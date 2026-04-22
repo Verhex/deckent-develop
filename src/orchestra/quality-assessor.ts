@@ -62,6 +62,13 @@ function assessCoverage(result: TaskResult): number {
   return Math.min(100, Math.round(cov));
 }
 
+/**
+ * Auxiliary directory prefixes — files here get partial credit (80/100)
+ * instead of 0 when outside the declared task scope.
+ * Sprint 151 D-5: Mirrors AUXILIARY_DIR_PREFIXES in result-evaluator.ts.
+ */
+const QA_AUXILIARY_PREFIXES = ['docs/', '.deckent/', '.tasks/', '.brain/', 'CHANGELOG', 'README'];
+
 function assessScopeAdherence(task: Task, result: TaskResult): number {
   if (!result.filesChanged || result.filesChanged.length === 0) return 100;
 
@@ -69,17 +76,23 @@ function assessScopeAdherence(task: Task, result: TaskResult): number {
   const allowedFiles = task.scope.filesWrite;
 
   let inScope = 0;
+  let auxiliary = 0;
   for (const file of result.filesChanged) {
     const isAllowed =
       allowedFiles.includes(file) ||
       allowedDirs.some(d => file.startsWith(d)) ||
       file.startsWith('.tasks/'); // heartbeat/result files always allowed
-    if (isAllowed) inScope++;
+    if (isAllowed) {
+      inScope++;
+    } else if (QA_AUXILIARY_PREFIXES.some(p => file.startsWith(p))) {
+      auxiliary++;
+    }
   }
 
-  return result.filesChanged.length > 0
-    ? Math.round((inScope / result.filesChanged.length) * 100)
-    : 100;
+  // D-5: Auxiliary files get 80 points instead of 0
+  const total = inScope * 100 + auxiliary * 80;
+  const max = result.filesChanged.length * 100;
+  return max > 0 ? Math.round((total / max) * 100) : 100;
 }
 
 function assessCompleteness(evaluation: string): number {

@@ -433,6 +433,91 @@ export function aggregateTokenUsage(results: TaskResult[]): {
   return { totalInputTokens, totalOutputTokens, totalCacheReadTokens, tasksWithTokenData };
 }
 
+// ─── Verification Task Detection (D-1) ─────────────────────────────
+
+/** Patterns that indicate a task is a verification/audit task (not a code-change task) */
+const VERIFICATION_TASK_PATTERNS: readonly RegExp[] = [
+  /\bverif(y|ication|ied)\b/i,
+  /\balready\s+implemented\b/i,
+  /\bsprint\s+\d+['']?de\s+yapıldı\b/i,
+  /\bsprint\s+\d+\s+(completed|done|finished)\b/i,
+  /\baudit\b/i,
+  /\bvalidat(e|ion)\s+(existing|current)\b/i,
+  /\bconfirm\s+(existing|that)\b/i,
+  /\bcheck\s+(that|if|whether)\b/i,
+];
+
+/**
+ * Detects whether a task is a verification/audit task that verifies existing work
+ * rather than producing new code changes.
+ *
+ * Verification tasks legitimately have filesChanged=[] and testsPassed=true
+ * because they only read and validate — they should not be penalized for
+ * not changing files.
+ *
+ * Sprint 151 D-1: Previously these tasks got NO_GO because correctness scored low
+ * when worker self-assessed as DONE but had no file changes.
+ */
+export function isVerificationTask(task: Task, result: TaskResult): boolean {
+  // Must have no file changes and tests passing
+  if ((result.filesChanged?.length ?? 0) > 0) return false;
+  if (!result.testsPassed) return false;
+
+  // Check task description for verification patterns
+  const description = (task.description ?? '').toLowerCase();
+  const title = (task.title ?? '').toLowerCase();
+  const notes = (result.notes ?? '').toLowerCase();
+  const textToCheck = `${description} ${title} ${notes}`;
+
+  return VERIFICATION_TASK_PATTERNS.some(pattern => pattern.test(textToCheck));
+}
+
+// ─── Result Schema Validation (D-2) ────────────────────────────────
+
+/**
+ * Validates that a worker result contains the required schema fields.
+ * Missing schema fields indicate the worker template was not followed correctly.
+ *
+ * Sprint 151 D-2: Workers must provide rubricScores, evaluationDecision, coverage.
+ * Missing fields → NO_GO with "schema violation" reason.
+ */
+export interface ResultSchemaValidation {
+  valid: boolean;
+  missingFields: string[];
+  reason: string;
+}
+
+export function validateResultSchema(result: TaskResult): ResultSchemaValidation {
+  const missingFields: string[] = [];
+
+  if (typeof result.coverage !== 'number') {
+    missingFields.push('coverage');
+  }
+
+  if (!result.selfAssessment) {
+    missingFields.push('selfAssessment');
+  }
+
+  if (typeof result.testsPassed !== 'boolean') {
+    missingFields.push('testsPassed');
+  }
+
+  if (!result.taskId) {
+    missingFields.push('taskId');
+  }
+
+  if (!Array.isArray(result.filesChanged)) {
+    missingFields.push('filesChanged');
+  }
+
+  const valid = missingFields.length === 0;
+  const reason = valid
+    ? 'Result schema valid'
+    : `Schema violation: missing required fields [${missingFields.join(', ')}]`;
+
+  return { valid, missingFields, reason };
+}
+
 // ─── Rubric-Based Evaluation ────────────────────────────────────────
 
 /** Default rubric used when no custom rubric is provided */
@@ -501,6 +586,27 @@ export function scoreTestCoverage(result: TaskResult): RubricScore {
   return { criterion: 'test_coverage', score, passed: score >= 50, reason: reasons.join('; ') };
 }
 
+/**
+ * Auxiliary directory prefixes — files in these directories are considered
+ * "task-intent compatible" even if they're outside the declared scope.
+ *
+ * Sprint 151 D-5: Workers touching docs/, .deckent/ etc. alongside their
+ * primary scope shouldn't get scope_compliance=0. Instead, auxiliary files
+ * get a -20 penalty (scored as 80) rather than 0.
+ */
+const AUXILIARY_DIR_PREFIXES = [
+  'docs/',
+  '.deckent/',
+  '.tasks/',
+  '.brain/',
+  'CHANGELOG',
+  'README',
+];
+
+function isAuxiliaryFile(filePath: string): boolean {
+  return AUXILIARY_DIR_PREFIXES.some(prefix => filePath.startsWith(prefix));
+}
+
 /** Score scope compliance by checking filesChanged against task scope */
 export function scoreScopeCompliance(result: TaskResult, task: Task): RubricScore {
   const dirs = task.scope?.directories ?? [];
@@ -512,18 +618,33 @@ export function scoreScopeCompliance(result: TaskResult, task: Task): RubricScor
   }
 
   let inScope = 0;
+  let auxiliary = 0;
   for (const file of changed) {
     const inDir = dirs.some(d => file.startsWith(d));
     const inWrite = writeFiles.some(w => file === w);
-    if (inDir || inWrite) inScope++;
+    if (inDir || inWrite) {
+      inScope++;
+    } else if (isAuxiliaryFile(file)) {
+      auxiliary++;
+    }
   }
 
-  const score = Math.round((inScope / changed.length) * 100);
+  // D-5: Auxiliary files get partial credit (80 per file) instead of 0
+  // Formula: (inScope * 100 + auxiliary * 80) / (changed.length * 100) * 100
+  const totalScore = inScope * 100 + auxiliary * 80;
+  const maxScore = changed.length * 100;
+  const score = Math.round((totalScore / maxScore) * 100);
+
+  const parts: string[] = [`${inScope}/${changed.length} files within scope`];
+  if (auxiliary > 0) {
+    parts.push(`${auxiliary} auxiliary files (partial credit)`);
+  }
+
   return {
     criterion: 'scope_compliance',
     score,
     passed: score >= 80,
-    reason: `${inScope}/${changed.length} files within scope`,
+    reason: parts.join('; '),
   };
 }
 
@@ -576,6 +697,38 @@ export function evaluateWithRubric(
   task: Task,
   rubric?: Partial<EvaluationRubric>,
 ): EvaluationResult {
+  // D-2: Schema validation — reject results with missing required fields
+  const schemaCheck = validateResultSchema(result);
+  if (!schemaCheck.valid) {
+    return {
+      decision: 'NO_GO',
+      totalScore: 0,
+      rubricScores: [{
+        criterion: 'schema_validation',
+        score: 0,
+        passed: false,
+        reason: schemaCheck.reason,
+      }],
+      retryCount: 0,
+    };
+  }
+
+  // D-1: Verification task fast-path — tasks that verify existing work
+  // should get DONE when filesChanged=[] + testsPassed=true + description matches
+  if (isVerificationTask(task, result)) {
+    return {
+      decision: 'DONE',
+      totalScore: 100,
+      rubricScores: [
+        { criterion: 'correctness', score: 100, passed: true, reason: 'verification task — tests passed, existing work confirmed' },
+        { criterion: 'test_coverage', score: 100, passed: true, reason: 'verification task — no new code to cover' },
+        { criterion: 'scope_compliance', score: 100, passed: true, reason: 'verification task — no files changed (expected)' },
+        { criterion: 'documentation', score: 100, passed: true, reason: 'verification task — notes provided' },
+      ],
+      retryCount: 0,
+    };
+  }
+
   const merged: EvaluationRubric = {
     criteria: rubric?.criteria ?? DEFAULT_RUBRIC.criteria,
     passingScore: rubric?.passingScore ?? DEFAULT_RUBRIC.passingScore,
@@ -1084,6 +1237,41 @@ export type {
   CodeVerifyOptions,
   CodeVerifyResult,
 } from '../monitor/auditor.js';
+
+// ─── FIX Context Enrichment (D-3) ──────────────────────────────────
+
+/**
+ * Build an enriched reason string for FIX tasks that includes specific
+ * rubric scores and failure details instead of generic "Task X NO_GO".
+ *
+ * Sprint 151 D-3: FIX workers need concrete failure context to break
+ * the retry loop. Generic reasons like "Task X evaluated as NO_GO"
+ * provide no actionable information.
+ */
+export function buildEnrichedFixReason(
+  taskId: string,
+  result: TaskResult,
+  rubricResult?: EvaluationResult,
+): string {
+  const parts: string[] = [`Task ${taskId} evaluated as NO_GO`];
+
+  if (rubricResult) {
+    parts.push(`totalScore=${rubricResult.totalScore}`);
+    for (const score of rubricResult.rubricScores) {
+      if (!score.passed) {
+        parts.push(`${score.criterion}=${score.score} (FAILED, reason: ${score.reason})`);
+      }
+    }
+  }
+
+  if (!result.testsPassed) parts.push('tests failed');
+  if ((result.filesChanged?.length ?? 0) === 0) parts.push('no files changed');
+  if (result.notes && result.notes.length > 0) {
+    parts.push(`worker notes: "${result.notes.slice(0, 200)}"`);
+  }
+
+  return parts.join('; ');
+}
 
 /** Parse NO_GO rate and coverage from a sprint log markdown table */
 function parseSprintStats(content: string): { noGoRate: number; coverage: number } | null {

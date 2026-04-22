@@ -122,14 +122,34 @@ export function handleEvaluation(
   // NO_GO — keep locks, create fix task
   updateTaskStatus(projectRoot, task.id, TaskStatus.NO_GO);
 
+  // D-3: Build enriched fix context with specific failure details
+  const fixReasonParts: string[] = [`Task ${task.id} evaluated as NO_GO`];
+  if (result.rubricScores) {
+    const rs = result.rubricScores;
+    if (typeof rs.correctness === 'number') fixReasonParts.push(`correctness=${rs.correctness}`);
+    if (typeof rs.test_coverage === 'number') fixReasonParts.push(`test_coverage=${rs.test_coverage}`);
+    if (typeof rs.scope_compliance === 'number') fixReasonParts.push(`scope_compliance=${rs.scope_compliance}`);
+  }
+  if (!result.testsPassed) fixReasonParts.push('tests failed');
+  if ((result.filesChanged?.length ?? 0) === 0) fixReasonParts.push('no files changed');
+  const enrichedReason = fixReasonParts.join('; ');
+
+  const fixDescription = [
+    `Priority fix for NO_GO task ${task.id}.`,
+    result.notes ? `Original worker notes: ${result.notes.slice(0, 500)}` : '',
+    result.rubricScores ? `Rubric: correctness=${result.rubricScores.correctness ?? '?'}, test_coverage=${result.rubricScores.test_coverage ?? '?'}, scope_compliance=${result.rubricScores.scope_compliance ?? '?'}` : '',
+    `Expected scope: ${(task.scope?.directories ?? []).join(', ')}`,
+    `Files that should change: ${(task.scope?.filesWrite ?? []).join(', ')}`,
+  ].filter(Boolean).join('\n');
+
   const fixTask: Task = {
     id: `${task.id}-fix`,
     title: `Fix: ${task.title}`,
-    description: `Priority fix for NO_GO task ${task.id}. Notes: ${result.notes}`,
+    description: fixDescription,
     model: task.model,
     effort: task.effort,
     priority: 'CRITICAL',
-    reason: `Task ${task.id} evaluated as NO_GO`,
+    reason: enrichedReason,
     scope: task.scope,
     dependencies: [],
     goNogo: task.goNogo,

@@ -643,9 +643,18 @@ describe('scoreScopeCompliance', () => {
     expect(score.passed).toBe(true);
   });
 
-  it('returns 0 when all files are out of scope', () => {
+  it('returns partial score when auxiliary files are out of scope (D-5 relaxation)', () => {
     const task = makeTask(['src/core/']);
     const result = makeResult({ filesChanged: ['docs/README.md', 'package.json'] });
+    const score = scoreScopeCompliance(result, task);
+    // D-5: docs/README.md gets 80 (auxiliary), package.json gets 0 → (80+0)/(200)*100 = 40
+    expect(score.score).toBe(40);
+    expect(score.passed).toBe(false);
+  });
+
+  it('returns 0 when all files are fully out of scope (no auxiliary)', () => {
+    const task = makeTask(['src/core/']);
+    const result = makeResult({ filesChanged: ['src/agents/worker.ts', 'package.json'] });
     const score = scoreScopeCompliance(result, task);
     expect(score.score).toBe(0);
     expect(score.passed).toBe(false);
