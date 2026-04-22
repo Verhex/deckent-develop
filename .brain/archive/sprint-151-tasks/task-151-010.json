@@ -1,0 +1,90 @@
+{
+  "id": "151-010",
+  "title": "CLI buildProgram Smoke Test Harness",
+  "description": "CLI buildProgram Smoke Test Harness\n\n- Model: opus\n- Effort: normal\n- Skills: typescript-expert, testing-expert\n- Files: tests/cli/buildProgram-smoke.test.ts (NEW), scripts/cli-smoke-test.sh (NEW)\n- Scope: tests/cli/, scripts/\n\n### Description\n\nSprint 149 T-149-019 CLI publish duplicate regression nedeniyle 49 komut broken oldu. Bir daha olmasın diye CI-level smoke test harness.\n\n**`tests/cli/buildProgram-smoke.test.ts`:**\n```typescript\nimport { buildProgram } from '../../src/cli/index.js';\n\ndescribe('buildProgram smoke', () => {\n  it('does not throw on commander register', () => {\n    expect(() => buildProgram()).not.toThrow();\n  });\n\n  it('registers all 49 commands without duplicates', () => {\n    const program = buildProgram();\n    const commands = program.commands.map(c => c.name());\n    const duplicates = commands.filter((c, i) => commands.indexOf(c) !== i);\n    expect(duplicates).toEqual([]);\n    expect(commands.length).toBeGreaterThanOrEqual(49);\n  });\n});\n```\n\n**`scripts/cli-smoke-test.sh`:**\n- `npx deckent --help` exit 0\n- Her top-level command için `npx deckent <cmd> --help` exit 0\n- Output: JSON rapor, CI fail trigger\n\n**Kanıt:** Test PASS + script exit 0 + CI workflow (`.github/workflows/cli-smoke.yml`) tetikleme.\n\n---",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "tests/cli/",
+      "scripts/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "tests/cli/buildProgram-smoke.test.ts (NEW)",
+      "scripts/cli-smoke-test.sh (NEW)",
+      "tests/cli/buildProgram-smoke.test.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; `npx deckent --help` exit 0; *Kanıt:** Test PASS + script exit 0 + CI workflow (`.github/workflows/cli-smoke.yml`) tetikleme.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-151",
+  "forceModel": "opus",
+  "forceEffort": "normal",
+  "forceSkills": [
+    "typescript-expert",
+    "testing-expert"
+  ],
+  "assignedAgent": "temp-react-ts-specialist",
+  "assignedSkills": [
+    "typescript-expert",
+    "testing-expert"
+  ],
+  "createdAt": "2026-04-22T05:59:27.923Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "implementation",
+        "secondary": [],
+        "confidence": 0.95
+      },
+      "tags": [
+        "test-coverage"
+      ],
+      "domains": [
+        {
+          "name": "cli",
+          "weight": 0.6
+        },
+        {
+          "name": "scripts",
+          "weight": 0.4
+        }
+      ],
+      "operations": [
+        {
+          "type": "create",
+          "weight": 0.75
+        },
+        {
+          "type": "test",
+          "weight": 0.25
+        }
+      ],
+      "complexity": {
+        "fileCount": 3,
+        "moduleCount": 2,
+        "crossCutting": true,
+        "estimatedSize": "medium"
+      },
+      "scope": {
+        "writeRatio": {
+          "tests/": 0.67,
+          "scripts/": 0.33
+        },
+        "primaryWriteTarget": "tests/",
+        "testWriteRatio": 0.67
+      }
+    },
+    "confidence": "low",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-22T06:49:37.196Z"
+}

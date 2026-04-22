@@ -1,0 +1,45 @@
+# Task 151-002 Execution Plan
+# Public Repo Flip — VerhexIO/deckent-dev → VerhexIO/deckent
+
+## Hedef
+- ../deckent-public dizini var mı kontrol et
+- Varsa: public-repo-sync.sh ile rsync + commit (git push YOK)
+- Yoksa: Alperen handoff'unda açıkla
+- docs/release/public-repo-flip-handoff.md üret
+
+## Adımlar
+
+### 1. Ön Kontrol
+- [ ] ../deckent-public dizini var mı?
+- [ ] scripts/public-repo-sync.sh çalışıyor mu?
+- [ ] docs/release/public-repo-manifest.md exclude listesi güncel mi?
+
+### 2. Sync (../deckent-public varsa)
+- [ ] Dry-run ile test et
+- [ ] Live sync (--dry-run olmadan)
+- [ ] git add -A + commit (push YOK)
+- [ ] git log -1 ile doğrula
+
+### 3. public-repo-manifest.md Güncelle
+- [ ] COMPETITIVE-ANALYSIS.md kararını netleştir (exclude et — iç strateji belgesi)
+- [ ] Eksik exclude pattern'leri ekle
+- [ ] Sprint 151 tarih bilgisini güncelle
+
+### 4. Handoff Dökümanı
+- [ ] docs/release/public-repo-flip-handoff.md oluştur
+- [ ] Sync özet (dosya sayısı, MB, exclude raporu)
+- [ ] Gizli dosya audit sonucu
+- [ ] Commit SHA + diff stat
+- [ ] Alperen'in 4 elle adımı
+- [ ] Rollback plan
+
+### 5. Verify
+- [ ] tsc --noEmit (kaynak değiştirmedik ama kontrol et)
+- [ ] vitest run (test değiştirmedik ama kontrol et)
+- [ ] .result dosyasını yaz
+
+## Kısıtlar
+- git push YASAK
+- gh repo edit --visibility YASAK
+- GitHub API visibility değişikliği YASAK
+- mkdir ../deckent-public YASAK (Alperen elle yapacak)

@@ -1,0 +1,101 @@
+{
+  "id": "151-011",
+  "title": "49 CLI Komut Tam Envanter + Smoke",
+  "description": "49 CLI Komut Tam Envanter + Smoke\n\n- Model: opus\n- Effort: high\n- Skills: typescript-expert, documentation-writer\n- Files: docs/reference/cli-commands.md (NEW), tests/cli/cli-inventory.test.ts (NEW)\n- Scope: docs/reference/, tests/cli/\n\n### Description\n\nAlperen direktifi: \"tüm cli komutlarına tektek analiz çalışağıcaz\"\n\n**`docs/reference/cli-commands.md`:**\n- 49 CLI komut envanteri (otomatik `buildProgram().commands` parse)\n- Her komut için: name + description + options + example usage + related MCP tool (ADR-022-V2 parity)\n\n**`tests/cli/cli-inventory.test.ts`:**\n- 49 komut × 3 test senaryo = 147 smoke test\n  - `--help` exit 0\n  - Invalid arg → error (graceful fail, 0 crash)\n  - Basic happy path (env-independent)\n\n**Kanıt:** Inventory md 49 komut listelenmiş + ~147 test PASS.\n\n---",
+  "model": "opus",
+  "effort": "high",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "docs/reference/",
+      "tests/cli/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "docs/reference/cli-commands.md (NEW)",
+      "tests/cli/cli-inventory.test.ts (NEW)",
+      "docs/reference/cli-commands.md",
+      "tests/cli/cli-inventory.test.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** Inventory md 49 komut listelenmiş + ~147 test PASS.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-151",
+  "forceModel": "opus",
+  "forceEffort": "high",
+  "forceSkills": [
+    "typescript-expert",
+    "documentation-writer"
+  ],
+  "assignedAgent": "doc-writer",
+  "assignedSkills": [
+    "typescript-expert",
+    "documentation-writer"
+  ],
+  "createdAt": "2026-04-22T05:59:27.923Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "documentation",
+        "secondary": [
+          "config"
+        ],
+        "confidence": 0.82
+      },
+      "tags": [
+        "test-coverage"
+      ],
+      "domains": [
+        {
+          "name": "docs",
+          "weight": 0.5
+        },
+        {
+          "name": "cli",
+          "weight": 0.5
+        }
+      ],
+      "operations": [
+        {
+          "type": "create",
+          "weight": 0.43
+        },
+        {
+          "type": "document",
+          "weight": 0.29
+        },
+        {
+          "type": "test",
+          "weight": 0.14
+        },
+        {
+          "type": "configure",
+          "weight": 0.14
+        }
+      ],
+      "complexity": {
+        "fileCount": 4,
+        "moduleCount": 2,
+        "crossCutting": true,
+        "estimatedSize": "medium"
+      },
+      "scope": {
+        "writeRatio": {
+          "docs/": 0.5,
+          "tests/": 0.5
+        },
+        "primaryWriteTarget": "docs/",
+        "testWriteRatio": 0.5
+      }
+    },
+    "confidence": "high",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-22T06:49:42.032Z"
+}

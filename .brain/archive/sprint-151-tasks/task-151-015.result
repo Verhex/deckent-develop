@@ -1,0 +1,36 @@
+{
+  "taskId": "151-015",
+  "filesChanged": [
+    "src/nervous/detectors/build-failure-recurrence.ts",
+    "src/nervous/detectors/token-spike.ts",
+    "src/nervous/detectors/agent-routing-anomaly.ts",
+    "src/nervous/detectors/scope-collision-rate.ts",
+    "src/nervous/detectors/notification-delivery-health.ts",
+    "src/nervous/detector-registry.ts",
+    "tests/nervous/detectors/build-failure-recurrence.test.ts",
+    "tests/nervous/detectors/token-spike.test.ts",
+    "tests/nervous/detectors/agent-routing-anomaly.test.ts",
+    "tests/nervous/detectors/scope-collision-rate.test.ts",
+    "tests/nervous/detectors/notification-delivery-health.test.ts"
+  ],
+  "linesAdded": 820,
+  "linesRemoved": 5,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "DONE",
+  "notes": "5 yeni nervous system detector oluşturuldu (6→11 toplam): BuildFailureRecurrenceDetector, TokenSpikeDetector, AgentRoutingAnomalyDetector, ScopeCollisionRateDetector, NotificationDeliveryHealthDetector. DetectorRegistry güncellendi (config types + instantiation). 15 test yazıldı (5 dosya × 3 test). tsc --noEmit 0 error. Tüm nervous test suite 224/224 PASS. Her detector IDetector interface'ini uygular, mevcut pattern'a uygun event-driven + phase-gated tasarım kullanır.",
+  "tokenUsage": {
+    "inputTokens": 95000,
+    "outputTokens": 12000,
+    "cacheReadTokens": 45000,
+    "provider": "claude",
+    "model": "opus"
+  },
+  "rubricScores": {
+    "correctness": 95,
+    "test_coverage": 90,
+    "scope_compliance": 100,
+    "documentation": 80
+  },
+  "evaluationDecision": "DONE"
+}

@@ -1,14 +1,13 @@
 {
   "_meta": {
     "version": "2.0",
-    "generatedAt": "2026-04-21T11:20:23.239Z",
+    "generatedAt": "2026-04-22T06:59:34.750Z",
     "generatedBy": "scripts/sync-manifest.mjs",
-    "sprintId": "sprint-150",
+    "sprintId": "sprint-151",
     "description": "Feature usage manifest — auto-generated from src/ import graph analysis. Categories: active, lightly_used, dormant, dead.",
     "usageWindow": "last-10-sprints",
     "sourceAnalysis": {
       "sprintsChecked": [
-        "sprint-141",
         "sprint-142",
         "sprint-143",
         "sprint-144",
@@ -17,7 +16,8 @@
         "sprint-147",
         "sprint-148",
         "sprint-149",
-        "sprint-150"
+        "sprint-150",
+        "sprint-151"
       ],
       "methodology": "import-graph traversal + @deprecated markers + file existence + blockedBy annotations"
     }

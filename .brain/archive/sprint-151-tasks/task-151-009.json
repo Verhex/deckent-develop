@@ -1,0 +1,93 @@
+{
+  "id": "151-009",
+  "title": "DECKENT→USER:NOTIFY Runtime Smoke Test + Nervous Bridge E2E",
+  "description": "DECKENT→USER:NOTIFY Runtime Smoke Test + Nervous Bridge E2E\n\n- Model: opus\n- Effort: normal\n- Skills: typescript-expert, testing-expert\n- Files: tests/e2e/notify-sprint-lifecycle.test.ts (NEW), tests/e2e/nervous-bridge-delivery.test.ts (NEW)\n- Scope: tests/e2e/\n\n### Description\n\nHot Fix H6 canlı wire yaptı ama **E2E test eksik**. Alperen'in direktifi: \"nervous sistemi test edelim\".\n\n**Test 1 — Sprint Lifecycle (`tests/e2e/notify-sprint-lifecycle.test.ts`):**\n- Küçük 1-task sprint başlat (mock)\n- 5 event sırayla görünmeli: sprint-started → task-done → sprint-finalized (veya task-no-go)\n- Her event için: event stream `DECKENT→USER:NOTIFY` channel + dispatcher.dispatch çağrısı + adapter.send çağrısı (mock)\n\n**Test 2 — Nervous Bridge (`tests/e2e/nervous-bridge-delivery.test.ts`):**\n- Mock NervousNotification push (severity=critical, action=required)\n- NervousDispatcher.dispatch çağrılır → bridgeToUserNotify paralel fire\n- Assert: DECKENT→USER:NOTIFY event emit + human-checkpoint-required name\n\n**Kanıt:** 2 e2e test file + 10+ test, `npx vitest run tests/e2e/notify-*.test.ts` PASS.\n\n**Test:** Manuel ek — Sprint 151 sırasında sprint-started notification Alperen terminal'inde görünmeli (canlı kanıt log'da).\n\n---",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "tests/e2e/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "tests/e2e/notify-sprint-lifecycle.test.ts (NEW)",
+      "tests/e2e/nervous-bridge-delivery.test.ts (NEW)",
+      "tests/e2e/notify-sprint-lifecycle.test.ts",
+      "tests/e2e/nervous-bridge-delivery.test.ts",
+      ".test",
+      "test.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** 2 e2e test file + 10+ test, `npx vitest run tests/e2e/notify-*.test.ts` PASS.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-151",
+  "forceModel": "opus",
+  "forceEffort": "normal",
+  "forceSkills": [
+    "typescript-expert",
+    "testing-expert"
+  ],
+  "assignedAgent": "architect",
+  "assignedSkills": [
+    "typescript-expert",
+    "testing-expert"
+  ],
+  "createdAt": "2026-04-22T05:59:27.923Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "implementation",
+        "secondary": [],
+        "confidence": 0.95
+      },
+      "subIntent": "observer",
+      "tags": [
+        "test-coverage"
+      ],
+      "domains": [
+        {
+          "name": "e2e",
+          "weight": 0.71
+        }
+      ],
+      "operations": [
+        {
+          "type": "create",
+          "weight": 0.4
+        },
+        {
+          "type": "test",
+          "weight": 0.4
+        },
+        {
+          "type": "modify",
+          "weight": 0.2
+        }
+      ],
+      "complexity": {
+        "fileCount": 6,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "large"
+      },
+      "scope": {
+        "writeRatio": {
+          "tests/": 0.67,
+          "./": 0.33
+        },
+        "primaryWriteTarget": "tests/",
+        "testWriteRatio": 0.67
+      }
+    },
+    "confidence": "medium",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-22T06:49:32.381Z"
+}

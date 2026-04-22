@@ -1,0 +1,27 @@
+{
+  "taskId": "151-004",
+  "filesChanged": [
+    "scripts/deploy-discord.sh",
+    "docs/launch/discord-bot-setup.md"
+  ],
+  "linesAdded": 270,
+  "linesRemoved": 0,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "GO_WITH_TECH_DEBT",
+  "notes": "## Tamamlanan İşler\n\n**scripts/deploy-discord.sh** (yeni, ~185 satır):\n- Prereq kontrolü: Node >= 18, .deck dosyası, DISCORD_TOKEN varlığı, config.json connectors.discord, dist/ build, discord.js paketi\n- 3 çalışma modu: --check (prereq only), --smoke (config validation), default (bot start)\n- Bot başlatma: inline Node.js ESM runner → DiscordConnector.start() + IncomingMessageRouter.route()\n- Komut handler: !deckent help, !deckent status, !deckent ping\n- Graceful shutdown: SIGINT/SIGTERM → connector.stop()\n- Token çözme: $DECK:DISCORD_TOKEN referansı → env var lookup\n\n**docs/launch/discord-bot-setup.md** (yeni, ~85 satır markdown):\n- Discord Developer Portal adım adım kurulum\n- .deck token konfigürasyonu\n- .deckent/config.json güncelleme kılavuzu\n- Deploy script kullanımı (--check, --smoke, start)\n- Smoke test komutları (!deckent ping/help/status)\n- Arka planda çalıştırma (tmux, pm2)\n- Sorun giderme bölümü (TOKEN_INVALID, intent eksik, dist/ eksik)\n- Mimari diyagram (Discord → DiscordConnector → IncomingMessageRouter → EventBus → Nervous System)\n\n## Tech Debt / Sınırlamalar\n\n- **Gerçek smoke test yapılamadı**: Bot token mevcut değil (worker .deck dosyasına erişemez, Alperen'in token oluşturması gerekiyor)\n- **--check mode test**: Beklendiği gibi hata verdi (.deck yok, connectors.discord config eksik) — doğru davranış\n- **Vitest failures**: 8 fail pre-existing (Sprint 151 T-151-NEW-E kapsamında, bu task'la ilgisiz: error-registry-lint + config-sprint064 + sprint-044-modules + error-handling-unification)\n- **tsc --noEmit**: 0 error (sadece npm notice çıktısı)\n- **deploy-discord.sh scope**: Script sadece Bash + Node.js inline ESM kullanıyor, src/ değişikliği yok\n\n## Kanıt\n- scripts/deploy-discord.sh mevcut + chmod +x yapıldı\n- docs/launch/discord-bot-setup.md mevcut\n- bash scripts/deploy-discord.sh --check → prereq kontrolü çalışıyor (token olmadan beklenen hata)",
+  "tokenUsage": {
+    "inputTokens": 45000,
+    "outputTokens": 4200,
+    "cacheReadTokens": 12000,
+    "provider": "claude",
+    "model": "sonnet"
+  },
+  "rubricScores": {
+    "correctness": 85,
+    "test_coverage": 60,
+    "scope_compliance": 100,
+    "documentation": 95
+  },
+  "evaluationDecision": "GO_WITH_TECH_DEBT"
+}

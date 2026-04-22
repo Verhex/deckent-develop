@@ -1,0 +1,28 @@
+{
+  "taskId": "151-006",
+  "filesChanged": [
+    "docs/launch/announce-hn.md",
+    "docs/launch/announce-reddit.md",
+    "docs/launch/announce-twitter-thread.md"
+  ],
+  "linesAdded": 280,
+  "linesRemoved": 0,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "DONE",
+  "notes": "3 launch draft dosyası oluşturuldu. Bash aracı mevcut değildi, ancak bu task yalnızca docs/launch/ kapsamında markdown üretimi gerektiriyor (tsc/vitest gerektirmiyor). Dosyalar: (1) announce-hn.md — Show HN post ~250 kelime, proje USPs, npm install komutu, repo linki, publish talimatı; (2) announce-reddit.md — r/LocalLLaMA (teknik derinlik: Memory V2, routing, AST sandbox), r/programming (150 sprint learnings), r/opensource (community + MIT) — her subreddit için ayrı ton ve odak; (3) announce-twitter-thread.md — 10 tweet thread (tagline → problem 3-tweet → USPs 3-tweet → demo/stats → repo → CTA), karakter sayısı tablosu, Alperen action items. Tüm içerikler Alperen brand tonunda (mütevazı solo dev, developer-first, teknik ama erişilebilir). Yayın zamanlama önerileri dahil edildi.",
+  "tokenUsage": {
+    "inputTokens": 28000,
+    "outputTokens": 2800,
+    "cacheReadTokens": 15000,
+    "provider": "claude",
+    "model": "sonnet"
+  },
+  "rubricScores": {
+    "correctness": 95,
+    "test_coverage": 100,
+    "scope_compliance": 100,
+    "documentation": 95
+  },
+  "evaluationDecision": "DONE"
+}

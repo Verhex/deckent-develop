@@ -1,0 +1,24 @@
+# Task 151-014-fix Execution Plan
+
+## Analysis
+The original task 151-014 worker exited with code 0 but didn't write a .result file.
+Upon investigation, ALL required code changes for the Docker HB 3-sprint debt fix are
+already implemented in spawn-backend-docker.ts:
+
+1. **Partial-result write at startup** (line 207-210): Worker script writes .partial-result BEFORE Claude CLI starts
+2. **Configurable graceful timeout** (constructor + kill method): SIGTERM → grace → SIGKILL with configurable seconds
+3. **Host-side .partial-result promotion** (monitorContainer, line 482-509): Promotes to .result with OOM-specific notes
+4. **Corrupt JSON detection** (line 471-479): Detects and overwrites corrupt .result files
+5. **Docker logs drain** (line 549-558): Extracts logs BEFORE container removal
+6. **fsync from host side** (line 414-420): Belt-and-suspenders fsync after container exit
+
+## Verification
+- tsc --noEmit: 0 errors
+- docker-oom-reproducer.test.ts: 25/25 PASS
+- docker-hb.test.ts: 12/12 PASS
+- dockerfile.test.ts: 15/15 PASS
+- timeout-with-work.test.ts: 14/14 PASS
+- Total Docker tests: 66/66 PASS
+
+## Conclusion
+No code changes needed — all 3-layer fixes are already present. Result: DONE.

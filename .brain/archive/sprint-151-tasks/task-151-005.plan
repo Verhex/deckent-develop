@@ -1,0 +1,32 @@
+# Task 151-005: Telegram Bot Deploy + Smoke Test Plan
+
+## Objective
+Telegram bot deploy script + setup documentation production.
+
+## Approach
+
+1. **scripts/deploy-telegram.sh** — Deploy script:
+   - `.deck` dosyasından `TELEGRAM_TOKEN` okur (ADR-014 .deck Secret File System)
+   - Bot health check: Telegram Bot API `getMe` endpoint call
+   - Smoke test: `/start`, `/status`, `/help` komut simülasyonu
+   - Renk kodlu terminal çıktısı (PASS/FAIL)
+
+2. **docs/launch/telegram-bot-setup.md** — Setup guide:
+   - BotFather ile bot oluşturma adımları
+   - Token konfigürasyonu (`.deck` file)
+   - Deploy script çalıştırma
+   - Smoke test sonuçlarını doğrulama
+   - Rollback plan
+
+## Files to Create
+- `scripts/deploy-telegram.sh` (new)
+- `docs/launch/telegram-bot-setup.md` (new)
+
+## Expected Output
+- Deploy script çalıştırıldığında API token doğrulanır, bot info alınır
+- Setup guide, Alperen'in 10 dakika içinde okuyup botu canlıya alabileceği netlikte
+- Smoke test çıktısı: PASS/FAIL raporu
+
+## Verify Steps
+- `tsc --noEmit` → src/ içinde script yok, pass bekleniyor
+- `npx vitest run` → script için test yok, mevcut testler etkilenmemeli

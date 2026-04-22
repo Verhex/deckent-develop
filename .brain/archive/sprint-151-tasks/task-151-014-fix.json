@@ -1,0 +1,107 @@
+{
+  "id": "151-014-fix",
+  "title": "Fix: Docker HB + Vitest Timeout Nihai Fix (3-Sprint Debt Final)",
+  "description": "Priority fix for NO_GO task 151-014. Notes: Worker exited without writing result (exitCode=0)",
+  "model": "opus",
+  "effort": "high",
+  "priority": "CRITICAL",
+  "reason": "Task 151-014 evaluated as NO_GO",
+  "scope": {
+    "directories": [
+      "tests/docker/",
+      "tests/e2e/",
+      "src/orchestra/",
+      "src/agents/",
+      "tests/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/orchestra/spawn-backend-docker.ts",
+      "src/agents/worker.sh",
+      "tests/e2e/docker-oom-reproducer.test.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** `tests/e2e/docker-oom-reproducer.test.ts` PASS + Sprint 151 canlı Docker backend 0 timeout unhandled error.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-151",
+  "isPriorityFix": true,
+  "fixForTaskId": "151-014",
+  "createdAt": "2026-04-22T06:49:48.452Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "implementation",
+        "secondary": [
+          "documentation"
+        ],
+        "confidence": 0.95
+      },
+      "tags": [
+        "test-coverage"
+      ],
+      "domains": [
+        {
+          "name": "e2e",
+          "weight": 0.25
+        },
+        {
+          "name": "orchestra",
+          "weight": 0.25
+        },
+        {
+          "name": "agents",
+          "weight": 0.25
+        },
+        {
+          "name": "docker",
+          "weight": 0.13
+        }
+      ],
+      "operations": [
+        {
+          "type": "modify",
+          "weight": 0.25
+        },
+        {
+          "type": "test",
+          "weight": 0.25
+        },
+        {
+          "type": "document",
+          "weight": 0.25
+        },
+        {
+          "type": "create",
+          "weight": 0.25
+        }
+      ],
+      "complexity": {
+        "fileCount": 3,
+        "moduleCount": 4,
+        "crossCutting": true,
+        "estimatedSize": "large"
+      },
+      "scope": {
+        "writeRatio": {
+          "src/": 0.67,
+          "tests/": 0.33
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0.33
+      }
+    },
+    "confidence": "medium",
+    "routingVersion": "v2"
+  },
+  "assignedAgent": "architect",
+  "assignedSkills": [
+    "docker-expert"
+  ],
+  "estimatedTokens": 2056,
+  "updatedAt": "2026-04-22T06:55:30.183Z"
+}

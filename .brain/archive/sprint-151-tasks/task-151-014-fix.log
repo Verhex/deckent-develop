@@ -1,0 +1,8 @@
+`★ Insight ─────────────────────────────────────`
+**Task 151-014-fix tamamlandı — DONE.**
+
+Anahtar bulgular:
+1. **Kök neden**: Önceki worker (151-014) Claude CLI session sorunu yaşadı ve exit code 0 ile çıktı ama result yazmadı — bu bir **kod defekti değil**, worker runtime sorunuydu.
+2. **3-katmanlı Docker HB fix zaten tamam**: `spawn-backend-docker.ts` içinde `.partial-result` intermediate write, configurable graceful timeout, host-side promotion, corrupt JSON detection, docker logs drain ve host-side fsync hepsi implement edilmiş durumda.
+3. **Test durumu**: 66/66 Docker-ilgili test PASS (4 test dosyası), tsc 0 error.
+`─────────────────────────────────────────────────`

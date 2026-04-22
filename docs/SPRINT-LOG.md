@@ -4037,3 +4037,39 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 150-038: Sprint-Scoped MetricsJsonl Writer Wire-Up + status.ts Live Reader (T-150-030 Tamamlayıcısı) (DONE)
 
 ---
+## Sprint 151 — sprint-151
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-04-22
+**Duration:** 3362s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 17 |
+| Completed | 17 |
+| Tech Debt | 3 |
+| No-Go | 0 |
+| Coverage | 13.0% |
+| Duration | 3362181ms |
+
+### Tasks
+
+- 151-001: npm publish HAZIRLIK + Alperen Handoff (PUBLISH WORKER TARAFINDAN ÇALIŞTIRILMAZ) (DONE)
+- 151-002: Public Repo Flip — VerhexIO/deckent-dev → VerhexIO/deckent (GO_WITH_TECH_DEBT)
+- 151-003: Dashboard ChatPage.tsx (7. page) (DONE)
+- 151-004: Discord Bot Deploy + Smoke Test (GO_WITH_TECH_DEBT)
+- 151-005: Telegram Bot Deploy + Smoke Test (DONE)
+- 151-006: Show HN + Reddit + Twitter Announce Hazırlığı (DONE)
+- 151-007: Discord Server Launch + Initial Channel Structure (DONE)
+- 151-008: Dev.to + Hashnode Long-Form Post (DONE)
+- 151-009: DECKENT→USER:NOTIFY Runtime Smoke Test + Nervous Bridge E2E (DONE)
+- 151-010: CLI buildProgram Smoke Test Harness (DONE)
+- 151-011: 49 CLI Komut Tam Envanter + Smoke (DONE)
+- 151-012: Brain Evaluator 5-in-1 Fix (DONE)
+- 151-013: Vitest 9 Residual Fail Fix (DONE)
+- 151-014: Docker HB + Vitest Timeout Nihai Fix (3-Sprint Debt Final) (DONE)
+- 151-015: Nervous System 6-10 Detector Activation (Sprint 147 Plan) (GO_WITH_TECH_DEBT)
+
+---

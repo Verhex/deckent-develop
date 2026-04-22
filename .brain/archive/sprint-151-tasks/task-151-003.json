@@ -1,0 +1,102 @@
+{
+  "id": "151-003",
+  "title": "Dashboard ChatPage.tsx (7. page)",
+  "description": "Dashboard ChatPage.tsx (7. page)\n\n- Model: opus\n- Effort: high\n- Skills: typescript-expert, react-specialist, frontend-design\n- Files: src/dashboard/src/pages/ChatPage.tsx, src/dashboard/src/routes.tsx\n- Scope: src/dashboard/\n\n### Description\n\nDashboard'a 7. page: **Chat** — user Deckent ile konuşabilir (`deckent_style: \"task\"` mode'da), nervous system notification'ları canlı görür.\n\n**Bileşenler:**\n- `ChatInput` — user mesajı gönder (textarea + submit)\n- `ChatHistory` — mesaj listesi (user + assistant ayrımı)\n- `NotificationPanel` — DECKENT→USER:NOTIFY event stream'den son 10 event (SSE bağlantı `/api/events`)\n- `TaskContextSidebar` — `deckent_run` ile başlatılan task'ın canlı status'u\n\n**Route:** `/chat` — `routes.tsx`'e ekle\n\n**Test:** `npx vitest run --config src/dashboard/vitest.config.ts tests/dashboard/chat-page.test.tsx` → 5+ test (input, history render, SSE connect, task launch, notification panel).\n\n---",
+  "model": "opus",
+  "effort": "high",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "src/dashboard/src/pages/",
+      "src/dashboard/src/",
+      "src/dashboard/",
+      "tests/dashboard/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/dashboard/src/pages/ChatPage.tsx",
+      "src/dashboard/src/routes.tsx",
+      "vitest.config.ts",
+      "src/dashboard/vitest.config.ts",
+      "tests/dashboard/vitest.config.test.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean",
+    "noGoCriteria": "Build fails or tests fail",
+    "techDebtAcceptable": "Minor style issues if tests pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-151",
+  "provider": "claude",
+  "forceModel": "opus",
+  "forceEffort": "high",
+  "forceSkills": [
+    "typescript-expert",
+    "react-specialist",
+    "frontend-design"
+  ],
+  "assignedAgent": "temp-react-ts-specialist",
+  "assignedSkills": [
+    "typescript-expert",
+    "react-specialist",
+    "frontend-design"
+  ],
+  "createdAt": "2026-04-22T05:59:27.923Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "implementation",
+        "secondary": [
+          "config"
+        ],
+        "confidence": 0.95
+      },
+      "subIntent": "config",
+      "tags": [
+        "test-coverage"
+      ],
+      "domains": [
+        {
+          "name": "dashboard",
+          "weight": 0.89
+        }
+      ],
+      "operations": [
+        {
+          "type": "test",
+          "weight": 0.5
+        },
+        {
+          "type": "configure",
+          "weight": 0.25
+        },
+        {
+          "type": "create",
+          "weight": 0.25
+        }
+      ],
+      "complexity": {
+        "fileCount": 5,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "medium"
+      },
+      "scope": {
+        "writeRatio": {
+          "src/": 0.6,
+          "./": 0.2,
+          "tests/": 0.2
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0.2
+      }
+    },
+    "confidence": "low",
+    "routingVersion": "v2"
+  },
+  "estimatedTokens": 1374,
+  "updatedAt": "2026-04-22T06:49:00.955Z"
+}

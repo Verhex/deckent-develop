@@ -1,0 +1,95 @@
+{
+  "id": "151-005",
+  "title": "Telegram Bot Deploy + Smoke Test",
+  "description": "Telegram Bot Deploy + Smoke Test\n\n- Model: sonnet\n- Effort: normal\n- Skills: devops-engineer, typescript-expert\n- Files: scripts/deploy-telegram.sh, docs/launch/telegram-bot-setup.md\n- Scope: scripts/, docs/launch/\n\n### Description\n\nAynı Discord gibi ama Telegram (@BotFather ile bot create, token `.deck`).\n\n**Smoke test:**\n- `/start` — karşılama mesajı\n- `/status` — current sprint status\n- `/help` — komut listesi\n\n**Kanıt:** `@deckent_bot` (veya user name) Telegram'da canlı + 1 smoke test.\n\n---",
+  "model": "sonnet",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive (model: sonnet -- user override)",
+  "scope": {
+    "directories": [
+      "docs/launch/",
+      "scripts/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "scripts/deploy-telegram.sh",
+      "docs/launch/telegram-bot-setup.md"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** `@deckent_bot` (veya user name) Telegram'da canlı + 1 smoke test.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-151",
+  "forceModel": "sonnet",
+  "forceEffort": "normal",
+  "forceSkills": [
+    "devops-engineer",
+    "typescript-expert"
+  ],
+  "assignedAgent": "doc-writer",
+  "assignedSkills": [
+    "devops-engineer",
+    "typescript-expert"
+  ],
+  "createdAt": "2026-04-22T05:59:27.923Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "documentation",
+        "secondary": [],
+        "confidence": 0.77
+      },
+      "tags": [],
+      "domains": [
+        {
+          "name": "docs",
+          "weight": 0.5
+        },
+        {
+          "name": "scripts",
+          "weight": 0.5
+        }
+      ],
+      "operations": [
+        {
+          "type": "create",
+          "weight": 0.4
+        },
+        {
+          "type": "test",
+          "weight": 0.2
+        },
+        {
+          "type": "document",
+          "weight": 0.2
+        },
+        {
+          "type": "configure",
+          "weight": 0.2
+        }
+      ],
+      "complexity": {
+        "fileCount": 2,
+        "moduleCount": 2,
+        "crossCutting": true,
+        "estimatedSize": "medium"
+      },
+      "scope": {
+        "writeRatio": {
+          "scripts/": 0.5,
+          "docs/": 0.5
+        },
+        "primaryWriteTarget": "scripts/",
+        "testWriteRatio": 0
+      }
+    },
+    "confidence": "high",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-22T06:49:11.080Z"
+}

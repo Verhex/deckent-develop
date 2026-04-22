@@ -1,0 +1,83 @@
+{
+  "id": "151-007",
+  "title": "Discord Server Launch + Initial Channel Structure",
+  "description": "Discord Server Launch + Initial Channel Structure\n\n- Model: sonnet\n- Effort: normal\n- Skills: documentation-writer\n- Files: docs/launch/discord-server-setup.md, docs/launch/CONDUCT.md\n- Scope: docs/launch/\n\n### Description\n\n**Alperen: Discord server create** (Deckent Community).\n\n**Kanal yapısı:**\n- 📢 `#announcements` — Alperen + moderator\n- 💬 `#general` — community talk\n- 🐛 `#bug-reports` — issue triage\n- 🔧 `#help` — user questions\n- 🎨 `#skill-showcase` — hub skill'leri showcase\n- 🤖 `#deckent-bot` — bot commands + events\n\n**Moderation:** CONDUCT.md (kod benim olsa değiştirmem, standard OSS) + temel roller (admin, moderator, contributor, user).\n\n**Kanıt:** Server invite link, 6 kanal, roller set.\n\n---",
+  "model": "sonnet",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive (model: sonnet -- user override)",
+  "scope": {
+    "directories": [
+      "docs/launch/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "docs/launch/discord-server-setup.md",
+      "docs/launch/CONDUCT.md"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** Server invite link, 6 kanal, roller set.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-151",
+  "forceModel": "sonnet",
+  "forceEffort": "normal",
+  "forceSkills": [
+    "documentation-writer"
+  ],
+  "assignedAgent": "doc-writer",
+  "assignedSkills": [
+    "documentation-writer"
+  ],
+  "createdAt": "2026-04-22T05:59:27.923Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "documentation",
+        "secondary": [],
+        "confidence": 0.95
+      },
+      "tags": [],
+      "domains": [
+        {
+          "name": "docs",
+          "weight": 1
+        }
+      ],
+      "operations": [
+        {
+          "type": "create",
+          "weight": 0.33
+        },
+        {
+          "type": "document",
+          "weight": 0.33
+        },
+        {
+          "type": "configure",
+          "weight": 0.33
+        }
+      ],
+      "complexity": {
+        "fileCount": 2,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "small"
+      },
+      "scope": {
+        "writeRatio": {
+          "docs/": 1
+        },
+        "primaryWriteTarget": "docs/",
+        "testWriteRatio": 0
+      }
+    },
+    "confidence": "high",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-22T06:49:22.951Z"
+}

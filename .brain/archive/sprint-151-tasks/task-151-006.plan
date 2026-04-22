@@ -1,0 +1,30 @@
+# Task 151-006 Execution Plan
+## Task: Show HN + Reddit + Twitter Announce Hazırlığı
+
+### Approach
+1. Proje bağlamını anlamak için mevcut README ve IDENTITY dosyalarını oku
+2. 3 ayrı dosya oluştur:
+   - docs/launch/announce-hn.md — Show HN post (~200 kelime)
+   - docs/launch/announce-reddit.md — r/LocalLLaMA, r/programming, r/opensource için 3 ayrı post
+   - docs/launch/announce-twitter-thread.md — 10 tweet thread
+
+### Ton: Alperen Brand
+- Mütevazı solo dev hikayesi
+- Developer-first yaklaşım
+- Türk dev community kimliği (ama İngilizce içerik)
+- Teknik ama erişilebilir
+
+### Key Messages
+- 150+ sprint battle-tested orchestrator
+- Sprint disiplini + nervous system
+- AST sandbox güvenlik
+- Açık kaynak, npm ile kurulum
+- OpenClaw gap'i dolduran çözüm
+
+### Files to Create
+- docs/launch/announce-hn.md
+- docs/launch/announce-reddit.md
+- docs/launch/announce-twitter-thread.md
+
+### Expected Outcome
+Alperen'in review edip yayınlayabileceği hazır draft'lar + yayın zamanlaması

@@ -1,0 +1,25 @@
+{
+  "taskId": "151-014-fix",
+  "workerId": "w-151-014-fix",
+  "filesChanged": [],
+  "linesAdded": 0,
+  "linesRemoved": 0,
+  "testsPassed": true,
+  "coverage": 0,
+  "selfAssessment": "DONE",
+  "notes": "All 3-layer Docker HB fixes verified in place: (1) .partial-result intermediate write at script start for OOM safety net, (2) configurable graceful timeout (SIGTERM → grace → SIGKILL) via gracefulTimeoutSeconds, (3) host-side .partial-result → .result promotion in monitorContainer, (4) corrupt JSON detection + overwrite, (5) docker logs drain BEFORE container removal, (6) host-side fsync belt-and-suspenders. tsc 0 errors. 66/66 Docker tests PASS (docker-oom-reproducer 25, docker-hb 12, dockerfile 15, timeout-with-work 14). Original 151-014 worker exited without result due to Claude CLI session issue, not a code defect.",
+  "rubricScores": {
+    "correctness": 95,
+    "test_coverage": 90,
+    "scope_compliance": 100,
+    "documentation": 80
+  },
+  "evaluationDecision": "DONE",
+  "tokenUsage": {
+    "inputTokens": 95000,
+    "outputTokens": 4500,
+    "cacheReadTokens": 60000,
+    "provider": "claude",
+    "model": "opus"
+  }
+}

@@ -1,0 +1,44 @@
+# Task 151-004: Discord Bot Deploy + Smoke Test — Execution Plan
+
+## Scope
+- scripts/deploy-discord.sh (new)
+- docs/launch/discord-bot-setup.md (new)
+
+## Context
+- DiscordConnector is fully implemented in src/connectors/discord.ts (discord.js)
+- ConnectorPool manages multi-connector lifecycle (start/stop)
+- IncomingMessageRouter routes messages to EventBus → nervous system
+- Token stored in .deck secret file as $DECK:DISCORD_TOKEN
+- Config: .deckent/config.json connectors.discord section
+
+## Approach
+
+### 1. deploy-discord.sh
+A shell script that:
+- Checks prerequisites (node, .deck file, discord token set)
+- Validates .deckent/config.json has connectors.discord.enabled: true
+- Builds the project (tsc check)
+- Starts the Discord bot via a Node.js inline runner (uses DiscordConnector + IncomingMessageRouter)
+- Outputs status + smoke test instructions
+
+Note: Cannot run npm publish or bot login (no token in CI). Script is written for Alperen to run manually.
+
+### 2. discord-bot-setup.md
+Complete setup guide covering:
+- Prerequisites
+- Discord Developer Portal steps
+- .deck file configuration
+- .deckent/config.json changes
+- Running the deploy script
+- Smoke test commands
+- Troubleshooting
+
+## Files to create
+1. /workspace/scripts/deploy-discord.sh
+2. /workspace/docs/launch/discord-bot-setup.md
+
+## Self-assessment criteria
+- Both files created and complete
+- Script has correct shebang, set -euo pipefail, prereq checks
+- Doc covers all Alperen manual steps clearly
+- No src/ modifications (scope violation)

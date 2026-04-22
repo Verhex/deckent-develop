@@ -1,0 +1,27 @@
+# Task 151-003 Execution Plan — ChatPage.tsx (7th Dashboard Page)
+
+## Approach
+Build ChatPage with 4 sub-components inline (ChatInput, ChatHistory, NotificationPanel, TaskContextSidebar).
+Use existing patterns: useSSE hook for SSE, fetchJson/postJson for API, i18n for translations, Tailwind dark theme.
+
+## Files to Create/Modify
+1. `src/dashboard/src/pages/ChatPage.tsx` — NEW: Full chat page with 4 components
+2. `src/dashboard/src/App.tsx` — ADD: `/chat` route + import
+3. `src/dashboard/src/components/Layout.tsx` — ADD: Chat nav item
+4. `src/dashboard/src/i18n/en.ts` — ADD: chat.* translation keys
+5. `src/dashboard/src/i18n/tr.ts` — ADD: chat.* translation keys (Turkish)
+6. `tests/dashboard/chat-page.test.tsx` — NEW: 5+ tests
+
+## Design
+- ChatInput: Textarea + Send button, calls POST /api/chat with message
+- ChatHistory: Scrollable message list, user/assistant bubbles
+- NotificationPanel: SSE /api/events filtered for NOTIFY events, last 10
+- TaskContextSidebar: Shows running task status from SSE data
+- Layout: 2-column on desktop (chat left, sidebar right), stacked on mobile
+
+## Test Strategy
+- File exists check
+- Component structure verification (ChatInput, ChatHistory, NotificationPanel, TaskContextSidebar)
+- SSE connection pattern
+- i18n key usage
+- Route registration in App.tsx

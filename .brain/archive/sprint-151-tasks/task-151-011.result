@@ -1,0 +1,27 @@
+{
+  "taskId": "151-011",
+  "filesChanged": [
+    "docs/reference/cli-commands.md",
+    "tests/cli/cli-inventory.test.ts"
+  ],
+  "linesAdded": 680,
+  "linesRemoved": 0,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "DONE",
+  "notes": "45 top-level CLI commands + 59 subcommands = 104 command endpoints documented. cli-commands.md includes: Quick Reference table, per-command options, examples, MCP parity mapping (22/45 commands, 49% parity). Smoke test: 202 tests all PASS — command existence, descriptions, duplicates, subcommand registration, options presence, alias checks. Note: DIRECTIVES said '49 commands' but actual count is 45 top-level (config-nervous registers as config subcommand, not standalone). tsc --noEmit: 0 errors.",
+  "tokenUsage": {
+    "inputTokens": 85000,
+    "outputTokens": 12000,
+    "cacheReadTokens": 45000,
+    "provider": "claude",
+    "model": "opus"
+  },
+  "rubricScores": {
+    "correctness": 95,
+    "test_coverage": 90,
+    "scope_compliance": 100,
+    "documentation": 95
+  },
+  "evaluationDecision": "DONE"
+}

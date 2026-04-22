@@ -6,6 +6,35 @@ Bu projedeki tüm önemli değişiklikler bu dosyada belgelenmektedir.
 Format [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) standardına dayanır
 ve proje [Semantic Versioning](https://semver.org/spec/v2.0.0.html) kurallarına uyar.
 
+## [1.0.0-beta.1-sprint151] - 2026-04-22
+
+### Added
+
+- npm publish HAZIRLIK + Alperen Handoff (PUBLISH WORKER TARAFINDAN ÇALIŞTIRILMAZ)
+- Dashboard ChatPage.tsx (7. page)
+- Telegram Bot Deploy + Smoke Test
+- Show HN + Reddit + Twitter Announce Hazırlığı
+- Discord Server Launch + Initial Channel Structure
+- Dev.to + Hashnode Long-Form Post
+- DECKENT→USER:NOTIFY Runtime Smoke Test + Nervous Bridge E2E
+- CLI buildProgram Smoke Test Harness
+- 49 CLI Komut Tam Envanter + Smoke
+
+### Changed
+
+- Public Repo Flip — VerhexIO/deckent-dev → VerhexIO/deckent (completed with tech debt)
+- Discord Bot Deploy + Smoke Test (completed with tech debt)
+- Nervous System 6-10 Detector Activation (Sprint 147 Plan) (completed with tech debt)
+
+### Fixed
+
+- Brain Evaluator 5-in-1 Fix
+- Vitest 9 Residual Fail Fix
+- Docker HB + Vitest Timeout Nihai Fix (3-Sprint Debt Final)
+
+
+_Tasks: 17 total, 17 done, 3 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint150] - 2026-04-21
 
 ### Added

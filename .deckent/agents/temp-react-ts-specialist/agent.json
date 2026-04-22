@@ -33,10 +33,10 @@
   "enabled": true,
   "source": "learned",
   "stats": {
-    "totalUses": 28,
+    "totalUses": 32,
     "successRate": 1,
-    "avgCoverage": 3.5714285714285716,
-    "lastUsedInSprint": "sprint-150"
+    "avgCoverage": 3.125,
+    "lastUsedInSprint": "sprint-151"
   },
   "id": "temp-react-ts-specialist",
   "name": "React TypeScript Specialist",

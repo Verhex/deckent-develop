@@ -1,0 +1,34 @@
+# Task 151-013-fix Execution Plan
+
+## Baseline Analysis
+
+The 4 test files specified in this task's scope are ALL currently passing:
+
+1. tests/core/config-sprint064.test.ts — 11 tests PASS
+2. tests/integration/sprint-044-modules.test.ts — 17 tests PASS
+3. tests/core/error-handling-unification.test.ts — 160 tests PASS
+4. tests/core/error-registry-lint.test.ts — 31 tests PASS
+
+Total: 219 tests passing in scope.
+
+## Context
+
+The original task 151-013 was created to fix 9 residual failures described as:
+- 5 fail → H3 scope carry: `claude_backend` field removal tests
+- 3 fail → task-mode-runner.ts bare throw ErrorRegistry whitelist
+- 1 fail → docker-backend concurrent task IDs flaky race
+
+These issues have been resolved by prior hot-fix workers (Sprint 150A Hot Fix bundle).
+
+## Current State — Out-of-Scope Failures
+
+2 test files are currently failing but are OUT of this task's scope:
+1. tests/docs/jsdoc.test.ts — Missing JSDoc for validateResultSchema in result-evaluator.ts (src/ file)
+2. tests/e2e/docker-backend.test.ts — expects 'fsyncSync' in monitorContainer function
+
+These cannot be fixed by this task without violating scope boundaries.
+
+## Conclusion
+
+This task is a verification-type task — the original failures have been resolved by previous workers.
+No code changes required. Self-assessment: DONE (verification pass).

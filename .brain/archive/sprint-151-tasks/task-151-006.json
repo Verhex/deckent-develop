@@ -1,0 +1,84 @@
+{
+  "id": "151-006",
+  "title": "Show HN + Reddit + Twitter Announce Hazırlığı",
+  "description": "Show HN + Reddit + Twitter Announce Hazırlığı\n\n- Model: sonnet\n- Effort: high\n- Skills: documentation-writer\n- Files: docs/launch/announce-hn.md, docs/launch/announce-reddit.md, docs/launch/announce-twitter-thread.md\n- Scope: docs/launch/\n\n### Description\n\nLaunch kanalı başına draft hazırla:\n\n1. **Show HN post** (~200 kelime):\n   - Title: \"Show HN: Deckent — Open source AI orchestrator with sprint discipline + nervous system\"\n   - Body: tagline + USPs + 148 sprint battle-tested + solo dev + repo link + npm install komut\n\n2. **Reddit posts** (r/LocalLLaMA, r/programming, r/opensource):\n   - Her subreddit'e uygun ton (LocalLLaMA technical, programming developer-focused, opensource community-focused)\n\n3. **Twitter thread** (10 tweet):\n   - 1/ Tagline\n   - 2-4/ Problem (OpenClaw gap)\n   - 5-7/ USPs (Sprint + Nervous + AST)\n   - 8/ Demo GIF/screenshot\n   - 9/ Repo link\n   - 10/ CTA (star + install)\n\n**Ton:** Alperen brand — Türk dev community + developer-first + mütevazı solo dev hikayesi.\n\n**Kanıt:** 3 draft dosya + Alperen review + yayın zamanı planlandı.\n\n---",
+  "model": "sonnet",
+  "effort": "high",
+  "priority": "NORMAL",
+  "reason": "Directive (model: sonnet -- user override)",
+  "scope": {
+    "directories": [
+      "docs/launch/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "docs/launch/announce-hn.md",
+      "docs/launch/announce-reddit.md",
+      "docs/launch/announce-twitter-thread.md"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** 3 draft dosya + Alperen review + yayın zamanı planlandı.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-151",
+  "forceModel": "sonnet",
+  "forceEffort": "high",
+  "forceSkills": [
+    "documentation-writer"
+  ],
+  "assignedAgent": "doc-writer",
+  "assignedSkills": [
+    "documentation-writer"
+  ],
+  "createdAt": "2026-04-22T05:59:27.923Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "documentation",
+        "secondary": [],
+        "confidence": 0.95
+      },
+      "tags": [],
+      "domains": [
+        {
+          "name": "docs",
+          "weight": 1
+        }
+      ],
+      "operations": [
+        {
+          "type": "document",
+          "weight": 0.5
+        },
+        {
+          "type": "test",
+          "weight": 0.25
+        },
+        {
+          "type": "create",
+          "weight": 0.25
+        }
+      ],
+      "complexity": {
+        "fileCount": 3,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "medium"
+      },
+      "scope": {
+        "writeRatio": {
+          "docs/": 1
+        },
+        "primaryWriteTarget": "docs/",
+        "testWriteRatio": 0
+      }
+    },
+    "confidence": "high",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-22T06:49:18.060Z"
+}

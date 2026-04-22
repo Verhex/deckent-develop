@@ -1,0 +1,38 @@
+# Task 151-001 Execution Plan
+
+## Objective
+Produce `docs/release/npm-publish-handoff.md` — a complete pre-flight checklist + handoff document
+for Alperen to safely execute `npm publish --access public --tag beta`.
+
+## Allowed Actions
+- npm pack --dry-run ✓ (done)
+- npm whoami ✓ (done — NOT_LOGGED_IN in this env, expected)
+- npm info deckent ✓ (done — 404, package name is free)
+- cat package.json ✓ (done)
+
+## Findings
+
+### PASS
+1. `version: "1.0.0-beta.1"` in package.json ✓
+2. `engines.node: ">=18.0.0"` ✓
+3. `bin.deckent: "./dist/cli/entry.js"` ✓ + binary exists at dist/cli/entry.js ✓
+4. `files` whitelist present: ["dist", "bin", "README.md", "LICENSE"] ✓
+5. tarball size: 1.2 MB (< 2MB limit) ✓
+6. total files: 851 ✓
+7. NO sensitive files in tarball (.brain/, .deck, .deckent/, tests/, docs/audits/) ✓
+8. `npm info deckent` → 404 (package name FREE — Alperen can claim it) ✓
+9. CHANGELOG.md has [1.0.0-beta.1-sprint150] section ✓
+10. `dist/` compiled and present ✓
+
+### FAIL / ACTION REQUIRED
+1. `publishConfig.access: "public"` MISSING in package.json → needs to be added before publish
+2. `npm whoami` → NOT_LOGGED_IN (expected in CI env — Alperen must login locally)
+3. CHANGELOG.md root-level file shows "Latest: v0.4.0-beta.4" headline (stale) — minor
+
+## Steps
+1. Write execution plan (this file)
+2. Update heartbeat
+3. Write docs/release/npm-publish-handoff.md with all findings
+4. Update package.json to add publishConfig.access: "public" (within scope ./)
+5. Update CHANGELOG.md root-level headline to reflect v1.0.0-beta.1
+6. Write .tasks/task-151-001.result

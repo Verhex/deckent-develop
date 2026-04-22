@@ -1,0 +1,86 @@
+{
+  "id": "151-008",
+  "title": "Dev.to + Hashnode Long-Form Post",
+  "description": "Dev.to + Hashnode Long-Form Post\n\n- Model: sonnet\n- Effort: normal\n- Skills: documentation-writer\n- Files: docs/launch/blog-devto-launch.md, docs/launch/blog-hashnode-launch.md\n- Scope: docs/launch/\n\n### Description\n\n2 platform için ~1500 kelime long-form post:\n\n**İçerik:**\n1. Hook: \"I built an AI orchestrator over 150 sprints — here's what I learned\"\n2. Problem: OpenClaw gap (%20 malicious skill, no sprint discipline)\n3. Journey: solo dev, 6 ay Deckent yolculuğu, Memory V2 SQLite FTS5, AST sandbox, nervous system\n4. Technical highlights: 3-layer config, event stream ADR-035, RBAC authority matrix, Hibrit retention\n5. Result: v1.0.0-beta.1 open source launch\n6. Call to action: install, star, skill publish\n\n**Kanıt:** 2 draft + yayın zamanı (launch day T+2 saat).\n\n---\n\n# PAKET 2 — P0 RESIDUAL DEBT (7 task)",
+  "model": "sonnet",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive (model: sonnet -- user override)",
+  "scope": {
+    "directories": [
+      "docs/launch/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "docs/launch/blog-devto-launch.md",
+      "docs/launch/blog-hashnode-launch.md"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** 2 draft + yayın zamanı (launch day T+2 saat).",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-151",
+  "forceModel": "sonnet",
+  "forceEffort": "normal",
+  "forceSkills": [
+    "documentation-writer"
+  ],
+  "assignedAgent": "doc-writer",
+  "assignedSkills": [
+    "documentation-writer"
+  ],
+  "createdAt": "2026-04-22T05:59:27.923Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "documentation",
+        "secondary": [
+          "security",
+          "config"
+        ],
+        "confidence": 0.95
+      },
+      "tags": [],
+      "domains": [
+        {
+          "name": "docs",
+          "weight": 1
+        }
+      ],
+      "operations": [
+        {
+          "type": "document",
+          "weight": 0.5
+        },
+        {
+          "type": "configure",
+          "weight": 0.25
+        },
+        {
+          "type": "create",
+          "weight": 0.25
+        }
+      ],
+      "complexity": {
+        "fileCount": 2,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "small"
+      },
+      "scope": {
+        "writeRatio": {
+          "docs/": 1
+        },
+        "primaryWriteTarget": "docs/",
+        "testWriteRatio": 0
+      }
+    },
+    "confidence": "high",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-22T06:49:27.723Z"
+}

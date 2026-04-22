@@ -9,12 +9,6 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
-| debt-150-007 | Tech debt from 150-007: Docker Worker Exit Pattern Final Fix completed. 3 change | normal | sprint-150 | resolved |
-| debt-150-009 | Tech debt from 150-009: Auditor stale alert race condition fix was already imple | normal | sprint-150 | resolved |
-| debt-150-017 | Tech debt from 150-017: deckent-hub/ local dizin scaffold tamamlandı. Docker wor | normal | sprint-150 | resolved |
-| debt-150-026 | Tech debt from 150-026: npm pack --dry-run PASSES: tarball 1.08MB (<2MB limit),  | normal | sprint-150 | resolved |
-| debt-150-029 | Tech debt from 150-029: Feature Manifest Canlılaştırma — 7 adımlı plan tamamland | normal | sprint-150 | resolved |
-| debt-150-032 | Tech debt from 150-032: Implemented `deckent audit` + `deckent recover` CLI comm | normal | sprint-150 | resolved |
 | debt-debt-138-002 | Tech debt from 138-002: ADR-035 Brain ↔ Worker ↔ Auditor Verification Protocol S | normal | - | resolved |
 | debt-debt-138-008 | Tech debt from 138-008: Worker Honest Assessment Calibration v2 tamamlandı. 3 al | normal | - | resolved |
 | debt-141-003 | Tech debt from 141-003: src/cli/ analizi tamamlandı. 75 rapor dosyası oluşturuld | normal | - | resolved |
@@ -110,3 +104,14 @@ M | normal | - | resolved |
 | debt-146-010 | Tech debt from 146-010: Rubric system consolidated: (1) Removed rubricScores spe | normal | - | resolved |
 | debt-148-022 | Tech debt from 148-022: Docker Worker Exit Pattern root cause fixed. Problem: Co | normal | - | resolved |
 | debt-149-002 | Tech debt from 149-002: Created `deckent mode` CLI command with 5 subcommands: s | normal | - | resolved |
+| debt-150-007 | Tech debt from 150-007: Docker Worker Exit Pattern Final Fix completed. 3 change | normal | - | resolved |
+| debt-150-009 | Tech debt from 150-009: Auditor stale alert race condition fix was already imple | normal | - | resolved |
+| debt-150-017 | Tech debt from 150-017: deckent-hub/ local dizin scaffold tamamlandı. Docker wor | normal | - | resolved |
+| debt-150-026 | Tech debt from 150-026: npm pack --dry-run PASSES: tarball 1.08MB (<2MB limit),  | normal | - | resolved |
+| debt-150-029 | Tech debt from 150-029: Feature Manifest Canlılaştırma — 7 adımlı plan tamamland | normal | - | resolved |
+| debt-150-032 | Tech debt from 150-032: Implemented `deckent audit` + `deckent recover` CLI comm | normal | - | resolved |
+| debt-151-002 | Tech debt from 151-002: DURUM: ../deckent-public dizini mevcut değil — Alperen'i | normal | - | resolved |
+| debt-151-004 | Tech debt from 151-004: ## Tamamlanan İşler
+
+**scripts/deploy-discord.sh** (yeni | normal | - | resolved |
+| debt-151-015 | Tech debt from 151-015: 5 yeni nervous system detector oluşturuldu (6→11 toplam) | normal | - | resolved |

@@ -1,0 +1,109 @@
+{
+  "id": "151-012",
+  "title": "Brain Evaluator 5-in-1 Fix",
+  "description": "Brain Evaluator 5-in-1 Fix\n\n- Model: opus\n- Effort: high\n- Skills: typescript-expert, system-architect\n- Files: src/orchestra/result-evaluator.ts, src/orchestra/quality-assessor.ts, src/agents/worker.ts, tests/orchestra/evaluator-*.test.ts\n- Scope: src/orchestra/, src/agents/, tests/orchestra/\n\n### Description\n\nSprint 150 retro'da keşfedilen 5 Brain evaluator bug'ını tek task'ta fix:\n\n**D-1: Verification-task recognition**\n- `filesChanged: []` + `testsPassed: true` + \"already implemented\" keyword → DONE (şu an NO_GO veriliyor)\n- Heuristic: description içinde \"verify\", \"Sprint N'de yapıldı\", \"already implemented\" fuzzy match → verification task işareti\n\n**D-2: Worker result schema enforcement**\n- Worker template `src/agents/worker.ts` → `rubricScores`, `evaluationDecision`, `coverage` alanları zorunlu yaz\n- Brain validator reject'e — eksik schema result → NO_GO gerekçesi \"schema violation\"\n\n**D-3: FIX task context enrichment**\n- `reason: \"Task X evaluated as NO_GO\"` generic → somut: \"rubric.scope_compliance=0 (hedef ≥50), filesChanged empty ama description verification task değildi\"\n- FIX worker'a somut hata verilir, döngü kırılır\n\n**D-4: Global build inheritance fix**\n- Sprint ortası TSC fail → rubric düşüşü race condition\n- Çözüm: `scope_compliance` hesaplarken **task'ın kendi dosyaları** için `tsc` check (worker scope filter), global state göz ardı\n- Alternatif: Sprint-final snapshot TSC re-check\n\n**D-5: Scope compliance heuristic relaxation**\n- T-007/T-009 scope=0 pattern: worker `docs/`, `.deckent/` gibi OPSIONEL dosyalara dokundu diye 0\n- Heuristic: whitelist `docs/**`, `.deckent/**` — scope dışı ama TASK INTENT ile tutarlı ise -20 puan (0 yerine 80)\n\n**Test:** `tests/orchestra/evaluator-verification-task.test.ts` + `evaluator-schema.test.ts` + `evaluator-fix-context.test.ts` + `evaluator-scope-heuristic.test.ts` = 15+ test.\n\n---",
+  "model": "opus",
+  "effort": "high",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "src/orchestra/",
+      "src/agents/",
+      "tests/orchestra/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/orchestra/result-evaluator.ts",
+      "src/orchestra/quality-assessor.ts",
+      "src/agents/worker.ts",
+      "tests/orchestra/evaluator-*.test.ts",
+      ".test",
+      "test.ts",
+      "tests/orchestra/evaluator-verification-task.test.ts",
+      "evaluator-schema.test.ts",
+      "evaluator-fix-context.test.ts",
+      "evaluator-scope-heuristic.test.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean",
+    "noGoCriteria": "Build fails or tests fail",
+    "techDebtAcceptable": "Minor style issues if tests pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-151",
+  "forceModel": "opus",
+  "forceEffort": "high",
+  "forceSkills": [
+    "typescript-expert",
+    "system-architect"
+  ],
+  "assignedAgent": "architect",
+  "assignedSkills": [
+    "typescript-expert",
+    "system-architect"
+  ],
+  "createdAt": "2026-04-22T05:59:27.923Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "implementation",
+        "secondary": [
+          "documentation"
+        ],
+        "confidence": 0.95
+      },
+      "tags": [
+        "test-coverage"
+      ],
+      "domains": [
+        {
+          "name": "orchestra",
+          "weight": 0.46
+        },
+        {
+          "name": "agents",
+          "weight": 0.15
+        }
+      ],
+      "operations": [
+        {
+          "type": "create",
+          "weight": 0.33
+        },
+        {
+          "type": "test",
+          "weight": 0.33
+        },
+        {
+          "type": "modify",
+          "weight": 0.22
+        },
+        {
+          "type": "document",
+          "weight": 0.11
+        }
+      ],
+      "complexity": {
+        "fileCount": 10,
+        "moduleCount": 2,
+        "crossCutting": true,
+        "estimatedSize": "large"
+      },
+      "scope": {
+        "writeRatio": {
+          "src/": 0.3,
+          "tests/": 0.2,
+          "./": 0.5
+        },
+        "primaryWriteTarget": "./",
+        "testWriteRatio": 0.5
+      }
+    },
+    "confidence": "medium",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-22T06:49:48.447Z"
+}
