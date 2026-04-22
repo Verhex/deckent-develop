@@ -31,7 +31,7 @@ describe('Docker HB Deploy Wire — HB Write', () => {
     // The initial HB write section
     const initialHbSection = source.slice(
       source.indexOf('Write initial heartbeat'),
-      source.indexOf('monitorContainer'),
+      source.indexOf('Set up container monitoring'),
     );
     expect(initialHbSection).toContain('writeFileSync(hbPath');
     expect(initialHbSection).toContain('JSON.stringify');
@@ -62,19 +62,17 @@ describe('Docker HB Deploy Wire — HB Write', () => {
 // ─── Test Suite: SIGTERM Grace Period ─────────────────────────────────────
 
 describe('Docker HB Deploy Wire — SIGTERM Grace Period', () => {
-  it('docker stop uses 15s grace period (not 10s)', () => {
+  it('docker stop uses configurable grace period (default 15s)', () => {
     const source = readSource('spawn-backend-docker.ts');
-    expect(source).toContain("'stop', '--time=15'");
+    // Sprint 151: grace period is configurable via gracefulTimeoutSeconds
+    expect(source).toContain('DEFAULT_GRACEFUL_TIMEOUT_SECONDS = 15');
+    expect(source).toContain('`--time=${grace}`');
   });
 
-  it('docker stop timeout exceeds grace period (20s > 15s)', () => {
+  it('docker stop timeout exceeds grace period (grace + 5s buffer)', () => {
     const source = readSource('spawn-backend-docker.ts');
-    // The spawnSync timeout for docker stop must be > 15s grace
-    const stopSection = source.slice(
-      source.indexOf("'stop', '--time=15'"),
-      source.indexOf("'stop', '--time=15'") + 200,
-    );
-    expect(stopSection).toContain('timeout: 20_000');
+    // The spawnSync timeout for docker stop must be > grace period
+    expect(source).toContain('(grace + 5) * 1000');
   });
 });
 

@@ -396,17 +396,18 @@ describe('Docker HB Shutdown Bug Fix — worker script SIGTERM trap', () => {
 });
 
 describe('Docker HB Shutdown Bug Fix — Docker backend graceful stop', () => {
-  it('kill() uses --time=15 grace period (increased from 10)', () => {
+  it('kill() uses configurable grace period (default 15s)', () => {
     // Arrange
     const sourceContent = fs.readFileSync(
       path.join(process.cwd(), 'src/orchestra/spawn-backend-docker.ts'),
       'utf-8',
     );
 
-    // Assert — 15s grace period, not 10s
-    expect(sourceContent).toContain("'stop', '--time=15'");
+    // Assert — Sprint 151: grace period is configurable, default 15s
+    expect(sourceContent).toContain('DEFAULT_GRACEFUL_TIMEOUT_SECONDS = 15');
+    expect(sourceContent).toContain('`--time=${grace}`');
     // Timeout must be > grace period to avoid race
-    expect(sourceContent).toContain('timeout: 20_000');
+    expect(sourceContent).toContain('(grace + 5) * 1000');
   });
 
   it('kill() calls verifyResultAfterStop for post-stop verification', () => {

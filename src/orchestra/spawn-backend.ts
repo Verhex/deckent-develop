@@ -208,6 +208,9 @@ export interface SpawnBackendFactoryOptions {
 
   /** Docker container timeout in seconds (default: 1200 = 20 minutes) */
   dockerTimeoutSeconds?: number;
+
+  /** Docker graceful shutdown timeout in seconds (default: 15). SIGTERM → grace → SIGKILL. */
+  dockerGracefulTimeoutSeconds?: number;
 }
 
 /**
@@ -233,6 +236,7 @@ export class SpawnBackendFactory {
         image: opts.dockerImage,
         timeoutSeconds: opts.dockerTimeoutSeconds
           ?? (opts.defaultTimeoutMs ? Math.floor(opts.defaultTimeoutMs / 1000) : undefined),
+        gracefulTimeoutSeconds: opts.dockerGracefulTimeoutSeconds,
       });
     }
 
@@ -252,6 +256,7 @@ export class SpawnBackendFactory {
         image: opts.dockerImage,
         timeoutSeconds: opts.dockerTimeoutSeconds
           ?? (opts.defaultTimeoutMs ? Math.floor(opts.defaultTimeoutMs / 1000) : undefined),
+        gracefulTimeoutSeconds: opts.dockerGracefulTimeoutSeconds,
       });
     }
     if (SpawnBackendFactory.isTmuxAvailable()) {

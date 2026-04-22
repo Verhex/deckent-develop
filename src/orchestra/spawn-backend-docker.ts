@@ -20,6 +20,7 @@ const DEFAULT_IMAGE = 'deckent-worker:latest';
 /** @deprecated Use adaptive timeout via brainEstimateTimeout() + SpawnBackendOptions.taskTimeoutSeconds instead. Kept for backward compat fallback. */
 const DEFAULT_TIMEOUT_SECONDS = 1200; // 20 minutes
 const CONTAINER_WORKSPACE = '/workspace';
+const DEFAULT_GRACEFUL_TIMEOUT_SECONDS = 15;
 const CONTAINER_PREFIX = 'deckent-w-';
 
 // ─── Docker Spawn Backend ─────────────────────────────────────────────────
@@ -30,12 +31,14 @@ export class DockerSpawnBackend implements SpawnBackend {
   private readonly projectDir: string;
   private readonly image: string;
   private readonly timeoutSeconds: number;
+  private readonly gracefulTimeoutSeconds: number;
   private readonly containers = new Map<string, { containerId: string; model: string }>(); // taskId → container info
 
-  constructor(projectDir: string, opts?: { image?: string; timeoutSeconds?: number }) {
+  constructor(projectDir: string, opts?: { image?: string; timeoutSeconds?: number; gracefulTimeoutSeconds?: number }) {
     this.projectDir = resolve(projectDir);
     this.image = opts?.image ?? DEFAULT_IMAGE;
     this.timeoutSeconds = opts?.timeoutSeconds ?? DEFAULT_TIMEOUT_SECONDS;
+    this.gracefulTimeoutSeconds = opts?.gracefulTimeoutSeconds ?? DEFAULT_GRACEFUL_TIMEOUT_SECONDS;
   }
 
   /**
@@ -130,6 +133,8 @@ export class DockerSpawnBackend implements SpawnBackend {
       '  if [ -f "$RFILE" ]; then',
       '    fsync_file "$RFILE"',
       '    fsync_file "$HBFILE"',
+      // Sprint 151: Clean up .partial-result — no longer needed when .result is present
+      '    rm -f "$PRFILE" 2>/dev/null',
       '    kill $HB_PID 2>/dev/null',
       '    return',
       '  fi',
@@ -175,14 +180,19 @@ export class DockerSpawnBackend implements SpawnBackend {
       '  fi',
       '  fsync_file "$RFILE"',
       '  fsync_file "$HBFILE"',
+      // Sprint 151: Clean up .partial-result — EXIT trap wrote a proper .result
+      '  rm -f "$PRFILE" 2>/dev/null',
       '  kill $HB_PID 2>/dev/null',
       '}',
     ].join('\n');
 
+    // Sprint 151: .partial-result path — intermediate checkpoint for OOM kill recovery
+    const partialResultPath = `${CONTAINER_WORKSPACE}/${TASKS_DIR}/task-${taskId}.partial-result`;
     const scriptContent = [
       '#!/bin/sh',
       `RFILE="${resultPath}"`,
       `HBFILE="${hbContainerPath}"`,
+      `PRFILE="${partialResultPath}"`,
       // POSIX-portable fsync: copy file to itself via dd conv=fsync
       // This forces OS buffer cache → disk. Survives SIGKILL after return.
       'fsync_file() { [ -f "$1" ] && dd if="$1" of="$1.fsync" bs=4096 conv=fsync 2>/dev/null && mv "$1.fsync" "$1" 2>/dev/null; }',
@@ -191,6 +201,13 @@ export class DockerSpawnBackend implements SpawnBackend {
       // Ensure session-env exists (Claude CLI requires it)
       `mkdir -p "${containerHome}/.claude" 2>/dev/null || true`,
       `touch "${containerHome}/.claude/session-env" 2>/dev/null || true`,
+      // Sprint 151: Write .partial-result BEFORE Claude CLI starts — OOM kill safety net.
+      // If container is SIGKILL'd (OOM), this file survives on the shared volume.
+      // Host-side monitorContainer promotes it to .result with NO_GO_PARTIAL assessment.
+      `cat > "$PRFILE" <<PARTIALEOF`,
+      `{"taskId":"${taskId}","selfAssessment":"NO_GO","notes":"Worker started but did not complete — partial-result written at startup. If you see this, the container was likely OOM-killed or force-stopped before Claude CLI could write a .result.","partialMarker":true,"tokenUsage":{"inputTokens":0,"outputTokens":0,"cacheReadTokens":0,"provider":"claude","model":"${model}"}}`,
+      'PARTIALEOF',
+      'fsync_file "$PRFILE"',
       // EXIT trap: Sprint 145 — calls on_exit() which detects partial work via git diff
       'trap on_exit EXIT',
       // SIGTERM trap: on graceful stop, fsync .result immediately (before grace period expires)
@@ -200,6 +217,8 @@ export class DockerSpawnBackend implements SpawnBackend {
       'HB_PID=$!',
       `TIMEOUT=\${TASK_TIMEOUT:-${effectiveTimeout}}`,
       `timeout $TIMEOUT ${claudeCmd} < "${CONTAINER_WORKSPACE}/${TASKS_DIR}/${promptFileName}" || echo "WORKER_TIMEOUT" > "${timeoutPath}"`,
+      // Sprint 151: Clean up .partial-result on normal exit — on_exit/EXIT trap handles abnormal exit
+      'rm -f "$PRFILE" 2>/dev/null',
     ].join('\n');
     writeFileSync(scriptHostPath, scriptContent, { mode: 0o755 });
 
@@ -302,12 +321,13 @@ export class DockerSpawnBackend implements SpawnBackend {
    */
   kill(taskId: string): void {
     const containerName = `${CONTAINER_PREFIX}${taskId}`;
-    debugLog('docker-backend:kill', `taskId=${taskId} (graceful stop --time=15)`);
+    const grace = this.gracefulTimeoutSeconds;
+    debugLog('docker-backend:kill', `taskId=${taskId} (graceful stop --time=${grace})`);
 
     try {
-      // Graceful: SIGTERM + 15s grace period (Sprint 139: was 10s, now 15s)
-      const stopResult = spawnSync('docker', ['stop', '--time=15', containerName], {
-        encoding: 'utf-8', timeout: 20_000, // 20s > 15s grace to avoid race
+      // Graceful: SIGTERM + configurable grace period (Sprint 151: was hardcoded 15s, now configurable)
+      const stopResult = spawnSync('docker', ['stop', `--time=${grace}`, containerName], {
+        encoding: 'utf-8', timeout: (grace + 5) * 1000, // grace + 5s buffer to avoid race
       });
       if (stopResult.status !== 0) {
         // Fallback: send SIGTERM (not SIGKILL) so EXIT trap can still run
@@ -457,6 +477,40 @@ export class DockerSpawnBackend implements SpawnBackend {
           try { unlinkSync(resultPath); } catch { /* ok */ }
           // Fall through to the fallback writer below
         }
+      }
+
+      // Sprint 151: Promote .partial-result → .result when container died without writing .result
+      // This catches OOM kills (exit 137) where SIGKILL bypasses all shell traps but the
+      // .partial-result file written at script start survives on the shared volume.
+      const partialPath = join(tasksDir, `task-${taskId}.partial-result`);
+      if (!existsSync(resultPath) && exitCode !== 0 && existsSync(partialPath)) {
+        try {
+          const partialRaw = readFileSync(partialPath, 'utf-8');
+          const partial = JSON.parse(partialRaw) as Record<string, unknown>;
+          // Enrich with exit code and signal info
+          const signalInfo = exitCode > 128 ? ` signal=${exitCode - 128}` : '';
+          const isOom = exitCode === 137;
+          partial.notes = isOom
+            ? `Container OOM-killed (exit 137, SIGKILL). Partial-result promoted by host monitor. No .result was written by worker.`
+            : `Container killed (exitCode=${exitCode}${signalInfo}). Partial-result promoted by host monitor.`;
+          partial.exitCode = exitCode;
+          partial.selfAssessment = 'NO_GO';
+          const enrichedResult = JSON.stringify(partial);
+          writeFileSync(resultPath, enrichedResult, 'utf-8');
+          const fd = openSync(resultPath, 'r');
+          try { fsyncSync(fd); } finally { closeSync(fd); }
+          try { unlinkSync(partialPath); } catch { /* ok */ }
+          debugLog('docker-backend:partial-promote', `taskId=${taskId} exitCode=${exitCode} → promoted .partial-result to .result`);
+        } catch (e) {
+          debugLog('docker-backend:partial-promote-error', `taskId=${taskId} ${e}`);
+          // Fall through to host fallback below
+          try { unlinkSync(partialPath); } catch { /* ok */ }
+        }
+      }
+
+      // Clean up .partial-result if .result already exists (normal exit or promoted above)
+      if (existsSync(partialPath)) {
+        try { unlinkSync(partialPath); } catch { /* ok */ }
       }
 
       if (!existsSync(resultPath) && exitCode !== 0) {
