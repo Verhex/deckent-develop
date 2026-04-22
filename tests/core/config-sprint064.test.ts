@@ -74,8 +74,8 @@ describe('A) autoMigrateOnLoad', () => {
       // The migrated file should now contain memory_budget (original value preserved)
       const updated = JSON.parse(readFileSync(configFile, 'utf-8')) as Record<string, unknown>;
       expect(updated['memory_budget']).toBe(400); // original value preserved
-      // New fields added
-      expect('brain_provider' in updated).toBe(true);
+      // New fields added (brain_provider was replaced by providers.brain in Sprint 150)
+      expect('providers' in updated).toBe(true);
     } finally {
       cleanupTmp(configFile);
     }
@@ -104,8 +104,9 @@ describe('A) autoMigrateOnLoad', () => {
     } as Record<string, unknown>;
     const { config, addedFields } = migrateConfigInMemory(existing);
     expect(config.memory_budget).toBe(999); // original preserved
-    expect(addedFields).toContain('brain_provider');
-    expect(config.brain_provider).toBe('claude'); // default filled
+    // brain_provider was replaced by providers.brain in Sprint 150
+    expect(addedFields).toContain('providers');
+    expect((config as unknown as Record<string, unknown>)['providers']).toBeDefined();
   });
 });
 

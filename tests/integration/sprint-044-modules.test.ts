@@ -290,13 +290,13 @@ describe('Config roundtrip', () => {
     expect(config).toHaveProperty('telemetry_enabled');
     expect(config).toHaveProperty('detected_env');
     expect(config).toHaveProperty('auth_mode');
-    expect(config).toHaveProperty('claude_backend');
+    // claude_backend removed in Sprint 150 (use spawn_backend instead)
+    expect(config).not.toHaveProperty('claude_backend');
 
     // Default values
     expect(config.output_splash).toBe(true);
     expect(config.telemetry_enabled).toBe(false);
     expect(config.auth_mode).toBe('subscription');
-    expect(config.claude_backend).toBe('tmux');
   });
 
   it('config with custom values survives JSON roundtrip', () => {
