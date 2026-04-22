@@ -37,32 +37,60 @@ Sprint 151 Deckent'in **public launch sprint**'i. 15 task = 8 Beta GA cutover + 
 
 # PAKET 1 — BETA GA CUTOVER (8 task)
 
-## Task 1: npm publish v1.0.0-beta.1
+## Task 1: npm publish HAZIRLIK + Alperen Handoff (PUBLISH WORKER TARAFINDAN ÇALIŞTIRILMAZ)
 
 - Model: sonnet
 - Effort: normal
 - Skills: devops-engineer
-- Files: package.json, CHANGELOG.md
-- Scope: ./
+- Files: package.json, CHANGELOG.md, docs/release/npm-publish-handoff.md
+- Scope: ./, docs/release/
+
+### KRİTİK — npm publish YASAK (feedback_npm_publish_alperen_approval)
+
+> **Worker `npm publish` ÇALIŞTIRAMAZ.** Hiçbir tag, hiçbir versiyon için. Bu task `npm publish` HAZIRLIĞI yapar — Alperen'in elle çalıştıracağı tek komut için gerekli tüm kanıt + checklist'i toplar. Beta öncesi npm publish pipeline'ı tam kapsamlı düzenlenecek (Sprint 152+ candidate). Sebep: irreversible (72h unpublish policy + cache + npx kalıcılığı), brand güvenliği, pipeline reform planı.
 
 ### Description
 
-`npm publish --access public` dry-run önce (zaten T-150-026'da PASS), sonra gerçek publish.
+Bu task **hazırlık + handoff dökümantasyonu** üretir. Sprint 151 sonunda Alperen'in elle çalıştıracağı tek komut: `npm publish --access public --tag beta`.
 
-**Pre-flight:**
-1. `npm pack --dry-run` tarball < 2MB, 0 warning
-2. `package.json` version == `1.0.0-beta.1` + `publishConfig.access: "public"`
-3. `npm whoami` login check — Alperen NPM account
-4. CHANGELOG.md v1.0.0-beta.1 section yazılmış mı
+**İzin verilen komutlar (worker):**
+- `npm pack --dry-run` (tarball içerik + boyut kontrolü)
+- `npm whoami` (Alperen account login check)
+- `npm info deckent` (mevcut versiyon kontrolü)
+- `cat package.json` (version + publishConfig validation)
 
-**Execution:**
-```bash
-npm publish --access public --tag beta
-```
+**Yasak komutlar (worker):**
+- `npm publish` (her form, her tag, her zaman)
+- CI auto-publish job ekleme
 
-**Kanıt:** `npm info deckent@1.0.0-beta.1 version` → `1.0.0-beta.1`
+**Pre-flight checklist (worker üretir):**
+1. `npm pack --dry-run` → tarball < 2MB, 0 warning, dosya listesi gizli pattern içermez (`.brain/`, `.deck`, `.deckent/`, `DECKENT-MASTER-BLUEPRINT.md`, `DECKENT-ANA-PLAN-TR.md`, `tests/`, `docs/audits/`)
+2. `package.json`:
+   - `version: "1.0.0-beta.1"` ✓
+   - `publishConfig.access: "public"` ✓
+   - `files` whitelist mevcut (gizli sızıntı koruması)
+   - `engines.node: ">=18"` ✓
+   - `bin` doğru (`deckent` CLI binary path)
+3. `npm whoami` → Alperen NPM account onaylı (`alperensartacoglu` veya configured username)
+4. CHANGELOG.md v1.0.0-beta.1 section yazılmış (Sprint 150 + Hot Fix bundle özeti)
+5. `npm info deckent` → mevcut versiyon kontrolü (deckent paket adı boş veya Alperen'e ait)
 
-**Test:** Fresh tmp project: `npx deckent@beta init` → `.deckent/` dizini oluşturmalı, 15 agent + 21 skill bundle'da olmalı (T-150-031 kanıt).
+**Handoff çıktısı:** `docs/release/npm-publish-handoff.md` — Alperen'in 5 dakika içinde okuyup karar verebileceği rapor:
+- Pre-flight checklist (her satır PASS/FAIL + kanıt)
+- Tarball içerik özeti (dosya sayısı, MB, gizli pattern raporu)
+- "Alperen elle çalıştırması gereken komut: `npm publish --access public --tag beta`"
+- Rollback plan (yanlış publish durumunda 72h `npm unpublish` window + alternatif: `npm deprecate`)
+- Post-publish doğrulama: `npm info deckent@1.0.0-beta.1 version` + smoke test (`npx deckent@beta init` fresh tmp dir)
+
+**Kanıt (worker):** `docs/release/npm-publish-handoff.md` mevcut + her checklist satırı PASS + tarball boyut/dosya raporu eklenmiş.
+
+**Test:** Worker `npm pack` ile üretilen tarball'ı geçici dizinde extract eder + içerik audit eder (gizli dosya yok, bin executable, README doğru). PASS olduğunda Alperen onayı bekler.
+
+**Alperen'in sırası (sprint sonrası):**
+1. `docs/release/npm-publish-handoff.md` oku
+2. Checklist tüm yeşil ise → terminalde elle: `npm publish --access public --tag beta`
+3. Doğrulama: `npm info deckent@1.0.0-beta.1 version`
+4. Smoke test: fresh tmp dir + `npx deckent@beta init`
 
 ---
 
@@ -74,22 +102,44 @@ npm publish --access public --tag beta
 - Files: scripts/public-repo-sync.sh (T-150-027 hazırladı), .gitignore
 - Scope: ./, scripts/
 
+### KRİTİK — git push + visibility flip ALPEREN'İN ELLE ADIMLARI
+
+> **Worker `git push` ÇALIŞTIRAMAZ + repo visibility değiştiremez.** Public flip irreversible (tweet/cache yayılır), `git push origin master` remote etkisi yaratır. Worker rsync + commit yapar, push + UI flip Alperen'in elle adımıdır.
+
 ### Description
 
-Public repo açılışı. `docs/release/public-repo-manifest.md`'deki exclude listesi uygulanır.
+Public repo açılışı **hazırlık + handoff**. `docs/release/public-repo-manifest.md`'deki exclude listesi uygulanır.
 
-**Adımlar:**
-1. `../deckent-public` clone (yoksa create, Alperen elle)
+**Worker adımları (otomatik):**
+1. `../deckent-public` dizini var mı kontrol (yoksa Alperen elle clone'lar — worker mkdir yapmaz)
 2. `scripts/public-repo-sync.sh` rsync ile exclude list uygulanır:
    - Exclude: `.brain/`, `.deckent/`, `.deck`, `DECKENT-MASTER-BLUEPRINT.md`, `DECKENT-ANA-PLAN-TR.md`, `node_modules/`, `dist/`, `.tasks/`, `.locks/`
    - Include: `src/`, `tests/`, `docs/` (audits hariç gizli), `README.md`, `LICENSE`, `CHANGELOG.md`, `CONTRIBUTING.md`
-3. `cd ../deckent-public && git add -A && git commit -m "feat: Deckent v1.0.0-beta.1 public launch"`
-4. Alperen repo visibility private → public flip (GitHub UI)
-5. `git push origin master`
+3. `cd ../deckent-public && git add -A && git commit -m "feat: Deckent v1.0.0-beta.1 public launch"` — **commit OK, push DEĞİL**
+4. Worker `git status` + `git log -1` ile commit doğrulaması yapar
+5. Worker `docs/release/public-repo-flip-handoff.md` üretir (Alperen handoff)
 
-**Kanıt:** `curl -s https://api.github.com/repos/VerhexIO/deckent` → `private: false`
+**Yasak komutlar (worker):**
+- `git push` (her remote, her branch)
+- `gh repo edit --visibility public` (GitHub CLI ile flip)
+- GitHub API çağrısı ile visibility değişikliği
 
-**Test:** Fresh clone: `git clone https://github.com/VerhexIO/deckent.git` + `cd deckent && npm install && npm run build` → 0 error.
+**Alperen elle adımları (sprint sonrası):**
+1. `cd ../deckent-public && git log -1` → worker commit'ini doğrula
+2. `git push origin master`
+3. GitHub UI: Settings → Danger Zone → Change visibility → Public
+4. **Doğrulama:** `curl -s https://api.github.com/repos/VerhexIO/deckent | jq '.private'` → `false`
+
+**Handoff çıktısı:** `docs/release/public-repo-flip-handoff.md`:
+- Sync özet (kaç dosya kopyalandı, kaç MB, exclude raporu)
+- Tarball içerik audit (gizli pattern sızıntısı yok)
+- Commit SHA + diff stat
+- Alperen elle 4 adımı (push + UI flip + doğrulama)
+- Rollback plan (yanlış public flip → private'a geri çevir, ama tweet/cache kalıcı uyarısı)
+
+**Kanıt (worker):** `../deckent-public/.git/refs/heads/master` mevcut + commit doğrulanmış + handoff dökümanı yazılmış.
+
+**Test (Alperen sprint sonrası):** Fresh clone `git clone https://github.com/VerhexIO/deckent.git` + `cd deckent && npm install && npm run build` → 0 error.
 
 ---
 
