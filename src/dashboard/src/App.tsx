@@ -7,6 +7,7 @@ import SettingsPage from "./pages/SettingsPage"; // redirects to /config
 import HistoryPage from "./pages/HistoryPage";
 import MemoryPage from "./pages/MemoryPage";
 import ConfigPage from "./pages/ConfigPage";
+import ChatPage from "./pages/ChatPage";
 
 function App() {
   return (
@@ -20,6 +21,7 @@ function App() {
               <Route path="/history" element={<HistoryPage />} />
               <Route path="/memory" element={<MemoryPage />} />
               <Route path="/config" element={<ConfigPage />} />
+              <Route path="/chat" element={<ChatPage />} />
             </Route>
           </Routes>
         </BrowserRouter>

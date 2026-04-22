@@ -1,6 +1,6 @@
 import { NavLink, Outlet } from "react-router-dom";
 import { useState } from "react";
-import { LayoutDashboard, History, Brain, Menu, SlidersHorizontal, Globe } from "lucide-react";
+import { LayoutDashboard, History, Brain, Menu, SlidersHorizontal, Globe, MessageCircle } from "lucide-react";
 import { cn } from "../lib/utils";
 import { Sheet, SheetTrigger, SheetContent } from "./ui/sheet";
 import { ScrollArea } from "./ui/scroll-area";
@@ -16,6 +16,7 @@ const navItems: ReadonlyArray<{ to: string; labelKey: TranslationKey; icon: type
   { to: "/history", labelKey: "nav.history", icon: History },
   { to: "/memory", labelKey: "nav.memory", icon: Brain },
   { to: "/config", labelKey: "nav.config", icon: SlidersHorizontal },
+  { to: "/chat", labelKey: "nav.chat", icon: MessageCircle },
 ];
 
 function NavLinks({ onNavigate }: { onNavigate?: () => void }) {

@@ -377,6 +377,22 @@ export const tr: Record<TranslationKey, string> = {
   'task_card.retry_history': 'Yeniden deneme geçmişi ({{n}})',
   'task_card.attempt_n': 'Deneme {{n}}',
 
+  // Chat Page
+  'nav.chat': 'Sohbet',
+  'chat.title': 'Deckent ile Sohbet',
+  'chat.input_placeholder': 'Bir mesaj yazın...',
+  'chat.send': 'Gönder',
+  'chat.empty': 'Deckent ile bir sohbet başlatın.',
+  'chat.error_response': 'Yanıt alınamadı. Lütfen tekrar deneyin.',
+  'chat.notifications': 'Bildirimler',
+  'chat.no_notifications': 'Henüz bildirim yok.',
+  'chat.task_context': 'Görev Bağlamı',
+  'chat.no_active_sprint': 'Aktif sprint yok.',
+  'chat.sprint': 'Sprint',
+  'chat.phase': 'Faz',
+  'chat.progress': 'İlerleme',
+  'chat.active_tasks': 'Aktif Görevler',
+
   // Common
   'common.loading': 'Yükleniyor...',
   'common.error': 'Hata',

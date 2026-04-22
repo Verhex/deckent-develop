@@ -375,6 +375,22 @@ export const en = {
   'task_card.retry_history': 'Retry history ({{n}})',
   'task_card.attempt_n': 'Attempt {{n}}',
 
+  // Chat Page
+  'nav.chat': 'Chat',
+  'chat.title': 'Chat with Deckent',
+  'chat.input_placeholder': 'Type a message...',
+  'chat.send': 'Send',
+  'chat.empty': 'Start a conversation with Deckent.',
+  'chat.error_response': 'Failed to get a response. Please try again.',
+  'chat.notifications': 'Notifications',
+  'chat.no_notifications': 'No notifications yet.',
+  'chat.task_context': 'Task Context',
+  'chat.no_active_sprint': 'No active sprint.',
+  'chat.sprint': 'Sprint',
+  'chat.phase': 'Phase',
+  'chat.progress': 'Progress',
+  'chat.active_tasks': 'Active Tasks',
+
   // Common
   'common.loading': 'Loading...',
   'common.error': 'Error',
