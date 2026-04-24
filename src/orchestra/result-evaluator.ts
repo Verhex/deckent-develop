@@ -451,16 +451,22 @@ const VERIFICATION_TASK_PATTERNS: readonly RegExp[] = [
  * Detects whether a task is a verification/audit task that verifies existing work
  * rather than producing new code changes.
  *
- * Verification tasks legitimately have filesChanged=[] and testsPassed=true
+ * Verification tasks legitimately have no SOURCE-CODE changes and testsPassed=true
  * because they only read and validate — they should not be penalized for
- * not changing files.
+ * not changing src/tests/lib. Writing doc/audit report files (e.g.
+ * docs/audits/sprint-NNN/*.md) is expected output and still qualifies.
  *
  * Sprint 151 D-1: Previously these tasks got NO_GO because correctness scored low
  * when worker self-assessed as DONE but had no file changes.
+ *
+ * Sprint 152 H2: filesChanged=[] was too strict — audit sprints legitimately
+ * write exactly one report file per task. Now the check is "no source-code
+ * changes" (src/, tests/, lib/), report files in docs/ are allowed.
  */
 export function isVerificationTask(task: Task, result: TaskResult): boolean {
-  // Must have no file changes and tests passing
-  if ((result.filesChanged?.length ?? 0) > 0) return false;
+  // No source-code changes (doc/audit reports in docs/ are OK)
+  const srcChanges = (result.filesChanged ?? []).some(f => isSourceCodeDir(f));
+  if (srcChanges) return false;
   if (!result.testsPassed) return false;
 
   // Check task description for verification patterns

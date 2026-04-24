@@ -199,13 +199,14 @@ export async function runPlanPhase(
 
     // Run beforeSprint hooks after planning (non-fatal)
     try {
-      await runHooks('beforeSprint', {
+      const ctx: BeforeSprintContext = {
         hook: 'beforeSprint',
         sprintId: sprint.id,
         tasks: sprint.tasks,
         config,
         projectRoot,
-      } satisfies BeforeSprintContext);
+      };
+      await runHooks('beforeSprint', ctx);
     } catch (e) { debugLog('runPlanPhase:beforeSprintHook', e); }
 
     // Create git safety point after planning but before workers spawn

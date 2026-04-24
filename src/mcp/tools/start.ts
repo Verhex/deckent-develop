@@ -5,6 +5,7 @@ import { writeFileSync, mkdirSync, rmSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadConfig } from '../../core/config.js';
+import { bootstrapProviders } from '../../core/provider.js';
 import { readContext, planSprint, BrainError } from '../../orchestra/brain.js';
 import { cleanOrphanIpcDirs } from '../../core/orphan-cleaner.js';
 import { debugLog } from '../../core/utils.js';
@@ -82,6 +83,15 @@ export function registerStartTool(server: McpServer): void {
 
         // Dry-run mode: plan only, no spawn
         if (dryRun) {
+          // Sprint 152 H4: Bootstrap provider registry so planSprint() can reach
+          // a provider adapter. CLI does this in commands/start.ts; MCP handler
+          // did not → "No providers registered" error. Idempotent on re-call.
+          try {
+            await bootstrapProviders(config);
+          } catch (e) {
+            debugLog('start:bootstrapProviders', e);
+          }
+
           const context = readContext(root);
           const recommendation: SprintSizeRecommendation = {
             size: 'full',

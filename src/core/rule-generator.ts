@@ -300,15 +300,15 @@ export async function regenerateRules(projectRoot: string): Promise<RuleGenerato
   // Try to load ADRs from memory DB
   const dbPath = join(projectRoot, '.brain', 'memory.db');
   if (existsSync(dbPath)) {
-    try {
-      // Dynamic import to avoid hard dependency on better-sqlite3 at module level
-      const { MemoryStore } = await import('./memory-store.js');
-      const store = new MemoryStore(dbPath);
-      adrs = store.getByType('adr');
-      store.close();
-    } catch {
-      // DB not available — generate without ADRs
-    }
+    // DB exists → ADR load MUST succeed. Silent catch here previously caused
+    // regression: better-sqlite3 native binding failure (host↔container glibc
+    // mismatch) returned adrs=[], which regenerated rules files stripped of
+    // ADR content (.claude/rules/{brain,auditor,worker-default}.md went from
+    // ~120 lines → ~15 lines). Loud failure preserves existing rules files.
+    const { MemoryStore } = await import('./memory-store.js');
+    const store = new MemoryStore(dbPath);
+    adrs = store.getByType('adr');
+    store.close();
   }
 
   return generateRules({ projectRoot, adrs });

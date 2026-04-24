@@ -2,6 +2,22 @@
 
 See [docs/CHANGELOG.md](docs/CHANGELOG.md) for the full changelog.
 
+## Unreleased — Hot Fix Day (Sprint 152.5, 2026-04-24)
+
+### Fixed (4 Beta GA launch blockers)
+- **Docker worker GLIBC mismatch (HF1)** — `Dockerfile.worker` base image `node:22-slim` → `node:24-trixie-slim` (Debian 13, glibc 2.41). better-sqlite3 NODE_MODULE_VERSION 137 native binding now loads in container. Memory V2 DB accessible to workers; `deckent://memory`, `deckent://debt`, `deckent://retro` MCP resources populated.
+- **Brain verification task detection (HF2)** — `isVerificationTask` in `result-evaluator.ts` relaxed from "no files changed" to "no source-code changes". Audit/verification tasks writing report files in `docs/` are now correctly classified as DONE instead of falling through to rubric coverage penalty → NO_GO.
+- **Rules regression fix (HF3)** — `rule-generator.ts::regenerateRules` no longer silently catches DB load failures. Silent catch previously caused `.claude/rules/{brain,auditor,worker-default}.md` to be regenerated with empty ADR set (stripped from ~120 lines to ~15). Loud failure preserves existing rules files.
+- **MCP dry-run provider init (HF4)** — `src/mcp/tools/start.ts` now calls `bootstrapProviders(config)` before `planSprint()`. Fixes "No providers registered" error when invoking `deckent_start --dry-run` via MCP. Restores CLI/MCP parity (ADR-022-v2).
+
+### Added
+- `docs/KNOWN_ISSUES.md` — backlog of tracked bugs, drifts, and deferred work (non-blocker items for Beta GA).
+
+### Known (non-blocker)
+See `docs/KNOWN_ISSUES.md` for the full list. Highlights: MCP tool count doc drift (22/23/27/31 → live 31), 11 nervous detectors implemented but not wired (planned Sprint 159), 20 seed skills use placeholder Ed25519 signatures (planned Sprint 153), Codex/Gemini CLI not installed (planned Sprint 164), `VerhexIO/deckent-dev` → `VerhexIO/deckent` repo flip pending Alperen manual.
+
+---
+
 ## Latest: v1.0.0-beta.1 (2026-04-22) — Beta GA Launch
 
 ### Sprint 150 + 150A Hot Fix — Beta GA Cutover

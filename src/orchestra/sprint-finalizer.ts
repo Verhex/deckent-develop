@@ -696,11 +696,12 @@ export async function finalizeSprint(
   // 8. Run afterSprint plugin hooks
   if (!opts?.skipHooks) {
     try {
-      await runHooks('afterSprint', {
+      const ctx: AfterSprintContext = {
         hook: 'afterSprint',
         sprint,
         projectRoot,
-      } satisfies AfterSprintContext);
+      };
+      await runHooks('afterSprint', ctx);
     } catch (e) { debugLog('finalizeSprint:afterSprintHook', e); }
   }
 
