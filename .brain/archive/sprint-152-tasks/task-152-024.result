@@ -1,0 +1,17 @@
+{
+  "taskId": "152-024",
+  "filesChanged": ["docs/audits/sprint-152/T-152-024-config-duplicate.md"],
+  "linesAdded": 201,
+  "linesRemoved": 0,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "DONE",
+  "notes": "Sprint 152 read-only audit — config integrity report (201 lines). Covered 5 directive axes + 2 additional findings. Key outcomes: (1) root-level max_workers is DEAD KEY — written by init-steps.ts but never read at runtime (all readers go through config.activeModeConfig.max_workers); recommended P0 fix to stop writing root-level and write mode-nested instead. (2) MODE_PRESETS ↔ DEFAULT_MODES duplication PARTIALLY RESOLVED by Sprint 150 (max_workers consolidated via MODE_PRESETS reference), but v1 brain_model/default_model/haiku_allowed/brain_planning still hard-coded in DEFAULT_MODES as v1/v2 bridge — T-151-NEW-H still open as P2 opsiyonel. (3) deckent_style: \"sprint\" toggle PASS — live, validated, sprint-controller guard active, mode CLI works. (4) ADR-004 3-layer merge PASS — defaults → global → project → env order correct (config.ts:676-757); global config missing on this system but fallback works. (5) .deck interpolation PASS — no leakage; 0 $DECK: placeholders in live config; connector tokens use it correctly. Extra findings: _auto_detected marker is dead-key in init-steps, KNOWN_DECK_KEYS list outdated vs connector usage (DISCORD/TELEGRAM/WHATSAPP tokens not listed). Sprint 150 Decision 3+4 duplicate key cleanup verified live (claude_backend + flat provider flags absent). tsc --noEmit passes with exit=0. git diff src/ tests/ empty — read-only enforced.",
+  "tokenUsage": {
+    "inputTokens": 46000,
+    "outputTokens": 4200,
+    "cacheReadTokens": 0,
+    "provider": "claude",
+    "model": "opus"
+  }
+}

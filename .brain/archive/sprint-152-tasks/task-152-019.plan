@@ -1,0 +1,35 @@
+# Task 152-019 Execution Plan
+
+**Type:** READ-ONLY audit — no source code changes
+**Output:** docs/audits/sprint-152/T-152-019-self-modifying-detector.md
+
+## Steps
+1. Locate and read `src/core/self-modifying-detector.ts` — LoC, exports, core API
+2. Locate and read tests: `tests/e2e/self-modifying-detector.test.ts` + any unit tests
+3. Run the tests for this detector (read-only execution)
+4. Grep for detector integration (imports of `self-modifying-detector` across codebase)
+5. Check ADR-039 status in `.brain/exports/decisions.md`
+6. Check Sprint 139 T-051/T-052 git history for origin
+7. Check Sprint 148 catastrophic lesson references in memory/retro
+8. Assess Sprint 152 self-modifying risk (READ-ONLY audit but reads .brain/)
+9. Locate Sprint 150A Hot Fix with Claude Subagents pattern (ROADMAP §11.11)
+10. Write audit report with [PASS|FAIL|...] findings + Sprint 153+ actions
+11. Write result file
+
+## Files to read (NO writes to src/ or tests/)
+- src/core/self-modifying-detector.ts
+- tests/e2e/self-modifying-detector.test.ts (if exists)
+- tests/**/*self-modifying*
+- .brain/exports/decisions.md (ADR-039)
+- docs/ROADMAP-GOD-LEVEL.md (§11.11)
+- .brain/RETRO.md (Sprint 148 lesson)
+
+## Expected output
+Markdown report with:
+- Summary
+- Detector LoC / API / integration points
+- Test pass/fail status
+- ADR-039 compliance status
+- Sprint 152 self-modifying risk assessment
+- Hot Fix pattern position
+- Sprint 153+ P0/P1/P2 actions

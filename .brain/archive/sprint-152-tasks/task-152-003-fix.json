@@ -1,0 +1,31 @@
+{
+  "id": "152-003-fix",
+  "title": "Fix: CLI Smoke Part 1 — Core Lifecycle (15 komut)",
+  "description": "Priority fix for NO_GO task 152-003.\nOriginal worker notes: READ-ONLY audit sprint. 15 CLI core lifecycle commands smoke-tested via `node dist/cli/entry.js <cmd>`. Result: 14/15 PASS, 1 DRIFT (`config read` subcommand missing but help-info advertises it). Report written to docs/audits/sprint-152/T-152-003-cli-core-lifecycle.md (210 lines, 15 command sections + 9 P0/P1/P2 action items + evidence tables). Key findings: (1) `init --dry-run` missing, (2) doctor still checks stale DECISIONS.md path post Memory V2 migration, (3) `config read` subcommand never \nRubric: correctness=95, test_coverage=90, scope_compliance=100\nExpected scope: docs/audits/sprint-152/\nFiles that should change: docs/audits/sprint-152/T-152-003-cli-core-lifecycle.md",
+  "model": "opus",
+  "effort": "high",
+  "priority": "CRITICAL",
+  "reason": "Task 152-003 evaluated as NO_GO; correctness=95; test_coverage=90; scope_compliance=100",
+  "scope": {
+    "directories": [
+      "docs/audits/sprint-152/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "docs/audits/sprint-152/T-152-003-cli-core-lifecycle.md"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** 15 komut × 5 satır bulgu = en az 75 satır rapor",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "NO_GO",
+  "sprintId": "sprint-152",
+  "isPriorityFix": true,
+  "fixForTaskId": "152-003",
+  "createdAt": "2026-04-24T12:51:35.555Z",
+  "estimatedTokens": 115,
+  "updatedAt": "2026-04-24T13:01:43.593Z"
+}

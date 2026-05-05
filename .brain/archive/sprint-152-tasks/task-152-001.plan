@@ -1,0 +1,18 @@
+# Task 152-001 Execution Plan
+
+## Goal
+Post-Migration Environment Delta Audit. READ-ONLY — only write the report file.
+
+## Files to Write
+- docs/audits/sprint-152/T-152-001-migration-delta.md
+
+## Approach
+1. Gather current system evidence: hostname, kernel, RAM, CPU, disk, WSL version, toolchain (gcc/g++/make/python3/node), better-sqlite3 NODE_MODULE_VERSION.
+2. Inspect old inventory file `wsl/claude-config-inventory.txt` (if exists) for before-state, or reconstruct from DIRECTIVES + migration doc.
+3. Inspect SYSTEM-MIGRATION-2026-04-22.md (9 sections).
+4. Count current auto-memory files at /tmp/deckent-home/.claude/projects/-workspace/memory/.
+5. Derive lost memory list from Sprint 138-151 retro/learnings in .brain/exports/memory.md + summary.md.
+6. Check MCP scope migration evidence.
+7. Write comprehensive report with 8 sections: Summary, Hardware Delta, WSL Config, Auto-Memory Loss, Toolchain, better-sqlite3 rebuild, MCP Scope, Sprint 153+ Actions.
+
+## No code changes — only docs/audits/sprint-152/T-152-001-migration-delta.md.

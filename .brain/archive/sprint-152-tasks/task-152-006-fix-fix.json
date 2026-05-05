@@ -1,0 +1,29 @@
+{
+  "id": "152-006-fix-fix",
+  "title": "Fix: Fix: CLI Smoke Part 4 — Nervous System + Audit + Feature + Mode (12+ komut)",
+  "description": "Priority fix for NO_GO task 152-006-fix.\nOriginal worker notes: Priority fix for spurious NO_GO on task 152-006. Root cause: docker worker OOM-killed AFTER writing 287-line report + DONE .result, but BEFORE container cleanup → brain evaluator picked up partial-result sentinel → flagged NO_GO. Fix worker re-verified all 7 PASS + 3 MISSING + 1 DRIFT + 1 SIDE_EFFECT + 2 expected-FAIL claims from original report via live CLI spot-checks (R1-R9): nervous 6 subcommands (no subscribe/status/config), Commander.js unknown-subcmd exit-0 (D3), 46 top-level cmd count, m\nExpected scope: docs/audits/sprint-152/\nFiles that should change: docs/audits/sprint-152/T-152-006-cli-nervous-audit.md",
+  "model": "opus",
+  "effort": "high",
+  "priority": "CRITICAL",
+  "reason": "Task 152-006-fix evaluated as NO_GO",
+  "scope": {
+    "directories": [
+      "docs/audits/sprint-152/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "docs/audits/sprint-152/T-152-006-cli-nervous-audit.md"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** 49 komut TOTAL coverage bu sprint sonunda kanıtlı, eksikler Sprint 153'e debt olarak taşınır",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "PENDING",
+  "sprintId": "sprint-152",
+  "isPriorityFix": true,
+  "fixForTaskId": "152-006-fix",
+  "createdAt": "2026-04-24T13:01:43.594Z"
+}

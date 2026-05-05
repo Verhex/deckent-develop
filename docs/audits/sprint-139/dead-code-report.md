@@ -1,6 +1,6 @@
 # Dead Code Audit Report — Sprint 139
 
-**Date:** 2026-04-22
+**Date:** 2026-04-24
 **Tool:** scripts/dead-code-audit.mjs
 **Scope:** src/ directory (read-only analysis)
 
@@ -42,7 +42,7 @@ These modules are deprecated but preserved by ADR decisions.
 ### src/orchestra/decision-engine.ts
 - **Lines:** 170
 - **Reason:** V1 DecisionOrchestrator — deprecated by ADR-028, kept as reference
-- **Imported by:** src/orchestra/decision-steps/scope-step.ts, src/orchestra/decision-steps/agent-step.ts, src/orchestra/decision-replay.ts, src/nervous/decision-engine.ts
+- **Imported by:** src/orchestra/decision-steps/agent-step.ts, src/orchestra/decision-steps/scope-step.ts, src/orchestra/decision-replay.ts, src/nervous/decision-engine.ts
 - **Action:** Keep — requires ADR amendment to remove
 
 ### src/orchestra/decision-replay.ts
@@ -71,7 +71,7 @@ No lightly-used modules found among known suspects.
 
 These suspects turned out to be actively used.
 
-- **src/orchestra/multi-agent.ts** — 2 importers (src/cli/helpers/cursor-config.ts, src/mcp/server.ts)
+- **src/orchestra/multi-agent.ts** — 2 importers (src/mcp/server.ts, src/cli/helpers/cursor-config.ts)
 
 ## Unused Export Sampling
 
@@ -80,26 +80,26 @@ Top 20 shown below (full list requires deeper analysis):
 
 | File | Export | Import Count |
 |------|--------|-------------|
-| src/orchestra/spawn-backend.ts | TmuxBackend | 0 |
-| src/orchestra/spawn-backend.ts | SpawnBackendFactoryOptions | 0 |
-| src/orchestra/decision-logger.ts | PersistedDecisionLog | 0 |
-| src/orchestra/task-builder.ts | DirectiveTaskSchema | 0 |
-| src/orchestra/task-builder.ts | DirectiveSchema | 0 |
-| src/orchestra/task-builder.ts | validateDirective | 0 |
-| src/orchestra/task-builder.ts | parseSkillsDirective | 0 |
-| src/orchestra/task-builder.ts | parseDependenciesDirective | 0 |
-| src/orchestra/task-builder.ts | parsePriorityDirective | 0 |
-| src/orchestra/task-builder.ts | maskCodeBlocks | 0 |
-| src/orchestra/task-builder.ts | parseBulletOrNumberedTasks | 0 |
-| src/orchestra/task-builder.ts | queryRelevantADRs | 0 |
-| src/orchestra/timeout-estimator.ts | TimeoutBreakdown | 0 |
-| src/orchestra/timeout-estimator.ts | estimateTaskLoC | 0 |
-| src/orchestra/result-collector.ts | estimateTokenUsage | 0 |
-| src/orchestra/result-collector.ts | enrichResultTokenUsage | 0 |
-| src/orchestra/parallel-pipeline.ts | PipelineTask | 0 |
-| src/orchestra/sprint-utils.ts | resolveMaxWorkersNumeric | 0 |
+| src/orchestra/handoff-protocol.ts | HandoffProtocol | 0 |
+| src/orchestra/rollback.ts | getDirtyFiles | 0 |
+| src/orchestra/rollback.ts | getCurrentCommitSha | 0 |
+| src/orchestra/rollback.ts | getCurrentBranch | 0 |
+| src/orchestra/rollback.ts | deleteSafetyPointFile | 0 |
+| src/orchestra/rollback.ts | loadSafetyPoint | 0 |
+| src/orchestra/mid-sprint-adapter.ts | RerouteResult | 0 |
+| src/orchestra/mid-sprint-adapter.ts | ReconciliationResult | 0 |
+| src/orchestra/mid-sprint-adapter.ts | ReconciliationDeps | 0 |
 | src/orchestra/promotion-pipeline.ts | PromotionCriteria | 0 |
 | src/orchestra/promotion-pipeline.ts | DemotionCriteria | 0 |
+| src/orchestra/promotion-pipeline.ts | PromotionResult | 0 |
+| src/orchestra/task-retry.ts | MAX_RETRY_COUNT | 0 |
+| src/orchestra/task-retry.ts | RETRY_BACKOFF_MS | 0 |
+| src/orchestra/task-retry.ts | RetryableTask | 0 |
+| src/orchestra/task-retry.ts | getRetryDelay | 0 |
+| src/orchestra/task-retry.ts | getRetryCount | 0 |
+| src/orchestra/task-retry.ts | createRetryTask | 0 |
+| src/orchestra/task-retry.ts | retryDelay | 0 |
+| src/orchestra/rule-evolver.ts | EvolutionResult | 0 |
 
 ## Recommendations
 

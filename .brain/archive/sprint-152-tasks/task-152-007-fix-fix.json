@@ -1,0 +1,29 @@
+{
+  "id": "152-007-fix-fix",
+  "title": "Fix: Fix: MCP Smoke Part 1 — Lifecycle Tools (8 tool)",
+  "description": "Priority fix for NO_GO task 152-007-fix.\nOriginal worker notes: Fix-retry for NO_GO task 152-007. Original 347-line comprehensive audit report was already written at docs/audits/sprint-152/T-152-007-mcp-lifecycle.md (Özet, Metod, Inventory Snapshot, 8 lifecycle tool detail, Consistency Matrix, Zod Validation Matrix, Bulgular [PASS/FAIL/REGRESSION/DRIFT/MINOR DRIFT], Sprint 153+ P0/P1/P2 action list, 6 evidence annexes E1-E6, Self-check). Previous fix-retry attempt was OOM-killed before writing .result (task-152-007-fix.partial-result confirms). This retry re\nExpected scope: docs/audits/sprint-152/\nFiles that should change: docs/audits/sprint-152/T-152-007-mcp-lifecycle.md",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "CRITICAL",
+  "reason": "Task 152-007-fix evaluated as NO_GO",
+  "scope": {
+    "directories": [
+      "docs/audits/sprint-152/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "docs/audits/sprint-152/T-152-007-mcp-lifecycle.md"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** 8 tool × stdio smoke rapor, schema delta doctor",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "PENDING",
+  "sprintId": "sprint-152",
+  "isPriorityFix": true,
+  "fixForTaskId": "152-007-fix",
+  "createdAt": "2026-04-24T13:01:43.594Z"
+}

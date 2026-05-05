@@ -1,0 +1,34 @@
+{
+  "id": "152-024-fix",
+  "title": "Fix: Config Integrity — Duplicate Keys + MODE_PRESETS Overlap",
+  "description": "Priority fix for NO_GO task 152-024.\nOriginal worker notes: Sprint 152 read-only audit — config integrity report (201 lines). Covered 5 directive axes + 2 additional findings. Key outcomes: (1) root-level max_workers is DEAD KEY — written by init-steps.ts but never read at runtime (all readers go through config.activeModeConfig.max_workers); recommended P0 fix to stop writing root-level and write mode-nested instead. (2) MODE_PRESETS ↔ DEFAULT_MODES duplication PARTIALLY RESOLVED by Sprint 150 (max_workers consolidated via MODE_PRESETS reference), but v1\nExpected scope: docs/audits/sprint-152/, src/core/\nFiles that should change: docs/audits/sprint-152/T-152-024-config-duplicate.md, .max_workers, config.json, src/core/config.ts, src/core/mode-presets.ts",
+  "model": "opus",
+  "effort": "low",
+  "priority": "CRITICAL",
+  "reason": "Task 152-024 evaluated as NO_GO",
+  "scope": {
+    "directories": [
+      "docs/audits/sprint-152/",
+      "src/core/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "docs/audits/sprint-152/T-152-024-config-duplicate.md",
+      ".max_workers",
+      "config.json",
+      "src/core/config.ts",
+      "src/core/mode-presets.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** Config drift listesi",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "PENDING",
+  "sprintId": "sprint-152",
+  "isPriorityFix": true,
+  "fixForTaskId": "152-024",
+  "createdAt": "2026-04-24T12:51:36.230Z"
+}

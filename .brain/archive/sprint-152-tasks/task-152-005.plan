@@ -1,0 +1,24 @@
+# T-152-005 Execution Plan
+
+## Goal
+Smoke test 12 CLI commands in agent/skill/plugin family. Read-only audit. Verify built-in inventory: 16 agents + 2 custom, 21 skills, Ed25519 readiness.
+
+## Steps
+1. Locate CLI entry + agent/skill/plugin command implementations.
+2. Run --help for: agent, agent list, skill, skill list, skill install, skill publish, plugin, plugin list (if exists).
+3. Run read-only listing: agent list, skill list.
+4. Read agent-pool.ts + skill-registry.ts to verify 16/21 built-in inventory.
+5. Inspect .deckent/agents/ for custom agents (target: 2).
+6. Check Ed25519 sign/verify infrastructure (skill manifest signing).
+7. Check Routing V2 wiring (activation-engine.ts, routing-engine.ts).
+8. Write report at docs/audits/sprint-152/T-152-005-cli-agent-skill.md.
+9. Write result file.
+
+## Constraints
+- READ-ONLY (no source code changes; git diff src/ tests/ must = 0).
+- Write only to docs/audits/sprint-152/T-152-005-cli-agent-skill.md (+ heartbeat/result/plan files).
+
+## Rubric
+- 12 commands × [PASS/FAIL/MISSING/REGRESSION] verdict.
+- Built-in inventory verified with file path + count evidence.
+- Ed25519 readiness summary (CLI commands, infra modules).

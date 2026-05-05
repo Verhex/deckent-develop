@@ -1,0 +1,31 @@
+{
+  "id": "152-006-fix",
+  "title": "Fix: CLI Smoke Part 4 — Nervous System + Audit + Feature + Mode (12+ komut)",
+  "description": "Priority fix for NO_GO task 152-006.\nOriginal worker notes: CLI Smoke Part 4 — Nervous/Audit/Features/Recover/Mode + 19 residual commands. 46/46 top-level command --help coverage (100%). Findings: 7 PASS, 3 MISSING (nervous subscribe/status/config), 1 DRIFT (feature-query → features rename), 1 SIDE_EFFECT (audit writes .deckent/*.json), 2 expected-FAIL (required sprint-id arg). Critical drifts (D1-D7): Commander.js exit-0 on unknown subcmd (false-PASS risk), audit command side-effect, nervous-system features manifest blockedBy conflicts with Sprint 150 H\nExpected scope: docs/audits/sprint-152/\nFiles that should change: docs/audits/sprint-152/T-152-006-cli-nervous-audit.md",
+  "model": "opus",
+  "effort": "high",
+  "priority": "CRITICAL",
+  "reason": "Task 152-006 evaluated as NO_GO",
+  "scope": {
+    "directories": [
+      "docs/audits/sprint-152/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "docs/audits/sprint-152/T-152-006-cli-nervous-audit.md"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** 49 komut TOTAL coverage bu sprint sonunda kanıtlı, eksikler Sprint 153'e debt olarak taşınır",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "NO_GO",
+  "sprintId": "sprint-152",
+  "isPriorityFix": true,
+  "fixForTaskId": "152-006",
+  "createdAt": "2026-04-24T12:51:35.557Z",
+  "estimatedTokens": 104,
+  "updatedAt": "2026-04-24T13:01:43.594Z"
+}

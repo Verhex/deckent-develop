@@ -1,0 +1,37 @@
+{
+  "id": "152-030-fix",
+  "title": "Fix: Sprint 151 Learnings → Sprint 152 Actionable Distilling + Meta-Dogfood Sayacı",
+  "description": "Priority fix for NO_GO task 152-030.\nOriginal worker notes: Timeout - no result received\nExpected scope: docs/audits/sprint-152/\nFiles that should change: docs/audits/sprint-152/T-152-030-sprint151-distill.md, RETRO.md, .md, CLAUDE.md, DECKENT.md, DIRECTIVES.md, package.json, tsconfig.json, vitest.config.ts",
+  "model": "opus",
+  "effort": "high",
+  "priority": "CRITICAL",
+  "reason": "Task 152-030 evaluated as NO_GO; tests failed; no files changed",
+  "scope": {
+    "directories": [
+      "docs/audits/sprint-152/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "docs/audits/sprint-152/T-152-030-sprint151-distill.md",
+      "RETRO.md",
+      ".md",
+      "CLAUDE.md",
+      "DECKENT.md",
+      "DIRECTIVES.md",
+      "package.json",
+      "tsconfig.json",
+      "vitest.config.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** Sprint 151 → 152 köprü + meta-dogfood projection + Sprint 153 öneri listesi",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "PENDING",
+  "sprintId": "sprint-152",
+  "isPriorityFix": true,
+  "fixForTaskId": "152-030",
+  "createdAt": "2026-04-24T12:51:36.372Z"
+}

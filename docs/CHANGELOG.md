@@ -6,6 +6,22 @@ Bu projedeki tüm önemli değişiklikler bu dosyada belgelenmektedir.
 Format [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) standardına dayanır
 ve proje [Semantic Versioning](https://semver.org/spec/v2.0.0.html) kurallarına uyar.
 
+## [1.0.0-beta.1-sprint152] - 2026-04-24
+
+### Added
+
+- Post-Migration Environment Delta Audit
+- tsc + vitest Baseline Drift Analysis
+- Auto-Memory 78 Dosya Kayıp Impact Analysis
+- Skills 21 AST Sandbox + Registry Integrity
+- Agents 16 Built-in Manifest + Routing V2 Rules
+- Debt 96 Item Envanter + Closeable Count + Top-10 Priority
+- Git State Hijyen + SYSTEM-MIGRATION Yaşam Döngüsü
+- Sprint 151 Learnings → Sprint 152 Actionable Distilling + Meta-Dogfood Sayacı
+
+
+_Tasks: 36 total, 8 done, 0 tech debt, 28 no-go_
+
 ## [1.0.0-beta.1-sprint151] - 2026-04-22
 
 ### Added

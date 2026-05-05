@@ -1,600 +1,600 @@
-| 2026-04-21T11:55:31.614Z | finalizeSprint:tripleLink | Triple-link created for sprint-150 |
-| 2026-04-21T11:55:31.752Z | finalizeSprint:routing-outcomes | Recorded 38 routing outcomes to learnings.json |
-| 2026-04-21T11:55:31.759Z | finalizeSprint:rule-evolution | 9 new rules evolved |
-| 2026-04-21T11:55:31.770Z | rule-evolver:saveRules | 9 rules saved to .deckent/routing/evolved-rules.json |
-| 2026-04-21T11:55:31.798Z | finalizeSprint:syncStatsToManifests | Synced 16 agents, 16 skills to manifest files |
-| 2026-04-21T11:55:31.801Z | finalizeSprint:promotion | agent 'test-writer': 123 tasks, 91% success — meets promotion criteria |
-| 2026-04-21T11:55:31.802Z | promotion-pipeline:promote | Temp agent 'test-writer' not found |
-| 2026-04-21T11:55:31.803Z | finalizeSprint:promotion | agent 'temp-react-ts-specialist': 28 tasks, 100% success — meets promotion criteria |
-| 2026-04-21T11:55:31.805Z | promotion-pipeline:promote | Temp agent 'temp-react-ts-specialist' not found |
-| 2026-04-21T11:55:31.806Z | finalizeSprint:promotion | skill 'code-reviewer': 32 tasks, 91% success — meets promotion criteria |
-| 2026-04-21T11:55:31.807Z | promotion-pipeline:promote | Temp skill 'code-reviewer' not found |
-| 2026-04-21T11:55:31.829Z | finalizeSprint:breadcrumb | Step 10 (richOutput) — entering |
-| 2026-04-21T11:55:31.908Z | buildAgentPerformance | task=150-001 agent=temp-react-ts-specialist ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150 |
-| 2026-04-21T11:55:31.909Z | buildAgentPerformance | task=150-002 agent=temp-react-ts-specialist ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150 |
-| 2026-04-21T11:55:31.910Z | buildAgentPerformance | task=150-003 agent=temp-react-ts-specialist ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150 |
-| 2026-04-21T11:55:31.912Z | buildAgentPerformance | task=150-004 agent=temp-react-ts-specialist ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150 |
-| 2026-04-21T11:55:31.913Z | buildAgentPerformance | task=150-005 agent=temp-react-ts-specialist ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150 |
-| 2026-04-21T11:55:31.914Z | buildAgentPerformance | task=150-006 agent=temp-react-ts-specialist ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150 |
-| 2026-04-21T11:55:31.915Z | buildAgentPerformance | task=150-007 agent=temp-react-ts-specialist ev=GO_WITH_TECH_DEBT evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-01 |
-| 2026-04-21T11:55:31.919Z | buildAgentPerformance | task=150-008 agent=architect ev=NO_GO evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150-016,150-017,1 |
-| 2026-04-21T11:55:31.920Z | buildAgentPerformance | task=150-009 agent=temp-react-ts-specialist ev=GO_WITH_TECH_DEBT evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-01 |
-| 2026-04-21T11:55:31.921Z | buildAgentPerformance | task=150-010 agent=architect ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150-016,150-017,15 |
-| 2026-04-21T11:55:31.922Z | buildAgentPerformance | task=150-011 agent=temp-react-ts-specialist ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150 |
-| 2026-04-21T11:55:31.924Z | buildAgentPerformance | task=150-012 agent=temp-react-ts-specialist ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150 |
-| 2026-04-21T11:55:31.924Z | buildAgentPerformance | task=150-013 agent=temp-react-ts-specialist ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150 |
-| 2026-04-21T11:55:31.925Z | buildAgentPerformance | task=150-014 agent=temp-react-ts-specialist ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150 |
-| 2026-04-21T11:55:31.926Z | buildAgentPerformance | task=150-015 agent=api-builder ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150-016,150-017, |
-| 2026-04-21T11:55:31.928Z | buildAgentPerformance | task=150-016 agent=temp-react-ts-specialist ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150 |
-| 2026-04-21T11:55:31.929Z | buildAgentPerformance | task=150-017 agent=architect ev=GO_WITH_TECH_DEBT evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150-0 |
-| 2026-04-21T11:55:31.930Z | buildAgentPerformance | task=150-018 agent=doc-writer ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150-016,150-017,1 |
-| 2026-04-21T11:55:31.930Z | buildAgentPerformance | task=150-019 agent=temp-react-ts-specialist ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150 |
-| 2026-04-21T11:55:31.932Z | buildAgentPerformance | task=150-020 agent=temp-react-ts-specialist ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150 |
-| 2026-04-21T11:55:31.933Z | buildAgentPerformance | task=150-021 agent=doc-writer ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150-016,150-017,1 |
-| 2026-04-21T11:55:31.933Z | buildAgentPerformance | task=150-022 agent=doc-writer ev=NO_GO evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150-016,150-017, |
-| 2026-04-21T11:55:31.934Z | buildAgentPerformance | task=150-023 agent=doc-writer ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150-016,150-017,1 |
-| 2026-04-21T11:55:31.936Z | buildAgentPerformance | task=150-024 agent=doc-writer ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150-016,150-017,1 |
-| 2026-04-21T11:55:31.936Z | buildAgentPerformance | task=150-025 agent=doc-writer ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150-016,150-017,1 |
-| 2026-04-21T11:55:31.938Z | buildAgentPerformance | task=150-026 agent=architect ev=GO_WITH_TECH_DEBT evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150-0 |
-| 2026-04-21T11:55:31.939Z | buildAgentPerformance | task=150-027 agent=doc-writer ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150-016,150-017,1 |
-| 2026-04-21T11:55:31.941Z | buildAgentPerformance | task=150-028 agent=architect ev=NO_GO evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150-016,150-017,1 |
-| 2026-04-21T11:55:31.942Z | buildAgentPerformance | task=150-029 agent=architect ev=GO_WITH_TECH_DEBT evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150-0 |
-| 2026-04-21T11:55:31.943Z | buildAgentPerformance | task=150-030 agent=architect ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150-016,150-017,15 |
-| 2026-04-21T11:55:31.943Z | buildAgentPerformance | task=150-031 agent=architect ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150-016,150-017,15 |
-| 2026-04-21T11:55:31.945Z | buildAgentPerformance | task=150-032 agent=architect ev=GO_WITH_TECH_DEBT evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150-0 |
-| 2026-04-21T11:55:31.946Z | buildAgentPerformance | task=150-033 agent=architect ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150-016,150-017,15 |
-| 2026-04-21T11:55:31.947Z | buildAgentPerformance | task=150-034 agent=architect ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150-016,150-017,15 |
-| 2026-04-21T11:55:31.948Z | buildAgentPerformance | task=150-035 agent=architect ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150-016,150-017,15 |
-| 2026-04-21T11:55:31.950Z | buildAgentPerformance | task=150-036 agent=architect ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150-016,150-017,15 |
-| 2026-04-21T11:55:31.950Z | buildAgentPerformance | task=150-037 agent=architect ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150-016,150-017,15 |
-| 2026-04-21T11:55:31.951Z | buildAgentPerformance | task=150-038 agent=architect ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150-016,150-017,15 |
-| 2026-04-21T11:55:31.955Z | finalizeSprint:breadcrumb | Step 10b (selfAuditGate) — entering |
-| 2026-04-21T11:55:43.036Z | runSelfAuditGate:tsc | status=PASS errors=0 |
-| 2026-04-21T11:58:03.296Z | runSelfAuditGate:vitest | status=FAIL delta.fail=5 |
-| 2026-04-21T11:58:11.496Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-test-docker-547690-b.json' |
-| 2026-04-21T11:58:11.508Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-test-docker-547690.json' |
-| 2026-04-21T11:58:12.847Z | runSelfAuditGate:honesty | violations=0 |
-| 2026-04-21T11:58:12.894Z | runSelfAuditGate | overallGate=GATE_FAILURE sprint=sprint-150 |
-| 2026-04-21T11:58:12.950Z | finalizeSprint:selfAuditGate | Gate completed: overallGate=GATE_FAILURE |
-| 2026-04-21T11:58:12.992Z | finalizeSprint:selfAuditGate | Status updated: RETROSPECTIVE → GO_WITH_GATE_FAILURE |
-| 2026-04-21T11:58:13.091Z | finalizeSprint:selfAuditGate | Gate result written to /home/alperen/deckent-dev/.deckent/sprint-150-gate.json overallGate=GATE_FAILURE |
-| 2026-04-21T11:58:13.168Z | finalizeSprint:breadcrumb | Step 10c (loadReport) — entering |
-| 2026-04-21T11:58:13.620Z | finalizeSprint:loadReport | Load test report written to /home/alperen/deckent-dev/docs/audits/sprint-150/load-test-report.md |
-| 2026-04-21T11:58:13.639Z | finalizeSprint:breadcrumb | Step 10c (loadReport) — done |
-| 2026-04-21T11:58:13.685Z | finalizeSprint:breadcrumb | Step 12 (archiveDirectives) — entering |
-| 2026-04-21T11:58:13.767Z | archiveDirectives | Archived DIRECTIVES.md → /home/alperen/deckent-dev/.brain/archive/DIRECTIVES-sprint-150.md |
-| 2026-04-21T11:58:13.768Z | finalizeSprint:breadcrumb | Step 12b (archiveOrphanTasks) — entering |
-| 2026-04-21T11:58:14.415Z | createPreArchiveSnapshot | Snapshot created: /home/alperen/deckent-dev/.deckent/sprint-150-pre-archive.tar.gz (206 files, hash=b3ea1d859188...) |
-| 2026-04-21T11:58:14.416Z | finalizeSprint:preArchiveSnapshot | Snapshot created: 206 files, hash=b3ea1d859188... |
-| 2026-04-21T11:58:14.813Z | archiveOrphanTasks | Archived 208 task files to /home/alperen/deckent-dev/.brain/archive/sprint-150-tasks |
-| 2026-04-21T11:58:14.815Z | finalizeSprint:archiveOrphanTasks | Archived 208 orphan task files |
-| 2026-04-21T11:58:14.829Z | finalizeSprint:breadcrumb | Step 12c (cleanTasksArchive) — entering |
-| 2026-04-21T11:58:14.876Z | finalizeSprint:cleanTasksArchive | Removed 0 old .tasks/archive/ dirs |
-| 2026-04-21T11:58:14.877Z | finalizeSprint:breadcrumb | Step 13 (jobSummary) — entering |
-| 2026-04-21T11:58:15.027Z | finalizeSprint:jobSummary | Job summary written to /home/alperen/deckent-dev/.deckent/jobs/sprint-150.json |
-| 2026-04-21T11:58:15.028Z | finalizeSprint:breadcrumb | Step 14 (postFinalizeHooks) — entering |
-| 2026-04-21T11:58:15.909Z | postFinalizeHooks:memoryExport | 4 files written, 0 errors |
-| 2026-04-21T11:58:15.931Z | postFinalizeHooks:identityRegen | updated adrCount=43 |
-| 2026-04-21T11:58:16.565Z | postFinalizeHooks:ruleRegen | Rule regeneration hook called |
-| 2026-04-21T11:58:16.567Z | finalizeSprint:postFinalizeHooks | memExport=4 identity=updated ruleRegen=true errors=0 |
-| 2026-04-21T11:58:16.609Z | [Brain] | Cleanup delayed 180000ms — .tasks/ files remain readable |
-| 2026-04-21T13:36:30.549Z | observability-rotation | Rotated 268467 bytes → /home/alperen/deckent-dev/.deckent/archive/metrics/metrics-sprint-150-live-wire.jsonl.gz (17601 bytes gzipped), pruned 0 old archives |
-| 2026-04-21T15:08:16.979Z | file-adapter | Write failed: EISDIR: illegal operation on a directory, open '/home/alperen/deckent-dev' |
-| 2026-04-21T15:08:16.981Z | file-adapter | Write failed: EISDIR: illegal operation on a directory, open '/home/alperen/deckent-dev' |
-| 2026-04-21T15:08:17.980Z | file-adapter | Write failed: EISDIR: illegal operation on a directory, open '/home/alperen/deckent-dev' |
-| 2026-04-21T15:09:49.453Z | runSelfAuditGate:tsc | status=PASS errors=0 |
-| 2026-04-21T15:12:01.220Z | runSelfAuditGate:vitest | status=FAIL delta.fail=2 |
-| 2026-04-21T15:12:01.229Z | runSelfAuditGate:honesty | violations=0 |
-| 2026-04-21T15:12:01.241Z | runSelfAuditGate | overallGate=GATE_FAILURE sprint=sprint-150 |
-| 2026-04-22T05:38:44.153Z | readJsonSafeAsync | ENOENT: no such file or directory, open '/home/alperen/.deckent/config.json' |
-| 2026-04-22T05:39:28.202Z | planSprint:learning-bonuses | Loaded 15 learning bonuses from previous sprints |
-| 2026-04-22T05:39:28.204Z | planSprint:temp-skill | Generated project-conventions skill for typescript |
-| 2026-04-22T05:39:28.206Z | planSprint:temp-agent | Generated temp agent: temp-react-ts-specialist for typescript/react |
-| 2026-04-22T05:39:28.208Z | planSprint:temp-agent | Generated temp agent: temp-react-specialist for typescript/react |
-| 2026-04-22T05:39:28.210Z | planSprint:evolved-rules | Injected 5 auto-applied evolved rules into activation configs |
-| 2026-04-22T05:39:28.214Z | planSprint:routing-v2 | Task 151-001 → agent=doc-writer, skills=[devops-engineer], confidence=high, intent=documentation |
-| 2026-04-22T05:39:28.216Z | planSprint:routing-v2 | Task 151-002 → agent=architect, skills=[devops-engineer, git-expert], confidence=uncertain, intent=documentation |
-| 2026-04-22T05:39:28.218Z | planSprint:routing-v2 | Task 151-003 → agent=temp-react-ts-specialist, skills=[typescript-expert, react-specialist, frontend-design], confidence=low, intent=implementation |
-| 2026-04-22T05:39:28.220Z | planSprint:routing-v2 | Task 151-004 → agent=doc-writer, skills=[devops-engineer, typescript-expert], confidence=high, intent=documentation |
-| 2026-04-22T05:39:28.222Z | planSprint:routing-v2 | Task 151-005 → agent=doc-writer, skills=[devops-engineer, typescript-expert], confidence=high, intent=documentation |
-| 2026-04-22T05:39:28.223Z | planSprint:routing-v2 | Task 151-006 → agent=doc-writer, skills=[documentation-writer], confidence=high, intent=documentation |
-| 2026-04-22T05:39:28.225Z | planSprint:routing-v2 | Task 151-007 → agent=doc-writer, skills=[documentation-writer], confidence=high, intent=documentation |
-| 2026-04-22T05:39:28.227Z | planSprint:routing-v2 | Task 151-008 → agent=doc-writer, skills=[documentation-writer], confidence=high, intent=documentation |
-| 2026-04-22T05:39:28.228Z | planSprint:routing-v2 | Task 151-009 → agent=architect, skills=[typescript-expert, testing-expert], confidence=medium, intent=implementation |
-| 2026-04-22T05:39:28.230Z | planSprint:routing-v2 | Task 151-010 → agent=temp-react-ts-specialist, skills=[typescript-expert, testing-expert], confidence=low, intent=implementation |
-| 2026-04-22T05:39:28.232Z | planSprint:routing-v2 | Task 151-011 → agent=doc-writer, skills=[typescript-expert, documentation-writer], confidence=high, intent=documentation |
-| 2026-04-22T05:39:28.234Z | planSprint:routing-v2 | Task 151-012 → agent=architect, skills=[typescript-expert, system-architect], confidence=medium, intent=implementation |
-| 2026-04-22T05:39:28.235Z | planSprint:routing-v2 | Task 151-013 → agent=temp-react-ts-specialist, skills=[testing-expert, typescript-expert], confidence=low, intent=implementation |
-| 2026-04-22T05:39:28.237Z | planSprint:routing-v2 | Task 151-014 → agent=architect, skills=[docker-expert, typescript-expert, testing-expert], confidence=medium, intent=implementation |
-| 2026-04-22T05:39:28.239Z | planSprint:routing-v2 | Task 151-015 → agent=temp-react-ts-specialist, skills=[typescript-expert, system-architect], confidence=low, intent=implementation |
-| 2026-04-22T05:39:28.240Z | planSprint:task-write | Writing 151-001: assignedAgent=doc-writer, assignedSkills=[devops-engineer] |
-| 2026-04-22T05:39:28.242Z | planSprint:task-write | Writing 151-002: assignedAgent=architect, assignedSkills=[devops-engineer, git-expert] |
-| 2026-04-22T05:39:28.244Z | planSprint:task-write | Writing 151-003: assignedAgent=temp-react-ts-specialist, assignedSkills=[typescript-expert, react-specialist, frontend-design] |
-| 2026-04-22T05:39:28.246Z | planSprint:task-write | Writing 151-004: assignedAgent=doc-writer, assignedSkills=[devops-engineer, typescript-expert] |
-| 2026-04-22T05:39:28.247Z | planSprint:task-write | Writing 151-005: assignedAgent=doc-writer, assignedSkills=[devops-engineer, typescript-expert] |
-| 2026-04-22T05:39:28.249Z | planSprint:task-write | Writing 151-006: assignedAgent=doc-writer, assignedSkills=[documentation-writer] |
-| 2026-04-22T05:39:28.251Z | planSprint:task-write | Writing 151-007: assignedAgent=doc-writer, assignedSkills=[documentation-writer] |
-| 2026-04-22T05:39:28.252Z | planSprint:task-write | Writing 151-008: assignedAgent=doc-writer, assignedSkills=[documentation-writer] |
-| 2026-04-22T05:39:28.254Z | planSprint:task-write | Writing 151-009: assignedAgent=architect, assignedSkills=[typescript-expert, testing-expert] |
-| 2026-04-22T05:39:28.256Z | planSprint:task-write | Writing 151-010: assignedAgent=temp-react-ts-specialist, assignedSkills=[typescript-expert, testing-expert] |
-| 2026-04-22T05:39:28.258Z | planSprint:task-write | Writing 151-011: assignedAgent=doc-writer, assignedSkills=[typescript-expert, documentation-writer] |
-| 2026-04-22T05:39:28.259Z | planSprint:task-write | Writing 151-012: assignedAgent=architect, assignedSkills=[typescript-expert, system-architect] |
-| 2026-04-22T05:39:28.261Z | planSprint:task-write | Writing 151-013: assignedAgent=temp-react-ts-specialist, assignedSkills=[testing-expert, typescript-expert] |
-| 2026-04-22T05:39:28.263Z | planSprint:task-write | Writing 151-014: assignedAgent=architect, assignedSkills=[docker-expert, typescript-expert, testing-expert] |
-| 2026-04-22T05:39:28.264Z | planSprint:task-write | Writing 151-015: assignedAgent=temp-react-ts-specialist, assignedSkills=[typescript-expert, system-architect] |
-| 2026-04-22T05:55:18.337Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
-| 2026-04-22T05:55:18.339Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
-| 2026-04-22T05:55:18.341Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
-| 2026-04-22T05:55:18.342Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
-| 2026-04-22T05:55:18.344Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
-| 2026-04-22T05:55:18.345Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
-| 2026-04-22T05:55:18.346Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
-| 2026-04-22T05:55:18.347Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
-| 2026-04-22T05:55:18.349Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
-| 2026-04-22T05:55:18.350Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
-| 2026-04-22T05:55:18.351Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
-| 2026-04-22T05:55:18.361Z | planSprint:learning-bonuses | Loaded 15 learning bonuses from previous sprints |
-| 2026-04-22T05:55:18.362Z | planSprint:temp-skill | Generated project-conventions skill for typescript |
-| 2026-04-22T05:55:18.364Z | planSprint:temp-agent | Generated temp agent: temp-react-ts-specialist for typescript/react |
-| 2026-04-22T05:55:18.366Z | planSprint:temp-agent | Generated temp agent: temp-react-specialist for typescript/react |
-| 2026-04-22T05:55:18.368Z | planSprint:evolved-rules | Injected 5 auto-applied evolved rules into activation configs |
-| 2026-04-22T05:55:18.370Z | planSprint:routing-v2 | Task 151-001 → agent=architect, skills=[devops-engineer], confidence=uncertain, intent=documentation |
-| 2026-04-22T05:55:18.372Z | planSprint:routing-v2 | Task 151-002 → agent=architect, skills=[devops-engineer, git-expert], confidence=uncertain, intent=documentation |
-| 2026-04-22T05:55:18.374Z | planSprint:routing-v2 | Task 151-003 → agent=temp-react-ts-specialist, skills=[typescript-expert, react-specialist, frontend-design], confidence=low, intent=implementation |
-| 2026-04-22T05:55:18.375Z | planSprint:routing-v2 | Task 151-004 → agent=doc-writer, skills=[devops-engineer, typescript-expert], confidence=high, intent=documentation |
-| 2026-04-22T05:55:18.377Z | planSprint:routing-v2 | Task 151-005 → agent=doc-writer, skills=[devops-engineer, typescript-expert], confidence=high, intent=documentation |
-| 2026-04-22T05:55:18.379Z | planSprint:routing-v2 | Task 151-006 → agent=doc-writer, skills=[documentation-writer], confidence=high, intent=documentation |
-| 2026-04-22T05:55:18.380Z | planSprint:routing-v2 | Task 151-007 → agent=doc-writer, skills=[documentation-writer], confidence=high, intent=documentation |
-| 2026-04-22T05:55:18.382Z | planSprint:routing-v2 | Task 151-008 → agent=doc-writer, skills=[documentation-writer], confidence=high, intent=documentation |
-| 2026-04-22T05:55:18.384Z | planSprint:routing-v2 | Task 151-009 → agent=architect, skills=[typescript-expert, testing-expert], confidence=medium, intent=implementation |
-| 2026-04-22T05:55:18.385Z | planSprint:routing-v2 | Task 151-010 → agent=temp-react-ts-specialist, skills=[typescript-expert, testing-expert], confidence=low, intent=implementation |
-| 2026-04-22T05:55:18.387Z | planSprint:routing-v2 | Task 151-011 → agent=doc-writer, skills=[typescript-expert, documentation-writer], confidence=high, intent=documentation |
-| 2026-04-22T05:55:18.389Z | planSprint:routing-v2 | Task 151-012 → agent=architect, skills=[typescript-expert, system-architect], confidence=medium, intent=implementation |
-| 2026-04-22T05:55:18.407Z | planSprint:routing-v2 | Task 151-013 → agent=temp-react-ts-specialist, skills=[testing-expert, typescript-expert], confidence=low, intent=implementation |
-| 2026-04-22T05:55:18.409Z | planSprint:routing-v2 | Task 151-014 → agent=architect, skills=[docker-expert, typescript-expert, testing-expert], confidence=medium, intent=implementation |
-| 2026-04-22T05:55:18.411Z | planSprint:routing-v2 | Task 151-015 → agent=temp-react-ts-specialist, skills=[typescript-expert, system-architect], confidence=low, intent=implementation |
-| 2026-04-22T05:55:18.412Z | planSprint:task-write | Writing 151-001: assignedAgent=architect, assignedSkills=[devops-engineer] |
-| 2026-04-22T05:55:18.420Z | planSprint:task-write | Writing 151-002: assignedAgent=architect, assignedSkills=[devops-engineer, git-expert] |
-| 2026-04-22T05:55:18.425Z | planSprint:task-write | Writing 151-003: assignedAgent=temp-react-ts-specialist, assignedSkills=[typescript-expert, react-specialist, frontend-design] |
-| 2026-04-22T05:55:18.427Z | planSprint:task-write | Writing 151-004: assignedAgent=doc-writer, assignedSkills=[devops-engineer, typescript-expert] |
-| 2026-04-22T05:55:18.428Z | planSprint:task-write | Writing 151-005: assignedAgent=doc-writer, assignedSkills=[devops-engineer, typescript-expert] |
-| 2026-04-22T05:55:18.430Z | planSprint:task-write | Writing 151-006: assignedAgent=doc-writer, assignedSkills=[documentation-writer] |
-| 2026-04-22T05:55:18.432Z | planSprint:task-write | Writing 151-007: assignedAgent=doc-writer, assignedSkills=[documentation-writer] |
-| 2026-04-22T05:55:18.433Z | planSprint:task-write | Writing 151-008: assignedAgent=doc-writer, assignedSkills=[documentation-writer] |
-| 2026-04-22T05:55:18.434Z | planSprint:task-write | Writing 151-009: assignedAgent=architect, assignedSkills=[typescript-expert, testing-expert] |
-| 2026-04-22T05:55:18.436Z | planSprint:task-write | Writing 151-010: assignedAgent=temp-react-ts-specialist, assignedSkills=[typescript-expert, testing-expert] |
-| 2026-04-22T05:55:18.438Z | planSprint:task-write | Writing 151-011: assignedAgent=doc-writer, assignedSkills=[typescript-expert, documentation-writer] |
-| 2026-04-22T05:55:18.439Z | planSprint:task-write | Writing 151-012: assignedAgent=architect, assignedSkills=[typescript-expert, system-architect] |
-| 2026-04-22T05:55:18.441Z | planSprint:task-write | Writing 151-013: assignedAgent=temp-react-ts-specialist, assignedSkills=[testing-expert, typescript-expert] |
-| 2026-04-22T05:55:18.442Z | planSprint:task-write | Writing 151-014: assignedAgent=architect, assignedSkills=[docker-expert, typescript-expert, testing-expert] |
-| 2026-04-22T05:55:18.444Z | planSprint:task-write | Writing 151-015: assignedAgent=temp-react-ts-specialist, assignedSkills=[typescript-expert, system-architect] |
-| 2026-04-22T05:59:27.576Z | readJsonSafeAsync | ENOENT: no such file or directory, open '/home/alperen/.deckent/config.json' |
-| 2026-04-22T05:59:27.927Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
-| 2026-04-22T05:59:27.928Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
-| 2026-04-22T05:59:27.929Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
-| 2026-04-22T05:59:27.931Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
-| 2026-04-22T05:59:27.932Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
-| 2026-04-22T05:59:27.933Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
-| 2026-04-22T05:59:27.934Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
-| 2026-04-22T05:59:27.936Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
-| 2026-04-22T05:59:27.937Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
-| 2026-04-22T05:59:27.938Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
-| 2026-04-22T05:59:27.939Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
-| 2026-04-22T05:59:27.945Z | planSprint:learning-bonuses | Loaded 15 learning bonuses from previous sprints |
-| 2026-04-22T05:59:27.947Z | planSprint:temp-skill | Generated project-conventions skill for typescript |
-| 2026-04-22T05:59:27.948Z | planSprint:temp-agent | Generated temp agent: temp-react-ts-specialist for typescript/react |
-| 2026-04-22T05:59:27.949Z | planSprint:temp-agent | Generated temp agent: temp-react-specialist for typescript/react |
-| 2026-04-22T05:59:27.951Z | planSprint:evolved-rules | Injected 5 auto-applied evolved rules into activation configs |
-| 2026-04-22T05:59:27.957Z | planSprint:routing-v2 | Task 151-001 → agent=architect, skills=[devops-engineer], confidence=uncertain, intent=documentation |
-| 2026-04-22T05:59:27.959Z | planSprint:routing-v2 | Task 151-002 → agent=architect, skills=[devops-engineer, git-expert], confidence=uncertain, intent=documentation |
-| 2026-04-22T05:59:27.961Z | planSprint:routing-v2 | Task 151-003 → agent=temp-react-ts-specialist, skills=[typescript-expert, react-specialist, frontend-design], confidence=low, intent=implementation |
-| 2026-04-22T05:59:27.963Z | planSprint:routing-v2 | Task 151-004 → agent=doc-writer, skills=[devops-engineer, typescript-expert], confidence=high, intent=documentation |
-| 2026-04-22T05:59:27.965Z | planSprint:routing-v2 | Task 151-005 → agent=doc-writer, skills=[devops-engineer, typescript-expert], confidence=high, intent=documentation |
-| 2026-04-22T05:59:27.966Z | planSprint:routing-v2 | Task 151-006 → agent=doc-writer, skills=[documentation-writer], confidence=high, intent=documentation |
-| 2026-04-22T05:59:27.968Z | planSprint:routing-v2 | Task 151-007 → agent=doc-writer, skills=[documentation-writer], confidence=high, intent=documentation |
-| 2026-04-22T05:59:27.969Z | planSprint:routing-v2 | Task 151-008 → agent=doc-writer, skills=[documentation-writer], confidence=high, intent=documentation |
-| 2026-04-22T05:59:27.971Z | planSprint:routing-v2 | Task 151-009 → agent=architect, skills=[typescript-expert, testing-expert], confidence=medium, intent=implementation |
-| 2026-04-22T05:59:27.972Z | planSprint:routing-v2 | Task 151-010 → agent=temp-react-ts-specialist, skills=[typescript-expert, testing-expert], confidence=low, intent=implementation |
-| 2026-04-22T05:59:27.974Z | planSprint:routing-v2 | Task 151-011 → agent=doc-writer, skills=[typescript-expert, documentation-writer], confidence=high, intent=documentation |
-| 2026-04-22T05:59:27.976Z | planSprint:routing-v2 | Task 151-012 → agent=architect, skills=[typescript-expert, system-architect], confidence=medium, intent=implementation |
-| 2026-04-22T05:59:27.977Z | planSprint:routing-v2 | Task 151-013 → agent=temp-react-ts-specialist, skills=[testing-expert, typescript-expert], confidence=low, intent=implementation |
-| 2026-04-22T05:59:27.979Z | planSprint:routing-v2 | Task 151-014 → agent=architect, skills=[docker-expert, typescript-expert, testing-expert], confidence=medium, intent=implementation |
-| 2026-04-22T05:59:27.981Z | planSprint:routing-v2 | Task 151-015 → agent=temp-react-ts-specialist, skills=[typescript-expert, system-architect], confidence=low, intent=implementation |
-| 2026-04-22T05:59:27.984Z | planSprint:task-write | Writing 151-001: assignedAgent=architect, assignedSkills=[devops-engineer] |
-| 2026-04-22T05:59:27.989Z | planSprint:task-write | Writing 151-002: assignedAgent=architect, assignedSkills=[devops-engineer, git-expert] |
-| 2026-04-22T05:59:27.991Z | planSprint:task-write | Writing 151-003: assignedAgent=temp-react-ts-specialist, assignedSkills=[typescript-expert, react-specialist, frontend-design] |
-| 2026-04-22T05:59:27.993Z | planSprint:task-write | Writing 151-004: assignedAgent=doc-writer, assignedSkills=[devops-engineer, typescript-expert] |
-| 2026-04-22T05:59:27.994Z | planSprint:task-write | Writing 151-005: assignedAgent=doc-writer, assignedSkills=[devops-engineer, typescript-expert] |
-| 2026-04-22T05:59:27.996Z | planSprint:task-write | Writing 151-006: assignedAgent=doc-writer, assignedSkills=[documentation-writer] |
-| 2026-04-22T05:59:27.997Z | planSprint:task-write | Writing 151-007: assignedAgent=doc-writer, assignedSkills=[documentation-writer] |
-| 2026-04-22T05:59:27.999Z | planSprint:task-write | Writing 151-008: assignedAgent=doc-writer, assignedSkills=[documentation-writer] |
-| 2026-04-22T05:59:28.000Z | planSprint:task-write | Writing 151-009: assignedAgent=architect, assignedSkills=[typescript-expert, testing-expert] |
-| 2026-04-22T05:59:28.002Z | planSprint:task-write | Writing 151-010: assignedAgent=temp-react-ts-specialist, assignedSkills=[typescript-expert, testing-expert] |
-| 2026-04-22T05:59:28.004Z | planSprint:task-write | Writing 151-011: assignedAgent=doc-writer, assignedSkills=[typescript-expert, documentation-writer] |
-| 2026-04-22T05:59:28.005Z | planSprint:task-write | Writing 151-012: assignedAgent=architect, assignedSkills=[typescript-expert, system-architect] |
-| 2026-04-22T05:59:28.007Z | planSprint:task-write | Writing 151-013: assignedAgent=temp-react-ts-specialist, assignedSkills=[testing-expert, typescript-expert] |
-| 2026-04-22T05:59:28.008Z | planSprint:task-write | Writing 151-014: assignedAgent=architect, assignedSkills=[docker-expert, typescript-expert, testing-expert] |
-| 2026-04-22T05:59:28.010Z | planSprint:task-write | Writing 151-015: assignedAgent=temp-react-ts-specialist, assignedSkills=[typescript-expert, system-architect] |
-| 2026-04-22T05:59:28.012Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
-| 2026-04-22T05:59:28.013Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
-| 2026-04-22T05:59:28.016Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
-| 2026-04-22T05:59:28.017Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
-| 2026-04-22T05:59:28.018Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
-| 2026-04-22T05:59:28.019Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
-| 2026-04-22T05:59:28.021Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
-| 2026-04-22T05:59:28.022Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
-| 2026-04-22T05:59:28.023Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
-| 2026-04-22T05:59:28.024Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
-| 2026-04-22T05:59:28.025Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
-| 2026-04-22T06:01:57.575Z | cleanOrphanSafetyPoint | Cleaned orphan safety point from sprint-150 (current: sprint-151) |
-| 2026-04-22T06:03:47.528Z | sprint-checkpoint:phaseTransition | Phase PLAN → writing checkpoint |
-| 2026-04-22T06:03:47.532Z | sprint-checkpoint:write | Checkpoint #1 written for sprint-151 |
-| 2026-04-22T06:03:47.536Z | spawnWorkers:collision | File "CHANGELOG.md" written by tasks: 151-001, 151-002 |
-| 2026-04-22T06:03:47.538Z | spawnWorkers:collision | File "DECKENT-MASTER-BLUEPRINT.md" written by tasks: 151-001, 151-002 |
-| 2026-04-22T06:03:47.540Z | spawnWorkers:collision | File "DECKENT-ANA-PLAN-TR.md" written by tasks: 151-001, 151-002 |
-| 2026-04-22T06:03:47.542Z | spawnWorkers:collision | File ".deck" written by tasks: 151-001, 151-002 |
-| 2026-04-22T06:03:47.548Z | spawnWorkers:collision | File ".test" written by tasks: 151-009, 151-012 |
-| 2026-04-22T06:03:47.550Z | spawnWorkers:collision | File "test.ts" written by tasks: 151-009, 151-012 |
-| 2026-04-22T06:03:47.622Z | scope-sanitizer | warnings=3, rejected=0 |
-| 2026-04-22T06:03:47.742Z | docker-backend:spawn | taskId=151-001 container=deckent-w-151-001 model=sonnet |
-| 2026-04-22T06:03:48.166Z | docker-backend:spawn-ok | taskId=151-001 containerId=d30c24ff73f4 |
-| 2026-04-22T06:03:48.188Z | scope-sanitizer | warnings=5, rejected=0 |
-| 2026-04-22T06:03:48.276Z | docker-backend:spawn | taskId=151-002 container=deckent-w-151-002 model=sonnet |
-| 2026-04-22T06:03:48.642Z | docker-backend:spawn-ok | taskId=151-002 containerId=2f3353804eca |
-| 2026-04-22T06:03:48.649Z | resolveAgentPrompt:readFile | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.deckent/agents/temp-react-ts-specialist/PROMPT.md' |
-| 2026-04-22T06:03:48.652Z | resolveAgentPrompt:readFile | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/agents/temp-react-ts-specialist/PROMPT.md' |
-| 2026-04-22T06:03:48.664Z | scope-sanitizer | warnings=1, rejected=0 |
-| 2026-04-22T06:03:48.756Z | docker-backend:spawn | taskId=151-003 container=deckent-w-151-003 model=opus |
-| 2026-04-22T06:03:49.218Z | docker-backend:spawn-ok | taskId=151-003 containerId=4f1b57df13c3 |
-| 2026-04-22T06:03:49.254Z | sprint-checkpoint:phaseTransition | Phase SPAWN → writing checkpoint |
-| 2026-04-22T06:03:49.256Z | sprint-checkpoint:write | Checkpoint #2 written for sprint-151 |
-| 2026-04-22T06:07:01.918Z | docker-backend:kill | taskId=151-001 (graceful stop --time=15) |
-| 2026-04-22T06:07:10.640Z | docker-backend:post-stop-verify | taskId=151-001 .result verified + fsynced |
-| 2026-04-22T06:07:10.730Z | docker-backend:exit | taskId=151-001 exitCode=0 |
-| 2026-04-22T06:07:10.979Z | docker-backend:spawn | taskId=151-004 container=deckent-w-151-004 model=sonnet |
-| 2026-04-22T06:07:11.328Z | docker-backend:spawn-ok | taskId=151-004 containerId=9d3aac98543d |
-| 2026-04-22T06:07:28.746Z | docker-backend:kill | taskId=151-003 (graceful stop --time=15) |
-| 2026-04-22T06:07:44.151Z | docker-backend:post-stop-verify | taskId=151-003 .result verified + fsynced |
-| 2026-04-22T06:07:44.309Z | docker-backend:exit | taskId=151-003 exitCode=137 |
-| 2026-04-22T06:07:44.312Z | docker-backend:reconcile | taskId=151-003 exitCode=137 but .result=DONE → HB DONE |
-| 2026-04-22T06:07:44.641Z | docker-backend:spawn | taskId=151-005 container=deckent-w-151-005 model=sonnet |
-| 2026-04-22T06:07:45.081Z | docker-backend:spawn-ok | taskId=151-005 containerId=da46553e08ca |
-| 2026-04-22T06:08:53.192Z | waitForResults:progress | Sprint devam ediyor — 2/15 task tamamlandı (5dk) |
-| 2026-04-22T06:10:38.296Z | docker-backend:kill | taskId=151-002 (graceful stop --time=15) |
-| 2026-04-22T06:10:54.064Z | docker-backend:post-stop-verify | taskId=151-002 .result verified + fsynced |
-| 2026-04-22T06:10:54.219Z | docker-backend:exit | taskId=151-002 exitCode=0 |
-| 2026-04-22T06:10:54.557Z | docker-backend:spawn | taskId=151-006 container=deckent-w-151-006 model=sonnet |
-| 2026-04-22T06:10:55.017Z | docker-backend:spawn-ok | taskId=151-006 containerId=4761ade09ec0 |
-| 2026-04-22T06:13:07.635Z | docker-backend:kill | taskId=151-006 (graceful stop --time=15) |
-| 2026-04-22T06:13:15.939Z | docker-backend:post-stop-verify | taskId=151-006 .result verified + fsynced |
-| 2026-04-22T06:13:16.121Z | docker-backend:exit | taskId=151-006 exitCode=0 |
-| 2026-04-22T06:13:16.969Z | docker-backend:spawn | taskId=151-007 container=deckent-w-151-007 model=sonnet |
-| 2026-04-22T06:13:17.561Z | docker-backend:spawn-ok | taskId=151-007 containerId=387d3b2d6c19 |
-| 2026-04-22T06:13:54.252Z | waitForResults:progress | Sprint devam ediyor — 4/15 task tamamlandı (10dk) |
-| 2026-04-22T06:15:38.607Z | docker-backend:kill | taskId=151-005 (graceful stop --time=15) |
-| 2026-04-22T06:15:55.732Z | docker-backend:post-stop-verify | taskId=151-005 .result verified + fsynced |
-| 2026-04-22T06:15:55.874Z | docker-backend:exit | taskId=151-005 exitCode=137 |
-| 2026-04-22T06:15:55.877Z | docker-backend:reconcile | taskId=151-005 exitCode=137 but .result=DONE → HB DONE |
-| 2026-04-22T06:15:56.192Z | docker-backend:spawn | taskId=151-008 container=deckent-w-151-008 model=sonnet |
-| 2026-04-22T06:15:56.672Z | docker-backend:spawn-ok | taskId=151-008 containerId=dc7924710cf9 |
-| 2026-04-22T06:16:09.248Z | readJsonSafe | Unexpected end of JSON input |
-| 2026-04-22T06:16:14.253Z | docker-backend:kill | taskId=151-007 (graceful stop --time=15) |
-| 2026-04-22T06:16:18.826Z | docker-backend:post-stop-verify | taskId=151-007 .result verified + fsynced |
-| 2026-04-22T06:16:18.981Z | docker-backend:exit | taskId=151-007 exitCode=0 |
-| 2026-04-22T06:16:19.263Z | docker-backend:spawn | taskId=151-009 container=deckent-w-151-009 model=opus |
-| 2026-04-22T06:16:19.769Z | docker-backend:spawn-ok | taskId=151-009 containerId=6e5656acbc44 |
-| 2026-04-22T06:18:57.883Z | waitForResults:progress | Sprint devam ediyor — 6/15 task tamamlandı (15dk) |
-| 2026-04-22T06:19:29.102Z | docker-backend:kill | taskId=151-008 (graceful stop --time=15) |
-| 2026-04-22T06:19:44.480Z | docker-backend:post-stop-verify | taskId=151-008 .result verified + fsynced |
-| 2026-04-22T06:19:44.568Z | resolveAgentPrompt:readFile | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.deckent/agents/temp-react-ts-specialist/PROMPT.md' |
-| 2026-04-22T06:19:44.571Z | docker-backend:exit | taskId=151-008 exitCode=137 |
-| 2026-04-22T06:19:44.574Z | docker-backend:reconcile | taskId=151-008 exitCode=137 but .result=DONE → HB DONE |
-| 2026-04-22T06:19:44.716Z | resolveAgentPrompt:readFile | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/agents/temp-react-ts-specialist/PROMPT.md' |
-| 2026-04-22T06:19:44.801Z | docker-backend:spawn | taskId=151-010 container=deckent-w-151-010 model=opus |
-| 2026-04-22T06:19:45.157Z | docker-backend:spawn-ok | taskId=151-010 containerId=b1ab5049596c |
-| 2026-04-22T06:19:56.164Z | docker-backend:kill | taskId=151-004 (graceful stop --time=15) |
-| 2026-04-22T06:20:11.510Z | docker-backend:post-stop-verify | taskId=151-004 .result verified + fsynced |
-| 2026-04-22T06:20:11.607Z | docker-backend:exit | taskId=151-004 exitCode=137 |
-| 2026-04-22T06:20:11.610Z | docker-backend:reconcile | taskId=151-004 exitCode=137 but .result=GO_WITH_TECH_DEBT → HB DONE |
-| 2026-04-22T06:20:11.821Z | docker-backend:spawn | taskId=151-011 container=deckent-w-151-011 model=opus |
-| 2026-04-22T06:20:12.139Z | docker-backend:spawn-ok | taskId=151-011 containerId=85dfefa757ed |
-| 2026-04-22T06:22:55.375Z | docker-backend:kill | taskId=151-010 (graceful stop --time=15) |
-| 2026-04-22T06:23:12.263Z | docker-backend:post-stop-verify | taskId=151-010 .result verified + fsynced |
-| 2026-04-22T06:23:12.359Z | docker-backend:exit | taskId=151-010 exitCode=137 |
-| 2026-04-22T06:23:12.362Z | docker-backend:reconcile | taskId=151-010 exitCode=137 but .result=DONE → HB DONE |
-| 2026-04-22T06:23:12.519Z | scope-sanitizer | warnings=3, rejected=0 |
-| 2026-04-22T06:23:12.596Z | docker-backend:spawn | taskId=151-012 container=deckent-w-151-012 model=opus |
-| 2026-04-22T06:23:12.956Z | docker-backend:spawn-ok | taskId=151-012 containerId=c4902ad0750b |
-| 2026-04-22T06:23:17.964Z | docker-backend:kill | taskId=151-009 (graceful stop --time=15) |
-| 2026-04-22T06:23:33.282Z | docker-backend:post-stop-verify | taskId=151-009 .result verified + fsynced |
-| 2026-04-22T06:23:33.365Z | resolveAgentPrompt:readFile | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.deckent/agents/temp-react-ts-specialist/PROMPT.md' |
-| 2026-04-22T06:23:33.367Z | docker-backend:exit | taskId=151-009 exitCode=137 |
-| 2026-04-22T06:23:33.370Z | docker-backend:reconcile | taskId=151-009 exitCode=137 but .result=DONE → HB DONE |
-| 2026-04-22T06:23:33.505Z | resolveAgentPrompt:readFile | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/agents/temp-react-ts-specialist/PROMPT.md' |
-| 2026-04-22T06:23:33.582Z | docker-backend:spawn | taskId=151-013 container=deckent-w-151-013 model=sonnet |
-| 2026-04-22T06:23:33.909Z | docker-backend:spawn-ok | taskId=151-013 containerId=8ec6b1837ad5 |
-| 2026-04-22T06:24:00.564Z | waitForResults:progress | Sprint devam ediyor — 10/15 task tamamlandı (20dk) |
-| 2026-04-22T06:27:22.409Z | docker-backend:kill | taskId=151-011 (graceful stop --time=15) |
-| 2026-04-22T06:27:36.669Z | docker-backend:post-stop-verify | taskId=151-011 .result verified + fsynced |
-| 2026-04-22T06:27:36.797Z | docker-backend:exit | taskId=151-011 exitCode=0 |
-| 2026-04-22T06:27:37.103Z | docker-backend:spawn | taskId=151-014 container=deckent-w-151-014 model=opus |
-| 2026-04-22T06:27:37.522Z | docker-backend:spawn-ok | taskId=151-014 containerId=eb83ec54b04f |
-| 2026-04-22T06:29:02.586Z | waitForResults:progress | Sprint devam ediyor — 11/15 task tamamlandı (25dk) |
-| 2026-04-22T06:32:12.896Z | docker-backend:kill | taskId=151-012 (graceful stop --time=15) |
-| 2026-04-22T06:32:30.147Z | docker-backend:post-stop-verify | taskId=151-012 .result verified + fsynced |
-| 2026-04-22T06:32:30.314Z | resolveAgentPrompt:readFile | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.deckent/agents/temp-react-ts-specialist/PROMPT.md' |
-| 2026-04-22T06:32:30.315Z | docker-backend:exit | taskId=151-012 exitCode=137 |
-| 2026-04-22T06:32:30.319Z | docker-backend:reconcile | taskId=151-012 exitCode=137 but .result=DONE → HB DONE |
-| 2026-04-22T06:32:30.544Z | resolveAgentPrompt:readFile | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/agents/temp-react-ts-specialist/PROMPT.md' |
-| 2026-04-22T06:32:30.685Z | docker-backend:spawn | taskId=151-015 container=deckent-w-151-015 model=opus |
-| 2026-04-22T06:32:31.127Z | docker-backend:spawn-ok | taskId=151-015 containerId=36a39ef6d42e |
-| 2026-04-22T06:34:06.734Z | waitForResults:progress | Sprint devam ediyor — 12/15 task tamamlandı (30dk) |
-| 2026-04-22T06:39:08.065Z | waitForResults:progress | Sprint devam ediyor — 12/15 task tamamlandı (35dk) |
-| 2026-04-22T06:40:56.182Z | docker-backend:exit | taskId=151-015 exitCode=0 |
-| 2026-04-22T06:44:11.907Z | waitForResults:progress | Sprint devam ediyor — 13/15 task tamamlandı (40dk) |
-| 2026-04-22T06:44:39.676Z | readJsonSafe | Unexpected end of JSON input |
-| 2026-04-22T06:44:39.678Z | collectResults:lateResult | taskId=151-013 EXIT trap wrote .result (NO_GO), skipping synthetic NO_GO |
-| 2026-04-22T06:44:39.917Z | docker-backend:exit | taskId=151-013 exitCode=0 |
-| 2026-04-22T06:48:46.197Z | sprint-checkpoint:phaseTransition | Phase EXECUTE → writing checkpoint |
-| 2026-04-22T06:48:46.200Z | sprint-checkpoint:write | Checkpoint #3 written for sprint-151 |
-| 2026-04-22T06:48:46.202Z | runEvaluatePhase:start | totalTasks=15 collectedResults=15 collectedIds=[151-001,151-003,151-002,151-006,151-005,151-007,151-008,151-004,151-010,151-009,151-011,151-012,151-015,151-013,151-014] |
-| 2026-04-22T06:48:46.217Z | countLanguageFiles:statSync | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/.tasks/task-151-014.result.fsync' |
-| 2026-04-22T06:48:51.254Z | runEvaluatePhase:task | task=151-001 selfAssessment=DONE evaluation=DONE testsPassed=true |
-| 2026-04-22T06:48:51.258Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
-| 2026-04-22T06:48:51.259Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
-| 2026-04-22T06:48:51.261Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
-| 2026-04-22T06:48:51.262Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
-| 2026-04-22T06:48:51.263Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
-| 2026-04-22T06:48:51.265Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
-| 2026-04-22T06:48:51.266Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
-| 2026-04-22T06:48:51.267Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
-| 2026-04-22T06:48:51.269Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
-| 2026-04-22T06:48:51.270Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
-| 2026-04-22T06:48:51.271Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
-| 2026-04-22T06:48:56.050Z | runEvaluatePhase:task | task=151-002 selfAssessment=GO_WITH_TECH_DEBT evaluation=GO_WITH_TECH_DEBT testsPassed=true |
-| 2026-04-22T06:48:56.089Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
-| 2026-04-22T06:48:56.091Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
-| 2026-04-22T06:48:56.092Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
-| 2026-04-22T06:48:56.094Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
-| 2026-04-22T06:48:56.095Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
-| 2026-04-22T06:48:56.096Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
-| 2026-04-22T06:48:56.098Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
-| 2026-04-22T06:48:56.099Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
-| 2026-04-22T06:48:56.100Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
-| 2026-04-22T06:48:56.101Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
-| 2026-04-22T06:48:56.103Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
-| 2026-04-22T06:49:00.953Z | runEvaluatePhase:task | task=151-003 selfAssessment=DONE evaluation=DONE testsPassed=true |
-| 2026-04-22T06:49:00.956Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
-| 2026-04-22T06:49:00.958Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
-| 2026-04-22T06:49:00.959Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
-| 2026-04-22T06:49:00.960Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
-| 2026-04-22T06:49:00.962Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
-| 2026-04-22T06:49:00.963Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
-| 2026-04-22T06:49:00.964Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
-| 2026-04-22T06:49:00.965Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
-| 2026-04-22T06:49:00.968Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
-| 2026-04-22T06:49:00.969Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
-| 2026-04-22T06:49:00.971Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
-| 2026-04-22T06:49:05.831Z | runEvaluatePhase:task | task=151-004 selfAssessment=GO_WITH_TECH_DEBT evaluation=GO_WITH_TECH_DEBT testsPassed=true |
-| 2026-04-22T06:49:05.867Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
-| 2026-04-22T06:49:05.868Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
-| 2026-04-22T06:49:05.870Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
-| 2026-04-22T06:49:05.871Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
-| 2026-04-22T06:49:05.872Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
-| 2026-04-22T06:49:05.873Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
-| 2026-04-22T06:49:05.875Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
-| 2026-04-22T06:49:05.876Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
-| 2026-04-22T06:49:05.877Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
-| 2026-04-22T06:49:05.879Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
-| 2026-04-22T06:49:05.880Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
-| 2026-04-22T06:49:11.078Z | runEvaluatePhase:task | task=151-005 selfAssessment=DONE evaluation=DONE testsPassed=true |
-| 2026-04-22T06:49:11.082Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
-| 2026-04-22T06:49:11.084Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
-| 2026-04-22T06:49:11.085Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
-| 2026-04-22T06:49:11.087Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
-| 2026-04-22T06:49:11.088Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
-| 2026-04-22T06:49:11.090Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
-| 2026-04-22T06:49:11.091Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
-| 2026-04-22T06:49:11.093Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
-| 2026-04-22T06:49:11.094Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
-| 2026-04-22T06:49:11.095Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
-| 2026-04-22T06:49:11.097Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
-| 2026-04-22T06:49:18.058Z | runEvaluatePhase:task | task=151-006 selfAssessment=DONE evaluation=DONE testsPassed=true |
-| 2026-04-22T06:49:18.061Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
-| 2026-04-22T06:49:18.063Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
-| 2026-04-22T06:49:18.064Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
-| 2026-04-22T06:49:18.066Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
-| 2026-04-22T06:49:18.067Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
-| 2026-04-22T06:49:18.068Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
-| 2026-04-22T06:49:18.070Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
-| 2026-04-22T06:49:18.071Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
-| 2026-04-22T06:49:18.072Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
-| 2026-04-22T06:49:18.074Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
-| 2026-04-22T06:49:18.075Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
-| 2026-04-22T06:49:22.949Z | runEvaluatePhase:task | task=151-007 selfAssessment=DONE evaluation=DONE testsPassed=true |
-| 2026-04-22T06:49:22.952Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
-| 2026-04-22T06:49:22.954Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
-| 2026-04-22T06:49:22.955Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
-| 2026-04-22T06:49:22.956Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
-| 2026-04-22T06:49:22.958Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
-| 2026-04-22T06:49:22.959Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
-| 2026-04-22T06:49:22.961Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
-| 2026-04-22T06:49:22.962Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
-| 2026-04-22T06:49:22.964Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
-| 2026-04-22T06:49:22.968Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
-| 2026-04-22T06:49:22.970Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
-| 2026-04-22T06:49:27.721Z | runEvaluatePhase:task | task=151-008 selfAssessment=DONE evaluation=DONE testsPassed=true |
-| 2026-04-22T06:49:27.724Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
-| 2026-04-22T06:49:27.726Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
-| 2026-04-22T06:49:27.727Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
-| 2026-04-22T06:49:27.728Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
-| 2026-04-22T06:49:27.730Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
-| 2026-04-22T06:49:27.731Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
-| 2026-04-22T06:49:27.732Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
-| 2026-04-22T06:49:27.734Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
-| 2026-04-22T06:49:27.735Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
-| 2026-04-22T06:49:27.736Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
-| 2026-04-22T06:49:27.737Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
-| 2026-04-22T06:49:32.379Z | runEvaluatePhase:task | task=151-009 selfAssessment=DONE evaluation=DONE testsPassed=true |
-| 2026-04-22T06:49:32.382Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
-| 2026-04-22T06:49:32.384Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
-| 2026-04-22T06:49:32.385Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
-| 2026-04-22T06:49:32.387Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
-| 2026-04-22T06:49:32.388Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
-| 2026-04-22T06:49:32.389Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
-| 2026-04-22T06:49:32.391Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
-| 2026-04-22T06:49:32.392Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
-| 2026-04-22T06:49:32.393Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
-| 2026-04-22T06:49:32.394Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
-| 2026-04-22T06:49:32.396Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
-| 2026-04-22T06:49:37.195Z | runEvaluatePhase:task | task=151-010 selfAssessment=DONE evaluation=DONE testsPassed=true |
-| 2026-04-22T06:49:37.198Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
-| 2026-04-22T06:49:37.199Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
-| 2026-04-22T06:49:37.201Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
-| 2026-04-22T06:49:37.202Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
-| 2026-04-22T06:49:37.203Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
-| 2026-04-22T06:49:37.205Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
-| 2026-04-22T06:49:37.206Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
-| 2026-04-22T06:49:37.207Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
-| 2026-04-22T06:49:37.208Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
-| 2026-04-22T06:49:37.210Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
-| 2026-04-22T06:49:37.211Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
-| 2026-04-22T06:49:42.030Z | runEvaluatePhase:task | task=151-011 selfAssessment=DONE evaluation=DONE testsPassed=true |
-| 2026-04-22T06:49:42.033Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
-| 2026-04-22T06:49:42.035Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
-| 2026-04-22T06:49:42.036Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
-| 2026-04-22T06:49:42.038Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
-| 2026-04-22T06:49:42.039Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
-| 2026-04-22T06:49:42.040Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
-| 2026-04-22T06:49:42.041Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
-| 2026-04-22T06:49:42.043Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
-| 2026-04-22T06:49:42.044Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
-| 2026-04-22T06:49:42.045Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
-| 2026-04-22T06:49:42.047Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
-| 2026-04-22T06:49:48.445Z | runEvaluatePhase:task | task=151-012 selfAssessment=DONE evaluation=DONE testsPassed=true |
-| 2026-04-22T06:49:48.448Z | runEvaluatePhase:task | task=151-013 selfAssessment=NO_GO evaluation=NO_GO testsPassed=false |
-| 2026-04-22T06:49:48.450Z | runEvaluatePhase:task | task=151-014 selfAssessment=NO_GO evaluation=NO_GO testsPassed=false |
-| 2026-04-22T06:49:48.452Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
-| 2026-04-22T06:49:48.454Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
-| 2026-04-22T06:49:48.455Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
-| 2026-04-22T06:49:48.456Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
-| 2026-04-22T06:49:48.458Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
-| 2026-04-22T06:49:48.459Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
-| 2026-04-22T06:49:48.461Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
-| 2026-04-22T06:49:48.462Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
-| 2026-04-22T06:49:48.463Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
-| 2026-04-22T06:49:48.465Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
-| 2026-04-22T06:49:48.466Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
-| 2026-04-22T06:49:56.412Z | runEvaluatePhase:task | task=151-015 selfAssessment=DONE evaluation=GO_WITH_TECH_DEBT testsPassed=true |
-| 2026-04-22T06:49:56.446Z | runEvaluatePhase:done | evaluations.size=15 keys=[151-001,151-002,151-003,151-004,151-005,151-006,151-007,151-008,151-009,151-010,151-011,151-012,151-013,151-014,151-015] |
-| 2026-04-22T06:49:56.454Z | sprint-checkpoint:phaseTransition | Phase EVALUATE → writing checkpoint |
-| 2026-04-22T06:49:56.456Z | sprint-checkpoint:write | Checkpoint #4 written for sprint-151 |
-| 2026-04-22T06:49:56.460Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
-| 2026-04-22T06:49:56.462Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
-| 2026-04-22T06:49:56.463Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
-| 2026-04-22T06:49:56.465Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
-| 2026-04-22T06:49:56.466Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
-| 2026-04-22T06:49:56.467Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
-| 2026-04-22T06:49:56.469Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
-| 2026-04-22T06:49:56.470Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
-| 2026-04-22T06:49:56.471Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
-| 2026-04-22T06:49:56.473Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
-| 2026-04-22T06:49:56.474Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
-| 2026-04-22T06:49:56.477Z | mid-sprint-adapter:shouldReroute | Rerouting: agent undefined→temp-react-specialist, skills []→[system-architect] (attempt 1/3) |
-| 2026-04-22T06:49:56.478Z | mid-sprint-adapter:apply | Task 151-013-fix rerouted → agent=temp-react-specialist, skills=[system-architect] |
-| 2026-04-22T06:49:56.480Z | mid-sprint-adapter:shouldReroute | Rerouting: agent undefined→architect, skills []→[docker-expert] (attempt 1/3) |
-| 2026-04-22T06:49:56.481Z | mid-sprint-adapter:apply | Task 151-014-fix rerouted → agent=architect, skills=[docker-expert] |
-| 2026-04-22T06:49:56.502Z | resolveAgentPrompt:readFile | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.deckent/agents/temp-react-specialist/PROMPT.md' |
-| 2026-04-22T06:49:56.504Z | docker-backend:exit | taskId=151-014 exitCode=0 |
-| 2026-04-22T06:49:56.734Z | resolveAgentPrompt:readFile | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/agents/temp-react-specialist/PROMPT.md' |
-| 2026-04-22T06:49:56.816Z | docker-backend:spawn | taskId=151-013-fix container=deckent-w-151-013-fix model=sonnet |
-| 2026-04-22T06:49:57.204Z | docker-backend:spawn-ok | taskId=151-013-fix containerId=fe61179635bb |
-| 2026-04-22T06:49:57.288Z | docker-backend:spawn | taskId=151-014-fix container=deckent-w-151-014-fix model=opus |
-| 2026-04-22T06:49:57.627Z | docker-backend:spawn-ok | taskId=151-014-fix containerId=16b0d56cb626 |
-| 2026-04-22T06:51:46.827Z | readJsonSafe | Unexpected end of JSON input |
-| 2026-04-22T06:52:02.838Z | docker-backend:exit | taskId=151-014-fix exitCode=0 |
-| 2026-04-22T06:55:00.341Z | waitForResults:progress | Sprint devam ediyor — 1/2 task tamamlandı (5dk) |
-| 2026-04-22T06:55:25.179Z | readJsonSafe | Unexpected end of JSON input |
-| 2026-04-22T06:55:30.186Z | sprint-checkpoint:phaseTransition | Phase FIX → writing checkpoint |
-| 2026-04-22T06:55:30.187Z | sprint-checkpoint:write | Checkpoint #5 written for sprint-151 |
-| 2026-04-22T06:55:30.193Z | finalizeSprint:preRetro | evaluations.size=17 keys=[151-001,151-002,151-003,151-004,151-005,151-006,151-007,151-008,151-009,151-010,151-011,151-012,151-013,151-014,151-015,151-013-fix,151-014-fix] |
-| 2026-04-22T06:55:30.194Z | buildAgentPerformance | task=151-001 agent=architect ev=DONE evalMapSize=17 evalKeys=[151-001,151-002,151-003,151-004,151-005,151-006,151-007,151-008,151-009,151-010,151-011,151-012,151-013,151-014,151-015,151-013-fix,151-01 |
-| 2026-04-22T06:55:30.196Z | buildAgentPerformance | task=151-002 agent=architect ev=GO_WITH_TECH_DEBT evalMapSize=17 evalKeys=[151-001,151-002,151-003,151-004,151-005,151-006,151-007,151-008,151-009,151-010,151-011,151-012,151-013,151-014,151-015,151-0 |
-| 2026-04-22T06:55:30.197Z | buildAgentPerformance | task=151-003 agent=temp-react-ts-specialist ev=DONE evalMapSize=17 evalKeys=[151-001,151-002,151-003,151-004,151-005,151-006,151-007,151-008,151-009,151-010,151-011,151-012,151-013,151-014,151-015,151 |
-| 2026-04-22T06:55:30.198Z | buildAgentPerformance | task=151-004 agent=doc-writer ev=GO_WITH_TECH_DEBT evalMapSize=17 evalKeys=[151-001,151-002,151-003,151-004,151-005,151-006,151-007,151-008,151-009,151-010,151-011,151-012,151-013,151-014,151-015,151- |
-| 2026-04-22T06:55:30.200Z | buildAgentPerformance | task=151-005 agent=doc-writer ev=DONE evalMapSize=17 evalKeys=[151-001,151-002,151-003,151-004,151-005,151-006,151-007,151-008,151-009,151-010,151-011,151-012,151-013,151-014,151-015,151-013-fix,151-0 |
-| 2026-04-22T06:55:30.201Z | buildAgentPerformance | task=151-006 agent=doc-writer ev=DONE evalMapSize=17 evalKeys=[151-001,151-002,151-003,151-004,151-005,151-006,151-007,151-008,151-009,151-010,151-011,151-012,151-013,151-014,151-015,151-013-fix,151-0 |
-| 2026-04-22T06:55:30.202Z | buildAgentPerformance | task=151-007 agent=doc-writer ev=DONE evalMapSize=17 evalKeys=[151-001,151-002,151-003,151-004,151-005,151-006,151-007,151-008,151-009,151-010,151-011,151-012,151-013,151-014,151-015,151-013-fix,151-0 |
-| 2026-04-22T06:55:30.203Z | buildAgentPerformance | task=151-008 agent=doc-writer ev=DONE evalMapSize=17 evalKeys=[151-001,151-002,151-003,151-004,151-005,151-006,151-007,151-008,151-009,151-010,151-011,151-012,151-013,151-014,151-015,151-013-fix,151-0 |
-| 2026-04-22T06:55:30.204Z | buildAgentPerformance | task=151-009 agent=architect ev=DONE evalMapSize=17 evalKeys=[151-001,151-002,151-003,151-004,151-005,151-006,151-007,151-008,151-009,151-010,151-011,151-012,151-013,151-014,151-015,151-013-fix,151-01 |
-| 2026-04-22T06:55:30.206Z | buildAgentPerformance | task=151-010 agent=temp-react-ts-specialist ev=DONE evalMapSize=17 evalKeys=[151-001,151-002,151-003,151-004,151-005,151-006,151-007,151-008,151-009,151-010,151-011,151-012,151-013,151-014,151-015,151 |
-| 2026-04-22T06:55:30.207Z | buildAgentPerformance | task=151-011 agent=doc-writer ev=DONE evalMapSize=17 evalKeys=[151-001,151-002,151-003,151-004,151-005,151-006,151-007,151-008,151-009,151-010,151-011,151-012,151-013,151-014,151-015,151-013-fix,151-0 |
-| 2026-04-22T06:55:30.208Z | buildAgentPerformance | task=151-012 agent=architect ev=DONE evalMapSize=17 evalKeys=[151-001,151-002,151-003,151-004,151-005,151-006,151-007,151-008,151-009,151-010,151-011,151-012,151-013,151-014,151-015,151-013-fix,151-01 |
-| 2026-04-22T06:55:30.209Z | buildAgentPerformance | task=151-013 agent=temp-react-ts-specialist ev=DONE evalMapSize=17 evalKeys=[151-001,151-002,151-003,151-004,151-005,151-006,151-007,151-008,151-009,151-010,151-011,151-012,151-013,151-014,151-015,151 |
-| 2026-04-22T06:55:30.211Z | buildAgentPerformance | task=151-014 agent=architect ev=DONE evalMapSize=17 evalKeys=[151-001,151-002,151-003,151-004,151-005,151-006,151-007,151-008,151-009,151-010,151-011,151-012,151-013,151-014,151-015,151-013-fix,151-01 |
-| 2026-04-22T06:55:30.212Z | buildAgentPerformance | task=151-015 agent=temp-react-ts-specialist ev=GO_WITH_TECH_DEBT evalMapSize=17 evalKeys=[151-001,151-002,151-003,151-004,151-005,151-006,151-007,151-008,151-009,151-010,151-011,151-012,151-013,151-01 |
-| 2026-04-22T06:57:06.323Z | finalizeSprint:tripleLink | Triple-link created for sprint-151 |
-| 2026-04-22T06:57:06.421Z | finalizeSprint:routing-outcomes | Recorded 15 routing outcomes to learnings.json |
-| 2026-04-22T06:57:06.437Z | finalizeSprint:rule-evolution | 10 new rules evolved |
-| 2026-04-22T06:57:06.443Z | rule-evolver:saveRules | 10 rules saved to .deckent/routing/evolved-rules.json |
-| 2026-04-22T06:57:06.516Z | finalizeSprint:syncStatsToManifests | Synced 16 agents, 16 skills to manifest files |
-| 2026-04-22T06:57:06.532Z | finalizeSprint:promotion | agent 'test-writer': 123 tasks, 91% success — meets promotion criteria |
-| 2026-04-22T06:57:06.535Z | promotion-pipeline:promote | Temp agent 'test-writer' not found |
-| 2026-04-22T06:57:06.544Z | finalizeSprint:promotion | agent 'temp-react-ts-specialist': 32 tasks, 100% success — meets promotion criteria |
-| 2026-04-22T06:57:06.551Z | promotion-pipeline:promote | Temp agent 'temp-react-ts-specialist' not found |
-| 2026-04-22T06:57:06.553Z | finalizeSprint:promotion | skill 'code-reviewer': 32 tasks, 91% success — meets promotion criteria |
-| 2026-04-22T06:57:06.560Z | promotion-pipeline:promote | Temp skill 'code-reviewer' not found |
-| 2026-04-22T06:57:06.600Z | finalizeSprint:breadcrumb | Step 10 (richOutput) — entering |
-| 2026-04-22T06:57:06.665Z | buildAgentPerformance | task=151-001 agent=architect ev=DONE evalMapSize=17 evalKeys=[151-001,151-002,151-003,151-004,151-005,151-006,151-007,151-008,151-009,151-010,151-011,151-012,151-013,151-014,151-015,151-013-fix,151-01 |
-| 2026-04-22T06:57:06.667Z | buildAgentPerformance | task=151-002 agent=architect ev=GO_WITH_TECH_DEBT evalMapSize=17 evalKeys=[151-001,151-002,151-003,151-004,151-005,151-006,151-007,151-008,151-009,151-010,151-011,151-012,151-013,151-014,151-015,151-0 |
-| 2026-04-22T06:57:06.668Z | buildAgentPerformance | task=151-003 agent=temp-react-ts-specialist ev=DONE evalMapSize=17 evalKeys=[151-001,151-002,151-003,151-004,151-005,151-006,151-007,151-008,151-009,151-010,151-011,151-012,151-013,151-014,151-015,151 |
-| 2026-04-22T06:57:06.671Z | buildAgentPerformance | task=151-004 agent=doc-writer ev=GO_WITH_TECH_DEBT evalMapSize=17 evalKeys=[151-001,151-002,151-003,151-004,151-005,151-006,151-007,151-008,151-009,151-010,151-011,151-012,151-013,151-014,151-015,151- |
-| 2026-04-22T06:57:06.674Z | buildAgentPerformance | task=151-005 agent=doc-writer ev=DONE evalMapSize=17 evalKeys=[151-001,151-002,151-003,151-004,151-005,151-006,151-007,151-008,151-009,151-010,151-011,151-012,151-013,151-014,151-015,151-013-fix,151-0 |
-| 2026-04-22T06:57:06.680Z | buildAgentPerformance | task=151-006 agent=doc-writer ev=DONE evalMapSize=17 evalKeys=[151-001,151-002,151-003,151-004,151-005,151-006,151-007,151-008,151-009,151-010,151-011,151-012,151-013,151-014,151-015,151-013-fix,151-0 |
-| 2026-04-22T06:57:06.681Z | buildAgentPerformance | task=151-007 agent=doc-writer ev=DONE evalMapSize=17 evalKeys=[151-001,151-002,151-003,151-004,151-005,151-006,151-007,151-008,151-009,151-010,151-011,151-012,151-013,151-014,151-015,151-013-fix,151-0 |
-| 2026-04-22T06:57:06.688Z | buildAgentPerformance | task=151-008 agent=doc-writer ev=DONE evalMapSize=17 evalKeys=[151-001,151-002,151-003,151-004,151-005,151-006,151-007,151-008,151-009,151-010,151-011,151-012,151-013,151-014,151-015,151-013-fix,151-0 |
-| 2026-04-22T06:57:06.689Z | buildAgentPerformance | task=151-009 agent=architect ev=DONE evalMapSize=17 evalKeys=[151-001,151-002,151-003,151-004,151-005,151-006,151-007,151-008,151-009,151-010,151-011,151-012,151-013,151-014,151-015,151-013-fix,151-01 |
-| 2026-04-22T06:57:06.691Z | buildAgentPerformance | task=151-010 agent=temp-react-ts-specialist ev=DONE evalMapSize=17 evalKeys=[151-001,151-002,151-003,151-004,151-005,151-006,151-007,151-008,151-009,151-010,151-011,151-012,151-013,151-014,151-015,151 |
-| 2026-04-22T06:57:06.693Z | buildAgentPerformance | task=151-011 agent=doc-writer ev=DONE evalMapSize=17 evalKeys=[151-001,151-002,151-003,151-004,151-005,151-006,151-007,151-008,151-009,151-010,151-011,151-012,151-013,151-014,151-015,151-013-fix,151-0 |
-| 2026-04-22T06:57:06.696Z | buildAgentPerformance | task=151-012 agent=architect ev=DONE evalMapSize=17 evalKeys=[151-001,151-002,151-003,151-004,151-005,151-006,151-007,151-008,151-009,151-010,151-011,151-012,151-013,151-014,151-015,151-013-fix,151-01 |
-| 2026-04-22T06:57:06.697Z | buildAgentPerformance | task=151-013 agent=temp-react-ts-specialist ev=DONE evalMapSize=17 evalKeys=[151-001,151-002,151-003,151-004,151-005,151-006,151-007,151-008,151-009,151-010,151-011,151-012,151-013,151-014,151-015,151 |
-| 2026-04-22T06:57:06.699Z | buildAgentPerformance | task=151-014 agent=architect ev=DONE evalMapSize=17 evalKeys=[151-001,151-002,151-003,151-004,151-005,151-006,151-007,151-008,151-009,151-010,151-011,151-012,151-013,151-014,151-015,151-013-fix,151-01 |
-| 2026-04-22T06:57:06.701Z | buildAgentPerformance | task=151-015 agent=temp-react-ts-specialist ev=GO_WITH_TECH_DEBT evalMapSize=17 evalKeys=[151-001,151-002,151-003,151-004,151-005,151-006,151-007,151-008,151-009,151-010,151-011,151-012,151-013,151-01 |
-| 2026-04-22T06:57:06.708Z | finalizeSprint:breadcrumb | Step 10b (selfAuditGate) — entering |
-| 2026-04-22T06:57:21.544Z | runSelfAuditGate:tsc | status=PASS errors=0 |
-| 2026-04-22T06:59:27.998Z | runSelfAuditGate:vitest | status=FAIL delta.fail=1 |
-| 2026-04-22T06:59:28.727Z | docker-backend:exit | taskId=151-013-fix exitCode=0 |
-| 2026-04-22T06:59:29.999Z | runSelfAuditGate:honesty | violations=0 |
-| 2026-04-22T06:59:30.031Z | runSelfAuditGate | overallGate=GATE_FAILURE sprint=sprint-151 |
-| 2026-04-22T06:59:30.048Z | finalizeSprint:selfAuditGate | Gate completed: overallGate=GATE_FAILURE |
-| 2026-04-22T06:59:30.057Z | finalizeSprint:selfAuditGate | Status updated: RETROSPECTIVE → GO_WITH_GATE_FAILURE |
-| 2026-04-22T06:59:30.081Z | finalizeSprint:selfAuditGate | Gate result written to /home/alperen/deckent-dev/.deckent/sprint-151-gate.json overallGate=GATE_FAILURE |
-| 2026-04-22T06:59:30.096Z | finalizeSprint:breadcrumb | Step 10c (loadReport) — entering |
-| 2026-04-22T06:59:30.173Z | finalizeSprint:loadReport | Load test report written to /home/alperen/deckent-dev/docs/audits/sprint-151/load-test-report.md |
-| 2026-04-22T06:59:30.187Z | finalizeSprint:breadcrumb | Step 10c (loadReport) — done |
-| 2026-04-22T06:59:30.193Z | finalizeSprint:breadcrumb | Step 10c2 (metricsRotation) — entering |
-| 2026-04-22T06:59:30.222Z | observability-rotation | Rotated 6096 bytes → /home/alperen/deckent-dev/.deckent/archive/metrics/metrics-sprint-151.jsonl.gz (684 bytes gzipped), pruned 0 old archives |
-| 2026-04-22T06:59:30.232Z | finalizeSprint:metricsRotation | Rotated 6096 bytes → /home/alperen/deckent-dev/.deckent/archive/metrics/metrics-sprint-151.jsonl.gz (684 bytes gzipped), pruned 0 old archives |
-| 2026-04-22T06:59:30.238Z | finalizeSprint:breadcrumb | Step 10c2 (metricsRotation) — done |
-| 2026-04-22T06:59:30.242Z | finalizeSprint:breadcrumb | Step 10d (featuresManifest) — entering |
-| 2026-04-22T06:59:34.813Z | finalizeSprint:featuresManifest | Sync exit=0: ✓ Features manifest written: /home/alperen/deckent-dev/.deckent/features-manifest.json (31 features) |
-| 2026-04-22T06:59:34.818Z | finalizeSprint:breadcrumb | Step 12 (archiveDirectives) — entering |
-| 2026-04-22T06:59:34.830Z | archiveDirectives | Archived DIRECTIVES.md → /home/alperen/deckent-dev/.brain/archive/DIRECTIVES-sprint-151.md |
-| 2026-04-22T06:59:34.839Z | finalizeSprint:breadcrumb | Step 12b (archiveOrphanTasks) — entering |
-| 2026-04-22T06:59:34.947Z | createPreArchiveSnapshot | Snapshot created: /home/alperen/deckent-dev/.deckent/sprint-151-pre-archive.tar.gz (85 files, hash=f846c48db707...) |
-| 2026-04-22T06:59:34.949Z | finalizeSprint:preArchiveSnapshot | Snapshot created: 85 files, hash=f846c48db707... |
-| 2026-04-22T06:59:35.074Z | archiveOrphanTasks | Archived 85 task files to /home/alperen/deckent-dev/.brain/archive/sprint-151-tasks |
-| 2026-04-22T06:59:35.087Z | finalizeSprint:archiveOrphanTasks | Archived 85 orphan task files |
-| 2026-04-22T06:59:35.101Z | finalizeSprint:breadcrumb | Step 12c (cleanTasksArchive) — entering |
-| 2026-04-22T06:59:35.113Z | finalizeSprint:cleanTasksArchive | Removed 0 old .tasks/archive/ dirs |
-| 2026-04-22T06:59:35.124Z | finalizeSprint:breadcrumb | Step 12d (sprintFileRetention) — entering |
-| 2026-04-22T06:59:35.186Z | finalizeSprint:sprintFileRetention | Retention complete: archived=2, countersDeleted=2, forensicMoved=0, bytesFreed=7673 |
-| 2026-04-22T06:59:35.189Z | finalizeSprint:breadcrumb | Step 13 (jobSummary) — entering |
-| 2026-04-22T06:59:35.219Z | finalizeSprint:jobSummary | Job summary written to /home/alperen/deckent-dev/.deckent/jobs/sprint-151.json |
-| 2026-04-22T06:59:35.221Z | finalizeSprint:breadcrumb | Step 14 (postFinalizeHooks) — entering |
-| 2026-04-22T06:59:35.407Z | postFinalizeHooks:memoryExport | 4 files written, 0 errors |
-| 2026-04-22T06:59:35.425Z | postFinalizeHooks:identityRegen | updated adrCount=43 |
-| 2026-04-22T06:59:35.488Z | postFinalizeHooks:ruleRegen | Rule regeneration hook called |
-| 2026-04-22T06:59:35.490Z | finalizeSprint:postFinalizeHooks | memExport=4 identity=updated ruleRegen=true errors=0 |
-| 2026-04-22T06:59:35.527Z | [Brain] | Cleanup delayed 180000ms — .tasks/ files remain readable |
-| 2026-04-22T07:02:27.562Z | readJsonSafeAsync | ENOENT: no such file or directory, open '/home/alperen/.deckent/config.json' |
+| 2026-04-24T12:16:30.229Z | planSprint:task-write | Writing 152-011: assignedAgent=doc-writer, assignedSkills=[testing-expert, code-reviewer] |
+| 2026-04-24T12:16:30.230Z | planSprint:task-write | Writing 152-012: assignedAgent=doc-writer, assignedSkills=[system-architect, code-reviewer] |
+| 2026-04-24T12:16:30.231Z | planSprint:task-write | Writing 152-013: assignedAgent=doc-writer, assignedSkills=[system-architect] |
+| 2026-04-24T12:16:30.232Z | planSprint:task-write | Writing 152-014: assignedAgent=doc-writer, assignedSkills=[devops-engineer, docker-expert] |
+| 2026-04-24T12:16:30.233Z | planSprint:task-write | Writing 152-015: assignedAgent=architect, assignedSkills=[react-specialist, frontend-design] |
+| 2026-04-24T12:16:30.234Z | planSprint:task-write | Writing 152-016: assignedAgent=doc-writer, assignedSkills=[system-architect, code-reviewer] |
+| 2026-04-24T12:16:30.234Z | planSprint:task-write | Writing 152-017: assignedAgent=doc-writer, assignedSkills=[typescript-expert, testing-expert] |
+| 2026-04-24T12:16:30.235Z | planSprint:task-write | Writing 152-018: assignedAgent=doc-writer, assignedSkills=[documentation-writer, system-architect] |
+| 2026-04-24T12:16:30.236Z | planSprint:task-write | Writing 152-019: assignedAgent=architect, assignedSkills=[security-specialist, system-architect] |
+| 2026-04-24T12:16:30.237Z | planSprint:task-write | Writing 152-020: assignedAgent=temp-react-ts-specialist, assignedSkills=[security-specialist, code-reviewer] |
+| 2026-04-24T12:16:30.238Z | planSprint:task-write | Writing 152-021: assignedAgent=doc-writer, assignedSkills=[system-architect, code-reviewer] |
+| 2026-04-24T12:16:30.238Z | planSprint:task-write | Writing 152-022: assignedAgent=doc-writer, assignedSkills=[documentation-writer, system-architect] |
+| 2026-04-24T12:16:30.239Z | planSprint:task-write | Writing 152-023: assignedAgent=doc-writer, assignedSkills=[system-architect, documentation-writer] |
+| 2026-04-24T12:16:30.240Z | planSprint:task-write | Writing 152-024: assignedAgent=doc-writer, assignedSkills=[code-reviewer, typescript-expert] |
+| 2026-04-24T12:16:30.241Z | planSprint:task-write | Writing 152-025: assignedAgent=architect, assignedSkills=[git-expert, documentation-writer] |
+| 2026-04-24T12:16:30.242Z | planSprint:task-write | Writing 152-026: assignedAgent=doc-writer, assignedSkills=[system-architect, documentation-writer] |
+| 2026-04-24T12:16:30.242Z | planSprint:task-write | Writing 152-027: assignedAgent=doc-writer, assignedSkills=[system-architect, documentation-writer] |
+| 2026-04-24T12:16:30.243Z | planSprint:task-write | Writing 152-028: assignedAgent=doc-writer, assignedSkills=[documentation-writer, system-architect] |
+| 2026-04-24T12:16:30.244Z | planSprint:task-write | Writing 152-029: assignedAgent=temp-react-ts-specialist, assignedSkills=[security-specialist] |
+| 2026-04-24T12:16:30.245Z | planSprint:task-write | Writing 152-030: assignedAgent=architect, assignedSkills=[documentation-writer, system-architect] |
+| 2026-04-24T12:16:30.284Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
+| 2026-04-24T12:16:30.284Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
+| 2026-04-24T12:16:30.285Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
+| 2026-04-24T12:16:30.285Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
+| 2026-04-24T12:16:30.286Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
+| 2026-04-24T12:16:30.287Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
+| 2026-04-24T12:16:30.288Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
+| 2026-04-24T12:16:30.288Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
+| 2026-04-24T12:16:30.289Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
+| 2026-04-24T12:16:30.289Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
+| 2026-04-24T12:16:30.290Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
+| 2026-04-24T12:16:30.291Z | planSprint:learning-bonuses | Loaded 16 learning bonuses from previous sprints |
+| 2026-04-24T12:16:30.291Z | planSprint:temp-skill | Generated project-conventions skill for typescript |
+| 2026-04-24T12:16:30.292Z | planSprint:temp-agent | Generated temp agent: temp-react-ts-specialist for typescript/react |
+| 2026-04-24T12:16:30.293Z | planSprint:temp-agent | Generated temp agent: temp-react-specialist for typescript/react |
+| 2026-04-24T12:16:30.293Z | planSprint:evolved-rules | Injected 5 auto-applied evolved rules into activation configs |
+| 2026-04-24T12:16:30.294Z | planSprint:routing-v2 | Task 152-001 → agent=doc-writer, skills=[system-architect, documentation-writer], confidence=high, intent=documentation |
+| 2026-04-24T12:16:30.295Z | planSprint:routing-v2 | Task 152-002 → agent=doc-writer, skills=[system-architect, code-reviewer], confidence=high, intent=documentation |
+| 2026-04-24T12:16:30.295Z | planSprint:routing-v2 | Task 152-003 → agent=doc-writer, skills=[testing-expert, code-reviewer], confidence=high, intent=documentation |
+| 2026-04-24T12:16:30.296Z | planSprint:routing-v2 | Task 152-004 → agent=doc-writer, skills=[testing-expert, code-reviewer], confidence=high, intent=documentation |
+| 2026-04-24T12:16:30.297Z | planSprint:routing-v2 | Task 152-005 → agent=doc-writer, skills=[testing-expert, code-reviewer], confidence=high, intent=documentation |
+| 2026-04-24T12:16:30.297Z | planSprint:routing-v2 | Task 152-006 → agent=doc-writer, skills=[testing-expert, code-reviewer], confidence=high, intent=documentation |
+| 2026-04-24T12:16:30.298Z | planSprint:routing-v2 | Task 152-007 → agent=doc-writer, skills=[testing-expert, code-reviewer], confidence=high, intent=documentation |
+| 2026-04-24T12:16:30.299Z | planSprint:routing-v2 | Task 152-008 → agent=doc-writer, skills=[testing-expert, code-reviewer], confidence=high, intent=documentation |
+| 2026-04-24T12:16:30.300Z | planSprint:routing-v2 | Task 152-009 → agent=doc-writer, skills=[testing-expert, code-reviewer], confidence=high, intent=documentation |
+| 2026-04-24T12:16:30.300Z | planSprint:routing-v2 | Task 152-010 → agent=doc-writer, skills=[testing-expert], confidence=high, intent=documentation |
+| 2026-04-24T12:16:30.301Z | planSprint:routing-v2 | Task 152-011 → agent=doc-writer, skills=[testing-expert, code-reviewer], confidence=high, intent=documentation |
+| 2026-04-24T12:16:30.302Z | planSprint:routing-v2 | Task 152-012 → agent=doc-writer, skills=[system-architect, code-reviewer], confidence=high, intent=documentation |
+| 2026-04-24T12:16:30.302Z | planSprint:routing-v2 | Task 152-013 → agent=doc-writer, skills=[system-architect], confidence=high, intent=documentation |
+| 2026-04-24T12:16:30.303Z | planSprint:routing-v2 | Task 152-014 → agent=doc-writer, skills=[devops-engineer, docker-expert], confidence=high, intent=documentation |
+| 2026-04-24T12:16:30.304Z | planSprint:routing-v2 | Task 152-015 → agent=architect, skills=[react-specialist, frontend-design], confidence=low, intent=implementation |
+| 2026-04-24T12:16:30.305Z | planSprint:routing-v2 | Task 152-016 → agent=doc-writer, skills=[system-architect, code-reviewer], confidence=high, intent=documentation |
+| 2026-04-24T12:16:30.305Z | planSprint:routing-v2 | Task 152-017 → agent=doc-writer, skills=[typescript-expert, testing-expert], confidence=high, intent=documentation |
+| 2026-04-24T12:16:30.306Z | planSprint:routing-v2 | Task 152-018 → agent=doc-writer, skills=[documentation-writer, system-architect], confidence=high, intent=documentation |
+| 2026-04-24T12:16:30.307Z | planSprint:routing-v2 | Task 152-019 → agent=architect, skills=[security-specialist, system-architect], confidence=uncertain, intent=documentation |
+| 2026-04-24T12:16:30.307Z | planSprint:routing-v2 | Task 152-020 → agent=temp-react-ts-specialist, skills=[security-specialist, code-reviewer], confidence=low, intent=implementation |
+| 2026-04-24T12:16:30.308Z | planSprint:routing-v2 | Task 152-021 → agent=doc-writer, skills=[system-architect, code-reviewer], confidence=high, intent=documentation |
+| 2026-04-24T12:16:30.309Z | planSprint:routing-v2 | Task 152-022 → agent=doc-writer, skills=[documentation-writer, system-architect], confidence=high, intent=documentation |
+| 2026-04-24T12:16:30.311Z | planSprint:routing-v2 | Task 152-023 → agent=doc-writer, skills=[system-architect, documentation-writer], confidence=high, intent=documentation |
+| 2026-04-24T12:16:30.312Z | planSprint:routing-v2 | Task 152-024 → agent=doc-writer, skills=[code-reviewer, typescript-expert], confidence=high, intent=documentation |
+| 2026-04-24T12:16:30.312Z | planSprint:routing-v2 | Task 152-025 → agent=architect, skills=[git-expert, documentation-writer], confidence=uncertain, intent=documentation |
+| 2026-04-24T12:16:30.313Z | planSprint:routing-v2 | Task 152-026 → agent=doc-writer, skills=[system-architect, documentation-writer], confidence=high, intent=documentation |
+| 2026-04-24T12:16:30.314Z | planSprint:routing-v2 | Task 152-027 → agent=doc-writer, skills=[system-architect, documentation-writer], confidence=high, intent=documentation |
+| 2026-04-24T12:16:30.315Z | planSprint:routing-v2 | Task 152-028 → agent=doc-writer, skills=[documentation-writer, system-architect], confidence=high, intent=documentation |
+| 2026-04-24T12:16:30.315Z | planSprint:routing-v2 | Task 152-029 → agent=temp-react-ts-specialist, skills=[security-specialist], confidence=low, intent=implementation |
+| 2026-04-24T12:16:30.316Z | planSprint:routing-v2 | Task 152-030 → agent=architect, skills=[documentation-writer, system-architect], confidence=uncertain, intent=documentation |
+| 2026-04-24T12:16:30.317Z | planSprint:task-write | Writing 152-001: assignedAgent=doc-writer, assignedSkills=[system-architect, documentation-writer] |
+| 2026-04-24T12:16:30.318Z | planSprint:task-write | Writing 152-002: assignedAgent=doc-writer, assignedSkills=[system-architect, code-reviewer] |
+| 2026-04-24T12:16:30.319Z | planSprint:task-write | Writing 152-003: assignedAgent=doc-writer, assignedSkills=[testing-expert, code-reviewer] |
+| 2026-04-24T12:16:30.319Z | planSprint:task-write | Writing 152-004: assignedAgent=doc-writer, assignedSkills=[testing-expert, code-reviewer] |
+| 2026-04-24T12:16:30.320Z | planSprint:task-write | Writing 152-005: assignedAgent=doc-writer, assignedSkills=[testing-expert, code-reviewer] |
+| 2026-04-24T12:16:30.321Z | planSprint:task-write | Writing 152-006: assignedAgent=doc-writer, assignedSkills=[testing-expert, code-reviewer] |
+| 2026-04-24T12:16:30.322Z | planSprint:task-write | Writing 152-007: assignedAgent=doc-writer, assignedSkills=[testing-expert, code-reviewer] |
+| 2026-04-24T12:16:30.323Z | planSprint:task-write | Writing 152-008: assignedAgent=doc-writer, assignedSkills=[testing-expert, code-reviewer] |
+| 2026-04-24T12:16:30.324Z | planSprint:task-write | Writing 152-009: assignedAgent=doc-writer, assignedSkills=[testing-expert, code-reviewer] |
+| 2026-04-24T12:16:30.324Z | planSprint:task-write | Writing 152-010: assignedAgent=doc-writer, assignedSkills=[testing-expert] |
+| 2026-04-24T12:16:30.325Z | planSprint:task-write | Writing 152-011: assignedAgent=doc-writer, assignedSkills=[testing-expert, code-reviewer] |
+| 2026-04-24T12:16:30.326Z | planSprint:task-write | Writing 152-012: assignedAgent=doc-writer, assignedSkills=[system-architect, code-reviewer] |
+| 2026-04-24T12:16:30.327Z | planSprint:task-write | Writing 152-013: assignedAgent=doc-writer, assignedSkills=[system-architect] |
+| 2026-04-24T12:16:30.328Z | planSprint:task-write | Writing 152-014: assignedAgent=doc-writer, assignedSkills=[devops-engineer, docker-expert] |
+| 2026-04-24T12:16:30.328Z | planSprint:task-write | Writing 152-015: assignedAgent=architect, assignedSkills=[react-specialist, frontend-design] |
+| 2026-04-24T12:16:30.329Z | planSprint:task-write | Writing 152-016: assignedAgent=doc-writer, assignedSkills=[system-architect, code-reviewer] |
+| 2026-04-24T12:16:30.330Z | planSprint:task-write | Writing 152-017: assignedAgent=doc-writer, assignedSkills=[typescript-expert, testing-expert] |
+| 2026-04-24T12:16:30.331Z | planSprint:task-write | Writing 152-018: assignedAgent=doc-writer, assignedSkills=[documentation-writer, system-architect] |
+| 2026-04-24T12:16:30.332Z | planSprint:task-write | Writing 152-019: assignedAgent=architect, assignedSkills=[security-specialist, system-architect] |
+| 2026-04-24T12:16:30.333Z | planSprint:task-write | Writing 152-020: assignedAgent=temp-react-ts-specialist, assignedSkills=[security-specialist, code-reviewer] |
+| 2026-04-24T12:16:30.333Z | planSprint:task-write | Writing 152-021: assignedAgent=doc-writer, assignedSkills=[system-architect, code-reviewer] |
+| 2026-04-24T12:16:30.334Z | planSprint:task-write | Writing 152-022: assignedAgent=doc-writer, assignedSkills=[documentation-writer, system-architect] |
+| 2026-04-24T12:16:30.335Z | planSprint:task-write | Writing 152-023: assignedAgent=doc-writer, assignedSkills=[system-architect, documentation-writer] |
+| 2026-04-24T12:16:30.336Z | planSprint:task-write | Writing 152-024: assignedAgent=doc-writer, assignedSkills=[code-reviewer, typescript-expert] |
+| 2026-04-24T12:16:30.338Z | planSprint:task-write | Writing 152-025: assignedAgent=architect, assignedSkills=[git-expert, documentation-writer] |
+| 2026-04-24T12:16:30.339Z | planSprint:task-write | Writing 152-026: assignedAgent=doc-writer, assignedSkills=[system-architect, documentation-writer] |
+| 2026-04-24T12:16:30.340Z | planSprint:task-write | Writing 152-027: assignedAgent=doc-writer, assignedSkills=[system-architect, documentation-writer] |
+| 2026-04-24T12:16:30.341Z | planSprint:task-write | Writing 152-028: assignedAgent=doc-writer, assignedSkills=[documentation-writer, system-architect] |
+| 2026-04-24T12:16:30.341Z | planSprint:task-write | Writing 152-029: assignedAgent=temp-react-ts-specialist, assignedSkills=[security-specialist] |
+| 2026-04-24T12:16:30.342Z | planSprint:task-write | Writing 152-030: assignedAgent=architect, assignedSkills=[documentation-writer, system-architect] |
+| 2026-04-24T12:16:30.344Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
+| 2026-04-24T12:16:30.344Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
+| 2026-04-24T12:16:30.345Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
+| 2026-04-24T12:16:30.345Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
+| 2026-04-24T12:16:30.346Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
+| 2026-04-24T12:16:30.346Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
+| 2026-04-24T12:16:30.346Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
+| 2026-04-24T12:16:30.347Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
+| 2026-04-24T12:16:30.347Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
+| 2026-04-24T12:16:30.348Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
+| 2026-04-24T12:16:30.348Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
+| 2026-04-24T12:16:30.909Z | sprint-checkpoint:phaseTransition | Phase PLAN → writing checkpoint |
+| 2026-04-24T12:16:30.909Z | sprint-checkpoint:write | Checkpoint #1 written for sprint-152 |
+| 2026-04-24T12:16:30.911Z | spawnWorkers:collision | File "vitest.config.ts" written by tasks: 152-015, 152-030 |
+| 2026-04-24T12:16:31.020Z | docker-backend:spawn | taskId=152-001 container=deckent-w-152-001 model=opus |
+| 2026-04-24T12:16:31.345Z | docker-backend:spawn-ok | taskId=152-001 containerId=6d90735469ce |
+| 2026-04-24T12:16:31.349Z | resolveSkillPrompts:readSkillFile | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.deckent/skills/code-reviewer/SKILL.md' |
+| 2026-04-24T12:16:31.357Z | scope-sanitizer | warnings=2, rejected=0 |
+| 2026-04-24T12:16:31.455Z | docker-backend:spawn | taskId=152-002 container=deckent-w-152-002 model=opus |
+| 2026-04-24T12:16:31.776Z | docker-backend:spawn-ok | taskId=152-002 containerId=46b8cf11849c |
+| 2026-04-24T12:16:31.780Z | resolveSkillPrompts:readSkillFile | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.deckent/skills/code-reviewer/SKILL.md' |
+| 2026-04-24T12:16:31.882Z | docker-backend:spawn | taskId=152-003 container=deckent-w-152-003 model=opus |
+| 2026-04-24T12:16:32.202Z | docker-backend:spawn-ok | taskId=152-003 containerId=a901aa81d49f |
+| 2026-04-24T12:16:32.205Z | resolveSkillPrompts:readSkillFile | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.deckent/skills/code-reviewer/SKILL.md' |
+| 2026-04-24T12:16:32.308Z | docker-backend:spawn | taskId=152-004 container=deckent-w-152-004 model=opus |
+| 2026-04-24T12:16:32.615Z | docker-backend:spawn-ok | taskId=152-004 containerId=53c2e824dd75 |
+| 2026-04-24T12:16:32.620Z | resolveSkillPrompts:readSkillFile | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.deckent/skills/code-reviewer/SKILL.md' |
+| 2026-04-24T12:16:32.717Z | docker-backend:spawn | taskId=152-005 container=deckent-w-152-005 model=opus |
+| 2026-04-24T12:16:33.020Z | docker-backend:spawn-ok | taskId=152-005 containerId=afa9fd954d3b |
+| 2026-04-24T12:16:33.024Z | resolveSkillPrompts:readSkillFile | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.deckent/skills/code-reviewer/SKILL.md' |
+| 2026-04-24T12:16:33.136Z | docker-backend:spawn | taskId=152-006 container=deckent-w-152-006 model=opus |
+| 2026-04-24T12:16:33.467Z | docker-backend:spawn-ok | taskId=152-006 containerId=fced2f44f388 |
+| 2026-04-24T12:16:33.478Z | sprint-checkpoint:phaseTransition | Phase SPAWN → writing checkpoint |
+| 2026-04-24T12:16:33.479Z | sprint-checkpoint:write | Checkpoint #2 written for sprint-152 |
+| 2026-04-24T12:17:23.672Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/workspace/Cargo.toml' |
+| 2026-04-24T12:17:23.672Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/workspace/go.mod' |
+| 2026-04-24T12:17:23.673Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/workspace/setup.py' |
+| 2026-04-24T12:17:23.674Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/workspace/pyproject.toml' |
+| 2026-04-24T12:17:23.675Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/workspace/requirements.txt' |
+| 2026-04-24T12:17:23.675Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/workspace/Pipfile' |
+| 2026-04-24T12:17:23.676Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/workspace/pom.xml' |
+| 2026-04-24T12:17:23.676Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/workspace/build.gradle' |
+| 2026-04-24T12:17:23.677Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/workspace/CMakeLists.txt' |
+| 2026-04-24T12:17:23.677Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/workspace/Makefile' |
+| 2026-04-24T12:17:23.678Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/workspace/meson.build' |
+| 2026-04-24T12:17:24.306Z | readJsonSafeAsync | ENOENT: no such file or directory, open '/tmp/deckent-home/.deckent/config.json' |
+| 2026-04-24T12:17:24.328Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/workspace/Cargo.toml' |
+| 2026-04-24T12:17:24.328Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/workspace/go.mod' |
+| 2026-04-24T12:17:24.329Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/workspace/setup.py' |
+| 2026-04-24T12:17:24.330Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/workspace/pyproject.toml' |
+| 2026-04-24T12:17:24.330Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/workspace/requirements.txt' |
+| 2026-04-24T12:17:24.331Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/workspace/Pipfile' |
+| 2026-04-24T12:17:24.332Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/workspace/pom.xml' |
+| 2026-04-24T12:17:24.332Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/workspace/build.gradle' |
+| 2026-04-24T12:17:24.333Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/workspace/CMakeLists.txt' |
+| 2026-04-24T12:17:24.333Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/workspace/Makefile' |
+| 2026-04-24T12:17:24.334Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/workspace/meson.build' |
+| 2026-04-24T12:17:24.338Z | planSprint:learning-bonuses | Loaded 16 learning bonuses from previous sprints |
+| 2026-04-24T12:17:24.338Z | planSprint:temp-skill | Generated project-conventions skill for typescript |
+| 2026-04-24T12:17:24.339Z | planSprint:temp-agent | Generated temp agent: temp-react-ts-specialist for typescript/react |
+| 2026-04-24T12:17:24.340Z | planSprint:temp-agent | Generated temp agent: temp-react-specialist for typescript/react |
+| 2026-04-24T12:17:24.341Z | planSprint:evolved-rules | Injected 5 auto-applied evolved rules into activation configs |
+| 2026-04-24T12:17:24.345Z | planSprint:routing-v2 | Task 153-001 → agent=doc-writer, skills=[system-architect, documentation-writer], confidence=high, intent=documentation |
+| 2026-04-24T12:17:24.346Z | planSprint:routing-v2 | Task 153-002 → agent=doc-writer, skills=[system-architect, code-reviewer], confidence=high, intent=documentation |
+| 2026-04-24T12:17:24.347Z | planSprint:routing-v2 | Task 153-003 → agent=doc-writer, skills=[testing-expert, code-reviewer], confidence=high, intent=documentation |
+| 2026-04-24T12:17:24.348Z | planSprint:routing-v2 | Task 153-004 → agent=doc-writer, skills=[testing-expert, code-reviewer], confidence=high, intent=documentation |
+| 2026-04-24T12:17:24.350Z | planSprint:routing-v2 | Task 153-005 → agent=doc-writer, skills=[testing-expert, code-reviewer], confidence=high, intent=documentation |
+| 2026-04-24T12:17:24.351Z | planSprint:routing-v2 | Task 153-006 → agent=doc-writer, skills=[testing-expert, code-reviewer], confidence=high, intent=documentation |
+| 2026-04-24T12:17:24.352Z | planSprint:routing-v2 | Task 153-007 → agent=doc-writer, skills=[testing-expert, code-reviewer], confidence=high, intent=documentation |
+| 2026-04-24T12:17:24.352Z | planSprint:routing-v2 | Task 153-008 → agent=doc-writer, skills=[testing-expert, code-reviewer], confidence=high, intent=documentation |
+| 2026-04-24T12:17:24.353Z | planSprint:routing-v2 | Task 153-009 → agent=doc-writer, skills=[testing-expert, code-reviewer], confidence=high, intent=documentation |
+| 2026-04-24T12:17:24.354Z | planSprint:routing-v2 | Task 153-010 → agent=doc-writer, skills=[testing-expert], confidence=high, intent=documentation |
+| 2026-04-24T12:17:24.355Z | planSprint:routing-v2 | Task 153-011 → agent=doc-writer, skills=[testing-expert, code-reviewer], confidence=high, intent=documentation |
+| 2026-04-24T12:17:24.356Z | planSprint:routing-v2 | Task 153-012 → agent=doc-writer, skills=[system-architect, code-reviewer], confidence=high, intent=documentation |
+| 2026-04-24T12:17:24.357Z | planSprint:routing-v2 | Task 153-013 → agent=doc-writer, skills=[system-architect], confidence=high, intent=documentation |
+| 2026-04-24T12:17:24.358Z | planSprint:routing-v2 | Task 153-014 → agent=doc-writer, skills=[devops-engineer, docker-expert], confidence=high, intent=documentation |
+| 2026-04-24T12:17:24.359Z | planSprint:routing-v2 | Task 153-015 → agent=architect, skills=[react-specialist, frontend-design], confidence=low, intent=implementation |
+| 2026-04-24T12:17:24.362Z | planSprint:routing-v2 | Task 153-016 → agent=doc-writer, skills=[system-architect, code-reviewer], confidence=high, intent=documentation |
+| 2026-04-24T12:17:24.362Z | planSprint:routing-v2 | Task 153-017 → agent=doc-writer, skills=[typescript-expert, testing-expert], confidence=high, intent=documentation |
+| 2026-04-24T12:17:24.363Z | planSprint:routing-v2 | Task 153-018 → agent=doc-writer, skills=[documentation-writer, system-architect], confidence=high, intent=documentation |
+| 2026-04-24T12:17:24.364Z | planSprint:routing-v2 | Task 153-019 → agent=architect, skills=[security-specialist, system-architect], confidence=uncertain, intent=documentation |
+| 2026-04-24T12:17:24.365Z | planSprint:routing-v2 | Task 153-020 → agent=temp-react-ts-specialist, skills=[security-specialist, code-reviewer], confidence=low, intent=implementation |
+| 2026-04-24T12:17:24.366Z | planSprint:routing-v2 | Task 153-021 → agent=doc-writer, skills=[system-architect, code-reviewer], confidence=high, intent=documentation |
+| 2026-04-24T12:17:24.366Z | planSprint:routing-v2 | Task 153-022 → agent=doc-writer, skills=[documentation-writer, system-architect], confidence=high, intent=documentation |
+| 2026-04-24T12:17:24.367Z | planSprint:routing-v2 | Task 153-023 → agent=doc-writer, skills=[system-architect, documentation-writer], confidence=high, intent=documentation |
+| 2026-04-24T12:17:24.367Z | planSprint:routing-v2 | Task 153-024 → agent=doc-writer, skills=[code-reviewer, typescript-expert], confidence=high, intent=documentation |
+| 2026-04-24T12:17:24.368Z | planSprint:routing-v2 | Task 153-025 → agent=architect, skills=[git-expert, documentation-writer], confidence=uncertain, intent=documentation |
+| 2026-04-24T12:17:24.369Z | planSprint:routing-v2 | Task 153-026 → agent=doc-writer, skills=[system-architect, documentation-writer], confidence=high, intent=documentation |
+| 2026-04-24T12:17:24.369Z | planSprint:routing-v2 | Task 153-027 → agent=doc-writer, skills=[system-architect, documentation-writer], confidence=high, intent=documentation |
+| 2026-04-24T12:17:24.370Z | planSprint:routing-v2 | Task 153-028 → agent=doc-writer, skills=[documentation-writer, system-architect], confidence=high, intent=documentation |
+| 2026-04-24T12:17:24.371Z | planSprint:routing-v2 | Task 153-029 → agent=temp-react-ts-specialist, skills=[security-specialist], confidence=low, intent=implementation |
+| 2026-04-24T12:17:24.371Z | planSprint:routing-v2 | Task 153-030 → agent=architect, skills=[documentation-writer, system-architect], confidence=uncertain, intent=documentation |
+| 2026-04-24T12:17:25.206Z | readJsonSafeAsync | ENOENT: no such file or directory, open '/tmp/deckent-home/.deckent/config.json' |
+| 2026-04-24T12:17:28.130Z | readJsonSafeAsync | ENOENT: no such file or directory, open '/tmp/deckent-home/.deckent/config.json' |
+| 2026-04-24T12:18:11.683Z | runSelfAuditGate:tsc | status=PASS errors=0 |
+| 2026-04-24T12:18:11.822Z | runSelfAuditGate:vitest | status=PASS delta.fail=0 |
+| 2026-04-24T12:18:11.825Z | runSelfAuditGate:honesty | violations=0 |
+| 2026-04-24T12:18:11.826Z | runSelfAuditGate | overallGate=PASS sprint=run |
+| 2026-04-24T12:18:12.069Z | runSelfAuditGate:tsc | status=PASS errors=0 |
+| 2026-04-24T12:18:12.206Z | runSelfAuditGate:vitest | status=PASS delta.fail=0 |
+| 2026-04-24T12:18:12.209Z | runSelfAuditGate:honesty | violations=0 |
+| 2026-04-24T12:18:12.210Z | runSelfAuditGate | overallGate=PASS sprint=sprint-151 |
+| 2026-04-24T12:18:26.747Z | runSelfAuditGate:tsc | status=PASS errors=0 |
+| 2026-04-24T12:18:26.889Z | runSelfAuditGate:vitest | status=PASS delta.fail=0 |
+| 2026-04-24T12:18:26.891Z | runSelfAuditGate:honesty | violations=0 |
+| 2026-04-24T12:18:26.893Z | runSelfAuditGate | overallGate=PASS sprint=sprint-151 |
+| 2026-04-24T12:18:34.314Z | readJsonSafeAsync | ENOENT: no such file or directory, open '/tmp/deckent-home/.deckent/config.json' |
+| 2026-04-24T12:19:12.869Z | killAllSessions:killSession | error connecting to /tmp/tmux-1000/default (No such file or directory) |
+| 2026-04-24T12:21:10.427Z | docker-backend:kill | taskId=152-003 (graceful stop --time=15) |
+| 2026-04-24T12:21:18.228Z | docker-backend:post-stop-verify | taskId=152-003 .result verified + fsynced |
+| 2026-04-24T12:21:18.316Z | docker-backend:exit | taskId=152-003 exitCode=0 |
+| 2026-04-24T12:21:18.443Z | resolveSkillPrompts:readSkillFile | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.deckent/skills/code-reviewer/SKILL.md' |
+| 2026-04-24T12:21:18.540Z | docker-backend:spawn | taskId=152-007 container=deckent-w-152-007 model=opus |
+| 2026-04-24T12:21:18.844Z | docker-backend:spawn-ok | taskId=152-007 containerId=b076ac5cb473 |
+| 2026-04-24T12:21:23.855Z | docker-backend:kill | taskId=152-001 (graceful stop --time=15) |
+| 2026-04-24T12:21:29.382Z | docker-backend:post-stop-verify | taskId=152-001 .result verified + fsynced |
+| 2026-04-24T12:21:29.475Z | docker-backend:exit | taskId=152-001 exitCode=0 |
+| 2026-04-24T12:21:29.608Z | resolveSkillPrompts:readSkillFile | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.deckent/skills/code-reviewer/SKILL.md' |
+| 2026-04-24T12:21:29.711Z | docker-backend:spawn | taskId=152-008 container=deckent-w-152-008 model=opus |
+| 2026-04-24T12:21:30.012Z | docker-backend:spawn-ok | taskId=152-008 containerId=bdbe8aeb9efb |
+| 2026-04-24T12:21:35.023Z | waitForResults:progress | Sprint devam ediyor — 2/30 task tamamlandı (5dk) |
+| 2026-04-24T12:21:49.926Z | docker-backend:kill | taskId=152-004 (graceful stop --time=15) |
+| 2026-04-24T12:22:02.278Z | docker-backend:post-stop-verify | taskId=152-004 .result verified + fsynced |
+| 2026-04-24T12:22:02.376Z | docker-backend:exit | taskId=152-004 exitCode=0 |
+| 2026-04-24T12:22:02.508Z | resolveSkillPrompts:readSkillFile | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.deckent/skills/code-reviewer/SKILL.md' |
+| 2026-04-24T12:22:02.607Z | docker-backend:spawn | taskId=152-009 container=deckent-w-152-009 model=opus |
+| 2026-04-24T12:22:02.915Z | docker-backend:spawn-ok | taskId=152-009 containerId=ca91bc7a3a60 |
+| 2026-04-24T12:22:33.510Z | docker-backend:kill | taskId=152-006 (graceful stop --time=15) |
+| 2026-04-24T12:22:41.745Z | docker-backend:post-stop-verify | taskId=152-006 .result verified + fsynced |
+| 2026-04-24T12:22:41.836Z | docker-backend:exit | taskId=152-006 exitCode=0 |
+| 2026-04-24T12:22:42.067Z | docker-backend:spawn | taskId=152-010 container=deckent-w-152-010 model=opus |
+| 2026-04-24T12:22:42.367Z | docker-backend:spawn-ok | taskId=152-010 containerId=cf73753ae00f |
+| 2026-04-24T12:23:08.492Z | docker-backend:kill | taskId=152-005 (graceful stop --time=15) |
+| 2026-04-24T12:23:23.259Z | docker-backend:post-stop-verify | taskId=152-005 .result verified + fsynced |
+| 2026-04-24T12:23:23.357Z | docker-backend:exit | taskId=152-005 exitCode=137 |
+| 2026-04-24T12:23:23.359Z | docker-backend:reconcile | taskId=152-005 exitCode=137 but .result=DONE → HB DONE |
+| 2026-04-24T12:23:23.504Z | resolveSkillPrompts:readSkillFile | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.deckent/skills/code-reviewer/SKILL.md' |
+| 2026-04-24T12:23:23.611Z | docker-backend:spawn | taskId=152-011 container=deckent-w-152-011 model=opus |
+| 2026-04-24T12:23:23.929Z | docker-backend:spawn-ok | taskId=152-011 containerId=268cf1862831 |
+| 2026-04-24T12:23:46.512Z | readJsonSafe | Unexpected end of JSON input |
+| 2026-04-24T12:23:51.519Z | docker-backend:kill | taskId=152-002 (graceful stop --time=15) |
+| 2026-04-24T12:24:01.761Z | docker-backend:post-stop-verify | taskId=152-002 .result verified + fsynced |
+| 2026-04-24T12:24:01.854Z | docker-backend:exit | taskId=152-002 exitCode=0 |
+| 2026-04-24T12:24:01.980Z | resolveSkillPrompts:readSkillFile | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.deckent/skills/code-reviewer/SKILL.md' |
+| 2026-04-24T12:24:02.076Z | docker-backend:spawn | taskId=152-012 container=deckent-w-152-012 model=opus |
+| 2026-04-24T12:24:02.376Z | docker-backend:spawn-ok | taskId=152-012 containerId=43a0fd7e7faa |
+| 2026-04-24T12:26:36.750Z | waitForResults:progress | Sprint devam ediyor — 6/30 task tamamlandı (10dk) |
+| 2026-04-24T12:26:54.058Z | docker-backend:kill | taskId=152-008 (graceful stop --time=15) |
+| 2026-04-24T12:27:02.451Z | docker-backend:post-stop-verify | taskId=152-008 .result verified + fsynced |
+| 2026-04-24T12:27:02.546Z | docker-backend:exit | taskId=152-008 exitCode=0 |
+| 2026-04-24T12:27:02.781Z | docker-backend:spawn | taskId=152-013 container=deckent-w-152-013 model=opus |
+| 2026-04-24T12:27:03.080Z | docker-backend:spawn-ok | taskId=152-013 containerId=b94f193fb562 |
+| 2026-04-24T12:27:41.374Z | docker-backend:kill | taskId=152-009 (graceful stop --time=15) |
+| 2026-04-24T12:27:50.458Z | docker-backend:post-stop-verify | taskId=152-009 .result verified + fsynced |
+| 2026-04-24T12:27:50.547Z | docker-backend:exit | taskId=152-009 exitCode=0 |
+| 2026-04-24T12:27:50.774Z | docker-backend:spawn | taskId=152-014 container=deckent-w-152-014 model=opus |
+| 2026-04-24T12:27:51.071Z | docker-backend:spawn-ok | taskId=152-014 containerId=a9bd9a8b903e |
+| 2026-04-24T12:28:12.469Z | docker-backend:kill | taskId=152-007 (graceful stop --time=15) |
+| 2026-04-24T12:28:20.288Z | docker-backend:post-stop-verify | taskId=152-007 .result verified + fsynced |
+| 2026-04-24T12:28:20.376Z | docker-backend:exit | taskId=152-007 exitCode=0 |
+| 2026-04-24T12:28:20.507Z | scope-sanitizer | warnings=1, rejected=0 |
+| 2026-04-24T12:28:20.602Z | docker-backend:spawn | taskId=152-015 container=deckent-w-152-015 model=opus |
+| 2026-04-24T12:28:20.897Z | docker-backend:spawn-ok | taskId=152-015 containerId=6e1a8256c463 |
+| 2026-04-24T12:28:57.484Z | docker-backend:kill | taskId=152-010 (graceful stop --time=15) |
+| 2026-04-24T12:29:12.834Z | docker-backend:post-stop-verify | taskId=152-010 .result verified + fsynced |
+| 2026-04-24T12:29:12.932Z | docker-backend:exit | taskId=152-010 exitCode=137 |
+| 2026-04-24T12:29:12.933Z | docker-backend:reconcile | taskId=152-010 exitCode=137 but .result=DONE → HB DONE |
+| 2026-04-24T12:29:13.062Z | resolveSkillPrompts:readSkillFile | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.deckent/skills/code-reviewer/SKILL.md' |
+| 2026-04-24T12:29:13.161Z | docker-backend:spawn | taskId=152-016 container=deckent-w-152-016 model=opus |
+| 2026-04-24T12:29:13.457Z | docker-backend:spawn-ok | taskId=152-016 containerId=e8877fce7ef0 |
+| 2026-04-24T12:31:38.586Z | waitForResults:progress | Sprint devam ediyor — 10/30 task tamamlandı (15dk) |
+| 2026-04-24T12:33:45.707Z | docker-backend:kill | taskId=152-012 (graceful stop --time=15) |
+| 2026-04-24T12:34:00.074Z | docker-backend:post-stop-verify | taskId=152-012 .result verified + fsynced |
+| 2026-04-24T12:34:00.167Z | docker-backend:exit | taskId=152-012 exitCode=0 |
+| 2026-04-24T12:34:00.408Z | docker-backend:spawn | taskId=152-017 container=deckent-w-152-017 model=opus |
+| 2026-04-24T12:34:00.708Z | docker-backend:spawn-ok | taskId=152-017 containerId=e038315f32a4 |
+| 2026-04-24T12:34:05.718Z | docker-backend:kill | taskId=152-014 (graceful stop --time=15) |
+| 2026-04-24T12:34:10.141Z | docker-backend:post-stop-verify | taskId=152-014 .result verified + fsynced |
+| 2026-04-24T12:34:10.233Z | docker-backend:exit | taskId=152-014 exitCode=0 |
+| 2026-04-24T12:34:10.461Z | docker-backend:spawn | taskId=152-018 container=deckent-w-152-018 model=opus |
+| 2026-04-24T12:34:10.754Z | docker-backend:spawn-ok | taskId=152-018 containerId=8dc2608c3784 |
+| 2026-04-24T12:34:17.326Z | docker-backend:kill | taskId=152-011 (graceful stop --time=15) |
+| 2026-04-24T12:34:32.654Z | docker-backend:post-stop-verify | taskId=152-011 .result verified + fsynced |
+| 2026-04-24T12:34:32.743Z | docker-backend:exit | taskId=152-011 exitCode=137 |
+| 2026-04-24T12:34:32.745Z | docker-backend:reconcile | taskId=152-011 exitCode=137 but .result=GO_WITH_TECH_DEBT → HB DONE |
+| 2026-04-24T12:34:32.973Z | docker-backend:spawn | taskId=152-019 container=deckent-w-152-019 model=opus |
+| 2026-04-24T12:34:33.262Z | docker-backend:spawn-ok | taskId=152-019 containerId=fc79a5669dda |
+| 2026-04-24T12:34:37.812Z | docker-backend:kill | taskId=152-013 (graceful stop --time=15) |
+| 2026-04-24T12:34:50.974Z | docker-backend:post-stop-verify | taskId=152-013 .result verified + fsynced |
+| 2026-04-24T12:34:51.073Z | resolveAgentPrompt:readFile | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.deckent/agents/temp-react-ts-specialist/PROMPT.md' |
+| 2026-04-24T12:34:51.073Z | docker-backend:exit | taskId=152-013 exitCode=0 |
+| 2026-04-24T12:34:51.205Z | resolveAgentPrompt:readFile | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/agents/temp-react-ts-specialist/PROMPT.md' |
+| 2026-04-24T12:34:51.207Z | resolveSkillPrompts:readSkillFile | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.deckent/skills/code-reviewer/SKILL.md' |
+| 2026-04-24T12:34:51.212Z | scope-sanitizer | warnings=1, rejected=0 |
+| 2026-04-24T12:34:51.304Z | docker-backend:spawn | taskId=152-020 container=deckent-w-152-020 model=opus |
+| 2026-04-24T12:34:51.590Z | docker-backend:spawn-ok | taskId=152-020 containerId=b5aea729d612 |
+| 2026-04-24T12:35:15.901Z | docker-backend:kill | taskId=152-015 (graceful stop --time=15) |
+| 2026-04-24T12:35:31.221Z | docker-backend:post-stop-verify | taskId=152-015 .result verified + fsynced |
+| 2026-04-24T12:35:31.318Z | docker-backend:exit | taskId=152-015 exitCode=137 |
+| 2026-04-24T12:35:31.319Z | docker-backend:reconcile | taskId=152-015 exitCode=137 but .result=DONE → HB DONE |
+| 2026-04-24T12:35:31.448Z | resolveSkillPrompts:readSkillFile | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.deckent/skills/code-reviewer/SKILL.md' |
+| 2026-04-24T17:24:01.582Z | docker-backend:spawn | taskId=152-021 container=deckent-w-152-021 model=opus |
+| 2026-04-24T12:35:31.872Z | docker-backend:spawn-ok | taskId=152-021 containerId=bd250dac2fd8 |
+| 2026-04-24T12:36:41.919Z | waitForResults:progress | Sprint devam ediyor — 15/30 task tamamlandı (20dk) |
+| 2026-04-24T12:40:48.959Z | docker-backend:kill | taskId=152-018 (graceful stop --time=15) |
+| 2026-04-24T12:41:04.298Z | docker-backend:post-stop-verify | taskId=152-018 .result verified + fsynced |
+| 2026-04-24T12:41:04.392Z | docker-backend:exit | taskId=152-018 exitCode=137 |
+| 2026-04-24T12:41:04.395Z | docker-backend:reconcile | taskId=152-018 exitCode=137 but .result=DONE → HB DONE |
+| 2026-04-24T12:41:04.526Z | scope-sanitizer | warnings=1, rejected=0 |
+| 2026-04-24T12:41:04.619Z | docker-backend:spawn | taskId=152-022 container=deckent-w-152-022 model=opus |
+| 2026-04-24T12:41:04.916Z | docker-backend:spawn-ok | taskId=152-022 containerId=94c7f97c199f |
+| 2026-04-24T12:41:08.512Z | docker-backend:kill | taskId=152-016 (graceful stop --time=15) |
+| 2026-04-24T12:41:23.860Z | docker-backend:post-stop-verify | taskId=152-016 .result verified + fsynced |
+| 2026-04-24T12:41:23.948Z | docker-backend:exit | taskId=152-016 exitCode=137 |
+| 2026-04-24T12:41:23.950Z | docker-backend:reconcile | taskId=152-016 exitCode=137 but .result=DONE → HB DONE |
+| 2026-04-24T12:41:24.173Z | docker-backend:spawn | taskId=152-023 container=deckent-w-152-023 model=opus |
+| 2026-04-24T12:41:24.475Z | docker-backend:spawn-ok | taskId=152-023 containerId=c48d7349f49c |
+| 2026-04-24T12:41:42.573Z | docker-backend:kill | taskId=152-020 (graceful stop --time=15) |
+| 2026-04-24T12:41:51.367Z | docker-backend:post-stop-verify | taskId=152-020 .result verified + fsynced |
+| 2026-04-24T12:41:51.457Z | docker-backend:exit | taskId=152-020 exitCode=0 |
+| 2026-04-24T12:41:51.589Z | resolveSkillPrompts:readSkillFile | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.deckent/skills/code-reviewer/SKILL.md' |
+| 2026-04-24T12:41:51.595Z | scope-sanitizer | warnings=1, rejected=0 |
+| 2026-04-24T12:41:51.687Z | docker-backend:spawn | taskId=152-024 container=deckent-w-152-024 model=opus |
+| 2026-04-24T12:41:51.992Z | docker-backend:spawn-ok | taskId=152-024 containerId=79c83da2826c |
+| 2026-04-24T12:41:51.994Z | waitForResults:progress | Sprint devam ediyor — 18/30 task tamamlandı (25dk) |
+| 2026-04-24T12:43:07.072Z | docker-backend:kill | taskId=152-017 (graceful stop --time=15) |
+| 2026-04-24T12:43:21.838Z | docker-backend:post-stop-verify | taskId=152-017 .result verified + fsynced |
+| 2026-04-24T12:43:21.932Z | docker-backend:exit | taskId=152-017 exitCode=0 |
+| 2026-04-24T12:43:22.070Z | scope-sanitizer | warnings=5, rejected=0 |
+| 2026-04-24T12:43:22.162Z | docker-backend:spawn | taskId=152-025 container=deckent-w-152-025 model=opus |
+| 2026-04-24T12:43:22.495Z | docker-backend:spawn-ok | taskId=152-025 containerId=c9b25db123ed |
+| 2026-04-24T12:43:26.733Z | docker-backend:kill | taskId=152-021 (graceful stop --time=15) |
+| 2026-04-24T12:43:26.969Z | docker-backend:post-stop-verify | taskId=152-021 .result verified + fsynced |
+| 2026-04-24T12:43:27.058Z | docker-backend:exit | taskId=152-021 exitCode=0 |
+| 2026-04-24T12:43:27.284Z | docker-backend:spawn | taskId=152-026 container=deckent-w-152-026 model=opus |
+| 2026-04-24T12:43:27.597Z | docker-backend:spawn-ok | taskId=152-026 containerId=cc301c95fb60 |
+| 2026-04-24T12:43:32.462Z | docker-backend:kill | taskId=152-019 (graceful stop --time=15) |
+| 2026-04-24T12:43:39.386Z | docker-backend:post-stop-verify | taskId=152-019 .result verified + fsynced |
+| 2026-04-24T12:43:39.482Z | docker-backend:exit | taskId=152-019 exitCode=0 |
+| 2026-04-24T12:43:39.717Z | docker-backend:spawn | taskId=152-027 container=deckent-w-152-027 model=opus |
+| 2026-04-24T12:43:40.013Z | docker-backend:spawn-ok | taskId=152-027 containerId=00d08ae1c089 |
+| 2026-04-24T12:44:14.283Z | readJsonSafeAsync | ENOENT: no such file or directory, open '/tmp/deckent-home/.deckent/config.json' |
+| 2026-04-24T12:48:03.919Z | docker-backend:exit | taskId=152-023 exitCode=0 |
+| 2026-04-24T12:48:09.062Z | docker-backend:exit | taskId=152-022 exitCode=0 |
+| 2026-04-24T12:48:41.978Z | docker-backend:exit | taskId=152-024 exitCode=0 |
+| 2026-04-24T12:49:15.004Z | docker-backend:exit | taskId=152-027 exitCode=0 |
+| 2026-04-24T12:51:31.620Z | docker-backend:exit | taskId=152-025 exitCode=0 |
+| 2026-04-24T12:51:35.101Z | panic-guard | BLOCKED kill for task 152-026 (reason: grace_period_timeout). Use --force --user-explicit to override. |
+| 2026-04-24T12:51:35.102Z | graceKill:panicGuard | Kill blocked for task 152-026 — user approval required |
+| 2026-04-24T12:51:35.103Z | sprint-checkpoint:phaseTransition | Phase EXECUTE → writing checkpoint |
+| 2026-04-24T12:51:35.105Z | sprint-checkpoint:write | Checkpoint #3 written for sprint-152 |
+| 2026-04-24T12:51:35.106Z | runEvaluatePhase:start | totalTasks=30 collectedResults=27 collectedIds=[152-003,152-001,152-004,152-006,152-005,152-002,152-008,152-009,152-007,152-010,152-012,152-014,152-011,152-013,152-015,152-018,152-016,152-020,152-017, |
+| 2026-04-24T12:51:35.550Z | runEvaluatePhase:task | task=152-001 selfAssessment=DONE evaluation=DONE testsPassed=true |
+| 2026-04-24T12:51:35.553Z | runEvaluatePhase:task | task=152-002 selfAssessment=DONE evaluation=NO_GO testsPassed=true |
+| 2026-04-24T12:51:35.554Z | runEvaluatePhase:task | task=152-003 selfAssessment=DONE evaluation=NO_GO testsPassed=true |
+| 2026-04-24T12:51:35.555Z | runEvaluatePhase:task | task=152-004 selfAssessment=DONE evaluation=NO_GO testsPassed=true |
+| 2026-04-24T12:51:35.555Z | runEvaluatePhase:task | task=152-005 selfAssessment=DONE evaluation=NO_GO testsPassed=true |
+| 2026-04-24T12:51:35.556Z | runEvaluatePhase:task | task=152-006 selfAssessment=DONE evaluation=NO_GO testsPassed=true |
+| 2026-04-24T12:51:35.557Z | runEvaluatePhase:task | task=152-007 selfAssessment=DONE evaluation=NO_GO testsPassed=true |
+| 2026-04-24T12:51:35.558Z | runEvaluatePhase:task | task=152-008 selfAssessment=DONE evaluation=NO_GO testsPassed=true |
+| 2026-04-24T12:51:35.558Z | runEvaluatePhase:task | task=152-009 selfAssessment=DONE evaluation=NO_GO testsPassed=true |
+| 2026-04-24T12:51:35.559Z | runEvaluatePhase:task | task=152-010 selfAssessment=DONE evaluation=NO_GO testsPassed=true |
+| 2026-04-24T12:51:35.560Z | runEvaluatePhase:task | task=152-011 selfAssessment=GO_WITH_TECH_DEBT evaluation=NO_GO testsPassed=true |
+| 2026-04-24T12:51:35.561Z | runEvaluatePhase:task | task=152-012 selfAssessment=DONE evaluation=NO_GO testsPassed=true |
+| 2026-04-24T12:51:35.561Z | runEvaluatePhase:task | task=152-013 selfAssessment=DONE evaluation=NO_GO testsPassed=true |
+| 2026-04-24T12:51:35.562Z | runEvaluatePhase:task | task=152-014 selfAssessment=DONE evaluation=NO_GO testsPassed=true |
+| 2026-04-24T12:51:35.563Z | runEvaluatePhase:task | task=152-015 selfAssessment=DONE evaluation=NO_GO testsPassed=true |
+| 2026-04-24T12:51:35.563Z | runEvaluatePhase:task | task=152-016 selfAssessment=DONE evaluation=NO_GO testsPassed=true |
+| 2026-04-24T12:51:35.564Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
+| 2026-04-24T12:51:35.565Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
+| 2026-04-24T12:51:35.565Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
+| 2026-04-24T12:51:35.566Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
+| 2026-04-24T12:51:35.566Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
+| 2026-04-24T12:51:35.567Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
+| 2026-04-24T12:51:35.567Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
+| 2026-04-24T12:51:35.568Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
+| 2026-04-24T12:51:35.568Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
+| 2026-04-24T12:51:35.569Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
+| 2026-04-24T12:51:35.569Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
+| 2026-04-24T12:51:35.695Z | runEvaluatePhase:task | task=152-017 selfAssessment=DONE evaluation=DONE testsPassed=true |
+| 2026-04-24T12:51:35.697Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
+| 2026-04-24T12:51:35.698Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
+| 2026-04-24T12:51:35.698Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
+| 2026-04-24T12:51:35.699Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
+| 2026-04-24T12:51:35.699Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
+| 2026-04-24T12:51:35.700Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
+| 2026-04-24T12:51:35.700Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
+| 2026-04-24T12:51:35.700Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
+| 2026-04-24T12:51:35.701Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
+| 2026-04-24T12:51:35.702Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
+| 2026-04-24T12:51:35.702Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
+| 2026-04-24T12:51:35.829Z | runEvaluatePhase:task | task=152-018 selfAssessment=DONE evaluation=DONE testsPassed=true |
+| 2026-04-24T12:51:35.831Z | runEvaluatePhase:task | task=152-019 selfAssessment=DONE evaluation=NO_GO testsPassed=true |
+| 2026-04-24T12:51:35.832Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
+| 2026-04-24T12:51:35.833Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
+| 2026-04-24T12:51:35.833Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
+| 2026-04-24T12:51:35.834Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
+| 2026-04-24T12:51:35.834Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
+| 2026-04-24T12:51:35.835Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
+| 2026-04-24T12:51:35.835Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
+| 2026-04-24T12:51:35.836Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
+| 2026-04-24T12:51:35.836Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
+| 2026-04-24T12:51:35.837Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
+| 2026-04-24T12:51:35.837Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
+| 2026-04-24T12:51:35.962Z | runEvaluatePhase:task | task=152-020 selfAssessment=DONE evaluation=DONE testsPassed=true |
+| 2026-04-24T12:51:35.964Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
+| 2026-04-24T12:51:35.964Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
+| 2026-04-24T12:51:35.964Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
+| 2026-04-24T12:51:35.965Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
+| 2026-04-24T12:51:35.966Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
+| 2026-04-24T12:51:35.966Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
+| 2026-04-24T12:51:35.967Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
+| 2026-04-24T12:51:35.967Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
+| 2026-04-24T12:51:35.968Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
+| 2026-04-24T12:51:35.968Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
+| 2026-04-24T12:51:35.968Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
+| 2026-04-24T12:51:36.095Z | runEvaluatePhase:task | task=152-021 selfAssessment=DONE evaluation=DONE testsPassed=true |
+| 2026-04-24T12:51:36.097Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
+| 2026-04-24T12:51:36.097Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
+| 2026-04-24T12:51:36.098Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
+| 2026-04-24T12:51:36.099Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
+| 2026-04-24T12:51:36.099Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
+| 2026-04-24T12:51:36.100Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
+| 2026-04-24T12:51:36.100Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
+| 2026-04-24T12:51:36.100Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
+| 2026-04-24T12:51:36.101Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
+| 2026-04-24T12:51:36.101Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
+| 2026-04-24T12:51:36.102Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
+| 2026-04-24T12:51:36.227Z | runEvaluatePhase:task | task=152-022 selfAssessment=DONE evaluation=DONE testsPassed=true |
+| 2026-04-24T12:51:36.229Z | runEvaluatePhase:task | task=152-023 selfAssessment=DONE evaluation=NO_GO testsPassed=true |
+| 2026-04-24T12:51:36.230Z | runEvaluatePhase:task | task=152-024 selfAssessment=DONE evaluation=NO_GO testsPassed=true |
+| 2026-04-24T12:51:36.231Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
+| 2026-04-24T12:51:36.231Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
+| 2026-04-24T12:51:36.232Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
+| 2026-04-24T12:51:36.232Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
+| 2026-04-24T12:51:36.233Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
+| 2026-04-24T12:51:36.233Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
+| 2026-04-24T12:51:36.234Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
+| 2026-04-24T12:51:36.234Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
+| 2026-04-24T12:51:36.235Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
+| 2026-04-24T12:51:36.235Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
+| 2026-04-24T12:51:36.236Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
+| 2026-04-24T12:51:36.367Z | runEvaluatePhase:task | task=152-025 selfAssessment=DONE evaluation=DONE testsPassed=true |
+| 2026-04-24T12:51:36.369Z | runEvaluatePhase:task | task=152-026 selfAssessment=NO_GO evaluation=NO_GO testsPassed=false |
+| 2026-04-24T12:51:36.369Z | runEvaluatePhase:task | task=152-027 selfAssessment=DONE evaluation=NO_GO testsPassed=true |
+| 2026-04-24T12:51:36.370Z | runEvaluatePhase:timeout | task=152-028 — no result collected, marking NO_GO (timeout/missing) |
+| 2026-04-24T12:51:36.371Z | runEvaluatePhase:timeout | task=152-029 — no result collected, marking NO_GO (timeout/missing) |
+| 2026-04-24T12:51:36.372Z | runEvaluatePhase:timeout | task=152-030 — no result collected, marking NO_GO (timeout/missing) |
+| 2026-04-24T12:51:36.372Z | runEvaluatePhase:done | evaluations.size=30 keys=[152-001,152-002,152-003,152-004,152-005,152-006,152-007,152-008,152-009,152-010,152-011,152-012,152-013,152-014,152-015,152-016,152-017,152-018,152-019,152-020,152-021,152-02 |
+| 2026-04-24T12:51:36.378Z | sprint-checkpoint:phaseTransition | Phase EVALUATE → writing checkpoint |
+| 2026-04-24T12:51:36.378Z | sprint-checkpoint:write | Checkpoint #4 written for sprint-152 |
+| 2026-04-24T12:51:36.388Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
+| 2026-04-24T12:51:36.389Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
+| 2026-04-24T12:51:36.389Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
+| 2026-04-24T12:51:36.390Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
+| 2026-04-24T12:51:36.391Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
+| 2026-04-24T12:51:36.391Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
+| 2026-04-24T12:51:36.391Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
+| 2026-04-24T12:51:36.392Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
+| 2026-04-24T12:51:36.393Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
+| 2026-04-24T12:51:36.393Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
+| 2026-04-24T12:51:36.394Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
+| 2026-04-24T12:51:36.395Z | mid-sprint-adapter:shouldReroute | Rerouting: agent undefined→doc-writer, skills []→[] (attempt 1/3) |
+| 2026-04-24T12:51:36.396Z | mid-sprint-adapter:apply | Task 152-026-fix rerouted → agent=doc-writer, skills=[] |
+| 2026-04-24T12:51:36.397Z | spawnWorkers:collision | File "vitest.config.ts" written by tasks: 152-015-fix, 152-030-fix |
+| 2026-04-24T12:51:36.405Z | scope-sanitizer | warnings=2, rejected=0 |
+| 2026-04-24T12:51:36.499Z | docker-backend:spawn | taskId=152-002-fix container=deckent-w-152-002-fix model=opus |
+| 2026-04-24T12:51:36.800Z | docker-backend:spawn-ok | taskId=152-002-fix containerId=d8690b05eeab |
+| 2026-04-24T12:51:36.908Z | docker-backend:spawn | taskId=152-003-fix container=deckent-w-152-003-fix model=opus |
+| 2026-04-24T12:51:37.219Z | docker-backend:spawn-ok | taskId=152-003-fix containerId=c348359005d6 |
+| 2026-04-24T12:51:37.327Z | docker-backend:spawn | taskId=152-004-fix container=deckent-w-152-004-fix model=opus |
+| 2026-04-24T12:51:37.650Z | docker-backend:spawn-ok | taskId=152-004-fix containerId=30d3a0101dd0 |
+| 2026-04-24T12:51:37.751Z | docker-backend:spawn | taskId=152-005-fix container=deckent-w-152-005-fix model=opus |
+| 2026-04-24T12:51:38.052Z | docker-backend:spawn-ok | taskId=152-005-fix containerId=71f482443904 |
+| 2026-04-24T12:51:38.162Z | docker-backend:spawn | taskId=152-006-fix container=deckent-w-152-006-fix model=opus |
+| 2026-04-24T12:51:38.478Z | docker-backend:spawn-ok | taskId=152-006-fix containerId=32d07f47bac2 |
+| 2026-04-24T12:51:38.588Z | docker-backend:spawn | taskId=152-007-fix container=deckent-w-152-007-fix model=opus |
+| 2026-04-24T12:51:38.920Z | docker-backend:spawn-ok | taskId=152-007-fix containerId=ebe9daeb036e |
+| 2026-04-24T12:53:10.131Z | docker-backend:exit | taskId=152-026 exitCode=0 |
+| 2026-04-24T12:53:49.515Z | docker-backend:exit | taskId=152-003-fix exitCode=0 |
+| 2026-04-24T12:53:54.826Z | readJsonSafeAsync | ENOENT: no such file or directory, open '/tmp/deckent-home/.deckent/config.json' |
+| 2026-04-24T12:53:58.733Z | docker-backend:exit | taskId=152-007-fix exitCode=0 |
+| 2026-04-24T12:54:47.267Z | readJsonSafe | Unexpected end of JSON input |
+| 2026-04-24T12:54:54.109Z | docker-backend:exit | taskId=152-002-fix exitCode=0 |
+| 2026-04-24T12:55:41.748Z | docker-backend:exit | taskId=152-006-fix exitCode=0 |
+| 2026-04-24T12:56:41.612Z | waitForResults:progress | Sprint devam ediyor — 4/23 task tamamlandı (5dk) |
+| 2026-04-24T12:58:11.396Z | docker-backend:exit | taskId=152-004-fix exitCode=0 |
+| 2026-04-24T12:58:13.460Z | docker-backend:exit | taskId=152-005-fix exitCode=0 |
+| 2026-04-24T13:01:43.590Z | waitForResults:progress | Sprint devam ediyor — 6/23 task tamamlandı (10dk) |
+| 2026-04-24T13:01:43.606Z | sprint-checkpoint:phaseTransition | Phase FIX → writing checkpoint |
+| 2026-04-24T13:01:43.608Z | sprint-checkpoint:write | Checkpoint #5 written for sprint-152 |
+| 2026-04-24T13:01:43.621Z | tryCodeVerifiedDone | Reconciliation triggered for task 152-028 |
+| 2026-04-24T13:01:43.625Z | tryCodeVerifiedDone | Reconciliation triggered for task 152-029 |
+| 2026-04-24T13:01:43.653Z | tryCodeVerifiedDone | Reconciliation triggered for task 152-030 |
+| 2026-04-24T13:01:43.678Z | tryCodeVerifiedDone | CODE_VERIFIED_DONE for task 152-030: 1 files verified |
+| 2026-04-24T13:01:43.679Z | writeCodeVerifiedResult | Wrote CODE_VERIFIED_DONE result for task 152-030 |
+| 2026-04-24T13:01:43.680Z | finalizeSprint:codeReconcile | Task 152-030 reconciled to CODE_VERIFIED_DONE |
+| 2026-04-24T13:01:43.683Z | finalizeSprint:codeReconcile | 1 tasks reconciled: 152-030 |
+| 2026-04-24T13:01:43.686Z | finalizeSprint:preRetro | evaluations.size=36 keys=[152-001,152-002,152-003,152-004,152-005,152-006,152-007,152-008,152-009,152-010,152-011,152-012,152-013,152-014,152-015,152-016,152-017,152-018,152-019,152-020,152-021,152-02 |
+| 2026-04-24T13:01:43.686Z | buildAgentPerformance | task=152-001 agent=doc-writer ev=DONE evalMapSize=36 evalKeys=[152-001,152-002,152-003,152-004,152-005,152-006,152-007,152-008,152-009,152-010,152-011,152-012,152-013,152-014,152-015,152-016,152-017,1 |
+| 2026-04-24T13:01:43.687Z | buildAgentPerformance | task=152-002 agent=doc-writer ev=NO_GO evalMapSize=36 evalKeys=[152-001,152-002,152-003,152-004,152-005,152-006,152-007,152-008,152-009,152-010,152-011,152-012,152-013,152-014,152-015,152-016,152-017, |
+| 2026-04-24T13:01:43.687Z | buildAgentPerformance | task=152-003 agent=doc-writer ev=NO_GO evalMapSize=36 evalKeys=[152-001,152-002,152-003,152-004,152-005,152-006,152-007,152-008,152-009,152-010,152-011,152-012,152-013,152-014,152-015,152-016,152-017, |
+| 2026-04-24T13:01:43.688Z | buildAgentPerformance | task=152-004 agent=doc-writer ev=NO_GO evalMapSize=36 evalKeys=[152-001,152-002,152-003,152-004,152-005,152-006,152-007,152-008,152-009,152-010,152-011,152-012,152-013,152-014,152-015,152-016,152-017, |
+| 2026-04-24T13:01:43.688Z | buildAgentPerformance | task=152-005 agent=doc-writer ev=NO_GO evalMapSize=36 evalKeys=[152-001,152-002,152-003,152-004,152-005,152-006,152-007,152-008,152-009,152-010,152-011,152-012,152-013,152-014,152-015,152-016,152-017, |
+| 2026-04-24T13:01:43.689Z | buildAgentPerformance | task=152-006 agent=doc-writer ev=NO_GO evalMapSize=36 evalKeys=[152-001,152-002,152-003,152-004,152-005,152-006,152-007,152-008,152-009,152-010,152-011,152-012,152-013,152-014,152-015,152-016,152-017, |
+| 2026-04-24T13:01:43.689Z | buildAgentPerformance | task=152-007 agent=doc-writer ev=NO_GO evalMapSize=36 evalKeys=[152-001,152-002,152-003,152-004,152-005,152-006,152-007,152-008,152-009,152-010,152-011,152-012,152-013,152-014,152-015,152-016,152-017, |
+| 2026-04-24T13:01:43.690Z | buildAgentPerformance | task=152-008 agent=doc-writer ev=NO_GO evalMapSize=36 evalKeys=[152-001,152-002,152-003,152-004,152-005,152-006,152-007,152-008,152-009,152-010,152-011,152-012,152-013,152-014,152-015,152-016,152-017, |
+| 2026-04-24T13:01:43.690Z | buildAgentPerformance | task=152-009 agent=doc-writer ev=NO_GO evalMapSize=36 evalKeys=[152-001,152-002,152-003,152-004,152-005,152-006,152-007,152-008,152-009,152-010,152-011,152-012,152-013,152-014,152-015,152-016,152-017, |
+| 2026-04-24T13:01:43.691Z | buildAgentPerformance | task=152-010 agent=doc-writer ev=NO_GO evalMapSize=36 evalKeys=[152-001,152-002,152-003,152-004,152-005,152-006,152-007,152-008,152-009,152-010,152-011,152-012,152-013,152-014,152-015,152-016,152-017, |
+| 2026-04-24T13:01:43.691Z | buildAgentPerformance | task=152-011 agent=doc-writer ev=NO_GO evalMapSize=36 evalKeys=[152-001,152-002,152-003,152-004,152-005,152-006,152-007,152-008,152-009,152-010,152-011,152-012,152-013,152-014,152-015,152-016,152-017, |
+| 2026-04-24T13:01:43.692Z | buildAgentPerformance | task=152-012 agent=doc-writer ev=NO_GO evalMapSize=36 evalKeys=[152-001,152-002,152-003,152-004,152-005,152-006,152-007,152-008,152-009,152-010,152-011,152-012,152-013,152-014,152-015,152-016,152-017, |
+| 2026-04-24T13:01:43.692Z | buildAgentPerformance | task=152-013 agent=doc-writer ev=NO_GO evalMapSize=36 evalKeys=[152-001,152-002,152-003,152-004,152-005,152-006,152-007,152-008,152-009,152-010,152-011,152-012,152-013,152-014,152-015,152-016,152-017, |
+| 2026-04-24T13:01:43.693Z | buildAgentPerformance | task=152-014 agent=doc-writer ev=NO_GO evalMapSize=36 evalKeys=[152-001,152-002,152-003,152-004,152-005,152-006,152-007,152-008,152-009,152-010,152-011,152-012,152-013,152-014,152-015,152-016,152-017, |
+| 2026-04-24T13:01:43.693Z | buildAgentPerformance | task=152-015 agent=architect ev=NO_GO evalMapSize=36 evalKeys=[152-001,152-002,152-003,152-004,152-005,152-006,152-007,152-008,152-009,152-010,152-011,152-012,152-013,152-014,152-015,152-016,152-017,1 |
+| 2026-04-24T13:01:43.694Z | buildAgentPerformance | task=152-016 agent=doc-writer ev=NO_GO evalMapSize=36 evalKeys=[152-001,152-002,152-003,152-004,152-005,152-006,152-007,152-008,152-009,152-010,152-011,152-012,152-013,152-014,152-015,152-016,152-017, |
+| 2026-04-24T13:01:43.694Z | buildAgentPerformance | task=152-017 agent=doc-writer ev=DONE evalMapSize=36 evalKeys=[152-001,152-002,152-003,152-004,152-005,152-006,152-007,152-008,152-009,152-010,152-011,152-012,152-013,152-014,152-015,152-016,152-017,1 |
+| 2026-04-24T13:01:43.695Z | buildAgentPerformance | task=152-018 agent=doc-writer ev=DONE evalMapSize=36 evalKeys=[152-001,152-002,152-003,152-004,152-005,152-006,152-007,152-008,152-009,152-010,152-011,152-012,152-013,152-014,152-015,152-016,152-017,1 |
+| 2026-04-24T13:01:43.695Z | buildAgentPerformance | task=152-019 agent=architect ev=NO_GO evalMapSize=36 evalKeys=[152-001,152-002,152-003,152-004,152-005,152-006,152-007,152-008,152-009,152-010,152-011,152-012,152-013,152-014,152-015,152-016,152-017,1 |
+| 2026-04-24T13:01:43.696Z | buildAgentPerformance | task=152-020 agent=temp-react-ts-specialist ev=DONE evalMapSize=36 evalKeys=[152-001,152-002,152-003,152-004,152-005,152-006,152-007,152-008,152-009,152-010,152-011,152-012,152-013,152-014,152-015,152 |
+| 2026-04-24T13:01:43.696Z | buildAgentPerformance | task=152-021 agent=doc-writer ev=DONE evalMapSize=36 evalKeys=[152-001,152-002,152-003,152-004,152-005,152-006,152-007,152-008,152-009,152-010,152-011,152-012,152-013,152-014,152-015,152-016,152-017,1 |
+| 2026-04-24T13:01:43.697Z | buildAgentPerformance | task=152-022 agent=doc-writer ev=DONE evalMapSize=36 evalKeys=[152-001,152-002,152-003,152-004,152-005,152-006,152-007,152-008,152-009,152-010,152-011,152-012,152-013,152-014,152-015,152-016,152-017,1 |
+| 2026-04-24T13:01:43.697Z | buildAgentPerformance | task=152-023 agent=doc-writer ev=NO_GO evalMapSize=36 evalKeys=[152-001,152-002,152-003,152-004,152-005,152-006,152-007,152-008,152-009,152-010,152-011,152-012,152-013,152-014,152-015,152-016,152-017, |
+| 2026-04-24T13:01:43.697Z | buildAgentPerformance | task=152-024 agent=doc-writer ev=NO_GO evalMapSize=36 evalKeys=[152-001,152-002,152-003,152-004,152-005,152-006,152-007,152-008,152-009,152-010,152-011,152-012,152-013,152-014,152-015,152-016,152-017, |
+| 2026-04-24T13:01:43.698Z | buildAgentPerformance | task=152-025 agent=architect ev=DONE evalMapSize=36 evalKeys=[152-001,152-002,152-003,152-004,152-005,152-006,152-007,152-008,152-009,152-010,152-011,152-012,152-013,152-014,152-015,152-016,152-017,15 |
+| 2026-04-24T13:01:43.699Z | buildAgentPerformance | task=152-026 agent=doc-writer ev=NO_GO evalMapSize=36 evalKeys=[152-001,152-002,152-003,152-004,152-005,152-006,152-007,152-008,152-009,152-010,152-011,152-012,152-013,152-014,152-015,152-016,152-017, |
+| 2026-04-24T13:01:43.699Z | buildAgentPerformance | task=152-027 agent=doc-writer ev=NO_GO evalMapSize=36 evalKeys=[152-001,152-002,152-003,152-004,152-005,152-006,152-007,152-008,152-009,152-010,152-011,152-012,152-013,152-014,152-015,152-016,152-017, |
+| 2026-04-24T13:01:43.699Z | buildAgentPerformance | task=152-028 agent=doc-writer ev=NO_GO evalMapSize=36 evalKeys=[152-001,152-002,152-003,152-004,152-005,152-006,152-007,152-008,152-009,152-010,152-011,152-012,152-013,152-014,152-015,152-016,152-017, |
+| 2026-04-24T13:01:43.700Z | buildAgentPerformance | task=152-029 agent=temp-react-ts-specialist ev=NO_GO evalMapSize=36 evalKeys=[152-001,152-002,152-003,152-004,152-005,152-006,152-007,152-008,152-009,152-010,152-011,152-012,152-013,152-014,152-015,15 |
+| 2026-04-24T13:01:43.700Z | buildAgentPerformance | task=152-030 agent=architect ev=DONE evalMapSize=36 evalKeys=[152-001,152-002,152-003,152-004,152-005,152-006,152-007,152-008,152-009,152-010,152-011,152-012,152-013,152-014,152-015,152-016,152-017,15 |
+| 2026-04-24T13:01:44.457Z | finalizeSprint:tripleLink | Triple-link created for sprint-152 |
+| 2026-04-24T13:01:44.481Z | finalizeSprint:routing-outcomes | Recorded 30 routing outcomes to learnings.json |
+| 2026-04-24T13:01:44.483Z | finalizeSprint:rule-evolution | 16 new rules evolved |
+| 2026-04-24T13:01:44.484Z | rule-evolver:saveRules | 16 rules saved to .deckent/routing/evolved-rules.json |
+| 2026-04-24T13:01:44.500Z | finalizeSprint:syncStatsToManifests | Synced 16 agents, 16 skills to manifest files |
+| 2026-04-24T13:01:44.502Z | finalizeSprint:promotion | agent 'test-writer': 123 tasks, 91% success — meets promotion criteria |
+| 2026-04-24T13:01:44.502Z | promotion-pipeline:promote | Temp agent 'test-writer' not found |
+| 2026-04-24T13:01:44.502Z | finalizeSprint:promotion | agent 'temp-react-ts-specialist': 34 tasks, 97% success — meets promotion criteria |
+| 2026-04-24T13:01:44.503Z | promotion-pipeline:promote | Temp agent 'temp-react-ts-specialist' not found |
+| 2026-04-24T13:01:44.510Z | finalizeSprint:breadcrumb | Step 10 (richOutput) — entering |
+| 2026-04-24T13:01:44.525Z | buildAgentPerformance | task=152-001 agent=doc-writer ev=DONE evalMapSize=36 evalKeys=[152-001,152-002,152-003,152-004,152-005,152-006,152-007,152-008,152-009,152-010,152-011,152-012,152-013,152-014,152-015,152-016,152-017,1 |
+| 2026-04-24T13:01:44.526Z | buildAgentPerformance | task=152-002 agent=doc-writer ev=NO_GO evalMapSize=36 evalKeys=[152-001,152-002,152-003,152-004,152-005,152-006,152-007,152-008,152-009,152-010,152-011,152-012,152-013,152-014,152-015,152-016,152-017, |
+| 2026-04-24T13:01:44.527Z | buildAgentPerformance | task=152-003 agent=doc-writer ev=NO_GO evalMapSize=36 evalKeys=[152-001,152-002,152-003,152-004,152-005,152-006,152-007,152-008,152-009,152-010,152-011,152-012,152-013,152-014,152-015,152-016,152-017, |
+| 2026-04-24T13:01:44.527Z | buildAgentPerformance | task=152-004 agent=doc-writer ev=NO_GO evalMapSize=36 evalKeys=[152-001,152-002,152-003,152-004,152-005,152-006,152-007,152-008,152-009,152-010,152-011,152-012,152-013,152-014,152-015,152-016,152-017, |
+| 2026-04-24T13:01:44.528Z | buildAgentPerformance | task=152-005 agent=doc-writer ev=NO_GO evalMapSize=36 evalKeys=[152-001,152-002,152-003,152-004,152-005,152-006,152-007,152-008,152-009,152-010,152-011,152-012,152-013,152-014,152-015,152-016,152-017, |
+| 2026-04-24T13:01:44.528Z | buildAgentPerformance | task=152-006 agent=doc-writer ev=NO_GO evalMapSize=36 evalKeys=[152-001,152-002,152-003,152-004,152-005,152-006,152-007,152-008,152-009,152-010,152-011,152-012,152-013,152-014,152-015,152-016,152-017, |
+| 2026-04-24T13:01:44.529Z | buildAgentPerformance | task=152-007 agent=doc-writer ev=NO_GO evalMapSize=36 evalKeys=[152-001,152-002,152-003,152-004,152-005,152-006,152-007,152-008,152-009,152-010,152-011,152-012,152-013,152-014,152-015,152-016,152-017, |
+| 2026-04-24T13:01:44.529Z | buildAgentPerformance | task=152-008 agent=doc-writer ev=NO_GO evalMapSize=36 evalKeys=[152-001,152-002,152-003,152-004,152-005,152-006,152-007,152-008,152-009,152-010,152-011,152-012,152-013,152-014,152-015,152-016,152-017, |
+| 2026-04-24T13:01:44.530Z | buildAgentPerformance | task=152-009 agent=doc-writer ev=NO_GO evalMapSize=36 evalKeys=[152-001,152-002,152-003,152-004,152-005,152-006,152-007,152-008,152-009,152-010,152-011,152-012,152-013,152-014,152-015,152-016,152-017, |
+| 2026-04-24T13:01:44.530Z | buildAgentPerformance | task=152-010 agent=doc-writer ev=NO_GO evalMapSize=36 evalKeys=[152-001,152-002,152-003,152-004,152-005,152-006,152-007,152-008,152-009,152-010,152-011,152-012,152-013,152-014,152-015,152-016,152-017, |
+| 2026-04-24T13:01:44.531Z | buildAgentPerformance | task=152-011 agent=doc-writer ev=NO_GO evalMapSize=36 evalKeys=[152-001,152-002,152-003,152-004,152-005,152-006,152-007,152-008,152-009,152-010,152-011,152-012,152-013,152-014,152-015,152-016,152-017, |
+| 2026-04-24T13:01:44.531Z | buildAgentPerformance | task=152-012 agent=doc-writer ev=NO_GO evalMapSize=36 evalKeys=[152-001,152-002,152-003,152-004,152-005,152-006,152-007,152-008,152-009,152-010,152-011,152-012,152-013,152-014,152-015,152-016,152-017, |
+| 2026-04-24T13:01:44.532Z | buildAgentPerformance | task=152-013 agent=doc-writer ev=NO_GO evalMapSize=36 evalKeys=[152-001,152-002,152-003,152-004,152-005,152-006,152-007,152-008,152-009,152-010,152-011,152-012,152-013,152-014,152-015,152-016,152-017, |
+| 2026-04-24T13:01:44.532Z | buildAgentPerformance | task=152-014 agent=doc-writer ev=NO_GO evalMapSize=36 evalKeys=[152-001,152-002,152-003,152-004,152-005,152-006,152-007,152-008,152-009,152-010,152-011,152-012,152-013,152-014,152-015,152-016,152-017, |
+| 2026-04-24T13:01:44.533Z | buildAgentPerformance | task=152-015 agent=architect ev=NO_GO evalMapSize=36 evalKeys=[152-001,152-002,152-003,152-004,152-005,152-006,152-007,152-008,152-009,152-010,152-011,152-012,152-013,152-014,152-015,152-016,152-017,1 |
+| 2026-04-24T13:01:44.533Z | buildAgentPerformance | task=152-016 agent=doc-writer ev=NO_GO evalMapSize=36 evalKeys=[152-001,152-002,152-003,152-004,152-005,152-006,152-007,152-008,152-009,152-010,152-011,152-012,152-013,152-014,152-015,152-016,152-017, |
+| 2026-04-24T13:01:44.533Z | buildAgentPerformance | task=152-017 agent=doc-writer ev=DONE evalMapSize=36 evalKeys=[152-001,152-002,152-003,152-004,152-005,152-006,152-007,152-008,152-009,152-010,152-011,152-012,152-013,152-014,152-015,152-016,152-017,1 |
+| 2026-04-24T13:01:44.534Z | buildAgentPerformance | task=152-018 agent=doc-writer ev=DONE evalMapSize=36 evalKeys=[152-001,152-002,152-003,152-004,152-005,152-006,152-007,152-008,152-009,152-010,152-011,152-012,152-013,152-014,152-015,152-016,152-017,1 |
+| 2026-04-24T13:01:44.534Z | buildAgentPerformance | task=152-019 agent=architect ev=NO_GO evalMapSize=36 evalKeys=[152-001,152-002,152-003,152-004,152-005,152-006,152-007,152-008,152-009,152-010,152-011,152-012,152-013,152-014,152-015,152-016,152-017,1 |
+| 2026-04-24T13:01:44.535Z | buildAgentPerformance | task=152-020 agent=temp-react-ts-specialist ev=DONE evalMapSize=36 evalKeys=[152-001,152-002,152-003,152-004,152-005,152-006,152-007,152-008,152-009,152-010,152-011,152-012,152-013,152-014,152-015,152 |
+| 2026-04-24T13:01:44.535Z | buildAgentPerformance | task=152-021 agent=doc-writer ev=DONE evalMapSize=36 evalKeys=[152-001,152-002,152-003,152-004,152-005,152-006,152-007,152-008,152-009,152-010,152-011,152-012,152-013,152-014,152-015,152-016,152-017,1 |
+| 2026-04-24T13:01:44.536Z | buildAgentPerformance | task=152-022 agent=doc-writer ev=DONE evalMapSize=36 evalKeys=[152-001,152-002,152-003,152-004,152-005,152-006,152-007,152-008,152-009,152-010,152-011,152-012,152-013,152-014,152-015,152-016,152-017,1 |
+| 2026-04-24T13:01:44.536Z | buildAgentPerformance | task=152-023 agent=doc-writer ev=NO_GO evalMapSize=36 evalKeys=[152-001,152-002,152-003,152-004,152-005,152-006,152-007,152-008,152-009,152-010,152-011,152-012,152-013,152-014,152-015,152-016,152-017, |
+| 2026-04-24T13:01:44.537Z | buildAgentPerformance | task=152-024 agent=doc-writer ev=NO_GO evalMapSize=36 evalKeys=[152-001,152-002,152-003,152-004,152-005,152-006,152-007,152-008,152-009,152-010,152-011,152-012,152-013,152-014,152-015,152-016,152-017, |
+| 2026-04-24T13:01:44.537Z | buildAgentPerformance | task=152-025 agent=architect ev=DONE evalMapSize=36 evalKeys=[152-001,152-002,152-003,152-004,152-005,152-006,152-007,152-008,152-009,152-010,152-011,152-012,152-013,152-014,152-015,152-016,152-017,15 |
+| 2026-04-24T13:01:44.538Z | buildAgentPerformance | task=152-026 agent=doc-writer ev=NO_GO evalMapSize=36 evalKeys=[152-001,152-002,152-003,152-004,152-005,152-006,152-007,152-008,152-009,152-010,152-011,152-012,152-013,152-014,152-015,152-016,152-017, |
+| 2026-04-24T13:01:44.538Z | buildAgentPerformance | task=152-027 agent=doc-writer ev=NO_GO evalMapSize=36 evalKeys=[152-001,152-002,152-003,152-004,152-005,152-006,152-007,152-008,152-009,152-010,152-011,152-012,152-013,152-014,152-015,152-016,152-017, |
+| 2026-04-24T13:01:44.539Z | buildAgentPerformance | task=152-028 agent=doc-writer ev=NO_GO evalMapSize=36 evalKeys=[152-001,152-002,152-003,152-004,152-005,152-006,152-007,152-008,152-009,152-010,152-011,152-012,152-013,152-014,152-015,152-016,152-017, |
+| 2026-04-24T13:01:44.539Z | buildAgentPerformance | task=152-029 agent=temp-react-ts-specialist ev=NO_GO evalMapSize=36 evalKeys=[152-001,152-002,152-003,152-004,152-005,152-006,152-007,152-008,152-009,152-010,152-011,152-012,152-013,152-014,152-015,15 |
+| 2026-04-24T13:01:44.540Z | buildAgentPerformance | task=152-030 agent=architect ev=DONE evalMapSize=36 evalKeys=[152-001,152-002,152-003,152-004,152-005,152-006,152-007,152-008,152-009,152-010,152-011,152-012,152-013,152-014,152-015,152-016,152-017,15 |
+| 2026-04-24T13:01:44.541Z | finalizeSprint:breadcrumb | Step 10b (selfAuditGate) — entering |
+| 2026-04-24T13:01:44.661Z | runSelfAuditGate:tsc | status=PASS errors=0 |
+| 2026-04-24T13:01:44.784Z | runSelfAuditGate:vitest | status=PASS delta.fail=0 |
+| 2026-04-24T13:01:44.799Z | runSelfAuditGate:honesty | violations=0 |
+| 2026-04-24T13:01:44.800Z | runSelfAuditGate | overallGate=PASS sprint=sprint-152 |
+| 2026-04-24T13:01:44.800Z | finalizeSprint:selfAuditGate | Gate completed: overallGate=PASS |
+| 2026-04-24T13:01:44.801Z | finalizeSprint:selfAuditGate | Gate result written to /home/alperen/deckent-dev/.deckent/sprint-152-gate.json overallGate=PASS |
+| 2026-04-24T13:01:44.802Z | finalizeSprint:breadcrumb | Step 10c (loadReport) — entering |
+| 2026-04-24T13:01:44.803Z | finalizeSprint:loadReport | Load test report written to /home/alperen/deckent-dev/docs/audits/sprint-152/load-test-report.md |
+| 2026-04-24T13:01:44.804Z | finalizeSprint:breadcrumb | Step 10c (loadReport) — done |
+| 2026-04-24T13:01:44.804Z | finalizeSprint:breadcrumb | Step 10c2 (metricsRotation) — entering |
+| 2026-04-24T13:01:44.806Z | observability-rotation | Rotated 9117 bytes → /home/alperen/deckent-dev/.deckent/archive/metrics/metrics-sprint-152.jsonl.gz (863 bytes gzipped), pruned 0 old archives |
+| 2026-04-24T13:01:44.806Z | finalizeSprint:metricsRotation | Rotated 9117 bytes → /home/alperen/deckent-dev/.deckent/archive/metrics/metrics-sprint-152.jsonl.gz (863 bytes gzipped), pruned 0 old archives |
+| 2026-04-24T13:01:44.807Z | finalizeSprint:breadcrumb | Step 10c2 (metricsRotation) — done |
+| 2026-04-24T13:01:44.807Z | finalizeSprint:breadcrumb | Step 10d (featuresManifest) — entering |
+| 2026-04-24T13:01:45.452Z | finalizeSprint:featuresManifest | Sync exit=0: ✓ Features manifest written: /home/alperen/deckent-dev/.deckent/features-manifest.json (31 features) |
+| 2026-04-24T13:01:45.452Z | finalizeSprint:breadcrumb | Step 12 (archiveDirectives) — entering |
+| 2026-04-24T13:01:45.453Z | archiveDirectives | Archived DIRECTIVES.md → /home/alperen/deckent-dev/.brain/archive/DIRECTIVES-sprint-152.md |
+| 2026-04-24T13:01:45.454Z | finalizeSprint:breadcrumb | Step 12b (archiveOrphanTasks) — entering |
+| 2026-04-24T13:01:45.474Z | createPreArchiveSnapshot | Snapshot created: /home/alperen/deckent-dev/.deckent/sprint-152-pre-archive.tar.gz (192 files, hash=5071ed335796...) |
+| 2026-04-24T13:01:45.475Z | finalizeSprint:preArchiveSnapshot | Snapshot created: 192 files, hash=5071ed335796... |
+| 2026-04-24T13:01:45.495Z | archiveOrphanTasks | Archived 204 task files to /home/alperen/deckent-dev/.brain/archive/sprint-152-tasks |
+| 2026-04-24T13:01:45.496Z | finalizeSprint:archiveOrphanTasks | Archived 204 orphan task files |
+| 2026-04-24T13:01:45.496Z | finalizeSprint:breadcrumb | Step 12c (cleanTasksArchive) — entering |
+| 2026-04-24T13:01:45.497Z | finalizeSprint:cleanTasksArchive | Removed 0 old .tasks/archive/ dirs |
+| 2026-04-24T13:01:45.498Z | finalizeSprint:breadcrumb | Step 12d (sprintFileRetention) — entering |
+| 2026-04-24T13:01:45.500Z | finalizeSprint:sprintFileRetention | Retention complete: archived=2, countersDeleted=2, forensicMoved=0, bytesFreed=9585 |
+| 2026-04-24T13:01:45.500Z | finalizeSprint:breadcrumb | Step 13 (jobSummary) — entering |
+| 2026-04-24T13:01:45.501Z | finalizeSprint:jobSummary | Job summary written to /home/alperen/deckent-dev/.deckent/jobs/sprint-152.json |
+| 2026-04-24T13:01:45.502Z | finalizeSprint:breadcrumb | Step 14 (postFinalizeHooks) — entering |
+| 2026-04-24T13:01:45.510Z | postFinalizeHooks:memoryExport | 4 files written, 0 errors |
+| 2026-04-24T13:01:45.511Z | postFinalizeHooks:identityRegen | updated adrCount=43 |
+| 2026-04-24T13:01:45.516Z | postFinalizeHooks:ruleRegen | Rule regeneration hook called |
+| 2026-04-24T13:01:45.517Z | finalizeSprint:postFinalizeHooks | memExport=4 identity=updated ruleRegen=true errors=0 |
+| 2026-04-24T13:01:45.517Z | [Brain] | Cleanup delayed 180000ms — .tasks/ files remain readable |

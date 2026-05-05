@@ -1,0 +1,84 @@
+{
+  "id": "152-018",
+  "title": "Auto-Memory 78 Dosya Kayıp Impact Analysis",
+  "description": "Auto-Memory 78 Dosya Kayıp Impact Analysis\n- Model: opus\n- Effort: normal\n- Skills: documentation-writer, system-architect\n- Files: docs/audits/sprint-152/T-152-018-automemory-loss-impact.md\n- Scope: docs/audits/sprint-152/\n\n### Description\nSistem taşımada WSL projesindeki `~/.claude/projects/-home-alperen-deckent-dev/memory/` 82 dosyadan sadece 4 geri geldi (Windows OneDrive/Deckent projesinden). Kayıp ~78 dosyanın içerik tahmini:\n- RESTORE-INSTRUCTIONS + NEXT-SESSION-PROMPT referanslarından türet (feedback_npm_publish_alperen_approval, feedback_timezone_trt, feedback_two_persona_analysis, feedback_deckent_kill_approval_required, feedback_test_agent_removal, feedback_max_workers, feedback_openclaw_not_openhands, project_sprint151_preflight_p0_bugs, vs.)\n- Sprint 138-151 retro öğrenimlerinden hangi feedback dosyaları türetilebilir\n- Yeniden-öğrenme maliyeti: hangi preference'lar Sprint 152-153'te ilk gün canlanacak\n- **Prevention playbook**: Gelecek taşımalar için `~/.claude/` tam yedekleme protokolü (RESTORE-INSTRUCTIONS'da eksik kalmış nokta)\n\n**Kanıt:** 78 dosya tahmini liste + geri-kurtarma öncelik matrisi (P0/P1/P2) + prevention checklist\n**Test:** N/A\n\n---",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "docs/audits/sprint-152/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "docs/audits/sprint-152/T-152-018-automemory-loss-impact.md"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** 78 dosya tahmini liste + geri-kurtarma öncelik matrisi (P0/P1/P2) + prevention checklist",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-152",
+  "forceModel": "opus",
+  "forceEffort": "normal",
+  "forceSkills": [
+    "documentation-writer",
+    "system-architect"
+  ],
+  "assignedAgent": "doc-writer",
+  "assignedSkills": [
+    "documentation-writer",
+    "system-architect"
+  ],
+  "createdAt": "2026-04-24T12:16:30.282Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "documentation",
+        "secondary": [],
+        "confidence": 0.95
+      },
+      "tags": [],
+      "domains": [
+        {
+          "name": "docs",
+          "weight": 1
+        }
+      ],
+      "operations": [
+        {
+          "type": "document",
+          "weight": 0.5
+        },
+        {
+          "type": "test",
+          "weight": 0.25
+        },
+        {
+          "type": "create",
+          "weight": 0.25
+        }
+      ],
+      "complexity": {
+        "fileCount": 1,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "trivial"
+      },
+      "scope": {
+        "writeRatio": {
+          "docs/": 1
+        },
+        "primaryWriteTarget": "docs/",
+        "testWriteRatio": 0
+      }
+    },
+    "confidence": "high",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-24T12:51:35.830Z"
+}

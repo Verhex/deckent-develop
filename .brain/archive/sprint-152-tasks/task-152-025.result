@@ -1,0 +1,19 @@
+{
+  "taskId": "152-025",
+  "filesChanged": [
+    "docs/audits/sprint-152/T-152-025-git-hygiene.md"
+  ],
+  "linesAdded": 207,
+  "linesRemoved": 0,
+  "testsPassed": true,
+  "coverage": 0,
+  "selfAssessment": "DONE",
+  "notes": "READ-ONLY git hygiene audit. Report written to docs/audits/sprint-152/T-152-025-git-hygiene.md (17648 B, 207 lines). All acceptance criteria met: [PASS|FAIL|REGRESSION|DRIFT|MISSING] labels, evidence (10+ command outputs + 3 matrix tables), Sprint 153+ action list (P0/P1/P2). Key findings: (1) REGRESSION — .claude/rules/{auditor,brain,worker-default}.md lost 91 lines each (AUTO-START ADR block stripped during sprint-152 PLAN regenerateRules — likely better-sqlite3 NODE_MODULE_VERSION fallback swallow); (2) FAIL — local master is BEHIND origin/master by 1 commit (8434387 docs(claude-md): sync), needs fast-forward pull; (3) PASS — SYSTEM-MIGRATION-2026-04-22.md intact at project root (22824 B, 597 lines, committed 117ae31), recommendation: keep at root, not .brain/archive/; (4) PASS — core.fileMode=false correctly suppresses 4012 WSL mode-flip artifact (3988 pure mode flips), no chmod -R needed; (5) DRIFT — remote URL still VerhexIO/deckent-dev, Beta GA gate #11 repo flip to VerhexIO/deckent pending (Alperen manual); (6) REGRESSION — temp-react/temp-react-ts agent stats reset (totalUses 32→0) noted for T-152-021 follow-up; (7) DRIFT — .gitignore missing patterns for .deckent/decisions/, .deckent/run-gate.json, .deckent/sprint-*-metrics.jsonl. Verification: `tsc --noEmit` exit=0 (no source changes to break build). Vitest NOT run (read-only audit, no code delta to validate — boilerplate step N/A per task spec `Test: N/A`). `git diff --stat src/ tests/` = empty → READ-ONLY compliance verified.",
+  "tokenUsage": {
+    "inputTokens": 32000,
+    "outputTokens": 7000,
+    "cacheReadTokens": 45000,
+    "provider": "claude",
+    "model": "opus"
+  }
+}

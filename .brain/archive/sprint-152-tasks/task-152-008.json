@@ -1,0 +1,90 @@
+{
+  "id": "152-008",
+  "title": "MCP Smoke Part 2 — Observational + Advanced (10 tool)",
+  "description": "MCP Smoke Part 2 — Observational + Advanced (10 tool)\n- Model: opus\n- Effort: normal\n- Skills: testing-expert, code-reviewer\n- Files: docs/audits/sprint-152/T-152-008-mcp-observational.md\n- Scope: docs/audits/sprint-152/\n\n### Description\n`deckent_doctor`, `deckent_analyze_project`, `deckent_sync`, `deckent_config`, `deckent_history`, `deckent_explain`, `deckent_help`, `deckent_run` (dry-run), `deckent_memory_query`, `deckent_checkpoint`.\n\nHer tool için CLI karşılığı ile **parity audit** (ADR-022-v2 CLI/MCP feature parity).\n\n**Kanıt:** CLI-MCP parity matrisi 10 satır\n**Test:** N/A\n\n---",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "docs/audits/sprint-152/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "docs/audits/sprint-152/T-152-008-mcp-observational.md"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** CLI-MCP parity matrisi 10 satır",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "NO_GO",
+  "sprintId": "sprint-152",
+  "forceModel": "opus",
+  "forceEffort": "normal",
+  "forceSkills": [
+    "testing-expert",
+    "code-reviewer"
+  ],
+  "assignedAgent": "doc-writer",
+  "assignedSkills": [
+    "testing-expert",
+    "code-reviewer"
+  ],
+  "createdAt": "2026-04-24T12:16:30.282Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "documentation",
+        "secondary": [
+          "config"
+        ],
+        "confidence": 0.95
+      },
+      "tags": [],
+      "domains": [
+        {
+          "name": "docs",
+          "weight": 1
+        }
+      ],
+      "operations": [
+        {
+          "type": "document",
+          "weight": 0.4
+        },
+        {
+          "type": "test",
+          "weight": 0.2
+        },
+        {
+          "type": "configure",
+          "weight": 0.2
+        },
+        {
+          "type": "create",
+          "weight": 0.2
+        }
+      ],
+      "complexity": {
+        "fileCount": 1,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "trivial"
+      },
+      "scope": {
+        "writeRatio": {
+          "docs/": 1
+        },
+        "primaryWriteTarget": "docs/",
+        "testWriteRatio": 0
+      }
+    },
+    "confidence": "high",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-24T12:51:35.558Z"
+}

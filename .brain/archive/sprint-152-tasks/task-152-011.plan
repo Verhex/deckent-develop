@@ -1,0 +1,22 @@
+# T-152-011 Execution Plan
+
+## Approach
+Read-only audit of Memory V2 SQLite DB and FTS5 search layer.
+
+## Steps
+1. Inspect `.brain/memory.db` via `sqlite3` CLI or node one-liner (better-sqlite3 already rebuilt in system)
+2. Query schema_version, entries counts by type, FTS5 table structure, relations integrity
+3. Run `searchMemory` test via node dist/ or directly on DB:
+   - TR query ("adr yönetişim")
+   - EN query ("docker heartbeat")
+   - DE query ("architekturentscheidung")
+4. Compare DB entries vs exports/*.md files
+5. Check decay policy enforcement (entries older than 20 sprints + status != accepted)
+6. Verify ADR count (43), debt (96), memory/retro/sprint/identity counts
+7. Write report to docs/audits/sprint-152/T-152-011-memory-v2-integrity.md
+
+## Files to Modify
+- docs/audits/sprint-152/T-152-011-memory-v2-integrity.md (WRITE)
+
+## Expected Output
+Report with: SQL query results, FTS5 TR/EN/DE recall evidence, schema version, relations counts, export pipeline parity check, decay compliance status, [PASS|FAIL|...] findings, Sprint 153+ action list.

@@ -1,0 +1,94 @@
+{
+  "id": "152-026",
+  "title": "Hot Fix with Claude Subagents Pattern — Sprint 150A Doğrulama",
+  "description": "Hot Fix with Claude Subagents Pattern — Sprint 150A Doğrulama\n- Model: opus\n- Effort: normal\n- Skills: system-architect, documentation-writer\n- Files: docs/audits/sprint-152/T-152-026-hotfix-pattern.md\n- Scope: docs/audits/sprint-152/\n\n### Description\nROADMAP §11.11: Sprint 150A \"Hot Fix with Claude Subagents\" pattern (H1..H7, ~68dk, ~1M token). Sprint 152+ için kullanılabilirliği:\n- Pattern spec bir yerde yazılı mı (ADR olarak kayıtlı mı)\n- 7 hot fix metadata (H1 CLI skill publish, H2 vitest triage, H3 config, H4 retention, H5 rotation, H6 NOTIFY, H7 rebuild) canlı kanıtları git log + DEBT arşivinde bulunabilir mi\n- Sprint 151 retro'da hot fix kalıntıları var mı\n- \"Deckent kırıkken deckent'le deckent tamiri sonsuz döngü\" riski bu pattern ile azaldı mı\n- DECKENT→USER:NOTIFY H6 kanalı (12 sprint sonra canlandı) hâlâ canlı mı (Sprint 151 T-151-009 smoke testleri 22 E2E)\n\n**Kanıt:** Pattern ADR önerisi + Sprint 150A canlı kanıt zinciri + pattern kullanım rehberi\n**Test:** N/A\n\n---",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "docs/audits/sprint-152/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "docs/audits/sprint-152/T-152-026-hotfix-pattern.md"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** Pattern ADR önerisi + Sprint 150A canlı kanıt zinciri + pattern kullanım rehberi",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "NO_GO",
+  "sprintId": "sprint-152",
+  "forceModel": "opus",
+  "forceEffort": "normal",
+  "forceSkills": [
+    "system-architect",
+    "documentation-writer"
+  ],
+  "assignedAgent": "doc-writer",
+  "assignedSkills": [
+    "system-architect",
+    "documentation-writer"
+  ],
+  "createdAt": "2026-04-24T12:16:30.282Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "documentation",
+        "secondary": [
+          "config"
+        ],
+        "confidence": 0.88
+      },
+      "tags": [],
+      "domains": [
+        {
+          "name": "docs",
+          "weight": 1
+        }
+      ],
+      "operations": [
+        {
+          "type": "create",
+          "weight": 0.25
+        },
+        {
+          "type": "test",
+          "weight": 0.25
+        },
+        {
+          "type": "document",
+          "weight": 0.25
+        },
+        {
+          "type": "modify",
+          "weight": 0.13
+        },
+        {
+          "type": "configure",
+          "weight": 0.13
+        }
+      ],
+      "complexity": {
+        "fileCount": 1,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "trivial"
+      },
+      "scope": {
+        "writeRatio": {
+          "docs/": 1
+        },
+        "primaryWriteTarget": "docs/",
+        "testWriteRatio": 0
+      }
+    },
+    "confidence": "high",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-24T12:51:36.369Z"
+}

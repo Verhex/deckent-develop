@@ -1,0 +1,29 @@
+{
+  "id": "152-005-fix-fix",
+  "title": "Fix: Fix: CLI Smoke Part 3 — Agent + Skill + Plugin (12 komut)",
+  "description": "Priority fix for NO_GO task 152-005-fix.\nOriginal worker notes: Priority fix for NO_GO task 152-005. Read-only CLI smoke audit of agent+skill+plugin families rewritten with stronger evidence: (a) 12-command verdict table with explicit PASS|DRIFT|MISSING tags + exit codes; (b) verbatim output blocks for 13 commands; (c) explicit `git diff --stat src/ tests/` = 0 scope-compliance kanıt bloğu; (d) corrected version banner (v1.0.0-beta.1, was v0.4.0-beta.1); (e) re-verified 4 bugs with kod:satır references — BUG #1 agent.ts:55-56 Math.round success rate, BUG #2 \nExpected scope: docs/audits/sprint-152/\nFiles that should change: docs/audits/sprint-152/T-152-005-cli-agent-skill.md",
+  "model": "opus",
+  "effort": "high",
+  "priority": "CRITICAL",
+  "reason": "Task 152-005-fix evaluated as NO_GO",
+  "scope": {
+    "directories": [
+      "docs/audits/sprint-152/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "docs/audits/sprint-152/T-152-005-cli-agent-skill.md"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** Built-in envanter doğrulanmış rapor",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "PENDING",
+  "sprintId": "sprint-152",
+  "isPriorityFix": true,
+  "fixForTaskId": "152-005-fix",
+  "createdAt": "2026-04-24T13:01:43.594Z"
+}

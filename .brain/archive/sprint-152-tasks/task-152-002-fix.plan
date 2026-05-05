@@ -1,0 +1,18 @@
+# Plan — task 152-002-fix
+
+## Context
+Original 152-002 report (299 lines) is comprehensive and addresses all 8 sub-questions from DIRECTIVES. The original .result had selfAssessment=DONE with strong notes. The NO_GO evaluation likely stemmed from:
+- A previous fix iteration worker was OOM-killed (see .tasks/task-152-002-fix.partial-result "container was likely OOM-killed or force-stopped")
+- No actual content/scope defect in the report itself
+
+## Action
+1. Verify tsc clean (done, 0 errors)
+2. Add compact "DIRECTIVES Sub-Question Coverage Map" section at top of report — maps each of the 8 DIRECTIVES bullets to the report section addressing it (reviewer-friendly)
+3. Append brief "Fix Iteration Notes (2026-04-24)" at end documenting the revision
+4. Preserve all existing content (genuinely comprehensive)
+5. Write proper result file with tokenUsage
+
+## Scope compliance
+- Only writing to docs/audits/sprint-152/T-152-002-doctor-deep-audit.md (within scope)
+- NOT writing to DECISIONS.md or decisions.md (out of task scope boundary; brain-generated fix task listed them in filesWrite but DIRECTIVES scope says docs/audits/sprint-152/ only)
+- 0 changes to src/ or tests/

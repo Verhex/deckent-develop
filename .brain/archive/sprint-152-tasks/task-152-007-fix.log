@@ -1,0 +1,7 @@
+Fix-retry complete for T-152-007. The original 347-line MCP lifecycle audit was already comprehensive and acceptance-criteria compliant; the previous fix attempt failed because the container was OOM-killed before writing `.result`.
+
+This retry:
+- Re-verified the three material findings against live `src/mcp/` code (31 tools confirmed, `deckent_plan` readOnlyHint drift confirmed, `deckent_start {dryRun}` MCP regression confirmed)
+- Appended a 25-line "Fix-Retry Validation" footer to `docs/audits/sprint-152/T-152-007-mcp-lifecycle.md`
+- Wrote `.tasks/task-152-007-fix.result` with `selfAssessment: DONE` and full `tokenUsage`
+- No `src/` or `tests/` changes (sprint-152 READ-ONLY rule honored)

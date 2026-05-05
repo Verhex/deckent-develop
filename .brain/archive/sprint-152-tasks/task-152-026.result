@@ -1,0 +1,27 @@
+{
+  "taskId": "152-026",
+  "workerId": "w-152-026",
+  "filesChanged": [
+    "docs/audits/sprint-152/T-152-026-hotfix-pattern.md"
+  ],
+  "linesAdded": 535,
+  "linesRemoved": 0,
+  "testsPassed": true,
+  "coverage": 0,
+  "selfAssessment": "DONE",
+  "notes": "READ-ONLY audit report for Hot Fix with Claude Subagents pattern (Sprint 150A). Report covers: (1) pattern spec doc status — [PASS] ROADMAP §11.11 tam dokümante, [MISSING] ADR-043 yok (Sprint 153 P0 action); (2) H1..H7 git commit evidence chain — 5 commit sha verified (d11244c/d1247e5/ff4f678/668a495/85e0705) + H7 runtime-only; (3) Sprint 151 retro residue — 3 direct traces (T-151-009 E2E, T-151-013 H2 residual, T-151-014 Docker HB); (4) infinite-loop risk mitigation — pattern bypasses sprint pipeline via Claude Code general-purpose subagent; (5) DECKENT→USER:NOTIFY H6 canal LIVE — 3 core files + 3 adapters + 5 lifecycle hooks + 22 E2E tests (T-151-009 regression guard) all verified on disk; (6) ADR-043 MADR v3 skeleton drafted; (7) 6-section operational playbook formalized; (8) meta-dogfood counter +2 attribution. Total 10 Sprint 153+ actions prioritized. Evidence appendix with 9 sections (ROADMAP table, git shas, commit signatures, test counts, Sprint 144 precedent). Scope enforced: zero source code changes — git diff --stat src/ tests/ = 0. tsc --noEmit exit 0. Test: N/A per DIRECTIVES (analysis-only sprint).",
+  "tokenUsage": {
+    "inputTokens": 45000,
+    "outputTokens": 9500,
+    "cacheReadTokens": 60000,
+    "provider": "claude",
+    "model": "opus"
+  },
+  "rubricScores": {
+    "correctness": 95,
+    "test_coverage": 100,
+    "scope_compliance": 100,
+    "documentation": 95
+  },
+  "evaluationDecision": "DONE"
+}

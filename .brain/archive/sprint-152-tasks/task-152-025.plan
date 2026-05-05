@@ -1,0 +1,19 @@
+# Task 152-025 Plan: Git State Hijyen + SYSTEM-MIGRATION Yaşam Döngüsü
+
+## Goal
+READ-ONLY audit of git repository state post-system-migration (2026-04-22 → 2026-04-24).
+Produce report at docs/audits/sprint-152/T-152-025-git-hygiene.md.
+
+## Steps
+1. Gather evidence via git commands (status, log, diff, config, remote)
+2. Inspect 4 kept diffs (.claude/rules/{auditor,brain,worker-default}.md + .claude/settings.local.json)
+3. Check SYSTEM-MIGRATION-2026-04-22.md state (existence, location, size)
+4. Verify git config core.fileMode and project-local config
+5. Investigate ~4012 mode-diff WSL migration artifact claim
+6. Check origin/master sync status and whether Sprint 151 commit 9f80755 was pushed
+7. Write findings report with [PASS|FAIL|REGRESSION|MISSING|DRIFT] labels
+8. List Sprint 153+ actions (P0/P1/P2)
+
+## Constraints
+- NO code changes (READ-ONLY sprint)
+- Only write: docs/audits/sprint-152/T-152-025-git-hygiene.md + .tasks/task-152-025.{plan,hb,result}

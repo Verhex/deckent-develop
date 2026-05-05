@@ -1,0 +1,101 @@
+{
+  "id": "152-012",
+  "title": "Nervous System 11 Detector Canlılık Audit",
+  "description": "Nervous System 11 Detector Canlılık Audit\n- Model: opus\n- Effort: high\n- Skills: system-architect, code-reviewer\n- Files: docs/audits/sprint-152/T-152-012-nervous-11-detectors.md\n- Scope: docs/audits/sprint-152/\n\n### Description\n11 detector (5 active + 5 sprint-148 reserved + 1 Sprint 151 T-151-015 eklentileri):\n- `stale_worker`, `scope_collision`, `debt_trend`, `agent_routing`, `directives_protection` (5 active)\n- Sprint 151 T-151-015 eklediği 5 yeni: `build_failure_recurrence`, `token_spike`, `agent_routing_anomaly` (?), `scope_collision_x` (?), `dead_event_stream`, `cost_threshold`, `prompt_quality`, `worker_output_variance`, `self_modifying_warner` → **kod ile eşleştir, sayı doğrula**\n\nHer detector için:\n- Registry'de kayıtlı mı (`src/nervous/detector-registry.ts`)\n- `config.json` `nervous_system.detectors` altında enabled/disabled\n- Sprint 148 \"reserve_for\" debt'i hâlâ geçerli mi\n- Son 5 sprint'te trigger oldu mu (event log)\n- DECKENT→USER:NOTIFY kanalında çıktı üretti mi (Sprint 150A H6/H7 canlı kanıt)\n\n**Kanıt:** 11 detector × durum tablosu + son trigger tarihi\n**Test:** N/A\n\n---",
+  "model": "opus",
+  "effort": "high",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "docs/audits/sprint-152/",
+      "src/nervous/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "docs/audits/sprint-152/T-152-012-nervous-11-detectors.md",
+      "src/nervous/detector-registry.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** 11 detector × durum tablosu + son trigger tarihi",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "NO_GO",
+  "sprintId": "sprint-152",
+  "forceModel": "opus",
+  "forceEffort": "high",
+  "forceSkills": [
+    "system-architect",
+    "code-reviewer"
+  ],
+  "assignedAgent": "doc-writer",
+  "assignedSkills": [
+    "system-architect",
+    "code-reviewer"
+  ],
+  "createdAt": "2026-04-24T12:16:30.282Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "documentation",
+        "secondary": [
+          "config"
+        ],
+        "confidence": 0.81
+      },
+      "tags": [],
+      "domains": [
+        {
+          "name": "docs",
+          "weight": 0.5
+        },
+        {
+          "name": "nervous",
+          "weight": 0.5
+        }
+      ],
+      "operations": [
+        {
+          "type": "create",
+          "weight": 0.33
+        },
+        {
+          "type": "modify",
+          "weight": 0.17
+        },
+        {
+          "type": "test",
+          "weight": 0.17
+        },
+        {
+          "type": "document",
+          "weight": 0.17
+        },
+        {
+          "type": "configure",
+          "weight": 0.17
+        }
+      ],
+      "complexity": {
+        "fileCount": 2,
+        "moduleCount": 2,
+        "crossCutting": true,
+        "estimatedSize": "medium"
+      },
+      "scope": {
+        "writeRatio": {
+          "docs/": 0.5,
+          "src/": 0.5
+        },
+        "primaryWriteTarget": "docs/",
+        "testWriteRatio": 0
+      }
+    },
+    "confidence": "high",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-24T12:51:35.561Z"
+}

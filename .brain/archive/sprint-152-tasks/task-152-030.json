@@ -1,0 +1,103 @@
+{
+  "id": "152-030",
+  "title": "Sprint 151 Learnings → Sprint 152 Actionable Distilling + Meta-Dogfood Sayacı",
+  "description": "Sprint 151 Learnings → Sprint 152 Actionable Distilling + Meta-Dogfood Sayacı\n- Model: opus\n- Effort: high\n- Skills: documentation-writer, system-architect\n- Files: docs/audits/sprint-152/T-152-030-sprint151-distill.md\n- Scope: docs/audits/sprint-152/\n\n### Description\n- Sprint 151 retro (`.brain/RETRO.md`) learnings → Sprint 153-160 actionable items\n- 15 task kalitesi (agent performance: doc-writer 6/6, architect 5/5, temp-react-ts-specialist 4/4) → hangi agent'lar over-performing\n- 3 TD (T-151-002, T-151-004, T-151-014, T-151-015) → kök sebep tekrarı var mı\n- Beta GA Exit Gate 17→19 (T-151-009 + T-151-014 açıldı)\n- **Meta-Dogfood sayacı:** Sprint 146 (1), 147 (3), 148 (6), 150 (11), 150A Hot Fix (13), 151 (?) → Sprint 152 tahmini\n- Sprint 151 gate failure root cause 1 vitest fail — Sprint 152 aynı hata riski\n- Sprint 152 bu audit sprint'inin kendisi \"13+ meta-dogfood kanıtı\" üretme potansiyeli (kendi kendini denetleme)\n\n**Kanıt:** Sprint 151 → 152 köprü + meta-dogfood projection + Sprint 153 öneri listesi\n**Test:** N/A\n\n---\n\n## Test Alanları (Tüm Task'lar İçin Ortak)\n\nBu sprint bir **analiz sprint'i** olduğundan `Test:` alanı her task'ta **N/A**. Ancak her worker rapor dosyasında aşağıdaki format zorunlu:\n\n```markdown\n# T-152-XXX: Task Başlığı\n\n## Özet\n(1 paragraf)\n\n## Bulgular\n- [PASS | FAIL | REGRESSION | MISSING | DRIFT] — kısa açıklama + kanıt dosya/satır\n- ...\n\n## Sprint 153+ İçin Aksiyon Listesi\n- [P0 | P1 | P2] — aksiyon + tahmini effort\n\n## Kanıt Ekleri\n- Komut çıktıları, SQL query sonuçları, stat'lar\n```\n\n## Acceptance Criteria (Her Task)\n- Rapor dosyası `docs/audits/sprint-152/T-152-XXX-*.md` yazılmış\n- Bulgular [PASS | FAIL | ...] etiketli\n- Kanıt (komut çıktısı, dosya:satır, grep sonucu) içeriyor\n- Sprint 153+ aksiyon listesi var\n- **Kod değişikliği YOK** (git diff src/ tests/ = 0)\n\n## Kod Yazma Enforcement\nHer worker scope:\n- `scope.directories`: `[\"docs/audits/sprint-152/\"]`\n- `scope.filesWrite`: `[\"docs/audits/sprint-152/T-152-XXX-*.md\"]`\n- `scope.filesRead`: `[\"src/**\", \"tests/**\", \"docs/**\", \".brain/**\", \".deckent/**\", \".tasks/**\", \"package.json\", \"tsconfig.json\", \"vitest.config.ts\", \"Dockerfile.worker\", \"CLAUDE.md\", \"DECKENT.md\", \"DIRECTIVES.md\", \".contracts/**\", \".claude/rules/**\"]`\n\nAuditor `git diff --stat src/ tests/` ile 0 satır değişiklik doğrular. İhlal = task NO_GO.\n\n## Sprint Meta\n\n| Field | Value |\n|-------|-------|\n| Sprint ID | sprint-152 |\n| Task count | 30 |\n| Mode | performance (opus brain, 6 worker) |\n| Backend | docker (deckent-worker:latest 940MB) |\n| Plan mode | structured (deterministic, no AI planner) |\n| Effort distribution | 6 low, 16 normal, 8 high |\n| Model distribution | 30 opus (derin analiz kalite önceliği, haiku_allowed=false) |\n| Expected duration | 90-150 minutes (6 paralel, çoğu sonnet) |\n| Code write | ❌ YASAK (100% read-only) |\n| Success metric | 30 rapor dosyası + 0 source code change + Sprint 153 aksiyon listesi |",
+  "model": "opus",
+  "effort": "high",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "docs/audits/sprint-152/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "docs/audits/sprint-152/T-152-030-sprint151-distill.md",
+      "RETRO.md",
+      ".md",
+      "CLAUDE.md",
+      "DECKENT.md",
+      "DIRECTIVES.md",
+      "package.json",
+      "tsconfig.json",
+      "vitest.config.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** Sprint 151 → 152 köprü + meta-dogfood projection + Sprint 153 öneri listesi",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "NO_GO",
+  "sprintId": "sprint-152",
+  "forceModel": "opus",
+  "forceEffort": "high",
+  "forceSkills": [
+    "documentation-writer",
+    "system-architect"
+  ],
+  "assignedAgent": "architect",
+  "assignedSkills": [
+    "documentation-writer",
+    "system-architect"
+  ],
+  "createdAt": "2026-04-24T12:16:30.282Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "documentation",
+        "secondary": [
+          "config"
+        ],
+        "confidence": 0.95
+      },
+      "tags": [],
+      "domains": [
+        {
+          "name": "docs",
+          "weight": 0.2
+        }
+      ],
+      "operations": [
+        {
+          "type": "modify",
+          "weight": 0.25
+        },
+        {
+          "type": "test",
+          "weight": 0.25
+        },
+        {
+          "type": "document",
+          "weight": 0.25
+        },
+        {
+          "type": "configure",
+          "weight": 0.13
+        },
+        {
+          "type": "create",
+          "weight": 0.13
+        }
+      ],
+      "complexity": {
+        "fileCount": 9,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "large"
+      },
+      "scope": {
+        "writeRatio": {
+          "docs/": 0.11,
+          "./": 0.89
+        },
+        "primaryWriteTarget": "./",
+        "testWriteRatio": 0
+      }
+    },
+    "confidence": "uncertain",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-24T12:51:36.372Z"
+}

@@ -1,0 +1,17 @@
+# Task 152-023 Execution Plan
+
+## Objective
+Produce `docs/audits/sprint-152/T-152-023-beta-ga-gates.md` — realistic status of 3 remaining Beta GA gates from ROADMAP §5.
+
+## Approach
+1. Locate ROADMAP-GOD-LEVEL.md §5 to enumerate the 20 gates + 3 open
+2. Gate #3 Coverage: check current coverage via CLAUDE.md / IDENTITY.md / vitest.config reports
+3. Gate #13 Messaging trio: search src/ for discord/telegram/whatsapp adapters, find notify-adapters, Sprint 151 retro mention of deploy
+4. Gate #15 DeckentHub: search for ed25519, deckent-hub, seed skill list, VerhexIO repo references
+5. Write findings report using PASS/FAIL/DRIFT/MISSING tags with file:line evidence
+6. Include realistic ETA for each gate
+7. Sprint 153+ action list
+8. No code changes; only write audit report
+
+## Output
+`docs/audits/sprint-152/T-152-023-beta-ga-gates.md` — structured report per sprint template

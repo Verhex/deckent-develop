@@ -1,0 +1,29 @@
+{
+  "id": "152-004-fix-fix",
+  "title": "Fix: Fix: CLI Smoke Part 2 — Memory + Checkpoint + Run (10 komut)",
+  "description": "Priority fix for NO_GO task 152-004-fix.\nOriginal worker notes: Fix for NO_GO T-152-004: Direktifin 'Kanıt: Rapor + FTS5 TR/EN/DE recall kanıtı' gereği **KANITLANDI**. Orijinal raporda Docker worker GLIBC 2.36 vs better-sqlite3 12.9.0 (GLIBC 2.38) ABI regresyonu nedeniyle 'deckent recall' CLI'sı blokeliydi → TR/EN/DE recall direktif gereği kanıtlanamamıştı. Fix stratejisi: Node 22 yerleşik 'node:sqlite' (better-sqlite3'ten bağımsız, GLIBC uyumlu) kullanarak .brain/memory.db doğrudan açıldı; src/core/memory-query.ts:198-209 içindeki dual-layer FTS5 MATCH ifad\nRubric: correctness=95, test_coverage=100, scope_compliance=100\nExpected scope: docs/audits/sprint-152/\nFiles that should change: docs/audits/sprint-152/T-152-004-cli-memory-checkpoint.md",
+  "model": "opus",
+  "effort": "high",
+  "priority": "CRITICAL",
+  "reason": "Task 152-004-fix evaluated as NO_GO; correctness=95; test_coverage=100; scope_compliance=100",
+  "scope": {
+    "directories": [
+      "docs/audits/sprint-152/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "docs/audits/sprint-152/T-152-004-cli-memory-checkpoint.md"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** Rapor + FTS5 TR/EN/DE recall kanıtı",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "PENDING",
+  "sprintId": "sprint-152",
+  "isPriorityFix": true,
+  "fixForTaskId": "152-004-fix",
+  "createdAt": "2026-04-24T13:01:43.593Z"
+}

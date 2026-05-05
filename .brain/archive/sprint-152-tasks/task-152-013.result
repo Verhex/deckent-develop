@@ -1,0 +1,17 @@
+{
+  "taskId": "152-013",
+  "filesChanged": ["docs/audits/sprint-152/T-152-013-provider-health.md"],
+  "linesAdded": 298,
+  "linesRemoved": 0,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "DONE",
+  "notes": "READ-ONLY audit. Report written: docs/audits/sprint-152/T-152-013-provider-health.md (298 lines, 20415 bytes). Covered: Claude CLI v2.1.119 session auth (max plan, 7.79h TTL, expires 2026-04-24T20:19Z), Codex CLI MISSING (no binary + no OPENAI_API_KEY + no .deck), Gemini CLI MISSING (no binary + no GOOGLE_API_KEY), model-registry integrity 13 models × 3 providers × 4 tiers SAĞLAM, tier equivalence map canlı doğrulandı (opus↔gpt-5↔gemini-2.5-pro vs.), auth_mode=subscription aktif, fallback_provider YOK (tek-nokta-arıza), rate-limit/throttle kod tarafında YOK, max_workers=6 performance mode. 3 P0 aksiyon Sprint 153 için: (1) fallback_provider ekle, (2) model-registry opus.apiId claude-opus-4-6→claude-opus-4-7, (3) Claude quota-exhausted guard + auto-defer. Multi-provider activation roadmap Sprint 153-164 için çizildi. Kod değişikliği YOK — `git diff --stat src/ tests/` = 0 lines. Scope compliance: docs/audits/sprint-152/ only. tsc/vitest verify atlandı (read-only audit, kod değişmedi — verify gereksiz).",
+  "tokenUsage": {
+    "inputTokens": 48000,
+    "outputTokens": 7200,
+    "cacheReadTokens": 0,
+    "provider": "claude",
+    "model": "opus"
+  }
+}

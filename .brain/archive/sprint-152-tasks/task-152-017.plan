@@ -1,0 +1,22 @@
+# T-152-017 Execution Plan: tsc + vitest Baseline Drift Analysis
+
+## Goal
+Read-only audit of TypeScript compile status + vitest baseline after system migration (old WSL → Ryzen 9 9950X3D). Compare against Sprint 151 baseline (9 fail + 16 skip + 12485 pass, 505 files).
+
+## Steps
+1. Run `tsc --noEmit` → capture error count + stderr
+2. Run `npx vitest run` → capture full output (pass/fail/skip counts + failing test names)
+3. Separately run dashboard vitest `npx vitest run --config src/dashboard/vitest.config.ts` → 413 test baseline
+4. Read `.deckent/ci-baseline.json` → understand baseline coverage/tests numbers in doctor
+5. Search recent retro/debt for vitest failure root causes
+6. Cross-check Sprint 151 gate FAIL ("1 failing tests") vs current state
+7. Write report to `docs/audits/sprint-152/T-152-017-tsc-vitest-baseline.md`
+8. Write `.result` with DONE/GO_WITH_TECH_DEBT
+
+## Scope
+- Read: src/**, tests/**, .brain/**, .deckent/**, docs/**, package.json, vitest.config.ts
+- Write: docs/audits/sprint-152/T-152-017-tsc-vitest-baseline.md only
+
+## Risk
+- Vitest suite may take 5-10 minutes; use 600s timeout
+- No code changes allowed (auditor verifies git diff --stat src/ tests/ = 0)

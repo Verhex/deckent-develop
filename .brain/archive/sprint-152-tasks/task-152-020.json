@@ -1,0 +1,104 @@
+{
+  "id": "152-020",
+  "title": "Skills 21 AST Sandbox + Registry Integrity",
+  "description": "Skills 21 AST Sandbox + Registry Integrity\n- Model: opus\n- Effort: normal\n- Skills: security-specialist, code-reviewer\n- Files: docs/audits/sprint-152/T-152-020-skills-integrity.md\n- Scope: docs/audits/sprint-152/\n\n### Description\n- 21 built-in skill (`src/core/skill-pool.ts`, `skill-registry.ts`) manifest bütünlüğü\n- `src/core/marketplace/skill-sandbox.ts` AST sandbox (eval/Function/child_process/fs/process.env blok) canlı mı\n- Ed25519 signature infrastructure (Sprint 149 başlangıç) — sign komutu, verify komutu\n- 20 seed skill hedefi (Sprint 149 Block D) — kaçı hazır?\n- `.deck` file interpolation (Sprint 149 planlanan) — hangi skill'lerde kullanılıyor\n\n**Kanıt:** 21 skill × durum + sandbox kanıt + Ed25519 readiness\n**Test:** N/A\n\n---",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "docs/audits/sprint-152/",
+      "src/core/",
+      "src/core/marketplace/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "docs/audits/sprint-152/T-152-020-skills-integrity.md",
+      "src/core/skill-pool.ts",
+      "skill-registry.ts",
+      "src/core/marketplace/skill-sandbox.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** 21 skill × durum + sandbox kanıt + Ed25519 readiness",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-152",
+  "forceModel": "opus",
+  "forceEffort": "normal",
+  "forceSkills": [
+    "security-specialist",
+    "code-reviewer"
+  ],
+  "assignedAgent": "temp-react-ts-specialist",
+  "assignedSkills": [
+    "security-specialist",
+    "code-reviewer"
+  ],
+  "createdAt": "2026-04-24T12:16:30.282Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "implementation",
+        "secondary": [
+          "documentation",
+          "security",
+          "config"
+        ],
+        "confidence": 0.63
+      },
+      "subIntent": "registry",
+      "tags": [],
+      "domains": [
+        {
+          "name": "core",
+          "weight": 0.57
+        },
+        {
+          "name": "docs",
+          "weight": 0.29
+        }
+      ],
+      "operations": [
+        {
+          "type": "test",
+          "weight": 0.5
+        },
+        {
+          "type": "document",
+          "weight": 0.17
+        },
+        {
+          "type": "configure",
+          "weight": 0.17
+        },
+        {
+          "type": "create",
+          "weight": 0.17
+        }
+      ],
+      "complexity": {
+        "fileCount": 4,
+        "moduleCount": 2,
+        "crossCutting": true,
+        "estimatedSize": "medium"
+      },
+      "scope": {
+        "writeRatio": {
+          "docs/": 0.25,
+          "src/": 0.5,
+          "./": 0.25
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0
+      }
+    },
+    "confidence": "low",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-24T12:51:35.963Z"
+}

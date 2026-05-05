@@ -1,0 +1,84 @@
+{
+  "id": "152-017",
+  "title": "tsc + vitest Baseline Drift Analysis",
+  "description": "tsc + vitest Baseline Drift Analysis\n- Model: opus\n- Effort: high\n- Skills: typescript-expert, testing-expert\n- Files: docs/audits/sprint-152/T-152-017-tsc-vitest-baseline.md\n- Scope: docs/audits/sprint-152/\n\n### Description\n- `tsc --noEmit` → 0 error (current), sistem taşıma sonrası değişti mi\n- `npx vitest run` → Sprint 151 9 fail + 16 skip + 12485 pass (toplam 505 file)\n  - 9 fail root-cause breakdown\n  - Hangi testler flaky, hangileri platform-specific (WSL2 vs Docker CI)\n  - `baseline tests: 16, baseline coverage: 0.0%` — doctor çıktısındaki bu değer neden 0?\n- Dashboard vitest ayrı: 413 test\n- Coverage %52 mevcut, %85 Beta GA gate'i (#3 \"Phase 2\" ertelendi) — Sprint 160+ hedef\n- Sprint 151 gate FAIL sebebi \"vitest: 1 failing tests\" — bu hangi test, hâlâ fail mı\n\n**Kanıt:** tsc 0 error kanıtı + vitest tam rapor + coverage delta\n**Test:** N/A\n\n---",
+  "model": "opus",
+  "effort": "high",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "docs/audits/sprint-152/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "docs/audits/sprint-152/T-152-017-tsc-vitest-baseline.md"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; `npx vitest run` → Sprint 151 9 fail + 16 skip + 12485 pass (toplam 505 file); *Kanıt:** tsc 0 error kanıtı + vitest tam rapor + coverage delta",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-152",
+  "forceModel": "opus",
+  "forceEffort": "high",
+  "forceSkills": [
+    "typescript-expert",
+    "testing-expert"
+  ],
+  "assignedAgent": "doc-writer",
+  "assignedSkills": [
+    "typescript-expert",
+    "testing-expert"
+  ],
+  "createdAt": "2026-04-24T12:16:30.282Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "documentation",
+        "secondary": [],
+        "confidence": 0.63
+      },
+      "tags": [],
+      "domains": [
+        {
+          "name": "docs",
+          "weight": 1
+        }
+      ],
+      "operations": [
+        {
+          "type": "test",
+          "weight": 0.6
+        },
+        {
+          "type": "document",
+          "weight": 0.2
+        },
+        {
+          "type": "create",
+          "weight": 0.2
+        }
+      ],
+      "complexity": {
+        "fileCount": 1,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "trivial"
+      },
+      "scope": {
+        "writeRatio": {
+          "docs/": 1
+        },
+        "primaryWriteTarget": "docs/",
+        "testWriteRatio": 0
+      }
+    },
+    "confidence": "high",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-24T12:51:35.696Z"
+}

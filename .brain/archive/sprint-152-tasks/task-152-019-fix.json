@@ -1,0 +1,33 @@
+{
+  "id": "152-019-fix",
+  "title": "Fix: ADR-039 Self-Modifying Task Detector — Sprint 148 Catastrophic Lesson Retention",
+  "description": "Priority fix for NO_GO task 152-019.\nOriginal worker notes: READ-ONLY audit of ADR-039 Self-Modifying Task Detector for Sprint 152. 0 source/test code changes (git diff --stat src/ tests/ = 0). tsc --noEmit = 0 errors. Detector tests: 32/32 pass (2 files, 231ms). Report covers: (1) Detector located at src/orchestra/self-modifying-detector.ts (163 LoC) NOT src/core/ as DIRECTIVES claimed — documented drift. (2) Tests at tests/orchestra/ not tests/e2e/ — documented drift. (3) 32 tests pass including cache, fail-safe, prefix matching, readonly array, 11 DEC\nRubric: correctness=100, test_coverage=100, scope_compliance=100\nExpected scope: docs/audits/sprint-152/, src/core/, tests/e2e/\nFiles that should change: docs/audits/sprint-152/T-152-019-self-modifying-detector.md, src/core/self-modifying-detector.ts, tests/e2e/self-modifying-detector.test.ts",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "CRITICAL",
+  "reason": "Task 152-019 evaluated as NO_GO; correctness=100; test_coverage=100; scope_compliance=100",
+  "scope": {
+    "directories": [
+      "docs/audits/sprint-152/",
+      "src/core/",
+      "tests/e2e/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "docs/audits/sprint-152/T-152-019-self-modifying-detector.md",
+      "src/core/self-modifying-detector.ts",
+      "tests/e2e/self-modifying-detector.test.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** Detector status + Sprint 152 self-modifying risk değerlendirmesi + Hot Fix pattern pozisyonu",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "PENDING",
+  "sprintId": "sprint-152",
+  "isPriorityFix": true,
+  "fixForTaskId": "152-019",
+  "createdAt": "2026-04-24T12:51:35.832Z"
+}

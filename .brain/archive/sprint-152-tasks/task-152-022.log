@@ -1,0 +1,16 @@
+Task complete.
+
+**Summary of T-152-022 Debt Inventory Audit:**
+
+Delivered `docs/audits/sprint-152/T-152-022-debt-inventory.md` (318 lines) with:
+
+- **96 entries classified**: 59 ARTIFACT (read-only analysis wrongly tagged as debt) / 32 CLOSEABLE (correctly resolved) / 5 ACTIONABLE-HIDDEN-OPEN
+- **Key finding**: DIRECTIVES' "96 open debt" framing is misleading — `.brain/exports/debt.md` Active table is EMPTY; all 96 are marked `resolved`. The 5 hidden-open items (debt-150-007/017/029/032, debt-151-015) are the real P0 backlog.
+- **3 cross-sprint closure verdicts**:
+  - Sprint 146-150 Docker HB spiral → T-151-014 **REGRESSION RISK** (commit 9a1f894 +430 LoC but brain quality=20, correctness=0)
+  - Brain Evaluator 5-in-1 (Sprint 150 T-008/022/028) → T-151-012 **CLOSED** (quality=99, 35 new tests)
+  - 9 vitest residual → T-151-013 **PARTIAL** (commit bc572ca exists but retro still reports gate FAIL; `run-gate.json` DRIFT vs retro)
+- **Top-10 P0 matrix** + 12-item Sprint 153+ action list (docker HB canlı smoke, vitest triage, evaluator regression detector, public repo flip, hub publish, nervous detectors 10-11, audit/recover smoke, docker image shrink, .brain/DEBT.md cleanup, addTechDebt heuristic filter)
+- **Zero source code changes** (READ-ONLY compliance verified via `git diff --stat src/ tests/` = 0)
+
+Result file written as `DONE`.

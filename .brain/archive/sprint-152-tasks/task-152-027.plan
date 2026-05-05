@@ -1,0 +1,28 @@
+# Task 152-027 Plan: Phase 2 Readiness Gap Audit
+
+## Approach
+1. Read ROADMAP Phase 2 (Sprint 152-160) detail
+2. Read supporting docs: SYSTEM-MIGRATION, DIRECTIVES, memory exports
+3. For each sprint (153..160): assess scaffold readiness, blockers, preparatory needs
+4. Produce readiness matrix + blocker list + preparatory task suggestions
+5. Verify: tsc --noEmit, vitest run (should be untouched)
+
+## Scope Check
+- filesWrite: docs/audits/sprint-152/T-152-027-phase2-readiness.md
+- filesRead: src/**, docs/**, .brain/**, .deckent/**, package.json
+
+## Key Sources
+- docs/ROADMAP-GOD-LEVEL.md §4 Phase 2
+- DIRECTIVES.md Task 27 spec
+- src/core/config.ts (multi-provider, max_workers)
+- src/nervous/** (detectors, 11 target)
+- src/api/server.ts, src/dashboard/** (messaging)
+- .deckent/agents/, .deckent/skills/ (hub seed)
+- SYSTEM-MIGRATION-2026-04-22.md
+
+## Deliverable
+- Executive summary
+- 9 sprint readiness matrix (scaffold | blockers | prep)
+- Blocker consolidated list
+- Preparatory task suggestions per sprint
+- Sprint 153+ actionable list

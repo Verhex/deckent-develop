@@ -1,0 +1,92 @@
+{
+  "id": "152-005",
+  "title": "CLI Smoke Part 3 — Agent + Skill + Plugin (12 komut)",
+  "description": "CLI Smoke Part 3 — Agent + Skill + Plugin (12 komut)\n- Model: opus\n- Effort: high\n- Skills: testing-expert, code-reviewer\n- Files: docs/audits/sprint-152/T-152-005-cli-agent-skill.md\n- Scope: docs/audits/sprint-152/\n\n### Description\nAgent/Skill/Plugin familya:\n\n`agent list`, `agent --help`, `skill list`, `skill --help`, `skill install --help` (don't actually install), `skill publish --help`, `plugin list` (varsa), `plugin --help` (varsa), agent/skill manifest version kontrol, agent/skill routing V2 drift.\n\nHer komut + manifest sağlığı: 16 built-in agent + 2 custom var mı? 21 built-in skill eksiksiz mi? Ed25519 signature verification komutu hazır mı?\n\n**Kanıt:** Built-in envanter doğrulanmış rapor\n**Test:** N/A\n\n---",
+  "model": "opus",
+  "effort": "high",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "docs/audits/sprint-152/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "docs/audits/sprint-152/T-152-005-cli-agent-skill.md"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** Built-in envanter doğrulanmış rapor",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "NO_GO",
+  "sprintId": "sprint-152",
+  "provider": "claude",
+  "forceModel": "opus",
+  "forceEffort": "high",
+  "forceSkills": [
+    "testing-expert",
+    "code-reviewer"
+  ],
+  "assignedAgent": "doc-writer",
+  "assignedSkills": [
+    "testing-expert",
+    "code-reviewer"
+  ],
+  "createdAt": "2026-04-24T12:16:30.282Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "documentation",
+        "secondary": [
+          "config"
+        ],
+        "confidence": 0.95
+      },
+      "tags": [],
+      "domains": [
+        {
+          "name": "docs",
+          "weight": 1
+        }
+      ],
+      "operations": [
+        {
+          "type": "test",
+          "weight": 0.25
+        },
+        {
+          "type": "document",
+          "weight": 0.25
+        },
+        {
+          "type": "configure",
+          "weight": 0.25
+        },
+        {
+          "type": "create",
+          "weight": 0.25
+        }
+      ],
+      "complexity": {
+        "fileCount": 1,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "trivial"
+      },
+      "scope": {
+        "writeRatio": {
+          "docs/": 1
+        },
+        "primaryWriteTarget": "docs/",
+        "testWriteRatio": 0
+      }
+    },
+    "confidence": "high",
+    "routingVersion": "v2"
+  },
+  "estimatedTokens": 1746,
+  "updatedAt": "2026-04-24T12:51:35.556Z"
+}

@@ -1,0 +1,31 @@
+# T-152-007-fix Execution Plan
+
+## Goal
+Fix NO_GO for task 152-007. The original worker produced a comprehensive
+347-line report at docs/audits/sprint-152/T-152-007-mcp-lifecycle.md with
+all required sections (Özet, Bulgular, Sprint 153+ Aksiyon Listesi, Kanıt
+Ekleri). Previous fix attempt was OOM-killed before writing .result.
+
+## Approach
+1. Review the existing report — confirm acceptance criteria are met:
+   - [x] Report file at docs/audits/sprint-152/T-152-007-mcp-lifecycle.md
+   - [x] Findings tagged [PASS | FAIL | REGRESSION | MISSING | DRIFT]
+   - [x] Evidence (command output, JSON-RPC ids, file:line) per finding
+   - [x] Sprint 153+ action list P0/P1/P2
+   - [x] Code change YOK (git diff --stat src/ tests/ = 0)
+2. Re-verify key claims against live code (quick sanity check):
+   - src/mcp/server.ts tool count
+   - ADR-022-v2 reference for CLI/MCP parity
+3. Touch report file with a brief "Fix-Retry Validation" footer note
+   confirming the 2026-04-24 fix pass re-validated findings.
+4. Write .result with selfAssessment: DONE + tokenUsage.
+
+## Scope discipline
+- Only file written under docs/: docs/audits/sprint-152/T-152-007-mcp-lifecycle.md
+- No src/ or tests/ writes (audit sprint READ-ONLY rule)
+- .result and .plan are worker meta artifacts (allowed)
+
+## Done criteria
+- Existing report preserved + footer confirms fix-retry pass
+- .result file written with DONE + full tokenUsage
+- No git diff under src/ or tests/

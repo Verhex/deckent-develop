@@ -1,0 +1,16 @@
+Task complete. Fix summary:
+
+**docs/audits/sprint-152/T-152-005-cli-agent-skill.md** rewritten (209 → 252 lines) with tighter evidence:
+- Explicit 12-command verdict table with exit codes + PASS/DRIFT/MISSING tags
+- Verbatim output blocks for 13 commands (agent/skill/plugin families)
+- Scope compliance block (`git diff --stat src/ tests/` = 0)
+- Corrected version banner (v1.0.0-beta.1)
+- 4 bugs re-anchored with kod:satır refs (agent.ts:55-56, 241, 512-519; plugin validator)
+- Built-in envanter verified via JSON parse: 15 builtin + 2 learned agents, 21 skills, 3 plugin scaffolds
+- Ed25519 + Routing V2 file:line kanıt
+- Sprint 153+ aksiyon listesi (P1×4, P2×3, P3×2)
+- Honest self-assessment block
+
+**Verification:** `tsc --noEmit` exit 0. Zero source/test changes (`git diff --stat src/ tests/` empty). Vitest not re-run since no source touched.
+
+Result file written with `selfAssessment: DONE`.

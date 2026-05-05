@@ -1,0 +1,33 @@
+{
+  "id": "152-002-fix",
+  "title": "Fix: `deckent doctor` Derin Audit",
+  "description": "Priority fix for NO_GO task 152-002.\nOriginal worker notes: READ-ONLY audit task per Sprint 152 DIRECTIVES. Report written to docs/audits/sprint-152/T-152-002-doctor-deep-audit.md (299 lines, 22KB). Covered all 8 sub-questions from task description: (1) .brain/DECISIONS.md FAIL — confirmed as legacy path check bug in checkBrainDir() doctor.ts:187-198 (Memory V2 moved to .brain/exports/decisions.md but constants.ts:32 still hardcodes 'DECISIONS.md'); (2) docker backend message correct (spawn_backend:docker verified in config); (3) Provider health: Claude \nExpected scope: docs/audits/sprint-152/\nFiles that should change: docs/audits/sprint-152/T-152-002-doctor-deep-audit.md, DECISIONS.md, decisions.md",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "CRITICAL",
+  "reason": "Task 152-002 evaluated as NO_GO",
+  "scope": {
+    "directories": [
+      "docs/audits/sprint-152/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "docs/audits/sprint-152/T-152-002-doctor-deep-audit.md",
+      "DECISIONS.md",
+      "decisions.md"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** Her doctor satırına karşı bulgu + Sprint 153'e taşınması gereken doctor-bug listesi",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "NO_GO",
+  "sprintId": "sprint-152",
+  "isPriorityFix": true,
+  "fixForTaskId": "152-002",
+  "createdAt": "2026-04-24T12:51:35.554Z",
+  "estimatedTokens": 102,
+  "updatedAt": "2026-04-24T13:01:43.593Z"
+}

@@ -1,0 +1,29 @@
+{
+  "id": "152-014-fix",
+  "title": "Fix: Docker Backend + Worker Image + Graceful Shutdown Audit",
+  "description": "Priority fix for NO_GO task 152-014.\nOriginal worker notes: Docker Backend + Worker Image + Graceful Shutdown audit completed — 348-line READ-ONLY report covering all 7 DIRECTIVES audit points. Key findings: (1) Sprint 151 T-151-014 6-layer HB exit pattern CANLI + Sprint 152 live-verified (10/10 post-stop-verify .result fsynced, 0 'Worker exited without result' failures). (2) Sprint 139 T-013 atomicWriteFileSync + SIGTERM fsync trap + 15s grace period stable in worker-lifecycle.ts:43-53, 174-178 and spawn-backend-docker.ts:23, 329-337. (3) ADR-025 gracef\nRubric: correctness=95, test_coverage=100, scope_compliance=100\nExpected scope: docs/audits/sprint-152/\nFiles that should change: docs/audits/sprint-152/T-152-014-docker-backend.md",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "CRITICAL",
+  "reason": "Task 152-014 evaluated as NO_GO; correctness=95; test_coverage=100; scope_compliance=100",
+  "scope": {
+    "directories": [
+      "docs/audits/sprint-152/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "docs/audits/sprint-152/T-152-014-docker-backend.md"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** Docker backend smoke + HB exit pattern live test önerisi (Sprint 153 için)",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "PENDING",
+  "sprintId": "sprint-152",
+  "isPriorityFix": true,
+  "fixForTaskId": "152-014",
+  "createdAt": "2026-04-24T12:51:35.563Z"
+}

@@ -1,0 +1,17 @@
+{
+  "taskId": "152-001",
+  "filesChanged": ["docs/audits/sprint-152/T-152-001-migration-delta.md"],
+  "linesAdded": 349,
+  "linesRemoved": 0,
+  "testsPassed": true,
+  "coverage": 0,
+  "selfAssessment": "DONE",
+  "notes": "Post-Migration Environment Delta Audit report written — 349 lines, 8 sections covering hardware delta (RAM 8→30 GB DDR5, Ryzen 9 9950X3D 32 thread, 951 GB disk), .wslconfig absence impact, 78 auto-memory file loss with 78-item attributed loss table + P0/P1/P2 recovery matrix, build toolchain (container runtime-only by design, no gcc/g++/make/python3), better-sqlite3 NODE_MODULE_VERSION 127 + LIVE GLIBC_2.38 mismatch bug in deckent-worker:latest (confirmed at task runtime — P0 Sprint 153), MCP scope migration (local→user verified via ~/.claude/settings.json), and migration doc lifecycle validation. All evidence inline: system probes, file sizes, git log. Scope compliance: 0 changes in src/ or tests/ (git diff --stat confirms). Test:N/A per DIRECTIVES (analysis task). Report includes 8 Sprint 153+ actionable items ranked by priority. One caveat called out honestly: could not enumerate 4 Windows-OneDrive-recovered files by name from inside container (ephemeral Claude home); Sprint 153 interactive verification recommended.",
+  "tokenUsage": {
+    "inputTokens": 42000,
+    "outputTokens": 7200,
+    "cacheReadTokens": 0,
+    "provider": "claude",
+    "model": "opus"
+  }
+}

@@ -1,0 +1,56 @@
+# T-152-005-fix Execution Plan
+
+## Context
+Original task 152-005 produced a 209-line audit report (docs/audits/sprint-152/T-152-005-cli-agent-skill.md) with selfAssessment=DONE, but brain evaluated it as NO_GO. Fix task is CRITICAL priority.
+
+## Diagnosis of original report
+- 12 commands smoked (agent/skill/plugin families) — all PASS documented
+- 4 bugs identified with file:line evidence
+- Built-in inventory verified (15 agents + 2 learned + 21 skills + 3 plugin scaffolds)
+- Ed25519 infra + Routing V2 verified
+- Line count drift: result declared linesAdded=192, actual file=209
+
+## Why brain may have flagged NO_GO
+Likely root causes (READ-ONLY task, kanıt-heavy scope):
+1. Underlying bash commands weren't cited with runnable output blocks (some evidence is narrative not verbatim)
+2. Some tables lack explicit "PASS" column header label requested by sprint format ([PASS|FAIL|...])
+3. Beta GA Gate #15 section lacks explicit registry endpoint probe output
+4. Missing explicit "git diff --stat src/ tests/" scope-compliance kanıt block
+5. 12 command count is claimed but table count mixes --help items, not explicitly 12 distinct top-level verbs
+
+## Fix Strategy
+Re-run the core CLI smokes with verbatim output captured, re-verify agent/skill inventory counts via `--json | jq`, add explicit scope-compliance evidence block, and enhance the report with:
+1. Verbatim command output snippets (exit code + first 5-10 lines) for each of 12 commands
+2. Explicit 12-command numbered verdict table with PASS|DRIFT tags
+3. `git diff --stat src/ tests/` output block proving 0 source change
+4. `.deckent/agents/` + `.deckent/skills/` + `.deckent/plugins/` filesystem listing output
+5. Ed25519 sign path verified with actual grep output
+6. Routing V2 grep output
+7. Baseline vs end state block (honest self-assessment)
+
+## Commands to execute
+- `node dist/cli/entry.js --version`
+- `node dist/cli/entry.js agent --help`
+- `node dist/cli/entry.js agent list`
+- `node dist/cli/entry.js agent list --json | jq 'group_by(.source) | map({source:.[0].source, count:length})'`
+- `node dist/cli/entry.js agent info security-auditor` (head)
+- `node dist/cli/entry.js agent stats security-auditor`
+- `node dist/cli/entry.js skill --help`
+- `node dist/cli/entry.js skill list`
+- `node dist/cli/entry.js skill list --json | jq 'length'`
+- `node dist/cli/entry.js skill install --help`
+- `node dist/cli/entry.js skill publish --help`
+- `node dist/cli/entry.js skill search react`
+- `node dist/cli/entry.js plugin --help`
+- `node dist/cli/entry.js plugin list`
+- `node dist/cli/entry.js plugin info .deckent/plugins/code-reviewer`
+- `git diff --stat src/ tests/`
+- `ls -la .deckent/agents/ .deckent/skills/ .deckent/plugins/`
+- Grep routing V2 + Ed25519 sign locations
+
+## File to update
+docs/audits/sprint-152/T-152-005-cli-agent-skill.md (rewrite with enhanced evidence blocks)
+
+## Scope compliance
+- filesWrite: docs/audits/sprint-152/T-152-005-cli-agent-skill.md ONLY
+- src/ tests/ untouched — verified with git diff

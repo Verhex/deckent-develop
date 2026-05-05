@@ -1,0 +1,29 @@
+{
+  "id": "152-027-fix",
+  "title": "Fix: Roadmap Phase 2 Readiness Gap (Sprint 152-160 Preparatory)",
+  "description": "Priority fix for NO_GO task 152-027.\nOriginal worker notes: Phase 2 (Sprint 152-160) readiness gap audit complete. 9-sprint readiness matrix (avg 48%, vs Phase 1 71%). Identified 8 P0 blockers + 5 external dependencies. Per-sprint preparatory task list + Sprint 152.5 mini-prep recommendation. Kanıt: src/connectors/ (Discord+Telegram+WhatsApp scaffold, Slack+Email MISSING), src/core/marketplace/ (Ed25519 signing canlı, moderation queue MISSING), src/nervous/detectors/ (11 dosya vs config 10 — DRIFT), src/agents/adaptive-agent.ts EXISTS, .deckent/skills/se\nRubric: correctness=92, test_coverage=100, scope_compliance=100\nExpected scope: docs/audits/sprint-152/\nFiles that should change: docs/audits/sprint-152/T-152-027-phase2-readiness.md",
+  "model": "opus",
+  "effort": "high",
+  "priority": "CRITICAL",
+  "reason": "Task 152-027 evaluated as NO_GO; correctness=92; test_coverage=100; scope_compliance=100",
+  "scope": {
+    "directories": [
+      "docs/audits/sprint-152/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "docs/audits/sprint-152/T-152-027-phase2-readiness.md"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** 9 sprint × readiness matrix + blocker listesi + preparatory task önerileri",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "PENDING",
+  "sprintId": "sprint-152",
+  "isPriorityFix": true,
+  "fixForTaskId": "152-027",
+  "createdAt": "2026-04-24T12:51:36.370Z"
+}

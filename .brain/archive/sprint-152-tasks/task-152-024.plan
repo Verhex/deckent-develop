@@ -1,0 +1,30 @@
+# T-152-024 Execution Plan
+
+## Objective
+READ-ONLY audit: Config integrity — duplicate keys + MODE_PRESETS overlap.
+
+## Files to Read
+- .deckent/config.json (live project config)
+- ~/.deckent/config.json (global, if exists)
+- src/core/config.ts (defaults + merge logic)
+- src/core/mode-presets.ts (MODE_PRESETS exports)
+- src/core/config-loader.ts (if exists)
+- scripts or modules that reference deckent_style
+- .deck* files (if any)
+
+## Audit Dimensions
+1. Root-level max_workers vs modes.*.max_workers — overlap, precedence
+2. MODE_PRESETS duplication: config.ts:84-105 vs mode-presets.ts (T-151-NEW-H)
+3. deckent_style: "sprint" key — single mode toggle liveness
+4. 3-layer merge: defaults → global → project (ADR-004)
+5. .deck file interpolation leakage into config
+
+## Output
+Single file: docs/audits/sprint-152/T-152-024-config-duplicate.md
+- Summary paragraph
+- Findings: [PASS | FAIL | REGRESSION | MISSING | DRIFT] tags + evidence
+- Sprint 153+ action list (P0/P1/P2)
+- Evidence appendices (grep output, file:line)
+
+## No Code Changes
+Sprint 152 is read-only. Zero git diff in src/ or tests/.

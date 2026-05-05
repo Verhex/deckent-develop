@@ -1,0 +1,24 @@
+{
+  "tsc": {
+    "status": "PASS",
+    "errors": []
+  },
+  "vitest": {
+    "status": "PASS",
+    "delta": {
+      "files": 0,
+      "pass": 0,
+      "fail": 0,
+      "skipped": 0
+    }
+  },
+  "honesty": {
+    "violations": 0,
+    "flaggedTasks": []
+  },
+  "observability": {
+    "metricsJsonlExists": true,
+    "lineCount": 3
+  },
+  "overallGate": "PASS"
+}

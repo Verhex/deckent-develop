@@ -1,0 +1,22 @@
+# T-152-009 Plan: MCP Smoke Part 3 — Docs + Agent/Skill + Nervous + Beta Trio
+
+## Scope
+READ-ONLY audit of 12 MCP tools:
+- Docs/Agent/Skill: deckent_docs, deckent_agent_list, deckent_skill_list, deckent_kill
+- Nervous: deckent_nervous_subscribe, deckent_nervous_accept, deckent_nervous_reject, deckent_nervous_status, deckent_nervous_config
+- Sprint 150 Beta Trio: deckent_audit, deckent_feature_query, deckent_recover
+
+## Approach
+1. Locate MCP server registration code (src/mcp/server.ts or similar)
+2. Read tool schema definitions for each of the 12 tools
+3. For each tool, smoke via stdio JSON-RPC if possible, OR verify schema/handler existence
+4. NEVER actually invoke deckent_kill (destructive)
+5. For nervous tools, verify Sprint 150A hot fix presence
+6. For beta trio, verify Sprint 150 T-151-... context
+
+## Deliverable
+docs/audits/sprint-152/T-152-009-mcp-nervous-beta.md with:
+- Each tool: [PASS | FAIL | MISSING | DRIFT] + evidence (file:line)
+- Schema validation summary
+- 27 tool total count verification
+- Sprint 153+ action list

@@ -1,0 +1,31 @@
+{
+  "id": "152-012-fix",
+  "title": "Fix: Nervous System 11 Detector Canlılık Audit",
+  "description": "Priority fix for NO_GO task 152-012.\nOriginal worker notes: READ-ONLY audit completed. 11 nervous system detectors audited across 5 layers (code, schema, config, registry conditional, runtime wire, event log, notify channel, test coverage). KEY FINDINGS: (1) 11/11 detector classes implemented and test-covered; (2) SCHEMA DRIFT — config-types.ts NervousSystemConfig.detectors has only 10 keys and 5 are orphan 'reserve_for:sprint-148' entries; (3) CONFIG DRIFT — .deckent/config.json missing 6 newer detector keys (task_mode_idle + 5 Sprint 151 T-015); (4) CR\nRubric: correctness=95, test_coverage=100, scope_compliance=100\nExpected scope: docs/audits/sprint-152/, src/nervous/\nFiles that should change: docs/audits/sprint-152/T-152-012-nervous-11-detectors.md, src/nervous/detector-registry.ts",
+  "model": "opus",
+  "effort": "high",
+  "priority": "CRITICAL",
+  "reason": "Task 152-012 evaluated as NO_GO; correctness=95; test_coverage=100; scope_compliance=100",
+  "scope": {
+    "directories": [
+      "docs/audits/sprint-152/",
+      "src/nervous/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "docs/audits/sprint-152/T-152-012-nervous-11-detectors.md",
+      "src/nervous/detector-registry.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** 11 detector × durum tablosu + son trigger tarihi",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "PENDING",
+  "sprintId": "sprint-152",
+  "isPriorityFix": true,
+  "fixForTaskId": "152-012",
+  "createdAt": "2026-04-24T12:51:35.561Z"
+}

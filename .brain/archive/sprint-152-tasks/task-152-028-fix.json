@@ -1,0 +1,29 @@
+{
+  "id": "152-028-fix",
+  "title": "Fix: OpenClaw Parity Matrix + Competitive Position Update",
+  "description": "Priority fix for NO_GO task 152-028.\nOriginal worker notes: Timeout - no result received\nExpected scope: docs/audits/sprint-152/\nFiles that should change: docs/audits/sprint-152/T-152-028-openclaw-parity.md",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "CRITICAL",
+  "reason": "Task 152-028 evaluated as NO_GO; tests failed; no files changed",
+  "scope": {
+    "directories": [
+      "docs/audits/sprint-152/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "docs/audits/sprint-152/T-152-028-openclaw-parity.md"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** 12 kriter güncel satırı + mesafe analizi + \"god-level üstün\" kriteri",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "PENDING",
+  "sprintId": "sprint-152",
+  "isPriorityFix": true,
+  "fixForTaskId": "152-028",
+  "createdAt": "2026-04-24T12:51:36.371Z"
+}

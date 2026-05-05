@@ -1,0 +1,88 @@
+{
+  "id": "152-010",
+  "title": "MCP 8 Resource Fetch Test",
+  "description": "MCP 8 Resource Fetch Test\n- Model: opus\n- Effort: normal\n- Skills: testing-expert\n- Files: docs/audits/sprint-152/T-152-010-mcp-resources.md\n- Scope: docs/audits/sprint-152/\n\n### Description\n`resources/list` + `resources/read` JSON-RPC: `deckent://dashboard`, `deckent://directives`, `deckent://memory`, `deckent://debt`, `deckent://config`, `deckent://retro`, `deckent://tasks`, `deckent://agents`.\n\nHer resource için: MIME type, içerik tazeliği (eski sprint log'u döndürüyor mu), boyut, error handling.\n\n**Kanıt:** 8 resource × tazeliği+boyutu rapor\n**Test:** N/A\n\n---",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "docs/audits/sprint-152/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "docs/audits/sprint-152/T-152-010-mcp-resources.md"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** 8 resource × tazeliği+boyutu rapor",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "NO_GO",
+  "sprintId": "sprint-152",
+  "forceModel": "opus",
+  "forceEffort": "normal",
+  "forceSkills": [
+    "testing-expert"
+  ],
+  "assignedAgent": "doc-writer",
+  "assignedSkills": [
+    "testing-expert"
+  ],
+  "createdAt": "2026-04-24T12:16:30.282Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "documentation",
+        "secondary": [
+          "config"
+        ],
+        "confidence": 0.95
+      },
+      "tags": [],
+      "domains": [
+        {
+          "name": "docs",
+          "weight": 1
+        }
+      ],
+      "operations": [
+        {
+          "type": "test",
+          "weight": 0.25
+        },
+        {
+          "type": "document",
+          "weight": 0.25
+        },
+        {
+          "type": "configure",
+          "weight": 0.25
+        },
+        {
+          "type": "create",
+          "weight": 0.25
+        }
+      ],
+      "complexity": {
+        "fileCount": 1,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "trivial"
+      },
+      "scope": {
+        "writeRatio": {
+          "docs/": 1
+        },
+        "primaryWriteTarget": "docs/",
+        "testWriteRatio": 0
+      }
+    },
+    "confidence": "high",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-24T12:51:35.560Z"
+}

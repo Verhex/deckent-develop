@@ -1,0 +1,34 @@
+# Execution Plan — T-152-014 Docker Backend Audit
+
+## Scope
+- Write: `docs/audits/sprint-152/T-152-014-docker-backend.md`
+- Read: Dockerfile.worker, src/orchestra/spawn-backend.ts, src/agents/worker.ts, .deckent/config.json, .brain/exports/debt.md, .brain/exports/memory.md
+
+## Approach (READ-ONLY audit — NO code changes)
+1. Inspect Dockerfile.worker for:
+   - Non-root USER directive (Beta GA gate #14)
+   - Multi-stage build opportunity (940 MB → smaller alpine)
+   - Base image version, .dockerignore presence
+2. Inspect spawn-backend.ts for Docker backend:
+   - Daemon version compatibility
+   - SIGTERM/SIGINT handling (ADR-025)
+   - Timeout ranges (docker_min_timeout, docker_max_timeout)
+3. Inspect worker.ts for Sprint 139 T-013 HB exit safety:
+   - atomicWriteFileSync usage
+   - SIGTERM fsync handler
+   - 15s grace period
+4. Check Sprint 146-148-150-151 HB exit debt status in DEBT
+5. Run `docker images deckent-worker` to verify 940 MB claim (or size)
+6. Emit report with [PASS|FAIL|REGRESSION|MISSING|DRIFT] findings + P0/P1/P2 Sprint 153 actions
+
+## Deliverable
+`docs/audits/sprint-152/T-152-014-docker-backend.md` with sections:
+- Özet
+- Bulgular (7 audit points from DIRECTIVES)
+- Sprint 153+ Aksiyon Listesi
+- Kanıt Ekleri (command outputs, file:line citations)
+
+## Verification
+- `tsc --noEmit` — baseline only (no code change)
+- `npx vitest run` — baseline only (no code change)
+- `git diff --stat src/ tests/` must be 0

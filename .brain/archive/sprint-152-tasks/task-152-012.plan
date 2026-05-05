@@ -1,0 +1,23 @@
+# T-152-012 Execution Plan
+
+## Task
+Audit Nervous System 11 detectors — registry, config, reserve status, trigger history, NOTIFY output.
+
+## Approach (READ-ONLY)
+1. Read `src/nervous/detector-registry.ts` — enumerate registered detectors
+2. Read `src/nervous/detectors/*.ts` — verify each detector implementation exists
+3. Read `.deckent/config.json` `nervous_system.detectors` — enabled/disabled status
+4. Search for Sprint 148 "reserve_for" debt entries in `.brain/exports/debt.md`
+5. Search event log `.deckent/sprint-15*-metrics.jsonl` for detector triggers in last 5 sprints
+6. Check NOTIFY adapter integration — `src/core/notify-adapters/` or Sprint 150A H6/H7 evidence
+7. Write report to `docs/audits/sprint-152/T-152-012-nervous-11-detectors.md`
+
+## Output
+- `docs/audits/sprint-152/T-152-012-nervous-11-detectors.md`
+- 11 detector × status table with last trigger date
+- Pass/Fail/Missing/Reserved classification
+
+## Rules
+- NO source code changes. Only audit report file.
+- Scope: `docs/audits/sprint-152/` write-only.
+- Evidence: every finding backed by file:line or grep output.

@@ -1,0 +1,26 @@
+{
+  "taskId": "152-015",
+  "filesChanged": [
+    "docs/audits/sprint-152/T-152-015-dashboard-audit.md"
+  ],
+  "linesAdded": 296,
+  "linesRemoved": 0,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "DONE",
+  "notes": "Dashboard 7-page + SSE + i18n + vitest audit completed on new-system (Ryzen 9 / 30 GB / Node v22.22.2). Key findings: (1) Dashboard vitest 17 files / 471 tests / 100% pass / 1.00s — progressed from directives' 413 baseline (Sprint 151 T-151-003 ChatPage added +58 tests); (2) tsc --noEmit 0 error; (3) API SSE tests 150/150 pass in 3 files (server.test.ts, server-edge.test.ts, server-security.test.ts); (4) i18n TR/EN parity 340 keys × 2 languages, LanguageProvider toggle works, i18n-coverage 16/16 pass; (5) SSE /api/events wired from src/api/server.ts:423 with useSSE hook EventSource + 3s reconnect. DRIFT findings: (a) DIRECTIVES' expected 7-page list (Dashboard, Directives, Memory, Debt, Tasks, Agents, Chat) does NOT match reality — actual is 5 primary pages (Dashboard, History, Memory, Config, Chat) + 1 Settings redirect + 1 orphan (StatusPage not routed in App.tsx); (b) routes.tsx has 5 entries but App.tsx has 6 routes — drift; (c) SSE heartbeat/ping missing — long-held connections behind proxies could timeout; (d) vitest.config.ts missing explicit jsdom environment (works by fallback). Sprint 153 actions: P0 StatusPage removal + routes.tsx alignment, P1 DIRECTIVES spec update + jsdom env declaration + SSE heartbeat, P2 DebtPage/TasksPage/AgentsPage ADR + Layout navItems from ROUTES const. Zero source code changes (git diff src/ tests/ = clean). Report 296 lines, 7 evidence appendices, 10 tagged findings, 9 action items.",
+  "tokenUsage": {
+    "inputTokens": 48000,
+    "outputTokens": 8500,
+    "cacheReadTokens": 0,
+    "provider": "claude",
+    "model": "opus"
+  },
+  "rubricScores": {
+    "correctness": 95,
+    "test_coverage": 100,
+    "scope_compliance": 100,
+    "documentation": 95
+  },
+  "evaluationDecision": "DONE"
+}

@@ -1,0 +1,29 @@
+# T-152-013 Execution Plan — Provider Health Matrix + Multi-Provider Readiness
+
+## Goal
+READ-ONLY audit of provider health and multi-provider readiness for Sprint 152 post-migration.
+
+## Steps
+1. Update heartbeat → sequence++ every phase
+2. Gather evidence:
+   - Claude CLI version + auth state
+   - Codex CLI presence
+   - Gemini CLI presence
+   - Read model-registry.ts — 13 models × 3 providers × 4 tiers
+   - Read provider.ts adapter interface
+   - Read config.json for provider settings
+   - Check env vars (OPENAI_API_KEY, GOOGLE_API_KEY)
+   - Rate-limit behavior analysis (6 workers)
+3. Write audit report to docs/audits/sprint-152/T-152-013-provider-health.md
+4. Write .result file with selfAssessment=DONE (read-only success)
+
+## Non-Goals
+- No source code changes
+- No config mutations
+- No network calls to external providers
+
+## Output
+- Report file with [PASS | FAIL | REGRESSION | MISSING | DRIFT] findings
+- Sprint 153+ actionable list
+- Provider matrix table
+- Multi-provider activation roadmap

@@ -48,6 +48,8 @@
 | adr-042 | Hybrid Mode Architecture — Sprint + Task Dual Modes | proposed |
 
 ## Recent Learnings
+- **Sprint sprint-152 Learnings** (sprint-152): ## Sprint sprint-152 Learnings
+- `deckent doctor` Derin Audit: NO_GO — READ-ONLY audit task per Sprint 152 DIRECTIVES...
 - **Sprint sprint-151 Learnings** (sprint-151): ## Sprint sprint-151 Learnings
 - Public Repo Flip — VerhexIO/deckent-dev → VerhexIO/deckent: GO_WITH_TECH_DEBT — DURU...
 - **Sprint sprint-150 Learnings** (sprint-150): ## Sprint sprint-150 Learnings
@@ -65,8 +67,6 @@
 - worker.ts Split (1669 → 4 dosya): NO_GO — Worker timeout — process exceeded time lim...
 - **Sprint sprint-143 Learnings** (sprint-143): ## Sprint sprint-143 Learnings
 - Memory V2 Tam Migrasyon (ci-reporter + managed-docs): NO_GO — Docker worker exited w...
-- **Sprint sprint-142 Learnings** (sprint-142): ## Sprint sprint-142 Learnings
-- src/core/ batch 1 — Memory V2 modulleri: GO_WITH_TECH_DEBT — Read-only deep analysis...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -74,4 +74,4 @@ _No active technical debt._
 ## Active Patterns
 _No active patterns._
 
-_Total entries: 174 | Generated: 2026-04-22_
+_Total entries: 176 | Generated: 2026-04-24_

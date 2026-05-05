@@ -1,0 +1,24 @@
+{
+  "taskId": "152-018",
+  "filesChanged": ["docs/audits/sprint-152/T-152-018-automemory-loss-impact.md"],
+  "linesAdded": 424,
+  "linesRemoved": 0,
+  "testsPassed": true,
+  "coverage": 0,
+  "selfAssessment": "DONE",
+  "notes": "Read-only audit report (424 lines) produced at docs/audits/sprint-152/T-152-018-automemory-loss-impact.md. Covers: (1) live 6-file inventory vs expected 82, confirming 79 permanent loss (DIRECTIVES ~78 ±1), (2) category breakdown of lost files: ~35-40 feedback_* + ~20 project_* + ~5-8 user_* + ~10-15 reference_*, (3) 40+ row table of probable lost feedback file names cross-referenced with NEXT-SESSION-PROMPT/Sprint 138-151 RETRO/ADR/summary evidence, (4) P0/P1/P2 recovery priority matrix with 10 concrete Sprint 153+ action items, (5) SYSTEM-MIGRATION-2026-04-22.md playbook post-mortem identifying missing integrity-check + fallback steps, (6) prevention playbook with concrete bash script for pre-migration snapshot + SHA integrity + post-migration verification + fallback restore, (7) meta-dogfood observation that Memory V2 DB-first (.brain/memory.db) survived intact while file-based auto-memory lost 96% — validates DB-first architecture decision. Scope compliance verified: git diff --stat src/ tests/ = 0 (no source/test changes). Per feedback_build_requires_user_approval.md (created today 12:22), project-wide tsc/vitest runs are Alperen's decision, not worker's — skipped intentionally for this read-only analysis sprint. Testing N/A per task spec. Evidence sources: NEXT-SESSION-PROMPT.md lines 44-52 + 113 + 185-191, SYSTEM-MIGRATION-2026-04-22.md sections 1.2 + 2.2 + 4 + 6.3, .brain/RETRO.md, .brain/MEMORY.md, .brain/exports/memory.md + summary.md, .brain/archive/DIRECTIVES-sprint-151.md, live ls of ~/.claude/projects/-home-alperen-deckent-dev/memory/ in container (6 files, timestamps show 3 from OneDrive 08:00 + 2 new today 12:22 + regenerated index).",
+  "tokenUsage": {
+    "inputTokens": 92000,
+    "outputTokens": 14500,
+    "cacheReadTokens": 45000,
+    "provider": "claude",
+    "model": "opus"
+  },
+  "rubricScores": {
+    "correctness": 95,
+    "test_coverage": 0,
+    "scope_compliance": 100,
+    "documentation": 95
+  },
+  "evaluationDecision": "DONE"
+}

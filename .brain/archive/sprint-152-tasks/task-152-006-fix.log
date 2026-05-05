@@ -1,0 +1,13 @@
+Result file written. Scope clean, tsc clean, report re-verified. The heartbeat file is being managed externally by the backend so I'll leave it alone.
+
+## Summary
+
+**task-152-006-fix complete.** Root cause of the spurious NO_GO: the original worker container was OOM-killed after writing both the 287-line report at `docs/audits/sprint-152/T-152-006-cli-nervous-audit.md` and a `selfAssessment: DONE` result, but the brain evaluator picked up the startup partial-result sentinel instead.
+
+What the fix worker did:
+- Re-verified all 12 report claims via live CLI spot-checks (R1-R9: nervous has 6 subcmds not 9, Commander.js exit-0 drift holds, 46 top-level commands, `mode show` → `Current: sprint`, `audit`/`recover`/`features` signatures)
+- Added a short "Fix-Worker Re-Verification" addendum (+24 lines) to the existing report so the audit trail is explicit
+- Confirmed golden rule: `git diff --stat src/ tests/` empty, `tsc --noEmit` exit 0
+- Wrote `.tasks/task-152-006-fix.result` with `selfAssessment: DONE`
+
+Sprint 153 action list from the original report (3 P0 / 3 P1 / 4 P2) remains actionable — notably D3 (Commander.js unknown subcmd should exit 1, smoke harness false-PASS risk), D4 (`audit` side-effect opt-in via `--no-write`), and D7 (46-vs-49 command-count calibration with T-151-NEW-C).

@@ -4073,3 +4073,54 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 151-015: Nervous System 6-10 Detector Activation (Sprint 147 Plan) (GO_WITH_TECH_DEBT)
 
 ---
+## Sprint 152 — sprint-152
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-04-24
+**Duration:** 2713s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 36 |
+| Completed | 8 |
+| Tech Debt | 0 |
+| No-Go | 28 |
+| Coverage | 0.0% |
+| Duration | 2713342ms |
+
+### Tasks
+
+- 152-001: Post-Migration Environment Delta Audit (DONE)
+- 152-002: `deckent doctor` Derin Audit (NO_GO)
+- 152-003: CLI Smoke Part 1 — Core Lifecycle (15 komut) (NO_GO)
+- 152-004: CLI Smoke Part 2 — Memory + Checkpoint + Run (10 komut) (NO_GO)
+- 152-005: CLI Smoke Part 3 — Agent + Skill + Plugin (12 komut) (NO_GO)
+- 152-006: CLI Smoke Part 4 — Nervous System + Audit + Feature + Mode (12+ komut) (NO_GO)
+- 152-007: MCP Smoke Part 1 — Lifecycle Tools (8 tool) (NO_GO)
+- 152-008: MCP Smoke Part 2 — Observational + Advanced (10 tool) (NO_GO)
+- 152-009: MCP Smoke Part 3 — Docs + Agent/Skill + Nervous + Beta Trio (9 tool) (NO_GO)
+- 152-010: MCP 8 Resource Fetch Test (NO_GO)
+- 152-011: Memory V2 DB Integrity + FTS5 Recall Test (NO_GO)
+- 152-012: Nervous System 11 Detector Canlılık Audit (NO_GO)
+- 152-013: Provider Health Matrix + Multi-Provider Readiness (NO_GO)
+- 152-014: Docker Backend + Worker Image + Graceful Shutdown Audit (NO_GO)
+- 152-015: Dashboard 7 Page + SSE + API Endpoints Audit (NO_GO)
+- 152-016: ADR 43 Compliance Automated Scan (NO_GO)
+- 152-017: tsc + vitest Baseline Drift Analysis (DONE)
+- 152-018: Auto-Memory 78 Dosya Kayıp Impact Analysis (DONE)
+- 152-019: ADR-039 Self-Modifying Task Detector — Sprint 148 Catastrophic Lesson Retention (NO_GO)
+- 152-020: Skills 21 AST Sandbox + Registry Integrity (DONE)
+- 152-021: Agents 16 Built-in Manifest + Routing V2 Rules (DONE)
+- 152-022: Debt 96 Item Envanter + Closeable Count + Top-10 Priority (DONE)
+- 152-023: Beta GA Kalan 3 Gate — Realistik Durum (NO_GO)
+- 152-024: Config Integrity — Duplicate Keys + MODE_PRESETS Overlap (NO_GO)
+- 152-025: Git State Hijyen + SYSTEM-MIGRATION Yaşam Döngüsü (DONE)
+- 152-026: Hot Fix with Claude Subagents Pattern — Sprint 150A Doğrulama (NO_GO)
+- 152-027: Roadmap Phase 2 Readiness Gap (Sprint 152-160 Preparatory) (NO_GO)
+- 152-028: OpenClaw Parity Matrix + Competitive Position Update (NO_GO)
+- 152-029: Security Posture — AST + Ed25519 + .deck + Dockerfile Non-Root Live Proof (NO_GO)
+- 152-030: Sprint 151 Learnings → Sprint 152 Actionable Distilling + Meta-Dogfood Sayacı (DONE)
+
+---

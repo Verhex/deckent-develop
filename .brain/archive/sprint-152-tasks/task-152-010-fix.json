@@ -1,0 +1,29 @@
+{
+  "id": "152-010-fix",
+  "title": "Fix: MCP 8 Resource Fetch Test",
+  "description": "Priority fix for NO_GO task 152-010.\nOriginal worker notes: READ-ONLY MCP 8 resource fetch audit. Live stdio JSON-RPC 2.0 invocation of dist/mcp/server.js inside docker worker container: initialize + resources/list + 8× resources/read. 10/10 protocol-level PASS (schema correct, MIME correct, no stderr). Content-level 5/8 PASS (dashboard 1395B, directives 31347B, config 4795B, tasks 72972B, agents 27693B). 3/8 FAIL silent (memory 0B, debt 2B `[]`, retro 0B) — root cause better-sqlite3 native binding GLIBC 2.38 mismatch inside deckent-worker:latest image, \nRubric: correctness=95, test_coverage=100, scope_compliance=100\nExpected scope: docs/audits/sprint-152/\nFiles that should change: docs/audits/sprint-152/T-152-010-mcp-resources.md",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "CRITICAL",
+  "reason": "Task 152-010 evaluated as NO_GO; correctness=95; test_coverage=100; scope_compliance=100",
+  "scope": {
+    "directories": [
+      "docs/audits/sprint-152/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "docs/audits/sprint-152/T-152-010-mcp-resources.md"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** 8 resource × tazeliği+boyutu rapor",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "PENDING",
+  "sprintId": "sprint-152",
+  "isPriorityFix": true,
+  "fixForTaskId": "152-010",
+  "createdAt": "2026-04-24T12:51:35.560Z"
+}

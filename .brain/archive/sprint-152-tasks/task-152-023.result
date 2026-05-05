@@ -1,0 +1,24 @@
+{
+  "taskId": "152-023",
+  "filesChanged": ["docs/audits/sprint-152/T-152-023-beta-ga-gates.md"],
+  "linesAdded": 168,
+  "linesRemoved": 0,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "DONE",
+  "notes": "Beta GA 3 gate audit raporu yazıldı (168 satır, 17KB). Bulgular: (1) Gate #3 Coverage ~%52 vs hedef %85 — DIRECTIVES.md:356 Phase 2 Sprint 160+ deferral bilinçli strateji; IDENTITY.md %89.33 drift'i P1 doctor task'ı olarak Sprint 153'e önerildi. (2) Gate #13 Messaging: Discord (src/connectors/discord.ts:1-74) + Telegram (telegram.ts:1-112) kod %100 hazır, deploy scripts mevcut (scripts/deploy-discord.sh + deploy-telegram.sh), Sprint 151 T-151-004/005/007 DONE; WhatsApp (whatsapp.ts:29-40) SCAFFOLD-ONLY Meta onayı bekliyor; canlı smoke kanıtı Alperen manuel token deploy'una bağlı. (3) Gate #15 Hub: 20 seed skill manifest ready (deckent-hub/skills/ 20 dizin), Ed25519 infra complete (src/core/signature.ts + skill-marketplace.ts CLI publish) AMA 20/20 signature.ed25519 dosyasının HEPSİ PLACEHOLDER (grep -L placeholder → 0 gerçek sig) — keygen + real-sign pass Sprint 153 P0. VerhexIO/deckent-hub public flip Sprint 151 T-151-002 GO_WITH_TECH_DEBT, registry.deckent.dev endpoint canlılığı doğrulanmadı. Acceptance: 3 gate × blocker + realistic ETA table + Sprint 153+ P0/P1/P2 aksiyon listesi dahil. tsc --noEmit 0 error; git diff --stat src/ tests/ boş (sadece docs/audits/sprint-152/ altında yeni dosya). vitest çalıştırılmadı — DIRECTIVES Test:N/A, docs-only task, Sprint 151 retro'daki 1 pre-existing fail bu taskla ilgisiz. Scope 100%, evidence tam.",
+  "tokenUsage": {
+    "inputTokens": 65000,
+    "outputTokens": 6200,
+    "cacheReadTokens": 52000,
+    "provider": "claude",
+    "model": "opus"
+  },
+  "rubricScores": {
+    "correctness": 95,
+    "test_coverage": 100,
+    "scope_compliance": 100,
+    "documentation": 95
+  },
+  "evaluationDecision": "DONE"
+}

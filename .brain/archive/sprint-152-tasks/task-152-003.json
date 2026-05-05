@@ -1,0 +1,96 @@
+{
+  "id": "152-003",
+  "title": "CLI Smoke Part 1 — Core Lifecycle (15 komut)",
+  "description": "CLI Smoke Part 1 — Core Lifecycle (15 komut)\n- Model: opus\n- Effort: high\n- Skills: testing-expert, code-reviewer\n- Files: docs/audits/sprint-152/T-152-003-cli-core-lifecycle.md\n- Scope: docs/audits/sprint-152/\n\n### Description\nAşağıdaki 15 CLI komutu `node dist/cli/entry.js <cmd> --help` + read-only execution ile tek tek smoke et. Her komut için: çıkış kodu, stdout/stderr örneği, beklenen davranış, **sistem taşıma sonrası çalışıyor mu**, bilinen bug var mı:\n\n`init` (dry-run), `doctor`, `analyze-project`, `plan` (--help + dry-run), `start` (--dry-run), `status` (--help + --json), `review` (--help), `retro` (--help), `history`, `cleanup` (--dry-run, DESTRUCTIVE olmasın), `help`, `config read`, `config set` (--help), `docs` (list), `explain` (--help)\n\nHer komut satırlık özet: `[PASS | FAIL | REGRESSION | MISSING]`. Kill komutunu test ETME (destructive).\n\n**Kanıt:** 15 komut × 5 satır bulgu = en az 75 satır rapor\n**Test:** N/A\n\n---",
+  "model": "opus",
+  "effort": "high",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "docs/audits/sprint-152/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "docs/audits/sprint-152/T-152-003-cli-core-lifecycle.md"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** 15 komut × 5 satır bulgu = en az 75 satır rapor",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "NO_GO",
+  "sprintId": "sprint-152",
+  "provider": "claude",
+  "forceModel": "opus",
+  "forceEffort": "high",
+  "forceSkills": [
+    "testing-expert",
+    "code-reviewer"
+  ],
+  "assignedAgent": "doc-writer",
+  "assignedSkills": [
+    "testing-expert",
+    "code-reviewer"
+  ],
+  "createdAt": "2026-04-24T12:16:30.282Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "documentation",
+        "secondary": [
+          "config"
+        ],
+        "confidence": 0.95
+      },
+      "tags": [],
+      "domains": [
+        {
+          "name": "docs",
+          "weight": 1
+        }
+      ],
+      "operations": [
+        {
+          "type": "document",
+          "weight": 0.29
+        },
+        {
+          "type": "configure",
+          "weight": 0.29
+        },
+        {
+          "type": "delete",
+          "weight": 0.14
+        },
+        {
+          "type": "test",
+          "weight": 0.14
+        },
+        {
+          "type": "create",
+          "weight": 0.14
+        }
+      ],
+      "complexity": {
+        "fileCount": 1,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "trivial"
+      },
+      "scope": {
+        "writeRatio": {
+          "docs/": 1
+        },
+        "primaryWriteTarget": "docs/",
+        "testWriteRatio": 0
+      }
+    },
+    "confidence": "high",
+    "routingVersion": "v2"
+  },
+  "estimatedTokens": 1787,
+  "updatedAt": "2026-04-24T12:51:35.554Z"
+}

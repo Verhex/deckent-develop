@@ -1,0 +1,100 @@
+{
+  "id": "152-025",
+  "title": "Git State Hijyen + SYSTEM-MIGRATION Yaşam Döngüsü",
+  "description": "Git State Hijyen + SYSTEM-MIGRATION Yaşam Döngüsü\n- Model: opus\n- Effort: low\n- Skills: git-expert, documentation-writer\n- Files: docs/audits/sprint-152/T-152-025-git-hygiene.md\n- Scope: docs/audits/sprint-152/\n\n### Description\n- `git status` kalan 4 diff (`.claude/rules/auditor.md`, `brain.md`, `worker-default.md`, `.claude/settings.local.json`) — sistem taşımada mı değişti, anlamlı mı\n- `SYSTEM-MIGRATION-2026-04-22.md` silinme olayı (bugün `git restore` ile geri geldi) — dosya arşivlensin mi (.brain/archive/) yoksa proje kökünde kalsın mı\n- `git config core.fileMode false` kalıcı mı (proje-local config)\n- 4012 mode-diff WSL taşıması artifact'i — Sprint 153 öncesi chmod -R cleanup mı\n- `origin/master` senkron durumu, Sprint 151 son commit `9f80755` push edildi mi\n\n**Kanıt:** Git state rapor + SYSTEM-MIGRATION disposition önerisi\n**Test:** N/A\n\n---",
+  "model": "opus",
+  "effort": "low",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "docs/audits/sprint-152/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "docs/audits/sprint-152/T-152-025-git-hygiene.md",
+      "auditor.md",
+      "brain.md",
+      "worker-default.md",
+      "settings.local.json",
+      "SYSTEM-MIGRATION-2026-04-22.md"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** Git state rapor + SYSTEM-MIGRATION disposition önerisi",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-152",
+  "forceModel": "opus",
+  "forceEffort": "low",
+  "forceSkills": [
+    "git-expert",
+    "documentation-writer"
+  ],
+  "assignedAgent": "architect",
+  "assignedSkills": [
+    "git-expert",
+    "documentation-writer"
+  ],
+  "createdAt": "2026-04-24T12:16:30.282Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "documentation",
+        "secondary": [
+          "config"
+        ],
+        "confidence": 0.95
+      },
+      "tags": [],
+      "domains": [
+        {
+          "name": "docs",
+          "weight": 0.29
+        }
+      ],
+      "operations": [
+        {
+          "type": "document",
+          "weight": 0.29
+        },
+        {
+          "type": "configure",
+          "weight": 0.29
+        },
+        {
+          "type": "delete",
+          "weight": 0.14
+        },
+        {
+          "type": "test",
+          "weight": 0.14
+        },
+        {
+          "type": "create",
+          "weight": 0.14
+        }
+      ],
+      "complexity": {
+        "fileCount": 6,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "large"
+      },
+      "scope": {
+        "writeRatio": {
+          "docs/": 0.17,
+          "./": 0.83
+        },
+        "primaryWriteTarget": "./",
+        "testWriteRatio": 0
+      }
+    },
+    "confidence": "uncertain",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-24T12:51:36.368Z"
+}

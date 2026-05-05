@@ -1,0 +1,39 @@
+# T-152-007 Execution Plan
+
+## Goal
+READ-ONLY smoke audit of 8 MCP lifecycle tools via stdio JSON-RPC:
+deckent_init, deckent_set_directives, deckent_plan, deckent_start,
+deckent_status, deckent_review, deckent_retro, deckent_cleanup.
+
+## Steps
+1. Read src/mcp/ server implementation to understand:
+   - Tool registration (tools/list handler)
+   - Input schemas (Zod)
+   - Tool handlers (destructive vs readonly)
+2. Start MCP stdio server (node dist/mcp/... or npx deckent mcp)
+3. Send JSON-RPC requests:
+   - initialize
+   - tools/list (inventory check)
+   - tools/call for each lifecycle tool (read-only parameters only,
+     dry-run / missing args to avoid side-effects)
+4. For each tool evaluate:
+   - Listed in tools/list? (PASS/MISSING)
+   - Schema sound? (PASS/DRIFT)
+   - Returns markdown or JSON as expected? (PASS/FAIL)
+   - Zod validation blocks bad input? (PASS/FAIL)
+   - Destructive behaviour gated? (PASS/CONCERN)
+5. Write findings to docs/audits/sprint-152/T-152-007-mcp-lifecycle.md
+6. Write .result
+
+## Scope discipline
+- Only file written under src/: NONE
+- Only file written under tests/: NONE
+- Report-only: docs/audits/sprint-152/T-152-007-mcp-lifecycle.md
+- Do NOT call deckent_kill, deckent_cleanup with real args,
+  deckent_start with real args — schema check only.
+
+## Done criteria
+- Report exists with 8 lifecycle tools × findings
+- Evidence: tools/list raw snippet, tools/call sample outputs
+- Sprint 153+ action items list
+- 0 source/test diff

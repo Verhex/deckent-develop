@@ -1,0 +1,92 @@
+{
+  "id": "152-001",
+  "title": "Post-Migration Environment Delta Audit",
+  "description": "Post-Migration Environment Delta Audit\n- Model: opus\n- Effort: normal\n- Skills: system-architect, documentation-writer\n- Files: docs/audits/sprint-152/T-152-001-migration-delta.md\n- Scope: docs/audits/sprint-152/\n\n### Description\nSistem taşıması sonrası tam envanter. Eski sistem (`wsl/claude-config-inventory.txt`, 2026-04-21 23:54) vs yeni sistem (bugün). Ne kazanıldı, ne kayboldu:\n- Donanım delta: 8 GB DDR4 → 30 GB DDR5, AMD Ryzen 9 9950X3D 32 thread, 952 GB disk\n- `.wslconfig` yokluğunun etkisi (default ayarlar)\n- 78 auto-memory dosyası kaybı detay analizi (eski `~/.claude/projects/-home-alperen-deckent-dev/memory/` 82 dosya → yeni 4 dosya, sadece Windows OneDrive/Deckent projesinden kurtarıldı)\n- Hangi feedback/project/user memory'lerinin kalıcı kayıp olduğu tahmini liste (Sprint 138-151 öğrenimlerinden türet)\n- Build toolchain durumu (eski vs yeni: gcc/g++/make/python3)\n- `better-sqlite3` native binding NODE_MODULE_VERSION 127 → 137 rebuild hikâyesi\n- MCP scope migrasyonu (local → user)\n\n**Kanıt:** Rapor dosyası, karşılaştırma tablosu, kurtarılan/kaybolan dosya listesi\n**Test:** N/A (analysis task)\n\n---",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "docs/audits/sprint-152/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "docs/audits/sprint-152/T-152-001-migration-delta.md"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** Rapor dosyası, karşılaştırma tablosu, kurtarılan/kaybolan dosya listesi",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-152",
+  "provider": "claude",
+  "forceModel": "opus",
+  "forceEffort": "normal",
+  "forceSkills": [
+    "system-architect",
+    "documentation-writer"
+  ],
+  "assignedAgent": "doc-writer",
+  "assignedSkills": [
+    "system-architect",
+    "documentation-writer"
+  ],
+  "createdAt": "2026-04-24T12:16:30.282Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "documentation",
+        "secondary": [
+          "config"
+        ],
+        "confidence": 0.95
+      },
+      "tags": [],
+      "domains": [
+        {
+          "name": "docs",
+          "weight": 1
+        }
+      ],
+      "operations": [
+        {
+          "type": "create",
+          "weight": 0.29
+        },
+        {
+          "type": "document",
+          "weight": 0.29
+        },
+        {
+          "type": "configure",
+          "weight": 0.29
+        },
+        {
+          "type": "test",
+          "weight": 0.14
+        }
+      ],
+      "complexity": {
+        "fileCount": 1,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "trivial"
+      },
+      "scope": {
+        "writeRatio": {
+          "docs/": 1
+        },
+        "primaryWriteTarget": "docs/",
+        "testWriteRatio": 0
+      }
+    },
+    "confidence": "high",
+    "routingVersion": "v2"
+  },
+  "estimatedTokens": 1743,
+  "updatedAt": "2026-04-24T12:51:35.551Z"
+}
