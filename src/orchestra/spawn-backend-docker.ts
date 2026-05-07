@@ -247,7 +247,7 @@ export class DockerSpawnBackend implements SpawnBackend {
       '-v', `${join(home, '.claude')}:${containerHome}/.claude`,
       // Claude config — ~/.claude.json (settings, permissions)
       ...(existsSync(join(home, '.claude.json'))
-        ? ['-v', `${join(home, '.claude.json')}:${containerHome}/.claude.json:ro`]
+        ? ['-v', `${join(home, '.claude.json')}:${containerHome}/.claude.json`]
         : []),
       // Working directory
       '-w', CONTAINER_WORKSPACE,

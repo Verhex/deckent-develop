@@ -551,9 +551,10 @@ export async function runFixPhase(
 
       const fixSprint: Sprint = { ...sprint, tasks: fixTasks, workers: fixTasks.map(t => `w-${t.id}`) };
       await spawnWorkers(projectRoot, fixSprint, config, { autoApprove: opts?.autoApprove, spawnBackend });
+      // Sprint 154 audit A4.F2: 600s yetersiz (Sprint 152 opus FIX worker timeout cascade kanıt) → 1800s.
       const fixPhaseTimeout = (config as unknown as Record<string, unknown>).fix_phase_timeout as number | undefined
         ?? opts?.fixPhaseTimeoutMs
-        ?? 600_000;
+        ?? 1_800_000;
       const fixResults = await waitForResults(projectRoot, fixSprint, fixPhaseTimeout, undefined, { spawnBackend });
       for (const fixTask of fixTasks) {
         const fixResult = fixResults.find(r => r.taskId === fixTask.id);

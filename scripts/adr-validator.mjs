@@ -158,7 +158,11 @@ export function validate(filePath) {
 
 // CLI entry point
 if (process.argv[1] && (process.argv[1].endsWith('adr-validator.mjs') || process.argv[1].endsWith('adr-validator'))) {
-  const filePath = process.argv[2] || resolve(process.cwd(), '.brain', 'DECISIONS.md');
+  // Sprint 154 audit A9.F4 / C5: .brain/DECISIONS.md was deleted in Memory V2 migration.
+  // Default fallback to auto-generated export. Source of truth = memory.db (entries WHERE type='adr').
+  const decisionsExport = resolve(process.cwd(), '.brain', 'exports', 'decisions.md');
+  const decisionsLegacy = resolve(process.cwd(), '.brain', 'DECISIONS.md');
+  const filePath = process.argv[2] || decisionsExport;
   const result = validate(filePath);
 
   if (result.warnings.length > 0) {
