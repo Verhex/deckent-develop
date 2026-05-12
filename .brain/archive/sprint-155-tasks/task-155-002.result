@@ -1,0 +1,17 @@
+{
+  "taskId": "155-002",
+  "filesChanged": ["docs/smoke-2026-05-13/T-SMOKE-02.md"],
+  "linesAdded": 192,
+  "linesRemoved": 0,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "DONE",
+  "notes": "deckent_status MCP tool için 954 kelimelik kapsamlı Türkçe dokümantasyon yazıldı. Kapsanan konular: genel bakış, parametreler (json/verbose/outputMode), dönen alanlar (sprint/progress/agents/alerts/eventStreamTail/metricSnapshot/phaseCountdown/backendBreakdown/agentAssignments/skillAssignments), 4 outputMode detayı (standart/explainatory/verbose/json), özel durumlar (no sprint/completed/dashboard error), CLI karşılığı, ilgili tool'lar. tsc --noEmit başarılı. 3 test başarısız (docker-backend ve gemini-integration) ancak bunlar dokumanasyon değişikliğimden önceden mevcut arızalar, kaynak kod değişikliği yapmadım.",
+  "tokenUsage": {
+    "inputTokens": 18500,
+    "outputTokens": 2100,
+    "cacheReadTokens": 4200,
+    "provider": "claude",
+    "model": "sonnet"
+  }
+}

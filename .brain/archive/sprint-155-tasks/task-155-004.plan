@@ -1,0 +1,29 @@
+# Task 155-004 Execution Plan
+
+## Objective
+Write a 200+ word Turkish/technical documentation for `deckent_set_directives` MCP tool.
+
+## Key Sources Reviewed
+- `src/mcp/tools/directives.ts` — MCP tool registration, inputSchema, response fields
+- `src/cli/commands/set-directives.ts` — CLI counterpart, stdin/file/content modes
+- `src/orchestra/task-builder.ts` — `parseStructuredDirectives()` function implementation
+
+## Key Facts Gathered
+1. Tool writes DIRECTIVES.md file to project root
+2. `content` param: Markdown string with `## Task N:` or `## Görev N:` headings
+3. Each block supports: Model, Effort, Skills, Files, Scope, Dependencies, Priority, Agent, Provider fields
+4. `parseStructuredDirectives()` splits on `## Task N:` regex, extracts per-block metadata
+5. Fallback: bullet/numbered list format if no headings found
+6. Code blocks in content are masked before scope extraction to prevent false positives
+7. Tool returns: taskCount, breakdown (code/docs/test/analysis), estimatedModels (opus/sonnet/haiku)
+8. Prerequisite: `deckent_init` must be run first
+9. Each call overwrites DIRECTIVES.md (idempotentHint: false)
+
+## Output File
+`docs/smoke-2026-05-13/T-SMOKE-04.md`
+
+## Steps
+1. Write plan (this file) ✓
+2. Write documentation file
+3. Update heartbeat
+4. Write result file

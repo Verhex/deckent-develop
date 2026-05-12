@@ -1,0 +1,7 @@
+Görev tamamlandı. `docs/smoke-2026-05-13/T-SMOKE-02.md` dosyası oluşturuldu — 954 kelimelik kapsamlı `deckent_status` MCP tool dokümantasyonu içeriyor:
+
+- Tüm parametreler (`json`, `verbose`, `outputMode`) ve dönüş alanları belgolendi
+- `eventStreamTail`, `metricSnapshot`, `phaseCountdown`, `backendBreakdown`, `agentAssignments` dahil tüm alan yapıları örneklerle açıklandı
+- 4 `outputMode` seçeneği (`standart`, `explainatory`, `verbose`, `json`) farkları ile detaylandırıldı
+- Özel durumlar (aktif sprint yok, tamamlandı, dashboard hatası) ele alındı
+- `selfAssessment: DONE` — `tsc --noEmit` temiz, başarısız testler önceden mevcut ve kapsam dışı

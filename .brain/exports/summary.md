@@ -48,6 +48,9 @@
 | adr-042 | Hybrid Mode Architecture — Sprint + Task Dual Modes | proposed |
 
 ## Recent Learnings
+- **Sprint sprint-155 Learnings** (sprint-155): ## Sprint sprint-155 Learnings
+- **Sprint sprint-154 Learnings** (sprint-154): ## Sprint sprint-154 Learnings
+- RubricRegistry Core Foundation: NO_GO — RubricRegistry foundation created at src/orc...
 - **Sprint sprint-153 Learnings** (sprint-153): ## Sprint sprint-153 Learnings
 - Brain 8-Phase Sprint Lifecycle: NO_GO — Brain 8-Phase Sprint Lifecycle dokümantasyon...
 - **Sprint sprint-151 Learnings** (sprint-151): ## Sprint sprint-151 Learnings
@@ -63,10 +66,6 @@
 - Agent Truncation Bug Fix: GO_WITH_TECH_DEBT — Root cause: task-builder.ts:761 had `a...
 - **Sprint sprint-145 Learnings** (sprint-145): ## Sprint sprint-145 Learnings
 - Brain Heuristic Timeout Estimator: NO_GO — Brain Heuristic Timeout Estimator impleme...
-- **Sprint sprint-144 Learnings** (sprint-144): ## Sprint sprint-144 Learnings
-- worker.ts Split (1669 → 4 dosya): NO_GO — Worker timeout — process exceeded time lim...
-- **Sprint sprint-143 Learnings** (sprint-143): ## Sprint sprint-143 Learnings
-- Memory V2 Tam Migrasyon (ci-reporter + managed-docs): NO_GO — Docker worker exited w...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -74,4 +73,4 @@ _No active technical debt._
 ## Active Patterns
 _No active patterns._
 
-_Total entries: 176 | Generated: 2026-05-12_
+_Total entries: 180 | Generated: 2026-05-12_

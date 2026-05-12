@@ -1,0 +1,28 @@
+# Task 155-001 Execution Plan
+
+## Objective
+Write 200+ word Turkish/English technical documentation for deckent_start MCP tool.
+
+## Source Files Read
+- src/mcp/tools/start.ts — Full implementation analyzed
+
+## Key Information Gathered
+- Tool: deckent_start
+- Parameters: autoApprove, dryRun, force, timeout, sandbox
+- Behavior: Returns immediately with jobId, sprint runs in background
+- Backend: fork() detached child process (sprint-runner-entry.js)
+- Lifecycle: PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → CLEANUP
+- Prerequisite: deckent_init + deckent_set_directives must be run first
+- Dry-run mode: plans tasks but does not spawn workers
+- Sprint lock: prevents duplicate concurrent sprints
+- IPC directory cleanup: orphan cleanup before start
+
+## Output File
+docs/smoke-2026-05-13/T-SMOKE-01.md
+
+## Structure
+1. Overview
+2. Parameters table
+3. How it works (step-by-step)
+4. Response format
+5. Usage examples

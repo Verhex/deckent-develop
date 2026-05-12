@@ -1,0 +1,17 @@
+{
+  "taskId": "155-004",
+  "filesChanged": ["docs/smoke-2026-05-13/T-SMOKE-04.md"],
+  "linesAdded": 110,
+  "linesRemoved": 0,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "DONE",
+  "notes": "deckent_set_directives MCP tool dokümantasyonu yazıldı. Kaynak: src/mcp/tools/directives.ts + src/orchestra/task-builder.ts. İçerik: genel bakış, content parametre formatı (## Task N: başlıkları, desteklenen tüm alanlar tablosu), parseStructuredDirectives() ayrıştırma adımları (regex split, alan etiket parse'ı, fallback bullet-list), araç yanıt yapısı (taskCount/breakdown/estimatedModels), CLI karşılığı örnekler, önemli notlar. 200+ kelime Türkçe/teknik karışık format.",
+  "tokenUsage": {
+    "inputTokens": 12500,
+    "outputTokens": 1800,
+    "cacheReadTokens": 45000,
+    "provider": "claude",
+    "model": "sonnet"
+  }
+}

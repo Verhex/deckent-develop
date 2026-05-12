@@ -1,0 +1,17 @@
+{
+  "taskId": "155-003",
+  "filesChanged": ["docs/smoke-2026-05-13/T-SMOKE-03.md"],
+  "linesAdded": 142,
+  "linesRemoved": 0,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "DONE",
+  "notes": "Wrote 860-word reference documentation for deckent_plan MCP tool. Covers all three planning modes (ai/structured/auto) with implementation details sourced from src/mcp/tools/plan.ts and src/orchestra/planner.ts + task-builder.ts. Documents how parseStructuredDirectives splits DIRECTIVES.md on ## Task N: headings and extracts Model/Effort/Scope fields. Explains dry-run semantics (always true, no task files written). Includes full response field reference table and error handling section. No source code modified — documentation-only task. tsc/vitest not applicable (no source changes).",
+  "tokenUsage": {
+    "inputTokens": 12500,
+    "outputTokens": 1100,
+    "cacheReadTokens": 45000,
+    "provider": "claude",
+    "model": "sonnet"
+  }
+}

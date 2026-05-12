@@ -1,0 +1,17 @@
+{
+  "taskId": "155-006",
+  "filesChanged": ["docs/smoke-2026-05-13/T-SMOKE-06.md"],
+  "linesAdded": 158,
+  "linesRemoved": 0,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "DONE",
+  "notes": "Created T-SMOKE-06.md with 879 words documenting deckent_cleanup MCP tool. Covers all required topics: .tasks/ archiving (9-phase cleanup including task file deletion, prompt file archiving with retention policy), lock release (.locks/ directory purge via releaseAllLocks()), metrics rotation (sprint-file-retention.ts 3-part rotation: counter cleanup + forensic migration + enforcement), and sprint-end discipline (releaseSprintLock gate, recommended workflow, abort-safe behavior). Includes parameter table, MCP usage examples, configuration reference, response fields, error handling, and related tools. No tsc/vitest needed — documentation-only task. Baseline: T-SMOKE-06.md did not exist. End state: fully written, 879 words. Delta: 100% complete.",
+  "tokenUsage": {
+    "inputTokens": 8500,
+    "outputTokens": 1200,
+    "cacheReadTokens": 0,
+    "provider": "claude",
+    "model": "sonnet"
+  }
+}

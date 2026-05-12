@@ -1,0 +1,22 @@
+# Task 155-009 Execution Plan
+
+## Objective
+deckent_audit MCP tool'unu belgele: Brain Self-Audit gate, tsc/vitest/honesty/observability dimensions, gate.json çıktısı. 200+ kelime.
+
+## Approach
+1. Codebase'de audit-related kaynak dosyaları ara (audit, gate, self-audit)
+2. MCP tool tanımını bul (mcp/ dizini)
+3. Brain self-audit gate mantığını incele
+4. gate.json çıktı formatını belirle
+5. docs/smoke-2026-05-13/T-SMOKE-09.md yaz
+
+## Files to Modify
+- docs/smoke-2026-05-13/T-SMOKE-09.md (CREATE)
+
+## Expected Content Structure
+- Tool açıklaması ve amacı
+- Brain Self-Audit gate nedir
+- 4 dimension (tsc / vitest / honesty / observability)
+- gate.json çıktı formatı
+- Ne zaman kullanılır
+- Örnek çıktı

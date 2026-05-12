@@ -4,8 +4,111 @@
 **Status:** CANONICAL — Sprint 149-200 anchor document
 **Vision:** OpenClaw'ın god-level üstün hali — developer-first + life-assistant dual platform
 **Brainstorming:** Alperen onayları 12+ karar, 5 paralel agent kod tabanı analizi
-**Last update:** 2026-04-21 (Sprint 150 kapanış + Hot Fix with Claude Subagents Session 1)
-**Next audit:** Sprint 151 Beta GA cutover sonrası revize
+**Last update:** 2026-05-12 (Sprint 154 — TaskType Registry foundation + Bug B fix + 3-katman mimari planlama)
+**Next audit:** Sprint 155 smoke validation sonrası
+
+---
+
+## ⚡ 2026-05-12 Session Kapanış — Sprint 152.5 Restore + Sprint 153 Smoke + Sprint 154 Bug B Fix
+
+### Restore Operasyonu (2026-05-12 sabah)
+
+- **Baseline:** commit `224618c` (Sprint 152 sonu, 2026-05-05) restore-152 branch
+- **Cherry-pick:** commit `9b91405` (Sprint 154 Wave A T1+T4+T6+T10 — claude.json:rw ROOT CAUSE, dist chmod, FIX timeout 30dk, adr-validator path)
+- **Backup integration:** Apr 22 tar dosyasından `.brain/memory.db` (2.3MB, 174 entries) + `.brain/sprints/` + `.deckent/{jobs,pids,cache,routing,plugins}/` + `.tasks/archive/` surgical extract
+- **Yeni repo:** `VerhexIO/deckent-develop` (private) `main` branch, push edildi commit `359bd10`
+- **Eski repo:** `VerhexIO/deckent-dev` `origin-archive` remote olarak korundu
+
+### Sprint 153 Smoke (2026-05-12, restore validation)
+
+10 doc-only paralel task, mini smoke. Pipeline LIVE kanıtı:
+- ✅ 6 worker docker spawn (claude.json:rw fix kanıtlı)
+- ✅ 10/10 .md dosyası diske düştü (`docs/smoke-2026-05-12/`)
+- ❌ Brain 9/10 NO_GO verdi (Bug B canlı: `validateResultSchema:499` `typeof null !== 'number'` schema fail)
+- ✅ 1 task DONE (153-005, worker `coverage:0` number yazdı — null'dan kaçtı)
+- **Forensic kazanım:** Worker non-determinism + tek-tip rubric birleşince false NO_GO; TaskType taxonomy ihtiyacı somutlandı
+
+### Sprint 154 Bug B Fix Dogfood (~14 dk, 6 opus task)
+
+Deckent kendi kendini fixledi — pipeline çalışırken kendi rubric'ini çoklu-tip yaptı:
+- **NEW** `src/orchestra/rubric-registry.ts` (196 LoC): TaskType taxonomy (audit/document-write/code-development) + 3 rubric + scope-shape detection + getRubric + coverageOptional
+- `src/orchestra/result-evaluator.ts` (+287/-6): registry import + `validateResultSchema(result, task?)` + 6 yeni scorer (scoreWordCount/scoreAuditCompleteness/scoreFindingCount/scoreCitationDensity/scoreMigrationTriage/scoreDocumentationQuality) + scoreCriterion switch ext + evaluateWithRubric registry wire
+- **NEW** `tests/orchestra/rubric-registry.test.ts` (26 test) + `result-evaluator-typed.test.ts` (8+ scenario)
+- Brain 5 DONE + 4 NO_GO etiketledi (kendi schema'sı yeni registry'i okumadığı için fix-of-fix race), AMA fiziksel kod tam disk'te + tsc PASS
+- `npm run build` + MCP restart sonrası canlı
+
+### Dogfood Bulguları (yeni mimari kanıtlar)
+
+| Bulgu | Konum | Etki |
+|---|---|---|
+| Brain self-contradiction | `debt-manager.ts:126-140` worker rubricScores LITERAL kopya + "NO_GO" mantık çelişkili reason | Fix-of-fix gereksiz spawn, token bleed |
+| `dependency_pipeline_enabled: false` default | `sprint-spawner.ts:220-234` | Wave gating disabled → paralel race |
+| Cascade/Unblock dangling exports | `sprint-spawner.ts:681-774` runtime çağrı yok | NO_GO sonrası dependents PAUSED gelmiyor |
+| Soft enforcement scope collision | `authority-enforcer.ts:5-6` ADR-037 | Auditor warn, Brain spawn 17ms sonra |
+| Bind-mount /workspace shared | `spawn-backend-docker.ts:241-245` | Container isolation YOK, POSIX overwrite |
+| `.locks/` mount edilmiş, kullanılmıyor | spawn-time runtime mutex eksik | File lock plan-time only |
+| Worker prompt previous-result CONTENT eksik | `prompt-god-template.ts:240-255` | Chain continuation = disk timing race |
+| External dependency ID graph'a girmiyor | `dependency-scheduler.ts:183-189` local-only | DIRECTIVES "Dependencies: 153-001" ignored |
+| Idempotency key var ama API'ye geçmiyor | `spawn-backend-docker.ts:92` promptId | External API retry'da duplicate riski |
+| Destructive whitelist tasarımda (Sprint 162A ADR-047) | restore'da YOK | Worker bash blocklist yok |
+
+### 3-Katman Mimari (Sprint 155+ canonical reference)
+
+Sprint 154 dogfood'undan türetildi. Üç katman birbirini tamamlar:
+
+#### Katman 1: TaskType Taxonomy + Hybrid Scoring — NE değerlendirilecek
+- 3 baseline tip (audit/document-write/code-development), genişletilebilir (user-mail-send, erp-create-purchase-order, payment-process vb.)
+- 5-layer hybrid pipeline: Schema → Gates → Quality Score → Outcome Tracker → Auditor Independent
+- Storage hiyerarşisi: TS core + SQLite Memory V2 + JSON manifest + Ed25519-signed hub plugin
+- Multi-language: statik İngilizce ID + i18n label layer (Sprint 162A 12-lang extension)
+- 5-channel self-awareness propagation: `deckent init` seed + `deckent sync types` + `.deckent/rubrics/*.json` + skill manifest + worker prompt enrichment
+
+#### Katman 2: Task Orchestration Pipeline Patterns (TOPP) — NASIL koordine edilecek
+- Topological wave scheduling (Kahn algoritması — kodda var, default disabled)
+- Hard-block on dependency (spawn precondition — kodda var, default disabled)
+- File-conflict → consolidation/sequencing (Auditor "consolidate-or-sequence" sinyali)
+- Worker prompt context enrichment (önceki task `.result.notes` + `filesChanged` embed)
+- Runtime file lock (`.locks/` flock spawn-time mutex)
+
+#### Katman 3: Reversibility Layer — YANLIŞ GİDERSE NE OLACAK
+- EffectClass taksonomi (pure/reversible/idempotent/compensable/critical-irreversible)
+- Pre-execution gate (class-aware spawn)
+- Compensation registry (Saga pattern — Ed25519 imzalı for hub plugins)
+- Effect log (5-layer schema: Identity/Action/Outcome/Compensation/Privacy)
+- Cross-worker effect coordination + Fresh-Eyes Rule for fix worker
+- Multi-tenant isolation 3-faz (Docker namespace → K8s namespace → Zero-trust audit ledger)
+
+### Sprint 155-180 Tema Önerileri (gradual evolution)
+
+| Sprint | Tema | Skor |
+|---|---|---|
+| 155 | **Brain self-rebuild smoke + Bug B canlı validation** (Sprint 154 fix'i Brain'in kendi rubric'inde devrede mi) | P0 |
+| 156 | Config defaults flip: `dependency_pipeline_enabled: true` + cascade/unblock wire (Sprint 154 Wave B'den) | P0 |
+| 157 | Worker prompt context enrichment (önceki task `.result.notes` embed) | P0 |
+| 158 | Idempotency key worker prompt env inject | P1 |
+| 159-160 | Destructive ops whitelist (`assertSpawnSafe` Sprint 162A ADR-047 cherry-pick) | P1 |
+| 161-162 | EffectClass annotation + pre-execution gate + saga registry foundation | P0 |
+| 163-164 | Effect log 5-layer schema implement + Memory V2 migration | P1 |
+| 165 | Per-tenant docker namespace (Reversibility Faz 1) | P2 |
+| 166 | Fresh-Eyes fix worker rotation (different model/agent + auditor diff review) | P1 |
+| 167-170 | Hub plugin TaskType + Ed25519 compensation imza | P2 |
+| 171-180 | K8s namespace per tenant (Reversibility Faz 2) | P3 |
+
+### Önemli Bulgu — Hot Fix Pattern Devam Ediyor
+
+Sprint 150A → 152.5 → 154 → 162A → şimdi 154-restore. 5. uygulama. Deckent kendi kırılganlığını kendi mimarisiyle keşfediyor — meta-dogfood paradigmasının 17. sprint'lik kanıtı.
+
+### Beta GA Gate Durumu (2026-05-12 Sprint 154 restore sonrası)
+
+| # | Gate | Sprint 150A sonu | Sprint 154 restore sonu |
+|---|------|------------------|--------------------------|
+| #1 tsc 0 errors | ✅ | ✅ |
+| #2 vitest ≥%99.5 | ✅ %99.94 | ⚠️ baseline re-run gerek |
+| #11 Documentation sync | 🟡 | ⚠️ ROADMAP bu update'le çatallı |
+| #13 Messaging trio smoke | 🟡 token bekleniyor | 🟡 |
+| Implicit: Pipeline Health | ✅ DONE (Sprint 150A) | ✅ Sprint 153 smoke + 154 dogfood kanıt |
+| **Yeni implicit: TaskType taxonomy foundation** | — | ✅ Sprint 154 (Bug B fix) |
+| **Yeni implicit: 3-katman mimari plan** | — | ✅ Sprint 154 dogfood türevi |
 
 ---
 

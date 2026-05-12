@@ -1,0 +1,38 @@
+# Task 154-005 Plan — RubricRegistry Test Suite
+
+## Goal
+Create `tests/orchestra/rubric-registry.test.ts` with 20+ test cases covering:
+- isAuditTask (5+ tests)
+- isDocumentWriteTask (5+ tests)
+- detectTaskType (4+ tests)
+- getRubric (3 tests)
+- coverageOptional (3 tests)
+
+## Approach
+1. Read the existing test patterns in `tests/orchestra/task-router.test.ts` for the
+   `makeTask()` helper and Task/TaskStatus imports.
+2. Import the symbols documented in Task 154-001's directive:
+   - `isAuditTask`, `isDocumentWriteTask`, `detectTaskType`
+   - `getRubric`, `coverageOptional`
+   - `AUDIT_RUBRIC`, `DOC_WRITE_RUBRIC`, `CODE_RUBRIC`
+3. Build a `makeTask()` helper that defaults scope to empty directories/filesWrite,
+   so each test arranges only the relevant scope shape.
+4. AAA pattern per test: Arrange a task with specific scope shape, Act by calling
+   the registry function, Assert the expected return value.
+5. Reference equality for rubrics (`toBe(AUDIT_RUBRIC)`) rather than deep equal,
+   since `getRubric` is documented as `RUBRIC_REGISTRY[detectTaskType(task)]`.
+
+## Files to write
+- `tests/orchestra/rubric-registry.test.ts` (new file, ~250 LoC)
+
+## Dependency note
+Task 154-001 creates `src/orchestra/rubric-registry.ts`. As of plan time, that
+file is still in flight (worker docker-154-001 sequence 6). My test file imports
+the documented API contract. If 154-001 has not landed by the time I run tsc,
+my test file will fail to compile — that is acceptable since the test contract
+itself is correct per directive.
+
+## Verification
+1. `npx tsc --noEmit` — must be 0 errors for the test file itself
+2. `npx vitest run tests/orchestra/rubric-registry.test.ts` — all assertions PASS
+3. Test count >= 20

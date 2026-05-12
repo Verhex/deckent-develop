@@ -1,0 +1,61 @@
+# Task 154-001 Execution Plan — RubricRegistry Core Foundation
+
+## Goal
+Create `src/orchestra/rubric-registry.ts` as a new file with TaskType taxonomy, 3 rubric constants, 3 detection heuristics, and registry API. Foundation for Sprint 154 Bug B fix (coverage:null doc task false NO_GO).
+
+## Files Modified
+- src/orchestra/rubric-registry.ts (NEW)
+
+## Approach
+
+### 1. Imports
+- `import type { Task, EvaluationRubric } from '../core/types.js'`
+- No imports from result-evaluator.ts (no circular)
+
+### 2. TaskType taxonomy
+```ts
+export type TaskType = 'audit' | 'document-write' | 'code-development';
+```
+
+### 3. Rubric constants (frozen)
+- `CODE_RUBRIC` — clone of DEFAULT_RUBRIC (correctness 0.4 / test_coverage 0.25 / scope_compliance 0.2 / documentation 0.15)
+- `AUDIT_RUBRIC` — audit_completeness 0.4 / finding_count 0.3 / citation_density 0.2 / migration_triage 0.1
+- `DOC_WRITE_RUBRIC` — correctness 0.3 / word_count 0.25 / scope_compliance 0.25 / documentation_quality 0.2
+- All `passingScore: 70`, `maxRetries: 0`
+- Use `Object.freeze` to prevent runtime mutation (gaming prevention SECURITY note)
+
+### 4. Detection helpers (scope-shape, i18n-neutral)
+- `hasCodeDir(directories)` — internal predicate checking src/tests/lib presence
+- `isAuditTask(task)`:
+  - filesWrite length === 1
+  - file starts with `docs/audits/` and ends with `.md`
+  - directories MUST NOT include any path with `src/`, `tests/`, `lib/`
+- `isDocumentWriteTask(task)`:
+  - filesWrite length >= 1 AND every file starts with `docs/` ends with `.md`
+  - NO file starts with `docs/audits/` (audit exclude)
+  - directories MUST NOT include src/tests/lib paths
+- `detectTaskType(task)`:
+  - audit → audit
+  - document-write → document-write
+  - fallback → code-development
+
+### 5. Registry API
+- `RUBRIC_REGISTRY: Record<TaskType, EvaluationRubric>` — frozen map
+- `getRubric(task)` → returns rubric per detected type
+- `coverageOptional(task)` → true for non-code
+
+### 6. SECURITY JSDoc
+- Document that rubric weights are NOT config-overridable; gaming prevention
+
+## Acceptance verification
+- `tsc --noEmit` → must be clean
+- No import from result-evaluator.ts (verify with grep)
+- JSDoc on every exported entity
+- Verify tests don't regress (`npx vitest run`)
+
+## Risks
+- TS strict mode: ensure ReadonlyArray immutability matches EvaluationRubric.criteria type (RubricCriterion[]) — may need cast on freeze
+- Path matching: use forward slash, ensure trailing slash handling for directories
+
+## Estimated impact
+- ~200 LoC, single file, no API surface changes for other modules yet (Tasks 2-4 will wire it)

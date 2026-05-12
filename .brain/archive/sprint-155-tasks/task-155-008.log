@@ -1,0 +1,1 @@
+Task 155-008 tamamlandı. `docs/smoke-2026-05-13/T-SMOKE-08.md` oluşturuldu — 592 kelime (200+ hedef), `deckent_recover` MCP aracının 4-adımlı akışı (self-audit → orphan IPC temizliği → stale lock temizliği → terminal görev arşivleme), tüm parametreler, PID kontrolü detayı, ne zaman çağrılır tablosu ve CLI/MCP örnekleri kaynak koddan doğrulanarak belgelendi.

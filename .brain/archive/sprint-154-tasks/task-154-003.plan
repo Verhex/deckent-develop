@@ -1,0 +1,52 @@
+# Plan — Task 154-003: scoreCriterion Switch + evaluateWithRubric Registry Wire
+
+## Scope
+- Write target: src/orchestra/result-evaluator.ts
+
+## Dependencies (CRITICAL CONTEXT)
+Task lists deps as `153-001`, `153-002` but this is a Sprint 154 typo — actual deps are sister tasks 154-001 (create src/orchestra/rubric-registry.ts) and 154-002 (add 6 scorer functions to result-evaluator.ts).
+
+Current state observation:
+- `src/orchestra/rubric-registry.ts` DOES NOT EXIST (154-001 not yet finished)
+- 154-002 has not written its scorer functions yet
+- All three workers (001/002/003) are running in parallel — scope collision: 154-002 + 154-003 + 154-004 all target the same file `result-evaluator.ts`
+
+## Strategy
+This is the "downstream wiring" task. Its correctness depends on 154-001 + 154-002 landing first. Since I cannot orchestrate other workers, I will:
+
+1. Read current state of `result-evaluator.ts` to find:
+   - `scoreCriterion()` switch location (~line 681)
+   - `evaluateWithRubric()` signature (~line 701)
+   - `validateResultSchema()` signature (~line 499)
+
+2. Add registry imports at top of file:
+   ```ts
+   import { getRubric, coverageOptional } from './rubric-registry.js';
+   ```
+
+3. Add 6 new cases to `scoreCriterion`:
+   - audit_completeness, finding_count, citation_density, migration_triage
+   - word_count, documentation_quality
+
+4. Wire `evaluateWithRubric`:
+   - Pass `task` arg into `validateResultSchema(result, task)` (Task 4 widens schema; safe to pass — TS optional param)
+   - When `rubric === undefined`: use `getRubric(task)` instead of `DEFAULT_RUBRIC`
+
+5. tsc + vitest verification.
+
+## Risk Mitigation
+- If `./rubric-registry.js` does not exist at compile time, tsc will fail. This is expected if 154-001 has not landed.
+- If scorer functions are not yet added by 154-002, switch cases will fail to compile.
+
+In both cases this task is BLOCKED by upstream deps. I will:
+- Write the wiring code correctly (as if deps were satisfied)
+- Run tsc and report which symbols are missing
+- selfAssessment: GO_WITH_TECH_DEBT (code is correct, blocked on parallel sister tasks)
+- Or NO_GO if I cannot make my own code compile
+
+## Expected Diff
+- +1 import line
+- +6 switch cases (~7 lines)
+- +1 task param to validateResultSchema signature + 1 caller update
+- +3 lines registry resolution in evaluateWithRubric
+- Total: ~20 LoC added

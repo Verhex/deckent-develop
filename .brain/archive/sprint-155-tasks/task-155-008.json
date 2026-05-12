@@ -1,0 +1,78 @@
+{
+  "id": "155-008",
+  "title": "deckent_recover MCP Tool Özet",
+  "description": "deckent_recover MCP Tool Özet\n- Model: sonnet\n- Effort: low\n- Skills: documentation\n- Files: docs/smoke-2026-05-13/T-SMOKE-08.md\n- Scope: docs/smoke-2026-05-13/\n\n### Description\ndeckent_recover MCP tool'unu anlat. Orphan sprint detection, stale PID temizliği, archive promotion. Hangi durumda çağrılır. 200+ kelime.\n\n---",
+  "model": "sonnet",
+  "effort": "low",
+  "priority": "NORMAL",
+  "reason": "Directive (model: sonnet -- user override)",
+  "scope": {
+    "directories": [
+      "docs/smoke-2026-05-13/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "docs/smoke-2026-05-13/T-SMOKE-08.md"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean",
+    "noGoCriteria": "Build fails or tests fail",
+    "techDebtAcceptable": "Minor style issues if tests pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-155",
+  "forceModel": "sonnet",
+  "forceEffort": "low",
+  "forceSkills": [
+    "documentation"
+  ],
+  "assignedAgent": "doc-writer",
+  "assignedSkills": [
+    "documentation"
+  ],
+  "createdAt": "2026-05-12T12:26:46.738Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "documentation",
+        "secondary": [],
+        "confidence": 0.95
+      },
+      "tags": [],
+      "domains": [
+        {
+          "name": "docs",
+          "weight": 1
+        }
+      ],
+      "operations": [
+        {
+          "type": "document",
+          "weight": 0.67
+        },
+        {
+          "type": "create",
+          "weight": 0.33
+        }
+      ],
+      "complexity": {
+        "fileCount": 1,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "trivial"
+      },
+      "scope": {
+        "writeRatio": {
+          "docs/": 1
+        },
+        "primaryWriteTarget": "docs/",
+        "testWriteRatio": 0
+      }
+    },
+    "confidence": "high",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-05-12T12:33:05.381Z"
+}

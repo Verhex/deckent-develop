@@ -1,13 +1,13 @@
-# DIRECTIVES — (Sprint 154 için hazırlanıyor)
+# DIRECTIVES — (Sprint 156 için hazırlanıyor)
 
-> Önceki sprint (sprint-153) tamamlandı. Bu dosya yeni sprint hedefleri için hazırdır.
+> Önceki sprint (sprint-155) tamamlandı. Bu dosya yeni sprint hedefleri için hazırdır.
 
 ## Referanslar
-- Arşiv: .brain/archive/DIRECTIVES-sprint-153.md
+- Arşiv: .brain/archive/DIRECTIVES-sprint-155.md
 - Retro: .brain/RETRO.md
 - Bellek: .brain/MEMORY.md
 
-## Goal: (Sprint 154 hedefini buraya yazın)
+## Goal: (Sprint 156 hedefini buraya yazın)
 
 ---
 

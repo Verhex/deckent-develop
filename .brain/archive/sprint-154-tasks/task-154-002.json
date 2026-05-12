@@ -1,0 +1,94 @@
+{
+  "id": "154-002",
+  "title": "New Scorer Functions (audit + doc-write criteria)",
+  "description": "New Scorer Functions (audit + doc-write criteria)\n- Model: opus\n- Effort: high\n- Skills: typescript-expert\n- Files: src/orchestra/result-evaluator.ts\n- Scope: src/orchestra/\n- Dependencies: 153-001\n\n### Description\n`src/orchestra/result-evaluator.ts`'ye 5 yeni scorer ekle. Mevcut pattern (`scoreCorrectness`, `scoreDocumentation`) örnek alın.\n\n1. **`scoreWordCount(result, task)`** — DOC_WRITE_RUBRIC için\n   - Worker notes'unda \"N kelime\" / \"N words\" pattern ara (Türkçe + İngilizce)\n   - Task description'da \"≥X kelime\" / \"≥X words\" target ara\n   - Score = (actual / target) × 100, max 100\n   - Target bulunamazsa: notes ≥200 char = 70, else 30\n\n2. **`scoreAuditCompleteness(result, task)`** — AUDIT_RUBRIC için\n   - Worker'ın yazdığı dosyayı `readFileSync` ile oku (filesChanged[0])\n   - Score: H1/H2 başlık varlığı + bullet/table varlığı + minimum 500 char\n   - Skor: heading 30 + bullet/table 40 + length ≥500 30\n\n3. **`scoreFindingCount(result, task)`** — AUDIT_RUBRIC için\n   - Dosyada \"Finding|Bug|Risk|Issue|Drift\" pattern (case-insensitive) say\n   - 0→10, 1-3→50, 4-7→80, 8+→100\n\n4. **`scoreCitationDensity(result, task)`** — AUDIT_RUBRIC için\n   - Dosyada `file:line` veya `<file>.ts:<N>` pattern say\n   - 0→20, 1-2→50, 3-5→75, 6+→100\n\n5. **`scoreMigrationTriage(result, task)`** — AUDIT_RUBRIC için\n   - Dosyada \"P0|P1|P2|P3|CRITICAL|HIGH|MEDIUM|LOW\" distinct label say\n   - 0→0, 1-2→50, 3+→100\n\n6. **`scoreDocumentationQuality(result, task)`** — DOC_WRITE_RUBRIC için\n   - Dosyada h2 (`##`) + h3 (`###`) başlık sayısı\n   - 0 heading → 30, 1-2 → 60, 3+ → 100\n\nTüm scorerlar `RubricScore` döner: `{ criterion, score, passed, reason }`. File-read fail durumunda graceful fallback (notes-based fallback).\n\n### Acceptance Criteria\n- 6 yeni scorer fonksiyonu export edilmiş\n- Her biri `RubricScore` döner, `passed` field criterion threshold ile karşılaştırılmış\n- File-read exception graceful handled (`try/catch`, fallback skoru)\n- tsc clean\n\n---",
+  "model": "opus",
+  "effort": "high",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "src/orchestra/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/orchestra/result-evaluator.ts",
+      ".ts"
+    ]
+  },
+  "dependencies": [
+    "153-001"
+  ],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean",
+    "noGoCriteria": "Build fails or tests fail",
+    "techDebtAcceptable": "Minor style issues if tests pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-154",
+  "provider": "claude",
+  "forceModel": "opus",
+  "forceEffort": "high",
+  "forceSkills": [
+    "typescript-expert"
+  ],
+  "assignedAgent": "temp-react-ts-specialist",
+  "assignedSkills": [
+    "typescript-expert"
+  ],
+  "createdAt": "2026-05-12T11:38:15.659Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "implementation",
+        "secondary": [
+          "documentation"
+        ],
+        "confidence": 0.72
+      },
+      "tags": [],
+      "domains": [
+        {
+          "name": "orchestra",
+          "weight": 0.67
+        }
+      ],
+      "operations": [
+        {
+          "type": "create",
+          "weight": 0.33
+        },
+        {
+          "type": "document",
+          "weight": 0.33
+        },
+        {
+          "type": "modify",
+          "weight": 0.17
+        },
+        {
+          "type": "delete",
+          "weight": 0.17
+        }
+      ],
+      "complexity": {
+        "fileCount": 2,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "small"
+      },
+      "scope": {
+        "writeRatio": {
+          "src/": 0.5,
+          "./": 0.5
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0
+      }
+    },
+    "confidence": "low",
+    "routingVersion": "v2"
+  },
+  "estimatedTokens": 925,
+  "updatedAt": "2026-05-12T11:49:47.501Z"
+}

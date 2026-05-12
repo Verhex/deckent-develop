@@ -1,0 +1,24 @@
+# Task 155-003 Execution Plan
+
+## Objective
+Write reference documentation for the `deckent_plan` MCP tool (200+ words) covering:
+- Mode options (ai/structured/auto)
+- How task list is derived from DIRECTIVES.md
+- Dry-run behavior
+- Output fields
+
+## Source Files Read
+- src/mcp/tools/plan.ts — MCP tool registration, input schema, response structure
+- src/orchestra/planner.ts — AI planner (buildPlanPrompt, callBrainPlanner, parsePlannerResponse)
+- src/orchestra/task-builder.ts — parseStructuredDirectives, extractScopeFromDirective
+
+## Key Findings
+1. dryRun is always true — tasks never written to .tasks/ disk
+2. mode=ai → calls callBrainPlanner() → spawns provider subprocess with structured JSON prompt
+3. mode=structured → calls parseStructuredDirectives() → splits DIRECTIVES.md on ## Task N: headings
+4. mode=auto → tries ai, falls back to structured if provider unavailable
+5. Response includes: sprintId, tasks[], waveBreakdown, modelDistribution, riskAssessment, reasoning
+6. Prerequisite: deckent_init + deckent_set_directives must have been run
+
+## Output
+Write docs/smoke-2026-05-13/T-SMOKE-03.md with all above points as reference doc.

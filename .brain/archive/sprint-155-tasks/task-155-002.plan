@@ -1,0 +1,19 @@
+# Task 155-002 Execution Plan
+
+## Görev
+deckent_status MCP tool için Türkçe/İngilizce teknik dokümantasyon yazmak.
+
+## Kaynak Dosyalar
+- src/mcp/tools/status.ts — tool registration, inputSchema, dönen alanlar
+- src/core/output-formatter.ts — OutputMode tanımları, renderlar
+
+## Kapsam Analizi
+Tool'un şu özellikleri belgelenmeli:
+1. Genel açıklama (ne işe yarar, ne zaman çağrılır)
+2. Input parametreleri: json, verbose, outputMode
+3. Dönen alanlar: sprint, progress, agents, alerts, eventStreamTail, lastOutputs, metricSnapshot, phaseCountdown, backendBreakdown, agentAssignments, skillAssignments
+4. outputMode seçenekleri: explainatory, standart, verbose, json
+5. Kullanım örnekleri
+
+## Hedef Dosya
+docs/smoke-2026-05-13/T-SMOKE-02.md

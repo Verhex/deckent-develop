@@ -6,6 +6,36 @@ Bu projedeki tüm önemli değişiklikler bu dosyada belgelenmektedir.
 Format [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) standardına dayanır
 ve proje [Semantic Versioning](https://semver.org/spec/v2.0.0.html) kurallarına uyar.
 
+## [1.0.0-beta.1-sprint155] - 2026-05-12
+
+### Added
+
+- deckent_start MCP Tool Özet
+- deckent_status MCP Tool Özet
+- deckent_plan MCP Tool Özet
+- deckent_set_directives MCP Tool Özet
+- deckent_retro MCP Tool Özet
+- deckent_cleanup MCP Tool Özet
+- deckent_doctor MCP Tool Özet
+- deckent_recover MCP Tool Özet
+- deckent_audit MCP Tool Özet
+- deckent_memory_query MCP Tool Özet
+
+
+_Tasks: 10 total, 10 done, 0 tech debt, 0 no-go_
+
+## [1.0.0-beta.1-sprint154] - 2026-05-12
+
+### Added
+
+- New Scorer Functions (audit + doc-write criteria)
+- scoreCriterion Switch + evaluateWithRubric Registry Wire
+- validateResultSchema Coverage:null Tolerance
+- Evaluator Integration Test (audit + doc-write scenarios)
+
+
+_Tasks: 9 total, 5 done, 0 tech debt, 4 no-go_
+
 ## [1.0.0-beta.1-sprint153] - 2026-05-12
 
 ### Added

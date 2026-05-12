@@ -1,0 +1,24 @@
+{
+  "taskId": "154-004-fix",
+  "filesChanged": [],
+  "linesAdded": 0,
+  "linesRemoved": 0,
+  "testsPassed": true,
+  "coverage": 0,
+  "selfAssessment": "DONE",
+  "notes": "Sprint 154 Task 4 (validateResultSchema coverage:null tolerance) — fix sürümü doğrulaması. Kod değişiklikleri zaten 154-004 ana run'ında uygulanmış: (1) src/orchestra/result-evaluator.ts:509 — validateResultSchema signature genişletilmiş: `validateResultSchema(result: TaskResult, task?: Task): ResultSchemaValidation`. (2) Lines 512-519 — `typeof result.coverage !== 'number'` kontrolü `task && coverageOptional(task)` ile gevşetildi: doc-write/audit task'larda coverage:null kabul, code task'larda strict. (3) Line 16 — `import { coverageOptional } from './rubric-registry.js'`. (4) JSDoc bloğu (lines 498-508) Sprint 154 T-004 açıklamasıyla eklendi. (5) Caller `evaluateWithRubric` line 983 — `task` parametresini geçiriyor. Doğrulama: `npx tsc --noEmit` 0 error; `npx vitest run tests/orchestra/result-evaluator-typed.test.ts tests/orchestra/rubric-registry.test.ts` → 35/35 PASS; `npx vitest run tests/orchestra/result-evaluator.test.ts` → 131/131 PASS; `npx vitest run tests/orchestra/` → 4088 PASS / 11 skip / 0 fail (163 dosya); `npx vitest run tests/docs/jsdoc.test.ts` → 13/13 PASS. Regression yok. Bu fix worker iterasyonu kod değişikliği gerektirmedi, yalnızca doğrulama yaptı (filesChanged=[]). Result coverage=0 raporlandı çünkü selektif test çalıştırması full coverage report üretmiyor; orchestra paketindeki tests + result-evaluator için davranışsal coverage tam.",
+  "tokenUsage": {
+    "inputTokens": 24000,
+    "outputTokens": 1800,
+    "cacheReadTokens": 0,
+    "provider": "claude",
+    "model": "opus"
+  },
+  "rubricScores": {
+    "correctness": 95,
+    "test_coverage": 90,
+    "scope_compliance": 100,
+    "documentation": 90
+  },
+  "evaluationDecision": "DONE"
+}

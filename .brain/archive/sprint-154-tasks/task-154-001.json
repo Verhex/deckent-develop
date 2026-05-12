@@ -1,0 +1,111 @@
+{
+  "id": "154-001",
+  "title": "RubricRegistry Core Foundation",
+  "description": "RubricRegistry Core Foundation\n- Model: opus\n- Effort: high\n- Skills: typescript-expert, system-architect\n- Files: src/orchestra/rubric-registry.ts\n- Scope: src/orchestra/\n\n### Description\n**Yeni dosya** `src/orchestra/rubric-registry.ts` oluştur. İçerik:\n\n1. **TaskType taxonomy:** `export type TaskType = 'audit' | 'document-write' | 'code-development'`\n\n2. **3 rubric constant:**\n   - `CODE_RUBRIC` — mevcut `DEFAULT_RUBRIC`'in kopyası (correctness 0.4 / test_coverage 0.25 / scope_compliance 0.2 / documentation 0.15, passingScore 70)\n   - `AUDIT_RUBRIC` — audit_completeness 0.4 / finding_count 0.3 / citation_density 0.2 / migration_triage 0.1, passingScore 70\n   - `DOC_WRITE_RUBRIC` — correctness 0.3 / word_count 0.25 / scope_compliance 0.25 / documentation_quality 0.2, passingScore 70\n\n3. **Detection heuristics (scope-shape, i18n-neutral):**\n   - `isAuditTask(task)` — exactly 1 filesWrite başlıyor `docs/audits/` + biten `.md`, scope.directories'te src/tests/lib YOK\n   - `isDocumentWriteTask(task)` — filesWrite hepsi `docs/` ile başlar (ama `docs/audits/` HARİÇ) + `.md`, scope.directories'te src/tests/lib YOK\n   - `detectTaskType(task): TaskType` — öncelik: audit > document-write > code-development (default)\n\n4. **Registry API:**\n   - `getRubric(task): EvaluationRubric` — `RUBRIC_REGISTRY[detectTaskType(task)]`\n   - `coverageOptional(task): boolean` — `detectTaskType(task) !== 'code-development'`\n\n5. **SECURITY note (JSDoc):** rubric weights config-override yasak. User config.evaluation_rubric ile bu constantlar değiştirilemez — gaming önleyici.\n\nImport: `Task`, `EvaluationRubric` from `../core/types.js`. ESM modules.\n\n### Acceptance Criteria\n- File var, exports TaskType + 3 rubric + 3 detection function + getRubric + coverageOptional\n- tsc clean (own file)\n- JSDoc her exported entity için\n- 0 import from result-evaluator.ts (no circular)\n\n---",
+  "model": "opus",
+  "effort": "high",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "src/orchestra/",
+      "docs/audits/",
+      "src/tests/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/orchestra/rubric-registry.ts",
+      ".md"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean",
+    "noGoCriteria": "Build fails or tests fail",
+    "techDebtAcceptable": "Minor style issues if tests pass"
+  },
+  "status": "NO_GO",
+  "sprintId": "sprint-154",
+  "provider": "claude",
+  "forceModel": "opus",
+  "forceEffort": "high",
+  "forceSkills": [
+    "typescript-expert",
+    "system-architect"
+  ],
+  "assignedAgent": "architect",
+  "assignedSkills": [
+    "typescript-expert",
+    "system-architect"
+  ],
+  "createdAt": "2026-05-12T11:38:15.659Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "implementation",
+        "secondary": [
+          "documentation",
+          "security",
+          "config"
+        ],
+        "confidence": 0.76
+      },
+      "subIntent": "config",
+      "tags": [],
+      "domains": [
+        {
+          "name": "orchestra",
+          "weight": 0.4
+        },
+        {
+          "name": "docs",
+          "weight": 0.2
+        },
+        {
+          "name": "tests",
+          "weight": 0.2
+        }
+      ],
+      "operations": [
+        {
+          "type": "test",
+          "weight": 0.29
+        },
+        {
+          "type": "document",
+          "weight": 0.29
+        },
+        {
+          "type": "delete",
+          "weight": 0.14
+        },
+        {
+          "type": "configure",
+          "weight": 0.14
+        },
+        {
+          "type": "create",
+          "weight": 0.14
+        }
+      ],
+      "complexity": {
+        "fileCount": 2,
+        "moduleCount": 3,
+        "crossCutting": true,
+        "estimatedSize": "large"
+      },
+      "scope": {
+        "writeRatio": {
+          "src/": 0.5,
+          "./": 0.5
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0
+      }
+    },
+    "confidence": "medium",
+    "routingVersion": "v2"
+  },
+  "estimatedTokens": 2498,
+  "updatedAt": "2026-05-12T11:49:44.016Z"
+}

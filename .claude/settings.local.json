@@ -40,7 +40,14 @@
       "Bash(sed -n '701,760p' src/orchestra/result-evaluator.ts)",
       "Bash(mkdir -p /tmp/sprint-153-forensic)",
       "Bash(tar -xzf /home/alperen/deckent-dev/.deckent/sprint-153-pre-archive.tar.gz task-153-005.result task-153-005.json task-153-001.result task-153-002.result)",
-      "Bash(tar -xzf .deckent/sprint-153-pre-archive.tar.gz -O task-153-001.json)"
+      "Bash(tar -xzf .deckent/sprint-153-pre-archive.tar.gz -O task-153-001.json)",
+      "Bash(awk '/^function scoreDocumentation|^export function scoreDocumentation/,/^}/' src/orchestra/result-evaluator.ts)",
+      "Bash(sed -n '495,520p' src/orchestra/result-evaluator.ts)",
+      "Bash(sed -n '700,740p' src/orchestra/result-evaluator.ts)",
+      "Bash(sed -n '1,20p' src/orchestra/result-evaluator.ts)",
+      "Bash(sed -n '490,525p' src/orchestra/result-evaluator.ts)",
+      "Bash(sed -n '80,130p' src/orchestra/spawn-backend-docker.ts)",
+      "Bash(sed -n '255,290p' src/orchestra/sprint-lifecycle.ts)"
     ]
   }
 }

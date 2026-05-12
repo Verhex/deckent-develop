@@ -1,0 +1,32 @@
+{
+  "id": "154-001-fix-fix",
+  "title": "Fix: Fix: RubricRegistry Core Foundation",
+  "description": "Priority fix for NO_GO task 154-001-fix.\nOriginal worker notes: FIX VERIFICATION PASS — no code changes required. Baseline assessment: src/orchestra/rubric-registry.ts already exists (196 LoC) from prior 154-001 worker and fully satisfies DIRECTIVES.md Task 1 acceptance criteria. Honest delta: 0% code change needed because the file was already 100% spec-compliant; prior NO_GO was caused by transient out-of-scope tsc errors in result-evaluator.ts (since cleaned up). Verification performed (this run, 2026-05-12T11:52Z): (1) `npx tsc --noEmit` → 0 errors global\nRubric: correctness=100, test_coverage=100, scope_compliance=100\nExpected scope: src/orchestra/, docs/audits/, src/tests/\nFiles that should change: src/orchestra/rubric-registry.ts, .md",
+  "model": "opus",
+  "effort": "high",
+  "priority": "CRITICAL",
+  "reason": "Task 154-001-fix evaluated as NO_GO; correctness=100; test_coverage=100; scope_compliance=100; no files changed",
+  "scope": {
+    "directories": [
+      "src/orchestra/",
+      "docs/audits/",
+      "src/tests/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/orchestra/rubric-registry.ts",
+      ".md"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean",
+    "noGoCriteria": "Build fails or tests fail",
+    "techDebtAcceptable": "Minor style issues if tests pass"
+  },
+  "status": "PENDING",
+  "sprintId": "sprint-154",
+  "isPriorityFix": true,
+  "fixForTaskId": "154-001-fix",
+  "createdAt": "2026-05-12T11:52:34.148Z"
+}

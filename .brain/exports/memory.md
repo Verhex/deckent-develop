@@ -1,5 +1,13 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-155 Learnings
+- Sprint sprint-155 Learnings: ## Sprint sprint-155 Learnings
+
+## Sprint sprint-154 Learnings
+- Sprint sprint-154 Learnings: ## Sprint sprint-154 Learnings
+- RubricRegistry Core Foundation: NO_GO — RubricRegistry foundation created at src/orchestra/rubric-registry.ts (196 LoC). Spec compliance: (1) TaskType taxonomy 
+- RubricRegistry Test Suite: NO_GO — Created tests/orchestra/rubric-registry.test.ts with 26 test cases (exceeds 20+ requirement): isAuditTask (7), isDocumen
+
 ## Sprint sprint-153 Learnings
 - Sprint sprint-153 Learnings: ## Sprint sprint-153 Learnings
 - Brain 8-Phase Sprint Lifecycle: NO_GO — Brain 8-Phase Sprint Lifecycle dokümantasyonu oluşturuldu. Her faz için Amaç, Kritik Karar ve Temel I/O bölümleri yazıld

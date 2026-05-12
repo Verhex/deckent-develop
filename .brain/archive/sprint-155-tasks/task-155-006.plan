@@ -1,0 +1,31 @@
+# Task 155-006 Execution Plan
+
+## Objective
+Write 200+ word documentation for deckent_cleanup MCP tool covering:
+- .tasks/ archiving mechanism
+- lock release process
+- metrics rotation
+- sprint-end discipline
+
+## Approach
+1. Write T-SMOKE-06.md with structured documentation in English
+2. Cover all major cleanup phases found in source code research
+3. Include code examples for MCP usage
+4. Ensure 200+ words
+
+## Files to Create
+- docs/smoke-2026-05-13/T-SMOKE-06.md (new file — no prior content)
+
+## Key Content Points
+- MCP tool signature: deckent_cleanup with `decay` and `dryRun` params
+- 9-phase CLI cleanup process
+- .tasks/ → delete + archive to .tasks/archive/sprint-{id}/
+- .locks/ → all .lock files removed
+- Metrics rotation via sprint-file-retention.ts
+- Memory decay (optional --decay flag)
+- Tmux session termination
+- Decision trail cleanup (.deckent/decisions/)
+
+## Verify
+- No tsc / vitest needed (docs-only task)
+- selfAssessment = DONE if file is written correctly

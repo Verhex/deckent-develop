@@ -1,0 +1,80 @@
+{
+  "id": "155-004",
+  "title": "deckent_set_directives MCP Tool Özet",
+  "description": "deckent_set_directives MCP Tool Özet\n- Model: sonnet\n- Effort: low\n- Skills: documentation\n- Files: docs/smoke-2026-05-13/T-SMOKE-04.md\n- Scope: docs/smoke-2026-05-13/\n\n### Description\ndeckent_set_directives MCP tool'unu anlat. content parametresi formatı (## Task N başlıkları). Parser nasıl çalışıyor (parseStructuredDirectives). 200+ kelime.\n\n---",
+  "model": "sonnet",
+  "effort": "low",
+  "priority": "NORMAL",
+  "reason": "Directive (model: sonnet -- user override)",
+  "scope": {
+    "directories": [
+      "docs/smoke-2026-05-13/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "docs/smoke-2026-05-13/T-SMOKE-04.md"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean",
+    "noGoCriteria": "Build fails or tests fail",
+    "techDebtAcceptable": "Minor style issues if tests pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-155",
+  "provider": "claude",
+  "forceModel": "sonnet",
+  "forceEffort": "low",
+  "forceSkills": [
+    "documentation"
+  ],
+  "assignedAgent": "doc-writer",
+  "assignedSkills": [
+    "documentation"
+  ],
+  "createdAt": "2026-05-12T12:26:46.738Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "documentation",
+        "secondary": [],
+        "confidence": 0.95
+      },
+      "tags": [],
+      "domains": [
+        {
+          "name": "docs",
+          "weight": 1
+        }
+      ],
+      "operations": [
+        {
+          "type": "document",
+          "weight": 0.67
+        },
+        {
+          "type": "create",
+          "weight": 0.33
+        }
+      ],
+      "complexity": {
+        "fileCount": 1,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "trivial"
+      },
+      "scope": {
+        "writeRatio": {
+          "docs/": 1
+        },
+        "primaryWriteTarget": "docs/",
+        "testWriteRatio": 0
+      }
+    },
+    "confidence": "high",
+    "routingVersion": "v2"
+  },
+  "estimatedTokens": 959,
+  "updatedAt": "2026-05-12T12:32:53.982Z"
+}

@@ -1,0 +1,13 @@
+Task 154-001 tamamlandı: **DONE**.
+
+**Teslim edilen:**
+- `src/orchestra/rubric-registry.ts` (196 LoC) — TaskType taxonomy + 3 rubric constant (CODE/AUDIT/DOC_WRITE) + scope-shape detection helpers (isAuditTask, isDocumentWriteTask, detectTaskType) + registry API (getRubric, coverageOptional).
+
+**Doğrulama:**
+- `tsc --noEmit` → rubric-registry.ts için 0 hata (filtreyle kontrol edildi).
+- `vitest run tests/orchestra/rubric-registry.test.ts` → **26/26 PASS**.
+- `vitest run rubric-detail + rubric-consolidation` → **19/19 PASS**.
+- Grep doğrulaması: result-evaluator.ts'ye 0 import (sadece JSDoc'ta isim geçiyor) — circular yok.
+- Tüm exported entity için JSDoc mevcut + SECURITY note (config-override prohibition).
+
+**Not:** result-evaluator.ts'de 2 unused-import hatası var (`readFileSync`, `getRubric` import edilmiş ama kullanılmamış) — bu paralel çalışan Task 4 worker'ın bıraktığı yarı-iş; Task 2/3'ün kapsamında. Task 1 scope'um sadece `src/orchestra/rubric-registry.ts` olduğu için RBAC gereği bu dosyaya dokunmadım.

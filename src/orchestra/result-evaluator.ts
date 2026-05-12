@@ -5,6 +5,7 @@
 // No side effects, no file writes — evaluation logic only.
 
 import { readFile, readdir, stat } from 'node:fs/promises';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Task, TaskResult, EvaluationRubric, RubricScore, EvaluationResult } from '../core/types.js';
 import { TaskEvaluation } from '../core/types.js';
@@ -12,6 +13,7 @@ import { BRAIN_DIR, SPRINTS_DIR } from '../core/constants.js';
 import { debugLog } from '../core/utils.js';
 import { validateWorkerCoverage } from './coverage-validator.js';
 import { reconcileSpuriousNoGo } from './mid-sprint-adapter.js';
+import { getRubric, coverageOptional } from './rubric-registry.js';
 
 // ─── Source code directory detection ──────────────────────────────────
 
@@ -493,11 +495,27 @@ export interface ResultSchemaValidation {
   reason: string;
 }
 
-export function validateResultSchema(result: TaskResult): ResultSchemaValidation {
+/**
+ * Validates that a worker result contains the required schema fields.
+ *
+ * Sprint 154 T-004: `task` parameter optional — when supplied and the task is a
+ * non-code task (per rubric-registry `coverageOptional`), `coverage:null` is
+ * tolerated. For code tasks, missing/non-numeric coverage still fails the schema.
+ *
+ * @param result - Worker task result to validate
+ * @param task - Optional task definition; used to relax coverage check for non-code tasks
+ * @returns ResultSchemaValidation with `valid`, `missingFields`, and human-readable `reason`
+ */
+export function validateResultSchema(result: TaskResult, task?: Task): ResultSchemaValidation {
   const missingFields: string[] = [];
 
   if (typeof result.coverage !== 'number') {
-    missingFields.push('coverage');
+    // Sprint 154 Bug B fix: doc-write and audit tasks may report coverage:null
+    // because they don't produce executable code. The rubric registry tells us
+    // whether coverage is required for this task's type.
+    if (!(task && coverageOptional(task))) {
+      missingFields.push('coverage');
+    }
   }
 
   if (!result.selfAssessment) {
@@ -677,6 +695,257 @@ export function scoreDocumentation(result: TaskResult): RubricScore {
   return { criterion: 'documentation', score, passed: score >= 30, reason: reasons.join('; ') };
 }
 
+// ─── Sprint 154 Bug B Fix — Per-TaskType Scorers ──────────────────────
+// Used by AUDIT_RUBRIC and DOC_WRITE_RUBRIC. File I/O is synchronous and
+// wrapped in try/catch — failure falls back to notes-derived heuristics so
+// a missing report file degrades gracefully instead of crashing evaluation.
+
+const WORD_COUNT_PATTERNS = [
+  /(\d+)\s*kelime/i,
+  /(\d+)\s*words?\b/i,
+];
+
+const WORD_COUNT_TARGET_PATTERNS = [
+  /[≥>=]+\s*(\d+)\s*kelime/i,
+  /[≥>=]+\s*(\d+)\s*words?\b/i,
+  /(\d+)\s*\+\s*kelime/i,
+  /(\d+)\s*\+\s*words?\b/i,
+];
+
+function extractFirstNumber(text: string, patterns: readonly RegExp[]): number | null {
+  for (const re of patterns) {
+    const m = re.exec(text);
+    if (m && m[1]) {
+      const n = parseInt(m[1], 10);
+      if (!isNaN(n)) return n;
+    }
+  }
+  return null;
+}
+
+function readChangedFile(result: TaskResult): string | null {
+  const first = result.filesChanged?.[0];
+  if (!first) return null;
+  try {
+    return readFileSync(first, 'utf-8');
+  } catch (e) {
+    debugLog('readChangedFile:readFileSync', e);
+    return null;
+  }
+}
+
+/**
+ * Score doc-write tasks by word count.
+ *
+ * Looks at worker notes for a self-reported word count (Turkish "kelime" or
+ * English "words") and at the task description for a target ("≥800 kelime").
+ * Falls back to notes length when neither is present so the criterion still
+ * produces a meaningful score.
+ */
+export function scoreWordCount(result: TaskResult, task: Task): RubricScore {
+  const notes = result.notes ?? '';
+  const description = task.description ?? '';
+  const actual = extractFirstNumber(notes, WORD_COUNT_PATTERNS);
+  const target = extractFirstNumber(description, WORD_COUNT_TARGET_PATTERNS);
+
+  if (actual !== null && target !== null && target > 0) {
+    const score = Math.min(Math.round((actual / target) * 100), 100);
+    return {
+      criterion: 'word_count',
+      score,
+      passed: score >= 50,
+      reason: `actual ${actual} / target ${target} words`,
+    };
+  }
+
+  if (actual !== null) {
+    const score = actual >= 200 ? 100 : actual >= 100 ? 70 : 30;
+    return {
+      criterion: 'word_count',
+      score,
+      passed: score >= 50,
+      reason: `actual ${actual} words (no explicit target)`,
+    };
+  }
+
+  const score = notes.length >= 200 ? 70 : 30;
+  return {
+    criterion: 'word_count',
+    score,
+    passed: score >= 50,
+    reason: `no word count reported; notes length ${notes.length} chars`,
+  };
+}
+
+/**
+ * Score audit reports by structural completeness: headings, lists/tables,
+ * and minimum length. Reads the first filesChanged entry; if unreadable,
+ * falls back to notes-based heuristic to avoid hard-failing the evaluator.
+ */
+export function scoreAuditCompleteness(result: TaskResult, _task: Task): RubricScore {
+  const content = readChangedFile(result);
+  if (content === null) {
+    const notes = result.notes ?? '';
+    const fallback = notes.length >= 200 ? 50 : 20;
+    return {
+      criterion: 'audit_completeness',
+      score: fallback,
+      passed: fallback >= 60,
+      reason: `report unreadable; notes-based fallback (${notes.length} chars)`,
+    };
+  }
+
+  let score = 0;
+  const reasons: string[] = [];
+
+  if (/^#\s/m.test(content) || /^##\s/m.test(content)) {
+    score += 30;
+    reasons.push('headings present');
+  }
+  if (/^\s*[-*+]\s/m.test(content) || /^\s*\|/m.test(content)) {
+    score += 40;
+    reasons.push('bullets/tables present');
+  }
+  if (content.length >= 500) {
+    score += 30;
+    reasons.push(`length ${content.length}≥500`);
+  } else {
+    reasons.push(`length ${content.length}<500`);
+  }
+
+  return {
+    criterion: 'audit_completeness',
+    score,
+    passed: score >= 60,
+    reason: reasons.join('; '),
+  };
+}
+
+const FINDING_PATTERN = /\b(finding|bug|risk|issue|drift)\b/gi;
+
+/** Count audit findings in the report (Finding/Bug/Risk/Issue/Drift, case-insensitive). */
+export function scoreFindingCount(result: TaskResult, _task: Task): RubricScore {
+  const content = readChangedFile(result);
+  if (content === null) {
+    return {
+      criterion: 'finding_count',
+      score: 10,
+      passed: false,
+      reason: 'report unreadable',
+    };
+  }
+
+  const matches = content.match(FINDING_PATTERN);
+  const count = matches?.length ?? 0;
+
+  let score: number;
+  if (count === 0) score = 10;
+  else if (count <= 3) score = 50;
+  else if (count <= 7) score = 80;
+  else score = 100;
+
+  return {
+    criterion: 'finding_count',
+    score,
+    passed: score >= 40,
+    reason: `${count} finding(s) detected`,
+  };
+}
+
+const CITATION_PATTERN = /[A-Za-z0-9_./\\-]+\.(?:ts|tsx|js|jsx|md|json|yml|yaml|sh)(?::\d+)?/g;
+const LINE_REF_PATTERN = /\b[A-Za-z0-9_./-]+:\d+\b/g;
+
+/** Count file:line references in the report — citation density signal. */
+export function scoreCitationDensity(result: TaskResult, _task: Task): RubricScore {
+  const content = readChangedFile(result);
+  if (content === null) {
+    return {
+      criterion: 'citation_density',
+      score: 20,
+      passed: false,
+      reason: 'report unreadable',
+    };
+  }
+
+  const fileRefs = content.match(CITATION_PATTERN) ?? [];
+  const lineRefs = content.match(LINE_REF_PATTERN) ?? [];
+  const count = new Set([...fileRefs, ...lineRefs]).size;
+
+  let score: number;
+  if (count === 0) score = 20;
+  else if (count <= 2) score = 50;
+  else if (count <= 5) score = 75;
+  else score = 100;
+
+  return {
+    criterion: 'citation_density',
+    score,
+    passed: score >= 40,
+    reason: `${count} unique citation(s) detected`,
+  };
+}
+
+const TRIAGE_LABEL_PATTERN = /\b(P0|P1|P2|P3|CRITICAL|HIGH|MEDIUM|LOW)\b/g;
+
+/** Count distinct migration triage labels (P0/P1/P2/P3 + severity words). */
+export function scoreMigrationTriage(result: TaskResult, _task: Task): RubricScore {
+  const content = readChangedFile(result);
+  if (content === null) {
+    return {
+      criterion: 'migration_triage',
+      score: 0,
+      passed: false,
+      reason: 'report unreadable',
+    };
+  }
+
+  const matches = content.match(TRIAGE_LABEL_PATTERN) ?? [];
+  const distinct = new Set(matches.map(m => m.toUpperCase())).size;
+
+  let score: number;
+  if (distinct === 0) score = 0;
+  else if (distinct <= 2) score = 50;
+  else score = 100;
+
+  return {
+    criterion: 'migration_triage',
+    score,
+    passed: score >= 40,
+    reason: `${distinct} distinct triage label(s)`,
+  };
+}
+
+/** Score doc heading structure: count of H2 and H3 sections. */
+export function scoreDocumentationQuality(result: TaskResult, _task: Task): RubricScore {
+  const content = readChangedFile(result);
+  if (content === null) {
+    const notes = result.notes ?? '';
+    const fallback = notes.length >= 100 ? 60 : 30;
+    return {
+      criterion: 'documentation_quality',
+      score: fallback,
+      passed: fallback >= 30,
+      reason: 'doc unreadable; notes-based fallback',
+    };
+  }
+
+  const h2 = (content.match(/^##\s/gm) ?? []).length;
+  const h3 = (content.match(/^###\s/gm) ?? []).length;
+  const total = h2 + h3;
+
+  let score: number;
+  if (total === 0) score = 30;
+  else if (total <= 2) score = 60;
+  else score = 100;
+
+  return {
+    criterion: 'documentation_quality',
+    score,
+    passed: score >= 30,
+    reason: `${h2} H2 + ${h3} H3 heading(s)`,
+  };
+}
+
 /** Dispatch scoring for a named criterion */
 function scoreCriterion(name: string, result: TaskResult, task: Task): RubricScore {
   switch (name) {
@@ -684,6 +953,12 @@ function scoreCriterion(name: string, result: TaskResult, task: Task): RubricSco
     case 'test_coverage': return scoreTestCoverage(result);
     case 'scope_compliance': return scoreScopeCompliance(result, task);
     case 'documentation': return scoreDocumentation(result);
+    case 'audit_completeness': return scoreAuditCompleteness(result, task);
+    case 'finding_count': return scoreFindingCount(result, task);
+    case 'citation_density': return scoreCitationDensity(result, task);
+    case 'migration_triage': return scoreMigrationTriage(result, task);
+    case 'word_count': return scoreWordCount(result, task);
+    case 'documentation_quality': return scoreDocumentationQuality(result, task);
     default:
       return { criterion: name, score: 0, passed: false, reason: `unknown criterion: ${name}` };
   }
@@ -704,7 +979,8 @@ export function evaluateWithRubric(
   rubric?: Partial<EvaluationRubric>,
 ): EvaluationResult {
   // D-2: Schema validation — reject results with missing required fields
-  const schemaCheck = validateResultSchema(result);
+  // Sprint 154 T-004: pass `task` so coverage:null is tolerated on non-code tasks
+  const schemaCheck = validateResultSchema(result, task);
   if (!schemaCheck.valid) {
     return {
       decision: 'NO_GO',
@@ -735,10 +1011,15 @@ export function evaluateWithRubric(
     };
   }
 
+  // Sprint 154 Bug B fix: when no rubric override is supplied, dispatch to
+  // the task-type-aware rubric from the registry (audit / doc-write / code).
+  // Doc-only tasks no longer get graded against the code rubric, which was
+  // producing false NO_GO when coverage was null.
+  const baseRubric: EvaluationRubric = rubric ? DEFAULT_RUBRIC : getRubric(task);
   const merged: EvaluationRubric = {
-    criteria: rubric?.criteria ?? DEFAULT_RUBRIC.criteria,
-    passingScore: rubric?.passingScore ?? DEFAULT_RUBRIC.passingScore,
-    maxRetries: Math.min(rubric?.maxRetries ?? DEFAULT_RUBRIC.maxRetries, 3),
+    criteria: rubric?.criteria ?? baseRubric.criteria,
+    passingScore: rubric?.passingScore ?? baseRubric.passingScore,
+    maxRetries: Math.min(rubric?.maxRetries ?? baseRubric.maxRetries, 3),
   };
 
   const rubricScores: RubricScore[] = [];

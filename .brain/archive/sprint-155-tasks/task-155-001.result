@@ -1,0 +1,17 @@
+{
+  "taskId": "155-001",
+  "filesChanged": ["docs/smoke-2026-05-13/T-SMOKE-01.md"],
+  "linesAdded": 153,
+  "linesRemoved": 0,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "DONE",
+  "notes": "deckent_start MCP tool dokümantasyonu oluşturuldu. 659 kelime (200+ gereksinim karşılandı). Tüm 5 parametre (autoApprove, dryRun, force, timeout, sandbox) kaynak koddan (src/mcp/tools/start.ts) okunarak doğru biçimde belgelendi. Detached fork mimarisi, IPC dizin yönetimi, dry-run modu, sprint kilidi kontrolü ve yanıt formatları açıklandı. tsc/vitest çalıştırılmadı — yalnızca docs/ kapsamında değişiklik yapıldı, kaynak kod dokunulmadı.",
+  "tokenUsage": {
+    "inputTokens": 8500,
+    "outputTokens": 1200,
+    "cacheReadTokens": 42000,
+    "provider": "claude",
+    "model": "sonnet"
+  }
+}

@@ -1,0 +1,9 @@
+Task 154-005 tamamlandı.
+
+**Özet:**
+- `tests/orchestra/rubric-registry.test.ts` oluşturuldu (367 satır, 26 test case)
+- Test dağılımı: `isAuditTask` (7) + `isDocumentWriteTask` (8) + `detectTaskType` (5) + `getRubric` (3) + `coverageOptional` (3) — direktif gereği 20+ tutturuldu
+- AAA pattern + `describe` gruplama uygulandı
+- `npx vitest run tests/orchestra/rubric-registry.test.ts` → 26/26 PASS
+- tsc temiz (kendi dosyam için); repodaki 2 tsc hatası paralel worker'lar 154-002/154-003'ün halen çalışan in-flight halinden geliyor, scope'um dışında
+- Sonuç: `selfAssessment: DONE`, result + heartbeat yazıldı

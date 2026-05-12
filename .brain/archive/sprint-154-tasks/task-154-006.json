@@ -1,0 +1,115 @@
+{
+  "id": "154-006",
+  "title": "Evaluator Integration Test (audit + doc-write scenarios)",
+  "description": "Evaluator Integration Test (audit + doc-write scenarios)\n- Model: opus\n- Effort: normal\n- Skills: typescript-expert, ci-testing\n- Files: tests/orchestra/result-evaluator-typed.test.ts\n- Scope: tests/orchestra/\n- Dependencies: 153-002, 153-003, 153-004\n\n### Description\n`tests/orchestra/result-evaluator-typed.test.ts` yeni dosya. End-to-end senaryolar:\n\n1. **Doc-write task DONE path** — Sprint 153 smoke senaryosu\n   - task = scope.filesWrite=[docs/smoke/T.md]\n   - result = { coverage:null, testsPassed:true, selfAssessment:'DONE', notes:'... 800 kelime ...', filesChanged:[docs/smoke/T.md] }\n   - Beklenen: `evaluateWithRubric(result, task)` → `decision: DONE`, totalScore ≥70\n   - **Bu test Sprint 153 false NO_GO bug'ı için regression guard**\n\n2. **Audit task DONE path**\n   - task = filesWrite=[docs/audits/sprint-X/T.md]\n   - result = coverage:null, notes detailed, filesChanged ile aynı path\n   - Beklenen: DONE veya GO_WITH_TECH_DEBT (audit rubric scorers ne döndürüyor)\n\n3. **Code task coverage:null still NO_GO (regression)**\n   - task = filesWrite=[src/x.ts]\n   - result = coverage:null\n   - Beklenen: schema fail → NO_GO\n\n4. **Coverage:0 number doc task DONE (153-005 senaryo)**\n   - task = doc-write\n   - result = coverage:0 number\n   - Beklenen: DONE (schema ok, rubric ok)\n\n5. **Doc-write but worker writes to wrong path** — scope violation\n   - task = filesWrite=[docs/smoke/T.md]\n   - result = filesChanged=[src/x.ts]\n   - Beklenen: NO_GO (scope compliance düşük)\n\n### Acceptance Criteria\n- 8+ test case, vitest run sadece bu dosya PASS\n- Mock dosya okuma için `fs` mock veya gerçek tmpfile (tercih: gerçek file `tmp/test-output.md` yaz + cleanup)\n- Test'lerin Sprint 153 dogfood'undan referans alıntıları olsun (yorum)\n\n---\n\n## Sprint Sonu Doğrulama (Brain → user'a sun)\n\n- Yeni `src/orchestra/rubric-registry.ts` 1 dosya, ~200 LoC\n- `src/orchestra/result-evaluator.ts` modify (~150 LoC eklendi)\n- `tests/orchestra/rubric-registry.test.ts` ~250 LoC\n- `tests/orchestra/result-evaluator-typed.test.ts` ~200 LoC\n- Toplam ~800 LoC, 6 task\n\nSprint sonrası user manuel doğrulama:\n- `npx tsc --noEmit` → 0 error\n- `npx vitest run tests/orchestra/rubric-registry.test.ts tests/orchestra/result-evaluator-typed.test.ts` → all pass\n- Smoke test 2 (5-10 doc task) re-koş → 10/10 DONE bekleniyor",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "tests/orchestra/",
+      "docs/smoke/",
+      "docs/audits/sprint-X/",
+      "src/orchestra/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "tests/orchestra/result-evaluator-typed.test.ts",
+      "docs/smoke/T.md",
+      "docs/audits/sprint-X/T.md",
+      "src/x.ts",
+      "src/orchestra/rubric-registry.ts",
+      "src/orchestra/result-evaluator.ts",
+      "tests/orchestra/rubric-registry.test.ts"
+    ]
+  },
+  "dependencies": [
+    "153-002",
+    "153-003",
+    "153-004"
+  ],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; `npx tsc --noEmit` → 0 error; `npx vitest run tests/orchestra/rubric-registry.test.ts tests/orchestra/result-evaluator-typed.test.ts` → all pass",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-154",
+  "provider": "claude",
+  "forceModel": "opus",
+  "forceEffort": "normal",
+  "forceSkills": [
+    "typescript-expert",
+    "ci-testing"
+  ],
+  "assignedAgent": "architect",
+  "assignedSkills": [
+    "typescript-expert",
+    "ci-testing"
+  ],
+  "createdAt": "2026-05-12T11:38:15.659Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "documentation",
+        "secondary": [],
+        "confidence": 0.72
+      },
+      "tags": [
+        "test-coverage"
+      ],
+      "domains": [
+        {
+          "name": "orchestra",
+          "weight": 0.55
+        },
+        {
+          "name": "docs",
+          "weight": 0.36
+        }
+      ],
+      "operations": [
+        {
+          "type": "modify",
+          "weight": 0.29
+        },
+        {
+          "type": "test",
+          "weight": 0.29
+        },
+        {
+          "type": "delete",
+          "weight": 0.14
+        },
+        {
+          "type": "document",
+          "weight": 0.14
+        },
+        {
+          "type": "create",
+          "weight": 0.14
+        }
+      ],
+      "complexity": {
+        "fileCount": 7,
+        "moduleCount": 2,
+        "crossCutting": true,
+        "estimatedSize": "large"
+      },
+      "scope": {
+        "writeRatio": {
+          "tests/": 0.29,
+          "docs/": 0.29,
+          "src/": 0.43
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0.29
+      }
+    },
+    "confidence": "uncertain",
+    "routingVersion": "v2"
+  },
+  "estimatedTokens": 3251,
+  "updatedAt": "2026-05-12T11:49:53.704Z"
+}

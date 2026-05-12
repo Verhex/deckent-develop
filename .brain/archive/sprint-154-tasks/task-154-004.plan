@@ -1,0 +1,65 @@
+# Task 154-004 Execution Plan
+
+## Objective
+Modify `validateResultSchema` in `src/orchestra/result-evaluator.ts` to tolerate
+`coverage:null` for non-code tasks (doc/audit), while preserving the existing
+strict check for code tasks.
+
+## Dependency Status
+- Task 154-001 (rubric-registry.ts) → NOT COMPLETED. File `src/orchestra/rubric-registry.ts`
+  does not exist. The `coverageOptional` helper specified by the task is therefore
+  unavailable for import.
+- My scope restricts writes to `src/orchestra/result-evaluator.ts` only — I cannot
+  create `rubric-registry.ts`.
+
+## Workaround Strategy
+Use the existing `isDocTask(task)` function (already exported from this same file,
+defined line 56). For the purposes of "is `coverage:null` acceptable?" — both
+`isDocTask` and the spec's `coverageOptional` evaluate to TRUE for doc-write AND
+audit tasks (neither has src/tests/lib in scope.directories), and FALSE for
+code tasks. Functionally equivalent for the validateResultSchema use case.
+
+When 154-001 lands, replacement is a 1-line swap (`isDocTask(task)` →
+`coverageOptional(task)`) + import line addition.
+
+## Changes
+1. Extend `validateResultSchema` signature:
+   - Before: `validateResultSchema(result: TaskResult): ResultSchemaValidation`
+   - After:  `validateResultSchema(result: TaskResult, task?: Task): ResultSchemaValidation`
+
+2. Modify coverage check (line ~499):
+   ```typescript
+   if (typeof result.coverage !== 'number') {
+     // Allow null for non-code task types (doc-write, audit)
+     // TODO(154-001): swap isDocTask → coverageOptional once rubric-registry.ts lands
+     if (task && isDocTask(task)) {
+       // skip — null is acceptable for non-code tasks
+     } else {
+       missingFields.push('coverage');
+     }
+   }
+   ```
+
+3. Update single caller `evaluateWithRubric` (line ~707):
+   - Before: `validateResultSchema(result)`
+   - After:  `validateResultSchema(result, task)`
+
+## Files Modified
+- src/orchestra/result-evaluator.ts
+
+## Verify Steps
+1. `npx tsc --noEmit` — 0 errors
+2. `npx vitest run tests/orchestra/result-evaluator*` — no regressions
+3. `npx vitest run` — full suite (sanity)
+
+## Risk Assessment
+- LOW: signature extension is backwards-compatible (`task?` optional)
+- LOW: `isDocTask` is well-tested existing helper
+- isDocTask returns false when `scope.directories` is empty — code tasks with empty
+  scope continue to require coverage (preserves regression guard)
+
+## Acceptance Match
+- ✓ coverage:null on doc/audit task → schema valid (isDocTask=true → skip)
+- ✓ coverage:null on code task → still invalid (isDocTask=false → push)
+- ✓ Other field checks unchanged
+- ✓ tsc clean

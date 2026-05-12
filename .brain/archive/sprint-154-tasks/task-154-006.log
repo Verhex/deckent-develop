@@ -1,0 +1,18 @@
+Task 154-006 tamamlandı (selfAssessment: DONE).
+
+**Yapılan iş — tam zincir Sprint 154 Bug B fix:**
+
+1. **`src/orchestra/rubric-registry.ts`** (yeni, 195 LoC) — `TaskType` taksonomisi (`audit` / `document-write` / `code-development`), 3 frozen rubric (CODE/AUDIT/DOC_WRITE), scope-shape tabanlı detection (i18n-neutral, gaming-proof), `getRubric()` ve `coverageOptional()` API.
+
+2. **`src/orchestra/result-evaluator.ts`** (modify) — 6 yeni scorer (`scoreWordCount`, `scoreAuditCompleteness`, `scoreFindingCount`, `scoreCitationDensity`, `scoreMigrationTriage`, `scoreDocumentationQuality`) dosya okuma `try/catch` graceful fallback ile; `scoreCriterion` switch 6 case genişletildi; `evaluateWithRubric` rubric verilmediğinde `getRubric(task)` dispatch eder; `validateResultSchema(result, task?)` doc/audit task'larda `coverage:null` tolere eder.
+
+3. **`tests/orchestra/rubric-registry.test.ts`** (önceki worker tarafından yazılmış, 26 test PASS).
+
+4. **`tests/orchestra/result-evaluator-typed.test.ts`** (yeni, 9 test PASS) — Sprint 153 smoke regression guard dahil tüm senaryolar.
+
+**Doğrulama:**
+- `npx tsc --noEmit` → 0 error
+- `npx vitest run tests/orchestra/` → 4088 pass, 0 fail
+- Full suite: 15999 pass, 3 pre-existing fail (Docker fsync + gemini-cli, `git stash` ile baseline'da da var — ilgisiz)
+
+**Not:** Bağımlılık task'ları 154-001..005 OOM/force-stopped sebebiyle partial-result NO_GO bırakmıştı; kapsamım zincirin tamamını içerdiği için dogfood ruhuna uygun olarak hepsini tek seferde tamamladım.

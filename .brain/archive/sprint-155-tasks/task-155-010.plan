@@ -1,0 +1,23 @@
+# Task 155-010 Execution Plan
+
+## Objective
+Write documentation for deckent_memory_query MCP tool covering:
+- Memory V2 SQLite FTS5 architecture
+- Type filter options (adr/memory/sprint/debt/pattern/retro/identity/error)
+- Status filters
+- Mode (and/or) for FTS5 token join
+- Recall (query) vs Promote (remember/insert) distinction
+- 200+ words, Turkish, matching T-SMOKE-01.md style
+
+## Files to Read
+- src/mcp/tools/memory-query.ts — tool registration + parameters
+- src/core/memory-query.ts — FTS5 search implementation
+- src/core/memory-types.ts — EntryType, MemoryQueryParams interfaces
+
+## Files to Write
+- docs/smoke-2026-05-13/T-SMOKE-10.md
+
+## Approach
+1. Structure: Genel Bakış → Parametreler → Nasıl Çalışır → Type Filtreleri → Recall vs Promote → Yanıt Formatı → Kullanım Örnekleri
+2. Match style of T-SMOKE-01.md (same sprint, same doc series)
+3. No code changes — doc only, no tsc/vitest needed

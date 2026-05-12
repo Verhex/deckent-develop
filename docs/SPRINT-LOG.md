@@ -4155,3 +4155,61 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 153-010: Beta GA 20-Gate Listesi (NO_GO)
 
 ---
+## Sprint 154 — sprint-154
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-05-12
+**Duration:** 858s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 9 |
+| Completed | 5 |
+| Tech Debt | 0 |
+| No-Go | 4 |
+| Coverage | 30.7% |
+| Duration | 858468ms |
+
+### Tasks
+
+- 154-001: RubricRegistry Core Foundation (NO_GO)
+- 154-002: New Scorer Functions (audit + doc-write criteria) (DONE)
+- 154-003: scoreCriterion Switch + evaluateWithRubric Registry Wire (DONE)
+- 154-004: validateResultSchema Coverage:null Tolerance (DONE)
+- 154-005: RubricRegistry Test Suite (NO_GO)
+- 154-006: Evaluator Integration Test (audit + doc-write scenarios) (DONE)
+
+---
+## Sprint 155 — sprint-155
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-05-12
+**Duration:** 384s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 10 |
+| Completed | 10 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 383887ms |
+
+### Tasks
+
+- 155-001: deckent_start MCP Tool Özet (DONE)
+- 155-002: deckent_status MCP Tool Özet (DONE)
+- 155-003: deckent_plan MCP Tool Özet (DONE)
+- 155-004: deckent_set_directives MCP Tool Özet (DONE)
+- 155-005: deckent_retro MCP Tool Özet (DONE)
+- 155-006: deckent_cleanup MCP Tool Özet (DONE)
+- 155-007: deckent_doctor MCP Tool Özet (DONE)
+- 155-008: deckent_recover MCP Tool Özet (DONE)
+- 155-009: deckent_audit MCP Tool Özet (DONE)
+- 155-010: deckent_memory_query MCP Tool Özet (DONE)
+
+---

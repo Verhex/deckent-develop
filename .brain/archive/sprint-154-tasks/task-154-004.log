@@ -1,0 +1,13 @@
+Task 154-004 tamamlandı.
+
+**Özet:**
+- `validateResultSchema` signature `(result, task?)` olarak genişletildi
+- Coverage:null kontrolü artık `coverageOptional(task)` ile non-code task'lar için tolere ediliyor (concurrent worker 154-001/154-003 paralel olarak `rubric-registry.ts` + import wire'ı tamamladı; spec-uyumlu kullanım achieved)
+- `evaluateWithRubric` caller `task` parametresini geçiriyor
+- JSDoc bloğu fonksiyona eklendi (`tests/docs/jsdoc.test.ts` gereksinim)
+
+**Verify:**
+- `tsc --noEmit` → 0 errors (EXIT:0)
+- `vitest run tests/orchestra/result-evaluator tests/docs/jsdoc.test.ts` → 144/144 PASS
+
+**selfAssessment:** DONE — Sprint 153 doc task false NO_GO senaryosu (coverage:null + docs/*.md filesWrite) artık schema validation'ı geçiyor.

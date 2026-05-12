@@ -1,0 +1,44 @@
+{
+  "id": "154-005-fix",
+  "title": "Fix: RubricRegistry Test Suite",
+  "description": "Priority fix for NO_GO task 154-005.\nOriginal worker notes: Created tests/orchestra/rubric-registry.test.ts with 26 test cases (exceeds 20+ requirement): isAuditTask (7), isDocumentWriteTask (8), detectTaskType (5), getRubric (3), coverageOptional (3). All tests follow AAA pattern with explicit Arrange/Act/Assert, grouped under describe blocks matching the directive (describe('isAuditTask', ...)). Verification: `npx vitest run tests/orchestra/rubric-registry.test.ts` → 26 passed (0 failed). tsc on test file itself is clean — the 2 tsc errors visible repo\nExpected scope: tests/orchestra/, docs/audits/sprint-N/, docs/audits/, docs/, docs/smoke/, src/orchestra/\nFiles that should change: tests/orchestra/rubric-registry.test.ts, docs/audits/sprint-N/T-N.md, docs/audits/X.md, docs/non-audit.md, docs/smoke/T.md, docs/X.md, docs/Y.md, docs/smoke/X.md, src/X.ts",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "CRITICAL",
+  "reason": "Task 154-005 evaluated as NO_GO",
+  "scope": {
+    "directories": [
+      "tests/orchestra/",
+      "docs/audits/sprint-N/",
+      "docs/audits/",
+      "docs/",
+      "docs/smoke/",
+      "src/orchestra/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "tests/orchestra/rubric-registry.test.ts",
+      "docs/audits/sprint-N/T-N.md",
+      "docs/audits/X.md",
+      "docs/non-audit.md",
+      "docs/smoke/T.md",
+      "docs/X.md",
+      "docs/Y.md",
+      "docs/smoke/X.md",
+      "src/X.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean",
+    "noGoCriteria": "Build fails or tests fail",
+    "techDebtAcceptable": "Minor style issues if tests pass"
+  },
+  "status": "NO_GO",
+  "sprintId": "sprint-154",
+  "isPriorityFix": true,
+  "fixForTaskId": "154-005",
+  "createdAt": "2026-05-12T11:49:50.170Z",
+  "estimatedTokens": 120,
+  "updatedAt": "2026-05-12T11:52:34.149Z"
+}

@@ -1,0 +1,8 @@
+Task 154-003 tamamlandı. **Self-assessment: DONE.**
+
+**Sonuç özeti (dürüst):**
+- Spec'in tüm gereksinimleri `src/orchestra/result-evaluator.ts`'de mevcut: import (satır 16), 6 yeni switch case (956-961), `validateResultSchema(result, task)` (498), `baseRubric = rubric ? DEFAULT_RUBRIC : getRubric(task)` (1018).
+- **Benim gerçek line katkım: 0.** Edit denemesinde dosya zaten paralel sister Docker worker'lar (154-002 + 154-004) tarafından mutate edilmişti — task spec'imle birebir aynı kod oraya yazılmıştı. Doğrulamadım, redundant overwrite yapmadım.
+- `tsc --noEmit` → exit 0; `vitest run tests/orchestra/` → 4079 passed / 11 skipped / 0 failed.
+
+**Dogfood gözlemi Brain retro için:** 154-002/003/004 hepsi aynı `filesWrite=src/orchestra/result-evaluator.ts` ile paralel spawn edildi — klasik scope collision. File-lock + read-modify-write sayesinde corruption olmadı çünkü üç worker da aynı doğru çözüme yakınsadı. Yorumları farklı olsaydı son yazan diğerini ezerdi. Planner `filesWrite[]` overlap'i tespit edip otomatik wave dependency emit etmeli.

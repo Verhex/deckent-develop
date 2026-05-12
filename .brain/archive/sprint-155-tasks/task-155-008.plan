@@ -1,0 +1,18 @@
+# Task 155-008 Execution Plan
+
+## Goal
+Document `deckent_recover` MCP tool in docs/smoke-2026-05-13/T-SMOKE-08.md (200+ words).
+
+## Sources Read
+- src/mcp/tools/recover.ts — MCP tool registration, parameters, 4-step flow
+- src/cli/commands/recover.ts — CLI parity, RecoveryReport interface, dry-run logic
+- src/core/orphan-cleaner.ts — cleanOrphanIpcDirs, postFinalizeCleanup internals
+
+## Sections to Write
+1. Genel Bakış — ne yapar, ne zaman çağrılır
+2. Parametreler — sprintId, dryRun, skipAudit
+3. 4-Adımlı Akış — audit → IPC temizlik → stale lock → archive promotion
+4. Çıktı alanları
+5. Ne zaman kullanılır (orphan sprint, crashed sprint, stale lock)
+6. CLI eşdeğeri
+7. Örnek MCP çağrısı

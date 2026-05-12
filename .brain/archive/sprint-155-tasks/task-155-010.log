@@ -1,0 +1,1 @@
+Görev tamamlandı. `docs/smoke-2026-05-13/T-SMOKE-10.md` dosyası oluşturuldu — 829 kelime ile `deckent_memory_query` MCP tool'unu kapsamlı biçimde belgeliyor: FTS5 çift katmanlı arama mimarisi, 7 parametre, 9 giriş türü filtresi, recall/promote ayrımı, 4 kullanım örneği ve CLI karşılığı.
