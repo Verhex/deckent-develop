@@ -276,7 +276,12 @@ export function cleanup(
   }
 
   const tasksDir = join(projectRoot, TASKS_DIR);
-  if (existsSync(tasksDir)) {
+  // Sprint 156 Task 4 follow-up (Sprint 157 hot fix, 2026-05-12):
+  // TASK_FILE_EXTENSIONS unlink is now gated by cleanupPhase. On 'spawn-fail'
+  // the task .json/.plan/.hb/.result files are PRESERVED for post-mortem
+  // forensic — they would otherwise be wiped before any retry/recover. Stale
+  // task file pruning still runs (always safe — only old-mtime files match).
+  if (cleanupPhase === 'sprint-end' && existsSync(tasksDir)) {
     for (const file of readdirSync(tasksDir).filter(f => TASK_FILE_EXTENSIONS.some(ext => f.endsWith(ext)))) {
       try { unlinkSync(join(tasksDir, file)); } catch (e) { debugLog('cleanup:unlinkTaskFile', e); }
     }
@@ -315,9 +320,13 @@ export function cleanup(
     }
   }
 
+  // Sprint 157 hot fix (2026-05-12): also clean up .spawnlock files written by
+  // Sprint 156 acquireSpawnLocks. Previously only .lock extension was cleaned,
+  // leaving orphan .spawnlock files that blocked next sprint's spawn-time locks
+  // when the Brain runner crashed mid-sprint without releasing them.
   const locksDir = join(projectRoot, LOCKS_DIR);
   if (existsSync(locksDir)) {
-    for (const file of readdirSync(locksDir).filter(f => f.endsWith('.lock'))) {
+    for (const file of readdirSync(locksDir).filter(f => f.endsWith('.lock') || f.endsWith('.spawnlock'))) {
       try { unlinkSync(join(locksDir, file)); } catch (e) { debugLog('cleanup:unlinkLockFile', e); }
     }
   }

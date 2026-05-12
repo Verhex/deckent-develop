@@ -10,7 +10,7 @@
 
 // ─── Node Builtins ─────────────────────────────────────────────────
 import {
-  readFileSync, writeFileSync, existsSync, readdirSync, statSync,
+  readFileSync, writeFileSync, existsSync, readdirSync, statSync, unlinkSync,
 } from 'node:fs';
 import { join } from 'node:path';
 
@@ -422,7 +422,12 @@ export async function runSpawnPhase(
       spawnAttempts++;
       if (spawnAttempts >= 2) {
         if (scanInterval) { clearInterval(scanInterval); scanInterval = null; }
-        try { cleanup(projectRoot, sprint); } catch (e) { debugLog('runSpawnPhase:cleanup', e); }
+        // Sprint 156 Task 4 follow-up (Sprint 157 hot fix, 2026-05-12):
+        // Spawn-fail path: pass 'spawn-fail' so cleanup preserves task .json/.plan/.hb
+        // and .prompt-*/.worker-*.sh tmpfiles for post-mortem. Default 'sprint-end'
+        // would archive prompts/worker scripts AND unlink TASK_FILE_EXTENSIONS, which
+        // destroyed Sprint 158 forensic evidence (.tasks/ wiped on lock conflict).
+        try { cleanup(projectRoot, sprint, undefined, 'spawn-fail'); } catch (e) { debugLog('runSpawnPhase:cleanup', e); }
         const hint = buildSpawnRetryHint(err, sprint);
         throw new BrainError(
           `Spawn phase failed after retry: ${err instanceof Error ? err.message : String(err)}. Hint: ${hint}`,
@@ -436,12 +441,131 @@ export async function runSpawnPhase(
 }
 
 
-// ═══ Phase 4: EVALUATE ════════════════════════════════════════════
+// ═══ Phase 4: EVALUATE — Idempotency Guard (Sprint 157 — Task 002) ══
+// Mutex/idempotency for runEvaluatePhase. Two known race triggers:
+//   1. fix_phase_timeout batch: parallel/retry callers may re-enter
+//      evaluation pipeline before the first call's evaluations Map
+//      mutations and side-effects (handleEvaluation, cascade events,
+//      afterTask hooks) complete.
+//   2. Reconcile/resume path: a resumed sprint may invoke
+//      runEvaluatePhase a second time on already-evaluated tasks.
+// Both surface as duplicate handleEvaluation debt-table writes and
+// duplicate BRAIN→*:DEPENDENCY_CASCADE_APPLIED events (Sprint 156
+// dogfood evidence).
+//
+// Strategy: PID-bound lock file at
+// `.deckent/<sprintId>-evaluate-lock`. Second concurrent call sees the
+// live lock and early-returns as NO_OP. Stale locks (process gone) are
+// reclaimed automatically. Fail-safe: any lock I/O error falls through
+// rather than blocking evaluation.
+
+interface EvaluateLockPayload {
+  pid: number;
+  startedAt: string;
+  sprintId: string;
+}
+
+/** Resolve the evaluate-lock file path for a sprint. */
+function evaluateLockPath(projectRoot: string, sprintId: string): string {
+  return join(projectRoot, DECKENT_DIR, `${sprintId}-evaluate-lock`);
+}
+
+/**
+ * Returns true if a process with `pid` is alive.
+ * `process.kill(pid, 0)` signals nothing but throws ESRCH if the
+ * process is gone. Fail-safe: any unexpected error → treat as alive
+ * (conservative — better to no-op than double-evaluate).
+ */
+function isPidAlive(pid: number): boolean {
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (e) {
+    const err = e as NodeJS.ErrnoException;
+    if (err.code === 'ESRCH') return false;
+    // EPERM means the process exists but we lack permission to signal.
+    if (err.code === 'EPERM') return true;
+    debugLog('isPidAlive', e);
+    return true;
+  }
+}
+
+/**
+ * Attempt to acquire the evaluate lock for the given sprint.
+ * Returns true on success (caller proceeds), false if a live lock from
+ * another in-flight call exists (caller must NO_OP early-return).
+ *
+ * Stale locks (whose PID is no longer alive) are reclaimed.
+ * Same-PID re-entry returns false to prevent recursion within the same
+ * process.
+ *
+ * Fail-safe: any I/O error falls through to `true` so transient
+ * filesystem problems do not block legitimate evaluation runs.
+ */
+function tryAcquireEvaluateLock(projectRoot: string, sprintId: string): boolean {
+  const lockPath = evaluateLockPath(projectRoot, sprintId);
+  try {
+    if (existsSync(lockPath)) {
+      let payload: EvaluateLockPayload | null = null;
+      try {
+        payload = JSON.parse(readFileSync(lockPath, 'utf-8')) as EvaluateLockPayload;
+      } catch (e) {
+        debugLog('tryAcquireEvaluateLock:parse', e);
+      }
+      if (payload && typeof payload.pid === 'number') {
+        if (payload.pid === process.pid) {
+          // Same-PID re-entry — second call within the same process is a NO_OP.
+          return false;
+        }
+        if (isPidAlive(payload.pid)) {
+          // Live lock held by another process — second call is a NO_OP.
+          return false;
+        }
+        // Stale lock — owner process is gone. Reclaim by overwriting.
+        debugLog('tryAcquireEvaluateLock:reclaim-stale', `pid=${payload.pid} dead`);
+      }
+    }
+    const newPayload: EvaluateLockPayload = {
+      pid: process.pid,
+      startedAt: now(),
+      sprintId,
+    };
+    writeFileSync(lockPath, JSON.stringify(newPayload), 'utf-8');
+    return true;
+  } catch (e) {
+    debugLog('tryAcquireEvaluateLock', e);
+    // Fail-safe: if we can't manage the lock file, allow evaluation.
+    return true;
+  }
+}
+
+/**
+ * Release the evaluate lock for the given sprint. Fail-safe: any I/O
+ * error is swallowed (debugLog only) — a stuck lock will be reclaimed
+ * by the next call's stale-PID check.
+ */
+function releaseEvaluateLock(projectRoot: string, sprintId: string): void {
+  const lockPath = evaluateLockPath(projectRoot, sprintId);
+  try {
+    if (existsSync(lockPath)) {
+      unlinkSync(lockPath);
+    }
+  } catch (e) { debugLog('releaseEvaluateLock', e); }
+}
 
 /**
  * Run the EVALUATE phase: evaluate each task result, run CI regression checks,
  * handle debt, and run afterTask hooks.
  * Mutates `sprint` (status, phase) and `evaluations` (Map entries) in place.
+ *
+ * Sprint 157 Task 002 — Dual-Evaluator Race Close (Bug X):
+ * Idempotency guard via PID-bound lock file
+ * `.deckent/<sprintId>-evaluate-lock`. If a live evaluation is already
+ * in flight for this sprint (different PID OR same PID re-entry),
+ * subsequent calls early-return as NO_OP — the evaluations Map and
+ * side-effects (handleEvaluation, cascade events, afterTask hooks) run
+ * exactly once per sprint per process boundary.
  */
 export async function runEvaluatePhase(
   projectRoot: string,
@@ -450,6 +574,13 @@ export async function runEvaluatePhase(
   evaluations: Map<string, TaskEvaluation>,
   _coverageThreshold = 90,
 ): Promise<void> {
+  // ─── Idempotency Guard (Sprint 157 Task 002) ───────────────────
+  // Acquire PID-bound lock; if a live evaluation is already running
+  // for this sprint, second call is a NO_OP.
+  if (!tryAcquireEvaluateLock(projectRoot, sprint.id)) {
+    debugLog('runEvaluatePhase:noop', `lock held — sprint=${sprint.id} pid=${process.pid}`);
+    return;
+  }
   try {
     sprint.status = SprintStatus.EVALUATING;
     sprint.phase = SprintPhase.EVALUATE;
@@ -621,6 +752,12 @@ export async function runEvaluatePhase(
     } catch (e) { debugLog('runEvaluatePhase:cascadeWire', e); }
   } catch (err) {
     safeDashboardUpdate(projectRoot, sprint, `Phase ${sprint.phase} error: ${err instanceof Error ? err.message : String(err)}`);
+  } finally {
+    // Release idempotency lock so a future legitimate runEvaluatePhase
+    // call (e.g., post-FIX re-evaluation in a separate orchestration
+    // pass) is not blocked by a stale lock file. Stale-PID reclaim is
+    // the safety net if this branch is skipped due to a hard crash.
+    releaseEvaluateLock(projectRoot, sprint.id);
   }
 }
 

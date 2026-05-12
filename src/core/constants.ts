@@ -20,6 +20,11 @@ export const PLUGINS_DIR = join(DECKENT_DIR, 'plugins');
 export const I18N_DIR = join(DECKENT_DIR, 'i18n');
 export const JOBS_DIR = join(DECKENT_DIR, 'jobs');
 export const DECISIONS_LOG_DIR = join(DECKENT_DIR, 'decisions');
+// Sprint 157 T-001: per-attempt forensic record of every Brain evaluation
+// decision. Layout: <EVALUATIONS_DIR>/<sprintId>/<taskId>-attempt-<N>.json
+// (see src/orchestra/evaluation-audit-trail.ts). Auditor-readable, append-
+// only (overwrites at the same attemptNum slot).
+export const EVALUATIONS_DIR = join(DECKENT_DIR, 'evaluations');
 export const DOCS_CONFIG_FILE = join(DECKENT_DIR, 'docs.json');
 export const MEMORY_DB_FILE = 'memory.db' as const;
 export const MEMORY_EXPORTS_DIR = 'exports' as const;
