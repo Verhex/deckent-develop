@@ -2,7 +2,8 @@
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { DECKENT_VERSION, DECKENT_DIR } from '../core/constants.js';
 import { registerTools } from './tools/index.js';
 import { registerResources } from './resources/index.js';
@@ -11,6 +12,14 @@ import { CliNotificationAdapter } from '../core/notify-adapters/cli-adapter.js';
 import { FileNotificationAdapter } from '../core/notify-adapters/file-adapter.js';
 import { NotifyDispatcher } from '../core/notification-dispatcher.js';
 import { setGlobalNotifyDispatcher } from '../core/notify-registry.js';
+import {
+  acquireSingletonLock,
+  releaseSingletonLock,
+  SingletonLockError,
+  type LockHandle,
+} from './server-singleton-lock.js';
+
+const MCP_SERVER_PID_FILE = 'mcp-server.pid' as const;
 
 export const DECKENT_MCP_INSTRUCTIONS = `
 Deckent is an AI agent orchestration CLI that runs multi-agent sprints inside your project.
@@ -149,13 +158,67 @@ export function createServer(): McpServer {
   return server;
 }
 
+export function bootSingletonGuard(projectRoot: string): LockHandle {
+  const lockPath = join(projectRoot, DECKENT_DIR, MCP_SERVER_PID_FILE);
+  try {
+    const handle = acquireSingletonLock(lockPath);
+    installSingletonReleaseHooks(handle);
+    return handle;
+  } catch (err) {
+    if (err instanceof SingletonLockError) {
+      process.stderr.write(
+        `deckent-mcp: refused to start — singleton lock held by pid=${err.ownerPid ?? 'unknown'} (${lockPath})\n`,
+      );
+    } else {
+      process.stderr.write(
+        `deckent-mcp: singleton guard failed: ${err instanceof Error ? err.message : String(err)}\n`,
+      );
+    }
+    process.exit(2);
+  }
+}
+
+let singletonReleaseHooksInstalled = false;
+
+function installSingletonReleaseHooks(handle: LockHandle): void {
+  if (singletonReleaseHooksInstalled) return;
+  singletonReleaseHooksInstalled = true;
+
+  const release = (): void => {
+    try {
+      releaseSingletonLock(handle);
+    } catch {
+      // best-effort: never throw from exit/signal hooks
+    }
+  };
+
+  process.on('exit', release);
+
+  process.on('SIGTERM', () => {
+    release();
+    process.exit(0);
+  });
+
+  process.on('SIGINT', () => {
+    release();
+    process.exit(0);
+  });
+}
+
 async function main(): Promise<void> {
+  bootSingletonGuard(process.cwd());
   const server = createServer();
   const transport = new StdioServerTransport();
   await server.connect(transport);
 }
 
-main().catch((err: unknown) => {
-  process.stderr.write(`deckent-mcp error: ${err instanceof Error ? err.message : String(err)}\n`);
-  process.exit(1);
-});
+const isEntryPoint =
+  process.argv[1] !== undefined &&
+  resolve(fileURLToPath(import.meta.url)) === resolve(process.argv[1]);
+
+if (isEntryPoint) {
+  main().catch((err: unknown) => {
+    process.stderr.write(`deckent-mcp error: ${err instanceof Error ? err.message : String(err)}\n`);
+    process.exit(1);
+  });
+}

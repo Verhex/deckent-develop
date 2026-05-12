@@ -5,7 +5,7 @@
 // Sprint 140+ will add mid-worker resume and heartbeat daemon integration.
 // Sprint 145+ will add external state store.
 
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, renameSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { DECKENT_DIR, TASKS_DIR } from '../core/constants.js';
@@ -101,11 +101,56 @@ function incrementCheckpointCounter(projectRoot: string, sprintId: string): numb
   return next;
 }
 
+// ─── Event Stream Offset (Sprint 161 T-002) ──────────────────────────
+
+/**
+ * Compute the current event stream offset by scanning `<sprintId>-events.jsonl`
+ * and returning the maximum `sequence` field across all valid JSON lines.
+ *
+ * Source-of-truth: the on-disk event stream itself, not an in-memory counter.
+ * Fail-safe: missing file, empty file, or unreadable file all return 0.
+ *
+ * @param projectRoot - Project root directory
+ * @param sprintId - Sprint identifier (e.g. "sprint-160")
+ * @returns Highest observed sequence number, or 0 if unavailable
+ */
+export function computeEventStreamOffset(
+  projectRoot: string,
+  sprintId: string,
+): number {
+  const filePath = join(projectRoot, DECKENT_DIR, `${sprintId}-events.jsonl`);
+  if (!existsSync(filePath)) return 0;
+  try {
+    const raw = readFileSync(filePath, 'utf-8');
+    if (raw.trim().length === 0) return 0;
+    let max = 0;
+    for (const line of raw.split('\n')) {
+      const trimmed = line.trim();
+      if (trimmed.length === 0) continue;
+      try {
+        const evt = JSON.parse(trimmed) as { sequence?: number };
+        if (typeof evt.sequence === 'number' && evt.sequence > max) {
+          max = evt.sequence;
+        }
+      } catch {
+        // Skip malformed lines — partial writes happen at the tail
+      }
+    }
+    return max;
+  } catch (e) {
+    debugLog('sprint-checkpoint:computeEventStreamOffset', e);
+    return 0;
+  }
+}
+
 // ─── Core API ────────────────────────────────────────────────────────
 
 /**
  * Write a checkpoint for the given sprint state.
  * Fail-safe: write errors are logged but do not crash the sprint.
+ *
+ * Atomic rename: writes to `<path>.tmp` then `renameSync()` to final path so
+ * a crash mid-write never leaves a half-serialized checkpoint.json.
  *
  * @param projectRoot - Project root directory
  * @param sprint - Current sprint state
@@ -127,6 +172,10 @@ export function writeCheckpoint(
       .filter(t => isTerminalStatus(t.status))
       .map(t => t.id);
 
+    // Pending: never-started tasks. EXECUTING/CLAIMED tasks are tracked
+    // separately in `activeWorkers` so the three sets stay disjoint.
+    // Resume logic should union pendingTasks ∪ activeWorkers.taskId to get
+    // the full set of non-terminal work.
     const pendingTasks = sprint.tasks
       .filter(t => t.status === TaskStatus.PENDING)
       .map(t => t.id);
@@ -158,8 +207,16 @@ export function writeCheckpoint(
       persistDependencyGraph(projectRoot, sprint.id, graph);
     }
 
+    // Atomic write: tmp → rename. Cleans up tmp on rename failure.
     const filePath = checkpointPath(projectRoot, sprint.id);
-    writeFileSync(filePath, JSON.stringify(checkpoint, null, 2), 'utf-8');
+    const tmpPath = `${filePath}.tmp`;
+    writeFileSync(tmpPath, JSON.stringify(checkpoint, null, 2), 'utf-8');
+    try {
+      renameSync(tmpPath, filePath);
+    } catch (renameErr) {
+      try { if (existsSync(tmpPath)) unlinkSync(tmpPath); } catch { /* ignore */ }
+      throw renameErr;
+    }
     debugLog('sprint-checkpoint:write', `Checkpoint #${checkpointNumber} written for ${sprint.id}`);
     return checkpoint;
   } catch (e) {
@@ -350,16 +407,43 @@ export function detectStaleWorkers(
 /**
  * Convenience: write a checkpoint at a phase transition boundary.
  * Wraps writeCheckpoint with phase-specific logging.
+ *
+ * Sprint 161 T-002: caller no longer has to pass the event stream offset.
+ * If `eventStreamOffset` is omitted or 0, the offset is computed from the
+ * on-disk events.jsonl (source of truth) so the checkpoint reflects real
+ * progress even when callers forget to thread the counter.
+ *
+ * The `brainPhase` parameter is explicit and authoritative — callers can
+ * pass `sprint.phase` for the current transition. It is set on the resulting
+ * checkpoint via the temporary phase swap below (avoids requiring writeCheckpoint
+ * to learn about an extra parameter for backward compatibility).
  */
 export function writePhaseCheckpoint(
   projectRoot: string,
   sprint: Sprint,
-  phase: SprintPhase,
-  eventStreamOffset: number = 0,
+  brainPhase: SprintPhase,
+  eventStreamOffset?: number,
   graph?: DependencyGraph,
 ): SprintCheckpoint | null {
-  debugLog('sprint-checkpoint:phaseTransition', `Phase ${String(phase)} → writing checkpoint`);
-  return writeCheckpoint(projectRoot, sprint, eventStreamOffset, graph);
+  debugLog('sprint-checkpoint:phaseTransition', `Phase ${String(brainPhase)} → writing checkpoint`);
+
+  const offset = (typeof eventStreamOffset === 'number' && eventStreamOffset > 0)
+    ? eventStreamOffset
+    : computeEventStreamOffset(projectRoot, sprint.id);
+
+  // Reflect the authoritative brainPhase on the sprint object passed to writeCheckpoint
+  // without mutating the caller's state permanently.
+  const originalPhase = sprint.phase;
+  if (brainPhase !== originalPhase) {
+    sprint.phase = brainPhase;
+  }
+  try {
+    return writeCheckpoint(projectRoot, sprint, offset, graph);
+  } finally {
+    if (brainPhase !== originalPhase) {
+      sprint.phase = originalPhase;
+    }
+  }
 }
 
 /**
