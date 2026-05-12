@@ -4292,3 +4292,39 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 156-015: Sprint 156 Retrospective + Build Impact Plan (DONE)
 
 ---
+## Sprint 159 — sprint-159
+
+**Status:** COMPLETE
+**Date:** 2026-05-12
+**Duration:** 0s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 15 |
+| Completed | 2 |
+| Tech Debt | 2 |
+| No-Go | 13 |
+| Coverage | NaN% |
+| Duration | -106ms |
+
+### Tasks
+
+- 159-001: EvaluationAuditTrail Foundation (GO_WITH_TECH_DEBT)
+- 159-002: Dual-Evaluator Race Close (Bug X) (GO_WITH_TECH_DEBT)
+- 159-003: Sprint-Stall Fix-Fix Spawn Loop (NO_GO)
+- 159-004: handleEvaluation → updateTaskStatus Wire (NO_GO)
+- 159-005: Heartbeat Write Atomicity (NO_GO)
+- 159-006: sprint-state.json Phase Transition Update (NO_GO)
+- 159-007: scoreTestCoverage null Neutral Score (NO_GO)
+- 159-008: AUDIT_RUBRIC Dinamik Threshold (NO_GO)
+- 159-009: Retro Naming Off-By-One Fix (NO_GO)
+- 159-010: sprint-phases.ts cleanup 'spawn-fail' Argument (NO_GO)
+- 159-011: DeckentConfig dependency_pipeline_enabled Field (NO_GO)
+- 159-012: Per-Change Security Review (NO_GO)
+- 159-013: 2 Yeni ADR Draft (NO_GO)
+- 159-014: EvaluationAuditTrail E2E Smoke Test (NO_GO)
+- 159-015: Sprint 157 Retro + Bug Close Forensic (NO_GO)
+
+---

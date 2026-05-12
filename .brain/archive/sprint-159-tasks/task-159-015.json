@@ -1,0 +1,83 @@
+{
+  "id": "159-015",
+  "title": "Sprint 157 Retro + Bug Close Forensic",
+  "description": "Sprint 157 Retro + Bug Close Forensic\n- Model: sonnet\n- Effort: low\n- Skills: documentation-writer\n- Files: docs/audits/sprint-157/T-015-retro-bug-close.md\n- Scope: docs/audits/sprint-157/\n\n### Description\nSprint 157 retrospective: Sprint 156'nın canlı kanıtladığı 3 major + 6 bonus bug'ın close kanıtları. EvaluationAuditTrail Sprint 158+ baseline. Dogfood meta-evidence (Sprint 157 kendisi de Brain stuck olursa yeni `.deckent/evaluations/*.json`'da görünür). ≥500 kelime.",
+  "model": "sonnet",
+  "effort": "low",
+  "priority": "NORMAL",
+  "reason": "Directive (model: sonnet -- user override)",
+  "scope": {
+    "directories": [
+      "docs/audits/sprint-157/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "docs/audits/sprint-157/T-015-retro-bug-close.md",
+      ".json"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean",
+    "noGoCriteria": "Build fails or tests fail",
+    "techDebtAcceptable": "Minor style issues if tests pass"
+  },
+  "status": "PENDING",
+  "sprintId": "sprint-159",
+  "forceModel": "sonnet",
+  "forceEffort": "low",
+  "forceSkills": [
+    "documentation-writer"
+  ],
+  "assignedAgent": "doc-writer",
+  "assignedSkills": [
+    "documentation-writer"
+  ],
+  "createdAt": "2026-05-12T15:44:41.208Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "documentation",
+        "secondary": [],
+        "confidence": 0.95
+      },
+      "tags": [],
+      "domains": [
+        {
+          "name": "docs",
+          "weight": 0.67
+        }
+      ],
+      "operations": [
+        {
+          "type": "document",
+          "weight": 0.5
+        },
+        {
+          "type": "test",
+          "weight": 0.25
+        },
+        {
+          "type": "create",
+          "weight": 0.25
+        }
+      ],
+      "complexity": {
+        "fileCount": 2,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "small"
+      },
+      "scope": {
+        "writeRatio": {
+          "docs/": 0.5,
+          "./": 0.5
+        },
+        "primaryWriteTarget": "docs/",
+        "testWriteRatio": 0
+      }
+    },
+    "confidence": "high",
+    "routingVersion": "v2"
+  }
+}

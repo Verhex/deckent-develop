@@ -1,0 +1,90 @@
+{
+  "id": "159-009",
+  "title": "Retro Naming Off-By-One Fix",
+  "description": "Retro Naming Off-By-One Fix\n- Model: opus\n- Effort: low\n- Skills: typescript-expert\n- Files: src/orchestra/sprint-lifecycle.ts, tests/orchestra/retro-naming.test.ts\n- Scope: src/orchestra/, tests/orchestra/\n\n### Description\n`retro-sprint-N.md` GERÇEKTEN sprint N retro'sunu içersin. Mevcut bug: sprint N CLEANUP'ında write yapılırken filename sprint N+1 alıyor (off-by-one). Naming: `retro-sprint-${sprint.id}.md` (sprint.id current sprint). Test: sprint 200 CLEANUP → retro-sprint-200.md sprint 200 metrikleri.\n\n---",
+  "model": "opus",
+  "effort": "low",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "src/orchestra/",
+      "tests/orchestra/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/orchestra/sprint-lifecycle.ts",
+      "tests/orchestra/retro-naming.test.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean",
+    "noGoCriteria": "Build fails or tests fail",
+    "techDebtAcceptable": "Minor style issues if tests pass"
+  },
+  "status": "PENDING",
+  "sprintId": "sprint-159",
+  "forceModel": "opus",
+  "forceEffort": "low",
+  "forceSkills": [
+    "typescript-expert"
+  ],
+  "assignedAgent": "temp-react-ts-specialist",
+  "assignedSkills": [
+    "typescript-expert"
+  ],
+  "createdAt": "2026-05-12T15:44:41.207Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "implementation",
+        "secondary": [],
+        "confidence": 0.79
+      },
+      "tags": [
+        "test-coverage"
+      ],
+      "domains": [
+        {
+          "name": "orchestra",
+          "weight": 1
+        }
+      ],
+      "operations": [
+        {
+          "type": "modify",
+          "weight": 0.25
+        },
+        {
+          "type": "delete",
+          "weight": 0.25
+        },
+        {
+          "type": "test",
+          "weight": 0.25
+        },
+        {
+          "type": "create",
+          "weight": 0.25
+        }
+      ],
+      "complexity": {
+        "fileCount": 2,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "small"
+      },
+      "scope": {
+        "writeRatio": {
+          "src/": 0.5,
+          "tests/": 0.5
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0.5
+      }
+    },
+    "confidence": "low",
+    "routingVersion": "v2"
+  }
+}

@@ -1,0 +1,87 @@
+{
+  "id": "159-004",
+  "title": "handleEvaluation → updateTaskStatus Wire",
+  "description": "handleEvaluation → updateTaskStatus Wire\n- Model: opus\n- Effort: normal\n- Skills: typescript-expert\n- Files: src/orchestra/debt-manager.ts, src/orchestra/sprint-phases.ts, tests/orchestra/task-status-update.test.ts\n- Scope: src/orchestra/, tests/orchestra/\n\n### Description\n`handleEvaluation(task, evaluation, result)` içinde fix workers ve orig workers için her durumda `updateTaskStatus(taskId, TaskStatus.DONE | GO_WITH_TECH_DEBT | NO_GO)` çağrılsın. Mevcut: sadece NO_GO yolunda updateTaskStatus(NO_GO) çağrılıyor, DONE/TECH_DEBT path'lerinde unutulmuş. Test: orig task DONE → status updated, fix task DONE → status updated, both paths.\n\n---",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "src/orchestra/",
+      "tests/orchestra/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/orchestra/debt-manager.ts",
+      "src/orchestra/sprint-phases.ts",
+      "tests/orchestra/task-status-update.test.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean",
+    "noGoCriteria": "Build fails or tests fail",
+    "techDebtAcceptable": "Minor style issues if tests pass"
+  },
+  "status": "PENDING",
+  "sprintId": "sprint-159",
+  "forceModel": "opus",
+  "forceEffort": "normal",
+  "forceSkills": [
+    "typescript-expert"
+  ],
+  "assignedAgent": "temp-react-ts-specialist",
+  "assignedSkills": [
+    "typescript-expert"
+  ],
+  "createdAt": "2026-05-12T15:44:41.207Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "implementation",
+        "secondary": [],
+        "confidence": 0.65
+      },
+      "tags": [
+        "test-coverage"
+      ],
+      "domains": [
+        {
+          "name": "orchestra",
+          "weight": 1
+        }
+      ],
+      "operations": [
+        {
+          "type": "modify",
+          "weight": 0.5
+        },
+        {
+          "type": "test",
+          "weight": 0.25
+        },
+        {
+          "type": "create",
+          "weight": 0.25
+        }
+      ],
+      "complexity": {
+        "fileCount": 3,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "medium"
+      },
+      "scope": {
+        "writeRatio": {
+          "src/": 0.67,
+          "tests/": 0.33
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0.33
+      }
+    },
+    "confidence": "low",
+    "routingVersion": "v2"
+  }
+}

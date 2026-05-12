@@ -1,0 +1,89 @@
+{
+  "id": "159-012",
+  "title": "Per-Change Security Review",
+  "description": "Per-Change Security Review\n- Model: sonnet\n- Effort: normal\n- Skills: security-specialist, documentation-writer\n- Files: docs/security/sprint-157-review.md\n- Scope: docs/security/\n\n### Description\nSprint 157 production task'ları (1-11) için per-change threat model + mitigation. EvaluationAuditTrail PII (notes) içerebilir — retention class belirtilmeli. HB atomic write race window kalıntısı analizi. ADR Lite style. ≥800 kelime.\n\n---",
+  "model": "sonnet",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive (model: sonnet -- user override)",
+  "scope": {
+    "directories": [
+      "docs/security/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "docs/security/sprint-157-review.md"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean",
+    "noGoCriteria": "Build fails or tests fail",
+    "techDebtAcceptable": "Minor style issues if tests pass"
+  },
+  "status": "PENDING",
+  "sprintId": "sprint-159",
+  "forceModel": "sonnet",
+  "forceEffort": "normal",
+  "forceSkills": [
+    "security-specialist",
+    "documentation-writer"
+  ],
+  "assignedAgent": "doc-writer",
+  "assignedSkills": [
+    "security-specialist",
+    "documentation-writer"
+  ],
+  "createdAt": "2026-05-12T15:44:41.208Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "documentation",
+        "secondary": [
+          "security"
+        ],
+        "confidence": 0.95
+      },
+      "tags": [],
+      "domains": [
+        {
+          "name": "docs",
+          "weight": 1
+        }
+      ],
+      "operations": [
+        {
+          "type": "document",
+          "weight": 0.4
+        },
+        {
+          "type": "modify",
+          "weight": 0.2
+        },
+        {
+          "type": "test",
+          "weight": 0.2
+        },
+        {
+          "type": "create",
+          "weight": 0.2
+        }
+      ],
+      "complexity": {
+        "fileCount": 1,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "trivial"
+      },
+      "scope": {
+        "writeRatio": {
+          "docs/": 1
+        },
+        "primaryWriteTarget": "docs/",
+        "testWriteRatio": 0
+      }
+    },
+    "confidence": "high",
+    "routingVersion": "v2"
+  }
+}

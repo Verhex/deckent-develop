@@ -1,0 +1,93 @@
+{
+  "id": "159-014",
+  "title": "EvaluationAuditTrail E2E Smoke Test",
+  "description": "EvaluationAuditTrail E2E Smoke Test\n- Model: opus\n- Effort: normal\n- Skills: typescript-expert, ci-testing\n- Files: tests/orchestra/evaluation-audit-trail-e2e.test.ts\n- Scope: tests/orchestra/\n\n### Description\nEnd-to-end test: 5 mock task evaluate edilir (doc-write 2 + audit 1 + code 2). Her birinin `.deckent/evaluations/<sprint>/<task>.json` doğru yazıldığını + criterionScores breakdown'un decisionRationale ile uyumlu olduğunu doğrula. tmpdir kullan, cleanup. Test: 5 senaryo per task tipi.\n\n---",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "tests/orchestra/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "tests/orchestra/evaluation-audit-trail-e2e.test.ts",
+      ".json"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean",
+    "noGoCriteria": "Build fails or tests fail",
+    "techDebtAcceptable": "Minor style issues if tests pass"
+  },
+  "status": "PENDING",
+  "sprintId": "sprint-159",
+  "forceModel": "opus",
+  "forceEffort": "normal",
+  "forceSkills": [
+    "typescript-expert",
+    "ci-testing"
+  ],
+  "assignedAgent": "temp-react-ts-specialist",
+  "assignedSkills": [
+    "typescript-expert",
+    "ci-testing"
+  ],
+  "createdAt": "2026-05-12T15:44:41.208Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "implementation",
+        "secondary": [
+          "documentation"
+        ],
+        "confidence": 0.92
+      },
+      "tags": [
+        "test-coverage"
+      ],
+      "domains": [
+        {
+          "name": "orchestra",
+          "weight": 0.67
+        }
+      ],
+      "operations": [
+        {
+          "type": "delete",
+          "weight": 0.25
+        },
+        {
+          "type": "test",
+          "weight": 0.25
+        },
+        {
+          "type": "document",
+          "weight": 0.25
+        },
+        {
+          "type": "create",
+          "weight": 0.25
+        }
+      ],
+      "complexity": {
+        "fileCount": 2,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "small"
+      },
+      "scope": {
+        "writeRatio": {
+          "tests/": 0.5,
+          "./": 0.5
+        },
+        "primaryWriteTarget": "tests/",
+        "testWriteRatio": 0.5
+      }
+    },
+    "confidence": "low",
+    "routingVersion": "v2"
+  }
+}

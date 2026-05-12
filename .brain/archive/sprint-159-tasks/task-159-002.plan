@@ -1,0 +1,40 @@
+# Task 159-002 Execution Plan
+
+## Discovery
+- `runEvaluatePhase` in src/orchestra/sprint-phases.ts ALREADY contains the
+  PID-bound idempotency guard (Sprint 157 T-002 survivor — commit 6c337b0).
+- Helpers in place: `evaluateLockPath`, `isPidAlive`, `tryAcquireEvaluateLock`,
+  `releaseEvaluateLock`. Lock file `.deckent/<sprintId>-evaluate-lock` is created
+  on entry and unlinked in a `finally` block.
+- Behavior verified by reading: same-PID re-entry → NO_OP; live other-PID → NO_OP;
+  stale-PID lock → reclaimed; fail-safe on I/O error.
+- Missing piece: `tests/orchestra/evaluate-phase-idempotency.test.ts` does NOT
+  exist. This task is the test write only — no source-code mutation.
+
+## Plan
+1. Create `tests/orchestra/evaluate-phase-idempotency.test.ts` with real-FS
+   tmpdir pattern (matching auto-archive.test.ts).
+2. Mock heavy dependencies of `runEvaluatePhase` (debt-manager, plugin-hooks,
+   result-evaluator, notify, event-stream, sprint-spawner, auditor) so the
+   tests focus on lock-file semantics, not full sprint orchestration.
+3. Write the canonical 2-parallel-call test plus stale-lock reclaim,
+   same-PID re-entry, lock release, and lock payload integrity tests.
+
+## Test Cases
+- T1: 2 parallel runEvaluatePhase calls — second is NO_OP, single result set
+       (handleEvaluation called exactly once per task across both calls).
+- T2: Same-PID re-entry (sequential within process) — second call NO_OP.
+- T3: Stale-lock reclaim — dead PID lock allows new caller to acquire.
+- T4: Live different-PID lock — new caller is NO_OP (simulated via real PID 1).
+- T5: Successful run releases lock — lock file unlinked after call completes.
+- T6: Lock payload integrity — file contains pid, startedAt, sprintId.
+
+## Files Touched
+- tests/orchestra/evaluate-phase-idempotency.test.ts (new)
+
+No source-code changes. The guard implementation is already correct and
+committed; only the regression test was missing.
+
+## Verify
+- `tsc --noEmit` on touched files only.
+- `npx vitest run tests/orchestra/evaluate-phase-idempotency.test.ts` — green.

@@ -1,0 +1,90 @@
+{
+  "id": "159-002",
+  "title": "Dual-Evaluator Race Close (Bug X)",
+  "description": "Dual-Evaluator Race Close (Bug X)\n- Model: opus\n- Effort: high\n- Skills: typescript-expert, system-architect\n- Files: src/orchestra/sprint-phases.ts, tests/orchestra/evaluate-phase-idempotency.test.ts\n- Scope: src/orchestra/, tests/orchestra/\n\n### Description\n`runEvaluatePhase` mutex/idempotency. Phase guard ekle: aynı sprint için runEvaluatePhase tekrar çağrılırsa second call no-op (early return). `.deckent/sprint-NNN-evaluate-lock` file (PID-bound). Race trigger root cause araştır (fix_phase_timeout batch trigger vs reconcile path). Test: 2 paralel runEvaluatePhase çağrısı, ikincisi NO_OP, single result set.\n\n---",
+  "model": "opus",
+  "effort": "high",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "src/orchestra/",
+      "tests/orchestra/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/orchestra/sprint-phases.ts",
+      "tests/orchestra/evaluate-phase-idempotency.test.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean",
+    "noGoCriteria": "Build fails or tests fail",
+    "techDebtAcceptable": "Minor style issues if tests pass"
+  },
+  "status": "EXECUTING",
+  "sprintId": "sprint-159",
+  "provider": "claude",
+  "forceModel": "opus",
+  "forceEffort": "high",
+  "forceSkills": [
+    "typescript-expert",
+    "system-architect"
+  ],
+  "assignedAgent": "temp-react-ts-specialist",
+  "assignedSkills": [
+    "typescript-expert",
+    "system-architect"
+  ],
+  "createdAt": "2026-05-12T15:44:41.207Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "implementation",
+        "secondary": [],
+        "confidence": 0.9
+      },
+      "tags": [
+        "test-coverage"
+      ],
+      "domains": [
+        {
+          "name": "orchestra",
+          "weight": 1
+        }
+      ],
+      "operations": [
+        {
+          "type": "modify",
+          "weight": 0.33
+        },
+        {
+          "type": "test",
+          "weight": 0.33
+        },
+        {
+          "type": "create",
+          "weight": 0.33
+        }
+      ],
+      "complexity": {
+        "fileCount": 2,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "small"
+      },
+      "scope": {
+        "writeRatio": {
+          "src/": 0.5,
+          "tests/": 0.5
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0.5
+      }
+    },
+    "confidence": "low",
+    "routingVersion": "v2"
+  },
+  "estimatedTokens": 1062
+}

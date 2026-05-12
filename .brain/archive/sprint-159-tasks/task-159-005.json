@@ -1,0 +1,92 @@
+{
+  "id": "159-005",
+  "title": "Heartbeat Write Atomicity",
+  "description": "Heartbeat Write Atomicity\n- Model: opus\n- Effort: normal\n- Skills: typescript-expert\n- Files: src/orchestra/spawn-backend-docker.ts, tests/orchestra/hb-atomic-write.test.ts\n- Scope: src/orchestra/, tests/orchestra/\n\n### Description\nHB write atomic pattern: önce `.hb.tmp` yaz, sonra `rename .hb.tmp .hb`. POSIX rename atomic. Concurrent multi-writer'a karşı: HB writer single-PID, başka process yazmaya çalışırsa lock fail. Test: 2 concurrent HB write simulation, atomic visibility check.\n\n---",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "src/orchestra/",
+      "tests/orchestra/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/orchestra/spawn-backend-docker.ts",
+      "tests/orchestra/hb-atomic-write.test.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean",
+    "noGoCriteria": "Build fails or tests fail",
+    "techDebtAcceptable": "Minor style issues if tests pass"
+  },
+  "status": "PENDING",
+  "sprintId": "sprint-159",
+  "forceModel": "opus",
+  "forceEffort": "normal",
+  "forceSkills": [
+    "typescript-expert"
+  ],
+  "assignedAgent": "temp-react-ts-specialist",
+  "assignedSkills": [
+    "typescript-expert"
+  ],
+  "createdAt": "2026-05-12T15:44:41.207Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "implementation",
+        "secondary": [
+          "documentation"
+        ],
+        "confidence": 0.79
+      },
+      "tags": [
+        "test-coverage"
+      ],
+      "domains": [
+        {
+          "name": "orchestra",
+          "weight": 1
+        }
+      ],
+      "operations": [
+        {
+          "type": "rename",
+          "weight": 0.25
+        },
+        {
+          "type": "test",
+          "weight": 0.25
+        },
+        {
+          "type": "document",
+          "weight": 0.25
+        },
+        {
+          "type": "create",
+          "weight": 0.25
+        }
+      ],
+      "complexity": {
+        "fileCount": 2,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "small"
+      },
+      "scope": {
+        "writeRatio": {
+          "src/": 0.5,
+          "tests/": 0.5
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0.5
+      }
+    },
+    "confidence": "low",
+    "routingVersion": "v2"
+  }
+}

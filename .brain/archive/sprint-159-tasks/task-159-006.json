@@ -1,0 +1,91 @@
+{
+  "id": "159-006",
+  "title": "sprint-state.json Phase Transition Update",
+  "description": "sprint-state.json Phase Transition Update\n- Model: opus\n- Effort: normal\n- Skills: typescript-expert\n- Files: src/orchestra/sprint-phases.ts, src/orchestra/sprint-state-manager.ts, tests/orchestra/sprint-state-update.test.ts\n- Scope: src/orchestra/, tests/orchestra/\n\n### Description\n`SPRINT_PHASE_CHANGE` event yayınlandığında sprint-state.json `phase` + `updatedAt` field'ları write edilir. Mevcut: sprint başlangıcında bir kez yazılıyor, sonra freeze. Yeni: phase her değiştiğinde update. `sprint-state-manager.ts` yeni dosya — read/write encapsulate. Test: 3 phase transition (EXECUTE→EVALUATE→RETRO→CLEANUP) → state.json 3 update.\n\n---",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "src/orchestra/",
+      "tests/orchestra/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/orchestra/sprint-phases.ts",
+      "src/orchestra/sprint-state-manager.ts",
+      "tests/orchestra/sprint-state-update.test.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean",
+    "noGoCriteria": "Build fails or tests fail",
+    "techDebtAcceptable": "Minor style issues if tests pass"
+  },
+  "status": "PENDING",
+  "sprintId": "sprint-159",
+  "forceModel": "opus",
+  "forceEffort": "normal",
+  "forceSkills": [
+    "typescript-expert"
+  ],
+  "assignedAgent": "temp-react-ts-specialist",
+  "assignedSkills": [
+    "typescript-expert"
+  ],
+  "createdAt": "2026-05-12T15:44:41.207Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "implementation",
+        "secondary": [],
+        "confidence": 0.81
+      },
+      "tags": [
+        "test-coverage"
+      ],
+      "domains": [
+        {
+          "name": "orchestra",
+          "weight": 1
+        }
+      ],
+      "operations": [
+        {
+          "type": "modify",
+          "weight": 0.4
+        },
+        {
+          "type": "delete",
+          "weight": 0.2
+        },
+        {
+          "type": "test",
+          "weight": 0.2
+        },
+        {
+          "type": "create",
+          "weight": 0.2
+        }
+      ],
+      "complexity": {
+        "fileCount": 3,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "medium"
+      },
+      "scope": {
+        "writeRatio": {
+          "src/": 0.67,
+          "tests/": 0.33
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0.33
+      }
+    },
+    "confidence": "low",
+    "routingVersion": "v2"
+  }
+}

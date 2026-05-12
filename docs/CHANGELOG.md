@@ -6,6 +6,17 @@ Bu projedeki tüm önemli değişiklikler bu dosyada belgelenmektedir.
 Format [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) standardına dayanır
 ve proje [Semantic Versioning](https://semver.org/spec/v2.0.0.html) kurallarına uyar.
 
+## [1.0.0-beta.1-sprint159] - 2026-05-12
+
+
+### Changed
+
+- EvaluationAuditTrail Foundation (completed with tech debt)
+- Dual-Evaluator Race Close (Bug X) (completed with tech debt)
+
+
+_Tasks: 15 total, 2 done, 2 tech debt, 13 no-go_
+
 ## [1.0.0-beta.1-sprint156] - 2026-05-12
 
 ### Added

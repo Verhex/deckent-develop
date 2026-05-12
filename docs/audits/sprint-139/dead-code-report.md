@@ -75,7 +75,7 @@ These suspects turned out to be actively used.
 
 ## Unused Export Sampling
 
-Found **638** potentially unused exports across src/.
+Found **647** potentially unused exports across src/.
 Top 20 shown below (full list requires deeper analysis):
 
 | File | Export | Import Count |
@@ -86,20 +86,20 @@ Top 20 shown below (full list requires deeper analysis):
 | src/orchestra/rollback.ts | getCurrentBranch | 0 |
 | src/orchestra/rollback.ts | deleteSafetyPointFile | 0 |
 | src/orchestra/rollback.ts | loadSafetyPoint | 0 |
+| src/orchestra/evaluation-audit-trail.ts | AuditRuleSet | 0 |
+| src/orchestra/evaluation-audit-trail.ts | AuditCriterionScore | 0 |
+| src/orchestra/evaluation-audit-trail.ts | AuditSchemaValidation | 0 |
+| src/orchestra/evaluation-audit-trail.ts | AuditDecision | 0 |
+| src/orchestra/evaluation-audit-trail.ts | EvaluationAuditRecord | 0 |
+| src/orchestra/evaluation-audit-trail.ts | EvaluationAuditInput | 0 |
+| src/orchestra/evaluation-audit-trail.ts | evaluationAuditPath | 0 |
+| src/orchestra/evaluation-audit-trail.ts | buildDecisionRationale | 0 |
+| src/orchestra/evaluation-audit-trail.ts | writeEvaluationAudit | 0 |
 | src/orchestra/mid-sprint-adapter.ts | RerouteResult | 0 |
 | src/orchestra/mid-sprint-adapter.ts | ReconciliationResult | 0 |
 | src/orchestra/mid-sprint-adapter.ts | ReconciliationDeps | 0 |
 | src/orchestra/promotion-pipeline.ts | PromotionCriteria | 0 |
 | src/orchestra/promotion-pipeline.ts | DemotionCriteria | 0 |
-| src/orchestra/promotion-pipeline.ts | PromotionResult | 0 |
-| src/orchestra/task-retry.ts | MAX_RETRY_COUNT | 0 |
-| src/orchestra/task-retry.ts | RETRY_BACKOFF_MS | 0 |
-| src/orchestra/task-retry.ts | RetryableTask | 0 |
-| src/orchestra/task-retry.ts | getRetryDelay | 0 |
-| src/orchestra/task-retry.ts | getRetryCount | 0 |
-| src/orchestra/task-retry.ts | createRetryTask | 0 |
-| src/orchestra/task-retry.ts | retryDelay | 0 |
-| src/orchestra/rule-evolver.ts | EvolutionResult | 0 |
 
 ## Recommendations
 
