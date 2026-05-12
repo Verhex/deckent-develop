@@ -48,8 +48,11 @@ import { acquireSprintLock, releaseSprintLock } from '../core/multi-ide.js';
 import {
   now, isDocTask,
   getDefaultProvider,
-  writeSprintState, clearSprintState,
+  writeSprintState, readSprintState, clearSprintState,
 } from './sprint-utils.js';
+
+// ─── Rollback (type-only — needed for safetyPoint variable typed in outer scope) ─
+import type { SafetyPoint } from './rollback.js';
 
 // ─── Sprint Phases (extracted phase functions) ──────────────────────
 import {
@@ -76,7 +79,7 @@ import {
 import type { SprintStateSnapshot } from './sprint-pid-manager.js';
 
 // ─── Sprint Checkpoint (phase-transition auto-checkpoint) ────────
-import { writePhaseCheckpoint } from './sprint-checkpoint.js';
+import { writePhaseCheckpoint, restoreSprintFromCheckpoint } from './sprint-checkpoint.js';
 
 // ─── Event Bus (nervous system lifecycle hooks) ─────────────────
 import { eventBus } from './event-bus.js';
@@ -307,226 +310,288 @@ export async function runSprint(
     );
   }
 
-  // Phase 1: PLAN
-  const { sprint, safetyPoint } = await runPlanPhase(
-    projectRoot, config, opts, activeProvider, rollbackEnabled,
-  );
-
-  // Set sprint ID for observability tagging (sprintId available after plan phase)
-  setObservabilitySprintId(sprint.id, { perSprintFile: true });
-
-  // Human Checkpoint: PLAN
-  if (config.human_checkpoints?.includes('plan')) {
-    const taskSummary = `${sprint.tasks.length} task planlandı: ${sprint.tasks.map(t => t.title).join(', ')}`;
-    const approved = await waitForHumanApproval(projectRoot, sprint.id, 'plan', taskSummary);
-    if (!approved) {
-      sprint.status = SprintStatus.ABORTED;
-      sprint.completedAt = now();
-      clearActiveSprint();
-      releaseSprintLock(projectRoot);
-      clearSprintState(projectRoot);
-      return sprint;
-    }
-  }
-
-  setActiveSprint(projectRoot, sprint, spawnBackend);
-
-  // PID + Snapshot Setup
-  try { writePid(projectRoot, sprint.id); } catch (e) { debugLog('runSprint:writePid', e); }
-
-  let snapshotInterval: ReturnType<typeof setInterval> | null = null;
-  const writePeriodicSnapshot = async (): Promise<void> => {
-    try {
-      const snap: SprintStateSnapshot = {
-        sprintId: sprint.id,
-        pid: process.pid,
-        startedAt: sprint.startedAt ?? new Date().toISOString(),
-        currentWave: 0,
-        taskStatuses: Object.fromEntries(sprint.tasks.map(t => [t.id, t.status])),
-        metricsJsonlSize: 0,
-        lastHeartbeat: new Date().toISOString(),
-      };
-      try {
-        const metricsPath = join(projectRoot, '.deckent', 'metrics.jsonl');
-        try {
-          const metricsContent = await readFile(metricsPath, 'utf-8');
-          snap.metricsJsonlSize = metricsContent.split('\n').filter(Boolean).length;
-        } catch { /* file doesn't exist or not readable — non-fatal */ }
-      } catch { /* non-fatal */ }
-      writeStateSnapshot(projectRoot, sprint.id, snap);
-    } catch (e) { debugLog('runSprint:writeStateSnapshot', e); }
-  };
-
-  void writePeriodicSnapshot();
-  snapshotInterval = setInterval(() => void writePeriodicSnapshot(), 30_000);
-
-  const beforeExitHandler = (): void => {
-    try { void writePeriodicSnapshot(); } catch { /* best effort */ }
-    try { clearPid(projectRoot, sprint.id); } catch { /* best effort */ }
-  };
-  process.on('beforeExit', beforeExitHandler);
-
-  // Phase 1.5: Route tasks to providers
+  // ═══ State Recovery on Brain Restart (Sprint 162 — Task T-004) ════
+  // Pair with T-002 (checkpoint loop) and T-001 (exception handler).
+  // If the previous Brain process left a sprint-state.json behind,
+  // attempt to restore from the latest checkpoint. Fail-soft: any error
+  // falls through to the normal PLAN path.
+  let isResumeEvaluate = false;
+  let recoveredSprint: Sprint | null = null;
+  const resumeResults: TaskResult[] = [];
   try {
-    const connector = opts?.connector;
-    const availableProviders = connector
-      ? connector.getAvailableProviders()
-      : providerRegistry.listProviders() as ProviderName[];
-    routeSprintTasksImpl(sprint.tasks, config, availableProviders);
-  } catch (e) { debugLog('runSprint:routeSprintTasks', e); }
-
-  try { updateLastSprintId(projectRoot, sprint.id); } catch (e) { debugLog('runSprint:updateLastSprintId', e); }
-  try { resetDashboard(projectRoot, sprint.id, sprint.tasks.length); } catch (e) { debugLog('runSprint:resetDashboard', e); }
-  writeSprintState(projectRoot, sprint);
-
-  // Phase 1.9: Capture pre-sprint test baseline
-  try {
-    const captured = captureVitestBaseline(projectRoot);
-    if (captured) writeBaseline(projectRoot, sprint.id, captured);
-  } catch (e) { debugLog('runSprint:baseline', e); }
-
-  // Phase-transition checkpoint: PLAN complete
-  try { writePhaseCheckpoint(projectRoot, sprint, sprint.phase); } catch (e) { debugLog('runSprint:checkpoint:plan', e); }
-
-  // Nervous System: PLAN→SPAWN + SPRINT_STARTED
-  emitPhaseChange(SprintPhase.PLAN, SprintPhase.SPAWN, sprint.id);
-  emitSprintEvent('SPRINT_STARTED', { sprintId: sprint.id, taskCount: sprint.tasks.length });
-
-  // DECKENT→USER:NOTIFY (Hot Fix H6) — fire-and-forget, fail-safe
-  try {
-    void notify(
-      'sprint-started',
-      sprint.id,
-      `Sprint ${sprint.id} başladı`,
-      `${sprint.tasks.length} task planlandı`,
-    );
-  } catch (e) { debugLog('runSprint:notify:sprint-started', e); }
-
-  // Phase 2: SPAWN
-  const { taskQueue, scanInterval: initialScanInterval } = await runSpawnPhase(
-    projectRoot, sprint, config, opts, spawnBackend,
-  );
-  let scanInterval = initialScanInterval;
-
-  // Phase-transition checkpoint: SPAWN complete
-  try { writePhaseCheckpoint(projectRoot, sprint, sprint.phase); } catch (e) { debugLog('runSprint:checkpoint:spawn', e); }
-
-  // Nervous System: SPAWN→EXECUTE
-  emitPhaseChange(SprintPhase.SPAWN, SprintPhase.EXECUTE, sprint.id);
-
-  // Phase 3: EXECUTE
-  let results: TaskResult[] = [];
-  try {
-    sprint.phase = SprintPhase.EXECUTE;
-    writeSprintState(projectRoot, sprint);
-    results = await waitForResults(projectRoot, sprint, opts?.timeoutMs, taskQueue, { autoApprove: opts?.autoApprove, spawnBackend });
-  } catch (err) {
-    safeDashboardUpdate(projectRoot, sprint, `Phase ${sprint.phase} error: ${err instanceof Error ? err.message : String(err)}`);
-  }
-
-  // Post-collect sweep
-  try {
-    const preGraceCollectedIds = new Set(results.map(r => r.taskId));
-    for (const task of sprint.tasks) {
-      if (preGraceCollectedIds.has(task.id)) continue;
-      const latePath = join(projectRoot, TASKS_DIR, `task-${task.id}.result`);
-      const lateExists = await stat(latePath).then(() => true, () => false);
-      if (lateExists) {
-        const lateResult = readJsonSafe<TaskResult>(latePath);
-        if (lateResult) results.push(lateResult);
-      }
-    }
-  } catch (e) { debugLog('postCollect:main', e); }
-
-  // Grace period (async file checks — Sprint 136 async I/O migration)
-  try {
-    const collectedIds = new Set(results.map(r => r.taskId));
-    const staleWorkers: Task[] = [];
-    for (const t of sprint.tasks) {
-      if (collectedIds.has(t.id)) continue;
-      const hbPath = join(projectRoot, TASKS_DIR, `task-${t.id}.hb`);
-      const resultPath = join(projectRoot, TASKS_DIR, `task-${t.id}.result`);
-      const [hbExists, resExists] = await Promise.all([
-        stat(hbPath).then(() => true, () => false),
-        stat(resultPath).then(() => true, () => false),
-      ]);
-      if (hbExists && !resExists) staleWorkers.push(t);
-    }
-
-    if (staleWorkers.length > 0) {
-      const GRACE_PERIOD_MS = 5 * 60 * 1000;
-      await new Promise(resolve => setTimeout(resolve, GRACE_PERIOD_MS));
-
-      for (const task of staleWorkers) {
-        const resultPath = join(projectRoot, TASKS_DIR, `task-${task.id}.result`);
-        const resultExists = await stat(resultPath).then(() => true, () => false);
-        if (resultExists) {
-          const lateResult = readJsonSafe<TaskResult>(resultPath);
-          if (lateResult) results.push(lateResult);
-        } else {
-          // Panic Guard: require user approval before killing workers
-          const panicGuard = new PanicGuard(projectRoot);
-          const decision = panicGuard.evaluate(
-            task.id,
-            task.assignedWorker ?? `w-${task.id}`,
-            sprint.id,
-            'grace_period_timeout',
-            undefined, // no force/userExplicit — default BLOCK
-            'Worker had heartbeat but failed to write result within grace period',
-          );
-
-          if (decision === 'BLOCK') {
-            debugLog('graceKill:panicGuard', `Kill blocked for task ${task.id} — user approval required`);
-            const syntheticResult: TaskResult = {
-              taskId: task.id,
-              workerId: task.assignedWorker ?? `w-${task.id}`,
-              filesChanged: [],
-              linesAdded: 0,
-              linesRemoved: 0,
-              testsPassed: false,
-              coverage: 0,
-              selfAssessment: 'NO_GO',
-              notes: 'Worker had heartbeat but failed to write result within grace period — kill blocked by panic guard (user approval required)',
-            };
-            try {
-              await writeFile(resultPath, JSON.stringify(syntheticResult, null, 2), 'utf-8');
-            } catch (e) { debugLog('graceKill:writeResult', e); }
-            results.push(syntheticResult);
-          } else {
-            try {
-              if (spawnBackend) spawnBackend.kill(task.id);
-              else {
-                const { killWorker: kw } = await import('./tmux.js');
-                kw(task.id);
-              }
-            } catch (e) { debugLog('graceKill:killWorker', e); }
-
-            const syntheticResult: TaskResult = {
-              taskId: task.id,
-              workerId: task.assignedWorker ?? `w-${task.id}`,
-              filesChanged: [],
-              linesAdded: 0,
-              linesRemoved: 0,
-              testsPassed: false,
-              coverage: 0,
-              selfAssessment: 'NO_GO',
-              notes: 'Worker had heartbeat but failed to write result within grace period — killed (user-explicit override)',
-            };
-            try {
-              await writeFile(resultPath, JSON.stringify(syntheticResult, null, 2), 'utf-8');
-            } catch (e) { debugLog('graceKill:writeResult', e); }
-            results.push(syntheticResult);
+    const prevState = readSprintState(projectRoot);
+    const prevSprintId = prevState?.sprintId;
+    if (prevSprintId) {
+      const recovery = restoreSprintFromCheckpoint(projectRoot, prevSprintId);
+      if (recovery.restored) {
+        if (recovery.action === 'complete') {
+          emitSprintEvent('SPRINT_RESUME_COMPLETE', { sprintId: prevSprintId });
+          const completed = recovery.restoredSprint!;
+          completed.completedAt = now();
+          releaseSprintLock(projectRoot);
+          clearActiveSprint();
+          clearSprintState(projectRoot);
+          return completed;
+        }
+        if (recovery.action === 'resume-evaluate') {
+          emitSprintEvent('SPRINT_RESUME', {
+            sprintId: prevSprintId,
+            staleWithResult: recovery.staleTasksWithResult,
+            staleMarkedNoGo: recovery.staleTasksMarkedNoGo,
+          });
+          isResumeEvaluate = true;
+          recoveredSprint = recovery.restoredSprint ?? null;
+          if (recoveredSprint) {
+            for (const t of recoveredSprint.tasks) {
+              const resPath = join(projectRoot, TASKS_DIR, `task-${t.id}.result`);
+              const r = readJsonSafe<TaskResult>(resPath);
+              if (r) resumeResults.push(r);
+            }
           }
         }
       }
     }
-  } catch (e) { debugLog('graceKill:main', e); }
+  } catch (e) { debugLog('runSprint:stateRecovery', e); }
 
-  // Phase-transition checkpoint: EXECUTE complete
-  try { writePhaseCheckpoint(projectRoot, sprint, sprint.phase); } catch (e) { debugLog('runSprint:checkpoint:execute', e); }
+  // ─── Outer-scope variables (shared between fresh and resume paths) ──
+  let sprint: Sprint;
+  let safetyPoint: SafetyPoint | null = null;
+  let scanInterval: ReturnType<typeof setInterval> | null = null;
+  let snapshotInterval: ReturnType<typeof setInterval> | null = null;
+  let results: TaskResult[] = [];
+  let beforeExitHandler: (() => void) | null = null;
 
-  // Nervous System: EXECUTE→EVALUATE
-  emitPhaseChange(SprintPhase.EXECUTE, SprintPhase.EVALUATE, sprint.id);
+  if (isResumeEvaluate && recoveredSprint) {
+    // ─── Resume Path: skip PLAN/SPAWN/EXECUTE, jump to EVALUATE ─────
+    sprint = recoveredSprint;
+    setObservabilitySprintId(sprint.id, { perSprintFile: true });
+    setActiveSprint(projectRoot, sprint, spawnBackend);
+    try { writePid(projectRoot, sprint.id); } catch (e) { debugLog('runSprint:writePid', e); }
+    writeSprintState(projectRoot, sprint);
+    results = resumeResults;
+  } else {
+    // ─── Fresh Path: PLAN → SPAWN → EXECUTE ─────────────────────────
+    // Phase 1: PLAN
+    const planResult = await runPlanPhase(
+      projectRoot, config, opts, activeProvider, rollbackEnabled,
+    );
+    sprint = planResult.sprint;
+    safetyPoint = planResult.safetyPoint;
+
+    // Set sprint ID for observability tagging (sprintId available after plan phase)
+    setObservabilitySprintId(sprint.id, { perSprintFile: true });
+
+    // Human Checkpoint: PLAN
+    if (config.human_checkpoints?.includes('plan')) {
+      const taskSummary = `${sprint.tasks.length} task planlandı: ${sprint.tasks.map(t => t.title).join(', ')}`;
+      const approved = await waitForHumanApproval(projectRoot, sprint.id, 'plan', taskSummary);
+      if (!approved) {
+        sprint.status = SprintStatus.ABORTED;
+        sprint.completedAt = now();
+        clearActiveSprint();
+        releaseSprintLock(projectRoot);
+        clearSprintState(projectRoot);
+        return sprint;
+      }
+    }
+
+    setActiveSprint(projectRoot, sprint, spawnBackend);
+
+    // PID + Snapshot Setup
+    try { writePid(projectRoot, sprint.id); } catch (e) { debugLog('runSprint:writePid', e); }
+
+    const writePeriodicSnapshot = async (): Promise<void> => {
+      try {
+        const snap: SprintStateSnapshot = {
+          sprintId: sprint.id,
+          pid: process.pid,
+          startedAt: sprint.startedAt ?? new Date().toISOString(),
+          currentWave: 0,
+          taskStatuses: Object.fromEntries(sprint.tasks.map(t => [t.id, t.status])),
+          metricsJsonlSize: 0,
+          lastHeartbeat: new Date().toISOString(),
+        };
+        try {
+          const metricsPath = join(projectRoot, '.deckent', 'metrics.jsonl');
+          try {
+            const metricsContent = await readFile(metricsPath, 'utf-8');
+            snap.metricsJsonlSize = metricsContent.split('\n').filter(Boolean).length;
+          } catch { /* file doesn't exist or not readable — non-fatal */ }
+        } catch { /* non-fatal */ }
+        writeStateSnapshot(projectRoot, sprint.id, snap);
+      } catch (e) { debugLog('runSprint:writeStateSnapshot', e); }
+    };
+
+    void writePeriodicSnapshot();
+    snapshotInterval = setInterval(() => void writePeriodicSnapshot(), 30_000);
+
+    beforeExitHandler = (): void => {
+      try { void writePeriodicSnapshot(); } catch { /* best effort */ }
+      try { clearPid(projectRoot, sprint.id); } catch { /* best effort */ }
+    };
+    process.on('beforeExit', beforeExitHandler);
+
+    // Phase 1.5: Route tasks to providers
+    try {
+      const connector = opts?.connector;
+      const availableProviders = connector
+        ? connector.getAvailableProviders()
+        : providerRegistry.listProviders() as ProviderName[];
+      routeSprintTasksImpl(sprint.tasks, config, availableProviders);
+    } catch (e) { debugLog('runSprint:routeSprintTasks', e); }
+
+    try { updateLastSprintId(projectRoot, sprint.id); } catch (e) { debugLog('runSprint:updateLastSprintId', e); }
+    try { resetDashboard(projectRoot, sprint.id, sprint.tasks.length); } catch (e) { debugLog('runSprint:resetDashboard', e); }
+    writeSprintState(projectRoot, sprint);
+
+    // Phase 1.9: Capture pre-sprint test baseline
+    try {
+      const captured = captureVitestBaseline(projectRoot);
+      if (captured) writeBaseline(projectRoot, sprint.id, captured);
+    } catch (e) { debugLog('runSprint:baseline', e); }
+
+    // Phase-transition checkpoint: PLAN complete
+    try { writePhaseCheckpoint(projectRoot, sprint, sprint.phase); } catch (e) { debugLog('runSprint:checkpoint:plan', e); }
+
+    // Nervous System: PLAN→SPAWN + SPRINT_STARTED
+    emitPhaseChange(SprintPhase.PLAN, SprintPhase.SPAWN, sprint.id);
+    emitSprintEvent('SPRINT_STARTED', { sprintId: sprint.id, taskCount: sprint.tasks.length });
+
+    // DECKENT→USER:NOTIFY (Hot Fix H6) — fire-and-forget, fail-safe
+    try {
+      void notify(
+        'sprint-started',
+        sprint.id,
+        `Sprint ${sprint.id} başladı`,
+        `${sprint.tasks.length} task planlandı`,
+      );
+    } catch (e) { debugLog('runSprint:notify:sprint-started', e); }
+
+    // Phase 2: SPAWN
+    const { taskQueue, scanInterval: initialScanInterval } = await runSpawnPhase(
+      projectRoot, sprint, config, opts, spawnBackend,
+    );
+    scanInterval = initialScanInterval;
+
+    // Phase-transition checkpoint: SPAWN complete
+    try { writePhaseCheckpoint(projectRoot, sprint, sprint.phase); } catch (e) { debugLog('runSprint:checkpoint:spawn', e); }
+
+    // Nervous System: SPAWN→EXECUTE
+    emitPhaseChange(SprintPhase.SPAWN, SprintPhase.EXECUTE, sprint.id);
+
+    // Phase 3: EXECUTE
+    try {
+      sprint.phase = SprintPhase.EXECUTE;
+      writeSprintState(projectRoot, sprint);
+      results = await waitForResults(projectRoot, sprint, opts?.timeoutMs, taskQueue, { autoApprove: opts?.autoApprove, spawnBackend });
+    } catch (err) {
+      safeDashboardUpdate(projectRoot, sprint, `Phase ${sprint.phase} error: ${err instanceof Error ? err.message : String(err)}`);
+    }
+
+    // Post-collect sweep
+    try {
+      const preGraceCollectedIds = new Set(results.map(r => r.taskId));
+      for (const task of sprint.tasks) {
+        if (preGraceCollectedIds.has(task.id)) continue;
+        const latePath = join(projectRoot, TASKS_DIR, `task-${task.id}.result`);
+        const lateExists = await stat(latePath).then(() => true, () => false);
+        if (lateExists) {
+          const lateResult = readJsonSafe<TaskResult>(latePath);
+          if (lateResult) results.push(lateResult);
+        }
+      }
+    } catch (e) { debugLog('postCollect:main', e); }
+
+    // Grace period (async file checks — Sprint 136 async I/O migration)
+    try {
+      const collectedIds = new Set(results.map(r => r.taskId));
+      const staleWorkers: Task[] = [];
+      for (const t of sprint.tasks) {
+        if (collectedIds.has(t.id)) continue;
+        const hbPath = join(projectRoot, TASKS_DIR, `task-${t.id}.hb`);
+        const resultPath = join(projectRoot, TASKS_DIR, `task-${t.id}.result`);
+        const [hbExists, resExists] = await Promise.all([
+          stat(hbPath).then(() => true, () => false),
+          stat(resultPath).then(() => true, () => false),
+        ]);
+        if (hbExists && !resExists) staleWorkers.push(t);
+      }
+
+      if (staleWorkers.length > 0) {
+        const GRACE_PERIOD_MS = 5 * 60 * 1000;
+        await new Promise(resolve => setTimeout(resolve, GRACE_PERIOD_MS));
+
+        for (const task of staleWorkers) {
+          const resultPath = join(projectRoot, TASKS_DIR, `task-${task.id}.result`);
+          const resultExists = await stat(resultPath).then(() => true, () => false);
+          if (resultExists) {
+            const lateResult = readJsonSafe<TaskResult>(resultPath);
+            if (lateResult) results.push(lateResult);
+          } else {
+            // Panic Guard: require user approval before killing workers
+            const panicGuard = new PanicGuard(projectRoot);
+            const decision = panicGuard.evaluate(
+              task.id,
+              task.assignedWorker ?? `w-${task.id}`,
+              sprint.id,
+              'grace_period_timeout',
+              undefined, // no force/userExplicit — default BLOCK
+              'Worker had heartbeat but failed to write result within grace period',
+            );
+
+            if (decision === 'BLOCK') {
+              debugLog('graceKill:panicGuard', `Kill blocked for task ${task.id} — user approval required`);
+              const syntheticResult: TaskResult = {
+                taskId: task.id,
+                workerId: task.assignedWorker ?? `w-${task.id}`,
+                filesChanged: [],
+                linesAdded: 0,
+                linesRemoved: 0,
+                testsPassed: false,
+                coverage: 0,
+                selfAssessment: 'NO_GO',
+                notes: 'Worker had heartbeat but failed to write result within grace period — kill blocked by panic guard (user approval required)',
+              };
+              try {
+                await writeFile(resultPath, JSON.stringify(syntheticResult, null, 2), 'utf-8');
+              } catch (e) { debugLog('graceKill:writeResult', e); }
+              results.push(syntheticResult);
+            } else {
+              try {
+                if (spawnBackend) spawnBackend.kill(task.id);
+                else {
+                  const { killWorker: kw } = await import('./tmux.js');
+                  kw(task.id);
+                }
+              } catch (e) { debugLog('graceKill:killWorker', e); }
+
+              const syntheticResult: TaskResult = {
+                taskId: task.id,
+                workerId: task.assignedWorker ?? `w-${task.id}`,
+                filesChanged: [],
+                linesAdded: 0,
+                linesRemoved: 0,
+                testsPassed: false,
+                coverage: 0,
+                selfAssessment: 'NO_GO',
+                notes: 'Worker had heartbeat but failed to write result within grace period — killed (user-explicit override)',
+              };
+              try {
+                await writeFile(resultPath, JSON.stringify(syntheticResult, null, 2), 'utf-8');
+              } catch (e) { debugLog('graceKill:writeResult', e); }
+              results.push(syntheticResult);
+            }
+          }
+        }
+      }
+    } catch (e) { debugLog('graceKill:main', e); }
+
+    // Phase-transition checkpoint: EXECUTE complete
+    try { writePhaseCheckpoint(projectRoot, sprint, sprint.phase); } catch (e) { debugLog('runSprint:checkpoint:execute', e); }
+
+    // Nervous System: EXECUTE→EVALUATE
+    emitPhaseChange(SprintPhase.EXECUTE, SprintPhase.EVALUATE, sprint.id);
+  }
 
   // Phase 4: EVALUATE
   const evaluations = new Map<string, TaskEvaluation>();
@@ -619,7 +684,7 @@ export async function runSprint(
 
   // PID Cleanup
   if (snapshotInterval) clearInterval(snapshotInterval);
-  process.removeListener('beforeExit', beforeExitHandler);
+  if (beforeExitHandler) process.removeListener('beforeExit', beforeExitHandler);
   try { clearPid(projectRoot, sprint.id); } catch { /* non-fatal */ }
 
   updateDashboard(projectRoot, {

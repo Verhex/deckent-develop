@@ -1,0 +1,103 @@
+{
+  "id": "162-001",
+  "title": "Sprint Phase Observability + EvaluationAuditTrail Runtime Wire (T-003, composite)",
+  "description": "Sprint Phase Observability + EvaluationAuditTrail Runtime Wire (T-003, composite)\n\n- Model: opus\n- Effort: high\n- Skills: typescript-expert, system-architect\n- Agent: bug-fixer\n- Files: src/orchestra/sprint-phases.ts, src/monitor/sprint-state.ts, tests/orchestra/phase-transition-observability.test.ts\n- Scope: src/orchestra/, src/monitor/, tests/orchestra/\n\n### Description\n\n**Composite task (sırasıyla iki bug aynı dosyada — birleştirme collision'ı önler):**\n\n**(a) Sprint phase observability (ADR-044):** Sprint 159+160+161 forensic: `sprint-state.json` `phase:SPAWN, status:PLANNING` donuk kaldı, Sprint ilerlemesi yansımadı. External observer kör.\n\n**(b) EvaluationAuditTrail wire:** `src/orchestra/evaluation-audit-trail.ts` Sprint 157 T-001 survivor (commit `6c337b0`, diskte 8/8 test PASS), AMA `runEvaluatePhase` içinde çağrılmıyor. `.tasks/<id>.audit.json` yazılmıyor.\n\n**Yapılacaklar:**\n1. **`src/orchestra/sprint-phases.ts`:**\n   - Yeni helper: `persistPhaseTransition(projectRoot, sprintId, phase, status)` — `writeSprintState` çağırır, try/catch wrap (fail-soft, Brain'i öldürmesin).\n   - Her `sprint.phase = SprintPhase.X` setinden SONRA `persistPhaseTransition()` çağrısı:\n     - `runPlanPhase` → PLAN / 'PLANNING'\n     - `runSpawnPhase` (line ~401) → SPAWN / 'RUNNING'\n     - `runEvaluatePhase` (line ~586) → EVALUATE / 'EVALUATING'\n     - `runFixPhase` → FIX / 'FIXING'\n   - `runEvaluatePhase` her task evaluation'dan sonra `writeEvaluationAudit(...)` çağrısı (try/catch wrap).\n\n2. **`writeSprintState` signature**'ı `src/monitor/sprint-state.ts`'ten oku. Field set: `{sprintId, phase: String(phase), status, taskIds, updatedAt}`. Mevcut field'ları korumak için read+merge pattern gerekiyorsa adapter yaz.\n\n3. **`writeEvaluationAudit` signature**'ı `src/orchestra/evaluation-audit-trail.ts:157`'den oku. Parametre: `{taskId, decision, ruleSet, criterionScores, schemaValidation, rationale, timestamp}`. `buildDecisionRationale(evaluation)` mevcut export'unu kullan.\n\n**Kanıt:**\n- `grep -n \"persistPhaseTransition\" src/orchestra/sprint-phases.ts` → 5+ match\n- `grep -n \"writeEvaluationAudit\" src/orchestra/sprint-phases.ts` → 1+ match\n- Test çıktısı: `sprint-state.json` phase her transition'da güncellenir\n\n**Test:** 6 test (PLAN/SPAWN/EVALUATE/FIX state.json write, audit.json schema, atomic write).\n\n---",
+  "model": "opus",
+  "effort": "high",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "src/orchestra/",
+      "src/monitor/",
+      "tests/orchestra/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/orchestra/sprint-phases.ts",
+      "src/monitor/sprint-state.ts",
+      "tests/orchestra/phase-transition-observability.test.ts",
+      ".audit",
+      "src/orchestra/evaluation-audit-trail.ts",
+      "audit.json"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:**; `grep -n \"persistPhaseTransition\" src/orchestra/sprint-phases.ts` → 5+ match; `grep -n \"writeEvaluationAudit\" src/orchestra/sprint-phases.ts` → 1+ match",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-162",
+  "provider": "claude",
+  "forceModel": "opus",
+  "forceEffort": "high",
+  "forceAgent": "bug-fixer",
+  "forceSkills": [
+    "typescript-expert",
+    "system-architect"
+  ],
+  "assignedAgent": "bug-fixer",
+  "assignedSkills": [
+    "typescript-expert",
+    "system-architect"
+  ],
+  "createdAt": "2026-05-12T22:11:02.804Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "implementation",
+        "secondary": [],
+        "confidence": 0.77
+      },
+      "subIntent": "observer",
+      "tags": [
+        "test-coverage"
+      ],
+      "domains": [
+        {
+          "name": "orchestra",
+          "weight": 0.56
+        },
+        {
+          "name": "monitor",
+          "weight": 0.22
+        }
+      ],
+      "operations": [
+        {
+          "type": "create",
+          "weight": 0.4
+        },
+        {
+          "type": "modify",
+          "weight": 0.4
+        },
+        {
+          "type": "test",
+          "weight": 0.2
+        }
+      ],
+      "complexity": {
+        "fileCount": 6,
+        "moduleCount": 2,
+        "crossCutting": true,
+        "estimatedSize": "large"
+      },
+      "scope": {
+        "writeRatio": {
+          "src/": 0.5,
+          "tests/": 0.17,
+          "./": 0.33
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0.17
+      }
+    },
+    "confidence": "high",
+    "routingVersion": "v2"
+  },
+  "estimatedTokens": 2579,
+  "updatedAt": "2026-05-12T22:24:04.513Z"
+}

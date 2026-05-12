@@ -1,0 +1,20 @@
+{
+  "taskId": "162-001",
+  "filesChanged": [
+    "src/orchestra/sprint-phases.ts",
+    "tests/orchestra/phase-transition-observability.test.ts"
+  ],
+  "linesAdded": 178,
+  "linesRemoved": 8,
+  "testsPassed": true,
+  "coverage": 0,
+  "selfAssessment": "DONE",
+  "notes": "T-003 composite (phase observability + EvaluationAuditTrail runtime wire) complete. persistPhaseTransition helper exported and wired into all 4 phases (PLAN/SPAWN/EVALUATE/FIX); writeEvaluationAudit invoked per-task inside runEvaluatePhase loop, both wrapped in try/catch (fail-soft). Kanıt greps satisfied: persistPhaseTransition 7 matches (≥5), writeEvaluationAudit 3 matches (≥1). Tests: 6/6 PASS (phase-transition-observability.test.ts — PLAN/SPAWN-PLANNING/SPAWN-ACTIVE/EVALUATE/FIX state.json writes + audit.json canonical schema + atomic write no .tmp leftover). tsc --noEmit: exit 0. Pre-existing failures in fix-phase-map / sprint-phases-rollback / brain-provider verified unrelated (10 tests fail identically on baseline before my changes — confirmed by checkout + rerun). Implementation found largely in place from prior iteration of this task on the working tree; verified the wires match the task spec exactly: signatures, transition order, fail-soft wraps, audit JSON shape with rubric threshold+weight join via toAuditCriterionScores.",
+  "tokenUsage": {
+    "inputTokens": 42000,
+    "outputTokens": 2400,
+    "cacheReadTokens": 0,
+    "provider": "claude",
+    "model": "opus"
+  }
+}

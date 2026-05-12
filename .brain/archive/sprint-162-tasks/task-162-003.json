@@ -1,0 +1,101 @@
+{
+  "id": "162-003",
+  "title": "Crash Injection Integration Test + E2E Smoke (T-007)",
+  "description": "Crash Injection Integration Test + E2E Smoke (T-007)\n\n- Model: opus\n- Effort: normal\n- Skills: testing-expert, ci-testing\n- Agent: test-writer\n- Files: tests/orchestra/brain-crash-injection.test.ts, tests/e2e/sprint-160-smoke.test.ts\n- Scope: tests/\n\n### Description\n\n**Dependency:** Task 1 + Task 2 DONE bekler.\n\n6 crash injection senaryosu + e2e mini-sprint smoke. T-001 + T-002 + T-006 hepsi commit'li, integration test bunları kanıtlayacak.\n\n**6 senaryo (`tests/orchestra/brain-crash-injection.test.ts`):**\n- S1: SIGTERM mid-EXECUTE → `restoreSprintFromCheckpoint` action `resume-evaluate`\n- S2: unhandledRejection with API key → `redactSensitive` API key silindi (T-001 verified)\n- S3: Double-MCP `acquireSingletonLock` ikinci kez → `SingletonLockError` (T-006 verified)\n- S4: `sprint-state.json` desync + checkpoint `EVALUATE` → recovery state.json EVALUATE'a yazar (T-003 + T-004 verified)\n- S5: Missing checkpoint → `action:'fresh'` (false-positive yok)\n- S6: `writeEvaluationAudit` fail (`vi.mock` throw) → `runEvaluatePhase` başarılı dönüş (fail-soft kanıtı, T-003 verified)\n\n**E2E smoke (`tests/e2e/sprint-160-smoke.test.ts`):** Mini-sprint 1 dummy task, DI mocked worker spawn. Assert: state.json phase transitions visible, checkpoint `eventStreamOffset > 0`, events.jsonl sequence monotonic.\n\n**Kanıt:**\n- `grep -nE \"S[1-6]:\" tests/orchestra/brain-crash-injection.test.ts` → 6 match\n- Test isolated run → 9/9 PASS\n\n**Test:** 9 test (6 crash injection + 3 e2e).\n\n---\n\n## Anchor Kurallar\n\n- **`npm run build` YASAK** worker'larda — Alperen kararı.\n- **Test izole:** `npx vitest run path/to/file.test.ts` ile tek dosya çalıştır.\n- **Scope discipline:** Sadece `Files` field'daki dosyalara yaz.\n- **ESM import:** `.js` uzantısı zorunlu (Node16 resolution).\n- **No mid-sprint refactor.** No MVP / No Minimum.\n- **🆕 NO docs/ PATH MENTION:** Task description'larında `docs/...` path yazma — planner filesWrite'a alıyor.\n\n## GO/NO_GO Criteria\n\n- ✅ 3/3 task DONE veya GO_WITH_TECH_DEBT\n- ✅ tsc PASS + vitest PASS (delta 0 fail)\n- ✅ 21 yeni test (6+6+9) PASS, 0 regression\n- ✅ ADR-043 + ADR-044 accepted (memory.db'de) — Sprint sonu finalize\n- ❌ NO_GO: Task 2 (state recovery) NO_GO → Sprint 163'te P0 retain",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "tests/orchestra/",
+      "tests/e2e/",
+      "tests/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "tests/orchestra/brain-crash-injection.test.ts",
+      "tests/e2e/sprint-160-smoke.test.ts",
+      "state.json"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:**; `grep -nE \"S[1-6]:\" tests/orchestra/brain-crash-injection.test.ts` → 6 match",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "NO_GO",
+  "sprintId": "sprint-162",
+  "provider": "claude",
+  "forceModel": "opus",
+  "forceEffort": "normal",
+  "forceAgent": "test-writer",
+  "forceSkills": [
+    "testing-expert",
+    "ci-testing"
+  ],
+  "assignedAgent": "test-writer",
+  "assignedSkills": [
+    "testing-expert",
+    "ci-testing"
+  ],
+  "createdAt": "2026-05-12T22:11:02.804Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "implementation",
+        "secondary": [
+          "documentation",
+          "security"
+        ],
+        "confidence": 0.95
+      },
+      "tags": [
+        "test-coverage"
+      ],
+      "domains": [
+        {
+          "name": "orchestra",
+          "weight": 0.33
+        },
+        {
+          "name": "e2e",
+          "weight": 0.33
+        }
+      ],
+      "operations": [
+        {
+          "type": "create",
+          "weight": 0.4
+        },
+        {
+          "type": "test",
+          "weight": 0.4
+        },
+        {
+          "type": "document",
+          "weight": 0.2
+        }
+      ],
+      "complexity": {
+        "fileCount": 3,
+        "moduleCount": 2,
+        "crossCutting": true,
+        "estimatedSize": "medium"
+      },
+      "scope": {
+        "writeRatio": {
+          "tests/": 0.67,
+          "./": 0.33
+        },
+        "primaryWriteTarget": "tests/",
+        "testWriteRatio": 0.67
+      }
+    },
+    "confidence": "high",
+    "routingVersion": "v2"
+  },
+  "estimatedTokens": 2143,
+  "updatedAt": "2026-05-12T22:24:08.169Z"
+}

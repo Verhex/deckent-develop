@@ -1,0 +1,73 @@
+# Task 162-002 Plan: State Recovery on Brain Restart (T-004)
+
+## Goal
+Implement `restoreSprintFromCheckpoint()` helper in `sprint-checkpoint.ts` and wire
+it into the start of `runSprint()` in `sprint-controller.ts` so that a Brain
+restart can pick up a half-completed sprint from its latest checkpoint, either
+declare it complete, or jump straight to EVALUATE for stale EXECUTING tasks.
+
+## Approach
+
+### 1. `src/orchestra/sprint-checkpoint.ts`
+Append at end of file:
+- `RestoreAction = 'fresh' | 'complete' | 'resume-evaluate'` union
+- `RestoreResult` interface:
+  - `restored: boolean`
+  - `action: RestoreAction`
+  - `restoredSprint?: Sprint` (rebuilt from disk task.json + checkpoint)
+  - `staleTasksWithResult: string[]`
+  - `staleTasksMarkedNoGo: string[]`
+- `restoreSprintFromCheckpoint(projectRoot, sprintId): RestoreResult`
+  - `readCheckpoint()`; if null → `{restored:false, action:'fresh', stale*:[]}`
+  - Rebuild `sprint.tasks` by reading each task.json file (completed + pending + active)
+  - Phase mirrored from `cp.brainPhase`; status mirrors EVALUATING when resume
+  - `startedAt` preserved from `cp.sprintStartedAt ?? cp.timestamp` — Sprint 159
+    forensic showed `durationMs: -106` so we must keep the original startedAt
+  - If `cp.pendingTasks.length === 0` AND no stale EXECUTING workers → `action:'complete'`
+  - Otherwise scan `activeWorkers`:
+      - `.result` exists → push to `staleTasksWithResult`
+      - `.result` missing → overwrite task.json with `status: NO_GO`, push id to `staleTasksMarkedNoGo`
+  - Call `writeSprintState(projectRoot, restoredSprint)` to sync state.json with
+    the resumed phase + status
+  - Return `{restored:true, action, restoredSprint, staleTasksWithResult, staleTasksMarkedNoGo}`
+
+Notes:
+- `sprintStartedAt` is not part of the existing `SprintCheckpoint` interface.
+  Use `cp.timestamp` as the fallback — the spec writes "cp.sprintStartedAt ?? cp.timestamp".
+  Will read field via optional chaining cast since types don't have it yet (no schema migration in scope).
+- Task files live under `.tasks/task-{id}.json`. Use `readJsonSafe<Task>`.
+
+### 2. `src/orchestra/sprint-controller.ts`
+Inside `runSprint`, after acquiring the sprint lock and BEFORE the PLAN phase:
+- Determine candidate sprint id from `.deckent/sprint-state.json` (`readSprintState`)
+  or directly from latest checkpoint files. Without an id we cannot recover, so we
+  fall through to normal PLAN path.
+- If id present → call `restoreSprintFromCheckpoint(projectRoot, sprintId)`:
+  - `action === 'fresh'` → continue normal path
+  - `action === 'complete'` → emit `SPRINT_RESUME_COMPLETE`, call `finalizeSprint`, return early
+  - `action === 'resume-evaluate'` → emit `SPRINT_RESUME` with payload, set
+    `sprint = recovery.restoredSprint!`, skip PLAN/SPAWN/EXECUTE, jump to evaluation
+    + cleanup tail. Use a single branch that does:
+      - waitForResults skipped (since EXECUTE done)
+      - runEvaluatePhase (idempotent — `tryAcquireEvaluateLock` already inside it)
+      - the rest of the tail (RETRO, CLEANUP) just like normal
+- Wrap recovery in try/catch — fail-safe: any error → continue with fresh sprint path
+
+### 3. `tests/orchestra/state-recovery.test.ts`
+6 tests:
+1. **no checkpoint → fresh** — empty `.deckent/`, expect `restored:false, action:'fresh'`
+2. **all DONE → complete** — checkpoint with empty pendingTasks and no active workers → `action:'complete'`
+3. **stale + result → resume-evaluate** — active worker with `.result` file → `staleTasksWithResult` includes task id, `action:'resume-evaluate'`
+4. **stale + no result → NO_GO mark + resume** — active worker, no `.result` → task.json overwritten to `NO_GO`, `staleTasksMarkedNoGo` includes id
+5. **startedAt preserve** — checkpoint with explicit `sprintStartedAt` → `restoredSprint.startedAt` equals that value
+6. **state.json sync after restore** — verify `.deckent/sprint-state.json` written with EVALUATE phase and resumed sprint id after `resume-evaluate`
+
+## Files Changed
+- `src/orchestra/sprint-checkpoint.ts` — append helper
+- `src/orchestra/sprint-controller.ts` — wire recovery into runSprint
+- `tests/orchestra/state-recovery.test.ts` — new test file (6 tests)
+
+## Verify
+- `npx tsc --noEmit` PASS
+- `npx vitest run tests/orchestra/state-recovery.test.ts` 6/6 PASS
+- No regressions in existing tests in `tests/orchestra/sprint-checkpoint.test.ts`

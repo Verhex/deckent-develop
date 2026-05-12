@@ -1,0 +1,10 @@
+Task 162-001 (T-003) tamamlandı.
+
+**Özet:**
+- `persistPhaseTransition` helper + 4 faz wire (PLAN/SPAWN/EVALUATE/FIX) yerinde, try/catch fail-soft.
+- `writeEvaluationAudit` `runEvaluatePhase` içinde per-task çağrılıyor, `buildDecisionRationale` + rubric threshold/weight join ile.
+- **Kanıt grep:** `persistPhaseTransition` = 7 match (≥5), `writeEvaluationAudit` = 3 match (≥1).
+- **Test:** 6/6 PASS (`phase-transition-observability.test.ts`).
+- **tsc --noEmit:** exit 0.
+- **Regression:** Pre-existing 10 fail (fix-phase-map / sprint-phases-rollback / brain-provider) baseline'da da fail — değişikliğimle alakasız (checkout + rerun ile doğrulandı).
+- **Honest assessment:** Implementation büyük ölçüde mevcuttu (working tree'de uncommitted modifikasyon olarak); spec ile birebir uyumluluk doğrulandı, regression eklenmedi → `DONE`.

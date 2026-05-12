@@ -1,0 +1,40 @@
+# Task 162-003 Execution Plan
+
+## Goal
+Write 9 tests proving Sprint 160-162 Brain stability survives crash scenarios:
+- 6 crash injection scenarios in `tests/orchestra/brain-crash-injection.test.ts`
+- 3 e2e smoke tests in `tests/e2e/sprint-160-smoke.test.ts`
+
+## Approach
+1. Map dependencies — locate exports for:
+   - `restoreSprintFromCheckpoint` (src/orchestra/sprint-checkpoint.ts)
+   - `redactSensitive` (src/core/redact-sensitive.ts)
+   - `acquireSingletonLock` + `SingletonLockError` (src/mcp/server-singleton-lock.ts)
+   - `writeEvaluationAudit` (src/orchestra/evaluation-audit-trail.ts)
+   - `writeSprintState` + `readSprintState` (src/monitor/sprint-state.ts)
+   - `runEvaluatePhase` / `persistPhaseTransition` (src/orchestra/sprint-phases.ts)
+
+2. Crash injection scenarios (each in vitest tmpdir to avoid state pollution):
+   - S1: pre-seed checkpoint with EXECUTING + .result existence → restore action `resume-evaluate`
+   - S2: redactSensitive on payload containing API key → key replaced
+   - S3: acquireSingletonLock twice → second throws SingletonLockError
+   - S4: write sprint-state.json desynced + checkpoint @EVALUATE → restore syncs state.json
+   - S5: no checkpoint file → action `fresh`
+   - S6: mock writeEvaluationAudit to throw → runEvaluatePhase wrapped path doesn't propagate
+
+3. E2E smoke (`tests/e2e/sprint-160-smoke.test.ts`):
+   - Build minimal sprint state + tasks in tmpdir, drive checkpoint writes
+   - Assert state.json shows phase transitions (PLAN→SPAWN→EVALUATE)
+   - Assert checkpoint `eventStreamOffset > 0`
+   - Assert events.jsonl sequence monotonic (offset increment)
+
+## Verify steps
+- `npx vitest run tests/orchestra/brain-crash-injection.test.ts`
+- `npx vitest run tests/e2e/sprint-160-smoke.test.ts`
+- `tsc --noEmit`
+
+## Constraints
+- Use `os.tmpdir()` + unique sprint IDs per test to avoid contention.
+- If a dependency module is missing/incomplete (Task 1/2 only have partial-result), skip that S# with documented TODO and mark GO_WITH_TECH_DEBT.
+- No mocking of source code modules — only DI or filesystem state injection.
+- All tests deterministic, no timeouts.

@@ -1,0 +1,29 @@
+{
+  "taskId": "162-002",
+  "workerId": "w-162-002",
+  "filesChanged": [
+    "src/orchestra/sprint-checkpoint.ts",
+    "src/orchestra/sprint-controller.ts",
+    "tests/orchestra/state-recovery.test.ts"
+  ],
+  "linesAdded": 285,
+  "linesRemoved": 105,
+  "testsPassed": true,
+  "coverage": 92,
+  "selfAssessment": "DONE",
+  "notes": "T-004 state recovery implemented. (1) restoreSprintFromCheckpoint() added to sprint-checkpoint.ts — returns RestoreResult {restored, action: 'fresh'|'complete'|'resume-evaluate', restoredSprint, staleTasksWithResult, staleTasksMarkedNoGo}. Reads .deckent/<sprintId>-checkpoint.json, rebuilds sprint.tasks from disk task.json (completed ∪ pending ∪ activeWorkers), preserves startedAt via cp.sprintStartedAt ?? cp.timestamp (Sprint 159 durationMs:-106 forensic fix), classifies stale workers against .result existence (no result → task.json overwritten to NO_GO on disk), syncs .deckent/sprint-state.json via writeSprintState. Fail-soft I/O throughout. (2) Wired into runSprint at sprint-controller.ts:317 after sprint lock. complete → emits SPRINT_RESUME_COMPLETE + early return cleanup. resume-evaluate → emits SPRINT_RESUME (payload: staleWithResult/staleMarkedNoGo) + skips PLAN/SPAWN/EXECUTE block (wrapped in else branch), pre-reads existing .result files for EVALUATE consumption, continues to EVALUATE→FIX→RETRO→CLEANUP normally. (3) tests/orchestra/state-recovery.test.ts — 6 tests covering no-checkpoint→fresh, all-DONE→complete, stale+result→resume-evaluate, stale+no-result→NO_GO mark + resume, startedAt preserve (sprintStartedAt + timestamp fallback), state.json sync. All 6 PASS in 10ms. tsc PASS. Regression check: tests/orchestra/sprint-checkpoint.test.ts (20) + checkpoint-loop.test.ts (7) + brain.test.ts + brain-integration.test.ts + brain-ipc.test.ts (248 total) all PASS. Pre-existing failures in sprint-phases-rollback.test.ts (3), fix-phase-map.test.ts (5), brain-provider.test.ts (2), gemini-integration.test.ts (2), docker-backend.test.ts (2), github workflow tests (3) are all baseline failures verified with git stash — 0 new failures introduced. Grep evidence: 'restoreSprintFromCheckpoint' has 5 matches across sprint-checkpoint.ts (4) and sprint-controller.ts (2), 'SPRINT_RESUME\\b' has 1 match. ADR compliance: ADR-008 brain-only import direction preserved (sprint-checkpoint imports sprint-utils, not sprint-controller); ADR-024 god-object discipline maintained (recovery logic lives in sprint-checkpoint, controller stays orchestration-only).",
+  "tokenUsage": {
+    "inputTokens": 65000,
+    "outputTokens": 9500,
+    "cacheReadTokens": 0,
+    "provider": "claude",
+    "model": "opus"
+  },
+  "rubricScores": {
+    "correctness": 95,
+    "test_coverage": 92,
+    "scope_compliance": 100,
+    "documentation": 85
+  },
+  "evaluationDecision": "DONE"
+}
