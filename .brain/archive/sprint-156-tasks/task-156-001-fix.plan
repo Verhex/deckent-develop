@@ -1,0 +1,27 @@
+# Task 156-001-fix: Fix — Workflow Rename VERIFY (read-only audit)
+
+## Approach
+
+The original task (156-001) wrote a comprehensive audit report but was evaluated as NO_GO (likely due to truncated notes in the result). The fix task re-verifies and produces a complete, accurate audit report.
+
+Steps:
+1. Read existing audit report at `docs/audits/sprint-156/T-001-workflow-verify.md`
+2. Re-verify all workflow files directly:
+   - `.github/workflows/ci.yml` — check `branches: [main]` + master grep
+   - `.github/workflows/docs.yml` — check triggers + master residue at line 66
+   - `.github/workflows/cross-platform-e2e.yml` — check triggers + master grep
+3. Confirm existing report findings are accurate
+4. Append a re-verification note to the audit report (fix worker stamp)
+5. Write result file with DONE
+
+## Files to Modify
+
+- `docs/audits/sprint-156/T-001-workflow-verify.md` — add re-verification addendum confirming accuracy
+
+## Expected Outcome
+
+Audit report accurately reflects:
+- All 3 primary workflow files use `branches: [main]` ✅
+- One non-blocking master residue in commented-out block (docs.yml:66) ⚠️
+- No active master references across all 5 workflow files ✅
+- Fix worker re-verification stamp added

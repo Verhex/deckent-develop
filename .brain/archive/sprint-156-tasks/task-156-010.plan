@@ -1,0 +1,76 @@
+# Task 156-010 — Runtime File Lock (flock spawn-time) Execution Plan
+
+## Goal
+Spawn-time concurrent-write conflict detection: before a worker container starts,
+acquire a per-file spawn lock for each `scope.filesWrite` entry. If another
+currently-active task already holds a spawn lock on any of those files, the
+spawn aborts and surfaces a clear `SpawnBackendError`.
+
+## Design
+
+### New module API (src/core/file-lock.ts)
+- `SpawnLockInfo` interface — { filePath, taskId, acquiredAt }.
+- `SpawnLockError extends Error` — thrown when another task holds the file.
+  Carries `filePath`, `conflictingTaskId` for actionable diagnostics.
+- `acquireSpawnLock(projectRoot, taskId, filePath): SpawnLockInfo`
+  - Atomic O_EXCL create at `.locks/<sha256(filePath).slice(0,32)>.spawnlock`.
+  - Hash-based naming keeps long paths short and platform-safe.
+  - Idempotent: same `taskId` re-acquiring returns the existing lock.
+  - Conflict (different `taskId`): throws `SpawnLockError`.
+- `releaseSpawnLock(projectRoot, taskId, filePath)` — no-op if missing;
+  refuses to delete locks owned by a different task (defensive).
+- `acquireSpawnLocks(projectRoot, taskId, files[]): SpawnLockInfo[]`
+  - Batch helper: rolls back all previously-acquired locks if any file in the
+    batch fails, so partial-lock state never leaks.
+- `releaseSpawnLocks(projectRoot, taskId, files[])` — best-effort cleanup.
+- `releaseAllSpawnLocks(projectRoot, taskId): number` — release every
+  spawnlock owned by the task (used by monitorContainer on exit).
+- `.spawnlock` extension (distinct from worker `.lock`) → existing
+  `checkLocks` / `clearStaleLocks` / `clearOrphanLocks` filters
+  (`endsWith('.lock')`) are unchanged. Verified — they remain limited
+  to worker-time `.lock` files.
+
+### Docker backend integration (src/orchestra/spawn-backend-docker.ts)
+- Inside `spawn()`, BEFORE the docker-images precheck and prompt write:
+  read the task JSON (`<tasksDir>/task-<taskId>.json`) to recover
+  `scope.filesWrite`. If the file is missing or malformed, log via
+  `debugLog` and skip locking (graceful degradation — never block spawn
+  because of a parse failure).
+- Call `acquireSpawnLocks(projectDir, taskId, filesWrite)`. On
+  `SpawnLockError`: throw `SpawnBackendError` with the conflicting task id.
+- On container exit (inside `monitorContainer`), call
+  `releaseAllSpawnLocks(projectDir, taskId)` so future spawns can claim
+  the same files.
+- On `kill()`: also call `releaseAllSpawnLocks` to ensure forced shutdown
+  doesn't leak locks.
+
+## Files Touched
+- src/core/file-lock.ts — additive (new exports, no breakage).
+- src/orchestra/spawn-backend-docker.ts — wire acquire/release calls.
+- tests/core/file-lock-runtime.test.ts — new test file.
+
+## Test Plan (tests/core/file-lock-runtime.test.ts)
+1. Single spawn lock acquired and visible on disk under `.locks/`.
+2. Second `acquireSpawnLock` for same file + different taskId throws
+   `SpawnLockError` (this is the canonical "2nd worker fails" scenario).
+3. Idempotent re-acquire for the same taskId returns without error.
+4. `releaseSpawnLock` removes the lock; subsequent acquire from a
+   different taskId succeeds.
+5. `acquireSpawnLocks` rolls back: if file[1] conflicts, file[0]'s lock
+   is released.
+6. `releaseAllSpawnLocks` removes only locks owned by the calling task.
+7. Verify `.spawnlock` files don't collide with `.lock` files (existing
+   `checkLocks()` ignores them).
+
+## Verification
+- `npx tsc --noEmit` — no type regressions.
+- `npx vitest run tests/core/file-lock-runtime.test.ts` — new suite passes.
+- `npx vitest run tests/core/file-lock.test.ts` — pre-existing suite
+  still passes (no regression on the old API).
+
+## ADR Compliance
+- ADR-001/002 (TypeScript + ESM): all imports use `.js` suffix.
+- ADR-008 (Brain-only import): file-lock.ts has no brain imports;
+  spawn-backend-docker.ts continues to call file-lock from orchestra
+  scope (already an established pattern via brain → backend → core).
+- No build invocation (ANCHOR rule); no project-wide test run.

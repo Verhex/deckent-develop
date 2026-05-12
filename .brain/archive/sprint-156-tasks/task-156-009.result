@@ -1,0 +1,27 @@
+{
+  "taskId": "156-009",
+  "filesChanged": [
+    "src/core/spawn-safety.ts",
+    "tests/core/spawn-safety.test.ts"
+  ],
+  "linesAdded": 312,
+  "linesRemoved": 0,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "GO_WITH_TECH_DEBT",
+  "notes": "HONEST SELF-ASSESSMENT: Module + tests fully shipped (100% of in-scope work). spawn-backend-docker.ts wire-up explicitly OUT OF SCOPE (src/orchestra/, not src/core/) — leaving as a small follow-up tech-debt item. Estimated full-spec coverage: ~75%.\n\nIMPLEMENTATION:\n- src/core/spawn-safety.ts (157 LoC) — defensive primitive.\n  * ADAPTER_BIN_WHITELIST: frozen ['node','npx','vitest','tsc','python','python3','go','cargo','java','dotnet']\n  * SH_C_ALLOWED: /^[A-Za-z0-9_\\-\\.\\/\\s\\=]+$/ (per spec, verbatim)\n  * SpawnSafetyError class (codes: BIN_NOT_WHITELISTED | ARG_INJECTION | INVALID_INPUT) with bin/badArg fields\n  * assertSpawnSafe(bin, args, opts?): throws on violation\n      - basename(bin) → whitelist check (accepts absolute paths)\n      - per-arg regex validation (empty strings skipped — no injection vector)\n      - opts.binWhitelist + opts.argRegex override hooks\n  * isSpawnSafe(): boolean wrapper for log-and-skip callers\n  * JSDoc references ADR-006 (spawnSync security pattern) and forthcoming ADR-047.\n\nTESTS (tests/core/spawn-safety.test.ts, 26 cases, all green):\n- ADAPTER_BIN_WHITELIST shape + frozen mutation\n- SH_C_ALLOWED accepts/rejects characters (incl. spec-required: rm -rf, npx vitest run, ;rm injection)\n- SH_C_ALLOWED whitespace classification edge case: \\s matches \\n/\\r/\\t per spec — documented as known limitation for direct spawn() (not sh -c)\n- All 10 whitelisted bins exercised with --version arg\n- Absolute path bin via basename\n- sh / bash rejection (not whitelisted)\n- Backtick / $() / pipe / && / >/< / multiline meta-character injection rejection\n- Empty args array + empty-string args accepted\n- INVALID_INPUT: non-string bin, non-array args, non-string entries\n- Custom binWhitelist + argRegex overrides\n- isSpawnSafe boolean variant covering all paths\n- SpawnSafetyError shape (code/bin/badArg)\n\nVERIFY (anchor-rule compliant — targeted only):\n- npx vitest run tests/core/spawn-safety.test.ts → 26/26 PASS, 158ms\n- npx tsc --noEmit (per-file with project compiler options + --skipLibCheck) → 0 errors on both source and test file\n\nFOLLOW-UP TECH DEBT (single line in subsequent task):\n  spawn-backend-docker.ts (src/orchestra/) needs:\n    import { assertSpawnSafe } from '../core/spawn-safety.js';\n    assertSpawnSafe(bin, args); // before each spawnSync('docker', ...) / nodeSpawn() call\n  Current scope (src/core/, tests/core/) forbids the edit; the primitive is exported and ready.\n\nANCHOR RULES OBSERVED:\n  1. No npm run build / install / publish / docker build / project-wide tsc / project-wide vitest.\n  2. Vitest invoked only for the single new test file.\n  3. Build/test results inform self-assessment but do not override it.\n  4. No example paths added beyond actual filesWrite.\n  5. Single atomic effect: spawn-safety primitive — no composite handling.",
+  "tokenUsage": {
+    "inputTokens": 28000,
+    "outputTokens": 6500,
+    "cacheReadTokens": 0,
+    "provider": "claude",
+    "model": "opus"
+  },
+  "rubricScores": {
+    "correctness": 95,
+    "test_coverage": 95,
+    "scope_compliance": 100,
+    "documentation": 90
+  },
+  "evaluationDecision": "GO_WITH_TECH_DEBT"
+}

@@ -1,0 +1,27 @@
+{
+  "taskId": "156-010-fix",
+  "filesChanged": [
+    "src/orchestra/spawn-backend-docker.ts",
+    "tests/core/file-lock-runtime.test.ts"
+  ],
+  "linesAdded": 135,
+  "linesRemoved": 19,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "DONE",
+  "rubricScores": {
+    "correctness": 95,
+    "test_coverage": 95,
+    "scope_compliance": 100,
+    "documentation": 85
+  },
+  "evaluationDecision": "DONE",
+  "notes": "Hardened Sprint 156 Task 10 spawn-time file lock by closing a real lock-leak bug in the docker backend. Baseline state: src/core/file-lock.ts already exported the full .spawnlock API (SpawnLockInfo, SpawnLockError, acquireSpawnLock/Locks with batch rollback, releaseSpawnLock/Locks, releaseAllSpawnLocks); 18-case tests/core/file-lock-runtime.test.ts was green; DockerSpawnBackend.spawn() acquired locks via acquireSpawnTimeLocks() and released them on container exit / kill() / image-not-found. Gap identified: between the lock acquisition and the successful handoff to monitorContainer(), several failure paths could leak locks: (a) the `docker run` non-zero status path silently wrote a .timeout marker and returned without releasing, permanently blocking any retry / fix worker spawned for the same file scope (transient docker errors became hard locks); (b) any throw from the WSL2 check / writeFileSync(promptHostPath) / writeFileSync(scriptHostPath) / spawnSync wrapper would leak in the same way. Fix: split spawn() into a thin acquire-locks + try/catch wrapper that delegates the body to a new private runSpawn(); the catch arm calls releaseAllSpawnLocks(dir, taskId) before rethrowing. The non-zero-status early-return path is augmented with an explicit releaseAllSpawnLocks call so the silent-return semantics are preserved while still freeing the locks. The image-not-found path now simply throws (catch arm handles the release). Added regression test (`cleanup-on-failure: releaseAllSpawnLocks unblocks a different task after a simulated failure`) — confirms that after a simulated post-acquire failure, a different task (e.g. the fix worker) can claim the same files. Verify: `npx tsc --noEmit` → 0 errors. `npx vitest run` on 4 relevant suites (file-lock, file-lock-runtime, unit/spawn-backend-docker, orchestra/tmpfile-preservation) → 59/59 pass (was 58/58 before the regression test was added). ANCHOR compliance: no npm run build, no npm install, no project-wide tsc/vitest. ADR-001/002: ESM .js suffixes preserved. ADR-008: file-lock under core, docker backend under orchestra — import direction unchanged. ADR-006/007 (spawnSync security): no new spawn signatures introduced. ADR-037 RBAC: worker stayed within declared scope (src/core/, src/orchestra/, tests/core/ — only the two new modifications are in src/orchestra/spawn-backend-docker.ts and tests/core/file-lock-runtime.test.ts; src/core/file-lock.ts untouched in this fix since the API contract was already correct).",
+  "tokenUsage": {
+    "inputTokens": 28000,
+    "outputTokens": 4200,
+    "cacheReadTokens": 0,
+    "provider": "claude",
+    "model": "opus"
+  }
+}

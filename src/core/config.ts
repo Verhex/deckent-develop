@@ -27,6 +27,19 @@ import type { ModelStrategy } from './mode-presets.js';
 import { metric } from './observability.js';
 import { interpolateConfig } from './deck-interpolation.js';
 
+/**
+ * Local intersection alias bridging the `dependency_pipeline_enabled` flag,
+ * which is declared on `ResolvedConfig` (config-types.ts) but is not yet a
+ * member of `DeckentConfig`. Used by createDefaultConfig/loadConfig/mergeConfigs
+ * to flip the default to `true` without modifying the shared type file.
+ *
+ * Sprint 156 Task 2: default flipped false → true to activate the dependency
+ * pipeline (wave-based spawning + cascade NO_GO + unblock DONE) by default.
+ * A follow-up sprint should add `dependency_pipeline_enabled` to `DeckentConfig`
+ * directly and remove this alias.
+ */
+type DeckentConfigWithPipeline = DeckentConfig & { dependency_pipeline_enabled?: boolean };
+
 // ─── Default Timeout Config ─────────────────────────────────────────
 export const DEFAULT_TIMEOUT_CONFIG: TimeoutConfig = {
   docker_min_timeout: 1200,
@@ -507,7 +520,7 @@ function getConfigMtime(projectRoot: string): number {
  * @returns A new DeckentConfig instance with default values
  */
 export function createDefaultConfig(): DeckentConfig {
-  return {
+  const config: DeckentConfigWithPipeline = {
     mode: DEFAULT_MODE,
     modes: structuredClone(DEFAULT_MODES),
     // Provider (Sprint 150 Decision 4 — grouped `providers` is canonical; flat keys deprecated)
@@ -568,6 +581,17 @@ export function createDefaultConfig(): DeckentConfig {
     routing_engine: 'v2',
     // Cleanup delay: wait before deleting .tasks/ files (ms)
     cleanup_delay_ms: 180_000,
+    /**
+     * Dependency pipeline enabled.
+     *
+     * Sprint 156 Task 2 — default flipped false → true.
+     * When true, sprint-spawner.ts uses wave-based spawning, applies
+     * cascade-on-NO_GO (dependents → PAUSED) and unblock-on-DONE (dependents → PENDING).
+     * Race conditions in DIRECTIVES with explicit `dependencies` are eliminated.
+     * Cast via DeckentConfigWithPipeline because the field is declared on
+     * ResolvedConfig but not yet on DeckentConfig (see alias at top of file).
+     */
+    dependency_pipeline_enabled: true,
     // Sprint checkpoint interval: how many terminal tasks before writing a checkpoint
     sprint_checkpoint_interval: 5,
     // Timeout
@@ -627,6 +651,7 @@ export function createDefaultConfig(): DeckentConfig {
       history_retention_days: 30,
     },
   };
+  return config;
 }
 
 /**
@@ -847,6 +872,9 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
     routing_config: config.routing_config,
     // Cleanup delay
     cleanup_delay_ms: config.cleanup_delay_ms,
+    // Dependency pipeline (Sprint 156: default true; user/project config can override)
+    dependency_pipeline_enabled:
+      (config as DeckentConfigWithPipeline).dependency_pipeline_enabled ?? true,
     // AI planner timeout
     ai_planner_timeout: config.ai_planner_timeout,
     // Sprint checkpoint interval
@@ -1361,6 +1389,9 @@ export function mergeConfigs(
     agent_min_score: config.agent_min_score ?? 5,
     adaptive_config: config.adaptive_config ?? { min_samples: 3, no_go_threshold: 0.3, coverage_lookback: 3 },
     deckent_style: config.deckent_style ?? 'sprint',
+    // Sprint 156: default true unless overridden by user/project config
+    dependency_pipeline_enabled:
+      (config as DeckentConfigWithPipeline).dependency_pipeline_enabled ?? true,
   };
 }
 

@@ -1,0 +1,26 @@
+# Plan — task-156-004-fix
+
+## Goal
+Re-verify that Sprint 156 Task 4 (Tmpfile Cleanup Discipline) is functionally complete.
+Original worker wrote selfAssessment=DONE but Brain reclassified as NO_GO.
+
+## Approach
+1. Verify the three target files contain the required changes:
+   - src/orchestra/spawn-backend-docker.ts
+     a. Inline .worker-*.sh deletion block (lines 567-578) removed → REPLACED by comment
+     b. archivePromptFiles extended to .worker-*.sh (in addition to .prompt-*.txt)
+   - src/orchestra/sprint-lifecycle.ts
+     a. cleanup() gets cleanupPhase: CleanupPhaseKind parameter (default sprint-end)
+     b. Archive call gated on cleanupPhase === 'sprint-end'
+   - tests/orchestra/tmpfile-preservation.test.ts
+     a. archivePromptFiles tests (4)
+     b. cleanup() gating tests (3)
+     c. Mid-sprint preservation contract test (1)
+
+2. Run isolated vitest on tmpfile-preservation.test.ts (per DIRECTIVES anchor rule TEST IZOLE).
+3. Run tsc --noEmit ONLY on the three target files via skipLibCheck if possible (per anchor rule BUILD YASAK — no project-wide tsc).
+
+## Risks
+- Anchor rule "BUILD YASAK" forbids project-wide tsc/build. Will only run the isolated test.
+- If files are already correct and tests pass → write selfAssessment=DONE.
+- If files are missing changes → edit them and re-run tests.

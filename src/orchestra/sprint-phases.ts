@@ -10,7 +10,7 @@
 
 // ─── Node Builtins ─────────────────────────────────────────────────
 import {
-  readFileSync, writeFileSync, existsSync, readdirSync,
+  readFileSync, writeFileSync, existsSync, readdirSync, statSync,
 } from 'node:fs';
 import { join } from 'node:path';
 
@@ -28,7 +28,7 @@ import type {
 } from '../core/types.js';
 
 import {
-  BRAIN_DIR, TASKS_DIR, DEBT_FILE, DECKENT_VERSION,
+  BRAIN_DIR, TASKS_DIR, DEBT_FILE, DECKENT_VERSION, DECKENT_DIR,
 } from '../core/constants.js';
 
 import { readJsonSafe, parseDebtTable, debugLog } from '../core/utils.js';
@@ -84,6 +84,14 @@ import { evaluateWithRubric } from './result-evaluator.js';
 // ─── Result Map Helper ──────────────────────────────────────────
 import { buildResultsMap } from './result-collector.js';
 
+// ─── Dependency Cascade / Unblock Wire (Sprint 156 — Task 003) ───
+// applyCascadeToSprint + applyUnblockToSprint were exported from
+// sprint-spawner but had no runtime caller. Wired here so NO_GO →
+// dependents PAUSED and DONE → dependents PENDING actually fire.
+import { applyCascadeToSprint, applyUnblockToSprint } from './sprint-spawner.js';
+import { writeEvent, getCurrentSprintId } from './event-stream.js';
+import type { FailureContext } from './result-evaluator.js';
+
 // ─── Sprint Controller (safe circular — all usages inside function bodies) ──
 import {
   BrainError,
@@ -109,6 +117,33 @@ function toTaskEvaluation(evalResult: EvaluationResult): TaskEvaluation {
     case 'NO_GO': return TaskEvaluation.NO_GO;
     default: return TaskEvaluation.NO_GO;
   }
+}
+
+/**
+ * Persist a single task's mutated status (PAUSED/PENDING) back to disk.
+ * Sprint 156 Task 003: cascade/unblock writes flow through here so spawn-spawner
+ * disk reads + Auditor dashboards reflect the new state.
+ */
+function persistTaskStatus(projectRoot: string, sprint: Sprint, taskId: string): void {
+  try {
+    const tasksPath = join(projectRoot, TASKS_DIR);
+    const task = sprint.tasks.find(t => t.id === taskId);
+    if (!task) return;
+    writeFileSync(
+      join(tasksPath, `task-${task.id}.json`),
+      JSON.stringify(task, null, 2),
+      'utf-8',
+    );
+  } catch (e) { debugLog('persistTaskStatus', e); }
+}
+
+/** Build a FailureContext from a TaskResult for cascade classification. */
+function buildFailureContext(result: TaskResult): FailureContext {
+  return {
+    notes: result.notes ?? '',
+    selfAssessment: result.selfAssessment,
+    resultFilePresent: true,
+  };
 }
 
 function now(): string {
@@ -139,6 +174,92 @@ function safeDashboardUpdate(
       updatedAt: now(),
     });
   } catch (e) { debugLog('safeDashboardUpdate:updateDashboard', e); }
+}
+
+
+// ═══ Build Staleness Pre-Flight (Sprint 156 — Task 008) ══════════════
+// Pre-flight check: detect when dist/orchestra/sprint-phases.js was rebuilt
+// AFTER the previous sprint's sprint-state.json was last written. When this
+// happens, runtime behavior may differ from the previously tested build —
+// emit SPRINT→USER:BUILD_STALE_WARNING so the user can decide whether to
+// re-validate before starting a new sprint.
+//
+// NO build invocation. Pure mtime read + event emit. Fail-safe: any I/O
+// error is swallowed (debugLog only) — never crash sprint start because of
+// staleness telemetry.
+
+/** Result of a build-staleness pre-flight check. */
+export interface BuildStalenessResult {
+  /** true → SPRINT→USER:BUILD_STALE_WARNING was emitted */
+  warningEmitted: boolean;
+  /** ISO 8601 mtime of dist/orchestra/sprint-phases.js (if readable) */
+  distMtime?: string;
+  /** ISO 8601 mtime of .deckent/sprint-state.json (if readable) */
+  sprintStateMtime?: string;
+  /** distMtime - sprintStateMtime in whole seconds (positive = dist newer) */
+  ageSeconds?: number;
+  /** Reason warning was NOT emitted, when applicable (for telemetry/debug) */
+  skipReason?: 'dist-missing' | 'state-missing' | 'not-newer' | 'io-error';
+}
+
+/**
+ * Pre-flight check: emit SPRINT→USER:BUILD_STALE_WARNING when the compiled
+ * dist/orchestra/sprint-phases.js is newer than the previous sprint's
+ * .deckent/sprint-state.json. Runs before any sprint-state mutation so the
+ * mtime read reflects the PREVIOUS sprint's final state.
+ *
+ * NO build invocation — pure mtime read + event emit. Fail-safe: any I/O
+ * error returns { warningEmitted: false, skipReason: 'io-error' } and does
+ * not throw.
+ *
+ * @param projectRoot - Project root directory
+ * @param sprintId - Current sprint ID, used for event-stream targeting
+ * @returns BuildStalenessResult describing the check outcome
+ */
+export function checkBuildStaleness(
+  projectRoot: string,
+  sprintId: string,
+): BuildStalenessResult {
+  try {
+    const distPath = join(projectRoot, 'dist', 'orchestra', 'sprint-phases.js');
+    const statePath = join(projectRoot, DECKENT_DIR, 'sprint-state.json');
+
+    if (!existsSync(distPath)) {
+      return { warningEmitted: false, skipReason: 'dist-missing' };
+    }
+    if (!existsSync(statePath)) {
+      return { warningEmitted: false, skipReason: 'state-missing' };
+    }
+
+    const distStat = statSync(distPath);
+    const stateStat = statSync(statePath);
+    const distMtime = distStat.mtime.toISOString();
+    const sprintStateMtime = stateStat.mtime.toISOString();
+
+    if (distStat.mtimeMs <= stateStat.mtimeMs) {
+      return {
+        warningEmitted: false,
+        distMtime,
+        sprintStateMtime,
+        ageSeconds: Math.floor((distStat.mtimeMs - stateStat.mtimeMs) / 1000),
+        skipReason: 'not-newer',
+      };
+    }
+
+    const ageSeconds = Math.floor((distStat.mtimeMs - stateStat.mtimeMs) / 1000);
+    writeEvent(
+      projectRoot,
+      sprintId,
+      'sprint',
+      'user',
+      'SPRINT→USER:BUILD_STALE_WARNING',
+      { distMtime, sprintStateMtime, ageSeconds },
+    );
+    return { warningEmitted: true, distMtime, sprintStateMtime, ageSeconds };
+  } catch (e) {
+    debugLog('checkBuildStaleness', e);
+    return { warningEmitted: false, skipReason: 'io-error' };
+  }
 }
 
 
@@ -179,6 +300,16 @@ export async function runPlanPhase(
     };
     const sprint = await planSprint(projectRoot, config, context, recommendation);
     sprint.startedAt = now();
+
+    // Sprint 156 Task 008: Pre-flight build-staleness check. Compares
+    // dist/orchestra/sprint-phases.js mtime against the previous sprint's
+    // .deckent/sprint-state.json mtime. If dist is newer, emits
+    // SPRINT→USER:BUILD_STALE_WARNING so the user can re-validate. Runs
+    // BEFORE writeSprintState (in runSpawnPhase) so the read reflects the
+    // previous sprint's state, not the in-flight one. Fail-safe — never
+    // throws.
+    try { checkBuildStaleness(projectRoot, sprint.id); }
+    catch (e) { debugLog('runPlanPhase:checkBuildStaleness', e); }
 
     // Show Kraken splash on first sprint start (non-fatal)
     if (sprint.number === 1) {
@@ -443,6 +574,51 @@ export async function runEvaluatePhase(
       }
     }
     debugLog('runEvaluatePhase:done', `evaluations.size=${evaluations.size} keys=[${[...evaluations.keys()].join(',')}]`);
+
+    // ─── Sprint 156 Task 003: Cascade NO_GO → dependents PAUSED ──────
+    // For each task that ended up NO_GO with a real result file, classify
+    // the failure and (if CODE) cascade-block PENDING dependents → PAUSED.
+    // Per-transition events are already emitted from inside
+    // applyCascadeToSprint; here we additionally fire a single
+    // BRAIN→*:DEPENDENCY_CASCADE_APPLIED summary event so listeners can
+    // observe aggregate cascade outcomes.
+    //
+    // Timeout NO_GOs (no result file present) are skipped: they are
+    // downstream effects rather than root failures, and applyCascadeToSprint
+    // would classify them as RUNTIME (no cascade) anyway — emitting an
+    // empty cascade event for them just adds noise.
+    try {
+      const sprintId = getCurrentSprintId(projectRoot) ?? sprint.id;
+      const resultsMapForCascade = buildResultsMap(results);
+      for (const [taskId, evaluation] of evaluations.entries()) {
+        if (evaluation !== TaskEvaluation.NO_GO) continue;
+        const result = resultsMapForCascade.get(taskId);
+        if (!result) continue; // skip timeout NO_GOs — root failures only
+        const failureCtx: FailureContext = buildFailureContext(result);
+        try {
+          const { decision, blockedTaskIds } = applyCascadeToSprint(
+            projectRoot, sprint, taskId, failureCtx,
+          );
+          // Persist any PENDING → PAUSED status mutations to disk
+          for (const blockedId of blockedTaskIds) {
+            persistTaskStatus(projectRoot, sprint, blockedId);
+          }
+          // Summary event — broadcast even when no tasks were blocked so
+          // observers can correlate failure decisions with their effect.
+          writeEvent(
+            projectRoot, sprintId, 'brain', '*',
+            'BRAIN→*:DEPENDENCY_CASCADE_APPLIED',
+            {
+              failedTaskId: taskId,
+              shouldCascade: decision.shouldCascade,
+              failureCategory: decision.category,
+              blockedTaskIds,
+              totalBlocked: blockedTaskIds.length,
+            },
+          );
+        } catch (e) { debugLog('runEvaluatePhase:applyCascade', e); }
+      }
+    } catch (e) { debugLog('runEvaluatePhase:cascadeWire', e); }
   } catch (err) {
     safeDashboardUpdate(projectRoot, sprint, `Phase ${sprint.phase} error: ${err instanceof Error ? err.message : String(err)}`);
   }
@@ -556,6 +732,7 @@ export async function runFixPhase(
         ?? opts?.fixPhaseTimeoutMs
         ?? 1_800_000;
       const fixResults = await waitForResults(projectRoot, fixSprint, fixPhaseTimeout, undefined, { spawnBackend });
+      const sprintIdForUnblock = getCurrentSprintId(projectRoot) ?? sprint.id;
       for (const fixTask of fixTasks) {
         const fixResult = fixResults.find(r => r.taskId === fixTask.id);
         if (fixResult) {
@@ -569,6 +746,40 @@ export async function runFixPhase(
           // Update original task evaluation if fix succeeded
           if (fixTask.fixForTaskId && fixEval !== TaskEvaluation.NO_GO && evaluations.has(fixTask.fixForTaskId)) {
             evaluations.set(fixTask.fixForTaskId, fixEval);
+          }
+
+          // ─── Sprint 156 Task 003: Unblock dependents on fix DONE ────
+          // When a fix worker resolves a previously-failed task, flip the
+          // original task's status to DONE in-memory so unblockDependents'
+          // doneTasks set picks it up, then re-enable PAUSED dependents
+          // whose dependencies are all satisfied.
+          if (
+            fixEval !== TaskEvaluation.NO_GO &&
+            fixTask.fixForTaskId
+          ) {
+            const originalTask = sprint.tasks.find(t => t.id === fixTask.fixForTaskId);
+            if (originalTask && originalTask.status !== TaskStatus.DONE) {
+              originalTask.status = TaskStatus.DONE;
+              persistTaskStatus(projectRoot, sprint, originalTask.id);
+            }
+            try {
+              const unblockedTaskIds = applyUnblockToSprint(
+                projectRoot, sprint, fixTask.fixForTaskId,
+              );
+              for (const unblockedId of unblockedTaskIds) {
+                persistTaskStatus(projectRoot, sprint, unblockedId);
+              }
+              writeEvent(
+                projectRoot, sprintIdForUnblock, 'brain', '*',
+                'BRAIN→*:DEPENDENCY_UNBLOCK_APPLIED',
+                {
+                  resolvedTaskId: fixTask.fixForTaskId,
+                  fixTaskId: fixTask.id,
+                  unblockedTaskIds,
+                  totalUnblocked: unblockedTaskIds.length,
+                },
+              );
+            } catch (e) { debugLog('runFixPhase:applyUnblock', e); }
           }
         }
       }

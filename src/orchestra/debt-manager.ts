@@ -6,6 +6,7 @@ import { TaskStatus, TaskEvaluation } from '../core/types.js';
 import type {
   Task, TaskResult, Sprint, DecayResult,
 } from '../core/types.js';
+import type { ModelType } from '../core/task-types.js';
 import {
   BRAIN_DIR, TASKS_DIR,
   MEMORY_DB_FILE,
@@ -58,6 +59,136 @@ function now(): string {
 function getSprintNumber(sprintId: string): number {
   const match = sprintId.match(/sprint-(\d+)/);
   return match?.[1] ? parseInt(match[1], 10) : 0;
+}
+
+// ═══ Fresh-Eyes Rotation (Sprint 156 Task 012) ═════════════════════
+// When a task fails (NO_GO), the fix worker should bring a "fresh
+// perspective" — different model tier and different agent specialty.
+// This reduces the chance that the same blind spot repeats on retry.
+
+/**
+ * Provider-agnostic model downgrade map. Used to rotate a failed task's
+ * model to a lower tier (different reasoning trace + cost savings).
+ * Terminal models map to themselves (no further downgrade possible).
+ */
+const MODEL_DOWNGRADE_MAP: Readonly<Record<string, ModelType>> = Object.freeze({
+  // Claude
+  opus: 'sonnet',
+  sonnet: 'haiku',
+  haiku: 'haiku',
+  // OpenAI / Codex
+  'gpt-5': 'gpt-4.1',
+  'gpt-5-mini': 'gpt-5-mini',
+  'gpt-4.1': 'gpt-4.1-mini',
+  'gpt-4.1-mini': 'gpt-4.1-mini',
+  o3: 'o4-mini',
+  'o4-mini': 'o4-mini',
+  // Gemini
+  'gemini-3.1-pro-preview': 'gemini-2.5-pro',
+  'gemini-2.5-pro': 'gemini-2.5-flash',
+  'gemini-2.5-flash': 'gemini-2.0-flash',
+  'gemini-2.0-flash': 'gemini-2.0-flash',
+});
+
+/**
+ * Agent rotation map — pairs agents whose perspectives complement each other.
+ * The retry agent should differ from the original to catch what the first agent missed.
+ */
+const AGENT_FRESH_EYES_MAP: Readonly<Record<string, string>> = Object.freeze({
+  architect: 'code-reviewer',
+  'architecture-planner': 'code-reviewer',
+  'bug-fixer': 'code-reviewer',
+  'code-reviewer': 'bug-fixer',
+  'test-writer': 'bug-fixer',
+  'doc-writer': 'code-reviewer',
+  'security-auditor': 'code-reviewer',
+  refactorer: 'bug-fixer',
+  'api-builder': 'code-reviewer',
+  'performance-analyzer': 'bug-fixer',
+  'ci-guardian': 'bug-fixer',
+  'accessibility-auditor': 'code-reviewer',
+  'data-engineer': 'bug-fixer',
+  'devops-engineer': 'code-reviewer',
+  'frontend-designer': 'code-reviewer',
+  'migration-specialist': 'code-reviewer',
+});
+
+const DEFAULT_FRESH_EYES_AGENT = 'code-reviewer';
+
+/**
+ * Strategy descriptor describing what rotation was applied to a fix task.
+ * Persisted to the fix task JSON as `rotationStrategy` for observability.
+ */
+export interface FreshEyesRotationStrategy {
+  enabled: true;
+  originalModel: ModelType;
+  rotatedModel: ModelType;
+  originalAgent: string;
+  rotatedAgent: string;
+  /** Companion skill ids added on top of the fresh-eyes agent rotation */
+  addedSkills: string[];
+  rationale: string;
+}
+
+/**
+ * Rotate a model to its fresh-eyes counterpart (one tier down when available).
+ * @param model - The original task's model
+ * @returns A different model where possible, the same model when already at the floor
+ */
+export function rotateModelForFix(model: ModelType): ModelType {
+  return MODEL_DOWNGRADE_MAP[model] ?? model;
+}
+
+/**
+ * Rotate an agent to its fresh-eyes counterpart.
+ * - Known agent: looked up in AGENT_FRESH_EYES_MAP
+ * - Unknown / generic / undefined: defaults to 'code-reviewer'
+ */
+export function rotateAgentForFix(agent: string | undefined | null): string {
+  if (!agent || agent === 'generic') return DEFAULT_FRESH_EYES_AGENT;
+  return AGENT_FRESH_EYES_MAP[agent] ?? DEFAULT_FRESH_EYES_AGENT;
+}
+
+/**
+ * Compute the additional companion skills to inject alongside a rotated agent.
+ * For architect → code-reviewer, we add a bug-fixer-flavored skill to ensure
+ * the fix worker has a debug-first mindset (matches DIRECTIVES intent
+ * "code-reviewer+bug-fixer").
+ */
+function companionSkillsForRotation(originalAgent: string | undefined | null): string[] {
+  if (!originalAgent) return [];
+  if (originalAgent === 'architect' || originalAgent === 'architecture-planner') {
+    return ['code-simplifier'];
+  }
+  if (originalAgent === 'security-auditor') return ['code-simplifier'];
+  return [];
+}
+
+/**
+ * Build a rotation strategy descriptor for a failed task.
+ * Pure function — does not mutate the input task.
+ *
+ * @param originalTask - Task being retried (its model + assignedAgent define the "original" side)
+ * @returns Strategy descriptor with rotated model, agent, and companion skills
+ */
+export function applyFreshEyesRotation(originalTask: Task): FreshEyesRotationStrategy {
+  const originalModel = originalTask.model;
+  const originalAgent = originalTask.assignedAgent ?? 'generic';
+  const rotatedModel = rotateModelForFix(originalModel);
+  const rotatedAgent = rotateAgentForFix(originalAgent);
+  const addedSkills = companionSkillsForRotation(originalAgent);
+  const rationale =
+    `Fresh-eyes rotation: ${originalModel}→${rotatedModel}, ${originalAgent}→${rotatedAgent}`
+    + (addedSkills.length > 0 ? ` (+skills: ${addedSkills.join(',')})` : '');
+  return {
+    enabled: true,
+    originalModel,
+    rotatedModel,
+    originalAgent,
+    rotatedAgent,
+    addedSkills,
+    rationale,
+  };
 }
 
 // ═══ Exported Functions ════════════════════════════════════════════
@@ -142,11 +273,22 @@ export function handleEvaluation(
     `Files that should change: ${(task.scope?.filesWrite ?? []).join(', ')}`,
   ].filter(Boolean).join('\n');
 
+  // ── Fresh-Eyes Rotation (Sprint 156 Task 012) ───────────────────
+  // Replace original model + agent with a rotated pair so the fix worker
+  // approaches the failure with a different reasoning style. This
+  // changes the existing "copy model/agent" behaviour intentionally.
+  const rotationStrategy = applyFreshEyesRotation(task);
+  const rotatedSkills = Array.from(new Set([
+    ...(task.assignedSkills ?? []),
+    ...rotationStrategy.addedSkills,
+  ]));
+
   const fixTask: Task = {
     id: `${task.id}-fix`,
     title: `Fix: ${task.title}`,
     description: fixDescription,
-    model: task.model,
+    model: rotationStrategy.rotatedModel,
+    forceModel: rotationStrategy.rotatedModel,
     effort: task.effort,
     priority: 'CRITICAL',
     reason: enrichedReason,
@@ -157,12 +299,25 @@ export function handleEvaluation(
     sprintId: task.sprintId,
     isPriorityFix: true,
     fixForTaskId: task.id,
+    assignedAgent: rotationStrategy.rotatedAgent,
+    forceAgent: rotationStrategy.rotatedAgent,
+    assignedSkills: rotatedSkills,
+    forceSkills: rotatedSkills.length > 0 ? rotatedSkills : undefined,
     createdAt: now(),
   };
+
+  // rotationStrategy lives on the JSON payload but is not part of the
+  // formal Task interface (kept out of core/ per task scope). Spread
+  // through an unknown-cast so TS doesn't widen Task with this field.
+  const fixTaskPayload: unknown = {
+    ...fixTask,
+    rotationStrategy,
+  };
+
   mkdirSync(join(projectRoot, TASKS_DIR), { recursive: true });
   writeFileSync(
     join(projectRoot, TASKS_DIR, `task-${fixTask.id}.json`),
-    JSON.stringify(fixTask, null, 2),
+    JSON.stringify(fixTaskPayload, null, 2),
     'utf-8',
   );
 }
@@ -191,11 +346,20 @@ export function handleCrossDependencies(
         const depTask = sprint.tasks.find(t => t.id === depId);
         if (!depTask) continue;
 
+        // Apply fresh-eyes rotation to cross-fix tasks too — same retry
+        // rationale as the direct NO_GO fix path.
+        const rotationStrategy = applyFreshEyesRotation(depTask);
+        const rotatedSkills = Array.from(new Set([
+          ...(depTask.assignedSkills ?? []),
+          ...rotationStrategy.addedSkills,
+        ]));
+
         const fixTask: Task = {
           id: `${depId}-xfix`,
           title: `Cross-fix: ${depTask.title}`,
           description: `Cross-dependency fix: ${noGoTask.id} (NO_GO) depends on ${depId}`,
-          model: depTask.model,
+          model: rotationStrategy.rotatedModel,
+          forceModel: rotationStrategy.rotatedModel,
           effort: depTask.effort,
           priority: 'CRITICAL',
           reason: `Cross-dependency: ${noGoTask.id} failed, may be caused by ${depId}`,
@@ -206,14 +370,23 @@ export function handleCrossDependencies(
           sprintId: depTask.sprintId,
           isPriorityFix: true,
           fixForTaskId: depId,
+          assignedAgent: rotationStrategy.rotatedAgent,
+          forceAgent: rotationStrategy.rotatedAgent,
+          assignedSkills: rotatedSkills,
+          forceSkills: rotatedSkills.length > 0 ? rotatedSkills : undefined,
           createdAt: now(),
         };
         fixTasks.push(fixTask);
 
+        const fixTaskPayload: unknown = {
+          ...fixTask,
+          rotationStrategy,
+        };
+
         mkdirSync(join(projectRoot, TASKS_DIR), { recursive: true });
         writeFileSync(
           join(projectRoot, TASKS_DIR, `task-${fixTask.id}.json`),
-          JSON.stringify(fixTask, null, 2),
+          JSON.stringify(fixTaskPayload, null, 2),
           'utf-8',
         );
       }

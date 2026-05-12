@@ -48,6 +48,8 @@
 | adr-042 | Hybrid Mode Architecture — Sprint + Task Dual Modes | proposed |
 
 ## Recent Learnings
+- **Sprint sprint-156 Learnings** (sprint-156): ## Sprint sprint-156 Learnings
+- Workflow Rename VERIFY (read-only audit): NO_GO — Audit-only task completed. All 3 p...
 - **Sprint sprint-155 Learnings** (sprint-155): ## Sprint sprint-155 Learnings
 - **Sprint sprint-154 Learnings** (sprint-154): ## Sprint sprint-154 Learnings
 - RubricRegistry Core Foundation: NO_GO — RubricRegistry foundation created at src/orc...
@@ -64,13 +66,11 @@
 - **Sprint sprint-147 Learnings** (sprint-147): ## Sprint sprint-147 Learnings
 - **Sprint sprint-146 Learnings** (sprint-146): ## Sprint sprint-146 Learnings
 - Agent Truncation Bug Fix: GO_WITH_TECH_DEBT — Root cause: task-builder.ts:761 had `a...
-- **Sprint sprint-145 Learnings** (sprint-145): ## Sprint sprint-145 Learnings
-- Brain Heuristic Timeout Estimator: NO_GO — Brain Heuristic Timeout Estimator impleme...
 
 ## Active Technical Debt
-_No active technical debt._
+- [NORMAL] Tech debt from 156-011-fix: Code physically verified despite missing .result (Sp
 
 ## Active Patterns
 _No active patterns._
 
-_Total entries: 180 | Generated: 2026-05-12_
+_Total entries: 186 | Generated: 2026-05-12_

@@ -1,0 +1,13 @@
+Task tamamlandı. Re-verification sonuçları:
+
+**Üç dosyada gerekli değişiklikler zaten mevcut** (original task-156-004 worker tarafından yapılmış):
+
+1. **`spawn-backend-docker.ts`** — Inline `.worker-*.sh` silme bloğu kaldırılmış (lines 641-645'te yorumla değiştirilmiş); `archivePromptFiles()` hem `.prompt-*.txt` hem `.worker-*.sh` arşivliyor (lines 700-702).
+2. **`sprint-lifecycle.ts`** — `CleanupPhaseKind` tipi tanımlı (line 231), `cleanup()` artık `cleanupPhase` parametresi alıyor (line 250), arşiv çağrısı `cleanupPhase === 'sprint-end'` gate'i altında (line 302).
+3. **`tmpfile-preservation.test.ts`** — 8 test, 3 describe bloğu.
+
+**Test:** `npx vitest run tests/orchestra/tmpfile-preservation.test.ts` → **8/8 pass** (461ms).
+
+**Out-of-scope not (Brain için):** `sprint-phases.ts:425` runSpawnPhase retry-failure callsite hâlâ `cleanup(projectRoot, sprint)` çağırıyor — `cleanupPhase: 'spawn-fail'` argümanı geçmiyor. API hazır ama caller update edilmemiş. sprint-phases.ts bu fix task'in `filesWrite` listesinde olmadığı için scope dışı kaldı; takip task'i önerildi.
+
+`selfAssessment: "DONE"` — fonksiyonel iş scope dahilindeki üç dosyada tamamlanmış ve verify edildi.

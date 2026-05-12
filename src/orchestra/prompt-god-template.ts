@@ -5,6 +5,8 @@
 //
 // Sprint 146 — Task 146-005
 
+import { existsSync, readFileSync } from 'fs';
+import { join } from 'path';
 import type { Task, TaskScope } from '../core/task-types.js';
 import type { MemoryEntryV2 } from '../core/memory-types.js';
 import { selectRelevantAdrs, buildAdrPromptSection } from './adr-selector.js';
@@ -42,6 +44,8 @@ export interface SprintContext {
   effort?: 'max' | 'high' | 'medium' | 'low';
   /** Dependencies info (task IDs this task depends on) */
   dependencies?: string[];
+  /** Directory containing `.tasks/` result files (defaults to `<cwd>/.tasks`). Used for enriching dependency block. */
+  tasksDir?: string;
 }
 
 // ─── Constants ─────────────────────────────────────────────────────────
@@ -86,7 +90,7 @@ export function buildTaskPrompt(task: Task, ctx: SprintContext): PromptArtifact 
   const scopeBlock = buildScopeBlock(task.scope, scopeWarnings);
 
   // ── 5. Dependencies Block ───────────────────────────────────────────
-  const depsBlock = buildDependenciesBlock(task.dependencies, ctx.dependencies);
+  const depsBlock = buildDependenciesBlock(task.dependencies, ctx.dependencies, ctx.tasksDir);
 
   // ── 6. Render final prompt ──────────────────────────────────────────
   const prompt = renderTemplate({
@@ -213,16 +217,93 @@ DO NOT touch files outside your scope — the auditor will flag violations.`;
 
 // ─── Dependencies Block Builder ────────────────────────────────────────
 
+/** Max chars of dependency `notes` embedded into the prompt — keeps worker context bounded. */
+const DEPENDENCY_NOTES_MAX_CHARS = 500;
+
+/** Subset of `.tasks/task-{id}.result` fields the dependency block embeds. */
+interface DependencyResultDigest {
+  selfAssessment?: string;
+  filesChanged?: string[];
+  linesAdded?: number;
+  linesRemoved?: number;
+  notes?: string;
+}
+
+/**
+ * Read and shape a previously-completed dependency's `.result` file.
+ * Returns null when the file does not exist or cannot be parsed — callers render
+ * a "Pending" placeholder in that case.
+ */
+function readDependencyResult(depId: string, tasksDir: string): DependencyResultDigest | null {
+  const filePath = join(tasksDir, `task-${depId}.result`);
+  if (!existsSync(filePath)) return null;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(readFileSync(filePath, 'utf-8'));
+  } catch {
+    return null;
+  }
+  if (!parsed || typeof parsed !== 'object') return null;
+  const obj = parsed as Record<string, unknown>;
+  return {
+    selfAssessment: typeof obj.selfAssessment === 'string' ? obj.selfAssessment : undefined,
+    filesChanged: Array.isArray(obj.filesChanged)
+      ? obj.filesChanged.filter((f): f is string => typeof f === 'string')
+      : undefined,
+    linesAdded: typeof obj.linesAdded === 'number' ? obj.linesAdded : undefined,
+    linesRemoved: typeof obj.linesRemoved === 'number' ? obj.linesRemoved : undefined,
+    notes: typeof obj.notes === 'string' ? obj.notes : undefined,
+  };
+}
+
+/**
+ * Format a single dependency entry. Header is `## Dependency {id} ({status})`,
+ * body lines: `- Files: …` and `- Notes: …`. When `result` is null, body is the
+ * literal `Pending (not yet complete)` sentinel so downstream consumers can match it.
+ */
+function formatDependencyEntry(depId: string, result: DependencyResultDigest | null): string {
+  if (!result) {
+    return `## Dependency ${depId} (Pending)\nPending (not yet complete)`;
+  }
+  const status = result.selfAssessment ?? 'UNKNOWN';
+  const lines: string[] = [`## Dependency ${depId} (${status})`];
+
+  if (result.filesChanged && result.filesChanged.length > 0) {
+    const filesList = result.filesChanged.join(', ');
+    const added = result.linesAdded;
+    const removed = result.linesRemoved;
+    const hasDelta = (typeof added === 'number' && added > 0) || (typeof removed === 'number' && removed > 0);
+    if (hasDelta) {
+      lines.push(`- Files: ${filesList} (+${added ?? 0}/-${removed ?? 0})`);
+    } else {
+      lines.push(`- Files: ${filesList}`);
+    }
+  }
+
+  if (result.notes) {
+    const notesText = truncateAtParagraph(result.notes, DEPENDENCY_NOTES_MAX_CHARS);
+    lines.push(`- Notes: ${notesText}`);
+  }
+
+  return lines.join('\n');
+}
+
 function buildDependenciesBlock(
   taskDeps?: string[],
   ctxDeps?: string[],
+  tasksDir?: string,
 ): string {
   const deps = taskDeps?.length ? taskDeps : ctxDeps;
   if (!deps || deps.length === 0) return '';
 
+  const resolvedDir = tasksDir ?? join(process.cwd(), '.tasks');
+  const entries = deps.map(depId => formatDependencyEntry(depId, readDependencyResult(depId, resolvedDir)));
+
   return `## Dependencies
 This task depends on: ${deps.join(', ')}
-Ensure dependent tasks are complete before starting.`;
+Ensure dependent tasks are complete before starting.
+
+${entries.join('\n\n')}`;
 }
 
 // ─── Template Renderer ─────────────────────────────────────────────────
@@ -254,7 +335,11 @@ See .deckent/workspace/WORKER-GUIDE.md for heartbeat format, result format, and 
 ## Your Task
 ${task.id}: ${task.title} — ${task.description}
 - Model: ${task.model}
-- Effort: ${effort}`);
+- Effort: ${effort}
+
+## Idempotency Key
+\${IDEMPOTENCY_KEY}
+Use this key for external API calls (Idempotency-Key header) to make retries safe.`);
 
   // What to do
   sections.push(`## What To Do

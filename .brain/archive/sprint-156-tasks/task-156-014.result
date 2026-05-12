@@ -1,0 +1,28 @@
+{
+  "taskId": "156-014",
+  "filesChanged": [
+    "docs/adr/053-task-type-taxonomy.md",
+    "docs/adr/055-hybrid-scoring-pipeline.md",
+    "docs/adr/060-self-awareness-channels.md"
+  ],
+  "linesAdded": 465,
+  "linesRemoved": 0,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "DONE",
+  "notes": "3 yeni ADR draft oluşturuldu (MADR v3 format). ADR-053 (1068 kelime): TaskType Taxonomy — audit/document-write/code-development tip tanımları, EffectClass mapping, extensibility roadmap (db-migration, package-publish, infrastructure-provision gelecek tipleri), detection priority order. ADR-055 (1168 kelime): Hybrid Scoring 5-Layer Pipeline — Schema/Gates/Quality/Outcome/Auditor katmanları, Gate Conditions tablosu (G-001..G-005), Final Decision matrisi, mevcut seed durumu (Layer 1 + Layer 3 canlı, Layer 4 EffectClass seed T-011 ile). ADR-060 (1297 kelime): Self-Awareness Propagation — 5 kanal (init/sync/manifest/skill-declare/worker-enrichment), WorkerContextBundle interface, token budget önceliklendirme sırası, Sprint 156 T-007 ile Kanal 5'in seed'lendiği belgelendi. Tüm ADR'ler Status: proposed, Context, Decision, Consequences (pos/neg), Related ADRs bölümlerini içeriyor. docs/adr/ dizini bu task ile oluşturuldu. tsc/vitest gerektirmez (docs-only task).",
+  "tokenUsage": {
+    "inputTokens": 28000,
+    "outputTokens": 6500,
+    "cacheReadTokens": 45000,
+    "provider": "claude",
+    "model": "sonnet"
+  },
+  "rubricScores": {
+    "correctness": 92,
+    "word_count": 95,
+    "scope_compliance": 100,
+    "documentation_quality": 90
+  },
+  "evaluationDecision": "DONE"
+}

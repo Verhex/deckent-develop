@@ -1,0 +1,20 @@
+{
+  "taskId": "156-007",
+  "filesChanged": [
+    "src/orchestra/prompt-god-template.ts",
+    "tests/orchestra/prompt-previous-result.test.ts"
+  ],
+  "linesAdded": 342,
+  "linesRemoved": 3,
+  "testsPassed": true,
+  "coverage": 0,
+  "selfAssessment": "DONE",
+  "notes": "buildDependenciesBlock enriched: reads .tasks/task-{depId}.result via new readDependencyResult helper, embeds selfAssessment header, files list with +/- line deltas, and truncated notes (cap 500 chars). Missing or malformed .result files render the literal 'Pending (not yet complete)' sentinel. SprintContext.tasksDir added (optional) to allow tests/callers to point at an isolated dir; buildTaskPrompt passes it through. The pre-existing summary line 'This task depends on: …' is preserved so the previous regression test in prompt-god-template.test.ts:268 still passes. 12 new tests cover: DONE happy path, missing result, +/- delta formatting, malformed JSON fallback, empty deps omission, 2-task chain end-to-end (T2 embeds T1.result), mixed present/missing, missing selfAssessment → UNKNOWN, isolation from real .tasks/, no-delta path, default cwd resolution, empty dir resolution. Verified: npx vitest run tests/orchestra/prompt-previous-result.test.ts → 12/12 pass; npx vitest run tests/orchestra/prompt-god-template.test.ts → 15/15 pass (no regression). tsc --noEmit clean for the two touched files (only pre-existing error in sprint-phases.ts unrelated, marked M in initial git status). No ADR violations: ADR-008 brain import boundary respected (no new brain imports); ADR-035 verification protocol furthered by giving downstream worker richer prior-task context.",
+  "tokenUsage": {
+    "inputTokens": 14200,
+    "outputTokens": 5400,
+    "cacheReadTokens": 0,
+    "provider": "claude",
+    "model": "opus"
+  }
+}

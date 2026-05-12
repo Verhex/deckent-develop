@@ -14,6 +14,7 @@ import {
   mkdirSync, readdirSync, openSync, closeSync, constants as fsConstants,
 } from 'node:fs';
 import { join } from 'node:path';
+import { createHash } from 'node:crypto';
 import { LOCKS_DIR } from './constants.js';
 import { trace } from './observability.js';
 import { debugLog } from './utils.js';
@@ -296,4 +297,204 @@ export async function claimTaskLock(
   return trace('lock.wait', async () => {
     return acquireLock(projectRoot, filePath, workerId, taskId);
   });
+}
+
+// ═══ Spawn-Time File Locks (Sprint 156 Task 10) ══════════════════════════
+// Distinct from worker-time locks above. These are acquired BEFORE the
+// worker container starts, keyed by taskId (workerId is not yet known).
+// Use the `.spawnlock` extension so existing `.lock` cleanup helpers
+// (checkLocks / clearStaleLocks / clearOrphanLocks) ignore them.
+
+export interface SpawnLockInfo {
+  filePath: string;
+  taskId: string;
+  acquiredAt: string;
+}
+
+export class SpawnLockError extends Error {
+  constructor(
+    message: string,
+    public readonly filePath: string,
+    public readonly conflictingTaskId: string,
+  ) {
+    super(message);
+    this.name = 'SpawnLockError';
+  }
+}
+
+function spawnLockPathFor(projectRoot: string, filePath: string): string {
+  const hash = createHash('sha256').update(filePath).digest('hex').slice(0, 32);
+  return join(projectRoot, LOCKS_DIR, `${hash}.spawnlock`);
+}
+
+/**
+ * Acquire a spawn-time lock for a single file.
+ * Atomic via O_EXCL. Idempotent for the same taskId.
+ * Throws SpawnLockError when a different task already holds the lock.
+ */
+export function acquireSpawnLock(
+  projectRoot: string,
+  taskId: string,
+  filePath: string,
+): SpawnLockInfo {
+  ensureLockDir(projectRoot);
+  const lockPath = spawnLockPathFor(projectRoot, filePath);
+
+  if (existsSync(lockPath)) {
+    try {
+      const existing = JSON.parse(readFileSync(lockPath, 'utf-8')) as SpawnLockInfo;
+      if (existing.taskId === taskId) {
+        return existing;
+      }
+      throw new SpawnLockError(
+        `Spawn lock conflict on ${filePath}: held by task ${existing.taskId}`,
+        filePath,
+        existing.taskId,
+      );
+    } catch (err) {
+      if (err instanceof SpawnLockError) throw err;
+      // Corrupted spawnlock file — let the O_EXCL path below overwrite it.
+      try { unlinkSync(lockPath); } catch { /* best-effort */ }
+    }
+  }
+
+  const info: SpawnLockInfo = {
+    filePath,
+    taskId,
+    acquiredAt: now(),
+  };
+  const data = JSON.stringify(info, null, 2);
+
+  try {
+    const fd = openSync(lockPath, fsConstants.O_WRONLY | fsConstants.O_CREAT | fsConstants.O_EXCL);
+    writeFileSync(fd, data, 'utf-8');
+    closeSync(fd);
+  } catch (err: unknown) {
+    if (err instanceof Error && 'code' in err && (err as NodeJS.ErrnoException).code === 'EEXIST') {
+      try {
+        const actual = JSON.parse(readFileSync(lockPath, 'utf-8')) as SpawnLockInfo;
+        if (actual.taskId === taskId) return actual;
+        throw new SpawnLockError(
+          `Spawn lock conflict on ${filePath}: held by task ${actual.taskId}`,
+          filePath,
+          actual.taskId,
+        );
+      } catch (innerErr) {
+        if (innerErr instanceof SpawnLockError) throw innerErr;
+        throw new SpawnLockError(
+          `Spawn lock conflict on ${filePath}: held by another task`,
+          filePath,
+          'unknown',
+        );
+      }
+    }
+    throw err;
+  }
+
+  return info;
+}
+
+/**
+ * Release a single spawn lock owned by `taskId`.
+ * No-op if the lock does not exist.
+ * Refuses to delete a lock owned by a different task (defensive).
+ */
+export function releaseSpawnLock(
+  projectRoot: string,
+  taskId: string,
+  filePath: string,
+): void {
+  const lockPath = spawnLockPathFor(projectRoot, filePath);
+  if (!existsSync(lockPath)) return;
+
+  try {
+    const existing = JSON.parse(readFileSync(lockPath, 'utf-8')) as SpawnLockInfo;
+    if (existing.taskId !== taskId) {
+      debugLog(
+        'file-lock:releaseSpawnLock',
+        `Refusing to release spawn lock on ${filePath}: owned by ${existing.taskId}, not ${taskId}`,
+      );
+      return;
+    }
+  } catch {
+    // Corrupted spawnlock — fall through and unlink
+  }
+
+  try { unlinkSync(lockPath); } catch { /* already gone */ }
+}
+
+/**
+ * Acquire spawn locks for a batch of files. Atomic at the batch level:
+ * if any file conflicts, every previously-acquired lock in this call is
+ * released before the error is rethrown — partial-lock state never leaks.
+ */
+export function acquireSpawnLocks(
+  projectRoot: string,
+  taskId: string,
+  filePaths: readonly string[],
+): SpawnLockInfo[] {
+  const acquired: SpawnLockInfo[] = [];
+  for (const fp of filePaths) {
+    try {
+      acquired.push(acquireSpawnLock(projectRoot, taskId, fp));
+    } catch (err) {
+      // Roll back everything this call obtained
+      for (const info of acquired) {
+        releaseSpawnLock(projectRoot, taskId, info.filePath);
+      }
+      throw err;
+    }
+  }
+  return acquired;
+}
+
+/**
+ * Release a batch of spawn locks for `taskId`. Best-effort: missing or
+ * non-owned locks are silently skipped.
+ */
+export function releaseSpawnLocks(
+  projectRoot: string,
+  taskId: string,
+  filePaths: readonly string[],
+): void {
+  for (const fp of filePaths) {
+    releaseSpawnLock(projectRoot, taskId, fp);
+  }
+}
+
+/**
+ * Release every `.spawnlock` in the project owned by `taskId`.
+ * Used during container exit / kill paths where we don't want to track
+ * the original filesWrite list. Returns the number released.
+ */
+export function releaseAllSpawnLocks(
+  projectRoot: string,
+  taskId: string,
+): number {
+  const locksDir = join(projectRoot, LOCKS_DIR);
+  if (!existsSync(locksDir)) return 0;
+
+  let files: string[];
+  try {
+    const all = readdirSync(locksDir);
+    if (!Array.isArray(all)) return 0;
+    files = all.filter(f => typeof f === 'string' && f.endsWith('.spawnlock'));
+  } catch {
+    return 0;
+  }
+
+  let released = 0;
+  for (const file of files) {
+    const lockPath = join(locksDir, file);
+    try {
+      const lock = JSON.parse(readFileSync(lockPath, 'utf-8')) as SpawnLockInfo;
+      if (lock.taskId === taskId) {
+        unlinkSync(lockPath);
+        released++;
+      }
+    } catch {
+      // Skip corrupted spawnlock files
+    }
+  }
+  return released;
 }

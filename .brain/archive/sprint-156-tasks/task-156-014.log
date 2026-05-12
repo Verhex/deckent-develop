@@ -1,0 +1,11 @@
+Task 156-014 tamamlandı. Sonuç özeti:
+
+**3 ADR Draft oluşturuldu** — `docs/adr/` dizini bu task ile hayata geçirildi:
+
+| ADR | Başlık | Kelime Sayısı |
+|-----|--------|--------------|
+| ADR-053 | TaskType Taxonomy: audit/document-write/code-development + extensibility roadmap | 1068 |
+| ADR-055 | Hybrid Scoring 5-Layer Pipeline: Schema/Gates/Quality/Outcome/Auditor | 1168 |
+| ADR-060 | Self-Awareness Propagation: 5 channel (init/sync/manifest/skill-declare/worker-enrichment) | 1297 |
+
+Her ADR MADR v3 formatında: Status `proposed`, Context, Decision, Consequences (pos/neg), Related ADRs bölümleri içeriyor. Minimum 600 kelime koşulu tüm ADR'lerde sağlandı (toplam 3533 kelime). Bu task sadece `docs/adr/` kapsamında çalıştı, kaynak kod değişikliği yok — `tsc`/`vitest` gerekmez.

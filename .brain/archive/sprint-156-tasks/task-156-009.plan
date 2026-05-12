@@ -1,0 +1,53 @@
+# Task 156-009 Plan — assertSpawnSafe Whitelist Runtime
+
+## Goal
+Defansif spawn safety primitivi olusturmak. spawn-backend-docker.ts ve gelecekteki adapter cagrilari oncesi cagrilacak.
+
+## Files (within scope)
+- src/core/spawn-safety.ts (new)
+- tests/core/spawn-safety.test.ts (new)
+
+## Out-of-scope (cannot modify in this task)
+- src/orchestra/spawn-backend-docker.ts — outside src/core/ scope.
+  Wire-up will be flagged as follow-up in result. The module is exported and ready to import.
+
+## Design
+### Public API
+- `ADAPTER_BIN_WHITELIST: readonly string[]` — frozen list of allowed binaries
+  ['node','npx','vitest','tsc','python','python3','go','cargo','java','dotnet']
+- `SH_C_ALLOWED: RegExp` — `/^[A-Za-z0-9_\-\.\/\s\=]+$/`
+- `class SpawnSafetyError extends Error` with codes:
+  - BIN_NOT_WHITELISTED
+  - ARG_INJECTION
+  - INVALID_INPUT
+- `assertSpawnSafe(bin: string, args: string[], opts?): void` — throws on violation
+- `isSpawnSafe(bin, args, opts?): boolean` — boolean wrapper for convenience
+
+### Validation logic
+1. Input shape: bin = non-empty string, args = string[]
+2. bin: extract basename (handles `/usr/bin/node`), check membership in whitelist
+3. args: each non-empty arg must match SH_C_ALLOWED (allows alnum, `_-./\s=`)
+   - Empty args allowed (no injection vector)
+4. opts.binWhitelist override for tests/specialized adapters
+
+### Test cases (>= 14)
+- rm rejected (not whitelisted)
+- npx vitest run accepted
+- Inline `;` injection arg rejected
+- `&&`, `|`, backtick, `$()`, `<`, `>`, newline rejected
+- Whole whitelist accepted with minimal args
+- Absolute path bin (`/usr/bin/node`) accepted via basename
+- Empty args array accepted
+- Non-string bin / non-array args → INVALID_INPUT
+- SpawnSafetyError shape: code/bin/badArg fields
+- isSpawnSafe boolean variant
+- Custom whitelist override
+- ADAPTER_BIN_WHITELIST is frozen (mutation throws)
+- SH_C_ALLOWED regex independently exported & matches expected
+
+## Verify (targeted per anchor rule 2)
+- `npx vitest run tests/core/spawn-safety.test.ts`
+- skip project-wide tsc (anchor rule 1)
+
+## ADR ref
+- ADR-047 (Sprint 162A) — placeholder, this task lays foundation.

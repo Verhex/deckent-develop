@@ -47,7 +47,13 @@
       "Bash(sed -n '1,20p' src/orchestra/result-evaluator.ts)",
       "Bash(sed -n '490,525p' src/orchestra/result-evaluator.ts)",
       "Bash(sed -n '80,130p' src/orchestra/spawn-backend-docker.ts)",
-      "Bash(sed -n '255,290p' src/orchestra/sprint-lifecycle.ts)"
+      "Bash(sed -n '255,290p' src/orchestra/sprint-lifecycle.ts)",
+      "Bash(ps -p 865872 -o pid,stat,etime,pcpu)",
+      "Bash([ -f \".tasks/task-156-$id-fix-fix.json\" ])",
+      "Bash([ -f \".tasks/task-156-$id-fix-fix.hb\" ])",
+      "Bash([ -f \".tasks/task-156-$id-fix-fix.plan\" ])",
+      "Bash([ -f \".tasks/task-156-$id-fix-fix.result\" ])",
+      "Read(//proc/865872/**)"
     ]
   }
 }

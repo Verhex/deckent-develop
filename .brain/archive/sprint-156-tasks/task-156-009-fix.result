@@ -1,0 +1,26 @@
+{
+  "taskId": "156-009-fix",
+  "filesChanged": [
+    "src/core/spawn-safety.ts"
+  ],
+  "linesAdded": 14,
+  "linesRemoved": 1,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "GO_WITH_TECH_DEBT",
+  "notes": "HONEST SELF-ASSESSMENT (fix worker — baseline preserved + threat-model JSDoc polish):\n\nBASELINE CHECK (re-verified 156-009 artifacts):\n- src/core/spawn-safety.ts — 157 LoC defensive primitive present and unchanged from 156-009 (ADAPTER_BIN_WHITELIST frozen, SH_C_ALLOWED verbatim per spec, SpawnSafetyError class, assertSpawnSafe + isSpawnSafe).\n- tests/core/spawn-safety.test.ts — 249 LoC, 26 tests, all green pre-fix and post-fix.\n\nSCOPE-BOUNDED EDIT (additive doc only, ATOMIC):\n- Replaced the 10-line header comment in src/core/spawn-safety.ts with a 23-line header that adds a 'Threat model boundary' subsection. The new subsection explicitly documents (a) why sh/bash/zsh/cmd/powershell are intentionally omitted from the whitelist (the no-shell invariant lets us treat whitespace as data, not separator) and (b) the dual-override pattern a future sh -c caller would have to invoke (custom binWhitelist + stricter argRegex without whitespace). This makes the existing newline-in-arg behavior explicitly justified rather than just 'documented limitation'.\n- No behavior change. No new exports. No regex change. No test change.\n- linesAdded=14, linesRemoved=1, net +13 LoC, all in JSDoc.\n\nVERIFY (anchor-rule compliant — targeted only):\n- npx vitest run tests/core/spawn-safety.test.ts → 26/26 PASS, 5ms test time, 168ms total. Both pre-edit and post-edit runs green.\n- npx tsc --noEmit --skipLibCheck (with project ESM/strict compiler flags) on src/core/spawn-safety.ts only → 0 errors.\n- No npm run build, no npm install, no project-wide tsc, no project-wide vitest.\n\nWHY GO_WITH_TECH_DEBT (NOT DONE):\nThe fix task description and task-156-009-fix.json filesWrite list `spawn-backend-docker.ts`, but the same envelope's scope.directories only allows `src/core/` + `tests/core/`. The effective scope rendered into this worker's prompt correctly filters spawn-backend-docker.ts OUT of writable files because its real path `src/orchestra/spawn-backend-docker.ts` is not in `scope.directories`. Worker rule 'Stay within your assigned scope' and DIRECTIVES anchor rule SCOPE İZOLE both forbid me from editing src/orchestra/ from this fix-worker.\n\nWith the wire-up structurally unreachable, the spec-level completion estimate is identical to 156-009: ~75% (primitive + tests done, wire-up pending). Per the Honest Self-Assessment block (<80% → GO_WITH_TECH_DEBT), this is the correct call.\n\nFOLLOW-UP (carried forward, unchanged from 156-009):\nA subsequent task with scope.directories including `src/orchestra/` must:\n  import { assertSpawnSafe } from '../core/spawn-safety.js';\n  // before each spawnSync('docker', ...) or nodeSpawn(...) in spawn-backend-docker.ts:\n  assertSpawnSafe(bin, args);\nThe primitive is exported, frozen-constant, fully tested, and ready for the orchestra wiring.\n\nBRAIN HINT — TO BREAK THE LOOP:\nIf Brain wants the wire-up done in this sprint, the next fix task must broaden scope.directories to include `src/orchestra/` and rewrite filesWrite to `src/orchestra/spawn-backend-docker.ts`. Re-spawning with identical scope cannot progress this work.\n\nANCHOR RULES OBSERVED:\n  1. BUILD YASAK — no npm/build/publish/install calls.\n  2. TEST İZOLE — vitest invoked only on tests/core/spawn-safety.test.ts.\n  3. VERIFY ONLY — test results inform note but did not override scope.\n  4. SCOPE İZOLE — no example paths beyond actual filesWrite; no orchestra edits.\n  5. ATOMIC TASKS — single effect (JSDoc clarification); no composite behavior change.",
+  "tokenUsage": {
+    "inputTokens": 22000,
+    "outputTokens": 3800,
+    "cacheReadTokens": 0,
+    "provider": "claude",
+    "model": "opus"
+  },
+  "rubricScores": {
+    "correctness": 95,
+    "test_coverage": 95,
+    "scope_compliance": 100,
+    "documentation": 95
+  },
+  "evaluationDecision": "GO_WITH_TECH_DEBT"
+}

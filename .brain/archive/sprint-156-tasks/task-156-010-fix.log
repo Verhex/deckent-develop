@@ -1,0 +1,14 @@
+Task 156-010-fix tamamlandı.
+
+**Yapılan**
+- **Tespit edilen gerçek bug**: `DockerSpawnBackend.spawn()` kilit aldıktan sonra `docker run` non-zero dönerse `.timeout` yazıp sessizce return ediyordu — kilitler asla serbest bırakılmıyordu. Aynı `taskId` retry için idempotency koruyordu, ama farklı id'li fix worker (örn. `156-010-fix`) aynı dosya kapsamına spawn olmaya çalıştığında `SpawnLockError` alıyordu. Geçici docker hatası → kalıcı scope bloku.
+- **Düzeltme** (`src/orchestra/spawn-backend-docker.ts`): `spawn()` ikiye bölündü — kilit alımı + try/catch wrapper, ve içeriği taşıyan yeni private `runSpawn()`. Catch arm `releaseAllSpawnLocks(dir, taskId)` çağırıp tekrar throw ediyor. Non-zero exit early-return path'i de explicit release ile zenginleştirildi. Image-not-found artık throw eder (catch arm release'i yapar).
+- **Regression testi** (`tests/core/file-lock-runtime.test.ts`): post-acquire failure simulate edip farklı task'in aynı dosyaları claim edebildiğini doğruluyor.
+
+**Verify**
+- `npx tsc --noEmit` → 0 hata
+- `npx vitest run` ilgili 4 suite (file-lock, file-lock-runtime, spawn-backend-docker, tmpfile-preservation) → **59/59 pass** (önceki 58/58 + 1 yeni regression)
+
+**ANCHOR uyumu**: build/install/proje geneli test yok; ADR-001/002/008/037 korundu; scope sadece `src/orchestra/` + `tests/core/`.
+
+selfAssessment: **DONE**.

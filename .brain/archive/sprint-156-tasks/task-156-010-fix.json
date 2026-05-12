@@ -1,0 +1,37 @@
+{
+  "id": "156-010-fix",
+  "title": "Fix: Runtime File Lock (flock spawn-time)",
+  "description": "Priority fix for NO_GO task 156-010.\nOriginal worker notes: Implemented spawn-time `.spawnlock` API in src/core/file-lock.ts (acquireSpawnLock, releaseSpawnLock, acquireSpawnLocks with batch rollback, releaseSpawnLocks, releaseAllSpawnLocks, SpawnLockInfo, SpawnLockError) using sha256 hash-based filenames so long paths stay platform-safe. The new files use the `.spawnlock` extension to stay clear of the existing worker-time `.lock` files (verified: checkLocks/clearStaleLocks/clearOrphanLocks endsWith('.lock') filters do NOT pick up `.spawnlock`). Wired i\nRubric: correctness=95, test_coverage=95, scope_compliance=100\nExpected scope: src/core/, src/orchestra/, tests/core/\nFiles that should change: src/core/file-lock.ts, src/orchestra/spawn-backend-docker.ts, tests/core/file-lock-runtime.test.ts, .lock, spawn-backend-docker.ts",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "CRITICAL",
+  "reason": "Task 156-010 evaluated as NO_GO; correctness=95; test_coverage=95; scope_compliance=100",
+  "scope": {
+    "directories": [
+      "src/core/",
+      "src/orchestra/",
+      "tests/core/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/core/file-lock.ts",
+      "src/orchestra/spawn-backend-docker.ts",
+      "tests/core/file-lock-runtime.test.ts",
+      ".lock",
+      "spawn-backend-docker.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean",
+    "noGoCriteria": "Build fails or tests fail",
+    "techDebtAcceptable": "Minor style issues if tests pass"
+  },
+  "status": "NO_GO",
+  "sprintId": "sprint-156",
+  "isPriorityFix": true,
+  "fixForTaskId": "156-010",
+  "createdAt": "2026-05-12T13:29:48.802Z",
+  "estimatedTokens": 106,
+  "updatedAt": "2026-05-12T13:51:03.240Z"
+}

@@ -1,0 +1,63 @@
+# Task 156-005 — Auditor Baseline Collection Fix — Execution Plan
+
+## Context
+Sprint 155 baseline `testPassed=0/testFailed=11` shows that the current vitest subprocess
+invocation (in `src/core/plugin-hooks.ts:runFullVitest`) silently misclassifies
+spawn-failures as "tests failed". The directive requests this be hardened on the
+**auditor** side under scope `src/monitor/` + `tests/monitor/`.
+
+Because the scope only permits `src/monitor/auditor.ts` and
+`tests/monitor/auditor-baseline.test.ts`, the fix is added as a NEW
+auditor-side function `gatherCiBaseline()` that:
+
+1. Runs `npx vitest run --reporter=json` with explicit pipe stdio + timeout.
+2. Parses both JSON reporter output (preferred) and `Tests` line fallback.
+3. Returns a tagged status: `OK | SPAWN_FAIL | PARSE_FAIL`.
+4. Retries ONCE on spawn-fail (`status === null` or `error` set).
+5. Wraps the result in a `CiBaselineRecord` carrying the new
+   `vitest_invocation_status` field so the JSON file shape becomes:
+
+   ```json
+   {
+     "sprintId": "sprint-156",
+     "baseline": { ... existing fields ... },
+     "vitest_invocation_status": "OK | SPAWN_FAIL | PARSE_FAIL"
+   }
+   ```
+
+A companion `writeCiBaselineRecord()` helper performs the JSON write to
+`.deckent/ci-baseline.json` so callers (currently
+`runPreSprintValidation` in `plugin-hooks.ts`) can adopt it without
+modifying out-of-scope files.
+
+## Files to write
+- `src/monitor/auditor.ts` — append new section (≈140 LoC):
+  - `export type CiBaselineInvocationStatus = 'OK' | 'SPAWN_FAIL' | 'PARSE_FAIL';`
+  - `export interface CiBaselineGatherResult { ... }`
+  - `export interface CiBaselineRecord { ... }`
+  - `export function parseVitestBaselineOutput(stdout, stderr)` (pure)
+  - `export function gatherCiBaseline(projectRoot, opts?)` (subprocess + retry)
+  - `export function writeCiBaselineRecord(projectRoot, sprintId, gather)`
+- `tests/monitor/auditor-baseline.test.ts` — NEW test file:
+  - parseVitestBaselineOutput: JSON path / Tests-line path / unparsable path
+  - gatherCiBaseline: spawn-fail twice → SPAWN_FAIL count 0
+  - gatherCiBaseline: spawn-fail once → retry success → OK
+  - gatherCiBaseline: JSON parse OK → OK with counts
+  - gatherCiBaseline: output garbled → PARSE_FAIL count 0
+  - writeCiBaselineRecord: writes JSON with `vitest_invocation_status`
+
+## Constraints
+- ADR-006: spawnSync MUST use array args (no shell:true with concat).
+- ADR-003: vitest test framework only.
+- ANCHOR: do NOT call `npm run build`, no project-wide `tsc --noEmit`,
+  no project-wide `vitest run`. Only `npx vitest run tests/monitor/auditor-baseline.test.ts`.
+- Stay strictly inside scope `src/monitor/` + `tests/monitor/`.
+
+## Verify
+1. `npx tsc --noEmit` (worker self-check) → expect clean (auditor.ts already typed).
+2. `npx vitest run tests/monitor/auditor-baseline.test.ts` → expect green.
+
+## Self-Assessment
+DONE if all new tests pass and auditor.ts compiles with `tsc --noEmit` clean
+in the new section. GO_WITH_TECH_DEBT if a test edge case is flaky.
+NO_GO if subprocess mock framework breaks.

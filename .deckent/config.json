@@ -2,7 +2,7 @@
   "mode": "performance",
   "language": "en",
   "projectName": "deckent",
-  "last_sprint_id": "sprint-155",
+  "last_sprint_id": "sprint-156",
   "spawn_backend": "docker",
   "modes": {
     "performance": {
@@ -194,5 +194,6 @@
     "keep_last_n": 10,
     "size_cap_mb": 500,
     "archive_path": ".deckent/archive/sprints/"
-  }
+  },
+  "dependency_pipeline_enabled": true
 }

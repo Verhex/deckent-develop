@@ -1,0 +1,32 @@
+{
+  "id": "156-006-fix-fix",
+  "title": "Fix: Fix: IDEMPOTENCY_KEY Worker Prompt Inject",
+  "description": "Priority fix for NO_GO task 156-006-fix.\nOriginal worker notes: Fix-task verification re-run. Original 156-006 worker had already wired IDEMPOTENCY_KEY end-to-end but was evaluated NO_GO (likely false NO_GO from Brain; partial-result marker shows the previously-spawned fix worker was OOM/SIGTERM-killed mid-execution before writing .result, hence Brain re-spawned this one). Inspection of the working tree confirmed all three deliverables already in place: (1) src/orchestra/spawn-backend-docker.ts:278 — dockerArgs.push('-e', `IDEMPOTENCY_KEY=${promptId}`) immed\nExpected scope: src/orchestra/, tests/orchestra/\nFiles that should change: src/orchestra/spawn-backend-docker.ts, src/orchestra/prompt-god-template.ts, tests/orchestra/idempotency-key-inject.test.ts",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "CRITICAL",
+  "reason": "Task 156-006-fix evaluated as NO_GO",
+  "scope": {
+    "directories": [
+      "src/orchestra/",
+      "tests/orchestra/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/orchestra/spawn-backend-docker.ts",
+      "src/orchestra/prompt-god-template.ts",
+      "tests/orchestra/idempotency-key-inject.test.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean",
+    "noGoCriteria": "Build fails or tests fail",
+    "techDebtAcceptable": "Minor style issues if tests pass"
+  },
+  "status": "PENDING",
+  "sprintId": "sprint-156",
+  "isPriorityFix": true,
+  "fixForTaskId": "156-006-fix",
+  "createdAt": "2026-05-12T13:51:03.240Z"
+}

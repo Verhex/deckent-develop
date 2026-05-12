@@ -1,0 +1,32 @@
+{
+  "id": "156-001-fix-fix",
+  "title": "Fix: Fix: Workflow Rename VERIFY (read-only audit)",
+  "description": "Priority fix for NO_GO task 156-001-fix.\nOriginal worker notes: Re-verification audit completed. Original task findings confirmed accurate: all 3 primary workflow files (ci.yml, docs.yml, cross-platform-e2e.yml) use branches: [main]. Single non-blocking master residue at docs.yml:66 (commented-out dead code) confirmed. No active master references across all 5 workflow files. Audit report updated with re-verification table (fix worker stamp). Original task was evaluated NO_GO due to truncated result notes — the underlying audit work was correct and complete.\nExpected scope: docs/audits/sprint-156/\nFiles that should change: docs/audits/sprint-156/T-001-workflow-verify.md, ci.yml, docs.yml, cross-platform-e2e.yml",
+  "model": "sonnet",
+  "effort": "low",
+  "priority": "CRITICAL",
+  "reason": "Task 156-001-fix evaluated as NO_GO",
+  "scope": {
+    "directories": [
+      "docs/audits/sprint-156/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "docs/audits/sprint-156/T-001-workflow-verify.md",
+      "ci.yml",
+      "docs.yml",
+      "cross-platform-e2e.yml"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean",
+    "noGoCriteria": "Build fails or tests fail",
+    "techDebtAcceptable": "Minor style issues if tests pass"
+  },
+  "status": "PENDING",
+  "sprintId": "sprint-156",
+  "isPriorityFix": true,
+  "fixForTaskId": "156-001-fix",
+  "createdAt": "2026-05-12T13:51:03.239Z"
+}

@@ -1,0 +1,57 @@
+# Task 156-002 Plan: dependency_pipeline_enabled Default Flip
+
+## Goal
+Flip default of `config.dependency_pipeline_enabled` from undefined (falsy) → true.
+This enables wave-based task spawning + cascade/unblock by default.
+
+## Scope Constraints
+- WRITE: src/core/config.ts, tests/core/config-defaults.test.ts ONLY
+- NO BUILD / NO INSTALL / NO PUBLISH calls
+- Per-test verify only (vitest single file)
+
+## Discovery
+- `dependency_pipeline_enabled?: boolean` already declared on `ResolvedConfig` at
+  src/core/config-types.ts:490 — NOT on DeckentConfig. Out of scope for this task to
+  add it to DeckentConfig (config-types.ts not in filesWrite). Will use a local
+  intersection type alias inside config.ts to bridge createDefaultConfig() / loadConfig() /
+  mergeConfigs() without touching config-types.ts.
+- Consumers: src/orchestra/sprint-spawner.ts:{220,248,368} read this on the resolved
+  config — flipping requires:
+  1. createDefaultConfig() set field to true
+  2. loadConfig() pass through into ResolvedConfig (use cast since DeckentConfig
+     doesn't declare it yet)
+  3. mergeConfigs() pass through into ResolvedConfig
+- No existing test for it. Must create tests/core/config-defaults.test.ts.
+
+## Steps
+1. src/core/config.ts:
+   - Declare local intersection alias `DeckentConfigWithPipeline = DeckentConfig & { dependency_pipeline_enabled?: boolean }` (top of file, internal).
+   - createDefaultConfig(): add `dependency_pipeline_enabled: true` to object literal,
+     cast return to DeckentConfig. JSDoc explains Sprint 156 flip + reason.
+   - loadConfig() `resolved` block: `dependency_pipeline_enabled:
+     (config as DeckentConfigWithPipeline).dependency_pipeline_enabled ?? true`.
+   - mergeConfigs() return: same pass-through.
+
+2. tests/core/config-defaults.test.ts (new):
+   - import { getDefaultConfig, createDefaultConfig } from config
+   - Verify `getDefaultConfig().dependency_pipeline_enabled === true`
+   - Verify both aliases return same value
+   - Verify a fresh copy is returned (no shared reference between calls)
+
+## Verify
+- `tsc --noEmit` (project-wide allowed only if needed — task says NO build call,
+  but tsc --noEmit is the worker default-rule verify loop). Per directive 1,
+  proje geneli tsc --noEmit YASAK. Skip global tsc.
+- `npx vitest run tests/core/config-defaults.test.ts` (file-scoped — allowed).
+
+## Risk
+- Changing default from off→on activates wave-gating for projects without explicit
+  config override. This is the intended behavior per Sprint 156 P0 plan.
+- Type assertion (`as DeckentConfigWithPipeline`) is a pragmatic bridge because
+  DeckentConfig type doesn't declare the field. A follow-up sprint must add the
+  field to DeckentConfig (config-types.ts) and remove the cast.
+
+## Self-Assessment Plan
+- DONE if file-scoped vitest passes and the test asserts the new default.
+- GO_WITH_TECH_DEBT if there's a tsc type issue introduced by the cast that
+  cannot be resolved without touching config-types.ts.

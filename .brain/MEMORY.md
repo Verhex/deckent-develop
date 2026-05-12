@@ -141,3 +141,18 @@
 - RubricRegistry Core Foundation: NO_GO — RubricRegistry foundation created at src/orchestra/rubric-registry.ts (196 LoC). Spec compliance: (1) TaskType taxonomy 
 - RubricRegistry Test Suite: NO_GO — Created tests/orchestra/rubric-registry.test.ts with 26 test cases (exceeds 20+ requirement): isAuditTask (7), isDocumen
 ## Sprint sprint-155 Learnings
+## Sprint sprint-156 Learnings
+- Workflow Rename VERIFY (read-only audit): NO_GO — Audit-only task completed. All 3 primary workflow files (ci.yml, docs.yml, cross-platform-e2e.yml) confirmed to use bran
+- dependency_pipeline_enabled Default Flip: NO_GO — Sprint 156 Task 2 — dependency_pipeline_enabled default flipped from undefined (falsy) → true. Three precise changes ins
+- Cascade/Unblock Runtime Wire: GO_WITH_TECH_DEBT — Sprint 156 Task 003 complete. Wired applyCascadeToSprint into runEvaluatePhase (after each NO_GO with a real result file
+- Task Tmpfile Cleanup Discipline: NO_GO — Sprint 156 Task 4 — Task Tmpfile Cleanup Discipline. Three changes:
+
+1) spawn-backend-docker.ts:567-581 — Removed the in
+- IDEMPOTENCY_KEY Worker Prompt Inject: NO_GO — IDEMPOTENCY_KEY worker prompt + container env injection wired end-to-end. (1) spawn-backend-docker.ts dockerArgs: append
+- Brain Self-Rebuild Gate (NO BUILD CALL): GO_WITH_TECH_DEBT — Sprint 156 Task 008 — Brain Self-Rebuild Gate (NO BUILD CALL) implemented.
+
+WHAT WAS DONE:
+1. src/orchestra/sprint-phase
+- assertSpawnSafe Whitelist Runtime: NO_GO — HONEST SELF-ASSESSMENT: Module + tests fully shipped (100% of in-scope work). spawn-backend-docker.ts wire-up explicitly
+- Runtime File Lock (flock spawn-time): NO_GO — Implemented spawn-time `.spawnlock` API in src/core/file-lock.ts (acquireSpawnLock, releaseSpawnLock, acquireSpawnLocks 
+- EffectClass Annotation rubric-registry: GO_WITH_TECH_DEBT — EffectClass annotation eklendi. src/orchestra/rubric-registry.ts'e: (1) EffectClass type union ('pure'|'reversible'|'ide

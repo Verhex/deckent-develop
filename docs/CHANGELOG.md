@@ -6,6 +6,60 @@ Bu projedeki tüm önemli değişiklikler bu dosyada belgelenmektedir.
 Format [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) standardına dayanır
 ve proje [Semantic Versioning](https://semver.org/spec/v2.0.0.html) kurallarına uyar.
 
+## [1.0.0-beta.1-sprint156] - 2026-05-12
+
+### Added
+
+- Worker Prompt Previous-Result Enrichment
+- Per-Change Security Review
+- 3 Yeni ADR Draft
+- Sprint 156 Retrospective + Build Impact Plan
+
+### Changed
+
+- Cascade/Unblock Runtime Wire (completed with tech debt)
+- Brain Self-Rebuild Gate (NO BUILD CALL) (completed with tech debt)
+- EffectClass Annotation rubric-registry (completed with tech debt)
+
+### Fixed
+
+- Auditor Baseline Collection Fix
+- Fresh-Eyes Fix Worker Rotation
+
+
+_Tasks: 22 total, 10 done, 4 tech debt, 12 no-go_
+
+## [1.0.0-beta.1-sprint156] - 2026-05-12
+
+### Added
+
+- Workflow Rename VERIFY (read-only audit)
+- Brain Self-Rebuild Gate (NO BUILD CALL)
+- Per-Change Security Review
+- 3 Yeni ADR Draft
+- Sprint 156 Retrospective + Build Impact Plan
+
+### Changed
+
+- Fix: dependency_pipeline_enabled Default Flip (completed with tech debt)
+- dependency_pipeline_enabled Default Flip (completed with tech debt)
+- Cascade/Unblock Runtime Wire (completed with tech debt)
+- Fix: Task Tmpfile Cleanup Discipline (completed with tech debt)
+- Task Tmpfile Cleanup Discipline (completed with tech debt)
+- Auditor Baseline Collection Fix (completed with tech debt)
+- Fix: IDEMPOTENCY_KEY Worker Prompt Inject (completed with tech debt)
+- IDEMPOTENCY_KEY Worker Prompt Inject (completed with tech debt)
+- Worker Prompt Previous-Result Enrichment (completed with tech debt)
+- Fix: assertSpawnSafe Whitelist Runtime (completed with tech debt)
+
+### Fixed
+
+- Fix: Workflow Rename VERIFY (read-only audit)
+- Fix: EffectClass Annotation rubric-registry
+
+
+_Tasks: 22 total, 22 done, 15 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint155] - 2026-05-12
 
 ### Added

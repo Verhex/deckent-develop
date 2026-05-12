@@ -4213,3 +4213,82 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 155-010: deckent_memory_query MCP Tool Özet (DONE)
 
 ---
+## Sprint 156 — sprint-156
+
+**Status:** COMPLETE
+**Date:** 2026-05-12
+**Duration:** 0s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 22 |
+| Completed | 22 |
+| Tech Debt | 15 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | -21ms |
+
+### Tasks
+
+- 156-001-fix: Fix: Workflow Rename VERIFY (read-only audit) (DONE)
+- 156-001: Workflow Rename VERIFY (read-only audit) (DONE)
+- 156-002-fix: Fix: dependency_pipeline_enabled Default Flip (GO_WITH_TECH_DEBT)
+- 156-002: dependency_pipeline_enabled Default Flip (GO_WITH_TECH_DEBT)
+- 156-003: Cascade/Unblock Runtime Wire (GO_WITH_TECH_DEBT)
+- 156-004-fix: Fix: Task Tmpfile Cleanup Discipline (GO_WITH_TECH_DEBT)
+- 156-004: Task Tmpfile Cleanup Discipline (GO_WITH_TECH_DEBT)
+- 156-005: Auditor Baseline Collection Fix (GO_WITH_TECH_DEBT)
+- 156-006-fix: Fix: IDEMPOTENCY_KEY Worker Prompt Inject (GO_WITH_TECH_DEBT)
+- 156-006: IDEMPOTENCY_KEY Worker Prompt Inject (GO_WITH_TECH_DEBT)
+- 156-007: Worker Prompt Previous-Result Enrichment (GO_WITH_TECH_DEBT)
+- 156-008: Brain Self-Rebuild Gate (NO BUILD CALL) (DONE)
+- 156-009-fix: Fix: assertSpawnSafe Whitelist Runtime (GO_WITH_TECH_DEBT)
+- 156-009: assertSpawnSafe Whitelist Runtime (GO_WITH_TECH_DEBT)
+- 156-010-fix: Fix: Runtime File Lock (flock spawn-time) (GO_WITH_TECH_DEBT)
+- 156-010: Runtime File Lock (flock spawn-time) (GO_WITH_TECH_DEBT)
+- 156-011-fix: Fix: EffectClass Annotation rubric-registry (DONE)
+- 156-011: EffectClass Annotation rubric-registry (GO_WITH_TECH_DEBT)
+- 156-012: Fresh-Eyes Fix Worker Rotation (GO_WITH_TECH_DEBT)
+- 156-013: Per-Change Security Review (DONE)
+- 156-014: 3 Yeni ADR Draft (DONE)
+- 156-015: Sprint 156 Retrospective + Build Impact Plan (DONE)
+
+---
+## Sprint 156 — sprint-156
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-05-12
+**Duration:** 2459s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 22 |
+| Completed | 10 |
+| Tech Debt | 4 |
+| No-Go | 12 |
+| Coverage | NaN% |
+| Duration | 2458991ms |
+
+### Tasks
+
+- 156-001: Workflow Rename VERIFY (read-only audit) (NO_GO)
+- 156-002: dependency_pipeline_enabled Default Flip (NO_GO)
+- 156-003: Cascade/Unblock Runtime Wire (GO_WITH_TECH_DEBT)
+- 156-004: Task Tmpfile Cleanup Discipline (NO_GO)
+- 156-005: Auditor Baseline Collection Fix (DONE)
+- 156-006: IDEMPOTENCY_KEY Worker Prompt Inject (NO_GO)
+- 156-007: Worker Prompt Previous-Result Enrichment (DONE)
+- 156-008: Brain Self-Rebuild Gate (NO BUILD CALL) (GO_WITH_TECH_DEBT)
+- 156-009: assertSpawnSafe Whitelist Runtime (NO_GO)
+- 156-010: Runtime File Lock (flock spawn-time) (NO_GO)
+- 156-011: EffectClass Annotation rubric-registry (GO_WITH_TECH_DEBT)
+- 156-012: Fresh-Eyes Fix Worker Rotation (DONE)
+- 156-013: Per-Change Security Review (DONE)
+- 156-014: 3 Yeni ADR Draft (DONE)
+- 156-015: Sprint 156 Retrospective + Build Impact Plan (DONE)
+
+---

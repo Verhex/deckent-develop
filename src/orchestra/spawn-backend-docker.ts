@@ -11,6 +11,11 @@ import { homedir, totalmem } from 'node:os';
 import type { ModelType } from '../core/types.js';
 import { TASKS_DIR } from '../core/constants.js';
 import { debugLog } from '../core/utils.js';
+import {
+  acquireSpawnLocks,
+  releaseAllSpawnLocks,
+  SpawnLockError,
+} from '../core/file-lock.js';
 import type { SpawnBackend, SpawnBackendOptions } from './spawn-backend.js';
 import { SpawnBackendError } from './spawn-backend.js';
 
@@ -59,6 +64,35 @@ export class DockerSpawnBackend implements SpawnBackend {
     const tasksDir = join(dir, TASKS_DIR);
     mkdirSync(tasksDir, { recursive: true });
 
+    // Sprint 156 Task 10: spawn-time per-file lock acquisition.
+    // Reject the spawn if any file in this task's scope.filesWrite is already
+    // claimed by a different active task — prevents concurrent worker writes
+    // to the same file. Acquired locks are released on container exit
+    // (monitorContainer) or forced kill().
+    this.acquireSpawnTimeLocks(dir, taskId);
+
+    // Sprint 156 Task 10 (fix): every code path between here and the
+    // successful handoff to monitorContainer() must release the spawn locks
+    // if it fails — otherwise a transient docker error permanently blocks
+    // the file scope for the next worker. monitorContainer's exit handler
+    // is what releases on the happy path.
+    try {
+      this.runSpawn(taskId, model, prompt, opts, dir, effectiveTimeout, tasksDir);
+    } catch (err) {
+      try { releaseAllSpawnLocks(dir, taskId); } catch (e) { debugLog('docker-backend:spawn-lock-release', e); }
+      throw err;
+    }
+  }
+
+  private runSpawn(
+    taskId: string,
+    model: ModelType,
+    prompt: string,
+    opts: SpawnBackendOptions | undefined,
+    dir: string,
+    effectiveTimeout: number,
+    tasksDir: string,
+  ): void {
     // Guard: verify Docker image exists before attempting spawn
     const imageCheck = spawnSync('docker', ['images', '-q', this.image], {
       encoding: 'utf-8', timeout: 5_000, stdio: ['pipe', 'pipe', 'pipe'],
@@ -258,6 +292,10 @@ export class DockerSpawnBackend implements SpawnBackend {
     dockerArgs.push('-e', `DECKENT_PROJECT_ROOT=${CONTAINER_WORKSPACE}`);
     // Adaptive timeout: pass computed timeout to container as env var
     dockerArgs.push('-e', `TASK_TIMEOUT=${effectiveTimeout}`);
+    // Sprint 156 T-006: stable per-spawn idempotency key — promptId is already a fresh
+    // 16-hex-char random token unique to this worker invocation. Workers should use this
+    // value as the `Idempotency-Key` header for any external API call so retries are safe.
+    dockerArgs.push('-e', `IDEMPOTENCY_KEY=${promptId}`);
 
     // Pass API keys if available (for Codex/Gemini providers)
     const envKeys = ['ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'GOOGLE_API_KEY', 'DECKENT_DEBUG'];
@@ -282,6 +320,9 @@ export class DockerSpawnBackend implements SpawnBackend {
       debugLog('docker-backend:spawn-error', `${result.stderr?.trim()}`);
       // Write .timeout marker so result-collector doesn't wait forever
       writeFileSync(join(tasksDir, `task-${taskId}.timeout`), 'container_start_failed', 'utf-8');
+      // Sprint 156 Task 10 (fix): release spawn locks so a retry / fix-worker
+      // for this scope is not permanently blocked by a transient docker error.
+      try { releaseAllSpawnLocks(dir, taskId); } catch (e) { debugLog('docker-backend:spawn-lock-release', e); }
       return;
     }
 
@@ -354,6 +395,12 @@ export class DockerSpawnBackend implements SpawnBackend {
       spawnSync('docker', ['rm', '-f', containerName], { encoding: 'utf-8', timeout: 10_000 });
     } catch (e) { debugLog('docker-backend:rm-error', e); }
 
+    // Sprint 156 Task 10: forced shutdown — release any spawn locks left over
+    try {
+      const released = releaseAllSpawnLocks(this.projectDir, taskId);
+      if (released > 0) debugLog('docker-backend:spawn-lock', `taskId=${taskId} released ${released} spawn lock(s) on kill`);
+    } catch (e) { debugLog('docker-backend:spawn-lock-release', e); }
+
     this.containers.delete(taskId);
   }
 
@@ -395,6 +442,50 @@ export class DockerSpawnBackend implements SpawnBackend {
       stdio: ['pipe', 'pipe', 'pipe'],
     });
     return result.status === 0;
+  }
+
+  /**
+   * Acquire spawn-time `.spawnlock` files for every entry in the task's
+   * `scope.filesWrite`. Reads `<tasksDir>/task-<taskId>.json` to recover
+   * the file list — if the JSON is missing or malformed, locking is
+   * silently skipped (graceful degradation; we never block a spawn over
+   * a parse failure). Throws `SpawnBackendError` on a real conflict so
+   * the caller can surface the conflicting task id.
+   */
+  private acquireSpawnTimeLocks(projectDir: string, taskId: string): void {
+    const taskJsonPath = join(projectDir, TASKS_DIR, `task-${taskId}.json`);
+    if (!existsSync(taskJsonPath)) {
+      debugLog('docker-backend:spawn-lock', `taskId=${taskId} no task JSON found at ${taskJsonPath} — skipping spawn locks`);
+      return;
+    }
+
+    let filesWrite: string[] = [];
+    try {
+      const raw = readFileSync(taskJsonPath, 'utf-8');
+      const parsed = JSON.parse(raw) as { scope?: { filesWrite?: unknown } };
+      const candidate = parsed.scope?.filesWrite;
+      if (Array.isArray(candidate)) {
+        filesWrite = candidate.filter((f): f is string => typeof f === 'string' && f.length > 0);
+      }
+    } catch (err) {
+      debugLog('docker-backend:spawn-lock', `taskId=${taskId} failed to parse task JSON: ${(err as Error).message}`);
+      return;
+    }
+
+    if (filesWrite.length === 0) return;
+
+    try {
+      acquireSpawnLocks(projectDir, taskId, filesWrite);
+      debugLog('docker-backend:spawn-lock', `taskId=${taskId} acquired ${filesWrite.length} spawn lock(s)`);
+    } catch (err) {
+      if (err instanceof SpawnLockError) {
+        throw new SpawnBackendError(
+          `Spawn lock conflict on ${err.filePath}: file is currently held by task ${err.conflictingTaskId}`,
+          'docker',
+        );
+      }
+      throw err;
+    }
   }
 
   /**
@@ -562,23 +653,19 @@ export class DockerSpawnBackend implements SpawnBackend {
         spawnSync('docker', ['rm', '-f', containerName], { encoding: 'utf-8', timeout: 10_000 });
       } catch (e) { debugLog('docker-backend:cleanup', e); }
 
+      // Sprint 156 Task 10: release every spawn lock owned by this task
+      try {
+        const released = releaseAllSpawnLocks(this.projectDir, taskId);
+        if (released > 0) debugLog('docker-backend:spawn-lock', `taskId=${taskId} released ${released} spawn lock(s) on exit`);
+      } catch (e) { debugLog('docker-backend:spawn-lock-release', e); }
+
       this.containers.delete(taskId);
 
-      // NOTE: .prompt-* files are intentionally NOT deleted here.
-      // Sprint 137 Alperen request: persist prompt files for analysis until sprint end.
-      // Prompt files are archived by archivePromptFiles() during sprint cleanup/finalize.
-      // Worker script (.worker-*.sh) files ARE cleaned up — they contain no useful debug info.
-      try {
-        const tmpFiles = readdirSync(tasksDir) as string[];
-        for (const f of tmpFiles) {
-          if (f.startsWith('.worker-') && f.endsWith('.sh')) {
-            // Only cleanup worker scripts if no other container is running
-            if (this.containers.size === 0) {
-              try { unlinkSync(join(tasksDir, f)); } catch { /* ok */ }
-            }
-          }
-        }
-      } catch { /* ok */ }
+      // Sprint 156 Task 4: .prompt-*.txt AND .worker-*.sh tmpfiles persist until sprint cleanup.
+      // Both are archived together by archivePromptFiles() during sprint cleanup phase.
+      // Rationale: worker scripts (.worker-*.sh) contain spawn invocation and env state useful for
+      // post-mortem debugging when a container fails mid-execution. Previous behavior deleted them
+      // immediately after each container exit, losing forensic value.
     });
 
     child.on('error', (err) => {
@@ -602,10 +689,14 @@ export function isDockerAvailable(): boolean {
 // ─── Prompt File Archive ───────────────────────────────────────────────────
 
 /**
- * Archive .prompt-* files from .tasks/ into .tasks/archive/sprint-{sprintId}/.
+ * Archive .prompt-*.txt AND .worker-*.sh tmpfiles from .tasks/ into .tasks/archive/sprint-{sprintId}/.
  *
- * Called during sprint finalize/cleanup — prompt files persist during the sprint
+ * Called during sprint finalize/cleanup — tmpfiles persist during the sprint
  * for analysis, then are moved to the archive directory on completion.
+ *
+ * Sprint 156 Task 4 extension: worker scripts (.worker-*.sh) are archived alongside
+ * prompt files. They contain spawn invocation context (env, claude args, taskId) that is
+ * essential for post-mortem debugging when a container fails mid-execution.
  *
  * @param tasksDir  Absolute path to .tasks/ directory
  * @param sprintId  Sprint identifier (e.g. "sprint-139")
@@ -625,11 +716,13 @@ export function archivePromptFiles(
   const archiveDir = join(tasksDir, 'archive', sprintId);
   mkdirSync(archiveDir, { recursive: true });
 
-  // Move all .prompt-* files to archive
+  // Move all .prompt-*.txt AND .worker-*.sh tmpfiles to archive
   try {
     const files = readdirSync(tasksDir) as string[];
     for (const f of files) {
-      if (f.startsWith('.prompt-') && f.endsWith('.txt')) {
+      const isPromptFile = f.startsWith('.prompt-') && f.endsWith('.txt');
+      const isWorkerScript = f.startsWith('.worker-') && f.endsWith('.sh');
+      if (isPromptFile || isWorkerScript) {
         const src = join(tasksDir, f);
         const dst = join(archiveDir, f);
         try {

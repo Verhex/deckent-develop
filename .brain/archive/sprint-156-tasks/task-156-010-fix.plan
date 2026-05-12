@@ -1,0 +1,56 @@
+# Task 156-010-fix — Spawn-Time File Lock Hardening Plan
+
+## Baseline state (before fix)
+- src/core/file-lock.ts already exports SpawnLockInfo / SpawnLockError /
+  acquireSpawnLock / releaseSpawnLock / acquireSpawnLocks (with rollback) /
+  releaseSpawnLocks / releaseAllSpawnLocks. 18-case test suite at
+  tests/core/file-lock-runtime.test.ts is green (verified locally).
+- DockerSpawnBackend.spawn() calls acquireSpawnTimeLocks(); on docker
+  image absence it releases. monitorContainer + kill() release on exit.
+
+## Identified gap (the actual bug behind the NO_GO)
+DockerSpawnBackend.spawn() acquires spawn locks early, then runs
+`spawnSync('docker', ...)` to launch the container. When that returns a
+non-zero status (engine refuses, image broken, volume mount error, etc.)
+the current code writes a `.timeout` marker and `return`s — without ever
+releasing the spawn locks. Result: every subsequent retry for the same
+task fails with `SpawnLockError` from the leftover lock owned by the
+SAME taskId. Idempotency saves us in practice for the same taskId, but
+fix-worker spawns use a new id (`<taskId>-fix`) and would NOT be the
+owner — turning a transient docker failure into a permanent block on
+the original file scope.
+
+A similar leak exists between `acquireSpawnTimeLocks` and the docker
+image check / prompt write / script write — any throw there would leave
+locks dangling.
+
+## Fix
+1. src/orchestra/spawn-backend-docker.ts
+   - Wrap the whole post-lock body of `spawn()` in a try/catch.
+   - On any throw OR on the non-zero docker-run early-return path, call
+     `releaseAllSpawnLocks(dir, taskId)` first, then rethrow / return.
+   - Keep the existing image-not-found release path (now redundant
+     thanks to the wrapper, but explicit is fine).
+
+2. tests/core/file-lock-runtime.test.ts
+   - Add a regression test that simulates a leak-prone caller pattern:
+     acquire spawn locks for [a,b], simulate failure, call
+     releaseAllSpawnLocks, then confirm a different task can claim the
+     same files. (No docker dependency — we're hardening the contract
+     consumed by the docker backend.)
+
+## Out of scope
+- tmux / subprocess backend wiring — DIRECTIVES Task 10 explicitly
+  targets only the docker backend.
+- ADR drafts (other Sprint 156 tasks).
+- Any build invocation (ANCHOR: build = Alperen).
+
+## Verification
+- `npx tsc --noEmit` → 0 errors.
+- `npx vitest run tests/core/file-lock-runtime.test.ts tests/core/file-lock.test.ts`
+  → green.
+
+## Files
+- src/orchestra/spawn-backend-docker.ts (defensive try/catch wrapper)
+- tests/core/file-lock-runtime.test.ts (regression test)
+- src/core/file-lock.ts (no functional change — leave as-is)

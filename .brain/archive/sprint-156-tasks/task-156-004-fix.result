@@ -1,0 +1,17 @@
+{
+  "taskId": "156-004-fix",
+  "filesChanged": [],
+  "linesAdded": 0,
+  "linesRemoved": 0,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "DONE",
+  "notes": "Sprint 156 Task 4 fix re-verification.\n\nScope per fix task JSON: filesWrite = [spawn-backend-docker.ts, sprint-lifecycle.ts, tmpfile-preservation.test.ts]. I re-read all three files and confirmed every required change is already in place from the original task-156-004 worker.\n\nVerification of required changes:\n\n1) src/orchestra/spawn-backend-docker.ts\n   - Inline .worker-*.sh deletion block (originally at lines 567-578 inside monitorContainer) is REMOVED. Replaced by a comment at lines 641-645 explaining the new contract: tmpfiles persist until sprint cleanup phase, archived by archivePromptFiles().\n   - archivePromptFiles() (lines 682-737) now archives BOTH .prompt-*.txt AND .worker-*.sh into .tasks/archive/sprint-{id}/ — verified at lines 700-702 (isPromptFile || isWorkerScript predicate).\n   - JSDoc updated with Sprint 156 Task 4 rationale (lines 668-681).\n\n2) src/orchestra/sprint-lifecycle.ts\n   - CleanupPhaseKind type defined: 'sprint-end' | 'spawn-fail' (line 231).\n   - cleanup() signature extended with `cleanupPhase: CleanupPhaseKind = 'sprint-end'` (line 250) — default preserves backward compat.\n   - Tmpfile archive call (lines 302-306) gated: only fires when cleanupPhase === 'sprint-end'. On 'spawn-fail' tmpfiles are preserved in-place for post-mortem debugging.\n   - JSDoc at lines 217-244 documents both branches and the Sprint 156 Task 4 audit finding.\n\n3) tests/orchestra/tmpfile-preservation.test.ts — 8 tests across 3 describe blocks:\n   - archivePromptFiles (.worker-*.sh extension): 4 tests (both classes, worker-only, prompt-only, unrelated files ignored).\n   - cleanup() — tmpfile gating by cleanupPhase: 3 tests (default sprint-end, explicit sprint-end, spawn-fail preserves).\n   - Mid-sprint tmpfile preservation contract: 1 test (4 tmpfiles → archive after sprint-end).\n\nTest result: npx vitest run tests/orchestra/tmpfile-preservation.test.ts → 8/8 pass in 461ms.\n\nNo additional code changes needed — the original worker's implementation matches DIRECTIVES for all three in-scope files. Re-running the isolated test confirms correctness. Per DIRECTIVES anchor rules: did not run project-wide tsc or vitest (BUILD YASAK / TEST IZOLE).\n\nADR compliance: ADR-008 preserved (sprint-lifecycle imports spawn-backend-docker as orchestra→orchestra peer, no brain import added). ADR-024 preserved (cleanup logic stays in sprint-lifecycle, not pushed back into sprint-controller).\n\nOut-of-scope note for Brain: the runSpawnPhase retry-failure callsite in src/orchestra/sprint-phases.ts:425 currently calls cleanup(projectRoot, sprint) without a cleanupPhase argument, defaulting to 'sprint-end'. To honor the 'spawn-fail preserves in-place' contract, that callsite should be updated to pass 'spawn-fail'. That edit is OUT OF SCOPE for this fix task (sprint-phases.ts not in filesWrite). Recommend a follow-up task to wire the 'spawn-fail' argument at sprint-phases.ts:425 — the API is in place, only the caller needs updating.",
+  "tokenUsage": {
+    "inputTokens": 22000,
+    "outputTokens": 1800,
+    "cacheReadTokens": 12000,
+    "provider": "claude",
+    "model": "opus"
+  }
+}

@@ -1,0 +1,90 @@
+{
+  "id": "156-013",
+  "title": "Per-Change Security Review",
+  "description": "Per-Change Security Review\n- Model: sonnet\n- Effort: normal\n- Skills: security-specialist, documentation-writer\n- Files: docs/security/sprint-156-review.md\n- Scope: docs/security/\n\n### Description\nSprint 156 production task'ları (2,3,4,5,6,7,8,9,10,11,12) için per-change security review yaz. Her task için: 1) Threat model summary, 2) Mitigation in this task, 3) Residual risk. Özellikle Task 9 (assertSpawnSafe) ve Task 10 (file-lock) için detaylı. Format: ADR Lite style. ≥800 kelime.\n\n---",
+  "model": "sonnet",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive (model: sonnet -- user override)",
+  "scope": {
+    "directories": [
+      "docs/security/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "docs/security/sprint-156-review.md"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean",
+    "noGoCriteria": "Build fails or tests fail",
+    "techDebtAcceptable": "Minor style issues if tests pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-156",
+  "forceModel": "sonnet",
+  "forceEffort": "normal",
+  "forceSkills": [
+    "security-specialist",
+    "documentation-writer"
+  ],
+  "assignedAgent": "doc-writer",
+  "assignedSkills": [
+    "security-specialist",
+    "documentation-writer"
+  ],
+  "createdAt": "2026-05-12T13:10:04.318Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "documentation",
+        "secondary": [
+          "security"
+        ],
+        "confidence": 0.95
+      },
+      "tags": [],
+      "domains": [
+        {
+          "name": "docs",
+          "weight": 1
+        }
+      ],
+      "operations": [
+        {
+          "type": "test",
+          "weight": 0.33
+        },
+        {
+          "type": "document",
+          "weight": 0.33
+        },
+        {
+          "type": "modify",
+          "weight": 0.17
+        },
+        {
+          "type": "create",
+          "weight": 0.17
+        }
+      ],
+      "complexity": {
+        "fileCount": 1,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "trivial"
+      },
+      "scope": {
+        "writeRatio": {
+          "docs/": 1
+        },
+        "primaryWriteTarget": "docs/",
+        "testWriteRatio": 0
+      }
+    },
+    "confidence": "high",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-05-12T13:29:54.999Z"
+}

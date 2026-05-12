@@ -1,0 +1,94 @@
+{
+  "id": "156-001",
+  "title": "Workflow Rename VERIFY (read-only audit)",
+  "description": "Workflow Rename VERIFY (read-only audit)\n- Model: sonnet\n- Effort: low\n- Skills: devops-engineer, ci-testing\n- Files: docs/audits/sprint-156/T-001-workflow-verify.md\n- Scope: docs/audits/sprint-156/\n\n### Description\n.github/workflows/{ci.yml,docs.yml,cross-platform-e2e.yml} dosyalarının `branches: [main]` referans içerdiğini doğrula. master kalıntısı VAR mı tara. GitHub Actions runs listesinden son 5 run'ı oku ve durumlarını rapor et. Bu audit-only task, dosya değişikliği YOK. Çıktı: docs/audits/sprint-156/T-001-workflow-verify.md.\n\n---",
+  "model": "sonnet",
+  "effort": "low",
+  "priority": "NORMAL",
+  "reason": "Directive (model: sonnet -- user override)",
+  "scope": {
+    "directories": [
+      "docs/audits/sprint-156/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "docs/audits/sprint-156/T-001-workflow-verify.md",
+      "ci.yml",
+      "docs.yml",
+      "cross-platform-e2e.yml"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean",
+    "noGoCriteria": "Build fails or tests fail",
+    "techDebtAcceptable": "Minor style issues if tests pass"
+  },
+  "status": "NO_GO",
+  "sprintId": "sprint-156",
+  "provider": "claude",
+  "forceModel": "sonnet",
+  "forceEffort": "low",
+  "forceSkills": [
+    "devops-engineer",
+    "ci-testing"
+  ],
+  "assignedAgent": "doc-writer",
+  "assignedSkills": [
+    "devops-engineer",
+    "ci-testing"
+  ],
+  "createdAt": "2026-05-12T13:10:04.318Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "documentation",
+        "secondary": [],
+        "confidence": 0.67
+      },
+      "tags": [],
+      "domains": [
+        {
+          "name": "docs",
+          "weight": 0.4
+        }
+      ],
+      "operations": [
+        {
+          "type": "test",
+          "weight": 0.4
+        },
+        {
+          "type": "rename",
+          "weight": 0.2
+        },
+        {
+          "type": "document",
+          "weight": 0.2
+        },
+        {
+          "type": "create",
+          "weight": 0.2
+        }
+      ],
+      "complexity": {
+        "fileCount": 4,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "medium"
+      },
+      "scope": {
+        "writeRatio": {
+          "docs/": 0.25,
+          "./": 0.75
+        },
+        "primaryWriteTarget": "./",
+        "testWriteRatio": 0
+      }
+    },
+    "confidence": "high",
+    "routingVersion": "v2"
+  },
+  "estimatedTokens": 2881,
+  "updatedAt": "2026-05-12T13:29:33.864Z"
+}

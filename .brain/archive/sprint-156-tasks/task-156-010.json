@@ -1,0 +1,100 @@
+{
+  "id": "156-010",
+  "title": "Runtime File Lock (flock spawn-time)",
+  "description": "Runtime File Lock (flock spawn-time)\n- Model: opus\n- Effort: normal\n- Skills: typescript-expert, system-architect\n- Files: src/core/file-lock.ts, src/orchestra/spawn-backend-docker.ts, tests/core/file-lock-runtime.test.ts\n- Scope: src/core/, src/orchestra/, tests/core/\n\n### Description\nsrc/core/file-lock.ts içine acquireSpawnLock(taskId, filePath) fonksiyonu ekle (mevcut file-lock plan-time only). Worker spawn öncesi her filesWrite için .locks/<file-hash>.lock dosyası oluştur. Concurrent worker conflict check. spawn-backend-docker.ts:spawn() öncesi çağır. Test: 2 worker aynı dosyaya spawn istesin, 2.si lock fail.\n\n---",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "src/core/",
+      "src/orchestra/",
+      "tests/core/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/core/file-lock.ts",
+      "src/orchestra/spawn-backend-docker.ts",
+      "tests/core/file-lock-runtime.test.ts",
+      ".lock",
+      "spawn-backend-docker.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean",
+    "noGoCriteria": "Build fails or tests fail",
+    "techDebtAcceptable": "Minor style issues if tests pass"
+  },
+  "status": "NO_GO",
+  "sprintId": "sprint-156",
+  "forceModel": "opus",
+  "forceEffort": "normal",
+  "forceSkills": [
+    "typescript-expert",
+    "system-architect"
+  ],
+  "assignedAgent": "temp-react-ts-specialist",
+  "assignedSkills": [
+    "typescript-expert",
+    "system-architect"
+  ],
+  "createdAt": "2026-05-12T13:10:04.318Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "implementation",
+        "secondary": [
+          "documentation"
+        ],
+        "confidence": 0.95
+      },
+      "tags": [
+        "test-coverage"
+      ],
+      "domains": [
+        {
+          "name": "core",
+          "weight": 0.5
+        },
+        {
+          "name": "orchestra",
+          "weight": 0.25
+        }
+      ],
+      "operations": [
+        {
+          "type": "test",
+          "weight": 0.33
+        },
+        {
+          "type": "document",
+          "weight": 0.33
+        },
+        {
+          "type": "create",
+          "weight": 0.33
+        }
+      ],
+      "complexity": {
+        "fileCount": 5,
+        "moduleCount": 2,
+        "crossCutting": true,
+        "estimatedSize": "medium"
+      },
+      "scope": {
+        "writeRatio": {
+          "src/": 0.4,
+          "tests/": 0.2,
+          "./": 0.4
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0.2
+      }
+    },
+    "confidence": "low",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-05-12T13:29:48.802Z"
+}

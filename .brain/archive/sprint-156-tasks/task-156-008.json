@@ -1,0 +1,91 @@
+{
+  "id": "156-008",
+  "title": "Brain Self-Rebuild Gate (NO BUILD CALL)",
+  "description": "Brain Self-Rebuild Gate (NO BUILD CALL)\n- Model: opus\n- Effort: normal\n- Skills: typescript-expert\n- Files: src/orchestra/sprint-phases.ts, tests/orchestra/brain-rebuild-gate.test.ts\n- Scope: src/orchestra/, tests/orchestra/\n\n### Description\nSprint başlangıcı pre-flight check: dist/orchestra/sprint-phases.js mtime > .deckent/sprint-state.json (önceki sprint) mtime ise warning event yayınla. NO npm run build call — sadece mtime read + log. Yeni event: SPRINT→USER:BUILD_STALE_WARNING payload: { distMtime, sprintStateMtime, ageSeconds }. Test: dist 1 saat eski mock, warning event emitted.\n\n---",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "src/orchestra/",
+      "tests/orchestra/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/orchestra/sprint-phases.ts",
+      "tests/orchestra/brain-rebuild-gate.test.ts",
+      "dist/orchestra/sprint-phases.js",
+      "sprint-state.json"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean",
+    "noGoCriteria": "Build fails or tests fail",
+    "techDebtAcceptable": "Minor style issues if tests pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-156",
+  "forceModel": "opus",
+  "forceEffort": "normal",
+  "forceSkills": [
+    "typescript-expert"
+  ],
+  "assignedAgent": "temp-react-ts-specialist",
+  "assignedSkills": [
+    "typescript-expert"
+  ],
+  "createdAt": "2026-05-12T13:10:04.318Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "implementation",
+        "secondary": [],
+        "confidence": 0.95
+      },
+      "tags": [
+        "test-coverage"
+      ],
+      "domains": [
+        {
+          "name": "orchestra",
+          "weight": 0.67
+        },
+        {
+          "name": "dist",
+          "weight": 0.17
+        }
+      ],
+      "operations": [
+        {
+          "type": "create",
+          "weight": 0.67
+        },
+        {
+          "type": "test",
+          "weight": 0.33
+        }
+      ],
+      "complexity": {
+        "fileCount": 4,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "medium"
+      },
+      "scope": {
+        "writeRatio": {
+          "src/": 0.25,
+          "tests/": 0.25,
+          "dist/": 0.25,
+          "./": 0.25
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0.25
+      }
+    },
+    "confidence": "low",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-05-12T13:29:48.779Z"
+}

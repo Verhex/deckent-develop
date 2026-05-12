@@ -1,0 +1,96 @@
+{
+  "id": "156-004",
+  "title": "Task Tmpfile Cleanup Discipline",
+  "description": "Task Tmpfile Cleanup Discipline\n- Model: opus\n- Effort: normal\n- Skills: typescript-expert\n- Files: src/orchestra/spawn-backend-docker.ts, src/orchestra/sprint-lifecycle.ts, tests/orchestra/tmpfile-preservation.test.ts\n- Scope: src/orchestra/, tests/orchestra/\n\n### Description\n.worker-*.sh ve .prompt-*.txt dosyaları sprint sırasında silinmemeli. spawn-backend-docker.ts:567-578 koşullu silmeyi kaldır (sprint cleanup'a kadar bekle). sprint-lifecycle.ts:266-272 early-invoke audit + sadece sprint cleanup phase'inde çağrılmasını sağla. archivePromptFiles fonksiyonunu .worker-*.sh'a da uzat. Test: sprint mid-execution .worker-*.sh + .prompt-* var, sprint cleanup sonrası archive'a taşınmış.\n\n---",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "src/orchestra/",
+      "tests/orchestra/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/orchestra/spawn-backend-docker.ts",
+      "src/orchestra/sprint-lifecycle.ts",
+      "tests/orchestra/tmpfile-preservation.test.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean",
+    "noGoCriteria": "Build fails or tests fail",
+    "techDebtAcceptable": "Minor style issues if tests pass"
+  },
+  "status": "NO_GO",
+  "sprintId": "sprint-156",
+  "provider": "claude",
+  "forceModel": "opus",
+  "forceEffort": "normal",
+  "forceSkills": [
+    "typescript-expert"
+  ],
+  "assignedAgent": "temp-react-ts-specialist",
+  "assignedSkills": [
+    "typescript-expert"
+  ],
+  "createdAt": "2026-05-12T13:10:04.318Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "implementation",
+        "secondary": [
+          "documentation"
+        ],
+        "confidence": 0.65
+      },
+      "tags": [
+        "test-coverage"
+      ],
+      "domains": [
+        {
+          "name": "orchestra",
+          "weight": 1
+        }
+      ],
+      "operations": [
+        {
+          "type": "delete",
+          "weight": 0.25
+        },
+        {
+          "type": "test",
+          "weight": 0.25
+        },
+        {
+          "type": "document",
+          "weight": 0.25
+        },
+        {
+          "type": "create",
+          "weight": 0.25
+        }
+      ],
+      "complexity": {
+        "fileCount": 3,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "medium"
+      },
+      "scope": {
+        "writeRatio": {
+          "src/": 0.67,
+          "tests/": 0.33
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0.33
+      }
+    },
+    "confidence": "low",
+    "routingVersion": "v2"
+  },
+  "estimatedTokens": 680,
+  "updatedAt": "2026-05-12T13:29:37.483Z"
+}

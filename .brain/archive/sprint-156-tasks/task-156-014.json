@@ -1,0 +1,86 @@
+{
+  "id": "156-014",
+  "title": "3 Yeni ADR Draft",
+  "description": "3 Yeni ADR Draft\n- Model: sonnet\n- Effort: high\n- Skills: system-architect, documentation-writer\n- Files: docs/adr/053-task-type-taxonomy.md, docs/adr/055-hybrid-scoring-pipeline.md, docs/adr/060-self-awareness-channels.md\n- Scope: docs/adr/\n\n### Description\n3 yeni ADR draft (MADR v3 format): ADR-053 (TaskType Taxonomy: audit/document-write/code-development + extensibility roadmap), ADR-055 (Hybrid Scoring 5-Layer Pipeline: Schema/Gates/Quality/Outcome/Auditor), ADR-060 (Self-Awareness Propagation: 5 channel - init/sync/manifest/skill-declare/worker-enrichment). Her ADR: Status: proposed, Context, Decision, Consequences (pos/neg), Related ADRs. ≥600 kelime per ADR.\n\n---",
+  "model": "sonnet",
+  "effort": "high",
+  "priority": "NORMAL",
+  "reason": "Directive (model: sonnet -- user override)",
+  "scope": {
+    "directories": [
+      "docs/adr/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "docs/adr/053-task-type-taxonomy.md",
+      "docs/adr/055-hybrid-scoring-pipeline.md",
+      "docs/adr/060-self-awareness-channels.md"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean",
+    "noGoCriteria": "Build fails or tests fail",
+    "techDebtAcceptable": "Minor style issues if tests pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-156",
+  "forceModel": "sonnet",
+  "forceEffort": "high",
+  "forceSkills": [
+    "system-architect",
+    "documentation-writer"
+  ],
+  "assignedAgent": "doc-writer",
+  "assignedSkills": [
+    "system-architect",
+    "documentation-writer"
+  ],
+  "createdAt": "2026-05-12T13:10:04.318Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "documentation",
+        "secondary": [],
+        "confidence": 0.95
+      },
+      "tags": [],
+      "domains": [
+        {
+          "name": "docs",
+          "weight": 1
+        }
+      ],
+      "operations": [
+        {
+          "type": "document",
+          "weight": 0.5
+        },
+        {
+          "type": "configure",
+          "weight": 0.25
+        },
+        {
+          "type": "create",
+          "weight": 0.25
+        }
+      ],
+      "complexity": {
+        "fileCount": 3,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "medium"
+      },
+      "scope": {
+        "writeRatio": {
+          "docs/": 1
+        },
+        "primaryWriteTarget": "docs/",
+        "testWriteRatio": 0
+      }
+    },
+    "confidence": "high",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-05-12T13:29:57.636Z"
+}

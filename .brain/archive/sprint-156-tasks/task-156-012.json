@@ -1,0 +1,90 @@
+{
+  "id": "156-012",
+  "title": "Fresh-Eyes Fix Worker Rotation",
+  "description": "Fresh-Eyes Fix Worker Rotation\n- Model: opus\n- Effort: normal\n- Skills: system-architect, typescript-expert\n- Files: src/orchestra/sprint-spawner.ts, src/orchestra/debt-manager.ts, tests/orchestra/fresh-eyes-rotation.test.ts\n- Scope: src/orchestra/, tests/orchestra/\n\n### Description\nFix worker spawn'da farklı model + agent rotation. debt-manager.ts:fixTask oluştururken: original opus → fix sonnet, original architect → fix code-reviewer+bug-fixer. Mevcut model/agent kopya mantığını değiştir. fix.json'a yeni field: rotation_strategy. Test: orig task model=opus+agent=architect, fix task model=sonnet+agent=code-reviewer.\n\n---",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "src/orchestra/",
+      "tests/orchestra/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/orchestra/sprint-spawner.ts",
+      "src/orchestra/debt-manager.ts",
+      "tests/orchestra/fresh-eyes-rotation.test.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean",
+    "noGoCriteria": "Build fails or tests fail",
+    "techDebtAcceptable": "Minor style issues if tests pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-156",
+  "forceModel": "opus",
+  "forceEffort": "normal",
+  "forceSkills": [
+    "system-architect",
+    "typescript-expert"
+  ],
+  "assignedAgent": "temp-react-ts-specialist",
+  "assignedSkills": [
+    "system-architect",
+    "typescript-expert"
+  ],
+  "createdAt": "2026-05-12T13:10:04.318Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "implementation",
+        "secondary": [],
+        "confidence": 0.65
+      },
+      "tags": [
+        "test-coverage"
+      ],
+      "domains": [
+        {
+          "name": "orchestra",
+          "weight": 1
+        }
+      ],
+      "operations": [
+        {
+          "type": "modify",
+          "weight": 0.33
+        },
+        {
+          "type": "test",
+          "weight": 0.33
+        },
+        {
+          "type": "create",
+          "weight": 0.33
+        }
+      ],
+      "complexity": {
+        "fileCount": 3,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "medium"
+      },
+      "scope": {
+        "writeRatio": {
+          "src/": 0.67,
+          "tests/": 0.33
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0.33
+      }
+    },
+    "confidence": "low",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-05-12T13:29:52.327Z"
+}

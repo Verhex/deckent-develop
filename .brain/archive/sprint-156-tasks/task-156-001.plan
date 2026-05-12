@@ -1,0 +1,22 @@
+# Task 156-001 Execution Plan
+
+## Objective
+Audit-only task. Read workflow files, detect master residues, report findings.
+
+## Steps
+1. Read .github/workflows/ci.yml — check branches triggers
+2. Read .github/workflows/docs.yml — check branches triggers
+3. Read .github/workflows/cross-platform-e2e.yml — check branches triggers
+4. Grep all workflow files for "master" string (case-sensitive)
+5. Document findings in docs/audits/sprint-156/T-001-workflow-verify.md
+6. Note: GitHub Actions runs list unavailable without API access — document limitation
+
+## Expected Findings (observed during read)
+- ci.yml: branches: [main] ✓
+- docs.yml: branches: [main] ✓, BUT line 66 has commented-out `refs/heads/master` residue
+- cross-platform-e2e.yml: branches: [main] ✓
+- publish.yml: tag-based trigger only, no branch filter — no master reference ✓
+- release.yml: tag-based trigger only, no branch filter — no master reference ✓
+
+## Output File
+docs/audits/sprint-156/T-001-workflow-verify.md

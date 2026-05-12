@@ -1,0 +1,16 @@
+Görev `156-009` tamamlandı.
+
+**Özet — `selfAssessment: GO_WITH_TECH_DEBT`**
+
+Teslimat (scope içi %100):
+- `src/core/spawn-safety.ts` (157 LoC) — `ADAPTER_BIN_WHITELIST` (10 bin, frozen), `SH_C_ALLOWED` regex (spec'e uygun), `assertSpawnSafe(bin, args, opts?)`, `isSpawnSafe()`, `SpawnSafetyError` (codes: `BIN_NOT_WHITELISTED` | `ARG_INJECTION` | `INVALID_INPUT`)
+- `tests/core/spawn-safety.test.ts` (26 test, hepsi yeşil): spec'in istediği üç vaka (`rm -rf` reject, `npx vitest run` accept, `;rm` injection reject) + 23 ek kenar durumu
+
+Verify (anchor-rule uyumlu):
+- `npx vitest run tests/core/spawn-safety.test.ts` → 26/26 PASS, 158ms
+- `tsc --noEmit` (proje opsiyonlarıyla, dosya-bazlı) → 0 hata
+
+Tech debt (scope dışı):
+- `src/orchestra/spawn-backend-docker.ts` wire-up (`import` + spawn öncesi `assertSpawnSafe()` çağrısı) bu task'ın `filesWrite` kapsamında değil. Primitif export edilmiş, hazır; follow-up task gerekli.
+
+Anchor kurallarına uyuldu (BUILD YASAK, test izole, scope izole, atomic). DRY notlar `.tasks/task-156-009.{plan,result}` içinde.

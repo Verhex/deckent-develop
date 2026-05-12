@@ -193,3 +193,100 @@ export function getRubric(task: Task): EvaluationRubric {
 export function coverageOptional(task: Task): boolean {
   return detectTaskType(task) !== 'code-development';
 }
+
+// ═══ EffectClass — Reversibility Tag (ADR-055 placeholder) ════════════
+// Sprint 156 Task 11: seed for hybrid scoring pipeline. Tasks differ in
+// the *blast radius* of their side-effects: an audit doc is read-only
+// scaffolding, a config edit is reversible via git, but a DB migration
+// or an external `npm publish` is irreversible. The Brain / Nervous
+// system needs a structural tag to decide whether a task can be retried
+// blindly, must run inside a compensation envelope, or requires Alperen
+// approval.
+//
+// This is the *default* mapping per TaskType. Specific tasks may
+// override via task metadata in a future revision (ADR-055).
+
+/**
+ * Reversibility classification for a task's side-effects.
+ *
+ * - `pure`: read-only. No persisted side-effect. Safe to retry N times.
+ *   Examples: audit reports (read code → write a doc summary), static
+ *   analysis, doctor checks.
+ * - `reversible`: side-effect lives in the working tree and is undoable
+ *   via `git restore` / branch reset. Examples: source edits, test files,
+ *   narrative docs. Default for most worker output.
+ * - `idempotent`: side-effect persists but re-running produces the same
+ *   end state (no duplication). Examples: schema migrations guarded by
+ *   `CREATE TABLE IF NOT EXISTS`, config upserts. Safe to retry but the
+ *   first run already changed external state.
+ * - `compensable`: side-effect cannot be undone by re-running, but a
+ *   companion "undo" task exists. Examples: outbound API calls with a
+ *   refund endpoint, queue dispatches with cancellation. Retry requires
+ *   explicit compensation, not naive re-execution.
+ * - `critical-irreversible`: side-effect is final and externally visible.
+ *   Examples: `npm publish`, production deploy, force-push to main,
+ *   external email/notification send, payment capture. Retry is NEVER
+ *   safe; failure requires manual recovery and likely human approval
+ *   (per ADR-037 RBAC and Alperen-approval gates).
+ *
+ * @see ADR-055 (proposed, Sprint 156) — Hybrid Scoring 5-Layer Pipeline.
+ * The EffectClass feeds Layer 4 (Outcome) and Layer 5 (Auditor) of that
+ * pipeline by attaching a risk weight to each task type.
+ */
+export type EffectClass =
+  | 'pure'
+  | 'reversible'
+  | 'idempotent'
+  | 'compensable'
+  | 'critical-irreversible';
+
+/**
+ * Default EffectClass per TaskType.
+ *
+ * Today every TaskType maps to either `pure` (read-only audit reports)
+ * or `reversible` (working-tree edits undoable via git). The richer
+ * classes (`idempotent`, `compensable`, `critical-irreversible`) are
+ * reserved for future task taxonomies — e.g., a `db-migration` or
+ * `package-publish` TaskType — and are part of the type union so callers
+ * can pattern-match exhaustively today.
+ *
+ * @security Frozen object — runtime mutation rejected by the engine.
+ * Same override prohibition as RUBRIC_REGISTRY (gaming-proof): allowing
+ * runtime relaxation of EffectClass would let a task downgrade itself
+ * from `critical-irreversible` to `reversible` and bypass approval gates.
+ * Do not export; consumers use {@link getEffectClass}.
+ *
+ * @see ADR-055 (proposed, Sprint 156).
+ */
+const EFFECT_CLASS_REGISTRY: Readonly<Record<TaskType, EffectClass>> = Object.freeze({
+  audit: 'pure',
+  'document-write': 'reversible',
+  'code-development': 'reversible',
+});
+
+/**
+ * Return the default {@link EffectClass} for the given task.
+ *
+ * Composition: `EFFECT_CLASS_REGISTRY[detectTaskType(task)]`. The lookup
+ * is wrapped in a function (rather than exposing the map) so callers
+ * cannot mutate the underlying registry and so future revisions can
+ * honour per-task overrides (e.g., a `task.effectClass` field) without
+ * breaking the API.
+ *
+ * The total function never throws: every TaskType has a registry entry,
+ * and detectTaskType always returns a valid TaskType (defaulting to
+ * code-development).
+ *
+ * @see ADR-055 (proposed, Sprint 156) — Hybrid Scoring 5-Layer Pipeline.
+ *
+ * @example
+ * ```ts
+ * const cls = getEffectClass(task);
+ * if (cls === 'critical-irreversible') {
+ *   await requireAlperenApproval(task);
+ * }
+ * ```
+ */
+export function getEffectClass(task: Task): EffectClass {
+  return EFFECT_CLASS_REGISTRY[detectTaskType(task)];
+}

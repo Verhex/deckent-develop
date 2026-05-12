@@ -1,0 +1,65 @@
+# Task 156-012 Plan — Fresh-Eyes Fix Worker Rotation
+
+## Goal
+Fix worker spawn'da model + agent rotation: tek bir modelle/agent ile takılan task'ı farklı bir model + agent kombinasyonu ile yeniden denemek. "Fresh eyes" = yeni bakış açısı.
+
+## Files in scope
+- src/orchestra/debt-manager.ts (PRIMARY — fix task oluşumunda rotation uygula)
+- src/orchestra/sprint-spawner.ts (rotation helper re-export + scope-friendly entrypoint)
+- tests/orchestra/fresh-eyes-rotation.test.ts (yeni test dosyası)
+
+## Approach
+
+### debt-manager.ts
+1. `MODEL_DOWNGRADE_MAP` constant — provider-agnostic tier downgrade
+   - opus → sonnet, sonnet → haiku, haiku → haiku (no further downgrade)
+   - gpt-5 → gpt-4.1, gpt-4.1 → gpt-4.1-mini, ...
+   - gemini-2.5-pro → gemini-2.5-flash, ...
+2. `AGENT_FRESH_EYES_MAP` constant — agent rotation map
+   - architect → code-reviewer (primary)
+   - bug-fixer → code-reviewer, code-reviewer → bug-fixer, ...
+3. Export type `FreshEyesRotationStrategy { originalModel, rotatedModel, originalAgent, rotatedAgent, rationale }`
+4. Export `rotateModelForFix(model: ModelType): ModelType`
+5. Export `rotateAgentForFix(agent: string | undefined): string`
+6. Export `applyFreshEyesRotation(originalTask: Task): FreshEyesRotationStrategy`
+7. Modify `handleEvaluation` NO_GO branch:
+   - Compute rotation (model + agent + skills enrichment)
+   - Set fixTask.model = rotatedModel, fixTask.forceModel = rotatedModel
+   - Set fixTask.assignedAgent = rotatedAgent, fixTask.forceAgent = rotatedAgent
+   - Add fix-specific skills (e.g., add 'code-simplifier' for architect rotation)
+   - Stringify with extra field `rotationStrategy` (cast outside Task interface to keep within scope)
+
+### sprint-spawner.ts
+- Re-export rotation helpers `{ applyFreshEyesRotation, rotateModelForFix, rotateAgentForFix }` and type `FreshEyesRotationStrategy` from debt-manager for easier test access and future spawn-time use.
+- Add small `enrichFixTaskWithRotation` helper that emits a METRIC_EMITTED event when fix task with rotationStrategy is spawned — provides observability.
+
+### Tests (tests/orchestra/fresh-eyes-rotation.test.ts)
+- Test `rotateModelForFix`:
+  - opus → sonnet
+  - sonnet → haiku
+  - haiku → haiku (terminal)
+  - gpt-5 → gpt-4.1
+  - gemini-2.5-pro → gemini-2.5-flash
+  - unknown → returns input unchanged
+- Test `rotateAgentForFix`:
+  - architect → code-reviewer
+  - bug-fixer → code-reviewer
+  - code-reviewer → bug-fixer
+  - generic / undefined → code-reviewer (default)
+- Test `applyFreshEyesRotation`:
+  - returns strategy object with original + rotated values
+- Test `handleEvaluation NO_GO` integration:
+  - orig task model=opus + assignedAgent=architect
+  - fix task: model=sonnet, assignedAgent=code-reviewer
+  - written JSON has rotationStrategy field
+- Test sprint-spawner re-exports rotation helpers correctly
+
+## Out of scope
+- Modifying Task interface in core/ (rotationStrategy stored via cast in fix task JSON only)
+- Modifying routing-engine.ts (rotation is applied at fix-task creation, not at routing time)
+
+## Risk / Edge Cases
+- Models not in map: return input unchanged (safe fallback)
+- Agent 'generic' / undefined: default to 'code-reviewer'
+- ADR-024 compliance: debt-manager.ts stays in its zone; sprint-spawner re-exports only
+- ADR-008 compliance: no inverse imports (sprint-spawner already imports from debt-manager territory via spawn flow)

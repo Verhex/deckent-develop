@@ -1,0 +1,28 @@
+{
+  "taskId": "156-010",
+  "filesChanged": [
+    "src/core/file-lock.ts",
+    "src/orchestra/spawn-backend-docker.ts",
+    "tests/core/file-lock-runtime.test.ts"
+  ],
+  "linesAdded": 470,
+  "linesRemoved": 2,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "DONE",
+  "rubricScores": {
+    "correctness": 95,
+    "test_coverage": 95,
+    "scope_compliance": 100,
+    "documentation": 85
+  },
+  "evaluationDecision": "DONE",
+  "notes": "Implemented spawn-time `.spawnlock` API in src/core/file-lock.ts (acquireSpawnLock, releaseSpawnLock, acquireSpawnLocks with batch rollback, releaseSpawnLocks, releaseAllSpawnLocks, SpawnLockInfo, SpawnLockError) using sha256 hash-based filenames so long paths stay platform-safe. The new files use the `.spawnlock` extension to stay clear of the existing worker-time `.lock` files (verified: checkLocks/clearStaleLocks/clearOrphanLocks endsWith('.lock') filters do NOT pick up `.spawnlock`). Wired into DockerSpawnBackend.spawn() via a new private acquireSpawnTimeLocks(projectDir, taskId) that reads scope.filesWrite from .tasks/task-<id>.json — falls back gracefully to no-op when JSON is missing/malformed so spawn never blocks on a parse error. Conflicts raise SpawnBackendError carrying the conflicting taskId. Locks are released on container exit (monitorContainer), forced kill(), and the docker-image-not-found early return. Added a defensive readdirSync guard inside releaseAllSpawnLocks so cleanup tolerates partial fs mocks. Tests (tests/core/file-lock-runtime.test.ts, 18 cases) cover: hash-named lock creation, idempotency, two-worker conflict (canonical Task spec scenario), corrupted-spawnlock recovery, batch rollback on partial conflict, releaseAllSpawnLocks scoping to taskId, coexistence with worker-time .lock files. Verify loop: `npx tsc --noEmit` → 0 errors in my files (2 pre-existing errors in src/orchestra/sprint-spawner.ts belong to concurrent Task 156-012 / Fresh-Eyes Rotation, out of my scope). `npx vitest run` on the 4 relevant suites (file-lock + file-lock-runtime + tmpfile-preservation + unit/spawn-backend-docker) → 58/58 pass; no pre-existing regressions. ANCHOR compliance: no `npm run build`, no `npm install`, no project-wide test/tsc invocation; build is Alperen's decision per memory feedback_build_requires_user_approval. ADR compliance: ADR-001/002 .js suffixes preserved; ADR-008 import direction unchanged (file-lock under core, docker backend under orchestra calls into core — no brain import added).",
+  "tokenUsage": {
+    "inputTokens": 32000,
+    "outputTokens": 9500,
+    "cacheReadTokens": 0,
+    "provider": "claude",
+    "model": "opus"
+  }
+}

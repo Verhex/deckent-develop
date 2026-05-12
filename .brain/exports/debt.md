@@ -4,6 +4,7 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-156-011-fix | Tech debt from 156-011-fix: Code physically verified despite missing .result (Sp | normal | sprint-156 | active |
 
 ## Resolved Technical Debt
 
@@ -115,3 +116,5 @@ M | normal | - | resolved |
 
 **scripts/deploy-discord.sh** (yeni | normal | - | resolved |
 | debt-151-015 | Tech debt from 151-015: 5 yeni nervous system detector oluşturuldu (6→11 toplam) | normal | - | resolved |
+| debt-156-003 | Tech debt from 156-003: Sprint 156 Task 003 complete. Wired applyCascadeToSprint | normal | - | resolved |
+| debt-156-008 | Tech debt from 156-008: Sprint 156 Task 008 — Brain Self-Rebuild Gate (NO BUILD  | normal | - | resolved |

@@ -1,0 +1,101 @@
+{
+  "id": "156-002",
+  "title": "dependency_pipeline_enabled Default Flip",
+  "description": "dependency_pipeline_enabled Default Flip\n- Model: opus\n- Effort: normal\n- Skills: typescript-expert, system-architect\n- Files: src/core/config.ts, tests/core/config-defaults.test.ts\n- Scope: src/core/, tests/core/\n\n### Description\nsrc/core/config.ts içinde dependency_pipeline_enabled default değerini false→true yap. Mevcut DEFAULT_CONFIG (line 523 civarı) güncelle. tests/core/config-defaults.test.ts'a regression test ekle: getDefaultConfig().dependency_pipeline_enabled === true. JSDoc güncelle (neden true). NO build call.\n\n---",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "src/core/",
+      "tests/core/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/core/config.ts",
+      "tests/core/config-defaults.test.ts",
+      ".dependency_pipeline_enabled"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean",
+    "noGoCriteria": "Build fails or tests fail",
+    "techDebtAcceptable": "Minor style issues if tests pass"
+  },
+  "status": "NO_GO",
+  "sprintId": "sprint-156",
+  "provider": "claude",
+  "forceModel": "opus",
+  "forceEffort": "normal",
+  "forceSkills": [
+    "typescript-expert",
+    "system-architect"
+  ],
+  "assignedAgent": "temp-react-ts-specialist",
+  "assignedSkills": [
+    "typescript-expert",
+    "system-architect"
+  ],
+  "createdAt": "2026-05-12T13:10:04.318Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "implementation",
+        "secondary": [
+          "documentation",
+          "config"
+        ],
+        "confidence": 0.79
+      },
+      "subIntent": "config",
+      "tags": [
+        "test-coverage"
+      ],
+      "domains": [
+        {
+          "name": "core",
+          "weight": 0.8
+        }
+      ],
+      "operations": [
+        {
+          "type": "create",
+          "weight": 0.4
+        },
+        {
+          "type": "test",
+          "weight": 0.2
+        },
+        {
+          "type": "document",
+          "weight": 0.2
+        },
+        {
+          "type": "configure",
+          "weight": 0.2
+        }
+      ],
+      "complexity": {
+        "fileCount": 3,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "medium"
+      },
+      "scope": {
+        "writeRatio": {
+          "src/": 0.33,
+          "tests/": 0.33,
+          "./": 0.33
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0.33
+      }
+    },
+    "confidence": "low",
+    "routingVersion": "v2"
+  },
+  "estimatedTokens": 1042,
+  "updatedAt": "2026-05-12T13:29:33.865Z"
+}

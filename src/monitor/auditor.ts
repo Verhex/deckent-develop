@@ -2027,3 +2027,273 @@ export function detectDependencyViolations(
 
   return violations;
 }
+
+// ─── CI Baseline Gather (Sprint 156 T-005) ─────────────────────────────
+//
+// Sprint 155 produced a bogus baseline (testPassed=0/testFailed=11) because
+// the vitest subprocess failed to spawn yet the caller treated absence of
+// output as "11 tests failed". This block adds an auditor-side helper that
+// distinguishes three outcomes:
+//
+//   OK         — vitest ran AND output parsed; counts are trustworthy.
+//   SPAWN_FAIL — child process never produced an exit code (after retry).
+//   PARSE_FAIL — subprocess returned an exit code but output could not be
+//                parsed into pass/fail counts.
+//
+// The result is written to `.deckent/ci-baseline.json` with a new
+// `vitest_invocation_status` field so downstream consumers
+// (CI guardian / sprint reporter) can ignore SPAWN_FAIL / PARSE_FAIL
+// baselines instead of mistaking them for regressions.
+
+/** Tagged status describing how the vitest subprocess actually behaved. */
+export type CiBaselineInvocationStatus = 'OK' | 'SPAWN_FAIL' | 'PARSE_FAIL';
+
+/** Parsed vitest counts plus a flag describing whether parsing succeeded. */
+export interface VitestBaselineParse {
+  testCount: number;
+  testPassed: number;
+  testFailed: number;
+  parseOk: boolean;
+}
+
+/** Full result of `gatherCiBaseline` — counts + status + diagnostics. */
+export interface CiBaselineGatherResult {
+  status: CiBaselineInvocationStatus;
+  testCount: number;
+  testPassed: number;
+  testFailed: number;
+  exitCode: number | null;
+  attempts: number;
+  /** Truncated stderr (last 2KB) preserved for forensic logging. */
+  stderrTail: string;
+  /** Why parse / spawn failed — empty string when status is OK. */
+  failureReason: string;
+}
+
+/** Options influencing how `gatherCiBaseline` invokes the subprocess. */
+export interface GatherCiBaselineOptions {
+  /** Subprocess timeout (ms). Default: 180_000. */
+  timeoutMs?: number;
+  /** Allow retry-on-spawn-fail once. Default: true. */
+  retryOnSpawnFail?: boolean;
+  /** Inject a custom spawn function (for testing). Default: spawnSync. */
+  spawnFn?: typeof spawnSync;
+}
+
+/** Disk record written to `.deckent/ci-baseline.json`. */
+export interface CiBaselineRecord {
+  sprintId: string;
+  baseline: {
+    tscPassed: boolean;
+    testCount: number;
+    testPassed: number;
+    testFailed: number;
+    coverage: number;
+    timestamp: string;
+  };
+  /**
+   * Sprint 156 T-005: distinguishes subprocess health from test outcomes.
+   *   OK         — counts are trustworthy.
+   *   SPAWN_FAIL — vitest never ran cleanly even after one retry — ignore counts.
+   *   PARSE_FAIL — vitest exited but output was not interpretable — ignore counts.
+   */
+  vitest_invocation_status: CiBaselineInvocationStatus;
+}
+
+/**
+ * Parse vitest output (stdout preferred, stderr fallback) into pass/fail counts.
+ *
+ * Recognises two formats:
+ *   1. `--reporter=json` JSON object containing `numPassedTests` / `numFailedTests`.
+ *   2. Human-readable footer "Tests  3 failed | 11312 passed (11315)".
+ *
+ * Returns `parseOk: false` when neither path yielded a value, allowing the
+ * caller to flag the invocation as PARSE_FAIL instead of silently recording
+ * zeros.
+ *
+ * Pure function — no I/O, safe to unit-test.
+ */
+export function parseVitestBaselineOutput(stdout: string, stderr: string): VitestBaselineParse {
+  // Path 1 — JSON reporter (preferred, structured)
+  const combined = `${stdout}\n${stderr}`;
+  const jsonMatch = combined.match(/\{[\s\S]*"numTotalTests"[\s\S]*?\}/);
+  if (jsonMatch) {
+    try {
+      const parsed = JSON.parse(jsonMatch[0]) as {
+        numPassedTests?: number;
+        numFailedTests?: number;
+        numTotalTests?: number;
+      };
+      const passed = parsed.numPassedTests ?? 0;
+      const failed = parsed.numFailedTests ?? 0;
+      const total = parsed.numTotalTests ?? passed + failed;
+      // Accept JSON only when total is consistent (>= passed + failed).
+      if (total >= passed + failed) {
+        return { testCount: total, testPassed: passed, testFailed: failed, parseOk: true };
+      }
+    } catch {
+      // fall through to text path
+    }
+  }
+
+  // Path 2 — human-readable footer
+  const testsLine = combined.match(/^\s*Tests\s+.+$/m)?.[0] ?? '';
+  const failedMatch = testsLine.match(/(\d+)\s+failed/);
+  const passedMatch = testsLine.match(/(\d+)\s+passed\s+\((\d+)\)/);
+  const skippedMatch = testsLine.match(/(\d+)\s+skipped/);
+
+  const testFailed = failedMatch?.[1] ? parseInt(failedMatch[1], 10) : 0;
+  const testPassed = passedMatch?.[1] ? parseInt(passedMatch[1], 10) : 0;
+  const testCount = passedMatch?.[2] ? parseInt(passedMatch[2], 10) : 0;
+
+  // Either the bracketed total OR an explicit passed/failed/skipped count
+  // is required to call this a successful parse.
+  const haveExplicitNumbers = Boolean(passedMatch || failedMatch || skippedMatch);
+  if (haveExplicitNumbers && testCount === 0 && testPassed === 0 && testFailed === 0) {
+    // Saw "Tests" line but no numeric capture — not a clean parse.
+    return { testCount: 0, testPassed: 0, testFailed: 0, parseOk: false };
+  }
+  if (!haveExplicitNumbers) {
+    return { testCount: 0, testPassed: 0, testFailed: 0, parseOk: false };
+  }
+
+  return {
+    testCount: testCount > 0 ? testCount : testPassed + testFailed,
+    testPassed,
+    testFailed,
+    parseOk: true,
+  };
+}
+
+/**
+ * Run vitest as a subprocess and produce a structured baseline gather result.
+ *
+ * Retries ONCE when the first attempt fails to spawn (no exit code or
+ * `result.error` populated — typical ENOENT / signal kill). Subsequent
+ * "ran but produced nothing parseable" cases surface as PARSE_FAIL without
+ * a retry, since the same invocation will reproduce.
+ *
+ * Never throws — the caller can write the returned record verbatim.
+ */
+export function gatherCiBaseline(
+  projectRoot: string,
+  opts: GatherCiBaselineOptions = {},
+): CiBaselineGatherResult {
+  const timeoutMs = opts.timeoutMs ?? 180_000;
+  const retryOnSpawnFail = opts.retryOnSpawnFail ?? true;
+  const spawnFn = opts.spawnFn ?? spawnSync;
+
+  let attempts = 0;
+  let lastResult: ReturnType<typeof spawnSync> | null = null;
+  let lastSpawnError: Error | null = null;
+
+  const maxAttempts = retryOnSpawnFail ? 2 : 1;
+  while (attempts < maxAttempts) {
+    attempts += 1;
+    try {
+      // ADR-006: array args, no shell, no concat.
+      lastResult = spawnFn('npx', ['vitest', 'run', '--reporter=json'], {
+        cwd: projectRoot,
+        timeout: timeoutMs,
+        encoding: 'utf-8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+      lastSpawnError = (lastResult.error as Error | undefined) ?? null;
+    } catch (e) {
+      lastSpawnError = e instanceof Error ? e : new Error(String(e));
+      lastResult = null;
+    }
+
+    const spawnFailed =
+      lastResult == null ||
+      lastSpawnError !== null ||
+      (lastResult.status === null && lastResult.signal == null);
+
+    if (!spawnFailed) break; // good enough to parse
+    if (!retryOnSpawnFail) break; // no retry allowed
+  }
+
+  // Compute stderr tail (last 2KB) for diagnostics in either branch.
+  const stderr = (lastResult?.stderr ?? '').toString();
+  const stdout = (lastResult?.stdout ?? '').toString();
+  const stderrTail = stderr.length > 2048 ? stderr.slice(-2048) : stderr;
+
+  // Was this still a spawn failure after all attempts?
+  if (
+    lastResult == null ||
+    lastSpawnError !== null ||
+    (lastResult.status === null && lastResult.signal == null)
+  ) {
+    return {
+      status: 'SPAWN_FAIL',
+      testCount: 0,
+      testPassed: 0,
+      testFailed: 0,
+      exitCode: lastResult?.status ?? null,
+      attempts,
+      stderrTail,
+      failureReason: lastSpawnError ? `spawn error: ${lastSpawnError.message}` : 'no exit code from subprocess',
+    };
+  }
+
+  // We got an exit code — parse output.
+  const parsed = parseVitestBaselineOutput(stdout, stderr);
+  if (!parsed.parseOk) {
+    return {
+      status: 'PARSE_FAIL',
+      testCount: 0,
+      testPassed: 0,
+      testFailed: 0,
+      exitCode: lastResult.status,
+      attempts,
+      stderrTail,
+      failureReason: `vitest exited with code ${String(lastResult.status)} but output was not parseable`,
+    };
+  }
+
+  return {
+    status: 'OK',
+    testCount: parsed.testCount,
+    testPassed: parsed.testPassed,
+    testFailed: parsed.testFailed,
+    exitCode: lastResult.status,
+    attempts,
+    stderrTail,
+    failureReason: '',
+  };
+}
+
+/**
+ * Build a `CiBaselineRecord` from a gather result and persist it to
+ * `.deckent/ci-baseline.json`. The returned record is the same value
+ * written to disk so callers can also feed it into the event stream.
+ *
+ * On SPAWN_FAIL / PARSE_FAIL the counts are forced to zero AND
+ * `tscPassed` is recorded as supplied — downstream readers must consult
+ * `vitest_invocation_status` before trusting the count fields.
+ */
+export function writeCiBaselineRecord(
+  projectRoot: string,
+  sprintId: string,
+  gather: CiBaselineGatherResult,
+  tscPassed: boolean,
+  coverage = 0,
+): CiBaselineRecord {
+  const record: CiBaselineRecord = {
+    sprintId,
+    baseline: {
+      tscPassed,
+      testCount: gather.status === 'OK' ? gather.testCount : 0,
+      testPassed: gather.status === 'OK' ? gather.testPassed : 0,
+      testFailed: gather.status === 'OK' ? gather.testFailed : 0,
+      coverage,
+      timestamp: new Date().toISOString(),
+    },
+    vitest_invocation_status: gather.status,
+  };
+
+  const dir = join(projectRoot, '.deckent');
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, 'ci-baseline.json'), JSON.stringify(record, null, 2), 'utf-8');
+  return record;
+}

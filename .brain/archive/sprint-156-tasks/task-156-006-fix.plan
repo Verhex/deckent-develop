@@ -1,0 +1,39 @@
+# Task 156-006-fix Execution Plan
+
+## Context
+Original task 156-006 was evaluated as NO_GO by Brain despite worker
+self-assessment DONE. Inspection of the working tree shows that all three
+deliverables are already in place:
+
+1. src/orchestra/spawn-backend-docker.ts:278 — `dockerArgs.push('-e', \`IDEMPOTENCY_KEY=${promptId}\`)`
+   (sourced from existing 16-hex `randomBytes(8).toString('hex')` promptId)
+2. src/orchestra/prompt-god-template.ts:340-342 — `## Idempotency Key` block
+   embedded in worker preamble between `## Your Task` and `## What To Do`
+3. tests/orchestra/idempotency-key-inject.test.ts — 7 tests covering env
+   injection format, -e flag placement, fresh key per spawn, header presence,
+   literal placeholder preservation, usage directive, and structural placement.
+
+## Why was 156-006 NO_GO?
+Likely a Brain evaluation issue (false NO_GO) rather than a defect in the
+delivered code. The partial-result marker in `.tasks/task-156-006-fix.partial-result`
+shows the fix worker started but was OOM/SIGTERM-killed before writing .result.
+Brain spawned this fix-task to re-verify and finalize the work.
+
+## Approach (verify-only)
+Since all artefacts are already present:
+1. Run targeted vitest on the idempotency test file — must pass 7/7.
+2. If any test fails, patch the relevant file (only within scope).
+3. Write the .result with selfAssessment based on the actual verification.
+
+## Files in scope
+- src/orchestra/spawn-backend-docker.ts (already modified)
+- src/orchestra/prompt-god-template.ts (already modified)
+- tests/orchestra/idempotency-key-inject.test.ts (already exists)
+
+## Verify
+- `npx vitest run tests/orchestra/idempotency-key-inject.test.ts` — expected 7/7 pass
+
+## Anchor compliance
+- NO `npm run build`
+- NO repo-wide tsc / vitest
+- File-targeted vitest only

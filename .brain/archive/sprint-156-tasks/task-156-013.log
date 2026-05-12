@@ -1,0 +1,7 @@
+Görev tamamlandı. `docs/security/sprint-156-review.md` dosyası oluşturuldu — 3.153 kelime, 11 task için ADR Lite formatında per-change security review içeriyor.
+
+**Öne çıkan bulgular:**
+- **T9 (assertSpawnSafe):** `npx <arbitrary-package>` semantic bypass tespit edildi — binary whitelist yalnızca üst-seviye binary'yi doğrular, `npx`'in çözümleyeceği paketi değil. Önerilen takip: ikincil paket allowlist.
+- **T10 (file-lock):** O_EXCL atomikliği doğru kullanılmış; corrupted lock TOCTOU penceresi teorik, exploit edilemez seviyede.
+- **T7 (prompt enrichment):** Dependency `notes` alanı üzerinden 500 karakter prompt injection penceresi mevcut; gelecekte result file imzalama önerildi.
+- **T12 (fix rotation):** P0/CRITICAL task'larının rotation'dan muaf tutulmaması güvenlik açığı — gap olarak işaretlendi.

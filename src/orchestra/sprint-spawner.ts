@@ -4,7 +4,7 @@
 //   routeSprintTasks()
 
 // ─── Node Builtins ─────────────────────────────────────────────────
-import { writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 // ─── Core (value imports — enums used at runtime) ──────────────────
@@ -90,6 +90,9 @@ import {
   type FailureContext,
   type CascadeDecision,
 } from './result-evaluator.js';
+
+// ─── Fresh-Eyes Rotation (Sprint 156 Task 012) ───────────────────
+import type { FreshEyesRotationStrategy } from './debt-manager.js';
 
 // ═══ Scope Path Utilities ══════════════════════════════════════════
 
@@ -417,6 +420,9 @@ export async function respawnEligibleTasks(
       : 'Read,Write,Edit,Bash,Glob,Grep';
 
     const taskProvider = resolveTaskProvider(task);
+
+    // Sprint 156 Task 012 — observability for fresh-eyes rotation on fix tasks
+    emitRotationMetricIfApplicable(projectRoot, sprint.id, task);
 
     if (backend) {
       backend.spawn(task.id, task.model, prompt, {
@@ -773,10 +779,83 @@ export function applyUnblockToSprint(
   return unblockResult.unblockedTaskIds;
 }
 
+// ─── Fresh-Eyes Rotation Emit (Sprint 156 Task 012) ─────────────────────────
+
+/**
+ * Read a fix task's persisted `rotationStrategy` from the task JSON file and
+ * emit a METRIC_EMITTED event if present.
+ *
+ * The strategy is written by `applyFreshEyesRotation` in debt-manager.ts when
+ * a NO_GO fix task is created. This helper provides spawn-time observability
+ * so dashboards can see *when* rotation actually took effect.
+ *
+ * Failure of the rotation emit must never break worker spawn — all I/O is
+ * try/catch wrapped and logged via debugLog.
+ *
+ * @param projectRoot - Project root for event stream + task file location
+ * @param sprintFallbackId - Sprint ID fallback when getCurrentSprintId returns null
+ * @param task - Task being spawned (only fix tasks emit; others are no-ops)
+ */
+export function emitRotationMetricIfApplicable(
+  projectRoot: string,
+  sprintFallbackId: string,
+  task: Task,
+): void {
+  if (!task.isPriorityFix) return;
+  try {
+    const taskFilePath = join(projectRoot, TASKS_DIR, `task-${task.id}.json`);
+    const raw = readFileSafely(taskFilePath);
+    if (!raw) return;
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    const strategy = parsed['rotationStrategy'] as FreshEyesRotationStrategy | undefined;
+    if (!strategy || !strategy.enabled) return;
+
+    const sprintId = getCurrentSprintId(projectRoot) ?? sprintFallbackId;
+    writeEvent(
+      projectRoot, sprintId, 'brain', '*',
+      CHANNELS.METRIC_EMITTED,
+      {
+        name: 'fix.rotation.applied',
+        value: 1,
+        taskId: task.id,
+        originalModel: strategy.originalModel,
+        rotatedModel: strategy.rotatedModel,
+        originalAgent: strategy.originalAgent,
+        rotatedAgent: strategy.rotatedAgent,
+        addedSkills: strategy.addedSkills,
+      },
+    );
+    metric('fix.rotation.applied', 1, {
+      task_id: task.id,
+      from_model: strategy.originalModel,
+      to_model: strategy.rotatedModel,
+      from_agent: strategy.originalAgent,
+      to_agent: strategy.rotatedAgent,
+    });
+  } catch (e) {
+    debugLog('emitRotationMetricIfApplicable', e);
+  }
+}
+
+/** Read a file's contents synchronously, returning null on any I/O error. */
+function readFileSafely(path: string): string | null {
+  try {
+    return readFileSync(path, 'utf-8');
+  } catch { return null; }
+}
+
 // ─── Re-exports for external consumers ────────────────────────────
 export { detectScopeCollisions, buildCollisionAwareWaves } from './conflict-resolver.js';
 export type { CollisionResult, CollisionMap } from './conflict-resolver.js';
 export type { FailureContext, CascadeDecision, FailureClassification, FailureCategory } from './result-evaluator.js';
+
+// ─── Fresh-Eyes Rotation re-exports (Sprint 156 Task 012) ────────
+export {
+  applyFreshEyesRotation,
+  rotateModelForFix,
+  rotateAgentForFix,
+} from './debt-manager.js';
+export type { FreshEyesRotationStrategy } from './debt-manager.js';
 
 // ─── Dependency Scheduler re-exports (Sprint 139 Task 028 + 029) ──
 export {

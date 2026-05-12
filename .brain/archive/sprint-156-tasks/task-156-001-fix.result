@@ -1,0 +1,17 @@
+{
+  "taskId": "156-001-fix",
+  "filesChanged": ["docs/audits/sprint-156/T-001-workflow-verify.md"],
+  "linesAdded": 17,
+  "linesRemoved": 0,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "DONE",
+  "notes": "Re-verification audit completed. Original task findings confirmed accurate: all 3 primary workflow files (ci.yml, docs.yml, cross-platform-e2e.yml) use branches: [main]. Single non-blocking master residue at docs.yml:66 (commented-out dead code) confirmed. No active master references across all 5 workflow files. Audit report updated with re-verification table (fix worker stamp). Original task was evaluated NO_GO due to truncated result notes — the underlying audit work was correct and complete.",
+  "tokenUsage": {
+    "inputTokens": 8200,
+    "outputTokens": 650,
+    "cacheReadTokens": 38000,
+    "provider": "claude",
+    "model": "sonnet"
+  }
+}

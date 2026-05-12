@@ -47,6 +47,9 @@ import { releaseSprintLock } from '../core/multi-ide.js';
 // ─── Spawn backend abstraction ───────────────────────────────────
 import type { SpawnBackend } from './spawn-backend.js';
 
+// ─── Spawn backend tmpfile archive ────────────────────────────────
+import { archivePromptFiles } from './spawn-backend-docker.js';
+
 // ─── Tmux ────────────────────────────────────────────────────────
 import { killWorker, listWorkers } from './tmux.js';
 
@@ -212,13 +215,40 @@ export function safeDashboardUpdate(
 // ═══ Cleanup ══════════════════════════════════════════════════════
 
 /**
+ * Indicates which lifecycle event triggered a cleanup() invocation.
+ *
+ * - `sprint-end`: Normal sprint completion or CLI-driven cleanup. Tmpfiles
+ *   (.prompt-*.txt, .worker-*.sh) are archived to .tasks/archive/sprint-{id}/.
+ * - `spawn-fail`: Cleanup invoked from runSpawnPhase retry-failure path. The
+ *   sprint did not reach its execution lifecycle, so tmpfiles are preserved
+ *   in-place for post-mortem debugging — they are NOT archived or deleted.
+ *
+ * Sprint 156 Task 4 audit: previously, cleanup() unconditionally deleted
+ * .prompt-* and .worker-*.sh tmpfiles (sprint-lifecycle.ts:266-272), even
+ * when called from spawn-fail retry. This destroyed forensic evidence before
+ * archival could run. The `cleanupPhase` parameter gates tmpfile handling.
+ */
+export type CleanupPhaseKind = 'sprint-end' | 'spawn-fail';
+
+/**
  * Clean up all sprint resources: kill workers, release locks, remove task files
  * (.json, .plan, .hb, .result, .paused, .log), stale files, and lock files.
+ *
+ * Tmpfile handling (.prompt-*.txt, .worker-*.sh) is gated by `cleanupPhase`:
+ * - `sprint-end` (default): tmpfiles archived via archivePromptFiles().
+ * - `spawn-fail`: tmpfiles preserved in .tasks/ for post-mortem debugging.
+ *
  * @param projectRoot - Project root directory
  * @param sprint - Sprint whose resources should be cleaned up
  * @param spawnBackend - Optional spawn backend for killing workers
+ * @param cleanupPhase - Which lifecycle event triggered cleanup. Default `'sprint-end'`.
  */
-export function cleanup(projectRoot: string, sprint: Sprint, spawnBackend?: SpawnBackend): void {
+export function cleanup(
+  projectRoot: string,
+  sprint: Sprint,
+  spawnBackend?: SpawnBackend,
+  cleanupPhase: CleanupPhaseKind = 'sprint-end',
+): void {
   // Kill all active workers via backend or direct tmux calls
   const workers = spawnBackend ? spawnBackend.list() : listWorkers();
   for (const taskId of workers) {
@@ -263,13 +293,16 @@ export function cleanup(projectRoot: string, sprint: Sprint, spawnBackend?: Spaw
     }
   }
 
-  // Clean up leftover .tasks/.prompt-* and .worker-*.sh hidden tmpfiles from Docker/tmux backends
-  if (existsSync(tasksDir)) {
-    for (const file of readdirSync(tasksDir)) {
-      if (file.startsWith('.prompt-') || (file.startsWith('.worker-') && file.endsWith('.sh'))) {
-        try { unlinkSync(join(tasksDir, file)); } catch (e) { debugLog('cleanup:unlinkTmpFile', e); }
-      }
-    }
+  // Sprint 156 Task 4: Tmpfile handling is gated by cleanupPhase.
+  // sprint-end → archive .prompt-*.txt and .worker-*.sh into .tasks/archive/sprint-{id}/.
+  // spawn-fail → preserve tmpfiles in-place (post-mortem debugging value).
+  // Previously (pre-Sprint 156) cleanup() unconditionally deleted these files, which
+  // (a) destroyed forensic evidence on spawn-fail and (b) raced ahead of CLI cleanup's
+  // own archivePromptFiles() call, leaving the archive directory empty.
+  if (cleanupPhase === 'sprint-end' && existsSync(tasksDir)) {
+    try {
+      archivePromptFiles(tasksDir, sprint.id);
+    } catch (e) { debugLog('cleanup:archivePromptFiles', e); }
   }
 
   // Clean up decision trail files from .deckent/decisions/

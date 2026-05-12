@@ -1,0 +1,27 @@
+{
+  "taskId": "156-002",
+  "filesChanged": [
+    "src/core/config.ts",
+    "tests/core/config-defaults.test.ts"
+  ],
+  "linesAdded": 65,
+  "linesRemoved": 2,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "DONE",
+  "notes": "Sprint 156 Task 2 — dependency_pipeline_enabled default flipped from undefined (falsy) → true. Three precise changes inside scope (src/core/config.ts only):\n\n1. New local intersection alias `DeckentConfigWithPipeline = DeckentConfig & { dependency_pipeline_enabled?: boolean }` declared at top of config.ts. JSDoc documents that the field is in ResolvedConfig (config-types.ts:490) but NOT yet in DeckentConfig, and that a follow-up sprint should add it to DeckentConfig (config-types.ts is OUT of this task's filesWrite scope, hence the local bridge).\n\n2. `createDefaultConfig()` (src/core/config.ts:522-654): typed local `config: DeckentConfigWithPipeline`, added `dependency_pipeline_enabled: true` with JSDoc explaining why true (eliminates race conditions in DIRECTIVES with explicit dependencies; activates wave-based spawning + cascade NO_GO + unblock DONE). Returns `config` (still typed as DeckentConfig via function signature).\n\n3. `loadConfig()` (src/core/config.ts:876-877) and `mergeConfigs()` (src/core/config.ts:1393-1394) resolved-block pass-through: `dependency_pipeline_enabled: (config as DeckentConfigWithPipeline).dependency_pipeline_enabled ?? true`. This wires the new default into ResolvedConfig so sprint-spawner.ts:{220,248,368} reads true by default, while still allowing project/global config to explicitly set false.\n\n4. New file tests/core/config-defaults.test.ts (3 tests, all passing):\n   - getDefaultConfig().dependency_pipeline_enabled === true (the explicit regression assertion the directive requires)\n   - createDefaultConfig() and getDefaultConfig() agree\n   - Fresh-copy semantics — mutating one returned config does not affect the next call (guards against singleton return)\n\nVerify performed in-scope only (per anchor rule 2 — proje geneli vitest YASAK):\n- npx vitest run tests/core/config-defaults.test.ts → 3/3 PASS (240ms)\n- npx vitest run tests/core/config.test.ts tests/core/config-defaults.test.ts → 164/164 PASS (316ms, no regression in pre-existing config tests)\n\nNot performed (per DIRECTIVES anchor rules):\n- npm run build (anchor rule 1 — YASAK)\n- Project-wide tsc --noEmit (anchor rule 1 — YASAK)\n- Project-wide vitest (anchor rule 2 — YASAK)\nThe new test relies on vitest's esbuild transform, which already type-checked the test imports and the modified config.ts surface needed for these tests; no transform errors. A separate, project-wide tsc gate is Alperen's responsibility per the anchor rules.\n\nScope discipline: filesWrite = [src/core/config.ts, tests/core/config-defaults.test.ts]. config-types.ts was deliberately NOT modified despite being where DeckentConfig is declared, because it is outside filesWrite. The local intersection alias is the pragmatic bridge until a follow-up sprint widens scope to add the field to DeckentConfig directly.\n\nHonest self-assessment: ≥80% of the task spec is achieved. Default flipped (true) at three integration points (default, load, merge), regression test guards the flip, JSDoc explains the why, scope respected. Residual debt: the type assertion bridge could be removed by adding `dependency_pipeline_enabled` to DeckentConfig in a follow-up sprint that includes config-types.ts in its filesWrite. This residual is documented in the JSDoc at config.ts:30-40.",
+  "tokenUsage": {
+    "inputTokens": 42000,
+    "outputTokens": 4500,
+    "cacheReadTokens": 0,
+    "provider": "claude",
+    "model": "opus"
+  },
+  "rubricScores": {
+    "correctness": 95,
+    "test_coverage": 90,
+    "scope_compliance": 100,
+    "documentation": 90
+  },
+  "evaluationDecision": "DONE"
+}
