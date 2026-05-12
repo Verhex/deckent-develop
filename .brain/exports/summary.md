@@ -48,6 +48,8 @@
 | adr-042 | Hybrid Mode Architecture — Sprint + Task Dual Modes | proposed |
 
 ## Recent Learnings
+- **Sprint sprint-162 Learnings** (sprint-162): ## Sprint sprint-162 Learnings
+- Sprint Phase Observability + EvaluationAuditTrail Runtime Wire (T-003, composite): G...
 - **Sprint sprint-156 Learnings** (sprint-156): ## Sprint sprint-156 Learnings
 - Workflow Rename VERIFY (read-only audit): NO_GO — Audit-only task completed. All 3 p...
 - **Sprint sprint-155 Learnings** (sprint-155): ## Sprint sprint-155 Learnings
@@ -64,13 +66,11 @@
 - **Sprint sprint-148 Learnings** (sprint-148): ## Sprint sprint-148 Learnings
 - Vitest Triage — 135 Fail → < 50 Fail: NO_GO — Docker worker exited without writing r...
 - **Sprint sprint-147 Learnings** (sprint-147): ## Sprint sprint-147 Learnings
-- **Sprint sprint-146 Learnings** (sprint-146): ## Sprint sprint-146 Learnings
-- Agent Truncation Bug Fix: GO_WITH_TECH_DEBT — Root cause: task-builder.ts:761 had `a...
 
 ## Active Technical Debt
-- [NORMAL] Tech debt from 156-011-fix: Code physically verified despite missing .result (Sp
+- [HIGH] Tech debt from 156-011-fix: Code physically verified despite missing .result (Sp
 
 ## Active Patterns
 _No active patterns._
 
-_Total entries: 186 | Generated: 2026-05-12_
+_Total entries: 189 | Generated: 2026-05-12_

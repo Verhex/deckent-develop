@@ -9,11 +9,13 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync, renameSync, unlinkS
 import { join } from 'node:path';
 
 import { DECKENT_DIR, TASKS_DIR } from '../core/constants.js';
-import { debugLog } from '../core/utils.js';
-import type { Sprint, SprintPhase } from '../core/types.js';
+import { debugLog, readJsonSafe } from '../core/utils.js';
+import type { Sprint } from '../core/types.js';
+import { SprintPhase, SprintStatus } from '../core/types.js';
 import type { Task } from '../core/types.js';
 import { TaskStatus } from '../core/types.js';
 import type { Heartbeat } from '../core/types.js';
+import { writeSprintState } from './sprint-utils.js';
 import type { SerializedDependencyGraph } from './dependency-scheduler.js';
 import {
   persistDependencyGraph,
@@ -494,4 +496,148 @@ function isTerminalStatus(status: TaskStatus): boolean {
     status === TaskStatus.DONE ||
     status === TaskStatus.NO_GO
   );
+}
+
+// ─── State Recovery on Brain Restart (Sprint 162 — Task T-004) ───────
+// Sprint 159 forensic: durationMs:-106 proved startedAt was lost on restart.
+// Sprint 160/161 stalled task forensic: stale EXECUTING tasks never reached
+// handleEvaluation because runSprint always re-entered PLAN→SPAWN→EXECUTE.
+// This helper pairs with T-002 (checkpoint loop) and T-001 (exception
+// handler) so a crashed Brain can resume from the latest checkpoint.
+
+/** Action restoreSprintFromCheckpoint recommends to runSprint. */
+export type RestoreAction = 'fresh' | 'complete' | 'resume-evaluate';
+
+/** Outcome of a restore attempt. */
+export interface RestoreResult {
+  /** True if a checkpoint was found and processed. False ⇒ fresh path. */
+  restored: boolean;
+  /** Recommended next action for the runSprint pipeline. */
+  action: RestoreAction;
+  /** Reconstructed Sprint object — present only when `restored` is true. */
+  restoredSprint?: Sprint;
+  /** Stale EXECUTING task IDs that already produced a .result on disk. */
+  staleTasksWithResult: string[];
+  /** Stale EXECUTING task IDs that had no .result and were marked NO_GO on disk. */
+  staleTasksMarkedNoGo: string[];
+}
+
+function parseSprintNumber(sprintId: string): number {
+  const m = /sprint-(\d+)/.exec(sprintId);
+  if (!m) return 0;
+  const parsed = parseInt(m[1] ?? '', 10);
+  return Number.isNaN(parsed) ? 0 : parsed;
+}
+
+/**
+ * Restore a sprint from its latest checkpoint after a Brain restart.
+ *
+ * Flow:
+ *   1. Read `.deckent/<sprintId>-checkpoint.json`. Missing → action 'fresh'.
+ *   2. Rebuild `sprint.tasks` by reading every task.json referenced in the
+ *      checkpoint (completed ∪ pending ∪ activeWorkers).
+ *   3. Preserve `startedAt` from `cp.sprintStartedAt ?? cp.timestamp` — Sprint
+ *      159 forensic showed restart was clobbering this with the new wall clock,
+ *      producing negative durations.
+ *   4. Classify activeWorkers:
+ *        - `.result` exists → push to `staleTasksWithResult` (EVALUATE can consume it)
+ *        - `.result` missing → mark task.json status=NO_GO on disk and push to `staleTasksMarkedNoGo`
+ *   5. Decide action:
+ *        - No pending tasks AND no active workers → 'complete'
+ *        - Otherwise → 'resume-evaluate'
+ *   6. Sync `.deckent/sprint-state.json` via writeSprintState so external observers
+ *      see the resumed phase immediately.
+ *
+ * Fail-soft on every I/O step — a malformed task.json or unwritable state file
+ * never crashes Brain restart.
+ */
+export function restoreSprintFromCheckpoint(
+  projectRoot: string,
+  sprintId: string,
+): RestoreResult {
+  const cp = readCheckpoint(projectRoot, sprintId);
+  if (!cp) {
+    return {
+      restored: false,
+      action: 'fresh',
+      staleTasksWithResult: [],
+      staleTasksMarkedNoGo: [],
+    };
+  }
+
+  // Rebuild task list: union of all three task buckets in the checkpoint.
+  const taskIds = new Set<string>();
+  for (const id of cp.completedTasks ?? []) taskIds.add(id);
+  for (const id of cp.pendingTasks ?? []) taskIds.add(id);
+  for (const w of cp.activeWorkers ?? []) taskIds.add(w.taskId);
+
+  const tasks: Task[] = [];
+  for (const id of taskIds) {
+    const taskPath = join(projectRoot, TASKS_DIR, `task-${id}.json`);
+    const t = readJsonSafe<Task>(taskPath);
+    if (t) tasks.push(t);
+  }
+
+  // Sprint 159 forensic: preserve startedAt across restart.
+  const startedAt = (cp as SprintCheckpoint & { sprintStartedAt?: string }).sprintStartedAt
+    ?? cp.timestamp;
+
+  // Classify active workers against the .result file on disk.
+  const staleTasksWithResult: string[] = [];
+  const staleTasksMarkedNoGo: string[] = [];
+
+  for (const worker of cp.activeWorkers ?? []) {
+    const resultPath = join(projectRoot, TASKS_DIR, `task-${worker.taskId}.result`);
+    if (existsSync(resultPath)) {
+      staleTasksWithResult.push(worker.taskId);
+      continue;
+    }
+    // No .result — mark task NO_GO on disk so EVALUATE has a deterministic input.
+    staleTasksMarkedNoGo.push(worker.taskId);
+    const taskPath = join(projectRoot, TASKS_DIR, `task-${worker.taskId}.json`);
+    const t = readJsonSafe<Task>(taskPath);
+    if (!t) continue;
+    t.status = TaskStatus.NO_GO;
+    const inMemory = tasks.find(x => x.id === worker.taskId);
+    if (inMemory) inMemory.status = TaskStatus.NO_GO;
+    try {
+      writeFileSync(taskPath, JSON.stringify(t, null, 2), 'utf-8');
+    } catch (e) {
+      debugLog('restoreSprintFromCheckpoint:writeTask', e);
+    }
+  }
+
+  const hasActiveWorkers = (cp.activeWorkers ?? []).length > 0;
+  const hasPending = (cp.pendingTasks ?? []).length > 0;
+  const action: RestoreAction = !hasPending && !hasActiveWorkers
+    ? 'complete'
+    : 'resume-evaluate';
+
+  const resumedPhase = action === 'complete' ? SprintPhase.COMPLETE : SprintPhase.EVALUATE;
+  const resumedStatus = action === 'complete' ? SprintStatus.COMPLETE : SprintStatus.EVALUATING;
+
+  const restoredSprint: Sprint = {
+    id: sprintId,
+    number: parseSprintNumber(sprintId),
+    status: resumedStatus,
+    phase: resumedPhase,
+    tasks,
+    workers: [],
+    startedAt,
+  };
+
+  // Sync sprint-state.json so observers see the resumed phase.
+  try {
+    writeSprintState(projectRoot, restoredSprint);
+  } catch (e) {
+    debugLog('restoreSprintFromCheckpoint:writeSprintState', e);
+  }
+
+  return {
+    restored: true,
+    action,
+    restoredSprint,
+    staleTasksWithResult,
+    staleTasksMarkedNoGo,
+  };
 }

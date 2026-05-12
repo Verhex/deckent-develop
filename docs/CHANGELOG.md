@@ -6,6 +6,19 @@ Bu projedeki tüm önemli değişiklikler bu dosyada belgelenmektedir.
 Format [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) standardına dayanır
 ve proje [Semantic Versioning](https://semver.org/spec/v2.0.0.html) kurallarına uyar.
 
+## [1.0.0-beta.1-sprint162] - 2026-05-12
+
+### Added
+
+- State Recovery on Brain Restart (T-004)
+
+### Changed
+
+- Sprint Phase Observability + EvaluationAuditTrail Runtime Wire (T-003, composite) (completed with tech debt)
+
+
+_Tasks: 4 total, 2 done, 1 tech debt, 2 no-go_
+
 ## [1.0.0-beta.1-sprint159] - 2026-05-12
 
 

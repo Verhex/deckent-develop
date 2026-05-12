@@ -1,5 +1,10 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-162 Learnings
+- Sprint sprint-162 Learnings: ## Sprint sprint-162 Learnings
+- Sprint Phase Observability + EvaluationAuditTrail Runtime Wire (T-003, composite): GO_WITH_TECH_DEBT — T-003 composite (phase observability + EvaluationAuditTrail runtime wire) complete. persistPhaseTransition helper export
+- Crash Injection Integration Test + E2E Smoke (T-007): NO_GO — T-007 — 9/9 tests PASS (6 crash injection + 3 e2e smoke). Crash file: 6 it() blocks S1-S6 (grep -nE 'S[1-6]:' → 18 match
+
 ## Sprint sprint-156 Learnings
 - Sprint sprint-156 Learnings: ## Sprint sprint-156 Learnings
 - Workflow Rename VERIFY (read-only audit): NO_GO — Audit-only task completed. All 3 primary workflow files (ci.yml, docs.yml, cross-platform-e2e.yml) confirmed to use bran

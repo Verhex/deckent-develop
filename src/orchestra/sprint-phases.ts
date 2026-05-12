@@ -84,6 +84,24 @@ import { evaluateWithRubric } from './result-evaluator.js';
 // ─── Result Map Helper ──────────────────────────────────────────
 import { buildResultsMap } from './result-collector.js';
 
+// ─── Evaluation Audit Trail (Sprint 161 — Task 2) ───────────────
+// Per-task forensic record of every Brain evaluation decision. Wire
+// is fail-soft: any I/O error during audit write is debugLog'd but
+// must not abort the evaluation pipeline.
+import {
+  writeEvaluationAudit,
+  buildDecisionRationale,
+  type AuditCriterionScore,
+  type AuditDecision,
+  type AuditRuleSet,
+  type AuditSchemaValidation,
+} from './evaluation-audit-trail.js';
+import {
+  coverageOptional,
+  detectTaskType,
+  getRubric,
+} from './rubric-registry.js';
+
 // ─── Dependency Cascade / Unblock Wire (Sprint 156 — Task 003) ───
 // applyCascadeToSprint + applyUnblockToSprint were exported from
 // sprint-spawner but had no runtime caller. Wired here so NO_GO →
@@ -157,6 +175,116 @@ function readFileSafe(filePath: string): string {
     debugLog('readFileSafe:readFileSync', e);
     return '';
   }
+}
+
+/**
+ * Persist a sprint phase + status transition to `.deckent/sprint-state.json`
+ * so external observers (auditor, dashboard, recovery) can see the live
+ * transition on disk. Sprint 159 forensic: sprint-state.json froze at
+ * `phase:SPAWN, status:PLANNING` while real execution progressed
+ * EXECUTE→EVALUATE→RETRO→CLEANUP — every transition must now reach disk.
+ *
+ * Mutates `sprint.phase` and `sprint.status` in place so subsequent reads
+ * of the in-memory Sprint reflect the transition. Fail-soft: any I/O error
+ * is swallowed via debugLog so an unwritable state file never aborts the
+ * Brain's lifecycle.
+ *
+ * Sprint 161 Task 2 (T-003).
+ */
+export function persistPhaseTransition(
+  projectRoot: string,
+  sprint: Sprint,
+  phase: SprintPhase,
+  status: SprintStatus,
+): void {
+  try {
+    sprint.phase = phase;
+    sprint.status = status;
+    writeSprintState(projectRoot, sprint);
+  } catch (e) {
+    debugLog('persistPhaseTransition', e);
+  }
+}
+
+/**
+ * Adapter: map a {@link TaskEvaluation} enum value to the audit-trail's
+ * screaming-snake {@link AuditDecision} union. Used only by the
+ * runEvaluatePhase wire — keeps adapter logic local to the call site.
+ */
+function toAuditDecision(evaluation: TaskEvaluation): AuditDecision {
+  switch (evaluation) {
+    case TaskEvaluation.DONE: return 'DONE';
+    case TaskEvaluation.GO_WITH_TECH_DEBT: return 'GO_WITH_TECH_DEBT';
+    case TaskEvaluation.NO_GO: return 'NO_GO';
+    default: return 'NO_GO';
+  }
+}
+
+/**
+ * Adapter: map a task's rubric-registry TaskType to the audit-trail's
+ * screaming-snake {@link AuditRuleSet} union.
+ */
+function toAuditRuleSet(task: Task): AuditRuleSet {
+  switch (detectTaskType(task)) {
+    case 'audit': return 'AUDIT';
+    case 'document-write': return 'DOC_WRITE';
+    default: return 'CODE';
+  }
+}
+
+/**
+ * Adapter: build {@link AuditCriterionScore[]} from an EvaluationResult's
+ * rubricScores by joining each score against the task's rubric criteria
+ * (for threshold + weight). Unknown criterion names (e.g. the synthetic
+ * `schema_validation` row used for schema-fail short-circuits) get
+ * zero threshold/weight so they remain visible in the audit record
+ * without affecting reconstructed totals.
+ */
+function toAuditCriterionScores(
+  task: Task,
+  rubricScores: { criterion: string; score: number; passed: boolean; reason: string }[],
+): AuditCriterionScore[] {
+  const rubric = getRubric(task);
+  const byName = new Map(rubric.criteria.map(c => [c.name, c]));
+  return rubricScores.map(rs => {
+    const def = byName.get(rs.criterion);
+    return {
+      name: rs.criterion,
+      score: rs.score,
+      threshold: def?.threshold ?? 0,
+      weight: def?.weight ?? 0,
+      passed: rs.passed,
+      reason: rs.reason,
+    };
+  });
+}
+
+/**
+ * Adapter: infer {@link AuditSchemaValidation} from an EvaluationResult.
+ * evaluateWithRubric() short-circuits to a synthetic
+ * `[{criterion:'schema_validation', passed:false, ...}]` when schema
+ * validation rejects the result; otherwise the result reflects rubric
+ * scoring on valid input. `coverageRelaxed` is true for non-code task
+ * types per the rubric-registry.
+ */
+function toAuditSchemaValidation(
+  task: Task,
+  rubricScores: { criterion: string; passed: boolean; reason: string }[],
+): AuditSchemaValidation {
+  const coverageRelaxed = coverageOptional(task);
+  const schemaRow = rubricScores.find(rs => rs.criterion === 'schema_validation');
+  if (schemaRow && !schemaRow.passed) {
+    // The reason payload may carry "missing fields: a, b" or similar
+    // free-form text. Extract a best-effort missingFields list — if the
+    // pattern is absent, fall back to the raw reason as a single token.
+    const match = /missing\s+fields?:?\s*([^.]+)/i.exec(schemaRow.reason);
+    const captured = match?.[1];
+    const missingFields = captured
+      ? captured.split(/[,\s]+/).map(s => s.trim()).filter(Boolean)
+      : [schemaRow.reason.trim() || 'schema_validation'];
+    return { valid: false, missingFields, coverageRelaxed };
+  }
+  return { valid: true, missingFields: [], coverageRelaxed };
 }
 
 /** Write error dashboard state — mirrors sprint-controller's private helper */
@@ -301,6 +429,11 @@ export async function runPlanPhase(
     const sprint = await planSprint(projectRoot, config, context, recommendation);
     sprint.startedAt = now();
 
+    // Sprint 161 Task 2 (T-003): emit PLAN/PLANNING transition to disk so
+    // external observers (CLI status, recovery) see the live phase from
+    // the moment planning starts. Fail-soft: never throws.
+    persistPhaseTransition(projectRoot, sprint, SprintPhase.PLAN, SprintStatus.PLANNING);
+
     // Sprint 156 Task 008: Pre-flight build-staleness check. Compares
     // dist/orchestra/sprint-phases.js mtime against the previous sprint's
     // .deckent/sprint-state.json mtime. If dist is newer, emits
@@ -398,11 +531,14 @@ export async function runSpawnPhase(
 
   while (spawnAttempts < 2) {
     try {
-      sprint.phase = SprintPhase.SPAWN;
-      writeSprintState(projectRoot, sprint);
+      // Sprint 161 Task 2 (T-003): SPAWN entry — phase reflects on disk
+      // immediately so observers can distinguish PLAN→SPAWN transition
+      // before workers are spawned. Status remains whatever planSprint
+      // emitted (PLANNING) until ACTIVE flips after a successful spawn.
+      persistPhaseTransition(projectRoot, sprint, SprintPhase.SPAWN, sprint.status);
       taskQueue = await spawnWorkers(projectRoot, sprint, config, { autoApprove: opts?.autoApprove, spawnBackend });
-      sprint.status = SprintStatus.ACTIVE;
-      writeSprintState(projectRoot, sprint);
+      // Spawn succeeded — promote to ACTIVE and re-persist.
+      persistPhaseTransition(projectRoot, sprint, SprintPhase.SPAWN, SprintStatus.ACTIVE);
       try {
         // Run the first scan immediately (0ms delay) so dashboard is fresh from the start
         try {
@@ -582,8 +718,10 @@ export async function runEvaluatePhase(
     return;
   }
   try {
-    sprint.status = SprintStatus.EVALUATING;
-    sprint.phase = SprintPhase.EVALUATE;
+    // Sprint 161 Task 2 (T-003): EVALUATE entry — phase reaches disk so
+    // observers see the EXECUTE→EVALUATE transition. Previously sprint-
+    // state.json froze on SPAWN through to CLEANUP (Sprint 159 forensic).
+    persistPhaseTransition(projectRoot, sprint, SprintPhase.EVALUATE, SprintStatus.EVALUATING);
     const resultsMap = buildResultsMap(results);
     const collectedIds = new Set(results.map(r => r.taskId));
     debugLog('runEvaluatePhase:start', `totalTasks=${sprint.tasks.length} collectedResults=${results.length} collectedIds=[${[...collectedIds].join(',')}]`);
@@ -634,6 +772,29 @@ export async function runEvaluatePhase(
         debugLog('runEvaluatePhase:task', `task=${task.id} selfAssessment=${result.selfAssessment} evaluation=${evaluation} testsPassed=${result.testsPassed}`);
         handleEvaluation(projectRoot, task, evaluation, result);
         evaluations.set(task.id, evaluation);
+
+        // Sprint 161 Task 2 (T-003): per-task forensic audit record.
+        // Joins the rubric outcome with the task's rubric definition
+        // (for threshold + weight) and writes a JSON file under
+        // .deckent/evaluations/<sprintId>/<taskId>-attempt-1.json.
+        // Fail-soft: any audit-write error is debugLog'd but must not
+        // abort the evaluation pipeline.
+        try {
+          const auditCriteria = toAuditCriterionScores(task, rubricResult.rubricScores);
+          const auditSchema = toAuditSchemaValidation(task, rubricResult.rubricScores);
+          const auditDecision = toAuditDecision(evaluation);
+          const rationale = buildDecisionRationale(
+            auditDecision, rubricResult.totalScore, auditCriteria, auditSchema,
+          );
+          writeEvaluationAudit(projectRoot, sprint.id, task.id, 1, {
+            ruleSet: toAuditRuleSet(task),
+            schemaValidation: auditSchema,
+            criterionScores: auditCriteria,
+            totalScore: rubricResult.totalScore,
+            decision: auditDecision,
+            decisionRationale: rationale,
+          });
+        } catch (e) { debugLog('runEvaluatePhase:writeEvaluationAudit', e); }
 
         // DECKENT→USER:NOTIFY (Hot Fix H6) — task-done / task-no-go, fail-safe
         try {
@@ -817,8 +978,9 @@ export async function runFixPhase(
   spawnBackend: SpawnBackend | undefined,
 ): Promise<void> {
   try {
-    sprint.status = SprintStatus.FIXING;
-    sprint.phase = SprintPhase.FIX;
+    // Sprint 161 Task 2 (T-003): FIX entry — phase reaches disk so
+    // observers see the EVALUATE→FIX transition.
+    persistPhaseTransition(projectRoot, sprint, SprintPhase.FIX, SprintStatus.FIXING);
     handleCrossDependencies(projectRoot, sprint, evaluations);
 
     const fixTasks: Task[] = [];
