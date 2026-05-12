@@ -9,12 +9,20 @@
 
 import { readFileSync, writeFileSync, existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
+import { redactSensitive } from './sensitive-redactor.js';
 
 // ─── IPC File Names ──────────────────────────────────────────────
 export const IPC_CONFIG_FILE = 'config.json';
 export const IPC_STATUS_FILE = 'status.json';
 export const IPC_RESULT_FILE = 'result.json';
 export const IPC_ERROR_FILE = 'error.json';
+
+// ─── Crash Handler Types (ADR-043) ──────────────────────────────
+
+export interface CrashContext {
+  ipcDir: string;
+  jobId: string;
+}
 
 // ─── IPC Types ───────────────────────────────────────────────────
 
@@ -92,6 +100,67 @@ export function readIpcError(ipcDir: string): SprintRunnerError | null {
   } catch { return null; }
 }
 
+// ─── Crash Handlers (ADR-043 Brain Crash Recovery) ───────────────
+// Sprint 157→158→159 üçü de silent crash oldu çünkü uncaughtException,
+// unhandledRejection ve SIGTERM yakalanamadı. installCrashHandlers
+// idempotent — module-level guard ile çift listener'ı engeller.
+// Fail-fast policy: brain kendi restart'ını YAPMAZ; exit code 1 (crash)
+// veya 143 (SIGTERM) ile çıkar, parent supervisor karar verir.
+
+let crashHandlersInstalled = false;
+
+export function installCrashHandlers(ctx: CrashContext): void {
+  if (crashHandlersInstalled) return;
+  crashHandlersInstalled = true;
+
+  const writeError = (kind: 'uncaughtException' | 'unhandledRejection', err: unknown): void => {
+    try {
+      const payload = {
+        kind,
+        jobId: ctx.jobId,
+        timestamp: new Date().toISOString(),
+        error: redactSensitive(err),
+      };
+      writeFileSync(join(ctx.ipcDir, IPC_ERROR_FILE), JSON.stringify(payload, null, 2), 'utf-8');
+    } catch { /* best-effort — parent may have cleaned up */ }
+  };
+
+  process.on('uncaughtException', (err) => {
+    writeError('uncaughtException', err);
+    try {
+      process.stderr.write(`Brain crash (uncaughtException): ${redactSensitive(err).message}\n`);
+    } catch { /* best-effort */ }
+    process.exit(1);
+  });
+
+  process.on('unhandledRejection', (reason) => {
+    writeError('unhandledRejection', reason);
+    try {
+      process.stderr.write(`Brain crash (unhandledRejection): ${redactSensitive(reason).message}\n`);
+    } catch { /* best-effort */ }
+    process.exit(1);
+  });
+
+  process.on('SIGTERM', () => {
+    try {
+      const status = {
+        phase: 'TERMINATED',
+        jobId: ctx.jobId,
+        terminatedBy: 'SIGTERM',
+        timestamp: new Date().toISOString(),
+      };
+      writeFileSync(join(ctx.ipcDir, IPC_STATUS_FILE), JSON.stringify(status, null, 2), 'utf-8');
+    } catch { /* best-effort */ }
+    // 128 + signal number (SIGTERM=15) = 143, POSIX convention.
+    process.exit(143);
+  });
+}
+
+// Test-only reset hook — prod kodu çağırmaz, vitest beforeEach kullanır.
+export function _resetCrashHandlersForTesting(): void {
+  crashHandlersInstalled = false;
+}
+
 // ─── Runner Main (only runs when executed directly) ──────────────
 
 async function main(): Promise<void> {
@@ -117,6 +186,11 @@ async function main(): Promise<void> {
   }
 
   const { projectRoot, jobId, autoApprove, sandboxMode, timeoutMs } = runnerConfig;
+
+  // ADR-043: Install crash handlers AS EARLY AS POSSIBLE after IPC
+  // config is known. Anything thrown after this point lands in error.json
+  // (redacted) instead of vanishing into a silent process exit.
+  installCrashHandlers({ ipcDir, jobId });
 
   // Write initial status
   writeIpcStatus(ipcDir, {
