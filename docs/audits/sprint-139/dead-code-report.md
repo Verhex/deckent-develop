@@ -75,7 +75,7 @@ These suspects turned out to be actively used.
 
 ## Unused Export Sampling
 
-Found **647** potentially unused exports across src/.
+Found **657** potentially unused exports across src/.
 Top 20 shown below (full list requires deeper analysis):
 
 | File | Export | Import Count |
@@ -92,14 +92,14 @@ Top 20 shown below (full list requires deeper analysis):
 | src/orchestra/mid-sprint-adapter.ts | RerouteResult | 0 |
 | src/orchestra/mid-sprint-adapter.ts | ReconciliationResult | 0 |
 | src/orchestra/mid-sprint-adapter.ts | ReconciliationDeps | 0 |
+| src/orchestra/mid-sprint-adapter.ts | RubricReconciliationReason | 0 |
+| src/orchestra/mid-sprint-adapter.ts | RubricReconciliationResult | 0 |
+| src/orchestra/mid-sprint-adapter.ts | RUBRIC_RECONCILIATION_THRESHOLDS | 0 |
 | src/orchestra/promotion-pipeline.ts | PromotionCriteria | 0 |
 | src/orchestra/promotion-pipeline.ts | DemotionCriteria | 0 |
 | src/orchestra/promotion-pipeline.ts | PromotionResult | 0 |
 | src/orchestra/task-retry.ts | MAX_RETRY_COUNT | 0 |
 | src/orchestra/task-retry.ts | RETRY_BACKOFF_MS | 0 |
-| src/orchestra/task-retry.ts | RetryableTask | 0 |
-| src/orchestra/task-retry.ts | getRetryDelay | 0 |
-| src/orchestra/task-retry.ts | getRetryCount | 0 |
 
 ## Recommendations
 

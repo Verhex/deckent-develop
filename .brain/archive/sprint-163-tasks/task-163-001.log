@@ -1,0 +1,13 @@
+Task 163-001 tamamlandı — selfAssessment: **DONE**.
+
+## Bug Fix Report
+- **Bug:** Sprint 162 162-003 spurious NO_GO — worker selfAssessment=DONE + rubric {95/95/100/85} (avg 93.75) → Brain evaluationDecision=NO_GO etiketledi.
+- **Root Cause:** `reconcileSpuriousNoGo` helper Sprint 145'te yazılmış ama **deprecated** `evaluateResult` (lines 92, 106) içine wire edilmişti. Sprint phases artık `evaluateWithRubric` (result-evaluator.ts:976) kullanıyor — orada reconciliation call-site yoktu. Heuristic NO_GO override mekanizması aktif değildi.
+- **Category:** Integration (API contract mismatch — helper var ama active evaluation path'i bypass ediyor)
+- **Fix:**
+  1. `src/orchestra/mid-sprint-adapter.ts:454-612` — yeni pure (no-subprocess) helper `reconcileRubricNoGo(result, rubricResult)` + `RubricReconciliationResult` interface + `RUBRIC_RECONCILIATION_THRESHOLDS` const. Decision matrix: worker DONE + testsPassed + rubric avg≥85 + coverage≥80 → override DONE; worker NO_GO / testsPassed=false / scope_compliance<90 → preserve NO_GO.
+  2. `src/orchestra/result-evaluator.ts:15,1054-1067` — import + `evaluateWithRubric` içinde rubric kararı sonrası, decision==='NO_GO' branch'inde reconciliation çağrısı.
+- **Files Changed:** src/orchestra/mid-sprint-adapter.ts, src/orchestra/result-evaluator.ts, tests/orchestra/spurious-no-go-reconciliation.test.ts (+304/-2)
+- **Regression Test:** tests/orchestra/spurious-no-go-reconciliation.test.ts — 10 test (5 zorunlu + 5 bonus): 162-003 exact reproduction, test_failed preserve, scope_violation preserve (ADR-037), worker self NO_GO preserve, rubric/coverage threshold respect, pass-through sanity, thresholds export sanity.
+- **Verification:** tsc --noEmit PASS; vitest 10/10 PASS (yeni); 79/79 PASS (adjacent regression: mid-sprint-adapter, spurious-nogo, evaluate-result, evaluator-* — 8 dosya). Full orchestra suite'te 11 pre-existing failure (`git stash` baseline ile teyit edildi) — 0 yeni regression.
+- **Kanıt:** `grep -nE "reconcileSpuriousNoGo|reconcil" src/orchestra/result-evaluator.ts` → **15 match** (≥3 gereksinim karşılandı).

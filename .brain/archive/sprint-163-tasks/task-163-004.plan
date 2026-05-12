@@ -1,0 +1,16 @@
+# Task 163-004: ADR-044 — Sprint State Observability Contract (A2)
+
+## Approach
+Bu görev saf bir dokümantasyon görevidir. Sprint 162 T-003'ün implement ettiği
+sprint state observability contract'ını MADR v3 hibrit formatında ADR olarak kayıt
+altına alıyorum.
+
+## Files to Modify
+- `docs/adr/044-sprint-state-observability-contract.md` — yeni dosya oluştur
+
+## Expected Outcome
+- Dosya MADR v3 section'larını (Status, Context, Decision, Consequences,
+  Alternatives, References) tam olarak içerir
+- `persistPhaseTransition` ve `writeEvaluationAudit` contract'ları belgelenir
+- memory.db insert pattern dahil edilir
+- Format, projedeki diğer ADR dosyalarıyla tutarlıdır (ADR-053 örneği)

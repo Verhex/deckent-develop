@@ -1,0 +1,3 @@
+Görev 163-004 tamamlandı.
+
+**Özet:** `docs/adr/044-sprint-state-observability-contract.md` dosyası MADR v3 hibrit formatında oluşturuldu. ADR; Sprint 159–161 forensic bağlamını, `persistPhaseTransition` zorunlu call-site tablosunu, `writeEvaluationAudit` per-task audit schema'sını, memory.db insert pattern'ini, 2 reddedilen alternatifi ve tüm ilgili referansları eksiksiz içeriyor. `selfAssessment: DONE`.

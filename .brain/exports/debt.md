@@ -4,7 +4,7 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
-| debt-156-011-fix | Tech debt from 156-011-fix: Code physically verified despite missing .result (Sp | high | sprint-156 | active |
+| debt-156-011-fix | Tech debt from 156-011-fix: Code physically verified despite missing .result (Sp | critical | sprint-156 | active |
 
 ## Resolved Technical Debt
 

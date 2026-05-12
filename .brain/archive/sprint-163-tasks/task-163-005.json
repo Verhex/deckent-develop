@@ -1,0 +1,102 @@
+{
+  "id": "163-005",
+  "title": "Sprint 160 Security Review 3/3 (A3)",
+  "description": "Sprint 160 Security Review 3/3 (A3)\n\n- Model: sonnet\n- Effort: normal\n- Skills: security-specialist, documentation-writer\n- Agent: security-auditor\n- Files: docs/audits/sprint-163/security-review.md\n- Scope: docs/audits/sprint-163/\n\n### Description\n\nSprint 160 plan'da Security Review 3 madde işaretliydi, Sprint 163'te kapatılır:\n- **SR-1:** Exception handler data leak risk — `redactSensitive` coverage tam mı? API key/token regex sızıntı var mı?\n- **SR-2:** Double-MCP O_EXCL race condition — `acquireSingletonLock` race-safety, EEXIST + stale PID cleanup atomicity\n- **SR-3:** State recovery integrity — `restoreSprintFromCheckpoint` checkpoint trust boundary, malformed JSON attack surface\n\nRaporda her madde için:\n- **Code path:** İlgili source file + grep çıktısı (kanıt)\n- **Saldırı yüzeyi:** Hangi input attacker-controlled? (örn. process.env, sprint state file, lock file PID)\n- **Mevcut savunma:** Defense layers (redaction regex, atomic syscall, JSON schema validation)\n- **Verdict:** GREEN (sound) / YELLOW (minor concerns) / RED (P0 fix needed)\n- **Öneri:** YELLOW/RED için sonraki sprint task önerisi\n\n**Kanıt:**\n- File 3 section (SR-1, SR-2, SR-3) içerir\n- Her section verdict + code path + öneri var\n\n**Test:** 0 test (audit task)\n\n---",
+  "model": "sonnet",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive (model: sonnet -- user override)",
+  "scope": {
+    "directories": [
+      "docs/audits/sprint-163/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "docs/audits/sprint-163/security-review.md"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:**",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-163",
+  "provider": "claude",
+  "forceModel": "sonnet",
+  "forceEffort": "normal",
+  "forceAgent": "security-auditor",
+  "forceSkills": [
+    "security-specialist",
+    "documentation-writer"
+  ],
+  "assignedAgent": "security-auditor",
+  "assignedSkills": [
+    "security-specialist",
+    "documentation-writer"
+  ],
+  "createdAt": "2026-05-12T23:09:01.000Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "documentation",
+        "secondary": [
+          "security",
+          "config"
+        ],
+        "confidence": 0.88
+      },
+      "tags": [],
+      "domains": [
+        {
+          "name": "docs",
+          "weight": 1
+        }
+      ],
+      "operations": [
+        {
+          "type": "test",
+          "weight": 0.3
+        },
+        {
+          "type": "create",
+          "weight": 0.2
+        },
+        {
+          "type": "document",
+          "weight": 0.2
+        },
+        {
+          "type": "modify",
+          "weight": 0.1
+        },
+        {
+          "type": "delete",
+          "weight": 0.1
+        },
+        {
+          "type": "configure",
+          "weight": 0.1
+        }
+      ],
+      "complexity": {
+        "fileCount": 1,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "trivial"
+      },
+      "scope": {
+        "writeRatio": {
+          "docs/": 1
+        },
+        "primaryWriteTarget": "docs/",
+        "testWriteRatio": 0
+      }
+    },
+    "confidence": "high",
+    "routingVersion": "v2"
+  },
+  "estimatedTokens": 1968,
+  "updatedAt": "2026-05-12T23:20:37.684Z"
+}

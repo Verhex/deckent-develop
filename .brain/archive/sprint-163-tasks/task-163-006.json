@@ -1,0 +1,101 @@
+{
+  "id": "163-006",
+  "title": "Brain Dogfood Smoke — Sprint 163 Self-Validation (C1)",
+  "description": "Brain Dogfood Smoke — Sprint 163 Self-Validation (C1)\n\n- Model: opus\n- Effort: normal\n- Skills: testing-expert, ci-testing\n- Agent: ci-guardian\n- Files: docs/audits/sprint-163/dogfood-smoke-report.md\n- Scope: docs/audits/sprint-163/\n\n### Description\n\n**Dependency:** Task 1-5 DONE bekler. Sprint 163'ün **kendisi** dogfood smoke — Wave 3 başladığında Wave 1+2 task'ları Brain stability fix'lerini zaten canlı kanıtlamış olur.\n\nWorker, Sprint 163'ün live state dosyalarını okur (read-only) ve aşağıdaki 6 invariant'ı doğrular:\n\n1. **events.jsonl monotonic sequence:** sprint events stream'de her satırda sequence numarası strict increasing (gap veya duplicate yok)\n2. **sprint-state.json phase transitions persisted:** PLAN → SPAWN → EVALUATE → RETRO geçişleri disk'te visible (Sprint 162 T-003 wire kanıtı)\n3. **checkpoint.json invariants:** `eventStreamOffset > 0`, `completedTasks` populated (boş array değil), `checkpointNumber` ≥ 1 (Sprint 161 T-002 fix kanıtı)\n4. **audit.json per-task:** Her completed task için per-task audit.json var, `decision`/`criterionScores`/`rationale` field'ları dolu (Sprint 162 T-003 EvaluationAuditTrail wire kanıtı)\n5. **No .tmp leftover:** sprint state/event dizininde `.tmp` suffix'li dosya yok (atomic rename başarılı)\n6. **Spurious NO_GO reconciliation evidence:** Sprint 163'te en az 1 task'ta worker selfAssessment vs Brain initial decision delta görülürse, `reconcileSpuriousNoGo` çağrılma kanıtı (audit.json `rationale` field'da reconciliation note)\n\nHer invariant için PASS/FAIL + kanıt (file content snippet) raporda. 6/6 PASS → Brain stability hattı LIVE CONFIRMED → Sprint 164 başlatma onayı.\n\n**Kanıt:**\n- Rapor 6 invariant section, her biri PASS/FAIL verdict + kanıt snippet\n- `grep -cE \"PASS|FAIL\" docs/audits/sprint-163/dogfood-smoke-report.md` → 6+\n\n**Test:** 0 test (live observability validation — read-only audit)\n\n---\n\n## Anchor Kurallar (worker'lar zorunlu okur)\n\n- **`npm run build` YASAK** worker'larda — Alperen kararı.\n- **Test izole:** `npx vitest run path/to/file.test.ts` ile tek dosya çalıştır.\n- **Scope discipline:** Sadece `Files` field'daki dosyalara yaz. `git diff --stat` auditor tarafından izlenir.\n- **ESM import:** `.js` uzantısı zorunlu (Node16 resolution).\n- **No mid-sprint refactor:** Task'ın `Files` dışına çıkma.\n- **TDD discipline:** Test önce yaz, fail doğrula, kod yaz, pass doğrula, commit.\n- **NO MVP / NO MINIMUM** — T4-modified disiplin, full god-level scope.\n- **🆕 NO docs/ + .deckent/ PATH MENTION** task description'larında — planner bunu `filesWrite`'a alıyor (Sprint 160 SPAWN crash sebebi). Path'ler `Files:` field'da.\n- **🆕 Post-sprint manuel verify ZORUNLU** — Brain spurious NO_GO bug aktif (Task 1 fix henüz canlı değil); worker selfAssessment primary kanıt, Brain evaluationDecision sekonder.\n\n## GO/NO_GO Criteria\n\n- ✅ 6/6 task DONE veya GO_WITH_TECH_DEBT (post-sprint manuel verify ile)\n- ✅ tsc PASS + vitest PASS (delta 0 fail)\n- ✅ 9 yeni test (5+4+0+0+0+0) PASS, 0 regression\n- ✅ ADR-043 + ADR-044 accepted (memory.db'de)\n- ✅ Security Review 3/3 verdict yazıldı (GREEN/YELLOW/RED)\n- ✅ Dogfood smoke 6/6 invariant PASS\n- ❌ NO_GO: Task 1 (spurious NO_GO) veya Task 2 (docker) NO_GO → Sprint 164 (dep_pipeline wire) GECİKİR, fix retry öncelikli",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "docs/audits/sprint-163/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "docs/audits/sprint-163/dogfood-smoke-report.md"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:**; `grep -cE \"PASS|FAIL\" docs/audits/sprint-163/dogfood-smoke-report.md` → 6+",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-163",
+  "provider": "claude",
+  "forceModel": "opus",
+  "forceEffort": "normal",
+  "forceAgent": "ci-guardian",
+  "forceSkills": [
+    "testing-expert",
+    "ci-testing"
+  ],
+  "assignedAgent": "ci-guardian",
+  "assignedSkills": [
+    "testing-expert",
+    "ci-testing"
+  ],
+  "createdAt": "2026-05-12T23:09:01.000Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "documentation",
+        "secondary": [
+          "security"
+        ],
+        "confidence": 0.68
+      },
+      "tags": [],
+      "domains": [
+        {
+          "name": "docs",
+          "weight": 1
+        }
+      ],
+      "operations": [
+        {
+          "type": "create",
+          "weight": 0.25
+        },
+        {
+          "type": "test",
+          "weight": 0.25
+        },
+        {
+          "type": "modify",
+          "weight": 0.13
+        },
+        {
+          "type": "rename",
+          "weight": 0.13
+        },
+        {
+          "type": "document",
+          "weight": 0.13
+        },
+        {
+          "type": "configure",
+          "weight": 0.13
+        }
+      ],
+      "complexity": {
+        "fileCount": 1,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "trivial"
+      },
+      "scope": {
+        "writeRatio": {
+          "docs/": 1
+        },
+        "primaryWriteTarget": "docs/",
+        "testWriteRatio": 0
+      }
+    },
+    "confidence": "high",
+    "routingVersion": "v2"
+  },
+  "estimatedTokens": 3380,
+  "updatedAt": "2026-05-12T23:20:40.333Z"
+}

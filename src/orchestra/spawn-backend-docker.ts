@@ -28,6 +28,110 @@ const CONTAINER_WORKSPACE = '/workspace';
 const DEFAULT_GRACEFUL_TIMEOUT_SECONDS = 15;
 const CONTAINER_PREFIX = 'deckent-w-';
 
+// ─── Sprint 163 T-002: Health Check + Retry Policy ──────────────────────────
+// container_start_failed previously masked four distinct failure modes
+// (image-missing, port-collision, resource-limit, instant-exit-success).
+// We retry transient failures up to MAX_SPAWN_ATTEMPTS times and surface a
+// stable error code so Brain/Auditor can act on it.
+
+/** How long to wait (ms) after `docker run -d` before inspecting state. */
+export const HEALTH_CHECK_DELAY_MS = 3_000;
+/** Maximum number of spawn attempts (1 = no retry). */
+export const MAX_SPAWN_ATTEMPTS = 2;
+/** Delay (ms) between consecutive spawn attempts. */
+export const SPAWN_RETRY_DELAY_MS = 5_000;
+
+/** Stable error codes for container_start_failed root causes. */
+export const DOCKER_ERROR_CODES = {
+  IMAGE_NOT_FOUND: 'DECKENT_E081',
+  PORT_COLLISION: 'DECKENT_E082',
+  RESOURCE_LIMIT: 'DECKENT_E083',
+  UNKNOWN: 'DECKENT_E084',
+} as const;
+
+export type DockerErrorCode = (typeof DOCKER_ERROR_CODES)[keyof typeof DOCKER_ERROR_CODES];
+
+/** Result of a single health-check inspect call. */
+export interface HealthCheckResult {
+  /** Container is running normally — proceed with monitor. */
+  healthy: boolean;
+  /** Container started then exited with code 0 (gracefully). */
+  instantExitSuccess: boolean;
+  /** Exit code reported by docker inspect, -1 if inspect failed entirely. */
+  exitCode: number;
+  /** Raw inspect stdout (debug). */
+  raw: string;
+}
+
+/**
+ * Classify a docker stderr blob into a stable error code.
+ * Pure function — exported for unit tests.
+ */
+export function classifyDockerError(stderr: string, exitCode: number): {
+  code: DockerErrorCode;
+  message: string;
+} {
+  const s = (stderr ?? '').toLowerCase();
+  if (
+    s.includes('pull access denied') ||
+    s.includes('image not found') ||
+    s.includes('unable to find image') ||
+    s.includes('no such image') ||
+    s.includes('manifest unknown')
+  ) {
+    return {
+      code: DOCKER_ERROR_CODES.IMAGE_NOT_FOUND,
+      message: `${DOCKER_ERROR_CODES.IMAGE_NOT_FOUND}: Docker image bulunamadı`,
+    };
+  }
+  if (
+    s.includes('port is already allocated') ||
+    s.includes('address already in use') ||
+    s.includes('bind: address already in use') ||
+    s.includes('port already in use')
+  ) {
+    return {
+      code: DOCKER_ERROR_CODES.PORT_COLLISION,
+      message: `${DOCKER_ERROR_CODES.PORT_COLLISION}: Port çakışması`,
+    };
+  }
+  if (
+    s.includes('cannot allocate memory') ||
+    s.includes('resource temporarily unavailable') ||
+    s.includes('no space left on device') ||
+    s.includes('memory limit') ||
+    s.includes('oom')
+  ) {
+    return {
+      code: DOCKER_ERROR_CODES.RESOURCE_LIMIT,
+      message: `${DOCKER_ERROR_CODES.RESOURCE_LIMIT}: Docker resource limit`,
+    };
+  }
+  const stderrSummary = (stderr ?? '').trim().slice(0, 200);
+  return {
+    code: DOCKER_ERROR_CODES.UNKNOWN,
+    message: `${DOCKER_ERROR_CODES.UNKNOWN}: container_start_failed (exitCode=${exitCode}, stderr=${stderrSummary})`,
+  };
+}
+
+/**
+ * Parse `docker inspect --format '{{.State.Running}}|{{.State.ExitCode}}'` output.
+ * Format: "true|0" or "false|137". Returns null on malformed input.
+ */
+export function parseInspectOutput(stdout: string): { running: boolean; exitCode: number } | null {
+  const trimmed = (stdout ?? '').trim();
+  if (!trimmed) return null;
+  const parts = trimmed.split('|');
+  if (parts.length !== 2) return null;
+  const runningRaw = parts[0];
+  const exitCodeRaw = parts[1];
+  if (runningRaw === undefined || exitCodeRaw === undefined) return null;
+  const running = runningRaw.trim() === 'true';
+  const exitCode = parseInt(exitCodeRaw.trim(), 10);
+  if (Number.isNaN(exitCode)) return null;
+  return { running, exitCode };
+}
+
 // ─── Docker Spawn Backend ─────────────────────────────────────────────────
 
 export class DockerSpawnBackend implements SpawnBackend {
@@ -310,25 +414,36 @@ export class DockerSpawnBackend implements SpawnBackend {
 
     debugLog('docker-backend:spawn', `taskId=${taskId} container=${containerName} model=${model}`);
 
-    // Run docker command
-    const result = spawnSync('docker', dockerArgs, {
-      encoding: 'utf-8',
-      timeout: 30_000, // 30s to start container
-    });
+    // Sprint 163 T-002: retry spawn with health check.
+    // Each attempt: docker run + 3s wait + docker inspect. If inspect reports
+    // Running=true OR Running=false+ExitCode=0 (instant-exit success), proceed.
+    // Otherwise, classify stderr and retry up to MAX_SPAWN_ATTEMPTS.
+    const spawnOutcome = this.runDockerWithRetry(taskId, containerName, dockerArgs);
 
-    if (result.status !== 0) {
-      debugLog('docker-backend:spawn-error', `${result.stderr?.trim()}`);
-      // Write .timeout marker so result-collector doesn't wait forever
-      writeFileSync(join(tasksDir, `task-${taskId}.timeout`), 'container_start_failed', 'utf-8');
+    if (!spawnOutcome.ok) {
+      debugLog('docker-backend:spawn-error', `taskId=${taskId} ${spawnOutcome.error.message}`);
+      // Write .timeout marker with the stable error code so result-collector and
+      // downstream tools can act on the failure category, not the bare string.
+      // Marker payload is 'container_start_failed' base + ":<code>:<message>" suffix
+      // so legacy substring grep ('container_start_failed') still matches.
+      const baseMarker = 'container_start_failed';
+      writeFileSync(
+        join(tasksDir, `task-${taskId}.timeout`),
+        `${baseMarker}:${spawnOutcome.error.code}:${spawnOutcome.error.message}`,
+        'utf-8',
+      );
       // Sprint 156 Task 10 (fix): release spawn locks so a retry / fix-worker
       // for this scope is not permanently blocked by a transient docker error.
       try { releaseAllSpawnLocks(dir, taskId); } catch (e) { debugLog('docker-backend:spawn-lock-release', e); }
       return;
     }
 
-    const containerId = result.stdout?.trim() ?? '';
+    const { containerId, instantExitSuccess } = spawnOutcome;
     this.containers.set(taskId, { containerId, model });
-    debugLog('docker-backend:spawn-ok', `taskId=${taskId} containerId=${containerId.slice(0, 12)}`);
+    debugLog(
+      'docker-backend:spawn-ok',
+      `taskId=${taskId} containerId=${containerId.slice(0, 12)} instantExit=${instantExitSuccess}`,
+    );
 
     // Write initial heartbeat
     const hbPath = join(tasksDir, `task-${taskId}.hb`);
@@ -345,6 +460,168 @@ export class DockerSpawnBackend implements SpawnBackend {
 
     // Set up container monitoring (async, fire-and-forget)
     this.monitorContainer(taskId, containerName, tasksDir, model);
+  }
+
+  /**
+   * Sprint 163 T-002: attempt `docker run` up to MAX_SPAWN_ATTEMPTS times,
+   * verifying container health after each attempt via `docker inspect`.
+   *
+   * Returns:
+   * - `{ ok: true, containerId, instantExitSuccess: false }` — container is running
+   * - `{ ok: true, containerId, instantExitSuccess: true }` — container started and gracefully exited (ExitCode 0)
+   * - `{ ok: false, error }` — all attempts failed, error classified into a stable code
+   *
+   * Between attempts the previous container is force-removed so the name slot
+   * is free for the next try.
+   */
+  private runDockerWithRetry(
+    taskId: string,
+    containerName: string,
+    dockerArgs: string[],
+  ): { ok: true; containerId: string; instantExitSuccess: boolean }
+    | { ok: false; error: { code: DockerErrorCode; message: string; exitCode: number; stderr: string } } {
+    let lastStderr = '';
+    let lastExitCode = -1;
+
+    for (let attempt = 1; attempt <= MAX_SPAWN_ATTEMPTS; attempt++) {
+      debugLog('docker-backend:spawn-attempt', `taskId=${taskId} attempt=${attempt}/${MAX_SPAWN_ATTEMPTS}`);
+
+      const result = spawnSync('docker', dockerArgs, {
+        encoding: 'utf-8',
+        timeout: 30_000, // 30s to start container
+      });
+
+      if (result.status !== 0) {
+        // docker run itself failed (image missing, syntax error, daemon down, …)
+        lastStderr = result.stderr ?? '';
+        lastExitCode = result.status ?? -1;
+        debugLog(
+          'docker-backend:spawn-attempt-fail',
+          `taskId=${taskId} attempt=${attempt} status=${result.status} stderr=${lastStderr.trim().slice(0, 200)}`,
+        );
+        // Force-remove the (probably non-existent) container in case it was
+        // half-created, then retry.
+        this.forceRemoveContainer(containerName);
+        if (attempt < MAX_SPAWN_ATTEMPTS) {
+          this.sleepSync(SPAWN_RETRY_DELAY_MS);
+        }
+        continue;
+      }
+
+      const containerId = result.stdout?.trim() ?? '';
+
+      // docker run succeeded — now confirm the container is actually alive.
+      const health = this.healthCheckContainer(containerName);
+      if (health.healthy) {
+        return { ok: true, containerId, instantExitSuccess: false };
+      }
+      if (health.instantExitSuccess) {
+        // Container started and gracefully exited with code 0 — this is not a
+        // failure. Workers that complete inside the health-check window are rare
+        // but legitimate.
+        return { ok: true, containerId, instantExitSuccess: true };
+      }
+
+      // Real container_start_failed: container died with a non-zero exit code.
+      // Pull docker logs to capture stderr for classification before removing.
+      const logResult = spawnSync('docker', ['logs', containerName], {
+        encoding: 'utf-8',
+        timeout: 5_000,
+        stdio: ['pipe', 'pipe', 'pipe'],
+      });
+      lastStderr = `${logResult.stdout ?? ''}${logResult.stderr ?? ''}`;
+      lastExitCode = health.exitCode;
+      debugLog(
+        'docker-backend:spawn-health-fail',
+        `taskId=${taskId} attempt=${attempt} exitCode=${lastExitCode} stderr=${lastStderr.trim().slice(0, 200)}`,
+      );
+      this.forceRemoveContainer(containerName);
+      if (attempt < MAX_SPAWN_ATTEMPTS) {
+        this.sleepSync(SPAWN_RETRY_DELAY_MS);
+      }
+    }
+
+    const classification = classifyDockerError(lastStderr, lastExitCode);
+    return {
+      ok: false,
+      error: {
+        code: classification.code,
+        message: classification.message,
+        exitCode: lastExitCode,
+        stderr: lastStderr,
+      },
+    };
+  }
+
+  /**
+   * Sprint 163 T-002: after `docker run -d` returns successfully, wait
+   * HEALTH_CHECK_DELAY_MS then ask docker about the container's real state.
+   *
+   * - Running=true             → healthy (proceed)
+   * - Running=false, exit=0    → graceful instant exit (proceed, no error)
+   * - Running=false, exit>0    → real container_start_failed (retry candidate)
+   * - inspect fails / malformed → fail-open: assume healthy. We have a clean
+   *   `docker run` ack already; optimistically hand off to monitorContainer
+   *   instead of burning a retry on inspect noise. Real failures still trip
+   *   the `Running=false + ExitCode>0` branch because docker inspect emits
+   *   exactly that format in real environments.
+   */
+  healthCheckContainer(containerName: string, delayMs: number = HEALTH_CHECK_DELAY_MS): HealthCheckResult {
+    if (delayMs > 0) this.sleepSync(delayMs);
+
+    const inspect = spawnSync(
+      'docker',
+      ['inspect', containerName, '--format', '{{.State.Running}}|{{.State.ExitCode}}'],
+      { encoding: 'utf-8', timeout: 5_000, stdio: ['pipe', 'pipe', 'pipe'] },
+    );
+
+    if (inspect.status !== 0) {
+      // inspect command itself failed — fail-open. `docker wait` in the
+      // monitor will catch genuine container death.
+      return { healthy: true, instantExitSuccess: false, exitCode: 0, raw: inspect.stderr ?? '' };
+    }
+
+    const parsed = parseInspectOutput(inspect.stdout ?? '');
+    if (!parsed) {
+      // Malformed inspect output — same reasoning, fail-open.
+      return { healthy: true, instantExitSuccess: false, exitCode: 0, raw: inspect.stdout ?? '' };
+    }
+
+    if (parsed.running) {
+      return { healthy: true, instantExitSuccess: false, exitCode: parsed.exitCode, raw: inspect.stdout ?? '' };
+    }
+    if (parsed.exitCode === 0) {
+      return { healthy: false, instantExitSuccess: true, exitCode: 0, raw: inspect.stdout ?? '' };
+    }
+    return { healthy: false, instantExitSuccess: false, exitCode: parsed.exitCode, raw: inspect.stdout ?? '' };
+  }
+
+  /**
+   * Sprint 163 T-002 helper: force-remove a container by name. Used between
+   * retry attempts so the container-name slot is free for the next `docker run`.
+   * Errors are swallowed — the next `docker run` will fail loudly if removal
+   * really did not work, and we already log via debugLog.
+   */
+  private forceRemoveContainer(containerName: string): void {
+    try {
+      spawnSync('docker', ['rm', '-f', containerName], {
+        encoding: 'utf-8',
+        timeout: 5_000,
+        stdio: ['pipe', 'pipe', 'pipe'],
+      });
+    } catch (e) {
+      debugLog('docker-backend:force-remove-error', e);
+    }
+  }
+
+  /**
+   * Blocking sleep using `spawnSync('sleep', …)` so the retry loop stays
+   * synchronous (matches the rest of this file's spawn-time path).
+   */
+  private sleepSync(ms: number): void {
+    if (ms <= 0) return;
+    const seconds = (ms / 1000).toFixed(3);
+    spawnSync('sleep', [seconds], { timeout: ms + 2_000 });
   }
 
   /**

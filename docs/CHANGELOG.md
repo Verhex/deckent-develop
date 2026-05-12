@@ -6,6 +6,20 @@ Bu projedeki tüm önemli değişiklikler bu dosyada belgelenmektedir.
 Format [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) standardına dayanır
 ve proje [Semantic Versioning](https://semver.org/spec/v2.0.0.html) kurallarına uyar.
 
+## [1.0.0-beta.1-sprint163] - 2026-05-12
+
+### Added
+
+- Brain Spurious NO_GO Reconciliation Wire Restore (B1)
+- Docker container_start_failed Health Check + Retry Policy (B2)
+- ADR-043 — Brain Crash Recovery Protocol (A1)
+- ADR-044 — Sprint State Observability Contract (A2)
+- Sprint 160 Security Review 3/3 (A3)
+- Brain Dogfood Smoke — Sprint 163 Self-Validation (C1)
+
+
+_Tasks: 6 total, 6 done, 0 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint162] - 2026-05-12
 
 ### Added

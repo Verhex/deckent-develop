@@ -12,7 +12,7 @@ import { TaskEvaluation } from '../core/types.js';
 import { BRAIN_DIR, SPRINTS_DIR } from '../core/constants.js';
 import { debugLog } from '../core/utils.js';
 import { validateWorkerCoverage } from './coverage-validator.js';
-import { reconcileSpuriousNoGo } from './mid-sprint-adapter.js';
+import { reconcileSpuriousNoGo, reconcileRubricNoGo } from './mid-sprint-adapter.js';
 import { getRubric, coverageOptional } from './rubric-registry.js';
 
 // ─── Source code directory detection ──────────────────────────────────
@@ -1044,12 +1044,30 @@ export function evaluateWithRubric(
     decision = 'NO_GO';
   }
 
-  return {
+  const evaluation: EvaluationResult = {
     decision,
     totalScore,
     rubricScores,
     retryCount: merged.maxRetries,
   };
+
+  // Sprint 163 T-001: Spurious NO_GO reconciliation wire restore.
+  // When the rubric returns NO_GO but the worker's selfAssessment + concrete
+  // rubric scores prove otherwise (162-003 regression class), override the
+  // decision. The helper preserves NO_GO for concrete failures (testsPassed=false,
+  // scope_compliance<90) and for worker self-NO_GO.
+  if (evaluation.decision === 'NO_GO') {
+    const reconciled = reconcileRubricNoGo(result, evaluation);
+    if (reconciled.reconciled) {
+      debugLog('evaluateWithRubric:reconcile', `Task ${task.id}: ${reconciled.notes}`);
+      return {
+        ...evaluation,
+        decision: reconciled.decision,
+      };
+    }
+  }
+
+  return evaluation;
 }
 
 // ─── TECH_DEBT Downgrade Layer (Honest Assessment Calibration v2) ────

@@ -1,0 +1,3 @@
+Görev tamamlandı; vitest zaten exit 0 verdiği için Monitor'ı yeniden arm etmeye gerek yok. Sprint runtime sequence counter'larının (`sprint-163-seq` → 15, `sprint-163-checkpoint-seq` → 5) raporu yazdığım sırada ileri sayması, raporun **Invariant 1** (monotonic sequence) ve **Invariant 3** (checkpoint loop atomic write) iddialarını canlı olarak güçlendirir — wire çalışmaya devam ediyor.
+
+**Result dosyası:** `.tasks/task-163-006.result` — selfAssessment: `DONE`, rubricScores `{correctness:95, test_coverage:100, scope_compliance:100, documentation:95}`, tokenUsage tam dolu (provider/model dahil).

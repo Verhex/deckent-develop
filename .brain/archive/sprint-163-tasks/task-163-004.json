@@ -1,0 +1,97 @@
+{
+  "id": "163-004",
+  "title": "ADR-044 — Sprint State Observability Contract (A2)",
+  "description": "ADR-044 — Sprint State Observability Contract (A2)\n\n- Model: sonnet\n- Effort: low\n- Skills: documentation-writer\n- Agent: doc-writer\n- Files: docs/adr/044-sprint-state-observability-contract.md\n- Scope: docs/adr/\n\n### Description\n\nSprint 160 governance borç — ADR-044 markdown + memory.db insert. Sprint 162 T-003 (phase observability + EvaluationAuditTrail wire) bu contract'ı implement etti, ADR sonradan kayda alınır.\n\nADR içeriği (MADR v3):\n- **Title:** Sprint State Observability Contract\n- **Status:** accepted\n- **Date:** 2026-05-13\n- **Context:** Sprint 159-161 forensic — `sprint-state.json` `phase:SPAWN, status:PLANNING` donuk kaldı, sprint gerçek phase ilerlemesi (EXECUTE→EVALUATE→RETRO→CLEANUP) disk'e yansımadı, external observer kör\n- **Decision:** Her `sprint.phase` mutation'dan sonra `persistPhaseTransition(projectRoot, sprint, phase, status)` ZORUNLU çağrı:\n  - `runPlanPhase` → PLAN / 'PLANNING'\n  - `runSpawnPhase` → SPAWN / 'RUNNING'\n  - `runEvaluatePhase` → EVALUATE / 'EVALUATING'\n  - `runFixPhase` → FIX / 'FIXING'\n  - Atomic write (rename pattern), fail-soft try/catch wrap (Brain'i öldürmesin)\n  - Her task evaluation sonrası `writeEvaluationAudit(...)` ZORUNLU — per-task audit.json schema: `{taskId, decision, ruleSet, criterionScores, schemaValidation, rationale, timestamp}`\n- **Consequences:** Dashboard real-time phase tracking, audit trail per-task, post-sprint forensic için sequential timeline rebuild edilebilir\n- **Alternatives considered:** (a) Event-stream-only observability — reddedildi, snapshot point gerekli; (b) Synchronous DB write — reddedildi, performance/lock risk\n- **References:** Sprint 162 T-003 (`sprint-phases.ts:persistPhaseTransition` wire), `evaluation-audit-trail.ts` (Sprint 157 T-001 survivor `6c337b0`)\n- **memory.db insert pattern:** ADR-043 ile aynı\n\n**Kanıt:**\n- File exists, MADR v3 sections\n- memory.db: `deckent recall \"adr-044\"` → result\n\n**Test:** 0 test (governance doc task)\n\n---",
+  "model": "sonnet",
+  "effort": "low",
+  "priority": "NORMAL",
+  "reason": "Directive (model: sonnet -- user override)",
+  "scope": {
+    "directories": [
+      "docs/adr/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "docs/adr/044-sprint-state-observability-contract.md"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:**",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-163",
+  "provider": "claude",
+  "forceModel": "sonnet",
+  "forceEffort": "low",
+  "forceAgent": "doc-writer",
+  "forceSkills": [
+    "documentation-writer"
+  ],
+  "assignedAgent": "doc-writer",
+  "assignedSkills": [
+    "documentation-writer"
+  ],
+  "createdAt": "2026-05-12T23:09:01.000Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "documentation",
+        "secondary": [],
+        "confidence": 0.95
+      },
+      "tags": [],
+      "domains": [
+        {
+          "name": "docs",
+          "weight": 1
+        }
+      ],
+      "operations": [
+        {
+          "type": "create",
+          "weight": 0.33
+        },
+        {
+          "type": "document",
+          "weight": 0.22
+        },
+        {
+          "type": "modify",
+          "weight": 0.11
+        },
+        {
+          "type": "delete",
+          "weight": 0.11
+        },
+        {
+          "type": "rename",
+          "weight": 0.11
+        },
+        {
+          "type": "test",
+          "weight": 0.11
+        }
+      ],
+      "complexity": {
+        "fileCount": 1,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "trivial"
+      },
+      "scope": {
+        "writeRatio": {
+          "docs/": 1
+        },
+        "primaryWriteTarget": "docs/",
+        "testWriteRatio": 0
+      }
+    },
+    "confidence": "high",
+    "routingVersion": "v2"
+  },
+  "estimatedTokens": 1868,
+  "updatedAt": "2026-05-12T23:20:35.091Z"
+}

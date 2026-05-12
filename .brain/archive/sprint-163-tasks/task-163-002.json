@@ -1,0 +1,102 @@
+{
+  "id": "163-002",
+  "title": "Docker container_start_failed Health Check + Retry Policy (B2)",
+  "description": "Docker container_start_failed Health Check + Retry Policy (B2)\n\n- Model: opus\n- Effort: normal\n- Skills: docker-expert, typescript-expert\n- Agent: bug-fixer\n- Files: src/orchestra/spawn-backend-docker.ts, tests/orchestra/docker-container-start-failed.test.ts\n- Scope: src/orchestra/, tests/orchestra/\n\n### Description\n\nSprint 156 commit `4d15196`'da docker worker exit pattern fix edilmişti. Sprint 162'de 162-003-fix worker spawn fail — `container_start_failed` error path tetiklendi. Fix-phase'de aynı race tekrarladı, root cause ya container hiç başlamıyor ya başlar başlamaz exit ediyor — iki durum ayırt edilmiyor.\n\n**Yapılacaklar:**\n\n1. **`src/orchestra/spawn-backend-docker.ts`:**\n   - `grep \"container_start_failed\"` ile error path'i bul\n   - Health check eklemesi: `docker run` çağrısından sonra 3 saniye bekle + `docker inspect <name> --format='{{.State.Running}}'` çağrısı. Sonuç:\n     - `true` → spawn başarılı, devam\n     - `false` + ExitCode 0 → instant-exit success (gracefully terminated) — bu hata değil\n     - `false` + ExitCode > 0 → real container_start_failed, retry candidate\n   - Retry policy: max 2 attempt × 5 saniye delay. İkinci fail sonrası graceful error:\n     - `image not found` → `DECKENT_E081: Docker image '<name>' bulunamadı`\n     - `port collision` → `DECKENT_E082: Port çakışması`\n     - `resource limit` → `DECKENT_E083: Docker resource limit`\n     - `unknown` → `DECKENT_E084: container_start_failed (exitCode=N, stderr=...)`\n   - Bu fix Sprint 162 162-003-fix senaryosunu kapatır (fix-phase'de container_start_failed → graceful retry → success or graceful fail)\n\n2. **Test:** 4 senaryo mock docker backend ile.\n\n**Kanıt:**\n- `grep -n \"inspect.*Running\\|retry.*spawn\" src/orchestra/spawn-backend-docker.ts` → 3+ match\n- Test çıktısı: instant-exit success ve real-fail ayırt edilir\n\n**Test:** 4 test (clean start, retry-then-success on 2nd attempt, retry-then-fail with graceful error code, instant-exit ExitCode=0 detected as success).\n\n---",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "src/orchestra/",
+      "tests/orchestra/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/orchestra/spawn-backend-docker.ts",
+      "tests/orchestra/docker-container-start-failed.test.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; `grep \"container_start_failed\"` ile error path'i bul; *Kanıt:**; `grep -n \"inspect.*Running\\|retry.*spawn\" src/orchestra/spawn-backend-docker.ts` → 3+ match",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-163",
+  "provider": "claude",
+  "forceModel": "opus",
+  "forceEffort": "normal",
+  "forceAgent": "bug-fixer",
+  "forceSkills": [
+    "docker-expert",
+    "typescript-expert"
+  ],
+  "assignedAgent": "bug-fixer",
+  "assignedSkills": [
+    "docker-expert",
+    "typescript-expert"
+  ],
+  "createdAt": "2026-05-12T23:09:01.000Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "implementation",
+        "secondary": [
+          "documentation"
+        ],
+        "confidence": 0.8
+      },
+      "tags": [
+        "test-coverage"
+      ],
+      "domains": [
+        {
+          "name": "orchestra",
+          "weight": 1
+        }
+      ],
+      "operations": [
+        {
+          "type": "test",
+          "weight": 0.33
+        },
+        {
+          "type": "modify",
+          "weight": 0.17
+        },
+        {
+          "type": "delete",
+          "weight": 0.17
+        },
+        {
+          "type": "document",
+          "weight": 0.17
+        },
+        {
+          "type": "create",
+          "weight": 0.17
+        }
+      ],
+      "complexity": {
+        "fileCount": 2,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "small"
+      },
+      "scope": {
+        "writeRatio": {
+          "src/": 0.5,
+          "tests/": 0.5
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0.5
+      }
+    },
+    "confidence": "high",
+    "routingVersion": "v2"
+  },
+  "estimatedTokens": 2219,
+  "updatedAt": "2026-05-12T23:20:29.874Z"
+}

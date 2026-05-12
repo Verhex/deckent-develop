@@ -1,0 +1,26 @@
+{
+  "taskId": "163-005",
+  "filesChanged": [
+    "docs/audits/sprint-163/security-review.md"
+  ],
+  "linesAdded": 320,
+  "linesRemoved": 0,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "DONE",
+  "notes": "Sprint 160 Security Review 3/3 tamamlandı. SR-1 (redactSensitive): YELLOW — GEMINI_API_KEY her iki implementasyonda eksik, iki divergent implementasyon arasında coverage farkı var, JWT pattern yok. SR-2 (acquireSingletonLock): GREEN — O_EXCL atomic primitive doğru kullanılmış, TOCTOU steal race second O_EXCL ile kapatılmış, PID validation crafted content engeller. SR-3 (restoreSprintFromCheckpoint): YELLOW — taskId değerleri dosya path'ine sanitization olmadan ekleniyor (path traversal risk), readCheckpoint minimal structural validation, multi-user ortamda MEDIUM risk. P0 fix yok. Sprint 164 için 2 task önerisi: (1) GEMINI_API_KEY + JWT redaction fix, (2) checkpoint taskId whitelist validation.",
+  "tokenUsage": {
+    "inputTokens": 45000,
+    "outputTokens": 3200,
+    "cacheReadTokens": 12000,
+    "provider": "claude",
+    "model": "sonnet"
+  },
+  "rubricScores": {
+    "correctness": 95,
+    "test_coverage": 100,
+    "scope_compliance": 100,
+    "documentation": 95
+  },
+  "evaluationDecision": "DONE"
+}

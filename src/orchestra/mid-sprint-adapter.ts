@@ -3,7 +3,7 @@
 // If task gets NO_GO, suggests alternative agent/skill for retry.
 // Sprint 145: reconcileSpuriousNoGo — recover partial work from TIMEOUT_WITH_WORK / false NO_GO.
 
-import type { Task, TaskResult } from '../core/task-types.js';
+import type { Task, TaskResult, EvaluationResult } from '../core/task-types.js';
 import type { AgentPool } from '../core/agent-types.js';
 import type { SkillDefinition } from '../core/skill-types.js';
 import type { RoutingDecision, UserOverride, TaskDNA } from '../core/routing-types.js';
@@ -436,5 +436,183 @@ export function reconcileSpuriousNoGo(
     tscPassed: true,
     vitestPassRatio,
     scopeCompliant: true,
+  };
+}
+
+// ─── Rubric-Based Spurious NO_GO Reconciliation (Sprint 163 T-001) ─────────
+// Sprint 145 wrote reconcileSpuriousNoGo (git/tsc/vitest heuristic) and wired
+// it into the deprecated evaluateResult. Sprint 162 162-003 forensic proved
+// the active path is evaluateWithRubric — same regression class, different
+// pipeline, no wire. This sibling helper is pure (no subprocess) so it can
+// run inline inside evaluateWithRubric for every NO_GO without cost.
+
+/** Reasons we may keep or override a NO_GO decision after rubric evaluation. */
+export type RubricReconciliationReason =
+  | 'not_no_go'
+  | 'worker_self_no_go'
+  | 'concrete_test_failed'
+  | 'concrete_scope_violation'
+  | 'rubric_threshold_not_met'
+  | 'unsupported_self_assessment'
+  | 'heuristic_no_go_overridden';
+
+/** Result of the rubric-based reconciliation attempt. */
+export interface RubricReconciliationResult {
+  /** Final decision after reconciliation. */
+  decision: 'DONE' | 'GO_WITH_TECH_DEBT' | 'NO_GO';
+  /** True only when the original NO_GO was overridden to DONE. */
+  reconciled: boolean;
+  /** Machine-readable reason code for the decision. */
+  reason: RubricReconciliationReason;
+  /** Human-readable explanation. */
+  notes: string;
+  /** Average rubric score across all criteria (0–100). */
+  rubricAverage: number;
+  /** Worker-reported coverage (0–100). */
+  coverage: number;
+}
+
+/** Reconciliation thresholds — exported so tests and callers stay aligned. */
+export const RUBRIC_RECONCILIATION_THRESHOLDS = {
+  /** Minimum rubric average required to override a heuristic NO_GO. */
+  rubricAverage: 85,
+  /** Minimum worker-reported coverage required to override a heuristic NO_GO. */
+  coverage: 80,
+  /** Below this scope_compliance score the failure is treated as concrete. */
+  scopeCompliance: 90,
+} as const;
+
+function getRubricScore(rubricResult: EvaluationResult, criterion: string): number | undefined {
+  return rubricResult.rubricScores.find(s => s.criterion === criterion)?.score;
+}
+
+function computeRubricAverage(rubricResult: EvaluationResult): number {
+  const scores = rubricResult.rubricScores;
+  if (scores.length === 0) return 0;
+  const sum = scores.reduce((acc, s) => acc + s.score, 0);
+  return Math.round((sum / scores.length) * 100) / 100;
+}
+
+/**
+ * Reconcile a rubric-based NO_GO using the Sprint 163 decision matrix.
+ *
+ * Decision matrix (only NO_GO inputs are inspected — DONE / GO_WITH_TECH_DEBT
+ * pass through unchanged):
+ *
+ * | Worker selfAssessment | Concrete signal                | Result            |
+ * | --------------------- | ------------------------------ | ----------------- |
+ * | NO_GO                 | (any)                          | preserve NO_GO    |
+ * | DONE                  | testsPassed === false          | preserve NO_GO    |
+ * | DONE                  | scope_compliance < 90          | preserve NO_GO    |
+ * | DONE                  | rubric avg ≥ 85 ∧ coverage ≥ 80 | override → DONE  |
+ * | DONE                  | rubric avg < 85 or cov < 80    | preserve NO_GO    |
+ * | GO_WITH_TECH_DEBT     | (any)                          | preserve NO_GO    |
+ *
+ * `testsPassed === true` is implicit for the override path because correctness
+ * is part of the rubric. `scope_compliance` is treated as a concrete signal
+ * (RBAC enforcement, per ADR-037) and is never overridden.
+ *
+ * @param result        - Worker-reported task result (selfAssessment, coverage, testsPassed)
+ * @param rubricResult  - Output of evaluateWithRubric (decision + per-criterion scores)
+ */
+export function reconcileRubricNoGo(
+  result: TaskResult,
+  rubricResult: EvaluationResult,
+): RubricReconciliationResult {
+  const rubricAverage = computeRubricAverage(rubricResult);
+  const coverage = typeof result.coverage === 'number' ? result.coverage : 0;
+
+  // Pass-through: non-NO_GO decisions are not reconcilable.
+  if (rubricResult.decision !== 'NO_GO') {
+    return {
+      decision: rubricResult.decision,
+      reconciled: false,
+      reason: 'not_no_go',
+      notes: `Rubric decision ${rubricResult.decision} — reconciliation skipped`,
+      rubricAverage,
+      coverage,
+    };
+  }
+
+  // Worker self NO_GO is always priority — never overridden.
+  if (result.selfAssessment === 'NO_GO') {
+    return {
+      decision: 'NO_GO',
+      reconciled: false,
+      reason: 'worker_self_no_go',
+      notes: 'Worker self-assessed NO_GO — preserved (worker priority over Brain heuristic)',
+      rubricAverage,
+      coverage,
+    };
+  }
+
+  // Only DONE selfAssessment may trigger override. GO_WITH_TECH_DEBT and any
+  // unexpected string keep the rubric NO_GO.
+  if (result.selfAssessment !== 'DONE') {
+    return {
+      decision: 'NO_GO',
+      reconciled: false,
+      reason: 'unsupported_self_assessment',
+      notes: `Worker selfAssessment=${result.selfAssessment} — only DONE may trigger override; NO_GO preserved`,
+      rubricAverage,
+      coverage,
+    };
+  }
+
+  // Concrete failure: tests genuinely failed → NO_GO stands (test_failed).
+  if (result.testsPassed === false) {
+    return {
+      decision: 'NO_GO',
+      reconciled: false,
+      reason: 'concrete_test_failed',
+      notes: 'Concrete failure: testsPassed=false — NO_GO preserved (test_failed)',
+      rubricAverage,
+      coverage,
+    };
+  }
+
+  // Concrete failure: scope_compliance below threshold → NO_GO stands.
+  // RBAC (ADR-037) enforcement; never overridden by worker selfAssessment.
+  const scopeScore = getRubricScore(rubricResult, 'scope_compliance');
+  if (scopeScore !== undefined && scopeScore < RUBRIC_RECONCILIATION_THRESHOLDS.scopeCompliance) {
+    return {
+      decision: 'NO_GO',
+      reconciled: false,
+      reason: 'concrete_scope_violation',
+      notes: `Concrete failure: scope_compliance=${scopeScore} < ${RUBRIC_RECONCILIATION_THRESHOLDS.scopeCompliance} — NO_GO preserved (scope_violation, ADR-037)`,
+      rubricAverage,
+      coverage,
+    };
+  }
+
+  // Heuristic override: worker DONE + tests pass + rubric average + coverage
+  // all clear. Sprint 162 162-003 reproduction (rubric 95/95/100/85 → avg 93.75,
+  // coverage ≥ 80) lands here.
+  if (
+    rubricAverage >= RUBRIC_RECONCILIATION_THRESHOLDS.rubricAverage &&
+    coverage >= RUBRIC_RECONCILIATION_THRESHOLDS.coverage
+  ) {
+    debugLog(
+      'reconcile:rubric-nogo',
+      `Spurious NO_GO overridden → DONE (rubric avg=${rubricAverage}, coverage=${coverage})`,
+    );
+    return {
+      decision: 'DONE',
+      reconciled: true,
+      reason: 'heuristic_no_go_overridden',
+      notes: `Spurious NO_GO reconciled → DONE: worker selfAssessment=DONE, testsPassed=true, rubric avg ${rubricAverage} ≥ ${RUBRIC_RECONCILIATION_THRESHOLDS.rubricAverage}, coverage ${coverage}% ≥ ${RUBRIC_RECONCILIATION_THRESHOLDS.coverage}%${scopeScore !== undefined ? `, scope_compliance=${scopeScore}` : ''} (heuristic Brain NO_GO overridden — Sprint 162 162-003 regression class)`,
+      rubricAverage,
+      coverage,
+    };
+  }
+
+  // Threshold not met — keep rubric NO_GO.
+  return {
+    decision: 'NO_GO',
+    reconciled: false,
+    reason: 'rubric_threshold_not_met',
+    notes: `Worker DONE but rubric avg=${rubricAverage} (need ≥${RUBRIC_RECONCILIATION_THRESHOLDS.rubricAverage}) or coverage=${coverage}% (need ≥${RUBRIC_RECONCILIATION_THRESHOLDS.coverage}%) — NO_GO preserved`,
+    rubricAverage,
+    coverage,
   };
 }

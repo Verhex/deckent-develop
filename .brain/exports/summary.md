@@ -48,6 +48,7 @@
 | adr-042 | Hybrid Mode Architecture — Sprint + Task Dual Modes | proposed |
 
 ## Recent Learnings
+- **Sprint sprint-163 Learnings** (sprint-163): ## Sprint sprint-163 Learnings
 - **Sprint sprint-162 Learnings** (sprint-162): ## Sprint sprint-162 Learnings
 - Sprint Phase Observability + EvaluationAuditTrail Runtime Wire (T-003, composite): G...
 - **Sprint sprint-156 Learnings** (sprint-156): ## Sprint sprint-156 Learnings
@@ -65,12 +66,11 @@
 - `deckent mode` CLI Command: GO_WITH_TECH_DEBT — Created `deckent mode` CLI command w...
 - **Sprint sprint-148 Learnings** (sprint-148): ## Sprint sprint-148 Learnings
 - Vitest Triage — 135 Fail → < 50 Fail: NO_GO — Docker worker exited without writing r...
-- **Sprint sprint-147 Learnings** (sprint-147): ## Sprint sprint-147 Learnings
 
 ## Active Technical Debt
-- [HIGH] Tech debt from 156-011-fix: Code physically verified despite missing .result (Sp
+- [CRITICAL] Tech debt from 156-011-fix: Code physically verified despite missing .result (Sp
 
 ## Active Patterns
 _No active patterns._
 
-_Total entries: 189 | Generated: 2026-05-12_
+_Total entries: 191 | Generated: 2026-05-12_

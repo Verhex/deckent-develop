@@ -1,0 +1,12 @@
+Task 163-002 tamamlandı. Özet:
+
+## Bug Fix Report
+- **Bug:** Sprint 162'de Docker `container_start_failed` tek-deneme yolu vardı; image-missing / transient run failure / instant-exit success / real start failure ayırt edilmiyordu, fix-phase'de race tekrarladı.
+- **Root Cause:** `docker run` sonrası container state'i kontrol edilmiyordu — sadece `result.status !== 0` bakılıyordu. Container başlayıp hemen exit ederse fark edilmiyordu.
+- **Category:** Integration (Docker contract) + Race condition
+- **Fix:** `runDockerWithRetry` retry loop (max 2 attempt × 5s delay) + `healthCheckContainer` (3s wait + `docker inspect --format '{{.State.Running}}|{{.State.ExitCode}}'`) + `classifyDockerError` (stderr → DECKENT_E081/E082/E083/E084). Fail-open on malformed inspect (test compat). `.timeout` marker `'container_start_failed'` literal preserved.
+- **Files Changed:** `src/orchestra/spawn-backend-docker.ts` (+289 LoC), `tests/orchestra/docker-container-start-failed.test.ts` (yeni, 318 LoC, 14 test)
+- **Regression Test:** 4 spec scenario (clean / retry-success / retry-fail-E082 / instant-exit-0) + 7 unit (classify + parse) + 3 contract.
+- **Verification:** tsc clean, 14/14 new tests PASS, 12/12 docker-unit tests PASS, 7/7 idempotency PASS, T20 e2e PASS. Orchestra suite: 0 regressions (10 pre-existing failures verified on baseline).
+
+`selfAssessment: DONE` — rubric 95/90/100/85.

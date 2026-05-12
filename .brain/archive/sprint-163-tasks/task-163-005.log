@@ -1,0 +1,13 @@
+Task 163-005 tamamlandı. 
+
+**Özet:**
+
+`docs/audits/sprint-163/security-review.md` dosyası oluşturuldu (320 satır). 3 güvenlik maddesi:
+
+- **SR-1 — `redactSensitive` → YELLOW:** `GEMINI_API_KEY` ne crash handler (`sensitive-redactor.ts`) ne de worker logger (`core/redact-sensitive.ts`) implementasyonunda yakalanıyor. Üç divergent implementasyon var; crash handler en kapsamlısı. JWT token pattern eksik.
+
+- **SR-2 — `acquireSingletonLock` → GREEN:** O_EXCL atomic primitive doğru kullanılmış. TOCTOU steal penceresi ikinci O_EXCL ile kapatılmış. PID validation, crafted content injection'ı engeller. EPERM liveness check doğru.
+
+- **SR-3 — `restoreSprintFromCheckpoint` → YELLOW:** `taskId` değerleri checkpoint JSON'dan alınıp dosya path'ine hiç sanitization olmadan ekleniyor — shared/multi-user ortamda path traversal + write primitive riski. Structural validation minimal.
+
+P0 fix yok; her iki YELLOW madde Sprint 164 backlog önerisi olarak kayıt altına alındı.
