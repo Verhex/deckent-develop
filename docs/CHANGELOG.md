@@ -6,6 +6,16 @@ Bu projedeki tüm önemli değişiklikler bu dosyada belgelenmektedir.
 Format [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) standardına dayanır
 ve proje [Semantic Versioning](https://semver.org/spec/v2.0.0.html) kurallarına uyar.
 
+## [1.0.0-beta.1-sprint153] - 2026-05-12
+
+### Added
+
+- CLI Komut Paleti Özeti
+- Docker Worker Spawn Akışı
+
+
+_Tasks: 16 total, 3 done, 0 tech debt, 13 no-go_
+
 ## [1.0.0-beta.1-sprint152] - 2026-04-24
 
 ### Added

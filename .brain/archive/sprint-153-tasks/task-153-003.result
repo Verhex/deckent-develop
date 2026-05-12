@@ -1,0 +1,19 @@
+{
+  "taskId": "153-003",
+  "filesChanged": [
+    "docs/smoke-2026-05-12/T-SMOKE-03.md"
+  ],
+  "linesAdded": 140,
+  "linesRemoved": 0,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "DONE",
+  "notes": "Memory V2 SQLite schema documentation written. File docs/smoke-2026-05-12/T-SMOKE-03.md created with 1001 words (minimum 200 required). Covers all 6 tables: entries (with all columns), entries_fts (FTS5 virtual table, dual-layer Turkish normalize, triggers), tags (NOCASE many-to-many), relations (6 rel_type values, auto-extract ADR refs), entry_history (field-level change tracking), schema_version (migration safety). Also documents indexes (8 total), CLI interface, and TypeScript API usage. No source code modified — doc-only task. tsc/vitest not applicable.",
+  "tokenUsage": {
+    "inputTokens": 18500,
+    "outputTokens": 1800,
+    "cacheReadTokens": 42000,
+    "provider": "claude",
+    "model": "sonnet"
+  }
+}

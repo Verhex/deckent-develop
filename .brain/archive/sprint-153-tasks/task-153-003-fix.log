@@ -1,0 +1,1 @@
+Görev tamamlandı. `T-SMOKE-03.md` dosyası zaten 1001 kelimeyle eksiksiz durumdaydı; önceki fix container'ı OOM-kill nedeniyle `.result` yazamadan durmuştu. `task-153-003-fix.result` dosyası başarıyla yazıldı, `selfAssessment: DONE`.

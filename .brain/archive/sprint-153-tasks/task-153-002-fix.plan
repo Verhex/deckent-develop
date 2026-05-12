@@ -1,0 +1,29 @@
+# Execution Plan: task-153-002-fix
+
+## Task
+Fix: Brain 8-Phase Sprint Lifecycle dokümantasyonu (T-SMOKE-02.md)
+
+## Baseline Analysis
+- Önceki worker (docker-153-002-fix, container 5f4e984e4ba0) container OOM-killed oldu
+- Ancak T-SMOKE-02.md dosyası başarıyla yazılmıştı (127 satır, 718 kelime)
+- partial-result dosyası mevcut: selfAssessment=NO_GO (container crash nedeniyle)
+- Asıl içerik TAMAM — problem sadece .result dosyasının yazılmamış olması
+
+## Approach
+1. T-SMOKE-02.md içeriğini doğrula (≥200 kelime, 8 faz tam mı?)
+2. İçerik yeterli ise yeni .result yaz (DONE)
+3. İçerik eksikse tamamla
+
+## Verification Results
+- Kelime sayısı: 718 (≥200 gereksinimi KARŞILANDI)
+- 8 faz tamamı mevcut: PLAN ✓ SPAWN ✓ EXECUTE ✓ EVALUATE ✓ FIX ✓ RETRO ✓ DECAY ✓ CLEANUP ✓
+- Her faz: Amaç ✓ Kritik Karar ✓ Temel I/O ✓
+- Özet tablo mevcut ✓
+- Doc-only task: tsc/vitest çalıştırılmaz
+
+## Expected Output
+- docs/smoke-2026-05-12/T-SMOKE-02.md: MEVCUT ve TAMAM (değişiklik gerekmez)
+- .tasks/task-153-002-fix.result: DONE
+
+## Files Changed
+- None (içerik önceki worker tarafından zaten yazılmıştı)

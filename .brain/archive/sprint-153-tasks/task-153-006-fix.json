@@ -1,0 +1,31 @@
+{
+  "id": "153-006-fix",
+  "title": "Fix: Nervous System Detector'ları",
+  "description": "Priority fix for NO_GO task 153-006.\nOriginal worker notes: T-SMOKE-06.md oluşturuldu: 982 kelime (≥200 minimum karşılandı). 11 detector tam olarak belgelendi: stale-worker, scope-collision, debt-trend, agent-routing, directives-protection, task-mode-idle, build-failure-recurrence, token-spike, agent-routing-anomaly, scope-collision-rate, notification-delivery-health. Her detector için amaç + tetikleyici + aksiyon içeriyor. NervousObserver (4 kaynak), DetectorRegistry ve NervousDispatcher (3 kanal) mimarisi açıklandı. Kaynak dosyalar doğrudan okundu: src\nRubric: correctness=100, test_coverage=100, scope_compliance=100\nExpected scope: docs/smoke-2026-05-12/\nFiles that should change: docs/smoke-2026-05-12/T-SMOKE-06.md",
+  "model": "sonnet",
+  "effort": "low",
+  "priority": "CRITICAL",
+  "reason": "Task 153-006 evaluated as NO_GO; correctness=100; test_coverage=100; scope_compliance=100",
+  "scope": {
+    "directories": [
+      "docs/smoke-2026-05-12/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "docs/smoke-2026-05-12/T-SMOKE-06.md"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean",
+    "noGoCriteria": "Build fails or tests fail",
+    "techDebtAcceptable": "Minor style issues if tests pass"
+  },
+  "status": "NO_GO",
+  "sprintId": "sprint-153",
+  "isPriorityFix": true,
+  "fixForTaskId": "153-006",
+  "createdAt": "2026-05-12T09:17:05.188Z",
+  "estimatedTokens": 91,
+  "updatedAt": "2026-05-12T09:47:12.339Z"
+}

@@ -1,0 +1,1 @@
+Görev tamamlandı. `docs/smoke-2026-05-12/T-SMOKE-01.md` dosyası zaten eksiksiz içerikle mevcuttu (762 kelime, 16 komut, referans tablosu + h3 bölümleri) — orijinal container OOM kill ile kapanmadan önce dosyayı başarıyla yazmış, ancak `.result` dosyasını yazamamıştı. Bu fix task'ı eksik result dosyasını sağlayarak sprint değerlendirmesinin tamamlanmasına izin verir.

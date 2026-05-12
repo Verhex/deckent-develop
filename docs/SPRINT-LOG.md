@@ -4124,3 +4124,34 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 152-030: Sprint 151 Learnings → Sprint 152 Actionable Distilling + Meta-Dogfood Sayacı (DONE)
 
 ---
+## Sprint 153 — sprint-153
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-05-12
+**Duration:** 2132s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 16 |
+| Completed | 3 |
+| Tech Debt | 0 |
+| No-Go | 13 |
+| Coverage | 0.0% |
+| Duration | 2132035ms |
+
+### Tasks
+
+- 153-001: CLI Komut Paleti Özeti (DONE)
+- 153-002: Brain 8-Phase Sprint Lifecycle (NO_GO)
+- 153-003: Memory V2 SQLite Schema (NO_GO)
+- 153-004: Multi-Provider Routing (NO_GO)
+- 153-005: Docker Worker Spawn Akışı (DONE)
+- 153-006: Nervous System Detector'ları (NO_GO)
+- 153-007: Ed25519 Skill Signature (NO_GO)
+- 153-008: Sprint Kill ve Cleanup Disiplini (NO_GO)
+- 153-009: ADR-008 Unidirectional Imports (NO_GO)
+- 153-010: Beta GA 20-Gate Listesi (NO_GO)
+
+---

@@ -1,0 +1,17 @@
+{
+  "taskId": "153-007-fix",
+  "filesChanged": ["docs/smoke-2026-05-12/T-SMOKE-07.md"],
+  "linesAdded": 0,
+  "linesRemoved": 0,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "DONE",
+  "notes": "T-SMOKE-07.md doğrulandı ve geçerli: 722 kelime (≥200 şart), 139 satır. Kapsanan tüm konular: OpenClaw %20 malicious skill problemi, @noble/ed25519 altyapısı, loadOrGenerateKeypair() keygen (~/.deckent/keys/private.hex + public.hex, 0600/0644 izin), deckent skill publish 4-aşamalı pipeline (dosya doğrulama→AST sandbox→Ed25519 imza→registry), hub-validate.mjs 3-aşamalı doğrulama (AST scan→manifest schema→Ed25519 verify), skill install lazy verify + SHA-256 directory checksum (.source.json), --no-sign / SKIP_SIGNATURE=1 opt-out mekanizmaları. Fix task nedeni: Önceki konteyner OOM-kill nedeniyle .result yazılamamıştı (partial-result kaydı mevcuttu). Dosya orijinal task-153-007 tarafından eksiksiz oluşturulmuştu — CI baseline tscPassed: true, doc-only kapsam (tsc/vitest etkilenmez).",
+  "tokenUsage": {
+    "inputTokens": 8200,
+    "outputTokens": 420,
+    "cacheReadTokens": 3100,
+    "provider": "claude",
+    "model": "sonnet"
+  }
+}

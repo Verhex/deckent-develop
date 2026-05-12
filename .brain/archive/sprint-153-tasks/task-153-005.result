@@ -1,0 +1,18 @@
+{
+  "taskId": "153-005",
+  "workerId": "w-153-005",
+  "filesChanged": ["docs/smoke-2026-05-12/T-SMOKE-05.md"],
+  "linesAdded": 142,
+  "linesRemoved": 0,
+  "testsPassed": true,
+  "coverage": 0,
+  "selfAssessment": "DONE",
+  "notes": "docs/smoke-2026-05-12/T-SMOKE-05.md yazıldı (897 kelime, ≥200 koşulunu karşılıyor). Dokümantasyon spawn-backend-docker.ts kaynak kodundan türetildi. Kapsanan konular: container create (docker run -d, ADR-006 spawnSync), 5 mount noktası (project/tasks/locks/claude/claude.json), tmpfs containerHome, env injection (8 değişken), claude CLI bootstrap script, heartbeat döngüsü (15s), EXIT ve SIGTERM trap'leri, exit code uzlaşma mantığı (DONE/TIMEOUT_WITH_WORK/OOM partial-result terfi/NO_GO fallback), 9 üretilen dosya türü. tsc/vitest çalıştırılamadı (bu task yalnızca docs/ scope'unda, kaynak kod değişikliği yok).",
+  "tokenUsage": {
+    "inputTokens": 12000,
+    "outputTokens": 1800,
+    "cacheReadTokens": 0,
+    "provider": "claude",
+    "model": "sonnet"
+  }
+}

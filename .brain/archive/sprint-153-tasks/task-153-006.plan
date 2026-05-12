@@ -1,0 +1,30 @@
+# Task 153-006 Execution Plan
+
+## Objective
+Write T-SMOKE-06.md documenting the Nervous System's proactive detectors (≥200 words).
+
+## Approach
+1. Read all 11 detector source files in src/nervous/detectors/
+2. Read observer.ts and dispatcher.ts for architecture overview
+3. Write markdown doc covering:
+   - NervousObserver + DetectorRegistry + NervousDispatcher architecture
+   - All 11 detectors with: purpose, trigger, action
+
+## Detectors Found (11 total)
+1. stale-worker — heartbeat staleness >3min → WORKER_RESPAWN (warning)
+2. scope-collision — same file write conflict in PLAN/EXECUTE → SCOPE_COLLISION_REORDER (warning)
+3. debt-trend — >15% avg debt rate over 3 sprints → DEBT_REPRIORITIZE (warning)
+4. agent-routing — corrupt agent IDs + >40% concentration at EVALUATE → warning/critical
+5. directives-protection — DIRECTIVES.md template reversion in EXECUTE/FIX → emergency halt
+6. task-mode-idle — user idle >5min in task mode → METRIC_EMIT (info)
+7. build-failure-recurrence — same files fail 3 consecutive sprints → BUILD_FAILURE_INVESTIGATE (warning)
+8. token-spike — sprint cost >$50 threshold at RETRO → COST_OVER_THRESHOLD (warning/critical)
+9. agent-routing-anomaly — single agent >80% tasks ADR-041 → SKILL_ROUTING_ADJUST (warning)
+10. scope-collision-rate — >10 collisions per sprint → SCOPE_COLLISION_REORDER (warning/critical)
+11. notification-delivery-health — >50% notification failure → NOTIFICATION_BRIDGE_REPAIR (warning/critical)
+
+## Output File
+docs/smoke-2026-05-12/T-SMOKE-06.md
+
+## Expected Word Count
+≥200 words (target ~500-600 for quality)

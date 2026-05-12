@@ -1,0 +1,28 @@
+# Task 153-003-fix Execution Plan
+
+## Context
+- Original task 153-003 was marked NO_GO by Brain despite worker self-assessment of DONE
+- Fix task 153-003-fix was started but container was OOM-killed before writing .result
+- T-SMOKE-03.md already exists with 1001 words covering all required content
+
+## Current State
+- docs/smoke-2026-05-12/T-SMOKE-03.md: EXISTS, 1001 words ✓
+- Content covers: entries (all columns), entries_fts (FTS5+triggers), tags, relations, entry_history, schema_version, 8 indexes, CLI interface, TypeScript API
+- All DIRECTIVES Task 3 requirements are met
+
+## Plan
+1. Verify T-SMOKE-03.md content meets all Task 3 requirements from DIRECTIVES
+2. Confirm word count ≥200 (already 1001) ✓
+3. Confirm all 6 tables documented with purpose + query examples ✓
+4. Skip tsc/vitest — doc-only task, no code changes
+5. Write .result with selfAssessment: DONE
+
+## Files to Change
+- docs/smoke-2026-05-12/T-SMOKE-03.md: Already complete, no changes needed
+- .tasks/task-153-003-fix.result: Write result
+
+## Verification
+- Word count: 1001 (≥200 required) ✓
+- Tables: entries, entries_fts, tags, relations, entry_history, schema_version — all 6 present ✓
+- Query examples: SQL + TypeScript API examples present for each table ✓
+- Scope: docs/smoke-2026-05-12/ only — compliant ✓

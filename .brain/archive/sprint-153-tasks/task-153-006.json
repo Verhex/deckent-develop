@@ -1,0 +1,84 @@
+{
+  "id": "153-006",
+  "title": "Nervous System Detector'ları",
+  "description": "Nervous System Detector'ları\n- Model: sonnet\n- Effort: low\n- Skills: documentation\n- Files: docs/smoke-2026-05-12/T-SMOKE-06.md\n- Scope: docs/smoke-2026-05-12/\n\n### Description\nNervous System'in proactive detector'larını listele: heartbeat-blind, scope-drift, token-spike, fix-cascade, worker-honesty vb. Her detector'ın amacı + tetikleyicisi + aksiyonu (warn/auto-fix/halt). NervousObserver + dispatcher mimarisi. ≥200 kelime.\n\n---",
+  "model": "sonnet",
+  "effort": "low",
+  "priority": "NORMAL",
+  "reason": "Directive (model: sonnet -- user override)",
+  "scope": {
+    "directories": [
+      "docs/smoke-2026-05-12/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "docs/smoke-2026-05-12/T-SMOKE-06.md"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean",
+    "noGoCriteria": "Build fails or tests fail",
+    "techDebtAcceptable": "Minor style issues if tests pass"
+  },
+  "status": "NO_GO",
+  "sprintId": "sprint-153",
+  "provider": "claude",
+  "forceModel": "sonnet",
+  "forceEffort": "low",
+  "forceSkills": [
+    "documentation"
+  ],
+  "assignedAgent": "doc-writer",
+  "assignedSkills": [
+    "documentation"
+  ],
+  "createdAt": "2026-05-12T09:11:40.394Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "documentation",
+        "secondary": [],
+        "confidence": 0.95
+      },
+      "tags": [],
+      "domains": [
+        {
+          "name": "docs",
+          "weight": 1
+        }
+      ],
+      "operations": [
+        {
+          "type": "document",
+          "weight": 0.5
+        },
+        {
+          "type": "modify",
+          "weight": 0.25
+        },
+        {
+          "type": "create",
+          "weight": 0.25
+        }
+      ],
+      "complexity": {
+        "fileCount": 1,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "trivial"
+      },
+      "scope": {
+        "writeRatio": {
+          "docs/": 1
+        },
+        "primaryWriteTarget": "docs/",
+        "testWriteRatio": 0
+      }
+    },
+    "confidence": "high",
+    "routingVersion": "v2"
+  },
+  "estimatedTokens": 969,
+  "updatedAt": "2026-05-12T09:17:05.188Z"
+}

@@ -1,0 +1,88 @@
+{
+  "id": "153-002",
+  "title": "Brain 8-Phase Sprint Lifecycle",
+  "description": "Brain 8-Phase Sprint Lifecycle\n- Model: sonnet\n- Effort: low\n- Skills: documentation\n- Files: docs/smoke-2026-05-12/T-SMOKE-02.md\n- Scope: docs/smoke-2026-05-12/\n\n### Description\nBrain modülünün sprint yaşam döngüsündeki 8 phase'i sıraylı anlat: PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → CLEANUP. Her phase'in amacı + kritik kararı + temel I/O nedir. ≥200 kelime.\n\n---",
+  "model": "sonnet",
+  "effort": "low",
+  "priority": "NORMAL",
+  "reason": "Directive (model: sonnet -- user override)",
+  "scope": {
+    "directories": [
+      "docs/smoke-2026-05-12/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "docs/smoke-2026-05-12/T-SMOKE-02.md"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean",
+    "noGoCriteria": "Build fails or tests fail",
+    "techDebtAcceptable": "Minor style issues if tests pass"
+  },
+  "status": "NO_GO",
+  "sprintId": "sprint-153",
+  "provider": "claude",
+  "forceModel": "sonnet",
+  "forceEffort": "low",
+  "forceSkills": [
+    "documentation"
+  ],
+  "assignedAgent": "doc-writer",
+  "assignedSkills": [
+    "documentation"
+  ],
+  "createdAt": "2026-05-12T09:11:40.394Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "documentation",
+        "secondary": [],
+        "confidence": 0.95
+      },
+      "tags": [],
+      "domains": [
+        {
+          "name": "docs",
+          "weight": 1
+        }
+      ],
+      "operations": [
+        {
+          "type": "document",
+          "weight": 0.4
+        },
+        {
+          "type": "modify",
+          "weight": 0.2
+        },
+        {
+          "type": "delete",
+          "weight": 0.2
+        },
+        {
+          "type": "create",
+          "weight": 0.2
+        }
+      ],
+      "complexity": {
+        "fileCount": 1,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "trivial"
+      },
+      "scope": {
+        "writeRatio": {
+          "docs/": 1
+        },
+        "primaryWriteTarget": "docs/",
+        "testWriteRatio": 0
+      }
+    },
+    "confidence": "high",
+    "routingVersion": "v2"
+  },
+  "estimatedTokens": 985,
+  "updatedAt": "2026-05-12T09:17:02.595Z"
+}

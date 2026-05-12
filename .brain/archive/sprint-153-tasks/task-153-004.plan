@@ -1,0 +1,22 @@
+# Plan: Task 153-004 — Multi-Provider Routing Documentation
+
+## Objective
+docs/smoke-2026-05-12/T-SMOKE-04.md dosyasına Deckent'in multi-provider mimarisini anlatan ≥200 kelimelik dokümantasyon yaz.
+
+## Scope
+- Yazılabilir: docs/smoke-2026-05-12/T-SMOKE-04.md
+- Kod değişikliği YOK
+
+## İçerik Planı
+1. Giriş: multi-provider neden gerekli
+2. Provider'lar: Claude (primary), Codex, Gemini
+3. ModelRegistry pattern: tier-based routing, 13 model, 3 provider
+4. Fallback chain: 429/capacity-aware respawn
+5. provider_auth modu: session vs api-key
+6. forceModel ve tier-clamp
+7. Konfigürasyon örnekleri
+
+## Kaynaklar
+- CLAUDE.md / DECKENT.md içindeki provider tabloları
+- .brain/exports/summary.md ADR listesi
+- .deckent/workspace/IDENTITY.md özellik listesi

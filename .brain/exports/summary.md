@@ -48,8 +48,8 @@
 | adr-042 | Hybrid Mode Architecture — Sprint + Task Dual Modes | proposed |
 
 ## Recent Learnings
-- **Sprint sprint-152 Learnings** (sprint-152): ## Sprint sprint-152 Learnings
-- `deckent doctor` Derin Audit: NO_GO — READ-ONLY audit task per Sprint 152 DIRECTIVES...
+- **Sprint sprint-153 Learnings** (sprint-153): ## Sprint sprint-153 Learnings
+- Brain 8-Phase Sprint Lifecycle: NO_GO — Brain 8-Phase Sprint Lifecycle dokümantasyon...
 - **Sprint sprint-151 Learnings** (sprint-151): ## Sprint sprint-151 Learnings
 - Public Repo Flip — VerhexIO/deckent-dev → VerhexIO/deckent: GO_WITH_TECH_DEBT — DURU...
 - **Sprint sprint-150 Learnings** (sprint-150): ## Sprint sprint-150 Learnings
@@ -74,4 +74,4 @@ _No active technical debt._
 ## Active Patterns
 _No active patterns._
 
-_Total entries: 176 | Generated: 2026-04-24_
+_Total entries: 176 | Generated: 2026-05-12_

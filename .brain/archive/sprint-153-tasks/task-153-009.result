@@ -1,0 +1,24 @@
+{
+  "taskId": "153-009",
+  "filesChanged": ["docs/smoke-2026-05-12/T-SMOKE-09.md"],
+  "linesAdded": 132,
+  "linesRemoved": 0,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "DONE",
+  "notes": "ADR-008 Unidirectional Imports dokümantasyonu oluşturuldu. 773 kelime (≥200 eşiği aşıldı). Kapsam: Brain→orchestra→core katman hiyerarşisi, Brain TEK içe aktarıcı kuralı, circular import yasağı, Layer 4 runtime enforcement (authority-enforcer.ts checkAdr008()), ADR-008 Cycle 2 Connector ayrıştırması, Wave 3 brain.ts 53 satır re-export shim bağlamı. Dokümanlar kod değişikliği içermediğinden tsc/vitest çalıştırılmadı.",
+  "tokenUsage": {
+    "inputTokens": 8500,
+    "outputTokens": 1400,
+    "cacheReadTokens": 12000,
+    "provider": "claude",
+    "model": "sonnet"
+  },
+  "rubricScores": {
+    "correctness": 100,
+    "test_coverage": 100,
+    "scope_compliance": 100,
+    "documentation": 100
+  },
+  "evaluationDecision": "DONE"
+}

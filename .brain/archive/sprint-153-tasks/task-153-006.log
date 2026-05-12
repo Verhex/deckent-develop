@@ -1,0 +1,8 @@
+Task 153-006 tamamlandı.
+
+**Özet:**
+- `docs/smoke-2026-05-12/T-SMOKE-06.md` oluşturuldu — **982 kelime** (≥200 minimum)
+- Kaynak koddan doğrudan okunarak **11 detector** belgelendi: her biri için amaç, tetikleyici ve aksiyon ID içeriyor
+- **NervousObserver** (4 event kaynağı), **DetectorRegistry** (izole çalıştırma) ve **NervousDispatcher** (3 kanal: mcp/cli/file) mimarisi açıklandı
+- Kod değişikliği yok — yalnızca `docs/smoke-2026-05-12/` kapsamında yazıldı
+- `selfAssessment: DONE` — task spec'in tüm gereksinimleri karşılandı

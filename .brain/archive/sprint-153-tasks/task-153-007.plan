@@ -1,0 +1,27 @@
+# Execution Plan — Task 153-007
+
+## Objective
+Write T-SMOKE-07.md: DeckentHub Ed25519 skill imzalama workflow dokümantasyonu (≥200 kelime).
+
+## Scope
+- Write only: docs/smoke-2026-05-12/T-SMOKE-07.md
+- No source code changes
+
+## Key Sources Found
+- src/core/signature.ts — Ed25519 keypair generate/load/sign/verify (loadOrGenerateKeypair, signMessage, verifySignature)
+- src/cli/commands/skill-marketplace.ts — `skill publish` pipeline: sandbox + Ed25519 sign + registry upload
+- src/cli/commands/skill.ts — `skill install` command (SHA-256 checksum, not Ed25519 verify yet)
+- scripts/hub-validate.mjs — DeckentHub validator: 3-stage pipeline (AST sandbox + manifest schema + Ed25519 verify)
+
+## Content Plan
+1. Problem context — OpenClaw %20 malicious skill sorun
+2. Çözüm mimarisi — Ed25519 + @noble/ed25519 kütüphanesi
+3. Keygen — loadOrGenerateKeypair(), ~/.deckent/keys/ (private.hex + public.hex)
+4. sign-seed-skills akışı — `deckent skill publish` pipeline, signMessage(), signature.ed25519
+5. verifySkillSignature — hub-validate.mjs Stage 3: validateSignature(), SKIP_SIGNATURE env
+6. `skill install` lazy verify — checksum (SHA-256) doğrulama, .source.json
+7. --allow-unsigned / --no-sign — opt-out mekanizması
+8. Güvenlik özeti
+
+## Estimated Word Count
+~350 kelime

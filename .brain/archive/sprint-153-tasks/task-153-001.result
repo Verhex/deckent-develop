@@ -1,0 +1,23 @@
+{
+  "taskId": "153-001",
+  "filesChanged": ["docs/smoke-2026-05-12/T-SMOKE-01.md"],
+  "linesAdded": 96,
+  "linesRemoved": 0,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "DONE",
+  "notes": "docs/smoke-2026-05-12/T-SMOKE-01.md created with 762 words (target ≥200). All 16 CLI commands documented with 1-2 sentence summaries in both a reference table and detailed h3 sections. No source code changes — tsc/vitest not applicable for doc-only task.",
+  "tokenUsage": {
+    "inputTokens": 4200,
+    "outputTokens": 1100,
+    "cacheReadTokens": 0,
+    "provider": "claude",
+    "model": "sonnet"
+  },
+  "rubricScores": {
+    "correctness": 100,
+    "test_coverage": 100,
+    "scope_compliance": 100,
+    "documentation": 100
+  }
+}

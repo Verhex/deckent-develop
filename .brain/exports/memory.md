@@ -1,17 +1,15 @@
 # Sprint Learnings (auto-generated)
 
-## Sprint sprint-152 Learnings
-- Sprint sprint-152 Learnings: ## Sprint sprint-152 Learnings
-- `deckent doctor` Derin Audit: NO_GO — READ-ONLY audit task per Sprint 152 DIRECTIVES. Report written to docs/audits/sprint-152/T-152-002-doctor-deep-audit.md 
-- CLI Smoke Part 1 — Core Lifecycle (15 komut): NO_GO — READ-ONLY audit sprint. 15 CLI core lifecycle commands smoke-tested via `node dist/cli/entry.js <cmd>`. Result: 14/15 PA
-- CLI Smoke Part 2 — Memory + Checkpoint + Run (10 komut): NO_GO — CLI Smoke Part 2 audit complete. 12 commands exercised (recall family 5, memory subcommands 9, remember 1, memory-query 
-- CLI Smoke Part 3 — Agent + Skill + Plugin (12 komut): NO_GO — Read-only CLI smoke audit of agent + skill + plugin command families. 12 main commands + 6 bonus sub-help spot checks ra
-- CLI Smoke Part 4 — Nervous System + Audit + Feature + Mode (12+ komut): NO_GO — CLI Smoke Part 4 — Nervous/Audit/Features/Recover/Mode + 19 residual commands. 46/46 top-level command --help coverage (
-- MCP Smoke Part 1 — Lifecycle Tools (8 tool): NO_GO — READ-ONLY MCP smoke audit completed for 8 lifecycle tools (deckent_init, set_directives, plan, start, status, review, re
-- MCP Smoke Part 2 — Observational + Advanced (10 tool): NO_GO — MCP Smoke Part 2 — Observational + Advanced (10 tool) audit complete. CLI-MCP parity matrix delivered for doctor, analyz
-- MCP Smoke Part 3 — Docs + Agent/Skill + Nervous + Beta Trio (9 tool): NO_GO — READ-ONLY audit of 12 MCP tools (deckent_docs, deckent_agent_list, deckent_skill_list, deckent_kill, deckent_nervous_sub
-- MCP 8 Resource Fetch Test: NO_GO — READ-ONLY MCP 8 resource fetch audit. Live stdio JSON-RPC 2.0 invocation of dist/mcp/server.js inside docker worker cont
-- Memory V2 DB Integrity + FTS5 Recall Test: NO_GO — Memory V2 DB integrity audit completed. 464-line report written to docs/audits/sprint-152/T-152-011-memory-v2-integrity.
+## Sprint sprint-153 Learnings
+- Sprint sprint-153 Learnings: ## Sprint sprint-153 Learnings
+- Brain 8-Phase Sprint Lifecycle: NO_GO — Brain 8-Phase Sprint Lifecycle dokümantasyonu oluşturuldu. Her faz için Amaç, Kritik Karar ve Temel I/O bölümleri yazıld
+- Memory V2 SQLite Schema: NO_GO — Memory V2 SQLite schema documentation written. File docs/smoke-2026-05-12/T-SMOKE-03.md created with 1001 words (minimum
+- Multi-Provider Routing: NO_GO — docs/smoke-2026-05-12/T-SMOKE-04.md oluşturuldu. 587 kelime (gerekli ≥200). İçerik: multi-provider genel bakış tablosu, 
+- Nervous System Detector'ları: NO_GO — T-SMOKE-06.md oluşturuldu: 982 kelime (≥200 minimum karşılandı). 11 detector tam olarak belgelendi: stale-worker, scope-
+- Ed25519 Skill Signature: NO_GO — T-SMOKE-07.md yazıldı: 722 kelime (≥200 şart karşılandı). Kapsanan konular: OpenClaw %20 malicious skill problemi, Ed255
+- Sprint Kill ve Cleanup Disiplini: NO_GO — T-SMOKE-08.md oluşturuldu. 679 kelime (≥200 koşulu sağlandı). Sprint kill kullanıcı onayı zorunluluğu, Nervous System lo
+- ADR-008 Unidirectional Imports: NO_GO — ADR-008 Unidirectional Imports dokümantasyonu oluşturuldu. 773 kelime (≥200 eşiği aşıldı). Kapsam: Brain→orchestra→core 
+- Beta GA 20-Gate Listesi: NO_GO — Beta GA 20-Gate dökümanı oluşturuldu. Her kapı için açıklama, ölçüm kriteri ve Sprint 152 sonu durumu (PASS/IN_PROGRESS)
 
 ## Sprint sprint-151 Learnings
 - Sprint sprint-151 Learnings: ## Sprint sprint-151 Learnings

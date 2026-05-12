@@ -1,6 +1,6 @@
 # Dead Code Audit Report — Sprint 139
 
-**Date:** 2026-04-24
+**Date:** 2026-05-12
 **Tool:** scripts/dead-code-audit.mjs
 **Scope:** src/ directory (read-only analysis)
 

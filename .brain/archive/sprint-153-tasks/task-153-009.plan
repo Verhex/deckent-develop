@@ -1,0 +1,24 @@
+# Task 153-009 Execution Plan
+
+## Objective
+ADR-008 Unidirectional Imports kuralını anlatan bir dokümantasyon dosyası oluştur.
+
+## Target File
+- docs/smoke-2026-05-12/T-SMOKE-09.md
+
+## Content Plan
+
+### Bölümler:
+1. ADR-008 Genel Bakış — ne neden kabul edildi
+2. Layer Hiyerarşisi — Brain → orchestra → core katmanları
+3. Brain TEK İçe Aktarıcı Kuralı — neden sadece Brain diğerlerini import edebilir
+4. Circular Import Yasağı — tehlike ve engelleme
+5. Layer 4 Runtime Enforcement — canlı ihlal tespiti
+6. Wave 3 brain.ts Bağlamı — ~550 satır, 17 export, 7 helper detayları
+
+### Hedef: ≥200 kelime
+### Kısıtlamalar: Sadece docs/smoke-2026-05-12/ kapsamı, kod değişikliği yok
+
+## Verify Steps
+- Bu görev documentation-only olduğundan tsc/vitest çalıştırmak gerekmez
+- Dosya kelime sayısını doğrula (≥200 kelime)

@@ -1,0 +1,87 @@
+{
+  "id": "153-005",
+  "title": "Docker Worker Spawn Akışı",
+  "description": "Docker Worker Spawn Akışı\n- Model: sonnet\n- Effort: low\n- Skills: documentation\n- Files: docs/smoke-2026-05-12/T-SMOKE-05.md\n- Scope: docs/smoke-2026-05-12/\n\n### Description\nDocker backend worker spawn akışını anlat: container create, mount points (`.claude.json`, `~/.codex`, workspace), env injection, claude CLI bootstrap, heartbeat, exit code handling, log/result/plan dosyaları. ADR-006 spawnSync pattern referansı. ≥200 kelime.\n\n---",
+  "model": "sonnet",
+  "effort": "low",
+  "priority": "NORMAL",
+  "reason": "Directive (model: sonnet -- user override)",
+  "scope": {
+    "directories": [
+      "docs/smoke-2026-05-12/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "docs/smoke-2026-05-12/T-SMOKE-05.md"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean",
+    "noGoCriteria": "Build fails or tests fail",
+    "techDebtAcceptable": "Minor style issues if tests pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-153",
+  "provider": "claude",
+  "forceModel": "sonnet",
+  "forceEffort": "low",
+  "forceSkills": [
+    "documentation"
+  ],
+  "assignedAgent": "doc-writer",
+  "assignedSkills": [
+    "documentation"
+  ],
+  "createdAt": "2026-05-12T09:11:40.394Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "documentation",
+        "secondary": [
+          "security",
+          "config"
+        ],
+        "confidence": 0.95
+      },
+      "tags": [],
+      "domains": [
+        {
+          "name": "docs",
+          "weight": 1
+        }
+      ],
+      "operations": [
+        {
+          "type": "create",
+          "weight": 0.4
+        },
+        {
+          "type": "document",
+          "weight": 0.4
+        },
+        {
+          "type": "configure",
+          "weight": 0.2
+        }
+      ],
+      "complexity": {
+        "fileCount": 1,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "trivial"
+      },
+      "scope": {
+        "writeRatio": {
+          "docs/": 1
+        },
+        "primaryWriteTarget": "docs/",
+        "testWriteRatio": 0
+      }
+    },
+    "confidence": "high",
+    "routingVersion": "v2"
+  },
+  "estimatedTokens": 977,
+  "updatedAt": "2026-05-12T09:17:05.186Z"
+}

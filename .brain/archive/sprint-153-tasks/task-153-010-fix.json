@@ -1,0 +1,29 @@
+{
+  "id": "153-010-fix",
+  "title": "Fix: Beta GA 20-Gate Listesi",
+  "description": "Priority fix for NO_GO task 153-010.\nOriginal worker notes: Beta GA 20-Gate dökümanı oluşturuldu. Her kapı için açıklama, ölçüm kriteri ve Sprint 152 sonu durumu (PASS/IN_PROGRESS) belirtildi. Özet tablo eklendi. 17/20 PASS, 3 gate (Gate 4: 27+ MCP tool, Gate 9: style toggle, Gate 15: seed skill signed) IN_PROGRESS olarak işaretlendi. tsc/vitest koşmak gerekmiyor — yalnızca docs/ scope'unda döküman değişikliği yapıldı.\nRubric: correctness=95, test_coverage=100, scope_compliance=100\nExpected scope: docs/smoke-2026-05-12/\nFiles that should change: docs/smoke-2026-05-12/T-SMOKE-10.md",
+  "model": "sonnet",
+  "effort": "low",
+  "priority": "CRITICAL",
+  "reason": "Task 153-010 evaluated as NO_GO; correctness=95; test_coverage=100; scope_compliance=100",
+  "scope": {
+    "directories": [
+      "docs/smoke-2026-05-12/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "docs/smoke-2026-05-12/T-SMOKE-10.md"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean",
+    "noGoCriteria": "Build fails or tests fail",
+    "techDebtAcceptable": "Minor style issues if tests pass"
+  },
+  "status": "PENDING",
+  "sprintId": "sprint-153",
+  "isPriorityFix": true,
+  "fixForTaskId": "153-010",
+  "createdAt": "2026-05-12T09:17:05.190Z"
+}

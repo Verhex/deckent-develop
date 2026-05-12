@@ -1,0 +1,1 @@
+Task 153-007 tamamlandı. `docs/smoke-2026-05-12/T-SMOKE-07.md` dosyası 722 kelimeyle yazıldı; OpenClaw %20 sorununu, Ed25519 keygen/sign/verify akışını, `skill publish` 4-aşamalı pipeline'ı, `hub-validate.mjs` doğrulama adımlarını ve `--no-sign`/`SKIP_SIGNATURE=1` opt-out mekanizmalarını gerçek kaynak kodundan elde edilen bilgilerle belgeledi.

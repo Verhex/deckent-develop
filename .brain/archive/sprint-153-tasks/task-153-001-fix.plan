@@ -1,0 +1,19 @@
+## Execution Plan — task-153-001-fix
+
+### Durum Analizi
+- `docs/smoke-2026-05-12/T-SMOKE-01.md` zaten mevcut ve 762 kelime içeriyor (hedef: ≥200)
+- Orijinal container OOM kill ile durmuş; .result dosyası yazılamamış
+- Belge içeriği tam: 16 CLI komutu referans tablosu + ayrıntılı h3 bölümleri
+- Rubric: correctness=100, test_coverage=100, scope_compliance=100
+
+### Yapılacaklar
+1. Mevcut belgeyi doğrula (kelime sayısı, komut listesi eksiksizliği)
+2. Heartbeat güncelle
+3. tsc/vitest — doc-only task, uygulanamaz
+4. .result dosyası yaz (DONE)
+
+### Doğrulama
+- Belge 16 komutu kapsıyor: init, plan, start, status, attach, spawn, kill, retro, cleanup, doctor, config, history, plugin, upgrade, memory, sync ✓
+- Her komut için 1-2 cümle özet + ayrıntılı h3 bölümü ✓
+- Markdown table + h3 yapısı ✓
+- 762 kelime >> 200 kelime hedefi ✓

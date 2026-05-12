@@ -1,0 +1,25 @@
+# Execution Plan — task-153-006-fix
+
+## Durum Analizi
+- Orijinal task-153-006: Başarıyla tamamlandı (rubric 100/100/100), DONE olarak işaretlendi
+- task-153-006-fix: Önceki worker OOM-kill nedeniyle partial-result bıraktı, .result yazamadı
+- docs/smoke-2026-05-12/T-SMOKE-06.md: Mevcut, 982 kelime (≥200 minimum sağlandı)
+
+## Yaklaşım
+1. T-SMOKE-06.md içeriğini doğrula — 11 detector, amaç+tetikleyici+aksiyon formatı
+2. Kaynak kodla karşılaştır: src/nervous/detectors/*.ts (11 dosya)
+3. Eksik veya hatalı bilgi varsa düzelt
+4. .result dosyasını yaz
+
+## Doğrulama Bulguları
+- 11 detector tam: stale-worker, scope-collision, debt-trend, agent-routing,
+  directives-protection, task-mode-idle, build-failure-recurrence, token-spike,
+  agent-routing-anomaly, scope-collision-rate, notification-delivery-health
+- DIRECTIVES'te geçen isimler (heartbeat-blind, scope-drift vb.) örnek isimler,
+  gerçek kod stale-worker/scope-collision adlarını kullanıyor → Doğru belgelendi
+- NervousObserver (4 kaynak), DetectorRegistry, NervousDispatcher (3 kanal) mimarisi OK
+- Kelime sayısı: 982 (≥200 ✓)
+
+## Sonuç
+Dosya zaten tam ve doğru. Herhangi bir kod değişikliği gerekmedi (doc-only sprint).
+Ana görev: .result dosyasını yazmak.
