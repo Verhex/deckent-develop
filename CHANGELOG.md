@@ -2,6 +2,73 @@
 
 See [docs/CHANGELOG.md](docs/CHANGELOG.md) for the full changelog.
 
+## Unreleased — Sprint 156 Pipeline Hardening (2026-05-12, commit `4d15196`)
+
+### Added
+
+- **`src/core/spawn-safety.ts` (NEW)** — `assertSpawnSafe(bin, args[])` runtime whitelist (ADAPTER_BIN_WHITELIST + SH_C_ALLOWED regex hardening, ADR-038 security note). 157 LoC + 26 unit tests.
+- **`src/core/file-lock.ts`** — `acquireSpawnLock/Locks` + `releaseAllSpawnLocks` + batch rollback. Spawn-time file mutex primitive (`.locks/<hash>.lock`). 19 regression test (includes lock-leak fix verification).
+- **`EffectClass` annotation** in `rubric-registry.ts` — 5-class taxonomy (`pure`/`reversible`/`idempotent`/`compensable`/`critical-irreversible`) + `getEffectClass(task)` + `DEFAULT_EFFECT_MAP` per TaskType (Reversibility Layer foundation).
+- **Worker prompt previous-result enrichment** — `buildDependenciesBlock()` artık dependency task `.result.notes` + `filesChanged` embed eder (TOPP context enrichment).
+- **`IDEMPOTENCY_KEY` env injection** — `spawn-backend-docker.ts` 16-hex promptId'yi container env'e inject eder; prompt template'a "## Idempotency Key" section eklendi.
+- **`CleanupPhaseKind` type** — `'sprint-end' | 'spawn-fail'` gating; tmpfiles spawn-fail'de in-place preserve.
+- **3 ADR drafts** (proposed): ADR-053 TaskType Taxonomy, ADR-055 Hybrid Scoring 5-Layer Pipeline, ADR-060 Self-Awareness Propagation Channels.
+- **Per-change security review** — `docs/security/sprint-156-review.md`.
+- **11 yeni test dosyası**.
+
+### Changed
+
+- **`dependency_pipeline_enabled: true` default** — wave-based spawning + cascade/unblock artık aktif (Sprint 161 audit'inde tespit edilen DIRECTIVES race condition source).
+- **`applyCascadeToSprint` + `applyUnblockToSprint` runtime wire** — NO_GO/DONE sonrası dependents PAUSED/PENDING. Önceden dangling export'lardı.
+- **Cleanup discipline `.worker-*.sh` + `.prompt-*`** — sprint cleanup'a kadar preserve, `archivePromptFiles` `.worker-*.sh`'a da uzar.
+- **Fresh-Eyes fix worker rotation** — opus→sonnet, architect→code-reviewer+bug-fixer.
+
+### Fixed
+
+- **Auditor baseline collection reliability** — vitest subprocess retry-once + `vitest_invocation_status` enum field.
+- **Lock leak post-acquire failure** — `acquireSpawnTimeLocks()` sonrası `docker run` non-zero / image-not-found / writeFileSync exception path'lerinde release missing fix.
+
+### Discovered (Sprint 157 P0 backlog — canlı dogfood kanıtla)
+
+Sprint 156 dogfood **3 major bug canlı kanıtladı**:
+
+1. **Bug X — Dual-Evaluator Stale-State Race**: 2sn'de iki rakip evaluate pass (Pass 1: 22 done 0 NO_GO → Pass 2: 10 done 12 NO_GO). 6 fix-fix.json definition yazıldı.
+2. **Bug Sprint-Stall**: 6 fix-fix.json definition var, spawn=0. Brain runner sleeping. `runFixPhase` recursion yok.
+3. **Brain State Update Missing**: Fix workers `.result` DONE yazdı, task.json EXECUTING freeze. `--force` finalize gerekti (Sprint 153 P0 memory bug'ı kanıt).
+
+Plus heartbeat write race, sprint-state.json freeze, retro naming off-by-one — hepsi Sprint 157 candidate.
+
+### Sprint Sayıları
+
+- **22 task evaluation**: 7 DONE + 15 TECH_DEBT + 0 NO_GO
+- 11 src/ modify + 1 NEW + 11 yeni test + 3 ADR + per-change security review
+- Force finalize ile cleanup, kayıp 0
+
+---
+
+## Sprint 155 — Bug B Fix Smoke Validation (2026-05-12, commit `81b1cb5`)
+
+- **10/10 doc-write task DONE**, 0 NO_GO, 0 fix spawn — Sprint 154'ün TaskType registry + coverage:null tolerance fix'inin CANLI dogfood validation'ı.
+- Sprint 153 smoke (Bug B varken) 9/10 false NO_GO almıştı; Sprint 155 aynı senaryo 10/10 DONE → fix kanıtlı kalıcı.
+- 6m 23s.
+
+---
+
+## Sprint 154 — TaskType Registry + Bug B Fix (2026-05-12, commit `81b1cb5`)
+
+### Added
+
+- **`src/orchestra/rubric-registry.ts` (NEW, 196 LoC)** — TaskType taxonomy (`audit` | `document-write` | `code-development`), 3 rubric constants, scope-shape detection (`isAuditTask`, `isDocumentWriteTask`, `detectTaskType`), registry API (`getRubric`, `coverageOptional`).
+- **6 yeni scorer functions** in `result-evaluator.ts`: scoreWordCount, scoreAuditCompleteness, scoreFindingCount, scoreCitationDensity, scoreMigrationTriage, scoreDocumentationQuality.
+- 2 yeni test dosyası (26 + 8 senaryo).
+
+### Fixed
+
+- **Bug B (coverage:null patolojisi)** — `validateResultSchema(result, task?)` task parametresi alır; `coverageOptional(task)` true ise `coverage:null` tolere edilir. `evaluateWithRubric` registry kullanır. Sprint 153 smoke'da 9/10 false NO_GO veren bug'ın kök çözümü.
+- **Sprint 154 Wave A (cherry-picked `9b91405`)**: claude.json `:ro` → `:rw` mount (pipeline LIVE), dist chmod +x, FIX timeout 30dk, adr-validator path.
+
+---
+
 ## Unreleased — Hot Fix Day (Sprint 152.5, 2026-04-24)
 
 ### Fixed (4 Beta GA launch blockers)

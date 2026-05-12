@@ -4,8 +4,102 @@
 **Status:** CANONICAL — Sprint 149-200 anchor document
 **Vision:** OpenClaw'ın god-level üstün hali — developer-first + life-assistant dual platform
 **Brainstorming:** Alperen onayları 12+ karar, 5 paralel agent kod tabanı analizi
-**Last update:** 2026-05-12 (Sprint 154 — TaskType Registry foundation + Bug B fix + 3-katman mimari planlama)
-**Next audit:** Sprint 155 smoke validation sonrası
+**Last update:** 2026-05-12 (Sprint 156 — Pipeline Hardening + Reversibility tohumu, commit `4d15196`)
+**Next audit:** Sprint 157 sonrası — Bug X close + EvaluationAuditTrail + Brain state update fix
+
+---
+
+## ⚡ 2026-05-12 (Sprint 156 Pipeline Hardening — T4 god-level dogfood)
+
+### Sprint 156 Final Metrikler (~50 dk, force finalize ile)
+
+- **15 orig + 7 fix = 22 task evaluation:** 7 DONE + 15 TECH_DEBT + 0 NO_GO
+- **11 src/ değişiklik + 1 NEW dosya** (spawn-safety.ts) + **11 yeni test dosyası** + **3 ADR draft** (053/055/060) + per-change security review
+- **`dependency_pipeline_enabled: true` default flip** — wave-based spawning + cascade-on-NO_GO + unblock-on-DONE artık aktif
+- **0 NO_GO** — Sprint 155 sonrası Bug B fix kalıcı, registry doc-write + audit rubric dispatch çalışıyor
+- **Force finalize gerekti** — 3 major bug Brain orchestra'sını stuck'a soktu (aşağıda)
+
+### Sprint 156 Mimari Kazanımlar
+
+| Modül | Etki |
+|---|---|
+| `src/core/config.ts` | dependency_pipeline_enabled default flip + DeckentConfigWithPipeline alias |
+| `src/orchestra/sprint-phases.ts` | applyCascadeToSprint + applyUnblockToSprint runtime wire + DEPENDENCY_{CASCADE,UNBLOCK}_APPLIED events |
+| `src/orchestra/spawn-backend-docker.ts` | tmpfile preservation + IDEMPOTENCY_KEY env inject + spawn-time lock + lock leak fix |
+| `src/orchestra/sprint-lifecycle.ts` | CleanupPhaseKind ('sprint-end'/'spawn-fail') gating |
+| `src/monitor/auditor.ts` | Baseline collection retry + vitest_invocation_status enum |
+| `src/orchestra/prompt-god-template.ts` | buildDependenciesBlock previous-result content embed + idempotency key directive |
+| `src/orchestra/rubric-registry.ts` | EffectClass type + getEffectClass + DEFAULT_EFFECT_MAP (Reversibility tohumu) |
+| `src/orchestra/debt-manager.ts` + sprint-spawner.ts | Fresh-Eyes rotation (opus→sonnet, architect→code-reviewer+bug-fixer) |
+| **NEW** `src/core/spawn-safety.ts` (157 LoC) | assertSpawnSafe + ADAPTER_BIN_WHITELIST + SH_C_ALLOWED + SpawnSafetyError (ADR-038 ref) |
+| `src/core/file-lock.ts` | acquireSpawnLock/Locks + releaseAllSpawnLocks + SpawnLockError + batch rollback |
+
+### 3 Major Bug — Canlı Forensic Kanıt (Sprint 157 P0)
+
+#### Bug X — Dual-Evaluator Stale-State Race
+2 saniyede iki rakip evaluate pass (Sprint 162C ADR-049 patolojisi):
+```
+13:51:01 Pass 1: completedTasks=22, techDebt=15, noGo=0  → RETRO yazılmaya başladı
+13:51:03 Pass 2: completedTasks=10, techDebt=4,  noGo=12 → 6 fix-fix.json yazıldı
+```
+Aynı disk state'in 2sn'de farklı değerlendirilmesi. Brain race'e takıldı.
+
+#### Bug Sprint-Stall — fix-fix Spawn Edilmedi
+6 fix-fix.json definition yazıldı AMA worker spawn=0 (.hb/.plan/.result yok). Brain runner sleeping state'e geçti. `runFixPhase` SADECE 1 KEZ çağrılıyor, recursion yok (Sprint 161 audit Bug Stall pattern tekrarı).
+
+#### Bug Brain State Update Missing
+Fix workers `.result` yazdı (DONE/GO_WITH_TECH_DEBT) AMA task.json status EXECUTING freeze. `npx deckent finalize` "6 in-progress" hatası verdi → `--force` gerekti. `handleEvaluation → updateTaskStatus` wire eksik (Sprint 153 P0 memory bug'ı canlı kanıt).
+
+### Bonus Bug'lar (Slot Monitor Forensic)
+
+4. **Heartbeat Write Race** — `.tasks/task-NNN.hb` birden fazla process tarafından yazılıyor (Slot 1+3 yakaladı, workerId clobber)
+5. **sprint-state.json Update Freeze** — mtime 16:11 (spawn anı), 38dk hiç güncellenmedi (Sprint 161 audit Bug R2)
+6. **Retro Naming Off-By-One** — `retro-sprint-156.md` aslında Sprint 155 retrosunu içeriyor
+
+### Worker Honesty Highlights (T4 discipline kanıtı)
+
+- **156-009-fix** GO_WITH_TECH_DEBT scope refusal — filesWrite vs scope.directories çelişki tespit, edit yapmadı, hint döndü
+- **156-002-fix** OOM cascade recovery — 0 file change rubric 100/95/100/95 (sprintin en yüksek), orig kod doğru olduğunu kanıtladı
+- **156-003** downstream breakage self-confession — `fix-phase-map.test.ts` (5 test) breakage kendi atfetti
+
+### Sprint 156 Beta GA Gate Durumu
+
+| # | Gate | Sprint 155 sonu | Sprint 156 sonu |
+|---|------|------------------|------------------|
+| #1 tsc 0 errors | ✅ | ✅ (76 file diff, 0 type error) |
+| #2 vitest ≥%99.5 | ⚠️ 2 pre-existing fail | ⚠️ 2-4 fail (gemini-integration + docker-e2e, environment-dependent) |
+| Implicit: Pipeline Health | ✅ | ⚠️ Brain orchestra Bug X + Stall canlı kanıt (Sprint 157 P0) |
+| #11 Documentation sync | ⚠️ | ✅ ROADMAP + memory + CHANGELOG Sprint 156 güncel |
+| **Yeni: Reversibility Layer foundation** | — | ✅ EffectClass + spawn-safety + file-lock primitives |
+| **Yeni: TOPP foundation** | — | ✅ dependency_pipeline_enabled + cascade/unblock + tmpfile discipline |
+
+### Sprint 157 Tema — Brain Orchestra Hardening + EvaluationAuditTrail
+
+| # | Madde | Konum | Effort |
+|---|---|---|---|
+| P0-1 | Dual-evaluator race close (Bug X) | sprint-phases.ts runEvaluatePhase | high |
+| P0-2 | Sprint-Stall fix-fix spawn loop | sprint-phases.ts runFixPhase recursion | high |
+| P0-3 | Brain handleEvaluation → updateTaskStatus wire | debt-manager.ts:139-152 | normal |
+| P0-4 | EvaluationAuditTrail `.deckent/evaluations/*.json` | sprint-phases.ts evaluateWithRubric çıktı persist | normal |
+| P0-5 | Heartbeat write atomicity | spawn-backend-docker.ts HB writer | normal |
+| P0-6 | sprint-state.json phase transition update | sprint-phases.ts SPRINT_PHASE_CHANGE wire | normal |
+| P1-1 | scoreTestCoverage Math.min(null,100)=0 fix | result-evaluator.ts:586 | low |
+| P1-2 | AUDIT_RUBRIC threshold tuning small audit | rubric-registry.ts | normal |
+| P1-3 | Retro naming off-by-one fix | sprint-lifecycle.ts retro write | low |
+| P2-1 | sprint-phases.ts:425 cleanup 'spawn-fail' caller | sprint-phases.ts | low |
+| P2-2 | DeckentConfig'e dependency_pipeline_enabled field | config-types.ts:69-312 | low |
+
+### Meta-Dogfood Kanıt 4. Uygulama
+
+Sprint 156 dogfood'undaki sprint sırasında **kendi kodunun bug'larını canlı keşfetti**:
+- Sprint 154 fix'leri devrede ama Bug X + Stall + state update miss farklı katmanlardan ortaya çıktı
+- Worker'lar HONEST raporladı, Brain stuck'a takıldı
+- Force finalize ile diskte tüm kazanım korundu
+- Sprint 157'de Brain self-orchestra fix'leri için kanıt seti hazır
+
+---
+
+## ⚡ 2026-05-12 Session Kapanış — Sprint 152.5 Restore + Sprint 153 Smoke + Sprint 154 Bug B Fix
 
 ---
 
