@@ -2,9 +2,9 @@ name: Cross-Platform E2E
 
 on:
   push:
-    branches: [master]
+    branches: [main]
   pull_request:
-    branches: [master]
+    branches: [main]
 
 concurrency:
   group: cross-platform-${{ github.ref }}
