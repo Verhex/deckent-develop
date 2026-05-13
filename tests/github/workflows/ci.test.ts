@@ -15,9 +15,9 @@ describe('CI Workflow (.github/workflows/ci.yml)', () => {
       expect(workflowContent).toContain('name: CI')
     })
 
-    it('should trigger on push to master', () => {
+    it('should trigger on push to main', () => {
       expect(workflowContent).toContain('push:')
-      expect(workflowContent).toContain('branches: [master]')
+      expect(workflowContent).toContain('branches: [main]')
     })
 
     it('should trigger on pull_request to master', () => {

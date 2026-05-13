@@ -124,11 +124,16 @@ vi.mock('../../src/cli/helpers/splash.js', () => ({
 }));
 
 // Mock constants
+// DECKENT_DIR is referenced by event-stream.getCurrentSprintId, which sprint-phases
+// imports at module-init; an unmocked export here throws inside the runFixPhase try
+// and silently aborts the evaluations.set assignments below — keep this list in
+// sync with src/core/constants.ts when adding new transitive deps.
 vi.mock('../../src/core/constants.js', () => ({
   BRAIN_DIR: '.brain',
   TASKS_DIR: '.tasks',
   DEBT_FILE: 'DEBT.md',
   DECKENT_VERSION: '0.4.0-test',
+  DECKENT_DIR: '.deckent',
 }));
 
 // ─── Imports (after mocks) ──────────────────────────────────────────

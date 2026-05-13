@@ -663,8 +663,11 @@ describe('Docker Backend Parity — fsync verifyResultAfterStop (unit)', () => {
 
     // Assert — monitorContainer must also fsync (belt-and-suspenders comment present)
     expect(src).toContain('belt-and-suspenders');
-    // monitorContainer uses fsyncSync after container exit to flush volume buffers
-    const monitorIdx = src.indexOf('monitorContainer');
+    // monitorContainer uses fsyncSync after container exit to flush volume buffers.
+    // Anchor on the function definition (`private monitorContainer`) so the slice
+    // starts at the implementation, not at an earlier comment-only mention.
+    const monitorIdx = src.indexOf('private monitorContainer');
+    expect(monitorIdx).toBeGreaterThan(-1);
     const monitorSection = src.slice(monitorIdx, monitorIdx + 3000);
     expect(monitorSection).toContain('fsyncSync');
   });
@@ -886,9 +889,10 @@ describe('Docker Backend — Prompt Persistence + Archive', () => {
     // Search entire source (not just monitorContainer section) for the key signals:
     // 1. .worker- cleanup must be present somewhere in file
     expect(src).toContain('.worker-');
-    // 2. .prompt- files must NOT be deleted in monitorContainer (persist for analysis)
-    // The comment about NOT deleting must be present
-    expect(src).toContain('intentionally NOT deleted here');
+    // 2. .prompt- files must NOT be deleted in monitorContainer (persist for analysis).
+    //    Sprint 156 Task 4 reworded this contract: prompt + worker tmpfiles persist
+    //    until sprint cleanup, where archivePromptFiles moves them to the archive dir.
+    expect(src).toContain('.prompt-*.txt AND .worker-*.sh tmpfiles persist until sprint cleanup');
   });
 
   // T22: Hash-based prompt filename format includes taskId

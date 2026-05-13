@@ -19,8 +19,8 @@ describe('CI Workflow (.github/workflows/ci.yml)', () => {
       expect(content).toContain('name: CI');
     });
 
-    it('should trigger on push to master', () => {
-      expect(content).toContain('branches: [master]');
+    it('should trigger on push to main', () => {
+      expect(content).toContain('branches: [main]');
     });
 
     it('should use checkout@v4', () => {

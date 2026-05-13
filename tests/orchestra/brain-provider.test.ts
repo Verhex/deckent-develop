@@ -30,6 +30,9 @@ vi.mock('node:fs', () => ({
   readdirSync: vi.fn(),
   unlinkSync: vi.fn(),
   statSync: vi.fn(),
+  // Sprint 156 Task 4: archivePromptFiles uses renameSync to move .prompt-*.txt
+  // and .worker-*.sh into .tasks/archive/sprint-{id}/ instead of unlinking.
+  renameSync: vi.fn(),
   // Sprint 139 async I/O migration: sprint-finalizer and other modules use
   // `import { promises as fsPromises } from 'node:fs'`. Bind async impls via
   // `vi.fn(async () => ...)` so vi.clearAllMocks preserves them.
@@ -261,7 +264,7 @@ vi.mock('../../src/orchestra/coverage-validator.js', async (importOriginal) => {
 
 // ─── Imports after mocks ──────────────────────────────────────────
 
-import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, unlinkSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, unlinkSync, renameSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { ensureSession, spawnWorker, killWorker, listWorkers } from '../../src/orchestra/tmux.js';
 import { updateDashboard, detectDeadlocks } from '../../src/monitor/auditor.js';
@@ -538,41 +541,49 @@ describe('cleanup with SpawnBackend', () => {
     expect(killWorker).toHaveBeenCalledWith('001-001');
   });
 
-  it('removes .tasks/.prompt-* hidden tmpfiles', () => {
+  it('archives .tasks/.prompt-*.txt hidden tmpfiles into archive/sprint-{id}/', () => {
+    // Sprint 156 Task 4: prompt files are archived (renameSync) instead of unlinked
+    // so they retain post-mortem forensic value. Production filter requires `.txt`.
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readdirSync).mockReturnValue([
       'task-001-001.json',
-      '.prompt-abc123',
-      '.prompt-def456',
+      '.prompt-abc123.txt',
+      '.prompt-def456.txt',
       'task-001-001.hb',
     ] as never);
     const sprint = makeSprint();
 
     cleanup(ROOT, sprint);
 
-    // Should unlink both .prompt-* files
-    expect(unlinkSync).toHaveBeenCalledWith(expect.stringContaining('.prompt-abc123'));
-    expect(unlinkSync).toHaveBeenCalledWith(expect.stringContaining('.prompt-def456'));
+    // Both .prompt-*.txt files should be renamed (archived), not deleted.
+    expect(renameSync).toHaveBeenCalledWith(
+      expect.stringContaining('.prompt-abc123.txt'),
+      expect.stringContaining('archive'),
+    );
+    expect(renameSync).toHaveBeenCalledWith(
+      expect.stringContaining('.prompt-def456.txt'),
+      expect.stringContaining('archive'),
+    );
   });
 
-  it('does not remove non-prompt hidden files', () => {
+  it('does not archive non-prompt hidden files', () => {
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readdirSync).mockReturnValue([
       '.gitkeep',
       '.dashboard',
-      '.prompt-xyz',
+      '.prompt-xyz.txt',
     ] as never);
     const sprint = makeSprint();
 
     cleanup(ROOT, sprint);
 
-    // Only .prompt-xyz should be removed, not .gitkeep or .dashboard
-    const unlinkedPaths = vi.mocked(unlinkSync).mock.calls.map(c => c[0] as string);
-    const removedPrompt = unlinkedPaths.filter(p => p.includes('.prompt-'));
-    const removedOthers = unlinkedPaths.filter(p => p.includes('.gitkeep') || p.includes('.dashboard'));
+    // Only .prompt-xyz.txt should be archived, not .gitkeep or .dashboard
+    const archivedPaths = vi.mocked(renameSync).mock.calls.map(c => c[0] as string);
+    const archivedPrompt = archivedPaths.filter(p => p.includes('.prompt-'));
+    const archivedOthers = archivedPaths.filter(p => p.includes('.gitkeep') || p.includes('.dashboard'));
 
-    expect(removedPrompt).toHaveLength(1);
-    expect(removedOthers).toHaveLength(0);
+    expect(archivedPrompt).toHaveLength(1);
+    expect(archivedOthers).toHaveLength(0);
   });
 
   it('handles cleanup errors gracefully (does not throw)', () => {

@@ -30,8 +30,8 @@ describe('GitHub Pages deployment workflow', () => {
 describe('docs.yml triggers', () => {
   const content = readFileSync(WORKFLOW_PATH, 'utf-8');
 
-  it('triggers on push to master branch', () => {
-    expect(content).toContain('branches: [master]');
+  it('triggers on push to main branch', () => {
+    expect(content).toContain('branches: [main]');
   });
 
   it('filters push by docs path', () => {

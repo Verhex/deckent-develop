@@ -133,6 +133,7 @@ describe('runPlanPhase — rollback integration', () => {
       wasClean: true,
     });
     mockExistsSync
+      .mockReturnValueOnce(false)  // checkBuildStaleness: dist/orchestra/sprint-phases.js missing → short-circuit
       .mockReturnValueOnce(true)   // loadSafetyPoint → file exists (orphan check)
       .mockReturnValueOnce(true);  // .deckent dir exists (saveSafetyPoint)
     mockReadFileSync.mockReturnValueOnce(staleData);
@@ -157,8 +158,9 @@ describe('runPlanPhase — rollback integration', () => {
 
   it('warns and skips safety point when not in a git repo', async () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    // cleanOrphanSafetyPoint: no file
-    mockExistsSync.mockReturnValueOnce(false);
+    mockExistsSync
+      .mockReturnValueOnce(false)  // checkBuildStaleness: dist missing → short-circuit
+      .mockReturnValueOnce(false); // cleanOrphanSafetyPoint: no file
     // isGitRepo → no
     mockSpawnSync.mockReturnValueOnce(makeResult('', 'not a git repo', 128));
 
@@ -171,8 +173,9 @@ describe('runPlanPhase — rollback integration', () => {
   });
 
   it('propagates stash pop failure as a hard error (BULGU 3)', async () => {
-    // cleanOrphanSafetyPoint: no file
-    mockExistsSync.mockReturnValueOnce(false);
+    mockExistsSync
+      .mockReturnValueOnce(false)  // checkBuildStaleness: dist missing → short-circuit
+      .mockReturnValueOnce(false); // cleanOrphanSafetyPoint: no file
     // isGitRepo → yes
     mockSpawnSync.mockReturnValueOnce(makeResult('.git'));
     // isCleanWorkingTree → dirty
