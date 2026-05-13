@@ -1,9 +1,24 @@
-# Public Repo Flip Handoff — Sprint 151
+# Public Repo Flip Handoff — Sprint 165 (Final)
 
-> **Oluşturan:** Worker T-151-002 (architect agent)
-> **Tarih:** 2026-04-22 Sprint 151 — Beta GA Cutover
-> **Versiyon:** v1.0.0-beta.1
-> **Hedef:** `github.com/VerhexIO/deckent` (henüz private, flip bekleniyor)
+> **Oluşturan:** Worker T-165-005 (doc-writer)  
+> **Tarih:** 2026-05-13 Sprint 165 — Brain Final Stability Closure  
+> **Önceki versiyon:** Sprint 151 handoff (2026-04-22)  
+> **Versiyon:** v1.0.0-beta.2 (Sprint 166'da release)  
+> **Hedef:** `github.com/VerhexIO/deckent` (henüz private, Sprint 166 flip bekleniyor)
+
+## Sprint 165 Güncellemeleri
+
+Bu Sprint 151 handoff'unun Sprint 165 final closure ile güncellenmiş versiyonudur.
+
+**Yeni:** Bug X/Y/Z/W tamamı kapatıldı — Brain production-ready. Flip artık Sprint 166 başlamadan önce güvenle yapılabilir.
+
+**Checklist güncellemeleri:**
+- ✅ `dead_event_stream` detector aktif (Bug W fix — Sprint 165 Task 4)
+- ✅ processQueue stall fix (Bug Y — Sprint 165 Task 2)
+- ✅ Brain stub eradication (Bug X — Sprint 165 Task 1)
+- ✅ Vitest gate delta.fail=0 (Bug Z — Sprint 165 Task 3)
+
+---
 
 ---
 

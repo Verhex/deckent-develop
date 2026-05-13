@@ -6,6 +6,24 @@ Bu projedeki tüm önemli değişiklikler bu dosyada belgelenmektedir.
 Format [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) standardına dayanır
 ve proje [Semantic Versioning](https://semver.org/spec/v2.0.0.html) kurallarına uyar.
 
+## [0.4.1-beta] — 2026-05-13 (Sprint 165)
+
+### Fixed
+
+- **Brain "no-result → CODE_VERIFIED_DONE" stub eradication** (Bug X, Sprint 156-011 CRITICAL debt CLOSED) — Worker crash ettiğinde Brain artık `CODE_VERIFIED_DONE` stub'ı yazmıyor; `linesAdded === 0 && testsPassed === false` koşulunda gerçek NO_GO üretiliyor, FIX phase tetikleniyor.
+- **processQueue legacy FIFO Wave transition stall** (Bug Y, Sprint 161/164 forensic replay fix) — 27dk hayalet task kalan Sprint 164 bug'ı kapatıldı. Wave 1 son task DONE → Wave 2 eligible task'lar otomatik spawn; slot 5dk+ boş → force re-scan.
+- **Vitest gate +1 fail chronic regression** (Bug Z, Sprint 159-164 6-sprint debt) — Brain self-audit ile worker `npx vitest run` aynı suite + config kullanıyor; parity test eklendi; `vitestDelta.fail = 0` confirmed.
+- **Auditor `dead_event_stream` detector activated** (Bug W, Sprint 148+ reserve cleared) — 16 sprint `reserve_for: sprint-148` ile uyuyan detector aktive edildi; `threshold_ms: 600000`, sprint event stream silent alarmı canlı.
+
+### Added
+
+- **ADR-045 Wave-Based Execution Semantics** — code-complete, `dependency_pipeline_enabled: false` flag-gated (Sprint 166'da live flip)
+- **Wire integration test suite** — `dependency-pipeline-integration.test.ts`, 6 senaryo (Sprint 164)
+- **Sprint 165 open source GA documentation** — final state report, public repo flip checklist, announce-final draft
+- **22 yeni test** — no-result stub eradication (6) + processQueue stall (8) + audit parity (4) + dead event stream (4)
+
+---
+
 ## [1.0.0-beta.1-sprint164] - 2026-05-13
 
 ### Added
