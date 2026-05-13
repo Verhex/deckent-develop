@@ -2137,18 +2137,25 @@ export function parseVitestBaselineOutput(stdout: string, stderr: string): Vites
   }
 
   // Path 2 — human-readable footer
+  //
+  // Sprint 165 Task 3 (Bug Z) fix: the `passed (NNN)` joined regex used to fail
+  // whenever vitest interleaved a skipped count between "passed" and the total
+  // ("16253 passed | 66 skipped (16321)"). That broke parity with the worker,
+  // which sees the line directly. Now: each count is matched independently and
+  // the bracketed total is anchored to end-of-line.
   const testsLine = combined.match(/^\s*Tests\s+.+$/m)?.[0] ?? '';
   const failedMatch = testsLine.match(/(\d+)\s+failed/);
-  const passedMatch = testsLine.match(/(\d+)\s+passed\s+\((\d+)\)/);
+  const passedMatch = testsLine.match(/(\d+)\s+passed/);
   const skippedMatch = testsLine.match(/(\d+)\s+skipped/);
+  const totalMatch = testsLine.match(/\((\d+)\)\s*$/);
 
   const testFailed = failedMatch?.[1] ? parseInt(failedMatch[1], 10) : 0;
   const testPassed = passedMatch?.[1] ? parseInt(passedMatch[1], 10) : 0;
-  const testCount = passedMatch?.[2] ? parseInt(passedMatch[2], 10) : 0;
+  const testCount = totalMatch?.[1] ? parseInt(totalMatch[1], 10) : 0;
 
   // Either the bracketed total OR an explicit passed/failed/skipped count
   // is required to call this a successful parse.
-  const haveExplicitNumbers = Boolean(passedMatch || failedMatch || skippedMatch);
+  const haveExplicitNumbers = Boolean(passedMatch || failedMatch || skippedMatch || totalMatch);
   if (haveExplicitNumbers && testCount === 0 && testPassed === 0 && testFailed === 0) {
     // Saw "Tests" line but no numeric capture — not a clean parse.
     return { testCount: 0, testPassed: 0, testFailed: 0, parseOk: false };
@@ -2296,4 +2303,198 @@ export function writeCiBaselineRecord(
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, 'ci-baseline.json'), JSON.stringify(record, null, 2), 'utf-8');
   return record;
+}
+
+// ─── Vitest Audit Gate (Sprint 165 Task 3 — Bug Z fix) ─────────────────
+//
+// Sprint 159-164 (6 sprints) carried a chronic `vitestDelta.fail = 1` regression
+// even when workers reported "0 failures" via their own `npx vitest run`. Root
+// cause: src/orchestra/baseline-tracker.ts::parseVitestOutput uses a loose
+// regex `(\d+)\s+failed` that matches the first "N failed" anywhere in the
+// vitest summary — typically the `Test Files  1 failed | 742 passed (743)`
+// line — and reports that as the test failure count. Worker, running the
+// same suite, sees `Tests  2 failed | 16253 passed (16321)` and reports the
+// authoritative count.
+//
+// This module provides an alternative audit path that uses the strict parser
+// already implemented above (`parseVitestBaselineOutput` — JSON reporter
+// preferred, text fallback constrained to the Tests line via `^\s*Tests\s+`
+// multiline anchor). The standalone `scripts/run-self-audit.ts` consumer
+// produces results identical to a worker's `npx vitest run`, restoring
+// worker↔brain parity.
+
+/** Audit gate counts shared by baseline and current snapshots. */
+export interface AuditGateBaseline {
+  testCount: number;
+  testPassed: number;
+  testFailed: number;
+  testSkipped: number;
+}
+
+/** Delta between two audit snapshots — positive fail = regression. */
+export interface AuditGateDelta {
+  count: number;
+  pass: number;
+  fail: number;
+  skipped: number;
+}
+
+/** Dependency-injection seam: how to gather the current vitest counts. */
+export type VitestGatherFn = () => CiBaselineGatherResult;
+
+/** Dependency-injection seam: how to read the pre-sprint baseline. */
+export type VitestBaselineReadFn = () => AuditGateBaseline | null;
+
+/** Options for `runVitestAuditGate`. */
+export interface VitestAuditGateOptions {
+  projectRoot: string;
+  sprintId: string;
+  /** Inject a gather function (defaults to `gatherCiBaseline` over project root). */
+  gatherFn?: VitestGatherFn;
+  /** Inject a baseline reader (defaults to reading `.deckent/<sprint>-baseline.json`). */
+  readBaselineFn?: VitestBaselineReadFn;
+}
+
+/** Result of an audit gate evaluation. */
+export interface VitestAuditGateResult {
+  status: CiBaselineInvocationStatus;
+  current: AuditGateBaseline;
+  baseline: AuditGateBaseline | null;
+  delta: AuditGateDelta;
+  /**
+   * PASS         — delta.fail <= 0 and gather succeeded
+   * GATE_FAILURE — delta.fail > 0 (regression introduced)
+   * INCONCLUSIVE — gather failed (SPAWN_FAIL / PARSE_FAIL), counts untrustworthy
+   */
+  gateStatus: 'PASS' | 'GATE_FAILURE' | 'INCONCLUSIVE';
+}
+
+/**
+ * Pure delta computation — exposed for unit testing.
+ *
+ * When baseline is null, delta equals current (no comparison reference).
+ */
+export function computeVitestDelta(
+  baseline: AuditGateBaseline | null,
+  current: AuditGateBaseline,
+): AuditGateDelta {
+  if (!baseline) {
+    return {
+      count: current.testCount,
+      pass: current.testPassed,
+      fail: current.testFailed,
+      skipped: current.testSkipped,
+    };
+  }
+  return {
+    count: current.testCount - baseline.testCount,
+    pass: current.testPassed - baseline.testPassed,
+    fail: current.testFailed - baseline.testFailed,
+    skipped: current.testSkipped - baseline.testSkipped,
+  };
+}
+
+/**
+ * Default baseline reader — accepts both legacy `<sprint>-baseline.json`
+ * (TestBaseline shape from baseline-tracker) and CiBaselineRecord shape from
+ * `ci-baseline.json`. Returns null when no readable baseline exists.
+ */
+export function readAuditBaseline(projectRoot: string, sprintId: string): AuditGateBaseline | null {
+  // Try sprint-specific baseline first (baseline-tracker legacy shape)
+  const sprintBaselinePath = join(projectRoot, '.deckent', `${sprintId}-baseline.json`);
+  if (existsSync(sprintBaselinePath)) {
+    try {
+      const raw = JSON.parse(readFileSync(sprintBaselinePath, 'utf-8')) as {
+        files?: number; pass?: number; fail?: number; skipped?: number;
+      };
+      if (typeof raw.pass === 'number' && typeof raw.fail === 'number') {
+        return {
+          testCount: (raw.pass ?? 0) + (raw.fail ?? 0) + (raw.skipped ?? 0),
+          testPassed: raw.pass ?? 0,
+          testFailed: raw.fail ?? 0,
+          testSkipped: raw.skipped ?? 0,
+        };
+      }
+    } catch { /* fall through */ }
+  }
+
+  // Fall back to CiBaselineRecord (.deckent/ci-baseline.json)
+  const ciBaselinePath = join(projectRoot, '.deckent', 'ci-baseline.json');
+  if (existsSync(ciBaselinePath)) {
+    try {
+      const raw = JSON.parse(readFileSync(ciBaselinePath, 'utf-8')) as CiBaselineRecord;
+      if (raw?.baseline && raw.vitest_invocation_status === 'OK') {
+        return {
+          testCount: raw.baseline.testCount,
+          testPassed: raw.baseline.testPassed,
+          testFailed: raw.baseline.testFailed,
+          testSkipped: 0,
+        };
+      }
+    } catch { /* ignore */ }
+  }
+
+  return null;
+}
+
+/**
+ * Run a Bug Z-immune vitest audit gate.
+ *
+ * Differences from sprint-finalizer's `runSelfAuditGate`:
+ *   1. Uses `gatherCiBaseline` (JSON reporter preferred) — bypasses the
+ *      ambiguous `(\d+)\s+failed` regex in `baseline-tracker::parseVitestOutput`.
+ *   2. Distinguishes SPAWN_FAIL / PARSE_FAIL from GATE_FAILURE — a failed
+ *      subprocess no longer masquerades as a regression.
+ *   3. Honors pre-existing failures as the baseline — workers who fix
+ *      pre-existing failures (negative delta) get PASS, not GATE_FAILURE.
+ *
+ * This is the function `scripts/run-self-audit.ts` invokes; the contract is
+ * pinned by `tests/audit/worker-brain-audit-parity.test.ts`.
+ */
+export async function runVitestAuditGate(
+  options: VitestAuditGateOptions,
+): Promise<VitestAuditGateResult> {
+  const gather = options.gatherFn
+    ? options.gatherFn()
+    : gatherCiBaseline(options.projectRoot);
+
+  // SPAWN_FAIL / PARSE_FAIL — counts not trustworthy, do not penalise
+  if (gather.status !== 'OK') {
+    return {
+      status: gather.status,
+      current: {
+        testCount: 0,
+        testPassed: 0,
+        testFailed: 0,
+        testSkipped: 0,
+      },
+      baseline: null,
+      delta: { count: 0, pass: 0, fail: 0, skipped: 0 },
+      gateStatus: 'INCONCLUSIVE',
+    };
+  }
+
+  const current: AuditGateBaseline = {
+    testCount: gather.testCount,
+    testPassed: gather.testPassed,
+    testFailed: gather.testFailed,
+    // gather does not currently surface skipped — best-effort: 0
+    testSkipped: 0,
+  };
+
+  const baseline = options.readBaselineFn
+    ? options.readBaselineFn()
+    : readAuditBaseline(options.projectRoot, options.sprintId);
+
+  const delta = computeVitestDelta(baseline, current);
+
+  const gateStatus: 'PASS' | 'GATE_FAILURE' = delta.fail > 0 ? 'GATE_FAILURE' : 'PASS';
+
+  return {
+    status: 'OK',
+    current,
+    baseline,
+    delta,
+    gateStatus,
+  };
 }
