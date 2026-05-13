@@ -4,7 +4,7 @@
 
 **Disiplin isteyen geliştiriciler için AI orkestratör.**
 
-[![npm version](https://img.shields.io/npm/v/deckent.svg)](https://www.npmjs.com/package/deckent) [![tests](https://img.shields.io/badge/tests-12485%2B-brightgreen)](https://github.com/VerhexIO/deckent) [![coverage](https://img.shields.io/badge/coverage-89.33%25-brightgreen)](https://github.com/VerhexIO/deckent) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![sprints](https://img.shields.io/badge/sprints-150%2B-teal)](https://github.com/VerhexIO/deckent) [![version](https://img.shields.io/badge/version-v1.0.0--beta.1-orange)](https://github.com/VerhexIO/deckent)
+[![npm version](https://img.shields.io/npm/v/deckent.svg)](https://www.npmjs.com/package/deckent) [![tests](https://img.shields.io/badge/tests-12485%2B-brightgreen)](https://github.com/VerhexIO/deckent) [![coverage](https://img.shields.io/badge/coverage-89.33%25-brightgreen)](https://github.com/VerhexIO/deckent) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![sprints](https://img.shields.io/badge/sprints-164%2B-teal)](https://github.com/VerhexIO/deckent) [![version](https://img.shields.io/badge/version-v1.0.0--beta.1-orange)](https://github.com/VerhexIO/deckent)
 
 Deckent, iki modlu bir AI agent orkestrasyon CLI'dir: geliştiriciler için yapılandırılmış çok-agent sprint'leri sunan **Sprint Mode** ve tek seferlik yaşam asistanı görevleri için **Task Mode**. Hedeflerinizi yazın; Deckent görevleri planlar, paralel AI worker'lar atar, kaliteyi izler ve sonuçları disiplinle teslim eder.
 
@@ -135,7 +135,7 @@ Tek görev yürütme. PLAN/SPAWN fazları yok. Hızlı komutlar, hatırlatmalar 
 - **Öz-Öğrenme** — Brain, sprint sonuçlarından (NO_GO oranı, coverage, süre) config önerileri üretir
 
 ### Agent'lar ve Skill'ler
-- **15 Yerleşik Agent** — security-auditor, doc-writer, bug-fixer, code-reviewer, refactorer, api-builder, performance-analyzer, ci-guardian, architect, architecture-planner, accessibility-auditor, data-engineer, devops-engineer, frontend-designer, migration-specialist
+- **16 Yerleşik Agent** — security-auditor, test-writer, doc-writer, bug-fixer, code-reviewer, refactorer, api-builder, performance-analyzer, ci-guardian, architect, architecture-planner, accessibility-auditor, data-engineer, devops-engineer, frontend-designer, migration-specialist
 - **21 Yerleşik Skill** — typescript-expert, testing-expert, react-specialist, security-specialist, docker-expert ve 16'sı daha
 - **Temp Agent ve Skill Üretimi** — Kod tabanı konvansiyonlarından projeye özel agent ve skill'ler otomatik üretir
 - **Agent Evrim Pipeline'ı** — Performansa dayalı temp'ten kalıcıya terfi; başarısızlıkta geri alım
@@ -146,7 +146,7 @@ Tek görev yürütme. PLAN/SPAWN fazları yok. Hızlı komutlar, hatırlatmalar 
 - **Katman Tabanlı Routing** — Model adları yerine `brain_tier: 'premium'`; ModelRegistry, provider'a göre en uygun modeli seçer
 - **Yapılandırılabilir Timeout'lar** — Görev ve sprint bazlı timeout, `sprint_timeout_minutes: 0` sınırsız için
 - **Human Checkpoint'ler** — Plan, evaluate, fix fazlarında yapılandırılabilir onay noktaları
-- **MCP Entegrasyonu** — Claude Code IDE entegrasyonu için 22 tool + 8 resource
+- **MCP Entegrasyonu** — Claude Code IDE entegrasyonu için 27 tool + 8 resource
 - **Web Dashboard** — React + Vite + Tailwind, 6 sayfa, SSE gerçek zamanlı güncellemeler, TR/EN dil değiştirici
 
 ### Cross-Platform
@@ -174,10 +174,10 @@ Tek görev yürütme. PLAN/SPAWN fazları yok. Hızlı komutlar, hatırlatmalar 
 | `.deck` gizli bilgi interpolasyonu | **Evet** | Hayır | Hayır | Hayır | Hayır |
 | Görev bazlı GO/NO-GO değerlendirme | **Evet** | Hayır | Hayır | Hayır | Hayır |
 | Açık kaynak | **Evet** (MIT) | Hayır | Hayır | Evet (OSS) | Hayır |
-| MCP entegrasyonu | **Evet** (22 tool, 8 resource) | Kısmi | Hayır | Sınırlı | Native |
+| MCP entegrasyonu | **Evet** (27 tool, 8 resource) | Kısmi | Hayır | Sınırlı | Native |
 | Web dashboard | **Evet** (6 sayfa) | Yerleşik | Yerleşik | Hayır | Hayır |
 | Çoklu provider (Claude, Codex, Gemini) | **Evet** | Hayır | Hayır | Sınırlı | Hayır |
-| Yerleşik agent sayısı | **15** | — | — | 100+ | — |
+| Yerleşik agent sayısı | **16** | — | — | 100+ | — |
 | Yerleşik skill sayısı | **21** | — | — | 13K+ (hub, ~%20 zararlı) | — |
 | Test coverage | **%89.33** | — | — | — | — |
 | Fiyat | **Ücretsiz (MIT)** | $20-40/ay | $20-500/ay | Ücretsiz | Ücretsiz |
@@ -360,7 +360,7 @@ claude mcp add deckent -- npx deckent mcp
 
 Veya `deckent init` otomatik olarak kayıt yapsın.
 
-### MCP Tool'lar (22)
+### MCP Tool'lar (27)
 
 | Tool | Açıklama |
 |------|----------|
@@ -386,6 +386,15 @@ Veya `deckent init` otomatik olarak kayıt yapsın.
 | `deckent_docs` | Yerleşik dokümantasyonu yönet ve sun |
 | `deckent_explain` | Sprint geçmişini ve sonuçlarını açıkla |
 | `deckent_memory_query` | Cross-source bellek araması (ADR, sprint, borç, desen) |
+| `deckent_audit` | Herhangi bir sprint için Brain Self-Audit Gate çalıştır (READ-ONLY) |
+| `deckent_recover` | Çökmüş veya takılmış sprint'i kurtar (DESTRUCTIVE) |
+| `deckent_feature_query` | Özellik manifestini sorgula (active/dormant/dead/all) |
+| `deckent_watch` | Sprint event'lerini gerçek zamanlı akış olarak izle |
+| `deckent_nervous_subscribe` | Nervous System bildirimlerine abone ol |
+| `deckent_nervous_accept` | Bekleyen nervous bildirimini kabul et |
+| `deckent_nervous_reject` | Bekleyen nervous bildirimini reddet |
+| `deckent_nervous_status` | Nervous System mevcut durumu |
+| `deckent_nervous_config` | Nervous detector'ları yapılandır |
 
 ### MCP Resource'lar (8)
 

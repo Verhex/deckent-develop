@@ -2,7 +2,7 @@
 
 **The AI orchestrator for developers who want discipline.**
 
-[![npm version](https://img.shields.io/npm/v/deckent.svg)](https://www.npmjs.com/package/deckent) [![tests](https://img.shields.io/badge/tests-12485%2B-brightgreen)](https://github.com/VerhexIO/deckent) [![coverage](https://img.shields.io/badge/coverage-89.33%25-brightgreen)](https://github.com/VerhexIO/deckent) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![sprints](https://img.shields.io/badge/sprints-150%2B-teal)](https://github.com/VerhexIO/deckent) [![version](https://img.shields.io/badge/version-v1.0.0--beta.1-orange)](https://github.com/VerhexIO/deckent)
+[![npm version](https://img.shields.io/npm/v/deckent.svg)](https://www.npmjs.com/package/deckent) [![tests](https://img.shields.io/badge/tests-12485%2B-brightgreen)](https://github.com/VerhexIO/deckent) [![coverage](https://img.shields.io/badge/coverage-89.33%25-brightgreen)](https://github.com/VerhexIO/deckent) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![sprints](https://img.shields.io/badge/sprints-164%2B-teal)](https://github.com/VerhexIO/deckent) [![version](https://img.shields.io/badge/version-v1.0.0--beta.1-orange)](https://github.com/VerhexIO/deckent)
 
 Deckent is an AI agent orchestration CLI with two modes: **Sprint Mode** for structured multi-agent development sprints, and **Task Mode** for one-shot life assistant tasks. Write your goals, and Deckent plans tasks, assigns parallel AI workers, monitors quality, and delivers results — all with discipline.
 
@@ -133,7 +133,7 @@ Single-task execution. No PLAN/SPAWN phases. Ideal for quick commands, reminders
 - **Self-Learning** — Brain generates config suggestions from sprint results (NO_GO rate, coverage, duration)
 
 ### Agents & Skills
-- **15 Built-in Agents** — security-auditor, doc-writer, bug-fixer, code-reviewer, refactorer, api-builder, performance-analyzer, ci-guardian, architect, architecture-planner, accessibility-auditor, data-engineer, devops-engineer, frontend-designer, migration-specialist
+- **16 Built-in Agents** — security-auditor, test-writer, doc-writer, bug-fixer, code-reviewer, refactorer, api-builder, performance-analyzer, ci-guardian, architect, architecture-planner, accessibility-auditor, data-engineer, devops-engineer, frontend-designer, migration-specialist
 - **21 Built-in Skills** — typescript-expert, testing-expert, react-specialist, security-specialist, docker-expert, and 16 more
 - **Temp Agent & Skill Generation** — Auto-generates project-specific agents and skills from your codebase conventions
 - **Agent Evolution Pipeline** — Promotion from temp to permanent based on performance; demotion on failure
@@ -144,7 +144,7 @@ Single-task execution. No PLAN/SPAWN phases. Ideal for quick commands, reminders
 - **Tier-Based Routing** — `brain_tier: 'premium'` instead of model names; ModelRegistry resolves best model per provider
 - **Configurable Timeouts** — Per-task and per-sprint timeout, `sprint_timeout_minutes: 0` for unlimited
 - **Human Checkpoints** — Configurable approval gates at plan, evaluate, fix phases
-- **MCP Integration** — 22 tools + 8 resources for Claude Code IDE integration
+- **MCP Integration** — 27 tools + 8 resources for Claude Code IDE integration
 - **Web Dashboard** — React + Vite + Tailwind, 6 pages, SSE real-time updates, TR/EN language switcher
 
 ### Cross-Platform
@@ -172,10 +172,10 @@ Single-task execution. No PLAN/SPAWN phases. Ideal for quick commands, reminders
 | `.deck` secret interpolation | **Yes** | No | No | No | No |
 | GO/NO-GO evaluation per task | **Yes** | No | No | No | No |
 | Open source | **Yes** (MIT) | No | No | Yes (OSS) | No |
-| MCP integration | **Yes** (22 tools, 8 resources) | Partial | No | Limited | Native |
+| MCP integration | **Yes** (27 tools, 8 resources) | Partial | No | Limited | Native |
 | Web dashboard | **Yes** (6 pages) | Built-in | Built-in | No | No |
 | Multi-provider (Claude, Codex, Gemini) | **Yes** | No | No | Limited | No |
-| Built-in agents | **15** | — | — | 100+ | — |
+| Built-in agents | **16** | — | — | 100+ | — |
 | Built-in skills | **21** | — | — | 13K+ (hub, ~20% flagged) | — |
 | Test coverage | **89.33%** | — | — | — | — |
 | Price | **Free (MIT)** | $20-40/mo | $20-500/mo | Free | Free |
@@ -358,7 +358,7 @@ claude mcp add deckent -- npx deckent mcp
 
 Or let `deckent init` auto-register it.
 
-### MCP Tools (22)
+### MCP Tools (27)
 
 | Tool | Description |
 |------|-------------|
@@ -384,6 +384,15 @@ Or let `deckent init` auto-register it.
 | `deckent_docs` | Manage and serve built-in documentation |
 | `deckent_explain` | Explain sprint history and results |
 | `deckent_memory_query` | Cross-source memory search (ADR, sprint, debt, pattern) |
+| `deckent_audit` | Run Brain Self-Audit Gate for any sprint (READ-ONLY) |
+| `deckent_recover` | Recover from crashed or stuck sprint (DESTRUCTIVE) |
+| `deckent_feature_query` | Query feature manifest (active/dormant/dead/all) |
+| `deckent_watch` | Stream sprint events in real-time |
+| `deckent_nervous_subscribe` | Subscribe to Nervous System notifications |
+| `deckent_nervous_accept` | Accept pending nervous notification |
+| `deckent_nervous_reject` | Reject pending nervous notification |
+| `deckent_nervous_status` | Nervous System current status |
+| `deckent_nervous_config` | Configure nervous detectors |
 
 ### MCP Resources (8)
 

@@ -4,8 +4,48 @@
 **Status:** CANONICAL — Sprint 149-200 anchor document
 **Vision:** OpenClaw'ın god-level üstün hali — developer-first + life-assistant dual platform
 **Brainstorming:** Alperen onayları 12+ karar, 5 paralel agent kod tabanı analizi
-**Last update:** 2026-05-12 (Sprint 156 — Pipeline Hardening + Reversibility tohumu, commit `4d15196`)
-**Next audit:** Sprint 157 sonrası — Bug X close + EvaluationAuditTrail + Brain state update fix
+**Last update:** 2026-05-13 (Sprint 164 — dep_pipeline Yol B Wire + Vitest Gate + Housekeeping)
+**Next audit:** Sprint 165 sonrası — Bug X+Y+Z+W close
+
+---
+
+## ⚡ 2026-05-13 (Sprint 157→164 Brain Stability Hattı + dep_pipeline Yol B Wire)
+
+### Sprint 157-164 — 8 Sprint Brain Stability Hattı
+
+Sprint 157-164 boyunca Brain stability hattı:
+
+- **Sprint 157-159:** Bug X (dual-eval race) + Sprint-Stall + Brain state update bug fix denemeleri, kronik NO_GO rate %87
+- **Sprint 160:** SPAWN crash (plan.md path collision) — T-001 survivor exception handler + redactor commit
+- **Sprint 161:** Resmi survivors — T-002 checkpoint loop + T-006 double-MCP guard + config fix
+- **Sprint 162:** T-003 phase observability + T-004 sprint-controller wire + T-007 finalize. Spurious NO_GO bug canlı tespit (3/3 DONE worker → Brain NO_GO sayım).
+- **Sprint 163 (Brain Stability Closure):** 6/6 DONE %0 NO_GO. B1 spurious NO_GO fix + B2 docker container_start_failed + ADR-043 Brain Crash Recovery + ADR-044 Sprint State Observability + Security Review 3/3 + Dogfood smoke 6/6.
+- **Sprint 164 (dep_pipeline Yol B Wire + Vitest Gate + Housekeeping, 2026-05-13):** 5/6 DONE + 1 hayalet stub. ADR-045 Wave-Based Execution Semantics accepted, respawnEligibleTasks runtime wire 13 grep match (sprint-controller'a kadar derinleşti), task.status inline mutation 3 dal, 14 yeni test (8 wire + 6 integration) PASS. **Wire RUNTIME DEVRE DIŞI:** `dependency_pipeline_enabled: false` kaldı, Sprint 166 flip için bekletilir.
+
+### Sprint 164 Canlı Dogfood Bulguları (Sprint 165 P0)
+
+- **Bug X canlı replay:** 164-006 worker docker HB shutdown → Brain "CODE_VERIFIED_DONE" stub yazımı. Sprint 156-011 CRITICAL debt EXACT replay.
+- **Bug Y canlı replay:** Brain processQueue legacy FIFO Wave 2→3 geçişinde stall — 164-006 spawn olmadı. Sprint 161 stalled forensic'in dogfood replay'i.
+- **Bug Z:** Vitest gate +1 fail Sprint 159'dan beri 6 sprint kronik. 164-003-fix worker 17→0 raporladı ama Brain audit hâlâ FAIL — worker iddiası ile Brain self-audit script uyumsuzluğu.
+- **Bug W:** Auditor dead_event_stream detector Sprint 148'den `reserve_for: sprint-148` ile uyuyor. 164-006 27dk hayalet kaldı, alarm verilmedi.
+
+### Sprint 165 Tema: Brain Final Stability + Open Source Hazırlık
+
+- **T1:** Bug X fix — "no-result → CODE_VERIFIED_DONE" stub kaldırılır
+- **T2:** Bug Y fix — processQueue legacy FIFO stall (flag false modunda)
+- **T3:** Bug Z fix — vitest gate +1 fail kaynak araştırma + worker/Brain audit uyumu
+- **T4:** Bug W fix — dead_event_stream detector activate
+- **T5:** Documentation freeze + public repo prep (open source GA için)
+
+### Beta GA Exit Gate Güncel Durum (Sprint 164 Sonrası)
+
+- **#2 vitest gate** hâlâ FAIL — Sprint 165 T3 ile kapanır
+- **#11 Documentation sync** — Sprint 165 T5 ile final
+- **Yeni feature:** Wave-Based Execution Semantics code-complete (ADR-045), runtime activation Sprint 166
+
+### Meta-Dogfood Kanıt — 5. Uygulama
+
+Sprint 164 kendi kodunun aktif buglarını kendi sprint'i sırasında 4 ayrı katmandan reproduce etti (Bug X+Y+Z+W). Worker'lar HONEST raporladı, Brain stub yarattı, force recovery ile diskte tüm kazanım korundu.
 
 ---
 

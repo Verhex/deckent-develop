@@ -1,6 +1,6 @@
 # DECKENT ANA PLAN
 ## Yapay Zeka Ajan Orkestrasyon Sistemi — Tam Uygulama Referansı
-### Versiyon 3.0 — Nisan 2026 — Beta GA
+### Versiyon 3.0 — Mayıs 2026 — Sprint 164 sonrası güncellendi (Beta GA Sprint 165 T3+T5 kapanış hedefli)
 
 ---
 
@@ -45,7 +45,7 @@
 **Slogan:** "Yapay zeka geliştirme ekibiniz, orkestre edilmiş."
 **Yazar:** Alperen @ Verhex
 **Versiyon:** 0.4.0-beta.1
-**Sprint:** 145 (Nisan 2026)
+**Sprint:** 164 (Mayıs 2026 — Beta GA Sprint 165 T3+T5 final closure'da hedeflenir)
 
 **Deckent Nedir:**
 Ajan-agnostik bir yapay zeka orkestrasyon sistemi. Hedeflerinizi doğal dille tanımlarsınız — Claude Code konuşmasında veya DIRECTIVES.md ile. Deckent planlar, görev atar, izler ve geliştirme işlerini paralel çalışan birden fazla yapay zeka ajanıyla tamamlar. Sistem her sprint'ten öğrenir ve zamanla gelişir.
@@ -100,8 +100,9 @@ Sprint + öğrenme döngüsü. Deckent sadece görevleri yürütmez — sprint'l
            │                          │
 ┌──────────▼──────────────────────────▼──────────────┐
 │              DECKENT MCP SUNUCU (stdio)              │
-│  22 Araç + 8 Kaynak                                 │
+│  27 Araç + 8 Kaynak                                 │
 │  init | plan | start | status | memory_query | ...  │
+│  audit | recover | feature_query | watch | nervous_*│
 └──────────────────────┬──────────────────────────────┘
                        │
 ┌──────────────────────▼──────────────────────────────┐
@@ -223,7 +224,7 @@ deckent docs              Sprint doküman yönetimi (add/remove/list)
 deckent output            Worker çıktısını göster
 ```
 
-**41+ CLI komutu** (+ alt komutlar: plugin install/list/create/remove, config set/read, memory rebuild/export/stats, agent list/info/stats, skill list/info/stats, doctor checks/format)
+**49+ CLI komutu** (+ alt komutlar: plugin install/list/create/remove, config set/read, memory rebuild/export/stats, agent list/info/stats, skill list/info/stats, doctor checks/format, audit, recover, feature_query, watch --ms, nervous_*)
 
 ## 3.3 Sistem Gereksinimleri
 
@@ -330,7 +331,7 @@ my-project/
 │   ├── agents/                       # Worker yaşam döngüsü (16 modül)
 │   ├── providers/                    # Claude, Codex, Gemini adaptörleri (5 modül)
 │   ├── api/                          # HTTP API sunucusu + SSE (3 modül)
-│   ├── mcp/                          # MCP sunucu: 22 araç + 8 kaynak
+│   ├── mcp/                          # MCP sunucu: 27 araç + 8 kaynak
 │   ├── cli/                          # 41+ komut, yardımcılar, giriş noktası
 │   └── dashboard/                    # React + Vite + Tailwind web dashboard
 │       └── src/                     # 6 sayfa, 18 UI bileşeni, SSE
@@ -365,12 +366,19 @@ Worker atanan görev kapsamında kod yazar, test çalıştırır ve sonuç rapor
 - **Sprint 140-143:** Memory V2 ile brain bilgi yönetimi SQLite'a taşındı
 - **Sprint 144:** Büyük dosya bölmeleri (init, doctor, retro) — modülerlik artırıldı
 - **Sprint 145:** Adaptive timeout + unified observability — worker izleme olgunlaştı
+- **Sprint 146-148:** Prompt God Template Reform + Nervous System (ADR-040/041) + Self-Healing Architecture, cross-platform 3/3 doğrulama
+- **Sprint 149-150:** Beta GA hedefi kaydı — chronic vitest regresyonları yüzeye çıktı
+- **Sprint 151:** Public repo flip (VerhexIO/deckent)
+- **Sprint 152-156:** Brain state update bug forensic dogfood — Sprint 156-011 CRITICAL debt doğdu
+- **Sprint 157-160:** TaskType + Hybrid Scoring + TOPP/Reversibility mimari hazırlığı
+- **Sprint 161-163:** Brain stability hattı — processQueue forensic + Sprint Phase Observability wire + Sprint 163 mühürleme (6/6 DONE)
+- **Sprint 164:** ADR-045 Wave-Based Execution Semantics — respawnEligibleTasks Runtime Wire **code-complete** (runtime devre dışı, Sprint 166 canlı flip planlı)
 
 # 6-17. ÇEKİRDEK MODÜLLER VE TEKNİK REFERANS
 
 > Bölüm 6-17 detaylı teknik referans için DECKENT.md ve api-surface.md'ye bakınız.
 
-**v3.0 Temel Değişiklikler (Sprint 23 → Sprint 145):**
+**v3.0 Temel Değişiklikler (Sprint 23 → Sprint 164):**
 
 - **Memory V2 DB-First** (Sprint 140+): SQLite veritabanı tek doğruluk kaynağı. FTS5 tam metin arama, turkishNormalize dual-layer, %96 bağlam azaltma. `.brain/exports/*.md` dosyaları otomatik oluşturulan snapshot'lar.
 - **16 yerleşik ajan** (Sprint 29'dan itibaren genişleme):
@@ -484,7 +492,7 @@ Her dosya, amacı, yazarı ve okuyucusu:
 | .deckent/docs.json | Managed-docs yapılandırması | Kullanıcı | sprint-reporter | Kalıcı |
 | .deckent/cost-config.json | Sağlayıcı fiyatlandırma | pricing-updater | cost-calculator | Kalıcı |
 | .claude/rules/*.md | Ajan kuralları (frontmatter) | deckent init | Claude Code | Kalıcı |
-| src/mcp/tools/*.ts | MCP araç işleyicileri (22) | Geliştirici | MCP sunucu | Kalıcı |
+| src/mcp/tools/*.ts | MCP araç işleyicileri (27) | Geliştirici | MCP sunucu | Kalıcı |
 | src/mcp/resources/*.ts | MCP kaynak işleyicileri (8) | Geliştirici | MCP sunucu | Kalıcı |
 | docs/audits/ | Audit raporları | Auditor | Geliştirici | Kalıcı |
 
@@ -623,28 +631,31 @@ Sprint 144'te büyük refaktör ve test genişlemesi (24/27 görev):
 - **Prompt assertion refactor:** Worker prompt injection testlerinde assertion kalitesi artırıldı
 - **Memory leak düzeltmeleri:** SQLite bağlantı havuzu ve EventEmitter listener sızıntıları giderildi
 
-### Sprint 145 — Olgunlaşma (Devam Ediyor)
+### Sprint 145 — Olgunlaşma (Tamamlandı; Sprint 146-164 Sürekli Geliştirme)
 
-Sprint 145 devam ediyor — Deckent'in 145+ sprint deneyimini taşıyan olgun bir orkestrasyon platformuna dönüşümünü tamamlıyor:
+Sprint 145 tamamlandı. Sprint 146-164 Deckent'in 164+ sprint deneyimini taşıyan olgun bir orkestrasyon platformuna dönüşümünü sürdürdü:
 
 - **Adaptive Timeout Sistemi:** timeout-watcher.ts + timeout-estimator.ts — worker görevlerinin süre aşımını görev özelliklerine (effort, LoC, scope, backend) ve sprint geçmişine göre akıllıca hesaplar. Sprint 101-122 Docker timeout döneminden öğrenilen derslerin ürünü.
 - **Unified Native Observability:** event-stream.ts genişletmeleri + event-bus.ts in-process pub/sub + monitor-adapter.ts backend-agnostic izleme. Sprint 134 Local Observability Seviye 2 ile Sprint 138 Event Stream'in birleşimi.
-- **CLI/MCP Kapsamlı Audit:** 41+ CLI komutu ve 22 MCP aracının parametre tutarlılığı, i18n coverage, hata mesajı kalitesi ve dokümantasyon doğruluğu incelemesi.
+- **CLI/MCP Kapsamlı Audit:** 49+ CLI komutu ve 27 MCP aracının (Sprint 145 baseline 41+/22; Sprint 151-164 boyunca audit/recover/feature_query/watch/nervous_* eklendi) parametre tutarlılığı, i18n coverage, hata mesajı kalitesi ve dokümantasyon doğruluğu incelemesi.
 - **DECKENT-ANA-PLAN-TR.md v3.0:** Sprint 23'ten Sprint 145'e kadar tüm gelişmelerin kapsamlı güncellenmesi — Memory V2, ADR governance, RBAC, event stream, adaptive timeout ve maliyet yönetimi bölümleri eklendi.
 
-**Güncel durum (Sprint 145):**
-- 12.485 test + 16 atlanmış (505 dosya)
+**Güncel durum (Sprint 164 sonrası):**
+- 12.485+ test (Sprint 164: +14 yeni — ADR-045 wire için 8 unit + 6 integration) + 16 atlanmış (505+ dosya)
 - %89.33 kapsam
-- 41+ CLI komutu
-- 22 MCP aracı + 8 kaynak
+- 49+ CLI komutu
+- 27 MCP aracı + 8 kaynak (audit, recover, feature_query, watch, nervous_* Sprint 151-164 boyunca eklendi)
 - 16 yerleşik ajan + 21 yetenek
 - 3 sağlayıcı (Claude, Codex, Gemini)
 - 13 model, 4 tier
-- 39 ADR (mimari karar kaydı)
-- 145+ sprint tamamlandı
+- 45 ADR (mimari karar kaydı — ADR-045 Wave-Based Execution Semantics Sprint 164'te accepted)
+- 164+ sprint tamamlandı
 - Memory V2 SQLite DB-first — FTS5 dual-layer arama, turkishNormalize
 - Event Stream ADR-035 Protocol V1.0 — 15 kanal kodu
 - RBAC ADR-037 Protocol V1.0 — formal yetki matrisi
+- ADR-045 Wave-Based Execution Semantics — respawnEligibleTasks Runtime Wire **code-complete** (runtime devre dışı, `dependency_pipeline_enabled: false`, Sprint 166 canlı flip planlı)
+
+**Beta GA durumu (Sprint 165 T3+T5 final closure):** Sprint 150 hedefi Sprint 151–164 boyunca kaymıştır. 20 GA kriterinden 18'i hâlâ açık. Sprint 165 T3 (vitest gate 6-sprint kronik fix — Sprint 159'dan beri) + T5 (final kapanış) versiyon 0.4.0-beta.1 → 1.0.0 flip yetkisini taşır.
 
 ---
 
@@ -997,9 +1008,28 @@ Claude + Codex + Gemini, tier-based model eşdeğerliği, provider fallback chai
 | 142 | 12485 | %89+ | Devasa kod inceleme batched: core 7 batch, orchestra 9 batch, CLI 7 batch, MCP 3 batch, agents/providers, dashboard 2 batch, tests 6 batch, docs 2 batch. Meta-audit: arch/dead code/security/i18n/Memory V2. Sprint 142 inceleme. 44/49 |
 | 143 | 12485 | %14.2 | Chain reform: güvenlik fix (shell injection → spawnSync whitelist, path traversal engelleme), .brain/memory.db git tracking, FTS5 query builder, relations hybrid backfill, Memory V2 migration (ci-reporter + managed-docs), ADR-009/010 güncellemeleri, layer 4 wire, task restoration, panic kill guard, e2e harness, MCP disconnect fix, heartbeat execSync whitelist. Sprint 143 güvenlik+hafıza. 19/20 |
 | 144 | 12485 | %52.1 | Dosya bölmeleri (init 1669→4 dosya, doctor 1102→3 dosya, retro 453→3 dosya), worker.ts bölme girişimi (NO_GO timeout), dead code temizliği dalgaları (2 timeout), auditor async scan, dockerfile hardening, i18n CLI (5 cmd), Docker HB deploy doğrulama, event stream emit, sprint-state lifecycle, orphan cleanup, Memory V2 test (+40), heartbeat test (+24), prompt assertion refactor, memory leak fix. Sprint 144 refaktör+test. 24/27 |
-| 145 | 12485+ | %89.3 | Adaptive timeout sistemi (timeout-watcher.ts + timeout-estimator.ts), unified native observability (event-stream.ts + event-bus.ts + monitor-adapter.ts), CLI/MCP kapsamlı audit, DECKENT-ANA-PLAN-TR.md v3.0 güncelleme (Sprint 145 T-020). Sprint 145 olgunlaşma. 🔄 Devam ediyor |
+| 145 | 12485+ | %89.3 | Adaptive timeout sistemi (timeout-watcher.ts + timeout-estimator.ts), unified native observability (event-stream.ts + event-bus.ts + monitor-adapter.ts), CLI/MCP kapsamlı audit, DECKENT-ANA-PLAN-TR.md v3.0 güncelleme (Sprint 145 T-020). |
+| 146 | 12485 | %89.33 | Prompt God Template Reform (10 task) + 3 kritik bug fix + rubric konsolidasyon. ADR-040 nervous system preflight. 17 task. |
+| 147 | 12485 | %89.33 | Deckent Nervous System mimarisi — AuthorityMode + ApprovalPolicy + NervousNotification + SafetyFloorAction. ADR-040 accepted. |
+| 148 | 12485 | %89.33 | Self-Healing Architecture — Agent Taxonomy Reform, nervous dogfood canlı (5 detektör), çapraz platform doğrulama 3/3 (macOS/Linux/WSL2). 28 task, 27 DONE. ADR-041 Agent Taxonomy proposed. |
+| 149 | 12485 | %89.33 | Dokümantasyon konsolidasyonu + npm publish dry-run. ADR-041 accepted. **Beta GA kayışı burada başladı** — kronik vitest regresyonları yüzeye çıktı. |
+| 150 | 12485 | %89.33 | Docker Worker Exit Pattern Final Fix (Sprint 146+148 debt kapanışı). GA kaydı — readiness gap yeniden baseline'landı. |
+| 151 | 12485 | %89.33 | Public repo flip — VerhexIO/deckent-dev → VerhexIO/deckent. GO_WITH_TECH_DEBT. |
+| 152 | 12485 | %89.33 | Brain NO_GO/FIX state update bug — meta-dogfood kanıt yakalandı (Sprint 153 P0). |
+| 153 | 12485 | %89.33 | `deckent watch --ms` MCP aracı resmileştirildi. Brain state update bug araştırması. 16 task, 3 DONE, 13 NO_GO. |
+| 154 | 12485 | %89.33 | RubricRegistry foundation. Sprint stabilizasyon. |
+| 155 | 12485 | %89.33 | Workflow rafinasyonu. |
+| 156 | 12485 | %89.33 | T4 dogfood (commit 4d15196): 22 task, 7 DONE / 15 TECH_DEBT / 0 NO_GO + 3 major bug canlı kanıt (Bug X dual-eval race, Sprint-Stall, state update freeze). Sprint 157 P0 11-madde köprüsü. **Sprint 156-011 CRITICAL debt doğdu: .result dosyası yokken kod fiziksel olarak doğrulandı** — Sprint 164'te canlı replay. |
+| 157 | 12485 | %89.33 | Sprint 156 P0 11-madde kapanışı. Workflow rename audit (read-only). |
+| 158 | 12485 | %89.33 | TaskType + EnvironmentType + Hybrid Scoring 5-katmanlı pipeline foundation. |
+| 159 | 12485 | %89.33 | Vitest gate kronik FAIL burada başladı — Sprint 159+ 6-sprint kronik zincir Sprint 164'e kadar devam etti. |
+| 160 | 12485 | %89.33 | TOPP + Reversibility 3-katman mimari çalışması. |
+| 161 | 12485 | %89.33 | Brain processQueue legacy FIFO Wave 2→3 stall forensic dogfood (Sprint 164'te Bug Y olarak canlı replay). |
+| 162 | 12485 | %89.33 | T-003 + T-004 + T-007 finalize. Sprint Phase Observability + EvaluationAuditTrail Runtime Wire (T-003 composite). Survivor wire recovery branch (T-004). |
+| 163 | 12485 | %89.33 | Brain stability hattı MÜHÜRLENDİ — 6/6 DONE, 0 NO_GO. Task 1 Files + Task 4/6 path düzeltme + Sprint 137→145 hizalama. |
+| 164 | 12485+14 | %89.33 | **ADR-045 Wave-Based Execution Semantics accepted** — respawnEligibleTasks Runtime Wire kontratı. Wire code-complete: 13 grep eşleşmesi (result-collector, sprint-spawner, sprint-controller), 3 task.status inline mutation dalı, 14 yeni test (8 unit + 6 integration) PASS. **Runtime DEVRE DIŞI: `dependency_pipeline_enabled: false`** (Sprint 166 canlı flip için bekletilir). Vitest gate hâlâ FAIL (6-sprint kronik, Sprint 165 T3 kapanış). Canlı dogfood 4 P0 bug yüzeye çıkardı (Sprint 165): Bug X (Sprint 156-011 replay), Bug Y (Sprint 161 replay), Bug Z (Vitest uyumsuzluk), Bug W (`dead_event_stream` detektör Sprint 148'den uyuyor). 6 task, 4 DONE, 2 TECH_DEBT, 0 NO_GO. |
 
-### Tarihsel Dönüm Noktaları (Sprint 1 → Sprint 145)
+### Tarihsel Dönüm Noktaları (Sprint 1 → Sprint 164)
 
 **Sprint 6 — İlk dogfooding:** Deckent `deckent start` komutunu kendi üzerinde çalıştırdı, 86 saniyede 1 worker ile README.md oluşturdu. Tam orkestrasyon döngüsü (PLAN→SPAWN→EXECUTE→EVALUATE→RETRO→CLEANUP) ilk kez uçtan uca çalıştı.
 
@@ -1055,11 +1085,13 @@ Claude + Codex + Gemini, tier-based model eşdeğerliği, provider fallback chai
 
 **Sprint 144 — Büyük Refaktör:** 24/27 görev. Dosya bölmeleri: init.ts 1669→4 dosya, doctor.ts 1102→3 dosya, retro.ts 453→3 dosya. Dead code temizliği dalgaları (ADR-038). Auditor async scan geçişi. Dockerfile hardening. i18n CLI (5 komut). Memory V2 testleri (+40), heartbeat testleri (+24), prompt assertion refactor, memory leak düzeltmeleri. Sprint 144 modülerlik ve test kalitesi sprint'i.
 
-**Sprint 145 — Olgunlaşma (Devam Ediyor):** Adaptive timeout sistemi (timeout-watcher.ts + timeout-estimator.ts), unified native observability (event-stream.ts + event-bus.ts + monitor-adapter.ts), CLI/MCP kapsamlı audit (41+ komut, 22 araç). DECKENT-ANA-PLAN-TR.md v3.0 güncelleme — Sprint 23'ten Sprint 145'e kadar tüm gelişmeler. Sprint 145 ile Deckent 145+ sprint deneyimini taşıyan olgun bir orkestrasyon platformu haline geldi.
+**Sprint 145 — Olgunlaşma (Tamamlandı):** Adaptive timeout sistemi (timeout-watcher.ts + timeout-estimator.ts), unified native observability (event-stream.ts + event-bus.ts + monitor-adapter.ts), CLI/MCP kapsamlı audit (49+ komut, 27 araç). DECKENT-ANA-PLAN-TR.md v3.0 güncelleme — Sprint 23'ten Sprint 164'e kadar tüm gelişmeler. Sprint 145 ile Deckent olgun bir orkestrasyon platformu haline geldi; Sprint 146-164 bu olgunluğu sürdürdü.
 
-### Sprint 130-145 Mimari Evrim Özeti
+**Sprint 146-164 — Olgunluk + Beta GA Çabası:** Prompt God Template Reform (Sprint 146), Nervous System mimarisi (Sprint 147 ADR-040 + Sprint 148 ADR-041), Self-Healing Architecture (Sprint 148), Public repo flip (Sprint 151), Brain state update bug forensic (Sprint 152-156), TaskType + Hybrid Scoring + TOPP/Reversibility mimari hazırlığı (Sprint 157-160), Brain stability hattı + Sprint 163 mühürleme, ADR-045 Wave-Based Execution Semantics code-complete (Sprint 164). **Beta GA Sprint 165 T3+T5'e kaydı.**
 
-Sprint 130 ile Sprint 145 arasındaki 16 sprint'lik dönem, Deckent'in "çalışan orkestratör"den "olgun platform"a dönüşümünü temsil eder:
+### Sprint 130-164 Mimari Evrim Özeti
+
+Sprint 130 ile Sprint 164 arasındaki 35 sprint'lik dönem, Deckent'in "çalışan orkestratör"den "olgun platform"a dönüşümünü temsil eder:
 
 | Dönem | Sprint Aralığı | Ana Tema | Sonuç |
 |-------|---------------|----------|-------|
@@ -1071,8 +1103,13 @@ Sprint 130 ile Sprint 145 arasındaki 16 sprint'lik dönem, Deckent'in "çalış
 | Hafıza | Sprint 140-143 | SQLite DB-first bellek | Memory V2, FTS5, turkishNormalize |
 | Kalite | Sprint 144 | Modülerlik ve test | Dosya bölmeleri, +64 yeni test |
 | Olgunlaşma | Sprint 145 | Timeout, observability, audit | Adaptive timeout, event bus |
+| Prompt + Nervous | Sprint 146-148 | God template + nervous system + self-healing | ADR-040/041, 5 detektör canlı |
+| Beta GA Çabası | Sprint 149-156 | npm publish hazırlık, dogfood, P0 yakalama | Sprint 156-011 CRITICAL debt, 4 P0 bug zinciri |
+| Mimari Hazırlık | Sprint 157-160 | TaskType + Hybrid Scoring + TOPP | 5-katmanlı pipeline foundation |
+| Brain Stability | Sprint 161-163 | processQueue forensic + observability wire + mühürleme | Sprint 163 6/6 DONE 0 NO_GO |
+| Wave Semantics | Sprint 164 | respawnEligibleTasks Runtime Wire | ADR-045 accepted, code-complete, runtime devre dışı |
 
-Bu evrim boyunca ADR sayısı 29'dan 39'a, test sayısı 12.300+'dan 12.485+'a, sprint yaşam döngüsü 6 fazdan 8 faza genişledi.
+Bu evrim boyunca ADR sayısı 29'dan 45'e, test sayısı 12.300+'dan 12.485+'a (+Sprint 164 +14 yeni), MCP araçları 22'den 27'ye, sprint yaşam döngüsü 6 fazdan 8 faza genişledi.
 
 ---
 
@@ -1465,26 +1502,26 @@ Sprint 134'te başlayan Local Observability Seviye 2 ile Sprint 138'de eklenen E
 
 ### 3. CLI/MCP Kapsamlı Audit
 
-41+ CLI komutu ve 22 MCP aracının sistematik denetimi:
+49+ CLI komutu ve 27 MCP aracının sistematik denetimi (Sprint 145'te 41+/22 baseline'ından genişledi):
 
 - Parametre tutarlılığı (CLI ↔ MCP eşleştirme, ADR-022-v2 compliance)
 - i18n coverage (eksik çeviri anahtarları tespiti)
 - Hata mesajı kalitesi (kullanıcı-dostu, çözüm önerili)
 - Dokümantasyon doğruluğu (help text ↔ gerçek davranış uyumu)
 
-## Deckent v3.0 Toplam Kazanımlar (Sprint 23 → Sprint 145)
+## Deckent v3.0 Toplam Kazanımlar (Sprint 23 → Sprint 164)
 
-| Metrik | Sprint 23 | Sprint 145 | Değişim |
+| Metrik | Sprint 23 | Sprint 164 | Değişim |
 |--------|-----------|------------|---------|
-| Test sayısı | 1.422 | 12.485 | +778% |
-| CLI komutları | 32 | 41+ | +28% |
-| MCP araçları | 17 | 22 | +29% |
+| Test sayısı | 1.422 | 12.485+ (Sprint 164: +14 yeni) | +778% |
+| CLI komutları | 32 | 49+ | +53% |
+| MCP araçları | 17 | 27 | +59% |
 | MCP kaynakları | 9 | 8 | -1 (optimize) |
 | Yerleşik ajanlar | 0 | 16 | +16 |
 | Yerleşik yetenekler | 0 | 21 | +21 |
 | Sağlayıcılar | 1 | 3 | +2 |
 | Modeller | 1 | 13 | +12 |
-| ADR'ler | 4 | 39 | +35 |
+| ADR'ler | 4 | 45 (ADR-045 Wave-Based Execution Semantics) | +41 |
 | Sprint controller LoC | ~800 | 209 | -74% |
 
 ---
@@ -1495,19 +1532,22 @@ Bu doküman Deckent'in uygulaması için tek doğruluk kaynağıdır.
 MCP araçlarını kullanın: "Deckent kur" veya "Şu hedefler için sprint planla".
 Veya Claude Code'da açıp söyleyin: "Bunu uygula."
 
-**Proje İstatistikleri (Sprint 145):**
-- 12.485 test + 16 atlanmış (505 dosya)
+**Proje İstatistikleri (Sprint 164 sonrası):**
+- 12.485+ test (Sprint 164: +14 yeni — ADR-045 wire için 8 unit + 6 integration) + 16 atlanmış (505+ dosya)
 - %89.33 kapsam
-- 41+ CLI komutu
-- 22 MCP aracı + 8 kaynak
+- 49+ CLI komutu
+- 27 MCP aracı + 8 kaynak (Sprint 151–164 boyunca eklenenler: audit, recover, feature_query, watch, nervous_subscribe/accept/reject/status)
 - 16 yerleşik ajan + 21 yetenek
 - 3 sağlayıcı (Claude, Codex, Gemini)
 - 13 model, 4 tier
-- 39 ADR (mimari karar kaydı)
-- 145+ sprint tamamlandı
+- 45 ADR (mimari karar kaydı — Sprint 164 ile ADR-045 Wave-Based Execution Semantics eklendi)
+- 164+ sprint tamamlandı
 - Memory V2 SQLite DB-first — FTS5 dual-layer arama
 - Event Stream ADR-035 Protocol V1.0 — 15 kanal kodu
 - RBAC ADR-037 Protocol V1.0 — formal yetki matrisi
+- ADR-045 Wave-Based Execution Semantics — respawnEligibleTasks Runtime Wire **code-complete** (Sprint 164), runtime `dependency_pipeline_enabled: false` ile devre dışı, Sprint 166'da canlı flip planlı
+
+**Beta GA durumu:** Sprint 150 hedefinden Sprint 151–164 boyunca kaymıştır. Sprint 164 kapanışında **20 kriterden 18'i hâlâ açık**. Sprint 165 T3 (vitest gate 6 sprintlik kronik fix) + T5 (final kapanış) GA flip yetkisini taşır. Versiyon 0.4.0-beta.1 → 1.0.0 geçişi Sprint 165 onayını bekler.
 
 ---
 

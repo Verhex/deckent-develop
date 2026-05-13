@@ -62,7 +62,7 @@ Three backends for different contexts: **tmux** (fastest, live terminal, Linux/m
 
 ### MCP (Model Context Protocol) Integration
 
-MCP integrates Deckent with any MCP-compatible IDE or tool. With 21 tools and 8 resources, the entire sprint lifecycle is programmatically accessible. This makes Deckent not just a CLI, but a platform.
+MCP integrates Deckent with any MCP-compatible IDE or tool. With 27 tools and 8 resources, the entire sprint lifecycle is programmatically accessible. This makes Deckent not just a CLI, but a platform.
 
 ### Docker Container Isolation
 
@@ -76,9 +76,9 @@ Workers run in isolated Docker containers with memory limits, non-root execution
 
 Core sprint lifecycle, multi-agent parallel execution, tmux/subprocess backends, MCP integration, multi-provider support (Claude + Codex + Gemini), ModelRegistry, agent/skill ecosystem, heartbeat daemon, human checkpoints, adaptive thresholds.
 
-### Phase 2: "Beta Readiness" — Active (Sprint 83-130)
+### Phase 2: "Beta Readiness" — Active (Sprint 83-164)
 
-Docker container backend (live-verified Sprint 119-129, 10 e2e tests, configurable timeout), documentation consolidation (BETA-TRACKER, i18n generators, docs.json automation), ERRORS.md active logging, backend smoke testing (tmux + subprocess + Docker via MCP + CLI), dashboard backend badge, ADR-027 hybrid backend decision, version 0.4.0-beta.1. Sprint 130: MCP instructions accuracy fix (21 tools), decision-engine V1 @deprecated archive + ADR-028, real coverage measurement (89.33%).
+Docker container backend (live-verified Sprint 119-129, 10 e2e tests, configurable timeout), documentation consolidation (BETA-TRACKER, i18n generators, docs.json automation), ERRORS.md active logging, backend smoke testing (tmux + subprocess + Docker via MCP + CLI), dashboard backend badge, ADR-027 hybrid backend decision, version 0.4.0-beta.1. Sprint 130: MCP instructions accuracy fix (27 tools), decision-engine V1 @deprecated archive + ADR-028, real coverage measurement (89.33%). Sprint 138-145: ADR-035/036/037/038/039/040/041 governance + Nervous System meta-orchestrator + Authority Matrix RBAC. Sprint 162-163: Brain stability mührü (6/6 DONE, 0 NO_GO). Sprint 164: ADR-045 Wave-Based Execution Semantics, dep_pipeline wire code-complete (runtime feature-flagged, Sprint 166 activation hedefi).
 
 ### Phase 3: "Public Beta" — Next
 
@@ -114,10 +114,10 @@ This is where Deckent enters the OpenClaw/Cowork/Devin category — not as anoth
 | Metric | Value |
 |--------|-------|
 | Version | 0.4.0-beta.1 |
-| Sprint | sprint-133 |
-| MCP Tools | 21 |
+| Sprint | sprint-164 |
+| MCP Tools | 27 |
 | MCP Resources | 8 |
-| CLI Commands | 35+ |
+| CLI Commands | 49+ |
 | Dashboard Pages | 6 |
 | Agents | 16 built-in + 2 custom |
 | Skills | 21 built-in |
@@ -126,16 +126,16 @@ This is where Deckent enters the OpenClaw/Cowork/Devin category — not as anoth
 ## Sprint History
 | Sprint | Status |
 |--------|-------|
-| sprint-132 | completed |
-| sprint-133 | completed |
+| sprint-163 | completed |
+| sprint-164 | completed_with_gate_failure |
 
 ## Sprint Metrics
 | Metric | Value |
 |--------|-------|
-| Sprint | sprint-133 |
-| Total Tasks | 12 |
-| Completed | 12 |
-| Tech Debt | 4 |
+| Sprint | sprint-164 |
+| Total Tasks | 6 |
+| Completed | 5/6 DONE + 1 stub |
+| Tech Debt | 1 |
 | No-Go | 0 |
-| Duration | 27dk 21sn |
-| Coverage | 8.3% |
+| Duration | ~80 dakika |
+| Coverage | 89.33% |

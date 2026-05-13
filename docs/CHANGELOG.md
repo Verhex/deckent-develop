@@ -6,6 +6,22 @@ Bu projedeki tüm önemli değişiklikler bu dosyada belgelenmektedir.
 Format [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) standardına dayanır
 ve proje [Semantic Versioning](https://semver.org/spec/v2.0.0.html) kurallarına uyar.
 
+## [1.0.0-beta.1-sprint164] - 2026-05-13
+
+### Added
+
+- ADR-045 — Wave-Based Execution Semantics Contract (E3)
+- Gitignore Housekeeping — Runtime Artifact Patterns
+- respawnEligibleTasks Runtime Wire + task.status Inline Sync — Composite (E1+E2)
+- Integration Test Suite — Sprint 161 Forensic Replay + Multi-Wave Coverage (E-tests)
+
+### Fixed
+
+- Fix debt: Tech debt from 156-011-fix: Code physically verified despite missing .result (Sp
+
+
+_Tasks: 6 total, 5 done, 0 tech debt, 1 no-go_
+
 ## [1.0.0-beta.1-sprint163] - 2026-05-12
 
 ### Added

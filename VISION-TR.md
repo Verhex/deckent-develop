@@ -62,7 +62,7 @@ Farklı bağlamlar için üç backend: **tmux** (en hızlı, canlı terminal, Li
 
 ### MCP (Model Context Protocol) Entegrasyonu
 
-MCP, Deckent'i herhangi bir MCP-uyumlu IDE veya araçla entegre eder. 21 tool ve 8 resource ile sprint yaşam döngüsünün tamamı programatik olarak erişilebilir. Bu, Deckent'i sadece bir CLI değil, bir platform haline getirir.
+MCP, Deckent'i herhangi bir MCP-uyumlu IDE veya araçla entegre eder. 27 tool ve 8 resource ile sprint yaşam döngüsünün tamamı programatik olarak erişilebilir. Bu, Deckent'i sadece bir CLI değil, bir platform haline getirir.
 
 ### Docker Container İzolasyonu
 
@@ -76,9 +76,9 @@ Worker'lar izole Docker container'larında bellek limitleri, non-root yürütme 
 
 Temel sprint yaşam döngüsü, çok-ajanlı paralel yürütme, tmux/subprocess backend'ler, MCP entegrasyonu, çoklu provider desteği (Claude + Codex + Gemini), ModelRegistry, agent/skill ekosistemi, heartbeat daemon, human checkpoint'ler, adaptive threshold'lar.
 
-### Faz 2: "Beta Hazırlığı" — Aktif (Sprint 83-123)
+### Faz 2: "Beta Hazırlığı" — Sprint 83-164 boyunca aktif
 
-Docker container backend (Sprint 119-123 canlı doğrulandı, 10 e2e test, ayarlanabilir timeout), dokümantasyon konsolidasyonu (BETA-TRACKER, i18n generator'lar, docs.json otomasyonu), ERRORS.md aktif loglama, backend smoke testing (tmux + subprocess + Docker, MCP + CLI), dashboard backend badge, ADR-027 hibrit backend kararı, versiyon 0.4.0-beta.1.
+Docker container backend (Sprint 119-129 canlı doğrulandı, 10 e2e test, ayarlanabilir timeout), dokümantasyon konsolidasyonu (BETA-TRACKER, i18n generator'lar, docs.json otomasyonu), ERRORS.md aktif loglama, backend smoke testing (tmux + subprocess + Docker, MCP + CLI), dashboard backend badge, ADR-027 hibrit backend kararı, versiyon 0.4.0-beta.1. Sprint 130: MCP instructions doğruluk düzeltmesi (27 tool), decision-engine V1 @deprecated arşiv + ADR-028, gerçek coverage ölçümü (%89.33). Sprint 138-145: ADR-035/036/037/038/039/040/041 governance + Nervous System meta-orkestratör + Authority Matrix RBAC. Sprint 162-163: Brain stability mührü (6/6 DONE, 0 NO_GO). Sprint 164: ADR-045 Wave-Based Execution Semantics, dep_pipeline wire kodu tamamlandı (runtime feature-flag'li, Sprint 166 aktivasyon hedefi).
 
 ### Faz 3: "Public Beta" — Sonraki
 
@@ -111,31 +111,31 @@ Deckent'in OpenClaw/Cowork/Devin kategorisine girdiği nokta — başka bir tek-
 ---
 
 ## Sayılarla Deckent
-| Metric | Value |
+| Metrik | Değer |
 |--------|-------|
-| Version | 0.4.0-beta.1 |
-| Sprint | sprint-133 |
-| MCP Tools | 21 |
-| MCP Resources | 8 |
-| CLI Commands | 35+ |
-| Dashboard Pages | 6 |
-| Agents | 16 built-in + 2 custom |
-| Skills | 21 built-in |
-| Providers | 3 (Claude, Codex, Gemini) |
+| Versiyon | 0.4.0-beta.1 |
+| Sprint | sprint-164 |
+| MCP Tool | 27 |
+| MCP Resource | 8 |
+| CLI Komutu | 49+ |
+| Dashboard Sayfası | 6 |
+| Agent | 16 built-in + 2 custom |
+| Skill | 21 built-in |
+| Provider | 3 (Claude, Codex, Gemini) |
 
-## Sprint History
-| Sprint | Status |
+## Sprint Geçmişi
+| Sprint | Durum |
 |--------|-------|
-| sprint-132 | completed |
-| sprint-133 | completed |
+| sprint-163 | tamamlandı |
+| sprint-164 | gate_failure_ile_tamamlandı |
 
-## Sprint Metrics
-| Metric | Value |
+## Sprint Metrikleri
+| Metrik | Değer |
 |--------|-------|
-| Sprint | sprint-133 |
-| Total Tasks | 12 |
-| Completed | 12 |
-| Tech Debt | 4 |
+| Sprint | sprint-164 |
+| Toplam Task | 6 |
+| Tamamlanan | 5/6 DONE + 1 stub |
+| Tech Debt | 1 |
 | No-Go | 0 |
-| Duration | 27dk 21sn |
-| Coverage | 8.3% |
+| Süre | ~80 dakika |
+| Coverage | %89.33 |

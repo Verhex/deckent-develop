@@ -1,19 +1,25 @@
 # DECKENT MASTER BLUEPRINT
 ## AI Agent Orchestration System — Complete Implementation Reference
-### Version 3.0 — April 2026 — Verhex
+### Version 3.0 — May 2026 — Verhex (Updated Sprint 164)
 
 ---
 
 ## Live Metrics
 | Metric | Value |
 |--------|-------|
-| Sprint | sprint-148 |
-| Total Tasks | 28 |
-| Completed | 27 |
-| Tech Debt | 1 |
-| No-Go | 1 |
-| Duration | 60dk 47sn |
-| Coverage | 0.0% |
+| Sprint | sprint-164 |
+| Total Tasks | 6 |
+| Completed | 4 |
+| Tech Debt | 2 |
+| No-Go | 0 |
+| Coverage | 89.33% |
+| Total Tests | 12,485+ (+14 new in Sprint 164) |
+| ADR Registry | 45 (latest: ADR-045 Wave-Based Execution Semantics) |
+| MCP Tools | 27 |
+| Built-in Agents | 16 |
+| Built-in Skills | 21 |
+| Providers | 3 (Claude, Codex, Gemini) |
+| Version | 0.4.0-beta.1 |
 
 # TABLE OF CONTENTS
 
@@ -41,7 +47,7 @@
 22. User Flows
 23. Strategic Roadmap
 24. Sprint History
-25. Beta GA Gate Criteria (Sprint 150)
+25. Beta GA Gate Criteria (Slipped — Sprint 165 T3+T5 target)
 
 ---
 
@@ -103,8 +109,9 @@ Sprint + learning loop. Deckent doesn't just execute tasks — it plans sprints,
            │                          │
 ┌──────────▼──────────────────────────▼──────────────┐
 │              DECKENT MCP SERVER (stdio)              │
-│  22 Tools + 8 Resources                             │
+│  27 Tools + 8 Resources                             │
 │  init | set_directives | plan | start | analyze ... │
+│  audit | recover | feature_query | watch | nervous_*│
 └──────────────────────┬──────────────────────────────┘
                        │
 ┌──────────────────────▼──────────────────────────────┐
@@ -320,7 +327,7 @@ my-project/
 │   │   ├── memory.md                 # Sprint learnings export
 │   │   └── debt.md                   # Debt table export
 │   ├── MEMORY.md                      # Sprint learnings (max 300 lines)
-│   ├── DECISIONS.md                   # Architecture Decision Records (39 ADRs)
+│   ├── DECISIONS.md                   # Architecture Decision Records (45 ADRs)
 │   ├── DEBT.md                        # Technical debt log
 │   ├── PATTERNS.md                    # Auditor findings
 │   ├── RETRO.md                       # Latest sprint retrospective
@@ -402,7 +409,7 @@ my-project/
 │   │   ├── server.ts               # 16 endpoints + SSE stream
 │   │   └── watcher.ts              # Dashboard file watcher
 │   ├── cli/                          # CLI commands (87 files, 41+ commands)
-│   ├── mcp/                          # MCP server (22 tools + 8 resources)
+│   ├── mcp/                          # MCP server (27 tools + 8 resources)
 │   │   ├── server.ts                # Entry point (McpServer + stdio)
 │   │   ├── tools/                   # 22 tool handlers
 │   │   │   ├── init.ts             # deckent_init
@@ -1398,7 +1405,7 @@ Every file in the project, its purpose, who writes it, who reads it:
 | src/api/watcher.ts | Dashboard file watcher | Developer | API server | Permanent |
 | src/dashboard/ | Web Dashboard (React+Vite+Tailwind) | Developer | Browser | Permanent |
 | src/mcp/server.ts | MCP server entry point | Developer | Claude Code | Permanent |
-| src/mcp/tools/*.ts | MCP tool handlers (22) | Developer | MCP server | Permanent |
+| src/mcp/tools/*.ts | MCP tool handlers (27) | Developer | MCP server | Permanent |
 | src/mcp/resources/*.ts | MCP resource handlers (8) | Developer | MCP server | Permanent |
 | .deckent/workspace/TOOLS.md | Environment tools/commands | deckent init | Workers | Permanent |
 | .deckent/workspace/BOOT.md | Agent boot sequence | deckent init | All agents | Permanent |
@@ -2131,13 +2138,12 @@ Full directive: `docs/directives/sprint-034.md`
 - Auditor async scan loop (52 sync I/O eliminated) — DONE (Sprint 144)
 - i18n basic CLI (5 commands TR/EN) — DONE (Sprint 144)
 
-**In Progress (Sprint 145):**
-- Adaptive Timeout estimation
-- Unified Observability (event bus + monitor adapter)
-- Dead code cleanup from Sprint 141/142 audit
-- CLI/MCP parity hardening
+**In Progress (Sprint 164 → Sprint 165 closure):**
+- ADR-045 Wave-Based Execution Semantics — respawnEligibleTasks Runtime Wire (code-complete, runtime disabled via `dependency_pipeline_enabled: false`, awaits Sprint 166 live flip)
+- Vitest gate chronic failure (Sprint 159+ — 6-sprint chronic, Sprint 165 T3 final closure)
+- Sprint 164 dogfood P0 follow-ups: Bug X (Brain "no-result → CODE_VERIFIED_DONE" stub — Sprint 156-011 CRITICAL debt live replay), Bug Y (Brain processQueue legacy FIFO Wave 2→3 stall — Sprint 161 forensic dogfood replay), Bug Z (Vitest gate +1 fail chronic — worker 17→0 vs Brain audit FAIL mismatch), Bug W (Auditor `dead_event_stream` detector sleeping since Sprint 148 with `reserve_for: sprint-148`)
 
-**Remaining (Sprint 146+):**
+**Remaining (Sprint 165+):**
 - Provider-specific tool mapping (allowedTools → function_calling)
 - Local models (Ollama) adapter
 - VSCode extension (sidebar, status bar, sprint management)
@@ -2256,7 +2262,26 @@ Full directive: `docs/directives/sprint-034.md`
 | sprint-142 | 13200+ | 89.33% | God Analysis — largest sprint by task count (49 tasks). Massive batched code review: src/core/ (7 batches), src/orchestra/ (9 batches), src/cli/ (7 batches), src/mcp/ (3 batches), src/dashboard/ (2 batches), tests/ (6 batches), docs/ (2 batches). Architecture graph + dead code + security review. Memory V2 integrity deep verification. 44/49 done, 42 TECH_DEBT, 5 NO_GO, 174.7 min. |
 | sprint-143 | 13500+ | 89.33% | Chain Reform complete — 19/20 DONE. Security fixes: shell injection (tmux.ts), path traversal (checkpoint/docs/decision-logger), API auth default secure, heartbeat-daemon execSync whitelist. FTS5 query builder fix. Relations hybrid backfill. DECISIONS.md archive + init.ts DB preload. Layer 4 runtime wire deploy (ADR-006 live enforcement). Sprint-finalizer hook. MCP disconnect fix. Task restoration on crash. 19/20 done, 1 TECH_DEBT, 1 NO_GO, 104.9 min. |
 | sprint-144 | 14000+ | 89.33% | God split + ADR-008 Cycle 2: init.ts split (1566→4 files), doctor.ts split (1102→3 files), retro.ts split (453→3 files). Auditor async scan loop (52 sync I/O ops eliminated). ADR-008 Cycle 2 fix (core/session-interface.ts). Dockerfile hardening. i18n basic CLI (5 commands TR/EN). Turkish locale fix (.toLocaleLowerCase('tr-TR')). Docker HB deploy wire. Event stream emit wire. Sprint-state lifecycle. Rich sprint output (7-section). Memory V2 CLI testing (+40 tests). 24/27 done, 2 TECH_DEBT, 3 NO_GO, 107.4 min. |
-| sprint-145 | 14400+ | 89.33% | Adaptive Timeout + Unified Observability + CLI/MCP audit. In progress. |
+| sprint-145 | 14400+ | 89.33% | Adaptive Timeout + Unified Observability + CLI/MCP audit. |
+| sprint-146 | 12485 | 89.33% | Prompt God Template Reform (10 tasks) + 3 critical bug fixes + rubric consolidation. ADR-040 nervous system preflight. 17 tasks. |
+| sprint-147 | 12485 | 89.33% | Deckent Nervous System architecture — AuthorityMode + ApprovalPolicy + NervousNotification + SafetyFloorAction. ADR-040 accepted. |
+| sprint-148 | 12485 | 89.33% | Self-Healing Architecture — Agent Taxonomy Reform (test-writer archived, 16→15→16 agents), nervous dogfood live (5 detectors), cross-platform validation 3/3 (macOS/Linux/WSL2), 28 tasks 27 DONE. ADR-041 Agent Taxonomy proposed. |
+| sprint-149 | 12485 | 89.33% | Documentation consolidation + npm publish dry-run. ADR-041 accepted. Beta GA slip began — chronic vitest regressions surfaced. |
+| sprint-150 | 12485 | 89.33% | Docker Worker Exit Pattern Final Fix (Sprint 146+148 debt closure). GA slipped — readiness gap re-baselined. |
+| sprint-151 | 12485 | 89.33% | Public repo flip — VerhexIO/deckent-dev → VerhexIO/deckent. GO_WITH_TECH_DEBT. |
+| sprint-152 | 12485 | 89.33% | Brain NO_GO/FIX state update bug — meta-dogfood evidence captured (P0 for Sprint 153). |
+| sprint-153 | 12485 | 89.33% | `deckent watch --ms` MCP tool promotion. Brain state update bug investigation. 16 tasks, 3 DONE, 13 NO_GO. |
+| sprint-154 | 12485 | 89.33% | RubricRegistry foundation. Sprint stabilization. |
+| sprint-155 | 12485 | 89.33% | Workflow refinement. |
+| sprint-156 | 12485 | 89.33% | T4 dogfood (commit 4d15196): 22 tasks, 7 DONE / 15 TECH_DEBT / 0 NO_GO + 3 major bugs evidenced live (Bug X dual-eval race, Sprint-Stall, state update freeze). Sprint 157 P0 11-item bridge created. **Sprint 156-011 CRITICAL debt born: code physically verified despite missing .result file** — replayed live in Sprint 164. |
+| sprint-157 | 12485 | 89.33% | Sprint 156 P0 11-item closure. Workflow rename audit (read-only). |
+| sprint-158 | 12485 | 89.33% | TaskType + EnvironmentType + Hybrid Scoring 5-layer pipeline foundation. |
+| sprint-159 | 12485 | 89.33% | Vitest gate chronic FAIL begins — Sprint 159+ 6-sprint chronic issue chain that persists through Sprint 164. |
+| sprint-160 | 12485 | 89.33% | TOPP + Reversibility 3-layer architecture work. |
+| sprint-161 | 12485 | 89.33% | Brain processQueue legacy FIFO Wave 2→3 stall forensic dogfood (replayed live in Sprint 164 as Bug Y). |
+| sprint-162 | 12485 | 89.33% | T-003 + T-004 + T-007 finalize. Sprint Phase Observability + EvaluationAuditTrail Runtime Wire (T-003 composite). Survivor wire recovery branch added (T-004). |
+| sprint-163 | 12485 | 89.33% | Brain stability line SEALED — 6/6 DONE, 0 NO_GO. Task 1 Files + Task 4/6 path correction + Sprint 137→145 alignment. |
+| sprint-164 | 12485+14 | 89.33% | **ADR-045 Wave-Based Execution Semantics accepted** — respawnEligibleTasks Runtime Wire contract. Wire code-complete: 13 grep matches (result-collector, sprint-spawner, sprint-controller), 3 task.status inline mutation branches, 14 new tests (8 unit + 6 integration) PASS. **Runtime DISABLED via `dependency_pipeline_enabled: false`** (Sprint 166 live flip). Vitest gate still FAIL (6-sprint chronic). Live dogfood surfaced 4 P0 bugs for Sprint 165: Bug X (Sprint 156-011 replay), Bug Y (Sprint 161 replay), Bug Z (Vitest mismatch), Bug W (dead_event_stream detector sleeping). 6 tasks, 4 DONE, 2 TECH_DEBT, 0 NO_GO. |
 
 **First dogfooding result (Sprint 6):** Deckent ran `deckent start` on itself, generated README.md in 86 seconds with 1 worker. The orchestration loop (plan → spawn → execute → evaluate → retro → cleanup) completed end-to-end.
 
@@ -2490,36 +2515,39 @@ Largest sprint in project history — 52 tasks planned.
 
 ---
 
-# 25. BETA GA GATE CRITERIA (Sprint 150 — Target: 23 April 2026)
+# 25. BETA GA GATE CRITERIA (Slipped — Sprint 165 T3+T5 Final Closure Target)
 
 ## Overview
 
-Sprint 150 is the target gate for transitioning from beta (0.4.0-beta.1) to GA (1.0.0). All criteria must be met before the version bump.
+Originally targeted at Sprint 150, Beta GA has slipped through Sprint 151–164. As of Sprint 164 closure, **18 of 20 criteria remain open**. Sprint 165 T3 (vitest gate chronic fix — 6 sprints overdue since Sprint 159) and T5 (final closure activities) carry the GA flip responsibility. ADR-045 Wave-Based Execution Semantics is code-complete but runtime-disabled (`dependency_pipeline_enabled: false`); Sprint 166 will live-flip it. Version bump from 0.4.0-beta.1 → 1.0.0 awaits Sprint 165 sign-off.
 
 ## Gate Criteria
 
 ### Functional Completeness
-- [ ] All 22 MCP tools operational and tested
+- [ ] All 27 MCP tools operational and tested (audit, recover, feature_query, watch, nervous_* added in Sprint 151–164)
 - [ ] All 8 MCP resources returning valid data
-- [ ] All 41+ CLI commands functional
+- [ ] All 49+ CLI commands functional
 - [ ] All 16 built-in agents with validated PROMPT.md
 - [ ] All 21 built-in skills with manifest.json + SKILL.md
 - [ ] Memory V2 DB-First fully operational (CRUD, FTS5, export, import, decay)
 - [ ] 3 provider backends operational (Claude, Codex, Gemini)
 - [ ] 3 spawn backends operational (tmux, subprocess, Docker)
+- [ ] ADR-045 Wave-Based Execution Semantics runtime-enabled (Sprint 166 flip)
 
 ### Quality
-- [ ] Test count: 15,000+ (currently 14,400+)
+- [ ] Test count: 15,000+ (currently 12,485+ — Sprint 164 added +14 from ADR-045 wire)
 - [ ] Coverage: ≥85% (currently 89.33%)
-- [ ] Zero CRITICAL tech debt items
+- [ ] Zero CRITICAL tech debt items (Sprint 156-011 "no-result → CODE_VERIFIED_DONE" CRITICAL still open — Sprint 164 replay confirmed)
 - [ ] tsc --noEmit: 0 errors
 - [ ] No known data-loss bugs
+- [ ] Vitest gate green (Sprint 159+ chronic FAIL — Sprint 165 T3 final closure)
 
 ### Governance
-- [ ] All 39 ADRs in accepted/deprecated status (no draft/proposed)
+- [ ] All 45 ADRs in accepted/deprecated status (no draft/proposed)
 - [ ] ADR-037 RBAC runtime enforcement operational
 - [ ] ADR-035 event stream audit trail complete
 - [ ] ADR-036 governance integration validated
+- [ ] ADR-045 Wave-Based Execution Semantics runtime contract honored
 - [ ] npm run lint:adr passes
 
 ### Documentation
@@ -2554,7 +2582,7 @@ Sprint 150 is the target gate for transitioning from beta (0.4.0-beta.1) to GA (
 # END OF BLUEPRINT
 
 This document is the single source of truth for Deckent's implementation.
-Version 3.0 — Updated Sprint 145 (April 2026).
+Version 3.0 — Updated Sprint 164 (May 2026).
 Use the MCP tools: "Set up Deckent" or "Plan a sprint for [goals]".
 Or open it in Claude Code and say: "Implement this."
 
