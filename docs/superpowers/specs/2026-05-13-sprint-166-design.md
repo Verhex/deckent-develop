@@ -1,9 +1,9 @@
 # Sprint 166 Design Spec — Brain Self-Update + Data Integrity Closure
 
 **Date:** 2026-05-13
-**Status:** v3 (system-debugging deep eval + devil's advocate red team sonrası 16 madde + Bug N factual fix)
-**Quality bar:** T4 god-level (Agent A skor 95+ + Agent B risk skor <30)
-**Author:** Koordinatör (4 forensic + 2 adversarial agent + brainstorming/systematic-debugging skill çift kullanımı + Phase 4.5 architectural review)
+**Status:** v4 (2. eval döngüsü sonrası — Agent A 95.2/100 ✓, Agent B 34/100 → 8 madde + 2 minor entegre)
+**Quality bar:** T4 god-level (Agent A skor 95+, Agent B risk skor <30)
+**Author:** Koordinatör (4 forensic + 4 adversarial eval agent + brainstorming/systematic-debugging skill çift kullanımı + Phase 4.5 architectural review)
 
 ---
 
@@ -13,11 +13,12 @@ Sprint 164-165 boyunca canlı reproduce olan 4 mimari kök sebebi (Bug M, N, S, 
 
 ## 2. Context
 
-Sprint 154'ten beri (12 sprint) Brain'in self-update mekanizması yarım çalışıyor. 4 paralel forensic agent + 2 adversarial agent ile derinlemesine audit yapıldı, kanıt-bazlı 4 architectural root cause + 16 bug tespit edildi.
+Sprint 154'ten beri (12 sprint) Brain'in self-update mekanizması yarım çalışıyor. 4 paralel forensic agent + 2 round (4 agent toplam) adversarial eval ile derinlemesine audit yapıldı, kanıt-bazlı 4 architectural root cause + 16 bug tespit edildi.
 
 **Ground truth (kod kanıtlı):**
 - Sprint: 165 | Agents: **15** (`src/core/builtins/agents/`) | Skills: 21 | MCP tools: 27 | CLI: 56
 - ADR: 43 memory.db (043/044/045 YOK) | spawn_backend: docker | Version: 1.0.0-beta.1
+- Sprint 165 gerçek token: 377K in+out + 514K cache = 891K grand total (5 task ortalama 75K input)
 
 ## 2.1 Working Pattern Comparison (Phase 2 — 3 kategori)
 
@@ -41,65 +42,80 @@ Sprint 154'ten beri (12 sprint) Brain'in self-update mekanizması yarım çalı�
 ### 3.1 Bug M — adrInsert hook YOK
 **Yer:** `src/orchestra/sprint-finalizer.ts:1197` runPostFinalizeHooks zinciri
 **Tanım:** Worker `docs/adr/045.md` yazıyor → memory.db'ye INSERT eden HİÇBİR runtime hook YOK. `parseDecisionsMd` (`src/core/memory-import.ts:54`) yalnız manuel `deckent memory rebuild` tetikleniyor.
-**Etki:** ADR-043 (Sprint 163), ADR-044 (Sprint 163), ADR-045 (Sprint 164) 23 gün önce kayboldu. ADR-036 governance bypass.
+**Etki:** ADR-043/044/045 23 gün önce kayboldu. ADR-036 governance bypass.
 
-### 3.2 Bug N — onRuleRegen callback manuel finalize path'ten geçirilmiyor (FACTUAL FIX v3)
-**ÖNCEKİ v2 İDDİASI YANLIŞ:** "sprint-finalizer.ts:1185 onRuleRegen geçirmiyor"
-**GERÇEK FORENSIC:**
+### 3.2 Bug N — onRuleRegen callback manuel finalize path'ten geçirilmiyor
+**Forensic kanıtlanmış (v3 factual fix):**
 
 ```
 sprint-phases.ts:1238    ✓ onRuleRegen: async (root) => await regenerateRules(root)  [GEÇIRIYOR]
 sprint-finalizer.ts:1197 ✓ onRuleRegen: opts?.onRuleRegen                             [PASSING THROUGH]
 identity-generator.ts:344 ✓ if (opts.onRuleRegen) { await opts.onRuleRegen(...) }     [WORKING IF DEFINED]
+cli/commands/finalize.ts:166 ✗ finalizeSprint(..., { skipDecay, skipHooks, config }) [onRuleRegen YOK!]
 
-cli/commands/finalize.ts:166 ✗ finalizeSprint(root, sprint, evaluations, results, {
-                                  skipDecay, skipHooks, config
-                                  // ← onRuleRegen YOK!
-                                })
+cli/commands/recover.ts → finalizeSprint çağrısı YOK ✓ (v4 forensic — F4 risk çürütüldü)
 ```
 
-**Asıl Bug:** Manuel `deckent finalize` CLI (Sprint 152+ force-finalize/recover sonrası kullanılan) onRuleRegen wire yapmıyor. Brain **otomatik** path çalışıyor, **manuel** path kırık.
+**Asıl Bug:** Manuel `deckent finalize` CLI onRuleRegen wire yapmıyor. Brain **otomatik** path çalışıyor, **manuel** path kırık. Recover path zaten finalize çağırmadığı için Bug N tetiklemiyor.
 
 **Bug S timeline ile mükemmel uyum:**
-- Sprint 130-151: Brain otomatik finalize → CLAUDE.md auto-sync commit zinciri ✓
+- Sprint 130-151: Brain otomatik finalize → CLAUDE.md auto-sync ✓
 - Sprint 152+: Manuel finalize/recover (force) → otomatik hook'lar ATLANDI ✗
 
 ### 3.3 Bug S — managed-doc-runner cache invalidation + Sprint 152 break point
 **Yer:** `src/orchestra/managed-docs/doc-cache.ts` cache key = fileHash + entryHash (sprint.id YOK)
-**Tanım:** Cache `cached_no_change` ile SKIP. Her sprint sonu invocation ✓ ama dosya update edilmiyor.
-**Bug N ile birlikte:** Cache problem + manuel finalize hook miss ikisi birleşince Sprint 152+ stale.
+**Tanım:** Cache `cached_no_change` SKIP. Her sprint sonu invocation ✓ ama dosya update edilmiyor.
 
-**Git bisect forensic (Sprint 166 T6'da derinleştirilecek):**
+**Git bisect forensic (Sprint 166 T6 deliverable: hangi commit kırdı):**
 ```
-Sprint 130-151 working chain:
-  fd09060 (Sprint 130) → 20b2a82 (132) → 06b7c8a (133) → b371065 (134) →
+Sprint 130-151 working chain (12 sprint zincir):
+  fd09060 (130) → 20b2a82 (132) → 06b7c8a (133) → b371065 (134) →
   119b65e (135) → a4440d5 (136) → 0d026b2 (137) → 079d1c8 (138) →
   375a1cf (139) → 2c21720 (142) → 8434387 (Sprint 151 son auto-sync)
-
-Sprint 152 break point: commit 224618c (restore baseline, 2026-05-05)
-Sprint 153+ manuel only: 359bd10 (12 May, restore + Wave A)
+Sprint 152 break point: commit 224618c (restore baseline 2026-05-05) + manuel-only Sprint 153+
+T6 deliverable: `git diff 8434387..224618c -- src/orchestra/managed-docs/` analiz → "Sprint 152 break: hangi LoC değişti" 1-line forensic raporu spec v5 changelog
 ```
 
 ### 3.4 Bug Y2 — Doc sync agent ground-truth verification eksik
 **Yer:** `src/orchestra/task-builder.ts` (build worker prompt) + `src/orchestra/planner.ts` (AI-mode prompt builder)
-**Tanım:** Sprint 164'te koordinatör agent'lara "16 agent" inject etti, gerçek 15. AGENTS.md doğru, diğer 5 dosya yanlış.
-**Etki:** Sprint 164 commit `a4f3be4` yanlış bilgi yaydı.
 
 **Test pattern kararı (3-katmanlı defense-in-depth):**
 - **Unit test:** `tests/orchestra/doc-sync-ground-truth.test.ts` — prompt input "X agents" iddiası vs `fs.readdirSync('src/core/builtins/agents/')` count. 3 case.
 - **Integration test:** Wave 2 retro Auditor "agent count assertion" doğru sayı vermiş mi?
-- **Auditor runtime check:** `src/monitor/auditor.ts` scan loop'unda doc-sync task var ise prompt regex parse + `fs.readdirSync` karşılaştırma → mismatch → boundary violation alarm.
-- **Falsifiable predicate:** Mismatch threshold = **1** (zero-tolerance — ground-truth her zaman exact).
-- **Whitelist mekanizması:** `.deckent/ground-truth-overrides.json` — Alperen onaylı bilinçli istisnalar (örn. yakın gelecek sprint sayısı).
+- **Auditor runtime check:** `src/monitor/auditor.ts::runScanCycle (line 705)` içine `verifyDocSyncGroundTruth(task)` çağrısı ekle, mismatch → `runtime.alert.boundary_violation`.
+- **Falsifiable predicate:** Mismatch threshold = **1** (zero-tolerance).
+- **Whitelist mekanizması:** `.deckent/ground-truth-overrides.json` — JSON şema:
+
+```json
+{
+  "version": "1.0",
+  "overrides": [
+    {
+      "metric": "agents_count",
+      "expected": 15,
+      "approvedBy": "alperen",
+      "until_sprint": 170,
+      "reason": "Sprint 148 ADR-041 reform stable"
+    },
+    {
+      "metric": "mcp_tools_count",
+      "expected": 27,
+      "approvedBy": "alperen",
+      "until_sprint": 200,
+      "reason": "Sprint 161-165 nervous tools eklendi"
+    }
+  ]
+}
+```
 
 ## 4. 16 Bug Final Inventory
 
 | ID | Tanım | Sev | Aksiyon |
 |---|---|---|---|
-| **M** | ADR-043/044/045 memory.db'de YOK | **P0** | adr-file-sync.ts + Step 4 wire |
+| **M** | ADR-043/044/045 memory.db'de YOK | **P0** | adr-file-sync.ts + Step renumbering |
 | **N** | onRuleRegen manuel finalize path'ten geçmiyor | **P0** | `cli/commands/finalize.ts:166` wire |
 | **S** | doc-cache.ts cache key sprint.id içermiyor | **P0** | cache key extension |
-| **Y2** | Doc sync ground-truth eksik | **P0** | Agent verification 3-katmanlı + whitelist |
+| **Y2** | Doc sync ground-truth eksik | **P0** | 3-katmanlı + `runScanCycle:705` + whitelist şema |
 | R | AGENTS.md docs.json'da yok | P1 | docs.json kayıt |
 | T | identityRegen yanlış hedef | P1 | managed-docs devret |
 | O | brain.md AUTO+CUSTOM duplicate | P1 | sync code refactor |
@@ -113,60 +129,68 @@ Sprint 153+ manuel only: 359bd10 (12 May, restore + Wave A)
 | X | summary.md "Active Debt" filter | P2 | export filter |
 | C | .brain/DECISIONS.md broken ref | P2 | DECKENT.md L49 fix |
 
-## 5. Architecture — 3-Wave Plan (11 task)
+## 5. Architecture — 4-Wave Plan (11 task, T11 Wave 1.5'e ayrıldı)
 
-### Wave 1: Architectural Hook Fixes (4 task, gating: T11 STRICTLY blocked until T1 DONE)
+### Wave 1: Architectural Hook Fixes (3 paralel — T11 ayrıldı v4)
 
-1. **166-T1 (Bug M):** adr-file-sync.ts yeni + identity-generator Step 4 wire + memory.ts rebuild secondary source. 5 test.
-2. **166-T2 (Bug N+O):** `cli/commands/finalize.ts:166` onRuleRegen wire + AUTO/CUSTOM block design fix. 4 test.
-3. **166-T3 (Bug S):** doc-cache.ts cache key extension (sprint.id hash) + fallback `if (!sprintId) use old hash` geriye uyumlu. 4 test.
-4. **166-T11 (ADR-046):** Brain Self-Update Hook Architecture ADR yazımı. **STRICTLY serial dependency:** T1 DONE bekler, sonra manuel `deckent memory rebuild` CHECKPOINT (Alperen approval) sonrası ADR-046 memory.db'ye girer. 0 test.
+1. **166-T1 (Bug M):** adr-file-sync.ts yeni + identity-generator Step renumbering wire + memory.ts rebuild secondary source. 5 test (1 idempotency).
+2. **166-T2 (Bug N+O):** `cli/commands/finalize.ts:166` onRuleRegen wire + AUTO/CUSTOM block design fix. **Scope review:** `cli/commands/recover.ts` finalize çağrısı YOK (v4 forensic confirmed) — recover path Bug N tetiklemiyor. 4 test (1 idempotency).
+3. **166-T3 (Bug S):** doc-cache.ts cache key extension (sprint.id hash) + fallback `if (!sprintId) use old hash` geriye uyumlu. 4 test (1 idempotency).
+
+### Wave 1.5: Bootstrap Gate (T11 STRICTLY SERIAL — yeni v4 wave)
+
+4. **166-T11 (ADR-046):** Brain Self-Update Hook Architecture ADR + Step renumbering doküman.
+   - **Gate:** T1, T2, T3 hepsi DONE bekler
+   - **Bridge step:** Alperen manuel `npx deckent memory rebuild` CHECKPOINT (`.deckent/decisions/sprint-166-T1-done.json` write → CHECKPOINT approve)
+   - **Sonrası:** T11 worker spawn, ADR-046 yazımı (`docs/adr/046-*.md`) + memory.db insert (T1 wire ile otomatik)
+   - **Step renumbering deliverable:** `identity-generator.ts:343` Step 3 (ruleRegen) → Step 4. Yeni Step 3 (adrInsert) insert noktası eklendi. Regression test `tests/core/identity-generator-step-order.test.ts` (1 test).
+   - **Test:** 1 regression test (Step ordering), 0 unit test (doc task)
 
 ### Wave 2: Data Integrity + Manuel Corrections (4 paralel)
 
-5. **166-T4 (Bug Y2):** Doc sync ground-truth verification 3-katmanlı + whitelist. 3 test.
+5. **166-T4 (Bug Y2):** Doc sync ground-truth verification 3-katmanlı + whitelist şema. `runScanCycle:705` içine `verifyDocSyncGroundTruth()` ekle. 3 test.
 6. **166-T5 (Bug R+T):** AGENTS.md docs.json kayıt + identityRegen managed-docs devret + 15 agent correction (5 dosya). 2 test.
-7. **166-T6 (Bug U+V):** Sprint type='sprint' Sprint 140+ forensic + 8 sprint memory backfill + 100 debt sprint_id populate. **Concurrency budget:** Wave 1 finalize'dan SONRA atomic transaction (lock ~50ms, çakışma yok). 4 test.
+7. **166-T6 (Bug U+V):** Sprint type='sprint' Sprint 140+ forensic (T6 deliverable: hangi commit kırdı raporu) + 8 sprint memory backfill + 100 debt sprint_id populate. **Atomic transaction** (lock ~50ms). 4 test.
 8. **166-T7 (Bug C+X):** DECKENT.md broken ref fix + summary.md "Active Debt" filter + Sprint 165 wire activation flip prep. 3 test.
 
 ### Wave 3: Living Docs + Cleanup (3 paralel)
 
 9. **166-T8 (Bug P):** TOOLS/BOOT/WORKER-GUIDE.md docs.json kayıtları + auto-content generators. 4 test.
-10. **166-T9 (Bug Q+W):** Provider parity (.codex/.gemini frontmatter sync + `.cursor/rules/` scaffold IN — boş template + sync codepath; `extensions/vscode/` adapter scope OUT, Sprint 169) + Auditor pattern emitter runtime wire. 3 test.
+10. **166-T9 (Bug Q+W + M4 emit codepath):** Provider parity (.codex/.gemini frontmatter sync + `.cursor/rules/` scaffold IN — boş template + sync codepath; `extensions/vscode/` OUT, Sprint 169) + Auditor pattern emitter + **stale_md detector emit codepath** (`emitAlert('stale_md', {...})` `.dashboard.json` write hook'una pipe — M4 monitoring source). 3 test.
 11. **166-T10 (Bug K+L):** verify-ran atomic write + 3 doc test sprint count. 2 test.
 
-**Toplam:** 11 task, ~510 LoC, 34 test.
+**Toplam:** 11 task, ~510 LoC, 34 test + 1 regression (T11) = 35 test.
 
 ### 5.1 Step Ordering Contract (Wave 1 mimari kontrat)
 
 `identity-generator.ts:308-356` post-finalize hook chain yeni sıralama:
 
 ```
-Step 1: memoryExport  (DB → .brain/exports/*.md)
-Step 2: identityRegen (DEPRECATED — T5 devret managed-docs)
-Step 3: adrInsert     (YENİ T1 — docs/adr/*.md → memory.db) ← ÖNCE
-Step 4: ruleRegen     (mevcut — memory.db'den ADR'leri okur, .claude/rules inject) ← SONRA
-Step 5: updateProjectDocs (managed-doc-runner, cache sprint-aware T3 sonrası)
+Step 1: memoryExport  (DB → .brain/exports/*.md)            [UNCHANGED]
+Step 2: identityRegen (DEPRECATED — T5 devret managed-docs) [UNCHANGED → DEPRECATED]
+Step 3: adrInsert     (YENİ T1 — docs/adr/*.md → memory.db) [v4 INSERTED HERE]
+Step 4: ruleRegen     (önce Step 3 idi → Step 4'e KAYDIRILDI) [v4 RENUMBERED]
+Step 5: updateProjectDocs (managed-doc-runner sprint-aware)  [UNCHANGED]
 ```
 
-**Kontrat:** adrInsert Step 3 (önce DB'ye yaz), ruleRegen Step 4 (sonra DB'den oku + inject). T1 fix bu sıralama gerçekleşmesi için kritik.
+**Kontrat:** adrInsert (Step 3) **ÖNCE** çalışır → ruleRegen (Step 4) memory.db'den ADR-043+ okur → `.claude/rules/brain.md` inject. T11 ADR-046 bu kontratı dokümante eder + regression test (`identity-generator-step-order.test.ts`).
 
 ### 5.2 Per-Task TDD + LoC Matrix
 
-| Task | LoC | Test count | Idempotency test | Failing-first kanıtı |
-|---|---|---|---|---|
-| T1 | ~60 | 5 | 1 | `verify-ran` marker (red→green commit hash) |
-| T2 | ~40 | 4 | 1 | `verify-ran` marker |
-| T3 | ~30 | 4 | 1 | `verify-ran` marker |
-| T11 | ~80 (doc) | 0 | 0 | TDD applicable değil (doc task) |
-| T4 | ~50 | 3 | 0 | `verify-ran` marker |
-| T5 | ~40 | 2 | 0 | manuel — anchor edits |
-| T6 | ~80 | 4 | 0 | atomic transaction test |
-| T7 | ~40 | 3 | 0 | `verify-ran` marker |
-| T8 | ~60 | 4 | 0 | `verify-ran` marker |
-| T9 | ~40 | 3 | 0 | `verify-ran` marker |
-| T10 | ~30 | 2 | 0 | `verify-ran` marker |
-| **TOPLAM** | **~510** | **34** | **3** | — |
+| Task | LoC | Test count | Idempotency test | Failing-first kanıtı | Post-condition |
+|---|---|---|---|---|---|
+| T1 | ~60 | 5 | 1 | `verify-ran` marker | grep `respawnEligibleTasks` 4+ match |
+| T2 | ~40 | 4 | 1 | `verify-ran` marker | grep `onRuleRegen` cli/finalize.ts:166 match |
+| T3 | ~30 | 4 | 1 | `verify-ran` marker | doc-cache test sprint hash kullanır |
+| T11 | ~80 (doc) | 1 (regression) | 0 | TDD applicable değil (doc) | `sqlite3 memory.db SELECT id FROM entries WHERE id='adr-046'` 1 row |
+| T4 | ~50 | 3 | 0 | `verify-ran` marker | `runScanCycle` verifyDocSyncGroundTruth invoked |
+| T5 | ~40 | 2 | 0 | manuel (anchor edits) | 5 root .md "15 agents" + test-writer YOK |
+| T6 | ~80 | 4 | 0 | atomic transaction test | sqlite3 ... `entries WHERE sprint_id IS NULL` → 0 |
+| T7 | ~40 | 3 | 0 | `verify-ran` marker | grep `.brain/DECISIONS.md` DECKENT.md 0 match |
+| T8 | ~60 | 4 | 0 | `verify-ran` marker | TOOLS.md auto-generated 27 MCP listed |
+| T9 | ~40 | 3 | 0 | `verify-ran` marker | emitAlert('stale_md') codepath kanıt |
+| T10 | ~30 | 2 | 0 | `verify-ran` marker | verify-ran .tmp + rename test |
+| **TOPLAM** | **~510** | **35** | **3** | — | — |
 
 ### 5.3 Wave 1 Plan-Time Collision Check
 
@@ -174,38 +198,37 @@ Step 5: updateProjectDocs (managed-doc-runner, cache sprint-aware T3 sonrası)
 T1:  src/core/adr-file-sync.ts (YENİ) + src/core/identity-generator.ts (EDIT) + src/cli/commands/memory.ts (EDIT)
 T2:  src/cli/commands/finalize.ts (EDIT) + src/core/rules-generator.ts (EDIT)
 T3:  src/orchestra/managed-docs/doc-cache.ts (EDIT)
-T11: docs/adr/046-*.md (YENİ)
+T11: docs/adr/046-*.md (YENİ) + tests/core/identity-generator-step-order.test.ts (YENİ)
 
 COLLISION CHECK (Sprint 138 detectScopeCollisions):
 - T1 vs T2: paylaşılan dosya YOK ✓
 - T1 vs T3: paylaşılan dosya YOK ✓
-- T1 vs T11: paylaşılan dosya YOK ✓ (T11 sadece docs/adr/ + manuel DB insert)
 - T2 vs T3: paylaşılan dosya YOK ✓
-- T2 vs T11: paylaşılan dosya YOK ✓
-- T3 vs T11: paylaşılan dosya YOK ✓
+- T11 (Wave 1.5): T1 sonrası serial, çakışma yok ✓
 ```
-
-Sprint 138 Task 4 `detectScopeCollisions` plan-time pre-spawn check otomatik çalışır.
 
 ## 6. Anchor Rules
 
-1. **Ground-truth verification (Y2):** Tüm doc sync agent'ları gerçek dosya count'unu task öncesi doğrular (Bash `ls | wc -l`). Whitelist `.deckent/ground-truth-overrides.json`.
+1. **Ground-truth verification (Y2):** Tüm doc sync agent'ları gerçek dosya count'unu task öncesi doğrular (Bash `ls | wc -l`). Whitelist `.deckent/ground-truth-overrides.json` JSON şema (Section 3.4).
 2. **`npm run build` YASAK** worker'larda
 3. **Brain finalize observability izleme:** `.deckent/sprint-166-events.jsonl` + `ERRORS.md` canlı
 4. **Sprint 165 wire korunur:** respawnEligibleTasks 13 grep match, honest-result gate, processQueue idempotency
 5. **Multi-provider sync (Q dersi):** Hook eklerken `.claude/`, `.codex/`, `.gemini/`, `.cursor/` TÜM provider'lara yansır
 6. **Test skip discipline:** verify-ran marker olmayan task NO_GO
-7. **Idempotency:** Her hook için `idempotency.test.ts` (Wave 1'de toplam 3 test)
+7. **Idempotency:** Wave 1'de 3 idempotency test (T1+T2+T3)
 8. **Koşulsuz invocation pattern:** Opsiyonel callback anti-pattern
 9. **TDD failing-first kanıtı:** Her code task `verify-ran` marker'da red→green commit hash zinciri
-10. **Step ordering kontratı:** Bölüm 5.1'deki sıralama değiştirilemez (mimari karar, ADR-046'da dokümante)
+10. **Step ordering kontratı:** Section 5.1 değiştirilemez (ADR-046'da dokümante)
+11. **T11 Wave 1.5 gate:** T1+T2+T3 DONE → `.deckent/decisions/sprint-166-T1-done.json` CHECKPOINT → `npx deckent memory rebuild` → T11 spawn
 
-### 6.1 Pre-Flight Checklist (Sprint 166 başlatma öncesi ZORUNLU)
+### 6.1 Pre-Flight Checklist (Sprint 166 başlatma öncesi ZORUNLU — 10 madde v4)
 
 ```
 [ ] npm run build PASS (Sprint 165 commits dist/'a yansıdı)
+[ ] dist/orchestra/sprint-finalizer.js mtime > git log -1 --format=%ct src/orchestra/sprint-finalizer.ts (build fresh kanıt)
 [ ] /mcp restart confirmed (MCP cache invalidation)
 [ ] docker ps --filter "name=deckent" → 0 container
+[ ] docker images deckent-worker:latest → mevcut (worker image hazır)
 [ ] ls .locks/ → boş
 [ ] ls .tasks/ → sadece archive/ veya boş
 [ ] npx deckent doctor → GREEN (no critical alerts)
@@ -213,28 +236,37 @@ Sprint 138 Task 4 `detectScopeCollisions` plan-time pre-spawn check otomatik ça
 [ ] cat .deckent/config.json | grep max_workers → 6
 ```
 
-### 6.2 Token Budget Gate
+### 6.2 Token Budget Gate (v4 — Sprint 165 gerçek forensic)
 
-Sprint 165 metrics 4 satır kanıtladı — observability sıfır seviyede. Sprint 166 11 task token tahmini:
-- Worker session ortalama: 30-50K input + 10-20K output
-- 11 task × ~50K = ~550K
-- fix_phase replay 1.5× = ~825K tahmin
-- **Wave başı checkpoint:** cumulative token >600K ise Alperen manuel triage (token usage tracker `.deckent/sprint-166-metrics.jsonl` izlenir)
-- **Sprint sonrası kanıt:** Sprint 166 metrics ≥10 satır (Sprint 165 4 satır anomalisinden uzak)
+**Sprint 165 gerçek toplam (5 task, run-mp3x* dahil):**
+- Input: 331K, Output: 45K, **In+Out: 377K**
+- Cache Read: 514K, **Grand Total: 891K**
+- Per-task avg in+out: ~75K | Per-task avg grand: ~178K
+
+**Sprint 166 tahmin (11 task):**
+- Beklenen in+out: 11 × 75K = **825K**
+- fix_phase replay 1.3× → **~1.07M in+out**
+- Grand (cache dahil): 11 × 178K = **~2M**
+
+**Checkpoint threshold:**
+- Wave başı cumulative `in+out > 900K` → Alperen manuel triage
+- Sprint sonu metric file ≥10 satır (Sprint 165 4-satır anomalisinden uzak)
+- Monitoring source: `.deckent/sprint-166-metrics.jsonl` (Wave bazlı emit)
 
 ## 7. GO/NO_GO Criteria
 
 - ✅ **11/11 task DONE** veya 9/11 + 2 GO_WITH_TECH_DEBT
 - ✅ `tsc --noEmit` PASS
-- ✅ `npx vitest run` **delta 0 fail** (Sprint 165 closure)
-- ✅ 34 yeni test PASS, 0 regression
+- ✅ `npx vitest run` **delta 0 fail**
+- ✅ 35 yeni test PASS (34 + 1 T11 regression), 0 regression
 - ✅ Bug M kanıtı: memory.db'de adr-043/044/045/046 var
 - ✅ Bug N kanıtı: `cli/commands/finalize.ts:166` onRuleRegen wire'lı + `.claude/rules/brain.md` ADR-043+ içerir
-- ✅ Bug S kanıtı: `grep "sprint-166" CLAUDE.md` 1+ match (manuel finalize sonrası bile)
-- ✅ Bug Y2 kanıtı: 5 root .md "15 agents" + test-writer YOK
-- ✅ ADR-046 accepted
-- ✅ **Per-hook idempotency:** adr-file-sync çift çağrı tek INSERT (dedup test), ruleRegen çift çağrı tek `.claude/rules/brain.md` write, doc-cache çift çağrı tek dosya update
+- ✅ Bug S kanıtı: `grep "sprint-166" CLAUDE.md` 1+ match
+- ✅ Bug Y2 kanıtı: 5 root .md "15 agents" + test-writer YOK + `runScanCycle` verifyDocSyncGroundTruth invoked
+- ✅ ADR-046 accepted + memory.db'de
+- ✅ **Per-hook idempotency:** 3 dedup test PASS (T1+T2+T3)
 - ✅ **Step ordering:** Sprint 166 finalize log'unda Step 3 (adrInsert) Step 4 (ruleRegen) ÖNCE çalıştı kanıtı
+- ✅ **T11 post-condition:** `sqlite3 memory.db SELECT id FROM entries WHERE id='adr-046'` → 1 row
 
 ## 8. Sprint 167+ Hazırlık
 
@@ -246,66 +278,69 @@ Sprint 165 metrics 4 satır kanıtladı — observability sıfır seviyede. Spri
 
 | Risk | Olasılık | Etki | Mitigation |
 |---|---|---|---|
-| Wave 1 hook fix Brain runtime bozar | Orta | Yüksek | Pre-flight checklist (6.1) + non-destructive additive + fix_phase güvenlik ağı + Sprint 166.1 hot-fix plan |
-| Token budget aşımı (>600K) | Orta | Orta | Wave başı checkpoint, Alperen manuel triage |
-| Sprint 166 OOM (Bug G replay) | Düşük | Orta | maxWorkers=6 ders, container memory limit Wave 2 izlenir |
+| Wave 1 hook fix Brain runtime bozar | Orta | Yüksek | Pre-flight 10-madde + non-destructive additive + fix_phase + Sprint 166.1 plan |
+| Token budget aşımı (>900K in+out) | Orta | Orta | Wave başı checkpoint, Sprint 165 forensic-bazlı tahmin (1.07M with replay) |
+| Sprint 166 OOM (Bug G replay) | Düşük | Orta | maxWorkers=6, Sprint 165 dersleri |
 | 16 bug çok geniş scope | Orta | Düşük | Wave prioritization, GO_WITH_TECH_DEBT kabul |
-| **Brain self-bozma paradox** | Orta | **Yüksek** | (1) T1 yeni dosya additive, (2) T2 `finalize.ts:166` parameter ekleme additive, (3) T3 cache key fallback geriye uyumlu — **mevcut çalışan hook'a dokunulmuyor** |
-| **T1 vs T11 bootstrap paradox** | Yüksek | Orta | T11 STRICTLY serial gate (T1 DONE → manuel `deckent memory rebuild` CHECKPOINT → T11) |
-| Wave 2 T6 schema migration race | Düşük | Düşük | Atomic transaction (lock ~50ms), Wave 1 finalize'dan SONRA execute |
-| TDD discipline regression (test sayısı tutmaz) | Düşük | Düşük | Per-task TDD matrix (5.2), failing-first marker `verify-ran` zinciri kanıt |
-| Cursor scaffold scope creep | Düşük | Düşük | T9 explicit `.cursor/rules/` IN, vscode OUT (Sprint 169) |
+| **Brain self-bozma paradox** | Orta | **Yüksek** | T1 yeni dosya, T2 parameter ekleme, T3 cache key fallback — **mevcut hook'a dokunulmuyor** |
+| **T1 vs T11 bootstrap paradox** | Düşük | Orta | **v4 fix:** T11 Wave 1.5'e ayrıldı, T1+T2+T3 DONE → manuel CHECKPOINT → T11 spawn (strict serial) |
+| Wave 2 T6 schema migration race | Düşük | Düşük | Atomic transaction (lock ~50ms), Wave 1 finalize'dan SONRA |
+| TDD discipline regression | Düşük | Düşük | Section 5.2 matrix + verify-ran marker red→green zinciri |
+| Cursor scope creep | Düşük | Düşük | T9 explicit `.cursor/rules/` IN, vscode OUT (Sprint 169) |
+| **recover path Bug N tetikler mi (Agent B F4)** | YOK ✓ | — | **v4 forensic confirmed:** `cli/commands/recover.ts` finalizeSprint çağrısı YOK — recover audit + cleanup + archive yapar, finalize bypass eder |
 
 ## 10. Concrete Monitoring Metric Spec (Phase 4.5 detail)
 
 Sprint 167-168 boyunca otomatik tracked metric'ler:
 
-| Metric ID | Tanım | Hedef | Kaynak |
-|---|---|---|---|
-| **M1** | `hook_fail_count` | = 0 her sprint sonu | `.deckent/sprint-NNN-events.jsonl` hook çağrı log'u |
-| **M2** | `claude_md_mtime_freshness` | ≤ 1 sprint cycle | `git log --follow CLAUDE.md` son commit ≥ sprint başı |
-| **M3** | `adr_parity_delta` | = 0 | `sqlite3 memory.db SELECT count(adr)` vs `ls docs/adr/*.md \| wc -l` |
-| **M4** | `auditor_stale_md_alert_count` | = 0 | `.dashboard.json` alerts içinde "stale_md" tipi |
+| Metric ID | Tanım | Hedef | Kaynak | Emit codepath |
+|---|---|---|---|---|
+| **M1** | `hook_fail_count` | = 0 her sprint sonu | `.deckent/sprint-NNN-events.jsonl` hook çağrı log | postFinalizeHooks içine emit eklenir (Sprint 167 P0) |
+| **M2** | `claude_md_mtime_freshness` | **≤ sprint median 35dk × 2 = 70dk** | `git log --follow CLAUDE.md` son commit ≥ sprint başı | Sprint 167 cron check |
+| **M3** | `adr_parity_delta` | = 0 | `sqlite3 memory.db SELECT count(*) FROM entries WHERE type='adr'` vs `ls docs/adr/*.md \| wc -l` | Sprint 167 daily check |
+| **M4** | `auditor_stale_md_alert_count` | = 0 | `.dashboard.json` alerts "stale_md" tipi | **Sprint 166 T9 emit codepath ekler** (`emitAlert('stale_md', ...)` `auditor.ts:runScanCycle` içine) |
 
 **Refactor trigger condition (Sprint 170 açılışı):**
-- Sprint 167-169 boyunca **4 metric'ten ≥1'i 2+ kez ihlal** → otomatik Sprint 170 "Brain Self-Update Mekanizması Mimari Refactor v2" sprint plan'a girer
+- Sprint 167-169 boyunca **4 metric'ten ≥1'i 2+ kez ihlal** (cumulative count `.deckent/sprint-NNN-metrics.jsonl` Wave bazlı track) → Sprint 170 "Brain Self-Update Mekanizması Mimari Refactor v2" sprint plan'a girer
 - Veya: cache_skip / hook_undefined / missing_md kategorilerinden ≥2 yeni bug raporu
 
-## 11. Phase 4.5 — Architectural Review (Yamalama vs Refactor Kararı)
+## 11. Phase 4.5 — Architectural Review (Yamalama vs Refactor)
 
-systematic-debugging diyor: **"3+ fix failed → question architecture"**. 12 sprint failure rate karşı kanıt mı?
+systematic-debugging: **"3+ fix failed → question architecture"**. 12 sprint failure → karşı kanıt mı?
 
-### 11.1 Yamalama Kararı Gerekçeleri
+### 11.1 Yamalama Kararı Gerekçeleri (v4)
 
-1. **Mevcut mimari paradigma sağlam (kısmi varsayım — Sprint 167-168 monitoring metric M1-M4 ile DOĞRULANACAK):** Hook chain + docs.json registry + cache layer doğru paradigma. Bug'lar **runtime invocation chain'inde** (manuel path miss, cache key eksik, missing hook).
-2. **Refactor riski yüksek + Sprint 134-136 god-split refactor counter-evidence:** 3 sprint sürdü, kısmen başarılı (sprint-controller.ts:1185 + identity-generator.ts:308-356 stable). Yeniden tasarım hayat eden 12 sprint kodu riske atar — AMA aynı zamanda refactor'un yapılabilirlik kanıtı.
-3. **Yamalama additive sınırı:** Spec'in proposed fix'leri **non-destructive additive** (yeni hook ekleme, cache key extension, ground-truth verification). Mevcut çalışan hook silmiyor — kontrolör Risk Matrix 9.5'te.
-4. **ADR-046 mimariyi dokümante eder:** Brain Self-Update Hook Architecture anchor doküman + working/broken pattern. Sprint 167-168 monitoring metric'leri ile **falsifiable** — eğer bug pattern replay olursa Sprint 170 refactor sprint açılır.
+1. **Mevcut mimari paradigma sağlam (KISMI VARSAYIM — Sprint 167-168 M1-M4 monitoring ile DOĞRULANACAK):** Hook chain + docs.json + cache layer doğru paradigma. Bug'lar runtime invocation chain'inde (manuel path miss, cache key eksik, missing hook).
+2. **Refactor riski yüksek + Sprint 134-136 god-split counter-evidence:** 3 sprint sürdü, kısmen başarılı (stable). Sprint 166 11 task + 510 LoC kapsamı zaten ağır — refactor 3 sprint'lik scope, ayrı sprint olarak Sprint 170'e taşınması mantıklı.
+3. **Yamalama additive sınırı:** Spec proposed fix'leri non-destructive additive. T11 Wave 1.5 gate + Pre-flight checklist + Step ordering kontratı ile mimari sözleşme açık.
+4. **ADR-046 mimariyi dokümante eder:** Brain Self-Update Hook Architecture + working/broken pattern anchor doküman. M1-M4 monitoring ile falsifiable — replay olursa Sprint 170.
 
-### 11.2 Counter-Argument (Agent B observation)
+### 11.2 Counter-Argument (Agent B observation kabul)
 
-> "Refactor riski yüksek" iddiası Sprint 134-136 örneğiyle ÇELİŞİYOR (refactor yapıldı, çalıştı). Bu yamalama kararının zayıf gerekçesi.
+> "Refactor riski yüksek iddiası Sprint 134-136 örneğiyle çelişiyor — refactor yapıldı, çalıştı."
 
-**Kabul:** Refactor mümkün ama Sprint 166'da scope çok büyük. Sprint 170 refactor sprint Sprint 167-168 monitoring sonrası açılırsa daha fokus olur. Sprint 166 = yamalama + Sprint 170 = refactor (eğer trigger sağlanırsa).
+**Kabul:** Refactor mümkün ama Sprint 166'da scope çok büyük. Sprint 170 refactor sprint Sprint 167-168 monitoring sonrası açılırsa daha fokus. Sprint 166 = yamalama + Sprint 170 = refactor (eğer trigger sağlanırsa, otomatik check `.deckent/sprint-NNN-metrics.jsonl`'dan).
 
-## 12. Self-Review v3
+## 12. Self-Review v4
 
-✅ **Placeholder scan:** Hiç TBD/TODO yok. Bug N factual fix `cli/commands/finalize.ts:166` kanıtlı.
-✅ **Internal consistency:** 4 root cause ↔ 11 task ↔ 16 bug ↔ 5.1 Step Ordering ↔ 5.2 TDD Matrix tutarlı.
-✅ **Scope check:** Tek sprint için ağır (11 task, ~510 LoC), Wave + Pre-flight + Token budget gate ile yönetilebilir.
-✅ **Ambiguity check:** Her bug unique aksiyon + file:line + test pattern. T11 strictly serial gate.
-✅ **Working pattern coverage:** 3 kategori (Working+Effective, Working but Ineffective, Not Invoked, Missing).
-✅ **Architectural review:** Phase 4.5 Section 11 + 11.2 counter-argument açık tartışma.
-✅ **Monitoring metric:** M1-M4 net + refactor trigger condition spesifik.
-✅ **Adversarial coverage:** Agent B 10 sorusu, Agent A 10 maddesi, factual error fix dahil 16 madde entegre.
+✅ **Placeholder scan:** Hiç TBD/TODO yok.
+✅ **Internal consistency:** 4 root cause ↔ 11 task ↔ 16 bug ↔ Step Ordering ↔ TDD Matrix ↔ Wave 1.5 gate tutarlı.
+✅ **Scope check:** Tek sprint ağır ama Wave + Pre-flight 10-madde + Token budget gate + Wave 1.5 strict serial ile yönetilebilir.
+✅ **Ambiguity check:** Her bug unique aksiyon + file:line + test pattern + post-condition.
+✅ **Working pattern coverage:** 3-eksenli kategori (7 hook tablodakil).
+✅ **Architectural review:** Phase 4.5 + counter-argument kabulü + monitoring trigger.
+✅ **Monitoring metric:** M1-M4 + emit codepath (M4 Sprint 166 T9'da implement).
+✅ **Adversarial coverage:** 2 eval döngüsü (4 agent toplam), 18 madde entegre, recover path forensic confirmed.
+✅ **Forensic kanıt:** Sprint 165 token toplam 891K, runScanCycle:705, recover.ts finalize yok — hepsi verified.
 
 ## 13. Cross-References
 
 - Sprint 165 final state: `docs/release/sprint-165-final-state.md`
 - Sprint 165 commit zinciri: `0f4c936..27f1759`
-- Spec v3 forensic agent raporları: Agent A (systematic-debugging deep eval) + Agent B (devil's advocate red team)
-- Bug N forensic: `git log -S "onRuleRegen"` → Sprint 143 `2e3ba2a` wire commit
-- Bug S timeline: `git log --follow CLAUDE.md` Sprint 130-151 working chain + Sprint 152 break
+- Spec v3 → v4 transition: commit `ad2d972` (v3) → bu commit (v4)
+- 2-round adversarial eval: 4 agent rapor (`agent A v2/v3` + `agent B v2/v3`)
+- Bug N forensic: `cli/commands/finalize.ts:166`, `cli/commands/recover.ts` (finalize yok)
+- Bug S Sprint 152 break: commit `224618c` ile `8434387` arası `git diff src/orchestra/managed-docs/`
 - ADR-036 ADR Governance, ADR-013 DECKENT.md Adapter Pattern
 - Sprint 161/164/165 forensic: `.brain/archive/sprint-{161,164,165}-tasks/`
 - Sprint 165 DIRECTIVES archive: `.brain/archive/DIRECTIVES-sprint-165.md`
