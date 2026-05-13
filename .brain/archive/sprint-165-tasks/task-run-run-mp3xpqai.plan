@@ -1,0 +1,63 @@
+# Execution Plan — Bug X Fix: CODE_VERIFIED_DONE Stub Eradication
+
+## Forensic Codepath
+
+Bug:
+- `src/monitor/auditor.ts:1169` `writeCodeVerifiedResult()` writes `{linesAdded:0, testsPassed:false, selfAssessment:'DONE', codeVerified:'CODE_VERIFIED_DONE'}`
+- `src/orchestra/sprint-finalizer.ts:530-565` calls `tryCodeVerifiedDone()` on NO_GO tasks, then `writeCodeVerifiedResult()`, and forces `evaluations.set(taskId, TaskEvaluation.DONE)`.
+- `src/orchestra/result-evaluator.ts:1531-1544` re-exports the auditor helpers.
+
+Scope constraint: My Files write-list excludes `auditor.ts` and `sprint-finalizer.ts`. I can only modify:
+- src/orchestra/result-evaluator.ts
+- src/orchestra/debt-manager.ts
+- src/orchestra/sprint-phases.ts
+- src/agents/worker.ts
+- tests/orchestra/no-result-stub-eradication.test.ts
+
+## Strategy: Honest-Eval Guard at the EVALUATE phase boundary
+
+Because `sprint-finalizer.ts` is called from `runRetroPhase()` in `sprint-phases.ts` (line 1115), the EVALUATE phase in `sprint-phases.ts` runs BEFORE finalizer's code-reconcile. Plan:
+
+1. In `result-evaluator.ts`: add `enforceHonestResultGate(result)` — pure function that returns NO_GO if `linesAdded === 0 && testsPassed === false` regardless of selfAssessment. This is the canonical guard.
+
+2. In `sprint-phases.ts` `runEvaluatePhase`: apply the guard to each result before calling `evaluateWithRubric`. Worker results with `selfAssessment:'DONE'` but no real work → forced NO_GO with reason `worker-crashed-no-result` or `dishonest-done-stub`.
+
+3. In `result-evaluator.ts`: shadow the auditor's `writeCodeVerifiedResult` and `tryCodeVerifiedDone` re-exports with guarded wrappers. Replace re-export with local `writeCodeVerifiedResult` that REFUSES to write the stub when `linesAdded===0 && testsPassed===false`, instead writes honest NO_GO `{selfAssessment:'NO_GO', notes:'worker-crashed-no-result — no real work performed'}`. The wrapped `tryCodeVerifiedDone` returns `verified:false` for the missing-result case (kills the auto-promote path).
+
+   But `sprint-finalizer.ts` imports DIRECTLY from `auditor.js`, not from `result-evaluator.js`. So that wrapper alone won't intercept the call. Mitigation: I also export a `dishonestStubFilter(results, evaluations)` from `result-evaluator.ts` and call it from `sprint-phases.ts` AFTER finalizer-likepaths or directly before retro. But finalizer runs inside `runRetroPhase`...
+
+   Better: extend `runEvaluatePhase` so it always **overrides** the evaluation map AFTER finalizer step (impossible from sprint-phases.ts without restructuring). However `runEvaluatePhase` runs the rubric eval, and we can intercept BEFORE finalizer.
+
+   Real architecture: `runEvaluatePhase` builds `evaluations`, then `runRetroPhase` → `finalizeSprint` runs the code-reconcile. The reconcile MUTATES the same evaluations Map. So I can:
+   - Add an EVALUATE-time guard that emits a `runEvaluatePhase:stub-write` audit event marking these tasks as `dishonest-done-candidate`
+   - In `runRetroPhase`, BEFORE calling `finalizeSprint`, run a second-pass enforcement that re-scans the .result files: any task with `linesAdded:0 + testsPassed:false + selfAssessment:DONE/codeVerified` → forcibly REWRITE the .result to NO_GO via my own writer (this stomps the finalizer's stub before retro consumes it).
+   - Alternative: between `runEvaluatePhase` and `runRetroPhase`, sprint-controller.ts is the only thing in between. Cannot modify it. BUT runRetroPhase is in sprint-phases.ts — I can prepend my enforcement to it.
+
+4. `debt-manager.ts`: when `handleEvaluation` sees a `worker-crashed-no-result` NO_GO, mark debt with a synthesized record that triggers FIX phase re-spawn (link to Task 2's processQueue fix downstream).
+
+5. `worker.ts`: ensure worker self-honesty — if a worker writes `filesChanged` non-empty but `linesAdded === 0`, force `selfAssessment: 'NO_GO'` with reason `scope-violation-or-empty-write`. (Boundary discipline.)
+
+6. Tests (`tests/orchestra/no-result-stub-eradication.test.ts`):
+   - (a) DONE: real work + tests pass → DONE preserved
+   - (b) Mixed: real work + tests fail → NO_GO/GO_WITH_TECH_DEBT
+   - (c) Missing .result + filesChanged-on-disk-only → NO_GO (NOT stub)
+   - (d) Stub literal: `linesAdded:0, testsPassed:false, selfAssessment:'DONE'` → forced NO_GO by guard
+   - (e) Docker crash + heartbeat timeout → `worker-crashed-no-result` NO_GO + FIX trigger
+   - (f) Scope violation (filesChanged outside filesWrite) + linesAdded>0 → NO_GO + boundary alarm
+
+## TDD Order
+
+1. Write tests in `tests/orchestra/no-result-stub-eradication.test.ts` (failing first)
+2. Implement `enforceHonestResultGate` in `result-evaluator.ts`
+3. Wire guard into `sprint-phases.ts` `runEvaluatePhase` and `runRetroPhase`
+4. Implement worker honesty check in `worker.ts`
+5. Update `debt-manager.ts` for crashed-worker debt classification
+6. Run `tsc --noEmit` + `npx vitest run tests/orchestra/no-result-stub-eradication.test.ts`
+7. Verify 6/6 PASS, no regressions in full suite
+
+## Verification
+
+- `grep -rn "CODE_VERIFIED_DONE" src/` → still has the canonical constant in auditor.ts (cannot remove without scope expansion) BUT no codepath that reaches `writeCodeVerifiedResult` produces a DONE without honest gates passing
+- After my guard, sprint-finalizer's `writeCodeVerifiedResult` either:
+  (a) is gated by `enforceHonestResultGate` before its result is consumed downstream, OR
+  (b) its written .result is immediately rewritten to NO_GO by my second-pass enforcement before retro reads it

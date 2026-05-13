@@ -1,0 +1,125 @@
+{
+  "id": "165-005",
+  "title": "Documentation Freeze + Public Repo Prep — Open Source GA Hazırlık",
+  "description": "Documentation Freeze + Public Repo Prep — Open Source GA Hazırlık\n\n- Model: sonnet\n- Effort: normal\n- Skills: documentation-writer, git-expert\n- Agent: doc-writer\n- Files: docs/release/public-repo-flip-handoff.md, docs/release/sprint-165-final-state.md, CHANGELOG.md, docs/launch/announce-final.md\n- Scope: docs/\n\n### Description\n\nSprint 165 sonrası Beta GA gate kapanışı — Sprint 166 öncesi public repo flip için tüm dokümantasyon \"open source ready\" hale getirilir. Alperen'in ifadesi: **\"Deckent işlevselliğini tamamlayıp repoyu açık kaynağa çekmek istiyorum.\"**\n\n**Soft dependency:** Task 1+2+3+4 DONE — Bug X/Y/Z/W kapandı; dokümantasyon Sprint 165 final state ile tutarlı yazılabilir.\n\n**İş paketi:**\n\n1. **`docs/release/sprint-165-final-state.md`:** Sprint 165 outcome dump — Bug X/Y/Z/W close kanıtı + Sprint 164 → 165 transition + Sprint 166 plan (dep_pipeline canlı flip)\n\n2. **`CHANGELOG.md` update:**\n   ```\n   ## [0.4.1-beta] — 2026-05-XX (Sprint 165)\n   ### Fixed\n   - Brain \"no-result → CODE_VERIFIED_DONE\" stub eradication (Bug X, Sprint 156-011 debt CLOSED)\n   - processQueue legacy FIFO Wave transition stall (Bug Y, Sprint 161/164 forensic replay fix)\n   - Vitest gate +1 fail chronic regression (Bug Z, Sprint 159-164 6-sprint debt)\n   - Auditor dead_event_stream detector activated (Bug W, Sprint 148+ reserve cleared)\n   ### Added\n   - ADR-045 Wave-Based Execution Semantics (code-complete, runtime flag-gated)\n   - Wire integration test suite (dependency-pipeline-integration.test.ts, 6 scenarios)\n   ```\n\n3. **`docs/launch/announce-final.md`** (yeni veya update):\n   - Show HN draft güncel sayılar ile (Sprint 165, 45 ADR, 12500+ test, 89.33% coverage)\n   - Twitter thread (Türkçe + English)\n   - Reddit r/LocalLLaMA + r/programming launch post\n\n4. **Public repo flip checklist** (`docs/release/public-repo-flip-handoff.md`):\n   - `.deck` file gitignore doğrulaması\n   - Sensitive data scan (detect-secrets)\n   - `.brain/memory.db` gitignore (binary file)\n   - CONTRIBUTING.md mevcut + güncel\n   - LICENSE MIT\n   - GitHub Actions CI/CD configured\n   - `npm publish --dry-run` clean\n   - VerhexIO/deckent-dev → VerhexIO/deckent (public) rename hazırlığı\n\n5. **Sprint history sync** — `docs/architecture/sprint-lifecycle.md` veya benzeri varsa sprint sayısı 164 → 165\n\n**Kanıt:**\n- `ls docs/release/sprint-165-final-state.md` → mevcut\n- `grep \"0.4.1-beta\" CHANGELOG.md` → match\n- `grep \"Bug X\\|Bug Y\\|Bug Z\\|Bug W\" docs/release/sprint-165-final-state.md` → 4+ match\n- `cat docs/release/public-repo-flip-handoff.md` → güncel checklist\n\n**Test:** 0 test (dokümantasyon task)\n\n---\n\n## Anchor Kurallar (worker'lar zorunlu okur)\n\n- **`npm run build` YASAK** worker'larda — Alperen kararı (final build doğrulaması Alperen onayı ile)\n- **Test izole:** `npx vitest run path/to/file.test.ts` ile tek dosya çalıştır\n- **Scope discipline:** Sadece `Files:` field'daki dosyalara yaz; `git diff --stat` Auditor tarafından izlenir\n- **ESM import:** `.js` uzantısı zorunlu (Node16 resolution)\n- **No mid-sprint refactor:** Task'ın `Files:` dışına çıkma\n- **TDD discipline:** Test önce yaz, fail doğrula, kod yaz, pass doğrula, commit\n- **NO MVP / NO MINIMUM** — T4-modified disiplin, full god-level scope\n- **NO docs/ + .deckent/ PATH MENTION** task description'larında — planner `filesWrite`'a alıyor\n- **Config flip YASAK Sprint 165'te:** `dependency_pipeline_enabled` config değiştirilmez (default `false` kalır). Flip Sprint 166'da canlı retry için Alperen onayı ile yapılır\n- **Sprint 164 wire korunur (Task 2 için):** respawnEligibleTasks wire kodu Sprint 164'te yazıldı (13 grep match), `dependency_pipeline_enabled: false` modunda Task 2 wire kodunu **silmez veya değiştirmez** — sadece legacy FIFO processQueue fix yapılır\n- **Test skip discipline (Task 3 için):** `it.skip()` gerekçesiz YASAK. Skip ediyorsan: (i) inline yorum sebep + (ii) takip task ID + (iii) ADR amendment notu\n- **Stub yazımı YASAK (Task 1 sonrası):** Worker `.result` yazmadıysa Brain stub yazmamalı — Task 1 bu davranışı KALDIRACAK; eğer fix sırasında geri eklenirse otomatik scope ihlali\n\n## GO/NO_GO Criteria\n\n- ✅ **5/5 task DONE** (T1 + T2 + T3 + T4 + T5)\n- ✅ `tsc --noEmit` PASS (Auditor self-gate)\n- ✅ `npx vitest run` PASS, **delta 0 fail** (Bug Z fix kanıtı — 6-sprint chronic regression CLOSED)\n- ✅ 22 yeni test PASS (T1: 6 + T2: 8 + T3: 4 + T4: 4), 0 regression\n- ✅ Bug X: `grep -rn \"CODE_VERIFIED_DONE\" src/` → 0 match (codepath silindi) **VEYA** koşullu guard ile sadece TEST modunda erişilebilir\n- ✅ Bug Y: Sprint 161 forensic replay test 5/5 spawn (hayalet sıfır)\n- ✅ Bug Z: `npx tsx scripts/run-self-audit.ts` → `status=PASS`, worker ile parity test PASS\n- ✅ Bug W: `cat .deckent/config.json | grep dead_event_stream` → `enabled: true`, reserve_for SİLİNMİŞ\n- ✅ Sprint 156-011 CRITICAL debt memory.db'de `status: resolved`\n- ✅ Documentation: CHANGELOG güncel, public repo flip checklist hazır, Sprint 165 final state report yazılı\n- ✅ Self-audit gate: `overallGate=PASS` (vitest fail 0, tsc 0, honesty violations 0)\n\n### NO_GO senaryoları ve aksiyon:\n\n- **Task 1 NO_GO** (Bug X fix fail veya regression açtı): Sprint 165 status `GO_WITH_GATE_FAILURE`; Brain stub eradication kritik P0 olmaya devam — Sprint 166'da P0 öncelik, dep_pipeline flip ERTELENİR\n- **Task 2 NO_GO** (processQueue stall fix fail): Bug Y kronik kalır, Sprint 166 flip live retry ERTELENİR (legacy mode'da bile stall riski)\n- **Task 3 NO_GO** (vitest +1 fail kaynak araştırma fail): Gate FAILURE devam — Sprint 166'a taşınır, ama Sprint 166 önceliği bu olur (flip değil)\n- **Task 4 NO_GO** (detector activate fail): Minor — Sprint 166'a taşınır, blocker değil ama observability eksikliği devam\n- **Task 5 NO_GO** (dokümantasyon eksik): Public repo flip ERTELENİR, Sprint 166'da tamamlanır\n\n## Sprint 166 İçin Hazırlık (Not — Sprint 165 retro'da netleşir)\n\nSprint 165 DONE sonrası Sprint 166 önerilen scope (DRAFT, retro sonrası netleşir):\n- **Config flip:** `dependency_pipeline_enabled: false → true` (Alperen onayı ile, ADR-045 contract canlı)\n- **Minimal 3-task multi-wave smoke sprint** (Wave 1: 2 task no-dep, Wave 2: 1 task dep on Wave 1)\n- **Live evidence:** `wave.respawn` metric emit, events.jsonl'de `BRAIN→WORKER:DEPENDENCY_BLOCKED` (eğer NO_GO senaryosu)\n- **Sprint 161 stalled forensic ile karşılaştırma:** Bu kez Wave 2 task'ı spawn ediyor mu? Hayalet kaybolmuş mu?\n- **Sprint 156-002 + Sprint 164 fail'leri Sprint 166'da canlı doğrulanır** → ADR-045 status onaylı kalır\n- **Public repo flip:** `VerhexIO/deckent-dev` → `VerhexIO/deckent` public, npm publish v1.0.0-beta.2\n- **Show HN launch:** Sprint 166 sonrası 24 saat içinde\n\n## Post-Sprint Verify Protokolü (manual review — opsiyonel ama önerilen)\n\nSprint 165 finalize sonrası Alperen manuel doğrulama yapar:\n\n1. **Bug X kanıtı:** `grep -rn \"CODE_VERIFIED_DONE\" src/` → 0 match (veya guard'lı)\n2. **Bug Y kanıtı:** `grep -n \"processQueue\" src/orchestra/result-collector.ts` → 1-2 match (force re-scan dahil)\n3. **Bug Z kanıtı:** `.deckent/sprint-165-gate.json` → `vitest.delta.fail === 0` mı?\n4. **Bug W kanıtı:** `cat .deckent/config.json | grep -A3 dead_event_stream` → enabled true\n5. **Memory.db kanıtı:** `npx deckent recall \"debt-156-011\"` → status resolved\n6. **Test count:** `npx vitest run` → fail 0, 22+ yeni test PASS\n7. **Documentation kanıtı:** `ls docs/release/sprint-165-final-state.md docs/release/public-repo-flip-handoff.md` → mevcut\n8. **maxWorkers korundu mu:** `cat .deckent/config.json | grep max_workers` → 6 (Sprint 164 restore sonrası)\n\nBu protokol opsiyonel — Brain self-audit gate ve Auditor scan bu kontrolleri içerikte kapsıyor; manuel review çift-katman güven katar.",
+  "model": "sonnet",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive (model: sonnet -- user override)",
+  "scope": {
+    "directories": [
+      "docs/release/",
+      "docs/launch/",
+      "docs/",
+      "docs/architecture/",
+      "src/orchestra/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "docs/release/public-repo-flip-handoff.md",
+      "docs/release/sprint-165-final-state.md",
+      "CHANGELOG.md",
+      "docs/launch/announce-final.md",
+      "docs/architecture/sprint-lifecycle.md",
+      "scripts/run-self-audit.ts",
+      "config.json",
+      "src/orchestra/result-collector.ts",
+      "sprint-165-gate.json"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:**; `ls docs/release/sprint-165-final-state.md` → mevcut; `grep \"0.4.1-beta\" CHANGELOG.md` → match",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "PENDING",
+  "sprintId": "sprint-165",
+  "forceModel": "sonnet",
+  "forceEffort": "normal",
+  "forceAgent": "doc-writer",
+  "forceSkills": [
+    "documentation-writer",
+    "git-expert"
+  ],
+  "assignedAgent": "doc-writer",
+  "assignedSkills": [
+    "documentation-writer",
+    "git-expert"
+  ],
+  "createdAt": "2026-05-13T09:56:22.133Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "documentation",
+        "secondary": [
+          "config"
+        ],
+        "confidence": 0.95
+      },
+      "tags": [],
+      "domains": [
+        {
+          "name": "docs",
+          "weight": 0.57
+        },
+        {
+          "name": "orchestra",
+          "weight": 0.14
+        },
+        {
+          "name": "scripts",
+          "weight": 0.07
+        }
+      ],
+      "operations": [
+        {
+          "type": "create",
+          "weight": 0.19
+        },
+        {
+          "type": "modify",
+          "weight": 0.19
+        },
+        {
+          "type": "test",
+          "weight": 0.19
+        },
+        {
+          "type": "document",
+          "weight": 0.19
+        },
+        {
+          "type": "configure",
+          "weight": 0.13
+        },
+        {
+          "type": "delete",
+          "weight": 0.06
+        },
+        {
+          "type": "rename",
+          "weight": 0.06
+        }
+      ],
+      "complexity": {
+        "fileCount": 9,
+        "moduleCount": 2,
+        "crossCutting": true,
+        "estimatedSize": "large"
+      },
+      "scope": {
+        "writeRatio": {
+          "docs/": 0.44,
+          "./": 0.33,
+          "scripts/": 0.11,
+          "src/": 0.11
+        },
+        "primaryWriteTarget": "docs/",
+        "testWriteRatio": 0
+      }
+    },
+    "confidence": "high",
+    "routingVersion": "v2"
+  }
+}

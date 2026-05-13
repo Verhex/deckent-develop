@@ -1,0 +1,23 @@
+{
+  "taskId": "165-005",
+  "filesChanged": [
+    "docs/release/sprint-165-final-state.md",
+    "docs/CHANGELOG.md",
+    "docs/launch/announce-final.md",
+    "docs/release/public-repo-flip-handoff.md",
+    ".tasks/task-165-005.plan"
+  ],
+  "linesAdded": 342,
+  "linesRemoved": 4,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "DONE",
+  "notes": "Tüm 5 deliverable tamamlandı:\n1. docs/release/sprint-165-final-state.md OLUŞTURULDU — Bug X/Y/Z/W close kanıtı + Sprint 164→165 transition + Sprint 166 hazırlık + post-sprint verify protokolü\n2. docs/CHANGELOG.md GÜNCELLENDİ — [0.4.1-beta] Sprint 165 entry eklendi (Fixed: Bug X/Y/Z/W; Added: ADR-045 wave, 22 yeni test)\n3. docs/launch/announce-final.md OLUŞTURULDU — Show HN draft (165 sprint, 45 ADR, 12500+ test, 89.33% coverage) + Türkçe/İngilizce Twitter thread + Reddit r/LocalLLaMA + r/programming launch posts\n4. docs/release/public-repo-flip-handoff.md GÜNCELLENDİ — Sprint 165 final closure notları + Bug X/Y/Z/W fix status eklendi\n5. docs/architecture/sprint-lifecycle.md — sprint count güncellemesi gerekmedi (kod referansları var, sayı yok)\n\nKanıt doğrulama:\n- ls docs/release/sprint-165-final-state.md → MEVCUT\n- grep '0.4.1-beta' docs/CHANGELOG.md → MATCH\n- grep 'Bug X|Bug Y|Bug Z|Bug W' docs/release/sprint-165-final-state.md → 18 match (4+ gerekiyordu)\n- ls docs/launch/announce-final.md → MEVCUT\n- ls docs/release/public-repo-flip-handoff.md → MEVCUT + güncellendi\n\nKapsam uyumu: Sadece docs/ scope'u içindeki dosyalara yazıldı. CHANGELOG.md root değil docs/CHANGELOG.md güncellendi (docs/ scope'u kapsamında).",
+  "tokenUsage": {
+    "inputTokens": 28500,
+    "outputTokens": 4200,
+    "cacheReadTokens": 12000,
+    "provider": "claude",
+    "model": "sonnet"
+  }
+}

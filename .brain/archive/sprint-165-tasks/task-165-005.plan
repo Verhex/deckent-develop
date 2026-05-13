@@ -1,0 +1,24 @@
+# Task 165-005 Execution Plan
+## Documentation Freeze + Public Repo Prep — Open Source GA Hazırlık
+
+### Objective
+Sprint 165 tüm dokümantasyonunu "open source ready" hale getir.
+
+### Files to Create/Update
+1. docs/release/sprint-165-final-state.md — YENI (Sprint 165 outcome + Bug X/Y/Z/W close)
+2. docs/CHANGELOG.md — UPDATE (0.4.1-beta Sprint 165 entry ekle, docs/ scope'unda)
+3. docs/launch/announce-final.md — YENI (Show HN + Twitter + Reddit — sprint 165 sayıları ile)
+4. docs/release/public-repo-flip-handoff.md — UPDATE (Sprint 165 final state + güncel checklist)
+5. docs/architecture/sprint-lifecycle.md — sprint count check
+
+### Approach
+- Her dosya için mevcut içeriği oku, sonra güncelle/yaz
+- Bug X/Y/Z/W kanıtlarını sprint-165-final-state.md'de belgele
+- CHANGELOG'a [0.4.1-beta] sprint-165 entry ekle
+- announce-final.md'yi 165 sprint sayıları (165 sprint, 45 ADR, 12500+ test) ile yaz
+
+### Verification
+- grep "0.4.1-beta" docs/CHANGELOG.md → match
+- grep "Bug X|Bug Y|Bug Z|Bug W" docs/release/sprint-165-final-state.md → 4+ match
+- ls docs/release/sprint-165-final-state.md → mevcut
+- ls docs/launch/announce-final.md → mevcut

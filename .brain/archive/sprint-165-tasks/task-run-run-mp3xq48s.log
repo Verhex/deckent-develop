@@ -1,0 +1,22 @@
+Sprint 165 Task 2 (Bug Y) tamamlandı, `selfAssessment: "DONE"`.
+
+## Özet
+
+**Bug Y kökü kapatıldı:** Brain `processQueue` legacy FIFO stall artık 3 katmandan koruma altında:
+
+1. **`pickFromQueue` + `assignedTaskIds`** — Bug F duplicate TASK_ASSIGN guard
+2. **`spawnIfNotAssigned`** — merkezi idempotent spawn dispatcher (in-memory status mutation + spawn-fail recovery)
+3. **`forceRescanIfIdle`** — 5dk idle slot → `selectEligibleForSpawn` ile orphan PENDING task'ı recover
+
+**Değişiklikler:**
+- `src/orchestra/sprint-spawner.ts:501-617` — 4 yeni pure helper (countCurrentlyExecuting, computeSlotsAvailable, selectEligibleForSpawn, pickFromQueue), `respawnEligibleTasks` wire korundu (16 grep match)
+- `src/orchestra/result-collector.ts:267-491` — assignedTaskIds Set + spawnIfNotAssigned + processQueue refactor + forceRescanIfIdle, ana loop `result-collector.ts:566`'da bağlandı
+- `tests/orchestra/processqueue-stall.test.ts` — yeni, 14 test (DIRECTIVES 8 senaryo + 6 bonus)
+
+**Kanıt:**
+- `tsc --noEmit` → 0 error
+- `npx vitest run tests/orchestra/` → **4290 PASS / 11 skip / 0 FAIL**
+- `grep -rn "respawnEligibleTasks" src/` → 16 match (DIRECTIVES istek: 13+)
+- Mevcut `task-queue.test.ts` 18/18 PASS — geriye uyumlu
+
+Full vitest'teki 4 fail `tests/blueprint/` ve `tests/docs/` kapsamında — Task 5 dokümantasyon işiyle ilgili, Task 2 scope dışı (baseline stash ile doğrulandı).

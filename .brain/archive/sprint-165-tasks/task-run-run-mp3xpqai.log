@@ -1,0 +1,23 @@
+## Sprint 165 Task 1 (Bug X) — DONE
+
+**Bug:** Brain `linesAdded:0 + testsPassed:false + selfAssessment:DONE + codeVerified:CODE_VERIFIED_DONE` stub yazıyordu — Sprint 156-011 CRITICAL debt'in Sprint 164 canlı replay'i.
+
+**Fix — 3 intercept point ile honest-result gate:**
+
+1. **`result-evaluator.ts`** (+362 satır): `enforceHonestResultGate()`, `classifyHonestyViolation()`, `writeHonestSentinelResult()`, `isStubResult()` — kanonik honesty boundary fonksiyonları.
+2. **`sprint-phases.ts:runEvaluatePhase`**: Gate `evaluateWithRubric`'ten ÖNCE her result'a uygulanır — stub şekli (`linesAdded=0 + testsPassed=false`) NO_GO'ya zorlanır, `.result` dosyası yeniden yazılır, `BRAIN→AUDITOR:STUB_WRITE_DETECTED` event'i emit edilir.
+3. **`sprint-phases.ts:runRetroPhase`**: Pre-finalize sentinel pass — eksik `.result` dosyaları için honest NO_GO sentinel yazılır, stub-şekilli dosyalar rewrite edilir. Bu, `finalizeSprint`'in `tryCodeVerifiedDone` codepath'ini girdi'siz bırakır.
+4. **`worker.ts:writeResult`**: Worker self-stub'ı write boundary'de yakalanır, `codeVerified` field strip'lenir.
+5. **`debt-manager.ts:handleEvaluation`**: Honest-gate violation `result.notes`'tan ayıklanır, FIX context'e yansır.
+
+**Defensive design:** Gate çağrıları typeof-guarded + try/catch wrapped — partial-mock test context'leri (phase-transition-observability, brain-crash-injection) çalışmaya devam ediyor.
+
+**Doğrulama:**
+- `tsc --noEmit`: PASS
+- `tests/orchestra/no-result-stub-eradication.test.ts`: **10/10 PASS** (6 mandated + 4 destekleyici)
+- Full orchestra suite: **184 files / 4290 tests PASS** — 0 regression
+- Kalan 3 fail (CHANGELOG, blueprint sprint-history × 2): pre-existing, kod değişikliklerimle alakasız (clean baseline'da da fail)
+
+`CODE_VERIFIED_DONE` sabiti `src/monitor/auditor.ts`'de (write-scope dışı) durmaya devam ediyor ama codepath fonksiyonel olarak nötralize: her erişim noktası EVALUATE veya RETRO'da honest NO_GO ile değiştiriliyor.
+
+Result file `.tasks/task-run-run-mp3xpqai.result` yazıldı — `selfAssessment: DONE`.

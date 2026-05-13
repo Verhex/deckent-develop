@@ -1,0 +1,14 @@
+Heartbeat dosyası docker backend tarafından otomatik yönetiliyor; result dosyası yazıldığı için task tamamlandı.
+
+## Sprint 165 Task 3 (Bug Z) — Özet
+
+**Root cause tespit edildi:** `src/orchestra/baseline-tracker.ts::parseVitestOutput` regex `(\d+)\s+failed` Tests prefix'i aramıyor — vitest çıktısındaki ilk "N failed" match'i yakalıyor. Bu çoğunlukla `Test Files  1 failed | 742 passed (743)` satırı; gerçek `Tests  2 failed | 16253 passed | 66 skipped (16321)` satırı görmüyor. Worker JSON reporter ile doğru sayıyor, Brain audit ise bug nedeniyle hatalı.
+
+**Fix kapsamı:**
+- `src/monitor/auditor.ts:auditor.ts:2275` — `parseVitestBaselineOutput` regex'i `passed | skipped (NNN)` formatını da parse edecek şekilde ayrıldı (passed/skipped/total ayrı regex, total `\((\d+)\)\s*$` ile end-of-line anchor). Yeni: `runVitestAuditGate`, `computeVitestDelta`, `readAuditBaseline`, `AuditGateBaseline`, `AuditGateDelta`, `VitestAuditGateResult` (+204 satır)
+- `scripts/run-self-audit.ts` — standalone audit runner (+157 satır), exit codes 0/2/3
+- `tests/audit/worker-brain-audit-parity.test.ts` — 15 parity test PASS (+279 satır)
+
+**Verify:** `tsc --noEmit` PASS, `vitest run tests/audit/...` 15/15 PASS, `vitest run tests/monitor/auditor-baseline.test.ts` 16/16 PASS (regression yok), full suite 2 pre-existing fail kaldı (`tests/blueprint/sprint-history.test.ts` — scope dışı, Task 5 doc freeze ile düzeltilir).
+
+**selfAssessment: GO_WITH_TECH_DEBT** çünkü sprint runtime'da çağrılan `src/orchestra/sprint-finalizer.ts::runSelfAuditGate` hala bug'lı `baseline-tracker::parseVitestOutput`'u kullanıyor — bu iki dosya Files listesi dışında. Sprint 166 follow-up: tek satır fix ile baseline-tracker regex'ini auditor.ts'teki pattern'e hizala veya `runVitestAuditGate`'e delege et.

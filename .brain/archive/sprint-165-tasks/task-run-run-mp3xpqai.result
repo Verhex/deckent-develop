@@ -1,0 +1,31 @@
+{
+  "taskId": "run-run-mp3xpqai",
+  "workerId": "w-run-run-mp3xpqai",
+  "filesChanged": [
+    "src/orchestra/result-evaluator.ts",
+    "src/orchestra/sprint-phases.ts",
+    "src/orchestra/debt-manager.ts",
+    "src/agents/worker.ts",
+    "tests/orchestra/no-result-stub-eradication.test.ts"
+  ],
+  "linesAdded": 522,
+  "linesRemoved": 4,
+  "testsPassed": true,
+  "coverage": 89.33,
+  "selfAssessment": "DONE",
+  "notes": "Sprint 165 Task 1 (Bug X) — Brain 'no-result → CODE_VERIFIED_DONE' stub eradication. Implemented honest-result gate at three intercept points to prevent dishonest DONE stubs from reaching downstream evaluation. (1) result-evaluator.ts: Added enforceHonestResultGate(), classifyHonestyViolation(), writeHonestSentinelResult(), isStubResult() — pure functions exporting the canonical honesty boundary. (2) sprint-phases.ts:runEvaluatePhase: Applied gate BEFORE evaluateWithRubric so any stub-shaped result (linesAdded=0 + testsPassed=false + selfAssessment=DONE OR codeVerified='CODE_VERIFIED_DONE') is downgraded to NO_GO + .result file rewritten + BRAIN→AUDITOR:STUB_WRITE_DETECTED event emitted. Locked evaluation=NO_GO so reconcileRubricNoGo cannot re-promote. (3) sprint-phases.ts:runRetroPhase: Pre-finalize sentinel pass writes honest NO_GO .result files for tasks with missing .result (worker-crashed-no-result) AND rewrites stub-shaped .result files BEFORE finalizeSprint runs — starves the legacy tryCodeVerifiedDone path of inputs that would trigger auto-promote (notes deliberately omit the Docker-auto-pattern phrase so reconcile returns NOT_TRIGGERED). (4) worker.ts:writeResult: Self-honesty enforcement — worker that claims DONE with linesAdded=0+testsPassed=false has its result downgraded at the write boundary, with codeVerified field stripped. (5) debt-manager.ts:handleEvaluation: Detects honest-gate violation in result.notes and surfaces it in the FIX context so FIX worker knows it must perform real work. Boundary violation (filesChanged outside scope.filesWrite) also forced to NO_GO. The CODE_VERIFIED_DONE constant remains in src/monitor/auditor.ts (outside my write scope) but the codepath that produces the stub is functionally neutered: any task it touches is intercepted at EVALUATE or RETRO and rewritten honestly. Gate calls are typeof-guarded + try/catch wrapped so partial-mock test contexts (phase-transition-observability, brain-crash-injection) keep working. Tests: 10/10 PASS in tests/orchestra/no-result-stub-eradication.test.ts (6 mandated scenarios + 4 supporting cases). Full orchestra suite (184 files / 4290 tests) PASS — no regressions. Three pre-existing doc/blueprint test failures (tests/docs/CHANGELOG.test.ts, tests/blueprint/sprint-history.test.ts × 2) are unrelated to this task — they fail on a clean baseline. tsc --noEmit clean. Scope discipline: only my Files: write-list (5 files) touched.",
+  "tokenUsage": {
+    "inputTokens": 68000,
+    "outputTokens": 11000,
+    "cacheReadTokens": 42000,
+    "provider": "claude",
+    "model": "opus"
+  },
+  "rubricScores": {
+    "correctness": 95,
+    "test_coverage": 95,
+    "scope_compliance": 100,
+    "documentation": 85
+  },
+  "evaluationDecision": "DONE"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "run-run-mp3xpqai",
+  "title": "Sprint 165 Task 1 (165-001) — Bug X Fix: Brain \"no-result → CODE_VERIFIED_DONE\" ",
+  "description": "Sprint 165 Task 1 (165-001) — Bug X Fix: Brain \"no-result → CODE_VERIFIED_DONE\" Stub Eradication\n\nNOT: Sprint 165 SPAWN phase FAILED oldu (Bug E+F+G), 165-001 ve 165-002 OOM-killed exit 137 ile NO_GO partial-result yazdı. Bug J nedeniyle CLI spawn retry edemiyor (stale task state). Bu task sprint-dışı `deckent_run` ile çalıştırılıyor (Sprint 164'te 164-006 pattern).\n\n**Görev:**\n\n- Model: opus\n- Effort: high\n- Skills: typescript-expert, system-architect\n- Agent: bug-fixer\n- **Files (sadece bunlara yaz):** src/orchestra/result-evaluator.ts, src/orchestra/debt-manager.ts, src/orchestra/sprint-phases.ts, src/agents/worker.ts, tests/orchestra/no-result-stub-eradication.test.ts\n- Scope: src/orchestra/, src/agents/, tests/orchestra/\n\n### Description\n\nSprint 156-011-fix CRITICAL debt'in Sprint 164 canlı reproduce kanıtı: 164-006 worker docker HB shutdown ile `.result` dosyası yazmadan kayboldu. Brain bunu görüp **stub** yazdı:\n\n```json\n{\n  \"linesAdded\": 0,\n  \"testsPassed\": false,\n  \"selfAssessment\": \"DONE\",\n  \"codeVerified\": \"CODE_VERIFIED_DONE\",\n  \"notes\": \"Code physically verified despite missing .result (Sprint 135 docker HB shutdown bug pattern)\"\n}\n```\n\nBu **gerçek bir DONE değil** — worker çalışmadı, hiçbir dosya yazılmadı. Brain \"selfAssessment: DONE\" stub'ı ile sprint'i 6/6 DONE saydı.\n\nPOZİTİF GÜNCELLE: Sprint 165 başlangıcında 165-001 ve 165-002 OOM ile partial-result aldı, AMA bu sefer **`selfAssessment: NO_GO + partialMarker: true + exitCode: 137`** ile DÜRÜST raporlandı. Yani Sprint 163 T1 fix partially çalışıyor — DONE stub yerine NO_GO partial yazılıyor. AMA hâlâ `codeVerified` field'i veya benzer codepath kalmış olabilir.\n\n**Bug kökeni:** `CODE_VERIFIED_DONE` codepath src/orchestra'da bir yerde — Brain \"fiziksel kanıt var (filesChanged listesi)\" diye DONE stub yazıyor.\n\n**Fix prosedürü:**\n\n1. **Codepath bulma:** `grep -rn \"CODE_VERIFIED_DONE\\|codeVerified\\|partial-promote\" src/` → stub'ı yazan kod parçası tespit\n2. **Guard ekleme:** `linesAdded === 0 && testsPassed === false` koşulu varsa `selfAssessment: 'NO_GO'` olmalı, `codeVerified` field hiç yazılmamalı, \"DONE\" damgası kesinlikle yok\n3. **Worker ölmüşse:** Brain ölü worker'ı `status: NO_GO + reason: 'worker-crashed-no-result'` olarak işaretler, FIX phase tetiklenir\n4. **`filesChanged` mantığı:** Worker `filesChanged` yazdı ama `linesAdded === 0` ise scope ihlali sinyali\n5. **Audit trail:** Stub yazılmadan önce `runEvaluatePhase:stub-write` event'i emit edilir\n\n**Anti-pattern (YASAK):**\n- \"DONE\" stub yazımı (`linesAdded=0 + testsPassed=false → DONE` ASLA)\n- Code physically verified diyerek görmezden gelme\n- Worker crash sonrası \"DONE\" damgası\n\n**Kanıt:**\n- `grep -rn \"CODE_VERIFIED_DONE\" src/` → fix öncesi 1+ match, fix sonrası 0 match\n- `npx vitest run tests/orchestra/no-result-stub-eradication.test.ts` → 6/6 PASS\n- Forensic test: worker .result yazmadan kapanırsa Brain NO_GO ile sınıflar, DONE stub'ı yazmaz\n\n**Test:** 6 unit test:\n- (a) Worker .result yazdı + linesAdded > 0 + testsPassed true → DONE\n- (b) Worker .result yazdı + linesAdded > 0 + testsPassed false → NO_GO/GO_WITH_TECH_DEBT (selfAssess)\n- (c) Worker .result YAZMADI + filesChanged listesi var → NO_GO (stub değil)\n- (d) Worker .result yazdı + linesAdded === 0 + testsPassed false → NO_GO\n- (e) Worker docker crash + heartbeat timeout → worker-crashed-no-result NO_GO + FIX phase trigger\n- (f) Worker scope ihlali (filesWrite dışı) → NO_GO + boundary alarm\n\n**KURALLAR:**\n- ESM `.js` uzantısı zorunlu\n- TDD discipline (önce test fail, sonra kod, sonra pass)\n- `npm run build` YASAK\n- Sadece yukarıdaki Files: listesindeki dosyalara yaz\n- Result yaz: filesChanged, linesAdded/Removed, testsPassed, selfAssessment, notes",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "scope": {
+    "directories": [
+      "src/orchestra/",
+      "src/agents/",
+      "tests/orchestra/"
+    ],
+    "filesRead": [],
+    "filesWrite": []
+  },
+  "reason": "One-off task via MCP deckent_run",
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Task completed successfully",
+    "noGoCriteria": "Task failed or timed out",
+    "techDebtAcceptable": "Minor issues acceptable"
+  },
+  "status": "PENDING",
+  "sprintId": "one-off",
+  "createdAt": "2026-05-13T10:46:34.842Z",
+  "assignedAgent": "generic",
+  "assignedSkills": [],
+  "provider": "claude"
+}

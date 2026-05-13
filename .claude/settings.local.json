@@ -59,7 +59,11 @@
       "mcp__deckent__deckent_recover",
       "Bash(cp /home/alperen/deckent-dev/.tasks/task-164-* /home/alperen/deckent-dev/.brain/archive/sprint-164-tasks/)",
       "Bash(cp /home/alperen/deckent-dev/.tasks/task-run-run-mp3qgy0b.* /home/alperen/deckent-dev/.brain/archive/sprint-164-tasks/)",
-      "Bash(echo \"Modified: $\\(git -C /home/alperen/deckent-dev status --short)"
+      "Bash(echo \"Modified: $\\(git -C /home/alperen/deckent-dev status --short)",
+      "Bash(docker system *)",
+      "Bash(xargs -r docker rm)",
+      "Bash(pkill -9 -f \"until.*task-165\")",
+      "Bash(awk '{print $5, $6, $7, $8, $9}')"
     ]
   }
 }

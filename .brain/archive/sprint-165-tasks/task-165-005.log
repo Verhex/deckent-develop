@@ -1,0 +1,13 @@
+Task 165-005 tamamlandı. Yapılan işler:
+
+**Oluşturulan/Güncellenen Dosyalar:**
+
+1. **`docs/release/sprint-165-final-state.md`** (YENİ) — Bug X/Y/Z/W close kanıtı ile Sprint 165 outcome dump, Sprint 164→165 geçiş tablosu, post-sprint verify protokolü
+
+2. **`docs/CHANGELOG.md`** (GÜNCELLENDİ) — `[0.4.1-beta]` Sprint 165 entry eklendi: 4 bug fix (X/Y/Z/W) + ADR-045 wave + 22 yeni test
+
+3. **`docs/launch/announce-final.md`** (YENİ) — Sprint 165 güncel sayılarla (165 sprint, 45 ADR, 12,500+ test, 89.33% coverage) Show HN draft + Türkçe/İngilizce Twitter thread + Reddit r/LocalLLaMA + r/programming launch posts
+
+4. **`docs/release/public-repo-flip-handoff.md`** (GÜNCELLENDİ) — Sprint 165 final closure notları ve Bug X/Y/Z/W fix status bilgileri eklendi
+
+`selfAssessment: DONE` — tüm deliverable'lar tamamlandı, kanıtlar doğrulandı.

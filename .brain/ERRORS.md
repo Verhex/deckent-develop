@@ -1,133 +1,3 @@
-| 2026-05-12T22:12:04.376Z | sprint-checkpoint:write | Checkpoint #1 written for sprint-162 |
-| 2026-05-12T22:12:04.398Z | scope-sanitizer | warnings=1, rejected=0 |
-| 2026-05-12T22:12:04.401Z | docker-backend:spawn-lock | taskId=162-001 acquired 6 spawn lock(s) |
-| 2026-05-12T22:12:04.512Z | docker-backend:spawn | taskId=162-001 container=deckent-w-162-001 model=opus |
-| 2026-05-12T22:12:04.843Z | docker-backend:spawn-ok | taskId=162-001 containerId=e6638bca2dcb |
-| 2026-05-12T22:12:04.859Z | docker-backend:spawn-lock | taskId=162-002 acquired 3 spawn lock(s) |
-| 2026-05-12T22:12:04.954Z | docker-backend:spawn | taskId=162-002 container=deckent-w-162-002 model=opus |
-| 2026-05-12T22:12:05.241Z | docker-backend:spawn-ok | taskId=162-002 containerId=e9fb8783e0f5 |
-| 2026-05-12T22:12:05.245Z | resolveAgentPrompt:readFile | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.deckent/agents/test-writer/PROMPT.md' |
-| 2026-05-12T22:12:05.245Z | resolveAgentPrompt:readFile | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/agents/test-writer/PROMPT.md' |
-| 2026-05-12T22:12:05.246Z | resolveAgentPrompt:readFile | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.deckent/agents/test-writer/agent.json' |
-| 2026-05-12T22:12:05.247Z | resolveAgentPrompt:readFile | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/agents/test-writer/agent.json' |
-| 2026-05-12T22:12:05.258Z | scope-sanitizer | warnings=1, rejected=0 |
-| 2026-05-12T22:12:05.259Z | docker-backend:spawn-lock | taskId=162-003 acquired 3 spawn lock(s) |
-| 2026-05-12T22:12:05.359Z | docker-backend:spawn | taskId=162-003 container=deckent-w-162-003 model=opus |
-| 2026-05-12T22:12:05.669Z | docker-backend:spawn-ok | taskId=162-003 containerId=d013ec1566e3 |
-| 2026-05-12T22:12:05.678Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-test-docker-1903094.json' |
-| 2026-05-12T22:12:05.679Z | sprint-checkpoint:phaseTransition | Phase SPAWN → writing checkpoint |
-| 2026-05-12T22:12:05.680Z | sprint-checkpoint:write | Checkpoint #2 written for sprint-162 |
-| 2026-05-12T22:14:35.767Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-test-docker-1903094.json' |
-| 2026-05-12T22:15:00.150Z | docker-backend:exit | taskId=162-001 exitCode=0 |
-| 2026-05-12T22:15:00.334Z | docker-backend:spawn-lock | taskId=162-001 released 6 spawn lock(s) on exit |
-| 2026-05-12T22:15:05.756Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-test-docker-1903094.json' |
-| 2026-05-12T22:15:35.757Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-test-docker-1903094.json' |
-| 2026-05-12T22:16:05.755Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-test-docker-1903094.json' |
-| 2026-05-12T22:16:35.761Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-test-docker-1903094.json' |
-| 2026-05-12T22:17:05.755Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-test-docker-1903094.json' |
-| 2026-05-12T22:17:10.014Z | waitForResults:progress | Sprint devam ediyor — 1/3 task tamamlandı (5dk) |
-| 2026-05-12T22:17:35.762Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-test-docker-1903094.json' |
-| 2026-05-12T22:18:05.756Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-test-docker-1903094.json' |
-| 2026-05-12T22:18:35.759Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-test-docker-1903094.json' |
-| 2026-05-12T22:19:05.761Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-test-docker-1903094.json' |
-| 2026-05-12T22:19:35.761Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-test-docker-1903094.json' |
-| 2026-05-12T22:20:05.762Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-test-docker-1903094.json' |
-| 2026-05-12T22:20:35.762Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-test-docker-1903094.json' |
-| 2026-05-12T22:21:05.765Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-test-docker-1903094.json' |
-| 2026-05-12T22:22:14.874Z | waitForResults:progress | Sprint devam ediyor — 1/3 task tamamlandı (10dk) |
-| 2026-05-12T22:23:19.251Z | docker-backend:exit | taskId=162-003 exitCode=0 |
-| 2026-05-12T22:23:19.421Z | docker-backend:spawn-lock | taskId=162-003 released 3 spawn lock(s) on exit |
-| 2026-05-12T22:24:00.958Z | sprint-checkpoint:phaseTransition | Phase EXECUTE → writing checkpoint |
-| 2026-05-12T22:24:00.959Z | sprint-checkpoint:write | Checkpoint #3 written for sprint-162 |
-| 2026-05-12T22:24:00.960Z | runEvaluatePhase:start | totalTasks=3 collectedResults=3 collectedIds=[162-001,162-003,162-002] |
-| 2026-05-12T22:24:00.962Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
-| 2026-05-12T22:24:00.962Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
-| 2026-05-12T22:24:00.963Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
-| 2026-05-12T22:24:00.963Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
-| 2026-05-12T22:24:00.964Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
-| 2026-05-12T22:24:00.964Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
-| 2026-05-12T22:24:00.965Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
-| 2026-05-12T22:24:00.965Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
-| 2026-05-12T22:24:00.966Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
-| 2026-05-12T22:24:00.966Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
-| 2026-05-12T22:24:00.967Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
-| 2026-05-12T22:24:04.512Z | runEvaluatePhase:task | task=162-001 selfAssessment=DONE evaluation=GO_WITH_TECH_DEBT testsPassed=true |
-| 2026-05-12T22:24:04.542Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
-| 2026-05-12T22:24:04.542Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
-| 2026-05-12T22:24:04.543Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
-| 2026-05-12T22:24:04.543Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
-| 2026-05-12T22:24:04.544Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
-| 2026-05-12T22:24:04.544Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
-| 2026-05-12T22:24:04.545Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
-| 2026-05-12T22:24:04.545Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
-| 2026-05-12T22:24:04.546Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
-| 2026-05-12T22:24:04.546Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
-| 2026-05-12T22:24:04.547Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
-| 2026-05-12T22:24:08.166Z | runEvaluatePhase:task | task=162-002 selfAssessment=DONE evaluation=DONE testsPassed=true |
-| 2026-05-12T22:24:08.168Z | runEvaluatePhase:task | task=162-003 selfAssessment=DONE evaluation=NO_GO testsPassed=true |
-| 2026-05-12T22:24:08.169Z | runEvaluatePhase:done | evaluations.size=3 keys=[162-001,162-002,162-003] |
-| 2026-05-12T22:24:08.171Z | evaluateFailureCascade | task 162-003: CODE → retry=false cascade=true |
-| 2026-05-12T22:24:08.171Z | dependency-scheduler:applyFailureCascade | Task 162-003 (CODE): cascading block to transitive dependents |
-| 2026-05-12T22:24:08.172Z | applyCascadeToSprint | Cascade applied: 162-003 (CODE) → 0 tasks blocked |
-| 2026-05-12T22:24:08.175Z | sprint-checkpoint:phaseTransition | Phase EVALUATE → writing checkpoint |
-| 2026-05-12T22:24:08.176Z | sprint-checkpoint:write | Checkpoint #4 written for sprint-162 |
-| 2026-05-12T22:24:08.178Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
-| 2026-05-12T22:24:08.179Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
-| 2026-05-12T22:24:08.182Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
-| 2026-05-12T22:24:08.183Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
-| 2026-05-12T22:24:08.183Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
-| 2026-05-12T22:24:08.184Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
-| 2026-05-12T22:24:08.184Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
-| 2026-05-12T22:24:08.185Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
-| 2026-05-12T22:24:08.185Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
-| 2026-05-12T22:24:08.186Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
-| 2026-05-12T22:24:08.186Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
-| 2026-05-12T22:24:08.201Z | scope-sanitizer | warnings=1, rejected=0 |
-| 2026-05-12T22:24:08.203Z | docker-backend:spawn-lock | taskId=162-003-fix acquired 3 spawn lock(s) |
-| 2026-05-12T22:24:08.308Z | docker-backend:spawn | taskId=162-003-fix container=deckent-w-162-003-fix model=sonnet |
-| 2026-05-12T22:24:08.384Z | docker-backend:spawn-error | docker: Error response from daemon: Conflict. The container name "/deckent-w-162-003-fix" is already in use by container "996e2a2e9a04a72de9f5a7c067cd43967ac6a8562fe037d04563ccbd3e93fb4d". You have to |
-| 2026-05-12T22:24:08.385Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-162-003-fix.result' |
-| 2026-05-12T22:24:08.406Z | sprint-checkpoint:phaseTransition | Phase FIX → writing checkpoint |
-| 2026-05-12T22:24:08.407Z | sprint-checkpoint:write | Checkpoint #5 written for sprint-162 |
-| 2026-05-12T22:24:08.411Z | finalizeSprint:preRetro | evaluations.size=4 keys=[162-001,162-002,162-003,162-003-fix] |
-| 2026-05-12T22:24:08.411Z | buildAgentPerformance | task=162-001 agent=bug-fixer ev=GO_WITH_TECH_DEBT evalMapSize=4 evalKeys=[162-001,162-002,162-003,162-003-fix] |
-| 2026-05-12T22:24:08.412Z | buildAgentPerformance | task=162-002 agent=bug-fixer ev=DONE evalMapSize=4 evalKeys=[162-001,162-002,162-003,162-003-fix] |
-| 2026-05-12T22:24:08.412Z | buildAgentPerformance | task=162-003 agent=test-writer ev=NO_GO evalMapSize=4 evalKeys=[162-001,162-002,162-003,162-003-fix] |
-| 2026-05-12T22:25:36.912Z | finalizeSprint:tripleLink | Triple-link created for sprint-162 |
-| 2026-05-12T22:25:36.925Z | finalizeSprint:routing-outcomes | Recorded 3 routing outcomes to learnings.json |
-| 2026-05-12T22:25:36.926Z | finalizeSprint:rule-evolution | 9 new rules evolved |
-| 2026-05-12T22:25:36.928Z | rule-evolver:saveRules | 9 rules saved to .deckent/routing/evolved-rules.json |
-| 2026-05-12T22:25:36.938Z | finalizeSprint:syncStatsToManifests | Synced 16 agents, 17 skills to manifest files |
-| 2026-05-12T22:25:36.940Z | finalizeSprint:promotion | agent 'test-writer': 124 tasks, 90% success — meets promotion criteria |
-| 2026-05-12T22:25:36.940Z | promotion-pipeline:promote | Temp agent 'test-writer' not found |
-| 2026-05-12T22:25:36.941Z | finalizeSprint:promotion | skill 'code-reviewer': 32 tasks, 91% success — meets promotion criteria |
-| 2026-05-12T22:25:36.941Z | promotion-pipeline:promote | Temp skill 'code-reviewer' not found |
-| 2026-05-12T22:25:36.945Z | finalizeSprint:breadcrumb | Step 10 (richOutput) — entering |
-| 2026-05-12T22:25:36.960Z | buildAgentPerformance | task=162-001 agent=bug-fixer ev=GO_WITH_TECH_DEBT evalMapSize=4 evalKeys=[162-001,162-002,162-003,162-003-fix] |
-| 2026-05-12T22:25:36.961Z | buildAgentPerformance | task=162-002 agent=bug-fixer ev=DONE evalMapSize=4 evalKeys=[162-001,162-002,162-003,162-003-fix] |
-| 2026-05-12T22:25:36.961Z | buildAgentPerformance | task=162-003 agent=test-writer ev=NO_GO evalMapSize=4 evalKeys=[162-001,162-002,162-003,162-003-fix] |
-| 2026-05-12T22:25:36.963Z | finalizeSprint:breadcrumb | Step 10b (selfAuditGate) — entering |
-| 2026-05-12T22:25:39.588Z | runSelfAuditGate:tsc | status=PASS errors=0 |
-| 2026-05-12T22:26:30.643Z | runSelfAuditGate:vitest | status=FAIL delta.fail=1 |
-| 2026-05-12T22:26:30.653Z | docker-backend:exit | taskId=162-002 exitCode=0 |
-| 2026-05-12T22:26:30.829Z | docker-backend:spawn-lock | taskId=162-002 released 3 spawn lock(s) on exit |
-| 2026-05-12T22:26:30.831Z | runSelfAuditGate:honesty | violations=0 |
-| 2026-05-12T22:26:30.832Z | runSelfAuditGate | overallGate=GATE_FAILURE sprint=sprint-162 |
-| 2026-05-12T22:26:30.833Z | finalizeSprint:selfAuditGate | Gate completed: overallGate=GATE_FAILURE |
-| 2026-05-12T22:26:30.833Z | finalizeSprint:selfAuditGate | Status updated: RETROSPECTIVE → GO_WITH_GATE_FAILURE |
-| 2026-05-12T22:26:30.834Z | finalizeSprint:selfAuditGate | Gate result written to /home/alperen/deckent-dev/.deckent/sprint-162-gate.json overallGate=GATE_FAILURE |
-| 2026-05-12T22:26:30.835Z | finalizeSprint:breadcrumb | Step 10c (loadReport) — entering |
-| 2026-05-12T22:26:30.840Z | finalizeSprint:loadReport | Load test report written to /home/alperen/deckent-dev/docs/audits/sprint-162/load-test-report.md |
-| 2026-05-12T22:26:30.841Z | finalizeSprint:breadcrumb | Step 10c (loadReport) — done |
-| 2026-05-12T22:26:30.841Z | finalizeSprint:breadcrumb | Step 10c2 (metricsRotation) — entering |
-| 2026-05-12T22:26:30.843Z | observability-rotation | Rotated 5460 bytes → /home/alperen/deckent-dev/.deckent/archive/metrics/metrics-sprint-162.jsonl.gz (645 bytes gzipped), pruned 0 old archives |
-| 2026-05-12T22:26:30.843Z | finalizeSprint:metricsRotation | Rotated 5460 bytes → /home/alperen/deckent-dev/.deckent/archive/metrics/metrics-sprint-162.jsonl.gz (645 bytes gzipped), pruned 0 old archives |
-| 2026-05-12T22:26:30.844Z | finalizeSprint:breadcrumb | Step 10c2 (metricsRotation) — done |
-| 2026-05-12T22:26:30.844Z | finalizeSprint:breadcrumb | Step 10d (featuresManifest) — entering |
-| 2026-05-12T22:26:30.951Z | finalizeSprint:featuresManifest | Sync exit=0: ✓ Features manifest written: /home/alperen/deckent-dev/.deckent/features-manifest.json (31 features) |
-| 2026-05-12T22:26:30.952Z | finalizeSprint:breadcrumb | Step 12 (archiveDirectives) — entering |
-| 2026-05-12T22:26:30.953Z | archiveDirectives | Archived DIRECTIVES.md → /home/alperen/deckent-dev/.brain/archive/DIRECTIVES-sprint-162.md |
-| 2026-05-12T22:26:30.953Z | finalizeSprint:breadcrumb | Step 12b (archiveOrphanTasks) — entering |
 | 2026-05-12T22:26:30.957Z | createPreArchiveSnapshot | Snapshot created: /home/alperen/deckent-dev/.deckent/sprint-162-pre-archive.tar.gz (19 files, hash=449c3b82fda7...) |
 | 2026-05-12T22:26:30.958Z | finalizeSprint:preArchiveSnapshot | Snapshot created: 19 files, hash=449c3b82fda7... |
 | 2026-05-12T22:26:30.960Z | archiveOrphanTasks | Archived 19 task files to /home/alperen/deckent-dev/.brain/archive/sprint-162-tasks |
@@ -598,3 +468,133 @@
 | 2026-05-13T08:00:33.796Z | runSelfAuditGate:vitest | status=FAIL delta.fail=1 |
 | 2026-05-13T08:00:33.800Z | runSelfAuditGate:honesty | violations=0 |
 | 2026-05-13T08:00:33.806Z | runSelfAuditGate | overallGate=GATE_FAILURE sprint=sprint-164 |
+| 2026-05-13T09:53:39.498Z | readJsonSafeAsync | ENOENT: no such file or directory, open '/home/alperen/.deckent/config.json' |
+| 2026-05-13T09:53:39.573Z | planSprint:learning-bonuses | Loaded 13 learning bonuses from previous sprints |
+| 2026-05-13T09:53:39.574Z | planSprint:temp-skill | Generated project-conventions skill for typescript |
+| 2026-05-13T09:53:39.575Z | planSprint:temp-agent | Generated temp agent: temp-react-ts-specialist for typescript/react |
+| 2026-05-13T09:53:39.575Z | planSprint:temp-agent | Generated temp agent: temp-react-specialist for typescript/react |
+| 2026-05-13T09:53:39.576Z | planSprint:evolved-rules | Injected 4 auto-applied evolved rules into activation configs |
+| 2026-05-13T09:53:39.578Z | planSprint:routing-v2 | Task 165-001 → agent=bug-fixer, skills=[typescript-expert, system-architect], confidence=high, intent=implementation |
+| 2026-05-13T09:53:39.579Z | planSprint:routing-v2 | Task 165-002 → agent=bug-fixer, skills=[typescript-expert, system-architect], confidence=high, intent=implementation |
+| 2026-05-13T09:53:39.580Z | planSprint:routing-v2 | Task 165-003 → agent=bug-fixer, skills=[typescript-expert, testing-expert, ci-testing], confidence=high, intent=implementation |
+| 2026-05-13T09:53:39.581Z | planSprint:routing-v2 | Task 165-004 → agent=code-reviewer, skills=[typescript-expert, system-architect], confidence=high, intent=implementation |
+| 2026-05-13T09:53:39.582Z | planSprint:routing-v2 | Task 165-005 → agent=doc-writer, skills=[documentation-writer, git-expert], confidence=high, intent=documentation |
+| 2026-05-13T09:53:39.583Z | planSprint:task-write | Writing 165-001: assignedAgent=bug-fixer, assignedSkills=[typescript-expert, system-architect] |
+| 2026-05-13T09:53:39.584Z | planSprint:task-write | Writing 165-002: assignedAgent=bug-fixer, assignedSkills=[typescript-expert, system-architect] |
+| 2026-05-13T09:53:39.585Z | planSprint:task-write | Writing 165-003: assignedAgent=bug-fixer, assignedSkills=[typescript-expert, testing-expert, ci-testing] |
+| 2026-05-13T09:53:39.586Z | planSprint:task-write | Writing 165-004: assignedAgent=code-reviewer, assignedSkills=[typescript-expert, system-architect] |
+| 2026-05-13T09:53:39.587Z | planSprint:task-write | Writing 165-005: assignedAgent=doc-writer, assignedSkills=[documentation-writer, git-expert] |
+| 2026-05-13T09:56:21.134Z | readJsonSafeAsync | ENOENT: no such file or directory, open '/home/alperen/.deckent/config.json' |
+| 2026-05-13T09:56:22.049Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.deckent/sprint-state.json' |
+| 2026-05-13T09:56:22.138Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
+| 2026-05-13T09:56:22.138Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
+| 2026-05-13T09:56:22.139Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
+| 2026-05-13T09:56:22.139Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
+| 2026-05-13T09:56:22.139Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
+| 2026-05-13T09:56:22.140Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
+| 2026-05-13T09:56:22.140Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
+| 2026-05-13T09:56:22.141Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
+| 2026-05-13T09:56:22.141Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
+| 2026-05-13T09:56:22.142Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
+| 2026-05-13T09:56:22.142Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
+| 2026-05-13T09:56:22.150Z | planSprint:learning-bonuses | Loaded 13 learning bonuses from previous sprints |
+| 2026-05-13T09:56:22.152Z | planSprint:temp-skill | Generated project-conventions skill for typescript |
+| 2026-05-13T09:56:22.153Z | planSprint:temp-agent | Generated temp agent: temp-react-ts-specialist for typescript/react |
+| 2026-05-13T09:56:22.153Z | planSprint:temp-agent | Generated temp agent: temp-react-specialist for typescript/react |
+| 2026-05-13T09:56:22.154Z | planSprint:evolved-rules | Injected 4 auto-applied evolved rules into activation configs |
+| 2026-05-13T09:56:22.157Z | planSprint:routing-v2 | Task 165-001 → agent=bug-fixer, skills=[typescript-expert, system-architect], confidence=high, intent=implementation |
+| 2026-05-13T09:56:22.158Z | planSprint:routing-v2 | Task 165-002 → agent=bug-fixer, skills=[typescript-expert, system-architect], confidence=high, intent=implementation |
+| 2026-05-13T09:56:22.159Z | planSprint:routing-v2 | Task 165-003 → agent=bug-fixer, skills=[typescript-expert, testing-expert, ci-testing], confidence=high, intent=implementation |
+| 2026-05-13T09:56:22.160Z | planSprint:routing-v2 | Task 165-004 → agent=code-reviewer, skills=[typescript-expert, system-architect], confidence=high, intent=implementation |
+| 2026-05-13T09:56:22.161Z | planSprint:routing-v2 | Task 165-005 → agent=doc-writer, skills=[documentation-writer, git-expert], confidence=high, intent=documentation |
+| 2026-05-13T09:56:22.161Z | planSprint:task-write | Writing 165-001: assignedAgent=bug-fixer, assignedSkills=[typescript-expert, system-architect] |
+| 2026-05-13T09:56:22.163Z | planSprint:task-write | Writing 165-002: assignedAgent=bug-fixer, assignedSkills=[typescript-expert, system-architect] |
+| 2026-05-13T09:56:22.163Z | planSprint:task-write | Writing 165-003: assignedAgent=bug-fixer, assignedSkills=[typescript-expert, testing-expert, ci-testing] |
+| 2026-05-13T09:56:22.165Z | planSprint:task-write | Writing 165-004: assignedAgent=code-reviewer, assignedSkills=[typescript-expert, system-architect] |
+| 2026-05-13T09:56:22.166Z | planSprint:task-write | Writing 165-005: assignedAgent=doc-writer, assignedSkills=[documentation-writer, git-expert] |
+| 2026-05-13T09:56:22.168Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
+| 2026-05-13T09:56:22.168Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
+| 2026-05-13T09:56:22.168Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
+| 2026-05-13T09:56:22.169Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
+| 2026-05-13T09:56:22.169Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
+| 2026-05-13T09:56:22.170Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
+| 2026-05-13T09:56:22.170Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
+| 2026-05-13T09:56:22.170Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
+| 2026-05-13T09:56:22.171Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
+| 2026-05-13T09:56:22.171Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
+| 2026-05-13T09:56:22.172Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
+| 2026-05-13T09:57:47.815Z | sprint-checkpoint:phaseTransition | Phase PLAN → writing checkpoint |
+| 2026-05-13T09:57:47.816Z | sprint-checkpoint:write | Checkpoint #1 written for sprint-165 |
+| 2026-05-13T09:57:47.817Z | spawnWorkers:collision | File "src/orchestra/result-evaluator.ts" written by tasks: 165-001, 165-003 |
+| 2026-05-13T09:57:47.818Z | spawnWorkers:collision | File "src/orchestra/result-collector.ts" written by tasks: 165-002, 165-005 |
+| 2026-05-13T09:57:47.819Z | spawnWorkers:collision | File "scripts/run-self-audit.ts" written by tasks: 165-003, 165-005 |
+| 2026-05-13T09:57:47.820Z | spawnWorkers:collision | File "config.json" written by tasks: 165-004, 165-005 |
+| 2026-05-13T09:57:47.838Z | docker-backend:spawn-lock | taskId=165-001 acquired 5 spawn lock(s) |
+| 2026-05-13T09:57:47.942Z | docker-backend:spawn | taskId=165-001 container=deckent-w-165-001 model=opus |
+| 2026-05-13T09:57:47.942Z | docker-backend:spawn-attempt | taskId=165-001 attempt=1/2 |
+| 2026-05-13T09:57:51.315Z | docker-backend:spawn-ok | taskId=165-001 containerId=809a04618128 instantExit=false |
+| 2026-05-13T09:57:51.331Z | docker-backend:spawn-lock | taskId=165-002 acquired 3 spawn lock(s) |
+| 2026-05-13T09:57:51.435Z | docker-backend:spawn | taskId=165-002 container=deckent-w-165-002 model=opus |
+| 2026-05-13T09:57:51.436Z | docker-backend:spawn-attempt | taskId=165-002 attempt=1/2 |
+| 2026-05-13T09:57:54.786Z | docker-backend:spawn-ok | taskId=165-002 containerId=6b4d17f56c71 instantExit=false |
+| 2026-05-13T09:57:54.803Z | spawnWorkers:collision | File "scripts/run-self-audit.ts" written by tasks: 165-003, 165-005 |
+| 2026-05-13T09:57:54.803Z | spawnWorkers:collision | File "config.json" written by tasks: 165-004, 165-005 |
+| 2026-05-13T09:57:54.816Z | docker-backend:spawn-lock | taskId=165-001 acquired 5 spawn lock(s) |
+| 2026-05-13T09:57:54.930Z | docker-backend:spawn | taskId=165-001 container=deckent-w-165-001 model=opus |
+| 2026-05-13T09:57:54.931Z | docker-backend:spawn-attempt | taskId=165-001 attempt=1/2 |
+| 2026-05-13T09:57:55.011Z | docker-backend:spawn-attempt-fail | taskId=165-001 attempt=1 status=125 stderr=docker: Error response from daemon: Conflict. The container name "/deckent-w-165-001" is already in use by container "809a046181289e9660caa313b3fb60c80d97250 |
+| 2026-05-13T09:58:00.382Z | docker-backend:spawn-attempt | taskId=165-001 attempt=2/2 |
+| 2026-05-13T09:58:03.753Z | docker-backend:spawn-ok | taskId=165-001 containerId=986b176e3af0 instantExit=false |
+| 2026-05-13T09:58:03.757Z | docker-backend:exit | taskId=165-001 exitCode=137 |
+| 2026-05-13T09:58:03.761Z | docker-backend:partial-promote | taskId=165-001 exitCode=137 → promoted .partial-result to .result |
+| 2026-05-13T09:58:04.213Z | docker-backend:spawn-lock | taskId=165-001 released 5 spawn lock(s) on exit |
+| 2026-05-13T09:58:04.215Z | docker-backend:exit | taskId=165-001 exitCode=137 |
+| 2026-05-13T09:58:04.372Z | docker-backend:spawn-lock | taskId=165-002 acquired 3 spawn lock(s) |
+| 2026-05-13T09:58:04.481Z | docker-backend:spawn | taskId=165-002 container=deckent-w-165-002 model=opus |
+| 2026-05-13T09:58:04.481Z | docker-backend:spawn-attempt | taskId=165-002 attempt=1/2 |
+| 2026-05-13T09:58:04.569Z | docker-backend:spawn-attempt-fail | taskId=165-002 attempt=1 status=125 stderr=docker: Error response from daemon: Conflict. The container name "/deckent-w-165-002" is already in use by container "6b4d17f56c714c623fa780ee9a9bc484ae41d5c |
+| 2026-05-13T09:58:09.928Z | docker-backend:spawn-attempt | taskId=165-002 attempt=2/2 |
+| 2026-05-13T09:58:13.305Z | docker-backend:spawn-ok | taskId=165-002 containerId=d05ffa9c5ffb instantExit=false |
+| 2026-05-13T09:58:13.308Z | docker-backend:exit | taskId=165-002 exitCode=137 |
+| 2026-05-13T09:58:13.313Z | docker-backend:partial-promote | taskId=165-002 exitCode=137 → promoted .partial-result to .result |
+| 2026-05-13T09:58:13.803Z | docker-backend:spawn-lock | taskId=165-002 released 3 spawn lock(s) on exit |
+| 2026-05-13T09:58:13.804Z | docker-backend:exit | taskId=165-002 exitCode=137 |
+| 2026-05-13T10:33:02.836Z | readJsonSafeAsync | ENOENT: no such file or directory, open '/home/alperen/.deckent/config.json' |
+| 2026-05-13T10:33:03.007Z | docker-backend:spawn | taskId=run-run-mp3x8bm3 container=deckent-w-run-run-mp3x8bm3 model=opus |
+| 2026-05-13T10:33:03.010Z | docker-backend:spawn-attempt | taskId=run-run-mp3x8bm3 attempt=1/2 |
+| 2026-05-13T10:33:06.480Z | docker-backend:spawn-ok | taskId=run-run-mp3x8bm3 containerId=6b9edf5a57d3 instantExit=false |
+| 2026-05-13T10:34:44.944Z | readJsonSafeAsync | ENOENT: no such file or directory, open '/home/alperen/.deckent/config.json' |
+| 2026-05-13T10:34:44.967Z | docker-backend:spawn-lock | taskId=165-004 acquired 5 spawn lock(s) |
+| 2026-05-13T10:34:45.090Z | docker-backend:spawn | taskId=165-004 container=deckent-w-165-004 model=sonnet |
+| 2026-05-13T10:34:45.091Z | docker-backend:spawn-attempt | taskId=165-004 attempt=1/2 |
+| 2026-05-13T10:34:48.503Z | docker-backend:spawn-ok | taskId=165-004 containerId=860dabbaf6df instantExit=false |
+| 2026-05-13T10:37:53.330Z | docker-backend:exit | taskId=165-004 exitCode=0 |
+| 2026-05-13T10:37:53.506Z | docker-backend:spawn-lock | taskId=165-004 released 5 spawn lock(s) on exit |
+| 2026-05-13T10:40:51.903Z | readJsonSafeAsync | ENOENT: no such file or directory, open '/home/alperen/.deckent/config.json' |
+| 2026-05-13T10:40:54.484Z | readJsonSafeAsync | ENOENT: no such file or directory, open '/home/alperen/.deckent/config.json' |
+| 2026-05-13T10:40:57.049Z | readJsonSafeAsync | ENOENT: no such file or directory, open '/home/alperen/.deckent/config.json' |
+| 2026-05-13T10:40:57.077Z | scope-sanitizer | warnings=2, rejected=0 |
+| 2026-05-13T10:40:57.080Z | docker-backend:spawn-lock | taskId=165-005 acquired 9 spawn lock(s) |
+| 2026-05-13T10:40:57.182Z | docker-backend:spawn | taskId=165-005 container=deckent-w-165-005 model=sonnet |
+| 2026-05-13T10:40:57.183Z | docker-backend:spawn-attempt | taskId=165-005 attempt=1/2 |
+| 2026-05-13T10:41:01.400Z | docker-backend:spawn-ok | taskId=165-005 containerId=56411f9f0584 instantExit=false |
+| 2026-05-13T10:43:54.853Z | docker-backend:exit | taskId=run-run-mp3x8bm3 exitCode=0 |
+| 2026-05-13T10:44:53.662Z | readJsonSafeAsync | ENOENT: no such file or directory, open '/home/alperen/.deckent/config.json' |
+| 2026-05-13T10:44:55.271Z | readJsonSafeAsync | ENOENT: no such file or directory, open '/home/alperen/.deckent/config.json' |
+| 2026-05-13T10:44:56.866Z | readJsonSafeAsync | ENOENT: no such file or directory, open '/home/alperen/.deckent/config.json' |
+| 2026-05-13T10:44:59.435Z | readJsonSafeAsync | ENOENT: no such file or directory, open '/home/alperen/.deckent/config.json' |
+| 2026-05-13T10:46:34.859Z | readJsonSafeAsync | ENOENT: no such file or directory, open '/home/alperen/.deckent/config.json' |
+| 2026-05-13T10:46:34.961Z | docker-backend:spawn | taskId=run-run-mp3xpqai container=deckent-w-run-run-mp3xpqai model=opus |
+| 2026-05-13T10:46:34.962Z | docker-backend:spawn-attempt | taskId=run-run-mp3xpqai attempt=1/2 |
+| 2026-05-13T10:46:38.396Z | docker-backend:spawn-ok | taskId=run-run-mp3xpqai containerId=5487e2f14737 instantExit=false |
+| 2026-05-13T10:46:53.046Z | docker-backend:spawn | taskId=run-run-mp3xq48s container=deckent-w-run-run-mp3xq48s model=opus |
+| 2026-05-13T10:46:53.047Z | docker-backend:spawn-attempt | taskId=run-run-mp3xq48s attempt=1/2 |
+| 2026-05-13T10:46:56.476Z | docker-backend:spawn-ok | taskId=run-run-mp3xq48s containerId=d5fc671bb583 instantExit=false |
+| 2026-05-13T10:47:09.950Z | docker-backend:exit | taskId=165-005 exitCode=0 |
+| 2026-05-13T10:47:10.110Z | docker-backend:spawn-lock | taskId=165-005 released 9 spawn lock(s) on exit |
+| 2026-05-13T11:02:59.545Z | docker-backend:exit | taskId=run-run-mp3xq48s exitCode=0 |
+| 2026-05-13T11:06:23.233Z | docker-backend:exit | taskId=run-run-mp3xpqai exitCode=0 |
+| 2026-05-13T11:15:41.365Z | runSelfAuditGate:tsc | status=PASS errors=0 |
+| 2026-05-13T11:16:59.319Z | runSelfAuditGate:vitest | status=FAIL delta.fail=2 |
+| 2026-05-13T11:16:59.344Z | runSelfAuditGate:honesty | violations=0 |
+| 2026-05-13T11:16:59.347Z | runSelfAuditGate | overallGate=GATE_FAILURE sprint=sprint-165 |

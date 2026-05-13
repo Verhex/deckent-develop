@@ -1,0 +1,1 @@
+{"taskId":"165-001","selfAssessment":"NO_GO","notes":"Container OOM-killed (exit 137, SIGKILL). Partial-result promoted by host monitor. No .result was written by worker.","partialMarker":true,"tokenUsage":{"inputTokens":0,"outputTokens":0,"cacheReadTokens":0,"provider":"claude","model":"opus"},"exitCode":137}
