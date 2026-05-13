@@ -175,6 +175,8 @@ Step 5: updateProjectDocs (managed-doc-runner sprint-aware)  [UNCHANGED]
 
 **Kontrat:** adrInsert (Step 3) **ÖNCE** çalışır → ruleRegen (Step 4) memory.db'den ADR-043+ okur → `.claude/rules/brain.md` inject. T11 ADR-046 bu kontratı dokümante eder + regression test (`identity-generator-step-order.test.ts`).
 
+**T11 task JSON dependencies enforcement (v5 patch — Agent B F5):** T11 task JSON'unda `dependencies: ["166-T1","166-T2","166-T3"]` ZORUNLU. Wave 1.5 gate scheduler tarafından enforce edilir (Sprint 134 T-005 priority + dependencies altyapısı), manuel CHECKPOINT sonrası spawn. AI planner T11'i Wave 1'e paralel düşüremez.
+
 ### 5.2 Per-Task TDD + LoC Matrix
 
 | Task | LoC | Test count | Idempotency test | Failing-first kanıtı | Post-condition |
@@ -188,7 +190,7 @@ Step 5: updateProjectDocs (managed-doc-runner sprint-aware)  [UNCHANGED]
 | T6 | ~80 | 4 | 0 | atomic transaction test | sqlite3 ... `entries WHERE sprint_id IS NULL` → 0 |
 | T7 | ~40 | 3 | 0 | `verify-ran` marker | grep `.brain/DECISIONS.md` DECKENT.md 0 match |
 | T8 | ~60 | 4 | 0 | `verify-ran` marker | TOOLS.md auto-generated 27 MCP listed |
-| T9 | ~40 | 3 | 0 | `verify-ran` marker | emitAlert('stale_md') codepath kanıt |
+| T9 | ~70 (40+30 helper) | 3 | 0 | `verify-ran` marker | emitAlert('stale_md') codepath kanıt + `src/monitor/alert-emitter.ts` yeni helper |
 | T10 | ~30 | 2 | 0 | `verify-ran` marker | verify-ran .tmp + rename test |
 | **TOPLAM** | **~510** | **35** | **3** | — | — |
 
@@ -252,6 +254,8 @@ COLLISION CHECK (Sprint 138 detectScopeCollisions):
 - Wave başı cumulative `in+out > 900K` → Alperen manuel triage
 - Sprint sonu metric file ≥10 satır (Sprint 165 4-satır anomalisinden uzak)
 - Monitoring source: `.deckent/sprint-166-metrics.jsonl` (Wave bazlı emit)
+
+**Token gate enforcement (v5 patch — Agent B F7):** Sprint 166'da **advisory only** (manuel triage, Sprint controller'a otomatik blocker eklenmemiş). Sprint 167 P0: automatic blocker codepath (`sprint-controller.ts` Wave başı `if (cumulativeTokens > 900K) waitForApproval()`).
 
 ## 7. GO/NO_GO Criteria
 
