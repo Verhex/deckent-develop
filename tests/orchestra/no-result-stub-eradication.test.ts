@@ -1,0 +1,305 @@
+// ─── No-Result Stub Eradication Tests ────────────────────────────────────
+// Sprint 165 Task 1 (Bug X): Brain "no-result → CODE_VERIFIED_DONE" stub
+// eradication. Sprint 156-011 CRITICAL debt reproduce on Sprint 164.
+//
+// The bug: when a worker dies (Docker HB shutdown, OOM) without writing .result,
+// Brain previously wrote a stub:
+//   { linesAdded: 0, testsPassed: false, selfAssessment: 'DONE',
+//     codeVerified: 'CODE_VERIFIED_DONE', notes: 'Code physically verified...' }
+// This treated dead workers as successful. The fix: an honest gate that
+// forces NO_GO whenever (linesAdded === 0 && testsPassed === false) even
+// when selfAssessment claims DONE, regardless of any codeVerified marker.
+
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { mkdtempSync, rmSync, writeFileSync, existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+import {
+  enforceHonestResultGate,
+  classifyHonestyViolation,
+  writeHonestSentinelResult,
+  isStubResult,
+} from '../../src/orchestra/result-evaluator.js';
+import type { Task, TaskResult } from '../../src/core/task-types.js';
+import { TaskStatus } from '../../src/core/types.js';
+
+// ─── Test helpers ─────────────────────────────────────────────────────────
+
+function makeTask(overrides: Partial<Task> = {}): Task {
+  return {
+    id: '165-001',
+    title: 'Bug X fix',
+    description: 'Eradicate CODE_VERIFIED_DONE stub',
+    model: 'opus',
+    effort: 'high',
+    priority: 'CRITICAL',
+    reason: 'Sprint 156-011 debt replay',
+    scope: {
+      directories: ['src/orchestra/', 'src/agents/', 'tests/orchestra/'],
+      filesRead: [],
+      filesWrite: [
+        'src/orchestra/result-evaluator.ts',
+        'src/orchestra/debt-manager.ts',
+        'src/orchestra/sprint-phases.ts',
+        'src/agents/worker.ts',
+        'tests/orchestra/no-result-stub-eradication.test.ts',
+      ],
+    },
+    dependencies: [],
+    goNogo: { goCriteria: '', noGoCriteria: '', techDebtAcceptable: '' },
+    status: TaskStatus.EXECUTING,
+    ...overrides,
+  };
+}
+
+function makeResult(overrides: Partial<TaskResult> = {}): TaskResult {
+  return {
+    taskId: '165-001',
+    workerId: 'w-165-001',
+    filesChanged: ['src/orchestra/result-evaluator.ts'],
+    linesAdded: 120,
+    linesRemoved: 10,
+    testsPassed: true,
+    coverage: 90,
+    selfAssessment: 'DONE',
+    notes: 'Real work performed',
+    ...overrides,
+  };
+}
+
+// ─── Scenario (a) — Real work + tests pass → DONE preserved ──────────────
+
+describe('enforceHonestResultGate — Scenario (a): real DONE preserved', () => {
+  it('passes through DONE when linesAdded>0 and testsPassed=true', () => {
+    const task = makeTask();
+    const result = makeResult({ linesAdded: 120, testsPassed: true, selfAssessment: 'DONE' });
+
+    const gated = enforceHonestResultGate(result, task);
+
+    expect(gated.honest).toBe(true);
+    expect(gated.violation).toBeUndefined();
+    expect(gated.result.selfAssessment).toBe('DONE');
+    expect(gated.result.linesAdded).toBe(120);
+  });
+
+  it('passes through GO_WITH_TECH_DEBT when linesAdded>0 and selfAssessment is tech debt', () => {
+    const task = makeTask();
+    const result = makeResult({ linesAdded: 50, testsPassed: true, selfAssessment: 'GO_WITH_TECH_DEBT' });
+
+    const gated = enforceHonestResultGate(result, task);
+
+    expect(gated.honest).toBe(true);
+    expect(gated.result.selfAssessment).toBe('GO_WITH_TECH_DEBT');
+  });
+});
+
+// ─── Scenario (b) — Real work + tests fail → not downgraded by gate ──────
+// (Rubric eval decides — NO_GO or GO_WITH_TECH_DEBT — not the honest gate.)
+
+describe('enforceHonestResultGate — Scenario (b): real-work test-fail not downgraded by gate', () => {
+  it('does NOT force NO_GO when linesAdded>0 even if testsPassed=false', () => {
+    const task = makeTask();
+    const result = makeResult({
+      linesAdded: 80,
+      testsPassed: false,
+      selfAssessment: 'GO_WITH_TECH_DEBT',
+      notes: 'Implementation done, 2 tests still flaky',
+    });
+
+    const gated = enforceHonestResultGate(result, task);
+
+    // Honest gate only triggers on (linesAdded === 0 && testsPassed === false).
+    // Real work with failing tests is a rubric/evaluator concern, not a stub.
+    expect(gated.honest).toBe(true);
+    expect(gated.violation).toBeUndefined();
+    expect(gated.result.selfAssessment).toBe('GO_WITH_TECH_DEBT');
+  });
+});
+
+// ─── Scenario (c) — Missing .result with on-disk files → NO_GO sentinel ──
+
+describe('writeHonestSentinelResult — Scenario (c): missing .result becomes honest NO_GO', () => {
+  let tmpRoot: string;
+
+  beforeEach(() => {
+    tmpRoot = mkdtempSync(join(tmpdir(), 'deckent-stub-eradication-'));
+    // .tasks dir
+    writeFileSync(join(tmpRoot, '.gitkeep'), '');
+    require('node:fs').mkdirSync(join(tmpRoot, '.tasks'), { recursive: true });
+  });
+
+  afterEach(() => {
+    rmSync(tmpRoot, { recursive: true, force: true });
+  });
+
+  it('writes honest NO_GO sentinel — not a CODE_VERIFIED_DONE stub', () => {
+    const taskId = '165-001';
+    const filesOnDisk = ['src/orchestra/result-evaluator.ts'];
+
+    writeHonestSentinelResult(tmpRoot, taskId, filesOnDisk, 'worker-crashed-no-result');
+
+    const resultPath = join(tmpRoot, '.tasks', `task-${taskId}.result`);
+    expect(existsSync(resultPath)).toBe(true);
+
+    const parsed = JSON.parse(readFileSync(resultPath, 'utf-8')) as TaskResult & {
+      codeVerified?: string;
+      partialMarker?: boolean;
+    };
+
+    // CRITICAL: NO_GO, never DONE, no codeVerified field
+    expect(parsed.selfAssessment).toBe('NO_GO');
+    expect(parsed.linesAdded).toBe(0);
+    expect(parsed.testsPassed).toBe(false);
+    expect(parsed.codeVerified).toBeUndefined();
+    expect(parsed.notes).toContain('worker-crashed-no-result');
+    // notes MUST NOT match Docker auto-pattern (would re-trigger tryCodeVerifiedDone)
+    expect(parsed.notes).not.toContain('Docker worker exited without writing result file');
+  });
+});
+
+// ─── Scenario (d) — Stub literal → forced NO_GO ──────────────────────────
+
+describe('enforceHonestResultGate — Scenario (d): stub literal forced to NO_GO', () => {
+  it('downgrades selfAssessment DONE with linesAdded=0 + testsPassed=false to NO_GO', () => {
+    const task = makeTask();
+    const stubResult: TaskResult & { codeVerified?: string } = {
+      taskId: '165-001',
+      workerId: 'brain-reconcile',
+      filesChanged: ['src/orchestra/result-evaluator.ts'],
+      linesAdded: 0,
+      linesRemoved: 0,
+      testsPassed: false,
+      coverage: 0,
+      selfAssessment: 'DONE',
+      notes: 'Code physically verified despite missing .result (Sprint 135 docker HB shutdown bug pattern)',
+      codeVerified: 'CODE_VERIFIED_DONE',
+    };
+
+    const gated = enforceHonestResultGate(stubResult, task);
+
+    expect(gated.honest).toBe(false);
+    expect(gated.violation).toBe('DISHONEST_DONE_STUB');
+    expect(gated.result.selfAssessment).toBe('NO_GO');
+    // codeVerified field MUST be stripped — never re-emitted by the gate
+    expect((gated.result as TaskResult & { codeVerified?: string }).codeVerified).toBeUndefined();
+    expect(gated.result.notes).toContain('honest-gate');
+  });
+
+  it('isStubResult detects the literal stub pattern', () => {
+    const stub: TaskResult & { codeVerified?: string } = {
+      taskId: '165-001',
+      workerId: 'brain-reconcile',
+      filesChanged: ['src/foo.ts'],
+      linesAdded: 0,
+      linesRemoved: 0,
+      testsPassed: false,
+      coverage: 0,
+      selfAssessment: 'DONE',
+      notes: 'stub',
+      codeVerified: 'CODE_VERIFIED_DONE',
+    };
+
+    expect(isStubResult(stub)).toBe(true);
+
+    const real = makeResult({ linesAdded: 100, testsPassed: true });
+    expect(isStubResult(real)).toBe(false);
+  });
+});
+
+// ─── Scenario (e) — Docker crash + heartbeat timeout → NO_GO + FIX ────────
+
+describe('classifyHonestyViolation — Scenario (e): docker crash classified for FIX', () => {
+  it('classifies missing result + crashed worker as worker-crashed-no-result', () => {
+    const task = makeTask();
+    // No result file at all — only on-disk evidence
+    const violation = classifyHonestyViolation({
+      hasResultFile: false,
+      result: null,
+      task,
+      filesOnDisk: ['src/orchestra/result-evaluator.ts'],
+      heartbeatTimedOut: true,
+    });
+
+    expect(violation.code).toBe('WORKER_CRASHED_NO_RESULT');
+    expect(violation.triggersFix).toBe(true);
+    expect(violation.evaluation).toBe('NO_GO');
+  });
+
+  it('classifies present-but-stub result as DISHONEST_DONE_STUB and triggers FIX', () => {
+    const task = makeTask();
+    const stub: TaskResult & { codeVerified?: string } = {
+      taskId: '165-001',
+      workerId: 'brain-reconcile',
+      filesChanged: ['src/orchestra/result-evaluator.ts'],
+      linesAdded: 0,
+      linesRemoved: 0,
+      testsPassed: false,
+      coverage: 0,
+      selfAssessment: 'DONE',
+      notes: 'Code physically verified',
+      codeVerified: 'CODE_VERIFIED_DONE',
+    };
+
+    const violation = classifyHonestyViolation({
+      hasResultFile: true,
+      result: stub,
+      task,
+      filesOnDisk: ['src/orchestra/result-evaluator.ts'],
+      heartbeatTimedOut: false,
+    });
+
+    expect(violation.code).toBe('DISHONEST_DONE_STUB');
+    expect(violation.triggersFix).toBe(true);
+    expect(violation.evaluation).toBe('NO_GO');
+  });
+});
+
+// ─── Scenario (f) — Scope violation → NO_GO + boundary alarm ──────────────
+
+describe('enforceHonestResultGate — Scenario (f): scope violation forced to NO_GO', () => {
+  it('forces NO_GO when filesChanged contains path outside scope.filesWrite', () => {
+    const task = makeTask({
+      scope: {
+        directories: ['src/orchestra/'],
+        filesRead: [],
+        filesWrite: ['src/orchestra/result-evaluator.ts'],
+      },
+    });
+    // Worker reports writing files INSIDE its scope BUT also touched an
+    // out-of-scope file (DIRECTIVES.md — Sprint 164 164-006 scenario).
+    const result = makeResult({
+      filesChanged: ['src/orchestra/result-evaluator.ts', 'DIRECTIVES.md'],
+      linesAdded: 50,
+      testsPassed: true,
+      selfAssessment: 'DONE',
+    });
+
+    const gated = enforceHonestResultGate(result, task);
+
+    expect(gated.honest).toBe(false);
+    expect(gated.violation).toBe('BOUNDARY_VIOLATION');
+    expect(gated.result.selfAssessment).toBe('NO_GO');
+    expect(gated.result.notes).toContain('boundary');
+  });
+
+  it('does NOT flag boundary violation when all filesChanged are inside scope', () => {
+    const task = makeTask({
+      scope: {
+        directories: ['src/orchestra/'],
+        filesRead: [],
+        filesWrite: ['src/orchestra/result-evaluator.ts', 'src/orchestra/debt-manager.ts'],
+      },
+    });
+    const result = makeResult({
+      filesChanged: ['src/orchestra/result-evaluator.ts', 'src/orchestra/debt-manager.ts'],
+      linesAdded: 50,
+      testsPassed: true,
+      selfAssessment: 'DONE',
+    });
+
+    const gated = enforceHonestResultGate(result, task);
+
+    expect(gated.honest).toBe(true);
+    expect(gated.violation).toBeUndefined();
+  });
+});

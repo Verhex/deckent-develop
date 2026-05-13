@@ -81,6 +81,18 @@ import { calculateMetrics } from './sprint-reporter.js';
 // ─── Rubric-Based Evaluation ─────────────────────────────────────
 import { evaluateWithRubric } from './result-evaluator.js';
 
+// ─── Honest Result Gate (Sprint 165 Task 1 — Bug X Fix) ─────────
+// Single canonical honesty boundary. Applied before evaluateWithRubric
+// to downgrade dishonest DONE stubs (linesAdded=0 + testsPassed=false)
+// to NO_GO. Used a second time in runRetroPhase to write honest
+// sentinels for tasks whose .result is missing, so the legacy
+// tryCodeVerifiedDone path in finalizeSprint cannot auto-promote.
+import {
+  enforceHonestResultGate,
+  writeHonestSentinelResult,
+  isStubResult,
+} from './result-evaluator.js';
+
 // ─── Result Map Helper ──────────────────────────────────────────
 import { buildResultsMap } from './result-collector.js';
 
@@ -731,10 +743,65 @@ export async function runEvaluatePhase(
 
     for (const task of sprint.tasks) {
       if (collectedIds.has(task.id)) {
-        const result = resultsMap.get(task.id);
-        if (!result) continue; // narrowed: collectedIds contains task.id
+        const rawResult = resultsMap.get(task.id);
+        if (!rawResult) continue; // narrowed: collectedIds contains task.id
+
+        // ── Honest Result Gate (Sprint 165 Task 1 — Bug X) ────────
+        // Downgrade dishonest DONE stubs BEFORE rubric scoring so the
+        // Sprint 156-011 / Sprint 164 CODE_VERIFIED_DONE pattern cannot
+        // produce false-DONE evaluations. enforceHonestResultGate is a
+        // pure function — returns the original on honest results.
+        //
+        // Wrapped in try/catch so partial mocks of result-evaluator.js
+        // (test contexts that stub only evaluateWithRubric) cannot abort
+        // the EVALUATE loop. Gate faults log + treat-as-honest fallback.
+        let gated: { result: TaskResult; honest: boolean; violation?: string };
+        try {
+          gated = typeof enforceHonestResultGate === 'function'
+            ? enforceHonestResultGate(rawResult, task)
+            : { result: rawResult, honest: true };
+        } catch (e) {
+          debugLog('runEvaluatePhase:honestGate:fault', e);
+          gated = { result: rawResult, honest: true };
+        }
+        const result = gated.result;
+        if (!gated.honest) {
+          // Emit a stub-write audit event so observers (Auditor, dashboard,
+          // CI gates) can correlate this downgrade with the originating
+          // task. ADR-035: BRAIN→AUDITOR:STUB_WRITE_DETECTED broadcast.
+          try {
+            const sidForGate = getCurrentSprintId(projectRoot) ?? sprint.id;
+            writeEvent(
+              projectRoot, sidForGate, 'brain', 'auditor',
+              'BRAIN→AUDITOR:STUB_WRITE_DETECTED',
+              {
+                taskId: task.id,
+                violation: gated.violation,
+                originalSelfAssessment: rawResult.selfAssessment,
+                linesAdded: rawResult.linesAdded ?? 0,
+                testsPassed: rawResult.testsPassed === true,
+                timestamp: new Date().toISOString(),
+              },
+            );
+          } catch (e) { debugLog('runEvaluatePhase:stub-write-event', e); }
+          // Overwrite the .result file on disk with the gated NO_GO copy
+          // so finalizeSprint's tryCodeVerifiedDone cannot re-promote it.
+          try {
+            const resultPath = join(projectRoot, '.tasks', `task-${task.id}.result`);
+            writeFileSync(resultPath, JSON.stringify(result, null, 2) + '\n', 'utf-8');
+          } catch (e) { debugLog('runEvaluatePhase:gated-write', e); }
+          debugLog('runEvaluatePhase:honestGate', `task=${task.id} violation=${gated.violation} → forced NO_GO`);
+        }
+
         const rubricResult = evaluateWithRubric(result, task);
         let evaluation = toTaskEvaluation(rubricResult);
+        // Sprint 165 Task 1: ensure honest-gate violations cannot be re-promoted
+        // by the rubric reconciler (reconcileRubricNoGo can override NO_GO
+        // when concrete rubric scores look good — for stub results this would
+        // re-introduce the bug). Lock to NO_GO when violation was detected.
+        if (!gated.honest) {
+          evaluation = TaskEvaluation.NO_GO;
+        }
 
         // CI regression check: run after initial evaluation (non-fatal)
         let ciCheckResult: CiRegressionCheckResult | undefined;
@@ -1110,6 +1177,60 @@ export async function runRetroPhase(
     try {
       sprint.status = SprintStatus.RETROSPECTIVE;
       sprint.phase = SprintPhase.RETRO;
+
+      // ── Pre-Finalize Honest-Sentinel Pass (Sprint 165 Task 1 — Bug X) ──
+      // BEFORE finalizeSprint runs (which calls tryCodeVerifiedDone +
+      // writeCodeVerifiedResult for any NO_GO task with missing .result OR
+      // Docker-auto-NO_GO notes), pre-write honest NO_GO sentinels for any
+      // task that lacks a .result file. The sentinel's notes deliberately
+      // omit the Docker auto-pattern phrase so tryCodeVerifiedDone returns
+      // NOT_TRIGGERED for these tasks — the buggy auto-promote codepath
+      // is starved of inputs. Also rewrites any existing stub-shaped
+      // .result file with an honest NO_GO so the downstream promotion
+      // cannot run on second-chance reads.
+      //
+      // Pass is wrapped in try/catch and the inner helpers are typeof-
+      // guarded so partial mocks of result-evaluator.js (test contexts
+      // that stub only the rubric scorer) cannot abort RETRO.
+      try {
+        const haveSentinel = typeof writeHonestSentinelResult === 'function';
+        const haveStubCheck = typeof isStubResult === 'function';
+        if (haveSentinel || haveStubCheck) {
+          const tasksDir = join(projectRoot, TASKS_DIR);
+          for (const task of sprint.tasks) {
+            const resultPath = join(tasksDir, `task-${task.id}.result`);
+            const exists = existsSync(resultPath);
+            if (!exists) {
+              if (haveSentinel) {
+                writeHonestSentinelResult(
+                  projectRoot, task.id, [], 'worker-crashed-no-result',
+                );
+                evaluations.set(task.id, TaskEvaluation.NO_GO);
+              }
+              continue;
+            }
+            // Existing .result — check for stub shape and rewrite if dishonest
+            try {
+              const raw = readFileSync(resultPath, 'utf-8');
+              const parsed = JSON.parse(raw) as TaskResult;
+              if (haveStubCheck && isStubResult(parsed)) {
+                debugLog('runRetroPhase:preFinalize', `Rewriting stub .result for task ${task.id}`);
+                if (haveSentinel) {
+                  writeHonestSentinelResult(
+                    projectRoot, task.id, parsed.filesChanged ?? [], 'dishonest-done-stub',
+                  );
+                }
+                evaluations.set(task.id, TaskEvaluation.NO_GO);
+              }
+            } catch (e) {
+              debugLog('runRetroPhase:preFinalize:parse', `task=${task.id} ${e}`);
+            }
+          }
+        }
+      } catch (e) {
+        debugLog('runRetroPhase:preFinalize', e);
+      }
+
       // Dynamic import to avoid circular dep at module level
       const { regenerateRules } = await import('../core/rule-generator.js');
       return await finalizeSprint(projectRoot, sprint, evaluations, results, {

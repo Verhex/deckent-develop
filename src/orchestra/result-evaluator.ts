@@ -5,11 +5,11 @@
 // No side effects, no file writes — evaluation logic only.
 
 import { readFile, readdir, stat } from 'node:fs/promises';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Task, TaskResult, EvaluationRubric, RubricScore, EvaluationResult } from '../core/types.js';
 import { TaskEvaluation } from '../core/types.js';
-import { BRAIN_DIR, SPRINTS_DIR } from '../core/constants.js';
+import { BRAIN_DIR, SPRINTS_DIR, TASKS_DIR } from '../core/constants.js';
 import { debugLog } from '../core/utils.js';
 import { validateWorkerCoverage } from './coverage-validator.js';
 import { reconcileSpuriousNoGo, reconcileRubricNoGo } from './mid-sprint-adapter.js';
@@ -1542,6 +1542,364 @@ export type {
   CodeVerifyOptions,
   CodeVerifyResult,
 } from '../monitor/auditor.js';
+
+// ─── Honest Result Gate (Sprint 165 Task 1 — Bug X Fix) ──────────────
+// Eradicates the "no-result → CODE_VERIFIED_DONE" stub pattern that
+// Sprint 156-011 marked CRITICAL and Sprint 164 reproduced live.
+//
+// The bug: when a worker died (Docker HB shutdown, OOM, scope mismatch)
+// without writing .result, the auditor + sprint-finalizer pipeline wrote
+// a fake-DONE stub:
+//   { linesAdded: 0, testsPassed: false, selfAssessment: 'DONE',
+//     codeVerified: 'CODE_VERIFIED_DONE',
+//     notes: 'Code physically verified despite missing .result ...' }
+// Brain then counted dead-worker tasks as successful.
+//
+// The gate below is the single canonical honest-eval boundary applied
+// at the EVALUATE phase (sprint-phases.ts:runEvaluatePhase) and again
+// before RETRO (writeHonestSentinelResult is called for missing-result
+// tasks so the finalizer's tryCodeVerifiedDone sees an honest NO_GO
+// instead of triggering the legacy auto-promote codepath).
+
+/**
+ * Stub-detection union: which dishonesty pattern triggered the gate.
+ * - DISHONEST_DONE_STUB: selfAssessment=DONE but linesAdded=0 + tests fail
+ * - CODE_VERIFIED_STUB:  legacy auditor stub (codeVerified field present)
+ * - WORKER_CRASHED_NO_RESULT: no .result file on disk
+ * - BOUNDARY_VIOLATION: filesChanged contains paths outside filesWrite
+ * - SCOPE_VIOLATION_OR_EMPTY_WRITE: filesChanged non-empty but linesAdded=0
+ */
+export type HonestyViolation =
+  | 'DISHONEST_DONE_STUB'
+  | 'CODE_VERIFIED_STUB'
+  | 'WORKER_CRASHED_NO_RESULT'
+  | 'BOUNDARY_VIOLATION'
+  | 'SCOPE_VIOLATION_OR_EMPTY_WRITE';
+
+/**
+ * Result of running enforceHonestResultGate.
+ * - `result`: the (possibly downgraded) TaskResult to use downstream
+ * - `honest`: true if the original was honest, false if downgraded
+ * - `violation`: which dishonesty pattern was detected (when !honest)
+ */
+export interface HonestGateResult {
+  result: TaskResult;
+  honest: boolean;
+  violation?: HonestyViolation;
+}
+
+/**
+ * Sentinel notes prefix attached to all downgraded results so the
+ * downstream evaluator + auditor can identify gated tasks without
+ * re-running the gate logic.
+ */
+const HONEST_GATE_PREFIX = '[honest-gate]';
+
+/**
+ * Detects the literal stub written by sprint-finalizer.ts's
+ * writeCodeVerifiedResult — the exact shape from Sprint 164 forensic.
+ */
+export function isStubResult(result: TaskResult): boolean {
+  if (!result) return false;
+  const codeVerified = (result as TaskResult & { codeVerified?: string }).codeVerified;
+  const linesAdded = result.linesAdded ?? 0;
+  const testsPassed = result.testsPassed === true;
+  const selfDone = result.selfAssessment === 'DONE';
+
+  // CODE_VERIFIED_DONE marker is the strongest signal (legacy stub writer)
+  if (codeVerified === 'CODE_VERIFIED_DONE' && linesAdded === 0 && !testsPassed) {
+    return true;
+  }
+  // Even without the marker, the shape itself is dishonest
+  if (selfDone && linesAdded === 0 && !testsPassed) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Detects when filesChanged contains paths outside of task.scope.filesWrite.
+ * This is the Sprint 164 164-006 scenario (worker tried to write DIRECTIVES.md
+ * which was outside its scope). Returns the violating paths (empty = clean).
+ */
+function findBoundaryViolations(result: TaskResult, task: Task): string[] {
+  const filesWrite = task.scope?.filesWrite ?? [];
+  if (filesWrite.length === 0) return [];
+
+  const allowed = new Set(filesWrite.map(f => f.replace(/\\/g, '/')));
+  const violations: string[] = [];
+
+  for (const changed of result.filesChanged ?? []) {
+    const norm = changed.replace(/\\/g, '/');
+    // Allow direct match OR match under any allowed directory in scope
+    if (allowed.has(norm)) continue;
+    // Scope-directory containment check
+    const dirs = task.scope?.directories ?? [];
+    const insideDir = dirs.some(d => {
+      const dn = d.endsWith('/') ? d : `${d}/`;
+      return norm.startsWith(dn.replace(/\\/g, '/'));
+    });
+    if (!insideDir) {
+      violations.push(changed);
+    }
+  }
+  return violations;
+}
+
+/**
+ * Build a downgraded NO_GO copy of the input result, stripping any
+ * `codeVerified` stub marker and prepending the honest-gate prefix to notes.
+ */
+function downgradeToNoGo(
+  result: TaskResult,
+  violation: HonestyViolation,
+  detail: string,
+): TaskResult {
+  const stripped: TaskResult & { codeVerified?: string } = { ...result };
+  // Strip the dishonest marker so it cannot resurface downstream
+  delete stripped.codeVerified;
+  const originalNotes = (result.notes ?? '').slice(0, 500);
+  const newNotes = `${HONEST_GATE_PREFIX} ${violation}: ${detail}. Original: ${originalNotes}`;
+  return {
+    ...stripped,
+    selfAssessment: 'NO_GO',
+    notes: newNotes,
+  };
+}
+
+/**
+ * The canonical honest-eval gate. Applied to every result BEFORE the
+ * rubric scorer (in runEvaluatePhase) so dishonest DONE stubs never reach
+ * the downstream pipeline.
+ *
+ * Order of checks (first match wins):
+ *   1. Stub literal (isStubResult)               → DISHONEST_DONE_STUB / CODE_VERIFIED_STUB
+ *   2. filesChanged contains out-of-scope path   → BOUNDARY_VIOLATION
+ *   3. filesChanged non-empty + linesAdded === 0 → SCOPE_VIOLATION_OR_EMPTY_WRITE
+ *      (only when selfAssessment claims success)
+ *
+ * Real-work failure modes (linesAdded>0 + testsPassed=false) are left
+ * untouched — the rubric scorer / mid-sprint reconciler handles those.
+ */
+export function enforceHonestResultGate(
+  result: TaskResult,
+  task: Task,
+): HonestGateResult {
+  if (!result) {
+    return { result, honest: true };
+  }
+
+  // Check 1: stub literal (covers Sprint 156-011 CRITICAL debt + Sprint 164 replay)
+  if (isStubResult(result)) {
+    const codeVerified = (result as TaskResult & { codeVerified?: string }).codeVerified;
+    const violation: HonestyViolation =
+      codeVerified === 'CODE_VERIFIED_DONE'
+        ? 'DISHONEST_DONE_STUB'
+        : 'DISHONEST_DONE_STUB';
+    const detail = codeVerified === 'CODE_VERIFIED_DONE'
+      ? `legacy CODE_VERIFIED_DONE marker detected; linesAdded=${result.linesAdded ?? 0} testsPassed=${result.testsPassed}`
+      : `selfAssessment=DONE claimed but linesAdded=${result.linesAdded ?? 0} testsPassed=${result.testsPassed} — worker likely crashed`;
+    debugLog('enforceHonestResultGate', `Task ${task.id}: ${violation} — ${detail}`);
+    return {
+      result: downgradeToNoGo(result, violation, detail),
+      honest: false,
+      violation,
+    };
+  }
+
+  // Check 2: boundary violation — only flag when worker claims success
+  const boundaryViolations = findBoundaryViolations(result, task);
+  if (
+    boundaryViolations.length > 0 &&
+    (result.selfAssessment === 'DONE' || result.selfAssessment === 'GO_WITH_TECH_DEBT')
+  ) {
+    const detail = `files outside scope.filesWrite: ${boundaryViolations.join(', ')}`;
+    debugLog('enforceHonestResultGate', `Task ${task.id}: BOUNDARY_VIOLATION — ${detail}`);
+    return {
+      result: downgradeToNoGo(result, 'BOUNDARY_VIOLATION', `boundary: ${detail}`),
+      honest: false,
+      violation: 'BOUNDARY_VIOLATION',
+    };
+  }
+
+  // Check 3: filesChanged non-empty but linesAdded === 0 + claimed success
+  // (sprint-finalizer's synthetic result shape — caught above by isStubResult,
+  // but this is a backstop for any other producer that emits the same shape)
+  if (
+    (result.filesChanged?.length ?? 0) > 0 &&
+    (result.linesAdded ?? 0) === 0 &&
+    result.selfAssessment === 'DONE'
+  ) {
+    debugLog('enforceHonestResultGate', `Task ${task.id}: SCOPE_VIOLATION_OR_EMPTY_WRITE`);
+    return {
+      result: downgradeToNoGo(
+        result,
+        'SCOPE_VIOLATION_OR_EMPTY_WRITE',
+        `filesChanged=${result.filesChanged.length} but linesAdded=0`,
+      ),
+      honest: false,
+      violation: 'SCOPE_VIOLATION_OR_EMPTY_WRITE',
+    };
+  }
+
+  return { result, honest: true };
+}
+
+/**
+ * Input shape for classifyHonestyViolation — describes the on-disk
+ * evidence the EVALUATE phase observed for a single task.
+ */
+export interface HonestyClassificationInput {
+  /** Whether .tasks/task-{id}.result exists */
+  hasResultFile: boolean;
+  /** Parsed result file content (null when missing or unparseable) */
+  result: TaskResult | null;
+  /** The task definition (for scope checks) */
+  task: Task;
+  /** Filesystem evidence — paths that show modifications */
+  filesOnDisk: string[];
+  /** Whether the worker's heartbeat timed out (Docker SIGKILL pattern) */
+  heartbeatTimedOut: boolean;
+}
+
+/**
+ * Output of classifyHonestyViolation — the verdict + whether FIX phase
+ * should re-spawn the task.
+ */
+export interface HonestyClassification {
+  /** The detected violation code (or null for honest results) */
+  code: HonestyViolation | null;
+  /** The evaluation to set in the evaluations Map */
+  evaluation: 'NO_GO' | 'DONE' | 'GO_WITH_TECH_DEBT';
+  /** Whether to trigger a FIX phase respawn */
+  triggersFix: boolean;
+  /** Human-readable detail line for audit logs */
+  detail: string;
+}
+
+/**
+ * Classifies a task's honesty state using on-disk evidence. Used by
+ * sprint-phases.ts BEFORE the rubric eval to decide whether the result
+ * deserves a fair evaluation or an honest-NO_GO downgrade.
+ *
+ * Three primary outcomes:
+ *   - WORKER_CRASHED_NO_RESULT — no .result + worker died → NO_GO + FIX trigger
+ *   - DISHONEST_DONE_STUB       — .result exists but stub-shaped → NO_GO + FIX trigger
+ *   - null (honest)             — pass through to rubric scorer
+ */
+export function classifyHonestyViolation(
+  input: HonestyClassificationInput,
+): HonestyClassification {
+  // Missing .result file → worker crashed without writing
+  if (!input.hasResultFile || !input.result) {
+    return {
+      code: 'WORKER_CRASHED_NO_RESULT',
+      evaluation: 'NO_GO',
+      triggersFix: true,
+      detail:
+        `worker-crashed-no-result — task ${input.task.id}: no .result file on disk` +
+        (input.heartbeatTimedOut ? '; heartbeat timed out' : '') +
+        (input.filesOnDisk.length > 0
+          ? `; on-disk evidence: ${input.filesOnDisk.join(', ')} (treated as NO_GO — not stub-promoted)`
+          : '; no on-disk evidence'),
+    };
+  }
+
+  // .result exists but is a stub
+  if (isStubResult(input.result)) {
+    const cv = (input.result as TaskResult & { codeVerified?: string }).codeVerified;
+    const code: HonestyViolation =
+      cv === 'CODE_VERIFIED_DONE' ? 'DISHONEST_DONE_STUB' : 'DISHONEST_DONE_STUB';
+    return {
+      code,
+      evaluation: 'NO_GO',
+      triggersFix: true,
+      detail:
+        `dishonest-done-stub — task ${input.task.id}: linesAdded=${input.result.linesAdded ?? 0} ` +
+        `testsPassed=${input.result.testsPassed} selfAssessment=${input.result.selfAssessment}` +
+        (cv ? ` codeVerified=${cv}` : ''),
+    };
+  }
+
+  // Boundary violation check (matches enforceHonestResultGate logic)
+  const boundary = findBoundaryViolations(input.result, input.task);
+  if (
+    boundary.length > 0 &&
+    (input.result.selfAssessment === 'DONE' || input.result.selfAssessment === 'GO_WITH_TECH_DEBT')
+  ) {
+    return {
+      code: 'BOUNDARY_VIOLATION',
+      evaluation: 'NO_GO',
+      triggersFix: true,
+      detail: `boundary-violation — task ${input.task.id}: out-of-scope files: ${boundary.join(', ')}`,
+    };
+  }
+
+  // Honest — pass through
+  return {
+    code: null,
+    evaluation:
+      input.result.selfAssessment === 'NO_GO'
+        ? 'NO_GO'
+        : input.result.selfAssessment === 'GO_WITH_TECH_DEBT'
+        ? 'GO_WITH_TECH_DEBT'
+        : 'DONE',
+    triggersFix: false,
+    detail: 'honest result — pass through to rubric scorer',
+  };
+}
+
+/**
+ * Writes a honest NO_GO sentinel .result file for a task whose worker
+ * crashed without producing a .result. Called from sprint-phases.ts
+ * BEFORE finalizeSprint runs so the legacy tryCodeVerifiedDone path sees
+ * a deliberate NO_GO (not the Docker auto-pattern note) and skips
+ * promotion entirely.
+ *
+ * The sentinel:
+ *   - selfAssessment: 'NO_GO'
+ *   - linesAdded: 0, testsPassed: false
+ *   - notes: prefixed with HONEST_GATE_PREFIX + the violation code
+ *   - codeVerified field: ABSENT (never re-emitted)
+ *   - notes deliberately DO NOT contain "Docker worker exited without writing result file"
+ *     so tryCodeVerifiedDone returns NOT_TRIGGERED (honest NO_GO preserved).
+ */
+export function writeHonestSentinelResult(
+  projectRoot: string,
+  taskId: string,
+  filesOnDisk: string[],
+  reason: string,
+): void {
+  const tasksDir = join(projectRoot, TASKS_DIR);
+  try {
+    mkdirSync(tasksDir, { recursive: true });
+  } catch (e) {
+    debugLog('writeHonestSentinelResult:mkdir', e);
+  }
+
+  const resultPath = join(tasksDir, `task-${taskId}.result`);
+  const sentinel: TaskResult = {
+    taskId,
+    workerId: 'brain-honest-gate',
+    filesChanged: filesOnDisk,
+    linesAdded: 0,
+    linesRemoved: 0,
+    testsPassed: false,
+    coverage: 0,
+    selfAssessment: 'NO_GO',
+    notes:
+      `${HONEST_GATE_PREFIX} ${reason} — task ${taskId} produced no .result file. ` +
+      `On-disk files: ${filesOnDisk.length > 0 ? filesOnDisk.join(', ') : 'none'}. ` +
+      `No real work verified; FIX phase respawn recommended.`,
+  };
+
+  try {
+    writeFileSync(resultPath, JSON.stringify(sentinel, null, 2) + '\n', 'utf-8');
+    debugLog('writeHonestSentinelResult', `Wrote honest NO_GO sentinel for task ${taskId}`);
+  } catch (e) {
+    debugLog('writeHonestSentinelResult:write', `Failed for task ${taskId}: ${e}`);
+  }
+}
 
 // ─── FIX Context Enrichment (D-3) ──────────────────────────────────
 

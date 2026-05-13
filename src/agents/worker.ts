@@ -308,6 +308,32 @@ export function writeResult(projectRoot: string, result: TaskResult, sprintId?: 
     (result as TaskResult & { planWarning?: string }).planWarning = 'missing';
   }
 
+  // ── Worker Self-Honesty (Sprint 165 Task 1 — Bug X) ──────────────
+  // A worker that claims DONE but reports linesAdded=0 + testsPassed=false
+  // is producing the exact stub shape the Sprint 156-011 / Sprint 164 bug
+  // exploited. Downgrade to NO_GO at the write boundary so the dishonest
+  // shape never reaches Brain's EVALUATE pipeline. The stripped
+  // codeVerified field guarantees the legacy auto-promote path cannot
+  // re-fire on a second-chance read.
+  const linesAdded = result.linesAdded ?? 0;
+  const testsPassed = result.testsPassed === true;
+  const codeVerified = (result as TaskResult & { codeVerified?: string }).codeVerified;
+  const looksLikeStub =
+    (result.selfAssessment === 'DONE' && linesAdded === 0 && !testsPassed) ||
+    (codeVerified === 'CODE_VERIFIED_DONE' && linesAdded === 0 && !testsPassed);
+  if (looksLikeStub) {
+    const stripped: TaskResult & { codeVerified?: string } = { ...result };
+    delete stripped.codeVerified;
+    const origNotes = (result.notes ?? '').slice(0, 400);
+    result = {
+      ...stripped,
+      selfAssessment: 'NO_GO',
+      notes:
+        `[honest-gate] worker-self-stub: linesAdded=${linesAdded} testsPassed=${testsPassed} — ` +
+        `DONE claim downgraded to NO_GO. Original: ${origNotes}`,
+    };
+  }
+
   const path = resultFilePath(projectRoot, result.taskId);
   _atomicWrite(path, JSON.stringify(result, null, 2));
 

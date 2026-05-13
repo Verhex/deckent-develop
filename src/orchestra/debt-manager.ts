@@ -253,8 +253,20 @@ export function handleEvaluation(
   // NO_GO — keep locks, create fix task
   updateTaskStatus(projectRoot, task.id, TaskStatus.NO_GO);
 
+  // ── Sprint 165 Task 1 — Bug X: honest-gate violation classification ──
+  // Worker-crashed and dishonest-done-stub NO_GOs need explicit FIX
+  // context. Notes prefixed with "[honest-gate]" come from the gate in
+  // result-evaluator.ts / sprint-phases.ts. Surface the violation code
+  // in the fix reason so the FIX worker knows it must perform real work
+  // (not just trust the previous .result).
+  const honestGateMatch = /\[honest-gate\]\s+([A-Z_-]+(?:[-_][a-z-]+)?|[a-z][a-z-]+):/i.exec(result.notes ?? '');
+  const honestGateViolation = honestGateMatch?.[1];
+
   // D-3: Build enriched fix context with specific failure details
   const fixReasonParts: string[] = [`Task ${task.id} evaluated as NO_GO`];
+  if (honestGateViolation) {
+    fixReasonParts.push(`honest-gate violation: ${honestGateViolation}`);
+  }
   if (result.rubricScores) {
     const rs = result.rubricScores;
     if (typeof rs.correctness === 'number') fixReasonParts.push(`correctness=${rs.correctness}`);
@@ -263,6 +275,7 @@ export function handleEvaluation(
   }
   if (!result.testsPassed) fixReasonParts.push('tests failed');
   if ((result.filesChanged?.length ?? 0) === 0) fixReasonParts.push('no files changed');
+  if ((result.linesAdded ?? 0) === 0) fixReasonParts.push('zero lines added — worker may have crashed');
   const enrichedReason = fixReasonParts.join('; ');
 
   const fixDescription = [
