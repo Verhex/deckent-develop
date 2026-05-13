@@ -2,7 +2,7 @@
   "mode": "performance",
   "language": "en",
   "projectName": "deckent",
-  "last_sprint_id": "sprint-164",
+  "last_sprint_id": "sprint-165",
   "spawn_backend": "docker",
   "modes": {
     "performance": {
@@ -160,8 +160,8 @@
         "auto_restore": true
       },
       "dead_event_stream": {
-        "enabled": false,
-        "reserve_for": "sprint-148"
+        "enabled": true,
+        "threshold_ms": 600000
       },
       "cost_threshold": {
         "enabled": false,

@@ -1,10 +1,11 @@
 // src/nervous/detector-registry.ts
 //
-// DetectorRegistry — 11 nervous system detector'ını yönetir ve çalıştırır.
+// DetectorRegistry — 12 nervous system detector'ını yönetir ve çalıştırır.
 // Config'e göre hangi detector'ların aktif olduğunu belirler, runAll() ile
 // tümünü çağırır, tek bir detector'ın başarısız olması diğerlerini etkilemez.
 //
-// Sprint 148 Task 8 (6 detector) + Sprint 151 Task 15 (5 yeni detector).
+// Sprint 148 Task 8 (6 detector) + Sprint 151 Task 15 (5 yeni detector)
+// + Sprint 165 Bug W (dead_event_stream aktif edildi).
 
 import type { DetectorContext, DetectorResult } from '../core/nervous-types.js';
 import { StaleWorkerDetector } from './detectors/stale-worker.js';
@@ -18,6 +19,7 @@ import { TokenSpikeDetector } from './detectors/token-spike.js';
 import { AgentRoutingAnomalyDetector } from './detectors/agent-routing-anomaly.js';
 import { ScopeCollisionRateDetector } from './detectors/scope-collision-rate.js';
 import { NotificationDeliveryHealthDetector } from './detectors/notification-delivery-health.js';
+import { DeadEventStreamDetector } from './detectors/dead-event-stream.js';
 
 // ─── Config Types ─────────────────────────────────────────────────────────────
 
@@ -65,6 +67,10 @@ export interface DetectorConfig {
   readonly notification_delivery_health?: {
     readonly enabled: boolean;
     readonly failure_rate_threshold?: number;
+  };
+  readonly dead_event_stream?: {
+    readonly enabled: boolean;
+    readonly threshold_ms?: number;
   };
 }
 
@@ -154,6 +160,11 @@ export class DetectorRegistry {
         new NotificationDeliveryHealthDetector(
           config.notification_delivery_health.failure_rate_threshold,
         ),
+      );
+    }
+    if (config.dead_event_stream?.enabled) {
+      this.active.push(
+        new DeadEventStreamDetector(config.dead_event_stream.threshold_ms),
       );
     }
   }
