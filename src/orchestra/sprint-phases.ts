@@ -1030,7 +1030,7 @@ export async function runFixPhase(
       const fixPhaseTimeout = (config as unknown as Record<string, unknown>).fix_phase_timeout as number | undefined
         ?? opts?.fixPhaseTimeoutMs
         ?? 1_800_000;
-      const fixResults = await waitForResults(projectRoot, fixSprint, fixPhaseTimeout, undefined, { spawnBackend });
+      const fixResults = await waitForResults(projectRoot, fixSprint, fixPhaseTimeout, undefined, { spawnBackend }, config);
       const sprintIdForUnblock = getCurrentSprintId(projectRoot) ?? sprint.id;
       for (const fixTask of fixTasks) {
         const fixResult = fixResults.find(r => r.taskId === fixTask.id);

@@ -223,9 +223,10 @@ export async function waitForResults(
   timeoutMs?: number,
   queue?: Task[],
   spawnOpts?: { autoApprove?: boolean; spawnBackend?: SpawnBackend },
+  config?: ResolvedConfig,
 ): Promise<TaskResult[]> {
   return trace('wait_results', () =>
-    waitForResultsImpl(projectRoot, sprint, timeoutMs, queue, spawnOpts, getChannelRegistry()),
+    waitForResultsImpl(projectRoot, sprint, timeoutMs, queue, spawnOpts, getChannelRegistry(), config),
   );
 }
 
@@ -483,7 +484,7 @@ export async function runSprint(
     try {
       sprint.phase = SprintPhase.EXECUTE;
       writeSprintState(projectRoot, sprint);
-      results = await waitForResults(projectRoot, sprint, opts?.timeoutMs, taskQueue, { autoApprove: opts?.autoApprove, spawnBackend });
+      results = await waitForResults(projectRoot, sprint, opts?.timeoutMs, taskQueue, { autoApprove: opts?.autoApprove, spawnBackend }, config);
     } catch (err) {
       safeDashboardUpdate(projectRoot, sprint, `Phase ${sprint.phase} error: ${err instanceof Error ? err.message : String(err)}`);
     }

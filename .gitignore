@@ -52,6 +52,11 @@ coverage/
 .deckent/pids/
 .claude/scheduled_tasks.lock
 
+# Deckent runtime artifacts (per-sprint, ephemeral)
+.deckent/mcp-server.pid
+.deckent/*-gate.json
+.deckent/sprint-*-metrics.jsonl
+
 # Environment
 .env
 .env.*

@@ -12,8 +12,11 @@ import { metric } from '../core/observability.js';
 
 // ─── Core Types ────────────────────────────────────────────────────
 import type {
-  Task, TaskResult, Sprint,
+  Task, TaskResult, Sprint, ResolvedConfig,
 } from '../core/types.js';
+
+// ─── Core (value imports — TaskStatus used at runtime for in-memory sync) ─
+import { TaskStatus } from '../core/types.js';
 
 import { TASKS_DIR } from '../core/constants.js';
 
@@ -40,6 +43,21 @@ import { buildWorkerPrompt } from './task-builder.js';
 // ─── tmux ─────────────────────────────────────────────────────────
 import { spawnWorker, killWorker } from './tmux.js';
 
+// ─── Sprint Spawner (lazy import — avoid module init cycle) ──────
+// ADR-045: respawnEligibleTasks wire — invoked at runtime only, never at
+// module load. sprint-spawner.ts imports resolveAgentPrompt/resolveSkillPrompts
+// from this file, so we use a dynamic import inside maybeRespawn to break the
+// init-time cycle.
+import type { respawnEligibleTasks as RespawnFn } from './sprint-spawner.js';
+let cachedRespawn: typeof RespawnFn | undefined;
+async function loadRespawn(): Promise<typeof RespawnFn> {
+  if (!cachedRespawn) {
+    const mod = await import('./sprint-spawner.js');
+    cachedRespawn = mod.respawnEligibleTasks;
+  }
+  return cachedRespawn;
+}
+
 // ═══ Results Map Helper ═══════════════════════════════════════════
 
 /**
@@ -53,6 +71,32 @@ export function buildResultsMap(results: TaskResult[]): Map<string, TaskResult> 
     map.set(r.taskId, r);
   }
   return map;
+}
+
+// ═══ Status Mutation (ADR-045 Decision 1) ═════════════════════════
+
+/**
+ * Apply ADR-045 status mutation rules to a task ref based on a result.
+ *
+ *   selfAssessment === 'DONE'              → status = TaskStatus.DONE
+ *   selfAssessment === 'GO_WITH_TECH_DEBT' → status = TaskStatus.DONE (debt-DONE)
+ *   selfAssessment === 'NO_GO'             → status = TaskStatus.NO_GO
+ *
+ * `GO_WITH_TECH_DEBT` → `DONE` is intentional: the dependency filter in
+ * `respawnEligibleTasks` checks `t.status === TaskStatus.DONE`, and debt
+ * closures should not block dependents (see ADR-045 Consequences).
+ *
+ * Exported for unit testing — the in-memory call site lives inside
+ * `waitForResults::collectResults`. Mutates the task ref in place.
+ */
+export function applyStatusMutation(taskRef: Task, result: TaskResult): void {
+  if (result.selfAssessment === 'DONE') {
+    taskRef.status = TaskStatus.DONE;
+  } else if (result.selfAssessment === 'GO_WITH_TECH_DEBT') {
+    taskRef.status = TaskStatus.DONE;
+  } else if (result.selfAssessment === 'NO_GO') {
+    taskRef.status = TaskStatus.NO_GO;
+  }
 }
 
 // ═══ Token Usage Enrichment ═══════════════════════════════════════
@@ -183,6 +227,7 @@ export async function waitForResults(
   queue?: Task[],
   spawnOpts?: { autoApprove?: boolean; spawnBackend?: SpawnBackend },
   channelRegistry?: ChannelRegistry,
+  config?: ResolvedConfig,
 ): Promise<TaskResult[]> {
   // 0 = unlimited (no timeout). undefined falls back to 30min for backward compat.
   const timeout = timeoutMs !== undefined ? timeoutMs : 30 * 60 * 1000;
@@ -196,6 +241,16 @@ export async function waitForResults(
   const taskMap = new Map(sprint.tasks.map(t => [t.id, t]));
   const collected = new Set<string>();
   const remainingQueue: Task[] = queue ? [...queue] : [];
+
+  // ─── In-memory status sync (ADR-045 Decision 1) ─────────────────
+  // Mutate the task object referenced by sprint.tasks so that
+  // respawnEligibleTasks sees up-to-date `t.status === TaskStatus.DONE`
+  // before EVALUATE phase persists status to disk.
+  const syncTaskStatusFromResult = (taskId: string, result: TaskResult): void => {
+    const taskRef = taskMap.get(taskId);
+    if (!taskRef) return;
+    applyStatusMutation(taskRef, result);
+  };
 
   const collectResults = async (): Promise<string[]> => {
     const collectStart = Date.now();
@@ -211,6 +266,7 @@ export async function waitForResults(
           results.push(result);
           collected.add(taskId);
           newlyCollected.push(taskId);
+          syncTaskStatusFromResult(taskId, result);
           metric('result.collected', 1, { taskId });
           continue;
         }
@@ -229,6 +285,7 @@ export async function waitForResults(
           results.push(lateResult);
           collected.add(taskId);
           newlyCollected.push(taskId);
+          syncTaskStatusFromResult(taskId, lateResult);
           debugLog('collectResults:lateResult', `taskId=${taskId} EXIT trap wrote .result (${lateResult.selfAssessment}), skipping synthetic NO_GO`);
           continue;
         }
@@ -255,12 +312,27 @@ export async function waitForResults(
         results.push(syntheticResult);
         collected.add(taskId);
         newlyCollected.push(taskId);
+        syncTaskStatusFromResult(taskId, syntheticResult);
       }
     }
     if (newlyCollected.length > 0) {
       metric('collect.batch', newlyCollected.length, { duration_ms: String(Date.now() - collectStart) });
     }
     return newlyCollected;
+  };
+
+  // ─── Dependency-aware respawn (ADR-045 Decision 2) ──────────────
+  // After result collection + queue processing, re-evaluate eligible
+  // tasks when dependency_pipeline_enabled is true. When config is
+  // missing or flag is false, this is a no-op (legacy FIFO preserved).
+  const maybeRespawn = async (): Promise<void> => {
+    if (!config?.dependency_pipeline_enabled) return;
+    try {
+      const respawnEligibleTasks = await loadRespawn();
+      await respawnEligibleTasks(projectRoot, sprint, config, spawnOpts);
+    } catch (e) {
+      debugLog('waitForResults:respawn', e);
+    }
   };
 
   const queueBackend = spawnOpts?.spawnBackend;
@@ -303,6 +375,9 @@ export async function waitForResults(
 
   const initiallyCollected = await collectResults();
   await processQueue(initiallyCollected);
+  // ADR-045 Decision 2: initial pass — Wave 2 may be eligible immediately
+  // if Wave 1 results were already on disk when waitForResults entered.
+  await maybeRespawn();
   if (collected.size === taskIds.size) return results;
 
   // IPC dual-mode: register HEARTBEAT listeners for any channels in registry
@@ -362,6 +437,9 @@ export async function waitForResults(
       await Promise.race([watcher.waitForChange(), ipcWakeupPromise]);
       const newlyCollected = await collectResults();
       await processQueue(newlyCollected);
+      // ADR-045 Decision 2: main loop — re-evaluate eligible Wave N+1 tasks
+      // each tick when dependency_pipeline_enabled is true.
+      await maybeRespawn();
       if (collected.size === taskIds.size) break;
       // Check for pending worker questions and auto-answer them
       checkWorkerQuestions(projectRoot, taskIds, collected);
@@ -387,6 +465,7 @@ export async function waitForResults(
         enrichResultTokenUsage(result, taskMap.get(taskId));
         results.push(result);
         collected.add(taskId);
+        syncTaskStatusFromResult(taskId, result);
       }
     }
   }
