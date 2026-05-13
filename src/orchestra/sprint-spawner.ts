@@ -498,6 +498,111 @@ export async function respawnEligibleTasks(
   return toSpawn.map(t => t.id);
 }
 
+// ─── Sprint 165 Bug Y — processQueue Stall Fix Helpers ──────────────
+// Pure functions used by waitForResults::processQueue to fix the
+// Sprint 161/164/165 hayalet-task regression (legacy FIFO stall +
+// duplicate spawn). Exported for unit testing.
+
+/**
+ * Count tasks currently occupying a worker slot.
+ * A task is "executing" if its status is EXECUTING, CLAIMED, or TESTING.
+ *
+ * Sprint 165 Bug Y fix — used by force re-scan and slot-aware spawn
+ * to detect when slots are available without actually killing a worker.
+ */
+export function countCurrentlyExecuting(sprint: Sprint): number {
+  return sprint.tasks.filter(t =>
+    t.status === TaskStatus.EXECUTING
+    || t.status === TaskStatus.CLAIMED
+    || t.status === TaskStatus.TESTING,
+  ).length;
+}
+
+/**
+ * Compute how many worker slots are free right now.
+ * Returns max(0, maxWorkers - countCurrentlyExecuting(sprint)).
+ *
+ * Sprint 165 Bug Y fix — used by force re-scan to decide whether to
+ * scan PENDING tasks for spawn.
+ */
+export function computeSlotsAvailable(sprint: Sprint, maxWorkers: number): number {
+  return Math.max(0, maxWorkers - countCurrentlyExecuting(sprint));
+}
+
+/**
+ * Select PENDING tasks eligible for spawn, respecting dependency_pipeline_enabled.
+ * Skips tasks already in assignedTaskIds (idempotency / Bug F guard) and
+ * those in collectedIds (already produced a result).
+ *
+ * - Legacy FIFO mode (`dependency_pipeline_enabled: false`): dependencies are
+ *   ignored — all PENDING tasks not in assigned/collected sets are eligible.
+ * - Dependency pipeline mode: each PENDING task is eligible only when all
+ *   its dependencies are in the done set.
+ *
+ * The function returns at most `slotsAvailable` tasks, in their natural
+ * sprint.tasks ordering (caller decides whether to use FIFO or another order).
+ *
+ * Sprint 165 Bug Y fix — used by force re-scan path to detect orphan PENDING
+ * tasks that the legacy `for (taskId of completedTaskIds)` loop missed.
+ */
+export function selectEligibleForSpawn(
+  sprint: Sprint,
+  config: Pick<ResolvedConfig, 'dependency_pipeline_enabled'> | undefined,
+  slotsAvailable: number,
+  assignedTaskIds: ReadonlySet<string>,
+  collectedIds: ReadonlySet<string>,
+): Task[] {
+  if (slotsAvailable <= 0) return [];
+
+  const depPipelineEnabled = config?.dependency_pipeline_enabled === true;
+  const doneIds = new Set(
+    sprint.tasks.filter(t => t.status === TaskStatus.DONE).map(t => t.id),
+  );
+
+  const eligible: Task[] = [];
+  for (const task of sprint.tasks) {
+    if (eligible.length >= slotsAvailable) break;
+    if (task.status !== TaskStatus.PENDING) continue;
+    if (assignedTaskIds.has(task.id)) continue;
+    if (collectedIds.has(task.id)) continue;
+    if (depPipelineEnabled && task.dependencies && task.dependencies.length > 0) {
+      const allDone = task.dependencies.every(dep => doneIds.has(dep));
+      if (!allDone) continue;
+    }
+    eligible.push(task);
+  }
+  return eligible;
+}
+
+/**
+ * Pop the first eligible task from a FIFO queue, skipping any that are
+ * already assigned. Mutates `remainingQueue` (shift).
+ *
+ * Used by processQueue to drain the queue while enforcing the idempotency
+ * guard against duplicate TASK_ASSIGN (Bug F). Returns undefined when the
+ * queue is exhausted or no eligible entry remains.
+ *
+ * Note: we deliberately do NOT skip on `collectedIds`. A task that is in
+ * `remainingQueue` has not yet been spawned, so its presence in the
+ * collected set indicates a synthetic test scenario or a race that should
+ * still drain the slot (preserving the contract of the original
+ * `for (taskId of completedTaskIds)` loop in task-queue.test.ts).
+ *
+ * Sprint 165 Bug Y fix.
+ */
+export function pickFromQueue(
+  remainingQueue: Task[],
+  assignedTaskIds: ReadonlySet<string>,
+): Task | undefined {
+  while (remainingQueue.length > 0) {
+    const candidate = remainingQueue.shift();
+    if (!candidate) return undefined;
+    if (assignedTaskIds.has(candidate.id)) continue;
+    return candidate;
+  }
+  return undefined;
+}
+
 /**
  * Validate task dependencies using topological sort.
  * Throws DependencyCycleError (DECKENT_E049) if circular dependencies are detected.

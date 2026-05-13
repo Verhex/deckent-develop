@@ -48,7 +48,12 @@ import { spawnWorker, killWorker } from './tmux.js';
 // module load. sprint-spawner.ts imports resolveAgentPrompt/resolveSkillPrompts
 // from this file, so we use a dynamic import inside maybeRespawn to break the
 // init-time cycle.
-import type { respawnEligibleTasks as RespawnFn } from './sprint-spawner.js';
+import type {
+  respawnEligibleTasks as RespawnFn,
+  computeSlotsAvailable as ComputeSlotsFn,
+  selectEligibleForSpawn as SelectEligibleFn,
+  pickFromQueue as PickFromQueueFn,
+} from './sprint-spawner.js';
 let cachedRespawn: typeof RespawnFn | undefined;
 async function loadRespawn(): Promise<typeof RespawnFn> {
   if (!cachedRespawn) {
@@ -57,6 +62,32 @@ async function loadRespawn(): Promise<typeof RespawnFn> {
   }
   return cachedRespawn;
 }
+
+// Sprint 165 Bug Y — lazy helpers for processQueue stall fix
+let cachedComputeSlots: typeof ComputeSlotsFn | undefined;
+let cachedSelectEligible: typeof SelectEligibleFn | undefined;
+let cachedPickFromQueue: typeof PickFromQueueFn | undefined;
+async function loadProcessQueueHelpers(): Promise<{
+  computeSlotsAvailable: typeof ComputeSlotsFn;
+  selectEligibleForSpawn: typeof SelectEligibleFn;
+  pickFromQueue: typeof PickFromQueueFn;
+}> {
+  if (!cachedComputeSlots || !cachedSelectEligible || !cachedPickFromQueue) {
+    const mod = await import('./sprint-spawner.js');
+    cachedComputeSlots = mod.computeSlotsAvailable;
+    cachedSelectEligible = mod.selectEligibleForSpawn;
+    cachedPickFromQueue = mod.pickFromQueue;
+  }
+  return {
+    computeSlotsAvailable: cachedComputeSlots,
+    selectEligibleForSpawn: cachedSelectEligible,
+    pickFromQueue: cachedPickFromQueue,
+  };
+}
+
+// Sprint 165 Bug Y — system-profile/config helper for force re-scan
+import { getSystemProfile } from '../core/system-profile.js';
+import { resolveEffectiveWorkers } from '../core/config.js';
 
 // ═══ Results Map Helper ═══════════════════════════════════════════
 
@@ -242,6 +273,26 @@ export async function waitForResults(
   const collected = new Set<string>();
   const remainingQueue: Task[] = queue ? [...queue] : [];
 
+  // ─── Sprint 165 Bug Y — duplicate spawn guard (Bug F) + force re-scan ────
+  // Tracks task IDs that have already been TASK_ASSIGN'd in this waitForResults
+  // call. Initially populated from tasks that spawnWorkers spawned (status
+  // EXECUTING/CLAIMED/TESTING). spawnIfNotAssigned consults this set before
+  // emitting another spawn — preventing the "duplicate TASK_ASSIGN" pattern
+  // (Sprint 165 Bug F) seen when processQueue is invoked twice with the same
+  // completedTaskIds, or when force re-scan races a queue drain.
+  const assignedTaskIds = new Set<string>();
+  for (const task of sprint.tasks) {
+    if (
+      task.status === TaskStatus.EXECUTING
+      || task.status === TaskStatus.CLAIMED
+      || task.status === TaskStatus.TESTING
+    ) {
+      assignedTaskIds.add(task.id);
+    }
+  }
+  let lastSpawnAttempt = Date.now();
+  const FORCE_RESCAN_IDLE_MS = 5 * 60 * 1000; // 5 minutes
+
   // ─── In-memory status sync (ADR-045 Decision 1) ─────────────────
   // Mutate the task object referenced by sprint.tasks so that
   // respawnEligibleTasks sees up-to-date `t.status === TaskStatus.DONE`
@@ -337,40 +388,110 @@ export async function waitForResults(
 
   const queueBackend = spawnOpts?.spawnBackend;
 
+  // ─── Sprint 165 Bug Y — single-task spawn helper (idempotent) ────────
+  // Centralizes the spawn dance: prompt resolution, allowedTools build,
+  // backend dispatch. Honors assignedTaskIds for Bug F idempotency: if the
+  // task was already TASK_ASSIGN'd, this is a no-op.
+  // Returns true when a new spawn was emitted, false on guard hit or error.
+  const spawnIfNotAssigned = async (nextTask: Task): Promise<boolean> => {
+    if (assignedTaskIds.has(nextTask.id)) return false;
+    assignedTaskIds.add(nextTask.id);
+    const queueAgentPrompt = await resolveAgentPrompt(projectRoot, nextTask);
+    const queueSkillPrompts = await resolveSkillPrompts(projectRoot, nextTask);
+    const prompt = buildWorkerPrompt(nextTask, queueAgentPrompt, queueSkillPrompts);
+    const writeTargets = ['.tasks/', ...nextTask.scope.directories, ...nextTask.scope.filesWrite].filter(Boolean);
+    const allowedTools = writeTargets.length > 0
+      ? `Read,Write(${writeTargets.join(',')}),Edit(${writeTargets.join(',')}),Bash,Glob,Grep`
+      : 'Read,Write,Edit,Bash,Glob,Grep';
+    try {
+      if (queueBackend) {
+        queueBackend.spawn(nextTask.id, nextTask.model, prompt, {
+          allowedTools,
+          autoApprove: spawnOpts?.autoApprove ?? false,
+          projectDir: projectRoot,
+        });
+      } else {
+        spawnWorker(nextTask.id, nextTask.model, prompt, projectRoot, {
+          allowedTools,
+          autoApprove: spawnOpts?.autoApprove ?? false,
+        });
+      }
+      // Mark task in-memory so subsequent slot calculations see it as
+      // occupying a slot. Disk persistence stays in spawnWorkers /
+      // respawnEligibleTasks paths; legacy FIFO queue does not persist.
+      nextTask.status = TaskStatus.EXECUTING;
+      lastSpawnAttempt = Date.now();
+      return true;
+    } catch (err) {
+      debugLog('waitForResults:queue-spawn', `Failed to spawn queued task ${nextTask.id}: ${err instanceof Error ? err.message : String(err)}`);
+      // Allow a future retry for this task (e.g. force re-scan).
+      assignedTaskIds.delete(nextTask.id);
+      return false;
+    }
+  };
+
+  // ─── Sprint 165 Bug Y — refactored processQueue ──────────────────────
+  // Behavior preserved for backward compat with task-queue.test.ts:
+  //   • For each completedTaskId, pick at most ONE eligible task from the
+  //     FIFO remainingQueue.
+  //   • If the queue is exhausted or its head was already assigned/collected
+  //     (idempotency), do NOT kill the worker for that slot — the slot
+  //     simply stays free until a later force re-scan or end of sprint.
+  // Added in Sprint 165:
+  //   • pickFromQueue skips entries already in assignedTaskIds (Bug F).
+  //   • Spawn is funnelled through spawnIfNotAssigned (idempotency guard).
   const processQueue = async (completedTaskIds: string[]): Promise<void> => {
+    const { pickFromQueue } = await loadProcessQueueHelpers();
     for (const taskId of completedTaskIds) {
-      if (remainingQueue.length === 0) break;
-      // Kill completed worker (clean up slot)
+      const nextTask = pickFromQueue(remainingQueue, assignedTaskIds);
+      if (!nextTask) break; // queue exhausted — preserve "no kill when no work" contract
       try {
         if (queueBackend) queueBackend.kill(taskId);
         else killWorker(taskId);
       } catch (e) { debugLog('processQueue:killWorker', e); }
-      const nextTask = remainingQueue.shift(); // length > 0 checked above
-      if (!nextTask) break;
-      const queueAgentPrompt = await resolveAgentPrompt(projectRoot, nextTask);
-      const queueSkillPrompts = await resolveSkillPrompts(projectRoot, nextTask);
-      const prompt = buildWorkerPrompt(nextTask, queueAgentPrompt, queueSkillPrompts);
-      const writeTargets = ['.tasks/', ...nextTask.scope.directories, ...nextTask.scope.filesWrite].filter(Boolean);
-      const allowedTools = writeTargets.length > 0
-        ? `Read,Write(${writeTargets.join(',')}),Edit(${writeTargets.join(',')}),Bash,Glob,Grep`
-        : 'Read,Write,Edit,Bash,Glob,Grep';
-      try {
-        if (queueBackend) {
-          queueBackend.spawn(nextTask.id, nextTask.model, prompt, {
-            allowedTools,
-            autoApprove: spawnOpts?.autoApprove ?? false,
-            projectDir: projectRoot,
-          });
-        } else {
-          spawnWorker(nextTask.id, nextTask.model, prompt, projectRoot, {
-            allowedTools,
-            autoApprove: spawnOpts?.autoApprove ?? false,
-          });
-        }
-      } catch (err) {
-        debugLog('waitForResults:queue-spawn', `Failed to spawn queued task ${nextTask.id}: ${err instanceof Error ? err.message : String(err)}`);
+      await spawnIfNotAssigned(nextTask);
+    }
+  };
+
+  // ─── Sprint 165 Bug Y — force re-scan idle slots ─────────────────────
+  // When more than FORCE_RESCAN_IDLE_MS has elapsed since the last spawn
+  // attempt and there are still uncollected tasks, scan PENDING tasks for
+  // eligible ones the legacy `for (taskId of completedTaskIds)` loop never
+  // reached (Sprint 161/164/165 hayalet replay).
+  //
+  // Required:
+  //   • `config` available (resolveEffectiveWorkers needs it)
+  //   • currentlyExecuting < maxWorkers (slots free)
+  //   • at least one PENDING task that isn't already assigned/collected
+  //     and whose dependencies (in pipeline mode) are DONE
+  const forceRescanIfIdle = async (): Promise<void> => {
+    if (!config) return; // legacy callers without config: skip force re-scan
+    const elapsed = Date.now() - lastSpawnAttempt;
+    if (elapsed < FORCE_RESCAN_IDLE_MS) return;
+    const { computeSlotsAvailable, selectEligibleForSpawn } = await loadProcessQueueHelpers();
+    const maxWorkers = resolveEffectiveWorkers(config, getSystemProfile());
+    const slotsAvailable = computeSlotsAvailable(sprint, maxWorkers);
+    if (slotsAvailable === 0) {
+      // Reset to avoid hammering the rescan loop while slots remain full.
+      lastSpawnAttempt = Date.now();
+      return;
+    }
+    const eligible = selectEligibleForSpawn(sprint, config, slotsAvailable, assignedTaskIds, collected);
+    if (eligible.length === 0) {
+      lastSpawnAttempt = Date.now(); // nothing to do; reset cadence
+      return;
+    }
+    debugLog(
+      'forceRescanIfIdle',
+      `slot idle for ${Math.round(elapsed / 1000)}s — respawning ${eligible.length} orphan PENDING task(s): ${eligible.map(t => t.id).join(', ')}`,
+    );
+    for (const orphan of eligible) {
+      const ok = await spawnIfNotAssigned(orphan);
+      if (ok) {
+        metric('queue.force_rescan_spawn', 1, { taskId: orphan.id });
       }
     }
+    lastSpawnAttempt = Date.now();
   };
 
   const initiallyCollected = await collectResults();
@@ -440,6 +561,9 @@ export async function waitForResults(
       // ADR-045 Decision 2: main loop — re-evaluate eligible Wave N+1 tasks
       // each tick when dependency_pipeline_enabled is true.
       await maybeRespawn();
+      // Sprint 165 Bug Y — force re-scan idle slots for hayalet PENDING tasks
+      // (legacy FIFO mode and dependency pipeline mode both benefit).
+      await forceRescanIfIdle();
       if (collected.size === taskIds.size) break;
       // Check for pending worker questions and auto-answer them
       checkWorkerQuestions(projectRoot, taskIds, collected);
