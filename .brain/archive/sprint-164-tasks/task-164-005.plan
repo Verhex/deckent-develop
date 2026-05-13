@@ -1,0 +1,77 @@
+# Task 164-005: respawnEligibleTasks Runtime Wire + task.status Inline Sync
+
+## ADR-045 Contract Verification
+- File: docs/adr/045-wave-based-execution-semantics.md — EXISTS, Status: accepted
+- 3 Decision items confirmed: (1) collectResults inline status mutation,
+  (2) waitForResults dep-aware respawn, (3) respawnEligibleTasks slot kontrolü korunur.
+- Implementation will match contract exactly.
+
+## Current state
+- Definition: src/orchestra/sprint-spawner.ts:364 (respawnEligibleTasks)
+- Re-export: src/orchestra/sprint-controller.ts:129
+- Call-sites in src/: 0 (CHAIN MISSING)
+
+## Plan
+
+### IP1 — collectResults inline status mutation (result-collector.ts)
+After `results.push(result)` add status mutation on `taskMap.get(taskId)`:
+- selfAssessment === 'DONE'              → status = TaskStatus.DONE
+- selfAssessment === 'GO_WITH_TECH_DEBT' → status = TaskStatus.DONE (debt-DONE)
+- selfAssessment === 'NO_GO'             → status = TaskStatus.NO_GO
+- Synthetic timeout result (NO_GO)       → status = TaskStatus.NO_GO
+- Late EXIT-trap result                  → same mapping
+- Final sweep result                     → same mapping
+
+Total: must produce ≥3 grep matches for `taskRef.status = TaskStatus`.
+
+Imports added:
+- `TaskStatus` (value import) from `../core/types.js`
+
+### IP2 — waitForResults main loop dep-aware respawn (result-collector.ts)
+- Add `config?: ResolvedConfig` parameter (optional for backward compat)
+- Import `respawnEligibleTasks` from `./sprint-spawner.js`
+- After initial `processQueue(initiallyCollected)`: if config.dependency_pipeline_enabled →
+  call `await respawnEligibleTasks(projectRoot, sprint, config, spawnOpts)`
+- Inside while loop after `await processQueue(newlyCollected)`: same call
+- If config not provided → skip (legacy behavior preserved)
+
+Total: ≥2 grep matches for `respawnEligibleTasks` in result-collector.ts.
+
+### IP3 — Caller signature pass-through
+- src/orchestra/sprint-controller.ts:220 `waitForResults`: add `config?: ResolvedConfig` param,
+  forward to `waitForResultsImpl`
+- src/orchestra/sprint-controller.ts:486 (runFullSprint EXECUTE): pass `config`
+- src/orchestra/sprint-phases.ts:1033 (runFixPhase): pass `config`
+- Keep parameters optional to avoid widespread breakage
+
+### IP4 — Test: tests/orchestra/dependency-pipeline-wire.test.ts (8 tests)
+Pattern: mock spawn modules (tmux, spawn-backend, dependency-scheduler, etc.),
+construct Sprint with tasks of varying statuses, drop .result files via vi.mock
+of `node:fs/promises::stat` + `readJsonSafe`, call `waitForResults` indirectly,
+or alternatively test `respawnEligibleTasks` directly with status sync.
+
+Test cases:
+- (a) enabled=false → legacy FIFO, no respawn called
+- (b) enabled=true + Wave 1 DONE → Wave 2 task spawned, status mutated DONE
+- (c) chain 3 waves with sequential completions
+- (d) NO_GO in Wave 1 → Wave 2 stays PENDING, DEPENDENCY_BLOCKED event
+- (e) Slot saturation: maxWorkers=2, 3 eligible → only 2 spawn
+- (f) GO_WITH_TECH_DEBT → still counted as DONE for dep filter
+- (g) Inline status mutation visible to respawn within same tick
+- (h) currentlyExecuting > 0, slotsAvailable=0 → no double-spawn
+
+## Risk Mitigation
+- Sprint 159 `evaluate-phase-idempotency` regression — status mutation timing change.
+  If respawnEligibleTasks/runEvaluatePhase already re-mutates DONE → idempotent (no harm).
+  If test inspects EXACT sequence of mutations → may need test update.
+- ADR-045 says: in-memory mutation only, disk write optional. EVALUATE phase
+  still writes task.json. No new disk I/O introduced.
+
+## Verification
+1. `grep -nE "respawnEligibleTasks" src/orchestra/result-collector.ts` → ≥2
+2. `grep -nE "taskRef\.status = TaskStatus" src/orchestra/result-collector.ts` → ≥3
+3. `grep -rn "respawnEligibleTasks" src/` → ≥4
+4. `tsc --noEmit` PASS
+5. `npx vitest run tests/orchestra/dependency-pipeline-wire.test.ts` → 8/8 PASS
+6. `npx vitest run` regression — focus on dependency-pipeline.test.ts,
+   evaluate-phase-idempotency, cascade-unblock-wire

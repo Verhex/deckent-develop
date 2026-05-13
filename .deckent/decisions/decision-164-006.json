@@ -1,0 +1,73 @@
+{
+  "taskId": "164-006",
+  "sprintId": "sprint-164",
+  "steps": [
+    {
+      "step": 2,
+      "name": "routing-step-2",
+      "input": {
+        "taskId": "164-006",
+        "title": "Integration Test Suite — Sprint 161 Forensic Replay + Multi-Wave Coverage (E-tests)",
+        "scope": [
+          "tests/orchestra/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "test-writer",
+        "skills": [
+          "testing-expert",
+          "ci-testing"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Agent forced by override: test-writer"
+    },
+    {
+      "step": 3,
+      "name": "routing-step-3",
+      "input": {
+        "taskId": "164-006",
+        "title": "Integration Test Suite — Sprint 161 Forensic Replay + Multi-Wave Coverage (E-tests)",
+        "scope": [
+          "tests/orchestra/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "test-writer",
+        "skills": [
+          "testing-expert",
+          "ci-testing"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Skill budget: max 3 (large task, 1 module(s), effort=normal)"
+    },
+    {
+      "step": 4,
+      "name": "routing-step-4",
+      "input": {
+        "taskId": "164-006",
+        "title": "Integration Test Suite — Sprint 161 Forensic Replay + Multi-Wave Coverage (E-tests)",
+        "scope": [
+          "tests/orchestra/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "test-writer",
+        "skills": [
+          "testing-expert",
+          "ci-testing"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Skills forced by override: [testing-expert, ci-testing]"
+    }
+  ],
+  "decidedAt": "2026-05-13T06:20:42.281Z"
+}

@@ -1,0 +1,100 @@
+{
+  "id": "164-002",
+  "title": "ADR-045 — Wave-Based Execution Semantics Contract (E3)",
+  "description": "ADR-045 — Wave-Based Execution Semantics Contract (E3)\n\n- Model: sonnet\n- Effort: normal\n- Skills: documentation-writer, system-architect\n- Agent: architecture-planner\n- Files: docs/adr/045-wave-based-execution-semantics.md\n- Scope: docs/adr/\n\n### Description\n\n`dependency_pipeline_enabled: true` Yol B (wire) implementation'ının kontraktı. **Implementation'dan ÖNCE yazılır** ki Task 4 buna uyumlu yazılsın. Architecture decision crystallization task'ı — Sprint 138 ADR Governance disiplinine uygun.\n\nADR içeriği (MADR v3 hibrit format, ADR-036 mandatory):\n\n- **Title:** Wave-Based Execution Semantics — respawnEligibleTasks Runtime Wire\n- **Status:** accepted\n- **Date:** 2026-05-13 (Sprint 164 başlangıç)\n- **Context:**\n  - Sprint 134 T-007'de `respawnEligibleTasks` tanımlandı (sprint-spawner module) ama runtime'da hiçbir yerden çağrılmıyordu (call-site eksik)\n  - Sprint 156-002'de default `dependency_pipeline_enabled: false→true` flip yapıldı (GO_WITH_TECH_DEBT) — wire eksikliği tespit edilmedi\n  - Sprint 161 stalled forensic: Wave 1 (3 task) spawn oldu, Wave 2 (T4 dep on T2) + Wave 3 (T5 dep on T1+T2+T4) hayalet kaldı, sprint hang\n  - Current session'da 6 ayrı forensic kanıtla (KESİN güven) bug doğrulandı: definition var, call-site yok; spawnWorkers Wave 2+'yi `activeTasks` ve `queuedTasks` listelerinden çıkarıyor; waitForResults dep-blind FIFO; task.status EXECUTING'de kalıp DONE'a inline mutate edilmiyor\n\n- **Decision:** Yol B (wire) — 3 değişiklik yapılır:\n  1. **`collectResults` içinde inline status mutation:** Bir `.result` toplandığında `taskMap.get(taskId).status` mutate edilir (`EXECUTING → DONE/NO_GO`, worker `selfAssessment`'a göre). EVALUATE phase öncesi status sync sağlanır.\n  2. **`processQueue` sonrası dep-aware respawn:** `dependency_pipeline_enabled` true ise `respawnEligibleTasks(projectRoot, sprint, config, spawnOpts)` çağrılır. Legacy FIFO ile çakışmaz — pipeline mode'da `queuedTasks` zaten boş (Wave 2+ eligible olmadığı için spawnWorkers'a girmedi).\n  3. **`respawnEligibleTasks` slot kontrolü korunur:** Mevcut `slotsAvailable = maxWorkers - currentlyExecuting` kontrolü çift spawn'ı engeller, değiştirilmez. `enforceWaveDependency` çağrısı korunur.\n\n- **Alternatives considered:**\n  - **Yol A (bury):** Feature'ı tamamen sil, `dependency_pipeline_enabled` flag deprecate. **REDDEDİLDİ** — Alperen wire kararı verdi, multi-wave execution disiplin için gerekli (Sprint 134 T-005 priority + dependencies altyapısı zaten wire için tasarlandı).\n  - **Disk-based status read:** `respawnEligibleTasks` `.result` mevcudiyetine bakar (in-memory status yerine). **REDDEDİLDİ** — disk I/O overhead, in-memory tutarlılık tercih edilir.\n  - **Status mutation in Brain EVALUATE phase only:** Status sadece EVALUATE phase'de değişir, EXECUTE devam ederken değişmez. **REDDEDİLDİ** — respawnEligibleTasks EVALUATE'a girmeden önce çağrılıyor; EVALUATE-only mutation wire'ı çalıştırmaz.\n\n- **Consequences:**\n  - **Pozitif:**\n    - Wave 2/3 task'lar spawn olur, dependency-aware execution semantik doğru çalışır\n    - Sprint 161 stalled senaryosu fix'lenir (5/5 spawn, hayalet sıfır)\n    - Sprint 134 T-007 design intent tamamlanır — chain scheduler runtime kanıtı kazanır\n  - **Negatif:**\n    - `task.status` mutation timing değişir — EVALUATE phase öncesi DONE/NO_GO status set edilir\n    - Auditor `git diff --stat` boundary detection bundan etkilenmez (status değişimi disk yazısı yapmaz, in-memory)\n    - `evaluate-phase idempotency` regression riski (Sprint 159 survivor test ile mevcut koruma var)\n  - **Risk mitigation:**\n    - Sprint 165 minimal multi-wave smoke ile canlı doğrulama\n    - Sprint 159 survivor test (`evaluate-phase-idempotency`) regression korur\n    - Sprint 166'da rollback opsiyonu (flag `false`'a geri çevrilebilir, wire kodu disabled mod'da legacy davranır)\n\n- **References:**\n  - Sprint 134 T-007 spec (chain dependency scheduler tasarım)\n  - Sprint 156-002 default flip commit (GO_WITH_TECH_DEBT — wire eksikliği belirlenmedi)\n  - Sprint 161 stalled task archive (Wave 2/3 hayalet forensic)\n  - Sprint 162 spurious NO_GO bug ve Sprint 163 T1 fix (status mutation timing dersleri)\n  - ADR-036 ADR Governance Integration (bu ADR'ı mandatory read yapan rule)\n  - ADR-037 Brain-Auditor-Worker Authority Matrix (wire'ın RBAC ihlali yapmaması zorunlu)\n  - ADR-039 Self-Modifying Task Detection (Deckent dogfood discrimination — wire kendi planlamasını etkilemiyor)\n\n- **memory.db insert pattern:** Worker ADR-045'i memory.db'ye `store.insert({ type: 'adr', id: 'adr-045', status: 'accepted', sprint_id: 'sprint-164', tags: ['dep-pipeline', 'wave-execution', 'task-status', 'wire', 'sprint-134-completion'] })` ile ekler. Markdown dosyası **deckent memory export** ile auto-regenerate edilir (DECISIONS.md değil, ayrı dosya — Memory V2 DB-first kuralı, ADR-036).\n\n**Kanıt:**\n- File exists, MADR v3 section dolu: Title, Status, Date, Context, Decision (3 madde numaralı), Alternatives (3 alternative reddedildi gerekçeli), Consequences (Pozitif/Negatif/Risk), References (7 cross-link)\n- memory.db query: `deckent recall \"adr-045\"` → result returned (eğer Worker memory.db insert yapacak commit script bırakırsa)\n- `npm run lint:adr` PASS (ADR validator script)\n\n**Test:** 0 test (governance contract task; test'ler Task 5'te wire'ı kanıtlar)\n\n---",
+  "model": "sonnet",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive (model: sonnet -- user override)",
+  "scope": {
+    "directories": [
+      "docs/adr/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "docs/adr/045-wave-based-execution-semantics.md"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:**",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-164",
+  "provider": "claude",
+  "forceModel": "sonnet",
+  "forceEffort": "normal",
+  "forceAgent": "architecture-planner",
+  "forceSkills": [
+    "documentation-writer",
+    "system-architect"
+  ],
+  "assignedAgent": "architecture-planner",
+  "assignedSkills": [
+    "documentation-writer",
+    "system-architect"
+  ],
+  "createdAt": "2026-05-13T06:20:42.252Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "implementation",
+        "secondary": [
+          "documentation",
+          "security",
+          "config"
+        ],
+        "confidence": 0.76
+      },
+      "subIntent": "config",
+      "tags": [],
+      "domains": [
+        {
+          "name": "docs",
+          "weight": 1
+        }
+      ],
+      "operations": [
+        {
+          "type": "create",
+          "weight": 0.27
+        },
+        {
+          "type": "modify",
+          "weight": 0.18
+        },
+        {
+          "type": "test",
+          "weight": 0.18
+        },
+        {
+          "type": "document",
+          "weight": 0.18
+        },
+        {
+          "type": "configure",
+          "weight": 0.18
+        }
+      ],
+      "complexity": {
+        "fileCount": 1,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "trivial"
+      },
+      "scope": {
+        "writeRatio": {
+          "docs/": 1
+        },
+        "primaryWriteTarget": "docs/",
+        "testWriteRatio": 0
+      }
+    },
+    "confidence": "high",
+    "routingVersion": "v2"
+  },
+  "estimatedTokens": 2269,
+  "updatedAt": "2026-05-13T07:52:30.428Z"
+}

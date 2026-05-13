@@ -1,0 +1,49 @@
+# Task 164-001: Debt Closure — debt-156-011-fix Bookkeeping
+
+## Context
+
+`debt-156-011-fix` (CRITICAL, sprint-156) is an open debt entry titled
+"Code physically verified despite missing .result". The DIRECTIVES (Sprint 164 wave plan)
+explicitly states this debt was already **semantically resolved** in Sprint 163 T1
+(Spurious NO_GO Reconciliation Helper canlı wire — extension of Sprint 145-015 work).
+Task 164-001 is a Brain auto-added priority fix for bookkeeping only — close the entry
+in memory.db so it reflects the live fix.
+
+## Approach
+
+Bookkeeping-only update (no source code changes). Update the SQLite debt entry to
+`status: 'resolved'` with `resolvedInSprintId: 'sprint-163'` metadata, then regenerate
+`.brain/exports/debt.md` via the existing export pipeline.
+
+This is the canonical pattern used by `archive-debt.ts` (Memory V2 DB-first per ADR-036
+governance). No new module is added — we use `MemoryStore.upsert()` directly via a
+small in-line script run with `tsx`.
+
+## Files to Modify
+
+- `.brain/memory.db` — debt entry `debt-156-011-fix` `status` field flipped to `resolved`
+  with `resolvedInSprintId` metadata pointing to sprint-163
+- `.brain/exports/debt.md` — auto-regenerated via `deckent memory export` (Active table
+  loses the row, Resolved table gains it)
+
+No `.ts`/`.js` source changes. No test changes (test gate from Task 2 is independent).
+
+## Expected Outcome
+
+- `npx deckent recall "debt-156-011"` returns the entry with status=resolved
+- `.brain/exports/debt.md` Active table is empty (or no longer has debt-156-011-fix)
+- Resolved table contains the debt with sprint-163 as resolved sprint
+- `tsc --noEmit` PASS (no source changes — should be unaffected)
+- selfAssessment: DONE if bookkeeping update propagates correctly to exports
+
+## Risk
+
+- If memory.db schema differs from expectation → fallback to direct SQL UPDATE
+- If `deckent memory export` script unavailable → manually regenerate via a small
+  re-export call (uses same MemoryStore APIs)
+
+## Out of Scope
+
+- The actual reconciliation helper wire (Sprint 163 T1 already DONE)
+- Vitest failure fix (Task 2, separate worker)
+- ADR-045 contract write (Task 1, separate worker)

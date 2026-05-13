@@ -1,0 +1,107 @@
+{
+  "id": "164-006",
+  "title": "Integration Test Suite — Sprint 161 Forensic Replay + Multi-Wave Coverage (E-tests)",
+  "description": "Integration Test Suite — Sprint 161 Forensic Replay + Multi-Wave Coverage (E-tests)\n\n- Model: opus\n- Effort: normal\n- Skills: testing-expert, ci-testing\n- Agent: test-writer\n- Files: tests/orchestra/dependency-pipeline-integration.test.ts\n- Scope: tests/orchestra/\n\n### Description\n\n**Soft dependency:** Task 4 (Wire) DONE olmalı — wire production-ready. Eğer worker spawn ettiğinde wire henüz mevcut değilse → NO_GO + Brain FIX phase retry (Wire'ın DONE olmasını bekler).\n\nSprint 161 stalled forensic'i (5 task, 3 spawn + 2 hayalet) integration test ile reproduce et + Sprint 164 wire'ın fix kanıtı. 6 senaryo:\n\n- **S1: Sprint 161 forensic replay** — 3 no-dep task (T1, T2, T3) + 1 task `dependencies: ['T2']` + 1 task `dependencies: ['T1','T2','T4']` → `enabled: true` ile **5/5 spawn** (forensic'te 3/5 idi); Wave transition kanıtı `wave.respawn` metric'te\n- **S2: Diamond dependency** — A → B, A → C, B+C → D. A done sonra B+C paralel spawn, B+C done sonra D spawn. Topological order kanıtı (Kahn's algorithm runtime kanıtı)\n- **S3: NO_GO cascade** — A NO_GO → B (dep on A) PENDING kalır (spawn etmez), sprint hang olmaz, EVALUATE'a düzgün geçer, `BRAIN→WORKER:DEPENDENCY_BLOCKED` event emit\n- **S4: GO_WITH_TECH_DEBT path** — A debt-DONE → B (dep on A) spawn olur, debt task DONE sayılır (ADR-045 Consequences kanıtı, Task 4 Iş Paketi 1 debt branch)\n- **S5: Slot constraint** — `maxWorkers=2` + 3 eligible Wave 2 task → first 2 spawn, 3rd bekler bir slot açılana kadar; `currentlyExecuting` accurate\n- **S6: Cycle detection** — yanlışlıkla cycle planlanmış (A → B, B → A) → `validateTaskDependencies` `DependencyCycleError` throw (error code DECKENT_E049), sprint başlatılmaz; cycle error message Brain log'unda forensic\n\n**Kanıt:**\n- `grep -nE \"S[1-6]:\" tests/orchestra/dependency-pipeline-integration.test.ts` → 6 match (her senaryo bir `describe` veya `it` başlığında)\n- `npx vitest run tests/orchestra/dependency-pipeline-integration.test.ts` → 6/6 PASS\n- Integration test fixture'ları: minimum 5 task plan (S1 reproduce için Sprint 161'in real task graph'ı kullanılır)\n- Cross-reference: Task 4 unit test (8 case) + Task 5 integration test (6 case) toplam = 14 yeni test\n\n**Test:** 6 integration test\n\n---\n\n## Anchor Kurallar (worker'lar zorunlu okur)\n\n- **`npm run build` YASAK** worker'larda — Alperen kararı (final build doğrulaması Alperen onayı ile)\n- **Test izole:** `npx vitest run path/to/file.test.ts` ile tek dosya çalıştır; tam suite Auditor self-gate'inde\n- **Scope discipline:** Sadece `Files:` field'daki dosyalara yaz. `git diff --stat` Auditor tarafından izlenir, scope ihlali → NO_GO\n- **ESM import:** `.js` uzantısı zorunlu (Node16 resolution). `import { foo } from './bar'` çalışmaz, `'./bar.js'` gerekir\n- **No mid-sprint refactor:** Task'ın `Files:` dışına çıkma; opportunistic refactor `directives-165.md` taşır\n- **TDD discipline:** Test önce yaz, fail doğrula, kod yaz, pass doğrula, commit (test-driven-development skill rigid)\n- **NO MVP / NO MINIMUM** — T4-modified disiplin, full god-level scope\n- **NO docs/ + .deckent/ PATH MENTION** task description'larında — planner bunu `filesWrite`'a alıyor; description'da sadece dosya **adı + fonksiyon adı + iş paketi** olur, path Files: field'da\n- **ADR-045 öncelik (Task 4 için):** Task 4 implement'i Task 1 ADR-045'inde belirtilen contract'a UYMAK ZORUNDA. Decision'da listelenen 3 maddeden sapma → NO_GO + ADR amendment proposal (ADR-036 mandatory)\n- **Config flip YASAK Sprint 164'te:** `dependency_pipeline_enabled` config değiştirilmez (default `false` kalır). Flip Sprint 165'te canlı retry için Alperen onayı ile yapılır\n- **Sprint 159 survivor test korunur (Task 4 için):** `evaluate-phase-idempotency` 6-case regression test mevcut — Task 4 status mutation timing değişikliği bu test'i bozmamalı, test güncellenmesi gerekirse Auditor + Alperen onayı zorunlu\n- **Test skip discipline (Task 2 için):** `it.skip()` veya `describe.skip()` gerekçesiz YASAK. Skip ediyorsan: (i) inline yorum sebep + (ii) takip task ID + (iii) ADR amendment notu\n\n## GO/NO_GO Criteria\n\n- ✅ **5/5 DIRECTIVES task DONE** (T1 ADR + T2 vitest + T3 gitignore + T4 wire + T5 test) — Brain auto-added debt close task'ı (164-001) ek olarak DONE beklenir\n- ✅ `tsc --noEmit` PASS (Auditor self-gate)\n- ✅ `npx vitest run` PASS, **delta 0 fail** (Sprint 164 Task 2 chronic regression closure kanıtı)\n- ✅ 14 yeni test PASS (T4: 8 unit + T5: 6 integration), 0 regression\n- ✅ ADR-045 accepted, memory.db'ye insert edildi\n- ✅ `dependency_pipeline_enabled: false` config'de korundu (Sprint 165 flip için bekletilir)\n- ✅ Wire kanıtı: `grep -rn \"respawnEligibleTasks\" src/` → 4+ match (önceki 2'den artış)\n- ✅ `git status --short` → `.deckent/*` ephemeral artifact'lar gizli (sadece DIRECTIVES.md ve intent-driven dosyalar listede)\n- ✅ Self-audit gate: `overallGate=PASS` (vitest fail 0, tsc 0, honesty violations 0)\n\n### NO_GO senaryoları ve aksiyon:\n\n- **Task 2 NO_GO** (vitest fix mümkün değil veya yeni regression açtı): Sprint 164 status `GO_WITH_GATE_FAILURE`; chronic regression Sprint 165'e taşınır; **Sprint 165 dep_pipeline canlı retry ERTELENİR** (gate güveni olmadan flip yapılmaz)\n- **Task 1 NO_GO** (ADR-045 yazılamadı): Task 4 + Task 5 BAŞLATILMAZ (dep chain'i koparılır); Sprint 164 yarıda kalır, Sprint 164.1 hot-fix sprint\n- **Task 4 NO_GO** (wire fail): Sprint 165 (live retry) GECİKİR, wire retry öncelikli — Task 5 başlatılmaz veya NO_GO\n- **Task 5 NO_GO** (integration test fail): Wire kanıtı zayıf, Sprint 165 live retry öncesi canlı doğrulama riski yüksek — Sprint 164.1 ile test retry\n- **Task 3 NO_GO** (gitignore sözleşmesi yanlış pattern): Minor — Sprint 165'e taşınır, blocker değil\n- **Brain 164-001 debt close NO_GO** (Sprint 156-011 forensic eksik): Minor — debt zaten Sprint 163 T1 ile semantik çözüldü, bookkeeping başarısızlığı blocker değil\n\n## Sprint 165 İçin Hazırlık (Not — Sprint 164 retro'da netleşir)\n\nSprint 164 DONE sonrası Sprint 165 önerilen scope (DRAFT, retro sonrası netleşir):\n- **Config flip:** `dependency_pipeline_enabled: false → true` (Alperen onayı ile, ADR-045 amendment'a gerek yok — flip default değişim)\n- **Minimal 3-task multi-wave smoke sprint** (Wave 1: 2 task no-dep, Wave 2: 1 task dep on Wave 1)\n- **Live evidence:** `wave.respawn` metric emit, `events.jsonl`'de `BRAIN→WORKER:DEPENDENCY_BLOCKED` (eğer NO_GO senaryosu)\n- **Sprint 161 stalled forensic ile karşılaştırma:** Bu kez Wave 2 task'ı spawn ediyor mu? Hayalet kaybolmuş mu?\n- **Sprint 156-002'de fail eden flip Sprint 165'te canlı doğrulanır** → ADR-045 status onaylı kalır\n- **Eğer Sprint 165 fail olursa:** rollback path — flag'i tekrar `false` yap + ADR-045 superseded by ADR-046 + wire kodu kept (disabled mode legacy davranır)\n\n## Post-Sprint Verify Protokolü (manual review — opsiyonel ama önerilen)\n\nSprint 164 finalize sonrası Alperen manuel doğrulama yapar:\n\n1. **vitest gate kanıtı:** `.deckent/sprint-164-gate.json` → `vitest.delta.fail === 0` mı?\n2. **Wire grep kanıtı:** `grep -rn \"respawnEligibleTasks\" src/` → 4+ satır görüyor musun?\n3. **ADR memory.db kanıtı:** `npx deckent recall \"adr-045\"` → 1 sonuç dönüyor mu?\n4. **Test count:** `npx vitest run tests/orchestra/dependency-pipeline*.test.ts` → 14/14 PASS mı?\n5. **Config korundu mu:** `cat .deckent/config.json | grep dependency_pipeline_enabled` → `false` mı?\n6. **Gitignore housekeeping kanıtı:** `git status --short | grep \".deckent/\"` → mcp-server.pid, gate.json, metrics.jsonl listede DEĞİL\n7. **maxWorkers restore:** Sprint sonrası `.deckent/config.json` → `max_workers: 6` (Sprint 164 için 3'e indirildi, retro sonrası 6'ya restore edilir)\n\nBu protokol opsiyonel — Brain self-audit gate ve Auditor scan bu kontrolleri içerikte kapsıyor; manuel review çift-katman güven katar (Sprint 162 spurious NO_GO bug deneyimi).",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "tests/orchestra/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "tests/orchestra/dependency-pipeline-integration.test.ts",
+      "directives-165.md",
+      "DIRECTIVES.md",
+      "sprint-164-gate.json",
+      ".test",
+      "test.ts",
+      "config.json",
+      "gate.json"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:**; `grep -nE \"S[1-6]:\" tests/orchestra/dependency-pipeline-integration.test.ts` → 6 match (her senaryo bir `describe` veya `it` başlığında); `npx vitest run tests/orchestra/dependency-pipeline-integration.test.ts` → 6/6 PASS",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "NO_GO",
+  "sprintId": "sprint-164",
+  "forceModel": "opus",
+  "forceEffort": "normal",
+  "forceAgent": "test-writer",
+  "forceSkills": [
+    "testing-expert",
+    "ci-testing"
+  ],
+  "assignedAgent": "test-writer",
+  "assignedSkills": [
+    "testing-expert",
+    "ci-testing"
+  ],
+  "createdAt": "2026-05-13T06:20:42.252Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "implementation",
+        "secondary": [
+          "documentation",
+          "config"
+        ],
+        "confidence": 0.91
+      },
+      "subIntent": "config",
+      "tags": [
+        "test-coverage"
+      ],
+      "domains": [
+        {
+          "name": "orchestra",
+          "weight": 0.22
+        }
+      ],
+      "operations": [
+        {
+          "type": "create",
+          "weight": 0.36
+        },
+        {
+          "type": "test",
+          "weight": 0.36
+        },
+        {
+          "type": "modify",
+          "weight": 0.09
+        },
+        {
+          "type": "document",
+          "weight": 0.09
+        },
+        {
+          "type": "configure",
+          "weight": 0.09
+        }
+      ],
+      "complexity": {
+        "fileCount": 8,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "large"
+      },
+      "scope": {
+        "writeRatio": {
+          "tests/": 0.13,
+          "./": 0.88
+        },
+        "primaryWriteTarget": "./",
+        "testWriteRatio": 0.13
+      }
+    },
+    "confidence": "high",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-05-13T07:52:36.533Z"
+}

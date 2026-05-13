@@ -1,0 +1,19 @@
+{
+  "taskId": "164-002",
+  "filesChanged": [
+    "docs/adr/045-wave-based-execution-semantics.md"
+  ],
+  "linesAdded": 230,
+  "linesRemoved": 0,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "DONE",
+  "notes": "ADR-045 (Wave-Based Execution Semantics — respawnEligibleTasks Runtime Wire) created at docs/adr/045-wave-based-execution-semantics.md. File contains all required MADR v3 hybrid sections: Title, Status, Date, Sprint, Context (6-point forensic analysis), Decision (3 numbered binding items for Task 4), Alternatives Considered (3 alternatives explicitly rejected with reasoning), Consequences (Positive/Negative/Risk Mitigation), References (7 cross-links), Memory DB Insert Pattern, and Notes.\n\nVerification:\n- tsc --noEmit: PASS (no TypeScript changes, markdown only)\n- File exists: 230 lines, 11.8KB\n- All 3 Decision items numbered (collectResults inline mutation + waitForResults dep-aware respawn + respawnEligibleTasks slot preservation)\n- All 3 Alternatives rejected with explicit rationale (feature burial, disk-based status read, EVALUATE-only mutation)\n- 7 References verified\n- Memory DB insert pattern included in ADR file\n\nlint:adr status: The validator (scripts/adr-validator.mjs) reads .brain/exports/decisions.md and expects '## ADR-NNN:' (uppercase) format, but decisions.md uses '## adr-NNN:' (lowercase). This is a pre-existing mismatch — ADR-043 and ADR-044 are also in docs/adr/ but not reflected in decisions.md (which auto-generates from memory.db). The individual docs/adr/045-wave-based-execution-semantics.md file follows the same format as ADR-043 and ADR-044 (project standard). Memory.db insert requires CLI scope outside docs/adr/ filesWrite boundary — 'deckent memory export' after DB insert will auto-generate the decisions.md update; this is post-sprint Auditor/Brain responsibility per Memory V2 DB-first architecture.\n\nTask 4 can now use this ADR as binding contract — Decision items 1, 2, and 3 define the exact implementation spec for result-collector.ts and sprint-spawner.ts.",
+  "tokenUsage": {
+    "inputTokens": 18500,
+    "outputTokens": 2800,
+    "cacheReadTokens": 45000,
+    "provider": "claude",
+    "model": "sonnet"
+  }
+}

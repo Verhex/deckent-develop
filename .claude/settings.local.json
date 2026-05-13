@@ -53,7 +53,13 @@
       "Bash([ -f \".tasks/task-156-$id-fix-fix.hb\" ])",
       "Bash([ -f \".tasks/task-156-$id-fix-fix.plan\" ])",
       "Bash([ -f \".tasks/task-156-$id-fix-fix.result\" ])",
-      "Read(//proc/865872/**)"
+      "Read(//proc/865872/**)",
+      "Bash(ps -o pid,tty,cmd -p 10894 4326)",
+      "mcp__deckent__deckent_run",
+      "mcp__deckent__deckent_recover",
+      "Bash(cp /home/alperen/deckent-dev/.tasks/task-164-* /home/alperen/deckent-dev/.brain/archive/sprint-164-tasks/)",
+      "Bash(cp /home/alperen/deckent-dev/.tasks/task-run-run-mp3qgy0b.* /home/alperen/deckent-dev/.brain/archive/sprint-164-tasks/)",
+      "Bash(echo \"Modified: $\\(git -C /home/alperen/deckent-dev status --short)"
     ]
   }
 }

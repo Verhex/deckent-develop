@@ -160,3 +160,5 @@ WHAT WAS DONE:
 - Sprint Phase Observability + EvaluationAuditTrail Runtime Wire (T-003, composite): GO_WITH_TECH_DEBT — T-003 composite (phase observability + EvaluationAuditTrail runtime wire) complete. persistPhaseTransition helper export
 - Crash Injection Integration Test + E2E Smoke (T-007): NO_GO — T-007 — 9/9 tests PASS (6 crash injection + 3 e2e smoke). Crash file: 6 it() blocks S1-S6 (grep -nE 'S[1-6]:' → 18 match
 ## Sprint sprint-163 Learnings
+## Sprint sprint-164 Learnings
+- Vitest Gate +1 Fail Closure — Chronic Regression Eradication: NO_GO — Vitest gate +1 fail chronic regression closure — TAMAMLANDI. Discovery: full vitest run 17 fail / 8 dosya tespit etti (n

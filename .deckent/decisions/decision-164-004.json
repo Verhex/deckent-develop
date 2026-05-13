@@ -1,0 +1,73 @@
+{
+  "taskId": "164-004",
+  "sprintId": "sprint-164",
+  "steps": [
+    {
+      "step": 2,
+      "name": "routing-step-2",
+      "input": {
+        "taskId": "164-004",
+        "title": "Gitignore Housekeeping — Runtime Artifact Patterns",
+        "scope": [
+          ". (root file only)/"
+        ],
+        "intent": "documentation"
+      },
+      "output": {
+        "agent": "doc-writer",
+        "skills": [
+          "documentation-writer",
+          "git-expert"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Agent forced by override: doc-writer"
+    },
+    {
+      "step": 3,
+      "name": "routing-step-3",
+      "input": {
+        "taskId": "164-004",
+        "title": "Gitignore Housekeeping — Runtime Artifact Patterns",
+        "scope": [
+          ". (root file only)/"
+        ],
+        "intent": "documentation"
+      },
+      "output": {
+        "agent": "doc-writer",
+        "skills": [
+          "documentation-writer",
+          "git-expert"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Skill budget: max 3 (large task, 1 module(s), effort=normal)"
+    },
+    {
+      "step": 4,
+      "name": "routing-step-4",
+      "input": {
+        "taskId": "164-004",
+        "title": "Gitignore Housekeeping — Runtime Artifact Patterns",
+        "scope": [
+          ". (root file only)/"
+        ],
+        "intent": "documentation"
+      },
+      "output": {
+        "agent": "doc-writer",
+        "skills": [
+          "documentation-writer",
+          "git-expert"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Skills forced by override: [documentation-writer, git-expert]"
+    }
+  ],
+  "decidedAt": "2026-05-13T06:20:42.279Z"
+}

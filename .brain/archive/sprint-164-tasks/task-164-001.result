@@ -1,0 +1,23 @@
+{
+  "taskId": "164-001",
+  "filesChanged": [
+    ".brain/memory.db",
+    ".brain/exports/debt.md",
+    ".brain/exports/summary.md",
+    ".brain/exports/decisions.md",
+    ".brain/exports/memory.md"
+  ],
+  "linesAdded": 1,
+  "linesRemoved": 1,
+  "testsPassed": true,
+  "coverage": 0,
+  "selfAssessment": "DONE",
+  "notes": "debt-156-011-fix bookkeeping closure completed. Used MemoryStore.upsert() via one-shot script (/tmp/close-debt-156-011-fix.mjs) against /workspace/dist/core/memory-store.js + memory-export.js — same Memory V2 DB-first pattern as archive-debt.ts (ADR-036 governance). Changes:\n\n1. memory.db entry debt-156-011-fix: status active → resolved; metadata enriched with resolvedInSprintId=sprint-163, resolvedBySprint=sprint-163, resolutionNote (Spurious NO_GO Reconciliation Helper canlı wire Sprint 163 T1 reference), closedBy=sprint-164-task-164-001.\n\n2. .brain/exports/debt.md regenerated: Active table emptied, Resolved table now includes the entry (diff: -1/+1 line, exactly as expected for active→resolved move).\n\n3. .brain/exports/summary.md regenerated: Active Technical Debt section now shows '_No active technical debt._' (previously listed the critical debt).\n\n4. .brain/exports/decisions.md + memory.md regenerated as side-effect of full export pipeline (idempotent — content unchanged from DB state).\n\nThe underlying spurious NO_GO bug (worker physically verifies code but writes no .result file, causing false NO_GO) was semantically resolved by Sprint 145-015 introducing the Spurious NO_GO Reconciliation Helper and Sprint 163 T1 canlı wiring it into runtime — DIRECTIVES Sprint 164 explicitly notes this debt was 'semantically resolved' and Task 164-001 = bookkeeping closure only.\n\nVerification:\n- npx tsc --noEmit → clean (no errors, no warnings)\n- Source code untouched (Task is pure DB bookkeeping per Brain auto-add priority fix scope)\n- git diff --stat shows only .brain/exports/debt.md (-1/+1) and summary.md (-1/+1) as intended\n- Active Technical Debt count: 1 → 0 ✓\n- Resolved Technical Debt count: +1 ✓\n\nHonest assessment: 100% of scope completed (debt entry closed in DB + exports regenerated + auditable diff produced). No source changes were required — Sprint 163 T1 already implemented the runtime fix; this task was bookkeeping per DIRECTIVES.",
+  "tokenUsage": {
+    "inputTokens": 28000,
+    "outputTokens": 4200,
+    "cacheReadTokens": 14000,
+    "provider": "claude",
+    "model": "opus"
+  }
+}

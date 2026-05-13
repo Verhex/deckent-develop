@@ -1,69 +1,73 @@
-# Sprint sprint-163 Retrospective
+# Sprint sprint-164 Retrospective
 
 ## Summary
-Completed 6/6 tasks in 11 minutes 40s.
+Completed 5/6 tasks in 1h 31m.
 
 ## Highlights
 - 6 tasks completed on first try
 - No boundary violations detected
-- NO_GO rate improved from 50% to 0%
+
+## Issues
+- Task 164-003 (Vitest Gate +1 Fail Closure — Chronic Regression Eradication) failed — Vitest gate +1 fail chronic regression closure — TAMAMLAN...
 
 ## Metrics
 | What | Value |
 |------|-------|
-| Tasks completed | 6/6 |
-| New test files | 2 |
-| Code changes | +1824 / -14 |
-| Sprint time | 11 minutes 40s |
-| NO_GO rate | 0% (0/6) |
-| Coverage | 16.7% |
+| Tasks completed | 5/6 |
+| New test files | 10 |
+| Code changes | +535 / -37 |
+| Sprint time | 1h 31m |
+| NO_GO rate | 17% (1/6) |
 
 
 ## Agent Performance
 | Agent | Tasks | Done | Debt | NoGo | Avg Coverage |
 |-------|-------|------|------|------|-------------|
-| bug-fixer | 2 | 2 | 0 | 0 | 50% |
-| doc-writer | 2 | 2 | 0 | 0 | 0% |
-| ci-guardian | 1 | 1 | 0 | 0 | 0% |
-| security-auditor | 1 | 1 | 0 | 0 | 0% |
+| bug-fixer | 3 | 2 | 0 | 1 | 0% |
+| architecture-planner | 1 | 1 | 0 | 0 | 0% |
+| doc-writer | 1 | 1 | 0 | 0 | 0% |
+| test-writer | 1 | 1 | 0 | 0 | 0% |
 
 
 ## Skill Performance
 | Skill | Tasks | Done | Debt | NoGo | Avg Coverage |
 |-------|-------|------|------|------|-------------|
-| documentation-writer | 3 | 3 | 0 | 0 | 0% |
-| typescript-expert | 2 | 2 | 0 | 0 | 50% |
-| testing-expert | 2 | 2 | 0 | 0 | 50% |
-| docker-expert | 1 | 1 | 0 | 0 | 0% |
-| security-specialist | 1 | 1 | 0 | 0 | 0% |
-| ci-testing | 1 | 1 | 0 | 0 | 0% |
+| documentation-writer | 2 | 2 | 0 | 0 | 0% |
+| system-architect | 2 | 2 | 0 | 0 | 0% |
+| typescript-expert | 2 | 1 | 0 | 1 | 0% |
+| testing-expert | 2 | 1 | 0 | 1 | 0% |
+| ci-testing | 2 | 1 | 0 | 1 | 0% |
+| git-expert | 1 | 1 | 0 | 0 | 0% |
 
 ## Token Usage
 | Task | Model | Input | Output | Cache Read | Total |
 |------|-------|-------|--------|------------|-------|
-| 163-004 | sonnet | 9.2K | 680 | 6.5K | 16.4K |
-| 163-003 | sonnet | 8.5K | 2.8K | 45.0K | 56.3K |
-| 163-005 | sonnet | 45.0K | 3.2K | 12.0K | 60.2K |
-| 163-006 | opus | 62.0K | 6.8K | 48.0K | 116.8K |
-| 163-001 | opus | 38.0K | 11.5K | 0 | 49.5K |
-| 163-002 | opus | 24.0K | 9.5K | 0 | 33.5K |
-| **Total** | — | 186.7K | 34.5K | 111.5K | 332.7K |
+| 164-001 | opus | 28.0K | 4.2K | 14.0K | 46.2K |
+| 164-002 | sonnet | 18.5K | 2.8K | 45.0K | 66.3K |
+| 164-004 | haiku | 8.2K | 1.9K | 0 | 10.1K |
+| 164-005 | opus | 85.0K | 8.2K | 340.0K | 433.2K |
+| 164-003 | opus | 95.0K | 11.0K | 80.0K | 186.0K |
+| **Total** | — | 234.7K | 28.1K | 479.0K | 741.8K |
 
-### Quality Dimensions (sprint-163)
+### Quality Dimensions (sprint-164)
 | Task | Correctness | Coverage | Scope Adherence | Completeness | Overall |
 |------|-------------|----------|-----------------|--------------|---------|
-| 163-004 — ADR-044 — Sprint State Observa | 100 | 0 | 100 | 100 | 75 |
-| 163-003 — ADR-043 — Brain Crash Recovery | 100 | 0 | 100 | 100 | 75 |
-| 163-005 — Sprint 160 Security Review 3/3 | 100 | 0 | 100 | 100 | 75 |
-| 163-006 — Brain Dogfood Smoke — Sprint 1 | 100 | 0 | 100 | 100 | 75 |
-| 163-001 — Brain Spurious NO_GO Reconcili | 100 | 100 | 100 | 100 | 100 |
-| 163-002 — Docker container_start_failed  | 100 | 0 | 100 | 100 | 75 |
-| **Sprint Avg** | — | — | — | — | **79** |
+| 164-001 — Fix debt: Tech debt from 156-0 | 100 | 0 | 80 | 100 | 71 |
+| 164-002 — ADR-045 — Wave-Based Execution | 100 | 0 | 100 | 100 | 75 |
+| 164-004 — Gitignore Housekeeping — Runti | 100 | 0 | 100 | 100 | 75 |
+| 164-005 — respawnEligibleTasks Runtime W | 100 | 0 | 100 | 100 | 75 |
+| 164-003 — Vitest Gate +1 Fail Closure —  | 100 | 0 | 100 | 100 | 75 |
+| 164-006 — Integration Test Suite — Sprin | 20 | 0 | 100 | 100 | 47 |
+| **Sprint Avg** | — | — | — | — | **70** |
 
 ## Learnings
-- Open CRITICAL debt: Tech debt from 156-011-fix: Code physically verified despite missing .result (Sp
+- Vitest Gate +1 Fail Closure — Chronic Regression Eradication: failed — Vitest gate +1 fail chronic regression closure — TAMAMLANDI. Discovery: full vitest run 17 fail / 8 dosya tespit etti (not 1 — gate parseVitestOutput 
+
+### Code-Verified DONE
+1 task(s) reconciled via physical code verification:
+- 164-006: Code physically verified despite missing .result (docker HB shutdown pattern)
 
 ### Gate Failure
-Self-audit gate failed for sprint sprint-163. Status: GO_WITH_GATE_FAILURE.
+Self-audit gate failed for sprint sprint-164. Status: GO_WITH_GATE_FAILURE.
 
-- vitest: 1 failing tests
+- vitest: 2 failing tests

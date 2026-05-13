@@ -1,0 +1,29 @@
+# Task 164-004: Gitignore Housekeeping — Execution Plan
+
+## Objective
+Add 3 runtime artifact patterns to .gitignore under "# Deckent runtime config & state" section.
+
+## Current State
+- `.gitignore` mevcut ve İNCELENDİ
+- Satır 50'de `.deckent/sprint-*-gate.json` zaten var
+- `.deckent/mcp-server.pid` ve `.deckent/sprint-*-metrics.jsonl` eksik
+- `.deckent/*-gate.json` pattern'ı daha generic olması gerekli (160-gate.json, 163-gate.json vb. saklamak için)
+
+## Changes Required
+1. Satır 50'den sonra (sprint ephemeral artifacts bölümü) 3 satır ekle:
+   - `.deckent/mcp-server.pid` — MCP stdio server PID dosyası
+   - `.deckent/*-gate.json` — Self-audit gate sonuç dosyaları (generic, sprint-* vb hepsini saklar)
+   - `.deckent/sprint-*-metrics.jsonl` — Observability metric stream'ler
+
+2. Mevcut `.deckent/sprint-*-gate.json` satırını koru (zaten doğru, daha generic pattern'ın yanında olabilir)
+
+## Verification Steps
+- `grep -E "mcp-server\.pid|\*-gate\.json|sprint-\*-metrics\.jsonl" .gitignore` → 3+ match beklenir
+- `tsc --noEmit` PASS
+- `npx vitest run` PASS (eğer testler varsa)
+- No code changes required, only .gitignore addition
+
+## Expected Result
+- 3 yeni satır .gitignore'a eklenir
+- `git status --short` çıktısında `.deckent/mcp-server.pid`, `*-gate.json`, `*-metrics.jsonl` dosyaları görünmez
+- Scope check: Sadece .gitignore dosyası değiştirilir

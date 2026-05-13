@@ -1,0 +1,26 @@
+# Task 164-002 Execution Plan
+
+## Objective
+Write ADR-045: Wave-Based Execution Semantics — respawnEligibleTasks Runtime Wire
+
+## Approach
+1. Read existing ADR files (043, 044) to confirm MADR v3 hybrid format used in this project
+2. Create docs/adr/045-wave-based-execution-semantics.md with full content per DIRECTIVES spec
+3. Verify file structure matches format: Title, Status, Date, Sprint, Context, Decision (3 numbered items), Alternatives (3 rejected with reasoning), Consequences (Positive/Negative/Risk), References (7 cross-links), Memory DB insert pattern
+
+## Files to Create
+- docs/adr/045-wave-based-execution-semantics.md
+
+## Format
+- MADR v3 hybrid format matching ADR-043 and ADR-044 style
+- Turkish content where appropriate (per project conventions)
+- All 3 decision items numbered
+- All 3 alternatives explicitly rejected with reasoning
+- All positive/negative consequences + risk mitigation
+- 7 cross-reference links in References section
+- Memory DB insert code block at end
+
+## Verification Steps
+- Confirm file exists with all required sections
+- Confirm tsc --noEmit passes (no TypeScript changes in this task)
+- Note: no tests required for this governance contract task

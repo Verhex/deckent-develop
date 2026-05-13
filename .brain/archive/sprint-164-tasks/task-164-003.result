@@ -1,0 +1,27 @@
+{
+  "taskId": "164-003",
+  "workerId": "w-164-003",
+  "filesChanged": [
+    "tests/github/workflows/ci.test.ts",
+    "tests/github/ci-workflow.test.ts",
+    "tests/docs/github-pages-deploy.test.ts",
+    "tests/orchestra/fix-phase-map.test.ts",
+    "tests/orchestra/sprint-phases-rollback.test.ts",
+    "tests/orchestra/brain-provider.test.ts",
+    "tests/providers/gemini-integration.test.ts",
+    "tests/e2e/docker-backend.test.ts"
+  ],
+  "linesAdded": 55,
+  "linesRemoved": 32,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "DONE",
+  "notes": "Vitest gate +1 fail chronic regression closure — TAMAMLANDI. Discovery: full vitest run 17 fail / 8 dosya tespit etti (not 1 — gate parseVitestOutput regex'i `Test Files N failed`'i alıyor; chronic delta=1 raporu önceki sprintlerin 1-fail dönemine ait). Triage 8 fail/file:\n\n1. tests/github/workflows/ci.test.ts (1 fail, kategori e test-only bug): `branches: [master]` → `branches: [main]`. Workflow file source-of-truth zaten `main` kullanıyor; test stale.\n2. tests/github/ci-workflow.test.ts (1 fail, kategori e): aynı master→main rename.\n3. tests/docs/github-pages-deploy.test.ts (1 fail, kategori e): aynı master→main rename.\n4. tests/orchestra/fix-phase-map.test.ts (5 fail, kategori c mock drift): `vi.mock('../../src/core/constants.js', ...)` factory'sinde `DECKENT_DIR` eksik. Sprint 156 `event-stream.getCurrentSprintId` runFixPhase içinden çağrılır hale geldi ve `import { DECKENT_DIR } from '../core/constants.js'` kullanıyor; testin constants mock'u buna güncellenmemişti. Vitest mocked module export'u bulamayınca THROW edip runFixPhase main try/catch'i tarafından swallow ediliyor → evaluations.set asla çalışmıyor. Forensic source-level debug-log trace ile doğrulandı (DEBUG-FIX getCurrentSprintId THREW). Fix: mock factory'ye `DECKENT_DIR: '.deckent'` eklendi + neden açıklayan inline yorum.\n5. tests/orchestra/sprint-phases-rollback.test.ts (3 fail, kategori c mock drift): Sprint 156 Task 008 `checkBuildStaleness` runPlanPhase başlangıcına eklendi; 2 ekstra `existsSync` çağrısı yapıyor. Test'in `mockExistsSync.mockReturnValueOnce(true)` queue'sundan checkBuildStaleness 2 entry tüketince loadSafetyPoint+isGitRepo+safetyBranchExists'in beklediği döngü kaydı. Forensic: source-level debug-log trace `isGitRepo=false` raporladı çünkü ilk spawnSync mock 'not found' status 128'i alıyordu. Fix: her test'in başına `mockExistsSync.mockReturnValueOnce(false)` prepend ettim ki checkBuildStaleness 'dist-missing' early-exit yapsın.\n6. tests/orchestra/brain-provider.test.ts (2 fail, kategori c production drift): Sprint 156 Task 4 `.prompt-*` cleanup semantiği değişti — unlinkSync (delete) → renameSync (archive to `.tasks/archive/sprint-{id}/`). Production filter `.prompt-*.txt` exact match istiyor. Fix: test fixture filenames `.prompt-abc123` → `.prompt-abc123.txt`, node:fs mock'a `renameSync: vi.fn()` eklendi, `renameSync` import edildi, assertions `unlinkSync` → `renameSync` (with archive dst). Test başlığı `removes` → `archives` olarak güncellendi.\n7. tests/providers/gemini-integration.test.ts (2 fail, kategori c production drift): Gemini CLI args format değişti — `--model` → `-m`, ek `--approval-mode plan` flag'i. Fix: 2 assertion güncel format'a göre güncellendi (buildArgs + buildCommand).\n8. tests/e2e/docker-backend.test.ts (2 fail, kategori c production drift): T16 `src.indexOf('monitorContainer')` ilk match'i comment'i alıyor (line 175), gerçek function definition (line 771) değil; 3000 char slice fsyncSync'i kaçırıyor. Fix: anchor `private monitorContainer` (uniquely function-def). T21 production yorumu Sprint 156 Task 4'te değişti: `intentionally NOT deleted here` → `.prompt-*.txt AND .worker-*.sh tmpfiles persist until sprint cleanup`. Fix: assertion güncel yorum stringine güncellendi.\n\nDoğrulama:\n- `npx vitest run` → 742 Test Files passed, 16247 Tests passed, 0 failed, 66 skipped (env-dependent — pre-existing). delta.fail = 17 → 0.\n- `npx tsc --noEmit` → 0 errors.\n\nAnti-pattern compliance: HİÇ skip eklenmedi, expect.any() gevşetmesi yok, mock loosening yok, test silinmedi. Tüm fix'ler kök neden (root cause) doğrultusunda — production semantics test'te aynen reflect edildi.\n\nSrc/orchestra/sprint-phases.ts diff (1 line `config` param to waitForResults call) Task 164-005 Wire worker'ından parallel geliyor — scope'um dışında, dokunmadım. tests/orchestra/dependency-pipeline-wire.test.ts da Task 164-005'in yeni dosyası.\n\nADR-046 (Test Skip Discipline) amendment ÖNERİSİ gereksiz — bu sprint'te skip eklenmedi; mevcut 66 skip pre-existing env-dependent (Docker yokluğu, vb.). Test Skip Discipline ADR'ı Sprint 165+'da skip'in canlı kullanımı olursa anlamlı.\n\nForensic discipline kanıt: 17 fail tespit → 8 kök neden kategorize → 8 dosyada minimal targeted fix → 0 fail. 5-sprint chronic regression eradicate edildi.",
+  "tokenUsage": {
+    "inputTokens": 95000,
+    "outputTokens": 11000,
+    "cacheReadTokens": 80000,
+    "provider": "claude",
+    "model": "opus"
+  }
+}
