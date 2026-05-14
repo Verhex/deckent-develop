@@ -1,0 +1,10 @@
+Sprint 168 C0a-4 Input: auto_archive_directives default value decision
+
+Decision: Option B (default=false) — safer, Sprint 167 BUG-CC live evidence sonrası önerilen.
+
+Behavior:
+- Sprint finalize'da DIRECTIVES.md KORUNUR (placeholder overwrite YASAK)
+- Sadece archive copy alınır (`.brain/archive/DIRECTIVES-sprint-NNN.md`)
+- auto_archive_directives=true opt-in flag (legacy behavior için)
+
+Approved by: Alperen (2026-05-14)
