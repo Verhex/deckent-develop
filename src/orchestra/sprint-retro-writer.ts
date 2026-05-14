@@ -503,16 +503,21 @@ export function writeRetrospective(
   // ─── DB dual-write: sprint + retro + memory entries ─────────
   // Bug U fix (Sprint 166): also write type='sprint' so each sprint has
   // a queryable entry (Sprint 140+ had only retro/memory rows, no sprint row).
+  // Sprint 168 C0a-3 (BUG-DD): ID prefix `sprint-NNN` was non-canonical and
+  // did not match the triple-link contract (`sprint-log-NNN`). Switched to
+  // canonical `sprint-log-${sprintNum}` per Sprint 143 plan L593 + Sprint
+  // 168 plan L1384. Forensic: Sprint 167 finalize emitted `sprint-167`
+  // instead of `sprint-log-167`, causing the audit query miss.
   if (existsSync(dbPath)) {
     try {
       const store = new MemoryStore(dbPath);
       try {
         const sprintNum = parseInt(sprint.id.replace(/\D/g, ''), 10) || 0;
 
-        // Write/update sprint metadata entry (Bug U fix)
+        // Write/update sprint metadata entry (Bug U fix / BUG-DD canonical ID)
         const sprintSummary = buildSprintEntrySummary(sprint, metrics, evaluations);
         store.upsert({
-          id: `sprint-${sprintNum}`,
+          id: `sprint-log-${sprintNum}`,
           type: 'sprint',
           title: `Sprint ${sprint.id}`,
           content: sprintSummary,

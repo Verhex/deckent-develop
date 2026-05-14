@@ -605,6 +605,13 @@ export async function finalizeSprint(
   );
 
   // 3 + 4. Write RETRO.md and update MEMORY.md (writeRetrospective does both)
+  // ─── ADR-046 Step 5 — retroWriter (dual write contract) ─────────
+  // Sprint 168 C0a-3 (BUG-DD + BUG-EE): writeRetrospective MUST emit
+  // both DB rows (`sprint-log-NNN`, `retro-sprint-NNN`, `mem-sprint-NNN`)
+  // and `.brain/RETRO.md` in a single invocation. Pinned by
+  // tests/orchestra/retro-dual-write.test.ts. Do NOT split the call
+  // (Sprint 167 regression — DB+FS came out of sync when the wire was
+  // partial). Unconditional invocation per ADR-046 §"Mimari Prensipler".
   debugLog('finalizeSprint:preRetro', `evaluations.size=${evaluations.size} keys=[${[...evaluations.keys()].join(',')}]`);
   try {
     // Build skillMap from tasks for Skill Performance table in RETRO.md
