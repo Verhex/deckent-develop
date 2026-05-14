@@ -96,7 +96,8 @@ describe('archiveDirectives', () => {
     // DIRECTIVES.md exists
     mockExistsSync.mockReturnValue(true);
 
-    archiveDirectives('/project', 'sprint-133');
+    // Sprint 168 C0a-4: legacy placeholder-overwrite behavior is now opt-in (BUG-CC fix)
+    archiveDirectives('/project', 'sprint-133', 'COMPLETE', { autoArchive: true });
 
     // Should create archive dir
     expect(mockMkdirSync).toHaveBeenCalledWith(
@@ -120,7 +121,8 @@ describe('archiveDirectives', () => {
   it('should write placeholder with correct next sprint number and references', () => {
     mockExistsSync.mockReturnValue(true);
 
-    archiveDirectives('/project', 'sprint-050');
+    // Sprint 168 C0a-4: explicit autoArchive opt-in (default preserve, BUG-CC)
+    archiveDirectives('/project', 'sprint-050', 'COMPLETE', { autoArchive: true });
 
     const writeCall = mockWriteFileSync.mock.calls[0];
     const content = writeCall?.[1] as string;

@@ -273,8 +273,7 @@ describe('runPostFinalizeHooks', () => {
     });
 
     expect(result.memoryExport).not.toBeNull();
-    expect(result.identityRegen).not.toBeNull();
-    expect(result.identityRegen?.success).toBe(true);
+    expect(result.identityRegen).toBeNull(); // Sprint 168 C0a-1: skipIdentityRegen default=true (BUG-GG)
     expect(result.ruleRegenCalled).toBe(true);
     expect(ruleRegenFn).toHaveBeenCalledWith('/test');
   });
@@ -290,7 +289,7 @@ describe('runPostFinalizeHooks', () => {
     });
 
     expect(result.memoryExport).toBeNull();
-    expect(result.identityRegen).not.toBeNull();
+    expect(result.identityRegen).toBeNull(); // Sprint 168 C0a-1: skipIdentityRegen default=true
   });
 
   it('skips identity regen when skipIdentityRegen=true', async () => {
@@ -336,8 +335,8 @@ describe('runPostFinalizeHooks', () => {
 
     expect(result.ruleRegenCalled).toBe(false);
     expect(result.errors.some(e => e.includes('ruleRegen'))).toBe(true);
-    // Identity regen still ran (even though it creates a new file)
-    expect(result.identityRegen).not.toBeNull();
+    // Sprint 168 C0a-1: identity regen now skipped by default (skipIdentityRegen=true)
+    expect(result.identityRegen).toBeNull();
   });
 
   it('handles async rule regen callback', async () => {
