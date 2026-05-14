@@ -1,0 +1,25 @@
+{
+  "sprintId": "sprint-157",
+  "pid": 1189767,
+  "startedAt": "2026-05-12T14:14:19.440Z",
+  "currentWave": 0,
+  "taskStatuses": {
+    "157-001": "PENDING",
+    "157-002": "PENDING",
+    "157-003": "PENDING",
+    "157-004": "PENDING",
+    "157-005": "PENDING",
+    "157-006": "PENDING",
+    "157-007": "PENDING",
+    "157-008": "PENDING",
+    "157-009": "PENDING",
+    "157-010": "PENDING",
+    "157-011": "PENDING",
+    "157-012": "PENDING",
+    "157-013": "PENDING",
+    "157-014": "PENDING",
+    "157-015": "PENDING"
+  },
+  "metricsJsonlSize": 3,
+  "lastHeartbeat": "2026-05-12T14:15:24.236Z"
+}

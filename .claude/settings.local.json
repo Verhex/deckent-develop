@@ -72,7 +72,13 @@
       "Bash(sed -n '1175,1200p' src/orchestra/sprint-finalizer.ts)",
       "Bash(awk '{i+=$1; o+=$2; c+=$3} END {printf \"Input: %d\\\\nOutput: %d\\\\nCacheRead: %d\\\\nTotal \\(in+out\\): %d\\\\nGrand \\(in+out+cache\\): %d\\\\n\", i, o, c, i+o, i+o+c}')",
       "Bash(mkdir -p /mnt/d/deckent)",
-      "Bash(cp /tmp/deckent-pkg/deckent-1.0.0-beta.1.tgz /mnt/d/deckent/)"
+      "Bash(cp /tmp/deckent-pkg/deckent-1.0.0-beta.1.tgz /mnt/d/deckent/)",
+      "Bash(tee /tmp/tsc-output.txt)",
+      "Bash(tee /tmp/vitest-output.txt)",
+      "Skill(superpowers:brainstorming)",
+      "Skill(superpowers:writing-plans)",
+      "Bash(sed -n '730,765p' src/orchestra/spawn-backend-docker.ts)",
+      "Bash(sed -n '425,460p' src/core/file-lock.ts)"
     ]
   }
 }

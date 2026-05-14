@@ -1,0 +1,15 @@
+{
+  "sprintId": "sprint-161",
+  "pid": 1692675,
+  "startedAt": "2026-05-12T21:28:15.446Z",
+  "currentWave": 0,
+  "taskStatuses": {
+    "161-001": "PENDING",
+    "161-002": "PENDING",
+    "161-003": "PENDING",
+    "161-004": "PENDING",
+    "161-005": "PENDING"
+  },
+  "metricsJsonlSize": 8,
+  "lastHeartbeat": "2026-05-12T21:29:08.357Z"
+}

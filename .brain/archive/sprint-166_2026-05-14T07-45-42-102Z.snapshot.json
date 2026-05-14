@@ -1,0 +1,21 @@
+{
+  "sprintId": "sprint-166",
+  "pid": 1214939,
+  "startedAt": "2026-05-13T13:45:52.885Z",
+  "currentWave": 0,
+  "taskStatuses": {
+    "166-001": "EXECUTING",
+    "166-002": "EXECUTING",
+    "166-003": "EXECUTING",
+    "166-004": "PENDING",
+    "166-005": "PENDING",
+    "166-006": "PENDING",
+    "166-007": "PENDING",
+    "166-008": "PENDING",
+    "166-009": "PENDING",
+    "166-010": "PENDING",
+    "166-011": "PENDING"
+  },
+  "metricsJsonlSize": 5,
+  "lastHeartbeat": "2026-05-13T13:47:30.112Z"
+}
