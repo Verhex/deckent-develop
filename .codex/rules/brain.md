@@ -1,4 +1,7 @@
 <!-- AUTO-START -->
+---
+paths: [".tasks/*",".brain/*",".contracts/*"]
+---
 # Brain Rules
 - Always read DIRECTIVES.md first
 - All brain knowledge lives in `.brain/memory.db` (SQLite) — this is the single source of truth

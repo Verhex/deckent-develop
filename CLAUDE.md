@@ -30,7 +30,7 @@
 - **core/** — Types, config, utilities, agent/skill pools (94 modules)
   - types.ts + *-types.ts: all type definitions (task, config, sprint, monitoring, routing)
   - config.ts: 3-layer config merge (defaults → global → project)
-  - agent-pool.ts: AgentPoolManager, 16 built-in agents, LRU eviction
+  - agent-pool.ts: AgentPoolManager, 15 built-in agents, LRU eviction
   - skill-pool.ts + skill-registry.ts: 21 built-in skills, sandbox AST validation
   - provider.ts: ProviderAdapter interface, multi-provider registry
   - routing-types.ts: TaskDNA, ActivationConfig, RoutingDecision, SkillBudget types

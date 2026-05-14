@@ -133,7 +133,7 @@ Single-task execution. No PLAN/SPAWN phases. Ideal for quick commands, reminders
 - **Self-Learning** — Brain generates config suggestions from sprint results (NO_GO rate, coverage, duration)
 
 ### Agents & Skills
-- **16 Built-in Agents** — security-auditor, test-writer, doc-writer, bug-fixer, code-reviewer, refactorer, api-builder, performance-analyzer, ci-guardian, architect, architecture-planner, accessibility-auditor, data-engineer, devops-engineer, frontend-designer, migration-specialist
+- **15 Built-in Agents** — security-auditor, doc-writer, bug-fixer, code-reviewer, refactorer, api-builder, performance-analyzer, ci-guardian, architect, architecture-planner, accessibility-auditor, data-engineer, devops-engineer, frontend-designer, migration-specialist
 - **21 Built-in Skills** — typescript-expert, testing-expert, react-specialist, security-specialist, docker-expert, and 16 more
 - **Temp Agent & Skill Generation** — Auto-generates project-specific agents and skills from your codebase conventions
 - **Agent Evolution Pipeline** — Promotion from temp to permanent based on performance; demotion on failure
@@ -175,7 +175,7 @@ Single-task execution. No PLAN/SPAWN phases. Ideal for quick commands, reminders
 | MCP integration | **Yes** (27 tools, 8 resources) | Partial | No | Limited | Native |
 | Web dashboard | **Yes** (6 pages) | Built-in | Built-in | No | No |
 | Multi-provider (Claude, Codex, Gemini) | **Yes** | No | No | Limited | No |
-| Built-in agents | **16** | — | — | 100+ | — |
+| Built-in agents | **15** | — | — | 100+ | — |
 | Built-in skills | **21** | — | — | 13K+ (hub, ~20% flagged) | — |
 | Test coverage | **89.33%** | — | — | — | — |
 | Price | **Free (MIT)** | $20-40/mo | $20-500/mo | Free | Free |

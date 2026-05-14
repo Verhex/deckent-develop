@@ -3,7 +3,11 @@
 // Parse existing .brain/ markdown files into CreateEntryInput objects
 // for Memory V2 DB insertion.
 
+import { readFileSync, readdirSync, existsSync } from 'node:fs';
+import { join } from 'node:path';
 import type { CreateEntryInput } from './memory-types.js';
+import type { MemoryStore } from './memory-store.js';
+import { DeckentError } from './errors.js';
 
 // ─── Stop Words ──────────────────────────────────────────────────
 
@@ -164,12 +168,34 @@ export function parseMemoryMd(content: string): CreateEntryInput[] {
   return entries;
 }
 
+// ─── extractSprintFromDebtId ─────────────────────────────────────
+
+/**
+ * Extract sprint id/num from a debt entry id.
+ * Handles both `debt-NNN-MMM` and `debt-debt-NNN-MMM` (double-prefix) shapes.
+ * Returns null when no sprint number is encoded in the id.
+ */
+export function extractSprintFromDebtId(
+  debtId: string,
+): { sprint_id: string; sprint_num: number } | null {
+  if (!debtId) return null;
+  const match = debtId.match(/^debt-(?:debt-)?(\d+)-\d+/);
+  if (!match?.[1]) return null;
+  const sprintNum = parseInt(match[1], 10);
+  if (!Number.isFinite(sprintNum) || sprintNum <= 0) return null;
+  return { sprint_id: `sprint-${sprintNum}`, sprint_num: sprintNum };
+}
+
 // ─── parseDebtMd ─────────────────────────────────────────────────
 
 /**
  * Parse DEBT.md pipe-delimited markdown table into CreateEntryInput[].
  * Columns: ID | Description | OriginTaskId | OriginSprintId | Priority |
  *          SprintsOpen | Resolved | ResolvedInSprintId | CreatedAt
+ *
+ * Bug V fix (Sprint 166): when originSprintId column is missing or "-",
+ * fall back to parsing the sprint number directly from the debt id
+ * (e.g. `debt-156-011` → `sprint-156`).
  */
 export function parseDebtMd(content: string): CreateEntryInput[] {
   if (!content) return [];
@@ -219,9 +245,19 @@ export function parseDebtMd(content: string): CreateEntryInput[] {
     const resolved = resolvedStr.toLowerCase() === 'true';
     const sprintsOpen = parseInt(sprintsOpenStr, 10) || 0;
 
-    // Extract sprint number from originSprintId (sprint-NNN)
+    // Extract sprint number from originSprintId column first
     const sprintNumMatch = originSprintId.match(/sprint-(\d+)/);
-    const sprintNum = sprintNumMatch?.[1] ? parseInt(sprintNumMatch[1], 10) : 0;
+    let sprintId = sprintNumMatch ? originSprintId : '';
+    let sprintNum = sprintNumMatch?.[1] ? parseInt(sprintNumMatch[1], 10) : 0;
+
+    // Bug V fallback: column missing or "-" → parse from id
+    if (!sprintId || sprintId === '-' || sprintNum <= 0) {
+      const idFallback = extractSprintFromDebtId(`debt-${rawId}`);
+      if (idFallback) {
+        sprintId = idFallback.sprint_id;
+        sprintNum = idFallback.sprint_num;
+      }
+    }
 
     const tags = extractKeywords(description);
 
@@ -234,7 +270,7 @@ export function parseDebtMd(content: string): CreateEntryInput[] {
       tags,
       status: resolved ? 'resolved' : 'active',
       priority: priority.toLowerCase(),
-      sprint_id: originSprintId,
+      sprint_id: sprintId || originSprintId,
       sprint_num: sprintNum,
       metadata: {
         originTaskId,
@@ -248,4 +284,149 @@ export function parseDebtMd(content: string): CreateEntryInput[] {
   }
 
   return entries;
+}
+
+// ─── backfillDebtSprintIds ───────────────────────────────────────
+
+interface DebtRow {
+  id: string;
+  sprint_id: string | null;
+  sprint_num: number;
+}
+
+/**
+ * Backfill missing sprint_id / sprint_num on existing debt entries.
+ *
+ * Sprint 166 Bug V fix: 100 debt entries in memory.db have sprint_id=NULL
+ * because they were inserted by debt-manager (not parseDebtMd). This helper
+ * parses sprint info directly from the debt id and updates rows atomically.
+ *
+ * @param store MemoryStore instance (writable connection)
+ * @returns { scanned, updated } — idempotent: second call returns updated=0
+ */
+export function backfillDebtSprintIds(store: MemoryStore): {
+  scanned: number;
+  updated: number;
+} {
+  // Access the underlying SQLite db via the documented escape hatch.
+  // MemoryStore does not yet expose a typed migration API, but the better-sqlite3
+  // Database instance is reachable through `store as any`. The transaction
+  // below is the single atomic write surface; reads occur in the same block.
+  const db = (store as unknown as { db: import('better-sqlite3').Database }).db;
+  if (!db) {
+    throw new DeckentError(
+      'DECKENT_MEMORY_NO_DB',
+      'backfillDebtSprintIds: MemoryStore has no underlying SQLite db handle',
+      'Ensure MemoryStore was constructed with a valid db path before invoking backfillDebtSprintIds.',
+    );
+  }
+
+  const selectStmt = db.prepare(
+    `SELECT id, sprint_id, sprint_num FROM entries WHERE type = 'debt' AND (sprint_id IS NULL OR sprint_id = '' OR sprint_id = '-')`,
+  );
+  const updateStmt = db.prepare(
+    `UPDATE entries SET sprint_id = @sprint_id, sprint_num = @sprint_num, updated_at = datetime('now') WHERE id = @id`,
+  );
+
+  let updated = 0;
+  let scanned = 0;
+
+  const txn = db.transaction(() => {
+    const rows = selectStmt.all() as DebtRow[];
+    scanned = rows.length;
+    for (const row of rows) {
+      const extracted = extractSprintFromDebtId(row.id);
+      if (!extracted) continue;
+      updateStmt.run({
+        id: row.id,
+        sprint_id: extracted.sprint_id,
+        sprint_num: extracted.sprint_num,
+      });
+      updated += 1;
+    }
+  });
+
+  txn();
+
+  return { scanned, updated };
+}
+
+// ─── backfillSprintMemoriesFromSprintsDir ────────────────────────
+
+/**
+ * Backfill type='memory' entries for the given sprint numbers from
+ * `.brain/sprints/sprint-NNN.md` log files.
+ *
+ * Sprint 166: parseMemoryMd only sees sprints that have a header in
+ * `.brain/exports/memory.md`. For older or missing sprints we fall back
+ * to the per-sprint log file when one exists. Idempotent — entries that
+ * already exist are not overwritten.
+ *
+ * @param store MemoryStore instance
+ * @param sprintsDir Path to `.brain/sprints/` directory
+ * @param sprintNumbers Sprint numbers to attempt backfill for
+ * @returns { attempted, inserted, skipped, missing }
+ */
+export function backfillSprintMemoriesFromSprintsDir(
+  store: MemoryStore,
+  sprintsDir: string,
+  sprintNumbers: number[],
+): { attempted: number; inserted: number; skipped: number; missing: number } {
+  let attempted = 0;
+  let inserted = 0;
+  let skipped = 0;
+  let missing = 0;
+
+  if (!existsSync(sprintsDir)) {
+    return { attempted: sprintNumbers.length, inserted: 0, skipped: 0, missing: sprintNumbers.length };
+  }
+
+  // Pre-load available sprint files for quick lookup
+  const availableFiles = new Set(readdirSync(sprintsDir));
+
+  for (const num of sprintNumbers) {
+    attempted += 1;
+
+    const memId = `mem-${num}`;
+    if (store.getById(memId)) {
+      skipped += 1;
+      continue;
+    }
+
+    const fileName = `sprint-${num}.md`;
+    if (!availableFiles.has(fileName)) {
+      missing += 1;
+      continue;
+    }
+
+    let content = '';
+    try {
+      content = readFileSync(join(sprintsDir, fileName), 'utf-8');
+    } catch {
+      missing += 1;
+      continue;
+    }
+
+    const trimmed = content.trim();
+    if (!trimmed) {
+      missing += 1;
+      continue;
+    }
+
+    const tags = extractKeywords(trimmed);
+    store.insert({
+      id: memId,
+      type: 'memory',
+      title: `Sprint ${num} Learnings`,
+      content: trimmed,
+      source: 'import',
+      tags,
+      status: 'active',
+      sprint_id: `sprint-${num}`,
+      sprint_num: num,
+    });
+    inserted += 1;
+  }
+
+  return { attempted, inserted, skipped, missing };
 }

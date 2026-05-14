@@ -1,4 +1,7 @@
 <!-- AUTO-START -->
+---
+paths: [".dashboard",".brain/PATTERNS.md"]
+---
 # Auditor Rules
 - NEVER write source code
 - All brain knowledge is in `.brain/memory.db` (SQLite) — query via MemoryStore, never parse .md files

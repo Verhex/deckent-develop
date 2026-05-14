@@ -11,7 +11,7 @@
 - Memory budget: 900 lines max in .brain/ (MEMORY 300, RETRO 120, PATTERNS 150, sprint log 100 per file)
 
 ## Providers
-- Default: Claude (tmux backend, session auth)
+- Default: Claude (docker backend, session auth)
 - Optional: Codex (set OPENAI_API_KEY), Gemini (set GOOGLE_API_KEY)
 - Config: brain_provider, worker_provider, fallback_provider in .deckent/config.json
 - Model Registry: 13 models, 3 providers, 4 tiers — single source of truth (model-registry.ts)
@@ -20,7 +20,7 @@
 - Planning mode: brain_planning = 'ai' | 'structured' | 'auto'
 
 ## Agents & Skills
-- 16 built-in agents: security-auditor, test-writer, doc-writer, bug-fixer, code-reviewer, refactorer, api-builder, performance-analyzer, ci-guardian, architect, architecture-planner, accessibility-auditor, data-engineer, devops-engineer, frontend-designer, migration-specialist
+- 15 built-in agents: security-auditor, doc-writer, bug-fixer, code-reviewer, refactorer, api-builder, performance-analyzer, ci-guardian, architect, architecture-planner, accessibility-auditor, data-engineer, devops-engineer, frontend-designer, migration-specialist
 - 21 built-in skills: typescript-expert, testing-expert, documentation-writer, security-specialist, performance-optimizer, api-builder, devops-engineer, database-migration, react-specialist, python-expert, ci-testing, accessibility-expert, anthropic-sdk, code-simplifier, docker-expert, frontend-design, git-expert, graphql-expert, migration-expert, monorepo-expert, system-architect
 - Agent pool: .deckent/agents/*/agent.json — LRU eviction (max 50 temp, 5 sprint age)
 - Skill registry: .deckent/skills/*/skill.json — AST sandbox validation
@@ -46,8 +46,9 @@
 @.brain/exports/summary.md
 
 ## Architecture Decision Records
-- `.brain/DECISIONS.md` = **ADR** (Architecture Decision Record) — project governance, MADR v3 hibrit format, mandatory read for all agents
+- `.brain/exports/decisions.md` = **ADR** (Architecture Decision Record) — generated export from memory.db, MADR v3 hibrit format, mandatory read for all agents
 - `.deckent/decisions/*.json` = **SDL** (Sprint Decision Log) — tactical decisions, audit trail, optional
+- **Sprint 167 flip:** `dependency_pipeline_enabled: true` — Wave scheduling goes live (anchor for Sprint 167 DIRECTIVES)
 
 ## Context
 @DIRECTIVES.md
@@ -364,12 +365,13 @@ tsc
 
 ---
 
-## Built-in Agents (16)
+## Built-in Agents (15)
+
+> ADR-041 (Sprint 166 reconfirmed): Tüm testing agent'ları kaldırıldı — test görevi task-bazlı yönetiliyor.
 
 | Agent | Uzmanlik | Aktivasyon |
 |-------|----------|------------|
 | `security-auditor` | Guvenlik aciklari, OWASP top 10, auth | security/auth/vuln anahtar kelimeleri |
-| `test-writer` | Unit test, integration test, coverage | test/spec/coverage anahtar kelimeleri |
 | `doc-writer` | README, JSDoc, API docs, CHANGELOG | docs/readme/comment anahtar kelimeleri |
 | `bug-fixer` | Hata ayiklama, regression, hotfix | fix/bug/error/crash anahtar kelimeleri |
 | `code-reviewer` | Kod kalitesi, best practices, PR review | review/quality/refactor anahtar kelimeleri |

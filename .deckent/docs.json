@@ -42,6 +42,30 @@
       "path": "DECKENT-MASTER-BLUEPRINT.md",
       "autoSections": ["Live Metrics"],
       "protectedSections": []
+    },
+    {
+      "id": "agents-md",
+      "path": "AGENTS.md",
+      "autoSections": ["Built-in Agents", "Last Updated"],
+      "protectedSections": ["Identity", "Architecture"]
+    },
+    {
+      "id": "tools-md",
+      "path": ".deckent/workspace/TOOLS.md",
+      "autoSections": ["MCP Tools", "CLI Commands"],
+      "protectedSections": ["Environment Tools"]
+    },
+    {
+      "id": "boot-md",
+      "path": ".deckent/workspace/BOOT.md",
+      "autoSections": ["Boot Sequence", "Manual Recovery Chain"],
+      "protectedSections": []
+    },
+    {
+      "id": "worker-guide-md",
+      "path": ".deckent/workspace/WORKER-GUIDE.md",
+      "autoSections": ["Anti-Patterns"],
+      "protectedSections": [".plan File", "Heartbeat File", "Result File", "Error Handling", "Scope Rules", "Verify Loop", "Skill & Agent Context"]
     }
   ]
 }

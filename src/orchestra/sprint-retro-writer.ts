@@ -500,13 +500,30 @@ export function writeRetrospective(
   const trimmed = trimMemoryWithHeader(memoryLines, MEMORY_MAX_LINES);
   writeFileSync(memoryPath, trimmed, 'utf-8');
 
-  // ─── DB dual-write: retro + memory entries ──────────────────
+  // ─── DB dual-write: sprint + retro + memory entries ─────────
+  // Bug U fix (Sprint 166): also write type='sprint' so each sprint has
+  // a queryable entry (Sprint 140+ had only retro/memory rows, no sprint row).
   if (existsSync(dbPath)) {
     try {
       const store = new MemoryStore(dbPath);
       try {
-        // Write/update retro entry
         const sprintNum = parseInt(sprint.id.replace(/\D/g, ''), 10) || 0;
+
+        // Write/update sprint metadata entry (Bug U fix)
+        const sprintSummary = buildSprintEntrySummary(sprint, metrics, evaluations);
+        store.upsert({
+          id: `sprint-${sprintNum}`,
+          type: 'sprint',
+          title: `Sprint ${sprint.id}`,
+          content: sprintSummary,
+          source: 'brain',
+          sprint_id: sprint.id,
+          sprint_num: sprintNum,
+          status: 'active',
+          tags: ['sprint', sprint.id],
+        }, 'brain');
+
+        // Write/update retro entry
         store.upsert({
           id: `retro-${sprint.id}`,
           type: 'retro',
@@ -540,6 +557,42 @@ export function writeRetrospective(
       // DB write failure is non-fatal — file write already succeeded
     }
   }
+}
+
+/**
+ * Build a compact sprint summary stored in the `type='sprint'` entry content.
+ * Sprint 166 Bug U fix — gives downstream consumers (memory-query, summary
+ * export) a single row per sprint with at-a-glance metrics.
+ */
+function buildSprintEntrySummary(
+  sprint: Sprint,
+  metrics: SprintMetrics,
+  evaluations: Map<string, TaskEvaluation>,
+): string {
+  const lines: string[] = [];
+  lines.push(`# ${sprint.id}`);
+  lines.push('');
+  lines.push(`- Total tasks: ${metrics.totalTasks}`);
+  lines.push(`- Completed: ${metrics.completedTasks}`);
+  lines.push(`- NO_GO: ${metrics.noGoTasks}`);
+  if (typeof metrics.coveragePercent === 'number') {
+    lines.push(`- Coverage: ${metrics.coveragePercent.toFixed(1)}%`);
+  }
+  if (typeof metrics.durationMs === 'number') {
+    lines.push(`- Duration: ${metrics.durationMs}ms`);
+  }
+
+  // Per-task evaluation roll-up (compact)
+  if (sprint.tasks.length > 0) {
+    lines.push('');
+    lines.push('## Task Outcomes');
+    for (const task of sprint.tasks) {
+      const ev: string = evaluations.get(task.id) ?? 'PENDING';
+      lines.push(`- ${task.id}: ${ev}`);
+    }
+  }
+
+  return lines.join('\n');
 }
 
 // ═══ Human-Friendly Sprint Complete ══════════════════════════════

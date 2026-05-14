@@ -52,7 +52,7 @@ describe('CHANGELOG.md format validation', () => {
   it('has multiple version entries', () => {
     const content = readChangelog();
     const versions = extractVersionHeaders(content);
-    expect(versions.length).toBeGreaterThanOrEqual(10);
+    expect(versions.length).toBeGreaterThanOrEqual(150);
   });
 
   it('latest entry is at the top and follows sprint naming convention', () => {

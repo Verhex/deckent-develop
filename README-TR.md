@@ -135,7 +135,7 @@ Tek görev yürütme. PLAN/SPAWN fazları yok. Hızlı komutlar, hatırlatmalar 
 - **Öz-Öğrenme** — Brain, sprint sonuçlarından (NO_GO oranı, coverage, süre) config önerileri üretir
 
 ### Agent'lar ve Skill'ler
-- **16 Yerleşik Agent** — security-auditor, test-writer, doc-writer, bug-fixer, code-reviewer, refactorer, api-builder, performance-analyzer, ci-guardian, architect, architecture-planner, accessibility-auditor, data-engineer, devops-engineer, frontend-designer, migration-specialist
+- **15 Yerleşik Agent** — security-auditor, doc-writer, bug-fixer, code-reviewer, refactorer, api-builder, performance-analyzer, ci-guardian, architect, architecture-planner, accessibility-auditor, data-engineer, devops-engineer, frontend-designer, migration-specialist
 - **21 Yerleşik Skill** — typescript-expert, testing-expert, react-specialist, security-specialist, docker-expert ve 16'sı daha
 - **Temp Agent ve Skill Üretimi** — Kod tabanı konvansiyonlarından projeye özel agent ve skill'ler otomatik üretir
 - **Agent Evrim Pipeline'ı** — Performansa dayalı temp'ten kalıcıya terfi; başarısızlıkta geri alım
@@ -177,7 +177,7 @@ Tek görev yürütme. PLAN/SPAWN fazları yok. Hızlı komutlar, hatırlatmalar 
 | MCP entegrasyonu | **Evet** (27 tool, 8 resource) | Kısmi | Hayır | Sınırlı | Native |
 | Web dashboard | **Evet** (6 sayfa) | Yerleşik | Yerleşik | Hayır | Hayır |
 | Çoklu provider (Claude, Codex, Gemini) | **Evet** | Hayır | Hayır | Sınırlı | Hayır |
-| Yerleşik agent sayısı | **16** | — | — | 100+ | — |
+| Yerleşik agent sayısı | **15** | — | — | 100+ | — |
 | Yerleşik skill sayısı | **21** | — | — | 13K+ (hub, ~%20 zararlı) | — |
 | Test coverage | **%89.33** | — | — | — | — |
 | Fiyat | **Ücretsiz (MIT)** | $20-40/ay | $20-500/ay | Ücretsiz | Ücretsiz |

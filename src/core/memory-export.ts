@@ -70,8 +70,8 @@ export function exportSummaryMd(store: MemoryStore): string {
   }
   lines.push('');
 
-  // Active Technical Debt
-  const debts = store.getByType('debt').filter(d => d.status === 'active');
+  // Active Technical Debt (exclude resolved — show active, open, acknowledged, etc.)
+  const debts = store.getByType('debt').filter(d => d.status !== 'resolved');
   lines.push('## Active Technical Debt');
   if (debts.length > 0) {
     for (const d of debts) {

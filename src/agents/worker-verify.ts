@@ -7,7 +7,7 @@
  */
 import { execSync } from 'node:child_process';
 import { promisify } from 'node:util';
-import { writeFileSync, existsSync, mkdirSync } from 'node:fs';
+import { writeFileSync, existsSync, mkdirSync, renameSync } from 'node:fs';
 import { join } from 'node:path';
 import { AgentStatus } from '../core/types.js';
 import type { TaskScope, VerifyTestsResult } from '../core/types.js';
@@ -377,14 +377,16 @@ export async function enforceVerifyLoop(
     }
 
     const markerPath = join(projectRoot, TASKS_DIR, `task-${taskId}.verify-ran`);
+    const tmpPath = `${markerPath}.tmp`;
     ensureDir(join(projectRoot, TASKS_DIR));
-    writeFileSync(markerPath, JSON.stringify({
+    writeFileSync(tmpPath, JSON.stringify({
       taskId,
       timestamp: new Date().toISOString(),
       attempts: attempt,
       tsc: 'PASS',
       vitest: 'PASS',
     }, null, 2), 'utf-8');
+    renameSync(tmpPath, markerPath);
 
     return { ok: true, attempts: attempt };
   }
