@@ -91,8 +91,9 @@ function extractSprintNum(sprintId: string): number | null {
 /**
  * @deprecated Sprint 166 (ADR-046) — identityRegen step delegated to managed-docs chain.
  * `.brain/PROJECT-IDENTITY.md` is superseded by `.deckent/workspace/IDENTITY.md`
- * (managed via docs.json "identity-md" entry). Will be removed in Sprint 168.
- * Set `skipIdentityRegen: true` in PostFinalizeHookOptions to opt out early.
+ * (managed via docs.json "identity-md" entry). Sprint 168 C0a-1 (BUG-GG) flipped
+ * the runtime default in `runPostFinalizeHooks` so this function is NO LONGER invoked
+ * unless the caller explicitly opts in via `skipIdentityRegen: false`.
  *
  * Regenerate PROJECT-IDENTITY.md with live metrics from the completed sprint.
  */
@@ -287,9 +288,20 @@ export interface PostFinalizeHookOptions {
   skipMemoryExport?: boolean;
   /**
    * Skip identity regeneration step.
+   *
+   * **Default: `true` — Sprint 168 C0a-1 BUG-GG fix (Sprint 166 T5 deprecated enforcement).**
+   *
+   * When this field is omitted or `undefined`, Step 2 (`regenerateProjectIdentity`)
+   * is bypassed. The `@deprecated` annotation added in Sprint 166 T5 had no runtime
+   * effect on its own (TypeScript annotations are compile-time/IDE hints), so the
+   * Step was still firing each finalize cycle and mutating `.brain/PROJECT-IDENTITY.md`.
+   * Sprint 168 flips the runtime default to `true` so callers must explicitly opt in
+   * by passing `skipIdentityRegen: false` to invoke the deprecated step.
+   *
    * @deprecated Sprint 166 — Step 2 (identityRegen) is deprecated. Managed-docs chain
    * handles `.deckent/workspace/IDENTITY.md` via docs.json "identity-md" entry.
-   * Will be removed in Sprint 168. Prefer `skipIdentityRegen: true` to opt out now.
+   * Will be removed in a future sprint once all call-sites are migrated to the
+   * managed-docs chain. Prefer omitting the field (default skips).
    */
   skipIdentityRegen?: boolean;
   /** Skip ADR file sync step (Step 3 — Bug M Sprint 166 T1) */
@@ -311,7 +323,9 @@ export interface PostFinalizeHookResult {
   memoryExport: MemoryExportResult | null;
   /**
    * @deprecated Sprint 166 — identityRegen step delegated to managed-docs chain.
-   * Will be `null` when `skipIdentityRegen: true` (recommended). Step 2 removed in Sprint 168.
+   * Sprint 168 C0a-1 (BUG-GG) made the default runtime behavior to skip Step 2;
+   * this field is therefore `null` on the common path. It becomes non-null only when
+   * the caller explicitly opts in with `skipIdentityRegen: false`.
    */
   identityRegen: IdentityRegenResult | null;
   /** Bug M Sprint 166 T1 — populated when adrInsert step ran (Step 3). */
@@ -361,8 +375,13 @@ export async function runPostFinalizeHooks(opts: PostFinalizeHookOptions): Promi
 
   // Step 2: PROJECT-IDENTITY.md auto-regen (DEPRECATED — Sprint 166 ADR-046)
   // Managed-docs chain (docs.json "identity-md") handles .deckent/workspace/IDENTITY.md.
-  // This step will be removed in Sprint 168. Pass skipIdentityRegen: true to opt out.
-  if (!opts.skipIdentityRegen) {
+  //
+  // Sprint 168 C0a-1 (BUG-GG): runtime default flipped to skip. The Sprint 166 T5
+  // `@deprecated` JSDoc annotation alone had no effect on dispatch (annotations are
+  // compile-time only). Step 2 must now be explicitly opted in via
+  // `skipIdentityRegen: false`. Omitting the field — the common path — skips Step 2
+  // and leaves `result.identityRegen === null`.
+  if (opts.skipIdentityRegen === false) {
     try {
       result.identityRegen = regenerateProjectIdentity({
         projectRoot: opts.projectRoot,
