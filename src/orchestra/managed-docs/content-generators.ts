@@ -11,6 +11,8 @@ import { modelRegistry } from '../../core/model-registry.js';
 import type { DocUpdateContext } from '../doc-updaters/types.js';
 import type { SectionGenerator } from './types.js';
 import type { MemoryEntryV2 } from '../../core/memory-types.js';
+// Sprint 168 W2.5 — C0d wire: guarded sprint metrics (BUG-FF NaN%/-1dk fix)
+import { computeSprintMetrics } from '../sprint-reporter.js';
 
 // ─── i18n Strings ────────────────────────────────────────────────────────
 
@@ -143,8 +145,23 @@ register({
     const s = i18n(ctx);
     const { metrics } = ctx.sprintResult;
     const { sprint } = ctx.sprintResult;
-    const durationMin = Math.floor(metrics.durationMs / 60000);
-    const durationSec = Math.floor((metrics.durationMs % 60000) / 1000);
+    // Sprint 168 W2.5 — C0d wire (BUG-FF closure):
+    // Use computeSprintMetrics to guard durationMs against negative drift
+    // (returns Math.max(0, …)). Coverage guard: render "N/A" sentinel when
+    // metrics.coveragePercent is not finite (NaN/Infinity from upstream
+    // division edge cases — e.g. read-only audit sprints with 0 results).
+    const guarded = computeSprintMetrics({
+      startMs: 0,
+      endMs: metrics.durationMs,
+      totalLines: 0,
+      coveredLines: 0,
+    });
+    const safeDurationMs = guarded.durationMs;
+    const durationMin = Math.floor(safeDurationMs / 60000);
+    const durationSec = Math.floor((safeDurationMs % 60000) / 1000);
+    const coverageDisplay = Number.isFinite(metrics.coveragePercent)
+      ? `${metrics.coveragePercent.toFixed(1)}%`
+      : 'N/A';
     return [
       `| ${s.metric} | ${s.value} |`,
       `|--------|-------|`,
@@ -154,7 +171,7 @@ register({
       `| ${s.techDebt} | ${metrics.techDebtTasks} |`,
       `| ${s.noGo} | ${metrics.noGoTasks} |`,
       `| ${s.duration} | ${durationMin}dk ${durationSec}sn |`,
-      `| ${s.coverage} | ${metrics.coveragePercent.toFixed(1)}% |`,
+      `| ${s.coverage} | ${coverageDisplay} |`,
     ].join('\n');
   },
 });

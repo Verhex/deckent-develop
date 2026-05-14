@@ -63,6 +63,16 @@ import { metric } from '../core/observability.js';
 import { detectScopeCollisions } from './conflict-resolver.js';
 import { writeEvent, CHANNELS, getCurrentSprintId, readSequence } from './event-stream.js';
 
+// ─── Decision Engine (Sprint 168 W2.5 — C0c wire) ──────────────
+// Wire: handleScopeCollision() is the pure decision function from C0c RC2.
+// Imported directly to avoid the sprint-controller ↔ sprint-spawner import
+// cycle that would arise if consultCollisionDecision() (its sprint-controller
+// wrapper) were imported here. The BRAIN→SPAWN:BLOCKED emit logic mirrors
+// the wrapper inline so callers of consultCollisionDecision (recovery paths)
+// remain functional and the spawn pipeline gets the same closure semantics.
+import { handleScopeCollision } from './decision-engine.js';
+import type { ScopeCollisionPayload } from './decision-engine.js';
+
 // ─── Dependency Scheduler (Sprint 139 Task 028 + 029) ───────────
 import {
   buildDependencyGraph,
@@ -200,8 +210,12 @@ export async function spawnWorkers(
   const maxWorkers = resolveEffectiveWorkers(config, systemProfile);
 
   // ─── Plan-Time Collision Detection (Sprint 138 ADR-035) ───────
+  // Sprint 168 W2.5 — C0c wire: build a blockedTaskIds set from
+  // handleScopeCollision() decisions and emit BRAIN→SPAWN:BLOCKED events.
+  // Blocked tasks short-circuit before TASK_ASSIGN below.
   const pendingTasks = sprint.tasks.filter(t => t.status === TaskStatus.PENDING);
   const collisionResult = detectScopeCollisions(pendingTasks);
+  const blockedTaskIds = new Set<string>();
   if (collisionResult.collisionCount > 0) {
     const sprintId = getCurrentSprintId(projectRoot) ?? sprint.id;
     for (const [file, writers] of collisionResult.collisions) {
@@ -211,6 +225,31 @@ export async function spawnWorkers(
         { taskIds: writers, files: [file], detectedAt: 'plan-time' },
       );
       debugLog('spawnWorkers:collision', `File "${file}" written by tasks: ${writers.join(', ')}`);
+
+      // Sprint 168 W2.5 — consult collision decision (C0c RC2) + emit BLOCKED
+      const payload: ScopeCollisionPayload = {
+        taskIds: writers,
+        files: [file],
+        detectedAt: 'plan-time',
+      };
+      const decision = handleScopeCollision(payload);
+      if (decision.action === 'block') {
+        for (const id of decision.taskIds) blockedTaskIds.add(id);
+        try {
+          writeEvent(
+            projectRoot, sprintId, 'brain', 'worker',
+            CHANNELS.SPAWN_BLOCKED,
+            {
+              taskIds: decision.taskIds,
+              files: payload.files,
+              reason: decision.reason,
+              detectedAt: payload.detectedAt,
+            },
+          );
+        } catch (e) {
+          debugLog('spawnWorkers:writeBlockedEvent', e);
+        }
+      }
     }
     metric('collision.detected', collisionResult.collisionCount, {
       pairs: String(collisionResult.collidingPairs.length),
@@ -252,6 +291,27 @@ export async function spawnWorkers(
   metric('wave.start', 0, { wave: waveId, count: String(activeTasks.length) });
 
   for (const task of activeTasks) {
+    // Sprint 168 W2.5 — C0c wire: skip blocked tasks (collision spawn-block).
+    // BRAIN→SPAWN:BLOCKED was already emitted above; no TASK_ASSIGN, no spawn.
+    if (blockedTaskIds.has(task.id)) {
+      debugLog('spawnWorkers:skipBlocked', `Task ${task.id} blocked by scope collision`);
+      continue;
+    }
+
+    // Sprint 168 W2.5 — C0c wire: fresh disk read of task.json (RC3).
+    // Operator manual patches between PLAN and SPAWN (--resume, recovery,
+    // race with Auditor) must be reflected in TASK_ASSIGN. We attempt a
+    // fresh read; on missing/corrupt file we fall back to the in-memory
+    // task to preserve resilience (fail-safe per ADR-035).
+    let freshTask: Task = task;
+    try {
+      const freshPath = join(projectRoot, TASKS_DIR, `task-${task.id}.json`);
+      const raw = readFileSync(freshPath, 'utf-8');
+      freshTask = JSON.parse(raw) as Task;
+    } catch (e) {
+      debugLog('spawnWorkers:freshTaskRead', e);
+    }
+
     const agentPrompt = await resolveAgentPrompt(projectRoot, task);
     const taskSkillPrompts = await resolveSkillPrompts(projectRoot, task);
     const prompt = buildWorkerPrompt(task, agentPrompt, taskSkillPrompts);
@@ -272,6 +332,7 @@ export async function spawnWorkers(
     // ─── TASK_ASSIGN event (Brain → Worker, Protocol 1.0) ────────
     // Emitted before spawn so the event stream records task intent
     // even if the spawn process fails (observable pre-condition state).
+    // Sprint 168 W2.5: payload reads scope from freshTask (disk-fresh).
     const sprintIdForAssign = getCurrentSprintId(projectRoot) ?? sprint.id;
     writeEvent(
       projectRoot, sprintIdForAssign, 'brain', 'worker',
@@ -280,9 +341,12 @@ export async function spawnWorkers(
         taskId: task.id,
         workerId: wid,
         model: task.model,
-        agent: task.assignedAgent ?? 'generic',
-        skills: task.assignedSkills ?? [],
-        scope: { directories: task.scope?.directories ?? [], filesWrite: task.scope?.filesWrite ?? [] },
+        agent: freshTask.assignedAgent ?? task.assignedAgent ?? 'generic',
+        skills: freshTask.assignedSkills ?? task.assignedSkills ?? [],
+        scope: {
+          directories: freshTask.scope?.directories ?? task.scope?.directories ?? [],
+          filesWrite: freshTask.scope?.filesWrite ?? task.scope?.filesWrite ?? [],
+        },
         provider: resolveTaskProvider(task),
       },
     );

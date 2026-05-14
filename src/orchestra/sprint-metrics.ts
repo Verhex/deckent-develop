@@ -109,13 +109,17 @@ export function calculateMetrics(
 
   const startTime = sprint.startedAt ? new Date(sprint.startedAt).getTime() : Date.now();
   const endTime = sprint.completedAt ? new Date(sprint.completedAt).getTime() : Date.now();
+  // Sprint 168 W2.5 — C0d wire (BUG-FF): guard against negative duration.
+  // Mirrors computeSprintMetrics({ ... }).durationMs from sprint-reporter.ts.
+  // Inline to avoid the sprint-reporter ↔ sprint-metrics import cycle.
+  const durationMs = Math.max(0, endTime - startTime);
 
   return {
     totalTasks,
     completedTasks,
     techDebtTasks,
     noGoTasks,
-    durationMs: endTime - startTime,
+    durationMs,
     coveragePercent,
     noGoRate,
     newDebtCount: techDebtTasks,
