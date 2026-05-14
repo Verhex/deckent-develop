@@ -1,17 +1,17 @@
-# Sprint 168.5 Design — Audit Remediation + Brain Pipeline Closure
+# Sprint 169 Design — Audit Remediation + Brain Pipeline Closure
 
 **Date:** 2026-05-15
 **Status:** Approved (brainstorming session)
 **Predecessor:** Sprint 168 GO_WITH_TECH_DEBT (`b5a0acb`, 13 commit push edildi)
-**Successor candidate:** Sprint 169 OSS GA (conditional on 168.5 GO)
-**Spec:** `docs/superpowers/specs/2026-05-14-sprint-168-design.md` Section 8 (Sprint 168.5 hint)
-**Plan:** `docs/superpowers/plans/2026-05-15-sprint-168.5-plan.md` (writing-plans output)
+**Successor candidate:** Sprint 170 OSS GA (conditional on 168.5 GO)
+**Spec:** `docs/superpowers/specs/2026-05-14-sprint-168-design.md` Section 8 (Sprint 169 hint)
+**Plan:** `docs/superpowers/plans/2026-05-15-sprint-169-plan.md` (writing-plans output)
 
 ---
 
 ## 1. Summary
 
-Sprint 168.5 = Audit Remediation + Brain Spawn Pipeline Closure. 9 task tek dalga (3 wave), Brain tam otonom mode. Sprint 169 OSS GA (`VerhexIO/deckent` public flip + `npm publish v1.0.0-beta.2` + Show HN) için anchor sprint.
+Sprint 169 = Audit Remediation + Brain Spawn Pipeline Closure. 9 task tek dalga (3 wave), Brain tam otonom mode. Sprint 170 OSS GA (`VerhexIO/deckent` public flip + `npm publish v1.0.0-beta.2` + Show HN) için anchor sprint.
 
 **Çift hedef:**
 - **Audit remediation:** Sprint 167 T7 cross-cutting audit'in açık 5 task'ı (C1, C2, H1–H5) closure
@@ -31,7 +31,7 @@ Sprint 168.5 = Audit Remediation + Brain Spawn Pipeline Closure. 9 task tek dalg
 - Push: `aab7071..b5a0acb` → `VerhexIO/deckent-develop`
 - Worktree cleanup: 10 worktree + 10 branch silindi
 
-### Sprint 168.5 Açık Tasks
+### Sprint 169 Açık Tasks
 
 | Cluster | Kategori | Source |
 |---|---|---|
@@ -53,21 +53,21 @@ Sprint 168.5 = Audit Remediation + Brain Spawn Pipeline Closure. 9 task tek dalg
 
 ```
 Wave 1 (paralel, 6 task, max_workers=6)
-├── 168.5-001  W3.1  C0c Collision Live Trigger Investigation
-├── 168.5-002  W3.2  Smoke Directive Dependency Parser Fix
-├── 168.5-003  C1    Memory Relations Migration
-├── 168.5-004  H2    Stub Memory Entries Backfill
-├── 168.5-005  H3    OSS Pre-Flip Secret Scan Baseline
-└── 168.5-006  H4    Dashboard Build CI Gate
+├── 169-001  W3.1  C0c Collision Live Trigger Investigation
+├── 169-002  W3.2  Smoke Directive Dependency Parser Fix
+├── 169-003  C1    Memory Relations Migration
+├── 169-004  H2    Stub Memory Entries Backfill
+├── 169-005  H3    OSS Pre-Flip Secret Scan Baseline
+└── 169-006  H4    Dashboard Build CI Gate
                                   │
-                                  ▼ (168.5-003 C1 DONE)
-Wave 2 (paralel, 2 task — depends 168.5-003)
-├── 168.5-007  C2    Bug Z3 Memory Rebuild Safety   [dependencies: ["168.5-003"]]
-└── 168.5-008  H1    ADR DB→FS Export Pipeline       [dependencies: ["168.5-003"]]
+                                  ▼ (169-003 C1 DONE)
+Wave 2 (paralel, 2 task — depends 169-003)
+├── 169-007  C2    Bug Z3 Memory Rebuild Safety   [dependencies: ["169-003"]]
+└── 169-008  H1    ADR DB→FS Export Pipeline       [dependencies: ["169-003"]]
                                   │
                                   ▼ (Wave 2 DONE)
 Wave 3 (sequential, 1 task — final config flip)
-└── 168.5-009  H5    dep_pipeline_enabled Flip + 3-Layer Doc Fix
+└── 169-009  H5    dep_pipeline_enabled Flip + 3-Layer Doc Fix
 ```
 
 ### Dependency Mantığı
@@ -81,13 +81,13 @@ Wave 3 (sequential, 1 task — final config flip)
 
 **Brain tam otonom:** `deckent plan + start` → finalize → review. Alperen sadece sprint başlangıç + sonuç checkpoint'i.
 
-**Parser quirk W3.2 bypass:** DIRECTIVES.md'de C2 + H1 için dependency JSON array formatında yazılır (`dependencies: ["168.5-003"]`). W3.2 fix Wave 1'de paralel çalışır ama Sprint 168.5'in kendisi parser bug'a maruz değil (bypass).
+**Parser quirk W3.2 bypass:** DIRECTIVES.md'de C2 + H1 için dependency JSON array formatında yazılır (`dependencies: ["169-003"]`). W3.2 fix Wave 1'de paralel çalışır ama Sprint 169'in kendisi parser bug'a maruz değil (bypass).
 
 ## 4. Task Breakdown
 
 ### Wave 1 — 6 paralel task
 
-#### 168.5-001 — W3.1 C0c Collision Detection Live Trigger Investigation + Fix
+#### 169-001 — W3.1 C0c Collision Detection Live Trigger Investigation + Fix
 
 - **Agent:** bug-fixer (full mode — RC analysis followed by fix)
 - **Model:** opus
@@ -96,10 +96,10 @@ Wave 3 (sequential, 1 task — final config flip)
 - **Files (read):** `src/orchestra/sprint-spawner.ts`, `src/orchestra/decision-engine.ts`, `src/orchestra/planner.ts`, `.deckent/events.jsonl`
 - **Files (write):** `src/orchestra/sprint-spawner.ts` veya `decision-engine.ts` (root cause fix), `tests/orchestra/c0c-collision-live-fire.test.ts`
 - **Description:** Sprint 168 C0c wire layer `detectScopeCollisions` çağrılıyor ama smoke test parallel-spawn same-file collision senaryosunda `BRAIN→SPAWN:BLOCKED` event runtime'da fire etmedi. `.deckent/events.jsonl` trace + decision-engine subscriber path'i forensic incelenir. Olası RC: subscriber registration timing, event-stream channel mismatch, veya scope normalization (`./src/foo.ts` vs `src/foo.ts`). Root cause + fix + canlı tetikleyici test.
-- **GO criteria:** TDD test: 2 task aynı `scope.filesWrite` ile spawn edilirse `BRAIN→SPAWN:BLOCKED` event'i `.deckent/events.jsonl`'a yazılır. RC doc `.audit/sprint-168.5/W3.1-root-cause.md`.
-- **NO_GO:** 4h investigation sonrası RC bulunmaz — Sprint 168.6 mikro-sprint'e ertelenir, investigation notları kaydedilir.
+- **GO criteria:** TDD test: 2 task aynı `scope.filesWrite` ile spawn edilirse `BRAIN→SPAWN:BLOCKED` event'i `.deckent/events.jsonl`'a yazılır. RC doc `.audit/sprint-169/W3.1-root-cause.md`.
+- **NO_GO:** 4h investigation sonrası RC bulunmaz — Sprint 169 hotfix mikro-sprint'e ertelenir, investigation notları kaydedilir.
 
-#### 168.5-002 — W3.2 Smoke Directive Dependency Parser Fix
+#### 169-002 — W3.2 Smoke Directive Dependency Parser Fix
 
 - **Agent:** bug-fixer
 - **Model:** opus
@@ -109,7 +109,7 @@ Wave 3 (sequential, 1 task — final config flip)
 - **Description:** Sprint 168 smoke test T3 NO_GO çünkü DIRECTIVES'te `- Dependencies: "sprint-168-smoke-T1"` literal string kaldı, task.json'a JSON array (`["sprint-168-smoke-T1"]`) olarak parse edilmedi. Parser her iki formatı kabul etmeli: bare string (`- Dependencies: foo-bar`) → `["foo-bar"]`, virgül listesi (`- Dependencies: a, b, c`) → `["a","b","c"]`, JSON array (`- Dependencies: ["a","b"]`) → `["a","b"]` pass-through. Backwards compat.
 - **GO criteria:** TDD test 3 senaryo PASS (bare string, virgül liste, JSON array). Sprint 168 smoke T3 retro replay PASS.
 
-#### 168.5-003 — C1 Memory Relations Migration
+#### 169-003 — C1 Memory Relations Migration
 
 - **Agent:** data-engineer
 - **Model:** opus
@@ -119,9 +119,9 @@ Wave 3 (sequential, 1 task — final config flip)
 - **Files (read):** `.brain/archive/pre-v2/DECISIONS.md` (96K original ADR file), `src/core/memory-types.ts`, `.brain/memory.db`
 - **Description:** memory.db `relations` tablosu var (Sprint 159 Memory V2) ama backfill eksik. ADR cross-references (`references`, `supersedes`, `caused_by`, `resolves`, `blocks`, `depends_on`) `.brain/archive/pre-v2/DECISIONS.md`'den regex/parse ile çıkar + insert. Idempotent migration script (re-run safe). Schema validation gate: `from_id` + `to_id` foreign key existence check (orphan reference skip + log).
 - **GO criteria:** `node -e "...COUNT relations"` > 0 (sıfır olmayan row), idempotent re-run aynı sonuç, TDD test 3 senaryo (insert, dedupe, FK validation). MADR v3 6 relation tipi kapsamı.
-- **NO_GO:** Archive parse %0 başarı (regex tamamen yanlış) → manuel sample 5 ADR backfill + Sprint 168.6'da scale.
+- **NO_GO:** Archive parse %0 başarı (regex tamamen yanlış) → manuel sample 5 ADR backfill + Sprint 169 hotfix'da scale.
 
-#### 168.5-004 — H2 Stub Memory Entries Backfill
+#### 169-004 — H2 Stub Memory Entries Backfill
 
 - **Agent:** data-engineer
 - **Model:** opus
@@ -132,7 +132,7 @@ Wave 3 (sequential, 1 task — final config flip)
 - **Description:** Sprint 159-161 memory entries stub (backfill Sprint 168 stub eklendi, gerçek içerik eksik). `.brain/archive/sprints/sprint-15{9,160,161}.md` + `git log` commit messages retrieve. Stub flag temizle (`stub_flag: true` → false). Idempotent: zaten dolu entries dokunulmaz.
 - **GO criteria:** memory.db `WHERE sprint_id IN ('sprint-159','sprint-160','sprint-161') AND stub_flag=false` ≥3 row. Content min 100 char. TDD test.
 
-#### 168.5-005 — H3 OSS Pre-Flip Secret Scan Baseline
+#### 169-005 — H3 OSS Pre-Flip Secret Scan Baseline
 
 - **Agent:** security-auditor
 - **Model:** opus
@@ -142,7 +142,7 @@ Wave 3 (sequential, 1 task — final config flip)
 - **Description:** OSS public flip öncesi secret scan baseline. `gitleaks` veya custom regex stack: `.env`, API keys, AWS access keys, GitHub PAT, Discord/Telegram tokens, Anthropic/OpenAI/Google API keys. Tüm git history scan (full repo blame). `.secrets-baseline` allowlist: bilinen test fixture'lar + dummy keys. CI workflow: PR'da secret scan PASS gate. İlk run informational (baseline build), ikinci run blocking.
 - **GO criteria:** `.github/workflows/secret-scan.yml` aktif, `.secrets-baseline` populate, 0 unallowlisted secret hit. TDD test (workflow yaml syntax + baseline format).
 
-#### 168.5-006 — H4 Dashboard Build CI Gate
+#### 169-006 — H4 Dashboard Build CI Gate
 
 - **Agent:** devops-engineer
 - **Model:** opus
@@ -152,27 +152,27 @@ Wave 3 (sequential, 1 task — final config flip)
 - **Description:** Sprint 167 retro: dashboard build CI'da yok (sadece `npm run build:all` local). React + Vite + Tailwind build CI'da. Node 18/20/22 matrix. Build artifact size threshold (sanity check). Smoke test: dashboard mount + render. Flake threshold >5% → fail. 2 retry tolerance.
 - **GO criteria:** CI run dashboard build PASS, `dist/dashboard/` artifact present, smoke test render PASS. TDD test (build invariant).
 
-### Wave 2 — 2 paralel task (depends 168.5-003)
+### Wave 2 — 2 paralel task (depends 169-003)
 
-#### 168.5-007 — C2 Bug Z3 Memory Rebuild Safety
+#### 169-007 — C2 Bug Z3 Memory Rebuild Safety
 
 - **Agent:** data-engineer
 - **Model:** opus
 - **Effort:** normal (3h)
 - **Scope:** `src/core/`
 - **Files (write):** `src/core/memory-import.ts` (rebuild relations preserve), `tests/core/memory-rebuild-safety.test.ts`
-- **Dependencies:** `["168.5-003"]`
+- **Dependencies:** `["169-003"]`
 - **Description:** `deckent memory rebuild` (memory-import.ts) relations'ı DROP edip yeniden insert ediyor — Sprint 167 audit Bug Z3 finding. Idempotent rebuild: relations önce yedek alınır (in-memory), DROP + re-insert + verify. Failed verify → rollback. Pre-rebuild relation count + post-rebuild count assertion equal.
 - **GO criteria:** TDD test: rebuild before/after relations row count equal. Rollback senaryo PASS (verify fail simulate).
 
-#### 168.5-008 — H1 ADR DB→FS Export Pipeline
+#### 169-008 — H1 ADR DB→FS Export Pipeline
 
 - **Agent:** data-engineer
 - **Model:** opus
 - **Effort:** high (5h)
 - **Scope:** `src/core/` + `scripts/memory/` + `docs/adr/`
 - **Files (write):** `src/core/memory-export.ts` (ADR section), `scripts/memory/export-adr-fs.mjs`, `docs/adr/*.md` (43 generated), `docs/adr/046-*.md` (amendment — reverse hook)
-- **Dependencies:** `["168.5-003"]`
+- **Dependencies:** `["169-003"]`
 - **Description:** 43 ADR memory.db'de var (`store.getByType('adr')`) ama `docs/adr/*.md` eksik. Sprint 166 hook tek yön: FS→DB (adrInsert), reverse export yok. DB→FS export pipeline:
   - `memory-export.ts:exportAdrToFs()` — MADR v3 hibrit format
   - Eksik field (consequences, alternatives) → `_To be backfilled in future sprint_` placeholder
@@ -182,7 +182,7 @@ Wave 3 (sequential, 1 task — final config flip)
 
 ### Wave 3 — 1 final task
 
-#### 168.5-009 — H5 dep_pipeline_enabled Flip + 3-Layer Doc Fix
+#### 169-009 — H5 dep_pipeline_enabled Flip + 3-Layer Doc Fix
 
 - **Agent:** architect
 - **Model:** opus
@@ -215,30 +215,30 @@ Wave 3 (sequential, 1 task — final config flip)
 
 ### Per-Wave Gates
 
-- **Wave 1 → Wave 2:** 168.5-003 (C1) DONE ZORUNLU
-- **Wave 2 → Wave 3:** 168.5-007 + 168.5-008 hepsi DONE
+- **Wave 1 → Wave 2:** 169-003 (C1) DONE ZORUNLU
+- **Wave 2 → Wave 3:** 169-007 + 169-008 hepsi DONE
 
 ## 6. Risk Matrix
 
 | Risk | Likelihood | Impact | Mitigation |
 |---|---|---|---|
-| W3.1 forensic RC bulunmaz | Medium | High | Sprint 168.6 mikro-sprint'e ertelenir, GO_WTD kabul. `.audit/sprint-168.5/W3.1-trace.md` artifacts. |
+| W3.1 forensic RC bulunmaz | Medium | High | Sprint 169 hotfix mikro-sprint'e ertelenir, GO_WTD kabul. `.audit/sprint-169/W3.1-trace.md` artifacts. |
 | C1 archive parse fragile | Medium | High | Schema validation gate (FK existence check). Failed inserts log + skip, NO_GO değil. Manual sample 5 ADR fallback. |
 | H1 43 ADR MADR field eksik | High | Medium | Template default placeholder `_To be backfilled_`. Export tolerant. NO_GO değil. |
 | H3 secret scan false positive | High | Medium | `.secrets-baseline` allowlist iteratif. İlk run informational, ikinci run gate. |
 | H4 dashboard CI flaky | Medium | Medium | 2 retry tolerance. Node 18/20/22 matrix. Flake >5% → fail. |
-| H5 dep_pipeline flip regression | Low | High | Test mode pre-flip (`.deckent/config.test.json`). Production flip Sprint 168.5 sonu. Backout test PASS gate. |
+| H5 dep_pipeline flip regression | Low | High | Test mode pre-flip (`.deckent/config.test.json`). Production flip Sprint 169 sonu. Backout test PASS gate. |
 | Wave 2 dep array parse | Low | Critical | DIRECTIVES JSON array bypass (W3.2 fix paralel). |
-| Sprint 168.5 task scope creep | Low | Medium | 9 task threshold altında. Wave split otomatik tetiklenmez. |
+| Sprint 169 task scope creep | Low | Medium | 9 task threshold altında. Wave split otomatik tetiklenmez. |
 
-## 7. Sprint 169 OSS GA Handoff Conditions
+## 7. Sprint 170 OSS GA Handoff Conditions
 
-- **168.5 GO (full pass):** Sprint 169 OSS GA conditional açılır
+- **168.5 GO (full pass):** Sprint 170 OSS GA conditional açılır
   - `VerhexIO/deckent-dev` → `VerhexIO/deckent` public flip
   - `npm publish v1.0.0-beta.2` (Alperen approval)
   - Show HN launch hazırlığı
 - **168.5 GO_WTD (≤2 cosmetic):** Sprint 169 conditional, 1 review cycle Alperen ile
-- **168.5 NO_GO:** Sprint 168.6 gap closure mikro-sprint (1-3 task). Sprint 169 Sprint 170+'a kayar.
+- **168.5 NO_GO:** Sprint 169 hotfix gap closure mikro-sprint (1-3 task). Sprint 169 Sprint 170+'a kayar.
 
 ## 8. Pre-Flight Checklist
 
@@ -246,14 +246,14 @@ Wave 3 (sequential, 1 task — final config flip)
 - [x] Sprint 168 worktree + branch cleanup (10 + 10 silindi)
 - [x] `npm run build` PASS (2026-05-15)
 - [x] `npx deckent doctor` READY (with warnings — Codex/Gemini optional)
-- [ ] Sprint 168.5 design spec commit (bu doküman)
-- [ ] DIRECTIVES.md Sprint 168.5 yazıldı (dep'ler JSON array format)
+- [ ] Sprint 169 design spec commit (bu doküman)
+- [ ] DIRECTIVES.md Sprint 169 yazıldı (dep'ler JSON array format)
 - [ ] writing-plans skill ile implementation plan
 - [ ] `deckent plan + start` Brain otonom
 
 ## 9. References
 
-- **Predecessor spec:** `docs/superpowers/specs/2026-05-14-sprint-168-design.md` (Section 8 Sprint 168.5 hint)
+- **Predecessor spec:** `docs/superpowers/specs/2026-05-14-sprint-168-design.md` (Section 8 Sprint 169 hint)
 - **Predecessor plan:** `docs/superpowers/plans/2026-05-14-sprint-168-plan.md`
 - **Audit input:** `.audit/sprint-167/T7-cross-cutting-synthesis.md` + `consolidated-inventory.md`
 - **ADR governance:** ADR-046 (Brain Self-Update Hook), ADR-047 (Manuel Dispatch Protocol), ADR-048 (Prompt Lifecycle Contract)
@@ -263,4 +263,4 @@ Wave 3 (sequential, 1 task — final config flip)
 ---
 
 **Approved by:** Alperen (brainstorming session, 2026-05-15)
-**Next step:** writing-plans skill → `docs/superpowers/plans/2026-05-15-sprint-168.5-plan.md`
+**Next step:** writing-plans skill → `docs/superpowers/plans/2026-05-15-sprint-169-plan.md`
