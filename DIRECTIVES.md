@@ -1,285 +1,314 @@
-# DIRECTIVES — Sprint 168: Brain Repair Phase
+# DIRECTIVES — Sprint 168.5: Audit Remediation + Brain Pipeline Closure
 
 ## Spec + Plan Referansları
 
-- **Spec:** `docs/superpowers/specs/2026-05-14-sprint-168-design.md` (v5 f63a8f6 — çift hedef başarılı: Agent A 96/100 + Agent B 26/100)
-- **Plan:** `docs/superpowers/plans/2026-05-14-sprint-168-plan.md` (54d9db2, 1598 satır TDD + runbook)
-- **Phase 1 input:** `.audit/sprint-167/T5-brain-debug-phase1.md`
-- **Phase 2 input:** `.audit/sprint-167/T5-brain-debug-phase2.md`
-- **Sprint 167 archive:** `.brain/archive/DIRECTIVES-sprint-167.md`
+- **Spec:** `docs/superpowers/specs/2026-05-15-sprint-168.5-design.md` (3a84f29, brainstorming output 266 satır)
+- **Plan:** `docs/superpowers/plans/2026-05-15-sprint-168.5-plan.md` (a528d16, TDD runbook 1638 satır)
+- **Predecessor:** Sprint 168 GO_WITH_TECH_DEBT (`b5a0acb`, 13 commit origin/main'de)
+- **Sprint 168 archive:** `.brain/archive/DIRECTIVES-sprint-168.md`
+- **Audit input:** `.audit/sprint-167/T7-cross-cutting-synthesis.md` + `consolidated-inventory.md`
 
 ## Goal
 
-Sprint 167 audit'in tespit ettiği **5 architectural cluster (10 bug)** için root-cause fix.
-Hardened manuel subagent dispatch (8 paralel + 1 sequential, git worktree isolation,
-file authority matrix, lock pattern, TDD gate). Sprint 168 sonrası Brain otonom
-sprint orkestrasyonu mümkün hale gelir.
+Sprint 167 T7 audit'in açık 7 task'ını (C1 Memory Relations, C2 Bug Z3 Rebuild Safety,
+H1 ADR DB→FS Export, H2 Stub Backfill, H3 Secret Scan Baseline, H4 Dashboard CI Gate,
+H5 dep_pipeline_enabled Flip) + Sprint 168 smoke test'in ortaya çıkardığı 2 brain
+pipeline quirk'ünü (W3.1 C0c collision live trigger + W3.2 dep parser fix) closure.
 
-**Çift hedef başarılı (v1→v5 eval zinciri):**
-- Agent A (systematic-debugging): 79/100 → **96/100 APPROVED** ✓ (hedef ≥95)
-- Agent B (devil's advocate): 22/100 → **26/100 SHIP_AS_IS** ✓ (hedef <30)
+Sprint 169 OSS GA (`VerhexIO/deckent` public flip + `npm publish v1.0.0-beta.2` +
+Show HN) için anchor sprint.
 
 ## Brain Planning Instructions
 
-- **Mode:** Manuel subagent dispatch (Brain bypass — chicken-and-egg paradox kabul)
-- **Subagent count:** 8 paralel + 1 sequential (ADR-047 meta) + Wave 1.5 manuel CHECKPOINT
-- **Worktree isolation:** `../deckent-sprint-168-<CLUSTER_ID>` (git worktree per cluster)
-- **File authority matrix:** Plan Section "Subagent Dispatch Runbook"
-- **Lock pattern:** `.deckent/sprint-168-dispatch-locks.json`
-- **TDD gate:** Failing test → fix → pass, yeni test'lerde skip kullanma (baseline 41 korunur)
-- **Alperen review:** Subagent commit sonrası `npx vitest run` + skip count delta + `git diff --stat` kontrol
+- **Mode:** Brain tam otonom (`deckent plan + start` — Sprint 168 smoke kanıtladı)
+- **Planning mode:** `mode: 'ai'` (DIRECTIVES yorumlu, 9 task → wave breakdown)
+- **Dependency format:** JSON array (`["168.5-003"]`) — W3.2 parser fix öncesi bypass
+- **Wave structure:** 3 wave (W1: 6 paralel → W2: 2 paralel depends C1 → W3: H5 final)
+- **Max workers:** 6 (Wave 1 paralelizm)
+- **Alperen review:** Sprint başlangıç + finalize sonrası 2 checkpoint (per-wave checkpoint yok)
 
-## Wave Structure (Cascade'in Tersine)
+## Wave Structure (dependency_pipeline_enabled: true)
 
-- **Wave 1 (paralel, 2 subagent):** C0e (cascade endpoint) + ADR-047 (meta governance)
-- **Wave 1.5 (manuel Alperen CHECKPOINT):** ADR-048 review + memory.db insert verify
-- **Wave 2 (paralel, 4 subagent):** C0b + C0c + C0a-1 + C0d
-- **Wave 3 (sequential within sprint-finalizer.ts):** C0a-2 → C0a-3 → C0a-4
+- **Wave 1 (6 paralel):** W3.1, W3.2, C1, H2, H3, H4
+- **Wave 2 (2 paralel, depends C1=168.5-003):** C2, H1
+- **Wave 3 (final):** H5
 
-## 8 Anchor Tasks
+## 9 Anchor Tasks
 
-### Task 1: C0e — Prompt Lifecycle Contract + ADR-048
+### Task 1: W3.1 — C0c Collision Detection Live Trigger Investigation + Fix
 
 - Model: opus
-- Effort: high (4h)
-- Cluster: E (Worker Lifecycle Mismatch — cascade ENDPOINT)
-- Agent: bug-fixer (selective filter design + active worker protection)
-- Worktree: `../deckent-sprint-168-C0e`
-- Files (write): `src/providers/claude.ts`, `src/orchestra/sprint-lifecycle.ts`, `src/orchestra/spawn-backend.ts`, `src/orchestra/tmux.ts`, `src/core/active-workers.ts` (NEW), `docs/adr/048-prompt-lifecycle-contract.md`, `tests/providers/`, `tests/orchestra/`, `tests/core/active-workers.test.ts`
-- Files (read): Phase 1+2 raporları, src/providers/claude.ts:125-142, src/orchestra/spawn-backend-docker.ts:941-942 + 982
-- Scope: read-write per file authority matrix
+- Effort: normal
+- Agent: bug-fixer
+- Skills: typescript-expert
+- Files: src/orchestra/sprint-spawner.ts, src/orchestra/decision-engine.ts, tests/orchestra/c0c-collision-live-fire.test.ts, .audit/sprint-168.5/W3.1-root-cause.md
+- Scope: src/orchestra/, tests/orchestra/, .audit/sprint-168.5/
+- Dependencies: []
 
 #### Description
 
-Sprint 167 BUG-HH live evidence — `_cleanupOrphanedPromptFiles()` non-selective.
-Option C selective filter + `getActiveWorkerIds()` shared helper extract
-(auditor.ts:2162-2168 pattern → `src/core/active-workers.ts`). Cross-sprint orphan
-handling (startup `archivePromptFiles(prevSprintId)`). Cross-backend uniformity
-(Docker + Subprocess + Tmux contract comments). ADR-048 yazımı MADR v3.
+Sprint 168 smoke evidence: `detectScopeCollisions` wire layer var (Sprint 168 W2.5
+integration) AMA runtime `BRAIN→SPAWN:BLOCKED` event tetiklenmiyor. Forensic
+investigation: `.deckent/events.jsonl` trace + subscriber path + scope normalization.
+
+RC olasılıkları (rank):
+- RC-A: subscriber registration timing race (spawn ÖNCESİ değil sonrası registered)
+- RC-B: event channel name string mismatch
+- RC-C: scope normalization eksik (`./src/foo` vs `src/foo`)
+
+Plan Task 2 (Steps 2.1-2.8) detaylı runbook. RC'ye göre fix + live-fire test.
 
 **Kanıt:**
-- `grep "activeTaskIds" src/providers/claude.ts` → 1+ match
-- `ls src/core/active-workers.ts` → mevcut
-- `ls docs/adr/048-*.md` → 100+ satır MADR v3
-- 4 TDD test PASS (active protected, prev sprint orphan, cross-backend, getActiveWorkerIds)
+- `grep "detectScopeCollisions\|normalizeScopeFiles" src/orchestra/sprint-spawner.ts` → 2+ match
+- `.audit/sprint-168.5/W3.1-root-cause.md` mevcut (RC + fix proposal)
+- TDD test 3/3 PASS
 
-**Test:** 4 TDD test (TDD pattern failing → fix → pass)
+**Test:** 3 TDD test (2 paralel collision detect, scope normalize, double-slash handling)
 
-### Task 2: C0b — SpawnLock Symmetric Cleanup
+### Task 2: W3.2 — Smoke Directive Dependency Parser Fix
 
 - Model: opus
-- Effort: high (5h)
-- Cluster: B (Locking Asymmetry — Sprint 156 T-10 partial)
+- Effort: low
 - Agent: bug-fixer
-- Worktree: `../deckent-sprint-168-C0b`
-- Files (write): `src/core/file-lock.ts` (5 yeni helper), `src/monitor/auditor.ts` (L485 binding), `src/orchestra/spawn-backend-docker.ts:933` (on-exit hook), `tests/core/spawn-lock-*.test.ts`, `tests/monitor/auditor-spawn-lock-*.test.ts`
+- Skills: typescript-expert
+- Files: src/orchestra/task-builder.ts, tests/orchestra/dep-parser-string-to-array.test.ts
+- Scope: src/orchestra/, tests/orchestra/
+- Dependencies: []
 
 #### Description
 
-Sprint 167 RC4 Bug E fix. SpawnLock cleanup helpers eksik (Phase 2 §141 listed 5).
-5 yeni helper (`checkSpawnLock`, `checkSpawnLocks`, `clearStaleSpawnLocks`,
-`clearOrphanSpawnLocks`, `releaseStaleSpawnLocksForTask`). Auditor L485 paterni
-`stale_spawn_lock` alert + 30s scan binding. On-exit hook sad-path coverage.
+Sprint 168 smoke test T3 NO_GO RC: DIRECTIVES.md `- Dependencies: foo` bare string
+parse edilmiyor, task.json'a literal kalıyor. `parseDependencyField` helper
+3 format kabul eder: bare string, comma-separated list, JSON array (idempotent).
+
+Plan Task 1 (Steps 1.1-1.6) detaylı runbook.
 
 **Kanıt:**
-- `grep -c "clearOrphanSpawnLocks\|clearStaleSpawnLocks" src/core/file-lock.ts` → 2+ match
-- `grep "stale_spawn_lock" src/monitor/auditor.ts` → 1+ match
-- 3 TDD test PASS
+- `grep "parseDependencyField" src/orchestra/task-builder.ts` → 2+ match (export + use)
+- TDD test 6/6 PASS
 
-**Test:** 3 TDD test (orphan cleanup, TTL 5min, Auditor binding)
+**Test:** 6 TDD test (bare string, comma list, JSON array, multi-element, empty, whitespace)
 
-### Task 3: C0c — Plan↔Spawn Integration Layer
+### Task 3: C1 — Memory Relations Migration
 
 - Model: opus
-- Effort: high (8h)
-- Cluster: C (Plan↔Spawn Disconnect — Sprint 138 T4 incomplete)
-- Agent: bug-fixer
-- Worktree: `../deckent-sprint-168-C0c`
-- Files (write): `src/orchestra/planner.ts` veya `task-builder.ts` (RC1 parser), `src/orchestra/decision-engine.ts` (RC2 subscriber), `src/orchestra/sprint-controller.ts` (RC3 fresh read), `tests/orchestra/`
+- Effort: high
+- Agent: data-engineer
+- Skills: database-migration, typescript-expert
+- Files: src/core/memory-store.ts, src/core/memory-types.ts, scripts/memory/migrate-relations.mjs, tests/core/memory-relations-migration.test.ts
+- Scope: src/core/, scripts/memory/, tests/core/
+- Dependencies: []
 
 #### Description
 
-3 alt-fix: RC1 parser `validateScopeFilesWrite` + bare token blocklist;
-RC2 `decision-engine.ts handleScopeCollision` subscriber + `BRAIN→SPAWN:BLOCKED`
-event; RC3 `readTaskJsonFresh` invariant — task.json fresh disk read.
+memory.db `relations` tablosu Sprint 159 Memory V2'de schema'da var ama backfill eksik.
+`.brain/archive/pre-v2/DECISIONS.md` regex parse ile 6 MADR v3 relation tipi extract +
+insert. Idempotent (INSERT OR IGNORE), FK validation (orphan skip + log).
+
+`insertRelation` + `getRelations` API memory-store.ts'e eklenir.
+
+Plan Task 3 (Steps 3.1-3.9) detaylı runbook.
 
 **Kanıt:**
-- `grep "validateScopeFilesWrite\|handleScopeCollision\|readTaskJsonFresh" src/orchestra/` → 3+ match
-- 3 TDD test PASS
+- `grep "insertRelation\|getRelations" src/core/memory-store.ts` → 2+ match
+- `node -e "...COUNT FROM relations"` > 0 (sıfır olmayan row)
+- Idempotent re-run aynı count
+- TDD test 4/4 PASS (insert, dedupe, FK validation, 6 MADR types)
 
-**Test:** 3 TDD test (parser, collision blocker, fresh read)
+**Test:** 4 TDD test
 
-### Task 4: C0a-1 — Step 2 identityRegen Default Flip
-
-- Model: sonnet
-- Effort: low (1h)
-- Cluster: A.1 (BUG-GG)
-- Agent: bug-fixer
-- Worktree: `../deckent-sprint-168-C0a-1`
-- Files (write): `src/core/identity-generator.ts`, `tests/core/identity-regen-default-skip.test.ts`
-
-#### Description
-
-Sprint 166 T5 deprecated annotation runtime'da etkili değildi. `skipIdentityRegen`
-default `false` → `true`. Deprecated enforcement.
-
-**Kanıt:**
-- `grep "skipIdentityRegen.*true" src/core/identity-generator.ts` → 1+ match
-- 1 TDD test PASS
-
-**Test:** 1 TDD test (default skip invariant)
-
-### Task 5: C0a-2 — Step 4 ruleRegen DB Query + Sentinel Idempotent
+### Task 4: H2 — Stub Memory Entries Backfill
 
 - Model: opus
-- Effort: normal (3h)
-- Cluster: A.2 (T3 audit finding HIGH)
-- Agent: bug-fixer
-- Worktree: `../deckent-sprint-168-C0a-2` (sequential after C0a-1)
-- Files (write): `src/core/rule-generator.ts`, `src/orchestra/sprint-finalizer.ts` (Step 4 only), `tests/core/`
+- Effort: normal
+- Agent: data-engineer
+- Skills: database-migration
+- Files: scripts/memory/backfill-stub-entries.mjs, src/core/memory-store.ts (getById + update API yoksa), tests/core/memory-stub-backfill.test.ts
+- Scope: src/core/, scripts/memory/, tests/core/
+- Dependencies: []
 
 #### Description
 
-`.claude/rules/brain.md` Active ADR Constraints 11 ADR eksik (44/50). DB query
-`store.getByType('adr')` ile regenerate. Sentinel marker `<!-- AUTO-START -->`
-`<!-- AUTO-END -->` idempotent replace (append YASAK). ADR-046 invariant test.
+Sprint 159-161 memory entries stub flag (Sprint 168 backfill stub eklendi, gerçek içerik eksik).
+`.brain/archive/sprints/sprint-{159,160,161}.md` retrieve + content swap.
+`stub_flag: true → false`. Idempotent: zaten dolu entries dokunulmaz.
+
+Plan Task 4 (Steps 4.1-4.7) detaylı runbook.
 
 **Kanıt:**
-- `grep "store.getByType.*adr" src/core/rule-generator.ts` → 1+ match
-- 4 rules dir parity (.claude / .codex / .gemini / .cursor)
-- 3 TDD test PASS (DB query + idempotent + ADR-046 invariant)
+- `node -e "...length(content) FROM entries WHERE id IN ('mem-sprint-159',...)"` → all > 100
+- `json_extract(metadata, '$.stub_flag')` → 0 (false) for sprint-159/160/161
+- TDD test 2/2 PASS
+
+**Test:** 2 TDD test (backfill replaces, idempotent skip)
+
+### Task 5: H3 — OSS Pre-Flip Secret Scan Baseline
+
+- Model: opus
+- Effort: normal
+- Agent: security-auditor
+- Skills: security-specialist, devops-engineer
+- Files: .github/workflows/secret-scan.yml, scripts/security/secret-baseline.mjs, .secrets-baseline
+- Scope: .github/workflows/, scripts/security/, root
+- Dependencies: []
+
+#### Description
+
+OSS public flip öncesi secret scan baseline. 10 regex pattern (AWS, GitHub PAT,
+OpenAI, Anthropic, Google, Discord, Telegram, Private keys, env vars). Tüm tracked
+dosyalarda scan (`git ls-files`). `.secrets-baseline` allowlist (bilinen test
+fixture'lar). GitHub Actions: PR + push main/master gate.
+
+Plan Task 5 (Steps 5.1-5.5) detaylı runbook.
+
+**Kanıt:**
+- `ls .github/workflows/secret-scan.yml` mevcut
+- `ls .secrets-baseline` mevcut JSON
+- `node scripts/security/secret-baseline.mjs` exit 0 (0 unallowlisted hit)
+
+**Test:** 1 functional smoke (script run + exit code)
+
+### Task 6: H4 — Dashboard Build CI Gate
+
+- Model: opus
+- Effort: normal
+- Agent: devops-engineer
+- Skills: react-specialist, devops-engineer, ci-testing
+- Files: .github/workflows/dashboard-build.yml, package.json, tests/dashboard/dashboard-build-smoke.test.ts
+- Scope: .github/workflows/, tests/dashboard/, root
+- Dependencies: []
+
+#### Description
+
+Sprint 167 retro: React+Vite+Tailwind dashboard build CI'da yoktu (sadece local).
+Node 18/20/22 matrix + artifact size threshold (5MB max) + smoke test (vite build +
+dist artifact + mount sanity).
+
+`npm run build:dashboard` + `npm run build:all` scripts package.json'a eklenir
+(yoksa).
+
+Plan Task 6 (Steps 6.1-6.6) detaylı runbook.
+
+**Kanıt:**
+- `ls .github/workflows/dashboard-build.yml` mevcut
+- `grep "build:dashboard\|build:all" package.json` → 2+ match
+- TDD test 3/3 PASS (2 local + 1 CI-only)
+
+**Test:** 3 TDD test (scripts defined, vite config exists, build produces dist)
+
+### Task 7: C2 — Bug Z3 Memory Rebuild Safety
+
+- Model: opus
+- Effort: normal
+- Agent: data-engineer
+- Skills: database-migration, typescript-expert
+- Files: src/core/memory-import.ts, tests/core/memory-rebuild-safety.test.ts
+- Scope: src/core/, tests/core/
+- Dependencies: ["168.5-003"]
+
+#### Description
+
+Sprint 167 audit Bug Z3: `deckent memory rebuild` relations tablosunu DROP edip
+re-insert ediyor AMA re-insert eksik (relations export tarafından regenerated
+değil). Rebuild: relations backup → import → verify → rollback contract.
+strict mode: relation count düşerse throw + rollback.
+
+Plan Task 7 (Steps 7.1-7.5) detaylı runbook.
+
+**Kanıt:**
+- TDD test 2/2 PASS (preserve + verify-fail rollback)
+
+**Test:** 2 TDD test
+
+### Task 8: H1 — ADR DB→FS Export Pipeline + ADR-046 Reverse Hook
+
+- Model: opus
+- Effort: high
+- Agent: data-engineer
+- Skills: database-migration, documentation-writer
+- Files: src/core/memory-export.ts, scripts/memory/export-adr-fs.mjs, docs/adr/046-brain-self-update-hook.md (amendment), docs/adr/*.md (43 generate), tests/core/adr-fs-export.test.ts
+- Scope: src/core/, scripts/memory/, docs/adr/, tests/core/
+- Dependencies: ["168.5-003"]
+
+#### Description
+
+Sprint 167 audit Bug R: 43 ADR memory.db'de accepted ama `docs/adr/*.md` eksik
+(Sprint 166 hook tek yön: FS→DB). DB→FS export pipeline + MADR v3 format +
+idempotent (existing .md mtime > DB updated_at → skip, manuel edit korunur) +
+eksik field placeholder (`_To be backfilled_`).
+
+ADR-046 amendment: bi-directional hook contract (FS ↔ DB her iki yön sync).
+
+Plan Task 8 (Steps 8.1-8.8) detaylı runbook.
+
+**Kanıt:**
+- `ls docs/adr/*.md | wc -l` ≥43
+- `grep "Amendment 2026-05-15" docs/adr/046-*.md` → 1+ match
+- TDD test 3/3 PASS
+
+**Test:** 3 TDD test (complete export, partial placeholder, idempotent)
+
+### Task 9: H5 — dep_pipeline_enabled Flip + 3-Layer Doc Fix
+
+- Model: opus
+- Effort: low
+- Agent: architect
+- Skills: typescript-expert, documentation-writer
+- Files: src/core/config.ts, DECKENT.md, CLAUDE.md, .contracts/api-surface.md, tests/core/config-dep-pipeline-default.test.ts
+- Scope: src/core/, root .md docs, .contracts/, tests/core/
+- Dependencies: ["168.5-007", "168.5-008"]
+
+#### Description
+
+Sprint 167 flip plan tamamlama: `dependency_pipeline_enabled: false → true` default.
+Wave scheduling go live (Sprint 139 T28 Kahn topological sort wire production
+default). 3-layer doc sync:
+- DECKENT.md ADR-045 reference + Sprint 168.5 flip anchor
+- CLAUDE.md "Wave scheduling default ON" note + rollback path
+- `.contracts/api-surface.md` "Sprint Phases" WAVE_BUILD step eklendi
+
+Backout: `dependency_pipeline_enabled: false` rollback test PASS gate.
+
+Plan Task 9 (Steps 9.1-9.8) detaylı runbook.
+
+**Kanıt:**
+- `grep "dependency_pipeline_enabled.*true" src/core/config.ts` → 1+ match
+- 3 doc'ta Sprint 168.5 flip satır mevcut
+- TDD test 3/3 PASS (default + override + no-config)
 
 **Test:** 3 TDD test
 
-### Task 6: C0a-3 — Step 5 retro Dual Write
-
-- Model: opus
-- Effort: normal (3h)
-- Cluster: A.3 (BUG-DD + BUG-EE)
-- Agent: bug-fixer
-- Worktree: `../deckent-sprint-168-C0a-3` (sequential after C0a-2)
-- Files (write): `src/orchestra/sprint-retro-writer.ts`, `src/orchestra/sprint-finalizer.ts` (Step 5 only), `tests/orchestra/retro-dual-write.test.ts`
-
-#### Description
-
-Sprint 166 wire shipped (T6 Bug U+V) AMA Sprint 167 finalize'da `sprint-log-167`,
-`retro-sprint-167`, `mem-sprint-167` = 0 (regression). DB upsert 3 row +
-`writeFileSync('.brain/RETRO.md', content)` dual write atomic.
-
-**Kanıt:**
-- Finalize sonrası `node -e "...COUNT type=sprint OR retro OR memory WHERE sprint_id='sprint-168'"` → 3 row
-- `.brain/RETRO.md` mtime current
-- 1 TDD test PASS
-
-**Test:** 1 TDD test (dual write invariant)
-
-### Task 7: C0a-4 — Step 12 archiveDirectives Decision + ADR-046 Amendment
-
-- Model: sonnet
-- Effort: low (2h)
-- Cluster: A.4 (BUG-CC)
-- Agent: doc-writer
-- Worktree: `../deckent-sprint-168-C0a-4` (sequential after C0a-3)
-- Files (write): `src/orchestra/sprint-docs-updater.ts:570`, `docs/adr/046-*.md` (amendment), `src/orchestra/sprint-finalizer.ts` (Step 12 only), `tests/orchestra/archive-directives-default-preserve.test.ts`
-
-#### Description
-
-**Alperen decision (Pre-Flight Step 16):** Option B — `auto_archive_directives`
-default=false. DIRECTIVES.md sprint finalize'da KORUNUR, sadece archive copy.
-ADR-046 Step 12 amendment. Documentation update.
-
-**Kanıt:**
-- Sprint finalize sonrası `wc -l DIRECTIVES.md` → ≥200 satır KORUNUR
-- `grep "auto_archive_directives.*false" src/orchestra/sprint-docs-updater.ts` → 1+ match
-- ADR-046 amendment satır mevcut
-- 1 TDD test PASS
-
-**Test:** 1 TDD test (default preserve invariant)
-
-### Task 8: C0d — Sprint Metrics Math Guards
-
-- Model: sonnet
-- Effort: low (1h)
-- Cluster: D (BUG-FF cosmetic)
-- Agent: bug-fixer
-- Worktree: `../deckent-sprint-168-C0d`
-- Files (write): `src/orchestra/sprint-reporter.ts` veya `managed-doc-runner.ts`, `tests/orchestra/sprint-metrics-guards.test.ts`
-
-#### Description
-
-Sprint 167 finalize "Duration: -1dk -1sn" + "Coverage: NaN%" cosmetic bug.
-Null/undefined guard: `Math.max(0, end - start)` + `total > 0 ? covered/total : null`
-display "N/A".
-
-**Kanıt:**
-- `grep "Math.max.*0\|N/A" src/orchestra/sprint-reporter.ts` → 1+ match
-- 1 TDD test PASS
-
-**Test:** 1 TDD test (edge case guards)
-
-### Meta Task: ADR-047 — Manuel Subagent Dispatch Protocol
-
-- Model: sonnet
-- Effort: normal (2h)
-- Agent: architect (governance doc)
-- Worktree: `../deckent-sprint-168-ADR-047`
-- Files (write): `docs/adr/047-manual-subagent-dispatch-protocol.md`
-
-#### Description
-
-Sprint 164-168 manuel survival pattern proven (23+ incident). Sprint 168 hardened
-dispatch protocol formal kontrat. MADR v3 hibrit format. Sprint 169+ Brain otonom
-hedefi anchor.
-
-**Kanıt:**
-- `ls docs/adr/047-*.md` → MADR v3 format
-- `grep "Wave 1.5 serial gate\|file authority matrix\|TDD enforcement gate" docs/adr/047-*.md` → 3+ match
-
-**Test:** N/A (governance doc, no test)
-
 ## Anchor Constraints (Worker zorunlu okur)
 
-1. **Git worktree isolation:** Subagent kendi worktree'sinde çalışır (../deckent-sprint-168-<CLUSTER_ID>)
-2. **File authority matrix:** scope.filesWrite STRICT (Plan "Subagent Dispatch Runbook")
-3. **TDD ZORUNLU:** failing test → fix → pass + integration test
-4. **Yeni test'lerde skip kullanma** (baseline 41 korunur, Sprint 168 ≤41)
-5. **Test PASS olmadan commit YASAK** + atomic commits per step
-6. **Phase 1+2 raporları mutlaka oku** (`.audit/sprint-167/T5-brain-debug-phase1.md` + `phase2.md` cluster section)
-7. **ADR-046 invariant korunur** (C0a-2 test ile)
-8. **Wave 1.5 Alperen CHECKPOINT** ZORUNLU (C0e DONE sonrası ADR-048 review)
-9. **Subagent .result yaz:** `.deckent/sprint-168-<CLUSTER_ID>-result.json` (status + commits + tests + files)
-10. **Alperen review gate:** Subagent DONE sonrası `npx vitest run` + skip delta + `git diff --stat`
+1. **TDD ZORUNLU:** failing test → fix → pass + integration test
+2. **Yeni test'lerde skip kullanma** (baseline 41 korunur, Sprint 168.5 ≤41)
+3. **Test PASS olmadan commit YASAK** + atomic commits per step
+4. **Plan dosyasını mutlaka oku** (`docs/superpowers/plans/2026-05-15-sprint-168.5-plan.md` ilgili Task section)
+5. **ADR-046 invariant korunur** (C1 + C2 + H1 her üçü relations preserve)
+6. **ADR-047 manuel dispatch ile çelişme:** Sprint 168.5 Brain otonom dispatch, manuel survival incident = 0 hedef
+7. **ADR-048 prompt lifecycle:** worker `.prompt-*.txt` selective cleanup (Sprint 168 C0e contract)
+8. **Worker .result yaz:** `.tasks/task-<id>.result` (status + commits + tests + files)
+9. **Scope enforcement:** `scope.filesWrite` STRICT (Auditor `git diff --stat` izler)
+10. **Dependency JSON array format:** task.json dependencies `["168.5-003"]` array (W3.2 bypass)
 
-## GO/NO_GO Criteria (Strict — Çift Hedef)
+## GO/NO_GO Criteria (Strict)
 
-- ✅ 8/8 anchor task DONE (0 NO_GO, GO_WTD ≤1 — en muhtemel C0d cosmetic)
-- ✅ ADR-047 + ADR-048 yazılı + memory.db `type='adr'` row count=2 artış
-- ✅ TDD compliance: yeni test'lerde skip kullanılmadı (baseline 41 korunur)
+- ✅ 9/9 anchor task DONE veya GO_WTD ≤2 cosmetic (NO_GO = 0)
+- ✅ Brain otonom finalize (manuel survival incident = 0)
 - ✅ `tsc --noEmit` 0 hata
-- ✅ `vitest run` baseline tolerance (pass≥16395 + fail≤2 + skip≤41)
-- ✅ Brain otonom smoke test PASS (Plan Section "Brain Otonom Smoke Test Runbook" — 3-task complex)
-- ✅ Cross-sprint orphan handling test (C0e)
-- ✅ ADR-046 Step Ordering invariant test (C0a-2)
-- ✅ Sprint 168 NO_GO ≠ Sprint 168.5 BLOCKED (Catch-22 v4 paterni)
+- ✅ `vitest run` baseline: pass ≥16475 + fail ≤2 + skip ≤41
+- ✅ memory.db: `relations` row count > 0 (C1 kanıt), ADR count delta ≥0
+- ✅ `docs/adr/*.md` ≥43 file (H1 kanıt)
+- ✅ `.github/workflows/secret-scan.yml` + `dashboard-build.yml` aktif (H3 + H4)
+- ✅ `dependency_pipeline_enabled: true` default (H5 kanıt)
+- ✅ Auditor `git diff --stat` boundary violation = 0
+- ✅ memory.db Sprint 168.5 entries: `sprint-log-168.5`, `retro-sprint-168.5`, `mem-sprint-168.5` 3 row
 
-## Sprint 168.5 + 169 Handoff
+## Sprint 169 OSS GA Handoff
 
-**Sprint 168.5 = Audit Remediation** (8 task — Sprint 167 T7 roadmap):
-- C1 Memory Relations Migration
-- C2 Bug Z3 Memory Rebuild Safety
-- H1 ADR DB→FS Export Pipeline (43 missing .md)
-- H2 Stub Memory Entries Backfill
-- H3 OSS Pre-Flip Secret Scan Baseline
-- H4 Dashboard Build CI Gate
-- H5 dep_pipeline_enabled Flip + 3-Layer Doc Fix
-- ADR-047 (yazıldı Sprint 168'de)
-
-**Sprint 168.5 execution mode (Section 3.2.4 spec):**
-- Sprint 168 GO → Brain otonom (`deckent plan + start` normal)
-- Sprint 168 GO_WTD → Brain yarı otonom (Alperen monitoring)
-- Sprint 168 NO_GO → Manuel subagent dispatch replay (Sprint 168 paterni)
-
-**Sprint 169 = OSS GA conditional** (Sprint 168.5 OSS pre-flip clear ise):
-- VerhexIO/deckent-dev → VerhexIO/deckent public flip
-- `npm publish v1.0.0-beta.2`
-- Show HN launch
+- **168.5 GO (full pass):** Sprint 169 OSS GA conditional açılır
+  - `VerhexIO/deckent-dev` → `VerhexIO/deckent` public flip
+  - `npm publish v1.0.0-beta.2` (Alperen approval)
+  - Show HN launch hazırlığı
+- **168.5 GO_WTD (≤2 cosmetic):** Sprint 169 conditional, 1 review cycle Alperen ile
+- **168.5 NO_GO:** Sprint 168.6 gap closure mikro-sprint (1-3 task). Sprint 169 Sprint 170+'a kayar.
