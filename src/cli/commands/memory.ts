@@ -5,6 +5,7 @@ import { createInterface } from 'node:readline';
 import { MemoryStore } from '../../core/memory-store.js';
 import { parseDecisionsMd, parseMemoryMd, parseDebtMd } from '../../core/memory-import.js';
 import { exportSummaryMd, exportDecisionsMd, exportMemoryMd, exportDebtMd } from '../../core/memory-export.js';
+import { syncAdrFilesToDb } from '../../core/adr-file-sync.js';
 import { BRAIN_DIR, MEMORY_DB_FILE, MEMORY_EXPORTS_DIR } from '../../core/constants.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { print, printError } from '../helpers/output.js';
@@ -35,12 +36,25 @@ export function registerMemory(program: Command): void {
       let count = 0;
 
       try {
-        // Import from exported .md files
+        // Bug M Sprint 166 T1: docs/adr/*.md is the primary source for ADRs.
+        // Exports/decisions.md is used only as a fallback when no ADR files exist.
+        const adrDir = join(root, 'docs', 'adr');
+        let adrInsertedFromFiles = 0;
+        if (existsSync(adrDir)) {
+          const syncResult = syncAdrFilesToDb(store, adrDir, { changedBy: 'memory-rebuild' });
+          adrInsertedFromFiles = syncResult.inserted + syncResult.updated;
+          count += adrInsertedFromFiles;
+          if (adrInsertedFromFiles > 0) {
+            print(`  ADRs (from docs/adr/): ${adrInsertedFromFiles}`);
+          }
+        }
+
+        // Fallback to exports/decisions.md only if no ADRs were imported from files.
         const decisionsPath = join(exportsDir, 'decisions.md');
-        if (existsSync(decisionsPath)) {
+        if (adrInsertedFromFiles === 0 && existsSync(decisionsPath)) {
           const entries = parseDecisionsMd(readFileSync(decisionsPath, 'utf-8'));
           for (const e of entries) { store.insert(e); count++; }
-          print(`  ADRs: ${entries.length}`);
+          print(`  ADRs (from exports/decisions.md): ${entries.length}`);
         }
 
         const memoryPath = join(exportsDir, 'memory.md');
@@ -57,7 +71,7 @@ export function registerMemory(program: Command): void {
           print(`  Debt: ${entries.length}`);
         }
 
-        // Also try original .brain/ files as secondary source
+        // Final fallback: original .brain/DECISIONS.md if everything else empty.
         const origDecisions = join(brainDir, 'DECISIONS.md');
         if (count === 0 && existsSync(origDecisions)) {
           const entries = parseDecisionsMd(readFileSync(origDecisions, 'utf-8'));

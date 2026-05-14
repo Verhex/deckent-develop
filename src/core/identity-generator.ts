@@ -89,12 +89,12 @@ function extractSprintNum(sprintId: string): number | null {
 }
 
 /**
- * Regenerate PROJECT-IDENTITY.md with live metrics from the completed sprint.
- * This is called as part of the post-finalize hook chain.
+ * @deprecated Sprint 166 (ADR-046) — identityRegen step delegated to managed-docs chain.
+ * `.brain/PROJECT-IDENTITY.md` is superseded by `.deckent/workspace/IDENTITY.md`
+ * (managed via docs.json "identity-md" entry). Will be removed in Sprint 168.
+ * Set `skipIdentityRegen: true` in PostFinalizeHookOptions to opt out early.
  *
- * The function updates the "Current State" section while preserving
- * all other sections of the existing file. If the file doesn't exist,
- * it creates a minimal version.
+ * Regenerate PROJECT-IDENTITY.md with live metrics from the completed sprint.
  */
 export function regenerateProjectIdentity(ctx: IdentityContext): IdentityRegenResult {
   const { projectRoot, metrics } = ctx;
@@ -281,24 +281,57 @@ export interface PostFinalizeHookOptions {
   projectRoot: string;
   sprintId: string;
   metrics: IdentityMetrics;
-  /** Optional callback for rule regeneration (Task 11 hook point) */
+  /** Optional callback for rule regeneration (renumbered to Step 4) */
   onRuleRegen?: (projectRoot: string) => void | Promise<void>;
   /** Skip memory export step */
   skipMemoryExport?: boolean;
-  /** Skip identity regeneration step */
+  /**
+   * Skip identity regeneration step.
+   * @deprecated Sprint 166 — Step 2 (identityRegen) is deprecated. Managed-docs chain
+   * handles `.deckent/workspace/IDENTITY.md` via docs.json "identity-md" entry.
+   * Will be removed in Sprint 168. Prefer `skipIdentityRegen: true` to opt out now.
+   */
   skipIdentityRegen?: boolean;
+  /** Skip ADR file sync step (Step 3 — Bug M Sprint 166 T1) */
+  skipAdrInsert?: boolean;
+  /** Override directory containing `NNN-*.md` ADR files (default: `<projectRoot>/docs/adr`) */
+  adrDir?: string;
+}
+
+/** Bug M Sprint 166 T1 — result of Step 3 ADR file sync run. */
+export interface AdrInsertResult {
+  inserted: number;
+  updated: number;
+  skipped: number;
+  errors: string[];
+  ids: string[];
 }
 
 export interface PostFinalizeHookResult {
   memoryExport: MemoryExportResult | null;
+  /**
+   * @deprecated Sprint 166 — identityRegen step delegated to managed-docs chain.
+   * Will be `null` when `skipIdentityRegen: true` (recommended). Step 2 removed in Sprint 168.
+   */
   identityRegen: IdentityRegenResult | null;
+  /** Bug M Sprint 166 T1 — populated when adrInsert step ran (Step 3). */
+  adrInsert: AdrInsertResult | null;
   ruleRegenCalled: boolean;
   errors: string[];
 }
 
 /**
  * Run the post-finalize hook chain.
- * Order: (1) memory export → (2) identity regen → (3) rule regen hook
+ *
+ * Step Ordering Contract (Sprint 166 T1 — Step Ordering Contract Section 5.1):
+ *   Step 1 — memory export   → exports/* regenerate
+ *   Step 2 — identity regen  → PROJECT-IDENTITY.md update
+ *   Step 3 — adr insert      → docs/adr/*.md → memory.db upsert (Bug M fix)
+ *   Step 4 — rule regen      → .claude/rules/*.md (renumbered from Step 3)
+ *
+ * Step 3 must run BEFORE Step 4 so that newly accepted ADRs (e.g. ADR-046)
+ * are present in the DB when rules are regenerated. ADR-046 documents this
+ * contract; do not reorder without updating the ADR.
  *
  * Changelog and sprint-log are already handled by doc-updaters registry
  * via updateProjectDocs() in finalizeSprint steps 9.
@@ -309,6 +342,7 @@ export async function runPostFinalizeHooks(opts: PostFinalizeHookOptions): Promi
   const result: PostFinalizeHookResult = {
     memoryExport: null,
     identityRegen: null,
+    adrInsert: null,
     ruleRegenCalled: false,
     errors: [],
   };
@@ -325,7 +359,9 @@ export async function runPostFinalizeHooks(opts: PostFinalizeHookOptions): Promi
     }
   }
 
-  // Step 2: PROJECT-IDENTITY.md auto-regen
+  // Step 2: PROJECT-IDENTITY.md auto-regen (DEPRECATED — Sprint 166 ADR-046)
+  // Managed-docs chain (docs.json "identity-md") handles .deckent/workspace/IDENTITY.md.
+  // This step will be removed in Sprint 168. Pass skipIdentityRegen: true to opt out.
   if (!opts.skipIdentityRegen) {
     try {
       result.identityRegen = regenerateProjectIdentity({
@@ -340,7 +376,42 @@ export async function runPostFinalizeHooks(opts: PostFinalizeHookOptions): Promi
     }
   }
 
-  // Step 3: Rule regen hook point (Task 11 will provide onRuleRegen callback)
+  // Step 3: ADR file sync — docs/adr/*.md → memory.db (Bug M Sprint 166 T1)
+  // Unconditional invocation pattern: runs whenever the DB exists. Failure
+  // (missing dir, malformed file) is captured in result.adrInsert.errors
+  // but does not block Step 4.
+  if (!opts.skipAdrInsert) {
+    try {
+      const dbPath = join(opts.projectRoot, BRAIN_DIR, MEMORY_DB_FILE);
+      if (existsSync(dbPath)) {
+        const { MemoryStore } = await import('./memory-store.js');
+        const { syncAdrFilesToDb } = await import('./adr-file-sync.js');
+        const adrDir = opts.adrDir ?? join(opts.projectRoot, 'docs', 'adr');
+        const store = new MemoryStore(dbPath);
+        try {
+          const syncResult = syncAdrFilesToDb(store, adrDir, { changedBy: 'post-finalize' });
+          result.adrInsert = {
+            inserted: syncResult.inserted,
+            updated: syncResult.updated,
+            skipped: syncResult.skipped,
+            errors: syncResult.errors,
+            ids: syncResult.ids,
+          };
+          debugLog('postFinalizeHooks:adrInsert',
+            `inserted=${syncResult.inserted} updated=${syncResult.updated} skipped=${syncResult.skipped}`);
+        } finally {
+          store.close();
+        }
+      } else {
+        result.adrInsert = { inserted: 0, updated: 0, skipped: 0, errors: ['memory.db not found'], ids: [] };
+      }
+    } catch (e) {
+      result.errors.push(`adrInsert: ${e}`);
+      debugLog('postFinalizeHooks:adrInsert', e);
+    }
+  }
+
+  // Step 4: Rule regen hook point (renumbered from Step 3 per ADR-046)
   if (opts.onRuleRegen) {
     try {
       await opts.onRuleRegen(opts.projectRoot);
