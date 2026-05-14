@@ -1177,11 +1177,30 @@ export async function finalizeSprint(
   } catch (e) { debugLog('finalizeSprint:jobSummary', e); }
 
   // 14. Post-finalize hook chain (Sprint 143 Task 10)
-  // Order: (1) memory export → (2) identity regen → (3) rule regen hook
+  // Order: (1) memory export → (2) identity regen → (3) adr insert → (4) rule regen hook
+  // ADR-046 Step Ordering Contract; ruleRegen MUST observe ADRs inserted by adrInsert.
   // Changelog and sprint-log are already handled by doc-updaters registry in step 9.
   debugLog('finalizeSprint:breadcrumb', 'Step 14 (postFinalizeHooks) — entering');
   let postFinalizeResult: PostFinalizeHookResult | null = null;
   try {
+    // ── Step 4 ruleRegen invocation (Sprint 168 C0a-2) ─────────────
+    // Sprint 167 T3 HIGH regression: when sprint-finalizer.ts was called
+    // without an explicit `onRuleRegen` callback, Step 4 was silently
+    // skipped, leaving `.claude/rules/brain.md` Active ADR Constraints
+    // stale (44/50 ADRs). The fix here provides a default callback that
+    // invokes `regenerateRules(projectRoot)` — which queries
+    // `store.getByType('adr')` against the post-Step-3 memory.db and
+    // re-renders rules for all 4 provider dirs (claude / codex / gemini
+    // / cursor). Callers passing their own `opts.onRuleRegen` (e.g. tests
+    // or override paths) bypass the default. ADR-046 Step 4 contract.
+    let resolvedOnRuleRegen = opts?.onRuleRegen;
+    if (!resolvedOnRuleRegen) {
+      resolvedOnRuleRegen = async (root: string): Promise<void> => {
+        const { regenerateRules } = await import('../core/rule-generator.js');
+        await regenerateRules(root);
+      };
+    }
+
     postFinalizeResult = await runPostFinalizeHooks({
       projectRoot,
       sprintId: sprint.id,
@@ -1194,7 +1213,7 @@ export async function finalizeSprint(
         coveragePercent: metrics.coveragePercent,
         durationMs: metrics.durationMs,
       },
-      onRuleRegen: opts?.onRuleRegen,
+      onRuleRegen: resolvedOnRuleRegen,
       skipMemoryExport: opts?.skipMemoryExport,
       skipIdentityRegen: opts?.skipIdentityRegen,
     });

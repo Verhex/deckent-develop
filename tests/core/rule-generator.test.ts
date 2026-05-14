@@ -232,13 +232,14 @@ describe('rule-generator', () => {
   // ── Full Generation ────────────────────────────────────────────
 
   describe('generateRules', () => {
-    it('generates 9 files for all providers × all roles', () => {
+    it('generates 12 files for all providers × all roles', () => {
+      // Sprint 168 C0a-2: cursor provider added — 4 providers × 3 roles = 12.
       const result = generateRules({ projectRoot: TEST_ROOT, adrs: [] });
-      expect(result.filesWritten.length).toBe(9);
+      expect(result.filesWritten.length).toBe(12);
       expect(result.errors.length).toBe(0);
 
       // Verify directory structure
-      for (const provider of ['claude', 'codex', 'gemini'] as const) {
+      for (const provider of ['claude', 'codex', 'gemini', 'cursor'] as const) {
         for (const role of ['brain', 'auditor', 'worker-default'] as const) {
           const dir = provider === 'claude' ? '.claude' : `.${provider}`;
           const filePath = join(TEST_ROOT, dir, 'rules', `${role}.md`);
@@ -309,7 +310,8 @@ describe('rule-generator', () => {
         adrs: [],
         roles: ['brain'],
       });
-      expect(result.filesWritten.length).toBe(3); // 3 providers × 1 role
+      // Sprint 168 C0a-2: 4 providers × 1 role = 4 (cursor added).
+      expect(result.filesWritten.length).toBe(4);
     });
 
     it('preserves existing file content as custom when no markers present', () => {
@@ -376,7 +378,8 @@ describe('rule-generator', () => {
         adrs: [],
         templateDir: '/nonexistent-template-dir',
       });
-      expect(result.errors.length).toBe(9); // all 9 files fail
+      // Sprint 168 C0a-2: 4 providers × 3 roles = 12 (all fail).
+      expect(result.errors.length).toBe(12);
       expect(result.filesWritten.length).toBe(0);
     });
   });

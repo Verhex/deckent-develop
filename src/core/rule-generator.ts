@@ -28,7 +28,11 @@ const ADR_PLACEHOLDER = '{{ADR_SECTION}}';
 const ROLES = ['brain', 'auditor', 'worker-default'] as const;
 export type RuleRole = typeof ROLES[number];
 
-const PROVIDERS = ['claude', 'codex', 'gemini'] as const;
+// Sprint 168 C0a-2: cursor adapter added for 4-rules-dir parity
+// (`.claude/`, `.codex/`, `.gemini/`, `.cursor/`). ADR-046 references
+// `.cursor/rules/` as a required target — previously the generator skipped
+// it, leaving cursor rules permanently stale.
+const PROVIDERS = ['claude', 'codex', 'gemini', 'cursor'] as const;
 export type RuleProvider = typeof PROVIDERS[number];
 
 // ─── Types ───────────────────────────────────────────────────────
@@ -103,10 +107,24 @@ function geminiAdapter(): ProviderAdapter {
   };
 }
 
+function cursorAdapter(): ProviderAdapter {
+  return {
+    format(_role: RuleRole, content: string): string {
+      // Cursor uses plain markdown without frontmatter (parallel to codex/gemini).
+      // Sprint 168 C0a-2: parity with claude/codex/gemini for ADR governance.
+      return content;
+    },
+    rulesDir(): string {
+      return join('.cursor', 'rules');
+    },
+  };
+}
+
 const ADAPTERS: Record<RuleProvider, () => ProviderAdapter> = {
   claude: claudeAdapter,
   codex: codexAdapter,
   gemini: geminiAdapter,
+  cursor: cursorAdapter,
 };
 
 // ─── Template Engine ─────────────────────────────────────────────
@@ -167,6 +185,85 @@ export function formatAdrSection(adrs: MemoryEntryV2[]): string {
 export function renderTemplate(template: string, adrs: MemoryEntryV2[]): string {
   const adrSection = formatAdrSection(adrs);
   return template.replace(ADR_PLACEHOLDER, adrSection).trimEnd() + '\n';
+}
+
+// ─── Sentinel Replace (Sprint 168 C0a-2) ──────────────────────────
+
+/**
+ * Idempotent replace between `<!-- AUTO-START -->` and `<!-- AUTO-END -->`
+ * markers. The sentinel block bounds are fixed — content between them is
+ * replaced atomically with `<!-- AUTO-START -->\n${newInner}\n<!-- AUTO-END -->`.
+ *
+ * Properties:
+ *   - **No append.** A single AUTO-START / AUTO-END pair survives every call.
+ *   - **Idempotent.** `replaceSentinel(replaceSentinel(s, x), x) === replaceSentinel(s, x)`.
+ *   - **Pass-through.** If markers are absent, returns `content` unchanged.
+ *
+ * Sprint 167 T3 HIGH: previous regen path could append a second ADR block
+ * because the sentinel logic was implicit (re-write whole file). This helper
+ * pins the contract so future hook authors cannot accidentally accumulate
+ * duplicate blocks.
+ *
+ * See: docs/superpowers/plans/2026-05-14-sprint-168-plan.md lines 1371-1379.
+ */
+export function replaceSentinel(content: string, newInner: string): string {
+  const startIdx = content.indexOf(AUTO_START);
+  const endIdx = content.indexOf(AUTO_END);
+  if (startIdx === -1 || endIdx === -1 || endIdx <= startIdx) {
+    // No sentinel pair — pass through unchanged.
+    return content;
+  }
+  const before = content.slice(0, startIdx);
+  const after = content.slice(endIdx + AUTO_END.length);
+  return `${before}${AUTO_START}\n${newInner}\n${AUTO_END}${after}`;
+}
+
+// ─── Pure Render From Store (Sprint 168 C0a-2) ────────────────────
+
+/** Output of `renderRulesFromStore` — markdown strings keyed by role. */
+export interface RenderedRules {
+  /** brain.md markdown (with ADR section embedded). */
+  brainMd: string;
+  /** auditor.md markdown (with ADR section embedded). */
+  auditorMd: string;
+  /** worker-default.md markdown (with ADR section embedded). */
+  workerMd: string;
+}
+
+export interface RenderRulesFromStoreOptions {
+  /** Override the template directory (for tests). */
+  templateDir?: string;
+}
+
+/**
+ * Pure-function rendering of the three rule role templates from a
+ * MemoryStore. Reads `store.getByType('adr')` at invocation time — this is
+ * the freshness guarantee referenced by ADR-046 Step Ordering Contract.
+ *
+ * Step 3 (adrInsert) MUST run before Step 4 (ruleRegen) so that any ADR
+ * inserted via `store.insert({ type: 'adr', ... })` is visible to this
+ * function when called immediately afterwards. The invariant test in
+ * `tests/core/adr-046-step-ordering-invariant.test.ts` guards this contract.
+ *
+ * @param store MemoryStore — queried via `getByType('adr')`.
+ * @returns rendered markdown strings for brain / auditor / worker roles.
+ */
+export function renderRulesFromStore(
+  store: { getByType(type: string): MemoryEntryV2[] },
+  opts: RenderRulesFromStoreOptions = {},
+): RenderedRules {
+  // Freshness invariant: read ADRs from the store at call time.
+  const adrs = store.getByType('adr');
+
+  const brainTpl = loadTemplate('brain', opts.templateDir);
+  const auditorTpl = loadTemplate('auditor', opts.templateDir);
+  const workerTpl = loadTemplate('worker-default', opts.templateDir);
+
+  return {
+    brainMd: renderTemplate(brainTpl, adrs),
+    auditorMd: renderTemplate(auditorTpl, adrs),
+    workerMd: renderTemplate(workerTpl, adrs),
+  };
 }
 
 // ─── Custom Section Preservation ─────────────────────────────────
