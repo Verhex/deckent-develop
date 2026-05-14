@@ -140,7 +140,8 @@ describe('archiveDirectives — phase guard (Sprint 146 T-008)', () => {
   it('should ALLOW archiving when called during CLEANUP phase', () => {
     mockExistsSync.mockReturnValue(true);
 
-    archiveDirectives('/project', 'sprint-145', 'CLEANUP');
+    // Sprint 168 C0a-4: legacy placeholder-overwrite opt-in (BUG-CC default preserve)
+    archiveDirectives('/project', 'sprint-145', 'CLEANUP', { autoArchive: true });
 
     // Should create archive dir
     expect(mockMkdirSync).toHaveBeenCalledWith(

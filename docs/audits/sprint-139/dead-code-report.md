@@ -9,7 +9,7 @@
 | Category | Modules | Total Lines |
 |----------|---------|-------------|
 | Dead | 3 | 561 |
-| Dormant (ADR-protected) | 4 | 495 |
+| Dormant (ADR-protected) | 4 | 553 |
 | Lightly-Used | 0 | 0 |
 | Active | 1 | 121 |
 
@@ -40,9 +40,9 @@ These modules have **zero imports** in src/ and are not protected by any ADR.
 These modules are deprecated but preserved by ADR decisions.
 
 ### src/orchestra/decision-engine.ts
-- **Lines:** 170
+- **Lines:** 228
 - **Reason:** V1 DecisionOrchestrator — deprecated by ADR-028, kept as reference
-- **Imported by:** src/orchestra/decision-steps/agent-step.ts, src/orchestra/decision-steps/scope-step.ts, src/orchestra/decision-replay.ts, src/nervous/decision-engine.ts
+- **Imported by:** src/orchestra/sprint-spawner.ts, src/orchestra/sprint-controller.ts, src/orchestra/decision-steps/agent-step.ts, src/orchestra/decision-steps/scope-step.ts, src/orchestra/decision-replay.ts, src/nervous/decision-engine.ts
 - **Action:** Keep — requires ADR amendment to remove
 
 ### src/orchestra/decision-replay.ts
@@ -75,7 +75,7 @@ These suspects turned out to be actively used.
 
 ## Unused Export Sampling
 
-Found **695** potentially unused exports across src/.
+Found **706** potentially unused exports across src/.
 Top 20 shown below (full list requires deeper analysis):
 
 | File | Export | Import Count |
@@ -104,6 +104,6 @@ Top 20 shown below (full list requires deeper analysis):
 ## Recommendations
 
 1. **Step 2 (Sprint 140+):** Remove Dead modules (3 files, ~561 LoC) with full test verification
-2. **ADR Amendment:** If V1 decision engine is no longer needed as reference, amend ADR-028 to allow removal (~495 LoC)
+2. **ADR Amendment:** If V1 decision engine is no longer needed as reference, amend ADR-028 to allow removal (~553 LoC)
 3. **Lightly-Used Review:** Consider inlining single-consumer modules to reduce coupling
 4. **Unused Export Cleanup:** Review top unused exports for dead function-level code

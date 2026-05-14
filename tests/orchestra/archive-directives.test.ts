@@ -153,7 +153,8 @@ describe('archiveDirectives', () => {
     // DIRECTIVES.md exists, archive dir will be created by mkdirSync recursive
     mockExistsSync.mockReturnValue(true);
 
-    archiveDirectives('/project', 'sprint-010');
+    // Sprint 168 C0a-4: legacy placeholder-overwrite opt-in (BUG-CC default preserve)
+    archiveDirectives('/project', 'sprint-010', 'COMPLETE', { autoArchive: true });
 
     expect(mockMkdirSync).toHaveBeenCalledWith(
       expect.stringContaining('.brain/archive'),
@@ -168,7 +169,8 @@ describe('archiveDirectives', () => {
   it('should handle sprint IDs with leading zeros correctly', () => {
     mockExistsSync.mockReturnValue(true);
 
-    archiveDirectives('/project', 'sprint-009');
+    // Sprint 168 C0a-4: legacy placeholder-overwrite opt-in (BUG-CC default preserve)
+    archiveDirectives('/project', 'sprint-009', 'COMPLETE', { autoArchive: true });
 
     // Next sprint should be 10, not 010
     const writeCall = mockWriteFileSync.mock.calls[0];
