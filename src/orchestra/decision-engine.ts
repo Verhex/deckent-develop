@@ -29,6 +29,64 @@ import { executeScopeStep } from './decision-steps/scope-step.js';
 import { selectSkills } from '../core/skill-selector.js';
 import { resolveTaskModel } from './model-selector.js';
 
+// ─── Sprint 168 C0c RC2 — Scope Collision Decision API ──────────────────────
+//
+// Sprint 167 events.jsonl evidence (seq #1, #2, #8):
+//   Auditor emits AUDITOR→BRAIN:SCOPE_COLLISION_DETECTED on plan-time when two
+//   tasks claim the same scope.filesWrite entry — but Brain spawn pipeline has
+//   no consumer/subscriber. Tasks proceed to TASK_ASSIGN anyway, causing
+//   runtime lock contention and Worker output corruption.
+//
+// Sprint 138 Task 4 designed the collision channel but wire was never
+// completed (T5 audit Cluster C RC2). This module exposes the missing
+// decision-engine subscriber. Spawn pipeline calls handleScopeCollision()
+// before TASK_ASSIGN emit; if action === 'block' the spawn is skipped and a
+// BRAIN→SPAWN:BLOCKED event is logged.
+//
+// File authority constraint: this is a *pure* decision function (no IO, no
+// event emission). The spawn-time wire reads the SpawnDecision return value
+// and emits the BLOCKED event itself.
+
+/** Payload emitted by Auditor when scope.filesWrite collision detected. */
+export interface ScopeCollisionPayload {
+  /** Task IDs that all claim at least one of the colliding files. */
+  taskIds: string[];
+  /** Files claimed by >1 task. */
+  files: string[];
+  /** When the collision was detected: 'plan-time' | 'spawn-time' | string. */
+  detectedAt: string;
+}
+
+/** Decision returned to the spawn pipeline. */
+export interface SpawnDecision {
+  /**
+   * - 'block': skip TASK_ASSIGN for the listed tasks (BRAIN→SPAWN:BLOCKED).
+   * - 'replan': mark tasks as PENDING and trigger a re-plan (future use).
+   * - 'continue': override the collision (forces TASK_ASSIGN, debug only).
+   */
+  action: 'block' | 'replan' | 'continue';
+  reason: string;
+  taskIds: string[];
+}
+
+/**
+ * Sprint 168 C0c RC2 — handle Auditor SCOPE_COLLISION_DETECTED alert.
+ *
+ * Pure function: deterministic block decision. The spawn pipeline is
+ * responsible for consulting this before TASK_ASSIGN and for emitting the
+ * BRAIN→SPAWN:BLOCKED event when action === 'block'.
+ *
+ * The deterministic 'block' policy is intentional for Sprint 168 — future
+ * sprints can extend with priority-aware 'replan' for low-priority tasks.
+ */
+export function handleScopeCollision(payload: ScopeCollisionPayload): SpawnDecision {
+  return {
+    action: 'block',
+    reason: `Scope collision: ${payload.files.join(', ')} held by multiple tasks`,
+    taskIds: payload.taskIds,
+  };
+}
+
 // ─── Effort Resolution ─────────────────────────────────────────────────────
 
 function resolveEffort(analysis: TaskAnalysis, agentMultiplier: number): TaskEffort {

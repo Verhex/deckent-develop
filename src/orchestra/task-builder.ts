@@ -361,6 +361,54 @@ export function validateGroundTruthClaims(
   return issues;
 }
 
+// ─── Sprint 168 C0c RC1 — Scope filesWrite Validation ──────────────
+//
+// Sprint 167 cascade root layer (Bug Z2): DIRECTIVES "Files:" parser accepted
+// bare extension tokens like ".ts", ".md" as scope.filesWrite entries — these
+// match no real path and poison downstream spawn-time lock acquisition, scope
+// enforcement, and worker auditing.
+//
+// Plan-time validator: reject bare tokens + basename-only paths. Callers may
+// either throw on invalid OR consume sanitized[] to drop poisoned entries.
+
+const BARE_TOKEN_BLOCKLIST = ['.ts', '.md', '.test', 'test.ts', '.json', '.txt'] as const;
+
+export interface ValidationResult {
+  valid: boolean;
+  errors: string[];
+  sanitized: string[];
+}
+
+/**
+ * Sprint 168 C0c RC1 — validate scope.filesWrite entries for bare tokens.
+ *
+ * Rules:
+ *   1. Reject entries in BARE_TOKEN_BLOCKLIST exactly (".ts", ".md", etc.)
+ *   2. Reject entries without a path separator ('/' or '\\')
+ *      — basename-only paths (e.g. "foo.ts", "README.md") are ambiguous and
+ *        bypass scope enforcement.
+ *   3. Valid entries pass through into `sanitized`.
+ *
+ * @param filesWrite Array of file path strings from parsed DIRECTIVES.md
+ * @returns ValidationResult — { valid, errors, sanitized }
+ */
+export function validateScopeFilesWrite(filesWrite: string[]): ValidationResult {
+  const errors: string[] = [];
+  const sanitized: string[] = [];
+  for (const fp of filesWrite) {
+    if ((BARE_TOKEN_BLOCKLIST as readonly string[]).includes(fp)) {
+      errors.push(`Bare token detected: ${fp}`);
+      continue;
+    }
+    if (!fp.includes('/') && !fp.includes('\\')) {
+      errors.push(`Basename without path: ${fp}`);
+      continue;
+    }
+    sanitized.push(fp);
+  }
+  return { valid: errors.length === 0, errors, sanitized };
+}
+
 /**
  * Extract a TaskScope from a directive line by matching directory and file path patterns.
  * Matches directories like src/..., tests/... and files ending in .ts or .js.
@@ -460,7 +508,14 @@ export function extractScopeFromDirective(line: string): TaskScope {
     }
   }
 
-  return { directories, filesRead: [], filesWrite };
+  // Sprint 168 C0c RC1 — drop bare extension tokens (".ts", ".md", etc.) that
+  // slipped through the catch-all regex above. Basename-only entries are NOT
+  // dropped here (back-compat: DECKENT.md / README.md still extracted).
+  const sanitizedFilesWrite = filesWrite.filter(
+    f => !(BARE_TOKEN_BLOCKLIST as readonly string[]).includes(f),
+  );
+
+  return { directories, filesRead: [], filesWrite: sanitizedFilesWrite };
 }
 
 /**

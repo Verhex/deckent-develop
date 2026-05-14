@@ -85,6 +85,11 @@ export const CHANNELS = {
 
   // Timeout extension (Sprint 145 — Task 019)
   TIMEOUT_EXTEND: 'BRAIN→WORKER:TIMEOUT_EXTEND',
+
+  // Sprint 168 C0c RC2 — scope collision spawn blocker
+  // Emitted by sprint-controller / spawn pipeline when handleScopeCollision()
+  // returns action='block'. Consumes AUDITOR→BRAIN:SCOPE_COLLISION_DETECTED.
+  SPAWN_BLOCKED: 'BRAIN→SPAWN:BLOCKED',
 } as const;
 
 export type ChannelCode = typeof CHANNELS[keyof typeof CHANNELS];

@@ -11,6 +11,7 @@
 
 // ─── Node Builtins ─────────────────────────────────────────────────
 import { readFile, stat, writeFile } from 'node:fs/promises';
+import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 // ─── Core (value imports) ──────────────────────────────────────────
@@ -183,6 +184,85 @@ function emitSprintEvent(
 
 function emitPhaseChange(oldPhase: string, newPhase: string, sprintId: string): void {
   emitSprintEvent('SPRINT_PHASE_CHANGE', { oldPhase, newPhase, sprintId });
+}
+
+// ═══ Sprint 168 C0c — Plan↔Spawn Integration Helpers ══════════════
+//
+// Sprint 167 cascade root layer: the spawn pipeline operated on the in-memory
+// plan-state object, never re-reading task.json from disk. Any manual patch
+// applied between PLAN and SPAWN (recovery, --resume, race with Auditor) was
+// invisible to TASK_ASSIGN payload. Combined with the missing collision
+// subscriber (RC2) the pipeline emitted stale assignments that triggered the
+// Sprint 167 Cluster C bug chain.
+//
+// Two helpers are exported here so the spawn pipeline (sprint-spawner) and
+// recovery paths can consult them deterministically:
+//   * readTaskJsonFresh — always disk read, no in-memory cache (RC3)
+//   * consultCollisionDecision — wrap handleScopeCollision + emit
+//     BRAIN→SPAWN:BLOCKED structured event (RC2)
+//
+// Both functions are fail-safe under standard sprint-controller convention.
+
+import { handleScopeCollision } from './decision-engine.js';
+import type { ScopeCollisionPayload, SpawnDecision } from './decision-engine.js';
+import { writeEvent, CHANNELS } from './event-stream.js';
+
+/**
+ * Sprint 168 C0c RC3 — always-fresh disk read of task.json.
+ *
+ * No in-memory cache; every call hits the filesystem. Used by spawn pipeline
+ * (TASK_ASSIGN flow) and recovery paths to detect manual patches between
+ * PLAN and SPAWN phases.
+ *
+ * @throws Error when task.json file not found at expected path.
+ */
+export function readTaskJsonFresh(projectRoot: string, taskId: string): Task {
+  const path = join(projectRoot, TASKS_DIR, `task-${taskId}.json`);
+  if (!existsSync(path)) {
+    throw new Error(`task.json not found: ${path}`);
+  }
+  return JSON.parse(readFileSync(path, 'utf-8')) as Task;
+}
+
+/**
+ * Sprint 168 C0c RC2 — wire-layer consult for scope collision decisions.
+ *
+ * Calls the pure decision function from decision-engine.ts, then — when the
+ * decision is 'block' — emits a BRAIN→SPAWN:BLOCKED structured event via
+ * the event stream so observers (Auditor dashboard, history replay) see the
+ * blocked spawn.
+ *
+ * The spawn pipeline checks the returned action and, on 'block', skips the
+ * TASK_ASSIGN emit + worker spawn for the listed tasks.
+ *
+ * Fail-safe: event stream write failures do not throw.
+ */
+export function consultCollisionDecision(
+  projectRoot: string,
+  sprintId: string,
+  payload: ScopeCollisionPayload,
+): SpawnDecision {
+  const decision = handleScopeCollision(payload);
+  if (decision.action === 'block') {
+    try {
+      writeEvent(
+        projectRoot,
+        sprintId,
+        'brain',
+        'worker',
+        CHANNELS.SPAWN_BLOCKED,
+        {
+          taskIds: decision.taskIds,
+          files: payload.files,
+          reason: decision.reason,
+          detectedAt: payload.detectedAt,
+        },
+      );
+    } catch (e) {
+      debugLog('consultCollisionDecision:writeEvent', e);
+    }
+  }
+  return decision;
 }
 
 // ═══ RunSprintOptions ═════════════════════════════════════════════
