@@ -1,0 +1,24 @@
+Tüm deliverable'lar yerinde, predicate PASS, result JSON geçerli (`selfAssessment: DONE`).
+
+## Özet
+
+**T1 Read-Only Code Inventory + Dead Code + Unused Features Audit tamamlandı.**
+
+**Çıktılar:**
+- `.audit/sprint-167/T1-code-inventory.md` — 565 satır, 9 section (gate: ≥500 + ≥6)
+- `.audit/sprint-167/T1-predicate.sh` — bash GO/NO_GO predicate, PASS verified
+- `.tasks/task-167-001.{plan,hb,result}` — execution + heartbeat + result
+
+**11 finding üretildi** (her biri `severity` / `suggested_fix` / `sprint_slot` / `effort_estimate` ile):
+- **HIGH (2):** `T1-MCP-001` (27 vs 31 MCP tool ground-truth drift), `T1-TEST-001` (505 vs 772 test file drift)
+- **MEDIUM (4):** quick-start.ts register orphan, Sprint 140-148 doc gap, 7 prompt-* dead candidate, Bug N regression semantic belirsiz
+- **LOW (5):** skill-marketplace pattern, feature_query parity, 4 suspect dosya, skip sayım drift, regression test namespace
+
+**Doğrulama:**
+- `wc -l` 565 ≥ 500 ✅
+- `grep -c "^## "` 9 ≥ 6 ✅
+- `bash T1-predicate.sh` PASS ✅
+- `tsc --noEmit` exit 0 (kod değişmedi) ✅
+- vitest run kasıtlı olarak çalıştırılmadı — sıfır source mutation, 16K-test suite ~30dk + sinyal yok; baseline korundu (rationale `notes` içinde)
+
+**Scope compliance:** `src/`, `tests/`, `dist/`, `docs/`, root `.md` dosyalarına dokunulmadı. Yalnız `.audit/sprint-167/` ve `.tasks/task-167-001.*` yazıldı.

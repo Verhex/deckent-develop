@@ -20,10 +20,8 @@ Features: **Memory V2 DB-First (SQLite FTS5, dual-layer i18n normalize, 96% cont
 ## Project Status
 | Metric | Value |
 |--------|-------|
-| Version | v1.0.0-beta.1 |
-| Sprint | sprint-166 |
-| Total Tasks | 11 |
-| Completed | 10 |
+| Version | 1.0.0-beta.1 |
+| Sprint | sprint-167 |
 | MCP Tools | 27 |
 | MCP Resources | 8 |
 | CLI Commands | 55+ |
@@ -31,5 +29,3 @@ Features: **Memory V2 DB-First (SQLite FTS5, dual-layer i18n normalize, 96% cont
 | Agents | 15 built-in + 2 custom |
 | Skills | 21 built-in |
 | Providers | 3 (Claude, Codex, Gemini) |
-| ADRs | 46 (ADR-046 Brain Self-Update Hook Architecture) |
-| Coverage | 89.33% |

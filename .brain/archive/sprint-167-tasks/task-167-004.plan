@@ -1,0 +1,44 @@
+# Task 167-004 Execution Plan — T4 Memory.db + Data Integrity Audit
+
+## Objective
+READ-ONLY forensic audit of `.brain/memory.db` SQLite database. Produce findings in `.audit/sprint-167/T4-memory-integrity.md` (≥300 lines) + a GO/NO_GO predicate script `.audit/sprint-167/T4-predicate.sh`.
+
+## Scope Reminder
+- NO source/doc/db mutation. `.brain/memory.db` opened READ-ONLY (`sqlite3 -readonly` or `file:?mode=ro`).
+- Write target: `.audit/sprint-167/` only.
+
+## Audit Plan (3 sub-stages mapped to spec)
+
+### 4.1 Entry Consistency
+- Total entry count vs ~215 claim
+- Sprint_id ↔ sprint_num parity (regex extract num from `sprint-NNN`)
+- Type/status enumeration + cardinality
+- decay_exempt distribution (identity / mandatory ADRs should be exempt)
+- Detect insufficient body entries (e.g. mem-sprint-165 ~30 bytes)
+- Detect orphan sprint_id refs (sprint_num exists but no sprint log file)
+
+### 4.2 FTS5 + Relations Integrity
+- FTS5 rowid parity with entries table (entries_fts trigger sync)
+- Dual-layer normalize: TR/EN/DE sample queries (3+ tests)
+- Relations: broken to_id / from_id (orphan FK)
+- Relation type enumeration
+- entry_history coverage analysis
+
+### 4.3 Schema, Backup, Bug Z3
+- Schema version drift (schema_version table vs implementation expectation `version=1`)
+- Backup pattern inventory (.bak-* files + gitignore confirmation)
+- Bug Z3 impact analysis — memory rebuild destructive behavior
+- Restore TEST: forbidden (audit only)
+
+## Files To Write
+1. `.audit/sprint-167/T4-memory-integrity.md` (≥300 lines, ≥3 FTS5 mentions, ≥1 Bug Z3 mention)
+2. `.audit/sprint-167/T4-predicate.sh` (GO/NO_GO predicate runner)
+
+## Verify Loop
+No source code changes → tsc/vitest do not apply. Predicate script self-verifies.
+
+## Output Quality Gates
+- ≥300 lines markdown
+- ≥6 sections
+- 4-field finding format where applicable (severity / suggested_fix / sprint_slot / effort_estimate)
+- predicate.sh exits 0 PASS / non-zero FAIL with explicit reason

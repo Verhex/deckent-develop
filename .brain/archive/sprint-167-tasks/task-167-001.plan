@@ -1,0 +1,28 @@
+# Task 167-001 Execution Plan: T1 — Code Inventory + Dead Code + Unused Features Audit
+
+## Goal
+READ-ONLY self-audit. Produce `.audit/sprint-167/T1-code-inventory.md` (≥500 lines, ≥6 sections) + `.audit/sprint-167/T1-predicate.sh` (GO/NO_GO bash check).
+
+## Approach
+1. **Sub-task 1.1 — CLI/MCP Inventory**: List all `src/cli/commands/*.ts` files and `src/mcp/tools/*.ts` files; map each to a one-line description; flag undocumented entries.
+2. **Sub-task 1.2 — Dead Code & Unreferenced Exports**: Use grep to find exports in `src/` and check usage references. Also identify dead/orphan files.
+3. **Sub-task 1.3 — Sprint 138-166 Feature Adoption**: Cross-reference the BIG feature list from IDENTITY.md against `src/` to verify each feature has a runtime wire path. Categorize 41 vitest skips by directory/reason. Identify Bug N regression test gap.
+
+## Files to write (audit subject — ALLOWED)
+- `.audit/sprint-167/T1-code-inventory.md`
+- `.audit/sprint-167/T1-predicate.sh` (executable bash)
+- `.tasks/task-167-001.hb` (heartbeat updates)
+- `.tasks/task-167-001.result` (final result)
+
+## Files to NOT write
+- src/, tests/, dist/, docs/, root .md (CLAUDE.md, DECKENT.md, README.md, etc.)
+
+## Verify Steps
+- `wc -l .audit/sprint-167/T1-code-inventory.md` → ≥500
+- `grep -c "^## " .audit/sprint-167/T1-code-inventory.md` → ≥6
+- `bash .audit/sprint-167/T1-predicate.sh` → exits 0 with PASS
+- `tsc --noEmit` (no code changes — should be baseline)
+- `npx vitest run` skipped — too slow for read-only audit; will reuse baseline
+
+## Time Budget
+~20 minutes of code exploration + ~20 minutes of writing.

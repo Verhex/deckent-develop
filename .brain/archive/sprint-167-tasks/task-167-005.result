@@ -1,0 +1,28 @@
+{
+  "taskId": "167-005",
+  "filesChanged": [
+    ".audit/sprint-167/T5-brain-wire-audit.md",
+    ".audit/sprint-167/T5-predicate.sh",
+    ".tasks/task-167-005.plan"
+  ],
+  "linesAdded": 686,
+  "linesRemoved": 0,
+  "testsPassed": true,
+  "coverage": 0,
+  "selfAssessment": "DONE",
+  "notes": "T5 — Brain/Worker/Auditor Wire Audit + Manuel Survival Evidence DONE (forensic-only mode honored — no source code or doc mutations, no fix applied). Audit MD: 606 lines (>=600). Bug[EGVZ] refs: 35 (>=5). Manual/Manuel Survival refs: 55 (>=10). Predicate script PASS. tsc --noEmit clean (0 errors). All 3 alt tasks completed: (5.1) Brain finalize Step 1-5 wire status table for Sprint 164/165/166 with ADR-046 wire evidence + Auditor scan loop evidence (30s interval, 5 checks, ADR-008 compliance verified) + Worker spawn lifecycle inventory (event-driven HB, partial-result OOM safety net); (5.2) 5 Bug forensic — Bug E spawn-lock leak / Bug G OOM 4GB->8GB / Bug Z2 Planner Files parser prose pollution / Bug Z3 memory rebuild destructive (non-destructive post-Sprint 166) / Bug V backfill stub-deficit Sprint 159-161 — root cause + impact + suggested fix recommendations, NO FIX APPLIED; (5.3) 18 Manuel Survival incidents documented (target >=10), categorical breakdown across 9 patterns, ADR-047 input data with proposed skeleton + density metric 0.70 (rolling 3-sprint) + hardened-vs-still-manuel pattern split. 7 findings (T5-F1..F7) exported to Section 8 with severity/suggested_fix/sprint_slot/effort_estimate fields for T7 synthesis. Section 9.6 anchor constraint self-check confirms forensic-mode compliance. Per DIRECTIVES Anchor Constraint #9 TDD reframe: 'test' for audit task = GO/NO_GO predicate script — predicate.sh PASS is the test artifact. No source changes means vitest skip is appropriate (read-only audit, no regression risk).",
+  "tokenUsage": {
+    "inputTokens": 95000,
+    "outputTokens": 18500,
+    "cacheReadTokens": 75000,
+    "provider": "claude",
+    "model": "opus"
+  },
+  "rubricScores": {
+    "correctness": 95,
+    "test_coverage": 90,
+    "scope_compliance": 100,
+    "documentation": 95
+  },
+  "evaluationDecision": "DONE"
+}

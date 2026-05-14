@@ -1,0 +1,47 @@
+# Task 167-005 Execution Plan — T5 Brain/Worker/Auditor Wire Audit + Manuel Survival Evidence
+
+## Mode
+FORENSIC ONLY (bug-fixer agent override) — NO FIX, root cause analysis + impact + suggested fix recommendations.
+
+## Files to Read (Inputs)
+- src/orchestra/*.ts — brain.ts, sprint-controller.ts, sprint-phases.ts, planner.ts, result-collector.ts, result-evaluator.ts, debt-manager.ts, spawn-backend.ts, tmux.ts, mid-sprint-adapter.ts
+- src/agents/*.ts — worker.ts, adaptive-agent.ts
+- src/monitor/*.ts — auditor.ts, dashboard-manager.ts, sprint-state.ts
+- .deckent/sprint-16*-events.jsonl — runtime event traces
+- .brain/archive/ — Sprint 164/165/166 snapshots
+- git log — Sprint 164-166 commit chain
+
+## Files to Write (Outputs)
+- .audit/sprint-167/T5-brain-wire-audit.md (≥600 lines, structured findings)
+- .audit/sprint-167/T5-predicate.sh (GO/NO_GO bash check)
+- .tasks/task-167-005.result
+
+## Approach (3 alt tasks)
+
+### 5.1 Brain Finalize Step 1-5 + Auditor + Worker Wire Audit
+- Map Brain finalize() pipeline (Step 1: result aggregation, Step 2: identity update, Step 3: memory.db write, Step 4: exports, Step 5: cleanup)
+- Cross-check ADR-046 Step Ordering Contract — verify Sprint 164/165/166 finalize event sequence
+- Auditor scan loop evidence: detect-stale-heartbeat, boundary-violation, lock-cleanup intervals
+- Worker spawn lifecycle: claim→hb→plan→result writeback
+
+### 5.2 5 Bug Forensic (No Fix)
+- Bug E — spawn-lock leak (root cause + impact + mitigation suggestion)
+- Bug G — OOM 4GB→8GB scaling threshold
+- Bug Z2 — Planner Files parser (DIRECTIVES.md Files: field tokenization edge case)
+- Bug Z3 — memory rebuild destructive (Tutarsızlık #1 from T4)
+- Bug V — backfill production vs gerçek (sprint backfill desync)
+
+### 5.3 Manuel Survival Inventory + ADR-047 Input
+- Scan .brain/archive/ + .deckent/sprint-16*-events.jsonl + git log for manual intervention markers
+- Categorize ≥10 incidents (deckent kill / cleanup / recover / manual edit / archive rotation)
+- Suggest ADR-047 "Manuel Survival Pattern" structure for Sprint 168 ADR writeup
+
+## Predicate Script
+- wc -l T5-brain-wire-audit.md ≥600
+- grep -cE "Bug [EGVZ]" ≥5
+- grep -ciE "manual survival|manuel survival" ≥10
+
+## Constraints
+- NO source code mutations (src/, tests/, dist/, root .md — all forbidden)
+- Output ONLY to .audit/sprint-167/ + .tasks/task-167-005.*
+- ADR compliance: ADR-008 Brain merkezi import, ADR-046 Step Ordering — referenced for verification only

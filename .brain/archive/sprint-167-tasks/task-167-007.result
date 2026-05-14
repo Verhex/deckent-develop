@@ -1,0 +1,29 @@
+{
+  "taskId": "167-007",
+  "filesChanged": [
+    ".audit/sprint-167/T7-cross-cutting-synthesis.md",
+    ".audit/sprint-167/consolidated-inventory.md",
+    ".audit/sprint-167/sprint-168-roadmap.md",
+    ".audit/sprint-167/T7-predicate.sh"
+  ],
+  "linesAdded": 1718,
+  "linesRemoved": 0,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "DONE",
+  "notes": "T7 Cross-Cutting Synthesis tamamlandı. T1, T3, T4, T5, T6 raporlarını okudum (T2 missing — Sprint 167 Wave 1 gap, Sprint 168 C1 task'ı bunu kapatacak). 50 finding (1 CRITICAL + 12 HIGH + 19 MEDIUM + 18 LOW/INFO) konsolide edildi. 8 cross-cutting pattern tespit edildi (P1 Ground-Truth Drift / P2 ADR-046 Step 4 Gap / P3 Memory Integrity Convergence / P4 Defensive Miss / P5 Dead Code / P6 Stale Proposed ADR / P7 dep_pipeline Deferral / P8 Manuel Survival Loop) — spec ≥3 eşiğini fazlasıyla karşılıyor. Sprint 168 roadmap: 12 task (≤12 spec ✓), 4 critical C1-C4 (≤4 spec ✓), her finding 4 zorunlu field (severity / suggested_fix / sprint_slot / effort_estimate) ile yazıldı. Predicate script T7-predicate.sh 9/9 PASS. tsc --noEmit exit 0. Vitest çalıştırılmadı çünkü read-only audit-only task (kaynak kod değişmedi, sadece .audit/sprint-167/ altına yazıldı). Sprint 167 anchor constraints korundu: no source/doc mutations, sadece .audit/sprint-167/ dizinine yazım. Sprint 168 catch-22 fix uygulandı — C1 ilk task olarak T2 audit gap closure.",
+  "tokenUsage": {
+    "inputTokens": 95000,
+    "outputTokens": 25000,
+    "cacheReadTokens": 0,
+    "provider": "claude",
+    "model": "opus"
+  },
+  "rubricScores": {
+    "correctness": 95,
+    "test_coverage": 100,
+    "scope_compliance": 100,
+    "documentation": 95
+  },
+  "evaluationDecision": "DONE"
+}

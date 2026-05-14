@@ -7,20 +7,13 @@
 ## Live Metrics
 | Metric | Value |
 |--------|-------|
-| Sprint | sprint-166 (DONE) |
-| Total Tasks | 11 |
-| Completed | 10 |
-| Tech Debt | 1 (T3 doc-cache runner wire-up) |
-| No-Go | 0 |
-| Duration | 215dk 9sn |
-| Coverage | 89.33% |
-| Tests | ~16,434 PASS |
-| Version | v1.0.0-beta.1 |
-| Built-in Agents | 15 |
-| Built-in Skills | 21 |
-| MCP Tools | 27 |
-| CLI Commands | 55+ |
-| ADRs | 46 (latest: ADR-046) |
+| Sprint | sprint-167 |
+| Total Tasks | 10 |
+| Completed | 9 |
+| Tech Debt | 2 |
+| No-Go | 1 |
+| Duration | -1dk -1sn |
+| Coverage | NaN% |
 
 # TABLE OF CONTENTS
 

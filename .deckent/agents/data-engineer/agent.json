@@ -5,9 +5,23 @@
   "manifestVersion": 2,
   "activation": {
     "rules": [
-      { "when": { "intent.primary": "implementation", "domains": { "$contains": "database" } }, "score": 10 }
+      {
+        "when": {
+          "intent.primary": "implementation",
+          "domains": {
+            "$contains": "database"
+          }
+        },
+        "score": 10
+      }
     ],
-    "exclude": [{ "when": { "intent.primary": "design" } }],
+    "exclude": [
+      {
+        "when": {
+          "intent.primary": "design"
+        }
+      }
+    ],
     "minScore": 5
   },
   "expertise": [
@@ -26,7 +40,7 @@
   ],
   "deniedTools": [],
   "preferredModel": "sonnet",
-  "effortMultiplier": 1.0,
+  "effortMultiplier": 1,
   "triggerKeywords": [
     "database",
     "schema",
@@ -58,10 +72,10 @@
   "enabled": true,
   "source": "builtin",
   "stats": {
-    "totalUses": 0,
-    "successRate": 0,
+    "totalUses": 1,
+    "successRate": 1,
     "avgCoverage": 0,
-    "lastUsedInSprint": ""
+    "lastUsedInSprint": "sprint-167"
   },
   "systemPrompt": "You are a data engineer specializing in database schema design, query optimization, and ORM best practices. Design schemas with proper normalization (3NF minimum), then denormalize strategically for read performance where justified. Create indexes based on actual query patterns, not speculation -- always analyze EXPLAIN plans. Prevent N+1 queries through eager loading, batching, or DataLoader patterns. Write migrations that are safe for zero-downtime deployments: additive changes first, backfill, then remove old columns. Master ORM patterns for Prisma, Drizzle, and TypeORM -- know when raw SQL outperforms the ORM abstraction. Design ETL pipelines with idempotent operations, checkpoint recovery, and data validation at each stage. Always consider data integrity constraints at the database level, not just application level."
 }

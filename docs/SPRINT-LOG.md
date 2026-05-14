@@ -4427,3 +4427,34 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 
 
 ---
+## Sprint 167 — sprint-167
+
+**Status:** COMPLETE
+**Date:** 2026-05-14
+**Duration:** 0s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 10 |
+| Completed | 9 |
+| Tech Debt | 2 |
+| No-Go | 1 |
+| Coverage | NaN% |
+| Duration | -11ms |
+
+### Tasks
+
+- 167-001: T1 — Code Inventory + Dead Code + Unused Features Audit (GO_WITH_TECH_DEBT)
+- 167-002: T2 — Doc Inventory + Reference Validation + Ground-Truth Audit (NO_GO)
+- 167-003: T3 — ADR Compliance + Status Audit (DONE)
+- 167-004: T4 — Memory.db + Data Integrity Audit (DONE)
+- 167-005: T5 — Brain/Worker/Auditor Wire Audit + Manuel Survival Evidence (GO_WITH_TECH_DEBT)
+- 167-006: T6 — Test + Build + Security + OSS Readiness Audit (DONE)
+- 167-007: T7 — Cross-Cutting Synthesis (Wave 2, T1-T6 dependent) (DONE)
+- run-1778748493227-0: Sprint 167 T1 — Code Inventory + Dead Code + Unused Features Audit. READ-ONLY au (DONE)
+- run-1778748498892-0: Sprint 167 T2 — Doc Inventory + Reference Validation + Ground-Truth Audit. READ- (DONE)
+- run-1778748966937-0: Sprint 167 T7 RETRY — Cross-Cutting Synthesis with T1+T2 included. READ-ONLY met (DONE)
+
+---

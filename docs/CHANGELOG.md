@@ -6,6 +6,26 @@ Bu projedeki tüm önemli değişiklikler bu dosyada belgelenmektedir.
 Format [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) standardına dayanır
 ve proje [Semantic Versioning](https://semver.org/spec/v2.0.0.html) kurallarına uyar.
 
+## [1.0.0-beta.1-sprint167] - 2026-05-14
+
+### Added
+
+- T3 — ADR Compliance + Status Audit
+- T4 — Memory.db + Data Integrity Audit
+- T6 — Test + Build + Security + OSS Readiness Audit
+- T7 — Cross-Cutting Synthesis (Wave 2, T1-T6 dependent)
+- Sprint 167 T1 — Code Inventory + Dead Code + Unused Features Audit. READ-ONLY au
+- Sprint 167 T2 — Doc Inventory + Reference Validation + Ground-Truth Audit. READ-
+- Sprint 167 T7 RETRY — Cross-Cutting Synthesis with T1+T2 included. READ-ONLY met
+
+### Changed
+
+- T1 — Code Inventory + Dead Code + Unused Features Audit (completed with tech debt)
+- T5 — Brain/Worker/Auditor Wire Audit + Manuel Survival Evidence (completed with tech debt)
+
+
+_Tasks: 10 total, 9 done, 2 tech debt, 1 no-go_
+
 ## [1.0.0-beta.1-sprint165] - 2026-05-13
 
 ### Added

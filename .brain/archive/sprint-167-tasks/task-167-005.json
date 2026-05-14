@@ -1,0 +1,97 @@
+{
+  "id": "167-005",
+  "title": "T5 — Brain/Worker/Auditor Wire Audit + Manuel Survival Evidence",
+  "description": "T5 — Brain/Worker/Auditor Wire Audit + Manuel Survival Evidence\n\n- Model: opus\n- Effort: high\n- Skills: typescript-expert, system-architect, performance-optimizer\n- Agent: bug-fixer (**FORENSIC MODE — no fix, root cause only**)\n- Files (read): src/orchestra/*.ts, src/agents/*.ts, src/monitor/*.ts, .deckent/sprint-16*-events.jsonl, git log\n- Files (write): .audit/sprint-167/T5-brain-wire-audit.md, .audit/sprint-167/T5-predicate.sh\n- Scope: .audit/sprint-167/\n\n### Description\n\n**Brain finalize Step 1-5 status table** (Sprint 164/165/166 evidence) + Auditor scan loop evidence + Worker spawn lifecycle inventory + **5 Bug forensic** (E spawn-lock leak / G OOM 4GB→8GB / Z2 Planner Files parser / Z3 memory rebuild destructive / V backfill production vs gerçek — **FIX YOK, sadece root cause**) + **Manuel Survival incident inventory** (Sprint 164-166, ≥10 vaka) + **ADR-047 input data** (Sprint 168'de yazılacak ADR için evidence collection).\n\n**Worker prompt override (T5 only):** bug-fixer agent \"forensic-only mode\" — root cause analysis + impact + suggested fix önerisi sun ama UYGULAMA.\n\n**Kanıt:**\n- `wc -l .audit/sprint-167/T5-brain-wire-audit.md` → ≥600\n- `grep -cE \"Bug [EGVZ]\" .audit/sprint-167/T5-brain-wire-audit.md` → ≥5\n- `grep -ciE \"manual survival|manuel survival\" .audit/sprint-167/T5-brain-wire-audit.md` → ≥10\n- `bash .audit/sprint-167/T5-predicate.sh` → PASS\n\n**Test:** 1 predicate + 3 alt task (5.1 Brain finalize+Auditor+Worker, 5.2 5 Bug forensic, 5.3 Manuel survival+ADR-047 input)\n\n---",
+  "model": "opus",
+  "effort": "high",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "src/orchestra/",
+      "src/agents/",
+      "src/monitor/",
+      ".audit/sprint-167/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      ".ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:**; `wc -l .audit/sprint-167/T5-brain-wire-audit.md` → ≥600; `grep -cE \"Bug [EGVZ]\" .audit/sprint-167/T5-brain-wire-audit.md` → ≥5",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "PENDING",
+  "sprintId": "sprint-167",
+  "forceModel": "opus",
+  "forceEffort": "high",
+  "forceAgent": "bug-fixer (**FORENSIC MODE — no fix, root cause only**)",
+  "forceSkills": [
+    "typescript-expert",
+    "system-architect",
+    "performance-optimizer"
+  ],
+  "assignedAgent": "bug-fixer (**FORENSIC MODE — no fix, root cause only**)",
+  "assignedSkills": [
+    "typescript-expert",
+    "system-architect",
+    "performance-optimizer"
+  ],
+  "createdAt": "2026-05-14T08:01:52.616Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "bugfix",
+        "secondary": [],
+        "confidence": 0.48
+      },
+      "tags": [],
+      "domains": [
+        {
+          "name": "orchestra",
+          "weight": 0.2
+        },
+        {
+          "name": "agents",
+          "weight": 0.2
+        },
+        {
+          "name": "monitor",
+          "weight": 0.2
+        }
+      ],
+      "operations": [
+        {
+          "type": "create",
+          "weight": 0.5
+        },
+        {
+          "type": "modify",
+          "weight": 0.25
+        },
+        {
+          "type": "test",
+          "weight": 0.25
+        }
+      ],
+      "complexity": {
+        "fileCount": 1,
+        "moduleCount": 4,
+        "crossCutting": true,
+        "estimatedSize": "large"
+      },
+      "scope": {
+        "writeRatio": {
+          "./": 1
+        },
+        "primaryWriteTarget": "./",
+        "testWriteRatio": 0
+      }
+    },
+    "confidence": "high",
+    "routingVersion": "v2"
+  }
+}

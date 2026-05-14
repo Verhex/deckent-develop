@@ -1,0 +1,15 @@
+T7 Cross-Cutting Synthesis tamamlandı.
+
+**Teslim edilen 4 dosya:**
+- `.audit/sprint-167/T7-cross-cutting-synthesis.md` (383 satır) — 8 cross-cutting pattern (P1-P8) + 6-source synthesis
+- `.audit/sprint-167/consolidated-inventory.md` (501 satır) — 50 finding severity sıralı + cross-cut tag
+- `.audit/sprint-167/sprint-168-roadmap.md` (434 satır) — 12 task, 4 critical (C1-C4), her finding 4 zorunlu field
+- `.audit/sprint-167/T7-predicate.sh` (executable) — 9/9 check PASS
+
+**Ana bulgular (Sprint 168 input):**
+- **C1:** T2 Audit Gap Closure (Wave 1 eksiği — Catch-22 v4 fallback ile Sprint 168 ilk task'ı)
+- **C2:** ADR-046 Step 4 (ruleRegen) Implementation Fix — `.claude/rules/brain.md` 11 ADR eksik + çift blok bug
+- **C3:** Memory Data-Integrity Recovery — Relations 39% broken (51/131) + ID drift + Bug Z3 destructive rebuild
+- **C4:** dep_pipeline_enabled Flip + 3-Layer Doc Fix — DECKENT.md/VISION.md/DIRECTIVES.md drift
+
+**Sprint 167 verdict:** GO_WITH_TECH_DEBT (T2 raporu eksikliği v4 spec tolerans dahilinde). Sprint 168 hard blocker'ları 4 critical task ile kapanırsa Sprint 169 Open Source GA için yeşil ışık.

@@ -8,17 +8,14 @@
 ## Mevcut Durum
 | Metric | Value |
 |--------|-------|
-| Version | 1.0.0-beta.1 (Sprint 168 → v1.0.0-beta.2 GA) |
-| Sprint | sprint-166 DONE (11/11) |
+| Version | 1.0.0-beta.1 |
+| Sprint | sprint-167 |
 | MCP Tools | 27 |
 | MCP Resources | 8 |
-| CLI Commands | 55-56 (recall, remember, memory rebuild/export/stats dahil) |
+| CLI Commands | 55+ |
 | Dashboard Pages | 7 |
 | Agents | 15 built-in + 2 custom |
 | Skills | 21 built-in |
-| ADRs | 46 kabul edilmiş (ADR-046 Sprint 166) |
-| Tests | 16,434+ geçiyor (Sprint 166'da +35, Sprint 164'ten beri +5.000+) |
-| Coverage | %89.33 |
 | Providers | 3 (Claude, Codex, Gemini) |
 
 ## Genel Bakış
@@ -1920,15 +1917,13 @@ Sprint 166 mimari forensic'inde 4 yeni follow-up bug tespit edildi (Sprint 167 �
 ## Sprint Metrics
 | Metric | Value |
 |--------|-------|
-| Sprint | sprint-166 |
-| Total Tasks | 11 |
-| Completed | 10 DONE + 1 GO_WITH_TECH_DEBT |
-| Tech Debt | 1 (Bug R+T bundled GO_WTD) |
-| No-Go | 0 |
-| Duration | ~3s (4-wave plan + bootstrap gate) |
-| Coverage | %89.33 |
-| LoC | ~2735 net |
-| New Tests | 35+ |
+| Sprint | sprint-167 |
+| Total Tasks | 10 |
+| Completed | 9 |
+| Tech Debt | 2 |
+| No-Go | 1 |
+| Duration | -1dk -1sn |
+| Coverage | NaN% |
 
 ## Sprint History
-_See "Sprint History (Sprint 136-166)" tablosu yukarıda._
+_No sprint history._

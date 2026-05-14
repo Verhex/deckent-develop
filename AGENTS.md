@@ -157,3 +157,14 @@ Agent seçimi `src/core/routing-engine.ts` tarafından yapılır:
 ---
 
 *Son Güncelleme: Sprint 149 | Reform: ADR-041 Agent Taxonomy*
+
+## Built-in Agents
+| Agent | Tasks | Done | Success |
+|-------|-------|------|--------|
+| code-reviewer | 2 | 2 | 100% |
+| doc-writer | 1 | 0 | 0% |
+| data-engineer | 1 | 1 | 100% |
+| bug-fixer (**FORENSIC MODE — no fix, root cause only**) | 1 | 1 | 100% |
+| security-auditor | 1 | 1 | 100% |
+| architect | 1 | 1 | 100% |
+| generic | 3 | 3 | 100% |

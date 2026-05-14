@@ -42,6 +42,10 @@ paths: [".tasks/*",".brain/*",".contracts/*"]
 
 ## Active ADR Constraints
 
+- **ADR-046**: Brain Self-Update Hook Architecture — **Status:** accepted
+- **ADR-045**: Wave-Based Execution Semantics — respawnEligibleTasks Runtime Wire — **Status:** accepted
+- **ADR-043**: Brain Crash Recovery Protocol — **Status:** accepted
+- **ADR-044**: Sprint State Observability Contract — **Status:** accepted
 - **ADR-041**: Agent Taxonomy — Horizontal Skills vs Vertical Agents — accepted (Sprint 150 — reconfirmed with Sprint 150 dogfood evidence)
 - **ADR-040**: Nervous System Architecture — Proactive Meta-Orchestrator — Deckent'in Sprint 144–146 boyunca yaşanan canlı olaylar, proaktif bir meta-katmana olan ihtiyacı kanıtladı:
 - **ADR-001**: TypeScript + ESM — **Status:** accepted

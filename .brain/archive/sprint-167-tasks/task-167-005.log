@@ -1,0 +1,20 @@
+T5 görevi tamamlandı. Sonuçlar:
+
+## Teslim Edilen Dosyalar
+- **`.audit/sprint-167/T5-brain-wire-audit.md`** — 606 satır, 9 ana bölüm (kanıt eşik: ≥600 ✓)
+- **`.audit/sprint-167/T5-predicate.sh`** — GO/NO_GO predicate, `PASS` döndürüyor
+- **`.tasks/task-167-005.result`** — DONE, tokenUsage tüm 4 alan dahil
+
+## Predicate Sonuçları
+- Satır sayısı: **606** (≥600 ✓)
+- `Bug [EGVZ]` eşleşmesi: **35** (≥5 ✓)
+- `manual/manuel survival` eşleşmesi: **55** (≥10 ✓)
+- `tsc --noEmit`: clean (0 hata)
+
+## Forensic-Mode Uyum
+- **Hiçbir source/doc mutasyonu YOK** (Anchor Constraint #1 + #8 — bug-fixer agent forensic-only mode)
+- 5 Bug (E, G, Z2, Z3, V): root cause + impact + suggested fix önerisi sunuldu, **uygulanmadı**
+- ADR-046 wire live evidence belgelendi (Sprint 166 finalize commit zinciri)
+- **18 manuel survival incident** kataloglandı (hedef ≥10)
+- ADR-047 "Manuel Survival Pattern" Sprint 168 input skeleton hazır (density 0.70)
+- T7 senteze için 7 finding (T5-F1..F7) severity/suggested_fix/sprint_slot/effort_estimate ile export edildi
