@@ -52,6 +52,17 @@ function workerWindowName(taskId: string): string {
  * Write prompt to a temp file and pass via stdin redirection.
  * This eliminates shell injection risk — no prompt content is ever
  * interpreted by the shell.
+ *
+ * Sprint 168 C0e Cross-Backend Contract: tmpfiles persist until sprint cleanup,
+ * archived together by archivePromptFiles() during sprint cleanup phase.
+ * (Same lifecycle as Docker backend spawn-backend-docker.ts:941-942 — Sprint 156 Task 4.)
+ *
+ * Asymmetry note (ADR-048 Consequences §Negative): tmux prompt filenames embed
+ * a random hex token, NOT the taskId, so the selective filter in
+ * `ClaudeAdapter._cleanupOrphanedPromptFiles()` cannot protect active-worker
+ * tmux prompts the way it protects Docker prompts. Tmux prompt cleanup relies
+ * on the kill-window cleanup flow (which is per-task by tmux semantics) plus
+ * the sprint-end archive sweep — not on per-prompt selective protection.
  */
 function writePromptFile(projectRoot: string, prompt: string): string {
   const tmpDir = join(projectRoot, TASKS_DIR);

@@ -100,6 +100,12 @@ export class TmuxBackend implements SpawnBackend {
   }
 
   spawn(taskId: string, model: ModelType, prompt: string, opts?: SpawnBackendOptions): void {
+    // Sprint 168 C0e Cross-Backend Contract: tmpfiles persist until sprint cleanup,
+    // archived together by archivePromptFiles() during sprint cleanup phase.
+    // (Same as Docker backend spawn-backend-docker.ts:941-942 — Sprint 156 Task 4.)
+    // Tmux backend's prompt files are named with random hex (no embedded taskId),
+    // so the active-worker selective filter in claude.ts._cleanupOrphanedPromptFiles
+    // does NOT protect them — see ADR-048 Consequences (Negative).
     const dir = opts?.projectDir ?? this.projectDir;
     ensureSession();
     tmuxSpawnWorker(taskId, model, prompt, dir, {
@@ -163,6 +169,12 @@ export class SubprocessBackend implements SpawnBackend {
   }
 
   spawn(taskId: string, model: ModelType, prompt: string, opts?: SpawnBackendOptions): void {
+    // Sprint 168 C0e Cross-Backend Contract: tmpfiles persist until sprint cleanup,
+    // archived together by archivePromptFiles() during sprint cleanup phase.
+    // (Same as Docker backend spawn-backend-docker.ts:941-942 — Sprint 156 Task 4.)
+    // Subprocess backend does NOT currently write `.prompt-*.txt` files (prompts
+    // are passed via child_process argv / stdin), so the cross-backend contract
+    // here is a marker that future prompt persistence MUST follow this lifecycle.
     const timeoutOverrideMs = opts?.taskTimeoutSeconds != null
       ? opts.taskTimeoutSeconds * 1000
       : undefined;

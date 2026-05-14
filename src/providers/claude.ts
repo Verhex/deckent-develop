@@ -14,6 +14,7 @@ import {
   cleanupPromptFile,
 } from '../orchestra/tmux.js';
 import { TASKS_DIR } from '../core/constants.js';
+import { getActiveWorkerIds } from '../core/active-workers.js';
 import {
   SubprocessSpawnBackend,
   CLAUDE_SUBPROCESS_CONFIG,
@@ -125,14 +126,35 @@ export class ClaudeAdapter implements ProviderAdapter {
   /**
    * Clean up orphaned `.prompt-*.txt` tmpfiles left behind by spawnWorker.
    * Called automatically after kill() to prevent file accumulation.
+   *
+   * Sprint 168 C0e (BUG-HH eradication): selective filter via
+   * `getActiveWorkerIds()` — prompt files belonging to active workers are
+   * PROTECTED and never deleted. Only orphan prompts (no live `.hb` referencing
+   * their taskId) are removed.
+   *
+   * Filter pattern matches Docker spawn naming
+   * `.prompt-{taskId}-{promptId}[-fix].txt` (spawn-backend-docker.ts:226-230).
+   * Tmux backend uses random-hex filenames (no embedded taskId, see
+   * tmux.ts:60 writePromptFile) — the selective filter will not match those,
+   * so legacy tmux orphan prompts are still cleaned via the fall-through
+   * branch. See ADR-048 Consequences (Negative) for cross-backend asymmetry
+   * documentation.
+   *
+   * @param activeTaskIds Optional explicit list of active task IDs. When
+   *   omitted, falls back to `getActiveWorkerIds(this.projectDir)` which
+   *   reads `.tasks/*.hb` heartbeats.
    */
-  private _cleanupOrphanedPromptFiles(): void {
+  private _cleanupOrphanedPromptFiles(activeTaskIds?: string[]): void {
     const tasksDir = join(this.projectDir, TASKS_DIR);
     if (!existsSync(tasksDir)) return;
+    const active = activeTaskIds ?? getActiveWorkerIds(this.projectDir);
     try {
       const files = readdirSync(tasksDir);
       for (const file of files) {
         if (file.startsWith('.prompt-') && file.endsWith('.txt')) {
+          // Selective filter: protect prompts whose filename embeds an active taskId.
+          // Docker pattern: `.prompt-{taskId}-{promptId}[-fix].txt` → match via `-${id}-`.
+          if (active.some(id => file.includes(`-${id}-`))) continue;
           cleanupPromptFile(join(tasksDir, file));
         }
       }

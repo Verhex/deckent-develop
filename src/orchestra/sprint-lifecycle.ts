@@ -212,6 +212,40 @@ export function safeDashboardUpdate(
   } catch (e) { debugLog('safeDashboardUpdate:updateDashboard', e); }
 }
 
+// ═══ Cross-Sprint Orphan Handling (Sprint 168 C0e) ══════════════════
+
+/**
+ * Sprint startup hook — archives orphan prompt files left behind by a
+ * previous sprint that did not run its cleanup phase (e.g. crash, kill -9,
+ * power loss).
+ *
+ * Sprint 168 C0e (ADR-048 Prompt Lifecycle Contract — clause 5
+ * "Cross-sprint orphan cleanup"): when a new sprint starts, any
+ * `.prompt-*.txt` / `.worker-*.sh` tmpfiles still sitting in `.tasks/` from
+ * the previous sprint MUST be archived (not deleted) so post-mortem forensic
+ * evidence is preserved while not polluting the active sprint's working set.
+ *
+ * This is a thin wrapper around `archivePromptFiles()` (the same operation
+ * cleanup() runs at sprint-end). Idempotent and safe to call when `.tasks/`
+ * is empty or missing.
+ *
+ * @param projectRoot Project root directory (parent of `.tasks/`)
+ * @param previousSprintId Identifier of the sprint whose orphans should be
+ *   archived (used as the archive subdirectory name, e.g. `"sprint-167"`).
+ */
+export function cleanupPreviousSprintOrphans(
+  projectRoot: string,
+  previousSprintId: string,
+): void {
+  const tasksDir = join(projectRoot, TASKS_DIR);
+  if (!existsSync(tasksDir)) return;
+  try {
+    archivePromptFiles(tasksDir, previousSprintId);
+  } catch (e) {
+    debugLog('cleanupPreviousSprintOrphans:archivePromptFiles', e);
+  }
+}
+
 // ═══ Cleanup ══════════════════════════════════════════════════════
 
 /**
