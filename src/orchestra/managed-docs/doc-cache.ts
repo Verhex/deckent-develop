@@ -14,6 +14,12 @@ const CACHE_FILE = join('.deckent', 'cache', 'managed-docs-cache.json');
 export interface DocCacheEntry {
   entryHash: string;
   fileHash: string;
+  /**
+   * Sprint identifier active when this entry was written.
+   * Added in Sprint 166 (Bug S fix) to force cache invalidation across sprints.
+   * Optional for backwards compatibility with pre-Sprint-166 cache files.
+   */
+  sprintId?: string;
   updatedAt: string;
 }
 
@@ -45,6 +51,49 @@ export function getCacheEntry(cache: DocCache, id: string): DocCacheEntry | unde
  */
 export function contentHash(input: string): string {
   return createHash('sha1').update(input).digest('hex');
+}
+
+/**
+ * Compute a composite cache key from entry config hash, file content hash, and
+ * (optional) sprint identifier. Sprint 166 Bug S fix: sprint-aware invalidation
+ * ensures managed-doc-runner regenerates content on every new sprint, since
+ * generators read sprint context that the previous (entryHash, fileHash) pair
+ * could not detect.
+ *
+ * Backwards compatible: when sprintId is undefined the key reduces to the
+ * legacy `entryHash:fileHash` form, preserving behavior for standalone callers
+ * (e.g., `docs run` without a sprint context).
+ */
+export function computeCacheKey(entryHash: string, fileHash: string, sprintId?: string): string {
+  return sprintId ? `${entryHash}:${fileHash}:${sprintId}` : `${entryHash}:${fileHash}`;
+}
+
+/**
+ * Decide whether a cached entry still satisfies the current generation inputs.
+ *
+ * Rules (Sprint 166 Bug S):
+ * - No cached entry → MISS.
+ * - entryHash or fileHash mismatch → MISS (legacy behavior preserved).
+ * - Caller does not provide sprintId → fall back to hash-only check (backwards
+ *   compat for standalone `docs run` invocations).
+ * - Caller provides sprintId but cached entry lacks sprintId → MISS. Legacy
+ *   cache entries (pre-Sprint-166) are intentionally invalidated so the next
+ *   run rewrites them with sprint identity.
+ * - Both sides have sprintId but differ → MISS (new sprint, regenerate).
+ * - All match → HIT (idempotent).
+ */
+export function isCacheHit(
+  cached: DocCacheEntry | undefined,
+  entryHash: string,
+  fileHash: string,
+  sprintId?: string,
+): boolean {
+  if (!cached) return false;
+  if (cached.entryHash !== entryHash) return false;
+  if (cached.fileHash !== fileHash) return false;
+  if (sprintId === undefined) return true;
+  if (cached.sprintId === undefined) return false;
+  return cached.sprintId === sprintId;
 }
 
 export function readDocCache(projectRoot: string): DocCache {
