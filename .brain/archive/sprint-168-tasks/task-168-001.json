@@ -1,0 +1,73 @@
+{
+  "id": "168-001",
+  "title": "T1 Scope Collision Trigger",
+  "description": "T1 Scope Collision Trigger\n- Model: haiku\n- Effort: low\n- Skills: (none)\n- Files: .test/shared.txt\n- Scope: .test/\n\n### Description\n`.test/shared.txt` dosyasına \"T1 done\" yaz.\n\n**Kanıt:** `grep \"T1 done\" .test/shared.txt` → match\n**Test:** N/A (integration test scenario)\n\n---",
+  "model": "haiku",
+  "effort": "low",
+  "priority": "NORMAL",
+  "reason": "Directive (model: haiku -- user override)",
+  "scope": {
+    "directories": [
+      ".test/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      ".test/shared.txt"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** `grep \"T1 done\" .test/shared.txt` → match",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-168",
+  "forceModel": "haiku",
+  "forceEffort": "low",
+  "forceSkills": [
+    "(none)"
+  ],
+  "assignedAgent": "temp-react-ts-specialist",
+  "assignedSkills": [
+    "(none)"
+  ],
+  "createdAt": "2026-05-14T18:03:42.442Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "implementation",
+        "secondary": [],
+        "confidence": 0.7
+      },
+      "tags": [],
+      "domains": [],
+      "operations": [
+        {
+          "type": "test",
+          "weight": 0.5
+        },
+        {
+          "type": "create",
+          "weight": 0.5
+        }
+      ],
+      "complexity": {
+        "fileCount": 1,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "trivial"
+      },
+      "scope": {
+        "writeRatio": {
+          ".test/": 1
+        },
+        "primaryWriteTarget": ".test/",
+        "testWriteRatio": 0
+      }
+    },
+    "confidence": "low",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-05-14T18:16:52.943Z"
+}

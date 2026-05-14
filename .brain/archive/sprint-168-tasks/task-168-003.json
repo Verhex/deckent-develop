@@ -1,0 +1,88 @@
+{
+  "id": "168-003",
+  "title": "T3 Kill Recovery Simulation (DEPENDS T1)",
+  "description": "T3 Kill Recovery Simulation (DEPENDS T1)\n- Model: haiku\n- Effort: low\n- Dependencies: [\"sprint-168-smoke-T1\"]\n- Skills: (none)\n- Files: .test/sleep-result.txt\n- Scope: .test/\n\n### Description\nSleep 30 saniye, sonra `.test/sleep-result.txt` yaz. Mid-execution kill edilecek (Docker container kill).\n\n**Kanıt:**\n- `.tasks/.prompt-T1-*.txt` ve `.tasks/.prompt-T2-*.txt` KILL SONRASI MEVCUT (C0e Option C selective filter test)\n- Auditor 60s içinde orphan spawn lock cleanup yapar (C0b)\n**Test:** N/A (integration test scenario)\n\n---\n\n## GO Criteria (Strict)\n1. 1/2 collision block (events.jsonl `BRAIN→SPAWN:BLOCKED` entry)\n2. T3 kill → orphan spawn lock cleaned (Auditor 60s)\n3. T1, T2 prompt MEVCUT kill sonrası\n4. Brain finalize otomatik (memory.db 3 entry — `sprint-log-168-smoke`, `retro-sprint-168-smoke`, `mem-sprint-168-smoke`)\n5. RETRO.md mtime current\n6. Manuel survival incident = 0",
+  "model": "haiku",
+  "effort": "low",
+  "priority": "NORMAL",
+  "reason": "Directive (model: haiku -- user override)",
+  "scope": {
+    "directories": [
+      ".test/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      ".test/sleep-result.txt"
+    ]
+  },
+  "dependencies": [
+    "[\"sprint-168-smoke-T1\"]"
+  ],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:**",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "NO_GO",
+  "sprintId": "sprint-168",
+  "provider": "claude",
+  "forceModel": "haiku",
+  "forceEffort": "low",
+  "forceSkills": [
+    "(none)"
+  ],
+  "assignedAgent": "devops-engineer",
+  "assignedSkills": [
+    "(none)"
+  ],
+  "createdAt": "2026-05-14T18:03:42.442Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "devops",
+        "secondary": [
+          "documentation",
+          "config"
+        ],
+        "confidence": 0.42
+      },
+      "tags": [],
+      "domains": [],
+      "operations": [
+        {
+          "type": "delete",
+          "weight": 0.25
+        },
+        {
+          "type": "test",
+          "weight": 0.25
+        },
+        {
+          "type": "document",
+          "weight": 0.25
+        },
+        {
+          "type": "create",
+          "weight": 0.25
+        }
+      ],
+      "complexity": {
+        "fileCount": 1,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "trivial"
+      },
+      "scope": {
+        "writeRatio": {
+          ".test/": 1
+        },
+        "primaryWriteTarget": ".test/",
+        "testWriteRatio": 0
+      }
+    },
+    "confidence": "low",
+    "routingVersion": "v2"
+  },
+  "estimatedTokens": 1568,
+  "updatedAt": "2026-05-14T18:16:56.388Z"
+}

@@ -1,0 +1,18 @@
+{
+  "cluster": "C0b",
+  "status": "DONE",
+  "commits": ["d61a5ae"],
+  "tests_added": 17,
+  "tests_skipped_added": 0,
+  "files_changed": [
+    "src/core/file-lock.ts",
+    "src/monitor/auditor.ts",
+    "src/orchestra/spawn-backend-docker.ts",
+    "tests/core/spawn-lock-orphan-cleanup.test.ts",
+    "tests/core/spawn-lock-stale-ttl.test.ts",
+    "tests/monitor/auditor-spawn-lock-binding.test.ts"
+  ],
+  "tsc_clean": true,
+  "vitest_baseline_preserved": true,
+  "notes": "5 helper (checkSpawnLock/checkSpawnLocks/clearStaleSpawnLocks/clearOrphanSpawnLocks/releaseStaleSpawnLocksForTask) added in file-lock.ts. Auditor runScanCycle binding emits [stale_spawn_lock] WARNING via createAlert(AlertLevel.WARNING, ...) — activeTaskIds derived from tasks[] in non-terminal status (DONE/NO_GO excluded). On-exit hook in spawn-backend-docker.ts:933 calls releaseStaleSpawnLocksForTask as defensive safety net after existing releaseAllSpawnLocks. 17 TDD tests (8 orphan/check/release-for-task + 5 stale TTL + 4 auditor binding) PASS. File-lock 39-test regression suite and auditor 204-test suite both still PASS. tsc --noEmit clean. 1 pre-existing unrelated failure in alert-emitter.test.ts (rule frontmatter — main repo baseline, not introduced by C0b). RC4 Bug E (Sprint 167 SPAWN crash root cause, Sprint 156 T-10 11-sprint asymmetric cleanup gap) closed."
+}

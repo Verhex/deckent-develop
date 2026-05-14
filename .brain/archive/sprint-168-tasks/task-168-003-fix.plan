@@ -1,0 +1,23 @@
+# Task 168-003-fix Execution Plan
+
+## Task: T3 Kill Recovery Simulation (Priority Fix)
+- Dependency: T1 (task-168-001) — STATUS: DONE ✓
+- Blocker resolved: Can now execute T3
+
+## Execution Steps
+1. ✓ Verified T1 is DONE
+2. → Create heartbeat file
+3. → Write to `.test/sleep-result.txt` (task requirement)
+4. → Run `tsc --noEmit` verification
+5. → Run `npx vitest run` verification
+6. → Write result file with assessment
+
+## Scope
+- May write: `.test/sleep-result.txt`
+- May read: `.test/`
+- Verified: No out-of-scope access
+
+## Expected Changes
+- Create/update `.test/sleep-result.txt` with task completion indicator
+- All verification checks should pass
+- Self-assessment: DONE

@@ -1,0 +1,81 @@
+{
+  "cluster": "C0a-4",
+  "status": "DONE_WITH_CONCERNS",
+  "worktree": "/home/alperen/deckent-sprint-168-C0a-4",
+  "branch": "sprint-168-C0a-4",
+  "baseline_commit": "aab7071",
+  "cherry_picks": [
+    {
+      "hash": "bb40d25",
+      "source": "b03c26a",
+      "cluster": "C0a-2",
+      "description": "Step 4 ruleRegen DB query + sentinel idempotent",
+      "conflicts": false
+    },
+    {
+      "hash": "d89f227",
+      "source": "217084d",
+      "cluster": "C0a-3",
+      "description": "Step 5 retro dual write (BUG-DD + BUG-EE)",
+      "conflicts": false
+    }
+  ],
+  "commits": ["050c5fc"],
+  "tests_added": 4,
+  "tests_skipped_added": 0,
+  "skip_delta": 0,
+  "files_changed": [
+    "src/orchestra/sprint-docs-updater.ts",
+    "src/orchestra/sprint-finalizer.ts",
+    "docs/adr/046-brain-self-update-hook-architecture.md",
+    "tests/orchestra/archive-directives-default-preserve.test.ts"
+  ],
+  "diff_stat": {
+    "files_changed": 4,
+    "insertions": 260,
+    "deletions": 17
+  },
+  "tsc_clean": true,
+  "vitest_target_test_pass": true,
+  "vitest_target_test_count": 4,
+  "adr_046_amendment_appended": true,
+  "adr_046_amendment_lines": 89,
+  "step_4_step_5_untouched": true,
+  "step_4_step_5_verification": "git diff sprint-finalizer.ts shows ONLY lines 1036-1054 modified (Step 12 block); Steps 4 and 5 byte-for-byte preserved from cherry-picked C0a-2/C0a-3 commits",
+  "implementation": {
+    "default_behavior": "preserve DIRECTIVES.md, archive copy always written",
+    "opt_in_flag": "auto_archive_directives: true (config) or { autoArchive: true } (options)",
+    "config_flag_default": false,
+    "phase_guard": "still enforced (CLEANUP / COMPLETE only)",
+    "interface": "ArchiveDirectivesOptions (exported, autoArchive?: boolean)",
+    "signature": "archiveDirectives(projectRoot, sprintId, phase?, options: ArchiveDirectivesOptions = {})"
+  },
+  "tdd_compliance": {
+    "failing_test_first": true,
+    "failing_test_evidence": "Initial run: 1 failed (default preserve assertion), 3 passed. Pre-fix test output captured.",
+    "passing_post_fix": "All 4 tests pass after implementation"
+  },
+  "concerns": {
+    "obsolete_tests_breakage": [
+      {
+        "file": "tests/orchestra/archive-directives.test.ts",
+        "failing_count": 4,
+        "reason": "Mock-based tests assert legacy default placeholder write (writeFileSync called with 'Sprint NNN' content). Default flipped to preserve, so writeFileSync is no longer called by default.",
+        "remediation": "Wave 4 hygiene patch — same pattern as C0a-1 hygiene (3 obsolete assertions). Update tests to use { autoArchive: true } or assert preserve behavior.",
+        "authority_note": "Out of C0a-4 strict file authority; must be patched in main repo post-merge."
+      },
+      {
+        "file": "tests/orchestra/sprint-finalizer.test.ts:720",
+        "failing_count": 1,
+        "reason": "Assertion expects archiveDirectives called with 3 positional args (expect.anything() for 3rd); implementation now passes 4 (added options object).",
+        "remediation": "Single-line fix in Wave 4 hygiene: add 4th expect.anything() to the assertion.",
+        "authority_note": "Out of C0a-4 strict file authority; trivial Wave 4 hygiene patch."
+      }
+    ]
+  },
+  "vitest_baseline_preserved": "PARTIAL — 5 pre-existing tests now fail as expected behavioral consequence of default flip (documented in concerns). No new skips added. Target test (archive-directives-default-preserve.test.ts) all 4 PASS.",
+  "notes": "Wave 3 SEQUENTIAL FINAL — C0a-4 complete. Default preserve + ADR-046 amendment shipped. BUG-CC closed. 5 obsolete test assertions (mock-based, legacy default behavior) are inevitable consequence of default flip and must be patched in Wave 4 post-cascade hygiene (similar to C0a-1's 3-assertion hygiene patch documented in dispatch brief). All authority constraints strictly observed: sprint-finalizer.ts Step 4/5 byte-identical to cherry-picked commits; ADR-046 amendment is APPEND-ONLY (existing 259 lines intact, +89 lines appended at end).",
+  "wave": "Wave 3 (sequential within sprint-finalizer.ts)",
+  "wave_order": "3 of 3 (after C0a-1 -> C0a-2 -> C0a-3 -> C0a-4)",
+  "next_wave": "Wave 4 — cascade merge to main + smoke test + GO declare + hygiene patches"
+}

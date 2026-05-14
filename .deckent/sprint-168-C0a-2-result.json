@@ -1,0 +1,52 @@
+{
+  "cluster": "C0a-2",
+  "status": "DONE",
+  "commits": ["b03c26a"],
+  "tests_added": 14,
+  "tests_added_breakdown": {
+    "rule-regen-db-query.test.ts": 5,
+    "rule-regen-sentinel-idempotent.test.ts": 6,
+    "adr-046-step-ordering-invariant.test.ts": 3
+  },
+  "tests_skipped_added": 0,
+  "files_changed": [
+    "src/core/rule-generator.ts",
+    "src/orchestra/sprint-finalizer.ts",
+    "tests/core/rule-generator.test.ts",
+    "tests/core/adr-046-step-ordering-invariant.test.ts",
+    "tests/core/rule-regen-db-query.test.ts",
+    "tests/core/rule-regen-sentinel-idempotent.test.ts"
+  ],
+  "tsc_clean": true,
+  "vitest_baseline_preserved": true,
+  "vitest_summary": {
+    "tests_core_pass": 3817,
+    "tests_core_baseline": 3816,
+    "tests_orchestra_pass": 4327,
+    "tests_orchestra_skipped": 11,
+    "new_tests_pass": 14
+  },
+  "four_rules_dir_parity": {
+    "claude": true,
+    "codex": true,
+    "gemini": true,
+    "cursor": true,
+    "note": "cursorAdapter added to ADAPTERS map in rule-generator.ts; PROVIDERS const extended from 3 to 4. regenerateRules(projectRoot) now writes 4 providers x 3 roles = 12 files."
+  },
+  "step_4_invocation_change": {
+    "file": "src/orchestra/sprint-finalizer.ts",
+    "lines_touched": "1180-1219 (Step 4 invocation only)",
+    "step_5_untouched": true,
+    "step_12_untouched": true,
+    "behaviour": "Default onRuleRegen callback provided when caller omits one; caller-supplied opts.onRuleRegen still takes precedence."
+  },
+  "adr_046_invariant": {
+    "test_file": "tests/core/adr-046-step-ordering-invariant.test.ts",
+    "complement_to": "tests/core/identity-generator-step-order.test.ts",
+    "contract_pinned": "store.insert({type:'adr', id:'adr-999'}) -> renderRulesFromStore(store).brainMd contains 'ADR-999'"
+  },
+  "collateral_changes": {
+    "tests/core/rule-generator.test.ts": "Numeric expectations updated (9 -> 12 files, 3 -> 4 files per role, 9 -> 12 errors) due to cursor adapter addition. Three test assertions modified in the existing file; no semantics changed."
+  },
+  "notes": "Wave 3 first sequential complete. C0a-3 (Step 5 retro dual write) dispatches next on sprint-finalizer.ts — Step 4 block contained between '// 14. Post-finalize hook chain' and 'runPostFinalizeHooks' call only; Step 5 (`writeRetrospective` site) and Step 12 (`archiveDirectives`) sections untouched and clean. Worktree branch sprint-168-C0a-2 at b03c26a."
+}

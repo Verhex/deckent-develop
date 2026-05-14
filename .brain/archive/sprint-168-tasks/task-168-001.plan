@@ -1,0 +1,34 @@
+# Execution Plan: Task 168-001 — T1 Scope Collision Trigger
+
+## Objective
+Write "T1 done" to `.test/shared.txt` file to trigger scope collision detection.
+
+## Scope Analysis
+- **Allowed Directory**: `.test/`
+- **Allowed Write File**: `.test/shared.txt`
+- **Expected Behavior**: Simple file write operation (integration test scenario)
+
+## Implementation Steps
+1. Create or update `.test/shared.txt` with content "T1 done"
+2. Verify file write succeeded with `grep` command
+3. Run type checking with `tsc --noEmit`
+4. Run test suite with `npx vitest run`
+5. Write result file with completion status
+
+## Files to Modify
+- `.test/shared.txt` — write "T1 done"
+
+## Expected Changes
+- **Files Changed**: 1 (`.test/shared.txt`)
+- **Lines Added**: 1
+- **Lines Removed**: 0 (new file)
+
+## Proof Verification
+Command: `grep "T1 done" .test/shared.txt`
+Expected: Match found (exit code 0)
+
+## Notes
+- This is an integration test scenario (no real tests for this task)
+- The file may not exist initially — need to create it
+- This task is designed to collide with Task 2 (T2) which writes to the same file
+- Decision engine should detect the collision and block one of the tasks

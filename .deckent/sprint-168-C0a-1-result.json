@@ -1,0 +1,51 @@
+{
+  "cluster": "C0a-1",
+  "status": "DONE",
+  "commits": ["dc197ff"],
+  "branch": "sprint-168-C0a-1",
+  "worktree": "/home/alperen/deckent-sprint-168-C0a-1",
+  "tests_added": 1,
+  "test_files_added": ["tests/core/identity-regen-default-skip.test.ts"],
+  "test_cases_in_new_file": 3,
+  "tests_skipped_added": 0,
+  "files_changed": [
+    "src/core/identity-generator.ts",
+    "tests/core/identity-regen-default-skip.test.ts"
+  ],
+  "diff_stat": {
+    "files": 2,
+    "insertions": 167,
+    "deletions": 6
+  },
+  "tsc_clean": true,
+  "new_test_run": {
+    "command": "npx vitest run tests/core/identity-regen-default-skip.test.ts",
+    "result": "3 passed (3)",
+    "note": "verified by copying file pair into main repo (worktree lacks node_modules); reverted main repo to clean state after verification"
+  },
+  "vitest_baseline_preserved": false,
+  "baseline_delta": {
+    "new_failures": 3,
+    "failing_tests": [
+      "tests/core/identity-generator.test.ts > runPostFinalizeHooks > runs full hook chain successfully",
+      "tests/core/identity-generator.test.ts > runPostFinalizeHooks > skips memory export when skipMemoryExport=true",
+      "tests/core/identity-generator.test.ts > runPostFinalizeHooks > isolates errors — rule regen failure does not affect other results"
+    ],
+    "explanation": "These pre-existing assertions encoded the old buggy default (`expect(result.identityRegen).not.toBeNull()` when no skipIdentityRegen option provided). The Sprint 168 C0a-1 default flip inverts that behavior: identityRegen is now null on the common path. File authority for Cluster C0a-1 explicitly forbade editing tests/core/identity-generator.test.ts (`YAZMA YETKİSİ` restricted to identity-generator.ts + the new test file). Updating these assertions should be a follow-up under the same cluster owner OR a separate hygiene task.",
+    "skip_delta": 0,
+    "vitest_full_run_blocked": "Full suite was not run from this dispatch (env caveat per brief: better_sqlite3 instability + worktree node_modules absence). Numbers above are derived from running tests/core/identity-generator.test.ts in isolation against the patched source."
+  },
+  "tdd_evidence": {
+    "red_phase": "Test 1 (`skipIdentityRegen default true — Step 2 not invoked when option omitted`) FAILED before fix with `expected { success: true, ... } to be null`",
+    "green_phase": "All 3 new tests PASS after fix; tsc --noEmit clean"
+  },
+  "notes": "BUG-GG closed. Runtime conditional flipped `!opts.skipIdentityRegen` → `opts.skipIdentityRegen === false`. JSDoc on PostFinalizeHookOptions.skipIdentityRegen, PostFinalizeHookResult.identityRegen, and regenerateProjectIdentity updated to document the new default-skip semantics. Sprint 166 T5's @deprecated annotation now has matching runtime enforcement.",
+  "anchor_constraints_compliance": {
+    "worktree_isolation": true,
+    "minimal_scope": true,
+    "tdd_enforced": true,
+    "skip_forbidden_respected": true,
+    "tsc_zero_errors": true,
+    "result_json_written": true
+  }
+}

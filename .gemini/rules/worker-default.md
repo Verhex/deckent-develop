@@ -1,7 +1,4 @@
 <!-- AUTO-START -->
----
-paths: ["src/**","tests/**"]
----
 # Worker Rules
 - Read your task file first (`.tasks/task-XXX.json`)
 - ADRs are injected into your prompt automatically from `.brain/memory.db` — they are mandatory constraints
@@ -38,6 +35,8 @@ paths: ["src/**","tests/**"]
 
 ## Active ADR Constraints
 
+- **ADR-048**: Prompt Lifecycle Contract — Sprint 168 C0e BUG-HH eradication. .tasks/.prompt-*.txt selective cleanup via getActiveWorkerIds() shared helper. Cross-
+- **ADR-047**: Manuel Subagent Dispatch Protocol — Sprint 164-168 manuel survival pattern formal kontrat. Hardened dispatch: git worktree isolation + file authority matrix
 - **ADR-046**: Brain Self-Update Hook Architecture — **Status:** accepted
 - **ADR-045**: Wave-Based Execution Semantics — respawnEligibleTasks Runtime Wire — **Status:** accepted
 - **ADR-043**: Brain Crash Recovery Protocol — **Status:** accepted

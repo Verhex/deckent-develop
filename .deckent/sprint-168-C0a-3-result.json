@@ -1,0 +1,25 @@
+{
+  "cluster": "C0a-3",
+  "status": "DONE",
+  "commits": ["217084d"],
+  "cherry_picked_commits": ["b03c26a"],
+  "tests_added": 3,
+  "tests_skipped_added": 0,
+  "files_changed": [
+    "src/orchestra/sprint-retro-writer.ts",
+    "src/orchestra/sprint-finalizer.ts",
+    "tests/orchestra/retro-dual-write.test.ts"
+  ],
+  "tsc_clean": true,
+  "vitest_baseline_preserved": true,
+  "vitest_run_scope": {
+    "scope": "tests/orchestra/ + tests/core/adr-046-step-ordering-invariant + rule-regen-{db-query,sentinel-idempotent}",
+    "test_files_passed": 192,
+    "tests_passed": 4344,
+    "tests_skipped": 11,
+    "tests_failed": 0
+  },
+  "step4_step12_untouched": true,
+  "step4_step12_verification": "sprint-finalizer.ts diff only adds 7-line comment block to Step 5 invocation (L605-612). Step 4 ruleRegen invocation block (L1186+) and Step 12 archiveDirectives block (L1033+, L1046+, L1075+, L1082+) untouched per git diff.",
+  "notes": "Dual write atomic. BUG-DD root cause: writer ID prefix `sprint-${sprintNum}` non-canonical → switched to `sprint-log-${sprintNum}` per Sprint 143 plan L593 + Sprint 168 plan L1384 (matches triple-link L660 reference and audit query expectation). BUG-EE: RETRO.md writeFileSync already present at writer L472 → new test pins current-mtime invariant for future regression detection. C0a-4 sequential next (Step 12 archiveDirectives + ADR-046 amendment) — will cherry-pick b03c26a + 217084d."
+}

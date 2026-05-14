@@ -1,0 +1,91 @@
+{
+  "sprint": "sprint-168",
+  "mode": "manual-subagent-dispatch",
+  "wave_structure": {
+    "wave_1": ["C0e", "ADR-047"],
+    "wave_1_5_checkpoint": "Alperen manual",
+    "wave_2": ["C0b", "C0c", "C0a-1", "C0d"],
+    "wave_3_sequential": ["C0a-2", "C0a-3", "C0a-4"]
+  },
+  "dispatches": {
+    "C0e": {
+      "status": "DONE",
+      "wave": 1,
+      "commit": "d4d66c3",
+      "branch": "sprint-168-C0e",
+      "worktree": "/home/alperen/deckent-sprint-168-C0e",
+      "result_json": ".deckent/sprint-168-C0e-result.json",
+      "completed_at": "2026-05-14T16:13:00Z",
+      "memory_db_inserted": true,
+      "adr_id": "adr-048",
+      "checkpoint_approved_by": "Alperen",
+      "checkpoint_approved_at": "2026-05-14T16:25:00Z"
+    },
+    "ADR-047": {
+      "status": "DONE",
+      "wave": 1,
+      "commit": "e8c2d08",
+      "branch": "sprint-168-ADR-047",
+      "worktree": "/home/alperen/deckent-sprint-168-ADR-047",
+      "result_json": ".deckent/sprint-168-ADR-047-result.json",
+      "memory_db_inserted": true,
+      "adr_id": "adr-047"
+    },
+    "C0b": {
+      "status": "READY_FOR_DISPATCH",
+      "wave": 2,
+      "branch": "sprint-168-C0b",
+      "worktree": "/home/alperen/deckent-sprint-168-C0b",
+      "prompt_file": ".deckent/sprint-168-subagent-prompts/C0b.md",
+      "depends_on": ["C0e_checkpoint_approved"],
+      "blocker_satisfied": true
+    },
+    "C0c": {
+      "status": "READY_FOR_DISPATCH",
+      "wave": 2,
+      "branch": "sprint-168-C0c",
+      "worktree": "/home/alperen/deckent-sprint-168-C0c",
+      "prompt_file": ".deckent/sprint-168-subagent-prompts/C0c.md",
+      "depends_on": ["C0e_checkpoint_approved"],
+      "blocker_satisfied": true
+    },
+    "C0a-1": {
+      "status": "READY_FOR_DISPATCH",
+      "wave": 2,
+      "branch": "sprint-168-C0a-1",
+      "worktree": "/home/alperen/deckent-sprint-168-C0a-1",
+      "prompt_file": ".deckent/sprint-168-subagent-prompts/C0a-1.md",
+      "depends_on": ["C0e_checkpoint_approved"],
+      "blocker_satisfied": true
+    },
+    "C0d": {
+      "status": "READY_FOR_DISPATCH",
+      "wave": 2,
+      "branch": "sprint-168-C0d",
+      "worktree": "/home/alperen/deckent-sprint-168-C0d",
+      "prompt_file": ".deckent/sprint-168-subagent-prompts/C0d.md",
+      "depends_on": ["C0e_checkpoint_approved"],
+      "blocker_satisfied": true
+    },
+    "C0a-2": {
+      "status": "BLOCKED_WAITING_C0a-1",
+      "wave": 3,
+      "branch": "sprint-168-C0a-2",
+      "depends_on": ["C0a-1"]
+    },
+    "C0a-3": {
+      "status": "BLOCKED_WAITING_C0a-2",
+      "wave": 3,
+      "branch": "sprint-168-C0a-3",
+      "depends_on": ["C0a-2"]
+    },
+    "C0a-4": {
+      "status": "BLOCKED_WAITING_C0a-3",
+      "wave": 3,
+      "branch": "sprint-168-C0a-4",
+      "depends_on": ["C0a-3"]
+    }
+  },
+  "last_updated": "2026-05-14T16:30:00Z",
+  "last_updated_by": "sprint-168-C0e-subagent"
+}

@@ -1,0 +1,29 @@
+# Task 168-003: T3 Kill Recovery Simulation
+
+## Overview
+This task is designed as an integration test scenario to verify kill recovery and prompt file persistence across sprint lifecycle events.
+
+## Dependencies Check
+- **Task depends on**: `sprint-168-smoke-T1` (T1 Scope Collision Trigger)
+- **Current status of T1**: PENDING (not yet complete)
+- **Blocking condition**: Cannot proceed until dependency completes
+
+## Planned Approach
+If T1 had completed, the execution plan would be:
+1. Create .test/sleep-result.txt if it doesn't exist
+2. Sleep for 30 seconds
+3. Write completion marker to .test/sleep-result.txt
+4. Task will be killed mid-execution (Docker container kill simulation)
+5. Verify prompt files (.tasks/.prompt-T1-*.txt, .tasks/.prompt-T2-*.txt) persist after kill
+
+## Actual Status
+**BLOCKED by dependency**: T1 must complete before T3 can execute.
+
+## Scope Compliance
+- Allowed directories: .test/
+- Files to write: .test/sleep-result.txt
+- Status: Not yet executing due to blocked dependency
+
+## Expected Duration
+- If unblocked: ~30 seconds (sleep duration) + write operation
+- Currently: Waiting for T1 completion

@@ -1,0 +1,49 @@
+{
+  "id": "168-003-fix",
+  "title": "Fix: T3 Kill Recovery Simulation (DEPENDS T1)",
+  "description": "Priority fix for NO_GO task 168-003.\nOriginal worker notes: Task blocked by unmet dependency. Task 168-003 (T3 Kill Recovery Simulation) depends on task sprint-168-smoke-T1 (T1 Scope Collision Trigger) which has status PENDING. Per worker rules: 'If blocked by another task → write NO_GO result explaining the dependency'. Cannot proceed with T3 execution until T1 completes. Dependency chain: [T1 → T3]. Expected to become unblocked once T1 reaches DONE status. No code execution or file modifications attempted.\nRubric: correctness=0, test_coverage=0, scope_compliance=100\nExpected scope: .test/\nFiles that should change: .test/sleep-result.txt",
+  "model": "haiku",
+  "forceModel": "haiku",
+  "effort": "low",
+  "priority": "CRITICAL",
+  "reason": "Task 168-003 evaluated as NO_GO; correctness=0; test_coverage=0; scope_compliance=100; tests failed; no files changed; zero lines added — worker may have crashed",
+  "scope": {
+    "directories": [
+      ".test/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      ".test/sleep-result.txt"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:**",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "NO_GO",
+  "sprintId": "sprint-168",
+  "isPriorityFix": true,
+  "fixForTaskId": "168-003",
+  "assignedAgent": "code-reviewer",
+  "forceAgent": "code-reviewer",
+  "assignedSkills": [
+    "(none)"
+  ],
+  "forceSkills": [
+    "(none)"
+  ],
+  "createdAt": "2026-05-14T18:16:56.389Z",
+  "rotationStrategy": {
+    "enabled": true,
+    "originalModel": "haiku",
+    "rotatedModel": "haiku",
+    "originalAgent": "devops-engineer",
+    "rotatedAgent": "code-reviewer",
+    "addedSkills": [],
+    "rationale": "Fresh-eyes rotation: haiku→haiku, devops-engineer→code-reviewer"
+  },
+  "estimatedTokens": 1094,
+  "updatedAt": "2026-05-14T18:18:46.613Z"
+}

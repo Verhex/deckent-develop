@@ -1,0 +1,61 @@
+{
+  "cluster": "W2.5",
+  "status": "DONE",
+  "commits": [
+    "8ce4dff",
+    "e90f7cc",
+    "f2ca504"
+  ],
+  "cherry_picks": [
+    {
+      "hash": "8ce4dff",
+      "source_hash": "df0b958",
+      "cluster": "C0c",
+      "note": "Plan↔Spawn integration helpers (consultCollisionDecision, readTaskJsonFresh, CHANNELS.SPAWN_BLOCKED, handleScopeCollision)"
+    },
+    {
+      "hash": "e90f7cc",
+      "source_hash": "438035f",
+      "cluster": "C0d",
+      "note": "computeSprintMetrics helper (Math.max(0,...) + null-coverage guards)"
+    }
+  ],
+  "wire_commit": "f2ca504",
+  "tests_added": 8,
+  "tests_skipped_added": 0,
+  "files_changed": [
+    "src/orchestra/sprint-spawner.ts",
+    "src/orchestra/sprint-metrics.ts",
+    "src/orchestra/managed-docs/content-generators.ts",
+    "tests/orchestra/spawn-spawner-wire.test.ts",
+    "tests/orchestra/managed-docs/content-generators-metrics-wire.test.ts"
+  ],
+  "tsc_clean": true,
+  "vitest_baseline_preserved": true,
+  "vitest_local_run": {
+    "scope_new_tests": "tests/orchestra/spawn-spawner-wire.test.ts + tests/orchestra/managed-docs/content-generators-metrics-wire.test.ts",
+    "new_tests_result": "8/8 PASS",
+    "scope_full_orchestra": "tests/orchestra/",
+    "files": 194,
+    "pass": 4326,
+    "skip": 11,
+    "fail": 28,
+    "fail_root_cause": "All 28 failures are pre-existing better_sqlite3 binding errors (Could not locate the bindings file ... node-v137-linux-x64). Identical failure set exists at baseline aab7071 — not caused by W2.5 wire. Brief explicitly warns: 'Environment caveat: Full vitest may fail (better_sqlite3 binding). Run only your new tests.'"
+  },
+  "tdd_compliance": {
+    "patch_2_test_first": true,
+    "patch_3_test_first": true,
+    "skip_count_delta": 0,
+    "all_new_tests_pass": "8/8"
+  },
+  "patch_1_status": "DEFERRED_TO_WAVE4 — C0a-1 hygiene timing dependency (W2.5 worktree forked from main at aab7071 — C0a-1 commit dc197ff NOT in cherry-pick chain because brief explicitly directed Patch 1 skip; identity-generator.test.ts 3 obsolete assertions will be flipped in ana repo after Wave 4 cascade merges C0a-1)",
+  "patch_2_status": "DONE — sprint-spawner.ts wire applied. spawnWorkers() now (a) consults handleScopeCollision per collision and emits BRAIN→SPAWN:BLOCKED with offending taskIds+files+reason+detectedAt, (b) maintains blockedTaskIds set that short-circuits per-task loop (continue) so blocked tasks never emit TASK_ASSIGN nor invoke backend.spawn, (c) reads task.json fresh from disk via readFileSync(join(projectRoot,TASKS_DIR,...)) before TASK_ASSIGN payload assembly, with fail-safe fallback to in-memory task on missing/corrupt file.",
+  "patch_3_status": "DONE — content-generators.ts:142 + sprint-metrics.ts:118 wire applied. (a) sprint-metrics calculateMetrics uses inline Math.max(0, endTime-startTime) — equivalent to computeSprintMetrics({...}).durationMs (inline to avoid sprint-reporter ↔ sprint-metrics import cycle). (b) content-generators sprint-metrics renderer calls computeSprintMetrics() for duration guard + Number.isFinite check for coverage display sentinel ('N/A' when NaN or Infinity).",
+  "import_cycle_decision": {
+    "patch_2": "sprint-controller.ts imports from sprint-spawner.ts (re-export barrel), so sprint-spawner.ts could not import consultCollisionDecision/readTaskJsonFresh back from sprint-controller.ts (cycle). Wire imports handleScopeCollision from decision-engine.ts (already cycle-free) and inlines the BRAIN→SPAWN:BLOCKED event emit + the fresh-read via existing readFileSync+TASKS_DIR. Functionally equivalent contract; consultCollisionDecision/readTaskJsonFresh exports remain available for non-cyclic callers (recovery paths).",
+    "patch_3_metrics": "sprint-reporter.ts imports buildResultsMap etc. from sprint-metrics.ts (barrel), so sprint-metrics.ts could not import computeSprintMetrics back from sprint-reporter.ts (cycle). Inline Math.max(0,...) guard in calculateMetrics is functionally equivalent (one-line mirror of computeSprintMetrics's durationMs guard).",
+    "patch_3_content_generators": "content-generators.ts has no cycle with sprint-reporter.ts — imports computeSprintMetrics directly. Used for durationMs guard; Number.isFinite check inline for coverage sentinel (since the helper's coverageRatio takes line counts but the renderer only has the pre-aggregated coveragePercent number, which we guard at the display layer)."
+  },
+  "concerns": [],
+  "notes": "8 TDD tests written FIRST per brief. Both wire sites verified via standalone integration tests + 59-test sprint-spawner.test.ts regression check (all PASS). tsc --noEmit clean. The 28 better_sqlite3 binding failures in tests/orchestra/ pre-date W2.5 and are explicitly documented as env caveat in the brief. Wire commit f2ca504 stacks atomically on cherry-picked C0c (8ce4dff) and C0d (e90f7cc). Wave 4 cascade merge will land in order: aab7071 → C0c → C0d → W2.5-wire (f2ca504). Patch 1 (identity-generator.test.ts) hygiene defers to ana repo post-Wave-4 per brief Section 'Patch 1 — C0a-1 hygiene' decision."
+}

@@ -1,0 +1,47 @@
+{
+  "id": "168-003-fix-fix",
+  "title": "Fix: Fix: T3 Kill Recovery Simulation (DEPENDS T1)",
+  "description": "Priority fix for NO_GO task 168-003-fix.\nOriginal worker notes: Priority fix successfully completed. T1 dependency verified DONE before execution. Created .test/sleep-result.txt with completion marker. Build passed (tsc), all 16452 vitest tests passed across 779 test files. No scope violations. Task unblocked and executed as designed.\nRubric: correctness=100, test_coverage=100, scope_compliance=100\nExpected scope: .test/\nFiles that should change: .test/sleep-result.txt",
+  "model": "haiku",
+  "forceModel": "haiku",
+  "effort": "low",
+  "priority": "CRITICAL",
+  "reason": "Task 168-003-fix evaluated as NO_GO; correctness=100; test_coverage=100; scope_compliance=100",
+  "scope": {
+    "directories": [
+      ".test/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      ".test/sleep-result.txt"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:**",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "PENDING",
+  "sprintId": "sprint-168",
+  "isPriorityFix": true,
+  "fixForTaskId": "168-003-fix",
+  "assignedAgent": "bug-fixer",
+  "forceAgent": "bug-fixer",
+  "assignedSkills": [
+    "(none)"
+  ],
+  "forceSkills": [
+    "(none)"
+  ],
+  "createdAt": "2026-05-14T18:18:46.613Z",
+  "rotationStrategy": {
+    "enabled": true,
+    "originalModel": "haiku",
+    "rotatedModel": "haiku",
+    "originalAgent": "code-reviewer",
+    "rotatedAgent": "bug-fixer",
+    "addedSkills": [],
+    "rationale": "Fresh-eyes rotation: haiku→haiku, code-reviewer→bug-fixer"
+  }
+}

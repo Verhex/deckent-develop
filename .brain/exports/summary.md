@@ -50,11 +50,15 @@
 | adr-044 | Sprint State Observability Contract | accepted |
 | adr-045 | Wave-Based Execution Semantics — respawnEligibleTasks Runtime Wire | accepted |
 | adr-046 | Brain Self-Update Hook Architecture | accepted |
+| adr-047 | Manuel Subagent Dispatch Protocol | accepted |
+| adr-048 | Prompt Lifecycle Contract | accepted |
 | adr-053 | TaskType Taxonomy — Audit / Document-Write / Code-Development + Extensibility Roadmap | proposed |
 | adr-055 | Hybrid Scoring 5-Layer Pipeline — Schema / Gates / Quality / Outcome / Auditor | proposed |
 | adr-060 | Self-Awareness Propagation — 5-Channel Context Enrichment Architecture | proposed |
 
 ## Recent Learnings
+- **Sprint sprint-168 Learnings** (sprint-168): ## Sprint sprint-168 Learnings
+- T3 Kill Recovery Simulation (DEPENDS T1): NO_GO — Task blocked by unmet dependency. ...
 - **Sprint sprint-166 Learnings** (sprint-166): # Sprint sprint-166 Learnings
 
 ## 4 Architectural Root Cause Fix
@@ -83,12 +87,11 @@
 | Total Tasks | 15 |
 | Completed | 2 |
 | Tech Debt | 2...
-- **Sprint 158 Learnings** (sprint-158): Sprint 158 learnings — no .brain/sprints/sprint-158.md log was available at backfill time. Stub inserted by Sprint 16...
 
 ## Active Technical Debt
 _No active technical debt._
 
 ## Active Patterns
-_No active patterns._
+- Violation pattern: stale_heartbeat
 
-_Total entries: 215 | Generated: 2026-05-14_
+_Total entries: 221 | Generated: 2026-05-14_
