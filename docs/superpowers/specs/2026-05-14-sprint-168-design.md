@@ -2,11 +2,19 @@
 
 **Tarih:** 2026-05-14
 **Sprint:** 168
-**Versiyon:** v4 (Agent A 79/100 + Agent B 22/100 integration — 17 madde fix)
+**Versiyon:** v5 (Agent A+B 2nd round patch — 6 madde minor, çift hedef başarılı)
 **Tip:** Architectural fix sprint with hardened subagent dispatch protocol
 **Vizyon:** Sprint 167 audit'in tespit ettiği 5 architectural cluster için root-cause fix + Brain otonom orchestration
 
-> **v1→v4 değişim notu:** v1 brainstorming output → v2 (Agent A systematic-debugging eval: 79/100, Phase 4.5 trigger) + v3 (Agent B devil's advocate: **22/100 — hedef <30 KARŞILANDI**) → v4 17-madde integration. v5 Alperen final approval bekliyor.
+> **v1→v5 zinciri:**
+> - v1 (commit fc91fcd): brainstorming output
+> - v2 1st round Agent A systematic-debugging: 79/100, Phase 4.5 trigger, 5 critical/high
+> - v3 1st round Agent B devil's advocate: 22/100, hedef <30 KARŞILANDI ✅
+> - v4 (commit 72b4880): 17 madde integration
+> - v5 2nd round Agent A: **96/100 APPROVED ✅** (hedef ≥95)
+> - v5 2nd round Agent B: **26/100 SHIP_AS_IS ✅** (hedef <30 korundu)
+> - v5 patch (bu): 6 madde minor (4 Agent A cosmetic + 2 Agent B clarification)
+> - v6 Alperen final approval bekliyor
 
 ---
 
@@ -22,6 +30,14 @@ Sprint 168 = **Pure Brain Repair**. Sprint 167 audit Phase 1+2 ile Brain orchest
 - **Brain decision-engine integration:** EKSIK (Auditor SCOPE_COLLISION_DETECTED subscribe yok) — Sprint 138 T4 wire incomplete, 1 bug evidence
 
 Yani Brain'in TÜM mekanizması kırık değil — **spawn pipeline + finalize hook chain bağlamında 4 modül grubu kırık**. Sprint 168 bu 4 grup için root-cause fix yapar.
+
+**10 bug attribution explicit (Agent A 2nd round #2 patch):**
+- Cluster A (Hook Chain — 4 bug): BUG-CC + BUG-DD + BUG-EE + BUG-GG
+- Cluster B (Locking — 1 bug): RC4 Bug E
+- Cluster C (Plan↔Spawn — 3 bug): RC1 + RC2 + RC3
+- Cluster D (Metrics — 1 bug): BUG-FF
+- Cluster E (Worker Lifecycle — 1 bug): BUG-HH
+- **Toplam:** 4+1+3+1+1 = **10 bug** ✓
 
 Sprint 168 scope 8 task'a genişletildi (Agent A #2 — C0a bundle split):
 - **C0a Hook Chain Complete** 4 ayrı sub-anchor'a bölündü (C0a-1/C0a-2/C0a-3/C0a-4)
@@ -239,7 +255,7 @@ Sprint 166 T11 paterni — C0e subagent ADR-048 yazımı sonrası Alperen manuel
 
 | Kriter | Falsifiable Predicate (v4) |
 |---|---|
-| Anchor task DONE | **8/8** (0 NO_GO, GO_WTD ≤1) |
+| Anchor task DONE | **8/8** (0 NO_GO, GO_WTD ≤1 — en muhtemel C0d cosmetic metrics fix degrade adayı, v5 patch netleştir) |
 | TDD compliance | Her cluster: failing test → fix → pass + integration test |
 | Skip count delta (v4 Agent B V7 fix) | **0 yeni skip** (baseline 41, Sprint 168 sonrası ≤41) |
 | ADR-047 + ADR-048 | İkisi yazılı + memory.db `type='adr'` row count=2 artış |
@@ -273,6 +289,10 @@ Sprint 166 T11 paterni — C0e subagent ADR-048 yazımı sonrası Alperen manuel
    - Signature: `_cleanupOrphanedPromptFiles(activeTaskIds: string[]): void`
    - Filter: `if (activeTaskIds.some(id => file.includes(id))) continue;`
    - Constructor-time çağrısı (claude.ts:122) için `getActiveWorkerIds()` invocation
+   - **`getActiveWorkerIds()` helper extract (v5 patch — Agent A 2nd round MINOR-1):**
+     - `auditor.ts:2162-2168` inline `Set<string>` pattern'i `src/core/active-workers.ts` shared helper'a extract
+     - Export: `export function getActiveWorkerIds(projectRoot: string): string[]`
+     - claude.ts constructor + cleanup function bu helper'ı invoke eder
 2. **Cross-sprint orphan handling (Agent A #1 critical fix):**
    - Startup'ta `archivePromptFiles(prevSprintId)` çağrısı — prior sprint cleanup
    - Sprint 168 spawn öncesi: `archivePromptFiles(getPreviousSprintId())` invoke
@@ -471,8 +491,8 @@ Sprint 166 T11 paterni — C0e subagent ADR-048 yazımı sonrası Alperen manuel
 SUBAGENT-CLUSTER-FIX (Sprint 168 C0X)
 - Git worktree: ../deckent-sprint-168-CXX (isolated)
 - File authority: <scope.filesWrite from matrix>
-- TDD ZORUNLU: failing test → fix → pass + skip count 0 yeni
-- Skip artış YASAK (baseline 41)
+- TDD ZORUNLU: failing test → fix → pass
+- **Yeni test'lerde skip kullanma** (v5 patch — Agent A 2nd round MINOR-3 reword). Mevcut 41 skip baseline aynı kalır, Sprint 168 yeni test'leri skip eklemeyecek.
 - Test PASS olmadan commit YASAK
 - ADR-047 dispatch protocol uyumlu
 - Output: .deckent/sprint-168-CXX-result.json (status + skip delta + commit hash)
@@ -540,6 +560,36 @@ wait $START_PID
 - RETRO.md mtime current
 - Manuel survival incident = 0
 
+**Sprint 168.5 pre-flight smoke test (v5 patch — Agent B 2nd round Saldırı #2):**
+
+Sprint 168 smoke test sadece C0a/b/c/e pattern'lerini doğrular. Sprint 168.5 task'ları (C1 memory migration, H1 ADR FS export, H3 secret scan) farklı pattern. Sprint 168.5 başlatma öncesi **ek pre-flight smoke** çalıştırılır:
+
+```bash
+# Sprint 168.5 başlatma öncesi (Sprint 168 GO'dan sonra):
+# Ek smoke: multi-file scope + DB write + repo scan pattern coverage
+
+cat > .test/sprint-168.5-preflight-directives.md <<EOF
+# DIRECTIVES — Sprint 168.5 Pre-Flight Smoke Test
+
+## Task 1: T1 Multi-File Module Edit (C1-like pattern)
+- Model: haiku
+- Scope: .test/multi/
+- Description: 3 dosya yazımı + DB upsert minimal pattern
+
+## Task 2: T2 File System Generate (H1-like pattern)
+- Model: haiku
+- Scope: .test/fs-gen/
+- Description: 5 .md file generate from template
+
+## Task 3: T3 Repo Scan (H3-like pattern)
+- Model: haiku
+- Scope: .test/scan/
+- Description: grep -r pattern repo-wide + raporlama
+EOF
+```
+
+Eğer pre-flight smoke FAIL → Sprint 168.5 başlatılmaz, Sprint 168 Phase 1 yeni döngü (cluster F discovery).
+
 ### 5.4 Cross-Cluster Dependency Resolution (Agent A P4.5 fix)
 
 (Section 2 cross-cluster dependency graph + Section 3.2.1 sequential merge order)
@@ -594,6 +644,15 @@ Already documented Section 3.5.
 - Sprint 168 GO_WTD → Brain yarı otonom (Alperen monitoring)
 - **Sprint 168 NO_GO → Manuel subagent dispatch (Sprint 168 paterni replay, ADR-047 protokol)**
 
+**Sprint 168.5 wave split opsiyonu (v5 patch — Agent B 2nd round Saldırı #3):**
+
+Sprint 168 NO_GO durumda Sprint 168.5 task sayısı 9-10 olabilir (7 mevcut + 1-2 gap closure). Sprint 166 max 11 task'ta chaos paterni. Wave split:
+- **Sprint 168.5a:** Sprint 168 fail cluster gap closure + C1 Memory Relations + C2 Bug Z3 (3-4 task)
+- **Sprint 168.5b:** H1 ADR FS Export + H2 Stub Backfill + H3 Secret Scan + H4 Dashboard + H5 dep_pipeline (5 task)
+- Sprint 169 OSS GA Sprint 168.5b sonrası (kayma ihtimali Sprint 170+'a, kullanıcı god-level vision review)
+
+**Alperen kararı:** Wave split tetikleyici threshold — Sprint 168.5 task count ≥10 ise auto-split (`split_directive` config flag).
+
 ### Sprint 169 = Open Source GA conditional
 
 - VerhexIO/deckent-dev → VerhexIO/deckent public flip
@@ -617,7 +676,12 @@ Already documented Section 3.5.
 - [ ] Brain otonom smoke test DIRECTIVES `.test/` hazır (Section 5.3)
 - [ ] Alperen `auto_archive_directives` default decision verildi (Section C0a-4 — Option A/B)
 - [ ] Sprint 168 NO_GO fallback (Section 3.2.4) Alperen ile gözden geçirildi
+- [ ] `src/core/active-workers.ts` shared helper extract planı (v5 patch C0e MINOR-1) C0e subagent prompt'a inject edildi
+- [ ] Sprint 168.5 pre-flight smoke test DIRECTIVES (`.test/sprint-168.5-preflight-directives.md`) hazırlandı (v5 patch — Agent B Saldırı #2)
+- [ ] Sprint 168.5 wave split threshold (`split_directive` config flag) Alperen ile kararlaştırıldı (v5 patch — Agent B Saldırı #3)
+
+**Pre-Flight Checklist toplam: 16 madde** (v5 patch — Agent A 2nd round MINOR-4 netleştirme: önceki "14 madde" iddiası yanıltıcıydı, gerçek 13'tü, v5 patch sonrası 16).
 
 ---
 
-**Versiyon notu:** Bu v4 spec Agent A 79/100 + Agent B 22/100 eval'larından gelen **17 madde fix** integration'ıdır. v5 Alperen final approval bekliyor — onay sonrası writing-plans skill Sprint 168 TDD plan yazımına geçilir.
+**Versiyon notu:** Bu v5 spec, v4 17-madde integration üzerine 2nd round Agent A 96/100 + Agent B 26/100 eval'larının 6 madde minor patch'ini içerir (4 Agent A cosmetic + 2 Agent B clarification). Çift hedef başarılı (Agent A ≥95 + Agent B <30). v6 Alperen final approval bekliyor — onay sonrası writing-plans skill Sprint 168 TDD plan yazımına geçilir.
