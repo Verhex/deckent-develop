@@ -18,6 +18,7 @@ coverage/
 .brain/memory.db
 .brain/memory.db-wal
 .brain/memory.db-shm
+.brain/memory.db.bak-*
 .brain/sprints/
 .brain/archive/
 !.brain/archive/

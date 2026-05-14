@@ -46,25 +46,44 @@
 | adr-040 | Nervous System Architecture — Proactive Meta-Orchestrator | accepted |
 | adr-041 | Agent Taxonomy — Horizontal Skills vs Vertical Agents | accepted |
 | adr-042 | Hybrid Mode Architecture — Sprint + Task Dual Modes | proposed |
+| adr-043 | Brain Crash Recovery Protocol | accepted |
+| adr-044 | Sprint State Observability Contract | accepted |
+| adr-045 | Wave-Based Execution Semantics — respawnEligibleTasks Runtime Wire | accepted |
+| adr-046 | Brain Self-Update Hook Architecture | accepted |
+| adr-053 | TaskType Taxonomy — Audit / Document-Write / Code-Development + Extensibility Roadmap | proposed |
+| adr-055 | Hybrid Scoring 5-Layer Pipeline — Schema / Gates / Quality / Outcome / Auditor | proposed |
+| adr-060 | Self-Awareness Propagation — 5-Channel Context Enrichment Architecture | proposed |
 
 ## Recent Learnings
+- **Sprint sprint-166 Learnings** (sprint-166): # Sprint sprint-166 Learnings
+
+## 4 Architectural Root Cause Fix
+1. **Bug M (adrInsert hook):** docs/adr/*.md → memor...
 - **Sprint sprint-165 Learnings** (sprint-165): ## Sprint sprint-165 Learnings
+- **Sprint 165 Learnings** (sprint-165): # sprint-165
+
+## Metrics
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 0 |
+| Completed | 0 |
+| Tech Debt | 0 ...
 - **Sprint sprint-164 Learnings** (sprint-164): ## Sprint sprint-164 Learnings
 - Vitest Gate +1 Fail Closure — Chronic Regression Eradication: NO_GO — Vitest gate +1...
 - **Sprint sprint-163 Learnings** (sprint-163): ## Sprint sprint-163 Learnings
 - **Sprint sprint-162 Learnings** (sprint-162): ## Sprint sprint-162 Learnings
 - Sprint Phase Observability + EvaluationAuditTrail Runtime Wire (T-003, composite): G...
-- **Sprint sprint-156 Learnings** (sprint-156): ## Sprint sprint-156 Learnings
-- Workflow Rename VERIFY (read-only audit): NO_GO — Audit-only task completed. All 3 p...
-- **Sprint sprint-155 Learnings** (sprint-155): ## Sprint sprint-155 Learnings
-- **Sprint sprint-154 Learnings** (sprint-154): ## Sprint sprint-154 Learnings
-- RubricRegistry Core Foundation: NO_GO — RubricRegistry foundation created at src/orc...
-- **Sprint sprint-153 Learnings** (sprint-153): ## Sprint sprint-153 Learnings
-- Brain 8-Phase Sprint Lifecycle: NO_GO — Brain 8-Phase Sprint Lifecycle dokümantasyon...
-- **Sprint sprint-151 Learnings** (sprint-151): ## Sprint sprint-151 Learnings
-- Public Repo Flip — VerhexIO/deckent-dev → VerhexIO/deckent: GO_WITH_TECH_DEBT — DURU...
-- **Sprint sprint-150 Learnings** (sprint-150): ## Sprint sprint-150 Learnings
-- Docker Worker Exit Pattern Final Fix (Sprint 146+148 Debt): GO_WITH_TECH_DEBT — Dock...
+- **Sprint 161 Learnings** (sprint-161): Sprint 161 learnings — no .brain/sprints/sprint-161.md log was available at backfill time. Stub inserted by Sprint 16...
+- **Sprint 160 Learnings** (sprint-160): Sprint 160 learnings — no .brain/sprints/sprint-160.md log was available at backfill time. Stub inserted by Sprint 16...
+- **Sprint 159 Learnings** (sprint-159): # sprint-159
+
+## Metrics
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 15 |
+| Completed | 2 |
+| Tech Debt | 2...
+- **Sprint 158 Learnings** (sprint-158): Sprint 158 learnings — no .brain/sprints/sprint-158.md log was available at backfill time. Stub inserted by Sprint 16...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -72,4 +91,4 @@ _No active technical debt._
 ## Active Patterns
 _No active patterns._
 
-_Total entries: 195 | Generated: 2026-05-13_
+_Total entries: 215 | Generated: 2026-05-14_

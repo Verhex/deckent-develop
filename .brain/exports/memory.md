@@ -1,7 +1,60 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-166 Learnings
+- Sprint sprint-166 Learnings: # Sprint sprint-166 Learnings
+
+## 4 Architectural Root Cause Fix
+1. **Bug M (adrInsert hook):** docs/adr/*.md → memory.db migration eksikti. Step 3 unconditional invocation pattern + syncAdrFilesToDb upsert ile çözüldü. ADR-046 Section 5.1 Step Ordering Contract kontract.
+2. **Bug N (onRuleRegen wire):** Manuel finalize path .claude/rules/*.md regenerate etmiyordu (13 sprint stale). finalize.ts:166 callback wire + rule-generator.ts CUSTOM_TEMPLATE empty placeholder.
+3. **Bug S (sprint-aware cache key):** doc-cache.ts cache key fileHash+entryHash idi, sprint.id eklendi. Runner wire-up Sprint 167'e ertelendi (GO_WITH_TECH_DEBT).
+4. **Bug Y2 (ground-truth defense):** Doc-sync agent'lar stale numeric claim üretiyordu (15 vs 16 agents Sprint 164 regression). 3-layer defense (plan-time + helper + runtime) + .deckent/ground-truth-overrides.json whitelist.
+
+## Key Decision: ADR-046 Brain Self-Update Hook Architecture
+- Post-finalize hook chain architectural contract dokümante
+- Step ordering: Step 1 memoryExport → Step 2 identityRegen (deprecated) → Step 3 adrInsert → Step 4 ruleRegen → Step 5 updateProjectDocs
+- 3 mimari prensip: unconditional invocation, cache key completeness, single registration target
+- Falsifiable M1-M4 monitoring criteria for Sprint 167-168
+- Sprint 170 refactor trigger criteria documented
+
+## Manuel Survival Pattern (Sprint 164→165→166 zincir kanıt)
+- Brain SPAWN/finalize otomatik chain çalışmıyor, manuel müdahale ile her sprint başarılı
+- npx deckent spawn <task-id> --auto-approve (CLI proven)
+- npx deckent run "<description>" (sprint-dışı proven)
+- Wave 1.5 strict gate manuel CHECKPOINT (npx deckent memory rebuild + decision JSON)
+
+## 4 New Bug Live Replay (Sprint 167 P0)
+- **Bug E:** Spawn-lock leak — DECKENT.md, .md, brain.md bare token lock conflict, 3× replay aynı sprint
+- **Bug G:** OOM exit 137 — Container 4GB → 8GB workaround proven (spawn-backend-docker.ts:374)
+- **Bug Z2:** Planner Files parser — DIRECTIVES.md Files: listesinden bare token üretiyor (.md, brain.md, git commit hash)
+- **Bug Z3:** memory rebuild semantic — destructive (delete-or-error, exports yetersiz). Sprint 167'de fix: rebuild = export, import = new command
+
+## Bug V Backfill Manuel Test
+- T6 commit "production backfill ran 100 debt rows" — DB'de hâlâ NULL bulundu (Sprint 166 sonu inspection)
+- Worker farklı db kullandığı veya code-path canlı tetiklenmediği için
+- Sprint 166 manuel backfill script (bu script) ile bu açık kapatıldı (UPDATE entries SET sprint_id=metadata.originSprintId)
+
 ## Sprint sprint-165 Learnings
 - Sprint sprint-165 Learnings: ## Sprint sprint-165 Learnings
+- Sprint 165 Learnings: # sprint-165
+
+## Metrics
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 0 |
+| Completed | 0 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 12909690ms |
+| Files Changed | - |
+
+## Agents
+Agents: -
+Skills: -
+
+## Tasks
+| Task | Agent | Skills | Status |
+|------|-------|--------|--------|
 
 ## Sprint sprint-164 Learnings
 - Sprint sprint-164 Learnings: ## Sprint sprint-164 Learnings
@@ -14,6 +67,55 @@
 - Sprint sprint-162 Learnings: ## Sprint sprint-162 Learnings
 - Sprint Phase Observability + EvaluationAuditTrail Runtime Wire (T-003, composite): GO_WITH_TECH_DEBT — T-003 composite (phase observability + EvaluationAuditTrail runtime wire) complete. persistPhaseTransition helper export
 - Crash Injection Integration Test + E2E Smoke (T-007): NO_GO — T-007 — 9/9 tests PASS (6 crash injection + 3 e2e smoke). Crash file: 6 it() blocks S1-S6 (grep -nE 'S[1-6]:' → 18 match
+
+## Sprint sprint-161 Learnings
+- Sprint 161 Learnings: Sprint 161 learnings — no .brain/sprints/sprint-161.md log was available at backfill time. Stub inserted by Sprint 166 Task 6 (Bug U+V).
+
+## Sprint sprint-160 Learnings
+- Sprint 160 Learnings: Sprint 160 learnings — no .brain/sprints/sprint-160.md log was available at backfill time. Stub inserted by Sprint 166 Task 6 (Bug U+V).
+
+## Sprint sprint-159 Learnings
+- Sprint 159 Learnings: # sprint-159
+
+## Metrics
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 15 |
+| Completed | 2 |
+| Tech Debt | 2 |
+| No-Go | 13 |
+| Coverage | NaN% |
+| Duration | -106ms |
+| Files Changed | - |
+
+## Agents
+Agents: temp-react-ts-specialist, doc-writer
+Skills: typescript-expert, system-architect, security-specialist, documentation-writer, ci-testing
+
+## Tasks
+| Task | Agent | Skills | Status |
+|------|-------|--------|--------|
+| 159-001: EvaluationAuditTrail Foundation | temp-react-ts-specialist | typescript-expert, system-architect | GO_WITH_TECH_DEBT |
+| 159-002: Dual-Evaluator Race Close (Bug X) | temp-react-ts-specialist | typescript-expert, system-architect | GO_WITH_TECH_DEBT |
+| 159-003: Sprint-Stall Fix-Fix Spawn Loop | temp-react-ts-specialist | typescript-expert, system-architect | NO_GO |
+| 159-004: handleEvaluation → updateTaskStatus Wire | temp-react-ts-specialist | typescript-expert | NO_GO |
+| 159-005: Heartbeat Write Atomicity | temp-react-ts-specialist | typescript-expert | NO_GO |
+| 159-006: sprint-state.json Phase Transition Update | temp-react-ts-specialist | typescript-expert | NO_GO |
+| 159-007: scoreTestCoverage null Neutral Score | temp-react-ts-specialist | typescript-expert | NO_GO |
+| 159-008: AUDIT_RUBRIC Dinamik Threshold | temp-react-ts-specialist | typescript-expert, system-architect | NO_GO |
+| 159-009: Retro Naming Off-By-One Fix | temp-react-ts-specialist | typescript-expert | NO_GO |
+| 159-010: sprint-phases.ts cleanup 'spawn-fail' Argument | temp-react-ts-specialist | typescript-expert | NO_GO |
+| 159-011: DeckentConfig dependency_pipeline_enabled Field | temp-react-ts-specialist | typescript-expert | NO_GO |
+| 159-012: Per-Change Security Review | doc-writer | security-specialist, documentation-writer | NO_GO |
+| 159-013: 2 Yeni ADR Draft | doc-writer | system-architect, documentation-writer | NO_GO |
+| 159-014: EvaluationAuditTrail E2E Smoke Test | temp-react-ts-specialist | typescript-expert, ci-testing | NO_GO |
+| 159-015: Sprint 157 Retro + Bug Close Forensic | doc-writer | documentation-writer | NO_GO |
+
+## Sprint sprint-158 Learnings
+- Sprint 158 Learnings: Sprint 158 learnings — no .brain/sprints/sprint-158.md log was available at backfill time. Stub inserted by Sprint 166 Task 6 (Bug U+V).
+
+## Sprint sprint-157 Learnings
+- Sprint 157 Learnings: Sprint 157 learnings — no .brain/sprints/sprint-157.md log was available at backfill time. Stub inserted by Sprint 166 Task 6 (Bug U+V).
 
 ## Sprint sprint-156 Learnings
 - Sprint sprint-156 Learnings: ## Sprint sprint-156 Learnings
@@ -50,6 +152,9 @@ WHAT WAS DONE:
 - Sprint Kill ve Cleanup Disiplini: NO_GO — T-SMOKE-08.md oluşturuldu. 679 kelime (≥200 koşulu sağlandı). Sprint kill kullanıcı onayı zorunluluğu, Nervous System lo
 - ADR-008 Unidirectional Imports: NO_GO — ADR-008 Unidirectional Imports dokümantasyonu oluşturuldu. 773 kelime (≥200 eşiği aşıldı). Kapsam: Brain→orchestra→core 
 - Beta GA 20-Gate Listesi: NO_GO — Beta GA 20-Gate dökümanı oluşturuldu. Her kapı için açıklama, ölçüm kriteri ve Sprint 152 sonu durumu (PASS/IN_PROGRESS)
+
+## Sprint sprint-152 Learnings
+- Sprint 152 Learnings: Sprint 152 learnings — no .brain/sprints/sprint-152.md log was available at backfill time. Stub inserted by Sprint 166 Task 6 (Bug U+V).
 
 ## Sprint sprint-151 Learnings
 - Sprint sprint-151 Learnings: ## Sprint sprint-151 Learnings
@@ -157,6 +262,9 @@ WHAT WAS DONE:
 - META — Test Coverage Map + Performance + Error Handling + TODO inventory: GO_WITH_TECH_DEBT — Completed all 4 cross-cutting analyses. Report at .deckent/sprint-140-analysis/meta/coverage-perf-errors-todo.md (563 li
 - META — Memory V2 Integrity Verification: GO_WITH_TECH_DEBT — Memory V2 Integrity Verification completed. 482-line report covering all 7 dimensions: (1) DB Schema: 5/5 tables + FTS5 
 
+## Sprint sprint-140 Learnings
+- Sprint 140 Learnings: Sprint 140 learnings — no .brain/sprints/sprint-140.md log was available at backfill time. Stub inserted by Sprint 166 Task 6 (Bug U+V).
+
 ## Sprint sprint-139 Learnings
 - Sprint 139 Learnings: ## Sprint sprint-139 Learnings
 
@@ -189,6 +297,9 @@ WHAT WAS DONE:
 1. Added `import { getRecentSprintStats, GO_WITH_GATE_FAILURE 
 - Dashboard vs MCP State Divergence Fix: NO_GO — Created src/monitor/sprint-state.ts with getCurrentSprintId() that reads .deckent/sprint-state.json (source 1: sprint-ac
 - Brain Memory Budget Enforcement + Config Sync: GO_WITH_TECH_DEBT — Brain Memory Budget Enforcement + Config Sync tamamlandı. (1) DECAY_EXEMPT constant: DECISIONS.md ve PROJECT-IDENTITY.md
+
+## Sprint sprint-134 Learnings
+- Sprint 134 Learnings: Sprint 134 learnings — no .brain/sprints/sprint-134.md log was available at backfill time. Stub inserted by Sprint 166 Task 6 (Bug U+V).
 
 ## Sprint sprint-133 Learnings
 - Sprint 133 Learnings: - HTTP API Bearer Token Auth: GO_WITH_TECH_DEBT — HTTP API Bearer Token Authentication implemented. Changes:

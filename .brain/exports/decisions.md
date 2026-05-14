@@ -1920,3 +1920,1386 @@ env DECKENT_STYLE=task (highest)
 - ADR-041: Agent Taxonomy — skill vs agent distinction (task mode reuses same pool)
 - Sprint 149 DIRECTIVES Block A — mode architecture implementation
 - Sprint 148 competitive analysis: OpenClaw life assistant mode comparison
+
+---
+
+## adr-043: Brain Crash Recovery Protocol
+
+**Status:** accepted
+
+# ADR-043: Brain Crash Recovery Protocol
+
+**Status:** accepted
+
+**Deciders:** Alperen Sartaçoğlu (product owner), Brain (orchestrator)
+
+**Date:** 2026-05-13
+
+**Sprint:** Sprint 163 (backfill — implementation sprints: 160, 161, 162)
+
+---
+
+## Status
+
+accepted (Sprint 163 — Sprint 160 T-001 + Sprint 161 T-002 + Sprint 162 T-004 birleşik implementasyonunun geriye dönük belgelenmesi)
+
+---
+
+## Context
+
+Sprint 159–161 forensic analizinde Brain crash recovery'nin üç kritik eksikliği tespit edildi:
+
+**1. Negatif `durationMs` bug (`durationMs: -106`)**
+Sprint state dosyası (`sprint-state.json`) crash öncesi `startTime` doğru yazılmıştı; ancak crash sonrası Brain yeniden başladığında `durationMs` hesaplaması yanlış referans zamanı kullanıyordu. Sonuç: negatif süre değerleri dashboard'da görünür hale geldi, sprint metrikleri güvenilmez oldu.
+
+**2. Stale EXECUTING task'lar `handleEvaluation`'a girmedi**
+Brain crash anında bazı task'lar `EXECUTING` statüsünde kalmış olabiliyordu. Yeniden başlamada bu task'ların `.result` dosyaları disk'te varken Brain bunları `handleEvaluation` pipeline'ına sokmuyordu. Görünürde tamamlanmış iş kayboluyordu; sprint döngüsü yanlış `NO_GO` veya eksik evaluate ile kapanıyordu.
+
+**3. Sensitive data exception log'unda leak riski**
+Unhandled exception yakalanmadığı durumlarda `process.on('uncaughtException')` handler yoktu. Stack trace'ler içinde `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` gibi environment variable değerleri doğrudan log'a yazılabiliyordu. Bu durum ADR-034 (Multi-Project Isolation) güvenlik sınırlarını ihlal edebilirdi.
+
+Bu üç sorun birbirinden bağımsız commit'lerde düzeltildi (Sprint 160 T-001, Sprint 161 T-002, Sprint 162 T-004) ancak bir recovery protokolü olarak ADR'ye alınmamıştı. ADR-043 bu protokolü resmî hale getirir.
+
+---
+
+## Decision
+
+Brain için **3-katman crash recovery protokolü** zorunlu kılınır:
+
+### Katman 1 — Entry-Point Exception Handler (Sprint 160 T-001)
+
+**Commit:** `9c184a3`
+
+Process boot'ta `installCrashHandlers()` çağrısı yapılır. Bu fonksiyon:
+
+- `process.on('uncaughtException', handler)` kaydeder
+- `process.on('unhandledRejection', handler)` kaydeder
+- Her handler `redactSensitive(error.message + stack)` çağrısıyla API key/token pattern'lerini log'a yazmadan önce `***REDACTED***` ile değiştirir
+
+`redactSensitive()` regex coverage:
+- `sk-ant-...` (Anthropic API key pattern)
+- `Bearer <token>`
+- `OPENAI_API_KEY=<value>`
+- `GOOGLE_API_KEY=<value>`
+- Genel `apiKey: "..."` JSON pattern
+
+**Zorunluluk:** `sprint-controller.ts` veya entry-point binary'de `installCrashHandlers()` process boot'un ilk satırlarında çağrılmalıdır. Handler kurulmadan sprint başlatılamaz.
+
+### Katman 2 — Atomic Checkpoint Write (Sprint 161 T-002)
+
+**Commit:** `8cefed0`
+
+Sprint execution boyunca periyodik checkpoint yazımı yapılır (`CHECKPOINT_INTERVAL` konfigürasyonu, varsayılan 5 dakika). Checkpoint atomicity kuralı:
+
+1. `computeEventStreamOffset()` ile o ana kadar yazılan event sayısı hesaplanır
+2. `completedTasks` listesi checkpoint'e eklenir (boş array YASAK — en az 1 completed task varsa populate edilmeli)
+3. `checkpointNumber` her yazımda artırılır
+4. Dosya **doğrudan hedef path'e yazılmaz** — önce `.tmp` suffix'li geçici dosyaya yazılır, ardından `renameSync()` ile atomik rename yapılır
+
+Bu pattern, yarı yazılmış checkpoint'in okunan geçersiz state'e yol açmasını önler. `renameSync()` POSIX sistemlerde atomik garantilidir.
+
+**Checkpoint schema zorunlu alanları:**
+```json
+{
+  "checkpointNumber": "<integer >= 1>",
+  "eventStreamOffset": "<integer > 0>",
+  "completedTasks": ["<taskId>", "..."],
+  "sprintId": "<sprint-NNN>",
+  "timestamp": "<ISO 8601>"
+}
+```
+
+### Katman 3 — State Recovery on Restart (Sprint 162 T-004)
+
+`restoreSprintFromCheckpoint()` fonksiyonu Brain restart'ında checkpoint'i okur ve 3 action'dan birini seçer:
+
+| Koşul | Action | Açıklama |
+|---|---|---|
+| Checkpoint yok | `fresh` | Yeni sprint başlat, geçmiş state yok |
+| Tüm task'lar DONE veya NO_GO | `complete` | Sprint zaten tamamlanmış, cleanup'a geç |
+| Stale EXECUTING task'lar var + `.result` mevcutsa | `resume-evaluate` | `.result` dosyasını `handleEvaluation`'a sok |
+
+**`resume-evaluate` ayırt etme kuralı:**
+Stale EXECUTING task için `.tasks/task-NNN.result` dosyası disk'te mevcutsa → worker iş bitirmiş, Brain crash etmişti → result `handleEvaluation`'a girer.
+`.result` yoksa → worker da crash etmiş veya henüz tamamlamamış → task EXECUTING kalır, timeout beklenir.
+
+**`durationMs` fix:**
+`restoreSprintFromCheckpoint()` içinde sprint `startTime` checkpoint'ten restore edilir. `durationMs` hesabı `Date.now() - restoredStartTime.getTime()` olarak yapılır. Bu negatif durationMs bug'ını ortadan kaldırır.
+
+---
+
+## Consequences
+
+### Olumlu
+
+- **Brain restart sonrası state korunur.** `resume-evaluate` action ile tamamlanmış worker sonuçları kaybolmaz.
+- **Negatif `durationMs` giderildi.** Sprint metrikleri crash sonrasında da anlamlı değerler gösterir.
+- **Sensitive data exception log'una sızmaz.** `redactSensitive()` API key/token değerlerini process crash loglarından temizler.
+- **External observer crash öncesi state'i restore edebilir.** Atomic checkpoint, makul bir tutarlılık noktası sağlar.
+- **Checkpoint integrity.** `.tmp` + `renameSync()` pattern sayesinde yarı yazılmış checkpoint asla okunmaz.
+
+### Olumsuz
+
+- **Checkpoint overhead.** Her `CHECKPOINT_INTERVAL` (varsayılan 5 dk) I/O yapılır. Yoğun sprint'lerde disk I/O artar; ancak `renameSync()` maliyeti genellikle ihmal edilebilir.
+- **`resume-evaluate` sadece `.result` varlığına bakar.** Worker `.result` yazmış ama dosya bozuksa (JSON parse hatası) evaluate fail olabilir. Bu durum için `handleEvaluation` içinde JSON parse guard eklenmesi önerilir (sonraki sprint).
+- **`installCrashHandlers()` zorunluluğu entegrasyon testi gerektirir.** Handler'ın gerçekten kurulduğunu doğrulamak için boot-sequence test eklenmeli.
+
+---
+
+## Alternatives Considered
+
+### (a) No-recovery (fresh restart)
+
+Brain crash sonrası her zaman temiz başlatma yapılır, partial state yok sayılır.
+
+**Reddedildi:** Partial work kaybı kabul edilemez. Özellikle uzun sprint'lerde (60+ dakika) tamamlanmış worker sonuçları sıfırlanır. Sprint duration ve task count metrikleri hatalı olur.
+
+### (b) Full memory checkpoint
+
+Her task completion'da tüm sprint state (task tree, event stream, memory context) tam olarak serialize edilir.
+
+**Reddedildi:** Performance overhead çok yüksek. Event stream büyük sprint'lerde MB-seviyesine çıkabilir; her task sonrası tam serialize → write maliyetli. Mevcut periyodik checkpoint (5 dk interval, sadece completed list + offset) yeterli recovery granülaritesi sağlıyor.
+
+### (c) Crash-only exception handler (no checkpoint)
+
+Sadece `uncaughtException` handler ekle, checkpoint yazma yok.
+
+**Reddedildi:** Sensitive data leak'i önler ama state recovery sağlamaz. Sprint 160 T-001 tek başına yetersiz; Katman 2 ve 3 olmadan stale task sorunu devam eder.
+
+---
+
+## References
+
+- **Sprint 160 T-001** — `installCrashHandlers()` + `redactSensitive()` implementation, commit `9c184a3`
+- **Sprint 161 T-002** — Atomic checkpoint write (`.tmp` + `renameSync`), commit `8cefed0`
+- **Sprint 162 T-004** — `restoreSprintFromCheckpoint()` 3-action state recovery discrimination
+- **ADR-034** — Multi-Project Isolation (sensitive data boundary)
+- **ADR-035** — Brain ↔ Worker ↔ Auditor Verification Protocol (state integrity)
+- **ADR-036** — ADR Governance Integration (mandatory read for all agents)
+
+---
+
+## Memory DB Insert
+
+Sprint 163 sonunda aşağıdaki pattern ile `memory.db`'ye eklendi:
+
+```typescript
+store.insert({
+  type: 'adr',
+  id: 'adr-043',
+  title: 'Brain Crash Recovery Protocol',
+  status: 'accepted',
+  sprint_id: 'sprint-163',
+  tags: ['recovery', 'crash', 'brain', 'observability'],
+  body: '3-katman crash recovery: exception handler + atomic checkpoint + state recovery on restart',
+});
+```
+
+---
+
+## Notes
+
+Bu ADR, Sprint 160–162 boyunca üç ayrı commit'te gerçekleştirilen implementasyonun geriye dönük belgelenmesidir. ADR-043 olmadan Sprint 163 governance borcu kapanmış sayılmıyordu. ADR-036 (ADR Governance Integration) gereği tüm kabul edilen mimari kararlar kayıt altına alınmak zorundadır.
+
+
+---
+
+## adr-044: Sprint State Observability Contract
+
+**Status:** accepted
+
+# ADR-044: Sprint State Observability Contract
+
+**Status:** accepted
+
+**Deciders:** Alperen Sartaçoğlu (product owner), Brain (orchestrator)
+
+**Date:** 2026-05-13
+
+**Sprint:** Sprint 163 (governance record — implementation: Sprint 162 T-003)
+
+---
+
+## Status
+
+accepted (Sprint 163 — Sprint 162 T-003 tarafından implement edilmiş contract'ın geriye dönük ADR kaydı)
+
+---
+
+## Context
+
+Sprint 159–161 forensic analizi, `sprint-state.json` dosyasının sprint'in gerçek
+lifecycle ilerlemesini yansıtmadığını ortaya koydu:
+
+- Dosya `phase: "SPAWN", status: "PLANNING"` durumunda donuk kalıyor, EXECUTE →
+  EVALUATE → RETRO → CLEANUP geçişleri diske yansımıyordu.
+- External observer'lar (CLI `deckent status`, recovery modülü, dashboard) sprint'in
+  gerçek fazını göremiyor, `sprint-state.json`'ı okuyarak yanlış kararlar alıyordu.
+- Crash sonrası restart'ta hangi fazdan devam edileceği belirsizdi; `restoreSprintFromCheckpoint`
+  stale EXECUTING task'ları tanıyamıyordu.
+- Per-task değerlendirme kararları (`DONE / NO_GO / GO_WITH_TECH_DEBT`) yalnızca
+  in-memory'de yaşıyor, post-sprint forensic için yeniden inşa edilemiyordu.
+
+Bu körlük Sprint 159–161 boyunca "Brain'in ne yaptığı belirsiz" şikayetinin teknik
+köküdür. Sprint 162 T-003, `sprint-phases.ts:persistPhaseTransition` wire'ını ve
+`evaluation-audit-trail.ts:writeEvaluationAudit` çağrısını ekleyerek bu boşluğu kapattı.
+
+---
+
+## Decision
+
+### 1. Phase Transition Persistence (Zorunlu)
+
+Her `sprint.phase` mutation'ından sonra `persistPhaseTransition(projectRoot, sprint, phase, status)`
+çağrısı **ZORUNLUDUR**. Aşağıdaki call-site'lar tanımlanmıştır:
+
+| Faz Fonksiyonu    | Phase Argümanı | Status Argümanı   |
+|-------------------|----------------|-------------------|
+| `runPlanPhase`    | `PLAN`         | `PLANNING`        |
+| `runSpawnPhase`   | `SPAWN`        | `RUNNING` → sonra `ACTIVE` |
+| `runEvaluatePhase`| `EVALUATE`     | `EVALUATING`      |
+| `runFixPhase`     | `FIX`          | `FIXING`          |
+
+**Uygulama kuralları:**
+
+- Atomic write pattern zorunlu: geçici `.tmp` dosyasına yaz, `renameSync` ile hedef
+  yola taşı. Partial write ortamı bozmamalı.
+- Fail-soft `try/catch` wrap zorunlu: `persistPhaseTransition` fırlatmamalı, hata
+  `debugLog` ile yutulmalıdır. Brain lifecycle'ı state-file yazma hatasıyla ölmemelidir.
+- Fonksiyon imzası:
+
+```typescript
+export function persistPhaseTransition(
+  projectRoot: string,
+  sprint: Sprint,
+  phase: SprintPhase,
+  status: SprintStatus,
+): void
+```
+
+### 2. Per-Task Evaluation Audit (Zorunlu)
+
+Her task evaluation sonrası `writeEvaluationAudit(projectRoot, sprintId, taskId, attemptNum, input)`
+çağrısı **ZORUNLUDUR**. Audit kaydı şu schema'yı izler:
+
+```typescript
+interface EvaluationAuditRecord {
+  taskId: string;
+  sprintId: string;
+  attemptNum: number;
+  decision: 'DONE' | 'GO_WITH_TECH_DEBT' | 'NO_GO';
+  ruleSet: AuditRuleSet;           // hangi rubrik çalıştı
+  criterionScores: Record<string, number | null>;
+  schemaValidation: SchemaValidationResult;
+  rationale: string;               // human-readable karar gerekçesi
+  timestamp: string;               // ISO 8601 UTC
+}
+```
+
+Dosya yolu: `.tasks/audit/<sprintId>/<taskId>-attempt-<N>.json`
+
+FIX-phase retry'ları `attemptNum` ile ayırt edilir; orijinal EVAL kaydının üzerine yazılmaz.
+
+### 3. Memory DB Insert Pattern
+
+ADR kabul edildiğinde aşağıdaki pattern ile memory.db'ye insert yapılır:
+
+```typescript
+store.insert({
+  type: 'adr',
+  id: 'adr-044',
+  title: 'Sprint State Observability Contract',
+  status: 'accepted',
+  sprint_id: 'sprint-163',
+  tags: ['observability', 'sprint-state', 'audit-trail', 'phase-transition'],
+});
+```
+
+---
+
+## Consequences
+
+### Olumlu
+
+- **Dashboard real-time tracking.** `deckent status` artık gerçek sprint fazını
+  gösterir; PLAN → SPAWN → EVALUATE → RETRO geçişleri disk'te görünür olur.
+- **Crash recovery determinizmi.** `restoreSprintFromCheckpoint` her fazda tutarlı
+  state görür; negatif `durationMs` (-106ms bug) ortadan kalkar.
+- **Post-sprint forensic.** `audit/<sprintId>/` dizinindeki audit kayıtları ile
+  her task'ın değerlendirme kararı, kullanılan rubrik ve skor dağılımı yeniden
+  inşa edilebilir; Brain'in neden DONE/NO_GO dediği açıklanabilir.
+- **Spurious NO_GO tespiti.** Audit trail `rationale` field'ı `reconcileSpuriousNoGo`
+  çağrısı yapıldığında override gerekçesini kaydeder; ADR-044 bu field'ı zorunlu kılar.
+
+### Olumsuz
+
+- **Ek disk I/O.** Her faz geçişinde ve her task evaluation'da dosya yazılır. Atomic
+  rename pattern bu riski düşürür; ancak yüksek task sayılı sprintlerde (50+) I/O
+  baskısı ölçülmelidir.
+- **Fail-soft gizler sorunları.** `persistPhaseTransition` hataları `debugLog`'a
+  düşer, kullanıcıya alert olarak yansımaz. State file yazma başarısız olursa
+  gözlemlenebilirlik zinciri sessizce kırılır. Uzun vadede metrics/alert entegrasyonu
+  gerekir.
+
+---
+
+## Alternatives Considered
+
+### (a) Event-Stream-Only Observability
+
+Sprint events stream (`events.jsonl`) tüm faz geçişlerini kayıt altına alabilir;
+ayrıca snapshot dosyası gerekmez.
+
+**Neden reddedildi:** Event stream'den anlık faz durumunu okumak tüm satırları
+yeniden işlemeyi gerektirir. `sprint-state.json` snapshot'ı O(1) okuma sağlar.
+Recovery modülü ve CLI status komutu snapshot'a ihtiyaç duyar.
+
+### (b) Synchronous DB Write
+
+Her faz geçişinde doğrudan `memory.db`'ye INSERT yapmak yerine sadece dosya
+yazmak yerine DB çağrısı yapmak.
+
+**Neden reddedildi:** `better-sqlite3` senkron API kilit çakışması riski taşır;
+Brain main loop'u bloke edebilir. Dosya-tabanlı atomic rename pattern daha düşük
+latency ve kilit riski sunar. DB export ayrıca `deckent memory export` ile manuel
+veya sprint sonu otomatik tetiklenebilir.
+
+---
+
+## References
+
+- Sprint 162 T-003 — `sprint-phases.ts:persistPhaseTransition` wire implementation
+- `evaluation-audit-trail.ts` — Sprint 157 T-001 survivor (`6c337b0`), per-task audit write path
+- Sprint 162 result forensic — `sprint-state.json` phase transition disk visibility kanıtı
+- ADR-043 — Brain Crash Recovery Protocol (bağlı: recovery modülü bu observability contract'ına dayanır)
+- ADR-035 — Brain ↔ Worker ↔ Auditor Verification Protocol (audit trail bu protokolü destekler)
+- Sprint 159–161 stalled forensic — `.tasks/archive/sprint-160-stalled/`, `.tasks/archive/sprint-161-stalled/`
+
+---
+
+## Notes
+
+Bu ADR, Sprint 162 T-003 tarafından implement edilen `persistPhaseTransition` wire'ının
+ve `evaluation-audit-trail.ts` entegrasyonunun geriye dönük governance kaydıdır.
+ADR-053'te olduğu gibi: uygulama önce yazıldı, ADR tasarım kararlarını geç ama eksiksiz
+kayıt altına almaktadır. Sprint 163 ile kabul edilmiştir.
+
+
+---
+
+## adr-045: Wave-Based Execution Semantics — respawnEligibleTasks Runtime Wire
+
+**Status:** accepted
+
+# ADR-045: Wave-Based Execution Semantics — respawnEligibleTasks Runtime Wire
+
+**Status:** accepted
+
+**Deciders:** Alperen Sartaçoğlu (product owner), Brain (orchestrator)
+
+**Date:** 2026-05-13
+
+**Sprint:** Sprint 164 (implementation contract — Task 4 wire implementation bu ADR'a uyumlu yazılır)
+
+---
+
+## Status
+
+accepted (Sprint 164 — implementation'dan ÖNCE yazılan contract ADR; ADR-036 Sprint 138 ADR Governance disiplinine uygun)
+
+---
+
+## Context
+
+Sprint 134 T-007'de `respawnEligibleTasks` fonksiyonu `sprint-spawner` modülünde tanımlandı
+(Kahn's algorithm topological sort + `enforceWaveDependency` çağrısı + slot kontrolü).
+Ancak fonksiyon runtime'da **hiçbir yerden çağrılmıyordu** — call-site eksikti.
+
+Bu eksiklik 5 sprint boyunca görünmez kaldı:
+
+- **Sprint 156-002:** Default `dependency_pipeline_enabled: false → true` flip yapıldı
+  (`GO_WITH_TECH_DEBT` kararı). Wire eksikliği bu flipte tespit edilmedi.
+- **Sprint 161 stalled forensic:** Wave 1 (3 task) spawn oldu; Wave 2 (T4 bağımlı T2'ye) ve
+  Wave 3 (T5 bağımlı T1+T2+T4'e) hayalet kaldı. Sprint hang — `waitForResults` sonsuza
+  kadar bekledi çünkü eligible task'lar hiç spawn edilmedi.
+- **Sprint 164 forensic analizi:** 6 ayrı kanıtla (KESİN güven) bug doğrulandı:
+  1. `respawnEligibleTasks` definition Sprint 134'ten beri var, call-site yok
+  2. `spawnWorkers` Wave 2+ task'larını `activeTasks` ve `queuedTasks` listelerinden çıkarıyor
+  3. `waitForResults` dep-blind FIFO loop — yalnızca ilk `queuedTasks`'tan shift ediyor
+  4. `task.status` EXECUTING'de kalıp DONE'a inline mutate edilmiyor; `respawnEligibleTasks`
+     `t.status === TaskStatus.DONE` filter'ı çalıştırınca eligible task bulamıyor
+  5. `processQueue` FIFO sonrası dep-aware respawn çağrısı yok
+  6. `collectResults` result topladıktan sonra in-memory status sync yapmıyor
+
+**Sonuç:** `dependency_pipeline_enabled: true` flag set edilmesine rağmen multi-wave execution
+semantiği hiçbir zaman çalışmamış; tüm sprint'ler legacy FIFO modunda devam etmiştir.
+
+---
+
+## Decision
+
+Yol B (wire) — 3 değişiklik yapılır. Bu 3 madde Task 4 implementasyonu için **binding contract**:
+
+### 1. `collectResults` İçinde Inline Status Mutation
+
+Bir `.result` dosyası toplandığında `taskMap.get(taskId)` referansı üzerinden in-memory
+task status mutation yapılır. Worker `selfAssessment` alanına göre:
+
+| selfAssessment değeri       | Yeni status           |
+|-----------------------------|-----------------------|
+| `DONE`                      | `TaskStatus.DONE`     |
+| `NO_GO`                     | `TaskStatus.NO_GO`    |
+| `GO_WITH_TECH_DEBT`         | `TaskStatus.DONE`     |
+
+`GO_WITH_TECH_DEBT` → `DONE` map'i bilinçli bir karardır: dependency filter
+`t.status === TaskStatus.DONE` kontrolü yapar; debt ile kapanan task'ların bağımlısını
+bloke etmemesi gerekir (ADR-045 Consequences bölümüne bkz.).
+
+`taskMap` zaten `Map<string, Task>` kullanıyor; `taskMap.get(taskId)` referansı
+`sprint.tasks` array'indeki aynı objeye işaret eder (referans paylaşımı). In-memory
+mutation yeterli — EVALUATE phase sonrası disk'e yazılır (mevcut pipeline korunur).
+
+**Rationale:** `respawnEligibleTasks` eligible task hesabı için `sprint.tasks` üzerinden
+`t.status === TaskStatus.DONE` filter'ı çalıştırır. EVALUATE phase öncesi inline
+mutation olmadan bu filter her zaman boş döner — Wave 2/3 task'ları asla eligible olmaz.
+
+### 2. `waitForResults` Ana Döngüsünde Dep-Aware Respawn
+
+`waitForResults` içinde, her `processQueue(newlyCollected)` çağrısının ardından
+`dependency_pipeline_enabled` kontrolü ile dallanma yapılır:
+
+```typescript
+if (config.dependency_pipeline_enabled) {
+  await respawnEligibleTasks(projectRoot, sprint, config, spawnOpts);
+}
+// else: legacy FIFO — processQueue yeterli, queuedTasks shift ile devam
+```
+
+`config: ResolvedConfig` parametresi `waitForResults` signature'a eklenir. Caller'lar
+(`sprint-controller.ts::runFullSprint` ve `sprint-phases.ts::runEvaluatePhase` giriş noktaları)
+parameter pass-through ile güncellenir — davranış değişikliği yok, sadece forwarding.
+
+İlk `collectResults + processQueue` bloğunun sonrasında da aynı respawn çağrısı yapılır:
+race-safe initial pass — Wave 1 ilk turda done olduysa Wave 2 hemen eligible olur.
+
+**Legacy compatibility:** `dependency_pipeline_enabled: false` (Sprint 164 default) durumunda
+`if` branch'i çalışmaz; `waitForResults` mevcut FIFO davranışını korur. Geriye uyumlu.
+
+### 3. `respawnEligibleTasks` Slot Kontrolü Korunur
+
+`sprint-spawner` modülündeki mevcut `slotsAvailable = maxWorkers - currentlyExecuting` kontrolü
+**değiştirilmez**. Bu kontrol çift spawn'ı engeller. `enforceWaveDependency` çağrısı korunur.
+`wave.respawn` metric emit'i ve `BRAIN→WORKER:DEPENDENCY_BLOCKED` event emit'leri zaten
+implement — artık gerçekten tetiklenecek.
+
+**Config freeze:** `dependency_pipeline_enabled` değeri Sprint 164'te `false` olarak kalır.
+Config flip Sprint 165'te Alperen onayı ile yapılır (canlı retry + smoke test).
+
+---
+
+## Alternatives Considered
+
+### (a) Yol A — Feature Burial (Flag Deprecate)
+
+`dependency_pipeline_enabled` flag'i deprecated işaretlenir, `respawnEligibleTasks` kodu
+silinir, tüm sprint'ler legacy FIFO ile devam eder.
+
+**Neden reddedildi:** Alperen açık wire kararı verdi. Sprint 134 T-005 priority+dependencies
+altyapısı ve Sprint 134 T-007 chain scheduler, multi-wave execution için tasarlandı. Bu altyapı
+5 sprint boyunca sessizce var; bury seçeneği Sprint 134 T-007 design intent'ini kalıcı olarak
+iptal eder. Product roadmap açısından dependency-aware execution kritik özellik — burial değil
+completion gerekli.
+
+### (b) Disk-Based Status Read
+
+`respawnEligibleTasks`, in-memory task status yerine `.result` dosyasının mevcudiyetine bakarak
+eligible task'ları belirler (`existsSync('.tasks/task-NNN.result')`).
+
+**Neden reddedildi:** Disk I/O overhead her respawn döngüsünde N task × `existsSync` çağrısı
+anlamına gelir. In-memory `task.status` zaten otoriter kaynak — `collectResults` result'ı okur,
+in-memory map'i günceller. Disk-based check tutarsız state yaratabilir (result yazıldı ama
+in-memory henüz güncellenmedi durumu). Memory-first mimari tercih edilir (ADR-005 deprecated
+olmasına rağmen in-memory state consistency prensibi geçerli).
+
+### (c) Status Mutation Sadece EVALUATE Phase'de
+
+`task.status` mutasyonu yalnızca `runEvaluatePhase` içinde yapılır; EXECUTE devam ederken
+in-memory status değişmez.
+
+**Neden reddedildi:** `respawnEligibleTasks` EVALUATE phase'e girmeden önce `waitForResults`
+ana döngüsü içinden çağrılır. EVALUATE-only mutation, respawn çağrısı anında `t.status` hâlâ
+`EXECUTING` olduğu için eligible task bulamaz — wire çalışmaz. Inline mutation (Decision 1)
+timing sorununu çözer: `collectResults` result toplar → status mutate → `processQueue` →
+`respawnEligibleTasks` → eligible Wave 2 task'lar bulunur → spawn edilir.
+
+---
+
+## Consequences
+
+### Olumlu
+
+- **Wave 2/3 task'lar spawn olur.** Dependency-aware execution semantiği ilk kez runtime'da
+  gerçek anlamda çalışır. Multi-wave sprint planları (priority + dependencies ile) uygulanabilir.
+- **Sprint 161 stalled senaryosu fix'lenir.** 3 spawn + 2 hayalet → 5/5 spawn. `waitForResults`
+  artık tüm task'ların tamamlanmasını bekleyebilir.
+- **Sprint 134 T-007 design intent tamamlanır.** Chain scheduler runtime kanıtı kazanır;
+  5 sprintlik call-site borcu kapanır.
+- **`BRAIN→WORKER:DEPENDENCY_BLOCKED` event'leri gerçekten yayınlanır.** `wave.respawn` metriği
+  meaningful veri içerir; observability zinciri tamamlanır.
+
+### Olumsuz
+
+- **`task.status` mutation timing değişir.** EVALUATE phase öncesi DONE/NO_GO status set edilir.
+  EVALUATE phase içindeki status okumaları bu mutasyonun farkında olmalı; mevcut EVALUATE
+  logic'i tekrar status set ederse duplicate mutation olur (idempotent — problem yok).
+- **`evaluate-phase idempotency` regression riski.** Sprint 159 survivor test
+  (`evaluate-phase-idempotency`) status mutation timing değişikliğini test eder. Task 4
+  bu testi bozmamak zorunda; bozulursa Auditor + Alperen onayıyla test güncellenebilir.
+- **Auditor `git diff --stat` boundary'yi etkilemez.** In-memory status mutation disk yazısı
+  yapmaz — Auditor scope violation detection sistemi bu değişiklikten etkilenmez (ADR-037 safe).
+
+### Risk Mitigation
+
+- **Sprint 159 survivor test:** `evaluate-phase-idempotency` 6-case regression suite mevcut;
+  Task 4 bu testi PASS etmek zorunda.
+- **Sprint 165 smoke:** `dependency_pipeline_enabled: true` flip + 3-task multi-wave smoke
+  sprint ile canlı doğrulama yapılır. Wire production'da kanıtlanmadan Sprint 165 geçmez.
+- **Sprint 166 rollback opsiyonu:** Flag `false`'a geri çevrilebilir. Wire kodu `disabled mod`'da
+  mevcut `if (config.dependency_pipeline_enabled)` branch atlayarak legacy davranışa döner.
+  Wire kodu silinmek zorunda değil; rollback non-destructive.
+
+---
+
+## References
+
+1. **Sprint 134 T-007 spec** — `respawnEligibleTasks` + Kahn's algorithm chain dependency
+   scheduler tasarımı (+620 LoC, Sprint 139 Wave 1 Early Wire Bootstrap)
+2. **Sprint 156-002 flip commit** — `dependency_pipeline_enabled: false → true` default değişimi
+   (`GO_WITH_TECH_DEBT` — wire eksikliği bu sprintte tespit edilmedi)
+3. **Sprint 161 stalled task archive** — `.tasks/archive/sprint-161-stalled/` Wave 2/3 hayalet
+   forensic kanıtı (3 spawn + 2 hayalet → sprint hang)
+4. **Sprint 162 spurious NO_GO bug ve Sprint 163 T1 fix** — Status mutation timing dersleri;
+   in-memory `task.status` sync önemi (ADR-045 Decision 1'in doğrudan öncülü)
+5. **ADR-036: ADR Governance Integration** — Bu ADR'ı mandatory read yapan kural; Sprint 138
+   ADR Governance disiplini gereği implementation'dan önce yazılır
+6. **ADR-037: Brain-Auditor-Worker Authority Matrix** — Wire implementasyonu RBAC sınırlarını
+   ihlal etmemeli; in-memory mutation Auditor'ın `git diff --stat` boundary sistemini bypass
+   etmez (disk write yok)
+7. **ADR-039: Self-Modifying Task Detection** — Deckent dogfood discrimination — wire kendi
+   sprint planlamasını etkilemiyor; `respawnEligibleTasks` sadece mevcut sprint task'larını
+   re-evaluates eder, yeni task yaratmaz
+
+---
+
+## Memory DB Insert Pattern
+
+Worker bu ADR'ı tamamladıktan sonra aşağıdaki pattern ile `memory.db`'ye insert yapılır:
+
+```typescript
+store.insert({
+  type: 'adr',
+  id: 'adr-045',
+  title: 'Wave-Based Execution Semantics — respawnEligibleTasks Runtime Wire',
+  status: 'accepted',
+  sprint_id: 'sprint-164',
+  tags: ['dep-pipeline', 'wave-execution', 'task-status', 'wire', 'sprint-134-completion'],
+  body: 'Yol B wire: collectResults inline status mutation + waitForResults dep-aware respawn + respawnEligibleTasks slot kontrolü korunur. Sprint 161 stalled fix. dependency_pipeline_enabled: false (Sprint 165 flip için bekletilir).',
+});
+```
+
+Markdown dosyası `deckent memory export` ile auto-regenerate edilir. ADR-036 Memory V2
+DB-first kuralı gereği bu manuel DECISIONS.md güncellemesi DEĞİL, DB insert + export
+pipeline'ı ile yönetilir.
+
+---
+
+## Notes
+
+Bu ADR, `dependency_pipeline_enabled: true` Yol B wire implementasyonunun (Task 4) **contract
+belgesidir** — implementation'dan önce yazılır. Task 4 worker bu ADR'ı okumak ve Decision
+bölümündeki 3 maddeye uymak zorundadır. Sapma → NO_GO + ADR amendment proposal (ADR-036 mandatory).
+
+Sprint 165 ile `dependency_pipeline_enabled: false → true` config flip + canlı multi-wave smoke
+test yapıldıktan sonra bu ADR production-validated olarak işaretlenir.
+
+
+---
+
+## adr-046: Brain Self-Update Hook Architecture
+
+**Status:** accepted
+
+# ADR-046: Brain Self-Update Hook Architecture
+
+**Status:** accepted
+
+**Deciders:** Alperen Sartaçoğlu (product owner), Brain (orchestrator)
+
+**Date:** 2026-05-13
+
+**Sprint:** Sprint 166 (implementation contract — T1/T2/T3 fixes bu ADR'ın kontratına göre yazıldı)
+
+---
+
+## Status
+
+accepted (Sprint 166 — 4 root cause forensic + Sprint 154-165 arasında kırık self-update döngüsünün kapanması)
+
+---
+
+## Context
+
+Sprint 154-165 boyunca Brain'in post-finalize self-update döngüsü **yarım çalıştı**: Brain her sprint sonunda
+dosyaları güncellediğini "sanıyordu" ama gerçekte dört kritik hook ya hiç tetiklenmiyordu ya da yanlış
+çalışıyordu. Sprint 166 forensic analizi dört root cause tespit etti:
+
+### Bug M — ADR Insert Hook Eksikliği
+
+`sprint-finalizer.ts:1197` çevresindeki `runPostFinalizeHooks` çağrısında `adrInsert` step yoktu.
+ADR-043, ADR-044, ADR-045 `docs/adr/` dizinine yazıldı; ancak `memory.db`'ye hiçbir zaman insert
+edilmedi. Brain ADR tabanlı kararlar alırken en güncel governance veriye erişemiyordu.
+
+**Kanıt:** `sqlite3 .brain/memory.db "SELECT COUNT(*) FROM entries WHERE type='adr'"` → Sprint 166
+öncesi `adr-042`'de duruyordu; `docs/adr/` dizininde 3 yeni ADR (043/044/045) mevcuttu.
+
+### Bug N — Manuel Finalize Path'inde onRuleRegen Eksikliği
+
+`sprint-phases.ts:1238` ve `sprint-finalizer.ts:1197` Brain'in otomatik finalize path'ini doğru
+şekilde yönetiyordu; ancak `cli/commands/finalize.ts:166` içindeki `finalizeSprint(...)` çağrısında
+`onRuleRegen` parametresi yoktu. Sprint 152'den itibaren manuel finalize kullanılan tüm dönemlerde
+`.claude/rules/*.md` dosyaları 13 sprint boyunca stale kaldı.
+
+**Kanıt:** `grep -n "onRuleRegen" src/cli/commands/finalize.ts` → Sprint 166 T2 öncesi 0 match.
+
+### Bug S — Cache Key Sprint-Agnostik Olduğundan Doc Sync Atlıyordu
+
+`src/orchestra/managed-docs/doc-cache.ts` cache key'i `fileHash + entryHash` olarak hesaplıyordu;
+sprint ID dahil değildi. Aynı dosya aynı sprint'te birden fazla kez finalize edildiğinde (veya farklı
+sprint'lerde içerik değişmediyse) cache hit oluyordu ve CLAUDE.md güncellenmiyordu. Sprint 152'den
+beri `cached_no_change` skip path aktifti.
+
+**Kanıt:** Sprint 130-151 working chain commit zinciri vs Sprint 152+ `cached_no_change` log analizi.
+
+### Bug Y2 — Doc Sync Ground-Truth Eksikliği
+
+Sprint 164 commit `a4f3be4`'te koordinatör agent prompt'una "16 agent" yanlış inject edildi (gerçek: 15).
+5 anchor `.md` dosyası yanlış güncellendi. Doc sync agent'larının prompt'a inject ettiği sayım gerçek
+dosya sistemine karşılaştırılmıyordu.
+
+**Ortak Pattern:** 4 bug da aynı mimari eksiklikten kaynaklanıyordu — post-finalize hook chain'i
+**opsiyonel callback'ler** ve **partial wiring** ile tasarlanmıştı. Yeni step eklendiğinde veya mevcut
+step'in wire'ı eksik kaldığında sessizce atlanıyordu. Hiçbir hook **koşulsuz invocation** garantisi
+vermiyordu.
+
+---
+
+## Decision
+
+Brain post-finalize hook chain için **Step Ordering Contract** zorunlu kılınır. Bu kontrat
+`src/core/identity-generator.ts → runPostFinalizeHooks()` implementasyonuna kodlanır ve bu ADR ile
+dokümante edilir.
+
+### Step Ordering Contract (Section 5.1)
+
+Post-finalize hook'lar aşağıdaki sırayla çalışır. Sıralama değiştirilemez — değişiklik bu ADR'ın
+amendment'ını gerektirir (ADR-036 mandatory).
+
+| Step | Adı             | Hedef                                      | Zorunluluk |
+|------|-----------------|--------------------------------------------|------------|
+| 1    | memoryExport    | `exports/*.md` regenerate                  | Koşulsuz   |
+| 2    | identityRegen   | `PROJECT-IDENTITY.md` update               | Deprecated (Sprint 168'de kaldırılır) |
+| 3    | adrInsert       | `docs/adr/*.md` → `memory.db` upsert       | Koşulsuz   |
+| 4    | ruleRegen       | `.claude/rules/*.md` regenerate            | Koşullu (callback mevcut ise) |
+
+**Step 3, Step 4'ten ÖNCE çalışmak ZORUNDADIR.** Sprint 166'da kabul edilen ADR-046 gibi yeni ADR'ler
+Step 3'te `memory.db`'ye insert edilir; Step 4'te regenerate edilen `.claude/rules/*.md` dosyaları
+bu insert'ten sonra çalışır. Sıralama ters olursa yeni ADR'ler kurallar güncellenmeden önce kayıt
+altına alınamaz.
+
+### Mimari Prensipler
+
+**1. Koşulsuz Invocation (Unconditional Invocation Pattern)**
+
+Her hook **her finalize döngüsünde** çalışır. Opsiyonel callback tasarımı yerine doğrudan çağrı kullanılır.
+`skipXxx` flag'leri sadece test izolasyonu ve acil devre-dışı bırakma senaryoları için mevcuttur;
+production deploy'da hiçbiri aktif olmamalıdır.
+
+**Rationale:** Bug M ve Bug N'nin ortak kökü optional wiring'di. `opts.onRuleRegen` callback yoksa
+Step 4 sessizce atlanıyordu. Koşulsuz pattern bu "sessiz atlanma" riskini ortadan kaldırır.
+
+**2. Cache Key Kompletliği (Complete Cache Key)**
+
+Managed-docs pipeline'ında her cache key şunları ZORUNLU olarak içerir:
+- `fileHash` — hedef dosya içerik hash'i
+- `entryHash` — generator entry config hash'i
+- `sprintId` — mevcut sprint identifier
+
+Eksik `sprintId` → cache hit → `cached_no_change` skip → doc sync sessizce atlanır.
+Bu Bug S'in tam tanımıdır.
+
+**3. Single Registration Target**
+
+Her hook sadece bir yerde registration point'e sahip olur:
+- **Brain otomatik path:** `sprint-finalizer.ts` → `runPostFinalizeHooks()`
+- **Manuel path:** `cli/commands/finalize.ts` → `finalizeSprint({ onRuleRegen: ... })`
+
+Her iki path da aynı `PostFinalizeHookOptions` interface'ini kullanır. Yeni hook eklendiğinde her iki
+path'e aynı anda eklenmek ZORUNDADIR (Bug N dersi: sadece bir path'e eklemek 13 sprint stale'e yol açar).
+
+**4. Ground-Truth Verification**
+
+Doc sync agent'ları (type='doc') inject edilen sayısal iddiayı (`N agents`, `M tools`) çalıştırma
+öncesi gerçek dosya sistemi ile doğrulamak ZORUNDADIR. Doğrulama whitelist:
+`.deckent/ground-truth-overrides.json`.
+
+### Step Ordering Contract Değişikliği Protokolü
+
+Step sıralamasını değiştirmek için:
+1. Bu ADR'ı supersede eden yeni ADR yazılır
+2. `runPostFinalizeHooks()` JSDoc bloğu güncellenir
+3. `tests/core/identity-generator-step-order.test.ts` regression test güncellenir
+4. Sprint finalize log'unda step execution order doğrulanır
+
+---
+
+## Consequences
+
+### Olumlu
+
+- **ADR-043/044/045/046 memory.db'ye insert edildi.** Brain ADR-bazlı kararlar için artık güncel
+  governance veriye erişebilir. Sprint 166 sonrası query: `searchMemory(store, {type:['adr']})` doğru
+  döner.
+- **`.claude/rules/*.md` artık manuel finalize'da da güncellenir.** Bug N kapandı — 13 sprint stale
+  borcu bitti. Multi-provider sync (Bug Q) ile `.codex/rules/`, `.gemini/rules/`, `.cursor/rules/`
+  da aynı anda güncellenir.
+- **CLAUDE.md her sprint'te güncellenir.** Bug S kapandı — sprint-aware cache key ile her yeni sprint
+  cache miss üretir ve doc sync çalışır.
+- **Doc sync agent'ları inject öncesi ground-truth doğrular.** Bug Y2 kapandı — `ls | wc -l` vs
+  whitelist kontrolü ile yanlış sayım propagasyonu engellenir.
+- **Yeni hook eklenmesi için anchor.** Sprint 167-168 M1-M4 monitoring hook'ları (örn. token budget
+  tracker, stale_md detector) bu contract'a uygun olarak Step 5+ olarak eklenir. Her yeni step bu
+  ADR'ı referans alır.
+
+### Olumsuz
+
+- **Step 2 (identityRegen) deprecated yükü.** Sprint 168'e kadar kod'da kalır. `skipIdentityRegen`
+  flag'i olmayan caller'lar eski behavior'ı almaya devam eder. Migration: managed-docs zincirine devret.
+- **onRuleRegen opsiyonelliği korundu.** Step 4 hâlâ callback-conditional — ancak artık cli finalize
+  path'inde callback zorunlu geçiriliyor (Bug N fix). Test coverage bu bağlantıyı korur.
+- **Cache key migration backward-compat yükü.** Eski cache entry'leri `sprintId` içermiyor — ilk
+  sprint'te her entry cache miss yapar (beklenen davranış, bütçe etkisi minimal).
+
+### M1-M4 Monitoring Falsifiable Claims (Sprint 167-168)
+
+Bu ADR'ın kontrakt doğruluğu 4 ölçüm kanalı ile izlenir:
+
+| Kanal | Metrik | Beklenti (Sprint 167+) |
+|-------|--------|------------------------|
+| M1    | `memory.db SELECT COUNT(*) WHERE type='adr'` | Her yeni ADR dosyası → +1 entry |
+| M2    | `ls .claude/rules/*.md` mtime | Her finalize → mtime güncellenir |
+| M3    | `grep "sprint-NNN" CLAUDE.md` | Her sprint → yeni sprint ID'si CLAUDE.md'de |
+| M4    | `stale_md detector emitAlert` | CLAUDE.md mtime > 70min ise alarm |
+
+Sprint 167'de dependency_pipeline_enabled flip + M1-M4 baseline tracking ile bu claim'ler
+ilk kez ölçülebilir hale gelir.
+
+### Sprint 170 Refactor Trigger
+
+Aşağıdaki koşullardan biri gerçekleşirse Sprint 170'te hook chain refactor tetiklenir:
+
+1. Step sayısı 6'yı geçerse (yeni M1-M4 monitoring hook'ları + billing hook + event emit)
+2. `runPostFinalizeHooks()` LoC > 150 olursa (şu an ~85 LoC)
+3. Step 2 (identityRegen deprecated) Sprint 168'den geçerse ve hâlâ kodda ise
+
+Refactor hedefi: hook chain'i `PostFinalizeStepRegistry` pattern'ına taşımak
+(ADR-026 God Object Split Stratejisi prensipleri ile).
+
+---
+
+## Alternatives Considered
+
+### (a) Optional Callback Pattern Korunur
+
+Mevcut `onRuleRegen?: callback` tasarımı korunur, eksik wire'lar tek tek patch edilir.
+
+**Neden reddedildi:** Bu yaklaşım Bug N'yi tekil olarak fix eder ama pattern'ı korur. Her yeni hook
+için aynı wiring hatası tekrarlanabilir. Sprint 166 forensic'i 4 bağımsız wiring hatasını aynı anda
+ortaya koydu — pattern değişikliği gerekli.
+
+### (b) Event-Driven Hook Dispatch
+
+`EventEmitter` pattern: `finalizeEmitter.emit('post-finalize', opts)`. Hook'lar listener olarak kayıt
+olur. Execution order belirsiz.
+
+**Neden reddedildi:** Step ordering contract ile çelişir. EventEmitter sıralaması listener registration
+sırasına bağlıdır — `once()` vs `on()` race condition riski. Explicit step ordering okunabilirliği ve
+test edilebilirliği daha yüksek; 4 step için EventEmitter overhead gereksiz karmaşıklık.
+
+### (c) Database-Only Hook Registration
+
+Tüm hook'lar `memory.db`'ye kayıt olur; finalize döngüsü DB'yi okuyarak hangi hook'ların çalışacağını
+belirler.
+
+**Neden reddedildi:** Finalize döngüsünün DB'ye bağımlılığını artırır. DB yoksa veya kilitliyse
+hiçbir hook çalışmaz. Mevcut in-process step chain daha güvenilir; DB sadece persistence layer
+olarak kalmalı (ADR-008 Brain merkezi import prensibi).
+
+---
+
+## References
+
+1. **Sprint 154-165 forensic analizi** — 4 root cause (M, N, S, Y2) tespiti
+2. **Sprint 166 T1** — `src/core/adr-file-sync.ts` + `identity-generator.ts` Step 3 wire (Bug M fix)
+3. **Sprint 166 T2** — `cli/commands/finalize.ts:166` onRuleRegen wire (Bug N fix)
+4. **Sprint 166 T3** — `doc-cache.ts` sprint-aware cache key (Bug S fix)
+5. **Sprint 166 T4** — Ground-truth verification 3-layer defense (Bug Y2 fix)
+6. **ADR-036** — ADR Governance Integration — mandatory read; bu ADR ADR-036 disiplinine uygun
+7. **ADR-037** — Brain-Auditor-Worker Authority Matrix — hook chain RBAC sınırlarını ihlal etmez
+8. **ADR-026** — God Object Split Stratejisi — Sprint 170 refactor trigger referansı
+9. **ADR-031** — Content Hash Cache — Bug S root cause (sprint ID eksik cache key)
+
+---
+
+## Memory DB Insert Pattern
+
+Bu ADR'ın `memory.db`'ye insert edilmesi `syncAdrFilesToDb()` aracılığıyla otomatik gerçekleşir
+(Sprint 166 T1 — Bug M fix). Alperen'in `npx deckent memory rebuild` çalıştırmasının ardından:
+
+```typescript
+// adr-file-sync.ts syncAdrFilesToDb() output (expected):
+{
+  inserted: 1,   // adr-046 (yeni)
+  updated: 3,    // adr-043, adr-044, adr-045 (eksik idiler)
+  skipped: 42,   // mevcut ve değişmemiş ADR'lar
+  errors: [],
+  ids: ['adr-046', 'adr-043', 'adr-044', 'adr-045'],
+}
+```
+
+Doğrulama: `sqlite3 .brain/memory.db "SELECT id FROM entries WHERE id='adr-046'"` → 1 row.
+
+---
+
+## Notes
+
+Bu ADR, Sprint 154-165 boyunca birikmiş "Brain self-update yarım çalışıyor" borcunun resmi
+kapanış belgesidir. T1-T3 fix'leri bu ADR'ın Step Ordering Contract'ına uygun yazıldı; test
+coverage (`tests/core/identity-generator-step-order.test.ts`) kontratı kalıcı kılar.
+
+Sprint 167-168 için M1-M4 monitoring baseline ve Sprint 170 refactor trigger bu ADR'a
+kodlanmıştır — gelecek sprint'ler bu kararı referans alarak genişletebilir.
+
+
+---
+
+## adr-053: TaskType Taxonomy — Audit / Document-Write / Code-Development + Extensibility Roadmap
+
+**Status:** proposed
+
+# ADR-053: TaskType Taxonomy — Audit / Document-Write / Code-Development + Extensibility Roadmap
+
+**Status:** proposed
+
+**Deciders:** Alperen Sartaçoğlu (product owner), Brain (orchestrator)
+
+**Date:** 2026-05-12
+
+**Sprint:** Sprint 156
+
+---
+
+## Status
+
+proposed (Sprint 156 — implementation seeded in `rubric-registry.ts` Sprint 154 Bug B fix)
+
+---
+
+## Context
+
+Deckent sprint lifecycle boyunca farklı türlerde görevler yürütülür: kaynak kodu yazan worker'lar, denetim raporu üreten worker'lar, yalnızca markdown belgeler oluşturan worker'lar. Sprint 154'e kadar tüm bu görevler tek bir `CODE_RUBRIC` ile değerlendiriliyordu. Bu tasarım Spring 153 ve 154'te ciddi bir sorun ortaya çıkardı: **Bug B** olarak kayıt altına alınan bu hata, `docs/audits/` altına yalnızca tek bir `.md` dosyası yazan audit task'larının `test_coverage: null` döndürmesi nedeniyle hatalı `NO_GO` kararı almasına neden oluyordu. Kod rubriği `test_coverage` için belirlenmiş bir eşik değeri beklediğinden, bu değer yokken görev başarısız sayılıyordu.
+
+Bu sorun görevlerin ne yaptığına dair eksik bir modellemenin belirtisiydi. Deckent'in değerlendirme katmanı (Brain'in `result-evaluator.ts` bileşeni) görevi *tipine* göre değil yalnızca tek bir rubrik üzerinden yargılıyordu. Bu durum şu soruları gündeme getirdi:
+
+1. Bir audit görevi neden kod kapsamı beklesin?
+2. Bir doküman yazma görevi neden `correctness` skoru için test çalıştırsın?
+3. Bir kod geliştirme görevi neden `audit_completeness` kriteriyle ölçülsün?
+
+Ayrıca **task routing** (ADR-015), **agent selection** (ADR-041) ve **EffectClass** (Sprint 156 T-011) gibi bileşenler de görev tipinden faydalanabilirdi; ancak ortak bir tip tanımı yoktu. `task-router.ts`, `adr-selector.ts`, `task-analyzer.ts` ve yeni eklenen `rubric-registry.ts` her biri kendi `TaskType` tanımını yapıyordu. Bu tutarsızlık kodu anlamayı güçleştiriyor, yeni bileşenler eklendiğinde drift yaratıyordu.
+
+Son olarak genişletilebilirlik eksikti. İleride `db-migration`, `package-publish`, `infrastructure-provision` gibi görev tipleri eklendiğinde bunları nereye yerleştirecek, hangi rubriği, hangi effect sınıfını atayacaktık? Açık bir taxonomi olmadan her ekleme ad-hoc olurdu.
+
+---
+
+## Decision
+
+Deckent'te **üç temel TaskType** tanımlanır ve `rubric-registry.ts` içinde `src/orchestra/rubric-registry.ts` tek kaynak olarak tutulur:
+
+```typescript
+export type TaskType = 'audit' | 'document-write' | 'code-development';
+```
+
+### Tip Tanımları
+
+**`audit`** — Tek bir denetim raporu dosyası üreten, kodda değişiklik yapmayan görevler.
+- Tespit kuralı: `scope.filesWrite` tam olarak 1 girdi içermeli, bu girdi `docs/audits/` ile başlamalı ve `.md` ile bitmeli; `scope.directories` kaynak kodu dizini içermemeli.
+- Örnek: T-152-016 ADR Compliance Scan, T-001 Workflow Verify.
+- Rubrik: `AUDIT_RUBRIC` — `audit_completeness`, `finding_count`, `citation_density`, `migration_triage`.
+- EffectClass: `pure` (sadece okuma + rapor yazma).
+
+**`document-write`** — `docs/` altında (ancak `docs/audits/` dışında) bir veya birden fazla markdown belgesi üreten görevler.
+- Tespit kuralı: Tüm `scope.filesWrite` girdileri `docs/` ile başlamalı ve `.md` ile bitmeli; hiçbiri `docs/audits/` ile başlamamalı; kaynak dizin içermemeli.
+- Örnek: ADR draft yazma, ROADMAP güncelleme, sprint retrospective belgesi.
+- Rubrik: `DOC_WRITE_RUBRIC` — `correctness`, `word_count`, `scope_compliance`, `documentation_quality`.
+- EffectClass: `reversible` (git restore ile geri alınabilir).
+
+**`code-development`** — Yukarıdaki kriterlere uymayan tüm görevler (varsayılan).
+- Tespit kuralı: `audit` veya `document-write` kategorisine girmeyen her görev.
+- Kapsam: kaynak kodu değişikliği, test yazma, refactoring, konfigürasyon değişikliği.
+- Rubrik: `CODE_RUBRIC` — `correctness`, `test_coverage`, `scope_compliance`, `documentation`.
+- EffectClass: `reversible` (çalışma ağacı değişiklikleri, git ile geri alınabilir).
+
+### Tespit Önceliği
+
+```
+audit (ilk eşleşme kazanır)
+  ↓ hayır
+document-write
+  ↓ hayır
+code-development (varsayılan)
+```
+
+`audit`, `document-write`'tan önce değerlendirilir çünkü denetim raporları da `docs/` altında yaşar; ancak daha katı bir şekle sahiptir (tek dosya, `docs/audits/` prefix).
+
+### Tek Kaynak Prensibi
+
+`rubric-registry.ts` bu taxonominin **tek doğruluk kaynağı** olacak. `task-router.ts:45`, `adr-selector.ts:45` ve `task-analyzer.ts:4` içindeki çakışan `TaskType` tanımları `rubric-registry.ts`'ten re-export ile hizalanacak veya kendi spesifik alanlarını koruyan ama birbiriyle çakışmayan ayrı tipler olarak adlandırılacak. Bu çakışma ADR-008 (tek yönlü bağımlılık) ihlali riski taşımaktadır; yeniden yapılandırma ayrı bir sprint task olarak planlanmalıdır.
+
+### Extensibility Roadmap
+
+Mevcut üç tip temel bir taxonomiyi temsil eder. Aşağıdaki tipler **gelecek sprint'lerde** eklenebilir:
+
+| Gelecek TaskType | EffectClass | Rubrik Odağı | Öncelik |
+|---|---|---|---|
+| `db-migration` | `idempotent` | migration atomicity, rollback plan | Sprint 162 |
+| `package-publish` | `critical-irreversible` | publish gate, version bump, changelogs | Sprint 163 |
+| `infrastructure-provision` | `compensable` | IaC diff, rollback script, approval gate | Sprint 165 |
+| `security-patch` | `reversible` | CVE fix correctness, regression coverage | Sprint 162 |
+
+Her yeni tip şu genişletme noktalarını güncellemelidir:
+1. `TaskType` union (`rubric-registry.ts`)
+2. `RUBRIC_REGISTRY` kaydı
+3. `EFFECT_CLASS_REGISTRY` kaydı
+4. `isXxxTask()` tespit fonksiyonu
+
+Bu dört nokta `rubric-registry.ts` içinde bir arada tutulduğundan, değişim lokal kalır ve sürünüm (drift) riski düşer.
+
+### ADR-053 ile İlgili Enforcement
+
+Sprint 156 T-009 (`assertSpawnSafe`) ve T-010 (Runtime File Lock) güvenlik katmanları; task tipine duyarlı kararlar alabilmek için `detectTaskType()` fonksiyonunu çağırabilir. Örneğin, `critical-irreversible` tipinde bir task spawn edilmeden önce ADR-037 RBAC gereği Alperen onayı alınmalıdır.
+
+---
+
+## Consequences
+
+### Olumlu
+
+- **Yanlış NO_GO oranı düşer.** Audit ve doküman görevleri artık uygulanamaz kriterleri (coverage) taşımayan rubriklerle değerlendiriliyor. Sprint 154 Bug B'nin tekrarlanması engellendi.
+- **Routing doğruluğu artar.** Agent seçimi (ADR-041), skill routing (ADR-015) ve ADR önerileri (`adr-selector.ts`) artık daha kesin bir tip üzerinden çalışabilir.
+- **Genişletilebilirlik.** Yeni görev tipleri dört noktayı güncelleyerek eklenir; mevcut kodu bozmaz.
+- **Güvenlik.** `RUBRIC_REGISTRY` ve `EFFECT_CLASS_REGISTRY` `Object.freeze()` ile korunur; runtime mutasyonu engellenir. Bu, bir worker'ın kendi tipini `critical-irreversible`'dan `reversible`'a düşürerek onay geçidini atlamasını önler.
+- **Gözlemlenebilirlik.** `detectTaskType()` dönüş değeri sprint metriklerine ve audit loglarına eklenebilir; hangi görevlerin hangi tipte değerlendirildiği izlenebilir.
+
+### Olumsuz
+
+- **Sınır vakaları belirsiz.** `isAuditTask()` kuralları katıdır (tek dosya, `docs/audits/`). Hybrid bir görev (hem kaynak kodu hem de audit raporu) `code-development` olarak sınıflandırılır ve audit_completeness değerlendirilmez. Bu durum scope ayrımını zorunlu kılar — ama bu zaten ADR-034 Multi-Project Isolation ile uyumludur.
+- **Mevcut `TaskType` çakışmaları.** `task-router.ts:45` (`'code' | 'test' | 'doc' | 'design' | 'unknown'`) ve `adr-selector.ts:45` kendi tip tanımlarını korur. Hizalama ayrı bir task gerektirir; şimdilik `rubric-registry.ts` yetki alanı yalnızca değerlendirme katmanı ile sınırlıdır.
+- **Tespit, scope shape'e bağlı.** Başlık veya açıklama metninden değil `scope.filesWrite` ve `scope.directories` örüntülerinden tespit yapılır. Bu gaming-proof olmayı sağlar; ancak yanlış scope tanımlamaları (Brain planning hatası) yanlış tip tespitine yol açabilir. ADR-036 validation, scope'u DIRECTIVES'e karşı doğrulamalıdır.
+
+---
+
+## Related ADRs
+
+- **ADR-015** — TaskRouter Module: mevcut `task-router.ts` içindeki `TaskType` bu ADR ile hizalanacak.
+- **ADR-035** — Verification Protocol: `CODE_VERIFY_REQUEST` kanalının tetiklenmesi task tipine göre farklılaşabilir (audit task'lar için kod doğrulaması anlamsız).
+- **ADR-037** — RBAC: `critical-irreversible` EffectClass → Alperen onay gating.
+- **ADR-041** — Agent Taxonomy: Horizontal skill seçimi task tipine göre filtrelenebilir (doc görevleri için `testing-expert` önerme).
+- **ADR-055** — Hybrid Scoring Pipeline (proposed): Bu ADR'nin TaskType'ları Hybrid Scoring'in Layer 1 (Schema) ve Layer 4 (Outcome) katmanlarına girdi sağlar.
+
+---
+
+## Notes
+
+Bu ADR, `rubric-registry.ts` içinde `Sprint 154 Bug B fix` olarak hayata geçirilen uygulamanın geriye dönük belgelenmesidir. Uygulama önce yazıldı; ADR, tasarım kararlarını geç de olsa kayıt altına almaktadır. Sprint 156 dogfood pratiğine göre bu geç-ADR pattern'i kabul edilebilir — ancak ileride tercih edilen sıra şudur: ADR draft → Sprint task → Implementation.
+
+
+---
+
+## adr-055: Hybrid Scoring 5-Layer Pipeline — Schema / Gates / Quality / Outcome / Auditor
+
+**Status:** proposed
+
+# ADR-055: Hybrid Scoring 5-Layer Pipeline — Schema / Gates / Quality / Outcome / Auditor
+
+**Status:** proposed
+
+**Deciders:** Alperen Sartaçoğlu (product owner), Brain (orchestrator)
+
+**Date:** 2026-05-12
+
+**Sprint:** Sprint 156
+
+---
+
+## Status
+
+proposed (Sprint 156 — EffectClass seed implementasyonu T-011'de tamamlandı; tam pipeline ayrı sprint'e bırakıldı)
+
+---
+
+## Context
+
+Deckent'in değerlendirme sistemi Sprint 139'a kadar `result-evaluator.ts` içindeki tek bir `DEFAULT_RUBRIC` etrafında yapılandırılmıştı. Bu rubrik dört kriter içeriyordu: `correctness`, `test_coverage`, `scope_compliance`, `documentation`. Basit ve tahmin edilebilirdi, ancak birkaç sistemsel sorunun kaynağıydı:
+
+**Sprint 153 ve Sprint 154 Bug B:** Audit raporları ve doküman yazma görevleri `test_coverage: null` döndürüyordu. Rubrik bu alanı zorunlu sayıyordu. Sonuç: geçerli çıktılar üretilmesine rağmen `NO_GO` kararı. ADR-053 (TaskType Taxonomy) bu hatayı rubriği görev tipine göre seçerek giderdi — ancak bu düzeltme değerlendirmenin **şeklini** değiştirdi, **derinliğini** değil.
+
+**Tek katmanlı değerlendirmenin kör noktaları:**
+1. **Schema geçersizliği önceden yakalanmıyor.** Bir `.result` dosyası eksik alan içeriyorsa değerlendirme skoru hesaplanmaya çalışır, ancak anlamsız bir skora ulaşır. Schema doğrulaması skorlamadan önce yapılmalıydı.
+2. **Gate koşulları yoktu.** Bazı durumlar sayısal skor olmaksızın kesin `NO_GO` gerektiriyordu: scope ihlali, ADR compliance hatası, heartbeat zaman aşımı. Bu koşullar rubrik içinde `0` ağırlıklı kriterler olarak temsil ediliyordu — doğru yapı değildi.
+3. **EffectClass (reversibility) skor üzerinde etkisi yoktu.** `critical-irreversible` görevler daha yüksek `correctness` eşiği veya zorunlu Auditor doğrulamasına tabi olmalıydı; ancak tek rubrik bunu ifade edemiyordu.
+4. **Auditor ve Brain bağımsız değerlendirme yapıyordu.** Auditor kendi scan sonuçlarını `.dashboard` dosyasına yazıyordu; Brain ise yalnızca `.result` dosyasını okuyordu. İki perspektif birleştirilmiyordu.
+5. **Outcome verisi geri besleme döngüsüne girmiyordu.** Görev tipine ve EffectClass'a göre geçmiş outcome verileri (başarı oranı, token kullanımı) değerlendirmeyi etkileyen bir sinyal olabilirdi.
+
+Bu sorunların toplamı, değerlendirmenin yüzeysel kaldığını ve gerçek görev kalitesini her zaman doğru yansıtmadığını ortaya koydu. Daha derin, çok katmanlı bir değerlendirme altyapısına ihtiyaç vardı.
+
+---
+
+## Decision
+
+**5-katmanlı Hybrid Scoring Pipeline** tasarlanır. Her katman girdiye bağımsız olarak çalışır ve kendi kararını `PipelineLayerResult` olarak üretir:
+
+```
+Layer 1: Schema Validation
+  ↓ PASS / FAIL (hard gate)
+Layer 2: Gate Conditions
+  ↓ PASS / BLOCK (hard gate)
+Layer 3: Quality Scoring
+  ↓ numeric score [0–100]
+Layer 4: Outcome Weighting
+  ↓ weighted score [0–100]
+Layer 5: Auditor Verification
+  ↓ auditor signal (optional, async)
+       ↓
+  Final Decision: DONE / GO_WITH_TECH_DEBT / NO_GO
+```
+
+### Katman 1 — Schema Validation
+
+Her `.result` dosyası önce JSON schema'ya karşı doğrulanır. Eksik zorunlu alanlar (`taskId`, `selfAssessment`, `filesChanged`, `tokenUsage`) pipeline'ı durdurur ve doğrudan `NO_GO` döndürür. Bu doğrulama zaten Sprint 155'te `validateResultSchema()` fonksiyonu ile hayata geçirilmiştir — ADR-055 bu davranışı resmen Layer 1 olarak sınıflandırır.
+
+```typescript
+interface Layer1Result {
+  pass: boolean;
+  missingFields: string[];
+  invalidFields: { field: string; reason: string }[];
+}
+```
+
+### Katman 2 — Gate Conditions
+
+Sayısal skorla ifade edilemeyen ikili (binary) koşullar burada değerlendirilir. Bir gate başarısız olursa pipeline `NO_GO` döndürür; skora ulaşılmaz.
+
+| Gate ID | Koşul | Kaynak |
+|---------|-------|--------|
+| `G-001` | Scope ihlali yok (`git diff --stat` scope dışı dosya içermemeli) | Auditor scan |
+| `G-002` | ADR compliance: görev sonucu kabul edilmiş ADR'yi ihlal etmemeli | `adr-validator.mjs` |
+| `G-003` | Heartbeat timeout aşılmamış | `.hb` dosya timestamp |
+| `G-004` | Self-modifying task tespiti negatif | `self-modifying-detector.ts` |
+| `G-005` | `critical-irreversible` EffectClass için Alperen onayı alınmış | Checkpoint mechanism |
+
+```typescript
+interface Layer2Result {
+  pass: boolean;
+  blockedByGates: string[];   // gate IDs that failed
+  gateDetails: Record<string, string>;
+}
+```
+
+### Katman 3 — Quality Scoring
+
+ADR-053 tarafından belirlenen görev tipine uygun rubrik (CODE_RUBRIC, AUDIT_RUBRIC, DOC_WRITE_RUBRIC) uygulanır. Mevcut `result-evaluator.ts` mantığı bu katmana karşılık gelir.
+
+```typescript
+interface Layer3Result {
+  score: number;          // 0–100
+  passingScore: number;
+  rubricId: 'code' | 'audit' | 'doc-write';
+  criteriaBreakdown: Record<string, number>;
+}
+```
+
+### Katman 4 — Outcome Weighting
+
+EffectClass ve görev tipi bazlı geçmiş outcome verileri (başarı oranı, ortalama retry sayısı) ağırlık çarpanı olarak uygulanır. Bu katman Layer 3 skorunu yukarı veya aşağı çeker:
+
+- `critical-irreversible` görevler: passingScore eşiği 70 → 85 yükseltilir.
+- `pure` (audit) görevler: passingScore eşiği 70 → 65 düşürülebilir (no-retry semantics).
+- Geçmiş 5 sprint ortalama başarı oranı < %50 olan agent: skor × 0.9 çarpanı.
+
+```typescript
+interface Layer4Result {
+  adjustedScore: number;    // Layer 3 score × weight
+  adjustedThreshold: number;
+  effectClass: EffectClass;
+  outcomeModifier: number;  // multiplier applied
+}
+```
+
+### Katman 5 — Auditor Verification (Asenkron)
+
+Auditor'ın bağımsız scan sonuçları (`.dashboard` dosyası) Layer 4 kararını onaylayabilir veya veto edebilir. Bu katman asenkron ve opsiyoneldir; Auditor sonucu zamanında gelmezse varsayılan olarak Layer 4 kararı korunur.
+
+```typescript
+interface Layer5Result {
+  auditorSignal: 'confirm' | 'veto' | 'absent';
+  auditorNotes?: string;
+  finalDecision: 'DONE' | 'GO_WITH_TECH_DEBT' | 'NO_GO';
+}
+```
+
+### Final Decision Matrisi
+
+```
+Layer1 FAIL              → NO_GO (schema invalid)
+Layer2 BLOCK             → NO_GO (gate violated)
+Layer4 adjustedScore ≥ adjustedThreshold:
+  + Layer5 confirm/absent → DONE
+  + Layer5 veto           → GO_WITH_TECH_DEBT
+Layer4 adjustedScore < adjustedThreshold:
+  + delta < 10            → GO_WITH_TECH_DEBT
+  + delta ≥ 10            → NO_GO
+```
+
+### Uygulama Yolu
+
+Sprint 156'da yalnızca **seed** tamamlandı:
+- Layer 1: `validateResultSchema()` (`result-evaluator.ts`) — canlı
+- Layer 3: ADR-053 TaskType rubric selection — canlı
+- Layer 4 girdi: `EffectClass` (`rubric-registry.ts` T-011) — canlı
+
+Tam pipeline entegrasyonu Sprint 157+ roadmap:
+- `src/orchestra/scoring-pipeline.ts` — yeni modül
+- `runScoringPipeline(task, result, auditorSnapshot): ScoringPipelineResult`
+- `result-evaluator.ts` yeniden düzenleme: `evaluateResult()` → pipeline çağrısı
+
+---
+
+## Consequences
+
+### Olumlu
+
+- **Daha az yanlış NO_GO.** Schema ve gate katmanları sayısal skor hesaplanmadan önce açık ihlalleri yakalar; rubrik puanlamayı anlamsız vakaların üzerine uygulama riskini ortadan kaldırır.
+- **EffectClass entegrasyonu.** `critical-irreversible` görevler artık yüksek eşikle ve zorunlu onay gapıyla değerlendirilir. ADR-037 RBAC ile uyumlu.
+- **Auditor-Brain entegrasyonu.** İki bağımsız perspektif (Brain değerlendirmesi + Auditor scan) birleştirilerek daha güvenilir kararlar üretilir. ADR-035 doğrulama protokolü bu birleşimi zaten öngörüyordu.
+- **Genişletilebilirlik.** Yeni gate koşulları (`G-006`, ...) pipeline'a eklenir; mevcut rubrik değişmez. Yeni katmanlar (Layer 6: ML scoring) ileride eklenebilir.
+- **Gözlemlenebilirlik.** Her katman kendi `PipelineLayerResult`'ını üretir; sprint metriklerine her katmanda hangi kararın verildiği kaydedilebilir. "Layer 2'de bloklanan task sayısı" gibi metrikler NO_GO sebeplerini ayrıştırır.
+
+### Olumsuz
+
+- **Pipeline gecikmesi.** 5 katmanın ardışık çalışması değerlendirme süresini artırır. Layer 5 (async Auditor) bekleme süresi sprint toplam süresini uzatabilir. Timeout mekanizması zorunlu.
+- **Karmaşıklık artışı.** `result-evaluator.ts`'in tek-fonksiyon yapısından pipeline mimarisine geçiş test yükümlülüğü doğurur. Her katmanın birim testi yazılmalıdır.
+- **Gate G-005 (Alperen onayı) bloklama riski.** `critical-irreversible` görevlerde Alperen cevap vermezse sprint donar. Timeout + fallback (GO_WITH_TECH_DEBT + onay kuyruğu) tasarlanmalıdır.
+- **Outcome verisi bootstrap sorunu.** Layer 4 geçmiş başarı oranlarına güvenir; ancak yeni bir agent veya görev tipi için bu veri yoktur. `outcomeModifier = 1.0` (nötr) başlangıç değeri ile bootstrap edilmelidir.
+
+---
+
+## Related ADRs
+
+- **ADR-035** — Verification Protocol Standard: Layer 5 (Auditor Verification) bu ADR'nin `CODE_VERIFY_REQUEST` / `VERIFICATION_RESULT` kanallarını kullanır.
+- **ADR-036** — ADR Governance: Layer 2 Gate G-002 (`adr-validator.mjs` entegrasyonu) bu ADR tarafından yönlendirilir.
+- **ADR-037** — RBAC Protocol: Layer 2 Gate G-005 (Alperen onayı) `critical-irreversible` görevler için RBAC gate gerektirir.
+- **ADR-041** — Agent Taxonomy: Layer 4 outcome weighting, agent başarı oranı verilerini `agent-pool.ts` kayıtlarından çeker.
+- **ADR-053** — TaskType Taxonomy (proposed): Layer 1 ve Layer 3'e görev tipi bilgisi sağlar.
+
+---
+
+## Notes
+
+Bu ADR Sprint 156 T-011 (EffectClass Annotation) çalışması sırasında ortaya çıkan mimari vizyonu belgeler. `rubric-registry.ts:197` içindeki `// ADR-055 placeholder` yorumu bu ADR'ye işaret eder. Tam uygulama Sprint 157+ roadmap kapsamındadır.
+
+
+---
+
+## adr-060: Self-Awareness Propagation — 5-Channel Context Enrichment Architecture
+
+**Status:** proposed
+
+# ADR-060: Self-Awareness Propagation — 5-Channel Context Enrichment Architecture
+
+**Status:** proposed
+
+**Deciders:** Alperen Sartaçoğlu (product owner), Brain (orchestrator)
+
+**Date:** 2026-05-12
+
+**Sprint:** Sprint 156
+
+---
+
+## Status
+
+proposed (Sprint 156 — kanal 5 (worker-enrichment) T-007 ile seed edildi; tam mimari ayrı sprint'e planlandı)
+
+---
+
+## Context
+
+Deckent worker'ları görevlerini bağımsız, izole bir ortamda yürütür. Bu izolasyon kasıtlıdır — ADR-034 (Multi-Project Isolation) ve ADR-037 (RBAC) gereği. Ancak izolasyonun bir yan etkisi vardır: worker'lar proje bağlamından habersiz kalabilir. Bu durum çeşitli sprint'lerde gözlemlenen aşağıdaki sorunların kaynağıdır:
+
+**1. Agent Alignment Drift (Sprint 145–153 boyunca gözlemlendi):** Worker'lar mimari kararlar (ADR'ler) hakkında bilgilendirilmese, uyguladıkları çözümler kabul edilmiş ADR'leri ihlal edebilir. Örneğin, worker `shell: true` kullanarak bir komut çalıştırabilir ve ADR-006 ihlali yaratabilir. Sprint 138'de ADR yönetimi çerçevesi (`queryRelevantADRs()` + `prompt-god-template.ts` "Mandatory Architecture Rules" bloğu) bu sorunun bir kısmını çözdü — ancak bağlam enjeksiyonu yalnızca ADR katmanıyla sınırlı kaldı.
+
+**2. Bağımlılık Sonuçlarının Bilinmezliği (Sprint 135–139 boyunca):** Worker T-002, T-001'in sonucundan haberdar değildi. Sprint 135 T-005 (Planner Priority/Dependencies) ve Sprint 134 T-001 (Task Dependency Pipeline) bağımlılık zincirini pipeline düzeyinde kurdu; ancak T-002 worker'ının prompt'unda T-001'in *ne yaptığı* yer almıyordu. Yalnızca "T-001 tamamlandı" bilgisi vardı. Bu eksiklik Sprint 156 T-007 (Worker Prompt Previous-Result Enrichment) ile giderildi.
+
+**3. Skill ve Agent Bağlamının Parçalı Aktarımı:** Skill seçimi (`selectSkills()`), agent seçimi (`selectAgent()`) ve ADR enjeksiyonu ayrı ayrı fonksiyonlarda gerçekleşiyor, her biri prompt'un farklı bir bölümüne yazıyor. Sonuçta worker prompt'u birbiriyle ilişkili ama koordine edilmemiş bağlam parçalarından oluşuyor. Worker, "Bu skill neden seçildi?" veya "Önceki sprint'teki benzer görevde ne oldu?" bilgisine erişemiyor.
+
+**4. Manifest Uyumsuzluğu.** Worker'ların hangi agent ve skill versiyonunu kullandığını bilmemesi, manifest güncellemesi sonrasında ortaya çıkan uyumsuzlukları Sprint 148'de gözlemlendiği gibi yakalamayı güçleştirdi. Spawn zamanında agent manifest snapshot'ı worker prompt'una eklenseydi, worker beklenen API'yi ve değişiklikleri daha iyi yorumlayabilirdi.
+
+**5. Self-Awareness Eksikliği.** "Self-awareness" terimi burada şu anlama gelir: worker'ın yalnızca kendi görevini değil, görevinin bulunduğu *bağlamı* — sprint kimliği, seçilen agent, seçilen skill'ler, ilgili ADR'ler, bağımlılık sonuçları — bilmesi. Bu bağlam eksikliği, worker'ların tekrarlayan hatalara düşmesine ve Brain'in fazladan FIX döngüsü çalıştırmasına neden olmaktaydı.
+
+Mevcut `prompt-god-template.ts` içindeki `buildHeader()`, `buildAgentBlock()`, `buildSkillBlock()`, `buildDependenciesBlock()`, `buildADRBlock()` fonksiyonları bu bağlam enjeksiyonunu kısmen çözüyor. Ancak koordineli bir mimari eksik. Bu ADR, bağlam yayılımını beş kanalda organize eden bir çerçeve tanımlar.
+
+---
+
+## Decision
+
+**Self-Awareness Propagation Architecture** — 5 kanal tanımlanır. Her kanal farklı bir bağlam tipini worker prompt'una taşır. Kanallar `prompt-god-template.ts` içinde `buildWorkerContext()` çatı fonksiyonu altında koordine edilir:
+
+```typescript
+interface WorkerContextBundle {
+  channel1_init:         InitChannel;
+  channel2_sync:         SyncChannel;
+  channel3_manifest:     ManifestChannel;
+  channel4_skill_declare: SkillDeclareChannel;
+  channel5_enrichment:   EnrichmentChannel;
+}
+
+async function buildWorkerContext(task: Task, sprintId: string): Promise<WorkerContextBundle>
+```
+
+### Kanal 1 — Init Channel (Sprint + Task Identity)
+
+Worker'ın kim olduğunu ve nerede çalıştığını aktarır.
+
+**İçerik:**
+- Sprint kimliği ve numarası (`sprint-156`)
+- Task kimliği ve başlığı
+- Seçilen model ve effort seviyesi
+- Scope tanımı (directories, filesRead, filesWrite)
+- GO/NO-GO kriterleri
+
+**Mevcut durum:** `buildHeader()` fonksiyonu bu bilgilerin büyük bölümünü zaten üretiyor. ADR-060, bu fonksiyonun "Kanal 1 sorumluluğu" olduğunu resmen belirler.
+
+**Yeni eklenti:** Sprint kimliğinden türetilen `sprint_sequence_number` (ör. sprint-156 → 156) ve bu sprint'teki görev sırası (ör. "15 task'tan 7.si") worker'a sprint'teki yerini gösterir.
+
+### Kanal 2 — Sync Channel (ADR + Memory Snapshot)
+
+Projenin geçmiş mimari kararlarını ve ilgili sprint öğrenmelerini aktarır.
+
+**İçerik:**
+- İlgili ADR'ler (zaten `queryRelevantADRs()` + `buildADRBlock()` ile yapılıyor)
+- İlgili sprint learnings (hafıza DB'sinden `searchMemory()` ile)
+- Aktif teknik borç maddeleri (görevle ilişkili olanlar)
+
+**Mevcut durum:** ADR enjeksiyonu Sprint 138'de hayata geçti. Öğrenim ve borç snapshot'ı opsiyonel. ADR-060 bu bağlamı zorunlu hale getirir.
+
+**Yeni eklenti:** `sprint_learning_digest` — son 3 sprint'teki benzer görevlerin sonuçlarından çıkarılan 3–5 cümlelik özet.
+
+### Kanal 3 — Manifest Channel (Agent + Skill Version Snapshot)
+
+Görev için seçilen agent ve skill'lerin anlık versiyonlarını aktarır.
+
+**İçerik:**
+- Agent tanımı: isim, versiyon, uzmanlık özeti
+- Her skill için: isim, kapsam, son güncellenme tarihi
+- Agent/skill uyumsuzluğu uyarıları (manifest checksum mevcut versiyonla eşleşmiyorsa)
+
+**Mevcut durum:** `buildAgentBlock()` ve `buildSkillBlock()` prompt içeriğini yazıyor; ancak versiyon ve checksum bilgisi dahil değil.
+
+**Yeni eklenti:** `manifest_checksum` alanı — spawn zamanındaki agent.json hash değeri. Worker bunu bilirse, manifest güncellemesini fark edebilir ve Not uygulanamaz durumlarda Brain'i uyarabilir.
+
+### Kanal 4 — Skill Declare Channel (Active Skill Instructions)
+
+Seçilen skill'lerin tam içeriğini aktarır (önceden kısmen yapılıyor).
+
+**İçerik:**
+- Her skill'in tam `SKILL_PROMPT` içeriği
+- Skill prioritization: çakışan talimatlar için öncelik sırası
+- Anti-pattern listesi: bu skill'i kullanan worker'ların önceki sprint'lerde yaptığı yaygın hatalar
+
+**Mevcut durum:** Skill içerikleri `buildSkillBlock()` ile zaten ekleniyor. ADR-060, anti-pattern listesini yeni bir eklenti olarak tanımlar.
+
+**Yeni eklenti:** `skill_anti_patterns` — `outcome-tracker.ts` kayıtlarından çıkarılan, bu skill ile yapılan yaygın hatalar listesi. Ör: "react-specialist skill kullanırken 3 sprint boyunca `useEffect` cleanup eksikliği gözlemlendi."
+
+### Kanal 5 — Enrichment Channel (Dependency Result Propagation)
+
+Bağımlılık görevlerinin sonuçlarını aktarır.
+
+**İçerik:**
+- Her bağımlılık task'ı için `.result` dosyasından `selfAssessment`, `filesChanged`, `notes` alanları
+- Bağımlılık tamamlanmamışsa: "Beklemede (henüz tamamlanmadı)"
+- Bağımlılık NO_GO ise: NO_GO sebebi ve önerilen çözüm
+
+**Mevcut durum:** Sprint 156 T-007 (Worker Prompt Previous-Result Enrichment) bu kanalı hayata geçirdi. `buildDependenciesBlock()` fonksiyonu güncellendi: artık yalnızca task ID listesi değil, her bağımlılığın `.result` içeriği embed ediliyor.
+
+**Format örneği:**
+```markdown
+## Dependency 154-001 (DONE)
+- Files: src/orchestra/rubric-registry.ts (+196 satır)
+- Self-assessment: DONE
+- Notes: TaskType taxonomy oluşturuldu. audit/document-write/code-development tipleri ve rubric registry.
+```
+
+### Koordinasyon
+
+Tüm kanallar `buildWorkerContext()` içinde birleşir ve tek bir `WorkerContextBundle` nesnesi döndürülür. Bu nesne `spawn-backend-docker.ts` ve `spawn-backend.ts` içinde kullanılarak final worker prompt'u oluşturulur. Token bütçesi aşılırsa (max context window) kanallar öncelik sırasına göre kısaltılır:
+
+```
+1 → 2 → 3 → 4 → 5  (öncelik sırası: 1 en yüksek)
+Kanal 5 (enrichment) en büyük ve en ilk kesilendir.
+```
+
+---
+
+## Consequences
+
+### Olumlu
+
+- **Alignment drift azalır.** Worker'lar ADR'leri, geçmiş öğrenmeleri ve önceki bağımlılık sonuçlarını bilerek çalışır. Sprint 154 boyunca gözlemlenen tekrarlayan hataların önemli bir kısmı bağlam eksikliğinden kaynaklandı.
+- **FIX döngüsü sayısı düşer.** Daha zengin bağlam, ilk denemede daha iyi çıktı anlamına gelir. Sprint sonuçlarında FIX → DONE oranı izlenerek doğrulanabilir.
+- **Manifest uyumsuzluğu erken yakalanır.** Kanal 3 sayesinde worker, kullandığı agent'ın beklenmedik şekilde güncellendiğini görebilir ve Brain'i uyarabilir.
+- **Skill anti-pattern öğrenmesi döngüsel hale gelir.** Her sprint'te `outcome-tracker.ts` yeni anti-pattern verisi üretir; kanal 4 bunu sonraki worker'lara iletir. Bu öğrenme döngüsü ADR-036 (ADR governance) ile uyumludur.
+
+### Olumsuz
+
+- **Prompt token maliyeti artışı.** 5 kanal, mevcut prompt boyutuna önemli bir ek yük getirir. Kanal 5 (dependency enrichment) özellikle büyük olabilir — 10+ bağımlılıklı bir görevde potansiyel olarak binlerce token. Token bütçesi yönetimi ve kanal önceliklendirmesi zorunlu.
+- **Uygulama süresi.** Tam 5-kanal entegrasyonu `prompt-god-template.ts`'in yeniden yapılandırılmasını gerektiriyor. Sprint 156 yalnızca Kanal 5'i tamamladı; kalan kanallar Sprint 157+ roadmap.
+- **Anti-pattern veri kalitesi.** Kanal 4 anti-pattern verisi `outcome-tracker.ts` kayıtlarına bağımlı. Erken sprint'lerde veri yetersiz olacak; anti-pattern listesi boş döner. Bu durumda kanal 4 gürültü değil sessizlik üretmeli.
+- **Manifest checksum false-positive riski.** Kanal 3 checksum eşleşmezliği uyarı üretir; ancak her güncelleme gerçek bir uyumsuzluk değildir (ör. JSDoc güncellemesi). Uyarı seviyesi "warning" olmalı; "block" olmamalı.
+
+---
+
+## Related ADRs
+
+- **ADR-007** — SpawnOptions Interface: `buildWorkerContext()` sonucu spawn options aracılığıyla worker'a iletilir.
+- **ADR-035** — Verification Protocol: Kanal 2 (Sync) öğrenme snapshot'ı, `CODE_VERIFY_REQUEST` kanalı hakkında worker'a önceki deneyimleri aktarabilir.
+- **ADR-036** — ADR Governance: Kanal 2 zorunlu ADR enjeksiyonunu formalize eder; `queryRelevantADRs()` bu kanalın uygulamasıdır.
+- **ADR-041** — Agent Taxonomy: Kanal 3 (Manifest) agent seçim gerekçesini ve versiyon bilgisini aktarır.
+- **ADR-053** — TaskType Taxonomy (proposed): Kanal 1 (Init) görev tipini aktarır; kanal 4 bu tipe özgü anti-pattern verisi içerebilir.
+- **ADR-055** — Hybrid Scoring Pipeline (proposed): Kanal 1 ve 2'deki bağlam bilgisi, Layer 4 (Outcome Weighting) ve Layer 5 (Auditor) skorlamaya girdi sağlar.
+
+---
+
+## Notes
+
+"Self-awareness" terimi bilerek seçilmiştir ve şu anlamı taşır: worker'ın yalnızca görevini değil, görevinin sistemdeki *yerini* bilmesi. Bu kavramsal çerçeve ADR-040 (Nervous System Architecture) ile örtüşür — nervous system sistemin genel durumunu izlerken, self-awareness kanalları bu bilgiyi görev düzeyinde yayar.
+
+Sprint 156 T-007'nin tamamlanması Kanal 5'in canlıya alındığını kanıtlar. Kalan 4 kanal (özellikle Kanal 1 için sprint_sequence_number ve Kanal 3 için manifest_checksum) Sprint 157 ADR consolidation sprint'inde hayata geçirilecektir.
