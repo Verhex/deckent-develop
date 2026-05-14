@@ -17,6 +17,12 @@ const AUTO_END = '<!-- AUTO-END -->';
 const CUSTOM_START = '<!-- CUSTOM-START -->';
 const CUSTOM_END = '<!-- CUSTOM-END -->';
 
+// Bug O fix (Sprint 166-T2): empty CUSTOM template. CUSTOM block is NOT a copy
+// of AUTO content — it is a sprint-specific empty placeholder where users (or
+// future hooks) inject custom rules. A single newline keeps the markers on
+// separate lines while keeping the slot semantically empty.
+export const CUSTOM_TEMPLATE = '\n';
+
 const ADR_PLACEHOLDER = '{{ADR_SECTION}}';
 
 const ROLES = ['brain', 'auditor', 'worker-default'] as const;
@@ -197,13 +203,12 @@ export function mergeWithCustom(autoContent: string, existingContent: string | n
     );
   }
 
-  // No custom section: wrap auto content and add empty custom block
+  // No custom section: wrap auto content and add empty CUSTOM_TEMPLATE block
   return (
     AUTO_START + '\n' +
     autoContent +
     AUTO_END + '\n\n' +
-    CUSTOM_START + '\n' +
-    CUSTOM_END + '\n'
+    CUSTOM_START + CUSTOM_TEMPLATE + CUSTOM_END + '\n'
   );
 }
 

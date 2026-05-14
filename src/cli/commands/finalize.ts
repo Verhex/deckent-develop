@@ -163,10 +163,19 @@ export function registerFinalize(program: Command): void {
 
         const config = await loadConfig(root);
 
+        // Bug N fix (Sprint 166-T2): wire onRuleRegen to regenerateRules so manual
+        // finalize regenerates .claude/rules/*.md just like the Brain-driven path
+        // in sprint-phases.ts:1238. Dynamic import to avoid pulling MemoryStore /
+        // better-sqlite3 into the CLI cold path.
+        const { regenerateRules } = await import('../../core/rule-generator.js');
+
         const metrics = await finalizeSprint(root, sprint, evaluations, results, {
           skipDecay: opts.skipDecay,
           skipHooks: opts.skipHooks,
           config,
+          onRuleRegen: async (projectRoot: string): Promise<void> => {
+            await regenerateRules(projectRoot);
+          },
         });
 
         print(getMessage('finalize.complete', lang, {
