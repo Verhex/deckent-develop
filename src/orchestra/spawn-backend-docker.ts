@@ -370,9 +370,9 @@ export class DockerSpawnBackend implements SpawnBackend {
       '--user', `${uid}:${gid}`,
       // HOME must point to a directory that EXISTS in the container
       '-e', `HOME=${containerHome}`,
-      // Memory limits — Claude CLI needs ~1-2GB base, leave headroom
-      '--memory', '4g',
-      '--memory-swap', '6g',
+      // Memory limits — Claude CLI peak ~4-6GB (Sprint 166 Bug G OOM forensic), 8g + 12g headroom
+      '--memory', '8g',
+      '--memory-swap', '12g',
       // Writable HOME via tmpfs — Claude CLI needs to write config/cache here
       '--tmpfs', `${containerHome}:size=100m,uid=${uid},gid=${gid}`,
       // Project mounted read-write — workers need to create/edit files in scope
