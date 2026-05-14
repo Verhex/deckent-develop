@@ -498,3 +498,135 @@ export function releaseAllSpawnLocks(
   }
   return released;
 }
+
+// ═══ Spawn-Time Lock Cleanup Helpers (Sprint 168 C0b — RC4 Bug E) ═════════
+// Sprint 156 T-10 introduced `.spawnlock` as a distinct namespace to keep
+// regular `.lock` cleanup helpers from touching them. The cleanup helpers
+// for spawn locks themselves were never added — 11 sprints later Sprint 167
+// crashed in SPAWN phase because orphan/stale spawnlocks accumulated and
+// blocked the next acquire. Phase 2 §141 enumerated the 5 missing helpers
+// (checkSpawnLock, checkSpawnLocks, clearStaleSpawnLocks,
+// clearOrphanSpawnLocks, releaseStaleSpawnLocksForTask). These mirror the
+// regular-lock symmetric API around acquireSpawnLock / releaseSpawnLock.
+
+/**
+ * Check a single spawn lock. Returns SpawnLockInfo when held, null otherwise.
+ * Symmetric with checkLock() for regular `.lock` files.
+ */
+export function checkSpawnLock(
+  projectRoot: string,
+  filePath: string,
+): SpawnLockInfo | null {
+  const lockPath = spawnLockPathFor(projectRoot, filePath);
+  if (!existsSync(lockPath)) return null;
+  try {
+    return JSON.parse(readFileSync(lockPath, 'utf-8')) as SpawnLockInfo;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * List every active spawn lock in the project's `.locks/` directory.
+ * Skips corrupted lock files silently. Symmetric with checkLocks().
+ */
+export function checkSpawnLocks(projectRoot: string): SpawnLockInfo[] {
+  const locksDir = join(projectRoot, LOCKS_DIR);
+  if (!existsSync(locksDir)) return [];
+
+  const out: SpawnLockInfo[] = [];
+  let files: string[];
+  try {
+    const all = readdirSync(locksDir);
+    if (!Array.isArray(all)) return [];
+    files = all.filter(f => typeof f === 'string' && f.endsWith('.spawnlock'));
+  } catch {
+    return [];
+  }
+
+  for (const file of files) {
+    try {
+      const lock = JSON.parse(readFileSync(join(locksDir, file), 'utf-8')) as SpawnLockInfo;
+      out.push(lock);
+    } catch {
+      // Skip corrupted spawnlock files
+    }
+  }
+  return out;
+}
+
+/**
+ * Clear spawn locks older than `maxAgeMs` (TTL-based stale cleanup).
+ * Default 5 minutes — Auditor scan loop calls this every 30 seconds.
+ * Symmetric with clearStaleLocks() for regular `.lock` files.
+ * Returns the number of stale spawn locks removed.
+ */
+export function clearStaleSpawnLocks(
+  projectRoot: string,
+  maxAgeMs = 300_000,
+): number {
+  const locks = checkSpawnLocks(projectRoot);
+  if (locks.length === 0) return 0;
+
+  const nowMs = Date.now();
+  let cleared = 0;
+  for (const lock of locks) {
+    const acquiredMs = new Date(lock.acquiredAt).getTime();
+    if (Number.isNaN(acquiredMs)) continue;
+    if (nowMs - acquiredMs > maxAgeMs) {
+      releaseSpawnLock(projectRoot, lock.taskId, lock.filePath);
+      cleared++;
+      debugLog(
+        'file-lock:clearStaleSpawnLocks',
+        `Released stale spawn lock: ${lock.filePath} (taskId=${lock.taskId}, age=${Math.round((nowMs - acquiredMs) / 1000)}s)`,
+      );
+    }
+  }
+  return cleared;
+}
+
+/**
+ * Clear orphan spawn locks — locks whose `taskId` is not in `activeTaskIds`.
+ * Used by Auditor scan loop after worker crashes / Brain stalls leave behind
+ * locks for tasks that no longer exist. Symmetric with clearOrphanLocks()
+ * for regular `.lock` files. Returns the count released.
+ */
+export function clearOrphanSpawnLocks(
+  projectRoot: string,
+  activeTaskIds: readonly string[],
+): number {
+  const locks = checkSpawnLocks(projectRoot);
+  if (locks.length === 0) return 0;
+
+  const activeSet = new Set(activeTaskIds);
+  let cleared = 0;
+  for (const lock of locks) {
+    if (!activeSet.has(lock.taskId)) {
+      releaseSpawnLock(projectRoot, lock.taskId, lock.filePath);
+      cleared++;
+      debugLog(
+        'file-lock:clearOrphanSpawnLocks',
+        `Released orphan spawn lock: ${lock.filePath} (taskId=${lock.taskId})`,
+      );
+    }
+  }
+  return cleared;
+}
+
+/**
+ * Release every spawn lock owned by `taskId`. Sad-path cleanup helper used
+ * by spawn backends on container exit / kill — covers paths where
+ * releaseAllSpawnLocks may have been bypassed (e.g. abrupt worker errors).
+ * No-op when no spawn locks for the task exist.
+ */
+export function releaseStaleSpawnLocksForTask(
+  projectRoot: string,
+  taskId: string,
+): void {
+  const locks = checkSpawnLocks(projectRoot);
+  for (const lock of locks) {
+    if (lock.taskId === taskId) {
+      releaseSpawnLock(projectRoot, taskId, lock.filePath);
+    }
+  }
+}

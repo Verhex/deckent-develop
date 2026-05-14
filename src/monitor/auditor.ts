@@ -27,7 +27,7 @@ import {
 import { readJsonSafe, debugLog } from '../core/utils.js';
 import { metric } from '../core/observability.js';
 import { writeEvent, CHANNELS } from '../orchestra/event-stream.js';
-import { clearOrphanLocks } from '../core/file-lock.js';
+import { clearOrphanLocks, clearOrphanSpawnLocks, clearStaleSpawnLocks } from '../core/file-lock.js';
 import { checkAuthority, emitAuthorityViolation } from '../orchestra/authority-enforcer.js';
 import { MemoryStore } from '../core/memory-store.js';
 import { MEMORY_DB_FILE } from '../core/constants.js';
@@ -998,6 +998,39 @@ export function runScanCycle(
       createAlert(AlertLevel.WARNING, `Doc-sync ground-truth mismatch: ${v.detail}`, v.agentId),
     );
 
+    // ─── Sprint 168 C0b: SpawnLock orphan + stale cleanup (RC4 Bug E) ─
+    // Mirror L485 stale_lock paterni for `.spawnlock` files.
+    // Active task IDs derive from .tasks/*.json in non-terminal status —
+    // anything else is orphan (worker crashed / Brain stalled mid-sprint).
+    const spawnLockAlerts: Alert[] = [];
+    try {
+      const activeTaskIds = tasks
+        .filter(t => t.status !== TaskStatus.DONE && t.status !== TaskStatus.NO_GO)
+        .map(t => t.id);
+      const orphanCleared = clearOrphanSpawnLocks(projectRoot, activeTaskIds);
+      if (orphanCleared > 0) {
+        spawnLockAlerts.push(
+          createAlert(
+            AlertLevel.WARNING,
+            `[stale_spawn_lock] Auto-removed ${orphanCleared} orphan spawn lock(s)`,
+            'auditor:spawn-lock',
+          ),
+        );
+      }
+      const staleCleared = clearStaleSpawnLocks(projectRoot, 300_000); // 5min TTL
+      if (staleCleared > 0) {
+        spawnLockAlerts.push(
+          createAlert(
+            AlertLevel.WARNING,
+            `[stale_spawn_lock] Auto-removed ${staleCleared} stale spawn lock(s) (TTL > 5min)`,
+            'auditor:spawn-lock',
+          ),
+        );
+      }
+    } catch {
+      // SpawnLock cleanup failure must not break the scan loop
+    }
+
     const allViolations = [
       ...hbResult.staleAgents,
       ...boundaryViolations,
@@ -1005,7 +1038,14 @@ export function runScanCycle(
       ...deadlocks,
       ...groundTruthViolations,
     ];
-    const allAlerts = [...hbResult.alerts, ...lockResult.alerts, ...depAlerts, ...authorityAlerts, ...groundTruthAlerts];
+    const allAlerts = [
+      ...hbResult.alerts,
+      ...lockResult.alerts,
+      ...depAlerts,
+      ...authorityAlerts,
+      ...groundTruthAlerts,
+      ...spawnLockAlerts,
+    ];
 
     // Detect patterns from violations
     detectPatterns(projectRoot, allViolations, currentSprintId);

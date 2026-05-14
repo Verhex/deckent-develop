@@ -14,6 +14,7 @@ import { debugLog } from '../core/utils.js';
 import {
   acquireSpawnLocks,
   releaseAllSpawnLocks,
+  releaseStaleSpawnLocksForTask,
   SpawnLockError,
 } from '../core/file-lock.js';
 import type { SpawnBackend, SpawnBackendOptions } from './spawn-backend.js';
@@ -935,6 +936,13 @@ export class DockerSpawnBackend implements SpawnBackend {
         const released = releaseAllSpawnLocks(this.projectDir, taskId);
         if (released > 0) debugLog('docker-backend:spawn-lock', `taskId=${taskId} released ${released} spawn lock(s) on exit`);
       } catch (e) { debugLog('docker-backend:spawn-lock-release', e); }
+
+      // Sprint 168 C0b: defensive sad-path safety net — releaseStaleSpawnLocksForTask
+      // catches any spawnlock missed by releaseAllSpawnLocks (e.g. corrupted file,
+      // partial unlink). Both helpers are idempotent and cheap when no locks remain.
+      try {
+        releaseStaleSpawnLocksForTask(this.projectDir, taskId);
+      } catch (e) { debugLog('docker-backend:spawn-lock-stale-release', e); }
 
       this.containers.delete(taskId);
 
