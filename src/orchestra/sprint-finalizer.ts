@@ -1036,16 +1036,21 @@ export async function finalizeSprint(
     }
   }
 
-  // 12. Archive DIRECTIVES.md (auto_archive_directives config flag, default true)
+  // 12. Archive DIRECTIVES.md — always archive copy; PRESERVE working DIRECTIVES.md by default.
+  //
+  // Sprint 168 C0a-4 (BUG-CC fix, Alperen Pre-Flight Step 16 Option B):
+  //   - auto_archive_directives config flag default flipped: true → FALSE
+  //   - Default: DIRECTIVES.md is PRESERVED (archive copy still always written)
+  //   - Opt-in: `auto_archive_directives: true` restores legacy placeholder-overwrite
+  //
+  // Rationale: Sprint 167 BUG-CC live evidence — placeholder overwrite =
+  // catastrophic sprint context loss. Conservative default (preserve) safer.
+  // See ADR-046 Amendment (Sprint 168 C0a-4).
   debugLog('finalizeSprint:breadcrumb', 'Step 12 (archiveDirectives) — entering');
   try {
     const rawCfg = opts?.config as Record<string, unknown> | undefined;
-    const autoArchive = rawCfg?.['auto_archive_directives'] ?? true;
-    if (autoArchive) {
-      archiveDirectives(projectRoot, sprint.id, 'CLEANUP');
-    } else {
-      debugLog('finalizeSprint:archiveDirectives', 'Skipped — auto_archive_directives=false');
-    }
+    const autoArchive = rawCfg?.['auto_archive_directives'] ?? false;
+    archiveDirectives(projectRoot, sprint.id, 'CLEANUP', { autoArchive: autoArchive === true });
   } catch (e) { debugLog('finalizeSprint:archiveDirectives', e); }
 
   // 12b. Archive orphan task files from .tasks/ to .brain/archive/sprint-NNN-tasks/

@@ -531,11 +531,37 @@ export function collectSprintFiles(root: string): Array<{ file: string; dir: str
 // ═══ DIRECTIVES Auto-Archive ══════════════════════════════════════
 
 /**
- * Archive the current DIRECTIVES.md and replace it with a placeholder
- * for the next sprint. Called by finalizeSprint() after RETRO is written.
+ * Options for archiveDirectives() (Sprint 168 C0a-4 BUG-CC fix).
  *
- * - Copies DIRECTIVES.md → .brain/archive/DIRECTIVES-sprint-NNN.md
- * - Writes a placeholder DIRECTIVES.md with next-sprint header
+ * @property autoArchive - When `true`, after copying DIRECTIVES.md to archive,
+ *   overwrites the working DIRECTIVES.md with a next-sprint placeholder
+ *   (legacy behavior). When `false` (default), DIRECTIVES.md is PRESERVED
+ *   on disk and only an archive copy is written.
+ *
+ *   Default flipped to `false` per Alperen Pre-Flight Step 16 Option B
+ *   decision following Sprint 167 BUG-CC live evidence: mid-sprint
+ *   placeholder overwrite = catastrophic sprint context loss. The
+ *   conservative "preserve" default is safer; opt-in remains available
+ *   for orchestrators that genuinely want the auto-reset workflow.
+ *
+ *   See ADR-046 Amendment (Sprint 168 C0a-4).
+ */
+export interface ArchiveDirectivesOptions {
+  autoArchive?: boolean;
+}
+
+/**
+ * Archive the current DIRECTIVES.md to .brain/archive/.
+ *
+ * Always copies DIRECTIVES.md → .brain/archive/DIRECTIVES-sprint-NNN.md (audit trail).
+ * The working DIRECTIVES.md is PRESERVED by default; opt-in placeholder
+ * overwrite via `{ autoArchive: true }` (legacy behavior).
+ *
+ * Called by finalizeSprint() Step 12 after RETRO is written.
+ *
+ * - Always: copies DIRECTIVES.md → .brain/archive/DIRECTIVES-sprint-NNN.md
+ * - Default (Sprint 168 C0a-4 Option B): PRESERVES the working DIRECTIVES.md
+ * - Opt-in via `{ autoArchive: true }`: writes next-sprint placeholder (legacy)
  * - Creates .brain/archive/ if it doesn't exist
  * - No-ops gracefully if DIRECTIVES.md doesn't exist
  * - Phase guard: only executes during CLEANUP or COMPLETE phase (Sprint 146 bug fix)
@@ -543,8 +569,14 @@ export function collectSprintFiles(root: string): Array<{ file: string; dir: str
  * @param projectRoot - Project root directory
  * @param sprintId - The completed sprint ID (e.g. 'sprint-133')
  * @param phase - Current sprint phase. If provided, only CLEANUP/COMPLETE phases are allowed.
+ * @param options - Archive options. See {@link ArchiveDirectivesOptions}.
  */
-export function archiveDirectives(projectRoot: string, sprintId: string, phase?: string): void {
+export function archiveDirectives(
+  projectRoot: string,
+  sprintId: string,
+  phase?: string,
+  options: ArchiveDirectivesOptions = {},
+): void {
   // Phase guard: reject calls outside CLEANUP/COMPLETE (Sprint 146 T-008 bug fix)
   if (phase !== undefined && phase !== 'CLEANUP' && phase !== 'COMPLETE') {
     debugLog('archiveDirectives', `REJECTED: called in phase ${phase}, only CLEANUP allowed`);
@@ -562,13 +594,25 @@ export function archiveDirectives(projectRoot: string, sprintId: string, phase?:
 
   const archiveFileName = `DIRECTIVES-${sprintId}.md`;
   const archivePath = join(archiveDir, archiveFileName);
+  // Always archive copy (audit trail)
   copyFileSync(directivesPath, archivePath);
 
-  const currentNum = extractSprintNumber(sprintId);
-  const nextNum = currentNum !== null ? currentNum + 1 : '???';
-
-  writeFileSync(directivesPath, buildDirectivesPlaceholder(sprintId, archiveFileName, nextNum));
-  debugLog('archiveDirectives', `Archived ${DIRECTIVES_FILE} → ${archivePath}`);
+  // Sprint 168 C0a-4 BUG-CC fix: default PRESERVE working DIRECTIVES.md.
+  // Opt-in legacy placeholder-overwrite behavior via { autoArchive: true }.
+  if (options.autoArchive === true) {
+    const currentNum = extractSprintNumber(sprintId);
+    const nextNum = currentNum !== null ? currentNum + 1 : '???';
+    writeFileSync(directivesPath, buildDirectivesPlaceholder(sprintId, archiveFileName, nextNum));
+    debugLog(
+      'archiveDirectives',
+      `Archived ${DIRECTIVES_FILE} → ${archivePath} (autoArchive=true → placeholder written)`,
+    );
+  } else {
+    debugLog(
+      'archiveDirectives',
+      `Archived ${DIRECTIVES_FILE} → ${archivePath} (preserved; autoArchive=false default per ADR-046 amendment Sprint 168 C0a-4)`,
+    );
+  }
 }
 
 /**

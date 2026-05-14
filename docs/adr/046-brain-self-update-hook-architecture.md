@@ -257,3 +257,92 @@ coverage (`tests/core/identity-generator-step-order.test.ts`) kontratı kalıcı
 
 Sprint 167-168 için M1-M4 monitoring baseline ve Sprint 170 refactor trigger bu ADR'a
 kodlanmıştır — gelecek sprint'ler bu kararı referans alarak genişletebilir.
+
+---
+
+## Amendment — Sprint 168 C0a-4 (BUG-CC fix)
+
+**Date:** 2026-05-14
+**Author:** Alperen Sartaçoğlu
+**Sprint:** sprint-168
+**Cluster:** A.4 (BUG-CC closure)
+**Decision reference:** `.deckent/sprint-168-archive-decision.txt` (Alperen Pre-Flight Step 16 — Option B)
+
+### Step 12 Default Behavior Flip — `archiveDirectives`
+
+Bu amendment, ADR-046 Step Ordering Contract'ın **Step 12 (archiveDirectives)** adımında
+default davranışı değiştirir. Step sırası, idempotency garantileri ve diğer kontrat
+maddeleri **aynen geçerli** kalır.
+
+#### Önceki (Sprint 138–167 davranışı)
+
+```ts
+// finalizeSprint Step 12 (legacy)
+const autoArchive = rawCfg?.['auto_archive_directives'] ?? true;  // default TRUE
+if (autoArchive) archiveDirectives(projectRoot, sprint.id, 'CLEANUP');
+```
+
+- Sprint finalize'da `DIRECTIVES.md` her zaman placeholder ile **overwrite** edilirdi.
+- Archive copy yazılırdı (`.brain/archive/DIRECTIVES-sprint-NNN.md`).
+- Mid-sprint yanlış invocation veya yan etki → DIRECTIVES.md kaybı = sprint context kaybı.
+
+#### Yeni (Sprint 168+ davranışı)
+
+```ts
+// finalizeSprint Step 12 (Sprint 168 C0a-4)
+const autoArchive = rawCfg?.['auto_archive_directives'] ?? false;  // default FALSE
+archiveDirectives(projectRoot, sprint.id, 'CLEANUP', { autoArchive: autoArchive === true });
+```
+
+```ts
+// archiveDirectives implementation (Sprint 168 C0a-4)
+export interface ArchiveDirectivesOptions {
+  autoArchive?: boolean;  // default false — PRESERVE working DIRECTIVES.md
+}
+
+export function archiveDirectives(
+  projectRoot: string,
+  sprintId: string,
+  phase?: string,
+  options: ArchiveDirectivesOptions = {},
+): void { /* ... */ }
+```
+
+- **Default:** `DIRECTIVES.md` **KORUNUR** (preserve). Archive copy her zaman yazılır.
+- **Opt-in:** `auto_archive_directives: true` → eski legacy davranış
+  (placeholder overwrite). Resmi `deckent` orchestrator için açık opt-in gerekir.
+
+#### Gerekçe
+
+Sprint 167 BUG-CC live evidence (Phase 1+2 forensic — `.audit/sprint-167/T5-brain-debug-phase1.md`,
+`phase2.md` Cluster A.4):
+- DIRECTIVES.md placeholder ile overwrite olduktan sonra, **mevcut sprint context'i kayboldu**.
+- Recovery için `emergencyRestoreDirectives` reaktif workaround gerekti — ancak orijinal
+  içerik (description, kanıt blokları, custom directives) tam restore edilemedi.
+- Conservative "preserve by default" davranışı, kayıp riskini sıfıra indirir; archive copy
+  yine de audit trail için garanti.
+
+#### Test Invariant
+
+Default preserve davranışı kalıcı test ile garanti altına alındı:
+
+```
+tests/orchestra/archive-directives-default-preserve.test.ts
+  ✓ preserves DIRECTIVES.md by default (auto_archive_directives=false)
+  ✓ overwrites DIRECTIVES.md when autoArchive=true (opt-in legacy)
+  ✓ skips silently when DIRECTIVES.md does not exist
+  ✓ phase guard still rejects non-CLEANUP/COMPLETE phases (default preserve)
+```
+
+#### Backward Compatibility
+
+Mevcut konfigürasyonlar:
+- `auto_archive_directives` config flag'i tanımlı **değilse** → yeni default (false, preserve).
+- `auto_archive_directives: true` ayarlı projeler → legacy davranış aynen devam eder.
+- `auto_archive_directives: false` ayarlı projeler → davranış değişmez (zaten preserve).
+
+#### Step Ordering Contract — Değişmedi
+
+ADR-046'nın orijinal Step Ordering Contract maddeleri (Step 1–13 sırası, idempotency,
+dual-write garantileri) bu amendment'tan **etkilenmez**. Sadece Step 12'nin "side-effect
+default'u" değiştirildi; sıra ve hook architecture aynen geçerli.
