@@ -73,7 +73,8 @@ export type BoundaryViolationType =
   | 'stale_heartbeat'
   | 'stale_lock'
   | 'circular_dependency'
-  | 'memory_budget_exceeded';
+  | 'memory_budget_exceeded'
+  | 'doc_sync_ground_truth_mismatch';
 
 export interface BoundaryViolation {
   type: BoundaryViolationType;

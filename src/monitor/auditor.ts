@@ -32,6 +32,7 @@ import { checkAuthority, emitAuthorityViolation } from '../orchestra/authority-e
 import { MemoryStore } from '../core/memory-store.js';
 import { MEMORY_DB_FILE } from '../core/constants.js';
 import { ACTIVE_EXECUTION_STATUSES, COMPLETED_STATUSES } from '../core/heartbeat-types.js';
+import { emitAlert } from './alert-emitter.js';
 
 // ─── Constants ─────────────────────────────────────────────────────
 
@@ -666,6 +667,252 @@ export function detectPatterns(
   writeFileSync(patternsPath, JSON.stringify(existingPatterns, null, 2), 'utf-8');
 }
 
+// ─── Bug Y2: Doc-Sync Ground-Truth Verification (Sprint 166) ──────────
+//
+// Sprint 164 commit a4f3be4 wrongly injected "16 agent + test-writer" into
+// coordinator agent prompt; the actual count is 15. Five anchor .md files
+// were updated with the wrong number. This module provides 3-layer
+// defense-in-depth: prompt claim verification at plan-time, integration
+// retro assertion, and Auditor runtime mismatch detection.
+
+/** A ground-truth metric that can be measured against the filesystem. */
+export interface GroundTruthMetric {
+  /** Metric identifier (e.g. "agents_count") */
+  metric: string;
+  /** Measured value from filesystem (source of truth) */
+  measured: number;
+  /** Optional source path used for the measurement */
+  source?: string;
+}
+
+/** A claim parsed from a task description (e.g. "16 agents") */
+export interface GroundTruthClaim {
+  metric: string;
+  claimed: number;
+  /** Original matched substring for diagnostics */
+  raw: string;
+}
+
+/** Result of a single mismatch check */
+export interface GroundTruthMismatch {
+  metric: string;
+  claimed: number;
+  measured: number;
+  /** Override applied (if any) — overrides suppress the violation */
+  overrideApplied?: boolean;
+  /** Original matched substring */
+  raw: string;
+}
+
+/** Ground-truth whitelist override schema (.deckent/ground-truth-overrides.json) */
+export interface GroundTruthOverride {
+  metric: string;
+  expected: number;
+  approvedBy: string;
+  until_sprint: number;
+  reason: string;
+}
+
+export interface GroundTruthOverridesFile {
+  version: string;
+  overrides: GroundTruthOverride[];
+}
+
+/**
+ * Measure the canonical agents count by counting directories under
+ * src/core/builtins/agents/. Returns -1 if directory does not exist
+ * (caller treats -1 as "no ground truth available, skip check").
+ */
+export function measureAgentsCount(projectRoot: string): number {
+  const agentsDir = join(projectRoot, 'src/core/builtins/agents');
+  if (!existsSync(agentsDir)) return -1;
+  try {
+    return readdirSync(agentsDir, { withFileTypes: true })
+      .filter((d) => d.isDirectory())
+      .length;
+  } catch {
+    return -1;
+  }
+}
+
+/**
+ * Parse "N agents" claims from a task description / prompt text.
+ * Matches phrases like "16 agents", "15 built-in agents", "16 agent + test-writer".
+ * Returns each match as a claim entry (the same metric may appear multiple times).
+ */
+export function parseAgentsClaims(text: string): GroundTruthClaim[] {
+  if (!text) return [];
+  const claims: GroundTruthClaim[] = [];
+  // Word boundary protects against matching "16 agents" inside e.g. "1160 agents"
+  const re = /\b(\d{1,3})\s+(?:built-?in\s+)?agents?\b/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    const numStr = m[1];
+    if (!numStr) continue;
+    const claimed = Number.parseInt(numStr, 10);
+    if (!Number.isFinite(claimed)) continue;
+    claims.push({
+      metric: 'agents_count',
+      claimed,
+      raw: m[0],
+    });
+  }
+  return claims;
+}
+
+/**
+ * Load whitelist overrides from .deckent/ground-truth-overrides.json.
+ * Returns empty list when the file is missing or malformed (fail-safe).
+ */
+export function loadGroundTruthOverrides(projectRoot: string): GroundTruthOverride[] {
+  const path = join(projectRoot, '.deckent', 'ground-truth-overrides.json');
+  if (!existsSync(path)) return [];
+  try {
+    const raw = readFileSync(path, 'utf-8');
+    const parsed = JSON.parse(raw) as GroundTruthOverridesFile;
+    if (!parsed || !Array.isArray(parsed.overrides)) return [];
+    return parsed.overrides;
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Parse the numeric portion of a sprint id (e.g. "sprint-166" → 166).
+ * Returns NaN if the id is malformed.
+ */
+function parseSprintNumber(sprintId: string | undefined | null): number {
+  if (!sprintId) return Number.NaN;
+  const m = /sprint-(\d+)/i.exec(sprintId);
+  if (!m || !m[1]) return Number.NaN;
+  return Number.parseInt(m[1], 10);
+}
+
+/**
+ * Resolve whether an override applies for a (metric, claimed, currentSprint).
+ * Override applies when metric matches, the expected value equals the claim,
+ * and current sprint number is strictly less than until_sprint.
+ */
+export function overrideApplies(
+  overrides: GroundTruthOverride[],
+  metric: string,
+  claimed: number,
+  currentSprintId: string,
+): boolean {
+  const current = parseSprintNumber(currentSprintId);
+  for (const o of overrides) {
+    if (o.metric !== metric) continue;
+    if (o.expected !== claimed) continue;
+    // If sprint id is malformed, treat as ALWAYS active override (fail-open for whitelist)
+    if (Number.isNaN(current)) return true;
+    if (current < o.until_sprint) return true;
+  }
+  return false;
+}
+
+/**
+ * Verify doc-sync ground-truth claims in a task description.
+ *
+ * Returns the list of mismatches detected (empty when all claims match
+ * measured values or are covered by a whitelist override).
+ *
+ * Falsifiable predicate: a mismatch is any (metric, claimed) where
+ * `claimed !== measured` AND no whitelist override applies.
+ *
+ * The function never throws — measurement or override-load failures
+ * yield an empty result set (fail-safe).
+ */
+export function verifyDocSyncGroundTruth(
+  projectRoot: string,
+  task: { description?: string; title?: string; id?: string },
+  currentSprintId: string,
+  opts: { overrides?: GroundTruthOverride[]; metrics?: GroundTruthMetric[] } = {},
+): GroundTruthMismatch[] {
+  const text = `${task.title ?? ''}\n${task.description ?? ''}`;
+  if (!text.trim()) return [];
+
+  const overrides = opts.overrides ?? loadGroundTruthOverrides(projectRoot);
+
+  // Default metric set: agents_count from src/core/builtins/agents/
+  const defaultMetrics: GroundTruthMetric[] = [];
+  const agentsMeasured = measureAgentsCount(projectRoot);
+  if (agentsMeasured >= 0) {
+    defaultMetrics.push({ metric: 'agents_count', measured: agentsMeasured });
+  }
+  const metrics = opts.metrics ?? defaultMetrics;
+  const byMetric = new Map<string, GroundTruthMetric>();
+  for (const m of metrics) byMetric.set(m.metric, m);
+
+  const mismatches: GroundTruthMismatch[] = [];
+  const claims = parseAgentsClaims(text);
+  for (const claim of claims) {
+    const gt = byMetric.get(claim.metric);
+    if (!gt) continue; // no ground truth available — skip
+    if (claim.claimed === gt.measured) continue;
+    const overrideApplied = overrideApplies(overrides, claim.metric, claim.claimed, currentSprintId);
+    if (overrideApplied) continue;
+    mismatches.push({
+      metric: claim.metric,
+      claimed: claim.claimed,
+      measured: gt.measured,
+      overrideApplied: false,
+      raw: claim.raw,
+    });
+  }
+  return mismatches;
+}
+
+/**
+ * Build BoundaryViolation entries from ground-truth mismatches.
+ * Threshold is zero-tolerance: any mismatch produces one violation.
+ */
+export function groundTruthMismatchesToViolations(
+  taskId: string,
+  mismatches: GroundTruthMismatch[],
+): BoundaryViolation[] {
+  return mismatches.map((m) => ({
+    type: 'doc_sync_ground_truth_mismatch',
+    agentId: taskId,
+    detail: `Task ${taskId} claim "${m.raw}" (${m.metric}=${m.claimed}) does not match measured value ${m.measured}`,
+    timestamp: now(),
+  }));
+}
+
+/**
+ * Scan all active tasks for doc-sync ground-truth mismatches.
+ * Used by runScanCycle to integrate into the existing audit loop.
+ */
+export function scanTasksForGroundTruthMismatches(
+  projectRoot: string,
+  currentSprintId: string,
+): BoundaryViolation[] {
+  const tasksDir = join(projectRoot, TASKS_DIR);
+  if (!existsSync(tasksDir)) return [];
+  const overrides = loadGroundTruthOverrides(projectRoot);
+  const violations: BoundaryViolation[] = [];
+  let taskFiles: string[];
+  try {
+    taskFiles = readdirSync(tasksDir).filter(
+      (f) => f.startsWith('task-') && f.endsWith('.json'),
+    );
+  } catch {
+    return [];
+  }
+  for (const file of taskFiles) {
+    const task = readJsonSafe<Task>(join(tasksDir, file));
+    if (!task) continue;
+    const mismatches = verifyDocSyncGroundTruth(
+      projectRoot,
+      { id: task.id, title: task.title, description: task.description },
+      currentSprintId,
+      { overrides },
+    );
+    if (mismatches.length === 0) continue;
+    violations.push(...groundTruthMismatchesToViolations(task.id ?? file, mismatches));
+  }
+  return violations;
+}
+
 export function buildWorkerScopeMap(
   projectRoot: string,
 ): Map<string, TaskScope> {
@@ -743,16 +990,79 @@ export function runScanCycle(
       ),
     );
 
+    // Sprint 166 Task 4 (Bug Y2): Doc-sync ground-truth mismatch detection.
+    // Catches stale numeric claims in task descriptions vs filesystem reality
+    // (e.g. "16 agents" when src/core/builtins/agents/ has 15 directories).
+    const groundTruthViolations = scanTasksForGroundTruthMismatches(projectRoot, currentSprintId);
+    const groundTruthAlerts: Alert[] = groundTruthViolations.map((v) =>
+      createAlert(AlertLevel.WARNING, `Doc-sync ground-truth mismatch: ${v.detail}`, v.agentId),
+    );
+
     const allViolations = [
       ...hbResult.staleAgents,
       ...boundaryViolations,
       ...lockResult.staleLocks,
       ...deadlocks,
+      ...groundTruthViolations,
     ];
-    const allAlerts = [...hbResult.alerts, ...lockResult.alerts, ...depAlerts, ...authorityAlerts];
+    const allAlerts = [...hbResult.alerts, ...lockResult.alerts, ...depAlerts, ...authorityAlerts, ...groundTruthAlerts];
 
     // Detect patterns from violations
     detectPatterns(projectRoot, allViolations, currentSprintId);
+
+    // Sprint 166 Bug W: Wire detected violation patterns into memory.db as type='pattern'.
+    // Sprint 148-165: 0 pattern entries — file-only write existed but DB insert was missing.
+    if (allViolations.length > 0) {
+      const dbPath = join(projectRoot, BRAIN_DIR, MEMORY_DB_FILE);
+      try {
+        if (existsSync(dbPath)) {
+          const store = new MemoryStore(dbPath);
+          try {
+            const violationTypes = new Map<string, number>();
+            for (const v of allViolations) {
+              violationTypes.set(v.type, (violationTypes.get(v.type) ?? 0) + 1);
+            }
+            for (const [type, count] of violationTypes) {
+              const id = `pattern-${currentSprintId}-${type}`;
+              store.upsert({
+                id,
+                type: 'pattern',
+                title: `Violation pattern: ${type}`,
+                content: `${count} occurrence(s) of ${type} detected in ${currentSprintId}`,
+                sprint_id: currentSprintId,
+                tags: ['auditor', 'pattern', type],
+                status: 'active',
+                metadata: { violationType: type, occurrences: count },
+              }, 'auditor');
+            }
+          } finally {
+            store.close();
+          }
+        }
+      } catch {
+        // DB insert failure must not break scan loop
+      }
+    }
+
+    // Sprint 166 Bug W: stale_md detector (M4 monitoring).
+    // CLAUDE.md mtime > 70 min triggers emitAlert so the dashboard surface shows staleness.
+    try {
+      const claudeMdPath = join(projectRoot, 'CLAUDE.md');
+      if (existsSync(claudeMdPath)) {
+        const { mtimeMs } = statSync(claudeMdPath);
+        const staleThresholdMs = 70 * 60 * 1000;
+        if (Date.now() - mtimeMs > staleThresholdMs) {
+          emitAlert(projectRoot, currentSprintId, {
+            type: 'stale_md',
+            message: `CLAUDE.md has not been updated in over 70 minutes (mtime: ${new Date(mtimeMs).toISOString()})`,
+            source: 'auditor:stale_md_detector',
+            mtimeMs,
+          });
+        }
+      }
+    } catch {
+      // stale_md check failure must not break scan loop
+    }
 
     // Sprint 138: Emit lock state snapshot to event stream
     if (lockResult.locks.length > 0) {

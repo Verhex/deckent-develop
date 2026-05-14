@@ -1,7 +1,7 @@
 // ─── Task Creation & Directive Parsing ─────────────────────────────
 // Extracted from brain.ts — task construction, scope extraction, directive parsing
 import { z } from 'zod';
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type {
   Task, TaskScope, GoNoGoCriteria, ModelType, TaskEffort, TaskPriority,
@@ -262,6 +262,103 @@ export function createTask(params: CreateTaskParams, sequence: number): Task {
     assignedSkills: params.forceSkills ?? [],
     createdAt: now(),
   };
+}
+
+// ─── Bug Y2: Plan-time Ground-Truth Claim Validation (Sprint 166) ─────
+//
+// Catches stale numeric claims in directive task descriptions (e.g. "16 agents")
+// before they ever reach the worker prompt. Mirrors the runtime check in
+// auditor.ts:verifyDocSyncGroundTruth — same regex, same override file.
+
+export interface GroundTruthClaimIssue {
+  metric: string;
+  claimed: number;
+  measured: number;
+  raw: string;
+}
+
+interface GroundTruthOverrideEntry {
+  metric: string;
+  expected: number;
+  approvedBy: string;
+  until_sprint: number;
+  reason: string;
+}
+
+const AGENTS_CLAIM_RE = /\b(\d{1,3})\s+(?:built-?in\s+)?agents?\b/gi;
+
+function measureAgentsCountFs(projectRoot: string): number {
+  const agentsDir = join(projectRoot, 'src/core/builtins/agents');
+  if (!existsSync(agentsDir)) return -1;
+  try {
+    return readdirSync(agentsDir, { withFileTypes: true })
+      .filter((d) => d.isDirectory())
+      .length;
+  } catch {
+    return -1;
+  }
+}
+
+function loadGroundTruthOverridesFs(projectRoot: string): GroundTruthOverrideEntry[] {
+  const path = join(projectRoot, '.deckent', 'ground-truth-overrides.json');
+  if (!existsSync(path)) return [];
+  try {
+    const raw = readFileSync(path, 'utf-8');
+    const parsed = JSON.parse(raw) as { overrides?: GroundTruthOverrideEntry[] };
+    if (!parsed?.overrides || !Array.isArray(parsed.overrides)) return [];
+    return parsed.overrides;
+  } catch {
+    return [];
+  }
+}
+
+function sprintNumberOf(sprintId: string | undefined | null): number {
+  if (!sprintId) return Number.NaN;
+  const m = /sprint-(\d+)/i.exec(sprintId);
+  if (!m || !m[1]) return Number.NaN;
+  return Number.parseInt(m[1], 10);
+}
+
+/**
+ * Validate doc-sync ground-truth claims in a directive task description at plan-time.
+ * Returns the list of mismatches (empty when all claims agree with filesystem
+ * reality or are covered by an active whitelist override).
+ */
+export function validateGroundTruthClaims(
+  projectRoot: string,
+  description: string,
+  currentSprintId: string,
+): GroundTruthClaimIssue[] {
+  if (!description) return [];
+  const agentsMeasured = measureAgentsCountFs(projectRoot);
+  if (agentsMeasured < 0) return [];
+  const overrides = loadGroundTruthOverridesFs(projectRoot);
+  const currentSprint = sprintNumberOf(currentSprintId);
+
+  const issues: GroundTruthClaimIssue[] = [];
+  let m: RegExpExecArray | null;
+  AGENTS_CLAIM_RE.lastIndex = 0;
+  while ((m = AGENTS_CLAIM_RE.exec(description)) !== null) {
+    const numStr = m[1];
+    if (!numStr) continue;
+    const claimed = Number.parseInt(numStr, 10);
+    if (!Number.isFinite(claimed)) continue;
+    if (claimed === agentsMeasured) continue;
+    const overrideActive = overrides.some((o) => {
+      if (o.metric !== 'agents_count') return false;
+      if (o.expected !== claimed) return false;
+      if (Number.isNaN(currentSprint)) return true;
+      return currentSprint < o.until_sprint;
+    });
+    if (overrideActive) continue;
+    issues.push({
+      metric: 'agents_count',
+      claimed,
+      measured: agentsMeasured,
+      raw: m[0],
+    });
+  }
+  return issues;
 }
 
 /**

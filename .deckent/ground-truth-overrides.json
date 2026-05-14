@@ -1,0 +1,12 @@
+{
+  "version": "1.0",
+  "overrides": [
+    {
+      "metric": "agents_count",
+      "expected": 15,
+      "approvedBy": "alperen",
+      "until_sprint": 170,
+      "reason": "Sprint 148 ADR-041 reform stable — 15 vertical agents (test-writer reform Sprint 149)"
+    }
+  ]
+}

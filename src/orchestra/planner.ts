@@ -1,5 +1,7 @@
 // ─── Node Builtins ─────────────────────────────────────────────────
 import { spawnSync } from 'node:child_process';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { z } from 'zod';
 
 // ─── Core (types only — NO brain.ts imports) ──────────────────────
@@ -491,6 +493,111 @@ export function callZeroConfigPlanner(
 
   if (result.status !== 0 || !result.stdout) return null;
   return parsePlannerResponse(result.stdout);
+}
+
+// ─── Bug Y2: Plan-time Ground-Truth Audit (Sprint 166) ───────────────
+//
+// Plans coming out of the AI planner may carry stale numeric claims
+// (e.g. "16 agents" when the codebase only ships 15). The runtime Auditor
+// catches mismatches via verifyDocSyncGroundTruth, but failing fast at
+// plan-time avoids spawning workers that would then emit boundary violations.
+
+export interface PlannerGroundTruthIssue {
+  taskIndex: number;
+  taskTitle: string;
+  metric: string;
+  claimed: number;
+  measured: number;
+  raw: string;
+}
+
+const PLANNER_AGENTS_CLAIM_RE = /\b(\d{1,3})\s+(?:built-?in\s+)?agents?\b/gi;
+
+function plannerMeasureAgentsCount(projectRoot: string): number {
+  const agentsDir = join(projectRoot, 'src/core/builtins/agents');
+  if (!existsSync(agentsDir)) return -1;
+  try {
+    return readdirSync(agentsDir, { withFileTypes: true })
+      .filter((d) => d.isDirectory())
+      .length;
+  } catch {
+    return -1;
+  }
+}
+
+function plannerLoadOverrides(projectRoot: string): Array<{
+  metric: string;
+  expected: number;
+  until_sprint: number;
+}> {
+  const path = join(projectRoot, '.deckent', 'ground-truth-overrides.json');
+  if (!existsSync(path)) return [];
+  try {
+    const parsed = JSON.parse(readFileSync(path, 'utf-8')) as {
+      overrides?: Array<{ metric: string; expected: number; until_sprint: number }>;
+    };
+    return parsed?.overrides ?? [];
+  } catch {
+    return [];
+  }
+}
+
+function plannerSprintNumber(sprintId: string | undefined | null): number {
+  if (!sprintId) return Number.NaN;
+  const m = /sprint-(\d+)/i.exec(sprintId);
+  if (!m || !m[1]) return Number.NaN;
+  return Number.parseInt(m[1], 10);
+}
+
+/**
+ * Audit a planner result for doc-sync ground-truth mismatches across all
+ * task descriptions. Returns the list of issues found (empty when no claim
+ * disagrees with the filesystem measurement, or every divergent claim is
+ * covered by an active whitelist override).
+ *
+ * Never throws — measurement failures yield an empty result (fail-safe).
+ */
+export function auditPlanGroundTruth(
+  projectRoot: string,
+  plan: PlannerResult,
+  currentSprintId: string,
+): PlannerGroundTruthIssue[] {
+  if (!plan?.tasks?.length) return [];
+  const agentsMeasured = plannerMeasureAgentsCount(projectRoot);
+  if (agentsMeasured < 0) return [];
+  const overrides = plannerLoadOverrides(projectRoot);
+  const currentSprint = plannerSprintNumber(currentSprintId);
+
+  const issues: PlannerGroundTruthIssue[] = [];
+  plan.tasks.forEach((task, idx) => {
+    const description = task.description ?? '';
+    if (!description) return;
+    let m: RegExpExecArray | null;
+    PLANNER_AGENTS_CLAIM_RE.lastIndex = 0;
+    while ((m = PLANNER_AGENTS_CLAIM_RE.exec(description)) !== null) {
+      const numStr = m[1];
+      if (!numStr) continue;
+      const claimed = Number.parseInt(numStr, 10);
+      if (!Number.isFinite(claimed)) continue;
+      if (claimed === agentsMeasured) continue;
+      const overrideActive = overrides.some((o) => {
+        if (o.metric !== 'agents_count') return false;
+        if (o.expected !== claimed) return false;
+        if (Number.isNaN(currentSprint)) return true;
+        return currentSprint < o.until_sprint;
+      });
+      if (overrideActive) continue;
+      issues.push({
+        taskIndex: idx,
+        taskTitle: task.title,
+        metric: 'agents_count',
+        claimed,
+        measured: agentsMeasured,
+        raw: m[0],
+      });
+    }
+  });
+  return issues;
 }
 
 /**
