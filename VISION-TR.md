@@ -16,7 +16,7 @@ Uzun vadeli hedef: Deckent, her zaman açık, kendi kendini geliştiren bir geli
 
 Solo AI asistanı kullanımı doğası gereği sınırlıdır: tek context window, tek görev, tek bakış açısı. Deckent bu sınırı Brain-Worker-Auditor mimarisi ile aşar. Brain stratejiyi belirler, Worker'lar paralel çalışır, Auditor kaliteyi garanti eder. Her sprint sonunda öğrenimler hafızaya yazılır — sistem her iterasyonda daha iyi kararlar alır.
 
-**Şu an neredeyiz:** AI orkestrasyon CLI — 3 spawn backend (tmux, subprocess, Docker), 3 AI provider, 16 agent, 21 skill ile sprint bazlı çok-ajanlı yürütme.
+**Şu an neredeyiz:** AI orkestrasyon CLI — 3 spawn backend (tmux, subprocess, Docker), 3 AI provider, **15 agent**, 21 skill, 27 MCP tool, ADR governance (46 ADR), Memory V2 (SQLite FTS5) ile sprint bazlı çok-ajanlı yürütme.
 
 **Nereye gidiyoruz:** Otonom AI asistanı — heartbeat daemon, proaktif görev yürütme, kanal entegrasyonları (Slack, GitHub), kod tabanı semantik anlayışı, always-on gateway. OpenClaw'ın mimarisi + Deckent'in çok-ajanlı disiplini.
 
@@ -76,13 +76,13 @@ Worker'lar izole Docker container'larında bellek limitleri, non-root yürütme 
 
 Temel sprint yaşam döngüsü, çok-ajanlı paralel yürütme, tmux/subprocess backend'ler, MCP entegrasyonu, çoklu provider desteği (Claude + Codex + Gemini), ModelRegistry, agent/skill ekosistemi, heartbeat daemon, human checkpoint'ler, adaptive threshold'lar.
 
-### Faz 2: "Beta Hazırlığı" — Sprint 83-164 boyunca aktif
+### Faz 2: "Beta Hazırlığı" — Sprint 83-166 boyunca aktif
 
-Docker container backend (Sprint 119-129 canlı doğrulandı, 10 e2e test, ayarlanabilir timeout), dokümantasyon konsolidasyonu (BETA-TRACKER, i18n generator'lar, docs.json otomasyonu), ERRORS.md aktif loglama, backend smoke testing (tmux + subprocess + Docker, MCP + CLI), dashboard backend badge, ADR-027 hibrit backend kararı, versiyon 0.4.0-beta.1. Sprint 130: MCP instructions doğruluk düzeltmesi (27 tool), decision-engine V1 @deprecated arşiv + ADR-028, gerçek coverage ölçümü (%89.33). Sprint 138-145: ADR-035/036/037/038/039/040/041 governance + Nervous System meta-orkestratör + Authority Matrix RBAC. Sprint 162-163: Brain stability mührü (6/6 DONE, 0 NO_GO). Sprint 164: ADR-045 Wave-Based Execution Semantics, dep_pipeline wire kodu tamamlandı (runtime feature-flag'li, Sprint 166 aktivasyon hedefi).
+Docker container backend (Sprint 119-129 canlı doğrulandı, 10 e2e test, ayarlanabilir timeout), dokümantasyon konsolidasyonu (BETA-TRACKER, i18n generator'lar, docs.json otomasyonu), ERRORS.md aktif loglama, backend smoke testing (tmux + subprocess + Docker, MCP + CLI), dashboard backend badge, ADR-027 hibrit backend kararı, versiyon 1.0.0-beta.1. Sprint 130: MCP instructions doğruluk düzeltmesi (27 tool), decision-engine V1 @deprecated arşiv + ADR-028, gerçek coverage ölçümü (%89.33). Sprint 138-145: ADR-035/036/037/038/039/040/041 governance + Nervous System meta-orkestratör + Authority Matrix RBAC. Sprint 162-163: Brain stability mührü (6/6 DONE, 0 NO_GO). Sprint 164: ADR-045 Wave-Based Execution Semantics, dep_pipeline wire kodu tamamlandı (runtime feature-flag'li, Sprint 167 aktivasyon hedefi). **Sprint 165: Brain Final Stability — Bug X+Y+Z+W düzeltmesi, npm publish v1.0.0-beta.1 hazırlığı, Open Source GA prep.** **Sprint 166: Brain Self-Update + Data Integrity Closure — 11/11 task DONE, 4 mimari kök sebep düzeltmesi (Bug M adrInsert hook + Bug N onRuleRegen manuel finalize wire + Bug S sprint-aware cache key + Bug Y2 ground-truth verification 3-katmanlı savunma), 12 veri düzeltmesi, ADR-046 Brain Self-Update Hook Architecture (Step Ordering Contract), ~2735 LoC, 35+ yeni test.**
 
-### Faz 3: "Public Beta" — Sonraki
+### Faz 3: "Public Beta" — Sonraki (Sprint 167-168)
 
-VerhexIO/deckent açık kaynak repo, CI/CD pipeline (GitHub Actions + Docker backend), npm publish, .detect-secrets, CONTRIBUTING rehberi, topluluk onboarding.
+**Sprint 167:** `dependency_pipeline_enabled` flip + Wave scheduling canlı + M1-M4 monitoring baseline + mimari refactor. **Sprint 168:** Open Source GA — VerhexIO/deckent public repo flip + npm publish v1.0.0-beta.2 + Show HN + CI/CD pipeline (GitHub Actions + Docker backend) + .detect-secrets + CONTRIBUTING rehberi + topluluk onboarding.
 
 ### Faz 4: "Otonom Asistan" — Gelecek
 

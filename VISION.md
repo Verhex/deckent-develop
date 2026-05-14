@@ -16,7 +16,7 @@ The long-term goal: Deckent becomes an always-on, self-improving development tea
 
 Solo AI assistants are inherently limited: one context window, one task, one perspective. Deckent breaks through this ceiling with its Brain-Worker-Auditor architecture. Brain sets the strategy, Workers execute in parallel, Auditor guarantees quality. After every sprint, learnings persist to memory — the system makes better decisions with each iteration.
 
-**Where we are now:** AI orchestration CLI — sprint-based multi-agent execution with 3 spawn backends (tmux, subprocess, Docker), 3 AI providers, 16 agents, 21 skills.
+**Where we are now:** AI orchestration CLI — sprint-based multi-agent execution with 3 spawn backends (tmux, subprocess, Docker), 3 AI providers, **15 agents**, 21 skills, 27 MCP tools, ADR governance (46 ADRs), Memory V2 (SQLite FTS5).
 
 **Where we are going:** Autonomous AI assistant — heartbeat daemon, proactive task execution, channel integrations (Slack, GitHub), codebase semantic understanding, always-on gateway. Think OpenClaw's architecture + Deckent's multi-agent discipline.
 
@@ -76,13 +76,13 @@ Workers run in isolated Docker containers with memory limits, non-root execution
 
 Core sprint lifecycle, multi-agent parallel execution, tmux/subprocess backends, MCP integration, multi-provider support (Claude + Codex + Gemini), ModelRegistry, agent/skill ecosystem, heartbeat daemon, human checkpoints, adaptive thresholds.
 
-### Phase 2: "Beta Readiness" — Active (Sprint 83-164)
+### Phase 2: "Beta Readiness" — Active (Sprint 83-166)
 
-Docker container backend (live-verified Sprint 119-129, 10 e2e tests, configurable timeout), documentation consolidation (BETA-TRACKER, i18n generators, docs.json automation), ERRORS.md active logging, backend smoke testing (tmux + subprocess + Docker via MCP + CLI), dashboard backend badge, ADR-027 hybrid backend decision, version 0.4.0-beta.1. Sprint 130: MCP instructions accuracy fix (27 tools), decision-engine V1 @deprecated archive + ADR-028, real coverage measurement (89.33%). Sprint 138-145: ADR-035/036/037/038/039/040/041 governance + Nervous System meta-orchestrator + Authority Matrix RBAC. Sprint 162-163: Brain stability mührü (6/6 DONE, 0 NO_GO). Sprint 164: ADR-045 Wave-Based Execution Semantics, dep_pipeline wire code-complete (runtime feature-flagged, Sprint 166 activation hedefi).
+Docker container backend (live-verified Sprint 119-129, 10 e2e tests, configurable timeout), documentation consolidation (BETA-TRACKER, i18n generators, docs.json automation), ERRORS.md active logging, backend smoke testing (tmux + subprocess + Docker via MCP + CLI), dashboard backend badge, ADR-027 hybrid backend decision, version 1.0.0-beta.1. Sprint 130: MCP instructions accuracy fix (27 tools), decision-engine V1 @deprecated archive + ADR-028, real coverage measurement (89.33%). Sprint 138-145: ADR-035/036/037/038/039/040/041 governance + Nervous System meta-orchestrator + Authority Matrix RBAC. Sprint 162-163: Brain stability mührü (6/6 DONE, 0 NO_GO). Sprint 164: ADR-045 Wave-Based Execution Semantics, dep_pipeline wire code-complete (runtime feature-flagged, Sprint 167 activation hedefi). **Sprint 165: Brain Final Stability — Bug X+Y+Z+W fix, npm publish v1.0.0-beta.1 hazırlığı, Open Source GA prep.** **Sprint 166: Brain Self-Update + Data Integrity Closure — 11/11 task DONE, 4 architectural root-cause fix (Bug M adrInsert hook + Bug N onRuleRegen manual finalize wire + Bug S sprint-aware cache key + Bug Y2 ground-truth verification 3-layer defense), 12 data corrections, ADR-046 Brain Self-Update Hook Architecture (Step Ordering Contract), ~2735 LoC, 35+ new tests.**
 
-### Phase 3: "Public Beta" — Next
+### Phase 3: "Public Beta" — Next (Sprint 167-168)
 
-VerhexIO/deckent open-source repository, CI/CD pipeline (GitHub Actions + Docker backend), npm publish, .detect-secrets, CONTRIBUTING guide, community onboarding.
+**Sprint 167:** `dependency_pipeline_enabled` flip + Wave scheduling live + M1-M4 monitoring baseline + architectural refactor. **Sprint 168:** Open Source GA — VerhexIO/deckent public repo flip + npm publish v1.0.0-beta.2 + Show HN + CI/CD pipeline (GitHub Actions + Docker backend) + .detect-secrets + CONTRIBUTING guide + community onboarding.
 
 ### Phase 4: "Autonomous Assistant" — Future
 

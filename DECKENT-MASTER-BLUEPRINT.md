@@ -1,19 +1,26 @@
 # DECKENT MASTER BLUEPRINT
 ## AI Agent Orchestration System — Complete Implementation Reference
-### Version 3.0 — May 2026 — Verhex (Updated Sprint 164)
+### Version 3.1 — May 2026 — Verhex (Updated Sprint 166)
 
 ---
 
 ## Live Metrics
 | Metric | Value |
 |--------|-------|
-| Sprint | sprint-165 |
-| Total Tasks | 0 |
-| Completed | 0 |
-| Tech Debt | 0 |
+| Sprint | sprint-166 (DONE) |
+| Total Tasks | 11 |
+| Completed | 10 |
+| Tech Debt | 1 (T3 doc-cache runner wire-up) |
 | No-Go | 0 |
 | Duration | 215dk 9sn |
-| Coverage | 0.0% |
+| Coverage | 89.33% |
+| Tests | ~16,434 PASS |
+| Version | v1.0.0-beta.1 |
+| Built-in Agents | 15 |
+| Built-in Skills | 21 |
+| MCP Tools | 27 |
+| CLI Commands | 55+ |
+| ADRs | 46 (latest: ADR-046) |
 
 # TABLE OF CONTENTS
 
@@ -365,7 +372,7 @@ my-project/
 │   │   ├── memory-types.ts          # MemoryEntryV2, CreateEntryInput interfaces
 │   │   ├── memory-export.ts         # DB → .md snapshot generation
 │   │   ├── memory-import.ts         # .md → DB migration parser
-│   │   ├── agent-pool.ts            # AgentPoolManager, 16 built-in agents, LRU eviction
+│   │   ├── agent-pool.ts            # AgentPoolManager, 15 built-in agents, LRU eviction (ADR-041 reconfirmed Sprint 166)
 │   │   ├── skill-pool.ts            # 21 built-in skills
 │   │   ├── skill-registry.ts        # AST sandbox validation
 │   │   ├── routing-engine.ts        # Layer 3 — unified routing (routeTaskV2)
@@ -557,6 +564,57 @@ Workers are instructed to create `.tasks/task-{id}.hb` with JSON heartbeat (work
 ```
 
 **Brain evolves:** Each sprint's retro feeds the next sprint's plan. Brain reads its own past mistakes and adjusts.
+
+### 5.1.1 Brain Post-Finalize Hook Chain (ADR-046 — Sprint 166)
+
+Sprint 166 ADR-046 codified the **Brain Self-Update Hook Architecture** as a binding contract. The chain runs at the end of every sprint (both auto-finalize via `sprint-phases.ts:1238` AND manual `deckent finalize` via `cli/commands/finalize.ts:166`).
+
+**Step Ordering Contract (Section 5.1 of the ADR — IMMUTABLE):**
+
+| Step | Hook | Source | Sprint Wired | Purpose |
+|------|------|--------|--------------|---------|
+| 1 | `memoryExport` | `src/core/memory-export.ts` | 140 | DB → `.brain/exports/*.md` snapshots |
+| 2 | `identityRegen` | `src/core/identity-generator.ts` | 138 | **DEPRECATED Sprint 166 T5** — content moved to managed-docs chain to avoid conflict with `.deckent/workspace/IDENTITY.md` |
+| 3 | `adrInsert` | `src/core/adr-file-sync.ts` | **166 T1 (Bug M fix)** | Parse `docs/adr/*.md` MADR v3 headers, upsert into memory.db (`type='adr'`) — was silently missing since Sprint 138 ADR governance; last DB insert was 2026-04-20 before fix |
+| 4 | `ruleRegen` | `src/core/rules-generator.ts` | **166 T2 (Bug N fix, renumbered)** | Regenerate `.claude/`, `.codex/`, `.gemini/`, `.cursor/` rule frontmatter with current ADR list (AUTO + empty CUSTOM template blocks) |
+| 5 | `updateProjectDocs` | `src/orchestra/managed-docs/runner.ts` | 131 | Re-render CLAUDE.md, DECKENT.md, AGENTS.md, TOOLS.md, BOOT.md, WORKER-GUIDE.md via content generators (Sprint 166 T8 added 3 workspace docs) |
+
+**Unconditional invocation principle (Phase 2 lesson, ADR-046 §3):** Each hook is a direct function call, never an optional callback or feature-flag-guarded path. The Sprint 152-165 stale-rules incident traced back to manual finalize bypassing optional `onRuleRegen` parameter — this is now contractually forbidden.
+
+**Cache key completeness (Bug S, ADR-046 §4):** `doc-cache.ts` cache key MUST include `sprint.id`. Pre-Sprint-166 hash was `fileHash + entryHash` only, causing CLAUDE.md to skip with `cached_no_change` since Sprint 130. Post-fix: `fileHash + entryHash + sprint.id`, with backward-compat fallback when sprint id is absent.
+
+**Single registration target (Bug N, ADR-046 §5):** Brain has exactly one post-finalize chain entry point — `runPostFinalizeHooks()` in `identity-generator.ts:308-356`. Both auto and manual finalize paths converge here; no parallel chain is permitted.
+
+**Regression test:** `tests/core/identity-generator-step-order.test.ts` asserts hook execution order `memoryExport → adrInsert (Step 3) → ruleRegen (Step 4) → updateProjectDocs`. Any reordering breaks the test.
+
+**Falsifiable monitoring (Sprint 167 M1-M4 baseline):** ADR-046 mandates Sprint 167 monitoring to track (M1) ADR insert lag, (M2) rules generation freshness, (M3) CLAUDE.md mtime per sprint, (M4) `stale_md` Auditor alert frequency. Sprint 170 will trigger refactor if violations exceed threshold.
+
+### 5.1.2 Data Integrity Closure (Sprint 166)
+
+Sprint 166 also resolved long-standing data integrity gaps that compromised `.brain/memory.db` ground truth:
+
+- **Bug U — Sprint type insert restored.** `src/orchestra/sprint-retro-writer.ts` had stopped inserting `type='sprint'` rows after Sprint 140; DB query confirmed only Sprints 136-139 present. Fix restored the insert path. Forensic git bisect deliverable (`8434387..224618c -- src/orchestra/`) identified the regressing commit.
+- **Bug V — Debt sprint_id backfill.** `src/core/memory-import.ts:54 parseDebtMd` produced ~100 debt entries with `sprint_id=NULL`. Sprint 166 adds regex extraction from the entry id (e.g. `debt-156-011` → `sprint-156`) wrapped in an atomic transaction (~50ms lock). 9-sprint memory backfill applied for 134/140/152/157/158/159/160/161/165.
+- **Bug M — ADR insert hook wired** (see §5.1.1 Step 3): ADR-043/044/045/046 now flow into memory.db automatically; previously they only existed as `docs/adr/*.md` files.
+
+**Verification:**
+```sql
+SELECT COUNT(DISTINCT sprint_id) FROM entries WHERE type='sprint';  -- ≥5 post Sprint 166
+SELECT COUNT(*) FROM entries WHERE type='debt' AND sprint_id IS NULL;  -- 0
+SELECT id FROM entries WHERE type='adr' AND id LIKE 'adr-04%';  -- adr-043, 044, 045, 046
+```
+
+### 5.1.3 Living Docs Pipeline (Sprint 166 T8 + T9)
+
+Sprint 166 extended the managed-docs runner with auto-content generators and provider parity sync:
+
+- **T8 — Workspace doc generators.** `.deckent/workspace/TOOLS.md`, `BOOT.md`, and `WORKER-GUIDE.md` were Sprint 138-148 stale (27 MCP + 56 CLI not enumerated, no anti-pattern list, no RBAC reference). `src/orchestra/managed-docs/content-generators.ts` now enumerates tools/commands directly from code and emits:
+  - **TOOLS.md** — 27 MCP tools + 55+ CLI commands (auto-listed)
+  - **BOOT.md** — 7-step boot sequence + Sprint 165 manual recovery chain (kill → cleanup → recover → run → spawn)
+  - **WORKER-GUIDE.md** — verify-ran marker discipline, honest-result gate (Bug X), processQueue stall awareness, RBAC ADR-037, anti-pattern list (no unjustified `it.skip`, no stubs)
+- **T9 — Provider parity.** `.codex/rules/`, `.gemini/rules/`, `.cursor/rules/` now share frontmatter (`paths: [...]`) with `.claude/rules/` via the rules-generator. `extensions/vscode/` parity deferred to Sprint 169.
+- **T9 — Auditor `emitAlert` helper.** `src/monitor/alert-emitter.ts` (+30 LoC) atomically writes alerts to `.dashboard.json` + emits to `.deckent/sprint-NNN-events.jsonl` (M4 monitoring source).
+- **T9 — `stale_md` Nervous detector.** CLAUDE.md mtime > 70min during a live sprint triggers `emitAlert('stale_md', {...})`.
 
 ## 5.2 Auditor (In-Process Scan Loop)
 
@@ -2132,12 +2190,29 @@ Full directive: `docs/directives/sprint-034.md`
 - Auditor async scan loop (52 sync I/O eliminated) — DONE (Sprint 144)
 - i18n basic CLI (5 commands TR/EN) — DONE (Sprint 144)
 
-**In Progress (Sprint 164 → Sprint 165 closure):**
-- ADR-045 Wave-Based Execution Semantics — respawnEligibleTasks Runtime Wire (code-complete, runtime disabled via `dependency_pipeline_enabled: false`, awaits Sprint 166 live flip)
-- Vitest gate chronic failure (Sprint 159+ — 6-sprint chronic, Sprint 165 T3 final closure)
-- Sprint 164 dogfood P0 follow-ups: Bug X (Brain "no-result → CODE_VERIFIED_DONE" stub — Sprint 156-011 CRITICAL debt live replay), Bug Y (Brain processQueue legacy FIFO Wave 2→3 stall — Sprint 161 forensic dogfood replay), Bug Z (Vitest gate +1 fail chronic — worker 17→0 vs Brain audit FAIL mismatch), Bug W (Auditor `dead_event_stream` detector sleeping since Sprint 148 with `reserve_for: sprint-148`)
+**Closed in Sprint 165 (Brain Final Stability):**
+- Bug X — Brain "no-result → CODE_VERIFIED_DONE" stub fixed (Sprint 156-011 CRITICAL debt CLOSED)
+- Bug Y — Brain processQueue legacy FIFO Wave 2→3 stall resolved (Sprint 161 replay closure)
+- Bug Z — Vitest gate +1 fail chronic delta-zero closure (worker honest-result gate)
+- Bug W — Auditor `dead_event_stream` detector reactivated
+- Docs freeze: managed-doc cache contract sealed pending Sprint 166 sprint-aware cache key
 
-**Remaining (Sprint 165+):**
+**Closed in Sprint 166 (Brain Self-Update + Data Integrity, 10/11 DONE):**
+- **Bug M** — adrInsert post-finalize hook wired: `src/core/adr-file-sync.ts` parses `docs/adr/*.md` MADR v3 headers + upserts memory.db; ADR-043/044/045/046 now flow into DB automatically (Sprint 156-011 corollary CLOSED)
+- **Bug N** — `cli/commands/finalize.ts:166` now passes `onRuleRegen` callback; manual finalize path regenerates `.claude/`, `.codex/`, `.gemini/`, `.cursor/` rules (13-sprint stale chain broken)
+- **Bug S** — `doc-cache.ts` cache key extended with `sprint.id`; CLAUDE.md now auto-updates each sprint (Sprint 130-151 commit chain anomaly resolved)
+- **Bug Y2** — 3-layer ground-truth defense: unit test + integration assertion + Auditor runtime `verifyDocSyncGroundTruth()` at `auditor.ts` runScanCycle; `.deckent/ground-truth-overrides.json` whitelist
+- **Bug U+V** — `sprint-retro-writer.ts` type='sprint' insert restored; `memory-import.ts:54 parseDebtMd` sprint_id regex backfill (100+ debt entries); 9-sprint memory backfill (134/140/152/157-161/165)
+- **Bug C+X** — DECKENT.md broken `.brain/DECISIONS.md` ref → `.brain/exports/decisions.md`; summary.md "Active Technical Debt" filter `status != 'resolved'`
+- **Bug P** — TOOLS.md / BOOT.md / WORKER-GUIDE.md auto-content generators wired via `managed-docs/content-generators.ts` (27 MCP + 56 CLI enumerated from code, anti-pattern listesi, RBAC ADR-037 anchor)
+- **Bug Q+W** — Provider parity: `.codex/rules/`, `.gemini/rules/`, `.cursor/rules/` synced with `.claude/rules/` frontmatter; Auditor `emitAlert` helper (`src/monitor/alert-emitter.ts`) + `stale_md` detector
+- **Bug K+L** — `worker-verify.ts:379` verify-ran marker atomic write (tmp + renameSync); CHANGELOG + sprint-history test sprint count refreshed
+- **ADR-046 accepted** — Brain Self-Update Hook Architecture (Wave 1.5 bootstrap gate); Step Ordering Contract Section 5.1 documented
+
+**Open Tech Debt (Sprint 166 → 167 carryover):**
+- T3 doc-cache runner wire-up — cache fix DONE but managed-docs runner integration deferred to Sprint 167
+
+**Remaining (Sprint 167+):**
 - Provider-specific tool mapping (allowedTools → function_calling)
 - Local models (Ollama) adapter
 - VSCode extension (sidebar, status bar, sprint management)
@@ -2276,6 +2351,10 @@ Full directive: `docs/directives/sprint-034.md`
 | sprint-162 | 12485 | 89.33% | T-003 + T-004 + T-007 finalize. Sprint Phase Observability + EvaluationAuditTrail Runtime Wire (T-003 composite). Survivor wire recovery branch added (T-004). |
 | sprint-163 | 12485 | 89.33% | Brain stability line SEALED — 6/6 DONE, 0 NO_GO. Task 1 Files + Task 4/6 path correction + Sprint 137→145 alignment. |
 | sprint-164 | 12485+14 | 89.33% | **ADR-045 Wave-Based Execution Semantics accepted** — respawnEligibleTasks Runtime Wire contract. Wire code-complete: 13 grep matches (result-collector, sprint-spawner, sprint-controller), 3 task.status inline mutation branches, 14 new tests (8 unit + 6 integration) PASS. **Runtime DISABLED via `dependency_pipeline_enabled: false`** (Sprint 166 live flip). Vitest gate still FAIL (6-sprint chronic). Live dogfood surfaced 4 P0 bugs for Sprint 165: Bug X (Sprint 156-011 replay), Bug Y (Sprint 161 replay), Bug Z (Vitest mismatch), Bug W (dead_event_stream detector sleeping). 6 tasks, 4 DONE, 2 TECH_DEBT, 0 NO_GO. |
+| sprint-165 | ~16400 | 89.33% | **Brain Final Stability — 4 P0 bug closure.** Bug X (no-result → CODE_VERIFIED_DONE stub fixed, Sprint 156-011 CRITICAL debt CLOSED), Bug Y (processQueue Wave 2→3 stall resolved with idempotency guard), Bug Z (Vitest gate chronic delta-zero closure via worker honest-result gate), Bug W (Auditor dead_event_stream detector reactivated). Docs freeze + managed-doc cache contract sealed. Manual recovery chain proven (kill→cleanup→recover→run→spawn). respawnEligibleTasks 13 grep matches preserved. |
+| sprint-166 | ~16434 | 89.33% | **Brain Self-Update + Data Integrity Closure — 10/11 DONE, 1 TECH_DEBT.** ADR-046 accepted (Brain Self-Update Hook Architecture, Step Ordering Contract). 4 architectural root cause fixes: Bug M (adrInsert hook + Step 3 wire in identity-generator.ts; `src/core/adr-file-sync.ts` MADR v3 parser), Bug N (onRuleRegen wired into manual finalize path at cli/commands/finalize.ts:166), Bug S (doc-cache sprint-aware cache key, backward-compat fallback), Bug Y2 (3-layer ground-truth defense: unit + integration + Auditor `verifyDocSyncGroundTruth` runtime + `.deckent/ground-truth-overrides.json` whitelist). Data integrity: Bug U (type='sprint' insert restored in sprint-retro-writer), Bug V (parseDebtMd sprint_id regex backfill, 100+ entries; 9-sprint memory backfill). Doc fixes: Bug C+X (DECKENT.md ref + summary debt filter), Bug P (TOOLS/BOOT/WORKER-GUIDE auto-content generators), Bug Q+W (provider parity .codex/.gemini/.cursor + emitAlert helper + stale_md detector), Bug K+L (verify-ran atomic write + stale doc test refresh). 35 new tests PASS (34 + 1 ADR-046 regression). T3 doc-cache runner wire-up TECH_DEBT carryover. **15 built-in agents reconfirmed (Sprint 148 archive preserved)** — 5 root .md files corrected from Sprint 164 commit a4f3be4 incorrect 16-count misinjection (Bug Y2 root cause). |
+| sprint-167 | TBD | TBD | **(PLANNED)** Bug E+G+Z2+Z3 fix + `dependency_pipeline_enabled: true` live flip (Wave Scheduling goes live, ADR-045 runtime contract enforced) + M1-M4 monitoring baseline tracking + minimal 3-task multi-wave smoke. |
+| sprint-168 | TBD | TBD | **(PLANNED)** Open Source GA — public repo flip (VerhexIO/deckent-dev → VerhexIO/deckent public) + npm publish v1.0.0-beta.2 + Show HN launch. |
 
 **First dogfooding result (Sprint 6):** Deckent ran `deckent start` on itself, generated README.md in 86 seconds with 1 worker. The orchestration loop (plan → spawn → execute → evaluate → retro → cleanup) completed end-to-end.
 
@@ -2509,11 +2588,11 @@ Largest sprint in project history — 52 tasks planned.
 
 ---
 
-# 25. BETA GA GATE CRITERIA (Slipped — Sprint 165 T3+T5 Final Closure Target)
+# 25. BETA GA GATE CRITERIA (Sprint 168 Open Source GA Target)
 
 ## Overview
 
-Originally targeted at Sprint 150, Beta GA has slipped through Sprint 151–164. As of Sprint 164 closure, **18 of 20 criteria remain open**. Sprint 165 T3 (vitest gate chronic fix — 6 sprints overdue since Sprint 159) and T5 (final closure activities) carry the GA flip responsibility. ADR-045 Wave-Based Execution Semantics is code-complete but runtime-disabled (`dependency_pipeline_enabled: false`); Sprint 166 will live-flip it. Version bump from 0.4.0-beta.1 → 1.0.0 awaits Sprint 165 sign-off.
+Originally targeted at Sprint 150, Beta GA has progressed through Sprint 151–166. Sprint 165 closed the 4 chronic Brain stability P0 bugs (X, Y, Z, W). Sprint 166 closed Brain Self-Update + Data Integrity (ADR-046, 4 architectural root cause fixes, 10/11 DONE). Sprint 167 will live-flip `dependency_pipeline_enabled: true` (ADR-045 runtime contract) and surface monitoring baseline. **Sprint 168 = Open Source GA flip** — public repo + npm publish v1.0.0-beta.2 + Show HN. Version is now v1.0.0-beta.1.
 
 ## Gate Criteria
 
@@ -2521,28 +2600,29 @@ Originally targeted at Sprint 150, Beta GA has slipped through Sprint 151–164.
 - [ ] All 27 MCP tools operational and tested (audit, recover, feature_query, watch, nervous_* added in Sprint 151–164)
 - [ ] All 8 MCP resources returning valid data
 - [ ] All 49+ CLI commands functional
-- [ ] All 16 built-in agents with validated PROMPT.md
+- [x] All 15 built-in agents with validated PROMPT.md (ADR-041 reconfirmed Sprint 166 — testing tasks routed task-based, no vertical testing agent)
 - [ ] All 21 built-in skills with manifest.json + SKILL.md
 - [ ] Memory V2 DB-First fully operational (CRUD, FTS5, export, import, decay)
 - [ ] 3 provider backends operational (Claude, Codex, Gemini)
 - [ ] 3 spawn backends operational (tmux, subprocess, Docker)
-- [ ] ADR-045 Wave-Based Execution Semantics runtime-enabled (Sprint 166 flip)
+- [ ] ADR-045 Wave-Based Execution Semantics runtime-enabled (Sprint 167 live flip — `dependency_pipeline_enabled: true`)
 
 ### Quality
-- [ ] Test count: 15,000+ (currently 12,485+ — Sprint 164 added +14 from ADR-045 wire)
-- [ ] Coverage: ≥85% (currently 89.33%)
-- [ ] Zero CRITICAL tech debt items (Sprint 156-011 "no-result → CODE_VERIFIED_DONE" CRITICAL still open — Sprint 164 replay confirmed)
-- [ ] tsc --noEmit: 0 errors
-- [ ] No known data-loss bugs
-- [ ] Vitest gate green (Sprint 159+ chronic FAIL — Sprint 165 T3 final closure)
+- [x] Test count: 15,000+ (currently ~16,434 PASS — Sprint 166 added +35 new tests)
+- [x] Coverage: ≥85% (currently 89.33%)
+- [x] Zero CRITICAL tech debt items (Sprint 156-011 CLOSED in Sprint 165 via Bug X fix; corollary Bug M ADR insert closed in Sprint 166)
+- [x] tsc --noEmit: 0 errors
+- [x] No known data-loss bugs
+- [x] Vitest gate green (Sprint 165 T3 closed the 6-sprint chronic FAIL via worker honest-result gate)
 
 ### Governance
-- [ ] All 45 ADRs in accepted/deprecated status (no draft/proposed)
-- [ ] ADR-037 RBAC runtime enforcement operational
-- [ ] ADR-035 event stream audit trail complete
-- [ ] ADR-036 governance integration validated
-- [ ] ADR-045 Wave-Based Execution Semantics runtime contract honored
-- [ ] npm run lint:adr passes
+- [x] All 46 ADRs in accepted/deprecated status (Sprint 166 added ADR-046 Brain Self-Update Hook Architecture)
+- [x] ADR-037 RBAC runtime enforcement operational
+- [x] ADR-035 event stream audit trail complete
+- [x] ADR-036 governance integration validated
+- [ ] ADR-045 Wave-Based Execution Semantics runtime contract honored (Sprint 167 flip)
+- [x] ADR-046 Brain Self-Update Hook contract honored (Step 3 adrInsert wired, Step 4 ruleRegen renumbered)
+- [x] npm run lint:adr passes
 
 ### Documentation
 - [ ] DECKENT-MASTER-BLUEPRINT.md EN fully updated (this document)
@@ -2576,7 +2656,7 @@ Originally targeted at Sprint 150, Beta GA has slipped through Sprint 151–164.
 # END OF BLUEPRINT
 
 This document is the single source of truth for Deckent's implementation.
-Version 3.0 — Updated Sprint 164 (May 2026).
+Version 3.1 — Updated Sprint 166 (May 2026).
 Use the MCP tools: "Set up Deckent" or "Plan a sprint for [goals]".
 Or open it in Claude Code and say: "Implement this."
 

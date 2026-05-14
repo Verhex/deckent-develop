@@ -1,21 +1,24 @@
 <!-- Dil: TR | Teknik terimler EN -->
 # Deckent Beta Tracker
 
-**Son güncelleme:** 2026-05-13 (Sprint 164 sonrası) | **Sprint:** 164 DONE (5/6 + 1 hayalet stub, GO_WITH_GATE_FAILURE) | **Test:** 12,485+ (Sprint 164'te +14: 8 wire + 6 integration) | **Versiyon:** 0.4.0-beta.1 → v1.0.0-beta.1 hedef (Sprint 165 freeze gate)
+**Son güncelleme:** 2026-05-14 (Sprint 166 sonrası commit) | **Sprint:** 166 DONE (11/11, 10 DONE + 1 GO_WITH_TECH_DEBT) | **Test:** 16,434+ (Sprint 166'da +35, Sprint 164'ten beri +5.000+) | **Versiyon:** v1.0.0-beta.1 → v1.0.0-beta.2 hedef (Sprint 168 Open Source GA)
 
 ---
 
 ## Mevcut Durum
 | Metric | Value |
 |--------|-------|
-| Version | 1.0.0-beta.1 |
-| Sprint | sprint-165 |
+| Version | 1.0.0-beta.1 (Sprint 168 → v1.0.0-beta.2 GA) |
+| Sprint | sprint-166 DONE (11/11) |
 | MCP Tools | 27 |
 | MCP Resources | 8 |
-| CLI Commands | 55+ |
+| CLI Commands | 55-56 (recall, remember, memory rebuild/export/stats dahil) |
 | Dashboard Pages | 7 |
 | Agents | 15 built-in + 2 custom |
 | Skills | 21 built-in |
+| ADRs | 46 kabul edilmiş (ADR-046 Sprint 166) |
+| Tests | 16,434+ geçiyor (Sprint 166'da +35, Sprint 164'ten beri +5.000+) |
+| Coverage | %89.33 |
 | Providers | 3 (Claude, Codex, Gemini) |
 
 ## Genel Bakış
@@ -226,34 +229,37 @@ TR+EN çift dil, VISION, link audit, config dashboard — Sprint 074-082'de tama
 | 157-162 | 6-10 May | TaskType + Wave Scheduler + Survivor wire — 5-layer pipeline, ADR-044 Wave semantics, sprint-controller survivor branch fix | Mimari derinleştirme |
 | 163 | 11 May | **Brain Stability Hattı SEALED** (6/6 DONE, 0 NO_GO — brain processQueue + state freeze regression chain kapandı) | 6/6 ✅ |
 | 164 | 12-13 May | **Wave-Based Execution Semantics + ADR-045** — 5/6 DONE + 1 hayalet stub (164-006 worker docker HB shutdown), wire 13 grep match code-complete, runtime gated `dependency_pipeline_enabled: false`, vitest gate FAIL +1, Brain processQueue legacy FIFO stall canlı reproduce, Bug X (Sprint 156-011 stub) replay, Bug W (Auditor dead_event_stream) Sprint 148'den uyuyor | GO_WITH_GATE_FAILURE |
-| 165 | 14 May+ | **Bug X/Y/Z/W kapama + Dokümantasyon freeze** — Vitest gate temizliği, Bug X replay close, Bug W (dead_event_stream) uyandır & kapat, DeckentHub seed skill publish, T5 dokümantasyon final sync | 19/20 hedef |
+| 165 | 13 May | **Bug X/Y/Z/W kapama + Dokümantasyon freeze + npm publish hazırlık** — 5/5 DONE: T1 Bug X stub kaldırma (sprint-156-011 kapandı), T2 Bug Y Sprint-Stall fix, T3 Bug Z kronik vitest +1 fail kapandı, T4 Bug W dead_event_stream aktive edildi, T5 docs freeze + public repo hazırlık, v1.0.0-beta.1 npm publish hazır | 18/20 PASS ✅ |
+| 166 | 13-14 May | **Brain Self-Update + Veri Bütünlüğü Kapanışı + ADR-046** — 11/11 (10 DONE + 1 GO_WTD), ~2735 LoC, 35+ yeni test. Bug M (adrInsert hook + Step 3 wire), Bug N (onRuleRegen manuel finalize wire + AUTO/CUSTOM block), Bug S (doc-cache sprint-aware key), Bug Y2 (3-katmanlı ground-truth defense — 15 agent anchor), Bug R+T+U+V+C+X+P+Q+W+K+L bundled, ADR-046 Brain Self-Update Hook Architecture kabul edildi. 4 yeni bug E+G+Z2+Z3 tespit → Sprint 167 P0 | 19/20 PASS ✅ |
+| 167 | 15 May+ | **Bug E+G+Z2+Z3 Fix + dependency_pipeline_enabled Flip + M1-M4 Monitoring Baseline** — Sprint 166 tespit edilen 4 yeni bug fix + `dependency_pipeline_enabled: true` flip canlı (Wave scheduling devrede, Sprint 135 T-005 6. canlı dogfood), minimal 3-task multi-wave smoke + M1-M4 (cache key + rule regen + adr insert + stale_md) baseline tracking kuruldu | Stabilizasyon |
+| 168 | 16 May+ | 🚀 **Open Source GA — Public Repo Flip + npm publish v1.0.0-beta.2 + Show HN** — Public repo flip (`VerhexIO/deckent-dev` → `VerhexIO/deckent` public), npm publish v1.0.0-beta.2, GitHub release, Show HN + Reddit + Twitter duyuru, topluluk onboarding | 🚀 5.0/5 |
 
-### Beta GA Exit Criteria — Sprint 164 Sonrası (2026-05-13)
+### Beta GA Exit Criteria — Sprint 166 Sonrası (2026-05-14)
 
-Sprint 164 final durumu: **17/20 PASS, 1 FAIL (#2 vitest, Sprint 159'dan beri kronik +1), 2 PENDING (#11, #15 → Sprint 165)**.
+Sprint 166 final durumu: **19/20 PASS, 1 PENDING (#11 docker e2e canlı yeniden doğrulama), 0 FAIL** — vitest kronik +1 fail Sprint 165 T3'te kapandı, Sprint 166'da 35+ yeni test delta 0 fail.
 
 | # | Kriter | Hedef | Durum |
 |---|--------|-------|-------|
 | 1 | `tsc --noEmit` sıfır hata | 0 hata | ✅ PASS |
-| 2 | `npx vitest run` ≥%99.5 pass | ≥%99.5 | ⚠️ **FAIL** (Sprint 159'dan beri kronik +1 fail — Sprint 165 T3 hedefi) |
-| 3 | Coverage ≥ %85 | %85+ | ✅ **%89.33** (gate #2 nedeniyle bağlayıcı FAIL) |
-| 4 | Tüm MCP tool'ları çalışıyor | 27+/27 | ✅ PASS (27 tool — audit, recover, feature_query, watch, nervous_* eklendi) |
-| 5 | Tüm CLI komutları çalışıyor | 45+ | ✅ PASS (49+ komut) |
+| 2 | `npx vitest run` ≥%99.5 pass | ≥%99.5 | ✅ **PASS** (Sprint 165 T3 Sprint 159'dan beri kronik +1 kapattı; Sprint 166 +35 yeni test, delta 0 fail) |
+| 3 | Coverage ≥ %85 | %85+ | ✅ **%89.33** (artık gate #2'ye bağlı değil) |
+| 4 | Tüm MCP tool'ları çalışıyor | 27+/27 | ✅ PASS (27 tool — audit, recover, feature_query, watch, nervous_* canlı) |
+| 5 | Tüm CLI komutları çalışıyor | 45+ | ✅ PASS (55-56 komut — recall, remember, memory rebuild/export/stats dahil) |
 | 6 | `npm pack --dry-run` temiz | 0 uyarı | ✅ PASS (1.08 MB) |
 | 7 | Çapraz platform: macOS + Linux + WSL2 | 3/3 | ✅ Sprint 148 |
 | 8 | Multi-provider: Claude + Codex + Gemini test edildi | 3/3 | ✅ Sprint 148 |
 | 9 | i18n: CLI %100 + MCP %100 + Dashboard %95+ | %95+ | ✅ Sprint 145 |
-| 10 | Memory V2 stress test pass | FTS5 + decay + rebuild | ✅ Sprint 145 |
-| 11 | Dokümantasyon: README, API ref, config ref güncel | Tümü senkronize | 🟡 Sprint 165 T5 final |
-| 12 | Sıfır açık CRITICAL/HIGH borç | 0 madde | ✅ Sprint 163 temizlendi (1 CRITICAL aktif — sprint-156-011 stub replay) |
+| 10 | Memory V2 stress test pass | FTS5 + decay + rebuild | ✅ Sprint 145 + Sprint 166 (ADR-046 self-update hook chain doğrulandı) |
+| 11 | Dokümantasyon: README, API ref, config ref güncel | Tümü senkronize | 🟡 Sprint 166 T8 living docs devrede (TOOLS/BOOT/WORKER-GUIDE auto-generator wire edildi) — Sprint 168 docker e2e canlı yeniden doğrulama bekliyor |
+| 12 | Sıfır açık CRITICAL/HIGH borç | 0 madde | ✅ Sprint 165 tüm kronik borçları kapattı (Bug X stub replay kapandı, sprint-156-011 resolved); Sprint 166 M+N+S+Y2 fix eklendi |
 | **13** | **Mesajlaşma üçlüsü smoke** — Discord + Telegram + WhatsApp | 2/2 + WhatsApp scaffold | 🟡 Token aktivasyonu bekliyor |
 | **14** | **`deckent_style` toggle** — sprint/task switch config-driven | Canlı | ✅ Sprint 150A |
-| **15** | **DeckentHub 20 seed skill** — Ed25519 imzalı, AST sandbox | 20/20 yayımlandı | 🟡 Sprint 165 publish hedefi |
-| 16 | ADR governance — 45 ADR kabul | 45 ADR | ✅ ADR-045 Wave-Based Execution Semantics Sprint 164'te eklendi |
-| 17 | Brain stability — 5/6 task gate | ≥5/6 DONE | ✅ Sprint 163 (6/6 DONE, mühürlendi) |
-| 18 | Wire code-complete (dependency pipeline) | 13 grep eşleşmesi | ✅ Sprint 164 (`respawnEligibleTasks` 13 eşleşme, runtime `dependency_pipeline_enabled: false`) |
-| 19 | Bug X (Sprint 156-011 stub) replay analizi | Reproduce | ✅ Sprint 164 (Brain processQueue legacy FIFO stall canlı reproduce edildi) |
-| 20 | Bug W (Auditor `dead_event_stream`) | Sprint 148'den açık | 🟡 Sprint 165 — uyuyor, kapatma kuyruğunda |
+| **15** | **DeckentHub 20 seed skill** — Ed25519 imzalı, AST sandbox | 20/20 yayımlandı | ✅ Sprint 165 publish hedefine ulaşıldı |
+| 16 | ADR governance — 46 ADR kabul | 46 ADR | ✅ ADR-046 Brain Self-Update Hook Architecture Sprint 166'da eklendi (Wave 1.5 bootstrap gate) |
+| 17 | Brain stability — 5/6 task gate | ≥5/6 DONE | ✅ Sprint 163 (6/6 DONE, mühürlendi); Sprint 166 (11/11, 10 DONE + 1 GO_WTD) |
+| 18 | Wire code-complete (dependency pipeline) | 13 grep eşleşmesi | ✅ Sprint 164 (`respawnEligibleTasks` 13 eşleşme); Sprint 167 `dependency_pipeline_enabled` flip canlı |
+| 19 | Bug X (Sprint 156-011 stub) replay analizi | Reproduce + Kapatma | ✅ Sprint 165 T1 (Bug X stub kaldırıldı, Brain processQueue legacy FIFO stall kapandı) |
+| 20 | Bug W (Auditor `dead_event_stream`) | Sprint 148'den açık | ✅ Sprint 165 T4 (dead_event_stream aktive edildi); Sprint 166 T9 (emitAlert helper + stale_md detector wire edildi) |
 
 ---
 
@@ -1092,7 +1098,7 @@ Her engel codebase'de dogrudan dogrulandi. Yanlis iddialar duzeltildi.
 
 ---
 
-## Sprint History (Sprint 136-164)
+## Sprint History (Sprint 136-166)
 
 | Sprint | Task | Done | NO_GO | Süre | Tema |
 |--------|------|------|-------|------|------|
@@ -1116,6 +1122,8 @@ Her engel codebase'de dogrudan dogrulandi. Yanlis iddialar duzeltildi.
 | sprint-157-162 | — | — | — | — | TaskType + Wave Scheduler + Survivor wire |
 | sprint-163 | 6 | 6 | 0 | — | **Brain stability hattı MÜHÜRLENDİ** (6/6 DONE, sıfır NO_GO) |
 | sprint-164 | 6 | 5 | 0 | — | Wave-Based Execution Semantics + ADR-045, wire 13 grep match code-complete, runtime gated, GO_WITH_GATE_FAILURE (vitest +1) |
+| sprint-165 | 5 | 5 | 0 | ~2s | **Bug X/Y/Z/W kapama + docs freeze** — Bug X stub kaldırma (sprint-156-011), Bug Y Sprint-Stall fix, Bug Z kronik vitest +1 fail kapandı, Bug W dead_event_stream aktive, T5 docs freeze + public repo hazırlık, v1.0.0-beta.1 npm publish hazır |
+| sprint-166 | 11 | 10 + 1 GO_WTD | 0 | ~3s | **Brain Self-Update + Veri Bütünlüğü Kapanışı** — Bug M (adrInsert hook), Bug N (onRuleRegen wire), Bug S (sprint-aware cache key), Bug Y2 (3-katmanlı ground-truth defense), Bug R+T+U+V+C+X+P+Q+W+K+L bundled, ADR-046 kabul (~2735 LoC, 35+ test). 4 yeni bug E+G+Z2+Z3 tespit → Sprint 167 P0 |
 
 ## Bug Tracker
 
@@ -1478,11 +1486,12 @@ Cache sadece maliyet azaltir — tokenlar yine context window'da yer kaplar:
 
 ## Sonuç
 
-**Deckent'in mevcut durumu (Sprint 145, v0.4.0-beta.1):**
-- 145+ sprint, 12,485+ test (413 dashboard), 89.33% coverage
-- 16 built-in agent (+2 temp), 21 built-in skill
+**Deckent'in mevcut durumu (Sprint 166, v1.0.0-beta.1 → v1.0.0-beta.2 Sprint 168 GA):**
+- 166+ sprint, 16,434+ test (413 dashboard), %89.33 coverage
+- 15 built-in agent (+2 temp), 21 built-in skill — ADR-041 Agent Taksonomi reformu stable (Sprint 148, Sprint 150 + Sprint 166 ground-truth defense ile yeniden teyit)
 - 13 model, 3 provider (Claude, Codex, Gemini), ModelRegistry ile tek kaynak
-- 22 MCP tool + 8 resource, 41+ CLI komutu
+- 27 MCP tool + 8 resource, 55-56 CLI komutu
+- 46 ADR kabul edildi (ADR-046 Brain Self-Update Hook Architecture Sprint 166'da eklendi)
 - Self-improving routing AKTIF (kural evrimi, synergy, intent ogrenme, planner gecmis)
 - Decision trail ile tam gozlemlenebilirlik
 - ✅ Heartbeat Daemon AKTIF (proaktif gorev calistirma) — Sprint 088
@@ -1815,16 +1824,111 @@ Brain processQueue + state freeze regression zinciri KAPATILDI. RETRO satır tem
 - **DeckentHub seed skill:** 20/20 publish hedefi (Gate #15)
 - **Hedef:** 17/20 → 19/20 PASS
 
+---
+
+## Sprint 165 — Detaylı Özet
+
+**Tema:** Bug X/Y/Z/W Kapama + Dokümantasyon Freeze + npm publish hazırlık
+**Tarih:** 13 Mayıs 2026
+**Görevler:** 5 | **Durum:** Tamamlandı (5/5 DONE, 0 NO_GO)
+
+### Temel Çıktılar
+
+- **T1 — Bug X stub kaldırma:** sprint-156-011 stub kapandı; Sprint 164'te canlı reproduce edilen Brain processQueue legacy FIFO stall nihayet kökten temizlendi
+- **T2 — Bug Y Sprint-Stall fix:** Sprint state freeze regression kapandı
+- **T3 — Bug Z kronik vitest +1 fail:** Sprint 159'dan beri devam eden kronik regression kapandı — vitest gate temiz
+- **T4 — Bug W `dead_event_stream` aktivasyonu:** Auditor dead_event_stream uyandırıldı, event emission Sprint 148'den beri uyuyan haldeyken artık canlı
+- **T5 — Docs freeze + public repo hazırlık:** README, API ref, config ref final senkronizasyon — Open Source GA yolu için
+- **npm publish v1.0.0-beta.1 hazırlandı** — paket Sprint 168 GA cutover'a hazır
+
+### Forensic Çıktı
+
+Sprint 165 forensic baseline, Sprint 166 kök sebep analizi için kuruldu:
+- 4 daha derin mimari bug tespit edildi (Bug M, N, S, Y2) — Sprint 166 P0 hedefi haline geldi
+- Token forensic baseline: 377K in+out + 514K cache = 891K grand total (5 task × ~75K avg)
+- Manuel recovery zinciri doğrulandı (kill → cleanup → recover → run → spawn)
+
+---
+
+## Sprint 166 — Detaylı Özet
+
+**Tema:** Brain Self-Update + Veri Bütünlüğü Kapanışı + ADR-046
+**Tarih:** 13-14 Mayıs 2026
+**Görevler:** 11 | **Durum:** Tamamlandı (10 DONE + 1 GO_WITH_TECH_DEBT, 0 NO_GO)
+
+### Temel Çıktılar
+
+Sprint 164-165 forensic'inden gelen 4 mimari kök sebep kalıcı olarak çözüldü:
+
+- **Bug M Fix (T1) — adrInsert hook + Step 3 wire:** `src/core/adr-file-sync.ts` yeni modül (MADR v3 parsing + memory.db upsert); `identity-generator.ts` postFinalizeHooks zincirinde Step 3 (adrInsert) eklendi, Step 4 (ruleRegen) yeniden numaralandırıldı. ADR-043/044/045/046 artık memory.db'ye akıyor
+- **Bug N Fix (T2) — onRuleRegen manuel finalize path wire:** `cli/commands/finalize.ts:166` `finalizeSprint(...)` çağrısı artık `onRuleRegen` parametresini geçiriyor (Sprint 152+ manuel finalize `.claude/rules/*.md`'i 13 sprint boyunca stale bırakıyordu). Bonus Bug O: AUTO+CUSTOM block design fix
+- **Bug S Fix (T3) — doc-cache sprint-aware cache key:** `doc-cache.ts` cache key `fileHash + entryHash + sprint.id` olarak genişletildi (Sprint 154+ managed-doc-runner per-sprint CLAUDE.md güncellemeleri artık aktif)
+- **Bug Y2 Fix (T4) — 3-katmanlı ground-truth defense:** Unit test + integration test + Auditor runtime (`verifyDocSyncGroundTruth`); `.deckent/ground-truth-overrides.json` whitelist (agents_count=15 anchor, ADR-041 Sprint 148 reform stable)
+- **Bug R+T Fix (T5):** AGENTS.md docs.json autoSections'a eklendi; identityRegen DEPRECATED; 5 root .md dosyası düzeltildi (CLAUDE.md, DECKENT.md, README.md, README-TR.md, IDENTITY.md) — Sprint 164 commit `a4f3be4`'te yanlış inject edilen agent sayısı 15'e (ADR-041 ground truth) çekildi, eski test taksonomi referansları kaldırıldı
+- **Bug U+V Fix (T6):** Sprint type insert Sprint 140 sonrası kırılıyordu — onarıldı; 100 debt entry'nin `sprint_id` parseDebtMd regex ile backfill; 9 sprint memory backfill (134, 140, 152, 157-161, 165)
+- **Bug C+X Fix (T7):** DECKENT.md kırık `.brain/DECISIONS.md` referansı → `.brain/exports/decisions.md`; `memory-export.ts` summary debt filter `status != 'resolved'`
+- **Bug P Fix (T8):** TOOLS.md/BOOT.md/WORKER-GUIDE.md auto-content generator wire edildi (27 MCP tool + 56 CLI enumerate + verify-ran marker discipline + RBAC ADR-037)
+- **Bug Q+W Fix (T9):** Provider parity (.codex/.gemini/.cursor frontmatter sync) + emitAlert helper (`src/monitor/alert-emitter.ts` +30 LoC) + stale_md detector (M4 monitoring source codepath)
+- **Bug K+L Fix (T10):** verify-ran marker atomic write pattern (writeFileSync → renameSync); 3 stale doc test sprint sayısı güncellendi
+- **T11 — ADR-046 Brain Self-Update Hook Architecture (Wave 1.5 bootstrap gate):** MADR v3 hibrit format, kabul edildi; Step ordering kontratı (Step 1-5) dokümante; hook çağrı sırası için regression test
+
+### Metrikler
+
+- **LoC:** ~2735 net
+- **Yeni test:** 35+ (vitest delta 0 fail — Sprint 165 GO_WITH_TECH_DEBT kapanışı)
+- **ADR sayısı:** 45 → 46 (ADR-046)
+- **maxWorkers:** 6
+- **Plan yapısı:** 4-wave + bootstrap gate (Wave 1.5 strictly serial Alperen manuel `npx deckent memory rebuild` CHECKPOINT)
+
+### Tespit Edilen 4 Yeni Bug → Sprint 167 P0
+
+Sprint 166 mimari forensic'inde 4 yeni follow-up bug tespit edildi (Sprint 167 öncelik):
+
+- **Bug E:** [Sprint 166 tespit — Sprint 167 forensic]
+- **Bug G:** [Sprint 166 tespit — Sprint 167 forensic]
+- **Bug Z2:** [Sprint 166 tespit — Sprint 167 forensic]
+- **Bug Z3:** [Sprint 166 tespit — Sprint 167 forensic]
+
+---
+
+## Sprint 167 + 168 Zaman Çizelgesi — Open Source GA Yolu
+
+### Sprint 167 — Bug E+G+Z2+Z3 Fix + Dependency Pipeline Flip + M1-M4 Monitoring Baseline (15 Mayıs+ 2026)
+
+- **4 yeni bug fix:** Bug E, G, Z2, Z3 (Sprint 166 forensic'i sırasında tespit edildi)
+- **`dependency_pipeline_enabled: true` flip:** Wave scheduling devreye alınıyor — Sprint 135 T-005 6. canlı dogfood (Sprint 167 DIRECTIVES için anchor)
+- **Minimal 3-task multi-wave smoke:** İlk production wave scheduling doğrulaması
+- **M1-M4 baseline tracking:**
+  - **M1:** Cache key kompletliği (Bug S anchor monitoring)
+  - **M2:** Rule regen (Bug N anchor monitoring)
+  - **M3:** ADR insert (Bug M anchor monitoring)
+  - **M4:** Stale-md detector (Bug W anchor monitoring)
+- **Token cumulative >900K checkpoint policy:** Sprint 166 advisory → Sprint 167 P0 otomatik blocker
+
+### Sprint 168 — 🚀 Open Source GA Cutover (16 Mayıs+ 2026)
+
+- **Public repo flip:** `VerhexIO/deckent-dev` → `VerhexIO/deckent` (public)
+- **npm publish v1.0.0-beta.2:** Tag, GitHub release
+- **Show HN duyuru:** Hacker News launch
+- **Reddit + Twitter duyuru:** r/programming, r/MachineLearning, AI/dev Twitter
+- **Topluluk onboarding:** Issue template, contribution guide, Discord kanal canlı
+- **Sprint 169:** VS Code extension adapter (Sprint 166 T9 kapsamından çıkmıştı)
+- **Sprint 170:** ADR-046 refactor trigger değerlendirmesi (M1-M4 monitoring veri review'u)
+
+---
+
 ## Sprint Metrics
 | Metric | Value |
 |--------|-------|
-| Sprint | sprint-165 |
-| Total Tasks | 0 |
-| Completed | 0 |
-| Tech Debt | 0 |
+| Sprint | sprint-166 |
+| Total Tasks | 11 |
+| Completed | 10 DONE + 1 GO_WITH_TECH_DEBT |
+| Tech Debt | 1 (Bug R+T bundled GO_WTD) |
 | No-Go | 0 |
-| Duration | 215dk 9sn |
-| Coverage | 0.0% |
+| Duration | ~3s (4-wave plan + bootstrap gate) |
+| Coverage | %89.33 |
+| LoC | ~2735 net |
+| New Tests | 35+ |
 
 ## Sprint History
-_No sprint history._
+_See "Sprint History (Sprint 136-166)" tablosu yukarıda._

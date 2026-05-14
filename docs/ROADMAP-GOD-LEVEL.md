@@ -4,8 +4,82 @@
 **Status:** CANONICAL — Sprint 149-200 anchor document
 **Vision:** OpenClaw'ın god-level üstün hali — developer-first + life-assistant dual platform
 **Brainstorming:** Alperen onayları 12+ karar, 5 paralel agent kod tabanı analizi
-**Last update:** 2026-05-13 (Sprint 164 — dep_pipeline Yol B Wire + Vitest Gate + Housekeeping)
-**Next audit:** Sprint 165 sonrası — Bug X+Y+Z+W close
+**Last update:** 2026-05-13 (Sprint 166 — Brain Self-Update + Data Integrity Closure)
+**Next audit:** Sprint 167 sonrası — Bug E+G+Z2+Z3 fix + dep_pipeline live + M1-M4 monitoring baseline
+
+---
+
+## ⚡ 2026-05-13 (Sprint 165→166 Final Stability + Brain Self-Update + Data Integrity Closure)
+
+### Sprint 165 (Final Stability + Open Source Hazırlık, 2026-05-12)
+
+5/5 task delivery, npm publish `v1.0.0-beta.1` hazır, Open Source GA Sprint 168'e ertelendi:
+
+- **T1 (Bug X):** "no-result → CODE_VERIFIED_DONE" stub kaldırıldı, honest-result gate runtime devrede
+- **T2 (Bug Y):** processQueue legacy FIFO stall fix (flag false modunda) — respawnEligibleTasks 13 grep match canlı çalışıyor
+- **T3 (Bug Z):** Vitest gate +1 fail kronik regresyon kaynak forensic + worker/Brain audit uyumu (NO_GO — Sprint 165 retro deliverable)
+- **T4 (Bug W):** dead_event_stream detector activate (Sprint 148 `reserve_for: sprint-148` cleared)
+- **T5:** Documentation freeze + public repo flip (`VerhexIO/deckent-dev` → `VerhexIO/deckent`) prep — GO_WITH_TECH_DEBT, public flip Sprint 168'e taşındı
+
+### Sprint 166 (Brain Self-Update + Data Integrity Closure, 2026-05-13)
+
+**11/11 task DONE** (10 DONE + 1 GO_WITH_TECH_DEBT), ~2735 LoC + 35+ test PASS, 0 regression. 4 architectural root cause kalıcı kapatıldı:
+
+| Task | Bug | Fix Özeti |
+|---|---|---|
+| **T1** | **Bug M (adrInsert hook eksik)** | `src/core/adr-file-sync.ts` NEW 244 LoC — MADR v3 başlık regex + memory.db upsert. `identity-generator.ts:308-356` postFinalizeHooks **Step 3 (adrInsert)** insert + ruleRegen Step 4'e renumber (Step Ordering Contract Section 5.1) |
+| **T2** | **Bug N+O (onRuleRegen manuel finalize path)** | `cli/commands/finalize.ts:166` finalizeSprint çağrısına `onRuleRegen: regenerateRules` callback eklendi + `rule-generator.ts` CUSTOM_TEMPLATE block (AUTO kopyası değil, empty template) |
+| **T3** | **Bug S (doc-cache sprint-aware cache key)** | `doc-cache.ts` cache key `fileHash + entryHash + sprint.id` (GO_WITH_TECH_DEBT — runner wire-up Sprint 167'e ertelendi) |
+| **T4** | **Bug Y2 (Doc-sync ground-truth 3-layer defense)** | Plan-time count assertion + helper `verifyDocSyncGroundTruth` + Auditor runtime check (`src/monitor/auditor.ts:705`) + `.deckent/ground-truth-overrides.json` whitelist (agents_count=15 anchor) |
+| **T5-T10** | **Bug R+T+U+V+C+X+P+Q+W+K+L bundled** | Data integrity + living docs: AGENTS.md docs.json entry, identityRegen deprecate, sprint type insert + debt sprint_id backfill (100 entry), DECKENT.md broken ref fix, summary debt filter `status != 'resolved'`, TOOLS/BOOT/WORKER-GUIDE auto-content generators, provider parity (.codex/.gemini/.cursor frontmatter sync), emitAlert helper + stale_md detector, verify-ran atomic write |
+| **T11** | **ADR-046 Brain Self-Update Hook Architecture** | MADR v3 hibrit, accepted — Wave 1.5 strictly serial gate (T1+T2+T3 DONE → Alperen manuel `npx deckent memory rebuild` CHECKPOINT). Step ordering kontratı, koşulsuz invocation pattern, falsifiable predicate |
+
+**Yeni infrastructure:**
+- Docker container memory 4GB → 8GB (Bug G workaround — Sprint 167 adaptive model-aware fix planlanıyor)
+- `src/monitor/alert-emitter.ts` (+30 LoC) — `emitAlert(type, payload)` → `.dashboard.json` + event jsonl atomic write
+- `.deckent/ground-truth-overrides.json` whitelist schema v1.0
+
+**Test büyümesi:** Sprint 166 sonrası test suite ~16,434 PASS (Sprint 166 35+ yeni test ekledi, 0 regression).
+
+### Sprint 166 Sırasında Tespit Edilen Yeni 4 Bug (Sprint 167 P0)
+
+| Bug | Tanım | Sprint 167 Aksiyon |
+|---|---|---|
+| **Bug E** | Spawn-lock leak — 3× replay aynı sprint içinde, manuel survival lock takip | `acquireSpawnLock` TTL + heartbeat-aware cleanup |
+| **Bug G** | OOM exit 137 — container 4GB→8GB workaround Sprint 166'da proven, mimari fix bekliyor | Adaptive model-aware memory allocator (opus=8GB, sonnet=4GB, haiku=2GB) |
+| **Bug Z2** | Planner `Files:` parser DIRECTIVES.md bare token üretiyor (`.md`, `brain.md`, git hash) | Token sanitizer regex + skip-on-malformed validation |
+| **Bug Z3** | `npx deckent memory rebuild` semantics yanlış — aslında export yapıyor, import için Sprint 167 fix | CLI subcommand split: `rebuild` (import) vs `export` (dump) |
+
+### Sprint 167 Tema (Architectural Refactor + Monitoring Baseline)
+
+- Bug E+G+Z2+Z3 mimari fix
+- `dependency_pipeline_enabled: true` flip (Wave scheduling live) — anchor decision Sprint 167 DIRECTIVES
+- M1-M4 monitoring baseline tracking aktif (Sprint 166 advisory, Sprint 167 P0 automatic blocker)
+- **ADR-047:** Manuel Survival Pattern + Brain Hot-Fix Architecture (planned)
+
+### Sprint 168 (Open Source GA Hedefi)
+
+- `VerhexIO/deckent-dev` → `VerhexIO/deckent` public flip (Sprint 165 T5 hazırlık → Sprint 168 cutover)
+- `npm publish v1.0.0-beta.2` GA
+- Show HN launch + Twitter/Reddit/Discord community feedback wave
+
+### Sprint 165-166 Beta GA Exit Gate Güncel Durum
+
+| # | Gate | Sprint 164 sonu | Sprint 166 sonu |
+|---|------|------------------|------------------|
+| #1 tsc 0 errors | ✅ | ✅ |
+| #2 vitest gate | ⚠️ +1 fail kronik | ✅ Sprint 166 35+ yeni test PASS, 0 regression |
+| #11 Documentation sync | ⚠️ | ✅ Living docs T8+T9 wire (TOOLS/BOOT/WORKER-GUIDE auto-content) |
+| #13 Messaging trio | 🟡 | 🟡 (Sprint 168 community launch) |
+| #15 Hub publish | 🟡 | 🟡 (Sprint 168 GA) |
+| **Yeni: Brain self-update integrity** | — | ✅ ADR-046 accepted, postFinalize Step 1-5 contract live |
+| **Yeni: Ground-truth verification** | — | ✅ 3-layer defense + whitelist (Bug Y2 zero-tolerance) |
+
+**Sprint 168 Beta GA için kalan 3 gate:** #3 (coverage long-term Sprint 170+), #13 (messaging smoke), #15 (hub publish).
+
+### Meta-Dogfood Kanıt — 6. Uygulama (Sprint 165-166 Hattı)
+
+Sprint 164 (5. uygulama) → Sprint 165 (honest-result gate canlı kanıt) → Sprint 166 (Brain self-update hook chain doğru sırada çalıştı, ADR-043/044/045/046 hepsi memory.db'ye düştü). Deckent kendi mimari kontratını kendi finalize çıktısında doğruladı.
 
 ---
 
@@ -526,7 +600,7 @@ Not: Sprint 151 Beta GA cutover'a kaydı, Phase 2 bir sprint kaydı. 2026-04-21 
 ## 6. Taşınan Debt (Sprint 148 → 149 → 150 → 151)
 
 ### Sprint 148 → 149 (tarihsel)
-8 item: Docker HB + scope sanitizer + auditor stale + Dockerfile root + .deck interpolation + test-writer kalıntı → hepsi Sprint 149/150 tarafından kapatıldı.
+8 item: Docker HB + scope sanitizer + auditor stale + Dockerfile root + .deck interpolation + ADR-041 reform kalıntı → hepsi Sprint 149/150 tarafından kapatıldı.
 
 ### Sprint 150 → 151 (Hot Fix sonrası kalan)
 
@@ -628,7 +702,7 @@ Not: Sprint 151 Beta GA cutover'a kaydı, Phase 2 bir sprint kaydı. 2026-04-21 
 ## 11. Anchor Kuralları — Yoldan Şaşmamak İçin
 
 1. **Sprint 151 Beta GA Çarşamba 22 Nis** — (Sprint 150 re-run + Hot Fix sonrası güncel hedef), catastrophic fail dışında ertelenmez
-2. **test-writer agent yasak** — Sprint 148 reform kalıcı, tekrar eklenmez
+2. **ADR-041 Agent Taxonomy** — Sprint 148 reform kalıcı (15 vertical agents), testing horizontal skill olarak korunur, vertical testing agent tekrar eklenmez
 3. **Nervous system production-critical** — her sprint'te event kanıtı aranır; **2026-04-21 Hot Fix H6 sonrası DECKENT→USER:NOTIFY canlı** + nervous bridge aktif
 4. **Ed25519 signature zorunlu** — imzasız skill hub'a kabul edilmez
 5. **Deckent "ürün değil servis"** — SaaS/paywall/enterprise edition yasak (ADR-033)

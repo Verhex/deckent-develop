@@ -4,7 +4,7 @@
 
 **Disiplin isteyen geliştiriciler için AI orkestratör.**
 
-[![npm version](https://img.shields.io/npm/v/deckent.svg)](https://www.npmjs.com/package/deckent) [![tests](https://img.shields.io/badge/tests-12485%2B-brightgreen)](https://github.com/VerhexIO/deckent) [![coverage](https://img.shields.io/badge/coverage-89.33%25-brightgreen)](https://github.com/VerhexIO/deckent) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![sprints](https://img.shields.io/badge/sprints-164%2B-teal)](https://github.com/VerhexIO/deckent) [![version](https://img.shields.io/badge/version-v1.0.0--beta.1-orange)](https://github.com/VerhexIO/deckent)
+[![npm version](https://img.shields.io/npm/v/deckent.svg)](https://www.npmjs.com/package/deckent) [![tests](https://img.shields.io/badge/tests-16434%2B-brightgreen)](https://github.com/VerhexIO/deckent) [![coverage](https://img.shields.io/badge/coverage-89.33%25-brightgreen)](https://github.com/VerhexIO/deckent) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![sprints](https://img.shields.io/badge/sprints-166%2B-teal)](https://github.com/VerhexIO/deckent) [![version](https://img.shields.io/badge/version-v1.0.0--beta.1-orange)](https://github.com/VerhexIO/deckent)
 
 Deckent, iki modlu bir AI agent orkestrasyon CLI'dir: geliştiriciler için yapılandırılmış çok-agent sprint'leri sunan **Sprint Mode** ve tek seferlik yaşam asistanı görevleri için **Task Mode**. Hedeflerinizi yazın; Deckent görevleri planlar, paralel AI worker'lar atar, kaliteyi izler ve sonuçları disiplinle teslim eder.
 
@@ -29,6 +29,13 @@ deckent start
 deckent mode task
 deckent run "Günün sonuna kadar PR'ı gözden geçirmeyi hatırlat"
 ```
+
+---
+
+## Sprint 166'da Yenilikler
+
+- **ADR-046** — Brain Self-Update Hook Mimarisi: post-finalize hook zinciri (memoryExport → adrInsert → ruleRegen → updateProjectDocs) artık resmi olarak tanımlandı ve zorunlu hale getirildi.
+- **Veri bütünlüğü kapanışı** — 100 debt satırına `sprint_id` geri dolduruldu, 9 sprint memory kaydı tamamlandı, doc-sync ground-truth doğrulaması (3 katmanlı savunma) gelecekteki agent sayısı sapmalarını engelliyor.
 
 ---
 
