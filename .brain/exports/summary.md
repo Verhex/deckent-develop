@@ -48,6 +48,7 @@
 | adr-042 | Hybrid Mode Architecture — Sprint + Task Dual Modes | proposed |
 
 ## Recent Learnings
+- **Sprint sprint-165 Learnings** (sprint-165): ## Sprint sprint-165 Learnings
 - **Sprint sprint-164 Learnings** (sprint-164): ## Sprint sprint-164 Learnings
 - Vitest Gate +1 Fail Closure — Chronic Regression Eradication: NO_GO — Vitest gate +1...
 - **Sprint sprint-163 Learnings** (sprint-163): ## Sprint sprint-163 Learnings
@@ -64,8 +65,6 @@
 - Public Repo Flip — VerhexIO/deckent-dev → VerhexIO/deckent: GO_WITH_TECH_DEBT — DURU...
 - **Sprint sprint-150 Learnings** (sprint-150): ## Sprint sprint-150 Learnings
 - Docker Worker Exit Pattern Final Fix (Sprint 146+148 Debt): GO_WITH_TECH_DEBT — Dock...
-- **Sprint sprint-149 Learnings** (sprint-149): ## Sprint sprint-149 Learnings
-- `deckent mode` CLI Command: GO_WITH_TECH_DEBT — Created `deckent mode` CLI command w...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -73,4 +72,4 @@ _No active technical debt._
 ## Active Patterns
 _No active patterns._
 
-_Total entries: 193 | Generated: 2026-05-13_
+_Total entries: 195 | Generated: 2026-05-13_

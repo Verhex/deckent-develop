@@ -113,29 +113,26 @@ This is where Deckent enters the OpenClaw/Cowork/Devin category — not as anoth
 ## Deckent by the Numbers
 | Metric | Value |
 |--------|-------|
-| Version | 0.4.0-beta.1 |
-| Sprint | sprint-164 |
+| Version | 1.0.0-beta.1 |
+| Sprint | sprint-165 |
 | MCP Tools | 27 |
 | MCP Resources | 8 |
-| CLI Commands | 49+ |
-| Dashboard Pages | 6 |
-| Agents | 16 built-in + 2 custom |
+| CLI Commands | 55+ |
+| Dashboard Pages | 7 |
+| Agents | 15 built-in + 2 custom |
 | Skills | 21 built-in |
 | Providers | 3 (Claude, Codex, Gemini) |
 
 ## Sprint History
-| Sprint | Status |
-|--------|-------|
-| sprint-163 | completed |
-| sprint-164 | completed_with_gate_failure |
+_No sprint history._
 
 ## Sprint Metrics
 | Metric | Value |
 |--------|-------|
-| Sprint | sprint-164 |
-| Total Tasks | 6 |
-| Completed | 5/6 DONE + 1 stub |
-| Tech Debt | 1 |
+| Sprint | sprint-165 |
+| Total Tasks | 0 |
+| Completed | 0 |
+| Tech Debt | 0 |
 | No-Go | 0 |
-| Duration | ~80 dakika |
-| Coverage | 89.33% |
+| Duration | 215dk 9sn |
+| Coverage | 0.0% |

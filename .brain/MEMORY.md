@@ -162,3 +162,4 @@ WHAT WAS DONE:
 ## Sprint sprint-163 Learnings
 ## Sprint sprint-164 Learnings
 - Vitest Gate +1 Fail Closure — Chronic Regression Eradication: NO_GO — Vitest gate +1 fail chronic regression closure — TAMAMLANDI. Discovery: full vitest run 17 fail / 8 dosya tespit etti (n
+## Sprint sprint-165 Learnings

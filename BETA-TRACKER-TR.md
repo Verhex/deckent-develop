@@ -6,20 +6,17 @@
 ---
 
 ## Mevcut Durum
-| Metrik | Değer |
+| Metric | Value |
 |--------|-------|
-| Versiyon | 1.0.0-beta.1 (Sprint 165 freeze gate) |
-| Sprint | sprint-164 |
-| ADR | 45 (ADR-045 Wave-Based Execution Semantics, Sprint 164) |
-| MCP Tool | 27 (audit, recover, feature_query, watch, nervous_* eklendi) |
-| MCP Resource | 8 |
-| CLI Komut | 49+ |
-| Dashboard Sayfa | 6 |
-| Agent | 16 built-in |
-| Skill | 21 built-in |
-| Provider | 3 (Claude, Codex, Gemini) |
-| Test | 12,485+ (Sprint 164: +14 — 8 wire + 6 integration) |
-| Coverage | %89.33 |
+| Version | 1.0.0-beta.1 |
+| Sprint | sprint-165 |
+| MCP Tools | 27 |
+| MCP Resources | 8 |
+| CLI Commands | 55+ |
+| Dashboard Pages | 7 |
+| Agents | 15 built-in + 2 custom |
+| Skills | 21 built-in |
+| Providers | 3 (Claude, Codex, Gemini) |
 
 ## Genel Bakış
 
@@ -1817,3 +1814,17 @@ Brain processQueue + state freeze regression zinciri KAPATILDI. RETRO satır tem
 - **T5:** Dokümantasyon freeze (README, API ref, config ref final sync)
 - **DeckentHub seed skill:** 20/20 publish hedefi (Gate #15)
 - **Hedef:** 17/20 → 19/20 PASS
+
+## Sprint Metrics
+| Metric | Value |
+|--------|-------|
+| Sprint | sprint-165 |
+| Total Tasks | 0 |
+| Completed | 0 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Duration | 215dk 9sn |
+| Coverage | 0.0% |
+
+## Sprint History
+_No sprint history._

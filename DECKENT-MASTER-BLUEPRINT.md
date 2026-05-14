@@ -7,19 +7,13 @@
 ## Live Metrics
 | Metric | Value |
 |--------|-------|
-| Sprint | sprint-164 |
-| Total Tasks | 6 |
-| Completed | 4 |
-| Tech Debt | 2 |
+| Sprint | sprint-165 |
+| Total Tasks | 0 |
+| Completed | 0 |
+| Tech Debt | 0 |
 | No-Go | 0 |
-| Coverage | 89.33% |
-| Total Tests | 12,485+ (+14 new in Sprint 164) |
-| ADR Registry | 45 (latest: ADR-045 Wave-Based Execution Semantics) |
-| MCP Tools | 27 |
-| Built-in Agents | 16 |
-| Built-in Skills | 21 |
-| Providers | 3 (Claude, Codex, Gemini) |
-| Version | 0.4.0-beta.1 |
+| Duration | 215dk 9sn |
+| Coverage | 0.0% |
 
 # TABLE OF CONTENTS
 

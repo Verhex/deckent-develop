@@ -63,7 +63,16 @@
       "Bash(docker system *)",
       "Bash(xargs -r docker rm)",
       "Bash(pkill -9 -f \"until.*task-165\")",
-      "Bash(awk '{print $5, $6, $7, $8, $9}')"
+      "Bash(awk '{print $5, $6, $7, $8, $9}')",
+      "Bash(awk '{print $6, $7, $8, $9}')",
+      "Bash(sqlite3 /home/alperen/deckent-dev/.brain/memory.db \"SELECT type, COUNT\\(*\\) FROM entries GROUP BY type;\")",
+      "Bash(sqlite3 /home/alperen/deckent-dev/.brain/memory.db \"SELECT id, status, sprint_id FROM entries WHERE type='adr' AND id LIKE 'adr-04%' ORDER BY id;\")",
+      "Bash(sed -n '1230,1245p' src/orchestra/sprint-phases.ts)",
+      "Bash(sed -n '155,180p' src/cli/commands/finalize.ts)",
+      "Bash(sed -n '1175,1200p' src/orchestra/sprint-finalizer.ts)",
+      "Bash(awk '{i+=$1; o+=$2; c+=$3} END {printf \"Input: %d\\\\nOutput: %d\\\\nCacheRead: %d\\\\nTotal \\(in+out\\): %d\\\\nGrand \\(in+out+cache\\): %d\\\\n\", i, o, c, i+o, i+o+c}')",
+      "Bash(mkdir -p /mnt/d/deckent)",
+      "Bash(cp /tmp/deckent-pkg/deckent-1.0.0-beta.1.tgz /mnt/d/deckent/)"
     ]
   }
 }

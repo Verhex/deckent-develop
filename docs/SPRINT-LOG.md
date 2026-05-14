@@ -4406,3 +4406,24 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 164-006: Integration Test Suite — Sprint 161 Forensic Replay + Multi-Wave Coverage (E-tests) (DONE)
 
 ---
+## Sprint 165 — sprint-165
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-05-13
+**Duration:** 12910s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 0 |
+| Completed | 0 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 12909690ms |
+
+### Tasks
+
+
+---

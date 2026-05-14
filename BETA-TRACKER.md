@@ -74,18 +74,15 @@ Before tagging `v1.0.0-beta.1` and running `npm publish`, **all 20 gates must PA
 ## Current Status
 | Metric | Value |
 |--------|-------|
-| Version | 1.0.0-beta.1 (Sprint 165 freeze gate) |
-| Sprint | sprint-164 |
-| ADRs | 45 (ADR-045 Wave-Based Execution Semantics, Sprint 164) |
-| MCP Tools | 27 (audit, recover, feature_query, watch, nervous_* added) |
+| Version | 1.0.0-beta.1 |
+| Sprint | sprint-165 |
+| MCP Tools | 27 |
 | MCP Resources | 8 |
-| CLI Commands | 49+ |
-| Dashboard Pages | 6 |
-| Agents | 16 built-in |
+| CLI Commands | 55+ |
+| Dashboard Pages | 7 |
+| Agents | 15 built-in + 2 custom |
 | Skills | 21 built-in |
 | Providers | 3 (Claude, Codex, Gemini) |
-| Tests | 12,485+ (Sprint 164: +14 — 8 wire + 6 integration) |
-| Coverage | 89.33% |
 
 ## Overview
 
@@ -935,14 +932,13 @@ Every blocker was directly verified in the codebase. False claims have been corr
 ## Sprint Metrics
 | Metric | Value |
 |--------|-------|
-| Sprint | sprint-164 |
-| Total Tasks | 6 |
-| Completed | 5 (+ 1 phantom stub: 164-006 worker docker HB shutdown) |
-| Tech Debt | 1 (Sprint 156-011 stub replay) |
+| Sprint | sprint-165 |
+| Total Tasks | 0 |
+| Completed | 0 |
+| Tech Debt | 0 |
 | No-Go | 0 |
-| Outcome | GO_WITH_GATE_FAILURE (vitest +1 chronic) |
-| New Tests | 14 (8 wire + 6 integration) |
-| Coverage | 89.33% |
+| Duration | 215dk 9sn |
+| Coverage | 0.0% |
 
 ## Sprint History (Sprint 136-164)
 | Sprint | Tasks | Done | NO_GO | Duration | Avg Rubric | Theme |
@@ -1455,7 +1451,7 @@ Cache only reduces cost — tokens still occupy the context window:
 - [CMA Quickstart](https://platform.claude.com/docs/en/managed-agents/quickstart) — Agent creation, sessions, streaming guide
 
 ## Sprint History
-See "Sprint History (Sprint 136-164)" table above.
+_No sprint history._
 
 ## Sprint 163 — Detailed Summary
 

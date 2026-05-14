@@ -1201,6 +1201,9 @@ export async function finalizeSprint(
     debugLog('finalizeSprint:postFinalizeHooks',
       `memExport=${postFinalizeResult.memoryExport?.filesWritten.length ?? 'skipped'} ` +
       `identity=${postFinalizeResult.identityRegen?.reason ?? 'skipped'} ` +
+      `adrInsert=${postFinalizeResult.adrInsert
+        ? `inserted=${postFinalizeResult.adrInsert.inserted}/updated=${postFinalizeResult.adrInsert.updated}/skipped=${postFinalizeResult.adrInsert.skipped}`
+        : 'skipped'} ` +
       `ruleRegen=${postFinalizeResult.ruleRegenCalled} ` +
       `errors=${postFinalizeResult.errors.length}`);
   } catch (e) {
