@@ -134,3 +134,22 @@ Bug A/B runtime aktif (dist 23:42 > src). Kalan MANUEL-P0 (C-03/04/05/06/07/13/1
 **MANUEL-P0 net:** 8 iddiadan **2 FALSE-POSITIVE** (C-29, C-06) + **1 MIS-CITED** (C-04→mid-sprint-adapter) + **5 CONFIRMED-REAL** (C-13 HIGH, C-14, C-03, C-05/07). Gerçek fix kuyruğu: C-13 (RBAC soft→hard, davranış-değiştiren → ESCALATE), C-14 (verify-loop wire, davranış-değiştiren → ESCALATE), C-03 (model rotation, davranış-değiştiren → ESCALATE), C-04 (execSync→spawnSync array, davranış-koruyan, ADR-006 → TDD-fix adayı), C-05/07 (doc-drift → doc-reorg batch).
 
 **Synthesis §2 güncel skor (~25/29 doğrulandı): 5 FALSE-POSITIVE/İPTAL** (BG-03, 171-002-B11, BA-07, C-29, C-06) + **2 OVERSTATED** (BG-01, BD-04) + **2 MIS-CITED** (BG-05, C-04) → §2'nin **~%31'i hatalı/kalibre-edilmemiş**. Verify-before-fix disiplini doğrulandı.
+
+## YP-RISK Batch — C-01/BA-01 ADR-008 (2026-05-15, auto-mode)
+
+| ID | Synthesis iddiası | Verdict | Kanıt |
+|---|---|---|---|
+| **C-01/BA-01** | ADR-008 "Brain merkezi import drift 5+ modül" — CRITICAL | ❎**FALSE-POSITIVE/OVERSTATED (İPTAL)** | ADR-008 decision metni dar: "Brain tmux/auditor/worker import eden TEK modül; **diğerleri brain'i import etmez**". Consequence testi: `grep "from.*brain" tmux.ts auditor.ts worker.ts` boş olmalı. Çalıştırıldı → tek hit `auditor.ts:1903 pattern:'from.*brain'` = **string literal (auditor'ın kendi tespit regex'i), import değil**. Triad'da 0 gerçek brain-import → **TAM COMPLIANT**. Synthesis, CLI/MCP/API entry-point'lerinin `brain.ts` (slim re-export layer, `brain.ts:1` doğrular) tüketmesini "drift" saymış — bu **amaçlanan public API paterni**, ADR-008 kapsamı dışı. Sprint 172 blocker'dan **ÇIKAR**. |
+| (yan bulgu) | — | ⊕**YENİ MED** | `sprint-controller.ts:63 ↔ sprint-phases.ts:136` karşılıklı value-import (ADR-024 God-split back-ref; `:137 import type` erased ama `:136/:63` value). ESM sibling-cycle riski. ADR-008 DEĞİL — ADR-024 hijyen. Blocker değil, DEFER. |
+
+**YP-RISK batch durumu:** C-01/BA-01 (FP), C-08/46/BA-07 (FP — daha önce), C-16/17/18/BA-02 ADR-040 (CONFIRMED nüanslı opt-in), C-25/BA-03 ADR-010 (CONFIRMED), C-32/33/BA-05/06 (CONFIRMED) → **YP-RISK esas tamam**. Kalan tek madde "Coverage ~92" = synthesis'in kendi "POTANSIYEL / re-audit" flag'i → Sprint 172 mini-re-audit (subdir tam-enumerasyon cross-check), şimdi otonom çözülmez.
+
+**SYNTHESIS §2 NİHAİ DOĞRULAMA SKORU (~28/29):** **6 FALSE-POSITIVE/İPTAL** (BG-03, 171-002-B11, BA-07/C-08/46, C-29, C-06, **C-01/BA-01**) + **2 OVERSTATED** (BG-01, BD-04) + **2 MIS-CITED** (BG-05, C-04) → §2'nin **~%34'ü hatalı/kalibre-edilmemiş**. Kök sebep: synthesis (Task 29) ADR başlık/özet okuyup precise consequence-clause'u okumamış → ADR-compliance kümesinde sistematik over-flag. **"Raporu okuyup hepsini fixle" yaklaşımı %34 hasar verirdi — verify-before-fix disiplini kanıtlandı.**
+
+**GERÇEK Sprint 172 fix kuyruğu (CONFIRMED-REAL, prioritized):**
+1. **C-13** ADR-037 RBAC soft mode (worker.ts:490) — HIGH, doc-vs-code, davranış-değiştiren → kullanıcı kararı (soft bilinçli rollout mu?)
+2. **C-14** enforceVerifyLoop 0-caller wire — davranış-değiştiren → kullanıcı kararı
+3. **C-03** rotateModelForFix ters-downgrade — davranış-değiştiren → kullanıcı kararı (memory'de mevcut)
+4. **C-04** mid-sprint-adapter.ts:228/284 execSync→spawnSync array — ADR-006, davranış-koruyan → TDD-fix hazır
+5. **BA-03/05** ADR-010 deps + Sprint 167 DB-boş — governance/ADR amendment → ESCALATE
+6. **C-05/07** config doc-drift — doc-reorg batch (Sprint 172)
