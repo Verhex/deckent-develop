@@ -1,0 +1,68 @@
+---
+
+## Kod İncelemesi: 170-002-fix — P0-5 Docker Spawn Race Window Closure
+
+### Durum Tespiti
+
+Orijinal worker (170-002) TDD kırmızı fazını tamamlamış — test dosyaları yazılmış, kırmızı konfirme edilmiş — ancak container implementasyonu yazmadan çökmüş. `.partial-result` vardı, `.result` yoktu.
+
+Bu fix görevi eksik implementasyonu tamamladı:
+
+---
+
+### Değişiklikler
+
+**`src/core/active-workers.ts`** (52 satır eklendi)
+
+- `PENDING_SPAWNS = new Set<string>()` modül düzeyinde eklendi
+- 5 yeni export: `markPending`, `markActive`, `clearPending`, `_clearAllPending`, `_getPendingSpawns`
+- `getActiveWorkerIds` güncellendi: `new Set<string>(PENDING_SPAWNS)` ile başlayıp `.hb` dosyaları union'ı alıyor — deduplication Set garantisi ile
+
+**`src/orchestra/spawn-backend-docker.ts`** (4 satır eklendi + 1 import)
+
+- `markPending(taskId)`: `spawn()` başında, `acquireSpawnTimeLocks` öncesi (prompt write'tan önce)
+- `clearPending(taskId)`: `spawn()` catch bloğu (tüm throw path'ler için)
+- `clearPending(taskId)`: `spawnOutcome.ok === false` return path'i (non-throw hata)
+- `markActive(taskId)`: `.hb` `writeFileSync` sonrası (heartbeat artık yetkili)
+
+---
+
+### Test Sonuçları
+
+```
+✓ tests/core/active-workers-pending.test.ts   (4 test)
+✓ tests/orchestra/docker-spawn-race.test.ts   (2 test)
+─────────────────────────────────────────────
+✓ 6/6 PASS — tüm yeni testler yeşil
+✓ tsc --noEmit — temiz, sıfır hata
+```
+
+Baseline: 7 pre-existing başarısızlık var (`event-stream-prompt` P0-6, `tmux-prompt-filename` P0-3, `decisions.md` ADR format, `alert-emitter` rules path) — bunların hiçbiri bu görevin scope'u değil, önceki sprint durumunda zaten kırmızıydı.
+
+---
+
+### Kod İncelemesi Bulguları
+
+**[LOW] `active-workers.ts:17` — In-memory Set process-restart'ta sıfırlanır**
+- Category: Architecture
+- Issue: `PENDING_SPAWNS` process yeniden başlatıldığında boş gelir. Brain veya auditor process'i yeniden başlarsa, spawn sırasında çöküp yeniden başlayan bir süreçte pending taskId'ler kaybolur.
+- Suggestion: Bu mevcut bir tasarım kararı (sprint lifetime = process lifetime), kritik değil. Uzun vadede persist etmek gerekirse `.tasks/.pending-spawns` dosyası kullanılabilir; ancak şu anki sprint lifecycle için kabul edilebilir.
+
+**[LOW] `spawn-backend-docker.ts` — `acquireSpawnTimeLocks` throw ederse clearPending çağrılmaz**
+- Category: Correctness (edge case)
+- Issue: `markPending` çağrısının ardından `acquireSpawnTimeLocks` `SpawnBackendError` throw edebilir. Bu throw `try { runSpawn }` catch bloğuna değil, doğrudan `spawn()` dışına çıkar.
+- Suggestion: `acquireSpawnTimeLocks` çağrısını da try-catch içine alın veya `markPending`'i `acquireSpawnTimeLocks` başarılı olduktan sonra çağırın. Ancak `acquireSpawnTimeLocks` throw etmesi nadir (sadece lock çakışmasında), ve `clearPending` idempotent olduğundan, üst katman bir retry sırasında `markPending` tekrar çağırabilir. Orta önemde ama sprint kapsamı dışında.
+
+**[GOOD] Deduplication yaklaşımı doğru** — `Set<string>` ile union yapmak doğal O(1) dedup sağlıyor, fazladan döngü yok.
+
+**[GOOD] Test kapsamı tam** — 4 birim testi (markPending, markActive, clearPending, dedup union) + 2 entegrasyon testi (race-window simulation, leak prevention) — TDD döngüsü eksiksiz.
+
+---
+
+## Review Summary
+- CRITICAL: 0 bulgu
+- HIGH: 0 bulgu
+- MEDIUM: 0 bulgu
+- LOW: 2 bulgu
+- Verdict: **APPROVE**
+- Key concern: `acquireSpawnTimeLocks` throw path'inde `clearPending` çağrılmıyor — düşük öncelikli, sonraki sprint'te düzeltilebilir.

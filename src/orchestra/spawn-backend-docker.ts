@@ -17,6 +17,7 @@ import {
   releaseStaleSpawnLocksForTask,
   SpawnLockError,
 } from '../core/file-lock.js';
+import { markPending, markActive, clearPending } from '../core/active-workers.js';
 import type { SpawnBackend, SpawnBackendOptions } from './spawn-backend.js';
 import { SpawnBackendError } from './spawn-backend.js';
 
@@ -169,6 +170,12 @@ export class DockerSpawnBackend implements SpawnBackend {
     const tasksDir = join(dir, TASKS_DIR);
     mkdirSync(tasksDir, { recursive: true });
 
+    // Sprint 170 P0-5: mark as pending BEFORE prompt write + lock acquisition.
+    // Bridges the ~3s race window between prompt write and .hb creation during
+    // which a concurrent cleanup (sibling kill()) would see no .hb and delete
+    // the new worker's prompt file. clearPending is called on all error paths.
+    markPending(taskId);
+
     // Sprint 156 Task 10: spawn-time per-file lock acquisition.
     // Reject the spawn if any file in this task's scope.filesWrite is already
     // claimed by a different active task — prevents concurrent worker writes
@@ -184,6 +191,7 @@ export class DockerSpawnBackend implements SpawnBackend {
     try {
       this.runSpawn(taskId, model, prompt, opts, dir, effectiveTimeout, tasksDir);
     } catch (err) {
+      clearPending(taskId);
       try { releaseAllSpawnLocks(dir, taskId); } catch (e) { debugLog('docker-backend:spawn-lock-release', e); }
       throw err;
     }
@@ -436,6 +444,8 @@ export class DockerSpawnBackend implements SpawnBackend {
       // Sprint 156 Task 10 (fix): release spawn locks so a retry / fix-worker
       // for this scope is not permanently blocked by a transient docker error.
       try { releaseAllSpawnLocks(dir, taskId); } catch (e) { debugLog('docker-backend:spawn-lock-release', e); }
+      // Sprint 170 P0-5: spawn failed — clear pending so Set doesn't leak
+      clearPending(taskId);
       return;
     }
 
@@ -458,6 +468,9 @@ export class DockerSpawnBackend implements SpawnBackend {
       backend: 'docker',
       containerId: containerId.slice(0, 12),
     }, null, 2), 'utf-8');
+
+    // Sprint 170 P0-5: .hb is now on disk — heartbeat is authoritative, race window closed
+    markActive(taskId);
 
     // Set up container monitoring (async, fire-and-forget)
     this.monitorContainer(taskId, containerName, tasksDir, model);

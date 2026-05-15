@@ -4,6 +4,7 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-170-001-fix | Tech debt from 170-001-fix: Code physically verified despite missing .result (Sp | normal | sprint-170 | active |
 
 ## Resolved Technical Debt
 

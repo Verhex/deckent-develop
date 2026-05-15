@@ -1,0 +1,80 @@
+# Task 170-002 Plan — P0-5 Docker Spawn Race Window Closure
+
+## Problem (Sprint 169 Forensic Bug 2A)
+
+`spawn-backend-docker.ts` lifecycle has a 3+ second window between prompt write
+(line 233) and heartbeat write (line 451). The 3 seconds come from
+`HEALTH_CHECK_DELAY_MS=3000` inside `runDockerWithRetry()`.
+
+During this window, a sibling worker's `kill()` flow calls
+`_cleanupOrphanedPromptFiles()` (in claude.ts), which calls
+`getActiveWorkerIds(projectRoot)` from `active-workers.ts`. That helper only
+inspects `.tasks/task-*.hb` files. Since the spawning worker has not yet
+written its `.hb`, its prompt is deemed orphaned and DELETED. The spawned
+container then fails because the prompt file vanished.
+
+## Fix Strategy
+
+Augment `active-workers.ts` with an in-memory `PENDING_SPAWNS: Set<string>`
+that tracks taskIds whose prompt is written but whose `.hb` is not yet on disk.
+
+API (new exports):
+- `markPending(taskId)` — call BEFORE writing the prompt file
+- `markActive(taskId)` — call AFTER writing the heartbeat (removes from pending)
+- `clearPending(taskId)` — call from error path (spawn failure)
+- `getActiveWorkerIds(projectRoot)` returns the UNION of pending Set + taskIds
+  parsed from `.hb` files (deduped, stable order)
+
+Test-only helpers:
+- `_clearAllPending()` — reset Set for test isolation
+- `_getPendingSpawns()` — read-only snapshot for assertions
+
+## Wire Lifecycle (spawn-backend-docker.ts)
+
+1. `runSpawn` begin — immediately before `writeFileSync(promptHostPath, ...)`:
+   `markPending(taskId)`
+2. After initial `.hb` write succeeds (current line 451–460): `markActive(taskId)`
+3. Failure path inside `runSpawn` (already wrapped in try/catch at `spawn()`
+   level): on the early return path when `runDockerWithRetry` returns
+   `{ok:false}` and on any other return-before-hb path: call
+   `clearPending(taskId)` so the Set does not leak.
+4. The outer `spawn()` method's catch block also calls `clearPending(taskId)`
+   defensively.
+
+## Tests
+
+### tests/core/active-workers-pending.test.ts (4 unit tests)
+
+1. `markPending` adds taskId to active list (no .hb required)
+2. `markActive` transitions taskId out of pending — Set becomes empty
+3. `getActiveWorkerIds` returns DEDUPED union(pending, fromHeartbeats)
+4. `clearPending` removes a pending taskId (failure path)
+
+Each test uses `_clearAllPending()` in `beforeEach` for isolation.
+
+### tests/orchestra/docker-spawn-race.test.ts (1 integration test)
+
+Race-window simulation (no real Docker):
+- markPending(taskId="race-test") is called
+- _cleanupOrphanedPromptFiles is invoked with this taskId active
+- The pending-taskId prompt is PRESERVED (passes selective filter)
+- After markActive, getActiveWorkerIds still includes it (now from .hb)
+
+This is the integration test that proves the runtime fix: prompt file is
+protected during the 3s race window.
+
+## Acceptance
+
+- `grep "markPending\|PENDING_SPAWNS\|markActive" src/core/active-workers.ts`
+  → ≥3 matches
+- 4 TDD tests PASS (3 unit + 1 integration race-window)
+- `tsc --noEmit` zero errors
+- `vitest run` baseline preserved
+
+## Risk
+
+- The Set is in-memory and per-process. Brain (Node process) is the only writer
+  of prompt files for Docker backend, so this is correct. Workers cannot mutate
+  this Set across process boundaries — but they don't need to.
+- Set never grows unbounded because every successful spawn calls `markActive`
+  and every failure calls `clearPending`. The outer catch is the safety net.

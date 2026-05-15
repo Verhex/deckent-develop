@@ -57,18 +57,18 @@ function workerWindowName(taskId: string): string {
  * archived together by archivePromptFiles() during sprint cleanup phase.
  * (Same lifecycle as Docker backend spawn-backend-docker.ts:941-942 — Sprint 156 Task 4.)
  *
- * Asymmetry note (ADR-048 Consequences §Negative): tmux prompt filenames embed
- * a random hex token, NOT the taskId, so the selective filter in
- * `ClaudeAdapter._cleanupOrphanedPromptFiles()` cannot protect active-worker
- * tmux prompts the way it protects Docker prompts. Tmux prompt cleanup relies
- * on the kill-window cleanup flow (which is per-task by tmux semantics) plus
- * the sprint-end archive sweep — not on per-prompt selective protection.
+ * Sprint 170 P0-3 (ADR-048 §Negative closure): when taskId is provided the filename
+ * mirrors the Docker convention: `.prompt-${taskId}-${hash}.txt`. This lets
+ * `ClaudeAdapter._cleanupOrphanedPromptFiles()` — which filters via
+ * `file.includes(\`-\${id}-\`)` — protect active tmux worker prompts the same way
+ * it protects Docker prompts. Auditor (no taskId) keeps the legacy hex-only name.
  */
-function writePromptFile(projectRoot: string, prompt: string): string {
+function writePromptFile(projectRoot: string, prompt: string, taskId?: string): string {
   const tmpDir = join(projectRoot, TASKS_DIR);
   if (!existsSync(tmpDir)) mkdirSync(tmpDir, { recursive: true });
   const id = randomBytes(8).toString('hex');
-  const promptPath = join(tmpDir, `.prompt-${id}.txt`);
+  const filename = taskId ? `.prompt-${taskId}-${id}.txt` : `.prompt-${id}.txt`;
+  const promptPath = join(tmpDir, filename);
   writeFileSync(promptPath, prompt, 'utf-8');
   return promptPath;
 }
@@ -175,7 +175,7 @@ export function spawnWorker(
     '-n', windowName,
     '-c', projectDir,
   ]);
-  const promptPath = writePromptFile(projectDir, prompt);
+  const promptPath = writePromptFile(projectDir, prompt, taskId);
   const cmd = buildWorkerCommand(model, promptPath, opts, adapter, taskId, opts?.taskTimeoutSeconds);
   run([
     'send-keys',

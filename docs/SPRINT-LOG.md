@@ -4558,3 +4558,54 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 169-009: H5 dep_pipeline_enabled Flip + 3-Layer Doc Fix (GO_WITH_TECH_DEBT)
 
 ---
+## Sprint 170 — sprint-170
+
+**Status:** COMPLETE
+**Date:** 2026-05-15
+**Duration:** 0s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 6 |
+| Completed | 5 |
+| Tech Debt | 3 |
+| No-Go | 1 |
+| Coverage | 16.7% |
+| Duration | 0ms |
+
+### Tasks
+
+- 170-001-fix: Fix: P0-3 Tmux Prompt Filename TaskId-Aware (DONE)
+- 170-001: P0-3 Tmux Prompt Filename TaskId-Aware (GO_WITH_TECH_DEBT)
+- 170-002-fix: Fix: P0-5 Docker Spawn Race Window Closure (DONE)
+- 170-002: P0-5 Docker Spawn Race Window Closure (GO_WITH_TECH_DEBT)
+- 170-003-fix: Fix: P0-6 Event Stream Prompt Write/Delete Visibility (NO_GO)
+- 170-003: P0-6 Event Stream Prompt Write/Delete Visibility (GO_WITH_TECH_DEBT)
+
+---
+## Sprint 170 — sprint-170
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-05-15
+**Duration:** 2023s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 6 |
+| Completed | 4 |
+| Tech Debt | 2 |
+| No-Go | 2 |
+| Coverage | 0.0% |
+| Duration | 2023306ms |
+
+### Tasks
+
+- 170-001: P0-3 Tmux Prompt Filename TaskId-Aware (GO_WITH_TECH_DEBT)
+- 170-002: P0-5 Docker Spawn Race Window Closure (DONE)
+- 170-003: P0-6 Event Stream Prompt Write/Delete Visibility (NO_GO)
+
+---

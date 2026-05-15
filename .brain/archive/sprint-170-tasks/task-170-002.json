@@ -1,0 +1,108 @@
+{
+  "id": "170-002",
+  "title": "P0-5 Docker Spawn Race Window Closure",
+  "description": "P0-5 Docker Spawn Race Window Closure\n\n- Model: opus\n- Effort: high\n- Skills: typescript-expert\n- Files: src/orchestra/spawn-backend-docker.ts, src/core/active-workers.ts, tests/orchestra/docker-spawn-race.test.ts, tests/core/active-workers-pending.test.ts\n- Scope: src/orchestra/, src/core/, tests/orchestra/, tests/core/\n- Agent: bug-fixer\n\n### Description\n\nSprint 169 forensic Bug 2A: `src/orchestra/spawn-backend-docker.ts:233` prompt yazıldı, `:451` heartbeat yazıldı (3+ saniye `HEALTH_CHECK_DELAY_MS=3000` gap). Bu pencerede sibling worker `kill()` → `_cleanupOrphanedPromptFiles()` → `getActiveWorkerIds()` `.hb` dosyasını henüz görmez → prompt SİLİNİR → spawn edilen worker prompt'unu okuyamaz → fail.\n\nFix: `src/core/active-workers.ts`'e `PENDING_SPAWNS` in-memory Set ekle. API:\n- `markPending(taskId)` — prompt write öncesi çağrılır\n- `markActive(taskId)` — heartbeat write sonrası çağrılır\n- `clearPending(taskId)` — spawn fail durumunda çağrılır\n- `getActiveWorkerIds()` artık `union(pending, fromHeartbeats)` döner\n\n`spawn-backend-docker.ts` lifecycle'a wire et: write öncesi `markPending`, heartbeat sonrası `markActive`, error path'te `clearPending`.\n\nTDD: önce repro test (RED) — pending state simülasyonu, prompt silinmemeli. Fix sonrası GREEN.\n\n**Kanıt:** `grep \"markPending\\|PENDING_SPAWNS\\|markActive\" src/core/active-workers.ts` 3+ match.\n\n**Test:** 4 TDD test PASS (markPending adds to active list, markActive transitions, getActiveWorkerIds union, prompt protected during race window simulation)",
+  "model": "opus",
+  "effort": "high",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "src/orchestra/",
+      "src/core/",
+      "tests/orchestra/",
+      "tests/core/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/orchestra/spawn-backend-docker.ts",
+      "src/core/active-workers.ts",
+      "tests/orchestra/docker-spawn-race.test.ts",
+      "tests/core/active-workers-pending.test.ts",
+      ".hb"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** `grep \"markPending\\|PENDING_SPAWNS\\|markActive\" src/core/active-workers.ts` 3+ match.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "NO_GO",
+  "sprintId": "sprint-170",
+  "forceModel": "opus",
+  "forceEffort": "high",
+  "forceAgent": "bug-fixer",
+  "forceSkills": [
+    "typescript-expert"
+  ],
+  "assignedAgent": "bug-fixer",
+  "assignedSkills": [
+    "typescript-expert"
+  ],
+  "createdAt": "2026-05-15T06:49:44.950Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "implementation",
+        "secondary": [
+          "documentation"
+        ],
+        "confidence": 0.7
+      },
+      "tags": [
+        "test-coverage"
+      ],
+      "domains": [
+        {
+          "name": "orchestra",
+          "weight": 0.44
+        },
+        {
+          "name": "core",
+          "weight": 0.44
+        }
+      ],
+      "operations": [
+        {
+          "type": "create",
+          "weight": 0.33
+        },
+        {
+          "type": "modify",
+          "weight": 0.17
+        },
+        {
+          "type": "delete",
+          "weight": 0.17
+        },
+        {
+          "type": "test",
+          "weight": 0.17
+        },
+        {
+          "type": "document",
+          "weight": 0.17
+        }
+      ],
+      "complexity": {
+        "fileCount": 5,
+        "moduleCount": 2,
+        "crossCutting": true,
+        "estimatedSize": "medium"
+      },
+      "scope": {
+        "writeRatio": {
+          "src/": 0.4,
+          "tests/": 0.4,
+          "./": 0.2
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0.4
+      }
+    },
+    "confidence": "high",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-05-15T07:10:33.665Z"
+}

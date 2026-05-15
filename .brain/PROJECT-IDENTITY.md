@@ -32,10 +32,10 @@
 ## Current State
 - Test Count: 16593
 - Coverage: 29.8%
-- Last Sprint: sprint-169
-- Total Sprints: 169
-- Completed Tasks: 39
-- No-Go Rate: 4.0%
+- Last Sprint: sprint-170
+- Total Sprints: 170
+- Completed Tasks: 43
+- No-Go Rate: 33.3%
 
 ## Active Configuration
 - Build: tsc

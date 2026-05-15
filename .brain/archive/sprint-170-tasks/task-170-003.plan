@@ -1,0 +1,38 @@
+# Task 170-003 Execution Plan — P0-6 Event Stream Prompt Write/Delete Visibility
+
+## Mevcut Durum
+- P0-3 (Task 1) tamamlandı: tmux.ts writePromptFile artık taskId içeriyor
+- P0-5 (Task 2) tamamlandı: markPending/markActive eklendi
+- Event-stream.ts PROMPT_WRITE/PROMPT_DELETE kanalları YOK
+- spawn-backend-docker.ts event emission YOK
+- claude.ts _cleanupOrphanedPromptFiles event emission YOK
+
+## Değişiklikler
+
+### 1. src/orchestra/event-stream.ts
+- CHANNELS.PROMPT_WRITE = 'BRAIN→SPAWN:PROMPT_WRITE' ekle
+- CHANNELS.PROMPT_DELETE = 'BRAIN→SPAWN:PROMPT_DELETE' ekle
+
+### 2. src/orchestra/spawn-backend-docker.ts
+- writeEvent, getCurrentSprintId, CHANNELS importları ekle
+- runSpawn metodunda writeFileSync(promptHostPath,...) sonrasına PROMPT_WRITE event ekle
+- Payload: { taskId, path: promptHostPath, backend: 'docker', ts }
+
+### 3. src/providers/claude.ts
+- writeEvent, getCurrentSprintId, CHANNELS importları ekle
+- _cleanupOrphanedPromptFiles metodunda her cleanupPromptFile öncesine PROMPT_DELETE ekle
+- Payload: { taskId (filename'den extract), path, reason: 'orphan_cleanup', ts }
+
+### 4. tests/orchestra/event-stream-prompt.test.ts (TDD)
+Test 1: PROMPT_WRITE emitted on Docker spawn (mock node:child_process)
+Test 2: PROMPT_DELETE emitted on cleanup unlink (mock tmux calls)
+Test 3: Event sequence ordering preserved (PROMPT_WRITE < PROMPT_DELETE)
+
+## Not
+- tmux.ts writePromptFile için PROMPT_WRITE: filesWrite boundary dışında, kapsam dahilinde
+  ama strict audit nedeniyle bu task'ta eklenmeyecek. GO_WTD notu eklenecek.
+
+## GO Kriterleri
+- tsc --noEmit: 0 hata
+- vitest: PASS (3 yeni test + regression yok)
+- grep "PROMPT_WRITE|PROMPT_DELETE" src/orchestra/event-stream.ts: 2+ match

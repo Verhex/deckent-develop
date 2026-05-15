@@ -1,0 +1,53 @@
+{
+  "id": "170-001-fix",
+  "title": "Fix: P0-3 Tmux Prompt Filename TaskId-Aware",
+  "description": "Priority fix for NO_GO task 170-001.\nOriginal worker notes: Sprint 170 P0-3 (Bug 2B / ADR-048 §Negative closure) — fix architecturally complete; 3/3 mandated TDD tests GREEN; 5 pre-existing tests in scope-blocked files now fail on literal-string assertions that hard-code the legacy `.prompt-${hex}.txt` pattern.\n\n## What changed\n\n- `src/orchestra/tmux.ts` — `writePromptFile(projectRoot, prompt, taskId)` now embeds taskId. Filename pattern is `.prompt-${taskId}-${hash}.txt`, byte-for-byte the same convention as Docker (`spawn-backend-docker.ts:227-231`). C\nRubric: correctness=95, test_coverage=80, scope_compliance=100\nExpected scope: src/orchestra/, tests/orchestra/, src/providers/\nFiles that should change: src/orchestra/tmux.ts, tests/orchestra/tmux-prompt-filename.test.ts, .prompt-, src/providers/claude.ts",
+  "model": "sonnet",
+  "forceModel": "sonnet",
+  "effort": "low",
+  "priority": "CRITICAL",
+  "reason": "Task 170-001 evaluated as NO_GO; correctness=95; test_coverage=80; scope_compliance=100; tests failed",
+  "scope": {
+    "directories": [
+      "src/orchestra/",
+      "tests/orchestra/",
+      "src/providers/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/orchestra/tmux.ts",
+      "tests/orchestra/tmux-prompt-filename.test.ts",
+      ".prompt-",
+      "src/providers/claude.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** `grep \"task-\\${taskId}\\|taskId\" src/orchestra/tmux.ts | head -3` 1+ match. filename pattern `.prompt-${taskId}-${hash}.txt`.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-170",
+  "isPriorityFix": true,
+  "fixForTaskId": "170-001",
+  "assignedAgent": "code-reviewer",
+  "forceAgent": "code-reviewer",
+  "assignedSkills": [
+    "typescript-expert"
+  ],
+  "forceSkills": [
+    "typescript-expert"
+  ],
+  "createdAt": "2026-05-15T07:10:33.664Z",
+  "rotationStrategy": {
+    "enabled": true,
+    "originalModel": "opus",
+    "rotatedModel": "sonnet",
+    "originalAgent": "bug-fixer",
+    "rotatedAgent": "code-reviewer",
+    "addedSkills": [],
+    "rationale": "Fresh-eyes rotation: opus→sonnet, bug-fixer→code-reviewer"
+  },
+  "updatedAt": "2026-05-15T07:23:28.195Z"
+}

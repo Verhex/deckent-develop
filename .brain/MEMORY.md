@@ -176,3 +176,11 @@ What changed:
 - H3 OSS Pre-Flip Secret Scan Baseline: NO_GO — H3 OSS Pre-Flip Secret Scan Baseline — 3/3 deliverable şartı eksiksiz. (1) scripts/security/secret-baseline.mjs: 10 rege
 - H4 Dashboard Build CI Gate: NO_GO — H4 Dashboard Build CI Gate tamamlandı. Yeni .github/workflows/dashboard-build.yml workflow'u: Node 18.x/20.x/22.x matrix
 - H1 ADR DB→FS Export Pipeline + ADR-046 Reverse Hook: NO_GO — Sprint 169 H1 — ADR DB→FS Export Pipeline + ADR-046 Bi-Directional Hook amendment COMPLETE. (1) src/core/memory-export.t
+## Sprint sprint-170 Learnings
+- P0-3 Tmux Prompt Filename TaskId-Aware: GO_WITH_TECH_DEBT — Sprint 170 P0-3 (Bug 2B / ADR-048 §Negative closure) — fix architecturally complete; 3/3 mandated TDD tests GREEN; 5 pre
+- P0-5 Docker Spawn Race Window Closure: GO_WITH_TECH_DEBT — P0-5 Docker Spawn Race Window Closure — Sprint 169 Bug 2A eradication. TDD red-green disciplined: 6 tests written first 
+- Fix: P0-6 Event Stream Prompt Write/Delete Visibility: NO_GO — Worker exited without writing result (exitCode=0)
+- P0-6 Event Stream Prompt Write/Delete Visibility: GO_WITH_TECH_DEBT — P0-6 Event Stream Prompt Write/Delete Visibility tamamlandı.
+
+## Yapılanlar
+1. src/orchestra/event-stream.ts: CHANNELS.P

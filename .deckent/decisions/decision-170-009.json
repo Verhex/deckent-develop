@@ -1,0 +1,85 @@
+{
+  "taskId": "170-009",
+  "sprintId": "sprint-170",
+  "steps": [
+    {
+      "step": 2,
+      "name": "routing-step-2",
+      "input": {
+        "taskId": "170-009",
+        "title": "H5 dep_pipeline_enabled Flip + 3-Layer Doc Fix",
+        "scope": [
+          "src/core/",
+          "tests/core/",
+          "root/",
+          ".contracts/",
+          "docs/adr/"
+        ],
+        "intent": "documentation"
+      },
+      "output": {
+        "agent": "architect",
+        "skills": [
+          "typescript-expert",
+          "documentation-writer"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Agent forced by override: architect"
+    },
+    {
+      "step": 3,
+      "name": "routing-step-3",
+      "input": {
+        "taskId": "170-009",
+        "title": "H5 dep_pipeline_enabled Flip + 3-Layer Doc Fix",
+        "scope": [
+          "src/core/",
+          "tests/core/",
+          "root/",
+          ".contracts/",
+          "docs/adr/"
+        ],
+        "intent": "documentation"
+      },
+      "output": {
+        "agent": "architect",
+        "skills": [
+          "typescript-expert",
+          "documentation-writer"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Skill budget: max 3 (large task, 4 module(s), effort=normal)"
+    },
+    {
+      "step": 4,
+      "name": "routing-step-4",
+      "input": {
+        "taskId": "170-009",
+        "title": "H5 dep_pipeline_enabled Flip + 3-Layer Doc Fix",
+        "scope": [
+          "src/core/",
+          "tests/core/",
+          "root/",
+          ".contracts/",
+          "docs/adr/"
+        ],
+        "intent": "documentation"
+      },
+      "output": {
+        "agent": "architect",
+        "skills": [
+          "typescript-expert",
+          "documentation-writer"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Skills forced by override: [typescript-expert, documentation-writer]"
+    }
+  ],
+  "decidedAt": "2026-05-15T06:42:08.794Z"
+}

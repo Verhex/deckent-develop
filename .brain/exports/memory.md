@@ -1,5 +1,15 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-170 Learnings
+- Sprint sprint-170 Learnings: ## Sprint sprint-170 Learnings
+- P0-3 Tmux Prompt Filename TaskId-Aware: GO_WITH_TECH_DEBT — Sprint 170 P0-3 (Bug 2B / ADR-048 §Negative closure) — fix architecturally complete; 3/3 mandated TDD tests GREEN; 5 pre
+- P0-5 Docker Spawn Race Window Closure: GO_WITH_TECH_DEBT — P0-5 Docker Spawn Race Window Closure — Sprint 169 Bug 2A eradication. TDD red-green disciplined: 6 tests written first 
+- Fix: P0-6 Event Stream Prompt Write/Delete Visibility: NO_GO — Worker exited without writing result (exitCode=0)
+- P0-6 Event Stream Prompt Write/Delete Visibility: GO_WITH_TECH_DEBT — P0-6 Event Stream Prompt Write/Delete Visibility tamamlandı.
+
+## Yapılanlar
+1. src/orchestra/event-stream.ts: CHANNELS.P
+
 ## Sprint sprint-169 Learnings
 - Sprint sprint-169 Learnings: ## Sprint sprint-169 Learnings
 - W3.1 C0c Collision Detection Live Trigger Investigation + Fix: NO_GO — W3.1 RC identified as path-normalization gap (RC-C from plan §2.1). `detectScopeCollisions` (conflict-resolver.ts:173) c

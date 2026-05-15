@@ -1,0 +1,76 @@
+{
+  "taskId": "170-004",
+  "sprintId": "sprint-170",
+  "steps": [
+    {
+      "step": 2,
+      "name": "routing-step-2",
+      "input": {
+        "taskId": "170-004",
+        "title": "H2 Stub Memory Entries Backfill",
+        "scope": [
+          "scripts/memory/",
+          "src/core/",
+          "tests/core/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "data-engineer",
+        "skills": [
+          "database-migration"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Agent forced by override: data-engineer"
+    },
+    {
+      "step": 3,
+      "name": "routing-step-3",
+      "input": {
+        "taskId": "170-004",
+        "title": "H2 Stub Memory Entries Backfill",
+        "scope": [
+          "scripts/memory/",
+          "src/core/",
+          "tests/core/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "data-engineer",
+        "skills": [
+          "database-migration"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Skill budget: max 2 (medium task, 2 module(s), effort=normal)"
+    },
+    {
+      "step": 4,
+      "name": "routing-step-4",
+      "input": {
+        "taskId": "170-004",
+        "title": "H2 Stub Memory Entries Backfill",
+        "scope": [
+          "scripts/memory/",
+          "src/core/",
+          "tests/core/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "data-engineer",
+        "skills": [
+          "database-migration"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Skills forced by override: [database-migration]"
+    }
+  ],
+  "decidedAt": "2026-05-15T06:42:08.791Z"
+}

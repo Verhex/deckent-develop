@@ -1,0 +1,52 @@
+{
+  "id": "170-003-fix-fix",
+  "title": "Fix: Fix: P0-6 Event Stream Prompt Write/Delete Visibility",
+  "description": "Priority fix for NO_GO task 170-003-fix.\nOriginal worker notes: Worker exited without writing result (exitCode=0)\nExpected scope: src/orchestra/, src/providers/, tests/orchestra/\nFiles that should change: src/orchestra/event-stream.ts, src/orchestra/spawn-backend-docker.ts, src/providers/claude.ts, tests/orchestra/event-stream-prompt.test.ts",
+  "model": "haiku",
+  "forceModel": "haiku",
+  "effort": "normal",
+  "priority": "CRITICAL",
+  "reason": "Task 170-003-fix evaluated as NO_GO; tests failed; no files changed; zero lines added — worker may have crashed",
+  "scope": {
+    "directories": [
+      "src/orchestra/",
+      "src/providers/",
+      "tests/orchestra/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/orchestra/event-stream.ts",
+      "src/orchestra/spawn-backend-docker.ts",
+      "src/providers/claude.ts",
+      "tests/orchestra/event-stream-prompt.test.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** `grep \"PROMPT_WRITE\\|PROMPT_DELETE\" src/orchestra/event-stream.ts` 2+ match. Events.jsonl smoke run'da bu event'ler görünür.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "PENDING",
+  "sprintId": "sprint-170",
+  "isPriorityFix": true,
+  "fixForTaskId": "170-003-fix",
+  "assignedAgent": "bug-fixer",
+  "forceAgent": "bug-fixer",
+  "assignedSkills": [
+    "typescript-expert"
+  ],
+  "forceSkills": [
+    "typescript-expert"
+  ],
+  "createdAt": "2026-05-15T07:23:28.229Z",
+  "rotationStrategy": {
+    "enabled": true,
+    "originalModel": "haiku",
+    "rotatedModel": "haiku",
+    "originalAgent": "code-reviewer",
+    "rotatedAgent": "bug-fixer",
+    "addedSkills": [],
+    "rationale": "Fresh-eyes rotation: haiku→haiku, code-reviewer→bug-fixer"
+  }
+}

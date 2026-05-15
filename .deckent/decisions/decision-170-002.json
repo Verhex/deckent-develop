@@ -1,0 +1,79 @@
+{
+  "taskId": "170-002",
+  "sprintId": "sprint-170",
+  "steps": [
+    {
+      "step": 2,
+      "name": "routing-step-2",
+      "input": {
+        "taskId": "170-002",
+        "title": "P0-5 Docker Spawn Race Window Closure",
+        "scope": [
+          "src/orchestra/",
+          "src/core/",
+          "tests/orchestra/",
+          "tests/core/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "bug-fixer",
+        "skills": [
+          "typescript-expert"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Agent forced by override: bug-fixer"
+    },
+    {
+      "step": 3,
+      "name": "routing-step-3",
+      "input": {
+        "taskId": "170-002",
+        "title": "P0-5 Docker Spawn Race Window Closure",
+        "scope": [
+          "src/orchestra/",
+          "src/core/",
+          "tests/orchestra/",
+          "tests/core/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "bug-fixer",
+        "skills": [
+          "typescript-expert"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Skill budget: max 2 (medium task, 2 module(s), effort=normal)"
+    },
+    {
+      "step": 4,
+      "name": "routing-step-4",
+      "input": {
+        "taskId": "170-002",
+        "title": "P0-5 Docker Spawn Race Window Closure",
+        "scope": [
+          "src/orchestra/",
+          "src/core/",
+          "tests/orchestra/",
+          "tests/core/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "bug-fixer",
+        "skills": [
+          "typescript-expert"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Skills forced by override: [typescript-expert]"
+    }
+  ],
+  "decidedAt": "2026-05-15T06:49:44.961Z"
+}

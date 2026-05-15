@@ -6,6 +6,36 @@ Bu projedeki tüm önemli değişiklikler bu dosyada belgelenmektedir.
 Format [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) standardına dayanır
 ve proje [Semantic Versioning](https://semver.org/spec/v2.0.0.html) kurallarına uyar.
 
+## [1.0.0-beta.1-sprint170] - 2026-05-15
+
+### Added
+
+- P0-5 Docker Spawn Race Window Closure
+
+### Changed
+
+- P0-3 Tmux Prompt Filename TaskId-Aware (completed with tech debt)
+
+
+_Tasks: 6 total, 4 done, 2 tech debt, 2 no-go_
+
+## [1.0.0-beta.1-sprint170] - 2026-05-15
+
+
+### Changed
+
+- P0-3 Tmux Prompt Filename TaskId-Aware (completed with tech debt)
+- P0-5 Docker Spawn Race Window Closure (completed with tech debt)
+- P0-6 Event Stream Prompt Write/Delete Visibility (completed with tech debt)
+
+### Fixed
+
+- Fix: P0-3 Tmux Prompt Filename TaskId-Aware
+- Fix: P0-5 Docker Spawn Race Window Closure
+
+
+_Tasks: 6 total, 5 done, 3 tech debt, 1 no-go_
+
 ## [1.0.0-beta.1-sprint169] - 2026-05-14
 
 ### Added

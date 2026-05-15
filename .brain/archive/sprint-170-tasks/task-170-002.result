@@ -1,0 +1,35 @@
+{
+  "taskId": "170-002",
+  "workerId": "docker-170-002",
+  "filesChanged": [
+    "src/core/active-workers.ts",
+    "src/orchestra/spawn-backend-docker.ts",
+    "tests/core/active-workers-pending.test.ts",
+    "tests/orchestra/docker-spawn-race.test.ts"
+  ],
+  "linesAdded": 235,
+  "linesRemoved": 12,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "DONE",
+  "evaluationDecision": "DONE",
+  "notes": "P0-5 Docker Spawn Race Window Closure — Sprint 169 Bug 2A eradication. TDD red-green disciplined: 6 tests written first (4 unit + 2 race-window integration), confirmed RED ('_clearAllPending is not a function' x6), then implementation, then GREEN (10/10 pass including 4 baseline active-workers tests). PENDING_SPAWNS Set + markPending/markActive/clearPending API added to src/core/active-workers.ts; getActiveWorkerIds now returns union(pending, fromHeartbeats) deduped. spawn-backend-docker.ts lifecycle wired at 4 points: (1) markPending BEFORE prompt write at line 233, (2) markActive AFTER initial .hb write at line 451, (3) clearPending on spawn-outcome-not-ok early return, (4) defensive clearPending in outer spawn() catch. Kanıt: grep matches=12 (>=3 required). tsc --noEmit clean. vitest run baseline preserved (16512 pass + 2 pre-existing unrelated fails in alert-emitter cursor-rules frontmatter parity, NOT my scope). ADR-008 honored (active-workers.ts/spawn-backend-docker.ts do not import brain). Files all in scope.filesWrite.",
+  "tokenUsage": {
+    "inputTokens": 42000,
+    "outputTokens": 5200,
+    "cacheReadTokens": 0,
+    "provider": "claude",
+    "model": "opus"
+  },
+  "honestAssessment": {
+    "baseline": "0/6 race-protection tests existed; PENDING_SPAWNS API absent; spawn-backend-docker had 3s race window between prompt write and .hb write (Sprint 169 forensic Bug 2A confirmed root cause).",
+    "endState": "PENDING_SPAWNS Set + 4-method API live; spawn-backend-docker lifecycle wired at 4 points; 6 new tests PASS (4 unit + 2 integration race-window); tsc clean; baseline test count preserved (no regression introduced by my changes).",
+    "delta": "100% — Acceptance criteria met fully: grep >= 3 matches (got 12), 4 TDD tests PASS (got 6 including race-window integration), tsc 0 errors, no scope violations."
+  },
+  "rubricScores": {
+    "correctness": 95,
+    "test_coverage": 100,
+    "scope_compliance": 100,
+    "documentation": 85
+  }
+}

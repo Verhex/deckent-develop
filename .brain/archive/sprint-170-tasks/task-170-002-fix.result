@@ -1,0 +1,29 @@
+{
+  "taskId": "170-002-fix",
+  "filesChanged": [
+    "src/core/active-workers.ts",
+    "src/orchestra/spawn-backend-docker.ts",
+    "tests/core/active-workers-pending.test.ts",
+    "tests/orchestra/docker-spawn-race.test.ts"
+  ],
+  "linesAdded": 52,
+  "linesRemoved": 6,
+  "testsPassed": true,
+  "coverage": 100,
+  "selfAssessment": "DONE",
+  "notes": "Sprint 170 P0-5 Docker Spawn Race Window: PENDING_SPAWNS Set + markPending/markActive/clearPending/_clearAllPending/_getPendingSpawns API added to src/core/active-workers.ts. getActiveWorkerIds returns union(PENDING_SPAWNS, fromHeartbeats) deduped via Set. spawn-backend-docker.ts wired: markPending at top of spawn() before lock acquisition + prompt write; markActive after .hb writeFileSync; clearPending in both error paths (throw catch block in spawn(), spawnOutcome.ok===false non-throw return in runSpawn()). All 6 new tests PASS (4 unit + 2 race-window integration). tsc --noEmit clean. 7 pre-existing failures unrelated to this task (event-stream-prompt P0-6, tmux-prompt-filename P0-3, decisions.md ADR format, alert-emitter rules path — all Sprint 170 sibling tasks not in scope).",
+  "tokenUsage": {
+    "inputTokens": 18500,
+    "outputTokens": 2800,
+    "cacheReadTokens": 42000,
+    "provider": "claude",
+    "model": "sonnet"
+  },
+  "rubricScores": {
+    "correctness": 100,
+    "test_coverage": 100,
+    "scope_compliance": 100,
+    "documentation": 90
+  },
+  "evaluationDecision": "DONE"
+}

@@ -57,6 +57,8 @@
 | adr-060 | Self-Awareness Propagation — 5-Channel Context Enrichment Architecture | proposed |
 
 ## Recent Learnings
+- **Sprint sprint-170 Learnings** (sprint-170): ## Sprint sprint-170 Learnings
+- P0-3 Tmux Prompt Filename TaskId-Aware: GO_WITH_TECH_DEBT — Sprint 170 P0-3 (Bug 2B ...
 - **Sprint sprint-169 Learnings** (sprint-169): ## Sprint sprint-169 Learnings
 - W3.1 C0c Collision Detection Live Trigger Investigation + Fix: NO_GO — W3.1 RC ident...
 - **Sprint sprint-168 Learnings** (sprint-168): ## Sprint sprint-168 Learnings
@@ -80,13 +82,13 @@
 - **Sprint sprint-162 Learnings** (sprint-162): ## Sprint sprint-162 Learnings
 - Sprint Phase Observability + EvaluationAuditTrail Runtime Wire (T-003, composite): G...
 - **Sprint 161 Learnings** (sprint-161): Sprint 161 learnings — no .brain/sprints/sprint-161.md log was available at backfill time. Stub inserted by Sprint 16...
-- **Sprint 160 Learnings** (sprint-160): Sprint 160 learnings — no .brain/sprints/sprint-160.md log was available at backfill time. Stub inserted by Sprint 16...
 
 ## Active Technical Debt
-_No active technical debt._
+- [NORMAL] Tech debt from 170-001-fix: Code physically verified despite missing .result (Sp
 
 ## Active Patterns
 - Violation pattern: stale_heartbeat
 - Violation pattern: stale_heartbeat
+- Violation pattern: stale_heartbeat
 
-_Total entries: 225 | Generated: 2026-05-14_
+_Total entries: 230 | Generated: 2026-05-15_
