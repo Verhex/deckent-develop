@@ -135,7 +135,7 @@ Bir bölüm eksik/kanıtsız/boş → task NO_GO (içerik kalite kapısı, Q7 Ka
 - PLAN→SPAWN→EXECUTE→EVALUATE→FIX→RETRO→DECAY→CLEANUP faz akışı kod gerçeği vs `.contracts/api-surface.md` Sprint Phases — tutarlı mı?
 - ADR-008 (Brain merkezi import tek-yön): sprint-controller dışı modül tmux/auditor/worker import ediyor mu? Circular dependency var mı?
 - ADR-046 (Brain Self-Update Hook), ADR-045 (Wave-Based Execution), ADR-043 (Crash Recovery), ADR-048 (Prompt Lifecycle) — kod enforcement mevcut mu yoksa sadece doküman mı?
-- `result-evaluator.ts`: bootstrap fix P0-1 (satır ~214 `coverageOptional`) + P0-2 (satır ~1625 `findBoundaryViolations` protocol allowlist) gerçekten aktif mi, doğru semantik mi?
+- `result-evaluator.ts`: bootstrap fix P0-1 (satır 516 `coverageOptional` coverage guard; Sprint 171 Bug A: satır 525-533 `testsPassed` aynı guard'a alındı) + P0-2 (satır 1625-1656 `findBoundaryViolations` protocol allowlist) gerçekten aktif mi, doğru semantik mi? [171-001 doğruladı: plan'ın eski ~214/~1625 referansı düzeltildi]
 - Dead code: çağrılmayan export, ulaşılamaz dal. Eksik prosedür: yarım implementasyon, `TODO`/`FIXME`/`throw new Error('not implemented')`.
 - `rotateModelForFix` lifecycle'a dokunuyorsa fix model downgrade etkisi görülüyor mu (not düş, asıl audit 171-002).
 
