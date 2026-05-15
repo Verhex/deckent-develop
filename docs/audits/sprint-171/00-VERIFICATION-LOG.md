@@ -73,4 +73,22 @@ devops-engineer worker; 41 pozisyon (9 PASS), titiz. **5 HIGH/CRIT non-ledger id
 | B-033 changelog.ts existsSync write'tan sonra → reason hep "updated" | MED | ✅CONFIRMED-REAL | Mantık hatası (logic bug). 📌ESCALATE ready §4 Ö-7. |
 | B-002..B-040 diğer MED/LOW (race, dead-code adayı, hata yutma, cosmetic) | MED/LOW | ✅CONFIRMED-REAL | ⊕ event-stream nextSequence race (B-019) stale_heartbeat ailesi; lock `__` collision (B-023); ↪DEFER Sprint 172+ (§4 Ö-10..16). |
 
+## SYNTHESIS §2 OSS-GA BLOCKER DOĞRULAMA — Güvenlik (BG-01..09)
+
+Synthesis §2.1 "9 güvenlik blocker" targeted-grep ile doğrulandı. **Sonuç: liste ciddi netsiz — ~3/7 hatalı.** Bu, Sprint 172'de fix sırasını doğrudan değiştirir.
+
+| Blocker | Synthesis iddiası | Verdict | Düzeltme |
+|---|---|---|---|
+| **BG-01** discord token log | CRITICAL secret leak | ❎**OVERSTATED → LOW** | `deploy-discord.sh:121` token'ı SADECE boş/placeholder iken logluyor (geçerli token satır 119'a gider, loglanmaz). Gerçek leak DEĞİL. Defansif redact iyi ama CRITICAL-blocker DEĞİL. |
+| **BG-02** gemini key shell | CRITICAL | ✅**CONFIRMED-REAL** | `gemini.ts:311 buildStreamCommand` → `curl -H "...: ${apiKey}"` key komut STRING'inde (process-list exposure). (NOT: `buildPlannerCommand`/satır 222 env ile GÜVENLİ — sadece streaming path açık.) Fix = curl yerine stdin/config. |
+| **BG-03** plugin-hooks shell:true | CRITICAL | ❎**FALSE-POSITIVE — İPTAL** | `src/orchestra/plugin-hooks.ts` **DOSYA YOK**. orchestra/'da `shell:true` yalnız `authority-enforcer.ts:464` detector string'lerinde (ihlal değil, ADR-006 tarayıcının kendi pattern tanımı). Synthesis C-29 hayali path. **Sprint 172 blocker listesinden ÇIKAR.** |
+| **BG-04** baseline-tracker sh-c | CRITICAL | ✅CONFIRMED ⊕(171-003 B-041) | `baseline-tracker.ts:85-90` `spawnSync('npx',[...],{shell:true})` — argv array VAR ama shell:true. Gerçek ADR-006. |
+| **BG-05** no-go-reconciler execSync | CRITICAL | ✅REAL ama **YANLIŞ DOSYA** | Synthesis C-04 `no-go-reconciler.ts:118` — o dosyada execSync YOK. Gerçek yer `mid-sprint-adapter.ts:228` `defaultGetGitDiffStats` + `:284` (rapor 02 B3 doğru cite). Fix doğru dosyaya. |
+| **BG-06** mcp explain sprintId traversal | CRITICAL | ✅**CONFIRMED-REAL** | `explain.ts:39` `replace(/^sprint-/,'')` sadece prefix soyuyor, `../` engellemiyor → `:42 join()` traversal. Fix = path.resolve guard + `..` reddi. |
+| **BG-07** deckent-hub pubkey yok | CRITICAL | ✅**CONFIRMED-REAL** | `signature.ed25519` dosyaları var ama `PUBKEY.pem` YOK → imza doğrulanamaz. |
+| BG-08 RBAC soft mode / BG-09 enforceVerifyLoop 0-caller | CRIT | ⊕LEDGER-DUP (C-13/C-14) | 171-002/007 ile çapraz; MANUEL-P0 escalate. |
+
+**Güvenlik blocker net sonuç:** 9 iddia → **1 false-positive (BG-03 İPTAL)** + 1 overstated (BG-01 LOW) + 1 mis-cited dosya (BG-05) + 4 confirmed-real (BG-02/04/06/07) + 2 ledger-dup (BG-08/09). Gerçek Sprint 172 güvenlik P0 = **BG-02, BG-04, BG-06, BG-07** (+ BG-08/09 MANUEL-P0). BG-01/BG-03 listeden düşer/iner.
+
+## 01-modul-derin/03-orchestra-infra.md (171-003) — DOĞRULANDI
 **171-003 özeti:** 32 confirmed + 9 PASS + **0 false-positive** (architect 171-002'nin aksine devops worker titiz). 1 CRIT (B-041 ledger-kısmi) + 7 HIGH. Yeni-ledger değerli: B-029/B-032/B-036/B-038 (ESM+dead-code+cache, hepsi trivial-ready 📌). P0-3/P0-5 PASS = Sprint 170 fix runtime aktif ek kanıt. Otonom fix YOK (production code, away-mode); hepsi ready-to-apply escalate. Coverage 9/9 + cross-cut, gap 0.
