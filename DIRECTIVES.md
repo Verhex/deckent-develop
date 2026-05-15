@@ -25,6 +25,22 @@ Tüm worker'lar plan dosyasındaki kendi Task bölümünü + ortak **Worker Cont
 - **DB kuralı:** memory.db SADECE read-only `SELECT`. Yazma/DROP/rebuild KESİN YASAK.
 - `.tasks/task-<id>.result`: `selfAssessment: DONE`, `coverage: null` (audit task), `filesChanged` tek rapor.
 
+## GO/NO_GO Criteria
+
+**Dual-gate (spec §9):**
+
+*Kapı 1 — Orchestration Health (sprint geneli):* 29/29 task sonuç dosyası yazdı; 0 cascade; 0 spurious NO_GO; 0 fix worker spawn; Auditor boundary ihlali = 0 (sadece sprint-171 audit dizini değişti). Asıl ispat: bootstrap fix runtime aktif. Spurious NO_GO çıkarsa → fix runtime'da DEĞİL → build + MCP restart sırası gözden geçir, sprint durdur.
+
+*Kapı 2 — İçerik Kalite (task bazlı):* Her rapor 4+1 zorunlu bölüm + ≥1 dosya:satır kanıt + Türkçe. Modül task'larda (Task 1-14) Kapsam Haritası mevcut + coverage-gap = 0. Eşiği geçmeyen task = task NO_GO (synthesis'te raporlanır, orchestration'ı bozmaz).
+
+*Sprint verdict:* **GO** = Kapı 1 tam + ≥27/29 Kapı 2 + coverage-gap 0. **GO_WITH_TECH_DEBT** = Kapı 1 tam + 24-26 Kapı 2 (≤5 yüzeysel re-audit backlog). **NO_GO** = Kapı 1 ihlali (cascade/spurious/boundary — bootstrap fix regresyon sinyali).
+
+**Kritik bulguların doğası:** Bir audit task'ın CRITICAL bulgu raporlaması = başarılı audit, NO_GO DEĞİL. NO_GO sadece orchestration arızası.
+
+## Sprint 172 OSS GA Handoff
+
+Sprint 171 GO (full) → Sprint 172 OSS GA conditional açar: doc-reorg uygulaması (badge→/docs), `VerhexIO/deckent-dev → VerhexIO/deckent` public flip, beta.2 yayını (Alperen onay), AEGIS manifestosu (ADR-061) public + Show HN. Sprint 171 GO_WTD → Sprint 172 conditional + 1 re-audit cycle. Sprint 171 NO_GO → bootstrap fix regresyon hotfix mikro-sprint, Sprint 172 ertelenir.
+
 ---
 
 ## Task 1: orchestra Lifecycle Audit
@@ -576,21 +592,3 @@ memory.db (read-only SELECT) her entry karar/referans bütünlüğü — "her bi
 **Kanıt:** `docs/audits/sprint-171/SYNTHESIS.md` mevcut, 6 alt bölüm dolu, Türkçe, coverage-gap tablosu + verdict önerisi.
 
 **Test:** Audit-only — rapor self-review + coverage diff doğrulama.
-
----
-
-## GO/NO_GO Criteria
-
-**Dual-gate (spec §9):**
-
-*Kapı 1 — Orchestration Health (sprint geneli):* 29/29 task `.result` yazdı; 0 cascade; 0 spurious NO_GO; 0 fix worker spawn; Auditor `git diff --stat` boundary ihlali = 0 (sadece `docs/audits/sprint-171/` değişti). Asıl ispat: bootstrap fix runtime aktif. Spurious NO_GO çıkarsa → fix runtime'da DEĞİL → `npm run build` + MCP restart sırası gözden geçir, sprint durdur.
-
-*Kapı 2 — İçerik Kalite (task bazlı):* Her rapor 4+1 zorunlu bölüm + ≥1 `file:line` kanıt + Türkçe. Modül task'larda (1-14) Kapsam Haritası mevcut + coverage-gap = 0. Eşiği geçmeyen task = task NO_GO (synthesis'te raporlanır, orchestration'ı bozmaz).
-
-*Sprint verdict:* **GO** = Kapı 1 tam + ≥27/29 Kapı 2 + coverage-gap 0. **GO_WITH_TECH_DEBT** = Kapı 1 tam + 24-26 Kapı 2 (≤5 yüzeysel re-audit backlog). **NO_GO** = Kapı 1 ihlali (cascade/spurious/boundary — bootstrap fix regresyon sinyali).
-
-**Kritik bulguların doğası:** Bir audit task'ın CRITICAL bulgu raporlaması = başarılı audit, NO_GO DEĞİL. NO_GO sadece orchestration arızası.
-
-## Sprint 172 OSS GA Handoff
-
-Sprint 171 GO (full) → Sprint 172 OSS GA conditional açar: doc-reorg uygulaması (badge→/docs), `VerhexIO/deckent-dev → VerhexIO/deckent` public flip, `npm publish v1.0.0-beta.2` (Alperen onay), AEGIS manifestosu (ADR-061) public + Show HN. Sprint 171 GO_WTD → Sprint 172 conditional + 1 re-audit cycle. Sprint 171 NO_GO → bootstrap fix regresyon hotfix mikro-sprint, Sprint 172 ertelenir.
