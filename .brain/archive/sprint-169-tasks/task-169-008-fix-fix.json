@@ -1,0 +1,55 @@
+{
+  "id": "169-008-fix-fix",
+  "title": "Fix: Fix: H1 ADR DB→FS Export Pipeline + ADR-046 Reverse Hook",
+  "description": "Priority fix for NO_GO task 169-008-fix.\nOriginal worker notes: Sprint 169 H1 fix — scope compliance restored. (1) src/core/memory-export.ts: Added exportAdrsToFs(store, adrDir, opts?) function — the function was missing from the original task's result. Implementation: mkdirSync recursive, per-ADR filename via adrToFilename() (001-slug.md pattern), MADR v3 wrapper via buildAdrMarkdown() (_To be backfilled_ placeholders for empty fields), mtime vs DB updated_at idempotency check (manual edit wins), returns { written, updated, skipped, errors, ids }. Added Nod\nRubric: correctness=100, test_coverage=100, scope_compliance=100\nExpected scope: docs/adr/, src/core/, scripts/memory/, tests/core/\nFiles that should change: src/core/memory-export.ts, scripts/memory/export-adr-fs.mjs, docs/adr/046-brain-self-update-hook.md, tests/core/adr-fs-export.test.ts",
+  "model": "haiku",
+  "forceModel": "haiku",
+  "effort": "high",
+  "priority": "CRITICAL",
+  "reason": "Task 169-008-fix evaluated as NO_GO; correctness=100; test_coverage=100; scope_compliance=100",
+  "scope": {
+    "directories": [
+      "docs/adr/",
+      "src/core/",
+      "scripts/memory/",
+      "tests/core/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/core/memory-export.ts",
+      "scripts/memory/export-adr-fs.mjs",
+      "docs/adr/046-brain-self-update-hook.md",
+      "tests/core/adr-fs-export.test.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** `ls docs/adr/*.md | wc -l` 43+. `grep \"Amendment 2026-05-15\" docs/adr/046-*.md` 1+ match.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "PENDING",
+  "sprintId": "sprint-169",
+  "isPriorityFix": true,
+  "fixForTaskId": "169-008-fix",
+  "assignedAgent": "code-reviewer",
+  "forceAgent": "code-reviewer",
+  "assignedSkills": [
+    "database-migration",
+    "documentation-writer"
+  ],
+  "forceSkills": [
+    "database-migration",
+    "documentation-writer"
+  ],
+  "createdAt": "2026-05-14T22:43:37.354Z",
+  "rotationStrategy": {
+    "enabled": true,
+    "originalModel": "sonnet",
+    "rotatedModel": "haiku",
+    "originalAgent": "bug-fixer",
+    "rotatedAgent": "code-reviewer",
+    "addedSkills": [],
+    "rationale": "Fresh-eyes rotation: sonnet→haiku, bug-fixer→code-reviewer"
+  }
+}

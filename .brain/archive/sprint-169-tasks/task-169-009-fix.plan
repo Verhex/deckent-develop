@@ -1,0 +1,26 @@
+# Task 169-009-fix Execution Plan
+
+## Goal
+Complete the H5 dep_pipeline_enabled Flip + 3-Layer Doc Fix.
+The original worker was OOM-killed after writing the test file but before:
+1. Updating config.ts comment blocks
+2. Updating .contracts/api-surface.md with WAVE_BUILD step
+3. Writing the .result file
+
+## Current State (pre-fix)
+- tests/core/config-dep-pipeline-default.test.ts — EXISTS ✓ (correct Sprint 169 content)
+- src/core/config.ts — dependency_pipeline_enabled: true ALREADY default since Sprint 156; comments lack Sprint 169 H5 annotation
+- .contracts/api-surface.md — Sprint Phases missing WAVE_BUILD step
+- .result — MISSING (partial-result only)
+
+## Steps
+1. Update config.ts top-of-file alias docstring: add Sprint 169 H5 GA anchor + ADR-045 ref + rollback note
+2. Update config.ts createDefaultConfig field comment: same additions
+3. Update .contracts/api-surface.md Sprint Phases: add WAVE_BUILD step between SPAWN and EXECUTE
+4. Run tsc --noEmit (verify no type errors)
+5. Run npx vitest run (verify test suite passes including new H5 tests)
+6. Write .result
+
+## Scope Compliance
+filesWrite: src/core/config.ts, .contracts/api-surface.md, tests/core/config-dep-pipeline-default.test.ts
+DECKENT.md and CLAUDE.md are outside strict filesWrite — will be noted as GO_WTD cosmetic gap.

@@ -1,0 +1,52 @@
+{
+  "id": "169-007-fix",
+  "title": "Fix: C2 Bug Z3 Memory Rebuild Safety",
+  "description": "Priority fix for NO_GO task 169-007.\nOriginal worker notes: Bug Z3 closure — backup → import → restore → verify pipeline shipped in src/core/memory-import.ts. Three new exports: backupRelations(store), restoreRelations(store, relations) with FK-safe orphan skip, and rebuildWithRelationSafety(store, importFn, { strict }) which wraps importFn in a better-sqlite3 transaction and throws DECKENT_MEMORY_RELATION_LOSS (auto-rollback) when strict mode detects a relation count drop. New test file tests/core/memory-rebuild-safety.test.ts contains 7 tests (2 backup\nExpected scope: src/core/, tests/core/\nFiles that should change: src/core/memory-import.ts, tests/core/memory-rebuild-safety.test.ts",
+  "model": "sonnet",
+  "forceModel": "sonnet",
+  "effort": "normal",
+  "priority": "CRITICAL",
+  "reason": "Task 169-007 evaluated as NO_GO",
+  "scope": {
+    "directories": [
+      "src/core/",
+      "tests/core/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/core/memory-import.ts",
+      "tests/core/memory-rebuild-safety.test.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** Pre-rebuild + post-rebuild relations count equal. strict mode rollback test PASS.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-169",
+  "isPriorityFix": true,
+  "fixForTaskId": "169-007",
+  "assignedAgent": "bug-fixer",
+  "forceAgent": "bug-fixer",
+  "assignedSkills": [
+    "database-migration",
+    "typescript-expert"
+  ],
+  "forceSkills": [
+    "database-migration",
+    "typescript-expert"
+  ],
+  "createdAt": "2026-05-14T22:21:53.426Z",
+  "rotationStrategy": {
+    "enabled": true,
+    "originalModel": "opus",
+    "rotatedModel": "sonnet",
+    "originalAgent": "data-engineer",
+    "rotatedAgent": "bug-fixer",
+    "addedSkills": [],
+    "rationale": "Fresh-eyes rotation: opus→sonnet, data-engineer→bug-fixer"
+  },
+  "updatedAt": "2026-05-14T22:43:37.352Z"
+}

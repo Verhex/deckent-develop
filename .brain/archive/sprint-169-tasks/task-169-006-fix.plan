@@ -1,0 +1,60 @@
+# Task 169-006-fix Execution Plan — Fix: H4 Dashboard Build CI Gate
+
+## Investigation Summary
+
+Previous task 169-006 (devops-engineer/opus) was evaluated as NO_GO by Brain.
+The fix task (169-006-fix) is to audit, verify and confirm the H4 implementation.
+
+## Root Cause Analysis of 169-006 NO_GO
+
+After investigation:
+1. The Docker container running 169-006-fix (previous attempt) was OOM-killed before completing
+   (partial-result: "Worker started but did not complete")
+2. The original 169-006 worker wrote a valid DONE result with correct implementation
+3. The full vitest suite showed 28 failing tests at evaluation time, but ALL failures are
+   from OTHER Sprint 169 tasks (T1: c0c-collision, T3: memory-relations, T4: stub-backfill,
+   T7: memory-rebuild, T8: adr-fs-export) not from T6 (H4 dashboard CI gate)
+4. The monitor alert-emitter test has 1 pre-existing failure unrelated to T6
+
+## Current State Verification
+
+### Files Present
+- `.github/workflows/dashboard-build.yml` ✓ (created by 169-006)
+- `tests/dashboard/dashboard-build-smoke.test.ts` ✓ (created by 169-006)
+- `package.json` build:dashboard + build:all scripts ✓ (pre-existing, no change needed)
+- `src/dashboard/vite.config.ts` ✓ (pre-existing)
+
+### Verification Results
+- `tsc --noEmit`: EXIT=0 (0 type errors) ✓
+- `dashboard-build-smoke.test.ts`: 5 PASS + 2 SKIP (CI-only skips are expected) ✓
+- `grep "build:dashboard|build:all" package.json`: 2+ matches ✓
+- Evidence: `ls .github/workflows/dashboard-build.yml` ✓
+
+### Test Coverage
+The smoke test covers:
+1. package.json scripts group (3 tests): declares, build:dashboard detail, build:all chain
+2. vite config group (2 tests): exists, imports plugins
+3. build artifacts group (2 CI-only tests): index.html exists, size < 5MB (skip unless built)
+
+## Approach
+
+This is an audit/verification task. The original implementation is correct:
+- No code changes needed
+- Verify all artifacts are in place
+- Run all verification commands
+- Write honest DONE result
+
+## Files to Modify
+
+None (existing implementation is correct). The filesWrite scope is available if
+verification reveals issues, but the audit found no issues.
+
+## Verify Gates
+
+1. `tsc --noEmit` — 0 errors ✓
+2. `npx vitest run tests/dashboard/dashboard-build-smoke.test.ts --config vitest.dashboard.config.ts`
+   — 5 PASS + 2 SKIP ✓
+
+## Self-Assessment Target
+
+DONE: All artifacts verified, smoke tests pass, tsc clean, no scope violations.

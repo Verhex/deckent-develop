@@ -1,0 +1,29 @@
+{
+  "taskId": "169-003",
+  "filesChanged": [
+    "src/core/memory-types.ts",
+    "src/core/memory-store.ts",
+    "scripts/memory/migrate-relations.mjs",
+    "tests/core/memory-relations-migration.test.ts"
+  ],
+  "linesAdded": 220,
+  "linesRemoved": 14,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "DONE",
+  "notes": "Sprint 169 C1 — Memory Relations Migration complete.\n\nWhat changed:\n1. src/core/memory-types.ts — added MemoryRelation interface (from_id, to_id, type, metadata?) for MADR v3 object-form relations.\n2. src/core/memory-store.ts — overloaded insertRelation: (a) positional (fromId, toId, relType) preserved for backward compat across 9+ call sites (sprint-finalizer, memory-import, cli/memory, 4 test files), (b) new object form insertRelation(rel: MemoryRelation) performs FK validation and throws DeckentError('DECKENT_MEMORY_ORPHAN_RELATION'). getRelations() now also exposes `type` alias alongside legacy `rel_type` on each returned row so plan-spec tests can read either field. Both paths share the same INSERT OR IGNORE idempotency.\n3. scripts/memory/migrate-relations.mjs — parses .brain/archive/pre-v2/DECISIONS.md, strips markdown bold (**) before applying 7 regex patterns covering the 6 MADR v3 relation types + the reverse `superseded by` direction (rewritten to forward `supersedes`). FK-validated against entries table, orphan skip + log, --dry-run + --db + --source CLI flags.\n4. tests/core/memory-relations-migration.test.ts — 4 TDD tests covering plan's spec: basic insert via object form, dedupe via INSERT OR IGNORE, FK orphan throw (both from_id and to_id directions), all 6 MADR v3 relation types accepted.\n\nVerification evidence:\n- `tsc --noEmit` — 0 errors\n- `npx vitest run tests/core/memory-relations-migration.test.ts` — 4/4 PASS (29ms)\n- Related-suite regression check (memory-store, memory-rebuild-safety, memory-v2-prod-readiness, memory-v2-stress, cli/memory, error-handling-unification): 230 PASS / 0 FAIL\n- Full suite: 16493 pass / 1 fail / 66 skipped. The single fail (tests/monitor/alert-emitter.test.ts — .cursor/rules/brain.md missing `paths:` frontmatter) is pre-existing and unrelated to this task — caused by `<!-- AUTO-START -->` prefix injected before the frontmatter in provider-mirrored rule files. Baseline acceptance met (pass ≥16475 ✓, fail ≤2 ✓).\n- `grep -cE \"insertRelation|getRelations\" src/core/memory-store.ts` → 13 (≥2 ✓)\n- `SELECT COUNT(*) FROM relations` → 137 (>0 ✓)\n- Migration script idempotent re-run: 137 → 137 → 137 (INSERT OR IGNORE confirmed)\n- DECISIONS.md scan found 1 explicit `Supersedes:` edge (adr-022-v2 → adr-022); already present in DB from auto-extract path, so 0 new inserts on first run is expected. The 137 baseline rows are mostly auto-extracted `references` edges from the existing insert() ADR-ref scanner.\n\nADR compliance: no new ADR violations. The DeckentError pattern (ADR-aligned with src/core/errors.ts conventions) is used for FK validation throws, satisfying the `no generic throw new Error in src/core/` lint test.\n\nScope: all writes within declared scope (src/core/, scripts/memory/, tests/core/).",
+  "tokenUsage": {
+    "inputTokens": 95000,
+    "outputTokens": 8500,
+    "cacheReadTokens": 0,
+    "provider": "claude",
+    "model": "opus"
+  },
+  "rubricScores": {
+    "correctness": 95,
+    "test_coverage": 95,
+    "scope_compliance": 100,
+    "documentation": 85
+  },
+  "evaluationDecision": "DONE"
+}

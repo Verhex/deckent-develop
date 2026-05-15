@@ -1,0 +1,103 @@
+{
+  "id": "169-006",
+  "title": "H4 Dashboard Build CI Gate",
+  "description": "H4 Dashboard Build CI Gate\n\n- Model: opus\n- Effort: normal\n- Skills: react-specialist, devops-engineer, ci-testing\n- Files: .github/workflows/dashboard-build.yml, package.json, tests/dashboard/dashboard-build-smoke.test.ts\n- Scope: .github/workflows/, tests/dashboard/, root\n- Agent: devops-engineer\n\n### Description\n\nSprint 167 retro finding: React+Vite+Tailwind dashboard build CI'da yoktu (sadece local). Node 18/20/22 matrix + artifact size threshold (5MB max) + smoke test. `npm run build:dashboard` + `npm run build:all` scripts package.json'a eklenir (yoksa). Plan Task 6 (Steps 6.1-6.6) detaylı runbook.\n\n**Kanıt:** `ls .github/workflows/dashboard-build.yml` mevcut. `grep \"build:dashboard\\|build:all\" package.json` 2+ match.\n\n**Test:** 3 TDD test PASS (scripts defined, vite config exists, build produces dist — CI-only)",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "tests/dashboard/",
+      ".github/workflows/",
+      "root/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      ".github/workflows/dashboard-build.yml",
+      "package.json",
+      "tests/dashboard/dashboard-build-smoke.test.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** `ls .github/workflows/dashboard-build.yml` mevcut. `grep \"build:dashboard\\|build:all\" package.json` 2+ match.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "NO_GO",
+  "sprintId": "sprint-169",
+  "provider": "claude",
+  "forceModel": "opus",
+  "forceEffort": "normal",
+  "forceAgent": "devops-engineer",
+  "forceSkills": [
+    "react-specialist",
+    "devops-engineer",
+    "ci-testing"
+  ],
+  "assignedAgent": "devops-engineer",
+  "assignedSkills": [
+    "react-specialist",
+    "devops-engineer",
+    "ci-testing"
+  ],
+  "createdAt": "2026-05-14T21:54:58.980Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "devops",
+        "secondary": [
+          "config"
+        ],
+        "confidence": 0.6
+      },
+      "tags": [
+        "test-coverage"
+      ],
+      "domains": [
+        {
+          "name": "dashboard",
+          "weight": 0.33
+        },
+        {
+          "name": "root",
+          "weight": 0.17
+        }
+      ],
+      "operations": [
+        {
+          "type": "create",
+          "weight": 0.4
+        },
+        {
+          "type": "test",
+          "weight": 0.4
+        },
+        {
+          "type": "configure",
+          "weight": 0.2
+        }
+      ],
+      "complexity": {
+        "fileCount": 3,
+        "moduleCount": 3,
+        "crossCutting": true,
+        "estimatedSize": "large"
+      },
+      "scope": {
+        "writeRatio": {
+          ".github/": 0.33,
+          "./": 0.33,
+          "tests/": 0.33
+        },
+        "primaryWriteTarget": ".github/",
+        "testWriteRatio": 0.33
+      }
+    },
+    "confidence": "high",
+    "routingVersion": "v2"
+  },
+  "estimatedTokens": 4081,
+  "updatedAt": "2026-05-14T22:21:53.425Z"
+}

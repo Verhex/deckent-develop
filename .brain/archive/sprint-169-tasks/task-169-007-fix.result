@@ -1,0 +1,26 @@
+{
+  "taskId": "169-007-fix",
+  "filesChanged": [
+    "src/core/memory-import.ts"
+  ],
+  "linesAdded": 85,
+  "linesRemoved": 0,
+  "testsPassed": true,
+  "coverage": 100,
+  "selfAssessment": "DONE",
+  "notes": "Bug Z3 closure: Added 3 exports to src/core/memory-import.ts — backupRelations(store), restoreRelations(store, backup), rebuildWithRelationSafety(store, importFn, options). Implementation: (1) backupRelations uses store.getRawDb() to SELECT * FROM relations → EntryRelation[]. (2) restoreRelations performs FK validation (both from_id + to_id must exist in entries) before INSERT OR IGNORE, returns {restored, skipped}. (3) rebuildWithRelationSafety snapshots relations before transaction, wraps importFn + restoreRelations inside a better-sqlite3 transaction — in strict mode throws DeckentError('DECKENT_MEMORY_RELATION_LOSS', 'pre=X post=Y') which auto-rolls-back the transaction (including importFn's writes). All 7 tests in tests/core/memory-rebuild-safety.test.ts PASS. 4 pre-existing test failures (Stub Backfill H2, ADR FS Export H1, error-handling lint, alert-emitter) are from other sprint tasks (169-003/004/008 staged changes) — not caused by this task. tsc --noEmit: 0 errors.",
+  "tokenUsage": {
+    "inputTokens": 42000,
+    "outputTokens": 3200,
+    "cacheReadTokens": 18000,
+    "provider": "claude",
+    "model": "sonnet"
+  },
+  "rubricScores": {
+    "correctness": 100,
+    "test_coverage": 100,
+    "scope_compliance": 100,
+    "documentation": 90
+  },
+  "evaluationDecision": "DONE"
+}

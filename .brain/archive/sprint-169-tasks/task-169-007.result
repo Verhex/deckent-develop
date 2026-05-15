@@ -1,0 +1,20 @@
+{
+  "taskId": "169-007",
+  "filesChanged": [
+    "src/core/memory-import.ts",
+    "tests/core/memory-rebuild-safety.test.ts"
+  ],
+  "linesAdded": 336,
+  "linesRemoved": 1,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "DONE",
+  "notes": "Bug Z3 closure — backup → import → restore → verify pipeline shipped in src/core/memory-import.ts. Three new exports: backupRelations(store), restoreRelations(store, relations) with FK-safe orphan skip, and rebuildWithRelationSafety(store, importFn, { strict }) which wraps importFn in a better-sqlite3 transaction and throws DECKENT_MEMORY_RELATION_LOSS (auto-rollback) when strict mode detects a relation count drop. New test file tests/core/memory-rebuild-safety.test.ts contains 7 tests (2 backup, 2 restore, 1 preserve happy-path, 2 verify-fail strict + non-strict). All 7 pass. Both kanıt clauses verified: (1) pre-rebuild and post-rebuild relations count equal in the preserve test (count=2 both before and after), (2) strict mode rollback test PASS — DeckentError code DECKENT_MEMORY_RELATION_LOSS thrown, transaction rolled back, original entries + relations restored. Dependency 169-003 was not strictly blocking: the relations API (insertRelation, getRelations, countRelations, getRawDb) already lives on MemoryStore (memory-store.ts:515-555,670), so the safety wrapper required only that surface. tsc --noEmit clean. npx vitest run: 16486 pass / 1 fail / 66 skip — the one failing test (tests/monitor/alert-emitter.test.ts) is a pre-existing frontmatter check on .claude/rules/*.md unrelated to this scope and unchanged by this task; baseline gate per DIRECTIVES (fail ≤2) is satisfied. CLI wiring of the new helpers into the `memory rebuild` command is intentionally out of scope (scope is src/core/, tests/core/) and is a follow-up.",
+  "tokenUsage": {
+    "inputTokens": 42000,
+    "outputTokens": 6500,
+    "cacheReadTokens": 0,
+    "provider": "claude",
+    "model": "opus"
+  }
+}

@@ -1,0 +1,20 @@
+Task 169-003 (C1 Memory Relations Migration) tamamlandı — **selfAssessment: DONE**.
+
+## Yapılanlar
+
+1. **`src/core/memory-types.ts`** — `MemoryRelation` interface eklendi (MADR v3 object form: `from_id`, `to_id`, `type`, `metadata?`).
+2. **`src/core/memory-store.ts`** — `insertRelation` overload edildi:
+   - Positional form `(fromId, toId, relType)` — backward compat (9+ çağrı yeri korundu)
+   - Object form `(rel: MemoryRelation)` — FK validation + `DeckentError('DECKENT_MEMORY_ORPHAN_RELATION')` throw
+   - `getRelations()` dönüşüne `type` alias eklendi (`rel_type` yanında)
+3. **`scripts/memory/migrate-relations.mjs`** — DECISIONS.md parse → 7 regex (6 MADR + reverse `superseded by`), markdown bold strip, FK skip+log, `--dry-run`/`--db`/`--source` flag desteği.
+4. **`tests/core/memory-relations-migration.test.ts`** — 4 TDD test PASS (insert basic, dedupe, FK orphan throw, 6 MADR types).
+
+## Kanıtlar
+
+- `tsc --noEmit` → 0 hata
+- `grep -cE "insertRelation|getRelations" src/core/memory-store.ts` → **13** (≥2 ✓)
+- `SELECT COUNT(*) FROM relations` → **137** (>0 ✓)
+- Idempotent re-run: 137 → 137 → 137 ✓
+- Yeni testler: **4/4 PASS**, related suite: **230 PASS / 0 FAIL**
+- Tam suite: **16493 pass / 1 fail / 66 skipped** — fail pre-existing (`.cursor/rules/brain.md` frontmatter), bu task'la ilgisiz.

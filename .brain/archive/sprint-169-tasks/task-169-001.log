@@ -1,0 +1,11 @@
+## Bug Fix Report
+
+- **Bug:** Sprint 168 smoke C0c collision detection wire fires `BRAIN→SPAWN:BLOCKED` only when `scope.filesWrite` paths match string-exact; path variants (`./src/foo.ts`, `src//foo.ts`, `src/foo.ts/`) bypass detection and tasks spawn into runtime contention.
+- **Root Cause (RC-C):** `detectScopeCollisions` (conflict-resolver.ts:179) uses `file.trim()` only. Path equivalence classes split into separate keys with `length === 1`, never hitting the `>=2` collision threshold. Sprint 169 events.jsonl seq 1–4 shows the wire *accidentally* fires when both tasks list both variants (variants masquerade as duplicates) but real-world single-variant declarations slip silently.
+- **Category:** Logic (string-equality used where path equivalence required).
+- **Fix:** Added `normalizeScopeFiles(files: readonly string[]): string[]` pure helper to `src/orchestra/sprint-spawner.ts`. `spawnWorkers` now pre-normalizes pending tasks' `filesWrite` (deep-clone, no mutation) before invoking `detectScopeCollisions`. `conflict-resolver.ts` stays untouched (out of scope).
+- **Files Changed:** `src/orchestra/sprint-spawner.ts` (+57 −1), `tests/orchestra/c0c-collision-live-fire.test.ts` (new, +231), `.audit/sprint-169/W3.1-root-cause.md` (new RC doc).
+- **Regression Test:** `tests/orchestra/c0c-collision-live-fire.test.ts` — 11 cases (7 normalize-unit, 3 collision-pre-pass, 1 live spawnWorkers wire with SPAWN_BLOCKED event assert). All PASS. Existing `spawn-spawner-wire.test.ts` (4 cases, identical-path baseline) still passes — no regression.
+- **Verification:** `tsc --noEmit` clean. `vitest run tests/orchestra/` → 4391 pass, 11 skipped. Full suite: 16476 pass / 1 fail (pre-existing `.cursor/rules/brain.md` frontmatter test, baseline ≤2 fail satisfied) / 66 skip.
+
+selfAssessment: **DONE**.

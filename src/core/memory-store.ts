@@ -10,12 +10,14 @@
 import Database from 'better-sqlite3';
 import type { Database as DatabaseType } from 'better-sqlite3';
 import { turkishNormalize } from './memory-normalize.js';
+import { DeckentError } from './errors.js';
 import type {
   MemoryEntryV2,
   CreateEntryInput,
   EntryRelation,
   EntryHistoryRecord,
   RelationType,
+  MemoryRelation,
 } from './memory-types.js';
 
 const SCHEMA_VERSION = 1;
@@ -473,6 +475,94 @@ export class MemoryStore {
     txn();
   }
 
+  update(
+    id: string,
+    fields: Partial<{
+      content: string;
+      title: string;
+      summary: string;
+      metadata: string;
+      status: string;
+      priority: string;
+      decay_exempt: number;
+    }>,
+    changedBy = 'system',
+  ): void {
+    const existing = this.db.prepare(
+      `SELECT * FROM entries WHERE id = ? AND deleted_at IS NULL`,
+    ).get(id) as EntryRow | undefined;
+    if (!existing) return;
+
+    const sets: string[] = [`updated_at = datetime('now')`];
+    const params: Record<string, string | number | null> = { id };
+    const diffs: Array<{ field: string; oldVal: string | null; newVal: string | null }> = [];
+
+    if (fields.content !== undefined) {
+      sets.push('content = @content', 'content_norm = @content_norm');
+      params.content = fields.content;
+      params.content_norm = turkishNormalize(fields.content);
+      if (existing.content !== fields.content) {
+        diffs.push({ field: 'content', oldVal: existing.content, newVal: fields.content });
+      }
+    }
+    if (fields.title !== undefined) {
+      sets.push('title = @title', 'title_norm = @title_norm');
+      params.title = fields.title;
+      params.title_norm = turkishNormalize(fields.title);
+      if (existing.title !== fields.title) {
+        diffs.push({ field: 'title', oldVal: existing.title, newVal: fields.title });
+      }
+    }
+    if (fields.summary !== undefined) {
+      sets.push('summary = @summary', 'summary_norm = @summary_norm');
+      params.summary = fields.summary;
+      params.summary_norm = turkishNormalize(fields.summary);
+      if (existing.summary !== fields.summary) {
+        diffs.push({ field: 'summary', oldVal: existing.summary ?? null, newVal: fields.summary });
+      }
+    }
+    if (fields.metadata !== undefined) {
+      sets.push('metadata = @metadata');
+      params.metadata = fields.metadata;
+      if (existing.metadata !== fields.metadata) {
+        diffs.push({ field: 'metadata', oldVal: existing.metadata ?? null, newVal: fields.metadata });
+      }
+    }
+    if (fields.status !== undefined) {
+      sets.push('status = @status');
+      params.status = fields.status;
+      if (existing.status !== fields.status) {
+        diffs.push({ field: 'status', oldVal: existing.status, newVal: fields.status });
+      }
+    }
+    if (fields.priority !== undefined) {
+      sets.push('priority = @priority');
+      params.priority = fields.priority;
+      if (existing.priority !== fields.priority) {
+        diffs.push({ field: 'priority', oldVal: existing.priority, newVal: fields.priority });
+      }
+    }
+    if (fields.decay_exempt !== undefined) {
+      sets.push('decay_exempt = @decay_exempt');
+      params.decay_exempt = fields.decay_exempt;
+      if (String(existing.decay_exempt) !== String(fields.decay_exempt)) {
+        diffs.push({ field: 'decay_exempt', oldVal: String(existing.decay_exempt), newVal: String(fields.decay_exempt) });
+      }
+    }
+
+    const insertHistory = this.db.prepare(`
+      INSERT INTO entry_history (entry_id, field, old_value, new_value, changed_by, change_type)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `);
+
+    this.db.transaction(() => {
+      this.db.prepare(`UPDATE entries SET ${sets.join(', ')} WHERE id = @id`).run(params);
+      for (const diff of diffs) {
+        insertHistory.run(id, diff.field, diff.oldVal, diff.newVal, changedBy, 'patch');
+      }
+    })();
+  }
+
   getById(id: string, opts?: { includeDeleted?: boolean }): MemoryEntryV2 | null {
     const includeDeleted = opts?.includeDeleted ?? false;
     const sql = includeDeleted
@@ -513,35 +603,76 @@ export class MemoryStore {
   // ── Relations ────────────────────────────────────────────────
 
   getRelationsFrom(entryId: string): EntryRelation[] {
-    return this.db.prepare(
+    const rows = this.db.prepare(
       `SELECT * FROM relations WHERE from_id = ?`,
-    ).all(entryId) as EntryRelation[];
+    ).all(entryId) as Array<{ from_id: string; to_id: string; rel_type: RelationType; created_at: string }>;
+    return rows.map((r) => ({ ...r, type: r.rel_type }));
   }
 
   getRelationsTo(entryId: string): EntryRelation[] {
-    return this.db.prepare(
+    const rows = this.db.prepare(
       `SELECT * FROM relations WHERE to_id = ?`,
-    ).all(entryId) as EntryRelation[];
+    ).all(entryId) as Array<{ from_id: string; to_id: string; rel_type: RelationType; created_at: string }>;
+    return rows.map((r) => ({ ...r, type: r.rel_type }));
   }
 
   /**
    * Insert a single relation between two entries.
    * Uses INSERT OR IGNORE to avoid duplicates.
+   *
+   * Overload 1 (positional): backward-compatible for existing call sites.
+   * Overload 2 (object form): MADR v3 MemoryRelation — performs FK validation.
    */
-  insertRelation(fromId: string, toId: string, relType: RelationType): void {
+  insertRelation(fromId: string, toId: string, relType: RelationType): void;
+  insertRelation(rel: MemoryRelation): void;
+  insertRelation(
+    fromIdOrRel: string | MemoryRelation,
+    toId?: string,
+    relType?: RelationType,
+  ): void {
+    let fromId: string;
+    let resolvedToId: string;
+    let resolvedRelType: RelationType;
+
+    if (typeof fromIdOrRel === 'object') {
+      // Object form — validate FK before insert
+      fromId = fromIdOrRel.from_id;
+      resolvedToId = fromIdOrRel.to_id;
+      resolvedRelType = fromIdOrRel.type;
+
+      const fromExists = this.db.prepare(
+        `SELECT 1 FROM entries WHERE id = ?`,
+      ).get(fromId);
+      if (!fromExists) {
+        throw new DeckentError('DECKENT_E068', `Orphan relation: from_id '${fromId}' not found in entries`);
+      }
+
+      const toExists = this.db.prepare(
+        `SELECT 1 FROM entries WHERE id = ?`,
+      ).get(resolvedToId);
+      if (!toExists) {
+        throw new DeckentError('DECKENT_E069', `Orphan relation: to_id '${resolvedToId}' not found in entries`);
+      }
+    } else {
+      fromId = fromIdOrRel;
+      resolvedToId = toId!;
+      resolvedRelType = relType!;
+    }
+
     this.db.prepare(
       `INSERT OR IGNORE INTO relations (from_id, to_id, rel_type) VALUES (?, ?, ?)`,
-    ).run(fromId, toId, relType);
+    ).run(fromId, resolvedToId, resolvedRelType);
   }
 
   /**
    * Get all relations for an entry (both from and to directions).
-   * Returns a combined array of EntryRelation.
+   * Returns a combined array of EntryRelation with both rel_type and type alias.
    */
   getRelations(entryId: string): EntryRelation[] {
-    return this.db.prepare(
+    const rows = this.db.prepare(
       `SELECT * FROM relations WHERE from_id = ? OR to_id = ?`,
-    ).all(entryId, entryId) as EntryRelation[];
+    ).all(entryId, entryId) as Array<{ from_id: string; to_id: string; rel_type: RelationType; created_at: string }>;
+    return rows.map((r) => ({ ...r, type: r.rel_type }));
   }
 
   /**

@@ -1,0 +1,39 @@
+# Task 169-004 Execution Plan
+
+## Goal
+Backfill memory entries `mem-sprint-{159,160,161}` whose metadata has `stub_flag: true`,
+replacing stub content with the actual sprint markdown from `.brain/archive/sprints/`.
+Idempotent: re-runs skip already-filled entries.
+
+## Files
+1. `src/core/memory-store.ts` — Add generic `update(id, fields)` method.
+   - MemoryStore class already has `getById` and `upsert` but no light-weight `update`.
+   - New method updates whitelisted columns (content, title, summary, status, metadata,
+     decay_exempt, priority) + auto-refreshes corresponding `_norm` FTS5 mirror columns,
+     bumps `updated_at`, and records `entry_history` rows.
+2. `scripts/memory/backfill-stub-entries.mjs` — Exports `backfillStubEntry(store, sprintNum, archiveDir?)`
+   plus CLI bottom (`if (import.meta.url === ...)`) iterating 159/160/161 against
+   `.brain/memory.db` / `.brain/archive` defaults.
+   - Skip rules: entry not found / not stub / archive file missing / archive content < 100 chars.
+   - On update: writes content + metadata `{..., stub_flag: false, backfilled_at: ISO}`.
+3. `tests/core/memory-stub-backfill.test.ts` — 2 vitest specs:
+   - Test 1: stub entry is replaced; `content.length > 100`, `metadata.stub_flag === false`.
+   - Test 2: idempotent — second call returns skip; content unchanged.
+
+## Steps
+1. Implement `MemoryStore.update()` (with norm refresh + history) — keep behaviour minimal.
+2. Write `backfill-stub-entries.mjs` (ESM, runs via `node`).
+3. Write `memory-stub-backfill.test.ts` (vitest, tmp dir + tmp db).
+4. `tsc --noEmit` → resolve type errors (max 3 attempts).
+5. `npx vitest run tests/core/memory-stub-backfill.test.ts` → expect 2/2 PASS.
+6. `npx vitest run` baseline check (no regressions).
+7. Write `.result`.
+
+## Scope
+- WRITE: `src/core/memory-store.ts`, `scripts/memory/backfill-stub-entries.mjs`, `tests/core/memory-stub-backfill.test.ts`
+- READ-only: `.brain/archive/sprints/*.md`, plan/spec docs.
+
+## Open notes
+- Live `.brain/memory.db` backfill (Step 4.6 in plan) requires built `dist/`; skipped in worker
+  scope to keep changes test-driven. CLI bottom is wired for ops to run manually.
+- `update()` API is generic but only whitelist-driven to prevent accidental misuse.

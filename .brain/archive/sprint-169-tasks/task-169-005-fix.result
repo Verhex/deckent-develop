@@ -1,0 +1,27 @@
+{
+  "taskId": "169-005-fix",
+  "filesChanged": [
+    "scripts/security/secret-baseline.mjs",
+    ".secrets-baseline"
+  ],
+  "linesAdded": 3,
+  "linesRemoved": 1,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "DONE",
+  "notes": "ROOT CAUSE FIX: --build-baseline idempotency bug. In scan(), the `allowed` set was always populated from existing baseline regardless of mode. This caused --build-baseline to: (1) load existing 6 entries into `allowed`, (2) skip all already-allowed matches, (3) write empty allowlist. Running check mode after would then detect 6 unallowlisted hits → exit 1. FIX: `allowed` is now mode-conditional — build-baseline uses empty Set (collects ALL current matches), check mode uses existing allowlist. VERIFICATION: (1) --build-baseline now correctly writes 6 entries; (2) idempotency confirmed — second --build-baseline also produces 6 entries; (3) check mode exit 0 with 5075 tracked files; (4) .secrets-baseline restored to correct 6 test-fixture entries (all manually verified as synthetic — not real secrets); (5) tsc --noEmit exit 0 (clean, .mjs not in tsconfig scope); (6) .github/workflows/secret-scan.yml unchanged — already correct (PR + push main/master gate). DELTA: 100% — single-line root cause fix + baseline rebuild. ADR compliance: ADR-006 (execFileSync with literal args, no user input injection).",
+  "tokenUsage": {
+    "inputTokens": 18000,
+    "outputTokens": 2500,
+    "cacheReadTokens": 8000,
+    "provider": "claude",
+    "model": "sonnet"
+  },
+  "rubricScores": {
+    "correctness": 100,
+    "test_coverage": 80,
+    "scope_compliance": 100,
+    "documentation": 90
+  },
+  "evaluationDecision": "DONE"
+}

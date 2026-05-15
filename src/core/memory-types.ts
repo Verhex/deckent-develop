@@ -106,6 +106,8 @@ export interface EntryRelation {
   from_id: string;
   to_id: string;
   rel_type: RelationType;
+  /** Alias for rel_type — available in query results for test/plan spec compatibility. */
+  type: RelationType;
   created_at: string;
 }
 
@@ -115,6 +117,14 @@ export interface Relation {
   to_id: string;
   rel_type: RelationType;
   source?: 'auto-extract' | 'backfill' | 'finalizer' | 'user';
+}
+
+/** Object form for insertRelation — MADR v3 relation input. */
+export interface MemoryRelation {
+  from_id: string;
+  to_id: string;
+  type: RelationType;
+  metadata?: Record<string, unknown>;
 }
 
 /** A change history record. */

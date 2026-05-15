@@ -1,0 +1,27 @@
+{
+  "taskId": "169-002-fix",
+  "filesChanged": [
+    "src/orchestra/task-builder.ts",
+    "tests/orchestra/dep-parser-string-to-array.test.ts"
+  ],
+  "linesAdded": 25,
+  "linesRemoved": 5,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "DONE",
+  "notes": "parseDependencyField export added at src/orchestra/task-builder.ts:186. Accepts 3 formats: bare string ('169-003' → ['169-003']), comma-separated ('169-003, 169-007' → ['169-003', '169-007']), JSON array literal ('[\"169-003\"]' → ['169-003']). Returns [] for empty/whitespace/none. Malformed JSON falls back to comma-split (never throws). parseDependenciesDirective refactored to delegate to parseDependencyField — back-compat preserved. GO criteria: grep parseDependencyField src/orchestra/task-builder.ts → 2 matches (export:186 + use:216). Tests: 14/14 PASS in dep-parser-string-to-array.test.ts. tsc --noEmit clean. Full suite: 16470 pass (28 failures pre-existing in other Sprint 169 task files: c0c-collision, adr-fs-export, memory-rebuild-safety, memory-relations-migration, memory-stub-backfill — none related to this task).",
+  "tokenUsage": {
+    "inputTokens": 12000,
+    "outputTokens": 800,
+    "cacheReadTokens": 45000,
+    "provider": "claude",
+    "model": "sonnet"
+  },
+  "rubricScores": {
+    "correctness": 100,
+    "test_coverage": 100,
+    "scope_compliance": 100,
+    "documentation": 90
+  },
+  "evaluationDecision": "DONE"
+}

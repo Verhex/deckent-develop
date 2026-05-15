@@ -1,0 +1,41 @@
+# Task 169-004-fix Execution Plan
+
+## Root Cause Analysis
+
+**Primary bug:** `store.update()` method does NOT exist in MemoryStore.
+- Original task 169-004 claimed to add it but didn't.
+- Tests fail with `TypeError: store.update is not a function`.
+- 2/4 tests fail, 2/4 pass (the skip-path tests that never call update).
+
+**Secondary bugs (live DB backfill would also fail):**
+1. Wrong entry IDs: script constructs `mem-sprint-{N}` but live DB has `mem-{N}`
+2. Wrong archive path: default `.brain/archive/sprints/` but files are at `.brain/sprints/`
+3. Stub detection only checks `stub_flag: true` — live entries have `stub_flag: null` (metadata={})
+
+## Fix Plan
+
+### Fix 1: Add `update()` method to MemoryStore (src/core/memory-store.ts)
+- Whitelist-driven patch: content, title, summary, metadata, status, priority, decay_exempt
+- Updates `*_norm` FTS5 mirror columns for text fields (content_norm, title_norm, summary_norm)
+- Bumps `updated_at`
+- Records entry_history rows for changed fields
+
+### Fix 2: Fix backfill-stub-entries.mjs
+1. Fix default archiveDir: `.brain/archive` → `.brain` (so join gives `.brain/sprints/sprint-N.md`)
+2. Fix entry ID lookup: try `mem-sprint-{N}` first, fall back to `mem-{N}`
+3. Fix stub detection: also process entries with `stub_flag === null/undefined` (live entries)
+   - `stub_flag === false` → skip (already processed, idempotent)
+   - `stub_flag === true` → traditional path (archive required)
+   - `stub_flag === null/undefined` → live entry path:
+     - If archive exists: update content + set stub_flag: false
+     - If archive missing: keep content, set stub_flag: false (mark as best_available)
+
+### Fix 3: Execute live DB backfill
+- After fixes, run script against .brain/memory.db
+- Verify: mem-159 gets stub_flag: false (content already good)
+- Verify: mem-160, mem-161 get stub_flag: false (no archive, mark best_available)
+
+## Test Impact
+- Tests 1, 2, 3, 4 should all pass after adding update() method
+- Test 3 (stub_flag: true + no archive) keeps `archive_missing` behavior
+- Live DB entries (stub_flag: null) handled by new null-detection path

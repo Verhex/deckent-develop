@@ -5,7 +5,7 @@
 
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import type { CreateEntryInput } from './memory-types.js';
+import type { CreateEntryInput, EntryRelation } from './memory-types.js';
 import type { MemoryStore } from './memory-store.js';
 import { DeckentError } from './errors.js';
 
@@ -349,6 +349,104 @@ export function backfillDebtSprintIds(store: MemoryStore): {
   txn();
 
   return { scanned, updated };
+}
+
+// ─── Relation Backup / Restore ────────────────────────────────────
+
+/**
+ * Snapshot every row in the relations table.
+ * Call before a rebuild that may wipe or truncate relations.
+ */
+export function backupRelations(store: MemoryStore): EntryRelation[] {
+  const db = store.getRawDb();
+  return db
+    .prepare(`SELECT from_id, to_id, rel_type, created_at FROM relations`)
+    .all() as EntryRelation[];
+}
+
+/**
+ * Restore a relations snapshot into the DB.
+ *
+ * Skips orphaned rows (from_id or to_id no longer present in entries).
+ * Uses INSERT OR IGNORE so duplicate calls are safe (idempotent).
+ *
+ * @returns { restored, skipped } — restored = rows attempted after FK check
+ */
+export function restoreRelations(
+  store: MemoryStore,
+  backup: EntryRelation[],
+): { restored: number; skipped: number } {
+  if (backup.length === 0) return { restored: 0, skipped: 0 };
+
+  const db = store.getRawDb();
+  const insertStmt = db.prepare(
+    `INSERT OR IGNORE INTO relations (from_id, to_id, rel_type) VALUES (?, ?, ?)`,
+  );
+  const existsStmt = db.prepare(
+    `SELECT 1 FROM entries WHERE id = ? AND deleted_at IS NULL`,
+  );
+
+  let restored = 0;
+  let skipped = 0;
+
+  for (const rel of backup) {
+    const fromExists = existsStmt.get(rel.from_id);
+    const toExists = existsStmt.get(rel.to_id);
+    if (!fromExists || !toExists) {
+      skipped += 1;
+      continue;
+    }
+    insertStmt.run(rel.from_id, rel.to_id, rel.rel_type);
+    restored += 1;
+  }
+
+  return { restored, skipped };
+}
+
+/**
+ * Run `importFn` inside a better-sqlite3 transaction and automatically
+ * restore the pre-import relations snapshot afterward.
+ *
+ * In strict mode, throws DECKENT_MEMORY_RELATION_LOSS and rolls back the
+ * entire transaction (including importFn's writes) when the post-rebuild
+ * relation count is less than the pre-rebuild count.
+ */
+export function rebuildWithRelationSafety(
+  store: MemoryStore,
+  importFn: () => void,
+  options: { strict?: boolean } = {},
+): { preCount: number; postCount: number; backed: number; restored: number; skipped: number } {
+  const { strict = false } = options;
+
+  // Snapshot before the transaction so backup reflects the state to preserve.
+  const backup = backupRelations(store);
+  const preCount = backup.length;
+
+  const db = store.getRawDb();
+  const txn = db.transaction(() => {
+    importFn();
+
+    const restoreResult = restoreRelations(store, backup);
+    const postCount = store.countRelations();
+
+    if (strict && postCount < preCount) {
+      throw new DeckentError(
+        'DECKENT_MEMORY_RELATION_LOSS',
+        `Memory rebuild would lose relations: pre=${preCount} post=${postCount}`,
+        'Run with strict: false to accept partial restore, or ensure all referenced entries exist.',
+      );
+    }
+
+    return {
+      preCount,
+      postCount,
+      backed: preCount,
+      restored: restoreResult.restored,
+      skipped: restoreResult.skipped,
+    };
+  });
+
+  return txn();
 }
 
 // ─── backfillSprintMemoriesFromSprintsDir ────────────────────────

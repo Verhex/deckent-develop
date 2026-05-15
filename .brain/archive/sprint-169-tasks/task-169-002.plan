@@ -1,0 +1,50 @@
+# Task 169-002 Execution Plan
+
+## Bug
+DIRECTIVES.md `Dependencies:` field supports only comma-separated bare strings.
+JSON array format (`["169-003"]`) — used by Sprint 169 plan dependencies — is
+treated as a single literal string and never split, so dependency wiring fails.
+
+## Root Cause
+`parseDependenciesDirective` at src/orchestra/task-builder.ts:182-190 does:
+1. strip `Dependencies:` prefix → raw value
+2. split by `,`
+3. return parts
+
+For input `["169-007", "169-008"]`, split-by-comma yields
+`['["169-007"', '"169-008"]']` — literal JSON syntax leaks into task.json's
+`dependencies` array.
+
+## Fix
+1. Add new pure helper `parseDependencyField(value: string): string[]` that
+   accepts 3 formats:
+   - bare string: `"169-003"` → `["169-003"]`
+   - comma-separated list: `"169-003, 169-007"` → `["169-003", "169-007"]`
+   - JSON array literal: `'["169-003"]'` → `["169-003"]`
+   Idempotent — JSON-parsing then re-stringifying yields the same result.
+2. Refactor `parseDependenciesDirective` to delegate to `parseDependencyField`.
+   This preserves existing call sites (parseStructuredDirectives,
+   parseBulletOrNumberedTasks).
+3. Export `parseDependencyField` (so grep finds 2+ matches: export + use).
+
+## Files Modified
+- src/orchestra/task-builder.ts — add helper, refactor existing parser
+- tests/orchestra/dep-parser-string-to-array.test.ts — new TDD test file
+
+## Test Cases (6 required)
+1. bare string → single-element array
+2. comma-separated list → multi-element array
+3. JSON array literal (single element) → single-element array
+4. JSON array (multi-element) → multi-element array
+5. empty / whitespace-only / "none" → empty array
+6. whitespace around comma values → trimmed elements
+
+## Verification
+- tsc --noEmit clean
+- npx vitest run tests/orchestra/dep-parser-string-to-array.test.ts → 6 pass
+- Full vitest baseline regression check
+- grep "parseDependencyField" src/orchestra/task-builder.ts → 2+ matches
+
+## ADRs Considered
+- ADR-008 Brain Merkezi Import — function is in orchestra/, no cross-module imports added
+- ADR-024 sprint-controller god object split — change is additive, no impact on phase modules

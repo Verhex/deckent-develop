@@ -1,0 +1,99 @@
+{
+  "id": "169-004",
+  "title": "H2 Stub Memory Entries Backfill",
+  "description": "H2 Stub Memory Entries Backfill\n\n- Model: opus\n- Effort: normal\n- Skills: database-migration\n- Files: scripts/memory/backfill-stub-entries.mjs, src/core/memory-store.ts, tests/core/memory-stub-backfill.test.ts\n- Scope: src/core/, scripts/memory/, tests/core/\n- Agent: data-engineer\n\n### Description\n\nSprint 159-161 memory entries stub flag (backfill Sprint 168 stub eklendi, gerçek içerik eksik). `.brain/archive/sprints/sprint-{159,160,161}.md` retrieve + content swap. `stub_flag: true → false`. Idempotent: zaten dolu entries dokunulmaz. `memory-store.ts` getById + update API yoksa eklenir. Plan Task 4 (Steps 4.1-4.7) detaylı runbook.\n\n**Kanıt:** `length(content) > 100` for sprint-159/160/161 memory entries. `json_extract(metadata, '$.stub_flag') = 0` (false).\n\n**Test:** 2 TDD test PASS (backfill replaces, idempotent skip)",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "scripts/memory/",
+      "src/core/",
+      "tests/core/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "scripts/memory/backfill-stub-entries.mjs",
+      "src/core/memory-store.ts",
+      "tests/core/memory-stub-backfill.test.ts",
+      "memory-store.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** `length(content) > 100` for sprint-159/160/161 memory entries. `json_extract(metadata, '$.stub_flag') = 0` (false).",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "NO_GO",
+  "sprintId": "sprint-169",
+  "forceModel": "opus",
+  "forceEffort": "normal",
+  "forceAgent": "data-engineer",
+  "forceSkills": [
+    "database-migration"
+  ],
+  "assignedAgent": "data-engineer",
+  "assignedSkills": [
+    "database-migration"
+  ],
+  "createdAt": "2026-05-14T21:54:58.980Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "implementation",
+        "secondary": [
+          "config"
+        ],
+        "confidence": 0.95
+      },
+      "tags": [
+        "test-coverage"
+      ],
+      "domains": [
+        {
+          "name": "core",
+          "weight": 0.57
+        },
+        {
+          "name": "scripts",
+          "weight": 0.29
+        }
+      ],
+      "operations": [
+        {
+          "type": "modify",
+          "weight": 0.33
+        },
+        {
+          "type": "test",
+          "weight": 0.33
+        },
+        {
+          "type": "create",
+          "weight": 0.33
+        }
+      ],
+      "complexity": {
+        "fileCount": 4,
+        "moduleCount": 2,
+        "crossCutting": true,
+        "estimatedSize": "medium"
+      },
+      "scope": {
+        "writeRatio": {
+          "scripts/": 0.25,
+          "src/": 0.25,
+          "tests/": 0.25,
+          "./": 0.25
+        },
+        "primaryWriteTarget": "scripts/",
+        "testWriteRatio": 0.25
+      }
+    },
+    "confidence": "high",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-05-14T22:21:53.424Z"
+}

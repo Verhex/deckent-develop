@@ -185,6 +185,34 @@ export function buildAllowedWriteTargets(task: Pick<Task, 'scope'>): string[] {
   return result;
 }
 
+// ═══ Scope Equivalence Normalization (Sprint 169 W3.1) ════════════
+
+/**
+ * Normalize a list of scope file paths to canonical form for equivalence-class
+ * collision detection. Resolves the following variants to a single canonical key:
+ *   - Leading `./` prefix  (`./src/foo.ts` → `src/foo.ts`)
+ *   - Repeated slashes     (`src//foo.ts`  → `src/foo.ts`)
+ *   - Trailing slash       (`src/foo.ts/`  → `src/foo.ts`)
+ * Empty and whitespace-only entries are dropped.
+ *
+ * Intentionally simpler than normalizeScopePath: no extension-only rejection, no
+ * ADR-013 protected-path exclusion — those checks belong to the build-time scope
+ * builder. This helper is concerned only with path equivalence for collision detection.
+ */
+export function normalizeScopeFiles(files: readonly string[]): string[] {
+  const result: string[] = [];
+  for (const f of files) {
+    const trimmed = f.trim();
+    if (!trimmed) continue;
+    const canonical = trimmed
+      .replace(/^\.\//, '')   // strip leading ./
+      .replace(/\/+/g, '/')   // collapse repeated slashes
+      .replace(/\/$/, '');    // strip trailing slash
+    if (canonical) result.push(canonical);
+  }
+  return result;
+}
+
 // ═══ Exported Functions ════════════════════════════════════════════
 
 /**
@@ -213,8 +241,17 @@ export async function spawnWorkers(
   // Sprint 168 W2.5 — C0c wire: build a blockedTaskIds set from
   // handleScopeCollision() decisions and emit BRAIN→SPAWN:BLOCKED events.
   // Blocked tasks short-circuit before TASK_ASSIGN below.
+  //
+  // Sprint 169 W3.1 fix: normalize filesWrite paths before collision detection
+  // so equivalence-class variants (./src/foo.ts vs src/foo.ts, double slashes,
+  // trailing slash) resolve to the same canonical key and trigger the >=2
+  // writer threshold correctly.
   const pendingTasks = sprint.tasks.filter(t => t.status === TaskStatus.PENDING);
-  const collisionResult = detectScopeCollisions(pendingTasks);
+  const normalizedPendingTasks = pendingTasks.map(t => ({
+    ...t,
+    scope: { ...t.scope, filesWrite: normalizeScopeFiles(t.scope.filesWrite) },
+  }));
+  const collisionResult = detectScopeCollisions(normalizedPendingTasks);
   const blockedTaskIds = new Set<string>();
   if (collisionResult.collisionCount > 0) {
     const sprintId = getCurrentSprintId(projectRoot) ?? sprint.id;

@@ -1,0 +1,92 @@
+{
+  "id": "169-007",
+  "title": "C2 Bug Z3 Memory Rebuild Safety",
+  "description": "C2 Bug Z3 Memory Rebuild Safety\n\n- Model: opus\n- Effort: normal\n- Skills: database-migration, typescript-expert\n- Files: src/core/memory-import.ts, tests/core/memory-rebuild-safety.test.ts\n- Scope: src/core/, tests/core/\n- Agent: data-engineer\n- Dependencies: [\"169-003\"]\n\n### Description\n\nSprint 167 audit Bug Z3: `deckent memory rebuild` relations tablosunu DROP edip re-insert ediyor AMA re-insert eksik (relations export tarafından regenerated değil). Rebuild: relations backup → import → verify → rollback contract. strict mode: relation count düşerse throw + rollback. Plan Task 7 (Steps 7.1-7.5) detaylı runbook. Task 3 (C1) DONE öncesi başlatılmaz.\n\n**Kanıt:** Pre-rebuild + post-rebuild relations count equal. strict mode rollback test PASS.\n\n**Test:** 2 TDD test PASS (preserve, verify-fail rollback)",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "src/core/",
+      "tests/core/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/core/memory-import.ts",
+      "tests/core/memory-rebuild-safety.test.ts"
+    ]
+  },
+  "dependencies": [
+    "[\"169-003\"]"
+  ],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** Pre-rebuild + post-rebuild relations count equal. strict mode rollback test PASS.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "NO_GO",
+  "sprintId": "sprint-169",
+  "forceModel": "opus",
+  "forceEffort": "normal",
+  "forceAgent": "data-engineer",
+  "forceSkills": [
+    "database-migration",
+    "typescript-expert"
+  ],
+  "assignedAgent": "data-engineer",
+  "assignedSkills": [
+    "database-migration",
+    "typescript-expert"
+  ],
+  "createdAt": "2026-05-14T21:54:58.980Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "implementation",
+        "secondary": [],
+        "confidence": 0.95
+      },
+      "tags": [
+        "test-coverage"
+      ],
+      "domains": [
+        {
+          "name": "core",
+          "weight": 1
+        }
+      ],
+      "operations": [
+        {
+          "type": "create",
+          "weight": 0.4
+        },
+        {
+          "type": "test",
+          "weight": 0.4
+        },
+        {
+          "type": "delete",
+          "weight": 0.2
+        }
+      ],
+      "complexity": {
+        "fileCount": 2,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "small"
+      },
+      "scope": {
+        "writeRatio": {
+          "src/": 0.5,
+          "tests/": 0.5
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0.5
+      }
+    },
+    "confidence": "high",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-05-14T22:21:53.426Z"
+}

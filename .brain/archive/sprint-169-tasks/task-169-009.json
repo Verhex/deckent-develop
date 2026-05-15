@@ -1,0 +1,122 @@
+{
+  "id": "169-009",
+  "title": "H5 dep_pipeline_enabled Flip + 3-Layer Doc Fix",
+  "description": "H5 dep_pipeline_enabled Flip + 3-Layer Doc Fix\n\n- Model: opus\n- Effort: low\n- Skills: typescript-expert, documentation-writer\n- Files: src/core/config.ts, DECKENT.md, CLAUDE.md, .contracts/api-surface.md, tests/core/config-dep-pipeline-default.test.ts\n- Scope: src/core/, root, .contracts/, tests/core/\n- Agent: architect\n- Dependencies: [\"169-007\", \"169-008\"]\n\n### Description\n\nSprint 167 flip plan tamamlama: `dependency_pipeline_enabled: false → true` default. Wave scheduling go live (Sprint 139 T28 Kahn topological sort wire production default). 3-layer doc sync: DECKENT.md (ADR-045 reference + Sprint 169 flip anchor), CLAUDE.md (Wave scheduling default ON note + rollback path), `.contracts/api-surface.md` (Sprint Phases WAVE_BUILD step). Backout: `dependency_pipeline_enabled: false` rollback test gate. Plan Task 9 (Steps 9.1-9.8) detaylı runbook. Task 7 + 8 DONE öncesi başlatılmaz.\n\n**Kanıt:** `grep \"dependency_pipeline_enabled.*true\" src/core/config.ts` 1+ match. 3 doc'ta Sprint 169 flip satır.\n\n**Test:** 3 TDD test PASS (default true, override false, no-config default)\n\n## GO/NO_GO Criteria\n\n9/9 anchor task DONE veya GO_WTD ≤2 cosmetic (NO_GO = 0). Brain otonom finalize, manuel survival incident = 0. `tsc --noEmit` 0 hata. `vitest run` baseline: pass ≥16475 + fail ≤2 + skip ≤41. memory.db: `relations` row count > 0 (C1 kanıt), ADR count delta ≥0. `docs/adr/*.md` ≥43 file (H1 kanıt). `.github/workflows/secret-scan.yml` + `dashboard-build.yml` aktif (H3 + H4). `dependency_pipeline_enabled: true` default (H5 kanıt). Auditor `git diff --stat` boundary violation = 0. memory.db Sprint 169 entries (`sprint-log-169`, `retro-sprint-169`, `mem-sprint-169`) 3 row insert.\n\n## Sprint 170 OSS GA Handoff\n\nSprint 169 GO (full pass) Sprint 170 OSS GA conditional açar: `VerhexIO/deckent-dev → VerhexIO/deckent` public flip, `npm publish v1.0.0-beta.2` (Alperen approval), Show HN launch hazırlığı. Sprint 169 GO_WTD (≤2 cosmetic) Sprint 170 conditional + 1 review cycle. Sprint 169 NO_GO Sprint 169 hotfix mikro-sprint (1-3 task), Sprint 170 ertelenir.",
+  "model": "opus",
+  "effort": "low",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "src/core/",
+      "tests/core/",
+      "root/",
+      ".contracts/",
+      "docs/adr/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/core/config.ts",
+      "DECKENT.md",
+      "CLAUDE.md",
+      ".contracts/api-surface.md",
+      "tests/core/config-dep-pipeline-default.test.ts",
+      "api-surface.md",
+      "secret-scan.yml",
+      "dashboard-build.yml"
+    ]
+  },
+  "dependencies": [
+    "[\"169-007\"",
+    "\"169-008\"]"
+  ],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** `grep \"dependency_pipeline_enabled.*true\" src/core/config.ts` 1+ match. 3 doc'ta Sprint 169 flip satır.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "NO_GO",
+  "sprintId": "sprint-169",
+  "forceModel": "opus",
+  "forceEffort": "low",
+  "forceAgent": "architect",
+  "forceSkills": [
+    "typescript-expert",
+    "documentation-writer"
+  ],
+  "assignedAgent": "architect",
+  "assignedSkills": [
+    "typescript-expert",
+    "documentation-writer"
+  ],
+  "createdAt": "2026-05-14T21:54:58.980Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "documentation",
+        "secondary": [
+          "config"
+        ],
+        "confidence": 0.93
+      },
+      "tags": [
+        "test-coverage"
+      ],
+      "domains": [
+        {
+          "name": "core",
+          "weight": 0.31
+        },
+        {
+          "name": "root",
+          "weight": 0.08
+        },
+        {
+          "name": "docs",
+          "weight": 0.08
+        }
+      ],
+      "operations": [
+        {
+          "type": "create",
+          "weight": 0.29
+        },
+        {
+          "type": "document",
+          "weight": 0.29
+        },
+        {
+          "type": "modify",
+          "weight": 0.14
+        },
+        {
+          "type": "test",
+          "weight": 0.14
+        },
+        {
+          "type": "configure",
+          "weight": 0.14
+        }
+      ],
+      "complexity": {
+        "fileCount": 8,
+        "moduleCount": 4,
+        "crossCutting": true,
+        "estimatedSize": "large"
+      },
+      "scope": {
+        "writeRatio": {
+          "src/": 0.13,
+          "./": 0.63,
+          ".contracts/": 0.13,
+          "tests/": 0.13
+        },
+        "primaryWriteTarget": "./",
+        "testWriteRatio": 0.13
+      }
+    },
+    "confidence": "high",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-05-14T22:21:53.427Z"
+}

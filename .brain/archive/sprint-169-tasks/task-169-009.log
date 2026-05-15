@@ -1,0 +1,13 @@
+Task 169-009 (H5) tamamlandı — `.result` yazıldı, `selfAssessment: DONE`.
+
+**Özet:**
+- **Discovery:** `dependency_pipeline_enabled: true` ZATEN production default (Sprint 156 Task 2'de flip edilmişti). Sprint 169 H5 = doc-sync GA anchor + TDD lock-in.
+- **5 dosya değişti** (hepsi scope.filesWrite içinde):
+  - `src/core/config.ts` — 2 yorum bloğuna Sprint 169 H5 + ADR-045 anchor + rollback path
+  - `DECKENT.md` — Sprint 167 satırı → Sprint 169 GA anchor + ADR-045 + rollback
+  - `CLAUDE.md` — Yeni Gotcha bullet: Wave scheduling default ON + rollback path
+  - `.contracts/api-surface.md` — WAVE_BUILD step #2 eklendi (9 phase lifecycle), Sprint 169 inline anchor
+  - `tests/core/config-dep-pipeline-default.test.ts` (yeni) — 3 TDD test
+- **Verify:** `tsc --noEmit` 0 hata, `vitest` 3/3 yeni + 3/3 Sprint 156 mevcut PASS (6/6 toplam), kanıt grep 3 match
+- **Scope:** `git diff --stat` benim alanım = 4 doc/code + 1 yeni test (diğer dosyalar 169-001/002/007/008 paralel worker'larından)
+- **Tech debt notu (out-of-scope):** `src/core/config-types.ts:489` yorumu hâlâ "Default: false" — scope dışı olduğundan dokunulmadı, Sprint 170'de düzeltme önerisi result'da

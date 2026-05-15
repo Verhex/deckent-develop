@@ -175,17 +175,45 @@ export function parseSkillsDirective(line: string | undefined): {
 }
 
 /**
+ * Normalise a raw dependency value (the part after "Dependencies:") into an
+ * array of task-ID strings.  Accepts three formats:
+ *   - bare string:           "169-003"              → ["169-003"]
+ *   - comma-separated list:  "169-003, 169-007"     → ["169-003", "169-007"]
+ *   - JSON array literal:    '["169-003"]'          → ["169-003"]
+ * Returns an empty array for empty / whitespace-only / "none" input.
+ * Malformed JSON falls back to comma-split (never throws).
+ */
+export function parseDependencyField(raw: string): string[] {
+  const trimmed = raw.trim();
+  if (!trimmed || trimmed.toLowerCase() === 'none') return [];
+
+  if (trimmed.startsWith('[')) {
+    try {
+      const parsed: unknown = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) {
+        return (parsed as unknown[]).map(v => String(v).trim()).filter(Boolean);
+      }
+    } catch {
+      // malformed JSON — fall through to comma-split
+    }
+  }
+
+  return trimmed.split(',').map(s => s.trim()).filter(Boolean);
+}
+
+/**
  * Parse a Dependencies: directive line into an array of task IDs.
- * Supports: "Dependencies: 134-005, 134-007" or "- Dependencies: 134-005"
+ * Supports: "Dependencies: 134-005, 134-007", "- Dependencies: 134-005",
+ * and JSON array literals like '- Dependencies: ["169-003"]'.
  * Returns undefined if no dependencies line or empty.
  */
 export function parseDependenciesDirective(line: string | undefined): string[] | undefined {
   if (!line) return undefined;
 
   const value = line.replace(/.*Dependencies:\s*/i, '').trim();
-  if (!value || value.toLowerCase() === 'none') return undefined;
+  if (!value) return undefined;
 
-  const parts = value.split(',').map(s => s.trim()).filter(Boolean);
+  const parts = parseDependencyField(value);
   return parts.length > 0 ? parts : undefined;
 }
 

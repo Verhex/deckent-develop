@@ -6,6 +6,53 @@ Bu projedeki tüm önemli değişiklikler bu dosyada belgelenmektedir.
 Format [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) standardına dayanır
 ve proje [Semantic Versioning](https://semver.org/spec/v2.0.0.html) kurallarına uyar.
 
+## [1.0.0-beta.1-sprint169] - 2026-05-14
+
+### Added
+
+- H2 Stub Memory Entries Backfill
+- H3 OSS Pre-Flip Secret Scan Baseline
+
+### Changed
+
+- Fix: W3.1 C0c Collision Detection Live Trigger Investigation + Fix (completed with tech debt)
+- Fix: W3.2 Smoke Directive Dependency Parser Fix (completed with tech debt)
+- W3.2 Smoke Directive Dependency Parser Fix (completed with tech debt)
+- Fix: C1 Memory Relations Migration (completed with tech debt)
+- C1 Memory Relations Migration (completed with tech debt)
+- Fix: H4 Dashboard Build CI Gate (completed with tech debt)
+- H4 Dashboard Build CI Gate (completed with tech debt)
+- C2 Bug Z3 Memory Rebuild Safety (completed with tech debt)
+- Fix: H1 ADR DB→FS Export Pipeline + ADR-046 Reverse Hook (completed with tech debt)
+- H1 ADR DB→FS Export Pipeline + ADR-046 Reverse Hook (completed with tech debt)
+
+### Fixed
+
+- Fix: Fix: W3.1 C0c Collision Detection Live Trigger Investigation + Fix
+- Fix: Fix: W3.2 Smoke Directive Dependency Parser Fix
+- Fix: Fix: C1 Memory Relations Migration
+- Fix: Fix: H2 Stub Memory Entries Backfill
+- Fix: H2 Stub Memory Entries Backfill
+- Fix: Fix: H3 OSS Pre-Flip Secret Scan Baseline
+- Fix: H3 OSS Pre-Flip Secret Scan Baseline
+- Fix: Fix: H4 Dashboard Build CI Gate
+- Fix: C2 Bug Z3 Memory Rebuild Safety
+- Fix: Fix: H1 ADR DB→FS Export Pipeline + ADR-046 Reverse Hook
+
+
+_Tasks: 25 total, 24 done, 12 tech debt, 1 no-go_
+
+## [1.0.0-beta.1-sprint169] - 2026-05-14
+
+
+### Fixed
+
+- C2 Bug Z3 Memory Rebuild Safety
+- H5 dep_pipeline_enabled Flip + 3-Layer Doc Fix
+
+
+_Tasks: 18 total, 4 done, 0 tech debt, 14 no-go_
+
 ## [1.0.0-beta.1-sprint168] - 2026-05-14
 
 ### Added

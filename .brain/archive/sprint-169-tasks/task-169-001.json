@@ -1,0 +1,101 @@
+{
+  "id": "169-001",
+  "title": "W3.1 C0c Collision Detection Live Trigger Investigation + Fix",
+  "description": "W3.1 C0c Collision Detection Live Trigger Investigation + Fix\n\n- Model: opus\n- Effort: normal\n- Skills: typescript-expert\n- Files: src/orchestra/sprint-spawner.ts, src/orchestra/decision-engine.ts, tests/orchestra/c0c-collision-live-fire.test.ts\n- Scope: src/orchestra/, tests/orchestra/, .audit/sprint-169/\n- Agent: bug-fixer\n\n### Description\n\nSprint 168 smoke evidence: `detectScopeCollisions` wire layer var (Sprint 168 W2.5 integration) ama runtime `BRAIN→SPAWN:BLOCKED` event tetiklenmiyor. Forensic investigation: `.deckent/events.jsonl` trace, subscriber path registration timing, scope normalization (`./src/foo` vs `src/foo`). RC bul + fix + live-fire test. Plan Task 2 (Steps 2.1-2.8) detaylı runbook. RC dosyası `.audit/sprint-169/W3.1-root-cause.md` yazılır.\n\n**Kanıt:** `grep \"normalizeScopeFiles\\|detectScopeCollisions\" src/orchestra/sprint-spawner.ts` 2+ match. RC docu mevcut.\n\n**Test:** 3 TDD test PASS (paralel collision detect, scope normalize, double-slash handling)",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "src/orchestra/",
+      "tests/orchestra/",
+      ".audit/sprint-169/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/orchestra/sprint-spawner.ts",
+      "src/orchestra/decision-engine.ts",
+      "tests/orchestra/c0c-collision-live-fire.test.ts",
+      "1-root-cause.md",
+      "W3.1-root-cause.md"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** `grep \"normalizeScopeFiles\\|detectScopeCollisions\" src/orchestra/sprint-spawner.ts` 2+ match. RC docu mevcut.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "NO_GO",
+  "sprintId": "sprint-169",
+  "provider": "claude",
+  "forceModel": "opus",
+  "forceEffort": "normal",
+  "forceAgent": "bug-fixer",
+  "forceSkills": [
+    "typescript-expert"
+  ],
+  "assignedAgent": "bug-fixer",
+  "assignedSkills": [
+    "typescript-expert"
+  ],
+  "createdAt": "2026-05-14T21:54:58.980Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "implementation",
+        "secondary": [
+          "documentation"
+        ],
+        "confidence": 0.77
+      },
+      "tags": [
+        "test-coverage"
+      ],
+      "domains": [
+        {
+          "name": "orchestra",
+          "weight": 0.63
+        }
+      ],
+      "operations": [
+        {
+          "type": "modify",
+          "weight": 0.25
+        },
+        {
+          "type": "test",
+          "weight": 0.25
+        },
+        {
+          "type": "document",
+          "weight": 0.25
+        },
+        {
+          "type": "create",
+          "weight": 0.25
+        }
+      ],
+      "complexity": {
+        "fileCount": 5,
+        "moduleCount": 2,
+        "crossCutting": true,
+        "estimatedSize": "medium"
+      },
+      "scope": {
+        "writeRatio": {
+          "src/": 0.4,
+          "tests/": 0.2,
+          "./": 0.4
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0.2
+      }
+    },
+    "confidence": "high",
+    "routingVersion": "v2"
+  },
+  "estimatedTokens": 2032,
+  "updatedAt": "2026-05-14T22:21:53.421Z"
+}

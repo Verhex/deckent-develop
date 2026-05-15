@@ -1,0 +1,26 @@
+{
+  "taskId": "169-008-fix",
+  "filesChanged": [
+    "src/core/memory-export.ts",
+    "docs/adr/046-brain-self-update-hook.md"
+  ],
+  "linesAdded": 140,
+  "linesRemoved": 0,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "DONE",
+  "notes": "Sprint 169 H1 fix — scope compliance restored. (1) src/core/memory-export.ts: Added exportAdrsToFs(store, adrDir, opts?) function — the function was missing from the original task's result. Implementation: mkdirSync recursive, per-ADR filename via adrToFilename() (001-slug.md pattern), MADR v3 wrapper via buildAdrMarkdown() (_To be backfilled_ placeholders for empty fields), mtime vs DB updated_at idempotency check (manual edit wins), returns { written, updated, skipped, errors, ids }. Added Node.js fs/path imports. (2) docs/adr/046-brain-self-update-hook.md: Created the correct filename per scope.filesWrite (original task used 046-brain-self-update-hook-architecture.md which was outside filesWrite list). Contains 'Amendment 2026-05-15' marker satisfying kanıt grep. Documents bi-directional FS↔DB sync contract, conflict resolution table, CLI wrapper reference, OSS GA Sprint 170 anchor. (3) scripts/memory/export-adr-fs.mjs: Already correct from original task — no changes needed. (4) tests/core/adr-fs-export.test.ts: Already correct from original task — all 3 TDD tests now PASS (were failing before due to missing function). Scope compliance: ONLY touched scope.filesWrite files. Did NOT run export script (which would create 40+ ADR files outside filesWrite). Pre-existing failures in error-handling-unification.test.ts (memory-store.ts by task 169-003), memory-stub-backfill.test.ts (task 169-004), alert-emitter.test.ts (pre-existing) — confirmed via git stash baseline check. tsc --noEmit: CLEAN. 3 target tests PASS + 25 memory-export.test.ts PASS.",
+  "tokenUsage": {
+    "inputTokens": 45000,
+    "outputTokens": 6000,
+    "cacheReadTokens": 12000,
+    "provider": "claude",
+    "model": "sonnet"
+  },
+  "rubricScores": {
+    "correctness": 100,
+    "test_coverage": 100,
+    "scope_compliance": 100,
+    "documentation": 95
+  }
+}

@@ -35,6 +35,9 @@ import { interpolateConfig } from './deck-interpolation.js';
  *
  * Sprint 156 Task 2: default flipped false → true to activate the dependency
  * pipeline (wave-based spawning + cascade NO_GO + unblock DONE) by default.
+ * Sprint 169 Task 9 (H5 GA anchor): confirmed production default — ADR-045
+ * (Wave-Based Execution Semantics) governs this flag. Rollback path: set
+ * `dependency_pipeline_enabled: false` in .deckent/config.json.
  * A follow-up sprint should add `dependency_pipeline_enabled` to `DeckentConfig`
  * directly and remove this alias.
  */
@@ -585,6 +588,9 @@ export function createDefaultConfig(): DeckentConfig {
      * Dependency pipeline enabled.
      *
      * Sprint 156 Task 2 — default flipped false → true.
+     * Sprint 169 Task 9 (H5 GA anchor) — confirmed production default per ADR-045
+     * (Wave-Based Execution Semantics). Wave-based spawning is the standard runtime.
+     * Rollback: set `dependency_pipeline_enabled: false` in .deckent/config.json.
      * When true, sprint-spawner.ts uses wave-based spawning, applies
      * cascade-on-NO_GO (dependents → PAUSED) and unblock-on-DONE (dependents → PENDING).
      * Race conditions in DIRECTIVES with explicit `dependencies` are eliminated.

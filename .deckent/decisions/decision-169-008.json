@@ -1,0 +1,82 @@
+{
+  "taskId": "169-008",
+  "sprintId": "sprint-169",
+  "steps": [
+    {
+      "step": 2,
+      "name": "routing-step-2",
+      "input": {
+        "taskId": "169-008",
+        "title": "H1 ADR DB→FS Export Pipeline + ADR-046 Reverse Hook",
+        "scope": [
+          "docs/adr/",
+          "src/core/",
+          "scripts/memory/",
+          "tests/core/"
+        ],
+        "intent": "documentation"
+      },
+      "output": {
+        "agent": "data-engineer",
+        "skills": [
+          "database-migration",
+          "documentation-writer"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Agent forced by override: data-engineer"
+    },
+    {
+      "step": 3,
+      "name": "routing-step-3",
+      "input": {
+        "taskId": "169-008",
+        "title": "H1 ADR DB→FS Export Pipeline + ADR-046 Reverse Hook",
+        "scope": [
+          "docs/adr/",
+          "src/core/",
+          "scripts/memory/",
+          "tests/core/"
+        ],
+        "intent": "documentation"
+      },
+      "output": {
+        "agent": "data-engineer",
+        "skills": [
+          "database-migration",
+          "documentation-writer"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Skill budget: max 3 (large task, 3 module(s), effort=normal)"
+    },
+    {
+      "step": 4,
+      "name": "routing-step-4",
+      "input": {
+        "taskId": "169-008",
+        "title": "H1 ADR DB→FS Export Pipeline + ADR-046 Reverse Hook",
+        "scope": [
+          "docs/adr/",
+          "src/core/",
+          "scripts/memory/",
+          "tests/core/"
+        ],
+        "intent": "documentation"
+      },
+      "output": {
+        "agent": "data-engineer",
+        "skills": [
+          "database-migration",
+          "documentation-writer"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Skills forced by override: [database-migration, documentation-writer]"
+    }
+  ],
+  "decidedAt": "2026-05-14T21:54:58.994Z"
+}

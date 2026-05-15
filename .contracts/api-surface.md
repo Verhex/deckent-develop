@@ -80,6 +80,7 @@ Each completed task writes `.tasks/task-{id}.result`:
 Sprint lifecycle follows these phases in order:
 1. **PLAN** — Brain reads DIRECTIVES, plans tasks, writes task JSON files
 2. **SPAWN** — Workers spawned via tmux or subprocess, auditor scan loop starts
+2a. **WAVE_BUILD** — When `dependency_pipeline_enabled: true` (default since Sprint 156, confirmed Sprint 169 H5), tasks are sorted into dependency waves via Kahn's topological algorithm; each wave runs in parallel, subsequent waves unblock only after all blocking tasks reach DONE. ADR-045.
 3. **EXECUTE** — Workers execute tasks, write heartbeats (.hb files)
 4. **EVALUATE** — Brain waits for results, evaluates (GO/NO-GO/TECH_DEBT)
 5. **FIX** — Failed tasks retried (optional, configurable timeout)

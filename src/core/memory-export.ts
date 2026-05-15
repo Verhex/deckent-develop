@@ -4,8 +4,13 @@
  * Four export functions produce markdown strings for git tracking
  * and human review. Each takes a MemoryStore instance and returns
  * a markdown string.
+ *
+ * Also exports `exportAdrsToFs` for DB→FS reverse sync (Sprint 169 H1,
+ * bi-directional hook contract per ADR-046 Amendment 2026-05-15).
  */
 
+import { mkdirSync, existsSync, statSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import type { MemoryStore } from './memory-store.js';
 import type { MemoryEntryV2 } from './memory-types.js';
 
@@ -223,4 +228,137 @@ export function exportDebtMd(store: MemoryStore): string {
   }
 
   return lines.join('\n');
+}
+
+// ─── exportAdrsToFs ────────────────────────────────────────────────
+
+/**
+ * Result of a DB→FS ADR export run.
+ */
+export interface AdrFsExportResult {
+  /** New files created (did not exist before). */
+  written: number;
+  /** Existing files overwritten (DB is newer than file mtime). */
+  updated: number;
+  /** Files skipped because file mtime > DB updated_at (manual edit wins). */
+  skipped: number;
+  /** Error messages (one per failed ADR entry). */
+  errors: string[];
+  /** IDs of ADRs that were written or updated (not skipped/errored). */
+  ids: string[];
+}
+
+/**
+ * Compute the filesystem filename for an ADR entry.
+ * adr-001  + "TypeScript ESM"            → "001-typescript-esm.md"
+ * adr-022-v2 + "CLI/MCP Feature Parity"  → "022-v2-cli-mcp-feature-parity.md"
+ */
+function adrToFilename(id: string, title: string): string {
+  const numPart = id.replace(/^adr-/i, '');
+  const numMatch = numPart.match(/^(\d+)/);
+  const numStr = numMatch ? numMatch[1]!.padStart(3, '0') : numPart;
+  const suffix = numMatch ? numPart.slice(numMatch[1]!.length) : '';
+  const slug = title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return `${numStr}${suffix}-${slug}.md`;
+}
+
+/**
+ * Build MADR v3 markdown for an ADR entry.
+ * If content already starts with a `#` header, use it as-is.
+ * Otherwise generate a wrapper with `_To be backfilled_` placeholders.
+ */
+function buildAdrMarkdown(entry: MemoryEntryV2): string {
+  const content = entry.content.trim();
+
+  if (content.startsWith('#')) {
+    return content + '\n';
+  }
+
+  const sprintField = entry.sprint_id ?? '_To be backfilled_';
+  const bodyContent = content || '_To be backfilled_';
+
+  return [
+    `# ${entry.id.toUpperCase()}: ${entry.title}`,
+    '',
+    `**Status:** ${entry.status || '_To be backfilled_'}`,
+    '',
+    `**Sprint:** ${sprintField}`,
+    '',
+    '---',
+    '',
+    bodyContent,
+    '',
+  ].join('\n');
+}
+
+/**
+ * Export all ADR entries from the memory DB to individual markdown files
+ * in `adrDir`. Implements the reverse (DB→FS) direction of the bi-directional
+ * hook contract introduced by ADR-046 Amendment 2026-05-15.
+ *
+ * Idempotency: if a file's mtime is newer than the DB `updated_at` the file
+ * is considered a manual edit and left untouched (manual edit wins).
+ */
+export function exportAdrsToFs(
+  store: MemoryStore,
+  adrDir: string,
+  opts?: { dryRun?: boolean },
+): AdrFsExportResult {
+  const dryRun = opts?.dryRun ?? false;
+  const result: AdrFsExportResult = {
+    written: 0,
+    updated: 0,
+    skipped: 0,
+    errors: [],
+    ids: [],
+  };
+
+  if (!dryRun) {
+    mkdirSync(adrDir, { recursive: true });
+  }
+
+  const adrs = store.getByType('adr').sort(sortById);
+
+  for (const adr of adrs) {
+    try {
+      const filename = adrToFilename(adr.id, adr.title);
+      const filePath = join(adrDir, filename);
+      const markdown = buildAdrMarkdown(adr);
+
+      const fileExists = existsSync(filePath);
+
+      if (fileExists) {
+        const fileMtime = statSync(filePath).mtimeMs;
+        // SQLite datetime() returns 'YYYY-MM-DD HH:MM:SS' (UTC). Parse safely.
+        const dbTs = adr.updated_at.includes('T')
+          ? adr.updated_at
+          : adr.updated_at.replace(' ', 'T') + 'Z';
+        const dbUpdatedAt = new Date(dbTs).getTime();
+
+        if (fileMtime > dbUpdatedAt) {
+          result.skipped++;
+          continue;
+        }
+
+        if (!dryRun) {
+          writeFileSync(filePath, markdown, 'utf-8');
+        }
+        result.ids.push(adr.id);
+        result.updated++;
+      } else {
+        if (!dryRun) {
+          writeFileSync(filePath, markdown, 'utf-8');
+        }
+        result.ids.push(adr.id);
+        result.written++;
+      }
+    } catch (e) {
+      result.errors.push(`${adr.id}: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
+  return result;
 }

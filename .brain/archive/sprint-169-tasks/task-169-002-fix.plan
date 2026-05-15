@@ -1,0 +1,59 @@
+# Task 169-002-fix Execution Plan
+## W3.2 Smoke Directive Dependency Parser Fix
+
+### Problem
+`parseDependenciesDirective` in `src/orchestra/task-builder.ts` only handles
+bare string and comma-separated formats. JSON array literals like `["169-003"]`
+(used in Sprint 169 DIRECTIVES.md) pass through `split(',')` unchanged, so the
+literal string `["169-003"]` ends up as a single dependency ID — breaking the
+wave dependency wiring.
+
+### Root Cause (confirmed by code read)
+Line 188: `const parts = value.split(',').map(s => s.trim()).filter(Boolean);`
+For value `["169-003"]`:
+- split(',') → `['["169-003"]']`  — one element, brackets included
+- This invalid ID is stored in task.json dependencies array
+
+### Fix Plan
+
+**File 1: src/orchestra/task-builder.ts**
+
+1. Add `parseDependencyField(raw: string): string[]` export above
+   `parseDependenciesDirective` (after line 175, before line 177):
+   - Trim input
+   - Return [] for empty/whitespace-only input
+   - Return [] for "none" / "NONE"
+   - If starts with '[': try JSON.parse → cast to string[], filter
+   - On JSON parse failure (malformed): fall through to comma-split
+   - Default: split by comma, trim each part, filter empty
+
+2. Refactor `parseDependenciesDirective` to delegate to `parseDependencyField`:
+   - Extract value after "Dependencies:" prefix (unchanged)
+   - Return undefined if empty (unchanged)
+   - Call `parseDependencyField(value)` instead of inline split
+   - Return undefined if result is empty array, else return array
+
+**File 2: tests/orchestra/dep-parser-string-to-array.test.ts**
+- Already written by previous worker with 8 correct test cases
+- No changes needed — tests import `parseDependencyField` which will now exist
+
+### Expected Test Coverage (6 parseDependencyField + 6 parseDependenciesDirective)
+1. bare string → single-element array ✓
+2. comma-separated → multi-element array ✓
+3. single-element JSON array literal → ['169-003'] ✓
+4. multi-element JSON array literal → ['169-007', '169-008'] ✓
+5. empty/whitespace/none → [] ✓
+6. trim whitespace around comma-separated ✓
+7. idempotent re-parse ✓
+8. malformed JSON fallback to comma-split ✓
+9. JSON array dependencies line integration ✓
+10. multi-element JSON integration ✓
+11. bare-string back-compat ✓
+12. comma-separated back-compat ✓
+13. undefined input → undefined ✓
+14. "none" → undefined ✓
+
+### Verify Steps
+1. `tsc --noEmit` — should be clean (types are simple: string → string[])
+2. `npx vitest run tests/orchestra/dep-parser-string-to-array.test.ts`
+3. `npx vitest run` — full suite, ensure no regressions

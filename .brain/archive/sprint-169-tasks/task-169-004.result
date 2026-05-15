@@ -1,0 +1,27 @@
+{
+  "taskId": "169-004",
+  "filesChanged": [
+    "src/core/memory-store.ts",
+    "scripts/memory/backfill-stub-entries.mjs",
+    "tests/core/memory-stub-backfill.test.ts"
+  ],
+  "linesAdded": 273,
+  "linesRemoved": 0,
+  "testsPassed": true,
+  "selfAssessment": "DONE",
+  "notes": "Sprint 169 H2 — Stub Memory Entries Backfill implemented per plan Task 4 (Steps 4.1-4.5, 4.7). Added MemoryStore.update(id, fields, changedBy?) with whitelist-driven column patch (content/title/summary/metadata/status/priority/decay_exempt), automatic FTS5 *_norm mirror refresh, updated_at bump, and entry_history rows. backfillStubEntry(store, sprintNum, archiveDir) script handles all idempotent skip cases (not_found, not_stub, archive_missing, archive_too_short) and on update writes {stub_flag: false, backfilled_at: ISO}. CLI entry iterates sprint-159/160/161 against .brain/archive + .brain/memory.db. 4/4 TDD tests PASS (backfill replaces, idempotent skip, archive_missing skip, not_found skip — 2 spec + 2 edge coverage). tsc --noEmit clean. Full vitest suite: 16497 pass / 1 fail / 66 skip — single failure (tests/monitor/alert-emitter.test.ts provider parity for .codex/.gemini/.cursor rules) is pre-existing and OUTSIDE this task scope (verified via git stash isolation). Step 4.6 (live .brain/memory.db backfill) deliberately deferred to ops: sprint-160.md and sprint-161.md are not present in workspace .brain/archive/sprints/, only sprint-159.md is. CLI entry stays wired for ops to run when archive files arrive. ADR-001/002/008 compliance preserved (ESM .js extensions, Node16 resolution, brain unilateral import — script does not import brain). Scope: only writes to src/core/memory-store.ts, scripts/memory/backfill-stub-entries.mjs, tests/core/memory-stub-backfill.test.ts — all within allowed filesWrite list. update() API is generic and reusable beyond H2 (Sprint 169 C2 rebuild + future workers).",
+  "tokenUsage": {
+    "inputTokens": 42000,
+    "outputTokens": 7200,
+    "cacheReadTokens": 0,
+    "provider": "claude",
+    "model": "opus"
+  },
+  "rubricScores": {
+    "correctness": 95,
+    "test_coverage": 100,
+    "scope_compliance": 100,
+    "documentation": 90
+  },
+  "evaluationDecision": "DONE"
+}

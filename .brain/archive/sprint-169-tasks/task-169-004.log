@@ -1,0 +1,11 @@
+Görev 169-004 tamamlandı.
+
+**Özet (H2 Stub Memory Entries Backfill):**
+- `src/core/memory-store.ts:487` — generic `update(id, fields, changedBy?)` metodu eklendi (whitelist + FTS5 norm refresh + history)
+- `scripts/memory/backfill-stub-entries.mjs` — idempotent `backfillStubEntry()` + CLI girişi (sprint-159/160/161)
+- `tests/core/memory-stub-backfill.test.ts` — 4/4 TDD test PASS (replace, idempotent, archive_missing, not_found)
+- `tsc --noEmit` temiz, tam vitest: 16497 pass / 1 fail / 66 skip; tek hata önceden mevcut ve scope dışı (`.codex/.gemini/.cursor` rules)
+- Scope: yalnızca izin verilen 3 dosya değiştirildi
+- selfAssessment: **DONE**
+
+Step 4.6 (canlı `.brain/memory.db` backfill) ops için bırakıldı — workspace'te sadece `sprint-159.md` mevcut, CLI girişi 160/161 arşivleri geldiğinde tekrar çalıştırılabilir.

@@ -4,9 +4,22 @@
 
 **Status:** accepted
 
+# ADR-001: TypeScript + ESM
+
+**Status:** accepted
+
+**Date:** 2026-04-16
+
+**Sprint:** _To be backfilled_
+
+---
+
+**Status:** accepted
+
 **Decision:** Use TypeScript with `"type": "module"` (ESM) as the project foundation.
 **Context:** Deckent is a Node.js CLI tool. ESM is the modern standard, supported by Node 18+.
 **Consequence:** All imports must use `.js` extensions. CommonJS interop via `esModuleInterop`.
+
 
 ---
 
@@ -14,9 +27,22 @@
 
 **Status:** accepted
 
+# ADR-002: Node16 Module Resolution
+
+**Status:** accepted
+
+**Date:** 2026-04-16
+
+**Sprint:** _To be backfilled_
+
+---
+
+**Status:** accepted
+
 **Decision:** Use `"module": "Node16"` and `"moduleResolution": "Node16"` in tsconfig.
 **Context:** TypeScript 5.2+ requires these to match. Node16 resolution enforces `.js` extensions and `package.json` exports.
 **Consequence:** Explicit `.js` in all relative imports. No index file auto-resolution.
+
 
 ---
 
@@ -24,9 +50,22 @@
 
 **Status:** accepted
 
+# ADR-003: vitest over Jest
+
+**Status:** accepted
+
+**Date:** 2026-04-16
+
+**Sprint:** _To be backfilled_
+
+---
+
+**Status:** accepted
+
 **Decision:** Use vitest for testing.
 **Context:** Native ESM support, faster startup, v8 coverage provider, compatible API.
 **Consequence:** Tests in `tests/` directory, `vitest.config.ts` at root.
+
 
 ---
 
@@ -34,13 +73,38 @@
 
 **Status:** accepted
 
+# ADR-004: 3-Layer Config Merge
+
+**Status:** accepted
+
+**Date:** 2026-04-16
+
+**Sprint:** _To be backfilled_
+
+---
+
+**Status:** accepted
+
 **Decision:** Config loads in 3 layers: hardcoded defaults → `~/.deckent/config.json` → `.deckent/config.json`.
 **Context:** Users need global defaults (plan type, language) and per-project overrides.
 **Consequence:** `deepMerge` function handles nested object merge. Arrays are replaced, not merged. `undefined` values are skipped.
 
+
 ---
 
 ## adr-005: Synchronous I/O
+
+**Status:** deprecated
+
+# ADR-005: Synchronous I/O
+
+**Status:** deprecated
+
+**Date:** 2026-04-16
+
+**Sprint:** _To be backfilled_
+
+---
 
 **Status:** deprecated
 
@@ -50,9 +114,22 @@
 **Context:** tmux komutları <100ms, lock dosyaları <1KB, auditor 30s cycle'da birkaç küçük JSON okur. Async overhead gereksiz.
 **Consequence:** Tüm fonksiyonlar senkron. Gelecekte performans sorunları çıkarsa async'e geçilebilir.
 
+
 ---
 
 ## adr-006: spawnSync Security Pattern
+
+**Status:** accepted
+
+# ADR-006: spawnSync Security Pattern
+
+**Status:** accepted
+
+**Date:** 2026-04-16
+
+**Sprint:** _To be backfilled_
+
+---
 
 **Status:** accepted
 
@@ -60,9 +137,22 @@
 **Context:** Command injection riski sıfıra indirilmeli. Prompt ve diğer kullanıcı girdileri argument array olarak geçer.
 **Consequence:** Template literal veya string concat ile komut oluşturmak yasak. `{ shell: true }` kullanılmaz.
 
+
 ---
 
 ## adr-007: SpawnOptions Interface
+
+**Status:** accepted
+
+# ADR-007: SpawnOptions Interface
+
+**Status:** accepted
+
+**Date:** 2026-04-16
+
+**Sprint:** _To be backfilled_
+
+---
 
 **Status:** accepted
 
@@ -70,9 +160,22 @@
 **Context:** Blueprint 15 gereği her ajan `--allowedTools` ile kısıtlanır. `autoApprove` ise `--dangerously-skip-permissions` ekler.
 **Consequence:** Brain, worker scope'una göre allowedTools string'i hesaplar. SpawnOptions her spawn fonksiyonuna opsiyonel parametre olarak geçer.
 
+
 ---
 
 ## adr-008: Brain Merkezi Import — Tek Yönlü Bağımlılık
+
+**Status:** accepted
+
+# ADR-008: Brain Merkezi Import — Tek Yönlü Bağımlılık
+
+**Status:** accepted
+
+**Date:** 2026-04-16
+
+**Sprint:** _To be backfilled_
+
+---
 
 **Status:** accepted
 
@@ -80,9 +183,22 @@
 **Context:** Döngüsel import'lar Node.js ESM'de tanımsız davranışa yol açar. Brain orkestratör rolünde — tmux/auditor/worker'ı çağırır ama onlar brain'den bağımsız çalışır.
 **Consequence:** `grep -r "from.*brain" src/orchestra/tmux.ts src/monitor/auditor.ts src/agents/worker.ts` her zaman boş sonuç vermeli. Yeni modüller eklenirken bu kural korunmalı.
 
+
 ---
 
 ## adr-009: DEBT.md Markdown Tablo Formatı
+
+**Status:** accepted
+
+# ADR-009: DEBT.md Markdown Tablo Formatı
+
+**Status:** accepted
+
+**Date:** 2026-04-16
+
+**Sprint:** _To be backfilled_
+
+---
 
 **Status:** accepted
 
@@ -90,9 +206,22 @@
 **Context:** DebtItem interface'inin tüm alanlarını (id, description, originTaskId, originSprintId, priority, sprintsOpen, resolved, resolvedInSprintId, createdAt) saklamalıyız. JSON yerine markdown tercih edildi çünkü git diff'lerde okunabilir.
 **Consequence:** Tablo parse'ı `|` split + `slice(1,-1)` ile yapılır. Boş kolon değerleri korunur. Yeni kolon eklemek parse/generate'i güncellemeyi gerektirir.
 
+
 ---
 
 ## adr-010: Tek Runtime Dependency — commander.js
+
+**Status:** accepted
+
+# ADR-010: Tek Runtime Dependency — commander.js
+
+**Status:** accepted
+
+**Date:** 2026-04-16
+
+**Sprint:** _To be backfilled_
+
+---
 
 **Status:** accepted
 
@@ -100,9 +229,22 @@
 **Context:** Deckent CLI minimal footprint hedefler. Node 18+ built-in'leri (readline/promises, Unicode support) çoğu ihtiyacı karşılar. Renk desteği modern terminallerde Unicode ile sağlanabilir.
 **Consequence:** `package.json` dependencies bölümünde yalnızca `commander` bulunur. Renkli çıktı gerekirse ileride `picocolors` (1.3KB) eklenebilir.
 
+
 ---
 
 ## adr-011: node:readline/promises — Built-in Prompt
+
+**Status:** accepted
+
+# ADR-011: node:readline/promises — Built-in Prompt
+
+**Status:** accepted
+
+**Date:** 2026-04-16
+
+**Sprint:** _To be backfilled_
+
+---
 
 **Status:** accepted
 
@@ -110,9 +252,22 @@
 **Context:** `inquirer` (1.2MB) veya `prompts` (200KB) eklemek yerine Node 18+ built-in API yeterli. Basit wrapper'lar (`promptText`, `promptSelect`, `promptConfirm`) tüm init wizard ihtiyacını karşılıyor.
 **Consequence:** Rich UI (autocomplete, fuzzy search) yok. Gerekirse Phase 3 TUI'da `ink` veya `blessed` eklenebilir.
 
+
 ---
 
 ## adr-012: register\<Name\>(program) Pattern
+
+**Status:** accepted
+
+# ADR-012: register\<Name\>(program) Pattern
+
+**Status:** accepted
+
+**Date:** 2026-04-16
+
+**Sprint:** _To be backfilled_
+
+---
 
 **Status:** accepted
 
@@ -120,9 +275,22 @@
 **Context:** Tek dosyada tüm komutları tanımlamak bakım zorluğu yaratır. Ayrı dosyalar bağımsız test, kolay ekleme/çıkarma sağlar.
 **Consequence:** `src/cli/commands/` dizininde 16 dosya. Entry point (`index.ts`) 16 register çağrısı yapar. Yeni komut eklemek: dosya oluştur + index.ts'e import + register ekle.
 
+
 ---
 
 ## adr-013: DECKENT.md Adapter Pattern (Sprint 15)
+
+**Status:** accepted
+
+# ADR-013: DECKENT.md Adapter Pattern (Sprint 15)
+
+**Status:** accepted
+
+**Date:** 2026-04-16
+
+**Sprint:** _To be backfilled_
+
+---
 
 **Status:** accepted
 
@@ -136,9 +304,22 @@
 - Gelecek provider'lar (Codex, Gemini) için adapter pattern genişletilebilir
 - `deckent sync` komutu adapter'ları yeniden senkronize eder
 
+
 ---
 
 ## adr-014: .deck Secret File System (Sprint 044)
+
+**Status:** accepted
+
+# ADR-014: .deck Secret File System (Sprint 044)
+
+**Status:** accepted
+
+**Date:** 2026-04-16
+
+**Sprint:** _To be backfilled_
+
+---
 
 **Status:** accepted
 
@@ -148,9 +329,22 @@
 
 **Consequence:** Worker'lar `.deck` içeriğini görmez. Brain sadece gerekli key'leri task scope'una göre inject eder. Kullanıcının .env dosyası hiç dokunulmaz.
 
+
 ---
 
 ## adr-015: TaskRouter Module — 6-level routing (Sprint 044)
+
+**Status:** accepted
+
+# ADR-015: TaskRouter Module — 6-level routing (Sprint 044)
+
+**Status:** accepted
+
+**Date:** 2026-04-16
+
+**Sprint:** _To be backfilled_
+
+---
 
 **Status:** accepted
 
@@ -160,9 +354,22 @@
 
 **Consequence:** Yeni routing kuralları sprint-controller'a dokunmadan eklenebilir. Her seviye bağımsız test edilebilir. Router, task metadata'sını (model, effort, scope) okuyarak otomatik provider seçimi yapar.
 
+
 ---
 
 ## adr-016: Connector Module — provider lifecycle (Sprint 044)
+
+**Status:** accepted
+
+# ADR-016: Connector Module — provider lifecycle (Sprint 044)
+
+**Status:** accepted
+
+**Date:** 2026-04-16
+
+**Sprint:** _To be backfilled_
+
+---
 
 **Status:** accepted
 
@@ -172,9 +379,22 @@
 
 **Consequence:** Sprint sırasında provider düşerse auditor tespit eder ve alert üretir. Lazy init sayesinde kullanılmayan provider'lar başlatılmaz. Connector, provider sağlık metriklerini `.dashboard`'a yazar.
 
+
 ---
 
 ## adr-017: MCP-Native Provider Adapters (Sprint 045)
+
+**Status:** accepted
+
+# ADR-017: MCP-Native Provider Adapters (Sprint 045)
+
+**Status:** accepted
+
+**Date:** 2026-04-16
+
+**Sprint:** _To be backfilled_
+
+---
 
 **Status:** accepted
 
@@ -184,9 +404,22 @@
 
 **Consequence:** Gerçek provider'larla uçtan uca test mümkün. CI ortamında binary yoksa `describe.skipIf` ile testler atlanır. Mock adapter'lar yalnızca unit test scope'unda kalır.
 
+
 ---
 
 ## adr-018: Multi-Environment Config Generation (Sprint 046)
+
+**Status:** accepted
+
+# ADR-018: Multi-Environment Config Generation (Sprint 046)
+
+**Status:** accepted
+
+**Date:** 2026-04-16
+
+**Sprint:** _To be backfilled_
+
+---
 
 **Status:** accepted
 
@@ -196,9 +429,22 @@
 
 **Consequence:** Kullanıcı tek komutla tüm IDE entegrasyonlarını kurar. Her generator bağımsız modül, yeni ortam eklemek kolaylaşır. Mevcut config'ler üzerine yazılmaz, `writeIfNotExists` prensibi korunur.
 
+
 ---
 
 ## adr-019: Language-Agnostic Worker Verify (Sprint 046)
+
+**Status:** accepted
+
+# ADR-019: Language-Agnostic Worker Verify (Sprint 046)
+
+**Status:** accepted
+
+**Date:** 2026-04-16
+
+**Sprint:** _To be backfilled_
+
+---
 
 **Status:** accepted
 
@@ -208,9 +454,22 @@
 
 **Consequence:** Deckent TypeScript dışı projelerde de çalışır. Verify döngüsü stack-aware hale geldi. Yeni dil eklemek `STACK_COMMANDS` map'ine bir entry eklemekle yapılır.
 
+
 ---
 
 ## adr-020: Rich Sprint Output — 7-section summary (Sprint 044)
+
+**Status:** accepted
+
+# ADR-020: Rich Sprint Output — 7-section summary (Sprint 044)
+
+**Status:** accepted
+
+**Date:** 2026-04-16
+
+**Sprint:** _To be backfilled_
+
+---
 
 **Status:** accepted
 
@@ -220,9 +479,22 @@
 
 **Consequence:** Her sprint sonunda kullanıcı tam resmi görür. `NO_COLOR=1` ile CI-friendly düz metin çıktısı alınır. Sprint log formatı da güncellendi — `.brain/sprints/sprint-NNN.md` aynı 7 bölüm yapısını kullanır.
 
+
 ---
 
 ## adr-021: Kraken ASCII Brand Identity (Sprint 044)
+
+**Status:** accepted
+
+# ADR-021: Kraken ASCII Brand Identity (Sprint 044)
+
+**Status:** accepted
+
+**Date:** 2026-04-16
+
+**Sprint:** _To be backfilled_
+
+---
 
 **Status:** accepted
 
@@ -232,9 +504,22 @@
 
 **Consequence:** Marka tanınırlığı artar. `NO_COLOR` veya `CI` env var varsa splash atlanır. ASCII art sabit string olarak `src/cli/splash.ts`'de tutulur, runtime üretilmez.
 
+
 ---
 
 ## adr-022: CLI/MCP Feature Parity — Tek Yapı, Çoklu Ortam (Sprint 067)
+
+**Status:** superseded
+
+# ADR-022: CLI/MCP Feature Parity — Tek Yapı, Çoklu Ortam (Sprint 067)
+
+**Status:** superseded
+
+**Date:** 2026-04-16
+
+**Sprint:** _To be backfilled_
+
+---
 
 **Status:** superseded
 
@@ -254,6 +539,7 @@
 - Yeni özellik ekleme maliyeti artar (2 wrapper) ama tutarlılık garantilenir
 - MCP tool sayısı 16'dan 25+'a çıkacak (bazı CLI komutları birleştirilebilir)
 - README, CONTRIBUTING ve docs güncellenirken her iki taraf da sayılmalı
+
 
 ---
 
@@ -292,6 +578,18 @@ MCP-only komutlar yoktur — tüm MCP araçlarının CLI karşılığı mevcuttu
 
 **Status:** accepted
 
+# ADR-023: Plan Tier Generalizasyonu — Provider-Agnostic Tier İsimleri (Sprint 072)
+
+**Status:** accepted
+
+**Date:** 2026-04-16
+
+**Sprint:** _To be backfilled_
+
+---
+
+**Status:** accepted
+
 **Context:** Plan tier isimleri Claude'a özgüydü: `max_plan`, `max5x_plan`, `pro_plan`. Bu isimler Codex ve Gemini kullanıcıları için anlamsızdı. Provider-agnostic bir CLI olarak Deckent, belirli bir sağlayıcıya atıfta bulunmamalı.
 
 **Decision:** Tier isimleri genelleştirildi:
@@ -304,9 +602,22 @@ Init wizard da güncellendi: "Select your Claude plan" → "Select your plan". E
 
 **Consequence:** Yeni kullanıcılar provider-agnostic terminoloji görür. Mevcut config'ler autoMigrateOnLoad ile otomatik güncellenir. Tüm belgeler yeni tier isimlerini kullanır. DECKENT.md ve CLAUDE.md provider.ts model equivalence tablosunu güncellenmiş tier isimleriyle gösterir.
 
+
 ---
 
 ## adr-024: sprint-controller.ts God Object Split — sprint-phases.ts Extract (Sprint 072)
+
+**Status:** accepted
+
+# ADR-024: sprint-controller.ts God Object Split — sprint-phases.ts Extract (Sprint 072)
+
+**Status:** accepted
+
+**Date:** 2026-04-16
+
+**Sprint:** _To be backfilled_
+
+---
 
 **Status:** accepted
 
@@ -320,9 +631,22 @@ Init wizard da güncellendi: "Select your Claude plan" → "Select your plan". E
 
 **Consequence:** Her faz bağımsız olarak test edilebilir. `sprint-controller.ts` boyutu önemli ölçüde azaldı. Yeni faz eklemek veya mevcut fazı değiştirmek tek dosyayı etkiler. orchestra/ modül sayısı 36'dan 37'ye çıktı.
 
+
 ---
 
 ## adr-025: Graceful Shutdown Stratejisi — SIGINT → interruptActiveSprint (Sprint 076)
+
+**Status:** accepted
+
+# ADR-025: Graceful Shutdown Stratejisi — SIGINT → interruptActiveSprint (Sprint 076)
+
+**Status:** accepted
+
+**Date:** 2026-04-16
+
+**Sprint:** _To be backfilled_
+
+---
 
 **Status:** accepted
 
@@ -335,9 +659,22 @@ Init wizard da güncellendi: "Select your Claude plan" → "Select your plan". E
 
 **Consequence:** Ctrl+C sonrası temiz state bırakılır. Sprint INTERRUPTED olarak işaretlenir, review komutu bu durumu gösterir. Worker'lar SIGTERM sinyali alır ve kendi .hb dosyalarını DONE olarak işaretleyebilir. `deckent cleanup` sonrasında orphan dosya kalmaz.
 
+
 ---
 
 ## adr-026: God Object Split Stratejisi — Faz 1-3 Tamamlandı (Sprint 076)
+
+**Status:** accepted
+
+# ADR-026: God Object Split Stratejisi — Faz 1-3 Tamamlandı (Sprint 076)
+
+**Status:** accepted
+
+**Date:** 2026-04-16
+
+**Sprint:** _To be backfilled_
+
+---
 
 **Status:** accepted
 
@@ -352,9 +689,22 @@ Her fazda backward compatibility sprint-controller re-export layer üzerinden ko
 
 **Consequence:** `sprint-controller.ts` orchestration koordinatörü rolüne döndü — iş mantığı bağımsız modüllerde. orchestra/ modül sayısı 37'den 47'ye çıktı. Her yeni modül bağımsız unit test kapsamı kazandı. Kademeli split stratejisi büyük refactor riskini minimize etti.
 
+
 ---
 
 ## adr-027: Hybrid Spawn Backend (Sprint 123, Revisited Sprint 139)
+
+**Status:** accepted
+
+# ADR-027: Hybrid Spawn Backend (Sprint 123, Revisited Sprint 139)
+
+**Status:** accepted
+
+**Date:** 2026-04-16
+
+**Sprint:** _To be backfilled_
+
+---
 
 **Status:** accepted
 
@@ -402,9 +752,22 @@ Sprint 139'da 3 backend'in (Docker, subprocess, tmux) E2E test coverage'ı tamam
 - Sprint 139 Task 19: Subprocess E2E tests (DONE — 33 test, 1.2s)
 - ADR-033: Product Vision — complexity minimization principle
 
+
 ---
 
 ## adr-028: Decision-Engine V1 → V2 Routing Migration
+
+**Status:** accepted
+
+# ADR-028: Decision-Engine V1 → V2 Routing Migration
+
+**Status:** accepted
+
+**Date:** 2026-04-16
+
+**Sprint:** _To be backfilled_
+
+---
 
 **Status:** accepted
 
@@ -416,13 +779,24 @@ Sprint 139'da 3 backend'in (Docker, subprocess, tmux) E2E test coverage'ı tamam
 
 **Status:** ACCEPTED (Sprint 130)
 
+
 ---
 
 ## adr-029: Managed-Docs Universalization — Sprint Lifecycle Template-Based Document Generation
 
 **Status:** accepted
 
-(Sprint 131)
+# ADR-029: Managed-Docs Universalization — Sprint Lifecycle Template-Based Document Generation
+
+**Status:** accepted
+
+**Date:** 2026-04-16
+
+**Sprint:** _To be backfilled_
+
+---
+
+**Status:** ACCEPTED (Sprint 131)
 
 **Context:**
 Önceki sprintlerde `sprint-reporter.ts` içindeki `updateProjectDocs()` fonksiyonu yalnızca hard-coded dokümanlara (CLAUDE.md, IDENTITY.md, README.md gibi) güncelleme yapabiliyordu. Kullanıcı kendi dokümanlarını (ARCHITECTURE.md, ONBOARDING.md, KPI dashboards) sprint döngüsüne dahil etmek istediğinde doğrudan `sprint-reporter.ts` kodunu değiştirmek zorunda kalıyordu. Bu durum:
@@ -472,13 +846,24 @@ Mevcut projeler `.deckent/docs.json` oluşturmadan bu sistemi kullanmaz — back
 
 ---
 
+
 ---
 
 ## adr-030: Template Engine + Plugin Loader — Managed-Docs Render Pipeline
 
 **Status:** accepted
 
-(Sprint 131)
+# ADR-030: Template Engine + Plugin Loader — Managed-Docs Render Pipeline
+
+**Status:** accepted
+
+**Date:** 2026-04-16
+
+**Sprint:** _To be backfilled_
+
+---
+
+**Status:** ACCEPTED (Sprint 131)
 
 **Context:**
 Managed-Docs sistemi built-in `SectionGenerator`'ları sprint context'inden markdown üretir. Ancak bazı kullanıcılar:
@@ -529,13 +914,24 @@ Güvenlik kararı: JSON generator'lar `loadUserGeneratorsSync()` ile sync olarak
 
 ---
 
+
 ---
 
 ## adr-031: Content Hash Cache — Sprint Dokümanları Hash-Based Invalidation
 
 **Status:** accepted
 
-(Sprint 131)
+# ADR-031: Content Hash Cache — Sprint Dokümanları Hash-Based Invalidation
+
+**Status:** accepted
+
+**Date:** 2026-04-16
+
+**Sprint:** _To be backfilled_
+
+---
+
+**Status:** ACCEPTED (Sprint 131)
 
 **Context:**
 `runManagedDocUpdates()` her sprint bitişinde tüm konfigüre edilmiş dokümanlar için içerik üretimi çalıştırır. Büyük projelerde:
@@ -590,13 +986,24 @@ Tek-key (yalnızca fileHash) konfigürasyon değişikliklerini gözden kaçırı
 
 ---
 
+
 ---
 
 ## adr-032: i18n Pattern System — TR/EN İçerik Çeşitliliği Desteği
 
 **Status:** accepted
 
-(Sprint 131)
+# ADR-032: i18n Pattern System — TR/EN İçerik Çeşitliliği Desteği
+
+**Status:** accepted
+
+**Date:** 2026-04-16
+
+**Sprint:** _To be backfilled_
+
+---
+
+**Status:** ACCEPTED (Sprint 131)
 
 **Context:**
 Deckent TR ve EN kullanıcı tabanına sahip. Sprint 131 öncesinde:
@@ -658,11 +1065,24 @@ Dil konfigürasyonu: `.deckent/config.json`'da `"language": "tr"` veya `"en"`. `
 
 ---
 
+
 ---
 
 ## adr-033: Product Vision — Product Not Service
 
 **Status:** accepted
+
+# ADR-033: Product Vision — Product Not Service
+
+**Status:** accepted
+
+**Date:** 2026-04-16
+
+**Sprint:** _To be backfilled_
+
+---
+
+**Status:** ACCEPTED
 
 **Date:** 2026-04-11
 
@@ -761,11 +1181,24 @@ Bu karar aşağıdaki yönlerin öncelikli geliştirme alanları olduğunu teyit
 
 ---
 
+
 ---
 
 ## adr-034: Multi-Project Isolation — Per-Project Security Boundaries
 
 **Status:** accepted
+
+# ADR-034: Multi-Project Isolation — Per-Project Security Boundaries
+
+**Status:** accepted
+
+**Date:** 2026-04-16
+
+**Sprint:** _To be backfilled_
+
+---
+
+**Status:** ACCEPTED
 
 **Date:** 2026-04-11
 
@@ -879,9 +1312,22 @@ API anahtarları config dosyalarında saklanmaz — environment variable olarak 
 - sprint-reporter.ts (2132 satır) — Split önerisi: retro-writer.ts (retrospektif) + performance-reporter.ts (metrik)
 - **Status:** Gelecek sprint'te değerlendirilecek — bu sprint'te sadece belgelendi.
 
+
 ---
 
 ## adr-035: Brain ↔ Worker ↔ Auditor Verification Protocol Standard (Sprint 138)
+
+**Status:** accepted
+
+# ADR-035: Brain ↔ Worker ↔ Auditor Verification Protocol Standard (Sprint 138)
+
+**Status:** accepted
+
+**Date:** 2026-04-16
+
+**Sprint:** _To be backfilled_
+
+---
 
 **Status:** accepted
 
@@ -1006,9 +1452,22 @@ Event stream write başarısız olursa (disk tam, permission hata) → `console.
 
 ---
 
+
 ---
 
 ## adr-036: ADR Governance Integration — Mandatory Architecture Decision Enforcement
+
+**Status:** accepted
+
+# ADR-036: ADR Governance Integration — Mandatory Architecture Decision Enforcement
+
+**Status:** accepted
+
+**Date:** 2026-04-16
+
+**Sprint:** _To be backfilled_
+
+---
 
 **Status:** accepted
 
@@ -1058,9 +1517,22 @@ ADR governance'ı kullanıcı-facing ürün özelliğine dönüştürmek. 5 bile
 
 ---
 
+
 ---
 
 ## adr-037: Brain-Auditor-Worker Authority Matrix — RBAC Protocol V1.0
+
+**Status:** accepted
+
+# ADR-037: Brain-Auditor-Worker Authority Matrix — RBAC Protocol V1.0
+
+**Status:** accepted
+
+**Date:** 2026-04-16
+
+**Sprint:** _To be backfilled_
+
+---
 
 **Status:** accepted
 
@@ -1381,9 +1853,22 @@ Bu RBAC matrix Protocol Version 1.0 ile birlikte tanımlanmıştır. Değişikli
 
 ---
 
+
 ---
 
 ## adr-038: Dead Code Disposition — Sprint 139 Audit Results
+
+**Status:** accepted
+
+# ADR-038: Dead Code Disposition — Sprint 139 Audit Results
+
+**Status:** accepted
+
+**Date:** 2026-04-16
+
+**Sprint:** _To be backfilled_
+
+---
 
 **Status:** accepted
 
@@ -1479,9 +1964,22 @@ Bu ADR, ADR-028'in removal'ını TALEP ETMİYOR — yalnızca Sprint 142'de reas
 
 ---
 
+
 ---
 
 ## adr-039: Self-Modifying Task Detection — Deckent Dogfood vs User Project Discrimination
+
+**Status:** accepted
+
+# ADR-039: Self-Modifying Task Detection — Deckent Dogfood vs User Project Discrimination
+
+**Status:** accepted
+
+**Date:** 2026-04-16
+
+**Sprint:** _To be backfilled_
+
+---
 
 **Status:** accepted
 
@@ -1590,11 +2088,22 @@ Self-modifying task tamamlandıktan sonra otomatik checkpoint yazılır (sprint-
 - `src/orchestra/self-modifying-detector.ts` — Sprint 139 implementasyonu
 - `src/orchestra/sprint-spawner.ts` — Sprint 140+ sequential wave wiring
 
+
 ---
 
 ## adr-040: Nervous System Architecture — Proactive Meta-Orchestrator
 
 **Status:** accepted
+
+# ADR-040: Nervous System Architecture — Proactive Meta-Orchestrator
+
+**Status:** accepted
+
+**Date:** 2026-04-20
+
+**Sprint:** sprint-147
+
+---
 
 ## Context
 
@@ -1726,6 +2235,16 @@ KILL_LIVE_SPRINT, MANUAL_FILE_DELETE, COST_OVER_THRESHOLD, DESTRUCTIVE_GIT, ADR_
 
 **Status:** accepted
 
+# ADR-041: Agent Taxonomy — Horizontal Skills vs Vertical Agents
+
+**Status:** accepted
+
+**Date:** 2026-04-21
+
+**Sprint:** sprint-150
+
+---
+
 ## Status
 accepted (Sprint 150 — reconfirmed with Sprint 150 dogfood evidence)
 
@@ -1819,11 +2338,22 @@ Agent taxonomy şu şekilde reorganize edildi:
 - ADR-037: Brain-Auditor-Worker Authority Matrix RBAC V1.0
 - ADR-040: Nervous System Architecture — AgentRoutingHealth detector integration
 
+
 ---
 
 ## adr-042: Hybrid Mode Architecture — Sprint + Task Dual Modes
 
 **Status:** proposed
+
+# ADR-042: Hybrid Mode Architecture — Sprint + Task Dual Modes
+
+**Status:** proposed
+
+**Date:** 2026-04-21
+
+**Sprint:** sprint-150
+
+---
 
 ## Status
 proposed (Sprint 150 — implementation in progress)
@@ -1920,6 +2450,7 @@ env DECKENT_STYLE=task (highest)
 - ADR-041: Agent Taxonomy — skill vs agent distinction (task mode reuses same pool)
 - Sprint 149 DIRECTIVES Block A — mode architecture implementation
 - Sprint 148 competitive analysis: OpenClaw life assistant mode comparison
+
 
 ---
 
@@ -2537,346 +3068,78 @@ test yapıldıktan sonra bu ADR production-validated olarak işaretlenir.
 
 **Date:** 2026-05-13
 
-**Sprint:** Sprint 166 (implementation contract — T1/T2/T3 fixes bu ADR'ın kontratına göre yazıldı)
+**Sprint:** Sprint 166
+
+> **Note:** The full architecture document is at
+> `docs/adr/046-brain-self-update-hook-architecture.md`. This file captures
+> the Sprint 169 bi-directional sync amendment.
 
 ---
 
-## Status
+## Amendment 2026-05-15 — Sprint 169 H1 (ADR-046 Reverse Hook)
 
-accepted (Sprint 166 — 4 root cause forensic + Sprint 154-165 arasında kırık self-update döngüsünün kapanması)
+**Date:** 2026-05-15
+**Author:** Alperen Sartaçoğlu
+**Sprint:** sprint-169
+**Decision reference:** DIRECTIVES.md Task 8 (H1 ADR DB→FS Export Pipeline)
 
----
+### Bi-Directional FS↔DB Sync Contract
 
-## Context
+ADR-046 originally established the **forward direction** (FS→DB) via
+`syncAdrFilesToDb()` in Sprint 166. This amendment adds the **reverse
+direction** (DB→FS) and formalizes the bi-directional contract:
 
-Sprint 154-165 boyunca Brain'in post-finalize self-update döngüsü **yarım çalıştı**: Brain her sprint sonunda
-dosyaları güncellediğini "sanıyordu" ama gerçekte dört kritik hook ya hiç tetiklenmiyordu ya da yanlış
-çalışıyordu. Sprint 166 forensic analizi dört root cause tespit etti:
+| Direction | Function | Location | Trigger |
+|-----------|----------|----------|---------|
+| Forward (FS→DB) | `syncAdrFilesToDb()` | `src/core/adr-file-sync.ts` | Post-finalize Step 3 |
+| Reverse (DB→FS) | `exportAdrsToFs()` | `src/core/memory-export.ts` | Manual / CI gate |
 
-### Bug M — ADR Insert Hook Eksikliği
+### Reverse Sync Rules
 
-`sprint-finalizer.ts:1197` çevresindeki `runPostFinalizeHooks` çağrısında `adrInsert` step yoktu.
-ADR-043, ADR-044, ADR-045 `docs/adr/` dizinine yazıldı; ancak `memory.db`'ye hiçbir zaman insert
-edilmedi. Brain ADR tabanlı kararlar alırken en güncel governance veriye erişemiyordu.
+1. **Manual edit wins** — if a file's mtime is newer than the DB `updated_at`,
+   the file is preserved unchanged (DB→FS write is skipped).
+2. **Idempotent** — re-running `exportAdrsToFs` with the same DB state produces
+   no changes (written=0, updated=0) when all files are up-to-date.
+3. **Missing fields** — DB entries with empty sprint, content, or date fields
+   render as `_To be backfilled_` placeholders.
+4. **MADR v3 passthrough** — if DB content already starts with a `#` header,
+   it is written as-is without further wrapping.
 
-**Kanıt:** `sqlite3 .brain/memory.db "SELECT COUNT(*) FROM entries WHERE type='adr'"` → Sprint 166
-öncesi `adr-042`'de duruyordu; `docs/adr/` dizininde 3 yeni ADR (043/044/045) mevcuttu.
+### Conflict Resolution
 
-### Bug N — Manuel Finalize Path'inde onRuleRegen Eksikliği
+| Condition | Winner | Action |
+|-----------|--------|--------|
+| File mtime > DB updated_at | File (manual edit) | Skip — no write |
+| File mtime ≤ DB updated_at | DB | Overwrite file |
+| File does not exist | DB | Create new file |
 
-`sprint-phases.ts:1238` ve `sprint-finalizer.ts:1197` Brain'in otomatik finalize path'ini doğru
-şekilde yönetiyordu; ancak `cli/commands/finalize.ts:166` içindeki `finalizeSprint(...)` çağrısında
-`onRuleRegen` parametresi yoktu. Sprint 152'den itibaren manuel finalize kullanılan tüm dönemlerde
-`.claude/rules/*.md` dosyaları 13 sprint boyunca stale kaldı.
+### CLI Wrapper
 
-**Kanıt:** `grep -n "onRuleRegen" src/cli/commands/finalize.ts` → Sprint 166 T2 öncesi 0 match.
+```bash
+node scripts/memory/export-adr-fs.mjs [--dry-run] [--db <path>] [--adr-dir <path>]
+```
 
-### Bug S — Cache Key Sprint-Agnostik Olduğundan Doc Sync Atlıyordu
+### Step Ordering (ADR-046 Section 5.1 unchanged)
 
-`src/orchestra/managed-docs/doc-cache.ts` cache key'i `fileHash + entryHash` olarak hesaplıyordu;
-sprint ID dahil değildi. Aynı dosya aynı sprint'te birden fazla kez finalize edildiğinde (veya farklı
-sprint'lerde içerik değişmediyse) cache hit oluyordu ve CLAUDE.md güncellenmiyordu. Sprint 152'den
-beri `cached_no_change` skip path aktifti.
+The reverse sync runs **outside** the post-finalize hook chain — it is a
+manual operator tool, not an automatic step. The Step Ordering Contract
+(Steps 1–13) defined in the architecture file is **unaffected** by this
+amendment.
 
-**Kanıt:** Sprint 130-151 working chain commit zinciri vs Sprint 152+ `cached_no_change` log analizi.
+### OSS GA Sprint 170 Anchor
 
-### Bug Y2 — Doc Sync Ground-Truth Eksikliği
-
-Sprint 164 commit `a4f3be4`'te koordinatör agent prompt'una "16 agent" yanlış inject edildi (gerçek: 15).
-5 anchor `.md` dosyası yanlış güncellendi. Doc sync agent'larının prompt'a inject ettiği sayım gerçek
-dosya sistemine karşılaştırılmıyordu.
-
-**Ortak Pattern:** 4 bug da aynı mimari eksiklikten kaynaklanıyordu — post-finalize hook chain'i
-**opsiyonel callback'ler** ve **partial wiring** ile tasarlanmıştı. Yeni step eklendiğinde veya mevcut
-step'in wire'ı eksik kaldığında sessizce atlanıyordu. Hiçbir hook **koşulsuz invocation** garantisi
-vermiyordu.
-
----
-
-## Decision
-
-Brain post-finalize hook chain için **Step Ordering Contract** zorunlu kılınır. Bu kontrat
-`src/core/identity-generator.ts → runPostFinalizeHooks()` implementasyonuna kodlanır ve bu ADR ile
-dokümante edilir.
-
-### Step Ordering Contract (Section 5.1)
-
-Post-finalize hook'lar aşağıdaki sırayla çalışır. Sıralama değiştirilemez — değişiklik bu ADR'ın
-amendment'ını gerektirir (ADR-036 mandatory).
-
-| Step | Adı             | Hedef                                      | Zorunluluk |
-|------|-----------------|--------------------------------------------|------------|
-| 1    | memoryExport    | `exports/*.md` regenerate                  | Koşulsuz   |
-| 2    | identityRegen   | `PROJECT-IDENTITY.md` update               | Deprecated (Sprint 168'de kaldırılır) |
-| 3    | adrInsert       | `docs/adr/*.md` → `memory.db` upsert       | Koşulsuz   |
-| 4    | ruleRegen       | `.claude/rules/*.md` regenerate            | Koşullu (callback mevcut ise) |
-
-**Step 3, Step 4'ten ÖNCE çalışmak ZORUNDADIR.** Sprint 166'da kabul edilen ADR-046 gibi yeni ADR'ler
-Step 3'te `memory.db`'ye insert edilir; Step 4'te regenerate edilen `.claude/rules/*.md` dosyaları
-bu insert'ten sonra çalışır. Sıralama ters olursa yeni ADR'ler kurallar güncellenmeden önce kayıt
-altına alınamaz.
-
-### Mimari Prensipler
-
-**1. Koşulsuz Invocation (Unconditional Invocation Pattern)**
-
-Her hook **her finalize döngüsünde** çalışır. Opsiyonel callback tasarımı yerine doğrudan çağrı kullanılır.
-`skipXxx` flag'leri sadece test izolasyonu ve acil devre-dışı bırakma senaryoları için mevcuttur;
-production deploy'da hiçbiri aktif olmamalıdır.
-
-**Rationale:** Bug M ve Bug N'nin ortak kökü optional wiring'di. `opts.onRuleRegen` callback yoksa
-Step 4 sessizce atlanıyordu. Koşulsuz pattern bu "sessiz atlanma" riskini ortadan kaldırır.
-
-**2. Cache Key Kompletliği (Complete Cache Key)**
-
-Managed-docs pipeline'ında her cache key şunları ZORUNLU olarak içerir:
-- `fileHash` — hedef dosya içerik hash'i
-- `entryHash` — generator entry config hash'i
-- `sprintId` — mevcut sprint identifier
-
-Eksik `sprintId` → cache hit → `cached_no_change` skip → doc sync sessizce atlanır.
-Bu Bug S'in tam tanımıdır.
-
-**3. Single Registration Target**
-
-Her hook sadece bir yerde registration point'e sahip olur:
-- **Brain otomatik path:** `sprint-finalizer.ts` → `runPostFinalizeHooks()`
-- **Manuel path:** `cli/commands/finalize.ts` → `finalizeSprint({ onRuleRegen: ... })`
-
-Her iki path da aynı `PostFinalizeHookOptions` interface'ini kullanır. Yeni hook eklendiğinde her iki
-path'e aynı anda eklenmek ZORUNDADIR (Bug N dersi: sadece bir path'e eklemek 13 sprint stale'e yol açar).
-
-**4. Ground-Truth Verification**
-
-Doc sync agent'ları (type='doc') inject edilen sayısal iddiayı (`N agents`, `M tools`) çalıştırma
-öncesi gerçek dosya sistemi ile doğrulamak ZORUNDADIR. Doğrulama whitelist:
-`.deckent/ground-truth-overrides.json`.
-
-### Step Ordering Contract Değişikliği Protokolü
-
-Step sıralamasını değiştirmek için:
-1. Bu ADR'ı supersede eden yeni ADR yazılır
-2. `runPostFinalizeHooks()` JSDoc bloğu güncellenir
-3. `tests/core/identity-generator-step-order.test.ts` regression test güncellenir
-4. Sprint finalize log'unda step execution order doğrulanır
-
----
-
-## Consequences
-
-### Olumlu
-
-- **ADR-043/044/045/046 memory.db'ye insert edildi.** Brain ADR-bazlı kararlar için artık güncel
-  governance veriye erişebilir. Sprint 166 sonrası query: `searchMemory(store, {type:['adr']})` doğru
-  döner.
-- **`.claude/rules/*.md` artık manuel finalize'da da güncellenir.** Bug N kapandı — 13 sprint stale
-  borcu bitti. Multi-provider sync (Bug Q) ile `.codex/rules/`, `.gemini/rules/`, `.cursor/rules/`
-  da aynı anda güncellenir.
-- **CLAUDE.md her sprint'te güncellenir.** Bug S kapandı — sprint-aware cache key ile her yeni sprint
-  cache miss üretir ve doc sync çalışır.
-- **Doc sync agent'ları inject öncesi ground-truth doğrular.** Bug Y2 kapandı — `ls | wc -l` vs
-  whitelist kontrolü ile yanlış sayım propagasyonu engellenir.
-- **Yeni hook eklenmesi için anchor.** Sprint 167-168 M1-M4 monitoring hook'ları (örn. token budget
-  tracker, stale_md detector) bu contract'a uygun olarak Step 5+ olarak eklenir. Her yeni step bu
-  ADR'ı referans alır.
-
-### Olumsuz
-
-- **Step 2 (identityRegen) deprecated yükü.** Sprint 168'e kadar kod'da kalır. `skipIdentityRegen`
-  flag'i olmayan caller'lar eski behavior'ı almaya devam eder. Migration: managed-docs zincirine devret.
-- **onRuleRegen opsiyonelliği korundu.** Step 4 hâlâ callback-conditional — ancak artık cli finalize
-  path'inde callback zorunlu geçiriliyor (Bug N fix). Test coverage bu bağlantıyı korur.
-- **Cache key migration backward-compat yükü.** Eski cache entry'leri `sprintId` içermiyor — ilk
-  sprint'te her entry cache miss yapar (beklenen davranış, bütçe etkisi minimal).
-
-### M1-M4 Monitoring Falsifiable Claims (Sprint 167-168)
-
-Bu ADR'ın kontrakt doğruluğu 4 ölçüm kanalı ile izlenir:
-
-| Kanal | Metrik | Beklenti (Sprint 167+) |
-|-------|--------|------------------------|
-| M1    | `memory.db SELECT COUNT(*) WHERE type='adr'` | Her yeni ADR dosyası → +1 entry |
-| M2    | `ls .claude/rules/*.md` mtime | Her finalize → mtime güncellenir |
-| M3    | `grep "sprint-NNN" CLAUDE.md` | Her sprint → yeni sprint ID'si CLAUDE.md'de |
-| M4    | `stale_md detector emitAlert` | CLAUDE.md mtime > 70min ise alarm |
-
-Sprint 167'de dependency_pipeline_enabled flip + M1-M4 baseline tracking ile bu claim'ler
-ilk kez ölçülebilir hale gelir.
-
-### Sprint 170 Refactor Trigger
-
-Aşağıdaki koşullardan biri gerçekleşirse Sprint 170'te hook chain refactor tetiklenir:
-
-1. Step sayısı 6'yı geçerse (yeni M1-M4 monitoring hook'ları + billing hook + event emit)
-2. `runPostFinalizeHooks()` LoC > 150 olursa (şu an ~85 LoC)
-3. Step 2 (identityRegen deprecated) Sprint 168'den geçerse ve hâlâ kodda ise
-
-Refactor hedefi: hook chain'i `PostFinalizeStepRegistry` pattern'ına taşımak
-(ADR-026 God Object Split Stratejisi prensipleri ile).
-
----
-
-## Alternatives Considered
-
-### (a) Optional Callback Pattern Korunur
-
-Mevcut `onRuleRegen?: callback` tasarımı korunur, eksik wire'lar tek tek patch edilir.
-
-**Neden reddedildi:** Bu yaklaşım Bug N'yi tekil olarak fix eder ama pattern'ı korur. Her yeni hook
-için aynı wiring hatası tekrarlanabilir. Sprint 166 forensic'i 4 bağımsız wiring hatasını aynı anda
-ortaya koydu — pattern değişikliği gerekli.
-
-### (b) Event-Driven Hook Dispatch
-
-`EventEmitter` pattern: `finalizeEmitter.emit('post-finalize', opts)`. Hook'lar listener olarak kayıt
-olur. Execution order belirsiz.
-
-**Neden reddedildi:** Step ordering contract ile çelişir. EventEmitter sıralaması listener registration
-sırasına bağlıdır — `once()` vs `on()` race condition riski. Explicit step ordering okunabilirliği ve
-test edilebilirliği daha yüksek; 4 step için EventEmitter overhead gereksiz karmaşıklık.
-
-### (c) Database-Only Hook Registration
-
-Tüm hook'lar `memory.db`'ye kayıt olur; finalize döngüsü DB'yi okuyarak hangi hook'ların çalışacağını
-belirler.
-
-**Neden reddedildi:** Finalize döngüsünün DB'ye bağımlılığını artırır. DB yoksa veya kilitliyse
-hiçbir hook çalışmaz. Mevcut in-process step chain daha güvenilir; DB sadece persistence layer
-olarak kalmalı (ADR-008 Brain merkezi import prensibi).
+This amendment is a prerequisite for the Sprint 170 OSS GA (`VerhexIO/deckent`
+public flip). The CI gate (`scripts/memory/export-adr-fs.mjs --dry-run`) must
+report `written=0` before the public flip proceeds.
 
 ---
 
 ## References
 
-1. **Sprint 154-165 forensic analizi** — 4 root cause (M, N, S, Y2) tespiti
-2. **Sprint 166 T1** — `src/core/adr-file-sync.ts` + `identity-generator.ts` Step 3 wire (Bug M fix)
-3. **Sprint 166 T2** — `cli/commands/finalize.ts:166` onRuleRegen wire (Bug N fix)
-4. **Sprint 166 T3** — `doc-cache.ts` sprint-aware cache key (Bug S fix)
-5. **Sprint 166 T4** — Ground-truth verification 3-layer defense (Bug Y2 fix)
-6. **ADR-036** — ADR Governance Integration — mandatory read; bu ADR ADR-036 disiplinine uygun
-7. **ADR-037** — Brain-Auditor-Worker Authority Matrix — hook chain RBAC sınırlarını ihlal etmez
-8. **ADR-026** — God Object Split Stratejisi — Sprint 170 refactor trigger referansı
-9. **ADR-031** — Content Hash Cache — Bug S root cause (sprint ID eksik cache key)
-
----
-
-## Memory DB Insert Pattern
-
-Bu ADR'ın `memory.db`'ye insert edilmesi `syncAdrFilesToDb()` aracılığıyla otomatik gerçekleşir
-(Sprint 166 T1 — Bug M fix). Alperen'in `npx deckent memory rebuild` çalıştırmasının ardından:
-
-```typescript
-// adr-file-sync.ts syncAdrFilesToDb() output (expected):
-{
-  inserted: 1,   // adr-046 (yeni)
-  updated: 3,    // adr-043, adr-044, adr-045 (eksik idiler)
-  skipped: 42,   // mevcut ve değişmemiş ADR'lar
-  errors: [],
-  ids: ['adr-046', 'adr-043', 'adr-044', 'adr-045'],
-}
-```
-
-Doğrulama: `sqlite3 .brain/memory.db "SELECT id FROM entries WHERE id='adr-046'"` → 1 row.
-
----
-
-## Notes
-
-Bu ADR, Sprint 154-165 boyunca birikmiş "Brain self-update yarım çalışıyor" borcunun resmi
-kapanış belgesidir. T1-T3 fix'leri bu ADR'ın Step Ordering Contract'ına uygun yazıldı; test
-coverage (`tests/core/identity-generator-step-order.test.ts`) kontratı kalıcı kılar.
-
-Sprint 167-168 için M1-M4 monitoring baseline ve Sprint 170 refactor trigger bu ADR'a
-kodlanmıştır — gelecek sprint'ler bu kararı referans alarak genişletebilir.
-
----
-
-## Amendment — Sprint 168 C0a-4 (BUG-CC fix)
-
-**Date:** 2026-05-14
-**Author:** Alperen Sartaçoğlu
-**Sprint:** sprint-168
-**Cluster:** A.4 (BUG-CC closure)
-**Decision reference:** `.deckent/sprint-168-archive-decision.txt` (Alperen Pre-Flight Step 16 — Option B)
-
-### Step 12 Default Behavior Flip — `archiveDirectives`
-
-Bu amendment, ADR-046 Step Ordering Contract'ın **Step 12 (archiveDirectives)** adımında
-default davranışı değiştirir. Step sırası, idempotency garantileri ve diğer kontrat
-maddeleri **aynen geçerli** kalır.
-
-#### Önceki (Sprint 138–167 davranışı)
-
-```ts
-// finalizeSprint Step 12 (legacy)
-const autoArchive = rawCfg?.['auto_archive_directives'] ?? true;  // default TRUE
-if (autoArchive) archiveDirectives(projectRoot, sprint.id, 'CLEANUP');
-```
-
-- Sprint finalize'da `DIRECTIVES.md` her zaman placeholder ile **overwrite** edilirdi.
-- Archive copy yazılırdı (`.brain/archive/DIRECTIVES-sprint-NNN.md`).
-- Mid-sprint yanlış invocation veya yan etki → DIRECTIVES.md kaybı = sprint context kaybı.
-
-#### Yeni (Sprint 168+ davranışı)
-
-```ts
-// finalizeSprint Step 12 (Sprint 168 C0a-4)
-const autoArchive = rawCfg?.['auto_archive_directives'] ?? false;  // default FALSE
-archiveDirectives(projectRoot, sprint.id, 'CLEANUP', { autoArchive: autoArchive === true });
-```
-
-```ts
-// archiveDirectives implementation (Sprint 168 C0a-4)
-export interface ArchiveDirectivesOptions {
-  autoArchive?: boolean;  // default false — PRESERVE working DIRECTIVES.md
-}
-
-export function archiveDirectives(
-  projectRoot: string,
-  sprintId: string,
-  phase?: string,
-  options: ArchiveDirectivesOptions = {},
-): void { /* ... */ }
-```
-
-- **Default:** `DIRECTIVES.md` **KORUNUR** (preserve). Archive copy her zaman yazılır.
-- **Opt-in:** `auto_archive_directives: true` → eski legacy davranış
-  (placeholder overwrite). Resmi `deckent` orchestrator için açık opt-in gerekir.
-
-#### Gerekçe
-
-Sprint 167 BUG-CC live evidence (Phase 1+2 forensic — `.audit/sprint-167/T5-brain-debug-phase1.md`,
-`phase2.md` Cluster A.4):
-- DIRECTIVES.md placeholder ile overwrite olduktan sonra, **mevcut sprint context'i kayboldu**.
-- Recovery için `emergencyRestoreDirectives` reaktif workaround gerekti — ancak orijinal
-  içerik (description, kanıt blokları, custom directives) tam restore edilemedi.
-- Conservative "preserve by default" davranışı, kayıp riskini sıfıra indirir; archive copy
-  yine de audit trail için garanti.
-
-#### Test Invariant
-
-Default preserve davranışı kalıcı test ile garanti altına alındı:
-
-```
-tests/orchestra/archive-directives-default-preserve.test.ts
-  ✓ preserves DIRECTIVES.md by default (auto_archive_directives=false)
-  ✓ overwrites DIRECTIVES.md when autoArchive=true (opt-in legacy)
-  ✓ skips silently when DIRECTIVES.md does not exist
-  ✓ phase guard still rejects non-CLEANUP/COMPLETE phases (default preserve)
-```
-
-#### Backward Compatibility
-
-Mevcut konfigürasyonlar:
-- `auto_archive_directives` config flag'i tanımlı **değilse** → yeni default (false, preserve).
-- `auto_archive_directives: true` ayarlı projeler → legacy davranış aynen devam eder.
-- `auto_archive_directives: false` ayarlı projeler → davranış değişmez (zaten preserve).
-
-#### Step Ordering Contract — Değişmedi
-
-ADR-046'nın orijinal Step Ordering Contract maddeleri (Step 1–13 sırası, idempotency,
-dual-write garantileri) bu amendment'tan **etkilenmez**. Sadece Step 12'nin "side-effect
-default'u" değiştirildi; sıra ve hook architecture aynen geçerli.
+1. **Sprint 166 T1** — `src/core/adr-file-sync.ts` forward sync implementation (Bug M fix)
+2. **Sprint 169 H1** — `src/core/memory-export.ts` reverse sync implementation
+3. **ADR-046 architecture** — `docs/adr/046-brain-self-update-hook-architecture.md`
+4. **ADR-036** — ADR Governance Integration (mandatory amendment protocol)
 
 
 ---

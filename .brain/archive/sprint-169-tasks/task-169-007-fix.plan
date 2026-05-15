@@ -1,0 +1,34 @@
+# Task 169-007-fix Execution Plan
+
+## Baseline State
+- `src/core/memory-import.ts` — backupRelations, restoreRelations, rebuildWithRelationSafety fonksiyonları YOK
+- `tests/core/memory-rebuild-safety.test.ts` — test dosyası mevcut, bu 3 fonksiyonu import ediyor
+- `src/core/memory-store.ts` — getRawDb(), countRelations(), insertRelation() PUBLIC methodları var
+
+## What Must Change
+
+### src/core/memory-import.ts
+1. Import `EntryRelation` from `./memory-types.js` (zaten `CreateEntryInput` import edilmiş)
+2. Add `backupRelations(store)`:
+   - `store.getRawDb()` ile raw DB al
+   - `SELECT * FROM relations` → EntryRelation[]
+3. Add `restoreRelations(store, backup)`:
+   - Her relation için from_id + to_id entries'de var mı kontrol et
+   - INSERT OR IGNORE — idempotent
+   - { restored, skipped } döndür
+4. Add `rebuildWithRelationSafety(store, importFn, options)`:
+   - Önce `backupRelations` ile snapshot al (transaction dışında)
+   - `db.transaction()` içinde: importFn() → restoreRelations() → countRelations()
+   - strict && postCount < preCount → throw DeckentError('DECKENT_MEMORY_RELATION_LOSS', 'pre=X post=Y')
+   - better-sqlite3 transaction otomatik rollback yapar hata durumunda
+
+## Test Expectations (from test file)
+- backupRelations: tüm relations döner, empty → []
+- restoreRelations: idempotent (INSERT OR IGNORE), orphan skip (from/to eksik → skip)
+- rebuildWithRelationSafety preserve: pre=post=2, backed=2, restored=2, skipped=0
+- rebuildWithRelationSafety strict throw: DeckentError code='DECKENT_MEMORY_RELATION_LOSS', message matches /pre=2/ /post=1/, DB rollback
+- rebuildWithRelationSafety non-strict loss: pre=2, post=1, restored=1, skipped=1, entry 'c' stays deleted
+
+## Files to Change
+- src/core/memory-import.ts (add 3 exports)
+- tests/core/memory-rebuild-safety.test.ts (already correct — NO CHANGES)

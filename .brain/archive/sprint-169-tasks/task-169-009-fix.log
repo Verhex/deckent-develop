@@ -1,0 +1,11 @@
+Task 169-009-fix tamamlandı. Özet:
+
+**Tamamlananlar:**
+- `src/core/config.ts` — İki comment bloğuna Sprint 169 H5 GA anchor + ADR-045 referansı + rollback path eklendi (semantic değişiklik yok — `true` Sprint 156'dan beri default)
+- `.contracts/api-surface.md` — Sprint Phases bölümüne WAVE_BUILD adımı (2a) eklendi, ADR-045 ve Kahn topological wave scheduling dokümante edildi
+- `tests/core/config-dep-pipeline-default.test.ts` — Önceki worker tarafından yazılmış, 3/3 test geçiyor ✓
+
+**GO_WITH_TECH_DEBT (cosmetic):**
+- `DECKENT.md` ve `CLAUDE.md` — "Sprint 167 flip" satırları güncellenmedi; bu dosyalar strict `filesWrite` kapsamı dışında. İşlevsel bir etki yok.
+
+**Doğrulama:** `tsc --noEmit` 0 hata, `vitest run` 16494 geçti — 4 başarısız test bu task'tan önceki Sprint 169 C1/H2 task'larından kaynaklı (pre-existing).

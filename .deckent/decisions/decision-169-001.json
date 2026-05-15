@@ -1,0 +1,76 @@
+{
+  "taskId": "169-001",
+  "sprintId": "sprint-169",
+  "steps": [
+    {
+      "step": 2,
+      "name": "routing-step-2",
+      "input": {
+        "taskId": "169-001",
+        "title": "W3.1 C0c Collision Detection Live Trigger Investigation + Fix",
+        "scope": [
+          "src/orchestra/",
+          "tests/orchestra/",
+          ".audit/sprint-169/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "bug-fixer",
+        "skills": [
+          "typescript-expert"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Agent forced by override: bug-fixer"
+    },
+    {
+      "step": 3,
+      "name": "routing-step-3",
+      "input": {
+        "taskId": "169-001",
+        "title": "W3.1 C0c Collision Detection Live Trigger Investigation + Fix",
+        "scope": [
+          "src/orchestra/",
+          "tests/orchestra/",
+          ".audit/sprint-169/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "bug-fixer",
+        "skills": [
+          "typescript-expert"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Skill budget: max 2 (medium task, 2 module(s), effort=normal)"
+    },
+    {
+      "step": 4,
+      "name": "routing-step-4",
+      "input": {
+        "taskId": "169-001",
+        "title": "W3.1 C0c Collision Detection Live Trigger Investigation + Fix",
+        "scope": [
+          "src/orchestra/",
+          "tests/orchestra/",
+          ".audit/sprint-169/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "bug-fixer",
+        "skills": [
+          "typescript-expert"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Skills forced by override: [typescript-expert]"
+    }
+  ],
+  "decidedAt": "2026-05-14T21:54:58.989Z"
+}

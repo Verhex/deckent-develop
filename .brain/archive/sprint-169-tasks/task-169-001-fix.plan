@@ -1,0 +1,38 @@
+# Task 169-001-fix Execution Plan
+
+## Root Cause (W3.1 RC-C)
+`detectScopeCollisions` in `conflict-resolver.ts:180` uses only `file.trim()` for normalization.
+Path equivalence variants (`./src/foo.ts` vs `src/foo.ts`, double slashes, trailing slash)
+bypass the >=2 writer threshold → colliding tasks spawn silently.
+
+## Fix Strategy
+
+### Step 1: Add `normalizeScopeFiles` to sprint-spawner.ts
+- Location: after `buildAllowedWriteTargets` (~line 186)
+- Pure helper: no IO, no rejection logic (simpler than normalizeScopePath)
+- Normalizations:
+  1. Trim whitespace, skip empty/whitespace-only
+  2. Strip leading `./`
+  3. Collapse repeated `/` via regex
+  4. Strip trailing `/`
+- Accept `readonly string[]`, return `string[]`
+- Export so tests can import it directly
+
+### Step 2: Wire normalizeScopeFiles into spawnWorkers
+- Location: ~line 216-217 (before detectScopeCollisions call)
+- Map pendingTasks → normalizedPendingTasks with filesWrite normalized
+- Pass normalizedPendingTasks to detectScopeCollisions
+- Collision map keys are now canonical → emitted events contain canonical paths
+
+### Step 3: Verify tests pass
+- `normalizeScopeFiles` unit tests (7 cases) in c0c-collision-live-fire.test.ts
+- `detectScopeCollisions via normalizeScopeFiles pre-pass` integration tests (3 cases)
+- `spawnWorkers C0c live wire` integration test (1 case with SPAWN_BLOCKED event check)
+
+## Files Changed
+- src/orchestra/sprint-spawner.ts (add function + wire)
+- tests/orchestra/c0c-collision-live-fire.test.ts (already exists with correct tests)
+
+## Expected Outcome
+- tsc --noEmit: 0 errors
+- vitest: all 3+7 collision tests PASS

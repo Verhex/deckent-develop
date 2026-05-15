@@ -1,0 +1,53 @@
+{
+  "id": "169-001-fix-fix",
+  "title": "Fix: Fix: W3.1 C0c Collision Detection Live Trigger Investigation + Fix",
+  "description": "Priority fix for NO_GO task 169-001-fix.\nOriginal worker notes: W3.1 RC-C fix implemented. Added `normalizeScopeFiles(files: readonly string[]): string[]` to sprint-spawner.ts (~line 188) — pure exported helper that strips leading `./`, collapses repeated `/`, and strips trailing `/`. Wired into `spawnWorkers` as a pre-pass before `detectScopeCollisions`: `normalizedPendingTasks = pendingTasks.map(t => ({...t, scope: {...t.scope, filesWrite: normalizeScopeFiles(t.scope.filesWrite)}}))`. decision-engine.ts required no changes (handleScopeCollision already cor\nRubric: correctness=100, test_coverage=100, scope_compliance=100\nExpected scope: src/orchestra/, tests/orchestra/, .audit/sprint-169/\nFiles that should change: src/orchestra/sprint-spawner.ts, src/orchestra/decision-engine.ts, tests/orchestra/c0c-collision-live-fire.test.ts, 1-root-cause.md, W3.1-root-cause.md",
+  "model": "haiku",
+  "forceModel": "haiku",
+  "effort": "normal",
+  "priority": "CRITICAL",
+  "reason": "Task 169-001-fix evaluated as NO_GO; correctness=100; test_coverage=100; scope_compliance=100",
+  "scope": {
+    "directories": [
+      "src/orchestra/",
+      "tests/orchestra/",
+      ".audit/sprint-169/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/orchestra/sprint-spawner.ts",
+      "src/orchestra/decision-engine.ts",
+      "tests/orchestra/c0c-collision-live-fire.test.ts",
+      "1-root-cause.md",
+      "W3.1-root-cause.md"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** `grep \"normalizeScopeFiles\\|detectScopeCollisions\" src/orchestra/sprint-spawner.ts` 2+ match. RC docu mevcut.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "PENDING",
+  "sprintId": "sprint-169",
+  "isPriorityFix": true,
+  "fixForTaskId": "169-001-fix",
+  "assignedAgent": "bug-fixer",
+  "forceAgent": "bug-fixer",
+  "assignedSkills": [
+    "typescript-expert"
+  ],
+  "forceSkills": [
+    "typescript-expert"
+  ],
+  "createdAt": "2026-05-14T22:43:37.351Z",
+  "rotationStrategy": {
+    "enabled": true,
+    "originalModel": "sonnet",
+    "rotatedModel": "haiku",
+    "originalAgent": "code-reviewer",
+    "rotatedAgent": "bug-fixer",
+    "addedSkills": [],
+    "rationale": "Fresh-eyes rotation: sonnet→haiku, code-reviewer→bug-fixer"
+  }
+}

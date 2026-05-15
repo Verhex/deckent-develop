@@ -1,0 +1,17 @@
+Task 169-008-fix tamamlandı.
+
+**Özet:**
+
+**Root Cause:** Orijinal task 169-008'de `exportAdrsToFs` fonksiyonu `memory-export.ts`'e yazılmamıştı (veya kaybolmuştu). Ayrıca `scope.filesWrite`'da belirtilen `docs/adr/046-brain-self-update-hook.md` yerine `046-brain-self-update-hook-architecture.md` güncellenmiş, bu da scope_compliance = 70'e neden olmuştu.
+
+**Fix:**
+1. **`src/core/memory-export.ts`**: `exportAdrsToFs()` fonksiyonu eklendi — DB→FS reverse sync, mtime-based idempotency, MADR v3 wrapper, `_To be backfilled_` placeholder'ları
+2. **`docs/adr/046-brain-self-update-hook.md`**: Scope.filesWrite'da belirtilen doğru dosya adıyla oluşturuldu, "Amendment 2026-05-15" markeri içeriyor
+
+**Verifications:**
+- `tsc --noEmit`: CLEAN
+- `tests/core/adr-fs-export.test.ts`: 3/3 PASS
+- `tests/core/memory-export.test.ts`: 25/25 PASS
+- `docs/adr/*.md` count: 52 (≥43 ✓)
+- `grep "Amendment 2026-05-15"`: 1 match ✓
+- Scope: sadece `scope.filesWrite` dosyaları dokunuldu ✓

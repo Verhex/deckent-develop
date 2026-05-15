@@ -1,0 +1,10 @@
+Task 169-007 (C2 Bug Z3 Memory Rebuild Safety) tamamlandı — `DONE`.
+
+**Özet:**
+- `src/core/memory-import.ts`: 3 yeni export — `backupRelations`, `restoreRelations` (FK-safe orphan skip), `rebuildWithRelationSafety` (better-sqlite3 transaction wrapper, strict mode'da `DECKENT_MEMORY_RELATION_LOSS` throw + otomatik rollback).
+- `tests/core/memory-rebuild-safety.test.ts`: 7 yeni test (2 backup + 2 restore + 1 preserve happy-path + 2 verify-fail strict/non-strict), tümü pass.
+- `tsc --noEmit`: temiz.
+- `npx vitest run`: 16486 pass / 1 fail (scope dışı pre-existing `tests/monitor/alert-emitter.test.ts`) / 66 skip — DIRECTIVES baseline gate (fail ≤2) korunuyor.
+- Her iki Kanıt clause doğrulandı: preserve testte count eşit (2=2), strict mode rollback testi `DeckentError` fırlatıp orijinal state'i geri yüklüyor.
+- 169-003 bağımlılığı blocking değildi: relations API (insertRelation/countRelations/getRawDb) zaten `MemoryStore`'da mevcut; safety wrapper sadece bu mevcut yüzeye dayanıyor.
+- CLI wiring (`memory rebuild` komutu) bilinçli olarak scope dışı — sonraki task'a kalıyor.

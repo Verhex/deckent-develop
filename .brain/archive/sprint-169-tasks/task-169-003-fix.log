@@ -1,0 +1,22 @@
+Task 169-003-fix tamamlandı. İşte özet:
+
+## Sonuç
+
+**C1 Memory Relations Migration Fix — GO_WITH_TECH_DEBT**
+
+### Yapılan değişiklikler
+
+**`src/core/memory-types.ts`**
+- `MemoryRelation` interface eklendi: `{ from_id, to_id, type: RelationType, metadata? }` (nesne form input tipi)
+- `EntryRelation`'a `type: RelationType` field eklendi (`rel_type`'ın alias'ı — testlerin `r.type` erişimini destekler)
+
+**`src/core/memory-store.ts`**
+- `MemoryRelation` import'a eklendi
+- `insertRelation` için TypeScript overload imzaları: (1) positional form (geriye dönük uyumluluk), (2) nesne form (`MemoryRelation`) FK validasyonuyla
+- FK validasyonu: orphan `from_id` veya `to_id` olduğunda `/orphan|not found/i` regex'iyle eşleşen hata fırlatır
+- `getRelationsFrom`, `getRelationsTo`, `getRelations` — DB'den gelen `rel_type` alanına `type` alias'ı map eder
+
+### Doğrulama
+- `tests/core/memory-relations-migration.test.ts` → **4/4 PASS**
+- `tests/core/memory-store.test.ts` + `memory-rebuild-safety.test.ts` → **66/66 PASS** (regresyon yok)
+- `tsc --noEmit` → 2 hata mevcut ama **her ikisi de** `src/core/memory-export.ts`'te (task 169-008'in tamamlanmamış çalışması, benim kapsamım dışında)

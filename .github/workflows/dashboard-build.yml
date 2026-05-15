@@ -1,0 +1,117 @@
+name: Dashboard Build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/dashboard/**'
+      - 'tests/dashboard/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/dashboard-build.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/dashboard/**'
+      - 'tests/dashboard/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/dashboard-build.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dashboard-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build dashboard (Node ${{ matrix.node-version }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [18.x, 20.x, 22.x]
+    env:
+      ARTIFACT_SIZE_LIMIT_BYTES: 5242880
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Install dashboard dependencies
+        run: npm install --prefix src/dashboard --ignore-scripts
+
+      - name: Build dashboard
+        run: npm run build:dashboard
+
+      - name: Verify dashboard output
+        run: |
+          test -d dist/dashboard
+          test -f dist/dashboard/index.html
+          test -s dist/dashboard/index.html
+
+      - name: Check artifact size (max 5MB)
+        run: |
+          SIZE=$(du -sb dist/dashboard | awk '{print $1}')
+          LIMIT=${ARTIFACT_SIZE_LIMIT_BYTES}
+          echo "Dashboard artifact size: ${SIZE} bytes (limit: ${LIMIT} bytes)"
+          if [ "${SIZE}" -gt "${LIMIT}" ]; then
+            echo "::error::Dashboard artifact size ${SIZE} bytes exceeds limit ${LIMIT} bytes (5MB)"
+            exit 1
+          fi
+
+      - name: Run dashboard build smoke tests
+        env:
+          CI: 'true'
+        run: npx vitest run tests/dashboard/dashboard-build-smoke.test.ts --config vitest.dashboard.config.ts
+
+      - name: Upload dashboard artifact
+        if: matrix.node-version == '22.x'
+        uses: actions/upload-artifact@v4
+        with:
+          name: dashboard-dist
+          path: dist/dashboard/
+          retention-days: 7
+          if-no-files-found: error
+
+  build-all-integration:
+    name: Full build:all integration (Node 22.x)
+    runs-on: ubuntu-latest
+    needs: build
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+          cache: npm
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Install dashboard dependencies
+        run: npm install --prefix src/dashboard --ignore-scripts
+
+      - name: Run full build pipeline (build:all)
+        run: npm run build:all
+
+      - name: Verify combined dist
+        run: |
+          test -f dist/cli/entry.js
+          test -f dist/mcp/server.js
+          test -f dist/index.js
+          test -f dist/dashboard/index.html

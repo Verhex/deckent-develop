@@ -4482,3 +4482,79 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 168-003: T3 Kill Recovery Simulation (DEPENDS T1) (NO_GO)
 
 ---
+## Sprint 169 — sprint-169
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-05-14
+**Duration:** 2918s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 18 |
+| Completed | 4 |
+| Tech Debt | 0 |
+| No-Go | 14 |
+| Coverage | NaN% |
+| Duration | 2918363ms |
+
+### Tasks
+
+- 169-001: W3.1 C0c Collision Detection Live Trigger Investigation + Fix (NO_GO)
+- 169-002: W3.2 Smoke Directive Dependency Parser Fix (NO_GO)
+- 169-003: C1 Memory Relations Migration (NO_GO)
+- 169-004: H2 Stub Memory Entries Backfill (NO_GO)
+- 169-005: H3 OSS Pre-Flip Secret Scan Baseline (NO_GO)
+- 169-006: H4 Dashboard Build CI Gate (NO_GO)
+- 169-007: C2 Bug Z3 Memory Rebuild Safety (DONE)
+- 169-008: H1 ADR DB→FS Export Pipeline + ADR-046 Reverse Hook (NO_GO)
+- 169-009: H5 dep_pipeline_enabled Flip + 3-Layer Doc Fix (DONE)
+
+---
+## Sprint 169 — sprint-169
+
+**Status:** COMPLETE
+**Date:** 2026-05-14
+**Duration:** 0s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 25 |
+| Completed | 24 |
+| Tech Debt | 12 |
+| No-Go | 1 |
+| Coverage | NaN% |
+| Duration | 0ms |
+
+### Tasks
+
+- 169-001-fix-fix: Fix: Fix: W3.1 C0c Collision Detection Live Trigger Investigation + Fix (DONE)
+- 169-001-fix: Fix: W3.1 C0c Collision Detection Live Trigger Investigation + Fix (GO_WITH_TECH_DEBT)
+- 169-001: W3.1 C0c Collision Detection Live Trigger Investigation + Fix (NO_GO)
+- 169-002-fix-fix: Fix: Fix: W3.2 Smoke Directive Dependency Parser Fix (DONE)
+- 169-002-fix: Fix: W3.2 Smoke Directive Dependency Parser Fix (GO_WITH_TECH_DEBT)
+- 169-002: W3.2 Smoke Directive Dependency Parser Fix (GO_WITH_TECH_DEBT)
+- 169-003-fix-fix: Fix: Fix: C1 Memory Relations Migration (DONE)
+- 169-003-fix: Fix: C1 Memory Relations Migration (GO_WITH_TECH_DEBT)
+- 169-003: C1 Memory Relations Migration (GO_WITH_TECH_DEBT)
+- 169-004-fix-fix: Fix: Fix: H2 Stub Memory Entries Backfill (DONE)
+- 169-004-fix: Fix: H2 Stub Memory Entries Backfill (DONE)
+- 169-004: H2 Stub Memory Entries Backfill (DONE)
+- 169-005-fix-fix: Fix: Fix: H3 OSS Pre-Flip Secret Scan Baseline (DONE)
+- 169-005-fix: Fix: H3 OSS Pre-Flip Secret Scan Baseline (DONE)
+- 169-005: H3 OSS Pre-Flip Secret Scan Baseline (DONE)
+- 169-006-fix-fix: Fix: Fix: H4 Dashboard Build CI Gate (DONE)
+- 169-006-fix: Fix: H4 Dashboard Build CI Gate (GO_WITH_TECH_DEBT)
+- 169-006: H4 Dashboard Build CI Gate (GO_WITH_TECH_DEBT)
+- 169-007-fix: Fix: C2 Bug Z3 Memory Rebuild Safety (DONE)
+- 169-007: C2 Bug Z3 Memory Rebuild Safety (GO_WITH_TECH_DEBT)
+- 169-008-fix-fix: Fix: Fix: H1 ADR DB→FS Export Pipeline + ADR-046 Reverse Hook (DONE)
+- 169-008-fix: Fix: H1 ADR DB→FS Export Pipeline + ADR-046 Reverse Hook (GO_WITH_TECH_DEBT)
+- 169-008: H1 ADR DB→FS Export Pipeline + ADR-046 Reverse Hook (GO_WITH_TECH_DEBT)
+- 169-009-fix: Fix: H5 dep_pipeline_enabled Flip + 3-Layer Doc Fix (GO_WITH_TECH_DEBT)
+- 169-009: H5 dep_pipeline_enabled Flip + 3-Layer Doc Fix (GO_WITH_TECH_DEBT)
+
+---

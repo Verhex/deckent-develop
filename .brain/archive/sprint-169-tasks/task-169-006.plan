@@ -1,0 +1,53 @@
+# Task 169-006 Execution Plan — H4 Dashboard Build CI Gate
+
+## Baseline
+- `package.json` zaten `build:dashboard` + `build:all` script'lerini içeriyor (line 25-26).
+  - `build:dashboard`: `cd src/dashboard && npx vite build --outDir ../../dist/dashboard`
+  - `build:all`: `tsc && node scripts/copy-assets.mjs && npm run build:dashboard`
+- `src/dashboard/vite.config.ts` mevcut (React + Vite + Tailwind).
+- `src/dashboard/package.json` "build" script: `tsc -b && vite build`.
+- `.github/workflows/ci.yml` `test-dashboard` ve `build` job içeriyor (`test:dashboard` Vitest + `npm run build` postbuild ile dashboard'u tetikler).
+- Bağımsız `dashboard-build.yml` workflow YOK — Task 6 bunu ekliyor.
+- `tests/dashboard/dashboard-build-smoke.test.ts` YOK — Task 6 bunu ekliyor.
+
+## Approach
+
+### 1. tests/dashboard/dashboard-build-smoke.test.ts (TDD — failing→pass)
+3 deterministik test:
+  1. **scripts defined**: `package.json` `build:dashboard` ve `build:all` script'lerinin varlığı + komut imzaları (vite build içeriyor + tsc içeriyor).
+  2. **vite config exists**: `src/dashboard/vite.config.ts` mevcut + `@vitejs/plugin-react` ve `@tailwindcss/vite` import ediyor (React + Tailwind toolchain kanıtı).
+  3. **build produces dist (CI-only)**: `process.env.CI === 'true'` koşullu — `dist/dashboard/` mevcut + `index.html` üretildi + boyut > 0. Local'de `it.skipIf(!CI)` ile atlanır (full build sırasında CI'da çalışır, dev'de gerek yok).
+
+### 2. .github/workflows/dashboard-build.yml
+Workflow yapısı:
+- **Trigger**: `push` (main) + `pull_request` (main) + path filter (`src/dashboard/**`, `tests/dashboard/**`, `package.json`, bu workflow dosyası).
+- **Concurrency**: aynı ref için in-progress run iptal.
+- **Permissions**: explicit `contents: read` (default güvensiz).
+- **Job: build (matrix)**:
+  - Matrix: `node-version: [18.x, 20.x, 22.x]`, `fail-fast: false`.
+  - `actions/checkout@v4` (mevcut workflow ile tutarlı).
+  - `actions/setup-node@v4` + npm cache.
+  - `npm ci` (root deps).
+  - `npm install --prefix src/dashboard --ignore-scripts` (dashboard sub-package).
+  - `npm run build:dashboard`.
+  - Verify `dist/dashboard/index.html` mevcut.
+  - Artifact size threshold (5MB max): `du -sb dist/dashboard | awk '{if($1>5242880) exit 1}'` (fail on overflow).
+  - Smoke test run: `npx vitest run tests/dashboard/dashboard-build-smoke.test.ts --config vitest.dashboard.config.ts` (CI=true env ile).
+  - Upload artifact (Node 22.x only, retention 7 days) — dashboard-dist görsel inceleme için.
+- **Job: build-all-integration** (sadece Node 22.x):
+  - `npm run build:all` çağır — full pipeline kanıtı.
+
+## Files to Modify
+- ✏️ NEW: `.github/workflows/dashboard-build.yml`
+- ✏️ NEW: `tests/dashboard/dashboard-build-smoke.test.ts`
+
+`package.json` zaten ihtiyaç duyulan script'leri içerdiğinden değişiklik gerekmiyor. Kanıt grep'i: `grep "build:dashboard\|build:all" package.json` → 4 match (2 occurrence × 2 satır = mevcut).
+
+## Verify Gates
+- `npx tsc --noEmit` — TS hatası 0.
+- `npx vitest run tests/dashboard/dashboard-build-smoke.test.ts --config vitest.dashboard.config.ts` — 3 test PASS (CI olmayan ortamda 2 PASS + 1 SKIP kabul).
+
+## Self-Assessment Hedef
+- DONE: workflow + smoke test eklenir, tsc clean, smoke test'ler geçer, scope dışına çıkılmaz.
+- GO_WITH_TECH_DEBT: smoke test "CI-only" testi CI dışında çalışmadığında belirtilir (planlı tasarım).
+- NO_GO: TS hatası veya scope ihlali.

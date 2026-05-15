@@ -1,0 +1,52 @@
+{
+  "id": "169-004-fix-fix",
+  "title": "Fix: Fix: H2 Stub Memory Entries Backfill",
+  "description": "Priority fix for NO_GO task 169-004-fix.\nOriginal worker notes: Root cause fixed: `store.update()` was never implemented in MemoryStore despite task 169-004 claiming it was added. Tests failed with `TypeError: store.update is not a function`. Fixes applied: (1) Added `update(id, fields, changedBy)` method to MemoryStore with whitelist-driven column patch (content/title/summary/metadata/status/priority/decay_exempt), automatic FTS5 *_norm mirror columns refresh for text fields, updated_at bump, and entry_history rows. (2) Fixed backfill-stub-entries.mjs: entr\nRubric: correctness=100, test_coverage=100, scope_compliance=100\nExpected scope: scripts/memory/, src/core/, tests/core/\nFiles that should change: scripts/memory/backfill-stub-entries.mjs, src/core/memory-store.ts, tests/core/memory-stub-backfill.test.ts, memory-store.ts",
+  "model": "haiku",
+  "forceModel": "haiku",
+  "effort": "normal",
+  "priority": "CRITICAL",
+  "reason": "Task 169-004-fix evaluated as NO_GO; correctness=100; test_coverage=100; scope_compliance=100",
+  "scope": {
+    "directories": [
+      "scripts/memory/",
+      "src/core/",
+      "tests/core/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "scripts/memory/backfill-stub-entries.mjs",
+      "src/core/memory-store.ts",
+      "tests/core/memory-stub-backfill.test.ts",
+      "memory-store.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** `length(content) > 100` for sprint-159/160/161 memory entries. `json_extract(metadata, '$.stub_flag') = 0` (false).",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "PENDING",
+  "sprintId": "sprint-169",
+  "isPriorityFix": true,
+  "fixForTaskId": "169-004-fix",
+  "assignedAgent": "code-reviewer",
+  "forceAgent": "code-reviewer",
+  "assignedSkills": [
+    "database-migration"
+  ],
+  "forceSkills": [
+    "database-migration"
+  ],
+  "createdAt": "2026-05-14T22:43:37.351Z",
+  "rotationStrategy": {
+    "enabled": true,
+    "originalModel": "sonnet",
+    "rotatedModel": "haiku",
+    "originalAgent": "bug-fixer",
+    "rotatedAgent": "code-reviewer",
+    "addedSkills": [],
+    "rationale": "Fresh-eyes rotation: sonnet→haiku, bug-fixer→code-reviewer"
+  }
+}

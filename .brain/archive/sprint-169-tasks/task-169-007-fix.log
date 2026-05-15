@@ -1,0 +1,17 @@
+## Bug Fix Report
+
+**Bug:** `deckent memory rebuild` relations tablosunu DROP edip re-insert ediyor ama re-insert pipeline eksikti — rebuild sonrası relations kayboluyor (Bug Z3).
+
+**Root Cause:** `src/core/memory-import.ts`'de `backupRelations`, `restoreRelations`, `rebuildWithRelationSafety` fonksiyonları hiç tanımlanmamıştı. Test dosyası bunları bekliyordu.
+
+**Category:** Integration — API contract mismatch (test → implementation)
+
+**Fix:** 3 yeni export eklendi:
+- `backupRelations(store)` — `SELECT * FROM relations` ile tüm satırları döndürür
+- `restoreRelations(store, backup)` — FK doğrulaması (from/to entries'de var mı?) + `INSERT OR IGNORE` ile idempotent restore; `{restored, skipped}` döndürür  
+- `rebuildWithRelationSafety(store, importFn, options)` — transaction içinde importFn + restore çalıştırır; strict mode'da `postCount < preCount` olursa `DeckentError('DECKENT_MEMORY_RELATION_LOSS')` fırlatıp better-sqlite3'ün auto-rollback'i ile tüm DB değişikliklerini (importFn dahil) geri alır
+
+**Verification:**
+- `tsc --noEmit` → 0 hata
+- `tests/core/memory-rebuild-safety.test.ts` → **7/7 PASS**
+- 4 başarısız test (Stub Backfill H2, ADR FS Export H1, error-handling lint, alert-emitter) — diğer sprint task'larından (169-003/004/008) gelen önceden var olan hatalar, bu task'la ilgisiz

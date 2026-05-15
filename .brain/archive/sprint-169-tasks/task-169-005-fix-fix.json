@@ -1,0 +1,55 @@
+{
+  "id": "169-005-fix-fix",
+  "title": "Fix: Fix: H3 OSS Pre-Flip Secret Scan Baseline",
+  "description": "Priority fix for NO_GO task 169-005-fix.\nOriginal worker notes: ROOT CAUSE FIX: --build-baseline idempotency bug. In scan(), the `allowed` set was always populated from existing baseline regardless of mode. This caused --build-baseline to: (1) load existing 6 entries into `allowed`, (2) skip all already-allowed matches, (3) write empty allowlist. Running check mode after would then detect 6 unallowlisted hits → exit 1. FIX: `allowed` is now mode-conditional — build-baseline uses empty Set (collects ALL current matches), check mode uses existing allowlist. VE\nRubric: correctness=100, test_coverage=80, scope_compliance=100\nExpected scope: scripts/security/, .github/workflows/, root/\nFiles that should change: .github/workflows/secret-scan.yml, scripts/security/secret-baseline.mjs, .secrets-baseline",
+  "model": "haiku",
+  "forceModel": "haiku",
+  "effort": "normal",
+  "priority": "CRITICAL",
+  "reason": "Task 169-005-fix evaluated as NO_GO; correctness=100; test_coverage=80; scope_compliance=100",
+  "scope": {
+    "directories": [
+      "scripts/security/",
+      ".github/workflows/",
+      "root/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      ".github/workflows/secret-scan.yml",
+      "scripts/security/secret-baseline.mjs",
+      ".secrets-baseline"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** `ls .github/workflows/secret-scan.yml` mevcut. `ls .secrets-baseline` mevcut JSON. Local script run exit 0.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "PENDING",
+  "sprintId": "sprint-169",
+  "isPriorityFix": true,
+  "fixForTaskId": "169-005-fix",
+  "assignedAgent": "bug-fixer",
+  "forceAgent": "bug-fixer",
+  "assignedSkills": [
+    "security-specialist",
+    "devops-engineer",
+    "code-simplifier"
+  ],
+  "forceSkills": [
+    "security-specialist",
+    "devops-engineer",
+    "code-simplifier"
+  ],
+  "createdAt": "2026-05-14T22:43:37.351Z",
+  "rotationStrategy": {
+    "enabled": true,
+    "originalModel": "sonnet",
+    "rotatedModel": "haiku",
+    "originalAgent": "code-reviewer",
+    "rotatedAgent": "bug-fixer",
+    "addedSkills": [],
+    "rationale": "Fresh-eyes rotation: sonnet→haiku, code-reviewer→bug-fixer"
+  }
+}
