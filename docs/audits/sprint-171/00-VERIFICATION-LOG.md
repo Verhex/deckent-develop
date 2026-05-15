@@ -153,3 +153,16 @@ Bug A/B runtime aktif (dist 23:42 > src). Kalan MANUEL-P0 (C-03/04/05/06/07/13/1
 4. **C-04** mid-sprint-adapter.ts:228/284 execSync→spawnSync array — ADR-006, davranış-koruyan → TDD-fix hazır
 5. **BA-03/05** ADR-010 deps + Sprint 167 DB-boş — governance/ADR amendment → ESCALATE
 6. **C-05/07** config doc-drift — doc-reorg batch (Sprint 172)
+
+## C-04 READY-TO-APPLY (otonom commit edilmedi — bootstrap-path + build/restart gerek)
+
+**Dosya:** `src/orchestra/mid-sprint-adapter.ts` — 2 injection-yüzeyi (`:228` git diff, `:284` vitest) + `:258` (static, ADR-006 tutarlılık için birlikte).
+**Import:** `:14 import { execSync }` → `import { spawnSync }`.
+**Fix (davranış-koruyan, ADR-006 array-form):**
+- `:228` `execSync(\`git diff --stat HEAD${pathArgs}\`)` → `spawnSync('git', ['diff','--stat','HEAD', ...(dirs.length ? ['--', ...dirs] : [])], {cwd,encoding,timeout:10_000})` → `.stdout`
+- `:258` `execSync('npx tsc --noEmit')` → `spawnSync('npx', ['tsc','--noEmit'], {...})`; başarı = `result.status === 0`
+- `:284` `execSync(\`npx vitest run --reporter=json ${testPatterns.join(' ')}\`)` → `spawnSync('npx', ['vitest','run','--reporter=json', ...testPatterns], {...})` → `.stdout`
+- 3 yerde `catch`→ `result.status !== 0 || result.error` kontrolü (execSync throw semantiği spawnSync status'a taşınır).
+**TDD (RED önce):** `tests/orchestra/mid-sprint-adapter-injection.test.ts` — scope.directories=`['src/foo; touch /tmp/pwned']` → fonksiyon çağrısı sonrası `/tmp/pwned` OLUŞMAMALI (shell-interp yok ispatı) + normal dirs ile git-diff parse davranışı korunur. Fonksiyonlar export değil → `ReconciliationDeps` enjeksiyon noktası veya cmd-builder pure helper extract gerek (minimal refactor, aynı dosya).
+**Severity revize:** MED→**LOW-MED**. scope.directories Brain-yazımı (DIRECTIVES); OSS'te user-DIRECTIVES self-harm sınırı (cross-trust-boundary değil). ADR-006 hijyen/tutarlılık fix'i, kritik-exploit değil. Yine de ADR-006 accepted → düzeltilmeli.
+**Onay bekleyen:** kullanıcı + build/restart batch.
