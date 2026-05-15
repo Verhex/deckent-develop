@@ -17,7 +17,7 @@
 
 | ID | Bulgu | Kanıt | Doğrulama |
 |---|---|---|---|
-| **BUG-A** | Schema gate `testsPassed` 2. spurious-NO_GO katmanı. P0-1 sadece `coverage` relax etti. 171-014/023 schema NO_GO (içerik suçsuz, rubric 95-100). **Synthesis bunu GÖREMEDİ** (EVALUATE öncesi yazıldı, §6.1 "Spurious 0" yanlış). | `.deckent/evaluations/sprint-171/171-014/023-attempt-1.json` | systematic-debug: `validateWorkerResult` testsPassed required path; `coverageOptional` genelleştir |
+| **BUG-A** ✅ FIX | Schema gate `testsPassed` spurious-NO_GO. P0-1 sadece `coverage` relax etti. **TEK katman** (görünen Layer-2 test artefaktıydı — reorg path; systematic-debug yanlış-fix'i önledi). Fix: `result-evaluator.ts:525-533` `testsPassed`'i `coverageOptional(task)` guard'ına aldı (test-yürütme-bağımlı alan grubu — P0-1 genelleştirmesi). TDD 5 yeni test, 196/196 regresyon GREEN. | `result-evaluator.ts:525-533`, `tests/orchestra/spurious-nogo-169-cascade.test.ts` | ✅ systematic-debug + TDD tamam — **dist rebuild + MCP restart gerek (runtime aktif olması için)** |
 | **BUG-B** | Brain FIX sonrası re-evaluate yok (attempt-2 yok); CLEANUP `.result` silince TERMINAL `NO_GO=0` yanlış. Sprint 153→171 açık. | 29 eval-kayıt, 0 attempt-2; ledger 27 DONE/2 NO_GO; terminal "NO_GO=0" | systematic-debug: post-FIX re-eval state transition + TERMINAL eval-ledger'dan say |
 | C-03 | `rotateModelForFix` ters downgrade + `forceModel` sessiz override (FIX yolu, Bug-B ailesi) | `src/orchestra/debt-manager.ts:127-178` | memory `project_fix_model_downgrade_bug` ile çapraz |
 | C-04 / BG-05 | `no-go-reconciler.ts:118` `execSync` taskId interpolasyon — injection + evaluator yolunda | `src/orchestra/no-go-reconciler.ts:118` | grep + spawnSync array form |

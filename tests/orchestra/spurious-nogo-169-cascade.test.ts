@@ -198,3 +198,147 @@ describe('Sprint 169.5 P0 — Spurious NO_GO Cascade Prevention', () => {
     });
   });
 });
+
+// ─── Sprint 171 Bug A — schema gate testsPassed 2. spurious-NO_GO katmanı ───
+//
+// Sprint 171 self-audit mega-sprint forensic:
+//   - 171-014 (devops-engineer) + 171-023 (doc-writer) audit-only task
+//   - Worker raporu yazdı, .result'a testsPassed YAZMADI (audit task test
+//     çalıştırmaz — Worker Contract "TDD YOK")
+//   - coverage:null P0-1 ile relax oldu (coverageRelaxed=true) AMA
+//     testsPassed guard'sız → schema NO_GO → Bug B reconcile etmedi
+//   - decisionRationale: "Schema invalid: missing [Schema violation:
+//     missing required fields [testsPassed]] (coverageRelaxed=true)"
+//
+// RC: validateResultSchema coverage'ı coverageOptional(task) ile guard'lıyor
+// ama testsPassed'i etmiyor. İkisi de test-yürütme-bağımlı alan; audit/non-code
+// task ikisini de legit atlar. Fix: testsPassed'i AYNI guard altına al (alan-alan
+// yama değil, test-yürütme-bağımlı alan GRUBU — Sprint 137-171 maske döngüsünü kır).
+
+function auditTask(id = '171-014', overrides: Partial<Task> = {}): Task {
+  return {
+    id,
+    title: 'extensions + scripts Audit',
+    description: 'Audit-only task — Türkçe rapor',
+    model: 'opus',
+    effort: 'normal',
+    priority: 'NORMAL',
+    reason: 'test bootstrap',
+    scope: {
+      directories: ['docs/audits/sprint-171/'],
+      filesRead: [],
+      filesWrite: [`docs/audits/sprint-171/extensions-scripts.md`],
+    },
+    dependencies: [],
+    goNogo: { goCriteria: '', noGoCriteria: '', techDebtAcceptable: '' },
+    status: 'EXECUTING',
+    // 171-014 gerçek agent'ı: devops-engineer — COVERAGE_OPTIONAL_AGENTS'ta YOK.
+    // Schema'nın TaskType='audit' yolundan relax etmesi gerek, agent allowlist'ten değil.
+    assignedAgent: 'devops-engineer',
+    ...overrides,
+  };
+}
+
+function auditResultNoTestsPassed(
+  id = '171-014',
+  overrides: Partial<TaskResult> = {},
+): TaskResult {
+  // 171-014 .result şekli: testsPassed ANAHTARI YOK (undefined), coverage:null
+  const r = {
+    taskId: id,
+    workerId: `docker-${id}`,
+    filesChanged: [`docs/audits/sprint-171/extensions-scripts.md`],
+    linesAdded: 0,
+    linesRemoved: 0,
+    coverage: null as unknown as number,
+    selfAssessment: 'DONE',
+    notes: 'Audit raporu Türkçe yazıldı. 4+1 bölüm tam.',
+  } as TaskResult;
+  return { ...r, ...overrides };
+}
+
+describe('Sprint 171 Bug A — schema gate testsPassed relax (audit task)', () => {
+  it('audit task (testsPassed YOK, coverage:null) schema validation GEÇER', () => {
+    const task = auditTask('171-014');
+    const result = auditResultNoTestsPassed('171-014');
+
+    const schema = validateResultSchema(result, task);
+
+    expect(schema.valid).toBe(true);
+    expect(schema.missingFields).not.toContain('testsPassed');
+    expect(schema.missingFields).not.toContain('coverage');
+  });
+
+  it('171-023 doc-writer audit task da kabul edilir', () => {
+    const task = auditTask('171-023', {
+      assignedAgent: 'doc-writer',
+      scope: {
+        directories: ['docs/audits/sprint-171/'],
+        filesRead: [],
+        filesWrite: ['docs/audits/sprint-171/docs-root.md'],
+      },
+    });
+    const result = auditResultNoTestsPassed('171-023', {
+      filesChanged: ['docs/audits/sprint-171/docs-root.md'],
+    });
+
+    const schema = validateResultSchema(result, task);
+
+    expect(schema.valid).toBe(true);
+  });
+
+  it('REGRESYON: code-development task testsPassed YOK ise hâlâ REDDEDİLİR', () => {
+    const task = bugFixTask('171-900', {
+      assignedAgent: 'generic',
+      scope: {
+        directories: ['src/orchestra/'],
+        filesRead: [],
+        filesWrite: ['src/orchestra/foo.ts'],
+      },
+    });
+    const result = auditResultNoTestsPassed('171-900', {
+      filesChanged: ['src/orchestra/foo.ts'],
+    });
+
+    const schema = validateResultSchema(result, task);
+
+    expect(schema.valid).toBe(false);
+    expect(schema.missingFields).toContain('testsPassed');
+  });
+
+  it('DEFANS: audit task testsPassed:false açıkça verilirse yine geçer', () => {
+    const task = auditTask('171-015');
+    const result = auditResultNoTestsPassed('171-015', { testsPassed: false });
+
+    const schema = validateResultSchema(result, task);
+
+    expect(schema.valid).toBe(true);
+  });
+
+  it('UÇTAN-UCA: gerçek 171-014 raporu (testsPassed YOK) → schema_validation NO_GO DEĞİL', () => {
+    // Bug A'nın davranış kontratı: SCHEMA GATE artık testsPassed eksikliğinde
+    // audit task'ı reddetmiyor. Gerçek commit'li rapor dosyasına yöneltilir
+    // (reorg sonrası path) ki audit içerik skorlaması (audit_completeness/
+    // finding_count/citation_density) gerçek içeriği okusun — Bug A'yı
+    // audit-content-scoring'den izole eder.
+    const realReport = 'docs/audits/sprint-171/01-modul-derin/14-extensions-scripts.md';
+    const task = auditTask('171-014', {
+      scope: {
+        directories: ['docs/audits/sprint-171/'],
+        filesRead: [],
+        filesWrite: [realReport],
+      },
+    });
+    const result = auditResultNoTestsPassed('171-014', {
+      filesChanged: [realReport],
+    });
+
+    const evaluation = evaluateWithRubric(result, task);
+
+    // Birincil kontrat: schema_validation kaynaklı spurious NO_GO YOK.
+    const schemaNoGo =
+      evaluation.decision === 'NO_GO' &&
+      evaluation.rubricScores?.[0]?.criterion === 'schema_validation';
+    expect(schemaNoGo).toBe(false);
+  });
+});

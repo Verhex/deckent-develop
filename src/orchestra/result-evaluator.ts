@@ -523,7 +523,16 @@ export function validateResultSchema(result: TaskResult, task?: Task): ResultSch
   }
 
   if (typeof result.testsPassed !== 'boolean') {
-    missingFields.push('testsPassed');
+    // Sprint 171 Bug A: testsPassed is test-execution-dependent — the SAME
+    // semantic field group as coverage above (512-519). Audit / non-code
+    // tasks run no tests (Worker Contract "TDD YOK"), so testsPassed is
+    // legitimately absent. Relax under the SAME coverageOptional(task) guard.
+    // This generalizes P0-1 (Sprint 169, coverage-only) to the full
+    // test-execution-dependent group — breaking the per-field spurious-NO_GO
+    // patch cycle (Sprint 137-171 "her sprint farklı maske").
+    if (!(task && coverageOptional(task))) {
+      missingFields.push('testsPassed');
+    }
   }
 
   if (!result.taskId) {
