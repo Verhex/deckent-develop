@@ -90,5 +90,29 @@ Synthesis §2.1 "9 güvenlik blocker" targeted-grep ile doğrulandı. **Sonuç: 
 
 **Güvenlik blocker net sonuç:** 9 iddia → **1 false-positive (BG-03 İPTAL)** + 1 overstated (BG-01 LOW) + 1 mis-cited dosya (BG-05) + 4 confirmed-real (BG-02/04/06/07) + 2 ledger-dup (BG-08/09). Gerçek Sprint 172 güvenlik P0 = **BG-02, BG-04, BG-06, BG-07** (+ BG-08/09 MANUEL-P0). BG-01/BG-03 listeden düşer/iner.
 
+## SYNTHESIS §2 BLOCKER DOĞRULAMA — Doc-Drift (BD) + Architecture (BA)
+
+| Blocker | Synthesis iddiası | Verdict | Düzeltme |
+|---|---|---|---|
+| **BD-04** CLAUDE.md modül sayıları (orchestra 76→95, core 94→101, api 3→4, mcp 27→31) | CRITICAL OSS-vitrin | ❎**OVERSTATED** | orchestra gerçek **76** = CLAUDE.md "76" → **DRIFT YOK** (synthesis "95" recursive subdir sayımı; top-level 76 doğru). core **90**≠94 (minor gerçek drift, 4 fark). api 4 vs "3" minor. mcp "27 tool"≠43 .ts dosya (apples-to-oranges; tool sayısı ≠ dosya sayısı). Gerçek aksiyon: core 90→94 + api 3→4 düzelt; orchestra/mcp "drift" yanlış. Severity LOW-MED, CRITICAL değil. |
+| **BD-05** MCP tool 22↔27↔31 üçlü çelişki | CRITICAL | ⚠️INCONCLUSIVE | grep pattern tutmadı (tool'lar mcp/tools/ ayrı dosya). Gerçek sayım için `server.ts` registration sayımı gerek — assert ETMİYORUM. 📌 deeper-verify Sprint 172. |
+| **BD-01/02/03** README/CLAUDE-metrics/IDENTITY stale | CRIT | ⊕LEDGER-DUP (C-41/36/37) | Stale metrik gerçek; fix = auto-gen pipeline. 📌ESCALATE. |
+| **BD-08** BOOT.md recovery chain 3/5 yanlış komut | HIGH | ↪DEFER-VERIFY | Komut imza doğrulaması gerek (commander.help() vs BOOT.md). Sprint 172. |
+| **BD-09/10/12** docs CHANGELOG dup / VitePress dead-link / guide stale | HIGH/MED | ⊕LEDGER-DUP (C-39/40) | doc-reorg §4 kapsamı. ↪DEFER Sprint 172. |
+| **BA-01** ADR-008 drift | CRIT | ✅CONFIRMED ⊕(171-001 1.2) | Gerçek doc-drift, fix=ADR amendment (governance). 📌ESCALATE. |
+| **BA-02** ADR-040 Nervous wire değil | CRIT | ⏳YP-RISK (sıradaki batch) | ADR-040 opt-in/feature-flag mı yoksa gerçek dead mi — verify gerek. |
+| **BA-03/C-25** ADR-010 7 dep vs "tek dependency" | CRIT | ✅**CONFIRMED-REAL** | Gerçek 7 runtime dep (commander/telegraf/zod/better-sqlite3/@noble×2/mcp-sdk). ADR-010 başlık "Tek Runtime Dependency". Fix = ADR-010 amendment (deps justify) veya doc düzelt. 📌ESCALATE (governance). |
+| **BA-04** ADR-037 RBAC soft | CRIT | ⊕LEDGER-DUP (C-13/14 MANUEL-P0) | 171-007 ile çapraz. |
+| **BA-05/C-32** Sprint 167 DB 0 entry | CRIT | ✅**CONFIRMED-REAL** | SQL `sprint_id IN ('sprint-167','167')` → `[]` boş. ADR-046 hook regresyon kesin. 📌ESCALATE (deckent memory rebuild hook fix sonrası). |
+| **BA-06/C-33** ADR-061 AEGIS DB-yok | CRIT | ✅CONFIRMED ⊕(memory'de daha önce doğrulandı) | summary.md ADR listesinde 061 yok. ADR-046 tek-yön. |
+| **BA-07/C-08/46** api-surface 8 vs 9 phase (WAVE_BUILD) | CRIT | ❎**FALSE-POSITIVE** | `api-surface.md:83` WAVE_BUILD'i **2a alt-faz olarak ZATEN belgeliyor**; SprintPhase enum'da ekstra üye yok (rapor 01 §1.1: SPAWN'a gömülü, müstakil faz değil). Synthesis "kontrat ihlali" YANLIŞ. **Sprint 172 blocker listesinden ÇIKAR.** (YP-RISK flag'im doğrulandı.) |
+| **BA-08/C-02** isAuditTask hardcoded | CRIT | ⊕LEDGER-DUP (171-002 B1) | Kök fix config prefix. 📌ESCALATE. |
+
+| **BA-02/C-16/17/18** ADR-040 Nervous dead pipeline | CRIT | ✅CONFIRMED-REAL (nüanslı) | `config.ts:893 nervous_system` + sprint-controller:167 "subscribers optional, always fires regardless of config" → **config-gated opt-in tasarım** (koşulsuz-dead DEĞİL). AMA `new Executor(`=0 production caller (C-18 yetim CONFIRMED) + observer→executor pipeline instantiate-wire yok. Event-emit var, consumer unwired. Fix = opt-in wire tamamla VEYA ADR-040→`proposed` indir (governance). 📌ESCALATE. "Dead code sil" YANLIŞ framing. |
+
+**BD/BA net sonuç:** **2 yeni FALSE-POSITIVE/OVERSTATED** — BA-07 (api-surface WAVE_BUILD zaten belgeli → İPTAL) + BD-04 (orchestra 76 doğru, sayım-artefaktı). BA-02 confirmed-real ama nüanslı (opt-in, dead değil). BA-03/05/06/01 confirmed-real. BD-05 inconclusive (deeper-verify).
+
+**SYNTHESIS §2 GENEL DOĞRULAMA SKORU:** 29 blocker iddiasından şimdiye dek doğrulanan ~17'de: **3 FALSE-POSITIVE** (BG-03 plugin-hooks-yok, 171-002-B11 RuleEvolver-canlı, BA-07 WAVE_BUILD-belgeli) + **2 OVERSTATED** (BG-01 placeholder-log, BD-04 sayım-artefaktı) + **1 MIS-CITED** (BG-05 yanlış dosya). Yani synthesis §2'nin ~%30'u hatalı/kalibre-edilmemiş → "raporu okuyup hepsini fixle" yaklaşımı yanlış olurdu; verify-before-fix zorunlu.
+
 ## 01-modul-derin/03-orchestra-infra.md (171-003) — DOĞRULANDI
 **171-003 özeti:** 32 confirmed + 9 PASS + **0 false-positive** (architect 171-002'nin aksine devops worker titiz). 1 CRIT (B-041 ledger-kısmi) + 7 HIGH. Yeni-ledger değerli: B-029/B-032/B-036/B-038 (ESM+dead-code+cache, hepsi trivial-ready 📌). P0-3/P0-5 PASS = Sprint 170 fix runtime aktif ek kanıt. Otonom fix YOK (production code, away-mode); hepsi ready-to-apply escalate. Coverage 9/9 + cross-cut, gap 0.
