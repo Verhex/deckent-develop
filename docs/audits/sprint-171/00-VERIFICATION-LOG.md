@@ -53,3 +53,24 @@ Otonom gezinti (Alperen 2sa yok, 2026-05-15). Her rapor systematic-debug ile do�
 | B18 rubric registry shallow freeze | MED | ✅CONFIRMED-REAL | deep freeze / readonly. 📌ESCALATE ready §4-B18. |
 
 **171-002 özeti:** 17 confirmed + **1 FALSE-POSITIVE (B11 — canlı feature, silinmekten kurtarıldı)**. CRITICAL'ler ledger-dup (C-02/03/04, hepsi MANUEL-P0/escalate). Mimari kök: rubric-drift (rubric-registry↔quality-assessor↔outcome-tracker, §4 Bütünsel Öneri) — Sprint 172 tek-iş. Otonom fix YOK (hepsi bootstrap/FIX-path/mimari, away-mode escalate).
+
+## 01-modul-derin/03-orchestra-infra.md (171-003) — DOĞRULANDI
+
+devops-engineer worker; 41 pozisyon (9 PASS), titiz. **5 HIGH/CRIT non-ledger iddia batch-doğrulandı → 5/5 CONFIRMED-REAL (false-positive YOK).**
+
+| Bulgu | Sev | Verdict | Not / Aksiyon |
+|---|---|---|---|
+| B-001 P0-3 tmux taskId-aware aktif | PASS | ✅CONFIRMED | Sprint 170 P0-3 runtime aktif kanıtı (Kapı 1 destek). |
+| B-010 P0-5 Docker race closure aktif | PASS | ✅CONFIRMED | Sprint 170 P0-5 runtime aktif. |
+| B-018 event-stream PROMPT_WRITE/DELETE yok | HIGH | ✅CONFIRMED ⊕(C-21) | Sprint 170 P0-6 NO_GO açık. 📌ESCALATE Sprint 172 (event-stream + 3 backend wire — next-session backlog #2). |
+| B-029 promotion-pipeline:275 `require('fs')` ESM | HIGH | ✅CONFIRMED-REAL | Doğrulandı (satır 275). Trivial ESM fix (node:fs import'a readdirSync ekle). 📌ESCALATE ready (2-satır, ~30sn). |
+| B-032 doc-updaters/metrics-updater.ts DEAD (91 LoC) | HIGH | ✅CONFIRMED-REAL | grep: src non-test kullanım=0 → gerçekten register edilmemiş. SİL adayı. 📌ESCALATE (171-015 disposition). |
+| B-036 managed-docs/docs-config.ts:89 `__dirname` ESM | HIGH | ✅CONFIRMED-REAL | fileURLToPath yok. ESM-native'de ReferenceError. 📌ESCALATE ready (fileURLToPath pattern). |
+| B-037 plugin-loader `.mjs` arbitrary exec, sandbox yok | HIGH | ✅CONFIRMED-REAL | ADR-034 izolasyon riski. 📌ESCALATE (security design — opt-in env flag, otonom değil). |
+| B-038 managed-doc-runner:69 sprint-aware cache wire yok | HIGH | ✅CONFIRMED-REAL | satır 69 legacy hash compare, sprintId hesaplanıyor (161) ama cache-hit'te kullanılmıyor. Sprint 166 Bug S kısmi. 📌ESCALATE ready (1-satır wire). |
+| B-014 worker script `local` POSIX-değil (ash vs dash) | HIGH | ✅CONFIRMED-REAL | non-Alpine'da EXIT trap sessiz kırılır → spurious NO_GO riski. 📌ESCALATE (Kapı 1 ilgili). |
+| B-041 baseline-tracker:90 `shell:true` (ADR-006) | CRIT | ✅CONFIRMED-REAL ⊕(C-30/BG-04 kısmi) | argv array VAR ama shell:true aktif. authority-enforcer:464 zaten ADR-006 detector. 📌ESCALATE ready (win32 npx.cmd guard). |
+| B-033 changelog.ts existsSync write'tan sonra → reason hep "updated" | MED | ✅CONFIRMED-REAL | Mantık hatası (logic bug). 📌ESCALATE ready §4 Ö-7. |
+| B-002..B-040 diğer MED/LOW (race, dead-code adayı, hata yutma, cosmetic) | MED/LOW | ✅CONFIRMED-REAL | ⊕ event-stream nextSequence race (B-019) stale_heartbeat ailesi; lock `__` collision (B-023); ↪DEFER Sprint 172+ (§4 Ö-10..16). |
+
+**171-003 özeti:** 32 confirmed + 9 PASS + **0 false-positive** (architect 171-002'nin aksine devops worker titiz). 1 CRIT (B-041 ledger-kısmi) + 7 HIGH. Yeni-ledger değerli: B-029/B-032/B-036/B-038 (ESM+dead-code+cache, hepsi trivial-ready 📌). P0-3/P0-5 PASS = Sprint 170 fix runtime aktif ek kanıt. Otonom fix YOK (production code, away-mode); hepsi ready-to-apply escalate. Coverage 9/9 + cross-cut, gap 0.
