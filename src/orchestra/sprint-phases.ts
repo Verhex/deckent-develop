@@ -1030,6 +1030,56 @@ export function runRollbackCheck(
 // ═══ Phase 5: FIX ═════════════════════════════════════════════════
 
 /**
+ * Sprint 171 Bug B: persist the FIX-phase re-evaluation to the forensic
+ * evaluation audit trail.
+ *
+ * RC: runFixPhase re-evaluates fix tasks (evaluateWithRubric +
+ * handleEvaluation) and updates the in-memory `evaluations` Map, but
+ * `writeEvaluationAudit` was ONLY called from runEvaluatePhase (hardcoded
+ * attempt=1). FIX decisions were therefore invisible in the ledger — a
+ * post-mortem reading `<original>-attempt-1.json=NO_GO` falsely concludes
+ * "never reconciled" even when the retro shows DONE (Sprint 171 171-014).
+ *
+ * Writes:
+ *   - `<fixTask.id>-attempt-1.json`         (the fix task's own record)
+ *   - `<fixForTaskId>-attempt-2.json`       (only when the original is
+ *                                            reconciled, so the ledger is
+ *                                            self-consistent with the retro)
+ *
+ * Fail-soft: any audit-write error is debugLog'd, never aborts FIX.
+ * Mirrors the runEvaluatePhase audit-write (this file, EVALUATE phase).
+ */
+export function recordFixEvaluationAudit(
+  projectRoot: string,
+  sprintId: string,
+  fixTask: Task,
+  fixRubricResult: EvaluationResult,
+  fixEval: TaskEvaluation,
+  originalReconciled: boolean,
+): void {
+  try {
+    const auditCriteria = toAuditCriterionScores(fixTask, fixRubricResult.rubricScores);
+    const auditSchema = toAuditSchemaValidation(fixTask, fixRubricResult.rubricScores);
+    const auditDecision = toAuditDecision(fixEval);
+    const rationale = buildDecisionRationale(
+      auditDecision, fixRubricResult.totalScore, auditCriteria, auditSchema,
+    );
+    const payload = {
+      ruleSet: toAuditRuleSet(fixTask),
+      schemaValidation: auditSchema,
+      criterionScores: auditCriteria,
+      totalScore: fixRubricResult.totalScore,
+      decision: auditDecision,
+      decisionRationale: rationale,
+    };
+    writeEvaluationAudit(projectRoot, sprintId, fixTask.id, 1, payload);
+    if (originalReconciled && fixTask.fixForTaskId) {
+      writeEvaluationAudit(projectRoot, sprintId, fixTask.fixForTaskId, 2, payload);
+    }
+  } catch (e) { debugLog('recordFixEvaluationAudit', e); }
+}
+
+/**
  * Run the FIX phase: handle cross-dependencies, reroute fix tasks (V2),
  * spawn fix workers, evaluate fix results.
  * Mutates `sprint` (status, phase) in place.
@@ -1110,9 +1160,22 @@ export async function runFixPhase(
             resolveDebt(projectRoot, `debt-${fixTask.fixForTaskId}`, sprint.id);
           }
           // Update original task evaluation if fix succeeded
-          if (fixTask.fixForTaskId && fixEval !== TaskEvaluation.NO_GO && evaluations.has(fixTask.fixForTaskId)) {
+          const originalReconciled =
+            !!fixTask.fixForTaskId &&
+            fixEval !== TaskEvaluation.NO_GO &&
+            evaluations.has(fixTask.fixForTaskId);
+          if (originalReconciled && fixTask.fixForTaskId) {
             evaluations.set(fixTask.fixForTaskId, fixEval);
           }
+
+          // Sprint 171 Bug B: persist FIX re-evaluation to forensic ledger
+          // (runEvaluatePhase wrote only attempt-1; FIX decisions were
+          // invisible → false post-mortem "never reconciled"). Use sprint.id
+          // so attempt-2 is a sibling of EVALUATE's attempt-1.
+          recordFixEvaluationAudit(
+            projectRoot, sprint.id, fixTask, fixRubricResult, fixEval,
+            originalReconciled,
+          );
 
           // ─── Sprint 156 Task 003: Unblock dependents on fix DONE ────
           // When a fix worker resolves a previously-failed task, flip the
