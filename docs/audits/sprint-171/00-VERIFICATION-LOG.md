@@ -166,3 +166,35 @@ Bug A/B runtime aktif (dist 23:42 > src). Kalan MANUEL-P0 (C-03/04/05/06/07/13/1
 **TDD (RED önce):** `tests/orchestra/mid-sprint-adapter-injection.test.ts` — scope.directories=`['src/foo; touch /tmp/pwned']` → fonksiyon çağrısı sonrası `/tmp/pwned` OLUŞMAMALI (shell-interp yok ispatı) + normal dirs ile git-diff parse davranışı korunur. Fonksiyonlar export değil → `ReconciliationDeps` enjeksiyon noktası veya cmd-builder pure helper extract gerek (minimal refactor, aynı dosya).
 **Severity revize:** MED→**LOW-MED**. scope.directories Brain-yazımı (DIRECTIVES); OSS'te user-DIRECTIVES self-harm sınırı (cross-trust-boundary değil). ADR-006 hijyen/tutarlılık fix'i, kritik-exploit değil. Yine de ADR-006 accepted → düzeltilmeli.
 **Onay bekleyen:** kullanıcı + build/restart batch.
+
+## C-13 / C-14 / C-03 — Verify-Before-Fix Verdict (2026-05-16, ADR-037 intent araştırması)
+
+### C-13 RBAC soft mode — ❎ KOD BUG'I DEĞİL → doc-drift (KULLANICI ONAYI: yön (a))
+
+**Kanıt:**
+- `authority-enforcer.ts:29` yorum: `Current enforcement mode (Sprint 139 = always soft)` + `:21-22 EnforcementMode='soft'|'hard'` (hard tip var, kasıtlı kullanılmıyor)
+- `worker.ts:480 return true` (ihlalde bile) = soft tasarımın uygulaması
+- ADR-037 `decisions.md:1825` Consequences(−): *"Runtime enforcement henüz tam değil (Sprint 139 scope) — compile-time + audit trail ağırlıklı"* → soft = **yazılı/kabul-edilmiş V1.0 tasarım kararı**
+- `tests/agents/worker-rbac.test.ts` Test 2 (`:95-112`) + Test 3 (`:116-132`): scope-dışı yazım `expect(result).toBe(true)` + yorum `// ADR-037 soft enforcement: always returns true but logs + emits violation` + `:163 expect(payload.allowed).toBe(false)` (ihlal tespit edilir ama bloke edilmez) → **soft davranış test-kilitli**
+
+**Verdict:** Kod ↔ ADR-037 **tam uyumlu**. ADR-037'nin deckent'teki fiili işlevi = **caydırıcı (Layer-1 prompt) + dedektif (Layer-3 audit trail)**, önleyici (Layer-2 runtime) DEĞİL — fail-open + audit, NIST fail-closed değil. Tek kusur: `CLAUDE.md` gotcha + `IDENTITY.md`/`summary.md` "RBAC **runtime enforcement**" ifadesi → önleyici sanılır, oysa fiilen önleyici değil. **Doküman ADR'den fazla iddialı.**
+
+**Karar (kullanıcı onayı — yön a):** Hard-flip YOK. Sprint 172 doc-reorg = sadece doküman gerçeğe çekilir (`"RBAC runtime enforcement"` → `"RBAC: compile-time lint + audit-trail; runtime advisory/soft — ADR-037 V1.0 Layer-2 kasıtlı eksik, hard-flip gelecek ADR amendment"`). Kod/test/build DEĞİŞMEZ. Hard-flip ayrı denetimli "ADR-037 V2 fail-closed" mikro-sprinti (Test 2/3 yeniden yazım + ADR amendment + audit-trail rework) — Sprint 172 OSS GA blocker'ı DEĞİL (kod↔ADR tutarlı).
+
+### C-14 enforceVerifyLoop + runTestVerifyLoop — ✅ CONFIRMED-REAL (tüm verify-gate subsystem unwired)
+
+**Kanıt:** `worker-verify.ts:163 export function runTestVerifyLoop` + `:335 export async function enforceVerifyLoop` — ikisi de `worker.ts:36/:42` import edilir; **ikisinin de call-form çağrısı src/ genelinde 0** (grep `runTestVerifyLoop(`/`enforceVerifyLoop(` def/import/comment hariç boş). `worker.ts:300` JSDoc: *"Callers MUST run enforceVerifyLoop() before calling this function"* — 0 caller. Programatik tsc/vitest verify-gate hiç wire edilmemiş.
+
+**Verdict:** Worker'lar tsc/vitest'i **prompt talimatıyla** çalıştırır (`worker-default.md` "Run tsc --noEmit and vitest run") — kod-enforced gate DEĞİL, trust/advisory. **C-13 ile aynı sistemik pattern: "scaffold edilmiş ama wire edilmemiş garanti"** (RBAC soft + verify-loop unwired). Bug A (schema gate self-reported testsPassed'a güveniyordu) ile aynı kök: deckent kendi-rapor'a güveniyor, kod doğrulamıyor.
+
+**Karar gerekli (davranış-değiştiren → ESCALATE):** (a) Dead code → ADR-038 dispose (prompt-level verify yeterli kabul; SAFE, davranış değişmez) **VEYA** (b) `enforceVerifyLoop`'u worker result-write yoluna wire et (deckent programatik gate; DONE'u broken-code'da bloke eder — daha güçlü garanti ama davranış-değiştiren, bootstrap-hassas, ayrı denetimli sprint, C-13 hard-flip ile paralel). Vizyon (god-level, no-MVP, spurious-NO_GO geçmişi) → (b) mimari doğru yön; ama kullanıcı kararı.
+
+### C-03 rotateModelForFix ters-downgrade — ✅ CONFIRMED-REAL + LIVE-WIRED
+
+**Kanıt:** `debt-manager.ts:76-78 MODEL_DOWNGRADE_MAP={opus:'sonnet',sonnet:'haiku',haiku:'haiku'}` → `:138 rotateModelForFix` = `MAP[model]??model` → `:177 applyFreshEyesRotation` → `:186 rotatedModel` → `sprint-spawner.ts:1016/:1060` canlı tüketilir (`forceModel: rotationStrategy.rotatedModel`). FIX worker **daha zayıf model** alır. JSDoc `:134 "one tier down"` + `:180 "Fresh-eyes rotation"` → tasarım niyeti bilinçli downgrade ("taze göz" = farklı perspektif), ama fix orijinalden ZOR + model ZAYIF = ters mantık.
+
+**Verdict:** Kod kendi JSDoc'una uyumlu (C-13 gibi değil — burada niyet'in kendisi hatalı). Kullanıcı memory `project_fix_model_downgrade_bug` zaten "bug, kural ters, OSS GA öncesi düzelt" diye karar vermiş. CONFIRMED + canlı tüketiliyor.
+
+**Karar gerekli (davranış-değiştiren → ESCALATE):** Fresh-eyes SIDEWAYS olmalı (eş-tier farklı model/provider: opus→gpt-5/gemini-2.5-pro; sonnet→gpt-4.1) ya da UP, asla DOWN. Yön kullanıcı onayı (TDD-fix: `MODEL_DOWNGRADE_MAP` → `MODEL_SIDEWAYS_MAP`, davranış-değiştiren → ayrı sprint/onay).
+
+**Sistemik bulgu (Sprint 172 synthesis girdisi):** C-13 + C-14 = "scaffold edilmiş garanti, wire/enforce edilmemiş" tekrar eden pattern. Bug A aynı kök (self-report'a güven). OSS GA öncesi dürüstlük: doküman bu trust-based gerçeği yansıtmalı VEYA enforcement kapatılmalı — ikisi arası drift = kullanıcıya sessiz güvenlik abartması.
