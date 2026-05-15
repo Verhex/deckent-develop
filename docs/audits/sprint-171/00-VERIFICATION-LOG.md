@@ -116,3 +116,21 @@ Synthesis §2.1 "9 güvenlik blocker" targeted-grep ile doğrulandı. **Sonuç: 
 
 ## 01-modul-derin/03-orchestra-infra.md (171-003) — DOĞRULANDI
 **171-003 özeti:** 32 confirmed + 9 PASS + **0 false-positive** (architect 171-002'nin aksine devops worker titiz). 1 CRIT (B-041 ledger-kısmi) + 7 HIGH. Yeni-ledger değerli: B-029/B-032/B-036/B-038 (ESM+dead-code+cache, hepsi trivial-ready 📌). P0-3/P0-5 PASS = Sprint 170 fix runtime aktif ek kanıt. Otonom fix YOK (production code, away-mode); hepsi ready-to-apply escalate. Coverage 9/9 + cross-cut, gap 0.
+
+## MANUEL-P0 Batch Doğrulama (2026-05-15, build+restart sonrası, auto-mode)
+
+Bug A/B runtime aktif (dist 23:42 > src). Kalan MANUEL-P0 (C-03/04/05/06/07/13/14/29) verify-first:
+
+| ID | Synthesis iddiası | Verdict | Kanıt |
+|---|---|---|---|
+| **C-29/BG-03** | `plugin-hooks.ts` `spawn(shell:true)` injection | ❎**FALSE-POSITIVE (İPTAL)** | `src/orchestra/plugin-hooks.ts` DOSYA YOK. Ledger'da zaten ⚠ idi → kesinleşti, blocker'dan çıkar. |
+| **C-04/BG-05** | `no-go-reconciler.ts:118` execSync taskId injection | ↪**MIS-CITED → CONFIRMED-REAL (düzeltilmiş konum)** | `no-go-reconciler.ts` DOSYA YOK. Gerçek yüzey: `mid-sprint-adapter.ts:228` `execSync(\`git diff --stat HEAD -- ${dirs.join(' ')}\`)` + `:284` `execSync(\`npx vitest run ... ${testPatterns.join(' ')}\`)`. `dirs`/`testPatterns` ← `task.scope.directories` (DIRECTIVES kaynaklı; OSS user-DIRECTIVES = injection yüzeyi). ADR-006 array-form ihlali. Severity **MED** (Brain-mediated ama OSS path). Fix: spawnSync array-form. |
+| **C-13/BG-08/BA-04** | ADR-037 RBAC `checkWorkerAuthority` soft mode (ihlalde return true) | ✅**CONFIRMED-REAL (isabetli, HIGH)** | `worker.ts:457-494`: `!result.allowed` → `console.warn('[ADR-037 soft]')` + emit + **`return true`** (satır 490); allowed yolu da `return true` (493). Fonksiyon **her zaman true**. CLAUDE.md "Worker scope dışına yazamaz — RBAC runtime enforcement" gotcha'sı **YANLIŞ** (sadece uyarır). PermissionGuard class (`validateAgentModification`) ayrıca **0 production caller** (yetim). OSS GA HIGH. |
+| **C-14/BG-09** | `enforceVerifyLoop` 0 production caller | ✅**CONFIRMED-REAL** | Tek tanım `worker-verify.ts:335`; `worker.ts:42` import + `:300` doc-yorum "Callers MUST run" ama tüm `src/`'de **0 gerçek `enforceVerifyLoop(` çağrısı**. Verify-loop gate var ama hiç enforce edilmiyor. |
+| **C-03** | `rotateModelForFix` ters downgrade + forceModel sessiz override | ✅**CONFIRMED-REAL** | `debt-manager.ts:76-78` `{opus:'sonnet', sonnet:'haiku', haiku:'haiku'}` downgrade map; `:177` rotate; `:304/:375` `forceModel: rotatedModel`. FIX orig'den zor ama model zayıflıyor. memory `project_fix_model_downgrade_bug` ile bire-bir. |
+| **C-05/C-07** | `dependency_pipeline_enabled` 3-katman drift + doc "Sprint 167 flip true" | ✅**CONFIRMED-REAL (doc-drift, MED)** | Kod default `true` (`config.ts:600`, `:883/:1400 ?? true`); `.deckent/config.json:198 false` (bu projede bilinçli — manuel dispatch); DECKENT.md "Sprint 167 flip true" + `api-surface.md:83` "default since Sprint 156". Doc default'u abartıyor. Merge mantığı tutarlı (config.json kazanır). Fix = doc düzelt (auto-gen pipeline). |
+| **C-06** | `DeckentConfig` tipinde `dependency_pipeline_enabled` eksik | ❎**FALSE-POSITIVE** | `config-types.ts:490 dependency_pipeline_enabled?: boolean` **VAR**. `config.ts:41` "follow-up sprint should add" yorumu + `DeckentConfigWithPipeline` alias **STALE/redundant** (minor dead-code, ADR-038 adayı) — tip boşluğu DEĞİL. |
+
+**MANUEL-P0 net:** 8 iddiadan **2 FALSE-POSITIVE** (C-29, C-06) + **1 MIS-CITED** (C-04→mid-sprint-adapter) + **5 CONFIRMED-REAL** (C-13 HIGH, C-14, C-03, C-05/07). Gerçek fix kuyruğu: C-13 (RBAC soft→hard, davranış-değiştiren → ESCALATE), C-14 (verify-loop wire, davranış-değiştiren → ESCALATE), C-03 (model rotation, davranış-değiştiren → ESCALATE), C-04 (execSync→spawnSync array, davranış-koruyan, ADR-006 → TDD-fix adayı), C-05/07 (doc-drift → doc-reorg batch).
+
+**Synthesis §2 güncel skor (~25/29 doğrulandı): 5 FALSE-POSITIVE/İPTAL** (BG-03, 171-002-B11, BA-07, C-29, C-06) + **2 OVERSTATED** (BG-01, BD-04) + **2 MIS-CITED** (BG-05, C-04) → §2'nin **~%31'i hatalı/kalibre-edilmemiş**. Verify-before-fix disiplini doğrulandı.

@@ -66,3 +66,23 @@
 4. **DEFER** (D) — Sprint 173+.
 
 **Durum kolonu:** [ ] beklemede / [~] doğrulanıyor / [x] fix / [!] yanlış-pozitif (iptal)
+
+---
+
+## MANUEL-P0 Doğrulama Durumu (2026-05-15, build+restart sonrası)
+
+Bug A/B runtime aktif. Kalan A-bölümü verify-first tamamlandı (detay: `00-VERIFICATION-LOG.md` → "MANUEL-P0 Batch Doğrulama"):
+
+| ID | Durum | Sonraki aksiyon |
+|---|---|---|
+| BUG-A | [x] fix (runtime aktif) | — |
+| BUG-B | [x] fix (runtime aktif) | — |
+| C-29/BG-03 | [!] yanlış-pozitif | dosya yok → İPTAL, blocker'dan çıkar |
+| C-06 | [!] yanlış-pozitif | tip alanı zaten var → İPTAL (yan ürün: stale alias dead-code, ADR-038 adayı) |
+| C-04/BG-05 | [~] doğrulandı (mis-cited→gerçek) | `mid-sprint-adapter.ts:228/284` execSync→spawnSync array; davranış-koruyan TDD-fix adayı |
+| C-13/BG-08/BA-04 | [~] doğrulandı (CONFIRMED HIGH) | RBAC soft→hard: **davranış-değiştiren → ESCALATE** (soft bilinçli rollout mu? intent doğrula) |
+| C-14/BG-09 | [~] doğrulandı (CONFIRMED) | enforceVerifyLoop wire: **davranış-değiştiren → ESCALATE** |
+| C-03 | [~] doğrulandı (CONFIRMED) | rotateModelForFix ters-downgrade: **davranış-değiştiren → ESCALATE** (memory `project_fix_model_downgrade_bug`) |
+| C-05/C-07 | [~] doğrulandı (doc-drift) | DECKENT.md/api-surface default abartısı → doc-reorg batch (Sprint 172) |
+
+**Otonom-güvenli tek fix adayı:** C-04 (execSync→spawnSync array, ADR-006, davranış-koruyan). Diğer 3 CONFIRMED davranış-değiştiren/bootstrap-hassas → kullanıcı kararı (away-mode kuralı: davranış-değiştiren auto-commit YASAK, ready-to-apply escalate).
