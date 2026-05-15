@@ -180,18 +180,41 @@ export function getRubric(task: Task): EvaluationRubric {
 }
 
 /**
+ * Agents whose output is not always a coverage-instrumentable surface.
+ * Bug-fixer (forensic + targeted patches), security-auditor (audit reports),
+ * architect / architecture-planner (design + ADR work), and doc-writer
+ * routinely report coverage:null because their work doesn't produce a
+ * coverable test surface.
+ *
+ * Sprint 169.5 P0-1 — Spurious NO_GO cascade prevention (Sprint 169 169-001).
+ */
+const COVERAGE_OPTIONAL_AGENTS = new Set([
+  'bug-fixer',
+  'security-auditor',
+  'architect',
+  'architecture-planner',
+  'doc-writer',
+]);
+
+/**
  * Returns true when the task's rubric treats coverage as optional.
  *
  * Audit and document-write tasks do not produce executable code, so
  * coverage:null in their result file is acceptable. Code-development
- * tasks must report a numeric coverage value.
+ * tasks must report a numeric coverage value — UNLESS the task is
+ * assigned to an audit-like agent (bug-fixer / security-auditor /
+ * architect / architecture-planner / doc-writer), in which case coverage
+ * is also optional (Sprint 169.5 P0-1).
  *
- * Used by validateResultSchema to suppress the "missing coverage" error
- * for non-code task types — fixes Sprint 153 Bug B (coverage:null → NO_GO
- * on doc tasks).
+ * Used by validateResultSchema to suppress the "missing coverage" error.
+ * Fixes Sprint 153 Bug B (coverage:null → NO_GO on doc tasks) and
+ * Sprint 169 169-001 (bug-fixer agent coverage:null cascade).
  */
 export function coverageOptional(task: Task): boolean {
-  return detectTaskType(task) !== 'code-development';
+  if (detectTaskType(task) !== 'code-development') return true;
+  const agent = task.assignedAgent;
+  if (agent && COVERAGE_OPTIONAL_AGENTS.has(agent)) return true;
+  return false;
 }
 
 // ═══ EffectClass — Reversibility Tag (ADR-055 placeholder) ════════════

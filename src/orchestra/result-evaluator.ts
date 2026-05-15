@@ -1626,6 +1626,14 @@ function findBoundaryViolations(result: TaskResult, task: Task): string[] {
   const filesWrite = task.scope?.filesWrite ?? [];
   if (filesWrite.length === 0) return [];
 
+  // Sprint 169.5 P0-2 — worker protocol files are mandated by worker-default.md
+  // (plan, result, heartbeat) and must NOT be flagged as boundary violations.
+  const protocolFiles = new Set([
+    `.tasks/task-${task.id}.plan`,
+    `.tasks/task-${task.id}.result`,
+    `.tasks/task-${task.id}.hb`,
+  ]);
+
   const allowed = new Set(filesWrite.map(f => f.replace(/\\/g, '/')));
   const violations: string[] = [];
 
@@ -1633,6 +1641,7 @@ function findBoundaryViolations(result: TaskResult, task: Task): string[] {
     const norm = changed.replace(/\\/g, '/');
     // Allow direct match OR match under any allowed directory in scope
     if (allowed.has(norm)) continue;
+    if (protocolFiles.has(norm)) continue;
     // Scope-directory containment check
     const dirs = task.scope?.directories ?? [];
     const insideDir = dirs.some(d => {
