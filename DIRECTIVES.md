@@ -1,594 +1,274 @@
-# DIRECTIVES — Sprint 171: Self-Audit Mega-Sprint
+# DIRECTIVES — Sprint 172: Doc-Reorg + OSS GA
 
 ## Spec + Plan Referansları
 
-- **Spec:** `docs/superpowers/specs/2026-05-15-sprint-171-self-audit-design.md` (Alperen onaylı, commit `59818a6`)
-- **Plan (bağlayıcı kontrat):** `docs/superpowers/plans/2026-05-15-sprint-171-self-audit-plan.md` (commit `4d16762`) — her worker kendi Task bölümünü + ortak **Worker Contract** bölümünü mutlaka okur. Ayrıntılı per-task audit runbook + okunacak kaynak dosya listesi orada.
-- **Predecessor:** Sprint 170 GO_WITH_TECH_DEBT (`5ffbf3e`), bootstrap fix `5436497` (runtime aktif: `npm run build` + MCP restart yapıldı 2026-05-15).
-- **Successor:** Sprint 172 OSS GA — bu audit'in bulgu defteri + doc-reorg planı + AEGIS (ADR-061) manifestosu girdisi.
+- **Plan (bağlayıcı kontrat):** `docs/superpowers/plans/2026-05-16-sprint-172-doc-reorg-plan.md` (commit `c0678c0`) — her worker kendi Task bölümünü + aşağıdaki **Worker Contract**'ı mutlaka okur. Per-task adım/dosya/kanıt orada.
+- **Girdi:** `docs/audits/sprint-171/00-SYNTHESIS.md` §4 (ideal ağaç/dosya→hedef/ignore) + `docs/audits/sprint-171/00-VERIFICATION-LOG.md` (C-05/07, C-13, C-14, BA-03, BA-05 doğrulanmış verdict'ler).
+- **Predecessor:** Sprint 171 self-audit + manuel fix-phase (Bug A/B + C-03/C-04 + TMUX-SF FIX, BA-05 backfill `0771f6d`). Bootstrap runtime aktif.
+- **Kararlar (Alperen 2026-05-16):** 3 faz tek sprint sıralı A→C→B; EN kanonik + TR tam paralel korunur (hiçbir TR dosya silinmez/birleştirilmez); archive `git rm --cached` (disk'te kalır, geri-dönülebilir, DB-parity önce). memory.db'ye ASLA dokunulmaz.
 
 ## Goal
 
-Bootstrap fix runtime aktifken deckent'in 29 audit-only worker ile kendini tam-kapsamlı denetlemesi. İki hedef: (1) Meta-dogfood ispatı — spurious NO_GO 2-katmanlı RC fix production'da çalışıyor, 0 cascade; (2) OSS GA bulgu defteri — kod + doküman + DB doğruluk/gereklilik/içerik/referans denetimi, Sprint 172 public flip öncesi prioritized backlog + kusursuz doküman yapısı temeli. "1 virgül bile görülmemiş olmamalı" — her kaynak dosya tam 1 modül-task'a ait, coverage-map ile mekanik ispat.
+OSS GA öncesi dokümantasyonu (A) kullanıcı-yanıltan drift'lerden arındır, (C) drift'i kalıcı önleyen auto-gen pipeline kur, (B) ideal ağaca yeniden yapılandır. **GA flip kapısı = Faz A+C tam**; Faz B GA'yı bloklamaz, paralel/sonra. Sprint 171 fix-phase bootstrap'ı onardı; bu sprint dokümantasyonu public-ready yapar.
 
 ## Brain Planning Instructions
 
-Mode: structured yeterli (bootstrap fix runtime aktif, cascade beklenmiyor — AI planlama gerekmez). Wave yapısı: 5 wave (Wave 1 = 8 paralel, Wave 2 = 8, Wave 3 = 8, Wave 4 = 4, Wave 5 = 1 synthesis). Max workers: 8. `dependency_pipeline_enabled: false` olduğundan Wave geçişleri + Task 29 synthesis dispatch Brain manuel (ADR-047, Sprint 164-168 kanıtlı) — Wave 4 tüm DONE doğrulanmadan Task 29 spawn edilmez. Alperen review: sprint başlangıç (plan tablosu) + finalize 2 checkpoint. Provider: claude (OPENAI/GOOGLE key yok).
+Mode: structured. Wave: 3 (Wave 1 = Faz A 4 paralel, Wave 2 = Faz C 3, Wave 3 = Faz B 5). Max workers: 4. `dependency_pipeline_enabled: false` → Wave geçişleri + GATE doğrulamaları Brain manuel (ADR-047, Sprint 164-171 kanıtlı). **GA-GATE-C sonrası Alperen checkpoint: public flip + beta.2 onayı** (deckent otomatik flip ETMEZ). Wave 2, GATE-A tüm DONE doğrulanmadan başlamaz; Wave 3, GATE-C doğrulanmadan başlamaz. B2 blockedBy B1 (DB-parity şart). Alperen review: sprint başlangıç (plan tablosu) + GA-GATE-C (flip) + finalize. Provider: claude.
 
 ## Worker Contract
 
-Tüm worker'lar plan dosyasındaki kendi Task bölümünü + ortak **Worker Contract**'ı mutlaka okur (bağlayıcı kontrat — bkz. Plan Referansları). Özet invariant:
+Tüm worker'lar plan dosyasındaki kendi Task bölümünü + bu Worker Contract'ı mutlaka okur. Özet invariant:
 
-- **Audit-only:** SADECE atanan tek `docs/audits/sprint-171/` raporu yazılır. Kaynak/test/config/db/md hiçbir dosya modify EDİLMEZ. TDD YOK, fix worker spawn YOK.
-- **Çıktı dili ZORUNLU Türkçe** (kullanıcı reinforced 2026-05-15, ATLANMAZ): raporun tüm içeriği insan-okur Türkçe, doğru orthography (ç/ğ/ı/ö/ş/ü); teknik terim/identifier orijinal kalır. Hedef: deckent'i tanımayan mühendis raporu okuyup aksiyona geçebilmeli.
-- **Rapor şeması:** 4+1 bölüm — `## 1. Bulgular`, `## 2. Severity`, `## 3. Kanıt` (≥1 `file:line`), `## 4. Öneriler`, `## 5. Kapsam Haritası` (sadece modül-derin Task 1-14). Bir bölüm eksik/kanıtsız = task NO_GO.
-- **DB kuralı:** memory.db SADECE read-only `SELECT`. Yazma/DROP/rebuild KESİN YASAK.
-- `.tasks/task-<id>.result`: `selfAssessment: DONE`, `coverage: null` (audit task), `filesChanged` tek rapor.
+- **Bu sprint dosya YAZAR** (Sprint 171 audit-only değildi — bu farklı): atanan task scope'undaki .md/script/config dosyaları modify edilir. Scope DIŞINA yazma YASAK (ADR-037, auditor `git diff --stat` izler).
+- **TDD ZORUNLU (Faz C kod task'ları C1/C2/C3 + B1):** script = production kod → RED-GREEN-REFACTOR, test önce yazılır fail görülür. Faz A/B doc task'ları: kod yok, kanıt = `grep` + `npm run lint:link`/`docs:*:check` gate exit 0.
+- **Çıktı dili:** doküman içeriği OSS public için **README.md/VISION.md/CONTRIBUTING vb. = İngilizce (kanonik)**; README-TR.md/VISION-TR.md = Türkçe tam paralel. Worker raporu/notları Türkçe. Hiçbir TR dosya silinmez/birleştirilmez (Alperen kararı).
+- **memory.db kuralı:** SADECE read-only SELECT (B1 parity doğrulama). Yazma/DROP/rebuild KESİN YASAK. Archive temizliği `git rm --cached` (disk'te kalır).
+- **Kod gerçeği = tek-hakikat:** Faz A'da doc koda hizalanır (kod doğru olan yerde doc düzeltilir, davranış DEĞİŞMEZ). Yeni ADR uydurulmaz; ADR-010 amendment (supersede değil).
+- `.tasks/task-<id>.result`: `selfAssessment`, `filesChanged`, Faz C için `coverage` (test var); Faz A/B `coverage: null`.
 
 ## GO/NO_GO Criteria
 
-**Dual-gate (spec §9):**
+**Faz-gate (plan ⛔ GATE'leri):**
 
-*Kapı 1 — Orchestration Health (sprint geneli):* 29/29 task sonuç dosyası yazdı; 0 cascade; 0 spurious NO_GO; 0 fix worker spawn; Auditor boundary ihlali = 0 (sadece sprint-171 audit dizini değişti). Asıl ispat: bootstrap fix runtime aktif. Spurious NO_GO çıkarsa → fix runtime'da DEĞİL → build + MCP restart sırası gözden geçir, sprint durdur.
+- **GA-GATE-A:** A1-A4 commit'li; `grep` kanıtları geçer; hiçbir kod/test değişmedi (sadece .md+ADR); `npm run lint:adr` + `tsc --noEmit` temiz.
+- **GA-GATE-C / OSS FLIP:** C1-C3 commit'li; `npm run docs:stats:check && docs:ref:check && lint:link` hepsi exit 0; `prepublishOnly` gate'leri içerir. **Bu kapı geçilince public flip + beta.2 Alperen onayıyla AÇIK.**
+- **GATE-B:** B1-B5 commit'li; `lint:link`+`docs:stats:check`+`docs:ref:check`+`tsc --noEmit`+`npx vitest run` temiz; `npm pack --dry-run` temiz paket; CLAUDE.md/DECKENT.md tüm @ref geçerli.
 
-*Kapı 2 — İçerik Kalite (task bazlı):* Her rapor 4+1 zorunlu bölüm + ≥1 dosya:satır kanıt + Türkçe. Modül task'larda (Task 1-14) Kapsam Haritası mevcut + coverage-gap = 0. Eşiği geçmeyen task = task NO_GO (synthesis'te raporlanır, orchestration'ı bozmaz).
+**Sprint verdict:** **GO** = 3 gate tam. **GO_WITH_TECH_DEBT** = GA-GATE-A+C tam (GA açılabilir) + GATE-B kısmi (≤2 B-task re-iterate backlog). **NO_GO** = GA-GATE-A veya C ihlali (doc-honesty/auto-gen eksik → public flip YASAK).
 
-*Sprint verdict:* **GO** = Kapı 1 tam + ≥27/29 Kapı 2 + coverage-gap 0. **GO_WITH_TECH_DEBT** = Kapı 1 tam + 24-26 Kapı 2 (≤5 yüzeysel re-audit backlog). **NO_GO** = Kapı 1 ihlali (cascade/spurious/boundary — bootstrap fix regresyon sinyali).
+**Kritik:** Faz B eksikliği GA'yı bloklamaz (kararla post-GA paralel). GA-blocking SADECE Faz A (honesty) + Faz C (drift-proof).
 
-**Kritik bulguların doğası:** Bir audit task'ın CRITICAL bulgu raporlaması = başarılı audit, NO_GO DEĞİL. NO_GO sadece orchestration arızası.
+## Sprint 173+ Handoff
 
-## Sprint 172 OSS GA Handoff
-
-Sprint 171 GO (full) → Sprint 172 OSS GA conditional açar: doc-reorg uygulaması (badge→/docs), `VerhexIO/deckent-dev → VerhexIO/deckent` public flip, beta.2 yayını (Alperen onay), AEGIS manifestosu (ADR-061) public + Show HN. Sprint 171 GO_WTD → Sprint 172 conditional + 1 re-audit cycle. Sprint 171 NO_GO → bootstrap fix regresyon hotfix mikro-sprint, Sprint 172 ertelenir.
+Post-GA: integrity-hardening V2 (C-13 RBAC hard-flip + C-14 verify-gate wire + BA-05 ADR-046 hook crash-safe — davranış-değiştiren, ayrı sprint), coverage re-audit (SYNTHESIS §5.3 ~92 potansiyel gap), AEGIS manifesto içeriği (ADR-061).
 
 ---
 
-## Task 1: orchestra Lifecycle Audit
+## Task 1: A1 — dependency_pipeline_enabled provenance drift
 
-- Model: opus
+- Model: sonnet
+- Effort: normal
+- Skills: documentation-writer
+- Agent: doc-writer
+- Files: DECKENT.md, .contracts/api-surface.md
+- Scope: ./
+
+### Description
+
+C-05/07 doğrulanmış doc-drift. Kod gerçeği: `config.ts:600` default `true`, `:883 ?? true`; `.deckent/config.json:198 false` (bu proje bilinçli override). `DECKENT.md:51` "Sprint 167 flip: true — Wave goes live" bu projede YANLIŞ + `api-surface.md:83` "default since Sprint 156" ile çelişen provenance. Plan Task A1 adımlarını izle: DECKENT.md:51 → kod default true + bu proje false (Brain manuel wave) açıklaması; api-surface:83 → tek doğru köken. Kod/config DEĞİŞMEZ, sadece iki doküman.
+
+**Kanıt:** `grep -n "deckent-dev bu projede bilinçli false" DECKENT.md` → eklendi; iki dosyada çelişki yok.
+
+**Test:** Doc-only — `grep` kanıtı + `tsc --noEmit` temiz (kod değişmedi teyidi).
+
+---
+
+## Task 2: A2 — RBAC + verify-gate enforcement honesty
+
+- Model: sonnet
+- Effort: normal
+- Skills: system-architect, documentation-writer
+- Agent: architect
+- Files: CLAUDE.md, .deckent/workspace/IDENTITY.md, .claude/rules/worker-default.md
+- Scope: ./
+
+### Description
+
+C-13 + C-14 doğrulanmış. `authority-enforcer.ts:29` "always soft", `worker.ts:480 return true`, ADR-037 `decisions.md:1825` runtime eksik kabul; `enforceVerifyLoop`/`runTestVerifyLoop` 0-caller. Doküman bunu "runtime enforcement" diye abartıyor. Plan Task A2: CLAUDE.md gotcha + IDENTITY → "RBAC compile-time lint + audit-trail; runtime advisory/soft (ADR-037 V1.0 Layer-2 kasıtlı eksik, hard-flip V2)"; worker-default verify → "prompt talimatı, kod-enforce değil". Kod/test DEĞİŞMEZ (hard-flip post-GA V2).
+
+**Kanıt:** `grep -ni "runtime enforcement" CLAUDE.md .deckent/workspace/IDENTITY.md` → her geçiş "soft/advisory" niteleyicili.
+
+**Test:** Doc-only — grep kanıtı; kod/test değişmedi (`git diff --stat src/ tests/` boş).
+
+---
+
+## Task 3: A3 — ADR-010 amendment (7 runtime dep)
+
+- Model: sonnet
 - Effort: normal
 - Skills: system-architect
 - Agent: architect
-- Files: docs/audits/sprint-171/orchestra-lifecycle.md
-- Scope: docs/audits/sprint-171/
+- Files: docs/adr/010-tek-runtime-dependency.md
+- Scope: docs/adr/
 
 ### Description
 
-orchestra yaşam döngüsü modüllerinin (sprint-controller, brain, planner, task-builder, result-evaluator, result-collector, sprint-reporter, sprint-utils, decision-steps) char-level denetimi. Faz akışı kontrat ile tutarlı mı, ADR-008 import tek-yön + circular dependency, ADR-046/045/043/048 kod enforcement, bootstrap fix P0-1/P0-2 semantiği aktif mi, dead code, eksik prosedür. Çıktı raporu TÜM içeriğiyle insan-okur Türkçe yazılır (ZORUNLU). Plan dosyasının Task 171-001 bölümü bağlayıcı runbook'tur — okunacak tam kaynak dosya listesi + audit boyutları orada. Kapsam Haritası tablosu (her dosya + LoC) zorunlu.
+BA-03 doğrulanmış: package.json 7 runtime dep, ADR-010 metni "yalnızca commander" (Sprint 044 CLI-only kalıntısı). Plan Task A3: ADR-010'a **Amendment** bölümü ekle (supersede DEĞİL — accepted kalır) — 7 dep'in her biri sonraki accepted ADR'ye map'li (@modelcontextprotocol/sdk←ADR-017, better-sqlite3←Memory V2, telegraf/discord←ADR-016, zod←plan validation, @noble←ADR-014). Güncel ilke: minimal + ADR-gerekçeli; keyfi ekleme hâlâ yasak. DB adr-010 entry ile tutarlı (kanonik DB ise MemoryStore upsert).
 
-**Kanıt:** `docs/audits/sprint-171/orchestra-lifecycle.md` mevcut, 4+1 bölüm dolu, Türkçe, ≥1 file:line kanıt + Kapsam Haritası tam.
+**Kanıt:** ADR-010 Amendment'ta 7 dep ADR-map'li; `npm run lint:adr` geçer.
 
-**Test:** Audit-only — kod/test yazımı yok; rapor self-review (4+1 bölüm + Türkçe + kanıt + kapsam).
+**Test:** Doc-only — `npm run lint:adr` exit 0.
 
 ---
 
-## Task 2: orchestra Routing + Evaluation Audit
+## Task 4: A4 — README 5-drift badge gerçek değer
 
-- Model: opus
+- Model: sonnet
 - Effort: normal
-- Skills: typescript-expert
-- Agent: architect
-- Files: docs/audits/sprint-171/orchestra-routing.md
-- Scope: docs/audits/sprint-171/
+- Skills: documentation-writer
+- Agent: doc-writer
+- Files: README.md, README-TR.md
+- Scope: ./
 
 ### Description
 
-orchestra routing/evaluation modüllerinin (task-router, outcome-tracker, quality-assessor, mid-sprint-adapter, rule-evolver, debt-manager, rubric-registry) denetimi. rubric-registry isAuditTask/coverageOptional mantığı + `docs/audits` hardcoded konvansiyon vs kullanıcı zihin modeli uyumsuzluğu (CRITICAL doc-vs-code drift), debt-manager rotateModelForFix fix-model-downgrade tasarım hatası (kanıtla + öneri), 6-level routing, learning bonus race, dead code. Çıktı raporu TÜM içeriğiyle insan-okur Türkçe (ZORUNLU). Plan Task 171-002 bölümü bağlayıcı runbook. Kapsam Haritası zorunlu.
+C-41/BD-01 doğrulanmış: README "16434+ tests / dashboard pages / 27 MCP tools / 60+ ADR / custom+2 agent" 5 drift bir arada (OSS ilk-vitrin yanılgı). Plan Task A4: gerçek değerleri komutla topla (vitest gerçek pass, `ls src/dashboard/pages`, `grep -c registerTool src/mcp/server.ts`, `getByType('adr').length`, `ls .deckent/agents`), README.md + README-TR.md senkron düzelt (EN kanonik, TR paralel — karar). Manuel düzeltme = Faz C auto-gen'e köprü.
 
-**Kanıt:** `docs/audits/sprint-171/orchestra-routing.md` mevcut, 4+1 bölüm dolu, Türkçe, ≥1 file:line + Kapsam Haritası.
+**Kanıt:** README.md her sayı Step 1 komut çıktısıyla eşleşir; README-TR.md senkron.
 
-**Test:** Audit-only — rapor self-review.
+**Test:** Doc-only — sayı↔komut eşleşme kanıtı.
 
 ---
 
-## Task 3: orchestra Infra Audit
+## Task 5: C1 — update-readme-stats.mjs auto-gen + CI gate
 
 - Model: opus
-- Effort: normal
-- Skills: docker-expert
+- Effort: high
+- Skills: typescript-expert, ci-testing
 - Agent: devops-engineer
-- Files: docs/audits/sprint-171/orchestra-infra.md
-- Scope: docs/audits/sprint-171/
+- Files: scripts/update-readme-stats.mjs, README.md, README-TR.md, .deckent/workspace/IDENTITY.md, package.json, tests/scripts/update-readme-stats.test.ts
+- Scope: scripts/, tests/scripts/, ./
 
 ### Description
 
-orchestra altyapı modüllerinin (tmux, spawn-backend, spawn-backend-docker, temp-skill-generator, promotion-pipeline, event-stream, file-lock, doc-updaters, managed-docs) denetimi. Sprint 170 P0-3 tmux taskId-aware fix aktif mi, P0-5 Docker race window closure aktif mi, P0-6 event stream PROMPT_WRITE/DELETE channel EKSİK mi (HIGH bulgu), ADR-027/048 enforcement, ADR-006 spawnSync güvenlik pattern, dead code. Çıktı raporu TÜM içeriğiyle insan-okur Türkçe (ZORUNLU). Plan Task 171-003 bölümü bağlayıcı runbook. Kapsam Haritası zorunlu.
+Plan Task C1 (TDD ZORUNLU). RED: `--check` stale badge'de exit≠0 testi (script yok → fail). GREEN: script gerçek kaynaklardan okur (vitest count, dashboard pages, registerTool, ADR DB, agents), README/README-TR/IDENTITY'deki `<!-- AUTOGEN:stat -->` bloklarını değiştirir; `--check`/`--write` modları. A4 manuel değerleri marker içine alınır. package.json `docs:stats`/`docs:stats:check` + `prepublishOnly --check`.
 
-**Kanıt:** `docs/audits/sprint-171/orchestra-infra.md` mevcut, 4+1 bölüm dolu, Türkçe, ≥1 file:line + Kapsam Haritası.
+**Kanıt:** `npm run docs:stats:check` exit 0; `tests/scripts/update-readme-stats.test.ts` PASS (RED→GREEN izlendi).
 
-**Test:** Audit-only — rapor self-review.
+**Test:** TDD — stale-fail + güncel-pass + marker-replace 3+ test.
 
 ---
 
-## Task 4: core Types + Config Audit
+## Task 6: C2 — reference docs auto-gen (MCP/ADR/CLI/agents)
 
 - Model: opus
-- Effort: normal
-- Skills: typescript-expert
-- Agent: architect
-- Files: docs/audits/sprint-171/core-types-config.md
-- Scope: docs/audits/sprint-171/
+- Effort: high
+- Skills: typescript-expert, api-builder
+- Agent: api-builder
+- Files: scripts/gen-reference-docs.mjs, docs/reference/mcp-tools.md, docs/reference/mcp-resources.md, docs/adr/README.md, docs/reference/cli.md, docs/reference/agents.md, package.json, tests/scripts/gen-reference-docs.test.ts
+- Scope: scripts/, tests/scripts/, docs/reference/, docs/adr/, ./
 
 ### Description
 
-core tip ve config modüllerinin (types, *-types, config, model-registry, mode-presets, condition-evaluator, manifest-migrator) denetimi. config 3-layer merge + dependency_pipeline_enabled default kod gerçeği vs doküman "Sprint 167'den true" iddiası (CRITICAL doc-vs-code drift, kanıtla), model-registry 13 model doküman birebir mi, Task/Result interface kontrat tutarlılığı, condition-evaluator injection, kullanılmayan type export. Çıktı raporu TÜM içeriğiyle insan-okur Türkçe (ZORUNLU). Plan Task 171-004 bölümü bağlayıcı runbook. Kapsam Haritası zorunlu.
+Plan Task C2 (TDD). RED: `--check` stale fail testi. GREEN: 5 üretici — MCP tools (`server.ts` registerTool parse), MCP resources, ADR index (`store.getByType('adr')` tablo), CLI (`commander` introspect), agents (DB/.deckent/agents). `--check` CI gate + `--write`. package.json `docs:ref`/`docs:ref:check` + prepublishOnly. Üretilen sayılar Faz A değerleriyle tutarlı.
 
-**Kanıt:** `docs/audits/sprint-171/core-types-config.md` mevcut, 4+1 bölüm dolu, Türkçe, ≥1 file:line + Kapsam Haritası.
+**Kanıt:** `npm run docs:ref:check` exit 0; test PASS; mcp-tools.md sayısı `grep -c registerTool` ile eşleşir.
 
-**Test:** Audit-only — rapor self-review.
+**Test:** TDD — 5 üretici × stale-fail/güncel-pass; 5+ test.
 
 ---
 
-## Task 5: core Memory Subsystem Audit
+## Task 7: C3 — lint:link dead-link gate
+
+- Model: opus
+- Effort: high
+- Skills: typescript-expert, devops-engineer
+- Agent: devops-engineer
+- Files: scripts/lint-links.mjs, docs/.vitepress/config.ts, package.json, tests/scripts/lint-links.test.ts
+- Scope: scripts/, tests/scripts/, docs/.vitepress/, ./
+
+### Description
+
+Plan Task C3 (TDD). RED: script kırık relatif .md link'te exit≠0 (mevcut kırık link'ler — SYNTHESIS Wave 4). GREEN: `lint-links.mjs` (relatif link + anchor doğrula), `config.ts` `ignoreDeadLinks:false`, package.json `lint:link`. Mevcut kırık link'ler düzeltilir (bu gate Faz B taşımalarını korur — B3/B4 ön-koşulu).
+
+**Kanıt:** `npm run lint:link` exit 0 (mevcut kırıklar düzeltildi); test PASS.
+
+**Test:** TDD — kırık-link-fail + temiz-pass + anchor 3+ test.
+
+---
+
+## Task 8: B1 — archive DB-parity doğrulama (B2 ön-koşulu)
 
 - Model: opus
 - Effort: normal
 - Skills: database-migration
 - Agent: data-engineer
-- Files: docs/audits/sprint-171/core-memory.md
-- Scope: docs/audits/sprint-171/
+- Files: scripts/verify-archive-db-parity.mjs, docs/audits/sprint-171/archive-parity-report.md
+- Scope: scripts/, docs/audits/sprint-171/
 
 ### Description
 
-core bellek alt sisteminin (memory-store, memory-query, memory-normalize, memory-types, memory-export, memory-import) denetimi. insertRelation/getRelations API doğru mu (Sprint 169 C1), rebuild safety relations preserve + rollback contract (Sprint 169 C2 Bug Z3), ADR DB↔FS bi-directional hook idempotent mi (Sprint 169 H1), turkishNormalize TR/EN/DE edge case (ı/İ/ğ/ß), buildAutoQuery injection, dead code. Çıktı raporu TÜM içeriğiyle insan-okur Türkçe (ZORUNLU). Plan Task 171-005 bölümü bağlayıcı runbook. Kapsam Haritası zorunlu.
+Plan Task B1. Read-only script: her `.brain/archive/sprint-*.md` + `retro-sprint-*.md` için DB'de karşılık (store sprint/retro entry) var mı (read-only SELECT, BA-05 backfill sonrası 167 dahil). Rapor: parity-OK vs DB-eksik liste. **DB-eksik HİÇBİR dosya git rm edilmez** (önce backfill — BA-05 deseni). memory.db SADECE read-only.
 
-**Kanıt:** `docs/audits/sprint-171/core-memory.md` mevcut, 4+1 bölüm dolu, Türkçe, ≥1 file:line + Kapsam Haritası.
+**Kanıt:** `node scripts/verify-archive-db-parity.mjs` → "N parity-OK, M eksik" raporu; M dosyaları B2 kapsamı dışı.
 
-**Test:** Audit-only — rapor self-review.
-
----
-
-## Task 6: core Pools + Routing Audit
-
-- Model: opus
-- Effort: normal
-- Skills: typescript-expert
-- Agent: architect
-- Files: docs/audits/sprint-171/core-pools-routing.md
-- Scope: docs/audits/sprint-171/
-
-### Description
-
-core havuz ve routing modüllerinin (agent-pool, skill-pool, skill-registry, provider, routing-engine, intent-classifier, activation-engine, builtins, marketplace, rule-templates, notify-adapters, notification-providers) denetimi. 15 agent + 21 skill doküman birebir mi, AST sandbox bypass riski, routeTaskV2 confidence + override resolution, exclude support, provider fallback chain (tek retry sonsuz döngü yok), dead code. Çıktı raporu TÜM içeriğiyle insan-okur Türkçe (ZORUNLU). Plan Task 171-006 bölümü bağlayıcı runbook. Kapsam Haritası zorunlu.
-
-**Kanıt:** `docs/audits/sprint-171/core-pools-routing.md` mevcut, 4+1 bölüm dolu, Türkçe, ≥1 file:line + Kapsam Haritası.
-
-**Test:** Audit-only — rapor self-review.
+**Test:** Read-only script — parity raporu doğruluğu (örnek dosya DB-lookup spot-check).
 
 ---
 
-## Task 7: agents Audit
+## Task 9: B2 — .gitignore/.npmignore + archive git rm --cached
 
-- Model: opus
+- Model: sonnet
 - Effort: normal
-- Skills: typescript-expert
-- Agent: architect
-- Files: docs/audits/sprint-171/agents.md
-- Scope: docs/audits/sprint-171/
-
-### Description
-
-agents worker yürütme modüllerinin (worker, adaptive-agent + tüm 20 modül) denetimi. Task claim/file locking/heartbeat/result write doğruluğu, ADR-037 RBAC runtime scope enforcement aktif mi (scope dışına yazamaz), verify loop (max 3 deneme) kod gerçeği, ADR-035/047 enforcement, adaptive-agent race/state corruption, dead code, type safety. Çıktı raporu TÜM içeriğiyle insan-okur Türkçe (ZORUNLU). Plan Task 171-007 bölümü bağlayıcı runbook. Kapsam Haritası zorunlu.
-
-**Kanıt:** `docs/audits/sprint-171/agents.md` mevcut, 4+1 bölüm dolu, Türkçe, ≥1 file:line + Kapsam Haritası.
-
-**Test:** Audit-only — rapor self-review.
-
----
-
-## Task 8: nervous Audit
-
-- Model: opus
-- Effort: normal
-- Skills: system-architect
-- Agent: architect
-- Files: docs/audits/sprint-171/nervous.md
-- Scope: docs/audits/sprint-171/
-
-### Description
-
-nervous proaktif meta-orchestrator modüllerinin (observer, detector-registry, decision-engine, proposer, dispatcher, executor, authority-matrix, runtime-scope-check, history, detectors) denetimi. ADR-040 mimari kod gerçeği vs doküman, observer→executor akışı kopuk halka, authority-matrix + runtime-scope-check ADR-037 RBAC enforcement gerçek mi, dead detector, history persist, eksik prosedür. Çıktı raporu TÜM içeriğiyle insan-okur Türkçe (ZORUNLU). Plan Task 171-008 bölümü bağlayıcı runbook. Kapsam Haritası zorunlu.
-
-**Kanıt:** `docs/audits/sprint-171/nervous.md` mevcut, 4+1 bölüm dolu, Türkçe, ≥1 file:line + Kapsam Haritası.
-
-**Test:** Audit-only — rapor self-review.
-
----
-
-## Task 9: monitor + connectors Audit
-
-- Model: opus
-- Effort: normal
-- Skills: typescript-expert
-- Agent: architect
-- Files: docs/audits/sprint-171/monitor-connectors.md
-- Scope: docs/audits/sprint-171/
-
-### Description
-
-monitor (auditor scan loop, dashboard-manager, sprint-state) ve connectors (discord, telegram, whatsapp, incoming-router) modüllerinin denetimi. Auditor kaynak kod yazmaz garantisi kod düzeyinde mi, stale heartbeat/lock/boundary detection doğru mu (stale_heartbeat tekrar eden pattern RC), connector secret leakage + input validation, ADR-016 lifecycle, dead code. Çıktı raporu TÜM içeriğiyle insan-okur Türkçe (ZORUNLU). Plan Task 171-009 bölümü bağlayıcı runbook. Kapsam Haritası zorunlu.
-
-**Kanıt:** `docs/audits/sprint-171/monitor-connectors.md` mevcut, 4+1 bölüm dolu, Türkçe, ≥1 file:line + Kapsam Haritası.
-
-**Test:** Audit-only — rapor self-review.
-
----
-
-## Task 10: providers + api Audit
-
-- Model: opus
-- Effort: normal
-- Skills: api-builder
-- Agent: api-builder
-- Files: docs/audits/sprint-171/providers-api.md
-- Scope: docs/audits/sprint-171/
-
-### Description
-
-providers (claude, codex, gemini adapter) ve api (HTTP server, SSE, rate limiting) modüllerinin denetimi. ADR-017 MCP-Native, fallback semantiği, API key yokken graceful mı, claude adapter event stream wire eksik mi, api auth/injection/DoS yüzeyi (OSS public öncesi kritik), dead code, type safety. Çıktı raporu TÜM içeriğiyle insan-okur Türkçe (ZORUNLU). Plan Task 171-010 bölümü bağlayıcı runbook. Kapsam Haritası zorunlu.
-
-**Kanıt:** `docs/audits/sprint-171/providers-api.md` mevcut, 4+1 bölüm dolu, Türkçe, ≥1 file:line + Kapsam Haritası.
-
-**Test:** Audit-only — rapor self-review.
-
----
-
-## Task 11: mcp Audit
-
-- Model: opus
-- Effort: normal
-- Skills: api-builder
-- Agent: api-builder
-- Files: docs/audits/sprint-171/mcp.md
-- Scope: docs/audits/sprint-171/
-
-### Description
-
-mcp sunucu modüllerinin (server, 27 tool, 8 resource, helpers) denetimi. Tool/resource sayıları doküman birebir mi, input schema validation injection + path traversal (root param), deckent_kill/cleanup destructive Alperen-onay gate kod gerçeği, stdio transport, MCP server cache gotcha doküman vs kod, dead code. Çıktı raporu TÜM içeriğiyle insan-okur Türkçe (ZORUNLU). Plan Task 171-011 bölümü bağlayıcı runbook. Kapsam Haritası zorunlu.
-
-**Kanıt:** `docs/audits/sprint-171/mcp.md` mevcut, 4+1 bölüm dolu, Türkçe, ≥1 file:line + Kapsam Haritası.
-
-**Test:** Audit-only — rapor self-review.
-
----
-
-## Task 12: cli Audit
-
-- Model: opus
-- Effort: normal
-- Skills: typescript-expert
-- Agent: architect
-- Files: docs/audits/sprint-171/cli.md
-- Scope: docs/audits/sprint-171/
-
-### Description
-
-cli komut modüllerinin (55+ komut, helpers, entry) denetimi. Komut sayısı doküman vs gerçek, register-pattern (ADR-012) tutarlı mı, ADR-010 tek runtime dependency ihlali, ADR-022-v2 CLI/MCP feature parity, recovery chain kod gerçeği, komut arg injection + path traversal, dead code. Çıktı raporu TÜM içeriğiyle insan-okur Türkçe (ZORUNLU). Plan Task 171-012 bölümü bağlayıcı runbook. Kapsam Haritası zorunlu.
-
-**Kanıt:** `docs/audits/sprint-171/cli.md` mevcut, 4+1 bölüm dolu, Türkçe, ≥1 file:line + Kapsam Haritası.
-
-**Test:** Audit-only — rapor self-review.
-
----
-
-## Task 13: dashboard Audit
-
-- Model: opus
-- Effort: normal
-- Skills: react-specialist
-- Agent: frontend-designer
-- Files: docs/audits/sprint-171/dashboard.md
-- Scope: docs/audits/sprint-171/
-
-### Description
-
-dashboard React+Vite+Tailwind modüllerinin (7 sayfa, component, analytics, api) denetimi. Build CI gate mevcut + doğru mu, accessibility WCAG (semantic HTML, ARIA, keyboard, kontrast — OSS öncesi temel), XSS yüzeyi (React ham HTML enjeksiyon prop'u, sanitize edilmemiş SSE/API render), client bundle secret expose, dead component, type safety. Çıktı raporu TÜM içeriğiyle insan-okur Türkçe (ZORUNLU). Plan Task 171-013 bölümü bağlayıcı runbook. Kapsam Haritası zorunlu.
-
-**Kanıt:** `docs/audits/sprint-171/dashboard.md` mevcut, 4+1 bölüm dolu, Türkçe, ≥1 file:line + Kapsam Haritası.
-
-**Test:** Audit-only — rapor self-review.
-
----
-
-## Task 14: extensions + scripts Audit
-
-- Model: opus
-- Effort: normal
-- Skills: devops-engineer
+- Skills: git-expert, devops-engineer
 - Agent: devops-engineer
-- Files: docs/audits/sprint-171/extensions-scripts.md
-- Scope: docs/audits/sprint-171/
+- Files: .gitignore, .npmignore
+- Scope: ./
+- Dependencies: ["172-008"]
 
 ### Description
 
-VS Code extension host ve script dizini (45 dosya) denetimi. Extension activation/command registration/workspace-trust güvenlik, her script ne yapıyor + çağrılıyor mu (dead script) + shell injection + hardcoded path/secret, Sprint 169 memory scriptleri idempotent + db-silmek-yasak ihlali yok mu, secret-baseline 10 pattern doğru mu, eksik prosedür. Çıktı raporu TÜM içeriğiyle insan-okur Türkçe (ZORUNLU). Plan Task 171-014 bölümü bağlayıcı runbook. Kapsam Haritası zorunlu.
+Plan Task B2 (B1 parity ŞART). `.gitignore`'a SYNTHESIS §4.3 blok; `.npmignore` oluştur (§4.3 npmignore). `git rm --cached -r` SADECE B1 parity-OK + ignore kapsamı (dosyalar DİSKTE KALIR). memory.db ASLA. `npm pack --dry-run` temiz paket doğrula.
 
-**Kanıt:** `docs/audits/sprint-171/extensions-scripts.md` mevcut, 4+1 bölüm dolu, Türkçe, ≥1 file:line + Kapsam Haritası.
+**Kanıt:** `npm pack --dry-run` internal state yok + boyut düştü; `ls .brain/archive | head` dosyalar diskte; `git status` temiz.
 
-**Test:** Audit-only — rapor self-review.
+**Test:** Doc/git-only — `npm pack --dry-run` çıktı + disk-mevcudiyet kanıtı.
 
 ---
 
-## Task 15: Dead Code + ESM Hygiene Audit
+## Task 10: B3 — kök → docs/ taşıma + redirect
 
-- Model: opus
+- Model: sonnet
+- Effort: high
+- Skills: documentation-writer, git-expert
+- Agent: doc-writer
+- Files: docs/vision/, docs/release/, docs/reference/, CLAUDE.md, DECKENT.md
+- Scope: docs/, ./
+- Dependencies: ["172-007"]
+
+### Description
+
+Plan Task B3 (C3 lint:link gate aktif olmalı). git mv per SYNTHESIS §4.2: BETA-TRACKER→docs/release/, COMPETITIVE-ANALYSIS→docs/vision/, ROADMAP-GOD-LEVEL(root+docs)→docs/vision/roadmap.md (birleştir), BLUEPRINT/MASTER-BLUEPRINT→docs/vision/blueprint.md, VISION.md+VISION-TR.md→docs/vision/ (**TR korunur**), .contracts/api-surface.md→docs/reference/ (CLAUDE.md @ref güncelle). Sil: NEXT-SESSION.md, next-session-prompt.md, docs/analysis/full-audit.md. Redirect: docs/CHANGELOG.md→root, docs/launch/CONDUCT.md→root. Her taşımada `npm run lint:link`.
+
+**Kanıt:** `npm run lint:link` exit 0 (0 kırık); CLAUDE.md/DECKENT.md @ref'leri geçerli (`grep @.contracts` güncellenmiş).
+
+**Test:** Doc-only — lint:link gate + @ref geçerlilik.
+
+---
+
+## Task 11: B4 — worker-guide 3→1 + ADR-046 dup merge + reference rename
+
+- Model: sonnet
+- Effort: high
+- Skills: documentation-writer
+- Agent: doc-writer
+- Files: docs/guide/workers.md, docs/adr/, docs/reference/
+- Scope: docs/, .deckent/workspace/
+- Dependencies: ["172-007"]
+
+### Description
+
+Plan Task B4. 3 worker-guide (docs/development/, docs/, .deckent/workspace/WORKER-GUIDE.md) → docs/guide/workers.md canonical; workspace 1-satır refer (runtime @ref kırılmaz — doğrula). ADR-046 iki dosya → tek + Amendment section, DB adr-046 tutarlı. 3 reference çifti lowercase rename + link fix. Her adımda `npm run lint:link`.
+
+**Kanıt:** `lint:link` exit 0; ADR-046 tek dosya; DB↔FS ADR parity; workspace @ref runtime kırılmadı.
+
+**Test:** Doc-only — lint:link + ADR-046 tekillik + @ref runtime smoke.
+
+---
+
+## Task 12: B5 — deckent-hub kararı + examples workspace fix
+
+- Model: sonnet
 - Effort: normal
-- Skills: code-simplifier
+- Skills: monorepo-expert
 - Agent: refactorer
-- Files: docs/audits/sprint-171/dead-code.md
-- Scope: docs/audits/sprint-171/
+- Files: examples/quickstart/package.json
+- Scope: examples/, ./
 
 ### Description
 
-Tüm kaynak tabanında cross-cutting ölü kod denetimi: hiçbir yerden import edilmeyen export, ulaşılamaz dal (erken return/throw sonrası, if-false), ESM `.js` uzantı eksiği (ADR-002 Node16 — derleme kırığı riski), import cycle + aşırı depth, `_` prefix susturulmuş unused var. Her aday için SİL/KORU önerisi (ADR-038 dispose formatı). Çıktı raporu TÜM içeriğiyle insan-okur Türkçe (ZORUNLU). Plan Task 171-015 bölümü bağlayıcı runbook (cross-cut — Kapsam Haritası yok).
+Plan Task B5. `examples/quickstart/package.json` `workspace:*` → `^1.0.0-beta.1` (OSS'te workspace protokolü çözülmez). deckent-hub disposition (SYNTHESIS "karar" flag): git submodule mi inline+pubkey mi — **Alperen mini-onay gerekli** (worker bu kararı VERMEZ, checkpoint question yazar, otonom ilerlemez).
 
-**Kanıt:** `docs/audits/sprint-171/dead-code.md` mevcut, 4+1 bölüm dolu, Türkçe, her aday file:line kanıtlı.
+**Kanıt:** examples/quickstart/package.json `^1.0.0-beta.1`; deckent-hub kararı Alperen checkpoint'e bağlı (worker önermez, sorar).
 
-**Test:** Audit-only — rapor self-review.
-
----
-
-## Task 16: ADR Compliance Audit
-
-- Model: opus
-- Effort: normal
-- Skills: system-architect
-- Agent: architect
-- Files: docs/audits/sprint-171/adr-compliance.md
-- Scope: docs/audits/sprint-171/
-
-### Description
-
-46+ accepted ADR'nin her biri için kod enforcement var mı yoksa sadece doküman mı (tablo: ADR-ID | Enforced? | Kanıt file:line | Drift). Öncelikli drift adayları: ADR-045 dependency_pipeline_enabled config false vs doküman true, ADR-046 bi-directional hook, ADR-048 prompt lifecycle, ADR-008 import tek-yön, ADR-037 RBAC, ADR-006 spawnSync. ADR DB↔FS 3'lü tutarlılık (export vs md dosya vs DB count). proposed ADR kısmi implement mi. En ciddi drift CRITICAL. Çıktı raporu TÜM içeriğiyle insan-okur Türkçe (ZORUNLU). Plan Task 171-016 bölümü bağlayıcı runbook (cross-cut — Kapsam Haritası yok).
-
-**Kanıt:** `docs/audits/sprint-171/adr-compliance.md` mevcut, 4+1 bölüm dolu, Türkçe, her ADR satırı kanıtlı.
-
-**Test:** Audit-only — rapor self-review.
-
----
-
-## Task 17: Security Audit
-
-- Model: opus
-- Effort: normal
-- Skills: security-specialist
-- Agent: security-auditor
-- Files: docs/audits/sprint-171/security.md
-- Scope: docs/audits/sprint-171/
-
-### Description
-
-Tüm kaynak + script + config'te OWASP top 10 cross-cutting denetimi. Command injection (tüm spawnSync/exec array-arg mı, ADR-006 ihlali CRITICAL), path traversal (root/taskId/dosya param sanitize, `../` escape), secret leakage (hardcoded key/token, log, client bundle, .deck ADR-014), secret-baseline yeterli mi, commit'lenmiş secret riski (OSS public öncesi kritik). Çıktı raporu TÜM içeriğiyle insan-okur Türkçe (ZORUNLU). Plan Task 171-017 bölümü bağlayıcı runbook (cross-cut — Kapsam Haritası yok).
-
-**Kanıt:** `docs/audits/sprint-171/security.md` mevcut, 4+1 bölüm dolu, Türkçe, her bulgu file:line kanıtlı.
-
-**Test:** Audit-only — rapor self-review.
-
----
-
-## Task 18: Performance Audit
-
-- Model: opus
-- Effort: normal
-- Skills: performance-optimizer
-- Agent: performance-analyzer
-- Files: docs/audits/sprint-171/performance.md
-- Scope: docs/audits/sprint-171/
-
-### Description
-
-Tüm kaynakta cross-cutting performans denetimi. Sync I/O sıcak döngüde (scan loop, evaluate, spawn — ADR-005 deprecated ile çelişki), memory leak (kapatılmayan handle, biriken Map/Set, listener leak), async anti-pattern (await-in-loop, unhandled promise, seri yerine Promise.all), N+1. Hot path öncelikli, ölçülebilir öneri. Çıktı raporu TÜM içeriğiyle insan-okur Türkçe (ZORUNLU). Plan Task 171-018 bölümü bağlayıcı runbook (cross-cut — Kapsam Haritası yok).
-
-**Kanıt:** `docs/audits/sprint-171/performance.md` mevcut, 4+1 bölüm dolu, Türkçe, her bulgu file:line kanıtlı.
-
-**Test:** Audit-only — rapor self-review.
-
----
-
-## Task 19: Type Safety Audit
-
-- Model: opus
-- Effort: normal
-- Skills: typescript-expert
-- Agent: architect
-- Files: docs/audits/sprint-171/type-safety.md
-- Scope: docs/audits/sprint-171/
-
-### Description
-
-Tüm kaynakta cross-cutting tip güvenliği denetimi. any/unknown kullanımı (her `: any`/`as any`/`@ts-ignore`/`@ts-expect-error` file:line + risk), unsafe assertion (`as Foo` runtime kontrolsüz, aşırı non-null `!`), missing return type (implicit any), tsconfig kapalı strict flag, ADR-001 disiplini. Risk severity'li. Çıktı raporu TÜM içeriğiyle insan-okur Türkçe (ZORUNLU). Plan Task 171-019 bölümü bağlayıcı runbook (cross-cut — Kapsam Haritası yok).
-
-**Kanıt:** `docs/audits/sprint-171/type-safety.md` mevcut, 4+1 bölüm dolu, Türkçe, her bulgu file:line kanıtlı.
-
-**Test:** Audit-only — rapor self-review.
-
----
-
-## Task 20: Error Handling Audit
-
-- Model: opus
-- Effort: normal
-- Skills: typescript-expert
-- Agent: architect
-- Files: docs/audits/sprint-171/error-handling.md
-- Scope: docs/audits/sprint-171/
-
-### Description
-
-Tüm kaynakta cross-cutting hata yönetimi denetimi. Yutulan hata (boş catch, log'suz catch, `.catch(()=>{})`), boundary try/catch eksiği (subprocess/dosya/JSON.parse/DB/network fail-safe yok), fail-safe/fallback pattern (kritik yollar ADR-035 Layer 4 fail-safe'li mi), hata yutmanın spurious NO_GO'ya katkısı (Sprint 169 RC ilişki). Kritik yol öncelikli. Çıktı raporu TÜM içeriğiyle insan-okur Türkçe (ZORUNLU). Plan Task 171-020 bölümü bağlayıcı runbook (cross-cut — Kapsam Haritası yok).
-
-**Kanıt:** `docs/audits/sprint-171/error-handling.md` mevcut, 4+1 bölüm dolu, Türkçe, her bulgu file:line kanıtlı.
-
-**Test:** Audit-only — rapor self-review.
-
----
-
-## Task 21: Test Integrity Audit
-
-- Model: opus
-- Effort: normal
-- Skills: ci-testing
-- Agent: ci-guardian
-- Files: docs/audits/sprint-171/test-integrity.md
-- Scope: docs/audits/sprint-171/
-
-### Description
-
-Tüm test tabanı + vitest config + package.json cross-cutting bütünlük denetimi. 807 test gerçek coverage iddiası (89.33%) doğrulanabilir mi, flaky pattern (timer/sleep/sıra/race bağımlı), mock drift (mock export gerçek ile uyumsuz — Sprint 170 170-001 5 legacy literal-string fixture), kalıcı skip/`.only`/`.todo` sayımı, vitest baseline (pass ≥16475 + fail ≤2 + skip ≤41), dashboard test ayrı config. Çıktı raporu TÜM içeriğiyle insan-okur Türkçe (ZORUNLU). Plan Task 171-021 bölümü bağlayıcı runbook (cross-cut — Kapsam Haritası yok).
-
-**Kanıt:** `docs/audits/sprint-171/test-integrity.md` mevcut, 4+1 bölüm dolu, Türkçe, her bulgu file:line kanıtlı.
-
-**Test:** Audit-only — rapor self-review.
-
----
-
-## Task 22: Memory V2 DB Integrity Audit
-
-- Model: opus
-- Effort: normal
-- Skills: database-migration
-- Agent: data-engineer
-- Files: docs/audits/sprint-171/memory-db-integrity.md
-- Scope: docs/audits/sprint-171/
-
-### Description
-
-core bellek modülleri + memory.db (read-only) + export'lar cross-cutting integrity denetimi. Schema 5 tablo + FTS5 + schema_version kontrat birebir mi, FTS5 8 sütun index drift, relations FK orphan + Sprint 169 C1 sonrası count>0 mı, decay doğruluğu + decay_exempt korunur mu, entry_history eksiksiz mi, DB-vs-export drift. memory.db SADECE read-only SELECT — yazma/DROP/rebuild KESİN YASAK. Çıktı raporu TÜM içeriğiyle insan-okur Türkçe (ZORUNLU). Plan Task 171-022 bölümü bağlayıcı runbook (cross-cut — Kapsam Haritası yok).
-
-**Kanıt:** `docs/audits/sprint-171/memory-db-integrity.md` mevcut, 4+1 bölüm dolu, Türkçe, her bulgu file:line/SQL kanıtlı.
-
-**Test:** Audit-only — rapor self-review.
-
----
-
-## Task 23: Doc Audit Root
-
-- Model: opus
-- Effort: normal
-- Skills: documentation-writer
-- Agent: doc-writer
-- Files: docs/audits/sprint-171/docs-root.md
-- Scope: docs/audits/sprint-171/
-
-### Description
-
-Repo kök dizinindeki 21 markdown dosyanın (README, README-TR, CONTRIBUTING, SECURITY, CODE_OF_CONDUCT, VISION, VISION-TR, ROADMAP, BLUEPRINT, BETA-TRACKER, COMPETITIVE-ANALYSIS, CHANGELOG, AGENTS, NEXT-SESSION vd.) denetimi. Doğruluk (iddia vs kod gerçeği), gereklilik (mükerrer: README vs README-TR, VISION vs VISION-TR), içerik (eksik bölüm, ölü link, güncel olmayan tarih/sprint), referans geçerliliği. Her dosyaya 8-badge (core/necessary/guide/reference/info/internal/archive/deprecated) + gerekçe + SİL/BİRLEŞTİR/TAMAMLA/KORU + Sprint 172 reorg hedef. Çıktı raporu TÜM içeriğiyle insan-okur Türkçe (ZORUNLU). Plan Task 171-023 bölümü bağlayıcı runbook.
-
-**Kanıt:** `docs/audits/sprint-171/docs-root.md` mevcut, 4+1 bölüm dolu, Türkçe, 21 dosya badge'li + kanıtlı.
-
-**Test:** Audit-only — rapor self-review.
-
----
-
-## Task 24: Doc Audit docs Tree
-
-- Model: opus
-- Effort: normal
-- Skills: documentation-writer
-- Agent: doc-writer
-- Files: docs/audits/sprint-171/docs-tree.md
-- Scope: docs/audits/sprint-171/
-
-### Description
-
-docs ağacındaki markdown dosyaların (adr, architecture, guide, reference, vision, governance, launch, release, development alt yapıları — audits ve superpowers/specs|plans hariç, recursion önle) denetimi. Yapı tutarlı mı, mükerrerlik (docs CHANGELOG vs root, docs ROADMAP vs root), her dosya doğruluk+gereklilik+içerik+referans, 8-badge + gerekçe. Sprint 172 reorg önerisi: ideal ağaç yapısı + dosya→hedef + hangi kök dosya docs'a taşınmalı (synthesis doc-reorg ana girdisi). Çıktı raporu TÜM içeriğiyle insan-okur Türkçe (ZORUNLU). Plan Task 171-024 bölümü bağlayıcı runbook.
-
-**Kanıt:** `docs/audits/sprint-171/docs-tree.md` mevcut, 4+1 bölüm dolu, Türkçe, her dosya badge'li + reorg önerisi.
-
-**Test:** Audit-only — rapor self-review.
-
----
-
-## Task 25: Doc Audit Config Contract Rules
-
-- Model: opus
-- Effort: normal
-- Skills: system-architect
-- Agent: architecture-planner
-- Files: docs/audits/sprint-171/docs-config-rules.md
-- Scope: docs/audits/sprint-171/
-
-### Description
-
-3-ortam agent rule (claude/gemini/cursor), api-surface kontratı, CLAUDE.md, DECKENT.md, IDENTITY.md, BOOT.md denetimi. En kritik: kod gerçeği ile doğruluk — brain/auditor/worker kuralları kod davranışı ile uyumlu mu, CLAUDE.md mimari tablo modül sayıları gerçek mi, DECKENT.md agent/skill/tool sayıları gerçek mi, 3-ortam rule divergence, api-surface JSON şema + Sprint Phases birebir mi (WAVE_BUILD + dependency_pipeline notu doğru mu), IDENTITY metrik güncel mi. 8-badge (çoğu core), drift'ler CRITICAL (worker'ı yanıltır). Çıktı raporu TÜM içeriğiyle insan-okur Türkçe (ZORUNLU). Plan Task 171-025 bölümü bağlayıcı runbook.
-
-**Kanıt:** `docs/audits/sprint-171/docs-config-rules.md` mevcut, 4+1 bölüm dolu, Türkçe, her drift kanıtlı.
-
-**Test:** Audit-only — rapor self-review.
-
----
-
-## Task 26: Doc Audit DB Sync Check
-
-- Model: opus
-- Effort: normal
-- Skills: database-migration
-- Agent: data-engineer
-- Files: docs/audits/sprint-171/docs-dbsync.md
-- Scope: docs/audits/sprint-171/
-
-### Description
-
-Sprint log (33), export'lar, legacy DEBT/MEMORY/RETRO/PATTERNS dosyaları ile memory.db (read-only) senkron diff denetimi (içerik audit DEĞİL). Sprint log içerik DB entry ile tutarlı mı, eksik sprint gap, Sprint 161 stub gerçek içerik geldi mi (Sprint 169 H2), auto-gen export stale mi, legacy dosyalar DB-first sonrası ölü mü. Sync drift tablosu + her dosya 8-badge (çoğu internal/archive) + sil/koru. memory.db SADECE read-only. Çıktı raporu TÜM içeriğiyle insan-okur Türkçe (ZORUNLU). Plan Task 171-026 bölümü bağlayıcı runbook.
-
-**Kanıt:** `docs/audits/sprint-171/docs-dbsync.md` mevcut, 4+1 bölüm dolu, Türkçe, drift tablosu + badge.
-
-**Test:** Audit-only — rapor self-review.
-
----
-
-## Task 27: Doc Audit Archive Summary
-
-- Model: opus
-- Effort: normal
-- Skills: documentation-writer
-- Agent: doc-writer
-- Files: docs/audits/sprint-171/docs-archive.md
-- Scope: docs/audits/sprint-171/
-
-### Description
-
-Tüm arşiv dizinleri (brain archive, deckent archive, .audit, examples, deckent-hub, .test) dizin-bazlı özet denetimi (her dosya tam okuma DEĞİL — örnekleme). Her dizin: ne içeriyor, kaç dosya/KB, ne amaçla, son dokunma. .audit sprint-167/169 değerli bulgu var mı, examples/deckent-hub OSS'te gerekli mi, .test ölü mü. 8-badge (çoğu archive/internal) + dizin-bazlı SİL/TAŞI/KORU + .gitignore/.npmignore önerisi (OSS GA exclude). Çıktı raporu TÜM içeriğiyle insan-okur Türkçe (ZORUNLU). Plan Task 171-027 bölümü bağlayıcı runbook.
-
-**Kanıt:** `docs/audits/sprint-171/docs-archive.md` mevcut, 4+1 bölüm dolu, Türkçe, dizin envanteri + badge + ignore önerisi.
-
-**Test:** Audit-only — rapor self-review.
-
----
-
-## Task 28: DB Decision Reference Integrity Audit
-
-- Model: opus
-- Effort: high
-- Skills: database-migration
-- Agent: data-engineer
-- Files: docs/audits/sprint-171/db-decision-integrity.md
-- Scope: docs/audits/sprint-171/
-
-### Description
-
-memory.db (read-only SELECT) her entry karar/referans bütünlüğü — "her bir kararı kontrol et". Her entries satırı zorunlu alan/status/sprint_id tutarlı mı, relations graph 6 MADR tip orphan + kopuk zincir + beklenen ama eksik relation (supersede edilen ADR hâlâ accepted mı), entry_history audit trail gap, kırık `[[ref]]` link hedefi, decay doğruluğu + decay_exempt, ADR DB↔FS 3'lü tutarlılık (Sprint 169 H1), ADR-009 DEBT tablo formatı. İhlaller severity'li, her biri SQL/file:line kanıtlı. memory.db yazma/DROP/rebuild KESİN YASAK. Çıktı raporu TÜM içeriğiyle insan-okur Türkçe (ZORUNLU). Plan Task 171-028 bölümü bağlayıcı runbook (cross-cut — Kapsam Haritası yok).
-
-**Kanıt:** `docs/audits/sprint-171/db-decision-integrity.md` mevcut, 4+1 bölüm dolu, Türkçe, her ihlal SQL/file:line kanıtlı.
-
-**Test:** Audit-only — rapor self-review.
-
----
-
-## Task 29: Cross-Cutting Synthesis + Coverage Doğrulama
-
-- Model: opus
-- Effort: high
-- Skills: system-architect
-- Agent: architect
-- Files: docs/audits/sprint-171/SYNTHESIS.md
-- Scope: docs/audits/sprint-171/
-- Dependencies: ["171-001","171-002","171-003","171-004","171-005","171-006","171-007","171-008","171-009","171-010","171-011","171-012","171-013","171-014","171-015","171-016","171-017","171-018","171-019","171-020","171-021","171-022","171-023","171-024","171-025","171-026","171-027","171-028"]
-
-### Description
-
-28 audit raporunu konsolide eden sentez (Brain manuel dispatch — Wave 4 tüm DONE sonrası, ADR-047). (1) Tüm bulguları topla+dedupe → tek severity-sıralı backlog. (2) OSS-GA blocker ayrı bölüm (secret leak, kullanıcı-yanıltan doc-vs-code drift, command injection). (3) AEGIS (ADR-061) hizalama — bulguları mode-agnostic AEGIS faz/rol/artifact terminolojisiyle çerçevele. (4) Sprint 172 doc-reorg planı (badge atamaları birleştir → ideal ağaç + dosya→hedef + ignore önerisi). (5) Coverage Doğrulama ZORUNLU: Task 1-14 Kapsam Haritası union vs `find` kaynak gerçeği diff → boşta dosya = CRITICAL coverage-gap, tablo (toplam/kapsanan/boşta). (6) Kapı 1 (orchestration) + Kapı 2 (içerik kalite) değerlendirme → Brain'e GO/GO_WTD/NO_GO önerisi. Çıktı raporu TÜM içeriğiyle insan-okur Türkçe (ZORUNLU). Plan Task 171-029 bölümü bağlayıcı runbook. Kapsam Doğrulama bölümü olmadan synthesis NO_GO.
-
-**Kanıt:** `docs/audits/sprint-171/SYNTHESIS.md` mevcut, 6 alt bölüm dolu, Türkçe, coverage-gap tablosu + verdict önerisi.
-
-**Test:** Audit-only — rapor self-review + coverage diff doğrulama.
+**Test:** Doc/config-only — package.json geçerli JSON + version resolve smoke.
