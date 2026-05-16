@@ -79,10 +79,11 @@ Bug A/B runtime aktif. Kalan A-bölümü verify-first tamamlandı (detay: `00-VE
 | BUG-B | [x] fix (runtime aktif) | — |
 | C-29/BG-03 | [!] yanlış-pozitif | dosya yok → İPTAL, blocker'dan çıkar |
 | C-06 | [!] yanlış-pozitif | tip alanı zaten var → İPTAL (yan ürün: stale alias dead-code, ADR-038 adayı) |
-| C-04/BG-05 | [~] doğrulandı (mis-cited→gerçek) | `mid-sprint-adapter.ts:228/284` execSync→spawnSync array; davranış-koruyan TDD-fix adayı |
+| C-04/BG-05 | [x] FIX (commit bb8b79c) | `mid-sprint-adapter.ts` 3 default fn execSync→spawnSync array (ADR-006). TDD RED (sentinel oluştu)→GREEN 2/2. tsc temiz. **build+restart bekliyor** |
+| TMUX-SF (yan bulgu) | [~] pre-existing — DEFER/Sprint 172 | `tmux.test.ts`+`tmux-edge.test.ts` spawnWorker 3 fail (prompt tmpfile/`${PATH}`). Sprint 170 P0-3 drift adayı. C-03/04 regresyonu DEĞİL (stash testi kanıtlı). Görev #20 |
 | C-13/BG-08/BA-04 | [x] KARAR (yön a) | **Kod bug'ı DEĞİL** — soft ADR-037 V1.0 yazılı tasarım + test-kilitli (`worker-rbac.test.ts` Test 2/3 `toBe(true)`). Doc-drift: Sprint 172 doküman gerçeğe çekilir, kod/test değişmez. Hard-flip ayrı ADR-037 V2 sprinti (OSS GA blocker DEĞİL) |
 | C-14/BG-09 | [~] CONFIRMED — KARAR BEKLİYOR | runTestVerifyLoop+enforceVerifyLoop 0-caller (verify-gate tümü unwired). (a) ADR-038 dispose [SAFE] / (b) wire [davranış-değiştiren, ayrı sprint] → kullanıcı |
-| C-03 | [~] CONFIRMED+LIVE — KARAR BEKLİYOR | downgrade-map canlı (`sprint-spawner.ts:1016`). Fix yönü SIDEWAYS/UP, asla DOWN → kullanıcı (memory `project_fix_model_downgrade_bug`) |
+| C-03 | [x] FIX (commit bb8b79c) | `rotateModelForFix`→identity, MODEL_DOWNGRADE_MAP kaldırıldı (yön: agent-rotate+model sabit, onaylı). TDD RED→GREEN 36/36. tsc temiz. **build+restart bekliyor** |
 | C-05/C-07 | [~] doğrulandı (doc-drift) | DECKENT.md/api-surface default abartısı → doc-reorg batch (Sprint 172) |
 
 **Otonom-güvenli tek fix adayı:** C-04 (execSync→spawnSync array, ADR-006, davranış-koruyan). Diğer 3 CONFIRMED davranış-değiştiren/bootstrap-hassas → kullanıcı kararı (away-mode kuralı: davranış-değiştiren auto-commit YASAK, ready-to-apply escalate).
