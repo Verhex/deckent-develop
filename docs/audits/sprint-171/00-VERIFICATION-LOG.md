@@ -198,3 +198,42 @@ Bug A/B runtime aktif (dist 23:42 > src). Kalan MANUEL-P0 (C-03/04/05/06/07/13/1
 **Karar gerekli (davranış-değiştiren → ESCALATE):** Fresh-eyes SIDEWAYS olmalı (eş-tier farklı model/provider: opus→gpt-5/gemini-2.5-pro; sonnet→gpt-4.1) ya da UP, asla DOWN. Yön kullanıcı onayı (TDD-fix: `MODEL_DOWNGRADE_MAP` → `MODEL_SIDEWAYS_MAP`, davranış-değiştiren → ayrı sprint/onay).
 
 **Sistemik bulgu (Sprint 172 synthesis girdisi):** C-13 + C-14 = "scaffold edilmiş garanti, wire/enforce edilmemiş" tekrar eden pattern. Bug A aynı kök (self-report'a güven). OSS GA öncesi dürüstlük: doküman bu trust-based gerçeği yansıtmalı VEYA enforcement kapatılmalı — ikisi arası drift = kullanıcıya sessiz güvenlik abartması.
+
+## C-14 / C-03 — KULLANICI KARARLARI (2026-05-16)
+
+**C-14 → "Doc-honest + enforcement sprinti" (yön a):**
+- Sprint 172 doc-reorg: `worker-default.md`/`CLAUDE.md`/`IDENTITY.md` verify ifadesi gerçeğe çekilir → "tsc/vitest verify = worker prompt talimatı (advisory), deckent kod-enforce ETMEZ". C-13 ile aynı dürüstlük düzeltmesi. Kod/test/build DEĞİŞMEZ.
+- `runTestVerifyLoop`+`enforceVerifyLoop` DISPOSE EDİLMEZ (ölü değil, eksik-wire). Wire'lama → ayrı denetimli **"enforcement-hardening V2"** sprinti (C-13 hard-flip RBAC + C-14 verify-gate wire BİRLİKTE, post-GA). Sprint 172 OSS GA blocker DEĞİL.
+
+**C-03 → "Agent-rotate + model sabit" (yön a):**
+- Fix: `rotateModelForFix(model)` → `return model` (identity; downgrade-map kaldırılır). Fresh-eyes zaten `rotateAgentForFix` ile sağlanıyor (farklı agent perspektifi) — model gücü düşmez.
+- Davranış-değiştiren → ayrı onaylı uygulama (build/restart batch). Provider-key'siz en doğru çözüm; multi-provider sideways gelecek backlog (key gelince).
+
+## C-03 READY-TO-APPLY (otonom commit edilmedi — davranış-değiştiren + build/restart gerek)
+
+**Dosya:** `src/orchestra/debt-manager.ts`
+**Değişiklik (minimal, davranış: model artık düşmez):**
+- `:76-78` `MODEL_DOWNGRADE_MAP` SİL (veya kullanılmaz hale getir).
+- `:138-140` `rotateModelForFix`: `return MODEL_DOWNGRADE_MAP[model] ?? model;` → `return model;` (identity). JSDoc `:133-137` güncelle: "fresh-eyes = agent rotasyonu; model korunur (downgrade ters-mantıktı, C-03)".
+- `:174-189 applyFreshEyesRotation`: `rotatedModel = rotateModelForFix(originalModel)` artık `=== originalModel`; `rationale` string'i hâlâ doğru (`opus→opus`). `enabled:true` korunur (agent rotasyonu hâlâ aktif).
+- `sprint-spawner.ts:1016/:1060/:303/:374` değişmez (rotatedModel artık orig'e eşit — forceModel orijinal model olur, davranış: fix worker orijinal modelle, taze agent'la spawn).
+
+**TDD (RED önce):** `tests/orchestra/debt-manager.test.ts` (mevcut downgrade-assert testleri VAR — `opus→sonnet` bekleyenler) → bunlar yeni davranışta KIRILIR (beklenen). Sıra:
+1. RED: yeni test `rotateModelForFix('opus') === 'opus'` + `applyFreshEyesRotation` opus task → `rotatedModel:'opus'`, `rotatedAgent` ≠ orig (agent değişir). Mevcut `opus→sonnet` assert'lerini yeni davranışa güncelle (ADR-037 Versioning benzeri: davranış-daraltma → etkilenen testler güncellenir — burada testler downgrade'i kilitliyordu, bilinçli revize).
+2. GREEN: identity fix.
+3. Tam suite: downgrade'e bağlı başka test var mı (`MODEL_DOWNGRADE_MAP` import edeni grep) → kontrol + güncelle.
+**Severity:** MED (canlı-wired, her FIX task'ı etkiler; ama fail-safe — yanlış yön zayıf model, identity güçlüye değil zarara yol açmaz).
+**Onay bekleyen:** kullanıcı + build/restart batch (C-04 ile birleştirilebilir).
+
+## Sprint 172 / Post-GA KONSOLİDE FIX KUYRUĞU (kararlar sonrası)
+
+| # | Madde | Sınıf | Build/restart? | Hedef |
+|---|-------|-------|----------------|-------|
+| 1 | C-04 execSync→spawnSync array (ADR-006) | davranış-koruyan TDD | EVET | onaylı batch |
+| 2 | C-03 rotateModelForFix→identity | davranış-değiştiren TDD (yön onaylı) | EVET | onaylı batch (C-04 ile) |
+| 3 | C-13 RBAC + C-14 verify doc-honest | doc-only | HAYIR | Sprint 172 doc-reorg |
+| 4 | C-05/07 config doc-drift | doc-only | HAYIR | Sprint 172 doc-reorg |
+| 5 | C-13 hard-flip + C-14 verify-gate wire | davranış-değiştiren mimari | EVET (ayrı) | post-GA "enforcement-hardening V2" sprinti |
+| 6 | BA-03/05 ADR-010 deps + Sprint 167 DB-boş | governance/ADR amendment | — | #18 ESCALATE (sıradaki) |
+
+**Sistemik karar:** C-13+C-14 ortak kökü ("scaffold edilmiş garanti enforce edilmemiş") tek "enforcement-hardening V2" sprintinde toplandı — OSS GA bloklamaz, dürüstlük Sprint 172 doc düzeltmesiyle sağlanır.
