@@ -189,7 +189,8 @@ describe.skipIf(isWindows)('spawnWorker edge cases', () => {
 
     // writeFileSync should be called with the prompt content
     expect(mockedWriteFileSync).toHaveBeenCalledWith(
-      expect.stringContaining('.prompt-deadbeef.txt'),
+      // Sprint 170 P0-3: taskId-aware prompt filename (collision-safe)
+      expect.stringContaining('.prompt-task-edge-03-deadbeef.txt'),
       prompt,
       'utf-8',
     );

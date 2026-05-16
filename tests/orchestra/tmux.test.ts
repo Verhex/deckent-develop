@@ -142,7 +142,8 @@ describe.skipIf(isWindows)('spawnWorker', () => {
     const cmdArg = args.find((a) => a.includes('claude'));
     expect(cmdArg).toBeDefined();
     expect(cmdArg).toContain('claude -p - --model sonnet');
-    expect(cmdArg).toContain('.prompt-abcdef01.txt');
+    // Sprint 170 P0-3: taskId-aware prompt filename (collision-safe, mirrors Docker)
+    expect(cmdArg).toContain('.prompt-task-001-abcdef01.txt');
   });
 
   it('prompt content is written to file, not embedded in command (injection-safe)', () => {
@@ -160,8 +161,8 @@ describe.skipIf(isWindows)('spawnWorker', () => {
     expect(cmdArg).not.toContain('rm -rf');
     expect(cmdArg).not.toContain('curl evil.com');
     expect(cmdArg).not.toContain('${PATH}');
-    // It should use stdin redirect from file
-    expect(cmdArg).toContain('< /project/.tasks/.prompt-abcdef01.txt');
+    // It should use stdin redirect from file (Sprint 170 P0-3: taskId-aware name)
+    expect(cmdArg).toContain('< /project/.tasks/.prompt-task-002-abcdef01.txt');
   });
 
   it('adds --allowedTools when opts.allowedTools is set', () => {
