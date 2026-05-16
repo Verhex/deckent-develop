@@ -284,3 +284,15 @@ ADR-046 post-sprint self-update hook'u sprint/retro/memory entry'lerini memory.d
 2. Asıl fix: ADR-046 hook crash-safe/idempotent + "sprint .md var ama 0 DB entry → reconcile/backfill" tespiti. Davranış-değiştiren + build/restart → ayrı denetimli sprint (BA-05 = "enforcement/integrity-hardening V2" adayı, C-13/C-14 ile aynı post-GA sprint kümesi).
 
 **Severity yükseltme:** "Sprint 167 hook regresyon" → daha doğru: "ADR-046 hook KRONİK güvenilmez (≤166'dan beri); 166 elle kurtarıldı, 167 değil". OSS-GA için daha ciddi — public kullanıcı manuel backfill yapamaz.
+
+## C-03 + C-04 FIX UYGULANDI (2026-05-16, commit bb8b79c, TDD red-green)
+
+**C-03 (`debt-manager.ts`):** `MODEL_DOWNGRADE_MAP` kaldırıldı; `rotateModelForFix` → identity (`return model`). Fresh-eyes artık sadece agent rotasyonu (rotateAgentForFix değişmedi). `fresh-eyes-rotation.test.ts` 9 rotateModelForFix + 7 applyFreshEyesRotation/handleEvaluation/re-export assert'i identity'ye güncellendi (governed behavior-narrowing). TDD: RED (downgrade aktifken `toBe('opus')` fail) → GREEN 36/36.
+
+**C-04 (`mid-sprint-adapter.ts`):** `execSync` → `spawnSync` array form, 3 default fn (`defaultGetGitDiffStats`/`RunTscCheck`/`RunVitestScopeCheck`). git diff: `['diff','--stat','HEAD','--',...dirs]`; tsc: `['tsc','--noEmit']`; vitest: `['vitest','run','--reporter=json',...patterns]`. `res.error||status!==0` guard execSync throw semantiğini korur (davranış-koruyan: stdout parse aynı). 3 fn export (regresyon test seam'i). Yeni `tests/orchestra/mid-sprint-adapter-injection.test.ts` 2 test. TDD: RED (`execSync` `; touch <sentinel>` shell'de çalıştı, sentinel oluştu = injection kanıtı) → GREEN 2/2 (sentinel oluşmadı).
+
+**Doğrulama:** `tsc --noEmit` exit 0. `tests/orchestra/` 4413 pass / 3 fail / 11 skip. 3 fail = `tmux.test.ts`+`tmux-edge.test.ts` spawnWorker prompt-file — **pre-existing, regresyon DEĞİL** (git stash testi: değişikliklerim olmadan da aynı 3 fail; değiştirilen modüllerle import ilişkisi yok; muhtemelen Sprint 170 P0-3 tmux taskId-aware drift). Diğer ~80 değiştirilmemiş `.brain/*`/`.deckent/*` working-tree değişikliği önceki sprint artığı — commit'e dahil edilmedi (sadece 4 dosya).
+
+**KALAN — Alperen aksiyonu:** `npm run build` + MCP restart → C-03+C-04 runtime aktif (kod-hot-reload yok; Bug A/B'deki gibi). Bu adıma kadar fix dist'te değil, sadece source+test.
+
+**Pre-existing tmux fail (yan bulgu, kapsam-dışı):** `tmux.test.ts > spawnWorker` 3 fail (prompt tmpfile `< .../.prompt-*.txt` + `${PATH}` injection-safe assert) — Sprint 170 P0-3 tmux taskId-aware fix sonrası test/impl drift adayı. C-03/C-04 kapsamı dışı; ayrı triyaj (DEFER veya Sprint 172 test-integrity). Ledger'a yeni satır eklendi.
