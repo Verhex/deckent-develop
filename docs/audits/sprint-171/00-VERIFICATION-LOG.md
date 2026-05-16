@@ -259,3 +259,28 @@ Bug A/B runtime aktif (dist 23:42 > src). Kalan MANUEL-P0 (C-03/04/05/06/07/13/1
 **Verdict:** İki doküman çelişkili köken + DECKENT.md bu projede yanlış-doğru ("goes live" oysa kapalı). Katkıda bulunan DECKENT.md okuyup "wave'ler canlı" sanır → değil. Kullanıcı-yanıltan doc-drift. **Sprint 172 doc-reorg:** tek doğru köken (config.ts default=true; bu proje bilinçli false; provenance netleştir), DECKENT.md:51 "goes live" → "default true; deckent-dev bilinçli false, Brain manuel wave (ADR-047)". Kod doğru, dök düzeltilir.
 
 **#18 sonuç:** 3/3 CONFIRMED-REAL. Hepsi governance/doc-drift sınıfı, **kod blocker yok**. BA-05 (Sprint 167) data-integrity → ADR-046 hook RC ayrı escalate (en kritik, OSS-GA P0 sınıfı). BA-03 + C-05/07 → Sprint 172 doc-reorg + ADR-010 amendment batch.
+
+## BA-05 RC — Sprint 167 DB-boş KÖK SEBEP (systematic-debugging Phase 1-3, 2026-05-16)
+
+**Phase 1 — Kanıt:**
+- `.brain/sprints/sprint-167.md` **DOSYA VAR** (tam içerik: metrics+task tablosu) → `writeSprintLog` (file-level, `sprint-finalizer.ts:597` try/catch) ÇALIŞTI. Eksik olan **DB-layer persist**.
+- sprint-167.md metrics anomalisi: `Duration: -11ms`, `Coverage: NaN%`, `Files Changed: -` → finalize bozuk/eksik timing ile koştu (interrupt/crash finalize imzası: startTime set değil → end−undefined = negatif/NaN).
+- Sprint 167 = **Read-Only Self-Audit** sprinti; task tablosunda `run-1778748493227-0` vb. = manuel `deckent run` recovery dispatch'leri (ADR-047 manuel survival) → 167 normal akışla değil, manuel recovery zinciriyle koştu.
+- `sprint-finalizer.ts` grep: `store.insert`/`store.upsert` **YOK** — finalizer sadece .md FILE yazar (`writeSprintLog`/`writeRetrospective`). DB persist AYRI hook (ADR-046, `sprint-docs-updater.ts`/`sprint-utils.ts`).
+
+**Phase 2 — Pattern (working vs broken karşılaştırma):**
+- Sprint 166 git: `fe35c49 chore(sprint-166-memory): backfill ADR-043..046 + sprint logs + retro/mem + debt sprint_id` → **166'nın DB kayıtları ELLE backfill edilmiş**. Yani ADR-046 oto-persist hook'u zaten **Sprint 166'da bozuktu**, 166 elle kurtarıldı.
+- Sprint 167 git: eşdeğer `*-memory backfill` commit'i **YOK**. `a72eb49 sprint-167-finalize: Brain finalize hook chain results — rules sentinel + manifests + archive` — finalize koştu ama scope "rules+manifest+archive", memory/retro/DB YOK. Sonra 168'e geçildi.
+
+**Phase 3 — Kök sebep (kanıtla doğrulanmış hipotez):**
+ADR-046 post-sprint self-update hook'u sprint/retro/memory entry'lerini memory.db'ye **güvenilir persist ETMİYOR — kronik, Sprint ≤166'dan beri**. Sprint 166 elle backfill (`fe35c49`) ile kurtarıldı. Sprint 167 (anormal Read-Only Self-Audit, ADR-047 manuel recovery zinciri, bozuk finalize metrics = interrupt/crash imzası) aynı hook boşluğuna düştü AMA **elle backfill ALMADI** → .md dosyası yazıldı (file-level try/catch hayatta kalır) ama DB persist hiç tamamlanmadı, kimse backfill etmedi → sprint-167 = 0 memory.db kaydı.
+
+**YP-RISK hipotezi ÇÜRÜTÜLDÜ:** C-32/33 "sprint_id format uyumsuzluğu (C-45 naming)" → YANLIŞ. Exact `'sprint-167'` + `LIKE '%167%'` ikisi de 0; sprint-167.md kanonik id doğruluyor. Gerçek persist boşluğu, format değil.
+
+**Sınıf:** memory `project_brain_state_update_bug` + Bug B ailesi (deckent'in kayıt katmanı = DB, gerçekte-olandan sessiz sapıyor). ADR-043 Brain Crash Recovery'nin var olması bu sınıfın bilindiğini gösterir. **OSS-GA P0** — sprint kendi varlığını DB'ye yazmıyor = kullanıcıya sessiz data-integrity ihlali.
+
+**Phase 4 (fix) OTONOM YAPILMADI — ESCALATE:**
+1. Sprint 167 DB verisi **uydurulamaz** (memory `feedback_db_silmek_yasak` + audit read-only + dürüstlük). AMA: gerçek artefaktlar VAR (`.brain/sprints/sprint-167.md` + arşivli audit raporları) → Sprint 166 `fe35c49` precedent'i gibi **gerçek .md'den türetilmiş kontrollü backfill** meşru kurtarma (silme/uydurma değil) — yine de DB-write, **kullanıcı onayı şart**.
+2. Asıl fix: ADR-046 hook crash-safe/idempotent + "sprint .md var ama 0 DB entry → reconcile/backfill" tespiti. Davranış-değiştiren + build/restart → ayrı denetimli sprint (BA-05 = "enforcement/integrity-hardening V2" adayı, C-13/C-14 ile aynı post-GA sprint kümesi).
+
+**Severity yükseltme:** "Sprint 167 hook regresyon" → daha doğru: "ADR-046 hook KRONİK güvenilmez (≤166'dan beri); 166 elle kurtarıldı, 167 değil". OSS-GA için daha ciddi — public kullanıcı manuel backfill yapamaz.
