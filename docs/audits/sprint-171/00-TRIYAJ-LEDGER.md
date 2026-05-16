@@ -86,3 +86,13 @@ Bug A/B runtime aktif. Kalan A-bölümü verify-first tamamlandı (detay: `00-VE
 | C-05/C-07 | [~] doğrulandı (doc-drift) | DECKENT.md/api-surface default abartısı → doc-reorg batch (Sprint 172) |
 
 **Otonom-güvenli tek fix adayı:** C-04 (execSync→spawnSync array, ADR-006, davranış-koruyan). Diğer 3 CONFIRMED davranış-değiştiren/bootstrap-hassas → kullanıcı kararı (away-mode kuralı: davranış-değiştiren auto-commit YASAK, ready-to-apply escalate).
+
+## #18 GOVERNANCE — KARAR (2026-05-16, 3/3 CONFIRMED-REAL, kod blocker yok)
+
+| ID | Durum | Sonraki aksiyon |
+|---|---|---|
+| BA-03/C-25 ADR-010 | [x] CONFIRMED (ADR-text stale) | 7 dep her biri sonraki ADR-gerekçeli. ADR-010 metni Sprint 044 CLI-only kalıntısı → Sprint 172 doc-reorg + ADR-010 amend ("yalnızca commander"→"minimal ADR-gerekçeli"). Kod blocker DEĞİL |
+| BA-05/C-32 Sprint 167 DB-boş | [x] CONFIRMED-REAL **OSS-GA P0** | sprint-167 = 0 satır (kesin gap 166→168). ADR-046 self-update hook regresyon. DB'ye sahte veri YAZILMAZ. ADR-046 hook RC + GA-öncesi tekrarlamaz garantisi → ESCALATE (en kritik) |
+| C-05/C-07 doc-drift | [x] CONFIRMED (kullanıcı-yanıltan) | DECKENT.md:51 "wave goes live" bu projede yanlış (false) + api-surface:83 çelişen provenance → Sprint 172 doc-reorg |
+
+**#18 net:** Hiçbiri kod blocker değil. BA-05 (Sprint 167 / ADR-046 hook) data-integrity P0 — ayrı RC escalate. BA-03+C-05/07 → Sprint 172 doc-reorg/ADR-amend batch.
