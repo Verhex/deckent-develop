@@ -237,3 +237,25 @@ Bug A/B runtime aktif (dist 23:42 > src). Kalan MANUEL-P0 (C-03/04/05/06/07/13/1
 | 6 | BA-03/05 ADR-010 deps + Sprint 167 DB-boş | governance/ADR amendment | — | #18 ESCALATE (sıradaki) |
 
 **Sistemik karar:** C-13+C-14 ortak kökü ("scaffold edilmiş garanti enforce edilmemiş") tek "enforcement-hardening V2" sprintinde toplandı — OSS GA bloklamaz, dürüstlük Sprint 172 doc düzeltmesiyle sağlanır.
+
+## #18 GOVERNANCE — Verify-Before-Fix (2026-05-16, hepsi CONFIRMED-REAL)
+
+### BA-03/C-25 ADR-010 tek-runtime-dependency — ✅ CONFIRMED (ADR-text stale, kod gerekçeli)
+
+**Kanıt:** ADR-010 `decisions.md:228`: *"CLI tek runtime dependency olarak commander@^13.0.0 kullanır... ek kütüphaneler eklenmez"* + `:230` *"package.json dependencies bölümünde yalnızca commander bulunur"*. Gerçek `package.json`: **7 runtime dep** (@modelcontextprotocol/sdk, @noble/ed25519, @noble/hashes, better-sqlite3, commander, telegraf, zod) + 1 optional (discord.js).
+
+**Verdict:** Kod ihlal etmiş GÖRÜNÜYOR ama her dep sonraki accepted ADR ile gerekçeli: MCP sdk←ADR-017, better-sqlite3←Memory V2, telegraf/discord←ADR-016 Connector, zod←plan validation, @noble←ADR-014 secret. Yani **ADR-010 metni eskimiş** (Sprint 044 CLI-only döneminden), kodbase yanlış değil. Governance defect: ADR-010 amend/supersede edilmeli → "yalnızca commander" → "minimal, ADR-gerekçeli bağımlılıklar". OSS public öncesi credibility riski (okur ADR-010 "only commander" görür → 7 dep → güven boşluğu). **Sprint 172 doc-reorg + ADR-010 amendment.** Kod blocker DEĞİL.
+
+### BA-05/C-32 Sprint 167 DB-boş — ✅ CONFIRMED-REAL (ADR-046 hook regresyon, data-integrity)
+
+**Kanıt (read-only SELECT, better-sqlite3 readonly):** `entries WHERE sprint_id='sprint-167'` → **0 satır**. Kesin gap: sprint-160..166 her biri ≥1 entry, **167 = HİÇ (memory/retro/sprint/adr 0)**, 168..171 normal. Korroborasyon: `summary.md` Recent Learnings 167'yi atlıyor (171,170,169,168,166,165...); `CLAUDE.md` Sprint Metrics tablosu Sprint 167 `Duration: -1dk -1sn`, `Coverage: NaN%` (bozuk finalize); `DECKENT.md:51` "anchor for Sprint 167 DIRECTIVES" — 167 wave-flip sprinti olmalıydı ama DB'ye **sıfır iz** bıraktı.
+
+**Verdict:** Sprint 167 koştu (metrics tablosu + archive dizinleri var) ama ADR-046 post-sprint self-update hook'u sprint+retro+memory entry'lerini memory.db'ye **hiç yazmadı** = sessiz veri kaybı. Bug B + memory `project_brain_state_update_bug` ailesi (persistence/observability boşluğu). **OSS-GA P0-sınıfı** (sprint kendi başarısını DB'ye yazmıyor = kullanıcıya sessiz data-integrity ihlali — `project_sprint169_spurious_nogo` ile aynı tehdit modeli). Tarihsel (167 geçti) → **DB'ye sahte 167 verisi YAZILMAZ** (memory `feedback_db_silmek_yasak` + audit read-only + dürüstlük). Aksiyon: (1) ADR-046 hook RC — neden 167'de persist etmedi, (2) GA öncesi tekrarlamaz garantisi. Otonom düzeltilemez (RC + davranış/build) → **ESCALATE**.
+
+### C-05/C-07 config doc-drift — ✅ CONFIRMED-REAL (kullanıcı-yanıltan)
+
+**Kanıt:** Kod default `config.ts:600 dependency_pipeline_enabled: true` + `:883 ?? true`. Tip alanı `config-types.ts:490` VAR (C-06 FP yine doğrulandı). Bu proje `.deckent/config.json:198 false` (açık override). `DIRECTIVES.md` Sprint 171: *"dependency_pipeline_enabled: false olduğundan Wave geçişleri Brain manuel"* — proje fiilen FALSE çalışıyor. AMA: `DECKENT.md:51` *"Sprint 167 flip: true — Wave scheduling goes live (anchor for Sprint 167 DIRECTIVES)"* → bu proje için **fiilen YANLIŞ** (false, wave manuel) + `.contracts/api-surface.md:83` *"default since Sprint 156, confirmed Sprint 169 H5"* ile **çelişen provenance** (156 mı 167 mi?).
+
+**Verdict:** İki doküman çelişkili köken + DECKENT.md bu projede yanlış-doğru ("goes live" oysa kapalı). Katkıda bulunan DECKENT.md okuyup "wave'ler canlı" sanır → değil. Kullanıcı-yanıltan doc-drift. **Sprint 172 doc-reorg:** tek doğru köken (config.ts default=true; bu proje bilinçli false; provenance netleştir), DECKENT.md:51 "goes live" → "default true; deckent-dev bilinçli false, Brain manuel wave (ADR-047)". Kod doğru, dök düzeltilir.
+
+**#18 sonuç:** 3/3 CONFIRMED-REAL. Hepsi governance/doc-drift sınıfı, **kod blocker yok**. BA-05 (Sprint 167) data-integrity → ADR-046 hook RC ayrı escalate (en kritik, OSS-GA P0 sınıfı). BA-03 + C-05/07 → Sprint 172 doc-reorg + ADR-010 amendment batch.
