@@ -116,43 +116,45 @@ function reset() {
   vi.mocked(existsSync).mockReturnValue(false);
 }
 
-// ─── rotateModelForFix ──────────────────────────────────────────────
+// ─── rotateModelForFix (C-03: identity — model preserved, fresh-eyes via agent) ──
 
 describe('rotateModelForFix', () => {
-  it('opus → sonnet', () => {
-    expect(rotateModelForFix('opus')).toBe('sonnet');
+  // C-03 fix: a failed task's retry is HARDER, not easier — downgrading the
+  // model (opus→sonnet→haiku) was reverse logic. Fresh-eyes now comes purely
+  // from agent rotation (rotateAgentForFix). Model is preserved (identity).
+  it('opus is preserved (no downgrade)', () => {
+    expect(rotateModelForFix('opus')).toBe('opus');
   });
 
-  it('sonnet → haiku', () => {
-    expect(rotateModelForFix('sonnet')).toBe('haiku');
+  it('sonnet is preserved', () => {
+    expect(rotateModelForFix('sonnet')).toBe('sonnet');
   });
 
-  it('haiku is terminal (haiku → haiku)', () => {
+  it('haiku is preserved', () => {
     expect(rotateModelForFix('haiku')).toBe('haiku');
   });
 
-  it('gpt-5 → gpt-4.1', () => {
-    expect(rotateModelForFix('gpt-5')).toBe('gpt-4.1');
+  it('gpt-5 is preserved', () => {
+    expect(rotateModelForFix('gpt-5')).toBe('gpt-5');
   });
 
-  it('gpt-4.1 → gpt-4.1-mini', () => {
-    expect(rotateModelForFix('gpt-4.1')).toBe('gpt-4.1-mini');
+  it('gpt-4.1 is preserved', () => {
+    expect(rotateModelForFix('gpt-4.1')).toBe('gpt-4.1');
   });
 
-  it('o3 → o4-mini', () => {
-    expect(rotateModelForFix('o3')).toBe('o4-mini');
+  it('o3 is preserved', () => {
+    expect(rotateModelForFix('o3')).toBe('o3');
   });
 
-  it('gemini-2.5-pro → gemini-2.5-flash', () => {
-    expect(rotateModelForFix('gemini-2.5-pro')).toBe('gemini-2.5-flash');
+  it('gemini-2.5-pro is preserved', () => {
+    expect(rotateModelForFix('gemini-2.5-pro')).toBe('gemini-2.5-pro');
   });
 
-  it('gemini-3.1-pro-preview → gemini-2.5-pro', () => {
-    expect(rotateModelForFix('gemini-3.1-pro-preview')).toBe('gemini-2.5-pro');
+  it('gemini-3.1-pro-preview is preserved', () => {
+    expect(rotateModelForFix('gemini-3.1-pro-preview')).toBe('gemini-3.1-pro-preview');
   });
 
-  it('returns same model when not in map (safe fallback)', () => {
-    // Use an unknown string cast as ModelType to verify the fallback branch
+  it('returns same model for unknown models too', () => {
     expect(rotateModelForFix('unknown-future-model' as never)).toBe('unknown-future-model');
   });
 });
@@ -205,7 +207,7 @@ describe('applyFreshEyesRotation', () => {
     const strategy = applyFreshEyesRotation(task);
     expect(strategy.enabled).toBe(true);
     expect(strategy.originalModel).toBe('opus');
-    expect(strategy.rotatedModel).toBe('sonnet');
+    expect(strategy.rotatedModel).toBe('opus'); // C-03: model preserved
     expect(strategy.originalAgent).toBe('architect');
     expect(strategy.rotatedAgent).toBe('code-reviewer');
   });
@@ -219,8 +221,7 @@ describe('applyFreshEyesRotation', () => {
   it('rationale string contains original and rotated identifiers', () => {
     const task = makeTask({ model: 'opus', assignedAgent: 'architect' });
     const strategy = applyFreshEyesRotation(task);
-    expect(strategy.rationale).toContain('opus');
-    expect(strategy.rationale).toContain('sonnet');
+    expect(strategy.rationale).toContain('opus→opus'); // C-03: model preserved
     expect(strategy.rationale).toContain('architect');
     expect(strategy.rationale).toContain('code-reviewer');
   });
@@ -230,10 +231,10 @@ describe('applyFreshEyesRotation', () => {
     const strategy = applyFreshEyesRotation(task);
     expect(strategy.originalAgent).toBe('generic');
     expect(strategy.rotatedAgent).toBe('code-reviewer');
-    expect(strategy.rotatedModel).toBe('haiku');
+    expect(strategy.rotatedModel).toBe('sonnet'); // C-03: model preserved
   });
 
-  it('returns same model when at terminal tier (haiku)', () => {
+  it('preserves model (haiku stays haiku)', () => {
     const task = makeTask({ model: 'haiku', assignedAgent: 'bug-fixer' });
     const strategy = applyFreshEyesRotation(task);
     expect(strategy.originalModel).toBe('haiku');
@@ -269,8 +270,8 @@ describe('handleEvaluation NO_GO with fresh-eyes rotation', () => {
     expect(writtenPath).toContain('task-task-001-fix.json');
 
     const writtenContent = JSON.parse(callArgs[1] as string) as Record<string, unknown>;
-    // Test spec: model=sonnet + agent=code-reviewer
-    expect(writtenContent['model']).toBe('sonnet');
+    // C-03: model preserved (opus), fresh-eyes via agent rotation
+    expect(writtenContent['model']).toBe('opus');
     expect(writtenContent['assignedAgent']).toBe('code-reviewer');
   });
 
@@ -287,7 +288,7 @@ describe('handleEvaluation NO_GO with fresh-eyes rotation', () => {
     expect(strategy).toBeDefined();
     expect(strategy.enabled).toBe(true);
     expect(strategy.originalModel).toBe('opus');
-    expect(strategy.rotatedModel).toBe('sonnet');
+    expect(strategy.rotatedModel).toBe('opus'); // C-03: model preserved
     expect(strategy.originalAgent).toBe('architect');
     expect(strategy.rotatedAgent).toBe('code-reviewer');
     expect(strategy.addedSkills).toContain('code-simplifier');
@@ -301,7 +302,7 @@ describe('handleEvaluation NO_GO with fresh-eyes rotation', () => {
 
     const callArgs = vi.mocked(writeFileSync).mock.calls[0]!;
     const writtenContent = JSON.parse(callArgs[1] as string) as Record<string, unknown>;
-    expect(writtenContent['forceModel']).toBe('sonnet');
+    expect(writtenContent['forceModel']).toBe('opus'); // C-03: model preserved
     expect(writtenContent['forceAgent']).toBe('code-reviewer');
   });
 
@@ -336,7 +337,7 @@ describe('handleEvaluation NO_GO with fresh-eyes rotation', () => {
     expect(skills).toContain('code-simplifier');
   });
 
-  it('fix task on sonnet+bug-fixer rotates to haiku+code-reviewer', () => {
+  it('fix task on sonnet+bug-fixer preserves sonnet, rotates agent to code-reviewer', () => {
     const task = makeTask({ model: 'sonnet', assignedAgent: 'bug-fixer' });
     const result = makeTaskResult({ selfAssessment: 'NO_GO' });
 
@@ -344,7 +345,7 @@ describe('handleEvaluation NO_GO with fresh-eyes rotation', () => {
 
     const callArgs = vi.mocked(writeFileSync).mock.calls[0]!;
     const writtenContent = JSON.parse(callArgs[1] as string) as Record<string, unknown>;
-    expect(writtenContent['model']).toBe('haiku');
+    expect(writtenContent['model']).toBe('sonnet'); // C-03: model preserved
     expect(writtenContent['assignedAgent']).toBe('code-reviewer');
   });
 });
@@ -354,7 +355,7 @@ describe('handleEvaluation NO_GO with fresh-eyes rotation', () => {
 describe('sprint-spawner fresh-eyes re-exports', () => {
   it('re-exports rotateModelForFix from debt-manager', () => {
     expect(typeof spawner.rotateModelForFix).toBe('function');
-    expect(spawner.rotateModelForFix('opus')).toBe('sonnet');
+    expect(spawner.rotateModelForFix('opus')).toBe('opus'); // C-03: model preserved
   });
 
   it('re-exports rotateAgentForFix from debt-manager', () => {

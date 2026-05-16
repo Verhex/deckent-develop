@@ -11,7 +11,7 @@ import { routeTaskV2, type RoutingOptions } from '../core/routing-engine.js';
 import type { OutcomeTracker } from './outcome-tracker.js';
 import type { ResolvedConfig } from '../core/config-types.js';
 import { debugLog } from '../core/utils.js';
-import { execSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -221,15 +221,22 @@ export interface ReconciliationDeps {
  * Get git diff stats for files within the task scope.
  * Returns lines changed and files changed.
  */
-function defaultGetGitDiffStats(projectRoot: string, scope: Task['scope']): { linesChanged: number; filesChanged: string[] } {
+export function defaultGetGitDiffStats(projectRoot: string, scope: Task['scope']): { linesChanged: number; filesChanged: string[] } {
   try {
     const dirs = scope?.directories ?? [];
-    const pathArgs = dirs.length > 0 ? ` -- ${dirs.join(' ')}` : '';
-    const output = execSync(`git diff --stat HEAD${pathArgs}`, {
+    // ADR-006: array-form spawnSync, no shell — dirs are pathspecs after `--`,
+    // never interpolated into a command string.
+    const args = ['diff', '--stat', 'HEAD'];
+    if (dirs.length > 0) args.push('--', ...dirs);
+    const res = spawnSync('git', args, {
       cwd: projectRoot,
       encoding: 'utf-8',
       timeout: 10_000,
     });
+    if (res.error || res.status !== 0 || typeof res.stdout !== 'string') {
+      return { linesChanged: 0, filesChanged: [] };
+    }
+    const output = res.stdout;
 
     const lines = output.trim().split('\n');
     const filesChanged: string[] = [];
@@ -253,15 +260,16 @@ function defaultGetGitDiffStats(projectRoot: string, scope: Task['scope']): { li
 /**
  * Run tsc --noEmit and return whether it passed.
  */
-function defaultRunTscCheck(projectRoot: string): boolean {
+export function defaultRunTscCheck(projectRoot: string): boolean {
   try {
-    execSync('npx tsc --noEmit', {
+    // ADR-006: array-form spawnSync, no shell. Static args (no task input).
+    const res = spawnSync('npx', ['tsc', '--noEmit'], {
       cwd: projectRoot,
       encoding: 'utf-8',
       timeout: 60_000,
       stdio: 'pipe',
     });
-    return true;
+    return !res.error && res.status === 0;
   } catch {
     return false;
   }
@@ -270,7 +278,7 @@ function defaultRunTscCheck(projectRoot: string): boolean {
 /**
  * Run vitest for scope-specific files and return pass ratio.
  */
-function defaultRunVitestScopeCheck(projectRoot: string, scopeDirs: string[]): { passRatio: number; passed: boolean } {
+export function defaultRunVitestScopeCheck(projectRoot: string, scopeDirs: string[]): { passRatio: number; passed: boolean } {
   try {
     // Build test path patterns from scope directories
     const testPatterns = scopeDirs
@@ -281,12 +289,18 @@ function defaultRunVitestScopeCheck(projectRoot: string, scopeDirs: string[]): {
       return { passRatio: 1, passed: true };
     }
 
-    const output = execSync(`npx vitest run --reporter=json ${testPatterns.join(' ')}`, {
+    // ADR-006: array-form spawnSync, no shell — testPatterns are argv items.
+    const res = spawnSync('npx', ['vitest', 'run', '--reporter=json', ...testPatterns], {
       cwd: projectRoot,
       encoding: 'utf-8',
       timeout: 120_000,
       stdio: 'pipe',
     });
+    if (res.error || res.status !== 0 || typeof res.stdout !== 'string') {
+      // vitest exits non-zero on test failures — preserve prior fail behavior
+      return { passRatio: 0, passed: false };
+    }
+    const output = res.stdout;
 
     const jsonMatch = output.match(/\{[\s\S]*"numPassedTests"[\s\S]*\}/);
     if (jsonMatch) {

@@ -66,29 +66,6 @@ function getSprintNumber(sprintId: string): number {
 // perspective" — different model tier and different agent specialty.
 // This reduces the chance that the same blind spot repeats on retry.
 
-/**
- * Provider-agnostic model downgrade map. Used to rotate a failed task's
- * model to a lower tier (different reasoning trace + cost savings).
- * Terminal models map to themselves (no further downgrade possible).
- */
-const MODEL_DOWNGRADE_MAP: Readonly<Record<string, ModelType>> = Object.freeze({
-  // Claude
-  opus: 'sonnet',
-  sonnet: 'haiku',
-  haiku: 'haiku',
-  // OpenAI / Codex
-  'gpt-5': 'gpt-4.1',
-  'gpt-5-mini': 'gpt-5-mini',
-  'gpt-4.1': 'gpt-4.1-mini',
-  'gpt-4.1-mini': 'gpt-4.1-mini',
-  o3: 'o4-mini',
-  'o4-mini': 'o4-mini',
-  // Gemini
-  'gemini-3.1-pro-preview': 'gemini-2.5-pro',
-  'gemini-2.5-pro': 'gemini-2.5-flash',
-  'gemini-2.5-flash': 'gemini-2.0-flash',
-  'gemini-2.0-flash': 'gemini-2.0-flash',
-});
 
 /**
  * Agent rotation map — pairs agents whose perspectives complement each other.
@@ -131,12 +108,15 @@ export interface FreshEyesRotationStrategy {
 }
 
 /**
- * Rotate a model to its fresh-eyes counterpart (one tier down when available).
+ * Return the model to use for a fix-retry. The model is preserved (identity):
+ * a failed task's retry is HARDER than the original, so downgrading the model
+ * (the old opus→sonnet→haiku map, C-03) was reverse logic. Fresh perspective
+ * on a retry comes from agent rotation (rotateAgentForFix), not a weaker model.
  * @param model - The original task's model
- * @returns A different model where possible, the same model when already at the floor
+ * @returns The same model (unchanged)
  */
 export function rotateModelForFix(model: ModelType): ModelType {
-  return MODEL_DOWNGRADE_MAP[model] ?? model;
+  return model;
 }
 
 /**
