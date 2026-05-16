@@ -55,14 +55,20 @@
 | adr-053 | TaskType Taxonomy — Audit / Document-Write / Code-Development + Extensibility Roadmap | proposed |
 | adr-055 | Hybrid Scoring 5-Layer Pipeline — Schema / Gates / Quality / Outcome / Auditor | proposed |
 | adr-060 | Self-Awareness Propagation — 5-Channel Context Enrichment Architecture | proposed |
+| adr-061 | AEGIS — Agentic Effect-Governed Iterative Stewardship Methodology | proposed |
 
 ## Recent Learnings
+- **Sprint sprint-171 Learnings** (sprint-171): ## Sprint sprint-171 Learnings
+- Doc Audit Root: NO_GO — Sprint 171 Task 23 — Doc Audit Root tamamlandı. Repo kökünde...
 - **Sprint sprint-170 Learnings** (sprint-170): ## Sprint sprint-170 Learnings
 - P0-3 Tmux Prompt Filename TaskId-Aware: GO_WITH_TECH_DEBT — Sprint 170 P0-3 (Bug 2B ...
 - **Sprint sprint-169 Learnings** (sprint-169): ## Sprint sprint-169 Learnings
 - W3.1 C0c Collision Detection Live Trigger Investigation + Fix: NO_GO — W3.1 RC ident...
 - **Sprint sprint-168 Learnings** (sprint-168): ## Sprint sprint-168 Learnings
 - T3 Kill Recovery Simulation (DEPENDS T1): NO_GO — Task blocked by unmet dependency. ...
+- **Sprint sprint-167 Learnings** (sprint-167): # Sprint sprint-167 Learnings
+
+Sprint 167 Read-Only Self-Audit deliverable'ları (kaynak: .audit/sprint-167/T*.md — hi...
 - **Sprint sprint-166 Learnings** (sprint-166): # Sprint sprint-166 Learnings
 
 ## 4 Architectural Root Cause Fix
@@ -79,16 +85,14 @@
 - **Sprint sprint-164 Learnings** (sprint-164): ## Sprint sprint-164 Learnings
 - Vitest Gate +1 Fail Closure — Chronic Regression Eradication: NO_GO — Vitest gate +1...
 - **Sprint sprint-163 Learnings** (sprint-163): ## Sprint sprint-163 Learnings
-- **Sprint sprint-162 Learnings** (sprint-162): ## Sprint sprint-162 Learnings
-- Sprint Phase Observability + EvaluationAuditTrail Runtime Wire (T-003, composite): G...
-- **Sprint 161 Learnings** (sprint-161): Sprint 161 learnings — no .brain/sprints/sprint-161.md log was available at backfill time. Stub inserted by Sprint 16...
 
 ## Active Technical Debt
-- [NORMAL] Tech debt from 170-001-fix: Code physically verified despite missing .result (Sp
+- [HIGH] Tech debt from 170-001-fix: Code physically verified despite missing .result (Sp
 
 ## Active Patterns
 - Violation pattern: stale_heartbeat
 - Violation pattern: stale_heartbeat
 - Violation pattern: stale_heartbeat
+- Violation pattern: stale_heartbeat
 
-_Total entries: 230 | Generated: 2026-05-15_
+_Total entries: 238 | Generated: 2026-05-16_

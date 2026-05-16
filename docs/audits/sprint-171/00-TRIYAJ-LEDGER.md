@@ -93,7 +93,7 @@ Bug A/B runtime aktif. Kalan A-bölümü verify-first tamamlandı (detay: `00-VE
 | ID | Durum | Sonraki aksiyon |
 |---|---|---|
 | BA-03/C-25 ADR-010 | [x] CONFIRMED (ADR-text stale) | 7 dep her biri sonraki ADR-gerekçeli. ADR-010 metni Sprint 044 CLI-only kalıntısı → Sprint 172 doc-reorg + ADR-010 amend ("yalnızca commander"→"minimal ADR-gerekçeli"). Kod blocker DEĞİL |
-| BA-05/C-32 Sprint 167 DB-boş | [x] CONFIRMED-REAL **OSS-GA P0** | sprint-167 = 0 satır (kesin gap 166→168). ADR-046 self-update hook regresyon. DB'ye sahte veri YAZILMAZ. ADR-046 hook RC + GA-öncesi tekrarlamaz garantisi → ESCALATE (en kritik) |
+| BA-05/C-32 Sprint 167 DB-boş | [x] VERİ KAPANDI / kök AÇIK | Backfill uygulandı (`scripts/sprint-167-memory-backfill.mjs`, dry-run→APPLY onaylı): sprint-167 0→3, gerçek artefakt, FTS senkron, .bak. ADR-046 hook KÖK SEBEBİ onarılmadı → post-GA integrity-V2 (tekrar edebilir) |
 | C-05/C-07 doc-drift | [x] CONFIRMED (kullanıcı-yanıltan) | DECKENT.md:51 "wave goes live" bu projede yanlış (false) + api-surface:83 çelişen provenance → Sprint 172 doc-reorg |
 
 **#18 net:** Hiçbiri kod blocker değil. BA-05 (Sprint 167 / ADR-046 hook) data-integrity P0 — ayrı RC escalate. BA-03+C-05/07 → Sprint 172 doc-reorg/ADR-amend batch.

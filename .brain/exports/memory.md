@@ -1,5 +1,9 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-171 Learnings
+- Sprint sprint-171 Learnings: ## Sprint sprint-171 Learnings
+- Doc Audit Root: NO_GO — Sprint 171 Task 23 — Doc Audit Root tamamlandı. Repo kökündeki 19 markdown dosyası tek tek denetlendi (DIRECTIVES'in idd
+
 ## Sprint sprint-170 Learnings
 - Sprint sprint-170 Learnings: ## Sprint sprint-170 Learnings
 - P0-3 Tmux Prompt Filename TaskId-Aware: GO_WITH_TECH_DEBT — Sprint 170 P0-3 (Bug 2B / ADR-048 §Negative closure) — fix architecturally complete; 3/3 mandated TDD tests GREEN; 5 pre
@@ -26,6 +30,37 @@ What changed:
 ## Sprint sprint-168 Learnings
 - Sprint sprint-168 Learnings: ## Sprint sprint-168 Learnings
 - T3 Kill Recovery Simulation (DEPENDS T1): NO_GO — Task blocked by unmet dependency. Task 168-003 (T3 Kill Recovery Simulation) depends on task sprint-168-smoke-T1 (T1 Sco
+
+## Sprint sprint-167 Learnings
+- Sprint sprint-167 Learnings: # Sprint sprint-167 Learnings
+
+Sprint 167 Read-Only Self-Audit deliverable'ları (kaynak: .audit/sprint-167/T*.md — hiçbir source/doc mutasyonu yok, salt tespit).
+
+## T1 — Code Inventory + Dead Code + Unused Features (167-001, code-reviewer)
+Kaynak: .audit/sprint-167/T1-code-inventory.md. Kod envanteri + ölü kod + kullanılmayan feature taraması (Sprint 171 dead-code audit'inin öncülü).
+
+## T2 — Doc Inventory + Reference Validation + Ground-Truth (167-002, doc-writer)
+Kaynak: .audit/sprint-167/T2-doc-inventory.md. READ-ONLY doc envanteri + kırık referans + ground-truth doğrulama. (Sprint 167 retro NO_GO bu task'tı.)
+
+## T3 — ADR Compliance + Status (167-003, code-reviewer)
+Kaynak: .audit/sprint-167/T3-adr-compliance.md. 50 ADR enumeration (DB↔FS parity) + 8 ADR runtime compliance + ADR-046 Step 1-4 wire canlı trigger + identity-generator Step 2 decommission önerisi + ADR-053/055/060 (Sprint 156'dan beri proposed) closure önerisi. Tümü Sprint 168 suggested_fix input'u.
+
+## T4 — Memory.db + Data Integrity (167-004, data-engineer)
+Kaynak: .audit/sprint-167/T4-memory-integrity.md. memory.db schema + FTS5 + relations integrity (Sprint 171 memory-db-integrity audit'inin öncülü).
+
+## T5 — Brain/Worker/Auditor Wire + Manuel Survival (167-005, bug-fixer FORENSIC)
+Kaynak: T5-brain-wire-audit.md + T5-brain-debug-phase1.md + T5-brain-debug-phase2.md. 9 Brain orchestration bug + BUG-HH forensic; 5 cluster pattern analysis; manuel survival pattern kanıtı (ADR-047 input).
+
+## T6 — Test + Build + Security + OSS Readiness (167-006, security-auditor)
+Kaynak: .audit/sprint-167/T6-test-build-security.md. tsc PASS / vitest 2 fail / OSS gate readiness forensic.
+
+## T7 — Cross-Cutting Synthesis + Brain Crash Addendum (167-007, architect)
+Kaynak: T7-cross-cutting-synthesis.md + T7-brain-crash-addendum.md. Meta-audit konsolidasyon + Alperen request Brain crash sebep detayı (live evidence).
+
+## Kalıcı Öğrenim
+- ADR-046 hook chain Sprint 161/163/166/167 dört kez wire denendi, hâlâ kısmî → BA-05'in (Sprint 171) doğrudan kökü; tam crash-safe fix post-GA integrity-V2 sprintine.
+- Sprint metrics math guard (Duration negatif / Coverage NaN) sprint-167.md'de canlı kanıt — finalize crash imzası.
+- Read-only self-audit deseni Sprint 171'in 29-task mega-audit'inin doğrudan atası.
 
 ## Sprint sprint-166 Learnings
 - Sprint sprint-166 Learnings: # Sprint sprint-166 Learnings

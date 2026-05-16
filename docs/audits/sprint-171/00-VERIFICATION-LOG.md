@@ -317,3 +317,15 @@ ADR-046 post-sprint self-update hook'u sprint/retro/memory entry'lerini memory.d
 | BA-05 Sprint 167 DB-boş | data-integrity P0 | RC tamam → Sprint 167 backfill (Alperen onayı) + ADR-046 hook V2 | — |
 
 **Otonom-güvenli iş bitti.** Kalan: (1) Sprint 167 backfill — Alperen onayı (DB-write); (2) Sprint 172 doc-reorg sprinti; (3) post-GA integrity/enforcement-hardening V2 sprinti (C-13 hard-flip + C-14 wire + BA-05 ADR-046 crash-safe). Hiçbiri OSS-GA blocker değil — bootstrap (Bug A/B) + güvenlik (C-04) + ters-mantık (C-03) kapandı, runtime aktif.
+
+## BA-05 BACKFILL UYGULANDI (2026-05-16, dry-run→APPLY onaylı)
+
+`scripts/sprint-167-memory-backfill.mjs` (fe35c49 precedent aynası, non-destructive upsert).
+
+**Sonuç:** PRE sprint-167=0 → POST=3 (`sprint-log-167`+`retro-sprint-167`+`mem-sprint-167`). Global 235→238 (sprint 10→11, retro 25→26, memory 41→42). `.bak`: `.brain/memory.db.bak-pre-sprint167-backfill-2026-05-16T17-34-03-982Z`.
+
+**Doğrulama PASS:** entries_fts=238==entries=238 (tam senkron); FTS5 `"sprint-167"` (quoted) match 8 (3 yeni + 5 referencer — fe35c49 "adr-046→4" deseni); peer-parity 166/168 (id/type/status/sprint_num) ✓; her `metadata.source` gerçek dosya; uydurma 0; upsert-only, DB silme/rebuild yok. `deckent memory export` → summary.md Recent Learnings artık 167 içerir (gap kapandı).
+
+**Yan bulgu (giderildi):** script POST FTS satırı tırnaksız `sprint-167` ile FTS5 kolon-syntax hatası → `0` yazdırdı (try/catch yuttu, veriye 0 etki — kozmetik). Quoted phrase'e düzeltildi (commit'te). systematic-debugging: "FTS broken" varsayılmadı, kanıtla query-bug olduğu ispatlandı.
+
+**Kapsam dışı (değişmedi):** ADR-046 hook crash-safe fix = post-GA integrity-V2. Bu yalnız tarihsel 167 verisini kurtardı, kök hook'u onarmadı.
