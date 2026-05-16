@@ -296,3 +296,24 @@ ADR-046 post-sprint self-update hook'u sprint/retro/memory entry'lerini memory.d
 **KALAN — Alperen aksiyonu:** `npm run build` + MCP restart → C-03+C-04 runtime aktif (kod-hot-reload yok; Bug A/B'deki gibi). Bu adıma kadar fix dist'te değil, sadece source+test.
 
 **Pre-existing tmux fail (yan bulgu, kapsam-dışı):** `tmux.test.ts > spawnWorker` 3 fail (prompt tmpfile `< .../.prompt-*.txt` + `${PATH}` injection-safe assert) — Sprint 170 P0-3 tmux taskId-aware fix sonrası test/impl drift adayı. C-03/C-04 kapsamı dışı; ayrı triyaj (DEFER veya Sprint 172 test-integrity). Ledger'a yeni satır eklendi.
+
+## TMUX-SF (#20) — STALE TEST verdict + fix (2026-05-16, commit f7230bb)
+
+**systematic-debugging Phase 1-3:** 3 fail (`tmux.test.ts` spawnWorker x2 + `tmux-edge.test.ts` x1). Actual cmd: `claude -p - --model sonnet < /project/.tasks/.prompt-task-001-abcdef01.txt`; test expected `.prompt-abcdef01.txt`. RC: `tmux.ts:70 filename = taskId ? \`.prompt-${taskId}-${id}.txt\` : \`.prompt-${id}.txt\`` = **Sprint 170 P0-3 taskId-aware fix (5ffbf3e)**, kasıtlı (collision-safe, Docker convention mirror). **Impl DOĞRU, test stale** (pre-P0-3 pattern, güncellenmemiş). Injection-safety property korunmuş (stdin redirect + tmpfile, sadece dosya adında taskId). C-03/C-04 regresyonu DEĞİL (zaten git stash testiyle elenmişti).
+
+**Verdict:** STALE TEST, gerçek bug değil. Fix = 3 assertion taskId-aware pattern'e güncellendi (`.prompt-task-001-abcdef01.txt`, `< .../.prompt-task-002-abcdef01.txt`, `.prompt-task-edge-03-deadbeef.txt`) — governed test-update (C-03 deseniyle aynı: impl source-of-truth, test eski davranışı kilitliyordu). **orchestra suite artık 0 fail** (4416 pass / 11 skip / 205 dosya). Sprint 170 170-001 tech-debt ailesinden (mock/literal drift) — bu kalem kapandı.
+
+## SPRINT 171 FIX-PHASE KAPANIŞ DURUMU (2026-05-16)
+
+| Madde | Sınıf | Durum | Runtime |
+|-------|-------|-------|---------|
+| Bug A (schema gate testsPassed) | MANUEL-P0 | ✅ FIX (83f5db4) | aktif |
+| Bug B (FIX re-eval audit-trail) | MANUEL-P0 | ✅ FIX (658ef7f) | aktif |
+| C-03 (rotateModelForFix→identity) | davranış-değiştiren (onaylı) | ✅ FIX (bb8b79c) | aktif (build+restart yapıldı) |
+| C-04 (execSync→spawnSync ADR-006) | davranış-koruyan | ✅ FIX (bb8b79c) | aktif |
+| TMUX-SF (stale test) | test-integrity | ✅ FIX (f7230bb) | n/a (test) |
+| C-13 RBAC / C-14 verify-gate | doc-honest + V2 | KARAR alındı → Sprint 172 doc + post-GA V2 | — |
+| C-05/07 / BA-03 ADR-010 | doc-drift/governance | Sprint 172 doc-reorg + ADR amend | — |
+| BA-05 Sprint 167 DB-boş | data-integrity P0 | RC tamam → Sprint 167 backfill (Alperen onayı) + ADR-046 hook V2 | — |
+
+**Otonom-güvenli iş bitti.** Kalan: (1) Sprint 167 backfill — Alperen onayı (DB-write); (2) Sprint 172 doc-reorg sprinti; (3) post-GA integrity/enforcement-hardening V2 sprinti (C-13 hard-flip + C-14 wire + BA-05 ADR-046 crash-safe). Hiçbiri OSS-GA blocker değil — bootstrap (Bug A/B) + güvenlik (C-04) + ters-mantık (C-03) kapandı, runtime aktif.
