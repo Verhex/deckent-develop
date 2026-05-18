@@ -135,7 +135,7 @@ searchMemory(store, {
 - `archive/pre-v2/DECISIONS.md`: Original 96K ADR file (backup)
 - `archive/pre-v2/MEMORY.md`: Original sprint learnings (backup)
 - `ERRORS.md`: Error log (still file-based, not in DB)
-- `PROJECT-IDENTITY.md`: Still exists as file, also in DB (decay_exempt)
+- `PROJECT-IDENTITY.md`: **Removed** — deprecated since Sprint 166 (ADR-046), superseded by `.deckent/workspace/IDENTITY.md` (managed-docs `identity-md` in `docs.json`). Identity remains in `memory.db` (decay_exempt).
 - `sprints/sprint-NNN.md`: Sprint logs (in DB + file)
 
 ## Lock File Format
