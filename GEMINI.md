@@ -1,7 +1,7 @@
 <!-- Dil: TR | Teknik terimler EN -->
 @DECKENT.md
 
-# Project: deckent — Codex CLI Adapter (AGENTS.md)
+# Project: deckent — Gemini CLI Adapter (GEMINI.md)
 
 > **Thin adapter (ADR-013).** The single source of truth is **`DECKENT.md`** —
 > read it. This file only points there; it intentionally contains no duplicated

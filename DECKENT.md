@@ -27,8 +27,9 @@
 - Task routing: task-router.ts assigns agent + skills + provider per task
 
 ## MCP Integration
-- 22 tools: init, set_directives, plan, start, status, doctor, retro, history, analyze_project, sync, config, review, run, kill, cleanup, help, agent_list, skill_list, checkpoint, docs, explain, **memory_query**
+- 31 tools: init, set_directives, plan, start, status, doctor, retro, history, analyze_project, sync, config, review, run, kill, cleanup, help, agent_list, skill_list, checkpoint, docs, explain, **memory_query**, watch, feature_query, audit, recover, nervous_subscribe, nervous_accept, nervous_reject, nervous_status, nervous_config
 - 8 resources: dashboard, directives, memory, debt, config, retro, tasks, agents
+- Canonical tool list is auto-generated — see `docs/reference/mcp-tools.md` (`npm run docs:ref`)
 - Registration: `claude mcp add deckent -- npx deckent mcp`
 
 ## Memory V2 — DB-First Architecture
@@ -61,9 +62,9 @@ When acting as Auditor: @.claude/rules/auditor.md
 When acting as Worker: @.claude/rules/worker-default.md
 
 ## Environment
-Build: tsc
-Test: npx vitest run
-Lint: tsc --noEmit
+Build: `npm run build` (tsc + copy-assets) | Full: `npm run build:all` (+ dashboard vite) | Dev: `npm run dev` (tsc --watch)
+Test: `npm test` (vitest run) | Watch: `npm run test:watch` | Coverage: `npm run test:coverage` | Dashboard: `npm run test:dashboard`
+Lint: `npm run lint` (tsc --noEmit) | ADR: `npm run lint:adr` | Errors: `npm run lint:errors` | Links: `npm run lint:link`
 
 ## Boot
 @.deckent/workspace/BOOT.md
@@ -192,6 +193,15 @@ PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → CLEANUP
 | `deckent_docs` | Sprint lifecycle dokuman yonetimi (add/remove/list) | Hayir | Hayir |
 | `deckent_explain` | Sprint gecmisini ve sonuclarini acikla | Evet | Hayir |
 | `deckent_memory_query` | Proje hafizasinda cross-source arama (ADR, sprint, debt, pattern) | Evet | Hayir |
+| `deckent_watch` | Sprint event'lerini gercek zamanli akisla izle | Evet | Hayir |
+| `deckent_feature_query` | Ozellik manifestini sorgula (active/dormant/dead/all) | Evet | Hayir |
+| `deckent_audit` | Herhangi bir sprint icin Brain Self-Audit Gate calistir | Evet | Hayir |
+| `deckent_recover` | Cokmus veya takilmis sprint'i kurtar | Hayir | **Evet** |
+| `deckent_nervous_subscribe` | Nervous System bildirimlerine abone ol | Hayir | Hayir |
+| `deckent_nervous_accept` | Bekleyen nervous bildirimini kabul et | Hayir | Hayir |
+| `deckent_nervous_reject` | Bekleyen nervous bildirimini reddet | Hayir | Hayir |
+| `deckent_nervous_status` | Nervous System mevcut durumunu goster | Evet | Hayir |
+| `deckent_nervous_config` | Nervous System detector'larini yapilandir | Hayir | Hayir |
 
 ### Parametre Ornekleri
 

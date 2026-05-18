@@ -27,7 +27,7 @@
   - promotion-pipeline.ts: temp→permanent agent/skill promotion, demotion
   - sprint-utils.ts: shared utilities for sprint phases, task analysis, timing helpers
   - result-collector.ts: waitForResults, processQueue, collectResults, result aggregation + IPC
-- **core/** — Types, config, utilities, agent/skill pools (94 modules)
+- **core/** — Types, config, utilities, agent/skill pools (90 modules)
   - types.ts + *-types.ts: all type definitions (task, config, sprint, monitoring, routing)
   - config.ts: 3-layer config merge (defaults → global → project)
   - agent-pool.ts: AgentPoolManager, 15 built-in agents, LRU eviction
@@ -54,9 +54,9 @@
 - **monitor/** — Auditor scan loop, dashboard manager, sprint-state tracking
 - **connectors/** — External messaging adapters: Discord, Telegram, WhatsApp, incoming-router
 - **providers/** — Claude, Codex, Gemini adapters (5 modules)
-- **api/** — HTTP API server, SSE, rate limiting (3 modules)
-- **mcp/** — MCP server: 27 tools + 8 resources, stdio transport
-- **cli/** — 55+ commands, helpers, entry point
+- **api/** — HTTP API server, SSE, rate limiting (4 modules)
+- **mcp/** — MCP server: 31 tools + 8 resources, stdio transport
+- **cli/** — 46 commands, helpers, entry point
 - **dashboard/** — React + Vite + Tailwind web dashboard
 - **extensions/vscode/** — VS Code extension host integration
 
@@ -64,7 +64,7 @@
 Build: `npm run build` (tsc + copy-assets) | Full: `npm run build:all` (+ dashboard vite build)
 Test: `npm test` (vitest run) | Watch: `npm run test:watch` | Coverage: `npm run test:coverage`
 Test Dashboard: `npm run test:dashboard` (vitest.dashboard.config.ts)
-Lint: `npm run lint` (tsc --noEmit) | ADR: `npm run lint:adr` | Errors: `npm run lint:errors`
+Lint: `npm run lint` (tsc --noEmit) | ADR: `npm run lint:adr` | Errors: `npm run lint:errors` | Links: `npm run lint:link`
 Dev: `npm run dev` (tsc --watch)
 Publish gate: `npm run validate:publish` — Alperen runs `npm publish` manually (see memory: npm publish approval)
 
@@ -91,6 +91,8 @@ Canlı sprint, debt, agent performance ve ADR durumu için: `@.brain/exports/sum
 Komutlar: `deckent status`, `deckent history`, `deckent retro`, `deckent recall "<sorgu>"`.
 
 ## Sprint Metrics
+> Snapshot — point-in-time, hand-maintained each sprint. Sprint Metrics / Active Debt / Agent Performance below are NOT auto-generated; for live state use `deckent status` or `.brain/exports/summary.md` (auto-generated).
+
 | Metric | Value |
 |--------|-------|
 | Sprint | sprint-172 |
