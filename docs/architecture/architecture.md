@@ -1,9 +1,9 @@
 # Deckent Architecture — Comprehensive Reference
 
-> **Version:** Sprint 100+ | **Language:** TypeScript (ESM) | **Runtime:** Node.js ≥18
+> **Version:** deckent v1.0.0-beta.1 (Memory V2 DB-first era) | **Language:** TypeScript (ESM) | **Runtime:** Node.js ≥18
 >
 > This document is the single comprehensive architectural reference for the Deckent system.
-> For the primary system specification, see [DECKENT-MASTER-BLUEPRINT.md](../DECKENT-MASTER-BLUEPRINT.md).
+> For the primary system specification, see [blueprint.md](../vision/blueprint.md).
 
 ---
 
@@ -451,7 +451,7 @@ The orchestration layer coordinates the entire sprint lifecycle. `brain.ts` is t
 
 | File | Responsibility | Key Exports |
 |------|---------------|-------------|
-| `brain.ts` | Re-export layer (~58 lines) — re-exports from sprint-controller, result-evaluator, model-selector, task-builder, debt-manager, sprint-reporter. Retains `readContext()`, `planSprint()`, `spawnWorkers()`, `confirmDraftTasks()`, IPC channel registry, `BrainError` class. | `runSprint()`, `planSprint()`, `evaluateResult()`, `runDecay()`, `resolveTaskModel()` |
+| `brain.ts` | Re-export layer (~53 lines) — re-exports from sprint-controller, result-evaluator, model-selector, task-builder, debt-manager, sprint-reporter. Retains `readContext()`, `planSprint()`, `spawnWorkers()`, `confirmDraftTasks()`, IPC channel registry, `BrainError` class. | `runSprint()`, `planSprint()`, `evaluateResult()`, `runDecay()`, `resolveTaskModel()` |
 | `sprint-controller.ts` | Sprint lifecycle management | `runSprint()`, `pauseSprint()`, `resumeSprint()`, `cleanup()` |
 | `result-evaluator.ts` | Pure task evaluation (no side effects) | `evaluateResult()`, `isDocTask()`, `waitForResults()` |
 | `planner.ts` | AI task planning with Zod schema validation | `planWithAI()`, `parseStructuredDirectives()`, `inferModelFromDirective()` |
@@ -459,7 +459,7 @@ The orchestration layer coordinates the entire sprint lifecycle. `brain.ts` is t
 | `sprint-estimator.ts` | Sprint duration and effort estimation | `estimateSprint()` |
 | `task-retry.ts` | NO_GO task retry and priority-fix scheduling | `scheduleRetry()`, `buildPriorityFix()` |
 
-**Key Design:** `brain.ts` is a **re-export layer** (~58 lines, down from 1,312 pre-Sprint 036). The actual logic lives in `sprint-controller.ts`, `result-evaluator.ts`, and other orchestra sub-modules. `brain.ts` remains the **only** module that external code imports for orchestration, preserving backward compatibility. It re-exports all public API functions from its sub-modules.
+**Key Design:** `brain.ts` is a **re-export layer** (~53 lines, down from 1,312 pre-Sprint 036). The actual logic lives in `sprint-controller.ts`, `result-evaluator.ts`, and other orchestra sub-modules. `brain.ts` remains the **only** module that external code imports for orchestration, preserving backward compatibility. It re-exports all public API functions from its sub-modules.
 
 #### Brain Planning Modes
 
@@ -471,10 +471,10 @@ The orchestration layer coordinates the entire sprint lifecycle. `brain.ts` is t
 
 #### Post-Validation Fallback (Sprint 23)
 
-After AI planning, `brain.ts` compares the number of returned tasks against the directive task count. If the AI planner returns fewer tasks than expected **and** `brain_planning !== 'ai'`, it discards the AI result and re-runs with structured planning:
+After AI planning, the orchestrator (in `sprint-controller.ts`, re-exported via `brain.ts`) compares the number of returned tasks against the directive task count. If the AI planner returns fewer tasks than expected **and** `brain_planning !== 'ai'`, it discards the AI result and re-runs with structured planning:
 
 ```typescript
-// src/orchestra/brain.ts
+// src/orchestra/sprint-controller.ts (re-exported via brain.ts)
 if (plannerResult && brain_planning !== 'ai') {
   const directiveCount = parseStructuredDirectives(directivesContent).length;
   if (plannerResult.tasks.length < directiveCount) {
@@ -520,11 +520,11 @@ The Auditor observes the system state and enforces boundaries. It **never writes
 3. Scan `.locks/*.lock` → detect stale locks (>5 min)
 4. Build dependency graph → run Kahn's algorithm → detect circular dependencies
 5. Overwrite `.dashboard` with merged state
-6. Append new patterns to `.brain/PATTERNS.md`
+6. Record new patterns into `memory.db` (`type='pattern'`) via MemoryStore
 
 **Auditor Outputs:**
 - `.dashboard` — overwritten every scan cycle (never appended)
-- `.brain/PATTERNS.md` — append-only (new patterns added, never removed by auditor)
+- `memory.db` patterns (`type='pattern'`) — additive (new patterns inserted; surfaced in the generated `.brain/exports/` summary). Under the original V1 model this was append-only `.brain/PATTERNS.md`.
 - `.tasks/ALERT` — critical alert files
 
 ---
@@ -560,15 +560,17 @@ Provides phase-based hints to guide operator actions. Hints are localized (tr/en
 
 The HTTP API exposes Deckent state and control via REST endpoints. Used by the Web Dashboard and external integrations.
 
-| Category | Count | Examples |
-|----------|-------|---------|
-| Status endpoints | 4 | `GET /status`, `GET /tasks`, `GET /dashboard`, `GET /health` |
-| Control endpoints | 7 | `POST /start`, `POST /stop`, `POST /kill`, `POST /plan`, `POST /cleanup`, `POST /sync`, `POST /checkpoint` |
-| Memory endpoints | 4 | `GET /memory`, `GET /retro`, `GET /history`, `GET /patterns` |
-| Streaming | 1 | `GET /events` (SSE — real-time dashboard updates) |
-| Config endpoint | 1 | `GET/POST /config` |
+All routes are served under the `/api/` prefix (see `src/api/server.ts`).
 
-**SSE Stream:** The `/events` endpoint watches the `.dashboard` file using `fs.watch()`. When `.dashboard` changes (Auditor overwrites), all connected SSE clients receive the updated state as a JSON event.
+| Category | Examples |
+|----------|---------|
+| Status | `GET /api/status`, `GET /api/tasks`, `GET /api/sprint`, `GET /api/health`, `GET /api/doctor` |
+| Control | `POST /api/start`, `POST /api/plan`, `POST /api/cleanup`, `POST /api/kill/:workerId` |
+| Memory | `GET /api/memory`, `GET /api/debt`, `GET /api/history` |
+| Streaming | `GET /api/events` (SSE — real-time dashboard updates) |
+| Config | `GET/POST /api/config`, `GET /api/config/defaults` |
+
+**SSE Stream:** The `/api/events` endpoint watches the `.dashboard` file using `fs.watch()`. When `.dashboard` changes (Auditor overwrites), all connected SSE clients receive the updated state as a JSON event.
 
 ---
 
@@ -576,7 +578,7 @@ The HTTP API exposes Deckent state and control via REST endpoints. Used by the W
 
 The MCP layer exposes Deckent capabilities as Claude Code tools and resources, enabling operators to control Deckent directly from within Claude Code conversations.
 
-**Tools (19):**
+**Tools (31 total — core handlers shown; full list: [docs/reference/mcp-tools.md](../reference/mcp-tools.md)):**
 
 | Tool | MCP Name | Description |
 |------|----------|-------------|
@@ -606,8 +608,8 @@ The MCP layer exposes Deckent capabilities as Claude Code tools and resources, e
 |-----|-------------|
 | `deckent://dashboard` | Live dashboard state (JSON) |
 | `deckent://directives` | Current `DIRECTIVES.md` content |
-| `deckent://memory` | Current `MEMORY.md` content |
-| `deckent://debt` | `DEBT.md` tech debt ledger |
+| `deckent://memory` | Brain memory summary (from `memory.db`) |
+| `deckent://debt` | Tech debt ledger (from `memory.db`) |
 | `deckent://config` | Current resolved config |
 | `deckent://retro` | Latest retrospective |
 | `deckent://tasks` | Current sprint tasks (JSON) |
@@ -668,7 +670,8 @@ api/           ← imports core/, orchestra/brain.ts
 ```
 tsc --noEmit → detects import errors at compile time
 Code review  → enforces architectural intent
-ADR-008      → documents the rule permanently in DECISIONS.md
+ADR-008      → recorded permanently in memory.db (type='adr'),
+               exported to .brain/exports/decisions.md + docs/adr/
 ```
 
 ---
@@ -684,7 +687,8 @@ OPERATOR writes DIRECTIVES.md
 brain.ts: runSprint()
         │
         ├─► readContext()
-        │     reads: MEMORY.md, RETRO.md, DEBT.md, PATTERNS.md
+        │     reads memory.db (SQLite) via MemoryStore — surfaced
+        │     through generated .brain/exports/ snapshots
         │
         ├─► planSprint()
         │     mode=ai  → planner.ts: planWithAI() → Zod validation
@@ -700,7 +704,7 @@ brain.ts: runSprint()
         ├─► startScanLoop()  ◄─────────────────────────────────┐
         │     auditor.ts: setInterval(30s)                     │
         │     scans heartbeats, boundaries, locks, deadlocks   │
-        │     writes .dashboard, appends PATTERNS.md           │
+        │     writes .dashboard, records patterns to memory.db │
         │                                                      │
         ├─► waitForResults()                                   │
         │     polls .tasks/*.result files                      │
@@ -720,17 +724,19 @@ brain.ts: runSprint()
         │     cross-dependency aware: fix root cause first
         │
         ├─► updateMemory()
-        │     append to .brain/MEMORY.md
-        │     overwrite .brain/RETRO.md
-        │     append to .brain/DECISIONS.md if new ADRs
-        │     write .brain/sprints/sprint-NNN.md
+        │     MemoryStore.insert/upsert into memory.db:
+        │       type='memory' (sprint learnings)
+        │       type='retro'  (retrospective)
+        │       type='adr'    (new ADRs, if any)
+        │     write .brain/sprints/sprint-NNN.md (in DB + file)
+        │     regenerate .brain/exports/*.md snapshots
         │
         └─► runDecay()
-              if countBrainLines() > 900: compress
+              if countBrainLines() > memory_budget (default 5000): compress
               step1: remove resolved PATTERNS
               step2: remove resolved DEBT rows
               step3: archive oldest sprint logs
-              step4: trim old MEMORY sections
+              step4: trim MEMORY sections older than decay_after_sprints (default 20)
               step5: hard-truncate if still over budget
 ```
 
@@ -799,9 +805,9 @@ writeScanToDashboard()
   ← SSE server detects file change → pushes to browser
         │
         ▼
-appendPatterns()
-  new patterns → append to .brain/PATTERNS.md
-  dedup by pattern id (never overwrite)
+recordPatterns()
+  new patterns → MemoryStore.insert(type='pattern') into memory.db
+  dedup by pattern id (surfaced via generated .brain/exports/)
 ```
 
 ### 5.4 MCP Tool Call Flow
@@ -982,20 +988,29 @@ Deckent's memory system was originally a **3-tier, file-based knowledge store** 
 > via the generated `exports/`. `ERRORS.md` is the one log that remains
 > genuinely file-based.
 
-### Tier 1 — MEMORY.md (Short-Term Memory)
+> **V1 framing.** The three "tier" subsections below describe the **original
+> V1 file-based model**. Under Memory V2 this knowledge lives in `memory.db`
+> (`type='memory'` / `type='pattern'` / `type='adr'`) and is surfaced through
+> the generated `.brain/exports/`. The line numbers below are the **current
+> `src/core/constants.ts` `@deprecated` backward-compat defaults**, themselves
+> overridable via the `memory_budget` config key. Canonical reference:
+> [memory-system.md](memory-system.md).
 
-- **Max lines:** 300 (`MEMORY_MAX_LINES`)
+### Tier 1 — Sprint Learnings (Short-Term Memory)
+
+- **Max lines:** 1500 (`MEMORY_MAX_LINES`, default)
+- **Stored:** `memory.db` entries `type='memory'` (V1: `MEMORY.md`)
 - **Written:** After every sprint retrospective
-- **Loaded:** Into Brain context at the start of every sprint via `@import`
+- **Loaded:** Into Brain context at the start of every sprint (generated `exports/summary.md` via `@reference`)
 - **Content:** Recent learnings, wave summaries, sprint-to-sprint patterns
 
-**Decay Rule:** Sections with sprint number ≥ 5 sprints behind current are removed. If budget is still exceeded, hard-truncate to 50 lines.
+**Decay Rule:** Entries older than `decay_after_sprints` (default 20) are removed. If budget is still exceeded, hard-truncate as a last resort.
 
-### Tier 2 — PATTERNS.md (Long-Term Patterns)
+### Tier 2 — Patterns (Long-Term Patterns)
 
-- **Max lines:** 150 (`PATTERNS_MAX_LINES`)
-- **Written:** Auditor appends new patterns (never overwrites)
-- **Format:** JSON array of `PatternEntry` objects
+- **Max lines:** 800 (`PATTERNS_MAX_LINES`, default)
+- **Stored:** `memory.db` entries `type='pattern'` (V1: `PATTERNS.md`)
+- **Written:** Auditor inserts new patterns via MemoryStore
 - **Decay Rule:** `resolved: true` entries removed first on budget exceeded
 
 ```json
@@ -1012,13 +1027,15 @@ Deckent's memory system was originally a **3-tier, file-based knowledge store** 
 ]
 ```
 
-### Tier 3 — DECISIONS.md (Permanent ADRs)
+### Tier 3 — ADRs (Permanent Architecture Decisions)
 
-- **No line limit** — grows indefinitely
-- **Never decayed**
-- **Format:** `## ADR-NNN: Title` + Decision / Context / Consequence
+- **Never decayed** (`decay_exempt`)
+- **Stored:** `memory.db` entries `type='adr'`, exported to `.brain/exports/decisions.md` + `docs/adr/*.md` (V1: `DECISIONS.md`)
+- **Format (export):** `## ADR-NNN: Title` + Decision / Context / Consequence
 
-Current ADRs (as of Sprint 095):
+The early foundational ADRs are listed below; the **canonical, always-current
+ADR set lives in `memory.db`** and is exported to `docs/adr/` — see the
+[ADR directory index](../adr/README.md) for the full list.
 
 | ADR | Subject |
 |-----|---------|
@@ -1026,7 +1043,7 @@ Current ADRs (as of Sprint 095):
 | ADR-002 | Node16 Module Resolution |
 | ADR-003 | vitest over Jest |
 | ADR-004 | 3-Layer Config Merge |
-| ADR-005 | Synchronous I/O in Brain |
+| ADR-005 | Synchronous I/O in Brain (deprecated) |
 | ADR-006 | spawnSync Security Pattern |
 | ADR-007 | SpawnOptions Interface |
 | ADR-008 | Brain Merkezi Import (Central Import Rule) |
@@ -1057,26 +1074,29 @@ Current ADRs (as of Sprint 095):
 ### Decay Cycle
 
 ```typescript
-// src/orchestra/sprint-controller.ts (re-exported via brain.ts)
-function runDecay(projectRoot: string, sprintId: string, opts?: { force?: boolean }): DecayResult {
-  if (!opts?.force && countBrainLines(projectRoot) <= BRAIN_TOTAL_LINE_BUDGET) { // default 5000 (config: memory_budget)
+// src/orchestra/debt-manager.ts — runDecay (re-exported via brain.ts)
+function runDecay(projectRoot: string, sprintId: string, opts?: RunDecayOptions): DecayResult {
+  // opts.memoryBudget defaults to config memory_budget (default 5000)
+  if (!opts?.force && countBrainLines(projectRoot) <= memoryBudget) {
     return earlyReturn(); // no-op if under budget
   }
 
-  // Step 1: Remove resolved patterns from PATTERNS.md
-  // Step 2: Remove resolved debt rows from DEBT.md
-  // Step 3: Archive oldest sprint logs (keep last 2)
-  // Step 4: Trim old MEMORY.md sections (>= 5 sprints old)
-  // Step 5: Hard-truncate MEMORY.md to 50 lines (last resort)
+  // Step 1: Remove resolved patterns
+  // Step 2: Remove resolved debt rows
+  // Step 3: Archive oldest sprint logs (keep recent active)
+  // Step 4: Trim memory entries older than decay_after_sprints (default 20)
+  // Step 5: Hard-truncate as last resort if still over budget
 }
 ```
 
 ### MCP Resources for Memory
 
-| URI | File | Description |
-|-----|------|-------------|
-| `deckent://memory` | `MEMORY.md` | Current active short-term memory |
-| `deckent://memory/patterns` | `PATTERNS.md` | Detected patterns (JSON) |
+| URI | Source | Description |
+|-----|--------|-------------|
+| `deckent://memory` | `memory.db` → generated `exports/memory.md` | Brain memory summary (learnings, patterns) |
+| `deckent://debt` | `memory.db` → generated `exports/debt.md` | Tech debt ledger |
+
+Full resource list: [docs/reference/mcp-resources.md](../reference/mcp-resources.md).
 
 ---
 
@@ -1210,7 +1230,7 @@ Every task declares a `scope` that defines the worker's write sandbox:
 {
   "scope": {
     "directories": ["src/core/", "src/monitor/"],
-    "filesRead": ["AGENTS.md", ".contracts/api-surface.md"],
+    "filesRead": ["AGENTS.md", "docs/reference/api-surface.md"],
     "filesWrite": ["docs/reference/security.md"]
   }
 }
@@ -1252,7 +1272,7 @@ Locks held >5 minutes generate a `WARNING` alert from the Auditor.
 | Concurrent write conflict | File-based lock mutex in `.locks/` |
 | Deadlocked task graph | Kahn's algorithm circular dependency detection |
 | Brain overreach | `--allowedTools` excludes DIRECTIVES and config paths |
-| Memory budget overflow | `runDecay()` triggered at sprint end when `.brain/` exceeds 900 lines |
+| Memory budget overflow | `runDecay()` triggered at sprint end when `.brain/` exceeds `memory_budget` (default 5000) |
 | Sprint abandonment | `runSprint()` wraps all phases in try/catch; always reaches COMPLETE |
 
 ### Operating Modes
@@ -1279,7 +1299,7 @@ project/
 │   ├── workspace/
 │   │   ├── IDENTITY.md         ← Project identity (name, type, language)
 │   │   └── BOOT.md             ← Boot sequence reference
-│   ├── agents/                 ← Agent pool (16 built-in + temp agents, LRU eviction)
+│   ├── agents/                 ← Agent pool (15 built-in + temp agents, LRU eviction)
 │   │   └── {agent-name}/      ← agent.json + PROMPT.md
 │   ├── skills/                 ← Skill registry (21 built-in + temp skills)
 │   │   └── {skill-name}/      ← manifest.json + SKILL.md
@@ -1290,19 +1310,20 @@ project/
 │       ├── .gitkeep
 │       └── {plugin-name}/      ← Plugin directories (gitignored)
 │
-├── .brain/                     ← Memory system (SQLite DB-first; line budgets in src/core/constants.ts)
-│   ├── MEMORY.md               ← Tier 1: Short-term (max 300 lines)
-│   ├── PATTERNS.md             ← Tier 2: Long-term patterns (JSON, max 150 lines)
-│   ├── DECISIONS.md            ← Tier 3: Permanent ADRs
-│   ├── PROJECT-IDENTITY.md     ← Permanent project memory (never decayed)
-│   ├── DEBT.md                 ← Tech debt ledger (markdown table)
-│   ├── RETRO.md                ← Latest retrospective (max 120 lines)
-│   ├── sprints/                ← Per-sprint logs (max 80 lines each)
+├── .brain/                     ← Memory V2 (SQLite DB-first; budgets: memory_budget config / src/core/constants.ts)
+│   ├── memory.db               ← SINGLE SOURCE OF TRUTH (SQLite + FTS5; gitignored)
+│   ├── exports/                ← Generated FROM memory.db (git-tracked)
+│   │   ├── summary.md          ← Context summary (loaded via @reference)
+│   │   ├── decisions.md        ← ADR export (entries type='adr')
+│   │   ├── memory.md           ← Sprint learnings export
+│   │   └── debt.md             ← Tech debt export
+│   ├── ERRORS.md               ← Error log — still FILE-BASED, not in DB
+│   ├── sprints/                ← Per-sprint logs (in DB + file)
 │   │   └── sprint-NNN.md
-│   └── archive/                ← Archived sprint logs
+│   └── archive/                ← Archived sprint logs + pre-v2/ backups
 │       └── sprint-NNN.md
 │
-├── .contracts/
+├── docs/reference/
 │   └── api-surface.md          ← Inter-agent contracts (task format, scope rules)
 │
 ├── .tasks/                     ← Ephemeral task files (auto-cleaned after sprint)
@@ -1346,8 +1367,8 @@ DIRECTIVE → PLAN → SPAWN → AUDIT_START → EXECUTE → AUDIT_STOP → EVAL
 | **AUDIT_STOP** | Brain | Stop scan loop after all results collected | Cleared interval |
 | **EVALUATE** | Brain | Grade each result: DONE / GO_DEBT / NO_GO | Evaluation records |
 | **FIX** | Brain | Spawn priority-fix workers for NO_GO tasks | Fixed tasks (or recorded as debt) |
-| **RETRO** | Brain | Update MEMORY, RETRO, DECISIONS, sprint log | Updated `.brain/` files |
-| **DECAY** | Brain | Compress if `.brain/` > 900 lines | Cleaned `.brain/` |
+| **RETRO** | Brain | Upsert memory/retro/adr into `memory.db`; write sprint log; regenerate `exports/` | Updated `memory.db` + `.brain/exports/` |
+| **DECAY** | Brain | Compress if `.brain/` exceeds `memory_budget` (default 5000) | Cleaned `.brain/` |
 | **TRANSITION** | Brain | More directives? Loop. Done? Report. | Sprint complete |
 
 **Invariant:** Sprints are **never** left incomplete. Every phase is wrapped in try/catch, and the sprint always reaches the COMPLETE state even if individual tasks fail.
@@ -1358,34 +1379,33 @@ DIRECTIVE → PLAN → SPAWN → AUDIT_START → EXECUTE → AUDIT_STOP → EVAL
 
 ### API Endpoints
 
-The HTTP API runs on port 3100 (default). Started via `deckent web` or `deckent serve`.
+The HTTP API runs on port 3100 (default). Started via `deckent web` or `deckent serve`. All routes are under the `/api/` prefix.
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/health` | Health check — returns `{ok: true}` |
-| `GET` | `/status` | Current sprint status and agent states |
-| `GET` | `/tasks` | All active task JSONs |
-| `GET` | `/dashboard` | Full dashboard state (same as `.dashboard` file) |
-| `GET` | `/events` | SSE stream — real-time dashboard updates |
-| `GET` | `/memory` | Current `MEMORY.md` content |
-| `GET` | `/patterns` | `PATTERNS.md` content (JSON array) |
-| `GET` | `/retro` | Latest retrospective |
-| `GET` | `/history` | Sprint history list |
-| `GET` | `/config` | Current resolved config |
-| `POST` | `/start` | Start a sprint |
-| `POST` | `/stop` | Stop current sprint |
-| `POST` | `/kill` | Kill a specific worker |
-| `POST` | `/plan` | Dry-run plan (no spawn) |
-| `POST` | `/cleanup` | Clean task artifacts |
-| `POST` | `/sync` | Sync memory |
-| `POST` | `/checkpoint` | Approve/reject human checkpoints |
+| `GET` | `/api/health` | Health check |
+| `GET` | `/api/status` | Current sprint status and agent states |
+| `GET` | `/api/sprint` | Active sprint state |
+| `GET` | `/api/tasks` | All active task JSONs |
+| `GET` | `/api/doctor` | Health-check report |
+| `GET` | `/api/events` | SSE stream — real-time dashboard updates |
+| `GET` | `/api/memory` | Brain memory summary (from `memory.db`) |
+| `GET` | `/api/debt` | Tech debt ledger |
+| `GET` | `/api/history` | Sprint history list |
+| `GET` | `/api/config` | Current resolved config |
+| `GET` | `/api/config/defaults` | Default config values |
+| `POST` | `/api/start` | Start a sprint |
+| `POST` | `/api/plan` | Dry-run plan (no spawn) |
+| `POST` | `/api/cleanup` | Clean task artifacts |
+| `POST` | `/api/config` | Update config |
+| `POST` | `/api/kill/:workerId` | Kill a specific worker |
 
 ### SSE Real-Time Updates
 
 The `/events` endpoint uses Server-Sent Events (SSE) to push dashboard updates to the browser in real-time:
 
 ```
-Browser ──GET /events──► API Server
+Browser ──GET /api/events──► API Server
                           │
                           │ fs.watch('.dashboard')
                           │   ◄── Auditor overwrites .dashboard every 30s
@@ -1446,16 +1466,16 @@ The ci-guardian agent is a specialized agent for CI/CD integration:
 
 | Document | Description |
 |----------|-------------|
-| [DECKENT-MASTER-BLUEPRINT.md](../DECKENT-MASTER-BLUEPRINT.md) | Primary system specification |
-| [SECURITY.md](SECURITY.md) | Security model detail |
-| [MEMORY-SYSTEM.md](MEMORY-SYSTEM.md) | Memory system detail |
-| [BRAIN-GUIDE.md](BRAIN-GUIDE.md) | Brain operational guide |
-| [WORKER-GUIDE.md](WORKER-GUIDE.md) | Worker operational guide |
-| [DASHBOARD-GUIDE.md](DASHBOARD-GUIDE.md) | Dashboard guide |
-| [MCP-GUIDE.md](MCP-GUIDE.md) | MCP integration guide |
-| [CONFIG-REFERENCE.md](CONFIG-REFERENCE.md) | Full config reference |
-| [SPRINT-LIFECYCLE.md](SPRINT-LIFECYCLE.md) | Sprint lifecycle detail |
-| `.contracts/api-surface.md` | Inter-agent contracts |
+| [blueprint.md](../vision/blueprint.md) | Primary system specification |
+| [security.md](../reference/security.md) | Security model detail |
+| [memory-system.md](memory-system.md) | Memory system detail |
+| [brain-guide.md](../development/brain-guide.md) | Brain operational guide |
+| [workers.md](../guide/workers.md) | Worker operational guide |
+| [dashboard-guide.md](../development/dashboard-guide.md) | Dashboard guide |
+| [mcp-guide.md](../reference/mcp-guide.md) | MCP integration guide |
+| [config-reference.md](../reference/config-reference.md) | Full config reference |
+| [sprint-lifecycle.md](sprint-lifecycle.md) | Sprint lifecycle detail |
+| [api-surface.md](../reference/api-surface.md) | Inter-agent contracts |
 
 ---
 

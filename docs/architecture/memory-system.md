@@ -1,19 +1,39 @@
-# Deckent Memory System — 3-Tier Architecture
+# Deckent Memory System — 3-Tier Architecture (V1 Design)
 
 > **Blueprint Reference:** §6 Memory Architecture (3-Tier)
 
-> ⚠️ **Memory V2 (DB-first) — read this first.** The "3-tier file-based" model
+> **Memory V2 (DB-first) — read this first.** The "3-tier file-based" model
 > below is the **original V1 design**, preserved for conceptual context. As of
 > **Memory V2 the single source of truth is `.brain/memory.db`** (SQLite +
 > FTS5, dual-layer Turkish/English normalize). The markdown files
-> (`exports/summary.md`, `decisions.md`, `memory.md`, `debt.md`) are
-> **generated exports**, not hand-edited tiers. **ADRs live in the DB
-> (`type='adr'`)** and are exported to `.brain/exports/decisions.md` and
-> `docs/adr/` — there is no live hand-maintained `.brain/DECISIONS.md`.
-> All line-budget numbers quoted below (200 / 80 / 600 / 5, "Sprint 065 — 21
-> ADRs", etc.) are **outdated V1 design figures**; the authoritative current
-> values are in `src/core/constants.ts`. Schema reference:
-> [api-surface.md](../reference/api-surface.md) (Memory V2 DB Schema).
+> (`exports/summary.md`, `exports/decisions.md`, `exports/memory.md`,
+> `exports/debt.md`) are **generated exports**, not hand-edited tiers. **ADRs
+> live in the DB (`type='adr'`)** and are exported to
+> `.brain/exports/decisions.md` and `docs/adr/` — there is no live
+> hand-maintained `.brain/DECISIONS.md`.
+>
+> All line-budget numbers quoted below (max-lines per file, total budget, decay
+> sprints, etc.) are **V1 design figures that have since changed**. The
+> authoritative current constants are in `src/core/constants.ts` (marked
+> `@deprecated` — prefer config keys `memory_budget` / `decay_after_sprints`).
+> Current `@deprecated` backward-compat defaults (Sprint 140 pre-flight
+> uplift):
+>
+> | Constant | V1 value | Current value |
+> |---|---|---|
+> | `MEMORY_MAX_LINES` | 200 | **1500** |
+> | `PATTERNS_MAX_LINES` | 80 | **800** |
+> | `RETRO_MAX_LINES` | 100 | **400** |
+> | `SPRINT_LOG_MAX_LINES` | 80 | **500** |
+> | `BRAIN_TOTAL_LINE_BUDGET` | 600 | **5000** |
+> | `MEMORY_DECAY_SPRINTS` | 5 | **20** |
+> | `PATTERN_DECAY_SPRINTS` | 8 | **25** |
+>
+> Schema reference: [api-surface.md](../reference/api-surface.md) (Memory V2
+> DB Schema). Under Memory V2, decay is DB-driven via `MemoryStore.decay()` in
+> `src/core/memory-store.ts`; file-based decay logic in `runDecay()`
+> (`src/orchestra/debt-manager.ts`, re-exported via `src/orchestra/brain.ts`)
+> is a no-op when the DB is present.
 
 ---
 
@@ -23,17 +43,26 @@ Deckent's memory system was originally designed as a **three-tiered, file-based 
 
 ```
 .brain/
-├── MEMORY.md          ← Tier 1: Short-term (always loaded, ~200 lines)
-├── PATTERNS.md        ← Tier 2: Long-term (JSON array, ~80 lines)
-├── DECISIONS.md       ← Tier 3: Permanent (ADR records, never decayed)
+├── MEMORY.md          ← Tier 1: Short-term (always loaded)
+├── PATTERNS.md        ← Tier 2: Long-term (JSON array)
 ├── DEBT.md            ← Tech debt ledger (markdown table)
 ├── RETRO.md           ← Latest retrospective (overwritten each sprint)
+├── memory.db          ← Memory V2: single source of truth (SQLite)
+├── exports/           ← Memory V2 generated exports (git-tracked)
+│   ├── summary.md
+│   ├── decisions.md
+│   ├── memory.md
+│   └── debt.md
 ├── sprints/           ← Per-sprint logs (auto-archived)
 │   ├── sprint-001.md
 │   └── sprint-NNN.md
 └── archive/           ← Archived sprint logs (deep history)
     └── sprint-001.md
 ```
+
+> Note: `.brain/DECISIONS.md` no longer exists as a hand-maintained file.
+> ADRs are stored in `memory.db` (`type='adr'`) and exported to
+> `.brain/exports/decisions.md` and individual files under `docs/adr/`.
 
 ---
 
@@ -58,30 +87,27 @@ Plain Markdown. Organized by wave/sprint sections:
 - Summary bullet for consolidated sprints
 ```
 
-### Limits
-| Constraint | Value | Source |
-|---|---|---|
-| Max lines | **200** | `MEMORY_MAX_LINES` in `src/core/constants.ts:47` |
-| Decay trigger | 600 lines total `.brain/` budget | `BRAIN_TOTAL_LINE_BUDGET` in `src/core/constants.ts:51` |
-| Decay age | Sections older than **5 sprints** are removed | `MEMORY_DECAY_SPRINTS = 5` in `src/core/constants.ts:52` |
-| Last-resort truncation | Trimmed to 50 lines when budget still exceeded | `brain.ts:970-975` |
+### Limits (V1 design — superseded by Memory V2 DB budget)
+| Constraint | V1 Value | Current `@deprecated` constant | Source |
+|---|---|---|---|
+| Max lines | 200 | **1500** | `MEMORY_MAX_LINES` in `src/core/constants.ts` |
+| Decay trigger | 600 lines total `.brain/` budget | **5000** | `BRAIN_TOTAL_LINE_BUDGET` in `src/core/constants.ts` |
+| Decay age | Sections older than 5 sprints | **20 sprints** | `MEMORY_DECAY_SPRINTS` in `src/core/constants.ts` |
+| Last-resort truncation | Trimmed to 50 lines when budget still exceeded | (file-based path, DB-first no-op) | `runDecay` in `src/orchestra/debt-manager.ts` |
 
 ### When Written
 - After every sprint retrospective (`runSprint` → `updateMemory` phase)
 - Brain appends new learnings from worker results
 - Long sections from old sprints are pruned during decay
 
-### Decay Rule
-When `countBrainLines(projectRoot) > 600`, Brain removes any MEMORY.md section whose sprint number is `>= 5 sprints` behind the current sprint. If the budget is still exceeded after section removal, the file is hard-truncated to the last 50 lines.
+### Decay Rule (V1 file-based — no-op under Memory V2 DB)
+When total `.brain/` entry count exceeds the configured budget, Brain removes any MEMORY.md section whose sprint number is older than `MEMORY_DECAY_SPRINTS` sprints behind the current sprint. Under Memory V2 this is handled by `MemoryStore.decay(currentSprintNum, decayAfterSprints)` operating on the SQLite DB, not the markdown file.
 
 ```typescript
-// src/orchestra/brain.ts — decay step 4
-const sectionMatch = line.match(/^## Sprint sprint-(\d+)/);
-if (sectionMatch?.[1]) {
-  const sectionNum = parseInt(sectionMatch[1], 10);
-  currentSectionOld = (currentNum - sectionNum) >= MEMORY_DECAY_SPRINTS;
-}
-if (!currentSectionOld) kept.push(line);
+// src/orchestra/debt-manager.ts — runDecay (DB-first path)
+// When memory.db is present, file-based decay is skipped entirely.
+// DB decay is performed via:
+store.decay(currentNum, decaySprints);
 ```
 
 ---
@@ -108,22 +134,22 @@ JSON array of `PatternEntry` objects:
 ]
 ```
 
-### Limits
-| Constraint | Value | Source |
-|---|---|---|
-| Max lines | **80** | `PATTERNS_MAX_LINES` in `src/core/constants.ts:48` |
-| Decay trigger | Budget exceeded (600 lines total) | `BRAIN_TOTAL_LINE_BUDGET` |
-| Decay rule | Resolved patterns removed first | `runDecay` step 1 in `brain.ts:909-919` |
-| Pattern lifetime | **8 sprints** before auto-resolve | `PATTERN_DECAY_SPRINTS = 8` in `src/core/constants.ts:53` |
+### Limits (V1 design — superseded by Memory V2 DB budget)
+| Constraint | V1 Value | Current `@deprecated` constant | Source |
+|---|---|---|---|
+| Max lines | 80 | **800** | `PATTERNS_MAX_LINES` in `src/core/constants.ts` |
+| Decay trigger | Budget exceeded (600 lines total) | **5000** | `BRAIN_TOTAL_LINE_BUDGET` in `src/core/constants.ts` |
+| Decay rule | Resolved patterns removed first | (DB-driven under V2) | `MemoryStore.decay()` in `src/core/memory-store.ts` |
+| Pattern lifetime | 8 sprints before auto-resolve | **25 sprints** | `PATTERN_DECAY_SPRINTS` in `src/core/constants.ts` |
 
 ### When Written
 - Auditor appends new patterns during scan loop (never overwrites, only appends)
 - Brain marks patterns as resolved when GO/NO-GO evaluation confirms fix
 - Decay removes only `resolved: true` entries
 
-### Decay Rule
+### Decay Rule (V1 file-based — no-op under Memory V2 DB)
 ```typescript
-// src/orchestra/brain.ts — decay step 1
+// src/orchestra/debt-manager.ts — V1 file-based path (skipped when DB present)
 const patterns = readJsonSafe<PatternEntry[]>(patternsPath);
 const resolved = patterns.filter(p => p.resolved);
 removedPatternCount = resolved.length;
@@ -132,20 +158,25 @@ writeFileSync(patternsPath, JSON.stringify(active, null, 2), 'utf-8');
 ```
 
 ### MCP Resource
-Patterns are exposed as an MCP resource at `src/mcp/resources/memory.ts`, readable by Claude Code via:
+Memory (including patterns stored in DB) is exposed as an MCP resource registered in `src/mcp/resources/memory.ts`, readable by Claude Code via:
 ```
-deckent://memory/patterns
+deckent://memory
 ```
 
 ---
 
-## Tier 3: DECISIONS.md — Permanent ADRs
+## Tier 3: ADRs — Permanent Architecture Decisions
 
 ### Purpose
-Architecture Decision Records (ADRs). These are **never decayed** — they capture permanent decisions about the system's design and are always available for context.
+Architecture Decision Records (ADRs). These are **never decayed** (`decay_exempt = true` in DB) — they capture permanent decisions about the system's design and are always available for context.
+
+### Storage (Memory V2)
+ADRs are stored in `memory.db` with `type='adr'` and `decay_exempt=1`. They are exported to:
+- `.brain/exports/decisions.md` — summary table (auto-generated)
+- `docs/adr/*.md` — individual ADR files
 
 ### Format
-Each ADR follows the format:
+Each ADR follows MADR v3 hybrid format (ADR-036):
 
 ```markdown
 ## ADR-NNN: Title
@@ -158,49 +189,39 @@ Each ADR follows the format:
 ### Limits
 | Constraint | Value |
 |---|---|
-| Max lines | No hard limit — grows indefinitely |
-| Decay | **Never decayed** |
-| Ownership | Brain writes; agents read |
+| Max entries | No hard limit — grows indefinitely |
+| Decay | **Never decayed** (`decay_exempt = true`) |
+| Ownership | Brain writes via `MemoryStore.upsert()`; agents read |
+| Current count | 54+ ADRs (ADR-001 through ADR-061; see `docs/adr/` for full list) |
 
-### Current ADRs (Sprint 065 — 21 ADRs total)
-| ID | Subject |
-|---|---|
-| ADR-001 | TypeScript + ESM |
-| ADR-002 | Node16 Module Resolution |
-| ADR-003 | vitest over Jest |
-| ADR-004 | 3-Layer Config Merge |
-| ADR-005 | Synchronous I/O |
-| ADR-006 | spawnSync Security Pattern |
-| ADR-007 | SpawnOptions Interface |
-| ADR-008 | Brain Merkezi Import |
-| ADR-009 | DEBT.md Markdown Table Format |
-| ADR-010 | Single Runtime Dependency (commander.js) |
-| ADR-011 | node:readline/promises Built-in Prompt |
-| ADR-012 | register\<Name\>(program) Pattern |
-| ADR-013 | DECKENT.md Adapter Pattern |
+> The V1 table showing "Sprint 065 — 21 ADRs total" (ADR-001 through ADR-013) is
+> **outdated**. ADR governance was formalized in Sprint 138 (ADR-036). For the
+> authoritative list query `store.getByType('adr')` or see `docs/adr/`.
 
 ---
 
 ## Supporting Files
 
 ### DEBT.md — Tech Debt Ledger
-9-column pipe-delimited markdown table. Brain reads/writes via `parseDebtTable` / `generateDebtTable` helpers (see `src/core/utils.ts`).
+9-column pipe-delimited markdown table. Brain reads/writes via `parseDebtTable` / `generateDebtTable` helpers (see `src/core/utils.ts`). Under Memory V2, debt entries are also stored in `memory.db` (`type='debt'`) and exported to `.brain/exports/debt.md`.
 
 ```markdown
 | ID | Description | Task | Sprint | Priority | Open | Resolved | Fixed In | Created |
 ```
 
-Decay removes `resolved: true` rows when budget is exceeded (step 2 of `runDecay`).
+Decay removes `resolved: true` rows when budget is exceeded (step 2 of `runDecay`). Under Memory V2 this is DB-driven.
 
 ### RETRO.md — Sprint Retrospective
-Overwritten (not appended) after every sprint. Max **100 lines** (`RETRO_MAX_LINES`). Contains:
+Overwritten (not appended) after every sprint. Current constant: `RETRO_MAX_LINES = 400` (`src/core/constants.ts`; V1 value was 100). Contains:
 - Sprint summary (tasks completed, GO/NO-GO rates)
 - What went well
 - What needs improvement
 - Debt created vs resolved
 
+Under Memory V2, retrospectives are also stored in `memory.db` (`type='retro'`) and exported to `.brain/exports/memory.md`.
+
 ### sprints/sprint-NNN.md — Per-Sprint Logs
-Max **80 lines** per file (`SPRINT_LOG_MAX_LINES`). Contains task list, results, and summary for a single sprint. Kept in `sprints/` directory. Oldest files are archived to `archive/` when decay runs.
+Current constant: `SPRINT_LOG_MAX_LINES = 500` (`src/core/constants.ts`; V1 value was 80). Contains task list, results, and summary for a single sprint. Kept in `sprints/` directory. Oldest files are archived to `archive/` when decay runs.
 
 ---
 
@@ -210,76 +231,91 @@ The decay cycle runs automatically at the end of every sprint, triggered by `run
 
 ### Trigger Condition
 ```typescript
-// src/orchestra/brain.ts:1250
+// src/orchestra/sprint-phases.ts — runDecayPhase
 runDecay(projectRoot, sprint.id);
 ```
 
-Decay always runs at sprint end. If total `.brain/` line count ≤ 600, it returns immediately with no changes. If `force: true` is passed, it runs regardless of budget.
+Decay always runs at sprint end. If total DB entry count ≤ configured budget (config key `memory_budget`, default `5000`), it returns immediately with no changes. If `force: true` is passed, it runs regardless of budget.
 
-### Decay Steps (in order)
+### Decay Steps (Memory V2 DB-first)
 
 ```
-Step 1 — Remove resolved patterns from PATTERNS.md
-Step 2 — Remove resolved debt rows from DEBT.md
-Step 3 — Archive old sprint logs (keep last 2 active, move rest to archive/)
-Step 4 — Trim old MEMORY.md sections (sections >= 5 sprints old)
-Step 5 — Last resort: hard-truncate MEMORY.md to 50 lines
+Step 1 — MemoryStore.decay(currentSprintNum, decayAfterSprints)
+         Soft-deletes non-exempt entries older than decayAfterSprints sprints
+         (decay_exempt=false entries only; ADRs are always exempt)
+Step 2 — Return DecayResult with before/after DB entry counts
 ```
+
+> The V1 5-step file-based decay pipeline (remove patterns → remove debt rows
+> → archive sprints → trim MEMORY.md sections → hard-truncate) is preserved in
+> `src/orchestra/debt-manager.ts` but runs only when `memory.db` is absent
+> (legacy fallback).
 
 ### `runDecay` Function Signature
 ```typescript
-// src/orchestra/brain.ts:895
+// src/orchestra/debt-manager.ts:542 (re-exported via src/orchestra/brain.ts)
 export function runDecay(
   projectRoot: string,
   sprintId: string,
-  opts?: { force?: boolean }
+  opts?: RunDecayOptions
 ): DecayResult
+
+// RunDecayOptions
+interface RunDecayOptions {
+  memoryBudget?: number;   // default: 900 (legacy fallback; use config memory_budget)
+  decaySprints?: number;   // default: 8 (legacy fallback; use config decay_after_sprints)
+  force?: boolean;
+}
 ```
 
 ### `DecayResult` Type
 ```typescript
+// src/core/sprint-types.ts
 interface DecayResult {
-  linesBefore: number;        // Total .brain/ lines before decay
-  linesAfter: number;         // Total .brain/ lines after decay
-  archivedSprints: string[];  // Sprint files moved to archive/
-  removedDebtCount: number;   // Resolved debt rows removed
-  removedPatternCount: number; // Resolved patterns removed
+  linesBefore: number;        // DB entry count before decay (Memory V2) or line count (V1)
+  linesAfter: number;         // DB entry count after decay
+  archivedSprints: string[];  // Sprint files moved to archive/ (V1 file path; empty under V2)
+  removedDebtCount: number;   // Resolved debt rows removed (V1 file path; 0 under V2)
+  removedPatternCount: number; // Resolved patterns removed (V1 file path; 0 under V2)
 }
 ```
 
-### `countBrainLines` Helper
-```typescript
-// src/core/utils.ts:11
-export function countBrainLines(projectRoot: string): number
-```
-Counts all lines in `.brain/` (excluding `archive/`), including `sprints/`. Used by Brain decay and `deckent doctor` health checks.
+### DB-First Memory Entry Count
+Under Memory V2 the legacy `countBrainLines(projectRoot)` helper (which counted `.brain/` markdown file lines) is **replaced** by DB-first entry counts. CLI commands (`doctor`, `cleanup`) use `MemoryStore.totalCount()` directly. See comments in `src/cli/commands/doctor.ts` and `src/cli/commands/cleanup.ts`.
 
 ---
 
 ## Memory Budget Summary
 
-| File | Max Lines | Decay Strategy |
-|---|---|---|
-| `MEMORY.md` | 200 | Remove sections ≥ 5 sprints old; hard-truncate to 50 as last resort |
-| `PATTERNS.md` | 80 | Remove `resolved: true` entries on budget exceeded |
-| `DECISIONS.md` | Unlimited | Never decayed |
-| `RETRO.md` | 100 | Overwritten every sprint |
-| `DEBT.md` | Unlimited | Remove resolved rows on budget exceeded |
-| `sprints/sprint-NNN.md` | 80 | Archive oldest (keep last 2 active) |
-| **Total `.brain/` budget** | **600** | `BRAIN_TOTAL_LINE_BUDGET` in `constants.ts` |
+> All values below are current `src/core/constants.ts` values (marked
+> `@deprecated` — canonical config keys are `memory_budget` and
+> `decay_after_sprints`). V1 original values are shown in parentheses for
+> reference.
+
+| File / Store | Current Max | V1 Max | Decay Strategy |
+|---|---|---|---|
+| `MEMORY.md` / DB `type='memory'` | 1500 lines (200) | 200 | Remove entries older than 20 sprints (was 5); hard-truncate to 50 lines as last resort (V1 file path only) |
+| `PATTERNS.md` / DB `type='pattern'` | 800 lines (80) | 80 | Remove `resolved: true` entries on budget exceeded; 25-sprint auto-expire (was 8) |
+| ADRs (DB `type='adr'`) | Unlimited | Unlimited | Never decayed (`decay_exempt=true`) |
+| `RETRO.md` / DB `type='retro'` | 400 lines (100) | 100 | Overwritten every sprint |
+| `DEBT.md` / DB `type='debt'` | Unlimited | Unlimited | Remove resolved rows on budget exceeded |
+| `sprints/sprint-NNN.md` | 500 lines (80) | 80 | Archive oldest (keep last 2 active) |
+| **Total `.brain/` budget** | **5000** (600) | **600** | `BRAIN_TOTAL_LINE_BUDGET` in `constants.ts`; canonical: `config.memory_budget` (default 5000) |
 
 ---
 
 ## MCP Resources for Memory
 
-Memory files are exposed as readable MCP resources:
+Memory is exposed as a readable MCP resource:
 
-| Resource URI | File | Description |
+| Resource URI | Source | Description |
 |---|---|---|
-| `deckent://memory` | `MEMORY.md` | Current active memory |
-| `deckent://memory/patterns` | `PATTERNS.md` | Detected patterns |
+| `deckent://memory` | `memory.db` (`type='memory'`) | Current sprint learnings and patterns |
 
-Accessible via Claude Code: use `deckent_status` MCP tool or read resource directly from `src/mcp/resources/memory.ts`.
+Accessible via Claude Code: use `deckent_memory_query` MCP tool or read resource directly. Resource registered in `src/mcp/resources/memory.ts`.
+
+> Note: The V1 `deckent://memory/patterns` URI does not exist. All memory
+> (including patterns) is served under `deckent://memory` from the DB.
 
 ---
 
@@ -288,9 +324,10 @@ Accessible via Claude Code: use `deckent_status` MCP tool or read resource direc
 - **§6 Memory Architecture (3-Tier)** — System design and tier definitions
 - **§5 Agent System** — Brain's memory write responsibilities
 - **§7 Sprint Lifecycle** — When decay runs in the sprint loop
-- **§8 GO/NO-GO Protocol** — How evaluation results feed into MEMORY.md
-- **§16 Self-Test & Reporting** — `deckent doctor` brain line count check
+- **§8 GO/NO-GO Protocol** — How evaluation results feed into memory
+- **§16 Self-Test & Reporting** — `deckent doctor` brain entry count check
+- **Memory V2 DB Schema** — [api-surface.md](../reference/api-surface.md)
 
 ---
 
-*Last updated: Sprint 065 — deckent v0.2.0-beta.1 — March 2026*
+*Last updated: Sprint 172 — deckent v1.0.0-beta.1 — Memory V2 DB-first architecture*

@@ -73,70 +73,74 @@ Edit `PROMPT.md` to define the agent's specialized instructions.
 
 ## Agent Selection Algorithm
 
-When the brain assigns tasks to workers, it runs the agent selection algorithm:
+When the brain assigns tasks to workers, it runs the agent selection algorithm
+(`src/core/agent-selector.ts` — `selectAgent()`):
 
-1. Load all enabled agents from `.deckent/agents/`
-2. For each task, combine `title` and `description` into a search string
-3. For each agent, count how many of its triggers appear in the search string (case-insensitive)
-4. The agent with the highest trigger match count wins
-5. If no agent has any trigger matches, the task is assigned to `generic`
+1. Load all enabled agents from `.deckent/agents/` (persistent) and `.tasks/agents/` (sprint-scoped temp)
+2. Extract keywords from task `title` + `description` (stopwords and short tokens filtered out)
+3. For each enabled agent, compute a weighted score:
+   - **+2** for each `triggerKeywords` entry that matches a task keyword
+   - **+3** for each `triggerScopes` directory that overlaps with the task's `scope.directories`
+   - **+1** for each `triggerFilePatterns` glob that matches a file in `scope.filesWrite`
+4. Agents scoring below the minimum threshold (default 3) are discarded
+5. The highest-scoring agent wins; ties are broken by `stats.successRate` (higher wins)
+6. If no agent meets the threshold, the task falls through an intent-based fallback chain
+   (`src/core/routing-engine.ts` — `selectAgentByFallback()`), then defaults to `generic`
 
-Tie-breaking: when multiple agents have the same score, the first one in directory order wins. To ensure deterministic selection, use specific, non-overlapping triggers.
-
-## Multi-Agent Pipelines
-
-For complex tasks, multiple agents can be chained in a pipeline:
-
-```
-code-reviewer -> bug-fixer -> security-auditor
-```
-
-Pipeline execution:
-1. Steps execute sequentially in the defined order
-2. Each step receives a shared context with all prior step results
-3. On failure, the pipeline aborts by default (configurable with `continueOnError`)
-4. The final context contains all step outputs for evaluation
-
-Pipelines are defined per-task when the brain determines that a task benefits from multiple perspectives.
+Override: set `forceAgent` in the task JSON or DIRECTIVES `Agent:` field to bypass scoring.
 
 ## Agent Stats and Learning
 
-Each agent tracks its performance:
+Each agent tracks its performance in `agent.json` under `stats`:
 
-- **uses**: total number of times the agent has been assigned to a task
-- **successRate**: percentage of tasks that received DONE evaluation (vs GO_WITH_TECH_DEBT or NO_GO)
+- **totalUses**: total number of times the agent has been assigned to a task
+- **successRate**: fraction (0.0–1.0) of tasks that received DONE evaluation
+- **lastUsedInSprint**: the sprint ID when the agent was last active
 
-After each sprint, the brain updates agent stats. Over time, the selection algorithm can factor in success rates to prefer agents that consistently produce good results for matching tasks.
+After each sprint the brain updates these stats via `AgentPoolManager.updateStats()`.
+The selection algorithm already uses `successRate` for tie-breaking; higher-performing
+agents naturally win when scores are equal.
 
 View agent stats:
 
 ```bash
 deckent agent list
+deckent agent stats <name>   # sprint-by-sprint breakdown
 ```
 
 ## Temp Agents
 
-Temporary agents can be created for a single sprint and discarded afterward. This is useful for one-off specialized work:
+Temporary agents can be created for a single sprint and discarded afterward.
+Two storage locations exist:
 
-1. Create a temp agent: `deckent agent create temp-sprint-029`
-2. Configure its triggers and prompt for the specific sprint tasks
-3. Run the sprint -- tasks will be matched to the temp agent
-4. Delete the agent directory after the sprint completes
+- **Sprint-scoped** (`.tasks/agents/{sprintId}-{name}/`) — created via
+  `AgentPoolManager.createTempAgent()`, subject to LRU eviction (default max 50)
+- **Persistent temp** (`.deckent/agents/temp-{name}/`) — created via
+  `AgentPoolManager.saveTempAgent()`; survive across sprints until explicitly removed
 
-Temp agents follow the same selection algorithm as permanent agents. They are not automatically cleaned up -- manual removal is required.
+For custom one-off agents created with `deckent agent create`:
+
+1. Create: `deckent agent create temp-sprint-029`
+2. Configure triggers and prompt in `.deckent/agents/temp-sprint-029/`
+3. Run the sprint — tasks will be matched to the temp agent via the normal scoring algorithm
+4. Delete when done: `deckent agent delete temp-sprint-029`
+
+Agents in `.deckent/agents/` are not automatically evicted; manual deletion is required.
 
 ## Configuration
 
 Agent behavior is configured at multiple levels:
 
 **Project-level** (`.deckent/config.json`):
-- `agent_selection`: `"auto"` (default), `"manual"`, or `"disabled"`
-- When `"disabled"`, all tasks use the generic worker
+- `routing_engine`: `"v1"` (keyword-based `selectAgent`) or `"v2"` (intent + activation engine)
+- `routing_min_agent_score`: minimum score threshold for agent selection (default 5, range 2–8)
+- To disable agent selection for all tasks: set `enabled: false` in each `agent.json`,
+  or omit agents — the fallback chain and `generic` worker are always available
 
 **Agent-level** (`agent.json`):
 - `enabled`: toggle agent on/off without deleting
 - `model`: preferred model for this agent's tasks
-- `triggers`: keywords for automatic selection
+- `triggers`: keywords for automatic selection (maps to `triggerKeywords` in agent-pool)
 
 **CLI commands**:
 - `deckent agent list` -- view all agents and their stats
@@ -144,3 +148,7 @@ Agent behavior is configured at multiple levels:
 - `deckent agent create <name>` -- scaffold a new custom agent
 - `deckent agent enable <name>` -- re-enable a disabled agent
 - `deckent agent disable <name>` -- disable an agent without deleting
+- `deckent agent delete <name>` -- permanently remove an agent
+- `deckent agent edit <name>` -- update model, triggers, description, or sync PROMPT.md
+- `deckent agent stats <name>` -- sprint-by-sprint performance breakdown
+- `deckent agent info <name>` -- show full agent config and PROMPT.md

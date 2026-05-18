@@ -34,7 +34,7 @@ Phase 6: RETRO       — Brain writes RETRO.md, updates MEMORY.md, metrics
                        Plugin hook: afterSprint (after retro, before decay)
 Phase 7: DECAY       — Brain compresses .brain/ if over budget
 Phase 8: COMPLETE    — finalizeSprint(): sprint log, MEMORY, RETRO,
-                       PROJECT-IDENTITY.md, last_sprint_id, decay, afterSprint hooks
+                       last_sprint_id, decay, managed-docs export, afterSprint hooks
 ```
 
 **Key invariant:** Every phase is wrapped in `try/catch`. A phase failure never stops the sprint — it logs a dashboard alert and continues to the next phase. Sprint is NEVER left incomplete.
@@ -60,12 +60,12 @@ This is the only phase that happens outside of `runSprint()`. DIRECTIVES.md is t
 
 **`SprintPhase.PLAN` | `SprintStatus.PLANNING`**
 
-**Brain function:** `planSprint(projectRoot, config, context, recommendation)` — `src/orchestra/brain.ts:325`
+**Brain function:** `planSprint(projectRoot, config, context, recommendation)` — `src/orchestra/sprint-planner.ts` (re-exported via `brain.ts`)
 
 **What happens:**
 
-1. **Read context** — `readContext(projectRoot)` reads `DIRECTIVES.md`, `MEMORY.md`, `RETRO.md`, `DEBT.md`, `PATTERNS.md`, `DECISIONS.md`
-2. **Handle critical debt** — Any `CRITICAL` priority unresolved debt from `DEBT.md` generates priority-fix tasks first
+1. **Read context** — `readContext(projectRoot)` queries `memory.db` via `MemoryStore` (Memory V2 DB-first): memory entries, latest retro, accepted ADRs, active patterns, open debt items. `DIRECTIVES.md` is always read from file. If the DB is absent, fields fall back to empty strings/arrays.
+2. **Handle critical debt** — Any `CRITICAL` priority unresolved debt from the DB generates priority-fix tasks first
 5. **Generate tasks** (three modes controlled by `brain_planning` config):
    - **`ai` mode:** `callBrainPlanner()` sends context to Claude CLI, gets Zod-validated task JSON
    - **`structured` mode:** `parseStructuredDirectives()` parses `## Task N:` blocks from DIRECTIVES.md
@@ -81,7 +81,7 @@ This is the only phase that happens outside of `runSprint()`. DIRECTIVES.md is t
 
 **Key data structures:**
 ```typescript
-// SprintPhase enum — src/core/types.ts:160
+// SprintPhase enum — src/core/sprint-types.ts
 SprintPhase.PLAN
 
 // Sprint object returned by planSprint
@@ -104,7 +104,7 @@ SprintPhase.PLAN
 
 **`SprintPhase.SPAWN` | `SprintStatus.ACTIVE`**
 
-**Brain function:** `spawnWorkers(projectRoot, sprint, config, opts)` — `src/orchestra/brain.ts:520`
+**Brain function:** `spawnWorkers(projectRoot, sprint, config, opts)` — `src/orchestra/sprint-spawner.ts` (re-exported via `brain.ts`)
 
 **What happens:**
 
@@ -134,7 +134,7 @@ SprintPhase.PLAN
 
 **`SprintPhase.EXECUTE` | `SprintStatus.ACTIVE`**
 
-**Brain function:** `waitForResults(projectRoot, sprint, timeoutMs?)` — `src/orchestra/brain.ts:564`
+**Brain function:** `waitForResults(projectRoot, sprint, timeoutMs?)` — `src/orchestra/result-collector.ts` (re-exported via `brain.ts`)
 
 **What happens (Brain side):**
 
@@ -179,8 +179,8 @@ Each worker (a Claude Code CLI instance in a tmux window) independently:
 **`SprintPhase.EVALUATE` | `SprintStatus.EVALUATING`**
 
 **Brain functions:**
-- `evaluateResult(result, task)` — `src/orchestra/brain.ts:601`
-- `handleEvaluation(projectRoot, task, evaluation, result)` — `src/orchestra/brain.ts:611`
+- `evaluateResult(result, task)` — `src/orchestra/result-evaluator.ts` (re-exported via `brain.ts`)
+- `handleEvaluation(projectRoot, task, evaluation, result)` — `src/orchestra/debt-manager.ts` (re-exported via `brain.ts`)
 
 **What happens:**
 
@@ -198,14 +198,14 @@ Each worker (a Claude Code CLI instance in a tmux window) independently:
    ```
 4. **Handle each evaluation** via `handleEvaluation()`:
    - `DONE` → task status → `DONE`, worker freed
-   - `GO_WITH_TECH_DEBT` → task status → `DONE`, debt appended to `DEBT.md`
+   - `GO_WITH_TECH_DEBT` → task status → `DONE`, debt entry written to `memory.db` (Memory V2 DB-first)
    - `NO_GO` → task status → `NO_GO`, fix task created in `.tasks/`
 5. **Resolve debt** — `resolveDebt()` marks debt items as resolved for DONE/GO_WITH_TECH_DEBT tasks
 6. **Plugin hook: `afterTask`** — fired after each individual task evaluation. Receives the `Task`, its `TaskResult`, and `TaskEvaluation`. Plugins may log metrics, send notifications, or update external trackers. Hook failures are non-fatal.
 
 **Files created/updated:**
 - `.tasks/task-{id}.json` — status updated to `DONE` or `NO_GO`
-- `.brain/DEBT.md` — new debt items appended for `GO_WITH_TECH_DEBT` evaluations
+- `.brain/memory.db` — new `type: 'debt'` entries inserted for `GO_WITH_TECH_DEBT` evaluations (Memory V2 DB-first)
 
 **Blueprint reference:** §7 Phase 4, §8 GO/NO-GO/Tech Debt Protocol
 
@@ -216,7 +216,7 @@ Each worker (a Claude Code CLI instance in a tmux window) independently:
 **`SprintPhase.FIX` | `SprintStatus.FIXING`**
 
 **Brain functions:**
-- `handleCrossDependencies(projectRoot, sprint, evaluations)` — `src/orchestra/debt-manager.ts:133`
+- `handleCrossDependencies(projectRoot, sprint, evaluations)` — `src/orchestra/debt-manager.ts`
 - `spawnWorkers()` (reused) + `waitForResults()` (reused, 10 min timeout)
 - `evaluateResult()` (reused for fix results)
 - `escalateDebt(projectRoot)` — `src/orchestra/debt-manager.ts`
@@ -326,7 +326,7 @@ Phase 4 produces NO_GO tasks
 **Files created/updated:**
 - `.tasks/task-{id}-fix.json` — new fix task files
 - `.tasks/task-{id}-fix.result` — fix results
-- `.brain/DEBT.md` — priorities escalated
+- `.brain/memory.db` — debt entry priorities escalated in DB (Memory V2 DB-first)
 
 **Blueprint reference:** §7 Phase 5, §8 Cross-Dependency Rule, §8 Tech Debt Escalation
 
@@ -337,20 +337,20 @@ Phase 4 produces NO_GO tasks
 **`SprintPhase.RETRO` | `SprintStatus.RETROSPECTIVE`**
 
 **Brain functions:**
-- `calculateMetrics(sprint, evaluations, results, debt)` — `src/orchestra/brain.ts:848`
-- `writeRetrospective(projectRoot, sprint, evaluations, metrics)` — `src/orchestra/brain.ts:768`
-- `writeSprintLog(projectRoot, sprint, metrics, evaluations)` — `src/orchestra/brain.ts:818`
+- `calculateMetrics(sprint, evaluations, results, debt)` — `src/orchestra/sprint-reporter.ts` (re-exported via `brain.ts`)
+- `writeRetrospective(projectRoot, sprint, evaluations, metrics)` — `src/orchestra/sprint-retro-writer.ts` (re-exported via `brain.ts`)
+- `writeSprintLog(projectRoot, sprint, metrics, evaluations)` — `src/orchestra/sprint-docs-updater.ts` (re-exported via `brain.ts`)
 
 **What happens:**
 
-1. **Re-read debt** — Loads current `DEBT.md` to get accurate open debt count
+1. **Re-read debt** — Open debt items loaded from `memory.db` (`store.getByType('debt')`) to get accurate open debt count
 2. **Calculate metrics** — `calculateMetrics()` computes:
    - `completedTasks`, `techDebtTasks`, `noGoTasks`
    - `durationMs`, `coveragePercent`, `noGoRate`
    - `newDebtCount`, `resolvedDebtCount`, `totalOpenDebt`
    - `boundaryViolations`, `crossAssignments`, `contextLinesUsed`
-3. **Write RETRO.md** — `writeRetrospective()` overwrites `.brain/RETRO.md` (max 100 lines per `RETRO_MAX_LINES`)
-4. **Write sprint log** — `writeSprintLog()` appends to `.brain/sprints/sprint-{NNN}.md` (max 80 lines)
+3. **Write RETRO.md** — `writeRetrospective()` overwrites `.brain/RETRO.md` (max `RETRO_MAX_LINES` lines — see `src/core/constants.ts`); also writes retro + memory entries to `memory.db`
+4. **Write sprint log** — `writeSprintLog()` appends to `.brain/sprints/sprint-{NNN}.md` (max `SPRINT_LOG_MAX_LINES` lines — see `src/core/constants.ts`)
 5. **Plugin hook: `afterSprint`** — fired after the retrospective is written, before decay runs. Receives the full `Sprint` object including metrics. Plugins may post summaries, trigger CI, or archive artifacts. Hook failures are non-fatal.
 
 **Files created/updated:**
@@ -366,26 +366,22 @@ Phase 4 produces NO_GO tasks
 
 **`SprintPhase.DECAY`**
 
-**Brain function:** `runDecay(projectRoot, sprintId, opts?)` — `src/orchestra/brain.ts:895`
+**Brain function:** `runDecay(projectRoot, sprintId, opts?)` — `src/orchestra/debt-manager.ts` (re-exported via `brain.ts`)
 
-**What happens:**
+**What happens (Memory V2 DB-first):**
 
-1. **Count brain lines** — `countBrainLines(projectRoot)` totals lines across all `.brain/` files
-2. **Decay triggers when:** total > `BRAIN_TOTAL_LINE_BUDGET` (900 lines)
-3. **Decay actions:**
-   - `MEMORY.md` trimmed to `MEMORY_MAX_LINES` (300 lines)
-   - `RETRO.md` trimmed to `RETRO_MAX_LINES` (100 lines)
-   - Old sprint logs archived to `.brain/archive/`
-   - Stale entries pruned from `PATTERNS.md`
-4. **Returns `DecayResult`** — `{ trimmed, archived, pruned, linesFreed }`
+1. **Open memory.db** — `MemoryStore` is obtained for the project root
+2. **Decay triggers when:** total DB entry count > `memoryBudget` (from `opts.memoryBudget` → `config.memory_budget` → fallback `900`; config default `5000` — see `src/core/config.ts:545` and `src/core/constants.ts`)
+3. **Decay actions:** `store.decay(currentSprintNum, decaySprints)` — DB entries older than `decaySprints` sprints are pruned (default `8` when called without config; config default `20`)
+4. **Returns `DecayResult`** — `{ linesBefore, linesAfter, archivedSprints, removedDebtCount, removedPatternCount }`
 
 **`force` option:** `runDecay(root, id, { force: true })` runs decay even if under budget (useful for testing/maintenance).
 
+> ℹ️ **V1 file-based decay is superseded.** Earlier versions trimmed `.brain/MEMORY.md`, `.brain/RETRO.md`, and `.brain/PATTERNS.md` as text files. Memory V2 (Sprint 140+) operates on `memory.db` rows. The `BRAIN_TOTAL_LINE_BUDGET`, `MEMORY_MAX_LINES`, `RETRO_MAX_LINES` constants in `src/core/constants.ts` are now `@deprecated` (kept for backward compat & tests only). The authoritative budget is `config.memory_budget`. See [memory-system.md](memory-system.md).
+
 **Files created/updated:**
-- `.brain/MEMORY.md` — potentially trimmed
-- `.brain/RETRO.md` — potentially trimmed
-- `.brain/archive/` — old sprint logs moved here
-- `.brain/PATTERNS.md` — stale patterns pruned
+- `.brain/memory.db` — old entries pruned by `store.decay()`
+- `.brain/archive/` — may be written if file-based archiving is triggered as fallback
 
 **Blueprint reference:** §7 Phase 7, §6 Memory Architecture (3-Tier)
 
@@ -397,7 +393,7 @@ Phase 4 produces NO_GO tasks
 
 **Brain functions:**
 - `cleanup(projectRoot, sprint)` — `src/orchestra/sprint-controller.ts`
-- `finalizeSprint(projectRoot, sprint, config)` — `src/orchestra/sprint-controller.ts` (Sprint 037)
+- `finalizeSprint(projectRoot, sprint, config)` — `src/orchestra/sprint-finalizer.ts` (re-exported via `sprint-controller.ts`; Sprint 037)
 
 **What happens:**
 
@@ -410,12 +406,11 @@ Phase 4 produces NO_GO tasks
    - Stale lock files from `.locks/`
 3. **`finalizeSprint()` — consolidated post-sprint actions** (Sprint 037): This function was introduced to fix a structured mode gap where post-sprint actions (RETRO, MEMORY update, etc.) were silently skipped. It is called at the end of `runSprint()` and is also exposed via the `deckent finalize` CLI command for manual recovery. It performs ALL of the following in order:
    a. **Write sprint log** — `writeSprintLog()` appends to `.brain/sprints/sprint-{NNN}.md`
-   b. **Update MEMORY.md** — appends sprint learnings (trimmed to `MEMORY_MAX_LINES`)
-   c. **Write RETRO.md** — overwrites `.brain/RETRO.md` with current sprint retrospective
-   d. **Update PROJECT-IDENTITY.md** — updates the project identity file to reflect the latest sprint state (name, version, last sprint ID, key decisions)
-   e. **Persist sprint ID** — `updateLastSprintId(projectRoot, sprint.id)` writes `last_sprint_id` to `.deckent/config.json` so `getNextSprintId()` never regresses
-   f. **Run decay** — `runDecay()` is called unconditionally; it self-gates on the line budget
-   g. **Fire `afterSprint` hooks** — plugin hooks are executed as the last finalize step
+   b. **Write RETRO.md and update MEMORY.md** — `writeRetrospective()` overwrites `.brain/RETRO.md` and appends learnings to `.brain/MEMORY.md` (both capped by `RETRO_MAX_LINES`/`MEMORY_MAX_LINES` constants); also writes sprint, retro, and memory entries to `memory.db` (Memory V2 DB dual-write)
+   c. **Project identity** — the legacy `.brain/PROJECT-IDENTITY.md` regen step is **deprecated** (ADR-046, Sprint 166; 0-caller since Sprint 168 C0a-1) and that file has been removed. Project identity is now `.deckent/workspace/IDENTITY.md`, maintained via the managed-docs pipeline (`docs.json` `identity-md`) during the docs-export step, not by a hand-written identity file.
+   d. **Persist sprint ID** — `updateLastSprintId(projectRoot, sprint.id)` writes `last_sprint_id` to `.deckent/config.json` so `getNextSprintId()` never regresses
+   e. **Run decay** — `runDecay()` is called; it self-gates on `config.memory_budget` (default `5000`, fallback `900`) — see Phase 7
+   f. **Fire `afterSprint` hooks** — plugin hooks are executed as the last finalize step
 4. **Mark sprint complete** — `sprint.status = SprintStatus.COMPLETE`, `sprint.phase = SprintPhase.COMPLETE`, `sprint.completedAt` set
 5. **Final dashboard update** — Dashboard updated with `done: sprint.tasks.length`, empty alerts
 
@@ -427,10 +422,11 @@ deckent finalize --sprint sprint-042   # Target a specific sprint
 
 **Files updated:**
 - `.deckent/config.json` — `last_sprint_id` persisted
+- `.brain/memory.db` — sprint, retro, memory entries written (Memory V2 dual-write)
 - `.brain/MEMORY.md` — sprint learnings appended
 - `.brain/RETRO.md` — overwritten with current sprint retrospective
 - `.brain/sprints/sprint-{NNN}.md` — sprint log created/updated
-- `.deckent/workspace/PROJECT-IDENTITY.md` — updated with latest sprint state
+- `.deckent/workspace/IDENTITY.md` — refreshed via managed-docs export (legacy `.brain/PROJECT-IDENTITY.md` deprecated/removed, ADR-046)
 - `.dashboard` — final state written
 - `.tasks/*.hb`, `.tasks/*.plan`, `.tasks/*.log`, `.tasks/*.paused` — deleted
 - `.locks/*.lock` (stale) — deleted
@@ -475,29 +471,29 @@ User writes DIRECTIVES.md
   ┌─────────────┐
   │  Phase 4    │  clearInterval(scanInterval)
   │  EVALUATE   │  evaluateResult() per task → DONE / GO_WITH_TECH_DEBT / NO_GO
-  │             │  handleEvaluation() → updates task JSON, DEBT.md
+  │             │  handleEvaluation() → updates task JSON, memory.db (debt)
   │             │  hook: afterTask (per task, after evaluation)
   └──────┬──────┘
          │
          ▼
   ┌─────────────┐  handleCrossDependencies()
   │  Phase 5    │  spawnWorkers() + waitForResults() for fix tasks (10min)
-  │     FIX     │  escalateDebt() → priority upgrades in DEBT.md
+  │     FIX     │  escalateDebt() → priority upgrades in memory.db
   │  (if NO-GO) │  [skipped if no NO-GO tasks]
   └──────┬──────┘
          │
          ▼
   ┌─────────────┐
   │  Phase 6    │  calculateMetrics()
-  │    RETRO    │  writeRetrospective() → .brain/RETRO.md (max 100 lines)
+  │    RETRO    │  writeRetrospective() → .brain/RETRO.md + .brain/MEMORY.md + memory.db
   │             │  writeSprintLog() → .brain/sprints/sprint-NNN.md
   │             │  hook: afterSprint (after retro, before decay)
   └──────┬──────┘
          │
          ▼
   ┌─────────────┐
-  │  Phase 7    │  countBrainLines() → if > 900: runDecay()
-  │    DECAY    │  trim MEMORY.md, RETRO.md, archive old sprint logs
+  │  Phase 7    │  runDecay() → if DB entries > memory_budget: store.decay()
+  │    DECAY    │  prunes old DB entries (Memory V2 DB-first; file-based trim deprecated)
   │             │
   └──────┬──────┘
          │
@@ -506,11 +502,10 @@ User writes DIRECTIVES.md
   │  Phase 8    │  clearInterval() + cleanup() → remove .hb/.plan/.log/.paused
   │  COMPLETE   │  finalizeSprint():
   │             │    writeSprintLog() → .brain/sprints/sprint-NNN.md
-  │             │    updateMemory() → .brain/MEMORY.md
-  │             │    writeRetrospective() → .brain/RETRO.md
-  │             │    updateProjectIdentity() → PROJECT-IDENTITY.md
+  │             │    writeRetrospective() → .brain/RETRO.md + .brain/MEMORY.md + memory.db
+  │             │    managed-docs export → .deckent/workspace/IDENTITY.md
   │             │    updateLastSprintId() → .deckent/config.json
-  │             │    runDecay() (self-gated on line budget)
+  │             │    runDecay() (self-gated on config.memory_budget)
   │             │    hook: afterSprint
   │             │  final updateDashboard()
   └─────────────┘
@@ -530,11 +525,11 @@ User writes DIRECTIVES.md
 | 1: PLAN | `.tasks/task-{id}.json` (N files) | `.dashboard` | — |
 | 2: SPAWN | — | `.dashboard` | — |
 | 3: EXECUTE | `.tasks/task-{id}.hb`, `.tasks/task-{id}.plan`, `.tasks/task-{id}.result`, `.locks/*.lock`, source files | `.dashboard` (every 30s) | — |
-| 4: EVALUATE | `.tasks/task-{id}-fix.json` (if NO-GO) | `.tasks/task-{id}.json` (status), `.brain/DEBT.md` | — |
-| 5: FIX | `.tasks/task-{id}-fix.result` | `.brain/DEBT.md` (escalation) | — |
-| 6: RETRO | `.brain/sprints/sprint-NNN.md` | `.brain/RETRO.md` (overwrite) | — |
-| 7: DECAY | `.brain/archive/*` | `.brain/MEMORY.md`, `.brain/RETRO.md`, `.brain/PATTERNS.md` | Archived sprint logs |
-| 8: COMPLETE | `.brain/sprints/sprint-NNN.md` (if not yet written) | `.deckent/config.json`, `.brain/MEMORY.md`, `.brain/RETRO.md`, `.deckent/workspace/PROJECT-IDENTITY.md`, `.dashboard` | `.tasks/*.hb`, `.tasks/*.plan`, `.tasks/*.log`, `.tasks/*.paused`, `.locks/*.lock` |
+| 4: EVALUATE | `.tasks/task-{id}-fix.json` (if NO-GO) | `.tasks/task-{id}.json` (status), `.brain/memory.db` (debt entries) | — |
+| 5: FIX | `.tasks/task-{id}-fix.result` | `.brain/memory.db` (debt priority escalation) | — |
+| 6: RETRO | `.brain/sprints/sprint-NNN.md` | `.brain/RETRO.md` (overwrite), `.brain/MEMORY.md`, `.brain/memory.db` (sprint/retro/memory entries) | — |
+| 7: DECAY | `.brain/archive/*` (if fallback triggered) | `.brain/memory.db` (old DB entries pruned) | Old DB entries past retention window |
+| 8: COMPLETE | `.brain/sprints/sprint-NNN.md` (if not yet written) | `.deckent/config.json`, `.brain/memory.db`, `.brain/MEMORY.md`, `.brain/RETRO.md`, `.deckent/workspace/IDENTITY.md` (managed-docs), `.dashboard` | `.tasks/*.hb`, `.tasks/*.plan`, `.tasks/*.log`, `.tasks/*.paused`, `.locks/*.lock` |
 
 ---
 
@@ -547,7 +542,7 @@ Every phase in `runSprint()` is wrapped in `try/catch`. Phase failures are:
 3. Exception: Phase 1 (PLAN) and Phase 2 (SPAWN) can throw `BrainError` that propagates to caller
 
 ```typescript
-// BrainError includes the phase that failed — src/orchestra/brain.ts:60
+// BrainError includes the phase that failed — src/orchestra/sprint-lifecycle.ts:70
 class BrainError extends Error {
   public readonly phase?: SprintPhase;
 }
@@ -561,16 +556,16 @@ class BrainError extends Error {
 
 All constants are defined in `src/core/constants.ts`:
 
-| Constant | Value | Used In |
-|----------|-------|---------|
-| `MEMORY_MAX_LINES` | 300 | Phase 7: MEMORY.md trim |
-| `RETRO_MAX_LINES` | 100 | Phase 6/7: RETRO.md trim |
-| `SPRINT_LOG_MAX_LINES` | 80 | Phase 6: sprint log |
-| `BRAIN_TOTAL_LINE_BUDGET` | 900 | Phase 7: decay trigger |
-| `MEMORY_DECAY_SPRINTS` | — | Phase 7: MEMORY.md rotation |
-| `DEBT_HIGH_PRIORITY_SPRINTS` | 2 | Phase 5: debt escalation |
-| `DEBT_CRITICAL_SPRINTS` | 3 | Phase 5: debt escalation |
-| `TASK_FILE_EXTENSIONS` | `.json,.plan,.hb,.result,.paused,.log` | Phase 8: cleanup |
+| Constant | Value | Used In | Note |
+|----------|-------|---------|------|
+| `MEMORY_MAX_LINES` | 1500 | Phase 6/8: MEMORY.md trim | Updated Sprint 140 (was 300) |
+| `RETRO_MAX_LINES` | 400 | Phase 6/8: RETRO.md trim | Updated Sprint 140 (was 100/120) |
+| `SPRINT_LOG_MAX_LINES` | 500 | Phase 6: sprint log | Updated Sprint 140 (was 80/100) |
+| `BRAIN_TOTAL_LINE_BUDGET` | 5000 | `@deprecated` — prefer `config.memory_budget` | Updated Sprint 140 (was 900); runtime uses `config.memory_budget` (default 5000) |
+| `MEMORY_DECAY_SPRINTS` | 20 | `@deprecated` — prefer `config.decay_after_sprints` | Updated Sprint 140 (was 5); runtime uses `config.decay_after_sprints` (default 20) |
+| `DEBT_HIGH_PRIORITY_SPRINTS` | 2 | Phase 5: debt escalation | — |
+| `DEBT_CRITICAL_SPRINTS` | 3 | Phase 5: debt escalation | — |
+| `TASK_FILE_EXTENSIONS` | `.json,.plan,.hb,.result,.paused,.log` | Phase 8: cleanup | — |
 
 **Timeouts (in `runSprint`):**
 - `waitForResults` default: 30 minutes

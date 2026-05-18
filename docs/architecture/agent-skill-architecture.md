@@ -1,669 +1,343 @@
-# Agent/Skill Architecture & User Experience — Design Document
+# Agent / Skill Architecture & Routing
 
-> **Version:** Draft v1 | **Date:** 2026-03-21 | **Status:** Historical (mostly implemented)
+> **Status:** Current architecture companion. **Last verified:** Sprint 172 (2026-05-18).
 >
-> **Note:** This was a design proposal from pre-Sprint 029. Most of the proposals in this document have been implemented across Sprints 029-033 (Agent Pool, Skill System, Brain Decision Engine, UX Polish). For the current architecture, see [architecture.md](architecture.md) and [agents.md](agents.md). This document is preserved as historical reference.
->
-> This document analyzes the current Deckent architecture and proposes extensions for dynamic agent pools, composable skills, intelligent Brain decisions, and polished end-user experience.
+> **Background:** The agent pool, composable skill system, and intent-based Brain
+> routing described here were introduced across Sprints 029–033 and have evolved
+> substantially since (notably the Routing v2 engine in Sprint 063 and the
+> agent-taxonomy reform in ADR-041). This document describes **what exists now**,
+> in present tense. For the broader system view see
+> [architecture.md](architecture.md); for the user-facing agent guide see
+> [agents.md](agents.md); for the canonical, auto-generated agent list see
+> [../reference/agents.md](../reference/agents.md).
+
+This document explains how Deckent matches tasks to specialized worker
+**agents** and composes domain **skills**, how the Brain makes the
+agent + skill + model + scope decision per task, and where each mechanism
+lives in the code.
 
 ---
 
 ## Table of Contents
 
-1. [Dynamic Agent Pool](#1-dynamic-agent-pool)
-2. [Dynamic Skill System](#2-dynamic-skill-system)
-3. [Brain Decision Engine](#3-brain-decision-engine)
-4. [End-User Experience](#4-end-user-experience)
+1. [Agent Pool](#1-agent-pool)
+2. [Skill System](#2-skill-system)
+3. [Brain Routing Decision](#3-brain-routing-decision)
+4. [Learning Loop](#4-learning-loop)
+5. [Promotion & Demotion Pipeline](#5-promotion--demotion-pipeline)
+6. [User Experience Surface](#6-user-experience-surface)
 
 ---
 
-## 1. Dynamic Agent Pool
+## 1. Agent Pool
 
-### 1.1 Current State
+### 1.1 Concept
 
-Deckent has three hardcoded agent roles defined in `src/core/types.ts:89`:
+Every task is executed by a worker, but the worker is not generic. The Brain
+selects a specialized **agent persona** for the task and injects that agent's
+`PROMPT.md` into the worker prompt. An agent carries a domain system prompt,
+activation rules, a preferred model, and performance statistics. When no agent
+meets the activation threshold, the task falls back to a `generic` worker.
 
-```typescript
-AgentRole = 'brain' | 'auditor' | 'worker'
-```
+The three structural roles in the system remain `brain | auditor | worker`
+(`AgentRole` in `src/core/types.ts`). "Agents" in this document are *worker
+personas* layered on top of the `worker` role — they shape the prompt and
+routing, not the process model.
 
-Every task gets a generic `worker` agent. The worker receives the same base prompt structure from `buildWorkerPrompt()` (`src/orchestra/task-builder.ts:161-219`) regardless of whether the task is a security audit, a documentation rewrite, or a database migration. The only differentiation is:
+### 1.2 Agent Definition
 
-- **Model** (opus/sonnet/haiku) — selected by `resolveTaskModel()` in `src/orchestra/model-selector.ts:117-168`
-- **Scope** (directories/files) — parsed from directives by `extractScopeFromDirective()` in `src/orchestra/task-builder.ts:65-86`
-- **Effort** (low/normal/high) — derived from model score in `resolveWorkerEffort()` at `task-builder.ts:152-158`
-
-There is no mechanism to:
-- Assign specialized prompts/personas to workers based on task type
-- Reuse successful agent configurations across sprints
-- Create temporary agents for one-off specialized tasks
-- Constrain agent tool access beyond scope directories
-
-### 1.2 Target Design
-
-#### Agent Definition Schema (`AgentDefinition`)
-
-```typescript
-interface AgentDefinition {
-  id: string;                              // e.g., "security-auditor"
-  name: string;                            // "Security Auditor"
-  description: string;                     // When to use this agent
-
-  // Persona
-  systemPrompt: string;                    // Agent-specific system prompt (injected before task prompt)
-  expertise: string[];                     // ["security", "authentication", "encryption"]
-
-  // Constraints
-  allowedTools: string[];                  // ["Read", "Grep", "Bash"] (subset of all tools)
-  deniedTools: string[];                   // ["Write"] for read-only agents
-  preferredModel: ModelType;               // Default model preference
-  effortMultiplier: number;                // 1.0 = normal, 1.5 = high, 0.5 = low
-
-  // Matching
-  triggerKeywords: string[];               // ["security", "auth", "jwt", "csrf", "xss"]
-  triggerScopes: string[];                 // ["src/auth/", "src/middleware/"]
-  triggerFilePatterns: string[];           // ["*.security.ts", "*.guard.ts"]
-
-  // Lifecycle
-  persistent: boolean;                     // true = stays in pool, false = per-sprint temp
-  source: 'builtin' | 'user' | 'learned'; // Origin
-
-  // Performance tracking
-  stats: {
-    totalUses: number;
-    successRate: number;                   // DONE / (DONE + NO_GO)
-    avgCoverage: number;
-    lastUsedInSprint: string;
-  };
-}
-```
-
-#### Directory Structure
+Agents are typed by `AgentDefinition` (`src/core/agent-types.ts`) and stored on
+disk, one directory per agent:
 
 ```
 .deckent/
-  agents/                          # Persistent agent pool
+  agents/
     security-auditor/
-      agent.json                   # AgentDefinition
-      PROMPT.md                    # System prompt template
-    test-writer/
+      agent.json          # AgentDefinition (triggers, model, stats, activation)
+      PROMPT.md            # System prompt injected before the task prompt
+    doc-writer/
       agent.json
       PROMPT.md
-    ...8 more builtins...
-
+    ...
 .tasks/
-  agents/                          # Temporary sprint agents
-    sprint-031-custom-migrator/
+  agents/                  # Temporary, per-sprint agents (separate pool)
+    {temp-agent}/
       agent.json
       PROMPT.md
 ```
 
-#### Built-in Agent Types
+Loading, validation, selection, persistence, and temp-agent lifecycle are
+handled by `AgentPoolManager` in `src/core/agent-pool.ts`. Each agent tracks
+`stats` (`totalUses`, `successRate`, `avgCoverage`, `lastUsedInSprint`) via
+`createDefaultStats()`.
 
-| Agent | Trigger Keywords | Preferred Model | Tools |
-|-------|-----------------|----------------|-------|
-| `security-auditor` | security, auth, jwt, csrf, xss, injection | opus | Read, Grep, Bash |
-| `test-writer` | test, coverage, spec, vitest, jest | sonnet | Read, Write, Bash |
-| `doc-writer` | docs, readme, changelog, jsdoc, guide | sonnet | Read, Write |
-| `code-reviewer` | review, refactor, quality, lint, cleanup | opus | Read, Grep |
-| `refactorer` | refactor, rename, extract, split, merge | sonnet | Read, Write, Bash |
-| `bug-fixer` | fix, bug, error, crash, regression, broken | opus | Read, Write, Bash |
-| `api-builder` | api, endpoint, route, controller, rest, graphql | sonnet | Read, Write, Bash |
-| `performance-analyzer` | performance, optimize, speed, memory, profiling | opus | Read, Grep, Bash |
+### 1.3 Built-in Agents
 
-#### Agent Selection Algorithm
+Deckent ships **15 built-in agents**. Per **ADR-041** (Agent Taxonomy —
+horizontal skills vs vertical agents), there is **no dedicated test agent**:
+testing is handled per-task as a skill/tag concern, and test work routes to
+`architect`/`refactorer` via the intent fallback chain.
 
-```
-Input: Task (title, description, scope, keywords)
-Output: AgentDefinition | null
+The 15 built-in agents are:
 
-1. Extract keywords from task title + description (lowercase, split on space/punctuation)
-2. For each agent in pool (persistent + temp):
-   a. Score = 0
-   b. For each keyword match with agent.triggerKeywords: Score += 2
-   c. For each scope overlap with agent.triggerScopes: Score += 3
-   d. For each file pattern match with agent.triggerFilePatterns: Score += 1
-3. Select agent with highest score (threshold: score >= 3)
-4. If no match: use generic worker (current behavior)
-5. If multiple tied: prefer agent with higher stats.successRate
-```
+| Agent | Focus |
+|-------|-------|
+| `security-auditor` | Security vulnerabilities, auth, injection, XSS/CSRF |
+| `doc-writer` | README, API docs, changelogs, guides, JSDoc |
+| `bug-fixer` | Debugging, regressions, hotfixes |
+| `code-reviewer` | Code quality, review, best practices |
+| `refactorer` | Restructuring, cleanup, modernization |
+| `api-builder` | REST / OpenAPI endpoint design |
+| `performance-analyzer` | Profiling, optimization, benchmarks |
+| `ci-guardian` | CI/CD health, regression, build (hook-aware) |
+| `architect` | System design, modules, dependency analysis |
+| `architecture-planner` | Architectural planning, ADRs, roadmap |
+| `accessibility-auditor` | WCAG, a11y audits |
+| `data-engineer` | Data pipelines, ETL, data modeling |
+| `devops-engineer` | CI/CD, Docker, deployment, infrastructure |
+| `frontend-designer` | UI/UX, components, responsive design |
+| `migration-specialist` | Version / framework migration, deprecations |
 
-### 1.3 Files to Create
+> **Drift note:** Activation keywords and per-agent model preferences live in
+> each `agent.json` and are surfaced by the auto-generated reference
+> ([../reference/agents.md](../reference/agents.md), `npm run docs:ref`). This
+> table is a stable overview only; it intentionally does **not** re-list
+> activation keywords, because hand-maintained trigger tables drift from the
+> manifests.
 
-| File | Purpose |
-|------|---------|
-| `src/core/agent-pool.ts` | AgentDefinition type, AgentPool class (load, select, save, create temp) |
-| `src/core/agent-selector.ts` | selectAgent() algorithm, keyword extraction, scoring |
-| `.deckent/agents/*/agent.json` | 8 built-in agent definitions |
-| `.deckent/agents/*/PROMPT.md` | 8 built-in agent prompts |
-| `tests/core/agent-pool.test.ts` | Pool CRUD tests |
-| `tests/core/agent-selector.test.ts` | Selection algorithm tests |
+### 1.4 Temp Agents & LRU Eviction
 
-### 1.4 Files to Modify
+Temporary agents created for a single sprint live under `.tasks/agents/`.
+`AgentPoolManager` enforces LRU-style eviction with two defaults from
+`src/core/agent-pool.ts`:
 
-| File | Change |
-|------|--------|
-| `src/core/types.ts:89` | Extend `AgentRole` union, add `AgentDefinition` interface |
-| `src/orchestra/brain.ts:298` (planSprint) | After task creation, call `selectAgent()` for each task |
-| `src/orchestra/task-builder.ts:161` (buildWorkerPrompt) | Prepend agent PROMPT.md content before task prompt |
-| `src/agents/worker.ts` | Accept agent context, enforce agent tool constraints |
-| `.brain/PATTERNS.md` | Record agent selection outcomes for learning |
+- `DEFAULT_MAX_TEMP_AGENTS = 50` — maximum number of temp agents kept.
+- `DEFAULT_MAX_AGENT_AGE = 5` — a temp agent unused for more than 5 sprints is
+  considered stale (`isTempAgentStale()`).
 
-### 1.5 Sprint Estimate
-
-**Sprint 30 or 31** — 8-10 tasks, ~2 sprint days
-- Task 1: AgentDefinition type + AgentPool class
-- Task 2: Agent selector algorithm
-- Task 3-4: 8 built-in agent definitions + prompts
-- Task 5: brain.ts planSprint integration
-- Task 6: task-builder.ts prompt injection
-- Task 7: worker.ts agent context
-- Task 8: Pattern learning for agent outcomes
-- Task 9-10: Tests (50+ tests)
+Built-in agents are never evicted. Selection (built-in + temp) goes through the
+unified routing engine described in §3.
 
 ---
 
-## 2. Dynamic Skill System
+## 2. Skill System
 
-### 2.1 Current State
+### 2.1 Concept
 
-The plugin system (`src/core/plugin.ts:1-365`) provides:
+Skills are composable, domain-specific instruction bundles that are injected
+into the worker prompt alongside the selected agent. Unlike agents (one per
+task, "who is doing it"), multiple skills can compose on one task ("what
+expertise to apply"). Skills are the *horizontal* axis of ADR-041; agents are
+the *vertical* axis.
 
-- **PluginManifest** (line 9): name, version, description, entrypoint, triggers, permissions, hooks, model, enabled, dependencies
-- **SKILL.md** per plugin: Markdown with YAML frontmatter, workflow instructions, rules
-- **3 built-in skills**: `doc-writer`, `code-reviewer`, `test-runner` in `.deckent/plugins/`
-- **Lifecycle hooks** (`src/core/plugin-hooks.ts`): beforeSprint, afterSprint, beforeTask, afterTask
+### 2.2 Skill Definition & Storage
 
-**What's missing:**
-- Skills are not automatically selected based on task content — they must be manually installed/enabled
-- No skill composition (can't combine `typescript-expert` + `react-specialist`)
-- No automatic trigger matching against task scope/keywords
-- No skill-to-agent binding (agents don't know which skills they have)
-- No project stack detection → skill recommendation pipeline
-- Worker prompt doesn't inject relevant SKILL.md content
-
-### 2.2 Target Design
-
-#### Skill Definition (extends PluginManifest)
-
-```typescript
-interface SkillDefinition extends PluginManifest {
-  // New fields (backward compatible)
-  category: 'language' | 'framework' | 'tool' | 'domain' | 'workflow';
-  stackDetection: {
-    files: string[];        // ["tsconfig.json", "*.ts"] → typescript detected
-    dependencies: string[]; // ["react", "react-dom"] → react detected
-    commands: string[];     // ["tsc --version"] → typescript available
-  };
-  composableWith: string[];  // ["typescript-expert"] — can combine with these skills
-  priority: number;          // Higher = selected first when multiple match
-  promptInjection: {
-    position: 'prepend' | 'append' | 'section';  // Where in worker prompt
-    maxTokens: number;      // Truncate SKILL.md if too long
-  };
-}
-```
-
-#### Skill Selection Pipeline
+Skills are typed by `SkillDefinition` (`src/core/skill-types.ts`), which extends
+the plugin manifest model with skill-specific fields: a `SkillCategory`
+(`language | framework | tool | domain | workflow`), stack-detection rules,
+composition affinity, priority, and a prompt-injection position
+(`prepend | append | section`). Each skill is a directory:
 
 ```
-Input: Task + ProjectAnalysis + AgentDefinition?
-Output: SkillDefinition[] (ordered by priority)
-
-1. Project Stack Detection:
-   - Scan root for tsconfig.json → "typescript"
-   - Scan package.json dependencies → "react", "express", etc.
-   - Cache result in .deckent/project-stack.json
-
-2. Task Keyword Matching:
-   - Match task title/description against skill.triggers[]
-   - Score each skill (same scoring as agent selection)
-
-3. Agent Compatibility Filter:
-   - If agent has preferred skills, prioritize those
-   - If agent has denied skills, exclude those
-
-4. Composition Resolution:
-   - Check composableWith[] for compatibility
-   - Max 3 skills per task (prompt size limit)
-
-5. Return: ordered list of matched skills
+.deckent/
+  skills/
+    typescript-expert/
+      manifest.json        # SkillDefinition
+      SKILL.md             # Domain instructions injected into the prompt
+    ...
 ```
 
-#### Built-in Skills (10)
+- `src/core/skill-pool.ts` — `SkillPoolManager`: loads/validates skills from
+  `.deckent/skills/`, skipping directories with invalid `manifest.json`.
+- `src/core/skill-registry.ts` — `SkillRegistry`: JSON-backed central registry
+  (register / search / getPopular / getAll / remove).
+- `src/core/skill-selector.ts` — composition resolution (`resolveComposition`),
+  used by the routing engine.
+- `src/core/skill-cache.ts` — skill resolution cache.
 
-| Skill | Category | Stack Detection | Triggers |
-|-------|----------|----------------|----------|
-| `typescript-expert` | language | tsconfig.json, *.ts | typescript, type, interface, generic |
-| `react-specialist` | framework | react in deps | react, component, hook, jsx, state |
-| `python-expert` | language | setup.py, *.py | python, pip, django, flask |
-| `api-builder` | domain | express/fastify in deps | api, endpoint, route, rest, graphql |
-| `database-migration` | domain | prisma/knex/typeorm in deps | database, migration, schema, query |
-| `testing-expert` | workflow | vitest/jest in deps | test, coverage, spec, mock, assert |
-| `documentation-writer` | workflow | docs/ exists | docs, readme, changelog, jsdoc |
-| `security-specialist` | domain | (always available) | security, auth, jwt, encryption, vulnerability |
-| `performance-optimizer` | domain | (always available) | performance, optimize, cache, memory, latency |
-| `devops-engineer` | tool | Dockerfile, .github/workflows | docker, ci, deploy, pipeline, infrastructure |
+### 2.3 Built-in Skills
 
-#### Worker Prompt Injection
+Deckent ships **21 built-in skills**:
 
-Current `buildWorkerPrompt()` output (task-builder.ts:161):
+`typescript-expert`, `testing-expert`, `documentation-writer`,
+`security-specialist`, `performance-optimizer`, `api-builder`,
+`devops-engineer`, `database-migration`, `react-specialist`, `python-expert`,
+`ci-testing`, `accessibility-expert`, `anthropic-sdk`, `code-simplifier`,
+`docker-expert`, `frontend-design`, `git-expert`, `graphql-expert`,
+`migration-expert`, `monorepo-expert`, `system-architect`.
 
-```
-=== Task ===
-ID: 031-001
-Title: Add JWT authentication
-...
-=== Instructions ===
-Complete this task...
-```
+Per-skill triggers, categories, and stack-detection rules live in each
+`manifest.json` — see [agents.md](agents.md) for the user-facing guide and
+`deckent skill list` for the live registry.
 
-With skill injection:
+### 2.4 Skill Sandbox Validation
 
-```
-=== Agent: security-auditor ===
-{PROMPT.md content — agent persona and approach}
+Skills sourced from the marketplace are security-scanned before they may run.
+`src/core/marketplace/skill-sandbox.ts` performs a two-pass scan: a fast regex
+pass over all files plus an **AST-level scan** of `.ts`/`.js` files
+(`scanCodeAST()`) that flags dangerous calls (e.g. `eval`, code-executing
+`Function`, dangerous `require` targets) and quarantines violators. AST scanning
+degrades gracefully when the TypeScript compiler is unavailable at runtime.
 
-=== Skills ===
---- typescript-expert ---
-{SKILL.md content — TypeScript best practices}
---- security-specialist ---
-{SKILL.md content — security review checklist}
+### 2.5 Skill Budget & Composition
 
-=== Task ===
-ID: 031-001
-Title: Add JWT authentication
-...
-=== Instructions ===
-Complete this task...
-```
-
-### 2.3 Files to Create
-
-| File | Purpose |
-|------|---------|
-| `src/core/skill.ts` | SkillDefinition type, SkillPool class, loadSkill(), selectSkills() |
-| `src/core/stack-detector.ts` | detectProjectStack() — scans project for framework/language indicators |
-| `.deckent/skills/*/manifest.json` | 10 built-in skill definitions |
-| `.deckent/skills/*/SKILL.md` | 10 built-in skill prompts |
-| `tests/core/skill.test.ts` | Skill loading, selection, composition tests |
-| `tests/core/stack-detector.test.ts` | Stack detection tests |
-
-### 2.4 Files to Modify
-
-| File | Change |
-|------|--------|
-| `src/core/types.ts` | Add `SkillDefinition`, `SkillSelectionResult`, `ProjectStack` types |
-| `src/core/plugin.ts` | Extend PluginManifest with SkillDefinition fields (backward compatible) |
-| `src/orchestra/brain.ts:298` (planSprint) | After agent selection, call `selectSkills()` for each task |
-| `src/orchestra/task-builder.ts:161` (buildWorkerPrompt) | Inject SKILL.md content into prompt |
-| `src/orchestra/model-selector.ts` | Skill-based model preference (if skill.model is set, factor into score) |
-
-### 2.5 Sprint Estimate
-
-**Sprint 31 or 32** — 10-12 tasks
-- Task 1: SkillDefinition type + SkillPool class
-- Task 2: Stack detector
-- Task 3: Skill selector algorithm
-- Task 4-6: 10 built-in skill definitions + prompts
-- Task 7: brain.ts skill selection integration
-- Task 8: task-builder.ts prompt injection
-- Task 9: model-selector.ts skill preference
-- Task 10-12: Tests (60+ tests)
+Skill composition is bounded so the worker prompt does not overflow. The
+routing engine applies a skill budget driven by task size and effort
+(`SKILL_BUDGET_BY_SIZE`, `SKILL_TOKEN_BUDGET_BY_EFFORT`,
+`DEFAULT_TOKEN_BUDGET_PER_SKILL`, `DEFAULT_TOKEN_BUDGET_TOTAL` in
+`src/core/routing-types.ts`) and resolves the final ordered set via
+`resolveComposition()` in `src/core/skill-selector.ts`.
 
 ---
 
-## 3. Brain Decision Engine
+## 3. Brain Routing Decision
 
-### 3.1 Current Decision Flow
+### 3.1 Routing v2 — Three Layers
 
-The current Brain decision flow (`src/orchestra/brain.ts`) follows this path:
-
-```
-readContext()           → BrainContext (directives, memory, patterns, debt)
-    ↓
-planSprint()           → Sprint (tasks with model, effort, scope)
-    ├─ AI planner (callBrainPlanner → claude CLI)
-    └─ Structured fallback (parseStructuredDirectives)
-        ↓
-    For each task:
-        calculateModelScore()     → score (-3 to +8)
-        inferModelFromDirective() → opus|sonnet|haiku
-        suggestModelFromPatterns()→ upgrade if patterns warrant
-        resolveTaskModel()        → final model (5-layer filter)
-```
-
-**Key limitation:** This flow determines `model + effort + scope` but has no concept of `agent + skill` selection. The decision is purely model-tier based.
-
-### 3.2 Extended Decision Flow
+Routing v2 (introduced Sprint 063) replaced flat keyword scoring with a unified,
+intent-based pipeline. The entry point is `routeTaskV2()` in
+`src/core/routing-engine.ts`, orchestrated per task through
+`src/orchestra/task-router.ts`.
 
 ```
-readContext()
-    ↓
-detectProjectStack()        → ProjectStack (language, framework, deps)  [NEW]
-    ↓
-planSprint()
-    ↓
-For each task:
-    ┌─────────────────────────────────────────────┐
-    │ 1. TASK ANALYSIS                             │
-    │    - Type: code|test|doc|security|refactor   │
-    │    - Complexity: score from calculateModel   │
-    │    - Keywords: extracted from title+desc      │
-    │    - Scope: directories + files              │
-    ├─────────────────────────────────────────────┤
-    │ 2. AGENT SELECTION                [NEW]      │
-    │    - Score agents against task keywords       │
-    │    - Score agents against task scope          │
-    │    - Check agent stats (success rate)         │
-    │    - Select best match or generic worker      │
-    ├─────────────────────────────────────────────┤
-    │ 3. SKILL SELECTION                [NEW]      │
-    │    - Match project stack → language skills    │
-    │    - Match task keywords → domain skills      │
-    │    - Filter by agent compatibility            │
-    │    - Compose up to 3 skills                   │
-    ├─────────────────────────────────────────────┤
-    │ 4. MODEL SELECTION (existing + enhanced)     │
-    │    Layer 4: Base score (calculateModelScore)  │
-    │    Layer 4b: Pattern upgrade                  │
-    │    Layer 4c: Agent preference   [NEW]         │
-    │    Layer 4d: Skill preference   [NEW]         │
-    │    Layer 3: Task type cap                     │
-    │    Layer 2: Usage pressure                    │
-    │    Layer 1: Plan filter + haiku check         │
-    ├─────────────────────────────────────────────┤
-    │ 5. EFFORT DETERMINATION                      │
-    │    - Base: resolveWorkerEffort (score-based)  │
-    │    - Agent multiplier          [NEW]          │
-    │    - Skill complexity factor   [NEW]          │
-    ├─────────────────────────────────────────────┤
-    │ 6. SCOPE COMPUTATION           [NEW]         │
-    │    - Task scope (from directives)             │
-    │    ∪ Agent permissions (agent.allowedTools)   │
-    │    ∪ Skill requirements (skill.permissions)   │
-    │    = Final merged scope                       │
-    └─────────────────────────────────────────────┘
+Layer 1 — Intent Classification    (src/core/intent-classifier.ts)
+  Task scope + title + description → TaskDNA
+  { intent, subIntent, operation, size, tags }
+  Intents: security | bugfix | refactor | documentation | performance |
+           design | devops | config | migration | architecture |
+           implementation | unknown
+  (ADR-041 / Sprint 148: no 'testing' primary intent — test work is a
+   'test-coverage' tag on TaskDNA, not an agent.)
+      ↓
+Layer 2 — Activation Engine        (src/core/activation-engine.ts)
+  Evaluate each agent's / skill's structured ActivationConfig against
+  TaskDNA via condition-evaluator.ts ($gt, $contains, $and, $or).
+  Exclusions are checked first; excluded entities score 0 and are skipped.
+  V1 manifests are migrated on the fly
+  (migrateV1AgentToActivation / migrateV1SkillToActivation).
+      ↓
+Layer 3 — Routing Engine           (src/core/routing-engine.ts)
+  routeTaskV2(): combine activation scores + learning bonuses +
+  user overrides → RoutingDecision
+  { agent, skills[], confidence, intent }
 ```
 
-### 3.3 Learning Loop
+### 3.2 Agent Fallback Chain
 
-**Current:** `detectPatterns()` in auditor.ts records `BoundaryViolation` patterns. `suggestModelFromPatterns()` upgrades model if repeated violations.
+When no agent clears the activation threshold, selection is deterministic via
+`AGENT_FALLBACK_CHAIN` (`src/core/routing-engine.ts`), keyed by intent. For
+example: `bugfix → [bug-fixer, refactorer]`, `documentation → [doc-writer]`,
+`security → [security-auditor]`, `architecture → [architecture-planner,
+architect]`, `unknown → [architect]`. This chain encodes the ADR-041 rule that
+testing tasks route to `architect`/`refactorer` (there is no `test-writer`).
 
-**Extended learning cycle:**
+### 3.3 Overrides & Confidence
 
-```
-Sprint N completes
-    ↓
-For each task evaluation:
-    Record to PATTERNS.md:
-    {
-      taskType: "security",
-      agent: "security-auditor",
-      skills: ["typescript-expert", "security-specialist"],
-      model: "opus",
-      effort: "high",
-      evaluation: "DONE",           // or GO_WITH_TECH_DEBT, NO_GO
-      coverage: 95,
-      durationMs: 45000,
-      sprintId: "sprint-031"
-    }
-    ↓
-Sprint N+1 planning:
-    For similar task type:
-    - Look up successful patterns (evaluation=DONE, coverage>80%)
-    - Suggest same agent+skill+model combination
-    - Avoid combinations that led to NO_GO
-    - Weight by recency (recent sprints matter more)
-```
+- **User / DIRECTIVES overrides:** `Agent:`, `Skills:`, `Model:` (and exclude
+  variants) in DIRECTIVES become `forceAgent` / `forceSkills` / `forceModel` /
+  `excludeAgent` / `excludeSkills` on the task JSON. `resolveOverrides()`
+  resolves precedence among override sources.
+- **Confidence:** `calculateConfidence()` and `assessContextFit()` produce a
+  confidence level recorded in `task.routingMeta` (`routingVersion`,
+  `confidence`, `taskDNA`), giving the audit trail visibility into *why* a task
+  was routed a particular way.
 
-### 3.4 Decision Example
+### 3.4 Decision Output
 
-```
-Task: "Add JWT authentication to Express API"
+The decision feeds the rest of planning:
 
-Step 1 — Task Analysis:
-  Type: code (has src/ scope)
-  Complexity: score=5 (2 directories, "auth" keyword, 8 files)
-  Keywords: [jwt, authentication, express, api, middleware]
-  Scope: src/auth/, src/middleware/, tests/auth/
+1. **Agent** → its `PROMPT.md` is prepended to the worker prompt.
+2. **Skills** → each selected `SKILL.md` is injected (position per
+   `promptInjection`), within the skill/token budget.
+3. **Model** → model resolution (`forceModel` / agent preference / pattern
+   upgrade / usage pressure) selects the final tier; tier equivalence across
+   providers comes from `src/core/model-registry.ts`.
+4. **Scope** → from DIRECTIVES; workers must stay within `scope.directories` and
+   `scope.filesWrite` (Auditor monitors via `git diff --stat` — advisory in
+   V1.0 per ADR-037, hard-flip post-GA V2).
 
-Step 2 — Agent Selection:
-  security-auditor: score=6 (jwt+2, auth+2, scope:src/auth/+3, -1 no file pattern)
-  api-builder: score=4 (api+2, express+2)
-  Winner: security-auditor (score 6 > 4)
-
-Step 3 — Skill Selection:
-  typescript-expert: match (tsconfig.json detected) → selected
-  security-specialist: match (jwt, auth keywords) → selected
-  api-builder skill: match (api, express) → selected but capped (max 3)
-  Result: [typescript-expert, security-specialist, api-builder]
-
-Step 4 — Model:
-  Base score: 5 → opus
-  Agent preference: opus (security-auditor.preferredModel)
-  Skill preference: no override
-  Usage pressure: 30% (no downgrade)
-  Final: opus
-
-Step 5 — Effort:
-  Base: high (score >= 4)
-  Agent multiplier: 1.0 (default)
-  Final: high
-
-Step 6 — Scope:
-  Task: src/auth/, src/middleware/, tests/auth/
-  Agent: src/auth/, src/middleware/ (matches)
-  Skills: src/**  (typescript), src/auth/ (security)
-  Merged: src/auth/, src/middleware/, tests/auth/
-```
-
-### 3.5 Files to Modify
-
-| File | Change |
-|------|--------|
-| `src/orchestra/brain.ts:298-434` (planSprint) | Insert agent+skill selection between task creation and model resolution |
-| `src/orchestra/model-selector.ts:117-168` (resolveTaskModel) | Add Layer 4c (agent pref) and 4d (skill pref) |
-| `src/orchestra/task-builder.ts:152-158` (resolveWorkerEffort) | Apply agent effort multiplier |
-| `src/orchestra/sprint-reporter.ts:45-119` (writeRetrospective) | Record agent+skill outcomes |
-| `src/monitor/auditor.ts:295-350` (detectPatterns) | Extended pattern schema with agent+skill fields |
-
-### 3.6 Sprint Estimate
-
-Integrated with Section 1 and 2 sprints. Additional 3-4 tasks:
-- Task: Extended model-selector with agent/skill layers
-- Task: Learning loop in sprint-reporter
-- Task: Extended PATTERNS.md schema
-- Task: Tests (30+ tests)
+The full prompt assembly is performed by `buildWorkerPrompt()` in
+`src/orchestra/task-builder.ts`.
 
 ---
 
-## 4. End-User Experience
+## 4. Learning Loop
 
-### 4.1 Current State
+Agent and skill selection improves across sprints from real evaluation
+outcomes. After each sprint, evaluation results (DONE / GO_WITH_TECH_DEBT /
+NO_GO, coverage, duration) are recorded and rolled into entity performance.
+`src/orchestra/outcome-tracker.ts` aggregates per-entity outcomes and computes
+**learning bonuses** (capped by `LEARNING_BONUS_CAP` in
+`src/core/routing-types.ts`) plus an agent↔skill synergy matrix. These bonuses
+feed back into Layer 3 scoring so combinations that historically succeeded for a
+given intent are preferred and ones that led to NO_GO are penalized.
 
-**CLI output** is functional but bare:
-- `formatDashboard()` (`src/cli/helpers/output.ts:65-105`): Box-drawn status with agent table
-- `formatSprintSummary()` (output.ts:138-155): Plain text metrics
-- `formatDoctorResult()` (output.ts:107-136): `[PASS]`/`[FAIL]` with colors
-- Messages via `getMessage()` (`src/cli/helpers/messages.ts`): i18n key lookup, `{var}` interpolation
-- Errors via `handleError()` (`src/cli/helpers/error-handler.ts`): DeckentError with suggestions
-
-**What's missing:**
-- No progress bars during sprint execution
-- No ETA calculation
-- No rich sprint summary (categorized changes, diff stats, recommendations)
-- No notification system (terminal bell, webhook, email)
-- No agent/skill visibility in output
-
-### 4.2 Sprint Summary Format
-
-**Current** (formatSprintSummary):
-```
-Sprint sprint-031 (#31)
-Tasks: 8 | Metrics: 6 done, 1 debt, 1 no-go | Coverage: 92.3% | Duration: 245s
-```
-
-**Target:**
-```
-Sprint #31 Complete                                              245s
-
-  RESULTS
-  6 done    1 tech debt    1 failed    92.3% coverage
-
-  CHANGES
-  src/auth/jwt.ts                      +142 -0    (new)
-  src/middleware/auth-guard.ts          +89  -12
-  tests/auth/jwt.test.ts               +156 -0    (new)
-  ... 4 more files
-
-  TESTS
-  +156 new tests    12 test files    92.3% coverage (+3.1%)
-
-  AGENT PERFORMANCE
-  security-auditor   3 tasks   3/3 done   avg 95% coverage
-  test-writer        2 tasks   2/2 done   avg 91% coverage
-  generic worker     3 tasks   1/3 done   (1 NO_GO: scope violation)
-
-  NEXT STEPS
-  - Fix NO_GO task 031-005: "Database migration" (scope violation detected)
-  - Consider: refactorer agent for task-031-003 tech debt
-  - Run: deckent start to continue
-
-```
-
-### 4.3 CLI Output Improvements
-
-| Command | Current | Target |
-|---------|---------|--------|
-| `deckent start` | "Sprint started..." then silence until complete | Progress bar, worker status updates every 5s, ETA |
-| `deckent status` | Box-drawn table | + agent/skill info per worker, color-coded health |
-| `deckent retro` | Raw RETRO.md dump | Formatted highlights, categorized recommendations |
-| Error messages | DeckentError with suggestion | + contextual help links, copy-paste fix commands |
-
-#### Progress Bar Design
-
-```
-deckent start
-
-  Planning...                                              2.1s
-  Spawning 4 workers (security-auditor x1, test-writer x2, generic x1)
-
-  [===========----------]  4/8 tasks    52%    ETA ~120s
-
-  w-031-001  security-auditor  CODING   src/auth/jwt.ts           32%
-  w-031-002  test-writer       TESTING  tests/auth/jwt.test.ts    71%
-  w-031-003  generic           CODING   src/config/loader.ts      28%
-  w-031-004  test-writer       DONE     tests/middleware/*.ts     100%
-
-  Queue: 4 tasks waiting (031-005, 031-006, 031-007, 031-008)
-```
-
-### 4.4 Notification System
-
-```typescript
-interface NotificationConfig {
-  terminal: boolean;       // \u0007 bell character on sprint complete
-  webhook?: string;        // POST to URL with sprint summary JSON
-  discord?: string;        // Discord webhook URL
-  slack?: string;          // Slack webhook URL
-  email?: {
-    to: string;
-    smtp: { host: string; port: number; auth: { user: string; pass: string } };
-  };
-}
-```
-
-**Implementation:** After sprint complete (brain.ts line 994), check config.notifications and fire:
-
-```typescript
-// In brain.ts, after sprint.status = SprintStatus.COMPLETE
-if (config.notifications?.terminal) process.stdout.write('\u0007');
-if (config.notifications?.webhook) sendWebhook(config.notifications.webhook, sprintSummary);
-if (config.notifications?.discord) sendDiscordWebhook(config.notifications.discord, sprintSummary);
-```
-
-### 4.5 Interaction Modes
-
-| Mode | Current State | Enhancement |
-|------|--------------|-------------|
-| **CLI** | Functional, basic output | Rich formatting, progress bars, agent/skill visibility |
-| **MCP** | 16 tools, enriched responses | Add agent/skill info to status response |
-| **Web Dashboard** | React + Vite, 4 pages | Add agent/skill visualization, diff viewer |
-| **API** | 16 endpoints + SSE | Add agent/skill endpoints, extended sprint detail |
-
-### 4.6 Files to Create
-
-| File | Purpose |
-|------|---------|
-| `src/cli/helpers/progress.ts` | Progress bar renderer, ETA calculator |
-| `src/cli/helpers/sprint-summary.ts` | Rich sprint summary formatter |
-| `src/core/notifications.ts` | Notification dispatcher (terminal, webhook, discord, slack) |
-| `tests/cli/progress.test.ts` | Progress bar tests |
-| `tests/cli/sprint-summary.test.ts` | Summary format tests |
-| `tests/core/notifications.test.ts` | Notification dispatch tests |
-
-### 4.7 Files to Modify
-
-| File | Change |
-|------|--------|
-| `src/core/types.ts` | Add `NotificationConfig` to DeckentConfig |
-| `src/orchestra/brain.ts:994` (after COMPLETE) | Fire notifications |
-| `src/cli/commands/start.ts` | Use progress bar during sprint |
-| `src/cli/commands/status.ts` | Show agent/skill info |
-| `src/cli/commands/retro.ts` | Use rich summary formatter |
-| `src/cli/helpers/output.ts` | Extend formatDashboard with agent/skill columns |
-
-### 4.8 Sprint Estimate
-
-**Sprint 32 or 33** — 8-10 tasks
-- Task 1: Progress bar renderer
-- Task 2: Rich sprint summary formatter
-- Task 3: Notification system (terminal + webhook)
-- Task 4: Discord/Slack webhook integration
-- Task 5: start.ts progress integration
-- Task 6: status.ts agent/skill display
-- Task 7: retro.ts rich output
-- Task 8-10: Tests (40+ tests)
+Agent statistics (`totalUses`, `successRate`, `avgCoverage`,
+`lastUsedInSprint`) are persisted back to each `agent.json` and surfaced via
+`deckent agent list` and sprint history.
 
 ---
 
-## Implementation Roadmap
+## 5. Promotion & Demotion Pipeline
 
-| Sprint | Focus | Tasks | Dependencies |
-|--------|-------|-------|-------------|
-| **30** | Agent Pool Core | 8-10 | None |
-| **31** | Skill System Core | 10-12 | Agent Pool |
-| **32** | Brain Decision Engine | 3-4 | Agent Pool + Skill System |
-| **32** | UX: Progress + Summary | 5-6 | None (parallel) |
-| **33** | UX: Notifications + Polish | 4-5 | None (parallel) |
-| **34** | Integration Testing | 5-6 | All above |
+`src/orchestra/promotion-pipeline.ts` (`PromotionPipeline`) automatically
+promotes well-performing **temp** agents/skills to permanent and demotes
+underperforming ones, using `OutcomeTracker` data.
 
-**Total:** ~35-43 tasks across 4-5 sprints
+Default criteria (from `promotion-pipeline.ts`):
 
----
+| Action | Criteria (defaults) |
+|--------|---------------------|
+| **Promote** | `minTasks: 8`, `minSuccessRate: 0.85`, `minSprints: 3` |
+| **Demote**  | `maxFailRate: 0.50`, `minTasks: 5`, `unusedSprints: 5` |
 
-## Risk Assessment
-
-| Risk | Impact | Likelihood | Mitigation |
-|------|--------|-----------|------------|
-| Prompt size explosion (agent + 3 skills + task) | Worker context overflow | Medium | Token budget per section, truncation at `promptInjection.maxTokens` |
-| Agent selection wrong type | Tasks assigned to wrong specialist | Low | Fallback to generic worker, learning loop corrects over time |
-| Skill composition conflict | Two skills give contradictory instructions | Low | `composableWith[]` whitelist, max 3 skills |
-| Pattern learning drift | Bad patterns reinforce bad decisions | Medium | Decay mechanism (existing), confidence threshold for pattern reuse |
-| Backward compatibility | Existing sprints break with new prompt format | Low | All extensions optional, default=generic worker with no skills (current behavior) |
-| Notification spam | Webhook fires on every sprint | Low | Config-driven, disabled by default |
+The pipeline returns a `PromotionResult` (`promote | demote | wait`) per entity
+with the reason and the performance snapshot that justified it.
 
 ---
 
-## Test Strategy
+## 6. User Experience Surface
 
-- **Unit tests:** Each new module (agent-pool, agent-selector, skill, stack-detector, notifications, progress, summary)
-- **Integration tests:** Full planSprint flow with agent+skill selection
-- **Regression tests:** Existing brain.test.ts, task-builder.test.ts must continue passing
-- **E2E test:** Sprint with agent+skill selection → worker receives enriched prompt → evaluateResult records outcome
-- **Target:** 200+ new tests across all sections
+Agent and skill information is exposed across every interaction mode:
+
+| Surface | Where agents/skills appear |
+|---------|----------------------------|
+| **CLI** | `deckent agent list` / `--json`, `deckent skill list`, sprint summary "Agent Performance" section, status dashboard |
+| **MCP** | `deckent_agent_list`, `deckent_skill_list`, agent/skill info in `deckent_status` |
+| **Web Dashboard** | Sprint/agent visualization (React + Vite) |
+| **API** | Sprint detail and history endpoints surface routing + agent stats |
+
+CLI rendering helpers live under `src/cli/helpers/` (status/dashboard
+formatting, messages via i18n, structured error handling). Routing decisions
+and outcomes are emitted to the structured event stream
+(`src/orchestra/event-stream.ts`) so the audit trail and dashboard can show why
+a task was routed to a given agent/skill set.
 
 ---
 
-*This document will be updated as implementation progresses. Each section maps to a concrete sprint with defined tasks, file changes, and test requirements.*
+## Related Documentation
+
+| Document | Description |
+|----------|-------------|
+| [architecture.md](architecture.md) | Full system architecture overview |
+| [agents.md](agents.md) | User-facing agent guide (creation, selection, pipelines) |
+| [../reference/agents.md](../reference/agents.md) | Auto-generated canonical agent list (`npm run docs:ref`) |
+| [authority-matrix.md](authority-matrix.md) | Brain / Auditor / Worker RBAC (ADR-037) |
+
+---
+
+## ADR References
+
+| ADR | Relevance |
+|-----|-----------|
+| **ADR-041** | Agent Taxonomy — horizontal skills vs vertical agents; no dedicated test agent (15 built-in agents) |
+| **ADR-028** | Decision-Engine V1 → V2 routing migration |
+| **ADR-037** | Brain-Auditor-Worker Authority Matrix — scope enforcement (advisory V1.0) |
+| **ADR-036** | ADR Governance — ADRs injected into worker prompts as mandatory constraints |
+
+*Facts in this document are derived from source code (single source of truth):
+`src/core/agent-pool.ts`, `src/core/agent-types.ts`, `src/core/skill-pool.ts`,
+`src/core/skill-registry.ts`, `src/core/skill-selector.ts`,
+`src/core/routing-engine.ts`, `src/core/intent-classifier.ts`,
+`src/core/activation-engine.ts`, `src/core/marketplace/skill-sandbox.ts`,
+`src/orchestra/promotion-pipeline.ts`, `src/orchestra/task-router.ts`.*

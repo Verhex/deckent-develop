@@ -55,7 +55,7 @@ Deckent's three core components operate under **explicit, least-privilege access
 | **Auditor** | Independent Verifier | Observe, verify, report — NEVER write source code |
 | **Worker** | Task Executor | Write code within assigned scope — NEVER judge own work |
 
-The authority matrix defines *exactly* what each component can read, write, execute, and emit. Any action not explicitly permitted is **implicitly denied** (fail-closed model).
+The authority matrix defines *exactly* what each component can read, write, execute, and emit. By design intent, any action not explicitly permitted is implicitly denied (fail-closed model). **In V1.0 this is not yet runtime-enforced** — see the enforcement-reality note at the top: a disallowed action is logged + event-emitted but still proceeds (soft mode). Treat the ✅/❌/⚠️ cells below as the *intended* policy, not a runtime guarantee.
 
 ### Why This Matters
 
@@ -87,7 +87,7 @@ Every permission exercise is recorded in the event stream (`.deckent/sprint-NNN-
 
 ## 3. Full Authority Matrix Table
 
-The master overview. ✅ = allowed, ❌ = denied, ⚠️ = conditional (see notes).
+The master overview of the **intended** policy. ✅ = allowed, ❌ = denied (by intent), ⚠️ = conditional (see notes). Per the enforcement-reality note above, ❌ cells are **not hard-blocked at runtime in V1.0** — a violation is warned + event-emitted, then the action proceeds; hard-block is the post-GA V2 target.
 
 ### File System Write Access
 
@@ -99,7 +99,7 @@ The master overview. ✅ = allowed, ❌ = denied, ⚠️ = conditional (see note
 | `.tasks/task-{ownId}.hb` | ❌ | ❌ | ✅ | Worker writes own heartbeat only |
 | `.tasks/task-{ownId}.result` | ❌ | ❌ | ✅ | Worker writes own result only |
 | `.tasks/task-{ownId}.plan` | ❌ | ❌ | ✅ | Worker writes own execution plan only |
-| `.tasks/task-{otherId}.*` | ❌ | ❌ | ❌ | Lateral movement prevention |
+| `.tasks/task-{otherId}.*` | ❌ | ❌ | ❌ | Lateral-movement prevention (intent; soft in V1.0) |
 | `.brain/MEMORY.md` | ✅ | ❌ | ❌ | Brain manages sprint learnings |
 | `.brain/RETRO.md` | ✅ | ❌ | ❌ | Brain writes retrospective |
 | `.brain/DEBT.md` | ✅ | ❌ | ❌ | Brain manages tech debt table |
@@ -128,7 +128,7 @@ The master overview. ✅ = allowed, ❌ = denied, ⚠️ = conditional (see note
 | Worker kill | ✅ | ❌ | ❌ | On timeout or NO_GO |
 | GO / NO_GO / GO_WITH_TECH_DEBT label | ✅ | ❌ | ❌ | Auditor recommends; Brain decides |
 | Cross-dependency fix spawn | ✅ | ❌ | ❌ | FIX phase, after dependency analysis |
-| Skip auditor verification | ❌ | ❌ | ❌ | Brain MUST await verification |
+| Skip auditor verification | ❌ | ❌ | ❌ | Brain expected to await verification (protocol intent; not code-gated) |
 | Self-audit (judge own decisions) | ❌ | ❌ | ❌ | Self-audit gate owned by Auditor |
 | Verification 3-pipeline | ❌ | ✅ | ❌ | Requires worker `.result` file |
 | Functional verification | ❌ | ✅ | ❌ | During EXECUTE or EVALUATE phase |
@@ -181,10 +181,10 @@ Brain is the **sprint orchestrator**. It plans, coordinates, and makes final GO/
 
 ### What Brain CANNOT Do
 
-- **Write source code** (`src/**`, `tests/**`) — must spawn a Worker instead
-- **Modify ADRs** (`.brain/DECISIONS.md`) — requires human governance process
-- **Write to `.dashboard`** — Auditor's exclusive domain
-- **Skip auditor verification** — Brain must consume `AUDITOR→BRAIN:VERIFICATION_RESULT` before labeling a task GO
+- **Write source code** (`src/**`, `tests/**`) — protocol intent: spawn a Worker instead (not runtime-blocked in V1.0)
+- **Modify ADRs** (the ADR governance store; legacy shorthand `.brain/DECISIONS.md`) — requires human governance process
+- **Write to `.dashboard`** — Auditor's domain by intent
+- **Skip auditor verification** — Brain is expected to consume `AUDITOR→BRAIN:VERIFICATION_RESULT` before labeling a task GO (protocol convention, not a code gate)
 
 ### Brain's Decision Flow
 
@@ -251,18 +251,18 @@ Workers are **task executors**. Each Worker operates within a strictly bounded s
 ### What Worker CAN Do
 
 - **Write code** — only files in `scope.filesWrite` and `scope.directories`
-- **Read context** — task JSON, `scope.filesRead`, `.brain/DECISIONS.md`, `DIRECTIVES.md`
+- **Read context** — task JSON, `scope.filesRead`, ADRs (injected into the prompt from the governance store; exported to `.brain/exports/decisions.md` / `docs/adr/`), `DIRECTIVES.md`
 - **Write own artifacts** — `.tasks/task-{ownId}.hb`, `.result`, `.plan`, `.verify-delta.json`
 - **Acquire file locks** — for its own scope before each file write
 - **Send event stream messages** — `WORKER→BRAIN:*` and `WORKER→AUDITOR:CODE_VERIFY_REQUEST`
 
 ### What Worker CANNOT Do
 
-- **Read or write sibling task files** (`.tasks/task-{otherId}.*`) — lateral movement prevention
-- **Modify `.brain/DECISIONS.md`** — privilege escalation prevention
-- **Write to `.brain/MEMORY.md`, `.brain/RETRO.md`** — Brain's exclusive domain
-- **Change sprint state** — Brain's exclusive right
-- **Self-verify** — Workers cannot run their own verification pipeline; that belongs to Auditor
+- **Read or write sibling task files** (`.tasks/task-{otherId}.*`) — lateral-movement prevention (intent; soft in V1.0)
+- **Modify the ADR governance store** (legacy shorthand `.brain/DECISIONS.md`) — privilege-escalation prevention (intent)
+- **Write to `.brain/MEMORY.md`, `.brain/RETRO.md`** — Brain's domain by intent
+- **Change sprint state** — Brain's responsibility by intent
+- **Self-verify** — Workers are not expected to run their own verification pipeline; that belongs to Auditor (role convention — note: the worker-side tsc/vitest verify loop is a prompt instruction, `enforceVerifyLoop`/`runTestVerifyLoop` have 0 runtime callers)
 
 ### Worker Scope Resolution
 
@@ -272,13 +272,13 @@ Every Worker's allowed paths come from its task JSON:
 {
   "scope": {
     "directories": ["src/core/", "tests/core/"],
-    "filesRead": ["src/core/config.ts", ".brain/DECISIONS.md"],
+    "filesRead": ["src/core/config.ts", "docs/adr/README.md"],
     "filesWrite": ["src/core/config.ts", "tests/core/config.test.ts"]
   }
 }
 ```
 
-The `isWithinScope()` function in `src/agents/worker.ts` enforces these boundaries with symlink-aware path resolution (see ADR-034).
+The `isWithinScope()` function in `src/agents/worker.ts` *computes* whether a path is in scope (symlink-aware, see ADR-034). It is a pure boolean predicate: it does **not** throw or block. The wrapper `checkWorkerAuthority()` warns + emits an `AUTHORITY_VIOLATION` event on an out-of-scope write but then `return true` (the write proceeds — V1.0 soft mode). Boundary observance therefore relies on worker discipline (honest BOUNDARY_VIOLATION → NO_GO self-flag) plus Auditor advisory monitoring, not a runtime block.
 
 ---
 
@@ -316,7 +316,7 @@ Worker A needs Worker B's output
 
 ### Rule 3: Auditor Independence (Absolute)
 
-Auditor **never** writes source code (`src/**`, `tests/**`). This is ADR-037's untouchable rule. If Auditor writes code, it can no longer independently verify it — the entire verification model collapses.
+Auditor **never** writes source code (`src/**`, `tests/**`). This is ADR-037's untouchable rule, enforced as a role-discipline invariant (the Auditor module has no source-write code path) plus audit-trail observation — not a runtime sandbox. If Auditor writes code, it can no longer independently verify it — the entire verification model collapses.
 
 ### Rule 4: Brain Orchestration Boundary
 
@@ -334,7 +334,7 @@ Worker implements + reports result
 Brain evaluates
 ```
 
-Exception: ADR-038 (meta-refactoring capability) is referenced but not yet defined. Until ADR-038 is accepted, Brain cannot write to `src/**`.
+Exception: ADR-038 (meta-refactoring capability) is referenced but not yet defined. By policy intent, Brain does not write to `src/**` until ADR-038 is accepted (enforced via role discipline + audit trail in V1.0, not a runtime block).
 
 ### Rule 5: Event Stream Integrity
 
@@ -352,10 +352,10 @@ The event stream (`.deckent/sprint-NNN-events.jsonl`) is **append-only**. No com
 
 1. Worker calls `isWithinScope('.deckent/sprint-state.json')` before writing.
 2. `isWithinScope()` checks the path against `task-139-005.json`'s `scope.filesWrite` list.
-3. `.deckent/sprint-state.json` is **not** in the worker's scope → violation detected. *(V1.0 soft: a warning is logged + an event emitted; the write is **not hard-blocked**. The honest worker self-flags BOUNDARY_VIOLATION → NO_GO. V2 will hard-block.)*
-4. Auditor's 30s scan also detects the attempt via `git diff --stat`.
+3. `isWithinScope('.deckent/sprint-state.json')` returns `false`. `checkWorkerAuthority()` logs a `[ADR-037 soft]` warning and emits an `AUTHORITY_VIOLATION` event, then `return true` — **the write is NOT hard-blocked in V1.0**. The honest worker self-flags `BOUNDARY_VIOLATION` → writes `NO_GO`. V2 will hard-block.
+4. Auditor's 30s scan also detects the drift via `git diff --stat` (advisory).
 5. Auditor emits `AUDITOR→BRAIN:ADR_VIOLATION` event with `{ rule: 'ADR-037', component: 'worker', path: '.deckent/sprint-state.json' }`.
-6. Brain receives the violation event → applies FIX/cascade and the task is evaluated NO_GO.
+6. Brain receives the violation event and may apply FIX/cascade; the task is typically evaluated NO_GO via the worker's honest self-flag + Auditor verdict (not an automatic runtime block).
 
 **Root cause:** Sprint state management is Brain's exclusive responsibility. Workers never advance sprint phases directly — they only write their own `.result` files.
 
@@ -368,9 +368,9 @@ The event stream (`.deckent/sprint-NNN-events.jsonl`) is **append-only**. No com
 **What happens:**
 
 1. Auditor has **READ** access to `src/**` (for code analysis).
-2. Auditor does **NOT** have write access to `src/**` — ADR-037 Rule 3 (Auditor Independence).
-3. Any attempt to write `src/monitor/auditor.ts` would trigger a scope violation.
-4. Auditor cannot modify the code it verifies — doing so would invalidate its independence.
+2. By policy intent, Auditor does **NOT** have write access to `src/**` — ADR-037 Rule 3 (Auditor Independence). This is enforced as a role-discipline rule (the Auditor module has no source-write code path), not a runtime guard.
+3. A write to `src/monitor/auditor.ts` would be flagged by the Auditor's own `git diff --stat` advisory scan and recorded in the audit trail (V1.0 does not hard-block it).
+4. Auditor must not modify the code it verifies — doing so would invalidate its independence.
 
 **Correct process:** Auditor identifies the issue → emits `AUDITOR→BRAIN:ADR_VIOLATION` or leaves a note in `docs/audits/` → Brain creates a new task for a Worker to implement the fix.
 
@@ -384,8 +384,8 @@ The event stream (`.deckent/sprint-NNN-events.jsonl`) is **append-only**. No com
 
 **What happens:**
 
-1. Brain does **NOT** have write access to `.brain/DECISIONS.md` — ADR-037 explicit DENY.
-2. Brain cannot create ADRs autonomously, even if it identifies a legitimate architectural need.
+1. By policy intent, Brain does **NOT** have write access to the ADR governance store (legacy shorthand `.brain/DECISIONS.md`; ADRs live in `.brain/memory.db` and `docs/adr/`) — ADR-037 DENY by intent (advisory/audit-trail in V1.0, not a runtime block).
+2. Brain must not create ADRs autonomously, even if it identifies a legitimate architectural need.
 
 **Correct process:**
 
@@ -396,12 +396,12 @@ Brain writes proposal to sprint retrospective (RETRO.md)
         ↓
 Human (Alperen) reviews proposal in next session
         ↓
-Human writes new ADR in .brain/DECISIONS.md
+Human authors the new ADR in docs/adr/ (mirrored into .brain/memory.db)
         ↓
 ADR governance validation: npm run lint:adr
 ```
 
-**Why this matters:** ADRs are governance documents. Allowing AI agents to modify them creates a privilege escalation path — an agent could relax its own scope constraints by writing a new "ADR." The `.brain/DECISIONS.md` write prohibition applies to **all three roles** (Brain, Auditor, Worker).
+**Why this matters:** ADRs are governance documents. Allowing AI agents to modify them creates a privilege escalation path — an agent could relax its own scope constraints by writing a new "ADR." The ADR-store write prohibition (legacy shorthand `.brain/DECISIONS.md`) applies by intent to **all three roles** (Brain, Auditor, Worker). In V1.0 this is enforced via audit-trail + role discipline, not a runtime block.
 
 ---
 
@@ -411,14 +411,14 @@ ADR governance validation: npm run lint:adr
 
 **What happens:**
 
-1. `detectScopeCollisions()` in `sprint-spawner.ts` identifies the conflict at **plan time**.
-2. Both tasks are placed in separate waves: task-139-010 in Wave 3, task-139-015 in Wave 4.
-3. At runtime, Worker task-139-010 acquires a file lock (`.locks/src__core__config.ts.lock`).
-4. If task-139-015 attempts to write before the lock is released, `acquireLock()` returns `null`.
+1. `detectScopeCollisions()` (defined in `src/orchestra/conflict-resolver.ts`, invoked from `src/orchestra/sprint-spawner.ts`) identifies the conflict at **plan time**.
+2. The conflicting tasks are placed in separate waves so they do not run concurrently (illustrative wave numbers).
+3. At runtime, Worker task-139-010 acquires a file lock (`.locks/src__core__config.ts.lock`) via `acquireLock()` in `src/core/file-lock.ts`.
+4. If task-139-015 attempts to lock before release, `acquireLock()` returns `null` (advisory, process-level — not OS-enforced).
 5. Worker task-139-015 waits and retries after the lock is released.
-6. If both attempt concurrent write despite wave separation, Auditor emits `AUDITOR→BRAIN:SCOPE_COLLISION_DETECTED`.
+6. If both attempt concurrent write despite wave separation, Auditor emits `AUDITOR→BRAIN:SCOPE_COLLISION_DETECTED` (advisory).
 
-**Prevention:** Plan-time collision detection means this scenario should be rare in practice.
+**Prevention:** Plan-time collision detection plus advisory file locks make this scenario rare; note neither is a hard OS-level guarantee in V1.0.
 
 ---
 
@@ -436,7 +436,7 @@ ADR governance validation: npm run lint:adr
    - Auditor runs `npx vitest run` on affected test files
    - 12 failures detected → verdict: `DOWNGRADE`
 5. Auditor emits `AUDITOR→BRAIN:VERIFICATION_RESULT` with `{ verdict: 'DOWNGRADE', newStatus: 'GO_WITH_TECH_DEBT' }`.
-6. Brain overrides the worker's self-assessment → task labeled `GO_WITH_TECH_DEBT`.
+6. Brain overrides the worker's self-assessment → task labeled `GO_WITH_TECH_DEBT`. (This evaluation path is real; the worker-side tsc/vitest verify loop that *should* catch this first is a prompt instruction only — `enforceVerifyLoop`/`runTestVerifyLoop` have 0 runtime callers — so Auditor verification is the effective backstop, not a worker-side hard gate.)
 
 **Historical context:** This exact scenario occurred in Sprint 137 Task 137-001. The worker shortcut ("code exists = DONE") was the direct motivation for the 3-pipeline verification system in Sprint 138.
 
@@ -449,8 +449,8 @@ ADR governance validation: npm run lint:adr
 **What happens:**
 
 1. `.tasks/task-139-012.result` is **not** in Worker task-139-007's `scope.filesRead`.
-2. `isWithinScope()` check fails → access denied.
-3. **Correct approach:** Worker task-139-007 should use `WORKER→BRAIN:QUESTION` channel to ask Brain about task-139-012's status.
+2. `isWithinScope()` returns `false` → the access is flagged (warn + `AUTHORITY_VIOLATION` event) but in V1.0 is **not hard-blocked**; the honest worker must not proceed and should self-flag. V2 will hard-deny.
+3. **Correct approach:** Worker task-139-007 should use the `WORKER→BRAIN:QUESTION` channel to ask Brain about task-139-012's status.
 4. Brain has full visibility into all task states and responds via `BRAIN→WORKER:ANSWER`.
 
 **Why workers can't read sibling task files:** Lateral movement prevention. A malicious or confused worker could read another task's result and falsely claim completion of work it didn't do.
@@ -467,7 +467,7 @@ The authority matrix is enforced at three layers:
 |-----------|----------------|
 | `npm run lint:adr` | ADR format, status enum, duplicate IDs |
 | Worker prompt injection (ADR-036) | Authority matrix injected into every worker prompt |
-| TypeScript type system | `isWithinScope()` return types enforce scope at call sites |
+| TypeScript type system | Typed scope/role interfaces catch mis-wiring at compile time (note: `isWithinScope()`'s boolean result is *advisory* at runtime — `checkWorkerAuthority()` warns/emits but does not act on it) |
 
 ### Layer 2 — Runtime (Advisory / Soft, V1.0)
 
@@ -497,7 +497,7 @@ The authority matrix is enforced at three layers:
 
 ADR-037 contains a forward reference to **ADR-038: Brain Meta-Refactoring Capability**. This is a **not-yet-accepted** ADR that would allow Brain to write to `src/**` under specific, tightly controlled conditions (e.g., automated code generation from schema, mechanical refactoring across many files).
 
-**Current status:** ADR-038 is referenced but not defined. Brain's `src/**` write prohibition is **absolute** until ADR-038 is formally accepted and specifies precise scope constraints.
+**Current status:** ADR-038 is referenced but not defined. Brain's `src/**` write prohibition is treated as **absolute by policy** until ADR-038 is formally accepted and specifies precise scope constraints (V1.0 enforcement is role-discipline + audit-trail, not a runtime guard).
 
 **Why it requires a separate ADR:** Granting Brain write access to source code is a significant authority expansion that could collapse the Brain/Worker separation of duties. Any such grant must be:
 - Explicitly scoped (which files, which conditions)
@@ -508,27 +508,29 @@ ADR-037 contains a forward reference to **ADR-038: Brain Meta-Refactoring Capabi
 
 ## 11. NIST SP 800-162 Reference
 
-Deckent's authority matrix aligns with NIST SP 800-162 (Guide to ABAC) principles:
+Deckent's authority matrix is **designed to align** with NIST SP 800-162 (Guide to ABAC) principles. The "Deckent V1.0 status" column states what is actually enforced today (soft/advisory) vs. the design target:
 
-| NIST Concept | Deckent Implementation |
-|---|---|
-| **Least Privilege** | Each role has minimal permissions; defaults to deny |
-| **Separation of Duties** | Worker ≠ Verifier ≠ Decision-maker |
-| **Need to Know** | Workers read only their own task file + declared `filesRead` |
-| **Accountability** | Event stream provides immutable audit trail |
-| **Fail-Secure** | Permission check failure → access denied (not granted) |
-| **Complete Mediation** | `isWithinScope()` called before every file write |
+| NIST Concept | Design Intent | Deckent V1.0 Status |
+|---|---|---|
+| **Least Privilege** | Each role has minimal permissions; default-deny | Policy defined; checks are advisory (soft) |
+| **Separation of Duties** | Worker ≠ Verifier ≠ Decision-maker | Enforced by role wiring + Auditor verification |
+| **Need to Know** | Workers read only their own task file + declared `filesRead` | Policy defined; out-of-scope reads warned, not blocked |
+| **Accountability** | Event stream provides an audit trail | Active (append-only event stream) |
+| **Fail-Secure** | Permission-check failure → access denied | **Not yet** — soft mode logs/emits, action proceeds (V2 target) |
+| **Complete Mediation** | `isWithinScope()` consulted before every file write | Check is computed but result is advisory (`return true`) |
 
 ### Threat Model Coverage
 
-| Threat (STRIDE) | Mitigation |
-|---|---|
-| **S**poofing (Worker A impersonates Worker B) | Task-scoped file access — each worker can only write `.tasks/task-{ownId}.*` |
-| **T**ampering (Worker modifies ADRs) | `.brain/DECISIONS.md` write denied for all agent roles |
-| **R**epudiation (No audit trail) | Append-only event stream records every action |
-| **I**nformation Disclosure (Worker reads sibling task) | `scope.filesRead` enforced by `isWithinScope()` |
-| **D**enial of Service (Stale lock flood) | Auditor clears locks older than 5 minutes |
-| **E**levation of Privilege (Worker writes sprint-state) | Sprint state write denied for Worker and Auditor |
+Mitigations below state the design intent; in V1.0 the scope/path mitigations are **advisory (warn + emit, not hard-block)** — see the enforcement-reality note. Audit-trail and lock-cleanup mitigations are active.
+
+| Threat (STRIDE) | Intended Mitigation | V1.0 Reality |
+|---|---|---|
+| **S**poofing (Worker A impersonates Worker B) | Task-scoped file access — worker writes only `.tasks/task-{ownId}.*` | Advisory check; relies on worker discipline + audit trail |
+| **T**ampering (Worker modifies ADRs) | ADR-store write denied for all agent roles | Advisory + audit trail (no hard-block) |
+| **R**epudiation (No audit trail) | Append-only event stream records every action | Active |
+| **I**nformation Disclosure (Worker reads sibling task) | `scope.filesRead` checked by `isWithinScope()` | Check computed; result advisory in V1.0 |
+| **D**enial of Service (Stale lock flood) | Auditor clears locks older than 5 minutes | Active |
+| **E**levation of Privilege (Worker writes sprint-state) | Sprint-state write denied for Worker and Auditor | Advisory + Auditor `git diff` scan (no hard-block) |
 
 ---
 
