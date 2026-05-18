@@ -546,10 +546,10 @@ When falling back, Deckent maps equivalent model tiers across providers:
 ## Still Have Questions?
 
 For detailed guides, see:
-- [QUICKSTART.md](./QUICKSTART.md) — 5-minute setup tutorial
-- [ARCHITECTURE.md](./ARCHITECTURE.md) — Deep technical reference
-- [MCP-GUIDE.md](./MCP-GUIDE.md) — MCP integration details
-- [PLUGIN-GUIDE.md](./PLUGIN-GUIDE.md) — Plugin development walkthrough
-- [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) — Common issues and fixes
+- [Quickstart](./quickstart.md) — 5-minute setup tutorial
+- [Core Concepts](./concepts.md) — How Brain, Workers, and Auditor work together
+- [MCP Guide](../reference/mcp-guide.md) — MCP integration details
+- [Multi-Provider Guide](../reference/multi-provider.md) — Using Claude, Codex, and Gemini
+- [Migration Guide](../reference/migration-guide.md) — Version upgrade paths
 
 Or ask in the [GitHub Discussions](https://github.com/anthropics/deckent/discussions).

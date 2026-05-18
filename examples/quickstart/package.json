@@ -13,7 +13,7 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "deckent": "workspace:*"
+    "deckent": "^1.0.0-beta.1"
   },
   "engines": {
     "node": ">=18.0.0"

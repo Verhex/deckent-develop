@@ -240,6 +240,6 @@ Ensure `fallback_provider` is set and the fallback provider's prerequisites are 
 
 ## Related Documentation
 
-- [CONFIG-REFERENCE.md](CONFIG-REFERENCE.md) -- Full configuration reference
-- [ARCHITECTURE.md](ARCHITECTURE.md) -- System architecture
-- [TROUBLESHOOTING.md](TROUBLESHOOTING.md) -- General troubleshooting
+- [Config Reference](./config-reference.md) — Full configuration reference
+- [Core Concepts](../guide/concepts.md) — System architecture overview
+- [FAQ](../guide/faq.md) — Common questions and troubleshooting

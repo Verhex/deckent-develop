@@ -1,600 +1,600 @@
-| 2026-05-14T18:09:48.907Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-test-docker-2890872.json' |
-| 2026-05-14T18:10:11.173Z | forceRescanIfIdle | slot idle for 303s — respawning 2 orphan PENDING task(s): 168-001, 168-002 |
-| 2026-05-14T18:10:11.174Z | resolveAgentPrompt:readFile | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.deckent/agents/temp-react-ts-specialist/PROMPT.md' |
-| 2026-05-14T18:10:11.175Z | resolveAgentPrompt:readFile | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/agents/temp-react-ts-specialist/PROMPT.md' |
-| 2026-05-14T18:10:11.176Z | resolveSkillPrompts:readSkillFile | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.deckent/skills/(none)/SKILL.md' |
-| 2026-05-14T18:10:11.183Z | docker-backend:spawn-lock | taskId=168-001 acquired 1 spawn lock(s) |
-| 2026-05-14T18:10:11.302Z | docker-backend:spawn | taskId=168-001 container=deckent-w-168-001 model=haiku |
-| 2026-05-14T18:10:11.303Z | docker-backend:spawn-attempt | taskId=168-001 attempt=1/2 |
-| 2026-05-14T18:10:14.695Z | docker-backend:spawn-ok | taskId=168-001 containerId=9f64bb613173 instantExit=false |
-| 2026-05-14T18:10:14.698Z | resolveAgentPrompt:readFile | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.deckent/agents/temp-react-ts-specialist/PROMPT.md' |
-| 2026-05-14T18:10:14.699Z | resolveAgentPrompt:readFile | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/agents/temp-react-ts-specialist/PROMPT.md' |
-| 2026-05-14T18:10:14.700Z | resolveSkillPrompts:readSkillFile | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.deckent/skills/(none)/SKILL.md' |
-| 2026-05-14T18:10:14.708Z | waitForResults:queue-spawn | Failed to spawn queued task 168-002: Spawn lock conflict on .test/shared.txt: file is currently held by task 168-001 |
-| 2026-05-14T18:10:14.709Z | waitForResults:progress | Sprint devam ediyor — 1/3 task tamamlandı (5dk) |
-| 2026-05-14T18:10:16.697Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-test-docker-2890872.json' |
-| 2026-05-14T18:11:55.452Z | docker-backend:exit | taskId=168-001 exitCode=0 |
-| 2026-05-14T18:11:55.645Z | docker-backend:spawn-lock | taskId=168-001 released 1 spawn lock(s) on exit |
-| 2026-05-14T18:15:15.182Z | forceRescanIfIdle | slot idle for 300s — respawning 1 orphan PENDING task(s): 168-002 |
-| 2026-05-14T18:15:15.183Z | resolveAgentPrompt:readFile | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.deckent/agents/temp-react-ts-specialist/PROMPT.md' |
-| 2026-05-14T18:15:15.183Z | resolveAgentPrompt:readFile | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/agents/temp-react-ts-specialist/PROMPT.md' |
-| 2026-05-14T18:15:15.185Z | resolveSkillPrompts:readSkillFile | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.deckent/skills/(none)/SKILL.md' |
-| 2026-05-14T18:15:15.191Z | docker-backend:spawn-lock | taskId=168-002 acquired 1 spawn lock(s) |
-| 2026-05-14T18:15:15.325Z | docker-backend:spawn | taskId=168-002 container=deckent-w-168-002 model=haiku |
-| 2026-05-14T18:15:15.326Z | docker-backend:spawn-attempt | taskId=168-002 attempt=1/2 |
-| 2026-05-14T18:15:18.816Z | docker-backend:spawn-ok | taskId=168-002 containerId=f8aaaf2a5147 instantExit=false |
-| 2026-05-14T18:15:18.818Z | waitForResults:progress | Sprint devam ediyor — 2/3 task tamamlandı (10dk) |
-| 2026-05-14T18:16:49.434Z | sprint-checkpoint:phaseTransition | Phase EXECUTE → writing checkpoint |
-| 2026-05-14T18:16:49.436Z | sprint-checkpoint:write | Checkpoint #3 written for sprint-168 |
-| 2026-05-14T18:16:49.438Z | runEvaluatePhase:start | totalTasks=3 collectedResults=3 collectedIds=[168-003,168-001,168-002] |
-| 2026-05-14T18:16:52.942Z | runEvaluatePhase:task | task=168-001 selfAssessment=DONE evaluation=DONE testsPassed=true |
-| 2026-05-14T18:16:52.946Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
-| 2026-05-14T18:16:52.947Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
-| 2026-05-14T18:16:52.947Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
-| 2026-05-14T18:16:52.948Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
-| 2026-05-14T18:16:52.949Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
-| 2026-05-14T18:16:52.949Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
-| 2026-05-14T18:16:52.949Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
-| 2026-05-14T18:16:52.950Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
-| 2026-05-14T18:16:52.950Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
-| 2026-05-14T18:16:52.951Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
-| 2026-05-14T18:16:52.951Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
-| 2026-05-14T18:16:56.385Z | runEvaluatePhase:task | task=168-002 selfAssessment=DONE evaluation=DONE testsPassed=true |
-| 2026-05-14T18:16:56.388Z | runEvaluatePhase:task | task=168-003 selfAssessment=NO_GO evaluation=NO_GO testsPassed=false |
-| 2026-05-14T18:16:56.389Z | runEvaluatePhase:done | evaluations.size=3 keys=[168-001,168-002,168-003] |
-| 2026-05-14T18:16:56.391Z | evaluateFailureCascade | task 168-003: AMBIGUOUS → retry=true cascade=false |
-| 2026-05-14T18:16:56.397Z | sprint-checkpoint:phaseTransition | Phase EVALUATE → writing checkpoint |
-| 2026-05-14T18:16:56.398Z | sprint-checkpoint:write | Checkpoint #4 written for sprint-168 |
-| 2026-05-14T18:16:56.401Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
-| 2026-05-14T18:16:56.402Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
-| 2026-05-14T18:16:56.403Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
-| 2026-05-14T18:16:56.403Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
-| 2026-05-14T18:16:56.404Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
-| 2026-05-14T18:16:56.404Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
-| 2026-05-14T18:16:56.405Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
-| 2026-05-14T18:16:56.405Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
-| 2026-05-14T18:16:56.406Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
-| 2026-05-14T18:16:56.406Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
-| 2026-05-14T18:16:56.407Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
-| 2026-05-14T18:16:56.408Z | mid-sprint-adapter:shouldReroute | Skipping reroute for task 168-003-fix: insufficient confidence (agent=uncertain, skill=uncertain) |
-| 2026-05-14T18:16:56.410Z | docker-backend:exit | taskId=168-002 exitCode=0 |
-| 2026-05-14T18:16:56.621Z | docker-backend:spawn-lock | taskId=168-002 released 1 spawn lock(s) on exit |
-| 2026-05-14T18:16:56.623Z | resolveSkillPrompts:readSkillFile | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.deckent/skills/(none)/SKILL.md' |
-| 2026-05-14T18:16:56.633Z | docker-backend:spawn-lock | taskId=168-003-fix acquired 1 spawn lock(s) |
-| 2026-05-14T18:16:56.755Z | docker-backend:spawn | taskId=168-003-fix container=deckent-w-168-003-fix model=haiku |
-| 2026-05-14T18:16:56.755Z | docker-backend:spawn-attempt | taskId=168-003-fix attempt=1/2 |
-| 2026-05-14T18:17:00.210Z | docker-backend:spawn-ok | taskId=168-003-fix containerId=a2578b3f1736 instantExit=false |
-| 2026-05-14T18:18:46.615Z | sprint-checkpoint:phaseTransition | Phase FIX → writing checkpoint |
-| 2026-05-14T18:18:46.616Z | sprint-checkpoint:write | Checkpoint #5 written for sprint-168 |
-| 2026-05-14T18:18:46.622Z | finalizeSprint:preRetro | evaluations.size=4 keys=[168-001,168-002,168-003,168-003-fix] |
-| 2026-05-14T18:18:46.622Z | buildAgentPerformance | task=168-001 agent=temp-react-ts-specialist ev=DONE evalMapSize=4 evalKeys=[168-001,168-002,168-003,168-003-fix] |
-| 2026-05-14T18:18:46.623Z | buildAgentPerformance | task=168-002 agent=temp-react-ts-specialist ev=DONE evalMapSize=4 evalKeys=[168-001,168-002,168-003,168-003-fix] |
-| 2026-05-14T18:18:46.624Z | buildAgentPerformance | task=168-003 agent=devops-engineer ev=NO_GO evalMapSize=4 evalKeys=[168-001,168-002,168-003,168-003-fix] |
-| 2026-05-14T18:20:10.094Z | finalizeSprint:tripleLink | Triple-link created for sprint-168 |
-| 2026-05-14T18:20:10.113Z | finalizeSprint:routing-outcomes | Recorded 3 routing outcomes to learnings.json |
-| 2026-05-14T18:20:10.115Z | finalizeSprint:rule-evolution | 9 new rules evolved |
-| 2026-05-14T18:20:10.117Z | rule-evolver:saveRules | 9 rules saved to .deckent/routing/evolved-rules.json |
-| 2026-05-14T18:20:10.130Z | finalizeSprint:syncStatsToManifests | Synced 18 agents, 19 skills to manifest files |
-| 2026-05-14T18:20:10.133Z | finalizeSprint:promotion | agent 'test-writer': 125 tasks, 90% success — meets promotion criteria |
-| 2026-05-14T18:20:10.134Z | promotion-pipeline:promote | Temp agent 'test-writer' not found |
-| 2026-05-14T18:20:10.134Z | finalizeSprint:promotion | skill 'code-reviewer': 32 tasks, 91% success — meets promotion criteria |
-| 2026-05-14T18:20:10.135Z | promotion-pipeline:promote | Temp skill 'code-reviewer' not found |
-| 2026-05-14T18:20:10.142Z | finalizeSprint:breadcrumb | Step 10 (richOutput) — entering |
-| 2026-05-14T18:20:10.161Z | buildAgentPerformance | task=168-001 agent=temp-react-ts-specialist ev=DONE evalMapSize=4 evalKeys=[168-001,168-002,168-003,168-003-fix] |
-| 2026-05-14T18:20:10.163Z | buildAgentPerformance | task=168-002 agent=temp-react-ts-specialist ev=DONE evalMapSize=4 evalKeys=[168-001,168-002,168-003,168-003-fix] |
-| 2026-05-14T18:20:10.163Z | buildAgentPerformance | task=168-003 agent=devops-engineer ev=NO_GO evalMapSize=4 evalKeys=[168-001,168-002,168-003,168-003-fix] |
-| 2026-05-14T18:20:10.165Z | finalizeSprint:breadcrumb | Step 10b (selfAuditGate) — entering |
-| 2026-05-14T18:20:13.726Z | runSelfAuditGate:tsc | status=PASS errors=0 |
-| 2026-05-14T18:21:25.972Z | runSelfAuditGate:vitest | status=FAIL delta.fail=2 |
-| 2026-05-14T18:21:25.987Z | file-lock:clearOrphanSpawnLocks | Released orphan spawn lock: .test/sleep-result.txt (taskId=168-003-fix) |
-| 2026-05-14T18:21:25.988Z | docker-backend:exit | taskId=168-003-fix exitCode=0 |
-| 2026-05-14T18:21:26.188Z | runSelfAuditGate:honesty | violations=0 |
-| 2026-05-14T18:21:26.190Z | runSelfAuditGate | overallGate=GATE_FAILURE sprint=sprint-168 |
-| 2026-05-14T18:21:26.190Z | finalizeSprint:selfAuditGate | Gate completed: overallGate=GATE_FAILURE |
-| 2026-05-14T18:21:26.191Z | finalizeSprint:selfAuditGate | Status updated: RETROSPECTIVE → GO_WITH_GATE_FAILURE |
-| 2026-05-14T18:21:26.192Z | finalizeSprint:selfAuditGate | Gate result written to /home/alperen/deckent-dev/.deckent/sprint-168-gate.json overallGate=GATE_FAILURE |
-| 2026-05-14T18:21:26.193Z | finalizeSprint:breadcrumb | Step 10c (loadReport) — entering |
-| 2026-05-14T18:21:26.195Z | finalizeSprint:loadReport | Load test report written to /home/alperen/deckent-dev/docs/audits/sprint-168/load-test-report.md |
-| 2026-05-14T18:21:26.196Z | finalizeSprint:breadcrumb | Step 10c (loadReport) — done |
-| 2026-05-14T18:21:26.197Z | finalizeSprint:breadcrumb | Step 10c2 (metricsRotation) — entering |
-| 2026-05-14T18:21:26.198Z | observability-rotation | Rotated 3300 bytes → /home/alperen/deckent-dev/.deckent/archive/metrics/metrics-sprint-168.jsonl.gz (524 bytes gzipped), pruned 1 old archives |
-| 2026-05-14T18:21:26.199Z | finalizeSprint:metricsRotation | Rotated 3300 bytes → /home/alperen/deckent-dev/.deckent/archive/metrics/metrics-sprint-168.jsonl.gz (524 bytes gzipped), pruned 1 old archives |
-| 2026-05-14T18:21:26.200Z | finalizeSprint:breadcrumb | Step 10c2 (metricsRotation) — done |
-| 2026-05-14T18:21:26.200Z | finalizeSprint:breadcrumb | Step 10d (featuresManifest) — entering |
-| 2026-05-14T18:21:26.345Z | finalizeSprint:featuresManifest | Sync exit=0: ✓ Features manifest written: /home/alperen/deckent-dev/.deckent/features-manifest.json (31 features) |
-| 2026-05-14T18:21:26.345Z | finalizeSprint:breadcrumb | Step 12 (archiveDirectives) — entering |
-| 2026-05-14T18:21:26.347Z | archiveDirectives | Archived DIRECTIVES.md → /home/alperen/deckent-dev/.brain/archive/DIRECTIVES-sprint-168.md (preserved; autoArchive=false default per ADR-046 amendment Sprint 168 C0a-4) |
-| 2026-05-14T18:21:26.347Z | finalizeSprint:breadcrumb | Step 12b (archiveOrphanTasks) — entering |
-| 2026-05-14T18:21:26.352Z | createPreArchiveSnapshot | Snapshot created: /home/alperen/deckent-dev/.deckent/sprint-168-pre-archive.tar.gz (21 files, hash=0147be33583e...) |
-| 2026-05-14T18:21:26.352Z | finalizeSprint:preArchiveSnapshot | Snapshot created: 21 files, hash=0147be33583e... |
-| 2026-05-14T18:21:26.356Z | archiveOrphanTasks | Archived 21 task files to /home/alperen/deckent-dev/.brain/archive/sprint-168-tasks |
-| 2026-05-14T18:21:26.357Z | finalizeSprint:archiveOrphanTasks | Archived 21 orphan task files |
-| 2026-05-14T18:21:26.357Z | finalizeSprint:breadcrumb | Step 12c (cleanTasksArchive) — entering |
-| 2026-05-14T18:21:26.358Z | finalizeSprint:cleanTasksArchive | Removed 0 old .tasks/archive/ dirs |
-| 2026-05-14T18:21:26.359Z | finalizeSprint:breadcrumb | Step 12d (sprintFileRetention) — entering |
-| 2026-05-14T18:21:26.361Z | finalizeSprint:sprintFileRetention | Retention complete: archived=6, countersDeleted=2, forensicMoved=0, bytesFreed=65461 |
-| 2026-05-14T18:21:26.362Z | finalizeSprint:breadcrumb | Step 13 (jobSummary) — entering |
-| 2026-05-14T18:21:26.363Z | finalizeSprint:jobSummary | Job summary written to /home/alperen/deckent-dev/.deckent/jobs/sprint-168.json |
-| 2026-05-14T18:21:26.363Z | finalizeSprint:breadcrumb | Step 14 (postFinalizeHooks) — entering |
-| 2026-05-14T18:21:26.372Z | postFinalizeHooks:memoryExport | 4 files written, 0 errors |
-| 2026-05-14T18:21:26.381Z | postFinalizeHooks:adrInsert | inserted=0 updated=0 skipped=9 |
-| 2026-05-14T18:21:26.389Z | postFinalizeHooks:ruleRegen | Rule regeneration hook called |
-| 2026-05-14T18:21:26.389Z | finalizeSprint:postFinalizeHooks | memExport=4 identity=skipped adrInsert=inserted=0/updated=0/skipped=9 ruleRegen=true errors=0 |
-| 2026-05-14T18:21:26.390Z | [Brain] | Cleanup delayed 180000ms — .tasks/ files remain readable |
-| 2026-05-14T22:21:53.460Z | sprint-checkpoint:phaseTransition | Phase EVALUATE → writing checkpoint |
-| 2026-05-14T22:21:53.460Z | sprint-checkpoint:write | Checkpoint #4 written for sprint-169 |
-| 2026-05-14T22:21:53.463Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
-| 2026-05-14T22:21:53.464Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
-| 2026-05-14T22:21:53.464Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
-| 2026-05-14T22:21:53.465Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
-| 2026-05-14T22:21:53.465Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
-| 2026-05-14T22:21:53.465Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
-| 2026-05-14T22:21:53.466Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
-| 2026-05-14T22:21:53.466Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
-| 2026-05-14T22:21:53.467Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
-| 2026-05-14T22:21:53.467Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
-| 2026-05-14T22:21:53.467Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
-| 2026-05-14T22:21:53.468Z | spawnWorkers:collision | File "src/core/memory-store.ts" written by tasks: 169-003-fix, 169-004-fix |
-| 2026-05-14T22:21:53.469Z | spawnWorkers:collision | File "memory-store.ts" written by tasks: 169-003-fix, 169-004-fix |
-| 2026-05-14T22:21:53.474Z | file-lock:clearOrphanSpawnLocks | Released orphan spawn lock: src/core/memory-store.ts (taskId=169-004) |
-| 2026-05-14T22:21:53.475Z | file-lock:clearOrphanSpawnLocks | Released orphan spawn lock: memory-store.ts (taskId=169-004) |
-| 2026-05-14T22:21:53.475Z | file-lock:clearOrphanSpawnLocks | Released orphan spawn lock: tests/core/memory-stub-backfill.test.ts (taskId=169-004) |
-| 2026-05-14T22:21:53.476Z | file-lock:clearOrphanSpawnLocks | Released orphan spawn lock: scripts/memory/backfill-stub-entries.mjs (taskId=169-004) |
-| 2026-05-14T22:21:53.485Z | scope-sanitizer | warnings=2, rejected=0 |
-| 2026-05-14T22:21:53.486Z | docker-backend:spawn-lock | taskId=169-001-fix acquired 5 spawn lock(s) |
-| 2026-05-14T22:21:53.587Z | docker-backend:spawn | taskId=169-001-fix container=deckent-w-169-001-fix model=sonnet |
-| 2026-05-14T22:21:53.588Z | docker-backend:spawn-attempt | taskId=169-001-fix attempt=1/2 |
-| 2026-05-14T22:21:56.978Z | docker-backend:spawn-ok | taskId=169-001-fix containerId=0fb78fc4e930 instantExit=false |
-| 2026-05-14T22:21:56.991Z | docker-backend:spawn-lock | taskId=169-002-fix acquired 2 spawn lock(s) |
-| 2026-05-14T22:21:57.094Z | docker-backend:spawn | taskId=169-002-fix container=deckent-w-169-002-fix model=sonnet |
-| 2026-05-14T22:21:57.094Z | docker-backend:spawn-attempt | taskId=169-002-fix attempt=1/2 |
-| 2026-05-14T22:22:01.505Z | docker-backend:spawn-ok | taskId=169-002-fix containerId=9bf9ee44c190 instantExit=false |
-| 2026-05-14T22:22:01.507Z | spawnWorkers:skipBlocked | Task 169-003-fix blocked by scope collision |
-| 2026-05-14T22:22:01.507Z | spawnWorkers:skipBlocked | Task 169-004-fix blocked by scope collision |
-| 2026-05-14T22:22:01.517Z | scope-sanitizer | warnings=1, rejected=0 |
-| 2026-05-14T22:22:01.518Z | docker-backend:spawn-lock | taskId=169-005-fix acquired 3 spawn lock(s) |
-| 2026-05-14T22:22:01.622Z | docker-backend:spawn | taskId=169-005-fix container=deckent-w-169-005-fix model=sonnet |
-| 2026-05-14T22:22:01.622Z | docker-backend:spawn-attempt | taskId=169-005-fix attempt=1/2 |
-| 2026-05-14T22:22:04.992Z | docker-backend:spawn-ok | taskId=169-005-fix containerId=00b688399a59 instantExit=false |
-| 2026-05-14T22:22:05.001Z | docker-backend:spawn-lock | taskId=169-006-fix acquired 3 spawn lock(s) |
-| 2026-05-14T22:22:05.104Z | docker-backend:spawn | taskId=169-006-fix container=deckent-w-169-006-fix model=sonnet |
-| 2026-05-14T22:22:05.105Z | docker-backend:spawn-attempt | taskId=169-006-fix attempt=1/2 |
-| 2026-05-14T22:22:08.535Z | docker-backend:spawn-ok | taskId=169-006-fix containerId=24aece718888 instantExit=false |
-| 2026-05-14T22:22:08.537Z | docker-backend:exit | taskId=169-004 exitCode=0 |
-| 2026-05-14T22:24:42.354Z | docker-backend:exit | taskId=169-005-fix exitCode=0 |
-| 2026-05-14T22:24:42.667Z | docker-backend:spawn-lock | taskId=169-005-fix released 3 spawn lock(s) on exit |
-| 2026-05-14T22:27:03.662Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: src/orchestra/sprint-spawner.ts (taskId=169-001-fix, age=310s) |
-| 2026-05-14T22:27:03.663Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: tests/orchestra/dep-parser-string-to-array.test.ts (taskId=169-002-fix, age=307s) |
-| 2026-05-14T22:27:03.663Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: W3.1-root-cause.md (taskId=169-001-fix, age=310s) |
-| 2026-05-14T22:27:03.664Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: tests/orchestra/c0c-collision-live-fire.test.ts (taskId=169-001-fix, age=310s) |
-| 2026-05-14T22:27:03.665Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: src/orchestra/decision-engine.ts (taskId=169-001-fix, age=310s) |
-| 2026-05-14T22:27:03.665Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: 1-root-cause.md (taskId=169-001-fix, age=310s) |
-| 2026-05-14T22:27:03.666Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: src/orchestra/task-builder.ts (taskId=169-002-fix, age=307s) |
-| 2026-05-14T22:27:07.453Z | docker-backend:exit | taskId=169-002-fix exitCode=0 |
-| 2026-05-14T22:27:12.235Z | forceRescanIfIdle | slot idle for 304s — respawning 4 orphan PENDING task(s): 169-003-fix, 169-004-fix, 169-007-fix, 169-008-fix |
-| 2026-05-14T22:27:12.243Z | scope-sanitizer | warnings=2, rejected=0 |
-| 2026-05-14T22:27:12.244Z | docker-backend:spawn-lock | taskId=169-003-fix acquired 6 spawn lock(s) |
-| 2026-05-14T22:27:12.346Z | docker-backend:spawn | taskId=169-003-fix container=deckent-w-169-003-fix model=sonnet |
-| 2026-05-14T22:27:12.347Z | docker-backend:spawn-attempt | taskId=169-003-fix attempt=1/2 |
-| 2026-05-14T22:27:15.807Z | docker-backend:spawn-ok | taskId=169-003-fix containerId=2ebc94674a87 instantExit=false |
-| 2026-05-14T22:27:15.817Z | scope-sanitizer | warnings=1, rejected=0 |
-| 2026-05-14T22:27:15.818Z | waitForResults:queue-spawn | Failed to spawn queued task 169-004-fix: Spawn lock conflict on src/core/memory-store.ts: file is currently held by task 169-003-fix |
-| 2026-05-14T22:27:15.826Z | docker-backend:spawn-lock | taskId=169-007-fix acquired 2 spawn lock(s) |
-| 2026-05-14T22:27:15.926Z | docker-backend:spawn | taskId=169-007-fix container=deckent-w-169-007-fix model=sonnet |
-| 2026-05-14T22:27:15.926Z | docker-backend:spawn-attempt | taskId=169-007-fix attempt=1/2 |
-| 2026-05-14T22:27:19.356Z | docker-backend:spawn-ok | taskId=169-007-fix containerId=a9fd950e58bc instantExit=false |
-| 2026-05-14T22:27:19.366Z | docker-backend:spawn-lock | taskId=169-008-fix acquired 4 spawn lock(s) |
-| 2026-05-14T22:27:19.469Z | docker-backend:spawn | taskId=169-008-fix container=deckent-w-169-008-fix model=sonnet |
-| 2026-05-14T22:27:19.469Z | docker-backend:spawn-attempt | taskId=169-008-fix attempt=1/2 |
-| 2026-05-14T22:27:22.888Z | docker-backend:spawn-ok | taskId=169-008-fix containerId=d8bdb7fd85eb instantExit=false |
-| 2026-05-14T22:27:22.890Z | waitForResults:progress | Sprint devam ediyor — 2/9 task tamamlandı (5dk) |
-| 2026-05-14T22:27:34.622Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: tests/dashboard/dashboard-build-smoke.test.ts (taskId=169-006-fix, age=330s) |
-| 2026-05-14T22:27:34.622Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: package.json (taskId=169-006-fix, age=330s) |
-| 2026-05-14T22:27:34.623Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: .github/workflows/dashboard-build.yml (taskId=169-006-fix, age=330s) |
-| 2026-05-14T22:28:14.992Z | docker-backend:exit | taskId=169-006-fix exitCode=0 |
-| 2026-05-14T22:30:10.081Z | docker-backend:exit | taskId=169-001-fix exitCode=0 |
-| 2026-05-14T22:32:12.664Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: scripts/memory/migrate-relations.mjs (taskId=169-003-fix, age=300s) |
-| 2026-05-14T22:32:12.665Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: src/core/memory-store.ts (taskId=169-003-fix, age=300s) |
-| 2026-05-14T22:32:12.665Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: memory-store.ts (taskId=169-003-fix, age=300s) |
-| 2026-05-14T22:32:12.666Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: tests/core/memory-relations-migration.test.ts (taskId=169-003-fix, age=300s) |
-| 2026-05-14T22:32:12.666Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: DECISIONS.md (taskId=169-003-fix, age=300s) |
-| 2026-05-14T22:32:12.667Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: src/core/memory-types.ts (taskId=169-003-fix, age=300s) |
-| 2026-05-14T22:32:23.900Z | forceRescanIfIdle | slot idle for 301s — respawning 2 orphan PENDING task(s): 169-004-fix, 169-009-fix |
-| 2026-05-14T22:32:23.908Z | scope-sanitizer | warnings=1, rejected=0 |
-| 2026-05-14T22:32:23.909Z | docker-backend:spawn-lock | taskId=169-004-fix acquired 4 spawn lock(s) |
-| 2026-05-14T22:32:24.012Z | docker-backend:spawn | taskId=169-004-fix container=deckent-w-169-004-fix model=sonnet |
-| 2026-05-14T22:32:24.013Z | docker-backend:spawn-attempt | taskId=169-004-fix attempt=1/2 |
-| 2026-05-14T22:32:27.366Z | docker-backend:spawn-ok | taskId=169-004-fix containerId=8138434ade98 instantExit=false |
-| 2026-05-14T22:32:27.376Z | scope-sanitizer | warnings=5, rejected=0 |
-| 2026-05-14T22:32:27.377Z | docker-backend:spawn-lock | taskId=169-009-fix acquired 8 spawn lock(s) |
-| 2026-05-14T22:32:27.479Z | docker-backend:spawn | taskId=169-009-fix container=deckent-w-169-009-fix model=sonnet |
-| 2026-05-14T22:32:27.480Z | docker-backend:spawn-attempt | taskId=169-009-fix attempt=1/2 |
-| 2026-05-14T22:32:30.876Z | docker-backend:spawn-ok | taskId=169-009-fix containerId=205a2e829b9f instantExit=false |
-| 2026-05-14T22:32:30.878Z | waitForResults:progress | Sprint devam ediyor — 4/9 task tamamlandı (10dk) |
-| 2026-05-14T22:32:43.641Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: src/core/memory-export.ts (taskId=169-008-fix, age=324s) |
-| 2026-05-14T22:32:43.641Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: tests/core/memory-rebuild-safety.test.ts (taskId=169-007-fix, age=328s) |
-| 2026-05-14T22:32:43.642Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: src/core/memory-import.ts (taskId=169-007-fix, age=328s) |
-| 2026-05-14T22:32:43.643Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: tests/core/adr-fs-export.test.ts (taskId=169-008-fix, age=324s) |
-| 2026-05-14T22:32:43.644Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: docs/adr/046-brain-self-update-hook.md (taskId=169-008-fix, age=324s) |
-| 2026-05-14T22:32:43.644Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: scripts/memory/export-adr-fs.mjs (taskId=169-008-fix, age=324s) |
-| 2026-05-14T22:32:50.030Z | docker-backend:exit | taskId=169-007-fix exitCode=0 |
-| 2026-05-14T22:34:27.569Z | docker-backend:exit | taskId=169-003-fix exitCode=0 |
-| 2026-05-14T22:36:35.773Z | docker-backend:exit | taskId=169-008-fix exitCode=0 |
-| 2026-05-14T22:37:32.510Z | waitForResults:progress | Sprint devam ediyor — 7/9 task tamamlandı (15dk) |
-| 2026-05-14T22:37:52.528Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: src/core/memory-store.ts (taskId=169-004-fix, age=329s) |
-| 2026-05-14T22:37:52.529Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: secret-scan.yml (taskId=169-009-fix, age=325s) |
-| 2026-05-14T22:37:52.529Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: tests/core/config-dep-pipeline-default.test.ts (taskId=169-009-fix, age=325s) |
-| 2026-05-14T22:37:52.530Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: memory-store.ts (taskId=169-004-fix, age=329s) |
-| 2026-05-14T22:37:52.530Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: CLAUDE.md (taskId=169-009-fix, age=325s) |
-| 2026-05-14T22:37:52.531Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: tests/core/memory-stub-backfill.test.ts (taskId=169-004-fix, age=329s) |
-| 2026-05-14T22:37:52.531Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: src/core/config.ts (taskId=169-009-fix, age=325s) |
-| 2026-05-14T22:37:52.532Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: scripts/memory/backfill-stub-entries.mjs (taskId=169-004-fix, age=329s) |
-| 2026-05-14T22:37:52.532Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: dashboard-build.yml (taskId=169-009-fix, age=325s) |
-| 2026-05-14T22:37:52.533Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: .contracts/api-surface.md (taskId=169-009-fix, age=325s) |
-| 2026-05-14T22:37:52.533Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: DECKENT.md (taskId=169-009-fix, age=325s) |
-| 2026-05-14T22:37:52.533Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: api-surface.md (taskId=169-009-fix, age=325s) |
-| 2026-05-14T22:38:24.670Z | docker-backend:exit | taskId=169-009-fix exitCode=0 |
-| 2026-05-14T22:42:37.278Z | waitForResults:progress | Sprint devam ediyor — 8/9 task tamamlandı (20dk) |
-| 2026-05-14T22:43:37.353Z | applyUnblockToSprint | Unblocked 0 tasks after 169-007 resolved |
-| 2026-05-14T22:43:37.355Z | applyUnblockToSprint | Unblocked 0 tasks after 169-009 resolved |
-| 2026-05-14T22:43:37.356Z | sprint-checkpoint:phaseTransition | Phase FIX → writing checkpoint |
-| 2026-05-14T22:43:37.357Z | sprint-checkpoint:write | Checkpoint #5 written for sprint-169 |
-| 2026-05-14T22:43:37.365Z | finalizeSprint:preRetro | evaluations.size=18 keys=[169-001,169-002,169-003,169-004,169-005,169-006,169-007,169-008,169-009,169-001-fix,169-002-fix,169-003-fix,169-004-fix,169-005-fix,169-006-fix,169-007-fix,169-008-fix,169-00 |
-| 2026-05-14T22:43:37.366Z | buildAgentPerformance | task=169-001 agent=bug-fixer ev=NO_GO evalMapSize=18 evalKeys=[169-001,169-002,169-003,169-004,169-005,169-006,169-007,169-008,169-009,169-001-fix,169-002-fix,169-003-fix,169-004-fix,169-005-fix,169-0 |
-| 2026-05-14T22:43:37.366Z | buildAgentPerformance | task=169-002 agent=bug-fixer ev=NO_GO evalMapSize=18 evalKeys=[169-001,169-002,169-003,169-004,169-005,169-006,169-007,169-008,169-009,169-001-fix,169-002-fix,169-003-fix,169-004-fix,169-005-fix,169-0 |
-| 2026-05-14T22:43:37.367Z | buildAgentPerformance | task=169-003 agent=data-engineer ev=NO_GO evalMapSize=18 evalKeys=[169-001,169-002,169-003,169-004,169-005,169-006,169-007,169-008,169-009,169-001-fix,169-002-fix,169-003-fix,169-004-fix,169-005-fix,1 |
-| 2026-05-14T22:43:37.367Z | buildAgentPerformance | task=169-004 agent=data-engineer ev=NO_GO evalMapSize=18 evalKeys=[169-001,169-002,169-003,169-004,169-005,169-006,169-007,169-008,169-009,169-001-fix,169-002-fix,169-003-fix,169-004-fix,169-005-fix,1 |
-| 2026-05-14T22:43:37.368Z | buildAgentPerformance | task=169-005 agent=security-auditor ev=NO_GO evalMapSize=18 evalKeys=[169-001,169-002,169-003,169-004,169-005,169-006,169-007,169-008,169-009,169-001-fix,169-002-fix,169-003-fix,169-004-fix,169-005-fi |
-| 2026-05-14T22:43:37.368Z | buildAgentPerformance | task=169-006 agent=devops-engineer ev=NO_GO evalMapSize=18 evalKeys=[169-001,169-002,169-003,169-004,169-005,169-006,169-007,169-008,169-009,169-001-fix,169-002-fix,169-003-fix,169-004-fix,169-005-fix |
-| 2026-05-14T22:43:37.369Z | buildAgentPerformance | task=169-007 agent=data-engineer ev=DONE evalMapSize=18 evalKeys=[169-001,169-002,169-003,169-004,169-005,169-006,169-007,169-008,169-009,169-001-fix,169-002-fix,169-003-fix,169-004-fix,169-005-fix,16 |
-| 2026-05-14T22:43:37.369Z | buildAgentPerformance | task=169-008 agent=data-engineer ev=NO_GO evalMapSize=18 evalKeys=[169-001,169-002,169-003,169-004,169-005,169-006,169-007,169-008,169-009,169-001-fix,169-002-fix,169-003-fix,169-004-fix,169-005-fix,1 |
-| 2026-05-14T22:43:37.370Z | buildAgentPerformance | task=169-009 agent=architect ev=DONE evalMapSize=18 evalKeys=[169-001,169-002,169-003,169-004,169-005,169-006,169-007,169-008,169-009,169-001-fix,169-002-fix,169-003-fix,169-004-fix,169-005-fix,169-00 |
-| 2026-05-14T22:45:09.399Z | finalizeSprint:tripleLink | Triple-link created for sprint-169 |
-| 2026-05-14T22:45:09.416Z | finalizeSprint:routing-outcomes | Recorded 9 routing outcomes to learnings.json |
-| 2026-05-14T22:45:09.417Z | finalizeSprint:rule-evolution | 12 new rules evolved |
-| 2026-05-14T22:45:09.418Z | rule-evolver:saveRules | 12 rules saved to .deckent/routing/evolved-rules.json |
-| 2026-05-14T22:45:09.429Z | finalizeSprint:syncStatsToManifests | Synced 18 agents, 19 skills to manifest files |
-| 2026-05-14T22:45:09.430Z | finalizeSprint:promotion | agent 'test-writer': 125 tasks, 90% success — meets promotion criteria |
-| 2026-05-14T22:45:09.431Z | promotion-pipeline:promote | Temp agent 'test-writer' not found |
-| 2026-05-14T22:45:09.431Z | finalizeSprint:promotion | skill 'code-reviewer': 32 tasks, 91% success — meets promotion criteria |
-| 2026-05-14T22:45:09.432Z | promotion-pipeline:promote | Temp skill 'code-reviewer' not found |
-| 2026-05-14T22:45:09.436Z | finalizeSprint:breadcrumb | Step 10 (richOutput) — entering |
-| 2026-05-14T22:45:09.455Z | buildAgentPerformance | task=169-001 agent=bug-fixer ev=NO_GO evalMapSize=18 evalKeys=[169-001,169-002,169-003,169-004,169-005,169-006,169-007,169-008,169-009,169-001-fix,169-002-fix,169-003-fix,169-004-fix,169-005-fix,169-0 |
-| 2026-05-14T22:45:09.456Z | buildAgentPerformance | task=169-002 agent=bug-fixer ev=NO_GO evalMapSize=18 evalKeys=[169-001,169-002,169-003,169-004,169-005,169-006,169-007,169-008,169-009,169-001-fix,169-002-fix,169-003-fix,169-004-fix,169-005-fix,169-0 |
-| 2026-05-14T22:45:09.456Z | buildAgentPerformance | task=169-003 agent=data-engineer ev=NO_GO evalMapSize=18 evalKeys=[169-001,169-002,169-003,169-004,169-005,169-006,169-007,169-008,169-009,169-001-fix,169-002-fix,169-003-fix,169-004-fix,169-005-fix,1 |
-| 2026-05-14T22:45:09.457Z | buildAgentPerformance | task=169-004 agent=data-engineer ev=NO_GO evalMapSize=18 evalKeys=[169-001,169-002,169-003,169-004,169-005,169-006,169-007,169-008,169-009,169-001-fix,169-002-fix,169-003-fix,169-004-fix,169-005-fix,1 |
-| 2026-05-14T22:45:09.457Z | buildAgentPerformance | task=169-005 agent=security-auditor ev=NO_GO evalMapSize=18 evalKeys=[169-001,169-002,169-003,169-004,169-005,169-006,169-007,169-008,169-009,169-001-fix,169-002-fix,169-003-fix,169-004-fix,169-005-fi |
-| 2026-05-14T22:45:09.458Z | buildAgentPerformance | task=169-006 agent=devops-engineer ev=NO_GO evalMapSize=18 evalKeys=[169-001,169-002,169-003,169-004,169-005,169-006,169-007,169-008,169-009,169-001-fix,169-002-fix,169-003-fix,169-004-fix,169-005-fix |
-| 2026-05-14T22:45:09.458Z | buildAgentPerformance | task=169-007 agent=data-engineer ev=DONE evalMapSize=18 evalKeys=[169-001,169-002,169-003,169-004,169-005,169-006,169-007,169-008,169-009,169-001-fix,169-002-fix,169-003-fix,169-004-fix,169-005-fix,16 |
-| 2026-05-14T22:45:09.459Z | buildAgentPerformance | task=169-008 agent=data-engineer ev=NO_GO evalMapSize=18 evalKeys=[169-001,169-002,169-003,169-004,169-005,169-006,169-007,169-008,169-009,169-001-fix,169-002-fix,169-003-fix,169-004-fix,169-005-fix,1 |
-| 2026-05-14T22:45:09.459Z | buildAgentPerformance | task=169-009 agent=architect ev=DONE evalMapSize=18 evalKeys=[169-001,169-002,169-003,169-004,169-005,169-006,169-007,169-008,169-009,169-001-fix,169-002-fix,169-003-fix,169-004-fix,169-005-fix,169-00 |
-| 2026-05-14T22:45:09.461Z | finalizeSprint:breadcrumb | Step 10b (selfAuditGate) — entering |
-| 2026-05-14T22:45:12.153Z | runSelfAuditGate:tsc | status=PASS errors=0 |
-| 2026-05-14T22:45:22.485Z | readJsonSafeAsync | ENOENT: no such file or directory, open '/home/alperen/.deckent/config.json' |
-| 2026-05-14T22:45:22.496Z | tryCodeVerifiedDone | Reconciliation triggered for task 169-001-fix-fix |
-| 2026-05-14T22:45:22.517Z | tryCodeVerifiedDone | CODE_VERIFIED_DONE for task 169-001-fix-fix: 2 files verified |
-| 2026-05-14T22:45:22.518Z | writeCodeVerifiedResult | Wrote CODE_VERIFIED_DONE result for task 169-001-fix-fix |
-| 2026-05-14T22:45:22.519Z | finalizeSprint:codeReconcile | Task 169-001-fix-fix reconciled to CODE_VERIFIED_DONE |
-| 2026-05-14T22:45:22.520Z | tryCodeVerifiedDone | Reconciliation triggered for task 169-002-fix-fix |
-| 2026-05-14T22:45:22.532Z | tryCodeVerifiedDone | CODE_VERIFIED_DONE for task 169-002-fix-fix: 2 files verified |
-| 2026-05-14T22:45:22.535Z | writeCodeVerifiedResult | Wrote CODE_VERIFIED_DONE result for task 169-002-fix-fix |
-| 2026-05-14T22:45:22.536Z | finalizeSprint:codeReconcile | Task 169-002-fix-fix reconciled to CODE_VERIFIED_DONE |
-| 2026-05-14T22:45:22.537Z | tryCodeVerifiedDone | Reconciliation triggered for task 169-003-fix-fix |
-| 2026-05-14T22:45:22.562Z | tryCodeVerifiedDone | CODE_VERIFIED_DONE for task 169-003-fix-fix: 4 files verified |
-| 2026-05-14T22:45:22.564Z | writeCodeVerifiedResult | Wrote CODE_VERIFIED_DONE result for task 169-003-fix-fix |
-| 2026-05-14T22:45:22.565Z | finalizeSprint:codeReconcile | Task 169-003-fix-fix reconciled to CODE_VERIFIED_DONE |
-| 2026-05-14T22:45:22.566Z | tryCodeVerifiedDone | Reconciliation triggered for task 169-004-fix-fix |
-| 2026-05-14T22:45:22.584Z | tryCodeVerifiedDone | CODE_VERIFIED_DONE for task 169-004-fix-fix: 3 files verified |
-| 2026-05-14T22:45:22.585Z | writeCodeVerifiedResult | Wrote CODE_VERIFIED_DONE result for task 169-004-fix-fix |
-| 2026-05-14T22:45:22.586Z | finalizeSprint:codeReconcile | Task 169-004-fix-fix reconciled to CODE_VERIFIED_DONE |
-| 2026-05-14T22:45:22.590Z | tryCodeVerifiedDone | Reconciliation triggered for task 169-005-fix-fix |
-| 2026-05-14T22:45:22.607Z | tryCodeVerifiedDone | CODE_VERIFIED_DONE for task 169-005-fix-fix: 3 files verified |
-| 2026-05-14T22:45:22.609Z | writeCodeVerifiedResult | Wrote CODE_VERIFIED_DONE result for task 169-005-fix-fix |
-| 2026-05-14T22:45:22.610Z | finalizeSprint:codeReconcile | Task 169-005-fix-fix reconciled to CODE_VERIFIED_DONE |
-| 2026-05-14T22:45:22.611Z | tryCodeVerifiedDone | Reconciliation triggered for task 169-006-fix-fix |
-| 2026-05-14T22:45:22.629Z | tryCodeVerifiedDone | CODE_VERIFIED_DONE for task 169-006-fix-fix: 2 files verified |
-| 2026-05-14T22:45:22.631Z | writeCodeVerifiedResult | Wrote CODE_VERIFIED_DONE result for task 169-006-fix-fix |
-| 2026-05-14T22:45:22.631Z | finalizeSprint:codeReconcile | Task 169-006-fix-fix reconciled to CODE_VERIFIED_DONE |
-| 2026-05-14T22:45:22.632Z | tryCodeVerifiedDone | Reconciliation triggered for task 169-008-fix-fix |
-| 2026-05-14T22:45:22.647Z | tryCodeVerifiedDone | CODE_VERIFIED_DONE for task 169-008-fix-fix: 4 files verified |
-| 2026-05-14T22:45:22.649Z | writeCodeVerifiedResult | Wrote CODE_VERIFIED_DONE result for task 169-008-fix-fix |
-| 2026-05-14T22:45:22.649Z | finalizeSprint:codeReconcile | Task 169-008-fix-fix reconciled to CODE_VERIFIED_DONE |
-| 2026-05-14T22:45:22.650Z | finalizeSprint:codeReconcile | 7 tasks reconciled: 169-001-fix-fix, 169-002-fix-fix, 169-003-fix-fix, 169-004-fix-fix, 169-005-fix-fix, 169-006-fix-fix, 169-008-fix-fix |
-| 2026-05-14T22:45:22.652Z | finalizeSprint:preRetro | evaluations.size=25 keys=[169-001-fix-fix,169-001-fix,169-001,169-002-fix-fix,169-002-fix,169-002,169-003-fix-fix,169-003-fix,169-003,169-004-fix-fix,169-004-fix,169-004,169-005-fix-fix,169-005-fix,16 |
-| 2026-05-14T22:45:22.653Z | buildAgentPerformance | task=169-001-fix-fix agent=bug-fixer ev=DONE evalMapSize=25 evalKeys=[169-001-fix-fix,169-001-fix,169-001,169-002-fix-fix,169-002-fix,169-002,169-003-fix-fix,169-003-fix,169-003,169-004-fix-fix,169-00 |
-| 2026-05-14T22:45:22.654Z | buildAgentPerformance | task=169-001-fix agent=code-reviewer ev=GO_WITH_TECH_DEBT evalMapSize=25 evalKeys=[169-001-fix-fix,169-001-fix,169-001,169-002-fix-fix,169-002-fix,169-002,169-003-fix-fix,169-003-fix,169-003,169-004-f |
-| 2026-05-14T22:45:22.654Z | buildAgentPerformance | task=169-001 agent=bug-fixer ev=NO_GO evalMapSize=25 evalKeys=[169-001-fix-fix,169-001-fix,169-001,169-002-fix-fix,169-002-fix,169-002,169-003-fix-fix,169-003-fix,169-003,169-004-fix-fix,169-004-fix,1 |
-| 2026-05-14T22:45:22.655Z | buildAgentPerformance | task=169-002-fix-fix agent=bug-fixer ev=DONE evalMapSize=25 evalKeys=[169-001-fix-fix,169-001-fix,169-001,169-002-fix-fix,169-002-fix,169-002,169-003-fix-fix,169-003-fix,169-003,169-004-fix-fix,169-00 |
-| 2026-05-14T22:45:22.655Z | buildAgentPerformance | task=169-002-fix agent=code-reviewer ev=GO_WITH_TECH_DEBT evalMapSize=25 evalKeys=[169-001-fix-fix,169-001-fix,169-001,169-002-fix-fix,169-002-fix,169-002,169-003-fix-fix,169-003-fix,169-003,169-004-f |
-| 2026-05-14T22:45:22.657Z | buildAgentPerformance | task=169-002 agent=bug-fixer ev=GO_WITH_TECH_DEBT evalMapSize=25 evalKeys=[169-001-fix-fix,169-001-fix,169-001,169-002-fix-fix,169-002-fix,169-002,169-003-fix-fix,169-003-fix,169-003,169-004-fix-fix,1 |
-| 2026-05-14T22:45:22.658Z | buildAgentPerformance | task=169-003-fix-fix agent=code-reviewer ev=DONE evalMapSize=25 evalKeys=[169-001-fix-fix,169-001-fix,169-001,169-002-fix-fix,169-002-fix,169-002,169-003-fix-fix,169-003-fix,169-003,169-004-fix-fix,16 |
-| 2026-05-14T22:45:22.658Z | buildAgentPerformance | task=169-003-fix agent=bug-fixer ev=GO_WITH_TECH_DEBT evalMapSize=25 evalKeys=[169-001-fix-fix,169-001-fix,169-001,169-002-fix-fix,169-002-fix,169-002,169-003-fix-fix,169-003-fix,169-003,169-004-fix-f |
-| 2026-05-14T22:45:22.659Z | buildAgentPerformance | task=169-003 agent=data-engineer ev=GO_WITH_TECH_DEBT evalMapSize=25 evalKeys=[169-001-fix-fix,169-001-fix,169-001,169-002-fix-fix,169-002-fix,169-002,169-003-fix-fix,169-003-fix,169-003,169-004-fix-f |
-| 2026-05-14T22:45:22.659Z | buildAgentPerformance | task=169-004-fix-fix agent=code-reviewer ev=DONE evalMapSize=25 evalKeys=[169-001-fix-fix,169-001-fix,169-001,169-002-fix-fix,169-002-fix,169-002,169-003-fix-fix,169-003-fix,169-003,169-004-fix-fix,16 |
-| 2026-05-14T22:45:22.660Z | buildAgentPerformance | task=169-004-fix agent=bug-fixer ev=DONE evalMapSize=25 evalKeys=[169-001-fix-fix,169-001-fix,169-001,169-002-fix-fix,169-002-fix,169-002,169-003-fix-fix,169-003-fix,169-003,169-004-fix-fix,169-004-fi |
-| 2026-05-14T22:45:22.661Z | buildAgentPerformance | task=169-004 agent=data-engineer ev=DONE evalMapSize=25 evalKeys=[169-001-fix-fix,169-001-fix,169-001,169-002-fix-fix,169-002-fix,169-002,169-003-fix-fix,169-003-fix,169-003,169-004-fix-fix,169-004-fi |
-| 2026-05-14T22:45:22.661Z | buildAgentPerformance | task=169-005-fix-fix agent=bug-fixer ev=DONE evalMapSize=25 evalKeys=[169-001-fix-fix,169-001-fix,169-001,169-002-fix-fix,169-002-fix,169-002,169-003-fix-fix,169-003-fix,169-003,169-004-fix-fix,169-00 |
-| 2026-05-14T22:45:22.662Z | buildAgentPerformance | task=169-005-fix agent=code-reviewer ev=DONE evalMapSize=25 evalKeys=[169-001-fix-fix,169-001-fix,169-001,169-002-fix-fix,169-002-fix,169-002,169-003-fix-fix,169-003-fix,169-003,169-004-fix-fix,169-00 |
-| 2026-05-14T22:45:22.662Z | buildAgentPerformance | task=169-005 agent=security-auditor ev=DONE evalMapSize=25 evalKeys=[169-001-fix-fix,169-001-fix,169-001,169-002-fix-fix,169-002-fix,169-002,169-003-fix-fix,169-003-fix,169-003,169-004-fix-fix,169-004 |
-| 2026-05-14T22:45:22.663Z | buildAgentPerformance | task=169-006-fix-fix agent=bug-fixer ev=DONE evalMapSize=25 evalKeys=[169-001-fix-fix,169-001-fix,169-001,169-002-fix-fix,169-002-fix,169-002,169-003-fix-fix,169-003-fix,169-003,169-004-fix-fix,169-00 |
-| 2026-05-14T22:45:22.663Z | buildAgentPerformance | task=169-006-fix agent=code-reviewer ev=GO_WITH_TECH_DEBT evalMapSize=25 evalKeys=[169-001-fix-fix,169-001-fix,169-001,169-002-fix-fix,169-002-fix,169-002,169-003-fix-fix,169-003-fix,169-003,169-004-f |
-| 2026-05-14T22:45:22.664Z | buildAgentPerformance | task=169-006 agent=devops-engineer ev=GO_WITH_TECH_DEBT evalMapSize=25 evalKeys=[169-001-fix-fix,169-001-fix,169-001,169-002-fix-fix,169-002-fix,169-002,169-003-fix-fix,169-003-fix,169-003,169-004-fix |
-| 2026-05-14T22:45:22.664Z | buildAgentPerformance | task=169-007-fix agent=bug-fixer ev=DONE evalMapSize=25 evalKeys=[169-001-fix-fix,169-001-fix,169-001,169-002-fix-fix,169-002-fix,169-002,169-003-fix-fix,169-003-fix,169-003,169-004-fix-fix,169-004-fi |
-| 2026-05-14T22:45:22.665Z | buildAgentPerformance | task=169-007 agent=data-engineer ev=GO_WITH_TECH_DEBT evalMapSize=25 evalKeys=[169-001-fix-fix,169-001-fix,169-001,169-002-fix-fix,169-002-fix,169-002,169-003-fix-fix,169-003-fix,169-003,169-004-fix-f |
-| 2026-05-14T22:45:22.665Z | buildAgentPerformance | task=169-008-fix-fix agent=code-reviewer ev=DONE evalMapSize=25 evalKeys=[169-001-fix-fix,169-001-fix,169-001,169-002-fix-fix,169-002-fix,169-002,169-003-fix-fix,169-003-fix,169-003,169-004-fix-fix,16 |
-| 2026-05-14T22:45:22.666Z | buildAgentPerformance | task=169-008-fix agent=bug-fixer ev=GO_WITH_TECH_DEBT evalMapSize=25 evalKeys=[169-001-fix-fix,169-001-fix,169-001,169-002-fix-fix,169-002-fix,169-002,169-003-fix-fix,169-003-fix,169-003,169-004-fix-f |
-| 2026-05-14T22:45:22.667Z | buildAgentPerformance | task=169-008 agent=data-engineer ev=GO_WITH_TECH_DEBT evalMapSize=25 evalKeys=[169-001-fix-fix,169-001-fix,169-001,169-002-fix-fix,169-002-fix,169-002,169-003-fix-fix,169-003-fix,169-003,169-004-fix-f |
-| 2026-05-14T22:45:22.668Z | buildAgentPerformance | task=169-009-fix agent=code-reviewer ev=GO_WITH_TECH_DEBT evalMapSize=25 evalKeys=[169-001-fix-fix,169-001-fix,169-001,169-002-fix-fix,169-002-fix,169-002,169-003-fix-fix,169-003-fix,169-003,169-004-f |
-| 2026-05-14T22:45:22.669Z | buildAgentPerformance | task=169-009 agent=architect ev=GO_WITH_TECH_DEBT evalMapSize=25 evalKeys=[169-001-fix-fix,169-001-fix,169-001,169-002-fix-fix,169-002-fix,169-002,169-003-fix-fix,169-003-fix,169-003,169-004-fix-fix,1 |
-| 2026-05-14T22:46:31.595Z | runSelfAuditGate:vitest | status=FAIL delta.fail=1 |
-| 2026-05-14T22:46:31.610Z | docker-backend:exit | taskId=169-004-fix exitCode=0 |
-| 2026-05-14T22:46:31.807Z | runSelfAuditGate:honesty | violations=0 |
-| 2026-05-14T22:46:31.808Z | runSelfAuditGate | overallGate=GATE_FAILURE sprint=sprint-169 |
-| 2026-05-14T22:46:31.808Z | finalizeSprint:selfAuditGate | Gate completed: overallGate=GATE_FAILURE |
-| 2026-05-14T22:46:31.809Z | finalizeSprint:selfAuditGate | Status updated: RETROSPECTIVE → GO_WITH_GATE_FAILURE |
-| 2026-05-14T22:46:31.810Z | finalizeSprint:selfAuditGate | Gate result written to /home/alperen/deckent-dev/.deckent/sprint-169-gate.json overallGate=GATE_FAILURE |
-| 2026-05-14T22:46:31.811Z | finalizeSprint:breadcrumb | Step 10c (loadReport) — entering |
-| 2026-05-14T22:46:31.813Z | finalizeSprint:loadReport | Load test report written to /home/alperen/deckent-dev/docs/audits/sprint-169/load-test-report.md |
-| 2026-05-14T22:46:31.813Z | finalizeSprint:breadcrumb | Step 10c (loadReport) — done |
-| 2026-05-14T22:46:31.814Z | finalizeSprint:breadcrumb | Step 10c2 (metricsRotation) — entering |
-| 2026-05-14T22:46:31.815Z | observability-rotation | Rotated 8772 bytes → /home/alperen/deckent-dev/.deckent/archive/metrics/metrics-sprint-169.jsonl.gz (862 bytes gzipped), pruned 1 old archives |
-| 2026-05-14T22:46:31.816Z | finalizeSprint:metricsRotation | Rotated 8772 bytes → /home/alperen/deckent-dev/.deckent/archive/metrics/metrics-sprint-169.jsonl.gz (862 bytes gzipped), pruned 1 old archives |
-| 2026-05-14T22:46:31.816Z | finalizeSprint:breadcrumb | Step 10c2 (metricsRotation) — done |
-| 2026-05-14T22:46:31.817Z | finalizeSprint:breadcrumb | Step 10d (featuresManifest) — entering |
-| 2026-05-14T22:46:31.932Z | finalizeSprint:featuresManifest | Sync exit=0: ✓ Features manifest written: /home/alperen/deckent-dev/.deckent/features-manifest.json (31 features) |
-| 2026-05-14T22:46:31.933Z | finalizeSprint:breadcrumb | Step 12 (archiveDirectives) — entering |
-| 2026-05-14T22:46:31.934Z | archiveDirectives | Archived DIRECTIVES.md → /home/alperen/deckent-dev/.brain/archive/DIRECTIVES-sprint-169.md (preserved; autoArchive=false default per ADR-046 amendment Sprint 168 C0a-4) |
-| 2026-05-14T22:46:31.934Z | finalizeSprint:breadcrumb | Step 12b (archiveOrphanTasks) — entering |
-| 2026-05-14T22:46:31.941Z | createPreArchiveSnapshot | Snapshot created: /home/alperen/deckent-dev/.deckent/sprint-169-pre-archive.tar.gz (104 files, hash=a0b71631f40a...) |
-| 2026-05-14T22:46:31.942Z | finalizeSprint:preArchiveSnapshot | Snapshot created: 104 files, hash=a0b71631f40a... |
-| 2026-05-14T22:46:31.951Z | archiveOrphanTasks | Archived 104 task files to /home/alperen/deckent-dev/.brain/archive/sprint-169-tasks |
-| 2026-05-14T22:46:31.952Z | finalizeSprint:archiveOrphanTasks | Archived 104 orphan task files |
-| 2026-05-14T22:46:31.953Z | finalizeSprint:breadcrumb | Step 12c (cleanTasksArchive) — entering |
-| 2026-05-14T22:46:31.954Z | finalizeSprint:cleanTasksArchive | Removed 0 old .tasks/archive/ dirs |
-| 2026-05-14T22:46:31.954Z | finalizeSprint:breadcrumb | Step 12d (sprintFileRetention) — entering |
-| 2026-05-14T22:46:31.956Z | finalizeSprint:sprintFileRetention | Retention complete: archived=6, countersDeleted=2, forensicMoved=0, bytesFreed=15839 |
-| 2026-05-14T22:46:31.957Z | finalizeSprint:breadcrumb | Step 13 (jobSummary) — entering |
-| 2026-05-14T22:46:31.958Z | finalizeSprint:jobSummary | Job summary written to /home/alperen/deckent-dev/.deckent/jobs/sprint-169.json |
-| 2026-05-14T22:46:31.958Z | finalizeSprint:breadcrumb | Step 14 (postFinalizeHooks) — entering |
-| 2026-05-14T22:46:31.965Z | postFinalizeHooks:memoryExport | 4 files written, 0 errors |
-| 2026-05-14T22:46:32.028Z | postFinalizeHooks:adrInsert | inserted=0 updated=43 skipped=9 |
-| 2026-05-14T22:46:32.043Z | postFinalizeHooks:ruleRegen | Rule regeneration hook called |
-| 2026-05-14T22:46:32.044Z | finalizeSprint:postFinalizeHooks | memExport=4 identity=skipped adrInsert=inserted=0/updated=43/skipped=9 ruleRegen=true errors=0 |
-| 2026-05-14T22:46:32.044Z | [Brain] | Cleanup delayed 180000ms — .tasks/ files remain readable |
-| 2026-05-14T22:46:54.691Z | finalizeSprint:tripleLink | Triple-link created for sprint-169 |
-| 2026-05-14T22:46:54.708Z | finalizeSprint:routing-outcomes | Recorded 25 routing outcomes to learnings.json |
-| 2026-05-14T22:46:54.709Z | finalizeSprint:rule-evolution | 13 new rules evolved |
-| 2026-05-14T22:46:54.710Z | rule-evolver:saveRules | 13 rules saved to .deckent/routing/evolved-rules.json |
-| 2026-05-14T22:46:54.724Z | finalizeSprint:syncStatsToManifests | Synced 18 agents, 19 skills to manifest files |
-| 2026-05-14T22:46:54.725Z | finalizeSprint:promotion | agent 'test-writer': 125 tasks, 90% success — meets promotion criteria |
-| 2026-05-14T22:46:54.726Z | promotion-pipeline:promote | Temp agent 'test-writer' not found |
-| 2026-05-14T22:46:54.726Z | finalizeSprint:promotion | skill 'code-reviewer': 32 tasks, 91% success — meets promotion criteria |
-| 2026-05-14T22:46:54.727Z | promotion-pipeline:promote | Temp skill 'code-reviewer' not found |
-| 2026-05-14T22:46:54.730Z | finalizeSprint:breadcrumb | Step 10 (richOutput) — entering |
-| 2026-05-14T22:46:54.742Z | buildAgentPerformance | task=169-001-fix-fix agent=bug-fixer ev=DONE evalMapSize=25 evalKeys=[169-001-fix-fix,169-001-fix,169-001,169-002-fix-fix,169-002-fix,169-002,169-003-fix-fix,169-003-fix,169-003,169-004-fix-fix,169-00 |
-| 2026-05-14T22:46:54.742Z | buildAgentPerformance | task=169-001-fix agent=code-reviewer ev=GO_WITH_TECH_DEBT evalMapSize=25 evalKeys=[169-001-fix-fix,169-001-fix,169-001,169-002-fix-fix,169-002-fix,169-002,169-003-fix-fix,169-003-fix,169-003,169-004-f |
-| 2026-05-14T22:46:54.743Z | buildAgentPerformance | task=169-001 agent=bug-fixer ev=NO_GO evalMapSize=25 evalKeys=[169-001-fix-fix,169-001-fix,169-001,169-002-fix-fix,169-002-fix,169-002,169-003-fix-fix,169-003-fix,169-003,169-004-fix-fix,169-004-fix,1 |
-| 2026-05-14T22:46:54.743Z | buildAgentPerformance | task=169-002-fix-fix agent=bug-fixer ev=DONE evalMapSize=25 evalKeys=[169-001-fix-fix,169-001-fix,169-001,169-002-fix-fix,169-002-fix,169-002,169-003-fix-fix,169-003-fix,169-003,169-004-fix-fix,169-00 |
-| 2026-05-14T22:46:54.743Z | buildAgentPerformance | task=169-002-fix agent=code-reviewer ev=GO_WITH_TECH_DEBT evalMapSize=25 evalKeys=[169-001-fix-fix,169-001-fix,169-001,169-002-fix-fix,169-002-fix,169-002,169-003-fix-fix,169-003-fix,169-003,169-004-f |
-| 2026-05-14T22:46:54.744Z | buildAgentPerformance | task=169-002 agent=bug-fixer ev=GO_WITH_TECH_DEBT evalMapSize=25 evalKeys=[169-001-fix-fix,169-001-fix,169-001,169-002-fix-fix,169-002-fix,169-002,169-003-fix-fix,169-003-fix,169-003,169-004-fix-fix,1 |
-| 2026-05-14T22:46:54.744Z | buildAgentPerformance | task=169-003-fix-fix agent=code-reviewer ev=DONE evalMapSize=25 evalKeys=[169-001-fix-fix,169-001-fix,169-001,169-002-fix-fix,169-002-fix,169-002,169-003-fix-fix,169-003-fix,169-003,169-004-fix-fix,16 |
-| 2026-05-14T22:46:54.745Z | buildAgentPerformance | task=169-003-fix agent=bug-fixer ev=GO_WITH_TECH_DEBT evalMapSize=25 evalKeys=[169-001-fix-fix,169-001-fix,169-001,169-002-fix-fix,169-002-fix,169-002,169-003-fix-fix,169-003-fix,169-003,169-004-fix-f |
-| 2026-05-14T22:46:54.746Z | buildAgentPerformance | task=169-003 agent=data-engineer ev=GO_WITH_TECH_DEBT evalMapSize=25 evalKeys=[169-001-fix-fix,169-001-fix,169-001,169-002-fix-fix,169-002-fix,169-002,169-003-fix-fix,169-003-fix,169-003,169-004-fix-f |
-| 2026-05-14T22:46:54.746Z | buildAgentPerformance | task=169-004-fix-fix agent=code-reviewer ev=DONE evalMapSize=25 evalKeys=[169-001-fix-fix,169-001-fix,169-001,169-002-fix-fix,169-002-fix,169-002,169-003-fix-fix,169-003-fix,169-003,169-004-fix-fix,16 |
-| 2026-05-14T22:46:54.747Z | buildAgentPerformance | task=169-004-fix agent=bug-fixer ev=DONE evalMapSize=25 evalKeys=[169-001-fix-fix,169-001-fix,169-001,169-002-fix-fix,169-002-fix,169-002,169-003-fix-fix,169-003-fix,169-003,169-004-fix-fix,169-004-fi |
-| 2026-05-14T22:46:54.747Z | buildAgentPerformance | task=169-004 agent=data-engineer ev=DONE evalMapSize=25 evalKeys=[169-001-fix-fix,169-001-fix,169-001,169-002-fix-fix,169-002-fix,169-002,169-003-fix-fix,169-003-fix,169-003,169-004-fix-fix,169-004-fi |
-| 2026-05-14T22:46:54.747Z | buildAgentPerformance | task=169-005-fix-fix agent=bug-fixer ev=DONE evalMapSize=25 evalKeys=[169-001-fix-fix,169-001-fix,169-001,169-002-fix-fix,169-002-fix,169-002,169-003-fix-fix,169-003-fix,169-003,169-004-fix-fix,169-00 |
-| 2026-05-14T22:46:54.748Z | buildAgentPerformance | task=169-005-fix agent=code-reviewer ev=DONE evalMapSize=25 evalKeys=[169-001-fix-fix,169-001-fix,169-001,169-002-fix-fix,169-002-fix,169-002,169-003-fix-fix,169-003-fix,169-003,169-004-fix-fix,169-00 |
-| 2026-05-14T22:46:54.748Z | buildAgentPerformance | task=169-005 agent=security-auditor ev=DONE evalMapSize=25 evalKeys=[169-001-fix-fix,169-001-fix,169-001,169-002-fix-fix,169-002-fix,169-002,169-003-fix-fix,169-003-fix,169-003,169-004-fix-fix,169-004 |
-| 2026-05-14T22:46:54.748Z | buildAgentPerformance | task=169-006-fix-fix agent=bug-fixer ev=DONE evalMapSize=25 evalKeys=[169-001-fix-fix,169-001-fix,169-001,169-002-fix-fix,169-002-fix,169-002,169-003-fix-fix,169-003-fix,169-003,169-004-fix-fix,169-00 |
-| 2026-05-14T22:46:54.749Z | buildAgentPerformance | task=169-006-fix agent=code-reviewer ev=GO_WITH_TECH_DEBT evalMapSize=25 evalKeys=[169-001-fix-fix,169-001-fix,169-001,169-002-fix-fix,169-002-fix,169-002,169-003-fix-fix,169-003-fix,169-003,169-004-f |
-| 2026-05-14T22:46:54.749Z | buildAgentPerformance | task=169-006 agent=devops-engineer ev=GO_WITH_TECH_DEBT evalMapSize=25 evalKeys=[169-001-fix-fix,169-001-fix,169-001,169-002-fix-fix,169-002-fix,169-002,169-003-fix-fix,169-003-fix,169-003,169-004-fix |
-| 2026-05-14T22:46:54.750Z | buildAgentPerformance | task=169-007-fix agent=bug-fixer ev=DONE evalMapSize=25 evalKeys=[169-001-fix-fix,169-001-fix,169-001,169-002-fix-fix,169-002-fix,169-002,169-003-fix-fix,169-003-fix,169-003,169-004-fix-fix,169-004-fi |
-| 2026-05-14T22:46:54.750Z | buildAgentPerformance | task=169-007 agent=data-engineer ev=GO_WITH_TECH_DEBT evalMapSize=25 evalKeys=[169-001-fix-fix,169-001-fix,169-001,169-002-fix-fix,169-002-fix,169-002,169-003-fix-fix,169-003-fix,169-003,169-004-fix-f |
-| 2026-05-14T22:46:54.750Z | buildAgentPerformance | task=169-008-fix-fix agent=code-reviewer ev=DONE evalMapSize=25 evalKeys=[169-001-fix-fix,169-001-fix,169-001,169-002-fix-fix,169-002-fix,169-002,169-003-fix-fix,169-003-fix,169-003,169-004-fix-fix,16 |
-| 2026-05-14T22:46:54.751Z | buildAgentPerformance | task=169-008-fix agent=bug-fixer ev=GO_WITH_TECH_DEBT evalMapSize=25 evalKeys=[169-001-fix-fix,169-001-fix,169-001,169-002-fix-fix,169-002-fix,169-002,169-003-fix-fix,169-003-fix,169-003,169-004-fix-f |
-| 2026-05-14T22:46:54.751Z | buildAgentPerformance | task=169-008 agent=data-engineer ev=GO_WITH_TECH_DEBT evalMapSize=25 evalKeys=[169-001-fix-fix,169-001-fix,169-001,169-002-fix-fix,169-002-fix,169-002,169-003-fix-fix,169-003-fix,169-003,169-004-fix-f |
-| 2026-05-14T22:46:54.751Z | buildAgentPerformance | task=169-009-fix agent=code-reviewer ev=GO_WITH_TECH_DEBT evalMapSize=25 evalKeys=[169-001-fix-fix,169-001-fix,169-001,169-002-fix-fix,169-002-fix,169-002,169-003-fix-fix,169-003-fix,169-003,169-004-f |
-| 2026-05-14T22:46:54.752Z | buildAgentPerformance | task=169-009 agent=architect ev=GO_WITH_TECH_DEBT evalMapSize=25 evalKeys=[169-001-fix-fix,169-001-fix,169-001,169-002-fix-fix,169-002-fix,169-002,169-003-fix-fix,169-003-fix,169-003,169-004-fix-fix,1 |
-| 2026-05-14T22:46:54.754Z | finalizeSprint:breadcrumb | Step 10b (selfAuditGate) — entering |
-| 2026-05-14T22:46:58.420Z | runSelfAuditGate:tsc | status=PASS errors=0 |
-| 2026-05-14T22:48:02.846Z | runSelfAuditGate:vitest | status=FAIL delta.fail=1 |
-| 2026-05-14T22:48:02.847Z | runSelfAuditGate:honesty | violations=0 |
-| 2026-05-14T22:48:02.848Z | runSelfAuditGate | overallGate=GATE_FAILURE sprint=sprint-169 |
-| 2026-05-14T22:48:02.849Z | finalizeSprint:selfAuditGate | Gate completed: overallGate=GATE_FAILURE |
-| 2026-05-14T22:48:02.849Z | finalizeSprint:selfAuditGate | Status updated: COMPLETE → GO_WITH_GATE_FAILURE |
-| 2026-05-14T22:48:02.853Z | finalizeSprint:selfAuditGate | Gate result written to /home/alperen/deckent-dev/.deckent/sprint-169-gate.json overallGate=GATE_FAILURE |
-| 2026-05-14T22:48:02.854Z | finalizeSprint:breadcrumb | Step 10c (loadReport) — entering |
-| 2026-05-14T22:48:02.855Z | finalizeSprint:loadReport | Load test report written to /home/alperen/deckent-dev/docs/audits/sprint-169/load-test-report.md |
-| 2026-05-14T22:48:02.856Z | finalizeSprint:breadcrumb | Step 10c (loadReport) — done |
-| 2026-05-14T22:48:02.857Z | finalizeSprint:breadcrumb | Step 10c2 (metricsRotation) — entering |
-| 2026-05-14T22:48:02.857Z | finalizeSprint:breadcrumb | Step 10c2 (metricsRotation) — done |
-| 2026-05-14T22:48:02.858Z | finalizeSprint:breadcrumb | Step 10d (featuresManifest) — entering |
-| 2026-05-14T22:48:02.967Z | finalizeSprint:featuresManifest | Sync exit=0: ✓ Features manifest written: /home/alperen/deckent-dev/.deckent/features-manifest.json (31 features) |
-| 2026-05-14T22:48:02.968Z | finalizeSprint:breadcrumb | Step 12 (archiveDirectives) — entering |
-| 2026-05-14T22:48:02.969Z | archiveDirectives | Archived DIRECTIVES.md → /home/alperen/deckent-dev/.brain/archive/DIRECTIVES-sprint-169.md (preserved; autoArchive=false default per ADR-046 amendment Sprint 168 C0a-4) |
-| 2026-05-14T22:48:02.969Z | finalizeSprint:breadcrumb | Step 12b (archiveOrphanTasks) — entering |
-| 2026-05-14T22:48:02.970Z | createPreArchiveSnapshot | No task files for sprint-169 |
-| 2026-05-14T22:48:02.970Z | archiveOrphanTasks | No orphan task files for sprint-169 |
-| 2026-05-14T22:48:02.971Z | finalizeSprint:archiveOrphanTasks | Archived 0 orphan task files |
-| 2026-05-14T22:48:02.971Z | finalizeSprint:breadcrumb | Step 12c (cleanTasksArchive) — entering |
-| 2026-05-14T22:48:02.972Z | finalizeSprint:cleanTasksArchive | Removed 0 old .tasks/archive/ dirs |
-| 2026-05-14T22:48:02.972Z | finalizeSprint:breadcrumb | Step 12d (sprintFileRetention) — entering |
-| 2026-05-14T22:48:02.974Z | finalizeSprint:sprintFileRetention | Retention complete: archived=0, countersDeleted=1, forensicMoved=0, bytesFreed=0 |
-| 2026-05-14T22:48:02.975Z | finalizeSprint:breadcrumb | Step 13 (jobSummary) — entering |
-| 2026-05-14T22:48:02.976Z | finalizeSprint:jobSummary | Job summary written to /home/alperen/deckent-dev/.deckent/jobs/sprint-169.json |
-| 2026-05-14T22:48:02.976Z | finalizeSprint:breadcrumb | Step 14 (postFinalizeHooks) — entering |
-| 2026-05-14T22:48:02.983Z | postFinalizeHooks:memoryExport | 4 files written, 0 errors |
-| 2026-05-14T22:48:02.999Z | postFinalizeHooks:adrInsert | inserted=0 updated=2 skipped=50 |
-| 2026-05-14T22:48:03.012Z | postFinalizeHooks:ruleRegen | Rule regeneration hook called |
-| 2026-05-14T22:48:03.012Z | finalizeSprint:postFinalizeHooks | memExport=4 identity=skipped adrInsert=inserted=0/updated=2/skipped=50 ruleRegen=true errors=0 |
-| 2026-05-15T07:10:33.727Z | sprint-checkpoint:phaseTransition | Phase EVALUATE → writing checkpoint |
-| 2026-05-15T07:10:33.728Z | sprint-checkpoint:write | Checkpoint #4 written for sprint-170 |
-| 2026-05-15T07:10:33.730Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
-| 2026-05-15T07:10:33.731Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
-| 2026-05-15T07:10:33.731Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
-| 2026-05-15T07:10:33.732Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
-| 2026-05-15T07:10:33.732Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
-| 2026-05-15T07:10:33.733Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
-| 2026-05-15T07:10:33.733Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
-| 2026-05-15T07:10:33.734Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
-| 2026-05-15T07:10:33.734Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
-| 2026-05-15T07:10:33.734Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
-| 2026-05-15T07:10:33.735Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
-| 2026-05-15T07:10:33.736Z | spawnWorkers:collision | File "src/providers/claude.ts" written by tasks: 170-001-fix, 170-003-fix |
-| 2026-05-15T07:10:33.737Z | spawnWorkers:collision | File "src/orchestra/spawn-backend-docker.ts" written by tasks: 170-002-fix, 170-003-fix |
-| 2026-05-15T07:10:33.738Z | spawnWorkers:skipBlocked | Task 170-001-fix blocked by scope collision |
-| 2026-05-15T07:10:33.738Z | spawnWorkers:skipBlocked | Task 170-002-fix blocked by scope collision |
-| 2026-05-15T07:10:33.738Z | spawnWorkers:skipBlocked | Task 170-003-fix blocked by scope collision |
-| 2026-05-15T07:10:41.738Z | docker-backend:exit | taskId=170-003 exitCode=0 |
-| 2026-05-15T07:15:38.194Z | forceRescanIfIdle | slot idle for 304s — respawning 3 orphan PENDING task(s): 170-001-fix, 170-002-fix, 170-003-fix |
-| 2026-05-15T07:15:38.202Z | scope-sanitizer | warnings=1, rejected=0 |
-| 2026-05-15T07:15:38.203Z | docker-backend:spawn-lock | taskId=170-001-fix acquired 4 spawn lock(s) |
-| 2026-05-15T07:15:38.304Z | docker-backend:spawn | taskId=170-001-fix container=deckent-w-170-001-fix model=sonnet |
-| 2026-05-15T07:15:38.305Z | docker-backend:spawn-attempt | taskId=170-001-fix attempt=1/2 |
-| 2026-05-15T07:15:41.708Z | docker-backend:spawn-ok | taskId=170-001-fix containerId=3c74699ce515 instantExit=false |
-| 2026-05-15T07:15:41.718Z | docker-backend:spawn-lock | taskId=170-002-fix acquired 5 spawn lock(s) |
-| 2026-05-15T07:15:41.823Z | docker-backend:spawn | taskId=170-002-fix container=deckent-w-170-002-fix model=sonnet |
-| 2026-05-15T07:15:41.823Z | docker-backend:spawn-attempt | taskId=170-002-fix attempt=1/2 |
-| 2026-05-15T07:15:45.173Z | docker-backend:spawn-ok | taskId=170-002-fix containerId=b6f87811a33c instantExit=false |
-| 2026-05-15T07:15:45.182Z | waitForResults:queue-spawn | Failed to spawn queued task 170-003-fix: Spawn lock conflict on src/orchestra/spawn-backend-docker.ts: file is currently held by task 170-002-fix |
-| 2026-05-15T07:15:45.183Z | waitForResults:progress | Sprint devam ediyor — 0/3 task tamamlandı (5dk) |
-| 2026-05-15T07:20:43.479Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: tests/core/active-workers-pending.test.ts (taskId=170-002-fix, age=302s) |
-| 2026-05-15T07:20:43.480Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: tests/orchestra/docker-spawn-race.test.ts (taskId=170-002-fix, age=302s) |
-| 2026-05-15T07:20:43.480Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: src/core/active-workers.ts (taskId=170-002-fix, age=302s) |
-| 2026-05-15T07:20:43.481Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: src/orchestra/tmux.ts (taskId=170-001-fix, age=305s) |
-| 2026-05-15T07:20:43.481Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: tests/orchestra/tmux-prompt-filename.test.ts (taskId=170-001-fix, age=305s) |
-| 2026-05-15T07:20:43.482Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: src/orchestra/spawn-backend-docker.ts (taskId=170-002-fix, age=302s) |
-| 2026-05-15T07:20:43.482Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: .hb (taskId=170-002-fix, age=302s) |
-| 2026-05-15T07:20:43.483Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: .prompt- (taskId=170-001-fix, age=305s) |
-| 2026-05-15T07:20:43.483Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: src/providers/claude.ts (taskId=170-001-fix, age=305s) |
-| 2026-05-15T07:20:46.225Z | forceRescanIfIdle | slot idle for 301s — respawning 1 orphan PENDING task(s): 170-003-fix |
-| 2026-05-15T07:20:46.232Z | docker-backend:spawn-lock | taskId=170-003-fix acquired 4 spawn lock(s) |
-| 2026-05-15T07:20:46.342Z | docker-backend:spawn | taskId=170-003-fix container=deckent-w-170-003-fix model=haiku |
-| 2026-05-15T07:20:46.342Z | docker-backend:spawn-attempt | taskId=170-003-fix attempt=1/2 |
-| 2026-05-15T07:20:49.726Z | docker-backend:spawn-ok | taskId=170-003-fix containerId=d7824c11d885 instantExit=false |
-| 2026-05-15T07:20:49.728Z | waitForResults:progress | Sprint devam ediyor — 0/3 task tamamlandı (10dk) |
-| 2026-05-15T07:21:37.755Z | docker-backend:exit | taskId=170-003-fix exitCode=0 |
-| 2026-05-15T07:21:37.918Z | docker-backend:spawn-lock | taskId=170-003-fix released 4 spawn lock(s) on exit |
-| 2026-05-15T07:22:01.501Z | docker-backend:exit | taskId=170-002-fix exitCode=0 |
-| 2026-05-15T07:23:23.161Z | readJsonSafeAsync | ENOENT: no such file or directory, open '/home/alperen/.deckent/config.json' |
-| 2026-05-15T07:23:23.169Z | tryCodeVerifiedDone | Reconciliation triggered for task 170-001-fix |
-| 2026-05-15T07:23:23.192Z | tryCodeVerifiedDone | CODE_VERIFIED_DONE for task 170-001-fix: 2 files verified |
-| 2026-05-15T07:23:23.193Z | readJsonSafe | Unexpected end of JSON input |
-| 2026-05-15T07:23:23.194Z | writeCodeVerifiedResult | Wrote CODE_VERIFIED_DONE result for task 170-001-fix |
-| 2026-05-15T07:23:23.196Z | finalizeSprint:codeReconcile | Task 170-001-fix reconciled to CODE_VERIFIED_DONE |
-| 2026-05-15T07:23:23.198Z | finalizeSprint:codeReconcile | 1 tasks reconciled: 170-001-fix |
-| 2026-05-15T07:23:23.201Z | finalizeSprint:preRetro | evaluations.size=6 keys=[170-001-fix,170-001,170-002-fix,170-002,170-003-fix,170-003] |
-| 2026-05-15T07:23:23.202Z | buildAgentPerformance | task=170-001-fix agent=code-reviewer ev=DONE evalMapSize=6 evalKeys=[170-001-fix,170-001,170-002-fix,170-002,170-003-fix,170-003] |
-| 2026-05-15T07:23:23.202Z | buildAgentPerformance | task=170-001 agent=bug-fixer ev=GO_WITH_TECH_DEBT evalMapSize=6 evalKeys=[170-001-fix,170-001,170-002-fix,170-002,170-003-fix,170-003] |
-| 2026-05-15T07:23:23.203Z | buildAgentPerformance | task=170-002-fix agent=code-reviewer ev=DONE evalMapSize=6 evalKeys=[170-001-fix,170-001,170-002-fix,170-002,170-003-fix,170-003] |
-| 2026-05-15T07:23:23.204Z | buildAgentPerformance | task=170-002 agent=bug-fixer ev=GO_WITH_TECH_DEBT evalMapSize=6 evalKeys=[170-001-fix,170-001,170-002-fix,170-002,170-003-fix,170-003] |
-| 2026-05-15T07:23:23.205Z | buildAgentPerformance | task=170-003-fix agent=code-reviewer ev=NO_GO evalMapSize=6 evalKeys=[170-001-fix,170-001,170-002-fix,170-002,170-003-fix,170-003] |
-| 2026-05-15T07:23:23.206Z | buildAgentPerformance | task=170-003 agent=bug-fixer ev=GO_WITH_TECH_DEBT evalMapSize=6 evalKeys=[170-001-fix,170-001,170-002-fix,170-002,170-003-fix,170-003] |
-| 2026-05-15T07:23:28.227Z | applyUnblockToSprint | Unblocked 0 tasks after 170-001 resolved |
-| 2026-05-15T07:23:28.228Z | applyUnblockToSprint | Unblocked 0 tasks after 170-002 resolved |
-| 2026-05-15T07:23:28.259Z | sprint-checkpoint:phaseTransition | Phase FIX → writing checkpoint |
-| 2026-05-15T07:23:28.260Z | sprint-checkpoint:write | Checkpoint #5 written for sprint-170 |
-| 2026-05-15T07:23:28.272Z | finalizeSprint:preRetro | evaluations.size=6 keys=[170-001,170-002,170-003,170-001-fix,170-002-fix,170-003-fix] |
-| 2026-05-15T07:23:28.272Z | buildAgentPerformance | task=170-001 agent=bug-fixer ev=GO_WITH_TECH_DEBT evalMapSize=6 evalKeys=[170-001,170-002,170-003,170-001-fix,170-002-fix,170-003-fix] |
-| 2026-05-15T07:23:28.273Z | buildAgentPerformance | task=170-002 agent=bug-fixer ev=DONE evalMapSize=6 evalKeys=[170-001,170-002,170-003,170-001-fix,170-002-fix,170-003-fix] |
-| 2026-05-15T07:23:28.275Z | buildAgentPerformance | task=170-003 agent=bug-fixer ev=NO_GO evalMapSize=6 evalKeys=[170-001,170-002,170-003,170-001-fix,170-002-fix,170-003-fix] |
-| 2026-05-15T07:25:00.578Z | finalizeSprint:tripleLink | Triple-link created for sprint-170 |
-| 2026-05-15T07:25:00.617Z | finalizeSprint:routing-outcomes | Recorded 6 routing outcomes to learnings.json |
-| 2026-05-15T07:25:00.619Z | finalizeSprint:rule-evolution | 13 new rules evolved |
-| 2026-05-15T07:25:00.623Z | rule-evolver:saveRules | 13 rules saved to .deckent/routing/evolved-rules.json |
-| 2026-05-15T07:25:00.666Z | finalizeSprint:syncStatsToManifests | Synced 18 agents, 19 skills to manifest files |
-| 2026-05-15T07:25:00.689Z | finalizeSprint:promotion | agent 'test-writer': 125 tasks, 90% success — meets promotion criteria |
-| 2026-05-15T07:25:00.691Z | promotion-pipeline:promote | Temp agent 'test-writer' not found |
-| 2026-05-15T07:25:00.691Z | finalizeSprint:promotion | skill 'code-reviewer': 32 tasks, 91% success — meets promotion criteria |
-| 2026-05-15T07:25:00.692Z | promotion-pipeline:promote | Temp skill 'code-reviewer' not found |
-| 2026-05-15T07:25:00.738Z | finalizeSprint:breadcrumb | Step 10 (richOutput) — entering |
-| 2026-05-15T07:25:00.787Z | buildAgentPerformance | task=170-001-fix agent=code-reviewer ev=DONE evalMapSize=6 evalKeys=[170-001-fix,170-001,170-002-fix,170-002,170-003-fix,170-003] |
-| 2026-05-15T07:25:00.788Z | buildAgentPerformance | task=170-001 agent=bug-fixer ev=GO_WITH_TECH_DEBT evalMapSize=6 evalKeys=[170-001-fix,170-001,170-002-fix,170-002,170-003-fix,170-003] |
-| 2026-05-15T07:25:00.788Z | buildAgentPerformance | task=170-002-fix agent=code-reviewer ev=DONE evalMapSize=6 evalKeys=[170-001-fix,170-001,170-002-fix,170-002,170-003-fix,170-003] |
-| 2026-05-15T07:25:00.789Z | buildAgentPerformance | task=170-002 agent=bug-fixer ev=GO_WITH_TECH_DEBT evalMapSize=6 evalKeys=[170-001-fix,170-001,170-002-fix,170-002,170-003-fix,170-003] |
-| 2026-05-15T07:25:00.789Z | buildAgentPerformance | task=170-003-fix agent=code-reviewer ev=NO_GO evalMapSize=6 evalKeys=[170-001-fix,170-001,170-002-fix,170-002,170-003-fix,170-003] |
-| 2026-05-15T07:25:00.791Z | buildAgentPerformance | task=170-003 agent=bug-fixer ev=GO_WITH_TECH_DEBT evalMapSize=6 evalKeys=[170-001-fix,170-001,170-002-fix,170-002,170-003-fix,170-003] |
-| 2026-05-15T07:25:00.793Z | finalizeSprint:breadcrumb | Step 10b (selfAuditGate) — entering |
-| 2026-05-15T07:25:05.612Z | finalizeSprint:tripleLink | Triple-link created for sprint-170 |
-| 2026-05-15T07:25:05.622Z | finalizeSprint:routing-outcomes | Recorded 3 routing outcomes to learnings.json |
-| 2026-05-15T07:25:05.626Z | finalizeSprint:rule-evolution | 13 new rules evolved |
-| 2026-05-15T07:25:05.627Z | rule-evolver:saveRules | 13 rules saved to .deckent/routing/evolved-rules.json |
-| 2026-05-15T07:25:05.654Z | finalizeSprint:syncStatsToManifests | Synced 18 agents, 19 skills to manifest files |
-| 2026-05-15T07:25:05.663Z | finalizeSprint:promotion | agent 'test-writer': 125 tasks, 90% success — meets promotion criteria |
-| 2026-05-15T07:25:05.663Z | promotion-pipeline:promote | Temp agent 'test-writer' not found |
-| 2026-05-15T07:25:05.664Z | finalizeSprint:promotion | skill 'code-reviewer': 32 tasks, 91% success — meets promotion criteria |
-| 2026-05-15T07:25:05.671Z | promotion-pipeline:promote | Temp skill 'code-reviewer' not found |
-| 2026-05-15T07:25:05.684Z | finalizeSprint:breadcrumb | Step 10 (richOutput) — entering |
-| 2026-05-15T07:25:05.704Z | buildAgentPerformance | task=170-001 agent=bug-fixer ev=GO_WITH_TECH_DEBT evalMapSize=6 evalKeys=[170-001,170-002,170-003,170-001-fix,170-002-fix,170-003-fix] |
-| 2026-05-15T07:25:05.706Z | buildAgentPerformance | task=170-002 agent=bug-fixer ev=DONE evalMapSize=6 evalKeys=[170-001,170-002,170-003,170-001-fix,170-002-fix,170-003-fix] |
-| 2026-05-15T07:25:05.706Z | buildAgentPerformance | task=170-003 agent=bug-fixer ev=NO_GO evalMapSize=6 evalKeys=[170-001,170-002,170-003,170-001-fix,170-002-fix,170-003-fix] |
-| 2026-05-15T07:25:05.716Z | finalizeSprint:breadcrumb | Step 10b (selfAuditGate) — entering |
-| 2026-05-15T07:25:08.175Z | runSelfAuditGate:tsc | status=PASS errors=0 |
-| 2026-05-15T07:25:11.372Z | runSelfAuditGate:tsc | status=PASS errors=0 |
-| 2026-05-15T07:26:35.357Z | runSelfAuditGate:vitest | status=FAIL delta.fail=1 |
-| 2026-05-15T07:26:35.373Z | runSelfAuditGate:honesty | violations=0 |
-| 2026-05-15T07:26:35.375Z | runSelfAuditGate | overallGate=GATE_FAILURE sprint=sprint-170 |
-| 2026-05-15T07:26:35.375Z | finalizeSprint:selfAuditGate | Gate completed: overallGate=GATE_FAILURE |
-| 2026-05-15T07:26:35.376Z | finalizeSprint:selfAuditGate | Status updated: RETROSPECTIVE → GO_WITH_GATE_FAILURE |
-| 2026-05-15T07:26:35.377Z | finalizeSprint:selfAuditGate | Gate result written to /home/alperen/deckent-dev/.deckent/sprint-170-gate.json overallGate=GATE_FAILURE |
-| 2026-05-15T07:26:35.378Z | finalizeSprint:breadcrumb | Step 10c (loadReport) — entering |
-| 2026-05-15T07:26:35.380Z | finalizeSprint:loadReport | Load test report written to /home/alperen/deckent-dev/docs/audits/sprint-170/load-test-report.md |
-| 2026-05-15T07:26:35.380Z | finalizeSprint:breadcrumb | Step 10c (loadReport) — done |
-| 2026-05-15T07:26:35.381Z | finalizeSprint:breadcrumb | Step 10c2 (metricsRotation) — entering |
-| 2026-05-15T07:26:35.382Z | observability-rotation | Rotated 4176 bytes → /home/alperen/deckent-dev/.deckent/archive/metrics/metrics-sprint-170.jsonl.gz (599 bytes gzipped), pruned 1 old archives |
-| 2026-05-15T07:26:35.383Z | finalizeSprint:metricsRotation | Rotated 4176 bytes → /home/alperen/deckent-dev/.deckent/archive/metrics/metrics-sprint-170.jsonl.gz (599 bytes gzipped), pruned 1 old archives |
-| 2026-05-15T07:26:35.384Z | finalizeSprint:breadcrumb | Step 10c2 (metricsRotation) — done |
-| 2026-05-15T07:26:35.384Z | finalizeSprint:breadcrumb | Step 10d (featuresManifest) — entering |
-| 2026-05-15T07:26:35.525Z | finalizeSprint:featuresManifest | Sync exit=0: ✓ Features manifest written: /home/alperen/deckent-dev/.deckent/features-manifest.json (31 features) |
-| 2026-05-15T07:26:35.526Z | finalizeSprint:breadcrumb | Step 12 (archiveDirectives) — entering |
-| 2026-05-15T07:26:35.527Z | archiveDirectives | Archived DIRECTIVES.md → /home/alperen/deckent-dev/.brain/archive/DIRECTIVES-sprint-170.md (preserved; autoArchive=false default per ADR-046 amendment Sprint 168 C0a-4) |
-| 2026-05-15T07:26:35.527Z | finalizeSprint:breadcrumb | Step 12b (archiveOrphanTasks) — entering |
-| 2026-05-15T07:26:35.532Z | createPreArchiveSnapshot | Snapshot created: /home/alperen/deckent-dev/.deckent/sprint-170-pre-archive.tar.gz (30 files, hash=8d4dedb30e8d...) |
-| 2026-05-15T07:26:35.533Z | finalizeSprint:preArchiveSnapshot | Snapshot created: 30 files, hash=8d4dedb30e8d... |
-| 2026-05-15T07:26:35.535Z | archiveOrphanTasks | Archived 29 task files to /home/alperen/deckent-dev/.brain/archive/sprint-170-tasks |
-| 2026-05-15T07:26:35.536Z | finalizeSprint:archiveOrphanTasks | Archived 29 orphan task files |
-| 2026-05-15T07:26:35.536Z | finalizeSprint:breadcrumb | Step 12c (cleanTasksArchive) — entering |
-| 2026-05-15T07:26:35.538Z | finalizeSprint:cleanTasksArchive | Removed 0 old .tasks/archive/ dirs |
-| 2026-05-15T07:26:35.538Z | finalizeSprint:breadcrumb | Step 12d (sprintFileRetention) — entering |
-| 2026-05-15T07:26:35.541Z | finalizeSprint:sprintFileRetention | Retention complete: archived=4, countersDeleted=2, forensicMoved=0, bytesFreed=4461 |
-| 2026-05-15T07:26:35.541Z | finalizeSprint:breadcrumb | Step 13 (jobSummary) — entering |
-| 2026-05-15T07:26:35.542Z | finalizeSprint:jobSummary | Job summary written to /home/alperen/deckent-dev/.deckent/jobs/sprint-170.json |
-| 2026-05-15T07:26:35.543Z | finalizeSprint:breadcrumb | Step 14 (postFinalizeHooks) — entering |
-| 2026-05-15T07:26:35.554Z | postFinalizeHooks:memoryExport | 4 files written, 0 errors |
-| 2026-05-15T07:26:35.590Z | postFinalizeHooks:adrInsert | inserted=0 updated=2 skipped=50 |
-| 2026-05-15T07:26:35.612Z | postFinalizeHooks:ruleRegen | Rule regeneration hook called |
-| 2026-05-15T07:26:35.613Z | finalizeSprint:postFinalizeHooks | memExport=4 identity=skipped adrInsert=inserted=0/updated=2/skipped=50 ruleRegen=true errors=0 |
-| 2026-05-15T07:26:35.615Z | [Brain] | Cleanup delayed 180000ms — .tasks/ files remain readable |
-| 2026-05-15T07:26:41.203Z | docker-backend:exit | taskId=170-001-fix exitCode=0 |
-| 2026-05-15T07:26:59.934Z | runSelfAuditGate:vitest | status=FAIL delta.fail=1 |
-| 2026-05-15T07:26:59.943Z | runSelfAuditGate:honesty | violations=0 |
-| 2026-05-15T07:26:59.944Z | runSelfAuditGate | overallGate=GATE_FAILURE sprint=sprint-170 |
-| 2026-05-15T07:26:59.944Z | finalizeSprint:selfAuditGate | Gate completed: overallGate=GATE_FAILURE |
-| 2026-05-15T07:26:59.945Z | finalizeSprint:selfAuditGate | Status updated: COMPLETE → GO_WITH_GATE_FAILURE |
-| 2026-05-15T07:26:59.946Z | finalizeSprint:selfAuditGate | Gate result written to /home/alperen/deckent-dev/.deckent/sprint-170-gate.json overallGate=GATE_FAILURE |
-| 2026-05-15T07:26:59.947Z | finalizeSprint:breadcrumb | Step 10c (loadReport) — entering |
-| 2026-05-15T07:26:59.949Z | finalizeSprint:loadReport | Load test report written to /home/alperen/deckent-dev/docs/audits/sprint-170/load-test-report.md |
-| 2026-05-15T07:26:59.949Z | finalizeSprint:breadcrumb | Step 10c (loadReport) — done |
-| 2026-05-15T07:26:59.950Z | finalizeSprint:breadcrumb | Step 10c2 (metricsRotation) — entering |
-| 2026-05-15T07:26:59.951Z | finalizeSprint:breadcrumb | Step 10c2 (metricsRotation) — done |
-| 2026-05-15T07:26:59.951Z | finalizeSprint:breadcrumb | Step 10d (featuresManifest) — entering |
-| 2026-05-15T07:27:00.116Z | finalizeSprint:featuresManifest | Sync exit=0: ✓ Features manifest written: /home/alperen/deckent-dev/.deckent/features-manifest.json (31 features) |
-| 2026-05-15T07:27:00.117Z | finalizeSprint:breadcrumb | Step 12 (archiveDirectives) — entering |
-| 2026-05-15T07:27:00.118Z | archiveDirectives | Archived DIRECTIVES.md → /home/alperen/deckent-dev/.brain/archive/DIRECTIVES-sprint-170.md (preserved; autoArchive=false default per ADR-046 amendment Sprint 168 C0a-4) |
-| 2026-05-15T07:27:00.118Z | finalizeSprint:breadcrumb | Step 12b (archiveOrphanTasks) — entering |
-| 2026-05-15T07:27:00.122Z | createPreArchiveSnapshot | Snapshot created: /home/alperen/deckent-dev/.deckent/sprint-170-pre-archive.tar.gz (3 files, hash=1301ee0d49ed...) |
-| 2026-05-15T07:27:00.123Z | finalizeSprint:preArchiveSnapshot | Snapshot created: 3 files, hash=1301ee0d49ed... |
-| 2026-05-15T07:27:00.124Z | archiveOrphanTasks | Archived 3 task files to /home/alperen/deckent-dev/.brain/archive/sprint-170-tasks |
-| 2026-05-15T07:27:00.125Z | finalizeSprint:archiveOrphanTasks | Archived 3 orphan task files |
-| 2026-05-15T07:27:00.125Z | finalizeSprint:breadcrumb | Step 12c (cleanTasksArchive) — entering |
-| 2026-05-15T07:27:00.126Z | finalizeSprint:cleanTasksArchive | Removed 0 old .tasks/archive/ dirs |
-| 2026-05-15T07:27:00.127Z | finalizeSprint:breadcrumb | Step 12d (sprintFileRetention) — entering |
-| 2026-05-15T07:27:00.129Z | finalizeSprint:sprintFileRetention | Retention complete: archived=0, countersDeleted=1, forensicMoved=0, bytesFreed=0 |
-| 2026-05-15T07:27:00.130Z | finalizeSprint:breadcrumb | Step 13 (jobSummary) — entering |
-| 2026-05-15T07:27:00.130Z | finalizeSprint:jobSummary | Job summary written to /home/alperen/deckent-dev/.deckent/jobs/sprint-170.json |
-| 2026-05-15T07:27:00.131Z | finalizeSprint:breadcrumb | Step 14 (postFinalizeHooks) — entering |
-| 2026-05-15T07:27:00.139Z | postFinalizeHooks:memoryExport | 4 files written, 0 errors |
-| 2026-05-15T07:27:00.160Z | postFinalizeHooks:adrInsert | inserted=0 updated=2 skipped=50 |
-| 2026-05-15T07:27:00.177Z | postFinalizeHooks:ruleRegen | Rule regeneration hook called |
-| 2026-05-15T07:27:00.178Z | finalizeSprint:postFinalizeHooks | memExport=4 identity=skipped adrInsert=inserted=0/updated=2/skipped=50 ruleRegen=true errors=0 |
+| 2026-05-15T11:14:00.045Z | buildAgentPerformance | task=171-019 agent=architect ev=DONE evalMapSize=31 evalKeys=[171-001,171-002,171-003,171-004,171-005,171-006,171-007,171-008,171-009,171-010,171-011,171-012,171-013,171-014,171-015,171-016,171-017,17 |
+| 2026-05-15T11:14:00.046Z | buildAgentPerformance | task=171-020 agent=architect ev=DONE evalMapSize=31 evalKeys=[171-001,171-002,171-003,171-004,171-005,171-006,171-007,171-008,171-009,171-010,171-011,171-012,171-013,171-014,171-015,171-016,171-017,17 |
+| 2026-05-15T11:14:00.046Z | buildAgentPerformance | task=171-021 agent=ci-guardian ev=DONE evalMapSize=31 evalKeys=[171-001,171-002,171-003,171-004,171-005,171-006,171-007,171-008,171-009,171-010,171-011,171-012,171-013,171-014,171-015,171-016,171-017, |
+| 2026-05-15T11:14:00.046Z | buildAgentPerformance | task=171-022 agent=data-engineer ev=DONE evalMapSize=31 evalKeys=[171-001,171-002,171-003,171-004,171-005,171-006,171-007,171-008,171-009,171-010,171-011,171-012,171-013,171-014,171-015,171-016,171-01 |
+| 2026-05-15T11:14:00.047Z | buildAgentPerformance | task=171-023 agent=doc-writer ev=NO_GO evalMapSize=31 evalKeys=[171-001,171-002,171-003,171-004,171-005,171-006,171-007,171-008,171-009,171-010,171-011,171-012,171-013,171-014,171-015,171-016,171-017, |
+| 2026-05-15T11:14:00.047Z | buildAgentPerformance | task=171-024 agent=doc-writer ev=DONE evalMapSize=31 evalKeys=[171-001,171-002,171-003,171-004,171-005,171-006,171-007,171-008,171-009,171-010,171-011,171-012,171-013,171-014,171-015,171-016,171-017,1 |
+| 2026-05-15T11:14:00.048Z | buildAgentPerformance | task=171-025 agent=architecture-planner ev=DONE evalMapSize=31 evalKeys=[171-001,171-002,171-003,171-004,171-005,171-006,171-007,171-008,171-009,171-010,171-011,171-012,171-013,171-014,171-015,171-016 |
+| 2026-05-15T11:14:00.048Z | buildAgentPerformance | task=171-026 agent=data-engineer ev=DONE evalMapSize=31 evalKeys=[171-001,171-002,171-003,171-004,171-005,171-006,171-007,171-008,171-009,171-010,171-011,171-012,171-013,171-014,171-015,171-016,171-01 |
+| 2026-05-15T11:14:00.049Z | buildAgentPerformance | task=171-027 agent=doc-writer ev=DONE evalMapSize=31 evalKeys=[171-001,171-002,171-003,171-004,171-005,171-006,171-007,171-008,171-009,171-010,171-011,171-012,171-013,171-014,171-015,171-016,171-017,1 |
+| 2026-05-15T11:14:00.049Z | buildAgentPerformance | task=171-028 agent=data-engineer ev=DONE evalMapSize=31 evalKeys=[171-001,171-002,171-003,171-004,171-005,171-006,171-007,171-008,171-009,171-010,171-011,171-012,171-013,171-014,171-015,171-016,171-01 |
+| 2026-05-15T11:14:00.050Z | buildAgentPerformance | task=171-029 agent=architect ev=DONE evalMapSize=31 evalKeys=[171-001,171-002,171-003,171-004,171-005,171-006,171-007,171-008,171-009,171-010,171-011,171-012,171-013,171-014,171-015,171-016,171-017,17 |
+| 2026-05-15T11:14:00.053Z | finalizeSprint:breadcrumb | Step 10b (selfAuditGate) — entering |
+| 2026-05-15T11:14:02.750Z | runSelfAuditGate:tsc | status=PASS errors=0 |
+| 2026-05-15T11:15:22.027Z | runSelfAuditGate:vitest | status=FAIL delta.fail=1 |
+| 2026-05-15T11:15:22.038Z | docker-backend:exit | taskId=171-023-fix exitCode=0 |
+| 2026-05-15T11:15:22.230Z | runSelfAuditGate:honesty | violations=0 |
+| 2026-05-15T11:15:22.231Z | runSelfAuditGate | overallGate=GATE_FAILURE sprint=sprint-171 |
+| 2026-05-15T11:15:22.231Z | finalizeSprint:selfAuditGate | Gate completed: overallGate=GATE_FAILURE |
+| 2026-05-15T11:15:22.232Z | finalizeSprint:selfAuditGate | Status updated: RETROSPECTIVE → GO_WITH_GATE_FAILURE |
+| 2026-05-15T11:15:22.232Z | finalizeSprint:selfAuditGate | Gate result written to /home/alperen/deckent-dev/.deckent/sprint-171-gate.json overallGate=GATE_FAILURE |
+| 2026-05-15T11:15:22.233Z | finalizeSprint:breadcrumb | Step 10c (loadReport) — entering |
+| 2026-05-15T11:15:22.235Z | finalizeSprint:loadReport | Load test report written to /home/alperen/deckent-dev/docs/audits/sprint-171/load-test-report.md |
+| 2026-05-15T11:15:22.236Z | finalizeSprint:breadcrumb | Step 10c (loadReport) — done |
+| 2026-05-15T11:15:22.236Z | finalizeSprint:breadcrumb | Step 10c2 (metricsRotation) — entering |
+| 2026-05-15T11:15:22.238Z | observability-rotation | Rotated 29230 bytes → /home/alperen/deckent-dev/.deckent/archive/metrics/metrics-sprint-171.jsonl.gz (1852 bytes gzipped), pruned 1 old archives |
+| 2026-05-15T11:15:22.238Z | finalizeSprint:metricsRotation | Rotated 29230 bytes → /home/alperen/deckent-dev/.deckent/archive/metrics/metrics-sprint-171.jsonl.gz (1852 bytes gzipped), pruned 1 old archives |
+| 2026-05-15T11:15:22.239Z | finalizeSprint:breadcrumb | Step 10c2 (metricsRotation) — done |
+| 2026-05-15T11:15:22.239Z | finalizeSprint:breadcrumb | Step 10d (featuresManifest) — entering |
+| 2026-05-15T11:15:22.350Z | finalizeSprint:featuresManifest | Sync exit=0: ✓ Features manifest written: /home/alperen/deckent-dev/.deckent/features-manifest.json (31 features) |
+| 2026-05-15T11:15:22.350Z | finalizeSprint:breadcrumb | Step 12 (archiveDirectives) — entering |
+| 2026-05-15T11:15:22.351Z | archiveDirectives | Archived DIRECTIVES.md → /home/alperen/deckent-dev/.brain/archive/DIRECTIVES-sprint-171.md (preserved; autoArchive=false default per ADR-046 amendment Sprint 168 C0a-4) |
+| 2026-05-15T11:15:22.352Z | finalizeSprint:breadcrumb | Step 12b (archiveOrphanTasks) — entering |
+| 2026-05-15T11:15:22.366Z | createPreArchiveSnapshot | Snapshot created: /home/alperen/deckent-dev/.deckent/sprint-171-pre-archive.tar.gz (155 files, hash=2bbe335db2ae...) |
+| 2026-05-15T11:15:22.367Z | finalizeSprint:preArchiveSnapshot | Snapshot created: 155 files, hash=2bbe335db2ae... |
+| 2026-05-15T11:15:22.378Z | archiveOrphanTasks | Archived 155 task files to /home/alperen/deckent-dev/.brain/archive/sprint-171-tasks |
+| 2026-05-15T11:15:22.379Z | finalizeSprint:archiveOrphanTasks | Archived 155 orphan task files |
+| 2026-05-15T11:15:22.379Z | finalizeSprint:breadcrumb | Step 12c (cleanTasksArchive) — entering |
+| 2026-05-15T11:15:22.380Z | finalizeSprint:cleanTasksArchive | Removed 0 old .tasks/archive/ dirs |
+| 2026-05-15T11:15:22.380Z | finalizeSprint:breadcrumb | Step 12d (sprintFileRetention) — entering |
+| 2026-05-15T11:15:22.383Z | finalizeSprint:sprintFileRetention | Retention complete: archived=4, countersDeleted=2, forensicMoved=0, bytesFreed=4397 |
+| 2026-05-15T11:15:22.384Z | finalizeSprint:breadcrumb | Step 13 (jobSummary) — entering |
+| 2026-05-15T11:15:22.384Z | finalizeSprint:jobSummary | Job summary written to /home/alperen/deckent-dev/.deckent/jobs/sprint-171.json |
+| 2026-05-15T11:15:22.385Z | finalizeSprint:breadcrumb | Step 14 (postFinalizeHooks) — entering |
+| 2026-05-15T11:15:22.395Z | postFinalizeHooks:memoryExport | 4 files written, 0 errors |
+| 2026-05-15T11:15:22.426Z | postFinalizeHooks:adrInsert | inserted=1 updated=2 skipped=50 |
+| 2026-05-15T11:15:22.441Z | postFinalizeHooks:ruleRegen | Rule regeneration hook called |
+| 2026-05-15T11:15:22.441Z | finalizeSprint:postFinalizeHooks | memExport=4 identity=skipped adrInsert=inserted=1/updated=2/skipped=50 ruleRegen=true errors=0 |
+| 2026-05-15T11:15:22.442Z | [Brain] | Cleanup delayed 180000ms — .tasks/ files remain readable |
+| 2026-05-18T04:16:10.670Z | readJsonSafeAsync | ENOENT: no such file or directory, open '/home/alperen/.deckent/config.json' |
+| 2026-05-18T04:16:10.762Z | planSprint:learning-bonuses | Loaded 18 learning bonuses from previous sprints |
+| 2026-05-18T04:16:10.763Z | planSprint:temp-skill | Generated project-conventions skill for typescript |
+| 2026-05-18T04:16:10.764Z | planSprint:temp-agent | Generated temp agent: temp-react-ts-specialist for typescript/react |
+| 2026-05-18T04:16:10.765Z | planSprint:temp-agent | Generated temp agent: temp-react-specialist for typescript/react |
+| 2026-05-18T04:16:10.766Z | planSprint:evolved-rules | Injected 4 auto-applied evolved rules into activation configs |
+| 2026-05-18T04:16:10.768Z | planSprint:routing-v2 | Task 172-001 → agent=doc-writer, skills=[documentation-writer], confidence=high, intent=documentation |
+| 2026-05-18T04:16:10.769Z | planSprint:routing-v2 | Task 172-002 → agent=architect, skills=[system-architect, documentation-writer], confidence=high, intent=documentation |
+| 2026-05-18T04:16:10.770Z | planSprint:routing-v2 | Task 172-003 → agent=architect, skills=[system-architect], confidence=high, intent=documentation |
+| 2026-05-18T04:16:10.771Z | planSprint:routing-v2 | Task 172-004 → agent=doc-writer, skills=[documentation-writer], confidence=high, intent=documentation |
+| 2026-05-18T04:16:10.772Z | planSprint:routing-v2 | Task 172-005 → agent=devops-engineer, skills=[typescript-expert, ci-testing], confidence=high, intent=documentation |
+| 2026-05-18T04:16:10.772Z | planSprint:routing-v2 | Task 172-006 → agent=api-builder, skills=[typescript-expert, api-builder], confidence=high, intent=documentation |
+| 2026-05-18T04:16:10.773Z | planSprint:routing-v2 | Task 172-007 → agent=devops-engineer, skills=[typescript-expert, devops-engineer], confidence=high, intent=implementation |
+| 2026-05-18T04:16:10.774Z | planSprint:routing-v2 | Task 172-008 → agent=data-engineer, skills=[database-migration], confidence=high, intent=documentation |
+| 2026-05-18T04:16:10.775Z | planSprint:routing-v2 | Task 172-009 → agent=devops-engineer, skills=[git-expert, devops-engineer], confidence=high, intent=implementation |
+| 2026-05-18T04:16:10.775Z | planSprint:routing-v2 | Task 172-010 → agent=doc-writer, skills=[documentation-writer, git-expert], confidence=high, intent=documentation |
+| 2026-05-18T04:16:10.776Z | planSprint:routing-v2 | Task 172-011 → agent=doc-writer, skills=[documentation-writer], confidence=high, intent=documentation |
+| 2026-05-18T04:16:10.777Z | planSprint:routing-v2 | Task 172-012 → agent=refactorer, skills=[monorepo-expert], confidence=high, intent=config |
+| 2026-05-18T04:16:10.777Z | planSprint:task-write | Writing 172-001: assignedAgent=doc-writer, assignedSkills=[documentation-writer] |
+| 2026-05-18T04:16:10.778Z | planSprint:task-write | Writing 172-002: assignedAgent=architect, assignedSkills=[system-architect, documentation-writer] |
+| 2026-05-18T04:16:10.779Z | planSprint:task-write | Writing 172-003: assignedAgent=architect, assignedSkills=[system-architect] |
+| 2026-05-18T04:16:10.780Z | planSprint:task-write | Writing 172-004: assignedAgent=doc-writer, assignedSkills=[documentation-writer] |
+| 2026-05-18T04:16:10.781Z | planSprint:task-write | Writing 172-005: assignedAgent=devops-engineer, assignedSkills=[typescript-expert, ci-testing] |
+| 2026-05-18T04:16:10.781Z | planSprint:task-write | Writing 172-006: assignedAgent=api-builder, assignedSkills=[typescript-expert, api-builder] |
+| 2026-05-18T04:16:10.782Z | planSprint:task-write | Writing 172-007: assignedAgent=devops-engineer, assignedSkills=[typescript-expert, devops-engineer] |
+| 2026-05-18T04:16:10.783Z | planSprint:task-write | Writing 172-008: assignedAgent=data-engineer, assignedSkills=[database-migration] |
+| 2026-05-18T04:16:10.784Z | planSprint:task-write | Writing 172-009: assignedAgent=devops-engineer, assignedSkills=[git-expert, devops-engineer] |
+| 2026-05-18T04:16:10.785Z | planSprint:task-write | Writing 172-010: assignedAgent=doc-writer, assignedSkills=[documentation-writer, git-expert] |
+| 2026-05-18T04:16:10.785Z | planSprint:task-write | Writing 172-011: assignedAgent=doc-writer, assignedSkills=[documentation-writer] |
+| 2026-05-18T04:16:10.786Z | planSprint:task-write | Writing 172-012: assignedAgent=refactorer, assignedSkills=[monorepo-expert] |
+| 2026-05-18T04:26:17.386Z | readJsonSafeAsync | ENOENT: no such file or directory, open '/home/alperen/.deckent/config.json' |
+| 2026-05-18T04:26:18.337Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
+| 2026-05-18T04:26:18.338Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
+| 2026-05-18T04:26:18.338Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
+| 2026-05-18T04:26:18.339Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
+| 2026-05-18T04:26:18.339Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
+| 2026-05-18T04:26:18.340Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
+| 2026-05-18T04:26:18.340Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
+| 2026-05-18T04:26:18.340Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
+| 2026-05-18T04:26:18.341Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
+| 2026-05-18T04:26:18.341Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
+| 2026-05-18T04:26:18.342Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
+| 2026-05-18T04:26:18.347Z | planSprint:learning-bonuses | Loaded 18 learning bonuses from previous sprints |
+| 2026-05-18T04:26:18.348Z | planSprint:temp-skill | Generated project-conventions skill for typescript |
+| 2026-05-18T04:26:18.348Z | planSprint:temp-agent | Generated temp agent: temp-react-ts-specialist for typescript/react |
+| 2026-05-18T04:26:18.349Z | planSprint:temp-agent | Generated temp agent: temp-react-specialist for typescript/react |
+| 2026-05-18T04:26:18.351Z | planSprint:evolved-rules | Injected 4 auto-applied evolved rules into activation configs |
+| 2026-05-18T04:26:18.353Z | planSprint:routing-v2 | Task 172-001 → agent=doc-writer, skills=[documentation-writer], confidence=high, intent=documentation |
+| 2026-05-18T04:26:18.354Z | planSprint:routing-v2 | Task 172-002 → agent=architect, skills=[system-architect, documentation-writer], confidence=high, intent=documentation |
+| 2026-05-18T04:26:18.355Z | planSprint:routing-v2 | Task 172-003 → agent=architect, skills=[system-architect], confidence=high, intent=documentation |
+| 2026-05-18T04:26:18.356Z | planSprint:routing-v2 | Task 172-004 → agent=doc-writer, skills=[documentation-writer], confidence=high, intent=documentation |
+| 2026-05-18T04:26:18.356Z | planSprint:routing-v2 | Task 172-005 → agent=devops-engineer, skills=[typescript-expert, ci-testing], confidence=high, intent=documentation |
+| 2026-05-18T04:26:18.357Z | planSprint:routing-v2 | Task 172-006 → agent=api-builder, skills=[typescript-expert, api-builder], confidence=high, intent=documentation |
+| 2026-05-18T04:26:18.358Z | planSprint:routing-v2 | Task 172-007 → agent=devops-engineer, skills=[typescript-expert, devops-engineer], confidence=high, intent=implementation |
+| 2026-05-18T04:26:18.359Z | planSprint:routing-v2 | Task 172-008 → agent=data-engineer, skills=[database-migration], confidence=high, intent=documentation |
+| 2026-05-18T04:26:18.359Z | planSprint:routing-v2 | Task 172-009 → agent=devops-engineer, skills=[git-expert, devops-engineer], confidence=high, intent=implementation |
+| 2026-05-18T04:26:18.360Z | planSprint:routing-v2 | Task 172-010 → agent=doc-writer, skills=[documentation-writer, git-expert], confidence=high, intent=documentation |
+| 2026-05-18T04:26:18.361Z | planSprint:routing-v2 | Task 172-011 → agent=doc-writer, skills=[documentation-writer], confidence=high, intent=documentation |
+| 2026-05-18T04:26:18.361Z | planSprint:routing-v2 | Task 172-012 → agent=refactorer, skills=[monorepo-expert], confidence=high, intent=config |
+| 2026-05-18T04:26:18.362Z | planSprint:task-write | Writing 172-001: assignedAgent=doc-writer, assignedSkills=[documentation-writer] |
+| 2026-05-18T04:26:18.363Z | planSprint:task-write | Writing 172-002: assignedAgent=architect, assignedSkills=[system-architect, documentation-writer] |
+| 2026-05-18T04:26:18.364Z | planSprint:task-write | Writing 172-003: assignedAgent=architect, assignedSkills=[system-architect] |
+| 2026-05-18T04:26:18.364Z | planSprint:task-write | Writing 172-004: assignedAgent=doc-writer, assignedSkills=[documentation-writer] |
+| 2026-05-18T04:26:18.365Z | planSprint:task-write | Writing 172-005: assignedAgent=devops-engineer, assignedSkills=[typescript-expert, ci-testing] |
+| 2026-05-18T04:26:18.366Z | planSprint:task-write | Writing 172-006: assignedAgent=api-builder, assignedSkills=[typescript-expert, api-builder] |
+| 2026-05-18T04:26:18.367Z | planSprint:task-write | Writing 172-007: assignedAgent=devops-engineer, assignedSkills=[typescript-expert, devops-engineer] |
+| 2026-05-18T04:26:18.368Z | planSprint:task-write | Writing 172-008: assignedAgent=data-engineer, assignedSkills=[database-migration] |
+| 2026-05-18T04:26:18.369Z | planSprint:task-write | Writing 172-009: assignedAgent=devops-engineer, assignedSkills=[git-expert, devops-engineer] |
+| 2026-05-18T04:26:18.370Z | planSprint:task-write | Writing 172-010: assignedAgent=doc-writer, assignedSkills=[documentation-writer, git-expert] |
+| 2026-05-18T04:26:18.371Z | planSprint:task-write | Writing 172-011: assignedAgent=doc-writer, assignedSkills=[documentation-writer] |
+| 2026-05-18T04:26:18.371Z | planSprint:task-write | Writing 172-012: assignedAgent=refactorer, assignedSkills=[monorepo-expert] |
+| 2026-05-18T04:26:18.392Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.deckent/sprint-state.json' |
+| 2026-05-18T04:26:18.406Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
+| 2026-05-18T04:26:18.406Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
+| 2026-05-18T04:26:18.407Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
+| 2026-05-18T04:26:18.407Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
+| 2026-05-18T04:26:18.409Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
+| 2026-05-18T04:26:18.409Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
+| 2026-05-18T04:26:18.410Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
+| 2026-05-18T04:26:18.410Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
+| 2026-05-18T04:26:18.411Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
+| 2026-05-18T04:26:18.411Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
+| 2026-05-18T04:26:18.412Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
+| 2026-05-18T04:26:18.413Z | planSprint:learning-bonuses | Loaded 18 learning bonuses from previous sprints |
+| 2026-05-18T04:26:18.413Z | planSprint:temp-skill | Generated project-conventions skill for typescript |
+| 2026-05-18T04:26:18.414Z | planSprint:temp-agent | Generated temp agent: temp-react-ts-specialist for typescript/react |
+| 2026-05-18T04:26:18.415Z | planSprint:temp-agent | Generated temp agent: temp-react-specialist for typescript/react |
+| 2026-05-18T04:26:18.415Z | planSprint:evolved-rules | Injected 4 auto-applied evolved rules into activation configs |
+| 2026-05-18T04:26:18.416Z | planSprint:routing-v2 | Task 172-001 → agent=doc-writer, skills=[documentation-writer], confidence=high, intent=documentation |
+| 2026-05-18T04:26:18.417Z | planSprint:routing-v2 | Task 172-002 → agent=architect, skills=[system-architect, documentation-writer], confidence=high, intent=documentation |
+| 2026-05-18T04:26:18.417Z | planSprint:routing-v2 | Task 172-003 → agent=architect, skills=[system-architect], confidence=high, intent=documentation |
+| 2026-05-18T04:26:18.418Z | planSprint:routing-v2 | Task 172-004 → agent=doc-writer, skills=[documentation-writer], confidence=high, intent=documentation |
+| 2026-05-18T04:26:18.419Z | planSprint:routing-v2 | Task 172-005 → agent=devops-engineer, skills=[typescript-expert, ci-testing], confidence=high, intent=documentation |
+| 2026-05-18T04:26:18.420Z | planSprint:routing-v2 | Task 172-006 → agent=api-builder, skills=[typescript-expert, api-builder], confidence=high, intent=documentation |
+| 2026-05-18T04:26:18.420Z | planSprint:routing-v2 | Task 172-007 → agent=devops-engineer, skills=[typescript-expert, devops-engineer], confidence=high, intent=implementation |
+| 2026-05-18T04:26:18.421Z | planSprint:routing-v2 | Task 172-008 → agent=data-engineer, skills=[database-migration], confidence=high, intent=documentation |
+| 2026-05-18T04:26:18.422Z | planSprint:routing-v2 | Task 172-009 → agent=devops-engineer, skills=[git-expert, devops-engineer], confidence=high, intent=implementation |
+| 2026-05-18T04:26:18.422Z | planSprint:routing-v2 | Task 172-010 → agent=doc-writer, skills=[documentation-writer, git-expert], confidence=high, intent=documentation |
+| 2026-05-18T04:26:18.423Z | planSprint:routing-v2 | Task 172-011 → agent=doc-writer, skills=[documentation-writer], confidence=high, intent=documentation |
+| 2026-05-18T04:26:18.424Z | planSprint:routing-v2 | Task 172-012 → agent=refactorer, skills=[monorepo-expert], confidence=high, intent=config |
+| 2026-05-18T04:26:18.424Z | planSprint:task-write | Writing 172-001: assignedAgent=doc-writer, assignedSkills=[documentation-writer] |
+| 2026-05-18T04:26:18.425Z | planSprint:task-write | Writing 172-002: assignedAgent=architect, assignedSkills=[system-architect, documentation-writer] |
+| 2026-05-18T04:26:18.426Z | planSprint:task-write | Writing 172-003: assignedAgent=architect, assignedSkills=[system-architect] |
+| 2026-05-18T04:26:18.426Z | planSprint:task-write | Writing 172-004: assignedAgent=doc-writer, assignedSkills=[documentation-writer] |
+| 2026-05-18T04:26:18.427Z | planSprint:task-write | Writing 172-005: assignedAgent=devops-engineer, assignedSkills=[typescript-expert, ci-testing] |
+| 2026-05-18T04:26:18.428Z | planSprint:task-write | Writing 172-006: assignedAgent=api-builder, assignedSkills=[typescript-expert, api-builder] |
+| 2026-05-18T04:26:18.428Z | planSprint:task-write | Writing 172-007: assignedAgent=devops-engineer, assignedSkills=[typescript-expert, devops-engineer] |
+| 2026-05-18T04:26:18.431Z | planSprint:task-write | Writing 172-008: assignedAgent=data-engineer, assignedSkills=[database-migration] |
+| 2026-05-18T04:26:18.431Z | planSprint:task-write | Writing 172-009: assignedAgent=devops-engineer, assignedSkills=[git-expert, devops-engineer] |
+| 2026-05-18T04:26:18.432Z | planSprint:task-write | Writing 172-010: assignedAgent=doc-writer, assignedSkills=[documentation-writer, git-expert] |
+| 2026-05-18T04:26:18.433Z | planSprint:task-write | Writing 172-011: assignedAgent=doc-writer, assignedSkills=[documentation-writer] |
+| 2026-05-18T04:26:18.433Z | planSprint:task-write | Writing 172-012: assignedAgent=refactorer, assignedSkills=[monorepo-expert] |
+| 2026-05-18T04:26:18.435Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
+| 2026-05-18T04:26:18.435Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
+| 2026-05-18T04:26:18.436Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
+| 2026-05-18T04:26:18.436Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
+| 2026-05-18T04:26:18.437Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
+| 2026-05-18T04:26:18.437Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
+| 2026-05-18T04:26:18.437Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
+| 2026-05-18T04:26:18.438Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
+| 2026-05-18T04:26:18.438Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
+| 2026-05-18T04:26:18.439Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
+| 2026-05-18T04:26:18.439Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
+| 2026-05-18T04:27:40.374Z | sprint-checkpoint:phaseTransition | Phase PLAN → writing checkpoint |
+| 2026-05-18T04:27:40.375Z | sprint-checkpoint:write | Checkpoint #1 written for sprint-172 |
+| 2026-05-18T04:27:40.377Z | spawnWorkers:collision | File "DECKENT.md" written by tasks: 172-001, 172-010 |
+| 2026-05-18T04:27:40.378Z | spawnWorkers:collision | File "api-surface.md" written by tasks: 172-001, 172-010 |
+| 2026-05-18T04:27:40.378Z | spawnWorkers:collision | File "CLAUDE.md" written by tasks: 172-002, 172-010 |
+| 2026-05-18T04:27:40.380Z | spawnWorkers:collision | File ".deckent/workspace/IDENTITY.md" written by tasks: 172-002, 172-005 |
+| 2026-05-18T04:27:40.381Z | spawnWorkers:collision | File "IDENTITY.md" written by tasks: 172-002, 172-005 |
+| 2026-05-18T04:27:40.384Z | spawnWorkers:collision | File "README.md" written by tasks: 172-004, 172-005 |
+| 2026-05-18T04:27:40.385Z | spawnWorkers:collision | File "README-TR.md" written by tasks: 172-004, 172-005 |
+| 2026-05-18T04:27:40.386Z | spawnWorkers:collision | File "package.json" written by tasks: 172-005, 172-006, 172-007, 172-012 |
+| 2026-05-18T04:27:40.386Z | spawnWorkers:skipBlocked | Task 172-001 blocked by scope collision |
+| 2026-05-18T04:27:40.387Z | spawnWorkers:skipBlocked | Task 172-002 blocked by scope collision |
+| 2026-05-18T04:27:40.405Z | docker-backend:spawn-lock | taskId=172-003 acquired 1 spawn lock(s) |
+| 2026-05-18T04:27:40.521Z | docker-backend:spawn | taskId=172-003 container=deckent-w-172-003 model=sonnet |
+| 2026-05-18T04:27:40.522Z | docker-backend:spawn-attempt | taskId=172-003 attempt=1/2 |
+| 2026-05-18T04:27:44.074Z | docker-backend:spawn-ok | taskId=172-003 containerId=93601e6daa9a instantExit=false |
+| 2026-05-18T04:27:44.078Z | spawnWorkers:skipBlocked | Task 172-004 blocked by scope collision |
+| 2026-05-18T04:27:44.078Z | spawnWorkers:skipBlocked | Task 172-005 blocked by scope collision |
+| 2026-05-18T04:27:44.079Z | spawnWorkers:skipBlocked | Task 172-006 blocked by scope collision |
+| 2026-05-18T04:27:44.115Z | sprint-checkpoint:phaseTransition | Phase SPAWN → writing checkpoint |
+| 2026-05-18T04:27:44.117Z | sprint-checkpoint:write | Checkpoint #2 written for sprint-172 |
+| 2026-05-18T04:30:22.774Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-test-docker-38991.json' |
+| 2026-05-18T04:30:54.624Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-test-docker-38991.json' |
+| 2026-05-18T04:31:26.736Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-test-docker-38991.json' |
+| 2026-05-18T04:31:28.184Z | docker-backend:kill | taskId=172-003 (graceful stop --time=15) |
+| 2026-05-18T04:31:35.165Z | docker-backend:post-stop-verify | taskId=172-003 .result verified + fsynced |
+| 2026-05-18T04:31:35.270Z | docker-backend:spawn-lock | taskId=172-003 released 1 spawn lock(s) on kill |
+| 2026-05-18T04:31:35.272Z | docker-backend:exit | taskId=172-003 exitCode=0 |
+| 2026-05-18T04:31:35.414Z | docker-backend:spawn-lock | taskId=172-007 acquired 4 spawn lock(s) |
+| 2026-05-18T04:31:35.510Z | docker-backend:spawn | taskId=172-007 container=deckent-w-172-007 model=opus |
+| 2026-05-18T04:31:35.510Z | docker-backend:spawn-attempt | taskId=172-007 attempt=1/2 |
+| 2026-05-18T04:31:42.146Z | docker-backend:spawn-ok | taskId=172-007 containerId=11c0f7ce2d81 instantExit=false |
+| 2026-05-18T04:31:59.956Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-test-docker-38991.json' |
+| 2026-05-18T04:32:31.795Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-test-docker-38991.json' |
+| 2026-05-18T04:32:51.538Z | waitForResults:progress | Sprint devam ediyor — 1/12 task tamamlandı (5dk) |
+| 2026-05-18T04:33:04.294Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-test-docker-38991.json' |
+| 2026-05-18T04:33:04.341Z | readJsonSafeAsync | ENOENT: no such file or directory, open '/home/alperen/.deckent/config.json' |
+| 2026-05-18T04:33:36.710Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-test-docker-38991.json' |
+| 2026-05-18T04:34:09.060Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-test-docker-38991.json' |
+| 2026-05-18T04:34:41.847Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-test-docker-38991.json' |
+| 2026-05-18T04:35:14.534Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-test-docker-38991.json' |
+| 2026-05-18T04:35:47.274Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-test-docker-38991.json' |
+| 2026-05-18T04:36:20.069Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-test-docker-38991.json' |
+| 2026-05-18T04:36:42.480Z | forceRescanIfIdle | slot idle for 300s — respawning 5 orphan PENDING task(s): 172-001, 172-002, 172-004, 172-005, 172-006 |
+| 2026-05-18T04:36:42.494Z | scope-sanitizer | warnings=3, rejected=0 |
+| 2026-05-18T04:36:42.495Z | docker-backend:spawn-lock | taskId=172-001 acquired 5 spawn lock(s) |
+| 2026-05-18T04:36:42.596Z | docker-backend:spawn | taskId=172-001 container=deckent-w-172-001 model=sonnet |
+| 2026-05-18T04:36:42.596Z | docker-backend:spawn-attempt | taskId=172-001 attempt=1/2 |
+| 2026-05-18T04:36:45.942Z | docker-backend:spawn-ok | taskId=172-001 containerId=243a26cbf143 instantExit=false |
+| 2026-05-18T04:36:45.954Z | scope-sanitizer | warnings=3, rejected=0 |
+| 2026-05-18T04:36:45.955Z | docker-backend:spawn-lock | taskId=172-002 acquired 5 spawn lock(s) |
+| 2026-05-18T04:36:46.056Z | docker-backend:spawn | taskId=172-002 container=deckent-w-172-002 model=sonnet |
+| 2026-05-18T04:36:46.057Z | docker-backend:spawn-attempt | taskId=172-002 attempt=1/2 |
+| 2026-05-18T04:36:52.236Z | docker-backend:spawn-ok | taskId=172-002 containerId=e8ca8f6d8175 instantExit=false |
+| 2026-05-18T04:36:52.246Z | scope-sanitizer | warnings=2, rejected=0 |
+| 2026-05-18T04:36:52.247Z | docker-backend:spawn-lock | taskId=172-004 acquired 4 spawn lock(s) |
+| 2026-05-18T04:36:52.352Z | docker-backend:spawn | taskId=172-004 container=deckent-w-172-004 model=sonnet |
+| 2026-05-18T04:36:52.352Z | docker-backend:spawn-attempt | taskId=172-004 attempt=1/2 |
+| 2026-05-18T04:36:55.724Z | docker-backend:spawn-ok | taskId=172-004 containerId=c8fcbef0bdaa instantExit=false |
+| 2026-05-18T04:36:55.773Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-test-docker-38991.json' |
+| 2026-05-18T04:36:55.785Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: scripts/lint-links.mjs (taskId=172-007, age=320s) |
+| 2026-05-18T04:36:55.786Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: docs/.vitepress/config.ts (taskId=172-007, age=320s) |
+| 2026-05-18T04:36:55.787Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: tests/scripts/lint-links.test.ts (taskId=172-007, age=320s) |
+| 2026-05-18T04:36:55.787Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: package.json (taskId=172-007, age=320s) |
+| 2026-05-18T04:36:55.808Z | scope-sanitizer | warnings=3, rejected=0 |
+| 2026-05-18T04:36:55.809Z | waitForResults:queue-spawn | Failed to spawn queued task 172-005: Spawn lock conflict on README.md: file is currently held by task 172-004 |
+| 2026-05-18T04:36:55.817Z | scope-sanitizer | warnings=1, rejected=0 |
+| 2026-05-18T04:36:55.818Z | docker-backend:spawn-lock | taskId=172-006 acquired 9 spawn lock(s) |
+| 2026-05-18T04:36:55.917Z | docker-backend:spawn | taskId=172-006 container=deckent-w-172-006 model=opus |
+| 2026-05-18T04:36:55.917Z | docker-backend:spawn-attempt | taskId=172-006 attempt=1/2 |
+| 2026-05-18T04:36:59.275Z | docker-backend:spawn-ok | taskId=172-006 containerId=376c69a76d3d instantExit=false |
+| 2026-05-18T04:37:28.605Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-test-docker-38991.json' |
+| 2026-05-18T04:37:52.113Z | waitForResults:progress | Sprint devam ediyor — 1/12 task tamamlandı (10dk) |
+| 2026-05-18T04:37:58.605Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-test-docker-38991.json' |
+| 2026-05-18T04:38:31.410Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-test-docker-38991.json' |
+| 2026-05-18T04:39:04.159Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-test-docker-38991.json' |
+| 2026-05-18T04:39:36.840Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-test-docker-38991.json' |
+| 2026-05-18T04:39:40.259Z | docker-backend:kill | taskId=172-001 (graceful stop --time=15) |
+| 2026-05-18T04:39:50.402Z | docker-backend:post-stop-verify | taskId=172-001 .result verified + fsynced |
+| 2026-05-18T04:39:50.504Z | docker-backend:spawn-lock | taskId=172-001 released 5 spawn lock(s) on kill |
+| 2026-05-18T04:39:50.505Z | docker-backend:exit | taskId=172-001 exitCode=0 |
+| 2026-05-18T04:39:50.653Z | docker-backend:spawn-lock | taskId=172-008 acquired 2 spawn lock(s) |
+| 2026-05-18T04:39:50.758Z | docker-backend:spawn | taskId=172-008 container=deckent-w-172-008 model=opus |
+| 2026-05-18T04:39:50.758Z | docker-backend:spawn-attempt | taskId=172-008 attempt=1/2 |
+| 2026-05-18T04:39:54.211Z | docker-backend:spawn-ok | taskId=172-008 containerId=5524b28e0311 instantExit=false |
+| 2026-05-18T04:40:09.486Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-test-docker-38991.json' |
+| 2026-05-18T04:40:42.105Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-test-docker-38991.json' |
+| 2026-05-18T04:41:08.703Z | docker-backend:kill | taskId=172-002 (graceful stop --time=15) |
+| 2026-05-18T04:41:14.620Z | docker-backend:post-stop-verify | taskId=172-002 .result verified + fsynced |
+| 2026-05-18T04:41:14.718Z | docker-backend:spawn-lock | taskId=172-002 released 5 spawn lock(s) on kill |
+| 2026-05-18T04:41:14.784Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-test-docker-38991.json' |
+| 2026-05-18T04:41:14.813Z | docker-backend:exit | taskId=172-002 exitCode=0 |
+| 2026-05-18T04:41:14.956Z | docker-backend:spawn-lock | taskId=172-009 acquired 2 spawn lock(s) |
+| 2026-05-18T04:41:15.051Z | docker-backend:spawn | taskId=172-009 container=deckent-w-172-009 model=sonnet |
+| 2026-05-18T04:41:15.052Z | docker-backend:spawn-attempt | taskId=172-009 attempt=1/2 |
+| 2026-05-18T04:41:18.458Z | docker-backend:spawn-ok | taskId=172-009 containerId=166f7d36d20a instantExit=false |
+| 2026-05-18T04:41:47.486Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-test-docker-38991.json' |
+| 2026-05-18T04:42:20.182Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-test-docker-38991.json' |
+| 2026-05-18T04:42:20.194Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: scripts/gen-reference-docs.mjs (taskId=172-006, age=324s) |
+| 2026-05-18T04:42:20.194Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: server.ts (taskId=172-006, age=324s) |
+| 2026-05-18T04:42:20.195Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: docs/reference/mcp-resources.md (taskId=172-006, age=324s) |
+| 2026-05-18T04:42:20.195Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: README-TR.md (taskId=172-004, age=328s) |
+| 2026-05-18T04:42:20.196Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: docs/adr/README.md (taskId=172-006, age=324s) |
+| 2026-05-18T04:42:20.196Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: package.json (taskId=172-006, age=324s) |
+| 2026-05-18T04:42:20.197Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: tests/scripts/gen-reference-docs.test.ts (taskId=172-006, age=324s) |
+| 2026-05-18T04:42:20.197Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: docs/reference/mcp-tools.md (taskId=172-006, age=324s) |
+| 2026-05-18T04:42:20.198Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: docs/reference/cli.md (taskId=172-006, age=324s) |
+| 2026-05-18T04:42:20.198Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: src/mcp/server.ts (taskId=172-004, age=328s) |
+| 2026-05-18T04:42:20.199Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: README.md (taskId=172-004, age=328s) |
+| 2026-05-18T04:42:20.199Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: .length (taskId=172-004, age=328s) |
+| 2026-05-18T04:42:20.200Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: docs/reference/agents.md (taskId=172-006, age=324s) |
+| 2026-05-18T04:42:52.377Z | waitForResults:progress | Sprint devam ediyor — 3/12 task tamamlandı (15dk) |
+| 2026-05-18T04:45:03.337Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: scripts/verify-archive-db-parity.mjs (taskId=172-008, age=313s) |
+| 2026-05-18T04:45:03.338Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: docs/audits/sprint-171/archive-parity-report.md (taskId=172-008, age=313s) |
+| 2026-05-18T04:46:23.321Z | forceRescanIfIdle | slot idle for 305s — respawning 1 orphan PENDING task(s): 172-005 |
+| 2026-05-18T04:46:23.330Z | scope-sanitizer | warnings=3, rejected=0 |
+| 2026-05-18T04:46:23.331Z | docker-backend:spawn-lock | taskId=172-005 acquired 7 spawn lock(s) |
+| 2026-05-18T04:46:23.425Z | docker-backend:spawn | taskId=172-005 container=deckent-w-172-005 model=opus |
+| 2026-05-18T04:46:23.426Z | docker-backend:spawn-attempt | taskId=172-005 attempt=1/2 |
+| 2026-05-18T04:46:26.796Z | docker-backend:spawn-ok | taskId=172-005 containerId=eb789c692f19 instantExit=false |
+| 2026-05-18T04:46:26.800Z | docker-backend:kill | taskId=172-004 (graceful stop --time=15) |
+| 2026-05-18T04:46:30.909Z | docker-backend:post-stop-verify | taskId=172-004 .result verified + fsynced |
+| 2026-05-18T04:46:31.006Z | docker-backend:exit | taskId=172-004 exitCode=0 |
+| 2026-05-18T04:46:31.148Z | scope-sanitizer | warnings=7, rejected=0 |
+| 2026-05-18T04:46:31.149Z | docker-backend:spawn-lock | taskId=172-010 acquired 12 spawn lock(s) |
+| 2026-05-18T04:46:31.246Z | docker-backend:spawn | taskId=172-010 container=deckent-w-172-010 model=sonnet |
+| 2026-05-18T04:46:31.246Z | docker-backend:spawn-attempt | taskId=172-010 attempt=1/2 |
+| 2026-05-18T04:46:34.616Z | docker-backend:spawn-ok | taskId=172-010 containerId=7cb91e204051 instantExit=false |
+| 2026-05-18T04:46:38.593Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: .npmignore (taskId=172-009, age=324s) |
+| 2026-05-18T04:46:38.594Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: .gitignore (taskId=172-009, age=324s) |
+| 2026-05-18T04:47:58.327Z | waitForResults:progress | Sprint devam ediyor — 4/12 task tamamlandı (20dk) |
+| 2026-05-18T04:48:28.483Z | docker-backend:kill | taskId=172-007 (graceful stop --time=15) |
+| 2026-05-18T04:48:46.747Z | docker-backend:post-stop-verify | taskId=172-007 .result verified + fsynced |
+| 2026-05-18T04:48:46.853Z | docker-backend:exit | taskId=172-007 exitCode=137 |
+| 2026-05-18T04:48:46.854Z | docker-backend:reconcile | taskId=172-007 exitCode=137 but .result=DONE → HB DONE |
+| 2026-05-18T04:48:46.995Z | scope-sanitizer | warnings=1, rejected=0 |
+| 2026-05-18T04:48:46.995Z | docker-backend:spawn-lock | taskId=172-011 acquired 2 spawn lock(s) |
+| 2026-05-18T04:48:47.096Z | docker-backend:spawn | taskId=172-011 container=deckent-w-172-011 model=sonnet |
+| 2026-05-18T04:48:47.097Z | docker-backend:spawn-attempt | taskId=172-011 attempt=1/2 |
+| 2026-05-18T04:48:50.511Z | docker-backend:spawn-ok | taskId=172-011 containerId=877b0696e484 instantExit=false |
+| 2026-05-18T04:48:55.519Z | docker-backend:kill | taskId=172-008 (graceful stop --time=15) |
+| 2026-05-18T04:49:13.746Z | docker-backend:post-stop-verify | taskId=172-008 .result verified + fsynced |
+| 2026-05-18T04:49:13.841Z | docker-backend:exit | taskId=172-008 exitCode=137 |
+| 2026-05-18T04:49:13.843Z | docker-backend:reconcile | taskId=172-008 exitCode=137 but .result=DONE → HB DONE |
+| 2026-05-18T04:49:13.985Z | waitForResults:queue-spawn | Failed to spawn queued task 172-012: Spawn lock conflict on package.json: file is currently held by task 172-005 |
+| 2026-05-18T04:49:50.996Z | docker-backend:exit | taskId=172-009 exitCode=0 |
+| 2026-05-18T04:51:16.246Z | docker-backend:exit | taskId=172-006 exitCode=0 |
+| 2026-05-18T04:51:34.954Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: .deckent/workspace/IDENTITY.md (taskId=172-005, age=312s) |
+| 2026-05-18T04:51:34.954Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: docs/vision/blueprint.md (taskId=172-010, age=304s) |
+| 2026-05-18T04:51:34.955Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: docs/CHANGELOG.md (taskId=172-010, age=304s) |
+| 2026-05-18T04:51:34.956Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: VISION-TR.md (taskId=172-010, age=304s) |
+| 2026-05-18T04:51:34.956Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: README-TR.md (taskId=172-005, age=312s) |
+| 2026-05-18T04:51:34.957Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: tests/scripts/update-readme-stats.test.ts (taskId=172-005, age=312s) |
+| 2026-05-18T04:51:34.957Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: NEXT-SESSION.md (taskId=172-010, age=304s) |
+| 2026-05-18T04:51:34.958Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: docs/analysis/full-audit.md (taskId=172-010, age=304s) |
+| 2026-05-18T04:51:34.958Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: CLAUDE.md (taskId=172-010, age=304s) |
+| 2026-05-18T04:51:34.959Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: package.json (taskId=172-005, age=312s) |
+| 2026-05-18T04:51:34.959Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: docs/launch/CONDUCT.md (taskId=172-010, age=304s) |
+| 2026-05-18T04:51:34.960Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: scripts/update-readme-stats.mjs (taskId=172-005, age=312s) |
+| 2026-05-18T04:51:34.961Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: IDENTITY.md (taskId=172-005, age=312s) |
+| 2026-05-18T04:51:34.961Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: VISION.md (taskId=172-010, age=304s) |
+| 2026-05-18T04:51:34.962Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: README.md (taskId=172-005, age=312s) |
+| 2026-05-18T04:51:34.962Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: docs/vision/roadmap.md (taskId=172-010, age=304s) |
+| 2026-05-18T04:51:34.963Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: DECKENT.md (taskId=172-010, age=304s) |
+| 2026-05-18T04:51:34.963Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: api-surface.md (taskId=172-010, age=304s) |
+| 2026-05-18T04:51:34.964Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: next-session-prompt.md (taskId=172-010, age=304s) |
+| 2026-05-18T04:53:00.991Z | waitForResults:progress | Sprint devam ediyor — 8/12 task tamamlandı (25dk) |
+| 2026-05-18T04:53:53.885Z | forceRescanIfIdle | slot idle for 303s — respawning 1 orphan PENDING task(s): 172-012 |
+| 2026-05-18T04:53:53.892Z | docker-backend:spawn-lock | taskId=172-012 acquired 2 spawn lock(s) |
+| 2026-05-18T04:53:53.990Z | docker-backend:spawn | taskId=172-012 container=deckent-w-172-012 model=sonnet |
+| 2026-05-18T04:53:53.991Z | docker-backend:spawn-attempt | taskId=172-012 attempt=1/2 |
+| 2026-05-18T04:53:57.334Z | docker-backend:spawn-ok | taskId=172-012 containerId=250ee261f1da instantExit=false |
+| 2026-05-18T04:54:17.719Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: WORKER-GUIDE.md (taskId=172-011, age=331s) |
+| 2026-05-18T04:54:17.720Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: docs/guide/workers.md (taskId=172-011, age=331s) |
+| 2026-05-18T04:55:01.115Z | docker-backend:exit | taskId=172-010 exitCode=0 |
+| 2026-05-18T04:56:23.713Z | docker-backend:exit | taskId=172-012 exitCode=0 |
+| 2026-05-18T04:56:23.881Z | docker-backend:spawn-lock | taskId=172-012 released 2 spawn lock(s) on exit |
+| 2026-05-18T04:58:01.857Z | waitForResults:progress | Sprint devam ediyor — 10/12 task tamamlandı (30dk) |
+| 2026-05-18T05:02:08.630Z | docker-backend:exit | taskId=172-011 exitCode=0 |
+| 2026-05-18T05:03:08.528Z | waitForResults:progress | Sprint devam ediyor — 11/12 task tamamlandı (35dk) |
+| 2026-05-18T05:03:25.966Z | sprint-checkpoint:phaseTransition | Phase EXECUTE → writing checkpoint |
+| 2026-05-18T05:03:25.967Z | sprint-checkpoint:write | Checkpoint #3 written for sprint-172 |
+| 2026-05-18T05:03:25.968Z | runEvaluatePhase:start | totalTasks=12 collectedResults=12 collectedIds=[172-003,172-001,172-002,172-004,172-007,172-008,172-009,172-006,172-010,172-012,172-011,172-005] |
+| 2026-05-18T05:03:28.616Z | runEvaluatePhase:task | task=172-001 selfAssessment=DONE evaluation=DONE testsPassed=true |
+| 2026-05-18T05:03:28.618Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
+| 2026-05-18T05:03:28.619Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
+| 2026-05-18T05:03:28.619Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
+| 2026-05-18T05:03:28.620Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
+| 2026-05-18T05:03:28.620Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
+| 2026-05-18T05:03:28.621Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
+| 2026-05-18T05:03:28.621Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
+| 2026-05-18T05:03:28.621Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
+| 2026-05-18T05:03:28.622Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
+| 2026-05-18T05:03:28.622Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
+| 2026-05-18T05:03:28.623Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
+| 2026-05-18T05:03:31.172Z | runEvaluatePhase:task | task=172-002 selfAssessment=GO_WITH_TECH_DEBT evaluation=DONE testsPassed=true |
+| 2026-05-18T05:03:31.174Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
+| 2026-05-18T05:03:31.175Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
+| 2026-05-18T05:03:31.175Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
+| 2026-05-18T05:03:31.176Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
+| 2026-05-18T05:03:31.176Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
+| 2026-05-18T05:03:31.177Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
+| 2026-05-18T05:03:31.177Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
+| 2026-05-18T05:03:31.178Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
+| 2026-05-18T05:03:31.178Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
+| 2026-05-18T05:03:31.178Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
+| 2026-05-18T05:03:31.179Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
+| 2026-05-18T05:03:33.706Z | runEvaluatePhase:task | task=172-003 selfAssessment=GO_WITH_TECH_DEBT evaluation=DONE testsPassed=true |
+| 2026-05-18T05:03:33.708Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
+| 2026-05-18T05:03:33.709Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
+| 2026-05-18T05:03:33.710Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
+| 2026-05-18T05:03:33.710Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
+| 2026-05-18T05:03:33.710Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
+| 2026-05-18T05:03:33.711Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
+| 2026-05-18T05:03:33.711Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
+| 2026-05-18T05:03:33.712Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
+| 2026-05-18T05:03:33.712Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
+| 2026-05-18T05:03:33.713Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
+| 2026-05-18T05:03:33.713Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
+| 2026-05-18T05:03:36.211Z | runEvaluatePhase:task | task=172-004 selfAssessment=DONE evaluation=DONE testsPassed=true |
+| 2026-05-18T05:03:36.213Z | runEvaluatePhase:task | task=172-005 selfAssessment=DONE evaluation=NO_GO testsPassed=true |
+| 2026-05-18T05:03:36.214Z | runEvaluatePhase:task | task=172-006 selfAssessment=DONE evaluation=NO_GO testsPassed=true |
+| 2026-05-18T05:03:36.215Z | enforceHonestResultGate | Task 172-007: BOUNDARY_VIOLATION — files outside scope.filesWrite: .lintlinkignore, docs/guide/quickstart.md, docs/guide/faq.md, docs/guide/concepts.md, docs/guide/first-sprint.md, docs/guide/getting- |
+| 2026-05-18T05:03:36.215Z | runEvaluatePhase:honestGate | task=172-007 violation=BOUNDARY_VIOLATION → forced NO_GO |
+| 2026-05-18T05:03:36.216Z | runEvaluatePhase:task | task=172-007 selfAssessment=NO_GO evaluation=NO_GO testsPassed=true |
+| 2026-05-18T05:03:36.217Z | runEvaluatePhase:task | task=172-008 selfAssessment=DONE evaluation=NO_GO testsPassed=true |
+| 2026-05-18T05:03:36.218Z | enforceHonestResultGate | Task 172-009: BOUNDARY_VIOLATION — files outside scope.filesWrite: .brain/archive/.gitignore |
+| 2026-05-18T05:03:36.218Z | runEvaluatePhase:honestGate | task=172-009 violation=BOUNDARY_VIOLATION → forced NO_GO |
+| 2026-05-18T05:03:36.219Z | runEvaluatePhase:task | task=172-009 selfAssessment=NO_GO evaluation=NO_GO testsPassed=true |
+| 2026-05-18T05:03:36.219Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
+| 2026-05-18T05:03:36.220Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
+| 2026-05-18T05:03:36.220Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
+| 2026-05-18T05:03:36.221Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
+| 2026-05-18T05:03:36.221Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
+| 2026-05-18T05:03:36.222Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
+| 2026-05-18T05:03:36.222Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
+| 2026-05-18T05:03:36.223Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
+| 2026-05-18T05:03:36.223Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
+| 2026-05-18T05:03:36.224Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
+| 2026-05-18T05:03:36.224Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
+| 2026-05-18T05:03:38.863Z | runEvaluatePhase:task | task=172-010 selfAssessment=DONE evaluation=DONE testsPassed=true |
+| 2026-05-18T05:03:38.865Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
+| 2026-05-18T05:03:38.866Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
+| 2026-05-18T05:03:38.867Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
+| 2026-05-18T05:03:38.867Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
+| 2026-05-18T05:03:38.868Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
+| 2026-05-18T05:03:38.868Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
+| 2026-05-18T05:03:38.868Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
+| 2026-05-18T05:03:38.869Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
+| 2026-05-18T05:03:38.869Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
+| 2026-05-18T05:03:38.870Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
+| 2026-05-18T05:03:38.870Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
+| 2026-05-18T05:03:41.520Z | runEvaluatePhase:task | task=172-011 selfAssessment=DONE evaluation=DONE testsPassed=true |
+| 2026-05-18T05:03:41.522Z | runEvaluatePhase:task | task=172-012 selfAssessment=DONE evaluation=NO_GO testsPassed=true |
+| 2026-05-18T05:03:41.523Z | runEvaluatePhase:done | evaluations.size=12 keys=[172-001,172-002,172-003,172-004,172-005,172-006,172-007,172-008,172-009,172-010,172-011,172-012] |
+| 2026-05-18T05:03:41.524Z | evaluateFailureCascade | task 172-005: CODE → retry=false cascade=true |
+| 2026-05-18T05:03:41.525Z | dependency-scheduler:applyFailureCascade | Task 172-005 (CODE): cascading block to transitive dependents |
+| 2026-05-18T05:03:41.525Z | applyCascadeToSprint | Cascade applied: 172-005 (CODE) → 0 tasks blocked |
+| 2026-05-18T05:03:41.526Z | evaluateFailureCascade | task 172-006: CODE → retry=false cascade=true |
+| 2026-05-18T05:03:41.527Z | dependency-scheduler:applyFailureCascade | Task 172-006 (CODE): cascading block to transitive dependents |
+| 2026-05-18T05:03:41.527Z | applyCascadeToSprint | Cascade applied: 172-006 (CODE) → 0 tasks blocked |
+| 2026-05-18T05:03:41.528Z | evaluateFailureCascade | task 172-007: CODE → retry=false cascade=true |
+| 2026-05-18T05:03:41.528Z | dependency-scheduler:applyFailureCascade | Task 172-007 (CODE): cascading block to transitive dependents |
+| 2026-05-18T05:03:41.529Z | applyCascadeToSprint | Cascade applied: 172-007 (CODE) → 2 tasks blocked |
+| 2026-05-18T05:03:41.530Z | evaluateFailureCascade | task 172-008: CODE → retry=false cascade=true |
+| 2026-05-18T05:03:41.530Z | dependency-scheduler:applyFailureCascade | Task 172-008 (CODE): cascading block to transitive dependents |
+| 2026-05-18T05:03:41.531Z | applyCascadeToSprint | Cascade applied: 172-008 (CODE) → 1 tasks blocked |
+| 2026-05-18T05:03:41.531Z | evaluateFailureCascade | task 172-009: CODE → retry=false cascade=true |
+| 2026-05-18T05:03:41.532Z | dependency-scheduler:applyFailureCascade | Task 172-009 (CODE): cascading block to transitive dependents |
+| 2026-05-18T05:03:41.532Z | applyCascadeToSprint | Cascade applied: 172-009 (CODE) → 0 tasks blocked |
+| 2026-05-18T05:03:41.533Z | evaluateFailureCascade | task 172-012: CODE → retry=false cascade=true |
+| 2026-05-18T05:03:41.534Z | dependency-scheduler:applyFailureCascade | Task 172-012 (CODE): cascading block to transitive dependents |
+| 2026-05-18T05:03:41.534Z | applyCascadeToSprint | Cascade applied: 172-012 (CODE) → 0 tasks blocked |
+| 2026-05-18T05:03:41.538Z | sprint-checkpoint:phaseTransition | Phase EVALUATE → writing checkpoint |
+| 2026-05-18T05:03:41.539Z | sprint-checkpoint:write | Checkpoint #4 written for sprint-172 |
+| 2026-05-18T05:03:41.543Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
+| 2026-05-18T05:03:41.543Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
+| 2026-05-18T05:03:41.544Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
+| 2026-05-18T05:03:41.544Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
+| 2026-05-18T05:03:41.545Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
+| 2026-05-18T05:03:41.545Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
+| 2026-05-18T05:03:41.546Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
+| 2026-05-18T05:03:41.546Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
+| 2026-05-18T05:03:41.547Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
+| 2026-05-18T05:03:41.547Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
+| 2026-05-18T05:03:41.548Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
+| 2026-05-18T05:03:41.549Z | spawnWorkers:collision | File "package.json" written by tasks: 172-005-fix, 172-006-fix, 172-007-fix, 172-012-fix |
+| 2026-05-18T05:03:41.549Z | spawnWorkers:skipBlocked | Task 172-005-fix blocked by scope collision |
+| 2026-05-18T05:03:41.549Z | spawnWorkers:skipBlocked | Task 172-006-fix blocked by scope collision |
+| 2026-05-18T05:03:41.550Z | spawnWorkers:skipBlocked | Task 172-007-fix blocked by scope collision |
+| 2026-05-18T05:03:41.586Z | docker-backend:spawn-lock | taskId=172-008-fix acquired 2 spawn lock(s) |
+| 2026-05-18T05:03:41.687Z | docker-backend:spawn | taskId=172-008-fix container=deckent-w-172-008-fix model=opus |
+| 2026-05-18T05:03:41.688Z | docker-backend:spawn-attempt | taskId=172-008-fix attempt=1/2 |
+| 2026-05-18T05:03:45.063Z | docker-backend:spawn-ok | taskId=172-008-fix containerId=9cd7b7960757 instantExit=false |
+| 2026-05-18T05:03:45.073Z | docker-backend:spawn-lock | taskId=172-009-fix acquired 2 spawn lock(s) |
+| 2026-05-18T05:03:45.180Z | docker-backend:spawn | taskId=172-009-fix container=deckent-w-172-009-fix model=sonnet |
+| 2026-05-18T05:03:45.181Z | docker-backend:spawn-attempt | taskId=172-009-fix attempt=1/2 |
+| 2026-05-18T05:03:48.621Z | docker-backend:spawn-ok | taskId=172-009-fix containerId=36e03d1c6924 instantExit=false |
+| 2026-05-18T05:03:48.623Z | spawnWorkers:skipBlocked | Task 172-012-fix blocked by scope collision |
+| 2026-05-18T05:03:48.624Z | docker-backend:exit | taskId=172-005 exitCode=0 |
+| 2026-05-18T05:07:38.688Z | docker-backend:exit | taskId=172-008-fix exitCode=0 |
+| 2026-05-18T05:07:38.844Z | docker-backend:spawn-lock | taskId=172-008-fix released 2 spawn lock(s) on exit |
+| 2026-05-18T05:08:54.149Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: .npmignore (taskId=172-009-fix, age=309s) |
+| 2026-05-18T05:08:54.150Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: .gitignore (taskId=172-009-fix, age=309s) |
+| 2026-05-18T05:08:54.188Z | forceRescanIfIdle | slot idle for 306s — respawning 4 orphan PENDING task(s): 172-005-fix, 172-006-fix, 172-007-fix, 172-012-fix |
+| 2026-05-18T05:08:54.196Z | scope-sanitizer | warnings=3, rejected=0 |
+| 2026-05-18T05:08:54.198Z | docker-backend:spawn-lock | taskId=172-005-fix acquired 7 spawn lock(s) |
+| 2026-05-18T05:08:54.301Z | docker-backend:spawn | taskId=172-005-fix container=deckent-w-172-005-fix model=opus |
+| 2026-05-18T05:08:54.302Z | docker-backend:spawn-attempt | taskId=172-005-fix attempt=1/2 |
+| 2026-05-18T05:08:57.682Z | docker-backend:spawn-ok | taskId=172-005-fix containerId=b428c7597133 instantExit=false |
+| 2026-05-18T05:08:57.692Z | scope-sanitizer | warnings=1, rejected=0 |
+| 2026-05-18T05:08:57.693Z | waitForResults:queue-spawn | Failed to spawn queued task 172-006-fix: Spawn lock conflict on package.json: file is currently held by task 172-005-fix |
+| 2026-05-18T05:08:57.701Z | waitForResults:queue-spawn | Failed to spawn queued task 172-007-fix: Spawn lock conflict on package.json: file is currently held by task 172-005-fix |
+| 2026-05-18T05:08:57.710Z | waitForResults:queue-spawn | Failed to spawn queued task 172-012-fix: Spawn lock conflict on package.json: file is currently held by task 172-005-fix |
+| 2026-05-18T05:08:57.710Z | waitForResults:progress | Sprint devam ediyor — 1/6 task tamamlandı (5dk) |
+| 2026-05-18T05:10:17.703Z | docker-backend:exit | taskId=172-009-fix exitCode=0 |
+| 2026-05-18T05:14:01.465Z | forceRescanIfIdle | slot idle for 304s — respawning 3 orphan PENDING task(s): 172-006-fix, 172-007-fix, 172-012-fix |
+| 2026-05-18T05:14:01.473Z | scope-sanitizer | warnings=1, rejected=0 |
+| 2026-05-18T05:14:01.474Z | waitForResults:queue-spawn | Failed to spawn queued task 172-006-fix: Spawn lock conflict on package.json: file is currently held by task 172-005-fix |
+| 2026-05-18T05:14:01.482Z | waitForResults:queue-spawn | Failed to spawn queued task 172-007-fix: Spawn lock conflict on package.json: file is currently held by task 172-005-fix |
+| 2026-05-18T05:14:01.490Z | waitForResults:queue-spawn | Failed to spawn queued task 172-012-fix: Spawn lock conflict on package.json: file is currently held by task 172-005-fix |
+| 2026-05-18T05:14:01.490Z | waitForResults:progress | Sprint devam ediyor — 2/6 task tamamlandı (10dk) |
+| 2026-05-18T05:14:11.793Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: .deckent/workspace/IDENTITY.md (taskId=172-005-fix, age=318s) |
+| 2026-05-18T05:14:11.794Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: README-TR.md (taskId=172-005-fix, age=318s) |
+| 2026-05-18T05:14:11.795Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: tests/scripts/update-readme-stats.test.ts (taskId=172-005-fix, age=318s) |
+| 2026-05-18T05:14:11.795Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: package.json (taskId=172-005-fix, age=318s) |
+| 2026-05-18T05:14:11.796Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: scripts/update-readme-stats.mjs (taskId=172-005-fix, age=318s) |
+| 2026-05-18T05:14:11.797Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: IDENTITY.md (taskId=172-005-fix, age=318s) |
+| 2026-05-18T05:14:11.797Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: README.md (taskId=172-005-fix, age=318s) |
+| 2026-05-18T05:14:42.330Z | docker-backend:exit | taskId=172-005-fix exitCode=0 |
+| 2026-05-18T05:19:01.730Z | forceRescanIfIdle | slot idle for 300s — respawning 3 orphan PENDING task(s): 172-006-fix, 172-007-fix, 172-012-fix |
+| 2026-05-18T05:19:01.738Z | scope-sanitizer | warnings=1, rejected=0 |
+| 2026-05-18T05:19:01.740Z | docker-backend:spawn-lock | taskId=172-006-fix acquired 9 spawn lock(s) |
+| 2026-05-18T05:19:01.864Z | docker-backend:spawn | taskId=172-006-fix container=deckent-w-172-006-fix model=opus |
+| 2026-05-18T05:19:01.865Z | docker-backend:spawn-attempt | taskId=172-006-fix attempt=1/2 |
+| 2026-05-18T05:19:05.244Z | docker-backend:spawn-ok | taskId=172-006-fix containerId=b312cb6323eb instantExit=false |
+| 2026-05-18T05:19:05.255Z | waitForResults:queue-spawn | Failed to spawn queued task 172-007-fix: Spawn lock conflict on package.json: file is currently held by task 172-006-fix |
+| 2026-05-18T05:19:05.263Z | waitForResults:queue-spawn | Failed to spawn queued task 172-012-fix: Spawn lock conflict on package.json: file is currently held by task 172-006-fix |
+| 2026-05-18T05:19:05.263Z | waitForResults:progress | Sprint devam ediyor — 3/6 task tamamlandı (15dk) |
+| 2026-05-18T05:22:59.474Z | docker-backend:exit | taskId=172-006-fix exitCode=0 |
+| 2026-05-18T05:22:59.645Z | docker-backend:spawn-lock | taskId=172-006-fix released 9 spawn lock(s) on exit |
+| 2026-05-18T05:24:08.083Z | forceRescanIfIdle | slot idle for 303s — respawning 2 orphan PENDING task(s): 172-007-fix, 172-012-fix |
+| 2026-05-18T05:24:08.093Z | docker-backend:spawn-lock | taskId=172-007-fix acquired 4 spawn lock(s) |
+| 2026-05-18T05:24:08.199Z | docker-backend:spawn | taskId=172-007-fix container=deckent-w-172-007-fix model=opus |
+| 2026-05-18T05:24:08.200Z | docker-backend:spawn-attempt | taskId=172-007-fix attempt=1/2 |
+| 2026-05-18T05:24:11.577Z | docker-backend:spawn-ok | taskId=172-007-fix containerId=4c8f6b4c78e8 instantExit=false |
+| 2026-05-18T05:24:11.586Z | waitForResults:queue-spawn | Failed to spawn queued task 172-012-fix: Spawn lock conflict on package.json: file is currently held by task 172-007-fix |
+| 2026-05-18T05:24:11.586Z | waitForResults:progress | Sprint devam ediyor — 4/6 task tamamlandı (20dk) |
+| 2026-05-18T05:29:15.860Z | forceRescanIfIdle | slot idle for 304s — respawning 1 orphan PENDING task(s): 172-012-fix |
+| 2026-05-18T05:29:15.883Z | waitForResults:queue-spawn | Failed to spawn queued task 172-012-fix: Spawn lock conflict on package.json: file is currently held by task 172-007-fix |
+| 2026-05-18T05:29:15.883Z | waitForResults:progress | Sprint devam ediyor — 4/6 task tamamlandı (25dk) |
+| 2026-05-18T05:29:36.933Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: scripts/lint-links.mjs (taskId=172-007-fix, age=329s) |
+| 2026-05-18T05:29:36.934Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: docs/.vitepress/config.ts (taskId=172-007-fix, age=329s) |
+| 2026-05-18T05:29:36.934Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: tests/scripts/lint-links.test.ts (taskId=172-007-fix, age=329s) |
+| 2026-05-18T05:29:36.935Z | file-lock:clearStaleSpawnLocks | Released stale spawn lock: package.json (taskId=172-007-fix, age=329s) |
+| 2026-05-18T05:32:27.842Z | docker-backend:exit | taskId=172-007-fix exitCode=0 |
+| 2026-05-18T05:33:51.825Z | sprint-checkpoint:phaseTransition | Phase FIX → writing checkpoint |
+| 2026-05-18T05:33:51.827Z | sprint-checkpoint:write | Checkpoint #5 written for sprint-172 |
+| 2026-05-18T05:33:51.846Z | finalizeSprint:preRetro | evaluations.size=17 keys=[172-001,172-002,172-003,172-004,172-005,172-006,172-007,172-008,172-009,172-010,172-011,172-012,172-005-fix,172-006-fix,172-007-fix,172-008-fix,172-009-fix] |
+| 2026-05-18T05:33:51.847Z | buildAgentPerformance | task=172-001 agent=doc-writer ev=DONE evalMapSize=17 evalKeys=[172-001,172-002,172-003,172-004,172-005,172-006,172-007,172-008,172-009,172-010,172-011,172-012,172-005-fix,172-006-fix,172-007-fix,172-0 |
+| 2026-05-18T05:33:51.848Z | buildAgentPerformance | task=172-002 agent=architect ev=DONE evalMapSize=17 evalKeys=[172-001,172-002,172-003,172-004,172-005,172-006,172-007,172-008,172-009,172-010,172-011,172-012,172-005-fix,172-006-fix,172-007-fix,172-00 |
+| 2026-05-18T05:33:51.849Z | buildAgentPerformance | task=172-003 agent=architect ev=DONE evalMapSize=17 evalKeys=[172-001,172-002,172-003,172-004,172-005,172-006,172-007,172-008,172-009,172-010,172-011,172-012,172-005-fix,172-006-fix,172-007-fix,172-00 |
+| 2026-05-18T05:33:51.849Z | buildAgentPerformance | task=172-004 agent=doc-writer ev=DONE evalMapSize=17 evalKeys=[172-001,172-002,172-003,172-004,172-005,172-006,172-007,172-008,172-009,172-010,172-011,172-012,172-005-fix,172-006-fix,172-007-fix,172-0 |
+| 2026-05-18T05:33:51.849Z | buildAgentPerformance | task=172-005 agent=devops-engineer ev=NO_GO evalMapSize=17 evalKeys=[172-001,172-002,172-003,172-004,172-005,172-006,172-007,172-008,172-009,172-010,172-011,172-012,172-005-fix,172-006-fix,172-007-fix |
+| 2026-05-18T05:33:51.850Z | buildAgentPerformance | task=172-006 agent=api-builder ev=NO_GO evalMapSize=17 evalKeys=[172-001,172-002,172-003,172-004,172-005,172-006,172-007,172-008,172-009,172-010,172-011,172-012,172-005-fix,172-006-fix,172-007-fix,172 |
+| 2026-05-18T05:33:51.850Z | buildAgentPerformance | task=172-007 agent=devops-engineer ev=NO_GO evalMapSize=17 evalKeys=[172-001,172-002,172-003,172-004,172-005,172-006,172-007,172-008,172-009,172-010,172-011,172-012,172-005-fix,172-006-fix,172-007-fix |
+| 2026-05-18T05:33:51.851Z | buildAgentPerformance | task=172-008 agent=data-engineer ev=NO_GO evalMapSize=17 evalKeys=[172-001,172-002,172-003,172-004,172-005,172-006,172-007,172-008,172-009,172-010,172-011,172-012,172-005-fix,172-006-fix,172-007-fix,1 |
+| 2026-05-18T05:33:51.851Z | buildAgentPerformance | task=172-009 agent=devops-engineer ev=NO_GO evalMapSize=17 evalKeys=[172-001,172-002,172-003,172-004,172-005,172-006,172-007,172-008,172-009,172-010,172-011,172-012,172-005-fix,172-006-fix,172-007-fix |
+| 2026-05-18T05:33:51.852Z | buildAgentPerformance | task=172-010 agent=doc-writer ev=DONE evalMapSize=17 evalKeys=[172-001,172-002,172-003,172-004,172-005,172-006,172-007,172-008,172-009,172-010,172-011,172-012,172-005-fix,172-006-fix,172-007-fix,172-0 |
+| 2026-05-18T05:33:51.852Z | buildAgentPerformance | task=172-011 agent=doc-writer ev=DONE evalMapSize=17 evalKeys=[172-001,172-002,172-003,172-004,172-005,172-006,172-007,172-008,172-009,172-010,172-011,172-012,172-005-fix,172-006-fix,172-007-fix,172-0 |
+| 2026-05-18T05:33:51.852Z | buildAgentPerformance | task=172-012 agent=refactorer ev=NO_GO evalMapSize=17 evalKeys=[172-001,172-002,172-003,172-004,172-005,172-006,172-007,172-008,172-009,172-010,172-011,172-012,172-005-fix,172-006-fix,172-007-fix,172- |
+| 2026-05-18T05:35:28.070Z | finalizeSprint:tripleLink | Triple-link created for sprint-172 |
+| 2026-05-18T05:35:28.091Z | finalizeSprint:routing-outcomes | Recorded 12 routing outcomes to learnings.json |
+| 2026-05-18T05:35:28.092Z | finalizeSprint:rule-evolution | 17 new rules evolved |
+| 2026-05-18T05:35:28.095Z | rule-evolver:saveRules | 17 rules saved to .deckent/routing/evolved-rules.json |
+| 2026-05-18T05:35:28.105Z | finalizeSprint:syncStatsToManifests | Synced 18 agents, 20 skills to manifest files |
+| 2026-05-18T05:35:28.107Z | finalizeSprint:promotion | agent 'test-writer': 125 tasks, 90% success — meets promotion criteria |
+| 2026-05-18T05:35:28.108Z | promotion-pipeline:promote | Temp agent 'test-writer' not found |
+| 2026-05-18T05:35:28.108Z | finalizeSprint:promotion | skill 'code-reviewer': 32 tasks, 91% success — meets promotion criteria |
+| 2026-05-18T05:35:28.109Z | promotion-pipeline:promote | Temp skill 'code-reviewer' not found |
+| 2026-05-18T05:35:28.116Z | finalizeSprint:breadcrumb | Step 10 (richOutput) — entering |
+| 2026-05-18T05:35:28.138Z | buildAgentPerformance | task=172-001 agent=doc-writer ev=DONE evalMapSize=17 evalKeys=[172-001,172-002,172-003,172-004,172-005,172-006,172-007,172-008,172-009,172-010,172-011,172-012,172-005-fix,172-006-fix,172-007-fix,172-0 |
+| 2026-05-18T05:35:28.139Z | buildAgentPerformance | task=172-002 agent=architect ev=DONE evalMapSize=17 evalKeys=[172-001,172-002,172-003,172-004,172-005,172-006,172-007,172-008,172-009,172-010,172-011,172-012,172-005-fix,172-006-fix,172-007-fix,172-00 |
+| 2026-05-18T05:35:28.139Z | buildAgentPerformance | task=172-003 agent=architect ev=DONE evalMapSize=17 evalKeys=[172-001,172-002,172-003,172-004,172-005,172-006,172-007,172-008,172-009,172-010,172-011,172-012,172-005-fix,172-006-fix,172-007-fix,172-00 |
+| 2026-05-18T05:35:28.140Z | buildAgentPerformance | task=172-004 agent=doc-writer ev=DONE evalMapSize=17 evalKeys=[172-001,172-002,172-003,172-004,172-005,172-006,172-007,172-008,172-009,172-010,172-011,172-012,172-005-fix,172-006-fix,172-007-fix,172-0 |
+| 2026-05-18T05:35:28.141Z | buildAgentPerformance | task=172-005 agent=devops-engineer ev=NO_GO evalMapSize=17 evalKeys=[172-001,172-002,172-003,172-004,172-005,172-006,172-007,172-008,172-009,172-010,172-011,172-012,172-005-fix,172-006-fix,172-007-fix |
+| 2026-05-18T05:35:28.141Z | buildAgentPerformance | task=172-006 agent=api-builder ev=NO_GO evalMapSize=17 evalKeys=[172-001,172-002,172-003,172-004,172-005,172-006,172-007,172-008,172-009,172-010,172-011,172-012,172-005-fix,172-006-fix,172-007-fix,172 |
+| 2026-05-18T05:35:28.142Z | buildAgentPerformance | task=172-007 agent=devops-engineer ev=NO_GO evalMapSize=17 evalKeys=[172-001,172-002,172-003,172-004,172-005,172-006,172-007,172-008,172-009,172-010,172-011,172-012,172-005-fix,172-006-fix,172-007-fix |
+| 2026-05-18T05:35:28.142Z | buildAgentPerformance | task=172-008 agent=data-engineer ev=NO_GO evalMapSize=17 evalKeys=[172-001,172-002,172-003,172-004,172-005,172-006,172-007,172-008,172-009,172-010,172-011,172-012,172-005-fix,172-006-fix,172-007-fix,1 |
+| 2026-05-18T05:35:28.143Z | buildAgentPerformance | task=172-009 agent=devops-engineer ev=NO_GO evalMapSize=17 evalKeys=[172-001,172-002,172-003,172-004,172-005,172-006,172-007,172-008,172-009,172-010,172-011,172-012,172-005-fix,172-006-fix,172-007-fix |
+| 2026-05-18T05:35:28.143Z | buildAgentPerformance | task=172-010 agent=doc-writer ev=DONE evalMapSize=17 evalKeys=[172-001,172-002,172-003,172-004,172-005,172-006,172-007,172-008,172-009,172-010,172-011,172-012,172-005-fix,172-006-fix,172-007-fix,172-0 |
+| 2026-05-18T05:35:28.143Z | buildAgentPerformance | task=172-011 agent=doc-writer ev=DONE evalMapSize=17 evalKeys=[172-001,172-002,172-003,172-004,172-005,172-006,172-007,172-008,172-009,172-010,172-011,172-012,172-005-fix,172-006-fix,172-007-fix,172-0 |
+| 2026-05-18T05:35:28.144Z | buildAgentPerformance | task=172-012 agent=refactorer ev=NO_GO evalMapSize=17 evalKeys=[172-001,172-002,172-003,172-004,172-005,172-006,172-007,172-008,172-009,172-010,172-011,172-012,172-005-fix,172-006-fix,172-007-fix,172- |
+| 2026-05-18T05:35:28.147Z | finalizeSprint:breadcrumb | Step 10b (selfAuditGate) — entering |
+| 2026-05-18T05:35:30.697Z | runSelfAuditGate:tsc | status=PASS errors=0 |
+| 2026-05-18T05:36:38.370Z | runSelfAuditGate:vitest | status=FAIL delta.fail=2 |
+| 2026-05-18T05:36:38.410Z | runSelfAuditGate:honesty | violations=0 |
+| 2026-05-18T05:36:38.411Z | runSelfAuditGate | overallGate=GATE_FAILURE sprint=sprint-172 |
+| 2026-05-18T05:36:38.411Z | finalizeSprint:selfAuditGate | Gate completed: overallGate=GATE_FAILURE |
+| 2026-05-18T05:36:38.412Z | finalizeSprint:selfAuditGate | Status updated: RETROSPECTIVE → GO_WITH_GATE_FAILURE |
+| 2026-05-18T05:36:38.413Z | finalizeSprint:selfAuditGate | Gate result written to /home/alperen/deckent-dev/.deckent/sprint-172-gate.json overallGate=GATE_FAILURE |
+| 2026-05-18T05:36:38.413Z | finalizeSprint:breadcrumb | Step 10c (loadReport) — entering |
+| 2026-05-18T05:36:38.415Z | finalizeSprint:loadReport | Load test report written to /home/alperen/deckent-dev/docs/audits/sprint-172/load-test-report.md |
+| 2026-05-18T05:36:38.416Z | finalizeSprint:breadcrumb | Step 10c (loadReport) — done |
+| 2026-05-18T05:36:38.416Z | finalizeSprint:breadcrumb | Step 10c2 (metricsRotation) — entering |
+| 2026-05-18T05:36:38.417Z | observability-rotation | Rotated 11167 bytes → /home/alperen/deckent-dev/.deckent/archive/metrics/metrics-sprint-172.jsonl.gz (1012 bytes gzipped), pruned 1 old archives |
+| 2026-05-18T05:36:38.418Z | finalizeSprint:metricsRotation | Rotated 11167 bytes → /home/alperen/deckent-dev/.deckent/archive/metrics/metrics-sprint-172.jsonl.gz (1012 bytes gzipped), pruned 1 old archives |
+| 2026-05-18T05:36:38.419Z | finalizeSprint:breadcrumb | Step 10c2 (metricsRotation) — done |
+| 2026-05-18T05:36:38.419Z | finalizeSprint:breadcrumb | Step 10d (featuresManifest) — entering |
+| 2026-05-18T05:36:38.522Z | finalizeSprint:featuresManifest | Sync exit=0: ✓ Features manifest written: /home/alperen/deckent-dev/.deckent/features-manifest.json (31 features) |
+| 2026-05-18T05:36:38.523Z | finalizeSprint:breadcrumb | Step 12 (archiveDirectives) — entering |
+| 2026-05-18T05:36:38.524Z | archiveDirectives | Archived DIRECTIVES.md → /home/alperen/deckent-dev/.brain/archive/DIRECTIVES-sprint-172.md (preserved; autoArchive=false default per ADR-046 amendment Sprint 168 C0a-4) |
+| 2026-05-18T05:36:38.525Z | finalizeSprint:breadcrumb | Step 12b (archiveOrphanTasks) — entering |
+| 2026-05-18T05:36:38.534Z | createPreArchiveSnapshot | Snapshot created: /home/alperen/deckent-dev/.deckent/sprint-172-pre-archive.tar.gz (91 files, hash=335ec5a19c21...) |
+| 2026-05-18T05:36:38.534Z | finalizeSprint:preArchiveSnapshot | Snapshot created: 91 files, hash=335ec5a19c21... |
+| 2026-05-18T05:36:38.542Z | archiveOrphanTasks | Archived 91 task files to /home/alperen/deckent-dev/.brain/archive/sprint-172-tasks |
+| 2026-05-18T05:36:38.542Z | finalizeSprint:archiveOrphanTasks | Archived 91 orphan task files |
+| 2026-05-18T05:36:38.542Z | finalizeSprint:breadcrumb | Step 12c (cleanTasksArchive) — entering |
+| 2026-05-18T05:36:38.543Z | finalizeSprint:cleanTasksArchive | Removed 0 old .tasks/archive/ dirs |
+| 2026-05-18T05:36:38.543Z | finalizeSprint:breadcrumb | Step 12d (sprintFileRetention) — entering |
+| 2026-05-18T05:36:38.546Z | finalizeSprint:sprintFileRetention | Retention complete: archived=6, countersDeleted=2, forensicMoved=0, bytesFreed=17904 |
+| 2026-05-18T05:36:38.547Z | finalizeSprint:breadcrumb | Step 13 (jobSummary) — entering |
+| 2026-05-18T05:36:38.548Z | finalizeSprint:jobSummary | Job summary written to /home/alperen/deckent-dev/.deckent/jobs/sprint-172.json |
+| 2026-05-18T05:36:38.548Z | finalizeSprint:breadcrumb | Step 14 (postFinalizeHooks) — entering |
+| 2026-05-18T05:36:38.559Z | postFinalizeHooks:memoryExport | 4 files written, 0 errors |
+| 2026-05-18T05:36:38.583Z | postFinalizeHooks:adrInsert | inserted=0 updated=3 skipped=50 |
+| 2026-05-18T05:36:38.600Z | postFinalizeHooks:ruleRegen | Rule regeneration hook called |
+| 2026-05-18T05:36:38.600Z | finalizeSprint:postFinalizeHooks | memExport=4 identity=skipped adrInsert=inserted=0/updated=3/skipped=50 ruleRegen=true errors=0 |
+| 2026-05-18T05:36:38.601Z | [Brain] | Cleanup delayed 180000ms — .tasks/ files remain readable |

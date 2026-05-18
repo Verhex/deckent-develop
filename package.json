@@ -28,10 +28,15 @@
     "lint": "tsc --noEmit",
     "lint:adr": "node scripts/adr-validator.mjs",
     "lint:errors": "node scripts/check-error-handling.mjs",
+    "lint:link": "node scripts/lint-links.mjs",
     "clean": "rm -rf dist",
     "validate:publish": "npx tsx scripts/validate-publish.ts",
     "docs:generate-cli": "npx tsx scripts/generate-cli-docs.ts",
-    "prepublishOnly": "npm run build"
+    "docs:ref": "node scripts/gen-reference-docs.mjs --write",
+    "docs:ref:check": "node scripts/gen-reference-docs.mjs --check",
+    "docs:stats": "node scripts/update-readme-stats.mjs --write",
+    "docs:stats:check": "node scripts/update-readme-stats.mjs --check",
+    "prepublishOnly": "npm run docs:stats:check && npm run docs:ref:check && npm run build"
   },
   "keywords": [
     "ai",

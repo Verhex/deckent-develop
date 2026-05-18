@@ -4,9 +4,18 @@
 
 **Disiplin isteyen geliştiriciler için AI orkestratör.**
 
-[![npm version](https://img.shields.io/npm/v/deckent.svg)](https://www.npmjs.com/package/deckent) [![tests](https://img.shields.io/badge/tests-16434%2B-brightgreen)](https://github.com/VerhexIO/deckent) [![coverage](https://img.shields.io/badge/coverage-89.33%25-brightgreen)](https://github.com/VerhexIO/deckent) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![sprints](https://img.shields.io/badge/sprints-166%2B-teal)](https://github.com/VerhexIO/deckent) [![version](https://img.shields.io/badge/version-v1.0.0--beta.1-orange)](https://github.com/VerhexIO/deckent)
+<!-- AUTOGEN:START id="badges" -->
+[![npm version](https://img.shields.io/npm/v/deckent.svg)](https://www.npmjs.com/package/deckent) [![tests](https://img.shields.io/badge/tests-16697%2B-brightgreen)](https://github.com/VerhexIO/deckent) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![sprints](https://img.shields.io/badge/sprints-172%2B-teal)](https://github.com/VerhexIO/deckent) [![version](https://img.shields.io/badge/version-v1.0.0--beta.1-orange)](https://github.com/VerhexIO/deckent)
+<!-- AUTOGEN:END id="badges" -->
 
 Deckent, iki modlu bir AI agent orkestrasyon CLI'dir: geliştiriciler için yapılandırılmış çok-agent sprint'leri sunan **Sprint Mode** ve tek seferlik yaşam asistanı görevleri için **Task Mode**. Hedeflerinizi yazın; Deckent görevleri planlar, paralel AI worker'lar atar, kaliteyi izler ve sonuçları disiplinle teslim eder.
+
+<!-- AUTOGEN:START id="stat-counts" -->
+- **31 MCP tools** + **8 MCP resources**
+- **15 built-in agents** (+2 custom)
+- **21 built-in skills**
+- **7 dashboard pages**
+<!-- AUTOGEN:END id="stat-counts" -->
 
 > **AST-sandbox'lanmış skill'ler • Nervous System • Memory V2 (SQLite FTS5) • 3 backend • 3 provider • cross-platform**
 
@@ -153,8 +162,8 @@ Tek görev yürütme. PLAN/SPAWN fazları yok. Hızlı komutlar, hatırlatmalar 
 - **Katman Tabanlı Routing** — Model adları yerine `brain_tier: 'premium'`; ModelRegistry, provider'a göre en uygun modeli seçer
 - **Yapılandırılabilir Timeout'lar** — Görev ve sprint bazlı timeout, `sprint_timeout_minutes: 0` sınırsız için
 - **Human Checkpoint'ler** — Plan, evaluate, fix fazlarında yapılandırılabilir onay noktaları
-- **MCP Entegrasyonu** — Claude Code IDE entegrasyonu için 27 tool + 8 resource
-- **Web Dashboard** — React + Vite + Tailwind, 6 sayfa, SSE gerçek zamanlı güncellemeler, TR/EN dil değiştirici
+- **MCP Entegrasyonu** — Claude Code IDE entegrasyonu için 31 tool + 8 resource
+- **Web Dashboard** — React + Vite + Tailwind, 7 sayfa, SSE gerçek zamanlı güncellemeler, TR/EN dil değiştirici
 
 ### Cross-Platform
 - **Linux** — Tam (Ubuntu 20+, Debian 11+, Fedora 38+, Arch)
@@ -181,8 +190,8 @@ Tek görev yürütme. PLAN/SPAWN fazları yok. Hızlı komutlar, hatırlatmalar 
 | `.deck` gizli bilgi interpolasyonu | **Evet** | Hayır | Hayır | Hayır | Hayır |
 | Görev bazlı GO/NO-GO değerlendirme | **Evet** | Hayır | Hayır | Hayır | Hayır |
 | Açık kaynak | **Evet** (MIT) | Hayır | Hayır | Evet (OSS) | Hayır |
-| MCP entegrasyonu | **Evet** (27 tool, 8 resource) | Kısmi | Hayır | Sınırlı | Native |
-| Web dashboard | **Evet** (6 sayfa) | Yerleşik | Yerleşik | Hayır | Hayır |
+| MCP entegrasyonu | **Evet** (31 tool, 8 resource) | Kısmi | Hayır | Sınırlı | Native |
+| Web dashboard | **Evet** (7 sayfa) | Yerleşik | Yerleşik | Hayır | Hayır |
 | Çoklu provider (Claude, Codex, Gemini) | **Evet** | Hayır | Hayır | Sınırlı | Hayır |
 | Yerleşik agent sayısı | **15** | — | — | 100+ | — |
 | Yerleşik skill sayısı | **21** | — | — | 13K+ (hub, ~%20 zararlı) | — |
@@ -367,7 +376,7 @@ claude mcp add deckent -- npx deckent mcp
 
 Veya `deckent init` otomatik olarak kayıt yapsın.
 
-### MCP Tool'lar (27)
+### MCP Tool'lar (31)
 
 | Tool | Açıklama |
 |------|----------|
@@ -514,7 +523,7 @@ Nervous System, sprint'lerle birlikte çalışan proaktif bir meta-orkestratorü
 deckent web   # localhost:3100 adresinde açılır
 ```
 
-React + Vite + Tailwind — 6 sayfa (Dashboard, Ayarlar, Geçmiş, Bellek, Config, Durum), SSE gerçek zamanlı güncellemeler, koyu/açık tema, TR/EN dil değiştirici.
+React + Vite + Tailwind — 7 sayfa (Chat, Config, Dashboard, Geçmiş, Bellek, Ayarlar, Durum), SSE gerçek zamanlı güncellemeler, koyu/açık tema, TR/EN dil değiştirici.
 
 <!-- ![dashboard ekran görüntüsü](docs/assets/dashboard.png) -->
 > Tam ekran görüntüsü galerisi Sprint 151'de gelecek

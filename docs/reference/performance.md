@@ -1,6 +1,6 @@
-# PERFORMANCE — Deckent Performance Tuning Guide
+# Performance Tuning Guide
 
-> Reference: CONFIG-REFERENCE.md, ARCHITECTURE.md, SPRINT-LIFECYCLE.md
+> See also: [config-reference.md](config-reference.md), [multi-provider.md](multi-provider.md)
 > Last updated: Sprint 099 (2026-04-06)
 
 ---
@@ -665,9 +665,8 @@ Is free RAM < 400 MB?
 
 ## Related Documentation
 
-- [CONFIG-REFERENCE.md](CONFIG-REFERENCE.md) — Full configuration reference
-- [ARCHITECTURE.md](ARCHITECTURE.md) — System components and data flow
-- [SPRINT-LIFECYCLE.md](SPRINT-LIFECYCLE.md) — Sprint phases in detail
-- [TROUBLESHOOTING.md](TROUBLESHOOTING.md) — Common error fixes
-- [MEMORY-SYSTEM.md](MEMORY-SYSTEM.md) — Memory tiers and decay
-- [BRAIN-GUIDE.md](BRAIN-GUIDE.md) — Brain planning internals
+- [Config Reference](./config-reference.md) — Full configuration reference
+- [Core Concepts](../guide/concepts.md) — System components and data flow
+- [Multi-Provider Guide](./multi-provider.md) — Provider-specific tuning
+- [API Reference](./api.md) — Programmatic API surface
+- [FAQ](../guide/faq.md) — Common performance questions

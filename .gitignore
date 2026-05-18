@@ -20,8 +20,24 @@ coverage/
 .brain/memory.db-shm
 .brain/memory.db.bak-*
 .brain/sprints/
-.brain/archive/
-!.brain/archive/
+
+# Sprint runtime artifacts (Memory V2 DB-first — content in memory.db)
+.brain/archive/sprint-*-tasks/
+.brain/archive/sprint-*.md
+.brain/archive/retro-sprint-*.md
+.brain/archive/pre-v2/
+.brain/archive/sprint-*_*.pid
+.brain/archive/*.snapshot.json
+.brain/archive/*.sprint-state.json
+
+# Sprint metrics (runtime + deckent archive)
+.deckent/archive/metrics/
+.deckent/sprint-*-metrics.jsonl
+
+# Test artifacts
+.test/
+.test-e2e-sprint-*/
+.test-e2e-sprint-*
 
 # Deckent runtime config & state
 .deckent/routing/
@@ -56,7 +72,6 @@ coverage/
 # Deckent runtime artifacts (per-sprint, ephemeral)
 .deckent/mcp-server.pid
 .deckent/*-gate.json
-.deckent/sprint-*-metrics.jsonl
 
 # Environment
 .env

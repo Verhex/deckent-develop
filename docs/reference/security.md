@@ -1,6 +1,6 @@
 # SECURITY.md — Deckent Security Model
 
-> Reference: [DECKENT-MASTER-BLUEPRINT.md](../DECKENT-MASTER-BLUEPRINT.md) §15 Security & Permissions
+> Reference: Deckent security model — see ADR-014 (`.deck` Secret File System), ADR-034 (Multi-Project Isolation), ADR-037 (Authority Matrix RBAC V1.0).
 
 ---
 
@@ -335,9 +335,8 @@ Brain reads this file but cannot write it. Workers have no access to it. Changes
 
 ## Related Documentation
 
-- [DECKENT-MASTER-BLUEPRINT.md §15](../DECKENT-MASTER-BLUEPRINT.md) — Primary security specification
-- [worker-guide.md](../development/worker-guide.md) — Worker scope and lock rules
-- [brain-guide.md](../development/brain-guide.md) — Brain permission boundaries
-- [architecture.md](../architecture/architecture.md) — Overall system architecture
+- [ADR Index](../adr/) — Architecture Decision Records (ADR-014, ADR-034, ADR-037 govern security)
+- [Core Concepts](../guide/concepts.md) — Overall system architecture
+- [Config Reference](./config-reference.md) — Security-relevant config keys
 - `.contracts/api-surface.md` — Worker scope contract definition
 - `.claude/rules/auditor.md` — Auditor operational rules

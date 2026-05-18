@@ -246,12 +246,12 @@ Configure different providers for Brain and workers:
 }
 ```
 
-See the [Multi-Provider Guide](/guide/multi-provider) for details.
+See the [Multi-Provider Guide](/reference/multi-provider) for details.
 
 ---
 
 ## Next Steps
 
-- [Core Concepts](/guide/concepts) -- Deep dive into how Deckent works
-- [Config Reference](/reference/config) -- Tune every parameter
-- [Troubleshooting](/guide/troubleshooting) -- Solutions for common issues
+- [Core Concepts](/guide/concepts) — Deep dive into how Deckent works
+- [Config Reference](/reference/config) — Tune every parameter
+- [FAQ](/guide/faq) — Common questions answered

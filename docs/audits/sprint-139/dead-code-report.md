@@ -1,6 +1,6 @@
 # Dead Code Audit Report — Sprint 139
 
-**Date:** 2026-05-15
+**Date:** 2026-05-18
 **Tool:** scripts/dead-code-audit.mjs
 **Scope:** src/ directory (read-only analysis)
 
@@ -75,7 +75,7 @@ These suspects turned out to be actively used.
 
 ## Unused Export Sampling
 
-Found **715** potentially unused exports across src/.
+Found **719** potentially unused exports across src/.
 Top 20 shown below (full list requires deeper analysis):
 
 | File | Export | Import Count |
@@ -92,14 +92,14 @@ Top 20 shown below (full list requires deeper analysis):
 | src/orchestra/mid-sprint-adapter.ts | RerouteResult | 0 |
 | src/orchestra/mid-sprint-adapter.ts | ReconciliationResult | 0 |
 | src/orchestra/mid-sprint-adapter.ts | ReconciliationDeps | 0 |
+| src/orchestra/mid-sprint-adapter.ts | defaultGetGitDiffStats | 0 |
+| src/orchestra/mid-sprint-adapter.ts | defaultRunTscCheck | 0 |
+| src/orchestra/mid-sprint-adapter.ts | defaultRunVitestScopeCheck | 0 |
 | src/orchestra/mid-sprint-adapter.ts | RubricReconciliationReason | 0 |
 | src/orchestra/mid-sprint-adapter.ts | RubricReconciliationResult | 0 |
 | src/orchestra/mid-sprint-adapter.ts | RUBRIC_RECONCILIATION_THRESHOLDS | 0 |
 | src/orchestra/promotion-pipeline.ts | PromotionCriteria | 0 |
 | src/orchestra/promotion-pipeline.ts | DemotionCriteria | 0 |
-| src/orchestra/promotion-pipeline.ts | PromotionResult | 0 |
-| src/orchestra/task-retry.ts | MAX_RETRY_COUNT | 0 |
-| src/orchestra/task-retry.ts | RETRY_BACKOFF_MS | 0 |
 
 ## Recommendations
 

@@ -701,4 +701,19 @@ function main(): void {
   console.log(`  Output: ${outputPath}`);
 }
 
-main();
+// Gate side-effect on direct invocation so importing this module (e.g. from
+// tests/docs/cli-reference.test.ts) does NOT overwrite docs/reference/cli.md.
+// The previous unconditional main() call clobbered AUTOGEN blocks maintained
+// by scripts/gen-reference-docs.mjs whenever the test suite imported this file.
+const __invokedDirectly = (() => {
+  try {
+    return import.meta.url === `file://${process.argv[1]}` ||
+           __filename === process.argv[1];
+  } catch {
+    return false;
+  }
+})();
+
+if (__invokedDirectly) {
+  main();
+}

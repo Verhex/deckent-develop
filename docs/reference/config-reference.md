@@ -502,7 +502,7 @@ DECKENT_WORKER_PROVIDER=codex
 DECKENT_FALLBACK_PROVIDER=gemini
 ```
 
-See [MULTI-PROVIDER-GUIDE.md](MULTI-PROVIDER-GUIDE.md) for the full multi-provider setup guide.
+See the [Multi-Provider Guide](./multi-provider.md) for the full multi-provider setup guide.
 
 ---
 
@@ -549,8 +549,8 @@ Source: `src/orchestra/rollback.ts`, `src/orchestra/sprint-phases.ts`
 
 ## Related Documentation
 
-- [ARCHITECTURE.md](ARCHITECTURE.md) -- System architecture overview
-- [BRAIN-GUIDE.md](BRAIN-GUIDE.md) -- Brain planning internals
-- [MULTI-PROVIDER-GUIDE.md](MULTI-PROVIDER-GUIDE.md) -- Multi-provider setup and usage
-- [SPRINT-LIFECYCLE.md](SPRINT-LIFECYCLE.md) -- Sprint phases and flow
-- [TROUBLESHOOTING.md](TROUBLESHOOTING.md) -- Common config issues
+- [Core Concepts](../guide/concepts.md) — Sprint, Task, Agent, Brain, Auditor overview
+- [Multi-Provider Guide](./multi-provider.md) — Multi-provider setup and usage
+- [API Reference](./api.md) — Programmatic API and HTTP endpoints
+- [MCP Guide](./mcp-guide.md) — MCP tools and resources
+- [FAQ](../guide/faq.md) — Common questions and troubleshooting

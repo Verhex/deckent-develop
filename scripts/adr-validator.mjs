@@ -20,7 +20,10 @@ export function parseADRs(content) {
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    const adrMatch = line.match(/^## (ADR-\d+):\s*(.+)/);
+    // Sprint 172 fix: auto-generated .brain/exports/decisions.md emits lowercase
+    // `## adr-NNN:` headers (canonical, matches DB id casing). Case-insensitive
+    // so the validator matches the actual generated format (pre-existing drift).
+    const adrMatch = line.match(/^## (ADR-\d+):\s*(.+)/i);
 
     if (adrMatch) {
       if (currentADR) {

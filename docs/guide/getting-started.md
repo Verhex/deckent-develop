@@ -13,7 +13,7 @@
 | Claude Code CLI | any | `claude --version` |
 | tmux | any (recommended) | `tmux -V` |
 
-You need an active Claude subscription (Pro, Max 5x, Max 20x) or an Anthropic API key. Alternatively, configure [Codex or Gemini](/guide/multi-provider) as your provider.
+You need an active Claude subscription (Pro, Max 5x, Max 20x) or an Anthropic API key. Alternatively, configure [Codex or Gemini](/reference/multi-provider) as your provider.
 
 If tmux is not installed, Deckent falls back to the subprocess backend automatically.
 
@@ -208,8 +208,8 @@ See the full [Config Reference](/reference/config) for all available parameters.
 
 ## Next Steps
 
-- [Core Concepts](/guide/concepts) -- Understand Sprint, Task, Agent, Brain, Auditor
-- [Your First Sprint](/guide/first-sprint) -- Detailed walkthrough with examples
-- [CLI Reference](/reference/cli) -- All 34+ commands documented
-- [Config Reference](/reference/config) -- Every configuration option explained
-- [Architecture](/guide/architecture) -- How the system works under the hood
+- [Core Concepts](/guide/concepts) — Understand Sprint, Task, Agent, Brain, Auditor
+- [Your First Sprint](/guide/first-sprint) — Detailed walkthrough with examples
+- [CLI Reference](/reference/cli) — All 34+ commands documented
+- [Config Reference](/reference/config) — Every configuration option explained
+- [API Reference](/reference/api) — Programmatic API and HTTP endpoints

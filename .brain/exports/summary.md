@@ -58,6 +58,8 @@
 | adr-061 | AEGIS — Agentic Effect-Governed Iterative Stewardship Methodology | proposed |
 
 ## Recent Learnings
+- **Sprint sprint-172 Learnings** (sprint-172): ## Sprint sprint-172 Learnings
+- C1 — update-readme-stats.mjs auto-gen + CI gate: NO_GO — TDD discipline: önce tests/...
 - **Sprint sprint-171 Learnings** (sprint-171): ## Sprint sprint-171 Learnings
 - Doc Audit Root: NO_GO — Sprint 171 Task 23 — Doc Audit Root tamamlandı. Repo kökünde...
 - **Sprint sprint-170 Learnings** (sprint-170): ## Sprint sprint-170 Learnings
@@ -84,15 +86,16 @@ Sprint 167 Read-Only Self-Audit deliverable'ları (kaynak: .audit/sprint-167/T*.
 | Tech Debt | 0 ...
 - **Sprint sprint-164 Learnings** (sprint-164): ## Sprint sprint-164 Learnings
 - Vitest Gate +1 Fail Closure — Chronic Regression Eradication: NO_GO — Vitest gate +1...
-- **Sprint sprint-163 Learnings** (sprint-163): ## Sprint sprint-163 Learnings
 
 ## Active Technical Debt
-- [HIGH] Tech debt from 170-001-fix: Code physically verified despite missing .result (Sp
+- [CRITICAL] Tech debt from 170-001-fix: Code physically verified despite missing .result (Sp
 
 ## Active Patterns
 - Violation pattern: stale_heartbeat
 - Violation pattern: stale_heartbeat
 - Violation pattern: stale_heartbeat
 - Violation pattern: stale_heartbeat
+- Violation pattern: doc_sync_ground_truth_mismatch
+- Violation pattern: stale_heartbeat
 
-_Total entries: 238 | Generated: 2026-05-16_
+_Total entries: 243 | Generated: 2026-05-18_

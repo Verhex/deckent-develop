@@ -10,8 +10,9 @@ export default defineConfig({
   // Clean URLs
   cleanUrls: true,
 
-  // Ignore dead links to excluded directories (reference/, development/, architecture/)
-  ignoreDeadLinks: true,
+  // Sprint 172 C3: dead-link gate enabled. Cross-cut validation via scripts/lint-links.mjs.
+  // VitePress build will fail on dead links — keeps OSS GA docs honest.
+  ignoreDeadLinks: false,
 
   // Head tags
   head: [

@@ -1,0 +1,74 @@
+# lint-links ignore — Sprint 172 C3 (OSS GA dead-link gate).
+# Patterns are gitignore-like globs (** wildcards). Empty lines / # comments allowed.
+#
+# Rationale:
+#   - Historical audit / sprint artifacts: read-only, link-rot is acceptable.
+#   - Auto-generated exports: regenerated each sprint, links churn.
+#   - Deprecated doc trees: scheduled for B3/B4 reorg in Sprint 172 plan.
+#   - Internal-only workspace dumps: not user-facing.
+# GA-public surface (root README/CLAUDE/DECKENT/DIRECTIVES, docs/guide,
+# docs/reference, docs/adr, docs/release, docs/vision, docs/launch,
+# .contracts/**) IS scanned and must be link-clean.
+
+# ─── Sprint / audit history (snapshot, never edit) ────────────────────────
+.audit/**
+.brain/archive/**
+.brain/exports/**
+.brain/MEMORY.md
+.brain/RETRO.md
+.brain/PATTERNS.md
+.brain/PROJECT-IDENTITY.md
+.brain/ERRORS.md
+.brain/sprints/**
+
+# ─── Deckent internal workspace (not user-facing OSS surface) ─────────────
+.deckent/**
+
+# ─── VitePress build output ───────────────────────────────────────────────
+docs/.vitepress/cache/**
+docs/.vitepress/dist/**
+
+# ─── Deprecated doc trees (scheduled for B3/B4 reorg) ─────────────────────
+docs/audits/**
+docs/archive/**
+docs/analysis/**
+docs/architecture/**
+docs/development/**
+docs/superpowers/**
+docs/design/**
+docs/agents/**
+docs/governance/**
+docs/launch/feature-map.md
+docs/launch/spec-*.md
+docs/launch/strategy.md
+docs/launch/competitive-analysis-condensed.md
+docs/launch/launch-checklist.md
+docs/SPRINT-LOG.md
+docs/sprint-log/**
+docs/smoke-**
+docs/KNOWN_ISSUES.md
+docs/ROADMAP-GOD-LEVEL.md
+docs/directives/**
+docs/security/**
+
+# ─── Top-level legacy/transient (pre-reorg) ───────────────────────────────
+next-session-prompt.md
+DECKENT-MASTER-BLUEPRINT.md
+DECKENT-ANA-PLAN-TR.md
+BETA-TRACKER.md
+BETA-TRACKER-TR.md
+COMPETITIVE-ANALYSIS.md
+
+# ─── Source / examples (not docs) ─────────────────────────────────────────
+src/**
+tests/**
+examples/**
+
+# ─── Task files / locks / build artifacts ─────────────────────────────────
+.tasks/**
+.locks/**
+.dashboard
+dist/**
+coverage/**
+node_modules/**
+.git/**

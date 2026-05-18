@@ -1,5 +1,17 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-172 Learnings
+- Sprint sprint-172 Learnings: ## Sprint sprint-172 Learnings
+- C1 — update-readme-stats.mjs auto-gen + CI gate: NO_GO — TDD discipline: önce tests/scripts/update-readme-stats.test.ts yazıldı (RED — script yok, import fail), sonra scripts/up
+- C2 — reference docs auto-gen (MCP/ADR/CLI/agents): NO_GO — Sprint 172 Task C2 — reference docs auto-gen (5 üretici TDD). RED: tests/scripts/gen-reference-docs.test.ts ilk çalıştır
+- C3 — lint:link dead-link gate: NO_GO — Sprint 172 C3 — lint:link dead-link gate. TDD RED→GREEN: 28/28 unit test pass. `node scripts/lint-links.mjs` exit 0 (156
+- B1 — archive DB-parity doğrulama (B2 ön-koşulu): NO_GO — B1 archive ↔ memory.db parity verifier tamamlandı (read-only). Çıktı: 23 parity-OK retro + 196 DB-eksik (121 sprint + 75
+- B2 — .gitignore/.npmignore + archive git rm --cached: NO_GO — B2 tamamlandı — kısmi (B1 parity eksikliği nedeniyle). 
+
+## DONE:
+1. .gitignore §4.3 bloğu eklendi: sprint-*-tasks/, spr
+- B5 — deckent-hub kararı + examples workspace fix: NO_GO — Step 1 TAMAMLANDI: examples/quickstart/package.json 'workspace:*' → '^1.0.0-beta.1'. OSS kullanıcıları artık 'npm instal
+
 ## Sprint sprint-171 Learnings
 - Sprint sprint-171 Learnings: ## Sprint sprint-171 Learnings
 - Doc Audit Root: NO_GO — Sprint 171 Task 23 — Doc Audit Root tamamlandı. Repo kökündeki 19 markdown dosyası tek tek denetlendi (DIRECTIVES'in idd

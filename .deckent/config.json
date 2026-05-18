@@ -2,7 +2,7 @@
   "mode": "performance",
   "language": "en",
   "projectName": "deckent",
-  "last_sprint_id": "sprint-170",
+  "last_sprint_id": "sprint-172",
   "spawn_backend": "docker",
   "modes": {
     "performance": {
@@ -89,7 +89,7 @@
   },
   "lock_stale_threshold": 300,
   "rubric_max_retries": 0,
-  "max_workers": 3,
+  "max_workers": "6",
   "sprint_checkpoint_interval": 3,
   "timeout": {
     "docker_min_timeout": 1200,

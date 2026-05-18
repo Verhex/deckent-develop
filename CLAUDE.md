@@ -74,7 +74,7 @@ When acting as Auditor: @.claude/rules/auditor.md
 When acting as Worker: @.claude/rules/worker-default.md
 
 ## Contracts
-@.contracts/api-surface.md
+@docs/reference/api-surface.md
 
 ## Identity
 @.deckent/workspace/IDENTITY.md
@@ -83,7 +83,7 @@ When acting as Worker: @.claude/rules/worker-default.md
 - **ESM imports**: `.js` uzantısı zorunlu (Node16 resolution). `import { foo } from './bar'` çalışmaz, `'./bar.js'` gerekir.
 - **MCP server restart**: `dist/` rebuild sonrası long-lived MCP process eski kodu cache'ler. `/mcp restart` veya Claude Code yeniden başlat.
 - **`deckent_start` fire-and-forget**: MCP stdio aynı process'te runSprint Promise event loop'u bloke edebilir. Long sprint için CLI `deckent start` tercih edilir.
-- **Scope enforcement**: Worker `scope.filesWrite` dışına yazamaz — `git diff --stat` Auditor tarafından izlenir, ADR-037 RBAC runtime enforcement.
+- **Scope enforcement**: Worker `scope.filesWrite` dışına yazamaz — ADR-037 RBAC **compile-time lint + audit-trail**; runtime **advisory/soft** (V1.0 Layer-2 kasıtlı eksik — ihlal `git diff --stat` ile Auditor tarafından izlenir + warn/emit edilir, **bloke ETMEZ**; hard-flip post-GA V2). Honest-gate worker tarafında self-flag eder (örn. BOUNDARY_VIOLATION → NO_GO), Brain FIX/cascade uygular.
 - **Sprint kill/cleanup**: Alperen onayı olmadan `deckent_kill`, `deckent_cleanup` (canlı sprint), `rm .tasks/*` YASAK (memory: feedback_deckent_kill_approval_required).
 
 ## Live Status
@@ -93,13 +93,13 @@ Komutlar: `deckent status`, `deckent history`, `deckent retro`, `deckent recall 
 ## Sprint Metrics
 | Metric | Value |
 |--------|-------|
-| Sprint | sprint-167 |
-| Total Tasks | 10 |
-| Completed | 9 |
-| Tech Debt | 2 |
-| No-Go | 1 |
-| Duration | -1dk -1sn |
-| Coverage | NaN% |
+| Sprint | sprint-172 |
+| Total Tasks | 17 |
+| Completed | 6 |
+| Tech Debt | 0 |
+| No-Go | 11 |
+| Duration | 67dk 33sn |
+| Coverage | 0.0% |
 
 ## Active Debt
 _No tech debt record._
@@ -107,10 +107,9 @@ _No tech debt record._
 ## Agent Performance
 | Agent | Tasks | Done | Success |
 |-------|-------|------|--------|
-| code-reviewer | 2 | 2 | 100% |
-| doc-writer | 1 | 0 | 0% |
-| data-engineer | 1 | 1 | 100% |
-| bug-fixer (**FORENSIC MODE — no fix, root cause only**) | 1 | 1 | 100% |
-| security-auditor | 1 | 1 | 100% |
-| architect | 1 | 1 | 100% |
-| generic | 3 | 3 | 100% |
+| doc-writer | 4 | 4 | 100% |
+| architect | 2 | 2 | 100% |
+| devops-engineer | 3 | 0 | 0% |
+| api-builder | 1 | 0 | 0% |
+| data-engineer | 1 | 0 | 0% |
+| refactorer | 1 | 0 | 0% |

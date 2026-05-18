@@ -1,8 +1,7 @@
 # Deckent Terminoloji Sözlüğü (Glossary)
 
-> **Kaynak:** [DECKENT-MASTER-BLUEPRINT.md](../DECKENT-MASTER-BLUEPRINT.md)
-> Bu sözlük Blueprint'teki tüm teknik terimleri alfabetik sırayla listeler.
-> Her terim için kısa bir tanım ve Blueprint'te ilk geçtiği bölüm numarası verilmiştir.
+> Bu sözlük Deckent'in tüm teknik terimlerini alfabetik sırayla listeler.
+> Her terim için kısa bir tanım ve ilgili referans bağlantısı verilmiştir.
 
 ---
 

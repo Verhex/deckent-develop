@@ -40,7 +40,7 @@ sudo apt install tmux
 sudo dnf install tmux
 ```
 
-You also need an active Claude subscription (Pro, Max 5x, Max 20x) or an Anthropic API key. Alternatively, you can use OpenAI Codex or Google Gemini as providers -- see [MULTI-PROVIDER-GUIDE.md](MULTI-PROVIDER-GUIDE.md).
+You also need an active Claude subscription (Pro, Max 5x, Max 20x) or an Anthropic API key. Alternatively, you can use OpenAI Codex or Google Gemini as providers — see [Multi-Provider Guide](../reference/multi-provider.md).
 
 ---
 
@@ -345,15 +345,11 @@ cat .brain/MEMORY.md
 
 ## 7. Next Steps
 
-- **[CONFIG-REFERENCE.md](CONFIG-REFERENCE.md)** -- All configuration options in detail
-- **[API.md](API.md)** -- Full TypeScript API and HTTP API reference
-- **[MCP-GUIDE.md](MCP-GUIDE.md)** -- Using Deckent inside Claude Code via MCP
-- **[ARCHITECTURE.md](ARCHITECTURE.md)** -- How Brain, Workers, and Auditor work together
-- **[SPRINT-LIFECYCLE.md](SPRINT-LIFECYCLE.md)** -- The full PLAN, SPAWN, EXECUTE, EVALUATE, RETRO, DECAY cycle
-- **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** -- Solutions for common issues
-- **[MULTI-PROVIDER-GUIDE.md](MULTI-PROVIDER-GUIDE.md)** -- Using Claude, Codex, and Gemini together
-- **[PLUGIN-GUIDE.md](PLUGIN-GUIDE.md)** -- How to extend Deckent with plugins
-- **[GLOSSARY.md](GLOSSARY.md)** -- Terminology reference
+- **[Config Reference](../reference/config-reference.md)** — All configuration options in detail
+- **[API Reference](../reference/api.md)** — Full TypeScript API and HTTP API reference
+- **[MCP Guide](../reference/mcp-guide.md)** — Using Deckent inside Claude Code via MCP
+- **[Multi-Provider Guide](../reference/multi-provider.md)** — Using Claude, Codex, and Gemini together
+- **[Glossary](../reference/glossary.md)** — Terminology reference
 
 ---
 

@@ -78,7 +78,30 @@
       "Skill(superpowers:brainstorming)",
       "Skill(superpowers:writing-plans)",
       "Bash(sed -n '730,765p' src/orchestra/spawn-backend-docker.ts)",
-      "Bash(sed -n '425,460p' src/core/file-lock.ts)"
+      "Bash(sed -n '425,460p' src/core/file-lock.ts)",
+      "Bash(awk '{print $NF}')",
+      "WebFetch(domain:gist.github.com)",
+      "Bash(awk '/^## Task 29:/,/^## GO\\\\/NO_GO/' DIRECTIVES.md)",
+      "Bash(mkdir -p 01-modul-derin 02-concern 03-dokuman 04-db 99-runtime-artifact)",
+      "Bash(mv SYNTHESIS.md 00-SYNTHESIS.md)",
+      "Bash(mv orchestra-lifecycle.md 01-modul-derin/01-orchestra-lifecycle.md)",
+      "Bash(mv orchestra-routing.md 01-modul-derin/02-orchestra-routing.md)",
+      "Bash(mv orchestra-infra.md 01-modul-derin/03-orchestra-infra.md)",
+      "Skill(superpowers:systematic-debugging)",
+      "Skill(superpowers:test-driven-development)",
+      "Bash(awk '{print $6, $7}')",
+      "Bash(deckent --version)",
+      "Bash(deckent start *)",
+      "Bash(nohup npx deckent start --auto-approve --timeout 21600000)",
+      "Bash(echo \"deckent start PID: $!\")",
+      "Bash(ps -p 6727 -o pid,etime,cmd)",
+      "Bash(ps -p 6727 -o pid,etime,stat,cmd)",
+      "Bash(ps -p 6727 -o pid,etime,stat)",
+      "Bash(sort -t' ' -k2)",
+      "Bash(xargs -n1 basename)",
+      "Bash(echo \"tsc exit: $?\")",
+      "Bash(echo \"lint:adr exit: $?\")",
+      "Bash(awk '{print $NF, $5\"B\"}')"
     ]
   }
 }

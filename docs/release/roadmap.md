@@ -98,4 +98,4 @@ Sprint 051-065 ile planlanan ve ilerleme durumu:
 ---
 
 *Current status: Sprint 100+ completed — 12,051+ tests passing, 96%+ coverage, 35+ CLI commands*
-*Source of truth: [DECKENT-MASTER-BLUEPRINT.md](../DECKENT-MASTER-BLUEPRINT.md) — Sections 12, 19, 23, 24*
+*Source of truth: ADR records ([`docs/adr/`](../adr/)) and the [CHANGELOG](../../CHANGELOG.md).*

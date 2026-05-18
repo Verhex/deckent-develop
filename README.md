@@ -2,11 +2,20 @@
 
 **The AI orchestrator for developers who want discipline.**
 
-[![npm version](https://img.shields.io/npm/v/deckent.svg)](https://www.npmjs.com/package/deckent) [![tests](https://img.shields.io/badge/tests-16434%2B-brightgreen)](https://github.com/VerhexIO/deckent) [![coverage](https://img.shields.io/badge/coverage-89.33%25-brightgreen)](https://github.com/VerhexIO/deckent) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![sprints](https://img.shields.io/badge/sprints-166%2B-teal)](https://github.com/VerhexIO/deckent) [![version](https://img.shields.io/badge/version-v1.0.0--beta.1-orange)](https://github.com/VerhexIO/deckent)
+<!-- AUTOGEN:START id="badges" -->
+[![npm version](https://img.shields.io/npm/v/deckent.svg)](https://www.npmjs.com/package/deckent) [![tests](https://img.shields.io/badge/tests-16697%2B-brightgreen)](https://github.com/VerhexIO/deckent) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![sprints](https://img.shields.io/badge/sprints-172%2B-teal)](https://github.com/VerhexIO/deckent) [![version](https://img.shields.io/badge/version-v1.0.0--beta.1-orange)](https://github.com/VerhexIO/deckent)
+<!-- AUTOGEN:END id="badges" -->
 
 Deckent is an AI agent orchestration CLI with two modes: **Sprint Mode** for structured multi-agent development sprints, and **Task Mode** for one-shot life assistant tasks. Write your goals, and Deckent plans tasks, assigns parallel AI workers, monitors quality, and delivers results — all with discipline.
 
 > **AST-sandboxed skills • Nervous System • Memory V2 (SQLite FTS5) • 3 backends • 3 providers • cross-platform**
+
+<!-- AUTOGEN:START id="stat-counts" -->
+- **31 MCP tools** + **8 MCP resources**
+- **15 built-in agents** (+2 custom)
+- **21 built-in skills**
+- **7 dashboard pages**
+<!-- AUTOGEN:END id="stat-counts" -->
 
 <!-- ![demo](docs/assets/demo.gif) -->
 
@@ -151,8 +160,8 @@ Single-task execution. No PLAN/SPAWN phases. Ideal for quick commands, reminders
 - **Tier-Based Routing** — `brain_tier: 'premium'` instead of model names; ModelRegistry resolves best model per provider
 - **Configurable Timeouts** — Per-task and per-sprint timeout, `sprint_timeout_minutes: 0` for unlimited
 - **Human Checkpoints** — Configurable approval gates at plan, evaluate, fix phases
-- **MCP Integration** — 27 tools + 8 resources for Claude Code IDE integration
-- **Web Dashboard** — React + Vite + Tailwind, 6 pages, SSE real-time updates, TR/EN language switcher
+- **MCP Integration** — 31 tools + 8 resources for Claude Code IDE integration
+- **Web Dashboard** — React + Vite + Tailwind, 7 pages, SSE real-time updates, TR/EN language switcher
 
 ### Cross-Platform
 - **Linux** — Full (Ubuntu 20+, Debian 11+, Fedora 38+, Arch)
@@ -179,8 +188,8 @@ Single-task execution. No PLAN/SPAWN phases. Ideal for quick commands, reminders
 | `.deck` secret interpolation | **Yes** | No | No | No | No |
 | GO/NO-GO evaluation per task | **Yes** | No | No | No | No |
 | Open source | **Yes** (MIT) | No | No | Yes (OSS) | No |
-| MCP integration | **Yes** (27 tools, 8 resources) | Partial | No | Limited | Native |
-| Web dashboard | **Yes** (6 pages) | Built-in | Built-in | No | No |
+| MCP integration | **Yes** (31 tools, 8 resources) | Partial | No | Limited | Native |
+| Web dashboard | **Yes** (7 pages) | Built-in | Built-in | No | No |
 | Multi-provider (Claude, Codex, Gemini) | **Yes** | No | No | Limited | No |
 | Built-in agents | **15** | — | — | 100+ | — |
 | Built-in skills | **21** | — | — | 13K+ (hub, ~20% flagged) | — |
@@ -365,7 +374,7 @@ claude mcp add deckent -- npx deckent mcp
 
 Or let `deckent init` auto-register it.
 
-### MCP Tools (27)
+### MCP Tools (31)
 
 | Tool | Description |
 |------|-------------|
@@ -512,7 +521,7 @@ The Nervous System is a proactive meta-orchestrator that runs alongside sprints:
 deckent web   # Opens at localhost:3100
 ```
 
-React + Vite + Tailwind — 6 pages (Dashboard, Settings, History, Memory, Config, Status), SSE real-time updates, dark/light theme, TR/EN language switcher.
+React + Vite + Tailwind — 7 pages (Chat, Config, Dashboard, History, Memory, Settings, Status), SSE real-time updates, dark/light theme, TR/EN language switcher.
 
 <!-- ![dashboard screenshot](docs/assets/dashboard.png) -->
 > Full screenshot gallery coming in Sprint 151

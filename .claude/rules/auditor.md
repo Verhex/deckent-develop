@@ -35,9 +35,10 @@ paths: [".dashboard",".brain/PATTERNS.md"]
 
 ## Active ADR Constraints
 
+- **ADR-010**: Tek Runtime Dependency — commander.js — **Status:** accepted
+- **ADR-046**: Brain Self-Update Hook Architecture — **Status:** accepted
 - **ADR-048**: Prompt Lifecycle Contract — Sprint 168 C0e BUG-HH eradication. .tasks/.prompt-*.txt selective cleanup via getActiveWorkerIds() shared helper. Cross-
 - **ADR-047**: Manuel Subagent Dispatch Protocol — Sprint 164-168 manuel survival pattern formal kontrat. Hardened dispatch: git worktree isolation + file authority matrix
-- **ADR-046**: Brain Self-Update Hook Architecture — **Status:** accepted
 - **ADR-045**: Wave-Based Execution Semantics — respawnEligibleTasks Runtime Wire — **Status:** accepted
 - **ADR-043**: Brain Crash Recovery Protocol — **Status:** accepted
 - **ADR-044**: Sprint State Observability Contract — **Status:** accepted
@@ -77,7 +78,6 @@ paths: [".dashboard",".brain/PATTERNS.md"]
 - **ADR-007**: SpawnOptions Interface — **Status:** accepted
 - **ADR-008**: Brain Merkezi Import — Tek Yönlü Bağımlılık — **Status:** accepted
 - **ADR-009**: DEBT.md Markdown Tablo Formatı — **Status:** accepted
-- **ADR-010**: Tek Runtime Dependency — commander.js — **Status:** accepted
 - **ADR-011**: node:readline/promises — Built-in Prompt — **Status:** accepted
 - **ADR-012**: register\<Name\>(program) Pattern — **Status:** accepted
 - **ADR-022-V2**: CLI/MCP Feature Parity — Parametre Eşitleme + Eksik Komutlar (Updated Sprint 085) — **Status:** accepted

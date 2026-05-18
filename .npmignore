@@ -38,6 +38,23 @@ vitest.config.ts
 vitest.dashboard.config.ts
 .github/
 
+# Sprint 172 B2 — SYNTHESIS §4.3 npmignore additions
+# Internal audits (not for OSS consumers)
+docs/audits/
+.audit/
+
+# Workspace packages (separate repos / optional)
+deckent-hub/
+examples/
+
+# Sprint runtime artifacts (DB-first, not in package)
+.brain/archive/sprint-*-tasks/
+.brain/archive/sprint-*.md
+.brain/archive/retro-sprint-*.md
+.brain/archive/pre-v2/
+.brain/archive/*.snapshot.json
+.deckent/archive/
+
 # Scripts (shell scripts not needed in package)
 scripts/
 

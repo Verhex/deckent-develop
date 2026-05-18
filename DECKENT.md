@@ -48,12 +48,12 @@
 ## Architecture Decision Records
 - `.brain/exports/decisions.md` = **ADR** (Architecture Decision Record) — generated export from memory.db, MADR v3 hibrit format, mandatory read for all agents
 - `.deckent/decisions/*.json` = **SDL** (Sprint Decision Log) — tactical decisions, audit trail, optional
-- **Sprint 167 flip:** `dependency_pipeline_enabled: true` — Wave scheduling goes live (anchor for Sprint 167 DIRECTIVES)
+- **`dependency_pipeline_enabled`:** kod default `true` (`config.ts:600`, Sprint 156 eklendi). deckent-dev bu projede bilinçli `false` (`.deckent/config.json:198`) — Wave geçişleri Brain manuel (ADR-047). Kullanıcı projelerinde default `true` = otomatik wave (ADR-045).
 
 ## Context
 @DIRECTIVES.md
 @.brain/exports/summary.md
-@.contracts/api-surface.md
+@docs/reference/api-surface.md
 
 ## Agent Roles
 When acting as Brain: @.claude/rules/brain.md

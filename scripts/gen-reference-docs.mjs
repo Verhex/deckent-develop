@@ -1,0 +1,479 @@
+#!/usr/bin/env node
+// gen-reference-docs.mjs — Sprint 172 Task C2
+// Single source of truth for reference docs (MCP tools/resources, ADR index, CLI, agents).
+// Modes:
+//   --check  → exit 1 if any target file drifts from generated content (CI gate)
+//   --write  → overwrite targets in place
+// Exit codes: 0 = ok / in-sync, 1 = drift detected (check) or write error, 2 = bad args
+
+import { readFileSync, readdirSync, writeFileSync, existsSync, statSync, mkdirSync } from 'node:fs';
+import { join, dirname, resolve, relative } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const DEFAULT_ROOT = resolve(__dirname, '..');
+
+const AUTOGEN_START = (id) => `<!-- AUTOGEN:START id="${id}" -->`;
+const AUTOGEN_END = (id) => `<!-- AUTOGEN:END id="${id}" -->`;
+
+// ─── filesystem helpers ──────────────────────────────────────────────────────
+
+function listFilesRecursive(dir, predicate) {
+  if (!existsSync(dir)) return [];
+  const out = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const p = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      if (entry.name === 'archive' || entry.name === 'node_modules') continue;
+      out.push(...listFilesRecursive(p, predicate));
+    } else if (entry.isFile() && predicate(entry.name, p)) {
+      out.push(p);
+    }
+  }
+  return out;
+}
+
+// ─── MCP tools parser ────────────────────────────────────────────────────────
+
+const TOOL_RE = /server\.registerTool\(\s*['"]([a-zA-Z0-9_-]+)['"]\s*,\s*\{([\s\S]*?)\}\s*,\s*async/g;
+const TITLE_RE = /title:\s*['"`]([^'"`]+)['"`]/;
+const DESC_RE = /description:\s*['"`]([^'"`]+)['"`]/;
+
+export function parseMcpTools(toolsDir) {
+  const files = listFilesRecursive(toolsDir, (n) => n.endsWith('.ts') && !n.endsWith('.d.ts') && n !== 'index.ts');
+  const tools = [];
+  for (const file of files) {
+    const src = readFileSync(file, 'utf-8');
+    let m;
+    TOOL_RE.lastIndex = 0;
+    while ((m = TOOL_RE.exec(src)) !== null) {
+      const name = m[1];
+      const opts = m[2];
+      const title = TITLE_RE.exec(opts)?.[1] ?? '';
+      const description = DESC_RE.exec(opts)?.[1] ?? '';
+      tools.push({ name, title, description });
+    }
+  }
+  // Sort deterministically by name.
+  tools.sort((a, b) => a.name.localeCompare(b.name));
+  return tools;
+}
+
+// ─── MCP resources parser ────────────────────────────────────────────────────
+
+const RESOURCE_RE = /server\.registerResource\(\s*['"]([a-zA-Z0-9_-]+)['"]\s*,\s*['"]([^'"]+)['"]\s*,\s*\{([\s\S]*?)\}\s*,\s*async/g;
+const MIME_RE = /mimeType:\s*['"`]([^'"`]+)['"`]/;
+
+export function parseMcpResources(resDir) {
+  const files = listFilesRecursive(resDir, (n) => n.endsWith('.ts') && !n.endsWith('.d.ts') && n !== 'index.ts');
+  const resources = [];
+  for (const file of files) {
+    const src = readFileSync(file, 'utf-8');
+    let m;
+    RESOURCE_RE.lastIndex = 0;
+    while ((m = RESOURCE_RE.exec(src)) !== null) {
+      const name = m[1];
+      const uri = m[2];
+      const opts = m[3];
+      const title = TITLE_RE.exec(opts)?.[1] ?? '';
+      const description = DESC_RE.exec(opts)?.[1] ?? '';
+      const mimeType = MIME_RE.exec(opts)?.[1] ?? '';
+      resources.push({ name, uri, title, description, mimeType });
+    }
+  }
+  resources.sort((a, b) => a.name.localeCompare(b.name));
+  return resources;
+}
+
+// ─── ADR parser ──────────────────────────────────────────────────────────────
+
+const ADR_FILE_RE = /^(\d+)-.+\.md$/;
+const ADR_HEADING_RE = /^#\s+ADR-(\d+):\s*(.+)$/m;
+const ADR_STATUS_RE = /\*\*Status:\*\*\s*([a-zA-Z]+)/;
+
+export function parseAdrs(adrDir) {
+  if (!existsSync(adrDir)) return [];
+  const out = [];
+  for (const entry of readdirSync(adrDir, { withFileTypes: true })) {
+    if (!entry.isFile()) continue;
+    if (!ADR_FILE_RE.test(entry.name)) continue;
+    const file = join(adrDir, entry.name);
+    const content = readFileSync(file, 'utf-8');
+    const head = ADR_HEADING_RE.exec(content);
+    if (!head) continue;
+    const idNum = head[1];
+    const title = head[2].trim();
+    const status = (ADR_STATUS_RE.exec(content)?.[1] ?? 'unknown').toLowerCase();
+    out.push({ id: `ADR-${idNum.padStart(3, '0')}`, num: parseInt(idNum, 10), title, status, file: entry.name });
+  }
+  // Deduplicate by id (some ADRs may have duplicate files — keep highest precedence file)
+  const byId = new Map();
+  for (const a of out) {
+    const existing = byId.get(a.id);
+    // Prefer accepted over proposed; otherwise alphabetical filename
+    if (!existing) byId.set(a.id, a);
+    else if (existing.status !== 'accepted' && a.status === 'accepted') byId.set(a.id, a);
+  }
+  return Array.from(byId.values()).sort((a, b) => a.num - b.num);
+}
+
+// ─── CLI command parser ──────────────────────────────────────────────────────
+
+const COMMAND_RE = /\.command\(\s*['"]([^'"]+)['"]\s*\)\s*(?:\.alias\([^)]*\))?\s*\.description\(\s*['"`]([\s\S]*?)['"`]\s*\)/g;
+
+export function parseCliCommands(cmdDir) {
+  const files = listFilesRecursive(cmdDir, (n) => n.endsWith('.ts') && !n.endsWith('.d.ts'));
+  const cmds = [];
+  for (const file of files) {
+    const src = readFileSync(file, 'utf-8');
+    let m;
+    COMMAND_RE.lastIndex = 0;
+    while ((m = COMMAND_RE.exec(src)) !== null) {
+      const signature = m[1].trim();
+      const description = m[2].replace(/\s+/g, ' ').trim();
+      const name = signature.split(/\s+/)[0];
+      cmds.push({ name, signature, description });
+    }
+  }
+  // Dedup by signature; preserve insertion order for stability then sort by name.
+  const seen = new Set();
+  const unique = [];
+  for (const c of cmds) {
+    const key = `${c.signature}|${c.description}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(c);
+  }
+  unique.sort((a, b) => a.name.localeCompare(b.name) || a.signature.localeCompare(b.signature));
+  return unique;
+}
+
+// ─── Agents parser ───────────────────────────────────────────────────────────
+
+export function parseAgents(agentsDir) {
+  if (!existsSync(agentsDir)) return [];
+  const out = [];
+  for (const entry of readdirSync(agentsDir, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    if (entry.name === 'archive') continue;
+    const manifest = join(agentsDir, entry.name, 'agent.json');
+    if (!existsSync(manifest)) continue;
+    try {
+      const data = JSON.parse(readFileSync(manifest, 'utf-8'));
+      out.push({
+        id: data.id ?? entry.name,
+        name: data.name ?? entry.name,
+        description: data.description ?? '',
+        expertise: Array.isArray(data.expertise) ? data.expertise : [],
+        builtIn: !String(data.id ?? entry.name).startsWith('temp-'),
+      });
+    } catch {
+      // Skip malformed manifests.
+    }
+  }
+  out.sort((a, b) => a.id.localeCompare(b.id));
+  return out;
+}
+
+// ─── escape helper for markdown table cells ──────────────────────────────────
+
+function tableCell(s) {
+  return String(s ?? '').replace(/\|/g, '\\|').replace(/\r?\n/g, ' ').trim();
+}
+
+// ─── Renderers ───────────────────────────────────────────────────────────────
+
+export function renderMcpTools(tools) {
+  const lines = [];
+  lines.push(`> ${tools.length} tools registered. Generated from \`src/mcp/tools/*.ts\`.`);
+  lines.push('');
+  lines.push('| Tool | Title | Description |');
+  lines.push('|------|-------|-------------|');
+  for (const t of tools) {
+    lines.push(`| \`${t.name}\` | ${tableCell(t.title)} | ${tableCell(t.description)} |`);
+  }
+  return lines.join('\n') + '\n';
+}
+
+export function renderMcpResources(resources) {
+  const lines = [];
+  lines.push(`> ${resources.length} resources registered. Generated from \`src/mcp/resources/*.ts\`.`);
+  lines.push('');
+  lines.push('| Resource | URI | MIME | Description |');
+  lines.push('|----------|-----|------|-------------|');
+  for (const r of resources) {
+    lines.push(`| \`${r.name}\` | \`${r.uri}\` | \`${r.mimeType}\` | ${tableCell(r.description)} |`);
+  }
+  return lines.join('\n') + '\n';
+}
+
+export function renderAdrs(adrs) {
+  const lines = [];
+  lines.push(`> ${adrs.length} ADRs. Generated from \`docs/adr/*.md\`.`);
+  lines.push('');
+  // Group counts by status
+  const counts = {};
+  for (const a of adrs) counts[a.status] = (counts[a.status] ?? 0) + 1;
+  const statusLine = Object.keys(counts).sort().map((s) => `${s} (${counts[s]})`).join(' · ');
+  if (statusLine) lines.push(`**By status:** ${statusLine}`);
+  lines.push('');
+  lines.push('| ID | Title | Status | File |');
+  lines.push('|----|-------|--------|------|');
+  for (const a of adrs) {
+    lines.push(`| ${a.id} | ${tableCell(a.title)} | ${a.status} | [\`${a.file}\`](./${a.file}) |`);
+  }
+  return lines.join('\n') + '\n';
+}
+
+export function renderCliCommands(commands) {
+  const lines = [];
+  lines.push(`> ${commands.length} commands. Generated from \`src/cli/commands/*.ts\`.`);
+  lines.push('');
+  lines.push('| Command | Description |');
+  lines.push('|---------|-------------|');
+  for (const c of commands) {
+    lines.push(`| \`deckent ${c.signature}\` | ${tableCell(c.description)} |`);
+  }
+  return lines.join('\n') + '\n';
+}
+
+export function renderAgents(agents) {
+  const lines = [];
+  const builtIn = agents.filter((a) => a.builtIn);
+  const custom = agents.filter((a) => !a.builtIn);
+  lines.push(`> ${agents.length} agents (${builtIn.length} built-in, ${custom.length} custom). Generated from \`.deckent/agents/*/agent.json\`.`);
+  lines.push('');
+  lines.push('| Agent | Name | Expertise | Description |');
+  lines.push('|-------|------|-----------|-------------|');
+  for (const a of agents) {
+    lines.push(`| \`${a.id}\` | ${tableCell(a.name)} | ${tableCell(a.expertise.join(', '))} | ${tableCell(a.description)} |`);
+  }
+  return lines.join('\n') + '\n';
+}
+
+// ─── AUTOGEN block replacement ───────────────────────────────────────────────
+
+export function replaceAutogenBlock(content, blockId, newBody) {
+  const start = AUTOGEN_START(blockId);
+  const end = AUTOGEN_END(blockId);
+  const startIdx = content.indexOf(start);
+  const endIdx = content.indexOf(end);
+  if (startIdx === -1 || endIdx === -1 || endIdx <= startIdx) {
+    throw new Error(`AUTOGEN markers for id="${blockId}" not found in content`);
+  }
+  const before = content.slice(0, startIdx + start.length);
+  const after = content.slice(endIdx);
+  const body = newBody.endsWith('\n') ? newBody : newBody + '\n';
+  return `${before}\n${body}${after}`;
+}
+
+// ─── Build target file content (header + AUTOGEN block + body) ───────────────
+
+function buildTargetContent(blockId, header, body) {
+  return [
+    header.trim(),
+    '',
+    AUTOGEN_START(blockId),
+    body.trimEnd(),
+    AUTOGEN_END(blockId),
+    '',
+  ].join('\n');
+}
+
+/**
+ * For files with rich hand/separately-generated content (cli.md), embed an
+ * AUTOGEN block inside the existing file without disturbing the rest.
+ *
+ * Strategy:
+ *   - If the file does not exist: write a minimal scaffold (header + AUTOGEN block).
+ *   - If the file exists with AUTOGEN markers for blockId: replace block content.
+ *   - If the file exists without AUTOGEN markers: append a new section + AUTOGEN
+ *     block at the end (preserves all prior content; idempotent on subsequent runs).
+ */
+function buildEmbedContent(existingContent, blockId, header, body) {
+  const start = AUTOGEN_START(blockId);
+  const end = AUTOGEN_END(blockId);
+  if (existingContent && existingContent.includes(start) && existingContent.includes(end)) {
+    return replaceAutogenBlock(existingContent, blockId, body.trimEnd());
+  }
+  // Append a fresh section with marker block at the end.
+  const tail = [
+    '',
+    '---',
+    '',
+    header.trim(),
+    '',
+    start,
+    body.trimEnd(),
+    end,
+    '',
+  ].join('\n');
+  if (!existingContent) {
+    return tail.replace(/^\n---\n\n/, ''); // drop the leading separator if no prior content
+  }
+  const trimmed = existingContent.replace(/\s+$/, '');
+  return `${trimmed}\n${tail}`;
+}
+
+// ─── Collect all generations (parse → render → expected content) ─────────────
+
+export function collectGenerations({ root = DEFAULT_ROOT } = {}) {
+  const toolsDir = join(root, 'src/mcp/tools');
+  const resDir = join(root, 'src/mcp/resources');
+  const adrDir = join(root, 'docs/adr');
+  const cliDir = join(root, 'src/cli/commands');
+  const agentsDir = join(root, '.deckent/agents');
+
+  const tools = parseMcpTools(toolsDir);
+  const resources = parseMcpResources(resDir);
+  const adrs = parseAdrs(adrDir);
+  const commands = parseCliCommands(cliDir);
+  const agents = parseAgents(agentsDir);
+
+  const generations = [
+    {
+      id: 'mcp-tools',
+      target: 'docs/reference/mcp-tools.md',
+      targetDir: 'docs/reference',
+      mode: 'fresh',
+      header: '# MCP Tools Reference\n\n> **Auto-generated** — do not edit AUTOGEN block by hand. Run `npm run docs:ref` to regenerate.\n\nDeckent ships an MCP server that exposes orchestration to MCP-compatible IDEs (Claude Code, Cursor, etc.). The tools below are registered in `src/mcp/tools/*.ts` and surfaced via `deckent-mcp` stdio transport.',
+      body: renderMcpTools(tools),
+      count: tools.length,
+    },
+    {
+      id: 'mcp-resources',
+      target: 'docs/reference/mcp-resources.md',
+      targetDir: 'docs/reference',
+      mode: 'fresh',
+      header: '# MCP Resources Reference\n\n> **Auto-generated** — do not edit AUTOGEN block by hand. Run `npm run docs:ref` to regenerate.\n\nMCP resources expose live project state (dashboard, directives, memory, debt, tasks, …) to MCP-compatible IDEs via the `deckent://` URI scheme.',
+      body: renderMcpResources(resources),
+      count: resources.length,
+    },
+    {
+      id: 'adr-index',
+      target: 'docs/adr/README.md',
+      targetDir: 'docs/adr',
+      mode: 'fresh',
+      header: '# Architecture Decision Records — Index\n\n> **Auto-generated** — do not edit AUTOGEN block by hand. Run `npm run docs:ref` to regenerate.\n\nThe canonical source of truth for ADR content is `.brain/memory.db` (Memory V2). This index is generated by scanning `docs/adr/*.md` filenames.',
+      body: renderAdrs(adrs),
+      count: adrs.length,
+    },
+    {
+      id: 'cli',
+      target: 'docs/reference/cli.md',
+      targetDir: 'docs/reference',
+      mode: 'embed',
+      header: '## Command Index (auto-generated)\n\n> **Source-parsed** — extracted from `src/cli/commands/*.ts` `.command(...)` registrations.\n> Hand-curated sections above are produced by `scripts/generate-cli-docs.ts`; this block is maintained by `scripts/gen-reference-docs.mjs`.',
+      body: renderCliCommands(commands),
+      count: commands.length,
+    },
+    {
+      id: 'agents',
+      target: 'docs/reference/agents.md',
+      targetDir: 'docs/reference',
+      mode: 'fresh',
+      header: '# Agents Reference\n\n> **Auto-generated** — do not edit AUTOGEN block by hand. Run `npm run docs:ref` to regenerate.\n\nAgents are domain specialists that Brain assigns per task. Built-in agents live under `.deckent/agents/`; `temp-*` agents are runtime-generated and auto-promoted/demoted by the Evolution Pipeline.',
+      body: renderAgents(agents),
+      count: agents.length,
+    },
+  ];
+
+  // Compute expected content + drift status.
+  for (const gen of generations) {
+    let actual = '';
+    let exists = false;
+    const targetPath = join(root, gen.target);
+    if (existsSync(targetPath)) {
+      exists = true;
+      actual = readFileSync(targetPath, 'utf-8');
+    }
+    const expected = gen.mode === 'embed'
+      ? buildEmbedContent(actual, gen.id, gen.header, gen.body)
+      : buildTargetContent(gen.id, gen.header, gen.body);
+    gen.content = expected;
+    gen.actual = actual;
+    gen.exists = exists;
+    gen.drift = !exists || actual !== expected;
+  }
+
+  return generations;
+}
+
+// ─── CLI entry ───────────────────────────────────────────────────────────────
+
+function fmtCount(n, label) {
+  if (n === 1) return `1 ${label}`;
+  // pluralise: entry → entries, otherwise add s
+  const plural = label.endsWith('y') ? label.slice(0, -1) + 'ies' : label + 's';
+  return `${n} ${plural}`;
+}
+
+export function main(argv = process.argv.slice(2), opts = {}) {
+  const args = new Set(argv);
+  const check = args.has('--check');
+  const write = args.has('--write');
+  if (args.has('-h') || args.has('--help')) {
+    process.stdout.write(
+      'gen-reference-docs.mjs — generate reference docs from source\n\n' +
+      'Usage:\n' +
+      '  node scripts/gen-reference-docs.mjs --check   # CI gate (exit 1 on drift)\n' +
+      '  node scripts/gen-reference-docs.mjs --write   # rewrite target files\n',
+    );
+    return 0;
+  }
+  if (!check && !write) {
+    process.stderr.write('error: must pass --check or --write\n');
+    return 2;
+  }
+  const root = opts.root ?? DEFAULT_ROOT;
+  const gens = collectGenerations({ root });
+
+  if (write) {
+    let updated = 0;
+    for (const gen of gens) {
+      const targetPath = join(root, gen.target);
+      mkdirSync(dirname(targetPath), { recursive: true });
+      if (gen.drift) {
+        writeFileSync(targetPath, gen.content);
+        updated += 1;
+        process.stdout.write(`  ✎ ${gen.target} (${fmtCount(gen.count, 'entry')})\n`);
+      } else {
+        process.stdout.write(`  ✓ ${gen.target} (${fmtCount(gen.count, 'entry')}, in sync)\n`);
+      }
+    }
+    process.stdout.write(`\ngen-reference-docs: wrote ${updated} of ${gens.length} target file(s).\n`);
+    return 0;
+  }
+
+  // check mode
+  const drifting = gens.filter((g) => g.drift);
+  for (const gen of gens) {
+    const marker = gen.drift ? '✗' : '✓';
+    const note = gen.drift ? (gen.exists ? 'stale' : 'missing') : 'in sync';
+    process.stdout.write(`  ${marker} ${gen.target} — ${note} (${fmtCount(gen.count, 'entry')})\n`);
+  }
+  if (drifting.length > 0) {
+    process.stderr.write(
+      `\ngen-reference-docs: ${drifting.length} of ${gens.length} reference doc(s) drift.` +
+      ` Run \`npm run docs:ref\` to regenerate.\n`,
+    );
+    return 1;
+  }
+  process.stdout.write(`\ngen-reference-docs: all ${gens.length} reference doc(s) in sync.\n`);
+  return 0;
+}
+
+// ─── invoke as CLI when run directly ─────────────────────────────────────────
+
+const isMain = (() => {
+  try {
+    return fileURLToPath(import.meta.url) === resolve(process.argv[1] ?? '');
+  } catch {
+    return false;
+  }
+})();
+
+if (isMain) {
+  const code = main();
+  process.exit(code);
+}

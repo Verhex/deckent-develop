@@ -240,7 +240,7 @@ Each sprint builds on the previous one. Brain remembers what worked, what failed
 
 ## Next Steps
 
-- [Getting Started](/guide/getting-started) -- Install and run your first sprint
-- [Your First Sprint](/guide/first-sprint) -- Step-by-step walkthrough
-- [Config Reference](/reference/config) -- Customize every parameter
-- [Architecture](/guide/architecture) -- Deep dive into internals
+- [Getting Started](/guide/getting-started) — Install and run your first sprint
+- [Your First Sprint](/guide/first-sprint) — Step-by-step walkthrough
+- [Config Reference](/reference/config) — Customize every parameter
+- [API Reference](/reference/api) — Programmatic API and HTTP surface

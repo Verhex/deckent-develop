@@ -4609,3 +4609,86 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 170-003: P0-6 Event Stream Prompt Write/Delete Visibility (NO_GO)
 
 ---
+## Sprint 171 — sprint-171
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-05-15
+**Duration:** 4595s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 31 |
+| Completed | 29 |
+| Tech Debt | 0 |
+| No-Go | 2 |
+| Coverage | 0.0% |
+| Duration | 4594661ms |
+
+### Tasks
+
+- 171-001: orchestra Lifecycle Audit (DONE)
+- 171-002: orchestra Routing + Evaluation Audit (DONE)
+- 171-003: orchestra Infra Audit (DONE)
+- 171-004: core Types + Config Audit (DONE)
+- 171-005: core Memory Subsystem Audit (DONE)
+- 171-006: core Pools + Routing Audit (DONE)
+- 171-007: agents Audit (DONE)
+- 171-008: nervous Audit (DONE)
+- 171-009: monitor + connectors Audit (DONE)
+- 171-010: providers + api Audit (DONE)
+- 171-011: mcp Audit (DONE)
+- 171-012: cli Audit (DONE)
+- 171-013: dashboard Audit (DONE)
+- 171-014: extensions + scripts Audit (DONE)
+- 171-015: Dead Code + ESM Hygiene Audit (DONE)
+- 171-016: ADR Compliance Audit (DONE)
+- 171-017: Security Audit (DONE)
+- 171-018: Performance Audit (DONE)
+- 171-019: Type Safety Audit (DONE)
+- 171-020: Error Handling Audit (DONE)
+- 171-021: Test Integrity Audit (DONE)
+- 171-022: Memory V2 DB Integrity Audit (DONE)
+- 171-023: Doc Audit Root (NO_GO)
+- 171-024: Doc Audit docs Tree (DONE)
+- 171-025: Doc Audit Config Contract Rules (DONE)
+- 171-026: Doc Audit DB Sync Check (DONE)
+- 171-027: Doc Audit Archive Summary (DONE)
+- 171-028: DB Decision Reference Integrity Audit (DONE)
+- 171-029: Cross-Cutting Synthesis + Coverage Doğrulama (DONE)
+
+---
+## Sprint 172 — sprint-172
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-05-18
+**Duration:** 4053s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 17 |
+| Completed | 6 |
+| Tech Debt | 0 |
+| No-Go | 11 |
+| Coverage | 0.0% |
+| Duration | 4053411ms |
+
+### Tasks
+
+- 172-001: A1 — dependency_pipeline_enabled provenance drift (DONE)
+- 172-002: A2 — RBAC + verify-gate enforcement honesty (DONE)
+- 172-003: A3 — ADR-010 amendment (7 runtime dep) (DONE)
+- 172-004: A4 — README 5-drift badge gerçek değer (DONE)
+- 172-005: C1 — update-readme-stats.mjs auto-gen + CI gate (NO_GO)
+- 172-006: C2 — reference docs auto-gen (MCP/ADR/CLI/agents) (NO_GO)
+- 172-007: C3 — lint:link dead-link gate (NO_GO)
+- 172-008: B1 — archive DB-parity doğrulama (B2 ön-koşulu) (NO_GO)
+- 172-009: B2 — .gitignore/.npmignore + archive git rm --cached (NO_GO)
+- 172-010: B3 — kök → docs/ taşıma + redirect (DONE)
+- 172-011: B4 — worker-guide 3→1 + ADR-046 dup merge + reference rename (DONE)
+- 172-012: B5 — deckent-hub kararı + examples workspace fix (NO_GO)
+
+---
