@@ -39,8 +39,8 @@ If you are not sure where to start, look for issues labeled `good first issue` o
 
 ### Prerequisites
 
-- **Node.js** >= 18.0.0 (required for `node:readline/promises`, `structuredClone`, native ESM)
-- **npm** >= 9.0.0
+- **Node.js** >= 18.0.0 — enforced via `package.json` `engines` (required for `node:readline/promises`, `structuredClone`, native ESM)
+- **npm** — any version bundled with Node 18+ works (npm 9+ recommended; not enforced in `engines`)
 - **git**
 
 ```bash
@@ -53,7 +53,7 @@ git --version
 
 ```bash
 # Clone the repository
-git clone https://github.com/verhex/deckent.git
+git clone https://github.com/VerhexIO/deckent.git
 cd deckent
 
 # Install dependencies
@@ -63,19 +63,42 @@ npm install
 ### Key commands
 
 ```bash
-npm run build        # Compile TypeScript → dist/ (tsc)
+# Build
+npm run build        # Compile TypeScript → dist/ (tsc + copy-assets)
+npm run build:all    # Full build including the web dashboard (Vite)
+npm run dev          # Incremental compile in watch mode (tsc --watch)
+npm run clean        # Remove dist/
+
+# Test
 npm test             # Run all tests (vitest run)
 npm run test:watch   # Run tests in watch mode
-npm run test:coverage  # Run tests with coverage report
+npm run test:coverage    # Run tests with coverage report
+npm run test:dashboard   # Run dashboard tests (vitest.dashboard.config.ts)
+
+# Lint / validation gates
 npm run lint         # Type-check without emitting (tsc --noEmit)
-npm run clean        # Remove dist/
+npm run lint:adr     # Validate ADR governance (scripts/adr-validator.mjs)
+npm run lint:link    # Validate doc links — no dead links (scripts/lint-links.mjs)
+npm run lint:errors  # Error-handling lint (scripts/check-error-handling.mjs)
+
+# Documentation automation (single source of truth — see "Documentation"
+# language convention" below)
+npm run docs:stats       # Regenerate README/IDENTITY stat blocks
+npm run docs:stats:check # CI gate: fail if stat blocks are stale
+npm run docs:ref         # Regenerate docs/reference/* (MCP/ADR/CLI/agents)
+npm run docs:ref:check   # CI gate: fail if reference docs are stale
+npm run docs:generate-cli  # Regenerate docs/reference/cli.md from Commander
+npm run validate:publish   # Pre-publish validation aggregate
 ```
+
+> `prepublishOnly` runs `docs:stats:check && docs:ref:check && build` — keep
+> the generated docs in sync or `npm publish` will fail.
 
 ### Verifying your setup
 
 ```bash
 npm run lint    # Should exit with no errors
-npm test        # Should pass all tests (9300+)
+npm test        # Should pass the full suite
 npm run build   # Should produce dist/ with no errors
 ```
 
@@ -86,69 +109,77 @@ npm run build   # Should produce dist/ with no errors
 ```
 deckent/
 ├── src/
-│   ├── index.ts            --Top-level barrel: re-exports all public API
-│   ├── core/               --Foundational types, constants, config, utils
-│   │   ├── types.ts        --All shared TypeScript interfaces and enums
-│   │   ├── constants.ts    --App-wide constants (DEFAULT_MODE, file paths)
-│   │   ├── config.ts       --3-layer config loader and validator
-│   │   ├── utils.ts        --Shared utility functions (countBrainLines, etc.)
-│   │   ├── analyzer.ts     --Project stack/size/methodology analysis
-│   │   └── index.ts        --Barrel: re-exports core public API
-│   ├── providers/          --Provider adapters (Claude, Codex, Gemini, subprocess, sandbox)
-│   ├── orchestra/          --Sprint orchestration and tmux management
-│   │   ├── brain.ts        --Sprint lifecycle: plan → run → evaluate → decay
-│   │   ├── planner.ts      --AI task planning (Zod-validated, imports only core/)
-│   │   ├── tmux.ts         --tmux session and window management
-│   │   └── index.ts        --Barrel
-│   ├── agents/             --Agent worker lifecycle
-│   │   ├── worker.ts       --Task claiming, locking, result writing
-│   │   └── index.ts        --Barrel
-│   ├── monitor/            --Observability and audit
-│   │   ├── auditor.ts      --Heartbeat scanning, boundary checks, dashboard
-│   │   └── index.ts        --Barrel
-│   ├── cli/                --Commander.js CLI entry point
+│   ├── index.ts            --Top-level barrel: re-exports public API
+│   ├── core/               --Types, constants, 3-layer config, utils,
+│   │                         analyzer, memory store, plugin loader, i18n types
+│   ├── providers/          --Provider adapters: claude, codex, gemini,
+│   │                         subprocess, sandbox
+│   ├── orchestra/          --Sprint orchestration
+│   │   ├── brain.ts        --Slim re-export layer (delegates to
+│   │   │                     sprint-controller / result-evaluator /
+│   │   │                     model-selector / task-builder / debt-manager /
+│   │   │                     sprint-reporter)
+│   │   ├── sprint-controller.ts --Full sprint lifecycle (PLAN→…→CLEANUP)
+│   │   ├── planner.ts      --AI task planning (Zod-validated, imports core/ only)
+│   │   └── tmux.ts         --tmux session / window management
+│   ├── agents/             --Agent worker lifecycle (worker.ts: claim, lock,
+│   │                         heartbeat, result write)
+│   ├── monitor/            --Auditor scan loop, dashboard state, sprint tracking
+│   ├── connectors/         --External messaging adapters (Discord, Telegram,
+│   │                         WhatsApp, incoming-router)
+│   ├── nervous/            --Proactive meta-orchestrator (ADR-040): observer,
+│   │                         detector, decision-engine, dispatcher, executor
+│   ├── cli/                --Commander.js CLI
 │   │   ├── index.ts        --CLI entry: registers all commands
-│   │   ├── commands/       --One file per command (init, start, status, …)
-│   │   └── helpers/        --Shared CLI helpers (prompt, display)
-│   ├── api/                --HTTP API + SSE
-│   │   ├── server.ts       --16 endpoints + SSE stream
-│   │   └── watcher.ts      --Dashboard file watcher
-│   ├── mcp/                --Model Context Protocol server
-│   │   ├── server.ts       --MCP server entry: createServer()
-│   │   ├── tools/          --21 MCP tool handlers
-│   │   └── resources/      --9 MCP resource handlers
-│   └── dashboard/          --Web Dashboard (React+Vite+Tailwind, 4 pages)
-├── tests/                  --Test files mirroring src/ structure
-│   ├── core/
-│   ├── providers/
-│   ├── orchestra/
-│   ├── agents/
-│   ├── monitor/
-│   ├── cli/
-│   ├── mcp/
-│   ├── e2e/                --End-to-end tests (install flow, provider smoke)
-│   └── integration/        --Integration tests
-├── docs/                   --API reference and architecture docs
+│   │   ├── commands/       --One file per command (register<Name>(program))
+│   │   └── helpers/        --Shared CLI helpers, incl. i18n.ts + messages.ts
+│   ├── api/                --HTTP API server + SSE stream + dashboard watcher
+│   ├── mcp/                --Model Context Protocol server (stdio transport)
+│   │   ├── server.ts       --MCP server entry + registerTools/registerResources
+│   │   ├── tools/          --One file per MCP tool (register<Name>Tool)
+│   │   ├── resources/      --One file per MCP resource (register<Name>Resource)
+│   │   └── helpers/        --enrich.ts (response enrichment)
+│   ├── dashboard/          --Web Dashboard (React + Vite + Tailwind)
+│   └── extensions/         --VS Code extension host integration
+├── tests/                  --Test files; mirror src/ plus dedicated suites
+│                             (e2e/, integration/, dashboard/, security/,
+│                             docker/, load/, smoke/, …)
+├── docs/                   --Reference, architecture, ADR, vision docs
+│   ├── reference/          --Auto-generated reference (cli.md, mcp-tools.md,
+│   │                         mcp-resources.md, agents.md, api-surface.md)
+│   ├── adr/                --Architecture Decision Records + README.md index
+│   └── vision/             --blueprint.md (full architecture reference), roadmap
 ├── package.json            --Dependencies, scripts, engine constraints
 ├── tsconfig.json           --TypeScript compiler config (strict, Node16, ESM)
-├── vitest.config.ts        --Test runner config (coverage, include patterns)
-├── DIRECTIVES.md           --Active sprint directives (read before contributing)
-└── DECKENT-MASTER-BLUEPRINT.md  --Full architecture reference
+├── vitest.config.ts        --Test runner config (coverage include/exclude)
+└── DIRECTIVES.md           --Active sprint directives (read before contributing)
 ```
+
+> Exact module/file counts intentionally omitted here — they drift fast. The
+> live counts are auto-generated; see [the auto-generated reference docs](docs/index.md) and
+> the README badges (kept in sync by `npm run docs:stats` / `docs:ref`).
 
 ### Module responsibilities
 
 | Module | Responsibility |
 |---|---|
-| `src/core` | Types, constants, config loading/validation, shared utilities, project analyzer, system profile, subscription detection |
-| `src/providers` | Provider adapters (Claude, Codex, Gemini), fallback chain, model equivalence mapping, provider registry |
+| `src/core` | Types, constants, config loading/validation, shared utilities, project analyzer, memory store (SQLite), plugin loader |
+| `src/providers` | Provider adapters (Claude, Codex, Gemini, subprocess, sandbox), fallback chain, model equivalence mapping, provider registry |
 | `src/orchestra` | Sprint planning (AI + structured + auto fallback), agent spawning, result evaluation, debt decay, layered model selection |
 | `src/agents` | Worker lifecycle: task claim, file lock, heartbeat, result write |
 | `src/monitor` | Heartbeat scanning, scope boundary enforcement, in-process scan loop, dashboard state, alert dedup |
-| `src/api` | HTTP API (16 endpoints + SSE), dashboard file watcher |
-| `src/cli` | CLI commands (28 commands), interactive prompts, display helpers, contextual hints, auto setup wizard |
-| `src/mcp` | MCP server with 21 tools (enriched responses) and 8 resources for IDE/host integration |
-| `src/dashboard` | Web Dashboard: React+Vite+Tailwind, 4 pages, shadcn/ui components |
+| `src/connectors` | External messaging adapters (Discord, Telegram, WhatsApp) + incoming router |
+| `src/nervous` | Proactive meta-orchestrator (ADR-040): observe → detect → decide → propose → dispatch |
+| `src/api` | HTTP API server + SSE stream + dashboard file watcher |
+| `src/cli` | CLI commands, interactive prompts, display helpers, contextual hints, auto setup wizard — see [docs/reference/cli.md](docs/reference/cli.md) |
+| `src/mcp` | MCP server (enriched responses) for IDE/host integration — see [docs/reference/mcp-tools.md](docs/reference/mcp-tools.md) and [mcp-resources.md](docs/reference/mcp-resources.md) |
+| `src/dashboard` | Web Dashboard: React + Vite + Tailwind, shadcn/ui components |
+| `src/extensions` | VS Code extension host integration |
+
+> Tool / command / resource / page counts are deliberately not stated here —
+> they are auto-generated. The single source of truth is
+> [the auto-generated reference docs](docs/index.md) (`npm run docs:ref`) and the README
+> badges (`npm run docs:stats`).
 
 ---
 
@@ -233,14 +264,22 @@ npx vitest run tests/core/   # Run a specific subdirectory
 
 ### Coverage goal
 
-The project targets **≥ 95% coverage** on non-barrel source files. Barrel `index.ts` files are excluded from coverage (see `vitest.config.ts` exclude list).
+The project **aims for high coverage** (~95% target) on non-barrel source
+files. Barrel `index.ts` files and the dashboard are excluded from coverage
+(see the `exclude` list in `vitest.config.ts`).
+
+> **Honest note:** this 95% figure is a **policy/aspiration, not an enforced
+> gate**. `vitest.config.ts` defines no numeric coverage `thresholds`, so the
+> test run will not automatically fail below 95%. Reviewers check the
+> `npm run test:coverage` output manually.
 
 ```bash
 npm run test:coverage
-# Look for: Lines | Branches | Functions | Statements all ≥ 95%
+# Inspect: Lines | Branches | Functions | Statements
 ```
 
-New code should not drop overall coverage. If a function is difficult to test, explain why in a PR comment.
+New code should not meaningfully drop overall coverage. If a function is
+difficult to test, explain why in a PR comment.
 
 ### Writing tests
 
@@ -354,9 +393,18 @@ describe('my-command', () => {
 });
 ```
 
-### 4. Update documentation
+### 4. Regenerate documentation
 
-Add the command to the CLI commands table in `README.md` and add usage examples if relevant.
+The CLI reference is **auto-generated** from Commander metadata — do not
+hand-edit command tables. Regenerate and commit the result:
+
+```bash
+npm run docs:generate-cli   # rewrites docs/reference/cli.md
+npm run docs:stats          # refreshes README/IDENTITY counts
+```
+
+Add usage examples to the relevant guide if the command introduces a new
+workflow.
 
 ---
 
@@ -375,6 +423,12 @@ test/<name>       --test-only additions
 - Never push directly to `main`
 - Keep branches short-lived (complete within a sprint wave)
 - Delete the branch after the PR is merged
+
+> **Note for external contributors:** the above is the required workflow for
+> all community PRs. The core maintainer team develops Deckent *with* Deckent
+> (dogfooding) and commits sprint work directly to `main` with prefixed
+> messages — that internal flow is an exception to "never push to `main`" and
+> does not apply to outside contributions.
 
 ---
 
@@ -396,7 +450,10 @@ Format: `type(scope): description [task-XXX]`
 
 ### Scopes
 
-Use the module name: `core`, `orchestra`, `agents`, `monitor`, `cli`, `mcp`, or omit for cross-cutting changes.
+Use a module name (`core`, `orchestra`, `agents`, `monitor`, `cli`, `mcp`, …)
+**or** an area/sprint scope when the change spans modules (e.g.
+`repo-cleanup`, `sprint-172`). Omit the scope for small cross-cutting
+changes. Maintainer sprint commits commonly use `sprint-NNN` as the scope.
 
 ### Examples
 
@@ -409,9 +466,10 @@ refactor(types): split enums into separate file [task-008]
 chore: upgrade vitest to v3
 ```
 
-- Keep the description under 72 characters
+- Aim to keep the description concise (~72 characters); not strictly enforced
 - Use imperative mood: "add", "fix", "remove" --not "added", "fixes"
-- Include `[task-XXX]` when the commit is part of a tracked sprint task
+- Optionally append `[task-XXX]` when the commit maps to a tracked sprint
+  task (used by maintainers; not required for community PRs)
 
 ---
 
@@ -423,11 +481,17 @@ chore: upgrade vitest to v3
 4. **Run the full check suite** before opening the PR:
 
    ```bash
-   npm run lint          # tsc --noEmit must be clean (zero errors)
-   npm test              # All tests must pass
-   npm run test:coverage # Coverage must stay ≥ 95%
-   npm run build         # dist/ must compile cleanly
+   npm run lint            # tsc --noEmit must be clean (zero errors)
+   npm test                # All tests must pass
+   npm run test:coverage   # Inspect coverage (target ~95%, not auto-gated)
+   npm run lint:link       # No dead doc links
+   npm run docs:stats:check && npm run docs:ref:check  # Generated docs in sync
+   npm run build           # dist/ must compile cleanly
    ```
+
+   > `docs:stats:check` / `docs:ref:check` mirror the `prepublishOnly` gate —
+   > if you changed CLI commands, MCP tools/resources, ADRs, or stat-bearing
+   > docs, run `npm run docs:stats && npm run docs:ref` and commit the result.
 
 5. **Open the PR** with:
    - A clear title matching the commit format
@@ -440,7 +504,9 @@ chore: upgrade vitest to v3
 
 - [ ] `npm run lint` exits with no errors
 - [ ] `npm test` passes (all existing tests green)
-- [ ] Coverage is ≥ 95% on modified files
+- [ ] Coverage reviewed via `npm run test:coverage` (no meaningful drop)
+- [ ] `npm run lint:link` passes (no dead doc links)
+- [ ] `npm run docs:stats:check && npm run docs:ref:check` pass (or regenerated)
 - [ ] `npm run build` succeeds
 - [ ] New public functions are documented with JSDoc
 - [ ] `DIRECTIVES.md` is updated if scope or approach changed
@@ -508,7 +574,10 @@ Every task produces a result file at `.tasks/task-XXX-YYY.result`:
 
 ## Plugin System Development
 
-Plugins extend Deckent's capabilities through a versioned plugin system. All plugins run in isolated worker contexts with scoped file access.
+Plugins extend Deckent with reusable, skill-style capabilities. Each plugin
+is a directory under `.deckent/plugins/` described by a **`manifest.json`**
+(not `plugin.json`). The plugin loader lives in
+[`src/core/plugin.ts`](src/core/plugin.ts) — read it as the source of truth.
 
 ### Plugin structure
 
@@ -516,199 +585,170 @@ Each plugin is stored in `.deckent/plugins/{pluginName}/`:
 
 ```
 .deckent/plugins/my-plugin/
-├── plugin.json          --Plugin metadata (name, version, description, exports)
-├── src/
-│   ├── index.ts         --Plugin entry point (exports IPlugin interface)
-│   └── *.ts             --Plugin implementation modules
-├── tests/
-│   └── *.test.ts        --Plugin tests (vitest)
-└── README.md            --Plugin documentation
+├── manifest.json   --Plugin metadata (validated by src/core/plugin.ts)
+├── SKILL.md        --Default entrypoint: skill instructions / prompt
+└── README.md       --Plugin documentation
 ```
 
-### Plugin metadata (plugin.json)
+Scaffold this layout with the CLI instead of creating it by hand:
 
-```json
+```bash
+deckent plugin create my-plugin   # writes manifest.json + SKILL.md + README.md
+```
+
+### Plugin manifest (manifest.json)
+
+The manifest shape is the `PluginManifest` interface in `src/core/plugin.ts`:
+
+```jsonc
 {
-  "name": "my-plugin",
-  "version": "1.0.0",
-  "description": "Brief description of what the plugin does",
-  "exports": {
-    "hooks": ["onTaskStart", "onTaskComplete"],
-    "commands": ["my-command"],
-    "patterns": ["CustomPattern"]
+  "name": "code-reviewer",                 // required
+  "version": "0.1.0",                      // required
+  "description": "Code review and quality checks", // required
+  "entrypoint": "SKILL.md",                // required
+  "enabled": true,                         // optional (default: true)
+  "triggers": ["code review", "review pr"],// optional: activation phrases
+  "permissions": ["src/**", "tests/**"],   // optional: glob scope strings
+  "model": "opus",                         // optional: ModelType
+  "hooks": {                               // optional lifecycle hook scripts
+    "beforeSprint": null,
+    "afterSprint": null
   },
-  "permissions": {
-    "directories": ["logs", "data"],
-    "filesRead": ["config.json"],
-    "filesWrite": ["state.json"]
-  }
+  "dependencies": []                       // optional: other plugin names
 }
 ```
 
-### Plugin interface
+Notes (verified against `validateManifest()` in `src/core/plugin.ts`):
 
-All plugins must implement the `IPlugin` interface from `src/core/types.ts`:
+- **Required**: `name`, `version`, `description`, `entrypoint` (non-empty strings).
+- `permissions` is a flat array of **glob strings** (e.g. `"src/**"`), not an
+  object of directories/filesRead/filesWrite.
+- `hooks` keys are **`beforeSprint` / `afterSprint` / `beforeTask` /
+  `afterTask`** (string script paths), *not* `onTaskStart` / `onTaskComplete`.
+- `model` must be a valid `ModelType`; `signature` (optional) must be
+  `{ "algorithm": "sha256", "value": "<hash>" }`.
+- `enabled: false` excludes the plugin from `listPlugins()` / `scanPlugins()`.
 
-```typescript
-export interface IPlugin {
-  name: string;
-  version: string;
-  hooks?: {
-    onTaskStart?: (task: Task) => Promise<void>;
-    onTaskComplete?: (result: TaskResult) => Promise<void>;
-    onSprintStart?: (directives: string) => Promise<void>;
-    onSprintComplete?: (retro: string) => Promise<void>;
-  };
-  commands?: Record<string, (args: unknown[]) => Promise<unknown>>;
-  validate?: () => Promise<boolean>;
-}
-```
+### Plugin lifecycle API
+
+`src/core/plugin.ts` exposes the loader/management functions:
+
+| Function | Purpose |
+|---|---|
+| `scanPlugins(projectRoot)` | List enabled plugins in `{root}/.deckent/plugins/` |
+| `loadPlugin(dir)` / `listPlugins(dir)` | Load one / all valid plugins |
+| `installPlugin(source, dir)` | Install from npm name, git URL, or local path (auto-enables; `--ignore-scripts` for npm safety) |
+| `enablePlugin` / `disablePlugin` | Flip `enabled` in `manifest.json` |
+| `createPlugin(name, dir)` | Scaffold a new plugin |
+| `removePlugin(name, dir)` | Remove (refuses `system: true` plugins) |
 
 ### Plugin development checklist
 
-- [ ] Plugin implements `IPlugin` interface correctly
-- [ ] `plugin.json` declares accurate permissions and hooks
-- [ ] All permissions in `plugin.json` are actually used by the plugin
-- [ ] Plugin is isolated --does not import from non-core modules
-- [ ] All plugin functions have ≥ 80% test coverage
-- [ ] Plugin has a `validate()` method that checks prerequisites
-- [ ] Plugin handles errors gracefully (no unhandled rejections)
-- [ ] Plugin cleanup: `onSprintComplete` should clean up temporary files
-- [ ] `README.md` documents plugin purpose, installation, and usage
+- [ ] `manifest.json` has all required fields (`name`, `version`,
+      `description`, `entrypoint`) as non-empty strings
+- [ ] `permissions` are glob strings and minimal (only what the plugin needs)
+- [ ] `triggers` are specific activation phrases (avoid over-broad terms)
+- [ ] `entrypoint` file (usually `SKILL.md`) exists and is documented
+- [ ] `README.md` documents purpose, installation, and usage
 - [ ] Version follows [Semantic Versioning](https://semver.org/)
-
-### Plugin testing
-
-Plugins are tested in isolation using mock core services:
-
-```typescript
-// .deckent/plugins/my-plugin/tests/index.test.ts
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { MyPlugin } from '../src/index.js';
-
-describe('MyPlugin', () => {
-  let plugin: MyPlugin;
-
-  beforeEach(() => {
-    plugin = new MyPlugin();
-  });
-
-  it('validates successfully with correct config', async () => {
-    const valid = await plugin.validate();
-    expect(valid).toBe(true);
-  });
-
-  it('calls onTaskStart hook when task begins', async () => {
-    const task = { id: '001-001', title: 'Test Task' };
-    await plugin.hooks?.onTaskStart?.(task);
-    expect(/* assertions */);
-  });
-});
-```
+- [ ] Manifest validates: `deckent plugin list` loads it without error
 
 ### Plugin registration
 
-Plugins are discovered and loaded from `.deckent/plugins/` by the Brain on startup. To register a new plugin:
+Plugins are discovered from `.deckent/plugins/` via `scanPlugins()`:
 
-1. Create the plugin directory structure
-2. Implement `IPlugin` interface
-3. Declare permissions and hooks in `plugin.json`
-4. Test the plugin with `npm test`
-5. The plugin is automatically available on next Brain restart
+1. `deckent plugin create <name>` (or `deckent plugin install <source>`)
+2. Fill in `manifest.json` and the `SKILL.md` entrypoint
+3. `deckent plugin list` to verify the manifest validates and is enabled
+4. The plugin is picked up on the next run (enabled plugins only)
 
 ---
 
 ## Internationalization (i18n) Contributing
 
-Deckent supports multiple languages through a runtime i18n system. Currently supported: **English (en)**, **Turkish (tr)**.
+Deckent ships a small, dependency-free runtime i18n system for CLI output.
+Currently supported: **English (en)**, **Turkish (tr)**.
+
+The system lives in **`src/cli/helpers/`** (not `src/i18n/`, and there is no
+`src/core/i18n.ts`):
+
+- [`src/cli/helpers/messages.ts`](src/cli/helpers/messages.ts) — a single flat
+  `MESSAGES: Record<MessageKey, Record<lang, string>>` map plus `getMessage()`
+  and `getLanguage()`.
+- [`src/cli/helpers/i18n.ts`](src/cli/helpers/i18n.ts) — language detection
+  (`detectLang`), the `MessageKey` union type, `getMessages(lang)` binder, and
+  `SUPPORTED_LANGS` / `isSupportedLang`.
+
+Design constraints: **ADR-010** (no external i18n libraries — plain
+TypeScript) and **ADR-008** (i18n lives in `cli/helpers/`, not `core/`, since
+it reads CLI config). Language priority: `.deckent/config.json` `language` →
+`LC_ALL` → `LANG` → `en`.
 
 ### Adding a new language
 
-1. **Create language directory**:
+There are no per-language directories. A language is just an extra key in
+every entry of the `MESSAGES` map.
 
-   ```bash
-   mkdir -p src/i18n/{languageCode}
-   ```
-
-   Use [ISO 639-1](https://en.wikipedia.org/wiki/List_of_ISO_639-1_codes) language codes (e.g., `de` for German, `fr` for French).
-
-2. **Create message files** --mirror the structure of `src/i18n/en/`:
-
-   ```
-   src/i18n/de/
-   ├── index.ts         --Barrel re-export
-   ├── cli.ts           --CLI messages
-   ├── errors.ts        --Error messages
-   ├── hints.ts         --Contextual hints
-   └── messages.ts      --General UI messages
-   ```
-
-3. **Implement message exports** --each file exports a Messages object:
+1. **Add the language code** to `SUPPORTED_LANGS` in
+   `src/cli/helpers/i18n.ts` (use an [ISO 639-1](https://en.wikipedia.org/wiki/List_of_ISO_639-1_codes)
+   code, e.g. `de`):
 
    ```typescript
-   // src/i18n/de/cli.ts
-   export const cliMessages = {
-     initStart: 'Deckent wird initialisiert...',
-     initComplete: 'Initialisierung abgeschlossen',
-     planStart: 'Planen Sie den Sprint...',
-     // ... all keys matching src/i18n/en/cli.ts
-   };
+   export const SUPPORTED_LANGS = ['en', 'tr', 'de'] as const;
    ```
 
-4. **Update i18n loader** --add the language to `src/core/i18n.ts`:
+2. **Translate every entry** in `MESSAGES` (in
+   `src/cli/helpers/messages.ts`) — add the new code alongside `en` / `tr`.
+   Keep `{placeholder}` tokens unchanged; they are substituted at runtime by
+   `getMessage(key, lang, vars)`:
 
    ```typescript
-   const languages = {
-     en: () => import('../i18n/en/index.js'),
-     tr: () => import('../i18n/tr/index.js'),
-     de: () => import('../i18n/de/index.js'),  // Add new language
-   };
+   'status.tasks_running': {
+     en: '{taskCount} tasks running',
+     tr: '{taskCount} görev çalışıyor',
+     de: '{taskCount} Aufgaben laufen',   // ← new
+   },
    ```
 
-5. **Test coverage** --ensure all keys are present in the new language:
+   Every `MessageKey` in the `MessageKey` union (in `i18n.ts`) must have a
+   value for the new language — missing keys are a parity failure.
+
+3. **Add a parity test** under `tests/i18n/` asserting the new language
+   covers all keys present for `en`:
 
    ```typescript
-   // tests/i18n/de.test.ts
    import { describe, it, expect } from 'vitest';
-   import { loadMessages } from '../../src/core/i18n.js';
-   import * as enMessages from '../../src/i18n/en/index.js';
+   import { getMessage } from '../../src/cli/helpers/i18n.js';
 
-   describe('German (de) i18n completeness', () => {
-     it('has all keys from English', async () => {
-       const deMessages = await loadMessages('de');
-       const enKeys = Object.keys(enMessages);
-       deKeys.forEach(key => {
-         expect(deMessages).toHaveProperty(key);
-       });
-     });
+   it('de has every key en has', () => {
+     // iterate the MessageKey union / MESSAGES keys and assert
+     // getMessage(key, 'de') !== getMessage(key, 'en') fallback-only
    });
    ```
 
-6. **Update DIRECTIVES.md** --note the new language support in the sprint summary
+4. Run `npm test` and `npm run lint` (the `MessageKey` union keeps this
+   type-safe — a missing key surfaces at compile time).
 
 ### i18n conventions
 
-- **Key naming**: Use camelCase, descriptive names (e.g., `taskStartedMessage`, not `msg1`)
-- **Consistent terminology**: Keep translated terms consistent across all files
-  - If "Sprint" = "Sprint" in German, use it everywhere
-  - Maintain a glossary comment at the top of each file
-- **Pluralization**: Use message templates for plural forms:
-
-  ```typescript
-  tasksCompleted: (count: number) => `${count} Aufgabe${count !== 1 ? 'n' : ''} abgeschlossen`,
-  ```
-
-- **Formatting**: Follow the structure of existing language files exactly
-- **Do not translate**: variable names, file paths, code snippets, command names
+- **Key naming**: dotted, namespaced keys (e.g. `status.tasks_running`,
+  `error.node_version_low`) — match the existing `MessageKey` union.
+- **Placeholders**: use `{name}` tokens; never translate the token itself.
+  Substitution is handled by `getMessage(key, lang, vars)`.
+- **Consistent terminology**: keep domain terms (Sprint, Worker, Brain)
+  consistent across all languages.
+- **Do not translate**: variable names, file paths, code snippets, command
+  names, `{placeholders}`.
+- A missing translation falls back to `en` — never throws.
 
 ### Available languages
 
-| Code | Language | Status | Maintainer |
-|---|---|---|---|
-| `en` | English | Complete | @team |
-| `tr` | Turkish | Complete | @team |
-| `de` | German | Needs contributor | --|
-| `fr` | French | Needs contributor | --|
+| Code | Language | Status |
+|---|---|---|
+| `en` | English | Complete (fallback language) |
+| `tr` | Turkish | Complete |
+
+Additional languages are welcome — follow "Adding a new language" above.
 
 ### Documentation language convention
 
@@ -722,7 +762,11 @@ All documentation follows a bilingual EN/TR pattern:
 When adding or updating documentation:
 - Always update the EN (base) file first
 - Keep the TR variant in sync -- same structure, same section headings (translated)
-- Auto-updated sections (marked with `<!-- auto:start -->`) are managed by `docs.json` and should not be edited manually
+- Auto-generated sections are delimited by `<!-- AUTOGEN:START id="..." -->`
+  … `<!-- AUTOGEN:END id="..." -->` markers and are managed by the
+  documentation scripts (`npm run docs:stats` / `docs:ref`, configured via
+  `.deckent/docs.json`). **Never hand-edit content between these markers** —
+  run the generator and commit its output instead.
 
 ---
 
@@ -734,187 +778,150 @@ Deckent exposes its API to IDE hosts (Claude, Cursor, etc.) through the Model Co
 
 ```
 src/mcp/
-├── server.ts          --MCP server entry point
-├── tools/             --Tool implementations (21 tools)
-│   ├── directives.ts
-│   ├── plan.ts
-│   ├── start.ts
-│   ├── status.ts
-│   ├── doctor.ts
-│   ├── init.ts
-│   ├── retro.ts
-│   ├── history.ts
-│   ├── sync.ts
-│   ├── analyze.ts
-│   ├── config.ts
-│   ├── usage.ts
-│   ├── review.ts
-│   ├── run.ts
-│   ├── kill.ts
-│   └── cleanup.ts
-├── resources/         --Resource implementations (9 resources)
-│   ├── directives.ts
-│   ├── brain-memory.ts
-│   ├── debt.ts
-│   ├── decisions.ts
-│   ├── patterns.ts
-│   ├── retro.ts
-│   ├── usage.ts
-│   ├── tasks.ts
-│   └── agents.ts
+├── server.ts          --MCP server entry (McpServer + stdio transport);
+│                         calls registerTools() / registerResources()
+├── tools/             --One file per tool, exports register<Name>Tool(server)
+│   ├── index.ts       --registerTools(server): wires every tool
+│   └── *.ts           --e.g. analyze.ts, plan.ts, start.ts, status.ts, …
+├── resources/         --One file per resource, exports register<Name>Resource(server)
+│   ├── index.ts       --registerResources(server): wires every resource
+│   └── *.ts           --e.g. directives.ts, tasks.ts, agents.ts, …
 └── helpers/
     └── enrich.ts      --Response enrichment utilities
 ```
 
+> The exact tool/resource list and counts are **auto-generated** — see
+> [docs/reference/mcp-tools.md](docs/reference/mcp-tools.md) and
+> [docs/reference/mcp-resources.md](docs/reference/mcp-resources.md)
+> (`npm run docs:ref`). Do not maintain a hand-written list here.
+
 ### Adding a new MCP tool
 
-1. **Create tool file** in `src/mcp/tools/{toolName}.ts`:
+Deckent uses the official **`@modelcontextprotocol/sdk`** (`McpServer`), not
+the Anthropic SDK. Each tool file exports a `register<Name>Tool(server)`
+function that calls `server.registerTool(...)`. Use an existing tool such as
+[`src/mcp/tools/analyze.ts`](src/mcp/tools/analyze.ts) as the template.
+
+1. **Create tool file** in `src/mcp/tools/{tool-name}.ts`:
 
    ```typescript
-   import { Tool } from '@anthropic-ai/sdk/resources/messages.js';
+   import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
    import { enrichResponse } from '../helpers/enrich.js';
-   import type { EnrichedResponse } from '../../core/types.js';
 
-   export const myTool: Tool = {
-     type: 'function',
-     function: {
-       name: 'my_tool',
-       description: 'What this tool does',
-       inputSchema: {
-         type: 'object' as const,
-         properties: {
-           param1: { type: 'string', description: 'Parameter description' },
+   export function registerMyTool(server: McpServer): void {
+     server.registerTool(
+       'deckent_my_tool',
+       {
+         title: 'My Tool',
+         description: 'What this tool does (clear, model-facing description).',
+         // inputSchema?: { type: 'object', properties: {...}, required: [...] }
+         annotations: {
+           readOnlyHint: true,
+           destructiveHint: false,
+           idempotentHint: true,
          },
-         required: ['param1'],
        },
-     },
-   };
-
-   export async function handleMyTool(params: { param1: string }): Promise<EnrichedResponse> {
-     // Implementation
-     const result = { /* tool output */ };
-     return enrichResponse(result, 'my_tool');
+       async (/* params */) => {
+         try {
+           const result = { /* tool output */ };
+           // enrichResponse(toolName, response, context?) — name FIRST
+           const enriched = enrichResponse('my_tool', result);
+           return {
+             content: [{ type: 'text' as const, text: JSON.stringify(enriched) }],
+           };
+         } catch (err) {
+           const message = err instanceof Error ? err.message : String(err);
+           return {
+             content: [{ type: 'text' as const, text: JSON.stringify({ error: true, message }) }],
+             isError: true,
+           };
+         }
+       },
+     );
    }
    ```
 
-2. **Register tool** in `src/mcp/server.ts`:
+2. **Wire it** in `src/mcp/tools/index.ts` — import `registerMyTool` and call
+   it inside `registerTools(server)` (the server itself just calls
+   `registerTools()` / `registerResources()`; there is no manual
+   `setRequestHandler` list to maintain).
 
-   ```typescript
-   import { myTool, handleMyTool } from './tools/my-tool.js';
-
-   // In createServer():
-   server.setRequestHandler(ListToolsRequestSchema, async () => ({
-     tools: [
-       // ... existing tools
-       myTool,
-     ],
-   }));
-
-   server.setRequestHandler(CallToolRequestSchema, async (request) => {
-     // ... existing handlers
-     if (request.params.name === 'my_tool') {
-       const result = await handleMyTool(request.params.arguments as { param1: string });
-       return { content: [{ type: 'text', text: JSON.stringify(result) }] };
-     }
-   }));
-   ```
-
-3. **Update index** --export tool from `src/mcp/tools/index.ts` (if barrel exists)
-
-4. **Write tests** in `tests/mcp/tools/my-tool.test.ts`:
-
-   ```typescript
-   import { describe, it, expect, vi, beforeEach } from 'vitest';
-   import { handleMyTool } from '../../../src/mcp/tools/my-tool.js';
-
-   describe('handleMyTool', () => {
-     it('returns enriched response', async () => {
-       const result = await handleMyTool({ param1: 'test' });
-       expect(result._enriched).toBeDefined();
-       expect(result._enriched.toolName).toBe('my_tool');
-     });
-   });
-   ```
+3. **Write tests** in `tests/mcp/tools/my-tool.test.ts` — register the tool
+   against a test `McpServer` (or assert on the handler's enriched output);
+   check `result._enriched` has `summary`, `hints`, `timestamp`.
 
 ### Adding a new MCP resource
 
-1. **Create resource file** in `src/mcp/resources/{resourceName}.ts`:
+Resources follow the same `register<Name>Resource(server)` convention. Use
+[`src/mcp/resources/directives.ts`](src/mcp/resources/directives.ts) as the
+template.
+
+1. **Create resource file** in `src/mcp/resources/{resource-name}.ts`:
 
    ```typescript
-   import { Resource } from '@anthropic-ai/sdk/resources/messages.js';
-   import { readFile } from 'node:fs/promises';
+   import { readFileSync, existsSync } from 'node:fs';
    import { join } from 'node:path';
+   import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
-   export const myResource: Resource = {
-     type: 'resource',
-     uri: 'deckent://my-resource',
-     name: 'My Resource',
-     description: 'What this resource exposes',
-     mimeType: 'application/json',
-   };
-
-   export async function readMyResource(): Promise<string> {
-     const filePath = join(process.cwd(), '.brain', 'my-resource.md');
-     try {
-       return await readFile(filePath, 'utf-8');
-     } catch {
-       return 'Resource not found';
-     }
+   export function registerMyResource(server: McpServer): void {
+     server.registerResource(
+       'my-resource',
+       'deckent://my-resource',
+       {
+         title: 'My Resource',
+         description: 'What this resource exposes',
+         mimeType: 'text/markdown',
+       },
+       async (uri) => {
+         const filePath = join(process.cwd(), '.brain', 'my-resource.md');
+         const text = existsSync(filePath) ? readFileSync(filePath, 'utf-8') : '';
+         return {
+           contents: [{ uri: uri.href, text, mimeType: 'text/markdown' }],
+         };
+       },
+     );
    }
    ```
 
-2. **Register resource** in `src/mcp/server.ts`:
-
-   ```typescript
-   import { myResource, readMyResource } from './resources/my-resource.js';
-
-   // In createServer():
-   server.setRequestHandler(ListResourcesRequestSchema, async () => ({
-     resources: [
-       // ... existing resources
-       myResource,
-     ],
-   }));
-
-   server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
-     if (request.params.uri === 'deckent://my-resource') {
-       const content = await readMyResource();
-       return { contents: [{ uri: request.params.uri, mimeType: 'text/markdown', text: content }] };
-     }
-   }));
-   ```
+2. **Wire it** in `src/mcp/resources/index.ts` — import `registerMyResource`
+   and call it inside `registerResources(server)`.
 
 3. **Write tests** in `tests/mcp/resources/my-resource.test.ts`
 
 ### Response enrichment
 
-All tool responses are enriched with metadata via `enrichResponse()`:
+Tool responses are enriched with metadata via `enrichResponse()` from
+[`src/mcp/helpers/enrich.ts`](src/mcp/helpers/enrich.ts). **The tool name is
+the first argument**, the response object is second:
 
 ```typescript
 import { enrichResponse } from '../helpers/enrich.js';
 
 const response = { data: 'tool result' };
-const enriched = enrichResponse(response, 'my_tool'); // Adds _enriched field
+const enriched = enrichResponse('my_tool', response, { lang: 'en' });
+// → { ...response, _enriched: { summary, hints, timestamp } }
 ```
 
-The `_enriched` field contains:
-- `toolName`: Name of the tool
+The injected `_enriched` field (`EnrichedMeta`) contains exactly:
+- `summary`: localized one-line summary (en/tr; falls back to a generic line)
+- `hints`: array of suggested next-step hints (may be empty)
 - `timestamp`: ISO 8601 timestamp
-- `version`: Deckent version
-- `locale`: Current language (en/tr)
+
+Language comes from the optional `context.lang` (default `'en'`). There is no
+`toolName`, `version`, or `locale` field on `_enriched`.
 
 ### Tool/resource checklist
 
-- [ ] Tool/resource implements MCP interface correctly
-- [ ] Tool has ≥ 80% test coverage
-- [ ] Response includes proper error messages (no stack traces)
-- [ ] Long-running tools support `--dry-run` or preview mode
-- [ ] Tool description is clear and concise
-- [ ] Input schema is complete and validated
-- [ ] Tool is registered in `src/mcp/server.ts`
-- [ ] All new test mocks include the new tool/resource in exports
-- [ ] Documentation mentions the new tool/resource in [docs/reference/api.md](docs/reference/api.md)
-- [ ] Response is enriched with `enrichResponse()` if it's a tool
+- [ ] Exports a `register<Name>Tool(server)` / `register<Name>Resource(server)`
+- [ ] Wired into `src/mcp/tools/index.ts` (or `resources/index.ts`)
+- [ ] Has tests under `tests/mcp/`
+- [ ] Errors return `{ isError: true }` with a clean message (no stack traces)
+- [ ] Destructive/long-running tools set correct `annotations` and/or a
+      `--dry-run`/preview path
+- [ ] Description is clear and model-facing; input schema complete
+- [ ] Tool responses are enriched with `enrichResponse('name', result)`
+- [ ] `npm run docs:ref` regenerated and committed (the reference docs in
+      [the auto-generated reference docs](docs/index.md) are auto-generated — do not hand-edit)
 
 ---
 
