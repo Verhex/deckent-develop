@@ -1,0 +1,4 @@
+{"type":"metric","name":"collision.detected","value":4,"tags":{"pairs":"4","sprintId":"sprint-165"},"timestamp":"2026-05-13T09:57:47.820Z"}
+{"type":"metric","name":"wave.start","value":0,"tags":{"wave":"legacy","count":"5","sprintId":"sprint-165"},"timestamp":"2026-05-13T09:57:47.820Z"}
+{"type":"metric","name":"collision.detected","value":2,"tags":{"pairs":"2","sprintId":"sprint-165"},"timestamp":"2026-05-13T09:57:54.804Z"}
+{"type":"metric","name":"wave.start","value":0,"tags":{"wave":"legacy","count":"5","sprintId":"sprint-165"},"timestamp":"2026-05-13T09:57:54.804Z"}
