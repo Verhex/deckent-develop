@@ -70,7 +70,7 @@ Deckent is an **AI agent orchestration CLI** that coordinates multiple AI agents
 | **Single orchestrator** | Brain is the only module that coordinates the system. Workers never plan. |
 | **Scope isolation** | Every worker operates in a declared file/directory sandbox. |
 | **Observer independence** | Auditor runs in-process but never modifies source code or creates tasks. |
-| **Memory budget** | `.brain/` directory capped at 900 lines; automatic decay maintains the budget. |
+| **Memory budget** | `.brain/` line budget is config-driven (`memory_budget`, default 5000); automatic decay maintains it. |
 | **Import discipline** | Module dependency graph is an explicit security boundary (ADR-008). |
 | **Sprint completeness** | Every sprint always runs to completion — errors never leave a sprint incomplete. |
 
@@ -258,8 +258,7 @@ src/
 
 | Tier | Claude | OpenAI | Gemini |
 |------|--------|--------|--------|
-| Premium+ | — | o3 | gemini-3.1-pro-preview |
-| Premium | opus | gpt-5 | gemini-2.5-pro |
+| Premium | opus | o3 / gpt-5 | gemini-3.1-pro-preview / gemini-2.5-pro |
 | Standard | sonnet | gpt-4.1 / o4-mini | gemini-2.5-flash |
 | Economy | haiku | gpt-5-mini / gpt-4.1-mini | gemini-2.0-flash |
 
@@ -844,21 +843,37 @@ Defaults per subscription tier, defined in `src/core/config.ts`:
 
 | Plan | `max_workers` | `brain_model` | `default_model` | `haiku_allowed` |
 |------|:------------:|:-------------:|:---------------:|:---------------:|
-| `performance` (formerly max_plan) | 8 | opus | opus | true |
-| `balanced` (formerly max5x_plan) | 5 | sonnet | opus | true |
-| `economic` (formerly pro_plan) | 3 | sonnet | sonnet | false |
-| `api` (API key) | 2 | haiku | haiku | true |
+| `performance` | 8 | opus | opus | true |
+| `balanced` | 5 | sonnet | opus | true |
+| `economic` | 3 | sonnet | sonnet | false |
+| `api` | 10 | opus | sonnet | true |
+
+> **These are recommended initial-setup defaults, not hard limits.** Every
+> Layer 1 value (`max_workers`, `brain_model`, `default_model`,
+> `haiku_allowed`, plan tier) is fully customizable via `.deckent/config.json`
+> (Layer 3) or environment variables (Layer 4). Tune them freely to match your
+> system power, provider plan, and budget — e.g. raise `max_workers` on a
+> strong machine, or pin `brain_model` regardless of tier.
 
 ### Layer 2 — Global Config
 
 File: `~/.deckent/config.json`
 
-Contains user-wide preferences (language, preferred model, default workspace path). Not tracked in project git.
+User-wide preferences that apply to **every project** on this machine, unless a
+project's own config (Layer 3) overrides them. Not tracked in any project's
+git. Typical keys: language, preferred/brain/default model, provider selection
+(`brain_provider`, `worker_provider`, `fallback_provider`), default plan
+`mode`, `max_workers`, notification/connector defaults. Anything valid in the
+project config is also valid here as a personal default.
 
 ```json
 {
   "language": "en",
-  "preferred_model": "sonnet"
+  "mode": "balanced",
+  "brain_provider": "claude",
+  "worker_provider": "claude",
+  "preferred_model": "sonnet",
+  "max_workers": 5
 }
 ```
 
@@ -866,7 +881,13 @@ Contains user-wide preferences (language, preferred model, default workspace pat
 
 File: `.deckent/config.json`
 
-The primary project-level config. Written by `deckent init`, updated by `deckent config`. Tracked in `.gitignore`.
+The primary, highest-precedence config (only Layer 4 env vars win over it) and
+**the place you customize Deckent for a project**. Written by `deckent init`,
+updated by `deckent config set <key> <value>`. Gitignored by default (it can
+hold project-local choices and `$DECK:` secret refs). **Any documented option
+can be set here** — plan tier, worker count, models, providers, timeouts,
+memory budget, checkpoints, connectors, routing engine — and it overrides both
+the Layer 1 defaults and the Layer 2 global config.
 
 ```json
 {
@@ -940,17 +961,26 @@ Deckent's memory system was originally a **3-tier, file-based knowledge store** 
 
 ```
 .brain/
-├── MEMORY.md          ← Tier 1: Short-term (always loaded, max 300 lines)
-├── PATTERNS.md        ← Tier 2: Long-term patterns (JSON array, max 150 lines)
-├── DECISIONS.md       ← Tier 3: Permanent ADRs (never decayed)
-├── DEBT.md            ← Tech debt ledger (markdown table, 9 columns)
-├── RETRO.md           ← Latest retrospective (overwritten each sprint, max 120 lines)
-├── sprints/           ← Per-sprint logs (max 80 lines each)
-│   ├── sprint-001.md
+├── memory.db          ← Memory V2: SINGLE SOURCE OF TRUTH (SQLite + FTS5;
+│                         gitignored, rebuilt from exports/)
+├── exports/           ← Generated FROM memory.db (git-tracked snapshots)
+│   ├── summary.md     ← Context summary (loaded via @reference, ~4K chars)
+│   ├── decisions.md   ← ADR export (entries type='adr')
+│   ├── memory.md      ← Sprint learnings export
+│   └── debt.md        ← Tech debt export
+├── ERRORS.md          ← Error log — still FILE-BASED, not in the DB
+│                         (budget ~600 lines; see Memory Budget below)
+├── sprints/           ← Per-sprint logs (in DB + file)
 │   └── sprint-NNN.md
-└── archive/           ← Archived sprint logs (deep history, no limit)
-    └── sprint-001.md
+└── archive/           ← Archived sprint logs + pre-v2 backups
+    └── pre-v2/        ← Original V1 MEMORY.md / DECISIONS.md (read-only)
 ```
+
+> The standalone V1 files (`MEMORY.md`, `PATTERNS.md`, `DECISIONS.md`,
+> `RETRO.md`) described in the tier subsections below are the **original V1
+> model**; under Memory V2 that knowledge lives in `memory.db` and is surfaced
+> via the generated `exports/`. `ERRORS.md` is the one log that remains
+> genuinely file-based.
 
 ### Tier 1 — MEMORY.md (Short-Term Memory)
 
@@ -1008,22 +1038,28 @@ Current ADRs (as of Sprint 095):
 
 ### Memory Budget
 
-| File | Max Lines | Decay Strategy |
+> **Config-driven & customizable.** The budget is **not fixed at 900** (that
+> was an early value). The canonical knobs are the config keys
+> `memory_budget` and `decay_after_sprints` in `.deckent/config.json`; the
+> `constants.ts` values below are `@deprecated` backward-compat **defaults**
+> and are easily overridden per project. Current defaults (Sprint 140 raise):
+
+| Component | Default Max Lines | Decay Strategy |
 |------|:---------:|----------------|
-| `MEMORY.md` | 300 | Remove sections ≥ 5 sprints old; hard-truncate to 50 as last resort |
-| `PATTERNS.md` | 150 | Remove `resolved: true` entries when budget exceeded |
-| `DECISIONS.md` | ∞ | Never decayed |
-| `RETRO.md` | 120 | Overwritten every sprint |
-| `DEBT.md` | ∞ | Remove resolved rows when budget exceeded |
-| `sprints/sprint-NNN.md` | 100 | Archive oldest (keep last 2 active) |
-| **Total `.brain/` budget** | **900** | `BRAIN_TOTAL_LINE_BUDGET` in `constants.ts` |
+| `MEMORY` | 1500 (`MEMORY_MAX_LINES`) | Remove sections older than `decay_after_sprints` (default 20); hard-truncate as last resort |
+| `PATTERNS` | 800 (`PATTERNS_MAX_LINES`) | Remove `resolved: true` entries when budget exceeded |
+| `RETRO` | 400 (`RETRO_MAX_LINES`) | Overwritten every sprint |
+| `SPRINT_LOG` | 500 (`SPRINT_LOG_MAX_LINES`) | Archive oldest (keep recent active) |
+| `ERRORS.md` | ~600 (target) | File-based error log |
+| `DECISIONS` (export) | ~1200 (target) | Regenerated from `memory.db` |
+| **Total `.brain/` budget** | **5000** (`BRAIN_TOTAL_LINE_BUDGET`, default) | `memory_budget` config overrides; decay triggers when exceeded |
 
 ### Decay Cycle
 
 ```typescript
 // src/orchestra/sprint-controller.ts (re-exported via brain.ts)
 function runDecay(projectRoot: string, sprintId: string, opts?: { force?: boolean }): DecayResult {
-  if (!opts?.force && countBrainLines(projectRoot) <= BRAIN_TOTAL_LINE_BUDGET) { // 900
+  if (!opts?.force && countBrainLines(projectRoot) <= BRAIN_TOTAL_LINE_BUDGET) { // default 5000 (config: memory_budget)
     return earlyReturn(); // no-op if under budget
   }
 
