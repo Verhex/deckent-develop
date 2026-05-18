@@ -70,7 +70,7 @@ Make Deckent provider-agnostic and cross-platform ready.
 
 Sprint 051-065 ile planlanan ve ilerleme durumu:
 - [x] `npm install -g deckent` works globally (Sprint 051 — npm publish dry-run, package validation)
-- [ ] Landing page at deckent.agency
+- [ ] Landing page at deckent.ai
 - [x] Documentation site — VitePress (Sprint 052 — setup, getting-started, guide, reference)
 - [ ] SWE-bench benchmark
 - [ ] GitHub Issue Mode — `deckent do --issue 42`

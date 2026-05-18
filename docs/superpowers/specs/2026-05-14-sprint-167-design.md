@@ -12,7 +12,7 @@
 
 ## 1. Summary
 
-Sprint 167, Deckent'in kapalı repo SON sprint'i. Sprint 168'de remediation (audit findings fix) + Open Source GA prep ve Sprint 169'da `VerhexIO/deckent-dev` → `VerhexIO/deckent` public flip + `npm publish v1.0.0-beta.2` + Show HN. Bu sprint **kaynak kodu ve user-facing dokümanı düzeltmez** — tek hedef tam kapsamlı self-analysis ve tutarsızlık inventory'sidir.
+Sprint 167, Deckent'in kapalı repo SON sprint'i. Sprint 168'de remediation (audit findings fix) + Open Source GA prep ve Sprint 169'da `VerhexIO/deckent` → `VerhexIO/deckent` public flip + `npm publish v1.0.0-beta.2` + Show HN. Bu sprint **kaynak kodu ve user-facing dokümanı düzeltmez** — tek hedef tam kapsamlı self-analysis ve tutarsızlık inventory'sidir.
 
 **Terminology netliği (v4 — Agent B V2 fix):** "Pure read-only" terimini bırakıyoruz; çünkü Brain finalize hook chain'i kontrat gereği `.brain/exports/`, `.brain/sprints/`, `.claude/rules/` yazar (ADR-046 Step Ordering Contract). Sprint 167 kontratı: **No source/doc mutations** — `src/`, `tests/`, `dist/`, `docs/` (specs/adr dışı), root user-facing .md'ler dokunulmaz. Brain hook chain yazımları audit subject'in kendisi (T5 + T3 evidence olarak ele alınır).
 
@@ -308,7 +308,7 @@ Brain'in mevcut `planner.ts` AI mode'u Sprint 167'nin temel mekaniğidir. Bu ayn
 - `dist/` güncelliği (Tutarsızlık #15)
 - npm publish gates (package.json files allowlist)
 - dep_pipeline_enabled flip readiness (Tutarsızlık #11) — sadece readiness
-- Public repo flip readiness (VerhexIO/deckent-dev → VerhexIO/deckent)
+- Public repo flip readiness (VerhexIO/deckent → VerhexIO/deckent)
 
 **Token budget tahmini:** ~120K in (test reasons + sensitive scan) + ~40K out
 **Brain expansion önerisi:** max 3 alt task (6.1 test + build stability, 6.2 sensitive data + OSS readiness, 6.3 dep_pipeline + public repo readiness)
@@ -512,7 +512,7 @@ Bu **TEST değil OBSERVATION**. Brain wire'ın ne olduğunu KAYIT ALMA — fix �
 5. `.audit/sprint-167/oss-whitelist.json` → permanent .deckent/oss-whitelist.json (Sprint 168'de migrate)
 
 **Sprint 169 = Open Source GA** (Sprint 168 hard blocker clear ise):
-1. VerhexIO/deckent-dev → VerhexIO/deckent public flip
+1. VerhexIO/deckent → VerhexIO/deckent public flip
 2. npm publish v1.0.0-beta.2
 3. Show HN launch
 4. Community feedback ingestion

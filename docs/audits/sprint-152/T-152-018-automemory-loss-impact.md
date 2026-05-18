@@ -123,7 +123,7 @@ NEXT-SESSION-PROMPT.md satır 44-52 + 113 + 185-191 ve DIRECTIVES.md satır 373,
 | `project_adr_governance_37_migration.md` | Sprint 138 37 ADR migration + MADR v3 | ADR-036 | P2 |
 | `project_rbac_authority_matrix_runtime.md` | ADR-037 runtime enforcement +1370 LoC | Sprint 139 T-034/35 | P2 |
 | `project_self_modifying_detector.md` | ADR-038/039 deckent dogfood vs user project discrimination | Sprint 139 T-051/52 | P2 |
-| `project_public_repo_flip_pending.md` | VerhexIO/deckent-dev → /deckent flip handoff | NEXT-SESSION + Sprint 151 T-151-002 | P0 |
+| `project_public_repo_flip_pending.md` | VerhexIO/deckent → /deckent flip handoff | NEXT-SESSION + Sprint 151 T-151-002 | P0 |
 | `project_npm_publish_handoff.md` | `npm publish --access public --tag beta` hazır | Sprint 151 T-151-001 | P0 |
 
 **[INFO] Kategori toplam:** ~20 project dosya.
@@ -148,7 +148,7 @@ NEXT-SESSION-PROMPT.md satır 44-52 + 113 + 185-191 ve DIRECTIVES.md satır 373,
 
 | Tahmini dosya | İçerik | Priority |
 |---------------|--------|----------|
-| `reference_verhexio_github_org.md` | `github.com/VerhexIO/deckent-dev` private + `VerhexIO/deckent` public flip | P1 |
+| `reference_verhexio_github_org.md` | `github.com/VerhexIO/deckent` private + `VerhexIO/deckent` public flip | P1 |
 | `reference_deckent_hub_repo.md` | `VerhexIO/deckent-hub` skill marketplace | P1 |
 | `reference_claude_api_anthropic_sdk.md` | `@anthropic-ai/sdk`, Opus 4.7 | P2 |
 | `reference_npm_deckent_package.md` | `deckent@1.0.0-beta.1` npm publish pending | P1 |

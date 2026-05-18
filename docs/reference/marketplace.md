@@ -21,7 +21,7 @@ Key features:
 - **Versioned Packages**: Every marketplace item follows semver for safe upgrades
 - **Quality Ratings**: Community-driven quality scores help identify the best extensions
 
-The marketplace is accessible via the CLI (`deckent marketplace`) and will eventually have a web interface at marketplace.deckent.agency.
+The marketplace is accessible via the CLI (`deckent marketplace`) and will eventually have a web interface at marketplace.deckent.ai.
 
 ## 2. Searching the Marketplace
 

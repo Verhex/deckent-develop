@@ -20,7 +20,7 @@ Sprint 172 doc-reorg için ana öneri:
 - **Kök dizinde kalanlar (10 dosya):** README, README-TR, CONTRIBUTING, SECURITY, CODE_OF_CONDUCT, CHANGELOG, AGENTS, CLAUDE.md, DECKENT.md, DIRECTIVES.md (son üçü konfig/kontrat — `171-025`'in işi).
 - **`docs/` ağacına taşınanlar (5 dosya):** VISION, VISION-TR, COMPETITIVE-ANALYSIS, BETA-TRACKER, BETA-TRACKER-TR.
 - **Arşive taşınanlar (2 dosya):** DECKENT-MASTER-BLUEPRINT, DECKENT-ANA-PLAN-TR — 285 KB toplam, içerikleri zaten README + VISION + ROADMAP'te özet halinde mevcut, OSS public için ağırlık.
-- **Silinenler (2 dosya):** NEXT-SESSION-PROMPT.md (Sprint 159 stale snapshot, repo path `VerhexIO/deckent-develop` artık geçersiz), next-session-prompt.md (Sprint 171 oturumlar arası temp dosya — kök dizinde yeri yok, `.deckent/notes/` veya tamamen silinmeli).
+- **Silinenler (2 dosya):** NEXT-SESSION-PROMPT.md (Sprint 159 stale snapshot, repo path `VerhexIO/deckent` artık geçersiz), next-session-prompt.md (Sprint 171 oturumlar arası temp dosya — kök dizinde yeri yok, `.deckent/notes/` veya tamamen silinmeli).
 
 Toplam aksiyon: **2 CRITICAL** doğruluk drift'i, **5 HIGH** içerik/mükerrerlik bulgusu, **9 MEDIUM**, **3 LOW** sayısal sapma.
 
@@ -52,7 +52,7 @@ Aşağıdaki bulgular dosya bazlı değil, çapraz-kesen tema bazlı sıralanmı
 
 ### B6 — VISION.md ve VISION-TR.md "Phase 3 Public Beta — Sprint 167-168" hâlâ "Next" diyor (HIGH)
 
-`VISION.md:83–85` *"### Phase 3: 'Public Beta' — Next (Sprint 167-168)"* der; içerikte *"Sprint 168: Open Source GA — VerhexIO/deckent public repo flip + npm publish v1.0.0-beta.2"* yazılı. VISION-TR.md:83–85 aynısı TR. Ancak DIRECTIVES.md *"Sprint 172 OSS GA Handoff"* başlığında *"VerhexIO/deckent-dev → VerhexIO/deckent public flip, beta.2 yayını"* Sprint 172'ye kaymış; Sprint 168 değil. VISION 4 sprintlik kaymayı yansıtmıyor — OSS public ana belgesi.
+`VISION.md:83–85` *"### Phase 3: 'Public Beta' — Next (Sprint 167-168)"* der; içerikte *"Sprint 168: Open Source GA — VerhexIO/deckent public repo flip + npm publish v1.0.0-beta.2"* yazılı. VISION-TR.md:83–85 aynısı TR. Ancak DIRECTIVES.md *"Sprint 172 OSS GA Handoff"* başlığında *"VerhexIO/deckent → VerhexIO/deckent public flip, beta.2 yayını"* Sprint 172'ye kaymış; Sprint 168 değil. VISION 4 sprintlik kaymayı yansıtmıyor — OSS public ana belgesi.
 
 ### B7 — VISION.md ve VISION-TR.md sonunda mükerrer auto-gen blokları (HIGH)
 
@@ -66,9 +66,9 @@ Aşağıdaki bulgular dosya bazlı değil, çapraz-kesen tema bazlı sıralanmı
 
 `BETA-TRACKER.md:4` *"Last updated: 2026-05-14 (Sprint 166 post-commit) | Sprint: 166 DONE … v1.0.0-beta.2 target (Sprint 168 Open Source GA)"*. BETA-TRACKER-TR.md aynı. Bugün 2026-05-15 ve Sprint 171 (4 sprint sonrası). Sprint 167/168 kapanış metrikleri eklenmemiş. OSS GA tarihi Sprint 168'den Sprint 172'ye kaymış. 1 692/1 929 satır TR/EN çift dosya — proje launch dökümanı, OSS GA sonrası tekrar gözden geçirilmeli; mevcut hâliyle kullanıcı yanıltır.
 
-### B10 — NEXT-SESSION-PROMPT.md tamamen stale, "VerhexIO/deckent-develop" + Sprint 157-159 brain crash snapshot'ı (HIGH)
+### B10 — NEXT-SESSION-PROMPT.md tamamen stale, "VerhexIO/deckent" + Sprint 157-159 brain crash snapshot'ı (HIGH)
 
-`NEXT-SESSION-PROMPT.md:2` *"Repo: VerhexIO/deckent-develop (private)"*; L6 *"Local: /home/alperen/deckent-dev"*; L9 *"Sprint 157 ÜÇ KEZ start denendi (157→158→159), ÜÇÜ DE crash/stall oldu"*. Bu dosya 2026-05-12 anlık kayıt; Sprint 161–170 sonrasında geçerli değil. Repo adı *deckent-develop* — başka bir özel repo'ya referans (OSS public flip Sprint 172 hedefi). Bu dosya kökte durduğu sürece OSS public flip'te kullanıcı yanıltır ve "develop" repo adı yan dosyaya referans olarak görünür. **Silme veya arşivleme** zorunlu.
+`NEXT-SESSION-PROMPT.md:2` *"Repo: VerhexIO/deckent (private)"*; L6 *"Local: /home/alperen/deckent-dev"*; L9 *"Sprint 157 ÜÇ KEZ start denendi (157→158→159), ÜÇÜ DE crash/stall oldu"*. Bu dosya 2026-05-12 anlık kayıt; Sprint 161–170 sonrasında geçerli değil. Repo adı *deckent-develop* — başka bir özel repo'ya referans (OSS public flip Sprint 172 hedefi). Bu dosya kökte durduğu sürece OSS public flip'te kullanıcı yanıltır ve "develop" repo adı yan dosyaya referans olarak görünür. **Silme veya arşivleme** zorunlu.
 
 ### B11 — next-session-prompt.md (lowercase) Sprint 171 oturum-arası temp dosyası, kök dizinde yeri yok (HIGH)
 
@@ -129,9 +129,9 @@ DIRECTIVES.md Task 23 tanımı *"21 markdown dosyanın … denetimi"* der; örne
 
 DeckentHub bölümü Sprint 150 zaman damgalı, 4 örnek skill adı veriliyor. BETA-TRACKER.md Gate #15 ✅ Sprint 165 *"publish target met"* der. Skill listesi (`deckent skill list` veya `.deckent/skills/`) ile doğrulanmadan README iddiasının yaşadığı varsayılıyor. LOW — 171-006 core-pools-routing audit kapsamına girer; burada flag.
 
-### B24 — README.md L617 ve VISION.md L? `https://deckent.agency` site referansı (LOW)
+### B24 — README.md L617 ve VISION.md L? `https://deckent.ai` site referansı (LOW)
 
-İki dosya da resmi sitenin **deckent.agency** olduğunu söyler. Site bugün gerçekten yayında mı? OSS GA blocker değil ama yayında değilse README bağ noktası boş çıkar.
+İki dosya da resmi sitenin **deckent.ai** olduğunu söyler. Site bugün gerçekten yayında mı? OSS GA blocker değil ama yayında değilse README bağ noktası boş çıkar.
 
 ### B25 — README.md L500/L518 ASCII-art screenshot placeholder yorumları (LOW)
 
@@ -152,7 +152,7 @@ DeckentHub bölümü Sprint 150 zaman damgalı, 4 örnek skill adı veriliyor. B
 | B7 | VISION-TR çift TR+EN auto-gen blok | HIGH | Auto-gen pipeline buglı — Türkçe dosyaya İngilizce blok da basıyor; dosyanın profesyonelliğini ihlal eder |
 | B8 | DECKENT-MASTER-BLUEPRINT 168 KB stale + bozuk metric | HIGH | OSS public için en büyük root dosya, içeriği README + VISION ile redundant; "−1dk −1sn" + "NaN%" tablo görünür |
 | B9 | BETA-TRACKER Sprint 166 post-commit stale, OSS GA Sprint 168 next | HIGH | Launch dökümanı 5 sprint geride; OSS GA tarihinin Sprint 168→172 kaymasını yansıtmıyor |
-| B10 | NEXT-SESSION-PROMPT.md `VerhexIO/deckent-develop` repo path stale | HIGH | OSS public flip'te yabancı repo adı görünürlüğü; tamamen stale snapshot |
+| B10 | NEXT-SESSION-PROMPT.md `VerhexIO/deckent` repo path stale | HIGH | OSS public flip'te yabancı repo adı görünürlüğü; tamamen stale snapshot |
 | B11 | next-session-prompt.md absolute path leak + kök dizinde temp dosya | HIGH | OSS vitrin alanında oturum-arası kişisel not; `/home/alperen/...` path leak |
 | B12 | COMPETITIVE-ANALYSIS Türkçe orthography ihlali (ç/ğ/ı/ö/ş/ü eksik) | HIGH | Kullanıcı 2026-05-15 ZORUNLU kuralının ihlali — kök dizindeki tek dosya bu kurala uymuyor |
 | B13 | CHANGELOG son entry Sprint 156, 13 sprint kayıt deliği | MEDIUM | Keep a Changelog pratiği bozuk; CHANGELOG terkedilmiş; root CHANGELOG ile docs/CHANGELOG ilişkisi belirsiz |
@@ -166,7 +166,7 @@ DeckentHub bölümü Sprint 150 zaman damgalı, 4 örnek skill adı veriliyor. B
 | B21 | Kök dosya envanteri DIRECTIVES task tanımıyla uyumsuz | MEDIUM | ROADMAP/BLUEPRINT kısa isimleriyle yok; isimlendirme konvansiyonu belirsiz |
 | B22 | README L482 `Dockerfile` referansı kökte teyit edilmedi | LOW | Komut başarısızlık ihtimali, ama 171-003/171-014 alanı |
 | B23 | README L588 DeckentHub 20 seed skill yayın iddiası | LOW | Doğrulanması gereken iddia, 171-006 alanı |
-| B24 | `deckent.agency` site yayın doğrulaması | LOW | Bilgilendirici, OSS GA blocker değil |
+| B24 | `deckent.ai` site yayın doğrulaması | LOW | Bilgilendirici, OSS GA blocker değil |
 | B25 | README 3 placeholder screenshot yorumu | LOW | İçerik eksikliği, vitrin görselleri yok |
 
 **Severity dağılımı:** 3 CRITICAL, 9 HIGH, 9 MEDIUM, 4 LOW.
@@ -231,7 +231,7 @@ Aşağıdaki dosya:satır referansları her bulgu için en az bir doğrudan kan�
 - TR mükerreri: `BETA-TRACKER-TR.md` (113 KB, aynı yapı)
 
 **B10 — NEXT-SESSION-PROMPT.md tamamen stale:**
-- `NEXT-SESSION-PROMPT.md:2` → `**Repo:** \`VerhexIO/deckent-develop\` (private), main branch`
+- `NEXT-SESSION-PROMPT.md:2` → `**Repo:** \`VerhexIO/deckent\` (private), main branch`
 - `NEXT-SESSION-PROMPT.md:6` → `**Local:** \`/home/alperen/deckent-dev\``
 - `NEXT-SESSION-PROMPT.md:9` → `**Deckent SORUNLU — Sprint 157 ÜÇ KEZ start denendi (157→158→159), ÜÇÜ DE crash/stall oldu.**`
 - `NEXT-SESSION-PROMPT.md:166` → `Brain runner restart loop tekrar olursa: \`npx deckent finalize --force\``
@@ -300,7 +300,7 @@ Aşağıdaki dosya:satır referansları her bulgu için en az bir doğrudan kan�
 **B22, B23, B24, B25 — LOW kanıtları:**
 - `README.md:482` → `docker build -f Dockerfile -t deckent-worker:latest .`
 - `README.md:589` → 20 seed skills iddiası
-- `README.md:617` → `[Alperen @ Verhex](https://deckent.agency)`
+- `README.md:617` → `[Alperen @ Verhex](https://deckent.ai)`
 - `README.md:11, 499, 517` → placeholder yorumlar
 
 ---
@@ -417,7 +417,7 @@ Her dosya için: **8-Badge** + **Aksiyon** (SİL / BİRLEŞTİR / TAMAMLA / KORU
 - **Badge:** `deprecated`
 - **Aksiyon:** **SİL** (veya `.brain/archive/oturum-notlari/sprint-159-restart-loop.md` taşı, ama gerekli değil)
 - **Hedef path:** silinir veya `.brain/archive/`
-- **Gerekçe:** Sprint 157→158→159 brain restart loop snapshot'ı (2026-05-12). Şu anki sprint 171. Repo path `VerhexIO/deckent-develop` artık geçerli değil. Brain restart loop sorunu zaten Sprint 161+ kapanmış. Kök dizinde sürdürmenin değeri 0; OSS public flip'te kullanıcıyı yanıltır.
+- **Gerekçe:** Sprint 157→158→159 brain restart loop snapshot'ı (2026-05-12). Şu anki sprint 171. Repo path `VerhexIO/deckent` artık geçerli değil. Brain restart loop sorunu zaten Sprint 161+ kapanmış. Kök dizinde sürdürmenin değeri 0; OSS public flip'te kullanıcıyı yanıltır.
 
 #### 19. next-session-prompt.md (lowercase)
 - **Badge:** `internal` (oturum-arası temp) — kökte yeri yok

@@ -319,7 +319,7 @@ Bu roadmap Sprint 168 DIRECTIVES.md seed'i olarak kullanılır. Sprint 168 sonra
 
 - **Sprint 168 NO_GO veya sensitive data BLOCKER** → Sprint 169 GA kayar; fix Sprint 169'a girer
 - **Sprint 168 PASS (12/12 done)** → Sprint 169 GA path:
-  - VerhexIO/deckent-develop → VerhexIO/deckent public flip (Alperen manuel)
+  - VerhexIO/deckent → VerhexIO/deckent public flip (Alperen manuel)
   - npm publish v1.0.0-beta.2
   - Show HN launch + community feedback
 - **Sprint 168 PARTIAL (7/12 minimum)** → Sprint 169 GA partial (ADR governance + memory integrity + secret scan kapatıldı, geri kalan M1/M2 Sprint 170'e)

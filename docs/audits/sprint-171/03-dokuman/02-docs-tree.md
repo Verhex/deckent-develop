@@ -97,7 +97,7 @@ Kullanıcı hangisinin canlı plan olduğunu anlayamaz. Bir tane CANONICAL (visi
 
 ### 1.4 Referans Bütünlüğü
 
-**B32 — Cross-dizin link disiplini yok (NORMAL).** `docs/governance/INDEX.md` `../../DECKENT-ANA-PLAN-TR.md`, `../../.brain/exports/summary.md` gibi yukarı çıkan linklerle dolu — yapı değiştiğinde toplu kırılma riski. `docs/launch/announce-*`, `docs/release/*` çoğunlukla `VerhexIO/deckent` public path'i kullanıyor (doğru — flip sonrası geçerli olacak), `docs/release/sprint-165-final-state.md:152` yalnız `VerhexIO/deckent-dev → VerhexIO/deckent` flip planını anlatıyor (bilgi amaçlı, sorun değil).
+**B32 — Cross-dizin link disiplini yok (NORMAL).** `docs/governance/INDEX.md` `../../DECKENT-ANA-PLAN-TR.md`, `../../.brain/exports/summary.md` gibi yukarı çıkan linklerle dolu — yapı değiştiğinde toplu kırılma riski. `docs/launch/announce-*`, `docs/release/*` çoğunlukla `VerhexIO/deckent` public path'i kullanıyor (doğru — flip sonrası geçerli olacak), `docs/release/sprint-165-final-state.md:152` yalnız `VerhexIO/deckent → VerhexIO/deckent` flip planını anlatıyor (bilgi amaçlı, sorun değil).
 
 **B33 — `docs/architecture/architecture.md` "Sprint 100+" header'ı (INFO).** Header "Single comprehensive architectural reference" diyor ama Sprint 167. Hızlı arttığımız için sayılar geri kalmıştır; reorg sırasında refresh.
 

@@ -243,7 +243,7 @@ Tum hata mesajlarini i18n sistemine entegre et. Yeni anahtarlar: error.tmux_not_
 - Kapsam: docs/
 
 ### Aciklama
-deckent.agency landing page icerigi (Ingilizce). Bolumler: 1) Hero: tagline + CTA, 2) Problem statement (3 madde), 3) Solution (Deckent nasil cozer), 4) How it works (3 adim gorsel aciklama), 5) Features (6 kart), 6) Comparison (vs alternatives), 7) Pricing (free, open source), 8) Getting started (3 adim), 9) Testimonials (placeholder), 10) Footer (GitHub, Discord, docs). Icerik doküman olarak, HTML/CSS degil. 5+ test.
+deckent.ai landing page icerigi (Ingilizce). Bolumler: 1) Hero: tagline + CTA, 2) Problem statement (3 madde), 3) Solution (Deckent nasil cozer), 4) How it works (3 adim gorsel aciklama), 5) Features (6 kart), 6) Comparison (vs alternatives), 7) Pricing (free, open source), 8) Getting started (3 adim), 9) Testimonials (placeholder), 10) Footer (GitHub, Discord, docs). Icerik doküman olarak, HTML/CSS degil. 5+ test.
 
 ### Test
 - Tum bolumler mevcut

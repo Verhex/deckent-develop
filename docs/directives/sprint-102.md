@@ -115,7 +115,7 @@ Sprint complete → Discord webhook notification. Format: embed with sprint summ
 - Scope: ./, tests/docs/
 
 ### Description
-Contributor Covenant v2.1 adapte et. İletişim: community@deckent.agency. Enforcement guidelines.
+Contributor Covenant v2.1 adapte et. İletişim: community@deckent.ai. Enforcement guidelines.
 
 **Test:** 2+ test.
 

@@ -149,7 +149,7 @@ Sprint 165 DONE sonrası Sprint 166 önerilen scope:
 1. **Config flip:** `dependency_pipeline_enabled: false → true` (Alperen onayı ile)
 2. **Minimal 3-task multi-wave smoke sprint** — Wave 1: 2 task, Wave 2: 1 task (dep on Wave 1)
 3. **Live evidence:** `wave.respawn` metric + `BRAIN→WORKER:DEPENDENCY_BLOCKED` event
-4. **Public repo flip:** `VerhexIO/deckent-dev` → `VerhexIO/deckent` public
+4. **Public repo flip:** `VerhexIO/deckent` → `VerhexIO/deckent` public
 5. **npm publish:** v1.0.0-beta.2
 6. **Show HN launch:** Sprint 166 sonrası 24 saat içinde
 

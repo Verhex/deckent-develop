@@ -65,7 +65,7 @@ All required fields verified:
 | Field | Value |
 |-------|-------|
 | `description` | "AI agent orchestration system — your AI development team, orchestrated." |
-| `homepage` | https://deckent.agency |
+| `homepage` | https://deckent.ai |
 | `bugs` | https://github.com/VerhexIO/deckent/issues |
 | `repository` | https://github.com/VerhexIO/deckent.git |
 | `keywords` | ai, agent, orchestration, claude, cli, agents, skills, marketplace, analytics |

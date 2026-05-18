@@ -1,6 +1,6 @@
 # DIRECTIVES — Sprint 052: Documentation Site + Full Config Expansion
 
-## Goal: docs.deckent.agency VitePress site kurulumu + config.json'u TÜM parametrelerle genişlet. Kullanıcı config'i açtığında Deckent'in tüm yeteneklerini görsün. Dashboard'dan config düzenlenebilsin.
+## Goal: docs.deckent.ai VitePress site kurulumu + config.json'u TÜM parametrelerle genişlet. Kullanıcı config'i açtığında Deckent'in tüm yeteneklerini görsün. Dashboard'dan config düzenlenebilsin.
 
 ---
 
@@ -110,7 +110,7 @@ Eski (minimal) config.json'ları yeni (tam) formata migrate et. `deckent config 
 - Scope: .github/, docs/
 
 ### Description
-GitHub Pages deploy. Push to main → auto-build → deploy. Custom domain: docs.deckent.agency (DNS config talimatları). `base` path doğru.
+GitHub Pages deploy. Push to main → auto-build → deploy. Custom domain: docs.deckent.ai (DNS config talimatları). `base` path doğru.
 3+ test.
 
 ---

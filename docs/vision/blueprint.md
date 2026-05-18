@@ -48,7 +48,7 @@
 # 1. PRODUCT IDENTITY & VISION
 
 **Name:** Deckent (Deck + Agent)
-**Domain:** deckent.agency
+**Domain:** deckent.ai
 **Tagline:** "Your AI development team, orchestrated."
 **Author:** Alperen @ Verhex
 
@@ -2330,7 +2330,7 @@ Full directive: `docs/directives/sprint-034.md`
 | sprint-148 | 12485 | 89.33% | Self-Healing Architecture — Agent Taxonomy Reform (test-writer archived, 16→15→16 agents), nervous dogfood live (5 detectors), cross-platform validation 3/3 (macOS/Linux/WSL2), 28 tasks 27 DONE. ADR-041 Agent Taxonomy proposed. |
 | sprint-149 | 12485 | 89.33% | Documentation consolidation + npm publish dry-run. ADR-041 accepted. Beta GA slip began — chronic vitest regressions surfaced. |
 | sprint-150 | 12485 | 89.33% | Docker Worker Exit Pattern Final Fix (Sprint 146+148 debt closure). GA slipped — readiness gap re-baselined. |
-| sprint-151 | 12485 | 89.33% | Public repo flip — VerhexIO/deckent-dev → VerhexIO/deckent. GO_WITH_TECH_DEBT. |
+| sprint-151 | 12485 | 89.33% | Public repo flip — VerhexIO/deckent → VerhexIO/deckent. GO_WITH_TECH_DEBT. |
 | sprint-152 | 12485 | 89.33% | Brain NO_GO/FIX state update bug — meta-dogfood evidence captured (P0 for Sprint 153). |
 | sprint-153 | 12485 | 89.33% | `deckent watch --ms` MCP tool promotion. Brain state update bug investigation. 16 tasks, 3 DONE, 13 NO_GO. |
 | sprint-154 | 12485 | 89.33% | RubricRegistry foundation. Sprint stabilization. |
@@ -2347,7 +2347,7 @@ Full directive: `docs/directives/sprint-034.md`
 | sprint-165 | ~16400 | 89.33% | **Brain Final Stability — 4 P0 bug closure.** Bug X (no-result → CODE_VERIFIED_DONE stub fixed, Sprint 156-011 CRITICAL debt CLOSED), Bug Y (processQueue Wave 2→3 stall resolved with idempotency guard), Bug Z (Vitest gate chronic delta-zero closure via worker honest-result gate), Bug W (Auditor dead_event_stream detector reactivated). Docs freeze + managed-doc cache contract sealed. Manual recovery chain proven (kill→cleanup→recover→run→spawn). respawnEligibleTasks 13 grep matches preserved. |
 | sprint-166 | ~16434 | 89.33% | **Brain Self-Update + Data Integrity Closure — 10/11 DONE, 1 TECH_DEBT.** ADR-046 accepted (Brain Self-Update Hook Architecture, Step Ordering Contract). 4 architectural root cause fixes: Bug M (adrInsert hook + Step 3 wire in identity-generator.ts; `src/core/adr-file-sync.ts` MADR v3 parser), Bug N (onRuleRegen wired into manual finalize path at cli/commands/finalize.ts:166), Bug S (doc-cache sprint-aware cache key, backward-compat fallback), Bug Y2 (3-layer ground-truth defense: unit + integration + Auditor `verifyDocSyncGroundTruth` runtime + `.deckent/ground-truth-overrides.json` whitelist). Data integrity: Bug U (type='sprint' insert restored in sprint-retro-writer), Bug V (parseDebtMd sprint_id regex backfill, 100+ entries; 9-sprint memory backfill). Doc fixes: Bug C+X (DECKENT.md ref + summary debt filter), Bug P (TOOLS/BOOT/WORKER-GUIDE auto-content generators), Bug Q+W (provider parity .codex/.gemini/.cursor + emitAlert helper + stale_md detector), Bug K+L (verify-ran atomic write + stale doc test refresh). 35 new tests PASS (34 + 1 ADR-046 regression). T3 doc-cache runner wire-up TECH_DEBT carryover. **15 built-in agents reconfirmed (Sprint 148 archive preserved)** — 5 root .md files corrected from Sprint 164 commit a4f3be4 incorrect 16-count misinjection (Bug Y2 root cause). |
 | sprint-167 | TBD | TBD | **(PLANNED)** Bug E+G+Z2+Z3 fix + `dependency_pipeline_enabled: true` live flip (Wave Scheduling goes live, ADR-045 runtime contract enforced) + M1-M4 monitoring baseline tracking + minimal 3-task multi-wave smoke. |
-| sprint-168 | TBD | TBD | **(PLANNED)** Open Source GA — public repo flip (VerhexIO/deckent-dev → VerhexIO/deckent public) + npm publish v1.0.0-beta.2 + Show HN launch. |
+| sprint-168 | TBD | TBD | **(PLANNED)** Open Source GA — public repo flip (VerhexIO/deckent → VerhexIO/deckent public) + npm publish v1.0.0-beta.2 + Show HN launch. |
 
 **First dogfooding result (Sprint 6):** Deckent ran `deckent start` on itself, generated README.md in 86 seconds with 1 worker. The orchestration loop (plan → spawn → execute → evaluate → retro → cleanup) completed end-to-end.
 

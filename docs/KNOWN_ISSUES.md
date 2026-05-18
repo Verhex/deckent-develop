@@ -86,7 +86,7 @@ This document is the source of truth for "things we know are imperfect but are n
 - **WhatsApp Business API activation pending** — no approval yet; scaffold-only.
 
 ### Repo
-- **Remote URL `VerhexIO/deckent-dev`** — Sprint 151 planned flip to `VerhexIO/deckent` not yet executed (Alperen manual).
+- **Remote URL `VerhexIO/deckent`** — Sprint 151 planned flip to `VerhexIO/deckent` not yet executed (Alperen manual).
 - **`.gitignore` drift** — `.deckent/decisions/`, `.deckent/sprint-*-metrics.jsonl` untracked unintentionally.
 
 ---

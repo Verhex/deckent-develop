@@ -53,7 +53,7 @@ Before tagging `v1.0.0-beta.2` and running `npm publish`, **all 20 gates must PA
 | Sprint 165 | May 13 2026 | **Bug X/Y/Z/W Close + Documentation Freeze + npm publish prep** | 5/5 DONE: T1 Bug X stub removal (sprint-156-011 closed), T2 Bug Y Sprint-Stall fix, T3 Bug Z chronic vitest +1 fail fixed, T4 Bug W `dead_event_stream` activated, T5 docs freeze + public repo prep, v1.0.0-beta.1 npm publish ready | 18/20 PASS ✅ |
 | Sprint 166 | May 13-14 2026 | **Brain Self-Update + Data Integrity Closure + ADR-046** | 11/11 (10 DONE + 1 GO_WTD), ~2735 LoC, 35+ new tests. Bug M (adrInsert hook + Step 3 wire), Bug N (onRuleRegen manual finalize wire + AUTO/CUSTOM block), Bug S (doc-cache sprint-aware key), Bug Y2 (3-layer ground-truth defense — 15 agents anchor), Bug R+T+U+V+C+X+P+Q+W+K+L bundled fixes, ADR-046 Brain Self-Update Hook Architecture accepted. 4 new bugs detected → Sprint 167 P0 (Bug E, G, Z2, Z3) | 19/20 PASS ✅ |
 | Sprint 167 | May 15+ 2026 | **Bug E+G+Z2+Z3 Fix + dependency_pipeline_enabled Flip + M1-M4 Monitoring Baseline** | 4 new bugs from Sprint 166 detection fixed + `dependency_pipeline_enabled: true` flip live (Wave scheduling goes live, Sprint 135 T-005 6th canlı dogfood), minimal 3-task multi-wave smoke + M1-M4 (cache key + rule regen + adr insert + stale_md) baseline tracking established | Stabilization |
-| Sprint 168 | May 16+ 2026 | 🚀 **Open Source GA — Public Repo Flip + npm publish v1.0.0-beta.2 + Show HN** | Public repo flip (`VerhexIO/deckent-dev` → `VerhexIO/deckent` public), npm publish v1.0.0-beta.2, GitHub release, Show HN + Reddit + Twitter announce, community onboarding | 🚀 5.0/5 |
+| Sprint 168 | May 16+ 2026 | 🚀 **Open Source GA — Public Repo Flip + npm publish v1.0.0-beta.2 + Show HN** | Public repo flip (`VerhexIO/deckent` → `VerhexIO/deckent` public), npm publish v1.0.0-beta.2, GitHub release, Show HN + Reddit + Twitter announce, community onboarding | 🚀 5.0/5 |
 
 ---
 
@@ -1581,7 +1581,7 @@ Sprint 166 surfacing 4 architectural follow-ups (Sprint 167 priority):
 
 ### Sprint 168 — 🚀 Open Source GA Cutover (May 16+ 2026)
 
-- **Public repo flip:** `VerhexIO/deckent-dev` → `VerhexIO/deckent` (public)
+- **Public repo flip:** `VerhexIO/deckent` → `VerhexIO/deckent` (public)
 - **npm publish v1.0.0-beta.2:** Tag, GitHub release
 - **Show HN announcement:** Hacker News launch
 - **Reddit + Twitter announce:** r/programming, r/MachineLearning, AI/dev Twitter

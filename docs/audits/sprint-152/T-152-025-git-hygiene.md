@@ -7,7 +7,7 @@
 
 ## Özet
 
-Sistem taşıması (2026-04-22: eski WSL → yeni Ryzen 9 / 30 GB) sonrası ilk çalışan sprint-152 kickoff'unda `git status` 41 satır gösteriyor (13 M, 12 D, 16 ??). Bu satırların çoğu beklenen sprint runtime davranışı (PID dosyaları arşiv taşınması, sprint-152 config toggle'ları, DIRECTIVES yenilenmesi) — ancak **4 gerçek regresyon** tespit edildi: `.claude/rules/{auditor,brain,worker-default}.md` dosyaları 91 satır kaybetmiş (AUTO-START/AUTO-END otomatik ADR blokları stripped), `.claude/settings.local.json` 173 izin entry'si kaybetmiş (eski sistem `/home/alperen/deckent-dev/` hardcoded path purge), 2 temp agent stats sıfırlanmış (`temp-react-ts-specialist` totalUses 32→0, successRate 1.0→0). `core.fileMode=false` local config'i WSL 4012 mode-diff artifact'ini başarıyla bastırıyor — manuel chmod cleanup gereksiz. `SYSTEM-MIGRATION-2026-04-22.md` proje kökünde sağlam (22824 B, 597 satır, 117ae31 commit'inde), silme olayı git reflog'a düşmedi — yerel tracked working-copy delete olduğu anlaşılıyor. `origin/master` **1 commit ileride** (`8434387 docs(claude-md): sync — sprint-151 state...`) — yerel `master` behind durumda, fast-forward pull gerekli; Sprint 151 son commit `9f80755` remote'ta mevcut. Remote URL hâlâ `VerhexIO/deckent-dev` — Sprint 151 `cce408a` commit'inde planlanan `VerhexIO/deckent` flip henüz yapılmamış.
+Sistem taşıması (2026-04-22: eski WSL → yeni Ryzen 9 / 30 GB) sonrası ilk çalışan sprint-152 kickoff'unda `git status` 41 satır gösteriyor (13 M, 12 D, 16 ??). Bu satırların çoğu beklenen sprint runtime davranışı (PID dosyaları arşiv taşınması, sprint-152 config toggle'ları, DIRECTIVES yenilenmesi) — ancak **4 gerçek regresyon** tespit edildi: `.claude/rules/{auditor,brain,worker-default}.md` dosyaları 91 satır kaybetmiş (AUTO-START/AUTO-END otomatik ADR blokları stripped), `.claude/settings.local.json` 173 izin entry'si kaybetmiş (eski sistem `/home/alperen/deckent-dev/` hardcoded path purge), 2 temp agent stats sıfırlanmış (`temp-react-ts-specialist` totalUses 32→0, successRate 1.0→0). `core.fileMode=false` local config'i WSL 4012 mode-diff artifact'ini başarıyla bastırıyor — manuel chmod cleanup gereksiz. `SYSTEM-MIGRATION-2026-04-22.md` proje kökünde sağlam (22824 B, 597 satır, 117ae31 commit'inde), silme olayı git reflog'a düşmedi — yerel tracked working-copy delete olduğu anlaşılıyor. `origin/master` **1 commit ileride** (`8434387 docs(claude-md): sync — sprint-151 state...`) — yerel `master` behind durumda, fast-forward pull gerekli; Sprint 151 son commit `9f80755` remote'ta mevcut. Remote URL hâlâ `VerhexIO/deckent` — Sprint 151 `cce408a` commit'inde planlanan `VerhexIO/deckent` flip henüz yapılmamış.
 
 ## Bulgular
 
@@ -60,7 +60,7 @@ Sistem taşıması (2026-04-22: eski WSL → yeni Ryzen 9 / 30 GB) sonrası ilk 
 
 ### 7. Remote URL + repo flip durumu
 
-- **[DRIFT]** `origin` URL → `https://github.com/VerhexIO/deckent-dev.git`. Sprint 151 commit `cce408a docs(launch): npm + repo flip handoff` içinde planlanan `VerhexIO/deckent-dev → VerhexIO/deckent` flip (Beta GA gate #11) **henüz yapılmadı**. Alperen manuel adımlarda (GitHub UI rename + `git remote set-url origin https://github.com/VerhexIO/deckent.git`) execute etmeli.
+- **[DRIFT]** `origin` URL → `https://github.com/VerhexIO/deckent.git`. Sprint 151 commit `cce408a docs(launch): npm + repo flip handoff` içinde planlanan `VerhexIO/deckent → VerhexIO/deckent` flip (Beta GA gate #11) **henüz yapılmadı**. Alperen manuel adımlarda (GitHub UI rename + `git remote set-url origin https://github.com/VerhexIO/deckent.git`) execute etmeli.
 
 ### 8. Modified file envanteri (4 core diff dışı — kısa)
 
@@ -100,7 +100,7 @@ Sistem taşıması (2026-04-22: eski WSL → yeni Ryzen 9 / 30 GB) sonrası ilk 
 
 ### P1 (önemli — Sprint 153 ortası)
 - **P1-1:** `.gitignore` drift fix: `.deckent/decisions/`, `.deckent/run-gate.json`, `.deckent/sprint-*-metrics.jsonl` ekle. Effort: 5 dk.
-- **P1-2:** Remote URL flip: `VerhexIO/deckent-dev` → `VerhexIO/deckent` (Alperen manual step — GitHub UI rename + `git remote set-url`). Gate #11 closure. Effort: 15 dk.
+- **P1-2:** Remote URL flip: `VerhexIO/deckent` → `VerhexIO/deckent` (Alperen manual step — GitHub UI rename + `git remote set-url`). Gate #11 closure. Effort: 15 dk.
 - **P1-3:** `Dockerfile.worker` içinde `git config --global core.fileMode false` enforce — cross-backend 4012 fantom mode-diff gelecekte oluşmasın. Effort: 10 dk.
 - **P1-4:** Temp agent stats regresyonunu T-152-021 kapsamında root-cause et (bu task'ta sadece kayıt).
 
@@ -165,7 +165,7 @@ $ git branch -a | grep backup | wc -l
 18
 
 $ git remote -v | head -1
-origin	https://github.com/VerhexIO/deckent-dev.git (fetch)
+origin	https://github.com/VerhexIO/deckent.git (fetch)
 ```
 
 ### Modified file matrix

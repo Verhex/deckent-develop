@@ -184,8 +184,8 @@ deckent web
 - [npm](https://www.npmjs.com/package/deckent)
 - [Contributing](https://github.com/VerhexIO/deckent/blob/main/CONTRIBUTING.md)
 - [License (MIT)](https://github.com/VerhexIO/deckent/blob/main/LICENSE)
-- [Website](https://deckent.agency)
+- [Website](https://deckent.ai)
 
 ---
 
-Built by [Verhex](https://deckent.agency). MIT License.
+Built by [Verhex](https://deckent.ai). MIT License.

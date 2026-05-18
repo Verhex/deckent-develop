@@ -269,7 +269,7 @@ Kapsamlı metodoloji araştırması (4 paralel research agent, ~95 metodoloji ta
 - **T2 (Bug Y):** processQueue legacy FIFO stall fix (flag false modunda) — respawnEligibleTasks 13 grep match canlı çalışıyor
 - **T3 (Bug Z):** Vitest gate +1 fail kronik regresyon kaynak forensic + worker/Brain audit uyumu (NO_GO — Sprint 165 retro deliverable)
 - **T4 (Bug W):** dead_event_stream detector activate (Sprint 148 `reserve_for: sprint-148` cleared)
-- **T5:** Documentation freeze + public repo flip (`VerhexIO/deckent-dev` → `VerhexIO/deckent`) prep — GO_WITH_TECH_DEBT, public flip Sprint 168'e taşındı
+- **T5:** Documentation freeze + public repo flip (`VerhexIO/deckent` → `VerhexIO/deckent`) prep — GO_WITH_TECH_DEBT, public flip Sprint 168'e taşındı
 
 ### Sprint 166 (Brain Self-Update + Data Integrity Closure, 2026-05-13)
 
@@ -309,7 +309,7 @@ Kapsamlı metodoloji araştırması (4 paralel research agent, ~95 metodoloji ta
 
 ### Sprint 168 (Open Source GA Hedefi)
 
-- `VerhexIO/deckent-dev` → `VerhexIO/deckent` public flip (Sprint 165 T5 hazırlık → Sprint 168 cutover)
+- `VerhexIO/deckent` → `VerhexIO/deckent` public flip (Sprint 165 T5 hazırlık → Sprint 168 cutover)
 - `npm publish v1.0.0-beta.2` GA
 - Show HN launch + Twitter/Reddit/Discord community feedback wave
 
@@ -474,8 +474,8 @@ Sprint 156 dogfood'undaki sprint sırasında **kendi kodunun bug'larını canlı
 - **Baseline:** commit `224618c` (Sprint 152 sonu, 2026-05-05) restore-152 branch
 - **Cherry-pick:** commit `9b91405` (Sprint 154 Wave A T1+T4+T6+T10 — claude.json:rw ROOT CAUSE, dist chmod, FIX timeout 30dk, adr-validator path)
 - **Backup integration:** Apr 22 tar dosyasından `.brain/memory.db` (2.3MB, 174 entries) + `.brain/sprints/` + `.deckent/{jobs,pids,cache,routing,plugins}/` + `.tasks/archive/` surgical extract
-- **Yeni repo:** `VerhexIO/deckent-develop` (private) `main` branch, push edildi commit `359bd10`
-- **Eski repo:** `VerhexIO/deckent-dev` `origin-archive` remote olarak korundu
+- **Yeni repo:** `VerhexIO/deckent` (private) `main` branch, push edildi commit `359bd10`
+- **Eski repo:** `VerhexIO/deckent` `origin-archive` remote olarak korundu
 
 ### Sprint 153 Smoke (2026-05-12, restore validation)
 

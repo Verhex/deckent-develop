@@ -57,7 +57,7 @@ package.json   — manifest with full metadata
 | `name` | deckent |
 | `version` | 1.0.0-beta.1 |
 | `description` | AI agent orchestration system — your AI development team, orchestrated. |
-| `homepage` | https://deckent.agency |
+| `homepage` | https://deckent.ai |
 | `bugs` | https://github.com/VerhexIO/deckent/issues |
 | `repository` | github:VerhexIO/deckent |
 | `keywords` | ai, agent, orchestration, claude, cli, agents, skills, marketplace, analytics |

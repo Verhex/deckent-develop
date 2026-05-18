@@ -28,7 +28,7 @@ Sprint 169 = Audit Remediation + Brain Spawn Pipeline Closure. 9 task tek dalga 
 - Brain otonom smoke test: 15dk auto-finalize, 2/4 task DONE (T1 + T2), 1 NO_GO (T3 dep parser bug), 1 fail (T4)
 - Manuel survival incident = 0
 - memory.db: ADR-047 + ADR-048 + sprint-log-168 + retro-sprint-168 + mem-sprint-168 + pattern-sprint-168-stale_heartbeat (6 entry)
-- Push: `aab7071..b5a0acb` → `VerhexIO/deckent-develop`
+- Push: `aab7071..b5a0acb` → `VerhexIO/deckent`
 - Worktree cleanup: 10 worktree + 10 branch silindi
 
 ### Sprint 169 Açık Tasks
@@ -234,7 +234,7 @@ Wave 3 (sequential, 1 task — final config flip)
 ## 7. Sprint 170 OSS GA Handoff Conditions
 
 - **168.5 GO (full pass):** Sprint 170 OSS GA conditional açılır
-  - `VerhexIO/deckent-dev` → `VerhexIO/deckent` public flip
+  - `VerhexIO/deckent` → `VerhexIO/deckent` public flip
   - `npm publish v1.0.0-beta.2` (Alperen approval)
   - Show HN launch hazırlığı
 - **168.5 GO_WTD (≤2 cosmetic):** Sprint 169 conditional, 1 review cycle Alperen ile

@@ -4057,7 +4057,7 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 ### Tasks
 
 - 151-001: npm publish HAZIRLIK + Alperen Handoff (PUBLISH WORKER TARAFINDAN ÇALIŞTIRILMAZ) (DONE)
-- 151-002: Public Repo Flip — VerhexIO/deckent-dev → VerhexIO/deckent (GO_WITH_TECH_DEBT)
+- 151-002: Public Repo Flip — VerhexIO/deckent → VerhexIO/deckent (GO_WITH_TECH_DEBT)
 - 151-003: Dashboard ChatPage.tsx (7. page) (DONE)
 - 151-004: Discord Bot Deploy + Smoke Test (GO_WITH_TECH_DEBT)
 - 151-005: Telegram Bot Deploy + Smoke Test (DONE)

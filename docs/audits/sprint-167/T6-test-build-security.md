@@ -448,8 +448,8 @@ Yani Sprint 167 *fiilen* false ile çalışıyor, ancak default flow yeni projel
 
 | Remote | URL | Visibility |
 |--------|-----|-----------|
-| `origin` | `https://github.com/VerhexIO/deckent-develop.git` | **private** (NEXT-SESSION-PROMPT.md:4 confirm) |
-| `origin-archive` | `https://github.com/VerhexIO/deckent-dev.git` | **private archive** (mevcut Sprint 165'e kadar develop) |
+| `origin` | `https://github.com/VerhexIO/deckent.git` | **private** (NEXT-SESSION-PROMPT.md:4 confirm) |
+| `origin-archive` | `https://github.com/VerhexIO/deckent.git` | **private archive** (mevcut Sprint 165'e kadar develop) |
 
 **Hedef:** `VerhexIO/deckent` (public) — Sprint 168/169 GA.
 
@@ -470,12 +470,12 @@ Yani Sprint 167 *fiilen* false ile çalışıyor, ancak default flow yeni projel
 | Workflows (ci/cross-platform-e2e/docs/publish/release) | ✅ ACCEPTED | 5 file mevcut |
 | `.detect-secrets` veya truffleHog gate | ⚠️ **EKSİK** | Sprint 168 P0 must-have |
 | `package.json` repository.url accurate | ✅ ACCEPTED | `VerhexIO/deckent.git` (target, develop değil) |
-| `package.json` homepage | ✅ ACCEPTED | `deckent.agency` |
+| `package.json` homepage | ✅ ACCEPTED | `deckent.ai` |
 | `package.json` bugs URL | ✅ ACCEPTED | `VerhexIO/deckent/issues` |
 | npm `files` allowlist | ✅ ACCEPTED | 4 entry (dist, bin, README.md, LICENSE) |
 | `.npmignore` belt-and-suspenders | ✅ ACCEPTED | 28 satır deny |
 | `LICENSE` mit Copyright year | ✅ ACCEPTED | 2026 — current |
-| AGENTS.md / BLUEPRINT / VISION public-safe | ⚠️ **REVIEW NEEDED** | Internal sprint history references include `VerhexIO/deckent-dev` rename trail |
+| AGENTS.md / BLUEPRINT / VISION public-safe | ⚠️ **REVIEW NEEDED** | Internal sprint history references include `VerhexIO/deckent` rename trail |
 | `validate-publish.ts` mandatory CI gate | ⚠️ **EKSİK** | Sprint 168 P0 add to publish.yml |
 | `.deckent/config.json` removed from npm pack | ✅ ACCEPTED | `.npmignore` ile blocked |
 | Brain/sprint state removed from npm pack | ✅ ACCEPTED | `.brain/`, `.tasks/`, `.locks/`, `.deckent/` blocked |
@@ -498,7 +498,7 @@ Yani Sprint 167 *fiilen* false ile çalışıyor, ancak default flow yeni projel
 2. Origin yeniden adlandırma:
    - `git remote rename origin origin-private`
    - `git remote add origin https://github.com/VerhexIO/deckent.git`
-3. `VerhexIO/deckent-dev` → archived; `VerhexIO/deckent-develop` → private dev fork; `VerhexIO/deckent` → public main.
+3. `VerhexIO/deckent` → archived; `VerhexIO/deckent` → private dev fork; `VerhexIO/deckent` → public main.
 4. README badge URL'leri (zaten `VerhexIO/deckent`'a işaret ediyor — README:5,618).
 5. `npm publish` only after `validate-publish.ts` PASS + `.detect-secrets` baseline PASS.
 
@@ -532,7 +532,7 @@ Yani Sprint 167 *fiilen* false ile çalışıyor, ancak default flow yeni projel
 
 ### 4.3 Sprint 169 P1 (Public GA)
 
-- **VerhexIO/deckent-develop → VerhexIO/deckent** public flip (manuel Alperen)
+- **VerhexIO/deckent → VerhexIO/deckent** public flip (manuel Alperen)
 - `npm publish v1.0.0-beta.2`
 - Show HN launch
 - Community onboarding (CONTRIBUTING güncelleme, GitHub Discussions enable)
@@ -610,8 +610,8 @@ $ ls workspace/.env* | wc -l  # 0
 ### A.5 Public Repo Flip Pre-State
 ```
 $ git remote -v
-origin           https://github.com/VerhexIO/deckent-develop.git
-origin-archive   https://github.com/VerhexIO/deckent-dev.git
+origin           https://github.com/VerhexIO/deckent.git
+origin-archive   https://github.com/VerhexIO/deckent.git
 
 $ git branch --show-current
 main

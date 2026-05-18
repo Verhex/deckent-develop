@@ -143,7 +143,7 @@ auditor.ts ← C0b binding
 - (Eğer Sprint 168 GO ise Brain otonom çalışır)
 
 **Sprint 169 = OSS GA conditional:**
-- VerhexIO/deckent-dev → VerhexIO/deckent public flip
+- VerhexIO/deckent → VerhexIO/deckent public flip
 - npm publish v1.0.0-beta.2
 - Show HN launch
 - ConditionalIf Sprint 168.5 OSS pre-flip clear (H1-H5 done)
@@ -655,7 +655,7 @@ Sprint 168 NO_GO durumda Sprint 168.5 task sayısı 9-10 olabilir (7 mevcut + 1-
 
 ### Sprint 169 = Open Source GA conditional
 
-- VerhexIO/deckent-dev → VerhexIO/deckent public flip
+- VerhexIO/deckent → VerhexIO/deckent public flip
 - npm publish v1.0.0-beta.2
 - Show HN launch
 - ConditionalIf Sprint 168.5 OSS pre-flip clear

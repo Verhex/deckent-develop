@@ -197,7 +197,7 @@ Worker 024-008 `package.json`'a repository ve bugs alanları ekledi:
 - [x] engines: node >=18.0.0
 - [x] prepublishOnly: npm run build
 - [x] repository + bugs alanları
-- [x] homepage: https://deckent.agency
+- [x] homepage: https://deckent.ai
 - [ ] LICENSE dosyası henüz yok (files'ta referans var)
 
 ---
