@@ -2,11 +2,24 @@
 
 > **Blueprint Reference:** §6 Memory Architecture (3-Tier)
 
+> ⚠️ **Memory V2 (DB-first) — read this first.** The "3-tier file-based" model
+> below is the **original V1 design**, preserved for conceptual context. As of
+> **Memory V2 the single source of truth is `.brain/memory.db`** (SQLite +
+> FTS5, dual-layer Turkish/English normalize). The markdown files
+> (`exports/summary.md`, `decisions.md`, `memory.md`, `debt.md`) are
+> **generated exports**, not hand-edited tiers. **ADRs live in the DB
+> (`type='adr'`)** and are exported to `.brain/exports/decisions.md` and
+> `docs/adr/` — there is no live hand-maintained `.brain/DECISIONS.md`.
+> All line-budget numbers quoted below (200 / 80 / 600 / 5, "Sprint 065 — 21
+> ADRs", etc.) are **outdated V1 design figures**; the authoritative current
+> values are in `src/core/constants.ts`. Schema reference:
+> [api-surface.md](../reference/api-surface.md) (Memory V2 DB Schema).
+
 ---
 
 ## Overview
 
-Deckent's memory system is a **three-tiered, file-based knowledge store** that lives entirely in the `.brain/` directory. Every sprint reads from and writes to this system, making the orchestrator progressively smarter with each execution cycle.
+Deckent's memory system was originally designed as a **three-tiered, file-based knowledge store** in the `.brain/` directory (the V1 model documented below). Under Memory V2 it is realised DB-first — see the note above. Every sprint reads from and writes to this system, making the orchestrator progressively smarter with each execution cycle.
 
 ```
 .brain/

@@ -1,11 +1,30 @@
 # Authority Matrix — Brain · Auditor · Worker RBAC Protocol V1.0
 
-> **ADR Reference:** [ADR-037](../../.brain/DECISIONS.md#adr-037-brain-auditor-worker-authority-matrix--rbac-protocol-v10)
+> **ADR Reference:** [ADR-037 — Brain-Auditor-Worker Authority Matrix](../adr/037-brain-auditor-worker-authority-matrix-rbac-protocol-v1-0.md) (see also the [ADR index](../adr/README.md))
 > **Protocol Version:** 1.0 (Sprint 138)
 > **NIST Reference:** NIST SP 800-162 — Guide to Attribute Based Access Control (ABAC)
-> **Last Updated:** Sprint 139
 
-This document is the human-readable reference for Deckent's Role-Based Access Control (RBAC) system. For the formal machine-readable specification, see `ADR-037` in `.brain/DECISIONS.md`.
+> ⚠️ **Enforcement reality (ADR-037 V1.0 — read this first).** This matrix
+> describes the **intended** authority model. What is actually enforced today:
+> - **Layer 1 (compile-time lint) + Layer 3 (audit-trail) are ACTIVE.**
+> - **Layer 2 (runtime) is ADVISORY/SOFT** — violations are logged as warnings
+>   and emitted to the event stream but **do NOT block the action**
+>   (`authority-enforcer.ts` is always-soft; `worker.ts` returns `true` even on
+>   a detected violation). The hard-blocking Layer-2 is **intentionally absent
+>   in V1.0** and planned as a post-GA **V2 hard-flip**.
+> - `enforceVerifyLoop()` / `runTestVerifyLoop()` are **prompt instructions,
+>   not code-enforced** (0 runtime callers).
+>
+> This mirrors the honest framing already in `CLAUDE.md` and
+> `.claude/rules/worker-default.md`. Read "blocks / prevents / denied / thrown /
+> NO_GO" below as **design intent**, not a current runtime guarantee.
+>
+> ℹ️ **ADR store:** ADRs live in `.brain/memory.db` (`type='adr'`), exported to
+> `.brain/exports/decisions.md` and `docs/adr/`. The legacy path
+> `.brain/DECISIONS.md` used below is **shorthand for the ADR governance
+> store** — the write-prohibition applies to that store in any representation.
+
+This document is the human-readable reference for Deckent's Role-Based Access Control (RBAC) system. For the formal specification see [ADR-037](../adr/037-brain-auditor-worker-authority-matrix-rbac-protocol-v1-0.md).
 
 ---
 
@@ -62,7 +81,7 @@ No single component can both execute and verify its own work:
 Every permission exercise is recorded in the event stream (`.deckent/sprint-NNN-events.jsonl`). Unauthorized access attempts are logged as `SCOPE_VIOLATION` events.
 
 ### Fail-Closed
-If a permission check fails or is ambiguous → **access denied**. There are no "maybe" states. Explicit allow lists, implicit deny.
+**Design goal:** if a permission check fails or is ambiguous → access denied; explicit allow lists, implicit deny. **Current implementation (V1.0):** soft-mode — a failed check is logged + event-emitted but the action still proceeds (see the enforcement-reality note at the top). Fail-closed blocking is the post-GA V2 target.
 
 ---
 
@@ -119,7 +138,7 @@ The master overview. ✅ = allowed, ❌ = denied, ⚠️ = conditional (see note
 | PASS / DOWNGRADE / FAIL verdict | ❌ | ✅ | ❌ | Auditor verdict informs Brain decision |
 | Task claim (PENDING → CLAIMED) | ❌ | ❌ | ✅ | Worker must own the task |
 | Code writing | ❌ | ❌ | ✅ | Within assigned scope only |
-| tsc + vitest verify loop | ❌ | ❌ | ✅ | Max 3 attempts |
+| tsc + vitest verify loop | ❌ | ❌ | ✅ | Prompt instruction (≤3 attempts), **not code-enforced** — `enforceVerifyLoop`/`runTestVerifyLoop` have 0 runtime callers |
 | Self-assessment writing | ❌ | ❌ | ✅ | DONE / GO_WITH_TECH_DEBT / NO_GO |
 | Checkpoint question | ❌ | ❌ | ✅ | WORKER→BRAIN:QUESTION channel |
 
@@ -333,10 +352,10 @@ The event stream (`.deckent/sprint-NNN-events.jsonl`) is **append-only**. No com
 
 1. Worker calls `isWithinScope('.deckent/sprint-state.json')` before writing.
 2. `isWithinScope()` checks the path against `task-139-005.json`'s `scope.filesWrite` list.
-3. `.deckent/sprint-state.json` is **not** in the worker's scope → `ScopeViolationError` thrown.
-4. Auditor's 30s scan detects the attempt via `git diff --stat` if the write was attempted via other means.
+3. `.deckent/sprint-state.json` is **not** in the worker's scope → violation detected. *(V1.0 soft: a warning is logged + an event emitted; the write is **not hard-blocked**. The honest worker self-flags BOUNDARY_VIOLATION → NO_GO. V2 will hard-block.)*
+4. Auditor's 30s scan also detects the attempt via `git diff --stat`.
 5. Auditor emits `AUDITOR→BRAIN:ADR_VIOLATION` event with `{ rule: 'ADR-037', component: 'worker', path: '.deckent/sprint-state.json' }`.
-6. Brain receives the violation event → task is flagged as NO_GO.
+6. Brain receives the violation event → applies FIX/cascade and the task is evaluated NO_GO.
 
 **Root cause:** Sprint state management is Brain's exclusive responsibility. Workers never advance sprint phases directly — they only write their own `.result` files.
 
@@ -450,14 +469,17 @@ The authority matrix is enforced at three layers:
 | Worker prompt injection (ADR-036) | Authority matrix injected into every worker prompt |
 | TypeScript type system | `isWithinScope()` return types enforce scope at call sites |
 
-### Layer 2 — Runtime (Dynamic)
+### Layer 2 — Runtime (Advisory / Soft, V1.0)
 
-| Mechanism | What It Checks |
-|-----------|----------------|
-| `isWithinScope()` in `worker.ts` | Symlink-aware path comparison against task scope |
-| `acquireLock()` in `file-lock.ts` | Prevents concurrent writes to same file |
-| Auditor 30s scan cycle | `git diff --stat` detects boundary violations |
-| Event stream `source` field validation | Wrong `source` → `SCOPE_VIOLATION` alert |
+> Violations here are **logged + event-emitted but do NOT block** (soft mode).
+> Hard blocking is the post-GA V2 target.
+
+| Mechanism | What it currently does (V1.0 soft) |
+|-----------|-----------------------------------|
+| `isWithinScope()` in `worker.ts` | Symlink-aware path check; on violation **warns + emits event, then allows the write** (`return true`) |
+| `acquireLock()` in `file-lock.ts` | Attempts a file lock; on conflict logs/retries (process-level, advisory) |
+| Auditor 30s scan cycle | `git diff --stat` detects boundary drift → **advisory** alert/event |
+| Event stream `source` field validation | Wrong `source` → `SCOPE_VIOLATION` alert (logged, non-blocking) |
 
 ### Layer 3 — Post-Hoc (Audit Trail)
 
@@ -534,11 +556,11 @@ Deckent's authority matrix aligns with NIST SP 800-162 (Guide to ABAC) principle
 
 ## Related Documents
 
-- **[ADR-037](.brain/DECISIONS.md#adr-037)** — Formal RBAC specification (machine-readable)
-- **[ADR-035](.brain/DECISIONS.md#adr-035)** — Event stream protocol and channel codes
-- **[ADR-034](.brain/DECISIONS.md#adr-034)** — Per-project isolation and symlink-aware scope
-- **[ADR-036](.brain/DECISIONS.md#adr-036)** — ADR governance and worker prompt injection
-- **[ADR-008](.brain/DECISIONS.md#adr-008)** — Brain-only import rule (import boundary = authority boundary)
+- **[ADR-037](../adr/037-brain-auditor-worker-authority-matrix-rbac-protocol-v1-0.md)** — Formal RBAC specification
+- **ADR-035** — Event stream protocol and channel codes ([ADR index](../adr/README.md))
+- **ADR-034** — Per-project isolation and symlink-aware scope ([ADR index](../adr/README.md))
+- **ADR-036** — ADR governance and worker prompt injection ([ADR index](../adr/README.md))
+- **ADR-008** — Brain-only import rule (import boundary = authority boundary) ([ADR index](../adr/README.md))
 - **[sprint-lifecycle.md](sprint-lifecycle.md)** — Sprint phases where authority rules apply
 - **[architecture.md](architecture.md)** — System overview and module map
 - **[NIST SP 800-162](https://csrc.nist.gov/publications/detail/sp/800-162/final)** — Guide to ABAC Definition and Considerations

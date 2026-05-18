@@ -36,7 +36,7 @@ Deckent is an **AI agent orchestration CLI** that coordinates multiple AI agents
                          │
                          ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│  DECKENT CLI  (src/cli/ — 35+ commands)                             │
+│  DECKENT CLI  (src/cli/ — 46 commands)                              │
 │  deckent start | deckent plan | deckent status | deckent web        │
 └────────────────────────┬────────────────────────────────────────────┘
                          │
@@ -59,7 +59,7 @@ Deckent is an **AI agent orchestration CLI** that coordinates multiple AI agents
           ▼
 ┌─────────────────────────────────────────────────────────────────────┐
 │  HTTP API + WEB DASHBOARD                                           │
-│  src/api/ (17 endpoints + SSE)  |  src/dashboard/ (React+Vite)     │
+│  src/api/ (REST + SSE)          |  src/dashboard/ (React+Vite)     │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -91,7 +91,7 @@ src/
 │   ├── plugin.ts            ← Plugin manifest validation, load, install, remove
 │   └── plugin-hooks.ts      ← Plugin hook execution (beforeSprint/afterSprint/etc.)
 │
-├── orchestra/               ← Sprint orchestration (63 modules)
+├── orchestra/               ← Sprint orchestration (76 modules)
 │   ├── brain.ts             ← Re-export layer — sole orchestration entry point
 │   ├── sprint-controller.ts ← Sprint lifecycle (PLAN→SPAWN→EXECUTE→EVALUATE→FIX→RETRO→DECAY→CLEANUP)
 │   ├── sprint-phases.ts     ← Phase-specific execution logic
@@ -120,7 +120,7 @@ src/
 │   ├── model-selector.ts    ← Task model resolution
 │   └── ...                  ← decision-engine, learning, collaboration modules
 │
-├── agents/                  ← Worker agent runtime (16 modules)
+├── agents/                  ← Worker agent runtime (20 modules)
 │   ├── worker.ts            ← Worker lifecycle, heartbeat, result writing
 │   ├── adaptive-agent.ts    ← Runtime agent adaptation
 │   ├── worker-ipc.ts        ← WorkerChannel, ChannelRegistry — process.send IPC
@@ -137,7 +137,7 @@ src/
 │
 ├── cli/                     ← Command-line interface
 │   ├── auto-setup.ts        ← Setup wizard (generateSetupRecommendation)
-│   ├── commands/            ← 35+ CLI commands (one file per command)
+│   ├── commands/            ← 46 CLI commands (one file per command)
 │   │   ├── init.ts          ← deckent init — project initialization
 │   │   ├── start.ts         ← deckent start — sprint execution
 │   │   ├── plan.ts          ← deckent plan — dry-run planning
@@ -174,8 +174,8 @@ src/
 │       ├── hints.ts         ← Phase-based contextual hints (tr/en)
 │       └── messages.ts      ← Localized message system (getMessage)
 │
-├── mcp/                     ← Model Context Protocol integration (20 tools + 8 resources)
-│   ├── tools/               ← 20 MCP tool handlers
+├── mcp/                     ← Model Context Protocol integration (31 tools + 8 resources)
+│   ├── tools/               ← 31 MCP tool handlers (one file per tool; nervous.ts registers 5)
 │   │   ├── index.ts         ← Tool registration
 │   │   ├── init.ts          ← deckent_init
 │   │   ├── directives.ts    ← deckent_set_directives
@@ -196,7 +196,8 @@ src/
 │   │   ├── agent-list.ts    ← deckent_agent_list
 │   │   ├── skill-list.ts    ← deckent_skill_list
 │   │   ├── checkpoint.ts    ← deckent_checkpoint
-│   │   └── job-runner.ts    ← background job execution (internal)
+│   │   ├── job-runner.ts    ← background job execution (internal)
+│   │   └── ...              ← memory-query, docs, explain, watch, audit, recover, feature-query, nervous_* (5) — full list: docs/reference/mcp-tools.md
 │   ├── resources/           ← 8 MCP resource handlers
 │   │   ├── index.ts         ← Resource registration
 │   │   ├── dashboard.ts     ← deckent://dashboard
@@ -210,13 +211,23 @@ src/
 │   └── helpers/
 │       └── enrich.ts        ← enrichResponse() — _enriched meta injection
 │
-├── api/                     ← HTTP REST API (3 modules)
-│   ├── server.ts            ← Express server, 17 endpoints + SSE stream
+├── api/                     ← HTTP REST API (4 modules)
+│   ├── server.ts            ← HTTP server, REST endpoints + SSE stream
+│   ├── auth.ts              ← API auth / token handling
 │   ├── rate-limiter.ts      ← API rate limiting
 │   └── watcher.ts           ← File watcher for SSE
 │
+├── monitor/                 ← Auditor scan loop, dashboard manager, sprint-state
+│   └── auditor.ts           ← 30s scan: heartbeat, boundary (git diff --stat), alerts
+├── connectors/              ← External messaging adapters (Discord, Telegram,
+│   └── ...                    WhatsApp, incoming-router)
+├── nervous/                 ← Proactive meta-orchestrator (ADR-040): observer,
+│   └── ...                    detector-registry, decision-engine, dispatcher, executor
+├── extensions/              ← VS Code extension host integration
+│   └── ...
+│
 └── dashboard/               ← Web Dashboard
-    └── ...                  ← React + Vite + Tailwind (4 pages)
+    └── ...                  ← React + Vite + Tailwind (7 pages)
 ```
 
 ### providers/ — Multi-Provider Architecture (Sprint 038)
@@ -247,9 +258,10 @@ src/
 
 | Tier | Claude | OpenAI | Gemini |
 |------|--------|--------|--------|
+| Premium+ | — | o3 | gemini-3.1-pro-preview |
 | Premium | opus | gpt-5 | gemini-2.5-pro |
-| Standard | sonnet | gpt-4.1 | gemini-2.5-flash |
-| Economy | haiku | gpt-5-mini | gemini-2.0-flash |
+| Standard | sonnet | gpt-4.1 / o4-mini | gemini-2.5-flash |
+| Economy | haiku | gpt-5-mini / gpt-4.1-mini | gemini-2.0-flash |
 
 **Provider-aware model selection:** `resolveTaskModel(task, provider?)` maps task requirements to the best model for the target provider using tier equivalence.
 
@@ -913,7 +925,16 @@ Controls AI planner behavior at runtime:
 
 ## 7. Memory System
 
-Deckent's memory system is a **3-tier, file-based knowledge store** in `.brain/`. Every sprint reads from and writes to this system, making the orchestrator progressively smarter.
+> ⚠️ **Memory V2 (DB-first) update.** The "3-tier file-based" model below is the
+> original V1 design and is kept for conceptual context. **As of Memory V2 the
+> single source of truth is `.brain/memory.db` (SQLite + FTS5)**; the markdown
+> files (`exports/summary.md`, `decisions.md`, `memory.md`, `debt.md`) are
+> **generated exports**, not hand-edited source. ADRs live in the DB
+> (`type='adr'`) and are exported to `.brain/exports/decisions.md` — there is no
+> live hand-maintained `.brain/DECISIONS.md`. Canonical reference:
+> [memory-system.md](memory-system.md). Line budgets: `src/core/constants.ts`.
+
+Deckent's memory system was originally a **3-tier, file-based knowledge store** in `.brain/`. Every sprint reads from and writes to this system, making the orchestrator progressively smarter.
 
 ### Directory Structure
 
@@ -1233,7 +1254,7 @@ project/
 │       ├── .gitkeep
 │       └── {plugin-name}/      ← Plugin directories (gitignored)
 │
-├── .brain/                     ← Memory system (3 tiers, 900-line budget)
+├── .brain/                     ← Memory system (SQLite DB-first; line budgets in src/core/constants.ts)
 │   ├── MEMORY.md               ← Tier 1: Short-term (max 300 lines)
 │   ├── PATTERNS.md             ← Tier 2: Long-term patterns (JSON, max 150 lines)
 │   ├── DECISIONS.md            ← Tier 3: Permanent ADRs
@@ -1339,14 +1360,17 @@ Browser ──GET /events──► API Server
 
 ### Web Dashboard
 
-The React dashboard (`src/dashboard/`) provides 4 pages:
+The React dashboard (`src/dashboard/`) provides 7 pages:
 
 | Page | URL | Description |
 |------|-----|-------------|
 | Dashboard | `/` | Live agent status, progress, alerts, sprint info |
-| Settings | `/settings` | Config editor, plan mode selector |
+| Status | `/status` | Detailed sprint/worker status |
 | History | `/history` | Sprint history, GO/NO-GO rates, test trends |
-| Memory | `/memory` | Browse MEMORY.md, PATTERNS.md, DECISIONS.md |
+| Memory | `/memory` | Browse brain memory (learnings, patterns, ADR exports) |
+| Chat | `/chat` | Conversational interface |
+| Config | `/config` | Configuration browser |
+| Settings | `/settings` | Config editor, plan mode selector |
 
 ---
 
@@ -1399,4 +1423,4 @@ The ci-guardian agent is a specialized agent for CI/CD integration:
 
 ---
 
-*Last updated: Sprint 100+ — deckent v0.3.0-beta.3 — April 2026*
+*Architecture reference — deckent v1.0.0-beta.1 (Memory V2 DB-first era). For live counts see the [docs index](../index.md) and the README badges; for the canonical memory model see [memory-system.md](memory-system.md).*

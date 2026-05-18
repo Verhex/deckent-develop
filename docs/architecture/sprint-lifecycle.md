@@ -2,6 +2,15 @@
 
 > **Blueprint Reference:** §7 Sprint Lifecycle & Orchestration, §8 GO/NO-GO/Tech Debt Protocol, §9 Usage-Aware Planning
 
+> ℹ️ **Memory V2 / constants note.** ADRs and learnings are stored **DB-first**
+> in `.brain/memory.db`; the `.brain/*.md` files (incl. `decisions.md`,
+> `memory.md`) are **generated exports**, not hand-edited source — there is no
+> live `.brain/DECISIONS.md`. The DECAY line-budget figures quoted below
+> (e.g. 900 / 300 / 100 / 5) are the **original V1 design values and are
+> outdated**; the authoritative current values live in `src/core/constants.ts`
+> (`BRAIN_TOTAL_LINE_BUDGET`, `MEMORY_MAX_LINES`, `MEMORY_DECAY_SPRINTS`, …).
+> See [memory-system.md](memory-system.md) for the canonical memory model.
+
 This document describes the complete 8-phase sprint lifecycle in Deckent. A sprint is the fundamental unit of orchestrated work — it begins with a directive, coordinates parallel workers, evaluates results, and always reaches COMPLETE state without being abandoned.
 
 **Master function:** `runSprint(projectRoot, config, opts?)` — `src/orchestra/sprint-controller.ts`

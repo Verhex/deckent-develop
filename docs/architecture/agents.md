@@ -14,61 +14,33 @@ When no agent matches a task, the default `generic` worker is used.
 
 ## Built-in Agents
 
-Deckent ships with the following built-in agents:
+Deckent ships **15 built-in agents** (ADR-041 — testing is handled per-task,
+not via a dedicated test agent). The canonical list with each agent's
+preferred model, primary intent, and activation keywords is **auto-generated**
+— see [docs/reference/agents.md](../reference/agents.md) (`npm run docs:ref`).
+The list below is a stable overview only.
 
-### security-auditor
+| Agent | Focus |
+|-------|-------|
+| `security-auditor` | Security: vulnerabilities, auth, injection, XSS/CSRF |
+| `doc-writer` | README, API docs, changelogs, guides, JSDoc |
+| `bug-fixer` | Debugging, regressions, hotfixes |
+| `code-reviewer` | Code quality, review, best practices |
+| `refactorer` | Restructuring, cleanup, modernization |
+| `api-builder` | REST / OpenAPI endpoint design |
+| `performance-analyzer` | Profiling, optimization, benchmarks |
+| `ci-guardian` | CI/CD health, regression, build (plugin-hook aware: beforeSprint / afterTask / afterSprint) |
+| `architect` | System design, modules, dependency analysis |
+| `architecture-planner` | Architectural planning, ADRs, roadmap |
+| `accessibility-auditor` | WCAG, a11y audits |
+| `data-engineer` | Data pipelines, ETL, data modeling |
+| `devops-engineer` | CI/CD, Docker, deployment, infrastructure |
+| `frontend-designer` | UI/UX, components, responsive design |
+| `migration-specialist` | Version / framework migration, deprecations |
 
-Specializes in security-related tasks: vulnerability scanning, authentication fixes, injection prevention, CSRF/XSS mitigation. Uses opus model by default for thorough analysis.
-
-Triggers: `security`, `vulnerability`, `jwt`, `authentication`, `xss`, `csrf`, `injection`, `auth`
-
-### test-writer
-
-Focused on creating and improving tests: unit tests, integration tests, test coverage improvements, spec files. Ensures tests follow project conventions and achieve target coverage.
-
-Triggers: `test`, `unit test`, `integration test`, `coverage`, `spec`, `vitest`, `jest`
-
-### doc-writer
-
-Handles documentation tasks: README updates, API docs, changelogs, guides, and inline documentation. Produces clear, consistent documentation following project style.
-
-Triggers: `readme`, `documentation`, `docs`, `changelog`, `api docs`, `guide`
-
-### code-reviewer
-
-Performs code review and refactoring: code quality improvements, linting fixes, dead code removal, pattern enforcement. Focuses on maintainability and readability.
-
-Triggers: `review`, `refactor`, `code quality`, `lint`, `clean up`, `dead code`
-
-### performance-optimizer
-
-Optimizes runtime performance: query optimization, caching strategies, bundle size reduction, memory leak fixes. Measures before and after.
-
-Triggers: `performance`, `optimize`, `cache`, `memory leak`, `bundle size`, `slow`
-
-### migration-specialist
-
-Handles migration tasks: database migrations, framework upgrades, API version bumps, dependency updates. Ensures backward compatibility.
-
-Triggers: `migration`, `upgrade`, `migrate`, `database`, `schema`, `dependency update`
-
-### api-designer
-
-Designs and implements API endpoints: REST, GraphQL, WebSocket interfaces. Follows API design best practices and ensures proper validation.
-
-Triggers: `api`, `endpoint`, `rest`, `graphql`, `websocket`, `route`, `controller`
-
-### devops-agent
-
-Manages CI/CD, deployment, and infrastructure tasks: GitHub Actions, Docker, environment configuration, monitoring setup.
-
-Triggers: `ci`, `cd`, `deploy`, `docker`, `github actions`, `pipeline`, `infrastructure`
-
-### ci-guardian (Sprint 062)
-
-A CI-aware agent that integrates with the sprint lifecycle through plugin hooks. Handles pre-sprint CI validation (beforeSprint), task-level regression detection (afterTask), and sprint CI reporting (afterSprint). Works with the ci-testing skill for comprehensive CI integration and sprint-to-sprint learning.
-
-Triggers: `ci`, `test`, `regression`, `coverage`, `pipeline`, `build`, `lint`, `workflow`
+> Activation keywords and model assignments live in the agent manifests
+> (`.deckent/agents/*/agent.json`) and the auto-generated reference above —
+> intentionally not duplicated here to avoid drift.
 
 ## Creating Custom Agents
 
@@ -116,7 +88,7 @@ Tie-breaking: when multiple agents have the same score, the first one in directo
 For complex tasks, multiple agents can be chained in a pipeline:
 
 ```
-code-reviewer -> test-writer -> security-auditor
+code-reviewer -> bug-fixer -> security-auditor
 ```
 
 Pipeline execution:
