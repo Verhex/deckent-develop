@@ -1,5 +1,12 @@
 # Sprint Metrics — Deckent Development History
 
+> ℹ️ **Historical document — closed-repo development period.** This is a
+> point-in-time snapshot (March 2026, through sprint 65). Counts and metrics
+> reflect that moment and are intentionally **not** updated, to preserve
+> accurate development history. For the current state see
+> [README](../../README.md), [CHANGELOG](../CHANGELOG.md), and the
+> [docs index](../index.md).
+
 > Tracking every sprint from inception to beta. Updated after each sprint.
 
 ## Summary

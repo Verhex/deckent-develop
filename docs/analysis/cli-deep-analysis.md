@@ -1,5 +1,11 @@
 # CLI Komut Derin Analizi
 
+> ℹ️ **Historical document — closed-repo development period.** This is a
+> point-in-time snapshot (~2026-05). Counts, versions, and metrics reflect that
+> moment and are intentionally **not** updated, to preserve accurate
+> development history. For the current state see [README](../../README.md),
+> [CHANGELOG](../CHANGELOG.md), and the [docs index](../index.md).
+
 Bu doküman deckent CLI'ın tüm komutlarının derinlemesine analizini, veri akışlarını, iç mekanizmalarını ve geliştirme önerilerini içerir.
 
 ---

@@ -1,5 +1,12 @@
 # Deckent Competitive Analysis — April 2026
 
+> ℹ️ **Historical document — closed-repo development period.** This is a
+> point-in-time snapshot (April 2026, v0.4.0-beta.1 era). Counts, versions,
+> scores, and competitor data reflect that moment and are intentionally **not**
+> updated, to preserve accurate development history. For the current state see
+> [README](../../README.md), [CHANGELOG](../CHANGELOG.md), and the
+> [docs index](../index.md).
+
 > Otonom AI Orkestrasyon Araçları Karşılaştırma Raporu
 
 ## Executive Summary

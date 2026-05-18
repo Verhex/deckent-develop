@@ -1,5 +1,11 @@
 # CLI & MCP Master Audit — Deckent v1.0 Beta Readiness
 
+> ℹ️ **Historical document — closed-repo development period.** This is a
+> point-in-time snapshot (2026-03-25). Counts, versions, and metrics reflect
+> that moment and are intentionally **not** updated, to preserve accurate
+> development history. For the current state see [README](../../README.md),
+> [CHANGELOG](../CHANGELOG.md), and the [docs index](../index.md).
+
 **Tarih:** 2026-03-25
 **Kapsam:** 32 CLI komutu, 10 MCP tool, 5 MCP resource, 3 provider adapter, multi-provider uyumluluk
 **Kaynak:** cli-deep-analysis.md (158 öneri), Sprint 055-057 learnings, Context7 provider docs
