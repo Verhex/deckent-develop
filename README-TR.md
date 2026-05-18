@@ -41,10 +41,12 @@ deckent run "Günün sonuna kadar PR'ı gözden geçirmeyi hatırlat"
 
 ---
 
-## Sprint 166'da Yenilikler
+## Öne Çıkanlar
 
-- **ADR-046** — Brain Self-Update Hook Mimarisi: post-finalize hook zinciri (memoryExport → adrInsert → ruleRegen → updateProjectDocs) artık resmi olarak tanımlandı ve zorunlu hale getirildi.
-- **Veri bütünlüğü kapanışı** — 100 debt satırına `sprint_id` geri dolduruldu, 9 sprint memory kaydı tamamlandı, doc-sync ground-truth doğrulaması (3 katmanlı savunma) gelecekteki agent sayısı sapmalarını engelliyor.
+- **Brain Self-Update Hook Mimarisi (ADR-046)** — post-finalize hook zinciri (memoryExport → adrInsert → ruleRegen → updateProjectDocs) resmi olarak tanımlı ve zorunlu.
+- **Veri bütünlüğü** — debt satırları `sprint_id` taşır, sprint memory kayıtları geri yüklendi ve 3 katmanlı doc-sync ground-truth kontrolü agent sayısı sapmalarını engeller.
+
+Tam sürüm geçmişi için [CHANGELOG.md](CHANGELOG.md) dosyasına bakın.
 
 ---
 
@@ -158,7 +160,7 @@ Tek görev yürütme. PLAN/SPAWN fazları yok. Hızlı komutlar, hatırlatmalar 
 
 ### Altyapı
 - **3 Backend** — tmux (Linux/macOS), subprocess (native Windows dahil tüm platformlar), Docker (izole container'lar)
-- **3 Provider** — Claude (varsayılan), OpenAI Codex, Google Gemini — 13 model, 4 katman
+- **3 Provider** — her biri kendi CLI'si ile entegre: Claude (`claude`, varsayılan), OpenAI Codex (`codex`, entegrasyon geliştirme aşamasında), Google Gemini (`gemini` — **hem Gemini CLI hem Google Generative AI API** ile çalışır) — 13 model, 4 katman
 - **Katman Tabanlı Routing** — Model adları yerine `brain_tier: 'premium'`; ModelRegistry, provider'a göre en uygun modeli seçer
 - **Yapılandırılabilir Timeout'lar** — Görev ve sprint bazlı timeout, `sprint_timeout_minutes: 0` sınırsız için
 - **Human Checkpoint'ler** — Plan, evaluate, fix fazlarında yapılandırılabilir onay noktaları
@@ -175,28 +177,30 @@ Tek görev yürütme. PLAN/SPAWN fazları yok. Hızlı komutlar, hatırlatmalar 
 
 ## Karşılaştırma
 
-> Nisan 2026 — ayrıntılı karşılaştırma için [tam rekabet analizi](docs/analysis/competitive-analysis.md) sayfasına bakın.
+Ayrıntılı karşılaştırma için [tam rekabet analizi](docs/analysis/competitive-analysis.md) sayfasına bakın.
 
-| Özellik | **deckent** | Cursor Agents | Devin | OpenClaw | Claude Code |
-|---------|-------------|--------------|-------|----------|-------------|
-| Sprint yaşam döngüsü (8 faz) | **Evet** | Hayır | Kısmi | Hayır | Hayır |
-| Çoklu agent paralel çalıştırma | **Evet** (10 worker) | Sınırlı | Evet | Evet (100+ AgentSkill) | Hayır |
-| Hedeflerden otomatik görev planlama | **Evet** (AI + structured) | Hayır | Evet | Hayır | Hayır |
-| Skill'ler için AST sandbox | **Evet** | Hayır | Hayır | Hayır | Hayır |
-| Sınır denetimli kalite auditor | **Evet** | Hayır | Hayır | Hayır | Hayır |
-| Nervous System (proaktif meta-orkestratör) | **Evet** | Hayır | Hayır | Hayır | Hayır |
-| Memory V2 (SQLite FTS5, sprint'ler arası öğrenme) | **Evet** | Hayır | Hayır | 3rd party | Hayır |
-| İki mod (sprint + task) | **Evet** | Hayır | Hayır | Hayır | Hayır |
-| `.deck` gizli bilgi interpolasyonu | **Evet** | Hayır | Hayır | Hayır | Hayır |
-| Görev bazlı GO/NO-GO değerlendirme | **Evet** | Hayır | Hayır | Hayır | Hayır |
-| Açık kaynak | **Evet** (MIT) | Hayır | Hayır | Evet (OSS) | Hayır |
-| MCP entegrasyonu | **Evet** (31 tool, 8 resource) | Kısmi | Hayır | Sınırlı | Native |
-| Web dashboard | **Evet** (7 sayfa) | Yerleşik | Yerleşik | Hayır | Hayır |
-| Çoklu provider (Claude, Codex, Gemini) | **Evet** | Hayır | Hayır | Sınırlı | Hayır |
-| Yerleşik agent sayısı | **15** | — | — | 100+ | — |
-| Yerleşik skill sayısı | **21** | — | — | 13K+ (hub, ~%20 zararlı) | — |
-| Test coverage | **%89.33** | — | — | — | — |
-| Fiyat | **Ücretsiz (MIT)** | $20-40/ay | $20-500/ay | Ücretsiz | Ücretsiz |
+> ⚠️ Karşılaştırma tablosunda hata veya eksik olabilir, rakipler hızla değişir. Bir yanlış fark ederseniz [bize bildirin](https://github.com/VerhexIO/deckent/issues), güncelleyelim.
+
+| Özellik | **deckent** | Cursor Agents | Devin | OpenClaw | Claude Code | Hermes Agency |
+|---------|-------------|--------------|-------|----------|-------------|---------------|
+| Sprint yaşam döngüsü (8 faz) | **Evet** | Hayır | Kısmi | Hayır | Hayır | — |
+| Çoklu agent paralel çalıştırma | **Evet** (10 worker) | Sınırlı | Evet | Evet (100+ AgentSkill) | Hayır | — |
+| Hedeflerden otomatik görev planlama | **Evet** (AI + structured) | Hayır | Evet | Hayır | Hayır | — |
+| Skill'ler için AST sandbox | **Evet** | Hayır | Hayır | Hayır | Hayır | — |
+| Sınır denetimli kalite auditor | **Evet** | Hayır | Hayır | Hayır | Hayır | — |
+| Nervous System (proaktif meta-orkestratör) | **Evet** | Hayır | Hayır | Hayır | Hayır | — |
+| Memory V2 (SQLite FTS5, sprint'ler arası öğrenme) | **Evet** | Hayır | Hayır | 3rd party | Hayır | — |
+| İki mod (sprint + task) | **Evet** | Hayır | Hayır | Hayır | Hayır | — |
+| `.deck` gizli bilgi interpolasyonu | **Evet** | Hayır | Hayır | Hayır | Hayır | — |
+| Görev bazlı GO/NO-GO değerlendirme | **Evet** | Hayır | Hayır | Hayır | Hayır | — |
+| Açık kaynak | **Evet** (MIT) | Hayır | Hayır | Evet (OSS) | Hayır | — |
+| MCP entegrasyonu | **Evet** (31 tool, 8 resource) | Kısmi | Hayır | Sınırlı | Native | — |
+| Web dashboard | **Evet** (7 sayfa) | Yerleşik | Yerleşik | Hayır | Hayır | — |
+| Çoklu provider (Claude, Codex, Gemini) | **Evet** | Hayır | Hayır | Sınırlı | Hayır | — |
+| Yerleşik agent sayısı | **15** | — | — | 100+ | — | — |
+| Yerleşik skill sayısı | **21** | — | — | 13K+ (hub, ~%20 zararlı) | — | — |
+| Test coverage | **Yüksek** (≈%95 hedef; zorunlu kapı değil) | — | — | — | — | — |
+| Fiyat | **Ücretsiz (MIT)** | Ücretli | Ücretli | Ücretsiz | Ücretsiz | — |
 
 ---
 
@@ -208,10 +212,10 @@ Tek görev yürütme. PLAN/SPAWN fazları yok. Hızlı komutlar, hatırlatmalar 
 | git | herhangi | `git --version` |
 | Claude Code CLI | herhangi | `claude --version` |
 | tmux | herhangi (isteğe bağlı, Linux/macOS) | `tmux -V` |
-| OpenAI Codex CLI | herhangi (isteğe bağlı) | `codex --version` |
-| Google Gemini API | herhangi (isteğe bağlı) | `GOOGLE_API_KEY` env var |
+| OpenAI Codex CLI | herhangi (isteğe bağlı, entegrasyon geliştirme aşamasında) | `codex --version` |
+| Google Gemini CLI | herhangi (isteğe bağlı) | `gemini --version` |
 
-**Claude Aboneliği:** Pro, Max 5x, Max 20x veya API key (kullandıkça öde). Diğer provider'lar (Codex, Gemini) kendi API key'leriyle çalışır.
+**Claude Aboneliği:** Pro, Max 5x, Max 20x veya API key (kullandıkça öde). Codex ve Gemini kendi CLI'leri (`codex`, `gemini`) üzerinden entegre; Gemini ayrıca `GOOGLE_API_KEY` ister ve Google Generative AI API ile de çalışabilir. Codex CLI entegrasyonu hâlâ geliştirme aşamasındadır.
 
 ---
 
@@ -363,6 +367,19 @@ deckent doctor
 | `deckent explain <konu>` | Bir kavram veya komutu açıkla |
 | `deckent heartbeat` | Tek seferlik heartbeat kontrolü (`--daemon` arka planda) |
 | `deckent checkpoint` | Human checkpoint'leri onayla/reddet |
+| `deckent onboard` | Rehberli ilk kurulum turu |
+| `deckent set-directives` | Sprint hedeflerini `DIRECTIVES.md`'ye yaz |
+| `deckent finalize` | Sprint'i sonlandır (retro, memory export, decay) |
+| `deckent resume` | Duraklatılmış/uzun süren sprint'i checkpoint'ten sürdür |
+| `deckent watch` | Sprint event'lerini gerçek zamanlı akışla izle |
+| `deckent nervous` | Nervous System TUI, durum ve detector yapılandırması (`nervous config\|set\|list`) |
+| `deckent plugin` | Plugin'leri yönet (oluştur, kur, listele, aç/kapat) |
+| `deckent archive-debt` | Çözülmüş teknik borç kayıtlarını arşivle |
+| `deckent cost` | Token kullanımı ve maliyet dökümünü göster |
+| `deckent output` | Görev bazlı yakalanan worker çıktısını göster |
+| `deckent docs` | Yerleşik dokümantasyonu yönet ve sun |
+| `deckent test` | Proje test paketini çalıştır |
+| `deckent help-info` | Çalışma zamanı yetenekleri, durum bilgisi ve kullanım rehberi |
 
 ---
 
@@ -456,13 +473,13 @@ Yapılandırma `.deckent/config.json` (proje) ve `~/.deckent/config.json` (globa
 
 ### Çoklu Provider Desteği
 
-| Provider | Modeller | Ortam Değişkeni |
-|----------|----------|-----------------|
-| Claude (varsayılan) | opus, sonnet, haiku | Oturum doğrulaması veya `ANTHROPIC_API_KEY` |
-| Codex (OpenAI) | o3, gpt-5, gpt-4.1, o4-mini, gpt-5-mini, gpt-4.1-mini | `OPENAI_API_KEY` |
-| Gemini (Google) | gemini-3.1-pro-preview, gemini-2.5-pro, gemini-2.5-flash, gemini-2.0-flash | `GOOGLE_API_KEY` |
+| Provider | CLI | Modeller | Kimlik |
+|----------|-----|----------|--------|
+| Claude (varsayılan) | `claude` | opus, sonnet, haiku | Oturum doğrulaması veya `ANTHROPIC_API_KEY` |
+| Codex (OpenAI) | `codex` *(entegrasyon geliştirme aşamasında)* | o3, gpt-5, gpt-4.1, o4-mini, gpt-5-mini, gpt-4.1-mini | `OPENAI_API_KEY` |
+| Gemini (Google) | `gemini` | gemini-3.1-pro-preview, gemini-2.5-pro, gemini-2.5-flash, gemini-2.0-flash | `GOOGLE_API_KEY` |
 
-**3 provider'da 13 model.** Katman eşdeğerliği: `premium_plus` (o3, gemini-3.1-pro-preview), `premium` (opus, gpt-5, gemini-2.5-pro), `standard` (sonnet, gpt-4.1, o4-mini, gemini-2.5-flash), `economy` (haiku, gpt-5-mini, gpt-4.1-mini, gemini-2.0-flash).
+**3 provider'da 13 model.** Her provider kendi CLI'si (`claude` / `codex` / `gemini`) üzerinden sürülür. Gemini **hem Gemini CLI hem Google Generative AI API** ile çalışır (CLI birincil). Codex CLI entegrasyonu **geliştirme aşamasındadır**. Katman eşdeğerliği: `premium_plus` (o3, gemini-3.1-pro-preview), `premium` (opus, gpt-5, gemini-2.5-pro), `standard` (sonnet, gpt-4.1, o4-mini, gemini-2.5-flash), `economy` (haiku, gpt-5-mini, gpt-4.1-mini, gemini-2.0-flash).
 
 Tam rehber için [docs/reference/multi-provider.md](docs/reference/multi-provider.md) dosyasına bakın.
 
@@ -508,10 +525,10 @@ Tam rehber için [docs/guide/docker-backend.md](docs/guide/docker-backend.md) do
 Nervous System, sprint'lerle birlikte çalışan proaktif bir meta-orkestratorüdür:
 
 <!-- ![deckent nervous TUI](docs/assets/nervous-tui.png) -->
-> Ekran görüntüsü Sprint 151'de gelecek — canlı TUI için `deckent nervous`
+> Canlı TUI için `deckent nervous` çalıştırın.
 
 - **Detector'lar** — Stale task'lar, boşta kalma durumu (task mode), routing anomalileri, agent sağlığı için tak-çalıştır detector'lar
-- **Bildirimler** — Event bus üzerinden bağlamsal uyarılar; Sprint 149+ ile Discord/Telegram connector'lar
+- **Bildirimler** — Event bus üzerinden bağlamsal uyarılar; Discord/Telegram connector'lar dahil
 - **Task Mode Boşta Kalma** — Task modunda, 5 dakikadan uzun inaktvitede bildirim gönderir
 - **Proaktif** — Polling gerekmez; detector'lar cron event'leri ve sprint yaşam döngüsü event'lerinde çalışır
 
@@ -526,7 +543,7 @@ deckent web   # localhost:3100 adresinde açılır
 React + Vite + Tailwind — 7 sayfa (Chat, Config, Dashboard, Geçmiş, Bellek, Ayarlar, Durum), SSE gerçek zamanlı güncellemeler, koyu/açık tema, TR/EN dil değiştirici.
 
 <!-- ![dashboard ekran görüntüsü](docs/assets/dashboard.png) -->
-> Tam ekran görüntüsü galerisi Sprint 151'de gelecek
+> Dashboard'u keşfetmek için `deckent web` çalıştırın.
 
 ---
 
@@ -597,7 +614,7 @@ DeckentHub, her skill'in şu özelliklere sahip olduğu seçici bir skill kayıt
 deckent skill publish ./my-skill   # İmzala + DeckentHub'a gönder
 ```
 
-Hub, Sprint 150'de 20 seed skill ile başlatılıyor: spotify-control, telegram-bot, discord-moderator, calendar-google ve 16'sı daha.
+DeckentHub seçilmiş seed skill'lerle gelir: spotify-control, telegram-bot, discord-moderator, calendar-google ve daha fazlası.
 
 ---
 

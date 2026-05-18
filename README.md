@@ -39,10 +39,12 @@ deckent run "Remind me to review the PR before end of day"
 
 ---
 
-## What's New in Sprint 166
+## Highlights
 
-- **ADR-046** — Brain Self-Update Hook Architecture: post-finalize hook chain (memoryExport → adrInsert → ruleRegen → updateProjectDocs) now formally specified and enforced.
-- **Data integrity closure** — 100 debt rows backfilled with `sprint_id`, 9 sprint memory entries restored, doc-sync ground-truth verification (3-layer defense) blocks future agent-count drift.
+- **Brain Self-Update Hook Architecture (ADR-046)** — post-finalize hook chain (memoryExport → adrInsert → ruleRegen → updateProjectDocs) is formally specified and enforced.
+- **Data integrity** — debt rows carry `sprint_id`, sprint memory entries are restored, and a 3-layer doc-sync ground-truth check blocks agent-count drift.
+
+See [CHANGELOG.md](CHANGELOG.md) for the full release history.
 
 ---
 
@@ -156,7 +158,7 @@ Single-task execution. No PLAN/SPAWN phases. Ideal for quick commands, reminders
 
 ### Infrastructure
 - **3 Backends** — tmux (Linux/macOS), subprocess (all platforms including native Windows), Docker (isolated containers)
-- **3 Providers** — Claude (default), OpenAI Codex, Google Gemini — 13 models, 4 tiers
+- **3 Providers** — each integrated via its own CLI: Claude (`claude`, default), OpenAI Codex (`codex`, integration in development), Google Gemini (`gemini` — works via **both the Gemini CLI and the Google Generative AI API**) — 13 models, 4 tiers
 - **Tier-Based Routing** — `brain_tier: 'premium'` instead of model names; ModelRegistry resolves best model per provider
 - **Configurable Timeouts** — Per-task and per-sprint timeout, `sprint_timeout_minutes: 0` for unlimited
 - **Human Checkpoints** — Configurable approval gates at plan, evaluate, fix phases
@@ -173,28 +175,30 @@ Single-task execution. No PLAN/SPAWN phases. Ideal for quick commands, reminders
 
 ## Comparison
 
-> April 2026 — see [full competitive analysis](docs/analysis/competitive-analysis.md) for detailed head-to-head breakdowns.
+See the [full competitive analysis](docs/analysis/competitive-analysis.md) for detailed head-to-head breakdowns.
 
-| Feature | **deckent** | Cursor Agents | Devin | OpenClaw | Claude Code |
-|---------|-------------|--------------|-------|----------|-------------|
-| Sprint lifecycle (8-phase) | **Yes** | No | Partial | No | No |
-| Multi-agent parallel execution | **Yes** (10 workers) | Limited | Yes | Yes (100+ AgentSkill) | No |
-| Automatic task planning from goals | **Yes** (AI + structured) | No | Yes | No | No |
-| AST sandbox for skills | **Yes** | No | No | No | No |
-| Quality auditor with boundary enforcement | **Yes** | No | No | No | No |
-| Nervous System (proactive meta-orchestrator) | **Yes** | No | No | No | No |
-| Memory V2 (SQLite FTS5, cross-sprint learning) | **Yes** | No | No | 3rd party | No |
-| Dual mode (sprint + task) | **Yes** | No | No | No | No |
-| `.deck` secret interpolation | **Yes** | No | No | No | No |
-| GO/NO-GO evaluation per task | **Yes** | No | No | No | No |
-| Open source | **Yes** (MIT) | No | No | Yes (OSS) | No |
-| MCP integration | **Yes** (31 tools, 8 resources) | Partial | No | Limited | Native |
-| Web dashboard | **Yes** (7 pages) | Built-in | Built-in | No | No |
-| Multi-provider (Claude, Codex, Gemini) | **Yes** | No | No | Limited | No |
-| Built-in agents | **15** | — | — | 100+ | — |
-| Built-in skills | **21** | — | — | 13K+ (hub, ~20% flagged) | — |
-| Test coverage | **89.33%** | — | — | — | — |
-| Price | **Free (MIT)** | $20-40/mo | $20-500/mo | Free | Free |
+> ⚠️ The comparison table may contain errors or omissions and competitors evolve fast. If you spot an inaccuracy, please [let us know](https://github.com/VerhexIO/deckent/issues) so we can update it.
+
+| Feature | **deckent** | Cursor Agents | Devin | OpenClaw | Claude Code | Hermes Agency |
+|---------|-------------|--------------|-------|----------|-------------|---------------|
+| Sprint lifecycle (8-phase) | **Yes** | No | Partial | No | No | — |
+| Multi-agent parallel execution | **Yes** (10 workers) | Limited | Yes | Yes (100+ AgentSkill) | No | — |
+| Automatic task planning from goals | **Yes** (AI + structured) | No | Yes | No | No | — |
+| AST sandbox for skills | **Yes** | No | No | No | No | — |
+| Quality auditor with boundary enforcement | **Yes** | No | No | No | No | — |
+| Nervous System (proactive meta-orchestrator) | **Yes** | No | No | No | No | — |
+| Memory V2 (SQLite FTS5, cross-sprint learning) | **Yes** | No | No | 3rd party | No | — |
+| Dual mode (sprint + task) | **Yes** | No | No | No | No | — |
+| `.deck` secret interpolation | **Yes** | No | No | No | No | — |
+| GO/NO-GO evaluation per task | **Yes** | No | No | No | No | — |
+| Open source | **Yes** (MIT) | No | No | Yes (OSS) | No | — |
+| MCP integration | **Yes** (31 tools, 8 resources) | Partial | No | Limited | Native | — |
+| Web dashboard | **Yes** (7 pages) | Built-in | Built-in | No | No | — |
+| Multi-provider (Claude, Codex, Gemini) | **Yes** | No | No | Limited | No | — |
+| Built-in agents | **15** | — | — | 100+ | — | — |
+| Built-in skills | **21** | — | — | 13K+ (hub, ~20% flagged) | — | — |
+| Test coverage | **High** (≈95% target; not a hard gate) | — | — | — | — | — |
+| Price | **Free (MIT)** | Paid | Paid | Free | Free | — |
 
 ---
 
@@ -206,10 +210,10 @@ Single-task execution. No PLAN/SPAWN phases. Ideal for quick commands, reminders
 | git | any | `git --version` |
 | Claude Code CLI | any | `claude --version` |
 | tmux | any (optional, Linux/macOS) | `tmux -V` |
-| OpenAI Codex CLI | any (optional) | `codex --version` |
-| Google Gemini API | any (optional) | `GOOGLE_API_KEY` env var |
+| OpenAI Codex CLI | any (optional, integration in development) | `codex --version` |
+| Google Gemini CLI | any (optional) | `gemini --version` |
 
-**Claude Subscription:** Pro, Max 5x, Max 20x, or API key (pay-as-you-go). Other providers (Codex, Gemini) require their respective API keys.
+**Claude Subscription:** Pro, Max 5x, Max 20x, or API key (pay-as-you-go). Codex and Gemini are integrated through their own CLIs (`codex`, `gemini`); Gemini additionally needs `GOOGLE_API_KEY` and can also run via the Google Generative AI API. The Codex CLI integration is still in development.
 
 ---
 
@@ -361,6 +365,19 @@ deckent doctor
 | `deckent explain <topic>` | Explain a concept or command |
 | `deckent heartbeat` | One-shot heartbeat check (`--daemon` for background) |
 | `deckent checkpoint` | Approve/reject human checkpoints |
+| `deckent onboard` | Guided first-run onboarding walkthrough |
+| `deckent set-directives` | Write sprint goals to `DIRECTIVES.md` |
+| `deckent finalize` | Finalize a sprint (retro, memory export, decay) |
+| `deckent resume` | Resume a paused or long-running sprint from a checkpoint |
+| `deckent watch` | Stream sprint events in real time |
+| `deckent nervous` | Nervous System TUI, status, and detector config (`nervous config\|set\|list`) |
+| `deckent plugin` | Manage plugins (create, install, list, enable/disable) |
+| `deckent archive-debt` | Archive resolved technical-debt entries |
+| `deckent cost` | Show token usage and cost breakdown |
+| `deckent output` | Show captured per-task worker output |
+| `deckent docs` | Manage and serve built-in documentation |
+| `deckent test` | Run the project test suite |
+| `deckent help-info` | Runtime capabilities, state info, and usage guide |
 
 ---
 
@@ -454,13 +471,13 @@ Configuration lives in `.deckent/config.json` (project) and `~/.deckent/config.j
 
 ### Multi-Provider Support
 
-| Provider | Models | Env Var |
-|----------|--------|---------|
-| Claude (default) | opus, sonnet, haiku | Session auth or `ANTHROPIC_API_KEY` |
-| Codex (OpenAI) | o3, gpt-5, gpt-4.1, o4-mini, gpt-5-mini, gpt-4.1-mini | `OPENAI_API_KEY` |
-| Gemini (Google) | gemini-3.1-pro-preview, gemini-2.5-pro, gemini-2.5-flash, gemini-2.0-flash | `GOOGLE_API_KEY` |
+| Provider | CLI | Models | Auth |
+|----------|-----|--------|------|
+| Claude (default) | `claude` | opus, sonnet, haiku | Session auth or `ANTHROPIC_API_KEY` |
+| Codex (OpenAI) | `codex` *(integration in development)* | o3, gpt-5, gpt-4.1, o4-mini, gpt-5-mini, gpt-4.1-mini | `OPENAI_API_KEY` |
+| Gemini (Google) | `gemini` | gemini-3.1-pro-preview, gemini-2.5-pro, gemini-2.5-flash, gemini-2.0-flash | `GOOGLE_API_KEY` |
 
-**13 models across 3 providers.** Tier equivalence: `premium_plus` (o3, gemini-3.1-pro-preview), `premium` (opus, gpt-5, gemini-2.5-pro), `standard` (sonnet, gpt-4.1, o4-mini, gemini-2.5-flash), `economy` (haiku, gpt-5-mini, gpt-4.1-mini, gemini-2.0-flash).
+**13 models across 3 providers.** Each provider is driven through its own CLI (`claude` / `codex` / `gemini`). Gemini works via **both the Gemini CLI and the Google Generative AI API** (CLI is primary). The Codex CLI integration is **in development**. Tier equivalence: `premium_plus` (o3, gemini-3.1-pro-preview), `premium` (opus, gpt-5, gemini-2.5-pro), `standard` (sonnet, gpt-4.1, o4-mini, gemini-2.5-flash), `economy` (haiku, gpt-5-mini, gpt-4.1-mini, gemini-2.0-flash).
 
 See [docs/reference/multi-provider.md](docs/reference/multi-provider.md) for the full guide.
 
@@ -506,10 +523,10 @@ See [docs/guide/docker-backend.md](docs/guide/docker-backend.md) for the full gu
 The Nervous System is a proactive meta-orchestrator that runs alongside sprints:
 
 <!-- ![deckent nervous TUI](docs/assets/nervous-tui.png) -->
-> Screenshot coming in Sprint 151 — `deckent nervous` for live TUI
+> Run `deckent nervous` for the live TUI.
 
 - **Detectors** — Pluggable detectors for stale tasks, idle state (task mode), routing anomalies, agent health
-- **Notifications** — Contextual alerts via event bus; Discord/Telegram connectors in Sprint 149+
+- **Notifications** — Contextual alerts via event bus; Discord/Telegram connectors included
 - **Task Mode Idle** — In task mode, notifies after 5 minutes of inactivity
 - **Proactive** — No polling required; detectors run on cron events and sprint lifecycle events
 
@@ -524,7 +541,7 @@ deckent web   # Opens at localhost:3100
 React + Vite + Tailwind — 7 pages (Chat, Config, Dashboard, History, Memory, Settings, Status), SSE real-time updates, dark/light theme, TR/EN language switcher.
 
 <!-- ![dashboard screenshot](docs/assets/dashboard.png) -->
-> Full screenshot gallery coming in Sprint 151
+> Run `deckent web` to explore the dashboard.
 
 ---
 
@@ -595,7 +612,7 @@ DeckentHub is a curated skill registry where every skill is:
 deckent skill publish ./my-skill   # Sign + submit to DeckentHub
 ```
 
-The hub launches with 20 seed skills in Sprint 150: spotify-control, telegram-bot, discord-moderator, calendar-google, and 16 more.
+DeckentHub ships curated seed skills: spotify-control, telegram-bot, discord-moderator, calendar-google, and more.
 
 ---
 
