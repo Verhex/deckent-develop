@@ -10,7 +10,7 @@
  * MemoryStore must include EVERY accepted ADR.
  *
  * See: docs/superpowers/plans/2026-05-14-sprint-168-plan.md lines 1371-1379
- *      .audit/sprint-167/T5-brain-debug-phase2.md (Cluster A.2)
+ *      docs/audits/sprint-167/T5-brain-debug-phase2.md (Cluster A.2)
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';

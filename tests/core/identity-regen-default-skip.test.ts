@@ -4,7 +4,7 @@
  * Sprint 168 — Cluster C0a-1 (BUG-GG closure)
  *
  * Phase 1+2 audit evidence:
- *   `.audit/sprint-167/T5-brain-debug-phase1.md` §1.9 — `@deprecated` TypeScript
+ *   `docs/audits/sprint-167/T5-brain-debug-phase1.md` §1.9 — `@deprecated` TypeScript
  *   annotation runtime'da etkili değildi; `skipIdentityRegen` default `false` ise
  *   Step 2 her finalize çağrısında çalışıyor. Sprint 166 T5'in beklediği davranış:
  *   default → skip (Step 2 invocation conditionally bypass).

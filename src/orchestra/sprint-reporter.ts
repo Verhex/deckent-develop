@@ -113,8 +113,8 @@ export type {
 //   • durationMs   === 0      → render "0s" / "<1s" instead of negative noise
 //
 // @see docs/superpowers/specs/2026-05-14-sprint-168-design.md §C0d
-// @see .audit/sprint-167/T5-brain-debug-phase1.md §1.8 BUG-FF
-// @see .audit/sprint-167/T5-brain-debug-phase2.md §Cluster D
+// @see docs/audits/sprint-167/T5-brain-debug-phase1.md §1.8 BUG-FF
+// @see docs/audits/sprint-167/T5-brain-debug-phase2.md §Cluster D
 
 /** Input arguments for {@link computeSprintMetrics}. */
 export interface SprintMetricsInput {

@@ -17,7 +17,7 @@
  *   3. Double slash + trailing slash: `src//foo.ts` + `src/foo.ts/` collide
  *      against the canonical `src/foo.ts`.
  *
- * RC: see `.audit/sprint-169/W3.1-root-cause.md`.
+ * RC: see `docs/audits/sprint-169/W3.1-root-cause.md`.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { writeFileSync, mkdirSync, rmSync, existsSync, mkdtempSync } from 'node:fs';
