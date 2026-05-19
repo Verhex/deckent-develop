@@ -4,8 +4,50 @@
 **Status:** CANONICAL — Sprint 149-200 anchor document
 **Vision:** OpenClaw'ın god-level üstün hali — developer-first + life-assistant dual platform
 **Brainstorming:** Alperen onayları 12+ karar, 5 paralel agent kod tabanı analizi
-**Last update:** 2026-05-13 (Sprint 166 — Brain Self-Update + Data Integrity Closure)
-**Next audit:** Sprint 167 sonrası — Bug E+G+Z2+Z3 fix + dep_pipeline live + M1-M4 monitoring baseline
+**Last update:** 2026-05-19 (Sprint 173-174 → 1 Haziran Beta reconciliation — aşağıdaki ⚡ 2026-05-19)
+**Reconciliation note:** §4 Master Roadmap + §5 20-Gate + §6 Debt = 2026-04-21 snapshot, historical. Güncel temel: ⚡ 2026-05-19.
+
+---
+
+## ⚡ 2026-05-19 (Sprint 173-174 → 1 Haziran Beta Reconciliation)
+
+Bu doküman `afc2638`'den restore edildi (Sprint 172 doc-reorg'da kayıp 722 satır,
+commit `9372f8d`). Aşağıdaki ⚡ tarihli bölümler + §1-3 Sprint 166'da, §4-6 Master
+Roadmap 2026-04-21'de donmuştu. Bu bölüm güncel temeli kurar; alttaki tarihli kayıtlar
+ve §4-6 **historical** olarak korunur (silinmez — kanıt/iz).
+
+### Durum (2026-05-19)
+
+- **Brain + Deckent stabil çalışıyor.** Sprint 162-163 Brain stability mührü (6/6 DONE,
+  0 NO_GO), Sprint 165-166 Brain Self-Update + Data Integrity Closure, Sprint 167-172
+  doc-honesty + doc-reorg, Sprint 173 ADR-honesty turu. Pipeline production-grade.
+- **Sürüm:** v1.0.0-beta.1. Güncel sprint: sprint-173/174.
+
+### Reality Reconciliation — §4 Phase 2-5 vs Gerçek
+
+§4 Master Roadmap'in sprint-numaralı temaları (Sprint 152-200: messaging→hub→daemon→
+voice→mobile) **historical plandır, sprint numaralarıyla 1:1 gerçekleşmedi**. Gerçek
+Sprint 152-174 sistemin olgunlaşmasına (Brain stability + data integrity + ADR/doc
+governance + doc-reorg) ayrıldı. Bu bir gecikme değil — temel sağlamlaştırma; feature
+roadmap'i (messaging/dashboard/vertical) **beta sonrası arka** kayar.
+
+### Güncel Anchor (bu satırlar §4'ü supersede eder)
+
+- **1 Haziran 2026 = OSS Public Beta** (tarih KESİN — Alperen 2026-05-19). Yüzey =
+  **Sprint Mode** (kod orkestrasyon, 170+ sprint dogfood-kanıtlı). §4 "Sprint 151 Beta
+  GA Çar 22 Nis" hedefi historical — güncel hedef 1 Haziran.
+- **Post-beta ark (roadmap'te taahhüt, beta'yı bloklamaz):** AEGIS metodoloji
+  implementasyonu Sprint 175-200 (ADR-061); Task Mode + Process Mode vertical
+  (gündelik iş / ERP / reklam / tüm sektörler); dashboard → kullanıcı uygulaması;
+  multi-tenant SaaS fazları. AEGIS impl. beta stabilitesinden SONRA (Alperen 2026-05-15).
+- **Değişmeyen DNA (geçerli):** §2 god-level vizyon, §7 rekabet konumu, §2.6 güvenlik
+  (.deck + AST sandbox + Ed25519), §11 anchor kuralları (ADR-041 / nervous-critical /
+  product-not-service ADR-033 / doc-önce-kod / Hot Fix pattern / meta-dogfood sayacı).
+
+### §5 20-Gate Notu
+
+2026-04-21 "17/20" ölçümü historical. Güncel beta launch-blocker seti (break-sprint-
+bug-cycle disiplini): bkz. ileride beta-gate çalışması. §5 tablosu kanıt olarak korunur.
 
 ---
 
@@ -497,6 +539,9 @@ Deckent = **Sprint Mode** (developer orchestrator, GO/NO-GO disiplin) **+ Task M
 
 ## 4. Sprint 149-200 Master Roadmap (2026-04-21 güncellendi)
 
+> **🕓 HISTORICAL (2026-04-21 snapshot).** Sprint-numaralı temalar 1:1 gerçekleşmedi —
+> güncel temel ⚡ 2026-05-19. Bu bölüm orijinal plan kaydı olarak korunur.
+
 ### Phase 1: Beta GA Launch (Sprint 149-151)
 **Hedef: Solid launch + community preview**
 
@@ -568,6 +613,9 @@ Not: Sprint 151 Beta GA cutover'a kaydı, Phase 2 bir sprint kaydı. 2026-04-21 
 
 ## 5. Beta GA (Sprint 151) Exit Criteria — 20 Gate (BETA-TRACKER + Sprint 150 Konsolidasyon)
 
+> **🕓 HISTORICAL (2026-04-21, "17/20").** Güncel beta = 1 Haziran 2026 (⚡ 2026-05-19).
+> Tablo kanıt olarak korunur.
+
 **Durum (2026-04-21 Hot Fix session sonrası): 17/20 açıldı** ✅
 
 | # | Gate | Hedef | Mevcut | Durum |
@@ -598,6 +646,9 @@ Not: Sprint 151 Beta GA cutover'a kaydı, Phase 2 bir sprint kaydı. 2026-04-21 
 ---
 
 ## 6. Taşınan Debt (Sprint 148 → 149 → 150 → 151)
+
+> **🕓 HISTORICAL (2026-04-21 snapshot).** Güncel debt için `.brain/exports/debt.md`.
+> Bu bölüm kanıt olarak korunur.
 
 ### Sprint 148 → 149 (tarihsel)
 8 item: Docker HB + scope sanitizer + auditor stale + Dockerfile root + .deck interpolation + ADR-041 reform kalıntı → hepsi Sprint 149/150 tarafından kapatıldı.
