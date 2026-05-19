@@ -96,3 +96,6 @@ Thumbs.db
 # Dashboard sub-project
 src/dashboard/node_modules
 src/dashboard/dist
+
+# SQLite URI test artifacts (regression guard, Sprint 175)
+file:audit-idem-*
