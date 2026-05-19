@@ -10,6 +10,7 @@ import type { HealthCheckResult } from '../../orchestra/connector.js';
 import type { CIBaseline, CIReport } from '../helpers/output.js';
 import { formatCIHealthSection } from '../helpers/output.js';
 import { detectEnvironment } from '../../core/environment.js';
+import { planInstall } from '../../core/provisioner.js';
 import { loadDeckSecrets, validateDeckFile, KNOWN_DECK_KEYS } from '../../core/deck-file.js';
 
 // ─── Types ──────────────────────────────────────────────────────────
@@ -67,12 +68,10 @@ export function getReadinessLabel(result: DoctorResult, brainLines: number, brai
 }
 
 export function getProviderInstallHint(name: string): string {
-  switch (name) {
-    case 'claude': return 'install: npm i -g @anthropic-ai/claude-code';
-    case 'codex': return 'install: npm i -g @openai/codex';
-    case 'gemini': return 'install: npm i -g @google/gemini-cli';
-    default: return '';
-  }
+  // Single source of truth: package mapping lives in provisioner.planInstall.
+  if (name !== 'claude' && name !== 'codex' && name !== 'gemini') return '';
+  const pkg = planInstall(name).args[2];
+  return `install: npm i -g ${pkg}`;
 }
 
 export function getProviderTips(providers: DetectedProvider[]): string[] {
