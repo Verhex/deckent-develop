@@ -79,14 +79,28 @@ plan proceeds ONLY from these. Drifts vs the original spec draft are corrected h
    mapping 7 runtime deps each to a governing ADR. Therefore the ADR task is to
    **EXTEND that existing Sprint-172 Amendment with `node-pty` + `ws`, following its
    established mapping pattern** — NOT to author a fresh amendment.
-2. **Frontend auth gap (systematic-debugging target #1):** `dashboard/src/lib/api.ts`
-   `fetchJson`/`postJson` send **no Authorization header**; server applies
-   authMiddleware to all `/api/` (`server.ts:317`), default-deny → 401 when no token.
-   The dashboard "works" → auth is effectively unenforced in the current local flow.
-   Spec's "browser passes token in WS handshake" assumes frontend token plumbing that
-   **does not exist**. → Frontend token infrastructure is **in scope for #1** and the
-   real current auth behavior is **resolved via systematic-debugging before the plan
-   is finalized** (Alperen-decided).
+2. **Auth — RESOLVED via systematic-debugging (Phase 1, root cause confirmed):**
+   - `serve.ts` exposes only `--port` (no token/host/autogen). `.deckent/config.json`
+     has **no `api_auth_token`**. Frontend (`api.ts`, `useApi`, `useSSE`) sends **zero
+     token** and `EventSource`/`WebSocket` **cannot** set an `Authorization` header.
+   - `verifyBearerToken` (`auth.ts:44`) reads **only** the `Authorization` header
+     (no query/cookie/subprotocol path).
+   - **Root cause:** the dashboard works ONLY because the environment has
+     `DECKENT_API_AUTH_DISABLED=1` (Sprint-143 local-dev bypass). Without it, no token
+     ⇒ `auth.ts:91` returns 401 for ALL `/api/` incl. SSE ⇒ dashboard dead. There is
+     **no working browser→server auth path for header-less transports** in the codebase.
+   - `DECKENT_API_AUTH_DISABLED` is flagged **B-022 [MEDIUM]** (Sprint-171 audit,
+     `docs/audits/sprint-171/02-concern/03-security.md:226`), recommended for removal.
+   - **Decisions (Alperen):** (a) terminal WS auth is a **new path independent of and
+     stricter than the global bypass** — it enforces its own token even when
+     `DECKENT_API_AUTH_DISABLED=1` (a read-only-dashboard dev convenience must NEVER
+     silently open a remote shell; aligns with B-022 hardening). (b) Token delivery:
+     **server injects an auto-generated token into the served page via a localhost-only
+     bootstrap**; the SPA reads it and passes it on the WS `Sec-WebSocket-Protocol`
+     subprotocol; server-side compares via the existing SHA-256 + `timingSafeEqual`
+     primitive (NOT header-bound `verifyBearerToken`). (c) `serve.ts` gains the missing
+     CLI surface (`--host`, terminal token/bind options). Frontend token plumbing is
+     **in scope for #1**.
 3. **WS auth primitive:** `bearerAuthMiddleware` is `(req,res)→boolean`; the `upgrade`
    event gives `(req,socket,head)` with no `res`. Reuse the lower-level
    `verifyBearerToken(req,token)` from `auth.ts` inside a custom upgrade-auth function,
@@ -101,6 +115,31 @@ plan proceeds ONLY from these. Drifts vs the original spec draft are corrected h
 **Git/branch (Alperen-decided):** dashboard repair + provisioner commits live on
 `docs/embedded-web-terminal-spec` (main is behind). Continue on this branch
 (spec + dashboard-fix + terminal together) → single PR/merge to main at the end.
+
+## 1d. Post-Step-A Locked Decisions (2026-05-19, Alperen)
+
+**UX — VSCode-like dock panel (NOT a separate full page).** The terminal is a
+**dockable, resizable panel** in the dashboard shell (bottom/side, toggle, persisted),
+so the user manages everything from one screen regardless of the active page. Step A
+verified the dashboard currently has **no panel/dock system** (full-page views only,
+`components/Layout.tsx`). Therefore #1 adds a **dock-panel layer to `Layout.tsx`** —
+this is added frontend scope (more than a `/terminal` route), deliberate.
+
+**Enterprise/k8s — design the seams now, implement in #3 (god-level architecture,
+sequenced delivery; NOT MVP-reduction).** #1 runs single-user localhost but bakes in
+**extension interfaces so #2/#3 extend without rewrite**:
+
+- `AuthProvider` interface — impl today = local injected token; future = OIDC/SSO/mTLS
+  (new impl only, no call-site changes).
+- `SessionBackend` interface — impl today = in-process `node-pty`; future = remote /
+  k8s pod-exec behind the same interface.
+- `tenantId` / identity field threaded through every session + audit structure from
+  the start (single `"local"` tenant today).
+- Audit `memory.db` schema includes a **tenant-scoped column** from day one.
+
+These seams are low-cost now and prevent a rewrite for the "localhost → server → k8s"
+trajectory. Multi-tenant isolation / SSO / k8s execution themselves remain **sub-project
+#3** (own spec, full scope). Decomposition + ship-and-iterate preserved.
 
 ## 2. Locked Decisions
 
