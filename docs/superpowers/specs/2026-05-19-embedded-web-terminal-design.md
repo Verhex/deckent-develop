@@ -53,6 +53,55 @@ Locked working discipline (Alperen, 2026-05-19):
    confirm current behavior matches documentation (catch drift first).
 4. Reorg companion constraints: `2026-05-19-terminal-aware-reorg-note.md`.
 
+## 1c. Verified Current State — Step A (2026-05-19, joint analysis, Alperen-approved)
+
+Facts below are **verified against the codebase** (not assumed). The implementation
+plan proceeds ONLY from these. Drifts vs the original spec draft are corrected here.
+
+**Confirmed (spec assumptions hold):**
+
+- `src/api/server.ts:42` `LOCALHOST_ONLY='127.0.0.1'`, `:864 server.listen(port,host)`,
+  strict localhost-only CORS — **the security posture already exists in code**.
+- SSE `/api/events` exists (`server.ts:441-443`, `text/event-stream`, `sseClients`).
+  Terminal **complements** it; must not break it.
+- `src/orchestra/self-modifying-detector.ts:40` path list includes **both `src/api/`
+  and `src/dashboard/`** → this feature **WILL trigger dogfood/self-modifying mode →
+  sequential execution is mandatory**. Must be declared in the sprint DIRECTIVES.
+- `node-pty` / `ws` absent from runtime deps (verified) — ADR work genuinely required.
+- `ConfigPage` uses a dynamic category system — a `terminal` config group is additive.
+- Routes/nav are a closed hardcoded list (`dashboard/src/App.tsx` +
+  `components/Layout.tsx` navItems) — adding `/terminal` = 3 known edits.
+
+**Corrections (original draft was wrong/assumed):**
+
+1. **ADR-010 path:** real file is `docs/adr/010-tek-runtime-dependency-commander-js.md`.
+   ADR-010 **already has an "Amendment — Sprint 172"** (`.brain/exports/decisions.md:210`)
+   mapping 7 runtime deps each to a governing ADR. Therefore the ADR task is to
+   **EXTEND that existing Sprint-172 Amendment with `node-pty` + `ws`, following its
+   established mapping pattern** — NOT to author a fresh amendment.
+2. **Frontend auth gap (systematic-debugging target #1):** `dashboard/src/lib/api.ts`
+   `fetchJson`/`postJson` send **no Authorization header**; server applies
+   authMiddleware to all `/api/` (`server.ts:317`), default-deny → 401 when no token.
+   The dashboard "works" → auth is effectively unenforced in the current local flow.
+   Spec's "browser passes token in WS handshake" assumes frontend token plumbing that
+   **does not exist**. → Frontend token infrastructure is **in scope for #1** and the
+   real current auth behavior is **resolved via systematic-debugging before the plan
+   is finalized** (Alperen-decided).
+3. **WS auth primitive:** `bearerAuthMiddleware` is `(req,res)→boolean`; the `upgrade`
+   event gives `(req,socket,head)` with no `res`. Reuse the lower-level
+   `verifyBearerToken(req,token)` from `auth.ts` inside a custom upgrade-auth function,
+   NOT the middleware.
+4. **`upgrade` handler absent (verified):** add `server.on('upgrade')` alongside the
+   existing `createServer` — a real implementation task.
+5. **config.ts type-surface debt:** there is NO `terminal` key; `dependency_pipeline_enabled`
+   is bolted on via an intersection type with a "should be added to DeckentConfig" TODO.
+   `terminal{}` must be added **properly to the `DeckentConfig` type**, not repeat the
+   bolt-on debt.
+
+**Git/branch (Alperen-decided):** dashboard repair + provisioner commits live on
+`docs/embedded-web-terminal-spec` (main is behind). Continue on this branch
+(spec + dashboard-fix + terminal together) → single PR/merge to main at the end.
+
 ## 2. Locked Decisions
 
 | Decision | Choice | Rationale |
@@ -120,9 +169,13 @@ ws-gateway.ts ──► session-manager.ts ──► node-pty (claude|gemini|cod
 
 - **Bind:** default `127.0.0.1`. Remote requires explicit `terminal.bind` config **and**
   a non-empty strong token (refuse to start remote-bound terminal without a token).
-- **Auth:** reuse `auth.ts` Bearer. Zero-config but authed locally: `deckent serve`
-  prints an **auto-generated session token** on start (user does nothing, but no
-  anonymous access).
+- **Auth:** WS upgrade reuses the **`verifyBearerToken(req,token)` primitive** from
+  `auth.ts` (NOT `bearerAuthMiddleware` — no `res` in the `upgrade` event; see §1c.3),
+  verified **before** pty spawn. HTTP `/api/terminal/*` uses the existing middleware.
+  Zero-config but authed locally: `deckent serve` prints an **auto-generated session
+  token** on start (user does nothing, but no anonymous access). NOTE: frontend has no
+  token plumbing today (§1c.2) — adding it is in scope; real auth behavior confirmed
+  via systematic-debugging before the plan is finalized.
 - **Transparent audit:** every session create/attach/kill + command-start + auth
   success/deny → structured event in `memory.db` (`audit` type, decay-exempt,
   FTS-excluded). Surfaced as a native "Activity / Security" timeline in the dashboard.
@@ -161,8 +214,10 @@ ws-gateway.ts ──► session-manager.ts ──► node-pty (claude|gemini|cod
 
 ## 8. ADR Work (ADR-036 governance — mandatory)
 
-- **ADR-010 Amendment:** add `node-pty` + `ws` as ADR-justified runtime deps (consistent
-  with Sprint 172 Task A3 "minimal + ADR-justified" direction).
+- **ADR-010 — EXTEND existing Sprint-172 Amendment** (file:
+  `docs/adr/010-tek-runtime-dependency-commander-js.md`; DB:
+  `.brain/exports/decisions.md:210`): add `node-pty` + `ws` rows following the
+  established 7-dep → governing-ADR mapping pattern. Not a fresh amendment. (See §1c.1.)
 - **New ADR — Embedded Web Terminal Architecture:** PtySessionManager + ws gateway +
   localhost-default security + transparent audit + reattach semantics + explicit
   server-restart boundary.
