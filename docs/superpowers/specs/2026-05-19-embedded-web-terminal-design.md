@@ -27,7 +27,7 @@ cycle. Decomposition is sequencing, not MVP/minimization.
 | # | Sub-project | Depends on |
 |---|-------------|-----------|
 | **1** | **Embedded web terminal** (this spec) — PTY + `ws` + xterm.js; claude/gemini/codex/deckent/shell; localhost-default + token; ADR amendment | — |
-| 2 | Self-security procedure — secure-by-default, transparent audit, prompt/command guard | 1 |
+| 2 | Self-security procedure — secure-by-default, transparent audit, prompt/command guard + **planner state hygiene** (see §1d backlog) | 1 |
 | 3 | Million-scale security — multi-tenant isolation, sandbox, rate/resource limits | 1, 2 |
 | 4 | Enterprise external-world integrations + secure data exchange | 2, 3 |
 
@@ -140,6 +140,24 @@ sequenced delivery; NOT MVP-reduction).** #1 runs single-user localhost but bake
 These seams are low-cost now and prevent a rewrite for the "localhost → server → k8s"
 trajectory. Multi-tenant isolation / SSO / k8s execution themselves remain **sub-project
 #3** (own spec, full scope). Decomposition + ship-and-iterate preserved.
+
+### Sub-project #2 — backlog (planner state hygiene, captured during Sprint 175 prep)
+
+Caught while preparing the Sprint 175 dogfood run; both are planner state-hygiene
+defects, formally deferred to #2 (Alperen 2026-05-20):
+
+1. **Auto-debt-injection empty-scope bug** (`src/orchestra/sprint-planner.ts:197-216`):
+   CRITICAL debt items are prepended as tasks with `scope:{directories:[],filesWrite:[]}`
+   → workers have nothing to do → no `.result` → debt re-perpetuates next sprint
+   (4-sprint loop confirmed for `debt-170-001-fix`, closed 2026-05-20). Fix should
+   either carry the original task's scope or skip auto-inject for "verified-no-result"
+   class debts and surface them for honest closure instead.
+2. **Re-plan orphan cleanup**: `deckent plan` rewrites `.tasks/task-{sprintId}-*.json`
+   but does NOT unlink task files from a previous plan iteration whose ID slot is no
+   longer used (Sprint 175 dry-run showed 20 tasks while disk held 21; orphan
+   `task-175-021.json` from the pre-debt-closure iteration was hand-removed and
+   committed). Fix: planner must reconcile by deleting stale `.tasks/*.json` not in
+   the new plan's id set.
 
 ## 2. Locked Decisions
 
