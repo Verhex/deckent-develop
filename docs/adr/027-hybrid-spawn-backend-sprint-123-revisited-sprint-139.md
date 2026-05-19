@@ -4,11 +4,7 @@
 
 **Date:** 2026-04-16
 
-**Sprint:** _To be backfilled_
-
 ---
-
-**Status:** accepted
 
 **Decision:** Hibrit backend desteği **kalıcı olarak reddedildi** (Option B: reject). Mevcut tek-backend modeli yeterli ve Sprint 139 backend parity çalışması bu kararı güçlendirdi. `SpawnBackendFactory` docker → tmux → subprocess fallback zinciriyle TEK bir backend seçer; hibrit mod (worker Docker'da, auditor subprocess olarak) implementasyona alınmayacak.
 

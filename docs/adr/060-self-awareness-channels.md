@@ -168,3 +168,11 @@ Kanal 5 (enrichment) en büyük ve en ilk kesilendir.
 "Self-awareness" terimi bilerek seçilmiştir ve şu anlamı taşır: worker'ın yalnızca görevini değil, görevinin sistemdeki *yerini* bilmesi. Bu kavramsal çerçeve ADR-040 (Nervous System Architecture) ile örtüşür — nervous system sistemin genel durumunu izlerken, self-awareness kanalları bu bilgiyi görev düzeyinde yayar.
 
 Sprint 156 T-007'nin tamamlanması Kanal 5'in canlıya alındığını kanıtlar. Kalan 4 kanal (özellikle Kanal 1 için sprint_sequence_number ve Kanal 3 için manifest_checksum) Sprint 157 ADR consolidation sprint'inde hayata geçirilecektir.
+
+> **Note (verified vs code, Sprint 172 — `proposed` doğru statü):** Yalnız **seed + mevcut bağımsız builder'lar** kod-doğrulandı:
+> - **Kanal 5 seed (Sprint 156 T-007) GERÇEK:** `src/orchestra/prompt-god-template.ts:93` `buildDependenciesBlock(task.dependencies, ctx.dependencies, ctx.tasksDir)`; `:223-238` `.tasks/task-{id}.result` okuyup `selfAssessment` vb. embed eder — §Kanal 5 "Mevcut durum" ile birebir ✓.
+> - Önceden var olan builder'lar mevcut: `buildAgentBlock` (`:124`), `buildSkillBlock` (`:131`), `buildDependenciesBlock` (`:291`) ✓.
+>
+> **Çekirdek karar GERÇEKLEŞMEDİ (gövde gelecek-zamanlı kalmıştır):** Koordineli 5-kanal çatı mimarisi `buildWorkerContext()` ve `WorkerContextBundle` interface'i `src/` genelinde **yoktur** — builder'lar bağımsız çalışır, ADR'nin önerdiği koordinatör altında birleşmez. Kanal 1-4 "Yeni eklenti"leri (`sprint_sequence_number`, `manifest_checksum`, `skill_anti_patterns`) kodda **hiç yoktur**. "Sprint 157+ / Sprint 157 ADR consolidation" roadmap hedefi **geçti ve gerçekleşmedi** (Sprint 172).
+>
+> **Statü gerekçesi (ADR-055 ile tutarlı, ADR-053 kontrastı):** Bu ADR'nin çekirdeği = koordineli `buildWorkerContext()` mimarisi ve o inşa edilmedi — yalnız Kanal 5 seed + çevresel builder'lar mevcut. Bu nedenle status doğru biçimde **`proposed` kalır** (terfi dürüst olmazdı; ADR-053 ise çekirdeği shipped olduğu için terfi etmişti). Behavior unchanged; documentation alignment only.

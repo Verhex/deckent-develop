@@ -1,5 +1,12 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-174 Learnings
+- Sprint sprint-174 Learnings: ## Sprint sprint-174 Learnings
+- Fix debt: Tech debt from 170-001-fix: Code physically verified despite missing .result (Sp: NO_GO — Worker exited without writing result (exitCode=0)
+
+## Sprint sprint-173 Learnings
+- Sprint sprint-173 Learnings: ## Sprint sprint-173 Learnings
+
 ## Sprint sprint-172 Learnings
 - Sprint sprint-172 Learnings: ## Sprint sprint-172 Learnings
 - C1 — update-readme-stats.mjs auto-gen + CI gate: NO_GO — TDD discipline: önce tests/scripts/update-readme-stats.test.ts yazıldı (RED — script yok, import fail), sonra scripts/up

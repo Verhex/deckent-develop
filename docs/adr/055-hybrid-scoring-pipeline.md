@@ -185,3 +185,12 @@ Tam pipeline entegrasyonu Sprint 157+ roadmap:
 ## Notes
 
 Bu ADR Sprint 156 T-011 (EffectClass Annotation) çalışması sırasında ortaya çıkan mimari vizyonu belgeler. `rubric-registry.ts:197` içindeki `// ADR-055 placeholder` yorumu bu ADR'ye işaret eder. Tam uygulama Sprint 157+ roadmap kapsamındadır.
+
+> **Note (verified vs code, Sprint 172 — `proposed` doğru statü):** Yalnız **seed** kod-doğrulandı:
+> - **Layer 1** `validateResultSchema()` → `src/orchestra/result-evaluator.ts:509` mevcut (call `:992`) ✓
+> - **Layer 3** ADR-053 TaskType rubric selection → `rubric-registry.ts` (ADR-053 notunda doğrulandı) ✓
+> - **Layer 4 girdi** `EffectClass` → `src/orchestra/rubric-registry.ts:259` mevcut; placeholder yorumu `:220` (`EffectClass — Reversibility Tag (ADR-055 placeholder)`), `:255 @see ADR-055 (proposed, Sprint 156)` — kod kendisi `proposed` işaretler.
+>
+> **Çekirdek karar GERÇEKLEŞMEDİ (gövde gelecek-zamanlı kalmıştır):** `src/orchestra/scoring-pipeline.ts` **yoktur**; `runScoringPipeline` / `ScoringPipelineResult` / `PipelineLayerResult` sembolleri `src/` genelinde **hiç yoktur**. Layer 2 (Gate Conditions G-001..G-005), Layer 5 (Auditor Verification), Final Decision Matrix ve orkestrasyon katmanı uygulanmadı. "Sprint 157+ roadmap" hedefi **geçti ve gerçekleşmedi** (Sprint 172).
+>
+> **Statü gerekçesi (ADR-053 kontrastı):** ADR-053 terfi etti çünkü çekirdeği (3-tip taxonomy) shipped'di. ADR-055'in çekirdeği = 5-katman pipeline'ın **kendisi** ve o inşa edilmedi — yalnız çevresel seed'ler mevcut. Bu nedenle status doğru biçimde **`proposed` kalır** (terfi dürüst olmazdı). Satır drift'i: ADR `:197` → gerçek `:220`. Behavior unchanged; documentation alignment only.

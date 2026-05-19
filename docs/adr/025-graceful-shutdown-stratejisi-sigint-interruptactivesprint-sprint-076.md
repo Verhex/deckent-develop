@@ -4,11 +4,7 @@
 
 **Date:** 2026-04-16
 
-**Sprint:** _To be backfilled_
-
 ---
-
-**Status:** accepted
 
 **Context:** Kullanıcı Ctrl+C yaptığında veya process SIGINT aldığında, çalışan sprint aniden sonlanıyordu. Worker'lar temizlenmeden çıkıyor, task dosyaları yarım kalıyor, tmux sessionlar arka planda çalışmaya devam ediyordu. Bu durum .tasks/ dizininde stale heartbeat ve kilit dosyalarına yol açıyordu.
 
@@ -18,3 +14,5 @@
 3. İşlem sırayla yapılır: önce sprint state kayıt, sonra session kill
 
 **Consequence:** Ctrl+C sonrası temiz state bırakılır. Sprint INTERRUPTED olarak işaretlenir, review komutu bu durumu gösterir. Worker'lar SIGTERM sinyali alır ve kendi .hb dosyalarını DONE olarak işaretleyebilir. `deckent cleanup` sonrasında orphan dosya kalmaz.
+
+**Note (verified — module locations):** Mechanism confirmed against code: `interruptActiveSprint()` is defined in `src/orchestra/sprint-lifecycle.ts` (marks task INTERRUPTED, aborts heartbeat, releases locks, kills workers); `killAllSessions()` lives in `src/orchestra/tmux.ts` ("Called on SIGINT for graceful shutdown"); the SIGINT handler is wired in `src/cli/entry.ts` (which exists alongside `src/cli/index.ts`). Behavior unchanged; documentation alignment only.

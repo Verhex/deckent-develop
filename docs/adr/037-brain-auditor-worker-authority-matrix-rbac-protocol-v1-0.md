@@ -2,15 +2,32 @@
 
 **Status:** accepted
 
-**Date:** 2026-04-16
+**Date:** 2026-04-15
 
-**Sprint:** _To be backfilled_
+**Sprint:** 138
 
 ---
 
-**Status:** accepted
-
-**Date:** 2026-04-15
+> ⚠️ **V1.0 enforcement reality (read this first — this is the canonical source other docs cite).**
+> This ADR defines the **intended** RBAC model. What is actually enforced today (Sprint 172):
+> - **Layer 1 (compile-time lint) + Layer 3 (audit-trail) are ACTIVE.**
+> - **Layer 2 (runtime) is ADVISORY / SOFT** — a violation is logged + emitted
+>   to the event stream but does **not** block the action
+>   (`src/orchestra/authority-enforcer.ts` is always-soft; `src/agents/worker.ts`
+>   `checkWorkerAuthority` returns `true` even on a detected violation).
+> - `enforceVerifyLoop()` / `runTestVerifyLoop()` are **prompt instructions,
+>   not code-enforced** (0 runtime callers).
+> - The hard-blocking Layer-2 is **intentionally absent in V1.0** and is a
+>   **post-GA V2 hard-flip** — *not* "Sprint 139 scope" (that completion did
+>   not land; it remains advisory at Sprint 172).
+> - Therefore the **"Fail-Closed"** principle and all ❌/"yasaklanmış" cells
+>   below are **design intent**, not a current runtime guarantee.
+>
+> This matches the honest framing in `CLAUDE.md`, `.claude/rules/worker-default.md`,
+> and `docs/architecture/authority-matrix.md`. Also: `.brain/DECISIONS.md` and the
+> `MEMORY.md`/`RETRO.md` line numbers in the matrix below are **Memory-V2
+> shorthand / outdated V1 budgets** — ADRs live in `.brain/memory.db`
+> (`type='adr'`); canonical line budgets are in `src/core/constants.ts`.
 
 **Context:**
 

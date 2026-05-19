@@ -1,6 +1,6 @@
 # ADR-053: TaskType Taxonomy — Audit / Document-Write / Code-Development + Extensibility Roadmap
 
-**Status:** proposed
+**Status:** accepted
 
 **Deciders:** Alperen Sartaçoğlu (product owner), Brain (orchestrator)
 
@@ -12,7 +12,7 @@
 
 ## Status
 
-proposed (Sprint 156 — implementation seeded in `rubric-registry.ts` Sprint 154 Bug B fix)
+accepted (proposed Sprint 156 → accepted Sprint 172: çekirdek 3-tip taxonomy `rubric-registry.ts`'te shipped & kod-doğrulandı; Extensibility Roadmap + Tek-Kaynak reconciliation deferred/unrealized — aşağıdaki nota bkz.)
 
 ---
 
@@ -132,3 +132,9 @@ Sprint 156 T-009 (`assertSpawnSafe`) ve T-010 (Runtime File Lock) güvenlik katm
 ## Notes
 
 Bu ADR, `rubric-registry.ts` içinde `Sprint 154 Bug B fix` olarak hayata geçirilen uygulamanın geriye dönük belgelenmesidir. Uygulama önce yazıldı; ADR, tasarım kararlarını geç de olsa kayıt altına almaktadır. Sprint 156 dogfood pratiğine göre bu geç-ADR pattern'i kabul edilebilir — ancak ileride tercih edilen sıra şudur: ADR draft → Sprint task → Implementation.
+
+> **Note (verified vs code → status promoted, Sprint 172):** Çekirdek taxonomy **shipped & kod-doğrulandı** (ADR-042 emsali): `src/orchestra/rubric-registry.ts:21` `TaskType = 'audit' | 'document-write' | 'code-development'`; `AUDIT_RUBRIC`/`DOC_WRITE_RUBRIC`/`RUBRIC_REGISTRY` `Object.freeze` (`:92-95`); `isAuditTask`/`detectTaskType` öncelik `audit → document-write → code-development` (`:166-169`) §Tespit Önceliği ile birebir. Bu nedenle status **proposed → accepted** (governance-onaylı). **Deferred/unrealized (gövde gelecek-zamanlı kalmıştır):**
+> - **Extensibility Roadmap** tablosundaki hedef sprint'ler (db-migration/security-patch Sprint 162, package-publish Sprint 163, infrastructure-provision Sprint 165) **geçti ve gerçekleşmedi** — Sprint 172 itibarıyla hâlâ 3 temel tip; gelecek tipler yalnız `rubric-registry.ts:272-273`'te "reserved for future" yorumu olarak durur. Roadmap niyet-beyanıdır, taahhüt değil.
+> - **Tek Kaynak Prensibi** uygulanmadı: `task-router.ts:45` (`'code'|'test'|'doc'|'design'|'unknown'`) ve `adr-selector.ts:45` çakışan `TaskType` tanımları Sprint 172'ye dek hâlâ bağımsızdır (ADR §Olumsuz bunu zaten kendi flag'ler — `rubric-registry.ts` yetkisi yalnız değerlendirme katmanıyla sınırlı kalır).
+>
+> Memory'deki taxonomy-vision (ADR-053/055/060 taslak seti) bağlamı korunur; yalnız ADR-053'ün **doğrulanmış çekirdeği** accepted'a alındı, geniş vizyon kapsamı değil. Behavior unchanged; documentation alignment only.

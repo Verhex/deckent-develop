@@ -57,6 +57,7 @@
 - **ADR-026**: God Object Split Stratejisi — Faz 1-3 Tamamlandı (Sprint 076) — **Status:** accepted
 - **ADR-023**: Plan Tier Generalizasyonu — Provider-Agnostic Tier İsimleri (Sprint 072) — **Status:** accepted
 - **ADR-024**: sprint-controller.ts God Object Split — sprint-phases.ts Extract (Sprint 072) — **Status:** accepted
+- **ADR-022**: CLI/MCP Feature Parity — Parametre Eşitleme + Eksik Komutlar — **Status:** accepted
 - **ADR-018**: Multi-Environment Config Generation (Sprint 046) — **Status:** accepted
 - **ADR-019**: Language-Agnostic Worker Verify (Sprint 046) — **Status:** accepted
 - **ADR-017**: MCP-Native Provider Adapters (Sprint 045) — **Status:** accepted

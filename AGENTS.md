@@ -22,3 +22,9 @@ When acting as Worker: @.claude/rules/worker-default.md
 
 ## Identity
 @.deckent/workspace/IDENTITY.md
+
+## Built-in Agents
+| Agent | Tasks | Done | Success |
+|-------|-------|------|--------|
+| bug-fixer | 1 | 1 | 100% |
+| doc-writer | 20 | 20 | 100% |

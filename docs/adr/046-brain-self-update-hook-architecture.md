@@ -406,3 +406,18 @@ flip proceeds.
 1. **Sprint 166 T1** — `src/core/adr-file-sync.ts` forward sync implementation (Bug M fix)
 2. **Sprint 169 H1** — `src/core/memory-export.ts` reverse sync implementation
 3. **ADR-036** — ADR Governance Integration (mandatory amendment protocol)
+
+---
+
+> **Note (deep-verified vs code, Sprint 172):** Bu ADR'nin tüm somut iddiaları kodla doğrulandı:
+> - **§5.1 Step Ordering Contract (4-hook) doğru:** `src/core/identity-generator.ts:341-346` JSDoc — Step 1 `memoryExport` → Step 2 `identityRegen` → Step 3 `adrInsert` → Step 4 `ruleRegen`, ve "Step 3 must run BEFORE Step 4 so that newly accepted ADRs (e.g. ADR-046)…" birebir. Invariant testleri mevcut: `tests/core/identity-generator-step-order.test.ts` + `tests/core/adr-046-step-ordering-invariant.test.ts`.
+> - **Bug M (Step 3 adrInsert):** `src/core/adr-file-sync.ts` `syncAdrFilesToDb()` mevcut (FS→DB upsert, non-destructive). **Önemli numaralandırma açıklığı:** Sprint 168 Amendment'taki "Step 12 (archiveDirectives) / Steps 1–13" ifadesi bu §5.1 **4-hook `runPostFinalizeHooks` kontratı DEĞİL**, ayrı `finalizeSprint` CLEANUP zincirinin (`src/cli/commands/finalize.ts`) 13-adımlı numaralandırmasıdır. İki numaralandırma farklı kapsamlardır; §5.1 kontratı 4 hook olarak geçerlidir.
+> - **Bug N:** `cli/commands/finalize.ts:166` "Bug N fix (Sprint 166-T2)" + `:176 onRuleRegen` wire ✓.
+> - **Bug S:** `src/orchestra/managed-docs/doc-cache.ts:67-68` `computeCacheKey(entryHash, fileHash, sprintId?)` → sprint-aware key, `sprintId` yoksa legacy `entryHash:fileHash` (backward-compat clause doğru) ✓.
+> - **Bug Y2:** `.deckent/ground-truth-overrides.json` mevcut; whitelist iddiası doğru ✓.
+> - **Step 2 (identityRegen):** kod `@deprecated Sprint 166 (ADR-046)`, "Sprint 168 C0a-1 (BUG-GG) made the default runtime behavior to skip Step 2 — NO LONGER invoked". `PROJECT-IDENTITY.md` kaldırıldı, `.deckent/workspace/IDENTITY.md` (managed-docs) ile ikame edildi (`docs/reference/api-surface.md` ile hizalı). §5.1'deki "Sprint 168'de kaldırılır" runtime-skip default'unu doğru özetler.
+> - **Sprint 169 H1 Amendment:** `src/core/memory-export.ts:305 exportAdrsToFs()` + `scripts/memory/export-adr-fs.mjs` mevcut ✓.
+> - **İleri-dönük iddialar (gerçekleşme durumu):** "Sprint 167'de dependency_pipeline_enabled flip + M1-M4 baseline" ve "Sprint 170 hook chain refactor trigger" tasarım-niyeti/falsifiable hedeflerdir. deckent-dev'de `dependency_pipeline_enabled` bilinçle `false` kalır (Brain-manuel wave, ADR-045 + ADR-047); M1-M4 izleme kanalları ve Sprint 170 `PostFinalizeStepRegistry` refactor'ı koşullu/post-GA — bu projede otomatik tetiklenmez. "Memory DB Insert Pattern" bloğundaki `inserted:1 / updated:3` çıktısı Sprint-166 dönemi bir tahmin snapshot'ıdır, güncel literal durum değildir.
+> - **Duplicate dosya:** `046-brain-self-update-hook.md` artık `# ADR-NNN:` H1 + `**Status:**` taşımayan bir insan/link redirect'idir; `adr-file-sync` onu `skipped` sayar, bu canonical `adr-046` entry'sini ezemez.
+>
+> Behavior unchanged; documentation alignment only.

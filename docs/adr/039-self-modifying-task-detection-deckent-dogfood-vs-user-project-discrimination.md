@@ -2,15 +2,11 @@
 
 **Status:** accepted
 
-**Date:** 2026-04-16
+**Date:** 2026-04-15
 
-**Sprint:** _To be backfilled_
+**Sprint:** 139
 
 ---
-
-**Status:** accepted
-
-**Date:** 2026-04-15
 
 **Context:**
 
@@ -114,3 +110,5 @@ Self-modifying task tamamlandıktan sonra otomatik checkpoint yazılır (sprint-
 - ADR-037: RBAC Authority Matrix — Brain/Worker dosya erişim sınırları
 - `src/orchestra/self-modifying-detector.ts` — Sprint 139 implementasyonu
 - `src/orchestra/sprint-spawner.ts` — Sprint 140+ sequential wave wiring
+
+> **Note (verified vs code, Sprint 172):** The **detection API is real** — `src/orchestra/self-modifying-detector.ts` exports `detectDeckentRepo`, `isSelfModifying`, `isSelfModifyingSprint`, consumed by `src/orchestra/authority-enforcer.ts` and `src/agents/worker.ts`. **However, the "Sprint 140+ Integration Points" did not land:** there is no sequential-wave wiring in `sprint-spawner.ts`, no MCP-restart hook in `sprint-finalizer.ts`, no `SELF_MODIFY_DETECTED` channel in `event-stream.ts`, and the P2 Wave-0 gate is unwired. In practice deckent-dev self-modifying sprints are handled via **ADR-047 (Manuel Subagent Dispatch)** — manual, isolated dispatch — rather than the projected automated sequential-wave / rebuild-restart orchestration. Behavior unchanged; documentation alignment only (records actual state vs the original roadmap).

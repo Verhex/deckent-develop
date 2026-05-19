@@ -2,15 +2,11 @@
 
 **Status:** accepted
 
-**Date:** 2026-04-16
+**Date:** 2026-04-11
 
-**Sprint:** _To be backfilled_
+**Sprint:** 134
 
 ---
-
-**Status:** ACCEPTED
-
-**Date:** 2026-04-11
 
 **Context:**
 Deckent, Sprint 134 itibarıyla kritik bir kavramsal dönüm noktasına ulaştı. 130+ sprint sürecinde organik büyüme, zaman zaman "SaaS platform" ya da "kurumsal servis" yönünde baskı yarattı: cloud deployment fikirleri, paywall tartışmaları, enterprise tier düşünceleri, SOC2 sertifikasyonu önerileri. Bu baskıların tamamı tek bir tutarsızlık kaynağından besleniyor:
@@ -25,7 +21,7 @@ Kullanıcı deneyimi gözlemleri:
 
 Sprint 133 post-mortem'de "product-not-service" ifadesi üç ayrı bağlamda kullanıldı ve herhangi bir şekilde formalize edilmedi. Sprint 134 DIRECTIVES bu boşluğu kapatmak için T-007'yi "DOKUNULAMAZ VİZYON" olarak işaretledi.
 
-Referans bellek: `.claude/projects/-home-alperen-deckent-dev/memory/project_vision_product_not_service.md`
+Referans bellek: proje hafızası — `memory.db` entry `project_vision_product_not_service` (Memory V2; `deckent recall "product not service"`)
 
 **Decision:**
 Deckent bir **üründür (product)**, **servis değildir (not service)**.
@@ -97,7 +93,7 @@ Bu karar aşağıdaki yönlerin öncelikli geliştirme alanları olduğunu teyit
 **References:**
 
 - Sprint 134 DIRECTIVES — "DOKUNULAMAZ VİZYON" bölümü
-- `.claude/projects/-home-alperen-deckent-dev/memory/project_vision_product_not_service.md`
+- Proje hafızası: `memory.db` entry `project_vision_product_not_service` (Memory V2)
 - ADR-034: Multi-Project Isolation (kardeş ADR — multi-project ≠ SaaS multi-tenant)
 - ADR-010: Minimal Dependencies (bağımlılık minimizasyonu, product kimliğiyle uyumlu)
 - `docs/vision/roadmap.md` — Halka açık yol haritası, product vizyonu pazarlama diliyle

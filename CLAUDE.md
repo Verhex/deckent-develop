@@ -91,16 +91,14 @@ Canlı sprint, debt, agent performance ve ADR durumu için: `@.brain/exports/sum
 Komutlar: `deckent status`, `deckent history`, `deckent retro`, `deckent recall "<sorgu>"`.
 
 ## Sprint Metrics
-> Snapshot — point-in-time, hand-maintained each sprint. Sprint Metrics / Active Debt / Agent Performance below are NOT auto-generated; for live state use `deckent status` or `.brain/exports/summary.md` (auto-generated).
-
 | Metric | Value |
 |--------|-------|
-| Sprint | sprint-172 |
-| Total Tasks | 17 |
-| Completed | 6 |
+| Sprint | sprint-173 |
+| Total Tasks | 22 |
+| Completed | 22 |
 | Tech Debt | 0 |
-| No-Go | 11 |
-| Duration | 67dk 33sn |
+| No-Go | 0 |
+| Duration | 14dk 19sn |
 | Coverage | 0.0% |
 
 ## Active Debt
@@ -109,9 +107,5 @@ _No tech debt record._
 ## Agent Performance
 | Agent | Tasks | Done | Success |
 |-------|-------|------|--------|
-| doc-writer | 4 | 4 | 100% |
-| architect | 2 | 2 | 100% |
-| devops-engineer | 3 | 0 | 0% |
-| api-builder | 1 | 0 | 0% |
-| data-engineer | 1 | 0 | 0% |
-| refactorer | 1 | 0 | 0% |
+| bug-fixer | 1 | 1 | 100% |
+| doc-writer | 20 | 20 | 100% |

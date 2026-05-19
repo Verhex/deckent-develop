@@ -60,7 +60,7 @@ Process boot'ta `installCrashHandlers()` çağrısı yapılır. Bu fonksiyon:
 
 **Commit:** `8cefed0`
 
-Sprint execution boyunca periyodik checkpoint yazımı yapılır (`CHECKPOINT_INTERVAL` konfigürasyonu, varsayılan 5 dakika). Checkpoint atomicity kuralı:
+Sprint execution boyunca periyodik checkpoint yazımı yapılır (`sprint_checkpoint_interval` config anahtarı, `config.ts:602` default `5`; Sprint 139 yüksek-riskli sprint'lerde `3`'e override edilir). Checkpoint atomicity kuralı:
 
 1. `computeEventStreamOffset()` ile o ana kadar yazılan event sayısı hesaplanır
 2. `completedTasks` listesi checkpoint'e eklenir (boş array YASAK — en az 1 completed task varsa populate edilmeli)
@@ -111,7 +111,7 @@ Stale EXECUTING task için `.tasks/task-NNN.result` dosyası disk'te mevcutsa �
 
 ### Olumsuz
 
-- **Checkpoint overhead.** Her `CHECKPOINT_INTERVAL` (varsayılan 5 dk) I/O yapılır. Yoğun sprint'lerde disk I/O artar; ancak `renameSync()` maliyeti genellikle ihmal edilebilir.
+- **Checkpoint overhead.** Her `sprint_checkpoint_interval` (default 5) I/O yapılır. Yoğun sprint'lerde disk I/O artar; ancak `renameSync()` maliyeti genellikle ihmal edilebilir.
 - **`resume-evaluate` sadece `.result` varlığına bakar.** Worker `.result` yazmış ama dosya bozuksa (JSON parse hatası) evaluate fail olabilir. Bu durum için `handleEvaluation` içinde JSON parse guard eklenmesi önerilir (sonraki sprint).
 - **`installCrashHandlers()` zorunluluğu entegrasyon testi gerektirir.** Handler'ın gerçekten kurulduğunu doğrulamak için boot-sequence test eklenmeli.
 
@@ -171,3 +171,5 @@ store.insert({
 ## Notes
 
 Bu ADR, Sprint 160–162 boyunca üç ayrı commit'te gerçekleştirilen implementasyonun geriye dönük belgelenmesidir. ADR-043 olmadan Sprint 163 governance borcu kapanmış sayılmıyordu. ADR-036 (ADR Governance Integration) gereği tüm kabul edilen mimari kararlar kayıt altına alınmak zorundadır.
+
+> **Note (verified vs code, Sprint 172):** Confirmed accurate against the codebase — referenced commits `9c184a3` (Sprint 160 T-001) and `8cefed0` (Sprint 161 T-002) **exist in this repo's git history** (real provenance, not migration-dead refs). The protocol's three layers are wired: `installCrashHandlers()` (`src/orchestra/sprint-runner-entry.ts`), `redactSensitive()` (`src/core/redact-sensitive.ts` + `src/orchestra/sensitive-redactor.ts`), and `restoreSprintFromCheckpoint()` + `computeEventStreamOffset()` (`src/orchestra/sprint-checkpoint.ts`). One naming correction applied above: the checkpoint interval is the `sprint_checkpoint_interval` config key (`config.ts:602`, default `5`), not a `CHECKPOINT_INTERVAL` constant. Behavior unchanged; documentation alignment only.

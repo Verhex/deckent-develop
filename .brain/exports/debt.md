@@ -4,6 +4,7 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-adr-019-reconciliation | ADR-019 reconciliation: language-agnostic verify not implemented | high | sprint-172 | active |
 | debt-170-001-fix | Tech debt from 170-001-fix: Code physically verified despite missing .result (Sp | critical | sprint-170 | active |
 
 ## Resolved Technical Debt

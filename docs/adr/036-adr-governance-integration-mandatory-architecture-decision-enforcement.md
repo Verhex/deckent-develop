@@ -2,15 +2,11 @@
 
 **Status:** accepted
 
-**Date:** 2026-04-16
+**Date:** 2026-04-14
 
-**Sprint:** _To be backfilled_
+**Sprint:** 138
 
 ---
-
-**Status:** accepted
-
-**Date:** 2026-04-14
 
 **Context:**
 
@@ -53,5 +49,7 @@ ADR governance'ı kullanıcı-facing ürün özelliğine dönüştürmek. 5 bile
 - `src/orchestra/task-builder.ts:loadADRContent()` — prompt injection
 - ADR-013: DECKENT.md Adapter Pattern — mandatory read wiring pattern
 - MADR v3: https://adr.github.io/madr/
+
+> **Note (verified / Memory V2 reconciliation):** Confirmed in code — `scripts/adr-validator.mjs` + `npm run lint:adr` (format/status-enum/duplicate-ID) and the MADR v3 mandatory `**Status:**` enum are real; the "enforcement is compile-time, not runtime" caveat is accurate (consistent with ADR-037 V1.0). **However, the ADR store evolved (Memory V2, DB-first):** `.brain/DECISIONS.md` is **no longer a live hand-maintained file**. ADRs live in `.brain/memory.db` (`type='adr'`), synced from `docs/adr/*.md` via ADR-046 (`syncAdrFilesToDb`) and exported to `.brain/exports/decisions.md`. Worker-prompt ADR injection is DB-based (`src/orchestra/adr-selector.ts`), not a raw `.brain/DECISIONS.md` read; the brain/worker/auditor rules now state "Query ADRs via MemoryStore — never parse .md files". Read every `.brain/DECISIONS.md` mention above as **shorthand for the ADR governance store** (DB + `docs/adr/` + `exports/decisions.md`) — consistent with ADR-009, `docs/architecture/memory-system.md`, and `CLAUDE.md`. Behavior unchanged; documentation alignment only.
 
 ---

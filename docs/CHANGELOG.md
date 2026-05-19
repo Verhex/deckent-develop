@@ -1,6 +1,41 @@
 # Changelog
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
+## [1.0.0-beta.1-sprint174] - 2026-05-18
+
+### Added
+
+- Pitch deck — marketing-ai-pitch.md (15 slide)
+- Canva template map — canva-kit/canva-bulk-template-map.md
+- Canva bulk CSV — canva-kit/canva-bulk-sample.csv
+- Aylık üretim rehberi — canva-kit/monthly-brand-report-howto.md
+- Kit index + tutarlılık — canva-kit/README.md
+
+
+_Tasks: 7 total, 5 done, 0 tech debt, 2 no-go_
+
+## [1.0.0-beta.1-sprint173] - 2026-05-18
+
+### Added
+
+- Slide 1 — Cover
+- Slide 2 — The Problem
+- Slide 3 — What is Deckent (Synthesis)
+- Slide 4 — Core Roles
+- Slide 5 — Sprint Lifecycle
+- Slide 6 — DIRECTIVES-Driven Planning
+- Slide 7 — Task Routing
+- Slide 8 — 15 Built-in Agents
+- Slide 9 — 21 Built-in Skills
+- Slide 10 — Multi-Provider & ModelRegistry
+
+### Fixed
+
+- Fix debt: Tech debt from 170-001-fix: Code physically verified despite missing .result (Sp
+
+
+_Tasks: 22 total, 22 done, 0 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint172] - 2026-05-18
 
 ### Added

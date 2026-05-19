@@ -4,11 +4,7 @@
 
 **Date:** 2026-04-16
 
-**Sprint:** _To be backfilled_
-
 ---
-
-**Status:** deprecated
 
 > **Note:** Sprint 132 CRITICAL #1 — Senkron I/O hot path performans sorunlarına yol açtı. Yeni modüller async I/O kullanmalıdır.
 

@@ -2,15 +2,11 @@
 
 **Status:** accepted
 
-**Date:** 2026-04-16
+**Date:** 2026-04-15
 
-**Sprint:** _To be backfilled_
+**Sprint:** 139
 
 ---
-
-**Status:** accepted
-
-**Date:** 2026-04-15
 
 **Context:**
 
@@ -100,4 +96,10 @@ Bu ADR, ADR-028'in removal'ını TALEP ETMİYOR — yalnızca Sprint 142'de reas
 - ADR-033: Product Vision — bakım maliyeti minimizasyonu
 - `docs/audits/sprint-139/dead-code-decisions.md` — detaylı decision matrix
 
----
+> **Note (actual disposition as of Sprint 172 — verified vs `src/orchestra/`):** The plan was only partially realized and partly diverged:
+> - **Kademe 1 (Remove):** `learning-decay.ts` ✓ removed, `learning-migration.ts` ✓ removed, but **`batch-stats.ts` still exists** (was not deleted).
+> - **Kademe 2 (Defer):** `handoff-protocol.ts` and `brain-context.ts` are still present as planned, but **`combination-scorer.ts` was removed** (diverged from "defer / reassess Sprint 145").
+> - **Kademe 3 (ADR-028 V1):** `decision-engine.ts`, `decision-replay.ts`, `decision-steps/agent-step.ts`, `decision-steps/scope-step.ts` all still present — accurate ✓.
+> - **Kademe 4 (false positive):** `parallel-pipeline.ts` confirmed present and actively imported — accurate ✓.
+>
+> Behavior unchanged; documentation alignment only (records the real outcome vs the original plan).

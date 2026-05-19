@@ -7,7 +7,7 @@ The canonical source of truth for ADR content is `.brain/memory.db` (Memory V2).
 <!-- AUTOGEN:START id="adr-index" -->
 > 52 ADRs. Generated from `docs/adr/*.md`.
 
-**By status:** accepted (45) · deprecated (1) · proposed (5) · superseded (1)
+**By status:** accepted (48) · deprecated (1) · proposed (3)
 
 | ID | Title | Status | File |
 |----|-------|--------|------|
@@ -32,7 +32,7 @@ The canonical source of truth for ADR content is `.brain/memory.db` (Memory V2).
 | ADR-019 | Language-Agnostic Worker Verify (Sprint 046) | accepted | [`019-language-agnostic-worker-verify-sprint-046.md`](./019-language-agnostic-worker-verify-sprint-046.md) |
 | ADR-020 | Rich Sprint Output — 7-section summary (Sprint 044) | accepted | [`020-rich-sprint-output-7-section-summary-sprint-044.md`](./020-rich-sprint-output-7-section-summary-sprint-044.md) |
 | ADR-021 | Kraken ASCII Brand Identity (Sprint 044) | accepted | [`021-kraken-ascii-brand-identity-sprint-044.md`](./021-kraken-ascii-brand-identity-sprint-044.md) |
-| ADR-022 | CLI/MCP Feature Parity — Tek Yapı, Çoklu Ortam (Sprint 067) | superseded | [`022-cli-mcp-feature-parity-tek-yap-coklu-ortam-sprint-067.md`](./022-cli-mcp-feature-parity-tek-yap-coklu-ortam-sprint-067.md) |
+| ADR-022 | CLI/MCP Feature Parity — Parametre Eşitleme + Eksik Komutlar | accepted | [`022-cli-mcp-feature-parity-tek-yap-coklu-ortam-sprint-067.md`](./022-cli-mcp-feature-parity-tek-yap-coklu-ortam-sprint-067.md) |
 | ADR-023 | Plan Tier Generalizasyonu — Provider-Agnostic Tier İsimleri (Sprint 072) | accepted | [`023-plan-tier-generalizasyonu-provider-agnostic-tier-isimleri-sprint-072.md`](./023-plan-tier-generalizasyonu-provider-agnostic-tier-isimleri-sprint-072.md) |
 | ADR-024 | sprint-controller.ts God Object Split — sprint-phases.ts Extract (Sprint 072) | accepted | [`024-sprint-controller-ts-god-object-split-sprint-phases-ts-extract-sprint-072.md`](./024-sprint-controller-ts-god-object-split-sprint-phases-ts-extract-sprint-072.md) |
 | ADR-025 | Graceful Shutdown Stratejisi — SIGINT → interruptActiveSprint (Sprint 076) | accepted | [`025-graceful-shutdown-stratejisi-sigint-interruptactivesprint-sprint-076.md`](./025-graceful-shutdown-stratejisi-sigint-interruptactivesprint-sprint-076.md) |
@@ -52,14 +52,14 @@ The canonical source of truth for ADR content is `.brain/memory.db` (Memory V2).
 | ADR-039 | Self-Modifying Task Detection — Deckent Dogfood vs User Project Discrimination | accepted | [`039-self-modifying-task-detection-deckent-dogfood-vs-user-project-discrimination.md`](./039-self-modifying-task-detection-deckent-dogfood-vs-user-project-discrimination.md) |
 | ADR-040 | Nervous System Architecture — Proactive Meta-Orchestrator | accepted | [`040-nervous-system-architecture-proactive-meta-orchestrator.md`](./040-nervous-system-architecture-proactive-meta-orchestrator.md) |
 | ADR-041 | Agent Taxonomy — Horizontal Skills vs Vertical Agents | accepted | [`041-agent-taxonomy-horizontal-skills-vs-vertical-agents.md`](./041-agent-taxonomy-horizontal-skills-vs-vertical-agents.md) |
-| ADR-042 | Hybrid Mode Architecture — Sprint + Task Dual Modes | proposed | [`042-hybrid-mode-architecture-sprint-task-dual-modes.md`](./042-hybrid-mode-architecture-sprint-task-dual-modes.md) |
+| ADR-042 | Hybrid Mode Architecture — Sprint + Task Dual Modes | accepted | [`042-hybrid-mode-architecture-sprint-task-dual-modes.md`](./042-hybrid-mode-architecture-sprint-task-dual-modes.md) |
 | ADR-043 | Brain Crash Recovery Protocol | accepted | [`043-brain-crash-recovery-protocol.md`](./043-brain-crash-recovery-protocol.md) |
 | ADR-044 | Sprint State Observability Contract | accepted | [`044-sprint-state-observability-contract.md`](./044-sprint-state-observability-contract.md) |
 | ADR-045 | Wave-Based Execution Semantics — respawnEligibleTasks Runtime Wire | accepted | [`045-wave-based-execution-semantics.md`](./045-wave-based-execution-semantics.md) |
 | ADR-046 | Brain Self-Update Hook Architecture | accepted | [`046-brain-self-update-hook-architecture.md`](./046-brain-self-update-hook-architecture.md) |
 | ADR-047 | Manuel Subagent Dispatch Protocol | accepted | [`047-manual-subagent-dispatch-protocol.md`](./047-manual-subagent-dispatch-protocol.md) |
 | ADR-048 | Prompt Lifecycle Contract | accepted | [`048-prompt-lifecycle-contract.md`](./048-prompt-lifecycle-contract.md) |
-| ADR-053 | TaskType Taxonomy — Audit / Document-Write / Code-Development + Extensibility Roadmap | proposed | [`053-task-type-taxonomy.md`](./053-task-type-taxonomy.md) |
+| ADR-053 | TaskType Taxonomy — Audit / Document-Write / Code-Development + Extensibility Roadmap | accepted | [`053-task-type-taxonomy.md`](./053-task-type-taxonomy.md) |
 | ADR-055 | Hybrid Scoring 5-Layer Pipeline — Schema / Gates / Quality / Outcome / Auditor | proposed | [`055-hybrid-scoring-pipeline.md`](./055-hybrid-scoring-pipeline.md) |
 | ADR-060 | Self-Awareness Propagation — 5-Channel Context Enrichment Architecture | proposed | [`060-self-awareness-channels.md`](./060-self-awareness-channels.md) |
 | ADR-061 | AEGIS — Agentic Effect-Governed Iterative Stewardship Methodology | proposed | [`061-aegis-methodology.md`](./061-aegis-methodology.md) |

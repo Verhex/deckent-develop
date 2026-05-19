@@ -4,11 +4,9 @@
 
 **Date:** 2026-04-16
 
-**Sprint:** _To be backfilled_
+**Accepted:** Sprint 131
 
 ---
-
-**Status:** ACCEPTED (Sprint 131)
 
 **Context:**
 Önceki sprintlerde `sprint-reporter.ts` içindeki `updateProjectDocs()` fonksiyonu yalnızca hard-coded dokümanlara (CLAUDE.md, IDENTITY.md, README.md gibi) güncelleme yapabiliyordu. Kullanıcı kendi dokümanlarını (ARCHITECTURE.md, ONBOARDING.md, KPI dashboards) sprint döngüsüne dahil etmek istediğinde doğrudan `sprint-reporter.ts` kodunu değiştirmek zorunda kalıyordu. Bu durum:
@@ -52,8 +50,10 @@ Yeni doküman eklemek sıfır kaynak kodu değişikliği gerektirir — sadece `
 Mevcut projeler `.deckent/docs.json` oluşturmadan bu sistemi kullanmaz — backward-compat sağlanmıştır. İlk kez etkinleştirmek için `deckent docs add <path>` komutu veya dosyayı manuel oluşturmak yeterlidir.
 
 **References:**
-- Sprint 131 commit: `e1da3c7` — feat: Sprint 131 — Managed Docs Universalization
+- Sprint 131 — feat: Managed Docs Universalization (commit hash omitted: pre-migration private-repo SHA, not resolvable in the public repo history)
 - Kaynak: `src/orchestra/managed-docs/managed-doc-runner.ts`, `types.ts`, `docs-config.ts`
 - Entegrasyon noktası: `src/orchestra/sprint-reporter.ts` → `updateProjectDocs()` → `runManagedDocUpdates()`
+
+> **Note (verified):** Managed-docs system confirmed in code — `src/orchestra/managed-docs/` (incl. `docs-config.ts`) exists and `.deckent/docs.json` is present. Behavior unchanged; documentation alignment + repo-migration cleanup only (dead old-repo commit SHA removed).
 
 ---

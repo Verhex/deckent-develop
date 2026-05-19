@@ -4,11 +4,7 @@
 
 **Date:** 2026-04-16
 
-**Sprint:** _To be backfilled_
-
 ---
-
-**Status:** accepted
 
 **Decision:** Use TypeScript with `"type": "module"` (ESM) as the project foundation.
 **Context:** Deckent is a Node.js CLI tool. ESM is the modern standard, supported by Node 18+.

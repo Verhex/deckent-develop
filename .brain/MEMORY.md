@@ -196,3 +196,6 @@ What changed:
 ## DONE:
 1. .gitignore §4.3 bloğu eklendi: sprint-*-tasks/, spr
 - B5 — deckent-hub kararı + examples workspace fix: NO_GO — Step 1 TAMAMLANDI: examples/quickstart/package.json 'workspace:*' → '^1.0.0-beta.1'. OSS kullanıcıları artık 'npm instal
+## Sprint sprint-173 Learnings
+## Sprint sprint-174 Learnings
+- Fix debt: Tech debt from 170-001-fix: Code physically verified despite missing .result (Sp: NO_GO — Worker exited without writing result (exitCode=0)

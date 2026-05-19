@@ -228,3 +228,10 @@ bölümündeki 3 maddeye uymak zorundadır. Sapma → NO_GO + ADR amendment prop
 
 Sprint 165 ile `dependency_pipeline_enabled: false → true` config flip + canlı multi-wave smoke
 test yapıldıktan sonra bu ADR production-validated olarak işaretlenir.
+
+> **Note (deep-verified vs code, Sprint 172):** Bu contract ADR'nin **3 Decision maddesi de kodda birebir indi** (gövde gelecek-zamanlı kalmıştır; aşağıdaki güncel gerçektir):
+> - **§1** → `src/orchestra/result-collector.ts:123-131` `applyStatusMutation` — 3-satır tablo (`DONE→DONE`, `GO_WITH_TECH_DEBT→DONE`, `NO_GO→NO_GO`) ve debt-DONE rationale yorumu ADR ile birebir.
+> - **§2** → `result-collector.ts:379-387` `maybeRespawn` — `if (!config?.dependency_pipeline_enabled) return` legacy-FIFO no-op + fail-soft try/catch + `respawnEligibleTasks(projectRoot, sprint, config, spawnOpts)`. Tek nüans: respawn statik değil **lazy dynamic-import** (`loadRespawn()`) ile yüklenir — sözleşme sapması değil, ADR-008 tek-yönlü bağımlılık dostu.
+> - **§3** → `src/orchestra/sprint-spawner.ts` — slot kontrolü korundu (`:507` `slotsAvailable = max(0, maxWorkers - currentlyExecuting)`), `enforceWaveDependency` korundu (`:486`), `BRAIN→WORKER:DEPENDENCY_BLOCKED` (`:493`) ve `wave.respawn` metric (`:576`) gerçekten tetikleniyor; eligible filtresi `t.status === TaskStatus.DONE` (`:477`).
+>
+> **deckent-dev gerçeği:** Bu projede `.deckent/config.json` `dependency_pipeline_enabled: false` — Wave geçişleri bilinçle Brain-manuel (ADR-047, Sprint 164-171 kanıtlı). ADR'deki "Sprint 165 flip → production-validated" **kullanıcı-projesi default yolunu** tanımlar (`config.ts` kod default `true`, ADR-045 Sprint 169 H5'te `docs/reference/api-surface.md`'de teyitli); dogfood'da flag `false` kalır, rollback non-destructive (`if` branch atlanır). Behavior unchanged; documentation alignment only.

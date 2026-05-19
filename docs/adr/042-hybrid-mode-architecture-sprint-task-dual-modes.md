@@ -1,6 +1,6 @@
 # ADR-042: Hybrid Mode Architecture — Sprint + Task Dual Modes
 
-**Status:** proposed
+**Status:** accepted
 
 **Date:** 2026-04-21
 
@@ -9,7 +9,7 @@
 ---
 
 ## Status
-proposed (Sprint 150 — implementation in progress)
+accepted (proposed Sprint 150 → accepted: dual-mode shipped & verified in code, Sprint 172)
 
 ## Context
 
@@ -103,3 +103,5 @@ env DECKENT_STYLE=task (highest)
 - ADR-041: Agent Taxonomy — skill vs agent distinction (task mode reuses same pool)
 - Sprint 149 DIRECTIVES Block A — mode architecture implementation
 - Sprint 148 competitive analysis: OpenClaw life assistant mode comparison
+
+> **Note (verified vs code → status promoted, Sprint 172):** This ADR was marked `proposed` but the dual-mode is **shipped and verified**: `src/orchestra/task-mode-runner.ts` (`runTaskMode()`), `src/cli/commands/mode.ts` (`VALID_STYLES = ['sprint','task']`, `deckent mode sprint|task|auto`), the `deckent_style` config key (3-layer merge, ADR-004), and `README.md` presents Dual Mode as a core feature. Status therefore promoted **proposed → accepted** (governance-approved). The `🔄` items above (T-150-003/004 full task-mode UX, idle detector) reflect Sprint-150-era progress markers; the core toggle + runner are in place. `.brain/exports/summary.md`/`memory.db` will reflect `accepted` after the next `syncAdrFilesToDb` (docs/adr → DB). Behavior unchanged; documentation alignment only.

@@ -4692,3 +4692,72 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 172-012: B5 — deckent-hub kararı + examples workspace fix (NO_GO)
 
 ---
+## Sprint 173 — sprint-173
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-05-18
+**Duration:** 860s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 22 |
+| Completed | 22 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 859957ms |
+
+### Tasks
+
+- 173-001: Fix debt: Tech debt from 170-001-fix: Code physically verified despite missing .result (Sp (DONE)
+- 173-002: Slide 1 — Cover (DONE)
+- 173-003: Slide 2 — The Problem (DONE)
+- 173-004: Slide 3 — What is Deckent (Synthesis) (DONE)
+- 173-005: Slide 4 — Core Roles (DONE)
+- 173-006: Slide 5 — Sprint Lifecycle (DONE)
+- 173-007: Slide 6 — DIRECTIVES-Driven Planning (DONE)
+- 173-008: Slide 7 — Task Routing (DONE)
+- 173-009: Slide 8 — 15 Built-in Agents (DONE)
+- 173-010: Slide 9 — 21 Built-in Skills (DONE)
+- 173-011: Slide 10 — Multi-Provider & ModelRegistry (DONE)
+- 173-012: Slide 11 — Memory V2 (DB-First) (DONE)
+- 173-013: Slide 12 — Dependency Pipeline ★ (DONE)
+- 173-014: Slide 13 — ADR Governance (DONE)
+- 173-015: Slide 14 — Nervous System (DONE)
+- 173-016: Slide 15 — Observability (DONE)
+- 173-017: Slide 16 — Spawn Backends (DONE)
+- 173-018: Slide 17 — Capability Synthesis (DONE)
+- 173-019: Slide 18 — CLI & MCP Surface (DONE)
+- 173-020: Slide 19 — Roadmap (DONE)
+- 173-021: Slide 20 — Closing & Call to Action (DONE)
+
+---
+## Sprint 174 — sprint-174
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-05-18
+**Duration:** 891s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 7 |
+| Completed | 5 |
+| Tech Debt | 0 |
+| No-Go | 2 |
+| Coverage | 0.0% |
+| Duration | 891165ms |
+
+### Tasks
+
+- 174-001: Fix debt: Tech debt from 170-001-fix: Code physically verified despite missing .result (Sp (NO_GO)
+- 174-002: Pitch deck — marketing-ai-pitch.md (15 slide) (DONE)
+- 174-003: Canva template map — canva-kit/canva-bulk-template-map.md (DONE)
+- 174-004: Canva bulk CSV — canva-kit/canva-bulk-sample.csv (DONE)
+- 174-005: Aylık üretim rehberi — canva-kit/monthly-brand-report-howto.md (DONE)
+- 174-006: Kit index + tutarlılık — canva-kit/README.md (DONE)
+
+---

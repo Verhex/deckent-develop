@@ -86,7 +86,7 @@ interface EvaluationAuditRecord {
 }
 ```
 
-Dosya yolu: `.tasks/audit/<sprintId>/<taskId>-attempt-<N>.json`
+Dosya yolu: `.deckent/evaluations/<sprintId>/<taskId>-attempt-<N>.json` (`EVALUATIONS_DIR` sabiti — `constants.ts:27`)
 
 FIX-phase retry'ları `attemptNum` ile ayırt edilir; orijinal EVAL kaydının üzerine yazılmaz.
 
@@ -115,7 +115,7 @@ store.insert({
   gösterir; PLAN → SPAWN → EVALUATE → RETRO geçişleri disk'te görünür olur.
 - **Crash recovery determinizmi.** `restoreSprintFromCheckpoint` her fazda tutarlı
   state görür; negatif `durationMs` (-106ms bug) ortadan kalkar.
-- **Post-sprint forensic.** `audit/<sprintId>/` dizinindeki audit kayıtları ile
+- **Post-sprint forensic.** `.deckent/evaluations/<sprintId>/` dizinindeki audit kayıtları ile
   her task'ın değerlendirme kararı, kullanılan rubrik ve skor dağılımı yeniden
   inşa edilebilir; Brain'in neden DONE/NO_GO dediği açıklanabilir.
 - **Spurious NO_GO tespiti.** Audit trail `rationale` field'ı `reconcileSpuriousNoGo`
@@ -173,3 +173,5 @@ Bu ADR, Sprint 162 T-003 tarafından implement edilen `persistPhaseTransition` w
 ve `evaluation-audit-trail.ts` entegrasyonunun geriye dönük governance kaydıdır.
 ADR-053'te olduğu gibi: uygulama önce yazıldı, ADR tasarım kararlarını geç ama eksiksiz
 kayıt altına almaktadır. Sprint 163 ile kabul edilmiştir.
+
+> **Note (deep-verified vs code, Sprint 172):** Decision §1'deki **4 call-site tablosu kod ile birebir doğrulandı** (`src/orchestra/sprint-phases.ts`): `runPlanPhase`→`PLAN/PLANNING` (`:447`), `runSpawnPhase`→`SPAWN/sprint.status`→`SPAWN/ACTIVE` (`:550`/`:553`), `runEvaluatePhase`→`EVALUATE/EVALUATING` (`:736`), `runFixPhase`→`FIX/FIXING` (`:1100`). `runRetroPhase` için call-site yoktur ve ADR de listelemez (tutarlı). Tek nüans: `runSpawnPhase` ilk çağrıda status argümanı literal `RUNNING` değil dinamik `sprint.status`'tur (ADR'nin "RUNNING → ACTIVE" ifadesi yaklaşık). `persistPhaseTransition`/`writeEvaluationAudit`/`reconcileSpuriousNoGo` fonksiyonları kodda mevcut; referans commit `6c337b0` (Sprint 157 T-001 survivor) repo git geçmişinde gerçek. Yukarıda audit yol düzeltmesi uygulandı: `.tasks/audit/...` → `.deckent/evaluations/<sprintId>/<taskId>-attempt-<N>.json` (`EVALUATIONS_DIR`, `constants.ts:27`). Behavior unchanged; documentation alignment only.

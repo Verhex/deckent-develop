@@ -91,3 +91,16 @@ Three additional gaps surfaced from the forensic:
 - Sprint 168 plan: `docs/superpowers/plans/2026-05-14-sprint-168-plan.md` lines 409-832 (Task 1 C0e TDD steps).
 - Sprint 168 spec v5: `docs/superpowers/specs/2026-05-14-sprint-168-design.md` Cluster E section.
 - Sprint 156 Task 4: original `archivePromptFiles()` introduction (`spawn-backend-docker.ts:982-1011`) — the persist-until-cleanup contract this ADR extends.
+
+---
+
+> **Note (deep-verified vs code, Sprint 172):** §Decision 4 + §Architectural Principles kod ile **birebir doğrulandı:**
+> - `_cleanupOrphanedPromptFiles(activeTaskIds?)` — opsiyonel param, yoksa `getActiveWorkerIds(this.projectDir)` default (`src/providers/claude.ts:147,150`); selective filter `active.some(id => file.includes(\`-${id}-\`))` (`:157`) ve Docker `.prompt-{taskId}-{promptId}.txt` yorumu birebir.
+> - `getActiveWorkerIds()` (`src/core/active-workers.ts:67`) `.hb` dosyalarından `hb.taskId` döndürür; JSDoc'u (`:55-57`) "auditor.ts:2162-2168 workerId pattern KASITLI değiştirilmedi, iki pattern tamamlayıcı" der — §Arch Principles ile aynen. Tolerance (malformed/empty/missing → boş) test 4-case ile uyumlu.
+> - **Pozitif nüans (ADR metninde yok):** `getActiveWorkerIds` ek olarak `PENDING_SPAWNS` (henüz `.hb` yazmamış spawn) ile **union** yapar — §Decision 4 kontratının süperseti (çelişki değil, erken-spawn koruması).
+> - **Fonksiyon/test ✓:** `cleanupPreviousSprintOrphans` (`sprint-lifecycle.ts:236`, `archivePromptFiles` çağırır), `archivePromptFiles` (`spawn-backend-docker.ts:1003`); 4 test dosyası (`active-workers`, `claude-cleanup-active-protected`, `sprint-startup-prev-sprint-orphan`, `cross-backend-prompt-uniformity`) mevcut.
+> - **Satır-ref drift'i:** ADR `claude.ts:129` → gerçek def `:147` (call `:123`); `archivePromptFiles` `:982` → gerçek export `:1003`. Fonksiyonlar mevcut, yalnız satır numaraları eski (kod büyüdü).
+> - **§Decision 6 hassasiyet düzeltmesi:** "All three backends carry an inline `Sprint 168 C0e Cross-Backend Contract` comment" abartılıdır — C0e marker yalnız `src/orchestra/spawn-backend.ts` + `src/orchestra/tmux.ts`'te (2 yeni-annote backend); `claude.ts`/`spawn-backend-docker.ts`'te yoktur (Docker'da orijinal Sprint 156 persist-until-cleanup yorumu vardır). ADR'ın kendi §Compliance maddesi zaten daha hassas ("the two newly-annotated backends"); §Decision 6 ile §Compliance arasındaki ifade farkı §Compliance lehine okunmalıdır.
+> - **Dangling ref:** §Context + §References'taki `.audit/sprint-167/T5-brain-debug-phase1.md` + `phase2.md` belirtilen yolda mevcut değil (transient `.audit/` — ADR-047 ile aynı; iddialar forensic formalizasyona dayanır). `docs/superpowers/plans|specs/2026-05-14-sprint-168-*` referansları mevcut ✓.
+>
+> Behavior unchanged; documentation alignment only.

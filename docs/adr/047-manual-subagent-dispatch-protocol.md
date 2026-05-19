@@ -351,9 +351,9 @@ Bu ADR'in protokolü Sprint 169+ Brain otonom orchestration ile **protocol parit
 | ADR-047 Protokol | Brain Otonom Esdeğeri |
 |------------------|-----------------------|
 | Worktree isolation | git worktree add -> Brain spawn-time isolation |
-| File authority matrix | scope.filesWrite RBAC (ADR-037 runtime enforcement) |
+| File authority matrix | scope.filesWrite RBAC (ADR-037 V1.0 — compile-time lint + audit-trail; runtime advisory/soft, bloke etmez; hard-flip post-GA V2) |
 | TDD enforcement gate | Brain GO/NO_GO evaluation (result evaluator) |
-| Wave structure | dependency_pipeline_enabled: true — Wave scheduling (Sprint 167 flip) |
+| Wave structure | dependency_pipeline_enabled — Wave scheduling (kod default true; deckent-dev'de bilinçle `false`, Wave geçişleri Brain-manuel — bkz. aşağıdaki not) |
 | Wave 1.5 serial gate | Human checkpoint MCP tool (deckent_checkpoint) |
 | Lock pattern | .locks/ infrastructure (ADR-037) |
 | Manual survival fallback | deckent recover + deckent run chain |
@@ -458,3 +458,15 @@ bu basarinin belgesi olarak arsivde kalacak.
 **Sprint 168 final eval zinciri:**
 v1 (fc91fcd): brainstorming -> v5 (f63a8f6): Agent A 96/100 + Agent B 26/100 — cift hedef basarili.
 Bu ADR Sprint 168 GO kararinin mimari anchor'idir.
+
+---
+
+> **Note (verified vs code + operating reality, Sprint 172):**
+> - **Provenance ✓:** commit `fc91fcd` (Sprint 168 design v1) ve `f63a8f6` (v5 patch) repo git geçmişinde gerçek; `docs/superpowers/specs/2026-05-14-sprint-168-design.md` + `docs/superpowers/plans/2026-05-14-sprint-168-plan.md` mevcut.
+> - **ADR-047 deprecated DEĞİL — hâlâ aktif işletim modu.** §Consequences/§"Sprint 169+ Brain Otonom Hedefi"/§Notes "Sprint 169+ Brain otonom → ADR-047 deprecated olacak" hedefi **gerçekleşmedi**. deckent-dev Sprint 172+ boyunca bu protokolle (manuel subagent dispatch) yürütülmeye devam ediyor — bu doküman turu dahil. Brain-otonom protocol parity sağlanmadı; ADR-047 bu projenin fiilî kanonik işletim modudur (CLAUDE.md/DECKENT.md ile hizalı).
+> - **ADR-037 düzeltmesi (parity tablosu):** "runtime enforcement" iddiası ADR-037 V1.0 gerçeğine çekildi — compile-time lint + audit-trail aktif; runtime **advisory/soft, bloke ETMEZ** (Layer-2 0-caller `authority-enforcer.ts` always-soft + `worker.ts` violation→true; hard-flip post-GA V2). Manuel dispatch'te bu kontrol fiilen **Alperen review gate** (`git diff --stat`) ile uygulanır — kod-enforce değil.
+> - **dependency_pipeline_enabled:** `.deckent/config.json` `false` (Brain-manuel Wave, ADR-045 + bu ADR). "Sprint 167 flip" deckent-dev'de gerçekleşmedi; öz-referans ironisi — flip'in olmama nedeni tam da bu ADR'ın tarif ettiği manuel mod. Kod default `true` kullanıcı-projesi yoludur.
+> - **Dangling ref:** §Context/§References'taki `.audit/sprint-167/T5-brain-debug-phase1.md` + `phase2.md` belirtilen yolda **mevcut değil** (transient `.audit/` dizini — forensic artefaktlar arşivlendi/silindi; iddialar formalizasyona dayanır, dosya erişimine değil).
+> - **Numaralandırma:** "Step 2/4/5 partial" (§Context) ve §"Related ADRs"daki "Step 4/5/12" — ADR-046'da netleştirildiği gibi `finalizeSprint` 13-adım CLEANUP zinciri numaralandırmasıdır, ADR-046 §5.1'in 4-hook `runPostFinalizeHooks` kontratı değil.
+>
+> Behavior unchanged; documentation alignment only.

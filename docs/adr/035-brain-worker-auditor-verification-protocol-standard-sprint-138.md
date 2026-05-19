@@ -2,15 +2,11 @@
 
 **Status:** accepted
 
-**Date:** 2026-04-16
+**Date:** 2026-04-14
 
-**Sprint:** _To be backfilled_
+**Sprint:** 138
 
 ---
-
-**Status:** accepted
-
-**Date:** 2026-04-14
 
 **Context:**
 
@@ -128,5 +124,7 @@ Event stream write başarısız olursa (disk tam, permission hata) → `console.
 - `src/orchestra/event-stream.ts` — Sprint 138 Task 4 implementasyonu
 - `src/monitor/auditor.ts` — Sprint 138 Task 3 Auditor Authority Extension
 - `.deckent/sprint-138-events.jsonl` — canlı runtime event log
+
+> **Note (verified vs code, Sprint 172):** `src/orchestra/event-stream.ts` exists and implements the versioned protocol + channel codes ✓. **However, the "Backward Compatibility Roadmap" did not materialize:** the table projects file-based state soft-deprecated by Sprint 140 and **removed by Sprint 142** — but at Sprint 172 the file-based `.hb`/`.result` mechanism is still the **live primary** path (`src/orchestra/result-collector.ts`, `src/agents/worker.ts`; the ADR-047 manual-dispatch flow reads `.tasks/task-*.result`). The event stream is an **additive layer**, not the sole canonical truth in practice. "Event stream = canonical truth / file-based removed by 142" is design intent, not the current runtime state (consistent with the ADR-037 V1.0 advisory framing in `docs/architecture/authority-matrix.md`). Behavior unchanged; documentation alignment only.
 
 ---

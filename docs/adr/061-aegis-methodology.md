@@ -18,7 +18,7 @@ proposed (Sprint 175 başlangıç, Sprint 200 god-level GA launch ile birlikte c
 
 ## Context
 
-Deckent Sprint 170 itibarıyla 14+ özgün mimari yapı içerir (Brain-Worker-Auditor 3-tier, Memory V2 SQLite FTS5, ADR Governance Integration ADR-036, RBAC Authority Matrix ADR-037, EffectClass taksonomisi, Self-Modifying Detection ADR-039, Nervous System ADR-040, TaskType Taxonomy ADR-053 proposed, Hybrid Scoring 5-Layer ADR-055 proposed, Wave-Based Execution ADR-045, Brain Self-Update Hook ADR-046, Manuel Subagent Dispatch ADR-047, Prompt Lifecycle ADR-048, Sprint Checkpoint+Resume ADR-043, Sprint State Observability ADR-044). Bu yapılar **kompozit bir disiplin** oluşturuyor; ancak **resmi bir adı ve yayınlanabilir spesifikasyonu yok**. Topluluk + akademik dünya + enterprise pazarda Deckent'i konumlandırmak için disiplinin **tek isim altında formel manifestosu** zorunlu.
+Deckent Sprint 170 itibarıyla 14+ özgün mimari yapı içerir (Brain-Worker-Auditor 3-tier, Memory V2 SQLite FTS5, ADR Governance Integration ADR-036, RBAC Authority Matrix ADR-037, EffectClass taksonomisi, Self-Modifying Detection ADR-039, Nervous System ADR-040, TaskType Taxonomy ADR-053 (Sprint 172 accepted — çekirdek shipped), Hybrid Scoring 5-Layer ADR-055 proposed, Wave-Based Execution ADR-045, Brain Self-Update Hook ADR-046, Manuel Subagent Dispatch ADR-047, Prompt Lifecycle ADR-048, Sprint Checkpoint+Resume ADR-043, Sprint State Observability ADR-044). Bu yapılar **kompozit bir disiplin** oluşturuyor; ancak **resmi bir adı ve yayınlanabilir spesifikasyonu yok**. Topluluk + akademik dünya + enterprise pazarda Deckent'i konumlandırmak için disiplinin **tek isim altında formel manifestosu** zorunlu.
 
 Sprint 170 öncesi yapılan kapsamlı metodoloji araştırması (4 paralel research agent, ~95 metodoloji taraması) iki temel bulgu ortaya koydu:
 
@@ -284,14 +284,14 @@ Manifesto-style canonical principles:
 - **ADR-039** — Self-Modifying Task Detection: AEGIS Layer 1 AWARENESS içinde, dogfood discrimination.
 - **ADR-040** — Nervous System: AEGIS Layer 1 AWARENESS'in çekirdeği.
 - **ADR-041** — Agent Taxonomy: AEGIS 5-rol + Workers içinde 15 vertical agent + 21 horizontal skill.
-- **ADR-042** — Hybrid Mode Architecture (proposed): AEGIS mode applicability'nin foundation, Sprint+Task+Process toggle.
+- **ADR-042** — Hybrid Mode Architecture (Sprint 172 accepted — dual-mode shipped): AEGIS mode applicability'nin foundation, Sprint+Task+Process toggle.
 - **ADR-043** — Brain Crash Recovery: AEGIS Layer 3 HEALING içinde.
 - **ADR-044** — Sprint State Observability Contract: AEGIS Layer 1 AWARENESS içinde.
 - **ADR-045** — Wave-Based Execution: AEGIS Phase 3 SPAWN içinde Kahn topological.
 - **ADR-046** — Brain Self-Update Hook: AEGIS Phase 9 COOL-DOWN içinde provenance + memory update.
 - **ADR-047** — Manuel Subagent Dispatch: AEGIS Layer 3 HEALING içinde, kritik kırık recovery.
 - **ADR-048** — Prompt Lifecycle Contract: AEGIS Phase 3 SPAWN + Phase 9 COOL-DOWN cleanup contract.
-- **ADR-053** — TaskType Taxonomy (proposed): AEGIS Phase 2 GOVERN içinde EffectClass classification dependency.
+- **ADR-053** — TaskType Taxonomy (Sprint 172 accepted — çekirdek 3-tip taxonomy shipped; Roadmap/Tek-Kaynak deferred): AEGIS Phase 2 GOVERN içinde EffectClass classification dependency.
 - **ADR-055** — Hybrid Scoring 5-Layer (proposed): AEGIS Phase 6 EVALUATE'in canonical implementation.
 - **ADR-060** — Self-Awareness Propagation (proposed): AEGIS Layer 1 AWARENESS 5-channel context enrichment specification.
 
@@ -372,3 +372,13 @@ AEGIS VSDD'nin **superset'idir** — VSDD prensiplerinin çoğunu (adversarial v
 **İmza (proposed):** Brain (orchestrator)
 **Diriliş:** Sprint 175 implementation Phase 1 başlangıç ile birlikte canonical
 **Sonraki revize:** Sprint 200 god-level GA sonrası empirical validation feedback ile v2.0
+
+---
+
+> **Note (status reconciliation + reality, Sprint 172):**
+> - **`proposed` doğru statü:** AEGIS bilinçli ileri-dönük manifestodur; 9-phase/3-layer/5-role/8-artifact spec'in 5 yeni faz/gate'i (REVIEW, andon, 5-Whys, provenance, COOL-DOWN) ve Implementation Roadmap (Sprint 175-200) **henüz başlamadı** (Sprint 172). ADR kendisi her yerde bunu dürüstçe işaretler — overclaim yok.
+> - **Çapraz-ADR statü uzlaştırması:** ADR-061 yazıldığında `(proposed)` etiketli iki ADR bu doküman turunda terfi etti — **ADR-042** (Hybrid Mode, dual-mode shipped → accepted) ve **ADR-053** (TaskType, çekirdek shipped → accepted; Roadmap/Tek-Kaynak deferred). §Context + §Related ADRs referansları buna göre güncellendi. **ADR-055 + ADR-060 `proposed` kalır** (çekirdekleri inşa edilmedi — bu ADR'lerdeki notlara bkz.); ADR-061 onları doğru biçimde `proposed` gösterir.
+> - **Açık Architect kararı:** "Trademark/isim araştırması Sprint 172 OSS GA öncesi şart" (§Consequences + §Notes, 3×) — Sprint 172 = şu an. AEGIS vs MAVEN/PRISM/OAGD/HELIX seçimi + "Aegis" trademark çakışma riski **çözülmemiş bir Architect kararıdır**; bu not onu yüzeye çıkarır, karara bağlamaz.
+> - Ground-truth tutarlı: "15 vertical agent + 21 horizontal skill" (§Related ADR-041) güncel kataloğla eşleşir.
+>
+> Behavior unchanged; documentation alignment only.

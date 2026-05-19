@@ -4,11 +4,9 @@
 
 **Date:** 2026-04-16
 
-**Sprint:** _To be backfilled_
+**Accepted:** Sprint 131
 
 ---
-
-**Status:** ACCEPTED (Sprint 131)
 
 **Context:**
 `runManagedDocUpdates()` her sprint bitişinde tüm konfigüre edilmiş dokümanlar için içerik üretimi çalıştırır. Büyük projelerde:
@@ -57,8 +55,10 @@ Dual-key (entryHash + fileHash) tasarımı şu senaryoları bağımsız olarak e
 Tek-key (yalnızca fileHash) konfigürasyon değişikliklerini gözden kaçırırdı.
 
 **References:**
-- Sprint 131 commit: `e1da3c7`
-- Kaynak: `src/orchestra/managed-docs/doc-cache.ts`, `managed-doc-runner.ts:60-71`
+- Sprint 131 — Content Hash Cache (commit hash omitted: pre-migration private-repo SHA, not resolvable in the public repo history)
+- Kaynak: `src/orchestra/managed-docs/doc-cache.ts`, `managed-doc-runner.ts`
 - İlgili: Sprint 132 Task 4 (loadConfig module-level cache) — benzer dual-key pattern, aynı motivasyon
+
+> **Note (verified / evolution):** Dual-key cache (`entryHash` + `fileHash`) confirmed in `src/orchestra/managed-docs/doc-cache.ts` (`contentHash()`). **Extended in Sprint 166 (Bug S fix):** sprint-aware invalidation was added — caches are now forced-invalidated across sprints and pre-Sprint-166 cache entries are intentionally invalidated, so the original two-key model now has a third (sprint) dimension. Behavior unchanged; documentation alignment + repo-migration cleanup only (dead old-repo commit SHA removed).
 
 ---

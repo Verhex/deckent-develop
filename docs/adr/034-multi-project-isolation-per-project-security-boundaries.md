@@ -2,15 +2,11 @@
 
 **Status:** accepted
 
-**Date:** 2026-04-16
+**Date:** 2026-04-11
 
-**Sprint:** _To be backfilled_
+**Sprint:** 134
 
 ---
-
-**Status:** ACCEPTED
-
-**Date:** 2026-04-11
 
 **Context:**
 
@@ -116,8 +112,8 @@ API anahtarları config dosyalarında saklanmaz — environment variable olarak 
 
 ---
 
-## NOTE: Büyük Dosya Split Analizi (Sprint 130)
-
-- sprint-controller.ts (2133 satır) — Split önerisi: sprint-lifecycle.ts (faz yönetimi) + sprint-orchestrator.ts (worker koordinasyonu)
-- sprint-reporter.ts (2132 satır) — Split önerisi: retro-writer.ts (retrospektif) + performance-reporter.ts (metrik)
-- **Status:** Gelecek sprint'te değerlendirilecek — bu sprint'te sadece belgelendi.
+> **Note (verified vs code + ADR-037 V1.0):**
+> - **Katman 2 (AES-256-GCM) confirmed:** `src/core/credential-encryption.ts` (`ALGORITHM = 'aes-256-gcm'`, `createCipheriv`) + `src/core/credentials.ts` — a real per-project credential-encryption system, distinct from the `.deck`/Ed25519 system of ADR-014.
+> - **Katman 3 (symlink-aware scope) — accuracy correction:** The symlink resolution **is** implemented — `isWithinScope()` (`src/agents/worker.ts`) calls `realpathSync()` and returns a **boolean**. However, it does **not** itself throw `ScopeViolationError`, and per **ADR-037 V1.0** runtime scope enforcement is **advisory/soft** (a violation is warned + event-emitted but does **not** hard-block; hard-flip is post-GA V2 — see `docs/architecture/authority-matrix.md`). Therefore "vulnerability is closed / `ScopeViolationError` thrown / blocks" describes the **design intent**, not the current runtime guarantee.
+>
+> Behavior unchanged; documentation alignment only. (An unrelated, stale "Büyük Dosya Split Analizi (Sprint 130)" appendix — long since completed via ADR-024/026 — was removed from this ADR.)

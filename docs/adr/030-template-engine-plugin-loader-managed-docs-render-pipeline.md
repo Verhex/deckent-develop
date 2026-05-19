@@ -4,11 +4,9 @@
 
 **Date:** 2026-04-16
 
-**Sprint:** _To be backfilled_
+**Accepted:** Sprint 131
 
 ---
-
-**Status:** ACCEPTED (Sprint 131)
 
 **Context:**
 Managed-Docs sistemi built-in `SectionGenerator`'ları sprint context'inden markdown üretir. Ancak bazı kullanıcılar:
@@ -53,8 +51,10 @@ Güvenlik kararı: JSON generator'lar `loadUserGeneratorsSync()` ile sync olarak
 - WebAssembly sandbox'lı plugin'ler — aşırı karmaşıklık, current requirements ötesinde
 
 **References:**
-- Sprint 131 commit: `e1da3c7`
+- Sprint 131 — Template Engine + Plugin Loader (commit hash omitted: pre-migration private-repo SHA, not resolvable in the public repo history)
 - Kaynak: `src/orchestra/managed-docs/template-renderer.ts`, `plugin-loader.ts`
 - Güvenlik notu: MJS loader gelecekte `src/core/plugin-loader.ts` SkillSandbox entegrasyonuyla güçlendirilebilir (Sprint 133 Task 1)
+
+> **Note (verified):** Confirmed in code — `src/orchestra/managed-docs/template-renderer.ts` and `plugin-loader.ts` exist (two-layer render pipeline as described). Behavior unchanged; documentation alignment + repo-migration cleanup only (dead old-repo commit SHA removed).
 
 ---

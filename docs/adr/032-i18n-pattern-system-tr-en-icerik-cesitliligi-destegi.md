@@ -4,11 +4,9 @@
 
 **Date:** 2026-04-16
 
-**Sprint:** _To be backfilled_
+**Accepted:** Sprint 131
 
 ---
-
-**Status:** ACCEPTED (Sprint 131)
 
 **Context:**
 Deckent TR ve EN kullanıcı tabanına sahip. Sprint 131 öncesinde:
@@ -63,9 +61,11 @@ Dil konfigürasyonu: `.deckent/config.json`'da `"language": "tr"` veya `"en"`. `
 - Enum-based dil anahtarı yerine string — `'tr' | 'en'` union type daha iyi tip güvenliği sağlardı (gelecek iyileştirme)
 
 **References:**
-- Sprint 131 commit: `e1da3c7`
-- Kaynak: `src/orchestra/managed-docs/content-generators.ts:15-66` (I18nStrings, EN, TR, i18n)
-- Kaynak: `src/orchestra/managed-docs/types.ts:64-65` (patternsByLang field)
+- Sprint 131 — i18n Pattern System (commit hash omitted: pre-migration private-repo SHA, not resolvable in the public repo history)
+- Kaynak: `src/orchestra/managed-docs/content-generators.ts` (I18nStrings, EN, TR, i18n)
+- Kaynak: `src/orchestra/managed-docs/types.ts` (`patternsByLang` field)
 - İlgili: Sprint 092 Dashboard i18n (React tarafı), Sprint 084 i18n kapsam genişletmesi
+
+> **Note (verified):** `patternsByLang` is present in `src/orchestra/managed-docs/types.ts` and the `I18nStrings`/`EN`/`TR`/`i18n()` localization layer in `content-generators.ts` — the two-layer i18n design described above is confirmed in code. (Line numbers dropped — drift-prone.) Behavior unchanged; documentation alignment + repo-migration cleanup only (dead old-repo commit SHA removed).
 
 ---

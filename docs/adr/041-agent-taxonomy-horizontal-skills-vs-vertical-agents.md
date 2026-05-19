@@ -100,3 +100,5 @@ Agent taxonomy şu şekilde reorganize edildi:
 - Sprint 148 T-148-001..005: Reform implementation package
 - ADR-037: Brain-Auditor-Worker Authority Matrix RBAC V1.0
 - ADR-040: Nervous System Architecture — AgentRoutingHealth detector integration
+
+> **Note (verified vs code, Sprint 172):** Confirmed accurate — `.deckent/agents/` holds **15 built-in agents** (excluding temp/archive); `test-writer` is removed and archived under `.deckent/agents/archive/test-writer-removed-sprint-148/`. The Agent=vertical / Skill=horizontal taxonomy is consistent with `docs/architecture/agents.md` and `docs/architecture/agent-skill-architecture.md`. This decision was further **re-reconfirmed in Sprint 166** (per `DECKENT.md`) — still in force. Behavior unchanged; documentation alignment only.
