@@ -41,6 +41,18 @@ instant disqualifier for enterprise (SOC2/GDPR).
 
 ---
 
+## 1b. Process Gate (before reorg AND before the implementation plan)
+
+Locked working discipline (Alperen, 2026-05-19):
+
+1. Before starting any work, **both Alperen and Claude fully analyze the current
+   dashboard + deckent processes** (routes, build, API surface, SSE, config flow) —
+   no assumed behavior.
+2. The implementation plan proceeds **only from verified / proven processes**.
+3. Before finalizing the plan, **run systematic-debugging** as a definitive check to
+   confirm current behavior matches documentation (catch drift first).
+4. Reorg companion constraints: `2026-05-19-terminal-aware-reorg-note.md`.
+
 ## 2. Locked Decisions
 
 | Decision | Choice | Rationale |
