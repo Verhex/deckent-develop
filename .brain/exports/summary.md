@@ -82,7 +82,6 @@ Sprint 167 Read-Only Self-Audit deliverable'ları (kaynak: .audit/sprint-167/T*.
 
 ## Active Technical Debt
 - [HIGH] ADR-019 reconciliation: language-agnostic verify not implemented
-- [CRITICAL] Tech debt from 170-001-fix: Code physically verified despite missing .result (Sp
 
 ## Active Patterns
 - Violation pattern: stale_heartbeat
