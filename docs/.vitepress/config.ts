@@ -16,7 +16,7 @@ export default defineConfig({
 
   // Head tags
   head: [
-    ['link', { rel: 'icon', href: '/favicon.svg', type: 'image/svg+xml' }],
+    ['link', { rel: 'icon', href: '/favicon.png', type: 'image/png' }],
     ['meta', { name: 'theme-color', content: '#5B21B6' }],
     ['meta', { property: 'og:type', content: 'website' }],
     ['meta', { property: 'og:site_name', content: 'Deckent' }],
@@ -48,8 +48,8 @@ export default defineConfig({
 
   // Theme config
   themeConfig: {
-    // Logo placeholder
-    logo: '/logo.svg',
+    // Brand emblem — pixel-art circuit kraken (ADR-021)
+    logo: '/logo.png',
     siteTitle: 'Deckent',
 
     // Top navigation

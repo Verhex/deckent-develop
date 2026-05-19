@@ -77,9 +77,17 @@ function SidebarContent({ onNavigate, sseState, sseStatus }: { onNavigate?: () =
   return (
     <>
       <div className="mb-4 px-3">
-        <h1 className="text-lg font-bold text-zinc-100 tracking-tight">
-          deckent
-        </h1>
+        <div className="flex items-center gap-2">
+          <img
+            src="/logo.png"
+            alt="Deckent"
+            className="h-7 w-7 shrink-0"
+            style={{ imageRendering: 'pixelated' }}
+          />
+          <h1 className="text-lg font-bold text-zinc-100 tracking-tight">
+            deckent
+          </h1>
+        </div>
         <p className="text-xs text-zinc-500">{t('layout.subtitle')}</p>
       </div>
       {sseState?.sprint && (
