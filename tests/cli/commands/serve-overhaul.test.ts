@@ -123,7 +123,13 @@ describe('serve command — registerServe', () => {
     registerServe(program);
     const cmd = program.commands.find(c => c.name() === 'serve')!;
     await cmd.parseAsync([], { from: 'user' });
-    expect(createHttpServer).toHaveBeenCalledWith('/test/project', 3100);
+    // serve now wires the bundled dashboard staticDir (previously a bug: it
+    // built the wrong path and never passed it to createHttpServer).
+    expect(createHttpServer).toHaveBeenCalledWith(
+      '/test/project',
+      3100,
+      expect.stringContaining('dashboard'),
+    );
   });
 
   it('rejects invalid port', async () => {

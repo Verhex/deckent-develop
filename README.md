@@ -24,13 +24,15 @@ Deckent is an AI agent orchestration CLI with two modes: **Sprint Mode** for str
 ## Quick Start
 
 ```bash
-npm install -g deckent
+# No global install needed:
+npx deckent@latest init          # detects + (with consent) installs missing CLIs
+# or: npm install -g deckent && deckent init
 
 # Developer workflow (Sprint Mode)
-deckent init
 deckent mode sprint
 # Edit DIRECTIVES.md with your goals, then:
 deckent start
+deckent web                      # open the web dashboard at http://localhost:3100
 
 # Life assistant (Task Mode)
 deckent mode task
@@ -215,19 +217,24 @@ See the [full competitive analysis](docs/analysis/competitive-analysis.md) for d
 
 **Claude Subscription:** Pro, Max 5x, Max 20x, or API key (pay-as-you-go). Codex and Gemini are integrated through their own CLIs (`codex`, `gemini`); Gemini additionally needs `GOOGLE_API_KEY` and can also run via the Google Generative AI API. The Codex CLI integration is still in development.
 
+**Zero-setup:** `deckent init` detects everything above and, with your per-tool consent, installs the missing provider CLIs (claude/codex/gemini). Use `--yes` to install all without prompting (CI), or `--no-install` for detection only. OS packages (tmux) / Node / Docker are surfaced as instructions, never auto-installed (ADR-062).
+
 ---
 
 ## Installation
 
 ```bash
-npm install -g deckent
+npx deckent@latest init      # recommended — no global install
+# or
+npm install -g deckent && deckent init
 ```
 
-Verify:
+Verify and open the dashboard:
 
 ```bash
 deckent --version    # 1.0.0-beta.1
-deckent doctor
+deckent doctor       # pre-flight health gate
+deckent web          # web dashboard at http://localhost:3100
 ```
 
 ---

@@ -63,7 +63,12 @@ describe('registerServe', () => {
 
   it('starts server with default port', async () => {
     await program.parseAsync(['node', 'test', 'serve']);
-    expect(mockCreateHttpServer).toHaveBeenCalledWith('/tmp/test-project', 3100);
+    // serve now wires the bundled dashboard staticDir (previously never passed).
+    expect(mockCreateHttpServer).toHaveBeenCalledWith(
+      '/tmp/test-project',
+      3100,
+      expect.stringContaining('dashboard'),
+    );
     expect(vi.mocked(print)).toHaveBeenCalledWith(
       expect.stringContaining('listening on http://localhost:3100'),
     );
@@ -71,7 +76,11 @@ describe('registerServe', () => {
 
   it('starts server with custom port', async () => {
     await program.parseAsync(['node', 'test', 'serve', '--port', '4000']);
-    expect(mockCreateHttpServer).toHaveBeenCalledWith('/tmp/test-project', 4000);
+    expect(mockCreateHttpServer).toHaveBeenCalledWith(
+      '/tmp/test-project',
+      4000,
+      expect.stringContaining('dashboard'),
+    );
   });
 
   it('registers SIGINT and SIGTERM handlers', async () => {

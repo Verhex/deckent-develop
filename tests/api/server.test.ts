@@ -423,6 +423,27 @@ describe('createHttpServer', () => {
 
   // ─── POST endpoints ────────────────────────────────────────
 
+  describe('POST /api/chat', () => {
+    it('returns 200 with a reply for a help message (no longer a 404 stub)', async () => {
+      api = createHttpServer(PROJECT_ROOT, 0);
+      await new Promise<void>((r) => api.server.once('listening', r));
+
+      const res = await request(api, '/api/chat', 'POST', { message: 'help' });
+      expect(res.status).toBe(200);
+      const body = JSON.parse(res.body) as { reply: string };
+      expect(typeof body.reply).toBe('string');
+      expect(body.reply.toLowerCase()).toContain('status');
+    });
+
+    it('returns 400 when message is missing', async () => {
+      api = createHttpServer(PROJECT_ROOT, 0);
+      await new Promise<void>((r) => api.server.once('listening', r));
+
+      const res = await request(api, '/api/chat', 'POST', {});
+      expect(res.status).toBe(400);
+    });
+  });
+
   describe('POST /api/start', () => {
     it('returns 202 and starts sprint', async () => {
       api = createHttpServer(PROJECT_ROOT, 0);

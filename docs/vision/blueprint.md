@@ -275,11 +275,16 @@ $ deckent init
 
 ```
 Required:
-  Node.js ≥ 18 (22 recommended)
+  Node.js ≥ 18 (22 recommended)         — detected; install guidance only (not auto-installed)
   git
-  tmux (auto-installed on first run if missing)
-  Claude Code CLI (npm install -g @anthropic-ai/claude-code)
+  tmux                                  — detected; OS-package instruction surfaced (sudo never run silently)
+  Claude Code CLI                       — `deckent init` offers consent-based install (npm i -g @anthropic-ai/claude-code); --yes for CI, --no-install for hint-only
   Claude subscription (Pro, Max, or API key)
+
+  Note (ADR-062): `deckent init` detects missing prerequisites and, with the
+  user's per-tool consent, installs the provider CLIs (claude/codex/gemini).
+  OS packages (tmux) and runtimes (node)/docker are surfaced as instructions
+  the user runs — never silently auto-installed.
 
 Supported OS:
   macOS (Intel + Apple Silicon)
@@ -1122,9 +1127,17 @@ $ deckent status
 ╚══════════════════════════════════════════════════════╝
 ```
 
-## Phase 2: Web Dashboard — DONE (Sprint 11)
+## Phase 2: Web Dashboard — DONE (Sprint 11), end-to-end repaired (Sprint 175)
 
 React + Vite + Tailwind, 6 pages, shadcn/ui components, SSE for real-time updates.
+
+> **Sprint 175 repair (honesty):** The dashboard shipped but was not end-to-end
+> usable — `web`/`serve` resolved the static dir to a non-existent path
+> (`<projectRoot>/src/dashboard/dist`) and `serve` never passed it; the build
+> chain could ship an empty `dist/dashboard`; `/api/chat` returned 404. Fixed:
+> bundled-dashboard resolver (`dist/dashboard`, install-safe), resilient
+> `build:dashboard`, and a real `/api/chat` handler. `deckent web` now serves a
+> working dashboard from the installed package.
 
 - **Dashboard page:** Live agent status, progress bars, alerts with badge colors, elapsed time, auditor status indicator
 - **Settings page:** Config viewer
