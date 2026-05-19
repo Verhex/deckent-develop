@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/assets/logo.png" width="140" alt="Deckent — circuit kraken emblem" />
+</p>
+
 # deckent
 
 **The AI orchestrator for developers who want discipline.**
