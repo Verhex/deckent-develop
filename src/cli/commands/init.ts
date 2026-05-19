@@ -22,7 +22,13 @@ import { detectEnvironment } from '../../core/environment.js';
 import { detectFullStack } from '../../core/stack-detector.js';
 import type { FullStackResult } from '../../core/stack-detector.js';
 import { DECKENT_VERSION } from '../../core/constants.js';
-import { promptText, promptSelect } from '../helpers/prompt.js';
+import { promptText, promptSelect, promptConfirm } from '../helpers/prompt.js';
+import {
+  provisionMissing,
+  resolveProvisionMode,
+  collectMissingTools,
+  planInstall,
+} from '../../core/provisioner.js';
 import { print, printError } from '../helpers/output.js';
 import { getMessage } from '../helpers/messages.js';
 import { resolveProjectRoot } from '../helpers/process.js';
@@ -122,7 +128,9 @@ export function registerInit(program: Command): void {
     .option('--upgrade', 'Update existing files while preserving user customizations (merge strategy)')
     .option('--force', 'Force overwrite of existing env files without warning')
     .option('--repair', 'Show which init steps failed and how to fix them')
-    .action(async (options: { auto?: boolean; manual?: boolean; cursor?: boolean; claudeCode?: boolean; env?: string; allEnvs?: boolean; upgrade?: boolean; force?: boolean; repair?: boolean }) => {
+    .option('-y, --yes', 'Install all missing prerequisites without prompting (CI)')
+    .option('--no-install', 'Detect missing prerequisites but never install them (legacy hint-only)')
+    .action(async (options: { auto?: boolean; manual?: boolean; cursor?: boolean; claudeCode?: boolean; env?: string; allEnvs?: boolean; upgrade?: boolean; force?: boolean; repair?: boolean; yes?: boolean; install?: boolean }) => {
       const root = resolveProjectRoot();
       const failedSteps: Array<{ step: string; error: string }> = [];
 
@@ -292,12 +300,36 @@ export function registerInit(program: Command): void {
 
         writeProviderConfig(root, mode, language, projectName, providerConfig);
 
-        // 7e. Run deckent doctor
+        // 7e. Run deckent doctor + consent-based provisioning of missing tools
         try {
           const doctorResult = runDoctorChecks(root);
-          if (!doctorResult.ok) {
-            const failedChecks = doctorResult.checks.filter(c => c.required && !c.passed);
-            print(`\n  Health check: ${failedChecks.length} issue(s) found — run 'deckent doctor' for details`);
+          const missing = collectMissingTools(providers, doctorResult.checks);
+          if (missing.length > 0) {
+            const mode = resolveProvisionMode({ yes: options.yes, noInstall: options.install === false });
+            if (mode === 'no-install') {
+              print(`\n  Missing prerequisites: ${missing.join(', ')} — run 'deckent doctor' for install hints`);
+            } else {
+              print(`\n  Missing prerequisites detected: ${missing.join(', ')}`);
+              const provisionResults = await provisionMissing({
+                missing,
+                mode,
+                confirm: async (tool, instruction) =>
+                  promptConfirm(`  Install ${tool}? (${instruction})`, false),
+                log: print,
+              });
+              for (const r of provisionResults) {
+                if (r.status === 'installed') print(`  ✓ ${r.tool} installed`);
+                else if (r.status === 'failed') print(`  ✗ ${r.tool} install failed: ${r.error}`);
+                else if (r.reason === 'manual') print(`  → ${r.tool}: ${planInstall(r.tool).instruction}`);
+                else print(`  • ${r.tool} skipped`);
+              }
+            }
+          }
+          // Re-verify after provisioning
+          const finalDoctor = runDoctorChecks(root);
+          if (!finalDoctor.ok) {
+            const failedChecks = finalDoctor.checks.filter(c => c.required && !c.passed);
+            print(`\n  Health check: ${failedChecks.length} issue(s) remaining — run 'deckent doctor' for details`);
           }
         } catch { /* doctor failure is non-fatal */ }
 

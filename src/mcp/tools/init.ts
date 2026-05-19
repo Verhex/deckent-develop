@@ -10,6 +10,12 @@ import {
   PATTERNS_FILE, RETRO_FILE, PROJECT_IDENTITY_FILE,
 } from '../../core/constants.js';
 import { analyzeProject } from '../../core/analyzer.js';
+import { detectAvailableProviders } from '../../core/provider.js';
+import {
+  provisionMissing,
+  collectMissingTools,
+  planInstall,
+} from '../../core/provisioner.js';
 import { generateProjectIdentity } from '../../orchestra/sprint-reporter.js';
 import { ensureDeckentImport } from '../../core/utils.js';
 import { enrichResponse } from '../helpers/enrich.js';
@@ -67,9 +73,10 @@ export function registerInitTool(server: McpServer): void {
         language: z.enum(['en', 'tr']).optional().default('en').describe('Language for agent prompt templates (en=English, tr=Turkish)'),
         force: z.boolean().optional().default(false).describe('Force re-initialization: overwrites existing config.json and workspace files. Does not delete .brain/ or .tasks/ data.'),
         auto: z.boolean().optional().default(false).describe('Auto-detection mode: skip interactive wizard, detect project stack automatically and apply defaults.'),
+        installMissing: z.boolean().optional().default(false).describe('Install missing provider CLIs (claude/codex/gemini) automatically. MCP has no interactive consent, so this is an explicit opt-in (equivalent to CLI `--yes`). When false, missing tools are only reported.'),
       }),
     },
-    async ({ projectName, mode, language, force, auto }) => {
+    async ({ projectName, mode, language, force, auto, installMissing }) => {
       const root = process.cwd();
       // auto: hint that project stack should be auto-detected (already default behavior in MCP)
       void auto;
@@ -253,13 +260,39 @@ Lint: tsc --noEmit
         created.push('.claude/settings.json');
       }
 
+      // Consent-based provisioning of missing provider CLIs (MCP parity).
+      let provisioning: Array<{ tool: string; status: string; detail?: string }> | undefined;
+      try {
+        const providers = await detectAvailableProviders();
+        const missing = collectMissingTools(providers, []);
+        if (missing.length > 0) {
+          if (installMissing) {
+            const results = await provisionMissing({ missing, mode: 'yes' });
+            provisioning = results.map(r => ({
+              tool: r.tool,
+              status: r.status,
+              detail: r.status === 'failed' ? r.error : planInstall(r.tool).instruction,
+            }));
+          } else {
+            provisioning = missing.map(t => ({
+              tool: t,
+              status: 'missing',
+              detail: planInstall(t).instruction,
+            }));
+          }
+        }
+      } catch { /* provider detection failure is non-fatal */ }
+
       const nextSteps = [
         '`deckent plan` — plan your first sprint',
         '`deckent start` — start the sprint',
         '`deckent status` — monitor progress',
       ];
+      if (provisioning && !installMissing) {
+        nextSteps.unshift(`Install missing prerequisites: ${provisioning.map(p => p.tool).join(', ')} (or re-run with installMissing:true)`);
+      }
 
-      const enriched = enrichResponse('init', { success: true, created, mode, language, projectName: resolvedProjectName, force, auto, nextSteps }, { lang: language });
+      const enriched = enrichResponse('init', { success: true, created, mode, language, projectName: resolvedProjectName, force, auto, nextSteps, provisioning }, { lang: language });
 
       return {
         content: [{

@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { platform } from 'node:os';
 import { spawnSync } from 'node:child_process';
 import type { Command } from 'commander';
+import { planInstall } from '../../core/provisioner.js';
 import type { DoctorResult, SystemProfile } from '../../core/types.js';
 import type { DetectedProvider } from '../../core/provider.js';
 import type { HealthCheckResult } from '../../orchestra/connector.js';
@@ -408,12 +409,10 @@ export function getReadinessLabel(result: DoctorResult, brainLines: number, brai
  * Returns an install command suggestion string, or empty string if unknown.
  */
 export function getProviderInstallHint(name: string): string {
-  switch (name) {
-    case 'claude': return 'install: npm i -g @anthropic-ai/claude-code';
-    case 'codex': return 'install: npm i -g @openai/codex';
-    case 'gemini': return 'install: npm i -g @google/gemini-cli';
-    default: return '';
-  }
+  // Single source of truth: package mapping lives in provisioner.planInstall.
+  if (name !== 'claude' && name !== 'codex' && name !== 'gemini') return '';
+  const pkg = planInstall(name).args[2];
+  return `install: npm i -g ${pkg}`;
 }
 
 /**
