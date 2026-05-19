@@ -65,7 +65,7 @@ describe('registerWeb', () => {
     expect(mockCreateHttpServer).toHaveBeenCalledWith(
       '/tmp/test-project',
       3100,
-      expect.stringContaining('src/dashboard/dist'),
+      expect.stringContaining('dashboard'),
     );
     expect(vi.mocked(print)).toHaveBeenCalledWith(
       expect.stringContaining('Deckent Web Dashboard on http://localhost:3100'),
@@ -77,7 +77,7 @@ describe('registerWeb', () => {
     expect(mockCreateHttpServer).toHaveBeenCalledWith(
       '/tmp/test-project',
       4000,
-      expect.stringContaining('src/dashboard/dist'),
+      expect.stringContaining('dashboard'),
     );
     expect(vi.mocked(print)).toHaveBeenCalledWith(
       expect.stringContaining('http://localhost:4000'),
@@ -103,7 +103,8 @@ describe('registerWeb', () => {
   it('passes staticDir in production mode', async () => {
     await program.parseAsync(['node', 'test', 'web']);
     const callArgs = mockCreateHttpServer.mock.calls[0]!;
-    expect(callArgs[2]).toContain('src/dashboard/dist');
+    // Bundled dashboard dir (built: dist/dashboard; source/test: src/dashboard).
+    expect(callArgs[2]).toContain('dashboard');
   });
 
   it('registers SIGINT and SIGTERM handlers', async () => {

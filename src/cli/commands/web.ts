@@ -1,8 +1,9 @@
-import { join, extname } from 'node:path';
+import { extname } from 'node:path';
 import type { Command } from 'commander';
 import { createHttpServer } from '../../api/server.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { print } from '../helpers/output.js';
+import { getDashboardStaticDir, dashboardIsBuilt } from '../helpers/dashboard-dir.js';
 
 interface WebOpts {
   port?: string;
@@ -35,7 +36,11 @@ export function registerWeb(program: Command): void {
         print("Run 'cd src/dashboard && npm run dev' for Vite dev server on port 5173");
       }
 
-      const staticDir = opts.dev ? undefined : join(root, 'src', 'dashboard', 'dist');
+      const staticDir = opts.dev ? undefined : getDashboardStaticDir();
+      if (staticDir && !dashboardIsBuilt(staticDir)) {
+        print(`Warning: bundled dashboard not found at ${staticDir}`);
+        print("Run 'npm run build:dashboard' (repo) or reinstall deckent. API still works.");
+      }
       const api = createHttpServer(root, port, staticDir);
 
       print(`Deckent Web Dashboard on http://localhost:${port}`);

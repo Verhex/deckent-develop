@@ -1,9 +1,9 @@
 import type { Command } from 'commander';
 import { existsSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
 import { createHttpServer } from '../../api/server.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { print, printError } from '../helpers/output.js';
+import { getDashboardStaticDir } from '../helpers/dashboard-dir.js';
 
 /** Extended MIME types for static file serving (superset of server.ts defaults) */
 export const EXTENDED_MIME_TYPES: Record<string, string> = {
@@ -68,18 +68,18 @@ export function registerServe(program: Command): void {
         return;
       }
 
-      // Build check: warn if dashboard dist/ is missing or empty
-      if (!opts.dev) {
-        const staticDir = join(root, 'src', 'dashboard', 'dist');
+      // Build check: warn if the bundled dashboard is missing or empty
+      const staticDir = opts.dev ? undefined : getDashboardStaticDir();
+      if (!opts.dev && staticDir) {
         const distCheck = checkDistDirectory(staticDir);
         if (!distCheck.exists) {
-          print(`Warning: Static directory not found: ${staticDir}`);
+          print(`Warning: Bundled dashboard not found: ${staticDir}`);
           print('Run the dashboard build before serving: npm run build:dashboard');
           print('Or use --dev flag to proxy a Vite dev server.');
           print('API endpoints will still work without static files.');
           print('');
         } else if (!distCheck.hasContent) {
-          print(`Warning: Static directory is empty: ${staticDir}`);
+          print(`Warning: Bundled dashboard is empty: ${staticDir}`);
           print('Run the dashboard build: npm run build:dashboard');
           print('');
         }
@@ -93,7 +93,7 @@ export function registerServe(program: Command): void {
         print('');
       }
 
-      const api = createHttpServer(root, port);
+      const api = createHttpServer(root, port, staticDir);
 
       print(`Deckent API server listening on http://localhost:${port}`);
 

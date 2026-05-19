@@ -28,6 +28,7 @@ import {
   validateWebhookKey,
 } from '../connectors/incoming-router.js';
 import { loadDeckSecrets } from '../core/deck-file.js';
+import { buildChatReply } from './chat-handler.js';
 
 const MIME_TYPES: Record<string, string> = {
   '.html': 'text/html',
@@ -99,6 +100,7 @@ const PlanSchema = z.object({
   mode: z.enum(['ai', 'structured', 'auto']).optional(),
 });
 const SetDirectivesSchema = z.object({ content: z.string().min(1) });
+const ChatSchema = z.object({ message: z.string() });
 const ConfigSchema = z.record(z.string(), z.unknown());
 const WORKER_ID_RE = /^[a-zA-Z0-9-]+$/;
 
@@ -172,6 +174,22 @@ export function parseBody(req: IncomingMessage, maxSize = MAX_BODY_SIZE): Promis
 
 function readDashboardJson(dashPath: string): unknown | null {
   return readJsonSafe<unknown>(dashPath);
+}
+
+/** One-line current status for the /api/chat handler. */
+function chatStatusLine(projectRoot: string, dashPath: string): string {
+  const data = readDashboardJson(dashPath) as {
+    sprint?: { id?: string; phase?: string; status?: string };
+    progress?: { done?: number; active?: number; blocked?: number; total?: number };
+  } | null;
+  if (data?.sprint) {
+    const s = data.sprint;
+    const p = data.progress ?? {};
+    return `${s.id ?? 'sprint'} — ${s.phase ?? s.status ?? 'running'} — ` +
+      `${p.done ?? 0}/${p.total ?? 0} done, ${p.active ?? 0} active, ${p.blocked ?? 0} blocked`;
+  }
+  const last = getLatestSprintLog(projectRoot);
+  return last ? `idle — last sprint ${last.id}` : 'idle — no sprint yet';
 }
 
 function getLatestSprintLog(projectRoot: string): { id: string; metrics: Record<string, string>; tasks: string[] } | null {
@@ -546,6 +564,19 @@ async function handleRequest(
       } catch (err: unknown) {
         sendError(res, 500, err instanceof Error ? err.message : 'Plan failed');
       }
+      return;
+    }
+
+    if (url === '/api/chat') {
+      const parsed = ChatSchema.safeParse(body);
+      if (!parsed.success) {
+        sendError(res, 400, parsed.error.message);
+        return;
+      }
+      const reply = buildChatReply(parsed.data.message, {
+        status: () => chatStatusLine(projectRoot, dashPath),
+      });
+      sendJson(res, { reply });
       return;
     }
 
