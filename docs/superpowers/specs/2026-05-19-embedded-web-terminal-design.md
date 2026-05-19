@@ -158,6 +158,17 @@ defects, formally deferred to #2 (Alperen 2026-05-20):
    `task-175-021.json` from the pre-debt-closure iteration was hand-removed and
    committed). Fix: planner must reconcile by deleting stale `.tasks/*.json` not in
    the new plan's id set.
+3. **DEP0190 / ADR-006 violation — `shell:true` + args array (3 call-sites,
+   unconditionally on all platforms)** observed during Sprint 175 EXECUTE:
+   `src/core/plugin-hooks.ts:395`, `:577`, `src/orchestra/baseline-tracker.ts:85`
+   all call `spawnSync('npx', ['vitest','run',…], { shell:true })`. Node DEP0190
+   warns ("security vulnerabilities, arguments are not escaped, only concatenated"
+   — future Error). Also violates ADR-006 (spawnSync Security Pattern) which
+   `src/orchestra/authority-enforcer.ts:464-481` already flags as a lint issue but
+   is not runtime-enforced (ADR-037 V1.0 Layer-2 advisory). Fix: drop `shell:true`
+   or gate it on `process.platform === 'win32'` (npm/npx `.cmd` resolution on
+   Windows is the only legitimate need — see `src/providers/subprocess.ts:147` for
+   the existing conditional pattern).
 
 ## 2. Locked Decisions
 
