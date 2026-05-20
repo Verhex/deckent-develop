@@ -113,6 +113,13 @@ const CONFIG_FIELDS: ConfigFieldMeta[] = [
   { key: "projectName", label: "Project Name", description: "Project display name", type: "text", category: "Project", defaultValue: null },
   { key: "version", label: "Version", description: "Project version", type: "text", category: "Project", defaultValue: null },
 
+  // ─── Terminal ─────────────────────────────────────────────
+  { key: "terminal.enabled", label: "Terminal Enabled", description: "Enable embedded terminal in dashboard", type: "boolean", category: "Terminal", defaultValue: true },
+  { key: "terminal.allowShellKind", label: "Allow Shell", description: "Allow generic shell sessions (not just AI tools)", type: "boolean", category: "Terminal", defaultValue: true },
+  { key: "terminal.maxSessions", label: "Max Sessions", description: "Maximum number of concurrent terminal sessions", type: "number", category: "Terminal", defaultValue: 10 },
+  { key: "terminal.idleTimeoutMs", label: "Idle Timeout (ms)", description: "Idle session timeout in milliseconds (0 = no timeout)", type: "number", category: "Terminal", defaultValue: 1800000 },
+  { key: "terminal.scrollbackBytes", label: "Scrollback Buffer", description: "Terminal scrollback buffer size in bytes", type: "number", category: "Terminal", defaultValue: 262144 },
+
   // ─── Advanced ─────────────────────────────────────────────
   { key: "auto_clean_locks", label: "Auto Clean Locks", description: "Automatically clean stale lock files", type: "boolean", category: "Advanced", defaultValue: false },
 
@@ -133,7 +140,7 @@ const CONFIG_FIELDS: ConfigFieldMeta[] = [
 const CATEGORIES = [
   "Provider", "Sprint", "Model Strategy", "Adaptive", "Auto Docs",
   "Memory", "Auditor", "Output", "Environment", "Skill Routing",
-  "Rollback", "Project", "Advanced", PLANNED_CATEGORY,
+  "Rollback", "Project", "Terminal", "Advanced", PLANNED_CATEGORY,
 ] as const;
 
 const CATEGORY_KEY_MAP: Record<string, string> = {
@@ -149,6 +156,7 @@ const CATEGORY_KEY_MAP: Record<string, string> = {
   "Skill Routing": "config.category.routing",
   "Rollback": "config.category.rollback",
   "Project": "config.category.project",
+  "Terminal": "config.category.terminal",
   "Advanced": "config.category.advanced",
   [PLANNED_CATEGORY]: "config.category.planned",
 };

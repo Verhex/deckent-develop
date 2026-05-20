@@ -5,6 +5,8 @@ import { cn } from "../lib/utils";
 import { Sheet, SheetTrigger, SheetContent } from "./ui/sheet";
 import { ScrollArea } from "./ui/scroll-area";
 import { Badge } from "./ui/badge";
+import { DockPanel } from "./DockPanel";
+import { TerminalPanel } from "./terminal/TerminalPanel.js";
 import { useSSEWithStatus } from "../hooks/useSSE";
 import type { SSEStatus } from "../hooks/useSSE";
 import { useTranslation } from "../i18n/LanguageProvider";
@@ -148,10 +150,14 @@ export function Layout() {
           <span className="ml-3 text-sm font-bold text-zinc-100">deckent</span>
         </header>
 
-        <ScrollArea className="flex-1 p-6">
+        <ScrollArea className="flex-1 p-6 pb-8">
           <Outlet />
         </ScrollArea>
       </div>
+
+      <DockPanel>
+        <TerminalPanel />
+      </DockPanel>
     </div>
   );
 }
