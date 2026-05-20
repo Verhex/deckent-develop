@@ -49,6 +49,8 @@ interface ServeOpts {
   port?: string;
   dev?: boolean;
   devPort?: string;
+  host?: string;
+  terminal?: boolean;
 }
 
 export function registerServe(program: Command): void {
@@ -58,6 +60,8 @@ export function registerServe(program: Command): void {
     .option('--port <number>', 'Port to listen on', '3100')
     .option('--dev', 'Enable dev proxy mode — expects Vite dev server on --dev-port')
     .option('--dev-port <number>', 'Vite dev server port for --dev proxy mode', '5173')
+    .option('--host <addr>', 'Bind address for the server', '127.0.0.1')
+    .option('--no-terminal', 'Disable the embedded web terminal')
     .action((opts: ServeOpts) => {
       const root = resolveProjectRoot();
       const port = parseInt(opts.port ?? '3100', 10);
@@ -66,6 +70,13 @@ export function registerServe(program: Command): void {
         printError(new Error(`Invalid port: ${opts.port}`));
         process.exitCode = 1;
         return;
+      }
+
+      // Non-localhost host: disable terminal and warn (spec §5)
+      const host = opts.host ?? '127.0.0.1';
+      const isLocalhost = host === '127.0.0.1' || host === '::1' || host === 'localhost';
+      if (!isLocalhost && opts.terminal !== false) {
+        process.stderr.write('Warning: terminal disabled — non-localhost host requires explicit --no-terminal\n');
       }
 
       // Build check: warn if the bundled dashboard is missing or empty
