@@ -1,6 +1,7 @@
 import type { Command } from 'commander';
 import { existsSync, readdirSync } from 'node:fs';
 import { createHttpServer } from '../../api/server.js';
+import { LocalPtyBackend } from '../../api/terminal/session-backend.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { print, printError } from '../helpers/output.js';
 import { getDashboardStaticDir } from '../helpers/dashboard-dir.js';
@@ -75,9 +76,16 @@ export function registerServe(program: Command): void {
       // Non-localhost host: disable terminal and warn (spec §5)
       const host = opts.host ?? '127.0.0.1';
       const isLocalhost = host === '127.0.0.1' || host === '::1' || host === 'localhost';
+      const terminalEnabled = opts.terminal !== false && isLocalhost;
       if (!isLocalhost && opts.terminal !== false) {
         process.stderr.write('Warning: terminal disabled — non-localhost host requires explicit --no-terminal\n');
       }
+
+      // Instantiate the local PTY backend when the terminal is enabled. This
+      // wires the embedded web terminal subsystem in server.ts (token mint,
+      // bootstrap inject, ws gateway, HTTP control routes). Without it, the
+      // server boots in API-only mode and the terminal panel cannot connect.
+      const terminalBackend = terminalEnabled ? new LocalPtyBackend() : undefined;
 
       // Build check: warn if the bundled dashboard is missing or empty
       const staticDir = opts.dev ? undefined : getDashboardStaticDir();
@@ -104,9 +112,19 @@ export function registerServe(program: Command): void {
         print('');
       }
 
-      const api = createHttpServer(root, port, staticDir);
+      const api = createHttpServer(root, {
+        port,
+        staticDir,
+        host,
+        terminalBackend,
+      });
 
-      print(`Deckent API server listening on http://localhost:${port}`);
+      print(`Deckent API server listening on http://${host}:${port}`);
+      if (terminalEnabled && api.terminalToken) {
+        print(`Embedded terminal enabled (token auto-injected for localhost callers)`);
+      } else if (!terminalEnabled) {
+        print('Embedded terminal disabled');
+      }
 
       const cleanup = (): void => {
         api.close().then(() => {
