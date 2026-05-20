@@ -46,8 +46,9 @@ describe('shell injection prevention', () => {
     expect(cmdArg).toBeDefined();
     // The prompt text should NOT appear in the command
     expect(cmdArg).not.toContain('This is a normal prompt');
-    // Instead it should use stdin redirect from a file
-    expect(cmdArg).toContain('< /project/.tasks/.prompt-deadbeef12345678.txt');
+    // Instead it should use stdin redirect from a file. Sprint 170 P0-3
+    // made the prompt filename taskId-aware: .prompt-{taskId}-{randomId}.txt
+    expect(cmdArg).toContain('< /project/.tasks/.prompt-task-001-deadbeef12345678.txt');
   });
 
   it('$() subshell syntax in prompt does not appear in command args', () => {
@@ -113,7 +114,8 @@ describe('shell injection prevention', () => {
       (c) => String(c[0]).includes('.prompt-'),
     );
     expect(writeCall).toBeDefined();
-    expect(String(writeCall![0])).toContain('.prompt-deadbeef12345678.txt');
+    // Sprint 170 P0-3: prompt filename now includes taskId prefix.
+    expect(String(writeCall![0])).toContain('.prompt-task-007-deadbeef12345678.txt');
   });
 });
 

@@ -123,12 +123,15 @@ describe('serve command — registerServe', () => {
     registerServe(program);
     const cmd = program.commands.find(c => c.name() === 'serve')!;
     await cmd.parseAsync([], { from: 'user' });
-    // serve now wires the bundled dashboard staticDir (previously a bug: it
-    // built the wrong path and never passed it to createHttpServer).
+    // serve wires the bundled dashboard staticDir, host, and terminalBackend
+    // through an opts object (Sprint 175 W2.3 added the embedded terminal +
+    // host binding; createHttpServer signature became (root, opts)).
     expect(createHttpServer).toHaveBeenCalledWith(
       '/test/project',
-      3100,
-      expect.stringContaining('dashboard'),
+      expect.objectContaining({
+        port: 3100,
+        staticDir: expect.stringContaining('dashboard'),
+      }),
     );
   });
 
