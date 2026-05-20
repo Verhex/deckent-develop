@@ -198,6 +198,19 @@ defects, formally deferred to #2 (Alperen 2026-05-20):
    PROJECT-IDENTITY.md, and `src/orchestra/authority-enforcer.ts:118` lists the
    path in its allow-list. Fix: replace with `.brain/memory.db` (or the export
    path) + sweep the cascade.
+7. **CI-only test flakes — lokal-CI environment divergence** (surfaced 2026-05-20
+   when PR #16 main merge surfaced 3 fails that all pass locally on the same
+   Node 24.15.0): `tests/cli/archive-debt.test.ts:102` — `mockMkdirSync` is
+   not invoked in the CI sandbox (mock setup is not picked up); and
+   `tests/core/orphan-cleaner-ipc.test.ts` two cases — `process.kill(pid, 0)`
+   liveness probe semantics differ on the ephemeral CI runner vs a stable
+   desktop process tree. Lokalde 15,534/15,534 pass; CI 3 fail. Fix candidates:
+   (a) mock-pattern hygiene pass (importOriginal + explicit vi.mock factories
+   to remove order-of-import sensitivity); (b) replace `process.kill(pid, 0)`
+   with a Node-version-stable liveness check (e.g., parse `/proc/{pid}` on
+   linux, fallback on darwin/win32) + corresponding mock surface; (c) tag
+   these specific cases with vitest's `--retry` for CI environments only.
+   Not an OSS GA blocker — main is 4/5 workflows green post-modernization.
 
 ### Sub-project #2 — self-security procedure scope (captured 2026-05-20)
 
