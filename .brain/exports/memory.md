@@ -1,5 +1,23 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-175 Learnings
+- Sprint sprint-175 Learnings: ## Sprint sprint-175 Learnings
+- W1.2 — SessionBackend + LocalPtyBackend: NO_GO — W1.2 — SessionBackend interface + LocalPtyBackend implementation, plan §Task 1.2 ile birebir aynı. RED→GREEN TDD akışı:
+
+- W1.4 — PtySessionManager: NO_GO — W1.4 PtySessionManager — implemented per plan §1.4. TDD: wrote 4 tests first (bounded ring, detach≠kill, maxSessions, id
+- W2.2 — HTTP control + localhost bootstrap inject: NO_GO — Worker exited without writing result (exitCode=0)
+- W3.3 — TerminalView (xterm): NO_GO — W3.3 TerminalView (xterm) — TDD complete. RED phase confirmed: 'Failed to resolve import TerminalView' before implementa
+- W3.4 — TerminalTabs + TerminalPanel: NO_GO — W3.4 multi-tab TerminalPanel + quick-launch (claude/gemini/codex/deckent/shell) implemented per plan §3.4 verbatim. TDD 
+- W3.5 — DockPanel + Layout: NO_GO — W3.5 DockPanel + Layout integration complete (TDD).
+
+## Deliverables
+1. src/dashboard/src/components/DockPanel.tsx (NEW,
+- W3.6 — ConfigPage Terminal kategori + i18n: NO_GO — Added 5 Terminal config fields (terminal.enabled, terminal.allowShellKind, terminal.maxSessions, terminal.idleTimeoutMs,
+- W4.1 — E2E reattach integration: NO_GO — W4.1 — E2E reattach integration test implemented per Plan §Task 4.1 and DIRECTIVES Task 18.
+
+Flow (1 it(), real `node-pt
+- W4.3 — Final verification: GO_WITH_TECH_DEBT — Worker had heartbeat but failed to write result within grace period — kill blocked by panic guard (user approval require
+
 ## Sprint sprint-174 Learnings
 - Sprint sprint-174 Learnings: ## Sprint sprint-174 Learnings
 - Fix debt: Tech debt from 170-001-fix: Code physically verified despite missing .result (Sp: NO_GO — Worker exited without writing result (exitCode=0)

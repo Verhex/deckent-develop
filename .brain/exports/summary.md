@@ -58,6 +58,8 @@
 | adr-061 | AEGIS — Agentic Effect-Governed Iterative Stewardship Methodology | proposed |
 
 ## Recent Learnings
+- **Sprint sprint-175 Learnings** (sprint-175): ## Sprint sprint-175 Learnings
+- W1.2 — SessionBackend + LocalPtyBackend: NO_GO — W1.2 — SessionBackend interface + L...
 - **Sprint sprint-174 Learnings** (sprint-174): ## Sprint sprint-174 Learnings
 - Fix debt: Tech debt from 170-001-fix: Code physically verified despite missing .resu...
 - **Sprint sprint-173 Learnings** (sprint-173): ## Sprint sprint-173 Learnings
@@ -78,10 +80,12 @@ Sprint 167 Read-Only Self-Audit deliverable'ları (kaynak: .audit/sprint-167/T*.
 
 ## 4 Architectural Root Cause Fix
 1. **Bug M (adrInsert hook):** docs/adr/*.md → memor...
-- **Sprint sprint-165 Learnings** (sprint-165): ## Sprint sprint-165 Learnings
 
 ## Active Technical Debt
-- [HIGH] ADR-019 reconciliation: language-agnostic verify not implemented
+- [NORMAL] Tech debt from 175-020-fix: All 5 automatic verification gates executed:
+
+1. npm
+- [CRITICAL] ADR-019 reconciliation: language-agnostic verify not implemented
 
 ## Active Patterns
 - Violation pattern: stale_heartbeat
@@ -92,5 +96,6 @@ Sprint 167 Read-Only Self-Audit deliverable'ları (kaynak: .audit/sprint-167/T*.
 - Violation pattern: stale_heartbeat
 - Violation pattern: stale_heartbeat
 - Violation pattern: stale_heartbeat
+- Violation pattern: stale_heartbeat
 
-_Total entries: 252 | Generated: 2026-05-19_
+_Total entries: 257 | Generated: 2026-05-19_

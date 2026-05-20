@@ -1,6 +1,28 @@
 # Changelog
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
+## [1.0.0-beta.1-sprint175] - 2026-05-19
+
+### Added
+
+- W0.1 — Runtime deps (node-pty + ws)
+- W0.2 — ADR-010 amendment ext + ADR-062
+- W0.3 — TerminalConfig → DeckentConfig
+- W0.4 — Shared terminal types
+- W1.1 — AuthProvider (bypass-independent)
+- W1.3 — TerminalAudit (tenant-scoped DB)
+- W2.1 — WS gateway (auth-before-bridge + reattach)
+- W2.3 — serve CLI surface
+- W3.1 — xterm deps + terminal-api
+- W3.2 — useTerminalSocket
+
+### Changed
+
+- W4.3 — Final verification (completed with tech debt)
+
+
+_Tasks: 37 total, 21 done, 2 tech debt, 16 no-go_
+
 ## [1.0.0-beta.1-sprint174] - 2026-05-18
 
 ### Added

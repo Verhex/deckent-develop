@@ -38,19 +38,22 @@ paths: ["src/**","tests/**"]
 
 ## Active ADR Constraints
 
+- **ADR-062**: Embedded Web Terminal — PTY Sessions, WS Gateway, Auth & Audit — **Status:** accepted
 - **ADR-010**: Tek Runtime Dependency — commander.js — **Status:** accepted
+- **ADR-037**: Brain-Auditor-Worker Authority Matrix — RBAC Protocol V1.0 — **Status:** accepted
+- **ADR-048**: Prompt Lifecycle Contract — **Status:** accepted
+- **ADR-047**: Manuel Subagent Dispatch Protocol — **Status:** accepted
 - **ADR-046**: Brain Self-Update Hook Architecture — **Status:** accepted
-- **ADR-048**: Prompt Lifecycle Contract — Sprint 168 C0e BUG-HH eradication. .tasks/.prompt-*.txt selective cleanup via getActiveWorkerIds() shared helper. Cross-
-- **ADR-047**: Manuel Subagent Dispatch Protocol — Sprint 164-168 manuel survival pattern formal kontrat. Hardened dispatch: git worktree isolation + file authority matrix
 - **ADR-045**: Wave-Based Execution Semantics — respawnEligibleTasks Runtime Wire — **Status:** accepted
 - **ADR-043**: Brain Crash Recovery Protocol — **Status:** accepted
 - **ADR-044**: Sprint State Observability Contract — **Status:** accepted
+- **ADR-053**: TaskType Taxonomy — Audit / Document-Write / Code-Development + Extensibility Roadmap — **Status:** accepted
 - **ADR-041**: Agent Taxonomy — Horizontal Skills vs Vertical Agents — **Status:** accepted
+- **ADR-042**: Hybrid Mode Architecture — Sprint + Task Dual Modes — **Status:** accepted
 - **ADR-040**: Nervous System Architecture — Proactive Meta-Orchestrator — **Status:** accepted
 - **ADR-038**: Dead Code Disposition — Sprint 139 Audit Results — **Status:** accepted
 - **ADR-039**: Self-Modifying Task Detection — Deckent Dogfood vs User Project Discrimination — **Status:** accepted
 - **ADR-035**: Brain ↔ Worker ↔ Auditor Verification Protocol Standard (Sprint 138) — **Status:** accepted
-- **ADR-037**: Brain-Auditor-Worker Authority Matrix — RBAC Protocol V1.0 — **Status:** accepted
 - **ADR-033**: Product Vision — Product Not Service — **Status:** accepted
 - **ADR-034**: Multi-Project Isolation — Per-Project Security Boundaries — **Status:** accepted
 - **ADR-029**: Managed-Docs Universalization — Sprint Lifecycle Template-Based Document Generation — **Status:** accepted
@@ -58,6 +61,7 @@ paths: ["src/**","tests/**"]
 - **ADR-031**: Content Hash Cache — Sprint Dokümanları Hash-Based Invalidation — **Status:** accepted
 - **ADR-032**: i18n Pattern System — TR/EN İçerik Çeşitliliği Desteği — **Status:** accepted
 - **ADR-036**: ADR Governance Integration — Mandatory Architecture Decision Enforcement — **Status:** accepted
+- **ADR-028**: Decision-Engine V1 → V2 Routing Migration — **Status:** accepted
 - **ADR-027**: Hybrid Spawn Backend (Sprint 123, Revisited Sprint 139) — **Status:** accepted
 - **ADR-025**: Graceful Shutdown Stratejisi — SIGINT → interruptActiveSprint (Sprint 076) — **Status:** accepted
 - **ADR-026**: God Object Split Stratejisi — Faz 1-3 Tamamlandı (Sprint 076) — **Status:** accepted
@@ -72,7 +76,6 @@ paths: ["src/**","tests/**"]
 - **ADR-016**: Connector Module — provider lifecycle (Sprint 044) — **Status:** accepted
 - **ADR-020**: Rich Sprint Output — 7-section summary (Sprint 044) — **Status:** accepted
 - **ADR-021**: Kraken ASCII Brand Identity (Sprint 044) — **Status:** accepted
-- **ADR-028**: Decision-Engine V1 → V2 Routing Migration — **Status:** accepted
 - **ADR-013**: DECKENT.md Adapter Pattern (Sprint 15) — **Status:** accepted
 - **ADR-001**: TypeScript + ESM — **Status:** accepted
 - **ADR-002**: Node16 Module Resolution — **Status:** accepted
