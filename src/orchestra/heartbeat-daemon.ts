@@ -9,6 +9,7 @@ import { existsSync, readFileSync, writeFileSync, appendFileSync, mkdirSync, unl
 import { join } from 'node:path';
 import { execSync } from 'node:child_process';
 import { DECKENT_DIR, BRAIN_DIR } from '../core/constants.js';
+import { isPidAlive } from '../core/pid-liveness.js';
 import { debugLog } from '../core/utils.js';
 import { ValidationError } from '../core/validators.js';
 
@@ -274,15 +275,14 @@ export function readDaemonPid(projectRoot: string): number | null {
   try {
     const pid = parseInt(readFileSync(pidPath, 'utf-8').trim(), 10);
     if (isNaN(pid)) return null;
-    // Check if process is alive
-    process.kill(pid, 0);
-    return pid;
-  } catch (e) {
-    debugLog('readDaemonPid:kill0', e);
-    // Process not running or permission denied — remove stale PID
+    if (isPidAlive(pid)) return pid;
+    // Stale PID — remove file
     try {
       unlinkSync(pidPath);
     } catch (e2) { debugLog('readDaemonPid:unlinkSync', e2); }
+    return null;
+  } catch (e) {
+    debugLog('readDaemonPid:read', e);
     return null;
   }
 }

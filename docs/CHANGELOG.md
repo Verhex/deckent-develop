@@ -1,6 +1,23 @@
 # Changelog
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
+## [1.0.0-beta.1-sprint178] - 2026-05-20
+
+### Added
+
+- 178-001 — Node 24/26 test assertion sweep
+- 178-002 — Doc updates (Node 24/26 yayılma)
+- 178-003 — Tmux backend code removal
+- 178-005 — TOPP B+C continuous-dispatch ★ MUST
+
+### Fixed
+
+- Fix debt: ADR-019 reconciliation: language-agnostic verify not implemented
+- 178-004 — CI flake fix (PID portability + mock hygiene)
+
+
+_Tasks: 11 total, 9 done, 0 tech debt, 2 no-go_
+
 ## [1.0.0-beta.1-sprint177] - 2026-05-20
 
 ### Added

@@ -104,6 +104,136 @@ export function buildResultsMap(results: TaskResult[]): Map<string, TaskResult> 
   return map;
 }
 
+// ═══ TOPP B — Continuous Dispatch Planner (Sprint 178 / ADR-064) ══
+// Unifies legacy FIFO queue drain and dep-pipeline re-evaluation under a
+// single pure function. The waitForResults main loop invokes dispatchTick
+// (the async wrapper) which delegates to planDispatch (pure) to decide
+// which tasks to spawn/kill on a given tick. See ADR-064 for the
+// rationale that supersedes ADR-045 §3 wave-barrier semantics.
+
+/**
+ * Input state for one dispatch tick.
+ *
+ * `remainingQueue` is a FIFO list of tasks that exceeded the initial fill
+ *   from spawnWorkers — when DECKENT_LEGACY_FIFO=1 it drains one entry per
+ *   completed task ID; in continuous mode it falls through to PENDING
+ *   re-evaluation. The array is mutated in place (shift).
+ */
+export interface DispatchState {
+  sprint: Sprint;
+  config?: Pick<ResolvedConfig, 'dependency_pipeline_enabled'>;
+  maxWorkers: number;
+  /** Tasks already spawned in this waitForResults call (Bug F idempotency). */
+  assignedTaskIds: ReadonlySet<string>;
+  /** Tasks whose .result was already collected. */
+  collectedIds: ReadonlySet<string>;
+  /** FIFO queue of tasks that exceeded the initial spawn fill. Mutated. */
+  remainingQueue: Task[];
+  /** Newly collected task IDs in this tick (drives legacy-fifo drain). */
+  completedTaskIds: readonly string[];
+}
+
+export interface DispatchPlan {
+  toSpawn: Task[];
+  /** Worker IDs to kill (legacy-fifo only). */
+  toKill: string[];
+  mode: 'continuous' | 'legacy-fifo';
+}
+
+/**
+ * Pure dispatch planner — flag-agnostic core of TOPP B.
+ *
+ * Behavior:
+ *   - DECKENT_LEGACY_FIFO=1 → legacy-fifo: drains one queue entry per
+ *     completed task ID, kills the corresponding worker slot. This is the
+ *     pre-Sprint-178 contract preserved as an escape hatch.
+ *   - otherwise → continuous (default): every tick re-evaluates eligible
+ *     PENDING tasks. Drains the queue first (respecting dep_pipeline
+ *     dependencies when the flag is on), then fills remaining slots from
+ *     PENDING tasks via the standard dep-aware filter.
+ *
+ * Mutates `state.remainingQueue` (shift). All other inputs are read-only.
+ */
+export function planDispatch(
+  state: DispatchState,
+  env: NodeJS.ProcessEnv = process.env,
+): DispatchPlan {
+  const legacy = env.DECKENT_LEGACY_FIFO === '1';
+  return legacy ? planLegacyFifo(state) : planContinuous(state);
+}
+
+function planLegacyFifo(state: DispatchState): DispatchPlan {
+  const toSpawn: Task[] = [];
+  const toKill: string[] = [];
+  for (const completedId of state.completedTaskIds) {
+    const next = popEligibleFromQueue(state.remainingQueue, state.assignedTaskIds);
+    if (!next) break; // queue exhausted — preserve "no kill when no work"
+    toSpawn.push(next);
+    toKill.push(completedId);
+  }
+  return { toSpawn, toKill, mode: 'legacy-fifo' };
+}
+
+function planContinuous(state: DispatchState): DispatchPlan {
+  const currentlyExecuting = state.sprint.tasks.filter(t =>
+    t.status === TaskStatus.EXECUTING
+    || t.status === TaskStatus.CLAIMED
+    || t.status === TaskStatus.TESTING,
+  ).length;
+  const slotsAvailable = Math.max(0, state.maxWorkers - currentlyExecuting);
+  const toSpawn: Task[] = [];
+
+  if (slotsAvailable === 0) {
+    return { toSpawn, toKill: [], mode: 'continuous' };
+  }
+
+  const depPipelineEnabled = state.config?.dependency_pipeline_enabled === true;
+  const doneIds = new Set(
+    state.sprint.tasks.filter(t => t.status === TaskStatus.DONE).map(t => t.id),
+  );
+
+  // Step 1 — drain the FIFO queue first (respecting deps if pipeline is on).
+  while (toSpawn.length < slotsAvailable && state.remainingQueue.length > 0) {
+    const next = popEligibleFromQueue(state.remainingQueue, state.assignedTaskIds);
+    if (!next) break;
+    if (depPipelineEnabled && next.dependencies && next.dependencies.length > 0) {
+      const allDone = next.dependencies.every(dep => doneIds.has(dep));
+      if (!allDone) continue; // deps not yet satisfied — drop, will re-emerge via PENDING scan
+    }
+    toSpawn.push(next);
+  }
+
+  // Step 2 — fill remaining slots from PENDING tasks (dep-aware).
+  const alreadyChosen = new Set(toSpawn.map(t => t.id));
+  for (const task of state.sprint.tasks) {
+    if (toSpawn.length >= slotsAvailable) break;
+    if (task.status !== TaskStatus.PENDING) continue;
+    if (state.assignedTaskIds.has(task.id)) continue;
+    if (state.collectedIds.has(task.id)) continue;
+    if (alreadyChosen.has(task.id)) continue;
+    if (depPipelineEnabled && task.dependencies && task.dependencies.length > 0) {
+      const allDone = task.dependencies.every(dep => doneIds.has(dep));
+      if (!allDone) continue;
+    }
+    toSpawn.push(task);
+  }
+
+  return { toSpawn, toKill: [], mode: 'continuous' };
+}
+
+function popEligibleFromQueue(
+  queue: Task[],
+  assigned: ReadonlySet<string>,
+): Task | undefined {
+  while (queue.length > 0) {
+    const candidate = queue.shift();
+    if (!candidate) return undefined;
+    if (assigned.has(candidate.id)) continue;
+    return candidate;
+  }
+  return undefined;
+}
+
 // ═══ Status Mutation (ADR-045 Decision 1) ═════════════════════════
 
 /**
@@ -376,7 +506,13 @@ export async function waitForResults(
   // After result collection + queue processing, re-evaluate eligible
   // tasks when dependency_pipeline_enabled is true. When config is
   // missing or flag is false, this is a no-op (legacy FIFO preserved).
+  //
+  // Sprint 178 / ADR-064 — TOPP B: maybeRespawn now also short-circuits
+  // when DECKENT_LEGACY_FIFO=1 is set. This is the documented rollback
+  // escape hatch — operators can re-pin the old wave-barrier semantics
+  // by setting the env var without changing any source code.
   const maybeRespawn = async (): Promise<void> => {
+    if (process.env.DECKENT_LEGACY_FIFO === '1') return;
     if (!config?.dependency_pipeline_enabled) return;
     try {
       const respawnEligibleTasks = await loadRespawn();
@@ -384,6 +520,21 @@ export async function waitForResults(
     } catch (e) {
       debugLog('waitForResults:respawn', e);
     }
+  };
+
+  // ─── TOPP B continuous-dispatch tick (Sprint 178 / ADR-064) ────
+  // Unified spawn entry that replaces the explicit dual-call sequence
+  // (processQueue + maybeRespawn) in the main loop. Behavior:
+  //   - DECKENT_LEGACY_FIFO=1 → legacy: only processQueue runs (the
+  //     pre-Sprint-178 wave-barrier semantics).
+  //   - default (continuous) → both run: queue is drained AND PENDING
+  //     tasks are re-evaluated for the freed slot.
+  // Kept as an internal closure so the existing main loop sequence is
+  // preserved verbatim — callers that still invoke processQueue +
+  // maybeRespawn directly (e.g. forceRescanIfIdle) are unaffected.
+  const dispatchTick = async (newlyCollected: string[]): Promise<void> => {
+    await processQueue(newlyCollected);
+    await maybeRespawn();
   };
 
   const queueBackend = spawnOpts?.spawnBackend;
@@ -495,10 +646,12 @@ export async function waitForResults(
   };
 
   const initiallyCollected = await collectResults();
-  await processQueue(initiallyCollected);
-  // ADR-045 Decision 2: initial pass — Wave 2 may be eligible immediately
-  // if Wave 1 results were already on disk when waitForResults entered.
-  await maybeRespawn();
+  // ADR-064 (TOPP B): unified dispatch tick — replaces the dual
+  // `await processQueue(...); await maybeRespawn();` sequence so the
+  // wave-barrier between Wave N completion and Wave N+1 spawn collapses
+  // to a single function call. Initial pass — Wave 2 may be eligible
+  // immediately if Wave 1 results were already on disk when entered.
+  await dispatchTick(initiallyCollected);
   if (collected.size === taskIds.size) return results;
 
   // IPC dual-mode: register HEARTBEAT listeners for any channels in registry
@@ -557,10 +710,11 @@ export async function waitForResults(
       // Race: fs.watch / fallback-poll vs IPC heartbeat wakeup
       await Promise.race([watcher.waitForChange(), ipcWakeupPromise]);
       const newlyCollected = await collectResults();
-      await processQueue(newlyCollected);
-      // ADR-045 Decision 2: main loop — re-evaluate eligible Wave N+1 tasks
-      // each tick when dependency_pipeline_enabled is true.
-      await maybeRespawn();
+      // ADR-064 (TOPP B): unified dispatch tick — main loop spawn entry.
+      // Continuous dispatch — re-evaluate eligible Wave N+1 tasks each
+      // tick when dependency_pipeline_enabled is true; honor
+      // DECKENT_LEGACY_FIFO=1 rollback escape inside dispatchTick itself.
+      await dispatchTick(newlyCollected);
       // Sprint 165 Bug Y — force re-scan idle slots for hayalet PENDING tasks
       // (legacy FIFO mode and dependency pipeline mode both benefit).
       await forceRescanIfIdle();

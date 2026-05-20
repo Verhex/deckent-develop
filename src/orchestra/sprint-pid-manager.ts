@@ -10,6 +10,7 @@ import {
 import { join, dirname } from 'node:path';
 import { DECKENT_DIR, BRAIN_DIR } from '../core/constants.js';
 import { ErrorRegistry } from '../core/errors.js';
+import { isPidAlive } from '../core/pid-liveness.js';
 
 // ─── Types ────────────────────────────────────────────────────────
 
@@ -153,19 +154,11 @@ export function readStateSnapshot(
  * Check if a process is alive using kill(pid, 0).
  * Returns true if the process exists (even if we don't own it).
  * POSIX: ESRCH = dead, EPERM = alive but not ours.
+ *
+ * Delegates to the portable {@link isPidAlive} helper (Sprint 178 Task 4).
  */
 export function isProcessAlive(pid: number): boolean {
-  try {
-    process.kill(pid, 0);
-    return true; // No error = process exists and we own it
-  } catch (err: unknown) {
-    const code = (err as NodeJS.ErrnoException).code;
-    if (code === 'EPERM') {
-      return true; // Process exists but we don't have permission (still alive)
-    }
-    // ESRCH or any other error = process does not exist
-    return false;
-  }
+  return isPidAlive(pid);
 }
 
 /**

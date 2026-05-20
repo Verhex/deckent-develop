@@ -27,7 +27,7 @@ Deckent artık 3 farklı AI provider'ı destekliyor: Claude (Anthropic), Codex (
 
 **Teknoloji:**
 - Dil: TypeScript (ESM)
-- Runtime: Node.js >=18
+- Runtime: Node.js >=24
 - Test: Vitest (8.555+ test, 265 test dosyası)
 - Build: tsc
 - Bagimsizlik: Claude CLI / OpenAI CLI / Google Gemini CLI, git (tmux opsiyonel — subprocess backend ile calismadan kaldirilabilir)

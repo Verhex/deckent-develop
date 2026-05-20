@@ -8,6 +8,7 @@
 import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { detectEnvironment } from './environment.js';
+import { isPidAlive } from './pid-liveness.js';
 import { debugLog } from './utils.js';
 
 /** Sprint lock information returned by isSprintLocked */
@@ -44,21 +45,8 @@ function lockPath(projectRoot: string): string {
   return join(projectRoot, DECKENT_DIR, LOCK_FILENAME);
 }
 
-/**
- * Check whether a process with the given PID is still running.
- * Uses process.kill(pid, 0) which sends no signal but throws if
- * the process does not exist.
- * @param pid - Process ID to check
- * @returns true if the process is alive
- */
-function isPidAlive(pid: number): boolean {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch {
-    return false;
-  }
-}
+// Local isPidAlive removed (Sprint 178 Task 4) — delegate to
+// src/core/pid-liveness.ts for portability + EPERM handling.
 
 /**
  * Acquire a sprint lock for the current process.

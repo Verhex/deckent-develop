@@ -17,6 +17,7 @@ import { join } from 'node:path';
 
 import { TASKS_DIR } from './constants.js';
 import { clearStaleLocks } from './file-lock.js';
+import { isPidAlive } from './pid-liveness.js';
 import { debugLog } from './utils.js';
 
 // ─── Constants ──────────────────────────────────────────────────────
@@ -212,20 +213,12 @@ export function preflightOrphanCleanup(
           const raw = readFileSync(join(pidsDir, pidFile), 'utf-8');
           const data = JSON.parse(raw) as { pid?: number };
           if (typeof data.pid === 'number') {
-            try {
-              process.kill(data.pid, 0);
+            if (isPidAlive(data.pid)) {
               // Process alive — another sprint is running, skip cleanup
               report.skipReason = `Live sprint detected: ${pidSprintId} (PID ${data.pid})`;
               return report;
-            } catch (err: unknown) {
-              const code = (err as NodeJS.ErrnoException).code;
-              if (code === 'EPERM') {
-                // Process alive but we don't own it — still skip
-                report.skipReason = `Live sprint detected: ${pidSprintId} (PID ${data.pid}, EPERM)`;
-                return report;
-              }
-              // ESRCH = dead — continue, this PID is stale
             }
+            // Dead PID — continue, this PID is stale
           }
         } catch {
           // Unparseable PID file — ignore
@@ -434,18 +427,5 @@ export function cleanOrphanIpcDirs(
   return cleaned;
 }
 
-/**
- * Check if a process is alive by sending signal 0.
- * Returns true if the process exists, false if ESRCH (no such process).
- * EPERM means the process exists but we don't own it — still "alive".
- */
-function isPidAlive(pid: number): boolean {
-  try {
-    process.kill(pid, 0);
-    return true; // SIGKILL(0) succeeded — process alive
-  } catch (err: unknown) {
-    const code = (err as NodeJS.ErrnoException).code;
-    if (code === 'EPERM') return true; // Process alive, we don't own it
-    return false; // ESRCH — process dead
-  }
-}
+// Legacy local isPidAlive removed (Sprint 178 Task 4) — see
+// src/core/pid-liveness.ts for the shared, portable implementation.

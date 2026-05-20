@@ -2,14 +2,25 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Command } from 'commander';
 import { DEBT_TABLE_HEADER } from '../../src/core/constants.js';
 
-vi.mock('node:fs', () => ({
-  readFileSync: vi.fn(),
-  writeFileSync: vi.fn(),
-  existsSync: vi.fn(),
-  mkdirSync: vi.fn(),
-  appendFileSync: vi.fn(),
-  statSync: vi.fn(),
-}));
+// Sprint 178 Task 4 mock-hygiene fix:
+// Use `importOriginal` factory so unmocked fs APIs (e.g. realpathSync.native,
+// promises.*, constants) still resolve to the real module. The previous
+// inline factory shadowed the entire 'node:fs' export surface, which caused
+// adjacent test modules under CI=true parallel workers to observe a
+// half-populated 'node:fs' depending on import order — flaking the suite
+// asymmetrically across local vs. CI runs.
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>();
+  return {
+    ...actual,
+    readFileSync: vi.fn(),
+    writeFileSync: vi.fn(),
+    existsSync: vi.fn(),
+    mkdirSync: vi.fn(),
+    appendFileSync: vi.fn(),
+    statSync: vi.fn(),
+  };
+});
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync, statSync } from 'node:fs';
 import { registerArchiveDebt } from '../../src/cli/commands/archive-debt.js';

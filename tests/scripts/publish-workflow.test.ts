@@ -26,8 +26,8 @@ describe('.github/workflows/publish.yml', () => {
     expect(workflowContent).toContain('id-token: write');
   });
 
-  it('should use Node.js 22.x', () => {
-    expect(workflowContent).toContain("node-version: '22.x'");
+  it('should use Node.js 24.x', () => {
+    expect(workflowContent).toContain("node-version: '24.x'");
   });
 
   it('should have npm ci step', () => {

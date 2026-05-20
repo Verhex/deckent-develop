@@ -91,7 +91,7 @@ describe('package.json release preparation', () => {
     const engines = pkg.engines as Record<string, string>;
     expect(engines).toBeDefined();
     expect(engines.node).toBeDefined();
-    expect(engines.node).toContain('>=18');
+    expect(engines.node).toContain('>=24');
   });
 
   it('type field is module (ESM)', () => {

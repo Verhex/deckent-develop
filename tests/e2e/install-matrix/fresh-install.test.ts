@@ -1,8 +1,8 @@
 /**
- * E2E Test: Fresh Install Matrix — Node 18/20/22 × Clean Env
+ * E2E Test: Fresh Install Matrix — Node 24/26 × Clean Env
  *
  * Validates that deckent installs, builds, and runs correctly across
- * Node.js 18, 20, and 22. Uses programmatic imports to simulate
+ * Node.js 24 and 26. Uses programmatic imports to simulate
  * the fresh install experience without requiring Docker in CI.
  *
  * For actual Docker-based multi-version testing, use:
@@ -43,7 +43,7 @@ vi.mock('node:child_process', async (importOriginal) => {
   return {
     ...actual,
     spawnSync: vi.fn().mockReturnValue({
-      status: 0, stdout: 'v22.0.0', stderr: '', pid: 1, signal: null, output: [],
+      status: 0, stdout: 'v24.0.0', stderr: '', pid: 1, signal: null, output: [],
     }),
     execSync: vi.fn().mockReturnValue(''),
   };
@@ -88,7 +88,7 @@ function simulateInit(root: string): void {
 
 // ─── Node Version Matrix ─────────────────────────────────────────────
 
-const NODE_VERSIONS = [18, 20, 22] as const;
+const NODE_VERSIONS = [24, 26] as const;
 
 function getNodeMajorVersion(): number {
   return parseInt(process.version.slice(1).split('.')[0], 10);
@@ -96,7 +96,7 @@ function getNodeMajorVersion(): number {
 
 // ─── Tests ───────────────────────────────────────────────────────────
 
-describe('Fresh Install Matrix — Node 18/20/22', () => {
+describe('Fresh Install Matrix — Node 24/26', () => {
   let projectDir: string;
 
   beforeEach(() => {
@@ -177,13 +177,13 @@ describe('Fresh Install Matrix — Node 18/20/22', () => {
       expect(pkg.name).toBe('deckent');
       expect(pkg.type).toBe('module');
 
-      // Verify engines field supports Node 18+
+      // Verify engines field requires Node 24+
       const engines = pkg.engines;
       if (engines?.node) {
-        // Parse ">=18.0.0" → extract first number sequence
+        // Parse ">=24.0.0" → extract first number sequence
         const match = engines.node.match(/(\d+)/);
         const minVersion = match ? parseInt(match[1], 10) : 0;
-        expect(minVersion).toBeLessThanOrEqual(18);
+        expect(minVersion).toBeGreaterThanOrEqual(24);
       }
 
       // Verify no known problematic peer dependencies

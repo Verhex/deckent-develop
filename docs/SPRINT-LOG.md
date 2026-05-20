@@ -4829,3 +4829,33 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 177-006: 177-005 — nervous_system directives_protection baseline-update hook (DONE)
 
 ---
+## Sprint 178 — sprint-178
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-05-20
+**Duration:** 2112s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 11 |
+| Completed | 9 |
+| Tech Debt | 0 |
+| No-Go | 2 |
+| Coverage | 0.0% |
+| Duration | 2111689ms |
+
+### Tasks
+
+- 178-001: Fix debt: Tech debt from 175-020-fix: All 5 automatic verification gates executed:
+
+1. npm (NO_GO)
+- 178-002: Fix debt: ADR-019 reconciliation: language-agnostic verify not implemented (DONE)
+- 178-003: 178-001 — Node 24/26 test assertion sweep (DONE)
+- 178-004: 178-002 — Doc updates (Node 24/26 yayılma) (DONE)
+- 178-005: 178-003 — Tmux backend code removal (DONE)
+- 178-006: 178-004 — CI flake fix (PID portability + mock hygiene) (DONE)
+- 178-007: 178-005 — TOPP B+C continuous-dispatch ★ MUST (DONE)
+
+---

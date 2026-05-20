@@ -32,6 +32,7 @@ import {
 } from '../core/constants.js';
 
 import { readJsonSafe, parseDebtTable, debugLog } from '../core/utils.js';
+import { isPidAlive as isPidAliveShared } from '../core/pid-liveness.js';
 import type { ProviderAdapter } from '../core/provider.js';
 import type { SpawnBackend } from './spawn-backend.js';
 
@@ -620,23 +621,17 @@ function evaluateLockPath(projectRoot: string, sprintId: string): string {
 
 /**
  * Returns true if a process with `pid` is alive.
- * `process.kill(pid, 0)` signals nothing but throws ESRCH if the
- * process is gone. Fail-safe: any unexpected error → treat as alive
- * (conservative — better to no-op than double-evaluate).
+ *
+ * Delegates to the shared {@link isPidAliveShared} helper (Sprint 178 Task 4).
+ * On Linux the shared helper uses /proc lookup (deterministic, no errno
+ * ambiguity); on other platforms it falls back to `process.kill(pid, 0)`
+ * with EPERM→alive. The fail-safe "unknown errno → alive" branch from the
+ * previous local copy is no longer needed: /proc/<pid> existence is a
+ * sufficient liveness oracle on Linux, and the kill(0) path here only
+ * fires on darwin/win32, where unexpected errno codes are vanishingly rare.
  */
 function isPidAlive(pid: number): boolean {
-  if (!Number.isInteger(pid) || pid <= 0) return false;
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (e) {
-    const err = e as NodeJS.ErrnoException;
-    if (err.code === 'ESRCH') return false;
-    // EPERM means the process exists but we lack permission to signal.
-    if (err.code === 'EPERM') return true;
-    debugLog('isPidAlive', e);
-    return true;
-  }
+  return isPidAliveShared(pid);
 }
 
 /**

@@ -6,15 +6,33 @@
 // M7.B v2: cleanOrphanIpcDirs — pre-flight scan with live-PID check
 // M7.C: sprint-runner-entry self-cleanup — cleans IPC dir on successful exit
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdirSync, rmSync, existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
+
+// Sprint 178 Task 4 mock-surface fix: route liveness through the shared
+// helper so the suite no longer depends on `process.kill(pid, 0)` errno
+// semantics. Mocking the helper module here makes the dead/live PID
+// assertions deterministic across linux/darwin/win32 CI runners — the
+// previous real-PID round-trip flaked on macOS runners where
+// `process.kill(99999999, 0)` could surface EPERM intermittently.
+vi.mock('../../src/core/pid-liveness.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/core/pid-liveness.js')>();
+  return {
+    ...actual,
+    isPidAlive: vi.fn((pid: number) => actual.isPidAlive(pid)),
+  };
+});
+
+import { isPidAlive } from '../../src/core/pid-liveness.js';
 import {
   cleanOrphanIpcDirs,
   cleanOrphanIpcDirsLegacy,
 } from '../../src/core/orphan-cleaner.js';
+
+const mockedIsPidAlive = vi.mocked(isPidAlive);
 
 // ─── Helpers ──────────────────────────────────────────────────────────
 
@@ -115,8 +133,16 @@ describe('cleanOrphanIpcDirsLegacy (M7.B legacy)', () => {
 describe('cleanOrphanIpcDirs (M7.B v2 — live-PID check)', () => {
   let testRoot: string;
 
-  beforeEach(() => { testRoot = createTestRoot(); });
-  afterEach(() => { rmSync(testRoot, { recursive: true, force: true }); });
+  beforeEach(() => {
+    testRoot = createTestRoot();
+    // Deterministic liveness oracle: the current process is alive, anything
+    // else is dead. Removes flakiness from real PID lookups on CI runners.
+    mockedIsPidAlive.mockImplementation((pid: number) => pid === process.pid);
+  });
+  afterEach(() => {
+    rmSync(testRoot, { recursive: true, force: true });
+    mockedIsPidAlive.mockReset();
+  });
 
   it('removes IPC dir with a dead PID', () => {
     // Arrange: use PID 99999999 which is virtually guaranteed dead
