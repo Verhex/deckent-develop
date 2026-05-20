@@ -1,4 +1,9 @@
-# ADR-062: Consent-Based Prerequisite Provisioning
+# ADR-063: Consent-Based Prerequisite Provisioning
+
+> **Numbering note (Sprint 175):** This ADR was originally numbered 062 alongside
+> `062-embedded-web-terminal.md` (Sprint 175 concurrent work). Renamed to 063 to
+> resolve the collision; the Embedded Web Terminal ADR retains 062 per its
+> spec/plan precedent.
 
 **Status:** accepted
 **Deciders:** Alperen Sartaçoğlu (product owner), Brain (orchestrator)

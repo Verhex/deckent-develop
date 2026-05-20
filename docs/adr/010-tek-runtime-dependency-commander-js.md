@@ -33,5 +33,7 @@
 | `zod` | `^3.25.0` | Plan/config schema validation at runtime | Task planner validation (Sprint 044+) |
 | `@noble/ed25519` | `^2.3.0` | Ed25519 signing for `.deck` secret files | ADR-014: .deck Secret File System |
 | `@noble/hashes` | `^1.8.0` | SHA-512 hashing for `.deck` key derivation | ADR-014: .deck Secret File System |
+| `node-pty` | `^1.0.0` | Interactive PTY for embedded web terminal (claude/gemini/codex/shell sessions) | ADR-062: Embedded Web Terminal |
+| `ws` | `^8.18.0` | Browser WebSocket transport for terminal stream (audited zero-dep; hand-rolled RFC6455 rejected as a security surface) | ADR-062: Embedded Web Terminal |
 
-**Consequence:** The principle shifts from "1 dependency" to "minimum necessary, every dependency ADR-backed". Any new runtime dependency proposal must include an ADR reference or a new ADR. The dependency count (7) reflects the full product scope — CLI + MCP + Memory + Connectors + Crypto.
+**Consequence:** The principle shifts from "1 dependency" to "minimum necessary, every dependency ADR-backed". Any new runtime dependency proposal must include an ADR reference or a new ADR. The dependency count (9) reflects the full product scope — CLI + MCP + Memory + Connectors + Crypto + Embedded Web Terminal (Sprint 175).

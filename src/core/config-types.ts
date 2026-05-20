@@ -31,6 +31,21 @@ export interface TimeoutConfig {
   runtime_extension_enabled: boolean;
 }
 
+// ─── Terminal Configuration ─────────────────────────────────────────
+export interface TerminalConfig {
+  enabled: boolean;
+  /** Bind address for the terminal WS. Default 127.0.0.1. */
+  bind: string;
+  /** Max concurrent PTY sessions. */
+  maxSessions: number;
+  /** Idle reaper timeout (ms) for shell/ai kinds; deckent kind exempt. */
+  idleTimeoutMs: number;
+  /** Per-session in-memory scrollback ring buffer size (bytes). */
+  scrollbackBytes: number;
+  /** Whether the plain `shell` session kind is allowed. */
+  allowShellKind: boolean;
+}
+
 // ─── Configuration (Blueprint 13) ───────────────────────────────────
 export interface PlanModeConfig {
   max_workers: number | 'auto';
@@ -309,6 +324,10 @@ export interface DeckentConfig {
   // ─── Runtime Style ─────────────────────────────────────────────────
   /** Active runtime style — sprint (developer orchestration) or task (one-shot life assistant) */
   deckent_style?: 'sprint' | 'task';
+
+  // ─── Terminal ──────────────────────────────────────────────────────
+  /** Embedded web terminal configuration (Sprint 175). */
+  terminal?: TerminalConfig;
 }
 
 // ─── Nervous System Config Types ────────────────────────────────────
@@ -500,6 +519,12 @@ export interface ResolvedConfig {
   observability?: DeckentConfig['observability'];
   /** Resolved runtime style — always 'sprint' or 'task' */
   deckent_style: 'sprint' | 'task';
+  /** Resolved embedded web terminal configuration. Mirrors the `model_strategy`
+   * optional-on-both-sides pattern: optional on the type, runtime-populated by
+   * `loadConfig`/`mergeConfigs` (DEFAULT_TERMINAL_CONFIG) so consumers can rely
+   * on it being present without forcing every ResolvedConfig literal to spell
+   * it out. Sprint 175. */
+  terminal?: TerminalConfig;
 }
 
 // ─── Config Metadata ──────────────────────────────────────────────
