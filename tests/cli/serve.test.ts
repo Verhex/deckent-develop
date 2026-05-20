@@ -63,14 +63,17 @@ describe('registerServe', () => {
 
   it('starts server with default port', async () => {
     await program.parseAsync(['node', 'test', 'serve']);
-    // serve now wires the bundled dashboard staticDir (previously never passed).
+    // Sprint 175 W2.3: createHttpServer signature became (root, opts) with
+    // host + terminalBackend wired through. Default host is 127.0.0.1.
     expect(mockCreateHttpServer).toHaveBeenCalledWith(
       '/tmp/test-project',
-      3100,
-      expect.stringContaining('dashboard'),
+      expect.objectContaining({
+        port: 3100,
+        staticDir: expect.stringContaining('dashboard'),
+      }),
     );
     expect(vi.mocked(print)).toHaveBeenCalledWith(
-      expect.stringContaining('listening on http://localhost:3100'),
+      expect.stringContaining('listening on http://127.0.0.1:3100'),
     );
   });
 
@@ -78,8 +81,10 @@ describe('registerServe', () => {
     await program.parseAsync(['node', 'test', 'serve', '--port', '4000']);
     expect(mockCreateHttpServer).toHaveBeenCalledWith(
       '/tmp/test-project',
-      4000,
-      expect.stringContaining('dashboard'),
+      expect.objectContaining({
+        port: 4000,
+        staticDir: expect.stringContaining('dashboard'),
+      }),
     );
   });
 

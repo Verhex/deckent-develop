@@ -96,6 +96,11 @@ describe('emitAlert', () => {
       await vi.importActual<typeof import('node:path')>('node:path');
 
     const projectRoot = process.cwd();
+    // rule-generator.ts:77-113 intentionally omits the `paths:` frontmatter
+    // for .codex / .gemini / .cursor — Claude is the only provider whose
+    // rule loader honours the frontmatter scope hint. The other three just
+    // get plain markdown. Parity here means "file exists with the AUTO-START
+    // marker", not "identical frontmatter". (Sprint 175 PR #16 CI dogfood.)
     const providers = ['.codex', '.gemini', '.cursor'] as const;
     const ruleFiles = ['brain.md', 'auditor.md', 'worker-default.md'] as const;
 
@@ -108,8 +113,8 @@ describe('emitAlert', () => {
         const content = realRead(fullPath, 'utf-8') as string;
         expect(
           content,
-          `${provider}/rules/${file} must contain paths: frontmatter`,
-        ).toMatch(/^paths:/m);
+          `${provider}/rules/${file} must contain the AUTO-START marker`,
+        ).toContain('<!-- AUTO-START -->');
       }
     }
   });
