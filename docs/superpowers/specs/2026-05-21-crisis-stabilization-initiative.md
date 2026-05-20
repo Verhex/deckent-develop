@@ -45,6 +45,7 @@ The Sub-project #2 spec (2026-05-21) only addressed item 7. **This master spec c
 | 6b | Doc updates: README, DECKENT.md, engines section | 178 | ⚠️ SHOULD |
 | 6c | Tmux code removal (Sprint 177 deprecate path follow-up) | 178 | (Defensive cleanup, no user impact) |
 | 6d | CI flaky test fix (orphan-cleaner-ipc + archive-debt, originally sub-project #2 Task 7) | 178 | (Already in main as backlog #7) |
+| **6e** | **TOPP B+C continuous-dispatch (wave-barrier removal + slot-fill efficiency)** | **178** | ⚠️ **MUST (without it Sprint 179's 12 tasks run wave-throttled; memory: project_topp_continuous_dispatch.md, Alperen onayı 2026-05-19)** |
 | 7a | Sub-project #2 original — planner state-hygiene W1-W3 (5 task: auto-debt, re-plan orphan, DEP0190 shell, coverage split, doctor cascade) | **179** | ⚠️ SHOULD (planner UX + ADR governance) |
 | 7b | Sub-project #2 original — frontend W3-5 (dashboard TS + root lint) | 179 | (TypeScript correctness) |
 | 7c | **Sub-project #2 original — self-security W4-W5 (5 task: prompt-guard, command-guard, outbound-limiter, mTLS hook, audit HMAC chain)** | **179** | ✅ **MUST (RCE surface — terminal feature is live)** |
@@ -210,9 +211,9 @@ Once Task 177-005 lands, `auto_restore` can stay `true` safely because intention
 
 ---
 
-## 4. Sprint 178 — Modernization Yayılma + CI/CD Yeşil (4 task)
+## 4. Sprint 178 — Modernization Yayılma + CI/CD Yeşil + TOPP (5 task)
 
-**Scope:** Items 6a-d (Node 24/26 spread across tests/docs, tmux code removal follow-up, CI flaky test fix).
+**Scope:** Items 6a-d (Node 24/26 spread across tests/docs, tmux code removal follow-up, CI flaky test fix) **+ TOPP B+C continuous-dispatch** (item 6e — wave-barrier removal + slot-fill efficiency).
 
 (Detailed task breakdown deferred to Sprint 178 spec — written after Sprint 177 retro. Outline only:)
 
@@ -220,6 +221,9 @@ Once Task 177-005 lands, `auto_restore` can stay `true` safely because intention
 - Task 178-002: Doc updates — README.md, DECKENT.md, docs/guide/*.md engines.node references
 - Task 178-003: Tmux code removal (Sprint 177 deprecation path → actual deletion of `src/orchestra/tmux.ts` + removal of tmux branch in `spawn-backend.ts`; tests pruned)
 - Task 178-004: CI flaky test fix (original sub-project #2 Task 7 — orphan-cleaner-ipc PID portability + archive-debt mock hygiene)
+- **Task 178-005: TOPP B+C continuous-dispatch — wave-barrier removal + slot-fill efficiency.** `result-collector.ts:380` `dispatchTick` flag-agnostik (replaces `respawnEligibleTasks` NO-OP-when-flag-false hole + supersedes `processQueue` legacy FIFO). `sprint-spawner.ts:472,509` continuous body + `:296-313` initial fill ladder. `prompt-god-template.ts:291-307` TOPP C collision-edge predecessor `.result` digest embed. Wave becomes a pure metric, not a barrier. **E1 flag-agnostic semantics:** continuous-dispatch fires regardless of `dependency_pipeline_enabled`; that flag now means "explicit dependency-ordering strictness", deckent-dev keeps `false` (ADR-047 intact). Escape hatch: `DECKENT_LEGACY_FIFO=1` env var. Reference design: memory `project_topp_continuous_dispatch.md` (Alperen onayı 2026-05-19). New ADR contract-first (number resolved from DB — ADR-045 §3 wave-barrier superseded). Cross-backend test (docker/subprocess) + multi-wave smoke. Bug-encoding tests (processqueue-stall, task-queue, dependency-pipeline-flag-disabled) **rewritten, not deleted** (continuous semantics preserve correctness).
+
+**Why TOPP MUST land in Sprint 178 (before Sprint 179):** Sprint 179 = 12-task sub-project #2 original scope. Without TOPP, those 12 tasks would run wave-barrier-throttled (~2-3 effective parallel slots even with max_workers=6) → beta gate (June 1) at risk. With TOPP, the 12 tasks can fan out to all available slots respecting only true dependency edges.
 
 **Sprint 178 detailed spec will be written by 2026-05-25 after Sprint 177 retro reveals what shifted.**
 
@@ -256,11 +260,11 @@ To be specced after Sprint 179 retro. Beta cut-off is June 1; Sprint 180 lands p
 | Sprint | Days est. | MUST tasks (beta blocker) | SHOULD tasks | Status |
 |--------|-----------|----------------------------|--------------|--------|
 | 177 | 2-3 | All 5 tasks | — | **In progress (this spec)** |
-| 178 | 2-3 | None (defensive cleanup) | 4 | Pending 177 retro |
-| 179 | 4-5 | W4-W5 (5 self-security tasks) | W1-W3 (7 planner+frontend tasks) | Pending 178 retro |
+| 178 | 2-3 | **TOPP (Task 178-005)** — unblocks Sprint 179 fan-out | 4 (Node 24/26 spread + tmux removal + CI flakes) | Pending 177 retro |
+| 179 | 3-4 (with TOPP) / 5-6 (without) | W4-W5 (5 self-security tasks) | W1-W3 (7 planner+frontend tasks) | Pending 178 retro |
 | 180 | post-beta | — | — | Pending 179 retro |
 
-**Total beta-required:** Sprint 177 (5) + Sprint 179 W4-W5 (5) = 10 task in ~7 days. With worker rollback live from Task 177-001 onward, sprint quality should be reliable.
+**Total beta-required:** Sprint 177 (5) + Sprint 178 TOPP (1) + Sprint 179 W4-W5 (5) = 11 task in ~7 days. With worker rollback live from Task 177-001 onward, sprint quality should be reliable; with TOPP live from Sprint 178 Task 5 onward, Sprint 179's 12-task fan-out runs at native parallelism.
 
 **Risk:** If Sprint 177 takes >3 days, Sprint 179 self-security may slip past June 1. Mitigation: keep Sprint 178 small (defensive only); shift Sprint 178's MUST tasks (none currently) to Sprint 179 if needed.
 
