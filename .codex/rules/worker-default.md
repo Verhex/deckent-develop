@@ -35,6 +35,7 @@
 
 ## Active ADR Constraints
 
+- **ADR-064**: TOPP — Continuous Dispatch (Wave-Barrier Removal) — **Status:** accepted
 - **ADR-062**: Embedded Web Terminal — PTY Sessions, WS Gateway, Auth & Audit — **Status:** accepted
 - **ADR-063**: Consent-Based Prerequisite Provisioning — > **Numbering note (Sprint 175):** This ADR was originally numbered 062 alongside
 - **ADR-010**: Tek Runtime Dependency — commander.js — **Status:** accepted

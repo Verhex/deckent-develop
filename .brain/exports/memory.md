@@ -1,5 +1,11 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-178 Learnings
+- Sprint sprint-178 Learnings: ## Sprint sprint-178 Learnings
+- Fix debt: Tech debt from 175-020-fix: All 5 automatic verification gates executed:
+
+1. npm: NO_GO — Priority fix for debt-175-020-fix (CRITICAL, open 3 sprints). Task JSON ships with EMPTY scope (scope.directories=[], sc
+
 ## Sprint sprint-177 Learnings
 - Sprint sprint-177 Learnings: ## Sprint sprint-177 Learnings
 - Fix debt: ADR-019 reconciliation: language-agnostic verify not implemented: NO_GO — Worker exited without writing result (exitCode=0)

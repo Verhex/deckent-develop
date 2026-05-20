@@ -60,6 +60,10 @@
 | adr-063 | Consent-Based Prerequisite Provisioning | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-178 Learnings** (sprint-178): ## Sprint sprint-178 Learnings
+- Fix debt: Tech debt from 175-020-fix: All 5 automatic verification gates executed:
+
+...
 - **Sprint sprint-177 Learnings** (sprint-177): ## Sprint sprint-177 Learnings
 - Fix debt: ADR-019 reconciliation: language-agnostic verify not implemented: NO_GO — ...
 - **Sprint sprint-176 Learnings** (sprint-176): ## Sprint sprint-176 Learnings
@@ -77,8 +81,6 @@
 - P0-3 Tmux Prompt Filename TaskId-Aware: GO_WITH_TECH_DEBT — Sprint 170 P0-3 (Bug 2B ...
 - **Sprint sprint-169 Learnings** (sprint-169): ## Sprint sprint-169 Learnings
 - W3.1 C0c Collision Detection Live Trigger Investigation + Fix: NO_GO — W3.1 RC ident...
-- **Sprint sprint-168 Learnings** (sprint-168): ## Sprint sprint-168 Learnings
-- T3 Kill Recovery Simulation (DEPENDS T1): NO_GO — Task blocked by unmet dependency. ...
 
 ## Active Technical Debt
 - [CRITICAL] Tech debt from 175-020-fix: All 5 automatic verification gates executed:
@@ -98,5 +100,6 @@
 - Violation pattern: stale_heartbeat
 - Violation pattern: stale_heartbeat
 - Violation pattern: stale_heartbeat
+- Violation pattern: stale_heartbeat
 
-_Total entries: 269 | Generated: 2026-05-20_
+_Total entries: 273 | Generated: 2026-05-20_
