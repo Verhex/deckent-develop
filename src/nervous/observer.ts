@@ -13,9 +13,9 @@
 // Sprint 147 Task 4.
 
 import { EventEmitter } from 'node:events';
-import { watch, type FSWatcher } from 'node:fs';
+import { watch, type FSWatcher, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { randomUUID } from 'node:crypto';
+import { randomUUID, createHash } from 'node:crypto';
 import type { ObserverEvent, ObserverEventSource, DetectorContext, SprintStateSnapshot } from '../core/nervous-types.js';
 import { eventBus } from '../orchestra/event-bus.js';
 import { assertBrainScope } from './runtime-scope-check.js';
@@ -244,4 +244,107 @@ export class NervousObserver extends EventEmitter {
       taskId: typeof payload.taskId === 'string' ? payload.taskId : undefined,
     };
   }
+}
+
+// ═══ DirectivesProtectionDetector — Sprint 177 Task 5 ════════════════════════
+//
+// Sprint 176 bug: kill+cleanup sonrası auto_restore Sprint 175 content'ini
+// Sprint 176'nın üstüne yazdı. Neden: set_directives başarıyla yazdıktan
+// sonra baseline hiç güncellenmiyordu.
+//
+// Fix: updateBaseline() hook — deckent_set_directives + sprint startSprint()
+// her ikisi de set_directives başarısından ve sprint başından sonra çağırır.
+
+/** Detector options for directives_protection baseline tracking */
+export interface DirectivesProtectionOptions {
+  readonly root: string;
+  readonly autoRestore: boolean;
+}
+
+/**
+ * Tracks the "known good" DIRECTIVES.md baseline hash and content.
+ * When auto_restore is true and scan() detects a deviation, the file is
+ * written back to the baseline content.
+ *
+ * Module-level singleton pattern: use initDirectivesProtection() to create
+ * and getActiveDirectivesProtection() to retrieve.
+ */
+export class DirectivesProtectionDetector {
+  private baselineHash: string | null = null;
+  private baselineContent: string | null = null;
+
+  constructor(
+    private readonly root: string,
+    private readonly autoRestore: boolean,
+  ) {
+    this.updateBaseline();
+  }
+
+  /**
+   * Reads the current DIRECTIVES.md and stores it as the new baseline.
+   * Call after set_directives succeeds or at sprint start.
+   */
+  updateBaseline(): void {
+    const path = join(this.root, 'DIRECTIVES.md');
+    if (existsSync(path)) {
+      const content = readFileSync(path, 'utf-8');
+      this.baselineContent = content;
+      this.baselineHash = this.computeHash(content);
+    }
+  }
+
+  /** SHA-256 hex hash of the given content string. */
+  computeHash(content: string): string {
+    return createHash('sha256').update(content, 'utf-8').digest('hex');
+  }
+
+  /** Returns the stored baseline hash, or null if no baseline set yet. */
+  getBaselineHash(): string | null {
+    return this.baselineHash;
+  }
+
+  /**
+   * Compare current DIRECTIVES.md to baseline.
+   * If different and auto_restore is enabled, writes baseline content back.
+   */
+  scan(): void {
+    if (this.baselineContent === null || this.baselineHash === null) return;
+
+    const path = join(this.root, 'DIRECTIVES.md');
+    if (!existsSync(path)) {
+      if (this.autoRestore) {
+        writeFileSync(path, this.baselineContent, 'utf-8');
+      }
+      return;
+    }
+
+    const current = readFileSync(path, 'utf-8');
+    if (this.computeHash(current) !== this.baselineHash && this.autoRestore) {
+      writeFileSync(path, this.baselineContent, 'utf-8');
+    }
+  }
+}
+
+// ─── Module-level singleton ────────────────────────────────────────────────
+
+let _activeDirectivesDetector: DirectivesProtectionDetector | null = null;
+
+/**
+ * Initialize the directives_protection singleton.
+ * Replaces any previously active detector. Called at program startup, sprint
+ * start, and in tests to scope the detector to a specific project root.
+ */
+export function initDirectivesProtection(
+  opts: DirectivesProtectionOptions,
+): DirectivesProtectionDetector {
+  _activeDirectivesDetector = new DirectivesProtectionDetector(opts.root, opts.autoRestore);
+  return _activeDirectivesDetector;
+}
+
+/**
+ * Returns the currently active directives_protection detector, or null if
+ * none has been initialized.
+ */
+export function getActiveDirectivesProtection(): DirectivesProtectionDetector | null {
+  return _activeDirectivesDetector;
 }

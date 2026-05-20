@@ -16,6 +16,7 @@ import type {
   NervousSystemConfig,
   Severity,
 } from '../../core/nervous-types.js';
+import { getActiveDirectivesProtection } from '../../nervous/observer.js';
 
 // ─── ANSI Color Helpers ─────────────────────────────────────────────────────
 
@@ -419,6 +420,31 @@ function showLog(root: string, follow: boolean): void {
   process.on('SIGINT', cleanup);
 }
 
+// ─── Baseline Refresh ────────────────────────────────────────────────────────
+
+/**
+ * Refresh the directives_protection baseline to the current DIRECTIVES.md content.
+ *
+ * Used by `deckent nervous baseline-refresh` CLI subcommand.
+ * Sprint 177 fix: called manually after kill+cleanup to prevent stale restore.
+ */
+export async function nervousBaselineRefresh(opts: { root: string }): Promise<void> {
+  const det = getActiveDirectivesProtection();
+  if (!det) {
+    printError('[deckent] No active directives_protection detector — run `deckent nervous` after starting a sprint');
+    process.exitCode = 1;
+    return;
+  }
+  const directivesPath = join(opts.root, 'DIRECTIVES.md');
+  if (!existsSync(directivesPath)) {
+    printError(`[deckent] DIRECTIVES.md not found at: ${directivesPath}`);
+    process.exitCode = 1;
+    return;
+  }
+  det.updateBaseline();
+  print('[deckent] directives_protection baseline refreshed');
+}
+
 // ─── Register Command ───────────────────────────────────────────────────────
 
 export function registerNervous(program: Command): void {
@@ -488,5 +514,17 @@ export function registerNervous(program: Command): void {
     .action((opts: { follow?: boolean }) => {
       const root = resolveProjectRoot();
       showLog(root, opts.follow === true);
+    });
+
+  // deckent nervous baseline-refresh (Sprint 177 Task 5)
+  nervousCmd
+    .command('baseline-refresh')
+    .description('Refresh directives_protection baseline to current DIRECTIVES.md content')
+    .action(() => {
+      const root = resolveProjectRoot();
+      nervousBaselineRefresh({ root }).catch((err: unknown) => {
+        printError(`[deckent] baseline-refresh failed: ${err instanceof Error ? err.message : String(err)}`);
+        process.exitCode = 1;
+      });
     });
 }

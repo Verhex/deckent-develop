@@ -190,3 +190,29 @@ export interface SummaryExportEntry {
   sprint_id: string | null;
   summary: string | null;
 }
+
+// ─── Task Persistence ────────────────────────────────────────────
+
+/**
+ * TaskRecord — persistence-layer projection of a runtime Task carrying only
+ * the fields the memory DB needs to track across a sprint.
+ *
+ * Sprint 177 Task 1 introduced `snapshot_stash_ref` to record the git stash
+ * ref captured at worker spawn so the result-evaluator can rollback (NO_GO)
+ * or drop (DONE/GO_WITH_TECH_DEBT) the snapshot.
+ *
+ * Note: runtime persistence of the ref currently uses the `.tasks/task-{id}.stash-ref`
+ * sidecar file (consistent with `.hb` / `.plan` / `.result`). This interface
+ * documents the contract for future memory-store integration.
+ */
+export interface TaskRecord {
+  task_id: string;
+  sprint_id?: string | null;
+  /**
+   * Sprint 177 Task 1: git stash ref captured at worker spawn for rollback.
+   * Format matches `stash@\{N\}`. Unset for tasks spawned before rollback
+   * infrastructure (Sprint ≤176) and for tasks whose project repo is not a
+   * git working tree.
+   */
+  snapshot_stash_ref?: string | null;
+}

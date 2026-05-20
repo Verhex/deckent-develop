@@ -1,5 +1,5 @@
 import { writeFile, mkdir } from 'node:fs/promises';
-import { existsSync, statSync, writeFileSync, renameSync } from 'node:fs';
+import { existsSync, statSync, writeFileSync, renameSync, readFileSync, copyFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import {
   PROJECT_CONFIG_PATH,
@@ -545,6 +545,8 @@ export function createDefaultConfig(): DeckentConfig {
     provider_overrides: undefined,
     cost_optimization: false,
     // claude_backend removed (Sprint 150 Decision 3 — use spawn_backend instead)
+    // Sprint 177: default changed from undefined/tmux to 'docker' (ADR-027, Sprint 176 evidence)
+    spawn_backend: 'docker',
     auth_mode: 'subscription',
     // Human Checkpoints (empty = fully autonomous)
     human_checkpoints: [],
@@ -992,6 +994,96 @@ export async function saveGlobalConfig(
     await mkdir(dir, { recursive: true });
   }
   await writeFile(cfgPath, JSON.stringify(config, null, 2) + '\n', 'utf-8');
+}
+
+// ─── Config Regen Guard ──────────────────────────────────────────────
+
+/**
+ * Safe template defaults applied when regenerating a project config.
+ * These represent deckent-dev project settings that must be preserved
+ * even if the config file is lost or regenerated from scratch.
+ *
+ * Sprint 177 — Sprint 176 evidence: `git rm --cached` + regen caused the
+ * template to overwrite all user fields including spawn_backend.
+ */
+export const REGEN_TEMPLATE_DEFAULTS: Record<string, unknown> = {
+  spawn_backend: 'docker',
+  dependency_pipeline_enabled: false,
+  haiku_allowed: false,
+  brain_planning: 'structured',
+} as const;
+
+export interface RegenConfigResult {
+  /** Absolute path of the backup file created before regen */
+  backupPath: string;
+  /** The merged config written back to disk */
+  merged: Record<string, unknown>;
+  /** Keys that were missing from the existing config and were added from template */
+  added: string[];
+}
+
+/**
+ * Safely regenerate the project config by merging the existing config OVER the
+ * template defaults. User fields are never overwritten — only missing fields are
+ * filled from the template. A timestamped backup is created before any write.
+ *
+ * Sprint 176 root cause: `deckent init` regenerated from template, overwriting
+ * all user fields. This function prevents that by always treating existing
+ * config as the higher-priority source.
+ *
+ * @param projectRoot — project root directory; defaults to process.cwd()
+ * @returns RegenConfigResult with backupPath, merged config, and added keys
+ */
+export function regenerateConfigSafe(projectRoot?: string): RegenConfigResult {
+  const root = resolve(projectRoot ?? process.cwd());
+  const configPath = join(root, PROJECT_CONFIG_PATH);
+
+  let existingConfig: Record<string, unknown> = {};
+
+  if (existsSync(configPath)) {
+    try {
+      const raw = readFileSync(configPath, 'utf-8');
+      const parsed = JSON.parse(raw) as unknown;
+      if (parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        existingConfig = parsed as Record<string, unknown>;
+      }
+    } catch {
+      // Unparseable config — treat as empty, template fills in all fields
+    }
+
+    const iso = new Date().toISOString().replace(/:/g, '-').replace(/\./g, '-');
+    const backupPath = `${configPath}.bak.regen-${iso}`;
+    copyFileSync(configPath, backupPath);
+
+    const added = Object.keys(REGEN_TEMPLATE_DEFAULTS).filter(
+      (k) => !(k in existingConfig),
+    );
+
+    // Template is the base; existing config overlays it — user fields always win
+    const merged = deepMerge(
+      REGEN_TEMPLATE_DEFAULTS as Record<string, unknown>,
+      existingConfig,
+    ) as Record<string, unknown>;
+
+    writeFileSync(configPath, JSON.stringify(merged, null, 2) + '\n', 'utf-8');
+
+    return { backupPath, merged, added };
+  }
+
+  // Config file does not exist — write template defaults as the new config
+  const deckentDir = join(root, '.deckent');
+  if (!existsSync(deckentDir)) {
+    // mkdirSync would require importing it — use writeFileSync path below which
+    // will throw naturally if the parent dir is missing (desired behaviour)
+  }
+
+  const merged = structuredClone(REGEN_TEMPLATE_DEFAULTS) as Record<string, unknown>;
+  const iso = new Date().toISOString().replace(/:/g, '-').replace(/\./g, '-');
+  const backupPath = `${configPath}.bak.regen-${iso}`;
+
+  writeFileSync(configPath, JSON.stringify(merged, null, 2) + '\n', 'utf-8');
+
+  return { backupPath, merged, added: Object.keys(REGEN_TEMPLATE_DEFAULTS) };
 }
 
 // ─── Config Metadata ─────────────────────────────────────────────────

@@ -3,7 +3,7 @@ import type { ModelType } from '../core/types.js';
 import type { ProviderSpawnOptions } from '../core/provider.js';
 import { ensureSession, spawnWorker as tmuxSpawnWorker, killWorker as tmuxKillWorker, listWorkers as tmuxListWorkers } from './tmux.js';
 import { SubprocessSpawnBackend } from '../providers/subprocess.js';
-import { DockerSpawnBackend, isDockerAvailable } from './spawn-backend-docker.js';
+import { DockerSpawnBackend } from './spawn-backend-docker.js';
 
 // ─── SpawnBackend Interface ───────────────────────────────────────────────────
 
@@ -195,6 +195,54 @@ export class SubprocessBackend implements SpawnBackend {
   }
 }
 
+// ─── Tmux Deprecation Warning ─────────────────────────────────────────────────
+
+/**
+ * Tracks sprint-scoped tmux deprecation warnings.
+ * Populated by resolveBackend() when explicit 'tmux' is requested.
+ * Reset at process start and can be reset for testing via resetTmuxDeprecationWarning().
+ */
+const _tmuxDeprecationWarned = new Set<string>();
+
+/**
+ * Reset the tmux deprecation warning tracker.
+ * Call this at sprint start or in tests to allow the warning to be re-emitted.
+ */
+export function resetTmuxDeprecationWarning(): void {
+  _tmuxDeprecationWarned.clear();
+}
+
+/**
+ * Resolve the effective backend type to use.
+ *
+ * - 'auto' always resolves to 'docker' (Sprint 177 — default changed from tmux to docker).
+ *   This eliminates the old auto→tmux fallback that caused Sprint 176 issues.
+ * - 'tmux' emits a one-time deprecation warning. tmux support will be removed in Sprint 178.
+ * - All other values pass through unchanged.
+ *
+ * @param backend  Requested backend type ('auto' | 'docker' | 'tmux' | 'subprocess')
+ * @returns        Resolved backend type to actually instantiate
+ */
+export function resolveBackend(backend: string): string {
+  if (backend === 'auto') {
+    return 'docker';
+  }
+
+  if (backend === 'tmux') {
+    const warnKey = 'tmux-deprecation';
+    if (!_tmuxDeprecationWarned.has(warnKey)) {
+      _tmuxDeprecationWarned.add(warnKey);
+      console.warn(
+        '[deckent] DEPRECATION: spawn_backend="tmux" is deprecated and will be removed in Sprint 178. ' +
+        'Migrate to spawn_backend="docker" (recommended) or spawn_backend="subprocess" (Windows fallback). ' +
+        'See docs/guide/troubleshooting.md for migration instructions.',
+      );
+    }
+  }
+
+  return backend;
+}
+
 // ─── SpawnBackendFactory ──────────────────────────────────────────────────────
 
 export type BackendType = 'tmux' | 'subprocess' | 'docker' | 'auto';
@@ -203,9 +251,9 @@ export interface SpawnBackendFactoryOptions {
   /**
    * Backend type to use.
    * - 'docker': isolated Docker containers (recommended)
-   * - 'tmux': tmux windows (legacy, shared filesystem)
+   * - 'tmux': tmux windows (legacy, DEPRECATED — will be removed Sprint 178)
    * - 'subprocess': child processes (Windows fallback)
-   * - 'auto' (default): docker → tmux → subprocess fallback chain
+   * - 'auto' (default): resolves to 'docker' (Sprint 177 — changed from tmux fallback)
    */
   backend?: BackendType;
 
@@ -228,10 +276,10 @@ export interface SpawnBackendFactoryOptions {
 /**
  * SpawnBackendFactory — selects and creates the appropriate SpawnBackend.
  *
- * Selection logic:
- * 1. If `backend` is explicitly set to 'tmux' or 'subprocess', use that.
- * 2. In 'auto' mode: check if tmux is available → use TmuxBackend.
- *    If tmux is not available → fall back to SubprocessBackend.
+ * Selection logic (Sprint 177 — updated):
+ * 1. resolveBackend() is called first: 'auto' → 'docker'; 'tmux' → deprecation warning.
+ * 2. Resolved type maps directly to the corresponding backend class.
+ *    No more auto→tmux→subprocess chain (Sprint 176 root cause eliminated).
  */
 export class SpawnBackendFactory {
   /**
@@ -241,9 +289,9 @@ export class SpawnBackendFactory {
    * @returns     A SpawnBackend instance ready to use
    */
   static create(opts: SpawnBackendFactoryOptions): SpawnBackend {
-    const backendType = opts.backend ?? 'auto';
+    const resolved = resolveBackend(opts.backend ?? 'auto');
 
-    if (backendType === 'docker') {
+    if (resolved === 'docker') {
       return new DockerSpawnBackend(opts.projectDir, {
         image: opts.dockerImage,
         timeoutSeconds: opts.dockerTimeoutSeconds
@@ -252,29 +300,17 @@ export class SpawnBackendFactory {
       });
     }
 
-    if (backendType === 'subprocess') {
+    if (resolved === 'subprocess') {
       return new SubprocessBackend(opts.projectDir, {
         timeoutMs: opts.defaultTimeoutMs,
       });
     }
 
-    if (backendType === 'tmux') {
+    if (resolved === 'tmux') {
       return new TmuxBackend(opts.projectDir);
     }
 
-    // 'auto': prefer docker if available, then tmux, then subprocess
-    if (isDockerAvailable()) {
-      return new DockerSpawnBackend(opts.projectDir, {
-        image: opts.dockerImage,
-        timeoutSeconds: opts.dockerTimeoutSeconds
-          ?? (opts.defaultTimeoutMs ? Math.floor(opts.defaultTimeoutMs / 1000) : undefined),
-        gracefulTimeoutSeconds: opts.dockerGracefulTimeoutSeconds,
-      });
-    }
-    if (SpawnBackendFactory.isTmuxAvailable()) {
-      return new TmuxBackend(opts.projectDir);
-    }
-
+    // Fallback — should not be reached after resolveBackend() normalisation
     return new SubprocessBackend(opts.projectDir, {
       timeoutMs: opts.defaultTimeoutMs,
     });

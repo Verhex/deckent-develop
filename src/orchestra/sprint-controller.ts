@@ -79,6 +79,10 @@ import {
 } from './sprint-pid-manager.js';
 import type { SprintStateSnapshot } from './sprint-pid-manager.js';
 
+// ─── Node Builtins (sync I/O for kill-cascade metadata cleanup) ──
+import { unlinkSync } from 'node:fs';
+import { DECKENT_DIR } from '../core/constants.js';
+
 // ─── Sprint Checkpoint (phase-transition auto-checkpoint) ────────
 import { writePhaseCheckpoint, restoreSprintFromCheckpoint } from './sprint-checkpoint.js';
 
@@ -87,6 +91,9 @@ import { eventBus } from './event-bus.js';
 
 // ─── Notify (DECKENT→USER:NOTIFY wire — Hot Fix H6) ─────────────
 import { notify } from '../core/notify.js';
+
+// ─── Directives Protection Baseline (Sprint 177 Task 5) ──────────
+import { getActiveDirectivesProtection } from '../nervous/observer.js';
 
 // ─── Panic Guard ─────────────────────────────────────────────────
 import { PanicGuard } from '../core/panic-guard.js';
@@ -159,6 +166,54 @@ export type { FinalizeSprintOptions, SelfAuditResult } from './sprint-finalizer.
 
 // --- parallel-pipeline.ts ---
 export { DependencyCycleError } from './parallel-pipeline.js';
+
+// ═══ Sprint 177 Task 177-003 — kill-cascade metadata cleanup ═══════
+//
+// `deckent kill --all` must leave zero stale metadata behind. Sprint 176
+// evidence: after kill, sprint-state.json + {id}-checkpoint.json +
+// {id}-gate.json + PID file all lingered for 43 minutes.
+//
+// Co-located with sprint-controller because these files are written by
+// the sprint lifecycle (writeSprintState / writePhaseCheckpoint /
+// finalizeSprint's gate writer) and clearPid is already imported here.
+//
+// Fail-safe: each removal is independently try/catched so a missing or
+// permission-locked file never aborts the cascade.
+/**
+ * Remove all on-disk metadata produced by a sprint's lifecycle.
+ *
+ * Cleans:
+ *   - `.deckent/sprint-state.json`        (global active-sprint marker)
+ *   - `.deckent/{sprintId}-checkpoint.json` (phase-transition checkpoint)
+ *   - `.deckent/{sprintId}-gate.json`       (self-audit gate result)
+ *   - `.deckent/pids/{sprintId}.pid` + `.snapshot.json` (via clearPid)
+ *
+ * Called by `deckent kill --all` cascade. Idempotent.
+ */
+export function cleanupSprintMetadata(root: string, sprintId: string): void {
+  const dir = join(root, DECKENT_DIR);
+
+  // 1. global sprint-state.json (single file, not per-sprint)
+  try {
+    const p = join(dir, 'sprint-state.json');
+    if (existsSync(p)) unlinkSync(p);
+  } catch (e) { debugLog('cleanupSprintMetadata:sprint-state', e); }
+
+  // 2. per-sprint checkpoint
+  try {
+    const p = join(dir, `${sprintId}-checkpoint.json`);
+    if (existsSync(p)) unlinkSync(p);
+  } catch (e) { debugLog('cleanupSprintMetadata:checkpoint', e); }
+
+  // 3. per-sprint gate
+  try {
+    const p = join(dir, `${sprintId}-gate.json`);
+    if (existsSync(p)) unlinkSync(p);
+  } catch (e) { debugLog('cleanupSprintMetadata:gate', e); }
+
+  // 4. PID + snapshot (delegates to sprint-pid-manager.clearPid)
+  try { clearPid(root, sprintId); } catch (e) { debugLog('cleanupSprintMetadata:clearPid', e); }
+}
 
 // ═══ Sprint Lifecycle Event Helpers (Nervous System hooks) ════════
 
@@ -537,6 +592,10 @@ export async function runSprint(
     // Nervous System: PLAN→SPAWN + SPRINT_STARTED
     emitPhaseChange(SprintPhase.PLAN, SprintPhase.SPAWN, sprint.id);
     emitSprintEvent('SPRINT_STARTED', { sprintId: sprint.id, taskCount: sprint.tasks.length });
+
+    // Refresh directives_protection baseline so auto_restore uses current DIRECTIVES.md.
+    // Sprint 177 fix: prevents restoring a stale sprint's directives on sprint boundary.
+    try { getActiveDirectivesProtection()?.updateBaseline(); } catch (e) { debugLog('runSprint:directivesBaseline', e); }
 
     // DECKENT→USER:NOTIFY (Hot Fix H6) — fire-and-forget, fail-safe
     try {

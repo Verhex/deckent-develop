@@ -280,6 +280,46 @@ export function killAllSessions(): void {
 }
 
 /**
+ * Sprint 177 Task 177-003 — full tmux socket cleanup for `deckent kill --all`.
+ *
+ * Sprint 176 evidence: after `deckent kill --all`, the deckent tmux session was
+ * gone but the on-disk socket file (`$TMUX_TMPDIR/tmux-<uid>/deckent`, default
+ * `/tmp/tmux-<uid>/deckent`) survived, leaving a re-attach surface that could
+ * resurrect a stale server. This helper:
+ *
+ *   1. Calls `tmux kill-session -t deckent` (idempotent — safe if session is gone).
+ *   2. Removes the residual socket file so no client can re-attach.
+ *
+ * Fail-safe: any spawn / fs error is swallowed (logged via debugLog) so the
+ * cascade never aborts on a missing tmux binary or read-only /tmp.
+ */
+export function cleanupTmuxSocket(): void {
+  // 1. kill-session — bypass `run()` because we don't want to throw on
+  //    "session not found"; that's the success case for cleanup.
+  try {
+    spawnSync('tmux', ['kill-session', '-t', TMUX_SESSION_NAME], {
+      encoding: 'utf-8',
+      timeout: 5_000,
+    });
+  } catch (e) {
+    debugLog('cleanupTmuxSocket:killSession', e);
+  }
+
+  // 2. Remove the socket file. tmux stores sockets at
+  //    $TMUX_TMPDIR/tmux-<uid>/<session-name> (default $TMUX_TMPDIR=/tmp).
+  try {
+    const uid = typeof process.getuid === 'function' ? process.getuid() : 0;
+    const baseDir = process.env.TMUX_TMPDIR ?? '/tmp';
+    const socketPath = join(baseDir, `tmux-${uid}`, TMUX_SESSION_NAME);
+    if (existsSync(socketPath)) {
+      unlinkSync(socketPath);
+    }
+  } catch (e) {
+    debugLog('cleanupTmuxSocket:unlinkSocket', e);
+  }
+}
+
+/**
  * @internal Sends keys to a tmux pane. Used only within orchestra/.
  * Not part of the public API surface.
  */

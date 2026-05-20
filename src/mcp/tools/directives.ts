@@ -4,6 +4,7 @@ import { z } from 'zod/v4';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { DIRECTIVES_FILE } from '../../core/constants.js';
 import { enrichResponse } from '../helpers/enrich.js';
+import { getActiveDirectivesProtection } from '../../nervous/observer.js';
 
 function computeBreakdown(content: string): { code: number; docs: number; test: number; analysis: number } {
   const headers = content.match(/^##\s+(Görev|Task)\s+\d+[:\s].*/gm) ?? [];
@@ -54,6 +55,12 @@ Prerequisite: deckent_init must have been run. Overwrites DIRECTIVES.md each cal
 
       try {
       writeFileSync(join(root, DIRECTIVES_FILE), content, 'utf-8');
+
+      // Refresh directives_protection baseline so auto_restore uses the new content.
+      // Sprint 177 fix: kill+cleanup sonrası yanlış baseline restore'unu önler.
+      try {
+        getActiveDirectivesProtection()?.updateBaseline();
+      } catch { /* baseline update is best-effort — never block set_directives */ }
 
       // Count tasks by matching ## Görev or ## Task headers
       const taskCount = (content.match(/^##\s+(Görev|Task)\s+\d+/gm) ?? []).length;
