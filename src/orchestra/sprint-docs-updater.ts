@@ -107,6 +107,14 @@ export function updateProjectDocs(projectRoot: string, sprintResult: SprintResul
     adaptive_config: { min_samples: 3, no_go_threshold: 0.3, coverage_lookback: 3 },
     sprint_timeout_minutes: 0,
     deckent_style: 'sprint' as const,
+    terminal: {
+      enabled: true,
+      bind: '127.0.0.1',
+      maxSessions: 10,
+      idleTimeoutMs: 1_800_000,
+      scrollbackBytes: 262_144,
+      allowShellKind: true,
+    },
   };
   const ctx = { projectRoot, sprintResult, config: resolvedConfig, isInternalProject };
   const builtinResults = runAllUpdaters(ctx);

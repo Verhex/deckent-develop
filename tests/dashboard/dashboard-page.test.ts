@@ -206,7 +206,7 @@ describe("dashboard page — ConfigPage.tsx", () => {
     expect(content).toContain('max_fix_retries');
   });
 
-  it("CATEGORIES array has 13 categories", () => {
+  it("CATEGORIES array has 14 categories", () => {
     const content = readFileSync(filePath, "utf-8");
     const categoriesMatch = content.match(/const CATEGORIES\s*=\s*\[([\s\S]*?)\]\s*as\s*const/);
     expect(categoriesMatch).not.toBeNull();
@@ -214,7 +214,7 @@ describe("dashboard page — ConfigPage.tsx", () => {
     // Count quoted strings
     const categories = categoriesBlock.match(/"[^"]+"/g);
     expect(categories).not.toBeNull();
-    expect(categories!.length).toBe(13);
+    expect(categories!.length).toBe(14);
   });
 
   it("CATEGORIES includes all required category names", () => {

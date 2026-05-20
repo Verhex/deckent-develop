@@ -23,8 +23,14 @@ describe('dashboard build smoke', () => {
         scripts?: Record<string, string>;
       };
       const cmd = pkg.scripts?.['build:dashboard'] ?? '';
-      expect(cmd).toMatch(/vite build/);
-      expect(cmd).toMatch(/src\/dashboard/);
+      // build:dashboard may delegate to a wrapper script that internally calls vite build
+      const wrapsVite = cmd.includes('vite build') || cmd.includes('build-dashboard.mjs');
+      expect(wrapsVite).toBe(true);
+      // dashboard source is always src/dashboard — verify via script content or path reference
+      const scriptContent = cmd.includes('build-dashboard.mjs')
+        ? readFileSync(join(ROOT, 'scripts', 'build-dashboard.mjs'), 'utf-8')
+        : cmd;
+      expect(scriptContent).toMatch(/src[/\\]dashboard/);
     });
 
     it('build:all chains tsc and build:dashboard', () => {
