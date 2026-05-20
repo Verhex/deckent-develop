@@ -53,6 +53,27 @@ Use Deckent to build Deckent. Validate the sprint loop on real development work.
 
 ---
 
+## Phase 3.6: Embedded Web Terminal (May 2026, Sprint 175) — COMPLETE
+
+VSCode-style dockable terminal panel inside the web dashboard. Sub-project #1 of a 4-part path toward agentic-OS-grade workflows; sub-projects #2-4 (self-security, multi-tenant/k8s, enterprise integrations) follow in dedicated sprints — `AuthProvider`, `SessionBackend`, and `tenantId` seams are in place from day one.
+
+- [x] **PTY backend** — `node-pty` spawn behind a pluggable `SessionBackend` interface (Sprint 175 W1)
+- [x] **WS gateway** — `server.on('upgrade')` + `Sec-WebSocket-Protocol` token auth verified BEFORE pty spawn; backpressure + reattach replay (W2)
+- [x] **HTTP control** — sessions CRUD at `/api/terminal/sessions`; localhost-only bootstrap injection of `window.__DECKENT_TERMINAL_TOKEN__` into served `index.html` (W2)
+- [x] **Bypass-independent auth** — `LocalTokenAuthProvider` deliberately ignores `DECKENT_API_AUTH_DISABLED`; SHA-256 + `timingSafeEqual` constant-time compare; aligns with Sprint-171 B-022 hardening (W1)
+- [x] **Multi-tab UI** — `claude` / `gemini` / `codex` / `deckent` / shell quick-launch; resizable + collapsible bottom `DockPanel` mounted outside the React Router `Outlet` for session persistence across page navigation (W3)
+- [x] **tmux-style reattach** — bounded in-memory scrollback ring buffer per session; `detach ≠ kill`; e2e test verifies MARKER replay across client disconnect (W4)
+- [x] **Transparent audit** — low-volume structured events (session.create/attach/detach/kill/exit, auth.ok/deny) → `memory.db` with `tenant_id` column; raw PTY output is never persisted (W1)
+- [x] **`deckent serve --host` / `--no-terminal`** — remote bind refuses to enable the terminal without an explicit token (spec §5) (W2)
+- [x] **ADR-062 + ADR-010 amendment** — both runtime deps (`node-pty`, `ws`) are ADR-justified (W0)
+- [ ] **Sub-project #2** — self-security procedure (prompt/command guard, planner state-hygiene)
+- [ ] **Sub-project #3** — million-scale: multi-tenant isolation, sandbox, rate/resource limits
+- [ ] **Sub-project #4** — enterprise external-world integrations + secure data exchange
+
+See `docs/guide/terminal.md` for the user guide and ADR-062 for the architectural record.
+
+---
+
 ## Phase 3.5: Multi-Provider & Platform Support (March 2026) — COMPLETE
 
 Make Deckent provider-agnostic and cross-platform ready.
