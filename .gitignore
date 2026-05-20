@@ -116,3 +116,4 @@ file:audit-idem-*
 .npm-cache/
 vitest-out.txt
 kendimenot.md
+.tmp/

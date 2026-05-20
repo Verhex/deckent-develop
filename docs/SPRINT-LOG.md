@@ -4802,3 +4802,30 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 175-020: W4.3 — Final verification (GO_WITH_TECH_DEBT)
 
 ---
+## Sprint 177 — sprint-177
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-05-20
+**Duration:** 1494s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 7 |
+| Completed | 5 |
+| Tech Debt | 1 |
+| No-Go | 2 |
+| Coverage | 15.8% |
+| Duration | 1494231ms |
+
+### Tasks
+
+- 177-001: Fix debt: ADR-019 reconciliation: language-agnostic verify not implemented (NO_GO)
+- 177-002: 177-001 — Worker rollback: git-stash snapshot-on-spawn (DONE)
+- 177-003: 177-002 — deckent kill cascade fix (DONE)
+- 177-004: 177-003 — Tmux backend deprecate path (GO_WITH_TECH_DEBT)
+- 177-005: 177-004 — Config template-regen guard + restore docs (DONE)
+- 177-006: 177-005 — nervous_system directives_protection baseline-update hook (DONE)
+
+---

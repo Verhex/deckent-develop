@@ -9,6 +9,57 @@
 
 ---
 
+## ⚡ 2026-05-20 (Trinity Vision Anchor — "Hedefimiz Her Zaman Bu")
+
+Alperen kanonik beyan (2026-05-20): **"Deckent hem AI asistan hem AI system worker hem AI developer olacak. Hem şirketler, hem geliştiriciler, hem de sade kişiler Deckent'i kullanabilecek. Hedefimiz her zaman bu."**
+
+Bu, "Deckent sadece dev tool" / "Deckent sadece enterprise SaaS" / "Deckent sadece kişisel asistan" çerçevelemelerinin **hepsini reddeden** üst-anchor. Mevcut motor (Brain + MCP 27 tool + Memory V2 + 15 agent + 21 skill + Nervous System + Hybrid Mode ADR-042) **zaten 3 yüzü taşıyacak şekilde kurulu**.
+
+### Trinity Matris (tek motor, 3 yüz, 3 kitle)
+
+| Yüz | Kitle | İşlev özü | Mode (ADR-042 üzerinden) | Olgunluk |
+|-----|-------|-----------|---------------------------|----------|
+| **AI Asistan** | Sade kişiler (öğrenci/freelancer/ev/günlük) | Conversational + planlama + hatırlatma + kişisel hafıza | **Chat Mode** (yeni, conversational shell Yol A/B/C karar bekliyor) | ~%25 (memory + nervous hazır, REPL eksik) |
+| **AI System Worker** | Şirketler (operasyon/IT/finans/CX/vertical) | İş otomasyonu + sistem entegrasyonu + scheduled flow + audit chain | **Process Mode** (Sub-project #3 multi-tenant + scheduled flows dashboard ile) | ~%50 (MCP + multi-tenant inşaada, enterprise entegrasyonu eksik) |
+| **AI Developer** | Geliştiriciler (solo/ekip/agency) | Sprint orchestration + multi-agent + quality gates + retro | **Sprint Mode** (ADR-042'de yerleşik, 170+ sprint dogfood) | ~%95 (1 Haz beta hazır) |
+
+### Üç Yüz Aynı Motoru Paylaşır
+
+```
+        ┌─────────────────────────────────────────────┐
+        │              TEK DECKENT MOTORU              │
+        │  Brain + MCP (27 tool) + Memory + Agent pool │
+        │  Nervous System + Auditor + Hybrid Mode     │
+        └─────────────────────────────────────────────┘
+                ▲              ▲              ▲
+                │              │              │
+        ┌───────┴──────┐ ┌─────┴─────┐ ┌─────┴─────┐
+        │ Chat Mode    │ │Process Mode│ │Sprint Mode│
+        │ (assistant)  │ │(sys worker)│ │(developer)│
+        │ → sade kişi  │ │ → şirket   │ │ → dev     │
+        └──────────────┘ └────────────┘ └───────────┘
+```
+
+Aynı 27 MCP tool, aynı SQLite memory, aynı agent pool, aynı nervous system — sadece **arayüz katmanı (mode)** değişir.
+
+### Anchor Sonuçları
+
+- **Hiçbir feature kararı "yalnızca dev için" veya "yalnızca enterprise için" çerçeveleyemez** — 3 yüze birden hizmet etmeli (veya en az 1 yüzü güçlendirip diğer 2'ye zarar vermemeli).
+- **"Persona-slice rakibi" tezi:** OpenHuman = sade kişi slice'ı, Devin/Cursor = developer slice'ı, Agentforce/Salesforce = enterprise slice'ı. Deckent **üçünü birden** yapma iddiasında — kanıtlanmamış ama hedef.
+- **Beta sıralaması (1 Haz 2026):** Sprint Mode OSS yüzü açılır (AI Developer); Chat + Process Mode'lar post-beta ark'ta tamamlanır.
+- **Olgunluk dengesizliği kasıtlı:** Developer'ı önce inşa etmek motoru zorladı → motor reel oldu → diğer 2 yüze hazır altyapı oldu. Meta-dogfood'un yan kazancı.
+
+### Değişmeyen DNA ile Bağlam
+
+Bu trinity beyanı §11 anchor kurallarını (ADR-033 product-not-service / ADR-034 multi-project isolation / ADR-042 hybrid mode) **rafine eder, çelişmez**. Üç yüz de:
+- Local-first çalışır (no Deckent cloud)
+- MIT lisansı altında ücretsiz (no pro tier / no enterprise edition)
+- Aynı binary'den gelir (no separate distributions)
+
+Referans memory'ler: `project_deckent_trinity_anchor` (canonical), `feedback_deckent_multi_role_scope`, `project_deckent_agentic_os_vision`, `project_deckent_god_level_vision`.
+
+---
+
 ## ⚡ 2026-05-20 (Sprint 175 → Embedded Web Terminal #1/4 Teslim)
 
 VSCode-benzeri **gömülü web terminal** dashboard içinde **canlı çalışıyor** (Alperen smoke 2026-05-20). 4-parçalı agentic-OS yolunun #1 alt-projesi.
@@ -31,6 +82,93 @@ VSCode-benzeri **gömülü web terminal** dashboard içinde **canlı çalışıy
 | 4 | **Enterprise dış-dünya entegrasyon + güvenli veri alışverişi** | denetim altyazısı zenginleştirme, dış sistem hook'ları, compliance (SOC2/GDPR) |
 
 Sprint 176+ önceliklerinden: node-pty kalıcı fix (`@lydell/node-pty-linux-x64` optionalDep), şu an çalışan manuel workaround'u tek-komut install'a indirir.
+
+---
+
+## ⚡ 2026-05-20 (Discussion: Conversational Shell — Karar Bekliyor)
+
+Sprint 175 embedded web terminal teslimatı sonrası gündeme gelen stratejik soru: **Deckent'in CLI-imperatif modelinden** (`deckent init && deckent plan && deckent start`) **conversational / native-chat modeline** geçişi nasıl olmalı? Mevcut CLI komutları zaten MCP'de tool olarak exposed — eksik olan tek katman bir **conversational shell** (LLM tool-use loop + REPL).
+
+### Kod-Doğrulanmış Mevcut Yapı Taşları
+
+| Taş | Konum | Durum | Chat için anlamı |
+|-----|-------|-------|-------------------|
+| **27+ MCP tool** | `src/mcp/tools/*.ts` (init/plan/start/status/explain/memory-query/nervous/watch/audit/...) | ✅ Tamam | Chat'in "elleri" — natural language hedefi |
+| **Provider abstraction** | `src/providers/{claude,codex,gemini,sandbox,subprocess}.ts` (1675 LoC) | ⚠️ **CLI shell-out** (`spawnSync`), native SDK değil | Tool-use loop için SDK migration ya da CLI-host yaklaşımı gerek |
+| **Embedded Web Terminal** | `src/api/terminal/{ws-gateway,session-manager,prompt-guard,audit,auth-provider}.ts` + `src/dashboard/.../terminal/` | ✅ Sprint 175 GA | PTY + WS gateway + auth + audit — chat'in evi hazır |
+| **`deckent` SessionKind** | DIRECTIVES.md Sprint 175 Task 4 (`AiTool` type: claude/gemini/codex/deckent/shell) | ✅ Tanımlı | "deckent" kind özel — chat mode'a ayrılabilir |
+| **Nervous System** | `src/nervous/{observer,decision-engine,proposer,dispatcher,executor}.ts` + 5 detector | ✅ ADR-040 accepted | Proactive notification + accept/reject UX zaten var |
+| **Hybrid Mode** | ADR-042 (Sprint + Task dual modes) | ✅ accepted | **Chat = 3. mod** mimari olarak yerleşik |
+| **MemoryStore SQLite + FTS5** | `src/core/memory-{store,query,types}.ts` | ✅ Tamam | Chat history için yeni `chat` entry type — schema additive |
+| **`deckent chat` komutu** | yok | ❌ **TEK EKSİK PARÇA** | Yazılacak yer |
+
+### 3 Mimari Yol — Karar Bekliyor
+
+#### Yol A — Sprint 175 Embedded Terminal Üstüne Bina Et
+
+`DeckentChatBackend` extension `src/api/terminal/session-backend.ts`'e: `deckent` SessionKind PTY yerine ChatOrchestrator spawn eder. Dashboard'tan "Deckent" tab'ı doğal chat surface'ı olur. CLI tarafında `deckent chat` aynı backend'i embedded olmadan kullanır (opsiyonel).
+
+- **LoC:** ~600
+- **Sprint:** 1-2
+- **Yeni dep:** yok
+- **CLI prerequisite:** yok
+- **ADR etkisi:** yok (Sprint 175 + ADR-042 mevcut)
+- **Multi-tenant uyumu:** ✅ tam (terminal infra Sprint 176'da tenant-scoped olacak)
+
+#### Yol B — Mevcut Claude/Codex CLI'ı Host Yap
+
+`deckent chat` kullanıcının `claude` (veya `codex`/`gemini`) CLI'ını subprocess olarak spawn eder + deckent MCP'sini auto-attach eder. Tool-use loop'u kullanıcının LLM CLI'ı yapar, Deckent sadece MCP server + tty forward sağlar.
+
+- **LoC:** ~150
+- **Sprint:** 0.5
+- **Yeni dep:** yok
+- **CLI prerequisite:** **kullanıcı `claude`/`codex`/`gemini` CLI kurmalı**
+- **ADR etkisi:** yok
+- **ADR-033 uyumu:** ⚠️ kısmen — kur-çalıştır kolaylığı için ek CLI dependency
+
+#### Yol C — Native SDK + Kendi REPL'i
+
+`@anthropic-ai/sdk` + `openai` + `@google/generative-ai` ile Deckent kendi tool-use loop'u + readline/ink REPL. Provider abstraction'ı (mevcut 1675 LoC) CLI shell-out modelinden native SDK modeline migrate edilir. Tam standalone.
+
+- **LoC:** ~1500 + provider migration
+- **Sprint:** 3-4
+- **Yeni dep:** 3 SDK
+- **CLI prerequisite:** yok
+- **ADR etkisi:** **ADR-010 (commander.js tek runtime dep) amendment gerek** (Sprint-172 amendment pattern ile)
+- **ADR-033 uyumu:** ✅ tam — Deckent gerçek standalone chat'leyebilir
+
+### Direkt Kıyas Tablosu
+
+| Boyut | Yol A (Embedded üstü) | Yol B (CLI host) | Yol C (Native SDK) |
+|-------|------------------------|-------------------|---------------------|
+| **LoC** | ~600 | ~150 | ~1500 + migration |
+| **Tahmini sprint** | 1-2 | 0.5 | 3-4 |
+| **Yeni dep** | yok | yok | 3 SDK |
+| **Terminal-native** | dashboard + opsiyonel CLI | ✅ doğal | ✅ doğal |
+| **`claude`/`codex` CLI zorunlu** | hayır | **evet** | hayır |
+| **ADR-010 etkisi** | yok | yok | amendment |
+| **ADR-033 (kur-çalıştır) uyumu** | ✅ | ⚠️ kısmen | ✅ tam |
+| **Sprint 175 entegrasyon** | tam üst kullanım | bağımsız | bağımsız |
+| **Multi-tenant uyumu** | ✅ tam | zor | orta |
+| **Bağımsızlık** | dashboard-bağlı | LLM CLI-bağlı | tam bağımsız |
+
+### Hibrit Sıralama Önerisi (karar bekliyor)
+
+Üç yol birbirine **çakışmaz, üst üste binar**:
+
+1. **Kısa vade — Yol B** (Sprint 176 fix sonrası, ~0.5 sprint): June 1 beta'ya yetişir, kanıt "deckent chat çalışıyor". Kullanıcının `claude` CLI'ı varsa, hızlı entegrasyon.
+2. **Orta vade — Yol A** (Sprint 175 sub-projects #2-#4 toparlanınca, ~1-2 sprint): Dashboard'tan "Deckent" tab'ı doğal chat surface'ı olur. Multi-tenant ile birebir uyum.
+3. **Uzun vade — Yol C** (Q3 2026, ~3-4 sprint): Provider SDK migration ile gerçek bağımsızlık + ADR-033 tam uyum + fresh-machine `npx deckent` → chat sıfır prerequisite.
+
+### Doğrulama Notu
+
+Bu öneri kod-doğrulamalı (`src/cli/index.ts`, `src/providers/claude.ts`, `src/mcp/tools/`, `src/nervous/`, `src/api/terminal/`, `src/dashboard/.../terminal/`). Memory kuralı `feedback_verify_deckent_before_competitor_advice` uygulandı — strateji önerisi mevcut Deckent kodunu görmeden yapılmaz. **Tek eksik parça** `src/cli/commands/chat.ts` — diğer her şey (MCP tool registry, provider adapter, terminal infra, nervous system, memory store, hybrid mode) zaten yerinde.
+
+### Bekleyen Karar
+
+- **Hangi yol önceliklendirilecek?** Karar Alperen'in.
+- **Karar sonrası:** Tek konkret task (örn. Yol B = `src/cli/commands/chat.ts` + MCP auto-attach + tty forward, ~150 LoC, 1 sprintlik iş) Sprint 177+ DIRECTIVES'e eklenir.
+- **Karar yapılana kadar:** Sprint 176 (planner state-hygiene + self-security) ve Sprint 175 #2-#4 önceliği değişmez — chat opsiyonu bir backlog/karar maddesi olarak kayıtlı kalır.
 
 ---
 

@@ -1,6 +1,25 @@
 # Changelog
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
+## [1.0.0-beta.1-sprint177] - 2026-05-20
+
+### Added
+
+- 177-001 — Worker rollback: git-stash snapshot-on-spawn
+- 177-004 — Config template-regen guard + restore docs
+- 177-005 — nervous_system directives_protection baseline-update hook
+
+### Changed
+
+- 177-003 — Tmux backend deprecate path (completed with tech debt)
+
+### Fixed
+
+- 177-002 — deckent kill cascade fix
+
+
+_Tasks: 7 total, 5 done, 1 tech debt, 2 no-go_
+
 ## [1.0.0-beta.1-sprint175] - 2026-05-19
 
 ### Added
