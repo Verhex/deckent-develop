@@ -4,17 +4,21 @@
 // and that new-project defaults remain safely disabled.
 
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { createDefaultConfig } from '../../src/core/config.js';
 
 // ─── Test 1: .deckent/config.json loads with enabled=true ──────────────────
 
 describe('nervous_system enabled=true pivot (Sprint 148 T-006)', () => {
-  it('project config .deckent/config.json has nervous_system.enabled === true', () => {
-    // Load the project config directly — simulates what loadConfig() does
-    const projectRoot = join(process.cwd());
-    const configPath = join(projectRoot, '.deckent', 'config.json');
+  // PR #16 made .deckent/config.json gitignored (it's a runtime file, not
+  // a tracked fixture). Skip the dogfood assertion when the file is absent
+  // (clean checkout / CI without a deckent init).
+  const projectRoot = join(process.cwd());
+  const configPath = join(projectRoot, '.deckent', 'config.json');
+  const hasProjectConfig = existsSync(configPath);
+
+  it.skipIf(!hasProjectConfig)('project config .deckent/config.json has nervous_system.enabled === true', () => {
     const raw = readFileSync(configPath, 'utf-8');
     const projectConfig = JSON.parse(raw) as { nervous_system?: { enabled?: boolean; mode?: string } };
 

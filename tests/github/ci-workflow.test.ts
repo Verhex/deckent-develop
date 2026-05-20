@@ -176,7 +176,7 @@ describe('CI Workflow (.github/workflows/ci.yml)', () => {
     });
 
     it('should still use matrix strategy for node versions', () => {
-      expect(content).toContain('node-version: [18.x, 20.x, 22.x]');
+      expect(content).toContain('node-version: [24.x, 26.x]');
     });
   });
 

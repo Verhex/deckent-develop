@@ -30,6 +30,7 @@
     "lint:errors": "node scripts/check-error-handling.mjs",
     "lint:link": "node scripts/lint-links.mjs",
     "clean": "rm -rf dist",
+    "ci:rebuild-native": "npm rebuild better-sqlite3 --ignore-scripts=false",
     "validate:publish": "npx tsx scripts/validate-publish.ts",
     "docs:generate-cli": "npx tsx scripts/generate-cli-docs.ts",
     "docs:ref": "node scripts/gen-reference-docs.mjs --write",
@@ -64,14 +65,14 @@
     "@modelcontextprotocol/sdk": "^1.27.1",
     "@noble/ed25519": "^2.3.0",
     "@noble/hashes": "^1.8.0",
-    "better-sqlite3": "^12.9.0",
+    "better-sqlite3": "^12.10.0",
     "commander": "^13.0.0",
     "telegraf": "^4.16.0",
     "ws": "^8.18.0",
     "zod": "^3.25.0"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=24.0.0"
   },
   "files": [
     "dist",
