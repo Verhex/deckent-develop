@@ -6,7 +6,7 @@
 |----|-------|----------|--------|--------|
 | debt-175-020-fix | Tech debt from 175-020-fix: All 5 automatic verification gates executed:
 
-1. npm | normal | sprint-175 | active |
+1. npm | critical | sprint-175 | active |
 | debt-adr-019-reconciliation | ADR-019 reconciliation: language-agnostic verify not implemented | critical | sprint-172 | active |
 
 ## Resolved Technical Debt
@@ -124,3 +124,5 @@ M | normal | - | resolved |
 | debt-156-011-fix | Tech debt from 156-011-fix: Code physically verified despite missing .result (Sp | normal | - | resolved |
 | debt-162-001 | Tech debt from 162-001: T-003 composite (phase observability + EvaluationAuditTr | normal | - | resolved |
 | debt-170-001-fix | Tech debt from 170-001-fix: Code physically verified despite missing .result (Sp | normal | - | resolved |
+| debt-176-004 | Tech debt from 176-004: Fixed DEP0190 deprecation: 3 call-sites changed from she | normal | - | resolved |
+| debt-177-004 | Tech debt from 177-004: 3 required TDD tests PASS (default→docker + explicit-war | normal | - | resolved |

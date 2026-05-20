@@ -1,5 +1,23 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-177 Learnings
+- Sprint sprint-177 Learnings: ## Sprint sprint-177 Learnings
+- Fix debt: ADR-019 reconciliation: language-agnostic verify not implemented: NO_GO — Worker exited without writing result (exitCode=0)
+- 177-003 — Tmux backend deprecate path: GO_WITH_TECH_DEBT — 3 required TDD tests PASS (default→docker + explicit-warns + warn-once). Functional requirements fully met: resolveBacke
+
+## Sprint sprint-176 Learnings
+- Sprint sprint-176 Learnings: ## Sprint sprint-176 Learnings
+- Fix debt: ADR-019 reconciliation: language-agnostic verify not implemented: NO_GO — REFUSED — empty-scope debt-injection dispatch. The task as dispatched is a live reproduction of the exact bug that W1-1 
+- W1-1 — Auto-debt empty-scope inheritance: NO_GO — Worker exited without writing result file
+- W1-2 — Re-plan orphan task file cleanup: NO_GO
+- W2-3 — DEP0190 shell:true win32-only conditional: NO_GO — Fixed DEP0190 deprecation: 3 call-sites changed from shell:true to shell:process.platform==='win32'. (1) src/core/plugin
+- W2-4 — Coverage hard-floor / aspirational split: NO_GO — Worker exited without writing result file
+- W3-5 — Dashboard TS errors + root lint wire: NO_GO — Worker exited without writing result file
+- W3-6 — doctor DECISIONS.md obsolete + 5-file cascade: NO_GO — Worker exited without writing result file
+- W2-7 — CI-only test flakes (PID portability + mock hygiene): NO_GO — Worker exited without writing result file
+- W4-8 — Prompt guard (I1+I2): NO_GO — Worker exited without writing result file
+- W4-9 — Command guard (I3 default-deny remote): NO_GO — Worker exited without writing result file
+
 ## Sprint sprint-175 Learnings
 - Sprint sprint-175 Learnings: ## Sprint sprint-175 Learnings
 - W1.2 — SessionBackend + LocalPtyBackend: NO_GO — W1.2 — SessionBackend interface + LocalPtyBackend implementation, plan §Task 1.2 ile birebir aynı. RED→GREEN TDD akışı:

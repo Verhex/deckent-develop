@@ -1,6 +1,6 @@
 # Dead Code Audit Report — Sprint 139
 
-**Date:** 2026-05-19
+**Date:** 2026-05-20
 **Tool:** scripts/dead-code-audit.mjs
 **Scope:** src/ directory (read-only analysis)
 
@@ -75,7 +75,7 @@ These suspects turned out to be actively used.
 
 ## Unused Export Sampling
 
-Found **730** potentially unused exports across src/.
+Found **736** potentially unused exports across src/.
 Top 20 shown below (full list requires deeper analysis):
 
 | File | Export | Import Count |

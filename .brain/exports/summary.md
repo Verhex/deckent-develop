@@ -56,8 +56,14 @@
 | adr-055 | Hybrid Scoring 5-Layer Pipeline — Schema / Gates / Quality / Outcome / Auditor | proposed |
 | adr-060 | Self-Awareness Propagation — 5-Channel Context Enrichment Architecture | proposed |
 | adr-061 | AEGIS — Agentic Effect-Governed Iterative Stewardship Methodology | proposed |
+| adr-062 | Embedded Web Terminal — PTY Sessions, WS Gateway, Auth & Audit | accepted |
+| adr-063 | Consent-Based Prerequisite Provisioning | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-177 Learnings** (sprint-177): ## Sprint sprint-177 Learnings
+- Fix debt: ADR-019 reconciliation: language-agnostic verify not implemented: NO_GO — ...
+- **Sprint sprint-176 Learnings** (sprint-176): ## Sprint sprint-176 Learnings
+- Fix debt: ADR-019 reconciliation: language-agnostic verify not implemented: NO_GO — ...
 - **Sprint sprint-175 Learnings** (sprint-175): ## Sprint sprint-175 Learnings
 - W1.2 — SessionBackend + LocalPtyBackend: NO_GO — W1.2 — SessionBackend interface + L...
 - **Sprint sprint-174 Learnings** (sprint-174): ## Sprint sprint-174 Learnings
@@ -73,16 +79,9 @@
 - W3.1 C0c Collision Detection Live Trigger Investigation + Fix: NO_GO — W3.1 RC ident...
 - **Sprint sprint-168 Learnings** (sprint-168): ## Sprint sprint-168 Learnings
 - T3 Kill Recovery Simulation (DEPENDS T1): NO_GO — Task blocked by unmet dependency. ...
-- **Sprint sprint-167 Learnings** (sprint-167): # Sprint sprint-167 Learnings
-
-Sprint 167 Read-Only Self-Audit deliverable'ları (kaynak: .audit/sprint-167/T*.md — hi...
-- **Sprint sprint-166 Learnings** (sprint-166): # Sprint sprint-166 Learnings
-
-## 4 Architectural Root Cause Fix
-1. **Bug M (adrInsert hook):** docs/adr/*.md → memor...
 
 ## Active Technical Debt
-- [NORMAL] Tech debt from 175-020-fix: All 5 automatic verification gates executed:
+- [CRITICAL] Tech debt from 175-020-fix: All 5 automatic verification gates executed:
 
 1. npm
 - [CRITICAL] ADR-019 reconciliation: language-agnostic verify not implemented
@@ -97,5 +96,7 @@ Sprint 167 Read-Only Self-Audit deliverable'ları (kaynak: .audit/sprint-167/T*.
 - Violation pattern: stale_heartbeat
 - Violation pattern: stale_heartbeat
 - Violation pattern: stale_heartbeat
+- Violation pattern: stale_heartbeat
+- Violation pattern: stale_heartbeat
 
-_Total entries: 257 | Generated: 2026-05-19_
+_Total entries: 269 | Generated: 2026-05-20_

@@ -228,8 +228,10 @@ These exceptions never interpolate untrusted input into a command string (args r
 | `zod` | `^3.25.0` | Plan/config schema validation at runtime | Task planner validation (Sprint 044+) |
 | `@noble/ed25519` | `^2.3.0` | Ed25519 signing for `.deck` secret files | ADR-014: .deck Secret File System |
 | `@noble/hashes` | `^1.8.0` | SHA-512 hashing for `.deck` key derivation | ADR-014: .deck Secret File System |
+| `node-pty` | `^1.0.0` | Interactive PTY for embedded web terminal (claude/gemini/codex/shell sessions) | ADR-062: Embedded Web Terminal |
+| `ws` | `^8.18.0` | Browser WebSocket transport for terminal stream (audited zero-dep; hand-rolled RFC6455 rejected as a security surface) | ADR-062: Embedded Web Terminal |
 
-**Consequence:** The principle shifts from "1 dependency" to "minimum necessary, every dependency ADR-backed". Any new runtime dependency proposal must include an ADR reference or a new ADR. The dependency count (7) reflects the full product scope — CLI + MCP + Memory + Connectors + Crypto.
+**Consequence:** The principle shifts from "1 dependency" to "minimum necessary, every dependency ADR-backed". Any new runtime dependency proposal must include an ADR reference or a new ADR. The dependency count (9) reflects the full product scope — CLI + MCP + Memory + Connectors + Crypto + Embedded Web Terminal (Sprint 175).
 
 
 ---
@@ -887,7 +889,7 @@ Built-in generator sistemi genişletilemez yapıda kalırsa, her yeni section t�
 İki katmanlı extensibility sistemi tasarlandı:
 
 **Katman 1: Template Renderer (`template-renderer.ts`)**
-- `{{path.to.value}}` placeholder syntax — `DocUpdateContext`'e karşı çözümlenir
+- `&#123;&#123;path.to.value&#125;&#125;` placeholder syntax — `DocUpdateContext`'e karşı çözümlenir
 - `buildTemplateScope()` — sprint result, config, metrikler, agent/skill sayıları, paket versiyonu gibi standart değerleri scope'a ekler
 - `resolvePath()` — nokta-ayrılmış yol üzerinden nested nesne/Map erişimi
 - `renderTemplate()` — regex replace, unresolved placeholder → boş string (non-fatal)
@@ -902,7 +904,7 @@ Built-in generator sistemi genişletilemez yapıda kalırsa, her yeni section t�
 Güvenlik kararı: JSON generator'lar `loadUserGeneratorsSync()` ile sync olarak sprint içinde çalışır; MJS generator'lar ise ayrı `loadUserGeneratorsAsync()` çağrısı gerektirir ve yalnızca güvenilen kaynaklardan yüklenmelidir.
 
 **Consequences (+):**
-- Template syntax öğrenme eğrisi düşük — `{{metrics.coveragePercent}}%` yeterli
+- Template syntax öğrenme eğrisi düşük — `&#123;&#123;metrics.coveragePercent&#125;&#125;%` yeterli
 - JSON format code review kolaylığı ve static analysis uyumluluğu sağlar
 - MJS format güçlü extensibility (herhangi bir hesaplama yapılabilir)
 - User generator'lar built-in'leri override edebilir — proje-spesifik davranış mümkün
@@ -5043,3 +5045,364 @@ AEGIS VSDD'nin **superset'idir** — VSDD prensiplerinin çoğunu (adversarial v
 > - Ground-truth tutarlı: "15 vertical agent + 21 horizontal skill" (§Related ADR-041) güncel kataloğla eşleşir.
 >
 > Behavior unchanged; documentation alignment only.
+
+
+---
+
+## adr-062: Embedded Web Terminal — PTY Sessions, WS Gateway, Auth & Audit
+
+**Status:** accepted
+
+# ADR-062: Embedded Web Terminal — PTY Sessions, WS Gateway, Auth & Audit
+
+**Status:** accepted
+
+**Deciders:** Alperen Sartaçoğlu (product owner), Brain (orchestrator)
+
+**Date:** 2026-05-19
+
+**Sprint:** Sprint 175 (Embedded Web Terminal — Sub-project #1/4)
+
+---
+
+## Status
+
+accepted — implements the VSCode-like dockable terminal feature for the deckent dashboard.
+Sub-project #1/4; sub-projects #2 (prompt/command guard), #3 (multi-tenant/k8s isolation),
+#4 (enterprise external integration) are deferred to separate sprints.
+
+> **Numbering note (Sprint 175, RESOLVED):** A collision with
+> `docs/adr/062-consent-based-provisioning.md` (Sprint 175 Workstream A, same date)
+> was resolved by renaming the consent-based ADR to `063-consent-based-provisioning.md`.
+> This file retains `062-` per its spec/plan precedent. `memory.db` `adr-062` already
+> points to this Embedded Web Terminal record.
+
+---
+
+## Context
+
+The deckent dashboard (React + Vite + Tailwind) provides sprint monitoring but offers no
+way to run interactive AI tools (`claude`, `gemini`, `codex`, `deckent`) or a shell session
+directly from the browser. Users must switch between the dashboard and a terminal, breaking
+focus during sprint supervision.
+
+Sprint 172–174 stabilised the dashboard and completed OSS GA preparation. Sprint 175 adds
+an embedded terminal as sub-project #1 of a 4-part roadmap.
+
+Key constraints established in the verified spec (`docs/superpowers/specs/2026-05-19-embedded-web-terminal-design.md`):
+
+1. **Security invariant (§1c.2):** The terminal WebSocket auth is **independent of and
+   stricter than** `DECKENT_API_AUTH_DISABLED`. Disabling the global API auth gate does
+   NOT open the shell. This invariant must never be relaxed (RCE surface if violated).
+
+2. **Auth delivery (§1c):** The token is generated per-server-start, injected into the
+   index.html page only for `127.0.0.1`/`::1` callers as `window.__DECKENT_TERMINAL_TOKEN__`,
+   and presented via the `Sec-WebSocket-Protocol` subprotocol header (never in a plain HTTP
+   Authorization header on the WS upgrade).
+
+3. **Audit invariant:** Raw PTY output (ANSI sequences, user keystrokes, command output)
+   is **never persisted** to disk or `memory.db`. Only structured, low-volume audit events
+   (session created/attached/detached/killed) are stored, scoped by `tenantId`.
+
+4. **Reattach boundary:** A PTY session survives client disconnect (browser tab closed,
+   network blip) and can be reattached with scrollback replay. It does NOT survive a server
+   restart (in-memory only). Disk persistence is a post-#1 backlog item.
+
+5. **Enterprise seams (§1d):** `AuthProvider` and `SessionBackend` interfaces are defined
+   from day one, with exactly one implementation each (`LocalTokenAuthProvider`,
+   `LocalPtyBackend`). Multi-tenant SSO, remote backends, and k8s pod exec are deferred
+   to sub-project #3.
+
+---
+
+## Decision
+
+A self-contained terminal subsystem is added under `src/api/terminal/` with the following
+components and contracts:
+
+### Module Boundary
+
+```
+src/api/terminal/
+  types.ts          — shared types (TenantId, SessionKind, AiTool, CreateSessionInput,
+                       SessionMeta, AuditAction, AuditEvent)
+  auth-provider.ts  — AuthProvider interface + LocalTokenAuthProvider
+  session-backend.ts — SessionBackend interface + LocalPtyBackend (node-pty)
+  session-manager.ts — PtySessionManager (Map, bounded ring buffer, attach/detach, reaper)
+  audit.ts          — TerminalAudit (structured events → memory.db, tenant-scoped)
+  ws-gateway.ts     — attachTerminalGateway (HTTP upgrade → auth → bridge)
+```
+
+`src/api/server.ts` wires the gateway, exposes HTTP control routes (`GET/POST/DELETE
+/api/terminal/sessions`), and injects the bootstrap token into `index.html` for localhost
+callers only.
+
+`src/cli/commands/serve.ts` adds `--host <addr>` (default `127.0.0.1`) and `--no-terminal`
+options; non-localhost `--host` without explicit token triggers a security warning and
+leaves terminal disabled unless the user opts in explicitly.
+
+### AuthProvider Interface
+
+```typescript
+interface AuthProvider {
+  verifyToken(token: string): boolean | Promise<boolean>;
+}
+```
+
+`LocalTokenAuthProvider` implements this with SHA-256 + `crypto.timingSafeEqual`. It
+deliberately ignores `DECKENT_API_AUTH_DISABLED` — auth bypass applies only to the REST
+API, not to the PTY shell.
+
+### SessionBackend Interface
+
+```typescript
+interface SessionBackend {
+  spawn(input: CreateSessionInput, tenantId: TenantId): PtySession;
+}
+```
+
+`LocalPtyBackend` wraps `node-pty` for in-process PTY spawning. Remote backends (k8s exec,
+Docker exec, SSH) are sub-project #3 implementations of this interface.
+
+### PtySessionManager
+
+- Sessions stored in a `Map<string, PtySessionEntry>` keyed by `sessionId` (UUID).
+- Each session holds an in-memory bounded ring buffer (configurable `scrollbackBytes`,
+  default 256 KiB) for reattach replay. Buffer does not overflow to disk.
+- `detach(sessionId)` releases the client WebSocket reference without killing the PTY
+  process. `kill(sessionId)` terminates the process and removes the entry.
+- Idle reaper runs on a configurable interval; deckent-managed sessions (kind `deckent`)
+  are exempt from idle-kill to avoid interrupting active sprints.
+- `maxSessions` cap (default 10) rejects new spawns when the limit is reached.
+
+### WS Gateway
+
+`attachTerminalGateway(server, deps)` hooks `server.on('upgrade')`:
+
+1. Token is extracted from `Sec-WebSocket-Protocol: deckent.<token>` — never from
+   query string or cookie.
+2. `AuthProvider.verifyToken()` is called **before** any session is spawned or a WebSocket
+   is accepted. On failure: `socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n')` + destroy.
+3. On success: `new WebSocket(socket)` with `handleProtocols` returning the matched
+   subprotocol; gateway forwards PTY output → WS and WS data → PTY stdin/resize.
+4. On WS close: `manager.detach(sessionId)` — session remains alive for reattach.
+
+### TerminalConfig
+
+Added to `DeckentConfig` via the `terminal` key:
+
+```typescript
+interface TerminalConfig {
+  enabled: boolean;          // default: true
+  bind: string;              // default: '127.0.0.1'
+  maxSessions: number;       // default: 10
+  idleTimeoutMs: number;     // default: 1_800_000 (30 min)
+  scrollbackBytes: number;   // default: 262_144 (256 KiB)
+  allowShellKind: boolean;   // default: true
+}
+```
+
+### Audit
+
+`TerminalAudit.record(event)` writes structured `AuditEvent` objects (session lifecycle
+only) to `memory.db` via the existing `MemoryStore`. The `memory.db` schema gains an
+additive `tenant_id TEXT` column via a non-destructive `ALTER TABLE` migration guarded by
+`schema_version`. Raw PTY bytes are never passed to this function.
+
+### Frontend
+
+A `DockPanel` component wraps a `TerminalPanel` (multi-tab, `TerminalTabs` + `TerminalView`
+using `@xterm/xterm`). The dock is mounted outside the React Router `<Outlet>` in
+`Layout.tsx` so it persists across route navigation. The WS hook (`useTerminalSocket`)
+reads `window.__DECKENT_TERMINAL_TOKEN__` and presents it via the `Sec-WebSocket-Protocol`
+subprotocol.
+
+---
+
+## Consequences
+
+### Positive
+
+- Dashboard gains real interactive terminal capability without leaving the browser.
+- Security-by-default: localhost-only token injection, bypass-independent auth, no raw
+  output persistence — RCE surface stays closed.
+- Enterprise extensibility built in from day one via `AuthProvider`/`SessionBackend` seams.
+- Reattach survives browser disconnect without server-side storage.
+- Audit trail (structured events only) integrates with existing `memory.db` infrastructure.
+
+### Negative / Risks
+
+- `node-pty` is a native addon — requires platform-specific prebuilt or compilation.
+  Handled by `node-pty`'s prebuilt binary system; `npm install` fails loudly if a platform
+  is unsupported (acceptable failure mode, not silent).
+- PTY sessions are in-memory: a server restart loses all sessions. Disk persistence is a
+  post-#1 backlog item (acceptable, documented boundary).
+- `scrollbackBytes` cap means long-running sessions lose early output after the buffer
+  wraps. Users requiring full history should pipe to a log file inside the PTY.
+- The `--host` non-localhost path requires users to manage their own TLS + token delivery
+  (no HTTPS termination built in); spec §5 documents this explicitly.
+
+---
+
+## Alternatives Considered
+
+- **xtermjs hosted via iframe / separate server:** Rejected — cross-origin auth complexity,
+  no shared token injection, user must manage a second process.
+- **Hand-rolled RFC6455 WebSocket server:** Rejected — security surface (frame parsing bugs,
+  masking errors); `ws` library is audited with zero runtime deps of its own.
+- **Persist raw PTY output to `memory.db`:** Rejected — ANSI escape sequences + keystrokes
+  are PII-adjacent and exceed the "structured audit only" security invariant. Raw output
+  may contain passwords, API keys, and personal data.
+- **Global auth bypass applies to terminal too:** Rejected — `DECKENT_API_AUTH_DISABLED`
+  was designed for local dev API convenience, not for shell access. Conflating the two would
+  create an RCE vector (spec §1c.2, B-022).
+- **No session limit / unbounded ring buffer:** Rejected — DoS vector; bounded defaults
+  with configurable overrides are the correct trade-off.
+
+---
+
+## Related ADRs
+
+- **ADR-006** — spawnSync Security Pattern: `LocalPtyBackend` spawn uses array args,
+  `shell: false` (except `win32` npm wrapper), mirroring the existing secure spawn pattern.
+- **ADR-010** — Minimal runtime dependencies: `ws` + `node-pty` added as the 8th and 9th
+  runtime deps, both ADR-justified (this record).
+- **ADR-014** — .deck Secret File System: terminal token uses `randomUUID()` (crypto-random,
+  not `.deck`-managed); complementary, not conflicting.
+- **ADR-016** — Connector Module: `AuthProvider`/`SessionBackend` follow the same
+  interface + local-impl pattern established for connectors.
+- **ADR-034** — Multi-Project Isolation: `tenantId` on audit events prepares the audit
+  trail for multi-project isolation when sub-project #3 lands.
+- **ADR-036** — ADR Governance Integration: this ADR is the runtime constraint record for
+  the terminal subsystem; enforced via Brain prompt enrichment.
+- **ADR-039** — Self-Modifying Task Detection: terminal touches `src/api/` + `src/dashboard/`
+  → dogfood mode triggered → sequential execution mandatory (verified in DIRECTIVES).
+- **ADR-045** — Wave-Based Execution Semantics: terminal implementation uses 5-wave
+  sequential structure (Wave 0→4) due to self-modifying-detector dogfood mode.
+- **ADR-047** — Manuel Subagent Dispatch Protocol: wave gate transitions are Brain-managed
+  manually per this ADR (dependency_pipeline_enabled: false for deckent-dev project).
+
+## Notes
+
+DB sync: this `.md` is intended for upsert into `memory.db` via the ADR-046 `adrInsert`
+post-finalize hook (`adr-file-sync.ts`) — never via destructive rebuild.
+
+Sub-project roadmap:
+- **#1 (this sprint):** Core terminal: PTY sessions, WS gateway, auth, audit, frontend dock
+- **#2:** Security: prompt/command guard — prevent dangerous command patterns
+- **#3:** Multi-tenant isolation: `AuthProvider`/`SessionBackend` k8s/SSO implementations
+- **#4:** Enterprise external integration: remote PTY backends, audit export, SIEM hooks
+
+**İmza:** Brain (orchestrator) — Sprint 175 Wave 0.
+
+
+---
+
+## adr-063: Consent-Based Prerequisite Provisioning
+
+**Status:** accepted
+
+# ADR-063: Consent-Based Prerequisite Provisioning
+
+> **Numbering note (Sprint 175):** This ADR was originally numbered 062 alongside
+> `062-embedded-web-terminal.md` (Sprint 175 concurrent work). Renamed to 063 to
+> resolve the collision; the Embedded Web Terminal ADR retains 062 per its
+> spec/plan precedent.
+
+**Status:** accepted
+**Deciders:** Alperen Sartaçoğlu (product owner), Brain (orchestrator)
+**Date:** 2026-05-19
+**Sprint:** Sprint 175 (1 Haziran Beta — Kusursuz Kurulum Deneyimi, Workstream A)
+
+---
+
+## Status
+
+accepted — implements the blueprint §3.4 "anyone can install & use" promise. Documents an
+implemented + TDD-tested capability (`src/core/provisioner.ts`, 23 tests). Geç-ADR pattern
+(implementation-first documentation), accepted Deckent practice (cf. ADR-053, ADR-061 Notes).
+
+## Context
+
+`deckent init` / `deckent doctor` only **detected** missing prerequisites and printed a hint
+string (`getProviderInstallHint` in `doctor.ts:410` + duplicated in `doctor-format.ts:69`).
+blueprint §3.4 falsely claimed "tmux auto-installed on first run if missing" — no install path
+existed anywhere (`spawnSync('npm', ['install', ...])` was absent from the codebase).
+
+For the 1 Haziran OSS public beta the critical-path goal is a frictionless install experience
+("Deckent herkesin kurabileceği kolaylık"). A non-developer running `deckent init` should be
+guided to a working setup, not handed a list of manual `npm i -g` commands. But silently
+installing global packages / running OS package managers is a security- and trust-sensitive
+action that must not happen without explicit user consent.
+
+## Decision
+
+A single provisioning module (`src/core/provisioner.ts`) is the source of truth for "how is a
+prerequisite installed", consent-gated and OS-aware:
+
+1. **`planInstall(tool, opts)`** — deterministic, pure mapping `ToolId → InstallPlan`:
+   - `claude/codex/gemini` → `method: 'npm-global'`, `npm install -g <pkg>`
+   - `tmux` → `method: 'os-package'` — OS-aware instruction (apt/dnf/pacman/brew)
+   - `node`, `docker` → `method: 'manual'` — never auto-installed (runtime / privileged)
+2. **`installTool`** — only `npm-global` plans are auto-executed, and only when
+   `consent === true`. Array args, `shell: false` (shell:true ONLY on win32 for the npm `.cmd`
+   wrapper, mirroring `provider.ts:detectCliVersion`). Executable checked against
+   `PROVISIONER_BIN_WHITELIST` (frozen, `['npm']` — `sh`/`bash` intentionally absent). Non-zero
+   exit returns `{ status: 'failed' }` (never throws). `os-package`/`manual` are surfaced as an
+   instruction string the user runs themselves — **no silent sudo**.
+3. **`provisionMissing`** — orchestration: `mode` ∈ `prompt | yes | no-install`.
+   - `prompt` (default) — per-tool consent prompt
+   - `yes` (CLI `--yes`, MCP `installMissing:true`) — install all without prompting (CI)
+   - `no-install` (CLI `--no-install`) — legacy hint-only behavior preserved (backward compat)
+4. **Single source of truth** — `getProviderInstallHint` (both `doctor.ts` and
+   `doctor-format.ts` copies) now delegates the package mapping to `planInstall`; legacy hint
+   string format preserved (no test/UX regression).
+5. **MCP parity** — `deckent_init` gains an `installMissing` opt-in (MCP has no interactive
+   consent channel, so it is explicit opt-in === CLI `--yes`; default reports only).
+
+## Alternatives Considered
+
+- **Silent auto-install (no consent).** Rejected — installing global npm packages / OS
+  packages without consent violates user trust and the security DNA (ROADMAP §11 anchor #9).
+- **Keep hint-only.** Rejected — does not meet the beta "frictionless install" goal.
+- **Bundle provider CLIs as deps.** Rejected — bloats the package, conflicts with ADR-010
+  (minimal runtime dependencies) and provider-agnostic vision.
+
+## Consequences
+
+### Positive
+- `deckent init` becomes a real provisioner — closes the blueprint §3.4 reality gap.
+- Security-preserving: consent-gated, whitelist + shell-free spawn (companion to ADR-006
+  spawnSync pattern + `spawn-safety.ts`), no silent sudo.
+- Single source of truth removes the duplicated install-hint mapping (DRY across 3 sites).
+- Backward compatible: `--no-install` preserves the prior hint-only behavior exactly.
+
+### Negative / Risks
+- Global `npm i -g` may require elevated permissions on some setups; failures are reported
+  with the manual command (graceful, non-fatal) rather than auto-escalating.
+- OS-package (tmux) still requires a manual user step on Linux (sudo) — by design.
+- Provider CLI package names (`@anthropic-ai/claude-code`, `@openai/codex`,
+  `@google/gemini-cli`) are now centralized; if a vendor renames a package, update one place.
+
+## Related ADRs
+
+- **ADR-006** — spawnSync Security Pattern: provisioner spawn obeys the array-args /
+  shell-free invariant; `PROVISIONER_BIN_WHITELIST` is a companion to `spawn-safety.ts`.
+- **ADR-010** — Minimal runtime dependencies: provisioner installs *external* CLIs on
+  consent rather than bundling them as deps.
+- **ADR-011** — node:readline/promises prompt: the interactive consent prompt uses the
+  existing `promptConfirm` helper.
+- **ADR-036** — ADR Governance: this ADR is the runtime contract for the provisioning
+  capability; written as governance record for the implemented behavior.
+
+## Notes
+
+ADR number selected as the next free slot above the highest existing ADR (061). Slots
+049–052 / 054 / 056–059 are intentionally left for the TaskType-taxonomy ADR family
+(ADR-053/055/060 already exist; cf. `project-task-type-taxonomy-vision` memory) to avoid
+cross-family collision. Verified against both `docs/adr/` and `memory.db` (`type='adr'`).
+
+DB sync: this `.md` is upserted into `memory.db` via the ADR-046 `adrInsert` post-finalize
+hook (`adr-file-sync.ts`) — never via destructive rebuild (cf. `feedback_db_silmek_yasak`).
+
+**İmza:** Brain (orchestrator) — Sprint 175 Workstream A, behavior implemented + 23 tests PASS.

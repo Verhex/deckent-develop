@@ -36,6 +36,7 @@ paths: [".dashboard",".brain/PATTERNS.md"]
 ## Active ADR Constraints
 
 - **ADR-062**: Embedded Web Terminal — PTY Sessions, WS Gateway, Auth & Audit — **Status:** accepted
+- **ADR-063**: Consent-Based Prerequisite Provisioning — > **Numbering note (Sprint 175):** This ADR was originally numbered 062 alongside
 - **ADR-010**: Tek Runtime Dependency — commander.js — **Status:** accepted
 - **ADR-037**: Brain-Auditor-Worker Authority Matrix — RBAC Protocol V1.0 — **Status:** accepted
 - **ADR-048**: Prompt Lifecycle Contract — **Status:** accepted
