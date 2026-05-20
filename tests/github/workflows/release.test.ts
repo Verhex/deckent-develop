@@ -66,8 +66,8 @@ describe('Release Workflow (.github/workflows/release.yml)', () => {
       expect(workflowContent).toContain("uses: actions/setup-node@v4")
     })
 
-    it('should specify node-version 22.x', () => {
-      expect(workflowContent).toMatch(/Setup Node\.js[\s\S]*?node-version: '22\.x'/)
+    it('should specify node-version 24.x (Active LTS)', () => {
+      expect(workflowContent).toMatch(/Setup Node\.js[\s\S]*?node-version: '24\.x'/)
     })
 
     it('should enable npm cache', () => {

@@ -39,14 +39,14 @@ describe('CI Workflow (.github/workflows/ci.yml)', () => {
       expect(workflowContent).toContain('npm run lint')
     })
 
-    it('should use Node.js 22.x', () => {
-      expect(workflowContent).toContain("node-version: '22.x'")
+    it('should use Node.js 24.x (Active LTS)', () => {
+      expect(workflowContent).toContain("node-version: '24.x'")
     })
   })
 
   describe('Test Jobs', () => {
     it('should test across multiple Node.js versions', () => {
-      expect(workflowContent).toContain('[18.x, 20.x, 22.x]')
+      expect(workflowContent).toContain('[24.x, 26.x]')
     })
 
     it('should depend on typecheck', () => {

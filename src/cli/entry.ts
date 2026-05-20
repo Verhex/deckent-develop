@@ -7,9 +7,9 @@ import { killAllSessions } from '../orchestra/tmux.js';
 
 // ─── Node Version Guard ─────────────────────────────────────────────────────
 const [major] = process.versions.node.split('.').map(Number);
-if ((major ?? 0) < 18) {
+if ((major ?? 0) < 24) {
   process.stderr.write(
-    `deckent requires Node.js >= 18. Current version: ${process.versions.node}\n`,
+    `deckent requires Node.js >= 24 (Active LTS). Current version: ${process.versions.node}\n`,
   );
   process.exit(1);
 }

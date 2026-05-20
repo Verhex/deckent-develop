@@ -44,9 +44,9 @@ describe('npx deckent compatibility', () => {
     expect(pkg.type).toBe('module');
   });
 
-  it('package.json engines requires node >= 18', () => {
+  it('package.json engines requires node >= 24 (Active LTS)', () => {
     const pkg = JSON.parse(readFileSync(join(PROJECT_ROOT, 'package.json'), 'utf-8'));
-    expect(pkg.engines.node).toMatch(/>=\s*18/);
+    expect(pkg.engines.node).toMatch(/>=\s*24/);
   });
 
   it('package.json files includes dist', () => {
