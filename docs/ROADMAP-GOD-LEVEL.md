@@ -4,8 +4,33 @@
 **Status:** CANONICAL — Sprint 149-200 anchor document
 **Vision:** OpenClaw'ın god-level üstün hali — developer-first + life-assistant dual platform
 **Brainstorming:** Alperen onayları 12+ karar, 5 paralel agent kod tabanı analizi
-**Last update:** 2026-05-19 (Sprint 173-174 → 1 Haziran Beta reconciliation — aşağıdaki ⚡ 2026-05-19)
-**Reconciliation note:** §4 Master Roadmap + §5 20-Gate + §6 Debt = 2026-04-21 snapshot, historical. Güncel temel: ⚡ 2026-05-19.
+**Last update:** 2026-05-20 (Sprint 175 Embedded Web Terminal teslimat — aşağıdaki ⚡ 2026-05-20)
+**Reconciliation note:** §4 Master Roadmap + §5 20-Gate + §6 Debt = 2026-04-21 snapshot, historical. Güncel temel: ⚡ 2026-05-20.
+
+---
+
+## ⚡ 2026-05-20 (Sprint 175 → Embedded Web Terminal #1/4 Teslim)
+
+VSCode-benzeri **gömülü web terminal** dashboard içinde **canlı çalışıyor** (Alperen smoke 2026-05-20). 4-parçalı agentic-OS yolunun #1 alt-projesi.
+
+### Sprint 175 (Embedded Web Terminal, 2026-05-19 → 2026-05-20)
+
+- **Branch:** `docs/embedded-web-terminal-spec` (origin push'lı); 17 commit (5 wave-bazlı feature + 2 hotfix + spec/plan/DIRECTIVES + debt closure + #2 backlog notları). PR URL: `https://github.com/VerhexIO/deckent-develop/pull/new/docs/embedded-web-terminal-spec`.
+- **Test sonucu:** 46/46 terminal-spesifik test PASS (backend 30 + frontend 15 + e2e reattach 1). Build temiz: `tsc` exit 0, `vite` SUCCESS (2.87s, 1066KB / gzip 296KB).
+- **ADR:** ADR-062 (Embedded Web Terminal) accepted; ADR-010 Sprint-172 Amendment table'a `node-pty` + `ws` satırları eklendi (dep count 7→9). 062 isim çakışması: consent-based-provisioning → 063 rename ile çözüldü.
+- **Operasyonel kanıt:** `DECKENT_API_AUTH_DISABLED=1 npx deckent serve` + browser hard-refresh sonrası dock panel canlı; `+claude`, `+gemini`, `+shell` sekmeleri gerçek interaktif PTY oturumlarına bağlandı.
+- **Kilitli mimari kararlar (spec §1c/§1d):** tam interaktif PTY (`node-pty`) + `ws` + xterm.js; çoklu-sekme; localhost-bind + zero-config oto-token; tmux-vari reattach (sunucu restart'ta DEĞİL — bilinçli sınır); audit `memory.db`'de yapısal event olarak (ham PTY çıktısı ASLA persist edilmez); `LocalTokenAuthProvider` `DECKENT_API_AUTH_DISABLED`'dan **kasıtlı bağımsız** (RCE bypass'a mahrum); enterprise dikişleri (`AuthProvider`/`SessionBackend`/`tenantId`) ilk günden konumlu.
+- **Bookkeeping/öğrenim:** systematic-debugging Phase-1 ile `debt-170-001-fix` 5-sprintlik döngü **honest closure** ile kapatıldı (Phase-4.5 mimari pattern). İki kalıcı feedback memory yazıldı (`feedback_trust_brain_eval_not_worker`, `feedback_trust_deckent_recovery`) — Brain verdict'i ≠ worker self-report, FIX phase'i küçümseme.
+
+### Sub-project Backlog (#2-#4 sırayla)
+
+| # | Alt-proje | Scope (özet) |
+|---|-----------|----|
+| 2 | **Self-security prosedürü + planner state hygiene** | prompt/komut guard, audit timeline UI; ek 6 maddelik planner state-hygiene defekti (auto-debt-inject empty-scope, re-plan orphan cleanup, DEP0190 `shell:true`, schema-gate coverage enforcement, WorkerCard/DashboardPage pre-existing TS, doctor DECISIONS.md obsolete check) |
+| 3 | **Milyon-ölçek güvenlik** | multi-tenant izolasyon (gerçek `tenantId`), `SessionBackend` k8s pod-exec impl'i, sandbox, rate/kaynak limitleri, OIDC/SSO `AuthProvider` impl'i |
+| 4 | **Enterprise dış-dünya entegrasyon + güvenli veri alışverişi** | denetim altyazısı zenginleştirme, dış sistem hook'ları, compliance (SOC2/GDPR) |
+
+Sprint 176+ önceliklerinden: node-pty kalıcı fix (`@lydell/node-pty-linux-x64` optionalDep), şu an çalışan manuel workaround'u tek-komut install'a indirir.
 
 ---
 

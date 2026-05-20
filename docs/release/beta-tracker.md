@@ -1,7 +1,7 @@
 <!-- Language: EN | Technical terms remain as-is -->
 # Deckent Beta Tracker
 
-**Last updated:** 2026-05-14 (Sprint 166 post-commit) | **Sprint:** 166 DONE (11/11, 10 DONE + 1 GO_WITH_TECH_DEBT) | **Tests:** 16,434+ (35+ new in Sprint 166, +5,000+ since Sprint 164) | **Version:** v1.0.0-beta.1 → v1.0.0-beta.2 target (Sprint 168 Open Source GA)
+**Last updated:** 2026-05-20 (Sprint 175 — Embedded Web Terminal delivered) | **Latest sprint:** 175 (operationally smoke-confirmed by user) | **Version:** v1.0.0-beta.1 → v1.0.0-beta.2 target | **Branch:** `docs/embedded-web-terminal-spec` (origin push'd)
 
 **Related:** [roadmap.md](../vision/roadmap.md) — Sprint 149-200 master plan
 
@@ -33,6 +33,44 @@ Before tagging `v1.0.0-beta.2` and running `npm publish`, **all 20 gates must PA
 | 18 | Wire code-complete (dependency pipeline) | 13 grep matches | ✅ Sprint 164 (`respawnEligibleTasks` 13 matches); Sprint 167 `dependency_pipeline_enabled` flip live |
 | 19 | Bug X (Sprint 156-011 stub) replay analysis | Reproduced + Closed | ✅ Sprint 165 T1 (Bug X stub removed, Brain processQueue legacy FIFO stall closed) |
 | 20 | Bug W (Auditor `dead_event_stream`) | Open since Sprint 148 | ✅ Sprint 165 T4 (dead_event_stream activated); Sprint 166 T9 (emitAlert helper + stale_md detector wired) |
+
+---
+
+## Sprint 175 — Embedded Web Terminal (2026-05-19 → 2026-05-20) — DELIVERED
+
+VSCode-style dockable terminal panel inside the dashboard. **Sub-project #1 of a 4-part agentic-OS path.** Operationally smoke-confirmed by Alperen on 2026-05-20: `+claude` / `+gemini` / `+shell` tabs all spawn real interactive PTY sessions.
+
+**What shipped:**
+- `node-pty` PTY backend behind `SessionBackend` interface (enterprise seam for #3 k8s pod-exec)
+- WebSocket gateway with token in `Sec-WebSocket-Protocol` subprotocol, auth verified BEFORE pty spawn (browsers can't set `Authorization` on `WebSocket`)
+- `LocalTokenAuthProvider` — bypass-independent (deliberately ignores `DECKENT_API_AUTH_DISABLED`; SHA-256 + `timingSafeEqual`)
+- HTTP control routes (`/api/terminal/sessions` CRUD) + localhost-only bootstrap inject of `window.__DECKENT_TERMINAL_TOKEN__` into served `index.html`
+- Multi-tab UI: `claude` / `gemini` / `codex` / `deckent` / shell quick-launch with `DockPanel` mounted outside the React Router `Outlet` for cross-page session persistence
+- tmux-style reattach: bounded in-memory scrollback ring buffer per session, `detach ≠ kill`, e2e test verifies MARKER replay across client disconnect (server-restart NOT supported — explicit boundary)
+- Transparent tenant-scoped audit → `memory.db` (low-volume structured events only; raw PTY output is **never** persisted)
+- `deckent serve --host` / `--no-terminal` CLI surface; remote bind refuses to enable the terminal without an explicit token
+- ADR-062 (Embedded Web Terminal) accepted; ADR-010 Sprint-172 Amendment extended with both new runtime deps (`node-pty`, `ws`) — dependency count 7→9, all ADR-justified
+
+**Metrics:**
+- 46/46 terminal-specific tests PASS (backend 30, frontend 15, e2e reattach 1)
+- `tsc --noEmit` clean; `vite build` SUCCESS (1066KB / gzip 296KB)
+- `npm pack --dry-run` clean (node-pty + ws bundled)
+- 17 commits on `docs/embedded-web-terminal-spec` (5 wave-based feature commits + 2 hotfixes + spec/plan/DIRECTIVES + debt closure + #2 backlog notes)
+
+**Honest debt:**
+- node-pty linux-x64 prebuild absent in `node-pty@^1.0.0` — manual workaround applied during Sprint 175 (copy from `@lydell/node-pty-linux-x64`); permanent fix (optionalDep) targeted for Sprint 176 (~5 min work)
+- `DECKENT_API_AUTH_DISABLED=1` still required for the dashboard's non-terminal data calls (SSE / status / events) because the frontend has no general API auth plumbing — this is **not** a terminal regression (terminal auth is independent), but a known limit of sub-project #1 (frontend auth infra deferred to #2/#3)
+
+**Sub-project #2-#4 backlog (formal record, spec §1d):**
+1. Self-security procedure (prompt/command guard) + planner state-hygiene (6 captured items: auto-debt-inject empty-scope bug, re-plan orphan cleanup, DEP0190 `shell:true`, schema-gate `coverage` enforcement, pre-existing WorkerCard/DashboardPage TS errors, doctor `DECISIONS.md` obsolete check)
+2. Million-scale: multi-tenant isolation, real `tenantId`, `SessionBackend` k8s pod-exec impl, sandbox, rate/resource limits, OIDC/SSO `AuthProvider` impl
+3. Enterprise external-world integrations + secure data exchange (audit enrichment, compliance: SOC2/GDPR)
+
+**Process learnings (durable feedback memories written):**
+- `feedback_trust_brain_eval_not_worker` — worker `.result.selfAssessment` is a hint; Brain's evaluation verdict is the real gate. They can disagree; I learned the hard way.
+- `feedback_trust_deckent_recovery` — deckent's lifecycle has its own FIX phase / recovery channels; manual intervention is the LAST recommendation, not the first.
+
+Spec: `docs/superpowers/specs/2026-05-19-embedded-web-terminal-design.md`. Plan: `docs/superpowers/plans/2026-05-19-embedded-web-terminal.md`. User guide: `docs/guide/terminal.md`. PR: `https://github.com/VerhexIO/deckent-develop/pull/new/docs/embedded-web-terminal-spec`.
 
 ---
 

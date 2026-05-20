@@ -5,7 +5,7 @@
 **Disiplin isteyen geliştiriciler için AI orkestratör.**
 
 <!-- AUTOGEN:START id="badges" -->
-[![npm version](https://img.shields.io/npm/v/deckent.svg)](https://www.npmjs.com/package/deckent) [![tests](https://img.shields.io/badge/tests-16697%2B-brightgreen)](https://github.com/VerhexIO/deckent) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![sprints](https://img.shields.io/badge/sprints-172%2B-teal)](https://github.com/VerhexIO/deckent) [![version](https://img.shields.io/badge/version-v1.0.0--beta.1-orange)](https://github.com/VerhexIO/deckent)
+[![npm version](https://img.shields.io/npm/v/deckent.svg)](https://www.npmjs.com/package/deckent) [![tests](https://img.shields.io/badge/tests-16774%2B-brightgreen)](https://github.com/VerhexIO/deckent) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![sprints](https://img.shields.io/badge/sprints-175%2B-teal)](https://github.com/VerhexIO/deckent) [![version](https://img.shields.io/badge/version-v1.0.0--beta.1-orange)](https://github.com/VerhexIO/deckent)
 <!-- AUTOGEN:END id="badges" -->
 
 Deckent, iki modlu bir AI agent orkestrasyon CLI'dir: geliştiriciler için yapılandırılmış çok-agent sprint'leri sunan **Sprint Mode** ve tek seferlik yaşam asistanı görevleri için **Task Mode**. Hedeflerinizi yazın; Deckent görevleri planlar, paralel AI worker'lar atar, kaliteyi izler ve sonuçları disiplinle teslim eder.
@@ -43,6 +43,7 @@ deckent run "Günün sonuna kadar PR'ı gözden geçirmeyi hatırlat"
 
 ## Öne Çıkanlar
 
+- **Gömülü Web Terminali (Sprint 175, ADR-062)** — Dashboard içinde VSCode-benzeri dock-edilebilir terminal paneli. Çoklu sekme ile interaktif `claude` / `gemini` / `codex` / `deckent` / shell oturumları WebSocket üzerinden, browser refresh'i sonrası tmux-vari reattach, localhost-default + global API bypass'tan bağımsız ve daha katı auth, şeffaf tenant-scoped audit (ham PTY çıktısı asla persist edilmez). Bkz. [`docs/guide/terminal-tr.md`](docs/guide/terminal-tr.md). Alt-proje #1/4 — self-security, multi-tenant/k8s ve enterprise entegrasyonlar ayrı sprint'lerde gelir.
 - **Brain Self-Update Hook Mimarisi (ADR-046)** — post-finalize hook zinciri (memoryExport → adrInsert → ruleRegen → updateProjectDocs) resmi olarak tanımlı ve zorunlu.
 - **Veri bütünlüğü** — debt satırları `sprint_id` taşır, sprint memory kayıtları geri yüklendi ve 3 katmanlı doc-sync ground-truth kontrolü agent sayısı sapmalarını engeller.
 

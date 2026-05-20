@@ -7,7 +7,7 @@
 **The AI orchestrator for developers who want discipline.**
 
 <!-- AUTOGEN:START id="badges" -->
-[![npm version](https://img.shields.io/npm/v/deckent.svg)](https://www.npmjs.com/package/deckent) [![tests](https://img.shields.io/badge/tests-16697%2B-brightgreen)](https://github.com/VerhexIO/deckent) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![sprints](https://img.shields.io/badge/sprints-172%2B-teal)](https://github.com/VerhexIO/deckent) [![version](https://img.shields.io/badge/version-v1.0.0--beta.1-orange)](https://github.com/VerhexIO/deckent)
+[![npm version](https://img.shields.io/npm/v/deckent.svg)](https://www.npmjs.com/package/deckent) [![tests](https://img.shields.io/badge/tests-16774%2B-brightgreen)](https://github.com/VerhexIO/deckent) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![sprints](https://img.shields.io/badge/sprints-175%2B-teal)](https://github.com/VerhexIO/deckent) [![version](https://img.shields.io/badge/version-v1.0.0--beta.1-orange)](https://github.com/VerhexIO/deckent)
 <!-- AUTOGEN:END id="badges" -->
 
 Deckent is an AI agent orchestration CLI with two modes: **Sprint Mode** for structured multi-agent development sprints, and **Task Mode** for one-shot life assistant tasks. Write your goals, and Deckent plans tasks, assigns parallel AI workers, monitors quality, and delivers results — all with discipline.
@@ -47,6 +47,7 @@ deckent run "Remind me to review the PR before end of day"
 
 ## Highlights
 
+- **Embedded Web Terminal (Sprint 175, ADR-062)** — VSCode-like dockable terminal panel inside the dashboard. Multi-tab interactive `claude` / `gemini` / `codex` / `deckent` / shell sessions over WebSocket, tmux-style reattach across browser refreshes, localhost-default with auth that is independent of and stricter than the global API bypass, transparent tenant-scoped audit (raw PTY output never persisted). See [`docs/guide/terminal.md`](docs/guide/terminal.md). Sub-project #1/4 — self-security, multi-tenant/k8s, and enterprise integrations follow in dedicated sprints.
 - **Brain Self-Update Hook Architecture (ADR-046)** — post-finalize hook chain (memoryExport → adrInsert → ruleRegen → updateProjectDocs) is formally specified and enforced.
 - **Data integrity** — debt rows carry `sprint_id`, sprint memory entries are restored, and a 3-layer doc-sync ground-truth check blocks agent-count drift.
 

@@ -1,7 +1,45 @@
 <!-- Dil: TR | Teknik terimler EN -->
 # Deckent Beta Tracker
 
-**Son güncelleme:** 2026-05-14 (Sprint 166 sonrası commit) | **Sprint:** 166 DONE (11/11, 10 DONE + 1 GO_WITH_TECH_DEBT) | **Test:** 16,434+ (Sprint 166'da +35, Sprint 164'ten beri +5.000+) | **Versiyon:** v1.0.0-beta.1 → v1.0.0-beta.2 hedef (Sprint 168 Open Source GA)
+**Son güncelleme:** 2026-05-20 (Sprint 175 — Gömülü Web Terminali teslim edildi) | **Son sprint:** 175 (Alperen tarafından smoke ile doğrulandı) | **Versiyon:** v1.0.0-beta.1 → v1.0.0-beta.2 hedef | **Branch:** `docs/embedded-web-terminal-spec` (origin push'lı)
+
+---
+
+## Sprint 175 — Gömülü Web Terminali (2026-05-19 → 2026-05-20) — TESLİM
+
+Dashboard içinde VSCode-benzeri dock-edilebilir terminal paneli. **4-parçalı agentic-OS yolunun #1 alt-projesi.** Alperen 2026-05-20 smoke kanıtı: `+claude` / `+gemini` / `+shell` sekmeleri gerçek interaktif PTY oturumları tetikledi.
+
+**Teslim edilenler:**
+- `node-pty` PTY backend `SessionBackend` interface'i arkasında (#3 k8s pod-exec için enterprise dikişi)
+- WebSocket gateway, token `Sec-WebSocket-Protocol` subprotocol'ünde; auth pty spawn'dan ÖNCE doğrulanır (tarayıcı `WebSocket`'te `Authorization` header set edemez)
+- `LocalTokenAuthProvider` — bypass-bağımsız (`DECKENT_API_AUTH_DISABLED`'ı **kasıtlı yok-sayar**; SHA-256 + `timingSafeEqual`)
+- HTTP control route'ları (`/api/terminal/sessions` CRUD) + servis edilen `index.html`'e localhost-only `window.__DECKENT_TERMINAL_TOKEN__` enjeksiyonu
+- Çoklu-sekme UI: `claude` / `gemini` / `codex` / `deckent` / shell quick-launch; `DockPanel` React Router `Outlet` DIŞINDA mount'lu (sayfa geçişlerinde oturum kalıcı)
+- tmux-vari reattach: oturum başına sınırlı in-memory scrollback ring buffer, `detach ≠ kill`, e2e test client disconnect sonrası MARKER replay'i doğruluyor (sunucu restart desteklenMEZ — bilinçli sınır)
+- Şeffaf tenant-scoped audit → `memory.db` (sadece düşük-hacim yapısal event; ham PTY çıktısı **asla** persist edilmez)
+- `deckent serve --host` / `--no-terminal` CLI; uzak bind, açık token olmadan terminal'i etkinleştirmeyi reddeder
+- ADR-062 (Embedded Web Terminal) accepted; ADR-010 Sprint-172 Amendment table iki yeni runtime dep ile genişledi (`node-pty`, `ws`) — dep count 7→9, hepsi ADR-gerekçeli
+
+**Metrikler:**
+- 46/46 terminal-spesifik test PASS (backend 30, frontend 15, e2e reattach 1)
+- `tsc --noEmit` temiz; `vite build` SUCCESS (1066KB / gzip 296KB)
+- `npm pack --dry-run` temiz (node-pty + ws bundled)
+- `docs/embedded-web-terminal-spec` üzerinde 17 commit (5 wave-bazlı feature + 2 hotfix + spec/plan/DIRECTIVES + debt closure + #2 backlog notları)
+
+**Dürüst kalan iş:**
+- node-pty linux-x64 prebuild `node-pty@^1.0.0`'da yok — Sprint 175'te manuel workaround uygulandı (`@lydell/node-pty-linux-x64`'tan kopyala); kalıcı fix (optionalDep) Sprint 176 hedefi (~5 dk iş)
+- `DECKENT_API_AUTH_DISABLED=1` dashboard'un terminal-dışı data call'ları (SSE / status / events) için hâlâ gerekli — frontend genel API auth altyapısı yok. Bu terminal regresyonu **değildir** (terminal auth bağımsız), alt-proje #1'in bilinen sınırı (frontend auth altyapısı #2/#3'e ertelendi).
+
+**Alt-proje #2-#4 backlog (spec §1d resmi kayıt):**
+1. Self-security prosedürü (prompt/komut guard) + planner state-hygiene (6 yakalanmış madde: auto-debt-inject empty-scope, re-plan orphan cleanup, DEP0190 `shell:true`, schema-gate `coverage` enforcement, pre-existing WorkerCard/DashboardPage TS errors, doctor `DECISIONS.md` obsolete check)
+2. Milyon-ölçek: multi-tenant izolasyon, gerçek `tenantId`, `SessionBackend` k8s pod-exec impl, sandbox, rate/kaynak limit, OIDC/SSO `AuthProvider` impl
+3. Enterprise dış-dünya entegrasyon + güvenli veri alışverişi (audit zenginleştirme, compliance: SOC2/GDPR)
+
+**Süreç öğrenimleri (kalıcı hafıza yazıldı):**
+- `feedback_trust_brain_eval_not_worker` — worker `.result.selfAssessment` ipucu; Brain evaluation verdict gerçek karar. Çelişebilirler; zor yoldan öğrendim.
+- `feedback_trust_deckent_recovery` — deckent'in kendi FIX phase / recovery kanalları var; manuel müdahale öneri listesinin SON maddesi, ilki değil.
+
+Spec: `docs/superpowers/specs/2026-05-19-embedded-web-terminal-design.md`. Plan: `docs/superpowers/plans/2026-05-19-embedded-web-terminal.md`. Kullanıcı rehberi: `docs/guide/terminal-tr.md`. PR: `https://github.com/VerhexIO/deckent-develop/pull/new/docs/embedded-web-terminal-spec`.
 
 ---
 
