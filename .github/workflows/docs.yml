@@ -33,11 +33,14 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22.x'
+          node-version: '24.x'
           cache: npm
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Rebuild native binding (better-sqlite3)
+        run: npm run ci:rebuild-native
 
       - name: Install docs dependencies
         run: npm install --prefix docs
