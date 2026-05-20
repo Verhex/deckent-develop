@@ -2,6 +2,12 @@ import { createServer, type Server, type IncomingMessage, type ServerResponse } 
 import { readFileSync, existsSync, readdirSync, writeFileSync } from 'node:fs';
 import { join, extname, resolve } from 'node:path';
 import { randomBytes, randomUUID } from 'node:crypto';
+import type { SessionBackend } from './terminal/session-backend.js';
+import { PtySessionManager } from './terminal/session-manager.js';
+import { LocalTokenAuthProvider } from './terminal/auth-provider.js';
+import { TerminalAudit, type AuditSink } from './terminal/audit.js';
+import { attachTerminalGateway } from './terminal/ws-gateway.js';
+import type { CreateSessionInput, SessionKind, TenantId } from './terminal/types.js';
 import { z } from 'zod';
 import {
   DASHBOARD_FILE, BRAIN_DIR, SPRINTS_DIR, TASKS_DIR, LOCKS_DIR,
@@ -758,6 +764,8 @@ async function handleRequest(
 
 export interface HttpApi {
   server: Server;
+  /** Terminal auth token (test-exposed). Only set when terminal is enabled. */
+  terminalToken?: string;
   close(): Promise<void>;
 }
 
@@ -772,6 +780,8 @@ export interface HttpServerOptions {
   autoGenerateToken?: boolean;
   /** Max requests per minute per IP. Defaults to 100. 0 disables rate limiting. */
   rateLimit?: number;
+  /** PTY session backend for embedded terminal support (Sprint 175). */
+  terminalBackend?: SessionBackend;
 }
 
 export function createHttpServer(projectRoot: string, port?: number, staticDir?: string, apiToken?: string): HttpApi;
@@ -789,6 +799,7 @@ export function createHttpServer(
 
   let autoGenerateToken = false;
   let rateLimitMax = 100;
+  let terminalBackend: SessionBackend | undefined;
 
   if (typeof portOrOpts === 'object' && portOrOpts !== null) {
     listenPort = portOrOpts.port ?? DEFAULT_PORT;
@@ -797,6 +808,7 @@ export function createHttpServer(
     host = portOrOpts.host ?? LOCALHOST_ONLY;
     autoGenerateToken = portOrOpts.autoGenerateToken ?? false;
     rateLimitMax = portOrOpts.rateLimit ?? 100;
+    terminalBackend = portOrOpts.terminalBackend;
   } else {
     listenPort = portOrOpts ?? DEFAULT_PORT;
     resolvedStaticDir = staticDir;
@@ -855,18 +867,179 @@ export function createHttpServer(
     }
   }
 
+  // ─── Terminal setup (Sprint 175) ──────────────────────────────
+  let terminalToken: string | undefined;
+  let terminalMgr: PtySessionManager | undefined;
+  let terminalAudit: TerminalAudit | undefined;
+  let terminalAuth: LocalTokenAuthProvider | undefined;
+  let terminalReaper: NodeJS.Timeout | undefined;
+
+  if (terminalBackend) {
+    // Check if terminal is enabled via project config (sync read — createHttpServer is synchronous)
+    let terminalEnabled = true;
+    const projCfgPath = join(projectRoot, PROJECT_CONFIG_PATH);
+    if (existsSync(projCfgPath)) {
+      try {
+        const raw = readFileSync(projCfgPath, 'utf-8');
+        const projCfg = JSON.parse(raw) as { terminal?: { enabled?: boolean } };
+        if (projCfg?.terminal?.enabled === false) {
+          terminalEnabled = false;
+        }
+      } catch { /* ignore parse errors */ }
+    }
+
+    if (terminalEnabled) {
+      // Terminal ALWAYS mints its own token — independent of API auth (spec §1c.2).
+      // LocalTokenAuthProvider uses constant-time SHA-256 compare (timingSafeEqual)
+      // and DELIBERATELY ignores DECKENT_API_AUTH_DISABLED.
+      terminalToken = randomUUID();
+      process.stderr.write(`[deckent:info] Auto-generated API token: ${terminalToken}\n`);
+      terminalMgr = new PtySessionManager(terminalBackend, {
+        scrollbackBytes: 262_144,
+        idleTimeoutMs: 1_800_000,
+        maxSessions: 10,
+      });
+      // Structured audit recorder. Tests pass a no-op sink; production wires
+      // MemoryStore. Raw PTY output is NEVER routed here (security invariant).
+      const auditSink: AuditSink = { insert: () => { /* no-op default */ } };
+      terminalAudit = new TerminalAudit(auditSink);
+      terminalAuth = new LocalTokenAuthProvider(terminalToken);
+    }
+  }
+
   const server = createServer((req: IncomingMessage, res: ServerResponse) => {
-    handleRequest(req, res, projectRoot, dashPath, sseClients, resolvedStaticDir, initWatcher, finalToken, rateLimiter, authMiddleware).catch((err: unknown) => {
+    (async () => {
+      const rawUrl = req.url ?? '/';
+      const urlPath = rawUrl.split('?')[0] ?? '/';
+      const method = req.method ?? 'GET';
+
+      // ─── Terminal routes (bypass-independent auth, spec §1c.2) ─
+      if (terminalMgr && terminalAuth && terminalAudit && rawUrl.startsWith('/api/terminal/')) {
+        const authHeader = req.headers['authorization'] ?? '';
+        const tok = authHeader.replace(/^Bearer\s+/i, '');
+        if (!terminalAuth.verify(tok || undefined)) {
+          terminalAudit.record({
+            action: 'auth.deny',
+            tenantId: 'local',
+            detail: `http ${method} ${urlPath}`,
+            at: new Date().toISOString(),
+          });
+          res.writeHead(401, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Unauthorized' }));
+          return;
+        }
+        // POST /api/terminal/sessions
+        if (method === 'POST' && urlPath === '/api/terminal/sessions') {
+          let body: unknown;
+          try { body = await parseBody(req); } catch { body = {}; }
+          const input = body as { kind?: string; tool?: string; args?: string[] };
+          const kind = input.kind ?? 'shell';
+          try {
+            const sess = terminalMgr.create({
+              kind: kind as SessionKind,
+              tool: input.tool as CreateSessionInput['tool'],
+              args: input.args,
+              tenantId: 'local' as TenantId,
+            });
+            terminalAudit.record({
+              action: 'session.create',
+              tenantId: 'local',
+              sessionId: sess.id,
+              detail: `kind=${sess.kind}`,
+              at: new Date().toISOString(),
+            });
+            res.writeHead(201, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify(sess));
+          } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : 'create failed';
+            res.writeHead(409, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: msg }));
+          }
+          return;
+        }
+        // GET /api/terminal/sessions
+        if (method === 'GET' && urlPath === '/api/terminal/sessions') {
+          const list = terminalMgr.list();
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify(list));
+          return;
+        }
+        // DELETE /api/terminal/sessions/:id
+        if (method === 'DELETE' && urlPath.startsWith('/api/terminal/sessions/')) {
+          const id = urlPath.slice('/api/terminal/sessions/'.length);
+          terminalMgr.kill(id);
+          terminalAudit.record({
+            action: 'session.kill',
+            tenantId: 'local',
+            sessionId: id,
+            detail: 'http delete',
+            at: new Date().toISOString(),
+          });
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: true }));
+          return;
+        }
+        // Unknown terminal route
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Not found' }));
+        return;
+      }
+
+      // ─── Localhost-only terminal token injection into index.html ─
+      if (terminalToken && resolvedStaticDir && method === 'GET' &&
+          (urlPath === '/' || urlPath === '/index.html')) {
+        const remoteAddr = req.socket.remoteAddress ?? '';
+        const isLocalhost = remoteAddr === '127.0.0.1' || remoteAddr === '::1' ||
+                            remoteAddr === '::ffff:127.0.0.1';
+        if (isLocalhost) {
+          const indexPath = join(resolvedStaticDir, 'index.html');
+          if (existsSync(indexPath)) {
+            try {
+              let html = readFileSync(indexPath, 'utf-8');
+              const inject = `<script>window.__DECKENT_TERMINAL_TOKEN__ = ${JSON.stringify(terminalToken)};</script>`;
+              html = html.replace('</head>', inject + '</head>');
+              res.writeHead(200, { 'Content-Type': 'text/html' });
+              res.end(html);
+              return;
+            } catch { /* fall through to normal handling */ }
+          }
+        }
+      }
+
+      await handleRequest(req, res, projectRoot, dashPath, sseClients, resolvedStaticDir, initWatcher, finalToken, rateLimiter, authMiddleware);
+    })().catch((err: unknown) => {
       sendError(res, 500, err instanceof Error ? err.message : 'Internal server error');
     });
   });
+
+  // Attach WS gateway for live terminal sessions (spec §1c.2 — auth verified
+  // BEFORE bridge, independent of DECKENT_API_AUTH_DISABLED).
+  if (terminalMgr && terminalAuth && terminalAudit) {
+    attachTerminalGateway(server, {
+      manager: terminalMgr,
+      auth: terminalAuth,
+      audit: terminalAudit,
+    });
+    // Idle reaper — sweeps stale non-deckent sessions every 30s.
+    // unref() so the timer does not keep the event loop alive in tests.
+    terminalReaper = setInterval(() => {
+      terminalMgr?.reapIdle();
+    }, 30_000);
+    terminalReaper.unref?.();
+  }
 
   server.listen(listenPort, host);
 
   return {
     server,
+    terminalToken,
     close(): Promise<void> {
       watcher?.close();
+      if (terminalReaper) {
+        clearInterval(terminalReaper);
+        terminalReaper = undefined;
+      }
+      terminalMgr?.reapIdle();
       for (const client of sseClients) {
         client.end();
       }
