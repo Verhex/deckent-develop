@@ -43,6 +43,7 @@ interface EntryRow {
   lang: string;
   decay_exempt: number;
   metadata: string;
+  tenant_id: string | null;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
@@ -68,6 +69,7 @@ function rowToEntry(row: EntryRow): MemoryEntryV2 {
     lang: row.lang,
     decay_exempt: row.decay_exempt === 1,
     metadata: row.metadata,
+    tenant_id: row.tenant_id ?? null,
     created_at: row.created_at,
     updated_at: row.updated_at,
     deleted_at: row.deleted_at,
@@ -114,6 +116,7 @@ export class MemoryStore {
         lang TEXT NOT NULL DEFAULT 'en',
         decay_exempt INTEGER NOT NULL DEFAULT 0,
         metadata TEXT NOT NULL DEFAULT '{}',
+        tenant_id TEXT,
         created_at TEXT NOT NULL DEFAULT (datetime('now')),
         updated_at TEXT NOT NULL DEFAULT (datetime('now')),
         deleted_at TEXT
@@ -146,6 +149,11 @@ export class MemoryStore {
       );
     `);
 
+    // Additive, non-destructive migrations for existing DBs (DROP/rebuild forbidden).
+    // Each migration is column-existence-guarded via PRAGMA so re-opening a DB
+    // is idempotent and never raises "duplicate column" errors.
+    this.applyAdditiveMigrations();
+
     // Indexes
     this.db.exec(`
       CREATE INDEX IF NOT EXISTS idx_entries_type ON entries(type);
@@ -172,6 +180,22 @@ export class MemoryStore {
 
     // Record schema version
     this.recordSchemaVersion();
+  }
+
+  /**
+   * Idempotent ALTER TABLE migrations for `entries`. Adds columns introduced
+   * after the initial schema without rebuilding the table. PRAGMA-guarded so
+   * repeated calls (re-opening the same DB file) are no-ops.
+   *
+   * Invariant: NEVER DROP or rebuild — historical rows must survive.
+   */
+  private applyAdditiveMigrations(): void {
+    const cols = this.db.prepare(`PRAGMA table_info(entries)`).all() as Array<{ name: string }>;
+    const have = new Set(cols.map(c => c.name));
+
+    if (!have.has('tenant_id')) {
+      this.db.exec(`ALTER TABLE entries ADD COLUMN tenant_id TEXT`);
+    }
   }
 
   private createIndexIfNotExists(name: string, ddl: string): void {
@@ -272,6 +296,7 @@ export class MemoryStore {
     const lang = input.lang ?? 'en';
     const decayExempt = input.decay_exempt ? 1 : 0;
     const metadata = JSON.stringify(input.metadata ?? {});
+    const tenantId = input.tenant_id ?? null;
     const relations = input.relations ?? [];
 
     const tagText = tags.join(' ');
@@ -285,12 +310,12 @@ export class MemoryStore {
         id, type, source, title, content, summary,
         tag_text, title_norm, content_norm, summary_norm, tag_norm,
         status, priority, sprint_id, sprint_num, lang,
-        decay_exempt, metadata
+        decay_exempt, metadata, tenant_id
       ) VALUES (
         @id, @type, @source, @title, @content, @summary,
         @tag_text, @title_norm, @content_norm, @summary_norm, @tag_norm,
         @status, @priority, @sprint_id, @sprint_num, @lang,
-        @decay_exempt, @metadata
+        @decay_exempt, @metadata, @tenant_id
       )
     `);
 
@@ -327,6 +352,7 @@ export class MemoryStore {
         lang,
         decay_exempt: decayExempt,
         metadata,
+        tenant_id: tenantId,
       });
 
       for (const tag of tags) {
@@ -374,6 +400,7 @@ export class MemoryStore {
     const lang = input.lang ?? 'en';
     const decayExempt = input.decay_exempt ? 1 : 0;
     const metadata = JSON.stringify(input.metadata ?? {});
+    const tenantId = input.tenant_id ?? null;
 
     const tagText = tags.join(' ');
     const titleNorm = turkishNormalize(input.title);
@@ -398,6 +425,7 @@ export class MemoryStore {
       ['lang', existing.lang, lang],
       ['decay_exempt', existing.decay_exempt, decayExempt],
       ['metadata', existing.metadata, metadata],
+      ['tenant_id', existing.tenant_id, tenantId],
     ];
 
     for (const [field, oldVal, newVal] of fieldMap) {
@@ -427,6 +455,7 @@ export class MemoryStore {
         lang = @lang,
         decay_exempt = @decay_exempt,
         metadata = @metadata,
+        tenant_id = @tenant_id,
         updated_at = datetime('now')
       WHERE id = @id
     `);
@@ -458,6 +487,7 @@ export class MemoryStore {
         lang,
         decay_exempt: decayExempt,
         metadata,
+        tenant_id: tenantId,
       });
 
       // Replace tags

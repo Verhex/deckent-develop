@@ -17,6 +17,7 @@ export type EntryType =
   | 'retro'
   | 'error'
   | 'identity'
+  | 'audit'
   | 'custom';
 
 /** Who created this entry. */
@@ -77,6 +78,8 @@ export interface MemoryEntryV2 {
   lang: string;
   decay_exempt: boolean;
   metadata: string;
+  /** Multi-tenant scope tag. NULL for legacy/single-tenant entries (default). */
+  tenant_id?: string | null;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
@@ -98,6 +101,8 @@ export interface CreateEntryInput {
   lang?: string;
   decay_exempt?: boolean;
   metadata?: Record<string, unknown>;
+  /** Multi-tenant scope tag (omit for single-tenant default). */
+  tenant_id?: string;
   relations?: Array<{ to_id: string; rel_type: RelationType }>;
 }
 
