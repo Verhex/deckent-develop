@@ -8,11 +8,14 @@ coverage/
 .locks/
 .dashboard
 
-# Brain runtime (DECISIONS.md + PROJECT-IDENTITY.md are tracked)
+# Brain runtime (Memory V2 — exports/ are tracked, raw runtime files are not)
 .brain/MEMORY.md
 .brain/RETRO.md
 .brain/DEBT.md
 .brain/PATTERNS.md
+.brain/ERRORS.md
+.brain/PROJECT-IDENTITY.md
+.brain/directives-backup/
 
 # Memory V2 SQLite DB (binary, rebuilt from exports)
 .brain/memory.db
@@ -66,8 +69,16 @@ coverage/
 .deckent/sprint-*-checkpoint.json
 .deckent/sprint-*-gate.json
 .deckent/sprint-*-pre-archive.*
+.deckent/sprint-*-panic-*.json
+.deckent/sprint-*-*-result.json
+.deckent/sprint-*-subagent-prompts/
+.deckent/sprint-*-merge-runbook.sh
+.deckent/sprint-*-worktree-setup.sh
+.deckent/sprint-*-dispatch-locks.json
+.deckent/evaluations/
 .deckent/pids/
 .claude/scheduled_tasks.lock
+.claude/settings.local.json
 
 # Deckent runtime artifacts (per-sprint, ephemeral)
 .deckent/mcp-server.pid
@@ -96,6 +107,12 @@ Thumbs.db
 # Dashboard sub-project
 src/dashboard/node_modules
 src/dashboard/dist
+src/dashboard/tsconfig.tsbuildinfo
 
 # SQLite URI test artifacts (regression guard, Sprint 175)
 file:audit-idem-*
+
+# Local diagnostic outputs (test logs, npm cache, personal notes)
+.npm-cache/
+vitest-out.txt
+kendimenot.md
