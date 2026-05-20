@@ -1006,7 +1006,7 @@ deckent web --dev
 | `deckent memory` | Memory V2 management |
 | `deckent migrate` | Migrate config.json to the latest full format (adds missing fields with defaults) |
 | `deckent mode` | Get/set deckent_style (sprint\|task\|auto) |
-| `deckent nervous` | Configure Nervous System authority mode and action overrides', ) .action(async () => { const root = resolveProjectRoot(); await handleInteractive(root); }); // deckent config nervous set mode <preset> nervousCmd .command('set |
+| `deckent nervous` | Configure Nervous System authority mode and action overrides', ) .action(async () => { const root = resolveProjectRoot(); await handleInteractive(root); }); // deckent config nervous set mode &lt;preset&gt; nervousCmd .command('set |
 | `deckent nervous` | Nervous System dashboard — monitor, accept, reject proactive suggestions |
 | `deckent onboard` | Run the onboarding wizard |
 | `deckent output <taskId>` | Show captured output for a specific worker task |

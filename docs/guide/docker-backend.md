@@ -372,4 +372,4 @@ sudo chown -R $USER:$USER .locks/
 
 - [Quickstart Guide](quickstart.md) — General sprint setup
 - [Configuration Reference](../reference/config-reference.md) — All config options
-- [Architecture Overview](../architecture/architecture.md) — Sprint lifecycle internals
+- [Architecture Overview](https://github.com/VerhexIO/deckent/blob/main/docs/architecture/architecture.md) — Sprint lifecycle internals

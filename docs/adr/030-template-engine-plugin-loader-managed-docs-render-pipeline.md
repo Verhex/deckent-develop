@@ -20,7 +20,7 @@ Built-in generator sistemi genişletilemez yapıda kalırsa, her yeni section t�
 İki katmanlı extensibility sistemi tasarlandı:
 
 **Katman 1: Template Renderer (`template-renderer.ts`)**
-- `{{path.to.value}}` placeholder syntax — `DocUpdateContext`'e karşı çözümlenir
+- `&#123;&#123;path.to.value&#125;&#125;` placeholder syntax — `DocUpdateContext`'e karşı çözümlenir
 - `buildTemplateScope()` — sprint result, config, metrikler, agent/skill sayıları, paket versiyonu gibi standart değerleri scope'a ekler
 - `resolvePath()` — nokta-ayrılmış yol üzerinden nested nesne/Map erişimi
 - `renderTemplate()` — regex replace, unresolved placeholder → boş string (non-fatal)
@@ -35,7 +35,7 @@ Built-in generator sistemi genişletilemez yapıda kalırsa, her yeni section t�
 Güvenlik kararı: JSON generator'lar `loadUserGeneratorsSync()` ile sync olarak sprint içinde çalışır; MJS generator'lar ise ayrı `loadUserGeneratorsAsync()` çağrısı gerektirir ve yalnızca güvenilen kaynaklardan yüklenmelidir.
 
 **Consequences (+):**
-- Template syntax öğrenme eğrisi düşük — `{{metrics.coveragePercent}}%` yeterli
+- Template syntax öğrenme eğrisi düşük — `&#123;&#123;metrics.coveragePercent&#125;&#125;%` yeterli
 - JSON format code review kolaylığı ve static analysis uyumluluğu sağlar
 - MJS format güçlü extensibility (herhangi bir hesaplama yapılabilir)
 - User generator'lar built-in'leri override edebilir — proje-spesifik davranış mümkün

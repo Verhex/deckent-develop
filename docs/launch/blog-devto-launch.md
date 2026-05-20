@@ -1,7 +1,7 @@
 ---
 title: I Built an AI Orchestrator Over 150 Sprints — Here's What I Learned
 published: false
-description: Six months of solo development, 150+ sprints of self-dogfooding, and one hard-won insight: multi-agent AI systems need sprint discipline, not just fire-and-forget execution.
+description: "Six months of solo development, 150+ sprints of self-dogfooding, and one hard-won insight: multi-agent AI systems need sprint discipline, not just fire-and-forget execution."
 tags: opensource, ai, typescript, productivity
 cover_image: https://github.com/VerhexIO/deckent/raw/main/docs/assets/deckent-cover.png
 canonical_url: https://dev.to/alperensartacoglu/i-built-an-ai-orchestrator-over-150-sprints
