@@ -18,6 +18,7 @@ import type {
   PlanModeConfig,
   ResolvedConfig,
   SystemProfile,
+  TerminalConfig,
   TimeoutConfig,
 } from './types.js';
 import { ALL_MODELS, PROVIDER_MODEL_MAP } from './types.js';
@@ -62,6 +63,19 @@ export const DEFAULT_AUTO_DOCS: AutoDocsConfig = {
   tier1: true,
   tier2: false,
   tier3: false,
+};
+
+// ─── Default Terminal Config ────────────────────────────────────────
+// Single source of truth for embedded web terminal defaults (Sprint 175).
+// Mirrors the DEFAULT_TIMEOUT_CONFIG / DEFAULT_AUTO_DOCS pattern: one named
+// const, structuredClone()'d at each use-site to keep instances independent.
+export const DEFAULT_TERMINAL_CONFIG: TerminalConfig = {
+  enabled: true,
+  bind: '127.0.0.1',
+  maxSessions: 10,
+  idleTimeoutMs: 1_800_000,
+  scrollbackBytes: 262_144,
+  allowShellKind: true,
 };
 
 // ─── Mode Aliases ────────────────────────────────────────────────────
@@ -618,6 +632,8 @@ export function createDefaultConfig(): DeckentConfig {
     },
     // Runtime Style
     deckent_style: 'sprint',
+    // Terminal (Sprint 175 — embedded web terminal)
+    terminal: structuredClone(DEFAULT_TERMINAL_CONFIG),
     // Nervous System (disabled by default — Sprint 148 will activate)
     nervous_system: {
       enabled: false,
@@ -893,6 +909,11 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
     nervous_system: config.nervous_system,
     // Runtime Style
     deckent_style: config.deckent_style ?? 'sprint',
+    // Terminal (Sprint 175) — deepMerge'd `config` already carries defaults from
+    // createDefaultConfig(); fallback is defensive for hot-reload scenarios.
+    terminal: config.terminal
+      ? deepMerge(DEFAULT_TERMINAL_CONFIG, config.terminal as Partial<TerminalConfig>)
+      : structuredClone(DEFAULT_TERMINAL_CONFIG),
   };
 
   // ─── $DECK: interpolation ────────────────────────────────────────────
@@ -1398,6 +1419,12 @@ export function mergeConfigs(
     // Sprint 156: default true unless overridden by user/project config
     dependency_pipeline_enabled:
       (config as DeckentConfigWithPipeline).dependency_pipeline_enabled ?? true,
+    // Terminal (Sprint 175) — deepMerge applies any partial project override on
+    // top of DEFAULT_TERMINAL_CONFIG so unspecified keys inherit defaults,
+    // mirroring the model_strategy nested-merge pattern.
+    terminal: config.terminal
+      ? deepMerge(DEFAULT_TERMINAL_CONFIG, config.terminal as Partial<TerminalConfig>)
+      : structuredClone(DEFAULT_TERMINAL_CONFIG),
   };
 }
 
