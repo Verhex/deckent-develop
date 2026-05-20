@@ -169,6 +169,64 @@ defects, formally deferred to #2 (Alperen 2026-05-20):
    or gate it on `process.platform === 'win32'` (npm/npx `.cmd` resolution on
    Windows is the only legitimate need — see `src/providers/subprocess.ts:147` for
    the existing conditional pattern).
+4. **Schema-gate coverage enforcement gap**: `config.coverage_threshold` defaults
+   to 90 (`src/core/config.ts:554`) and is wired into the EVALUATE phase
+   (`sprint-controller.ts:679`), but the gate is **advisory** — sprint-finalizer
+   auto-lowers the threshold when "avg coverage < 70%" (`sprint-finalizer.ts:413,
+   450`), so a sprint of low-coverage work silently re-baselines the bar. Recent
+   sprints (172–175) show coverage drifting 0.0–15.0% while the gate keeps moving
+   with it. Fix should split into two knobs: a hard floor (never auto-lowered)
+   and an aspirational threshold that the auto-learn loop may tune.
+5. **WorkerCard / DashboardPage pre-existing TS errors**: `cd src/dashboard && npx
+   tsc --noEmit` surfaces TS2345 in `src/components/WorkerCard.tsx:127` and
+   `src/pages/DashboardPage.tsx:284` — the i18n `t()` signature uses a literal
+   union of 340+ keys but is passed to a child that types `key: string`, so the
+   contravariance fails. Suppressed because `npm run test:dashboard` uses Vite
+   (which transpiles without strict type checks) and the root `npm run lint`
+   doesn't recurse into `src/dashboard/tsconfig.json`. Fix: relax the `t()`
+   return-type to `(key: string, params?: ...) => string` at the prop boundary,
+   or thread the literal union all the way down. Either way, wire the dashboard
+   tsc into root `lint` so this doesn't regress silently.
+6. **`doctor` DECISIONS.md obsolete check**: `src/cli/commands/doctor.ts:193`
+   still lists `DECISIONS_FILE` (`.brain/DECISIONS.md`) in `requiredFiles`, but
+   Memory V2 (Sprint 143) moved this to `.brain/memory.db` with `.brain/exports/
+   decisions.md` as the generated snapshot. The check reports a false-positive
+   "missing required file" on any clean Memory-V2 install. Cascade fossils:
+   `src/core/constants.ts:37` exports the constant, `src/orchestra/debt-manager.
+   ts:481` keeps `DECISIONS.md` in `DECAY_EXEMPT`, `src/orchestra/sprint-docs-
+   helpers.ts:142` writes "See .brain/DECISIONS.md" into the now-deprecated
+   PROJECT-IDENTITY.md, and `src/orchestra/authority-enforcer.ts:118` lists the
+   path in its allow-list. Fix: replace with `.brain/memory.db` (or the export
+   path) + sweep the cascade.
+
+### Sub-project #2 — self-security procedure scope (captured 2026-05-20)
+
+Beyond the planner state-hygiene defects above, #2 introduces a runtime **prompt
+& command guard** between the terminal session and the AI tools running inside
+it (claude / gemini / codex / deckent). Working notes — to be designed into
+ADR-form during the #2 spec phase:
+
+- **Prompt guard**: terminal pipes user input into AI tools; an injected prompt
+  could exfiltrate via the same PTY. Pre-input filter (token bucket on suspect
+  patterns: long base64 blobs, OSC sequences from upstream that escape to the
+  host terminal, `curl … | sh` chains). Block on signal, surface to audit as
+  structured event, never drop bytes silently (security ≠ trust loss).
+- **Command guard**: explicit deny-list for shell-kind sessions when
+  `allowShellKind=true` but `host !== 127.0.0.1` (i.e. opt-in remote-shell).
+  Candidates: `rm -rf /`, `mkfs.*`, `dd of=/dev/*`, `:(){:|:&};:`, ssh-keygen
+  rewrites, `.ssh/authorized_keys` touches. Same audit + surface pattern.
+- **Outbound rate-limit**: per-session ws send-bytes cap (already present as
+  backpressure pause); add a *daily* tenant-scoped quota so a compromised AI
+  loop can't exfiltrate gigabytes before the operator notices.
+- **Mutual-TLS hook**: `AuthProvider` interface (#3 implements multi-tenant)
+  needs a designed hook for client-cert auth, separate from the localhost token
+  path. Capture in the #2 spec so #3 doesn't have to re-litigate.
+- **Self-audit-of-audit**: terminal audit writes to `memory.db`, but who watches
+  the writer? Periodic integrity check (HMAC chain over append-only event
+  series) — explore in #2, ship in #3.
+
+These are the *requirement* surfaces — the #2 plan will translate them into
+TDD'able tasks.
 
 ## 2. Locked Decisions
 
