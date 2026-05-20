@@ -1,117 +1,105 @@
-# DIRECTIVES — Sprint 177: Critical Runtime Stability (Crisis Stabilization §3)
+# DIRECTIVES — Sprint 178: Modernization Yayılma + TOPP (Crisis Stabilization §4)
 
 ## Spec + Plan Referansları
 
-- **Master spec:** `docs/superpowers/specs/2026-05-21-crisis-stabilization-initiative.md` (commit `912b8715`) — Sprint 177-180 master plan, beta-gate prioritization.
-- **Plan (bağlayıcı kontrat):** `docs/superpowers/plans/2026-05-21-sprint-177-critical-runtime.md` (commit `ea53052b`) — her worker kendi Task bölümündeki **adım/kod/test'i** + aşağıdaki Worker Contract'ı **mutlaka** okur.
-- **Predecessor:** Sprint 176 (rolled back — config drift + 8 dogfood bug; evidence: `docs/audits/sprint-176/dogfood-evidence.md`)
-- **Sub-project status:** Sub-project #2 original (planner hijyen + self-security) subsumed → Sprint 179'a kaydı; bu sprint kritik runtime stability'ye odaklanıyor.
+- **Master spec:** `docs/superpowers/specs/2026-05-21-crisis-stabilization-initiative.md` §4 (Sprint 178 outline)
+- **Plan (bağlayıcı kontrat):** `docs/superpowers/plans/2026-05-22-sprint-178-modernization-topp.md` — TOPP en detaylı (567 satır)
+- **TOPP referans:** memory `project_topp_continuous_dispatch.md` (Alperen onayı 2026-05-19)
+- **Predecessor:** Sprint 177 (GO_WITH_TECH_DEBT, 4 DONE + 1 GWT). Worker rollback live; NO_GO worker'ları otomatik src/ revert.
 
 ## Goal
 
-5 task ile Sprint 176'nın açığa çıkardığı 5 runtime gap'i kapat: worker rollback, deckent kill cascade, tmux deprecate path, config regen guard, nervous baseline hook. Bu sprint **June 1 beta gate için MUST** — bu altyapı yoksa sonraki sprint'ler tekrar Sprint 176 gibi state'i bozar.
+5 task ile Crisis Stabilization §4: Node 24/26 modernization yayılma (test+doc) + tmux backend code removal + CI flake fix + **TOPP B+C continuous-dispatch** (MUST — Sprint 179 12-task fan-out için zorunlu). Beta gate (June 1) yolu: bu sprint TOPP land etmezse Sprint 179 wave-throttled koşar.
 
 ## Brain Planning Instructions
 
-Mode: **structured**. **Self-modifying / dogfood: ZORUNLU sequential** (`src/agents/`, `src/orchestra/`, `src/core/`, `src/nervous/`, `src/cli/`, `src/mcp/` → `self-modifying-detector.ts` tetikler). Wave: 1 (5 task tek wave — Task 177-001 önce, sonra 002-005 paralel olabilir ama max 2 concurrent). Max workers: 2. `dependency_pipeline_enabled: false` → Brain manuel gate (ADR-047). Provider: claude. Alperen review: sprint başlangıç + her task PASS sonrası + finalize.
+Mode: **structured**. Self-modifying: ZORUNLU sequential. Wave: 5 (W1→W5 — Task 5 son, TOPP architectural lift). Max workers: 2. `dependency_pipeline_enabled: false` → Brain manuel gate (ADR-047). Provider: claude. **Worker rollback canlı** — Task NO_GO src/ otomatik revert.
 
 ## Worker Contract
 
-- **Kod YAZAR** (her task src/ + tests/ modifies). Scope DIŞINA yazma YASAK (ADR-037 advisory). **Task 177-001 lands ondan sonra worker rollback canlı** — sonraki task'ların NO_GO'sı otomatik revert.
-- **TDD ZORUNLU:** plandaki RED→GREEN aynen.
-- **ESM:** `.js` uzantısı zorunlu (Node 16/24).
-- **memory.db:** Task 177-001 additive ALTER (TaskRecord.snapshot_stash_ref kolon). DROP/rebuild YASAK.
-- **Honest gate:** `.tasks/task-<id>.result` gerçek vitest çıktısına göre selfAssessment + filesChanged + coverage + testsPassed + notes. **Fake "DONE" YOK.**
-- **Worker rollback engaged Task 177-001'den itibaren** — bir worker NO_GO döndüğünde scope'undaki tüm src/ değişiklikleri otomatik revert edilir.
+- **Kod YAZAR** (5 task source + tests + 1 silme + 1 yeni ADR). Scope DIŞINA yazma YASAK (advisory + worker rollback).
+- **TDD ZORUNLU:** Task 1-4 RED→GREEN; Task 5 G1-G10 matrix.
+- **ESM:** `.js` uzantısı zorunlu.
+- **memory.db:** sadece query (ADR number lookup Task 5 Step 2). Schema değişmiyor.
+- **Worker rollback active:** her NO_GO scope writes auto-revert. Sprint 176 corrupted src/ pattern imkansız.
+- `.tasks/task-<id>.result`: gerçek vitest + selfAssessment + filesChanged + coverage + notes.
 
 ## GO/NO_GO Criteria
 
-- **GATE-1 (Task 177-001):** Worker rollback testleri PASS (4 test); `git stash list` test sonrası clean; out-of-scope NO_GO da revert; **bu task BLOCKING — başarısız olursa sprint NO_GO.**
-- **GATE-2 (Task 177-002):** Kill cascade integration testi PASS; dummy sprint + kill → 0 stale process/metadata/socket.
-- **GATE-3 (Task 177-003):** Default `spawn_backend` resolves to docker; tmux deprecation warning emitted (once per sprint).
-- **GATE-4 (Task 177-004):** Partial config regen preserves user fields + creates `.bak.regen-{iso}` backup.
-- **GATE-5 (Task 177-005):** Sprint-boundary `deckent_set_directives` change not auto-restored by nervous directives_protection.
+- **GATE-1 (Task 178-001):** Node 24/26 test sweep PASS (4 files updated, vitest green)
+- **GATE-2 (Task 178-002):** Doc updates PASS (lint:link exit 0, no stale Node 18 refs)
+- **GATE-3 (Task 178-003):** Tmux removal PASS (tsc clean, no tmux refs, deprecation→removal note)
+- **GATE-4 (Task 178-004):** CI flake PASS (lokal + CI=true parity)
+- **GATE-5 (Task 178-005) ★ MUST:** TOPP G1-G10 PASS + cross-backend smoke + ADR lint:adr exit 0
 
 **Sprint verdict:**
 - **GO** = 5/5 DONE
-- **GO_WITH_TECH_DEBT** = 4/5 DONE + 1 GWT, **provided GWT task is NOT 177-001 or 177-002** (worker rollback ve kill cascade non-negotiable)
-- **NO_GO** = 177-001 veya 177-002 fail; veya worker rollback regresyonu tespit edilirse
+- **GO_WITH_TECH_DEBT** = 4/5 DONE + 1 GWT **provided GWT is NOT Task 178-005 TOPP** (Sprint 179 unblock non-negotiable)
+- **NO_GO** = Task 5 fails outright; veya test regression (worker rollback verdict)
 
 ---
 
-## Task 1: 177-001 — Worker rollback: git-stash snapshot-on-spawn
-- Model: opus
-- Effort: high
-- Skills: typescript-expert, git-expert
-- Agent: bug-fixer
-- Files: src/agents/worker.ts, src/agents/worker-rollback.ts, src/orchestra/result-evaluator.ts, src/core/memory-types.ts, tests/agents/worker-rollback.test.ts
-- Scope: src/agents/, src/orchestra/, src/core/, tests/agents/
-
-### Description
-Plan §Task 1 adımları. `snapshotWorkerScope()` git stash --include-untracked --keep-index ile pre-spawn state kayıt; `rollbackWorkerScope()` NO_GO'da git checkout HEAD -- . + git clean -fd; `dropWorkerSnapshot()` DONE/GWT'de stash drop. TaskRecord.snapshot_stash_ref memory.db'de tutulur. **Bu task BLOCKING** — sonraki 4 task bu altyapıya bağlı.
-**Kanıt:** vitest 4 test PASS (snapshot/NO_GO-revert/DONE-keep/out-of-scope-revert); git stash list test sonrası boş.
-**Test:** TDD — 4 test (RED→GREEN izlenebilir).
-
----
-
-## Task 2: 177-002 — deckent kill cascade fix
-- Model: opus
-- Effort: normal
-- Skills: typescript-expert
-- Agent: bug-fixer
-- Files: src/cli/commands/kill.ts, src/orchestra/sprint-controller.ts, src/orchestra/tmux.ts, src/orchestra/spawn-backend.ts, tests/cli/kill-cascade.test.ts
-- Scope: src/cli/, src/orchestra/, tests/cli/
-- Dependencies: ["177-001"]
-
-### Description
-Plan §Task 2 adımları. `deckent kill --all` cascade: SIGTERM workers + SIGTERM controller PID (.deckent/pids/) + 5s grace + SIGKILL stragglers + remove sprint-state.json/checkpoint.json/gate.json + tmux socket cleanup + emit `BRAIN→*:SPRINT_KILLED` event. **Sprint 176 evidence: kill 43dk controller PID alive kalıyor + metadata kalıyor.**
-**Kanıt:** vitest 3 test PASS (full cascade + controller-only + tmux-socket cleanup); integration test: dummy sprint + kill → 0 stale process/metadata/socket.
-**Test:** TDD — 3 test.
-
----
-
-## Task 3: 177-003 — Tmux backend deprecate path
+## Task 1: 178-001 — Node 24/26 test assertion sweep
 - Model: sonnet
 - Effort: low
-- Skills: typescript-expert
+- Skills: typescript-expert, testing-expert
+- Agent: ci-guardian
+- Files: tests/scripts/publish-workflow.test.ts, tests/workflows/publish.test.ts, tests/e2e/install-matrix/fresh-install.test.ts, tests/docs/release-prep.test.ts
+- Scope: tests/
+
+### Description
+Plan §Task 1. 4 test dosyasında stale Node 18/20/22 + '22.x' assertion'larını 24/26 + '24.x'a güncelle; engines.node >= 24 assertion. **Kanıt:** vitest 4 dosya PASS. **Test:** Assertion update — TDD bypass (existing test, sadece beklentiler güncellenir).
+
+---
+
+## Task 2: 178-002 — Doc updates (Node 24/26 yayılma)
+- Model: sonnet
+- Effort: low
+- Skills: documentation-writer
+- Agent: doc-writer
+- Files: README.md, DECKENT.md, docs/guide/installation.md, docs/guide/quickstart.md, docs/guide/troubleshooting.md
+- Scope: ./, docs/guide/
+
+### Description
+Plan §Task 2. README + DECKENT.md prerequisites + docs/guide/* Node 24/26 references. lint:link exit 0. **Kanıt:** lint:link temiz, grep stale "Node 18" 0 hit. **Test:** doc-only.
+
+---
+
+## Task 3: 178-003 — Tmux backend code removal
+- Model: opus
+- Effort: normal
+- Skills: typescript-expert, system-architect
 - Agent: refactorer
-- Files: src/orchestra/spawn-backend.ts, src/orchestra/tmux.ts, src/core/config.ts, docs/guide/troubleshooting.md, tests/orchestra/tmux-deprecation.test.ts
-- Scope: src/orchestra/, src/core/, docs/guide/, tests/orchestra/
-- Dependencies: ["177-001"]
+- Files: src/orchestra/tmux.ts (DELETE), src/orchestra/spawn-backend.ts, src/core/config.ts, tests/orchestra/tmux-deprecation.test.ts (DELETE), docs/guide/troubleshooting.md
+- Scope: src/orchestra/, src/core/, tests/orchestra/, docs/guide/
+- Dependencies: ["178-002"]
 
 ### Description
-Plan §Task 3 adımları. `resolveBackend()` default 'auto'→'docker' (önceden 'tmux'); explicit tmux için deprecation warning (once per sprint); DEFAULT_CONFIG.spawn_backend = 'docker'; docs/guide/troubleshooting.md tmux deprecation section. Sprint 178'de tmux kodu silinecek. **Sprint 176 evidence: auto→tmux fallback yanlış backend tetikledi.**
-**Kanıt:** vitest 3 test PASS (default→docker + explicit-warns + warn-once).
-**Test:** TDD — 3 test.
+Plan §Task 3. tmux.ts + tmux-deprecation.test.ts sil. spawn-backend.ts tmux branch removal (3 backend → 2). config.ts spawn_backend type narrow ('docker' | 'subprocess' | 'auto'). tsc clean. **Kanıt:** grep tmux src/ 0 hit; vitest tests/orchestra/ regression yok. **Test:** Removal + type-check.
 
 ---
 
-## Task 4: 177-004 — Config template-regen guard + restore docs
-- Model: sonnet
+## Task 4: 178-004 — CI flake fix (PID portability + mock hygiene)
+- Model: opus
 - Effort: normal
-- Skills: typescript-expert, documentation-writer
-- Agent: devops-engineer
-- Files: src/core/config.ts, docs/guide/config-recovery.md, tests/core/config-regen-guard.test.ts
-- Scope: src/core/, docs/guide/, tests/core/
-- Dependencies: ["177-001"]
+- Skills: typescript-expert, testing-expert, ci-testing
+- Agent: bug-fixer
+- Files: src/core/pid-liveness.ts (NEW), tests/cli/archive-debt.test.ts, tests/core/orphan-cleaner-ipc.test.ts, src/orchestra/ (process.kill call sites)
+- Scope: src/core/, src/orchestra/, tests/
 
 ### Description
-Plan §Task 4 adımları. `regenerateConfigSafe()` mevcut config'i template ile MERGE eder (overwrite değil); destructive regen öncesi `.deckent/config.json.bak.regen-{iso}` backup; templateDefaults spawn_backend='docker' + dependency_pipeline_enabled=false + haiku_allowed=false + brain_planning='structured' içerir. **Sprint 176 evidence: PR #16 git rm --cached sonrası regen template alıp spawn_backend dahil tüm field'ları kaybetti.**
-**Kanıt:** vitest 3 test PASS (merge preserves user fields + backup created + missing-field add); docs/guide/config-recovery.md mevcut.
-**Test:** TDD — 3 test.
+Plan §Task 4. isPidAlive() extract (linux /proc parse, darwin/win32 fallback). 2 test mock hygiene fix. process.kill(pid, 0) call sites → isPidAlive(). **Kanıt:** lokal + CI=true parity (2 test PASS her iki ortamda). **Test:** TDD — portability + mock surface.
 
 ---
 
-## Task 5: 177-005 — nervous_system directives_protection baseline-update hook
-- Model: sonnet
-- Effort: normal
-- Skills: typescript-expert
-- Agent: api-builder
-- Files: src/nervous/observer.ts (veya detector-registry.ts), src/mcp/tools/set-directives.ts, src/orchestra/sprint-controller.ts, src/cli/commands/nervous.ts, tests/nervous/directives-protection-baseline.test.ts
-- Scope: src/nervous/, src/mcp/, src/orchestra/, src/cli/, tests/nervous/
-- Dependencies: ["177-001"]
+## Task 5: 178-005 — TOPP B+C continuous-dispatch ★ MUST
+- Model: opus
+- Effort: high
+- Skills: typescript-expert, system-architect, testing-expert
+- Agent: architect
+- Files: src/orchestra/result-collector.ts, src/orchestra/sprint-spawner.ts, src/orchestra/prompt-god-template.ts, tests/orchestra/topp-continuous-dispatch.test.ts (NEW), docs/adr/0XX-topp-continuous-dispatch.md (NEW)
+- Scope: src/orchestra/, tests/orchestra/, docs/adr/
+- Dependencies: ["178-003"]
 
 ### Description
-Plan §Task 5 adımları. DirectivesProtectionDetector.updateBaseline() metodu eklenir + `deckent_set_directives` success path tetikler + `sprint-controller.startSprint()` tetikler + `deckent nervous baseline-refresh` CLI subcommand. **Sprint 176 evidence: kill+cleanup sonrası auto_restore Sprint 175 content'ini Sprint 176'nın üstüne yazdı.**
-**Kanıt:** vitest 3 test PASS (set_directives baseline refresh + adversary change restored + CLI baseline refresh).
-**Test:** TDD — 3 test.
+Plan §Task 5. Wave-barrier kalkar: result-collector.ts:380 `dispatchTick(state)` flag-agnostik (replaces maybeRespawn + processQueue). sprint-spawner.ts:472,509 continuous body + 296-313 initial fill ladder. prompt-god-template.ts:291-307 TOPP C `buildDependenciesBlock` predecessor `.result` digest embed (selfAssessment + filesChanged + notes head). Yeni ADR 0XX (number memory.db'den) ADR-045 §3 wave-barrier supersede. DECKENT_LEGACY_FIFO=1 rollback escape hatch. **Kanıt:** vitest 10/10 G-matrix PASS + cross-backend (docker/subprocess) smoke clean + lint:adr exit 0. **Test:** TDD — G1-G10 matrix (empty queue, eligible spawn, dep-block, dep-resolve, max_workers boundary, collision-edge, predecessor digest, flag-agnostic, escape hatch, multi-wave smoke).
