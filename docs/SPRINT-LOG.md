@@ -4761,3 +4761,44 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 174-006: Kit index + tutarlılık — canva-kit/README.md (DONE)
 
 ---
+## Sprint 175 — sprint-175
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-05-19
+**Duration:** 3849s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 37 |
+| Completed | 21 |
+| Tech Debt | 2 |
+| No-Go | 16 |
+| Coverage | 15.0% |
+| Duration | 3849199ms |
+
+### Tasks
+
+- 175-001: W0.1 — Runtime deps (node-pty + ws) (DONE)
+- 175-002: W0.2 — ADR-010 amendment ext + ADR-062 (DONE)
+- 175-003: W0.3 — TerminalConfig → DeckentConfig (DONE)
+- 175-004: W0.4 — Shared terminal types (DONE)
+- 175-005: W1.1 — AuthProvider (bypass-independent) (DONE)
+- 175-006: W1.2 — SessionBackend + LocalPtyBackend (NO_GO)
+- 175-007: W1.3 — TerminalAudit (tenant-scoped DB) (DONE)
+- 175-008: W1.4 — PtySessionManager (NO_GO)
+- 175-009: W2.1 — WS gateway (auth-before-bridge + reattach) (DONE)
+- 175-010: W2.2 — HTTP control + localhost bootstrap inject (NO_GO)
+- 175-011: W2.3 — serve CLI surface (DONE)
+- 175-012: W3.1 — xterm deps + terminal-api (DONE)
+- 175-013: W3.2 — useTerminalSocket (DONE)
+- 175-014: W3.3 — TerminalView (xterm) (NO_GO)
+- 175-015: W3.4 — TerminalTabs + TerminalPanel (NO_GO)
+- 175-016: W3.5 — DockPanel + Layout (NO_GO)
+- 175-017: W3.6 — ConfigPage Terminal kategori + i18n (NO_GO)
+- 175-018: W4.1 — E2E reattach integration (NO_GO)
+- 175-019: W4.2 — Docs (guide EN+TR + reference) (DONE)
+- 175-020: W4.3 — Final verification (GO_WITH_TECH_DEBT)
+
+---

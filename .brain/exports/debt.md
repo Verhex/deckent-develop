@@ -4,13 +4,15 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
-| debt-adr-019-reconciliation | ADR-019 reconciliation: language-agnostic verify not implemented | high | sprint-172 | active |
+| debt-175-020-fix | Tech debt from 175-020-fix: All 5 automatic verification gates executed:
+
+1. npm | normal | sprint-175 | active |
+| debt-adr-019-reconciliation | ADR-019 reconciliation: language-agnostic verify not implemented | critical | sprint-172 | active |
 
 ## Resolved Technical Debt
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
-| debt-170-001-fix | Tech debt from 170-001-fix: Code physically verified despite missing .result (Sp | critical | sprint-170 | resolved |
 | debt-debt-138-002 | Tech debt from 138-002: ADR-035 Brain ↔ Worker ↔ Auditor Verification Protocol S | normal | - | resolved |
 | debt-debt-138-008 | Tech debt from 138-008: Worker Honest Assessment Calibration v2 tamamlandı. 3 al | normal | - | resolved |
 | debt-141-003 | Tech debt from 141-003: src/cli/ analizi tamamlandı. 75 rapor dosyası oluşturuld | normal | - | resolved |
@@ -121,3 +123,4 @@ M | normal | - | resolved |
 | debt-156-008 | Tech debt from 156-008: Sprint 156 Task 008 — Brain Self-Rebuild Gate (NO BUILD  | normal | - | resolved |
 | debt-156-011-fix | Tech debt from 156-011-fix: Code physically verified despite missing .result (Sp | normal | - | resolved |
 | debt-162-001 | Tech debt from 162-001: T-003 composite (phase observability + EvaluationAuditTr | normal | - | resolved |
+| debt-170-001-fix | Tech debt from 170-001-fix: Code physically verified despite missing .result (Sp | normal | - | resolved |
