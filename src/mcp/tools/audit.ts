@@ -10,7 +10,7 @@ export function registerAuditTool(server: McpServer): void {
     'deckent_audit',
     {
       title: 'Sprint Audit',
-      description: 'Run Brain Self-Audit Gate for a sprint. Checks tsc, vitest, honesty violations, and observability. Returns gate result (PASS or GATE_FAILURE) and writes to .deckent/<sprint-id>-gate.json. Read-only: does not modify source code or sprint state.',
+      description: 'Run Brain Self-Audit Gate for a sprint. Checks tsc, vitest, honesty violations, and observability. Returns gate result (PASS or GATE_FAILURE) and writes to .deckent/{sprintId}-gate.json. Read-only: does not modify source code or sprint state.',
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
       inputSchema: z.object({
         sprintId: z.string().describe('Sprint ID to audit (e.g. "sprint-150")'),

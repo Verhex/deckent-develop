@@ -178,7 +178,16 @@ export function parseAgents(agentsDir) {
 // ─── escape helper for markdown table cells ──────────────────────────────────
 
 function tableCell(s) {
-  return String(s ?? '').replace(/\|/g, '\\|').replace(/\r?\n/g, ' ').trim();
+  return String(s ?? '')
+    .replace(/\|/g, '\\|')
+    .replace(/\r?\n/g, ' ')
+    // VitePress's Vue compiler parses bare `<word>` patterns as unclosed HTML
+    // tags and bombs the build (e.g. `<command>`, `<sprint-id>` in usage
+    // strings). Escape as HTML entities so they render as literal text but
+    // are no longer parsed as element openers. Real HTML in source (e.g.
+    // `<br/>`, `<sub>`) won't match this anchored single-token pattern.
+    .replace(/<([a-zA-Z][a-zA-Z0-9_-]*)>/g, '&lt;$1&gt;')
+    .trim();
 }
 
 // ─── Renderers ───────────────────────────────────────────────────────────────

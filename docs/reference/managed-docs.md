@@ -57,7 +57,7 @@ Section headings that Deckent **never** touches. Use this for:
 
 ### templates
 
-User-defined templates per section with `{{path.to.value}}` placeholders resolved against the sprint context. Templates take precedence over built-in generators for matching sections.
+User-defined templates per section with `&#123;&#123;path.to.value&#125;&#125;` placeholders resolved against the sprint context. Templates take precedence over built-in generators for matching sections.
 
 ```json
 {

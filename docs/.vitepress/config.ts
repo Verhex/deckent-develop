@@ -25,8 +25,10 @@ export default defineConfig({
   // Dark/light theme
   appearance: 'auto',
 
-  // Exclude directories containing TypeScript generics, placeholder syntax (<N>, <T>, <Record>)
-  // that VitePress Vue compiler treats as unclosed HTML elements.
+  // Exclude directories containing TypeScript generics, placeholder syntax (<N>, <T>, <Record>),
+  // or HTML-like substrings (e.g. `<noreply@anthropic.com>` in co-author trailers, `<PID>` in
+  // placeholders) that VitePress's Vue compiler treats as unclosed HTML elements. These are
+  // developer notes / specs / audits, not user-facing documentation.
   // Only guide/ and index.md are built as user-facing docs.
   srcExclude: [
     'directives/**',
@@ -35,7 +37,10 @@ export default defineConfig({
     'release/**',
     'development/**',
     'architecture/**',
-    'reference/**',
+    'superpowers/**',
+    'audits/**',
+    'launch/**',
+    'governance/**',
     'SPRINT-LOG.md',
     'CHANGELOG.md',
   ],

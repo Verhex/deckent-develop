@@ -335,7 +335,7 @@ Brain reads this file but cannot write it. Workers have no access to it. Changes
 
 ## Related Documentation
 
-- [ADR Index](../adr/) — Architecture Decision Records (ADR-014, ADR-034, ADR-037 govern security)
+- [ADR Index](../adr/README) — Architecture Decision Records (ADR-014, ADR-034, ADR-037 govern security)
 - [Core Concepts](../guide/concepts.md) — Overall system architecture
 - [Config Reference](./config-reference.md) — Security-relevant config keys
 - `.contracts/api-surface.md` — Worker scope contract definition
