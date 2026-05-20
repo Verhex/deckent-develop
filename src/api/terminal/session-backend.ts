@@ -1,4 +1,4 @@
-import * as pty from 'node-pty';
+import * as pty from '@lydell/node-pty';
 
 export interface SpawnSpec {
   file: string;
