@@ -26,6 +26,8 @@
     "build:all": "tsc && node scripts/copy-assets.mjs && npm run build:dashboard",
     "postbuild": "npm run build:dashboard",
     "lint": "tsc --noEmit && tsc --noEmit -p src/dashboard",
+    "tsc:dashboard": "tsc --noEmit -p src/dashboard",
+    "install:all": "npm ci && npm ci --prefix src/dashboard",
     "lint:adr": "node scripts/adr-validator.mjs",
     "lint:errors": "node scripts/check-error-handling.mjs",
     "lint:link": "node scripts/lint-links.mjs",

@@ -45,6 +45,9 @@ jobs:
       - name: Install docs dependencies
         run: npm install --prefix docs
 
+      - name: Install dashboard dependencies
+        run: npm ci --prefix src/dashboard --ignore-scripts
+
       - name: Type check
         run: npm run lint
 

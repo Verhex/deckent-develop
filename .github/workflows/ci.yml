@@ -18,6 +18,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run ci:rebuild-native
+      - name: Install dashboard dependencies
+        run: npm ci --prefix src/dashboard --ignore-scripts
       - run: npm run lint
 
   security:
