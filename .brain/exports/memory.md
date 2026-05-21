@@ -1,5 +1,8 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-185 Learnings
+- Sprint sprint-185 Learnings: ## Sprint sprint-185 Learnings
+
 ## Sprint sprint-183 Learnings
 - Sprint sprint-183 Learnings: ## Sprint sprint-183 Learnings
 - W3-3 — v1.0.0-beta.1 final smoke (build:all + vitest + dashboard + serve): NO_GO — W3-3 final smoke gate: 6/6 GREEN. Read-only verification task, no source changes. Gate-by-gate: (1) `npm run build:all` 
