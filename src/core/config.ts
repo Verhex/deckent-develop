@@ -507,11 +507,12 @@ export function validateConfig(config: DeckentConfig): string[] {
       }
     }
 
-    // per-backend max <= 14400
+    // per-backend max <= 86400 (24h). Sprint 186 raised from 14400 (4h) to 86400 (24h)
+    // to support long-running per-file audit sprints (479 tasks × opus ≈ 13h).
     const maxFields = ['docker_max_timeout', 'tmux_max_timeout', 'subprocess_max_timeout'] as const;
     for (const field of maxFields) {
-      if (t[field] > 14400) {
-        errors.push(`timeout.${field} must be <= 14400`);
+      if (t[field] > 86400) {
+        errors.push(`timeout.${field} must be <= 86400`);
       }
     }
 
