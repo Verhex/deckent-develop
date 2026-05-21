@@ -37,9 +37,9 @@ These are **not three products**. They are **three modes of the same product**. 
 
 **Today's maturity is uneven, and that is honest:**
 
-- **AI Developer** is ~95% — 170+ sprints of dogfooding, beta-ready for 1 June 2026.
-- **AI System Worker** is ~50% — MCP server and multi-tenant isolation in flight (Sub-project #3), enterprise integrations and scheduled-flow dashboards on the horizon.
-- **AI Assistant** is ~25% — memory and nervous system are ready, the conversational shell decision is pending (see *Conversational Shell — Direction Under Consideration* below).
+- **AI Developer** is ~95% — 180+ sprints of dogfooding. **`v1.0.0-beta.1` validated and READY** as of Sprint 183 (final smoke 6/6 GREEN). Publish gate is Alperen-manual per project policy.
+- **AI System Worker** is ~55% — embedded web terminal foundation shipped in Sprint 175 (PTY sessions, WS gateway, token auth, audit chain). Self-security invariants I1–I5 (prompt guard, command guard, outbound rate-limit, append-only HMAC audit chain, tenant-scoped isolation) landed in Sprint 179. Multi-tenant + k8s pod-exec + mTLS impl is Sub-project #3 (Sprint 185+). Enterprise SSO/SIEM/compliance is Sub-project #4 (Sprint 189+).
+- **AI Assistant** is ~30% — memory V2 (SQLite + FTS5, dual-layer Turkish normalize) is production, Nervous System Phase 1 smoke (3 detectors) is live, conversational shell direction is documented (see *Conversational Shell — Direction Under Consideration* below) but unbuilt.
 
 The maturity gap is expected. Building the Developer face first forced the engine to become real — the same engine that will run the other two faces. **The goal has always been all three.**
 
@@ -67,24 +67,59 @@ macOS, Linux, WSL2, Docker, CI runners. Turkish and English interfaces. Works on
 
 ---
 
-## Sprint 134-145 Roadmap
+## Crisis Stabilization Initiative — Sprint 177-183 (CLOSED, 2026-05-21)
 
-Each sprint is approximately 30-60 minutes of Deckent orchestrating its own development. The roadmap below reflects confirmed work items and planned priorities. Details change — the direction does not.
+Late in the Sprint 175 cycle, eight failure modes surfaced simultaneously across the dogfood loop: worker-rollback dropping untracked files, kill cascades not propagating, an aging tmux backend, config drift on regenerate, nervous-system baseline drift, Node modernization lag, lost work from a missed commit gate, and a not-yet-production-ready Nervous System. Rather than absorbing these into routine sprints, they were grouped into a single multi-sprint program — the **Crisis Stabilization Initiative**.
+
+| Sprint | Theme | Outcome |
+|--------|-------|---------|
+| **177** | Critical Runtime Stability — worker rollback foundation, kill cascade fix, tmux deprecate, config regen guard, nervous baseline hook | 5/5 GO_WITH_TECH_DEBT, 24m 54s |
+| **178** | Modernization (Node 24/26), tmux backend removal, TOPP B+C continuous-dispatch (ADR-064 supersedes the wave-barrier in ADR-045 §3) | 9/11, 35m |
+| **179** | Sub-project #2 — planner state-hygiene + self-security invariants I1–I5 + Bug A dependency-aggregate fix-aware verdict foundation | 12/13 aggregate DONE |
+| **180** | Hybrid Beta MUST + Nervous Phase 1 Smoke (3 detectors) + Panic Guard UI groundwork | 8/13 DONE (re-evaluation surfaced coverage gaps) |
+| **181** | Manual Recovery + Worker-Rollback untracked-safe fix (Sprint 180 worker-rollback removed 7 src/ files because Sprint 179 was not committed before Sprint 180 launched) | 10 DONE + 3 NO_GO + 4 TECH_DEBT |
+| **182** | Worker Prompt Quality F1-F8 land + wave pipeline + verify pattern | 12/17 aggregate DONE, quality 64/100 |
+| **183** | 3 P0 fixes + Sprint 182 NO_GO recovery + Beta Launch v1.0.0-beta.1 validation | 11/13 DONE %85, quality **84/100** (best of the initiative), 25m |
+
+**What landed during the initiative:**
+
+- **Worker rollback became scope-bounded** — `git stash --include-untracked` with explicit pathspec only stashes scope dirs/files; an archive folder under `.deckent/worker-rollback-history/{sprintId}/{taskId}/` writes a patch before drop with a 7-sprint TTL.
+- **TOPP B+C continuous-dispatch** (ADR-064) — the wave barrier is gone; eligible tasks are dispatched whenever a worker slot frees, with a `DECKENT_LEGACY_FIFO=1` escape hatch retained for one minor version.
+- **Bug A foundation** — `getAggregateVerdict()` and the `BRAIN→*:DEPENDENCY_RESOLVED_BY_FIX` audit channel mean a NO_GO main task with a DONE fix task no longer blocks dependents that were waiting on aggregate success.
+- **Self-security invariants I1–I5** — `prompt-guard.ts` (BASE64_BLOB, OSC_ESCAPE, CURL_PIPE_SHELL patterns), `command-guard.ts` (6 deny patterns with localhost bypass), `outbound-limiter.ts` (per-tenant 24h windows), `audit-integrity.ts` (append-only HMAC chain with file-based key at mode 0600), and the mTLS interface (`AuthProvider.verifyClientCert?()`) shipped as part of Sprint 175 with file-key-only impl now extended.
+- **Worker prompt quality F1-F8** — idempotency-key injection (`${sprintId}-${taskId}-${retryCount}`), removal of skill/ADR/agent truncation (preserving completeness over brevity), agent `PROMPT.md` as canonical source with degraded-fallback semantics, DIRECTIVES parser fixes, ADR cosine-similarity threshold at 0.3, and override semantic warning.
+- **Nervous System became PLAN-phase-quiet** — FSWatcher debounced at 500ms with phase guard to EXECUTE only, eliminating the 14-minute PLAN-phase hang observed in Sprint 182.
+- **Beta launch validated** — `npm run validate:publish` returns 6/6 GREEN, the 2.7MB tarball contains 923 files, and the publish gate sits in Alperen's hands per project policy.
+
+The initiative is closed as of 2026-05-21. `v1.0.0-beta.1` is publish-ready.
+
+---
+
+## Sprint 184-200 Post-Beta Roadmap
+
+Each sprint is approximately 30-60 minutes of Deckent orchestrating its own development. The roadmap below reflects confirmed direction after the Crisis Stabilization closure. Details change — the direction does not.
 
 | Sprint | Theme | Key Deliverables | Status |
 |--------|-------|-----------------|--------|
-| **134** | Triple Dogfooding + Max Load + Product Vision Launch | Task dependency pipeline (T-001), scope parser hardening (T-002), stale heartbeat fix (T-003), baseline honesty checker (T-005), token pipeline fix (T-006), ADR-033 product vision (T-007), ADR-034 multi-project isolation (T-012), god object split phase 1 sprint-reporter (T-009), god object split phase 2 sprint-controller (T-010), local observability Level 2 (T-011), self-audit gate (T-014), RETRO rubric detail (T-013) | **Active** |
-| **135** | Setup Wizard + First-Run Experience | Interactive `deckent init` wizard, provider detection, model tier auto-config, first sprint guided walkthrough, README-first documentation rewrite | Planned |
-| **136** | Local Model Support (Phase 1) | Ollama provider adapter, local model registry entries, tier mapping for llama-3.3/qwen2.5/mistral, offline sprint capability, no-internet test suite | Planned |
-| **137** | Cross-Platform Hardening | Windows native support (non-WSL), Docker backend stability, CI runner first-class support (GitHub Actions, GitLab CI, CircleCI), path normalization across platforms | Planned |
-| **138** | Distribution + Package Quality | `npm publish` automation, provenance attestation, SBOM generation, signed releases, `npx` zero-install verification matrix, homebrew tap draft | Planned |
-| **139** | MCP Tool Completeness + Backend Parity | Full MCP tool parity with CLI, resource subscription model, streaming status updates, IDE extension protocol improvements, Docker/tmux/subprocess E2E test coverage, ADR-027 hybrid backend revisit (permanently rejected — event stream covers the need) | Planned |
-| **140** | Observability Level 3 | Web-based local dashboard (no cloud), metrics history, sprint comparison charts, agent performance trends, cost tracking per sprint | Planned |
-| **141** | i18n Expansion | Japanese (JA), German (DE), Spanish (ES) support — `patternsByLang` expansion, locale-aware reports, community translation workflow | Planned |
-| **142** | Multi-Project Workspace | Per-project isolation refinements (ADR-034 implementation depth), global config inheritance, workspace manifest, `deckent ls` across projects | Planned |
-| **143** | Agent Evolution Pipeline | Temp-to-permanent agent promotion UI, community agent registry (local-first, no central server), agent skill recommendation engine | Planned |
-| **144** | Sprint Intelligence V2 | Adaptive task splitting based on historical data, cross-sprint pattern learning, effort estimation calibration, retry strategy auto-tuning | Planned |
-| **145** | v1.0 Launch Prep | API surface stabilization, breaking change freeze, migration guide from 0.x, full documentation audit, community contributor onboarding guide | Planned |
+| **184** | Repo Housekeeping + Documentation Cleanup | Repository split decision (in-place cleanup vs. clean OSS clone), 388+ markdown documents triaged, `README.md` user-facing rewrite, `CONTRIBUTING.md`, OSS-launch polish, Brain Quality Scorer calibration backlog for read-only verify tasks (Sprint 182 W4-1 + Sprint 183 W3-3 false-positive root cause) | **Next** |
+| **185** | Sub-project #3 (1/4) — mTLS impl scaffold + multi-tenant audit shard | `RemoteTokenAuthProvider` impl extending the Sprint 175 `AuthProvider` interface, audit shard schema with per-tenant table partitioning, cross-tenant query denial via SQLite row-level enforcement | Planned |
+| **186** | Sub-project #3 (2/4) — k8s pod-exec `SessionBackend` impl | `K8sPodExecBackend` wrapping `kubectl exec`, namespace-per-tenant, RBAC ServiceAccount enforcement, dashboard reconnect across pod restarts | Planned |
+| **187** | Sub-project #3 (3/4) — Hardware-attested HMAC + outbound cluster aggregation | TPM/HSM key path via PKCS#11 abstraction, outbound limiter Redis-based counter for cluster-wide quota aggregation, per-tenant override via config schema | Planned |
+| **188** | Sub-project #3 (4/4) — Final polish + integration test + ADR-065 | E2E test with 3 tenants in parallel, audit shard isolation verification, mTLS handshake verification, k8s pod-exec end-to-end, Sub-project #3 GA marker | Planned |
+| **189** | Sub-project #4 (1/4) — SSO/OIDC integration | `OidcAuthProvider` impl, refresh-token flow, group-to-tenant mapping, `.deckent/sso.json` config schema. Adapters: Okta, Azure AD, Google Workspace | Planned |
+| **190** | Sub-project #4 (2/4) — Audit SIEM forwarder | `SiemForwarder` interface + 3 adapters (Splunk, Datadog, ELK), CEF / ECS / OTel format generation, per-event forwarding queue with backpressure | Planned |
+| **191** | Sub-project #4 (3/4) — Compliance reports | `deckent compliance generate` CLI: SOC 2 / ISO 27001 / GDPR control matrices auto-generated from the audit log, PDF + JSON export, evidence linking to specific audit events | Planned |
+| **192** | Sub-project #4 (4/4) — Enterprise dashboard + audit export API + ADR-066 | Dashboard `NervousPage` + `AuditPage` multi-tenant views, HTTP API `/api/audit/export` + `/api/compliance/report`, Sub-project #4 GA marker | Planned |
+| **193** | Nervous Phase 2 pilot | 5 MVP detectors in balanced mode, 8 action handlers, pilot dogfood across the next 3 sprints | Planned |
+| **194** | Nervous Phase 3 GA | Full 12-detector rollout, 30 action handlers, autopilot/full-auto mode testing | Planned |
+| **195** | Nervous dashboard + Local LLM (CUDA) provider | `NervousPage.tsx` + pending-approval badge (panic guard UI), `src/providers/ollama.ts` or `src/providers/cuda.ts` adapter — RTX 5090 + CUDA 13.2 + WSL2 passthrough verified 2026-05-21; 32GB VRAM allows 70B model residence (Qwen2.5-Coder, Llama-3.3, DeepSeek-V2) for enterprise data sovereignty, sub-50ms latency, and zero-API-cost dogfood | Planned |
+| **196** | Nervous user guide + ADR-040 status realization | Documentation closure of the Nervous System debt that has accumulated since Sprint 149 | Planned |
+| **197** | AEGIS Phase 1 — Foundation | Explicit ADVERSE phase, REVIEW MCP tool, COOL-DOWN consolidation per ADR-061 | Planned |
+| **198** | AEGIS Phase 2 — Verification Stack | Property-based fast-check tests, branded types across boundaries, Stryker mutation-diff in CI | Planned |
+| **199** | AEGIS Phase 3 — Provenance + Governance | Artifact manifest schema, Ed25519 signing for sprint outputs, formalized worker andon authority | Planned |
+| **200** | God-Level GA Canonical Launch — `v1.0.0` stable | Sprint 200 milestone: `agentaegis.io` standard draft, academic paper prep (ICSE/FSE 2027 target), AEGIS-compliant orchestrator certification | Planned |
+
+> **Why Sub-project #3 and #4 are open source, not "Enterprise Edition":** Every capability — multi-tenancy, mTLS, k8s, SSO, SIEM, compliance reports — ships under the same MIT license as the rest of Deckent. There is no paid tier and no feature gate. The same code that ran the dogfood loop runs in a 10,000-employee corporation. Enterprise-grade does not mean closed source; it means default-deny security, scoped tenants, and operator-grade audit, available to anyone who installs.
 
 ---
 

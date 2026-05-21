@@ -9,6 +9,107 @@
 
 ---
 
+## ⚡ 2026-05-21 (Sprint 177-183 → Crisis Stabilization Initiative Closure + Beta Launch READY)
+
+**Status:** Sprint 175 sonrası planlanan post-beta sub-project'ler yerine, Sprint 176 dogfood'unun ortaya çıkardığı 8 simultan failure mode (worker rollback gap + kill cascade gap + tmux backend rot + config drift + nervous baseline drift + node modernization + sub-project #2 lost work + nervous not-prod-ready) → **Crisis Stabilization Initiative** kuruldu (Sprint 177-183, 7 sprint).
+
+### Crisis Stabilization Initiative — 7 Sprint Özet
+
+| Sprint | Tema | Sonuç | Quality Avg |
+|--------|------|-------|-------------|
+| **177** | Critical Runtime Stability — worker rollback foundation + kill cascade fix + tmux deprecate + config regen guard + nervous baseline hook | 5/5 task (GO_WITH_TECH_DEBT 24m 54s) | — |
+| **178** | Modernization Yayılma + TOPP B+C Continuous-Dispatch (ADR-064 supersede ADR-045 §3 wave-barrier) — Node 24/26 spread + tmux removal + CI flake fix | 9/11 task (35m 11s) | — |
+| **179** | Sub-project #2 + Bug A Foundation — 12 task self-security (I1-I5 invariant) + dependency aggregate fix-aware verdict | 12/13 aggregate DONE | — |
+| **180** | Hybrid Beta MUST + Nervous Faz 1 Smoke + Panic Guard UI (13 task hybrid) | 8/13 DONE (Brain re-eval coverage gap'i ile 9 TECH_DEBT) | — |
+| **181** | Manual Recovery + Nervous Restart + Worker-Rollback Untracked-Safe Fix (Sprint 180 worker-rollback 7 src/ dosyası sildi → manuel recovery 16 task scope) | 10 DONE + 3 NO_GO + 4 TECH_DEBT (Bug A canlı kanıt — 4 task NO_GO+fix DONE aggregate) | — |
+| **182** | Worker Prompt Quality F1-F8 sub-spec + Wave Pipeline + Verify Pattern | 12/17 aggregate DONE (worker prompt refactor LAND) | **64** |
+| **183** | 3 P0 fix + Sprint 182 NO_GO Recovery + Beta Launch v1.0.0-beta.1 | 11/13 DONE %85 (sprint 25dk — Crisis kapanış sprinti) | **84** ⭐ |
+
+**Kazanım Özeti (Sprint 177-183 boyunca):**
+
+- ✅ **Worker rollback scope-bounded** (Sprint 177 + 181) — `git stash --include-untracked` pathspec ile sadece scope dirs/files stashlenir; archive folder `.deckent/worker-rollback-history/` 7-sprint TTL
+- ✅ **TOPP B+C continuous-dispatch** (Sprint 178, ADR-064) — wave-barrier kalkar, flag-agnostik fan-out
+- ✅ **Bug A foundation** (Sprint 179) — `getAggregateVerdict` + `DEPENDENCY_RESOLVED_BY_FIX` event channel — main NO_GO + fix DONE → aggregate DONE
+- ✅ **Self-security I1-I5** (Sprint 179) — prompt-guard + command-guard + outbound-limiter + audit-integrity HMAC chain + mTLS hook interface
+- ✅ **Worker Prompt Quality F1-F8** (Sprint 182) — `${IDEMPOTENCY_KEY}` injection + skill/ADR truncation kaldır + agent PROMPT.md kanonik + DIRECTIVES parser fix + ADR threshold + override semantic warning
+- ✅ **Nervous PLAN-phase pasif** (Sprint 183) — FSWatcher 500ms debounce + phase guard EXECUTE-only (Sprint 182'deki 14dk PLAN takılma çözüldü)
+- ✅ **DEPENDENCY_BLOCKED event spam debounce** (Sprint 183) — state-change-only emit
+- ✅ **Beta Launch v1.0.0-beta.1 READY** (Sprint 183) — `validate:publish` 6/6 GREEN, 2.7MB tarball, 923 files, npm publish Alperen manuel
+
+### Yeni ADR'ler (Crisis Stabilization eklemeleri)
+
+| ADR | Konu | Status | Sprint |
+|-----|------|--------|--------|
+| ADR-064 | TOPP — Continuous Dispatch (Wave-Barrier Removal) | accepted | 178 |
+| ADR-048 (amendment) | Prompt Lifecycle Contract — F1-F8 worker prompt quality | accepted | 182 |
+
+### Sprint 184-200 Post-Beta Roadmap (CRİSİS STABİLİZATİON SONRASI)
+
+**Sprint 184 — Repo Housekeeping + Documentation Cleanup**
+
+Beta launch (June 1) sonrası ilk sprint. Alperen analiz fazı — repo split kararı (deckent-develop → deckent OSS clean veya in-place cleanup), 388+ .md dokümanın hijyeni, README.md user-facing optimizasyon, CONTRIBUTING.md, OSS launch için final polish.
+
+**Sprint 185-188 — Sub-project #3: Multi-Tenant + k8s + mTLS** (Embedded Terminal #3/4)
+
+Sprint 175'te `LocalTokenAuthProvider` + `AuthProvider.verifyClientCert?()` interface land etti (mTLS interface no-op). Sprint 179'da audit HMAC chain file-based key (`.deckent/audit-key` mode 0600). Sprint 185+ enterprise-scale impl:
+
+| Sprint | Hedef | Çıktı |
+|--------|-------|-------|
+| **185** | mTLS impl scaffold + multi-tenant audit shard | `RemoteTokenAuthProvider` impl (LocalToken + cert chain); audit shard schema (per-tenant table partition); cross-tenant query yasağı (DB row-level security with SQLite enforcer) |
+| **186** | k8s pod-exec `SessionBackend` impl | `K8sPodExecBackend` — `kubectl exec` wrapper, namespace-per-tenant, RBAC ServiceAccount enforcement |
+| **187** | Hardware-attested HMAC key + outbound cluster aggregation | TPM/HSM key path (PKCS#11 abstraction); outbound limiter Redis-based counter (cluster-wide quota aggregation); per-tenant override via config |
+| **188** | Sub-project #3 final polish + integration test + ADR-065 (Multi-Tenant Architecture) | E2E test: 3 tenant paralel + audit shard isolation + mTLS handshake + k8s pod-exec end-to-end; ADR yaz; Sub-project #3 GA |
+
+**Sprint 189-192 — Sub-project #4: Enterprise Dış-Dünya Entegrasyon**
+
+OSS dual-yüz strategy (developer-first + enterprise edition'sız) ile uyumlu — feature'lar **herkese** open source, sadece config-driven enable.
+
+| Sprint | Hedef | Çıktı |
+|--------|-------|-------|
+| **189** | SSO/OIDC integration (Okta + Azure AD + Google Workspace) | `OidcAuthProvider` impl, refresh token flow, group-to-tenant mapping; `.deckent/sso.json` config schema |
+| **190** | Audit SIEM forwarder (Splunk + Datadog + ELK) | `SiemForwarder` interface + 3 adapter; CEF / ECS / OTel format generation; per-event forwarding queue |
+| **191** | Compliance reports (SOC 2 + ISO 27001 + GDPR) | `deckent compliance generate` CLI — kontrol matrisleri auto-generate from audit log; PDF + JSON export |
+| **192** | Enterprise dashboard (multi-tenant view) + audit log export API + ADR-066 (Enterprise Integration) | Dashboard NervousPage + AuditPage multi-tenant; HTTP API `/api/audit/export` + `/api/compliance/report`; ADR yaz; Sub-project #4 GA |
+
+**Sprint 193-196 — Nervous Faz 2/3 Pilot + GA**
+
+Sprint 180'de Nervous Faz 1 smoke (3 detector enabled — stale_worker + dead_event_stream + directives_protection) land etti. Sprint 183'te PLAN-phase pasif fix LAND. Sprint 193+ Faz 2 pilot (5 MVP detector balanced mode) + Faz 3 GA (12 detector tamamı + dashboard NervousPage).
+
+| Sprint | Hedef |
+|--------|-------|
+| 193 | Nervous Faz 2 pilot — 5 detector balanced mode + 8 action handler |
+| 194 | Faz 2 → Faz 3 geçiş + 30 action handler + autopilot/full-auto mode test |
+| 195 | Dashboard NervousPage.tsx + bekleyen onay rozeti (panic guard UI) |
+| 196 | Nervous user guide (Sprint 149 doc borcu) + ADR-040 status realized note |
+
+**Sprint 197-200 — AEGIS Methodology Realization + God-Level GA**
+
+ADR-061 (AEGIS — Agentic Effect-Governed Iterative Stewardship) Sprint 170'te proposed. Post-beta stabilite kanıtlandıktan sonra (Sprint 196 itibariyle) implementation başlar. Phase 1-5 master plan §AEGIS Sprint 175-200 Roadmap.
+
+| Sprint | Hedef |
+|--------|-------|
+| 197 | AEGIS Phase 1 Foundation — ADVERSE explicit phase + REVIEW MCP tool + COOL-DOWN consolidation |
+| 198 | AEGIS Phase 2 Verification Stack — fast-check PBT + branded types + Stryker mutation diff |
+| 199 | AEGIS Phase 3 Provenance + Governance — manifest schema + Ed25519 signing + worker andon authority |
+| **200** | **God-Level GA Canonical Launch — `v1.0.0` stable** | Sprint 200 milestone — agentaegis.io standard draft, academic paper prep (ICSE/FSE 2027), AEGIS-compliant orchestrator certification |
+
+### Local LLM Provider (CUDA) — Sub-project #5 Adayı
+
+Alperen 2026-05-21 hardware check: **RTX 5090 + CUDA 13.2 + WSL2 passthrough hazır** (`nvidia-smi` WSL'den görünüyor). Sprint 195+ ek sub-project: `src/providers/ollama.ts` veya `src/providers/cuda.ts` adapter. 32GB VRAM → 70B model (Qwen2.5-Coder, Llama-3.3, DeepSeek-V2) full residence. Enterprise data sovereignty + latency düşür (10-50ms vs 500-2000ms cloud) + cost düşür (subscription/API limit yok) + offline çalışabilir.
+
+### Crisis Stabilization Lessons Learned (kalıcı memory)
+
+| Lesson | Memory |
+|--------|--------|
+| Sprint kapanış sonrası ZORUNLU 2 commit | `feedback_post_sprint_commit_mandatory` (Sprint 181 origin — Sprint 179'u commit etmediğimiz için 7 src/ dosyası worker-rollback ile silindi) |
+| worker-rollback `git stash --include-untracked + drop` döngüsü untracked dosyaları siliyor | `project_worker_rollback_untracked_bug` (Sprint 181 P0 fix scope-bounded stash) |
+| DIRECTIVES'te retro/stub task ASLA KOYMA — Brain `sprint-reporter.ts` otomatik | `feedback_no_retro_task_in_directives` (Sprint 182 W4-4 hatası → 182-017 worker uydurma 340 satır retro yazdı) |
+| Token-tasarruf YASAK, prompt truncation tutarsızlık yaratır | `feedback_prompt_completeness_over_brevity` (Sprint 182 sub-spec F2+F3 felsefe anchor) |
+| Nervous + dep_pipeline + auto_restore birlikte enable PLAN-phase kombinatorial yavaşlatıcı | `project_sprint183_p0_fixes` (Sprint 182 dogfood → Sprint 183 P0-1 fix) |
+| Sprint kapanış sonrası kazanım/işleyiş raporu (impact summary) ver | `feedback_post_sprint_impact_summary` (Alperen istek 2026-05-20) |
+
+---
+
 ## ⚡ 2026-05-20 (Trinity Vision Anchor — "Hedefimiz Her Zaman Bu")
 
 Alperen kanonik beyan (2026-05-20): **"Deckent hem AI asistan hem AI system worker hem AI developer olacak. Hem şirketler, hem geliştiriciler, hem de sade kişiler Deckent'i kullanabilecek. Hedefimiz her zaman bu."**
