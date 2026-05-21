@@ -77,13 +77,15 @@ describe('worker rollback — git stash snapshot-on-spawn (Sprint 177 Task 1)', 
     expect(stashList.trim()).toBe('');
   });
 
-  it('rollback also reverts out-of-scope writes (advisory ADR-037 violation)', () => {
+  it('rollback (Sprint 181 scope-bounded) preserves out-of-scope writes', () => {
+    // Sprint 181 fix: scope-bounded rollback no longer touches out-of-scope
+    // files. Sprint 179->180 incident root cause.
     const ref = snapshotWorkerScope(tmp, 'task-004');
 
     writeFileSync(join(tmp, 'out-of-scope.ts'), 'sneaky\n');
     rollbackWorkerScope(tmp, ref, ['in-scope.ts']);
 
-    expect(existsSync(join(tmp, 'out-of-scope.ts'))).toBe(false);
+    expect(existsSync(join(tmp, 'out-of-scope.ts'))).toBe(true);
 
     const stashList = execSync('git stash list', { cwd: tmp, encoding: 'utf-8' });
     expect(stashList.trim()).toBe('');

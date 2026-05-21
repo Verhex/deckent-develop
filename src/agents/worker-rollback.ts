@@ -1,16 +1,16 @@
 /**
- * Worker Rollback — Sprint 177 Task 1
+ * Worker Rollback — Sprint 177 Task 1 + Sprint 181 untracked-safe revision.
  *
- * Captures the working tree at worker spawn via `git stash --include-untracked
- * --keep-index`, then either reverts (NO_GO) or drops (DONE / GO_WITH_TECH_DEBT)
- * the snapshot once the result-evaluator delivers a verdict.
+ * **Sprint 181 fix:** previously a bare `git stash --include-untracked` would
+ * sweep ALL untracked files (including the previous sprint's uncommitted
+ * deliverables). Sprint 179 -> 180 incident lost 7 src/ files this way. The
+ * new implementation is **scope-bounded**: only the worker's `scopedDirs` and
+ * `scopedFiles` are included in the stash. Out-of-scope uncommitted changes
+ * remain in the working tree untouched.
  *
- * Closes the Sprint 176 dogfood gap where NO_GO workers left `src/` corrupted
- * because no infrastructure existed to revert their partial edits.
- *
- * Persistence: the stash ref is stored in a sidecar file `.tasks/task-{id}.stash-ref`
- * alongside the existing `.hb` / `.plan` / `.result` sidecars. Type-level
- * documentation lives in `src/core/memory-types.ts` (TaskRecord interface).
+ * Archive folder: drops are written to
+ * `.deckent/worker-rollback-history/{sprintId}/{taskId}/stash-{iso}.patch`
+ * before `git stash drop`, with a 7-sprint TTL prune.
  */
 
 import { execFileSync, execSync } from 'node:child_process';
@@ -18,18 +18,35 @@ import {
   existsSync,
   mkdirSync,
   readFileSync,
+  readdirSync,
+  rmSync,
   unlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { join } from 'node:path';
 
-const STASH_REF_PATTERN = /^stash@\{\d+\}$/;
+const STASH_REF_PATTERN = /^stash@\{(\d+|NOSTASH)\}$/;
+const NOSTASH_SENTINEL = 'stash@{NOSTASH}';
+const ARCHIVE_ROOT_REL = '.deckent/worker-rollback-history';
+const ARCHIVE_TTL_SPRINTS = 7;
 
 export class WorkerRollbackError extends Error {
   constructor(message: string) {
     super(message);
     this.name = 'WorkerRollbackError';
   }
+}
+
+export interface SnapshotOptions {
+  scopedDirs?: string[];
+  scopedFiles?: string[];
+  sprintId?: string;
+  onWarn?: (event: { code: string; files: string[] }) => void;
+}
+
+export interface DropOptions {
+  sprintId?: string;
+  taskId?: string;
 }
 
 function ensureTasksDir(projectRoot: string): string {
@@ -44,105 +61,227 @@ function stashRefPath(projectRoot: string, taskId: string): string {
   return join(ensureTasksDir(projectRoot), `task-${taskId}.stash-ref`);
 }
 
-/**
- * Captures the current working-tree state into a named stash and returns the
- * stash ref (e.g. `stash@{0}`). New files are included via `--include-untracked`.
- *
- * The stash message is `deckent-worker-{taskId}-{iso}` so concurrent workers can
- * be disambiguated and so `git stash list` makes the intent obvious to operators.
- *
- * If the working tree is clean we still create a sentinel stash (with a single
- * untracked sentinel file removed immediately afterward) so callers always get a
- * valid ref — see test "snapshot captures pre-spawn state".
- */
-export function snapshotWorkerScope(repoRoot: string, taskId: string): string {
+function collectOutOfScopeUntracked(
+  repoRoot: string,
+  scopedDirs: string[],
+  scopedFiles: string[],
+): string[] {
+  try {
+    const out = execSync('git status --porcelain --untracked-files=all', {
+      cwd: repoRoot,
+      encoding: 'utf-8',
+    });
+    const offenders: string[] = [];
+    for (const line of out.split('\n')) {
+      if (!line.startsWith('??')) continue;
+      const file = line.slice(3).trim();
+      if (!file) continue;
+      const inDirs = scopedDirs.some((d) => {
+        const norm = d.endsWith('/') ? d : d + '/';
+        return file === d || file.startsWith(norm);
+      });
+      const inFiles = scopedFiles.includes(file);
+      if (!inDirs && !inFiles) {
+        offenders.push(file);
+      }
+    }
+    return offenders;
+  } catch {
+    return [];
+  }
+}
+
+export function snapshotWorkerScope(
+  repoRoot: string,
+  taskId: string,
+  options?: SnapshotOptions,
+): string {
   const ts = new Date().toISOString().replace(/[:.]/g, '-');
   const message = `deckent-worker-${taskId}-${ts}`;
+  const scopedDirs = options?.scopedDirs ?? [];
+  const scopedFiles = options?.scopedFiles ?? [];
+  const scopeBounded = scopedDirs.length > 0 || scopedFiles.length > 0;
 
-  // Ensure there is at least one change to stash. `git stash push` is a no-op
-  // when the working tree is clean and produces no stash entry, which would
-  // break the contract that snapshotWorkerScope always returns a ref. Touching
-  // a sentinel untracked file guarantees the stash captures *something*.
-  const sentinelPath = join(repoRoot, `.deckent-worker-sentinel-${taskId}`);
-  let sentinelCreated = false;
-  if (!existsSync(sentinelPath)) {
-    writeFileSync(sentinelPath, '');
-    sentinelCreated = true;
+  if (scopeBounded && options?.onWarn) {
+    const offenders = collectOutOfScopeUntracked(repoRoot, scopedDirs, scopedFiles);
+    if (offenders.length > 0) {
+      options.onWarn({ code: 'UNCOMMITTED_OUT_OF_SCOPE', files: offenders });
+    }
   }
 
-  execFileSync(
-    'git',
-    ['stash', 'push', '--include-untracked', '--keep-index', '--message', message],
-    { cwd: repoRoot, stdio: ['ignore', 'ignore', 'pipe'] },
-  );
+  const args = [
+    'stash',
+    'push',
+    '--include-untracked',
+    '--keep-index',
+    '--message',
+    message,
+  ];
 
-  // Clean up sentinel from working tree if we created it. The stash itself
-  // still contains the sentinel, so a rollback will not resurrect it because
-  // rollback restores the entire pre-snapshot tree (sentinel didn't exist
-  // pre-snapshot either).
-  if (sentinelCreated && existsSync(sentinelPath)) {
+  // Sentinel only in legacy mode — in scope-bounded mode, the scope paths
+  // are the stash content. If scope is empty git stash push will be a no-op
+  // but `resolveStashRefByMessage` will fall back to `stash@{0}` (possibly
+  // unrelated). Scope-bounded callers should ensure their scope dir exists.
+  let sentinelPath: string | null = null;
+  let sentinelCreated = false;
+  if (!scopeBounded) {
+    sentinelPath = join(repoRoot, `.deckent-worker-sentinel-${taskId}`);
+    if (!existsSync(sentinelPath)) {
+      writeFileSync(sentinelPath, '');
+      sentinelCreated = true;
+    }
+  } else {
+    // Ensure scope dirs exist so stash has something to capture
+    for (const dir of scopedDirs) {
+      const abs = join(repoRoot, dir);
+      if (!existsSync(abs)) {
+        mkdirSync(abs, { recursive: true });
+      }
+    }
+    args.push('--');
+    for (const dir of scopedDirs) args.push(dir);
+    for (const file of scopedFiles) args.push(file);
+  }
+
+  try {
+    execFileSync('git', args, {
+      cwd: repoRoot,
+      stdio: ['ignore', 'ignore', 'pipe'],
+    });
+  } catch {
+    // Empty scope can cause stash to fail with "No local changes to save".
+    // In that case fall through — caller still gets a (possibly stale) ref.
+  }
+
+  if (sentinelCreated && sentinelPath && existsSync(sentinelPath)) {
     try {
       unlinkSync(sentinelPath);
     } catch {
-      // best-effort cleanup
+      /* best-effort */
     }
   }
 
   return resolveStashRefByMessage(repoRoot, message);
 }
 
-/**
- * Reverts the working tree to the snapshot captured by `snapshotWorkerScope`.
- *
- * Implementation: `git checkout HEAD -- .` resets tracked files, `git clean -fd`
- * removes untracked files. The stash itself is then dropped because it has
- * served its purpose as proof-of-pre-state.
- *
- * `scopedPaths` is accepted for API surface stability but the rollback is
- * intentionally whole-tree — ADR-037 advisory: if a worker wrote out of scope,
- * we still revert those writes because they should never have happened.
- */
 export function rollbackWorkerScope(
   repoRoot: string,
   stashRef: string,
-  _scopedPaths: string[],
+  scopedPaths: string[],
 ): void {
   if (!STASH_REF_PATTERN.test(stashRef)) {
     throw new WorkerRollbackError(`rollbackWorkerScope: invalid stashRef "${stashRef}"`);
   }
 
-  execFileSync('git', ['checkout', 'HEAD', '--', '.'], {
-    cwd: repoRoot,
-    stdio: ['ignore', 'ignore', 'pipe'],
-  });
-  execFileSync('git', ['clean', '-fd'], {
-    cwd: repoRoot,
-    stdio: ['ignore', 'ignore', 'pipe'],
-  });
-  execFileSync('git', ['stash', 'drop', stashRef], {
-    cwd: repoRoot,
-    stdio: ['ignore', 'ignore', 'pipe'],
-  });
+  if (scopedPaths.length > 0) {
+    // Checkout tracked paths individually so untracked files in the list
+    // (which don't exist in HEAD) don't abort the entire checkout batch.
+    for (const p of scopedPaths) {
+      try {
+        execFileSync('git', ['checkout', 'HEAD', '--', p], {
+          cwd: repoRoot,
+          stdio: ['ignore', 'ignore', 'pipe'],
+        });
+      } catch {
+        /* not in HEAD — handled by clean step below */
+      }
+    }
+    for (const p of scopedPaths) {
+      try {
+        execFileSync('git', ['clean', '-fd', '--', p], {
+          cwd: repoRoot,
+          stdio: ['ignore', 'ignore', 'pipe'],
+        });
+      } catch {
+        /* nothing to clean */
+      }
+    }
+  } else {
+    execFileSync('git', ['checkout', 'HEAD', '--', '.'], {
+      cwd: repoRoot,
+      stdio: ['ignore', 'ignore', 'pipe'],
+    });
+    execFileSync('git', ['clean', '-fd'], {
+      cwd: repoRoot,
+      stdio: ['ignore', 'ignore', 'pipe'],
+    });
+  }
+
+  if (stashRef !== NOSTASH_SENTINEL) {
+    execFileSync('git', ['stash', 'drop', stashRef], {
+      cwd: repoRoot,
+      stdio: ['ignore', 'ignore', 'pipe'],
+    });
+  }
 }
 
-/**
- * Drops the snapshot stash without reverting — used on DONE / GO_WITH_TECH_DEBT
- * verdicts where the worker's changes should be preserved.
- */
-export function dropWorkerSnapshot(repoRoot: string, stashRef: string): void {
+export function dropWorkerSnapshot(
+  repoRoot: string,
+  stashRef: string,
+  options?: DropOptions,
+): void {
   if (!STASH_REF_PATTERN.test(stashRef)) {
     throw new WorkerRollbackError(`dropWorkerSnapshot: invalid stashRef "${stashRef}"`);
   }
+
+  if (stashRef === NOSTASH_SENTINEL) {
+    return;
+  }
+
+  if (options?.sprintId && options?.taskId) {
+    archiveStash(repoRoot, stashRef, options.sprintId, options.taskId);
+    pruneArchiveHistory(repoRoot);
+  }
+
   execFileSync('git', ['stash', 'drop', stashRef], {
     cwd: repoRoot,
     stdio: ['ignore', 'ignore', 'pipe'],
   });
 }
 
-/**
- * Persists the stash ref for a task to `.tasks/task-{id}.stash-ref` so that
- * the result-evaluator can recover it after the worker process has exited.
- */
+function archiveStash(
+  repoRoot: string,
+  stashRef: string,
+  sprintId: string,
+  taskId: string,
+): void {
+  const archiveDir = join(repoRoot, ARCHIVE_ROOT_REL, sprintId, taskId);
+  if (!existsSync(archiveDir)) {
+    mkdirSync(archiveDir, { recursive: true });
+  }
+  const ts = new Date().toISOString().replace(/[:.]/g, '-');
+  const patchPath = join(archiveDir, `stash-${ts}.patch`);
+  try {
+    const patch = execFileSync('git', ['stash', 'show', '-p', stashRef], {
+      cwd: repoRoot,
+      encoding: 'utf-8',
+      maxBuffer: 16 * 1024 * 1024,
+    });
+    writeFileSync(patchPath, patch, 'utf-8');
+  } catch {
+    // best-effort archive
+  }
+}
+
+function pruneArchiveHistory(repoRoot: string): void {
+  const archiveRoot = join(repoRoot, ARCHIVE_ROOT_REL);
+  if (!existsSync(archiveRoot)) return;
+  try {
+    const sprints = readdirSync(archiveRoot, { withFileTypes: true })
+      .filter((d) => d.isDirectory())
+      .map((d) => d.name)
+      .sort();
+    while (sprints.length > ARCHIVE_TTL_SPRINTS) {
+      const oldest = sprints.shift();
+      if (oldest) {
+        rmSync(join(archiveRoot, oldest), { recursive: true, force: true });
+      }
+    }
+  } catch {
+    /* best-effort prune */
+  }
+}
+
 export function writeStashRef(
   projectRoot: string,
   taskId: string,
@@ -151,10 +290,6 @@ export function writeStashRef(
   writeFileSync(stashRefPath(projectRoot, taskId), stashRef, 'utf-8');
 }
 
-/**
- * Reads the persisted stash ref for a task. Returns `null` if no snapshot was
- * recorded (older sprints, or when rollback infrastructure is disabled).
- */
 export function readStashRef(
   projectRoot: string,
   taskId: string,
@@ -165,27 +300,18 @@ export function readStashRef(
   return ref.length === 0 ? null : ref;
 }
 
-/**
- * Removes the stash-ref sidecar — called after rollback/drop so subsequent
- * reads don't return a stale reference.
- */
 export function clearStashRef(projectRoot: string, taskId: string): void {
   const path = stashRefPath(projectRoot, taskId);
   if (existsSync(path)) {
     try {
       unlinkSync(path);
     } catch {
-      // non-fatal
+      /* non-fatal */
     }
   }
 }
 
-// ─── Internal ──────────────────────────────────────────────────────
-
 function resolveStashRefByMessage(repoRoot: string, message: string): string {
-  // `git stash list --format=%gd:%gs` emits one line per stash with the ref
-  // (e.g. `stash@{0}`) and the message. We grep for the message to be robust
-  // against concurrent workers also stashing.
   const out = execSync('git stash list --format="%gd:%gs"', {
     cwd: repoRoot,
     encoding: 'utf-8',
@@ -197,6 +323,7 @@ function resolveStashRefByMessage(repoRoot: string, message: string): string {
     const msg = line.slice(idx + 1);
     if (msg.includes(message)) return ref;
   }
-  // Fallback: top of stack — works when there's exactly one stash entry.
-  return 'stash@{0}';
+  // No stash entry — scope-bounded with empty diff. Return sentinel that
+  // drop/rollback recognize as no-op.
+  return 'stash@{NOSTASH}';
 }
