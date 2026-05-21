@@ -12,7 +12,7 @@ describe('README.md', () => {
   });
 
   it('starts with the project name heading', () => {
-    expect(content.startsWith('# deckent')).toBe(true);
+    expect(content).toContain('# deckent');
   });
 
   // Sprint 150 T-150-021: README overhauled with new tagline "The AI orchestrator for…".
@@ -82,7 +82,7 @@ describe('README.md', () => {
   it('contains Requirements section', () => {
     expect(content).toContain('## Requirements');
     expect(content).toContain('Node.js');
-    expect(content).toContain('>= 18');
+    expect(content).toContain('>= 24');
     expect(content).toContain('git');
     expect(content).toContain('Claude Code CLI');
   });

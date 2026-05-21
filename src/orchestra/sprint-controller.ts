@@ -262,6 +262,127 @@ import { handleScopeCollision } from './decision-engine.js';
 import type { ScopeCollisionPayload, SpawnDecision } from './decision-engine.js';
 import { writeEvent, CHANNELS } from './event-stream.js';
 
+// ═══ Nervous System Wire (Sprint 180 W3-1, NERVOUS-TODO §11.2 Step D) ══
+//
+// `runSprint()` instantiates the nervous system at the top of its body and
+// disposes it in a `finally` block, so a single sprint's pipeline owns the
+// observer's lifetime. Default-off respect: when
+// `config.nervous_system.enabled` is false (or undefined) the bootstrap
+// returns `null` and no wire happens — the historical no-op behaviour is
+// preserved exactly.
+//
+// Bootstrap module is loaded via *dynamic* import wrapped in try/catch so
+// runSprint() continues to function even if `src/nervous/bootstrap.ts` is
+// not present yet (W1-2 deliverable can land asynchronously to W3-1).
+
+/**
+ * Handle returned by `initNervousSystemForSprint()` — owns the observer
+ * lifecycle. `dispose()` is idempotent and fail-safe.
+ */
+export interface NervousSystemHandle {
+  dispose: () => void;
+}
+
+/**
+ * Shape of the optional `src/nervous/bootstrap.ts` module (W1-2).
+ * Resolved at runtime; absent module yields `null`.
+ */
+interface NervousBootstrapModule {
+  createNervousSystemIfEnabled: (
+    config: ResolvedConfig,
+    projectRoot: string,
+    sprintStateProvider: () => unknown,
+  ) => NervousSystemHandle | null;
+}
+
+/**
+ * Defensive dynamic import of the nervous bootstrap module.
+ *
+ * Returns `null` when:
+ *   - module file is not present (W1-2 not landed yet)
+ *   - module loaded but `createNervousSystemIfEnabled` export is missing
+ *   - dynamic import throws for any other reason
+ *
+ * Module path stored in a variable so the TypeScript compiler does not
+ * resolve it at build time — runtime ESM resolver loads it on demand.
+ */
+export async function loadNervousBootstrap(): Promise<NervousBootstrapModule | null> {
+  try {
+    const modulePath = '../nervous/bootstrap.js';
+    const mod = (await import(modulePath)) as Partial<NervousBootstrapModule>;
+    if (typeof mod.createNervousSystemIfEnabled !== 'function') return null;
+    return mod as NervousBootstrapModule;
+  } catch (e) {
+    debugLog('loadNervousBootstrap', e);
+    return null;
+  }
+}
+
+/**
+ * Late-binding fetch for `getSprintStateSnapshot` from
+ * `sprint-state-tracker.ts` (W1-1 deliverable). Same defensive contract
+ * as `loadNervousBootstrap` — returns a fallback that yields `null` when
+ * the tracker module is not yet available.
+ */
+async function loadSprintStateProvider(): Promise<() => unknown> {
+  try {
+    const modulePath = './sprint-state-tracker.js';
+    const mod = (await import(modulePath)) as { getSprintStateSnapshot?: () => unknown };
+    if (typeof mod.getSprintStateSnapshot === 'function') return mod.getSprintStateSnapshot;
+  } catch (e) {
+    debugLog('loadSprintStateProvider', e);
+  }
+  return () => null;
+}
+
+/**
+ * Initialise the nervous system for a sprint.
+ *
+ * Wire contract (NERVOUS-TODO §11.2 Step D):
+ *   - `config.nervous_system?.enabled !== true` → return `null` (default-off respect)
+ *   - bootstrap module missing → return `null`
+ *   - bootstrap returns `null` (its own default-off check) → return `null`
+ *   - otherwise → return handle whose `dispose()` is wired to observer
+ *     teardown
+ *
+ * Fail-safe: any exception during bootstrap call is logged and treated as
+ * "nervous not active" so runSprint never aborts on a meta-orchestrator
+ * fault.
+ */
+export async function initNervousSystemForSprint(
+  config: ResolvedConfig,
+  projectRoot: string,
+  bootstrapLoader: () => Promise<NervousBootstrapModule | null> = loadNervousBootstrap,
+  sprintStateProviderLoader: () => Promise<() => unknown> = loadSprintStateProvider,
+): Promise<NervousSystemHandle | null> {
+  if (config.nervous_system?.enabled !== true) return null;
+
+  const bootstrap = await bootstrapLoader();
+  if (!bootstrap) return null;
+
+  try {
+    const sprintStateProvider = await sprintStateProviderLoader();
+    return bootstrap.createNervousSystemIfEnabled(config, projectRoot, sprintStateProvider);
+  } catch (e) {
+    debugLog('initNervousSystemForSprint', e);
+    return null;
+  }
+}
+
+/**
+ * Dispose the nervous system handle. No-op when `handle` is `null`.
+ * Wrapped in try/catch so a dispose failure cannot mask the sprint's
+ * own return value or exception.
+ */
+export function disposeNervousSystem(handle: NervousSystemHandle | null): void {
+  if (!handle) return;
+  try {
+    handle.dispose();
+  } catch (e) {
+    debugLog('disposeNervousSystem', e);
+  }
+}
+
 /**
  * Sprint 168 C0c RC3 — always-fresh disk read of task.json.
  *
@@ -446,6 +567,13 @@ export async function runSprint(
     );
   }
 
+  // ═══ Nervous System Wire (Sprint 180 W3-1, NERVOUS-TODO §11.2 Step D) ══
+  // Lives for the duration of this sprint; disposed in the finally block
+  // below regardless of how runSprint exits (success, abort, throw).
+  // Default-off respect: returns null when `nervous_system.enabled !== true`.
+  const nervous = await initNervousSystemForSprint(config, projectRoot);
+
+  try {
   // ═══ State Recovery on Brain Restart (Sprint 162 — Task T-004) ════
   // Pair with T-002 (checkpoint loop) and T-001 (exception handler).
   // If the previous Brain process left a sprint-state.json behind,
@@ -734,8 +862,11 @@ export async function runSprint(
   }
 
   // Phase 4: EVALUATE
+  // Sprint 179 W2-4: EVALUATE gates on the immutable hard floor, not the
+  // adaptive aspirational target. Finalizer auto-learn may lower
+  // `coverage_aspirational` over time; the gate must not slide with it.
   const evaluations = new Map<string, TaskEvaluation>();
-  await runEvaluatePhase(projectRoot, sprint, results, evaluations, config.coverage_threshold);
+  await runEvaluatePhase(projectRoot, sprint, results, evaluations, config.coverage_hard_floor);
 
   // Honesty Check Metrics
   {
@@ -836,4 +967,9 @@ export async function runSprint(
   });
 
   return sprint;
+  } finally {
+    // Sprint 180 W3-1: nervous system lives in sprint scope — tear down on
+    // every exit path (success, BrainError, human-checkpoint abort, throw).
+    disposeNervousSystem(nervous);
+  }
 }

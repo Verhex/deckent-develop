@@ -196,6 +196,14 @@ export class MemoryStore {
     if (!have.has('tenant_id')) {
       this.db.exec(`ALTER TABLE entries ADD COLUMN tenant_id TEXT`);
     }
+
+    // Sprint 179 W5-12: audit HMAC chain (I4 invariant). Additive, idempotent.
+    if (!have.has('audit_prev_hmac')) {
+      this.db.exec(`ALTER TABLE entries ADD COLUMN audit_prev_hmac TEXT`);
+    }
+    if (!have.has('audit_hmac')) {
+      this.db.exec(`ALTER TABLE entries ADD COLUMN audit_hmac TEXT`);
+    }
   }
 
   private createIndexIfNotExists(name: string, ddl: string): void {
@@ -813,6 +821,123 @@ export class MemoryStore {
       `SELECT COUNT(*) as cnt FROM entries WHERE deleted_at IS NULL`,
     ).get() as { cnt: number };
     return row.cnt;
+  }
+
+  // ── Audit HMAC chain (Sprint 179 W5-12, I4 invariant) ──────────
+
+  /**
+   * Insert an audit entry that participates in the append-only HMAC chain.
+   * The caller is responsible for computing `prevHmac` (last row's hmac, or
+   * null for genesis) and `hmac` via `computeAuditHmac()`. We persist them
+   * verbatim — verify-side recomputation lives in `audit-integrity.ts`.
+   *
+   * Note: `type` is forced to `'audit'` to keep the chain coherent.
+   */
+  insertAuditWithHmac(
+    input: CreateEntryInput,
+    prevHmac: string | null,
+    hmac: string,
+  ): void {
+    const source = input.source ?? 'system';
+    const summary = input.summary ?? null;
+    const tags = input.tags ?? [];
+    const status = input.status ?? 'active';
+    const priority = input.priority ?? 'normal';
+    const sprintId = input.sprint_id ?? null;
+    const sprintNum = input.sprint_num ?? 0;
+    const lang = input.lang ?? 'en';
+    const decayExempt = input.decay_exempt ? 1 : 0;
+    const metadata = JSON.stringify(input.metadata ?? {});
+    const tenantId = input.tenant_id ?? null;
+
+    const tagText = tags.join(' ');
+    const titleNorm = turkishNormalize(input.title);
+    const contentNorm = turkishNormalize(input.content);
+    const summaryNorm = turkishNormalize(summary ?? '');
+    const tagNorm = turkishNormalize(tagText);
+
+    const stmt = this.db.prepare(`
+      INSERT INTO entries (
+        id, type, source, title, content, summary,
+        tag_text, title_norm, content_norm, summary_norm, tag_norm,
+        status, priority, sprint_id, sprint_num, lang,
+        decay_exempt, metadata, tenant_id,
+        audit_prev_hmac, audit_hmac
+      ) VALUES (
+        @id, 'audit', @source, @title, @content, @summary,
+        @tag_text, @title_norm, @content_norm, @summary_norm, @tag_norm,
+        @status, @priority, @sprint_id, @sprint_num, @lang,
+        @decay_exempt, @metadata, @tenant_id,
+        @audit_prev_hmac, @audit_hmac
+      )
+    `);
+
+    stmt.run({
+      id: input.id,
+      source,
+      title: input.title,
+      content: input.content,
+      summary,
+      tag_text: tagText,
+      title_norm: titleNorm,
+      content_norm: contentNorm,
+      summary_norm: summaryNorm,
+      tag_norm: tagNorm,
+      status,
+      priority,
+      sprint_id: sprintId,
+      sprint_num: sprintNum,
+      lang,
+      decay_exempt: decayExempt,
+      metadata,
+      tenant_id: tenantId,
+      audit_prev_hmac: prevHmac,
+      audit_hmac: hmac,
+    });
+  }
+
+  /**
+   * Returns the HMAC of the latest audit row (id-order = insertion order via
+   * SQLite rowid). Returns null when no chained audit rows exist yet.
+   */
+  getLastAuditHmac(): string | null {
+    const row = this.db.prepare(
+      `SELECT audit_hmac FROM entries
+        WHERE type = 'audit' AND audit_hmac IS NOT NULL
+        ORDER BY rowid DESC
+        LIMIT 1`,
+    ).get() as { audit_hmac: string | null } | undefined;
+    return row?.audit_hmac ?? null;
+  }
+
+  /**
+   * Walk every audit row in chain (insertion) order. Returns the fields the
+   * verifier needs to recompute and compare HMACs.
+   */
+  queryAuditChain(): Array<{
+    id: string;
+    tenant_id: string | null;
+    title: string;
+    content: string;
+    audit_prev_hmac: string | null;
+    audit_hmac: string | null;
+    created_at: string;
+  }> {
+    return this.db.prepare(
+      `SELECT id, tenant_id, title, content,
+              audit_prev_hmac, audit_hmac, created_at
+         FROM entries
+        WHERE type = 'audit'
+        ORDER BY rowid ASC`,
+    ).all() as Array<{
+      id: string;
+      tenant_id: string | null;
+      title: string;
+      content: string;
+      audit_prev_hmac: string | null;
+      audit_hmac: string | null;
+      created_at: string;
+    }>;
   }
 
   // ── Schema & Raw Access ──────────────────────────────────────

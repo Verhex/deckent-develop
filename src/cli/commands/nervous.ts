@@ -7,7 +7,7 @@
 
 import { Command } from 'commander';
 import { join } from 'node:path';
-import { existsSync, readFileSync, writeFileSync, appendFileSync, mkdirSync, watchFile, unwatchFile } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, appendFileSync, mkdirSync, watchFile, unwatchFile, readdirSync } from 'node:fs';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { print, printError } from '../helpers/output.js';
 import type {
@@ -420,6 +420,134 @@ function showLog(root: string, follow: boolean): void {
   process.on('SIGINT', cleanup);
 }
 
+// ─── Panic Guard Approval (Sprint 180 W4-2) ─────────────────────────────────
+//
+// Sprint 179 dogfood keşfi: PanicGuard "kill blocked — user approval required"
+// uyarısı veriyordu ama hiçbir kanaldan onay UI yoktu. Bu helper file-based
+// IPC marker yazar — W2-2 IPC queue ile uyumlu format:
+//
+//   .deckent/panic-ipc/pending/<taskId>-<ts>.json   ← onay isteği
+//   .deckent/panic-ipc/resolved/<taskId>.json       ← onay tüketildi (Executor yazar)
+//
+// Marker payload: { taskId, acceptedAt, acceptedBy, reason? }
+// acceptedBy: 'user-cli' | 'user-mcp' — onay kanalı için audit-trail.
+
+export interface PanicAcceptMarker {
+  taskId: string;
+  acceptedAt: string;
+  acceptedBy: 'user-cli' | 'user-mcp';
+  reason?: string;
+}
+
+export interface PanicGuardPendingEvent {
+  channel: 'PANIC_GUARD_KILL_PENDING';
+  taskId: string;
+  workerId: string;
+  sprintId: string;
+  reason: string;
+  timestamp: string;
+}
+
+function getPanicIpcDir(root: string): string {
+  return join(root, '.deckent', 'panic-ipc');
+}
+
+/**
+ * Write a panic approval IPC marker. Idempotent: re-running for the same task
+ * overwrites the marker with a fresh timestamp (latest approval wins).
+ *
+ * Used by CLI `deckent nervous accept-panic` and MCP `deckent_nervous_accept`
+ * panic: prefix path.
+ */
+export function acceptPanicGuard(
+  root: string,
+  taskId: string,
+  acceptedBy: 'user-cli' | 'user-mcp',
+  reason?: string,
+): { markerPath: string; marker: PanicAcceptMarker } {
+  const pendingDir = join(getPanicIpcDir(root), 'pending');
+  if (!existsSync(pendingDir)) mkdirSync(pendingDir, { recursive: true });
+
+  const safeTaskId = taskId.replace(/[^a-zA-Z0-9_-]/g, '_');
+  const acceptedAt = new Date().toISOString();
+  const safeTs = acceptedAt.replace(/[:.]/g, '-');
+  const markerPath = join(pendingDir, `${safeTaskId}-${safeTs}.json`);
+
+  const marker: PanicAcceptMarker = { taskId, acceptedAt, acceptedBy, ...(reason ? { reason } : {}) };
+  writeFileSync(markerPath, JSON.stringify(marker, null, 2) + '\n', 'utf-8');
+  return { markerPath, marker };
+}
+
+/**
+ * List PanicGuard events that are still awaiting user approval.
+ *
+ * Source files: `.deckent/<sprintId>-panic-<timestamp>.json` (written by
+ * `src/core/panic-guard.ts`). An event is "pending" when:
+ *   - blocked === true (PanicGuard returned BLOCK)
+ *   - no `.deckent/panic-ipc/resolved/<taskId>.json` marker exists yet
+ *
+ * Returned as `PANIC_GUARD_KILL_PENDING` events for the MCP subscribe stream.
+ */
+export function listPendingPanicEvents(root: string): PanicGuardPendingEvent[] {
+  const deckentDir = join(root, '.deckent');
+  if (!existsSync(deckentDir)) return [];
+
+  const resolvedDir = join(getPanicIpcDir(root), 'resolved');
+  const resolvedTaskIds = new Set<string>();
+  if (existsSync(resolvedDir)) {
+    for (const f of readdirSync(resolvedDir)) {
+      if (f.endsWith('.json')) {
+        resolvedTaskIds.add(f.slice(0, -'.json'.length));
+      }
+    }
+  }
+
+  const out: PanicGuardPendingEvent[] = [];
+  let files: string[] = [];
+  try { files = readdirSync(deckentDir); } catch { return out; }
+
+  for (const file of files) {
+    // Match: <sprintId>-panic-<timestamp>.json
+    if (!file.includes('-panic-') || !file.endsWith('.json')) continue;
+    try {
+      const raw = readFileSync(join(deckentDir, file), 'utf-8');
+      const ev = JSON.parse(raw) as {
+        taskId?: string;
+        workerId?: string;
+        sprintId?: string;
+        reason?: string;
+        timestamp?: string;
+        blocked?: boolean;
+      };
+      if (!ev.taskId || !ev.workerId || !ev.sprintId || !ev.timestamp) continue;
+      if (ev.blocked === false) continue;
+      if (resolvedTaskIds.has(ev.taskId)) continue;
+      out.push({
+        channel: 'PANIC_GUARD_KILL_PENDING',
+        taskId: ev.taskId,
+        workerId: ev.workerId,
+        sprintId: ev.sprintId,
+        reason: ev.reason ?? 'unknown',
+        timestamp: ev.timestamp,
+      });
+    } catch {
+      // Skip unreadable / malformed panic event files.
+    }
+  }
+  return out;
+}
+
+function handleAcceptPanic(root: string, taskId: string, reason?: string): void {
+  if (!taskId || taskId.trim() === '') {
+    printError('task-id is required');
+    process.exitCode = 1;
+    return;
+  }
+  const { markerPath } = acceptPanicGuard(root, taskId, 'user-cli', reason);
+  print(colorize(`  ✓ Panic approval queued for task ${taskId}`, GREEN));
+  print(colorize(`    marker: ${markerPath}`, DIM));
+}
+
 // ─── Baseline Refresh ────────────────────────────────────────────────────────
 
 /**
@@ -514,6 +642,16 @@ export function registerNervous(program: Command): void {
     .action((opts: { follow?: boolean }) => {
       const root = resolveProjectRoot();
       showLog(root, opts.follow === true);
+    });
+
+  // deckent nervous accept-panic <task-id> (Sprint 180 W4-2)
+  nervousCmd
+    .command('accept-panic <task-id>')
+    .description('Approve a PanicGuard-blocked worker kill (writes IPC marker)')
+    .option('--reason <text>', 'Optional reason for the approval')
+    .action((taskId: string, opts: { reason?: string }) => {
+      const root = resolveProjectRoot();
+      handleAcceptPanic(root, taskId, opts.reason);
     });
 
   // deckent nervous baseline-refresh (Sprint 177 Task 5)

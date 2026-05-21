@@ -34,8 +34,17 @@ export const DASHBOARD_FILE = '.dashboard' as const;
 export const ERRORS_FILE = 'ERRORS.md' as const;
 export const ERRORS_MAX_LINES = 600 as const; // Sprint 140 pre-flight: 200→600 (3x)
 export const MEMORY_FILE = 'MEMORY.md' as const;
+/**
+ * @deprecated since Sprint 179 (W3-6). Memory V2 source of truth is
+ * `.brain/memory.db` (SQLite) + `.brain/exports/decisions.md` (auto-generated export).
+ * This legacy filename is retained for backward compatibility checks but is no
+ * longer the canonical ADR storage location. New ADRs go through MemoryStore.
+ */
 export const DECISIONS_FILE = 'DECISIONS.md' as const;
+/** @deprecated since Sprint 179 — see DECISIONS_FILE. Legacy export cap. */
 export const DECISIONS_MAX_LINES = 1200 as const; // Sprint 140 pre-flight: explicit cap (ADR governance, 37+ ADR canlı)
+/** Memory V2 auto-generated decisions export (relative to BRAIN_DIR/MEMORY_EXPORTS_DIR). */
+export const DECISIONS_EXPORT_FILE = 'decisions.md' as const;
 export const DEBT_FILE = 'DEBT.md' as const;
 export const PATTERNS_FILE = 'PATTERNS.md' as const;
 export const RETRO_FILE = 'RETRO.md' as const;

@@ -188,9 +188,18 @@ function planContinuous(state: DispatchState): DispatchPlan {
   }
 
   const depPipelineEnabled = state.config?.dependency_pipeline_enabled === true;
-  const doneIds = new Set(
-    state.sprint.tasks.filter(t => t.status === TaskStatus.DONE).map(t => t.id),
-  );
+  // Sprint 179 W0-1 (Bug A): aggregate-aware doneIds. When a fix task DONE
+  // supersedes its original NO_GO (via Task.fixForTaskId), downstream tasks
+  // that declared a dependency on the *original* id must see the dep as
+  // resolved. The aggregate is computed inline here to keep planDispatch
+  // pure (no MemoryStore reach). See getAggregateVerdict() for the canonical
+  // domain helper invoked by Brain re-evaluation paths.
+  const doneIds = new Set<string>();
+  for (const t of state.sprint.tasks) {
+    if (t.status !== TaskStatus.DONE) continue;
+    doneIds.add(t.id);
+    if (t.fixForTaskId) doneIds.add(t.fixForTaskId);
+  }
 
   // Step 1 — drain the FIFO queue first (respecting deps if pipeline is on).
   while (toSpawn.length < slotsAvailable && state.remainingQueue.length > 0) {

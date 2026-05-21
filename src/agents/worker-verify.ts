@@ -7,7 +7,7 @@
  */
 import { execSync } from 'node:child_process';
 import { promisify } from 'node:util';
-import { writeFileSync, existsSync, mkdirSync, renameSync } from 'node:fs';
+import { writeFileSync, readFileSync, existsSync, mkdirSync, renameSync } from 'node:fs';
 import { join } from 'node:path';
 import { AgentStatus } from '../core/types.js';
 import type { TaskScope, VerifyTestsResult } from '../core/types.js';
@@ -308,6 +308,125 @@ export function runCompilationLoop(
   }
 
   return { success: false, attempts: maxRetries, errors: lastErrors };
+}
+
+// ─── Coverage Parse & Verify ────────────────────────────────────────
+// Sprint 180 W4-1: Worker `.result.coverage` must reflect real measurement.
+// Sprint 179 root cause: 9 tasks shipped with coverage=0 → Quality Scorer
+// dropped overall 100→75 → TECH_DEBT verdict. Below utilities parse vitest
+// `coverage-summary.json` so the worker writes a real number (or null when
+// the task type cannot produce coverage — see quality-assessor escape hatch).
+
+/** Default location of vitest's json-summary coverage report. */
+const COVERAGE_SUMMARY_RELATIVE = 'coverage/coverage-summary.json';
+
+/**
+ * Parse vitest `coverage-summary.json` and return the total line coverage
+ * percentage. Returns `null` when the file is missing, malformed, or does not
+ * contain `total.lines.pct` — callers treat null as "unmeasured" and decide
+ * whether to retry (code task) or accept (doc/audit escape hatch).
+ */
+export function parseCoverageSummary(projectRoot: string): number | null {
+  const summaryPath = join(projectRoot, COVERAGE_SUMMARY_RELATIVE);
+  if (!existsSync(summaryPath)) return null;
+
+  let raw: string;
+  try {
+    raw = readFileSync(summaryPath, 'utf-8');
+  } catch {
+    return null;
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+
+  if (!parsed || typeof parsed !== 'object') return null;
+  const total = (parsed as { total?: unknown }).total;
+  if (!total || typeof total !== 'object') return null;
+  const lines = (total as { lines?: unknown }).lines;
+  if (!lines || typeof lines !== 'object') return null;
+  const pct = (lines as { pct?: unknown }).pct;
+  if (typeof pct !== 'number' || !Number.isFinite(pct)) return null;
+  return pct;
+}
+
+/**
+ * Returns true when a parsed coverage value reflects a real measurement.
+ * `null` and `0` are treated as "unmeasured" — for code-development tasks the
+ * caller should retry vitest, for escape-hatch tasks (doc/audit) the quality
+ * assessor records partial credit instead of penalising correctness.
+ */
+export function validateCoverageNumber(coverage: number | null | undefined): boolean {
+  return typeof coverage === 'number' && Number.isFinite(coverage) && coverage > 0;
+}
+
+export interface CoverageVerifyResult {
+  /** Parsed total.lines.pct, or null when unmeasured (doc scope, parse failure). */
+  coverage: number | null;
+  /** True when vitest finished without error AND a coverage number was parsed. */
+  success: boolean;
+  /** Stdout/stderr captured from the vitest run (empty for skipped doc scope). */
+  output: string;
+  /** True when the task scope is doc-only and coverage was deliberately skipped. */
+  skipped: boolean;
+}
+
+/**
+ * Run `npx vitest run --coverage --reporter=json-summary` and parse the
+ * resulting `coverage-summary.json`. Doc-only scopes short-circuit with
+ * `{ coverage: null, skipped: true, success: true }` so the quality assessor
+ * can apply the escape hatch instead of treating coverage as a hard failure.
+ */
+export function runCoverageVerify(
+  projectRoot: string,
+  scope?: string[],
+  taskScope?: TaskScope,
+): CoverageVerifyResult {
+  if (isDocOnlyScope(taskScope)) {
+    return { coverage: null, success: true, output: '', skipped: true };
+  }
+
+  const { test: testCmd } = getVerifyCommands(projectRoot);
+  if (!testCmd || !testCmd.includes('vitest')) {
+    return { coverage: null, success: true, output: '', skipped: true };
+  }
+
+  const scopeArgs = scope && scope.length > 0 ? ` ${scope.join(' ')}` : '';
+  const command = `${testCmd} --coverage --reporter=json-summary${scopeArgs}`;
+
+  let output = '';
+  let testsOk = true;
+  try {
+    output = execSync(command, {
+      cwd: projectRoot,
+      encoding: 'utf-8',
+      timeout: 180_000,
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+  } catch (err: unknown) {
+    testsOk = false;
+    output =
+      err instanceof Error && 'stdout' in err
+        ? String((err as { stdout: unknown }).stdout)
+        : err instanceof Error && 'stderr' in err
+          ? String((err as { stderr: unknown }).stderr)
+          : err instanceof Error
+            ? err.message
+            : String(err);
+  }
+
+  const coverage = parseCoverageSummary(projectRoot);
+  const measured = validateCoverageNumber(coverage);
+  return {
+    coverage,
+    success: testsOk && measured,
+    output,
+    skipped: false,
+  };
 }
 
 // ─── Enforce Verify Loop (Async Gate) ──────────────────────────────

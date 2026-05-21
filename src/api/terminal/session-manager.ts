@@ -1,11 +1,25 @@
 import { randomUUID } from 'node:crypto';
 import type { SessionBackend, BackendHandle, SpawnSpec } from './session-backend.js';
-import type { CreateSessionInput, SessionMeta, TenantId } from './types.js';
+import type { AuditEvent, CreateSessionInput, SessionMeta, TenantId } from './types.js';
+import { checkCommandGuard, formatCommandGuardDetail } from './command-guard.js';
 
 interface ManagerOpts {
   scrollbackBytes: number;
   idleTimeoutMs: number;
   maxSessions?: number;
+  /**
+   * Remote host for the session pipeline. The command guard (I3) bypasses
+   * when this host is in {127.0.0.1, ::1, localhost}; otherwise it enforces.
+   * Defaults to 'localhost' to preserve today's LocalTokenAuthProvider reality.
+   * Sub-project #3 mTLS will plumb the real peer host through here.
+   */
+  host?: string;
+  /**
+   * Optional structured audit sink. Used by the command guard (W4-9) to emit
+   * `guard.block` events when a deny-list pattern fires on a remote shell.
+   * If unset, blocks still kill the session but are not recorded.
+   */
+  audit?: { record(ev: AuditEvent): void };
 }
 
 interface Session {
@@ -80,6 +94,26 @@ export class PtySessionManager {
   write(id: string, data: string): void {
     const s = this.sessions.get(id);
     if (!s) return;
+    const matches = checkCommandGuard(data, {
+      kind: s.meta.kind,
+      host: this.opts.host ?? 'localhost',
+    });
+    if (matches.length > 0) {
+      if (this.opts.audit) {
+        const at = new Date().toISOString();
+        for (const m of matches) {
+          this.opts.audit.record({
+            action: 'guard.block',
+            tenantId: s.meta.tenantId,
+            sessionId: s.meta.id,
+            detail: formatCommandGuardDetail(m),
+            at,
+          });
+        }
+      }
+      this.kill(id);
+      return;
+    }
     s.lastActivity = Date.now();
     s.handle.write(data);
   }

@@ -178,6 +178,57 @@ export function evaluateResult(result: TaskResult, task: Task, vitestJsonOutput?
   return TaskEvaluation.DONE;
 }
 
+// ─── Aggregate Verdict (Sprint 179 W0-1 — Bug A foundation) ──────────
+// Sprint 178 forensik: ana NO_GO + fix DONE → downstream depStatuses
+// 22 dakika boyunca "EXECUTING" gözüktü çünkü downstream filtreleri yalnızca
+// orijinal kaydı görüyordu. `getAggregateVerdict` original + tüm fix
+// kayıtlarının verdict ranklarını max'lar; fix DONE üreterek dependency
+// graph'ı serbest bırakır. Honest-gate: kayıtlar mutable Map — Brain
+// re-evaluate UPDATE yazınca aggregate yeni değeri yansıtır.
+
+/** Bug A aggregate domain — kept here to avoid leaking TaskStatus into result-collector pure fn. */
+export type Verdict = 'DONE' | 'GO_WITH_TECH_DEBT' | 'NO_GO';
+
+/** Rank ordering for aggregate max: NO_GO < GO_WITH_TECH_DEBT < DONE. */
+export const VERDICT_RANK: Record<Verdict, number> = {
+  NO_GO: 0,
+  GO_WITH_TECH_DEBT: 1,
+  DONE: 2,
+};
+
+/** Minimum shape needed to compute an aggregate verdict for a task. */
+export interface TaskRecord {
+  verdict: Verdict;
+  isFix: boolean;
+  originalTaskId?: string;
+}
+
+/**
+ * Returns the highest verdict between a task's original record and any
+ * fix-retry records that reference it via `originalTaskId`.
+ *
+ * Used by `planDispatch` (dep-pipeline mode) so downstream tasks unblock
+ * once a fix DONE supersedes the original NO_GO. The original record is
+ * never mutated — only read — so Brain honest-gate re-evaluation flows
+ * are preserved (Bug C/E remain intact).
+ */
+export function getAggregateVerdict(
+  taskId: string,
+  records: ReadonlyMap<string, TaskRecord>,
+): Verdict {
+  const original = records.get(taskId);
+  if (!original) return 'NO_GO';
+  let best: Verdict = original.verdict;
+  for (const rec of records.values()) {
+    if (!rec.isFix) continue;
+    if (rec.originalTaskId !== taskId) continue;
+    if (VERDICT_RANK[rec.verdict] > VERDICT_RANK[best]) {
+      best = rec.verdict;
+    }
+  }
+  return best;
+}
+
 // ─── Worker Rollback Verdict Hook (Sprint 177 Task 1) ────────────────
 
 /**

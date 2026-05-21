@@ -23,6 +23,7 @@ import type {
   ResolvedConfig,
   BrainContext, SprintSizeRecommendation,
   BrainPlanningMode, PlannerResult, ProviderName,
+  ModelType,
 } from '../core/types.js';
 
 import {
@@ -130,6 +131,9 @@ export function readContext(projectRoot: string): BrainContext {
             resolved: false,
             resolvedInSprintId: undefined,
             createdAt: d.created_at,
+            // Sprint 179 W1-1: surface class + originScope to injectCriticalDebtTasks
+            class: meta.class,
+            originScope: meta.originScope,
           };
         });
       } finally {
@@ -193,25 +197,10 @@ export async function planSprint(
   let plannerResult: PlannerResult | null = null;
   let usedMode: string = 'structured';
 
-  // CRITICAL debt -> priority fix tasks
-  const criticalDebt = context.debt.filter(d => d.priority === DebtPriority.CRITICAL && !d.resolved);
-  for (const debt of criticalDebt) {
-    tasks.push(createTask({
-      title: `Fix debt: ${debt.description}`,
-      description: `Priority fix for critical debt item ${debt.id}`,
-      model: defaultModel,
-      effort: 'high',
-      priority: 'CRITICAL',
-      reason: `Critical debt open for ${debt.sprintsOpen} sprints`,
-      scope: { directories: [], filesRead: [], filesWrite: [] },
-      dependencies: [],
-      goNogo: { goCriteria: 'Debt resolved', noGoCriteria: 'Debt still present', techDebtAcceptable: '' },
-      sprintId,
-      isPriorityFix: true,
-      fixForTaskId: debt.originTaskId,
-      initialStatus,
-    }, seq++));
-  }
+  // CRITICAL debt -> priority fix tasks (Sprint 179 W1-1)
+  const injected = injectCriticalDebtTasks(context.debt, sprintId, defaultModel, seq, initialStatus);
+  tasks.push(...injected.tasks);
+  seq = injected.nextSeq;
 
   // AI planner attempt
   if (planMode === 'ai' || planMode === 'auto') {
@@ -627,6 +616,15 @@ export async function planSprint(
       );
       await writeFile(join(tasksPath, `task-${task.id}.json`), JSON.stringify(task, null, 2), 'utf-8');
     }
+
+    // Sprint 179 W1-2 — re-plan orphan cleanup. Tasks rewritten above; remove
+    // stale `task-{sprintNum}-NNN.json` siblings whose id slipped out of the
+    // new plan (cross-sprint files left intact).
+    const newTaskIds = new Set(tasks.map(t => t.id));
+    const orphans = cleanupOrphanTaskFiles(projectRoot, sprintId, newTaskIds);
+    if (orphans.length > 0) {
+      debugLog('planSprint:orphan-cleanup', `Removed ${orphans.length} orphan task file(s) for ${sprintId}`);
+    }
   }
 
   return {
@@ -661,6 +659,73 @@ export async function confirmDraftTasks(projectRoot: string, sprint: Sprint): Pr
 }
 
 /**
+ * Remove stale `.tasks/task-{sprintNum}-NNN.json` files that belong to the
+ * given sprint but are not part of the freshly-planned task ID set.
+ *
+ * Sprint 179 W1-2 — when Brain re-plans a sprint (e.g. after auto-debt
+ * injection shifts the id-slot allocation), task files from the previous
+ * plan attempt could linger on disk and confuse downstream tooling (the
+ * Auditor would otherwise see ghost workers). This helper deletes them.
+ *
+ * Cross-sprint isolation: files whose filename prefix does not match the
+ * current sprint number are NEVER touched, so co-resident sprint archives
+ * remain safe. Sibling files (`.hb`, `.result`, `.plan`) are ignored — this
+ * helper only scans `task-*.json`.
+ *
+ * @param projectRoot Project root directory containing `.tasks/`.
+ * @param sprintId Sprint identifier (e.g. `sprint-179`). Sprint number is
+ *   derived from the trailing numeric segment.
+ * @param newTaskIds Set of task IDs that survived the latest plan; files
+ *   whose parsed `task.id` is absent from this set are removed.
+ * @param opts.dryRun When true, return the would-be removal list without
+ *   touching disk.
+ * @returns Absolute paths of the (would-be) removed task files.
+ */
+export function cleanupOrphanTaskFiles(
+  projectRoot: string,
+  sprintId: string,
+  newTaskIds: Set<string>,
+  opts?: { dryRun?: boolean },
+): string[] {
+  const tasksPath = join(projectRoot, TASKS_DIR);
+  if (!existsSync(tasksPath)) return [];
+
+  const sprintNum = sprintId.replace(/^sprint-/, '');
+  if (!sprintNum) return [];
+  const sprintPrefix = `task-${sprintNum}-`;
+
+  const removed: string[] = [];
+  const files = readdirSync(tasksPath).filter(
+    f => f.startsWith(sprintPrefix) && f.endsWith('.json'),
+  );
+
+  for (const file of files) {
+    const filePath = join(tasksPath, file);
+    let taskId: string | undefined;
+    try {
+      const raw = readFileSync(filePath, 'utf-8');
+      const task = JSON.parse(raw);
+      taskId = typeof task?.id === 'string' ? task.id : undefined;
+    } catch (e) {
+      debugLog('cleanupOrphanTaskFiles:parseTaskFile', e);
+      continue;
+    }
+    if (!taskId || newTaskIds.has(taskId)) continue;
+
+    removed.push(filePath);
+    if (!opts?.dryRun) {
+      try {
+        unlinkSync(filePath);
+      } catch (e) {
+        debugLog('cleanupOrphanTaskFiles:unlink', e);
+      }
+    }
+  }
+
+  return removed;
+}
+
+/**
  * Remove existing DRAFT task files from .tasks/ directory.
  * Called before planning to ensure idempotency — re-running `deckent plan`
  * cleans up stale drafts from a previous plan.
@@ -682,4 +747,91 @@ export function cleanupDraftTasks(projectRoot: string): void {
       debugLog('cleanupDraftTasks:parseTaskFile', e);
     }
   }
+}
+
+// ═══ Sprint 179 W1-1 — Auto-debt scope inheritance + verified-no-result skip ═══
+
+/**
+ * Result of injecting CRITICAL debt items into the sprint as priority fix tasks.
+ */
+export interface DebtInjectionResult {
+  /** Newly created Task objects ready to be added to the sprint. */
+  tasks: Task[];
+  /** Next available sequence number after injection (callers continue from here). */
+  nextSeq: number;
+  /** Debt IDs that were intentionally skipped (e.g. verified-no-result). */
+  skipped: string[];
+}
+
+/**
+ * Build the broad legacy fallback scope used when a debt item carries no
+ * `originScope` (e.g. older debt rows persisted before Sprint 179 W1-1).
+ */
+function legacyFallbackScope(): TaskScope {
+  return { directories: ['src/'], filesRead: [], filesWrite: ['src/'] };
+}
+
+/**
+ * Translate CRITICAL debt items into priority fix tasks for the next sprint.
+ *
+ * Sprint 179 W1-1 behaviour:
+ *  - `class === 'verified-no-result'` → skip (honest closure, no work needed).
+ *  - `originScope` present → inherit `directories` + `filesWrite`; `filesRead`
+ *    mirrors `directories` so the worker can read the area it must write to.
+ *  - `originScope` absent → broad legacy fallback `src/` (matches behaviour
+ *    expected of pre-W1-1 debt rows so they still get a fix attempt).
+ */
+export function injectCriticalDebtTasks(
+  debt: DebtItem[],
+  sprintId: string,
+  defaultModel: ModelType,
+  startingSeq: number,
+  initialStatus: TaskStatus,
+): DebtInjectionResult {
+  const tasks: Task[] = [];
+  const skipped: string[] = [];
+  let seq = startingSeq;
+
+  for (const item of debt) {
+    if (item.priority !== DebtPriority.CRITICAL || item.resolved) continue;
+
+    // Honest closure: verified-no-result debts have no follow-up work.
+    if (item.class === 'verified-no-result') {
+      skipped.push(item.id);
+      continue;
+    }
+
+    const hasOriginScope = !!item.originScope
+      && (item.originScope.directories.length > 0 || item.originScope.filesWrite.length > 0);
+
+    const scope: TaskScope = hasOriginScope
+      ? {
+          directories: [...item.originScope!.directories],
+          filesRead: [...item.originScope!.directories],
+          filesWrite: [...item.originScope!.filesWrite],
+        }
+      : legacyFallbackScope();
+
+    const scopeNote = hasOriginScope
+      ? `Origin scope inherited (directories=[${scope.directories.join(', ')}], filesWrite=[${scope.filesWrite.join(', ')}]).`
+      : 'No origin scope on debt — broad legacy fallback (src/) applied.';
+
+    tasks.push(createTask({
+      title: `Fix debt: ${item.description}`,
+      description: `Priority fix for critical debt item ${item.id}. ${scopeNote}`,
+      model: defaultModel,
+      effort: 'high',
+      priority: 'CRITICAL',
+      reason: `Critical debt open for ${item.sprintsOpen} sprints`,
+      scope,
+      dependencies: [],
+      goNogo: { goCriteria: 'Debt resolved', noGoCriteria: 'Debt still present', techDebtAcceptable: '' },
+      sprintId,
+      isPriorityFix: true,
+      fixForTaskId: item.originTaskId,
+      initialStatus,
+    }, seq++));
+  }
+
+  return { tasks, nextSeq: seq, skipped };
 }

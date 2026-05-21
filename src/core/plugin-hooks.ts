@@ -396,7 +396,7 @@ export function runTargetedTests(
     cwd: projectRoot,
     timeout: 180_000,
     encoding: 'utf-8',
-    shell: true,
+    shell: process.platform === 'win32',
   });
   const output = ((result.stdout ?? '') + (result.stderr ?? '')).trim();
 
@@ -578,7 +578,7 @@ export function runFullVitest(projectRoot: string): {
     cwd: projectRoot,
     timeout: 300_000,
     encoding: 'utf-8',
-    shell: true,
+    shell: process.platform === 'win32',
   });
   const output = ((result.stdout ?? '') + (result.stderr ?? '')).trim();
   const parsed = parseVitestOutput(output);

@@ -227,6 +227,53 @@ interface DependencyResultDigest {
   linesAdded?: number;
   linesRemoved?: number;
   notes?: string;
+  /**
+   * When set, this digest represents a fix-retry whose target is the named
+   * task. Sprint 179 W0-1 (Bug A): downstream prompts must surface both the
+   * original NO_GO digest *and* the latest fix DONE digest so the worker
+   * understands which artifact is current.
+   */
+  originalTaskId?: string;
+}
+
+/**
+ * In-memory dependency digest for {@link buildDependenciesBlock} object-form.
+ * Verdict is the worker self-assessment (or evaluator verdict if known).
+ *
+ * Sprint 179 W0-1 (Bug A): introduced so test/runtime call sites can pass
+ * pre-collected results without round-tripping through `.tasks/*.result`.
+ */
+export interface DependencyResultEntry {
+  verdict: 'DONE' | 'GO_WITH_TECH_DEBT' | 'NO_GO';
+  filesChanged?: string[];
+  linesAdded?: number;
+  linesRemoved?: number;
+  notes?: string;
+  originalTaskId?: string;
+}
+
+/** Object-form arguments for {@link buildDependenciesBlock} (Sprint 179 W0-1). */
+export interface BuildDependenciesBlockInput {
+  currentTaskId?: string;
+  deps: string[];
+  results: ReadonlyMap<string, DependencyResultEntry>;
+}
+
+const VERDICT_RANK_DIGEST: Record<DependencyResultEntry['verdict'], number> = {
+  NO_GO: 0,
+  GO_WITH_TECH_DEBT: 1,
+  DONE: 2,
+};
+
+function entryToDigest(entry: DependencyResultEntry): DependencyResultDigest {
+  return {
+    selfAssessment: entry.verdict,
+    filesChanged: entry.filesChanged,
+    linesAdded: entry.linesAdded,
+    linesRemoved: entry.linesRemoved,
+    notes: entry.notes,
+    originalTaskId: entry.originalTaskId,
+  };
 }
 
 /**
@@ -288,11 +335,31 @@ function formatDependencyEntry(depId: string, result: DependencyResultDigest | n
   return lines.join('\n');
 }
 
-function buildDependenciesBlock(
+export function buildDependenciesBlock(input: BuildDependenciesBlockInput): string;
+export function buildDependenciesBlock(
   taskDeps?: string[],
   ctxDeps?: string[],
   tasksDir?: string,
+): string;
+export function buildDependenciesBlock(
+  arg1?: string[] | BuildDependenciesBlockInput,
+  ctxDeps?: string[],
+  tasksDir?: string,
 ): string {
+  // ── Object-form (Sprint 179 W0-1): aggregate-aware in-memory results ─
+  if (arg1 && !Array.isArray(arg1) && typeof arg1 === 'object') {
+    const { deps, results } = arg1;
+    if (!deps || deps.length === 0) return '';
+    const entries = deps.map(depId => formatAggregateEntry(depId, results));
+    return `## Dependencies
+This task depends on: ${deps.join(', ')}
+Ensure dependent tasks are complete before starting.
+
+${entries.join('\n\n')}`;
+  }
+
+  // ── Legacy disk-based form (backward compatible) ────────────────────
+  const taskDeps = arg1 as string[] | undefined;
   const deps = taskDeps?.length ? taskDeps : ctxDeps;
   if (!deps || deps.length === 0) return '';
 
@@ -304,6 +371,53 @@ This task depends on: ${deps.join(', ')}
 Ensure dependent tasks are complete before starting.
 
 ${entries.join('\n\n')}`;
+}
+
+/**
+ * Sprint 179 W0-1 (Bug A): format a dependency that may have an original
+ * record and zero-or-more fix retries. Emits header with aggregate verdict
+ * then individual sub-entries (Original / Fix:{id}) so the worker sees the
+ * full trajectory.
+ */
+function formatAggregateEntry(
+  depId: string,
+  results: ReadonlyMap<string, DependencyResultEntry>,
+): string {
+  const original = results.get(depId);
+  const fixes: Array<{ id: string; entry: DependencyResultEntry }> = [];
+  for (const [id, entry] of results) {
+    if (entry.originalTaskId === depId) fixes.push({ id, entry });
+  }
+
+  if (!original && fixes.length === 0) {
+    return `## Dependency ${depId} (Pending)\nPending (not yet complete)`;
+  }
+
+  let aggregate: DependencyResultEntry['verdict'] = original?.verdict ?? 'NO_GO';
+  for (const { entry } of fixes) {
+    if (VERDICT_RANK_DIGEST[entry.verdict] > VERDICT_RANK_DIGEST[aggregate]) {
+      aggregate = entry.verdict;
+    }
+  }
+
+  const lines: string[] = [`## Dependency ${depId} (aggregate: ${aggregate})`];
+  if (original) {
+    lines.push(`### Original ${depId} (${original.verdict})`);
+    const body = formatDependencyEntry(depId, entryToDigest(original))
+      .split('\n')
+      .slice(1) // drop the synthetic "## Dependency …" header
+      .join('\n');
+    if (body) lines.push(body);
+  }
+  for (const { id, entry } of fixes) {
+    lines.push(`### Fix ${id} (${entry.verdict})`);
+    const body = formatDependencyEntry(id, entryToDigest(entry))
+      .split('\n')
+      .slice(1)
+      .join('\n');
+    if (body) lines.push(body);
+  }
+  return lines.join('\n');
 }
 
 // ─── Template Renderer ─────────────────────────────────────────────────

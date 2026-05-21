@@ -131,6 +131,8 @@ const AUTHORITY_MATRIX: Record<AgentRole, RoleAuthority> = {
       { pattern: '.brain/PATTERNS.md', allowed: true },
       { pattern: '.brain/sprints/**', allowed: true },
       { pattern: '.brain/archive/**', allowed: true },
+      // Memory V2 (Sprint 179 W3-6): auto-generated exports are brain-owned.
+      { pattern: '.brain/exports/**', allowed: true },
       // READ is always allowed for brain
       { pattern: 'src/**', allowed: true, actions: ['read'] },
       { pattern: 'tests/**', allowed: true, actions: ['read'] },
@@ -176,6 +178,8 @@ const AUTHORITY_MATRIX: Record<AgentRole, RoleAuthority> = {
       { pattern: 'src/**', allowed: true, actions: ['read'] },
       { pattern: 'tests/**', allowed: true, actions: ['read'] },
       { pattern: '.brain/DECISIONS.md', allowed: true, actions: ['read'] },
+      // Memory V2 (Sprint 179 W3-6): exports are the new ADR source — read allowed.
+      { pattern: '.brain/exports/**', allowed: true, actions: ['read'] },
     ],
     emitChannels: [
       'AUDITOR→BRAIN:VERIFICATION_RESULT',
@@ -207,6 +211,8 @@ const AUTHORITY_MATRIX: Record<AgentRole, RoleAuthority> = {
       { pattern: '.locks/**', allowed: true },
       // ALLOW — Read references
       { pattern: '.brain/DECISIONS.md', allowed: true, actions: ['read'] },
+      // Memory V2 (Sprint 179 W3-6): workers must read ADRs from exports too.
+      { pattern: '.brain/exports/**', allowed: true, actions: ['read'] },
       { pattern: 'DIRECTIVES.md', allowed: true, actions: ['read'] },
       // src/** and tests/** — allowed only within scope (dynamic check)
       // Handled by dynamic scope check below, not static matrix

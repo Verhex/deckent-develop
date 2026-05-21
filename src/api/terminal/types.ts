@@ -21,7 +21,9 @@ export interface SessionMeta {
 
 export type AuditAction =
   | 'session.create' | 'session.attach' | 'session.detach'
-  | 'session.kill' | 'session.exit' | 'auth.ok' | 'auth.deny';
+  | 'session.kill' | 'session.exit' | 'auth.ok' | 'auth.deny'
+  | 'guard.block'
+  | 'outbound.warn' | 'outbound.kill';
 
 export interface AuditEvent {
   action: AuditAction;

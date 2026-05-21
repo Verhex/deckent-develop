@@ -139,7 +139,10 @@ export function generateProjectIdentity(info: ProjectIdentityInfo): string {
   lines.push('');
 
   lines.push('## Key Rules');
-  lines.push('- See .brain/DECISIONS.md for architecture decision records');
+  // Memory V2 (Sprint 179 W3-6): decisions live in DB + auto-generated export.
+  // Legacy .brain/DECISIONS.md path is kept in the reference for backward compat
+  // with V1 installs that have not yet migrated to memory.db.
+  lines.push('- See .brain/exports/decisions.md (Memory V2 export of .brain/memory.db, replaces legacy .brain/DECISIONS.md) for architecture decision records');
   lines.push('');
 
   lines.push('## Module Map');

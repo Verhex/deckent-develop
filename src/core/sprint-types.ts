@@ -80,6 +80,25 @@ export enum DebtPriority {
   CRITICAL = 'CRITICAL',
 }
 
+/**
+ * Class marker for tech-debt entries.
+ * - `verified-no-result`: closure-only debt that requires no follow-up code change
+ *   (e.g. earlier sprint already verified the underlying issue). Injection step
+ *   skips such debts to avoid spawning no-op CRITICAL fix tasks (Sprint 179 W1-1).
+ * - `standard`: regular debt that needs a fix task (default when class is absent).
+ */
+export type DebtClass = 'verified-no-result' | 'standard';
+
+/**
+ * Origin scope captured when the debt was created. Used by the auto-debt
+ * injector to seed CRITICAL fix tasks with the original task's writable
+ * surface, instead of falling back to an empty/broad scope (Sprint 179 W1-1).
+ */
+export interface DebtOriginScope {
+  directories: string[];
+  filesWrite: string[];
+}
+
 export interface DebtItem {
   id: string;
   description: string;
@@ -90,6 +109,10 @@ export interface DebtItem {
   resolved: boolean;
   resolvedInSprintId?: string;
   createdAt: string;
+  /** Class marker; absence is treated as 'standard'. Sprint 179 W1-1. */
+  class?: DebtClass;
+  /** Origin task scope inherited by the auto-injected fix task. Sprint 179 W1-1. */
+  originScope?: DebtOriginScope;
 }
 
 // ─── Memory System (Blueprint 6) ────────────────────────────────────

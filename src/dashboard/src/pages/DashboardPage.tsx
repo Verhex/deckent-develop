@@ -13,6 +13,7 @@ import { SkeletonCard } from "../components/Skeleton";
 import { Sheet, SheetContent } from "../components/ui/sheet";
 import { useSSE } from "../hooks/useSSE";
 import { useTranslation } from "../i18n/LanguageProvider";
+import type { TranslatorProp } from "../i18n/types";
 import { fetchJson, postJson, ApiError } from "../lib/api";
 import type { DashboardState, Alert } from "../types";
 
@@ -84,7 +85,7 @@ const ALERT_ICON: Record<string, typeof Info> = {
   CRITICAL: XOctagon,
 };
 
-function relativeTime(isoDate: string, t: (key: string, params?: Record<string, string | number>) => string): string {
+function relativeTime(isoDate: string, t: TranslatorProp): string {
   const ms = Date.now() - new Date(isoDate).getTime();
   const secs = Math.floor(ms / 1000);
   if (secs < 60) return t('common.seconds_ago', { n: secs });

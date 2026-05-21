@@ -46,6 +46,7 @@ import { registerConfigNervous } from './commands/config-nervous.js';
 import { registerMode } from './commands/mode.js';
 import { registerFeatures } from './commands/features.js';
 import { registerAudit } from './commands/audit.js';
+import { registerAuditVerify } from './commands/audit-verify.js';
 import { registerRecover } from './commands/recover.js';
 import { showSplash } from './helpers/splash.js';
 
@@ -113,6 +114,7 @@ export function buildProgram(): Command {
   registerMode(program);
   registerFeatures(program);
   registerAudit(program);
+  registerAuditVerify(program);
   registerRecover(program);
   registerHelp(program);
 

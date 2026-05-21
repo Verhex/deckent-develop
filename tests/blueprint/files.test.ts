@@ -11,8 +11,9 @@ describe('Blueprint file existence', () => {
     expect(readFileSync(path, 'utf-8').trim().length).toBeGreaterThan(0);
   });
 
-  it('.contracts/api-surface.md exists and is non-empty', () => {
-    const path = join(ROOT, '.contracts', 'api-surface.md');
+  it('docs/reference/api-surface.md exists and is non-empty', () => {
+    // Sprint 172 doc-reorg (commit 1c8cef29): .contracts/ → docs/reference/.
+    const path = join(ROOT, 'docs', 'reference', 'api-surface.md');
     expect(existsSync(path)).toBe(true);
     expect(readFileSync(path, 'utf-8').trim().length).toBeGreaterThan(0);
   });
@@ -32,8 +33,9 @@ describe('Blueprint file existence', () => {
     expect(content).toContain('orchestra/');
   });
 
-  it('.contracts/api-surface.md contains task format', () => {
-    const content = readFileSync(join(ROOT, '.contracts', 'api-surface.md'), 'utf-8');
+  it('docs/reference/api-surface.md contains task format', () => {
+    // Sprint 172 doc-reorg (commit 1c8cef29): .contracts/ → docs/reference/.
+    const content = readFileSync(join(ROOT, 'docs', 'reference', 'api-surface.md'), 'utf-8');
     expect(content).toContain('.tasks/');
     expect(content).toContain('Module Import Rules');
   });

@@ -90,6 +90,12 @@ export const CHANNELS = {
   // Emitted by sprint-controller / spawn pipeline when handleScopeCollision()
   // returns action='block'. Consumes AUDITOR→BRAIN:SCOPE_COLLISION_DETECTED.
   SPAWN_BLOCKED: 'BRAIN→SPAWN:BLOCKED',
+
+  // Sprint 179 W0-1 — Bug A foundation
+  // Emitted by result-collector when a fix-task DONE supersedes its
+  // original task NO_GO; downstream consumers learn that the dependency
+  // is now aggregate-DONE without polling the disk.
+  DEPENDENCY_RESOLVED_BY_FIX: 'BRAIN→*:DEPENDENCY_RESOLVED_BY_FIX',
 } as const;
 
 export type ChannelCode = typeof CHANNELS[keyof typeof CHANNELS];
@@ -321,4 +327,41 @@ export function reconstructState(
   }
 
   return state;
+}
+
+// ─── Bug A: DEPENDENCY_RESOLVED_BY_FIX (Sprint 179 W0-1) ────────────
+
+/**
+ * Payload emitted on {@link CHANNELS.DEPENDENCY_RESOLVED_BY_FIX}.
+ *
+ * Downstream consumers (auditor/dashboard/Brain depStatuses cache) use
+ * this signal to flip a dependency's effective status to DONE the moment
+ * a fix-retry succeeds — closing the Sprint 178 22-minute polling gap.
+ */
+export interface DependencyResolvedByFixEvent {
+  type: typeof CHANNELS.DEPENDENCY_RESOLVED_BY_FIX;
+  originalTaskId: string;
+  fixTaskId: string;
+  emittedAt: string;
+}
+
+/**
+ * Emit a {@link DependencyResolvedByFixEvent} via an injected sink.
+ *
+ * The sink-based shape keeps this function pure: callers in
+ * result-collector wire it to `writeEvent`, tests pass a `vi.fn()` spy.
+ * Wiring is intentionally explicit (no module-level singleton) so the
+ * honest-gate audit trail records exactly which call site fired the
+ * resolution event.
+ */
+export function emitDependencyResolvedByFix(
+  payload: { originalTaskId: string; fixTaskId: string },
+  emit: (event: DependencyResolvedByFixEvent) => void,
+): void {
+  emit({
+    type: CHANNELS.DEPENDENCY_RESOLVED_BY_FIX,
+    originalTaskId: payload.originalTaskId,
+    fixTaskId: payload.fixTaskId,
+    emittedAt: new Date().toISOString(),
+  });
 }

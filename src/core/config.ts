@@ -1,6 +1,7 @@
 import { writeFile, mkdir } from 'node:fs/promises';
 import { existsSync, statSync, writeFileSync, renameSync, readFileSync, copyFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
+import { z } from 'zod';
 import {
   PROJECT_CONFIG_PATH,
   GLOBAL_CONFIG_PATH,
@@ -77,6 +78,93 @@ export const DEFAULT_TERMINAL_CONFIG: TerminalConfig = {
   scrollbackBytes: 262_144,
   allowShellKind: true,
 };
+
+/**
+ * Default per-tenant outbound byte quota over a 24h window (W4-10, invariant I5).
+ * Exposed as a separate const so `DEFAULT_TERMINAL_CONFIG` stays the locked
+ * Sprint 175 secure-default snapshot; callers wire this into `OutboundLimiter`
+ * via `config.terminal.outboundDailyQuotaBytes ?? DEFAULT_OUTBOUND_DAILY_QUOTA_BYTES`.
+ */
+export const DEFAULT_OUTBOUND_DAILY_QUOTA_BYTES = 1_073_741_824; // 1 GiB
+
+// ─── Nervous System Zod Schemas (Sprint 180 W0 — Step F) ─────────────
+// Runtime validation that mirrors the NervousSystemConfig TypeScript
+// interface from config-types.ts. Used by tests and integration
+// boundaries to enforce shape + value invariants on incoming config.
+
+/** Per-detector configuration schema (mirrors NervousDetectorConfig). */
+export const NERVOUS_DETECTOR_SCHEMA = z
+  .object({
+    enabled: z.boolean(),
+    threshold_ms: z.number().nonnegative().optional(),
+    threshold_rate: z.number().min(0).max(1).optional(),
+    anomaly_threshold: z.number().min(0).max(1).optional(),
+    auto_restore: z.boolean().optional(),
+    reserve_for: z.string().optional(),
+  })
+  .strict();
+
+const NERVOUS_AUTHORITY_MODE_SCHEMA = z.enum(['strict', 'balanced', 'autopilot', 'full-auto']);
+const NERVOUS_SEVERITY_MIN_SCHEMA = z.enum(['info', 'warning', 'critical', 'emergency']);
+const NERVOUS_APPROVAL_POLICY_SCHEMA = z.enum(['autonomous', 'suggest-30m', 'suggest-5m', 'approve']);
+const NERVOUS_SAFETY_FLOOR_ACTION_SCHEMA = z.enum([
+  'KILL_LIVE_SPRINT',
+  'MANUAL_FILE_DELETE',
+  'COST_OVER_THRESHOLD',
+  'DESTRUCTIVE_GIT',
+  'ADR_DEPRECATE_ACCEPTED',
+]);
+
+/** Full Nervous System configuration schema (mirrors NervousSystemConfig). */
+export const NERVOUS_SYSTEM_SCHEMA = z
+  .object({
+    enabled: z.boolean(),
+    mode: NERVOUS_AUTHORITY_MODE_SCHEMA,
+    actionOverrides: z.record(z.string(), NERVOUS_APPROVAL_POLICY_SCHEMA),
+    safety_floor: z.object({
+      locked_actions: z.array(NERVOUS_SAFETY_FLOOR_ACTION_SCHEMA),
+      cost_threshold_usd: z.number().nonnegative(),
+      bypass_allowed: z.boolean(),
+    }),
+    notifications: z.object({
+      channels: z.object({
+        mcp: z.boolean(),
+        cli: z.boolean(),
+        file: z.boolean(),
+        desktop: z.boolean(),
+      }),
+      throttle_ms: z.number().nonnegative(),
+      group_info_window_ms: z.number().nonnegative(),
+      severity_min: NERVOUS_SEVERITY_MIN_SCHEMA,
+      quiet_hours: z.object({
+        start: z.string(),
+        end: z.string(),
+        timezone: z.string(),
+      }),
+      cross_channel_dedup: z.boolean(),
+    }),
+    detectors: z.object({
+      stale_worker: NERVOUS_DETECTOR_SCHEMA,
+      scope_collision: NERVOUS_DETECTOR_SCHEMA,
+      debt_trend: NERVOUS_DETECTOR_SCHEMA,
+      agent_routing: NERVOUS_DETECTOR_SCHEMA,
+      directives_protection: NERVOUS_DETECTOR_SCHEMA,
+      dead_event_stream: NERVOUS_DETECTOR_SCHEMA,
+      cost_threshold: NERVOUS_DETECTOR_SCHEMA,
+      prompt_quality: NERVOUS_DETECTOR_SCHEMA,
+      worker_output_variance: NERVOUS_DETECTOR_SCHEMA,
+      self_modifying_warner: NERVOUS_DETECTOR_SCHEMA,
+      // Sprint 180 W0 — NERVOUS-TODO §11.2 Step F: 6 new detectors.
+      task_mode_idle: NERVOUS_DETECTOR_SCHEMA,
+      build_failure_recurrence: NERVOUS_DETECTOR_SCHEMA,
+      token_spike: NERVOUS_DETECTOR_SCHEMA,
+      agent_routing_anomaly: NERVOUS_DETECTOR_SCHEMA,
+      scope_collision_rate: NERVOUS_DETECTOR_SCHEMA,
+      notification_delivery_health: NERVOUS_DETECTOR_SCHEMA,
+    }),
+    history_retention_days: z.number().int().min(1),
+  })
+  .strict();
 
 // ─── Mode Aliases ────────────────────────────────────────────────────
 
@@ -498,6 +586,33 @@ export function resolveEffectiveWorkers(
   return maxWorkers;
 }
 
+// ─── Coverage gate resolver (Sprint 179 W2-4) ────────────────────────
+
+/**
+ * Resolve the coverage gate split fields:
+ *   - `coverage_hard_floor`   immutable EVALUATE gate (default 50)
+ *   - `coverage_aspirational` finalizer-tunable target (default 90)
+ *   - `coverage_threshold`    legacy field, mirrored to aspirational
+ *
+ * Precedence for the aspirational target:
+ *   explicit `coverage_aspirational` > legacy `coverage_threshold` > 90.
+ * The hard floor is clamped at the aspirational value so the floor never
+ * exceeds the target.
+ */
+export function resolveCoverageGates(
+  config: Partial<DeckentConfig>,
+): { coverage_hard_floor: number; coverage_aspirational: number; coverage_threshold: number } {
+  const aspirational =
+    config.coverage_aspirational ?? config.coverage_threshold ?? 90;
+  const requestedFloor = config.coverage_hard_floor ?? 50;
+  const hardFloor = Math.min(requestedFloor, aspirational);
+  return {
+    coverage_hard_floor: hardFloor,
+    coverage_aspirational: aspirational,
+    coverage_threshold: aspirational, // back-compat mirror
+  };
+}
+
 // ─── File Reading ────────────────────────────────────────────────────
 
 async function readJsonFile<T>(filePath: string): Promise<T | null> {
@@ -553,7 +668,15 @@ export function createDefaultConfig(): DeckentConfig {
     // Sprint
     fix_phase_enabled: true,
     max_fix_retries: 2,
+    // @deprecated retained as the aspirational seed for legacy configs.
     coverage_threshold: 90,
+    // Sprint 179 W2-4 — split single threshold into immutable floor +
+    // adaptive aspirational target. Defaults are also asserted by
+    // `resolveCoverageGates`, which is the single resolver consulted by
+    // `mergeConfigs`/`loadConfig` BEFORE the deep-merge with defaults so the
+    // legacy `coverage_threshold` precedence is preserved.
+    coverage_hard_floor: 50,
+    coverage_aspirational: 90,
     max_reroutes: 3,
     reroute_on_tech_debt: false,
     sprint_timeout_minutes: 0,
@@ -666,11 +789,20 @@ export function createDefaultConfig(): DeckentConfig {
         debt_trend: { enabled: true, threshold_rate: 0.15 },
         agent_routing: { enabled: true, anomaly_threshold: 0.40 },
         directives_protection: { enabled: true, auto_restore: true },
-        dead_event_stream: { enabled: false, reserve_for: 'sprint-148' },
+        // Sprint 165: kod hazır — reserve_for kaldırıldı (Sprint 180 W0).
+        dead_event_stream: { enabled: false },
         cost_threshold: { enabled: false, reserve_for: 'sprint-148' },
         prompt_quality: { enabled: false, reserve_for: 'sprint-148' },
         worker_output_variance: { enabled: false, reserve_for: 'sprint-148' },
         self_modifying_warner: { enabled: false, reserve_for: 'sprint-148' },
+        // Sprint 180 W0 — NERVOUS-TODO §11.2 Step F: 6 yeni detector default
+        // enabled:false. Faz 2/3'te aktive edilir.
+        task_mode_idle: { enabled: false },
+        build_failure_recurrence: { enabled: false },
+        token_spike: { enabled: false },
+        agent_routing_anomaly: { enabled: false },
+        scope_collision_rate: { enabled: false },
+        notification_delivery_health: { enabled: false },
       },
       history_retention_days: 30,
     },
@@ -878,7 +1010,17 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
     // Sprint
     fix_phase_enabled: config.fix_phase_enabled,
     max_fix_retries: config.max_fix_retries,
-    coverage_threshold: config.coverage_threshold ?? 90,
+    // Sprint 179 W2-4: coverage gate split.
+    // - hard_floor (default 50) is the immutable EVALUATE gate.
+    // - aspirational (default 90) is auto-learned by the finalizer.
+    // - legacy `coverage_threshold` seeds aspirational when set explicitly.
+    // Resolve from the raw user partials so user-supplied legacy
+    // `coverage_threshold` is honored over the default aspirational of 90
+    // pre-populated by `createDefaultConfig`.
+    ...resolveCoverageGates({
+      ...(globalConfig ?? {}),
+      ...(projectConfig ?? {}),
+    }),
     max_reroutes: config.max_reroutes ?? 3,
     reroute_on_tech_debt: config.reroute_on_tech_debt ?? false,
     sprint_timeout_minutes: config.sprint_timeout_minutes ?? 0,
@@ -1490,6 +1632,16 @@ export function mergeConfigs(
 
   const activeModeConfig = (config.modes[config.mode] ?? config.modes['performance']) as PlanModeConfig;
 
+  // Sprint 179 W2-4: resolve coverage gates from the raw user partials
+  // (NOT the post-default-merge config) so user-supplied legacy
+  // `coverage_threshold` correctly seeds `coverage_aspirational` even though
+  // `createDefaultConfig` pre-populates an aspirational default of 90.
+  const userCoverageInput: Partial<DeckentConfig> = {
+    ...(globalConfig ?? {}),
+    ...(projectConfig ?? {}),
+  };
+  const coverageGates = resolveCoverageGates(userCoverageInput);
+
   return {
     mode: config.mode,
     activeModeConfig,
@@ -1500,7 +1652,8 @@ export function mergeConfigs(
     version: config.version ?? DECKENT_VERSION,
     auto_docs: config.auto_docs ?? { ...DEFAULT_AUTO_DOCS },
     skills: config.skills,
-    coverage_threshold: config.coverage_threshold ?? 90,
+    // Sprint 179 W2-4: see resolveCoverageGates docstring for split semantics.
+    ...coverageGates,
     max_reroutes: config.max_reroutes ?? 3,
     reroute_on_tech_debt: config.reroute_on_tech_debt ?? false,
     sprint_timeout_minutes: config.sprint_timeout_minutes ?? 0,

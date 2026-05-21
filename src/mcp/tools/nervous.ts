@@ -7,9 +7,14 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod/v4';
 import { ACTION_REGISTRY } from '../../nervous/action-registry.js';
 import { NervousHistory } from '../../nervous/history.js';
+import { NervousIpcQueue } from '../../nervous/ipc-queue.js';
 import type { AuthorityMode, NervousSystemConfig } from '../../core/nervous-types.js';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import {
+  acceptPanicGuard,
+  listPendingPanicEvents,
+} from '../../cli/commands/nervous.js';
 
 // ─── Helper: Load nervous config from project ──────────────────────────────
 
@@ -49,6 +54,147 @@ function saveNervousConfig(root: string, updates: Record<string, unknown>): void
 
 const subscribers: Set<string> = new Set();
 
+// ─── Pure handler types ────────────────────────────────────────────────────
+// Sprint 180 W2-2 (Task 5): saf fonksiyonlar — IPC queue ile MCP→Executor
+// bağlantısını test edilebilir ve register handler'larından bağımsız tutar.
+
+export interface NervousAcceptInput {
+  readonly id: string;
+  readonly root?: string;
+}
+
+export interface NervousAcceptResult {
+  readonly accepted: boolean;
+  readonly notificationId: string;
+  readonly queued: boolean;
+  readonly existsInHistory: boolean;
+  readonly message: string;
+  readonly ipcFile?: string;
+}
+
+export interface NervousRejectInput {
+  readonly id: string;
+  readonly reason?: string;
+  readonly root?: string;
+}
+
+export interface NervousRejectResult {
+  readonly rejected: boolean;
+  readonly notificationId: string;
+  readonly queued: boolean;
+  readonly reason: string | null;
+  readonly message: string;
+  readonly ipcFile?: string;
+}
+
+const NOTIFICATION_ID_PATTERN = /^[a-f0-9-]{36}$/;
+
+function isValidNotificationId(id: string): boolean {
+  return NOTIFICATION_ID_PATTERN.test(id) || id.startsWith('ns-');
+}
+
+/**
+ * Pure handler for `deckent_nervous_accept`.
+ *
+ * Backward-compat: when `nervous_system.enabled` is false the handler returns
+ * the legacy history-only stub response and does NOT touch the IPC queue.
+ *
+ * When nervous is active the approval is appended to the file-based IPC queue
+ * (`.deckent/nervous-ipc/pending/*.json`) so the Executor can resolve it on
+ * its next polling tick (1s).
+ */
+export async function handleNervousAccept(
+  input: NervousAcceptInput,
+): Promise<NervousAcceptResult> {
+  const id = input.id?.trim() ?? '';
+  if (!id) {
+    throw new Error('id is required');
+  }
+  if (!isValidNotificationId(id)) {
+    throw new Error(`Invalid notification ID: ${id}`);
+  }
+
+  const root = input.root ?? process.cwd();
+  const config = loadNervousConfig(root);
+
+  // Existing-history check (legacy informational field)
+  const history = new NervousHistory(root);
+  const all = await history.readAll();
+  const existsInHistory = all.some(r => r.notificationId === id);
+
+  if (!config.enabled) {
+    return {
+      accepted: true,
+      notificationId: id,
+      queued: false,
+      existsInHistory,
+      message: `Notification ${id} accepted (nervous inactive — history-only stub).`,
+    };
+  }
+
+  // Nervous active → enqueue for Executor pickup
+  const queue = new NervousIpcQueue(root);
+  const ipcFile = await queue.writeApproval({
+    notificationId: id,
+    decision: 'accepted',
+  });
+
+  return {
+    accepted: true,
+    notificationId: id,
+    queued: true,
+    existsInHistory,
+    message: `Notification ${id} accepted. Action queued for Executor.`,
+    ipcFile,
+  };
+}
+
+/**
+ * Pure handler for `deckent_nervous_reject`. Mirrors `handleNervousAccept`
+ * with `decision: 'rejected'` and an optional reason.
+ */
+export async function handleNervousReject(
+  input: NervousRejectInput,
+): Promise<NervousRejectResult> {
+  const id = input.id?.trim() ?? '';
+  if (!id) {
+    throw new Error('id is required');
+  }
+  if (!isValidNotificationId(id)) {
+    throw new Error(`Invalid notification ID: ${id}`);
+  }
+
+  const root = input.root ?? process.cwd();
+  const config = loadNervousConfig(root);
+  const reason = input.reason ?? null;
+
+  if (!config.enabled) {
+    return {
+      rejected: true,
+      notificationId: id,
+      queued: false,
+      reason,
+      message: `Notification ${id} rejected (nervous inactive — history-only stub).${reason ? ` Reason: ${reason}` : ''}`,
+    };
+  }
+
+  const queue = new NervousIpcQueue(root);
+  const ipcFile = await queue.writeApproval({
+    notificationId: id,
+    decision: 'rejected',
+    reason: input.reason,
+  });
+
+  return {
+    rejected: true,
+    notificationId: id,
+    queued: true,
+    reason,
+    message: `Notification ${id} rejected. Decision queued for Executor.${reason ? ` Reason: ${reason}` : ''}`,
+    ipcFile,
+  };
+}
+
 // ─── Tool Registrations ─────────────────────────────────────────────────────
 
 export function registerNervousSubscribeTool(server: McpServer): void {
@@ -58,15 +204,29 @@ export function registerNervousSubscribeTool(server: McpServer): void {
       title: 'Nervous Subscribe',
       description:
         'Subscribe to Nervous System notifications for the current sprint. ' +
-        'Registers this MCP client for push notifications.',
+        'Registers this MCP client for push notifications. Also surfaces ' +
+        'currently pending PanicGuard kill approvals as PANIC_GUARD_KILL_PENDING events (Sprint 180 W4-2).',
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
       inputSchema: z.object({
         sprintId: z.string().optional().describe('Sprint ID to subscribe to (default: active sprint)'),
+        root: z.string().optional().describe('Project root path (for panic event scan)'),
       }),
     },
-    async ({ sprintId }) => {
+    async ({ sprintId, root: rootParam }) => {
       const subId = sprintId ?? 'all';
       subscribers.add(subId);
+      const root = rootParam ?? process.cwd();
+
+      // Sprint 180 W4-2: include currently pending PanicGuard approval events
+      // so MCP subscribers see PANIC_GUARD_KILL_PENDING immediately on subscribe.
+      let pendingPanics: ReturnType<typeof listPendingPanicEvents> = [];
+      try { pendingPanics = listPendingPanicEvents(root); } catch { pendingPanics = []; }
+
+      // Filter by sprint if explicit sprintId provided
+      const filteredPanics = sprintId && sprintId !== 'all'
+        ? pendingPanics.filter(p => p.sprintId === sprintId)
+        : pendingPanics;
+
       return {
         content: [{
           type: 'text' as const,
@@ -74,6 +234,7 @@ export function registerNervousSubscribeTool(server: McpServer): void {
             subscribed: true,
             sprintId: subId,
             message: `Subscribed to Nervous System notifications${sprintId ? ` for ${sprintId}` : ''}`,
+            pendingPanics: filteredPanics,
           }),
         }],
       };
@@ -88,13 +249,15 @@ export function registerNervousAcceptTool(server: McpServer): void {
       title: 'Nervous Accept',
       description:
         'Accept a pending Nervous System notification/action. ' +
-        'The action will be executed by the Executor.',
+        'The action will be executed by the Executor. ' +
+        'Sprint 180 W4-2: id="panic:<taskId>" approves a PanicGuard-blocked kill.',
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
       inputSchema: z.object({
-        id: z.string().describe('Notification ID to accept'),
+        id: z.string().describe('Notification ID to accept, or "panic:<taskId>" for PanicGuard approval'),
+        root: z.string().optional().describe('Project root path (for panic approval IPC write)'),
       }),
     },
-    async ({ id }) => {
+    async ({ id, root: rootParam }) => {
       if (!id || id.trim() === '') {
         return {
           content: [{ type: 'text' as const, text: JSON.stringify({ error: true, message: 'id is required' }) }],
@@ -102,32 +265,47 @@ export function registerNervousAcceptTool(server: McpServer): void {
         };
       }
 
-      // Check history for this notification
-      const root = process.cwd();
-      const history = new NervousHistory(root);
-      const all = await history.readAll();
-      const exists = all.some(r => r.notificationId === id);
-
-      // In a full implementation, Executor.resolveApproval would be called.
-      // For now, we record the intent and verify the ID format.
-      if (!id.match(/^[a-f0-9-]{36}$/) && !id.startsWith('ns-')) {
+      // Sprint 180 W4-2: panic guard approval path
+      if (id.startsWith('panic:')) {
+        const taskId = id.slice('panic:'.length).trim();
+        if (!taskId) {
+          return {
+            content: [{ type: 'text' as const, text: JSON.stringify({ error: true, message: 'panic: id requires a non-empty taskId' }) }],
+            isError: true,
+          };
+        }
+        const root = rootParam ?? process.cwd();
+        const { markerPath, marker } = acceptPanicGuard(root, taskId, 'user-mcp');
         return {
-          content: [{ type: 'text' as const, text: JSON.stringify({ error: true, message: `Invalid notification ID: ${id}` }) }],
-          isError: true,
+          content: [{
+            type: 'text' as const,
+            text: JSON.stringify({
+              accepted: true,
+              notificationId: id,
+              channel: 'PANIC_GUARD_KILL_PENDING',
+              taskId,
+              markerPath,
+              acceptedAt: marker.acceptedAt,
+              message: `PanicGuard approval queued for task ${taskId}.`,
+            }),
+          }],
         };
       }
 
-      return {
-        content: [{
-          type: 'text' as const,
-          text: JSON.stringify({
-            accepted: true,
-            notificationId: id,
-            message: `Notification ${id} accepted. Action will be executed.`,
-            existsInHistory: exists,
-          }),
-        }],
-      };
+      // Sprint 180 W2-2 (Task 5): delegate to pure handler — handles backward-
+      // compat stub (nervous inactive) and IPC queue write (nervous active).
+      try {
+        const result = await handleNervousAccept({ id, root: rootParam });
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(result) }],
+        };
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify({ error: true, message }) }],
+          isError: true,
+        };
+      }
     },
   );
 }
@@ -144,34 +322,22 @@ export function registerNervousRejectTool(server: McpServer): void {
       inputSchema: z.object({
         id: z.string().describe('Notification ID to reject'),
         reason: z.string().optional().describe('Reason for rejection'),
+        root: z.string().optional().describe('Project root path (for IPC queue write)'),
       }),
     },
-    async ({ id, reason }) => {
-      if (!id || id.trim() === '') {
+    async ({ id, reason, root: rootParam }) => {
+      try {
+        const result = await handleNervousReject({ id, reason, root: rootParam });
         return {
-          content: [{ type: 'text' as const, text: JSON.stringify({ error: true, message: 'id is required' }) }],
+          content: [{ type: 'text' as const, text: JSON.stringify(result) }],
+        };
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify({ error: true, message }) }],
           isError: true,
         };
       }
-
-      if (!id.match(/^[a-f0-9-]{36}$/) && !id.startsWith('ns-')) {
-        return {
-          content: [{ type: 'text' as const, text: JSON.stringify({ error: true, message: `Invalid notification ID: ${id}` }) }],
-          isError: true,
-        };
-      }
-
-      return {
-        content: [{
-          type: 'text' as const,
-          text: JSON.stringify({
-            rejected: true,
-            notificationId: id,
-            reason: reason ?? null,
-            message: `Notification ${id} rejected.${reason ? ` Reason: ${reason}` : ''}`,
-          }),
-        }],
-      };
     },
   );
 }

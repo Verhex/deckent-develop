@@ -44,6 +44,12 @@ export interface TerminalConfig {
   scrollbackBytes: number;
   /** Whether the plain `shell` session kind is allowed. */
   allowShellKind: boolean;
+  /**
+   * Per-tenant outbound byte quota over a 24h window (W4-10, invariant I5).
+   * Crossing 50% triggers a one-shot warn event; reaching 100% kills the
+   * session and closes the WS with code 4429.
+   */
+  outboundDailyQuotaBytes?: number;
 }
 
 // ─── Configuration (Blueprint 13) ───────────────────────────────────
@@ -247,9 +253,19 @@ export interface DeckentConfig {
   max_fix_retries?: number;
   /** AI planner subprocess timeout in milliseconds (default: 60000) */
   ai_planner_timeout?: number;
-  /** Minimum coverage % to pass without tech debt (default: 90).
-   * Adaptive suggestion: if avg coverage < 70 over last 3 sprints, auto-lower to avg. */
+  /** @deprecated Use `coverage_aspirational` (auto-learn target) +
+   *  `coverage_hard_floor` (immutable EVALUATE gate) instead.
+   *  When set, this value is mapped to `coverage_aspirational` on load
+   *  for backward compatibility. */
   coverage_threshold?: number;
+  /** Immutable coverage floor used by the EVALUATE gate (default: 50).
+   *  Finalizer auto-learn never lowers `coverage_aspirational` below
+   *  this value. Sprint 179 W2-4. */
+  coverage_hard_floor?: number;
+  /** Auto-learn coverage target (default: 90). Lowered by finalizer
+   *  when recent avg coverage falls below it, but clamped at
+   *  `coverage_hard_floor`. Sprint 179 W2-4. */
+  coverage_aspirational?: number;
   /** Max reroute attempts per task during mid-sprint adapter (default: 3) */
   max_reroutes?: number;
   /** Also reroute GO_WITH_TECH_DEBT tasks, not just NO_GO (default: false) */
@@ -406,7 +422,9 @@ export interface NervousSystemConfig {
     /** Deduplicate notification across channels by ID */
     cross_channel_dedup: boolean;
   };
-  /** Per-detector configuration — 5 active + 5 reserved */
+  /** Per-detector configuration — Sprint 180 W0: 16 detectors (3 Faz-1 active + 13 reserved/optional).
+   *  Sprint 165'te dead_event_stream kod hazır → reserve_for kaldırıldı.
+   *  Sprint 180 W0 (NERVOUS-TODO §11.2 Step F): 6 yeni detector default enabled:false. */
   detectors: {
     stale_worker: NervousDetectorConfig;
     scope_collision: NervousDetectorConfig;
@@ -418,6 +436,12 @@ export interface NervousSystemConfig {
     prompt_quality: NervousDetectorConfig;
     worker_output_variance: NervousDetectorConfig;
     self_modifying_warner: NervousDetectorConfig;
+    task_mode_idle: NervousDetectorConfig;
+    build_failure_recurrence: NervousDetectorConfig;
+    token_spike: NervousDetectorConfig;
+    agent_routing_anomaly: NervousDetectorConfig;
+    scope_collision_rate: NervousDetectorConfig;
+    notification_delivery_health: NervousDetectorConfig;
   };
   /** Retention for history JSONL file in days */
   history_retention_days: number;
@@ -477,9 +501,18 @@ export interface ResolvedConfig {
   max_fix_retries?: number;
   /** AI planner subprocess timeout in milliseconds (default: 60000) */
   ai_planner_timeout?: number;
-  /** Minimum coverage % to pass without tech debt (default: 90).
-   * Adaptive suggestion: if avg coverage < 70 over last 3 sprints, auto-lower to avg. */
+  /** @deprecated Use `coverage_aspirational` + `coverage_hard_floor`.
+   *  Retained on ResolvedConfig as the resolved aspirational value
+   *  (mirrors `coverage_aspirational`) so legacy consumers keep working. */
   coverage_threshold: number;
+  /** Immutable EVALUATE gate floor (Sprint 179 W2-4, default: 50).
+   *  Optional on the type to keep existing ResolvedConfig literals valid;
+   *  `loadConfig`/`mergeConfigs` always populate it via `resolveCoverageGates`.
+   *  Consumers should `?? 50` defensively. */
+  coverage_hard_floor?: number;
+  /** Auto-learn aspirational coverage target (Sprint 179 W2-4, default: 90).
+   *  Optional on the type — see `coverage_hard_floor` note. */
+  coverage_aspirational?: number;
   /** Max reroute attempts per task during mid-sprint adapter (default: 3) */
   max_reroutes: number;
   /** Also reroute GO_WITH_TECH_DEBT tasks, not just NO_GO (default: false) */

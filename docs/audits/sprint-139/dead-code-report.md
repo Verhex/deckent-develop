@@ -75,11 +75,14 @@ These suspects turned out to be actively used.
 
 ## Unused Export Sampling
 
-Found **739** potentially unused exports across src/.
+Found **760** potentially unused exports across src/.
 Top 20 shown below (full list requires deeper analysis):
 
 | File | Export | Import Count |
 |------|--------|-------------|
+| src/orchestra/quality-assessor.ts | isCoverageEscapeHatchTask | 0 |
+| src/orchestra/quality-assessor.ts | COVERAGE_UNMEASURED_OVERALL_CEILING | 0 |
+| src/orchestra/quality-assessor.ts | COVERAGE_UNMEASURED_PARTIAL_CREDIT | 0 |
 | src/orchestra/handoff-protocol.ts | HandoffProtocol | 0 |
 | src/orchestra/rollback.ts | getDirtyFiles | 0 |
 | src/orchestra/rollback.ts | getCurrentCommitSha | 0 |
@@ -97,9 +100,6 @@ Top 20 shown below (full list requires deeper analysis):
 | src/orchestra/mid-sprint-adapter.ts | defaultRunVitestScopeCheck | 0 |
 | src/orchestra/mid-sprint-adapter.ts | RubricReconciliationReason | 0 |
 | src/orchestra/mid-sprint-adapter.ts | RubricReconciliationResult | 0 |
-| src/orchestra/mid-sprint-adapter.ts | RUBRIC_RECONCILIATION_THRESHOLDS | 0 |
-| src/orchestra/promotion-pipeline.ts | PromotionCriteria | 0 |
-| src/orchestra/promotion-pipeline.ts | DemotionCriteria | 0 |
 
 ## Recommendations
 

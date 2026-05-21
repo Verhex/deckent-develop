@@ -80,6 +80,13 @@ export interface MemoryEntryV2 {
   metadata: string;
   /** Multi-tenant scope tag. NULL for legacy/single-tenant entries (default). */
   tenant_id?: string | null;
+  /**
+   * Sprint 179 W5-12 (I4 invariant): audit HMAC chain fields.
+   * Only populated for type='audit' rows inserted via `insertAuditWithHmac`.
+   * NULL on legacy or non-audit rows.
+   */
+  audit_prev_hmac?: string | null;
+  audit_hmac?: string | null;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;

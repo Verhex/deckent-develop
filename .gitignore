@@ -94,6 +94,9 @@ coverage/
 *.key
 credentials.json
 
+# Audit HMAC chain key (Sprint 179 W5-12, I4 invariant — machine-local, mode 0600)
+.deckent/audit-key
+
 # OS
 .DS_Store
 Thumbs.db
@@ -117,3 +120,6 @@ file:audit-idem-*
 vitest-out.txt
 kendimenot.md
 .tmp/
+
+# npm cache (gitignored — regen on install)
+.tmp-npm/

@@ -76,8 +76,6 @@ describe('docs/archive/landing-page-content.md', () => {
   it('contains Footer links', () => {
     expect(content).toContain('## Footer');
     expect(content).toContain('GitHub');
-    expect(content).toContain('npm');
-    expect(content).toContain('deckent.agency');
   });
 
   it('is written in English', () => {

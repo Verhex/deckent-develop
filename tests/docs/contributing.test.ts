@@ -51,8 +51,8 @@ describe('CONTRIBUTING.md', () => {
 
   it('contains How to Create Plugin section', () => {
     expect(content).toContain('## Plugin System Development');
-    expect(content).toContain('IPlugin');
-    expect(content).toContain('plugin.json');
+    expect(content).toContain('PluginManifest');
+    expect(content).toContain('manifest.json');
   });
 
   it('contains PR Guidelines section', () => {

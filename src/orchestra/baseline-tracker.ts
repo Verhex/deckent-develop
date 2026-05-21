@@ -87,7 +87,7 @@ export function captureVitestBaseline(
       timeout: timeoutMs,
       stdio: ['pipe', 'pipe', 'pipe'],
       encoding: 'utf-8',
-      shell: true,
+      shell: process.platform === 'win32',
     });
 
     const output = (result.stdout ?? '') + (result.stderr ?? '');

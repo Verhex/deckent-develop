@@ -24,6 +24,7 @@ import { mkdirSync, rmSync, writeFileSync, readFileSync, existsSync } from 'node
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
+import { isPidAlive } from '../../src/core/pid-liveness.js';
 import {
   TaskEvaluation, TaskStatus, SprintPhase, SprintStatus,
 } from '../../src/core/types.js';
@@ -272,19 +273,15 @@ describe('runEvaluatePhase — PID-bound Idempotency Lock (Sprint 157 Task 002)'
 
   it('stale lock (dead PID) is reclaimed by new caller', async () => {
     // Arrange — plant a lock owned by a synthetic PID that is virtually
-    // guaranteed not to exist on the host. We probe upward from 2**30 until
-    // we find one ESRCH-rejected by kill(0).
+    // guaranteed not to exist on the host. Sprint 179 W2-7: route the probe
+    // through `isPidAlive()` so the loop is platform-portable (Linux uses
+    // /proc/<pid>; darwin/win32 falls back to process.kill with EPERM
+    // treated as "alive but not ours", removing the macOS CI flake where
+    // ESRCH/EPERM ambiguity sometimes advanced past dead PIDs).
     let deadPid = (1 << 30) >>> 0;
     for (let i = 0; i < 64; i++) {
-      try {
-        process.kill(deadPid, 0);
-        deadPid += 1; // alive — try the next candidate
-      } catch (e) {
-        const err = e as NodeJS.ErrnoException;
-        if (err.code === 'ESRCH') break;
-        if (err.code === 'EPERM') { deadPid += 1; continue; }
-        break;
-      }
+      if (!isPidAlive(deadPid)) break;
+      deadPid += 1;
     }
     const stalePayload = {
       pid: deadPid,

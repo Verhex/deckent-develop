@@ -403,14 +403,44 @@ export function applyGateStatus(currentStatus: string, gate: Pick<SelfAuditResul
 // ═══ Adaptive Thresholds ══════════════════════════════════════════
 
 /**
- * Auto-adjust agent_min_score and coverage_threshold based on recent sprint stats.
+ * Pure helper for the coverage aspirational auto-learn step (Sprint 179 W2-4).
+ *
+ * Returns the new aspirational coverage target given the current target,
+ * the immutable hard floor, and recent avg coverage. The hard floor is
+ * never mutated — the result is always clamped at `>= hardFloor`.
+ *
+ * Lowering rule (mirrors pre-split behavior): when avg coverage drops
+ * below 70 and is positive, lower aspirational to round(avg). Otherwise
+ * no change. The clamp prevents the EVALUATE gate from ever sliding
+ * below `hardFloor`.
+ */
+export function computeAdjustedAspirational(input: {
+  currentAspirational: number;
+  hardFloor: number;
+  avgCoverage: number;
+}): { newAspirational: number; changed: boolean } {
+  const { currentAspirational, hardFloor, avgCoverage } = input;
+  if (avgCoverage <= 0 || avgCoverage >= 70) {
+    return { newAspirational: currentAspirational, changed: false };
+  }
+  const proposed = Math.round(avgCoverage);
+  const clamped = Math.max(proposed, hardFloor);
+  return {
+    newAspirational: clamped,
+    changed: clamped !== currentAspirational,
+  };
+}
+
+/**
+ * Auto-adjust agent_min_score and coverage_aspirational based on recent sprint stats.
  * Reads .brain/sprints/ files, computes NO_GO rate and avg coverage,
  * then writes updated values to .deckent/config.json and appends a note to RETRO.md.
  *
  * Rules:
  * - NO_GO rate > no_go_threshold → agent_min_score decremented (min 1)
  * - NO_GO rate < 10% → agent_min_score incremented (max 10)
- * - avg coverage < 70% → coverage_threshold lowered to avg
+ * - avg coverage < 70% → coverage_aspirational lowered to avg (clamped at coverage_hard_floor)
+ * - coverage_hard_floor is immutable; auto-learn never touches it
  * - Requires min_samples sprints before any adjustment
  */
 export async function applyAdaptiveThresholds(projectRoot: string, config: ResolvedConfig): Promise<void> {
@@ -447,15 +477,27 @@ export async function applyAdaptiveThresholds(projectRoot: string, config: Resol
     debugLog('applyAdaptiveThresholds', changes.at(-1));
   }
 
-  // Adjust coverage_threshold based on avg coverage
-  const currentCoverage = config.coverage_threshold;
-  if (stats.avgCoverage < 70 && stats.avgCoverage > 0) {
-    const newCoverage = Math.round(stats.avgCoverage);
-    if (newCoverage !== currentCoverage) {
-      rawCfg['coverage_threshold'] = newCoverage;
-      changes.push(`coverage_threshold ${currentCoverage} => ${newCoverage} (avg coverage: ${stats.avgCoverage.toFixed(1)}%)`);
-      debugLog('applyAdaptiveThresholds', changes.at(-1));
-    }
+  // Adjust coverage_aspirational based on avg coverage — Sprint 179 W2-4.
+  // The hard floor (immutable EVALUATE gate) is never written; the helper
+  // clamps the new aspirational to `>= hard_floor`.
+  // Defensive defaults: config-types marks both fields optional on
+  // ResolvedConfig and instructs consumers to `?? <default>` (50 / 90).
+  const currentAspirational = config.coverage_aspirational ?? 90;
+  const hardFloor = config.coverage_hard_floor ?? 50;
+  const adjustment = computeAdjustedAspirational({
+    currentAspirational,
+    hardFloor,
+    avgCoverage: stats.avgCoverage,
+  });
+  if (adjustment.changed) {
+    rawCfg['coverage_aspirational'] = adjustment.newAspirational;
+    // Mirror to the legacy field so unmigrated consumers stay in sync.
+    rawCfg['coverage_threshold'] = adjustment.newAspirational;
+    changes.push(
+      `coverage_aspirational ${currentAspirational} => ${adjustment.newAspirational} ` +
+      `(avg coverage: ${stats.avgCoverage.toFixed(1)}%, hard_floor: ${hardFloor})`,
+    );
+    debugLog('applyAdaptiveThresholds', changes.at(-1));
   }
 
   if (changes.length === 0) return;

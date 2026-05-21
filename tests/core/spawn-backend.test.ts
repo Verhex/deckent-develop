@@ -258,23 +258,27 @@ describe('SpawnBackendFactory', () => {
     });
   });
 
+  // Sprint 178 modernization: auto mode unconditionally resolves to 'docker'
+  // (tmux deprecated; subprocess remains as Windows fallback via explicit selection).
+  // resolveBackend('auto') → 'docker' regardless of tmux availability.
   describe('create() with auto mode', () => {
-    it('selects TmuxBackend when tmux is available', () => {
+    it('selects DockerBackend when auto and tmux is available', () => {
       tmuxOk();
       const backend = SpawnBackendFactory.create({ projectDir: '/proj' });
-      expect(backend.name).toBe('tmux');
+      expect(backend.name).toBe('docker');
     });
 
-    it('selects SubprocessBackend when tmux is not available', () => {
+    it('selects DockerBackend when auto and tmux is not available', () => {
       tmuxMissing();
       const backend = SpawnBackendFactory.create({ projectDir: '/proj' });
-      expect(backend.name).toBe('subprocess');
+      expect(backend.name).toBe('docker');
     });
 
-    it('auto mode calls isTmuxAvailable()', () => {
+    it('auto mode does not probe tmux availability (deprecation moved decision to Docker)', () => {
       tmuxOk();
+      mockSpawnSync.mockClear();
       SpawnBackendFactory.create({ projectDir: '/proj' });
-      expect(mockSpawnSync).toHaveBeenCalledWith('tmux', ['-V'], expect.any(Object));
+      expect(mockSpawnSync).not.toHaveBeenCalledWith('tmux', ['-V'], expect.any(Object));
     });
   });
 
@@ -365,13 +369,13 @@ describe('SpawnBackend swappability', () => {
     }
   });
 
-  it('auto mode picks tmux when available, subprocess when not', () => {
+  it('auto mode resolves to docker regardless of tmux availability (Sprint 178 modernization)', () => {
     tmuxOk();
     const b1 = SpawnBackendFactory.create({ projectDir: '/proj' });
-    expect(b1.name).toBe('tmux');
+    expect(b1.name).toBe('docker');
 
     tmuxMissing();
     const b2 = SpawnBackendFactory.create({ projectDir: '/proj' });
-    expect(b2.name).toBe('subprocess');
+    expect(b2.name).toBe('docker');
   });
 });

@@ -3,6 +3,7 @@ import { Button } from "./ui/button";
 import { Skull } from "lucide-react";
 import type { AgentInfo } from "../types";
 import { useTranslation } from "../i18n/LanguageProvider";
+import type { TranslatorProp } from "../i18n/types";
 
 const STATUS_BORDER: Record<string, string> = {
   EXECUTING: "border border-l-4 border-blue-500 animate-pulse",
@@ -61,7 +62,7 @@ function elapsed(startedAt?: string): string {
   return `${mins}m ${remSecs}s`;
 }
 
-function relativeTime(isoDate: string | undefined, t: (key: string, params?: Record<string, string | number>) => string): string {
+function relativeTime(isoDate: string | undefined, t: TranslatorProp): string {
   if (!isoDate) return "—";
   const ms = Date.now() - new Date(isoDate).getTime();
   const secs = Math.floor(ms / 1000);

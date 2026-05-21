@@ -1,4 +1,5 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
+import type { TenantId } from './types.js';
 
 /**
  * Pluggable auth for the embedded terminal WebSocket gateway.
@@ -9,6 +10,14 @@ import { createHash, timingSafeEqual } from 'node:crypto';
 export interface AuthProvider {
   /** @returns true iff the presented credential is valid. */
   verify(presented: string | undefined): boolean;
+
+  /**
+   * Optional mTLS client-certificate verification hook (sub-project #3 seam).
+   * If defined, the WS gateway will call this during TLS upgrade when the client
+   * presents a certificate. Returns the TenantId for the cert, or null to deny.
+   * Absence of this method signals that mTLS is not configured.
+   */
+  verifyClientCert?(cert: Buffer): Promise<TenantId | null>;
 }
 
 function sha256(s: string): Buffer {

@@ -12,6 +12,10 @@ import {
   DIRECTIVES_FILE, LOCKS_DIR, DEBT_TABLE_HEADER, MEMORY_DB_FILE,
   PROJECT_CONFIG_PATH,
 } from '../../core/constants.js';
+
+// Memory V2 (Sprint 179 W3-6): exports/decisions.md is the auto-generated
+// source. doctor must accept EITHER this OR legacy .brain/DECISIONS.md.
+const DECISIONS_EXPORT_RELATIVE = 'exports/decisions.md';
 import { MemoryStore } from '../../core/memory-store.js';
 import { getSystemProfile } from '../../core/system-profile.js';
 import { detectSubscription } from '../../core/subscription.js';
@@ -190,8 +194,21 @@ function checkBrainDir(root: string): DoctorCheck {
   if (!existsSync(brainPath)) {
     return { name: 'Brain Dir', passed: false, message: '.brain/ missing', required: false };
   }
-  const requiredFiles = [MEMORY_FILE, DEBT_FILE, DECISIONS_FILE];
-  const missing = requiredFiles.filter(f => !existsSync(join(brainPath, f)));
+  // Memory V2 accept-either (Sprint 179 W3-6): decisions can live in EITHER
+  // legacy .brain/DECISIONS.md OR Memory V2 (.brain/memory.db + .brain/exports/decisions.md).
+  // A fresh V2 install no longer ships DECISIONS.md, so requiring it would
+  // produce a false-positive on every clean install.
+  const hasV2Decisions =
+    existsSync(join(brainPath, MEMORY_DB_FILE))
+    || existsSync(join(brainPath, DECISIONS_EXPORT_RELATIVE));
+  const hasLegacyDecisions = existsSync(join(brainPath, DECISIONS_FILE));
+
+  const missing: string[] = [];
+  if (!existsSync(join(brainPath, MEMORY_FILE))) missing.push(MEMORY_FILE);
+  if (!existsSync(join(brainPath, DEBT_FILE))) missing.push(DEBT_FILE);
+  if (!hasV2Decisions && !hasLegacyDecisions) {
+    missing.push(`${DECISIONS_FILE} or ${DECISIONS_EXPORT_RELATIVE}`);
+  }
   if (missing.length > 0) {
     return { name: 'Brain Dir', passed: false, message: `Missing: ${missing.join(', ')}`, required: false };
   }

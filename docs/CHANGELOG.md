@@ -1,6 +1,51 @@
 # Changelog
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
+## [1.0.0-beta.1-sprint180] - 2026-05-20
+
+### Added
+
+- W0 — Nervous config schema sync (Step F)
+- W2-2 — Nervous IPC queue MCP→Executor (Step E)
+
+### Changed
+
+- W1-2 — Nervous bootstrap fabrika (Step A) (completed with tech debt)
+- W2-1 — Nervous action handlers (Step C) (completed with tech debt)
+- W3-1 — Sprint-controller nervous wire (Step D) (completed with tech debt)
+- W3-3 — Nervous integration runtime test (completed with tech debt)
+- W4-1 — Worker .result coverage zorunluluk ★ BETA MUST (completed with tech debt)
+- W4-2 — Panic guard onay UI (Layer 3 synergy) (completed with tech debt)
+- W5-2 — OSS GA docs review ★ BETA LAUNCH (completed with tech debt)
+- W5-3 — auto_restore=true + nervous user guide kısa giriş (completed with tech debt)
+
+
+_Tasks: 20 total, 12 done, 8 tech debt, 8 no-go_
+
+## [1.0.0-beta.1-sprint179] - 2026-05-20
+
+### Added
+
+- W1-2 — Re-plan orphan task file cleanup
+- W2-4 — Coverage hard-floor / aspirational split
+- W4-10 — Outbound rate-limit (I5 tenant isolation) ★ BETA MUST
+- W5-12 — Audit HMAC chain + verify CLI (I4 invariant) ★ BETA MUST
+
+### Changed
+
+- W0-1 — Dependency aggregate fix-aware (Bug A foundation) (completed with tech debt)
+- W1-1 — Auto-debt empty-scope inheritance (completed with tech debt)
+- W2-3 — DEP0190 shell:true win32-only conditional (completed with tech debt)
+- W2-7 — CI-only test flakes (PID portability + mock hygiene) (completed with tech debt)
+- W3-5 — Dashboard TS errors + root lint wire (completed with tech debt)
+- W3-6 — doctor DECISIONS.md obsolete + 5-file cascade (completed with tech debt)
+- W4-8 — Prompt guard (I1 + I2 invariants) ★ BETA MUST (completed with tech debt)
+- W4-9 — Command guard (I3 default-deny remote) ★ BETA MUST (completed with tech debt)
+- W5-11 — mTLS hook (AuthProvider interface) ★ BETA MUST (completed with tech debt)
+
+
+_Tasks: 17 total, 17 done, 9 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint178] - 2026-05-20
 
 ### Added

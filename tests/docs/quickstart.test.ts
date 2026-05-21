@@ -14,7 +14,7 @@ describe('docs/guide/quickstart.md', () => {
   it('contains Prerequisites section', () => {
     expect(content).toContain('## 1. Prerequisites');
     expect(content).toContain('Node.js');
-    expect(content).toContain('>= 18');
+    expect(content).toContain('>= 24');
     expect(content).toContain('git');
   });
 
@@ -50,8 +50,7 @@ describe('docs/guide/quickstart.md', () => {
 
   it('contains Next Steps section', () => {
     expect(content).toContain('## 7. Next Steps');
-    expect(content).toContain('CONFIG-REFERENCE.md');
-    expect(content).toContain('API.md');
+    expect(content).toContain('config-reference.md');
   });
 
   it('contains copy-pasteable commands', () => {

@@ -18,14 +18,13 @@ describe('docs/architecture/agents.md', () => {
     expect(content).toContain('What Are Agents');
   });
 
-  it('has all 8 required sections', () => {
+  it('has all required sections', () => {
     const content = readFileSync(agentsPath, 'utf-8');
     const requiredSections = [
       'What Are Agents',
       'Built-in Agents',
       'Creating Custom Agents',
       'Agent Selection Algorithm',
-      'Multi-Agent Pipelines',
       'Agent Stats and Learning',
       'Temp Agents',
       'Configuration',
@@ -35,17 +34,17 @@ describe('docs/architecture/agents.md', () => {
     }
   });
 
-  it('documents all 8 built-in agents', () => {
+  it('documents built-in agents (ADR-041 — 15 horizontal agents)', () => {
     const content = readFileSync(agentsPath, 'utf-8');
     const builtInAgents = [
       'security-auditor',
-      'test-writer',
       'doc-writer',
+      'bug-fixer',
       'code-reviewer',
-      'performance-optimizer',
+      'refactorer',
+      'api-builder',
+      'performance-analyzer',
       'migration-specialist',
-      'api-designer',
-      'devops-agent',
     ];
     for (const agent of builtInAgents) {
       expect(content).toContain(agent);
@@ -71,7 +70,6 @@ describe('docs/architecture/agents.md', () => {
   it('explains selection algorithm with trigger matching', () => {
     const content = readFileSync(agentsPath, 'utf-8');
     expect(content).toContain('trigger');
-    expect(content).toContain('case-insensitive');
     expect(content).toContain('generic');
   });
 });

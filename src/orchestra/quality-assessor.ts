@@ -20,6 +20,54 @@ export interface QualityScore {
 // ─── Main API ───────────────────────────────────────────────────────────────
 
 /**
+ * Sprint 180 W4-1: Coverage "escape hatch" — doc-only scopes and pure
+ * audit/review agents cannot produce real test coverage, so the Quality
+ * Scorer must not treat their `coverage=0/null` reports as a defect.
+ *
+ * @see assessQuality — applies a 90/100 overall ceiling when this returns true
+ * @see Sprint 179 retrospective — 9 doc/audit tasks were demoted to TECH_DEBT
+ *      solely because vitest never ran on a non-source scope.
+ */
+const COVERAGE_ESCAPE_AGENTS = new Set([
+  'doc-writer',
+  'security-auditor',
+  'accessibility-auditor',
+  'code-reviewer',
+  'architect',
+  'architecture-planner',
+]);
+
+const COVERAGE_ESCAPE_SOURCE_PREFIXES = ['src/', 'src\\', 'tests/', 'tests\\', 'lib/', 'lib\\'];
+const COVERAGE_ESCAPE_SOURCE_EXACT = new Set(['src', 'tests', 'lib']);
+
+function isSourceScopeDir(dir: string): boolean {
+  if (COVERAGE_ESCAPE_SOURCE_EXACT.has(dir)) return true;
+  return COVERAGE_ESCAPE_SOURCE_PREFIXES.some(p => dir.startsWith(p));
+}
+
+/**
+ * Returns true when a task cannot reasonably produce coverage data — either
+ * its scope omits source/test directories entirely (pure docs/config) or it
+ * is routed to an audit/review agent whose deliverable is not executable code.
+ *
+ * Workers running under this regime are allowed to record `coverage: null` (or
+ * `0`) in their `.result` without triggering the Sprint 179 demotion path.
+ */
+export function isCoverageEscapeHatchTask(task: Task): boolean {
+  if (task.assignedAgent && COVERAGE_ESCAPE_AGENTS.has(task.assignedAgent)) {
+    return true;
+  }
+  const dirs = task.scope?.directories ?? [];
+  if (dirs.length === 0) return false;
+  return dirs.every(d => !isSourceScopeDir(d));
+}
+
+/** Overall-score ceiling applied when coverage is unmeasured but excused. */
+export const COVERAGE_UNMEASURED_OVERALL_CEILING = 90;
+/** Partial-credit coverage dimension for excused (escape-hatch) unmeasured runs. */
+export const COVERAGE_UNMEASURED_PARTIAL_CREDIT = 70;
+
+/**
  * Assess multi-dimensional quality of a task result.
  */
 export function assessQuality(
@@ -27,17 +75,26 @@ export function assessQuality(
   result: TaskResult,
   evaluation: string, // 'DONE' | 'GO_WITH_TECH_DEBT' | 'NO_GO'
 ): QualityScore {
+  const isEscape = isCoverageEscapeHatchTask(task);
   const correctness = assessCorrectness(result, evaluation);
-  const coverage = assessCoverage(result);
+  const coverage = assessCoverage(result, isEscape);
   const scopeAdherence = assessScopeAdherence(task, result);
   const completeness = assessCompleteness(evaluation);
 
-  const overall = Math.round(
+  let overall = Math.round(
     correctness * 0.35 +
     coverage * 0.25 +
     scopeAdherence * 0.2 +
     completeness * 0.2,
   );
+
+  // Sprint 180 W4-1: When coverage is unmeasured under the escape hatch, cap
+  // the overall score so we never claim full confidence without real data.
+  // For non-NO_GO evaluations this also lifts the dimension above the Sprint
+  // 179 ~75 demotion threshold.
+  if (isEscape && !isCoverageMeasured(result) && evaluation !== 'NO_GO') {
+    overall = Math.min(COVERAGE_UNMEASURED_OVERALL_CEILING, overall);
+  }
 
   const skillRelevance = assessSkillRelevance(task, result);
 
@@ -57,8 +114,16 @@ function assessCorrectness(result: TaskResult, evaluation: string): number {
   return 100;
 }
 
-function assessCoverage(result: TaskResult): number {
-  const cov = result.coverage ?? 0;
+function isCoverageMeasured(result: TaskResult): boolean {
+  const cov = result.coverage;
+  return typeof cov === 'number' && Number.isFinite(cov) && cov > 0;
+}
+
+function assessCoverage(result: TaskResult, isEscape = false): number {
+  if (!isCoverageMeasured(result)) {
+    return isEscape ? COVERAGE_UNMEASURED_PARTIAL_CREDIT : 0;
+  }
+  const cov = result.coverage as number;
   return Math.min(100, Math.round(cov));
 }
 

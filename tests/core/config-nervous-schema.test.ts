@@ -101,14 +101,16 @@ describe('nervous_system config schema', () => {
     }
   });
 
-  // ─── Test 6: detectors has exactly 10 entries ─────────────────────────────
-  it('nervous_system.detectors has exactly 10 entries (5 active + 5 reserve)', () => {
+  // ─── Test 6: detectors has exactly 16 entries (5 active + 11 reserve) ────
+  // Sprint 180 W0 — NERVOUS-TODO §11.2 Step F: 6 new detectors added.
+  // dead_event_stream'in reserve_for'u kaldırıldı (Sprint 165 kod hazır).
+  it('nervous_system.detectors has exactly 16 entries (5 active + 11 reserve)', () => {
     const config = createDefaultConfig();
     const detectors = config.nervous_system!.detectors;
     const detectorKeys = Object.keys(detectors);
-    expect(detectorKeys.length).toBe(10);
+    expect(detectorKeys.length).toBe(16);
 
-    // 5 active detectors
+    // 5 active detectors (unchanged from Sprint 147 baseline)
     const activeDetectors = detectorKeys.filter(
       k => detectors[k as keyof typeof detectors].enabled,
     );
@@ -119,20 +121,38 @@ describe('nervous_system config schema', () => {
     expect(activeDetectors).toContain('agent_routing');
     expect(activeDetectors).toContain('directives_protection');
 
-    // 5 reserved detectors (enabled: false)
+    // 11 reserved detectors (enabled: false) — 5 original (incl. dead_event_stream
+    // without reserve_for) + 6 new in Sprint 180 W0
     const reservedDetectors = detectorKeys.filter(
       k => !detectors[k as keyof typeof detectors].enabled,
     );
-    expect(reservedDetectors.length).toBe(5);
+    expect(reservedDetectors.length).toBe(11);
     expect(reservedDetectors).toContain('dead_event_stream');
     expect(reservedDetectors).toContain('cost_threshold');
     expect(reservedDetectors).toContain('prompt_quality');
     expect(reservedDetectors).toContain('worker_output_variance');
     expect(reservedDetectors).toContain('self_modifying_warner');
+    // Sprint 180 W0 new detectors
+    expect(reservedDetectors).toContain('task_mode_idle');
+    expect(reservedDetectors).toContain('build_failure_recurrence');
+    expect(reservedDetectors).toContain('token_spike');
+    expect(reservedDetectors).toContain('agent_routing_anomaly');
+    expect(reservedDetectors).toContain('scope_collision_rate');
+    expect(reservedDetectors).toContain('notification_delivery_health');
 
-    // All reserved detectors have reserve_for='sprint-148'
-    for (const key of reservedDetectors) {
-      expect(detectors[key as keyof typeof detectors].reserve_for).toBe('sprint-148');
+    // dead_event_stream — Sprint 165 kod hazır → reserve_for clear (Sprint 180 W0)
+    expect(detectors.dead_event_stream.reserve_for).toBeUndefined();
+
+    // 4 still-reserved Sprint-148 detectors keep reserve_for='sprint-148'
+    const sprint148Reserved = ['cost_threshold', 'prompt_quality', 'worker_output_variance', 'self_modifying_warner'] as const;
+    for (const key of sprint148Reserved) {
+      expect(detectors[key].reserve_for).toBe('sprint-148');
+    }
+
+    // 6 Sprint 180 W0 new detectors carry no reserve_for (Faz 2/3 activation TBD)
+    const sprint180New = ['task_mode_idle', 'build_failure_recurrence', 'token_spike', 'agent_routing_anomaly', 'scope_collision_rate', 'notification_delivery_health'] as const;
+    for (const key of sprint180New) {
+      expect(detectors[key].reserve_for).toBeUndefined();
     }
   });
 });

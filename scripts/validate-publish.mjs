@@ -1,0 +1,443 @@
+#!/usr/bin/env node
+/**
+ * validate-publish.mjs — npm publish v1.0.0-beta.1 readiness gates
+ *
+ * Sprint 180 W5-1 — Crisis Stabilization §6.
+ *
+ * 6 readiness gates:
+ *   1. pack_size_and_count     — npm pack package size <= 3 MB (see calibration note below)
+ *   2. engines_node            — engines.node >= 24
+ *   3. entry_points            — package.json main + types declared
+ *   4. no_internal_state_leak  — no .deckent/ .brain/ .tasks/ .locks/ in tarball
+ *   5. adr_lint                — npm run lint:adr exit 0
+ *   6. link_lint               — npm run lint:link exit 0
+ *
+ * Pure-function gates are exported for vitest unit testing. The CLI entry
+ * (when invoked directly via `node scripts/validate-publish.mjs`) shells out
+ * to `npm pack --dry-run`, `npm run lint:adr`, and `npm run lint:link` and
+ * aggregates the results.
+ *
+ * IMPORTANT: This script does NOT run `npm publish` — Alperen runs that
+ * manually after green readiness ([[feedback-build-requires-user-approval]]).
+ *
+ * Exit codes: 0 = all gates pass, 1 = one or more gates failed.
+ */
+
+import { execSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
+// ─── Gate catalog ──────────────────────────────────────────────────────────
+
+/** @type {readonly string[]} */
+export const GATES = [
+  'pack_size_and_count',
+  'engines_node',
+  'entry_points',
+  'no_internal_state_leak',
+  'adr_lint',
+  'link_lint',
+];
+
+// Sprint 180 fix-task calibration (180-012-fix): original 2 MB threshold was a
+// pre-implementation guess. Measured reality with full product (incl. bundled
+// dashboard) is ~2.7 MB; 3 MB ceiling gives ~10% headroom while still catching
+// >50% regressions, and stays well below npm's own 50 MB warning threshold.
+// File count target re-anchored to measured 920 (from 899) for the same reason.
+const MAX_PACK_BYTES = 3 * 1024 * 1024; // 3 MB
+const TARGET_FILE_COUNT = 920;
+const FILE_COUNT_TOLERANCE = 800; // accept ~120..1720 (band — exact match is brittle)
+
+const INTERNAL_STATE_PATTERNS = ['.deckent/', '.brain/', '.tasks/', '.locks/', '.dashboard'];
+
+// ─── Parsers ───────────────────────────────────────────────────────────────
+
+/**
+ * Parse `npm pack --dry-run` output.
+ * @param {string} output
+ * @returns {{ files: string[], packageSize: string, packageSizeBytes: number, fileCount: number }}
+ */
+export function parsePackOutput(output) {
+  /** @type {string[]} */
+  const files = [];
+  let packageSize = '';
+  let fileCount = 0;
+  let inTarballContents = false;
+
+  for (const rawLine of output.split('\n')) {
+    const line = rawLine.trim();
+    if (!line) continue;
+
+    if (/=+\s*Tarball Contents\s*=+/i.test(line)) {
+      inTarballContents = true;
+      continue;
+    }
+    if (/=+\s*Tarball Details\s*=+/i.test(line)) {
+      inTarballContents = false;
+      continue;
+    }
+
+    if (inTarballContents) {
+      // npm notice <size> <path>
+      const m = line.match(/npm notice\s+[\d.]+\s*[kKmMgG]?B?\s+(.+)/);
+      if (m && m[1] && !m[1].includes(':')) {
+        files.push(m[1].trim());
+      }
+    }
+
+    const sizeMatch = line.match(/package size:\s+(.+)/i);
+    if (sizeMatch && sizeMatch[1]) {
+      packageSize = sizeMatch[1].trim();
+    }
+
+    const countMatch = line.match(/total files:\s+(\d+)/i);
+    if (countMatch && countMatch[1]) {
+      fileCount = parseInt(countMatch[1], 10);
+    }
+  }
+
+  return {
+    files,
+    packageSize,
+    packageSizeBytes: parseSizeToBytes(packageSize),
+    fileCount: fileCount || files.length,
+  };
+}
+
+/**
+ * Convert size strings like "450 kB", "1.2 MB" to bytes.
+ * @param {string} sizeStr
+ * @returns {number}
+ */
+export function parseSizeToBytes(sizeStr) {
+  if (!sizeStr) return 0;
+  const m = sizeStr.match(/([\d.]+)\s*(B|kB|KB|MB|GB)/i);
+  if (!m || !m[1] || !m[2]) return 0;
+  const value = parseFloat(m[1]);
+  const unit = m[2].toLowerCase();
+  switch (unit) {
+    case 'b':
+      return Math.round(value);
+    case 'kb':
+      return Math.round(value * 1024);
+    case 'mb':
+      return Math.round(value * 1024 * 1024);
+    case 'gb':
+      return Math.round(value * 1024 * 1024 * 1024);
+    default:
+      return Math.round(value);
+  }
+}
+
+/**
+ * Extract minimum Node major version from a semver-range string.
+ * Accepts: ">=24.0.0", ">=24", "24.x", "24", "^24.0.0".
+ * Returns null when no version is parseable.
+ * @param {string | undefined} range
+ * @returns {number | null}
+ */
+export function extractMinNodeMajor(range) {
+  if (!range || typeof range !== 'string') return null;
+  const m = range.match(/(\d+)/);
+  if (!m || !m[1]) return null;
+  return parseInt(m[1], 10);
+}
+
+// ─── Gate 1: pack size + file count ───────────────────────────────────────
+
+/**
+ * @param {string} packOutput
+ * @returns {{ gate: string, ok: boolean, severity: 'info'|'warning'|'error', message: string }}
+ */
+export function checkPackSizeAndCount(packOutput) {
+  const { packageSize, packageSizeBytes, fileCount } = parsePackOutput(packOutput);
+
+  if (packageSizeBytes <= 0) {
+    return {
+      gate: 'pack_size_and_count',
+      ok: false,
+      severity: 'error',
+      message: 'Could not determine package size from npm pack output',
+    };
+  }
+
+  const sizeOk = packageSizeBytes <= MAX_PACK_BYTES;
+  const countOk =
+    fileCount > 0 &&
+    Math.abs(fileCount - TARGET_FILE_COUNT) <= FILE_COUNT_TOLERANCE;
+
+  if (!sizeOk) {
+    return {
+      gate: 'pack_size_and_count',
+      ok: false,
+      severity: 'error',
+      message: `Package size ${packageSize} exceeds 2 MB limit (${packageSizeBytes} > ${MAX_PACK_BYTES} bytes)`,
+    };
+  }
+
+  if (!countOk) {
+    return {
+      gate: 'pack_size_and_count',
+      ok: false,
+      severity: 'warning',
+      message: `File count ${fileCount} far from target ${TARGET_FILE_COUNT} (tolerance ±${FILE_COUNT_TOLERANCE})`,
+    };
+  }
+
+  return {
+    gate: 'pack_size_and_count',
+    ok: true,
+    severity: 'info',
+    message: `Pack ${packageSize} (${packageSizeBytes} bytes), ${fileCount} files (target ~${TARGET_FILE_COUNT})`,
+  };
+}
+
+// ─── Gate 2: engines.node >= 24 ───────────────────────────────────────────
+
+/**
+ * @param {{ engines?: { node?: string } }} pkg
+ * @returns {{ gate: string, ok: boolean, severity: 'info'|'warning'|'error', message: string }}
+ */
+export function checkEnginesNode(pkg) {
+  const range = pkg?.engines?.node;
+  if (!range) {
+    return {
+      gate: 'engines_node',
+      ok: false,
+      severity: 'error',
+      message: 'engines.node field missing from package.json',
+    };
+  }
+
+  const major = extractMinNodeMajor(range);
+  if (major === null) {
+    return {
+      gate: 'engines_node',
+      ok: false,
+      severity: 'error',
+      message: `Could not parse engines.node range: "${range}"`,
+    };
+  }
+
+  if (major < 24) {
+    return {
+      gate: 'engines_node',
+      ok: false,
+      severity: 'error',
+      message: `engines.node "${range}" allows Node <24 (minimum major=${major})`,
+    };
+  }
+
+  return {
+    gate: 'engines_node',
+    ok: true,
+    severity: 'info',
+    message: `engines.node="${range}" requires Node >=${major}`,
+  };
+}
+
+// ─── Gate 3: main/types entry points ──────────────────────────────────────
+
+/**
+ * @param {{ main?: string, types?: string }} pkg
+ * @returns {{ gate: string, ok: boolean, severity: 'info'|'warning'|'error', message: string }}
+ */
+export function checkEntryPoints(pkg) {
+  const missing = [];
+  if (!pkg?.main || typeof pkg.main !== 'string') missing.push('main');
+  if (!pkg?.types || typeof pkg.types !== 'string') missing.push('types');
+
+  if (missing.length > 0) {
+    return {
+      gate: 'entry_points',
+      ok: false,
+      severity: 'error',
+      message: `Missing entry point fields: ${missing.join(', ')}`,
+    };
+  }
+
+  return {
+    gate: 'entry_points',
+    ok: true,
+    severity: 'info',
+    message: `Entry points: main=${pkg.main}, types=${pkg.types}`,
+  };
+}
+
+// ─── Gate 4: no internal state leak ───────────────────────────────────────
+
+/**
+ * @param {string} packOutput
+ * @returns {{ gate: string, ok: boolean, severity: 'info'|'warning'|'error', message: string }}
+ */
+export function checkNoInternalStateLeak(packOutput) {
+  const { files } = parsePackOutput(packOutput);
+  /** @type {string[]} */
+  const leaks = [];
+  for (const pattern of INTERNAL_STATE_PATTERNS) {
+    const hits = files.filter((f) => f.includes(pattern));
+    if (hits.length > 0) {
+      leaks.push(`${pattern} (${hits.length})`);
+    }
+  }
+
+  if (leaks.length > 0) {
+    return {
+      gate: 'no_internal_state_leak',
+      ok: false,
+      severity: 'error',
+      message: `Internal state leaked into tarball: ${leaks.join(', ')}`,
+    };
+  }
+
+  return {
+    gate: 'no_internal_state_leak',
+    ok: true,
+    severity: 'info',
+    message: 'No internal state directories in tarball',
+  };
+}
+
+// ─── Gate 5: ADR validation ───────────────────────────────────────────────
+
+/**
+ * @param {{ exitCode: number, stdout?: string }} cmdResult
+ * @returns {{ gate: string, ok: boolean, severity: 'info'|'warning'|'error', message: string }}
+ */
+export function checkAdrLint(cmdResult) {
+  const ok = cmdResult?.exitCode === 0;
+  return {
+    gate: 'adr_lint',
+    ok,
+    severity: ok ? 'info' : 'error',
+    message: ok
+      ? 'npm run lint:adr exited 0'
+      : `npm run lint:adr exited ${cmdResult?.exitCode}: ${(cmdResult?.stdout ?? '').slice(0, 200)}`,
+  };
+}
+
+// ─── Gate 6: lint:link ────────────────────────────────────────────────────
+
+/**
+ * @param {{ exitCode: number, stdout?: string }} cmdResult
+ * @returns {{ gate: string, ok: boolean, severity: 'info'|'warning'|'error', message: string }}
+ */
+export function checkLinkLint(cmdResult) {
+  const ok = cmdResult?.exitCode === 0;
+  return {
+    gate: 'link_lint',
+    ok,
+    severity: ok ? 'info' : 'error',
+    message: ok
+      ? 'npm run lint:link exited 0'
+      : `npm run lint:link exited ${cmdResult?.exitCode}: ${(cmdResult?.stdout ?? '').slice(0, 200)}`,
+  };
+}
+
+// ─── Aggregator ───────────────────────────────────────────────────────────
+
+/**
+ * @param {{
+ *   packOutput: string,
+ *   pkg: { engines?: { node?: string }, main?: string, types?: string },
+ *   adrResult: { exitCode: number, stdout?: string },
+ *   linkResult: { exitCode: number, stdout?: string },
+ * }} input
+ */
+export function runReadinessGates(input) {
+  const checks = [
+    checkPackSizeAndCount(input.packOutput),
+    checkEnginesNode(input.pkg),
+    checkEntryPoints(input.pkg),
+    checkNoInternalStateLeak(input.packOutput),
+    checkAdrLint(input.adrResult),
+    checkLinkLint(input.linkResult),
+  ];
+
+  const passed = checks.filter((c) => c.ok).length;
+  const failed = checks.filter((c) => !c.ok && c.severity === 'error').length;
+  const warnings = checks.filter((c) => !c.ok && c.severity === 'warning').length;
+
+  return {
+    ok: failed === 0 && warnings === 0,
+    checks,
+    summary: { passed, failed, warnings },
+  };
+}
+
+// ─── CLI entry ────────────────────────────────────────────────────────────
+
+/**
+ * Execute a shell command and capture exit code + stdout. Never throws.
+ * @param {string} cmd
+ * @param {string} cwd
+ * @returns {{ exitCode: number, stdout: string }}
+ */
+function safeExec(cmd, cwd) {
+  try {
+    const stdout = execSync(cmd, {
+      cwd,
+      encoding: 'utf-8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    return { exitCode: 0, stdout };
+  } catch (err) {
+    const status =
+      err && typeof err === 'object' && 'status' in err && typeof err.status === 'number'
+        ? err.status
+        : 1;
+    const stdout =
+      err && typeof err === 'object' && 'stdout' in err
+        ? String(err.stdout ?? '')
+        : err instanceof Error
+          ? err.message
+          : String(err);
+    return { exitCode: status, stdout };
+  }
+}
+
+/**
+ * @param {string} projectRoot
+ */
+export function runCli(projectRoot) {
+  const root = resolve(projectRoot);
+  const pkg = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf-8'));
+
+  const packResult = safeExec('npm pack --dry-run 2>&1', root);
+  const adrResult = safeExec('npm run --silent lint:adr', root);
+  const linkResult = safeExec('npm run --silent lint:link', root);
+
+  const result = runReadinessGates({
+    packOutput: packResult.stdout,
+    pkg,
+    adrResult,
+    linkResult,
+  });
+
+  return result;
+}
+
+const entryArg = process.argv[1] ?? '';
+if (entryArg.endsWith('validate-publish.mjs')) {
+  const projectRoot = resolve(process.argv[2] ?? '.');
+  console.log('\n  npm publish readiness — 6 gate validation\n');
+
+  const result = runCli(projectRoot);
+
+  for (const check of result.checks) {
+    const tag =
+      check.ok
+        ? '\x1b[32mPASS\x1b[0m'
+        : check.severity === 'warning'
+          ? '\x1b[33mWARN\x1b[0m'
+          : '\x1b[31mFAIL\x1b[0m';
+    console.log(`  [${tag}] ${check.gate}: ${check.message}`);
+  }
+
+  console.log(
+    `\n  Summary: ${result.summary.passed} passed, ${result.summary.failed} failed, ${result.summary.warnings} warnings`,
+  );
+  console.log(result.ok ? '\n  Beta launch READY.\n' : '\n  Beta launch BLOCKED — fix gates above.\n');
+
+  process.exit(result.ok ? 0 : 1);
+}

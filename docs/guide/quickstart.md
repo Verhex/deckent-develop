@@ -46,25 +46,25 @@ You also need an active Claude subscription (Pro, Max 5x, Max 20x) or an Anthrop
 
 ## 2. Installation
 
-Install Deckent globally:
+**Recommended — no global install needed:**
+
+```bash
+npx deckent@latest init          # detects + installs missing CLIs with your consent
+```
+
+Or install globally if you prefer:
 
 ```bash
 npm install -g deckent
-```
-
-Verify the installation:
-
-```bash
 deckent --version
 ```
 
-If you see `command not found`, add the npm global bin to your PATH:
+If you see `command not found` after global install, add the npm global bin to your PATH:
 
 ```bash
 export PATH="$(npm bin -g):$PATH"
+# Add to ~/.bashrc or ~/.zshrc for persistence
 ```
-
-Add that line to `~/.bashrc` or `~/.zshrc` to make it permanent.
 
 Run the health check to confirm all dependencies are available:
 
@@ -247,6 +247,16 @@ deckent start --auto-approve
 ```
 
 Use `--auto-approve` only in trusted environments. Workers are scoped to assigned directories, but auto-approve removes confirmation prompts.
+
+### Open the Web Dashboard
+
+While a sprint is running, open the live web dashboard in your browser:
+
+```bash
+deckent web   # opens at http://localhost:3100
+```
+
+The dashboard shows live worker status, task results, memory, and sprint history. It uses Server-Sent Events (SSE) for real-time updates — no page refresh needed.
 
 ---
 

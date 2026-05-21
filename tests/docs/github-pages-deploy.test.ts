@@ -70,8 +70,8 @@ describe('docs.yml build job', () => {
     expect(content).toContain('actions/checkout@v4');
   });
 
-  it('sets up Node.js 22.x', () => {
-    expect(content).toContain("node-version: '22.x'");
+  it('sets up Node.js 24.x', () => {
+    expect(content).toContain("node-version: '24.x'");
   });
 
   it('installs root dependencies', () => {

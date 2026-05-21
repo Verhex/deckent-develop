@@ -229,29 +229,116 @@ Once Task 177-005 lands, `auto_restore` can stay `true` safely because intention
 
 ---
 
-## 5. Sprint 179 — Sub-project #2 Original Scope (12 task)
+## 5. Sprint 179 — Sub-project #2 Original Scope + Bug A Foundation (14 task)
 
-**Scope:** Items 7a-c (planner state-hygiene + frontend + self-security).
+**Scope:** Items 7a-c (planner state-hygiene + frontend + self-security) **+ Bug A foundation** (Sprint 178 forensik bulgusu: dependency aggregate fix-aware).
 
-This sprint references the existing [sub-project #2 design spec](2026-05-21-sub-project-2-design.md) which **is not superseded** — it remains the canonical reference for tasks 7a-c. Sprint 179 simply executes that plan with the same 12-task breakdown:
+### 5a. Sprint 178 forensik: Bug A discovery
 
-- W1: Auto-debt scope inheritance + re-plan orphan cleanup (2 task — planner P0)
-- W2: DEP0190 shell:true + coverage gate split + CI flakes (3 task — discipline gate)
-- W3: Dashboard TS + doctor cascade (2 task — Memory V2 cleanup + frontend)
-- W4: Prompt guard + command guard + outbound limiter (3 task — self-security core, **invariants I1-I3, I5 — beta MUST**)
-- W5: mTLS hook + audit HMAC chain (2 task — self-security advanced, **invariant I4 — beta MUST**)
+`/.deckent/sprint-178-events.jsonl` analizinde 5 dispatch bug bulundu. Alperen filtresi (2026-05-22):
 
-Sprint 179 launches AFTER Sprint 177's worker rollback (Task 1) is live — without it, the planner-hijyen tasks would risk corrupting sprint-planner.ts further as Sprint 176 did.
+- **Bug A — DO:** Dependency aggregate fix-aware. Ana worker NO_GO ama fix DONE olduğunda → event stream'de ana task hâlâ NO_GO durur; downstream `depStatuses` "EXECUTING" görür → fix-after-NO_GO başarısı dependency hattına yansımaz. CLI final aggregate doğru hesaplıyor ama event stream + predecessor digest yanlış. **Sprint 179 W0 foundation — sub-project #2 12 task fan-out'tan ÖNCE land.**
+- **Bug C/E — DON'T TOUCH:** Brain done işleri dürüstçe re-evaluate ediyor (FIX phase'de). Bu davranış kasıtlı + doğru — "done olmasına aldanmıyor". User direktifi: "bu yapıya dokunmayalım doğru çalışması yeterli".
 
-**Sprint 179 detailed plan reuses [docs/superpowers/plans/2026-05-21-sub-project-2.md](../plans/2026-05-21-sub-project-2.md) with task IDs re-slotted to `179-*` and dependency edges updated.**
+**Why Bug A önce land etmeli:** Sprint 179'da 12 task var, çoğu cross-wave dependency'li (W2→W1, W3→W1, W5→W4 etc). Bug A olmadan her ana task NO_GO + fix DONE pattern'ı downstream wave'i 22dk taklit boş yere bekletecek. Sprint 178'de tek task'ta görüldü; 12-task fan-out'ta amplifie olur → beta gate (June 1) risk.
+
+### 5b. Wave breakdown — Bug A foundation + sub-project #2 12 task
+
+- **W0 — Foundation (1 task, sequential, Sprint 179 başı):**
+  - Task 179-W0-1: Dependency aggregate fix-aware. Event stream'e `DEPENDENCY_RESOLVED_BY_FIX` channel ekle; `result-evaluator` ana task verdict'i `max(originalVerdict, latestFixVerdict)` aggregate; `result-collector.planDispatch` downstream task `depStatuses` query'sinde aggregate verdict döner; predecessor digest (TOPP C) fix sonucunu da embed eder.
+- **W1 — Planner P0 (2 task, sequential, same file: sprint-planner.ts):**
+  - Auto-debt scope inheritance
+  - Re-plan orphan task file cleanup
+- **W2 — Discipline gate (3 task, parallel):**
+  - DEP0190 shell:true win32-only
+  - Coverage hard-floor / aspirational split
+  - CI-only test flakes (PID portability — Sprint 178 partial; final hygiene burada)
+- **W3 — Memory V2 cascade (2 task, parallel):**
+  - Dashboard TS + root lint wire
+  - `doctor` DECISIONS.md obsolete + cascade
+- **W4 — Self-security core ★ BETA MUST (3 task, parallel):**
+  - Prompt guard (I1 + I2 invariant)
+  - Command guard (I3 default-deny remote-shell)
+  - Outbound rate-limit (I5 tenant isolation)
+- **W5 — Self-security advanced ★ BETA MUST (2 task, parallel):**
+  - mTLS hook (AuthProvider interface — no impl)
+  - Audit HMAC chain + verify CLI (I4 append-only)
+
+### 5c. Spec/plan reference chain
+
+- Sub-project #2 design spec (2026-05-21-sub-project-2-design.md) **remains canonical** for W1-W5 (12 task; 5 invariants I1-I5; verdict matrix; threat model).
+- Sub-project #2 plan (docs/superpowers/plans/2026-05-21-sub-project-2.md) **remains canonical TDD breakdown** for W1-W5 task steps (re-slot 176-* → 179-*).
+- Sprint 179 detailed plan (yeni, `docs/superpowers/plans/2026-05-23-sprint-179-subproject-2-plus-bugA.md`) **eklenecek:** W0 task tasarımı + dependency wiring + DIRECTIVES task-title pattern.
+
+### 5d. Bug A test surface
+
+- `tests/orchestra/dependency-aggregate-fix-aware.test.ts` (NEW):
+  - (a) `result-evaluator` ana task NO_GO + fix DONE → `getAggregateVerdict(taskId)` döner `DONE`
+  - (b) `event-stream` fix DONE on dependency → `DEPENDENCY_RESOLVED_BY_FIX` event emit
+  - (c) `planDispatch` downstream task `depStatuses` aggregate kullanır — "EXECUTING" değil "DONE" döner
+  - (d) Predecessor digest (TOPP C buildDependenciesBlock) hem original hem latest-fix .result digest'ini içerir
+  - (e) Honest-gate koruma: Brain re-evaluate her zaman ana verdict üstüne yazabilir (Bug C/E intact — aggregate hesaplama UPDATE'i bloke etmez)
+
+### 5e. Sprint 179 verdict
+
+- **GO** = 13/13 DONE
+- **GO_WITH_TECH_DEBT** = 11-12/13 DONE + ≤2 GWT (W0 + W4 + W5 ≥6 DONE şart — beta blocker; W1-W3 ≤2 GWT KABUL)
+- **NO_GO** = W0 fail (downstream rant'ı engelliyor) **veya** güvenlik invariant ihlali (I1-I5)
+
+Sprint 179 launches AFTER Sprint 177 worker rollback + Sprint 178 TOPP land (her ikisi de live). Worker rollback NO_GO src/ revert garantisi + TOPP continuous-dispatch fan-out parallelism = 14 task ≤4 gün.
+
+**Sprint 179 detailed plan: [docs/superpowers/plans/2026-05-23-sprint-179-subproject-2-plus-bugA.md](../plans/2026-05-23-sprint-179-subproject-2-plus-bugA.md) (eklenecek).**
 
 ---
 
-## 6. Sprint 180 — Nervous System Production + Feature Backlog (post-beta)
+## 6. Sprint 180 — Hybrid Beta MUST + Nervous Faz 1 + Panic Guard UI (14 task)
 
-**Scope:** Items 8a-c (nervous defaults, dashboard panel, feature backlog).
+**Revised 2026-05-20 after Sprint 179 retro:** Originally planned as post-beta. Reframed as **last beta-blocker sprint** because Sprint 179 surfaced four open beta-MUST items (worker `.result` coverage zorunluluk → 9 TECH_DEBT root, self-audit gate vitest failure, npm publish readiness, OSS GA docs) **plus** NERVOUS-TODO.md analysis (2026-05-20) confirmed Nervous Half-Wired Dormant state — §11.4 timing window already on Sprint 180 (28+ sprint backlog).
 
-To be specced after Sprint 179 retro. Beta cut-off is June 1; Sprint 180 lands post-beta (June 2+).
+### 6a. Three-layer hybrid scope
+
+**Layer 1 — Beta MUST cleanup (4 task):** Sprint 179 verdict GO_WITH_TECH_DEBT (9 TECH_DEBT) root cause: worker `.result` coverage=0/null → Quality Scorer overall 100→75 → TECH_DEBT yargısı. Plus 1 vitest failing test (self-audit gate `GO_WITH_GATE_FAILURE`). Plus npm publish v1.0.0-beta.1 readiness gap (Sprint 165 prep). Plus OSS GA docs review (README, install, getting-started).
+
+**Layer 2 — Nervous Faz 1 Smoke (8 task):** NERVOUS-TODO §11.2 6-step activation + §11.3 Faz 1 (3 detector strict mode). Locked decisions:
+- IPC kanal MCP→Executor: **file-based queue** (`.deckent/nervous-ipc/`) — dispatcher zaten file channel yazıyor, singleton anti-pattern'den kaçınma
+- Faz 1 detector seçimi: **stale-worker + dead-event-stream + directives-protection** (Sprint 179 stale_heartbeat 5x pattern + Sprint 165 reserve_for clear + Sprint 177-005 baseline hook canlı)
+- Authority mode: **strict** (autonomous yok, hepsi approval)
+- Severity threshold: **critical+** (false-positive gürültü filtresi)
+
+**Layer 3 — Panic Guard UI synergy (2 task):** Sprint 179 dogfood'da keşfedilen UX bug ([[project-panic-guard-no-approval-ui]]): "kill blocked — user approval required" diyor ama hiçbir kanaldan onay yok. Layer 2 Step E (IPC queue) altyapısını kullanır. `directives_protection.auto_restore` → true geçişi (Bug A landed + Sprint 177-005 baseline hook canlı).
+
+### 6b. Wave breakdown
+
+| Wave | Layer | Task | Effort |
+|------|-------|------|--------|
+| W0 | L2 Step F | Config schema sync (6 detector default + dead_event_stream reserve clear) | low |
+| W1-1 | L2 Step B | sprint-state-tracker `getSprintStateSnapshot()` export | low |
+| W1-2 | L2 Step A | nervous bootstrap fabrika `createNervousSystemIfEnabled()` | normal |
+| W2-1 | L2 Step C | İlk 4 action handler (WORKER_RESPAWN, ORPHAN_TASK_ARCHIVE, STALE_LOCK_RELEASE, DEAD_EVENT_STREAM_CLEANUP) | high |
+| W2-2 | L2 Step E | IPC queue MCP→Executor + nervous-ipc.ts (NEW) | high |
+| W3-1 | L2 Step D | sprint-controller wire (bootstrap + dispose finally) | normal |
+| W3-2 | L2 Faz 1 smoke | 3 detector enable + strict mode + severity critical | low |
+| W3-3 | L2 integration | runtime nervous pipeline end-to-end test | normal |
+| W4-1 | L1 | Worker `.result` coverage zorunluluk + vitest --coverage parse | high |
+| W4-2 | L3 | Panic guard UI (Layer 2 IPC queue ile bağla) | normal |
+| W4-3 | L1 | Self-audit gate vitest failing test fix | normal |
+| W5-1 | L1 | npm publish v1.0.0-beta.1 readiness (validate:publish smoke) | high |
+| W5-2 | L1 | OSS GA docs review (README + install-matrix + getting-started) | normal |
+| W5-3 | L3 | `directives_protection.auto_restore` → true (Bug A + baseline hook canlı) + Sprint 149 doc borcu (nervous user guide kısa giriş) | normal |
+
+### 6c. Sprint 180 verdict
+
+- **GO** = 13/13 DONE (beta launch ready, nervous Faz 1 live, panic UI functional)
+- **GO_WITH_TECH_DEBT** = 11-12/13 DONE + ≤2 GWT; **şart:** L2 nervous activation (W1-W3 hepsi) DONE + L1 beta MUST (W4-1 coverage + W5-1 npm publish) DONE
+- **NO_GO** = nervous bootstrap fail veya integration test fail (rollback `enabled: false` ile config-driven, code rollback gerekmez) veya npm publish smoke fail
+
+### 6d. Beta launch readiness
+
+Sprint 180 GO sonrası June 1 beta launch için tek kalan:
+- npm publish v1.0.0-beta.1 (Alperen manuel komutu, build/publish gate [[feedback-build-requires-user-approval]])
+- Sprint 181 (post-beta) buffer: nervous Faz 2 pilot başlangıç + doc sprint borcu kapanış + Sub-project #3/#4 spec'i
+
+**Risk:** Sprint 180 NO_GO durumunda Faz 1 nervous rollback `.deckent/config.json` → `nervous_system.enabled: false`. Beta MUST (Layer 1) bağımsız land edebilir — nervous rollback Layer 1'i etkilemez. Beta launch Sprint 181 buffer ile hâlâ June 1 zamanlamasında.
 
 ---
 

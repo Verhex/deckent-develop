@@ -477,8 +477,27 @@ export function archiveResolvedDebt(projectRoot: string): number {
 /**
  * Files in .brain/ that are permanent and must never be decayed.
  * These are excluded from the "decayable" line count used for budget decisions.
+ *
+ * @deprecated since Sprint 179 (W3-6). Memory V2 enforces decay exemption at
+ * the entry level via `type='identity'` / `type='adr'` (see auditBrainBudget).
+ * The path-based set is retained for V1↔V2 hybrid installs but is no longer
+ * the canonical mechanism. New code should not consult this set; legacy
+ * tests still depend on its membership for backward compatibility.
+ *
+ * Legacy V1 paths: DECISIONS.md, PROJECT-IDENTITY.md
+ * Memory V2 export paths: exports/decisions.md, exports/summary.md,
+ * exports/memory.md, exports/debt.md
  */
-export const DECAY_EXEMPT = new Set(['DECISIONS.md', 'PROJECT-IDENTITY.md']);
+export const DECAY_EXEMPT = new Set([
+  // Legacy V1 (retained for backward compat — V1 projects without memory.db)
+  'DECISIONS.md',
+  'PROJECT-IDENTITY.md',
+  // Memory V2 auto-generated exports (read-only snapshots, regenerated from DB)
+  'exports/decisions.md',
+  'exports/summary.md',
+  'exports/memory.md',
+  'exports/debt.md',
+]);
 
 /**
  * Result of a brain budget audit — shows decayable vs permanent line accounting.

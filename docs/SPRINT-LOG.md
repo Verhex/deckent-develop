@@ -4859,3 +4859,72 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 178-007: 178-005 — TOPP B+C continuous-dispatch ★ MUST (DONE)
 
 ---
+## Sprint 179 — sprint-179
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-05-20
+**Duration:** 3260s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 17 |
+| Completed | 17 |
+| Tech Debt | 9 |
+| No-Go | 0 |
+| Coverage | 7.7% |
+| Duration | 3259623ms |
+
+### Tasks
+
+- 179-001: W0-1 — Dependency aggregate fix-aware (Bug A foundation) (GO_WITH_TECH_DEBT)
+- 179-002: W1-1 — Auto-debt empty-scope inheritance (GO_WITH_TECH_DEBT)
+- 179-003: W1-2 — Re-plan orphan task file cleanup (DONE)
+- 179-004: W2-3 — DEP0190 shell:true win32-only conditional (GO_WITH_TECH_DEBT)
+- 179-005: W2-4 — Coverage hard-floor / aspirational split (DONE)
+- 179-006: W2-7 — CI-only test flakes (PID portability + mock hygiene) (GO_WITH_TECH_DEBT)
+- 179-007: W3-5 — Dashboard TS errors + root lint wire (GO_WITH_TECH_DEBT)
+- 179-008: W3-6 — doctor DECISIONS.md obsolete + 5-file cascade (GO_WITH_TECH_DEBT)
+- 179-009: W4-8 — Prompt guard (I1 + I2 invariants) ★ BETA MUST (GO_WITH_TECH_DEBT)
+- 179-010: W4-9 — Command guard (I3 default-deny remote) ★ BETA MUST (GO_WITH_TECH_DEBT)
+- 179-011: W4-10 — Outbound rate-limit (I5 tenant isolation) ★ BETA MUST (DONE)
+- 179-012: W5-11 — mTLS hook (AuthProvider interface) ★ BETA MUST (GO_WITH_TECH_DEBT)
+- 179-013: W5-12 — Audit HMAC chain + verify CLI (I4 invariant) ★ BETA MUST (DONE)
+
+---
+## Sprint 180 — sprint-180
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-05-20
+**Duration:** 2936s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 20 |
+| Completed | 12 |
+| Tech Debt | 8 |
+| No-Go | 8 |
+| Coverage | 15.2% |
+| Duration | 2935858ms |
+
+### Tasks
+
+- 180-001: W0 — Nervous config schema sync (Step F) (DONE)
+- 180-002: W1-1 — sprint-state-tracker getSprintStateSnapshot (Step B) (NO_GO)
+- 180-003: W1-2 — Nervous bootstrap fabrika (Step A) (GO_WITH_TECH_DEBT)
+- 180-004: W2-1 — Nervous action handlers (Step C) (GO_WITH_TECH_DEBT)
+- 180-005: W2-2 — Nervous IPC queue MCP→Executor (Step E) (DONE)
+- 180-006: W3-1 — Sprint-controller nervous wire (Step D) (GO_WITH_TECH_DEBT)
+- 180-007: W3-2 — Faz 1 smoke config (NO_GO)
+- 180-008: W3-3 — Nervous integration runtime test (GO_WITH_TECH_DEBT)
+- 180-009: W4-1 — Worker .result coverage zorunluluk ★ BETA MUST (GO_WITH_TECH_DEBT)
+- 180-010: W4-2 — Panic guard onay UI (Layer 3 synergy) (GO_WITH_TECH_DEBT)
+- 180-011: W4-3 — Self-audit gate vitest fix ★ BETA MUST (NO_GO)
+- 180-012: W5-1 — npm publish v1.0.0-beta.1 readiness ★ BETA LAUNCH (NO_GO)
+- 180-013: W5-2 — OSS GA docs review ★ BETA LAUNCH (GO_WITH_TECH_DEBT)
+- 180-014: W5-3 — auto_restore=true + nervous user guide kısa giriş (GO_WITH_TECH_DEBT)
+
+---

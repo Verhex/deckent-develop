@@ -206,10 +206,23 @@ See the full [Config Reference](/reference/config) for all available parameters.
 
 ---
 
+## Web Dashboard
+
+Once the sprint starts, open the live dashboard in your browser:
+
+```bash
+deckent web   # http://localhost:3100
+```
+
+The dashboard shows live worker status, task results, memory, and sprint history. The **embedded terminal** lets you run `claude`, `gemini`, `deckent`, or a plain shell directly from the browser. Terminal security guards (prompt-guard, command-guard, audit HMAC chain) are active by default when using `deckent web`.
+
+---
+
 ## Next Steps
 
 - [Core Concepts](/guide/concepts) — Understand Sprint, Task, Agent, Brain, Auditor
 - [Your First Sprint](/guide/first-sprint) — Detailed walkthrough with examples
-- [CLI Reference](/reference/cli) — All 34+ commands documented
+- [Installation Guide](installation.md) — Platform-specific setup and Node 24+ requirements
+- [CLI Reference](/reference/cli) — All 46+ commands documented
 - [Config Reference](/reference/config) — Every configuration option explained
 - [API Reference](/reference/api) — Programmatic API and HTTP endpoints
