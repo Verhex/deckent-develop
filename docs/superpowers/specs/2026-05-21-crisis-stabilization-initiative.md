@@ -386,6 +386,118 @@ The original sub-project #2 design spec (2026-05-21-sub-project-2-design.md) rem
 
 ---
 
+## 8. Sprint 182 — Test Fix + Wave Pipeline + Worker Prompt Quality + Beta Launch (17 task)
+
+**Reason for existence:** Sprint 181 closure 2026-05-21 — CI typecheck root cause (dashboard deps install + lockfile sync + i18n/types recovery) çözüldü. Kalan CI failure'lar **pre-existing tech debt** (vitest mock hygiene + spawn-backend refactor regresyon). Sprint 181 sistem testinde **3 önemli mimari bulgu** ortaya çıktı:
+
+1. **CI Tests step 4 failure** (Sprint 178/179 retro'larda mevcut, mock hygiene + spawn-backend refactor regresyon)
+2. **Wave pipeline ihlal kanıtı** — `dependency_pipeline_enabled: false` + Dependencies field YOK kombinasyonu wave-order garanti vermiyor. 181-003 W2-1 verify task'ı W1-1 + W1-2 LAND etmeden spawn oldu, boş verify yaptı → GO_WITH_TECH_DEBT
+3. **Worker prompt kalite sorunları (8 fix)** — Sprint 181-001 + 181-002 prompt'larının canlı incelemesi `${IDEMPOTENCY_KEY}` literal bug + skill/ADR truncation + agent prompt dual-source + DIRECTIVES Files→filesWrite eksik + title/description duplicate + ADR relevance threshold yok + agent override semantic check yok → 8 sınıf problem
+
+Sprint 182 = son beta-blocker sprint **+ kalite sıçraması**. June 1 OSS beta launch ~10 gün; Sprint 182 GO sonrası `npm publish v1.0.0-beta.1` Alperen manuel.
+
+### 8a. Four-layer scope (17 task / 4 wave)
+
+**Layer 1 — CI Tests Mock Hygiene Fix (3 task):** Sprint 181 CI run #26212167619 forensik:
+- `tests/core/orphan-cleaner-ipc.test.ts` 2 fail (CI-only, lokal PASS) — `node:fs` mock factory'sinde `renameSync` export eksik
+- `tests/cli/archive-debt.test.ts` 1 fail (CI-only) — aynı root cause
+- `tests/cli/run.test.ts` 2 fail (lokal + CI) — Sprint 178 spawn-backend refactor regresyon, mock chain `SpawnBackendFactory`'ye güncellenmemiş
+
+**Layer 2 — Wave Pipeline Aktivasyonu (3 task):** Sprint 181 sistem bulgusu — `dependency_pipeline_enabled: false` deckent-dev policy ADR-047 ile aldatıcı: "Brain manuel wave gate" semantiği pratikte çalışmıyor (Brain wave-prefix parse etmiyor, sadece collision-aware dispatch).
+- W2-1: `dependency_pipeline_enabled: false → true` + ADR-045 wave-based execution wire verify
+- W2-2: Auto-debt prepend offset drift fix — `Dependencies: ["W1-1"]` title-prefix resolver veya plan-slot offset prediction
+- W2-3: Verify task pattern redesign — sprint dışına çıkar (post-sprint smoke script) veya wave-aware sıralama
+
+**Layer 3 — Worker Prompt Quality Fixes (7 task, F1-F8, sub-spec):**
+Detaylı sub-spec: `docs/superpowers/specs/2026-05-21-worker-prompt-quality-fixes.md` (314 satır).
+Felsefe anchor: [[feedback-prompt-completeness-over-brevity]] — token-tasarruf YASAK, tutarlılık + kalite öncelik.
+
+**Locked decisions (4 açık soru cevabı, 2026-05-21):**
+- **F1 IDEMPOTENCY_KEY scheme:** `${sprintId}-${taskId}-${retryCount}` (retry safety + deterministik + debug edilebilir)
+- **F4 PROMPT.md yoksa:** Degraded warning + `systemPrompt` fallback (hard fail YOK — sprint'i bloke etmez, worker bilgisiz kalmaktansa eski path)
+- **F7 ADR threshold default:** `0.3` (lenient kalibrasyon) + `.deckent/config.json::prompt.adr_min_relevance` configurable
+- **F8 override warning severity:** `warn` (PLAN devam, transparency için yeterli; error override semantiğini bozar)
+
+Tasks (sub-spec §4'ten):
+- 182-PQ-1: F1 `${IDEMPOTENCY_KEY}` injection bug fix (4 test)
+- 182-PQ-2: F2 + F3 skill + ADR truncation cap kaldır (7 test)
+- 182-PQ-3: F4 agent prompt single source (PROMPT.md kanonik, 4 test + 15 agent sweep)
+- 182-PQ-4: F5 + F6 DIRECTIVES parser (Files→filesWrite + title/description split, 6 test)
+- 182-PQ-5: F7 ADR relevance threshold + config (3 test)
+- 182-PQ-6: F8 agent override semantic warning + `routingMeta.overrideWarnings` (4 test)
+- 182-PQ-7: Integration smoke — Sprint 181-001/002 prompt regresyon snapshot (2 test)
+
+**Layer 4 — Beta Launch Ready (4 task):**
+- W4-1: `npm run validate:publish` 6 gate green smoke
+- W4-2: `package.json` version `1.0.0-beta.1` final + `npm run lint:adr` + `npm run lint:link` exit 0
+- W4-3: ADR-048 Prompt Lifecycle Contract **amendment** yaz (PQ fix'lerden sonra) + ADR registry update
+- W4-4: Sprint 182 retro + Sprint 183 post-beta stub (nervous Faz 2 + sub-project #3 + #4)
+
+### 8b. Wave breakdown (17 task)
+
+| Wave | Layer | Task | Effort | Test count |
+|------|-------|------|--------|-----------|
+| W1 | L1 | Mock hygiene orphan-cleaner-ipc + archive-debt (`renameSync` ekle) | normal | 3 |
+| W1 | L1 | cli/run.test.ts SpawnBackendFactory mock chain | normal | 2 |
+| W1 | L1 | Full vitest sweep CI=true parity verify | low | 0 (smoke) |
+| W2 | L2 | `dependency_pipeline_enabled: true` + ADR-045 wave-based execution wire | normal | 3 |
+| W2 | L2 | Auto-debt prepend offset drift fix (Dependencies title-prefix resolver) | high | 5 |
+| W2 | L2 | Verify task pattern redesign | normal | 2 |
+| W3 | L3 | PQ-1: F1 IDEMPOTENCY_KEY (`${sprintId}-${taskId}-${retryCount}`) | low | 4 |
+| W3 | L3 | PQ-2: F2 + F3 truncation kaldır (skill + ADR) | normal | 7 |
+| W3 | L3 | PQ-3: F4 agent prompt single source | high | 4 + 15 agent sweep |
+| W3 | L3 | PQ-4: F5 + F6 DIRECTIVES parser fix | normal | 6 |
+| W3 | L3 | PQ-5: F7 ADR relevance threshold (default 0.3) | normal | 3 |
+| W3 | L3 | PQ-6: F8 override semantic warning (severity=warn) | normal | 4 |
+| W3 | L3 | PQ-7: Integration smoke regression snapshot | low | 2 |
+| W4 | L4 | npm publish v1.0.0-beta.1 validate:publish 6 gate smoke | high | 0 (gate verify) |
+| W4 | L4 | package.json final + lint:adr + lint:link green | low | 0 |
+| W4 | L4 | ADR-048 amendment yaz (PQ fix'lerden sonra) | normal | 0 |
+| W4 | L4 | Sprint 182 retro + Sprint 183 post-beta stub | normal | 0 |
+
+**Dispatch:** W1 → W2 → W3 → W4 sequential wave gate. W3'te PQ task'ları birbirinden bağımsız, paralel (max_workers 2). W4 sequential (build/publish gates Alperen onayı).
+
+### 8c. Sprint 182 verdict
+
+- **GO** = 17/17 DONE — CI fully green + wave pipeline aktif + worker prompt quality fixes land + beta launch READY
+- **GO_WITH_TECH_DEBT** = 14-16/17 DONE + ≤3 GWT; **şart:** L1 (mock hygiene) DONE + L3 PQ-1..PQ-6 ≥5/6 DONE + L4 W4-1 (validate:publish) DONE
+- **NO_GO** = L1 ≥2 NO_GO (CI hala fail) **veya** L3 PQ truncation/agent-source fail (Worker davranışı bozulur) **veya** L4 W4-1 fail (beta launch kayar)
+
+### 8d. ADR İmplikasyonu
+
+Sprint 182 sonu ADR-048 amendment yazılır (PQ fix'lerden sonra W4-3 task):
+
+> **ADR-048 Amendment (Sprint 182):**
+> - Worker prompt: skill content + ADR content + agent prompt truncation YASAK (memory: [[feedback-prompt-completeness-over-brevity]])
+> - Agent prompt single source = `PROMPT.md`; `agent.json::systemPrompt` yalnızca routing + UI display
+> - DIRECTIVES `Files:` field birebir `task.scope.filesWrite`'a map; title (`## Task N:`) + description (`### Description`) parser ayırır
+> - ADR injection threshold-based: `prompt.adr_min_relevance` (default 0.3) altı atlanır; 0 ADR kalırsa blok render edilmez
+> - Agent override semantic check: activation rules ile score + warning, override honored
+
+Yeni memory:
+- `feedback_prompt_completeness_over_brevity.md` (Alperen 2026-05-21 anchor — zaten yazıldı)
+
+Yeni ADR (opsiyonel, Sprint 183'te):
+- ADR-065: Wave Pipeline Activation Contract (dependency_pipeline_enabled=true universal) — Sprint 182 W2-1 sonrası
+
+### 8e. Risk + Mitigation
+
+| Risk | Mitigation |
+|------|-----------|
+| W2-1 wave pipeline aktive edince Sprint 178 TOPP (ADR-064) ile çakışma | TOPP continuous-dispatch wave-barrier-free; wave pipeline ADR-045 wave-based gate. İkisi orthogonal: wave gate dependency edge'leri, TOPP slot fill. Test: 2 sprint paralel dogfood |
+| W2-2 drift fix auto-debt prepend hesabı kırılgan | Title-prefix resolver tercih edilir (memory.db debt count'tan offset hesaplamaktan daha sağlam) |
+| F2 + F3 truncation kaldırma → 20K+ prompt | Opus 1M / Sonnet 200K context window → 20K rahat sığar; felsefe anchor değişmez |
+| F4 agent prompt sweep 15 agent için PROMPT.md varlık denetimi | Pre-task audit script: eksikse "PROMPT.md missing" warning, sprint başında çözülür |
+| Beta launch June 1 kayma riski | Sprint 182 ≤ 5 gün hedef; W1+W4 küçük, W2+W3 ana iş. Buffer Sprint 183 post-beta |
+
+### 8f. Beta launch readiness post-Sprint 182
+
+Sprint 182 GO sonrası:
+- `npm publish v1.0.0-beta.1` (Alperen manuel, [[feedback-build-requires-user-approval]])
+- Sprint 183 post-beta scope: nervous Faz 2 pilot + sub-project #3 (multi-tenant + mTLS) + sub-project #4 (enterprise) + AEGIS realization (ADR-061)
+
+---
+
 ## 7. Sprint 181 — Recovery + Nervous Restart + Worker-Rollback Fix (16 task)
 
 **Reason for existence:** Sprint 180 (2026-05-20) closed GO_WITH_GATE_FAILURE — 8 NO_GO / 8 TECH_DEBT / 4 DONE. Root cause: Sprint 179'u commit etmeden Sprint 180'i başlattık. Sprint 180 worker-rollback (Sprint 177 deliverable, `src/agents/worker-rollback.ts`) `git stash --include-untracked` + `git stash drop` döngüsüyle Sprint 179'un commit edilmemiş 7 YENİ src/ dosyasını sildi:
