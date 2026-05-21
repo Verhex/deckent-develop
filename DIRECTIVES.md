@@ -1,52 +1,120 @@
-# DIRECTIVES — Sprint 182: Test Fix + Wave Pipeline + Worker Prompt Quality + Beta Launch (Crisis Stabilization §8)
+# DIRECTIVES — Sprint 183: P0 Bug Fixes + Sprint 182 NO_GO Recovery + Beta Launch (Crisis Stabilization §9)
 
 ## Spec + Plan Referansları
 
-- **Master spec:** `docs/superpowers/specs/2026-05-21-crisis-stabilization-initiative.md` §8 (Sprint 182: 17 task, son beta-blocker sprint)
-- **Worker Prompt Quality sub-spec:** `docs/superpowers/specs/2026-05-21-worker-prompt-quality-fixes.md` (8 fix F1-F8, 314 satır)
-- **Anchor memory (W3 felsefe):** `feedback_prompt_completeness_over_brevity.md` — token-tasarruf YASAK
-- **Predecessor:** Sprint 181 closure (CI typecheck root cause çözüldü, kalan tech debt'ler Sprint 182 kapsamında). Sprint 181 sistem testi 3 bulgu: (a) mock hygiene CI fail, (b) wave pipeline ihlal, (c) worker prompt quality 8 issue.
+- **Master spec:** `docs/superpowers/specs/2026-05-21-crisis-stabilization-initiative.md` §9 (Sprint 183: 10 task, son beta-blocker)
+- **Sprint 182 retro:** `.brain/exports/memory.md` Sprint 182 Learnings block (5 NO_GO + W4-1 gate) + commits `1273d628` feat + `084c607a` chore
+- **Sprint 182 sub-spec (F1-F8 LAND):** `docs/superpowers/specs/2026-05-21-worker-prompt-quality-fixes.md` — referans, Sprint 183'te dokunulmaz
+- **P0 Fix Listesi:** `~/.claude/projects/-home-alperen-deckent-dev/memory/project_sprint183_p0_fixes.md` — 3 P0 bug forensik + Sprint 138 implicit dep chain pozitif kanıt
+- **No retro/stub task kuralı:** [[feedback_no_retro_task_in_directives]] — DIRECTIVES'te retro/stub task YASAK
 
 ## Goal
 
-17 task ile **son beta-blocker sprint**: (W1) CI Tests pre-existing failure'ları kapat → CI 100% green; (W2) Wave pipeline aktivasyonu altyapısı → ADR-045 sprint runtime'ında çalışır hale getir; (W3) Worker Prompt Quality Fixes (8 fix sub-spec) → prompt kalitesi sıçraması; (W4) Beta launch ready v1.0.0-beta.1. June 1 OSS beta launch ~10 gün; Sprint 182 GO sonrası Alperen `npm publish` manuel.
+10 task ile **son beta-blocker sprint**: (L1) Sprint 182 dogfood'dan keşfedilen 3 sistemik P0 fix (nervous PLAN pasif + DEPENDENCY_BLOCKED debounce + worker timeout RC); (L2) Sprint 182 5 NO_GO recovery (W1-1 mock hygiene + W1-3 CI parity + W2-2 title-prefix + W3-PQ-7 integration smoke + W4-1 validate:publish recheck); (L3) Beta launch v1.0.0-beta.1 final smoke. Sprint 183 GO sonrası Alperen `npm publish` manuel, June 1 OSS launch yolu net.
 
 ## Brain Planning Instructions
 
-Mode: **structured**. Self-modifying: ZORUNLU sequential (src/orchestra + src/core + tests/ hepsi self-modifying). Wave: 4 (W1 → W2 → W3 → W4). Max workers: 2. `dependency_pipeline_enabled: false` (deckent-dev policy — Sprint 182'de değiştirmiyoruz, sadece Sprint 183 için altyapı hazırlıyoruz) → Brain manuel wave gates (ADR-047). Provider: claude.
+Mode: **structured**. Self-modifying: ZORUNLU sequential (src/orchestra + src/nervous + src/core + src/agents + tests/ hepsi self-modifying). Wave: 3 (W1 → W2 → W3). Max workers: 2. `dependency_pipeline_enabled: true` (Sprint 182 dogfood'da çalıştı; P0-2 event spam fix bu pipeline'a uygulanır). `nervous_system.enabled: false` (P0-1 fix LAND etmeden FSWatcher amplification riski). Provider: claude.
 
-### Wave dispatch strategy (Sprint 181 bulgusu)
+### Wave dispatch (drift-immune korunur)
 
-Sprint 181 W2-1 verify task'ı W1 LAND etmeden spawn olmuştu (`dependency_pipeline_enabled: false` + Dependencies field YOK → wave-order garanti yok). Sprint 182'de **bu yapıyı değiştirmiyoruz** (deliberate, Sprint 183'e ertelendi); ama:
-- W4-1 (verify task) Sprint 181 deneyimi sonrası **W3 sonu** sequential dispatch — Brain manuel gate (Alperen W3 hepsi DONE/GWT olunca W4 başlatır)
-- W3'teki PQ task'ları birbirinden bağımsız (sub-spec §5 risk analizi) → paralel max 2 worker
+Dependencies field DIRECTIVES'te YOK. Sprint 138 implicit collision-aware dependency chain otomatik türetir (Sprint 182'de runtime'da kanıtlandı). Brain manuel wave gate + max_workers 2.
 
 ## Worker Contract
 
-- **Kod YAZAR** (W1: test mock fix; W2: src/orchestra + src/core wave pipeline kod; W3: src/orchestra/prompt-god-template.ts + task-builder + agent loader + 15 PROMPT.md audit; W4: package.json + ADR docs).
-- Scope DIŞINA yazma YASAK (advisory + worker rollback scope-bounded Sprint 181 W0 fix canlı).
-- **TDD ZORUNLU:** RED → GREEN her task (sub-spec §4 task taslağı + W1/W2 tests breakdown).
-- **ESM:** `.js` uzantısı zorunlu (Node16 resolution).
+- **Kod YAZAR** (L1: src/nervous/observer.ts + src/orchestra/event-stream.ts + result-collector.ts; L2: tests/ + src/orchestra; L3: smoke + lint). Scope DIŞINA yazma YASAK (advisory + worker rollback scope-bounded Sprint 181 W0 canlı).
+- **TDD ZORUNLU:** RED → GREEN her task.
+- **ESM:** `.js` uzantısı zorunlu.
 - **memory.db:** schema değişikliği YOK.
-- **Felsefe anchor (W3 ZORUNLU):** `feedback_prompt_completeness_over_brevity.md` — skill/ADR/agent prompt **truncation YASAK**. Token cap kaldırılır, full content inject edilir. Worker prompt'larında "(content truncated)" gibi marker BULUNMAMALI.
-- **Post-sprint commit ZORUNLU:** Sprint 182 sonrası 2 commit + push ([[feedback-post-sprint-commit-mandatory]]).
-- `.tasks/task-<id>.result`: gerçek vitest + selfAssessment + filesChanged + coverage + notes.
+- **Post-sprint commit ZORUNLU:** [[feedback-post-sprint-commit-mandatory]]
+- **DIRECTIVES'te retro/stub task YOK:** Brain `sprint-reporter.ts` otomatik retro yazar; W3-3 sadece smoke verify, retro yazımı kapsamında DEĞİL ([[feedback_no_retro_task_in_directives]])
+- `.tasks/task-<id>.result`: gerçek vitest + selfAssessment + filesChanged + coverage + notes (honest-gate kalibrasyon).
+- **Truncation YASAK** (Sprint 182 F2+F3 felsefe canlı): skill/ADR/agent prompt full content
+- **PROMPT.md kanonik** (Sprint 182 F4): agent.json systemPrompt prompt injection'a girmez
 
 ## GO/NO_GO Criteria
 
-- **GATE-1 (W1) ★ CI GREEN:** orphan-cleaner-ipc + archive-debt + cli/run.test.ts mock hygiene fix → tüm vitest sweep CI'da 0 fail (pre-existing 4 fail kapanır)
-- **GATE-2 (W2):** Wave pipeline kod altyapısı + test'ler land — `dependency_pipeline_enabled: true` durumunda ADR-045 wave-based execution doğru çalışır (test seviyesinde doğrulanır, config flip Sprint 183)
-- **GATE-3 (W3) ★ PROMPT QUALITY:** 7 PQ task DONE — F1 IDEMPOTENCY_KEY render edilir, F2+F3 truncation kalkar, F4 agent single source PROMPT.md, F5+F6 DIRECTIVES parser doğru, F7 ADR threshold 0.3, F8 override warning
-- **GATE-4 (W4) ★ BETA LAUNCH:** validate:publish 6/6 gate green + v1.0.0-beta.1 + ADR-048 amendment + Sprint 183 stub
+- **GATE-1 (L1 P0):** 3 P0 fix LAND — nervous PLAN-phase pasif test PASS, DEPENDENCY_BLOCKED debounce test PASS (state-change emit), worker timeout RC tespit + fix applied
+- **GATE-2 (L2 Recovery):** 5 NO_GO recovery — mock hygiene + CI parity + title-prefix + integration smoke + validate:publish recheck hepsi DONE
+- **GATE-3 (L3 Beta Launch):** v1.0.0-beta.1 final smoke — `npm run build:all` + full vitest + lint:adr + lint:link + validate:publish 6/6 GREEN + `deckent serve` smoke
 
 **Sprint verdict:**
-- **GO** = 17/17 DONE (CI fully green + wave pipeline ready + prompt quality + beta launch ready)
-- **GO_WITH_TECH_DEBT** = 14-16/17 DONE + ≤3 GWT; **şart:** W1 mock hygiene DONE + W3 PQ-1..PQ-6 ≥5/6 DONE + W4-1 validate:publish DONE
-- **NO_GO** = W1 ≥2 NO_GO (CI hala fail) **veya** W3 PQ truncation/agent-source fail (worker davranışı bozulur) **veya** W4-1 fail
+- **GO** = 10/10 DONE → beta launch READY → Alperen `npm publish v1.0.0-beta.1` manuel
+- **GO_WITH_TECH_DEBT** = 8-9/10 + ≤2 GWT; **şart:** L1 ≥2/3 DONE (3 P0'dan en az 2 fix LAND) + W3-3 final smoke DONE + W3-1 validate:publish GREEN
+- **NO_GO** = L1 ≥2 NO_GO (P0 bug'lar çözülmedi, Sprint 184 zorlaşır) **veya** W3-3 final smoke fail (beta launch kayar)
 
 ---
 
-## Task 1: W1-1 — Mock hygiene: orphan-cleaner-ipc + archive-debt `renameSync` ekle
+## Task 1: W1-1 — P0-1 Nervous PLAN-phase pasif (FSWatcher debounce + phase guard)
+- Model: opus
+- Effort: high
+- Skills: typescript-expert, system-architect, testing-expert
+- Agent: architect
+- Files: src/nervous/observer.ts, src/nervous/detector-registry.ts, src/orchestra/sprint-state-tracker.ts, tests/nervous/observer-phase-guard.test.ts (NEW)
+- Scope: src/nervous/, src/orchestra/, tests/nervous/
+
+### Description
+Sprint 182 dogfood: `nervous_system.enabled: true` durumunda PLAN phase 14+dk donuyor (controller %85 CPU, 0 worker spawn). Kök neden: FSWatcher 17 task JSON yazıldıkça her FS event'inde detector cycle tetikliyor → kombinatorial overhead. **Fix iki katman:**
+
+1. **Phase guard:** `NervousObserver.emitObserve()` içinde `if (currentPhase !== 'EXECUTE') return;` — PLAN/SPAWN phase'de detector'lar pasif. `getSprintStateSnapshot().currentPhase` üzerinden check.
+2. **FSWatcher debounce:** raw event'leri 500ms debounce window'da topla, batched emit. Multiple file events tek detector cycle tetikler.
+
+**Kanıt:** vitest 4 test PASS (PLAN no-op + EXECUTE active + debounce batch + IDLE phase no-op); manuel test (nervous=true + 17 task JSON yazımı sırasında detector cycle 0 değil 1-2 olmalı, 17 değil).
+**Test:** TDD RED→GREEN — 4 case.
+
+---
+
+## Task 2: W1-2 — P0-2 DEPENDENCY_BLOCKED event spam debounce (state-change emit)
+- Model: opus
+- Effort: normal
+- Skills: typescript-expert, system-architect
+- Agent: refactorer
+- Files: src/orchestra/result-collector.ts, src/orchestra/event-stream.ts, tests/orchestra/dependency-blocked-debounce.test.ts (NEW)
+- Scope: src/orchestra/, tests/orchestra/
+
+### Description
+Sprint 182 event stream 550+ event, 95% spam (her 5sn'de aynı state DEPENDENCY_BLOCKED). Kök neden: `wave.respawn` tick'inde tüm blocked task'lar için tekrar emit. **Fix:** state-change-only emit:
+
+```typescript
+const previousBlockedState = new Map<string, string>(); // taskId → hash(deps)
+function emitBlockedIfChanged(taskId, unresolvedDeps) {
+  const hash = deps.sort().join(',');
+  if (previousBlockedState.get(taskId) === hash) return; // skip
+  previousBlockedState.set(taskId, hash);
+  emit(DEPENDENCY_BLOCKED, ...);
+}
+```
+
+Plus: dep resolve olduğunda (`unresolvedDeps.length === 0` → spawn ediliyor) Map'ten temizle.
+
+**Kanıt:** vitest 3 test PASS (initial emit + state-change emit + spam suppress). Manuel: Sprint 182 17 task dispatch boyunca DEPENDENCY_BLOCKED event count ≤30 (Sprint 182'de 500+'tı).
+**Test:** TDD — 3 case.
+
+---
+
+## Task 3: W1-3 — P0-3 Worker timeout root cause investigation + fix
+- Model: opus
+- Effort: high
+- Skills: typescript-expert, ci-testing, system-architect
+- Agent: bug-fixer
+- Files: src/orchestra/spawn-backend.ts (Docker container timeout), src/agents/worker.ts (heartbeat), src/orchestra/prompt-god-template.ts (prompt size limit?), tests/orchestra/worker-timeout-rc.test.ts (NEW)
+- Scope: src/orchestra/, src/agents/, tests/orchestra/
+
+### Description
+Sprint 182'de 5 task "Worker exited without writing result (exitCode=0)" — timeout pattern. Bu task'lar (W1-1, W1-3, W2-2, W3-PQ-7) **big task'lar** (mock surface büyük, vitest parity test, title-prefix resolver derin refactor, integration smoke). **Investigate:**
+
+1. **Prompt size hipotezi:** Sprint 182 dep chain uzun (`182-011 → 010 → 008 → 007 → 005`), her predecessor digest prompt'a ekleniyor → 50K+ char prompt → worker context window stress. Fix: predecessor digest size limit (örn. 2K char per dep, summary mode).
+2. **Docker container timeout hipotezi:** `docker_max_timeout: 14400` (4 saat) yeterli ama Worker Claude API rate-limit yiyebilir veya stdout buffer dolabilir. Fix: container stdout streaming + heartbeat extension.
+3. **Worker exitCode=0 ama .result eksik:** Worker bitirdi diyor ama dosya yazmamış. Fix: heartbeat-daemon `.result` yazımını force flush + atomic write doğrulama.
+
+W1-3 = investigation + fix. Worker tarafından "1 saat read-only forensik" + minimal fix sonra. Tam çözüm Sprint 184'e bile iter olabilir.
+
+**Kanıt:** vitest 3 test PASS (prompt size limit + heartbeat force flush + exitCode=0 detect). Manuel: Sprint 184 dogfood'da timeout pattern düşmeli.
+**Test:** TDD — 3 + audit report (`docs/audits/sprint-183/worker-timeout-rc.md`).
+
+---
+
+## Task 4: W2-1 — Sprint 182 W1-1 recovery: mock hygiene orphan-cleaner-ipc + archive-debt
 - Model: opus
 - Effort: normal
 - Skills: testing-expert, typescript-expert, ci-testing
@@ -55,229 +123,102 @@ Sprint 181 W2-1 verify task'ı W1 LAND etmeden spawn olmuştu (`dependency_pipel
 - Scope: tests/core/, tests/cli/
 
 ### Description
-Sprint 181 CI run 26212167619 forensik: `tests/core/orphan-cleaner-ipc.test.ts` 2 fail (line 181, 211) + `tests/cli/archive-debt.test.ts` 1 fail (line 113). Lokal'de PASS, CI'da FAIL → mock hygiene. Root cause: `[deckent] Config recovery failed: [vitest] No "renameSync" export is defined on the "node:fs" mock`. `vi.mock('node:fs', ...)` factory'sinde `renameSync` (ve olası diğer Sprint 178/179'da eklenmiş method'lar) eksik → CI'da Node 26 fs implementation farklı, exception swallow → cleanup atlanıyor. **Fix:** Mock factory'ye `renameSync` + sweep diğer eksikleri ekle (`writeSync`, `linkSync` vb. grep ile bul). **Kanıt:** lokal + `CI=true` env aynı 4 test PASS.
-**Test:** Mevcut testler yeşil — mock surface tam.
+Sprint 181/182'den beri pre-existing CI fail. Sprint 182 W1-1 timeout yedi (big task). Sprint 183 küçük scope ile retry: `vi.mock('node:fs', ...)` factory'sine `renameSync` + sweep diğer eksik methodlar (`writeSync`, `linkSync`, `unlinkSync` vb. grep ile bul). **Kanıt:** lokal + `CI=true` env aynı 4 test PASS (orphan-cleaner-ipc 3 + archive-debt 1).
+**Test:** Mock surface tam — CI parity verify.
 
 ---
 
-## Task 2: W1-2 — cli/run.test.ts SpawnBackendFactory mock chain
-- Model: opus
-- Effort: normal
-- Skills: typescript-expert, testing-expert
-- Agent: bug-fixer
-- Files: tests/cli/run.test.ts
-- Scope: tests/cli/
-
-### Description
-Sprint 181 lokal+CI 2 fail: `spawns worker and reports DONE result` (spy not called) + `sets exit code 1 for NO_GO result` (10s timeout). Root cause: Sprint 178 spawn-backend refactor — production kod artık `SpawnBackendFactory` üzerinden çağırıyor (Docker default), test direkt `spawnWorker` mock'luyor. **Fix:** Test mock chain `SpawnBackendFactory` route'una güncelle (örn. `vi.mock('../../src/orchestra/spawn-backend.js', ...)` factory ile `SpawnBackendFactory.create()` mock'la, döndürdüğü backend instance'ında `spawnWorker` spy). Veya `dist/` davranışını referans alıp test'leri buna göre uyarla. **Kanıt:** vitest 2 test PASS lokal + CI parity.
-**Test:** TDD — mock chain refactor.
-
----
-
-## Task 3: W1-3 — Full vitest sweep CI=true parity verify
+## Task 5: W2-2 — Sprint 182 W1-3 recovery: vitest CI=true parity smoke
 - Model: sonnet
 - Effort: low
 - Skills: ci-testing
 - Agent: ci-guardian
-- Files: (no source — verification only)
+- Files: (verification only)
 - Scope: (read-only)
 
 ### Description
-W1-1 + W1-2 LAND ettikten sonra: `CI=true npx vitest run` lokal'de çalıştır, **0 failure** olduğunu doğrula. Sprint 181 baseline 16785 PASS + 5 fail (pre-existing) → 16790 PASS hedef. Karşılaştırma: yerel `npx vitest run` ile `CI=true npx vitest run` aynı sonuç vermeli. **Kanıt:** vitest CI=true exit 0 + lokal exit 0; diff yok.
-**Test:** Smoke verification only.
+W2-1 (mock hygiene fix) LAND ettikten sonra: `CI=true npx vitest run` lokal'de çalıştır, **0 failure** doğrula. Karşılaştırma: yerel `npx vitest run` ile `CI=true` aynı sonuç vermeli. Sprint 183 baseline: 16785+ PASS hedef. **Kanıt:** vitest CI=true exit 0 + lokal exit 0; diff yok.
+**Test:** Smoke verification.
 
 ---
 
-## Task 4: W2-1 — `dependency_pipeline_enabled: true` ADR-045 wire verify
-- Model: opus
-- Effort: normal
-- Skills: typescript-expert, system-architect, testing-expert
-- Agent: architect
-- Files: src/orchestra/sprint-planner.ts (Kahn TopSort), src/orchestra/sprint-controller.ts (wave dispatch), tests/orchestra/wave-pipeline-activation.test.ts (NEW)
-- Scope: src/orchestra/, tests/orchestra/
-
-### Description
-Sprint 181 W3 verify (181-003 W2-1 ci-guardian) sistem bulgusu: "Wave gate manuel orchestration ŞÜPHELİ — W1 tamamlanmadan W2 spawn izlenimi". Root cause: `dependency_pipeline_enabled: false` + Dependencies field YOK → ADR-045 wave-based execution **inactive**. **Sprint 182'de config flip ETMİYORUZ** (deckent-dev policy ADR-047 + Sprint 183 hazırlık); ama altyapı çalışıyor mu test seviyesinde doğrula. Test: fake DIRECTIVES + Dependencies field + `dependency_pipeline_enabled: true` ile Brain Kahn TopSort wave inşa eder, W1 hepsi DONE olmadan W2 dispatch ETMEZ. **Kanıt:** vitest 3 test PASS (wave inşa + sequential dispatch + collision-aware wave merge).
-**Test:** TDD — 3 wave activation case.
-
----
-
-## Task 5: W2-2 — Auto-debt prepend offset drift fix (Dependencies title-prefix resolver)
+## Task 6: W2-3 — Sprint 182 W2-2 recovery: title-prefix Dependencies resolver tamamla
 - Model: opus
 - Effort: high
 - Skills: typescript-expert, testing-expert
 - Agent: architect
-- Files: src/orchestra/task-builder.ts (parseDependenciesDirective + resolveDependencyRef), tests/orchestra/dependencies-title-prefix-resolver.test.ts (NEW)
+- Files: src/orchestra/task-builder.ts (parseDependencies + resolveDependencyRef), tests/orchestra/dependencies-title-prefix-resolver.test.ts (mevcut, tamamla)
 - Scope: src/orchestra/, tests/orchestra/
 
 ### Description
-Sprint 176/178 drift bug: DIRECTIVES'te `Dependencies: ["178-002"]` plan-slot ID, Brain auto-debt prepend ettiğinde task ID'leri shift olur → yanlış disk task'a işaret. Sprint 179'da Dependencies field'ı KALDIRDIK ama bu wave-order garantisini bozdu. **Fix:** Dependencies field'ı geri getir + **title-prefix resolver** ekle. DIRECTIVES'te `Dependencies: ["W1-1"]` yazılırsa Brain title'da "W1-1" geçen task'a resolve eder. Plan-slot ID'leri ile geri uyumlu (eski format hala çalışır). **Kanıt:** vitest 5 test PASS (title-prefix + plan-slot + mixed + missing reference + auto-debt prepend scenario).
+Sprint 182'de dosya kısmen yazıldı (`tests/orchestra/dependencies-title-prefix-resolver.test.ts` mevcut, +24 LoC) ama implementation eksik. Sprint 183'te tamamla: DIRECTIVES'te `Dependencies: ["W1-1"]` yazılırsa Brain title'da "W1-1" geçen task'a resolve eder. Plan-slot ID'leri ile geri uyumlu (eski format hala çalışır). **Kanıt:** vitest 5 test PASS (title-prefix + plan-slot + mixed + missing reference + auto-debt prepend scenario).
 **Test:** TDD — 5 case.
 
 ---
 
-## Task 6: W2-3 — Verify task pattern redesign
+## Task 7: W2-4 — Sprint 182 W3-PQ-7 recovery: integration smoke regression tamamla
 - Model: opus
 - Effort: normal
-- Skills: typescript-expert, system-architect
-- Agent: architect
-- Files: src/orchestra/sprint-reporter.ts veya src/cli/commands/review.ts (post-sprint smoke runner), tests/orchestra/verify-task-pattern.test.ts (NEW)
-- Scope: src/orchestra/, src/cli/, tests/orchestra/
-
-### Description
-Sprint 181 181-003 W2-1 verify task spec'inde W1 LAND etmeden çalıştı (boş verify) → GO_WITH_TECH_DEBT. Pattern problemi: verify task'lar sprint içinde diğer task'lara bağımlı olduğunda race. **Çözüm:** Verify task'larını sprint dışına çıkar veya wave-aware sıralama. Önerim: `deckent_review` veya post-sprint smoke script'i — sprint COMPLETE phase'inde otomatik tetiklenir, tüm task'lar DONE/GWT olduktan sonra çalışır. **Kanıt:** vitest 2 test PASS (post-sprint smoke trigger + W1 deliverable görünür).
-**Test:** TDD — 2 case.
-
----
-
-## Task 7: W3-PQ-1 — F1 `${IDEMPOTENCY_KEY}` injection fix
-- Model: opus
-- Effort: low
-- Skills: typescript-expert, testing-expert
-- Agent: bug-fixer
-- Files: src/orchestra/prompt-god-template.ts (line 455, renderTemplate), tests/orchestra/prompt-god-template-idempotency.test.ts (NEW)
-- Scope: src/orchestra/, tests/orchestra/
-
-### Description
-Sub-spec F1 (`docs/superpowers/specs/2026-05-21-worker-prompt-quality-fixes.md#f1`). Mevcut: `\${IDEMPOTENCY_KEY}` template literal'de escape edilmiş → worker'a literal string gidiyor. **Fix:** `RenderInput`'a `idempotencyKey: string` field ekle, `buildTaskPrompt` `${task.sprintId}-${task.id}-${task.retryCount ?? 0}` compute eder (**locked decision: `${sprintId}-${taskId}-${retryCount}`** — retry safety). `renderTemplate` line 455'i `${input.idempotencyKey}` interpolasyonuna çevir. **Kanıt:** vitest 4 test PASS — literal placeholder yok, deterministic key, farklı taskId → farklı key.
-**Test:** TDD — 4 case (literal yok + key formatı + determinism + collision yok).
-
----
-
-## Task 8: W3-PQ-2 — F2 + F3 truncation kaldır (skill + ADR full content)
-- Model: opus
-- Effort: normal
-- Skills: typescript-expert, testing-expert
-- Agent: refactorer
-- Files: src/orchestra/prompt-god-template.ts (skill section + ADR section), tests/orchestra/prompt-god-template-skill-completeness.test.ts (NEW), tests/orchestra/prompt-god-template-adr-completeness.test.ts (NEW)
-- Scope: src/orchestra/, tests/orchestra/
-
-### Description
-Sub-spec F2 + F3. Felsefe anchor [[feedback-prompt-completeness-over-brevity]] — token-tasarruf YASAK. **F2:** `EFFORT_TOKEN_MAP`, `perItemMax`, `sectionMax`, `truncateAtParagraph`, `if (... > sectionMax) break` — hepsi SİL (line 131-157). Her atanmış skill full SKILL.md inject. **F3:** `ADR_SECTION_MAX = 6000` cap SİL (line 184-187). `"(ADR content truncated for prompt size)"` marker'ı çıkar. Full ADR content. **Kanıt:** vitest 4 skill + 3 ADR test PASS — full content, truncation marker yok, skip yok.
-**Test:** TDD — 7 test.
-
----
-
-## Task 9: W3-PQ-3 — F4 Agent prompt single source (PROMPT.md kanonik)
-- Model: opus
-- Effort: high
-- Skills: typescript-expert, system-architect
-- Agent: refactorer
-- Files: src/core/agent-pool.ts (getAgentPrompt), src/orchestra/task-router.ts veya agent loader, tests/orchestra/agent-prompt-single-source.test.ts (NEW), .deckent/agents/*/PROMPT.md audit
-- Scope: src/core/, src/orchestra/, tests/orchestra/, .deckent/agents/
-
-### Description
-Sub-spec F4. **Fix:** `getAgentPrompt(id)` → öncelik `PROMPT.md`, fallback `systemPrompt` (**locked: degraded warning + systemPrompt fallback**, hard fail YOK). Concatenation kalkar (systemPrompt + PROMPT.md birleştirilmez). `agent.json::systemPrompt` schema korunur (routing scoring + UI display) ama prompt injection'a girmez. **Pre-task audit:** 15 built-in agent için `PROMPT.md` varlığını sweep et (eksik varsa task scope'a ekle). **Kanıt:** vitest 4 test PASS + 15 agent sweep.
-**Test:** TDD — 4 test (PROMPT.md kanonik + systemPrompt yok + fallback + 15 agent loop).
-
----
-
-## Task 10: W3-PQ-4 — F5 + F6 DIRECTIVES parser fix (Files + title/desc)
-- Model: opus
-- Effort: normal
-- Skills: typescript-expert, testing-expert
-- Agent: bug-fixer
-- Files: src/orchestra/task-builder.ts (parseDirectives), src/orchestra/prompt-god-template.ts (line 450 render), tests/orchestra/directives-files-to-scope.test.ts (NEW), tests/orchestra/directives-title-description-split.test.ts (NEW)
-- Scope: src/orchestra/, tests/orchestra/
-
-### Description
-Sub-spec F5 + F6. **F5:** DIRECTIVES `Files: a.ts, b.ts` → `task.scope.filesWrite = ['a.ts', 'b.ts']` parse. Boş kalırsa Scope dizinlerinden inferred listing. Fallback string'i (`"(determined by your task scope)"`) açık formulation. **F6:** `## Task N: <title>` parse'tan title; `### Description` heading'den sonrası description. Render template'te title kendi satırında, description ayrı paragrafta — markdown korunur. Duplicate `title — description` kalkar. **Kanıt:** vitest 3 Files + 3 title test PASS.
-**Test:** TDD — 6 test.
-
----
-
-## Task 11: W3-PQ-5 — F7 ADR relevance threshold (default 0.3)
-- Model: opus
-- Effort: normal
-- Skills: typescript-expert, testing-expert
-- Agent: refactorer
-- Files: src/orchestra/prompt-god-template.ts (selectRelevantAdrs + buildAdrBlock), src/core/config-types.ts, src/core/config.ts, tests/orchestra/prompt-god-template-adr-relevance.test.ts (NEW)
-- Scope: src/orchestra/, src/core/, tests/orchestra/
-
-### Description
-Sub-spec F7. **Fix:** `selectRelevantAdrs(task, allAdrs, maxCount, minScore)` signature genişlet. Threshold altı ADR atlanır. 0 ADR kalırsa blok render edilmez (boş `=== Mandatory Architecture Rules (ADR) ===` header da basılmaz). **Locked decision: default 0.3** lenient, configurable `.deckent/config.json::prompt.adr_min_relevance`. `core/config-types.ts`'e field ekle, `core/config.ts` default 0.3. **Kanıt:** vitest 3 test PASS (threshold filter + 0 ADR blok kaldır + config override).
-**Test:** TDD — 3 test.
-
----
-
-## Task 12: W3-PQ-6 — F8 Agent override semantic warning
-- Model: opus
-- Effort: normal
-- Skills: typescript-expert, testing-expert
-- Agent: architect
-- Files: src/orchestra/task-router.ts veya planner.ts (forceAgent path), src/core/types.ts (routingMeta.overrideWarnings), tests/orchestra/agent-override-semantic-check.test.ts (NEW)
-- Scope: src/orchestra/, src/core/, tests/orchestra/
-
-### Description
-Sub-spec F8. **Fix:** forceAgent atandığında: (1) activation rules taskDNA üzerinde çalıştır, (2) min score (örn. 0.3) altıysa **warning emit** (**locked: severity=warn**, PLAN devam eder, override honored), (3) `Task.routingMeta.overrideWarnings: string[]` field. **Kanıt:** vitest 4 test PASS (low score warning + high score no warning + override honored + routingMeta field).
-**Test:** TDD — 4 test.
-
----
-
-## Task 13: W3-PQ-7 — Integration smoke: Sprint 181-001/002 prompt regression
-- Model: sonnet
-- Effort: low
 - Skills: testing-expert
 - Agent: ci-guardian
-- Files: tests/integration/prompt-quality-regression.test.ts (NEW), snapshot fixture
+- Files: tests/integration/prompt-quality-regression.test.ts (mevcut Sprint 182 worker yazdı, tamamla)
 - Scope: tests/integration/
 
 ### Description
-Sub-spec PQ-7. Sprint 181-001 (devops-engineer CI workflow) + 181-002 (refactorer package.json) prompt'larını snapshot al, PQ-1..PQ-6 fix sonrası yeniden render et, diff'i assert. **Kanıt:** Snapshot diff'te: (a) `${IDEMPOTENCY_KEY}` literal YOK + deterministik key VAR, (b) `(content truncated)` marker YOK, (c) PROMPT.md var, systemPrompt yok, (d) title kendi satırında description ayrı, (e) ADR threshold uygulandı (eski 3 yerine 0-2 ADR), (f) filesWrite listesi explicit. **2 test:** before/after diff.
-**Test:** Integration snapshot regression.
+Sprint 182 PQ-7 worker dosyayı yazdı ama timeout yedi. Sprint 183'te `tests/integration/prompt-quality-regression.test.ts` review + Sprint 181-001/002 prompt snapshot regression test pass. PQ-1..PQ-6 fix sonrası diff'i assert: (a) `${IDEMPOTENCY_KEY}` literal YOK + deterministik key VAR, (b) `(content truncated)` marker YOK, (c) PROMPT.md var systemPrompt yok, (d) title kendi satırında description ayrı, (e) ADR threshold uygulandı, (f) filesWrite listesi explicit. **Kanıt:** 2 test PASS (before/after snapshot diff).
+**Test:** Integration regression smoke.
 
 ---
 
-## Task 14: W4-1 — Beta launch smoke: validate:publish 6/6 gate green
+## Task 8: W3-1 — Sprint 182 W4-1 recovery: validate:publish 6/6 GREEN recheck + Brain re-eval RC
+- Model: opus
+- Effort: normal
+- Skills: devops-engineer, ci-testing
+- Agent: devops-engineer
+- Files: scripts/validate-publish.mjs (gözden geçir, hata varsa fix), audit raporu
+- Scope: ./, scripts/
+
+### Description
+Sprint 182 W4-1 worker raporu "validate:publish 6/6 GREEN, exit 0" + 2.7 MB tarball + 923 files + tüm gate'ler PASS dedi. **AMA Brain NO_GO işaretledi** (re-eval). Sprint 183'te:
+1. `npm run validate:publish` bağımsız çalıştır — 6 gate GREEN doğrula
+2. Brain re-eval logs incele — neden NO_GO verdi? (worker output kontradiksiyon, gate threshold uyumsuzluğu, content scoring rubric yanıltıcı?)
+3. Sebep tespit edilirse fix; tespit edilmezse audit raporu (`docs/audits/sprint-183/w41-brain-reeval-rc.md`)
+
+**Kanıt:** validate:publish exit 0 + 6/6 GREEN + audit raporu OR re-eval RC fix.
+**Test:** Gate verification + audit.
+
+---
+
+## Task 9: W3-2 — Beta launch hijyen: npm pack + lint:adr + lint:link final
+- Model: sonnet
+- Effort: low
+- Skills: documentation-writer, devops-engineer
+- Agent: doc-writer
+- Files: (verification + minor fix if needed)
+- Scope: ./, docs/
+
+### Description
+`npm pack --dry-run` 923 files / 2.7 MB target verify (Sprint 182 W4-1 reportlu). `npm run lint:adr` 54+ ADR validation clean. `npm run lint:link` 197 files no broken link. Eğer Sprint 182 sonrası yeni broken link veya ADR ihlal varsa fix. **Kanıt:** 3 komut exit 0.
+**Test:** Lint smoke + tarball stats verify.
+
+---
+
+## Task 10: W3-3 — v1.0.0-beta.1 final smoke (build:all + vitest + dashboard + serve)
 - Model: opus
 - Effort: high
 - Skills: devops-engineer, ci-testing
 - Agent: devops-engineer
-- Files: package.json (version), scripts/validate-publish.mjs verify
-- Scope: ./, scripts/
+- Files: (verification only)
+- Scope: (read-only)
 
 ### Description
-`npm run validate:publish` 6/6 gate green: (1) `npm pack --dry-run` ≤2MB + 899 files target, (2) engines.node>=24, (3) main/types entry points, (4) no internal state leak, (5) ADR validation clean, (6) lint:link clean. Version `1.0.0-beta.1` (Sprint 178'de set edildi, intact verify). **Publish KOŞMAZ** — Alperen manuel ([[feedback-build-requires-user-approval]]). **Kanıt:** validate:publish exit 0 + 6/6 gate PASS.
-**Test:** Gate verification.
+**Beta launch ready gate.** Sırayla:
+1. `npm run build:all` (tsc + copy-assets + dashboard vite build) exit 0
+2. `npx tsc --noEmit` + `npx tsc --noEmit -p src/dashboard` exit 0
+3. `npx vitest run` full sweep — fail count = Sprint 182 baseline (CI parity)
+4. `npm run test:dashboard` 23+ tests PASS
+5. `deckent serve` smoke — Sprint 175 embedded terminal feature canlı (browser açma manuel, Alperen doğrular)
+6. Package.json version `1.0.0-beta.1` final intact
 
----
-
-## Task 15: W4-2 — package.json final + lint:adr + lint:link
-- Model: sonnet
-- Effort: low
-- Skills: documentation-writer
-- Agent: doc-writer
-- Files: package.json verify, lint check
-- Scope: ./
-
-### Description
-`package.json` version `1.0.0-beta.1` final + dependency list audit (Sprint 178 better-sqlite3 12.10 intact) + `npm run lint:adr` exit 0 + `npm run lint:link` exit 0. **Kanıt:** 3 komut exit 0.
-**Test:** Lint smoke.
-
----
-
-## Task 16: W4-3 — ADR-048 Prompt Lifecycle Contract amendment
-- Model: opus
-- Effort: normal
-- Skills: documentation-writer, system-architect
-- Agent: architecture-planner
-- Files: docs/adr/048-prompt-lifecycle-contract.md (modify) veya memory.db ADR-048 entry update + .brain/exports/decisions.md regen
-- Scope: docs/adr/, .brain/
-
-### Description
-W3 PQ fix'leri ADR-048'i somut hâle getirir. Amendment text (Crisis Stab §8d): "Worker prompt truncation YASAK; agent prompt single source = PROMPT.md; DIRECTIVES Files→filesWrite; title/description ayrı; ADR threshold-based (default 0.3); agent override semantic warning". memory.db update (additive, no DROP) + `.brain/exports/decisions.md` regen. **Kanıt:** ADR-048 amendment text dahil + lint:adr exit 0 + memory.db query'de ADR-048 status='accepted' + amendment_history field güncel.
-**Test:** Doc + ADR validation.
-
----
-
-## Task 17: W4-4 — Sprint 182 retro + Sprint 183 post-beta stub
-- Model: sonnet
-- Effort: normal
-- Skills: documentation-writer
-- Agent: doc-writer
-- Files: .brain/exports/memory.md (Sprint 182 retro entries), docs/superpowers/specs/2026-05-27-sprint-183-post-beta-stub.md (NEW)
-- Scope: .brain/, docs/superpowers/specs/
-
-### Description
-Sprint 182 retro: 17 task verdict + W1 CI green + W2 wave pipeline test ready + W3 PQ fixes + W4 beta launch. Sprint 183 post-beta stub: nervous Faz 2 pilot + sub-project #3 (multi-tenant + mTLS) + sub-project #4 (enterprise SSO/SIEM) + AEGIS realization (ADR-061) + `dependency_pipeline_enabled: true` config flip + post-beta feature backlog. **Kanıt:** memory.md updated + Sprint 183 stub ≥150 satır.
-**Test:** Doc smoke.
+**Publish KOŞMAZ** — Alperen manuel ([[feedback-build-requires-user-approval]]). **Kanıt:** 6 gate green.
+**Test:** Final smoke gate.

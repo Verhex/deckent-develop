@@ -498,6 +498,83 @@ Sprint 182 GO sonrası:
 
 ---
 
+## 9. Sprint 183 — P0 Bug Fixes + Sprint 182 NO_GO Recovery + Beta Launch (10 task)
+
+**Status:** Spec 2026-05-21 — son beta-blocker sprint, sub-project #3 + #4 Sprint 184+'a iter.
+
+**Reason for existence:** Sprint 182 dogfood (12/17 aggregate DONE) 3 sistemik P0 bug ortaya çıkardı + 5 NO_GO task recovery gerekli + beta launch v1.0.0-beta.1 ready. Sprint 183 GO sonrası `npm publish` Alperen manuel, June 1 OSS launch yolu net.
+
+### 9a. Three-layer scope (10 task)
+
+**Layer 1 — P0 Bug Fixes (3 task):** Sprint 182 dogfood'dan keşfedilen 3 kritik P0 ([[project_sprint183_p0_fixes]] memory):
+
+- **P0-1 Nervous PLAN-phase pasif:** `nervous_system.enabled: true` durumunda PLAN phase 14+dk donuyor. FSWatcher 17 task JSON yazılırken her FS event'inde detector cycle → kombinatorial overhead. Fix: phase guard (`currentPhase !== 'EXECUTE'` → detector no-op) + FSWatcher debounce
+- **P0-2 DEPENDENCY_BLOCKED event spam:** Sprint 182'de 550+ event, 95% spam (her 5sn'de aynı state tekrar emit). Fix: state-change-only emit (previousBlockedState Map + hash compare)
+- **P0-3 Worker timeout RC investigation + fix:** Sprint 182'de 5 task "Worker exited without writing result (exitCode=0)" timeout pattern. Root cause investigate + fix (prompt size? scope mismatch? Docker overhead?)
+
+**Layer 2 — Sprint 182 NO_GO Recovery (4 task):**
+
+- **W2-1 — W1-1 mock hygiene** (orphan-cleaner-ipc + archive-debt `renameSync`): Sprint 181'den beri pre-existing, Sprint 182 timeout'a uğradı. Sprint 183 küçük scope ile retry
+- **W2-2 — W1-3 vitest CI parity verify**: W2-1 land sonrası `CI=true npx vitest run` 0 fail doğrulama
+- **W2-3 — W2-2 title-prefix resolver**: Sprint 182'de dosya kısmen yazıldı (`tests/orchestra/dependencies-title-prefix-resolver.test.ts` mevcut) ama implementation eksik — Sprint 183'te tamamla
+- **W2-4 — W3-PQ-7 integration smoke regression**: `tests/integration/prompt-quality-regression.test.ts` Sprint 182'de yazıldı, sonra timeout. Sprint 183'te tests pass + Sprint 181/182 prompt snapshot regression
+
+**Layer 3 — Beta Launch v1.0.0-beta.1 (3 task):**
+
+- **W3-1 — validate:publish 6/6 GREEN recheck**: Sprint 182 W4-1 worker raporladı "6/6 GREEN exit 0" ama Brain re-eval NO_GO işaretledi. Sprint 183'te aynı gate'ler **bağımsız** çalıştırılır + Brain re-eval sebebi incele
+- **W3-2 — npm pack + lint:adr + lint:link final**: 923 files / 2.7 MB tarball verified (Sprint 182 reportlu) + 54+ ADR + 0 broken link
+- **W3-3 — v1.0.0-beta.1 final smoke**: `npm run build:all` (tsc + copy-assets + dashboard vite) + `npx vitest run` (full sweep) + dashboard tsc check + `deckent serve` smoke (terminal feature canlı kanıt)
+
+### 9b. Wave breakdown (10 task)
+
+| Wave | Layer | Task | Effort | Test count |
+|------|-------|------|--------|-----------|
+| W1 | L1 P0 | W1-1 Nervous PLAN/SPAWN phase pasif (FSWatcher debounce + phase guard) | high | 4 |
+| W1 | L1 P0 | W1-2 DEPENDENCY_BLOCKED event debounce (state-change only) | normal | 3 |
+| W1 | L1 P0 | W1-3 Worker timeout RC investigation + fix | high | 3 + audit |
+| W2 | L2 Recovery | W2-1 Mock hygiene orphan-cleaner-ipc + archive-debt | normal | 3 |
+| W2 | L2 Recovery | W2-2 vitest CI parity verify (W2-1 sonrası) | low | 0 (smoke) |
+| W2 | L2 Recovery | W2-3 title-prefix resolver tamamla | high | 5 |
+| W2 | L2 Recovery | W2-4 integration smoke regression tamamla | normal | 2 |
+| W3 | L3 Beta | W3-1 validate:publish 6/6 GREEN recheck + Brain re-eval RC | normal | 0 (gate) |
+| W3 | L3 Beta | W3-2 npm pack + lint:adr + lint:link final | low | 0 |
+| W3 | L3 Beta | W3-3 v1.0.0-beta.1 final smoke (build:all + vitest + dashboard + serve) | high | 0 (smoke) |
+
+**No retro/stub task** — Sprint 182'deki W4-4 hatası tekrarlanmaz ([[feedback_no_retro_task_in_directives]]). Brain `sprint-reporter.ts` otomatik retro yazar.
+
+### 9c. Sprint 183 verdict
+
+- **GO** = 10/10 DONE — Beta launch ready, 3 P0 fix LAND, 5 NO_GO closed
+- **GO_WITH_TECH_DEBT** = 8-9/10 + ≤2 GWT; **şart:** L1 ≥2/3 DONE (3 P0'ın en az 2'si fix), W3-3 final smoke DONE, W3-1 validate:publish GREEN
+- **NO_GO** = L1 ≥2 NO_GO (P0 bug'ları çözülmedi) **veya** W3-3 final smoke fail (beta launch kayar)
+
+### 9d. Sprint 184+ Sub-project Roadmap (post-beta)
+
+Sprint 183 GO + npm publish v1.0.0-beta.1 sonrası:
+
+- **Sprint 184:** Repo housekeeping + dokümantasyon temizliği (Alperen analiz zamanı bittikten sonra). Hedef: deckent-develop → deckent OSS clean split veya in-place cleanup
+- **Sprint 185:** Sub-project #3 başlangıç (Multi-tenant audit shard + mTLS impl scaffold)
+- **Sprint 186-188:** Sub-project #3 tamamlama (k8s SessionBackend + cross-tenant guards + hardware-attested key path)
+- **Sprint 189-192:** Sub-project #4 (Enterprise SSO/OIDC + SIEM forwarder + compliance reports)
+- **Sprint 193+:** Nervous Faz 2/3 + AEGIS realization (ADR-061) + daily-assistant persona + local LLM provider (CUDA)
+
+Sub-project #3 + #4 detaylı spec'leri Sprint 184 sonu / Sprint 185 başında yazılır (memory `project_embedded_web_terminal` + sub-project-2-design'da temel referanslar mevcut).
+
+### 9e. Process Invariants (Sprint 183 specific)
+
+- **No retro/stub task in DIRECTIVES** — [[feedback_no_retro_task_in_directives]]
+- **nervous_system.enabled: false** during Sprint 183 (P0-1 fix LAND etmeden risk var, fix sonu testlerinde tekrar denenir)
+- **dependency_pipeline_enabled: true** korunur — Sprint 182 dogfood'da çalıştı, P0-2 event spam fix'i bu pipeline'a uygulanır
+- **directives_protection.auto_restore: true** korunur (Sprint 177-005 hook canlı)
+- **Worker rollback scope-bounded** canlı (Sprint 181 W0 fix)
+- **Bug A aggregate verdict** canlı (Sprint 179)
+- **Worker prompt quality F1-F8** canlı (Sprint 182)
+- **Post-sprint commit ZORUNLU** ([[feedback-post-sprint-commit-mandatory]])
+- **Brain mode `structured`** + max_workers 2 + Brain manuel wave gate (ADR-047)
+- **build/publish gates Alperen** — `npm publish` manuel ([[feedback-build-requires-user-approval]])
+
+---
+
 ## 7. Sprint 181 — Recovery + Nervous Restart + Worker-Rollback Fix (16 task)
 
 **Reason for existence:** Sprint 180 (2026-05-20) closed GO_WITH_GATE_FAILURE — 8 NO_GO / 8 TECH_DEBT / 4 DONE. Root cause: Sprint 179'u commit etmeden Sprint 180'i başlattık. Sprint 180 worker-rollback (Sprint 177 deliverable, `src/agents/worker-rollback.ts`) `git stash --include-untracked` + `git stash drop` döngüsüyle Sprint 179'un commit edilmemiş 7 YENİ src/ dosyasını sildi:
