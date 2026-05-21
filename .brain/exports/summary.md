@@ -58,8 +58,13 @@
 | adr-061 | AEGIS — Agentic Effect-Governed Iterative Stewardship Methodology | proposed |
 | adr-062 | Embedded Web Terminal — PTY Sessions, WS Gateway, Auth & Audit | accepted |
 | adr-063 | Consent-Based Prerequisite Provisioning | accepted |
+| adr-064 | TOPP — Continuous Dispatch (Wave-Barrier Removal) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-180 Learnings** (sprint-180): ## Sprint sprint-180 Learnings
+- W1-1 — sprint-state-tracker getSprintStateSnapshot (Step B): NO_GO — W1-1 sprint-sta...
+- **Sprint sprint-179 Learnings** (sprint-179): ## Sprint sprint-179 Learnings
+- W0-1 — Dependency aggregate fix-aware (Bug A foundation): GO_WITH_TECH_DEBT — W0-1 (...
 - **Sprint sprint-178 Learnings** (sprint-178): ## Sprint sprint-178 Learnings
 - Fix debt: Tech debt from 175-020-fix: All 5 automatic verification gates executed:
 
@@ -77,16 +82,9 @@
 - C1 — update-readme-stats.mjs auto-gen + CI gate: NO_GO — TDD discipline: önce tests/...
 - **Sprint sprint-171 Learnings** (sprint-171): ## Sprint sprint-171 Learnings
 - Doc Audit Root: NO_GO — Sprint 171 Task 23 — Doc Audit Root tamamlandı. Repo kökünde...
-- **Sprint sprint-170 Learnings** (sprint-170): ## Sprint sprint-170 Learnings
-- P0-3 Tmux Prompt Filename TaskId-Aware: GO_WITH_TECH_DEBT — Sprint 170 P0-3 (Bug 2B ...
-- **Sprint sprint-169 Learnings** (sprint-169): ## Sprint sprint-169 Learnings
-- W3.1 C0c Collision Detection Live Trigger Investigation + Fix: NO_GO — W3.1 RC ident...
 
 ## Active Technical Debt
-- [CRITICAL] Tech debt from 175-020-fix: All 5 automatic verification gates executed:
-
-1. npm
-- [CRITICAL] ADR-019 reconciliation: language-agnostic verify not implemented
+_No active technical debt._
 
 ## Active Patterns
 - Violation pattern: stale_heartbeat
@@ -101,5 +99,7 @@
 - Violation pattern: stale_heartbeat
 - Violation pattern: stale_heartbeat
 - Violation pattern: stale_heartbeat
+- Violation pattern: stale_heartbeat
+- Violation pattern: stale_heartbeat
 
-_Total entries: 273 | Generated: 2026-05-20_
+_Total entries: 299 | Generated: 2026-05-20_

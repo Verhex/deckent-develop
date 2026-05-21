@@ -4,10 +4,6 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
-| debt-175-020-fix | Tech debt from 175-020-fix: All 5 automatic verification gates executed:
-
-1. npm | critical | sprint-175 | active |
-| debt-adr-019-reconciliation | ADR-019 reconciliation: language-agnostic verify not implemented | critical | sprint-172 | active |
 
 ## Resolved Technical Debt
 
@@ -124,5 +120,26 @@ M | normal | - | resolved |
 | debt-156-011-fix | Tech debt from 156-011-fix: Code physically verified despite missing .result (Sp | normal | - | resolved |
 | debt-162-001 | Tech debt from 162-001: T-003 composite (phase observability + EvaluationAuditTr | normal | - | resolved |
 | debt-170-001-fix | Tech debt from 170-001-fix: Code physically verified despite missing .result (Sp | normal | - | resolved |
+| debt-adr-019-reconciliation | ADR-019 reconciliation: language-agnostic verify not implemented | normal | - | resolved |
+| debt-175-020-fix | Tech debt from 175-020-fix: All 5 automatic verification gates executed:
+
+1. npm | normal | - | resolved |
 | debt-176-004 | Tech debt from 176-004: Fixed DEP0190 deprecation: 3 call-sites changed from she | normal | - | resolved |
 | debt-177-004 | Tech debt from 177-004: 3 required TDD tests PASS (default→docker + explicit-war | normal | - | resolved |
+| debt-179-001 | Tech debt from 179-001: W0-1 (Bug A foundation) tamamlandı. TDD akışı RED→GREEN. | normal | - | resolved |
+| debt-179-002 | Tech debt from 179-002: W1-1 Auto-debt empty-scope inheritance implemented. (1)  | normal | - | resolved |
+| debt-179-004 | Tech debt from 179-004: DEP0190 fix: 3 call-sites changed from shell:true to she | normal | - | resolved |
+| debt-179-006 | Tech debt from 179-006: W2-7 CI-only test flakes — final hygiene. Pre-work audit | normal | - | resolved |
+| debt-179-007 | Tech debt from 179-007: W3-5 implementation per sub-project #2 plan Task 5. (1)  | normal | - | resolved |
+| debt-179-008 | Tech debt from 179-008: W3-6 doctor DECISIONS.md obsolete + 5-file cascade COMPL | normal | - | resolved |
+| debt-179-009 | Tech debt from 179-009: W4-8 Prompt Guard (I1 + I2) tamamlandı. matchPromptPatte | normal | - | resolved |
+| debt-179-010 | Tech debt from 179-010: W4-9 Command Guard (I3 default-deny remote) — TDD comple | normal | - | resolved |
+| debt-179-012 | Tech debt from 179-012: W5-11 mTLS hook (AuthProvider interface) tam implement e | normal | - | resolved |
+| debt-180-003 | Tech debt from 180-003: W1-2 — Nervous bootstrap fabrika tamamlandı. `createNerv | normal | - | resolved |
+| debt-180-004 | Tech debt from 180-004: W2-1 — Nervous action handlers (Step C) implemented per  | normal | - | resolved |
+| debt-180-006 | Tech debt from 180-006: Sprint 180 W3-1 — Sprint-controller nervous wire (Step D | normal | - | resolved |
+| debt-180-008 | Tech debt from 180-008: W3-3 — Nervous integration runtime test landed: tests/ne | normal | - | resolved |
+| debt-180-009 | Tech debt from 180-009: Sprint 180 W4-1 — Worker .result coverage zorunluluk imp | normal | - | resolved |
+| debt-180-010 | Tech debt from 180-010: W4-2 — Panic guard onay UI Sprint 179 dogfood keşfi ([[p | normal | - | resolved |
+| debt-180-013 | Tech debt from 180-013: OSS GA docs review tamamlandı. (1) docs/guide/installati | normal | - | resolved |
+| debt-180-014 | Tech debt from 180-014: Sprint 180 W5-3 tamamlandi. (1) .deckent/config.json: di | normal | - | resolved |

@@ -1,5 +1,36 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-180 Learnings
+- Sprint sprint-180 Learnings: ## Sprint sprint-180 Learnings
+- W1-1 — sprint-state-tracker getSprintStateSnapshot (Step B): NO_GO — W1-1 sprint-state-tracker — getSprintStateSnapshot(projectRoot) exports a fresh SprintStateSnapshot built from .deckent/
+- W1-2 — Nervous bootstrap fabrika (Step A): GO_WITH_TECH_DEBT — W1-2 — Nervous bootstrap fabrika tamamlandı. `createNervousSystemIfEnabled(config, projectRoot, sprintStateProvider, act
+- W2-1 — Nervous action handlers (Step C): GO_WITH_TECH_DEBT — W2-1 — Nervous action handlers (Step C) implemented per NERVOUS-TODO §11.2 Step C. Module exports: ActionHandlerResult (
+- W3-1 — Sprint-controller nervous wire (Step D): GO_WITH_TECH_DEBT — Sprint 180 W3-1 — Sprint-controller nervous wire (Step D) tamamlandı. NERVOUS-TODO §11.2 Step D wire eklendi: runSprint(
+- W3-2 — Faz 1 smoke config: NO_GO — W3-2 Faz 1 smoke config tamamlandı. nervous_system.mode: balanced→strict, notifications.severity_min: info→critical. 3 d
+- W3-3 — Nervous integration runtime test: GO_WITH_TECH_DEBT — W3-3 — Nervous integration runtime test landed: tests/nervous/integration-runtime.test.ts (257 LoC). Drives the full ner
+- W4-1 — Worker .result coverage zorunluluk ★ BETA MUST: GO_WITH_TECH_DEBT — Sprint 180 W4-1 — Worker .result coverage zorunluluk implemented across 2 source files + 1 new test file.
+
+## Bug Fix Re
+- W4-2 — Panic guard onay UI (Layer 3 synergy): GO_WITH_TECH_DEBT — W4-2 — Panic guard onay UI Sprint 179 dogfood keşfi ([[project-panic-guard-no-approval-ui]]) çözümlendi. 3 path land ett
+- W4-3 — Self-audit gate vitest fix ★ BETA MUST: NO_GO — Worker exited without writing result (exitCode=0)
+- W5-1 — npm publish v1.0.0-beta.1 readiness ★ BETA LAUNCH: NO_GO — W5-1 npm publish readiness — 6 gate validator + 20 unit tests + package.json wiring. DELIVERABLES: (1) scripts/validate-
+
+## Sprint sprint-179 Learnings
+- Sprint sprint-179 Learnings: ## Sprint sprint-179 Learnings
+- W0-1 — Dependency aggregate fix-aware (Bug A foundation): GO_WITH_TECH_DEBT — W0-1 (Bug A foundation) tamamlandı. TDD akışı RED→GREEN. 5/5 case PASS: (a) getAggregateVerdict ana NO_GO + fix DONE → D
+- W1-1 — Auto-debt empty-scope inheritance: GO_WITH_TECH_DEBT — W1-1 Auto-debt empty-scope inheritance implemented. (1) DebtItem extended with optional class ('verified-no-result' | 's
+- W2-3 — DEP0190 shell:true win32-only conditional: GO_WITH_TECH_DEBT — DEP0190 fix: 3 call-sites changed from shell:true to shell:process.platform==='win32'.
+- src/core/plugin-hooks.ts:399 (r
+- W2-7 — CI-only test flakes (PID portability + mock hygiene): GO_WITH_TECH_DEBT — W2-7 CI-only test flakes — final hygiene. Pre-work audit: src/core/pid-liveness.ts already shipped (Sprint 178 Task 4 fo
+- W3-5 — Dashboard TS errors + root lint wire: GO_WITH_TECH_DEBT — W3-5 implementation per sub-project #2 plan Task 5. (1) NEW src/dashboard/src/i18n/types.ts: Translator (strict, key: Tr
+- W3-6 — doctor DECISIONS.md obsolete + 5-file cascade: GO_WITH_TECH_DEBT — W3-6 doctor DECISIONS.md obsolete + 5-file cascade COMPLETE. TDD RED→GREEN: 2 tests in tests/cli/doctor-memory-v2.test.t
+- W4-8 — Prompt guard (I1 + I2 invariants) ★ BETA MUST: GO_WITH_TECH_DEBT — W4-8 Prompt Guard (I1 + I2) tamamlandı. matchPromptPatterns() 3 pattern (base_blob ≥256, osc_escape, curl_pipe_shell) + 
+- W4-9 — Command guard (I3 default-deny remote) ★ BETA MUST: GO_WITH_TECH_DEBT — W4-9 Command Guard (I3 default-deny remote) — TDD complete.
+
+IMPLEMENTATION (src/api/terminal/command-guard.ts, NEW):
+- 
+- W5-11 — mTLS hook (AuthProvider interface) ★ BETA MUST: GO_WITH_TECH_DEBT — W5-11 mTLS hook (AuthProvider interface) tam implement edildi. AuthProvider interface'e optional `verifyClientCert?(cert
+
 ## Sprint sprint-178 Learnings
 - Sprint sprint-178 Learnings: ## Sprint sprint-178 Learnings
 - Fix debt: Tech debt from 175-020-fix: All 5 automatic verification gates executed:
