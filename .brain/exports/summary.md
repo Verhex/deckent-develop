@@ -61,6 +61,8 @@
 | adr-064 | TOPP — Continuous Dispatch (Wave-Barrier Removal) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-182 Learnings** (sprint-182): ## Sprint sprint-182 Learnings
+- W1-1 — Mock hygiene: orphan-cleaner-ipc + archive-debt `renameSync` ekle: NO_GO — Wo...
 - **Sprint sprint-181 Learnings** (sprint-181): ## Sprint sprint-181 Learnings
 - W1-1 — CI workflow'una dashboard deps install adımı ekle: NO_GO — W1-1 primary fix t...
 - **Sprint sprint-180 Learnings** (sprint-180): ## Sprint sprint-180 Learnings
@@ -80,8 +82,6 @@
 - **Sprint sprint-174 Learnings** (sprint-174): ## Sprint sprint-174 Learnings
 - Fix debt: Tech debt from 170-001-fix: Code physically verified despite missing .resu...
 - **Sprint sprint-173 Learnings** (sprint-173): ## Sprint sprint-173 Learnings
-- **Sprint sprint-172 Learnings** (sprint-172): ## Sprint sprint-172 Learnings
-- C1 — update-readme-stats.mjs auto-gen + CI gate: NO_GO — TDD discipline: önce tests/...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -102,5 +102,6 @@ _No active technical debt._
 - Violation pattern: stale_heartbeat
 - Violation pattern: stale_heartbeat
 - Violation pattern: stale_heartbeat
+- Violation pattern: stale_heartbeat
 
-_Total entries: 303 | Generated: 2026-05-21_
+_Total entries: 307 | Generated: 2026-05-21_

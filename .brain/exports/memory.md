@@ -1,5 +1,16 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-182 Learnings
+- Sprint sprint-182 Learnings: ## Sprint sprint-182 Learnings
+- W1-1 — Mock hygiene: orphan-cleaner-ipc + archive-debt `renameSync` ekle: NO_GO — Worker exited without writing result (exitCode=0)
+- W1-3 — Full vitest sweep CI=true parity verify: NO_GO — Worker exited without writing result (exitCode=0)
+- W2-2 — Auto-debt prepend offset drift fix (Dependencies title-prefix resolver): NO_GO — Worker exited without writing result (exitCode=0)
+- W3-PQ-7 — Integration smoke: Sprint 181-001/002 prompt regression: NO_GO — Worker exited without writing result (exitCode=0)
+- W4-1 — Beta launch smoke: validate:publish 6/6 gate green: NO_GO — W4-1 Beta launch smoke — validate:publish 6/6 GREEN, exit 0.
+
+Gate verdicts:
+  [PASS] pack_size_and_count — 2.7 MB (2,83
+
 ## Sprint sprint-181 Learnings
 - Sprint sprint-181 Learnings: ## Sprint sprint-181 Learnings
 - W1-1 — CI workflow'una dashboard deps install adımı ekle: NO_GO — W1-1 primary fix tamamlandı: (1) .github/workflows/ci.yml typecheck job'una `npm ci --prefix src/dashboard --ignore-scri
