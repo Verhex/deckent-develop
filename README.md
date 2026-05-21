@@ -47,7 +47,8 @@ deckent run "Remind me to review the PR before end of day"
 
 ## Highlights
 
-- **Embedded Web Terminal (Sprint 175, ADR-062)** — VSCode-like dockable terminal panel inside the dashboard. Multi-tab interactive `claude` / `gemini` / `codex` / `deckent` / shell sessions over WebSocket, tmux-style reattach across browser refreshes, localhost-default with auth that is independent of and stricter than the global API bypass, transparent tenant-scoped audit (raw PTY output never persisted). See [`docs/guide/terminal.md`](docs/guide/terminal.md). Sub-project #1/4 — self-security, multi-tenant/k8s, and enterprise integrations follow in dedicated sprints.
+- **Embedded Web Terminal (Sprint 175, ADR-062)** — VSCode-like dockable terminal panel inside the dashboard. Multi-tab interactive `claude` / `gemini` / `codex` / `deckent` / shell sessions over WebSocket, tmux-style reattach across browser refreshes, localhost-default with auth that is independent of and stricter than the global API bypass, transparent tenant-scoped audit (raw PTY output never persisted). See [`docs/guide/terminal.md`](docs/guide/terminal.md).
+- **Terminal Security Guards (Sub-project #2)** — Three security layers ship with the terminal: **prompt-guard** (input pattern matching blocks injection attempts before PTY write), **command-guard** (shell-kind deny-list + default-deny on non-localhost), and **outbound-limiter** (per-tenant daily byte quota with warn/kill thresholds). Audit integrity uses an HMAC-SHA256 append-only chain — tamper detection via `deckent audit verify`.
 - **Brain Self-Update Hook Architecture (ADR-046)** — post-finalize hook chain (memoryExport → adrInsert → ruleRegen → updateProjectDocs) is formally specified and enforced.
 - **Data integrity** — debt rows carry `sprint_id`, sprint memory entries are restored, and a 3-layer doc-sync ground-truth check blocks agent-count drift.
 
@@ -356,6 +357,7 @@ deckent doctor
 | `deckent cleanup` | Archive sprint files and kill workers |
 | `deckent doctor` | Check system health |
 | `deckent audit <sprint-id>` | Run Brain Self-Audit Gate for a sprint |
+| `deckent audit verify` | Verify terminal audit log HMAC-SHA256 integrity chain |
 | `deckent recover <sprint-id>` | Recover a crashed or incomplete sprint |
 | `deckent config` | Show/edit configuration |
 | `deckent config set <key> <value>` | Set a config value |
@@ -636,6 +638,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, testing guide, cod
 
 ## Documentation
 
+- [Installation Guide](docs/guide/installation.md)
 - [Quickstart Tutorial](docs/guide/quickstart.md)
 - [API Reference](docs/reference/api.md)
 - [Configuration Reference](docs/reference/config-reference.md)
