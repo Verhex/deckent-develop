@@ -542,6 +542,18 @@ export class GeminiAdapter implements ProviderAdapter {
   getProjectDir(): string {
     return this.projectDir;
   }
+
+  /**
+   * Unwrap Gemini CLI `--output-format json` envelope (and NDJSON stream-json).
+   * Shapes:
+   *   - JSON: `{response:"<text>", candidates:[{content:{parts:[{text:"..."}]}}], usageMetadata:{...}}`
+   *   - NDJSON: newline-delimited, final line typically `{response:"..."}` or final candidate chunk
+   * Falls back to existing parseGeminiOutput helper, returning the `.response` field.
+   */
+  parseAgentResponse(raw: string): string {
+    const parsed = parseGeminiOutput(raw);
+    return parsed.response || raw;
+  }
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────

@@ -79,6 +79,21 @@ export interface ProviderAdapter {
    * @returns command (CLI binary) and args array
    */
   buildPlannerCommand?(prompt: string, model: ModelType): { command: string; args: string[] };
+
+  /**
+   * Optional: extract the agent's actual response from the CLI's stdout envelope.
+   * Provider CLIs wrap responses in different shapes:
+   *   - Claude  `--output-format json`: `{type:"result", result:"<inner-json-string>", usage:{...}}`
+   *   - Gemini  `--output-format json`: `{response:"<text>", candidates:[...], usageMetadata:{...}}`
+   *   - Gemini  `--output-format stream-json`: NDJSON (newline-delimited JSON, last line carries final response)
+   *   - Codex   raw stdout (no envelope)
+   *
+   * Returns the inner agent response as a plain string (JSON parser handles further structure).
+   * If the input isn't a recognised envelope for this provider, returns `raw` unchanged.
+   * @param raw  Full stdout captured from spawnSync
+   * @returns Unwrapped response string (still text — caller decides whether to JSON.parse)
+   */
+  parseAgentResponse?(raw: string): string;
 }
 
 // ─── ProviderError ───────────────────────────────────────────────────

@@ -101,7 +101,10 @@ export const DECKENT_VERSION: string = (() => {
 export const SUPPORTED_LANGUAGES = ['en', 'tr'] as const;
 
 // ─── Brain AI Planner ───────────────────────────────────────────────
-export const BRAIN_PLAN_TIMEOUT_MS = 60_000 as const;
+// Sprint 184: bumped from 60s → 900s. Empirically Claude opus on 16K-char zero-config
+// prompt took 434s; 60s caused SIGTERM and silent failure ("AI planner failed"). 900s
+// gives 2x headroom for larger DIRECTIVES (manifest-driven 90+ task generation).
+export const BRAIN_PLAN_TIMEOUT_MS = 900_000 as const;
 export const BRAIN_PLAN_MAX_CONTEXT_LINES = 200 as const;
 
 // ─── Timing (deprecated — prefer config: scan_interval, heartbeat_timeout) ──

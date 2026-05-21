@@ -254,16 +254,58 @@ ${contextBlock}${worstCombinationsSection}
  * @internal Used only within orchestra/ — parses the AI planner response JSON.
  * Not part of the public API surface.
  */
-export function parsePlannerResponse(raw: string): PlannerResult | null {
+/**
+ * Strip markdown code fences from a text block and return the inner content.
+ * Handles ` ```json ... ``` ` and plain ` ``` ... ``` ` wrappers.
+ */
+function stripCodeFences(text: string): string {
+  const trimmed = text.trim();
+  const fence = trimmed.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?```$/);
+  return fence?.[1] ? fence[1].trim() : trimmed;
+}
+
+/**
+ * Parse the planner CLI stdout into a PlannerResult.
+ *
+ * Provider-agnostic: when `adapter` is supplied and implements `parseAgentResponse`,
+ * the adapter unwraps its provider-specific envelope first (Claude/Gemini/Codex differ).
+ * If no adapter is given, treats stdout as raw text and code-fence-strips it.
+ *
+ * Returns null when stdout is empty, not valid JSON, or fails schema validation.
+ *
+ * @param raw      Full stdout captured from spawnSync
+ * @param adapter  Provider adapter — when present, used to unwrap CLI envelopes
+ */
+export function parsePlannerResponse(raw: string, adapter?: ProviderAdapter): PlannerResult | null {
   try {
-    // Strip code fences if present
-    let cleaned = raw.trim();
-    const fenceMatch = cleaned.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?```$/);
-    if (fenceMatch?.[1]) {
-      cleaned = fenceMatch[1].trim();
+    // Step 1: provider-specific envelope unwrap (Claude/Gemini/Codex)
+    const unwrapped = adapter?.parseAgentResponse ? adapter.parseAgentResponse(raw) : raw;
+
+    // Step 2: strip outer code fences
+    let cleaned = stripCodeFences(unwrapped);
+
+    // Step 3: first JSON.parse — may yield wrapped envelope if adapter didn't unwrap
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(cleaned);
+    } catch {
+      // Some adapter unwraps leave a string that's still wrapped in fences/quotes — retry once
+      cleaned = stripCodeFences(cleaned.replace(/^"|"$/g, ''));
+      parsed = JSON.parse(cleaned);
     }
 
-    const parsed = JSON.parse(cleaned) as unknown;
+    // Step 4: defensive fallback unwrap for callers that pass raw without an adapter
+    // Mirrors ClaudeAdapter.parseAgentResponse so direct CLI-format stdout still parses.
+    if (
+      parsed !== null
+      && typeof parsed === 'object'
+      && (parsed as { type?: unknown }).type === 'result'
+      && typeof (parsed as { result?: unknown }).result === 'string'
+    ) {
+      const inner = stripCodeFences((parsed as { result: string }).result);
+      parsed = JSON.parse(inner);
+    }
+
     const result = PlannerResultSchema.safeParse(parsed);
     if (!result.success) {
       debugLog('parsePlannerResponse:validation', result.error);
@@ -349,7 +391,7 @@ export function callBrainPlanner(
   });
 
   if (result.status !== 0 || !result.stdout) return null;
-  return parsePlannerResponse(result.stdout);
+  return parsePlannerResponse(result.stdout, resolved);
 }
 
 // ─── Zero-Config AI Planner ───────────────────────────────────────
@@ -492,7 +534,7 @@ export function callZeroConfigPlanner(
   });
 
   if (result.status !== 0 || !result.stdout) return null;
-  return parsePlannerResponse(result.stdout);
+  return parsePlannerResponse(result.stdout, resolved);
 }
 
 // ─── Bug Y2: Plan-time Ground-Truth Audit (Sprint 166) ───────────────

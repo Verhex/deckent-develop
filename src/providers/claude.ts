@@ -236,6 +236,30 @@ export class ClaudeAdapter implements ProviderAdapter {
     }
     return isSessionActive();
   }
+
+  /**
+   * Unwrap Claude CLI `--output-format json` envelope.
+   * Shape: `{type:"result", subtype:"success", result:"<inner-json-string>", usage:{...}}`
+   * Returns inner string if recognised; otherwise raw unchanged.
+   */
+  parseAgentResponse(raw: string): string {
+    const trimmed = raw.trim();
+    if (!trimmed.startsWith('{')) return raw;
+    try {
+      const parsed = JSON.parse(trimmed) as unknown;
+      if (
+        parsed !== null
+        && typeof parsed === 'object'
+        && (parsed as { type?: unknown }).type === 'result'
+        && typeof (parsed as { result?: unknown }).result === 'string'
+      ) {
+        return (parsed as { result: string }).result;
+      }
+    } catch {
+      // Not JSON envelope — fall through to raw
+    }
+    return raw;
+  }
 }
 
 // ─── Factory ─────────────────────────────────────────────────────────

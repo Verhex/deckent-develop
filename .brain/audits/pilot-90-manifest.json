@@ -1,0 +1,640 @@
+{
+  "audit_id": "full-codebase-2026-05-21",
+  "phase": "pilot",
+  "sprint_id": "sprint-184",
+  "total_files": 90,
+  "created_at": "2026-05-21T13:31:54.469Z",
+  "description": "OSS Launch Initiative Phase 2 pilot — line-by-line context audit of 90 critical src/ files. Doc-only, source writes forbidden.",
+  "files": [
+    {
+      "task_id": "184-001",
+      "path": "src/agents/adaptive-agent.ts",
+      "loc": 214,
+      "subdir": "src/agents",
+      "output": "docs/audits/full-codebase-2026-05-21/src__agents__adaptive-agent.md"
+    },
+    {
+      "task_id": "184-002",
+      "path": "src/agents/worker-lifecycle.ts",
+      "loc": 579,
+      "subdir": "src/agents",
+      "output": "docs/audits/full-codebase-2026-05-21/src__agents__worker-lifecycle.md"
+    },
+    {
+      "task_id": "184-003",
+      "path": "src/agents/worker-rollback.ts",
+      "loc": 330,
+      "subdir": "src/agents",
+      "output": "docs/audits/full-codebase-2026-05-21/src__agents__worker-rollback.md"
+    },
+    {
+      "task_id": "184-004",
+      "path": "src/agents/worker-verify.ts",
+      "loc": 515,
+      "subdir": "src/agents",
+      "output": "docs/audits/full-codebase-2026-05-21/src__agents__worker-verify.md"
+    },
+    {
+      "task_id": "184-005",
+      "path": "src/agents/worker.ts",
+      "loc": 593,
+      "subdir": "src/agents",
+      "output": "docs/audits/full-codebase-2026-05-21/src__agents__worker.md"
+    },
+    {
+      "task_id": "184-006",
+      "path": "src/api/server.ts",
+      "loc": 1053,
+      "subdir": "src/api",
+      "output": "docs/audits/full-codebase-2026-05-21/src__api__server.md"
+    },
+    {
+      "task_id": "184-007",
+      "path": "src/api/terminal/audit-integrity.ts",
+      "loc": 153,
+      "subdir": "src/api",
+      "output": "docs/audits/full-codebase-2026-05-21/src__api__terminal__audit-integrity.md"
+    },
+    {
+      "task_id": "184-008",
+      "path": "src/api/terminal/command-guard.ts",
+      "loc": 65,
+      "subdir": "src/api",
+      "output": "docs/audits/full-codebase-2026-05-21/src__api__terminal__command-guard.md"
+    },
+    {
+      "task_id": "184-009",
+      "path": "src/api/terminal/outbound-limiter.ts",
+      "loc": 92,
+      "subdir": "src/api",
+      "output": "docs/audits/full-codebase-2026-05-21/src__api__terminal__outbound-limiter.md"
+    },
+    {
+      "task_id": "184-010",
+      "path": "src/api/terminal/prompt-guard.ts",
+      "loc": 48,
+      "subdir": "src/api",
+      "output": "docs/audits/full-codebase-2026-05-21/src__api__terminal__prompt-guard.md"
+    },
+    {
+      "task_id": "184-011",
+      "path": "src/api/terminal/session-backend.ts",
+      "loc": 55,
+      "subdir": "src/api",
+      "output": "docs/audits/full-codebase-2026-05-21/src__api__terminal__session-backend.md"
+    },
+    {
+      "task_id": "184-012",
+      "path": "src/api/terminal/ws-gateway.ts",
+      "loc": 233,
+      "subdir": "src/api",
+      "output": "docs/audits/full-codebase-2026-05-21/src__api__terminal__ws-gateway.md"
+    },
+    {
+      "task_id": "184-013",
+      "path": "src/cli/commands/agent.ts",
+      "loc": 535,
+      "subdir": "src/cli",
+      "output": "docs/audits/full-codebase-2026-05-21/src__cli__commands__agent.md"
+    },
+    {
+      "task_id": "184-014",
+      "path": "src/cli/commands/checkpoint.ts",
+      "loc": 154,
+      "subdir": "src/cli",
+      "output": "docs/audits/full-codebase-2026-05-21/src__cli__commands__checkpoint.md"
+    },
+    {
+      "task_id": "184-015",
+      "path": "src/cli/commands/doctor.ts",
+      "loc": 1081,
+      "subdir": "src/cli",
+      "output": "docs/audits/full-codebase-2026-05-21/src__cli__commands__doctor.md"
+    },
+    {
+      "task_id": "184-016",
+      "path": "src/cli/commands/init-steps.ts",
+      "loc": 703,
+      "subdir": "src/cli",
+      "output": "docs/audits/full-codebase-2026-05-21/src__cli__commands__init-steps.md"
+    },
+    {
+      "task_id": "184-017",
+      "path": "src/cli/commands/init-templates.ts",
+      "loc": 635,
+      "subdir": "src/cli",
+      "output": "docs/audits/full-codebase-2026-05-21/src__cli__commands__init-templates.md"
+    },
+    {
+      "task_id": "184-018",
+      "path": "src/cli/commands/nervous.ts",
+      "loc": 669,
+      "subdir": "src/cli",
+      "output": "docs/audits/full-codebase-2026-05-21/src__cli__commands__nervous.md"
+    },
+    {
+      "task_id": "184-019",
+      "path": "src/cli/commands/serve.ts",
+      "loc": 141,
+      "subdir": "src/cli",
+      "output": "docs/audits/full-codebase-2026-05-21/src__cli__commands__serve.md"
+    },
+    {
+      "task_id": "184-020",
+      "path": "src/cli/commands/skill.ts",
+      "loc": 657,
+      "subdir": "src/cli",
+      "output": "docs/audits/full-codebase-2026-05-21/src__cli__commands__skill.md"
+    },
+    {
+      "task_id": "184-021",
+      "path": "src/cli/commands/sync.ts",
+      "loc": 535,
+      "subdir": "src/cli",
+      "output": "docs/audits/full-codebase-2026-05-21/src__cli__commands__sync.md"
+    },
+    {
+      "task_id": "184-022",
+      "path": "src/cli/helpers/output.ts",
+      "loc": 648,
+      "subdir": "src/cli",
+      "output": "docs/audits/full-codebase-2026-05-21/src__cli__helpers__output.md"
+    },
+    {
+      "task_id": "184-023",
+      "path": "src/core/activation-engine.ts",
+      "loc": 321,
+      "subdir": "src/core",
+      "output": "docs/audits/full-codebase-2026-05-21/src__core__activation-engine.md"
+    },
+    {
+      "task_id": "184-024",
+      "path": "src/core/agent-pool.ts",
+      "loc": 589,
+      "subdir": "src/core",
+      "output": "docs/audits/full-codebase-2026-05-21/src__core__agent-pool.md"
+    },
+    {
+      "task_id": "184-025",
+      "path": "src/core/config-migration.ts",
+      "loc": 637,
+      "subdir": "src/core",
+      "output": "docs/audits/full-codebase-2026-05-21/src__core__config-migration.md"
+    },
+    {
+      "task_id": "184-026",
+      "path": "src/core/config-types.ts",
+      "loc": 697,
+      "subdir": "src/core",
+      "output": "docs/audits/full-codebase-2026-05-21/src__core__config-types.md"
+    },
+    {
+      "task_id": "184-027",
+      "path": "src/core/config.ts",
+      "loc": 1704,
+      "subdir": "src/core",
+      "output": "docs/audits/full-codebase-2026-05-21/src__core__config.md"
+    },
+    {
+      "task_id": "184-028",
+      "path": "src/core/errors.ts",
+      "loc": 624,
+      "subdir": "src/core",
+      "output": "docs/audits/full-codebase-2026-05-21/src__core__errors.md"
+    },
+    {
+      "task_id": "184-029",
+      "path": "src/core/file-lock.ts",
+      "loc": 633,
+      "subdir": "src/core",
+      "output": "docs/audits/full-codebase-2026-05-21/src__core__file-lock.md"
+    },
+    {
+      "task_id": "184-030",
+      "path": "src/core/intent-classifier.ts",
+      "loc": 467,
+      "subdir": "src/core",
+      "output": "docs/audits/full-codebase-2026-05-21/src__core__intent-classifier.md"
+    },
+    {
+      "task_id": "184-031",
+      "path": "src/core/memory-export.ts",
+      "loc": 365,
+      "subdir": "src/core",
+      "output": "docs/audits/full-codebase-2026-05-21/src__core__memory-export.md"
+    },
+    {
+      "task_id": "184-032",
+      "path": "src/core/memory-import.ts",
+      "loc": 531,
+      "subdir": "src/core",
+      "output": "docs/audits/full-codebase-2026-05-21/src__core__memory-import.md"
+    },
+    {
+      "task_id": "184-033",
+      "path": "src/core/memory-normalize.ts",
+      "loc": 39,
+      "subdir": "src/core",
+      "output": "docs/audits/full-codebase-2026-05-21/src__core__memory-normalize.md"
+    },
+    {
+      "task_id": "184-034",
+      "path": "src/core/memory-query.ts",
+      "loc": 416,
+      "subdir": "src/core",
+      "output": "docs/audits/full-codebase-2026-05-21/src__core__memory-query.md"
+    },
+    {
+      "task_id": "184-035",
+      "path": "src/core/memory-store.ts",
+      "loc": 960,
+      "subdir": "src/core",
+      "output": "docs/audits/full-codebase-2026-05-21/src__core__memory-store.md"
+    },
+    {
+      "task_id": "184-036",
+      "path": "src/core/model-registry.ts",
+      "loc": 316,
+      "subdir": "src/core",
+      "output": "docs/audits/full-codebase-2026-05-21/src__core__model-registry.md"
+    },
+    {
+      "task_id": "184-037",
+      "path": "src/core/plugin-hooks.ts",
+      "loc": 834,
+      "subdir": "src/core",
+      "output": "docs/audits/full-codebase-2026-05-21/src__core__plugin-hooks.md"
+    },
+    {
+      "task_id": "184-038",
+      "path": "src/core/plugin.ts",
+      "loc": 489,
+      "subdir": "src/core",
+      "output": "docs/audits/full-codebase-2026-05-21/src__core__plugin.md"
+    },
+    {
+      "task_id": "184-039",
+      "path": "src/core/pricing-updater.ts",
+      "loc": 530,
+      "subdir": "src/core",
+      "output": "docs/audits/full-codebase-2026-05-21/src__core__pricing-updater.md"
+    },
+    {
+      "task_id": "184-040",
+      "path": "src/core/provider.ts",
+      "loc": 610,
+      "subdir": "src/core",
+      "output": "docs/audits/full-codebase-2026-05-21/src__core__provider.md"
+    },
+    {
+      "task_id": "184-041",
+      "path": "src/core/routing-engine.ts",
+      "loc": 687,
+      "subdir": "src/core",
+      "output": "docs/audits/full-codebase-2026-05-21/src__core__routing-engine.md"
+    },
+    {
+      "task_id": "184-042",
+      "path": "src/core/skill-pool.ts",
+      "loc": 307,
+      "subdir": "src/core",
+      "output": "docs/audits/full-codebase-2026-05-21/src__core__skill-pool.md"
+    },
+    {
+      "task_id": "184-043",
+      "path": "src/core/stack-detector.ts",
+      "loc": 737,
+      "subdir": "src/core",
+      "output": "docs/audits/full-codebase-2026-05-21/src__core__stack-detector.md"
+    },
+    {
+      "task_id": "184-044",
+      "path": "src/core/types.ts",
+      "loc": 14,
+      "subdir": "src/core",
+      "output": "docs/audits/full-codebase-2026-05-21/src__core__types.md"
+    },
+    {
+      "task_id": "184-045",
+      "path": "src/dashboard/src/pages/ConfigPage.tsx",
+      "loc": 519,
+      "subdir": "src/dashboard",
+      "output": "docs/audits/full-codebase-2026-05-21/src__dashboard__src__pages__ConfigPage.md"
+    },
+    {
+      "task_id": "184-046",
+      "path": "src/mcp/server.ts",
+      "loc": 225,
+      "subdir": "src/mcp",
+      "output": "docs/audits/full-codebase-2026-05-21/src__mcp__server.md"
+    },
+    {
+      "task_id": "184-047",
+      "path": "src/mcp/tools/nervous.ts",
+      "loc": 509,
+      "subdir": "src/mcp",
+      "output": "docs/audits/full-codebase-2026-05-21/src__mcp__tools__nervous.md"
+    },
+    {
+      "task_id": "184-048",
+      "path": "src/mcp/tools/status.ts",
+      "loc": 488,
+      "subdir": "src/mcp",
+      "output": "docs/audits/full-codebase-2026-05-21/src__mcp__tools__status.md"
+    },
+    {
+      "task_id": "184-049",
+      "path": "src/nervous/action-handlers.ts",
+      "loc": 197,
+      "subdir": "src/nervous",
+      "output": "docs/audits/full-codebase-2026-05-21/src__nervous__action-handlers.md"
+    },
+    {
+      "task_id": "184-050",
+      "path": "src/nervous/authority-matrix.ts",
+      "loc": 185,
+      "subdir": "src/nervous",
+      "output": "docs/audits/full-codebase-2026-05-21/src__nervous__authority-matrix.md"
+    },
+    {
+      "task_id": "184-051",
+      "path": "src/nervous/bootstrap.ts",
+      "loc": 143,
+      "subdir": "src/nervous",
+      "output": "docs/audits/full-codebase-2026-05-21/src__nervous__bootstrap.md"
+    },
+    {
+      "task_id": "184-052",
+      "path": "src/nervous/decision-engine.ts",
+      "loc": 117,
+      "subdir": "src/nervous",
+      "output": "docs/audits/full-codebase-2026-05-21/src__nervous__decision-engine.md"
+    },
+    {
+      "task_id": "184-053",
+      "path": "src/nervous/detector-registry.ts",
+      "loc": 203,
+      "subdir": "src/nervous",
+      "output": "docs/audits/full-codebase-2026-05-21/src__nervous__detector-registry.md"
+    },
+    {
+      "task_id": "184-054",
+      "path": "src/nervous/dispatcher.ts",
+      "loc": 345,
+      "subdir": "src/nervous",
+      "output": "docs/audits/full-codebase-2026-05-21/src__nervous__dispatcher.md"
+    },
+    {
+      "task_id": "184-055",
+      "path": "src/nervous/executor.ts",
+      "loc": 300,
+      "subdir": "src/nervous",
+      "output": "docs/audits/full-codebase-2026-05-21/src__nervous__executor.md"
+    },
+    {
+      "task_id": "184-056",
+      "path": "src/nervous/observer.ts",
+      "loc": 427,
+      "subdir": "src/nervous",
+      "output": "docs/audits/full-codebase-2026-05-21/src__nervous__observer.md"
+    },
+    {
+      "task_id": "184-057",
+      "path": "src/nervous/proposer.ts",
+      "loc": 158,
+      "subdir": "src/nervous",
+      "output": "docs/audits/full-codebase-2026-05-21/src__nervous__proposer.md"
+    },
+    {
+      "task_id": "184-058",
+      "path": "src/orchestra/authority-enforcer.ts",
+      "loc": 674,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/full-codebase-2026-05-21/src__orchestra__authority-enforcer.md"
+    },
+    {
+      "task_id": "184-059",
+      "path": "src/orchestra/brain.ts",
+      "loc": 54,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/full-codebase-2026-05-21/src__orchestra__brain.md"
+    },
+    {
+      "task_id": "184-060",
+      "path": "src/orchestra/debt-manager.ts",
+      "loc": 599,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/full-codebase-2026-05-21/src__orchestra__debt-manager.md"
+    },
+    {
+      "task_id": "184-061",
+      "path": "src/orchestra/dependency-scheduler.ts",
+      "loc": 688,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/full-codebase-2026-05-21/src__orchestra__dependency-scheduler.md"
+    },
+    {
+      "task_id": "184-062",
+      "path": "src/orchestra/event-stream.ts",
+      "loc": 528,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/full-codebase-2026-05-21/src__orchestra__event-stream.md"
+    },
+    {
+      "task_id": "184-063",
+      "path": "src/orchestra/managed-docs/content-generators.ts",
+      "loc": 672,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/full-codebase-2026-05-21/src__orchestra__managed-docs__content-generators.md"
+    },
+    {
+      "task_id": "184-064",
+      "path": "src/orchestra/mid-sprint-adapter.ts",
+      "loc": 633,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/full-codebase-2026-05-21/src__orchestra__mid-sprint-adapter.md"
+    },
+    {
+      "task_id": "184-065",
+      "path": "src/orchestra/outcome-tracker.ts",
+      "loc": 502,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/full-codebase-2026-05-21/src__orchestra__outcome-tracker.md"
+    },
+    {
+      "task_id": "184-066",
+      "path": "src/orchestra/planner.ts",
+      "loc": 630,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/full-codebase-2026-05-21/src__orchestra__planner.md"
+    },
+    {
+      "task_id": "184-067",
+      "path": "src/orchestra/prompt-god-template.ts",
+      "loc": 640,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/full-codebase-2026-05-21/src__orchestra__prompt-god-template.md"
+    },
+    {
+      "task_id": "184-068",
+      "path": "src/orchestra/quality-assessor.ts",
+      "loc": 211,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/full-codebase-2026-05-21/src__orchestra__quality-assessor.md"
+    },
+    {
+      "task_id": "184-069",
+      "path": "src/orchestra/result-collector.ts",
+      "loc": 753,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/full-codebase-2026-05-21/src__orchestra__result-collector.md"
+    },
+    {
+      "task_id": "184-070",
+      "path": "src/orchestra/result-evaluator.ts",
+      "loc": 2086,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/full-codebase-2026-05-21/src__orchestra__result-evaluator.md"
+    },
+    {
+      "task_id": "184-071",
+      "path": "src/orchestra/self-modifying-detector.ts",
+      "loc": 164,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/full-codebase-2026-05-21/src__orchestra__self-modifying-detector.md"
+    },
+    {
+      "task_id": "184-072",
+      "path": "src/orchestra/spawn-backend-docker.ts",
+      "loc": 1059,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/full-codebase-2026-05-21/src__orchestra__spawn-backend-docker.md"
+    },
+    {
+      "task_id": "184-073",
+      "path": "src/orchestra/spawn-backend.ts",
+      "loc": 373,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/full-codebase-2026-05-21/src__orchestra__spawn-backend.md"
+    },
+    {
+      "task_id": "184-074",
+      "path": "src/orchestra/sprint-checkpoint.ts",
+      "loc": 644,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/full-codebase-2026-05-21/src__orchestra__sprint-checkpoint.md"
+    },
+    {
+      "task_id": "184-075",
+      "path": "src/orchestra/sprint-controller.ts",
+      "loc": 985,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/full-codebase-2026-05-21/src__orchestra__sprint-controller.md"
+    },
+    {
+      "task_id": "184-076",
+      "path": "src/orchestra/sprint-docs-updater.ts",
+      "loc": 835,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/full-codebase-2026-05-21/src__orchestra__sprint-docs-updater.md"
+    },
+    {
+      "task_id": "184-077",
+      "path": "src/orchestra/sprint-finalizer.ts",
+      "loc": 1311,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/full-codebase-2026-05-21/src__orchestra__sprint-finalizer.md"
+    },
+    {
+      "task_id": "184-078",
+      "path": "src/orchestra/sprint-lifecycle.ts",
+      "loc": 604,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/full-codebase-2026-05-21/src__orchestra__sprint-lifecycle.md"
+    },
+    {
+      "task_id": "184-079",
+      "path": "src/orchestra/sprint-metrics.ts",
+      "loc": 615,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/full-codebase-2026-05-21/src__orchestra__sprint-metrics.md"
+    },
+    {
+      "task_id": "184-080",
+      "path": "src/orchestra/sprint-planner.ts",
+      "loc": 847,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/full-codebase-2026-05-21/src__orchestra__sprint-planner.md"
+    },
+    {
+      "task_id": "184-081",
+      "path": "src/orchestra/sprint-reporter.ts",
+      "loc": 185,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/full-codebase-2026-05-21/src__orchestra__sprint-reporter.md"
+    },
+    {
+      "task_id": "184-082",
+      "path": "src/orchestra/sprint-retro-writer.ts",
+      "loc": 744,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/full-codebase-2026-05-21/src__orchestra__sprint-retro-writer.md"
+    },
+    {
+      "task_id": "184-083",
+      "path": "src/orchestra/sprint-spawner.ts",
+      "loc": 1085,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/full-codebase-2026-05-21/src__orchestra__sprint-spawner.md"
+    },
+    {
+      "task_id": "184-084",
+      "path": "src/orchestra/sprint-state-tracker.ts",
+      "loc": 114,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/full-codebase-2026-05-21/src__orchestra__sprint-state-tracker.md"
+    },
+    {
+      "task_id": "184-085",
+      "path": "src/orchestra/sprint-utils.ts",
+      "loc": 362,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/full-codebase-2026-05-21/src__orchestra__sprint-utils.md"
+    },
+    {
+      "task_id": "184-086",
+      "path": "src/orchestra/task-builder.ts",
+      "loc": 1162,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/full-codebase-2026-05-21/src__orchestra__task-builder.md"
+    },
+    {
+      "task_id": "184-087",
+      "path": "src/orchestra/task-router.ts",
+      "loc": 319,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/full-codebase-2026-05-21/src__orchestra__task-router.md"
+    },
+    {
+      "task_id": "184-088",
+      "path": "src/orchestra/tmux.ts",
+      "loc": 401,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/full-codebase-2026-05-21/src__orchestra__tmux.md"
+    },
+    {
+      "task_id": "184-089",
+      "path": "src/providers/claude.ts",
+      "loc": 252,
+      "subdir": "src/providers",
+      "output": "docs/audits/full-codebase-2026-05-21/src__providers__claude.md"
+    },
+    {
+      "task_id": "184-090",
+      "path": "src/providers/gemini.ts",
+      "loc": 566,
+      "subdir": "src/providers",
+      "output": "docs/audits/full-codebase-2026-05-21/src__providers__gemini.md"
+    }
+  ]
+}
