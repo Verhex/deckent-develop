@@ -382,6 +382,105 @@ The original sub-project #2 design spec (2026-05-21-sub-project-2-design.md) rem
 - **`.brain/memory.db` is sacred** — additive ALTER only, no DROP/rebuild ([feedback_db_silmek_yasak](../../.claude/projects/.../memory/feedback_db_silmek_yasak.md))
 - **`.deckent/config.json` stays tracked** — never `git rm --cached` ([feedback_config_json_git_rm_yasak](../../.claude/projects/.../memory/feedback_config_json_git_rm_yasak.md))
 - **NEW (this spec):** **Worker rollback engaged from Sprint 177 Task 1 onward** — every NO_GO reverts worker scope writes. Prevents the Sprint 176 corrupting pattern.
+- **NEW (Sprint 181, see §7):** **Post-sprint commit MANDATORY** — every sprint verdict triggers `feat:` + `chore:` commit pair before next sprint launch. Sprint 179→180 transition without commit lost 7 src/ files to worker-rollback stash-drop cycle ([[feedback-post-sprint-commit-mandatory]]).
+
+---
+
+## 7. Sprint 181 — Recovery + Nervous Restart + Worker-Rollback Fix (16 task)
+
+**Reason for existence:** Sprint 180 (2026-05-20) closed GO_WITH_GATE_FAILURE — 8 NO_GO / 8 TECH_DEBT / 4 DONE. Root cause: Sprint 179'u commit etmeden Sprint 180'i başlattık. Sprint 180 worker-rollback (Sprint 177 deliverable, `src/agents/worker-rollback.ts`) `git stash --include-untracked` + `git stash drop` döngüsüyle Sprint 179'un commit edilmemiş 7 YENİ src/ dosyasını sildi:
+
+- `src/api/terminal/audit-integrity.ts` (HMAC chain, I4)
+- `src/api/terminal/command-guard.ts` (Default-deny remote, I3)
+- `src/api/terminal/prompt-guard.ts` (Input pattern guard, I1+I2)
+- `src/api/terminal/outbound-limiter.ts` (Tenant quota, I5)
+- `src/cli/commands/audit-verify.ts` (Audit CLI)
+- `src/nervous/bootstrap.ts` (Sprint 180 W1-2)
+- `src/nervous/action-handlers.ts` (Sprint 180 W2-1)
+
+Plus 5 test dosyası (Sprint 179) ve `NERVOUS-TODO.md` proje kökü doc. `dist/` build intact, ama tsc gate fail → kod iterasyonu imkansız.
+
+**Sprint 181 = son beta-blocker sprint.** June 1 OSS beta launch ~10 gün. Recovery + worker-rollback fix + Sprint 180 NO_GO closure + nervous Faz 1 retry.
+
+### 7a. Six-layer hybrid scope
+
+**Layer 1 — Worker-rollback untracked-safe fix (1 task, P0):** [[project-worker-rollback-untracked-bug]]. `src/agents/worker-rollback.ts` scope-bounded stash + pre-spawn uncommitted guard + stash archive (drop yerine `.deckent/worker-rollback-history/{sprintId}/{taskId}/stash-{iso}.patch`). Sprint 181'in geri kalanı bu fix LAND ettikten SONRA başlar (W0 sequential, single task).
+
+**Layer 2 — Sprint 179 src/ + tests/ recovery (5 task):** Sub-project #2 plan (`docs/superpowers/plans/2026-05-21-sub-project-2.md`) TDD breakdown'u + `dist/` runtime davranış referansı + Sprint 179 retro notes'tan TDD ile yeniden yaz. 5 deliverable:
+- `src/api/terminal/audit-integrity.ts` + `tests/api/terminal/audit-integrity.test.ts` (I4 HMAC chain, 5 case)
+- `src/api/terminal/command-guard.ts` + `tests/security/command-guard.test.ts` (I3 default-deny remote, 9 case)
+- `src/api/terminal/prompt-guard.ts` + `tests/security/prompt-guard.test.ts` (I1+I2 input pattern, 5 case + 1 integration)
+- `src/api/terminal/outbound-limiter.ts` + `tests/security/outbound-limiter.test.ts` (I5 tenant quota, 4 case)
+- `src/cli/commands/audit-verify.ts` + `tests/cli/audit-verify.test.ts` (CLI smoke + tamper detection)
+
+**Layer 3 — Sprint 180 nervous core recovery (2 task):**
+- `src/nervous/bootstrap.ts` (W1-2 createNervousSystemIfEnabled) — Sprint 180 retro detail var, 161 LoC kod + 131 LoC test referansı; TDD yeniden yaz
+- `src/nervous/action-handlers.ts` (W2-1 4 MVP action handler) — Sprint 180 retro detail var, 247 LoC kod + 259 LoC test referansı
+
+**Layer 4 — Sprint 180 NO_GO/GWT closure (5 task):**
+- 180-002 W1-1 (sprint-state-tracker getSprintStateSnapshot) — kod survived modified state'te + retro learning'de TDD detail var, fix retry yetersiz → DONE'a çıkar
+- 180-007 W3-2 (Faz 1 smoke config) — config'de aktif olabilir ama test PASS olmadıysa, validation gerek
+- 180-011 W4-3 (Self-audit gate vitest fix) — Sprint 179'un kalan vitest 1 failing + Sprint 180'in 5 TS2307 error fix
+- 180-012 W5-1 (npm publish v1.0.0-beta.1 readiness) — `scripts/validate-publish.mjs` survived ama 6 gate test fail; gate'leri yeşile çıkar
+- 180-008 W3-3 (Nervous integration runtime test GWT) — test dosyası survived, runtime bağlantı + assertion düzeltme
+
+**Layer 5 — NERVOUS-TODO + docs restore (1 task):** `NERVOUS-TODO.md` proje kökünde restore (`/home/alperen/.claude/plans/deckent-i-inde-nervous-system-fuzzy-fern.md` mirror'dan kopya, 540 satır 31KB).
+
+**Layer 6 — Beta launch hazırlık (2 task):**
+- v1.0.0-beta.1 final smoke: tsc green + vitest green + validate:publish 6/6 gate + dashboard build + lint:link
+- Sprint 181 retro + git tag v1.0.0-beta.1 + npm publish gate (Alperen manuel) + Sprint 182 spec stub (post-beta sub-project #3 + #4 roadmap)
+
+### 7b. Wave breakdown (16 task)
+
+| Wave | Layer | Task | Effort |
+|------|-------|------|--------|
+| W0 | L1 | Worker-rollback untracked-safe (scope-bounded stash + archive) | high |
+| W1-1..5 | L2 | 5 self-security src/+tests recovery (5 task) | normal-high each |
+| W2-1..2 | L3 | 2 nervous core src/+tests recovery (2 task) | high each |
+| W3-1..5 | L4 | 5 Sprint 180 NO_GO/GWT close (5 task) | normal-high each |
+| W4-1 | L5 | NERVOUS-TODO.md + docs restore (1 task) | low |
+| W5-1..2 | L6 | Beta launch smoke + Sprint 181 retro (2 task) | high |
+
+**Dispatch:** W0 sequential FIRST (worker-rollback fix). Sonra W1-W4 paralel (max_workers 2, self-modifying detector sequential within shared scope). W5 sequential SON.
+
+### 7c. Sprint 181 verdict
+
+- **GO** = 16/16 DONE — Sprint 179 + Sprint 180 deliverable'lar tam, beta launch READY
+- **GO_WITH_TECH_DEBT** = 14-15/16 DONE + ≤2 GWT; **şart:** W0 worker-rollback fix DONE (yoksa Sprint 182'de aynı silme döngüsü) + W1 5/5 DONE (self-security tamamen recover) + W6-1 beta smoke DONE (npm publish ready)
+- **NO_GO** = W0 worker-rollback fail (sonraki sprint riski) **veya** W1 self-security ≥2 NO_GO (RCE surface açık kalır) **veya** W6 beta smoke fail (June 1 kayar)
+
+### 7d. Beta launch readiness post-Sprint 181
+
+Sprint 181 GO sonrası June 1 beta launch için tek kalan:
+- `npm publish v1.0.0-beta.1` (Alperen manuel komutu, [[feedback-build-requires-user-approval]])
+- Sprint 182 (post-beta) buffer: nervous Faz 2 pilot + sub-project #3 + #4 spec başlangıç
+
+### 7e. Risk + Mitigation
+
+| Risk | Mitigation |
+|------|-----------|
+| W0 worker-rollback fix kendisi worker-rollback kullanır → recursive bug riski | W0 task'ında `git stash` kullanılmaz; Alperen pre-spawn sırasında manuel snapshot alır + post-DONE manuel commit |
+| 5 self-security re-write Sprint 179 davranışını birebir taklit edemezse contract drift | dist/`.js` runtime referans + Sprint 179 retro notes'taki test detayları → davranış invariant kalır; 5 invariant testleri (I1-I5) drift'i yakalar |
+| Sprint 181 yine commit edilmeden Sprint 182'ye geçilirse | Sprint 181 retro task'ı (W6-2) zorunlu `feat:` + `chore:` commit + Alperen onayıyla push; [[feedback-post-sprint-commit-mandatory]] memory işletilir |
+| Worker-rollback fix LAND etmeden W1-W4 başlatılırsa | W0 sequential gate, Brain manuel wave gate (ADR-047) — W0 DONE doğrulamadan W1+ dispatch YOK |
+| Sub-project #2 plan referansı eskimişse (Sprint 179'da değişen file structure) | dist/ runtime referans + Sprint 179 commit history modified file diff'leri (b6d6e7a3) tamamlayıcı kaynak |
+
+### 7f. Test Strategy
+
+| Wave | Test surface | Hedef | Command |
+|------|--------------|-------|---------|
+| W0 | Unit + integration | scope-bounded stash + archive folder TTL + out-of-scope guard | `npx vitest run tests/agents/worker-rollback-untracked-safety.test.ts` |
+| W1 | Unit + integration | I1-I5 invariant testleri (Sprint 179 surface) | `npx vitest run tests/security/ tests/api/terminal/audit-integrity.test.ts` |
+| W2 | Unit + integration | nervous bootstrap + action-handlers + IPC queue | `npx vitest run tests/nervous/` |
+| W3 | Unit (NO_GO closure) | Sprint 180 gate fix + npm publish 6 gate | per-task |
+| W5 | Smoke + lint | beta launch readiness | `npm run validate:publish && npm run lint:link && npm run lint:adr && npx tsc --noEmit && npx vitest run` |
+
+### 7g. Process Invariants (Sprint 181 specific)
+
+- **Worker rollback LAND ettikten sonra mı dispatch?** W0 sequential blocker, sonraki wave'ler ancak W0 DONE doğrulandıktan sonra.
+- **Post-sprint commit ZORUNLU** ([[feedback-post-sprint-commit-mandatory]]) — Sprint 181 sonrası 2 commit yapılmadan Sprint 182 başlatılmaz.
+- **dist/ runtime referans olarak korunur** — Sprint 181'de `npm run build` ÇAĞRILMAZ (yoksa dist/ regen olur, kayıp runtime referansı). Recovery sonunda son `build` çağrısı W6-1'de.
+- **5 self-security testleri silinmişti** — Sprint 181'de yeniden yazılır; TDD RED→GREEN disiplini ve I1-I5 invariant assertion'ları korunur.
 
 ---
 
