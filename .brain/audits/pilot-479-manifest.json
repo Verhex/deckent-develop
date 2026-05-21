@@ -1,0 +1,3842 @@
+{
+  "audit_id": "per-file-2026-05-21",
+  "phase": "full-coverage",
+  "sprint_id": "sprint-186",
+  "total_files": 479,
+  "created_at": "2026-05-21T18:06:56.481Z",
+  "description": "OSS Launch Initiative Phase 2 full coverage — line-by-line per-file audit of ALL src/ TypeScript files. DOC-ONLY enforcement.",
+  "files": [
+    {
+      "task_id": "186-001",
+      "path": "src/agents/adaptive-agent.ts",
+      "loc": 214,
+      "subdir": "src/agents",
+      "output": "docs/audits/per-file-2026-05-21/src__agents__adaptive-agent.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-002",
+      "path": "src/agents/agent-genealogy.ts",
+      "loc": 188,
+      "subdir": "src/agents",
+      "output": "docs/audits/per-file-2026-05-21/src__agents__agent-genealogy.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-003",
+      "path": "src/agents/agent-retirement.ts",
+      "loc": 207,
+      "subdir": "src/agents",
+      "output": "docs/audits/per-file-2026-05-21/src__agents__agent-retirement.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-004",
+      "path": "src/agents/auditor.ts",
+      "loc": 13,
+      "subdir": "src/agents",
+      "output": "docs/audits/per-file-2026-05-21/src__agents__auditor.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-005",
+      "path": "src/agents/cross-sprint-analyzer.ts",
+      "loc": 243,
+      "subdir": "src/agents",
+      "output": "docs/audits/per-file-2026-05-21/src__agents__cross-sprint-analyzer.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-006",
+      "path": "src/agents/index.ts",
+      "loc": 19,
+      "subdir": "src/agents",
+      "output": "docs/audits/per-file-2026-05-21/src__agents__index.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-007",
+      "path": "src/agents/permission-guard.ts",
+      "loc": 220,
+      "subdir": "src/agents",
+      "output": "docs/audits/per-file-2026-05-21/src__agents__permission-guard.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-008",
+      "path": "src/agents/prompt-ab-test.ts",
+      "loc": 10,
+      "subdir": "src/agents",
+      "output": "docs/audits/per-file-2026-05-21/src__agents__prompt-ab-test.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-009",
+      "path": "src/agents/prompt-analytics.ts",
+      "loc": 474,
+      "subdir": "src/agents",
+      "output": "docs/audits/per-file-2026-05-21/src__agents__prompt-analytics.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-010",
+      "path": "src/agents/prompt-evolution.ts",
+      "loc": 133,
+      "subdir": "src/agents",
+      "output": "docs/audits/per-file-2026-05-21/src__agents__prompt-evolution.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-011",
+      "path": "src/agents/prompt-metrics.ts",
+      "loc": 6,
+      "subdir": "src/agents",
+      "output": "docs/audits/per-file-2026-05-21/src__agents__prompt-metrics.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-012",
+      "path": "src/agents/prompt-rollback.ts",
+      "loc": 151,
+      "subdir": "src/agents",
+      "output": "docs/audits/per-file-2026-05-21/src__agents__prompt-rollback.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-013",
+      "path": "src/agents/prompt-version.ts",
+      "loc": 227,
+      "subdir": "src/agents",
+      "output": "docs/audits/per-file-2026-05-21/src__agents__prompt-version.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-014",
+      "path": "src/agents/shared-context.ts",
+      "loc": 121,
+      "subdir": "src/agents",
+      "output": "docs/audits/per-file-2026-05-21/src__agents__shared-context.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-015",
+      "path": "src/agents/specialization-drift.ts",
+      "loc": 108,
+      "subdir": "src/agents",
+      "output": "docs/audits/per-file-2026-05-21/src__agents__specialization-drift.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-016",
+      "path": "src/agents/worker-ipc.ts",
+      "loc": 370,
+      "subdir": "src/agents",
+      "output": "docs/audits/per-file-2026-05-21/src__agents__worker-ipc.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-017",
+      "path": "src/agents/worker-lifecycle.ts",
+      "loc": 579,
+      "subdir": "src/agents",
+      "output": "docs/audits/per-file-2026-05-21/src__agents__worker-lifecycle.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-018",
+      "path": "src/agents/worker-log.ts",
+      "loc": 195,
+      "subdir": "src/agents",
+      "output": "docs/audits/per-file-2026-05-21/src__agents__worker-log.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-019",
+      "path": "src/agents/worker-rollback.ts",
+      "loc": 330,
+      "subdir": "src/agents",
+      "output": "docs/audits/per-file-2026-05-21/src__agents__worker-rollback.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-020",
+      "path": "src/agents/worker-verify.ts",
+      "loc": 515,
+      "subdir": "src/agents",
+      "output": "docs/audits/per-file-2026-05-21/src__agents__worker-verify.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-021",
+      "path": "src/agents/worker.ts",
+      "loc": 593,
+      "subdir": "src/agents",
+      "output": "docs/audits/per-file-2026-05-21/src__agents__worker.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-022",
+      "path": "src/api/auth.ts",
+      "loc": 113,
+      "subdir": "src/api",
+      "output": "docs/audits/per-file-2026-05-21/src__api__auth.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-023",
+      "path": "src/api/chat-handler.ts",
+      "loc": 29,
+      "subdir": "src/api",
+      "output": "docs/audits/per-file-2026-05-21/src__api__chat-handler.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-024",
+      "path": "src/api/rate-limiter.ts",
+      "loc": 96,
+      "subdir": "src/api",
+      "output": "docs/audits/per-file-2026-05-21/src__api__rate-limiter.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-025",
+      "path": "src/api/server.ts",
+      "loc": 1053,
+      "subdir": "src/api",
+      "output": "docs/audits/per-file-2026-05-21/src__api__server.md",
+      "effort": "high"
+    },
+    {
+      "task_id": "186-026",
+      "path": "src/api/terminal/audit-integrity.ts",
+      "loc": 153,
+      "subdir": "src/api",
+      "output": "docs/audits/per-file-2026-05-21/src__api__terminal__audit-integrity.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-027",
+      "path": "src/api/terminal/audit.ts",
+      "loc": 110,
+      "subdir": "src/api",
+      "output": "docs/audits/per-file-2026-05-21/src__api__terminal__audit.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-028",
+      "path": "src/api/terminal/auth-provider.ts",
+      "loc": 55,
+      "subdir": "src/api",
+      "output": "docs/audits/per-file-2026-05-21/src__api__terminal__auth-provider.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-029",
+      "path": "src/api/terminal/command-guard.ts",
+      "loc": 65,
+      "subdir": "src/api",
+      "output": "docs/audits/per-file-2026-05-21/src__api__terminal__command-guard.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-030",
+      "path": "src/api/terminal/outbound-limiter.ts",
+      "loc": 92,
+      "subdir": "src/api",
+      "output": "docs/audits/per-file-2026-05-21/src__api__terminal__outbound-limiter.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-031",
+      "path": "src/api/terminal/prompt-guard.ts",
+      "loc": 48,
+      "subdir": "src/api",
+      "output": "docs/audits/per-file-2026-05-21/src__api__terminal__prompt-guard.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-032",
+      "path": "src/api/terminal/session-backend.ts",
+      "loc": 55,
+      "subdir": "src/api",
+      "output": "docs/audits/per-file-2026-05-21/src__api__terminal__session-backend.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-033",
+      "path": "src/api/terminal/session-manager.ts",
+      "loc": 153,
+      "subdir": "src/api",
+      "output": "docs/audits/per-file-2026-05-21/src__api__terminal__session-manager.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-034",
+      "path": "src/api/terminal/types.ts",
+      "loc": 35,
+      "subdir": "src/api",
+      "output": "docs/audits/per-file-2026-05-21/src__api__terminal__types.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-035",
+      "path": "src/api/terminal/ws-gateway.ts",
+      "loc": 233,
+      "subdir": "src/api",
+      "output": "docs/audits/per-file-2026-05-21/src__api__terminal__ws-gateway.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-036",
+      "path": "src/api/watcher.ts",
+      "loc": 29,
+      "subdir": "src/api",
+      "output": "docs/audits/per-file-2026-05-21/src__api__watcher.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-037",
+      "path": "src/cli/auto-setup.ts",
+      "loc": 113,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__auto-setup.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-038",
+      "path": "src/cli/commands/agent.ts",
+      "loc": 535,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__commands__agent.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-039",
+      "path": "src/cli/commands/analyze.ts",
+      "loc": 45,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__commands__analyze.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-040",
+      "path": "src/cli/commands/archive-debt.ts",
+      "loc": 200,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__commands__archive-debt.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-041",
+      "path": "src/cli/commands/attach.ts",
+      "loc": 79,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__commands__attach.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-042",
+      "path": "src/cli/commands/audit-verify.ts",
+      "loc": 58,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__commands__audit-verify.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-043",
+      "path": "src/cli/commands/audit.ts",
+      "loc": 45,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__commands__audit.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-044",
+      "path": "src/cli/commands/checkpoint.ts",
+      "loc": 154,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__commands__checkpoint.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-045",
+      "path": "src/cli/commands/cleanup.ts",
+      "loc": 255,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__commands__cleanup.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-046",
+      "path": "src/cli/commands/config-nervous.ts",
+      "loc": 416,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__commands__config-nervous.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-047",
+      "path": "src/cli/commands/config.ts",
+      "loc": 270,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__commands__config.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-048",
+      "path": "src/cli/commands/cost.ts",
+      "loc": 246,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__commands__cost.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-049",
+      "path": "src/cli/commands/dashboard.ts",
+      "loc": 214,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__commands__dashboard.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-050",
+      "path": "src/cli/commands/docs.ts",
+      "loc": 158,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__commands__docs.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-051",
+      "path": "src/cli/commands/doctor-checks.ts",
+      "loc": 481,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__commands__doctor-checks.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-052",
+      "path": "src/cli/commands/doctor-format.ts",
+      "loc": 360,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__commands__doctor-format.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-053",
+      "path": "src/cli/commands/doctor.ts",
+      "loc": 1081,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__commands__doctor.md",
+      "effort": "high"
+    },
+    {
+      "task_id": "186-054",
+      "path": "src/cli/commands/explain.ts",
+      "loc": 435,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__commands__explain.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-055",
+      "path": "src/cli/commands/features.ts",
+      "loc": 149,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__commands__features.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-056",
+      "path": "src/cli/commands/finalize.ts",
+      "loc": 194,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__commands__finalize.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-057",
+      "path": "src/cli/commands/heartbeat.ts",
+      "loc": 85,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__commands__heartbeat.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-058",
+      "path": "src/cli/commands/help.ts",
+      "loc": 142,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__commands__help.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-059",
+      "path": "src/cli/commands/history.ts",
+      "loc": 310,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__commands__history.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-060",
+      "path": "src/cli/commands/init-steps.ts",
+      "loc": 703,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__commands__init-steps.md",
+      "effort": "high"
+    },
+    {
+      "task_id": "186-061",
+      "path": "src/cli/commands/init-templates.ts",
+      "loc": 635,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__commands__init-templates.md",
+      "effort": "high"
+    },
+    {
+      "task_id": "186-062",
+      "path": "src/cli/commands/init-wizard.ts",
+      "loc": 172,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__commands__init-wizard.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-063",
+      "path": "src/cli/commands/init.ts",
+      "loc": 378,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__commands__init.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-064",
+      "path": "src/cli/commands/kill.ts",
+      "loc": 327,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__commands__kill.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-065",
+      "path": "src/cli/commands/memory.ts",
+      "loc": 232,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__commands__memory.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-066",
+      "path": "src/cli/commands/mode.ts",
+      "loc": 126,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__commands__mode.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-067",
+      "path": "src/cli/commands/nervous.ts",
+      "loc": 669,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__commands__nervous.md",
+      "effort": "high"
+    },
+    {
+      "task_id": "186-068",
+      "path": "src/cli/commands/onboard.ts",
+      "loc": 238,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__commands__onboard.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-069",
+      "path": "src/cli/commands/output.ts",
+      "loc": 140,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__commands__output.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-070",
+      "path": "src/cli/commands/plan.ts",
+      "loc": 113,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__commands__plan.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-071",
+      "path": "src/cli/commands/plugin.ts",
+      "loc": 244,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__commands__plugin.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-072",
+      "path": "src/cli/commands/quick-start.ts",
+      "loc": 85,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__commands__quick-start.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-073",
+      "path": "src/cli/commands/recall.ts",
+      "loc": 58,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__commands__recall.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-074",
+      "path": "src/cli/commands/recover.ts",
+      "loc": 168,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__commands__recover.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-075",
+      "path": "src/cli/commands/remember.ts",
+      "loc": 47,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__commands__remember.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-076",
+      "path": "src/cli/commands/resume.ts",
+      "loc": 148,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__commands__resume.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-077",
+      "path": "src/cli/commands/retro-formatter.ts",
+      "loc": 112,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__commands__retro-formatter.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-078",
+      "path": "src/cli/commands/retro-parser.ts",
+      "loc": 214,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__commands__retro-parser.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-079",
+      "path": "src/cli/commands/retro.ts",
+      "loc": 454,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__commands__retro.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-080",
+      "path": "src/cli/commands/review.ts",
+      "loc": 312,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__commands__review.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-081",
+      "path": "src/cli/commands/run.ts",
+      "loc": 333,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__commands__run.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-082",
+      "path": "src/cli/commands/serve.ts",
+      "loc": 141,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__commands__serve.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-083",
+      "path": "src/cli/commands/set-directives.ts",
+      "loc": 85,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__commands__set-directives.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-084",
+      "path": "src/cli/commands/skill-marketplace.ts",
+      "loc": 272,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__commands__skill-marketplace.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-085",
+      "path": "src/cli/commands/skill.ts",
+      "loc": 657,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__commands__skill.md",
+      "effort": "high"
+    },
+    {
+      "task_id": "186-086",
+      "path": "src/cli/commands/spawn.ts",
+      "loc": 145,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__commands__spawn.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-087",
+      "path": "src/cli/commands/start.ts",
+      "loc": 450,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__commands__start.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-088",
+      "path": "src/cli/commands/status.ts",
+      "loc": 452,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__commands__status.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-089",
+      "path": "src/cli/commands/sync.ts",
+      "loc": 535,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__commands__sync.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-090",
+      "path": "src/cli/commands/test-run.ts",
+      "loc": 272,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__commands__test-run.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-091",
+      "path": "src/cli/commands/upgrade.ts",
+      "loc": 387,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__commands__upgrade.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-092",
+      "path": "src/cli/commands/watch.ts",
+      "loc": 178,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__commands__watch.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-093",
+      "path": "src/cli/commands/web.ts",
+      "loc": 60,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__commands__web.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-094",
+      "path": "src/cli/entry.ts",
+      "loc": 41,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__entry.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-095",
+      "path": "src/cli/helpers/agent-performance.ts",
+      "loc": 77,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__helpers__agent-performance.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-096",
+      "path": "src/cli/helpers/agent-templates.ts",
+      "loc": 96,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__helpers__agent-templates.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-097",
+      "path": "src/cli/helpers/ansi.ts",
+      "loc": 30,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__helpers__ansi.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-098",
+      "path": "src/cli/helpers/change-categorizer.ts",
+      "loc": 103,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__helpers__change-categorizer.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-099",
+      "path": "src/cli/helpers/codex-config.ts",
+      "loc": 109,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__helpers__codex-config.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-100",
+      "path": "src/cli/helpers/config-reader.ts",
+      "loc": 21,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__helpers__config-reader.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-101",
+      "path": "src/cli/helpers/cursor-config.ts",
+      "loc": 90,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__helpers__cursor-config.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-102",
+      "path": "src/cli/helpers/dashboard-dir.ts",
+      "loc": 31,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__helpers__dashboard-dir.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-103",
+      "path": "src/cli/helpers/debt-counter.ts",
+      "loc": 39,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__helpers__debt-counter.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-104",
+      "path": "src/cli/helpers/error-handler.ts",
+      "loc": 85,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__helpers__error-handler.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-105",
+      "path": "src/cli/helpers/eta-calculator.ts",
+      "loc": 62,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__helpers__eta-calculator.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-106",
+      "path": "src/cli/helpers/gemini-config.ts",
+      "loc": 64,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__helpers__gemini-config.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-107",
+      "path": "src/cli/helpers/hints.ts",
+      "loc": 59,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__helpers__hints.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-108",
+      "path": "src/cli/helpers/i18n.ts",
+      "loc": 109,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__helpers__i18n.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-109",
+      "path": "src/cli/helpers/messages.ts",
+      "loc": 359,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__helpers__messages.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-110",
+      "path": "src/cli/helpers/output-mode.ts",
+      "loc": 79,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__helpers__output-mode.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-111",
+      "path": "src/cli/helpers/output.ts",
+      "loc": 648,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__helpers__output.md",
+      "effort": "high"
+    },
+    {
+      "task_id": "186-112",
+      "path": "src/cli/helpers/process.ts",
+      "loc": 23,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__helpers__process.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-113",
+      "path": "src/cli/helpers/progress-persistence.ts",
+      "loc": 109,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__helpers__progress-persistence.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-114",
+      "path": "src/cli/helpers/progress.ts",
+      "loc": 75,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__helpers__progress.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-115",
+      "path": "src/cli/helpers/prompt.ts",
+      "loc": 62,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__helpers__prompt.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-116",
+      "path": "src/cli/helpers/queue-display.ts",
+      "loc": 54,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__helpers__queue-display.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-117",
+      "path": "src/cli/helpers/recommendations.ts",
+      "loc": 97,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__helpers__recommendations.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-118",
+      "path": "src/cli/helpers/review-actions.ts",
+      "loc": 107,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__helpers__review-actions.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-119",
+      "path": "src/cli/helpers/review-summary.ts",
+      "loc": 127,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__helpers__review-summary.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-120",
+      "path": "src/cli/helpers/selective-retry.ts",
+      "loc": 91,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__helpers__selective-retry.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-121",
+      "path": "src/cli/helpers/splash.ts",
+      "loc": 62,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__helpers__splash.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-122",
+      "path": "src/cli/helpers/sprint-comparison.ts",
+      "loc": 75,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__helpers__sprint-comparison.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-123",
+      "path": "src/cli/helpers/sprint-summary-rich.ts",
+      "loc": 421,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__helpers__sprint-summary-rich.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-124",
+      "path": "src/cli/helpers/sprint-summary.ts",
+      "loc": 122,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__helpers__sprint-summary.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-125",
+      "path": "src/cli/helpers/status-renderer.ts",
+      "loc": 380,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__helpers__status-renderer.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-126",
+      "path": "src/cli/helpers/terminal-utils.ts",
+      "loc": 76,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__helpers__terminal-utils.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-127",
+      "path": "src/cli/helpers/theme.ts",
+      "loc": 94,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__helpers__theme.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-128",
+      "path": "src/cli/helpers/wizard.ts",
+      "loc": 355,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__helpers__wizard.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-129",
+      "path": "src/cli/helpers/worker-status.ts",
+      "loc": 89,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__helpers__worker-status.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-130",
+      "path": "src/cli/index.ts",
+      "loc": 123,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__index.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-131",
+      "path": "src/cli/version-info.ts",
+      "loc": 37,
+      "subdir": "src/cli",
+      "output": "docs/audits/per-file-2026-05-21/src__cli__version-info.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-132",
+      "path": "src/connectors/base-connector.ts",
+      "loc": 81,
+      "subdir": "src/connectors",
+      "output": "docs/audits/per-file-2026-05-21/src__connectors__base-connector.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-133",
+      "path": "src/connectors/connector-pool.ts",
+      "loc": 114,
+      "subdir": "src/connectors",
+      "output": "docs/audits/per-file-2026-05-21/src__connectors__connector-pool.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-134",
+      "path": "src/connectors/discord.ts",
+      "loc": 75,
+      "subdir": "src/connectors",
+      "output": "docs/audits/per-file-2026-05-21/src__connectors__discord.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-135",
+      "path": "src/connectors/incoming-router.ts",
+      "loc": 188,
+      "subdir": "src/connectors",
+      "output": "docs/audits/per-file-2026-05-21/src__connectors__incoming-router.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-136",
+      "path": "src/connectors/telegram.ts",
+      "loc": 113,
+      "subdir": "src/connectors",
+      "output": "docs/audits/per-file-2026-05-21/src__connectors__telegram.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-137",
+      "path": "src/connectors/types.ts",
+      "loc": 83,
+      "subdir": "src/connectors",
+      "output": "docs/audits/per-file-2026-05-21/src__connectors__types.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-138",
+      "path": "src/connectors/whatsapp.ts",
+      "loc": 69,
+      "subdir": "src/connectors",
+      "output": "docs/audits/per-file-2026-05-21/src__connectors__whatsapp.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-139",
+      "path": "src/core/activation-engine.ts",
+      "loc": 321,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__activation-engine.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-140",
+      "path": "src/core/active-workers.ts",
+      "loc": 91,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__active-workers.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-141",
+      "path": "src/core/adr-file-sync.ts",
+      "loc": 245,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__adr-file-sync.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-142",
+      "path": "src/core/adr-seed.ts",
+      "loc": 470,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__adr-seed.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-143",
+      "path": "src/core/agent-cache.ts",
+      "loc": 172,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__agent-cache.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-144",
+      "path": "src/core/agent-pool.ts",
+      "loc": 589,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__agent-pool.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-145",
+      "path": "src/core/agent-selector.ts",
+      "loc": 198,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__agent-selector.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-146",
+      "path": "src/core/agent-types.ts",
+      "loc": 97,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__agent-types.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-147",
+      "path": "src/core/analyzer.ts",
+      "loc": 345,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__analyzer.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-148",
+      "path": "src/core/anthropic-http-client.ts",
+      "loc": 337,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__anthropic-http-client.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-149",
+      "path": "src/core/cascade-detector.ts",
+      "loc": 171,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__cascade-detector.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-150",
+      "path": "src/core/ci-learning.ts",
+      "loc": 461,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__ci-learning.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-151",
+      "path": "src/core/condition-evaluator.ts",
+      "loc": 161,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__condition-evaluator.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-152",
+      "path": "src/core/config-migration.ts",
+      "loc": 637,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__config-migration.md",
+      "effort": "high"
+    },
+    {
+      "task_id": "186-153",
+      "path": "src/core/config-types.ts",
+      "loc": 697,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__config-types.md",
+      "effort": "high"
+    },
+    {
+      "task_id": "186-154",
+      "path": "src/core/config-validator.ts",
+      "loc": 7,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__config-validator.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-155",
+      "path": "src/core/config.ts",
+      "loc": 1704,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__config.md",
+      "effort": "high"
+    },
+    {
+      "task_id": "186-156",
+      "path": "src/core/constants.ts",
+      "loc": 130,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__constants.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-157",
+      "path": "src/core/cost-calculator.ts",
+      "loc": 477,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__cost-calculator.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-158",
+      "path": "src/core/cost-config-loader.ts",
+      "loc": 373,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__cost-config-loader.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-159",
+      "path": "src/core/credential-encryption.ts",
+      "loc": 140,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__credential-encryption.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-160",
+      "path": "src/core/credentials.ts",
+      "loc": 266,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__credentials.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-161",
+      "path": "src/core/debug-log.ts",
+      "loc": 67,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__debug-log.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-162",
+      "path": "src/core/decision-config.ts",
+      "loc": 195,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__decision-config.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-163",
+      "path": "src/core/decision-types.ts",
+      "loc": 95,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__decision-types.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-164",
+      "path": "src/core/deck-file.ts",
+      "loc": 199,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__deck-file.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-165",
+      "path": "src/core/deck-interpolation.ts",
+      "loc": 39,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__deck-interpolation.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-166",
+      "path": "src/core/environment.ts",
+      "loc": 53,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__environment.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-167",
+      "path": "src/core/errors.ts",
+      "loc": 624,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__errors.md",
+      "effort": "high"
+    },
+    {
+      "task_id": "186-168",
+      "path": "src/core/file-lock.ts",
+      "loc": 633,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__file-lock.md",
+      "effort": "high"
+    },
+    {
+      "task_id": "186-169",
+      "path": "src/core/global-config.ts",
+      "loc": 74,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__global-config.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-170",
+      "path": "src/core/heartbeat-types.ts",
+      "loc": 39,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__heartbeat-types.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-171",
+      "path": "src/core/identity-generator.ts",
+      "loc": 447,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__identity-generator.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-172",
+      "path": "src/core/index.ts",
+      "loc": 37,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__index.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-173",
+      "path": "src/core/intent-classifier.ts",
+      "loc": 467,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__intent-classifier.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-174",
+      "path": "src/core/lazy-loader.ts",
+      "loc": 146,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__lazy-loader.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-175",
+      "path": "src/core/manifest-migrator.ts",
+      "loc": 64,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__manifest-migrator.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-176",
+      "path": "src/core/marketplace/dependency-resolver.ts",
+      "loc": 272,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__marketplace__dependency-resolver.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-177",
+      "path": "src/core/marketplace/marketplace-auth.ts",
+      "loc": 151,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__marketplace__marketplace-auth.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-178",
+      "path": "src/core/marketplace/rating-system.ts",
+      "loc": 201,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__marketplace__rating-system.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-179",
+      "path": "src/core/marketplace/registry-client.ts",
+      "loc": 196,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__marketplace__registry-client.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-180",
+      "path": "src/core/marketplace/skill-sandbox.ts",
+      "loc": 391,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__marketplace__skill-sandbox.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-181",
+      "path": "src/core/memory-export.ts",
+      "loc": 365,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__memory-export.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-182",
+      "path": "src/core/memory-import.ts",
+      "loc": 531,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__memory-import.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-183",
+      "path": "src/core/memory-normalize.ts",
+      "loc": 39,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__memory-normalize.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-184",
+      "path": "src/core/memory-query.ts",
+      "loc": 416,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__memory-query.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-185",
+      "path": "src/core/memory-store.ts",
+      "loc": 960,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__memory-store.md",
+      "effort": "high"
+    },
+    {
+      "task_id": "186-186",
+      "path": "src/core/memory-types.ts",
+      "loc": 226,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__memory-types.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-187",
+      "path": "src/core/mode-presets.ts",
+      "loc": 113,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__mode-presets.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-188",
+      "path": "src/core/model-equivalence.ts",
+      "loc": 149,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__model-equivalence.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-189",
+      "path": "src/core/model-registry.ts",
+      "loc": 316,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__model-registry.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-190",
+      "path": "src/core/monitoring-types.ts",
+      "loc": 124,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__monitoring-types.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-191",
+      "path": "src/core/multi-ide.ts",
+      "loc": 169,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__multi-ide.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-192",
+      "path": "src/core/nervous-types.ts",
+      "loc": 332,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__nervous-types.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-193",
+      "path": "src/core/notification-config.ts",
+      "loc": 96,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__notification-config.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-194",
+      "path": "src/core/notification-dispatcher.ts",
+      "loc": 200,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__notification-dispatcher.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-195",
+      "path": "src/core/notification-providers/discord.ts",
+      "loc": 111,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__notification-providers__discord.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-196",
+      "path": "src/core/notification-providers/slack.ts",
+      "loc": 96,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__notification-providers__slack.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-197",
+      "path": "src/core/notification-providers/webhook.ts",
+      "loc": 91,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__notification-providers__webhook.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-198",
+      "path": "src/core/notifications.ts",
+      "loc": 119,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__notifications.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-199",
+      "path": "src/core/notify-adapters/cli-adapter.ts",
+      "loc": 80,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__notify-adapters__cli-adapter.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-200",
+      "path": "src/core/notify-adapters/file-adapter.ts",
+      "loc": 42,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__notify-adapters__file-adapter.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-201",
+      "path": "src/core/notify-adapters/mcp-adapter.ts",
+      "loc": 85,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__notify-adapters__mcp-adapter.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-202",
+      "path": "src/core/notify-registry.ts",
+      "loc": 43,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__notify-registry.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-203",
+      "path": "src/core/notify.ts",
+      "loc": 103,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__notify.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-204",
+      "path": "src/core/observability-rotation.ts",
+      "loc": 171,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__observability-rotation.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-205",
+      "path": "src/core/observability.ts",
+      "loc": 480,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__observability.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-206",
+      "path": "src/core/orphan-cleaner.ts",
+      "loc": 432,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__orphan-cleaner.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-207",
+      "path": "src/core/output-collector.ts",
+      "loc": 460,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__output-collector.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-208",
+      "path": "src/core/output-formatter.ts",
+      "loc": 235,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__output-formatter.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-209",
+      "path": "src/core/panic-guard.ts",
+      "loc": 142,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__panic-guard.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-210",
+      "path": "src/core/pid-liveness.ts",
+      "loc": 32,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__pid-liveness.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-211",
+      "path": "src/core/plugin-hooks.ts",
+      "loc": 834,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__plugin-hooks.md",
+      "effort": "high"
+    },
+    {
+      "task_id": "186-212",
+      "path": "src/core/plugin-loader.ts",
+      "loc": 162,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__plugin-loader.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-213",
+      "path": "src/core/plugin.ts",
+      "loc": 489,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__plugin.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-214",
+      "path": "src/core/pricing-updater.ts",
+      "loc": 530,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__pricing-updater.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-215",
+      "path": "src/core/provider-capabilities.ts",
+      "loc": 157,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__provider-capabilities.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-216",
+      "path": "src/core/provider.ts",
+      "loc": 625,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__provider.md",
+      "effort": "high"
+    },
+    {
+      "task_id": "186-217",
+      "path": "src/core/provisioner.ts",
+      "loc": 230,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__provisioner.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-218",
+      "path": "src/core/redact-sensitive.ts",
+      "loc": 40,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__redact-sensitive.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-219",
+      "path": "src/core/routing-engine.ts",
+      "loc": 687,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__routing-engine.md",
+      "effort": "high"
+    },
+    {
+      "task_id": "186-220",
+      "path": "src/core/routing-types.ts",
+      "loc": 228,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__routing-types.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-221",
+      "path": "src/core/rule-generator.ts",
+      "loc": 418,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__rule-generator.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-222",
+      "path": "src/core/session-interface.ts",
+      "loc": 177,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__session-interface.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-223",
+      "path": "src/core/signature.ts",
+      "loc": 84,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__signature.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-224",
+      "path": "src/core/skill-cache.ts",
+      "loc": 197,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__skill-cache.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-225",
+      "path": "src/core/skill-pool.ts",
+      "loc": 307,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__skill-pool.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-226",
+      "path": "src/core/skill-registry.ts",
+      "loc": 135,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__skill-registry.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-227",
+      "path": "src/core/skill-selector.ts",
+      "loc": 200,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__skill-selector.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-228",
+      "path": "src/core/skill-types.ts",
+      "loc": 115,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__skill-types.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-229",
+      "path": "src/core/spawn-safety.ts",
+      "loc": 169,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__spawn-safety.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-230",
+      "path": "src/core/sprint-file-retention.ts",
+      "loc": 355,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__sprint-file-retention.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-231",
+      "path": "src/core/sprint-types.ts",
+      "loc": 167,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__sprint-types.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-232",
+      "path": "src/core/stack-detector.ts",
+      "loc": 737,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__stack-detector.md",
+      "effort": "high"
+    },
+    {
+      "task_id": "186-233",
+      "path": "src/core/subscription.ts",
+      "loc": 155,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__subscription.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-234",
+      "path": "src/core/system-capacity.ts",
+      "loc": 93,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__system-capacity.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-235",
+      "path": "src/core/system-profile.ts",
+      "loc": 31,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__system-profile.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-236",
+      "path": "src/core/task-types.ts",
+      "loc": 368,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__task-types.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-237",
+      "path": "src/core/telemetry.ts",
+      "loc": 67,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__telemetry.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-238",
+      "path": "src/core/token-counter.ts",
+      "loc": 204,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__token-counter.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-239",
+      "path": "src/core/types.ts",
+      "loc": 14,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__types.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-240",
+      "path": "src/core/utils.ts",
+      "loc": 341,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__utils.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-241",
+      "path": "src/core/validators.ts",
+      "loc": 123,
+      "subdir": "src/core",
+      "output": "docs/audits/per-file-2026-05-21/src__core__validators.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-242",
+      "path": "src/dashboard/analytics/agent-comparison-data.ts",
+      "loc": 121,
+      "subdir": "src/dashboard",
+      "output": "docs/audits/per-file-2026-05-21/src__dashboard__analytics__agent-comparison-data.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-243",
+      "path": "src/dashboard/analytics/analytics-data.ts",
+      "loc": 166,
+      "subdir": "src/dashboard",
+      "output": "docs/audits/per-file-2026-05-21/src__dashboard__analytics__analytics-data.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-244",
+      "path": "src/dashboard/analytics/skill-heatmap-data.ts",
+      "loc": 147,
+      "subdir": "src/dashboard",
+      "output": "docs/audits/per-file-2026-05-21/src__dashboard__analytics__skill-heatmap-data.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-245",
+      "path": "src/dashboard/analytics/success-chart-data.ts",
+      "loc": 113,
+      "subdir": "src/dashboard",
+      "output": "docs/audits/per-file-2026-05-21/src__dashboard__analytics__success-chart-data.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-246",
+      "path": "src/dashboard/api/output-stream.ts",
+      "loc": 266,
+      "subdir": "src/dashboard",
+      "output": "docs/audits/per-file-2026-05-21/src__dashboard__api__output-stream.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-247",
+      "path": "src/dashboard/src/App.tsx",
+      "loc": 34,
+      "subdir": "src/dashboard",
+      "output": "docs/audits/per-file-2026-05-21/src__dashboard__src__App.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-248",
+      "path": "src/dashboard/src/components/ActivityFeed.tsx",
+      "loc": 199,
+      "subdir": "src/dashboard",
+      "output": "docs/audits/per-file-2026-05-21/src__dashboard__src__components__ActivityFeed.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-249",
+      "path": "src/dashboard/src/components/AgentDetail.tsx",
+      "loc": 234,
+      "subdir": "src/dashboard",
+      "output": "docs/audits/per-file-2026-05-21/src__dashboard__src__components__AgentDetail.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-250",
+      "path": "src/dashboard/src/components/DebtTable.tsx",
+      "loc": 92,
+      "subdir": "src/dashboard",
+      "output": "docs/audits/per-file-2026-05-21/src__dashboard__src__components__DebtTable.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-251",
+      "path": "src/dashboard/src/components/DockPanel.tsx",
+      "loc": 68,
+      "subdir": "src/dashboard",
+      "output": "docs/audits/per-file-2026-05-21/src__dashboard__src__components__DockPanel.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-252",
+      "path": "src/dashboard/src/components/EmptyState.tsx",
+      "loc": 34,
+      "subdir": "src/dashboard",
+      "output": "docs/audits/per-file-2026-05-21/src__dashboard__src__components__EmptyState.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-253",
+      "path": "src/dashboard/src/components/Layout.tsx",
+      "loc": 164,
+      "subdir": "src/dashboard",
+      "output": "docs/audits/per-file-2026-05-21/src__dashboard__src__components__Layout.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-254",
+      "path": "src/dashboard/src/components/NewSprintModal.tsx",
+      "loc": 171,
+      "subdir": "src/dashboard",
+      "output": "docs/audits/per-file-2026-05-21/src__dashboard__src__components__NewSprintModal.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-255",
+      "path": "src/dashboard/src/components/SimpleMarkdown.tsx",
+      "loc": 99,
+      "subdir": "src/dashboard",
+      "output": "docs/audits/per-file-2026-05-21/src__dashboard__src__components__SimpleMarkdown.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-256",
+      "path": "src/dashboard/src/components/Skeleton.tsx",
+      "loc": 78,
+      "subdir": "src/dashboard",
+      "output": "docs/audits/per-file-2026-05-21/src__dashboard__src__components__Skeleton.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-257",
+      "path": "src/dashboard/src/components/SprintChart.tsx",
+      "loc": 124,
+      "subdir": "src/dashboard",
+      "output": "docs/audits/per-file-2026-05-21/src__dashboard__src__components__SprintChart.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-258",
+      "path": "src/dashboard/src/components/SprintPhaseTimeline.tsx",
+      "loc": 96,
+      "subdir": "src/dashboard",
+      "output": "docs/audits/per-file-2026-05-21/src__dashboard__src__components__SprintPhaseTimeline.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-259",
+      "path": "src/dashboard/src/components/SprintSummary.tsx",
+      "loc": 404,
+      "subdir": "src/dashboard",
+      "output": "docs/audits/per-file-2026-05-21/src__dashboard__src__components__SprintSummary.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-260",
+      "path": "src/dashboard/src/components/TaskCard.tsx",
+      "loc": 380,
+      "subdir": "src/dashboard",
+      "output": "docs/audits/per-file-2026-05-21/src__dashboard__src__components__TaskCard.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-261",
+      "path": "src/dashboard/src/components/ThemeProvider.tsx",
+      "loc": 34,
+      "subdir": "src/dashboard",
+      "output": "docs/audits/per-file-2026-05-21/src__dashboard__src__components__ThemeProvider.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-262",
+      "path": "src/dashboard/src/components/WorkerCard.tsx",
+      "loc": 209,
+      "subdir": "src/dashboard",
+      "output": "docs/audits/per-file-2026-05-21/src__dashboard__src__components__WorkerCard.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-263",
+      "path": "src/dashboard/src/components/terminal/TerminalPanel.tsx",
+      "loc": 64,
+      "subdir": "src/dashboard",
+      "output": "docs/audits/per-file-2026-05-21/src__dashboard__src__components__terminal__TerminalPanel.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-264",
+      "path": "src/dashboard/src/components/terminal/TerminalTabs.tsx",
+      "loc": 55,
+      "subdir": "src/dashboard",
+      "output": "docs/audits/per-file-2026-05-21/src__dashboard__src__components__terminal__TerminalTabs.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-265",
+      "path": "src/dashboard/src/components/terminal/TerminalView.tsx",
+      "loc": 46,
+      "subdir": "src/dashboard",
+      "output": "docs/audits/per-file-2026-05-21/src__dashboard__src__components__terminal__TerminalView.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-266",
+      "path": "src/dashboard/src/components/terminal/useTerminalSocket.ts",
+      "loc": 66,
+      "subdir": "src/dashboard",
+      "output": "docs/audits/per-file-2026-05-21/src__dashboard__src__components__terminal__useTerminalSocket.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-267",
+      "path": "src/dashboard/src/components/ui/badge.tsx",
+      "loc": 37,
+      "subdir": "src/dashboard",
+      "output": "docs/audits/per-file-2026-05-21/src__dashboard__src__components__ui__badge.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-268",
+      "path": "src/dashboard/src/components/ui/button.tsx",
+      "loc": 49,
+      "subdir": "src/dashboard",
+      "output": "docs/audits/per-file-2026-05-21/src__dashboard__src__components__ui__button.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-269",
+      "path": "src/dashboard/src/components/ui/card.tsx",
+      "loc": 44,
+      "subdir": "src/dashboard",
+      "output": "docs/audits/per-file-2026-05-21/src__dashboard__src__components__ui__card.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-270",
+      "path": "src/dashboard/src/components/ui/dialog.tsx",
+      "loc": 183,
+      "subdir": "src/dashboard",
+      "output": "docs/audits/per-file-2026-05-21/src__dashboard__src__components__ui__dialog.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-271",
+      "path": "src/dashboard/src/components/ui/input.tsx",
+      "loc": 24,
+      "subdir": "src/dashboard",
+      "output": "docs/audits/per-file-2026-05-21/src__dashboard__src__components__ui__input.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-272",
+      "path": "src/dashboard/src/components/ui/label.tsx",
+      "loc": 23,
+      "subdir": "src/dashboard",
+      "output": "docs/audits/per-file-2026-05-21/src__dashboard__src__components__ui__label.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-273",
+      "path": "src/dashboard/src/components/ui/progress.tsx",
+      "loc": 42,
+      "subdir": "src/dashboard",
+      "output": "docs/audits/per-file-2026-05-21/src__dashboard__src__components__ui__progress.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-274",
+      "path": "src/dashboard/src/components/ui/scroll-area.tsx",
+      "loc": 18,
+      "subdir": "src/dashboard",
+      "output": "docs/audits/per-file-2026-05-21/src__dashboard__src__components__ui__scroll-area.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-275",
+      "path": "src/dashboard/src/components/ui/select.tsx",
+      "loc": 25,
+      "subdir": "src/dashboard",
+      "output": "docs/audits/per-file-2026-05-21/src__dashboard__src__components__ui__select.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-276",
+      "path": "src/dashboard/src/components/ui/separator.tsx",
+      "loc": 28,
+      "subdir": "src/dashboard",
+      "output": "docs/audits/per-file-2026-05-21/src__dashboard__src__components__ui__separator.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-277",
+      "path": "src/dashboard/src/components/ui/sheet.tsx",
+      "loc": 126,
+      "subdir": "src/dashboard",
+      "output": "docs/audits/per-file-2026-05-21/src__dashboard__src__components__ui__sheet.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-278",
+      "path": "src/dashboard/src/components/ui/table.tsx",
+      "loc": 80,
+      "subdir": "src/dashboard",
+      "output": "docs/audits/per-file-2026-05-21/src__dashboard__src__components__ui__table.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-279",
+      "path": "src/dashboard/src/components/ui/tabs.tsx",
+      "loc": 124,
+      "subdir": "src/dashboard",
+      "output": "docs/audits/per-file-2026-05-21/src__dashboard__src__components__ui__tabs.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-280",
+      "path": "src/dashboard/src/components/ui/textarea.tsx",
+      "loc": 24,
+      "subdir": "src/dashboard",
+      "output": "docs/audits/per-file-2026-05-21/src__dashboard__src__components__ui__textarea.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-281",
+      "path": "src/dashboard/src/hooks/useApi.ts",
+      "loc": 33,
+      "subdir": "src/dashboard",
+      "output": "docs/audits/per-file-2026-05-21/src__dashboard__src__hooks__useApi.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-282",
+      "path": "src/dashboard/src/hooks/useSSE.ts",
+      "loc": 58,
+      "subdir": "src/dashboard",
+      "output": "docs/audits/per-file-2026-05-21/src__dashboard__src__hooks__useSSE.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-283",
+      "path": "src/dashboard/src/i18n/LanguageProvider.tsx",
+      "loc": 68,
+      "subdir": "src/dashboard",
+      "output": "docs/audits/per-file-2026-05-21/src__dashboard__src__i18n__LanguageProvider.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-284",
+      "path": "src/dashboard/src/i18n/en.ts",
+      "loc": 417,
+      "subdir": "src/dashboard",
+      "output": "docs/audits/per-file-2026-05-21/src__dashboard__src__i18n__en.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-285",
+      "path": "src/dashboard/src/i18n/tr.ts",
+      "loc": 417,
+      "subdir": "src/dashboard",
+      "output": "docs/audits/per-file-2026-05-21/src__dashboard__src__i18n__tr.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-286",
+      "path": "src/dashboard/src/i18n/types.ts",
+      "loc": 24,
+      "subdir": "src/dashboard",
+      "output": "docs/audits/per-file-2026-05-21/src__dashboard__src__i18n__types.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-287",
+      "path": "src/dashboard/src/lib/api.ts",
+      "loc": 30,
+      "subdir": "src/dashboard",
+      "output": "docs/audits/per-file-2026-05-21/src__dashboard__src__lib__api.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-288",
+      "path": "src/dashboard/src/lib/terminal-api.ts",
+      "loc": 60,
+      "subdir": "src/dashboard",
+      "output": "docs/audits/per-file-2026-05-21/src__dashboard__src__lib__terminal-api.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-289",
+      "path": "src/dashboard/src/lib/utils.ts",
+      "loc": 7,
+      "subdir": "src/dashboard",
+      "output": "docs/audits/per-file-2026-05-21/src__dashboard__src__lib__utils.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-290",
+      "path": "src/dashboard/src/main.tsx",
+      "loc": 11,
+      "subdir": "src/dashboard",
+      "output": "docs/audits/per-file-2026-05-21/src__dashboard__src__main.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-291",
+      "path": "src/dashboard/src/pages/ChatPage.tsx",
+      "loc": 319,
+      "subdir": "src/dashboard",
+      "output": "docs/audits/per-file-2026-05-21/src__dashboard__src__pages__ChatPage.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-292",
+      "path": "src/dashboard/src/pages/ConfigPage.tsx",
+      "loc": 519,
+      "subdir": "src/dashboard",
+      "output": "docs/audits/per-file-2026-05-21/src__dashboard__src__pages__ConfigPage.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-293",
+      "path": "src/dashboard/src/pages/DashboardPage.tsx",
+      "loc": 400,
+      "subdir": "src/dashboard",
+      "output": "docs/audits/per-file-2026-05-21/src__dashboard__src__pages__DashboardPage.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-294",
+      "path": "src/dashboard/src/pages/HistoryPage.tsx",
+      "loc": 165,
+      "subdir": "src/dashboard",
+      "output": "docs/audits/per-file-2026-05-21/src__dashboard__src__pages__HistoryPage.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-295",
+      "path": "src/dashboard/src/pages/MemoryPage.tsx",
+      "loc": 81,
+      "subdir": "src/dashboard",
+      "output": "docs/audits/per-file-2026-05-21/src__dashboard__src__pages__MemoryPage.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-296",
+      "path": "src/dashboard/src/pages/SettingsPage.tsx",
+      "loc": 6,
+      "subdir": "src/dashboard",
+      "output": "docs/audits/per-file-2026-05-21/src__dashboard__src__pages__SettingsPage.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-297",
+      "path": "src/dashboard/src/pages/StatusPage.tsx",
+      "loc": 69,
+      "subdir": "src/dashboard",
+      "output": "docs/audits/per-file-2026-05-21/src__dashboard__src__pages__StatusPage.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-298",
+      "path": "src/dashboard/src/routes.tsx",
+      "loc": 14,
+      "subdir": "src/dashboard",
+      "output": "docs/audits/per-file-2026-05-21/src__dashboard__src__routes.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-299",
+      "path": "src/dashboard/src/types/index.ts",
+      "loc": 99,
+      "subdir": "src/dashboard",
+      "output": "docs/audits/per-file-2026-05-21/src__dashboard__src__types__index.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-300",
+      "path": "src/dashboard/vite.config.d.ts",
+      "loc": 3,
+      "subdir": "src/dashboard",
+      "output": "docs/audits/per-file-2026-05-21/src__dashboard__vite.config.d.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-301",
+      "path": "src/dashboard/vite.config.ts",
+      "loc": 17,
+      "subdir": "src/dashboard",
+      "output": "docs/audits/per-file-2026-05-21/src__dashboard__vite.config.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-302",
+      "path": "src/dashboard/vitest.config.ts",
+      "loc": 17,
+      "subdir": "src/dashboard",
+      "output": "docs/audits/per-file-2026-05-21/src__dashboard__vitest.config.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-303",
+      "path": "src/extensions/vscode/extension.ts",
+      "loc": 90,
+      "subdir": "src/extensions",
+      "output": "docs/audits/per-file-2026-05-21/src__extensions__vscode__extension.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-304",
+      "path": "src/index.ts",
+      "loc": 5,
+      "subdir": "src/index.ts",
+      "output": "docs/audits/per-file-2026-05-21/src__index.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-305",
+      "path": "src/mcp/helpers/enrich.ts",
+      "loc": 99,
+      "subdir": "src/mcp",
+      "output": "docs/audits/per-file-2026-05-21/src__mcp__helpers__enrich.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-306",
+      "path": "src/mcp/helpers/format.ts",
+      "loc": 324,
+      "subdir": "src/mcp",
+      "output": "docs/audits/per-file-2026-05-21/src__mcp__helpers__format.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-307",
+      "path": "src/mcp/helpers/index.ts",
+      "loc": 23,
+      "subdir": "src/mcp",
+      "output": "docs/audits/per-file-2026-05-21/src__mcp__helpers__index.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-308",
+      "path": "src/mcp/resources/agents.ts",
+      "loc": 47,
+      "subdir": "src/mcp",
+      "output": "docs/audits/per-file-2026-05-21/src__mcp__resources__agents.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-309",
+      "path": "src/mcp/resources/config.ts",
+      "loc": 37,
+      "subdir": "src/mcp",
+      "output": "docs/audits/per-file-2026-05-21/src__mcp__resources__config.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-310",
+      "path": "src/mcp/resources/dashboard.ts",
+      "loc": 33,
+      "subdir": "src/mcp",
+      "output": "docs/audits/per-file-2026-05-21/src__mcp__resources__dashboard.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-311",
+      "path": "src/mcp/resources/debt.ts",
+      "loc": 51,
+      "subdir": "src/mcp",
+      "output": "docs/audits/per-file-2026-05-21/src__mcp__resources__debt.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-312",
+      "path": "src/mcp/resources/directives.ts",
+      "loc": 27,
+      "subdir": "src/mcp",
+      "output": "docs/audits/per-file-2026-05-21/src__mcp__resources__directives.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-313",
+      "path": "src/mcp/resources/index.ts",
+      "loc": 21,
+      "subdir": "src/mcp",
+      "output": "docs/audits/per-file-2026-05-21/src__mcp__resources__index.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-314",
+      "path": "src/mcp/resources/memory.ts",
+      "loc": 37,
+      "subdir": "src/mcp",
+      "output": "docs/audits/per-file-2026-05-21/src__mcp__resources__memory.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-315",
+      "path": "src/mcp/resources/retro.ts",
+      "loc": 37,
+      "subdir": "src/mcp",
+      "output": "docs/audits/per-file-2026-05-21/src__mcp__resources__retro.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-316",
+      "path": "src/mcp/resources/tasks.ts",
+      "loc": 42,
+      "subdir": "src/mcp",
+      "output": "docs/audits/per-file-2026-05-21/src__mcp__resources__tasks.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-317",
+      "path": "src/mcp/server-singleton-lock.ts",
+      "loc": 128,
+      "subdir": "src/mcp",
+      "output": "docs/audits/per-file-2026-05-21/src__mcp__server-singleton-lock.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-318",
+      "path": "src/mcp/server.ts",
+      "loc": 225,
+      "subdir": "src/mcp",
+      "output": "docs/audits/per-file-2026-05-21/src__mcp__server.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-319",
+      "path": "src/mcp/tools/agent-list.ts",
+      "loc": 112,
+      "subdir": "src/mcp",
+      "output": "docs/audits/per-file-2026-05-21/src__mcp__tools__agent-list.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-320",
+      "path": "src/mcp/tools/analyze.ts",
+      "loc": 49,
+      "subdir": "src/mcp",
+      "output": "docs/audits/per-file-2026-05-21/src__mcp__tools__analyze.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-321",
+      "path": "src/mcp/tools/audit.ts",
+      "loc": 58,
+      "subdir": "src/mcp",
+      "output": "docs/audits/per-file-2026-05-21/src__mcp__tools__audit.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-322",
+      "path": "src/mcp/tools/checkpoint.ts",
+      "loc": 149,
+      "subdir": "src/mcp",
+      "output": "docs/audits/per-file-2026-05-21/src__mcp__tools__checkpoint.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-323",
+      "path": "src/mcp/tools/cleanup.ts",
+      "loc": 139,
+      "subdir": "src/mcp",
+      "output": "docs/audits/per-file-2026-05-21/src__mcp__tools__cleanup.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-324",
+      "path": "src/mcp/tools/config.ts",
+      "loc": 88,
+      "subdir": "src/mcp",
+      "output": "docs/audits/per-file-2026-05-21/src__mcp__tools__config.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-325",
+      "path": "src/mcp/tools/directives.ts",
+      "loc": 88,
+      "subdir": "src/mcp",
+      "output": "docs/audits/per-file-2026-05-21/src__mcp__tools__directives.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-326",
+      "path": "src/mcp/tools/docs.ts",
+      "loc": 144,
+      "subdir": "src/mcp",
+      "output": "docs/audits/per-file-2026-05-21/src__mcp__tools__docs.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-327",
+      "path": "src/mcp/tools/doctor.ts",
+      "loc": 90,
+      "subdir": "src/mcp",
+      "output": "docs/audits/per-file-2026-05-21/src__mcp__tools__doctor.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-328",
+      "path": "src/mcp/tools/explain.ts",
+      "loc": 150,
+      "subdir": "src/mcp",
+      "output": "docs/audits/per-file-2026-05-21/src__mcp__tools__explain.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-329",
+      "path": "src/mcp/tools/feature-query.ts",
+      "loc": 146,
+      "subdir": "src/mcp",
+      "output": "docs/audits/per-file-2026-05-21/src__mcp__tools__feature-query.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-330",
+      "path": "src/mcp/tools/help.ts",
+      "loc": 243,
+      "subdir": "src/mcp",
+      "output": "docs/audits/per-file-2026-05-21/src__mcp__tools__help.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-331",
+      "path": "src/mcp/tools/history.ts",
+      "loc": 87,
+      "subdir": "src/mcp",
+      "output": "docs/audits/per-file-2026-05-21/src__mcp__tools__history.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-332",
+      "path": "src/mcp/tools/index.ts",
+      "loc": 59,
+      "subdir": "src/mcp",
+      "output": "docs/audits/per-file-2026-05-21/src__mcp__tools__index.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-333",
+      "path": "src/mcp/tools/init.ts",
+      "loc": 313,
+      "subdir": "src/mcp",
+      "output": "docs/audits/per-file-2026-05-21/src__mcp__tools__init.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-334",
+      "path": "src/mcp/tools/job-runner.ts",
+      "loc": 98,
+      "subdir": "src/mcp",
+      "output": "docs/audits/per-file-2026-05-21/src__mcp__tools__job-runner.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-335",
+      "path": "src/mcp/tools/kill.ts",
+      "loc": 125,
+      "subdir": "src/mcp",
+      "output": "docs/audits/per-file-2026-05-21/src__mcp__tools__kill.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-336",
+      "path": "src/mcp/tools/memory-query.ts",
+      "loc": 73,
+      "subdir": "src/mcp",
+      "output": "docs/audits/per-file-2026-05-21/src__mcp__tools__memory-query.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-337",
+      "path": "src/mcp/tools/nervous.ts",
+      "loc": 509,
+      "subdir": "src/mcp",
+      "output": "docs/audits/per-file-2026-05-21/src__mcp__tools__nervous.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-338",
+      "path": "src/mcp/tools/plan.ts",
+      "loc": 111,
+      "subdir": "src/mcp",
+      "output": "docs/audits/per-file-2026-05-21/src__mcp__tools__plan.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-339",
+      "path": "src/mcp/tools/recover.ts",
+      "loc": 128,
+      "subdir": "src/mcp",
+      "output": "docs/audits/per-file-2026-05-21/src__mcp__tools__recover.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-340",
+      "path": "src/mcp/tools/retro.ts",
+      "loc": 109,
+      "subdir": "src/mcp",
+      "output": "docs/audits/per-file-2026-05-21/src__mcp__tools__retro.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-341",
+      "path": "src/mcp/tools/review.ts",
+      "loc": 134,
+      "subdir": "src/mcp",
+      "output": "docs/audits/per-file-2026-05-21/src__mcp__tools__review.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-342",
+      "path": "src/mcp/tools/run.ts",
+      "loc": 114,
+      "subdir": "src/mcp",
+      "output": "docs/audits/per-file-2026-05-21/src__mcp__tools__run.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-343",
+      "path": "src/mcp/tools/skill-list.ts",
+      "loc": 101,
+      "subdir": "src/mcp",
+      "output": "docs/audits/per-file-2026-05-21/src__mcp__tools__skill-list.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-344",
+      "path": "src/mcp/tools/start.ts",
+      "loc": 238,
+      "subdir": "src/mcp",
+      "output": "docs/audits/per-file-2026-05-21/src__mcp__tools__start.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-345",
+      "path": "src/mcp/tools/status.ts",
+      "loc": 488,
+      "subdir": "src/mcp",
+      "output": "docs/audits/per-file-2026-05-21/src__mcp__tools__status.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-346",
+      "path": "src/mcp/tools/sync.ts",
+      "loc": 50,
+      "subdir": "src/mcp",
+      "output": "docs/audits/per-file-2026-05-21/src__mcp__tools__sync.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-347",
+      "path": "src/mcp/tools/watch.ts",
+      "loc": 130,
+      "subdir": "src/mcp",
+      "output": "docs/audits/per-file-2026-05-21/src__mcp__tools__watch.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-348",
+      "path": "src/monitor/alert-emitter.ts",
+      "loc": 70,
+      "subdir": "src/monitor",
+      "output": "docs/audits/per-file-2026-05-21/src__monitor__alert-emitter.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-349",
+      "path": "src/monitor/auditor.ts",
+      "loc": 2851,
+      "subdir": "src/monitor",
+      "output": "docs/audits/per-file-2026-05-21/src__monitor__auditor.md",
+      "effort": "high"
+    },
+    {
+      "task_id": "186-350",
+      "path": "src/monitor/dashboard-manager.ts",
+      "loc": 259,
+      "subdir": "src/monitor",
+      "output": "docs/audits/per-file-2026-05-21/src__monitor__dashboard-manager.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-351",
+      "path": "src/monitor/index.ts",
+      "loc": 13,
+      "subdir": "src/monitor",
+      "output": "docs/audits/per-file-2026-05-21/src__monitor__index.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-352",
+      "path": "src/monitor/sprint-state.ts",
+      "loc": 64,
+      "subdir": "src/monitor",
+      "output": "docs/audits/per-file-2026-05-21/src__monitor__sprint-state.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-353",
+      "path": "src/nervous/action-handlers.ts",
+      "loc": 197,
+      "subdir": "src/nervous",
+      "output": "docs/audits/per-file-2026-05-21/src__nervous__action-handlers.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-354",
+      "path": "src/nervous/action-registry.ts",
+      "loc": 329,
+      "subdir": "src/nervous",
+      "output": "docs/audits/per-file-2026-05-21/src__nervous__action-registry.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-355",
+      "path": "src/nervous/authority-matrix.ts",
+      "loc": 185,
+      "subdir": "src/nervous",
+      "output": "docs/audits/per-file-2026-05-21/src__nervous__authority-matrix.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-356",
+      "path": "src/nervous/bootstrap.ts",
+      "loc": 143,
+      "subdir": "src/nervous",
+      "output": "docs/audits/per-file-2026-05-21/src__nervous__bootstrap.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-357",
+      "path": "src/nervous/decision-engine.ts",
+      "loc": 117,
+      "subdir": "src/nervous",
+      "output": "docs/audits/per-file-2026-05-21/src__nervous__decision-engine.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-358",
+      "path": "src/nervous/detector-registry.ts",
+      "loc": 203,
+      "subdir": "src/nervous",
+      "output": "docs/audits/per-file-2026-05-21/src__nervous__detector-registry.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-359",
+      "path": "src/nervous/detectors/agent-routing-anomaly.ts",
+      "loc": 114,
+      "subdir": "src/nervous",
+      "output": "docs/audits/per-file-2026-05-21/src__nervous__detectors__agent-routing-anomaly.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-360",
+      "path": "src/nervous/detectors/agent-routing.ts",
+      "loc": 139,
+      "subdir": "src/nervous",
+      "output": "docs/audits/per-file-2026-05-21/src__nervous__detectors__agent-routing.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-361",
+      "path": "src/nervous/detectors/build-failure-recurrence.ts",
+      "loc": 193,
+      "subdir": "src/nervous",
+      "output": "docs/audits/per-file-2026-05-21/src__nervous__detectors__build-failure-recurrence.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-362",
+      "path": "src/nervous/detectors/dead-event-stream.ts",
+      "loc": 161,
+      "subdir": "src/nervous",
+      "output": "docs/audits/per-file-2026-05-21/src__nervous__detectors__dead-event-stream.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-363",
+      "path": "src/nervous/detectors/debt-trend.ts",
+      "loc": 118,
+      "subdir": "src/nervous",
+      "output": "docs/audits/per-file-2026-05-21/src__nervous__detectors__debt-trend.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-364",
+      "path": "src/nervous/detectors/directives-protection.ts",
+      "loc": 92,
+      "subdir": "src/nervous",
+      "output": "docs/audits/per-file-2026-05-21/src__nervous__detectors__directives-protection.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-365",
+      "path": "src/nervous/detectors/notification-delivery-health.ts",
+      "loc": 124,
+      "subdir": "src/nervous",
+      "output": "docs/audits/per-file-2026-05-21/src__nervous__detectors__notification-delivery-health.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-366",
+      "path": "src/nervous/detectors/scope-collision-rate.ts",
+      "loc": 101,
+      "subdir": "src/nervous",
+      "output": "docs/audits/per-file-2026-05-21/src__nervous__detectors__scope-collision-rate.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-367",
+      "path": "src/nervous/detectors/scope-collision.ts",
+      "loc": 197,
+      "subdir": "src/nervous",
+      "output": "docs/audits/per-file-2026-05-21/src__nervous__detectors__scope-collision.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-368",
+      "path": "src/nervous/detectors/stale-worker.ts",
+      "loc": 62,
+      "subdir": "src/nervous",
+      "output": "docs/audits/per-file-2026-05-21/src__nervous__detectors__stale-worker.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-369",
+      "path": "src/nervous/detectors/task-mode-idle.ts",
+      "loc": 73,
+      "subdir": "src/nervous",
+      "output": "docs/audits/per-file-2026-05-21/src__nervous__detectors__task-mode-idle.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-370",
+      "path": "src/nervous/detectors/token-spike.ts",
+      "loc": 140,
+      "subdir": "src/nervous",
+      "output": "docs/audits/per-file-2026-05-21/src__nervous__detectors__token-spike.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-371",
+      "path": "src/nervous/dispatcher.ts",
+      "loc": 345,
+      "subdir": "src/nervous",
+      "output": "docs/audits/per-file-2026-05-21/src__nervous__dispatcher.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-372",
+      "path": "src/nervous/executor.ts",
+      "loc": 300,
+      "subdir": "src/nervous",
+      "output": "docs/audits/per-file-2026-05-21/src__nervous__executor.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-373",
+      "path": "src/nervous/history.ts",
+      "loc": 143,
+      "subdir": "src/nervous",
+      "output": "docs/audits/per-file-2026-05-21/src__nervous__history.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-374",
+      "path": "src/nervous/ipc-queue.ts",
+      "loc": 238,
+      "subdir": "src/nervous",
+      "output": "docs/audits/per-file-2026-05-21/src__nervous__ipc-queue.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-375",
+      "path": "src/nervous/observer.ts",
+      "loc": 427,
+      "subdir": "src/nervous",
+      "output": "docs/audits/per-file-2026-05-21/src__nervous__observer.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-376",
+      "path": "src/nervous/proposer.ts",
+      "loc": 158,
+      "subdir": "src/nervous",
+      "output": "docs/audits/per-file-2026-05-21/src__nervous__proposer.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-377",
+      "path": "src/nervous/runtime-scope-check.ts",
+      "loc": 56,
+      "subdir": "src/nervous",
+      "output": "docs/audits/per-file-2026-05-21/src__nervous__runtime-scope-check.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-378",
+      "path": "src/orchestra/adr-selector.ts",
+      "loc": 389,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__adr-selector.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-379",
+      "path": "src/orchestra/authority-enforcer.ts",
+      "loc": 674,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__authority-enforcer.md",
+      "effort": "high"
+    },
+    {
+      "task_id": "186-380",
+      "path": "src/orchestra/baseline-tracker.ts",
+      "loc": 281,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__baseline-tracker.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-381",
+      "path": "src/orchestra/batch-stats.ts",
+      "loc": 141,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__batch-stats.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-382",
+      "path": "src/orchestra/brain-context.ts",
+      "loc": 268,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__brain-context.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-383",
+      "path": "src/orchestra/brain.ts",
+      "loc": 54,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__brain.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-384",
+      "path": "src/orchestra/ci-reporter.ts",
+      "loc": 244,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__ci-reporter.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-385",
+      "path": "src/orchestra/conflict-resolver.ts",
+      "loc": 277,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__conflict-resolver.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-386",
+      "path": "src/orchestra/connector.ts",
+      "loc": 8,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__connector.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-387",
+      "path": "src/orchestra/coverage-validator.ts",
+      "loc": 324,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__coverage-validator.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-388",
+      "path": "src/orchestra/debt-manager.ts",
+      "loc": 599,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__debt-manager.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-389",
+      "path": "src/orchestra/decision-engine.ts",
+      "loc": 228,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__decision-engine.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-390",
+      "path": "src/orchestra/decision-logger.ts",
+      "loc": 150,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__decision-logger.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-391",
+      "path": "src/orchestra/decision-replay.ts",
+      "loc": 150,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__decision-replay.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-392",
+      "path": "src/orchestra/decision-steps/agent-step.ts",
+      "loc": 83,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__decision-steps__agent-step.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-393",
+      "path": "src/orchestra/decision-steps/scope-step.ts",
+      "loc": 92,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__decision-steps__scope-step.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-394",
+      "path": "src/orchestra/dependency-scheduler.ts",
+      "loc": 688,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__dependency-scheduler.md",
+      "effort": "high"
+    },
+    {
+      "task_id": "186-395",
+      "path": "src/orchestra/doc-updaters/changelog.ts",
+      "loc": 92,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__doc-updaters__changelog.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-396",
+      "path": "src/orchestra/doc-updaters/health-check.ts",
+      "loc": 78,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__doc-updaters__health-check.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-397",
+      "path": "src/orchestra/doc-updaters/index.ts",
+      "loc": 19,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__doc-updaters__index.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-398",
+      "path": "src/orchestra/doc-updaters/metrics-updater.ts",
+      "loc": 92,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__doc-updaters__metrics-updater.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-399",
+      "path": "src/orchestra/doc-updaters/readme-metrics.ts",
+      "loc": 58,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__doc-updaters__readme-metrics.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-400",
+      "path": "src/orchestra/doc-updaters/registry.ts",
+      "loc": 29,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__doc-updaters__registry.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-401",
+      "path": "src/orchestra/doc-updaters/sprint-log.ts",
+      "loc": 64,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__doc-updaters__sprint-log.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-402",
+      "path": "src/orchestra/doc-updaters/types.ts",
+      "loc": 29,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__doc-updaters__types.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-403",
+      "path": "src/orchestra/ecosystem-intelligence.ts",
+      "loc": 194,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__ecosystem-intelligence.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-404",
+      "path": "src/orchestra/evaluation-audit-trail.ts",
+      "loc": 192,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__evaluation-audit-trail.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-405",
+      "path": "src/orchestra/event-bus.ts",
+      "loc": 254,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__event-bus.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-406",
+      "path": "src/orchestra/event-stream.ts",
+      "loc": 528,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__event-stream.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-407",
+      "path": "src/orchestra/handoff-protocol.ts",
+      "loc": 152,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__handoff-protocol.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-408",
+      "path": "src/orchestra/heartbeat-daemon.ts",
+      "loc": 308,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__heartbeat-daemon.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-409",
+      "path": "src/orchestra/index.ts",
+      "loc": 110,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__index.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-410",
+      "path": "src/orchestra/ipc-registry.ts",
+      "loc": 271,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__ipc-registry.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-411",
+      "path": "src/orchestra/managed-docs/content-generators.ts",
+      "loc": 672,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__managed-docs__content-generators.md",
+      "effort": "high"
+    },
+    {
+      "task_id": "186-412",
+      "path": "src/orchestra/managed-docs/doc-cache.ts",
+      "loc": 139,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__managed-docs__doc-cache.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-413",
+      "path": "src/orchestra/managed-docs/docs-config.ts",
+      "loc": 170,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__managed-docs__docs-config.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-414",
+      "path": "src/orchestra/managed-docs/index.ts",
+      "loc": 9,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__managed-docs__index.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-415",
+      "path": "src/orchestra/managed-docs/managed-doc-runner.ts",
+      "loc": 199,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__managed-docs__managed-doc-runner.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-416",
+      "path": "src/orchestra/managed-docs/plugin-loader.ts",
+      "loc": 113,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__managed-docs__plugin-loader.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-417",
+      "path": "src/orchestra/managed-docs/section-updater.ts",
+      "loc": 146,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__managed-docs__section-updater.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-418",
+      "path": "src/orchestra/managed-docs/template-renderer.ts",
+      "loc": 136,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__managed-docs__template-renderer.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-419",
+      "path": "src/orchestra/managed-docs/types.ts",
+      "loc": 75,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__managed-docs__types.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-420",
+      "path": "src/orchestra/mid-sprint-adapter.ts",
+      "loc": 633,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__mid-sprint-adapter.md",
+      "effort": "high"
+    },
+    {
+      "task_id": "186-421",
+      "path": "src/orchestra/model-selector.ts",
+      "loc": 283,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__model-selector.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-422",
+      "path": "src/orchestra/monitor-adapter.ts",
+      "loc": 212,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__monitor-adapter.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-423",
+      "path": "src/orchestra/multi-agent.ts",
+      "loc": 121,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__multi-agent.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-424",
+      "path": "src/orchestra/outcome-tracker.ts",
+      "loc": 502,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__outcome-tracker.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-425",
+      "path": "src/orchestra/parallel-pipeline.ts",
+      "loc": 125,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__parallel-pipeline.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-426",
+      "path": "src/orchestra/pattern-reader.ts",
+      "loc": 164,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__pattern-reader.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-427",
+      "path": "src/orchestra/pattern-recorder.ts",
+      "loc": 96,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__pattern-recorder.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-428",
+      "path": "src/orchestra/planner.ts",
+      "loc": 672,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__planner.md",
+      "effort": "high"
+    },
+    {
+      "task_id": "186-429",
+      "path": "src/orchestra/post-sprint-smoke.ts",
+      "loc": 314,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__post-sprint-smoke.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-430",
+      "path": "src/orchestra/promotion-pipeline.ts",
+      "loc": 287,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__promotion-pipeline.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-431",
+      "path": "src/orchestra/prompt-god-template.ts",
+      "loc": 640,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__prompt-god-template.md",
+      "effort": "high"
+    },
+    {
+      "task_id": "186-432",
+      "path": "src/orchestra/prompt-token-optimizer.ts",
+      "loc": 154,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__prompt-token-optimizer.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-433",
+      "path": "src/orchestra/quality-assessor.ts",
+      "loc": 211,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__quality-assessor.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-434",
+      "path": "src/orchestra/result-collector.ts",
+      "loc": 753,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__result-collector.md",
+      "effort": "high"
+    },
+    {
+      "task_id": "186-435",
+      "path": "src/orchestra/result-evaluator.ts",
+      "loc": 2086,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__result-evaluator.md",
+      "effort": "high"
+    },
+    {
+      "task_id": "186-436",
+      "path": "src/orchestra/result-merger.ts",
+      "loc": 101,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__result-merger.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-437",
+      "path": "src/orchestra/result-watcher.ts",
+      "loc": 73,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__result-watcher.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-438",
+      "path": "src/orchestra/rollback.ts",
+      "loc": 354,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__rollback.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-439",
+      "path": "src/orchestra/rubric-registry.ts",
+      "loc": 316,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__rubric-registry.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-440",
+      "path": "src/orchestra/rule-evolver.ts",
+      "loc": 279,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__rule-evolver.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-441",
+      "path": "src/orchestra/scope-sanitizer.ts",
+      "loc": 155,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__scope-sanitizer.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-442",
+      "path": "src/orchestra/self-modifying-detector.ts",
+      "loc": 164,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__self-modifying-detector.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-443",
+      "path": "src/orchestra/sensitive-redactor.ts",
+      "loc": 62,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__sensitive-redactor.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-444",
+      "path": "src/orchestra/shared-memory.ts",
+      "loc": 143,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__shared-memory.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-445",
+      "path": "src/orchestra/spawn-backend-docker.ts",
+      "loc": 1059,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__spawn-backend-docker.md",
+      "effort": "high"
+    },
+    {
+      "task_id": "186-446",
+      "path": "src/orchestra/spawn-backend-mock.ts",
+      "loc": 108,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__spawn-backend-mock.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-447",
+      "path": "src/orchestra/spawn-backend.ts",
+      "loc": 373,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__spawn-backend.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-448",
+      "path": "src/orchestra/sprint-checkpoint.ts",
+      "loc": 644,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__sprint-checkpoint.md",
+      "effort": "high"
+    },
+    {
+      "task_id": "186-449",
+      "path": "src/orchestra/sprint-controller.ts",
+      "loc": 985,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__sprint-controller.md",
+      "effort": "high"
+    },
+    {
+      "task_id": "186-450",
+      "path": "src/orchestra/sprint-docs-helpers.ts",
+      "loc": 350,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__sprint-docs-helpers.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-451",
+      "path": "src/orchestra/sprint-docs-updater.ts",
+      "loc": 835,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__sprint-docs-updater.md",
+      "effort": "high"
+    },
+    {
+      "task_id": "186-452",
+      "path": "src/orchestra/sprint-estimator.ts",
+      "loc": 278,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__sprint-estimator.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-453",
+      "path": "src/orchestra/sprint-finalizer.ts",
+      "loc": 1311,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__sprint-finalizer.md",
+      "effort": "high"
+    },
+    {
+      "task_id": "186-454",
+      "path": "src/orchestra/sprint-lifecycle.ts",
+      "loc": 604,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__sprint-lifecycle.md",
+      "effort": "high"
+    },
+    {
+      "task_id": "186-455",
+      "path": "src/orchestra/sprint-metrics.ts",
+      "loc": 615,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__sprint-metrics.md",
+      "effort": "high"
+    },
+    {
+      "task_id": "186-456",
+      "path": "src/orchestra/sprint-phases.ts",
+      "loc": 1369,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__sprint-phases.md",
+      "effort": "high"
+    },
+    {
+      "task_id": "186-457",
+      "path": "src/orchestra/sprint-pid-manager.ts",
+      "loc": 252,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__sprint-pid-manager.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-458",
+      "path": "src/orchestra/sprint-planner.ts",
+      "loc": 847,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__sprint-planner.md",
+      "effort": "high"
+    },
+    {
+      "task_id": "186-459",
+      "path": "src/orchestra/sprint-reporter.ts",
+      "loc": 185,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__sprint-reporter.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-460",
+      "path": "src/orchestra/sprint-retro-writer.ts",
+      "loc": 744,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__sprint-retro-writer.md",
+      "effort": "high"
+    },
+    {
+      "task_id": "186-461",
+      "path": "src/orchestra/sprint-runner-entry.ts",
+      "loc": 334,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__sprint-runner-entry.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-462",
+      "path": "src/orchestra/sprint-spawner.ts",
+      "loc": 1085,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__sprint-spawner.md",
+      "effort": "high"
+    },
+    {
+      "task_id": "186-463",
+      "path": "src/orchestra/sprint-state-tracker.ts",
+      "loc": 114,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__sprint-state-tracker.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-464",
+      "path": "src/orchestra/sprint-utils.ts",
+      "loc": 362,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__sprint-utils.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-465",
+      "path": "src/orchestra/task-analyzer.ts",
+      "loc": 141,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__task-analyzer.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-466",
+      "path": "src/orchestra/task-builder.ts",
+      "loc": 1162,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__task-builder.md",
+      "effort": "high"
+    },
+    {
+      "task_id": "186-467",
+      "path": "src/orchestra/task-mode-runner.ts",
+      "loc": 123,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__task-mode-runner.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-468",
+      "path": "src/orchestra/task-restoration.ts",
+      "loc": 269,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__task-restoration.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-469",
+      "path": "src/orchestra/task-retry.ts",
+      "loc": 93,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__task-retry.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-470",
+      "path": "src/orchestra/task-router.ts",
+      "loc": 319,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__task-router.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-471",
+      "path": "src/orchestra/temp-skill-generator.ts",
+      "loc": 392,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__temp-skill-generator.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-472",
+      "path": "src/orchestra/timeout-estimator.ts",
+      "loc": 186,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__timeout-estimator.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-473",
+      "path": "src/orchestra/timeout-watcher.ts",
+      "loc": 306,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__timeout-watcher.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-474",
+      "path": "src/orchestra/tmux.ts",
+      "loc": 401,
+      "subdir": "src/orchestra",
+      "output": "docs/audits/per-file-2026-05-21/src__orchestra__tmux.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-475",
+      "path": "src/providers/claude.ts",
+      "loc": 276,
+      "subdir": "src/providers",
+      "output": "docs/audits/per-file-2026-05-21/src__providers__claude.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-476",
+      "path": "src/providers/codex.ts",
+      "loc": 372,
+      "subdir": "src/providers",
+      "output": "docs/audits/per-file-2026-05-21/src__providers__codex.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-477",
+      "path": "src/providers/gemini.ts",
+      "loc": 578,
+      "subdir": "src/providers",
+      "output": "docs/audits/per-file-2026-05-21/src__providers__gemini.md",
+      "effort": "normal"
+    },
+    {
+      "task_id": "186-478",
+      "path": "src/providers/sandbox.ts",
+      "loc": 162,
+      "subdir": "src/providers",
+      "output": "docs/audits/per-file-2026-05-21/src__providers__sandbox.md",
+      "effort": "low"
+    },
+    {
+      "task_id": "186-479",
+      "path": "src/providers/subprocess.ts",
+      "loc": 328,
+      "subdir": "src/providers",
+      "output": "docs/audits/per-file-2026-05-21/src__providers__subprocess.md",
+      "effort": "normal"
+    }
+  ]
+}
