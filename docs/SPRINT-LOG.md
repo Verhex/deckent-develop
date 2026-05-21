@@ -4990,3 +4990,34 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 182-017: W4-4 — Sprint 182 retro + Sprint 183 post-beta stub (DONE)
 
 ---
+## Sprint 183 — sprint-183
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-05-21
+**Duration:** 1507s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 13 |
+| Completed | 11 |
+| Tech Debt | 0 |
+| No-Go | 2 |
+| Coverage | 10.0% |
+| Duration | 1506938ms |
+
+### Tasks
+
+- 183-001: W1-1 — P0-1 Nervous PLAN-phase pasif (FSWatcher debounce + phase guard) (DONE)
+- 183-002: W1-2 — P0-2 DEPENDENCY_BLOCKED event spam debounce (state-change emit) (DONE)
+- 183-003: W1-3 — P0-3 Worker timeout root cause investigation + fix (DONE)
+- 183-004: W2-1 — Sprint 182 W1-1 recovery: mock hygiene orphan-cleaner-ipc + archive-debt (DONE)
+- 183-005: W2-2 — Sprint 182 W1-3 recovery: vitest CI=true parity smoke (DONE)
+- 183-006: W2-3 — Sprint 182 W2-2 recovery: title-prefix Dependencies resolver tamamla (DONE)
+- 183-007: W2-4 — Sprint 182 W3-PQ-7 recovery: integration smoke regression tamamla (DONE)
+- 183-008: W3-1 — Sprint 182 W4-1 recovery: validate:publish 6/6 GREEN recheck + Brain re-eval RC (DONE)
+- 183-009: W3-2 — Beta launch hijyen: npm pack + lint:adr + lint:link final (DONE)
+- 183-010: W3-3 — v1.0.0-beta.1 final smoke (build:all + vitest + dashboard + serve) (NO_GO)
+
+---

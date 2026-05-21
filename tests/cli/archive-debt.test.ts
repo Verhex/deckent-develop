@@ -20,22 +20,64 @@ import { DEBT_TABLE_HEADER } from '../../src/core/constants.js';
 // before cleanup and bled into adjacent suites. Listing the methods
 // explicitly makes the mock CI-stable regardless of importOriginal
 // resolution timing.
+//
+// Sprint 183 W2-1 sweep (mock-hygiene completion): the Sprint 182 partial
+// fix landed renameSync/copyFileSync/unlinkSync/rmSync/readdirSync but the
+// worker timed out before sweeping the remaining sync surface. This
+// extension explicitly pass-throughs every node:fs *Sync method reached
+// transitively by archive-debt code paths under CI=true (config.ts,
+// event-stream.ts, file-lock.ts, heartbeat-daemon.ts, sprint-controller.ts,
+// pid-liveness.ts, sprint-state-tracker.ts, et al.). Non-Sync surfaces
+// (watch/watchFile/createReadStream/promises/constants) plus class
+// constructors (Dirent/Stats) continue to resolve via the leading
+// `...actual` spread — the explicit list below is a redundant safety net
+// against the spread's known CI=true unreliability, not a replacement.
 vi.mock('node:fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs')>();
   return {
     ...actual,
+    // ── Test-controlled stubs (mocked behavior) ────────────────────
     readFileSync: vi.fn(),
     writeFileSync: vi.fn(),
     existsSync: vi.fn(),
     mkdirSync: vi.fn(),
     appendFileSync: vi.fn(),
     statSync: vi.fn(),
-    // Sprint 182 W1-1: explicit pass-through for config-recovery surfaces.
+    // ── Sprint 182 W1-1 explicit pass-through (config-recovery surface)
     renameSync: actual.renameSync,
     copyFileSync: actual.copyFileSync,
     unlinkSync: actual.unlinkSync,
     rmSync: actual.rmSync,
     readdirSync: actual.readdirSync,
+    // ── Sprint 183 W2-1 sweep: remaining sync surface used elsewhere
+    // in the src/ tree that may load transitively under CI=true parallel
+    // workers. Keep explicit even when `...actual` would suffice — the
+    // redundancy is the entire point of this guard.
+    rmdirSync: actual.rmdirSync,
+    cpSync: actual.cpSync,
+    accessSync: actual.accessSync,
+    lstatSync: actual.lstatSync,
+    realpathSync: actual.realpathSync,
+    readlinkSync: actual.readlinkSync,
+    chmodSync: actual.chmodSync,
+    chownSync: actual.chownSync,
+    linkSync: actual.linkSync,
+    symlinkSync: actual.symlinkSync,
+    truncateSync: actual.truncateSync,
+    ftruncateSync: actual.ftruncateSync,
+    utimesSync: actual.utimesSync,
+    futimesSync: actual.futimesSync,
+    openSync: actual.openSync,
+    closeSync: actual.closeSync,
+    readSync: actual.readSync,
+    writeSync: actual.writeSync,
+    fsyncSync: actual.fsyncSync,
+    fdatasyncSync: actual.fdatasyncSync,
+    fstatSync: actual.fstatSync,
+    mkdtempSync: actual.mkdtempSync,
+    opendirSync: actual.opendirSync,
+    // ── Non-Sync helpers the codebase still reaches synchronously
+    constants: actual.constants,
   };
 });
 

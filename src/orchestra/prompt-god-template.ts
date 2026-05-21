@@ -288,6 +288,25 @@ DO NOT touch files outside your scope — the auditor will flag violations.`;
 /** Max chars of dependency `notes` embedded into the prompt — keeps worker context bounded. */
 const DEPENDENCY_NOTES_MAX_CHARS = 500;
 
+/**
+ * Maximum char count for a single dependency digest entry, header included
+ * (Sprint 183 W1-3).
+ *
+ * Sprint 182 dogfood produced an 11-task dep chain — every predecessor digest
+ * fed back into downstream prompts, and a few entries with hundreds of
+ * `filesChanged` ballooned the prompt past the worker context budget, causing
+ * the "Worker exited without writing result (exitCode=0)" pattern documented
+ * in `docs/audits/sprint-183/worker-timeout-rc.md`.
+ *
+ * 2000 chars is a compromise: large enough to keep a reasonable diff summary
+ * (~30 filenames + truncated notes) but small enough that 10+ deps cannot
+ * cumulatively exceed the worker's safe context budget (10 × 2000 = 20K).
+ */
+export const DEPENDENCY_ENTRY_MAX_CHARS = 2000;
+
+/** Suffix appended when a dependency entry is truncated for size. */
+const DEPENDENCY_TRUNCATION_MARKER = '\n  - (dependency digest truncated for prompt size)';
+
 /** Subset of `.tasks/task-{id}.result` fields the dependency block embeds. */
 interface DependencyResultDigest {
   selfAssessment?: string;
@@ -400,7 +419,27 @@ function formatDependencyEntry(depId: string, result: DependencyResultDigest | n
     lines.push(`- Notes: ${notesText}`);
   }
 
-  return lines.join('\n');
+  return capDependencyEntry(lines.join('\n'));
+}
+
+/**
+ * Sprint 183 W1-3: enforce {@link DEPENDENCY_ENTRY_MAX_CHARS} per entry.
+ *
+ * When an entry exceeds the cap (long `filesChanged` list with hundreds of
+ * paths is the dominant overflow source — `notes` already get a 500-char
+ * paragraph cap), truncate at a UTF-8-safe slice boundary and append
+ * {@link DEPENDENCY_TRUNCATION_MARKER} so the worker can tell the digest is
+ * partial.
+ *
+ * The cap is applied after assembly so all three potential lines (header,
+ * files, notes) share the budget — a single oversized line cannot push the
+ * total past the bound.
+ */
+function capDependencyEntry(entry: string): string {
+  if (entry.length <= DEPENDENCY_ENTRY_MAX_CHARS) return entry;
+  const budget = DEPENDENCY_ENTRY_MAX_CHARS - DEPENDENCY_TRUNCATION_MARKER.length;
+  if (budget <= 0) return entry.slice(0, DEPENDENCY_ENTRY_MAX_CHARS);
+  return entry.slice(0, budget) + DEPENDENCY_TRUNCATION_MARKER;
 }
 
 export function buildDependenciesBlock(input: BuildDependenciesBlockInput): string;

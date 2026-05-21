@@ -74,11 +74,30 @@ const IDLE_SPRINT_STATE: SprintStateSnapshot = {
   completedTasks: 0,
 };
 
+/**
+ * Sprint 183 W1-1 (P0-1): detector dispatch debounce window.
+ * Multiple observer events arriving inside this window collapse to a SINGLE
+ * detector cycle. Prevents FS event amplification observed during Sprint 182
+ * dogfood (17 task JSON writes triggered 17 detector cycles).
+ */
+export const DETECTOR_DEBOUNCE_WINDOW_MS = 500;
+
+/**
+ * Sprint 183 W1-1 (P0-1): only run detector pipeline during EXECUTE phase.
+ * PLAN / SPAWN / EVALUATE / FIX / RETRO / DECAY / CLEANUP / IDLE skip detector
+ * cycle (raw 'observe' event still emitted for observability).
+ */
+const DETECTOR_ACTIVE_PHASE: SprintStateSnapshot['currentPhase'] = 'EXECUTE';
+
 export class NervousObserver extends EventEmitter {
   private readonly fsWatchers: Map<string, FSWatcher> = new Map();
   private cronTimer: ReturnType<typeof setInterval> | null = null;
   private _isStarted = false;
   private readonly detectorRegistry: DetectorRegistry | null;
+
+  // Sprint 183 W1-1 (P0-1): debounced detector dispatch state
+  private detectorDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+  private detectorPendingEvent: ObserverEvent | null = null;
 
   constructor(
     private readonly projectRoot: string,
@@ -137,23 +156,80 @@ export class NervousObserver extends EventEmitter {
       this.cronTimer = null;
     }
 
+    // Sprint 183 W1-1: pending detector dispatch'i iptal et
+    if (this.detectorDebounceTimer !== null) {
+      clearTimeout(this.detectorDebounceTimer);
+      this.detectorDebounceTimer = null;
+    }
+    this.detectorPendingEvent = null;
+
     this._isStarted = false;
   }
 
   // ─── Observe + Detect Pipeline ────────────────────────────────
 
   /**
-   * Bir ObserverEvent emit eder ve DetectorRegistry varsa runAll çalıştırır.
-   * Detector sonuçları 'detection' event'i olarak emit edilir.
+   * Bir ObserverEvent emit eder ve gerekli koşullar sağlanırsa detector
+   * pipeline'ını debounced olarak tetikler.
+   *
+   * Sprint 183 W1-1 (P0-1) — iki katman koruma:
+   *   1. **Phase guard:** detector cycle yalnızca EXECUTE phase'inde çalışır.
+   *      PLAN / SPAWN / EVALUATE vb. fazlarda raw 'observe' event yine emit
+   *      edilir (observability korunur) ancak detector pipeline atlanır.
+   *   2. **Debounce window:** ardışık observer event'ler 500ms pencereye
+   *      düşerse tek detector cycle tetikler — son event ctx'e taşınır.
    */
   private emitObserve(event: ObserverEvent): void {
     this.emit('observe', event);
+    this.scheduleDetectorDispatch(event);
+  }
 
+  /**
+   * Sprint 183 W1-1: phase guard + 500ms debounce ile detector pipeline.
+   * Internal — testler tarafından doğrudan çağrılmaz; emitObserve'ten gelir.
+   */
+  private scheduleDetectorDispatch(event: ObserverEvent): void {
     if (this.detectorRegistry === null) return;
+
+    // Phase guard — EXECUTE dışındaki fazlarda detector pasif.
+    // sprintStateProvider runtime'da phase değişimini yansıttığı için
+    // her çağrıda taze okunur.
+    const sprintState = this.sprintStateProvider();
+    if (sprintState.currentPhase !== DETECTOR_ACTIVE_PHASE) return;
+
+    // Debounce: pending event'i güncel olanla değiştir, timer'ı reset et.
+    this.detectorPendingEvent = event;
+    if (this.detectorDebounceTimer !== null) {
+      clearTimeout(this.detectorDebounceTimer);
+    }
+    const timer = setTimeout(() => {
+      this.flushDetectorDispatch();
+    }, DETECTOR_DEBOUNCE_WINDOW_MS);
+    // Detector dispatch process'i ayakta tutmamalı
+    if (timer && typeof timer === 'object' && 'unref' in timer) {
+      timer.unref();
+    }
+    this.detectorDebounceTimer = timer;
+  }
+
+  /**
+   * Debounce window dolduğunda detector pipeline'ını tek seferde çalıştırır.
+   * Phase guard tekrar kontrol edilir — debounce penceresi sırasında phase
+   * değişmiş olabilir (örn. EXECUTE → EVALUATE geçişi).
+   */
+  private flushDetectorDispatch(): void {
+    this.detectorDebounceTimer = null;
+    const event = this.detectorPendingEvent;
+    this.detectorPendingEvent = null;
+    if (event === null) return;
+    if (this.detectorRegistry === null) return;
+
+    const sprintState = this.sprintStateProvider();
+    if (sprintState.currentPhase !== DETECTOR_ACTIVE_PHASE) return;
 
     const ctx: DetectorContext = {
       event,
-      sprintState: this.sprintStateProvider(),
+      sprintState,
       projectRoot: this.projectRoot,
       now: new Date(),
     };

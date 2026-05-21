@@ -96,6 +96,12 @@ export const CHANNELS = {
   // original task NO_GO; downstream consumers learn that the dependency
   // is now aggregate-DONE without polling the disk.
   DEPENDENCY_RESOLVED_BY_FIX: 'BRAIN→*:DEPENDENCY_RESOLVED_BY_FIX',
+
+  // Sprint 183 W1-2 — DEPENDENCY_BLOCKED event spam debounce (P0-2)
+  // Emitted by sprint-spawner.respawnEligibleTasks() when enforceWaveDependency
+  // reports a task is still blocked on unresolved deps. State-change-only
+  // semantics live inside writeEvent (channel-aware dedupe).
+  DEPENDENCY_BLOCKED: 'BRAIN→WORKER:DEPENDENCY_BLOCKED',
 } as const;
 
 export type ChannelCode = typeof CHANNELS[keyof typeof CHANNELS];
@@ -184,6 +190,19 @@ export function writeEvent(
   payload: unknown,
 ): DeckentEvent | null {
   try {
+    // Sprint 183 W1-2 — DEPENDENCY_BLOCKED spam debounce.
+    // Channel-aware suppression: when the same taskId has the same set of
+    // unresolved deps as the last emitted event for this sprint, drop the
+    // duplicate. This transparently de-spams the existing sprint-spawner
+    // wave.respawn tick emission without changing any call site.
+    if (channel === CHANNELS.DEPENDENCY_BLOCKED) {
+      const decision = applyDependencyBlockedDedupe(sprintId, payload);
+      if (decision === 'suppress') {
+        debugLog('event-stream:writeEvent', `Suppressed duplicate DEPENDENCY_BLOCKED for sprint=${sprintId}`);
+        return null;
+      }
+    }
+
     const deckentDir = join(projectRoot, DECKENT_DIR);
     if (!existsSync(deckentDir)) {
       mkdirSync(deckentDir, { recursive: true });
@@ -364,4 +383,145 @@ export function emitDependencyResolvedByFix(
     fixTaskId: payload.fixTaskId,
     emittedAt: new Date().toISOString(),
   });
+}
+
+// ─── Sprint 183 W1-2: DEPENDENCY_BLOCKED Spam Debounce ──────────────
+//
+// Sprint 182 dogfood emitted 550+ events; 95% were duplicate
+// BRAIN→WORKER:DEPENDENCY_BLOCKED on every wave.respawn tick. Root cause:
+// sprint-spawner.respawnEligibleTasks() re-emits one event per still-blocked
+// task each tick regardless of state change.
+//
+// Fix: state-change-only semantics. We track the last emitted blocked state
+// (taskId → hash of sorted unresolvedDeps) per sprint at the event-stream
+// boundary, so existing callers (sprint-spawner is out of W1-2 scope) are
+// transparently de-spammed via the writeEvent hook above.
+
+/**
+ * Payload shape expected for a DEPENDENCY_BLOCKED event.
+ * `unresolvedDeps` is the set of task IDs that prevent `taskId` from spawning.
+ */
+export interface DependencyBlockedPayload {
+  taskId: string;
+  unresolvedDeps: string[];
+  reason?: string;
+  [extra: string]: unknown;
+}
+
+/** Module-level state: sprintId → (taskId → hash). Cleared on sprint end. */
+const previousBlockedState: Map<string, Map<string, string>> = new Map();
+
+/** Deterministic hash for a list of unresolved deps (order-independent). */
+function hashUnresolvedDeps(deps: ReadonlyArray<string>): string {
+  return [...deps].sort().join(',');
+}
+
+/**
+ * Apply state-change-only dedupe for DEPENDENCY_BLOCKED payloads.
+ *
+ * Returns `'emit'` when the event should proceed (and updates the cache),
+ * `'suppress'` when the same blocked state was already emitted for this
+ * (sprintId, taskId), and `'emit'` for malformed payloads (fail-open — we
+ * never silently drop unfamiliar shapes).
+ *
+ * Side effects:
+ *   - On `'emit'`: stores the new hash in `previousBlockedState`.
+ *   - When `unresolvedDeps.length === 0`: clears the cache entry so a later
+ *     re-block on the same task always emits a fresh event.
+ */
+function applyDependencyBlockedDedupe(
+  sprintId: string,
+  payload: unknown,
+): 'emit' | 'suppress' {
+  if (!payload || typeof payload !== 'object') return 'emit';
+  const p = payload as Partial<DependencyBlockedPayload>;
+  if (typeof p.taskId !== 'string' || !Array.isArray(p.unresolvedDeps)) {
+    // Unknown shape — fail-open, emit (caller chose this channel deliberately).
+    return 'emit';
+  }
+
+  const unresolvedDeps = p.unresolvedDeps.filter((d): d is string => typeof d === 'string');
+
+  // Auto-clear semantics: zero unresolved deps means the dep set fully
+  // resolved, so the next time this task is blocked again (rare but
+  // possible if a downstream cascade re-blocks) we MUST emit fresh.
+  if (unresolvedDeps.length === 0) {
+    const sprintMap = previousBlockedState.get(sprintId);
+    if (sprintMap) {
+      sprintMap.delete(p.taskId);
+      if (sprintMap.size === 0) previousBlockedState.delete(sprintId);
+    }
+    return 'emit';
+  }
+
+  const hash = hashUnresolvedDeps(unresolvedDeps);
+
+  let sprintMap = previousBlockedState.get(sprintId);
+  if (!sprintMap) {
+    sprintMap = new Map();
+    previousBlockedState.set(sprintId, sprintMap);
+  }
+
+  const previousHash = sprintMap.get(p.taskId);
+  if (previousHash === hash) {
+    return 'suppress';
+  }
+
+  sprintMap.set(p.taskId, hash);
+  return 'emit';
+}
+
+/**
+ * Public API — explicit state-change emit helper.
+ *
+ * Equivalent to calling `writeEvent(... CHANNELS.DEPENDENCY_BLOCKED, payload)`
+ * directly (since the same dedupe logic is wired into writeEvent), but offers
+ * a typed call site that consumers can prefer for clarity. Returns the
+ * written event, or `null` if suppressed.
+ */
+export function emitDependencyBlockedIfChanged(
+  projectRoot: string,
+  sprintId: string,
+  source: DeckentEvent['source'],
+  target: DeckentEvent['target'],
+  payload: DependencyBlockedPayload,
+): DeckentEvent | null {
+  return writeEvent(projectRoot, sprintId, source, target, CHANNELS.DEPENDENCY_BLOCKED, payload);
+}
+
+/**
+ * Clear cached blocked state.
+ *
+ * - `clearDependencyBlockedState()` — clear all sprints (used by tests).
+ * - `clearDependencyBlockedState(sprintId)` — clear all entries for one sprint
+ *   (call this on sprint completion to free memory).
+ * - `clearDependencyBlockedState(sprintId, taskId)` — clear a single (sprint,
+ *   task) entry (call this when a task is being spawned, so a subsequent
+ *   re-block emits fresh).
+ */
+export function clearDependencyBlockedState(sprintId?: string, taskId?: string): void {
+  if (sprintId === undefined) {
+    previousBlockedState.clear();
+    return;
+  }
+  if (taskId === undefined) {
+    previousBlockedState.delete(sprintId);
+    return;
+  }
+  const sprintMap = previousBlockedState.get(sprintId);
+  if (!sprintMap) return;
+  sprintMap.delete(taskId);
+  if (sprintMap.size === 0) previousBlockedState.delete(sprintId);
+}
+
+/**
+ * Test-only introspection of the dedupe cache.
+ *
+ * The underscore prefix signals "internal — for tests" so production code
+ * isn't tempted to depend on its shape. Returns the live `Map` so writes
+ * from test code would affect production state — callers must treat this
+ * as read-only.
+ */
+export function _getDependencyBlockedStateForTest(): Map<string, Map<string, string>> {
+  return previousBlockedState;
 }

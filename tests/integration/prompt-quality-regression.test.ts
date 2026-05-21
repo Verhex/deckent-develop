@@ -3,17 +3,16 @@
  *
  * Verifies Sprint 182 PQ fix improvements over Sprint 181 baseline prompts.
  * Two tests model Sprint 181-001 (devops-engineer CI workflow) and 181-002
- * (refactorer package.json).
+ * (refactorer package.json). Sprint 183 W2-4 closes the PQ-1 + PQ-5 gaps
+ * that the Sprint 182 PQ-7 recovery worker left as inactive comments.
  *
- * Quality assertions tracked:
- *   (b) "(content truncated)" marker absent          — PQ-2/3 ✓ implemented
- *   (c) Agent block injected from PROMPT.md          — ✓ implemented
- *   (d) Full skill content, no clipping              — PQ-2 ✓ implemented
- *   (f) filesWrite list explicit in scope block      — ✓ implemented
- *
- * Pending (tasks returned NO_GO / not yet applied):
- *   (a) ${IDEMPOTENCY_KEY} literal removed            — PQ-1 pending (182-007 NO_GO)
- *   (e) ADR relevance threshold 0.3 filtering        — PQ-5 pending (182-011 not run)
+ * Quality assertions covered (PQ-1..PQ-6 all LANDED in prompt-god-template.ts):
+ *   (a) ${IDEMPOTENCY_KEY} literal absent + deterministic key present — PQ-1 (F1)
+ *   (b) "(content truncated)" marker absent                          — PQ-2/3 (F2/F3)
+ *   (c) Agent block sourced from PROMPT.md only (no systemPrompt)    — PQ-4 (F4)
+ *   (d) Title + description on separate lines/paragraphs             — PQ-4 (F6)
+ *   (e) ADR relevance threshold filtering observable                 — PQ-5 (F7)
+ *   (f) filesWrite list explicit in scope block                      — PQ-4 (F5)
  */
 
 import { describe, it, expect } from 'vitest';
@@ -313,29 +312,56 @@ describe('Prompt Quality Regression (Sprint 181-001/002)', () => {
     // Act
     const { prompt, metadata } = buildTaskPrompt(task181_001, ctx181_001);
 
-    // ── (b) PQ-2/3: No truncation markers ───────────────────────────────
+    // ── (a) PQ-1 (F1): deterministic idempotency key, no literal placeholder ─
+    // Pre-PQ-1: template emitted the literal `${IDEMPOTENCY_KEY}` string because
+    // no shell-style interpolation ran. Post-PQ-1: computeIdempotencyKey()
+    // resolves the key to `${sprintId}-${taskId}-${retryCount}` at render time.
+    expect(prompt).not.toContain('${IDEMPOTENCY_KEY}');
+    expect(prompt).toContain('sprint-181-181-001-0');
+    // The key must land in the "## Idempotency Key" section, on its own line —
+    // not buried inside another sentence — so the worker can copy it cleanly.
+    expect(prompt).toMatch(/## Idempotency Key\nsprint-181-181-001-0\n/);
+
+    // ── (b) PQ-2/3 (F2/F3): No truncation markers ───────────────────────
     // Pre-PQ-2: skill content was clipped via truncateAtParagraph() at EFFORT_TOKEN_MAP.low * 2.67 chars
     // Pre-PQ-3: ADR section was hard-capped at ADR_SECTION_MAX = 6000 chars with marker
     expect(prompt).not.toContain('(content truncated)');
     expect(prompt).not.toContain('(ADR content truncated for prompt size)');
     expect(prompt).not.toContain('content truncated');
 
-    // ── (c) Agent block from PROMPT.md ──────────────────────────────────
+    // ── (c) PQ-4 (F4): Agent block sourced from PROMPT.md only ──────────
     // The agentPrompt (simulating PROMPT.md) must appear in the rendered prompt.
     // Pre-fix: some code paths concatenated systemPrompt + PROMPT.md.
-    // Post-fix (PQ-4 goal): PROMPT.md is the sole source; systemPrompt excluded.
-    // Current state: agentPrompt is injected directly — sentinel at end must be present.
+    // Post-fix: buildAgentBlock() consumes ctx.agentPrompt exclusively — the
+    // SprintContext interface no longer exposes a systemPrompt field. Sentinel
+    // at the tail proves PROMPT.md content reached the prompt unchanged.
     expect(prompt).toContain('=== Agent: devops-engineer ===');
     expect(prompt).toContain('DEVOPS_PROMPT_SENTINEL_END');
 
-    // ── (d) Full skill content — PQ-2 ───────────────────────────────────
+    // ── (d) PQ-4 (F6): title + description on separate lines/paragraphs ─
+    // Pre-fix: `${id}: ${title} — ${description}` collapsed title+description
+    // onto one line, breaking markdown structure when description began with
+    // the title. Post-fix: title sits on its own line under "## Your Task",
+    // description follows as a separate paragraph (blank line in between).
+    const titleLine = `${task181_001.id}: ${task181_001.title}`;
+    expect(prompt).toContain(titleLine);
+    // Strict shape: header newline + title newline + blank newline + description body.
+    const expectedTitleBlock = `## Your Task\n${titleLine}\n\n`;
+    expect(prompt).toContain(expectedTitleBlock);
+    // And the title MUST NOT be glued to the description with an em dash.
+    expect(prompt).not.toContain(`${titleLine} — `);
+    expect(prompt).not.toContain(`${titleLine}: `);
+
+    // ── (b+) PQ-2 (F2): Full skill content — no clipping ─────────────────
     // The tail marker of LONG_CI_SKILL_CONTENT must appear verbatim in prompt.
     // Before PQ-2 (effort=low, ~1000 tokens max per skill), the tail section
     // starting with "CI_SKILL_LONG_CONTENT_TAIL_MARKER_PQ2_VERIFICATION" would
-    // have been cut by truncateAtParagraph().
+    // have been cut by truncateAtParagraph(). This is the positive companion
+    // to assertion (b)'s "no truncation marker" check — proves nothing was
+    // dropped, not just that the marker is missing.
     expect(prompt).toContain('CI_SKILL_LONG_CONTENT_TAIL_MARKER_PQ2_VERIFICATION');
 
-    // ── (f) filesWrite explicit in scope block ───────────────────────────
+    // ── (f) PQ-4 (F5): filesWrite explicit in scope block ───────────────
     // Scope block must list the task's filesWrite entries explicitly.
     expect(prompt).toContain('.github/workflows/ci.yml');
 
@@ -345,13 +371,23 @@ describe('Prompt Quality Regression (Sprint 181-001/002)', () => {
     expect(metadata.skills).toContain('ci-testing');
     expect(metadata.charCount).toBeGreaterThan(1000);
 
-    // ── PQ-1 current state (pending fix) ────────────────────────────────
-    // When PQ-1 (182-007) is applied, ${IDEMPOTENCY_KEY} literal should be
-    // replaced with a deterministic key of format `${sprintId}-${taskId}-${retryCount}`.
-    // Current state: literal placeholder still present (PQ-1 returned NO_GO).
-    // Assertion to enable once PQ-1 lands:
-    //   expect(prompt).not.toContain('${IDEMPOTENCY_KEY}');
-    //   expect(prompt).toContain('sprint-181-181-001-0'); // sprintId-taskId-retryCount=0
+    // ── (e) PQ-5 (F7): ADR relevance threshold filtering observable ─────
+    // Re-render the same task with an aggressively high minScore. Some ADRs
+    // (or all, depending on the scoring outcome) MUST be filtered out compared
+    // to the lenient default. This is the runtime evidence that the threshold
+    // knob in SprintContext.adrMinRelevance flows through to the ADR block.
+    const { prompt: promptStrict, metadata: metadataStrict } = buildTaskPrompt(
+      task181_001,
+      { ...ctx181_001, adrMinRelevance: 0.99 },
+    );
+    // Strict threshold cannot SURFACE more ADRs than the lenient default — it
+    // is a monotonic filter. (Equal is allowed when nothing exceeds the floor.)
+    expect(metadataStrict.adrIds.length).toBeLessThanOrEqual(metadata.adrIds.length);
+    // With minScore=0.99 nothing should survive the filter, so the entire
+    // "Mandatory Architecture Rules" header must be omitted (PQ-5 contract:
+    // empty filtered set drops the block header too, no stranded headers).
+    expect(metadataStrict.adrIds).toHaveLength(0);
+    expect(promptStrict).not.toContain('=== Mandatory Architecture Rules (ADR) ===');
   });
 
   // ─── Test 2: Sprint 181-002 style — refactorer package.json ────────────
@@ -401,20 +437,32 @@ describe('Prompt Quality Regression (Sprint 181-001/002)', () => {
     // Act
     const { prompt, metadata } = buildTaskPrompt(task181_002, ctx181_002);
 
-    // ── (b) PQ-2/3: No truncation markers ───────────────────────────────
+    // ── (a) PQ-1 (F1): deterministic idempotency key, no literal placeholder ─
+    expect(prompt).not.toContain('${IDEMPOTENCY_KEY}');
+    expect(prompt).toContain('sprint-181-181-002-0');
+    expect(prompt).toMatch(/## Idempotency Key\nsprint-181-181-002-0\n/);
+
+    // ── (b) PQ-2/3 (F2/F3): No truncation markers ───────────────────────
     expect(prompt).not.toContain('(content truncated)');
     expect(prompt).not.toContain('(ADR content truncated for prompt size)');
     expect(prompt).not.toContain('content truncated');
 
-    // ── (c) Agent block from PROMPT.md ──────────────────────────────────
+    // ── (c) PQ-4 (F4): Agent block from PROMPT.md (no systemPrompt path) ─
     expect(prompt).toContain('=== Agent: refactorer ===');
     expect(prompt).toContain('REFACTORER_PROMPT_SENTINEL_END');
 
-    // ── (d) Full skill content — PQ-2 ───────────────────────────────────
+    // ── (d) PQ-4 (F6): title + description on separate lines/paragraphs ─
+    const titleLine = `${task181_002.id}: ${task181_002.title}`;
+    expect(prompt).toContain(titleLine);
+    expect(prompt).toContain(`## Your Task\n${titleLine}\n\n`);
+    expect(prompt).not.toContain(`${titleLine} — `);
+
+    // ── (b+) PQ-2 (F2): Full skill content — tail marker present ────────
     // Tail marker must be present; pre-PQ-2 it would have been truncated.
+    // Positive companion to (b)'s negative "no truncation marker" check.
     expect(prompt).toContain('TS_SKILL_LONG_CONTENT_TAIL_MARKER_PQ2_VERIFICATION');
 
-    // ── (f) filesWrite explicit in scope block ───────────────────────────
+    // ── (f) PQ-4 (F5): filesWrite explicit in scope block ───────────────
     expect(prompt).toContain('src/dashboard/package.json');
     expect(prompt).toContain('src/dashboard/package-lock.json');
 
@@ -423,12 +471,30 @@ describe('Prompt Quality Regression (Sprint 181-001/002)', () => {
     expect(metadata.skills).toContain('typescript-expert');
     expect(metadata.charCount).toBeGreaterThan(1000);
 
-    // ── ADR selection sanity (current state, pre-PQ-5) ──────────────────
-    // Post-PQ-5 (minScore=0.3): only ADRs with score >= 0.3 would appear.
-    // Current (no threshold): up to 3 ADRs with score > 0.
-    // The current code selects based on relevance; with dashboard scope
-    // the dashboard-related ADRs (adr-001, adr-002) may score highest.
+    // ── (e) PQ-5 (F7): ADR threshold filter applied + monotonic ─────────
+    // The default minScore comes from DEFAULT_ADR_MIN_RELEVANCE (0.3). The
+    // selector caps the inclusion at topN=3 regardless, but the threshold
+    // restricts the set further.
     expect(metadata.adrIds.length).toBeGreaterThanOrEqual(0);
-    expect(metadata.adrIds.length).toBeLessThanOrEqual(3); // topN cap
+    expect(metadata.adrIds.length).toBeLessThanOrEqual(3);
+
+    // Strict re-render: pushing minScore to 0.99 must filter out every ADR
+    // and drop the entire mandatory rules block header. This proves the
+    // threshold is wired end-to-end and not silently ignored.
+    const { prompt: promptStrict, metadata: metadataStrict } = buildTaskPrompt(
+      task181_002,
+      { ...ctx181_002, adrMinRelevance: 0.99 },
+    );
+    expect(metadataStrict.adrIds.length).toBeLessThanOrEqual(metadata.adrIds.length);
+    expect(metadataStrict.adrIds).toHaveLength(0);
+    expect(promptStrict).not.toContain('=== Mandatory Architecture Rules (ADR) ===');
+
+    // Lenient re-render: minScore=0 keeps everything selectRelevantAdrs
+    // surfaces (up to topN). It must be >= the default-threshold render.
+    const { metadata: metadataLenient } = buildTaskPrompt(
+      task181_002,
+      { ...ctx181_002, adrMinRelevance: 0 },
+    );
+    expect(metadataLenient.adrIds.length).toBeGreaterThanOrEqual(metadata.adrIds.length);
   });
 });

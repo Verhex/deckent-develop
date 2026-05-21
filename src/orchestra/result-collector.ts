@@ -92,6 +92,9 @@ async function loadProcessQueueHelpers(): Promise<{
 import { getSystemProfile } from '../core/system-profile.js';
 import { resolveEffectiveWorkers } from '../core/config.js';
 
+// Sprint 183 W1-2 — DEPENDENCY_BLOCKED debounce cleanup helper
+import { clearDependencyBlockedState } from './event-stream.js';
+
 // ═══ Results Map Helper ═══════════════════════════════════════════
 
 /**
@@ -501,6 +504,16 @@ export async function waitForResults(
     try {
       const respawnEligibleTasks = await loadRespawn();
       await respawnEligibleTasks(projectRoot, sprint, config, spawnOpts);
+      // Sprint 183 W1-2 — clear DEPENDENCY_BLOCKED dedupe state for any task
+      // that just moved out of PENDING (spawned or otherwise no longer
+      // blocked). This frees the per-sprint Map of stale entries and ensures
+      // that if a task is later re-blocked by a cascade it will emit a fresh
+      // event instead of being silently suppressed by stale state.
+      for (const task of sprint.tasks) {
+        if (task.status !== TaskStatus.PENDING) {
+          clearDependencyBlockedState(sprint.id, task.id);
+        }
+      }
     } catch (e) {
       debugLog('waitForResults:respawn', e);
     }

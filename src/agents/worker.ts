@@ -10,7 +10,7 @@
  *   - worker-lifecycle.ts: State machine, shutdown, verify-delta, feedback loop
  *   - worker-log.ts: Structured log formatting & I/O
  */
-import { readFileSync, writeFileSync, existsSync, unlinkSync, mkdirSync, realpathSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, unlinkSync, mkdirSync, realpathSync, openSync, closeSync, fsyncSync, fstatSync } from 'node:fs';
 import { join, normalize, sep } from 'node:path';
 import { TaskStatus, AgentStatus } from '../core/types.js';
 import type {
@@ -404,6 +404,41 @@ export function writeResult(projectRoot: string, result: TaskResult, sprintId?: 
       filesChanged: result.filesChanged,
       evidence: result.notes ?? '',
     });
+  }
+}
+
+/**
+ * Sprint 183 W1-3: post-write `.result` disk-persistence verification.
+ *
+ * Returns whether the `.tasks/task-{id}.result` file is physically present on
+ * disk *and* forces an fsync to flush any lingering OS buffer cache. Designed
+ * to be called immediately after {@link writeResult} so the orchestrator can
+ * confirm the artifact survives a subsequent SIGKILL — closes the Sprint 182
+ * "exitCode=0 but no .result" gap where workers reported normal exit yet the
+ * result file never appeared (`docs/audits/sprint-183/worker-timeout-rc.md`).
+ *
+ * - `persisted=false, size=0` → file missing or unreadable; caller should
+ *   treat the worker as having lost its result and schedule a fix-spawn.
+ * - `persisted=true, size>0` → file present, fsync'd; safe to proceed to
+ *   EVALUATE.
+ */
+export function verifyResultPersisted(
+  projectRoot: string,
+  taskId: string,
+): { persisted: boolean; size: number } {
+  const path = resultFilePath(projectRoot, taskId);
+  if (!existsSync(path)) return { persisted: false, size: 0 };
+  try {
+    const fd = openSync(path, 'r');
+    try {
+      fsyncSync(fd);
+      const stat = fstatSync(fd);
+      return { persisted: true, size: stat.size };
+    } finally {
+      closeSync(fd);
+    }
+  } catch {
+    return { persisted: false, size: 0 };
   }
 }
 

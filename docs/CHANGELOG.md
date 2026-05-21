@@ -1,6 +1,26 @@
 # Changelog
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
+## [1.0.0-beta.1-sprint183] - 2026-05-21
+
+### Added
+
+- W1-1 — P0-1 Nervous PLAN-phase pasif (FSWatcher debounce + phase guard)
+- W1-2 — P0-2 DEPENDENCY_BLOCKED event spam debounce (state-change emit)
+- W2-1 — Sprint 182 W1-1 recovery: mock hygiene orphan-cleaner-ipc + archive-debt
+- W2-2 — Sprint 182 W1-3 recovery: vitest CI=true parity smoke
+- W2-4 — Sprint 182 W3-PQ-7 recovery: integration smoke regression tamamla
+- W3-1 — Sprint 182 W4-1 recovery: validate:publish 6/6 GREEN recheck + Brain re-eval RC
+- W3-2 — Beta launch hijyen: npm pack + lint:adr + lint:link final
+
+### Fixed
+
+- W1-3 — P0-3 Worker timeout root cause investigation + fix
+- W2-3 — Sprint 182 W2-2 recovery: title-prefix Dependencies resolver tamamla
+
+
+_Tasks: 13 total, 11 done, 0 tech debt, 2 no-go_
+
 ## [1.0.0-beta.1-sprint182] - 2026-05-21
 
 ### Added
