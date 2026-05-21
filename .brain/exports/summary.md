@@ -61,6 +61,8 @@
 | adr-064 | TOPP — Continuous Dispatch (Wave-Barrier Removal) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-183 Learnings** (sprint-183): ## Sprint sprint-183 Learnings
+- W3-3 — v1.0.0-beta.1 final smoke (build:all + vitest + dashboard + serve): NO_GO — W...
 - **Sprint sprint-182 Learnings** (sprint-182): ## Sprint sprint-182 Learnings
 - W1-1 — Mock hygiene: orphan-cleaner-ipc + archive-debt `renameSync` ekle: NO_GO — Wo...
 - **Sprint sprint-181 Learnings** (sprint-181): ## Sprint sprint-181 Learnings
@@ -81,7 +83,6 @@
 - W1.2 — SessionBackend + LocalPtyBackend: NO_GO — W1.2 — SessionBackend interface + L...
 - **Sprint sprint-174 Learnings** (sprint-174): ## Sprint sprint-174 Learnings
 - Fix debt: Tech debt from 170-001-fix: Code physically verified despite missing .resu...
-- **Sprint sprint-173 Learnings** (sprint-173): ## Sprint sprint-173 Learnings
 
 ## Active Technical Debt
 _No active technical debt._
@@ -103,5 +104,6 @@ _No active technical debt._
 - Violation pattern: stale_heartbeat
 - Violation pattern: stale_heartbeat
 - Violation pattern: stale_heartbeat
+- Violation pattern: stale_heartbeat
 
-_Total entries: 307 | Generated: 2026-05-21_
+_Total entries: 311 | Generated: 2026-05-21_

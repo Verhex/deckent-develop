@@ -1,5 +1,9 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-183 Learnings
+- Sprint sprint-183 Learnings: ## Sprint sprint-183 Learnings
+- W3-3 — v1.0.0-beta.1 final smoke (build:all + vitest + dashboard + serve): NO_GO — W3-3 final smoke gate: 6/6 GREEN. Read-only verification task, no source changes. Gate-by-gate: (1) `npm run build:all` 
+
 ## Sprint sprint-182 Learnings
 - Sprint sprint-182 Learnings: ## Sprint sprint-182 Learnings
 - W1-1 — Mock hygiene: orphan-cleaner-ipc + archive-debt `renameSync` ekle: NO_GO — Worker exited without writing result (exitCode=0)
