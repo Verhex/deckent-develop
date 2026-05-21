@@ -128,3 +128,5 @@ kendimenot.md
 # Sprint runtime debris (gitignored — regen on each sprint)
 .vitest-out*.txt
 .test-e2e*
+
+!.brain/archive/
