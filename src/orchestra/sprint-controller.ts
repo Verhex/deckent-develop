@@ -324,11 +324,20 @@ export async function loadNervousBootstrap(): Promise<NervousBootstrapModule | n
  * as `loadNervousBootstrap` — returns a fallback that yields `null` when
  * the tracker module is not yet available.
  */
-async function loadSprintStateProvider(): Promise<() => unknown> {
+async function loadSprintStateProvider(projectRoot: string): Promise<() => unknown> {
   try {
     const modulePath = './sprint-state-tracker.js';
-    const mod = (await import(modulePath)) as { getSprintStateSnapshot?: () => unknown };
-    if (typeof mod.getSprintStateSnapshot === 'function') return mod.getSprintStateSnapshot;
+    const mod = (await import(modulePath)) as {
+      getSprintStateSnapshot?: (root: string) => unknown;
+    };
+    if (typeof mod.getSprintStateSnapshot === 'function') {
+      const fn = mod.getSprintStateSnapshot;
+      // Bind projectRoot — observer calls sprintStateProvider() with no args.
+      // Without this wrapper getSprintStateSnapshot(undefined) crashes at
+      // join(undefined, ...) in readSprintState. Sprint 180 W3-1 wire bug,
+      // discovered Sprint 182 dogfood 2026-05-21.
+      return () => fn(projectRoot);
+    }
   } catch (e) {
     debugLog('loadSprintStateProvider', e);
   }
@@ -353,7 +362,7 @@ export async function initNervousSystemForSprint(
   config: ResolvedConfig,
   projectRoot: string,
   bootstrapLoader: () => Promise<NervousBootstrapModule | null> = loadNervousBootstrap,
-  sprintStateProviderLoader: () => Promise<() => unknown> = loadSprintStateProvider,
+  sprintStateProviderLoader: (root: string) => Promise<() => unknown> = loadSprintStateProvider,
 ): Promise<NervousSystemHandle | null> {
   if (config.nervous_system?.enabled !== true) return null;
 
@@ -361,7 +370,7 @@ export async function initNervousSystemForSprint(
   if (!bootstrap) return null;
 
   try {
-    const sprintStateProvider = await sprintStateProviderLoader();
+    const sprintStateProvider = await sprintStateProviderLoader(projectRoot);
     return bootstrap.createNervousSystemIfEnabled(config, projectRoot, sprintStateProvider);
   } catch (e) {
     debugLog('initNervousSystemForSprint', e);
