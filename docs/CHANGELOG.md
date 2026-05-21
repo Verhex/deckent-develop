@@ -1,6 +1,39 @@
 # Changelog
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
+## [1.0.0-beta.1-sprint182] - 2026-05-21
+
+### Added
+
+- W1-2 — cli/run.test.ts SpawnBackendFactory mock chain
+- W2-1 — `dependency_pipeline_enabled: true` ADR-045 wire verify
+- W2-3 — Verify task pattern redesign
+- W3-PQ-2 — F2 + F3 truncation kaldır (skill + ADR full content)
+- W3-PQ-3 — F4 Agent prompt single source (PROMPT.md kanonik)
+- W3-PQ-5 — F7 ADR relevance threshold (default 0.3)
+- W3-PQ-6 — F8 Agent override semantic warning
+- W4-2 — package.json final + lint:adr + lint:link
+- W4-3 — ADR-048 Prompt Lifecycle Contract amendment
+- W4-4 — Sprint 182 retro + Sprint 183 post-beta stub
+
+### Fixed
+
+- W3-PQ-1 — F1 `${IDEMPOTENCY_KEY}` injection fix
+- W3-PQ-4 — F5 + F6 DIRECTIVES parser fix (Files + title/desc)
+
+
+_Tasks: 24 total, 14 done, 0 tech debt, 10 no-go_
+
+## [1.0.0-beta.1-sprint181] - 2026-05-21
+
+### Added
+
+- W1-2 — package.json root scripts gözden geçir + tsc:dashboard alias
+- W2-1 — Sprint smoke + CI yeşil verify
+
+
+_Tasks: 5 total, 3 done, 0 tech debt, 2 no-go_
+
 ## [1.0.0-beta.1-sprint180] - 2026-05-20
 
 ### Added

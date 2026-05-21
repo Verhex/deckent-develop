@@ -130,8 +130,11 @@ describe('truncateAtParagraph', () => {
 
 // ─── C) Skill Budget Dynamic ────────────────────────────────────────────────
 
-describe('buildWorkerPrompt — dynamic skill budget', () => {
-  it('allows more skill content for high-effort tasks', () => {
+describe('buildWorkerPrompt — skill content (Sprint 182 PQ-2: full inject, no budget)', () => {
+  // Sprint 182 PQ-2 (F2): effort-based skill budget removed. Per
+  // `feedback_prompt_completeness_over_brevity`, full skill content is now
+  // injected verbatim regardless of effort level.
+  it('injects full skill content for both high and low effort tasks', () => {
     const longContent = 'Paragraph one.\n\n' + 'Y'.repeat(1800) + '\n\nParagraph three.';
     const skillPrompts = [{ name: 'skill-a', content: longContent }];
 
@@ -141,23 +144,20 @@ describe('buildWorkerPrompt — dynamic skill budget', () => {
     const highPrompt = buildWorkerPrompt(highTask, undefined, skillPrompts);
     const lowPrompt = buildWorkerPrompt(lowTask, undefined, skillPrompts);
 
-    const highSkillLen = (highPrompt.split('=== Skills ===')[1]?.split('You are a Deckent')[0] ?? '').length;
-    const lowSkillLen = (lowPrompt.split('=== Skills ===')[1]?.split('You are a Deckent')[0] ?? '').length;
-
-    expect(highSkillLen).toBeGreaterThan(lowSkillLen);
+    expect(highPrompt).toContain(longContent);
+    expect(lowPrompt).toContain(longContent);
   });
 
-  it('truncates at paragraph boundary instead of mid-content', () => {
+  it('injects full skill content with no paragraph-boundary clipping', () => {
     const content = 'First paragraph with rules.\n\nSecond paragraph with more rules.\n\n' + 'Z'.repeat(2000);
     const skillPrompts = [{ name: 'test-skill', content }];
     const task = makeTask({ effort: 'low', forceEffort: 'low' });
     const prompt = buildWorkerPrompt(task, undefined, skillPrompts);
 
-    // With low effort (1000 budget), content should be truncated
-    // but NOT in the middle of the Z block — should end at a paragraph boundary
-    const skillSection = prompt.split('--- test-skill ---')[1]?.split('\n\nYou are a Deckent')[0] ?? '';
-    // Should not contain the full Z block
+    // Sprint 182 PQ-2 (F2): full content survives, including the Z block.
+    expect(prompt).toContain(content);
+    const skillSection = prompt.split('--- test-skill ---')[1]?.split('\n=== ')[0] ?? '';
     const zCount = (skillSection.match(/Z/g) || []).length;
-    expect(zCount).toBeLessThan(2000);
+    expect(zCount).toBe(2000);
   });
 });

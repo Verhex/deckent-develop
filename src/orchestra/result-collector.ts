@@ -40,6 +40,9 @@ import type { SpawnBackend } from './spawn-backend.js';
 // ─── Task builder ─────────────────────────────────────────────────
 import { buildWorkerPrompt } from './task-builder.js';
 
+// ─── Agent prompt single-source resolution (ADR-048, Sprint 182 F4) ──
+import { getAgentPrompt } from '../core/agent-pool.js';
+
 // ─── tmux ─────────────────────────────────────────────────────────
 import { spawnWorker, killWorker } from './tmux.js';
 
@@ -313,49 +316,21 @@ export function enrichResultTokenUsage(result: TaskResult, task: Task | undefine
 
 /**
  * Resolve the agent prompt for a task's assigned agent.
- * Combines PROMPT.md (if exists) with systemPrompt + expertise from agent.json.
- * Returns undefined if the agent is 'generic' or no prompt material can be found.
+ *
+ * Single-source contract (ADR-048, Sprint 182 F4):
+ *   PROMPT.md (canonical) > agent.json::systemPrompt (degraded fallback) > undefined.
+ *
+ * Concatenation is NOT performed. `agent.json::systemPrompt` is retained in
+ * the schema for routing scoring + UI display but never co-exists with
+ * PROMPT.md in the worker prompt block.
  */
 export async function resolveAgentPrompt(projectRoot: string, task: Task): Promise<string | undefined> {
   const agentId = task.assignedAgent;
   if (!agentId || agentId === 'generic') return undefined;
 
-  // Try to load PROMPT.md
-  let promptMd: string | undefined;
-  const promptPaths = [
-    join(projectRoot, '.deckent', 'agents', agentId, 'PROMPT.md'),
-    join(projectRoot, TASKS_DIR, 'agents', agentId, 'PROMPT.md'),
-  ];
-  for (const p of promptPaths) {
-    try {
-      promptMd = await readFile(p, 'utf-8');
-      break;
-    } catch (e) { debugLog('resolveAgentPrompt:readFile', e); }
-  }
-
-  // Load systemPrompt + expertise from agent.json
-  let systemPrompt: string | undefined;
-  let expertise = '';
-  const agentJsonPaths = [
-    join(projectRoot, '.deckent', 'agents', agentId, 'agent.json'),
-    join(projectRoot, TASKS_DIR, 'agents', agentId, 'agent.json'),
-  ];
-  for (const p of agentJsonPaths) {
-    try {
-      const raw = JSON.parse(await readFile(p, 'utf-8')) as Record<string, unknown>;
-      systemPrompt = raw['systemPrompt'] as string | undefined;
-      expertise = Array.isArray(raw['expertise']) ? (raw['expertise'] as string[]).join(', ') : '';
-      break;
-    } catch (e) { debugLog('resolveAgentPrompt:readFile', e); }
-  }
-
-  // Combine: PROMPT.md + systemPrompt + expertise
-  const parts: string[] = [];
-  if (systemPrompt) parts.push(systemPrompt);
-  if (expertise) parts.push(`Expertise: ${expertise}`);
-  if (promptMd) parts.push(promptMd);
-
-  return parts.length > 0 ? parts.join('\n\n') : undefined;
+  const resolution = getAgentPrompt(agentId, projectRoot);
+  if (resolution.source === 'none') return undefined;
+  return resolution.content;
 }
 
 /**

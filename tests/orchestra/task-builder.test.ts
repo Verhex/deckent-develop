@@ -411,9 +411,13 @@ describe('buildWorkerPrompt', () => {
   });
 
   it('includes task description alongside title', () => {
+    // Sprint 182 PQ-4 (F6): title and description live on separate lines
+    // instead of being joined with " — ". Both must still appear in the prompt.
     const task = makeTask({ id: '025-001', title: 'Fix Bug', description: 'Fix the login bug' });
     const prompt = buildWorkerPrompt(task);
-    expect(prompt).toContain('Fix Bug — Fix the login bug');
+    expect(prompt).toContain('Fix Bug');
+    expect(prompt).toContain('Fix the login bug');
+    expect(prompt).not.toContain('Fix Bug — Fix the login bug');
   });
 
   it('includes model in prompt', () => {
@@ -1690,7 +1694,7 @@ describe('buildWorkerPrompt — effort maxTokens budget', () => {
     expect(skillSection.length).toBeGreaterThan(1000);
   });
 
-  it('low effort task uses smaller skill token budget (1000 per skill)', () => {
+  it('low effort task still injects full skill content (Sprint 182 PQ-2 F2: no effort-based clipping)', () => {
     const task = makeTask({
       effort: 'low',
       forceEffort: 'low',
@@ -1700,10 +1704,9 @@ describe('buildWorkerPrompt — effort maxTokens budget', () => {
     const prompt = buildWorkerPrompt(task, undefined, [
       { name: 'typescript-expert', content: longSkillContent },
     ]);
-    // Low effort truncates at ~1000 chars per skill
+    // Sprint 182 PQ-2 (F2): EFFORT_TOKEN_MAP removed; full content for every effort level.
     expect(prompt).toContain('typescript-expert');
-    // The full 2000-char content should NOT appear verbatim — truncation applied
-    expect(prompt).not.toContain(longSkillContent);
+    expect(prompt).toContain(longSkillContent);
   });
 
   it('normal effort uses 1500 token budget (unchanged from default)', () => {

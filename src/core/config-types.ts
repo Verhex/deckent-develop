@@ -344,6 +344,22 @@ export interface DeckentConfig {
   // ─── Terminal ──────────────────────────────────────────────────────
   /** Embedded web terminal configuration (Sprint 175). */
   terminal?: TerminalConfig;
+
+  // ─── Prompt Generation (Sprint 182 PQ-5 / F7) ──────────────────────
+  /** Worker prompt generation tuning. */
+  prompt?: PromptConfig;
+}
+
+/** Worker prompt generation tuning (Sprint 182 PQ-5 / F7). */
+export interface PromptConfig {
+  /**
+   * Minimum ADR relevance score required to include an ADR in the worker
+   * prompt's mandatory rules block. ADRs whose computed score falls below
+   * this threshold are dropped; if every selected ADR is filtered out the
+   * entire `=== Mandatory Architecture Rules (ADR) ===` block is omitted
+   * (no empty header). Default: 0.3 (lenient).
+   */
+  adr_min_relevance?: number;
 }
 
 // ─── Nervous System Config Types ────────────────────────────────────
@@ -558,6 +574,10 @@ export interface ResolvedConfig {
    * on it being present without forcing every ResolvedConfig literal to spell
    * it out. Sprint 175. */
   terminal?: TerminalConfig;
+  /** Resolved worker prompt generation tuning (Sprint 182 PQ-5 / F7).
+   *  Same optional-on-both-sides pattern as `terminal`; `loadConfig`/`mergeConfigs`
+   *  always populate it with DEFAULT_PROMPT_CONFIG. Consumers may rely on it. */
+  prompt?: PromptConfig;
 }
 
 // ─── Config Metadata ──────────────────────────────────────────────

@@ -104,3 +104,56 @@ Three additional gaps surfaced from the forensic:
 > - **Dangling ref:** §Context + §References'taki `.audit/sprint-167/T5-brain-debug-phase1.md` + `phase2.md` belirtilen yolda mevcut değil (transient `.audit/` — ADR-047 ile aynı; iddialar forensic formalizasyona dayanır). `docs/superpowers/plans|specs/2026-05-14-sprint-168-*` referansları mevcut ✓.
 >
 > Behavior unchanged; documentation alignment only.
+
+---
+
+## Amendments
+
+### Sprint 182 Amendment — Worker Prompt Quality Contract (2026-05-21)
+
+**Status:** accepted (Sprint 182 Wave 3, Crisis Stabilization Initiative §8d)
+**Trigger:** Sprint 181 sistem testi 8 worker prompt quality bulgusu (`docs/superpowers/specs/2026-05-21-worker-prompt-quality-fixes.md`) + anchor memory `feedback_prompt_completeness_over_brevity.md` (token-tasarruf YASAK felsefesi).
+
+ADR-048'in orijinal kapsamı (Sprint 168) `.prompt-*.txt` ve `.worker-*.sh` **tmpfile lifecycle** (yaz/persist/arşivle) ile sınırlıdır. Bu amendment, aynı lifecycle'ın **render/inject aşamasına** dair eksik kontratı şu altı kuralla tamamlar:
+
+1. **Worker prompt truncation YASAK.** `prompt-god-template.ts` içindeki skill section'ı (`EFFORT_TOKEN_MAP`, `perItemMax`, `sectionMax`, `truncateAtParagraph`, `if (... > sectionMax) break`) ve ADR section'ı `ADR_SECTION_MAX = 6000` cap'i kaldırılmıştır. Her atanmış skill **full SKILL.md**, her ilgili ADR **full content** inject edilir. `"(content truncated)"`, `"(ADR content truncated for prompt size)"` gibi marker'lar worker prompt'larında **bulunmaz**. Felsefi temel: prompt tamamlığı > token-tasarrufu (anchor: `feedback_prompt_completeness_over_brevity`).
+2. **Agent prompt single source = `PROMPT.md`.** `agent-pool.ts::getAgentPrompt(id)` öncelik sırası: (a) `PROMPT.md` (kanonik), (b) yoksa `agent.json::systemPrompt` (degraded warning ile fallback — hard fail YOK). `systemPrompt` + `PROMPT.md` **concatenation YASAK**. `agent.json::systemPrompt` schema'sı routing scoring + UI display için korunur ama prompt injection pipeline'ına girmez.
+3. **DIRECTIVES `Files:` → `task.scope.filesWrite`.** `task-builder.ts::parseDirectives` DIRECTIVES'ten gelen `Files:` satırını parse edip `task.scope.filesWrite` array'ine map'ler. Liste boşsa `Scope:` dizinlerinden inferred listing. Fallback string'i (`"(determined by your task scope)"`) açıkça formüle edilir — sessiz default YOK.
+4. **Title / Description ayrı render.** `## Task N: <title>` parse'tan title, `### Description` heading'den sonrası description. Render template'te title kendi satırında, description ayrı paragrafta — markdown korunur. Duplicate `title — description` birleşik satırı **kaldırılmıştır**.
+5. **ADR threshold-based selection (default 0.3).** `selectRelevantAdrs(task, allAdrs, maxCount, minScore)` signature genişletildi. Relevance score'u `minScore` (default **0.3**, configurable `.deckent/config.json::prompt.adr_min_relevance`) altında kalan ADR atlanır. 0 ADR kalırsa `=== Mandatory Architecture Rules (ADR) ===` blok header'ı dahil basılmaz (boş blok render yok).
+6. **Agent override semantic warning.** `forceAgent` atandığında: (a) activation rules `taskDNA` üzerinde çalıştırılır, (b) min score (default 0.3) altıysa **warning emit** (severity=`warn`, PLAN devam eder, override honored), (c) `Task.routingMeta.overrideWarnings: string[]` field'a kayıt yazılır. Override iptal değildir — semantic skew sadece görünür kılınır.
+
+**Implementation tasks (Sprint 182 Wave 3):**
+
+- **182-007** W3-PQ-1 — F1 `${IDEMPOTENCY_KEY}` injection fix (`src/orchestra/prompt-god-template.ts:455`)
+- **182-008** W3-PQ-2 — F2 + F3 truncation kaldır (skill + ADR full content)
+- **182-009** W3-PQ-3 — F4 Agent prompt single source = PROMPT.md (`src/core/agent-pool.ts::getAgentPrompt`)
+- **182-010** W3-PQ-4 — F5 + F6 DIRECTIVES parser fix (Files → filesWrite + title/description ayrı)
+- **182-011** W3-PQ-5 — F7 ADR relevance threshold default 0.3 (`selectRelevantAdrs` + `prompt.adr_min_relevance` config)
+- **182-012** W3-PQ-6 — F8 Agent override semantic warning (`Task.routingMeta.overrideWarnings`)
+- **182-013** W3-PQ-7 — Integration smoke: Sprint 181-001/002 prompt regression snapshot
+
+**Verification (Sprint 182 GO/NO_GO §GATE-3 PROMPT QUALITY):**
+
+- 7 PQ task DONE → ADR-048 amendment land
+- `tests/orchestra/prompt-god-template-skill-completeness.test.ts` + `prompt-god-template-adr-completeness.test.ts` PASS (truncation yok)
+- `tests/orchestra/agent-prompt-single-source.test.ts` PASS (PROMPT.md kanonik, fallback warning)
+- `tests/orchestra/directives-files-to-scope.test.ts` + `directives-title-description-split.test.ts` PASS
+- `tests/orchestra/prompt-god-template-adr-relevance.test.ts` PASS (threshold filter + config override)
+- `tests/orchestra/agent-override-semantic-check.test.ts` PASS (low score warning + override honored + routingMeta field)
+- `tests/integration/prompt-quality-regression.test.ts` PASS (Sprint 181-001/002 snapshot diff before/after)
+
+**Relation to original ADR-048 scope:**
+
+Sprint 168 ADR-048 = **tmpfile lifecycle** (write → persist → archive). Bu amendment = **prompt content lifecycle** (compose → render → inject → consume). İki katman birlikte "Prompt Lifecycle Contract"in tam karşılığını verir: bir prompt fiziksel olarak nerede yaşar (Sprint 168) **ve** semantic olarak ne içerir (Sprint 182). §Decision 1-6 (tmpfile) ve bu §Amendment §1-6 (content) **tamamlayıcıdır**, çelişmez.
+
+**Backward compatibility:**
+
+- `agent.json::systemPrompt` schema korunur (silinmez) — UI display + routing scoring katmanı için.
+- `forceAgent` override mekanizması kalır — yalnızca semantic skew warning ile zenginleştirilir.
+- `prompt.adr_min_relevance` config opsiyoneldir; tanımlanmazsa default 0.3 uygulanır.
+- DIRECTIVES `Files:` field'ı opsiyoneldir; eski format (yalnızca `Scope:`) inferred listing fallback'i ile çalışmaya devam eder.
+
+**Related amendments:** —
+**Supersedes:** —
+**Superseded by:** —

@@ -120,6 +120,7 @@ export function routeTaskV2(
   const overrides = options?.overrides ?? [];
   const learningData = options?.learningData ?? [];
   const reasoning: string[] = [];
+  const overrideWarnings: string[] = [];
 
   // Step 1: Classify task intent
   const taskDNA = classifyIntent(task);
@@ -142,6 +143,20 @@ export function routeTaskV2(
     agentScore = 100;
     agentConfidence = 'high';
     reasoning.push(`Agent forced by override: ${agentId}`);
+
+    // F8 (Sprint 182): Semantic check — run activation rules on the forced agent
+    // against TaskDNA. If the score is below `forceAgentWarnRatio * agentMinScore`
+    // emit an advisory warning. Override is still honored (PLAN continues).
+    const semanticWarning = evaluateForceAgentSemantic(
+      resolved.forceAgent,
+      taskDNA,
+      agentPool,
+      cfg,
+    );
+    if (semanticWarning) {
+      overrideWarnings.push(semanticWarning);
+      reasoning.push(`Override warning: ${semanticWarning}`);
+    }
   } else {
     // Compute dynamic exclusions based on intent + scope (replaces hard-coded global exclusions)
     const dynamicExclusions = getDynamicExclusions(
@@ -220,7 +235,53 @@ export function routeTaskV2(
     reasoning,
     contextFit,
     routingVersion: 'v3' as const,
+    overrideWarnings: overrideWarnings.length > 0 ? overrideWarnings : undefined,
   };
+}
+
+// ─── F8: Force-Agent Semantic Check ─────────────────────────────────────────
+
+/**
+ * F8 (Sprint 182): Evaluate whether a `forceAgent` override is semantically
+ * aligned with the task's intent. Computes the agent's activation score
+ * against the task DNA and returns a warning string when the agent is missing,
+ * excluded, or scores below `forceAgentWarnRatio * agentMinScore`.
+ *
+ * Severity: `warn` (locked) — PLAN continues, override is honored.
+ *
+ * @returns A human-readable warning string, or `null` if the override is
+ *   semantically appropriate.
+ */
+export function evaluateForceAgentSemantic(
+  forcedAgentId: string,
+  taskDNA: TaskDNA,
+  agentPool: AgentPool,
+  cfg: RoutingEngineConfig,
+): string | null {
+  const agent = agentPool.get(forcedAgentId);
+  if (!agent) {
+    return `forceAgent '${forcedAgentId}' is not registered in the agent pool (intent=${taskDNA.intent.primary})`;
+  }
+  if (!agent.enabled) {
+    return `forceAgent '${forcedAgentId}' is registered but disabled (intent=${taskDNA.intent.primary})`;
+  }
+
+  const activation = getAgentActivation(agent);
+  const result = evaluateActivation(taskDNA, activation);
+  if (result.excluded) {
+    return `forceAgent '${forcedAgentId}' is excluded by its own activation rules ` +
+      `(reason='${result.excludeReason ?? 'unknown'}', intent=${taskDNA.intent.primary})`;
+  }
+
+  const ratio = cfg.forceAgentWarnRatio ?? 0.3;
+  const threshold = cfg.agentMinScore * ratio;
+  if (result.score < threshold) {
+    return `forceAgent '${forcedAgentId}' has low semantic relevance: ` +
+      `activation score=${result.score} < threshold=${threshold.toFixed(2)} ` +
+      `(agentMinScore=${cfg.agentMinScore} × ratio=${ratio}, intent=${taskDNA.intent.primary}). ` +
+      `Override honored; verify this is intentional.`;
+  }
+  return null;
 }
 
 // ─── Agent Selection ────────────────────────────────────────────────────────

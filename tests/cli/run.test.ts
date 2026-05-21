@@ -1,6 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Command } from 'commander';
 
+// ─── Hoisted Spies (referenced inside vi.mock factories) ────────────
+
+const hoisted = vi.hoisted(() => ({
+  backendSpawn: vi.fn(),
+  backendKill: vi.fn(),
+  backendList: vi.fn().mockReturnValue([]),
+}));
+
 // ─── Mocks ──────────────────────────────────────────────────────────
 
 vi.mock('node:fs', () => ({
@@ -9,6 +17,7 @@ vi.mock('node:fs', () => ({
   writeFileSync: vi.fn(),
   unlinkSync: vi.fn(),
   readFileSync: vi.fn(),
+  renameSync: vi.fn(),
 }));
 
 vi.mock('../../src/orchestra/tmux.js', () => ({
@@ -22,6 +31,41 @@ vi.mock('../../src/orchestra/tmux.js', () => ({
       this.command = cmd;
     }
   },
+}));
+
+// Sprint 178 refactor: production code routes through SpawnBackendFactory
+// (default spawn_backend='docker'); mock the factory so backend.spawn is
+// the observable call instead of legacy tmux.spawnWorker.
+vi.mock('../../src/orchestra/spawn-backend.js', () => ({
+  SpawnBackendFactory: {
+    create: vi.fn(() => ({
+      name: 'docker',
+      spawn: hoisted.backendSpawn,
+      kill: hoisted.backendKill,
+      list: hoisted.backendList,
+      isAvailable: vi.fn().mockResolvedValue(true),
+    })),
+    createAsync: vi.fn(async () => ({
+      name: 'docker',
+      spawn: hoisted.backendSpawn,
+      kill: hoisted.backendKill,
+      list: hoisted.backendList,
+      isAvailable: vi.fn().mockResolvedValue(true),
+    })),
+    isTmuxAvailable: vi.fn(() => true),
+  },
+  resolveBackend: vi.fn((b: string) => (b === 'auto' ? 'docker' : b)),
+  resetTmuxDeprecationWarning: vi.fn(),
+  SpawnBackendError: class SpawnBackendError extends Error {
+    backendName: string;
+    constructor(msg: string, backendName: string) {
+      super(msg);
+      this.name = 'SpawnBackendError';
+      this.backendName = backendName;
+    }
+  },
+  TmuxBackend: class TmuxBackend {},
+  SubprocessBackend: class SubprocessBackend {},
 }));
 
 vi.mock('../../src/orchestra/brain.js', () => ({
@@ -210,6 +254,7 @@ describe('registerRun', () => {
 
   it('spawns worker and reports DONE result', async () => {
     const origExitCode = process.exitCode;
+    hoisted.backendSpawn.mockClear();
     vi.mocked(resolveProjectRoot).mockReturnValue('/project');
     vi.mocked(mkdirSync).mockReturnValue(undefined);
     vi.mocked(writeFileSync).mockReturnValue(undefined);
@@ -233,12 +278,13 @@ describe('registerRun', () => {
 
     await program.parseAsync(['node', 'deckent', 'run', 'test task', '--model', 'sonnet']);
 
-    expect(spawnWorker).toHaveBeenCalledWith(
+    // Sprint 178 refactor: backend.spawn(taskId, model, prompt, opts) — 4 args,
+    // projectDir lives inside the opts object instead of as a positional arg.
+    expect(hoisted.backendSpawn).toHaveBeenCalledWith(
       expect.stringMatching(/^run-/),
       'sonnet',
       expect.any(String),
-      '/project',
-      expect.any(Object),
+      expect.objectContaining({ projectDir: '/project' }),
     );
     expect(process.exitCode).toBe(0);
     process.exitCode = origExitCode as number;
@@ -246,6 +292,7 @@ describe('registerRun', () => {
 
   it('sets exit code 1 for NO_GO result', async () => {
     const origExitCode = process.exitCode;
+    hoisted.backendSpawn.mockClear();
     vi.mocked(resolveProjectRoot).mockReturnValue('/project');
     vi.mocked(mkdirSync).mockReturnValue(undefined);
     vi.mocked(writeFileSync).mockReturnValue(undefined);
@@ -267,6 +314,8 @@ describe('registerRun', () => {
 
     await program.parseAsync(['node', 'deckent', 'run', 'test task']);
 
+    // backend.spawn was invoked via SpawnBackendFactory (docker default).
+    expect(hoisted.backendSpawn).toHaveBeenCalled();
     expect(process.exitCode).toBe(1);
     process.exitCode = origExitCode as number;
   });

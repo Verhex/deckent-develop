@@ -123,6 +123,13 @@ export interface RoutingDecision {
   contextFit?: 'ok' | 'tight' | 'overflow';
   /** Routing engine version used to produce this decision */
   routingVersion: 'v2' | 'v3';
+  /**
+   * F8 (Sprint 182): Non-blocking semantic warnings about override usage.
+   * Populated when a forceAgent override results in an activation score below
+   * `agentMinScoreRatio * agentMinScore` (default ratio 0.3). PLAN continues
+   * and the override is honored — these are advisory diagnostics only.
+   */
+  overrideWarnings?: string[];
 }
 
 export type OverrideSource = 'none' | 'task-directive' | 'sprint-directive' | 'project-config';
@@ -165,6 +172,13 @@ export interface RoutingEngineConfig {
   agentMinScore: number;       // default 5
   skillMinScore: number;       // default 3
   maxSkillsDefault: number;    // default 3
+  /**
+   * F8 (Sprint 182): Ratio of `agentMinScore` below which a forced agent
+   * triggers a semantic override warning. Default 0.3 (lenient): warn when
+   * forced agent activation < 30% of the score normally required to be
+   * selected organically. PLAN proceeds; override is honored.
+   */
+  forceAgentWarnRatio?: number;
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -185,7 +199,7 @@ export function createDefaultActivationConfig(minScore = 5): ActivationConfig {
 }
 
 export function createDefaultRoutingEngineConfig(): RoutingEngineConfig {
-  return { agentMinScore: 5, skillMinScore: 3, maxSkillsDefault: 3 };
+  return { agentMinScore: 5, skillMinScore: 3, maxSkillsDefault: 3, forceAgentWarnRatio: 0.3 };
 }
 
 export const LEARNING_BONUS_CAP = 3;

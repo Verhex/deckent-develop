@@ -489,3 +489,100 @@ export class AgentPoolManager {
     return { valid: errors.length === 0, errors };
   }
 }
+
+// ─── Agent Prompt Resolution (single source — PROMPT.md canonical) ─────
+
+/** Source of the resolved agent prompt content. */
+export type AgentPromptSource = 'prompt-md' | 'system-prompt' | 'none';
+
+/**
+ * Result of {@link getAgentPrompt}. Single-source contract:
+ *   PROMPT.md (canonical) > agent.json::systemPrompt (degraded fallback) > none.
+ * Concatenation is NOT performed — at most one source supplies `content`.
+ */
+export interface AgentPromptResolution {
+  content: string;
+  source: AgentPromptSource;
+  /** True when PROMPT.md was missing and we fell back to systemPrompt. */
+  degraded: boolean;
+  /** Resolved path (when source !== 'none'), useful for diagnostics. */
+  resolvedFrom?: string;
+}
+
+const PROMPT_MD_FILENAME = 'PROMPT.md';
+
+function readFileIfExists(filePath: string): string | undefined {
+  try {
+    if (!fs.existsSync(filePath)) return undefined;
+    return fs.readFileSync(filePath, 'utf8');
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Resolve a single canonical agent prompt for `agentId` from `projectRoot`.
+ *
+ * Lookup order:
+ *   1. `<root>/.deckent/agents/<id>/PROMPT.md` (canonical)
+ *   2. `<root>/.tasks/agents/<id>/PROMPT.md`  (temp scope)
+ *   3. `agent.json::systemPrompt` (degraded fallback — emits warning)
+ *
+ * No concatenation. `agent.json::systemPrompt` is preserved in the schema for
+ * routing scoring and UI display, but it never co-exists with PROMPT.md in
+ * the worker prompt block. ADR-048 (Prompt Lifecycle Contract) — Sprint 182.
+ */
+export function getAgentPrompt(
+  agentId: string,
+  projectRoot: string,
+): AgentPromptResolution {
+  // 1. PROMPT.md (canonical) — persistent agents
+  const persistentPromptPath = path.join(projectRoot, AGENTS_DIR, agentId, PROMPT_MD_FILENAME);
+  const persistentPrompt = readFileIfExists(persistentPromptPath);
+  if (persistentPrompt !== undefined && persistentPrompt.trim().length > 0) {
+    return {
+      content: persistentPrompt,
+      source: 'prompt-md',
+      degraded: false,
+      resolvedFrom: persistentPromptPath,
+    };
+  }
+
+  // 2. PROMPT.md (temp scope)
+  const tempPromptPath = path.join(projectRoot, TEMP_AGENTS_DIR, agentId, PROMPT_MD_FILENAME);
+  const tempPrompt = readFileIfExists(tempPromptPath);
+  if (tempPrompt !== undefined && tempPrompt.trim().length > 0) {
+    return {
+      content: tempPrompt,
+      source: 'prompt-md',
+      degraded: false,
+      resolvedFrom: tempPromptPath,
+    };
+  }
+
+  // 3. Degraded fallback: agent.json::systemPrompt
+  const candidates = [
+    path.join(projectRoot, AGENTS_DIR, agentId, AGENT_FILENAME),
+    path.join(projectRoot, TEMP_AGENTS_DIR, agentId, AGENT_FILENAME),
+  ];
+  for (const jsonPath of candidates) {
+    const raw = readJsonSafe<Record<string, unknown>>(jsonPath);
+    if (!raw) continue;
+    const sp = raw['systemPrompt'];
+    if (typeof sp === 'string' && sp.trim().length > 0) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        `[deckent] Agent "${agentId}" PROMPT.md missing — falling back to agent.json::systemPrompt (degraded).`,
+      );
+      return {
+        content: sp,
+        source: 'system-prompt',
+        degraded: true,
+        resolvedFrom: jsonPath,
+      };
+    }
+  }
+
+  // 4. Nothing usable
+  return { content: '', source: 'none', degraded: true };
+}

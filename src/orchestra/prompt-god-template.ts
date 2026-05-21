@@ -46,6 +46,14 @@ export interface SprintContext {
   dependencies?: string[];
   /** Directory containing `.tasks/` result files (defaults to `<cwd>/.tasks`). Used for enriching dependency block. */
   tasksDir?: string;
+  /**
+   * Minimum ADR relevance score required to include an ADR in the prompt
+   * (Sprint 182 PQ-5 / F7). ADRs scoring below this threshold are dropped.
+   * When every selected ADR is filtered out the entire mandatory rules block
+   * (including its header) is omitted. Defaults to {@link DEFAULT_ADR_MIN_RELEVANCE}
+   * when unset. Resolved from `config.prompt.adr_min_relevance` at the call site.
+   */
+  adrMinRelevance?: number;
 }
 
 // ─── Constants ─────────────────────────────────────────────────────────
@@ -53,13 +61,43 @@ export interface SprintContext {
 /** Rough estimate: 1 token ≈ 4 chars for English/mixed text */
 const CHARS_PER_TOKEN = 4;
 
-/** Maximum chars threshold for switching ADR mode to summary */
-const ADR_SUMMARY_THRESHOLD = 3000;
+/**
+ * Default minimum ADR relevance score (Sprint 182 PQ-5 / F7).
+ *
+ * Threshold below which ADRs are dropped from the worker prompt's mandatory
+ * rules block. Lenient (0.3) so that scope-only or keyword-only matches still
+ * surface, but the long tail of unrelated ADRs is filtered out. Mirrors
+ * `DEFAULT_PROMPT_CONFIG.adr_min_relevance` in `src/core/config.ts`; the two
+ * defaults must stay in lockstep so prompt rendering is consistent whether the
+ * caller threads the config through or not.
+ */
+export const DEFAULT_ADR_MIN_RELEVANCE = 0.3;
 
-/** Effort → max tokens per skill */
-const EFFORT_TOKEN_MAP: Record<string, number> = {
-  max: 2500, high: 2500, medium: 1500, normal: 1500, low: 1000,
-};
+/**
+ * Sentinel sprintId when a task has no sprintId — keeps the key deterministic.
+ * @internal
+ */
+const IDEMPOTENCY_SPRINT_FALLBACK = 'no-sprint';
+
+/**
+ * Compute the per-task idempotency key injected into the worker prompt
+ * (Sprint 182 PQ-1 / F1).
+ *
+ * Locked format: `${sprintId}-${taskId}-${retryCount}` — deterministic so
+ * two renders of the same task yield the same key (retry-safe external API
+ * calls), but task-id-unique so different tasks never collide.
+ *
+ * `retryCount` is sourced from `task.routingMeta.rerouteCount` (mid-sprint
+ * reroute counter — the runtime expression of "retry attempt" in deckent's
+ * sprint loop); missing → 0. `sprintId` is required by the contract; when a
+ * caller forgets to thread it through, fall back to a sentinel rather than
+ * emit `undefined-…` into the key.
+ */
+export function computeIdempotencyKey(task: Task): string {
+  const sprintId = task.sprintId ?? IDEMPOTENCY_SPRINT_FALLBACK;
+  const retryCount = task.routingMeta?.rerouteCount ?? 0;
+  return `${sprintId}-${task.id}-${retryCount}`;
+}
 
 // ─── Main API ──────────────────────────────────────────────────────────
 
@@ -81,10 +119,19 @@ export function buildTaskPrompt(task: Task, ctx: SprintContext): PromptArtifact 
   const agentBlock = buildAgentBlock(agentId, ctx.agentPrompt);
 
   // ── 2. Skill Block ──────────────────────────────────────────────────
-  const skillBlock = buildSkillBlock(ctx.skillPrompts, effort, skillNames);
+  // F2 (Sprint 182 PQ-2): full skill content, no truncation, no effort-based clipping.
+  const skillBlock = buildSkillBlock(ctx.skillPrompts, skillNames);
 
   // ── 3. ADR Block (topN=3, relevance-scored) ─────────────────────────
-  const adrBlock = buildAdrBlock(task, ctx.allAdrs, adrIds);
+  // Sprint 182 PQ-5 (F7): threshold-based filtering. ADRs below
+  // `ctx.adrMinRelevance` (default DEFAULT_ADR_MIN_RELEVANCE) are dropped, and
+  // if zero ADRs survive the entire block — header included — is omitted.
+  const adrBlock = buildAdrBlock(
+    task,
+    ctx.allAdrs,
+    adrIds,
+    ctx.adrMinRelevance ?? DEFAULT_ADR_MIN_RELEVANCE,
+  );
 
   // ── 4. Scope Rules (sanitized) ──────────────────────────────────────
   const scopeBlock = buildScopeBlock(task.scope, scopeWarnings);
@@ -93,6 +140,10 @@ export function buildTaskPrompt(task: Task, ctx: SprintContext): PromptArtifact 
   const depsBlock = buildDependenciesBlock(task.dependencies, ctx.dependencies, ctx.tasksDir);
 
   // ── 6. Render final prompt ──────────────────────────────────────────
+  // Sprint 182 PQ-1 (F1): compute deterministic idempotency key once per render
+  // so the template can interpolate the resolved value instead of leaking the
+  // literal `${IDEMPOTENCY_KEY}` placeholder to the worker.
+  const idempotencyKey = computeIdempotencyKey(task);
   const prompt = renderTemplate({
     agentBlock,
     skillBlock,
@@ -101,6 +152,7 @@ export function buildTaskPrompt(task: Task, ctx: SprintContext): PromptArtifact 
     depsBlock,
     task,
     effort,
+    idempotencyKey,
   });
 
   const charCount = prompt.length;
@@ -128,26 +180,25 @@ function buildAgentBlock(agentId: string, agentPrompt?: string): string {
 
 // ─── Skill Block Builder ───────────────────────────────────────────────
 
+/**
+ * Build the skill prompt section. Full SKILL.md content for every assigned
+ * skill — no truncation, no effort-based clipping, no skip on overflow.
+ *
+ * Sprint 182 PQ-2 (F2): per `feedback_prompt_completeness_over_brevity` anchor,
+ * skill content is injected verbatim. The previous EFFORT_TOKEN_MAP /
+ * `truncateAtParagraph` / `sectionMax` break logic was removed.
+ */
 function buildSkillBlock(
   skillPrompts: Array<{ name: string; content: string }> | undefined,
-  effort: string,
   outNames: string[],
 ): string {
   if (!skillPrompts || skillPrompts.length === 0) return '';
 
-  const perItemMax = EFFORT_TOKEN_MAP[effort] ?? 1500;
-  const sectionMax = Math.round(perItemMax * 2.67);
-
   const header = '=== Skills ===';
   const parts: string[] = [header];
-  let totalLen = header.length;
 
   for (const sp of skillPrompts) {
-    const truncated = truncateAtParagraph(sp.content, perItemMax);
-    const entry = `--- ${sp.name} ---\n${truncated}`;
-    if (totalLen + entry.length + 1 > sectionMax) break;
-    parts.push(entry);
-    totalLen += entry.length + 1;
+    parts.push(`--- ${sp.name} ---\n${sp.content}`);
     outNames.push(sp.name);
   }
 
@@ -158,33 +209,40 @@ function buildSkillBlock(
 
 // ─── ADR Block Builder ─────────────────────────────────────────────────
 
+/**
+ * Build the ADR prompt section. Full ADR content for every selected ADR —
+ * no length-based summary fallback, no outer safety cap.
+ *
+ * Sprint 182 PQ-2 (F3): per `feedback_prompt_completeness_over_brevity` anchor,
+ * mandatory ADR content is injected verbatim. The previous
+ * `ADR_SUMMARY_THRESHOLD` switch and `ADR_SECTION_MAX = 6000` cap (with the
+ * "(ADR content truncated for prompt size)" marker) were removed; mode is
+ * always `'full'`.
+ *
+ * Sprint 182 PQ-5 (F7): `minScore` filters out low-relevance ADRs after the
+ * top-N selection. When the threshold drops every candidate, the entire block
+ * — including the `=== Mandatory Architecture Rules (ADR) ===` header — is
+ * omitted so the worker is not handed a stranded empty section.
+ */
 function buildAdrBlock(
   task: Task,
   allAdrs: MemoryEntryV2[] | undefined,
   outIds: string[],
+  minScore: number,
 ): string {
   if (!allAdrs || allAdrs.length === 0) return '';
 
   const ranked = selectRelevantAdrs(task, allAdrs, 3);
-  if (ranked.length === 0) return '';
+  // F7: drop ADRs whose relevance score falls below the configured threshold.
+  // `selectRelevantAdrs` already filters strict-positive scores, so we apply
+  // the threshold on top of that without re-running scoring.
+  const filtered = minScore > 0 ? ranked.filter(r => r.score >= minScore) : ranked;
+  if (filtered.length === 0) return '';
 
-  for (const r of ranked) outIds.push(r.adrId);
+  for (const r of filtered) outIds.push(r.adrId);
 
-  // Determine mode: if any selected ADR's content > threshold, use summary
-  const hasLongAdr = ranked.some(r => {
-    const entry = allAdrs.find(a => a.id === r.adrId);
-    return entry?.content && entry.content.length > ADR_SUMMARY_THRESHOLD;
-  });
-  const mode: 'full' | 'summary' = hasLongAdr ? 'summary' : 'full';
-
-  let content = buildAdrPromptSection(ranked, mode, allAdrs);
+  const content = buildAdrPromptSection(filtered, 'full', allAdrs);
   if (!content) return '';
-
-  // Safety cap: truncate if ADR section exceeds reasonable limit
-  const ADR_SECTION_MAX = 6000;
-  if (content.length > ADR_SECTION_MAX) {
-    content = content.slice(0, ADR_SECTION_MAX) + '\n\n(ADR content truncated for prompt size)';
-  }
 
   return `=== Mandatory Architecture Rules (ADR) ===\nAll accepted ADRs below are mandatory constraints. Violating an accepted ADR requires a NO_GO result + ADR amendment proposal.\n\n${content}\n`;
 }
@@ -201,9 +259,19 @@ function buildScopeBlock(scope: TaskScope, outWarnings: string[]): string {
     ? scope.directories.map(d => `  - ${d}`).join('\n')
     : '  - (no directory restriction)';
 
-  const scopeFiles = sanitized.filesWrite.length > 0
-    ? sanitized.filesWrite.map(f => `  - ${f}`).join('\n')
-    : '  - (determined by your task scope)';
+  // Sprint 182 PQ-4 (F5): when DIRECTIVES omits an explicit `Files:` list,
+  // fall back to an inferred formulation that names the assigned directories
+  // instead of the vague "(determined by your task scope)" sentinel. The
+  // worker now knows it may write anywhere within those directories.
+  let scopeFiles: string;
+  if (sanitized.filesWrite.length > 0) {
+    scopeFiles = sanitized.filesWrite.map(f => `  - ${f}`).join('\n');
+  } else if (scope.directories.length > 0) {
+    const dirList = scope.directories.join(', ');
+    scopeFiles = `  - (no explicit Files list — you may write to any file within the directories above: ${dirList})`;
+  } else {
+    scopeFiles = '  - (determined by your task scope)';
+  }
 
   return `## Scope Rules
 You may ONLY modify files in these directories:
@@ -430,10 +498,17 @@ interface RenderInput {
   depsBlock: string;
   task: Task;
   effort: string;
+  /**
+   * Pre-computed idempotency key threaded by {@link buildTaskPrompt}. Inlined
+   * directly into the rendered "## Idempotency Key" section — Sprint 182 PQ-1
+   * (F1) replaced the previous literal `${IDEMPOTENCY_KEY}` placeholder that
+   * was reaching workers verbatim because no shell expansion happened.
+   */
+  idempotencyKey: string;
 }
 
 function renderTemplate(input: RenderInput): string {
-  const { agentBlock, skillBlock, adrBlock, scopeBlock, depsBlock, task, effort } = input;
+  const { agentBlock, skillBlock, adrBlock, scopeBlock, depsBlock, task, effort, idempotencyKey } = input;
 
   // Conditionally emit non-empty sections only (skip filler empty headers)
   const sections: string[] = [];
@@ -443,16 +518,24 @@ function renderTemplate(input: RenderInput): string {
   if (adrBlock) sections.push(adrBlock);
 
   // Main worker preamble
+  // Sprint 182 PQ-4 (F6): title and description live on separate lines/paragraphs.
+  // The previous "${id}: ${title} — ${description}" form duplicated the title
+  // when description started with the title and collapsed markdown structure
+  // (lists, bold) into a single line. Now: id + title on one line, description
+  // as its own paragraph so markdown survives rendering.
   sections.push(`You are a Deckent worker agent.
 See .deckent/workspace/WORKER-GUIDE.md for heartbeat format, result format, and error handling rules.
 
 ## Your Task
-${task.id}: ${task.title} — ${task.description}
+${task.id}: ${task.title}
+
+${task.description}
+
 - Model: ${task.model}
 - Effort: ${effort}
 
 ## Idempotency Key
-\${IDEMPOTENCY_KEY}
+${idempotencyKey}
 Use this key for external API calls (Idempotency-Key header) to make retries safe.`);
 
   // What to do

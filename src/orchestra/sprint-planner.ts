@@ -488,7 +488,16 @@ export async function planSprint(
             taskDNA: decision.taskDNA,
             confidence: decision.agentConfidence,
             routingVersion: 'v2',
+            ...(decision.overrideWarnings && decision.overrideWarnings.length > 0
+              ? { overrideWarnings: decision.overrideWarnings }
+              : {}),
           };
+
+          if (decision.overrideWarnings && decision.overrideWarnings.length > 0) {
+            for (const w of decision.overrideWarnings) {
+              debugLog('planSprint:override-warning', `[${task.id}] ${w}`);
+            }
+          }
 
           // Persist decision trail via DecisionLogger — only for v2 routing with meaningful steps
           try {

@@ -1,15 +1,20 @@
 // ─── IDEMPOTENCY_KEY Worker Prompt Inject Tests ─────────────────────────────
-// Sprint 156 — Task 156-006
+// Sprint 156 — Task 156-006 (initial); Sprint 182 PQ-1 / F1 (revised).
 //
 // Verifies two coupled behaviors:
 //   1. DockerSpawnBackend.spawn() injects IDEMPOTENCY_KEY=<16-hex> env var
-//      into the docker run argument list.
-//   2. buildTaskPrompt() emits a "## Idempotency Key" header containing the
-//      literal ${IDEMPOTENCY_KEY} shell placeholder + usage directive so the
-//      worker can read the env var at runtime.
+//      into the docker run argument list (spawn-time, unchanged).
+//   2. buildTaskPrompt() emits a "## Idempotency Key" header containing a
+//      pre-computed deterministic key (`${sprintId}-${taskId}-${retryCount}`)
+//      so the worker can hand it to external APIs directly.
 //
-// Together these ensure: spawn-time the env is set, prompt-time the worker is
-// told how to use it (Idempotency-Key header on external API calls).
+// Sprint 182 PQ-1 (F1): the prompt previously embedded the literal
+// `${IDEMPOTENCY_KEY}` shell placeholder, expecting a shell to expand it from
+// the env var at container runtime. Live evidence from Sprint 181 showed no
+// expansion ever happened — the literal string reached workers verbatim. The
+// fix swaps the placeholder for an interpolated value computed by
+// `computeIdempotencyKey(task)`; the spawn-time env var still ships for any
+// out-of-band consumers but the prompt is now self-sufficient.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync, existsSync } from 'node:fs';
@@ -152,11 +157,15 @@ describe('buildTaskPrompt — Idempotency Key directive', () => {
     expect(artifact.prompt).toContain('## Idempotency Key');
   });
 
-  it('embeds the literal ${IDEMPOTENCY_KEY} shell placeholder', () => {
+  it('embeds the computed deterministic key (no literal ${IDEMPOTENCY_KEY} placeholder)', () => {
     const ctx: SprintContext = { effort: 'medium' };
     const artifact = buildTaskPrompt(makeTask(), ctx);
-    // Placeholder must remain literal — shell expands it at container runtime.
-    expect(artifact.prompt).toContain('${IDEMPOTENCY_KEY}');
+    // Sprint 182 PQ-1 (F1): the literal `${IDEMPOTENCY_KEY}` placeholder is no
+    // longer emitted. Worker receives the resolved key directly.
+    expect(artifact.prompt).not.toContain('${IDEMPOTENCY_KEY}');
+    // Computed key shape: `${sprintId}-${taskId}-${retryCount}`. makeTask()
+    // produces sprintId='sprint-156', id='156-006', and no rerouteCount → 0.
+    expect(artifact.prompt).toContain('sprint-156-156-006-0');
   });
 
   it('includes the Idempotency-Key header usage directive', () => {

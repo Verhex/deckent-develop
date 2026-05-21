@@ -17,6 +17,7 @@ import type {
   DeckentConfig,
   PlanMode,
   PlanModeConfig,
+  PromptConfig,
   ResolvedConfig,
   SystemProfile,
   TerminalConfig,
@@ -77,6 +78,14 @@ export const DEFAULT_TERMINAL_CONFIG: TerminalConfig = {
   idleTimeoutMs: 1_800_000,
   scrollbackBytes: 262_144,
   allowShellKind: true,
+};
+
+// ─── Default Prompt Config (Sprint 182 PQ-5 / F7) ───────────────────
+// Lenient default threshold (0.3) keeps the ADR set roughly equivalent to
+// pre-F7 behaviour while filtering out the long tail of low-relevance ADRs
+// that previously inflated worker prompts.
+export const DEFAULT_PROMPT_CONFIG: Required<PromptConfig> = {
+  adr_min_relevance: 0.3,
 };
 
 /**
@@ -559,6 +568,16 @@ export function validateConfig(config: DeckentConfig): string[] {
     }
   }
 
+  // ─── Prompt config validation (Sprint 182 PQ-5 / F7) ────────────────
+  if (config.prompt?.adr_min_relevance !== undefined) {
+    const v = config.prompt.adr_min_relevance;
+    if (typeof v !== 'number' || Number.isNaN(v) || v < 0 || v > 1) {
+      errors.push(
+        `Invalid value '${v}' for field 'prompt.adr_min_relevance'. Must be a number in [0, 1].`,
+      );
+    }
+  }
+
   if (errors.length > 0) {
     throw new ConfigValidationError(errors);
   }
@@ -759,6 +778,8 @@ export function createDefaultConfig(): DeckentConfig {
     deckent_style: 'sprint',
     // Terminal (Sprint 175 — embedded web terminal)
     terminal: structuredClone(DEFAULT_TERMINAL_CONFIG),
+    // Worker prompt tuning (Sprint 182 PQ-5 / F7 — ADR relevance threshold)
+    prompt: structuredClone(DEFAULT_PROMPT_CONFIG),
     // Nervous System (disabled by default — Sprint 148 will activate)
     nervous_system: {
       enabled: false,
@@ -1058,6 +1079,13 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
     terminal: config.terminal
       ? deepMerge(DEFAULT_TERMINAL_CONFIG, config.terminal as Partial<TerminalConfig>)
       : structuredClone(DEFAULT_TERMINAL_CONFIG),
+    // Prompt tuning (Sprint 182 PQ-5 / F7) — mirrors the terminal pattern: user
+    // override deep-merged over DEFAULT_PROMPT_CONFIG so unspecified fields keep
+    // their defaults. Always populated so prompt-god-template consumers can rely
+    // on `resolved.prompt.adr_min_relevance` being defined.
+    prompt: config.prompt
+      ? deepMerge(DEFAULT_PROMPT_CONFIG, config.prompt as Partial<PromptConfig>)
+      : structuredClone(DEFAULT_PROMPT_CONFIG),
   };
 
   // ─── $DECK: interpolation ────────────────────────────────────────────

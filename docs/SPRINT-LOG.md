@@ -4928,3 +4928,65 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 180-014: W5-3 — auto_restore=true + nervous user guide kısa giriş (GO_WITH_TECH_DEBT)
 
 ---
+## Sprint 181 — sprint-181
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-05-21
+**Duration:** 1436s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 5 |
+| Completed | 3 |
+| Tech Debt | 0 |
+| No-Go | 2 |
+| Coverage | 0.0% |
+| Duration | 1435614ms |
+
+### Tasks
+
+- 181-001: W1-1 — CI workflow'una dashboard deps install adımı ekle (NO_GO)
+- 181-002: W1-2 — package.json root scripts gözden geçir + tsc:dashboard alias (DONE)
+- 181-003: W2-1 — Sprint smoke + CI yeşil verify (DONE)
+
+---
+## Sprint 182 — sprint-182
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-05-21
+**Duration:** 2974s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 24 |
+| Completed | 14 |
+| Tech Debt | 0 |
+| No-Go | 10 |
+| Coverage | 5.9% |
+| Duration | 2974018ms |
+
+### Tasks
+
+- 182-001: W1-1 — Mock hygiene: orphan-cleaner-ipc + archive-debt `renameSync` ekle (NO_GO)
+- 182-002: W1-2 — cli/run.test.ts SpawnBackendFactory mock chain (DONE)
+- 182-003: W1-3 — Full vitest sweep CI=true parity verify (NO_GO)
+- 182-004: W2-1 — `dependency_pipeline_enabled: true` ADR-045 wire verify (DONE)
+- 182-005: W2-2 — Auto-debt prepend offset drift fix (Dependencies title-prefix resolver) (NO_GO)
+- 182-006: W2-3 — Verify task pattern redesign (DONE)
+- 182-007: W3-PQ-1 — F1 `${IDEMPOTENCY_KEY}` injection fix (DONE)
+- 182-008: W3-PQ-2 — F2 + F3 truncation kaldır (skill + ADR full content) (DONE)
+- 182-009: W3-PQ-3 — F4 Agent prompt single source (PROMPT.md kanonik) (DONE)
+- 182-010: W3-PQ-4 — F5 + F6 DIRECTIVES parser fix (Files + title/desc) (DONE)
+- 182-011: W3-PQ-5 — F7 ADR relevance threshold (default 0.3) (DONE)
+- 182-012: W3-PQ-6 — F8 Agent override semantic warning (DONE)
+- 182-013: W3-PQ-7 — Integration smoke: Sprint 181-001/002 prompt regression (NO_GO)
+- 182-014: W4-1 — Beta launch smoke: validate:publish 6/6 gate green (NO_GO)
+- 182-015: W4-2 — package.json final + lint:adr + lint:link (DONE)
+- 182-016: W4-3 — ADR-048 Prompt Lifecycle Contract amendment (DONE)
+- 182-017: W4-4 — Sprint 182 retro + Sprint 183 post-beta stub (DONE)
+
+---

@@ -129,23 +129,29 @@ describe('Agent Activation', () => {
       expect(result).toContain(prompt);
     });
 
-    it('includes expertise in the resolved prompt', async () => {
+    it('returns systemPrompt verbatim (no expertise concatenation, F4)', async () => {
+      // Sprint 182 F4 (ADR-048): single-source contract — when PROMPT.md is
+      // missing, systemPrompt is the degraded fallback. Expertise is no longer
+      // prepended (concatenation removed entirely).
       writeAgentJson(tmpDir, 'test-agent', makeAgentDef('test-agent', 'You are a test agent.'));
       const task = makeTask({ assignedAgent: 'test-agent' });
       const result = await resolveAgentPrompt(tmpDir, task);
-      expect(result).toContain('Expertise:');
-      expect(result).toContain('testing');
+      expect(result).toBe('You are a test agent.');
+      expect(result).not.toContain('Expertise:');
     });
 
-    it('combines systemPrompt + expertise + PROMPT.md when all exist', async () => {
-      writeAgentJson(tmpDir, 'test-agent', makeAgentDef('test-agent', 'From agent.json'));
+    it('returns PROMPT.md verbatim — no systemPrompt or expertise concatenation when PROMPT.md exists (F4)', async () => {
+      // Sprint 182 F4 (ADR-048): PROMPT.md is the single canonical source.
+      // systemPrompt and expertise MUST NOT appear in the resolved prompt
+      // when PROMPT.md exists.
+      writeAgentJson(tmpDir, 'test-agent', makeAgentDef('test-agent', 'From agent.json LEAK MARKER'));
       const promptDir = path.join(tmpDir, '.deckent', 'agents', 'test-agent');
       fs.writeFileSync(path.join(promptDir, 'PROMPT.md'), 'From PROMPT.md', 'utf-8');
       const task = makeTask({ assignedAgent: 'test-agent' });
       const result = await resolveAgentPrompt(tmpDir, task);
-      expect(result).toContain('From agent.json');
-      expect(result).toContain('Expertise:');
-      expect(result).toContain('From PROMPT.md');
+      expect(result).toBe('From PROMPT.md');
+      expect(result).not.toContain('From agent.json LEAK MARKER');
+      expect(result).not.toContain('Expertise:');
     });
 
     it('returns undefined for generic agent', async () => {
@@ -173,12 +179,14 @@ describe('Agent Activation', () => {
       expect(result).toContain('Fix bugs');
     });
 
-    it('agent prompt includes expertise even with forceModel', async () => {
+    it('agent prompt returns single-source content even with forceModel (F4)', async () => {
+      // Sprint 182 F4 (ADR-048): single-source contract holds regardless of
+      // forceModel — systemPrompt is returned as-is, no expertise prepended.
       writeAgentJson(tmpDir, 'test-agent', makeAgentDef('test-agent', 'Agent prompt'));
       const task = makeTask({ assignedAgent: 'test-agent', forceModel: 'haiku' } as Partial<Task>);
       const result = await resolveAgentPrompt(tmpDir, task);
-      expect(result).toContain('Expertise:');
-      expect(result).toContain('testing');
+      expect(result).toBe('Agent prompt');
+      expect(result).not.toContain('Expertise:');
     });
   });
 

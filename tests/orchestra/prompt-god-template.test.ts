@@ -148,8 +148,10 @@ describe('buildTaskPrompt', () => {
     expect(result.metadata.estimatedTokens).toBeGreaterThan(0);
   });
 
-  // Test 6: ADR mode switches to summary when content > 3000 chars
-  it('should use summary mode when any ADR content > 3000 chars', () => {
+  // Test 6: ADR renders in full regardless of content length
+  // Sprint 182 PQ-2 (F3): summary-mode threshold and ADR_SECTION_MAX cap removed.
+  // ADR content is now injected verbatim per `feedback_prompt_completeness_over_brevity`.
+  it('should render ADR content in full even when > 3000 chars (F3, Sprint 182)', () => {
     // Create a long ADR with realistic multi-line content
     const longLines = Array.from({ length: 200 }, (_, i) =>
       `Line ${i + 1}: This is a detailed architecture decision about TypeScript ESM configuration and module resolution.`,
@@ -166,9 +168,10 @@ describe('buildTaskPrompt', () => {
     });
     const result = buildTaskPrompt(task, ctx);
 
-    // In summary mode, the full 200-line content should NOT be in the prompt
-    expect(result.prompt).not.toContain('Line 200:');
-    // But ADR IDs should still be in metadata
+    // Full mode is now mandatory — tail of the long ADR must survive
+    expect(result.prompt).toContain('Line 200:');
+    expect(result.prompt).not.toContain('(ADR content truncated for prompt size)');
+    // ADR IDs are still in metadata
     expect(result.metadata.adrIds.length).toBeGreaterThan(0);
   });
 

@@ -9,6 +9,17 @@ import { DEBT_TABLE_HEADER } from '../../src/core/constants.js';
 // adjacent test modules under CI=true parallel workers to observe a
 // half-populated 'node:fs' depending on import order — flaking the suite
 // asymmetrically across local vs. CI runs.
+//
+// Sprint 182 W1-1 mock-hygiene reinforcement: explicitly re-export the
+// node:fs sync surfaces that `src/core/config.ts` reaches for during the
+// self-healing/recovery branch (renameSync, copyFileSync). CI run
+// 26212167619 surfaced `[deckent] Config recovery failed: [vitest] No
+// "renameSync" export is defined on the "node:fs" mock` — the
+// `...actual` spread does not always resolve transitively under CI=true
+// parallel workers (Node 26 + vitest interop), so config recovery threw
+// before cleanup and bled into adjacent suites. Listing the methods
+// explicitly makes the mock CI-stable regardless of importOriginal
+// resolution timing.
 vi.mock('node:fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs')>();
   return {
@@ -19,6 +30,12 @@ vi.mock('node:fs', async (importOriginal) => {
     mkdirSync: vi.fn(),
     appendFileSync: vi.fn(),
     statSync: vi.fn(),
+    // Sprint 182 W1-1: explicit pass-through for config-recovery surfaces.
+    renameSync: actual.renameSync,
+    copyFileSync: actual.copyFileSync,
+    unlinkSync: actual.unlinkSync,
+    rmSync: actual.rmSync,
+    readdirSync: actual.readdirSync,
   };
 });
 

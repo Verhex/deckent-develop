@@ -199,6 +199,12 @@ export interface Task {
     routingVersion?: 'v1' | 'v2';
     /** Number of mid-sprint reroute attempts applied to this task */
     rerouteCount?: number;
+    /**
+     * F8 (Sprint 182): Semantic warnings from forceAgent/forceSkills override
+     * activation checks (e.g., low-relevance forced agent). Advisory only —
+     * PLAN proceeds with override honored.
+     */
+    overrideWarnings?: string[];
   };
   createdAt?: string;
   updatedAt?: string;

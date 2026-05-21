@@ -33,6 +33,12 @@ Sprint 181 W1 wave'inde üretilen iki worker prompt'unu (181-001 devops-engineer
 
 ### F1. `${IDEMPOTENCY_KEY}` placeholder render edilmiyor
 
+**Status:** ✅ Implemented — Sprint 182 PQ-1 (task `182-007` → fix `182-007-fix`).
+Key formatı `${sprintId}-${taskId}-${retryCount}` (retryCount kaynağı `task.routingMeta.rerouteCount`,
+yoksa 0; sprintId yoksa `no-sprint` sentinel). Yardımcı: `computeIdempotencyKey(task)` export'lu.
+Testler: `tests/orchestra/prompt-god-template-idempotency.test.ts` (4 ana + 3 helper) + legacy
+`tests/orchestra/idempotency-key-inject.test.ts` placeholder assertion'ı tersine çevrildi.
+
 **Mevcut davranış:** `src/orchestra/prompt-god-template.ts:455`
 
 ```ts

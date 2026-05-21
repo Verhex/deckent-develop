@@ -202,10 +202,24 @@ export function parseDependencyField(raw: string): string[] {
 }
 
 /**
- * Parse a Dependencies: directive line into an array of task IDs.
- * Supports: "Dependencies: 134-005, 134-007", "- Dependencies: 134-005",
- * and JSON array literals like '- Dependencies: ["169-003"]'.
- * Returns undefined if no dependencies line or empty.
+ * Parse a Dependencies: directive line into an array of dependency refs.
+ *
+ * Supports two ref styles in the array elements (Sprint 182 W2-2):
+ *   - Plan-slot ID (back-compat):   "169-003", "134-005"
+ *   - Title-prefix label (new):     "W1-1", "GATE-2", "PQ-3"
+ *
+ * Plan-slot IDs shift when Brain auto-prepends critical-debt fix tasks at
+ * the head of the sprint (Sprint 176/178 drift bug) — title-prefix refs
+ * survive that shift because they bind by the directive task's title, not
+ * its allocation slot. Caller resolves each raw ref via `resolveDependencyRef`
+ * after the full task list is built.
+ *
+ * Accepted line shapes (all delegated to `parseDependencyField`):
+ *   - bare:           "Dependencies: 134-005"
+ *   - comma list:     "- Dependencies: 134-005, 134-007"
+ *   - JSON array:     '- Dependencies: ["W1-1", "W1-2"]'
+ *
+ * Returns undefined if there is no dependencies line or the value is empty.
  */
 export function parseDependenciesDirective(line: string | undefined): string[] | undefined {
   if (!line) return undefined;
@@ -215,6 +229,100 @@ export function parseDependenciesDirective(line: string | undefined): string[] |
 
   const parts = parseDependencyField(value);
   return parts.length > 0 ? parts : undefined;
+}
+
+// Reserved prefixes / keywords that always resolve to themselves rather than
+// being interpreted as title-prefix lookups (so `Dependencies: none` etc. are
+// never accidentally treated as title fragments). Plan-slot IDs are detected
+// by regex.
+const DEPENDENCY_REF_RESERVED = new Set(['NONE', 'AUTO']);
+
+const PLAN_SLOT_ID_RE = /^\d{1,4}-\d{1,4}$/;
+
+function escapeRegExp(literal: string): string {
+  return literal.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Test whether `title` contains `ref` as a standalone token.
+ *
+ * Standalone means: the ref appears at the start of `title`, at the end, or
+ * surrounded by non-(word|dash) characters. This avoids the classic
+ * substring trap where `"W1-1"` would otherwise match the title `"W1-10 …"`.
+ * Comparison is case-insensitive so `Dependencies: ["w1-1"]` resolves the
+ * same as `["W1-1"]`.
+ */
+function titleHasRefToken(title: string, ref: string): boolean {
+  if (!title || !ref) return false;
+  const re = new RegExp(`(?:^|[^\\w-])${escapeRegExp(ref)}(?=[^\\w-]|$)`, 'i');
+  return re.test(title);
+}
+
+/**
+ * Sprint 182 W2-2 — Resolve a single DIRECTIVES dependency ref to a concrete
+ * `task.id`, surviving the auto-debt prepend offset drift (Sprint 176/178).
+ *
+ * Resolution order:
+ *   1. Plan-slot ID (`NNN-NNN`) → exact `task.id` lookup. Returns the id
+ *      when a task with that exact id exists, otherwise undefined. (Back-
+ *      compat: legacy DIRECTIVES that hard-code slot IDs still work — but
+ *      only when the slot is actually present after planning.)
+ *   2. Title-prefix label (anything else) → case-insensitive token match
+ *      against `task.title`. Returns the first matching task's id, or
+ *      undefined when no title contains the ref as a standalone token.
+ *
+ * Why title-prefix is preferred: Brain prepends critical-debt fix tasks at
+ * the head of the sprint, which shifts every subsequent plan-slot ID by N.
+ * Hard-coded refs like `"178-002"` then silently point at the wrong disk
+ * task. Title-prefix labels (`"W1-1"`) bind to the directive task itself,
+ * so they remain correct even after debt-prepend.
+ *
+ * @param ref Raw dependency reference parsed from DIRECTIVES.
+ * @param tasks All tasks already created for the sprint (debt + directive)
+ *   — typically passed in after the planner finishes constructing the task
+ *   list. Only `id` and `title` are read.
+ */
+export function resolveDependencyRef(
+  ref: string,
+  tasks: ReadonlyArray<{ id: string; title: string }>,
+): string | undefined {
+  if (typeof ref !== 'string') return undefined;
+  const trimmed = ref.trim();
+  if (!trimmed) return undefined;
+  if (DEPENDENCY_REF_RESERVED.has(trimmed.toUpperCase())) return undefined;
+
+  if (PLAN_SLOT_ID_RE.test(trimmed)) {
+    const exact = tasks.find(t => t.id === trimmed);
+    return exact?.id;
+  }
+
+  const titleMatch = tasks.find(t => titleHasRefToken(t.title, trimmed));
+  return titleMatch?.id;
+}
+
+/**
+ * Sprint 182 W2-2 — Batch-resolve dependency refs into concrete task IDs.
+ *
+ * Convenience wrapper around `resolveDependencyRef`:
+ *   - preserves the input order
+ *   - drops refs that fail to resolve (caller can compare lengths to detect
+ *     missing references and emit a warning if needed)
+ *   - de-duplicates the output (a dependency listed twice resolves to one id)
+ */
+export function resolveTaskDependencies(
+  refs: ReadonlyArray<string>,
+  tasks: ReadonlyArray<{ id: string; title: string }>,
+): string[] {
+  const seen = new Set<string>();
+  const resolved: string[] = [];
+  for (const ref of refs) {
+    const id = resolveDependencyRef(ref, tasks);
+    if (id && !seen.has(id)) {
+      seen.add(id);
+      resolved.push(id);
+    }
+  }
+  return resolved;
 }
 
 const VALID_PRIORITIES: readonly string[] = ['CRITICAL', 'HIGH', 'NORMAL', 'LOW'];
@@ -694,8 +802,16 @@ export function parseStructuredDirectives(content: string): ParsedDirectiveTask[
     const priorityLine = lines.find(l => /^[\s-]*Priority:\s*/i.test(l.trim()));
     const parsedPriority = parsePriorityDirective(priorityLine);
 
+    // Sprint 182 PQ-4 (F6): description = content after `### Description` heading
+    // when present. Falls back to the full block when no heading is found, so
+    // legacy DIRECTIVES.md files keep their old description=block behavior.
+    const descHeadingIdx = lines.findIndex(l => /^\s*###\s+Description\b/i.test(l));
+    const description = descHeadingIdx >= 0
+      ? lines.slice(descHeadingIdx + 1).join('\n').trim()
+      : block.trim();
+
     const enrichedScope = enrichScopeWithTestFiles(scope, scope.filesWrite);
-    tasks.push({ title, description: block.trim(), scope: enrichedScope, testTarget, provider: parsedProvider, forceModel: parsedForceModel, forceEffort: parsedForceEffort, forceAgent, forceSkills, excludeSkills, dependencies, priority: parsedPriority });
+    tasks.push({ title, description, scope: enrichedScope, testTarget, provider: parsedProvider, forceModel: parsedForceModel, forceEffort: parsedForceEffort, forceAgent, forceSkills, excludeSkills, dependencies, priority: parsedPriority });
   }
   return tasks;
 }

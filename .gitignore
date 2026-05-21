@@ -124,3 +124,7 @@ kendimenot.md
 # npm cache (gitignored — regen on install)
 .tmp-npm/
 .tmp-vitest-result.json
+
+# Sprint runtime debris (gitignored — regen on each sprint)
+.vitest-out*.txt
+.test-e2e*
