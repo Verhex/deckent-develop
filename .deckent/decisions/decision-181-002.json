@@ -1,0 +1,85 @@
+{
+  "taskId": "181-002",
+  "sprintId": "sprint-181",
+  "steps": [
+    {
+      "step": 2,
+      "name": "routing-step-2",
+      "input": {
+        "taskId": "181-002",
+        "title": "W1-1 — Recover src/api/terminal/audit-integrity.ts (I4 HMAC chain)",
+        "scope": [
+          "src/api/terminal/",
+          "src/core/",
+          "tests/api/terminal/",
+          "docs/superpowers/plans/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "data-engineer",
+        "skills": [
+          "security-specialist",
+          "database-migration",
+          "typescript-expert"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Agent forced by override: data-engineer"
+    },
+    {
+      "step": 3,
+      "name": "routing-step-3",
+      "input": {
+        "taskId": "181-002",
+        "title": "W1-1 — Recover src/api/terminal/audit-integrity.ts (I4 HMAC chain)",
+        "scope": [
+          "src/api/terminal/",
+          "src/core/",
+          "tests/api/terminal/",
+          "docs/superpowers/plans/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "data-engineer",
+        "skills": [
+          "security-specialist",
+          "database-migration",
+          "typescript-expert"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Skill budget: max 3 (large task, 3 module(s), effort=normal)"
+    },
+    {
+      "step": 4,
+      "name": "routing-step-4",
+      "input": {
+        "taskId": "181-002",
+        "title": "W1-1 — Recover src/api/terminal/audit-integrity.ts (I4 HMAC chain)",
+        "scope": [
+          "src/api/terminal/",
+          "src/core/",
+          "tests/api/terminal/",
+          "docs/superpowers/plans/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "data-engineer",
+        "skills": [
+          "security-specialist",
+          "database-migration",
+          "typescript-expert"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Skills forced by override: [security-specialist, database-migration, typescript-expert]"
+    }
+  ],
+  "decidedAt": "2026-05-21T05:13:04.616Z"
+}

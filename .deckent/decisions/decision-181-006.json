@@ -1,0 +1,79 @@
+{
+  "taskId": "181-006",
+  "sprintId": "sprint-181",
+  "steps": [
+    {
+      "step": 2,
+      "name": "routing-step-2",
+      "input": {
+        "taskId": "181-006",
+        "title": "W1-5 — Recover src/cli/commands/audit-verify.ts (CLI tamper detect)",
+        "scope": [
+          "src/cli/commands/",
+          "src/cli/",
+          "tests/cli/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "api-builder",
+        "skills": [
+          "typescript-expert",
+          "security-specialist"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Agent forced by override: api-builder"
+    },
+    {
+      "step": 3,
+      "name": "routing-step-3",
+      "input": {
+        "taskId": "181-006",
+        "title": "W1-5 — Recover src/cli/commands/audit-verify.ts (CLI tamper detect)",
+        "scope": [
+          "src/cli/commands/",
+          "src/cli/",
+          "tests/cli/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "api-builder",
+        "skills": [
+          "typescript-expert",
+          "security-specialist"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Skill budget: max 3 (large task, 1 module(s), effort=normal)"
+    },
+    {
+      "step": 4,
+      "name": "routing-step-4",
+      "input": {
+        "taskId": "181-006",
+        "title": "W1-5 — Recover src/cli/commands/audit-verify.ts (CLI tamper detect)",
+        "scope": [
+          "src/cli/commands/",
+          "src/cli/",
+          "tests/cli/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "api-builder",
+        "skills": [
+          "typescript-expert",
+          "security-specialist"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Skills forced by override: [typescript-expert, security-specialist]"
+    }
+  ],
+  "decidedAt": "2026-05-21T05:13:04.618Z"
+}
