@@ -276,6 +276,20 @@ describe('handleEvaluation', () => {
     expect(mockMemoryStore.close).toHaveBeenCalled();
   });
 
+  it('GO_WITH_TECH_DEBT: derives debt sprint_id from task id when task.sprintId is missing (B10)', () => {
+    vi.mocked(existsSync).mockReturnValue(true);
+    // task.sprintId is optional — when absent the debt entry must still be
+    // sprint-associated (derived from the NNN-MMM task id) so sprint-range
+    // queries, escalation and decay never miss it.
+    const task = makeTask({ id: '200-005', assignedWorker: 'w-200-005', sprintId: undefined });
+    const result = makeTaskResult({ taskId: '200-005', notes: 'tech debt note' });
+    handleEvaluation('/root', task, TaskEvaluation.GO_WITH_TECH_DEBT, result);
+    const insertArg = mockMemoryStore.insert.mock.calls[0]![0];
+    expect(insertArg.sprint_id).toBe('sprint-200');
+    expect(insertArg.sprint_num).toBe(200);
+    expect(insertArg.metadata.originSprintId).toBe('sprint-200');
+  });
+
   it('GO_WITH_TECH_DEBT: does not insert duplicate debt entry', () => {
     vi.mocked(existsSync).mockReturnValue(true);
     // Simulate existing entry

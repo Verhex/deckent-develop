@@ -15,6 +15,7 @@ import {
 import { updateTaskStatus, releaseAllLocks } from '../agents/worker.js';
 import { MemoryStore } from '../core/memory-store.js';
 import type { MemoryEntryV2, CreateEntryInput } from '../core/memory-types.js';
+import { extractSprintFromDebtId } from '../core/memory-import.js';
 
 // ═══ Internal Helpers ══════════════════════════════════════════════
 
@@ -204,6 +205,14 @@ export function handleEvaluation(
 
     const debtId = `debt-${task.id}`;
 
+    // B10: a debt entry must always be sprint-associated. `task.sprintId` is
+    // optional — when it is absent, derive the sprint from the NNN-MMM task
+    // id so sprint-range queries, escalation and decay never miss the entry
+    // (a NULL sprint_id column was the Memory V2 debt-row defect).
+    const debtSprint = task.sprintId
+      ? { sprint_id: task.sprintId, sprint_num: getSprintNumber(task.sprintId) }
+      : extractSprintFromDebtId(debtId) ?? { sprint_id: '', sprint_num: 0 };
+
     // ── Memory V2: DB-first ──────────────────────────────────────
     const store = getMemoryStore(projectRoot);
     if (store) {
@@ -217,10 +226,10 @@ export function handleEvaluation(
             source: 'brain',
             status: 'active',
             priority: 'normal',
-            sprint_id: task.sprintId,
-            sprint_num: parseInt((task.sprintId ?? '').replace(/\D/g, ''), 10) || 0,
+            sprint_id: debtSprint.sprint_id,
+            sprint_num: debtSprint.sprint_num,
             tags: ['debt', task.id],
-            metadata: { originTaskId: task.id, originSprintId: task.sprintId ?? '', sprintsOpen: 0 },
+            metadata: { originTaskId: task.id, originSprintId: debtSprint.sprint_id, sprintsOpen: 0 },
           });
         }
       } finally { store.close(); }
