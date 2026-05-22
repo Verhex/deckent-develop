@@ -293,16 +293,16 @@ const MESSAGES: MessageMap = {
     tr: 'Kullanim esigi asildi. Sprint otomatik olarak duraklatildi.',
   },
   'error.build_failed': {
-    en: 'Build failed. Run: tsc --noEmit to check for errors.',
-    tr: 'Derleme basarisiz. Hatalari kontrol icin calistirin: tsc --noEmit',
+    en: 'Build failed. Run your project\'s type check / lint command to check for errors.',
+    tr: 'Derleme başarısız. Hataları kontrol için projenizin tip kontrolü / lint komutunu çalıştırın.',
   },
   'error.git_not_found': {
     en: 'git not found. Install git to use deckent.',
     tr: 'git bulunamadi. deckent kullanmak icin git kurun.',
   },
   'error.node_version_low': {
-    en: 'Node.js version too low. Upgrade to >=18.',
-    tr: 'Node.js surumu cok dusuk. >=18 surumune yukselin.',
+    en: 'Node.js version too low. Upgrade to >=24.0.0.',
+    tr: 'Node.js sürümü çok düşük. >=24.0.0 sürümüne yükseltin.',
   },
 };
 

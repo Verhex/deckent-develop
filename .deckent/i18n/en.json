@@ -107,7 +107,7 @@
   "error.scope_violation": "Worker exceeded assigned scope. Check task scope boundaries.",
   "error.lock_conflict": "Another worker holds the lock. Wait or run: deckent cleanup",
   "error.usage_exceeded": "Usage threshold reached. Sprint has been auto-paused.",
-  "error.build_failed": "Build failed. Run: tsc --noEmit to check for errors.",
+  "error.build_failed": "Build failed. Run your project's type check / lint command to check for errors.",
   "error.git_not_found": "git not found. Install git to use deckent.",
-  "error.node_version_low": "Node.js version too low. Upgrade to >=18."
+  "error.node_version_low": "Node.js version too low. Upgrade to >=24.0.0."
 }

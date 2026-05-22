@@ -120,9 +120,8 @@
   "error.no_directives": "DIRECTIVES.md bulunamadi. Sprint hedeflerinizi yazin veya calistirin: deckent init",
   "error.config_invalid": "Yapilandirma gecersiz. Tani icin calistirin: deckent doctor",
   "error.scope_violation": "Worker atanan kapsami asti. Gorev kapsam sinirlarini kontrol edin.",
-  "error.lock_conflict": "Baska bir worker kilidi tutuyor. Bekleyin veya calistirin: deckent cleanup",
   "error.usage_exceeded": "Kullanim esigi asildi. Sprint otomatik olarak duraklatildi.",
-  "error.build_failed": "Derleme basarisiz. Hatalari kontrol icin calistirin: tsc --noEmit",
+  "error.build_failed": "Derleme başarısız. Hataları kontrol için projenizin tip kontrolü / lint komutunu çalıştırın.",
   "error.git_not_found": "git bulunamadi. deckent kullanmak icin git kurun.",
-  "error.node_version_low": "Node.js surumu cok dusuk. >=18 surumune yukselin."
+  "error.node_version_low": "Node.js sürümü çok düşük. >=24.0.0 sürümüne yükseltin."
 }
