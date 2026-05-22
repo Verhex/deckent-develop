@@ -22,6 +22,16 @@ vi.mock('node:child_process', () => ({
 vi.mock('../../../src/core/utils.js', () => ({
   countBrainLines: vi.fn().mockReturnValue(100),
   ensureDeckentImport: vi.fn(),
+  debugLog: vi.fn(),
+}));
+
+// B8: writeSyncToMemory records to memory.db (no .brain/MEMORY.md file).
+const syncStore = vi.hoisted(() => ({ upserts: [] as Array<Record<string, unknown>> }));
+vi.mock('../../../src/core/memory-store.js', () => ({
+  MemoryStore: vi.fn(() => ({
+    upsert: (input: Record<string, unknown>) => { syncStore.upserts.push(input); },
+    close: () => {},
+  })),
 }));
 
 import { ensureDeckentImport } from '../../../src/core/utils.js';
@@ -252,7 +262,7 @@ describe('formatSyncOutput', () => {
     expect(output).toContain('Modified: src/auth/jwt.ts, src/middleware/guard.ts');
     expect(output).toContain('New: src/utils/crypto.ts');
     expect(output).toContain('Deleted: src/old-auth.ts');
-    expect(output).toContain('→ Added to MEMORY.md for next sprint context');
+    expect(output).toContain('→ Recorded to memory.db for next sprint context');
     expect(output).not.toContain('Renamed');
   });
 
@@ -278,11 +288,11 @@ describe('formatSyncOutput', () => {
 describe('writeSyncToMemory', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    syncStore.upserts = [];
   });
 
-  it('appends section when no existing Out-of-band section', () => {
-    vi.mocked(existsSync).mockReturnValue(true);
-    vi.mocked(readFileSync).mockReturnValue('## Sprint 042 Learnings\n- Something\n');
+  it('upserts an Out-of-band Changes memory entry', () => {
+    vi.mocked(existsSync).mockReturnValue(true); // memory.db present
 
     const syncResult: SyncResult = {
       commits: 2,
@@ -295,18 +305,14 @@ describe('writeSyncToMemory', () => {
 
     writeSyncToMemory('/project', syncResult);
 
-    expect(writeFileSync).toHaveBeenCalledWith(
-      expect.stringContaining('MEMORY.md'),
-      expect.stringContaining('## Out-of-band Changes'),
-      'utf-8',
-    );
+    expect(syncStore.upserts).toHaveLength(1);
+    expect(syncStore.upserts[0]!.type).toBe('memory');
+    expect(syncStore.upserts[0]!.id).toBe('sync-out-of-band');
+    expect(syncStore.upserts[0]!.content).toContain('## Out-of-band Changes');
   });
 
-  it('replaces existing Out-of-band section', () => {
+  it('records the latest sync (single upserted entry, last wins)', () => {
     vi.mocked(existsSync).mockReturnValue(true);
-    vi.mocked(readFileSync).mockReturnValue(
-      '## Sprint 042 Learnings\n- Something\n## Out-of-band Changes\n- 1 commit(s) since Sprint #041\n- Modified: old.ts\n',
-    );
 
     const syncResult: SyncResult = {
       commits: 3,
@@ -319,14 +325,11 @@ describe('writeSyncToMemory', () => {
 
     writeSyncToMemory('/project', syncResult);
 
-    expect(writeFileSync).toHaveBeenCalledWith(
-      expect.stringContaining('MEMORY.md'),
-      expect.stringContaining('3 commit(s) since Sprint #042'),
-      'utf-8',
-    );
+    expect(syncStore.upserts).toHaveLength(1);
+    expect(syncStore.upserts[0]!.content).toContain('3 commit(s) since Sprint #042');
   });
 
-  it('does nothing when MEMORY.md does not exist', () => {
+  it('does nothing when memory.db does not exist', () => {
     vi.mocked(existsSync).mockReturnValue(false);
 
     const syncResult: SyncResult = {
@@ -340,9 +343,7 @@ describe('writeSyncToMemory', () => {
 
     writeSyncToMemory('/project', syncResult);
 
-    expect(readFileSync).not.toHaveBeenCalled();
-    expect(writeFileSync).not.toHaveBeenCalled();
-    expect(appendFileSync).not.toHaveBeenCalled();
+    expect(syncStore.upserts).toHaveLength(0);
   });
 });
 

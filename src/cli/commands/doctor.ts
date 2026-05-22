@@ -8,7 +8,7 @@ import type { DoctorResult, SystemProfile } from '../../core/types.js';
 import type { DetectedProvider } from '../../core/provider.js';
 import type { HealthCheckResult } from '../../orchestra/connector.js';
 import {
-  DECKENT_DIR, BRAIN_DIR, MEMORY_FILE, DECISIONS_FILE,
+  DECKENT_DIR, BRAIN_DIR, DECISIONS_FILE,
   DIRECTIVES_FILE, LOCKS_DIR, MEMORY_DB_FILE,
   PROJECT_CONFIG_PATH,
 } from '../../core/constants.js';
@@ -206,9 +206,10 @@ function checkBrainDir(root: string): DoctorCheck {
   const hasLegacyDecisions = existsSync(join(brainPath, DECISIONS_FILE));
 
   const missing: string[] = [];
-  if (!existsSync(join(brainPath, MEMORY_FILE))) missing.push(MEMORY_FILE);
+  // Memory V2: memory.db is the single source of truth — legacy .brain/ root
+  // .md files (MEMORY/RETRO/PATTERNS/DEBT) are no longer expected.
   if (!hasV2Decisions && !hasLegacyDecisions) {
-    missing.push(`${DECISIONS_FILE} or ${DECISIONS_EXPORT_RELATIVE}`);
+    missing.push(`${MEMORY_DB_FILE} or ${DECISIONS_FILE}`);
   }
   if (missing.length > 0) {
     return { name: 'Brain Dir', passed: false, message: `Missing: ${missing.join(', ')}`, required: false };

@@ -1,6 +1,6 @@
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { BRAIN_DIR, RETRO_FILE, SPRINTS_DIR } from '../../core/constants.js';
+import { BRAIN_DIR, SPRINTS_DIR } from '../../core/constants.js';
 
 // ─── Types ───────────────────────────────────────────────────────────────
 
@@ -181,33 +181,7 @@ export function loadSprintTrend(root: string, n = 5): SprintTrendEntry[] {
   return entries;
 }
 
-// ─── Previous sprint loader ──────────────────────────────────────────────
-
-export function loadPreviousRetro(root: string): string | null {
-  const sprintsDir = join(root, BRAIN_DIR, SPRINTS_DIR);
-  if (!existsSync(sprintsDir)) return null;
-  const files = readdirSync(sprintsDir)
-    .filter((f) => f.startsWith('sprint-') && f.endsWith('.md'))
-    .sort();
-  if (files.length === 0) return null;
-
-  // Read current retro to find current sprint ID
-  const retroPath = join(root, BRAIN_DIR, RETRO_FILE);
-  let currentSprintId: string | undefined;
-  if (existsSync(retroPath)) {
-    const retroContent = readFileSync(retroPath, 'utf-8');
-    const match = retroContent.match(/(?:sprint|Sprint)\s*[:#-]?\s*(sprint-\S+)/i);
-    currentSprintId = match?.[1];
-  }
-
-  // If last file matches current sprint, use second-to-last
-  const lastFile = files.at(-1)!;
-  if (currentSprintId && lastFile === `${currentSprintId}.md`) {
-    if (files.length < 2) return null;
-    const prevFile = files.at(-2)!;
-    return readFileSync(join(sprintsDir, prevFile), 'utf-8');
-  }
-
-  // Otherwise last file IS the previous sprint
-  return readFileSync(join(sprintsDir, lastFile), 'utf-8');
-}
+// B8 (Memory V2): the legacy `loadPreviousRetro` (which scanned `.brain/`
+// sprint logs and read `.brain/RETRO.md`) was removed — it had no caller.
+// `deckent retro --compare` loads previous-sprint retros from the memory.db
+// `retro` entries via retro.ts `loadPreviousRetro`.

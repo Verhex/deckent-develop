@@ -26,6 +26,21 @@ vi.mock('../../../src/cli/helpers/messages.js', () => ({
   getMessage: vi.fn((_key: string, _lang: string) => _key),
 }));
 
+// B8: `deckent explain` reads sprint learnings from memory.db `retro` entries.
+const RETRO_CONTENT = vi.hoisted(() => `## Learnings
+- Lesson one
+- Lesson two
+`);
+vi.mock('../../../src/core/memory-store.js', () => ({
+  MemoryStore: vi.fn(() => ({
+    getById: (id: string) =>
+      id.startsWith('retro-') ? { id, content: RETRO_CONTENT, sprint_num: 42, sprint_id: 'sprint-042' } : null,
+    getByType: (t: string) =>
+      t === 'retro' ? [{ content: RETRO_CONTENT, sprint_num: 42, sprint_id: 'sprint-042' }] : [],
+    close: () => {},
+  })),
+}));
+
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { print } from '../../../src/cli/helpers/output.js';
 import { getLangFromConfig } from '../../../src/cli/helpers/config-reader.js';
@@ -54,11 +69,6 @@ const SPRINT_CONTENT = `# Sprint sprint-042
 
 - Task 1: Something
 - Task 2: Another thing
-`;
-
-const RETRO_CONTENT = `## Learnings
-- Lesson one
-- Lesson two
 `;
 
 const DIRECTIVES_CONTENT = `# DIRECTIVES — Sprint 042: Big Refactor
@@ -175,15 +185,11 @@ describe('explain enhanced', () => {
       mockExistsSync.mockImplementation((p) => {
         const s = String(p);
         if (s.includes('sprints')) return true;
-        if (s.includes('RETRO.md')) return true;
+        if (s.includes('memory.db')) return true;
         if (s.includes('DIRECTIVES.md')) return false;
         return false;
       });
-      mockReadFileSync.mockImplementation((p) => {
-        const s = String(p);
-        if (s.includes('RETRO.md')) return RETRO_CONTENT;
-        return SPRINT_CONTENT;
-      });
+      mockReadFileSync.mockImplementation(() => SPRINT_CONTENT);
 
       runExplain('--json');
 

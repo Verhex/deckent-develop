@@ -20,6 +20,17 @@ vi.mock('../../../src/mcp/helpers/enrich.js', () => ({
   })),
 }));
 
+// B8: deckent_explain reads the retro from memory.db `retro` entries.
+vi.mock('../../../src/core/memory-store.js', () => ({
+  MemoryStore: vi.fn(() => ({
+    getById: (id: string) =>
+      id.startsWith('retro-') ? { id, content: SAMPLE_RETRO, sprint_num: 124, sprint_id: 'sprint-124' } : null,
+    getByType: (t: string) =>
+      t === 'retro' ? [{ content: SAMPLE_RETRO, sprint_num: 124, sprint_id: 'sprint-124' }] : [],
+    close: () => {},
+  })),
+}));
+
 vi.mock('../../../src/mcp/helpers/format.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../src/mcp/helpers/format.js')>();
   return {
@@ -68,14 +79,14 @@ const SAMPLE_SPRINT_LOG = `# Sprint 124
 - Sprint Reporter Token Summary
 `;
 
-const SAMPLE_RETRO = `# Retrospective — Sprint 124
+const SAMPLE_RETRO = vi.hoisted(() => `# Retrospective — Sprint 124
 
 ## Learnings
 - Context-aware routing improves model selection
 - Token usage tracking helps cost analysis
 - Sprint reporter token table provides visibility
 - Rubric evaluation is the next priority
-`;
+`);
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
@@ -184,7 +195,7 @@ describe('registerExplainTool', () => {
       vi.mocked(existsSync).mockImplementation((p) => {
         const path = String(p);
         if (path.includes('sprints')) return true;
-        if (path.includes('RETRO.md')) return true;
+        if (path.includes('memory.db')) return true;
         if (path.includes('DIRECTIVES.md')) return false;
         return false;
       });
@@ -192,7 +203,6 @@ describe('registerExplainTool', () => {
       vi.mocked(readFileSync).mockImplementation((p) => {
         const path = String(p);
         if (path.includes('sprint-124')) return SAMPLE_SPRINT_LOG;
-        if (path.includes('RETRO')) return SAMPLE_RETRO;
         return '';
       });
 

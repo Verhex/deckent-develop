@@ -130,32 +130,16 @@ describe('writeRetrospective — dual write invariant (BUG-DD + BUG-EE)', () => 
     expect(memRow!.type).toBe('memory');
   });
 
-  it('writes .brain/RETRO.md with current mtime (BUG-EE)', () => {
-    const sprint = makeSprint('sprint-168', 168);
-    const evaluations = new Map<string, TaskEvaluation>();
+  // B8 (Memory V2): the legacy `.brain/RETRO.md` file is no longer written —
+  // the retro lives only in memory.db. The former BUG-EE mtime test (stale
+  // RETRO.md file) is obsolete; DB-row freshness is covered by the canonical
+  // 3-row test above and tests/orchestra/write-retrospective.test.ts.
 
-    store.close();
-
-    const beforeMs = Date.now();
-    writeRetrospective(tmpDir, sprint, evaluations, sprint.metrics!);
-    const afterMs = Date.now();
-
-    const retroPath = join(brainDir, 'RETRO.md');
-    expect(existsSync(retroPath), '.brain/RETRO.md must exist after writeRetrospective').toBe(true);
-
-    const stat = statSync(retroPath);
-    // BUG-EE root cause: RETRO.md was stale 2 sprints — mtime must be
-    // within the writeRetrospective() call window.
-    expect(stat.mtimeMs).toBeGreaterThanOrEqual(beforeMs - 1000);
-    expect(stat.mtimeMs).toBeLessThanOrEqual(afterMs + 1000);
-  });
-
-  it('dual write is atomic — both DB rows and RETRO.md emitted in same call', () => {
-    // Single writeRetrospective() invocation must produce both side-effects.
+  it('writeRetrospective emits all 3 canonical DB rows in a single call', () => {
+    // Single writeRetrospective() invocation must produce all side-effects.
     // Sprint 167 regression: invocation happened but DB had zero entries —
-    // probably because finalize used a separate code path. This test
-    // pins the contract: any call site that invokes writeRetrospective gets
-    // BOTH outputs.
+    // this test pins the contract: any call site that invokes
+    // writeRetrospective gets the sprint-log / retro / memory rows.
     const sprint = makeSprint('sprint-169', 169);
     const evaluations = new Map<string, TaskEvaluation>([
       ['169-001', TaskEvaluation.DONE],
@@ -168,12 +152,8 @@ describe('writeRetrospective — dual write invariant (BUG-DD + BUG-EE)', () => 
     // Re-open DB
     store = new MemoryStore(dbPath);
 
-    // DB invariant: 3 rows
     expect(store.getById('sprint-log-169')).not.toBeNull();
     expect(store.getById('retro-sprint-169')).not.toBeNull();
     expect(store.getById('mem-sprint-169')).not.toBeNull();
-
-    // FS invariant: RETRO.md present
-    expect(existsSync(join(brainDir, 'RETRO.md'))).toBe(true);
   });
 });

@@ -25,8 +25,9 @@ import {
   BRAIN_DIR, TASKS_DIR, LOCKS_DIR, DECKENT_DIR,
   DIRECTIVES_FILE, DASHBOARD_FILE,
   MEMORY_FILE, DECISIONS_FILE, DEBT_FILE, PATTERNS_FILE, RETRO_FILE,
-  SPRINTS_DIR, DEBT_TABLE_HEADER,
+  SPRINTS_DIR, DEBT_TABLE_HEADER, MEMORY_DB_FILE,
 } from '../../src/core/constants.js';
+import { MemoryStore } from '../../src/core/memory-store.js';
 
 // ─── Mocks: tmux, child_process ────────────────────────────────
 
@@ -81,6 +82,9 @@ function setupProjectDir(root: string): void {
   writeFileSync(join(root, BRAIN_DIR, DEBT_FILE), `# Tech Debt\n\n${DEBT_TABLE_HEADER}\n`);
   writeFileSync(join(root, BRAIN_DIR, PATTERNS_FILE), '[]');
   writeFileSync(join(root, BRAIN_DIR, RETRO_FILE), '# Sprint Retrospective\n');
+  // B8: writeRetrospective is DB-first — provide a real memory.db so the
+  // retro/sprint/memory entries can be written.
+  new MemoryStore(join(root, BRAIN_DIR, MEMORY_DB_FILE)).close();
 }
 
 function makeTestTask(id: string, sprintId: string, overrides?: Partial<Task>): Task {
@@ -353,10 +357,10 @@ describe('Full sprint lifecycle with mock tmux', () => {
 
       writeRetrospective(root, sprint, evaluations, metrics);
 
-      const retroPath = join(root, BRAIN_DIR, RETRO_FILE);
-      expect(existsSync(retroPath)).toBe(true);
-
-      const retro = readFileSync(retroPath, 'utf-8');
+      // B8: the retro is persisted to the memory.db `retro-<id>` entry.
+      const store = new MemoryStore(join(root, BRAIN_DIR, MEMORY_DB_FILE));
+      const retro = store.getById('retro-sprint-004')?.content ?? '';
+      store.close();
       expect(retro).toContain('Retrospective');
       expect(retro).toContain('## Summary');
       expect(retro).toContain('## Metrics');

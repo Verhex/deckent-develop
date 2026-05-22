@@ -2,7 +2,8 @@ import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { z } from 'zod/v4';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { BRAIN_DIR, RETRO_FILE, SPRINTS_DIR } from '../../core/constants.js';
+import { BRAIN_DIR, MEMORY_DB_FILE, SPRINTS_DIR } from '../../core/constants.js';
+import { MemoryStore } from '../../core/memory-store.js';
 import { enrichResponse } from '../helpers/enrich.js';
 import { formatExplainResponse, wrapResponse, type ExplainData } from '../helpers/format.js';
 import {
@@ -16,12 +17,38 @@ import {
   formatDuration,
 } from '../../cli/commands/explain.js';
 
+/**
+ * Load a sprint's retrospective content from the Memory V2 DB `retro` entry.
+ * B8: retros live in memory.db (no `.brain/RETRO.md` file). Falls back to the
+ * most recent retro when the requested sprint has no entry.
+ */
+function loadRetroContent(root: string, sprintNumber: number): string | null {
+  const dbPath = join(root, BRAIN_DIR, MEMORY_DB_FILE);
+  if (!existsSync(dbPath)) return null;
+  try {
+    const store = new MemoryStore(dbPath);
+    try {
+      if (sprintNumber > 0) {
+        const entry = store.getById(`retro-sprint-${sprintNumber}`);
+        if (entry) return entry.content;
+      }
+      const retros = store.getByType('retro')
+        .sort((a, b) => (b.sprint_num ?? 0) - (a.sprint_num ?? 0));
+      return retros[0]?.content ?? null;
+    } finally {
+      store.close();
+    }
+  } catch {
+    return null;
+  }
+}
+
 export function registerExplainTool(server: McpServer): void {
   server.registerTool(
     'deckent_explain',
     {
       title: 'Sprint Explanation',
-      description: 'Explain what a sprint did in human-friendly language. Reads the sprint log from .brain/sprints/ and RETRO.md to generate a summary including goal, task outcomes (completed/failed/tech debt), duration, and key learnings. Use after a sprint completes to get a quick overview. Supports specific sprint lookup, verbose mode for full details, and JSON output.',
+      description: 'Explain what a sprint did in human-friendly language. Reads the sprint log from .brain/sprints/ and the retrospective from the Memory V2 DB to generate a summary including goal, task outcomes (completed/failed/tech debt), duration, and key learnings. Use after a sprint completes to get a quick overview. Supports specific sprint lookup, verbose mode for full details, and JSON output.',
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
       inputSchema: z.object({
         sprintId: z.string().optional().describe('Show a specific sprint by ID (e.g. "042", "sprint-042"). If omitted, returns the latest sprint.'),
@@ -83,15 +110,14 @@ export function registerExplainTool(server: McpServer): void {
           }
         }
 
-        // Read RETRO.md for learnings
+        // Load sprint learnings from the Memory V2 DB `retro` entry — B8.
         let learnings = { items: [] as string[] };
-        const retroPath = join(root, BRAIN_DIR, RETRO_FILE);
-        if (existsSync(retroPath)) {
+        const retroContent = loadRetroContent(root, sprintSummary.sprintNumber);
+        if (retroContent) {
           try {
-            const retroContent = readFileSync(retroPath, 'utf-8');
             learnings = parseRetroLearnings(retroContent, verbose ? Infinity : 3);
           } catch {
-            // skip learnings if unreadable
+            // skip learnings if unparseable
           }
         }
 

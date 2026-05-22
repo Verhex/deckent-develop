@@ -1246,58 +1246,9 @@ describe('escalateDebt', () => {
   });
 });
 
-describe('writeRetrospective', () => {
-  const metrics: SprintMetrics = {
-    totalTasks: 2, completedTasks: 1, techDebtTasks: 0, noGoTasks: 1,
-    durationMs: 60000, coveragePercent: 90, noGoRate: 50,
-    newDebtCount: 0, resolvedDebtCount: 0, totalOpenDebt: 0,
-    boundaryViolations: 0, crossAssignments: 0, contextLinesUsed: 0,
-  };
-
-  it('overwrites RETRO.md', () => {
-    mockedReadFileSync.mockReturnValue('');
-    const evals = new Map([['001-001', TaskEvaluation.DONE]]);
-    writeRetrospective(ROOT, makeSprint(), evals, metrics);
-
-    const retroCall = mockedWriteFileSync.mock.calls.find(c => String(c[0]).includes('RETRO'));
-    expect(retroCall).toBeDefined();
-    expect(retroCall![1]).toContain('Sprint sprint-001 Retrospective');
-  });
-
-  it('respects 100-line RETRO limit', () => {
-    mockedReadFileSync.mockReturnValue('');
-    const manyTasks = Array.from({ length: 200 }, (_, i) => makeTask({ id: `001-${String(i).padStart(3, '0')}` }));
-    const sprint = makeSprint({ tasks: manyTasks });
-    const evals = new Map(manyTasks.map(t => [t.id, TaskEvaluation.DONE] as const));
-
-    writeRetrospective(ROOT, sprint, evals, metrics);
-    const retroCall = mockedWriteFileSync.mock.calls.find(c => String(c[0]).includes('RETRO'));
-    const lines = (retroCall![1] as string).split('\n');
-    expect(lines.length).toBeLessThanOrEqual(100);
-  });
-
-  it('appends learnings to MEMORY.md', () => {
-    mockedReadFileSync.mockReturnValue('# Existing');
-    const evals = new Map([['001-001', TaskEvaluation.NO_GO]]);
-    writeRetrospective(ROOT, makeSprint(), evals, metrics);
-
-    const memCall = mockedWriteFileSync.mock.calls.find(c => String(c[0]).includes('MEMORY'));
-    expect(memCall).toBeDefined();
-    expect(memCall![1]).toContain('Learnings');
-    expect(memCall![1]).toContain('Existing');
-  });
-
-  it('respects MEMORY_MAX_LINES limit', () => {
-    const bigMemory = Array.from({ length: MEMORY_MAX_LINES + 20 }, (_, i) => `Line ${i}`).join('\n');
-    mockedReadFileSync.mockReturnValue(bigMemory);
-    const evals = new Map([['001-001', TaskEvaluation.NO_GO]]);
-
-    writeRetrospective(ROOT, makeSprint(), evals, metrics);
-    const memCall = mockedWriteFileSync.mock.calls.find(c => String(c[0]).includes('MEMORY'));
-    const lines = (memCall![1] as string).split('\n');
-    expect(lines.length).toBeLessThanOrEqual(MEMORY_MAX_LINES);
-  });
-});
+// B8 (Memory V2): writeRetrospective writes the retro/learnings to memory.db,
+// not the legacy .brain/RETRO.md + .brain/MEMORY.md files. DB persistence is
+// covered by tests/orchestra/write-retrospective.test.ts.
 
 describe('writeSprintLog', () => {
   const metrics: SprintMetrics = {

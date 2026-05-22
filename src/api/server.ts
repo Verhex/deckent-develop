@@ -11,7 +11,7 @@ import type { CreateSessionInput, SessionKind, TenantId } from './terminal/types
 import { z } from 'zod';
 import {
   DASHBOARD_FILE, BRAIN_DIR, SPRINTS_DIR, TASKS_DIR, LOCKS_DIR,
-  PROJECT_CONFIG_PATH, MEMORY_FILE, DIRECTIVES_FILE,
+  PROJECT_CONFIG_PATH, DIRECTIVES_FILE,
 } from '../core/constants.js';
 import { SprintStatus, SprintPhase, TaskStatus } from '../core/types.js';
 import type { Task, Sprint } from '../core/types.js';
@@ -391,8 +391,9 @@ async function handleRequest(
     }
 
     if (url === '/api/memory') {
-      const content = readTextFile(join(projectRoot, BRAIN_DIR, MEMORY_FILE));
-      if (content === null) { sendError(res, 404, 'Memory file not found'); return; }
+      // B8: memory is DB-first; serve the generated exports/memory.md view.
+      const content = readTextFile(join(projectRoot, BRAIN_DIR, 'exports', 'memory.md'));
+      if (content === null) { sendError(res, 404, 'Memory export not found'); return; }
       sendJson(res, { content });
       return;
     }

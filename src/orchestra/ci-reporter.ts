@@ -181,14 +181,14 @@ export function appendCiHealthToRetro(projectRoot: string, sprintId: string, sto
 // ═══ CI Learning Integration ══════════════════════════════════════
 
 /**
- * Run CI learning analysis and append CI Learnings section to DB or MEMORY.md.
+ * Run CI learning analysis and upsert the CI Learnings entry into memory.db.
  * Called during sprint retrospective to capture cross-sprint CI insights.
  *
  * 1. Reads last N sprint CI reports
  * 2. Detects failure patterns
  * 3. Generates suggestions and config recommendations
  * 4. Writes ci-learnings.json to .brain/
- * 5. Upserts CI Learnings to DB (when store provided) or appends to MEMORY.md (legacy)
+ * 5. Upserts the CI Learnings `memory` entry to memory.db (B8: DB-first)
  *
  * Non-fatal — errors are logged to stderr but never abort the sprint.
  */

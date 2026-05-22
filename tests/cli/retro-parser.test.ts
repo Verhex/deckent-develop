@@ -7,7 +7,6 @@ import {
   parseAgentPerformanceFromRetro,
   parseSkillPerformanceFromRetro,
   loadSprintTrend,
-  loadPreviousRetro,
 } from '../../src/cli/commands/retro-parser.js';
 
 // ─── parseRetroToRichSummary ─────────────────────────────────────────────
@@ -152,46 +151,6 @@ describe('loadSprintTrend', () => {
   });
 });
 
-// ─── loadPreviousRetro ───────────────────────────────────────────────────
-
-describe('loadPreviousRetro', () => {
-  let testRoot: string;
-
-  beforeEach(() => {
-    testRoot = mkdtempSync(join(tmpdir(), 'retro-parser-prev-'));
-  });
-
-  afterEach(() => {
-    rmSync(testRoot, { recursive: true, force: true });
-  });
-
-  it('returns null when sprints dir does not exist', () => {
-    expect(loadPreviousRetro(testRoot)).toBeNull();
-  });
-
-  it('returns null when no sprint files', () => {
-    mkdirSync(join(testRoot, '.brain', 'sprints'), { recursive: true });
-    expect(loadPreviousRetro(testRoot)).toBeNull();
-  });
-
-  it('returns previous sprint content when current retro matches last file', () => {
-    const brainDir = join(testRoot, '.brain');
-    const sprintsDir = join(brainDir, 'sprints');
-    mkdirSync(sprintsDir, { recursive: true });
-    writeFileSync(join(sprintsDir, 'sprint-054.md'), '# Sprint sprint-054 content');
-    writeFileSync(join(sprintsDir, 'sprint-055.md'), '# Sprint sprint-055 content');
-    writeFileSync(join(brainDir, 'RETRO.md'), '# Sprint sprint-055 Retrospective');
-
-    const prev = loadPreviousRetro(testRoot);
-    expect(prev).toContain('sprint-054');
-  });
-
-  it('returns last sprint file when no current retro exists', () => {
-    const sprintsDir = join(testRoot, '.brain', 'sprints');
-    mkdirSync(sprintsDir, { recursive: true });
-    writeFileSync(join(sprintsDir, 'sprint-050.md'), '# Sprint sprint-050 content');
-
-    const prev = loadPreviousRetro(testRoot);
-    expect(prev).toContain('sprint-050');
-  });
-});
+// B8 (Memory V2): retro-parser's `loadPreviousRetro` (legacy `.brain/` sprint
+// log + RETRO.md scanner) was removed — it had no caller. `deckent retro
+// --compare` loads previous-sprint retros from the memory.db `retro` entries.

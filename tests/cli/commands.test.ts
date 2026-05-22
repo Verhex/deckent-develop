@@ -418,9 +418,12 @@ describe('retro command', () => {
   beforeEach(() => { vi.clearAllMocks(); captureOutput(); });
   afterEach(() => restoreOutput());
 
-  it('prints retro content when file exists', async () => {
+  it('prints retro content when a retro entry exists', async () => {
+    // B8: retro is read from the memory.db `retro` entries.
     vi.mocked(existsSync).mockReturnValue(true);
-    vi.mocked(readFileSync).mockReturnValue('# Sprint 1 Retro\nGood stuff');
+    mockCmdMemStore.getByType.mockReturnValueOnce([
+      { content: '# Sprint 1 Retro\nGood stuff', sprint_num: 1, sprint_id: 'sprint-001' },
+    ]);
     await runCommand(registerRetro, ['retro']);
     // Rich summary format is now the default (use --raw for original content)
     expect(stdout()).toContain('Sprint Retrospective');
@@ -432,11 +435,13 @@ describe('retro command', () => {
     expect(stdout()).toContain('No retrospective found');
   });
 
-  it('handles empty retro file', async () => {
+  it('handles an empty retro entry', async () => {
     vi.mocked(existsSync).mockReturnValue(true);
-    vi.mocked(readFileSync).mockReturnValue('');
+    mockCmdMemStore.getByType.mockReturnValueOnce([
+      { content: '', sprint_num: 1, sprint_id: 'sprint-001' },
+    ]);
     await runCommand(registerRetro, ['retro']);
-    expect(stdout()).toContain('empty');
+    expect(stdout()).toContain('No retrospective found');
   });
 });
 
@@ -1296,12 +1301,13 @@ describe('init command', () => {
 
     await runCommand(registerInit, ['init']);
 
-    const brainCalls = vi.mocked(writeFileSync).mock.calls.filter(
+    const brainDirCalls = vi.mocked(mkdirSync).mock.calls.filter(
       (c) => String(c[0]).includes('.brain'),
     );
-    // Task #4e + B6 + B7: DEBT.md / PROJECT-IDENTITY.md / PATTERNS.md stubs
-    // removed (DB-first) — only MEMORY.md / RETRO.md remain as legacy stubs.
-    expect(brainCalls.length).toBeGreaterThanOrEqual(2);
+    // B6/B7/B8: Memory V2 is fully DB-first — init provisions the .brain/
+    // directory tree (incl. exports/) + memory.db; no legacy root .md stubs
+    // (MEMORY/RETRO/PATTERNS/DEBT/PROJECT-IDENTITY) are written.
+    expect(brainDirCalls.length).toBeGreaterThan(0);
   });
 
   it('does not create PROJECT-IDENTITY.md (B6 — DB-first identity, Memory V2)', async () => {

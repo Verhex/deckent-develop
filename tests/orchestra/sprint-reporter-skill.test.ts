@@ -8,6 +8,8 @@ import {
   formatSkillPerformanceTable,
   writeRetrospective,
 } from '../../src/orchestra/sprint-reporter.js';
+import { MemoryStore } from '../../src/core/memory-store.js';
+import { MEMORY_DB_FILE } from '../../src/core/constants.js';
 import { TaskEvaluation, SprintPhase, SprintStatus } from '../../src/core/types.js';
 import type { Sprint, Task, SprintMetrics } from '../../src/core/types.js';
 
@@ -226,17 +228,31 @@ describe('formatSkillPerformanceTable', () => {
 // ─── writeRetrospective — skill performance section ─────────────────────────
 
 describe('writeRetrospective — skillMap parameter', () => {
+  // B8: writeRetrospective writes the retro to memory.db (`retro-<id>` entry),
+  // not the legacy .brain/RETRO.md file — assertions read the DB entry.
   let tempDir: string;
+  let dbPath: string;
 
   beforeEach(() => {
     tempDir = makeTempDir();
     mkdirSync(join(tempDir, '.brain'), { recursive: true });
     mkdirSync(join(tempDir, '.brain', 'sprints'), { recursive: true });
+    dbPath = join(tempDir, '.brain', MEMORY_DB_FILE);
+    new MemoryStore(dbPath).close();
   });
 
   afterEach(() => {
     rmSync(tempDir, { recursive: true, force: true });
   });
+
+  function readRetro(sprintId: string): string {
+    const store = new MemoryStore(dbPath);
+    try {
+      return store.getById(`retro-${sprintId}`)?.content ?? '';
+    } finally {
+      store.close();
+    }
+  }
 
   it('includes skill performance section when skillMap is provided', () => {
     const sprint = makeSprint({
@@ -256,7 +272,7 @@ describe('writeRetrospective — skillMap parameter', () => {
 
     writeRetrospective(tempDir, sprint, evals, makeMetrics(), undefined, skillMap);
 
-    const retro = readFileSync(join(tempDir, '.brain', 'RETRO.md'), 'utf8');
+    const retro = readRetro(sprint.id);
     expect(retro).toContain('## Skill Performance');
     expect(retro).toContain('ts-skill');
   });
@@ -267,8 +283,7 @@ describe('writeRetrospective — skillMap parameter', () => {
 
     writeRetrospective(tempDir, sprint, evals, makeMetrics());
 
-    const retro = readFileSync(join(tempDir, '.brain', 'RETRO.md'), 'utf8');
-    expect(retro).not.toContain('## Skill Performance');
+    expect(readRetro(sprint.id)).not.toContain('## Skill Performance');
   });
 
   it('skill section appears after agent section in retro', () => {
@@ -281,7 +296,7 @@ describe('writeRetrospective — skillMap parameter', () => {
 
     writeRetrospective(tempDir, sprint, evals, makeMetrics(), agentMap, skillMap);
 
-    const retro = readFileSync(join(tempDir, '.brain', 'RETRO.md'), 'utf8');
+    const retro = readRetro(sprint.id);
     const agentIdx = retro.indexOf('## Agent Performance');
     const skillIdx = retro.indexOf('## Skill Performance');
     // Both sections may or may not be present based on data, but if both are present:
@@ -311,7 +326,7 @@ describe('writeRetrospective — skillMap parameter', () => {
 
     writeRetrospective(tempDir, sprint, evals, makeMetrics(), undefined, skillMap);
 
-    const retro = readFileSync(join(tempDir, '.brain', 'RETRO.md'), 'utf8');
+    const retro = readRetro(sprint.id);
     expect(retro).toContain('| super-skill | 3 | 2 | 1 | 1 | 0% |'); // Done=2: DONE + GO_WITH_TECH_DEBT
   });
 });

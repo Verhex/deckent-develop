@@ -8,6 +8,8 @@ import {
   buildAgentPerformance,
   formatAgentPerformanceTable,
 } from '../../src/orchestra/sprint-reporter.js';
+import { MemoryStore } from '../../src/core/memory-store.js';
+import { MEMORY_DB_FILE } from '../../src/core/constants.js';
 import { TaskEvaluation, SprintPhase, SprintStatus } from '../../src/core/types.js';
 import type { Sprint, Task, TaskResult, SprintMetrics } from '../../src/core/types.js';
 
@@ -225,18 +227,32 @@ describe('formatAgentPerformanceTable', () => {
 // ─── writeRetrospective — agent performance section ─────────────────────
 
 describe('writeRetrospective — agent performance section', () => {
+  // B8: writeRetrospective writes the retro to memory.db (`retro-<id>` entry),
+  // not the legacy .brain/RETRO.md file — assertions read the DB entry.
   let tempDir: string;
+  let dbPath: string;
 
   beforeEach(() => {
     tempDir = makeTempDir();
     mkdirSync(join(tempDir, '.brain'), { recursive: true });
+    dbPath = join(tempDir, '.brain', MEMORY_DB_FILE);
+    new MemoryStore(dbPath).close();
   });
 
   afterEach(() => {
     try { rmSync(tempDir, { recursive: true }); } catch { /* ignore */ }
   });
 
-  it('includes agent performance table in RETRO.md', () => {
+  function readRetro(sprintId: string): string {
+    const store = new MemoryStore(dbPath);
+    try {
+      return store.getById(`retro-${sprintId}`)?.content ?? '';
+    } finally {
+      store.close();
+    }
+  }
+
+  it('includes agent performance table in the retro entry', () => {
     const sprint = makeSprint({
       tasks: [
         makeTask({ id: '001', assignedAgent: 'security-auditor' }),
@@ -251,7 +267,7 @@ describe('writeRetrospective — agent performance section', () => {
 
     writeRetrospective(tempDir, sprint, evaluations, metrics);
 
-    const retro = readFileSync(join(tempDir, '.brain', 'RETRO.md'), 'utf-8');
+    const retro = readRetro(sprint.id);
     expect(retro).toContain('## Agent Performance');
     expect(retro).toContain('security-auditor');
     expect(retro).toContain('generic');
@@ -267,18 +283,16 @@ describe('writeRetrospective — agent performance section', () => {
 
     writeRetrospective(tempDir, sprint, evaluations, metrics, agentMap);
 
-    const retro = readFileSync(join(tempDir, '.brain', 'RETRO.md'), 'utf-8');
-    expect(retro).toContain('custom-agent');
+    expect(readRetro(sprint.id)).toContain('custom-agent');
   });
 
-  it('writes RETRO.md without agent section when no tasks have agents', () => {
+  it('writes the retro entry without an agent section when no tasks have agents', () => {
     const sprint = makeSprint({ tasks: [] });
     const evaluations = new Map<string, TaskEvaluation>();
     const metrics = makeMetrics({ totalTasks: 0, completedTasks: 0 });
 
     writeRetrospective(tempDir, sprint, evaluations, metrics);
 
-    const retro = readFileSync(join(tempDir, '.brain', 'RETRO.md'), 'utf-8');
-    expect(retro).not.toContain('## Agent Performance');
+    expect(readRetro(sprint.id)).not.toContain('## Agent Performance');
   });
 });

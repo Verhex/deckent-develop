@@ -196,17 +196,12 @@ describe('Full sprint cycle — DONE scenario', () => {
     writeRetrospective(root, sprint, evaluations, metrics);
     writeSprintLog(root, sprint, metrics);
 
-    // Verify RETRO.md written
-    const retro = readFileSync(join(root, BRAIN_DIR, RETRO_FILE), 'utf-8');
-    expect(retro).toContain(sprintId);
-    expect(retro).toContain('Metrics');
+    // B8: writeRetrospective persists the retro + learnings to memory.db
+    // (no .brain/RETRO.md / MEMORY.md files). DB persistence is covered by
+    // tests/orchestra/write-retrospective.test.ts.
 
     // Verify sprint log
     expect(existsSync(join(root, BRAIN_DIR, SPRINTS_DIR, `${sprintId}.md`))).toBe(true);
-
-    // Verify MEMORY.md updated
-    const memory = readFileSync(join(root, BRAIN_DIR, MEMORY_FILE), 'utf-8');
-    expect(memory).toContain('Learned Patterns');
 
     // Step 5: Decay (under budget, should be no-op)
     decay(root, sprintId);

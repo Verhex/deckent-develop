@@ -175,7 +175,7 @@ describe('Sync + Explain flow', () => {
     expect(output).toContain('Sprint #044');
     expect(output).toContain('Modified:');
     expect(output).toContain('New:');
-    expect(output).toContain('MEMORY.md');
+    expect(output).toContain('memory.db');
   });
 
   it('buildExplainOutput produces sprint summary with task counts', () => {

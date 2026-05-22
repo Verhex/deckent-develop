@@ -330,12 +330,12 @@ describe('createHttpServer', () => {
 
       const res = await request(api, '/api/memory');
       expect(res.status).toBe(404);
-      expect(JSON.parse(res.body)).toEqual({ error: 'Memory file not found' });
+      expect(JSON.parse(res.body)).toEqual({ error: 'Memory export not found' });
     });
 
-    it('returns memory content when file exists', async () => {
+    it('returns memory content when the export exists', async () => {
       mockExistsSync.mockImplementation((p) => {
-        if (typeof p === 'string' && p.includes('MEMORY.md')) return true;
+        if (typeof p === 'string' && p.includes('memory.md')) return true;
         return false;
       });
       mockReadFileSync.mockReturnValue('# Memory\n- Item 1');
@@ -1351,7 +1351,7 @@ describe('createHttpServer', () => {
   describe('GET /api/memory — response field validation', () => {
     it('content field is a string, not an object', async () => {
       mockExistsSync.mockImplementation((p) => {
-        if (typeof p === 'string' && p.includes('MEMORY.md')) return true;
+        if (typeof p === 'string' && p.includes('memory.md')) return true;
         return false;
       });
       mockReadFileSync.mockReturnValue('## Sprint Learnings\n- item one\n- item two');

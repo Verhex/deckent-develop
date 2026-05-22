@@ -1,9 +1,10 @@
-import { existsSync, readFileSync, readdirSync, statSync, writeFileSync, mkdirSync } from 'node:fs';
+import { existsSync, readdirSync, statSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import type { Command } from 'commander';
-import { DECKENT_FILE, CLAUDE_FILE, AGENTS_FILE, BRAIN_DIR, SPRINTS_DIR, MEMORY_FILE } from '../../core/constants.js';
-import { ensureDeckentImport } from '../../core/utils.js';
+import { DECKENT_FILE, CLAUDE_FILE, AGENTS_FILE, BRAIN_DIR, SPRINTS_DIR, MEMORY_DB_FILE } from '../../core/constants.js';
+import { ensureDeckentImport, debugLog } from '../../core/utils.js';
+import { MemoryStore } from '../../core/memory-store.js';
 import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 
@@ -228,17 +229,18 @@ export function replaceMemorySection(content: string, sectionHeading: string, ne
 }
 
 /**
- * Write sync summary to MEMORY.md under ## Out-of-band Changes section.
+ * Record the sync summary as the Memory V2 `Out-of-band Changes` entry.
+ *
+ * B8 (Memory V2): writes to memory.db (`type='memory'`) instead of the legacy
+ * `.brain/MEMORY.md` file. Upserts a single `sync-out-of-band` entry — the
+ * latest sync overwrites it, mirroring the old "## Out-of-band Changes"
+ * section-replace behaviour. A missing DB is a graceful no-op.
  */
 export function writeSyncToMemory(root: string, syncResult: SyncResult): void {
-  const memoryPath = join(root, BRAIN_DIR, MEMORY_FILE);
-  if (!existsSync(memoryPath)) return;
+  const dbPath = join(root, BRAIN_DIR, MEMORY_DB_FILE);
+  if (!existsSync(dbPath)) return;
 
-  const content = readFileSync(memoryPath, 'utf-8');
-
-  // Build new section
-  const sectionLines: string[] = [];
-  sectionLines.push('## Out-of-band Changes');
+  const sectionLines: string[] = ['## Out-of-band Changes'];
   const sprintLabel = syncResult.sprintId ? `Sprint #${syncResult.sprintId.replace('sprint-', '')}` : 'last sprint';
   sectionLines.push(`- ${syncResult.commits} commit(s) since ${sprintLabel}`);
 
@@ -255,11 +257,24 @@ export function writeSyncToMemory(root: string, syncResult: SyncResult): void {
     sectionLines.push(`- Renamed: ${truncateFileList(syncResult.renamed)}`);
   }
 
-  const newSection = sectionLines.join('\n');
-
-  // B) Use tolerant section replacement instead of fragile regex
-  const updated = replaceMemorySection(content, 'Out-of-band Changes', newSection);
-  writeFileSync(memoryPath, updated, 'utf-8');
+  try {
+    const store = new MemoryStore(dbPath);
+    try {
+      store.upsert({
+        id: 'sync-out-of-band',
+        type: 'memory',
+        title: 'Out-of-band Changes',
+        content: sectionLines.join('\n'),
+        source: 'system',
+        sprint_id: syncResult.sprintId ?? undefined,
+        tags: ['sync', 'out-of-band', 'memory'],
+      }, 'sync');
+    } finally {
+      store.close();
+    }
+  } catch (e) {
+    debugLog('writeSyncToMemory', e);
+  }
 }
 
 /**
@@ -288,7 +303,7 @@ export function formatSyncOutput(syncResult: SyncResult): string {
     lines.push(`  Renamed: ${truncateFileList(syncResult.renamed)}`);
   }
 
-  lines.push('  → Added to MEMORY.md for next sprint context');
+  lines.push('  → Recorded to memory.db for next sprint context');
 
   return lines.join('\n');
 }
@@ -520,7 +535,7 @@ export function registerSync(program: Command): void {
           }
           if (!opts.json) {
             print('');
-            if (opts.dryRun) print('[dry-run] Would write to MEMORY.md:');
+            if (opts.dryRun) print('[dry-run] Would record to memory.db:');
             print(formatSyncOutput(syncResult));
           }
         }

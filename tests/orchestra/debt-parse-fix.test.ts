@@ -152,11 +152,6 @@ describe('parseDebtTable — DEBT.md markdown table parser', () => {
       expect(() => {
         writeRetrospective(tmpDir, sprint, evaluations, metrics);
       }).not.toThrow();
-
-      // Verify RETRO.md was actually written
-      const retroPath = join(tmpDir, '.brain', 'RETRO.md');
-      const retroContent = readFileSync(retroPath, 'utf-8');
-      expect(retroContent.length).toBeGreaterThan(0);
     });
   });
 });

@@ -11,6 +11,8 @@ vi.mock('../../../src/cli/helpers/process.js', () => ({
 
 import { Command } from 'commander';
 import { registerRetro, parseRetroToRichSummary } from '../../../src/cli/commands/retro.js';
+import { MemoryStore } from '../../../src/core/memory-store.js';
+import { MEMORY_DB_FILE } from '../../../src/core/constants.js';
 
 let printOutput: string[] = [];
 vi.mock('../../../src/cli/helpers/output.js', () => ({
@@ -49,8 +51,23 @@ describe('retro --json', () => {
     return program;
   }
 
-  function writeRetro(content: string): void {
-    writeFileSync(join(testRoot, '.brain', 'RETRO.md'), content);
+  // B8: `deckent retro` reads the retro from memory.db `retro` entries.
+  function writeRetro(content: string, sprintId = 'sprint-055'): void {
+    const store = new MemoryStore(join(testRoot, '.brain', MEMORY_DB_FILE));
+    try {
+      store.upsert({
+        id: `retro-${sprintId}`,
+        type: 'retro',
+        title: `${sprintId} Retrospective`,
+        content,
+        source: 'brain',
+        sprint_id: sprintId,
+        sprint_num: parseInt(sprintId.replace(/\D/g, ''), 10) || 0,
+        tags: ['retro'],
+      }, 'test');
+    } finally {
+      store.close();
+    }
   }
 
   it('should output valid JSON', async () => {
@@ -83,12 +100,9 @@ describe('retro --json', () => {
   });
 
   it('should include delta with --compare', async () => {
-    writeRetro(SAMPLE_RETRO);
-    // Create sprint files for comparison
-    const sprintsDir = join(testRoot, '.brain', 'sprints');
-    mkdirSync(sprintsDir, { recursive: true });
-    writeFileSync(join(sprintsDir, 'sprint-054.md'), `# Sprint sprint-054\n| Tasks completed | 5/8 |\n| NO_GO rate | 12% (1/8) |\n| Sprint time | 3m |\n| Coverage | 88% |`);
-    writeFileSync(join(sprintsDir, 'sprint-055.md'), SAMPLE_RETRO);
+    // Two retro entries: sprint-054 (previous) + sprint-055 (latest).
+    writeRetro(`# Sprint sprint-054\n| Tasks completed | 5/8 |\n| NO_GO rate | 12% (1/8) |\n| Sprint time | 3m |\n| Coverage | 88% |`, 'sprint-054');
+    writeRetro(SAMPLE_RETRO, 'sprint-055');
 
     const program = buildProgram();
     await program.parseAsync(['node', 'test', 'retro', '--json', '--compare']);
@@ -113,7 +127,7 @@ describe('retro --json', () => {
     writeRetro('');
     const program = buildProgram();
     await program.parseAsync(['node', 'test', 'retro', '--json']);
-    // Should print "empty" message, not JSON
-    expect(printOutput[0]).toContain('empty');
+    // Should print the no-retro message, not JSON
+    expect(printOutput[0]).toContain('No retrospective found');
   });
 });
