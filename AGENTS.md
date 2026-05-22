@@ -23,7 +23,7 @@ When acting as Worker: @.codex/rules/worker-default.md
 ## Identity
 @.deckent/workspace/IDENTITY.md
 
-## Built-in Agents
+## Agent Performance
 | Agent | Tasks | Done | Success |
 |-------|-------|------|--------|
 | bug-fixer | 1 | 1 | 100% |

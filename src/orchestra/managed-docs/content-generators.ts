@@ -441,8 +441,6 @@ register({
   patterns: ['manual recovery chain', 'manual recovery', 'recovery chain', 'recovery steps'],
   generate(_ctx: DocUpdateContext): string {
     return [
-      '## Sprint Stuck / Manual Recovery',
-      '',
       'If a sprint stalls, follow this chain in order:',
       '',
       '```bash',
@@ -464,13 +462,11 @@ register({
       '',
       '**MCP equivalent:**',
       '```',
-      'deckent_kill   → { target: "all" }',
+      'deckent_kill    → { target: "all" }',
       'deckent_cleanup → { root: "." }',
       'deckent_recover → { root: "." }',
-      'deckent_run    → { taskId: "166-NNN" }',
+      'deckent_run     → { taskId: "<task-id>" }',
       '```',
-      '',
-      '_Sprint 165 proven recovery chain — verified 2026-05-12._',
     ].join('\n');
   },
 });
@@ -530,7 +526,7 @@ register({
       '|-------------|--------|--------|',
       '| `it.skip(...)` without justification comment | YASAK | Hides failing tests — must fix or document why |',
       '| `stub()` / empty function returning hardcoded value | YASAK | Produces false GO results — implement real logic |',
-      '| `npm run build` in worker | YASAK | Alperen kararı — dist/ contamination risk |',
+      '| `npm run build` in worker | YASAK | dist/ contamination risk — build is a separate gate, not worker responsibility |',
       '| Writing outside `scope.filesWrite` | YASAK | ADR-037 RBAC violation — auditor will flag |',
       '| `selfAssessment: "DONE"` without verify-ran marker | YASAK | Sprint evaluator rejects, task → NO_GO |',
       '| Hardcoded timestamps in `.hb` files | YASAK | Use `new Date().toISOString()` always |',

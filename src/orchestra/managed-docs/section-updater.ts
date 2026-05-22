@@ -7,27 +7,71 @@ import type { ParsedSection, ManagedDocEntry } from './types.js';
 // ─── parseSections ────────────────────────────────────────────────────────
 
 /**
- * Parse a markdown file into sections based on ## headings.
+ * Parse a markdown file into sections based on headings (H1-H6).
  * Each section extends from its heading line to the line before the next
  * heading of the same or higher level (or EOF).
+ *
+ * Code fences (``` or ~~~, 3+ chars) are tracked so that `# comment` lines
+ * inside bash/shell blocks are not mistaken for H1 headings — which previously
+ * caused BOOT.md structural corruption (parseSections bug, Sprint 186 audit).
  */
 export function parseSections(content: string): ParsedSection[] {
   const lines = content.split('\n');
   const sections: ParsedSection[] = [];
   const headingRegex = /^(#{1,6})\s+(.+)$/;
+  const fenceStartRegex = /^(`{3,}|~{3,})/;
+
+  // ── outer pass: track fence state, collect headings ──
+  let inFence = false;
+  let fenceChar = '';
+  let fenceMinLen = 0;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]!;
+
+    // Check for fence open/close
+    const fm = line.match(fenceStartRegex);
+    if (fm) {
+      const ch = fm[1]![0]!;
+      const len = fm[1]!.length;
+      if (!inFence) {
+        inFence = true; fenceChar = ch; fenceMinLen = len;
+      } else if (ch === fenceChar && len >= fenceMinLen) {
+        inFence = false; fenceChar = ''; fenceMinLen = 0;
+      }
+      continue; // fence boundary lines are never headings
+    }
+    if (inFence) continue;
+
     const match = line.match(headingRegex);
     if (!match) continue;
 
     const level = match[1]!.length;
     const heading = line;
 
-    // Find where this section ends: next heading of same or higher level
+    // Find where this section ends: next heading of same or higher level,
+    // skipping content inside nested code fences.
     let endLine = lines.length;
+    let innerFence = false;
+    let innerFenceChar = '';
+    let innerFenceMinLen = 0;
+
     for (let j = i + 1; j < lines.length; j++) {
-      const nextMatch = lines[j]!.match(headingRegex);
+      const nextLine = lines[j]!;
+      const nfm = nextLine.match(fenceStartRegex);
+      if (nfm) {
+        const ch = nfm[1]![0]!;
+        const len = nfm[1]!.length;
+        if (!innerFence) {
+          innerFence = true; innerFenceChar = ch; innerFenceMinLen = len;
+        } else if (ch === innerFenceChar && len >= innerFenceMinLen) {
+          innerFence = false; innerFenceChar = ''; innerFenceMinLen = 0;
+        }
+        continue;
+      }
+      if (innerFence) continue;
+
+      const nextMatch = nextLine.match(headingRegex);
       if (nextMatch && nextMatch[1]!.length <= level) {
         endLine = j;
         break;

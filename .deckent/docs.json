@@ -46,7 +46,7 @@
     {
       "id": "agents-md",
       "path": "AGENTS.md",
-      "autoSections": ["Built-in Agents", "Last Updated"],
+      "autoSections": ["Agent Performance"],
       "protectedSections": ["Identity", "Architecture"]
     },
     {
