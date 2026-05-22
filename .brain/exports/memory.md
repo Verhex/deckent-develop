@@ -1,5 +1,8 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-187 Learnings
+- Sprint sprint-187 Learnings: ## Sprint sprint-187 Learnings
+
 ## Sprint sprint-186 Learnings
 - Sprint sprint-186 Learnings: ## Sprint sprint-186 Learnings
 - Audit src/core/cascade-detector.ts: NO_GO — Worker exited without writing result (exitCode=0)

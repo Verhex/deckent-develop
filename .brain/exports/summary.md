@@ -61,6 +61,7 @@
 | adr-064 | TOPP — Continuous Dispatch (Wave-Barrier Removal) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-187 Learnings** (sprint-187): ## Sprint sprint-187 Learnings
 - **Sprint sprint-186 Learnings** (sprint-186): ## Sprint sprint-186 Learnings
 - Audit src/core/cascade-detector.ts: NO_GO — Worker exited without writing result (ex...
 - **Sprint sprint-185 Learnings** (sprint-185): ## Sprint sprint-185 Learnings
@@ -79,8 +80,6 @@
 
 ...
 - **Sprint sprint-177 Learnings** (sprint-177): ## Sprint sprint-177 Learnings
-- Fix debt: ADR-019 reconciliation: language-agnostic verify not implemented: NO_GO — ...
-- **Sprint sprint-176 Learnings** (sprint-176): ## Sprint sprint-176 Learnings
 - Fix debt: ADR-019 reconciliation: language-agnostic verify not implemented: NO_GO — ...
 
 ## Active Technical Debt
@@ -107,4 +106,4 @@ _No active technical debt._
 - Violation pattern: stale_heartbeat
 - Violation pattern: stale_heartbeat
 
-_Total entries: 319 | Generated: 2026-05-21_
+_Total entries: 322 | Generated: 2026-05-22_

@@ -114,10 +114,10 @@ This is where Deckent enters the OpenClaw/Cowork/Devin category — not as anoth
 | Metric | Value |
 |--------|-------|
 | Version | 1.0.0-beta.1 |
-| Sprint | sprint-167 |
+| Sprint | sprint-187 |
 | MCP Tools | 27 |
 | MCP Resources | 8 |
-| CLI Commands | 55+ |
+| CLI Commands | 56+ |
 | Dashboard Pages | 7 |
 | Agents | 15 built-in + 2 custom |
 | Skills | 21 built-in |
@@ -129,10 +129,10 @@ _No sprint history._
 ## Sprint Metrics
 | Metric | Value |
 |--------|-------|
-| Sprint | sprint-167 |
-| Total Tasks | 10 |
-| Completed | 9 |
-| Tech Debt | 2 |
-| No-Go | 1 |
-| Duration | -1dk -1sn |
-| Coverage | NaN% |
+| Sprint | sprint-187 |
+| Total Tasks | 1 |
+| Completed | 1 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Duration | 3dk 13sn |
+| Coverage | 0.0% |

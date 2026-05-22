@@ -1,6 +1,15 @@
 # Changelog
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
+## [1.0.0-beta.1-sprint187] - 2026-05-22
+
+### Added
+
+- api-surface.md Memory V2 atıf güncellemesi
+
+
+_Tasks: 1 total, 1 done, 0 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint186] - 2026-05-21
 
 ### Added

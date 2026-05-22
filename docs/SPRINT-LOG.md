@@ -5092,3 +5092,25 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 186-050: Audit src/core/errors.ts (NO_GO)
 
 ---
+## Sprint 187 — sprint-187
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-05-22
+**Duration:** 193s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 1 |
+| Completed | 1 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 193123ms |
+
+### Tasks
+
+- 187-001: api-surface.md Memory V2 atıf güncellemesi (DONE)
+
+---

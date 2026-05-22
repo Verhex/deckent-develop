@@ -8,7 +8,6 @@
 7. Retrospective written to DB → memory update → decay → sprint complete
 
 ## Manual Recovery Chain
-
 If a sprint stalls, follow this chain in order:
 
 ```bash

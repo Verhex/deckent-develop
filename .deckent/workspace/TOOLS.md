@@ -11,12 +11,12 @@ Dashboard: deckent web
 | Tool | MCP Name |
 |------|---------|
 | agent-list | `deckent_agent_list` |
-| analyze-project | `deckent_analyze_project` |
+| analyze | `deckent_analyze` |
 | audit | `deckent_audit` |
 | checkpoint | `deckent_checkpoint` |
 | cleanup | `deckent_cleanup` |
 | config | `deckent_config` |
-| set-directives | `deckent_set_directives` |
+| directives | `deckent_directives` |
 | docs | `deckent_docs` |
 | doctor | `deckent_doctor` |
 | explain | `deckent_explain` |
@@ -26,11 +26,7 @@ Dashboard: deckent web
 | init | `deckent_init` |
 | kill | `deckent_kill` |
 | memory-query | `deckent_memory_query` |
-| nervous-subscribe | `deckent_nervous_subscribe` |
-| nervous-accept | `deckent_nervous_accept` |
-| nervous-reject | `deckent_nervous_reject` |
-| nervous-status | `deckent_nervous_status` |
-| nervous-config | `deckent_nervous_config` |
+| nervous | `deckent_nervous` |
 | plan | `deckent_plan` |
 | recover | `deckent_recover` |
 | retro | `deckent_retro` |
@@ -42,9 +38,9 @@ Dashboard: deckent web
 | sync | `deckent_sync` |
 | watch | `deckent_watch` |
 
-_Total: 31 MCP tools_
+_Total: 27 MCP tools_
 
-**Key operational tools:** `deckent_audit`, `deckent_watch`, `deckent_recover`, `deckent_status`, `deckent_memory_query`, `deckent_nervous_status`
+**Key operational tools:** `deckent_audit`, `deckent_nervous`, `deckent_watch`, `deckent_recover`, `deckent_status`, `deckent_memory_query`
 
 ## CLI Commands
 | Command Module | Description |
@@ -54,6 +50,7 @@ _Total: 31 MCP tools_
 | `archive-debt` | deckent archive-debt |
 | `attach` | deckent attach |
 | `audit` | deckent audit |
+| `audit-verify` | deckent audit-verify |
 | `checkpoint` | deckent checkpoint |
 | `cleanup` | deckent cleanup |
 | `config` | deckent config |
@@ -105,4 +102,4 @@ _Total: 31 MCP tools_
 | `watch` | deckent watch |
 | `web` | deckent web |
 
-_Total: 55 CLI command modules_
+_Total: 56 CLI command modules_
