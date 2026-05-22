@@ -25,7 +25,7 @@ import type {
 import type { TaskDNA } from '../core/routing-types.js';
 
 import {
-  BRAIN_DIR, SPRINTS_DIR, JOBS_DIR,
+  BRAIN_DIR, JOBS_DIR,
 } from '../core/constants.js';
 
 import { runRetention } from '../core/sprint-file-retention.js';
@@ -37,7 +37,7 @@ import { getDebtItems } from '../core/debt-store.js';
 // ─── Sprint Reporter ──────────────────────────────────────────────
 import {
   writeRetrospective, writeSprintLog, calculateMetrics,
-  updateProjectDocs, updateProjectIdentity,
+  updateProjectDocs,
   buildAgentPerformance, archiveDirectives, archiveOrphanTasks,
 } from './sprint-reporter.js';
 
@@ -684,18 +684,9 @@ export async function finalizeSprint(
     }
   } catch (e) { debugLog('finalizeSprint:writeRetrospective', e); }
 
-  // 5. Update PROJECT-IDENTITY.md
-  try {
-    // Count total sprints from .brain/sprints/ directory
-    const sprintsPath = join(projectRoot, BRAIN_DIR, SPRINTS_DIR);
-    let totalSprints = 1;
-    try {
-      if (existsSync(sprintsPath)) {
-        totalSprints = readdirSync(sprintsPath).filter(f => f.endsWith('.md')).length;
-      }
-    } catch (e) { debugLog('finalizeSprint:countSprints', e); }
-    updateProjectIdentity(projectRoot, sprint.id, metrics, totalSprints);
-  } catch (e) { debugLog('finalizeSprint:updateProjectIdentity', e); }
+  // 5. Legacy .brain/PROJECT-IDENTITY.md update removed — B6 (Memory V2).
+  // Identity is DB-first: the memory.db `identity` entry is the source of
+  // truth, surfaced via the managed .deckent/workspace/IDENTITY.md doc.
 
   // 5b. Triple-link: sprint-log → memory → retro (depends_on chain)
   try {

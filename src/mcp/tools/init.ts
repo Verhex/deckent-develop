@@ -7,9 +7,8 @@ import {
   DECKENT_DIR, BRAIN_DIR, TASKS_DIR, LOCKS_DIR, CLAUDE_RULES_DIR,
   WORKSPACE_DIR, PLUGINS_DIR, I18N_DIR, DASHBOARD_FILE, DIRECTIVES_FILE,
   AGENTS_FILE, CLAUDE_FILE, DECKENT_FILE, MEMORY_FILE,
-  PATTERNS_FILE, RETRO_FILE, PROJECT_IDENTITY_FILE,
+  PATTERNS_FILE, RETRO_FILE,
 } from '../../core/constants.js';
-import { analyzeProject } from '../../core/analyzer.js';
 import { regenerateRules } from '../../core/rule-generator.js';
 import { detectAvailableProviders } from '../../core/provider.js';
 import {
@@ -17,7 +16,6 @@ import {
   collectMissingTools,
   planInstall,
 } from '../../core/provisioner.js';
-import { generateProjectIdentity } from '../../orchestra/sprint-reporter.js';
 import { ensureDeckentImport } from '../../core/utils.js';
 import { enrichResponse } from '../helpers/enrich.js';
 import { seedDocsConfig } from '../../orchestra/managed-docs/docs-config.js';
@@ -179,29 +177,8 @@ Lint: tsc --noEmit
       // (memory.db); this also restores CLI/MCP init parity.
       writeIfNotExists(join(root, BRAIN_DIR, PATTERNS_FILE), '# Detected Patterns\n');
       writeIfNotExists(join(root, BRAIN_DIR, RETRO_FILE), '# Sprint Retrospective\n');
-
-      // PROJECT-IDENTITY.md (permanent memory — never decayed)
-      try {
-        const analysis = analyzeProject(root);
-        writeIfNotExists(join(root, BRAIN_DIR, PROJECT_IDENTITY_FILE), generateProjectIdentity({
-          projectName: resolvedProjectName,
-          sprintId: 'sprint-000',
-          totalSprints: 0,
-          mode: mode as string,
-          language: analysis.language,
-          framework: analysis.framework,
-          testFramework: analysis.testFramework,
-          buildTool: analysis.buildTool,
-        }));
-      } catch {
-        // Non-fatal — create minimal identity
-        writeIfNotExists(join(root, BRAIN_DIR, PROJECT_IDENTITY_FILE), generateProjectIdentity({
-          projectName: resolvedProjectName,
-          sprintId: 'sprint-000',
-          totalSprints: 0,
-          mode: mode as string,
-        }));
-      }
+      // B6 (Memory V2): no PROJECT-IDENTITY.md stub — identity is DB-first
+      // (memory.db `identity` entry + managed .deckent/workspace/IDENTITY.md).
 
       // Workspace: TOOLS.md + BOOT.md
       writeFile(join(root, WORKSPACE_DIR, 'TOOLS.md'), generateToolsContent(root));

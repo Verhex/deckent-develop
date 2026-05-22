@@ -1303,6 +1303,28 @@ describe('init command', () => {
     expect(brainCalls.length).toBeGreaterThanOrEqual(4);
   });
 
+  it('does not create PROJECT-IDENTITY.md (B6 — DB-first identity, Memory V2)', async () => {
+    const mockQuestion = vi.fn()
+      .mockResolvedValueOnce('1')
+      .mockResolvedValueOnce('1')
+      .mockResolvedValueOnce('proj');
+    vi.mocked(createInterface).mockReturnValue({
+      question: mockQuestion,
+      close: vi.fn(),
+    } as unknown as ReturnType<typeof createInterface>);
+    vi.mocked(existsSync).mockReturnValue(false);
+    vi.mocked(readFileSync).mockReturnValue('');
+
+    await runCommand(registerInit, ['init']);
+
+    // Legacy .brain/PROJECT-IDENTITY.md is superseded by the DB `identity`
+    // entry + .deckent/workspace/IDENTITY.md managed-doc. init must not stub it.
+    const identityCalls = vi.mocked(writeFileSync).mock.calls.filter(
+      (c) => String(c[0]).includes('PROJECT-IDENTITY'),
+    );
+    expect(identityCalls).toHaveLength(0);
+  });
+
   it('creates claude rules', async () => {
     const mockQuestion = vi.fn()
       .mockResolvedValueOnce('1')

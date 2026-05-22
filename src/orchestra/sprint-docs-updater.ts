@@ -1,7 +1,7 @@
 // ─── Sprint Docs Updater ─────────────────────────────────────────
 // Extracted from sprint-reporter.ts — managed-docs, project identity, sprint log, debt, archive
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, copyFileSync, unlinkSync, rmdirSync } from 'node:fs';
-import { execSync, spawnSync } from 'node:child_process';
+import { execSync } from 'node:child_process';
 import { join } from 'node:path';
 import { TaskEvaluation } from '../core/types.js';
 import type {
@@ -10,7 +10,6 @@ import type {
 import {
   BRAIN_DIR, SPRINTS_DIR, ARCHIVE_DIR, SPRINT_LOG_MAX_LINES,
   PATTERNS_FILE, DECISIONS_FILE, DIRECTIVES_FILE,
-  PROJECT_IDENTITY_FILE,
 } from '../core/constants.js';
 import { runAllUpdaters } from './doc-updaters/registry.js';
 import type { DocUpdateResult } from './doc-updaters/types.js';
@@ -24,31 +23,12 @@ import { modelRegistry } from '../core/model-registry.js';
 import { extractSprintNumber } from './sprint-metrics.js';
 import {
   buildSprintLogLines,
-  generateProjectIdentity as generateProjectIdentityHelper,
-  buildCurrentStateLines,
   buildDirectivesPlaceholder,
   buildAdrEntry,
   parseAddedSrcFiles,
   findMaxAdrNumber,
-  readPreviousCompletedTasks,
-  readPreviousCoverage,
-  replaceCurrentStateSection,
   sprintFileNumber,
 } from './sprint-docs-helpers.js';
-import type { ProjectIdentityInfo as ProjectIdentityInfoType } from './sprint-docs-helpers.js';
-export type { ProjectIdentityInfo } from './sprint-docs-helpers.js';
-type ProjectIdentityInfo = ProjectIdentityInfoType;
-
-// ═══ Internal Helpers ══════════════════════════════════════════════
-
-function readFileSafe(filePath: string): string {
-  try {
-    return readFileSync(filePath, 'utf-8');
-  } catch (e) {
-    debugLog('readFileSafe:readFile', e);
-    return '';
-  }
-}
 
 // ═══ Sprint Log ═════════════════════════════════════════════════
 
@@ -130,199 +110,12 @@ export function updateProjectDocs(projectRoot: string, sprintResult: SprintResul
   }
 }
 
-// ═══ Project Identity ═════════════════════════════════════════════
-
-/**
- * Generate the initial PROJECT-IDENTITY.md content.
- * Called during `deckent init` to create the permanent project memory file.
- * @param info - Project identity information
- * @returns Markdown content for PROJECT-IDENTITY.md
- */
-export function generateProjectIdentity(info: ProjectIdentityInfo): string {
-  return generateProjectIdentityHelper(info);
-}
-
-/**
- * Count real test cases by scanning test files for it()/test() calls.
- * Returns the total number of test cases found in tests/ directory.
- */
-export function countProjectTestCases(projectRoot: string): number {
-  const testsDir = join(projectRoot, 'tests');
-  if (!existsSync(testsDir)) return 0;
-
-  let totalTests = 0;
-  const testPattern = /\b(?:it|test)\s*\(/g;
-
-  function scanDir(dir: string): void {
-    try {
-      const entries = readdirSync(dir, { withFileTypes: true });
-      for (const entry of entries) {
-        const fullPath = join(dir, entry.name);
-        if (entry.isDirectory()) {
-          scanDir(fullPath);
-        } else if (entry.name.match(/\.(test|spec)\.(ts|tsx|js|jsx)$/)) {
-          try {
-            const content = readFileSync(fullPath, 'utf-8');
-            const matches = content.match(testPattern);
-            if (matches) totalTests += matches.length;
-          } catch (e) { debugLog('countTestsInProject:readFile', e); }
-        }
-      }
-    } catch (e) { debugLog('countTestsInProject:readdirSync', e); }
-  }
-
-  scanDir(testsDir);
-  return totalTests;
-}
-
-/**
- * Parse statement coverage percentage from coverage/clover.xml if it exists.
- * Returns the coverage percentage (0-100), or null if unavailable.
- */
-export function parseCoverageFromClover(projectRoot: string): number | null {
-  const cloverPath = join(projectRoot, 'coverage', 'clover.xml');
-  if (!existsSync(cloverPath)) return null;
-
-  try {
-    const xml = readFileSync(cloverPath, 'utf-8');
-    const projectMetrics = xml.match(/<project[^>]*>[\s\S]*?<metrics\s([^/]*?)\/>/);
-    if (!projectMetrics) return null;
-
-    const attrs = projectMetrics[1] ?? '';
-    const statementsMatch = attrs.match(/statements="(\d+)"/);
-    const coveredMatch = attrs.match(/coveredstatements="(\d+)"/);
-    if (!statementsMatch || !coveredMatch) return null;
-
-    const total = parseInt(statementsMatch[1] ?? '0', 10);
-    const covered = parseInt(coveredMatch[1] ?? '0', 10);
-    if (total === 0) return 0;
-
-    return (covered / total) * 100;
-  } catch (e) {
-    debugLog('parseCoverageFromClover:parse', e);
-    return null;
-  }
-}
-
-/**
- * Get test count from vitest --reporter=json output.
- * Returns numTotalTests or null if vitest fails/times out.
- */
-export function getTestCountFromVitest(projectRoot: string): number | null {
-  try {
-    if (!existsSync(join(projectRoot, 'package.json'))) return null;
-    const result = spawnSync('npx', ['vitest', 'run', '--reporter=json'], {
-      cwd: projectRoot,
-      timeout: 30_000,
-      encoding: 'utf-8',
-      stdio: ['pipe', 'pipe', 'pipe'],
-    });
-    if (result.status !== 0 && result.status !== 1) return null;
-    const output = result.stdout ?? '';
-    const jsonStart = output.indexOf('{');
-    if (jsonStart === -1) return null;
-    const parsed = JSON.parse(output.slice(jsonStart)) as { numTotalTests?: number };
-    if (typeof parsed.numTotalTests === 'number' && parsed.numTotalTests > 0) {
-      return parsed.numTotalTests;
-    }
-    return null;
-  } catch (e) {
-    debugLog('getTestCountFromVitest:parseJSON', e);
-    return null;
-  }
-}
-
-/**
- * Get coverage percentage from vitest --coverage text output.
- * Parses "All files" line from the text summary. Returns percentage or null.
- */
-export function getCoverageFromVitest(projectRoot: string): number | null {
-  try {
-    if (!existsSync(join(projectRoot, 'package.json'))) return null;
-    const result = spawnSync('npx', ['vitest', 'run', '--coverage', '--reporter=default'], {
-      cwd: projectRoot,
-      timeout: 60_000,
-      encoding: 'utf-8',
-      stdio: ['pipe', 'pipe', 'pipe'],
-    });
-    if (result.status !== 0 && result.status !== 1) return null;
-    const output = (result.stdout ?? '') + (result.stderr ?? '');
-    const allFilesMatch = output.match(/All files[^|]*\|\s*([\d.]+)/);
-    if (!allFilesMatch) return null;
-    const value = parseFloat(allFilesMatch[1] ?? '0');
-    return isNaN(value) ? null : value;
-  } catch (e) {
-    debugLog('getCoverageFromVitest:parse', e);
-    return null;
-  }
-}
-
-/**
- * Read the previous "Test Count" value from PROJECT-IDENTITY.md content.
- */
-export function readPreviousTestCount(content: string): number | null {
-  const match = content.match(/- Test Count:\s*(\d+)/);
-  if (!match) return null;
-  const value = parseInt(match[1] ?? '0', 10);
-  return value > 0 ? value : null;
-}
-
-/**
- * Update the "Current State" section of PROJECT-IDENTITY.md after each sprint.
- * Preserves all other sections. Creates the file with defaults if missing.
- *
- * Test count fallback chain: vitest JSON → previous value → regex scan
- * Coverage fallback chain: vitest --coverage → clover.xml → previous value → metrics → 0
- * Total sprints: sprint ID number → parameter → 1
- * Completed tasks: cumulative (previous + current)
- */
-export function updateProjectIdentity(
-  projectRoot: string,
-  sprintId: string,
-  metrics: SprintMetrics,
-  totalSprints?: number,
-): void {
-  const brainPath = join(projectRoot, BRAIN_DIR);
-  mkdirSync(brainPath, { recursive: true });
-  const filePath = join(brainPath, PROJECT_IDENTITY_FILE);
-
-  let content = readFileSafe(filePath);
-
-  const vitestTestCount = getTestCountFromVitest(projectRoot);
-  const previousTestCount = readPreviousTestCount(content);
-  const realTestCount = vitestTestCount ?? previousTestCount ?? countProjectTestCases(projectRoot);
-
-  const vitestCoverage = getCoverageFromVitest(projectRoot);
-  const realCoverage = vitestCoverage ?? parseCoverageFromClover(projectRoot);
-  const previousCoverage = readPreviousCoverage(content);
-  const coverageValue =
-    (realCoverage !== null && realCoverage > 0) ? realCoverage :
-    (previousCoverage !== null && previousCoverage > 0) ? previousCoverage :
-    (metrics.coveragePercent > 0) ? metrics.coveragePercent :
-    0;
-
-  const sprintNumber = extractSprintNumber(sprintId);
-  const resolvedTotalSprints = sprintNumber ?? totalSprints ?? 1;
-  const previousCompleted = readPreviousCompletedTasks(content);
-  const cumulativeCompleted = previousCompleted + metrics.completedTasks;
-
-  if (!content) {
-    const dirName = projectRoot.split(/[\\/]/).pop() ?? 'unknown';
-    content = generateProjectIdentity({
-      projectName: dirName,
-      sprintId,
-      totalSprints: resolvedTotalSprints,
-      testCount: realTestCount,
-    });
-    writeFileSync(filePath, content, 'utf-8');
-    return;
-  }
-
-  const stateLines = buildCurrentStateLines(
-    realTestCount, coverageValue, sprintId, resolvedTotalSprints, cumulativeCompleted, metrics.noGoRate,
-  );
-  writeFileSync(filePath, replaceCurrentStateSection(content, stateLines), 'utf-8');
-}
+// ═══ Project Identity — removed (B6, Memory V2 DB-first) ═════════
+// `updateProjectIdentity` + its PROJECT-IDENTITY.md render helpers
+// (generateProjectIdentity, countProjectTestCases, parseCoverageFromClover,
+// getTestCountFromVitest, getCoverageFromVitest, readPreviousTestCount) were
+// removed: the legacy `.brain/PROJECT-IDENTITY.md` file is superseded by the
+// memory.db `identity` entry + the managed .deckent/workspace/IDENTITY.md doc.
 
 // ═══ DEBT.md Auto-Resolve ════════════════════════════════════════
 

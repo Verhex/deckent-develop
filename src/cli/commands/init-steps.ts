@@ -32,14 +32,12 @@ import {
   MEMORY_FILE,
   PATTERNS_FILE,
   RETRO_FILE,
-  PROJECT_IDENTITY_FILE,
 } from '../../core/constants.js';
 import { ensureDeckentImport } from '../../core/utils.js';
 import { regenerateRules } from '../../core/rule-generator.js';
 import { deepMerge } from '../../core/config.js';
 import { getModePreset } from '../../core/mode-presets.js';
 import { detectSystemCapacity, suggestMaxWorkers, suggestSpawnBackend } from '../../core/system-capacity.js';
-import { generateProjectIdentity } from '../../orchestra/sprint-reporter.js';
 import { generateProjectConventionsSkill, getGeneratedContent, generateTempAgents } from '../../orchestra/temp-skill-generator.js';
 import { seedDocsConfig } from '../../orchestra/managed-docs/docs-config.js';
 import { ADR_SEED_DATA, createIdentitySeed } from '../../core/adr-seed.js';
@@ -407,7 +405,6 @@ export function writeDirectivesFile(
 export function writeBrainFiles(
   root: string,
   projectName: string,
-  mode: PlanMode,
   language: string,
   stackResult: FullStackResult,
   detectedAnalysis?: { language?: string; framework?: string; testFramework?: string; buildTool?: string },
@@ -432,30 +429,14 @@ export function writeBrainFiles(
     } catch { /* non-fatal — DB preload failure doesn't block init */ }
   }
 
-  // 10a. PROJECT-IDENTITY.md
+  // 10a. Stack detection for the workspace IDENTITY.md (below).
+  // B6 (Memory V2): legacy .brain/PROJECT-IDENTITY.md is no longer stubbed —
+  // identity lives in the memory.db `identity` entry + the managed
+  // .deckent/workspace/IDENTITY.md doc (docs.json "identity-md").
   const identityLanguage = detectedAnalysis?.language ?? stackResult.language ?? 'unknown';
   const identityFramework = detectedAnalysis?.framework ?? stackResult.framework ?? 'unknown';
   const identityTestFramework = detectedAnalysis?.testFramework ?? stackResult.testFramework ?? 'unknown';
   const identityBuildTool = detectedAnalysis?.buildTool ?? stackResult.buildTool ?? 'unknown';
-  try {
-    writeIfNotExists(join(root, BRAIN_DIR, PROJECT_IDENTITY_FILE), generateProjectIdentity({
-      projectName,
-      sprintId: 'sprint-000',
-      totalSprints: 0,
-      mode,
-      language: identityLanguage,
-      framework: identityFramework,
-      testFramework: identityTestFramework,
-      buildTool: identityBuildTool,
-    }));
-  } catch {
-    writeIfNotExists(join(root, BRAIN_DIR, PROJECT_IDENTITY_FILE), generateProjectIdentity({
-      projectName,
-      sprintId: 'sprint-000',
-      totalSprints: 0,
-      mode,
-    }));
-  }
 
   // 10a2. Workspace IDENTITY.md
   const runtimeName = identityLanguage.toLowerCase().includes('typescript') || identityLanguage.toLowerCase().includes('javascript')
