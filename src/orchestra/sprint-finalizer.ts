@@ -32,7 +32,7 @@ import { runRetention } from '../core/sprint-file-retention.js';
 
 // ─── Core — utils ─────────────────────────────────────────────────
 import { updateLastSprintId, debugLog } from '../core/utils.js';
-import { getDebtItems } from './debt-manager.js';
+import { getDebtItems } from '../core/debt-store.js';
 
 // ─── Sprint Reporter ──────────────────────────────────────────────
 import {

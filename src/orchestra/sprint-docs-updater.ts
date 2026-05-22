@@ -17,7 +17,8 @@ import type { DocUpdateResult } from './doc-updaters/types.js';
 // Side-effect import: registers all updaters
 import './doc-updaters/index.js';
 import { runManagedDocUpdates } from './managed-docs/managed-doc-runner.js';
-import { getDebtItems, resolveDebt } from './debt-manager.js';
+import { resolveDebt } from './debt-manager.js';
+import { getDebtItems } from '../core/debt-store.js';
 import { debugLog } from '../core/utils.js';
 import { modelRegistry } from '../core/model-registry.js';
 import { extractSprintNumber } from './sprint-metrics.js';

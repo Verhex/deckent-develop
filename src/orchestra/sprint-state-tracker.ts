@@ -12,7 +12,7 @@
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { readSprintState } from './sprint-utils.js';
-import { getDebtItems } from './debt-manager.js';
+import { getDebtItems } from '../core/debt-store.js';
 import type { SprintStateSnapshot } from '../core/nervous-types.js';
 
 type ActiveWorker = { id: string; taskId: string; lastHeartbeat: string };

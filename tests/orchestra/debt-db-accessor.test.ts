@@ -8,7 +8,7 @@ import * as fs from 'node:fs';
 import { join } from 'node:path';
 import { MemoryStore } from '../../src/core/memory-store.js';
 import { DebtPriority } from '../../src/core/types.js';
-import { getDebtItems } from '../../src/orchestra/debt-manager.js';
+import { getDebtItems } from '../../src/core/debt-store.js';
 import { recordRollbackInDebt } from '../../src/orchestra/rollback.js';
 import { autoResolveDebt } from '../../src/orchestra/sprint-docs-updater.js';
 

@@ -362,7 +362,8 @@ describe('createHttpServer', () => {
 
     it('returns debt content when file exists', async () => {
       mockExistsSync.mockImplementation((p) => {
-        if (typeof p === 'string' && p.includes('DEBT.md')) return true;
+        // Task #4d: /api/debt now serves the generated exports/debt.md view.
+        if (typeof p === 'string' && p.includes('debt.md')) return true;
         return false;
       });
       mockReadFileSync.mockReturnValue('# Tech Debt\n| ID | Desc |');

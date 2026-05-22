@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { join } from 'node:path';
-import { mkdtempSync, mkdirSync, writeFileSync, existsSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, existsSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import {
   buildZeroConfigDirectives,
@@ -14,13 +14,11 @@ import {
   rollback,
   getRollbackPolicy,
   deleteSafetyPoint,
-  recordRollbackInDebt,
   getCurrentCommitSha,
   getCurrentBranch,
   getDirtyFiles,
   safetyBranchExists,
   type SafetyPoint,
-  type RollbackResult,
 } from '../../src/orchestra/rollback.js';
 import { DIRECTIVES_FILE } from '../../src/core/constants.js';
 
@@ -224,35 +222,9 @@ describe('safetyBranchExists', () => {
   });
 });
 
-// ─── Rollback: recordRollbackInDebt ─────────────────────────────────
-
-describe('recordRollbackInDebt', () => {
-  it('creates DEBT.md with header and entry when file does not exist', () => {
-    const result: RollbackResult = { success: true, message: 'Rolled back to safety' };
-    recordRollbackInDebt(tmpRoot, 'sprint-042', result);
-
-    const debtPath = join(tmpRoot, '.brain', 'DEBT.md');
-    expect(existsSync(debtPath)).toBe(true);
-    const content = readFileSync(debtPath, 'utf-8');
-    expect(content).toContain('rollback-sprint-042');
-    expect(content).toContain('SUCCESS');
-  });
-
-  it('appends to existing DEBT.md', () => {
-    const brainDir = join(tmpRoot, '.brain');
-    mkdirSync(brainDir, { recursive: true });
-    const debtPath = join(brainDir, 'DEBT.md');
-    writeFileSync(debtPath, '| existing | row |\n', 'utf-8');
-
-    const result: RollbackResult = { success: false, message: 'Branch missing' };
-    recordRollbackInDebt(tmpRoot, 'sprint-043', result);
-
-    const content = readFileSync(debtPath, 'utf-8');
-    expect(content).toContain('existing');
-    expect(content).toContain('rollback-sprint-043');
-    expect(content).toContain('FAILED');
-  });
-});
+// NOTE: the recordRollbackInDebt file-behavior describe was removed in
+// Task #4b — rollback debt is now recorded DB-first (memory.db).
+// See tests/orchestra/debt-db-accessor.test.ts.
 
 // ─── Full flow: prepare → safety check → (fail) → rollback policy → cleanup
 
@@ -271,15 +243,7 @@ describe('Full zero-config → rollback flow', () => {
     const policy = getRollbackPolicy(['NO_GO', 'NO_GO', 'NO_GO']);
     expect(policy).toBe('auto');
 
-    // Step 3: Record in debt
-    recordRollbackInDebt(tmpRoot, 'sprint-050', {
-      success: true,
-      message: 'Rolled back successfully',
-    });
-    const debtPath = join(tmpRoot, '.brain', 'DEBT.md');
-    expect(existsSync(debtPath)).toBe(true);
-
-    // Step 4: Cleanup
+    // Step 3: Cleanup
     cleanupZeroConfig(zcResult);
     expect(existsSync(zcResult.directivesPath)).toBe(false);
   });

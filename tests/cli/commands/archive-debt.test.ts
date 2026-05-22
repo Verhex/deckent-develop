@@ -1,292 +1,101 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+// archive-debt command — Task #4f: the command is now a DB-first reporter.
+// Tech debt lives in memory.db; the legacy .brain/DEBT.md + DEBT-ARCHIVE.md
+// file-archiving behavior was removed. These tests exercise the reporter
+// against a real tmpdir-backed SQLite DB (the MemoryStore harness the old
+// suite's TODO comment asked for).
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Command } from 'commander';
-import { DEBT_TABLE_HEADER } from '../../../src/core/constants.js';
-
-vi.mock('node:fs', () => ({
-  readFileSync: vi.fn(),
-  writeFileSync: vi.fn(),
-  existsSync: vi.fn(),
-  mkdirSync: vi.fn(),
-  appendFileSync: vi.fn(),
-  statSync: vi.fn().mockReturnValue({ size: 0 }),
-}));
-
-// ── MemoryStore mock for DB-first code paths ─────────────────────
-const mockMemStore = {
-  getById: vi.fn().mockReturnValue(null),
-  getByType: vi.fn().mockReturnValue([]),
-  insert: vi.fn().mockImplementation((input) => ({ ...input, metadata: JSON.stringify(input.metadata ?? {}), tag_text: (input.tags ?? []).join(' '), status: input.status ?? 'active', priority: input.priority ?? 'normal', sprint_id: input.sprint_id ?? null, sprint_num: input.sprint_num ?? 0, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), deleted_at: null })),
-  upsert: vi.fn().mockImplementation((input) => ({ ...input, metadata: JSON.stringify(input.metadata ?? {}), tag_text: (input.tags ?? []).join(' '), status: input.status ?? 'active', priority: input.priority ?? 'normal' })),
-  softDelete: vi.fn(), totalCount: vi.fn().mockReturnValue(0), countByType: vi.fn(),
-  decay: vi.fn(), close: vi.fn(), getRawDb: vi.fn(),
-  getRelationsFrom: vi.fn().mockReturnValue([]), getRelationsTo: vi.fn().mockReturnValue([]),
-  getTagsForEntry: vi.fn().mockReturnValue([]), getByTags: vi.fn().mockReturnValue([]),
-  getHistory: vi.fn().mockReturnValue([]), restore: vi.fn(), getSchemaVersion: vi.fn().mockReturnValue(1),
-};
-vi.mock('../../../src/core/memory-store.js', () => ({
-  MemoryStore: vi.fn().mockImplementation(() => mockMemStore),
-}));
-
-
-import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync } from 'node:fs';
+import * as fs from 'node:fs';
+import { join } from 'node:path';
+import { MemoryStore } from '../../../src/core/memory-store.js';
 import { registerArchiveDebt } from '../../../src/cli/commands/archive-debt.js';
 
-const mockReadFileSync = vi.mocked(readFileSync);
-const mockWriteFileSync = vi.mocked(writeFileSync);
-const mockExistsSync = vi.mocked(existsSync);
-const mockMkdirSync = vi.mocked(mkdirSync);
-const mockAppendFileSync = vi.mocked(appendFileSync);
+const ROOT = join(process.cwd(), '.test-archive-debt-' + process.pid);
+const ORIG_CWD = process.cwd();
 
-const SEPARATOR = '|----|-------------|------|--------|----------|------|----------|----------|---------|';
-
-function buildDebtContent(rows: string[]): string {
-  return [DEBT_TABLE_HEADER, SEPARATOR, ...rows].join('\n');
-}
-
-function makeRow(id: string, desc: string, resolved: 'true' | 'false', fixedIn = '-'): string {
-  return `| ${id} | ${desc} | task-001 | sprint-001 | NORMAL | 0 | ${resolved} | ${fixedIn} | 2026-01-01 |`;
-}
-
-let stdoutData: string[];
+let stdout: string[];
 let stdoutSpy: ReturnType<typeof vi.spyOn>;
 
-function captureOutput(): void {
-  stdoutData = [];
-  stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation((data) => {
-    stdoutData.push(String(data));
-    return true;
-  });
+function seedDebt(items: Array<{ id: string; status: 'active' | 'resolved'; sprint: string }>): void {
+  const store = new MemoryStore(join(ROOT, '.brain', 'memory.db'));
+  for (const it of items) {
+    store.insert({
+      id: it.id, type: 'debt', title: `debt ${it.id}`, content: '',
+      source: 'brain', status: it.status, priority: 'normal',
+      sprint_id: it.sprint, sprint_num: parseInt(it.sprint.replace(/\D/g, ''), 10) || 0,
+      tags: ['debt'],
+      metadata: { originTaskId: it.id, originSprintId: it.sprint, sprintsOpen: 0 },
+    });
+  }
+  store.close();
 }
 
-function restoreOutput(): void {
-  stdoutSpy?.mockRestore();
-}
-
-async function runCommand(): Promise<string> {
+async function run(args: string[] = []): Promise<string> {
   const program = new Command();
   program.exitOverride();
   registerArchiveDebt(program);
   try {
-    await program.parseAsync(['node', 'test', 'archive-debt']);
+    await program.parseAsync(['node', 'test', 'archive-debt', ...args]);
   } catch (err) {
-    if (err instanceof Error && err.message.includes('commander.')) {
-      // expected
-    }
+    if (!(err instanceof Error && err.message.includes('commander.'))) throw err;
   }
-  return stdoutData.join('');
+  return stdout.join('');
 }
 
-describe('archive-debt command', () => {
+describe('archive-debt command (DB-first)', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
-    // Reset MemoryStore mock to default empty returns
-    mockMemStore.getByType.mockReturnValue([]);
-    mockMemStore.getById.mockReturnValue(null);
-    captureOutput();
+    if (fs.existsSync(ROOT)) fs.rmSync(ROOT, { recursive: true, force: true });
+    fs.mkdirSync(join(ROOT, '.brain'), { recursive: true });
+    fs.mkdirSync(join(ROOT, '.deckent'), { recursive: true });
+    process.chdir(ROOT);
+    stdout = [];
+    stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation((d) => {
+      stdout.push(String(d));
+      return true;
+    });
   });
 
   afterEach(() => {
-    restoreOutput();
+    stdoutSpy?.mockRestore();
+    process.chdir(ORIG_CWD);
+    if (fs.existsSync(ROOT)) fs.rmSync(ROOT, { recursive: true, force: true });
   });
 
-  // ─── Registration ─────────────────────────────────────────────────────────
-
-  it('registers archive-debt command on program', () => {
+  it('registers the archive-debt command on the program', () => {
     const program = new Command();
-    program.exitOverride();
     registerArchiveDebt(program);
-    const cmd = program.commands.find(c => c.name() === 'archive-debt');
-    expect(cmd).toBeDefined();
-    expect(cmd?.description()).toContain('resolved debt');
+    expect(program.commands.some(c => c.name() === 'archive-debt')).toBe(true);
   });
 
-  // ─── Empty debt table — no-op behavior ────────────────────────────────────
-
-  it('prints no resolved items when DEBT.md does not exist', async () => {
-    mockExistsSync.mockReturnValue(false);
-    const output = await runCommand();
-    expect(output).toContain('No resolved debt items to archive.');
-    expect(mockWriteFileSync).not.toHaveBeenCalled();
-    expect(mockAppendFileSync).not.toHaveBeenCalled();
+  it('reports zero debt when the DB is empty', async () => {
+    seedDebt([]);
+    const out = await run();
+    expect(out).toContain('0 open, 0 resolved');
   });
 
-  it('prints no resolved items when table has no rows', async () => {
-    const content = buildDebtContent([]);
-    mockExistsSync.mockReturnValue(true);
-    mockReadFileSync.mockReturnValue(content);
-    const output = await runCommand();
-    expect(output).toContain('No resolved debt items to archive.');
-    expect(mockWriteFileSync).not.toHaveBeenCalled();
-  });
-
-  // ─── Non-resolved debt preservation ───────────────────────────────────────
-
-  it('does not archive when all items are unresolved', async () => {
-    const content = buildDebtContent([
-      makeRow('debt-001', 'Active debt 1', 'false'),
-      makeRow('debt-002', 'Active debt 2', 'false'),
+  it('reports open and resolved debt counts from the DB', async () => {
+    seedDebt([
+      { id: 'debt-a', status: 'active', sprint: 'sprint-200' },
+      { id: 'debt-b', status: 'active', sprint: 'sprint-201' },
+      { id: 'debt-c', status: 'resolved', sprint: 'sprint-200' },
     ]);
-    mockExistsSync.mockReturnValue(true);
-    mockReadFileSync.mockReturnValue(content);
-    const output = await runCommand();
-    expect(output).toContain('No resolved debt items to archive.');
-    expect(mockWriteFileSync).not.toHaveBeenCalled();
-    expect(mockAppendFileSync).not.toHaveBeenCalled();
+    const out = await run();
+    expect(out).toContain('2 open, 1 resolved');
   });
 
-  it('preserves unresolved items unchanged in DEBT.md after archiving resolved ones', async () => {
-    const content = buildDebtContent([
-      makeRow('debt-001', 'Keep me', 'false'),
-      makeRow('debt-002', 'Remove me', 'true', 'sprint-002'),
-      makeRow('debt-003', 'Keep me too', 'false'),
+  it('--before counts resolved items originating before a sprint', async () => {
+    seedDebt([
+      { id: 'debt-old', status: 'resolved', sprint: 'sprint-100' },
+      { id: 'debt-new', status: 'resolved', sprint: 'sprint-300' },
     ]);
-    mockExistsSync.mockImplementation((p: unknown) => !String(p).includes('DEBT-ARCHIVE') && !String(p).includes('memory.db'));
-    mockReadFileSync.mockReturnValue(content);
-
-    await runCommand();
-
-    const debtWrite = mockWriteFileSync.mock.calls.find(c => String(c[0]).includes('DEBT.md') && !String(c[0]).includes('ARCHIVE'));
-    expect(debtWrite).toBeDefined();
-    const written = debtWrite![1] as string;
-    expect(written).toContain('debt-001');
-    expect(written).toContain('debt-003');
-    expect(written).not.toContain('debt-002');
+    const out = await run(['--before', 'sprint-200']);
+    expect(out).toContain('1 resolved item(s) originate before sprint-200');
   });
 
-  // ─── Resolved debt archiving ───────────────────────────────────────────────
-
-  it('moves single resolved item to archive', async () => {
-    const content = buildDebtContent([
-      makeRow('debt-001', 'Unresolved', 'false'),
-      makeRow('debt-002', 'Resolved', 'true', 'sprint-003'),
-    ]);
-    mockExistsSync.mockImplementation((p: unknown) => !String(p).includes('DEBT-ARCHIVE') && !String(p).includes('memory.db'));
-    mockReadFileSync.mockReturnValue(content);
-
-    const output = await runCommand();
-
-    expect(output).toContain('Archived 1 resolved debt items. 1 items remaining.');
-    const appendCall = mockAppendFileSync.mock.calls[0];
-    expect(appendCall).toBeDefined();
-    expect(String(appendCall![1])).toContain('debt-002');
-    expect(String(appendCall![1])).not.toContain('debt-001');
-  });
-
-  it('moves multiple resolved items to archive in one operation', async () => {
-    const content = buildDebtContent([
-      makeRow('debt-001', 'Resolved 1', 'true', 'sprint-002'),
-      makeRow('debt-002', 'Resolved 2', 'true', 'sprint-003'),
-      makeRow('debt-003', 'Active', 'false'),
-    ]);
-    mockExistsSync.mockImplementation((p: unknown) => !String(p).includes('DEBT-ARCHIVE') && !String(p).includes('memory.db'));
-    mockReadFileSync.mockReturnValue(content);
-
-    const output = await runCommand();
-
-    expect(output).toContain('Archived 2 resolved debt items. 1 items remaining.');
-    const appendContent = String(mockAppendFileSync.mock.calls[0]![1]);
-    expect(appendContent).toContain('debt-001');
-    expect(appendContent).toContain('debt-002');
-    expect(appendContent).not.toContain('debt-003');
-  });
-
-  it('archives all items when all are resolved leaving empty table', async () => {
-    const content = buildDebtContent([
-      makeRow('debt-001', 'Resolved 1', 'true', 'sprint-002'),
-      makeRow('debt-002', 'Resolved 2', 'true', 'sprint-003'),
-    ]);
-    mockExistsSync.mockImplementation((p: unknown) => !String(p).includes('DEBT-ARCHIVE') && !String(p).includes('memory.db'));
-    mockReadFileSync.mockReturnValue(content);
-
-    const output = await runCommand();
-
-    expect(output).toContain('Archived 2 resolved debt items. 0 items remaining.');
-
-    const debtWrite = mockWriteFileSync.mock.calls.find(c => String(c[0]).includes('DEBT.md') && !String(c[0]).includes('ARCHIVE'));
-    expect(debtWrite).toBeDefined();
-    const written = debtWrite![1] as string;
-    // Only header and separator, no data rows
-    expect(written).toContain(DEBT_TABLE_HEADER);
-    expect(written).not.toContain('debt-001');
-    expect(written).not.toContain('debt-002');
-  });
-
-  // ─── Archive file creation — correct format ───────────────────────────────
-
-  it('creates archive file with table header when it does not exist', async () => {
-    const content = buildDebtContent([makeRow('debt-001', 'Resolved', 'true', 'sprint-002')]);
-    mockExistsSync.mockImplementation((p: unknown) => !String(p).includes('DEBT-ARCHIVE') && !String(p).includes('memory.db'));
-    mockReadFileSync.mockReturnValue(content);
-
-    await runCommand();
-
-    const archiveCreate = mockWriteFileSync.mock.calls.find(c => String(c[0]).includes('DEBT-ARCHIVE'));
-    expect(archiveCreate).toBeDefined();
-    expect(String(archiveCreate![1])).toContain(DEBT_TABLE_HEADER);
-    expect(String(archiveCreate![1])).toContain(SEPARATOR);
-  });
-
-  it('does not recreate archive header when file already exists', async () => {
-    const content = buildDebtContent([makeRow('debt-001', 'Resolved', 'true', 'sprint-002')]);
-    // Both DEBT.md and DEBT-ARCHIVE.md exist, but not memory.db (use file fallback)
-    mockExistsSync.mockImplementation((p: unknown) => !String(p).includes('memory.db'));
-    mockReadFileSync.mockReturnValue(content);
-
-    await runCommand();
-
-    const archiveCreate = mockWriteFileSync.mock.calls.find(c => String(c[0]).includes('DEBT-ARCHIVE'));
-    expect(archiveCreate).toBeUndefined();
-    // But append should still be called
-    expect(mockAppendFileSync).toHaveBeenCalledOnce();
-  });
-
-  it('creates archive directory with recursive flag', async () => {
-    const content = buildDebtContent([makeRow('debt-001', 'Resolved', 'true', 'sprint-002')]);
-    mockExistsSync.mockImplementation((p: unknown) => !String(p).includes('DEBT-ARCHIVE') && !String(p).includes('memory.db'));
-    mockReadFileSync.mockReturnValue(content);
-
-    await runCommand();
-
-    expect(mockMkdirSync).toHaveBeenCalledWith(
-      expect.stringContaining('archive'),
-      { recursive: true },
-    );
-  });
-
-  // ─── Malformed debt entries — graceful handling ───────────────────────────
-
-  it('skips rows with fewer than 9 columns without crashing', async () => {
-    const content = buildDebtContent([
-      '| debt-bad | Only two cols |',
-      makeRow('debt-001', 'Resolved', 'true', 'sprint-002'),
-    ]);
-    mockExistsSync.mockImplementation((p: unknown) => !String(p).includes('DEBT-ARCHIVE') && !String(p).includes('memory.db'));
-    mockReadFileSync.mockReturnValue(content);
-
-    const output = await runCommand();
-    expect(output).toContain('Archived 1 resolved debt items. 0 items remaining.');
-  });
-
-  it('ignores separator and header lines without treating them as data rows', async () => {
-    const content = [
-      DEBT_TABLE_HEADER,
-      SEPARATOR,
-      makeRow('debt-001', 'Resolved', 'true', 'sprint-002'),
-    ].join('\n');
-    mockExistsSync.mockImplementation((p: unknown) => !String(p).includes('DEBT-ARCHIVE') && !String(p).includes('memory.db'));
-    mockReadFileSync.mockReturnValue(content);
-
-    const output = await runCommand();
-    expect(output).toContain('Archived 1 resolved debt items. 0 items remaining.');
-  });
-
-  it('handles content with no table header gracefully — no rows parsed', async () => {
-    const content = 'Just some text\nwithout a proper table header\n| col1 | col2 |';
-    mockExistsSync.mockReturnValue(true);
-    mockReadFileSync.mockReturnValue(content);
-
-    const output = await runCommand();
-    // No header found → no rows parsed → nothing to archive
-    expect(output).toContain('No resolved debt items to archive.');
+  it('--count suppresses the explanatory footer', async () => {
+    seedDebt([{ id: 'debt-a', status: 'active', sprint: 'sprint-200' }]);
+    const out = await run(['--count']);
+    expect(out).toContain('1 open, 0 resolved');
+    expect(out).not.toContain('no manual archival step');
   });
 });

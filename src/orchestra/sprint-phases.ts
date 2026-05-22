@@ -32,7 +32,7 @@ import {
 } from '../core/constants.js';
 
 import { readJsonSafe, debugLog } from '../core/utils.js';
-import { getDebtItems } from './debt-manager.js';
+import { getDebtItems } from '../core/debt-store.js';
 import { isPidAlive as isPidAliveShared } from '../core/pid-liveness.js';
 import type { ProviderAdapter } from '../core/provider.js';
 import type { SpawnBackend } from './spawn-backend.js';

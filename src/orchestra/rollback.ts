@@ -9,7 +9,7 @@ import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { ErrorRegistry } from '../core/errors.js';
 import { debugLog } from '../core/utils.js';
-import { recordRollbackDebt } from './debt-manager.js';
+import { recordRollbackDebt } from '../core/debt-store.js';
 
 // ─── Types ────────────────────────────────────────────────────────
 

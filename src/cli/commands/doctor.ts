@@ -13,7 +13,7 @@ import {
   PROJECT_CONFIG_PATH,
 } from '../../core/constants.js';
 import { DebtPriority } from '../../core/types.js';
-import { getDebtItems } from '../../orchestra/debt-manager.js';
+import { getDebtItems } from '../../core/debt-store.js';
 
 // Memory V2 (Sprint 179 W3-6): exports/decisions.md is the auto-generated
 // source. doctor must accept EITHER this OR legacy .brain/DECISIONS.md.

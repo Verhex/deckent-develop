@@ -1299,7 +1299,8 @@ describe('init command', () => {
     const brainCalls = vi.mocked(writeFileSync).mock.calls.filter(
       (c) => String(c[0]).includes('.brain'),
     );
-    expect(brainCalls.length).toBeGreaterThanOrEqual(5);
+    // Task #4e: DEBT.md stub removed (DB-first) — MEMORY/PATTERNS/RETRO/PROJECT-IDENTITY.
+    expect(brainCalls.length).toBeGreaterThanOrEqual(4);
   });
 
   it('creates claude rules', async () => {

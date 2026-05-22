@@ -30,7 +30,6 @@ import {
   CLAUDE_FILE,
   DECKENT_FILE,
   MEMORY_FILE,
-  DEBT_FILE,
   PATTERNS_FILE,
   RETRO_FILE,
   PROJECT_IDENTITY_FILE,
@@ -415,7 +414,7 @@ export function writeBrainFiles(
 ): void {
   // 10. Brain files (Memory V2: DB-first, .md files are legacy exports)
   writeIfNotExists(join(root, BRAIN_DIR, MEMORY_FILE), '# Learned Patterns\n');
-  writeIfNotExists(join(root, BRAIN_DIR, DEBT_FILE), '# Tech Debt\n');
+  // Task #4e: no DEBT.md stub — tech debt is DB-first (memory.db).
   writeIfNotExists(join(root, BRAIN_DIR, PATTERNS_FILE), '# Detected Patterns\n');
   writeIfNotExists(join(root, BRAIN_DIR, RETRO_FILE), '# Sprint Retrospective\n');
   ensureDir(join(root, BRAIN_DIR, 'exports'));
