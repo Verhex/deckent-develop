@@ -1,6 +1,6 @@
 // ═══ Rule Generator ══════════════════════════════════════════════
-// Generates provider-specific rule files (.claude/rules/, .codex/rules/,
-// .gemini/rules/) from templates + ADR entries in MemoryStore.
+// Generates provider-specific rule files (.claude/rules/*.md, .codex/rules/*.md,
+// .gemini/rules/*.md, .cursor/rules/*.mdc) from templates + ADR entries in MemoryStore.
 // Preserves user custom sections via <!-- CUSTOM-START/END --> markers.
 // Called by sprint-finalizer post-finalize hook chain (onRuleRegen).
 
@@ -58,10 +58,14 @@ export interface RuleGeneratorResult {
 // ─── Provider Adapters ───────────────────────────────────────────
 
 interface ProviderAdapter {
-  /** Wraps the rule content with provider-specific format */
+  /** Wraps the rule content with provider-specific format (placed inside the AUTO block) */
   format(role: RuleRole, content: string): string;
   /** Returns the output directory relative to projectRoot */
   rulesDir(): string;
+  /** File extension for generated rule files, without leading dot (e.g. 'md', 'mdc') */
+  fileExt(): string;
+  /** Content emitted before the AUTO block — e.g. Cursor .mdc frontmatter (line 1 required) */
+  preamble(role: RuleRole): string;
 }
 
 function claudeAdapter(): ProviderAdapter {
@@ -80,6 +84,12 @@ function claudeAdapter(): ProviderAdapter {
     rulesDir(): string {
       return join('.claude', 'rules');
     },
+    fileExt(): string {
+      return 'md';
+    },
+    preamble(): string {
+      return '';
+    },
   };
 }
 
@@ -91,6 +101,12 @@ function codexAdapter(): ProviderAdapter {
     },
     rulesDir(): string {
       return join('.codex', 'rules');
+    },
+    fileExt(): string {
+      return 'md';
+    },
+    preamble(): string {
+      return '';
     },
   };
 }
@@ -104,18 +120,45 @@ function geminiAdapter(): ProviderAdapter {
     rulesDir(): string {
       return join('.gemini', 'rules');
     },
+    fileExt(): string {
+      return 'md';
+    },
+    preamble(): string {
+      return '';
+    },
   };
 }
 
 function cursorAdapter(): ProviderAdapter {
+  // Cursor Project Rules load only `.cursor/rules/*.mdc` (MDC format). The MDC
+  // frontmatter (description / globs / alwaysApply) MUST be line 1 → emitted via
+  // preamble(), before the AUTO block. Plain `.md` files are silently ignored
+  // by Cursor — hence fileExt() === 'mdc'.
+  const globsMap: Record<RuleRole, string> = {
+    'brain': '.tasks/**,.brain/**',
+    'auditor': '.dashboard,.brain/PATTERNS.md',
+    'worker-default': 'src/**,tests/**',
+  };
+  const descMap: Record<RuleRole, string> = {
+    'brain': 'Deckent Brain (orchestrator) role rules',
+    'auditor': 'Deckent Auditor (verifier) role rules',
+    'worker-default': 'Deckent Worker (executor) role rules',
+  };
+
   return {
     format(_role: RuleRole, content: string): string {
-      // Cursor uses plain markdown without frontmatter (parallel to codex/gemini).
-      // Sprint 168 C0a-2: parity with claude/codex/gemini for ADR governance.
       return content;
     },
     rulesDir(): string {
       return join('.cursor', 'rules');
+    },
+    fileExt(): string {
+      return 'mdc';
+    },
+    preamble(role: RuleRole): string {
+      const desc = descMap[role] ?? 'Deckent role rules';
+      const globs = globsMap[role] ?? '**/*';
+      return `---\ndescription: ${desc}\nglobs: ${globs}\nalwaysApply: false\n---\n`;
     },
   };
 }
@@ -341,7 +384,7 @@ export function generateRules(opts: RuleGeneratorOptions): RuleGeneratorResult {
     }
 
     for (const role of roles) {
-      const outPath = join(rulesDir, `${role}.md`);
+      const outPath = join(rulesDir, `${role}.${adapter.fileExt()}`);
 
       try {
         // Load and render template
@@ -361,15 +404,17 @@ export function generateRules(opts: RuleGeneratorOptions): RuleGeneratorResult {
           existing.includes(AUTO_START) &&
           existing.includes(AUTO_END);
 
-        let finalContent: string;
+        // Body = AUTO/CUSTOM-wrapped content. Provider preamble (e.g. Cursor
+        // .mdc frontmatter) is prepended afterwards so it stays on line 1.
+        let body: string;
         if (hasMarkers) {
           // Preserve custom section, replace auto section
-          finalContent = mergeWithCustom(formatted, existing);
+          body = mergeWithCustom(formatted, existing);
         } else if (existing !== null) {
           // First time: existing file without markers.
           // Treat entire existing content as custom, wrap new content as auto.
           const preservedCustom = '\n' + existing + '\n';
-          finalContent = (
+          body = (
             AUTO_START + '\n' +
             formatted +
             AUTO_END + '\n\n' +
@@ -377,9 +422,10 @@ export function generateRules(opts: RuleGeneratorOptions): RuleGeneratorResult {
           );
         } else {
           // Brand new file
-          finalContent = mergeWithCustom(formatted, null);
+          body = mergeWithCustom(formatted, null);
         }
 
+        const finalContent = adapter.preamble(role) + body;
         writeFileSync(outPath, finalContent, 'utf-8');
         result.filesWritten.push(outPath);
       } catch (err) {

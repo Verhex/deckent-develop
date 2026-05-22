@@ -1,40 +1,38 @@
+---
+description: Deckent Auditor (verifier) role rules
+globs: .dashboard,.brain/PATTERNS.md
+alwaysApply: false
+---
 <!-- AUTO-START -->
-# Brain Rules
-- Always read DIRECTIVES.md first
-- All brain knowledge lives in `.brain/memory.db` (SQLite) — this is the single source of truth
-- Query ADRs via MemoryStore: `store.getByType('adr')` — never parse .md files directly
-- If a worker output violates an accepted ADR → NO_GO + require ADR amendment proposal
-- New architectural decisions → `store.insert({ type: 'adr', status: 'accepted', ... })`
-- Always check usage before planning
-- Plan mode required before execution
-- Write sprint plan as task JSON files in `.tasks/`
-- Assign model and effort per task with reason
-- Define scope (directories, filesRead, filesWrite) for each task
-- Define GO/NO-GO criteria for each task — task-specific, not generic
-- Evaluate every result: DONE / GO_WITH_TECH_DEBT / NO_GO
-- Cross-dependency: if A's NO-GO caused by B's output, B gets priority fix
-- Write sprint learnings to DB: `store.insert({ type: 'memory', sprint_id, ... })`
-- Write retrospective to DB: `store.upsert({ type: 'retro', sprint_id, ... })`
-- Trigger decay via `store.decay(currentSprintNum, decayAfterSprints)`
-- Export .md snapshots after sprint: `deckent memory export`
-- Sprint is NEVER left incomplete
+# Auditor Rules
+- NEVER write source code
+- All brain knowledge is in `.brain/memory.db` (SQLite) — query via MemoryStore, never parse .md files
+- ADR compliance: load ADRs from `store.getByType('adr')`, not from DECISIONS.md
+- Write patterns to DB: `store.insert({ type: 'pattern', ... })`
+- Scan every 30 seconds
+- Read all heartbeat files → detect stale agents (>2min = alert)
+- Run `git diff --stat` → detect boundary violations
+- Check `.locks/` → detect stale locks (>5min)
+- Detect circular dependencies / deadlocks
+- Monitor usage thresholds
+- Overwrite `.dashboard` on every scan (never append)
+- Append new patterns to `PATTERNS.md` (never overwrite)
+- Write alerts for critical issues
 
-## Agent & Skill Selection
-- Run selectAgent() for EVERY task — even when forceModel is set
-- Agent selection is independent of model selection
-- Resolve agent's PROMPT.md + systemPrompt for worker context injection
-- Run selectSkills() based on task scope + project stack — avoid generic selection
-- Update agent stats (totalUses, successRate) after sprint evaluation
+## Agent & Skill Monitoring
+- Track which agents and skills are assigned to active tasks
+- Flag agent assignment failures in alerts
+- Monitor agent utilization rate (assigned vs generic)
 
-## Provider Routing
-- Route tasks to providers via task-router.ts
-- Respect brain_provider, worker_provider, fallback_provider config
-- Use provider fallback chain on failure (single retry, no infinite loops)
+## Provider Health
+- Check provider availability during scan
+- Flag provider failures or timeouts in dashboard alerts
+- Track mixed-provider sprint status (Claude + Codex/Gemini)
 
-## Self-Learning
-- Generate config suggestions from sprint results (NO_GO rate, coverage, duration)
-- Detect recurring file errors across sprints
-- Build insights for sprint report
+## Sprint Phase Tracking
+- Track current sprint phase in dashboard
+- Alert if phase duration exceeds expected thresholds
+- Detect orphan workers from previous sprints
 
 
 ## Active ADR Constraints

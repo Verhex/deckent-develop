@@ -5,116 +5,116 @@
 **Perspektif:** Deckent dogfooding + Deckent ürün kullanıcısı  
 **Referans:** [2026-05-22-claude-rules-audit.md](2026-05-22-claude-rules-audit.md) (aynı seri, `.claude/rules/` audit)
 
+> **Kök neden reframe'i (Alperen yönlendirmesi):** İlk taslakta `.codex/rules/` ve
+> `.gemini/rules/` "ölü dizin → sil" olarak çerçevelenmişti. Bu **yanlıştı**.
+> Kullanıcılar Claude kullanmayıp yalnızca Gemini/Cursor/Codex kullanabilir —
+> her provider `.claude/` olmadan **kendi başına çalışabilir** olmalı. Sorun
+> dizinlerin var olması değil, adapter dosyalarının `.claude/rules/`'a
+> bağlanmasıydı (claude-coupling).
+
 ---
 
 ## Dizin Yapısı
 
 ```
-.cursor/
-└── rules/
-    ├── brain.md          (git tracked — rule-generator.ts çıktısı)
-    ├── auditor.md
-    └── worker-default.md
-.codex/
-└── rules/                (aynı 3 dosya — .gemini ile byte-identical)
-.gemini/
-└── rules/                (aynı 3 dosya)
+.cursor/rules/{brain,auditor,worker-default}.mdc   ← Cursor Project Rules (MDC)
+.codex/rules/{brain,auditor,worker-default}.md     ← Codex rol kuralları
+.gemini/rules/{brain,auditor,worker-default}.md    ← Gemini rol kuralları
+.claude/rules/{brain,auditor,worker-default}.md    ← Claude Code rol kuralları
 ```
 
-İlgili kök adapter dosyaları:
-- `AGENTS.md` — Codex CLI girişi (ADR-013 thin-adapter, `@DECKENT.md` pointer)
-- `GEMINI.md` — Gemini CLI girişi (aynı desen)
-- `.cursor/rules/deckent.mdc` — `deckent init` üretir (`cursor-config.ts`), bu repoda mevcut değil
-
-Üç dizini de **`src/core/rule-generator.ts`** üretir: `PROVIDERS = ['claude', 'codex', 'gemini', 'cursor']` × `ROLES = ['brain', 'auditor', 'worker-default']` = 12 dosya. Sprint sonu `sprint-finalizer` hook'undan çağrılır.
+Kök adapter (giriş) dosyaları: `CLAUDE.md` (Claude Code), `AGENTS.md` (Codex),
+`GEMINI.md` (Gemini), `.cursor/rules/*.mdc` (Cursor). Hepsi `@DECKENT.md` (ortak,
+provider-neutral kaynak) import eder. Rol kuralları `src/core/rule-generator.ts`
+tarafından üretilir: 4 provider × 3 rol = 12 dosya.
 
 ---
 
 ## Tespit Edilen Sorunlar
 
-### Sorun 1 — `.codex/rules/` ve `.gemini/rules/` Ölü Dizin
+### Sorun 1 — Adapter Dosyaları Yanlış Provider Dizinini İşaret Ediyordu (claude-coupling)
 
-**Öncelik:** Yüksek (dogfooding) / Orta (kullanıcı)  
-**Kök Neden:** `rule-generator.ts` `PROVIDERS` dizisi 4 dizine yazar. Ancak `AGENTS.md` (Codex girişi) ve `GEMINI.md` (Gemini girişi) rol kurallarını `@.claude/rules/brain.md` üzerinden import eder — kendi `rules/` dizinlerini değil. Codex/Gemini CLI'larının `<dir>/rules/` otomatik yükleme konvansiyonu yoktur; girdi noktaları kök `AGENTS.md` / `GEMINI.md`.
+**Öncelik:** Yüksek (kullanıcı-facing)  
+**Kök Neden:** `AGENTS.md` (Codex girişi) ve `GEMINI.md` (Gemini girişi)
+`@.claude/rules/brain.md` import ediyordu — kendi dizinleri değil. Dahası ortak
+`DECKENT.md` da `## Agent Roles` bölümünde `@.claude/rules/*` içeriyordu; tüm
+adapter'lar `@DECKENT.md` import ettiği için Codex/Gemini kullanıcısı **dolaylı
+olarak** `.claude`'a bağlanıyordu.
 
-**Etki:** `.codex/rules/*` ve `.gemini/rules/*` byte-identical 6 ölü dosya — her sprint regen edilir, hiçbir şey okumaz. `.claude/rules/` aksine `constants.ts` sabiti (`CLAUDE_RULES_DIR`) + `permission-guard.ts` kaydı + `@import`'larla gerçekten bağlıdır.
+**Etki:** Claude kullanmayan bir kullanıcı (`deckent init` yapan Gemini/Codex
+kullanıcısı) `.claude/` dizini olmadan çalışamıyordu — her provider bağımsız
+olmalıyken değildi.
 
-**Durum:** Belgelendi — kaldırma önerisi (bkz. Gelecek Öneriler #1). CUSTOM kirliliği bu turda temizlendi (Sorun 2).
+**Durum:** Düzeltildi —
+- `AGENTS.md` → `@.codex/rules/*`
+- `GEMINI.md` → `@.gemini/rules/*`
+- `DECKENT.md` → `## Agent Roles` bloğu kaldırıldı (ortak doküman artık
+  provider-neutral; rol-kuralı wiring'i her adapter dosyasının kendisinde)
 
 ---
 
 ### Sorun 2 — CUSTOM-START Bloklarında Duplicate İçerik (6 dosya)
 
 **Öncelik:** Orta  
-**Kök Neden:** `.claude/rules/` ile aynı kök neden — `rule-generator.ts:368-377` "first-time migration" mantığı. `.codex/rules/` ve `.gemini/rules/` dosyaları Sprint 168'deki AUTO/CUSTOM marker sisteminden önce mevcuttu → marker'sız eski içerik bütünüyle `CUSTOM-START` bloğuna kopyalandı, her `regenerateRules()` çağrısında korundu. `.cursor/rules/` temizdi çünkü dizin Sprint 168 C0a-2'de eklendi (generator ilk çalıştığında dosya yoktu).
+**Kök Neden:** `.claude/rules/` ile aynı kök neden — `rule-generator.ts`
+"first-time migration" mantığı. `.codex`/`.gemini` rules dosyaları Sprint 168
+AUTO/CUSTOM marker sisteminden önce vardı → eski içerik `CUSTOM-START` bloğuna
+kopyalandı, her regen korudu. (`.cursor/rules/` temizdi — Sprint 168'de eklendi.)
 
-**Kanıt:** CUSTOM bloğundaki `paths:` frontmatter boşlukluydu (`[".tasks/*", ".brain/*"...]` — elle yazım); AUTO bloğunki boşluksuz (`JSON.stringify` çıktısı). İki ayrı kaynak = iki ayrı çağ.
+**Etki:** Her dosya rol kurallarını iki kez içeriyordu; ~218 satır / ~6 KB
+bağlam kirliliği.
 
-**Etki:** Her dosya rol kurallarını iki kez içeriyordu; ikinci kopya bayattı (ör. ADR-037 honesty note yoktu). Toplam ~218 satır / ~6 KB bağlam kirliliği.
-
-**Durum:** Düzeltildi — 6 dosyanın CUSTOM blokları boşaltıldı (`.claude/rules/` ile aynı biçim: `<!-- CUSTOM-START -->\n\n<!-- CUSTOM-END -->`).
+**Durum:** Düzeltildi — 6 dosyanın CUSTOM blokları boşaltıldı (`.claude/rules/`
+ile aynı biçim).
 
 ---
 
 ### Sorun 3 — Cursor Yanlış Dosya Formatı (`.md` vs `.mdc`)
 
-**Öncelik:** Yüksek (kullanıcı-facing — Cursor entegrasyonu çalışmıyor)  
-**Kök Neden:** `rule-generator.ts` `cursorAdapter()` `.cursor/rules/{role}.md` üretir. Cursor Project Rules sistemi yalnızca `.cursor/rules/*.mdc` (MDC formatı, `description`/`globs` frontmatter) yükler. Deckent'in kendi kodu bunu zaten bilir — `cursor-config.ts` `.mdc` üretir. Yani iki dahili mekanizma çelişir.
+**Öncelik:** Yüksek (kullanıcı-facing — Cursor entegrasyonu çalışmıyordu)  
+**Kök Neden:** `rule-generator.ts` `cursorAdapter()` `.cursor/rules/{role}.md`
+üretiyordu. Cursor Project Rules sistemi yalnızca `.cursor/rules/*.mdc` (MDC
+formatı, `description`/`globs`/`alwaysApply` frontmatter) yükler.
 
-**Etki:** Repodaki 3 `.cursor/rules/*.md` dosyasını Cursor hiç okumaz.
+**Etki:** `.cursor/rules/*.md` dosyalarını Cursor hiç okumuyordu.
 
-**Durum:** Belgelendi — öneri: rule-generator'dan `cursor` adapter'ı kaldır; `.cursor/rules/deckent.mdc` (cursor-config) tek kaynak (bkz. Gelecek Öneriler #2).
+**Durum:** Düzeltildi — `cursorAdapter` `.mdc` üretir; MDC frontmatter satır 1'de
+(AUTO bloğundan **önce** — Cursor gereği). `ProviderAdapter`'a `fileExt()` +
+`preamble()` eklendi. Repodaki `.cursor/rules/*` `.mdc`'ye çevrildi.
 
 ---
 
-### Sorun 4 — `.cursor/rules/` İçin Üç Çelişen Üretim Mekanizması
+### Sorun 4 — `.cursor/rules/` Çoklu Üretim Mekanizması
 
-**Öncelik:** Orta  
-**Kök Neden:** Üç ayrı kod yolu aynı dizine farklı dosya üretir:
+**Öncelik:** Düşük (Sorun 3 düzeltmesiyle büyük ölçüde çözüldü)  
+**Kök Neden:** `rule-generator.ts` (rol kuralları) + `cursor-config.ts`
+`generateCursorConfig` (`deckent.mdc` proje-bağlamı) + `agent-templates.ts`
+`generateCursorRules`. `init-steps.ts` `deckent.mdc`'yi iki kez yazıyor.
 
-| Üreten | Çıktı |
-|--------|-------|
-| `rule-generator.ts` | `.cursor/rules/{brain,auditor,worker-default}.md` |
-| `cursor-config.ts` `generateCursorConfig` | `.cursor/rules/deckent.mdc` |
-| `agent-templates.ts` `generateCursorRules` | `.cursor/rules/deckent.mdc` (farklı içerik) |
-
-Ayrıca `init-steps.ts` `applyEnvConfig('cursor')` `deckent.mdc`'yi iki kez yazar (satır 161 `generateCursorConfig` + satır 164 `generateCursorRules`) — ikincisi kazanır.
-
-**Etki:** Hangi dosyanın canonical olduğu belirsiz; `deckent init` çift yazım yapar.
-
-**Durum:** Belgelendi — öneri: tek mekanizma (bkz. Gelecek Öneriler #2-3).
+**Durum:** Kısmen — uzantı çatalı (`.md` vs `.mdc`) kapandı; rol kuralları
+(`*.mdc`) ile proje-bağlamı (`deckent.mdc`) ayrı amaçlar, birlikte yaşamaları
+sorun değil. `init-steps.ts` çift yazımı kalan iş (Gelecek Öneriler #3).
 
 ---
 
 ### Sorun 5 — MCP Kayıt Komutu Yanlış (BUG-18)
 
-**Öncelik:** Kritik (kullanıcı-facing — IDE MCP entegrasyonu hiç kurulamıyordu)  
-**Kök Neden:** Adapter config üreticileri MCP sunucusunu yanlış komutla kaydediyordu:
-- `codex-config.ts` / `cursor-config.ts` / `gemini-config.ts` → `npx deckent mcp-server`
-- `wizard.ts` / `init-templates.ts` + dokümanlar → `npx deckent mcp`
+**Öncelik:** Kritik (kullanıcı-facing)  
+**Kök Neden:** `deckent` CLI'da `mcp`/`mcp-server` subcommand'ı yok; MCP sunucusu
+ayrı bin (`package.json` → `deckent-mcp`). `npx deckent mcp` "unknown command"
+veriyordu.
 
-`deckent` CLI'da `mcp` veya `mcp-server` diye **kayıtlı subcommand yok** — `index.ts` 50 komut register eder, hiçbiri mcp değil; `entry.ts`'te dispatch yok. MCP sunucusu ayrı bir bin'dir: `package.json` → `"deckent-mcp": "./dist/mcp/server.js"`. Doğru biçimi `mcp/tools/init.ts:256` zaten kullanıyordu: `{ command: 'deckent-mcp', args: [] }`. Bu, SPRINT-LOG'da **BUG-18** olarak biliniyordu ama düzeltme tüm çağrı noktalarına yayılmamıştı.
-
-**Etki:** `DECKENT.md` / `README` / `api.md`'den `claude mcp add deckent -- npx deckent mcp` komutunu kopyalayan kullanıcı "unknown command" hatası alıyordu — MCP entegrasyonu hiç kurulmuyordu.
-
-**Durum:** Düzeltildi — 17 dosya `deckent-mcp` (args `[]`) biçimine sabitlendi. `tsc --noEmit` temiz; ilgili 5 test dosyası (246 test) yeşil.
+**Durum:** Düzeltildi — 17 dosya `deckent-mcp` (args `[]`) biçimine sabitlendi.
 
 ---
 
 ### Sorun 6 — `.codex/AGENTS.md` Yanlış Konum
 
 **Öncelik:** Düşük  
-**Kök Neden:** `sync.ts:351-360` `.codex/` dizini varsa `.codex/AGENTS.md` oluşturur. Codex CLI **kök** `AGENTS.md` okur (repoda zaten mevcut).
+**Kök Neden:** `sync.ts:351-360` `.codex/` dizini varsa `.codex/AGENTS.md`
+oluşturuyor. Codex CLI **kök** `AGENTS.md` okur.
 
-**Etki:** `.codex/AGENTS.md` hiç okunmayan ikinci kopya olur.
-
-**Durum:** Belgelendi — öneri (bkz. Gelecek Öneriler #4).
-
----
-
-### Minör — `paths:` Frontmatter Tutarsızlığı
-
-`.claude/rules/*` AUTO bloğunda `paths:` frontmatter var, `.codex`/`.gemini`/`.cursor` AUTO bloğunda yok (`claudeAdapter` vs diğer adapter'lar). `paths:` anahtarını ne Claude Code ne deckent runtime tüketiyor görünüyor — rol dosyaları `@import` ile bütün olarak yükleniyor. Belgelendi.
+**Durum:** Belgelendi — öneri (Gelecek Öneriler #4).
 
 ---
 
@@ -122,43 +122,56 @@ Ayrıca `init-steps.ts` `applyEnvConfig('cursor')` `deckent.mdc`'yi iki kez yaza
 
 | Dosya | Değişiklik |
 |-------|-----------|
-| `src/cli/helpers/codex-config.ts` | MCP kayıt komutu → `deckent-mcp`, `args = []` |
-| `src/cli/helpers/cursor-config.ts` | MCP kayıt komutu → `deckent-mcp`, `args: []` |
-| `src/cli/helpers/gemini-config.ts` | MCP kayıt komutu → `deckent-mcp`, `args: []` |
-| `src/cli/helpers/wizard.ts` | Cursor MCP rehberi + terminal mesajı → `deckent-mcp` |
-| `src/cli/commands/init-templates.ts` | `claude mcp add` satırları + `generateVscodeMcpJson` → `deckent-mcp` |
-| `.codex/rules/{brain,auditor,worker-default}.md` | CUSTOM bloğu temizlendi (duplicate kaldırıldı) |
-| `.gemini/rules/{brain,auditor,worker-default}.md` | CUSTOM bloğu temizlendi (duplicate kaldırıldı) |
-| `tests/cli/helpers/{codex,cursor,gemini}-config.test.ts` | Assertion'lar `deckent-mcp` ile güncellendi |
-| `tests/integration/multi-env.test.ts` | Aynı |
-| `tests/cli/commands/init.test.ts` | `generateVscodeMcpJson` + MCP guidance assertion'ları güncellendi |
-| `DECKENT.md`, `README.md`, `README-TR.md` | MCP kayıt komutu → `npx deckent-mcp` |
-| `docs/reference/api.md`, `docs/vision/blueprint.md` | Aynı |
-| `DECKENT-ANA-PLAN-TR.md`, `docs/development/troubleshooting.md` | Aynı |
+| `src/core/rule-generator.ts` | `ProviderAdapter` + `fileExt()`/`preamble()`; `cursorAdapter` `.mdc` + MDC frontmatter; `generateRules` uzantı + preamble |
+| `tests/core/rule-generator.test.ts` | Cursor `.mdc` testleri eklendi; `d4214c41`'in kırdığı `.contracts/*` testi düzeltildi |
+| `AGENTS.md` | Rol kuralları `@.codex/rules/*` |
+| `GEMINI.md` | Rol kuralları `@.gemini/rules/*` |
+| `DECKENT.md` | `## Agent Roles` bloğu kaldırıldı (ortak doküman provider-neutral) |
+| `.cursor/rules/*.md → *.mdc` | 3 dosya `.mdc`'ye çevrildi (Cursor-native MDC frontmatter) |
+| `.codex/rules/*`, `.gemini/rules/*` | 6 dosya CUSTOM bloğu temizlendi |
+| `src/cli/helpers/{codex,cursor,gemini}-config.ts` + `wizard.ts` + `init-templates.ts` | MCP kayıt komutu `deckent-mcp` (BUG-18) |
+| 5 test + 7 doküman | MCP komutu `deckent-mcp` ile güncellendi |
 
-**Doğrulama:** `tsc --noEmit` exit 0; ilgili 5 test dosyası 246/246 test yeşil.
+**Doğrulama:** `tsc --noEmit` exit 0; rule-generator + MCP test takımları yeşil
+(52 + 246 test).
 
 ---
 
 ## Açık Kaynak Hazırlığı Değerlendirmesi
 
 **Dogfooding perspektifi:**
-- 12 rule dosyasından 6'sı (`.codex/rules/` + `.gemini/rules/`) ölü — hiçbir şey referans vermiyor. rule-generator hâlâ 4 dizine yazıyor.
-- CUSTOM blok kirliliği tüm adapter dizinlerinden temizlendi (`.claude` + `.codex` + `.gemini`); `.cursor` zaten temizdi.
-- AUTO/CUSTOM + `replaceSentinel` mekanizması sağlam tasarım; kök sorun "first-time migration" yan etkisiydi.
+- Repo artık self-contained adapter modelini gösteriyor: `CLAUDE.md`→`.claude/`,
+  `AGENTS.md`→`.codex/`, `GEMINI.md`→`.gemini/`, Cursor→`.cursor/rules/*.mdc`.
+- `DECKENT.md` provider-neutral — hiçbir provider'a coupling yok.
+- 4 provider rule dizini de canlı ve bağımsız; "ölü dizin" yok.
 
 **Kullanıcı perspektifi:**
-- MCP kayıt komutu artık çalışıyor — bu kritik düzeltme olmadan hiçbir kullanıcı deckent MCP'yi IDE'sine bağlayamıyordu.
-- Cursor `.md`/`.mdc` uyumsuzluğu kullanıcı projelerinde Cursor entegrasyonunu sessizce kırıyor — kaldırma/`.mdc` geçişi önerildi.
-- `.codex/rules/`, `.gemini/rules/` kullanıcı projesinde de ölü ağırlık olarak üretiliyor.
+- Claude kullanmayan kullanıcı artık `.claude/` olmadan çalışabilir (her adapter
+  kendi dizinini işaret ediyor).
+- Cursor entegrasyonu artık çalışıyor (`.mdc` formatı).
+- MCP kayıt komutu çalışıyor.
+- **Kalan boşluk:** `deckent init` generator'ları henüz tek-kaynak değil —
+  `mcp/tools/init.ts` yalnızca `.claude/rules/` inline yazıyor. Codex/Gemini/Cursor
+  kullanıcısı ilk sprint regen'ine kadar kendi rule dosyalarını almıyor (Gelecek
+  Öneriler #1).
 
 ---
 
 ## Gelecek Öneriler
 
-1. **Ölü dizinleri kaldır:** `rule-generator.ts` `PROVIDERS`'tan `codex` + `gemini` çıkar; `.codex/rules/` ve `.gemini/rules/` `git rm`. `AGENTS.md`/`GEMINI.md` zaten `.claude/rules/` kullanıyor.
-2. **Cursor tek mekanizma:** rule-generator `cursor` adapter'ı kaldır VEYA `.mdc` üret. `.cursor/rules/deckent.mdc` (cursor-config) canonical olsun.
-3. **Çift yazımı tekille:** `init-steps.ts` `applyEnvConfig('cursor')` `deckent.mdc`'yi iki kez yazıyor — `generateCursorConfig` veya `generateCursorRules`'tan biri kalsın.
+1. **Tek-kaynak init:** `init` generator'ları (`init-steps.ts`, `mcp/tools/init.ts`)
+   hardcoded inline rules yerine `generateRules({ projectRoot, adrs: [] })` çağırsın
+   — `deckent init` 4 provider rule dizinini de tutarlı üretir. (`.claude` audit
+   dokümanının da #1 önerisi.)
+2. **init adapter dosyaları self-contained:** `init-templates.ts`
+   `generateDeckentContentTR/EN` + `mcp/tools/init.ts` `deckentContent` `DECKENT.md`'ye
+   `## Agent Roles` koyuyor — ortak dokümandan çıkar; üretilen `CLAUDE.md`/`AGENTS.md`
+   her biri kendi `<provider>/rules/`'ını işaret etsin. (Bu repoda yapıldı,
+   generator'larda değil.)
+3. **init-steps çift yazım:** `applyEnvConfig('cursor')` `deckent.mdc`'yi iki kez
+   yazıyor (`generateCursorConfig` + `generateCursorRules`) — tekille.
 4. **`sync.ts` düzelt:** `.codex/AGENTS.md` yerine kök `AGENTS.md` senkronize et.
-5. **Bug O kapanışı:** `rule-generator.ts` first-run dalı (`else if (existing !== null)`) eski içeriği CUSTOM'a kopyalamasın — boş CUSTOM ile başlatsın. Marker sistemi öncesi dosya kalmadığı için artık dormant ama defansif düzeltme değerli.
-6. **`paths:` kararı:** Ya runtime'da tüketilsin ya tüm adapter'lardan kaldırılsın.
+5. **Bug O kapanışı:** `rule-generator.ts` first-run dalı (`else if (existing)`)
+   marker'sız dosyanın içeriğini CUSTOM'a kopyalamasın — boş CUSTOM ile başlatsın.
+6. **Phantom path:** `init-templates.ts:79,140` `@.contracts/api-surface.md` —
+   gerçek dosya `docs/reference/api-surface.md`; `.contracts/` hiç oluşturulmuyor.

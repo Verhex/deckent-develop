@@ -56,11 +56,6 @@
 @.brain/exports/summary.md
 @docs/reference/api-surface.md
 
-## Agent Roles
-When acting as Brain: @.claude/rules/brain.md
-When acting as Auditor: @.claude/rules/auditor.md
-When acting as Worker: @.claude/rules/worker-default.md
-
 ## Environment
 Build: `npm run build` (tsc + copy-assets) | Full: `npm run build:all` (+ dashboard vite) | Dev: `npm run dev` (tsc --watch)
 Test: `npm test` (vitest run) | Watch: `npm run test:watch` | Coverage: `npm run test:coverage` | Dashboard: `npm run test:dashboard`

@@ -1,3 +1,8 @@
+---
+description: Deckent Worker (executor) role rules
+globs: src/**,tests/**
+alwaysApply: false
+---
 <!-- AUTO-START -->
 # Worker Rules
 - Read your task file first (`.tasks/task-XXX.json`)

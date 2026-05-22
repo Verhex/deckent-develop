@@ -16,9 +16,9 @@
 @.brain/exports/summary.md
 
 ## Agent Instructions
-When acting as Brain: @.claude/rules/brain.md
-When acting as Auditor: @.claude/rules/auditor.md
-When acting as Worker: @.claude/rules/worker-default.md
+When acting as Brain: @.gemini/rules/brain.md
+When acting as Auditor: @.gemini/rules/auditor.md
+When acting as Worker: @.gemini/rules/worker-default.md
 
 ## Identity
 @.deckent/workspace/IDENTITY.md

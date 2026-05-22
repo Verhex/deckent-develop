@@ -238,11 +238,12 @@ describe('rule-generator', () => {
       expect(result.filesWritten.length).toBe(12);
       expect(result.errors.length).toBe(0);
 
-      // Verify directory structure
+      // Verify directory structure (cursor → .mdc, others → .md)
       for (const provider of ['claude', 'codex', 'gemini', 'cursor'] as const) {
         for (const role of ['brain', 'auditor', 'worker-default'] as const) {
           const dir = provider === 'claude' ? '.claude' : `.${provider}`;
-          const filePath = join(TEST_ROOT, dir, 'rules', `${role}.md`);
+          const ext = provider === 'cursor' ? 'mdc' : 'md';
+          const filePath = join(TEST_ROOT, dir, 'rules', `${role}.${ext}`);
           expect(existsSync(filePath), `${filePath} should exist`).toBe(true);
         }
       }
@@ -346,12 +347,11 @@ describe('rule-generator', () => {
   // ── Claude Provider Specific ───────────────────────────────────
 
   describe('claude provider frontmatter', () => {
-    it('brain gets task/brain/contracts paths', () => {
+    it('brain gets task/brain paths', () => {
       generateRules({ projectRoot: TEST_ROOT, adrs: [], providers: ['claude'], roles: ['brain'] });
       const content = readFileSync(join(TEST_ROOT, '.claude', 'rules', 'brain.md'), 'utf-8');
       expect(content).toContain('.tasks/*');
       expect(content).toContain('.brain/*');
-      expect(content).toContain('.contracts/*');
     });
 
     it('auditor gets dashboard/patterns paths', () => {
@@ -366,6 +366,40 @@ describe('rule-generator', () => {
       const content = readFileSync(join(TEST_ROOT, '.claude', 'rules', 'worker-default.md'), 'utf-8');
       expect(content).toContain('src/**');
       expect(content).toContain('tests/**');
+    });
+  });
+
+  // ── Cursor Provider Specific ───────────────────────────────────
+
+  describe('cursor provider mdc', () => {
+    it('emits .mdc files with MDC frontmatter on line 1', () => {
+      const result = generateRules({ projectRoot: TEST_ROOT, adrs: [], providers: ['cursor'], roles: ['brain'] });
+      expect(result.errors.length).toBe(0);
+      const mdcPath = join(TEST_ROOT, '.cursor', 'rules', 'brain.mdc');
+      expect(existsSync(mdcPath)).toBe(true);
+      const content = readFileSync(mdcPath, 'utf-8');
+      // Frontmatter must be the very first thing in the file (Cursor requirement)
+      expect(content.startsWith('---\n')).toBe(true);
+      expect(content).toContain('description: Deckent Brain');
+      expect(content).toContain('globs:');
+      expect(content).toContain('alwaysApply: false');
+      // AUTO block follows the frontmatter
+      expect(content).toContain('<!-- AUTO-START -->');
+      expect(content).toContain('# Brain Rules');
+    });
+
+    it('does not emit a plain .md file for cursor', () => {
+      generateRules({ projectRoot: TEST_ROOT, adrs: [], providers: ['cursor'], roles: ['brain'] });
+      expect(existsSync(join(TEST_ROOT, '.cursor', 'rules', 'brain.md'))).toBe(false);
+    });
+
+    it('is idempotent across repeated runs', () => {
+      const adrs = [makeAdr()];
+      generateRules({ projectRoot: TEST_ROOT, adrs, providers: ['cursor'], roles: ['brain'] });
+      const first = readFileSync(join(TEST_ROOT, '.cursor', 'rules', 'brain.mdc'), 'utf-8');
+      generateRules({ projectRoot: TEST_ROOT, adrs, providers: ['cursor'], roles: ['brain'] });
+      const second = readFileSync(join(TEST_ROOT, '.cursor', 'rules', 'brain.mdc'), 'utf-8');
+      expect(first).toBe(second);
     });
   });
 
