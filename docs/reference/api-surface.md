@@ -84,7 +84,7 @@ Sprint lifecycle follows these phases in order:
 3. **EXECUTE** — Workers execute tasks, write heartbeats (.hb files)
 4. **EVALUATE** — Brain waits for results, evaluates (GO/NO-GO/TECH_DEBT)
 5. **FIX** — Failed tasks retried (optional, configurable timeout)
-6. **RETRO** — Retrospective written to RETRO.md
+6. **RETRO** — Retrospective written to the memory.db `retro` entry
 7. **DECAY** — Memory trimmed if .brain/ exceeds budget
 8. **CLEANUP** — Task files archived, locks released, sprint complete
 
