@@ -1,0 +1,175 @@
+{
+  "taskId": "186-224",
+  "sprintId": "sprint-186",
+  "steps": [
+    {
+      "step": 2,
+      "name": "routing-step-2",
+      "input": {
+        "taskId": "186-224",
+        "title": "Audit src/core/skill-cache.ts",
+        "scope": [
+          "docs/audits/per-file-2026-05-21/",
+          "src/core/"
+        ],
+        "intent": "documentation"
+      },
+      "output": {
+        "agent": "doc-writer",
+        "skills": [
+          "typescript-expert",
+          "documentation-writer",
+          "security-specialist"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Dynamic exclusions: [migration-specialist, devops-engineer, security-auditor]"
+    },
+    {
+      "step": 3,
+      "name": "routing-step-3",
+      "input": {
+        "taskId": "186-224",
+        "title": "Audit src/core/skill-cache.ts",
+        "scope": [
+          "docs/audits/per-file-2026-05-21/",
+          "src/core/"
+        ],
+        "intent": "documentation"
+      },
+      "output": {
+        "agent": "doc-writer",
+        "skills": [
+          "typescript-expert",
+          "documentation-writer",
+          "security-specialist"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Agent 'devops-engineer' excluded by override"
+    },
+    {
+      "step": 4,
+      "name": "routing-step-4",
+      "input": {
+        "taskId": "186-224",
+        "title": "Audit src/core/skill-cache.ts",
+        "scope": [
+          "docs/audits/per-file-2026-05-21/",
+          "src/core/"
+        ],
+        "intent": "documentation"
+      },
+      "output": {
+        "agent": "doc-writer",
+        "skills": [
+          "typescript-expert",
+          "documentation-writer",
+          "security-specialist"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Agent 'migration-specialist' excluded by override"
+    },
+    {
+      "step": 5,
+      "name": "routing-step-5",
+      "input": {
+        "taskId": "186-224",
+        "title": "Audit src/core/skill-cache.ts",
+        "scope": [
+          "docs/audits/per-file-2026-05-21/",
+          "src/core/"
+        ],
+        "intent": "documentation"
+      },
+      "output": {
+        "agent": "doc-writer",
+        "skills": [
+          "typescript-expert",
+          "documentation-writer",
+          "security-specialist"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Agent 'security-auditor' excluded by override"
+    },
+    {
+      "step": 6,
+      "name": "routing-step-6",
+      "input": {
+        "taskId": "186-224",
+        "title": "Audit src/core/skill-cache.ts",
+        "scope": [
+          "docs/audits/per-file-2026-05-21/",
+          "src/core/"
+        ],
+        "intent": "documentation"
+      },
+      "output": {
+        "agent": "doc-writer",
+        "skills": [
+          "typescript-expert",
+          "documentation-writer",
+          "security-specialist"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Agent selected: 'doc-writer' (score=10, rules=[rule(score=10)])"
+    },
+    {
+      "step": 7,
+      "name": "routing-step-7",
+      "input": {
+        "taskId": "186-224",
+        "title": "Audit src/core/skill-cache.ts",
+        "scope": [
+          "docs/audits/per-file-2026-05-21/",
+          "src/core/"
+        ],
+        "intent": "documentation"
+      },
+      "output": {
+        "agent": "doc-writer",
+        "skills": [
+          "typescript-expert",
+          "documentation-writer",
+          "security-specialist"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Skill budget: max 2 (medium task, 2 module(s), effort=normal)"
+    },
+    {
+      "step": 8,
+      "name": "routing-step-8",
+      "input": {
+        "taskId": "186-224",
+        "title": "Audit src/core/skill-cache.ts",
+        "scope": [
+          "docs/audits/per-file-2026-05-21/",
+          "src/core/"
+        ],
+        "intent": "documentation"
+      },
+      "output": {
+        "agent": "doc-writer",
+        "skills": [
+          "typescript-expert",
+          "documentation-writer",
+          "security-specialist"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Skills forced by override: [typescript-expert, documentation-writer, security-specialist]"
+    }
+  ],
+  "decidedAt": "2026-05-21T19:25:47.814Z"
+}

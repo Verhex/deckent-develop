@@ -1,5 +1,18 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-186 Learnings
+- Sprint sprint-186 Learnings: ## Sprint sprint-186 Learnings
+- Audit src/core/cascade-detector.ts: NO_GO — Worker exited without writing result (exitCode=0)
+- Audit src/core/ci-learning.ts: NO_GO — Worker exited without writing result (exitCode=0)
+- Audit src/core/condition-evaluator.ts: NO_GO — Worker exited without writing result (exitCode=0)
+- Audit src/core/config-migration.ts: NO_GO — Worker exited without writing result (exitCode=0)
+- Audit src/core/config-types.ts: NO_GO — Worker exited without writing result (exitCode=0)
+- Audit src/core/config-validator.ts: NO_GO — Worker exited without writing result (exitCode=0)
+- Audit src/core/config.ts: NO_GO — Worker exited without writing result (exitCode=0)
+- Audit src/core/constants.ts: NO_GO — Worker exited without writing result (exitCode=0)
+- Audit src/core/cost-calculator.ts: NO_GO — Worker exited without writing result (exitCode=0)
+- Audit src/core/cost-config-loader.ts: NO_GO — Worker exited without writing result (exitCode=0)
+
 ## Sprint sprint-185 Learnings
 - Sprint sprint-185 Learnings: ## Sprint sprint-185 Learnings
 
