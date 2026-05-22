@@ -155,8 +155,21 @@ yazımı da kalktı (Sorun 4 / Öneri #3 kapandı).
 | `src/cli/helpers/{codex,cursor,gemini}-config.ts` + `wizard.ts` + `init-templates.ts` | MCP kayıt komutu `deckent-mcp` (BUG-18) |
 | 5 test + 7 doküman | MCP komutu `deckent-mcp` ile güncellendi |
 
-**Doğrulama:** `tsc --noEmit` exit 0; rule-generator + MCP test takımları yeşil
-(52 + 246 test).
+**Doğrulama:** Her değişiklik sonrası `tsc --noEmit` exit 0; etkilenen test
+takımları yeşil — rule-generator (52 test), init (183 test), multi-env + MCP
+adapter test takımları.
+
+---
+
+## Commit Geçmişi
+
+| Commit | Konu |
+|--------|------|
+| `3a2f06e9` | MCP kayıt komutu `deckent-mcp` (BUG-18) + `.codex`/`.gemini` CUSTOM purge |
+| `e45ffbe7` | Provider-bağımsız adapter wiring (`AGENTS.md`→`.codex`, `GEMINI.md`→`.gemini`, `DECKENT.md` neutral) + Cursor `.mdc` desteği |
+| `56465200` | _(Alperen)_ `deckent init` → `regenerateRules` tek-kaynak — bu turun 4-provider init değişikliği bu commit'te bundle'landı |
+| `685e65c8` | Obsolete "rule templates" testi kaldır + audit doküman güncelle |
+| `9a353a45` | `applyEnvConfig` non-destructive — kullanıcı `AGENTS.md`/`GEMINI.md`'sini ezme |
 
 ---
 
@@ -188,7 +201,9 @@ yazımı da kalktı (Sorun 4 / Öneri #3 kapandı).
    `generateDeckentContentTR/EN` + `mcp/tools/init.ts` `deckentContent` `DECKENT.md`'ye
    `## Agent Roles` koyuyor — ortak dokümandan çıkar; üretilen `CLAUDE.md`/`AGENTS.md`
    her biri kendi `<provider>/rules/`'ını işaret etsin. (Bu repoda yapıldı,
-   generator'larda değil.)
+   generator'larda değil.) **Not:** Bu madde `DECKENT.md` `## Agent Roles` bölümünün
+   yeniden tasarımı (**"Part 2"** — bölüm semantiği = deckent'in kendi core/hub
+   agent'ları, ayrı dosyayla referans) ile iç içe; Alperen kararıyla **ertelendi**.
 3. ~~**init-steps çift yazım**~~ — ✅ **TAMAMLANDI:** `applyEnvConfig` non-destructive
    düzeltmesiyle Cursor çift `deckent.mdc` yazımı da kalktı.
 4. **`sync.ts` düzelt:** `.codex/AGENTS.md` yerine kök `AGENTS.md` senkronize et.
@@ -196,3 +211,19 @@ yazımı da kalktı (Sorun 4 / Öneri #3 kapandı).
    marker'sız dosyanın içeriğini CUSTOM'a kopyalamasın — boş CUSTOM ile başlatsın.
 6. **Phantom path:** `init-templates.ts:79,140` `@.contracts/api-surface.md` —
    gerçek dosya `docs/reference/api-surface.md`; `.contracts/` hiç oluşturulmuyor.
+
+---
+
+## Kapanış
+
+Audit 2026-05-22'de kapatıldı. **7 sorundan 6'sı düzeltildi** (Sorun 1, 2, 3, 4,
+5, 7), 1'i belgelendi (Sorun 6 — düşük öncelik, öneri). "Gelecek Öneriler" #1 ve
+#3 tamamlandı. Kalan açık maddeler: **#2** (Part 2 — `DECKENT.md` agent-rolleri
+redesign'ı, Alperen kararıyla ertelendi), **#4** (`sync.ts` `.codex/AGENTS.md`),
+**#5** (Bug O first-run dalı — dormant), **#6** (phantom path) — hepsi
+bağımsız/küçük, ileride ele alınmak üzere bu belgede izlenir.
+
+`.cursor/` · `.codex/` · `.gemini/` adapter zincirinin son durumu: her provider
+self-contained (kendi `rules/` dizinine bağlı), `deckent init` 4 provider için
+rule üretir, Cursor `.mdc` formatında, MCP kayıt komutu doğru, ve `deckent init`
+kullanıcının mevcut dosyalarını **ezmez** (additive, ADR-013 thin-adapter).
