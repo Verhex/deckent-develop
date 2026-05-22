@@ -2039,7 +2039,7 @@ describe('human-friendly init output', () => {
       vi.mocked(detectIDEEnvironment).mockReturnValue('terminal');
     });
 
-    it('reuses detectedAnalysis for PROJECT-IDENTITY.md in --auto mode', async () => {
+    it('runs analyzeProject once for stack detection in --auto mode', async () => {
       await runCommand(['init', '--auto']);
       // analyzeProject should be called only once (at the top of --auto mode)
       expect(analyzeProject).toHaveBeenCalledTimes(1);

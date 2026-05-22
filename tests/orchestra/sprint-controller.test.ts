@@ -160,7 +160,6 @@ vi.mock('../../src/orchestra/sprint-reporter.js', () => ({
     crossAssignments: 0, contextLinesUsed: 0,
   }),
   updateProjectDocs: vi.fn(),
-  updateProjectIdentity: vi.fn(),
   buildAgentPerformance: vi.fn().mockReturnValue([
     { agent: 'worker-001', tasks: 2, done: 2, debt: 0, noGo: 0, avgCoverage: 90 },
   ]),

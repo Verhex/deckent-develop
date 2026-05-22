@@ -62,13 +62,6 @@ export type {
 export {
   writeSprintLog,
   updateProjectDocs,
-  generateProjectIdentity,
-  countProjectTestCases,
-  parseCoverageFromClover,
-  getTestCountFromVitest,
-  getCoverageFromVitest,
-  readPreviousTestCount,
-  updateProjectIdentity,
   autoResolveDebt,
   autoDraftDecisions,
   addRecurringPatternsToFile,
@@ -76,10 +69,6 @@ export {
   archiveDirectives,
   emergencyRestoreDirectives,
   archiveOrphanTasks,
-} from './sprint-docs-updater.js';
-
-export type {
-  ProjectIdentityInfo,
 } from './sprint-docs-updater.js';
 
 // ═══ ci-reporter.ts ═════════════════════════════════════════════

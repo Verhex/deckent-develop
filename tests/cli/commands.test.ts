@@ -1299,8 +1299,9 @@ describe('init command', () => {
     const brainCalls = vi.mocked(writeFileSync).mock.calls.filter(
       (c) => String(c[0]).includes('.brain'),
     );
-    // Task #4e: DEBT.md stub removed (DB-first) — MEMORY/PATTERNS/RETRO/PROJECT-IDENTITY.
-    expect(brainCalls.length).toBeGreaterThanOrEqual(4);
+    // Task #4e + B6: DEBT.md & PROJECT-IDENTITY.md stubs removed (DB-first) —
+    // only MEMORY.md / PATTERNS.md / RETRO.md remain as legacy export stubs.
+    expect(brainCalls.length).toBeGreaterThanOrEqual(3);
   });
 
   it('does not create PROJECT-IDENTITY.md (B6 — DB-first identity, Memory V2)', async () => {

@@ -153,7 +153,6 @@ vi.mock('../../src/orchestra/sprint-reporter.js', () => ({
     crossAssignments: 0, contextLinesUsed: 0,
   }),
   updateProjectDocs: vi.fn(),
-  updateProjectIdentity: vi.fn(),
 }));
 
 vi.mock('../../src/orchestra/coverage-validator.js', () => ({
@@ -239,7 +238,7 @@ vi.mock('../../src/agents/worker-ipc.js', () => {
 import { existsSync, readdirSync } from 'node:fs';
 import { finalizeSprint } from '../../src/orchestra/sprint-controller.js';
 import type { FinalizeSprintOptions } from '../../src/orchestra/sprint-controller.js';
-import { writeRetrospective, writeSprintLog, calculateMetrics, updateProjectDocs, updateProjectIdentity } from '../../src/orchestra/sprint-reporter.js';
+import { writeRetrospective, writeSprintLog, calculateMetrics, updateProjectDocs } from '../../src/orchestra/sprint-reporter.js';
 import { runDecay } from '../../src/orchestra/debt-manager.js';
 import { updateLastSprintId } from '../../src/core/utils.js';
 import { runHooks } from '../../src/core/plugin-hooks.js';
@@ -382,22 +381,6 @@ describe('finalizeSprint', () => {
     );
   });
 
-  it('should call updateProjectIdentity', async () => {
-    const tasks = [createTestTask('042-001')];
-    const sprint = createTestSprint(tasks);
-    const evaluations = new Map([['042-001', TaskEvaluation.DONE]]);
-    const results = [createTestResult('042-001')];
-
-    await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results);
-
-    expect(vi.mocked(updateProjectIdentity)).toHaveBeenCalledWith(
-      PROJECT_ROOT,
-      'sprint-042',
-      expect.objectContaining({ totalTasks: 3 }),
-      expect.any(Number),
-    );
-  });
-
   it('should call updateLastSprintId', async () => {
     const tasks = [createTestTask('042-001')];
     const sprint = createTestSprint(tasks);
@@ -519,7 +502,6 @@ describe('finalizeSprint', () => {
     expect(metrics).toBeDefined();
     // Other actions still run
     expect(vi.mocked(writeRetrospective)).toHaveBeenCalled();
-    expect(vi.mocked(updateProjectIdentity)).toHaveBeenCalled();
   });
 
   it('should survive writeRetrospective failure', async () => {
@@ -531,21 +513,7 @@ describe('finalizeSprint', () => {
 
     const metrics = await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results);
     expect(metrics).toBeDefined();
-    expect(vi.mocked(updateProjectIdentity)).toHaveBeenCalled();
     expect(vi.mocked(updateLastSprintId)).toHaveBeenCalled();
-  });
-
-  it('should survive updateProjectIdentity failure', async () => {
-    vi.mocked(updateProjectIdentity).mockImplementationOnce(() => { throw new Error('write error'); });
-    const tasks = [createTestTask('042-001')];
-    const sprint = createTestSprint(tasks);
-    const evaluations = new Map([['042-001', TaskEvaluation.DONE]]);
-    const results = [createTestResult('042-001')];
-
-    const metrics = await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results);
-    expect(metrics).toBeDefined();
-    expect(vi.mocked(updateLastSprintId)).toHaveBeenCalled();
-    expect(vi.mocked(runDecay)).toHaveBeenCalled();
   });
 
   it('should survive runDecay failure', async () => {
@@ -569,28 +537,6 @@ describe('finalizeSprint', () => {
 
     const metrics = await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results);
     expect(metrics).toBeDefined();
-  });
-
-  it('should count total sprints from .brain/sprints/ directory', async () => {
-    vi.mocked(existsSync).mockImplementation((p) => {
-      if (typeof p === 'string' && p.includes('sprints')) return true;
-      return false;
-    });
-    vi.mocked(readdirSync).mockReturnValue(['sprint-040.md', 'sprint-041.md', 'sprint-042.md'] as unknown as ReturnType<typeof readdirSync>);
-
-    const tasks = [createTestTask('042-001')];
-    const sprint = createTestSprint(tasks);
-    const evaluations = new Map([['042-001', TaskEvaluation.DONE]]);
-    const results = [createTestResult('042-001')];
-
-    await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results);
-
-    expect(vi.mocked(updateProjectIdentity)).toHaveBeenCalledWith(
-      PROJECT_ROOT,
-      'sprint-042',
-      expect.any(Object),
-      3, // 3 sprint files
-    );
   });
 
   it('should be idempotent-safe: calling twice does not throw', async () => {
@@ -659,7 +605,6 @@ describe('finalizeSprint', () => {
     expect(vi.mocked(updateProjectDocs)).toHaveBeenCalled();
     expect(vi.mocked(writeSprintLog)).toHaveBeenCalled();
     expect(vi.mocked(writeRetrospective)).toHaveBeenCalled();
-    expect(vi.mocked(updateProjectIdentity)).toHaveBeenCalled();
     expect(vi.mocked(updateLastSprintId)).toHaveBeenCalled();
   });
 });

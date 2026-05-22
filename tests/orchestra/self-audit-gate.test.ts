@@ -43,7 +43,6 @@ vi.mock('../../src/orchestra/sprint-reporter.js', () => ({
     coverage: 95,
   }),
   updateProjectDocs: vi.fn(),
-  updateProjectIdentity: vi.fn(),
   buildAgentPerformance: vi.fn().mockReturnValue([]),
   archiveDirectives: vi.fn(),
 }));

@@ -237,7 +237,7 @@ export function registerInit(program: Command): void {
         writeDirectivesFile(root, language, stackResult, projectName);
 
         // 10. Brain files
-        writeBrainFiles(root, projectName, mode, language, stackResult, detectedAnalysis);
+        writeBrainFiles(root, projectName, language, stackResult, detectedAnalysis);
 
         // 10d. i18n
         writeI18nFiles(root);

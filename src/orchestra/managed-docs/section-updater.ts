@@ -1,6 +1,6 @@
 // ─── Section Updater ──────────────────────────────────────────────────────
 // Parse markdown into sections by heading and replace auto-section content.
-// Generalized from updateProjectIdentity() pattern in sprint-reporter.ts.
+// Generic heading-scoped section replacement for the managed-docs pipeline.
 
 import type { ParsedSection, ManagedDocEntry } from './types.js';
 

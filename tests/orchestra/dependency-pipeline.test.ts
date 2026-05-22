@@ -199,7 +199,6 @@ vi.mock('../../src/orchestra/sprint-reporter.js', () => ({
   writeSprintLog: vi.fn(),
   calculateMetrics: vi.fn().mockReturnValue({}),
   updateProjectDocs: vi.fn(),
-  updateProjectIdentity: vi.fn(),
   buildAgentPerformance: vi.fn().mockReturnValue({}),
   archiveDirectives: vi.fn(),
 }));
