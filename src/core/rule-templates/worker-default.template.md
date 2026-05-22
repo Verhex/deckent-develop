@@ -7,7 +7,7 @@
 - Check `.locks/` before writing any file
 - Update heartbeat (`.tasks/task-XXX.hb`) on every file change
 - Stay within your assigned scope — do not touch files outside it
-- Run `tsc --noEmit` and `vitest run` before marking done
+- Run project-specific lint/build and test suite before marking done
 - Document changes in relevant docs
 - Write result to `.tasks/task-XXX.result` with:
   - files_changed, lines_added/removed
@@ -21,8 +21,9 @@
 - Do not ignore skill instructions even if they seem overly detailed
 
 ## Verify Loop
-- Run `tsc --noEmit` after code changes — fix errors (max 3 attempts)
-- Run `npx vitest run` after code changes — fix failures (max 3 attempts)
+> **Honesty note (ADR-037 V1.0):** Bu Verify Loop bir **prompt talimatıdır, kod-enforce DEĞİL**. `enforceVerifyLoop`/`runTestVerifyLoop` runtime'da çağrılmaz (0-caller, hard-flip post-GA V2). Worker disiplinine + Auditor advisory izlemeye dayanır.
+- Run lint/build check after code changes — fix errors (max 3 attempts; use project-specific command)
+- Run test suite after code changes — fix failures (max 3 attempts; use project-specific command)
 - If both fail after 3 attempts → write NO_GO result with error details
 - If blocked by another task → write NO_GO result explaining the dependency
 

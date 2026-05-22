@@ -415,7 +415,7 @@ export function writeClaudeRules(
 ): void {
   writeFile(
     join(root, CLAUDE_RULES_DIR, 'brain.md'),
-    `---\npaths: [".tasks/*", ".brain/*", ".contracts/*"]\n---\n# Brain Rules\n- Always read DIRECTIVES.md first\n- Always check usage before planning\n- Plan mode required before execution\n- Write sprint plan as task JSON files in .tasks/\n- Assign model and effort per task with reason\n- Define scope (directories, filesRead, filesWrite) for each task\n- Define GO/NO-GO criteria for each task\n- Evaluate every result: DONE / GO_WITH_TECH_DEBT / NO_GO\n- Cross-dependency: if A's NO-GO caused by B's output, B gets priority fix\n- Update MEMORY.md after every sprint (max 300 lines)\n- Write RETRO.md (overwrite, max 100 lines)\n- Trigger decay if .brain/ exceeds 900 lines\n- Sprint is NEVER left incomplete\n`,
+    `---\npaths: [".tasks/*", ".brain/*"]\n---\n# Brain Rules\n- Always read DIRECTIVES.md first\n- All brain knowledge lives in '.brain/memory.db' (SQLite) — this is the single source of truth\n- Always check usage before planning\n- Plan mode required before execution\n- Write sprint plan as task JSON files in .tasks/\n- Assign model and effort per task with reason\n- Define scope (directories, filesRead, filesWrite) for each task\n- Define GO/NO-GO criteria for each task\n- Evaluate every result: DONE / GO_WITH_TECH_DEBT / NO_GO\n- Cross-dependency: if A's NO-GO caused by B's output, B gets priority fix\n- Write sprint learnings to DB: store.insert({ type: 'memory', sprint_id, ... })\n- Write retrospective to DB: store.upsert({ type: 'retro', sprint_id, ... })\n- Trigger decay via store.decay(currentSprintNum, decayAfterSprints)\n- Sprint is NEVER left incomplete\n`,
   );
   writeFile(
     join(root, CLAUDE_RULES_DIR, 'auditor.md'),

@@ -66,7 +66,7 @@ interface ProviderAdapter {
 
 function claudeAdapter(): ProviderAdapter {
   const pathsMap: Record<RuleRole, string[]> = {
-    'brain': ['.tasks/*', '.brain/*', '.contracts/*'],
+    'brain': ['.tasks/*', '.brain/*'],
     'auditor': ['.dashboard', '.brain/PATTERNS.md'],
     'worker-default': ['src/**', 'tests/**'],
   };
