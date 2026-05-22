@@ -8,7 +8,6 @@ import {
   detectDeadlocks,
   resetDashboard,
   updateDashboard,
-  detectPatterns,
   buildWorkerScopeMap,
   runScanCycle,
   startScanLoop,
@@ -769,60 +768,6 @@ describe('updateDashboard', () => {
     const callArgs = mockedWriteFileSync.mock.calls[0]!;
     expect(String(callArgs[0])).toContain('.dashboard');
     expect(JSON.parse(callArgs[1] as string)).toEqual(state);
-  });
-});
-
-describe('detectPatterns', () => {
-  it('appends new pattern', () => {
-    mockedReadFileSync.mockImplementation(() => { throw new Error('not found'); });
-
-    detectPatterns('/project', [
-      { type: 'stale_heartbeat', agentId: 'w1', detail: 'stale', timestamp: new Date().toISOString() },
-    ], 'sprint-1');
-
-    expect(mockedWriteFileSync).toHaveBeenCalledTimes(1);
-    const written = JSON.parse(mockedWriteFileSync.mock.calls[0]![1] as string) as Array<{ pattern: string }>;
-    expect(written).toHaveLength(1);
-    expect(written[0]!.pattern).toBe('stale_heartbeat');
-  });
-
-  it('increments occurrence for existing pattern', () => {
-    mockedReadFileSync.mockReturnValue(JSON.stringify([
-      { pattern: 'stale_heartbeat', occurrences: 2, firstDetectedInSprint: 's1', lastDetectedInSprint: 's1', resolved: false },
-    ]) as never);
-
-    detectPatterns('/project', [
-      { type: 'stale_heartbeat', agentId: 'w1', detail: 'stale', timestamp: new Date().toISOString() },
-    ], 'sprint-2');
-
-    const written = JSON.parse(mockedWriteFileSync.mock.calls[0]![1] as string) as Array<{ occurrences: number }>;
-    expect(written[0]!.occurrences).toBe(3);
-  });
-
-  it('truncates when exceeding PATTERNS_MAX_LINES', () => {
-    // Each pattern serializes to ~7 lines of JSON (pretty-printed with 2-space indent).
-    // To reliably exceed PATTERNS_MAX_LINES we create 2x the budget worth of patterns.
-    const patternCount = Math.ceil(PATTERNS_MAX_LINES / 3);
-    const manyPatterns = Array.from({ length: patternCount }, (_, i) => ({
-      pattern: `pattern-${i}`,
-      occurrences: 1,
-      firstDetectedInSprint: 's1',
-      lastDetectedInSprint: 's1',
-      resolved: false,
-    }));
-    mockedReadFileSync.mockReturnValue(JSON.stringify(manyPatterns) as never);
-
-    detectPatterns('/project', [
-      { type: 'new_pattern' as never, agentId: 'w1', detail: 'new', timestamp: new Date().toISOString() },
-    ], 'sprint-2');
-
-    expect(mockedWriteFileSync).toHaveBeenCalledTimes(1);
-    // Should have removed oldest entries to fit within PATTERNS_MAX_LINES budget
-    const written = JSON.parse(mockedWriteFileSync.mock.calls[0]![1] as string) as unknown[];
-    expect(written.length).toBeLessThan(patternCount + 1);
-    // Serialized output must fit within the line budget
-    const lineCount = JSON.stringify(written, null, 2).split('\n').length;
-    expect(lineCount).toBeLessThanOrEqual(PATTERNS_MAX_LINES);
   });
 });
 

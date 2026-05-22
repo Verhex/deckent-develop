@@ -30,7 +30,6 @@ import {
   CLAUDE_FILE,
   DECKENT_FILE,
   MEMORY_FILE,
-  PATTERNS_FILE,
   RETRO_FILE,
 } from '../../core/constants.js';
 import { ensureDeckentImport } from '../../core/utils.js';
@@ -412,7 +411,8 @@ export function writeBrainFiles(
   // 10. Brain files (Memory V2: DB-first, .md files are legacy exports)
   writeIfNotExists(join(root, BRAIN_DIR, MEMORY_FILE), '# Learned Patterns\n');
   // Task #4e: no DEBT.md stub — tech debt is DB-first (memory.db).
-  writeIfNotExists(join(root, BRAIN_DIR, PATTERNS_FILE), '# Detected Patterns\n');
+  // B7 (Memory V2): no PATTERNS.md stub — violation patterns are DB-first
+  // (memory.db `pattern` entries written by the auditor).
   writeIfNotExists(join(root, BRAIN_DIR, RETRO_FILE), '# Sprint Retrospective\n');
   ensureDir(join(root, BRAIN_DIR, 'exports'));
 

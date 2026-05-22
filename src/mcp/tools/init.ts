@@ -7,7 +7,7 @@ import {
   DECKENT_DIR, BRAIN_DIR, TASKS_DIR, LOCKS_DIR, CLAUDE_RULES_DIR,
   WORKSPACE_DIR, PLUGINS_DIR, I18N_DIR, DASHBOARD_FILE, DIRECTIVES_FILE,
   AGENTS_FILE, CLAUDE_FILE, DECKENT_FILE, MEMORY_FILE,
-  PATTERNS_FILE, RETRO_FILE,
+  RETRO_FILE,
 } from '../../core/constants.js';
 import { regenerateRules } from '../../core/rule-generator.js';
 import { detectAvailableProviders } from '../../core/provider.js';
@@ -173,9 +173,8 @@ Lint: tsc --noEmit
 
       // Brain files (never overwrite — preserves accumulated knowledge)
       writeIfNotExists(join(root, BRAIN_DIR, MEMORY_FILE), '# Learned Patterns\n');
-      // Task #4e/#13: no DEBT.md or DECISIONS.md stub — both are DB-first
-      // (memory.db); this also restores CLI/MCP init parity.
-      writeIfNotExists(join(root, BRAIN_DIR, PATTERNS_FILE), '# Detected Patterns\n');
+      // Task #4e/#13 + B7: no DEBT.md / DECISIONS.md / PATTERNS.md stub —
+      // tech debt, ADRs and violation patterns are all DB-first (memory.db).
       writeIfNotExists(join(root, BRAIN_DIR, RETRO_FILE), '# Sprint Retrospective\n');
       // B6 (Memory V2): no PROJECT-IDENTITY.md stub — identity is DB-first
       // (memory.db `identity` entry + managed .deckent/workspace/IDENTITY.md).

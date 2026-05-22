@@ -88,7 +88,7 @@ import {
 } from '../../src/agents/worker.js';
 import {
   scanHeartbeats, checkStaleLocks, buildWorkerScopeMap,
-  updateDashboard, detectPatterns,
+  updateDashboard,
 } from '../../src/monitor/auditor.js';
 import {
   readContext, evaluateResult, handleEvaluation, escalateDebt,
@@ -487,18 +487,6 @@ describe('Auditor scan integration', () => {
     const parsed = JSON.parse(raw) as DashboardState;
     expect(parsed.sprint.id).toBe('sprint-001');
     expect(parsed.progress.total).toBe(2);
-  });
-
-  it('detectPatterns writes to PATTERNS.md', () => {
-    const violations: BoundaryViolation[] = [{
-      type: 'stale_heartbeat', agentId: 'w-001',
-      detail: 'test', timestamp: new Date().toISOString(),
-    }];
-    detectPatterns(root, violations, 'sprint-001');
-    const raw = readFileSync(join(root, BRAIN_DIR, PATTERNS_FILE), 'utf-8');
-    const patterns = JSON.parse(raw) as Array<{ pattern: string }>;
-    expect(patterns.length).toBeGreaterThan(0);
-    expect(patterns[0]!.pattern).toBe('stale_heartbeat');
   });
 });
 
