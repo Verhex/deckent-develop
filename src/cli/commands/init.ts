@@ -225,10 +225,7 @@ export function registerInit(program: Command): void {
           : options.env
             ? options.env.split(',').map(e => e.trim()).filter(e => ALL_ENV_NAMES.includes(e as typeof ALL_ENV_NAMES[number])) as typeof ALL_ENV_NAMES[number][]
             : [];
-        writeMultiEnvConfig(root, projectName, requestedEnvs, stackResult, {
-          upgrade: options.upgrade,
-          force: options.force,
-        });
+        writeMultiEnvConfig(root, requestedEnvs);
 
         // 7d. Security files
         writeDeckSecurityFiles(root);

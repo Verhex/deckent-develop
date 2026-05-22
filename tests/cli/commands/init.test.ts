@@ -1352,13 +1352,13 @@ describe('human-friendly init output', () => {
       expect(generateCodexConfig).toHaveBeenCalledWith('/mock/root');
     });
 
-    it('--env codex writes AGENTS.md via generateAgentsMd', async () => {
+    it('--env codex wires AGENTS.md additively, never overwrites', async () => {
       vi.mocked(existsSync).mockReturnValue(false);
       await runCommand(['init', '--auto', '--env', 'codex']);
-      expect(generateAgentsMd).toHaveBeenCalled();
-      const writeCalls = vi.mocked(writeFileSync).mock.calls;
-      const agentsCall = writeCalls.find(c => String(c[0]).endsWith('AGENTS.md') && String(c[1]).includes('Deckent Integration'));
-      expect(agentsCall).toBeDefined();
+      // ADR-013 thin-adapter: applyEnvConfig injects @DECKENT.md via
+      // ensureDeckentImport — it does NOT overwrite AGENTS.md with a fat template.
+      expect(generateAgentsMd).not.toHaveBeenCalled();
+      expect(ensureDeckentImport).toHaveBeenCalledWith(expect.stringContaining('AGENTS.md'));
     });
 
     it('--env gemini calls generateGeminiConfig', async () => {
@@ -1367,28 +1367,17 @@ describe('human-friendly init output', () => {
       expect(generateGeminiConfig).toHaveBeenCalledWith('/mock/root');
     });
 
-    it('--env gemini writes GEMINI.md via generateGeminiMd', async () => {
+    it('--env gemini wires GEMINI.md additively, never overwrites', async () => {
       vi.mocked(existsSync).mockReturnValue(false);
       await runCommand(['init', '--auto', '--env', 'gemini']);
-      expect(generateGeminiMd).toHaveBeenCalled();
-      const writeCalls = vi.mocked(writeFileSync).mock.calls;
-      const geminiCall = writeCalls.find(c => String(c[0]).endsWith('GEMINI.md') && String(c[1]).includes('Deckent Integration'));
-      expect(geminiCall).toBeDefined();
+      expect(generateGeminiMd).not.toHaveBeenCalled();
+      expect(ensureDeckentImport).toHaveBeenCalledWith(expect.stringContaining('GEMINI.md'));
     });
 
     it('--env cursor calls generateCursorConfig', async () => {
       vi.mocked(existsSync).mockReturnValue(false);
       await runCommand(['init', '--auto', '--env', 'cursor']);
       expect(generateCursorConfig).toHaveBeenCalledWith('/mock/root');
-    });
-
-    it('--env cursor writes cursor rules via generateCursorRules', async () => {
-      vi.mocked(existsSync).mockReturnValue(false);
-      await runCommand(['init', '--auto', '--env', 'cursor']);
-      expect(generateCursorRules).toHaveBeenCalled();
-      const writeCalls = vi.mocked(writeFileSync).mock.calls;
-      const cursorCall = writeCalls.find(c => String(c[0]).includes('deckent.mdc') && String(c[1]).includes('Deckent'));
-      expect(cursorCall).toBeDefined();
     });
 
     it('--env codex,cursor creates both environment configs', async () => {
@@ -1406,12 +1395,14 @@ describe('human-friendly init output', () => {
       expect(generateCursorConfig).toHaveBeenCalled();
     });
 
-    it('--all-envs writes AGENTS.md, GEMINI.md, and cursor rules', async () => {
+    it('--all-envs wires every adapter additively, never overwrites', async () => {
       vi.mocked(existsSync).mockReturnValue(false);
       await runCommand(['init', '--auto', '--all-envs']);
-      expect(generateAgentsMd).toHaveBeenCalled();
-      expect(generateGeminiMd).toHaveBeenCalled();
-      expect(generateCursorRules).toHaveBeenCalled();
+      // No fat-template overwrite generators are used — additive injection only.
+      expect(generateAgentsMd).not.toHaveBeenCalled();
+      expect(generateGeminiMd).not.toHaveBeenCalled();
+      expect(generateCursorRules).not.toHaveBeenCalled();
+      expect(ensureDeckentImport).toHaveBeenCalledWith(expect.stringContaining('GEMINI.md'));
     });
 
     it('multi_ide_mode set in config when --env has multiple values', async () => {
@@ -1462,25 +1453,12 @@ describe('human-friendly init output', () => {
       expect(detectFullStack).toHaveBeenCalledWith('/mock/root');
     });
 
-    it('stack info is passed to template generators', async () => {
-      vi.mocked(existsSync).mockReturnValue(false);
-      await runCommand(['init', '--auto', '--env', 'codex']);
-      expect(generateAgentsMd).toHaveBeenCalledWith(expect.objectContaining({
-        language: 'typescript',
-        framework: 'express',
-        commands: expect.objectContaining({ build: 'npx tsc' }),
-      }));
-    });
-
     it('gracefully handles detectFullStack failure', async () => {
       vi.mocked(existsSync).mockReturnValue(false);
-      // Use mockImplementation (not Once) since detectFullStack is now called multiple times
       vi.mocked(detectFullStack).mockImplementation(() => { throw new Error('stack detection fail'); });
       await runCommand(['init', '--auto', '--env', 'codex']);
-      // Should still complete with fallback info
-      expect(generateAgentsMd).toHaveBeenCalledWith(expect.objectContaining({
-        language: 'unknown',
-      }));
+      // Init still completes — applyEnvConfig does not depend on stack info.
+      expect(generateCodexConfig).toHaveBeenCalled();
     });
 
     it('ignores invalid env names in --env flag', async () => {
@@ -1773,7 +1751,7 @@ describe('human-friendly init output', () => {
     });
   });
 
-  describe('--env conflict warning', () => {
+  describe('--env non-destructive (additive injection)', () => {
     beforeEach(() => {
       vi.clearAllMocks();
       vi.mocked(existsSync).mockReturnValue(false);
@@ -1808,21 +1786,22 @@ describe('human-friendly init output', () => {
       vi.mocked(promptText).mockResolvedValue('my-project');
     });
 
-    it('warns when env file already exists without --upgrade', async () => {
+    it('does not overwrite an existing AGENTS.md', async () => {
+      // Brownfield: a user AGENTS.md already exists — deckent must not clobber it.
       vi.mocked(existsSync).mockImplementation((p) => String(p).includes('AGENTS.md'));
       await runCommand(['init', '--auto', '--env', 'codex']);
-      const printCalls = vi.mocked(print).mock.calls.map(c => String(c[0]));
-      const hasWarning = printCalls.some(msg => msg.includes('already exists') && msg.includes('--force'));
-      expect(hasWarning).toBe(true);
+      // The destructive overwrite path (generateAgentsMd → writeFileSync) is gone.
+      expect(generateAgentsMd).not.toHaveBeenCalled();
+      expect(ensureDeckentImport).toHaveBeenCalledWith(expect.stringContaining('AGENTS.md'));
     });
 
-    it('does not warn when --upgrade is passed', async () => {
+    it('wires the env even when its file already exists (no --force needed)', async () => {
+      // Additive injection has no overwrite gate — brownfield projects are
+      // wired without requiring --force.
       vi.mocked(existsSync).mockReturnValue(true);
-      vi.mocked(readFileSync).mockReturnValue(JSON.stringify({ mode: 'pro_plan' }));
-      await runCommand(['init', '--auto', '--env', 'codex', '--upgrade']);
-      const printCalls = vi.mocked(print).mock.calls.map(c => String(c[0]));
-      const hasWarning = printCalls.some(msg => msg.includes('already exists') && msg.includes('--force'));
-      expect(hasWarning).toBe(false);
+      vi.mocked(readFileSync).mockReturnValue('# My existing agents\n');
+      await runCommand(['init', '--auto', '--env', 'codex']);
+      expect(generateCodexConfig).toHaveBeenCalled();
     });
   });
 

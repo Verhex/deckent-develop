@@ -49,7 +49,6 @@ import { print } from '../helpers/output.js';
 import { generateCodexConfig } from '../helpers/codex-config.js';
 import { generateGeminiConfig } from '../helpers/gemini-config.js';
 import { generateCursorConfig } from '../helpers/cursor-config.js';
-import { generateAgentsMd, generateGeminiMd, generateCursorRules } from '../helpers/agent-templates.js';
 import { createDeckTemplate, ensureDeckGitignore } from '../../core/deck-file.js';
 import {
   generateDeckentContentTR,
@@ -148,21 +147,25 @@ export function applyIdeAdapters(
 }
 
 /**
- * Apply multi-environment config for a single environment name.
- * Creates environment-specific files using stack-aware templates.
+ * Apply per-environment IDE config for a single environment.
+ *
+ * Non-destructive (ADR-013 thin-adapter): deckent only injects a `@DECKENT.md`
+ * reference into the user's AGENTS.md / GEMINI.md via ensureDeckentImport — it
+ * NEVER overwrites the user's existing adapter files or their own agents.
+ * Greenfield → the thin adapter is created; brownfield → the reference is
+ * prepended and all existing user content is preserved. MCP/IDE config
+ * (.codex/config.toml, .gemini/settings.json, .cursor/mcp.json) is upserted.
  */
-export function applyEnvConfig(env: EnvName, root: string, projectInfo: { name: string; language: string; framework: string; commands: { build: string; test: string; lint: string } }): void {
+export function applyEnvConfig(env: EnvName, root: string): void {
   if (env === 'codex') {
     generateCodexConfig(root);
-    writeFileSync(join(root, 'AGENTS.md'), generateAgentsMd(projectInfo));
+    ensureDeckentImport(join(root, AGENTS_FILE));
   } else if (env === 'gemini') {
     generateGeminiConfig(root);
-    writeFileSync(join(root, 'GEMINI.md'), generateGeminiMd(projectInfo));
+    ensureDeckentImport(join(root, 'GEMINI.md'));
   } else if (env === 'cursor') {
+    // generateCursorConfig writes .cursor/mcp.json + .cursor/rules/deckent.mdc
     generateCursorConfig(root);
-    const cursorRulesDir = join(root, '.cursor', 'rules');
-    mkdirSync(cursorRulesDir, { recursive: true });
-    writeFileSync(join(cursorRulesDir, 'deckent.mdc'), generateCursorRules(projectInfo));
   }
   // vscode and shell: CLAUDE.md already handled by default flow
 }
@@ -349,43 +352,14 @@ globs: ["**/*"]
   } catch { /* non-fatal — IDE adapters are best-effort */ }
 }
 
-export function writeMultiEnvConfig(
-  root: string,
-  projectName: string,
-  requestedEnvs: EnvName[],
-  stackResult: FullStackResult,
-  options: { upgrade?: boolean; force?: boolean },
-): void {
+export function writeMultiEnvConfig(root: string, requestedEnvs: EnvName[]): void {
   if (requestedEnvs.length === 0) return;
 
-  const envFileMap: Record<string, string> = {
-    codex: join(root, 'AGENTS.md'),
-    gemini: join(root, 'GEMINI.md'),
-    cursor: join(root, '.cursor', 'rules', 'deckent.mdc'),
-  };
-
-  // Conflict detection: warn and skip if env files exist without --force or --upgrade
-  const envsToApply: EnvName[] = [];
+  // Additive injection — applyEnvConfig only prepends a @DECKENT.md reference
+  // and upserts MCP config; it never overwrites the user's adapter files. No
+  // overwrite gate / --force needed — brownfield projects are wired safely.
   for (const env of requestedEnvs) {
-    const envFile = envFileMap[env];
-    if (envFile && existsSync(envFile) && !options.upgrade && !options.force) {
-      print(`  Warning: ${envFile} already exists. Overwrite? (use --force)`);
-    } else {
-      envsToApply.push(env);
-    }
-  }
-
-  if (envsToApply.length > 0) {
-    const projectInfo = {
-      name: projectName,
-      language: stackResult.language,
-      framework: stackResult.framework,
-      commands: stackResult.commands,
-    };
-
-    for (const env of envsToApply) {
-      applyEnvConfig(env, root, projectInfo);
-    }
+    applyEnvConfig(env, root);
   }
 
   // Set multi_ide_mode if multiple envs requested

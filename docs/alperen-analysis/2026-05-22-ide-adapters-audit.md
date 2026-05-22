@@ -93,7 +93,7 @@ formatı, `description`/`globs`/`alwaysApply` frontmatter) yükler.
 
 **Durum:** Kısmen — uzantı çatalı (`.md` vs `.mdc`) kapandı; rol kuralları
 (`*.mdc`) ile proje-bağlamı (`deckent.mdc`) ayrı amaçlar, birlikte yaşamaları
-sorun değil. `init-steps.ts` çift yazımı kalan iş (Gelecek Öneriler #3).
+sorun değil. `init-steps.ts` çift `deckent.mdc` yazımı Sorun 7 düzeltmesiyle kapandı.
 
 ---
 
@@ -118,6 +118,27 @@ oluşturuyor. Codex CLI **kök** `AGENTS.md` okur.
 
 ---
 
+### Sorun 7 — `applyEnvConfig` Kullanıcı Dosyalarını Eziyordu (destructive)
+
+**Öncelik:** Kritik (kullanıcı veri kaybı)  
+**Kök Neden:** CLI init `applyEnvConfig` (`--env` / `--all-envs`) codex/gemini
+dallarında `writeFileSync(join(root,'AGENTS.md'), generateAgentsMd(...))` —
+kullanıcının mevcut `AGENTS.md`/`GEMINI.md`'sini (kendi Codex/Gemini agent
+yapılandırması) **koşulsuz eziyordu**. `writeMultiEnvConfig` conflict-detection'ı
+yalnızca `--force`/`--upgrade` yokken atlıyordu; `--force` ile yine eziyordu.
+
+**Etki:** Mevcut bir projeye deckent bağlayan kullanıcı (`deckent init --env
+codex --force`) kendi `AGENTS.md`'sini kaybediyordu.
+
+**Durum:** Düzeltildi — `applyEnvConfig` artık `ensureDeckentImport` ile
+**additive** (ADR-013 thin-adapter): mevcut dosyaya yalnızca `@DECKENT.md`
+referansı eklenir, kullanıcı içeriği korunur; dosya yoksa thin-adapter
+oluşturulur. Obsolete conflict-detection kaldırıldı — brownfield projeler
+`--force` olmadan da güvenle bağlanıyor. Cursor dalındaki çift `deckent.mdc`
+yazımı da kalktı (Sorun 4 / Öneri #3 kapandı).
+
+---
+
 ## Uygulanan Değişiklikler
 
 | Dosya | Değişiklik |
@@ -125,6 +146,7 @@ oluşturuyor. Codex CLI **kök** `AGENTS.md` okur.
 | `src/core/rule-generator.ts` | `ProviderAdapter` + `fileExt()`/`preamble()`; `cursorAdapter` `.mdc` + MDC frontmatter; `generateRules` uzantı + preamble |
 | `tests/core/rule-generator.test.ts` | Cursor `.mdc` testleri eklendi; `d4214c41`'in kırdığı `.contracts/*` testi düzeltildi |
 | `init-steps.ts` + `mcp/tools/init.ts` + `init.ts` | `deckent init` artık `regenerateRules` ile **4 provider** rule dizinini üretir (tek-kaynak; eski inline `.claude/rules/` yazımı kaldırıldı; `writeClaudeRules` → `writeRuleFiles`) |
+| `init-steps.ts` (`applyEnvConfig`/`writeMultiEnvConfig`) + `init.ts` + `init.test.ts` | `applyEnvConfig` **non-destructive** — `ensureDeckentImport` ile additive; kullanıcının `AGENTS.md`/`GEMINI.md`'si ezilmez; obsolete conflict-detection + Cursor çift yazımı kaldırıldı |
 | `AGENTS.md` | Rol kuralları `@.codex/rules/*` |
 | `GEMINI.md` | Rol kuralları `@.gemini/rules/*` |
 | `DECKENT.md` | `## Agent Roles` bloğu kaldırıldı (ortak doküman provider-neutral) |
@@ -167,8 +189,8 @@ oluşturuyor. Codex CLI **kök** `AGENTS.md` okur.
    `## Agent Roles` koyuyor — ortak dokümandan çıkar; üretilen `CLAUDE.md`/`AGENTS.md`
    her biri kendi `<provider>/rules/`'ını işaret etsin. (Bu repoda yapıldı,
    generator'larda değil.)
-3. **init-steps çift yazım:** `applyEnvConfig('cursor')` `deckent.mdc`'yi iki kez
-   yazıyor (`generateCursorConfig` + `generateCursorRules`) — tekille.
+3. ~~**init-steps çift yazım**~~ — ✅ **TAMAMLANDI:** `applyEnvConfig` non-destructive
+   düzeltmesiyle Cursor çift `deckent.mdc` yazımı da kalktı.
 4. **`sync.ts` düzelt:** `.codex/AGENTS.md` yerine kök `AGENTS.md` senkronize et.
 5. **Bug O kapanışı:** `rule-generator.ts` first-run dalı (`else if (existing)`)
    marker'sız dosyanın içeriğini CUSTOM'a kopyalamasın — boş CUSTOM ile başlatsın.
