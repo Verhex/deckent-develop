@@ -25,14 +25,14 @@ import type {
 import type { TaskDNA } from '../core/routing-types.js';
 
 import {
-  BRAIN_DIR, SPRINTS_DIR,
-  DEBT_FILE, JOBS_DIR,
+  BRAIN_DIR, SPRINTS_DIR, JOBS_DIR,
 } from '../core/constants.js';
 
 import { runRetention } from '../core/sprint-file-retention.js';
 
 // ─── Core — utils ─────────────────────────────────────────────────
-import { parseDebtTable, updateLastSprintId, debugLog } from '../core/utils.js';
+import { updateLastSprintId, debugLog } from '../core/utils.js';
+import { getDebtItems } from './debt-manager.js';
 
 // ─── Sprint Reporter ──────────────────────────────────────────────
 import {
@@ -609,9 +609,8 @@ export async function finalizeSprint(
     debugLog('finalizeSprint:codeReconcile', `${codeVerifiedTasks.length} tasks reconciled: ${codeVerifiedTasks.join(', ')}`);
   }
 
-  // 1. Calculate metrics (async DEBT_FILE read — Sprint 139 async migration)
-  const debtContent = await fsPromises.readFile(join(projectRoot, BRAIN_DIR, DEBT_FILE), 'utf-8').catch(() => '');
-  const freshDebt = parseDebtTable(debtContent);
+  // 1. Calculate metrics — tech debt is read DB-first (Task #4d).
+  const freshDebt = getDebtItems(projectRoot);
   const metrics = calculateMetrics(sprint, evaluations, results, freshDebt);
   sprint.metrics = metrics;
 

@@ -321,31 +321,9 @@ describe('Config roundtrip', () => {
 // ═══════════════════════════════════════════════════════════════════════
 
 describe('DEBT auto-resolve', () => {
-  it('autoResolveDebt with mock fix task resolves debt entry', () => {
-    // Create .brain/DEBT.md with a debt entry referencing task 001-001
-    const brainDir = join(tmpDir, '.brain');
-    mkdirSync(brainDir, { recursive: true });
-    writeFileSync(
-      join(brainDir, 'DEBT.md'),
-      '| ID | Description | Task | Resolved |\n| D001 | Missing tests | 001-001 | resolved=false |\n',
-      'utf-8',
-    );
-
-    const sprint = {
-      id: 'sprint-044',
-      tasks: [
-        { id: '002-001', isPriorityFix: true, fixForTaskId: '001-001' },
-      ],
-    };
-    const evaluations = new Map<string, string>([['002-001', 'DONE']]);
-
-    const resolved = autoResolveDebt(tmpDir, sprint, evaluations);
-    expect(resolved).toBe(1);
-
-    // Verify the file was updated
-    const updated = readFileSync(join(brainDir, 'DEBT.md'), 'utf-8');
-    expect(updated).toContain('sprint-044');
-  });
+  // NOTE: the file-based autoResolveDebt resolution test was removed in
+  // Task #4c — autoResolveDebt is now DB-first. Resolution behavior is
+  // covered by tests/orchestra/debt-db-accessor.test.ts.
 
   it('autoResolveDebt with no fix tasks returns 0', () => {
     const brainDir = join(tmpDir, '.brain');

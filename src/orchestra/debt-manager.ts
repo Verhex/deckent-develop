@@ -2,9 +2,9 @@
 // Extracted from brain.ts — debt resolution, escalation, cross-dependencies
 import { writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { TaskStatus, TaskEvaluation } from '../core/types.js';
+import { TaskStatus, TaskEvaluation, DebtPriority } from '../core/types.js';
 import type {
-  Task, TaskResult, Sprint, DecayResult,
+  Task, TaskResult, Sprint, DecayResult, DebtItem,
 } from '../core/types.js';
 import type { ModelType } from '../core/task-types.js';
 import {
@@ -443,6 +443,98 @@ export function resolveDebt(projectRoot: string, debtId: string, resolvedInSprin
 
   // No DB available — resolve skipped
   return false;
+}
+
+/**
+ * Record a sprint rollback event as a Memory V2 debt entry.
+ * DB-first replacement for the old `.brain/DEBT.md` row append (Task #4b) —
+ * eliminates the 7-vs-9-column corruption and the missing-newline bug.
+ * Idempotent: at most one rollback record per sprint.
+ * @param projectRoot - Project root directory
+ * @param sprintId - Sprint that was rolled back
+ * @param success - Whether the rollback succeeded
+ * @param message - Human-readable rollback detail
+ */
+export function recordRollbackDebt(
+  projectRoot: string,
+  sprintId: string,
+  success: boolean,
+  message: string,
+): void {
+  const store = getMemoryStore(projectRoot);
+  if (!store) return;
+  try {
+    const id = `rollback-${sprintId}`;
+    if (store.getById(id)) return; // idempotent
+    const status = success ? 'SUCCESS' : 'FAILED';
+    store.insert({
+      id,
+      type: 'debt',
+      title: `Sprint ${sprintId} rollback ${status}`.slice(0, 80),
+      content: `Sprint ${sprintId} rollback ${status}: ${message}`,
+      source: 'brain',
+      status: 'active',
+      priority: 'normal',
+      sprint_id: sprintId,
+      sprint_num: getSprintNumber(sprintId),
+      tags: ['debt', 'rollback', sprintId],
+      metadata: {
+        originTaskId: '',
+        originSprintId: sprintId,
+        sprintsOpen: 0,
+        kind: 'rollback',
+        rollbackSuccess: success,
+      },
+    });
+  } finally {
+    store.close();
+  }
+}
+
+// ═══ DB Debt Accessor (Memory V2 — replaces parseDebtTable(DEBT.md)) ═══
+
+/** Map a Memory V2 `debt` entry row to the legacy DebtItem shape. */
+function debtEntryToDebtItem(entry: MemoryEntryV2): DebtItem {
+  const meta = JSON.parse(entry.metadata || '{}') as Record<string, unknown>;
+  const p = (entry.priority || 'normal').toUpperCase();
+  const priority = p === 'HIGH' ? DebtPriority.HIGH
+    : p === 'CRITICAL' ? DebtPriority.CRITICAL
+    : DebtPriority.NORMAL;
+  return {
+    id: entry.id,
+    description: entry.title,
+    originTaskId: typeof meta.originTaskId === 'string' ? meta.originTaskId : '',
+    originSprintId: (typeof meta.originSprintId === 'string' && meta.originSprintId)
+      ? meta.originSprintId
+      : (entry.sprint_id ?? ''),
+    priority,
+    sprintsOpen: typeof meta.sprintsOpen === 'number' ? meta.sprintsOpen : 0,
+    resolved: entry.status === 'resolved',
+    resolvedInSprintId: typeof meta.resolvedInSprintId === 'string' ? meta.resolvedInSprintId : undefined,
+    createdAt: entry.created_at,
+  };
+}
+
+/**
+ * Load tech-debt items from the Memory V2 DB as DebtItem[].
+ * DB-first replacement for `parseDebtTable(readFile('.brain/DEBT.md'))` — the
+ * root DEBT.md file is no longer a source of truth (saf DB-first, Task #4).
+ * @param projectRoot - Project root directory
+ * @param opts.activeOnly - When true, resolved debt is excluded
+ * @returns DebtItem[]; empty array when no DB is present
+ */
+export function getDebtItems(projectRoot: string, opts?: { activeOnly?: boolean }): DebtItem[] {
+  const store = getMemoryStore(projectRoot);
+  if (!store) return [];
+  try {
+    const entries = store.getByType('debt');
+    const filtered = opts?.activeOnly
+      ? entries.filter(e => e.status !== 'resolved')
+      : entries;
+    return filtered.map(debtEntryToDebtItem);
+  } finally {
+    store.close();
+  }
 }
 
 // ═══ Archive ═══════════════════════════════════════════════════════

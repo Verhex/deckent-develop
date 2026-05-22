@@ -8,10 +8,12 @@ import type { DoctorResult, SystemProfile } from '../../core/types.js';
 import type { DetectedProvider } from '../../core/provider.js';
 import type { HealthCheckResult } from '../../orchestra/connector.js';
 import {
-  DECKENT_DIR, BRAIN_DIR, MEMORY_FILE, DEBT_FILE, DECISIONS_FILE,
-  DIRECTIVES_FILE, LOCKS_DIR, DEBT_TABLE_HEADER, MEMORY_DB_FILE,
+  DECKENT_DIR, BRAIN_DIR, MEMORY_FILE, DECISIONS_FILE,
+  DIRECTIVES_FILE, LOCKS_DIR, MEMORY_DB_FILE,
   PROJECT_CONFIG_PATH,
 } from '../../core/constants.js';
+import { DebtPriority } from '../../core/types.js';
+import { getDebtItems } from '../../orchestra/debt-manager.js';
 
 // Memory V2 (Sprint 179 W3-6): exports/decisions.md is the auto-generated
 // source. doctor must accept EITHER this OR legacy .brain/DECISIONS.md.
@@ -205,7 +207,6 @@ function checkBrainDir(root: string): DoctorCheck {
 
   const missing: string[] = [];
   if (!existsSync(join(brainPath, MEMORY_FILE))) missing.push(MEMORY_FILE);
-  if (!existsSync(join(brainPath, DEBT_FILE))) missing.push(DEBT_FILE);
   if (!hasV2Decisions && !hasLegacyDecisions) {
     missing.push(`${DECISIONS_FILE} or ${DECISIONS_EXPORT_RELATIVE}`);
   }
@@ -255,21 +256,13 @@ function checkBrainBudget(root: string, memoryBudget = 900): DoctorCheck {
 }
 
 function checkDebt(root: string): DoctorCheck {
-  const debtPath = join(root, BRAIN_DIR, DEBT_FILE);
-  if (!existsSync(debtPath)) {
-    return { name: 'Debt', passed: true, message: 'No debt file', required: false };
+  // Task #4d: DB-first — debt lives in memory.db, not .brain/DEBT.md.
+  const items = getDebtItems(root, { activeOnly: true });
+  const criticalCount = items.filter(d => d.priority === DebtPriority.CRITICAL).length;
+  if (criticalCount > 0) {
+    return { name: 'Debt', passed: false, message: `${criticalCount} CRITICAL debt item(s)`, required: false };
   }
-  try {
-    const content = readFileSync(debtPath, 'utf-8');
-    const lines = content.split('\n').filter(l => l.startsWith('|') && !l.startsWith(DEBT_TABLE_HEADER.slice(0, 5)) && !l.startsWith('|-'));
-    const criticalCount = lines.filter(l => l.includes('CRITICAL')).length;
-    if (criticalCount > 0) {
-      return { name: 'Debt', passed: false, message: `${criticalCount} CRITICAL debt item(s)`, required: false };
-    }
-    return { name: 'Debt', passed: true, message: `${lines.length} debt items, no critical`, required: false };
-  } catch {
-    return { name: 'Debt', passed: false, message: 'Cannot parse DEBT.md', required: false };
-  }
+  return { name: 'Debt', passed: true, message: `${items.length} open debt items, no critical`, required: false };
 }
 
 function checkStaleLocks(root: string, lockStaleThresholdMs = 300_000): DoctorCheck {

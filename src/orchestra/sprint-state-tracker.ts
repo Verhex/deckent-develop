@@ -7,18 +7,17 @@
 //   - .deckent/sprint-state.json   → sprintId, currentPhase, totalTasks
 //   - .tasks/task-<id>.hb           → activeWorkers
 //   - .tasks/task-<id>.result       → completedTasks
-//   - .brain/exports/debt.md        → openDebtCount
+//   - .brain/memory.db              → openDebtCount (DB-first, Task #4d)
 
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { readSprintState } from './sprint-utils.js';
-import { parseDebtTable } from '../core/utils.js';
+import { getDebtItems } from './debt-manager.js';
 import type { SprintStateSnapshot } from '../core/nervous-types.js';
 
 type ActiveWorker = { id: string; taskId: string; lastHeartbeat: string };
 
 const TASKS_DIR = '.tasks';
-const DEBT_EXPORT_FILE = join('.brain', 'exports', 'debt.md');
 const VALID_PHASES = new Set([
   'IDLE', 'PLAN', 'SPAWN', 'EXECUTE', 'EVALUATE', 'FIX', 'RETRO', 'DECAY', 'CLEANUP',
 ]);
@@ -102,12 +101,6 @@ function countCompletedTasks(tasksDir: string): number {
 }
 
 function countOpenDebt(projectRoot: string): number {
-  const debtPath = join(projectRoot, DEBT_EXPORT_FILE);
-  if (!existsSync(debtPath)) return 0;
-  try {
-    const items = parseDebtTable(readFileSync(debtPath, 'utf-8'));
-    return items.filter((d) => !d.resolved).length;
-  } catch {
-    return 0;
-  }
+  // Task #4d: DB-first — was parseDebtTable(.brain/exports/debt.md).
+  return getDebtItems(projectRoot, { activeOnly: true }).length;
 }

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { spawnSync } from 'node:child_process';
 import type { SpawnSyncReturns } from 'node:child_process';
-import { existsSync, readFileSync, writeFileSync, appendFileSync, mkdirSync, rmSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
 
 import {
   isCleanWorkingTree,
@@ -14,7 +14,6 @@ import {
   deleteSafetyPointFile,
   safetyBranchExists,
   getRollbackPolicy,
-  recordRollbackInDebt,
   saveSafetyPoint,
   loadSafetyPoint,
   isGitRepo,
@@ -336,63 +335,12 @@ describe('getRollbackPolicy', () => {
 const mockExistsSync = vi.mocked(existsSync);
 const mockReadFileSync = vi.mocked(readFileSync);
 const mockWriteFileSync = vi.mocked(writeFileSync);
-const mockAppendFileSync = vi.mocked(appendFileSync);
 const mockMkdirSync = vi.mocked(mkdirSync);
 const mockRmSync = vi.mocked(rmSync);
 
-describe('recordRollbackInDebt', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('creates DEBT.md with header when file does not exist', () => {
-    mockExistsSync.mockReturnValueOnce(true);   // brainPath exists
-    mockExistsSync.mockReturnValueOnce(false);  // debtPath does not exist
-
-    const result: RollbackResult = { success: true, message: 'Rolled back to abc' };
-    recordRollbackInDebt('/repo', 'sprint-050', result);
-
-    expect(mockWriteFileSync).toHaveBeenCalledOnce();
-    const written = mockWriteFileSync.mock.calls[0][1] as string;
-    expect(written).toContain('| id | description |');
-    expect(written).toContain('rollback-sprint-050');
-    expect(written).toContain('SUCCESS');
-  });
-
-  it('appends to existing DEBT.md', () => {
-    mockExistsSync.mockReturnValueOnce(true);  // brainPath exists
-    mockExistsSync.mockReturnValueOnce(true);  // debtPath exists
-
-    const result: RollbackResult = { success: false, message: 'Branch not found' };
-    recordRollbackInDebt('/repo', 'sprint-051', result);
-
-    expect(mockAppendFileSync).toHaveBeenCalledOnce();
-    const appended = mockAppendFileSync.mock.calls[0][1] as string;
-    expect(appended).toContain('rollback-sprint-051');
-    expect(appended).toContain('FAILED');
-    expect(appended).toContain('Branch not found');
-  });
-
-  it('creates .brain/ directory if it does not exist', () => {
-    mockExistsSync.mockReturnValueOnce(false);  // brainPath does not exist
-    mockExistsSync.mockReturnValueOnce(false);  // debtPath does not exist
-
-    const result: RollbackResult = { success: true, message: 'ok' };
-    recordRollbackInDebt('/repo', 'sprint-052', result);
-
-    expect(mockMkdirSync).toHaveBeenCalledWith(expect.stringContaining('.brain'), { recursive: true });
-  });
-
-  it('does not throw when fs operations fail', () => {
-    mockExistsSync.mockReturnValueOnce(true);
-    mockExistsSync.mockReturnValueOnce(true);
-    mockAppendFileSync.mockImplementationOnce(() => { throw new Error('disk full'); });
-
-    expect(() => {
-      recordRollbackInDebt('/repo', 'sprint-053', { success: true, message: 'ok' });
-    }).not.toThrow();
-  });
-});
+// NOTE: the former `recordRollbackInDebt` describe was removed in Task #4b —
+// recordRollbackInDebt is now DB-first (no .brain/DEBT.md write). Its behavior
+// is covered by tests/orchestra/debt-db-accessor.test.ts.
 
 describe('saveSafetyPoint', () => {
   beforeEach(() => {

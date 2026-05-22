@@ -4,12 +4,12 @@
 // rollback: restore to backup branch on failure
 // isCleanWorkingTree: detect uncommitted changes
 
-import { existsSync, readFileSync, writeFileSync, appendFileSync, mkdirSync, rmSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { BRAIN_DIR, DEBT_FILE } from '../core/constants.js';
 import { ErrorRegistry } from '../core/errors.js';
 import { debugLog } from '../core/utils.js';
+import { recordRollbackDebt } from './debt-manager.js';
 
 // ─── Types ────────────────────────────────────────────────────────
 
@@ -251,31 +251,17 @@ export function getRollbackPolicy(
 // ─── recordRollbackInDebt ─────────────────────────────────────────
 
 /**
- * Records a rollback event as a debt entry in DEBT.md.
+ * Records a sprint rollback event as a debt entry.
+ * Task #4b: DB-first — was a `.brain/DEBT.md` row append (the source of the
+ * 7-vs-9-column corruption + missing-newline bug); now delegates to the
+ * Memory V2 DB via recordRollbackDebt().
  */
 export function recordRollbackInDebt(
   projectRoot: string,
   sprintId: string,
   result: RollbackResult,
 ): void {
-  const brainPath = join(projectRoot, BRAIN_DIR);
-  try {
-    if (!existsSync(brainPath)) mkdirSync(brainPath, { recursive: true });
-  } catch (e) { debugLog('recordRollbackDebt:mkdirSync', e); }
-
-  const debtPath = join(brainPath, DEBT_FILE);
-  const timestamp = new Date().toISOString().slice(0, 10);
-  const status = result.success ? 'SUCCESS' : 'FAILED';
-  const entry = `| rollback-${sprintId} | Sprint ${sprintId} rollback ${status}: ${result.message} | ${sprintId} | ${timestamp} | NORMAL | 0 | false |\n`;
-
-  try {
-    if (!existsSync(debtPath)) {
-      const header = '| id | description | originSprintId | createdAt | priority | sprintsOpen | resolved |\n|---|---|---|---|---|---|---|\n';
-      writeFileSync(debtPath, header + entry, 'utf-8');
-    } else {
-      appendFileSync(debtPath, entry, 'utf-8');
-    }
-  } catch (e) { debugLog('recordRollbackDebt:writeDebt', e); }
+  recordRollbackDebt(projectRoot, sprintId, result.success, result.message);
 }
 
 // ─── isGitRepo ───────────────────────────────────────────────────

@@ -2303,27 +2303,10 @@ describe('autoResolveDebt', () => {
     rmSync(tempDir, { recursive: true, force: true });
   });
 
-  it('resolves matching debt entry when fix task is DONE', () => {
-    writeFileSync(join(brainDir, 'DEBT.md'), [
-      '| ID | Description | Task | Priority | resolved |',
-      '|-----|-------------|------|----------|----------|',
-      '| D001 | Broken tests | task-001 | HIGH | resolved=false |',
-    ].join('\n'));
-
-    const sprint = {
-      id: 'sprint-044',
-      tasks: [
-        { id: 'fix-001', isPriorityFix: true, fixForTaskId: 'task-001' },
-      ],
-    };
-    const evaluations = new Map([['fix-001', 'DONE']]);
-
-    const count = autoResolveDebt(tempDir, sprint, evaluations);
-    expect(count).toBe(1);
-
-    const content = readFileSync(join(brainDir, 'DEBT.md'), 'utf-8');
-    expect(content).toContain('resolved=true');
-  });
+  // NOTE: the file-based "resolves matching debt entry" / "resolves multiple"
+  // tests were removed in Task #4c — autoResolveDebt is now DB-first.
+  // Resolution behavior is covered by tests/orchestra/debt-db-accessor.test.ts.
+  // The skip / early-return tests below remain valid.
 
   it('skips non-fix tasks (isPriorityFix=false)', () => {
     writeFileSync(join(brainDir, 'DEBT.md'), [
@@ -2429,26 +2412,6 @@ describe('autoResolveDebt', () => {
     expect(count).toBe(0);
   });
 
-  it('resolves multiple debt entries in one pass', () => {
-    writeFileSync(join(brainDir, 'DEBT.md'), [
-      '| ID | Description | Task | Priority | resolved |',
-      '|-----|-------------|------|----------|----------|',
-      '| D001 | Broken tests | task-001 | HIGH | resolved=false |',
-      '| D002 | Missing types | task-002 | NORMAL | resolved=false |',
-    ].join('\n'));
-
-    const sprint = {
-      id: 'sprint-044',
-      tasks: [
-        { id: 'fix-001', isPriorityFix: true, fixForTaskId: 'task-001' },
-        { id: 'fix-002', isPriorityFix: true, fixForTaskId: 'task-002' },
-      ],
-    };
-    const evaluations = new Map([['fix-001', 'DONE'], ['fix-002', 'DONE']]);
-
-    const count = autoResolveDebt(tempDir, sprint, evaluations);
-    expect(count).toBe(2);
-  });
 });
 
 // ═══ autoDraftDecisions ══════════════════════════════════════════

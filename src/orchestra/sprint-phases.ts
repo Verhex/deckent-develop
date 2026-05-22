@@ -28,10 +28,11 @@ import type {
 } from '../core/types.js';
 
 import {
-  BRAIN_DIR, TASKS_DIR, DEBT_FILE, DECKENT_VERSION, DECKENT_DIR,
+  TASKS_DIR, DECKENT_VERSION, DECKENT_DIR,
 } from '../core/constants.js';
 
-import { readJsonSafe, parseDebtTable, debugLog } from '../core/utils.js';
+import { readJsonSafe, debugLog } from '../core/utils.js';
+import { getDebtItems } from './debt-manager.js';
 import { isPidAlive as isPidAliveShared } from '../core/pid-liveness.js';
 import type { ProviderAdapter } from '../core/provider.js';
 import type { SpawnBackend } from './spawn-backend.js';
@@ -179,15 +180,6 @@ function buildFailureContext(result: TaskResult): FailureContext {
 
 function now(): string {
   return new Date().toISOString();
-}
-
-function readFileSafe(filePath: string): string {
-  try {
-    return readFileSync(filePath, 'utf-8');
-  } catch (e) {
-    debugLog('readFileSafe:readFileSync', e);
-    return '';
-  }
 }
 
 /**
@@ -1301,7 +1293,7 @@ export async function runRetroPhase(
     }
   } else {
     try {
-      const freshDebt = parseDebtTable(readFileSafe(join(projectRoot, BRAIN_DIR, DEBT_FILE)) ?? '');
+      const freshDebt = getDebtItems(projectRoot);
       const metrics = calculateMetrics(sprint, evaluations, results, freshDebt);
       sprint.metrics = metrics;
       return metrics;

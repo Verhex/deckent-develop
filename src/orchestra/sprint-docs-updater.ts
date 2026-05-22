@@ -9,7 +9,7 @@ import type {
 } from '../core/types.js';
 import {
   BRAIN_DIR, SPRINTS_DIR, ARCHIVE_DIR, SPRINT_LOG_MAX_LINES,
-  PATTERNS_FILE, DEBT_FILE, DECISIONS_FILE, DIRECTIVES_FILE,
+  PATTERNS_FILE, DECISIONS_FILE, DIRECTIVES_FILE,
   PROJECT_IDENTITY_FILE,
 } from '../core/constants.js';
 import { runAllUpdaters } from './doc-updaters/registry.js';
@@ -17,6 +17,7 @@ import type { DocUpdateResult } from './doc-updaters/types.js';
 // Side-effect import: registers all updaters
 import './doc-updaters/index.js';
 import { runManagedDocUpdates } from './managed-docs/managed-doc-runner.js';
+import { getDebtItems, resolveDebt } from './debt-manager.js';
 import { debugLog } from '../core/utils.js';
 import { modelRegistry } from '../core/model-registry.js';
 import { extractSprintNumber } from './sprint-metrics.js';
@@ -325,23 +326,20 @@ export function updateProjectIdentity(
 // ═══ DEBT.md Auto-Resolve ════════════════════════════════════════
 
 /**
- * Auto-resolve DEBT.md entries for tasks that were fixed during the FIX phase.
- * A task is "fixed" if it was NO_GO in initial evaluation but became DONE/GO_WITH_TECH_DEBT after FIX.
+ * Auto-resolve tech-debt entries for tasks that were fixed during the FIX phase.
+ * A task is "fixed" if its priority-fix task evaluated DONE.
+ * Task #4c: DB-first — resolves Memory V2 debt entries via resolveDebt()
+ * instead of string-mangling rows in the (now removed) .brain/DEBT.md.
  * @param projectRoot - Project root directory
  * @param sprint - Current sprint object
  * @param evaluations - Map of task ID to final evaluation result
+ * @returns Number of debt entries resolved
  */
 export function autoResolveDebt(
   projectRoot: string,
   sprint: { id: string; tasks: Array<{ id: string; isPriorityFix?: boolean; fixForTaskId?: string }> },
   evaluations: Map<string, string>,
 ): number {
-  const debtPath = join(projectRoot, BRAIN_DIR, DEBT_FILE);
-  if (!existsSync(debtPath)) return 0;
-
-  const content = readFileSync(debtPath, 'utf-8');
-  if (!content.trim()) return 0;
-
   const resolvedTaskIds = new Set<string>();
   for (const task of sprint.tasks) {
     if (!task.isPriorityFix || !task.fixForTaskId) continue;
@@ -350,31 +348,15 @@ export function autoResolveDebt(
       resolvedTaskIds.add(task.fixForTaskId);
     }
   }
-
   if (resolvedTaskIds.size === 0) return 0;
 
-  const lines = content.split('\n');
   let resolvedCount = 0;
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i] ?? '';
-    for (const taskId of resolvedTaskIds) {
-      if (line.includes(taskId) && !line.includes('resolved=true') && !line.includes('✅')) {
-        lines[i] = line.replace(/\|\s*$/, `| resolved=${sprint.id} |`)
-          .replace(/resolved\s*=\s*false/, `resolved=true`)
-          .replace(/\bfalse\b(?=[^|]*$)/, `true (${sprint.id})`);
-        if (!lines[i]!.includes(sprint.id)) {
-          lines[i] = `${line} <!-- resolved in ${sprint.id} -->`;
-        }
-        resolvedCount++;
-      }
+  for (const debt of getDebtItems(projectRoot, { activeOnly: true })) {
+    const taskKey = debt.originTaskId || debt.id.replace(/^debt-/, '');
+    if (resolvedTaskIds.has(taskKey) && resolveDebt(projectRoot, debt.id, sprint.id)) {
+      resolvedCount++;
     }
   }
-
-  if (resolvedCount > 0) {
-    writeFileSync(debtPath, lines.join('\n'), 'utf-8');
-  }
-
   return resolvedCount;
 }
 
