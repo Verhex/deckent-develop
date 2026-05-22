@@ -204,11 +204,11 @@ function generateManifest() {
       generatedAt: new Date().toISOString(),
       generatedBy: 'scripts/sync-manifest.mjs',
       sprintId: detectCurrentSprint(),
-      description: 'Feature usage manifest — auto-generated from src/ import graph analysis. Categories: active, lightly_used, dormant, dead.',
+      description: 'Feature usage manifest — curated feature catalog (FEATURE_DEFINITIONS in scripts/sync-manifest.mjs) bucketed by an import-count heuristic plus manual lifecycle annotations. NOT a full import-graph analysis. Categories: active, lightly_used, dormant, dead.',
       usageWindow: 'last-10-sprints',
       sourceAnalysis: {
         sprintsChecked: getRecentSprints(),
-        methodology: 'import-graph traversal + @deprecated markers + file existence + blockedBy annotations',
+        methodology: 'curated catalog + grep-based import count (basename match) + @deprecated detection + manual blockedBy/deprecatedSince/supersededBy annotations',
       },
     },
     ...categories,
