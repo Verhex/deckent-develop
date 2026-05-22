@@ -1,6 +1,24 @@
 # Changelog
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
+## [1.0.0-beta.1-sprint186] - 2026-05-21
+
+### Added
+
+- Audit src/agents/adaptive-agent.ts
+- Audit src/agents/agent-genealogy.ts
+- Audit src/agents/agent-retirement.ts
+- Audit src/agents/auditor.ts
+- Audit src/agents/cross-sprint-analyzer.ts
+- Audit src/agents/index.ts
+- Audit src/agents/permission-guard.ts
+- Audit src/agents/prompt-ab-test.ts
+- Audit src/agents/prompt-analytics.ts
+- Audit src/agents/prompt-evolution.ts
+
+
+_Tasks: 69 total, 31 done, 0 tech debt, 38 no-go_
+
 ## [1.0.0-beta.1-sprint183] - 2026-05-21
 
 ### Added

@@ -5021,3 +5021,74 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 183-010: W3-3 — v1.0.0-beta.1 final smoke (build:all + vitest + dashboard + serve) (NO_GO)
 
 ---
+## Sprint 186 — sprint-186
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-05-21
+**Duration:** 1964s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 69 |
+| Completed | 31 |
+| Tech Debt | 0 |
+| No-Go | 38 |
+| Coverage | 0.0% |
+| Duration | 1964352ms |
+
+### Tasks
+
+- 186-001: Audit src/agents/adaptive-agent.ts (DONE)
+- 186-002: Audit src/agents/agent-genealogy.ts (DONE)
+- 186-003: Audit src/agents/agent-retirement.ts (DONE)
+- 186-004: Audit src/agents/auditor.ts (DONE)
+- 186-005: Audit src/agents/cross-sprint-analyzer.ts (DONE)
+- 186-006: Audit src/agents/index.ts (DONE)
+- 186-007: Audit src/agents/permission-guard.ts (DONE)
+- 186-008: Audit src/agents/prompt-ab-test.ts (DONE)
+- 186-009: Audit src/agents/prompt-analytics.ts (DONE)
+- 186-010: Audit src/agents/prompt-evolution.ts (DONE)
+- 186-011: Audit src/agents/prompt-metrics.ts (DONE)
+- 186-012: Audit src/agents/prompt-rollback.ts (DONE)
+- 186-013: Audit src/agents/prompt-version.ts (DONE)
+- 186-014: Audit src/agents/shared-context.ts (DONE)
+- 186-015: Audit src/agents/specialization-drift.ts (DONE)
+- 186-016: Audit src/agents/worker-ipc.ts (DONE)
+- 186-017: Audit src/agents/worker-lifecycle.ts (DONE)
+- 186-018: Audit src/agents/worker-log.ts (DONE)
+- 186-019: Audit src/agents/worker-rollback.ts (DONE)
+- 186-020: Audit src/agents/worker-verify.ts (DONE)
+- 186-021: Audit src/agents/worker.ts (DONE)
+- 186-022: Audit src/core/activation-engine.ts (DONE)
+- 186-023: Audit src/core/active-workers.ts (DONE)
+- 186-024: Audit src/core/adr-file-sync.ts (DONE)
+- 186-025: Audit src/core/adr-seed.ts (DONE)
+- 186-026: Audit src/core/agent-cache.ts (DONE)
+- 186-027: Audit src/core/agent-pool.ts (DONE)
+- 186-028: Audit src/core/agent-selector.ts (DONE)
+- 186-029: Audit src/core/agent-types.ts (DONE)
+- 186-030: Audit src/core/analyzer.ts (DONE)
+- 186-031: Audit src/core/anthropic-http-client.ts (DONE)
+- 186-032: Audit src/core/cascade-detector.ts (NO_GO)
+- 186-033: Audit src/core/ci-learning.ts (NO_GO)
+- 186-034: Audit src/core/condition-evaluator.ts (NO_GO)
+- 186-035: Audit src/core/config-migration.ts (NO_GO)
+- 186-036: Audit src/core/config-types.ts (NO_GO)
+- 186-037: Audit src/core/config-validator.ts (NO_GO)
+- 186-038: Audit src/core/config.ts (NO_GO)
+- 186-039: Audit src/core/constants.ts (NO_GO)
+- 186-040: Audit src/core/cost-calculator.ts (NO_GO)
+- 186-041: Audit src/core/cost-config-loader.ts (NO_GO)
+- 186-042: Audit src/core/credential-encryption.ts (NO_GO)
+- 186-043: Audit src/core/credentials.ts (NO_GO)
+- 186-044: Audit src/core/debug-log.ts (NO_GO)
+- 186-045: Audit src/core/decision-config.ts (NO_GO)
+- 186-046: Audit src/core/decision-types.ts (NO_GO)
+- 186-047: Audit src/core/deck-file.ts (NO_GO)
+- 186-048: Audit src/core/deck-interpolation.ts (NO_GO)
+- 186-049: Audit src/core/environment.ts (NO_GO)
+- 186-050: Audit src/core/errors.ts (NO_GO)
+
+---
