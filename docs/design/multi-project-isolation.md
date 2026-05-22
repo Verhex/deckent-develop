@@ -27,14 +27,14 @@ project-root/
     config.json      # Project-specific configuration overrides
     agents/          # Temp and custom agents for this project
     skills/          # Temp and custom skills for this project
-    credentials.enc  # AES-256-GCM encrypted credentials (per-project key)
     metrics.jsonl    # Local observability data (append-only)
-  .brain/            # Decision records, memory, retrospectives
-    DECISIONS.md     # Architecture Decision Records
-    MEMORY.md        # Sprint learnings (max 300 lines)
-    RETRO.md         # Last sprint retrospective (max 120 lines)
-    PATTERNS.md      # Active/resolved patterns
-    DEBT.md          # Technical debt tracking
+  .brain/            # Decision records, memory, retrospectives (Memory V2 DB-first)
+    memory.db        # SQLite database — single source of truth (Memory V2, Sprint 167+)
+    exports/         # Auto-generated markdown views from memory.db
+      decisions.md   # ADR list (generated)
+      memory.md      # Sprint learnings (generated)
+      debt.md        # Tech debt table (generated, root DEBT.md removed Sprint 186)
+      summary.md     # Context summary (generated)
     sprints/         # Per-sprint log files
   .tasks/            # Sprint task files (ephemeral per sprint)
     task-*.json      # Task definitions
@@ -44,6 +44,8 @@ project-root/
     task-*.log       # Worker logs
   .locks/            # File locks (ephemeral per sprint)
 ```
+
+> **Note (2026-05-22 audit):** Memory V2 DB-first migration (Sprint 167+) changed the `.brain/` layout. The primary storage is `memory.db`; `.md` files in `exports/` are generated views. The root `DEBT.md` file was removed in Sprint 186 (Task #4). `credentials.enc` per-project encryption was planned but not implemented — see Section 4.2.
 
 ### 2.2 Isolation Guarantees
 
@@ -265,19 +267,23 @@ export function isWithinScope(
 
 ### 4.2 Credential Isolation Pattern
 
-Per-project credential encryption (already implemented in Sprint 133):
+> **⚠️ NOT YET IMPLEMENTED (2026-05-22 audit):** The per-project HKDF key derivation described below was planned in Sprint 134 but not built. Actual implementation (`src/core/credentials.ts`) uses a **single global master key** stored in `~/.deckent/.keyring`, shared across all projects. Credentials are stored at `~/.deckent/credentials/<provider>.json` (global, not per-project). The `credentials.enc` per-project file is never created. The cross-project credential decryption protection described here does **not** currently apply.
+
+Per-project credential encryption (planned):
 
 ```
-Encryption key = HKDF(machine_key, project_root_path_hash)
-Cipher = AES-256-GCM
-Storage = .deckent/credentials.enc
+Encryption key = HKDF(machine_key, project_root_path_hash)  ← NOT IMPLEMENTED
+Cipher = AES-256-GCM                                         ← implemented (global key)
+Storage = .deckent/credentials.enc                           ← NOT IMPLEMENTED
 ```
 
-Each project derives a unique encryption key from the combination of a machine-level secret and the project root path hash. Even if `.deckent/credentials.enc` is copied to another project, decryption fails because the key derivation input differs.
+The intent: each project derives a unique encryption key from a machine-level secret and the project root path hash. Until this is implemented, the single global master key is used and credentials are not per-project isolated at the cryptographic level.
 
 ### 4.3 Config Boundary Enforcement
 
-Config write operations are validated:
+> **⚠️ NOT YET IMPLEMENTED (2026-05-22 audit):** The `writeProjectConfig()` function shown below does not exist in `src/core/config.ts`. Config writes use `writeFileSync()` directly without symlink-aware path validation. Practical risk is low: sprint operations do not write to global config in practice (verified by code tracing). This is a planned defense-in-depth layer, not an active mitigation.
+
+Config write operations (planned, not yet implemented):
 
 ```typescript
 function writeProjectConfig(projectRoot: string, config: ProjectConfig): void {
@@ -311,15 +317,17 @@ Located in `tests/agents/worker.test.ts`:
 
 ### 5.2 Integration Tests — Multi-Project Isolation
 
-These tests require filesystem setup with actual symlinks:
+> **⚠️ NOT YET IMPLEMENTED (2026-05-22 audit):** None of the integration tests below exist in `tests/integration/`. `mcp-sprint-isolation.test.ts` tests MCP tool isolation, not multi-project filesystem isolation. These tests were planned for Sprints 135-140 but were not built.
 
-| Test | Description |
-|------|-------------|
-| cross-project-symlink | Create symlink from Project A to Project B file, verify scope rejection |
-| concurrent-sprints | Run sprints in two projects simultaneously, verify no state leakage |
-| credential-isolation | Verify `.deckent/credentials.enc` from Project A cannot be decrypted in Project B context |
-| config-isolation | Modify Project A config, verify Project B is unaffected |
-| lock-isolation | Acquire lock in Project A, verify no conflict in Project B |
+These tests require filesystem setup with actual symlinks (planned):
+
+| Test | Description | Status |
+|------|-------------|--------|
+| cross-project-symlink | Create symlink from Project A to Project B file, verify scope rejection | ❌ Not implemented |
+| concurrent-sprints | Run sprints in two projects simultaneously, verify no state leakage | ❌ Not implemented |
+| credential-isolation | Verify credential from Project A cannot be decrypted in Project B context | ❌ Not implemented |
+| config-isolation | Modify Project A config, verify Project B is unaffected | ❌ Not implemented |
+| lock-isolation | Acquire lock in Project A, verify no conflict in Project B | ❌ Not implemented |
 
 ### 5.3 Security Regression Tests
 
@@ -373,22 +381,24 @@ If performance becomes a concern in future sprints:
 
 ## 8. Implementation Plan
 
-### Sprint 134 (Current)
+> **Historical note (2026-05-22 audit):** This section reflects Sprint 134 planning. We are currently at Sprint 186. Sprint 134 deliverables were completed; the future sprint roadmap (135-150) was not executed.
 
-1. **Symlink-aware `isWithinScope()`** — Add optional `projectRoot` parameter, `realpathSync()` resolution, `ELOOP` handling
-2. **Unit tests** — 3+ tests covering symlink in-scope, out-of-scope, and cycle detection
-3. **ADR-034** — Formal decision record in `.brain/DECISIONS.md`
-4. **This design doc** — `docs/design/multi-project-isolation.md`
+### Sprint 134 (Completed — 2026-04-11)
 
-### Future Sprints (Roadmap)
+1. ✅ **Symlink-aware `isWithinScope()`** — Implemented in `src/agents/worker.ts:492`
+2. ✅ **Unit tests** — Implemented in `tests/agents/worker.test.ts:559`
+3. ✅ **ADR-034** — Formal decision record in memory.db
+4. ✅ **This design doc** — `docs/design/multi-project-isolation.md`
 
-| Sprint | Enhancement |
-|--------|------------|
-| 135-140 | Integration tests with actual multi-project filesystem setup |
-| 135-140 | Config write validation (prevent global config writes from sprint operations) |
-| 140-145 | Optional inode comparison for hardlink detection |
-| 140-145 | `isWithinScope()` path cache for performance optimization |
-| 145-150 | Security regression test suite automation |
+### Future Sprints (Roadmap — NOT YET DONE as of Sprint 186)
+
+| Sprint Target | Enhancement | Status |
+|--------------|------------|--------|
+| 135-140 | Integration tests with actual multi-project filesystem setup | ❌ Not done |
+| 135-140 | Config write validation (prevent global config writes from sprint operations) | ❌ Not done |
+| 140-145 | Optional inode comparison for hardlink detection | ❌ Not done |
+| 140-145 | `isWithinScope()` path cache for performance optimization | ❌ Not done |
+| 145-150 | Security regression test suite automation | ❌ Not done |
 
 ---
 
@@ -418,4 +428,4 @@ If performance becomes a concern in future sprints:
 
 ---
 
-*Document generated by architect agent, Sprint 134 Task 12. Last updated: 2026-04-11.*
+*Document generated by architect agent, Sprint 134 Task 12. Last updated: 2026-05-22 (audit — stale sections annotated, Memory V2 layout updated, unimplemented mitigations flagged).*
