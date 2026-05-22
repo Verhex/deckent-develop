@@ -55,7 +55,9 @@
   "stackDetection": {
     "files": [
       "tsconfig.json",
-      "src/core/"
+      "pyproject.toml",
+      "go.mod",
+      "Cargo.toml"
     ],
     "dependencies": [
       "typescript"

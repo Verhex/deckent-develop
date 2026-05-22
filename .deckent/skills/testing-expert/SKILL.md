@@ -35,13 +35,29 @@
 - Use coverage reports to find untested paths, not as a quality metric by itself.
 - Run coverage in CI and fail the build if it drops below the threshold.
 
-## Vitest Patterns
+## Framework-Specific Patterns
+
+Use the test framework matching your project's stack. The principles are the same; only the API differs.
+
+### Vitest / Jest (TypeScript / Node.js)
 - Use `describe` blocks for logical grouping. Nest for related scenarios.
 - Use `it` or `test` with descriptive names: `it('returns 404 when user not found')`.
-- Use `vi.fn()` for function mocks, `vi.spyOn()` for partial mocking of objects.
-- Use `vi.useFakeTimers()` for time-dependent code. Call `vi.advanceTimersByTime()` to control progression.
-- Use `vi.mock()` for module-level mocking. Place at the top of the file, before imports.
-- Use `toMatchInlineSnapshot()` for small, readable snapshot assertions.
+- `vi.fn()` / `jest.fn()` for function mocks, `vi.spyOn()` / `jest.spyOn()` for partial mocking.
+- `vi.useFakeTimers()` + `vi.advanceTimersByTime()` for time-dependent code (never real `setTimeout`).
+- Module mocking is hoisted — use factory function for explicit control.
+- `toMatchInlineSnapshot()` for small, readable snapshot assertions.
+
+### pytest (Python)
+- Use `pytest.fixture` for setup/teardown; prefer function scope over module/session scope.
+- `unittest.mock.patch` or `pytest-mock`'s `mocker.patch` for mocking.
+- `@pytest.mark.parametrize` for data-driven tests instead of loops.
+- `freezegun` for time-dependent tests.
+
+### Go testing
+- Co-locate test files: `foo.go` → `foo_test.go`; use `_test` package for black-box testing.
+- `t.Parallel()` for independent test cases; `t.Helper()` in assertion helpers.
+- `testing.T.Cleanup()` for teardown.
+- `testify/assert` or `testify/require` for readable assertions.
 
 ## Snapshot Testing
 - Use snapshots for UI component output and serialized data structures.

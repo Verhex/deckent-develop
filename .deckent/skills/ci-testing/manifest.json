@@ -44,21 +44,27 @@
   "stackDetection": {
     "files": [
       ".github/workflows/*.yml",
+      ".gitlab-ci.yml",
+      "Makefile",
       "vitest.config.*",
-      "tsconfig.json"
+      "pytest.ini",
+      "pyproject.toml",
+      "go.mod",
+      "Cargo.toml"
     ],
     "dependencies": [
       "vitest",
+      "jest",
+      "pytest",
       "typescript"
     ],
-    "commands": [
-      "tsc",
-      "vitest"
-    ]
+    "commands": []
   },
   "composableWith": [
     "testing-expert",
-    "typescript-expert"
+    "typescript-expert",
+    "python-expert",
+    "devops-engineer"
   ],
   "priority": 12,
   "promptInjection": {
@@ -67,10 +73,10 @@
   },
   "enabled": true,
   "stats": {
-    "totalUses": 33,
-    "successCount": 21,
-    "successRate": 0.6363636363636364,
-    "avgCoverage": 0,
-    "lastUsedInSprint": "sprint-186"
+    "totalUses": 0,
+    "successCount": 0,
+    "successRate": 0,
+    "avgScore": 0,
+    "lastUsedInSprint": ""
   }
 }

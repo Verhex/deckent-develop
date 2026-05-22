@@ -14,11 +14,20 @@
 - Document every breaking change in a migration guide before starting implementation.
 
 ## Codemod Tools
-- Use `jscodeshift` for JavaScript/TypeScript AST transformations at scale.
-- Use `ts-morph` for TypeScript-aware refactoring (preserves type information during transforms).
-- Write codemods as idempotent transforms — running them twice should produce the same result.
-- Test codemods against fixture files: input fixture -> transform -> compare with expected output.
-- Always run codemods in a clean git state so changes can be reviewed and reverted.
+
+Choose based on the project's language. All codemods must be idempotent (running twice produces same result).
+
+- **JavaScript/TypeScript**: `jscodeshift` (AST transforms), `ts-morph` (TypeScript-aware with type info)
+- **Python**: `libcst` or `rope` for AST transforms; `2to3` for Python 2→3 migrations
+- **Go**: `gofmt -r` rewrite rules, `gorename`, or `go/ast`-based scripts
+- **Rust**: `sed`/`awk` for simple renames; compiler error messages guide most mechanical changes
+- **Java/Kotlin**: `OpenRewrite` recipes, IntelliJ structural search/replace
+- **General (any language)**: `comby` — language-agnostic structural search and replace
+
+Common rules for all codemod tools:
+- Test codemods against fixture files: input fixture → transform → compare with expected output
+- Always run in a clean git state so changes can be reviewed and reverted
+- Run the project's static analysis / type check after transform to catch errors
 
 ## Version Upgrade Checklist
 1. Read the full changelog and migration guide for every major version between current and target.
