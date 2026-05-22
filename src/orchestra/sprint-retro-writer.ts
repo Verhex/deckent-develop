@@ -1,14 +1,13 @@
 // ─── Sprint Retro Writer ─────────────────────────────────────────
 // Extracted from sprint-reporter.ts — retro generation, learnings, memory, decay
-import { readFileSync, writeFileSync, existsSync, mkdirSync, copyFileSync } from 'node:fs';
+import { existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { TaskEvaluation, TaskStatus } from '../core/types.js';
 import type {
   TaskResult, Sprint, SprintMetrics, DebtItem, PatternEntry,
 } from '../core/types.js';
 import {
-  BRAIN_DIR, MEMORY_FILE, RETRO_FILE, MEMORY_MAX_LINES, RETRO_MAX_LINES,
-  MEMORY_DB_FILE,
+  BRAIN_DIR, MEMORY_DB_FILE,
 } from '../core/constants.js';
 import { MemoryStore } from '../core/memory-store.js';
 import { debugLog } from '../core/utils.js';
@@ -30,15 +29,6 @@ import {
 } from './sprint-metrics.js';
 
 // ═══ Internal Helpers ══════════════════════════════════════════════
-
-function readFileSafe(filePath: string): string {
-  try {
-    return readFileSync(filePath, 'utf-8');
-  } catch (e) {
-    debugLog('readFileSafe:readFile', e);
-    return '';
-  }
-}
 
 /** Truncate notes to a reasonable length for display. */
 function truncateNotes(notes: string): string {
@@ -453,31 +443,13 @@ export function writeRetrospective(
     debt,
   });
 
-  // Truncate to max lines
-  const retroLines = retroContent.split('\n');
-  const retroPath = join(brainPath, RETRO_FILE);
+  // B8 (Memory V2): the legacy `.brain/RETRO.md` + `.brain/MEMORY.md` file
+  // writers (and the RETRO.md archive copy) were removed — the retro and the
+  // per-sprint learnings are persisted only to memory.db below. `deckent
+  // retro` / MCP `retro` / `deckent explain` read the `retro` entry from the
+  // DB; sprint learnings are surfaced via `.brain/exports/memory.md`.
 
-  // (E) Archive existing RETRO.md before overwriting
-  if (existsSync(retroPath)) {
-    try {
-      const archiveDir = join(brainPath, 'archive');
-      mkdirSync(archiveDir, { recursive: true });
-      const archivePath = join(archiveDir, `retro-${sprint.id}.md`);
-      if (!existsSync(archivePath)) {
-        copyFileSync(retroPath, archivePath);
-      }
-    } catch (e) { debugLog('writeRetrospective:archiveRetro', e); }
-  }
-
-  writeFileSync(
-    retroPath,
-    retroLines.slice(0, RETRO_MAX_LINES).join('\n'),
-    'utf-8',
-  );
-
-  // Append to MEMORY.md
-  const memoryPath = join(brainPath, MEMORY_FILE);
-  const existingMemory = readFileSafe(memoryPath);
+  // Build per-sprint learnings (persisted to the DB `memory` entry below).
   const learnings: string[] = [`## Sprint ${sprint.id} Learnings`];
   for (const task of sprint.tasks) {
     const ev = evaluations.get(task.id);
@@ -489,18 +461,8 @@ export function writeRetrospective(
     }
     if (learnings.length >= 11) break; // header + max 10
   }
-  const sprintHeader = `## Sprint ${sprint.id} Learnings`;
-  const alreadyHasLearnings = existingMemory?.includes(sprintHeader);
-  const newMemory = alreadyHasLearnings
-    ? existingMemory // Skip — already has this sprint's learnings
-    : existingMemory
-      ? existingMemory + '\n' + learnings.join('\n')
-      : learnings.join('\n');
-  const memoryLines = newMemory.split('\n');
-  const trimmed = trimMemoryWithHeader(memoryLines, MEMORY_MAX_LINES);
-  writeFileSync(memoryPath, trimmed, 'utf-8');
 
-  // ─── DB dual-write: sprint + retro + memory entries ─────────
+  // ─── DB write: sprint + retro + memory entries ──────────────
   // Bug U fix (Sprint 166): also write type='sprint' so each sprint has
   // a queryable entry (Sprint 140+ had only retro/memory rows, no sprint row).
   // Sprint 168 C0a-3 (BUG-DD): ID prefix `sprint-NNN` was non-canonical and
@@ -561,6 +523,43 @@ export function writeRetrospective(
     } catch {
       // DB write failure is non-fatal — file write already succeeded
     }
+  }
+}
+
+/**
+ * Append a supplementary section to a sprint's `retro` entry in memory.db.
+ *
+ * B8 (Memory V2): the retrospective lives in the DB (no `.brain/RETRO.md`
+ * file). Finalize-time detail sections — rubric scores, adaptive-threshold
+ * notes, gate-failure detail, code-verified reconciliation — are appended to
+ * the `retro-<sprintId>` entry's content here instead of the legacy file.
+ *
+ * Idempotent: skips when `marker` is already present in the content. A
+ * graceful no-op when the DB or the retro entry is absent.
+ *
+ * @returns true when the section was appended.
+ */
+export function appendRetroSection(
+  projectRoot: string,
+  sprintId: string,
+  marker: string,
+  section: string,
+): boolean {
+  const dbPath = join(projectRoot, BRAIN_DIR, MEMORY_DB_FILE);
+  if (!existsSync(dbPath)) return false;
+  try {
+    const store = new MemoryStore(dbPath);
+    try {
+      const entry = store.getById(`retro-${sprintId}`);
+      if (!entry || entry.content.includes(marker)) return false;
+      store.update(entry.id, { content: entry.content + section }, 'brain');
+      return true;
+    } finally {
+      store.close();
+    }
+  } catch (e) {
+    debugLog('appendRetroSection', e);
+    return false;
   }
 }
 

@@ -47,6 +47,7 @@ export {
   buildRetroIssues,
   buildRetroLearnings,
   writeRetrospective,
+  appendRetroSection,
   formatHumanSprintComplete,
   buildWhatWentWell,
   buildWhatNeedsAttention,

@@ -36,7 +36,7 @@ import { getDebtItems } from '../core/debt-store.js';
 
 // ─── Sprint Reporter ──────────────────────────────────────────────
 import {
-  writeRetrospective, writeSprintLog, calculateMetrics,
+  writeRetrospective, appendRetroSection, writeSprintLog, calculateMetrics,
   updateProjectDocs,
   buildAgentPerformance, archiveDirectives, archiveOrphanTasks,
 } from './sprint-reporter.js';
@@ -136,26 +136,20 @@ export async function runHonestyCheck(
 }
 
 /**
- * Write rubric score detail to RETRO.md.
- * Appends a "### Rubric Scores" section to the existing RETRO.md.
+ * Append rubric score detail to the sprint's `retro` entry in memory.db.
+ * Adds a "### Rubric Scores" section. B8: writes to the DB retro entry —
+ * the legacy `.brain/RETRO.md` file is no longer produced.
  * @returns true if detail was written, false if no rubric data available
  */
 export async function writeRubricDetail(
   projectRoot: string,
-  _sprintId: string,
+  sprintId: string,
   results: TaskResult[],
   _evaluations: Map<string, TaskEvaluation>,
 ): Promise<boolean> {
   // Only proceed if at least one result has rubric scores
   const scoredResults = results.filter(r => r.rubricScores && Object.keys(r.rubricScores).length > 0);
   if (scoredResults.length === 0) return false;
-
-  const retroPath = join(projectRoot, BRAIN_DIR, 'RETRO.md');
-  // Async read — Sprint 139 async migration
-  const existing = await fsPromises.readFile(retroPath, 'utf-8').catch(() => '');
-
-  // Avoid duplicate injection
-  if (existing.includes('### Rubric Scores')) return false;
 
   // Build the rubric table rows
   const tableLines: string[] = [];
@@ -186,14 +180,7 @@ export async function writeRubricDetail(
     tableLines.push(`| **Sprint Avg** | — | — | — | — | **${overallAvg}** |`);
   }
 
-  try {
-    // Async write — Sprint 139 async migration
-    await fsPromises.writeFile(retroPath, existing + tableLines.join('\n') + '\n', 'utf-8');
-    return true;
-  } catch (e) {
-    debugLog('writeRubricDetail:write', e);
-    return false;
-  }
+  return appendRetroSection(projectRoot, sprintId, '### Rubric Scores', tableLines.join('\n') + '\n');
 }
 
 /**
@@ -443,7 +430,7 @@ export function computeAdjustedAspirational(input: {
  * - coverage_hard_floor is immutable; auto-learn never touches it
  * - Requires min_samples sprints before any adjustment
  */
-export async function applyAdaptiveThresholds(projectRoot: string, config: ResolvedConfig): Promise<void> {
+export async function applyAdaptiveThresholds(projectRoot: string, config: ResolvedConfig, sprintId?: string): Promise<void> {
   const ac = config.adaptive_config;
   const stats = await getRecentSprintStats(projectRoot, ac.coverage_lookback);
 
@@ -505,13 +492,12 @@ export async function applyAdaptiveThresholds(projectRoot: string, config: Resol
   // Async write updated config — Sprint 139 async migration
   await fsPromises.writeFile(configPath, JSON.stringify(rawCfg, null, 2) + '\n');
 
-  // Async append adaptive notes to RETRO.md — Sprint 139 async migration
-  try {
-    const retroPath = join(projectRoot, BRAIN_DIR, 'RETRO.md');
-    const retroContent = await fsPromises.readFile(retroPath, 'utf-8').catch(() => '');
-    const adaptiveLines = changes.map(c => `- Adaptive: ${c}`).join('\n') + '\n';
-    await fsPromises.writeFile(retroPath, retroContent + adaptiveLines);
-  } catch (e) { debugLog('applyAdaptiveThresholds:retroAppend', e); }
+  // Append adaptive-threshold notes to the sprint retro entry — B8 (DB-first).
+  if (sprintId) {
+    const adaptiveSection = '\n### Adaptive Threshold Changes\n'
+      + changes.map(c => `- Adaptive: ${c}`).join('\n') + '\n';
+    appendRetroSection(projectRoot, sprintId, '### Adaptive Threshold Changes', adaptiveSection);
+  }
 }
 
 
@@ -664,23 +650,16 @@ export async function finalizeSprint(
     }
     writeRetrospective(projectRoot, sprint, evaluations, metrics, undefined, skillMap.size > 0 ? skillMap : undefined, results);
 
-    // Append Code-Verified DONE section if reconciliation happened (async)
+    // Append Code-Verified DONE section to the retro entry — B8 (DB-first).
     if (codeVerifiedTasks.length > 0) {
-      try {
-        const retroPath = join(projectRoot, BRAIN_DIR, 'RETRO.md');
-        // Async read + write — Sprint 139 async migration
-        const existing = await fsPromises.readFile(retroPath, 'utf-8').catch(() => '');
-        if (!existing.includes('### Code-Verified DONE')) {
-          const section = [
-            '',
-            '### Code-Verified DONE',
-            `${codeVerifiedTasks.length} task(s) reconciled via physical code verification:`,
-            ...codeVerifiedTasks.map(id => `- ${id}: Code physically verified despite missing .result (docker HB shutdown pattern)`),
-            '',
-          ].join('\n');
-          await fsPromises.writeFile(retroPath, existing + section, 'utf-8');
-        }
-      } catch (e) { debugLog('finalizeSprint:codeVerifiedRetro', e); }
+      const section = [
+        '',
+        '### Code-Verified DONE',
+        `${codeVerifiedTasks.length} task(s) reconciled via physical code verification:`,
+        ...codeVerifiedTasks.map(id => `- ${id}: Code physically verified despite missing .result (docker HB shutdown pattern)`),
+        '',
+      ].join('\n');
+      appendRetroSection(projectRoot, sprint.id, '### Code-Verified DONE', section);
     }
   } catch (e) { debugLog('finalizeSprint:writeRetrospective', e); }
 
@@ -986,26 +965,20 @@ export async function finalizeSprint(
   } catch (writeErr) {
     debugLog('finalizeSprint:selfAuditGate', `WARNING: Failed to write gate.json: ${writeErr}`);
   }
-  // Append Gate Failure section to RETRO.md if gate failed
+  // Append Gate Failure section to the retro entry if the gate failed — B8.
   if (gateResult.overallGate === 'GATE_FAILURE') {
-    try {
-      const retroPath = join(projectRoot, BRAIN_DIR, 'RETRO.md');
-      const existing = existsSync(retroPath) ? readFileSync(retroPath, 'utf-8') : '';
-      if (!existing.includes('### Gate Failure')) {
-        const errors: string[] = [];
-        if (gateResult.tsc.status === 'FAIL') errors.push(...gateResult.tsc.errors.slice(0, 5));
-        if (gateResult.vitest.status === 'FAIL') errors.push(`vitest: ${gateResult.vitest.delta.fail} failing tests`);
-        if (gateResult.honesty.violations > 0) errors.push(`honesty violations: ${gateResult.honesty.flaggedTasks.join(', ')}`);
-        const gateSection = [
-          '',
-          '### Gate Failure',
-          `Self-audit gate failed for sprint ${sprint.id}. Status: ${GO_WITH_GATE_FAILURE}.`,
-          '',
-          ...errors.map(e => `- ${e}`),
-        ].join('\n') + '\n';
-        writeFileSync(retroPath, existing + gateSection, 'utf-8');
-      }
-    } catch (e) { debugLog('finalizeSprint:gateRetroAppend', e); }
+    const errors: string[] = [];
+    if (gateResult.tsc.status === 'FAIL') errors.push(...gateResult.tsc.errors.slice(0, 5));
+    if (gateResult.vitest.status === 'FAIL') errors.push(`vitest: ${gateResult.vitest.delta.fail} failing tests`);
+    if (gateResult.honesty.violations > 0) errors.push(`honesty violations: ${gateResult.honesty.flaggedTasks.join(', ')}`);
+    const gateSection = [
+      '',
+      '### Gate Failure',
+      `Self-audit gate failed for sprint ${sprint.id}. Status: ${GO_WITH_GATE_FAILURE}.`,
+      '',
+      ...errors.map(e => `- ${e}`),
+    ].join('\n') + '\n';
+    appendRetroSection(projectRoot, sprint.id, '### Gate Failure', gateSection);
   }
 
   // 10c. Generate load-test-report.md from metrics.jsonl (Sprint 135 N6 — Task 5)
@@ -1062,7 +1035,7 @@ export async function finalizeSprint(
   // 11. Adaptive thresholds: auto-adjust agent_min_score + coverage_threshold based on recent sprints
   if (opts?.config?.adaptive_thresholds) {
     try {
-      await applyAdaptiveThresholds(projectRoot, opts.config);
+      await applyAdaptiveThresholds(projectRoot, opts.config, sprint.id);
     } catch (err) {
       debugLog('finalizeSprint:adaptive', `Adaptive threshold update failed: ${err}`);
     }
