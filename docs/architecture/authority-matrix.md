@@ -93,7 +93,7 @@ The master overview of the **intended** policy. ✅ = allowed, ❌ = denied (by 
 
 | Path Pattern | Brain | Auditor | Worker | Notes |
 |---|:---:|:---:|:---:|---|
-| `src/**` | ❌ | ❌ | ⚠️ | Worker: only files in `scope.filesWrite`. ADR-038 Brain exception pending. |
+| `src/**` | ❌ | ❌ | ⚠️ | Worker: only files in `scope.filesWrite`. Brain meta-refactoring has no accepted ADR (see §10). |
 | `tests/**` | ❌ | ❌ | ⚠️ | Worker: only files in `scope.filesWrite` |
 | `.tasks/*.json` (task definitions) | ✅ | ❌ | ❌ | Brain creates/updates task definitions |
 | `.tasks/task-{ownId}.hb` | ❌ | ❌ | ✅ | Worker writes own heartbeat only |
@@ -162,7 +162,7 @@ The master overview of the **intended** policy. ✅ = allowed, ❌ = denied (by 
 | `AUDITOR→BRAIN:LOAD_REPORT_WRITTEN` | CONSUME | EMIT | — |
 | `DECKENT→USER:NOTIFY` | — | — | — |
 
-> `DECKENT→USER:NOTIFY` is owned by the Deckent CLI layer, not any agent role. Defined in Protocol V1.0 for Sprint 139 dispatcher implementation.
+> `DECKENT→USER:NOTIFY` is owned by the Deckent CLI layer, not any agent role. Implemented in Sprint 139 (`src/core/notification-dispatcher.ts`).
 
 ---
 
@@ -334,7 +334,7 @@ Worker implements + reports result
 Brain evaluates
 ```
 
-Exception: ADR-038 (meta-refactoring capability) is referenced but not yet defined. By policy intent, Brain does not write to `src/**` until ADR-038 is accepted (enforced via role discipline + audit trail in V1.0, not a runtime block).
+Exception: The Brain meta-refactoring capability (referenced in ADR-037) has no accepted ADR. By policy intent, Brain does not write to `src/**` (enforced via role discipline + audit trail in V1.0, not a runtime block). See §10 for ADR-038 naming clarification.
 
 ### Rule 5: Event Stream Integrity
 
@@ -493,11 +493,18 @@ The authority matrix is enforced at three layers:
 
 ---
 
-## 10. ADR-038 Exception (Future)
+## 10. ADR-038 Exception
 
-ADR-037 contains a forward reference to **ADR-038: Brain Meta-Refactoring Capability**. This is a **not-yet-accepted** ADR that would allow Brain to write to `src/**` under specific, tightly controlled conditions (e.g., automated code generation from schema, mechanical refactoring across many files).
+> ⚠️ **ADR-038 naming clarification:** The ADR-038 accepted in memory.db is
+> **"Dead Code Disposition — Sprint 139 Audit Results"** (code cleanup
+> decisions). It is **not** the "Brain Meta-Refactoring Capability" referenced
+> in ADR-037 section 3 above. The Brain Meta-Refactoring Capability concept
+> remains un-ADR'd — the forward reference in ADR-037 was written speculatively
+> during Sprint 138 (before Sprint 139 finalized ADR-038's actual content).
 
-**Current status:** ADR-038 is referenced but not defined. Brain's `src/**` write prohibition is treated as **absolute by policy** until ADR-038 is formally accepted and specifies precise scope constraints (V1.0 enforcement is role-discipline + audit-trail, not a runtime guard).
+ADR-037 contains a forward reference to a **Brain Meta-Refactoring Capability** that would allow Brain to write to `src/**` under specific, tightly controlled conditions (e.g., automated code generation from schema, mechanical refactoring across many files). This concept has **not** been accepted as an ADR.
+
+**Current status:** No accepted ADR grants Brain write access to `src/**`. Brain's `src/**` write prohibition is treated as **absolute by policy** (V1.0 enforcement is role-discipline + audit-trail, not a runtime guard).
 
 **Why it requires a separate ADR:** Granting Brain write access to source code is a significant authority expansion that could collapse the Brain/Worker separation of duties. Any such grant must be:
 - Explicitly scoped (which files, which conditions)
@@ -545,14 +552,17 @@ Mitigations below state the design intent; in V1.0 the scope/path mitigations ar
 | Add new role (e.g., Notifier, Scheduler) | New ADR superseding ADR-037 |
 | Change event channel rights | ADR-035 + ADR-037 updated together |
 
-### Planned Evolution
+### Evolution History (current sprint: 186)
 
-| Sprint | Scope |
-|--------|-------|
-| Sprint 139 | `DECKENT→USER:NOTIFY` channel implementation (Notification Dispatcher) |
-| Sprint 140+ | File-based fallback soft-deprecated; event stream becomes primary |
-| Sprint 142 | File-based state (`.hb`, `.result`) removed — event stream only |
-| Sprint 145+ | Distributed sprint execution — authority matrix may require new ADR |
+> These milestones were written as future plans at Sprint 138. Sprint 186 is now
+> active; the items below are historical.
+
+| Sprint | Scope | Status |
+|--------|-------|--------|
+| Sprint 139 | `DECKENT→USER:NOTIFY` channel (Notification Dispatcher) | ✅ Implemented (`src/core/notification-dispatcher.ts`) |
+| Sprint 140+ | File-based fallback soft-deprecated; event stream primary | ⚠️ Partial — DB-first Memory V2 active; file decay is no-op |
+| Sprint 142 | File-based state (`.hb`, `.result`) removed — event stream only | ❌ Not yet — `.hb`/`.result` files still active |
+| Sprint 145+ | Distributed sprint execution — new ADR required | ❌ Not yet — scope not started |
 
 ---
 

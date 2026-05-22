@@ -1,6 +1,6 @@
 # Deckent Architecture — Comprehensive Reference
 
-> **Version:** deckent v1.0.0-beta.1 (Memory V2 DB-first era) | **Language:** TypeScript (ESM) | **Runtime:** Node.js ≥18
+> **Version:** deckent v1.0.0-beta.1 (Memory V2 DB-first era) | **Language:** TypeScript (ESM) | **Runtime:** Node.js ≥24.0.0
 >
 > This document is the single comprehensive architectural reference for the Deckent system.
 > For the primary system specification, see [blueprint.md](../vision/blueprint.md).
@@ -36,7 +36,7 @@ Deckent is an **AI agent orchestration CLI** that coordinates multiple AI agents
                          │
                          ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│  DECKENT CLI  (src/cli/ — 46 commands)                              │
+│  DECKENT CLI  (src/cli/ — 55+ commands)                             │
 │  deckent start | deckent plan | deckent status | deckent web        │
 └────────────────────────┬────────────────────────────────────────────┘
                          │
@@ -91,7 +91,7 @@ src/
 │   ├── plugin.ts            ← Plugin manifest validation, load, install, remove
 │   └── plugin-hooks.ts      ← Plugin hook execution (beforeSprint/afterSprint/etc.)
 │
-├── orchestra/               ← Sprint orchestration (76 modules)
+├── orchestra/               ← Sprint orchestration (78 modules)
 │   ├── brain.ts             ← Re-export layer — sole orchestration entry point
 │   ├── sprint-controller.ts ← Sprint lifecycle (PLAN→SPAWN→EXECUTE→EVALUATE→FIX→RETRO→DECAY→CLEANUP)
 │   ├── sprint-phases.ts     ← Phase-specific execution logic
@@ -137,7 +137,7 @@ src/
 │
 ├── cli/                     ← Command-line interface
 │   ├── auto-setup.ts        ← Setup wizard (generateSetupRecommendation)
-│   ├── commands/            ← 46 CLI commands (one file per command)
+│   ├── commands/            ← 55+ CLI commands (one file per command)
 │   │   ├── init.ts          ← deckent init — project initialization
 │   │   ├── start.ts         ← deckent start — sprint execution
 │   │   ├── plan.ts          ← deckent plan — dry-run planning
@@ -217,8 +217,12 @@ src/
 │   ├── rate-limiter.ts      ← API rate limiting
 │   └── watcher.ts           ← File watcher for SSE
 │
-├── monitor/                 ← Auditor scan loop, dashboard manager, sprint-state
-│   └── auditor.ts           ← 30s scan: heartbeat, boundary (git diff --stat), alerts
+├── monitor/                 ← Auditor scan loop, dashboard manager, sprint-state (5 modules)
+│   ├── auditor.ts           ← 30s scan: heartbeat, boundary (git diff --stat), alerts
+│   ├── alert-emitter.ts     ← Alert construction and emission
+│   ├── dashboard-manager.ts ← .dashboard file management
+│   ├── sprint-state.ts      ← Sprint state snapshot tracking
+│   └── index.ts             ← Re-export barrel
 ├── connectors/              ← External messaging adapters (Discord, Telegram,
 │   └── ...                    WhatsApp, incoming-router)
 ├── nervous/                 ← Proactive meta-orchestrator (ADR-040): observer,
@@ -717,7 +721,7 @@ brain.ts: runSprint()
         ├─► evaluateResults()
         │     DONE / GO_WITH_TECH_DEBT / NO_GO per task
         │     testsPassed=false → NO_GO override
-        │     coverage<80 → GO_WITH_TECH_DEBT override
+        │     coverage<90 → GO_WITH_TECH_DEBT override
         │
         ├─► handleNoGo()
         │     spawn priority-fix workers for NO_GO tasks

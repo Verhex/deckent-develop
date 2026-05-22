@@ -116,7 +116,7 @@ Two storage locations exist:
 - **Sprint-scoped** (`.tasks/agents/{sprintId}-{name}/`) — created via
   `AgentPoolManager.createTempAgent()`, subject to LRU eviction (default max 50)
 - **Persistent temp** (`.deckent/agents/temp-{name}/`) — created via
-  `AgentPoolManager.saveTempAgent()`; survive across sprints until explicitly removed
+  `AgentPoolManager.saveTempAgentToPool()`; survive across sprints until explicitly removed
 
 For custom one-off agents created with `deckent agent create`:
 
@@ -133,7 +133,7 @@ Agent behavior is configured at multiple levels:
 
 **Project-level** (`.deckent/config.json`):
 - `routing_engine`: `"v1"` (keyword-based `selectAgent`) or `"v2"` (intent + activation engine)
-- `routing_min_agent_score`: minimum score threshold for agent selection (default 5, range 2–8)
+- `agent_min_score`: minimum score threshold for agent selection (default 5, range 2–8)
 - To disable agent selection for all tasks: set `enabled: false` in each `agent.json`,
   or omit agents — the fallback chain and `generic` worker are always available
 

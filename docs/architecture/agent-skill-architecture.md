@@ -1,6 +1,6 @@
 # Agent / Skill Architecture & Routing
 
-> **Status:** Current architecture companion. **Last verified:** Sprint 172 (2026-05-18).
+> **Status:** Current architecture companion. **Last verified:** Sprint 186 (2026-05-22).
 >
 > **Background:** The agent pool, composable skill system, and intent-based Brain
 > routing described here were introduced across Sprints 029–033 and have evolved
@@ -40,7 +40,7 @@ activation rules, a preferred model, and performance statistics. When no agent
 meets the activation threshold, the task falls back to a `generic` worker.
 
 The three structural roles in the system remain `brain | auditor | worker`
-(`AgentRole` in `src/core/types.ts`). "Agents" in this document are *worker
+(`AgentRole` in `src/core/monitoring-types.ts`). "Agents" in this document are *worker
 personas* layered on top of the `worker` role — they shape the prompt and
 routing, not the process model.
 

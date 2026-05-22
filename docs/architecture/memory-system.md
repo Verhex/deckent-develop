@@ -45,7 +45,6 @@ Deckent's memory system was originally designed as a **three-tiered, file-based 
 .brain/
 ├── MEMORY.md          ← Tier 1: Short-term (always loaded)
 ├── PATTERNS.md        ← Tier 2: Long-term (JSON array)
-├── DEBT.md            ← Tech debt ledger (markdown table)
 ├── RETRO.md           ← Latest retrospective (overwritten each sprint)
 ├── memory.db          ← Memory V2: single source of truth (SQLite)
 ├── exports/           ← Memory V2 generated exports (git-tracked)
@@ -202,14 +201,11 @@ Each ADR follows MADR v3 hybrid format (ADR-036):
 
 ## Supporting Files
 
-### DEBT.md — Tech Debt Ledger
-9-column pipe-delimited markdown table. Brain reads/writes via `parseDebtTable` / `generateDebtTable` helpers (see `src/core/utils.ts`). Under Memory V2, debt entries are also stored in `memory.db` (`type='debt'`) and exported to `.brain/exports/debt.md`.
+### DEBT.md — Tech Debt Ledger (removed Sprint 186)
 
-```markdown
-| ID | Description | Task | Sprint | Priority | Open | Resolved | Fixed In | Created |
-```
+> ⚠️ `.brain/DEBT.md` was **removed in Sprint 186** (Task #4 — DB-first migration). The file no longer exists in new projects and is no longer initialized by `deckent init`. Tech debt is now entirely in `memory.db` (`type='debt'`), exported to `.brain/exports/debt.md` (generated, git-tracked). The `archive-debt` CLI command reads from `memory.db` directly via `getDebtItems()` in `src/core/debt-store.ts`.
 
-Decay removes `resolved: true` rows when budget is exceeded (step 2 of `runDecay`). Under Memory V2 this is DB-driven.
+Decay removes `resolved: true` debt entries when budget is exceeded (DB-driven via `MemoryStore.decay()`). The `parseDebtTable` / `generateDebtTable` helpers in `src/core/utils.ts` are legacy V1 code (no active callers post-Sprint 186).
 
 ### RETRO.md — Sprint Retrospective
 Overwritten (not appended) after every sprint. Current constant: `RETRO_MAX_LINES = 400` (`src/core/constants.ts`; V1 value was 100). Contains:
@@ -298,7 +294,7 @@ Under Memory V2 the legacy `countBrainLines(projectRoot)` helper (which counted 
 | `PATTERNS.md` / DB `type='pattern'` | 800 lines (80) | 80 | Remove `resolved: true` entries on budget exceeded; 25-sprint auto-expire (was 8) |
 | ADRs (DB `type='adr'`) | Unlimited | Unlimited | Never decayed (`decay_exempt=true`) |
 | `RETRO.md` / DB `type='retro'` | 400 lines (100) | 100 | Overwritten every sprint |
-| `DEBT.md` / DB `type='debt'` | Unlimited | Unlimited | Remove resolved rows on budget exceeded |
+| `exports/debt.md` (generated) / DB `type='debt'` | Unlimited | Unlimited | Remove resolved rows on budget exceeded (`.brain/DEBT.md` removed Sprint 186) |
 | `sprints/sprint-NNN.md` | 500 lines (80) | 80 | Archive oldest (keep last 2 active) |
 | **Total `.brain/` budget** | **5000** (600) | **600** | `BRAIN_TOTAL_LINE_BUDGET` in `constants.ts`; canonical: `config.memory_budget` (default 5000) |
 
@@ -330,4 +326,4 @@ Accessible via Claude Code: use `deckent_memory_query` MCP tool or read resource
 
 ---
 
-*Last updated: Sprint 172 — deckent v1.0.0-beta.1 — Memory V2 DB-first architecture*
+*Last updated: Sprint 186 — deckent v1.0.0-beta.1 — Memory V2 DB-first architecture*
