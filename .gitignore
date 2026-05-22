@@ -43,6 +43,7 @@ coverage/
 .test-e2e-sprint-*
 
 # Deckent runtime config & state
+.deckent/agents/temp-*/
 .deckent/routing/
 .deckent/config.json
 .deckent/config.json.bak.*

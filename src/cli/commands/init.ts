@@ -10,7 +10,6 @@
  * Split from 1566 LoC monolith (Sprint 144 Task 1).
  */
 
-import { writeFileSync, existsSync } from 'node:fs';
 import type { Command } from 'commander';
 import type { PlanMode } from '../../core/types.js';
 import { generateSetupRecommendation } from '../auto-setup.js';
@@ -65,7 +64,7 @@ import {
   writeAgentFiles,
   writeMultiEnvConfig,
   writeDeckSecurityFiles,
-  writeClaudeRules,
+  writeRuleFiles,
   writeDirectivesFile,
   writeBrainFiles,
   writeI18nFiles,
@@ -133,12 +132,6 @@ export function registerInit(program: Command): void {
     .action(async (options: { auto?: boolean; manual?: boolean; cursor?: boolean; claudeCode?: boolean; env?: string; allEnvs?: boolean; upgrade?: boolean; force?: boolean; repair?: boolean; yes?: boolean; install?: boolean }) => {
       const root = resolveProjectRoot();
       const failedSteps: Array<{ step: string; error: string }> = [];
-
-      const writeFile = (filePath: string, content: string): void => {
-        if (options.upgrade || !existsSync(filePath)) {
-          writeFileSync(filePath, content);
-        }
-      };
 
       try {
         let mode: PlanMode;
@@ -220,9 +213,7 @@ export function registerInit(program: Command): void {
           } catch { /* non-fatal */ }
         }
 
-        const { buildCmd: _buildCmd, testCmd, lintCmd } = writeStackAndDeckentFile(
-          root, language, projectName, stackResult, stackDetected,
-        );
+        writeStackAndDeckentFile(root, language, projectName, stackResult, stackDetected);
 
         // 7. Agent files
         const detectedEnv = detectEnvironment();
@@ -242,8 +233,8 @@ export function registerInit(program: Command): void {
         // 7d. Security files
         writeDeckSecurityFiles(root);
 
-        // 8. Claude rules
-        writeClaudeRules(root, writeFile, lintCmd, testCmd);
+        // 8. Rule files — all supported providers (Claude/Codex/Gemini/Cursor)
+        await writeRuleFiles(root);
 
         // 9. DIRECTIVES.md
         writeDirectivesFile(root, language, stackResult, projectName);

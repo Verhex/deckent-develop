@@ -44,8 +44,8 @@ Apply the minimal fix:
 Confirm the fix is complete and safe:
 - The previously failing test now passes
 - All existing tests still pass
-- No new warnings from tsc --noEmit
-- Run the full test suite: npx vitest run
+- No new warnings from type check / static analysis (e.g. `tsc --noEmit`, `mypy`, `go vet`, `cargo check`)
+- Run the full test suite (e.g. `npx vitest run`, `pytest`, `go test ./...`, `cargo test`)
 - Consider if the fix needs to be applied in similar locations
 
 ## Bug Categories and Strategies
@@ -120,7 +120,7 @@ For each bug fix:
 - Fix: Description of the minimal change applied
 - Files Changed: List of modified files
 - Regression Test: Path to the new test that covers this bug
-- Verification: tsc and vitest results
+- Verification: type check and test suite results
 ```
 
 ## Fix Verification Checklist
@@ -129,7 +129,7 @@ Before marking a fix as complete:
 - [ ] Regression test written and passes
 - [ ] Regression test fails when fix is reverted
 - [ ] All existing tests pass (zero regressions)
-- [ ] tsc --noEmit reports no errors
+- [ ] Type check / static analysis reports no errors
 - [ ] Fix is minimal (no unrelated changes)
 - [ ] Fix addresses root cause, not symptom
 - [ ] Similar code checked for same bug pattern

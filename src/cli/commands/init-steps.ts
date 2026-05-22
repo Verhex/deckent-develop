@@ -36,6 +36,7 @@ import {
   PROJECT_IDENTITY_FILE,
 } from '../../core/constants.js';
 import { ensureDeckentImport } from '../../core/utils.js';
+import { regenerateRules } from '../../core/rule-generator.js';
 import { deepMerge } from '../../core/config.js';
 import { getModePreset } from '../../core/mode-presets.js';
 import { detectSystemCapacity, suggestMaxWorkers, suggestSpawnBackend } from '../../core/system-capacity.js';
@@ -407,24 +408,15 @@ export function writeDeckSecurityFiles(root: string): void {
   } catch { /* non-fatal */ }
 }
 
-export function writeClaudeRules(
-  root: string,
-  writeFile: (path: string, content: string) => void,
-  lintCmd: string,
-  testCmd: string,
-): void {
-  writeFile(
-    join(root, CLAUDE_RULES_DIR, 'brain.md'),
-    `---\npaths: [".tasks/*", ".brain/*"]\n---\n# Brain Rules\n- Always read DIRECTIVES.md first\n- All brain knowledge lives in '.brain/memory.db' (SQLite) — this is the single source of truth\n- Always check usage before planning\n- Plan mode required before execution\n- Write sprint plan as task JSON files in .tasks/\n- Assign model and effort per task with reason\n- Define scope (directories, filesRead, filesWrite) for each task\n- Define GO/NO-GO criteria for each task\n- Evaluate every result: DONE / GO_WITH_TECH_DEBT / NO_GO\n- Cross-dependency: if A's NO-GO caused by B's output, B gets priority fix\n- Write sprint learnings to DB: store.insert({ type: 'memory', sprint_id, ... })\n- Write retrospective to DB: store.upsert({ type: 'retro', sprint_id, ... })\n- Trigger decay via store.decay(currentSprintNum, decayAfterSprints)\n- Sprint is NEVER left incomplete\n`,
-  );
-  writeFile(
-    join(root, CLAUDE_RULES_DIR, 'auditor.md'),
-    `---\npaths: [".dashboard", ".brain/PATTERNS.md"]\n---\n# Auditor Rules\n- NEVER write source code\n- Scan every 30 seconds\n- Read all heartbeat files → detect stale agents (>2min = alert)\n- Run git diff --stat → detect boundary violations\n- Check .locks/ → detect stale locks (>5min)\n- Detect circular dependencies / deadlocks\n- Overwrite .dashboard on every scan (never append)\n- Append new patterns to PATTERNS.md (never overwrite)\n- Write alerts for critical issues\n`,
-  );
-  writeFile(
-    join(root, CLAUDE_RULES_DIR, 'worker-default.md'),
-    `---\npaths: ["src/**", "tests/**"]\n---\n# Worker Rules\n- Read your task file first\n- Write plan before writing code\n- Check .locks/ before writing any file\n- Create and update heartbeat file (.tasks/task-{id}.hb)\n- Run lint before marking done (${lintCmd})\n- Run tests before marking done (${testCmd})\n- Coverage goal: minimum 80%\n- Document changes\n- Stay within your assigned scope\n- Write result file (.tasks/task-{id}.result) — REQUIRED\n`,
-  );
+/**
+ * Generate rule files for ALL supported providers (Claude, Codex, Gemini,
+ * Cursor) from the canonical rule-generator templates. Single source —
+ * replaces the old hardcoded inline `.claude/rules/` writes so every provider
+ * gets self-contained rules at init time. regenerateRules() also picks up
+ * ADRs from .brain/memory.db when re-run on an existing project.
+ */
+export async function writeRuleFiles(root: string): Promise<void> {
+  await regenerateRules(root);
 }
 
 export function writeDirectivesFile(
