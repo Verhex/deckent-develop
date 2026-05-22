@@ -3,34 +3,34 @@
 # See: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
 
 # Default owner for everything
-* @verhex/deckent-core
+* @alperensartacoglu
 
-# Brain/Orchestration — core orchestrator, planner, task builder, debt manager
-src/orchestra/ @verhex/deckent-core
+# Brain/Orchestration
+src/orchestra/ @alperensartacoglu
 
-# Core modules — types, config, utils, plugin system
-src/core/ @verhex/deckent-core
+# Core modules
+src/core/ @alperensartacoglu
 
-# MCP integration — tools, resources, server
-src/mcp/ @verhex/deckent-core
+# MCP integration
+src/mcp/ @alperensartacoglu
 
-# CLI commands and helpers
-src/cli/ @verhex/deckent-core
+# CLI commands
+src/cli/ @alperensartacoglu
 
 # Agent workers
-src/agents/ @verhex/deckent-core
+src/agents/ @alperensartacoglu
 
 # Monitoring and auditing
-src/monitor/ @verhex/deckent-core
+src/monitor/ @alperensartacoglu
 
 # HTTP API
-src/api/ @verhex/deckent-core
+src/api/ @alperensartacoglu
 
 # Documentation
-docs/ @verhex/deckent-core
+docs/ @alperensartacoglu
 
 # CI/CD and GitHub configuration
-.github/ @verhex/deckent-core
+.github/ @alperensartacoglu
 
 # Tests
-tests/ @verhex/deckent-core
+tests/ @alperensartacoglu

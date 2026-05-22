@@ -43,7 +43,7 @@ jobs:
         run: npm run ci:rebuild-native
 
       - name: Install docs dependencies
-        run: npm install --prefix docs
+        run: npm ci --prefix docs
 
       - name: Install dashboard dependencies
         run: npm ci --prefix src/dashboard --ignore-scripts
@@ -56,7 +56,7 @@ jobs:
         working-directory: docs
 
       - name: Create CNAME file for custom domain
-        run: echo "docs.deckent.agency" > docs/.vitepress/dist/CNAME
+        run: echo "docs.deckent.ai" > docs/.vitepress/dist/CNAME
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
@@ -69,7 +69,7 @@ jobs:
   #   name: Deploy to GitHub Pages
   #   needs: build
   #   runs-on: ubuntu-latest
-  #   if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+  #   if: github.event_name == 'push' && github.ref == 'refs/heads/main'
   #   environment:
   #     name: github-pages
   #     url: ${{ steps.deployment.outputs.page_url }}

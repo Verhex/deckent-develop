@@ -91,7 +91,7 @@ jobs:
           if-no-files-found: error
 
   build-all-integration:
-    name: Full build:all integration (Node 22.x)
+    name: Full build:all integration (Node 24.x)
     runs-on: ubuntu-latest
     needs: build
     timeout-minutes: 15
@@ -99,7 +99,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node.js 22.x
+      - name: Setup Node.js 24.x
         uses: actions/setup-node@v4
         with:
           node-version: '24.x'

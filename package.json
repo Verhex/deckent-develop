@@ -61,7 +61,7 @@
   "bugs": {
     "url": "https://github.com/VerhexIO/deckent/issues"
   },
-  "homepage": "https://deckent.agency",
+  "homepage": "https://deckent.ai",
   "dependencies": {
     "@lydell/node-pty": "^1.2.0-beta.12",
     "@modelcontextprotocol/sdk": "^1.27.1",

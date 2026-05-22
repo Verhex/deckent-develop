@@ -3,6 +3,7 @@ name: Publish to npm
 on:
   release:
     types: [published]
+
   push:
     tags:
       - 'v*'
@@ -39,9 +40,11 @@ jobs:
         run: npm run build
 
       - name: Run tests (staged to avoid OOM)
+        env:
+          NODE_OPTIONS: '--max-old-space-size=8192'
         run: |
           npx vitest run tests/core/ tests/agents/
-          npx vitest run tests/orchestra/
+          npx vitest run tests/orchestra/ --pool=forks
           npx vitest run tests/cli/
           npx vitest run tests/mcp/ tests/api/ tests/integration/ tests/security/ tests/providers/ tests/monitor/ tests/docs/ tests/skills/ tests/analytics/ tests/scripts/
         timeout-minutes: 15
