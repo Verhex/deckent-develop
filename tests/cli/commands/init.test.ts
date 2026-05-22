@@ -563,60 +563,12 @@ describe('init command (isolated)', () => {
   });
 
   // ─── Rule templates ────────────────────────────────────────────────
-
-  describe('rule templates', () => {
-    it('writes brain.md rule template', async () => {
-      vi.mocked(existsSync).mockReturnValue(false);
-      await runCommand(['init', '--auto']);
-      const writeCalls = vi.mocked(writeFileSync).mock.calls;
-      const brainCall = writeCalls.find(c => String(c[0]).includes('brain.md'));
-      expect(brainCall).toBeDefined();
-      expect(String(brainCall![1])).toContain('Brain Rules');
-    });
-
-    it('writes auditor.md rule template', async () => {
-      vi.mocked(existsSync).mockReturnValue(false);
-      await runCommand(['init', '--auto']);
-      const writeCalls = vi.mocked(writeFileSync).mock.calls;
-      const auditorCall = writeCalls.find(c => String(c[0]).includes('auditor.md'));
-      expect(auditorCall).toBeDefined();
-      expect(String(auditorCall![1])).toContain('Auditor Rules');
-    });
-
-    it('writes worker-default.md rule template', async () => {
-      vi.mocked(existsSync).mockReturnValue(false);
-      await runCommand(['init', '--auto']);
-      const writeCalls = vi.mocked(writeFileSync).mock.calls;
-      const workerCall = writeCalls.find(c => String(c[0]).includes('worker-default.md'));
-      expect(workerCall).toBeDefined();
-      expect(String(workerCall![1])).toContain('Worker Rules');
-    });
-
-    it('does not overwrite brain.md if it already exists', async () => {
-      vi.mocked(existsSync).mockImplementation((p) => String(p).includes('brain.md'));
-      await runCommand(['init', '--auto']);
-      const writeCalls = vi.mocked(writeFileSync).mock.calls;
-      const brainCall = writeCalls.find(c => String(c[0]).endsWith('brain.md'));
-      expect(brainCall).toBeUndefined();
-    });
-
-    it('brain.md template includes YAML frontmatter', async () => {
-      vi.mocked(existsSync).mockReturnValue(false);
-      await runCommand(['init', '--auto']);
-      const writeCalls = vi.mocked(writeFileSync).mock.calls;
-      const brainCall = writeCalls.find(c => String(c[0]).includes('brain.md'));
-      expect(String(brainCall![1])).toContain('---');
-      expect(String(brainCall![1])).toContain('paths:');
-    });
-
-    it('auditor.md template includes NEVER write source code rule', async () => {
-      vi.mocked(existsSync).mockReturnValue(false);
-      await runCommand(['init', '--auto']);
-      const writeCalls = vi.mocked(writeFileSync).mock.calls;
-      const auditorCall = writeCalls.find(c => String(c[0]).includes('auditor.md'));
-      expect(String(auditorCall![1])).toContain('NEVER write source code');
-    });
-  });
+  // Rule-file generation moved to rule-generator.ts (regenerateRules) — init
+  // delegates to it for all 4 supported providers (Claude/Codex/Gemini/Cursor).
+  // Content / frontmatter / per-provider assertions live in
+  // tests/core/rule-generator.test.ts. The isolated node:fs mock in this suite
+  // cannot exercise the template-reading generator, so those assertions are
+  // intentionally not duplicated here.
 
   // ─── --auto mode ───────────────────────────────────────────────────
 

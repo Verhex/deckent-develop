@@ -124,6 +124,7 @@ oluşturuyor. Codex CLI **kök** `AGENTS.md` okur.
 |-------|-----------|
 | `src/core/rule-generator.ts` | `ProviderAdapter` + `fileExt()`/`preamble()`; `cursorAdapter` `.mdc` + MDC frontmatter; `generateRules` uzantı + preamble |
 | `tests/core/rule-generator.test.ts` | Cursor `.mdc` testleri eklendi; `d4214c41`'in kırdığı `.contracts/*` testi düzeltildi |
+| `init-steps.ts` + `mcp/tools/init.ts` + `init.ts` | `deckent init` artık `regenerateRules` ile **4 provider** rule dizinini üretir (tek-kaynak; eski inline `.claude/rules/` yazımı kaldırıldı; `writeClaudeRules` → `writeRuleFiles`) |
 | `AGENTS.md` | Rol kuralları `@.codex/rules/*` |
 | `GEMINI.md` | Rol kuralları `@.gemini/rules/*` |
 | `DECKENT.md` | `## Agent Roles` bloğu kaldırıldı (ortak doküman provider-neutral) |
@@ -150,19 +151,17 @@ oluşturuyor. Codex CLI **kök** `AGENTS.md` okur.
   kendi dizinini işaret ediyor).
 - Cursor entegrasyonu artık çalışıyor (`.mdc` formatı).
 - MCP kayıt komutu çalışıyor.
-- **Kalan boşluk:** `deckent init` generator'ları henüz tek-kaynak değil —
-  `mcp/tools/init.ts` yalnızca `.claude/rules/` inline yazıyor. Codex/Gemini/Cursor
-  kullanıcısı ilk sprint regen'ine kadar kendi rule dosyalarını almıyor (Gelecek
-  Öneriler #1).
+- `deckent init` artık `regenerateRules` ile 4 provider rule dizinini de üretiyor
+  — Codex/Gemini/Cursor kullanıcısı init anında kendi (self-contained) rule
+  dosyalarını alıyor; ilk sprint'i beklemiyor.
 
 ---
 
 ## Gelecek Öneriler
 
-1. **Tek-kaynak init:** `init` generator'ları (`init-steps.ts`, `mcp/tools/init.ts`)
-   hardcoded inline rules yerine `generateRules({ projectRoot, adrs: [] })` çağırsın
-   — `deckent init` 4 provider rule dizinini de tutarlı üretir. (`.claude` audit
-   dokümanının da #1 önerisi.)
+1. ~~**Tek-kaynak init**~~ — ✅ **TAMAMLANDI:** `init` generator'ları artık
+   `regenerateRules` çağırıyor; `deckent init` 4 provider rule dizinini de
+   templates'ten tutarlı üretiyor.
 2. **init adapter dosyaları self-contained:** `init-templates.ts`
    `generateDeckentContentTR/EN` + `mcp/tools/init.ts` `deckentContent` `DECKENT.md`'ye
    `## Agent Roles` koyuyor — ortak dokümandan çıkar; üretilen `CLAUDE.md`/`AGENTS.md`
