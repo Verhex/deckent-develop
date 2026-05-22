@@ -1818,7 +1818,7 @@ Runs system health checks and returns results.
   "checks": [
     { "name": "tmux", "passed": true, "message": "tmux 3.3a found", "required": true },
     { "name": "claude", "passed": true, "message": "claude CLI found", "required": true },
-    { "name": "node", "passed": true, "message": "Node.js v20.11.0 found", "required": true }
+    { "name": "node", "passed": true, "message": "Node.js v24.x found", "required": true }
   ]
 }
 ```

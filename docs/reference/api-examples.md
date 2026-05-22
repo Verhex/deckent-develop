@@ -188,7 +188,7 @@ curl http://localhost:3100/api/doctor
 {
   "ok": true,
   "checks": [
-    { "name": "node", "passed": true, "message": "Node.js v20.11.0", "required": true },
+    { "name": "node", "passed": true, "message": "Node.js v24.x", "required": true },
     { "name": "git", "passed": true, "message": "git version 2.43.0", "required": true },
     { "name": "tmux", "passed": true, "message": "tmux 3.3a", "required": true },
     { "name": "claude", "passed": true, "message": "Claude CLI found", "required": true },

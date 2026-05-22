@@ -293,17 +293,19 @@ Tasks 1+2 run in parallel; tasks 3+4 run in parallel. Zero idle time, zero queue
 
 ## 4. Memory Budget Management
 
-The `.brain/` directory is a 3-tier memory system with a 600-line budget. Exceeding this budget degrades sprint planning quality and triggers automatic decay.
+The `.brain/` directory uses a 3-tier memory system backed by SQLite (`memory.db`). Exceeding the configured entry budget degrades sprint planning quality and triggers automatic decay.
 
 ### 4.1 Memory Architecture
 
-| Tier | File | Max Lines | Loaded When |
-|------|------|-----------|-------------|
-| 1 | `.brain/MEMORY.md` | 200 | Always (every sprint) |
-| 2 | `.brain/sprints/sprint-NNN.md` | 80 each | Brain reads last 2 |
-| 3 | `.brain/archive/` | No limit | On-demand only |
+Memory V2 uses SQLite as the single source of truth. Markdown files under `.brain/exports/` are generated snapshots (read-only exports).
 
-**Total budget: 600 lines** (excluding archive). Each sprint adds ~50 lines (retro + memory update). After ~8–12 sprints, decay is needed.
+| Tier | Storage | Exported To | Loaded When |
+|------|---------|-------------|-------------|
+| 1 | `memory.db` entries (`type='memory'`) | `.brain/exports/memory.md` | Always (every sprint, via FTS5 query) |
+| 2 | `memory.db` entries (`type='retro'`, `type='sprint'`) | `.brain/sprints/sprint-NNN.md` | Brain reads last 2 |
+| 3 | `memory.db` entries (decayed/archived) | `.brain/archive/` | On-demand only |
+
+**Budget is managed via DB decay** (`memory.decay_after_sprints` in `.deckent/config.json`). The `deckent memory decay` CLI command prunes old entries from memory.db. Run `deckent memory stats` to see current entry counts.
 
 ### 4.2 Monitoring Memory Usage
 
@@ -318,7 +320,7 @@ deckent doctor
 
 Or check directly:
 ```bash
-wc -l .brain/MEMORY.md .brain/RETRO.md .brain/DEBT.md .brain/PATTERNS.md .brain/DECISIONS.md .brain/sprints/*.md
+deckent memory stats
 ```
 
 ### 4.3 Decay and Compression
@@ -334,43 +336,40 @@ deckent cleanup --force
 ```
 
 Decay removes:
-- **Old sprint logs** — logs older than 5 sprints are archived to `.brain/archive/`
-- **Resolved debt** — `DEBT.md` entries resolved 3+ sprints ago are removed
-- **Stale patterns** — `PATTERNS.md` entries not seen in 8+ sprints are pruned
+- **Old sprint logs** — `memory.db` sprint/retro entries older than `decay_after_sprints` sprints are archived to `.brain/archive/`
+- **Resolved debt** — `memory.db` debt entries resolved 3+ sprints ago are removed
+- **Stale patterns** — `memory.db` pattern entries not seen in 8+ sprints are pruned
 
 ### 4.4 Memory Budget Best Practices
 
-**Keep MEMORY.md focused:**
-- Maximum 200 lines enforced
-- Each entry should be a unique, actionable learning
-- Remove duplicates and outdated facts after major refactors
+**Keep memory entries focused:**
+- Each entry in `memory.db` should be a unique, actionable learning
+- Use `deckent memory decay` to prune outdated or duplicate entries (controlled by `memory.decay_after_sprints` in config)
+- Run `deckent memory stats` to review entry counts by type
 
-**Keep RETRO.md concise:**
-- Maximum 100 lines per retro
+**Keep retro entries concise:**
 - Focus on decisions and surprises, not task summaries
-- Brain overwrites RETRO.md each sprint — it doesn't accumulate
+- Brain upserts the retro entry in `memory.db` each sprint — it doesn't accumulate unboundedly
 
-**Keep DEBT.md clean:**
+**Keep debt entries clean:**
 - Resolve items promptly — items resolved 3+ sprints ago are auto-removed by decay
 - Mark items as `resolved` using `deckent archive-debt` after fixing
 - Never add items that are already in the source code (they'll conflict with decay)
 
-**Archive aggressively:**
+**Decay aggressively:**
 ```bash
-# Manually archive old sprint logs
-mkdir -p .brain/archive
-mv .brain/sprints/sprint-001.md .brain/archive/
-mv .brain/sprints/sprint-002.md .brain/archive/
+# Trigger memory decay (respects decay_after_sprints config)
+deckent memory decay
 ```
 
 ### 4.5 Memory Overflow Symptoms
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
-| Brain plans duplicate tasks | MEMORY.md context is stale/contradictory | Run decay, clean MEMORY.md manually |
-| Planning quality decreases | Too much noise in context window | Compress MEMORY.md to key facts only |
-| `doctor` warns over budget | .brain/ > 600 lines | `deckent cleanup --decay` |
-| Slow sprint planning | Large MEMORY/PATTERNS context | Prune irrelevant entries |
+| Brain plans duplicate tasks | memory.db context is stale/contradictory | Run `deckent memory decay`, review entries via `deckent recall` |
+| Planning quality decreases | Too much noise in context window | Prune irrelevant entries with `deckent memory decay` |
+| `doctor` warns over budget | Too many memory.db entries | `deckent memory decay` (configure `memory.decay_after_sprints`) |
+| Slow sprint planning | Large memory/pattern context loaded | Prune irrelevant pattern entries from memory.db |
 
 ---
 
@@ -446,31 +445,27 @@ cat .tasks/task-XXX.log
 
 ### 5.2 Memory Overflow
 
-**Symptom:** `deckent doctor` warns `Brain Budget over 600 lines`.
+**Symptom:** `deckent doctor` warns that memory budget is over limit.
 
 ```bash
 # Step 1: Check what's taking space
-wc -l .brain/*.md .brain/sprints/*.md 2>/dev/null | sort -rn | head -20
+deckent memory stats
 
 # Step 2: Run decay
-deckent cleanup --decay
+deckent memory decay
 
-# Step 3: If still over budget, manually trim MEMORY.md
-# Remove duplicate or outdated entries
-# Keep total under 200 lines
+# Step 3: If still over budget, query and review stale entries
+deckent recall "stale pattern"
+# Remove specific entries via deckent memory CLI or direct DB query
 
-# Step 4: Archive old sprint logs manually
-mkdir -p .brain/archive
-mv .brain/sprints/sprint-00{1..5}.md .brain/archive/ 2>/dev/null
-
-# Step 5: Verify
+# Step 4: Verify
 deckent doctor
 ```
 
 **Prevention:**
-- Run `deckent cleanup --decay` after every 3–4 sprints
-- Keep MEMORY.md under 80 lines (leave headroom for the next sprint's learnings)
-- Don't add verbose summaries to MEMORY.md — only unique, actionable insights
+- Run `deckent memory decay` after every 3–4 sprints
+- Set `memory.decay_after_sprints` in `.deckent/config.json` to auto-prune old entries
+- Don't add verbose summaries — only unique, actionable insights (Brain manages this during RETRO phase)
 
 ### 5.3 tmux Issues Affecting Performance
 
@@ -537,10 +532,11 @@ This is usually a planning quality issue, not a performance issue. But it does w
 **Diagnosis:**
 ```bash
 # View last retro
-cat .brain/RETRO.md
+deckent retro
 
 # View current debt
-cat .brain/DEBT.md
+deckent recall "debt"
+# or view the generated snapshot: cat .brain/exports/debt.md
 
 # Check sprint log
 cat .brain/sprints/sprint-NNN.md
@@ -561,7 +557,7 @@ Before starting a large sprint, run this checklist:
 deckent doctor
 
 # 2. Check memory budget
-wc -l .brain/*.md | tail -1
+deckent memory stats
 
 # 3. Preview the plan (0 tokens with structured mode)
 deckent plan --dry-run
@@ -570,7 +566,7 @@ deckent plan --dry-run
 deckent config | jq '{mode, max_workers: .activeModeConfig.max_workers, brain_planning: .activeModeConfig.brain_planning}'
 ```
 
-All required checks in step 1 must pass. Memory should be under 250 lines. The plan should have ≤ `max_workers` tasks for best parallelism.
+All required checks in step 1 must pass. Memory stats should show no over-budget warning. The plan should have ≤ `max_workers` tasks for best parallelism.
 
 ---
 

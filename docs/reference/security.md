@@ -62,7 +62,7 @@ The Auditor observes the system but never modifies source code or creates tasks.
 | Capability | Allowed | Denied |
 |---|---|---|
 | **Read** | All files | — |
-| **Write** | `.dashboard`, `.brain/PATTERNS.md`, `.tasks/ALERT` | Source code, `.tasks/*.json` (create/modify), `.brain/MEMORY.md` |
+| **Write** | `.dashboard`, `memory.db (pattern entries)`, `.tasks/ALERT` | Source code, `.tasks/*.json` (create/modify), `.brain/MEMORY.md` |
 | **Execute** | `git diff`, `git log` (read-only git) | Build, test, spawn agents |
 | **Alerts** | Write alert files | Cannot kill agents directly |
 
@@ -70,7 +70,7 @@ The Auditor observes the system but never modifies source code or creates tasks.
 
 **Claude Code `--allowedTools`:**
 ```
-Read,Write(.dashboard),Write(.brain/PATTERNS.md),Write(.tasks/ALERT),Bash(git diff *),Bash(git log *),Bash(cat *),Bash(ls *),Bash(wc *)
+Read,Write(.dashboard),Write(.brain/memory.db),Write(.tasks/ALERT),Bash(git diff *),Bash(git log *),Bash(cat *),Bash(ls *),Bash(wc *)
 ```
 
 ---
@@ -182,7 +182,7 @@ File path separators (`/`) are replaced with `__` (double underscore) to avoid n
 
 When Auditor detects a stale lock (>5 min), it:
 1. Creates a `WARNING` alert in `.dashboard`
-2. Records the pattern in `.brain/PATTERNS.md`
+2. Records the pattern in `memory.db` (type='pattern' entry)
 3. The Brain can escalate to killing the offending worker
 
 ```
@@ -240,7 +240,7 @@ const cyclicNodes = [...inDegree.entries()]
 
 After each scan, the Auditor:
 - Overwrites `.dashboard` with updated state (never appends — always fresh)
-- Appends new patterns to `.brain/PATTERNS.md` (never overwrites — append only)
+- Upserts new patterns to `memory.db` (type='pattern' entries via detectPatterns())
 - Keeps last 50 alerts in dashboard state
 
 ---

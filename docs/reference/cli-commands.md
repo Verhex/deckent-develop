@@ -1,7 +1,7 @@
 # CLI Command Inventory
 
-> Complete inventory of all Deckent CLI commands. Auto-generated reference for Sprint 151.
-> **Total:** 45 top-level commands + 59 subcommands = 104 command endpoints
+> Complete inventory of all Deckent CLI commands. Last updated Sprint 186.
+> **Total:** 55+ top-level commands + subcommands
 
 ## Quick Reference
 

@@ -13,7 +13,7 @@ Deckent, [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) üzeri
    - [Claude Code](#claude-code)
    - [VS Code (Cline / Continue)](#vs-code)
    - [Cursor](#cursor)
-3. [10 MCP Tool Referansı](#10-mcp-tool-referansı)
+3. [31 MCP Tool Referansı](#31-mcp-tool-referansı)
    - [deckent_init](#1-deckent_init)
    - [deckent_set_directives](#2-deckent_set_directives)
    - [deckent_plan](#3-deckent_plan)
@@ -24,7 +24,7 @@ Deckent, [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) üzeri
    - [deckent_history](#8-deckent_history)
    - [deckent_analyze_project](#9-deckent_analyze_project)
    - [deckent_sync](#10-deckent_sync)
-4. [5 MCP Resource Referansı](#5-mcp-resource-referansı)
+4. [8 MCP Resource Referansı](#8-mcp-resource-referansı)
    - [deckent://dashboard](#1-deckentdashboard)
    - [deckent://directives](#2-deckentdirectives)
    - [deckent://memory](#3-deckentmemory)
@@ -42,8 +42,8 @@ Claude Code / IDE (MCP client)
          │  stdio transport
          ▼
 deckent-mcp process (src/mcp/server.ts)
-    ├── 10 Tools  (src/mcp/tools/)
-    └──  5 Resources (src/mcp/resources/)
+    ├── 31 Tools  (src/mcp/tools/)
+    └──  8 Resources (src/mcp/resources/)
          │
          ▼
 Deckent Core Engine
@@ -183,7 +183,7 @@ Alternatif olarak `~/.cursor/mcp.json` dosyasına ekleyin:
 
 ---
 
-## 10 MCP Tool Referansı
+## 31 MCP Tool Referansı
 
 Tüm tool'lar `src/mcp/tools/` altında tanımlanmıştır. Blueprint §21'de listelenen tam tablo:
 
@@ -445,7 +445,7 @@ Tüm tool'lar `src/mcp/tools/` altında tanımlanmıştır. Blueprint §21'de li
 {
   "ok": true,
   "checks": [
-    { "name": "node_version", "status": "ok", "detail": "v20.11.0 (>=18 required)" },
+    { "name": "node_version", "status": "ok", "detail": "v24.x (>=24.0.0 required)" },
     { "name": "git", "status": "ok", "detail": "git 2.43.0" },
     { "name": "tmux", "status": "ok", "detail": "tmux 3.3a" },
     { "name": "claude_cli", "status": "ok", "detail": "claude 1.2.3" },
@@ -621,7 +621,7 @@ Tüm tool'lar `src/mcp/tools/` altında tanımlanmıştır. Blueprint §21'de li
 
 ---
 
-## 5 MCP Resource Referansı
+## 8 MCP Resource Referansı
 
 Resource'lar IDE'nin context penceresine otomatik olarak dahil edilebilir. `deckent://` URI şemasını kullanırlar.
 
@@ -629,8 +629,8 @@ Resource'lar IDE'nin context penceresine otomatik olarak dahil edilebilir. `deck
 |---|---|---|---|
 | `deckent://dashboard` | `application/json` | `.dashboard` | Anlık sprint durumu |
 | `deckent://directives` | `text/markdown` | `DIRECTIVES.md` | Aktif sprint hedefleri |
-| `deckent://memory` | `text/markdown` | `.brain/MEMORY.md` | Öğrenilmiş desenler |
-| `deckent://debt` | `application/json` | `.brain/DEBT.md` | Teknik borç kalemleri |
+| `deckent://memory` | `text/markdown` | `.brain/exports/memory.md (generated snapshot)` | Öğrenilmiş desenler |
+| `deckent://debt` | `application/json` | `memory.db (debt type entries, exported to .brain/exports/debt.md)` | Teknik borç kalemleri |
 | `deckent://config` | `application/json` | `.deckent/config.json` | Proje konfigürasyonu |
 
 ---
@@ -681,9 +681,9 @@ Resource'lar IDE'nin context penceresine otomatik olarak dahil edilebilir. `deck
 
 ### 3. deckent://memory
 
-**Açıklama:** `.brain/MEMORY.md` içeriği — önceki sprintlerden öğrenilen desenler. Max 100 satır. Brain her sprint başında bu resource'u okur.
+**Açıklama:** `.brain/exports/memory.md (Memory V2 generated snapshot — actual data in memory.db)` içeriği — önceki sprintlerden öğrenilen desenler. Max 100 satır. Brain her sprint başında bu resource'u okur.
 
-**Kaynak Dosya:** `.brain/MEMORY.md` (Markdown)
+**Kaynak Dosya:** `.brain/exports/memory.md (Memory V2 generated snapshot — actual data in memory.db)`
 
 **Örnek Çıktı:**
 
@@ -701,9 +701,9 @@ Resource'lar IDE'nin context penceresine otomatik olarak dahil edilebilir. `deck
 
 ### 4. deckent://debt
 
-**Açıklama:** `.brain/DEBT.md` dosyasından parse edilmiş teknik borç kalemleri. JSON array formatında döner.
+**Açıklama:** `memory.db debt entries` — parse edilmiş teknik borç kalemleri. JSON array formatında döner.
 
-**Kaynak Dosya:** `.brain/DEBT.md` (Markdown tablo → JSON)
+**Kaynak Dosya:** `memory.db debt entries` (exported to `.brain/exports/debt.md`)
 
 **Örnek Çıktı:**
 
