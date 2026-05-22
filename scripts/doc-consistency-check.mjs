@@ -9,13 +9,17 @@ import { resolve } from 'node:path';
 const ROOT = process.argv[2] || process.cwd();
 
 /** @type {Array<{name: string, path: string}>} */
+// Paths updated after Sprint 172 doc-reorg (root → docs/ subdirs):
+//   DECKENT-MASTER-BLUEPRINT.md → docs/vision/blueprint.md
+//   BETA-TRACKER.md             → docs/release/beta-tracker.md
+//   BETA-TRACKER-TR.md          → docs/release/beta-tracker-tr.md
 const DOCS = [
   { name: 'DECKENT.md', path: 'DECKENT.md' },
   { name: 'IDENTITY.md', path: '.deckent/workspace/IDENTITY.md' },
-  { name: 'MASTER-BLUEPRINT', path: 'DECKENT-MASTER-BLUEPRINT.md' },
+  { name: 'MASTER-BLUEPRINT', path: 'docs/vision/blueprint.md' },
   { name: 'ANA-PLAN-TR', path: 'DECKENT-ANA-PLAN-TR.md' },
-  { name: 'BETA-TRACKER (EN)', path: 'BETA-TRACKER.md' },
-  { name: 'BETA-TRACKER (TR)', path: 'BETA-TRACKER-TR.md' },
+  { name: 'BETA-TRACKER (EN)', path: 'docs/release/beta-tracker.md' },
+  { name: 'BETA-TRACKER (TR)', path: 'docs/release/beta-tracker-tr.md' },
   { name: 'summary.md', path: '.brain/exports/summary.md' },
 ];
 

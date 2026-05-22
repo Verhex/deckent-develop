@@ -7,15 +7,15 @@
 
 ## Yaşayan Sicil (Living Records)
 - [FINAL-EXECUTIVE-REPORT.md](../audits/sprint-132/FINAL-EXECUTIVE-REPORT.md) — Sprint 132+ executive audit, inline güncellenir her sprint
-- [God Analysis FINAL-REPORT.md](../../.deckent/sprint-god-analysis/FINAL-REPORT.md) — Sprint 142 self-analysis + closure tracking
+- [God Analysis FINAL-REPORT.md](../../.deckent/archive/sprints/misc/sprint-god-analysis/FINAL-REPORT.md) — Sprint 142 self-analysis + closure tracking (Sprint 172 doc-reorg ile arşive taşındı)
 
 ## Yapısal Plan (Static Plans)
-- [DECKENT-ANA-PLAN-TR.md](../../DECKENT-ANA-PLAN-TR.md) — TR ana plan, her major sprint sonu güncellenir
-- [DECKENT-MASTER-BLUEPRINT.md](../../DECKENT-MASTER-BLUEPRINT.md) — EN technical blueprint, her major sprint sonu güncellenir
+- [DECKENT-ANA-PLAN-TR.md](../../DECKENT-ANA-PLAN-TR.md) — TR ana plan, her major sprint sonu güncellenir ⚠️ Sprint 164 sonrası güncellenmedi
+- [blueprint.md](../vision/blueprint.md) — EN technical blueprint (Sprint 172 doc-reorg: `DECKENT-MASTER-BLUEPRINT.md` → `docs/vision/blueprint.md`)
 
 ## Beta Tracking
-- [BETA-TRACKER.md](../../BETA-TRACKER.md) — EN beta GA roadmap
-- [BETA-TRACKER-TR.md](../../BETA-TRACKER-TR.md) — TR beta GA yol haritası
+- [beta-tracker.md](../release/beta-tracker.md) — EN beta GA roadmap (Sprint 172 doc-reorg: `BETA-TRACKER.md` → `docs/release/beta-tracker.md`)
+- [beta-tracker-tr.md](../release/beta-tracker-tr.md) — TR beta GA yol haritası (Sprint 172 doc-reorg: `BETA-TRACKER-TR.md` → `docs/release/beta-tracker-tr.md`)
 
 ## Kimlik (Identity)
 - [DECKENT.md](../../DECKENT.md) — Project root identity adapter
