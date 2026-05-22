@@ -64,7 +64,6 @@ export {
   updateProjectDocs,
   autoResolveDebt,
   autoDraftDecisions,
-  addRecurringPatternsToFile,
   collectSprintFiles,
   archiveDirectives,
   emergencyRestoreDirectives,

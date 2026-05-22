@@ -29,7 +29,8 @@ export default defineConfig({
   // or HTML-like substrings (e.g. `<noreply@anthropic.com>` in co-author trailers, `<PID>` in
   // placeholders) that VitePress's Vue compiler treats as unclosed HTML elements. These are
   // developer notes / specs / audits, not user-facing documentation.
-  // Only guide/ and index.md are built as user-facing docs.
+  // User-facing build set (NOT excluded): guide/, reference/, adr/, design/, security/,
+  // vision/ + root files (index.md, KNOWN_ISSUES.md, ROADMAP-GOD-LEVEL.md, worker-guide.md).
   srcExclude: [
     'directives/**',
     'analysis/**',
@@ -60,20 +61,8 @@ export default defineConfig({
     // Top navigation
     nav: [
       { text: 'Home', link: '/' },
-      {
-        text: 'Docs',
-        activeMatch: '^/(guide|reference|api)/',
-        items: [
-          { text: 'Getting Started', link: '/guide/getting-started' },
-          { text: 'Architecture', link: '/guide/architecture' },
-          { text: 'CLI Reference', link: '/reference/cli' },
-          { text: 'API Reference', link: '/api/' },
-          { text: 'MCP Guide', link: '/guide/mcp' },
-          { text: 'Config Reference', link: '/reference/config' },
-          { text: 'Plugin Development', link: '/guide/plugins' },
-        ],
-      },
-      { text: 'Blog', link: '/blog/' },
+      { text: 'Guide', link: '/guide/getting-started', activeMatch: '^/guide/' },
+      { text: 'Reference', link: '/reference/cli', activeMatch: '^/reference/' },
       {
         text: 'GitHub',
         link: 'https://github.com/VerhexIO/deckent',
@@ -83,87 +72,112 @@ export default defineConfig({
     ],
 
     // Sidebar configuration
+    // Sidebar — matches the actual docs/guide/ (14) + docs/reference/ (21) files.
+    // Rewritten 2026-05-22: previous sidebar described a doc structure that never
+    // shipped (Sprint 172 doc-reorg residue). See alperen-analysis/2026-05-22-vitepress-config-audit.md
     sidebar: {
       '/guide/': [
         {
           text: 'Getting Started',
           collapsed: false,
           items: [
-            { text: 'Introduction', link: '/guide/introduction' },
             { text: 'Getting Started', link: '/guide/getting-started' },
-            { text: 'First Sprint', link: '/guide/first-sprint' },
+            { text: 'Installation', link: '/guide/installation' },
+            { text: 'Quickstart', link: '/guide/quickstart' },
+            { text: 'Your First Sprint', link: '/guide/first-sprint' },
+          ],
+        },
+        {
+          text: 'Core Concepts',
+          collapsed: false,
+          items: [
             { text: 'Core Concepts', link: '/guide/concepts' },
-            { text: 'Configuration', link: '/guide/configuration' },
-          ],
-        },
-        {
-          text: 'Architecture',
-          collapsed: false,
-          items: [
-            { text: 'Overview', link: '/guide/architecture' },
-            { text: 'Brain & Orchestration', link: '/guide/brain' },
             { text: 'Workers', link: '/guide/workers' },
-            { text: 'Auditor', link: '/guide/auditor' },
-            { text: 'Skills System', link: '/guide/skills' },
+            { text: 'Nervous System', link: '/guide/nervous-system' },
           ],
         },
         {
-          text: 'MCP Guide',
+          text: 'Backends & Operations',
           collapsed: false,
           items: [
-            { text: 'MCP Overview', link: '/guide/mcp' },
-            { text: 'MCP Tools', link: '/guide/mcp-tools' },
-            { text: 'MCP Resources', link: '/guide/mcp-resources' },
+            { text: 'Docker Backend', link: '/guide/docker-backend' },
+            { text: 'Config Recovery', link: '/guide/config-recovery' },
+            { text: 'Troubleshooting', link: '/guide/troubleshooting' },
           ],
         },
         {
-          text: 'Plugin Development',
-          collapsed: true,
+          text: 'Web Terminal',
+          collapsed: false,
           items: [
-            { text: 'Plugin System', link: '/guide/plugins' },
-            { text: 'Writing a Plugin', link: '/guide/writing-plugins' },
-            { text: 'Plugin API', link: '/guide/plugin-api' },
-            { text: 'Publishing Plugins', link: '/guide/publishing-plugins' },
+            { text: 'Embedded Web Terminal', link: '/guide/terminal' },
+            { text: 'Gömülü Web Terminali (Türkçe)', link: '/guide/terminal-tr' },
+          ],
+        },
+        {
+          text: 'Help',
+          collapsed: false,
+          items: [
+            { text: 'FAQ', link: '/guide/faq' },
+            { text: 'Deckent Nedir? (Türkçe)', link: '/guide/deckent-nedir' },
           ],
         },
       ],
       '/reference/': [
         {
-          text: 'CLI Reference',
+          text: 'CLI',
           collapsed: false,
           items: [
-            { text: 'Overview', link: '/reference/cli' },
-            { text: 'deckent start', link: '/reference/cli-start' },
-            { text: 'deckent status', link: '/reference/cli-status' },
-            { text: 'deckent config', link: '/reference/cli-config' },
-            { text: 'deckent doctor', link: '/reference/cli-doctor' },
-            { text: 'deckent finalize', link: '/reference/cli-finalize' },
+            { text: 'CLI Overview', link: '/reference/cli' },
+            { text: 'CLI Commands', link: '/reference/cli-commands' },
           ],
         },
         {
-          text: 'Config Reference',
+          text: 'Configuration',
           collapsed: false,
           items: [
-            { text: 'Configuration Overview', link: '/reference/config' },
-            { text: 'Provider Settings', link: '/reference/config-provider' },
-            { text: 'Sprint Settings', link: '/reference/config-sprint' },
-            { text: 'Memory Settings', link: '/reference/config-memory' },
-            { text: 'Auditor Settings', link: '/reference/config-auditor' },
-            { text: 'Output Settings', link: '/reference/config-output' },
+            { text: 'Config Overview', link: '/reference/config' },
+            { text: 'Config Reference', link: '/reference/config-reference' },
           ],
         },
-      ],
-      '/api/': [
         {
-          text: 'API Reference',
+          text: 'API',
           collapsed: false,
           items: [
-            { text: 'Overview', link: '/api/' },
-            { text: 'REST API', link: '/api/rest' },
-            { text: 'Health Endpoints', link: '/api/health' },
-            { text: 'Config Endpoints', link: '/api/config' },
-            { text: 'Sprint Endpoints', link: '/api/sprint' },
-            { text: 'WebSocket', link: '/api/websocket' },
+            { text: 'API Overview', link: '/reference/api' },
+            { text: 'API Surface', link: '/reference/api-surface' },
+            { text: 'API Examples', link: '/reference/api-examples' },
+          ],
+        },
+        {
+          text: 'MCP',
+          collapsed: false,
+          items: [
+            { text: 'MCP Guide', link: '/reference/mcp-guide' },
+            { text: 'MCP Tools', link: '/reference/mcp-tools' },
+            { text: 'MCP Resources', link: '/reference/mcp-resources' },
+          ],
+        },
+        {
+          text: 'Agents & Skills',
+          collapsed: false,
+          items: [
+            { text: 'Agents', link: '/reference/agents' },
+            { text: 'Skills', link: '/reference/skills' },
+          ],
+        },
+        {
+          text: 'Operations',
+          collapsed: false,
+          items: [
+            { text: 'Multi-Provider', link: '/reference/multi-provider' },
+            { text: 'Health Check', link: '/reference/health-check' },
+            { text: 'Performance', link: '/reference/performance' },
+            { text: 'Security', link: '/reference/security' },
+            { text: 'Managed Docs', link: '/reference/managed-docs' },
+            { text: 'Marketplace', link: '/reference/marketplace' },
+            { text: 'Migration Guide', link: '/reference/migration-guide' },
+            { text: 'Features', link: '/reference/features' },
+            { text: 'Glossary', link: '/reference/glossary' },
           ],
         },
       ],

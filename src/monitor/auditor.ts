@@ -12,15 +12,12 @@ import type {
   BoundaryViolation,
   Alert,
   DashboardState,
-  PatternEntry,
 } from '../core/types.js';
 import {
   TASKS_DIR,
   LOCKS_DIR,
   BRAIN_DIR,
   DASHBOARD_FILE,
-  PATTERNS_FILE,
-  PATTERNS_MAX_LINES,
   ARCHIVE_DIR,
 } from '../core/constants.js';
 
@@ -609,6 +606,16 @@ export function updateDashboard(
   writeFileSync(dashPath, JSON.stringify(state, null, 2), 'utf-8');
 }
 
+/**
+ * Record auditor boundary-violation patterns into the Memory V2 DB as
+ * `type='pattern'` entries — one upserted row per (sprint, violation-type).
+ *
+ * B7 (Memory V2): replaces the legacy `.brain/PATTERNS.md` JSON writer.
+ * memory.db is the single source of truth for patterns; the auditor scan
+ * loop calls this once per scan with the sprint's accumulated violations.
+ * A missing DB or write failure is a graceful no-op — pattern recording
+ * must never break the scan loop.
+ */
 export function detectPatterns(
   projectRoot: string,
   violations: BoundaryViolation[],
@@ -616,55 +623,37 @@ export function detectPatterns(
 ): void {
   if (violations.length === 0) return;
 
-  const patternsPath = join(projectRoot, BRAIN_DIR, PATTERNS_FILE);
+  const dbPath = join(projectRoot, BRAIN_DIR, MEMORY_DB_FILE);
+  if (!existsSync(dbPath)) return;
 
-  // Read existing patterns
-  let existingPatterns: PatternEntry[] = [];
-  try {
-    const content = readFileSync(patternsPath, 'utf-8');
-    // safe: PatternEntry[] shape validated by detectPatterns logic (occurrences, pattern, etc.)
-    existingPatterns = JSON.parse(content) as PatternEntry[];
-  } catch {
-    existingPatterns = [];
-  }
-
-  // Group violations by type to create/update patterns
+  // Group violations by type — one pattern entry per type, occurrence count
+  // carried in metadata.
   const violationTypes = new Map<string, number>();
   for (const v of violations) {
     violationTypes.set(v.type, (violationTypes.get(v.type) ?? 0) + 1);
   }
 
-  for (const [type, count] of violationTypes) {
-    const existing = existingPatterns.find((p) => p.pattern === type);
-    if (existing) {
-      existing.occurrences += count;
-      existing.lastDetectedInSprint = currentSprintId;
-    } else {
-      existingPatterns.push({
-        pattern: type,
-        occurrences: count,
-        firstDetectedInSprint: currentSprintId,
-        lastDetectedInSprint: currentSprintId,
-        resolved: false,
-      });
+  try {
+    const store = new MemoryStore(dbPath);
+    try {
+      for (const [type, count] of violationTypes) {
+        store.upsert({
+          id: `pattern-${currentSprintId}-${type}`,
+          type: 'pattern',
+          title: `Violation pattern: ${type}`,
+          content: `${count} occurrence(s) of ${type} detected in ${currentSprintId}`,
+          sprint_id: currentSprintId,
+          tags: ['auditor', 'pattern', type],
+          status: 'active',
+          metadata: { violationType: type, occurrences: count },
+        }, 'auditor');
+      }
+    } finally {
+      store.close();
     }
+  } catch {
+    // DB write failure must not break the auditor scan loop.
   }
-
-  // Truncate if exceeding max lines
-  const serialized = JSON.stringify(existingPatterns, null, 2);
-  const lineCount = serialized.split('\n').length;
-  if (lineCount > PATTERNS_MAX_LINES) {
-    // Sort descending so lowest-occurrence patterns are at the end — pop() is O(1) vs shift() O(n)
-    existingPatterns.sort((a, b) => b.occurrences - a.occurrences);
-    while (
-      JSON.stringify(existingPatterns, null, 2).split('\n').length > PATTERNS_MAX_LINES &&
-      existingPatterns.length > 1
-    ) {
-      existingPatterns.pop();
-    }
-  }
-
-  writeFileSync(patternsPath, JSON.stringify(existingPatterns, null, 2), 'utf-8');
 }
 
 // ─── Bug Y2: Doc-Sync Ground-Truth Verification (Sprint 166) ──────────
@@ -1075,42 +1064,11 @@ export function runScanCycle(
       ...spawnLockAlerts,
     ];
 
-    // Detect patterns from violations
+    // Detect patterns from violations → memory.db `pattern` entries.
+    // B7: detectPatterns is now the single (DB-first) pattern writer — the
+    // former inline upsert block + legacy `.brain/PATTERNS.md` file write
+    // were folded into it.
     detectPatterns(projectRoot, allViolations, currentSprintId);
-
-    // Sprint 166 Bug W: Wire detected violation patterns into memory.db as type='pattern'.
-    // Sprint 148-165: 0 pattern entries — file-only write existed but DB insert was missing.
-    if (allViolations.length > 0) {
-      const dbPath = join(projectRoot, BRAIN_DIR, MEMORY_DB_FILE);
-      try {
-        if (existsSync(dbPath)) {
-          const store = new MemoryStore(dbPath);
-          try {
-            const violationTypes = new Map<string, number>();
-            for (const v of allViolations) {
-              violationTypes.set(v.type, (violationTypes.get(v.type) ?? 0) + 1);
-            }
-            for (const [type, count] of violationTypes) {
-              const id = `pattern-${currentSprintId}-${type}`;
-              store.upsert({
-                id,
-                type: 'pattern',
-                title: `Violation pattern: ${type}`,
-                content: `${count} occurrence(s) of ${type} detected in ${currentSprintId}`,
-                sprint_id: currentSprintId,
-                tags: ['auditor', 'pattern', type],
-                status: 'active',
-                metadata: { violationType: type, occurrences: count },
-              }, 'auditor');
-            }
-          } finally {
-            store.close();
-          }
-        }
-      } catch {
-        // DB insert failure must not break scan loop
-      }
-    }
 
     // Sprint 166 Bug W: stale_md detector (M4 monitoring).
     // CLAUDE.md mtime > 70 min triggers emitAlert so the dashboard surface shows staleness.

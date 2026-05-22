@@ -18,6 +18,8 @@
 
 **Tek cümlede:** VitePress nav/sidebar, hiç var olmayan bir doküman yapısını tarif ediyor — gerçek 14 guide + 21 reference dosyasının yalnız 7'si menüden erişilebilir, geri kalan 29'u orphan, menü tıklamalarının %77'si 404.
 
+> **Durum (2026-05-22): ✅ Düzeltildi** — nav/sidebar yaklaşım (a) ile yeniden yazıldı; **38/38 link çözülüyor, 0 kırık, 0 orphan**. Ayrıntı: aşağıdaki "Uygulanan Düzeltme" bölümü.
+
 ---
 
 ## Kök Neden
@@ -93,6 +95,24 @@ Gerçek `srcExclude` listesi: `directives/`, `analysis/`, `archive/`, `release/`
 
 ---
 
+## Uygulanan Düzeltme — `config.ts` Yeniden Yazıldı (2026-05-22)
+
+Kullanıcı kararı: **yaklaşım (a)** — nav/sidebar mevcut 14 guide + 21 reference dosyasına göre baştan yazıldı (eksik aspirasyonel sayfaları oluşturmak yerine).
+
+| Alan | Önce | Sonra |
+|------|------|-------|
+| `nav` | "Docs" dropdown (4 phantom öğe) + "Blog" + `activeMatch` `api` | Sade `Home / Guide / Reference / GitHub` — 3 dahili link, 3'ü geçerli |
+| `/guide/` sidebar | 17 link, 13 kırık | 5 bölüm (Getting Started / Core Concepts / Backends & Operations / Web Terminal / Help) — 14 guide dosyasının **tamamı** |
+| `/reference/` sidebar | 12 link, 10 kırık | 6 bölüm (CLI / Configuration / API / MCP / Agents & Skills / Operations) — 21 reference dosyasının **tamamı** |
+| `/api/` sidebar bloğu | 6 link, 6 kırık | **Tümüyle kaldırıldı** (`docs/api/` yok); API dokümanı `/reference/api*` altında |
+| `srcExclude` yorumu | "Only guide/ and index.md" (yanlış) | Gerçek build seti listelendi (guide/, reference/, adr/, design/, security/, vision/ + kök dosyalar) |
+
+**Doğrulama:** `config.ts`'teki 38 dahili linkin tamamı `cleanUrls` kuralıyla dosya sistemine karşı kontrol edildi — **38/38 çözülüyor, 0 kırık, 0 orphan**. Önce: 44 link / 34 kırık / 29 orphan.
+
+**Açık kalan (bu düzeltme kapsamı dışı):** reference/ duplikasyonu — `cli`↔`cli-commands`, `config`↔`config-reference`, `api`↔`api-surface`↔`api-examples`, `mcp-guide`↔`mcp-tools`↔`mcp-resources` şimdilik ikisi de sidebar'da (öneri #3); themeConfig link-lint CI adımı (öneri #6); `terminal-tr.md`/`deckent-nedir.md` Türkçe sayfaları EN sidebar'da etiketle sunuluyor — kalıcı çözüm VitePress i18n `locales`.
+
+---
+
 ## Açık Kaynak Hazırlığı Değerlendirmesi
 
 **Kullanıcı perspektifi (kritik):**
@@ -108,15 +128,15 @@ Gerçek `srcExclude` listesi: `directives/`, `analysis/`, `archive/`, `release/`
 
 ## Gelecek Öneriler
 
-1. **nav + sidebar gerçek dosya setine yeniden yazılmalı** — Bir **karar** gerekiyor: (a) nav/sidebar'ı mevcut 14 guide + 21 reference dosyasına göre baştan yaz (hızlı, dürüst); ya da (b) eksik 30 aspirasyonel sayfayı (`introduction`, `architecture`, `brain`, `auditor`, `mcp*`, `plugins*`, `/api/*`, `cli-*`, `config-*`) gerçekten oluştur (büyük efor). (a) önerilir — sonra eksik sayfalar ayrı iş kalemi.
-2. **Phantom route gruplarını kaldır:** `/api/` sidebar bloğu + nav "API Reference" → `docs/reference/api.md`'ye repoint veya `/reference/` altına taşı; `/blog/` nav linki kaldırılmalı (blog yoksa).
-3. **reference/ duplikasyonu çözülmeli:** `cli.md`↔`cli-commands.md`, `config.md`↔`config-reference.md`, `api.md`↔`api-surface.md`↔`api-examples.md`, `mcp-guide.md`↔`mcp-tools.md`↔`mcp-resources.md` — her küme için canonical seçilip diğeri redirect/silinmeli; sidebar ona göre kurulmalı.
-4. **29 orphan sayfa sidebar'a bağlanmalı** — özellikle `installation`, `quickstart`, `docker-backend`, `nervous-system`, `terminal`, `faq` ve tüm `reference/`.
-5. **`srcExclude` yorumu düzeltilmeli** (satır 32) — gerçek build kapsamını yansıtacak şekilde.
-6. **themeConfig link doğrulaması CI'a eklenmeli** — `ignoreDeadLinks` nav/sidebar'ı kapsamadığı için `scripts/lint-links.mjs`'e config.ts `link:` değerlerini dosya sistemine karşı denetleyen bir adım eklenmeli; aksi hâlde bu regresyon sınıfı sessizce geri döner.
+1. ✅ **Tamamlandı (2026-05-22)** — nav + sidebar yaklaşım (a) ile mevcut 14 guide + 21 reference dosyasına göre yeniden yazıldı. Eksik 30 aspirasyonel sayfanın (`introduction`, `architecture`, `brain`, `auditor`, `mcp*`, `plugins*`, `/api/*`, `cli-*`, `config-*`) gerçekten oluşturulması ayrı iş kalemi olarak **açık**.
+2. ✅ **Tamamlandı** — `/api/` sidebar bloğu + nav "API Reference" + "Blog" linki kaldırıldı; API dokümanı `/reference/api*` altında zaten sidebar'da.
+3. **reference/ duplikasyonu çözülmeli (AÇIK):** `cli.md`↔`cli-commands.md`, `config.md`↔`config-reference.md`, `api.md`↔`api-surface.md`↔`api-examples.md`, `mcp-guide.md`↔`mcp-tools.md`↔`mcp-resources.md` — her küme için canonical seçilip diğeri redirect/silinmeli; şu an ikisi de sidebar'da sunuluyor.
+4. ✅ **Tamamlandı** — 29 orphan sayfanın tamamı yeni sidebar'a bağlandı (14 guide + 21 reference = 35 sayfa kapsama).
+5. ✅ **Tamamlandı** — `srcExclude` yorumu gerçek build setini yansıtacak şekilde düzeltildi.
+6. **themeConfig link doğrulaması CI'a eklenmeli (AÇIK)** — `ignoreDeadLinks` nav/sidebar'ı kapsamadığı için `scripts/lint-links.mjs`'e config.ts `link:` değerlerini dosya sistemine karşı denetleyen bir adım eklenmeli; aksi hâlde bu regresyon sınıfı sessizce geri döner.
 
 ---
 
 ## Kapanış
 
-Audit 2026-05-22'de kapatıldı. `docs/.vitepress/config.ts` 44 dahili navigasyon linki disk gerçeğine karşı doğrulandı: **34'ü kırık** (30 farklı phantom hedef), yalnız **7 gerçek sayfaya** ulaşıyor; ayrıca **29 gerçek sayfa** navigasyonda hiç görünmüyor. Kök neden Sprint 172 doc-reorg'un eksik temizliği — `governance-index-audit` ile aynı. Bu tur **kod/config değişikliği yapılmadı** — saf analiz; düzeltme (nav/sidebar yeniden yazımı) (a)/(b) kararı gerektirdiği için "Gelecek Öneriler"e bırakıldı. Tüm bulgular `cleanUrls` kuralıyla dosya sistemi kontrolü ile kanıtlandı.
+Audit 2026-05-22'de kapatıldı. `docs/.vitepress/config.ts` 44 dahili navigasyon linki disk gerçeğine karşı doğrulandı: **34'ü kırık** (30 farklı phantom hedef), yalnız **7 gerçek sayfaya** ulaşıyor; ayrıca **29 gerçek sayfa** navigasyonda hiç görünmüyor. Kök neden Sprint 172 doc-reorg'un eksik temizliği — `governance-index-audit` ile aynı. Kullanıcı yaklaşım (a)'yı onayladı ve **`config.ts` aynı gün düzeltildi** (2026-05-22): nav + sidebar mevcut 14 guide + 21 reference dosyasına göre yeniden yazıldı, phantom `/api/` + `/blog/` kaldırıldı, `srcExclude` yorumu düzeltildi — doğrulama: 38/38 link çözülüyor, 0 kırık, 0 orphan. Açık kalan: reference/ duplikasyonu (öneri #3) ve themeConfig link-lint CI (öneri #6). Tüm bulgular `cleanUrls` kuralıyla dosya sistemi kontrolü ile kanıtlandı.

@@ -5,11 +5,11 @@ import { execSync } from 'node:child_process';
 import { join } from 'node:path';
 import { TaskEvaluation } from '../core/types.js';
 import type {
-  TaskResult, Sprint, SprintMetrics, ResolvedConfig, SprintResult, PatternEntry,
+  TaskResult, Sprint, SprintMetrics, ResolvedConfig, SprintResult,
 } from '../core/types.js';
 import {
   BRAIN_DIR, SPRINTS_DIR, ARCHIVE_DIR, SPRINT_LOG_MAX_LINES,
-  PATTERNS_FILE, DECISIONS_FILE, DIRECTIVES_FILE,
+  DECISIONS_FILE, DIRECTIVES_FILE,
 } from '../core/constants.js';
 import { runAllUpdaters } from './doc-updaters/registry.js';
 import type { DocUpdateResult } from './doc-updaters/types.js';
@@ -233,55 +233,10 @@ export function autoDraftDecisions(
   return adrCount;
 }
 
-// ═══ Patterns ═══════════════════════════════════════════════════
-
-/**
- * Add recurring error files as patterns to .brain/PATTERNS.md.
- * Returns the number of new patterns added.
- */
-export function addRecurringPatternsToFile(projectRoot: string, recurringFiles: string[]): number {
-  if (recurringFiles.length === 0) return 0;
-
-  const patternsPath = join(projectRoot, BRAIN_DIR, PATTERNS_FILE);
-  mkdirSync(join(projectRoot, BRAIN_DIR), { recursive: true });
-
-  let data: { active: PatternEntry[]; resolved: PatternEntry[] } = { active: [], resolved: [] };
-  if (existsSync(patternsPath)) {
-    try {
-      data = JSON.parse(readFileSync(patternsPath, 'utf-8'));
-    } catch (e) {
-      debugLog('appendPatterns:parsePatterns', e);
-    }
-  }
-  if (!Array.isArray(data.active)) data.active = [];
-  if (!Array.isArray(data.resolved)) data.resolved = [];
-
-  const existingPatterns = new Set([
-    ...data.active.map(p => p.pattern),
-    ...data.resolved.map(p => p.pattern),
-  ]);
-
-  let added = 0;
-  for (const filePath of recurringFiles) {
-    const patternName = `recurring_error_${filePath.replace(/[/.]/g, '_')}`;
-    if (existingPatterns.has(patternName)) continue;
-
-    data.active.push({
-      pattern: patternName,
-      occurrences: 3,
-      firstDetectedInSprint: 'auto-detected',
-      lastDetectedInSprint: 'auto-detected',
-      resolved: false,
-    });
-    added++;
-  }
-
-  if (added > 0) {
-    writeFileSync(patternsPath, JSON.stringify(data, null, 2) + '\n', 'utf-8');
-  }
-
-  return added;
-}
+// ═══ Patterns — removed (B7, Memory V2 DB-first) ═════════════════
+// addRecurringPatternsToFile (legacy .brain/PATTERNS.md JSON writer) had no
+// production caller and was removed; violation patterns are recorded to the
+// memory.db `pattern` entries by the auditor (detectPatterns).
 
 // ═══ Sprint File Collection ══════════════════════════════════════
 

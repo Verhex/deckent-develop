@@ -1,11 +1,7 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
-import { tmpdir } from 'node:os';
+import { describe, it, expect } from 'vitest';
 import {
   generateConfigSuggestions,
   detectRecurringFileErrors,
-  addRecurringPatternsToFile,
   buildBrainInsights,
 } from '../../src/orchestra/sprint-reporter.js';
 import { TaskEvaluation } from '../../src/core/types.js';
@@ -151,43 +147,6 @@ describe('detectRecurringFileErrors', () => {
     const recurring = detectRecurringFileErrors('/tmp/test', results);
     expect(recurring).toContain('src/new.ts');
     expect(recurring).not.toContain('src/old.ts');
-  });
-});
-
-// ═══ addRecurringPatternsToFile ═══
-
-describe('addRecurringPatternsToFile', () => {
-  let tmpDir: string;
-
-  beforeEach(() => {
-    tmpDir = join(tmpdir(), `brain-self-learning-${Date.now()}-${Math.random().toString(36).slice(2)}`);
-    mkdirSync(join(tmpDir, '.brain'), { recursive: true });
-    writeFileSync(
-      join(tmpDir, '.brain', 'PATTERNS.md'),
-      JSON.stringify({ active: [], resolved: [] }, null, 2),
-    );
-  });
-
-  afterEach(() => {
-    rmSync(tmpDir, { recursive: true, force: true });
-  });
-
-  it('adds new patterns to PATTERNS.md', () => {
-    const count = addRecurringPatternsToFile(tmpDir, ['src/broken.ts']);
-    expect(count).toBe(1);
-    const data = JSON.parse(readFileSync(join(tmpDir, '.brain', 'PATTERNS.md'), 'utf-8'));
-    expect(data.active.length).toBe(1);
-    expect(data.active[0].pattern).toContain('recurring_error');
-  });
-
-  it('does not duplicate existing patterns', () => {
-    addRecurringPatternsToFile(tmpDir, ['src/broken.ts']);
-    const count2 = addRecurringPatternsToFile(tmpDir, ['src/broken.ts']);
-    expect(count2).toBe(0);
-  });
-
-  it('returns 0 for empty recurring files', () => {
-    expect(addRecurringPatternsToFile(tmpDir, [])).toBe(0);
   });
 });
 
