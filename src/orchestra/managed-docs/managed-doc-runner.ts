@@ -14,7 +14,7 @@ import { generateAllSections } from './content-generators.js';
 import { updateDocSections, trimToMaxLines } from './section-updater.js';
 import { renderTemplate } from './template-renderer.js';
 import { loadUserGeneratorsSync } from './plugin-loader.js';
-import { contentHash, readDocCache, writeDocCache, getCacheEntry } from './doc-cache.js';
+import { contentHash, readDocCache, writeDocCache, getCacheEntry, isCacheHit } from './doc-cache.js';
 import { MemoryStore } from '../../core/memory-store.js';
 
 /**
@@ -34,6 +34,9 @@ export function runManagedDocUpdates(ctx: DocUpdateContext): DocUpdateResult[] {
   let cacheDirty = false;
 
   const results: DocUpdateResult[] = [];
+  // Sprint-scoped cache: generators read sprint context, so a doc must be
+  // regenerated on every new sprint even if its file + entry config are stable.
+  const sprintId = ctx.sprintResult.sprint.id;
 
   for (const entry of config.docs) {
     if (entry.enabled === false) continue;
@@ -66,7 +69,7 @@ export function runManagedDocUpdates(ctx: DocUpdateContext): DocUpdateResult[] {
       }));
       const fileHash = contentHash(content);
       const cached = getCacheEntry(cache, entry.id);
-      if (cached && cached.entryHash === entryHash && cached.fileHash === fileHash) {
+      if (isCacheHit(cached, entryHash, fileHash, sprintId)) {
         results.push({ file: entry.path, updated: false, reason: 'cached_no_change' });
         continue;
       }
@@ -100,7 +103,7 @@ export function runManagedDocUpdates(ctx: DocUpdateContext): DocUpdateResult[] {
 
       if (final !== content) {
         writeFileSync(filePath, final, 'utf-8');
-        cache[entry.id] = { entryHash, fileHash: contentHash(final), updatedAt: new Date().toISOString() };
+        cache[entry.id] = { entryHash, fileHash: contentHash(final), sprintId, updatedAt: new Date().toISOString() };
         cacheDirty = true;
         results.push({
           file: entry.path,
@@ -109,7 +112,7 @@ export function runManagedDocUpdates(ctx: DocUpdateContext): DocUpdateResult[] {
         });
       } else {
         // Refresh cache even on no-change to avoid repeated generation work
-        cache[entry.id] = { entryHash, fileHash, updatedAt: new Date().toISOString() };
+        cache[entry.id] = { entryHash, fileHash, sprintId, updatedAt: new Date().toISOString() };
         cacheDirty = true;
         results.push({ file: entry.path, updated: false, reason: 'no_changes' });
       }

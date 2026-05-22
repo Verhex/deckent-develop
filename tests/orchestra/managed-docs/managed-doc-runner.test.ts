@@ -150,6 +150,47 @@ describe('runManagedDocUpdates', () => {
     expect(results).toHaveLength(2);
     expect(results.every(r => r.updated)).toBe(true);
   });
+
+  it('regenerates a managed doc when the sprint changes (sprint-aware cache)', () => {
+    // B5: a managed doc whose file content + entry config are unchanged across
+    // sprints must STILL be regenerated — generators read sprint context the
+    // (entryHash, fileHash) pair cannot see. The legacy hash-only cache check
+    // froze .deckent/workspace/IDENTITY.md at sprint-173.
+    const docPath = path.join(TEST_ROOT, 'project.md');
+    fs.writeFileSync(docPath, '# Project\n\n## Sprint Metrics\nOld data\n', 'utf-8');
+    saveDocsConfig(TEST_ROOT, {
+      version: 1,
+      docs: [{ id: 'project', path: 'project.md', autoSections: ['Sprint Metrics'] }],
+    });
+
+    runManagedDocUpdates(makeCtx()); // sprint-100 — writes file + cache
+    expect(fs.readFileSync(docPath, 'utf-8')).toContain('sprint-100');
+
+    // Second run, different sprint, file content + entry config unchanged.
+    const ctxNext = makeCtx();
+    const nextSprint = ctxNext.sprintResult.sprint as { id: string; number: number };
+    nextSprint.id = 'sprint-200';
+    nextSprint.number = 200;
+    runManagedDocUpdates(ctxNext);
+
+    expect(fs.readFileSync(docPath, 'utf-8')).toContain('sprint-200');
+  });
+
+  it('reports a cache hit when re-run within the same sprint', () => {
+    // B5 regression guard: the sprint-aware cache must still short-circuit a
+    // genuine repeat (same sprint, same content) — caching is not disabled.
+    const docPath = path.join(TEST_ROOT, 'metrics.md');
+    fs.writeFileSync(docPath, '# Metrics\n\n## Sprint Metrics\nOld data\n', 'utf-8');
+    saveDocsConfig(TEST_ROOT, {
+      version: 1,
+      docs: [{ id: 'metrics', path: 'metrics.md', autoSections: ['Sprint Metrics'] }],
+    });
+
+    runManagedDocUpdates(makeCtx()); // sprint-100, first run
+    const results = runManagedDocUpdates(makeCtx()); // sprint-100, second run
+
+    expect(results[0]!.reason).toBe('cached_no_change');
+  });
 });
 
 // ─── buildStandaloneDocContext — DB-first ─────────────────────────────────

@@ -116,8 +116,10 @@ export function isStackStale(projectRoot: string): boolean {
     try {
       const fileStat = fs.statSync(filePath);
       if (fileStat.mtimeMs > cacheMtime) return true;
-    } catch (e) {
-      debugLog('isStackStale:statSyncFile', e);
+    } catch {
+      // Monitored file absent — expected for most project types (a TS project
+      // has no Cargo.toml/go.mod/etc.). Not an error, so it must not be logged
+      // to ERRORS.md (see analyzer.ts getConfigMtime for the same pattern).
     }
   }
 

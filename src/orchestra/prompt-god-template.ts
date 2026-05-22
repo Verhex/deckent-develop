@@ -587,10 +587,13 @@ Use this key for external API calls (Idempotency-Key header) to make retries saf
 
   // Verify steps
   sections.push(`## CRITICAL VERIFY STEPS (DO NOT SKIP)
-You MUST run these commands before marking your task as done:
+You MUST run the project's type check and test suite before marking your task as done.
+Check the project's TOOLS.md or package.json scripts to find the right commands.
 
-1. \`tsc --noEmit\` — fix ALL type errors (max 3 attempts)
-2. \`npx vitest run\` — fix ALL test failures (max 3 attempts)
+1. **Type check / static analysis** — fix ALL errors (max 3 attempts)
+   Examples: \`tsc --noEmit\` (TypeScript), \`mypy\` (Python), \`go vet ./...\` (Go), \`cargo check\` (Rust)
+2. **Full test suite** — fix ALL failures (max 3 attempts)
+   Examples: \`npx vitest run\` / \`jest\` (Node.js), \`pytest\` (Python), \`go test ./...\` (Go), \`cargo test\` (Rust)
 
 If BOTH pass → selfAssessment = "DONE"
 If minor issues remain → selfAssessment = "GO_WITH_TECH_DEBT" with details in notes

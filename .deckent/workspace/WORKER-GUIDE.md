@@ -51,7 +51,7 @@ Workers MAY ONLY write files listed in `scope.filesWrite`. Auditor detects viola
 |-------------|--------|--------|
 | `it.skip(...)` without justification comment | YASAK | Hides failing tests — must fix or document why |
 | `stub()` / empty function returning hardcoded value | YASAK | Produces false GO results — implement real logic |
-| `npm run build` in worker | YASAK | Alperen kararı — dist/ contamination risk |
+| `npm run build` in worker | YASAK | dist/ contamination risk — build is a separate gate, not worker responsibility |
 | Writing outside `scope.filesWrite` | YASAK | ADR-037 RBAC violation — auditor will flag |
 | `selfAssessment: "DONE"` without verify-ran marker | YASAK | Sprint evaluator rejects, task → NO_GO |
 | Hardcoded timestamps in `.hb` files | YASAK | Use `new Date().toISOString()` always |

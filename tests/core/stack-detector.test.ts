@@ -398,6 +398,34 @@ describe('isStackStale', () => {
     });
     expect(isStackStale(ROOT)).toBe(false);
   });
+
+  it('does not log statSync failures for absent monitored build files', () => {
+    // B4: isStackStale must not spam stderr/ERRORS.md when optional build
+    // files (Cargo.toml, go.mod, ...) are simply absent — expected, not an error.
+    const stderrSpy = vi.spyOn(process.stderr, 'write').mockReturnValue(true);
+    const prevDebug = process.env['DECKENT_DEBUG'];
+    process.env['DECKENT_DEBUG'] = '1';
+    try {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.statSync).mockImplementation((p) => {
+        if (String(p).endsWith('project-stack.json')) {
+          return { mtimeMs: 9999 } as fs.Stats;
+        }
+        throw new Error('ENOENT: no such file or directory');
+      });
+
+      isStackStale(ROOT);
+
+      const logged = stderrSpy.mock.calls
+        .map((c) => String(c[0]))
+        .filter((line) => line.includes('isStackStale:statSyncFile'));
+      expect(logged).toEqual([]);
+    } finally {
+      if (prevDebug === undefined) delete process.env['DECKENT_DEBUG'];
+      else process.env['DECKENT_DEBUG'] = prevDebug;
+      stderrSpy.mockRestore();
+    }
+  });
 });
 
 // ─── refreshStack ──────────────────────────────────────────────────────────
