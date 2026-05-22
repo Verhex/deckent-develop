@@ -34,6 +34,7 @@ Bu indeks üç bölümden oluşur: **Belgeler** (yapılan incelemeler), **Uygula
 | [2026-05-22-vitepress-config-audit.md](2026-05-22-vitepress-config-audit.md) | `docs/.vitepress/config.ts` audit — VitePress nav/sidebar; 44 navigasyon linkinin 34'ü kırık (30 phantom hedef), 29 gerçek sayfa orphan, phantom `/api/` + `/blog/` route grupları, srcExclude yorumu yanlış; kök neden Sprint 172 doc-reorg eksik temizliği (governance-index ile aynı) | 2026-05-22 |
 | [2026-05-22-vision-docs-audit.md](2026-05-22-vision-docs-audit.md) | `docs/vision/` audit — 5 doküman (blueprint.md, VISION.md, VISION-TR.md, roadmap.md, competitive-analysis.md); 31 sorun: MCP araç sayısı 27→31 (×9), Node.js ≥18→≥24, entry type 7→9, dashboard pages 6→7, CLI 41+→55+, Sprint 185/186 yanlış açıklama, 12 detektor (3 değil), Memory V2 DB-first güncelleme | 2026-05-22 |
 | [2026-05-22-reference-docs-audit.md](2026-05-22-reference-docs-audit.md) | `docs/reference/` audit — 21 doküman (10.476 satır); 27 sorun: mcp-guide.md 10→31 araç + 5→8 resource (×6), Node v20→v24 (×3), Memory V2 legacy refs (mcp-guide + security.md PATTERNS.md×4 + performance.md MEMORY/DEBT/PATTERNS×10+), cli-commands.md Sprint 151→186 | 2026-05-22 |
+| [2026-05-22-wrongstack-comparison-learnings.md](2026-05-22-wrongstack-comparison-learnings.md) | WrongStack/WrongStack kıyaslaması — Deckent kazanımları/düzenlemeleri/zorunlulukları; 13 iş kalemi (3 OSS GA zorunluluğu: coverage threshold/CHANGELOG/SECURITY + WS-X1 Conversational Shell kararı + 4 düzenleme + 5 kazanım), her bulgu iki turlu kod doğrulamasından geçti (3 ilk-tur hatası düzeltildi) | 2026-05-22 |
 
 ## Uygulanan Güncellemeler
 
@@ -71,6 +72,7 @@ Belgelenmiş ama henüz **uygulanmamış** başlıca işler:
 - **`docs/reference/`** — 21 dosya + duplikasyon (`cli`↔`cli-commands`, `config`↔`config-reference`, `api`↔`api-surface`↔`api-examples`, `mcp-*`) henüz denetlenmedi
 - **VitePress** (vitepress-config-audit öneri #3, #6) — reference/ duplikasyon çözümü + themeConfig link-lint CI adımı
 - **Kategori-anlam borçları** — cost-config model-list senkronu, features-manifest "dead"/"dormant" semantiği (post-GA)
+- **WrongStack kıyaslaması** (wrongstack-comparison-learnings) — saf analiz/öneri; 3 OSS GA zorunluluğu (WS-Z1 coverage threshold, WS-Z2 CHANGELOG 157→186 backfill, WS-Z3 SECURITY tehdit modeli) + WS-X1 Conversational Shell kararının June 1 öncesi yeniden değerlendirmesi henüz uygulanmadı; WS-D*/WS-K* post-GA roadmap
 
 ---
 

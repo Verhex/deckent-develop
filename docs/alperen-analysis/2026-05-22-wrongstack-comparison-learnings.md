@@ -190,6 +190,32 @@ WrongStack'te olup Deckent'te bulunmayan, kapsamı **genişleten** (azaltmayan) 
 
 ---
 
+## 3.5 — Stratejik Bağ: WrongStack, Deckent'in "Conversational Shell" Kararının Canlı Referansı
+
+WrongStack'in çalışma modeli — terminalde **doğal dille konuş**, ajan tool-use loop'unu döndürsün — Deckent'in **zaten roadmap'te kayıtlı ama henüz karara bağlanmamış** bir yönü:
+
+- `docs/vision/roadmap.md:192` — **"Conversational Shell — Direction Under Consideration"** (kaydedildi 2026-05-20).
+- `docs/ROADMAP-GOD-LEVEL.md:189` — **"⚡ 2026-05-20 (Discussion: Conversational Shell — Karar Bekliyor)"** — tam mimari karşılaştırma + kod envanteri.
+- `docs/ROADMAP-GOD-LEVEL.md:123` — Trinity tablosunda **"Chat Mode"** (AI-Asistan personası) ~%25 hazır işaretli; "tek eksik parça `src/cli/commands/chat.ts`".
+
+Roadmap üç yol tanımlıyor: **A** (embedded terminal üstüne, ~600 LoC), **B** (kullanıcının `claude`/`codex`/`gemini` CLI'ını subprocess host'la, ~150 LoC), **C** (native SDK + kendi REPL, ~1500 LoC + ADR-010 amendment). Önerilen sıra **B→A→C**.
+
+**WrongStack tam olarak Yol C'nin — hatta ötesinin — canlı kanıtı:**
+
+| Roadmap'in Yol C için varsaydığı | WrongStack'in 10 günde yaptığı |
+|----------------------------------|--------------------------------|
+| "Provider abstraction CLI shell-out'tan native SDK'ye göç" | SDK'ye bile değil — **kendi 4 wire-family transport'u** (anthropic/openai/openai-compatible/google), SSE dahil, sıfır runtime bağımlılığı |
+| "~1500 LoC + migration + ADR-010 amendment" | Çekirdek loop ~1030 LoC; REPL + TUI + WebUI + autonomy hepsi üstte |
+| "Q3 2026'da provider abstraction olgunlaşınca" | models.dev kataloğu ile ~110 provider, hardcode-sıfır |
+
+**Çıkarım:** Yol C "büyük korkutucu iş" olarak fiyatlanmış (~1500 LoC, Q3 2026). WrongStack bu tahminin **abartılı** olduğunu gösteriyor — provider abstraction + tool-use loop + REPL 10 günde, üstelik TUI/WebUI/autonomy ile birlikte yazılabiliyor. WrongStack'in `complete() = aggregateStream(stream())` deseni ve wire-family soyutlaması Deckent için **doğrudan okunabilir referans implementasyon**.
+
+**Önerilen iş:** Conversational Shell kararı (şu an "karar bekliyor") WrongStack incelemesi ışığında yeniden ele alınır. B→A→C sırası hâlâ geçerli ama **Yol C'nin maliyet/zaman tahmini aşağı revize edilmeli** — C, "uzun vade Q3 2026" yerine B'den hemen sonra gündeme alınabilir. Karar `docs/ROADMAP-GOD-LEVEL.md` ⚡ 2026-05-20 bölümünde güncellenir.
+
+**Öncelik:** P1 karar maddesi (June 1 beta `deckent chat` kanıtı için) · **Efor:** karar + ardından Yol B ~150 LoC
+
+---
+
 ## 4. BİLİNÇLİ AYRIŞMALAR — Kopyalanmayacaklar
 
 WrongStack'in iyi yaptığı ama Deckent'in **kasıtlı olarak farklı** olduğu noktalar. Belgeleniyor ki gelecekte "bunu kaçırdık" yanılgısına düşülmesin.
@@ -210,6 +236,7 @@ WrongStack'in iyi yaptığı ama Deckent'in **kasıtlı olarak farklı** olduğu
 | WS-Z1 | Coverage threshold kapısı + CI adımı | Zorunluluk | **P0** | normal | Blocker |
 | WS-Z2 | CHANGELOG 157→186 backfill + otomasyon | Zorunluluk | **P0** | normal | Blocker |
 | WS-Z3 | SECURITY.md güncelleme + tehdit modeli | Zorunluluk | **P1** | normal | Önemli |
+| WS-X1 | Conversational Shell kararı — WrongStack ışığında yeniden değerlendir (§3.5) | Karar/Strateji | **P1** | karar + Yol B ~150 LoC | `deckent chat` beta kanıtı |
 | WS-D1 | CLI başlangıç lazy-load | Düzenleme | P2 | normal | — |
 | WS-D2 | `TaskBudget` birleşik bütçe zarfı | Düzenleme | P2 | yüksek | — |
 | WS-D3 | Dinamik provider/model kataloğu | Düzenleme | P3 | yüksek | post-GA |
@@ -220,7 +247,7 @@ WrongStack'in iyi yaptığı ama Deckent'in **kasıtlı olarak farklı** olduğu
 | WS-K4 | İsimli bağlam politikaları | Kazanım | P3 | normal | post-GA |
 | WS-K5 | Fleet gözlem araçları + artımlı checkpoint | Kazanım | P3 | normal | post-GA |
 
-**OSS GA öncesi minimum:** WS-Z1, WS-Z2, WS-Z3 (3 zorunluluk). Geri kalan post-GA roadmap.
+**OSS GA öncesi minimum:** WS-Z1, WS-Z2, WS-Z3 (3 zorunluluk) + WS-X1 (Conversational Shell kararı, `deckent chat` beta kanıtı için). Geri kalan post-GA roadmap.
 
 ---
 
@@ -229,6 +256,8 @@ WrongStack'in iyi yaptığı ama Deckent'in **kasıtlı olarak farklı** olduğu
 WrongStack'in Deckent'e öğrettiği tek gerçek ders **test/coverage disiplini ve güvenlik enforcement sertliği** — mimari değil. 10 günlük bir proje zorlanan %85 coverage kapısıyla 2 aylık Deckent'i bu alanda utandırıyor. WS-Z1/Z2/Z3 bu açığı OSS GA penceresinde kapatır.
 
 Orkestrasyon derinliği, hafıza ve yönetişimde Deckent açık ara önde — bu nedenle kazanımlar (WS-K*) **yeni yetenek ekleme** niteliğinde, "eksik kapatma" değil. MCP istemci yeteneği (WS-K1) ve sürekli mod (WS-K2) Deckent'in agentic-OS vizyonuyla doğrudan örtüştüğü için stratejik olarak en değerli ikisi.
+
+**En önemli stratejik çıktı — WS-X1 (§3.5):** WrongStack'in doğal-dil-ile-çalışma modeli, Deckent'in roadmap'te zaten kayıtlı ama "karar bekliyor" durumundaki **Conversational Shell** yönünün canlı referansıdır. WrongStack, Yol C'nin (native provider + REPL) korkulduğu kadar büyük bir iş olmadığını 10 günde kanıtlıyor. Bu, `deckent chat` kararını June 1 beta öncesi yeniden ele almak için somut bir gerekçe.
 
 ---
 
