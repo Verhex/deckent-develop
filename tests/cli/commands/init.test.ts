@@ -528,7 +528,7 @@ describe('init command (isolated)', () => {
     });
 
     it('skips duplicate entries when .gitignore already has all required entries', async () => {
-      const existingGitignore = '.tasks/\n.locks/\n.dashboard\n.brain/archive/\n';
+      const existingGitignore = '.tasks/\n.locks/\n.dashboard\n.brain/archive/\n.brain/memory.db*\n.brain/ERRORS.md\n';
       vi.mocked(existsSync).mockImplementation((p) => String(p).includes('.gitignore'));
       vi.mocked(readFileSync).mockImplementation((p) => {
         if (String(p).includes('.gitignore')) return existingGitignore;

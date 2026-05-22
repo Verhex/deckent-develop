@@ -571,6 +571,10 @@ export function updateGitignore(root: string): void {
     LOCKS_DIR + '/',
     DASHBOARD_FILE,
     BRAIN_DIR + '/archive/',
+    // Memory V2: memory.db (+ WAL sidecars, backups) and the ERRORS.md
+    // runtime log are generated artifacts — never commit them (B11).
+    BRAIN_DIR + '/memory.db*',
+    BRAIN_DIR + '/ERRORS.md',
   ]);
 }
 

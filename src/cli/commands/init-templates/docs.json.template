@@ -6,6 +6,12 @@
       "path": "CLAUDE.md",
       "autoSections": ["Sprint Metrics"],
       "protectedSections": []
+    },
+    {
+      "id": "identity-md",
+      "path": ".deckent/workspace/IDENTITY.md",
+      "autoSections": ["Project Status"],
+      "protectedSections": []
     }
   ]
 }

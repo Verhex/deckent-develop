@@ -6,7 +6,7 @@ import type { PlanMode } from '../../core/types.js';
 import {
   DECKENT_DIR, BRAIN_DIR, TASKS_DIR, LOCKS_DIR, CLAUDE_RULES_DIR,
   WORKSPACE_DIR, PLUGINS_DIR, I18N_DIR, DASHBOARD_FILE, DIRECTIVES_FILE,
-  AGENTS_FILE, CLAUDE_FILE, DECKENT_FILE, MEMORY_FILE, DECISIONS_FILE,
+  AGENTS_FILE, CLAUDE_FILE, DECKENT_FILE, MEMORY_FILE,
   PATTERNS_FILE, RETRO_FILE, PROJECT_IDENTITY_FILE,
 } from '../../core/constants.js';
 import { analyzeProject } from '../../core/analyzer.js';
@@ -175,8 +175,8 @@ Lint: tsc --noEmit
 
       // Brain files (never overwrite — preserves accumulated knowledge)
       writeIfNotExists(join(root, BRAIN_DIR, MEMORY_FILE), '# Learned Patterns\n');
-      writeIfNotExists(join(root, BRAIN_DIR, DECISIONS_FILE), '# Architecture Decisions\n');
-      // Task #4e: no DEBT.md stub — tech debt is DB-first (memory.db).
+      // Task #4e/#13: no DEBT.md or DECISIONS.md stub — both are DB-first
+      // (memory.db); this also restores CLI/MCP init parity.
       writeIfNotExists(join(root, BRAIN_DIR, PATTERNS_FILE), '# Detected Patterns\n');
       writeIfNotExists(join(root, BRAIN_DIR, RETRO_FILE), '# Sprint Retrospective\n');
 

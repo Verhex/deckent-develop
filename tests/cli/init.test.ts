@@ -106,6 +106,16 @@ describe('init.ts template references', () => {
     );
     expect(brainFilesSection).not.toContain('DECISIONS_FILE), \'# Architecture');
   });
+
+  it('mcp/tools/init.ts does not create DECISIONS.md for new projects (CLI/MCP parity)', () => {
+    const mcpInitContent = readFileSync(
+      join(process.cwd(), 'src', 'mcp', 'tools', 'init.ts'),
+      'utf-8',
+    );
+    // DECISIONS.md is a legacy V1 file — Memory V2 keeps decisions in
+    // memory.db (exported to exports/decisions.md). Neither init path writes it.
+    expect(mcpInitContent).not.toContain("DECISIONS_FILE), '# Architecture");
+  });
 });
 
 // ─── Archive Script Tests ───────────────────────────────────────────────
