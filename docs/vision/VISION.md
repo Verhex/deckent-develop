@@ -16,7 +16,7 @@ The long-term goal: Deckent becomes an always-on, self-improving development tea
 
 Solo AI assistants are inherently limited: one context window, one task, one perspective. Deckent breaks through this ceiling with its Brain-Worker-Auditor architecture. Brain sets the strategy, Workers execute in parallel, Auditor guarantees quality. After every sprint, learnings persist to memory — the system makes better decisions with each iteration.
 
-**Where we are now:** AI orchestration CLI — sprint-based multi-agent execution with 3 spawn backends (tmux, subprocess, Docker), 3 AI providers, **15 agents**, 21 skills, 27 MCP tools, ADR governance (46 ADRs), Memory V2 (SQLite FTS5), and as of **Sprint 175** an **embedded web terminal** that lets users drive `claude` / `gemini` / `codex` / `deckent` / shell sessions from a VSCode-style dockable panel inside the dashboard (ADR-062). That terminal is sub-project #1 of a four-part path toward agentic-OS-grade workflows; see `docs/guide/terminal.md`.
+**Where we are now:** AI orchestration CLI — sprint-based multi-agent execution with 3 spawn backends (tmux, subprocess, Docker), 3 AI providers, **15 agents**, 21 skills, 31 MCP tools, ADR governance (55+ ADRs), Memory V2 (SQLite FTS5), and as of **Sprint 175** an **embedded web terminal** that lets users drive `claude` / `gemini` / `codex` / `deckent` / shell sessions from a VSCode-style dockable panel inside the dashboard (ADR-062). That terminal is sub-project #1 of a four-part path toward agentic-OS-grade workflows; see `docs/guide/terminal.md`.
 
 **Where we are going:** Autonomous AI assistant — heartbeat daemon, proactive task execution, channel integrations (Slack, GitHub), codebase semantic understanding, always-on gateway. The embedded terminal is the first concrete step into that future: it dissolves the boundary between "orchestrator" and "where you actually work". Sub-projects #2 (self-security: prompt/command guard), #3 (multi-tenant / k8s isolation), and #4 (enterprise external integrations) extend it without rewriting — `AuthProvider`, `SessionBackend`, and `tenantId` seams are in place from day one. Think OpenClaw's architecture + Deckent's multi-agent discipline.
 
@@ -62,7 +62,7 @@ Three backends for different contexts: **tmux** (fastest, live terminal, Linux/m
 
 ### MCP (Model Context Protocol) Integration
 
-MCP integrates Deckent with any MCP-compatible IDE or tool. With 27 tools and 8 resources, the entire sprint lifecycle is programmatically accessible. This makes Deckent not just a CLI, but a platform.
+MCP integrates Deckent with any MCP-compatible IDE or tool. With 31 tools and 8 resources, the entire sprint lifecycle is programmatically accessible. This makes Deckent not just a CLI, but a platform.
 
 ### Docker Container Isolation
 

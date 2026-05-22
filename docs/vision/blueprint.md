@@ -103,7 +103,7 @@ Sprint + learning loop. Deckent doesn't just execute tasks — it plans sprints,
            │                          │
 ┌──────────▼──────────────────────────▼──────────────┐
 │              DECKENT MCP SERVER (stdio)              │
-│  27 Tools + 8 Resources                             │
+│  31 Tools + 8 Resources                             │
 │  init | set_directives | plan | start | analyze ... │
 │  audit | recover | feature_query | watch | nervous_*│
 └──────────────────────┬──────────────────────────────┘
@@ -132,14 +132,15 @@ Sprint + learning loop. Deckent doesn't just execute tasks — it plans sprints,
 │          MEMORY V2 — DB-FIRST (.brain/)              │
 │  SQLite (memory.db) — single source of truth        │
 │  FTS5 full-text search (dual-layer TR/EN normalize) │
-│  7 entry types: ADR, memory, sprint, debt, pattern  │
+│  9 entry types: ADR, memory, sprint, debt, pattern, │
+│                 retro, error, identity, audit        │
 │  Auto-export: .brain/exports/ (summary, decisions)  │
 └─────────────────────────────────────────────────────┘
            │
 ┌──────────▼──────────────────────────────────────────┐
 │          HTTP API + WEB DASHBOARD                    │
 │  src/api/server.ts — 16 endpoints + SSE             │
-│  src/dashboard/ — React+Vite+Tailwind (6 pages)     │
+│  src/dashboard/ — React+Vite+Tailwind (7 pages)     │
 │  `deckent web` → localhost:3100                     │
 └─────────────────────────────────────────────────────┘
 ```
@@ -275,7 +276,7 @@ $ deckent init
 
 ```
 Required:
-  Node.js ≥ 18 (22 recommended)         — detected; install guidance only (not auto-installed)
+  Node.js ≥ 24.0.0                       — detected; install guidance only (not auto-installed)
   git
   tmux                                  — detected; OS-package instruction surfaced (sudo never run silently)
   Claude Code CLI                       — `deckent init` offers consent-based install (npm i -g @anthropic-ai/claude-code); --yes for CI, --no-install for hint-only
@@ -353,11 +354,10 @@ my-project/
 │   └── rules/                         # Path-scoped rules
 │       ├── brain.md                   # Rules when acting as Brain
 │       ├── auditor.md                 # Rules when acting as Auditor
-│       ├── worker-default.md          # Default worker rules
-│       └── testing.md                 # Rules for test files
+│       └── worker-default.md          # Default worker rules
 │
 ├── src/                               # Deckent source code
-│   ├── core/                         # Types, config, utilities (89 modules)
+│   ├── core/                         # Types, config, utilities (93 modules)
 │   │   ├── types.ts + *-types.ts    # All type definitions (task, config, sprint, monitoring, routing)
 │   │   ├── constants.ts             # App-wide constants
 │   │   ├── config.ts                # 3-layer config loader
@@ -404,13 +404,13 @@ my-project/
 │   │   ├── claude-adapter.ts        # Claude CLI adapter
 │   │   ├── codex-adapter.ts         # OpenAI Codex CLI adapter
 │   │   └── gemini-adapter.ts        # Google Gemini CLI adapter
-│   ├── api/                          # HTTP API server (3 modules)
+│   ├── api/                          # HTTP API server (5 modules)
 │   │   ├── server.ts               # 16 endpoints + SSE stream
 │   │   └── watcher.ts              # Dashboard file watcher
-│   ├── cli/                          # CLI commands (87 files, 41+ commands)
-│   ├── mcp/                          # MCP server (27 tools + 8 resources)
+│   ├── cli/                          # CLI commands (57 files, 55+ commands)
+│   ├── mcp/                          # MCP server (31 tools + 8 resources)
 │   │   ├── server.ts                # Entry point (McpServer + stdio)
-│   │   ├── tools/                   # 22 tool handlers
+│   │   ├── tools/                   # 29 files (28 handlers; nervous.ts registers 5 nervous_* tools)
 │   │   │   ├── init.ts             # deckent_init
 │   │   │   ├── directives.ts       # deckent_set_directives
 │   │   │   ├── plan.ts             # deckent_plan
@@ -436,7 +436,7 @@ my-project/
 │   │   └── resources/               # 8 resource handlers
 │   └── dashboard/                    # Web Dashboard (React+Vite+Tailwind)
 │       └── src/
-│           ├── pages/               # 6 pages: Dashboard, Settings, History, Memory, Config, Status
+│           ├── pages/               # 7 pages: Dashboard, Settings, History, Memory, Config, Status, Chat
 │           ├── components/          # Layout, DebtTable, SprintChart, 14 UI components
 │           ├── hooks/               # useSSE, custom hooks
 │           ├── lib/                 # Utilities
@@ -574,8 +574,8 @@ Sprint 166 ADR-046 codified the **Brain Self-Update Hook Architecture** as a bin
 | 1 | `memoryExport` | `src/core/memory-export.ts` | 140 | DB → `.brain/exports/*.md` snapshots |
 | 2 | `identityRegen` | `src/core/identity-generator.ts` | 138 | **DEPRECATED Sprint 166 T5** — content moved to managed-docs chain to avoid conflict with `.deckent/workspace/IDENTITY.md` |
 | 3 | `adrInsert` | `src/core/adr-file-sync.ts` | **166 T1 (Bug M fix)** | Parse `docs/adr/*.md` MADR v3 headers, upsert into memory.db (`type='adr'`) — was silently missing since Sprint 138 ADR governance; last DB insert was 2026-04-20 before fix |
-| 4 | `ruleRegen` | `src/core/rules-generator.ts` | **166 T2 (Bug N fix, renumbered)** | Regenerate `.claude/`, `.codex/`, `.gemini/`, `.cursor/` rule frontmatter with current ADR list (AUTO + empty CUSTOM template blocks) |
-| 5 | `updateProjectDocs` | `src/orchestra/managed-docs/runner.ts` | 131 | Re-render CLAUDE.md, DECKENT.md, AGENTS.md, TOOLS.md, BOOT.md, WORKER-GUIDE.md via content generators (Sprint 166 T8 added 3 workspace docs) |
+| 4 | `ruleRegen` | `src/core/rule-generator.ts` | **166 T2 (Bug N fix, renumbered)** | Regenerate `.claude/`, `.codex/`, `.gemini/`, `.cursor/` rule frontmatter with current ADR list (AUTO + empty CUSTOM template blocks) |
+| 5 | `updateProjectDocs` | `src/orchestra/managed-docs/managed-doc-runner.ts` | 131 | Re-render CLAUDE.md, DECKENT.md, AGENTS.md, TOOLS.md, BOOT.md, WORKER-GUIDE.md via content generators (Sprint 166 T8 added 3 workspace docs) |
 
 **Unconditional invocation principle (Phase 2 lesson, ADR-046 §3):** Each hook is a direct function call, never an optional callback or feature-flag-guarded path. The Sprint 152-165 stale-rules incident traced back to manual finalize bypassing optional `onRuleRegen` parameter — this is now contractually forbidden.
 
@@ -606,8 +606,8 @@ SELECT id FROM entries WHERE type='adr' AND id LIKE 'adr-04%';  -- adr-043, 044,
 
 Sprint 166 extended the managed-docs runner with auto-content generators and provider parity sync:
 
-- **T8 — Workspace doc generators.** `.deckent/workspace/TOOLS.md`, `BOOT.md`, and `WORKER-GUIDE.md` were Sprint 138-148 stale (27 MCP + 56 CLI not enumerated, no anti-pattern list, no RBAC reference). `src/orchestra/managed-docs/content-generators.ts` now enumerates tools/commands directly from code and emits:
-  - **TOOLS.md** — 27 MCP tools + 55+ CLI commands (auto-listed)
+- **T8 — Workspace doc generators.** `.deckent/workspace/TOOLS.md`, `BOOT.md`, and `WORKER-GUIDE.md` were Sprint 138-148 stale (31 MCP + 55+ CLI not enumerated, no anti-pattern list, no RBAC reference). `src/orchestra/managed-docs/content-generators.ts` now enumerates tools/commands directly from code and emits:
+  - **TOOLS.md** — 31 MCP tools + 55+ CLI commands (auto-listed)
   - **BOOT.md** — 7-step boot sequence + Sprint 165 manual recovery chain (kill → cleanup → recover → run → spawn)
   - **WORKER-GUIDE.md** — verify-ran marker discipline, honest-result gate (Bug X), processQueue stall awareness, RBAC ADR-037, anti-pattern list (no unjustified `it.skip`, no stubs)
 - **T9 — Provider parity.** `.codex/rules/`, `.gemini/rules/`, `.cursor/rules/` now share frontmatter (`paths: [...]`) with `.claude/rules/` via the rules-generator. `extensions/vscode/` parity deferred to Sprint 169.
@@ -720,7 +720,7 @@ Memory V2 (Sprint 140+) replaced the original 3-tier file-based memory with a **
 - **SQLite + better-sqlite3**: Zero-config embedded database, no external dependency
 - **FTS5 Full-Text Search**: Dual-layer Turkish normalize (TR/EN/DE %100 recall)
 - **96% context reduction**: From ~96K DECISIONS.md to ~4K summary.md auto-generated export
-- **7 entry types**: ADR, memory, sprint, debt, pattern, retro, identity
+- **9 entry types**: ADR, memory, sprint, debt, pattern, retro, error, identity, audit
 - **Cross-source query**: Single API searches across all knowledge types
 
 ## DB Schema (5 tables + FTS5)
@@ -1129,7 +1129,7 @@ $ deckent status
 
 ## Phase 2: Web Dashboard — DONE (Sprint 11), end-to-end repaired (Sprint 175)
 
-React + Vite + Tailwind, 6 pages, shadcn/ui components, SSE for real-time updates.
+React + Vite + Tailwind, 7 pages, shadcn/ui components, SSE for real-time updates.
 
 > **Sprint 175 repair (honesty):** The dashboard shipped but was not end-to-end
 > usable — `web`/`serve` resolved the static dir to a non-existent path
@@ -1463,7 +1463,7 @@ Every file in the project, its purpose, who writes it, who reads it:
 | src/api/watcher.ts | Dashboard file watcher | Developer | API server | Permanent |
 | src/dashboard/ | Web Dashboard (React+Vite+Tailwind) | Developer | Browser | Permanent |
 | src/mcp/server.ts | MCP server entry point | Developer | Claude Code | Permanent |
-| src/mcp/tools/*.ts | MCP tool handlers (27) | Developer | MCP server | Permanent |
+| src/mcp/tools/*.ts | MCP tool handlers (31) | Developer | MCP server | Permanent |
 | src/mcp/resources/*.ts | MCP resource handlers (8) | Developer | MCP server | Permanent |
 | .deckent/workspace/TOOLS.md | Environment tools/commands | deckent init | Workers | Permanent |
 | .deckent/workspace/BOOT.md | Agent boot sequence | deckent init | All agents | Permanent |
@@ -2622,7 +2622,7 @@ Originally targeted at Sprint 150, Beta GA has progressed through Sprint 151–1
 - [x] Vitest gate green (Sprint 165 T3 closed the 6-sprint chronic FAIL via worker honest-result gate)
 
 ### Governance
-- [x] All 46 ADRs in accepted/deprecated status (Sprint 166 added ADR-046 Brain Self-Update Hook Architecture)
+- [x] All 55+ ADRs in accepted/deprecated status (Sprint 166 added ADR-046; Sprint 167-186 added ADR-047 through ADR-064)
 - [x] ADR-037 RBAC runtime enforcement operational
 - [x] ADR-035 event stream audit trail complete
 - [x] ADR-036 governance integration validated

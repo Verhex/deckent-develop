@@ -25,16 +25,16 @@
 ## Deckent Nerede Guclu?
 
 ### 1. Sprint Orkestrasyon Motoru (Sektorde Essiz)
-PLAN-SPAWN-EXECUTE-EVALUATE-FIX-RETRO-DECAY-CLEANUP dongusu hicbir rakipte yok. Devin otonom ama kullaniciya sprint kontrolu vermiyor. Cursor/Claude Code "tek task" mentalitesinde. 45+ orchestra modulu bu alanin en derin implementasyonu.
+PLAN-SPAWN-EXECUTE-EVALUATE-FIX-RETRO-DECAY-CLEANUP dongusu hicbir rakipte yok. Devin otonom ama kullaniciya sprint kontrolu vermiyor. Cursor/Claude Code "tek task" mentalitesinde. 78+ orchestra modulu bu alanin en derin implementasyonu.
 
 ### 2. V2 Intent-Based Routing (3-Katman)
 intent-classifier → activation-engine → routing-engine. Task'i anlamlandirip dogru agent+skill+provider kombinasyonuna yonlendiren yapisal sistem. Rakiplerin cogu sabit kural tabanli.
 
 ### 3. Yapisal Hafiza + Otomatik Decay
-.brain/ (MEMORY, RETRO, DEBT, PATTERNS, DECISIONS) + learning-decay. Sprint'ler arasi ogrenme. Claude Code basit key-value, OpenClaw manuel MEMORY.md. Deckent zamanla curuyen yapisal bilgi tabani.
+.brain/memory.db (SQLite FTS5) + learning-decay. 9 entry type (ADR, memory, sprint, debt, pattern, retro, error, identity, audit), dual-layer i18n normalize, `deckent recall` CLI. Claude Code basit key-value, OpenClaw manuel MEMORY.md. Deckent zamanla curuyen yapisal bilgi tabani.
 
 ### 4. Muhendislik Disiplini
-11,918+ test, %96+ coverage, 67+ sprint. Bu seviyede test kapsami olan acik kaynak AI araci cok az.
+16,697+ test descriptor, 186+ sprint. Bu seviyede test disiplinine sahip acik kaynak AI araci cok az.
 
 ### 5. Multi-Provider Esnekligi
 Claude + Codex + Gemini + fallback chain + model equivalence. Cogu rakip tek provider'a bagimli.

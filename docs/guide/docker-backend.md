@@ -20,13 +20,15 @@
 
 Deckent supports three spawn backends for worker processes:
 
-| Backend | Description | Default |
-|---------|-------------|---------|
-| `tmux` | Workers run in tmux panes (session auth) | Yes |
-| `subprocess` | Workers run as child processes | Fallback |
-| `docker` | Workers run in isolated Docker containers | Optional |
+| Backend | Description | Status |
+|---------|-------------|--------|
+| `docker` | Workers run in isolated Docker containers | **Default** — `auto` resolves here (Sprint 177) |
+| `subprocess` | Workers run as child processes | Fallback — Windows / no Docker |
+| `tmux` | Workers run in tmux panes (session auth) | Deprecated — emits a warning |
 
-The **Docker backend** provides the strongest isolation: each worker gets its own filesystem namespace. Workers cannot interfere with each other or corrupt the project directory — the project is mounted read-only inside the container.
+The **Docker backend** provides the strongest *process* isolation: each worker runs in its own container with separate PID, network, and mount namespaces, so workers cannot see or interfere with each other's processes.
+
+> **Note on the project mount:** The project directory is mounted **read-write** — workers need to create and edit files within their assigned scope. Docker does **not** add a filesystem-level read-only guarantee for the project; a worker can write anywhere under the project root. Scope boundaries are enforced the same way as on the other backends: advisory at runtime (ADR-037 V1.0 — compile-time lint + audit-trail; the Auditor flags out-of-scope writes via `git diff --stat`). Treat the Docker backend as process and environment isolation, not as protection against a worker modifying project files.
 
 ---
 
@@ -68,7 +70,7 @@ docker info
 
 ### 2.2 Claude Code CLI Authentication
 
-The Docker backend mounts your host `~/.claude/` directory into each container (read-only). This means workers use **your existing Claude Code session** — no separate login needed inside containers.
+The Docker backend mounts your host `~/.claude/` directory into each container. This means workers use **your existing Claude Code session** — no separate login needed inside containers. (The mount is read-write; see [§5.2](#52-authentication) for why.)
 
 Verify your host session is active before launching Docker-backed sprints:
 ```bash
@@ -91,7 +93,7 @@ docker images | grep deckent-worker
 ```
 
 The image includes:
-- **Node.js 22** (slim base)
+- **Node.js 24** (`trixie-slim` base)
 - **Git** (for diff operations)
 - **curl** (for health checks)
 - **Claude Code CLI** (`@anthropic-ai/claude-code`) installed globally
@@ -137,16 +139,16 @@ npx deckent config read | grep spawn_backend
 
 ### 5.1 Volume Mount Strategy
 
-Each container receives four volume mounts:
+Each container receives four volume mounts — **all read-write**:
 
 | Mount | Container Path | Mode | Purpose |
 |-------|---------------|------|---------|
-| Project root | `/workspace` | `ro` | Source code (read-only — workers cannot corrupt) |
+| Project root | `/workspace` | `rw` | Source code — workers create/edit files within their scope |
 | `.tasks/` | `/workspace/.tasks/` | `rw` | Results, heartbeats, prompts (shared volume) |
 | `.locks/` | `/workspace/.locks/` | `rw` | File locking between workers |
-| `~/.claude/` | `~/.claude/` | `ro` | Claude Code session auth credentials |
+| `~/.claude/` | `<container HOME>/.claude/` | `rw` | Claude Code session auth (writable — the session env updates on use) |
 
-The project is mounted read-only to prevent accidental corruption. Only `.tasks/` and `.locks/` are writable — all inter-process communication happens through these directories.
+All four mounts are read-write. Inter-process communication between Brain and workers happens through `.tasks/` and `.locks/`; the project root is writable because workers must edit source files to do their work. The container HOME itself is a `tmpfs` (in-memory, 100 MB) — files a worker writes outside the mounted paths stay in the container and never touch the host.
 
 ### 5.2 Authentication
 
@@ -154,11 +156,13 @@ Workers use the host user's Claude Code session via the `~/.claude/` mount:
 
 ```
 Host ~/.claude/
-  ├── .credentials.json   ← session token (mounted ro into container)
+  ├── .credentials.json   ← session token (mounted rw into container)
   └── settings.json       ← Claude settings
 ```
 
-If `~/.claude.json` exists on the host, it is also mounted read-only (Claude config file).
+The `~/.claude/` mount is **read-write** — the Claude CLI updates its session environment on use, so a read-only mount would break authentication. If `~/.claude.json` exists on the host, it is also mounted (read-write, for the same reason).
+
+> **Security note:** Because `~/.claude/` is mounted read-write, a worker container can in principle modify your host Claude credentials. The container runs as your host user (see §5.3), so this is the same trust boundary as running Claude locally — the mount is shared, not sandboxed.
 
 For API-key-based providers (Codex, Gemini), keys are passed as environment variables:
 - `ANTHROPIC_API_KEY` → Claude API mode

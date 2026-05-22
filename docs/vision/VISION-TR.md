@@ -16,7 +16,7 @@ Uzun vadeli hedef: Deckent, her zaman açık, kendi kendini geliştiren bir geli
 
 Solo AI asistanı kullanımı doğası gereği sınırlıdır: tek context window, tek görev, tek bakış açısı. Deckent bu sınırı Brain-Worker-Auditor mimarisi ile aşar. Brain stratejiyi belirler, Worker'lar paralel çalışır, Auditor kaliteyi garanti eder. Her sprint sonunda öğrenimler hafızaya yazılır — sistem her iterasyonda daha iyi kararlar alır.
 
-**Şu an neredeyiz:** AI orkestrasyon CLI — 3 spawn backend (tmux, subprocess, Docker), 3 AI provider, **15 agent**, 21 skill, 27 MCP tool, ADR governance (46 ADR), Memory V2 (SQLite FTS5) ile sprint bazlı çok-ajanlı yürütme; **Sprint 175** itibarıyla dashboard içinde VSCode-benzeri dock-edilebilir panel olarak çalışan **gömülü web terminali** — `claude` / `gemini` / `codex` / `deckent` / shell oturumlarını kullanıcı tek ekrandan sürer (ADR-062). Bu terminal, agentic-OS düzeyindeki iş akışlarına giden 4-parçalı yolun #1 alt-projesidir; bkz. `docs/guide/terminal-tr.md`.
+**Şu an neredeyiz:** AI orkestrasyon CLI — 3 spawn backend (tmux, subprocess, Docker), 3 AI provider, **15 agent**, 21 skill, 31 MCP tool, ADR governance (55+ ADR), Memory V2 (SQLite FTS5) ile sprint bazlı çok-ajanlı yürütme; **Sprint 175** itibarıyla dashboard içinde VSCode-benzeri dock-edilebilir panel olarak çalışan **gömülü web terminali** — `claude` / `gemini` / `codex` / `deckent` / shell oturumlarını kullanıcı tek ekrandan sürer (ADR-062). Bu terminal, agentic-OS düzeyindeki iş akışlarına giden 4-parçalı yolun #1 alt-projesidir; bkz. `docs/guide/terminal-tr.md`.
 
 **Nereye gidiyoruz:** Otonom AI asistanı — heartbeat daemon, proaktif görev yürütme, kanal entegrasyonları (Slack, GitHub), kod tabanı semantik anlayışı, always-on gateway. Gömülü terminal bu geleceğe atılan ilk somut adım: "orkestratör" ile "gerçekten çalıştığın yer" arasındaki sınırı kaldırır. Alt-projeler #2 (self-security: prompt/komut guard), #3 (multi-tenant / k8s izolasyonu) ve #4 (enterprise dış-dünya entegrasyonları) bunu **yeniden yazmadan** genişletir — `AuthProvider`, `SessionBackend` ve `tenantId` dikişleri ilk günden konumlandı. OpenClaw'ın mimarisi + Deckent'in çok-ajanlı disiplini.
 
@@ -62,7 +62,7 @@ Farklı bağlamlar için üç backend: **tmux** (en hızlı, canlı terminal, Li
 
 ### MCP (Model Context Protocol) Entegrasyonu
 
-MCP, Deckent'i herhangi bir MCP-uyumlu IDE veya araçla entegre eder. 27 tool ve 8 resource ile sprint yaşam döngüsünün tamamı programatik olarak erişilebilir. Bu, Deckent'i sadece bir CLI değil, bir platform haline getirir.
+MCP, Deckent'i herhangi bir MCP-uyumlu IDE veya araçla entegre eder. 31 tool ve 8 resource ile sprint yaşam döngüsünün tamamı programatik olarak erişilebilir. Bu, Deckent'i sadece bir CLI değil, bir platform haline getirir.
 
 ### Docker Container İzolasyonu
 

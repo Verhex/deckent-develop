@@ -39,7 +39,7 @@ These are **not three products**. They are **three modes of the same product**. 
 
 - **AI Developer** is ~95% — 180+ sprints of dogfooding. **`v1.0.0-beta.1` validated and READY** as of Sprint 183 (final smoke 6/6 GREEN). Publish gate is Alperen-manual per project policy.
 - **AI System Worker** is ~55% — embedded web terminal foundation shipped in Sprint 175 (PTY sessions, WS gateway, token auth, audit chain). Self-security invariants I1–I5 (prompt guard, command guard, outbound rate-limit, append-only HMAC audit chain, tenant-scoped isolation) landed in Sprint 179. Multi-tenant + k8s pod-exec + mTLS impl is Sub-project #3 (Sprint 185+). Enterprise SSO/SIEM/compliance is Sub-project #4 (Sprint 189+).
-- **AI Assistant** is ~30% — memory V2 (SQLite + FTS5, dual-layer Turkish normalize) is production, Nervous System Phase 1 smoke (3 detectors) is live, conversational shell direction is documented (see *Conversational Shell — Direction Under Consideration* below) but unbuilt.
+- **AI Assistant** is ~30% — memory V2 (SQLite + FTS5, dual-layer Turkish normalize) is production, Nervous System Phase 1 smoke (12 detectors) is live, conversational shell direction is documented (see *Conversational Shell — Direction Under Consideration* below) but unbuilt.
 
 The maturity gap is expected. Building the Developer face first forced the engine to become real — the same engine that will run the other two faces. **The goal has always been all three.**
 
@@ -101,9 +101,9 @@ Each sprint is approximately 30-60 minutes of Deckent orchestrating its own deve
 
 | Sprint | Theme | Key Deliverables | Status |
 |--------|-------|-----------------|--------|
-| **184** | Repo Housekeeping + Documentation Cleanup | Repository split decision (in-place cleanup vs. clean OSS clone), 388+ markdown documents triaged, `README.md` user-facing rewrite, `CONTRIBUTING.md`, OSS-launch polish, Brain Quality Scorer calibration backlog for read-only verify tasks (Sprint 182 W4-1 + Sprint 183 W3-3 false-positive root cause) | **Next** |
-| **185** | Sub-project #3 (1/4) — mTLS impl scaffold + multi-tenant audit shard | `RemoteTokenAuthProvider` impl extending the Sprint 175 `AuthProvider` interface, audit shard schema with per-tenant table partitioning, cross-tenant query denial via SQLite row-level enforcement | Planned |
-| **186** | Sub-project #3 (2/4) — k8s pod-exec `SessionBackend` impl | `K8sPodExecBackend` wrapping `kubectl exec`, namespace-per-tenant, RBAC ServiceAccount enforcement, dashboard reconnect across pod restarts | Planned |
+| **184** | Repo Housekeeping + Documentation Cleanup | Repository split decision (in-place cleanup vs. clean OSS clone), 388+ markdown documents triaged, `README.md` user-facing rewrite, `CONTRIBUTING.md`, OSS-launch polish, Brain Quality Scorer calibration backlog for read-only verify tasks (Sprint 182 W4-1 + Sprint 183 W3-3 false-positive root cause) | **Done** |
+| **185** | Codebase Self-Audit — 6 subdirectory audit reports + Brain runtime regen | 6 subdirectory audit deliverables, Brain runtime regeneration (`5db72192`) | **Done** |
+| **186** | Per-file audit pilot — 35 audit reports + debt-store extract | 479-file per-file audit pilot manifest; 31 DONE + 4 recovered false-NO_GO; debt-store.ts extracted to core/ (`d43d679b`) | **Done** |
 | **187** | Sub-project #3 (3/4) — Hardware-attested HMAC + outbound cluster aggregation | TPM/HSM key path via PKCS#11 abstraction, outbound limiter Redis-based counter for cluster-wide quota aggregation, per-tenant override via config schema | Planned |
 | **188** | Sub-project #3 (4/4) — Final polish + integration test + ADR-065 | E2E test with 3 tenants in parallel, audit shard isolation verification, mTLS handshake verification, k8s pod-exec end-to-end, Sub-project #3 GA marker | Planned |
 | **189** | Sub-project #4 (1/4) — SSO/OIDC integration | `OidcAuthProvider` impl, refresh-token flow, group-to-tenant mapping, `.deckent/sso.json` config schema. Adapters: Okta, Azure AD, Google Workspace | Planned |
@@ -193,7 +193,7 @@ Deckent occupies a unique position: **open-source CLI sprint orchestration with 
 
 > **Status:** Pending architecture decision (recorded 2026-05-20). Three viable paths are documented in `docs/ROADMAP-GOD-LEVEL.md` ⚡ 2026-05-20 (Discussion) with verified code-level inventory. This section captures the product-vision framing; the decision itself is open.
 
-Today Deckent works through imperative CLI commands and an MCP server (27+ tools). A developer types `deckent init && deckent plan && deckent start`, and orchestration runs. For users who already speak fluent CLI, this is fast. For users who want to *chat* — to describe what they want and let Deckent figure out which commands to invoke — there is a missing layer.
+Today Deckent works through imperative CLI commands and an MCP server (31+ tools). A developer types `deckent init && deckent plan && deckent start`, and orchestration runs. For users who already speak fluent CLI, this is fast. For users who want to *chat* — to describe what they want and let Deckent figure out which commands to invoke — there is a missing layer.
 
 **The question is not whether Deckent should support conversational interaction.** The MCP server already makes every command callable from Claude Code, Cursor, and VS Code. **The question is whether Deckent should ship its own native conversational shell** — `deckent chat` — so that a user with nothing but Deckent installed can have the same experience without depending on a host LLM CLI.
 
@@ -286,8 +286,8 @@ See `CONTRIBUTING.md` for code style, test requirements, and PR process.
 
 ## References
 
-- ADR-033: Product Vision — `.brain/DECISIONS.md`
-- ADR-034: Multi-Project Isolation — `.brain/DECISIONS.md`
+- ADR-033: Product Vision — `.brain/exports/decisions.md` (Memory V2 generated export)
+- ADR-034: Multi-Project Isolation — `.brain/exports/decisions.md` (Memory V2 generated export)
 - Sprint 134 Design Spec: `docs/superpowers/specs/2026-04-11-sprint-134-design.md`
 - API Surface Contract: `docs/reference/api-surface.md`
 - Project Identity: `.deckent/workspace/IDENTITY.md`
