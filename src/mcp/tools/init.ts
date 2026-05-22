@@ -144,13 +144,8 @@ export function registerInitTool(server: McpServer): void {
 
 ## Context
 @DIRECTIVES.md
-@.brain/MEMORY.md
-@.contracts/api-surface.md
-
-## Agent Roles
-When acting as Brain: @.claude/rules/brain.md
-When acting as Auditor: @.claude/rules/auditor.md
-When acting as Worker: @.claude/rules/worker-default.md
+@.brain/exports/summary.md
+@docs/reference/api-surface.md
 
 ## Environment
 Build: tsc

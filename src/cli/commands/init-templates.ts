@@ -76,12 +76,7 @@ Detaylı rehber: .deckent/docs/directives-guide.md
 ## Context
 @DIRECTIVES.md
 @.brain/exports/summary.md
-@.contracts/api-surface.md
-
-## Agent Roles
-When acting as Brain: @.claude/rules/brain.md
-When acting as Auditor: @.claude/rules/auditor.md
-When acting as Worker: @.claude/rules/worker-default.md
+@docs/reference/api-surface.md
 
 ## Environment
 Build: ${buildCmd}
@@ -137,12 +132,7 @@ Detailed guide: .deckent/docs/directives-guide.md
 ## Context
 @DIRECTIVES.md
 @.brain/exports/summary.md
-@.contracts/api-surface.md
-
-## Agent Roles
-When acting as Brain: @.claude/rules/brain.md
-When acting as Auditor: @.claude/rules/auditor.md
-When acting as Worker: @.claude/rules/worker-default.md
+@docs/reference/api-surface.md
 
 ## Environment
 Build: ${buildCmd}
