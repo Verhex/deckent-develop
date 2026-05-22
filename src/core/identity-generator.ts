@@ -6,7 +6,7 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  BRAIN_DIR, PROJECT_IDENTITY_FILE, SPRINTS_DIR, MEMORY_DB_FILE,
+  BRAIN_DIR, PROJECT_IDENTITY_FILE, SPRINTS_DIR, MEMORY_DB_FILE, WORKSPACE_DIR,
 } from './constants.js';
 import { debugLog } from './utils.js';
 
@@ -276,6 +276,67 @@ export async function runMemoryExport(projectRoot: string): Promise<MemoryExport
   return result;
 }
 
+// ─── Identity DB Sync ─────────────────────────────────────────────
+
+export interface IdentitySyncResult {
+  success: boolean;
+  /** The memory.db `identity` entry id that was written, or null on skip. */
+  entryId: string | null;
+  /** `created` | `updated` | a skip/error reason. */
+  reason: string;
+}
+
+/**
+ * Mirror the managed `.deckent/workspace/IDENTITY.md` document into the
+ * memory.db `identity` entry.
+ *
+ * B9 (Memory V2): the DB `identity` entry froze (2026-04-16) because nothing
+ * refreshed it after a sprint. The managed IDENTITY.md doc is the identity
+ * source of truth (ADR-046, docs.json "identity-md"); this keeps the DB entry
+ * — what `deckent recall` / memory queries read — in sync with it.
+ *
+ * The existing entry is updated in place (matched by `type='identity'`, so a
+ * legacy `project-identity` id is preserved); a missing entry is created with
+ * the canonical `identity-project` id. Missing IDENTITY.md or DB is a
+ * graceful no-op — never throws into the finalize chain.
+ */
+export async function syncIdentityToDb(projectRoot: string): Promise<IdentitySyncResult> {
+  const identityPath = join(projectRoot, WORKSPACE_DIR, 'IDENTITY.md');
+  if (!existsSync(identityPath)) {
+    return { success: false, entryId: null, reason: 'IDENTITY.md not found' };
+  }
+  const dbPath = join(projectRoot, BRAIN_DIR, MEMORY_DB_FILE);
+  if (!existsSync(dbPath)) {
+    return { success: false, entryId: null, reason: 'memory.db not found' };
+  }
+
+  try {
+    const content = readFileSync(identityPath, 'utf-8');
+    const { MemoryStore } = await import('./memory-store.js');
+    const store = new MemoryStore(dbPath);
+    try {
+      const existing = store.getByType('identity')[0];
+      const entryId = existing?.id ?? 'identity-project';
+      store.upsert({
+        id: entryId,
+        type: 'identity',
+        title: 'Project Identity',
+        content,
+        source: 'brain',
+        status: 'active',
+        decay_exempt: true,
+        tags: ['identity', 'project'],
+      }, 'brain');
+      return { success: true, entryId, reason: existing ? 'updated' : 'created' };
+    } finally {
+      store.close();
+    }
+  } catch (e) {
+    debugLog('syncIdentityToDb', e);
+    return { success: false, entryId: null, reason: `error: ${e}` };
+  }
+}
+
 // ─── Post-Finalize Hook Chain ─────────────────────────────────────
 
 export interface PostFinalizeHookOptions {
@@ -321,6 +382,8 @@ export interface AdrInsertResult {
 
 export interface PostFinalizeHookResult {
   memoryExport: MemoryExportResult | null;
+  /** B9 — managed IDENTITY.md → memory.db `identity` entry sync (Step 1b). */
+  identitySync: IdentitySyncResult | null;
   /**
    * @deprecated Sprint 166 — identityRegen step delegated to managed-docs chain.
    * Sprint 168 C0a-1 (BUG-GG) made the default runtime behavior to skip Step 2;
@@ -338,10 +401,11 @@ export interface PostFinalizeHookResult {
  * Run the post-finalize hook chain.
  *
  * Step Ordering Contract (Sprint 166 T1 — Step Ordering Contract Section 5.1):
- *   Step 1 — memory export   → exports/* regenerate
- *   Step 2 — identity regen  → PROJECT-IDENTITY.md update
- *   Step 3 — adr insert      → docs/adr/*.md → memory.db upsert (Bug M fix)
- *   Step 4 — rule regen      → .claude/rules/*.md (renumbered from Step 3)
+ *   Step 1  — memory export   → exports/* regenerate
+ *   Step 1b — identity sync   → managed IDENTITY.md → memory.db `identity` (B9)
+ *   Step 2  — identity regen  → PROJECT-IDENTITY.md update (deprecated, skipped)
+ *   Step 3  — adr insert      → docs/adr/*.md → memory.db upsert (Bug M fix)
+ *   Step 4  — rule regen      → .claude/rules/*.md (renumbered from Step 3)
  *
  * Step 3 must run BEFORE Step 4 so that newly accepted ADRs (e.g. ADR-046)
  * are present in the DB when rules are regenerated. ADR-046 documents this
@@ -355,6 +419,7 @@ export interface PostFinalizeHookResult {
 export async function runPostFinalizeHooks(opts: PostFinalizeHookOptions): Promise<PostFinalizeHookResult> {
   const result: PostFinalizeHookResult = {
     memoryExport: null,
+    identitySync: null,
     identityRegen: null,
     adrInsert: null,
     ruleRegenCalled: false,
@@ -371,6 +436,16 @@ export async function runPostFinalizeHooks(opts: PostFinalizeHookOptions): Promi
       result.errors.push(`memoryExport: ${e}`);
       debugLog('postFinalizeHooks:memoryExport', e);
     }
+  }
+
+  // Step 1b: Sync managed IDENTITY.md → memory.db `identity` entry (B9).
+  // Without this the DB identity entry stays frozen at its init-seed value.
+  try {
+    result.identitySync = await syncIdentityToDb(opts.projectRoot);
+    debugLog('postFinalizeHooks:identitySync', result.identitySync.reason);
+  } catch (e) {
+    result.errors.push(`identitySync: ${e}`);
+    debugLog('postFinalizeHooks:identitySync', e);
   }
 
   // Step 2: PROJECT-IDENTITY.md auto-regen (DEPRECATED — Sprint 166 ADR-046)
