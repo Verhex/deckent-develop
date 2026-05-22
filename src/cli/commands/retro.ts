@@ -1,7 +1,8 @@
-import { readFileSync, existsSync, readdirSync, mkdirSync, copyFileSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Command } from 'commander';
-import { BRAIN_DIR, RETRO_FILE, SPRINTS_DIR } from '../../core/constants.js';
+import { BRAIN_DIR, SPRINTS_DIR, MEMORY_DB_FILE } from '../../core/constants.js';
+import { MemoryStore } from '../../core/memory-store.js';
 import { print } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getLangFromConfig } from '../helpers/config-reader.js';
@@ -295,64 +296,41 @@ export function formatTrend(entries: SprintTrendEntry[], lang = 'en'): string {
   return lines.join('\n');
 }
 
-// ─── Archive ──────────────────────────────────────────────────────────────
+// ─── Retro entry loaders (Memory V2 DB-first) ──────────────────────────────
+//
+// B8: the retrospective lives in memory.db as `type='retro'` entries (one per
+// sprint, id `retro-<sprintId>`). The legacy `.brain/RETRO.md` file — and its
+// `.brain/archive/` copy — are no longer produced; each sprint's retro is its
+// own queryable DB row, so a separate archive step is unnecessary.
 
-/**
- * Archive the current RETRO.md to .brain/archive/retro-{sprintId}.md before overwriting.
- * Creates the archive directory if it does not exist.
- * Does NOT overwrite an existing archive for the same sprint.
- * @param root - Project root directory
- * @param sprintId - Sprint identifier (e.g. "sprint-063")
- * @returns The archive file path on success, null if RETRO.md doesn't exist or on error.
- */
-export function archiveCurrentRetro(root: string, sprintId: string): string | null {
-  const retroPath = join(root, BRAIN_DIR, RETRO_FILE);
-  if (!existsSync(retroPath)) return null;
+/** Load all `retro` entries from memory.db, newest sprint first. */
+function loadRetroEntriesDesc(root: string): Array<{ content: string; sprintId: string }> {
+  const dbPath = join(root, BRAIN_DIR, MEMORY_DB_FILE);
+  if (!existsSync(dbPath)) return [];
   try {
-    const archiveDir = join(root, BRAIN_DIR, 'archive');
-    mkdirSync(archiveDir, { recursive: true });
-    const archiveName = sprintId.startsWith('sprint-')
-      ? `retro-${sprintId}.md`
-      : `retro-sprint-${sprintId}.md`;
-    const archivePath = join(archiveDir, archiveName);
-    if (!existsSync(archivePath)) {
-      copyFileSync(retroPath, archivePath);
+    const store = new MemoryStore(dbPath);
+    try {
+      return store.getByType('retro')
+        .sort((a, b) => (b.sprint_num ?? 0) - (a.sprint_num ?? 0))
+        .map(e => ({ content: e.content, sprintId: e.sprint_id ?? '' }));
+    } finally {
+      store.close();
     }
-    return archivePath;
   } catch {
-    return null;
+    return [];
   }
+}
+
+/** Latest sprint retrospective content, or null when none has been recorded. */
+export function loadLatestRetro(root: string): string | null {
+  return loadRetroEntriesDesc(root)[0]?.content ?? null;
 }
 
 // ─── Previous sprint loader ────────────────────────────────────────────────
 
+/** Second-most-recent sprint retrospective content (for `--compare`). */
 function loadPreviousRetro(root: string): string | null {
-  const sprintsDir = join(root, BRAIN_DIR, SPRINTS_DIR);
-  if (!existsSync(sprintsDir)) return null;
-  const files = readdirSync(sprintsDir)
-    .filter((f) => f.startsWith('sprint-') && f.endsWith('.md'))
-    .sort();
-  if (files.length === 0) return null;
-
-  // Read current retro to find current sprint ID
-  const retroPath = join(root, BRAIN_DIR, RETRO_FILE);
-  let currentSprintId: string | undefined;
-  if (existsSync(retroPath)) {
-    const retroContent = readFileSync(retroPath, 'utf-8');
-    const match = retroContent.match(/(?:sprint|Sprint)\s*[:#-]?\s*(sprint-\S+)/i);
-    currentSprintId = match?.[1];
-  }
-
-  // If last file matches current sprint, use second-to-last
-  const lastFile = files.at(-1)!;
-  if (currentSprintId && lastFile === `${currentSprintId}.md`) {
-    if (files.length < 2) return null;
-    const prevFile = files.at(-2)!;
-    return readFileSync(join(sprintsDir, prevFile), 'utf-8');
-  }
-
-  // Otherwise last file IS the previous sprint
-  return readFileSync(join(sprintsDir, lastFile), 'utf-8');
+  return loadRetroEntriesDesc(root)[1]?.content ?? null;
 }
 
 // ─── Command Registration ─────────────────────────────────────────────────
@@ -378,14 +356,9 @@ export function registerRetro(program: Command): void {
         return;
       }
 
-      const retroPath = join(root, BRAIN_DIR, RETRO_FILE);
-      if (!existsSync(retroPath)) {
+      const content = loadLatestRetro(root);
+      if (!content || !content.trim()) {
         print('No retrospective found. Run `deckent start` to complete a sprint first.');
-        return;
-      }
-      const content = readFileSync(retroPath, 'utf-8');
-      if (!content.trim()) {
-        print('Retrospective file is empty.');
         return;
       }
 
