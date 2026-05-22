@@ -811,6 +811,23 @@ export function overrideApplies(
 }
 
 /**
+ * Find overrides whose `until_sprint` has passed (current sprint >= until_sprint).
+ * Expired overrides are already inert — `overrideApplies` never returns true for
+ * them — but they linger in the whitelist file. Surfacing them lets the auditor
+ * prompt cleanup so the whitelist does not accumulate stale entries.
+ *
+ * Returns empty when the sprint id is malformed (cannot decide expiry).
+ */
+export function findExpiredOverrides(
+  overrides: GroundTruthOverride[],
+  currentSprintId: string,
+): GroundTruthOverride[] {
+  const current = parseSprintNumber(currentSprintId);
+  if (Number.isNaN(current)) return [];
+  return overrides.filter((o) => current >= o.until_sprint);
+}
+
+/**
  * Verify doc-sync ground-truth claims in a task description.
  *
  * Returns the list of mismatches detected (empty when all claims match
@@ -997,6 +1014,17 @@ export function runScanCycle(
     const groundTruthAlerts: Alert[] = groundTruthViolations.map((v) =>
       createAlert(AlertLevel.WARNING, `Doc-sync ground-truth mismatch: ${v.detail}`, v.agentId),
     );
+
+    // Audit hygiene: surface expired ground-truth overrides so the whitelist
+    // does not accumulate stale entries. An expired override is already inert
+    // (overrideApplies returns false for it) — this alert only prompts cleanup.
+    for (const o of findExpiredOverrides(loadGroundTruthOverrides(projectRoot), currentSprintId)) {
+      groundTruthAlerts.push(createAlert(
+        AlertLevel.WARNING,
+        `[expired_override] ground-truth override "${o.metric}" expired at sprint ${o.until_sprint} — remove or renew it in .deckent/ground-truth-overrides.json`,
+        'auditor:ground-truth',
+      ));
+    }
 
     // ─── Sprint 168 C0b: SpawnLock orphan + stale cleanup (RC4 Bug E) ─
     // Mirror L485 stale_lock paterni for `.spawnlock` files.

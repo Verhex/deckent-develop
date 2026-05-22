@@ -21,6 +21,7 @@ import {
   verifyDocSyncGroundTruth,
   scanTasksForGroundTruthMismatches,
   groundTruthMismatchesToViolations,
+  findExpiredOverrides,
 } from '../../src/monitor/auditor.js';
 import { validateGroundTruthClaims } from '../../src/orchestra/task-builder.js';
 import { auditPlanGroundTruth } from '../../src/orchestra/planner.js';
@@ -318,5 +319,33 @@ describe('auditPlanGroundTruth (planner, plan-time)', () => {
     expect(issues[0]!.taskIndex).toBe(0);
     expect(issues[0]!.claimed).toBe(16);
     expect(issues[0]!.measured).toBe(15);
+  });
+});
+
+// ─── Expired override hygiene ──────────────────────────────────────
+
+describe('findExpiredOverrides', () => {
+  const mk = (until_sprint: number) => ({
+    metric: 'agents_count', expected: 15, approvedBy: 'alperen', until_sprint, reason: 'test',
+  });
+
+  it('returns overrides whose until_sprint has passed', () => {
+    expect(findExpiredOverrides([mk(170)], 'sprint-186')).toHaveLength(1);
+  });
+
+  it('excludes overrides still within their until_sprint window', () => {
+    expect(findExpiredOverrides([mk(200)], 'sprint-186')).toEqual([]);
+  });
+
+  it('treats current sprint == until_sprint as expired (overrideApplies uses strict <)', () => {
+    expect(findExpiredOverrides([mk(186)], 'sprint-186')).toHaveLength(1);
+  });
+
+  it('returns empty for a malformed sprint id', () => {
+    expect(findExpiredOverrides([mk(170)], 'not-a-sprint')).toEqual([]);
+  });
+
+  it('returns empty for an empty override list', () => {
+    expect(findExpiredOverrides([], 'sprint-186')).toEqual([]);
   });
 });

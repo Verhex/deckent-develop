@@ -84,7 +84,7 @@ planner.ts (plan-time) · task-builder.ts (helper) · auditor.ts (runtime)
 
 **Etki:** İşlevsel zarar yok ama whitelist dosyaları zamanla stale girdilerle dolar; OSS'te bir kullanıcı dosyayı açtığında geçerli/geçersiz ayrımını elle yapmak zorunda.
 
-**Durum:** Belgelendi — bkz. Gelecek Öneriler #2.
+**Durum:** Düzeltildi — `auditor.ts`'e `findExpiredOverrides()` eklendi; scan döngüsü (`runScanCycle`) süresi dolmuş her override için bir WARNING alert üretir: `[expired_override] ground-truth override "X" expired at sprint N — remove or renew it`. Expired override zaten inert'ti — bu yalnızca temizlik için görünürlük sağlar. 5 yeni regresyon testi (`findExpiredOverrides`).
 
 ---
 
@@ -92,11 +92,13 @@ planner.ts (plan-time) · task-builder.ts (helper) · auditor.ts (runtime)
 
 | Dosya | Değişiklik |
 |-------|-----------|
-| `.deckent/ground-truth-overrides.json` | Expired+redundant tek override (`agents_count:15`, `until_sprint:170`) Alperen onayıyla kaldırıldı → `"overrides": []` |
+| `.deckent/ground-truth-overrides.json` | Expired+redundant tek override (`agents_count:15`, `until_sprint:170`) Alperen onayıyla kaldırıldı → `"overrides": []` (Sorun 1) |
+| `src/monitor/auditor.ts` | `findExpiredOverrides()` eklendi; scan döngüsü süresi dolmuş override için WARNING alert üretir — expiry hijyeni (Sorun 2) |
+| `tests/orchestra/doc-sync-ground-truth.test.ts` | `findExpiredOverrides` için 5 regresyon testi |
 
-Davranış değişmez — expired override zaten inert'ti; whitelist yalnızca stale girdiden arındırıldı. Yeni bir mismatch ihtiyacı doğarsa süresi geçerli bir override eklenebilir.
+Sorun 1: Davranış değişmez — expired override zaten inert'ti; whitelist stale girdiden arındırıldı. Sorun 2: süresi dolmuş override artık görünür (dashboard'da WARNING alert) — sessiz birikim önlenir.
 
-**Doğrulama:** 3 tüketici (planner/task-builder/auditor) kodu okundu; `measureAgentsCount` kaynağı `src/core/builtins/agents/` diskte doğrulandı (15 dizin); `overrideApplies` expiry semantiği (`current < until_sprint`) kanıtla teyit edildi; güncel JSON geçerliliği doğrulandı.
+**Doğrulama:** 3 tüketici (planner/task-builder/auditor) kodu okundu; `measureAgentsCount` kaynağı `src/core/builtins/agents/` diskte doğrulandı (15 dizin); `overrideApplies` expiry semantiği kanıtla teyit; güncel JSON geçerliliği doğrulandı; `tsc --noEmit` temiz; `doc-sync-ground-truth.test.ts` 22 test yeşil (5'i yeni).
 
 ---
 
@@ -104,7 +106,7 @@ Davranış değişmez — expired override zaten inert'ti; whitelist yalnızca s
 
 **Dogfooding perspektifi:**
 - Ground-truth savunma sistemi sağlam tasarım — gerçek ölçüm, fail-safe, 3 katman, süreli istisna.
-- Tek override expired + redundant — temizlenmeli (stale dead weight).
+- Whitelist temizlendi (`overrides: []`) ve expiry hijyeni eklendi — stale override artık sessizce birikmez, dashboard'da görünür.
 
 **Kullanıcı perspektifi:**
 - Dosya opsiyonel — yoksa sistem fail-safe çalışır; `deckent init` oluşturmaz.
@@ -116,11 +118,11 @@ Davranış değişmez — expired override zaten inert'ti; whitelist yalnızca s
 ## Gelecek Öneriler
 
 1. ~~**Stale override temizliği**~~ — ✅ **TAMAMLANDI:** Tek override (`agents_count:15`, expired sprint 170) Alperen onayıyla kaldırıldı; `overrides: []`.
-2. **Expiry hijyeni:** Auditor, süresi dolmuş override için bir uyarı üretebilir ("override `agents_count` sprint 170'te doldu — kaldır ya da yenile") — whitelist'in stale girdilerle dolmasını önler.
+2. ~~**Expiry hijyeni**~~ — ✅ **TAMAMLANDI:** `auditor.ts` `findExpiredOverrides()` + scan döngüsü WARNING alert'i — süresi dolmuş override artık dashboard'da görünür.
 3. **Metrik genişletme (opsiyonel):** Sistem `agents_count` dışına da uygulanabilir (skills_count, mcp_tools_count vb.) — doc-sync stale-sayı regresyonu yalnızca agent sayısında değil; `GroundTruthMetric[]` zaten genişlemeye açık.
 
 ---
 
 ## Kapanış
 
-Audit 2026-05-22'de kapatıldı. `.deckent/ground-truth-overrides.json` = doc-sync ground-truth whitelist'i (Sprint 166 Bug Y2) — doc-sync agent'larının stale sayısal iddia üretmesine karşı insan-onaylı, süreli istisna listesi. 3 katman (planner/task-builder/auditor) tarafından tüketilir; `measureAgentsCount` ile gerçek ölçüme karşı doğrulanır. Sistem tasarımı sağlam (gerçek ölçüm, fail-safe, süreli istisna). **2 sorun** — Sorun 1 (tek override çifte ölü: expired sprint 170 + redundant) Alperen onayıyla **düzeltildi** (`overrides: []`); Sorun 2 (expired-override hijyeni yok) belgelendi. İşlevsel risk yoktu; whitelist stale girdiden temizlendi.
+Audit 2026-05-22'de kapatıldı. `.deckent/ground-truth-overrides.json` = doc-sync ground-truth whitelist'i (Sprint 166 Bug Y2) — doc-sync agent'larının stale sayısal iddia üretmesine karşı insan-onaylı, süreli istisna listesi. 3 katman (planner/task-builder/auditor) tarafından tüketilir; `measureAgentsCount` ile gerçek ölçüme karşı doğrulanır. Sistem tasarımı sağlam (gerçek ölçüm, fail-safe, süreli istisna). **2 sorunun ikisi de düzeltildi** — Sorun 1: expired+redundant override Alperen onayıyla kaldırıldı (`overrides: []`); Sorun 2: `findExpiredOverrides()` + auditor scan-döngüsü WARNING alert'i ile expiry hijyeni eklendi (5 yeni test). İşlevsel risk yoktu; whitelist temizlendi ve gelecekte stale override görünür kılındı.
