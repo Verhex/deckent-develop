@@ -29,6 +29,18 @@ vi.mock('../../../src/mcp/helpers/enrich.js', () => ({
   })),
 }));
 
+// B8: deckent_retro reads memory.db `retro` entries (no .brain/RETRO.md file).
+const retroState = vi.hoisted(() => ({
+  entries: [] as Array<{ content: string; sprint_num: number; sprint_id: string }>,
+}));
+vi.mock('../../../src/core/memory-store.js', () => ({
+  MemoryStore: vi.fn(() => ({
+    getByType: (t: string) => (t === 'retro' ? retroState.entries : []),
+    getById: (id: string) => retroState.entries.find(e => `retro-${e.sprint_id}` === id) ?? null,
+    close: () => {},
+  })),
+}));
+
 import { ensureDeckentImport } from '../../../src/core/utils.js';
 import { analyzeProject } from '../../../src/core/analyzer.js';
 import { enrichResponse } from '../../../src/mcp/helpers/enrich.js';
@@ -90,10 +102,10 @@ describe('registerRetroTool', () => {
     });
   });
 
-  describe('RETRO.md read', () => {
-    it('returns content when RETRO.md exists and has data', async () => {
+  describe('retro entry read', () => {
+    it('returns content when a retro entry exists and has data', async () => {
       vi.mocked(existsSync).mockReturnValue(true);
-      vi.mocked(readFileSync).mockReturnValue('# Retro\n- Good teamwork\n- Tests passed\n- Coverage improved');
+      retroState.entries = [{ content: '# Retro\n- Good teamwork\n- Tests passed\n- Coverage improved', sprint_num: 1, sprint_id: 'sprint-001' }];
 
       const tool = await getRetroTool();
       const result = await tool.handler({});
@@ -106,7 +118,7 @@ describe('registerRetroTool', () => {
 
     it('extracts highlights from bullet points', async () => {
       vi.mocked(existsSync).mockReturnValue(true);
-      vi.mocked(readFileSync).mockReturnValue('- First highlight\n- Second highlight\n- Third highlight');
+      retroState.entries = [{ content: '- First highlight\n- Second highlight\n- Third highlight', sprint_num: 1, sprint_id: 'sprint-001' }];
 
       const tool = await getRetroTool();
       const result = await tool.handler({});
@@ -120,7 +132,7 @@ describe('registerRetroTool', () => {
     it('limits highlights to at most 5 items', async () => {
       const manyBullets = Array.from({ length: 10 }, (_, i) => `- Item ${i + 1}`).join('\n');
       vi.mocked(existsSync).mockReturnValue(true);
-      vi.mocked(readFileSync).mockReturnValue(manyBullets);
+      retroState.entries = [{ content: manyBullets, sprint_num: 1, sprint_id: 'sprint-001' }];
 
       const tool = await getRetroTool();
       const result = await tool.handler({});
@@ -153,10 +165,10 @@ describe('registerRetroTool', () => {
     });
   });
 
-  describe('empty file', () => {
-    it('returns empty content and empty highlights for empty RETRO.md', async () => {
+  describe('empty entry', () => {
+    it('returns empty content and empty highlights for an empty retro entry', async () => {
       vi.mocked(existsSync).mockReturnValue(true);
-      vi.mocked(readFileSync).mockReturnValue('');
+      retroState.entries = [{ content: '', sprint_num: 1, sprint_id: 'sprint-001' }];
 
       const tool = await getRetroTool();
       const result = await tool.handler({});
@@ -164,7 +176,8 @@ describe('registerRetroTool', () => {
       const parsed = wrapped.data ?? wrapped;
 
       expect(parsed.content).toBeFalsy();
-      expect(parsed.highlights).toEqual([]);
+      // An empty retro entry yields no highlights (field absent or empty).
+      expect(parsed.highlights ?? []).toEqual([]);
     });
   });
 

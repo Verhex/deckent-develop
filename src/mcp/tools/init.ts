@@ -6,8 +6,7 @@ import type { PlanMode } from '../../core/types.js';
 import {
   DECKENT_DIR, BRAIN_DIR, TASKS_DIR, LOCKS_DIR, CLAUDE_RULES_DIR,
   WORKSPACE_DIR, PLUGINS_DIR, I18N_DIR, DASHBOARD_FILE, DIRECTIVES_FILE,
-  AGENTS_FILE, CLAUDE_FILE, DECKENT_FILE, MEMORY_FILE,
-  RETRO_FILE,
+  AGENTS_FILE, CLAUDE_FILE, DECKENT_FILE,
 } from '../../core/constants.js';
 import { regenerateRules } from '../../core/rule-generator.js';
 import { detectAvailableProviders } from '../../core/provider.js';
@@ -171,13 +170,9 @@ Lint: tsc --noEmit
       // DIRECTIVES.md (never overwrite with force — user content is precious)
       writeIfNotExists(join(root, DIRECTIVES_FILE), '# Directives\n\nDescribe your project goals and architecture here.\nBrain reads this before every sprint.\n');
 
-      // Brain files (never overwrite — preserves accumulated knowledge)
-      writeIfNotExists(join(root, BRAIN_DIR, MEMORY_FILE), '# Learned Patterns\n');
-      // Task #4e/#13 + B7: no DEBT.md / DECISIONS.md / PATTERNS.md stub —
-      // tech debt, ADRs and violation patterns are all DB-first (memory.db).
-      writeIfNotExists(join(root, BRAIN_DIR, RETRO_FILE), '# Sprint Retrospective\n');
-      // B6 (Memory V2): no PROJECT-IDENTITY.md stub — identity is DB-first
-      // (memory.db `identity` entry + managed .deckent/workspace/IDENTITY.md).
+      // Brain files — Memory V2 is fully DB-first (Task #4 + B6/B7/B8): no
+      // .brain/ root .md stubs (MEMORY / RETRO / PATTERNS / DEBT / DECISIONS /
+      // PROJECT-IDENTITY). memory.db is the single source of truth.
 
       // Workspace: TOOLS.md + BOOT.md
       writeFile(join(root, WORKSPACE_DIR, 'TOOLS.md'), generateToolsContent(root));

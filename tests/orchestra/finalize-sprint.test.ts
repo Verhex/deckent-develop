@@ -145,6 +145,7 @@ vi.mock('../../src/orchestra/debt-manager.js', () => ({
 vi.mock('../../src/orchestra/sprint-reporter.js', () => ({
   trimMemoryWithHeader: vi.fn(),
   writeRetrospective: vi.fn(),
+  appendRetroSection: vi.fn(),
   writeSprintLog: vi.fn(),
   calculateMetrics: vi.fn().mockReturnValue({
     totalTasks: 3, completedTasks: 2, techDebtTasks: 1, noGoTasks: 0,

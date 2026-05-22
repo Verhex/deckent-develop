@@ -66,6 +66,15 @@ vi.mock('../../src/mcp/tools/job-runner.js', () => ({
   readLatestJobState: vi.fn().mockReturnValue(null),
 }));
 
+// B8: deckent_retro reads memory.db `retro` entries (no .brain/RETRO.md file).
+const retroState = vi.hoisted(() => ({ throwError: null as string | null }));
+vi.mock('../../src/core/memory-store.js', () => ({
+  MemoryStore: vi.fn(() => {
+    if (retroState.throwError) throw new Error(retroState.throwError);
+    return { getByType: () => [], getById: () => null, close: () => {} };
+  }),
+}));
+
 import { analyzeProject } from '../../src/core/analyzer.js';
 import { loadConfig } from '../../src/core/config.js';
 
@@ -151,15 +160,16 @@ describe('MCP Tool Quality — Error Handling', () => {
     expect(parsed.message).toContain('permission denied');
   });
 
-  it('deckent_retro returns isError on readFileSync failure', async () => {
+  it('deckent_retro returns isError on DB read failure', async () => {
     const { registerRetroTool } = await import('../../src/mcp/tools/retro.js');
     const mock = createMockServer();
     registerRetroTool(mock as unknown as import('@modelcontextprotocol/sdk/server/mcp.js').McpServer);
 
     vi.mocked(existsSync).mockReturnValue(true);
-    vi.mocked(readFileSync).mockImplementation(() => { throw new Error('disk error'); });
+    retroState.throwError = 'disk error';
 
     const result = await mock.tools.get('deckent_retro')!.handler({});
+    retroState.throwError = null;
     expect(result.isError).toBe(true);
     const parsed = JSON.parse(result.content[0]!.text);
     expect(parsed.error).toBe(true);

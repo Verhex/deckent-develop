@@ -45,6 +45,7 @@ vi.mock('../../src/core/utils.js', async (importOriginal) => {
 
 vi.mock('../../src/orchestra/sprint-reporter.js', () => ({
   writeRetrospective: vi.fn(),
+  appendRetroSection: vi.fn(),
   writeSprintLog: vi.fn(),
   calculateMetrics: vi.fn().mockReturnValue({
     totalTasks: 1,

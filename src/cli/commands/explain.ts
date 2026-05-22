@@ -1,6 +1,8 @@
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Command } from 'commander';
+import { BRAIN_DIR, MEMORY_DB_FILE } from '../../core/constants.js';
+import { MemoryStore } from '../../core/memory-store.js';
 import { print } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getLangFromConfig } from '../helpers/config-reader.js';
@@ -121,7 +123,33 @@ export function parseSprintLog(content: string): SprintSummary {
 }
 
 /**
- * Parse the learnings section from RETRO.md.
+ * Load a sprint's retrospective content from the Memory V2 DB `retro` entry.
+ * B8: retros live in memory.db (no `.brain/RETRO.md` file). Falls back to the
+ * most recent retro when the requested sprint has no entry.
+ */
+function loadRetroContentForSprint(root: string, sprintNumber: number): string | null {
+  const dbPath = join(root, BRAIN_DIR, MEMORY_DB_FILE);
+  if (!existsSync(dbPath)) return null;
+  try {
+    const store = new MemoryStore(dbPath);
+    try {
+      if (sprintNumber > 0) {
+        const entry = store.getById(`retro-sprint-${sprintNumber}`);
+        if (entry) return entry.content;
+      }
+      const retros = store.getByType('retro')
+        .sort((a, b) => (b.sprint_num ?? 0) - (a.sprint_num ?? 0));
+      return retros[0]?.content ?? null;
+    } finally {
+      store.close();
+    }
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Parse the learnings section from a retrospective.
  * Extracts items under the "## Learnings" heading.
  * @param maxItems - Maximum items to return (default 3, pass Infinity for all)
  */
@@ -397,16 +425,15 @@ export function registerExplain(program: Command): void {
 
       const verbose = opts.verbose ?? false;
 
-      // Read RETRO.md for learnings
+      // Load sprint learnings from the Memory V2 DB `retro` entry — B8.
       // J) verbose: load ALL learnings (no limit); default: max 3
       let learnings: RetroLearnings = { items: [] };
-      const retroPath = join(root, '.brain', 'RETRO.md');
-      if (existsSync(retroPath)) {
+      const retroContent = loadRetroContentForSprint(root, summary.sprintNumber);
+      if (retroContent) {
         try {
-          const retroContent = readFileSync(retroPath, 'utf-8');
           learnings = parseRetroLearnings(retroContent, verbose ? Infinity : 3);
         } catch {
-          // skip learnings if unreadable
+          // skip learnings if unparseable
         }
       }
 

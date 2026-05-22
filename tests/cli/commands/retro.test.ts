@@ -22,6 +22,21 @@ vi.mock('../../../src/cli/helpers/config-reader.js', () => ({
   getLangFromConfig: vi.fn().mockReturnValue('en'),
 }));
 
+// B8: `deckent retro` reads the retrospective from memory.db (`retro` entries),
+// not the legacy `.brain/RETRO.md` file. Mock MemoryStore so tests can feed
+// retro content via `retroState.entries`.
+const retroState = vi.hoisted(() => ({
+  entries: [] as Array<{ content: string; sprint_num: number; sprint_id: string }>,
+}));
+
+vi.mock('../../../src/core/memory-store.js', () => ({
+  MemoryStore: vi.fn(() => ({
+    getByType: (type: string) => (type === 'retro' ? retroState.entries : []),
+    getById: (id: string) => retroState.entries.find(e => `retro-${e.sprint_id}` === id) ?? null,
+    close: () => {},
+  })),
+}));
+
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { print } from '../../../src/cli/helpers/output.js';
 import { getLangFromConfig } from '../../../src/cli/helpers/config-reader.js';
@@ -57,6 +72,7 @@ describe('retro command (isolated)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(getLangFromConfig).mockReturnValue('en');
+    retroState.entries = [];
     process.exitCode = undefined;
   });
 
@@ -78,10 +94,10 @@ describe('retro command (isolated)', () => {
     expect(print).toHaveBeenCalledWith(expect.stringContaining('No retrospective found'));
   });
 
-  it('prints retrospective content when file exists and has content', async () => {
+  it('prints retrospective content when a retro entry exists', async () => {
     const content = '## Sprint 001\n- Task completed\n- Results: DONE';
     vi.mocked(existsSync).mockReturnValue(true);
-    vi.mocked(readFileSync).mockReturnValue(content);
+    retroState.entries = [{ content, sprint_num: 1, sprint_id: 'sprint-001' }];
     await runCommand(['retro']);
     // Now shows rich summary by default (use --raw for original content)
     expect(print).toHaveBeenCalledWith(expect.stringContaining('Sprint Retrospective'));
@@ -90,23 +106,23 @@ describe('retro command (isolated)', () => {
   it('prints raw content with --raw flag', async () => {
     const content = '## Sprint 001\n- Task completed\n- Results: DONE';
     vi.mocked(existsSync).mockReturnValue(true);
-    vi.mocked(readFileSync).mockReturnValue(content);
+    retroState.entries = [{ content, sprint_num: 1, sprint_id: 'sprint-001' }];
     await runCommand(['retro', '--raw']);
     expect(print).toHaveBeenCalledWith(content);
   });
 
-  it('prints empty file message when file exists but is empty', async () => {
+  it('prints no-retro message when the retro entry is empty', async () => {
     vi.mocked(existsSync).mockReturnValue(true);
-    vi.mocked(readFileSync).mockReturnValue('');
+    retroState.entries = [{ content: '', sprint_num: 1, sprint_id: 'sprint-001' }];
     await runCommand(['retro']);
-    expect(print).toHaveBeenCalledWith('Retrospective file is empty.');
+    expect(print).toHaveBeenCalledWith(expect.stringContaining('No retrospective found'));
   });
 
-  it('prints empty file message when file contains only whitespace', async () => {
+  it('prints no-retro message when the retro entry is only whitespace', async () => {
     vi.mocked(existsSync).mockReturnValue(true);
-    vi.mocked(readFileSync).mockReturnValue('   \n  \n  ');
+    retroState.entries = [{ content: '   \n  \n  ', sprint_num: 1, sprint_id: 'sprint-001' }];
     await runCommand(['retro']);
-    expect(print).toHaveBeenCalledWith('Retrospective file is empty.');
+    expect(print).toHaveBeenCalledWith(expect.stringContaining('No retrospective found'));
   });
 
   it('resolves project root and constructs correct path', async () => {
@@ -127,7 +143,7 @@ describe('retro command (isolated)', () => {
     vi.mocked(getLangFromConfig).mockReturnValue('tr');
     const content = '# Sprint sprint-042\n| Tasks completed | 8/10 |\n';
     vi.mocked(existsSync).mockReturnValue(true);
-    vi.mocked(readFileSync).mockReturnValue(content);
+    retroState.entries = [{ content, sprint_num: 42, sprint_id: 'sprint-042' }];
     await runCommand(['retro']);
     expect(print).toHaveBeenCalledWith(expect.stringContaining('Retrospektifi'));
   });
@@ -152,7 +168,7 @@ describe('retro command (isolated)', () => {
   it('shows agent performance with --perf flag', async () => {
     const content = `# Sprint sprint-056 Retrospective\n\n## Agent Performance\n| Agent | Tasks | Done | Debt | NoGo | Avg Coverage |\n|-------|-------|------|------|------|--------------|\n| worker-1 | 5 | 4 | 1 | 0 | 80% |\n`;
     vi.mocked(existsSync).mockReturnValue(true);
-    vi.mocked(readFileSync).mockReturnValue(content);
+    retroState.entries = [{ content, sprint_num: 56, sprint_id: 'sprint-056' }];
     await runCommand(['retro', '--perf']);
     const calls = vi.mocked(print).mock.calls.map(c => c[0]);
     expect(calls.some(s => typeof s === 'string' && s.includes('Agent Performance'))).toBe(true);
@@ -162,7 +178,7 @@ describe('retro command (isolated)', () => {
   it('includes agent/skill performance in JSON when --json --perf', async () => {
     const content = `# Sprint sprint-056\n## Agent Performance\n| Agent | Tasks | Done | Debt | NoGo | Avg Coverage |\n|-------|-------|------|------|------|--------------|\n| worker-1 | 5 | 4 | 1 | 0 | 80% |\n`;
     vi.mocked(existsSync).mockReturnValue(true);
-    vi.mocked(readFileSync).mockReturnValue(content);
+    retroState.entries = [{ content, sprint_num: 56, sprint_id: 'sprint-056' }];
     await runCommand(['retro', '--json', '--perf']);
     const jsonCall = vi.mocked(print).mock.calls[0]?.[0] as string;
     const parsed = JSON.parse(jsonCall);

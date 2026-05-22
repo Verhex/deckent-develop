@@ -341,7 +341,7 @@ describe('MCP Tool Descriptions', () => {
   it('deckent_retro description explains what is returned', () => {
     const desc = server.tools.get('deckent_retro')?.config.description ?? '';
     expect(desc).toMatch(/retrospect/i);
-    expect(desc).toMatch(/RETRO\.md/);
+    expect(desc).toMatch(/highlight/i);
   });
 });
 

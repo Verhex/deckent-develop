@@ -29,8 +29,6 @@ import {
   AGENTS_FILE,
   CLAUDE_FILE,
   DECKENT_FILE,
-  MEMORY_FILE,
-  RETRO_FILE,
 } from '../../core/constants.js';
 import { ensureDeckentImport } from '../../core/utils.js';
 import { regenerateRules } from '../../core/rule-generator.js';
@@ -408,12 +406,10 @@ export function writeBrainFiles(
   stackResult: FullStackResult,
   detectedAnalysis?: { language?: string; framework?: string; testFramework?: string; buildTool?: string },
 ): void {
-  // 10. Brain files (Memory V2: DB-first, .md files are legacy exports)
-  writeIfNotExists(join(root, BRAIN_DIR, MEMORY_FILE), '# Learned Patterns\n');
-  // Task #4e: no DEBT.md stub — tech debt is DB-first (memory.db).
-  // B7 (Memory V2): no PATTERNS.md stub — violation patterns are DB-first
-  // (memory.db `pattern` entries written by the auditor).
-  writeIfNotExists(join(root, BRAIN_DIR, RETRO_FILE), '# Sprint Retrospective\n');
+  // 10. Brain files — Memory V2 is fully DB-first (Task #4 + B6/B7/B8): no
+  // .brain/ root .md stubs (MEMORY / RETRO / PATTERNS / DEBT / DECISIONS /
+  // PROJECT-IDENTITY). memory.db is the single source of truth; the generated
+  // `.brain/exports/` views are produced after each sprint.
   ensureDir(join(root, BRAIN_DIR, 'exports'));
 
   // 10-db. Memory V2 DB preload — seed ADRs + identity entry on fresh init

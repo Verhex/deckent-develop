@@ -42,6 +42,18 @@ vi.mock('../../src/core/subscription.js', () => ({
   }),
 }));
 
+// B8: deckent_retro reads memory.db `retro` entries (no .brain/RETRO.md file).
+const retroState = vi.hoisted(() => ({
+  entries: [] as Array<{ content: string; sprint_num: number; sprint_id: string }>,
+}));
+vi.mock('../../src/core/memory-store.js', () => ({
+  MemoryStore: vi.fn(() => ({
+    getByType: (t: string) => (t === 'retro' ? retroState.entries : []),
+    getById: (id: string) => retroState.entries.find(e => `retro-${e.sprint_id}` === id) ?? null,
+    close: () => {},
+  })),
+}));
+
 import { analyzeProject } from '../../src/core/analyzer.js';
 
 // ─── Mock Server ────────────────────────────────────────────────────
@@ -152,7 +164,7 @@ describe('MCP Tools Enrichment (Task 5)', () => {
       registerRetroTool(mock as unknown as import('@modelcontextprotocol/sdk/server/mcp.js').McpServer);
 
       vi.mocked(existsSync).mockReturnValue(true);
-      vi.mocked(readFileSync).mockReturnValue('# Retrospective\n- Learned X\n- Improved Y\n');
+      retroState.entries = [{ content: '# Retrospective\n- Learned X\n- Improved Y\n', sprint_num: 1, sprint_id: 'sprint-001' }];
 
       const result = await mock.tools.get('deckent_retro')!.handler({});
       const parsed = JSON.parse(result.content[0]!.text);
@@ -172,7 +184,7 @@ describe('MCP Tools Enrichment (Task 5)', () => {
       registerRetroTool(mock as unknown as import('@modelcontextprotocol/sdk/server/mcp.js').McpServer);
 
       vi.mocked(existsSync).mockReturnValue(true);
-      vi.mocked(readFileSync).mockReturnValue('# Retro\n- Item');
+      retroState.entries = [{ content: '# Retro\n- Item', sprint_num: 1, sprint_id: 'sprint-001' }];
 
       const result = await mock.tools.get('deckent_retro')!.handler({});
       const parsed = JSON.parse(result.content[0]!.text);

@@ -665,26 +665,8 @@ describe('Sprint mini-cycle integration', () => {
     expect(sprint.id).toBe('sprint-003');
   });
 
-  it('writeRetrospective writes RETRO.md', () => {
-    const sprint: Sprint = {
-      id: 'sprint-001', number: 1, status: SprintStatus.COMPLETE,
-      phase: SprintPhase.COMPLETE, tasks: [makeTestTask('r01')], workers: ['w-r01'],
-      startedAt: new Date().toISOString(), completedAt: new Date().toISOString(),
-    };
-    const evals = new Map<string, TaskEvaluation>([['r01', TaskEvaluation.DONE]]);
-    const metrics: SprintMetrics = {
-      totalTasks: 1, completedTasks: 1, techDebtTasks: 0, noGoTasks: 0,
-      durationMs: 5000, coveragePercent: 95, noGoRate: 0,
-      newDebtCount: 0, resolvedDebtCount: 0, totalOpenDebt: 0,
-      boundaryViolations: 0, crossAssignments: 0, contextLinesUsed: 0,
-    };
-
-    writeRetrospective(root, sprint, evals, metrics);
-
-    const retro = readFileSync(join(root, BRAIN_DIR, RETRO_FILE), 'utf-8');
-    expect(retro).toContain('sprint-001');
-    expect(retro).toContain('Metrics');
-  });
+  // B8: writeRetrospective → memory.db `retro` entry (no .brain/RETRO.md file).
+  // DB persistence is covered by tests/orchestra/write-retrospective.test.ts.
 
   it('writeSprintLog creates sprint-NNN.md', () => {
     const sprint: Sprint = {
@@ -863,8 +845,9 @@ describe('Init wizard integration', () => {
     expect(existsSync(join(root, LOCKS_DIR))).toBe(true);
     expect(existsSync(join(root, '.claude', 'rules'))).toBe(true);
     expect(existsSync(join(root, DIRECTIVES_FILE))).toBe(true);
-    expect(existsSync(join(root, BRAIN_DIR, MEMORY_FILE))).toBe(true);
-    expect(existsSync(join(root, BRAIN_DIR, RETRO_FILE))).toBe(true);
+    // B6/B7/B8: init no longer stubs .brain/ root .md files (Memory V2 is
+    // fully DB-first); it provisions the generated exports/ view directory.
+    expect(existsSync(join(root, BRAIN_DIR, 'exports'))).toBe(true);
   });
 
   it('init writes valid config with selected mode', async () => {

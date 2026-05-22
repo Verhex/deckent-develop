@@ -48,6 +48,15 @@ vi.mock('../../src/mcp/tools/job-runner.js', () => ({
   readLatestJobState: vi.fn().mockReturnValue(null),
 }));
 
+// B8: deckent_retro reads memory.db `retro` entries (no .brain/RETRO.md file).
+const retroState = vi.hoisted(() => ({ throwError: null as string | null }));
+vi.mock('../../src/core/memory-store.js', () => ({
+  MemoryStore: vi.fn(() => {
+    if (retroState.throwError) throw new Error(retroState.throwError);
+    return { getByType: () => [], getById: () => null, close: () => {} };
+  }),
+}));
+
 import { analyzeProject } from '../../src/core/analyzer.js';
 import { loadConfig } from '../../src/core/config.js';
 import { ensureDeckentImport } from '../../src/core/utils.js';
@@ -115,9 +124,10 @@ describe('MCP Tool Error Format — debt-059-008-fix (sprint-061)', () => {
       registerRetroTool(mock as unknown as import('@modelcontextprotocol/sdk/server/mcp.js').McpServer);
 
       vi.mocked(existsSync).mockReturnValue(true);
-      vi.mocked(readFileSync).mockImplementation(() => { throw new Error('read failure'); });
+      retroState.throwError = 'read failure';
 
       const result = await mock.tools.get('deckent_retro')!.handler({});
+      retroState.throwError = null;
       const parsed = JSON.parse(result.content[0]!.text);
 
       expect(result.isError).toBe(true);
