@@ -23,7 +23,7 @@ import type { SprintFileRetentionConfig } from './config-types.js';
 
 /** Default retention configuration */
 export const DEFAULT_RETENTION_CONFIG: SprintFileRetentionConfig = {
-  keep_last_n: 10,
+  keep_last_n: 2,
   size_cap_mb: 500,
   archive_path: '.deckent/archive/sprints/',
 };
@@ -31,12 +31,14 @@ export const DEFAULT_RETENTION_CONFIG: SprintFileRetentionConfig = {
 /** Sprint-prefixed file families (machine-generated) */
 const SPRINT_FILE_PATTERNS = [
   /-events\.jsonl$/,
+  /-metrics\.jsonl$/,
   /-seq$/,
   /-checkpoint\.json$/,
   /-checkpoint-seq$/,
   /-gate\.json$/,
   /-pre-archive\.tar\.gz$/,
   /-pre-archive\.sha256$/,
+  /-panic-[^/]*\.json$/,
 ] as const;
 
 /** Counter files that should be deleted (not archived) when sprint is DONE */
