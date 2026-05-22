@@ -60,11 +60,26 @@ export function findSectionByTitle(sections: ParsedSection[], title: string): Pa
   }) ?? null;
 }
 
+// ─── extractAutogenBlocks ─────────────────────────────────────────────────
+
+/**
+ * Extract complete `<!-- AUTOGEN:START id="X" --> ... <!-- AUTOGEN:END id="X" -->`
+ * blocks from a section body. These blocks are owned by a separate tool
+ * (scripts/update-readme-stats.mjs) and must survive managed-doc section
+ * replacement — otherwise the `docs:stats:check` gate fails because the
+ * markers it relies on were destroyed (B15: IDENTITY.md identity-status).
+ */
+function extractAutogenBlocks(body: string): string[] {
+  const re = /<!-- AUTOGEN:START id="[^"]+" -->[\s\S]*?<!-- AUTOGEN:END id="[^"]+" -->/g;
+  return body.match(re) ?? [];
+}
+
 // ─── replaceSectionContent ────────────────────────────────────────────────
 
 /**
  * Replace the content of a specific section (identified by heading title).
- * Preserves the heading line itself. Returns the full updated content.
+ * Preserves the heading line itself. AUTOGEN marker blocks nested in the old
+ * body are preserved (re-appended). Returns the full updated content.
  * If the section is not found, returns content unchanged.
  */
 export function replaceSectionContent(
@@ -80,9 +95,16 @@ export function replaceSectionContent(
   const before = lines.slice(0, section.startLine + 1); // include heading
   const after = lines.slice(section.endLine);
 
+  // Preserve AUTOGEN blocks from the old body — they are managed by a separate
+  // tool and must not be destroyed when generated content is swapped in.
+  const preserved = extractAutogenBlocks(section.content);
+
   // Ensure newContent ends with a newline for clean separation
   const trimmedNew = newContent.trimEnd();
-  return [...before, trimmedNew, '', ...after].join('\n');
+  const body = preserved.length > 0
+    ? [trimmedNew, '', preserved.join('\n\n')]
+    : [trimmedNew];
+  return [...before, ...body, '', ...after].join('\n');
 }
 
 // ─── appendSection ────────────────────────────────────────────────────────

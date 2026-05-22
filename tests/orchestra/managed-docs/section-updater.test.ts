@@ -91,6 +91,33 @@ describe('replaceSectionContent', () => {
     const result = replaceSectionContent(SAMPLE_DOC, 'Nonexistent', 'Content');
     expect(result).toBe(SAMPLE_DOC);
   });
+
+  it('preserves AUTOGEN marker blocks nested in the replaced section', () => {
+    // B15: managed-docs swaps a whole section body, but AUTOGEN blocks inside
+    // are owned by a separate tool (scripts/update-readme-stats.mjs).
+    // Destroying the markers breaks `docs:stats:check` — it happened to
+    // IDENTITY.md's identity-status block at sprint-173.
+    const doc = [
+      '# Doc',
+      '',
+      '## Project Status',
+      'old table row',
+      '<!-- AUTOGEN:START id="identity-status" -->',
+      'stale generated stats',
+      '<!-- AUTOGEN:END id="identity-status" -->',
+      '',
+      '## Next',
+      'tail',
+    ].join('\n');
+
+    const result = replaceSectionContent(doc, 'Project Status', 'fresh generated table');
+
+    expect(result).toContain('fresh generated table');
+    expect(result).toContain('<!-- AUTOGEN:START id="identity-status" -->');
+    expect(result).toContain('<!-- AUTOGEN:END id="identity-status" -->');
+    expect(result).not.toContain('old table row'); // non-AUTOGEN body still swapped
+    expect(result).toContain('## Next'); // section boundary intact
+  });
 });
 
 // ─── appendSection ────────────────────────────────────────────────────────
