@@ -289,8 +289,10 @@ export function loadCostConfig(projectRoot: string, options?: { forceReload?: bo
 
 /**
  * Initialize `.deckent/cost-config.json` from bundled baseline if missing.
- * Called by `deckent init` and lazily by `loadCostConfig` when user edits
- * the file for the first time.
+ * Called by `deckent start` and `deckent cost` (lazy materialization).
+ * NOT called by `deckent init` — and `loadCostConfig` itself does not call
+ * this; it falls back to the bundled baseline in-memory, so cost features
+ * work even before the project file is materialized.
  */
 export function initCostConfig(projectRoot: string, options?: { force?: boolean }): { created: boolean; path: string } {
   const configPath = join(projectRoot, PROJECT_COST_CONFIG);
