@@ -221,7 +221,7 @@ deckent web               Web dashboard + API server (localhost:3100)
 deckent plugin install <n> Install a skill/plugin
 deckent plugin list       List installed plugins
 deckent upgrade           Self-update
-deckent mcp               Start MCP server (stdio transport for Claude Code)
+deckent-mcp               Start MCP server (stdio transport for Claude Code)
 deckent sync             Sync adapter files (CLAUDE.md, AGENTS.md) with DECKENT.md reference
 deckent watch            Live tmux split view: dashboard + worker panes
 deckent recall <query>   Search project memory (Memory V2 FTS5 search)
@@ -1788,7 +1788,7 @@ Deckent integrates into Claude Code via the Model Context Protocol (MCP). The MC
 deckent init
 
 # Option 2: Manual registration
-claude mcp add deckent -- npx deckent mcp
+claude mcp add deckent -- npx deckent-mcp
 ```
 
 Both methods register in `.claude/settings.json`:

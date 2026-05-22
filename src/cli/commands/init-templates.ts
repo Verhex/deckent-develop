@@ -286,7 +286,7 @@ deckent cleanup   # Temizle ve yeniden başla
 ## MCP Entegrasyonu
 Claude Code, Cursor veya VS Code'da MCP server olarak kullanabilirsiniz:
 \`\`\`bash
-claude mcp add deckent -- npx deckent mcp
+claude mcp add deckent -- npx deckent-mcp
 \`\`\`
 `;
   }
@@ -334,7 +334,7 @@ deckent cleanup     # Clean up and restart
 ## MCP Integration
 Use as MCP server in Claude Code, Cursor, or VS Code:
 \`\`\`bash
-claude mcp add deckent -- npx deckent mcp
+claude mcp add deckent -- npx deckent-mcp
 \`\`\`
 `;
 }
@@ -622,8 +622,8 @@ export function generateVscodeMcpJson(): string {
     {
       servers: {
         deckent: {
-          command: 'npx',
-          args: ['deckent', 'mcp'],
+          command: 'deckent-mcp',
+          args: [],
           env: {},
         },
       },

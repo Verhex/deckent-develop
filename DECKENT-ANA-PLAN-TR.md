@@ -211,7 +211,7 @@ deckent upgrade           Kendini güncelle
 deckent explain           Kavram veya komut hakkında rehberlik
 deckent finalize          Sprint sonuçlandırma (retro + decay + cleanup)
 deckent quick-start       Hızlı başlangıç (init + plan + start tek komutta)
-deckent mcp               MCP sunucuyu başlat (Claude Code için stdio transport)
+deckent-mcp               MCP sunucuyu başlat (Claude Code için stdio transport)
 deckent sync              Adaptör dosyalarını DECKENT.md referansıyla senkronize et
 deckent watch             Canlı tmux bölünmüş görünüm: dashboard + worker panelleri
 deckent recall <sorgu>    Proje hafızasında arama (Memory V2 FTS5)
@@ -698,7 +698,7 @@ Deckent, Model Context Protocol (MCP) ile Claude Code'a entegre olur. MCP sunucu
 deckent init
 
 # Seçenek 2: Manuel kayıt
-claude mcp add deckent -- npx deckent mcp
+claude mcp add deckent -- npx deckent-mcp
 ```
 
 ## Araçlar (22)

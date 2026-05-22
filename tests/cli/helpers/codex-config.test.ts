@@ -23,8 +23,8 @@ describe('codex-config', () => {
     it('creates section from empty string', () => {
       const result = mergeDeckentSection('');
       expect(result).toContain('[mcp_servers.deckent]');
-      expect(result).toContain('command = "npx"');
-      expect(result).toContain('args = ["deckent", "mcp-server"]');
+      expect(result).toContain('command = "deckent-mcp"');
+      expect(result).toContain('args = []');
       expect(result).toContain('tool_timeout_sec = 600');
     });
 
@@ -44,7 +44,7 @@ args = ["old"]
 tool_timeout_sec = 30`;
       const result = mergeDeckentSection(existing);
       expect(result).not.toContain('old-command');
-      expect(result).toContain('command = "npx"');
+      expect(result).toContain('command = "deckent-mcp"');
       // Should only have one deckent section
       const count = result.split('[mcp_servers.deckent]').length - 1;
       expect(count).toBe(1);
@@ -66,7 +66,7 @@ command = "other"`;
       expect(result).toContain('[mcp_servers.other]');
       expect(result).toContain('command = "other"');
       expect(result).not.toContain('command = "old"');
-      expect(result).toContain('command = "npx"');
+      expect(result).toContain('command = "deckent-mcp"');
     });
 
     it('does not duplicate on repeated calls', () => {
@@ -85,7 +85,7 @@ model = "opus"
 command = "old"`;
       const result = mergeDeckentSection(existing);
       expect(result).toContain('[general]');
-      expect(result).toContain('command = "npx"');
+      expect(result).toContain('command = "deckent-mcp"');
       expect(result).not.toContain('command = "old"');
     });
   });

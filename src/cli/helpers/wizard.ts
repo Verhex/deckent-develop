@@ -202,12 +202,12 @@ export function getMCPGuidance(ide: IDEEnvironment): string[] {
     case 'cursor':
       return [
         'Cursor detected — add deckent MCP to ~/.cursor/mcp.json:',
-        '  { "mcpServers": { "deckent": { "command": "npx", "args": ["deckent", "mcp"] } } }',
+        '  { "mcpServers": { "deckent": { "command": "deckent-mcp", "args": [] } } }',
         'Or run: deckent init --cursor',
       ];
     case 'terminal':
       return [
-        'Terminal mode — MCP tools available via: deckent mcp',
+        'Terminal mode — MCP server binary: deckent-mcp',
         'For IDE integration, run deckent init inside your IDE.',
       ];
   }

@@ -1585,7 +1585,7 @@ Resources provide read-only context that MCP hosts can inject into the AI's cont
 Register the Deckent MCP server with Claude Code:
 
 ```bash
-claude mcp add deckent -- npx deckent mcp
+claude mcp add deckent -- npx deckent-mcp
 ```
 
 Or let `deckent init` handle registration automatically. The MCP server is registered in `.claude/settings.json`:

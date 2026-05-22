@@ -4,8 +4,8 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
 const DECKENT_MCP_ENTRY = {
-  command: 'npx',
-  args: ['deckent', 'mcp-server'],
+  command: 'deckent-mcp',
+  args: [] as string[],
   timeout: 600,
 };
 

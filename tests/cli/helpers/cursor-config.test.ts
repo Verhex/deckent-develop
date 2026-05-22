@@ -25,8 +25,8 @@ describe('cursor-config', () => {
     const raw = readFileSync(result.mcpPath, 'utf-8');
     const parsed = JSON.parse(raw);
     expect(parsed.mcpServers.deckent).toEqual({
-      command: 'npx',
-      args: ['deckent', 'mcp-server'],
+      command: 'deckent-mcp',
+      args: [],
       timeout: 600,
     });
   });
@@ -72,7 +72,7 @@ describe('cursor-config', () => {
     const parsed = JSON.parse(raw);
     expect(parsed.mcpServers.other.command).toBe('other-tool');
     expect(parsed.extraKey).toBe(true);
-    expect(parsed.mcpServers.deckent.command).toBe('npx');
+    expect(parsed.mcpServers.deckent.command).toBe('deckent-mcp');
   });
 
   it('updates existing deckent entry in mcp.json', () => {
@@ -88,7 +88,7 @@ describe('cursor-config', () => {
 
     const raw = readFileSync(join(cursorDir, 'mcp.json'), 'utf-8');
     const parsed = JSON.parse(raw);
-    expect(parsed.mcpServers.deckent.command).toBe('npx');
+    expect(parsed.mcpServers.deckent.command).toBe('deckent-mcp');
     expect(parsed.mcpServers.deckent.timeout).toBe(600);
   });
 
@@ -120,7 +120,7 @@ describe('cursor-config', () => {
     expect(() => generateCursorConfig(tempDir)).not.toThrow();
     const raw = readFileSync(join(cursorDir, 'mcp.json'), 'utf-8');
     const parsed = JSON.parse(raw);
-    expect(parsed.mcpServers.deckent.command).toBe('npx');
+    expect(parsed.mcpServers.deckent.command).toBe('deckent-mcp');
   });
 
   it('handles mcpServers being a non-object in mcp.json', () => {
@@ -136,7 +136,7 @@ describe('cursor-config', () => {
 
     const raw = readFileSync(join(cursorDir, 'mcp.json'), 'utf-8');
     const parsed = JSON.parse(raw);
-    expect(parsed.mcpServers.deckent.command).toBe('npx');
+    expect(parsed.mcpServers.deckent.command).toBe('deckent-mcp');
   });
 
   // ─── Rules content ───────────────────────────────────────────────

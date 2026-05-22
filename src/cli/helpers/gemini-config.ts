@@ -5,8 +5,8 @@ import { dirname, join } from 'node:path';
 import { homedir } from 'node:os';
 
 const DECKENT_MCP_ENTRY = {
-  command: 'npx',
-  args: ['deckent', 'mcp-server'],
+  command: 'deckent-mcp',
+  args: [] as string[],
   timeout: 600,
 };
 

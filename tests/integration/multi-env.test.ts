@@ -130,8 +130,8 @@ describe('Cross-environment integration tests', () => {
 
       const content = readFileSync(result.project, 'utf-8');
       expect(content).toContain('[mcp_servers.deckent]');
-      expect(content).toContain('command = "npx"');
-      expect(content).toContain('args = ["deckent", "mcp-server"]');
+      expect(content).toContain('command = "deckent-mcp"');
+      expect(content).toContain('args = []');
       expect(content).toContain('tool_timeout_sec = 600');
     });
   });
@@ -150,8 +150,8 @@ describe('Cross-environment integration tests', () => {
       const settings = {
         mcpServers: {
           deckent: {
-            command: 'npx',
-            args: ['deckent', 'mcp-server'],
+            command: 'deckent-mcp',
+            args: [],
             timeout: 600,
           },
         },
@@ -163,8 +163,8 @@ describe('Cross-environment integration tests', () => {
       const mcpServers = parsed['mcpServers'] as Record<string, unknown>;
       const deckent = mcpServers['deckent'] as Record<string, unknown>;
 
-      expect(deckent['command']).toBe('npx');
-      expect(deckent['args']).toEqual(['deckent', 'mcp-server']);
+      expect(deckent['command']).toBe('deckent-mcp');
+      expect(deckent['args']).toEqual([]);
       expect(deckent['timeout']).toBe(600);
     });
   });
@@ -184,8 +184,8 @@ describe('Cross-environment integration tests', () => {
       const mcpConfig = JSON.parse(mcpRaw) as Record<string, unknown>;
       const mcpServers = mcpConfig['mcpServers'] as Record<string, unknown>;
       const deckent = mcpServers['deckent'] as Record<string, unknown>;
-      expect(deckent['command']).toBe('npx');
-      expect(deckent['args']).toEqual(['deckent', 'mcp-server']);
+      expect(deckent['command']).toBe('deckent-mcp');
+      expect(deckent['args']).toEqual([]);
 
       // Verify rules file content
       const rulesContent = readFileSync(result.rulesPath, 'utf-8');

@@ -12,3 +12,4 @@ Tüm analizler sistematik debugging metodolojisiyle yürütülür (kanıt toplam
 | Dosya | Konu | Tarih |
 |-------|------|-------|
 | [2026-05-22-claude-rules-audit.md](2026-05-22-claude-rules-audit.md) | `.claude/rules/` dizin audit — tutarlılık, dil-bağımsızlık, çift kod yolu | 2026-05-22 |
+| [2026-05-22-ide-adapters-audit.md](2026-05-22-ide-adapters-audit.md) | `.cursor/` `.codex/` `.gemini/` adapter audit — ölü dizinler, CUSTOM kirliliği, MCP kayıt komutu (BUG-18) | 2026-05-22 |

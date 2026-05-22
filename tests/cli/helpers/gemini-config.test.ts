@@ -52,8 +52,8 @@ describe('gemini-config', () => {
     const raw = readFileSync(join(tempDir, '.gemini', 'settings.json'), 'utf-8');
     const parsed = JSON.parse(raw);
     expect(parsed.mcpServers.deckent).toEqual({
-      command: 'npx',
-      args: ['deckent', 'mcp-server'],
+      command: 'deckent-mcp',
+      args: [],
       timeout: 600,
     });
   });
@@ -75,7 +75,7 @@ describe('gemini-config', () => {
     const parsed = JSON.parse(raw);
     expect(parsed.theme).toBe('dark');
     expect(parsed.mcpServers.other.command).toBe('other');
-    expect(parsed.mcpServers.deckent.command).toBe('npx');
+    expect(parsed.mcpServers.deckent.command).toBe('deckent-mcp');
   });
 
   it('updates existing deckent entry', () => {
@@ -91,8 +91,8 @@ describe('gemini-config', () => {
 
     const raw = readFileSync(join(geminiDir, 'settings.json'), 'utf-8');
     const parsed = JSON.parse(raw);
-    expect(parsed.mcpServers.deckent.command).toBe('npx');
-    expect(parsed.mcpServers.deckent.args).toEqual(['deckent', 'mcp-server']);
+    expect(parsed.mcpServers.deckent.command).toBe('deckent-mcp');
+    expect(parsed.mcpServers.deckent.args).toEqual([]);
   });
 
   // ─── Duplicate prevention ────────────────────────────────────────
@@ -115,7 +115,7 @@ describe('gemini-config', () => {
     expect(() => generateGeminiConfig(tempDir)).not.toThrow();
     const raw = readFileSync(join(geminiDir, 'settings.json'), 'utf-8');
     const parsed = JSON.parse(raw);
-    expect(parsed.mcpServers.deckent.command).toBe('npx');
+    expect(parsed.mcpServers.deckent.command).toBe('deckent-mcp');
   });
 
   it('handles array as existing settings (resets to object)', () => {
@@ -126,7 +126,7 @@ describe('gemini-config', () => {
     expect(() => generateGeminiConfig(tempDir)).not.toThrow();
     const raw = readFileSync(join(geminiDir, 'settings.json'), 'utf-8');
     const parsed = JSON.parse(raw);
-    expect(parsed.mcpServers.deckent.command).toBe('npx');
+    expect(parsed.mcpServers.deckent.command).toBe('deckent-mcp');
   });
 
   it('handles mcpServers being a non-object (resets to object)', () => {
@@ -142,6 +142,6 @@ describe('gemini-config', () => {
 
     const raw = readFileSync(join(geminiDir, 'settings.json'), 'utf-8');
     const parsed = JSON.parse(raw);
-    expect(parsed.mcpServers.deckent.command).toBe('npx');
+    expect(parsed.mcpServers.deckent.command).toBe('deckent-mcp');
   });
 });

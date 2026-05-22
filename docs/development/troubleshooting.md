@@ -398,7 +398,7 @@ deckent init
 **Solution:**
 ```bash
 # Test MCP server startup manually
-deckent mcp
+deckent-mcp
 
 # Check for TypeScript build issues
 tsc --noEmit

@@ -400,7 +400,7 @@ deckent doctor
 Deckent integrates with Claude Code via the Model Context Protocol:
 
 ```bash
-claude mcp add deckent -- npx deckent mcp
+claude mcp add deckent -- npx deckent-mcp
 ```
 
 Or let `deckent init` auto-register it.

@@ -121,7 +121,7 @@ vi.mock('../../../src/core/provider.js', () => ({
 
 vi.mock('../../../src/cli/helpers/wizard.js', () => ({
   detectIDEEnvironment: vi.fn().mockReturnValue('terminal'),
-  getMCPGuidance: vi.fn().mockReturnValue(['Terminal mode — MCP tools available via: deckent mcp']),
+  getMCPGuidance: vi.fn().mockReturnValue(['Terminal mode — MCP server binary: deckent-mcp']),
   buildProviderWizardSteps: vi.fn().mockReturnValue({
     autoConfig: {
       brain_provider: 'claude',
@@ -2151,14 +2151,13 @@ describe('human-friendly init output', () => {
       expect(() => JSON.parse(content)).not.toThrow();
     });
 
-    it('registers deckent server with npx command', () => {
+    it('registers deckent server with deckent-mcp command', () => {
       const parsed = JSON.parse(generateVscodeMcpJson()) as Record<string, unknown>;
       const servers = parsed['servers'] as Record<string, unknown>;
       expect(servers).toHaveProperty('deckent');
       const deckent = servers['deckent'] as Record<string, unknown>;
-      expect(deckent['command']).toBe('npx');
-      expect(deckent['args']).toContain('deckent');
-      expect(deckent['args']).toContain('mcp');
+      expect(deckent['command']).toBe('deckent-mcp');
+      expect(deckent['args']).toEqual([]);
     });
   });
 

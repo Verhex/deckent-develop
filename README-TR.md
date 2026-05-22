@@ -389,7 +389,7 @@ deckent doctor
 Deckent, Model Context Protocol üzerinden Claude Code ile entegre olur:
 
 ```bash
-claude mcp add deckent -- npx deckent mcp
+claude mcp add deckent -- npx deckent-mcp
 ```
 
 Veya `deckent init` otomatik olarak kayıt yapsın.

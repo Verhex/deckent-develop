@@ -7,8 +7,8 @@ import { homedir } from 'node:os';
 const DECKENT_SECTION_HEADER = '[mcp_servers.deckent]';
 
 const DECKENT_TOML_BLOCK = `${DECKENT_SECTION_HEADER}
-command = "npx"
-args = ["deckent", "mcp-server"]
+command = "deckent-mcp"
+args = []
 tool_timeout_sec = 600`;
 
 /**
