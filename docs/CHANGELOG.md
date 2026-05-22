@@ -1,6 +1,24 @@
 # Changelog
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
+## [1.0.0-beta.1-sprint188] - 2026-05-22
+
+### Added
+
+- W1-T01 — CLI komut envanteri ve bütünlük denetimi
+- W1-T02 — MCP araç ve resource envanteri
+- W1-T03 — core/ çekirdek modül sağlığı
+- W1-T04 — orchestra/ sprint lifecycle sağlığı
+- W1-T05 — agents/ + monitor/ sağlığı
+- W1-T06 — nervous/ + connectors/ + providers/ sağlığı
+- W1-T07 — api/ + dashboard/ tutarlılığı
+- W1-T08 — scripts/ + build/test config envanteri
+- W1-T09 — feature envanteri ve doğruluk denetimi
+- W2-T10 — CLI↔MCP parity tam haritası
+
+
+_Tasks: 12 total, 12 done, 0 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint187] - 2026-05-22
 
 ### Added

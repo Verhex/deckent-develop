@@ -26,7 +26,7 @@ Features: **Memory V2 DB-First (SQLite FTS5, dual-layer i18n normalize, 96% cont
 | Metric | Value |
 |--------|-------|
 | Version | 1.0.0-beta.1 |
-| Sprint | sprint-187 |
+| Sprint | sprint-188 |
 | MCP Tools | 27 |
 | MCP Resources | 8 |
 | CLI Commands | 56+ |

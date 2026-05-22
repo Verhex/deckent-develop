@@ -1,5 +1,8 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-188 Learnings
+- Sprint sprint-188 Learnings: ## Sprint sprint-188 Learnings
+
 ## Sprint sprint-187 Learnings
 - Sprint sprint-187 Learnings: ## Sprint sprint-187 Learnings
 

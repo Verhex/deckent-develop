@@ -26,4 +26,4 @@ When acting as Worker: @.codex/rules/worker-default.md
 ## Agent Performance
 | Agent | Tasks | Done | Success |
 |-------|-------|------|--------|
-| doc-writer | 1 | 1 | 100% |
+| doc-writer | 12 | 12 | 100% |
