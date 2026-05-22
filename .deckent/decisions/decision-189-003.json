@@ -1,0 +1,85 @@
+{
+  "taskId": "189-003",
+  "sprintId": "sprint-189",
+  "steps": [
+    {
+      "step": 2,
+      "name": "routing-step-2",
+      "input": {
+        "taskId": "189-003",
+        "title": "189-003 — MCP_INSTRUCTIONS 27→31 + 4 eksik tool + lint regression-guard",
+        "scope": [
+          "src/mcp/",
+          "scripts/",
+          ".github/",
+          "tests/mcp/",
+          "src/mcp/tools/"
+        ],
+        "intent": "devops"
+      },
+      "output": {
+        "agent": "architect",
+        "skills": [
+          "anthropic-sdk",
+          "documentation-writer"
+        ],
+        "confidence": "low"
+      },
+      "durationMs": 0,
+      "reasoning": "Agent selected: 'architect' (score=10, rules=[rule(score=10)])"
+    },
+    {
+      "step": 3,
+      "name": "routing-step-3",
+      "input": {
+        "taskId": "189-003",
+        "title": "189-003 — MCP_INSTRUCTIONS 27→31 + 4 eksik tool + lint regression-guard",
+        "scope": [
+          "src/mcp/",
+          "scripts/",
+          ".github/",
+          "tests/mcp/",
+          "src/mcp/tools/"
+        ],
+        "intent": "devops"
+      },
+      "output": {
+        "agent": "architect",
+        "skills": [
+          "anthropic-sdk",
+          "documentation-writer"
+        ],
+        "confidence": "low"
+      },
+      "durationMs": 0,
+      "reasoning": "Skill budget: max 3 (large task, 3 module(s), effort=normal)"
+    },
+    {
+      "step": 4,
+      "name": "routing-step-4",
+      "input": {
+        "taskId": "189-003",
+        "title": "189-003 — MCP_INSTRUCTIONS 27→31 + 4 eksik tool + lint regression-guard",
+        "scope": [
+          "src/mcp/",
+          "scripts/",
+          ".github/",
+          "tests/mcp/",
+          "src/mcp/tools/"
+        ],
+        "intent": "devops"
+      },
+      "output": {
+        "agent": "architect",
+        "skills": [
+          "anthropic-sdk",
+          "documentation-writer"
+        ],
+        "confidence": "low"
+      },
+      "durationMs": 0,
+      "reasoning": "Skills forced by override: [anthropic-sdk, documentation-writer]"
+    }
+  ],
+  "decidedAt": "2026-05-22T22:53:45.031Z"
+}

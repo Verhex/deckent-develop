@@ -1,0 +1,122 @@
+{
+  "taskId": "189-014",
+  "sprintId": "sprint-189",
+  "steps": [
+    {
+      "step": 2,
+      "name": "routing-step-2",
+      "input": {
+        "taskId": "189-014",
+        "title": "189-014 — `directives-stress-simulator.mjs` koruma + `validate-publish` duplicate temizlik",
+        "scope": [
+          "scripts/",
+          "tests/scripts/",
+          "scripts/archive/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "architect",
+        "skills": [
+          "devops-engineer"
+        ],
+        "confidence": "medium"
+      },
+      "durationMs": 0,
+      "reasoning": "Agent 'ci-guardian' excluded: Excluded by rule"
+    },
+    {
+      "step": 3,
+      "name": "routing-step-3",
+      "input": {
+        "taskId": "189-014",
+        "title": "189-014 — `directives-stress-simulator.mjs` koruma + `validate-publish` duplicate temizlik",
+        "scope": [
+          "scripts/",
+          "tests/scripts/",
+          "scripts/archive/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "architect",
+        "skills": [
+          "devops-engineer"
+        ],
+        "confidence": "medium"
+      },
+      "durationMs": 0,
+      "reasoning": "Agent 'doc-writer' excluded: Excluded by rule"
+    },
+    {
+      "step": 4,
+      "name": "routing-step-4",
+      "input": {
+        "taskId": "189-014",
+        "title": "189-014 — `directives-stress-simulator.mjs` koruma + `validate-publish` duplicate temizlik",
+        "scope": [
+          "scripts/",
+          "tests/scripts/",
+          "scripts/archive/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "architect",
+        "skills": [
+          "devops-engineer"
+        ],
+        "confidence": "medium"
+      },
+      "durationMs": 0,
+      "reasoning": "Agent selected: 'architect' (score=10, rules=[rule(score=10)])"
+    },
+    {
+      "step": 5,
+      "name": "routing-step-5",
+      "input": {
+        "taskId": "189-014",
+        "title": "189-014 — `directives-stress-simulator.mjs` koruma + `validate-publish` duplicate temizlik",
+        "scope": [
+          "scripts/",
+          "tests/scripts/",
+          "scripts/archive/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "architect",
+        "skills": [
+          "devops-engineer"
+        ],
+        "confidence": "medium"
+      },
+      "durationMs": 0,
+      "reasoning": "Skill budget: max 3 (large task, 1 module(s), effort=normal)"
+    },
+    {
+      "step": 6,
+      "name": "routing-step-6",
+      "input": {
+        "taskId": "189-014",
+        "title": "189-014 — `directives-stress-simulator.mjs` koruma + `validate-publish` duplicate temizlik",
+        "scope": [
+          "scripts/",
+          "tests/scripts/",
+          "scripts/archive/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "architect",
+        "skills": [
+          "devops-engineer"
+        ],
+        "confidence": "medium"
+      },
+      "durationMs": 0,
+      "reasoning": "Skills forced by override: [devops-engineer]"
+    }
+  ],
+  "decidedAt": "2026-05-22T22:53:45.045Z"
+}

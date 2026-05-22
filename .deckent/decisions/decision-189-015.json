@@ -1,0 +1,217 @@
+{
+  "taskId": "189-015",
+  "sprintId": "sprint-189",
+  "steps": [
+    {
+      "step": 2,
+      "name": "routing-step-2",
+      "input": {
+        "taskId": "189-015",
+        "title": "189-015 — Test fail 36 kategorize + Sprint 190 fix plan (audit)",
+        "scope": [
+          "docs/audits/sprint-189/",
+          "docs/audits/",
+          "tests/docs/",
+          "tests/config/",
+          "tests/nervous/",
+          "tests/docker/",
+          "tests/e2e/",
+          "tests/agents/",
+          "tests/scripts/"
+        ],
+        "intent": "documentation"
+      },
+      "output": {
+        "agent": "architect",
+        "skills": [
+          "testing-expert",
+          "ci-testing"
+        ],
+        "confidence": "uncertain"
+      },
+      "durationMs": 0,
+      "reasoning": "Dynamic exclusions: [migration-specialist, devops-engineer, security-auditor]"
+    },
+    {
+      "step": 3,
+      "name": "routing-step-3",
+      "input": {
+        "taskId": "189-015",
+        "title": "189-015 — Test fail 36 kategorize + Sprint 190 fix plan (audit)",
+        "scope": [
+          "docs/audits/sprint-189/",
+          "docs/audits/",
+          "tests/docs/",
+          "tests/config/",
+          "tests/nervous/",
+          "tests/docker/",
+          "tests/e2e/",
+          "tests/agents/",
+          "tests/scripts/"
+        ],
+        "intent": "documentation"
+      },
+      "output": {
+        "agent": "architect",
+        "skills": [
+          "testing-expert",
+          "ci-testing"
+        ],
+        "confidence": "uncertain"
+      },
+      "durationMs": 0,
+      "reasoning": "Agent 'devops-engineer' excluded by override"
+    },
+    {
+      "step": 4,
+      "name": "routing-step-4",
+      "input": {
+        "taskId": "189-015",
+        "title": "189-015 — Test fail 36 kategorize + Sprint 190 fix plan (audit)",
+        "scope": [
+          "docs/audits/sprint-189/",
+          "docs/audits/",
+          "tests/docs/",
+          "tests/config/",
+          "tests/nervous/",
+          "tests/docker/",
+          "tests/e2e/",
+          "tests/agents/",
+          "tests/scripts/"
+        ],
+        "intent": "documentation"
+      },
+      "output": {
+        "agent": "architect",
+        "skills": [
+          "testing-expert",
+          "ci-testing"
+        ],
+        "confidence": "uncertain"
+      },
+      "durationMs": 0,
+      "reasoning": "Agent 'migration-specialist' excluded by override"
+    },
+    {
+      "step": 5,
+      "name": "routing-step-5",
+      "input": {
+        "taskId": "189-015",
+        "title": "189-015 — Test fail 36 kategorize + Sprint 190 fix plan (audit)",
+        "scope": [
+          "docs/audits/sprint-189/",
+          "docs/audits/",
+          "tests/docs/",
+          "tests/config/",
+          "tests/nervous/",
+          "tests/docker/",
+          "tests/e2e/",
+          "tests/agents/",
+          "tests/scripts/"
+        ],
+        "intent": "documentation"
+      },
+      "output": {
+        "agent": "architect",
+        "skills": [
+          "testing-expert",
+          "ci-testing"
+        ],
+        "confidence": "uncertain"
+      },
+      "durationMs": 0,
+      "reasoning": "Agent 'security-auditor' excluded by override"
+    },
+    {
+      "step": 6,
+      "name": "routing-step-6",
+      "input": {
+        "taskId": "189-015",
+        "title": "189-015 — Test fail 36 kategorize + Sprint 190 fix plan (audit)",
+        "scope": [
+          "docs/audits/sprint-189/",
+          "docs/audits/",
+          "tests/docs/",
+          "tests/config/",
+          "tests/nervous/",
+          "tests/docker/",
+          "tests/e2e/",
+          "tests/agents/",
+          "tests/scripts/"
+        ],
+        "intent": "documentation"
+      },
+      "output": {
+        "agent": "architect",
+        "skills": [
+          "testing-expert",
+          "ci-testing"
+        ],
+        "confidence": "uncertain"
+      },
+      "durationMs": 0,
+      "reasoning": "Agent selected: 'architect' (score=10, rules=[rule(score=10)])"
+    },
+    {
+      "step": 7,
+      "name": "routing-step-7",
+      "input": {
+        "taskId": "189-015",
+        "title": "189-015 — Test fail 36 kategorize + Sprint 190 fix plan (audit)",
+        "scope": [
+          "docs/audits/sprint-189/",
+          "docs/audits/",
+          "tests/docs/",
+          "tests/config/",
+          "tests/nervous/",
+          "tests/docker/",
+          "tests/e2e/",
+          "tests/agents/",
+          "tests/scripts/"
+        ],
+        "intent": "documentation"
+      },
+      "output": {
+        "agent": "architect",
+        "skills": [
+          "testing-expert",
+          "ci-testing"
+        ],
+        "confidence": "uncertain"
+      },
+      "durationMs": 0,
+      "reasoning": "Skill budget: max 3 (large task, 7 module(s), effort=normal)"
+    },
+    {
+      "step": 8,
+      "name": "routing-step-8",
+      "input": {
+        "taskId": "189-015",
+        "title": "189-015 — Test fail 36 kategorize + Sprint 190 fix plan (audit)",
+        "scope": [
+          "docs/audits/sprint-189/",
+          "docs/audits/",
+          "tests/docs/",
+          "tests/config/",
+          "tests/nervous/",
+          "tests/docker/",
+          "tests/e2e/",
+          "tests/agents/",
+          "tests/scripts/"
+        ],
+        "intent": "documentation"
+      },
+      "output": {
+        "agent": "architect",
+        "skills": [
+          "testing-expert",
+          "ci-testing"
+        ],
+        "confidence": "uncertain"
+      },
+      "durationMs": 0,
+      "reasoning": "Skills forced by override: [testing-expert, ci-testing]"
+    }
+  ],
+  "decidedAt": "2026-05-22T22:53:45.046Z"
+}

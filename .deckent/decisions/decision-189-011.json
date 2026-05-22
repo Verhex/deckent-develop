@@ -1,0 +1,182 @@
+{
+  "taskId": "189-011",
+  "sprintId": "sprint-189",
+  "steps": [
+    {
+      "step": 2,
+      "name": "routing-step-2",
+      "input": {
+        "taskId": "189-011",
+        "title": "189-011 — API endpoint envanteri + E2E HTTP test suite başlangıcı",
+        "scope": [
+          "src/api/",
+          "tests/api/",
+          "docs/reference/",
+          "src/api/terminal/"
+        ],
+        "intent": "documentation"
+      },
+      "output": {
+        "agent": "doc-writer",
+        "skills": [
+          "api-builder",
+          "testing-expert"
+        ],
+        "confidence": "low"
+      },
+      "durationMs": 0,
+      "reasoning": "Dynamic exclusions: [migration-specialist, devops-engineer, security-auditor]"
+    },
+    {
+      "step": 3,
+      "name": "routing-step-3",
+      "input": {
+        "taskId": "189-011",
+        "title": "189-011 — API endpoint envanteri + E2E HTTP test suite başlangıcı",
+        "scope": [
+          "src/api/",
+          "tests/api/",
+          "docs/reference/",
+          "src/api/terminal/"
+        ],
+        "intent": "documentation"
+      },
+      "output": {
+        "agent": "doc-writer",
+        "skills": [
+          "api-builder",
+          "testing-expert"
+        ],
+        "confidence": "low"
+      },
+      "durationMs": 0,
+      "reasoning": "Agent 'devops-engineer' excluded by override"
+    },
+    {
+      "step": 4,
+      "name": "routing-step-4",
+      "input": {
+        "taskId": "189-011",
+        "title": "189-011 — API endpoint envanteri + E2E HTTP test suite başlangıcı",
+        "scope": [
+          "src/api/",
+          "tests/api/",
+          "docs/reference/",
+          "src/api/terminal/"
+        ],
+        "intent": "documentation"
+      },
+      "output": {
+        "agent": "doc-writer",
+        "skills": [
+          "api-builder",
+          "testing-expert"
+        ],
+        "confidence": "low"
+      },
+      "durationMs": 0,
+      "reasoning": "Agent 'migration-specialist' excluded by override"
+    },
+    {
+      "step": 5,
+      "name": "routing-step-5",
+      "input": {
+        "taskId": "189-011",
+        "title": "189-011 — API endpoint envanteri + E2E HTTP test suite başlangıcı",
+        "scope": [
+          "src/api/",
+          "tests/api/",
+          "docs/reference/",
+          "src/api/terminal/"
+        ],
+        "intent": "documentation"
+      },
+      "output": {
+        "agent": "doc-writer",
+        "skills": [
+          "api-builder",
+          "testing-expert"
+        ],
+        "confidence": "low"
+      },
+      "durationMs": 0,
+      "reasoning": "Agent 'security-auditor' excluded by override"
+    },
+    {
+      "step": 6,
+      "name": "routing-step-6",
+      "input": {
+        "taskId": "189-011",
+        "title": "189-011 — API endpoint envanteri + E2E HTTP test suite başlangıcı",
+        "scope": [
+          "src/api/",
+          "tests/api/",
+          "docs/reference/",
+          "src/api/terminal/"
+        ],
+        "intent": "documentation"
+      },
+      "output": {
+        "agent": "doc-writer",
+        "skills": [
+          "api-builder",
+          "testing-expert"
+        ],
+        "confidence": "low"
+      },
+      "durationMs": 0,
+      "reasoning": "Agent selected: 'doc-writer' (score=10, rules=[rule(score=10)])"
+    },
+    {
+      "step": 7,
+      "name": "routing-step-7",
+      "input": {
+        "taskId": "189-011",
+        "title": "189-011 — API endpoint envanteri + E2E HTTP test suite başlangıcı",
+        "scope": [
+          "src/api/",
+          "tests/api/",
+          "docs/reference/",
+          "src/api/terminal/"
+        ],
+        "intent": "documentation"
+      },
+      "output": {
+        "agent": "doc-writer",
+        "skills": [
+          "api-builder",
+          "testing-expert"
+        ],
+        "confidence": "low"
+      },
+      "durationMs": 0,
+      "reasoning": "Skill budget: max 2 (medium task, 2 module(s), effort=normal)"
+    },
+    {
+      "step": 8,
+      "name": "routing-step-8",
+      "input": {
+        "taskId": "189-011",
+        "title": "189-011 — API endpoint envanteri + E2E HTTP test suite başlangıcı",
+        "scope": [
+          "src/api/",
+          "tests/api/",
+          "docs/reference/",
+          "src/api/terminal/"
+        ],
+        "intent": "documentation"
+      },
+      "output": {
+        "agent": "doc-writer",
+        "skills": [
+          "api-builder",
+          "testing-expert"
+        ],
+        "confidence": "low"
+      },
+      "durationMs": 0,
+      "reasoning": "Skills forced by override: [api-builder, testing-expert]"
+    }
+  ],
+  "decidedAt": "2026-05-22T22:53:45.043Z"
+}
