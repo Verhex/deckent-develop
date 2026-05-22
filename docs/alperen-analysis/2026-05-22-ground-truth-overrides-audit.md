@@ -73,7 +73,7 @@ planner.ts (plan-time) · task-builder.ts (helper) · auditor.ts (runtime)
 
 **Etki:** Yok — sistem fail-safe; expired override asla `true` döndürmez, yanlış bastırma olmaz. Ancak dosya, amacı (Sprint 148-149 ADR-041 reform geçiş dönemi "15 vs 16" akışkanlığı) sona ermiş **stale bir kalıntı** taşıyor.
 
-**Durum:** Belgelendi — bkz. Gelecek Öneriler #1. Dosya `approvedBy: alperen` taşıyan bir **insan-onay artefaktı** olduğu için bu turda elle düzenlenmedi (kullanıcı kararı).
+**Durum:** Düzeltildi — Alperen onayıyla expired+redundant override kaldırıldı; `.deckent/ground-truth-overrides.json` artık `"overrides": []`. Sistem davranışı değişmez (expired override zaten inert'ti — `overrideApplies` `false` döndürüyordu); whitelist stale girdiden temizlendi.
 
 ---
 
@@ -90,9 +90,13 @@ planner.ts (plan-time) · task-builder.ts (helper) · auditor.ts (runtime)
 
 ## Uygulanan Değişiklikler
 
-Bu tur **kod/dosya değişikliği yok** — saf analiz. `ground-truth-overrides.json` `approvedBy: alperen` taşıyan insan-onay artefaktıdır; expired override'ın kaldırılması kullanıcı kararına bırakıldı (Gelecek Öneriler #1).
+| Dosya | Değişiklik |
+|-------|-----------|
+| `.deckent/ground-truth-overrides.json` | Expired+redundant tek override (`agents_count:15`, `until_sprint:170`) Alperen onayıyla kaldırıldı → `"overrides": []` |
 
-**Doğrulama:** 3 tüketici (planner/task-builder/auditor) kodu okundu; `measureAgentsCount` kaynağı `src/core/builtins/agents/` diskte doğrulandı (15 dizin); `overrideApplies` expiry semantiği (`current < until_sprint`) kanıtla teyit edildi.
+Davranış değişmez — expired override zaten inert'ti; whitelist yalnızca stale girdiden arındırıldı. Yeni bir mismatch ihtiyacı doğarsa süresi geçerli bir override eklenebilir.
+
+**Doğrulama:** 3 tüketici (planner/task-builder/auditor) kodu okundu; `measureAgentsCount` kaynağı `src/core/builtins/agents/` diskte doğrulandı (15 dizin); `overrideApplies` expiry semantiği (`current < until_sprint`) kanıtla teyit edildi; güncel JSON geçerliliği doğrulandı.
 
 ---
 
@@ -111,7 +115,7 @@ Bu tur **kod/dosya değişikliği yok** — saf analiz. `ground-truth-overrides.
 
 ## Gelecek Öneriler
 
-1. **Stale override temizliği:** Tek override (`agents_count:15`, expired sprint 170) `overrides: []` yapılarak kaldırılmalı — ölçülen sayım (15) zaten onaylı değerle eşit, override gereksiz. (İnsan-onay dosyası → Alperen kararı.)
+1. ~~**Stale override temizliği**~~ — ✅ **TAMAMLANDI:** Tek override (`agents_count:15`, expired sprint 170) Alperen onayıyla kaldırıldı; `overrides: []`.
 2. **Expiry hijyeni:** Auditor, süresi dolmuş override için bir uyarı üretebilir ("override `agents_count` sprint 170'te doldu — kaldır ya da yenile") — whitelist'in stale girdilerle dolmasını önler.
 3. **Metrik genişletme (opsiyonel):** Sistem `agents_count` dışına da uygulanabilir (skills_count, mcp_tools_count vb.) — doc-sync stale-sayı regresyonu yalnızca agent sayısında değil; `GroundTruthMetric[]` zaten genişlemeye açık.
 
@@ -119,4 +123,4 @@ Bu tur **kod/dosya değişikliği yok** — saf analiz. `ground-truth-overrides.
 
 ## Kapanış
 
-Audit 2026-05-22'de kapatıldı. `.deckent/ground-truth-overrides.json` = doc-sync ground-truth whitelist'i (Sprint 166 Bug Y2) — doc-sync agent'larının stale sayısal iddia üretmesine karşı insan-onaylı, süreli istisna listesi. 3 katman (planner/task-builder/auditor) tarafından tüketilir; `measureAgentsCount` ile gerçek ölçüme karşı doğrulanır. Sistem tasarımı sağlam (gerçek ölçüm, fail-safe, süreli istisna). **2 sorun belgelendi** — ikisi de düşük öncelik: tek override çifte ölü (expired sprint 170 + redundant, ölçüm zaten 15), ve expired-override hijyeni yok. İşlevsel risk yok; bulgular OSS temizliği kapsamında "Gelecek Öneriler"de izleniyor.
+Audit 2026-05-22'de kapatıldı. `.deckent/ground-truth-overrides.json` = doc-sync ground-truth whitelist'i (Sprint 166 Bug Y2) — doc-sync agent'larının stale sayısal iddia üretmesine karşı insan-onaylı, süreli istisna listesi. 3 katman (planner/task-builder/auditor) tarafından tüketilir; `measureAgentsCount` ile gerçek ölçüme karşı doğrulanır. Sistem tasarımı sağlam (gerçek ölçüm, fail-safe, süreli istisna). **2 sorun** — Sorun 1 (tek override çifte ölü: expired sprint 170 + redundant) Alperen onayıyla **düzeltildi** (`overrides: []`); Sorun 2 (expired-override hijyeni yok) belgelendi. İşlevsel risk yoktu; whitelist stale girdiden temizlendi.
