@@ -924,3 +924,37 @@ Her sprint sonunda **3 görünür değişim** raporlanmalı:
 - `[[feedback_prompt_completeness_over_brevity]]` — uyum: Karpathy "completeness preserved" (criteria self-contained, talimat değil tasarruf)
 - W-E (Evrimsel Mimari) — Karpathy criteria = mutation hedefi
 - W-K (Dead Code Wire-Up) — prompt-evolution.ts canlanır, criteria-based feedback loop'la
+
+---
+
+# EK BÖLÜM — Sprint 191 P0 Backlog (2026-05-24 eklendi, 2 sprint dogfood'dan biriken)
+
+**Hedef:** Sprint 189-190 boyunca biriken false-NO_GO + infrastructure + UX bug'larını kapat. Beta launch için her biri kritik.
+**Anchor:** [[feedback_docker_oom_false_no_go]], systematic-debug 2026-05-24 RC tanısı
+
+## Sprint 191 P0 — Beta Bloker (12 madde)
+
+| ID | İş | RC | Kanıt |
+|----|----|-----|-------|
+| **P191-1** | `evaluateWithRubric` → `reconcileSpuriousNoGo` wire (Sprint 145 deprecated path'inde kaldı) | sprint-phases EVALUATE production fn'i partialMarker durumda git-diff reconcile etmiyor | result-evaluator.ts:1087 + sprint-phases.ts:783/1142 |
+| **P191-2** | Docker memory budget düzelt — 6 worker × 8g = 48GB, WSL2 yetmez | OOM exit 137 SIGKILL kök neden | `max_workers: 3` veya `--memory 4g` (spawn-backend-docker.ts:383) |
+| **P191-3** | `runtime_extension_enabled: true` + auto-extend | Worker timeout yaklaşırsa otomatik uzatma yok | .deckent/config.json:timeout |
+| **P191-4** | Sprint 190 16 false-NO_GO retroactive reclassify | evaluateWithRubric fix sonrası mevcut .result'lar re-eval edilmeli | docs/audits/sprint-189/test-fail-categorize.md follow-up |
+| **P191-5** | Temp agent PROMPT.md generator template (3 missing: archive, temp-react-specialist, temp-react-ts-specialist) | Sprint 190'da temp-react-ts %33 success — degraded prompt direkt etki | temp-skill-generator.ts wire |
+| **P191-6** | Dashboard non-terminal endpoints token bootstrap | /status, /history vs 401 — terminal-api token attach var, diğer fetch'lerde yok | api-dashboard-consistency.md follow-up |
+| **P191-7** | Cost-gate `planSprint` mode-respecting (structured → AI fallback bug) | brain_planning:structured iken AI parser çağrılıyor → 3 dk gecikme | start.ts:349, mcp/tools/start.ts:113 dryRun:true (drift) |
+| **P191-8** | ci-guardian "0 failure but warning" yanıltıcı mesaj | vitestResult.passed/testFailed parsing — 0 fail ama passed=false (build/OOM) durumu | plugin-hooks.ts:691 |
+| **P191-9** | MCP `deckent_start` fire-and-forget Promise lifecycle | MCP stdio process'inde runSprint Promise event loop'a takılı kalıyor → sprint silently başlamıyor | CLAUDE.md gotchas note kalıcı çözüm |
+| **P191-10** | CLI `node dist/cli/index.js` silent exit RC + fix | index.js boş çıktı veriyor (bin entry.js doğru ama compat eksik) | bin yolu sanity |
+| **P191-11** | Memory DB retro entry yazımı (ADR-046 hook chronic incomplete) — Sprint 189-190'da retro entry yok | sprint-finalizer retro hook DB write fail | sprint-retro-writer.ts |
+| **P191-12** | IDENTITY.md sat30 Project Status AUTOGEN extend (Sprint 189-012 carry-over) | AUTOGEN block sat26-38'e taşındı ama hâlâ sat30 manuel düzenleme drift'i mümkün | identity-generator.ts |
+
+## Karpathy + dead-code wire-up (W-L+W-E+W-K kapsamı)
+
+Yukarıdaki P0 12 + W-L Karpathy Discipline Refactor (L-1..L-5 core + L-20 temp template = 6 task) + Sprint 190 yarım kalan (Provider isAvailable + Ollama TECH_DEBT fix) = ~20 task Sprint 191 için.
+
+**Sprint 191 toplam tahmin:** 18-20 task, 2-3 dalga, ~60 dk
+
+## Beta launch için zorunlu eşik (1 Haz 2026)
+
+Bu 12 P0 + Sprint 190 carry-over tamam olmalı. Sprint 192+ (Trinity dashboard reborn, Path A, Local LLM polish) buna bağlı.

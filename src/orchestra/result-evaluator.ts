@@ -1088,6 +1088,7 @@ export function evaluateWithRubric(
   result: TaskResult,
   task: Task,
   rubric?: Partial<EvaluationRubric>,
+  projectRoot?: string,
 ): EvaluationResult {
   // D-2: Schema validation — reject results with missing required fields
   // Sprint 154 T-004: pass `task` so coverage:null is tolerated on non-code tasks
@@ -1175,6 +1176,47 @@ export function evaluateWithRubric(
         ...evaluation,
         decision: reconciled.decision,
       };
+    }
+
+    // Sprint 191 P191-1: Spurious NO_GO recovery for OOM-killed / partial-result
+    // promoted workers (Sprint 151 safety-net). evaluateWithRubric was the only
+    // production EVALUATE path that did NOT call reconcileSpuriousNoGo (Sprint 145
+    // helper was wired only into the deprecated evaluateResult).
+    //
+    // When projectRoot is provided, attempt git-diff/scope/tsc recovery as a
+    // final fallback. For OOM-killed workers (Sprint 151 partial-marker promotion)
+    // we accept reconcile WITHOUT vitest scope check — the worker was killed
+    // before it could run tests, so expecting test pass is illogical. The
+    // result will be GO_WITH_TECH_DEBT (tech debt: tests need follow-up sprint).
+    if (projectRoot) {
+      const isOomKilled =
+        typeof result.notes === 'string' &&
+        (result.notes.includes('OOM-killed') ||
+          result.notes.includes('SIGKILL') ||
+          result.notes.includes('partial-result promoted'));
+
+      const spurious = reconcileSpuriousNoGo(
+        result,
+        task,
+        projectRoot,
+        isOomKilled
+          ? {
+              // OOM-kill path: skip vitest (worker died before tests could run).
+              // Still require: git diff > 0, scope compliant, tsc clean.
+              runVitestScopeCheck: () => ({ passed: true, passRatio: 0 }),
+            }
+          : undefined,
+      );
+      if (spurious.reconciled && spurious.decision === 'GO_WITH_TECH_DEBT') {
+        debugLog(
+          'evaluateWithRubric:spurious-reconcile',
+          `Task ${task.id}: spurious NO_GO reconciled → GO_WITH_TECH_DEBT (${spurious.linesChanged} lines, ${spurious.filesChanged.length} files, oomKilled=${isOomKilled})`,
+        );
+        return {
+          ...evaluation,
+          decision: 'GO_WITH_TECH_DEBT',
+        };
+      }
     }
   }
 

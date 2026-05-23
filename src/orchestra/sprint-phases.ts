@@ -780,7 +780,9 @@ export async function runEvaluatePhase(
           debugLog('runEvaluatePhase:honestGate', `task=${task.id} violation=${gated.violation} → forced NO_GO`);
         }
 
-        const rubricResult = evaluateWithRubric(result, task);
+        // Sprint 191 P191-1: pass projectRoot so OOM-killed / partial-result
+        // workers can be reconciled via reconcileSpuriousNoGo (git diff fallback).
+        const rubricResult = evaluateWithRubric(result, task, undefined, projectRoot);
         let evaluation = toTaskEvaluation(rubricResult);
         // Sprint 165 Task 1: ensure honest-gate violations cannot be re-promoted
         // by the rubric reconciler (reconcileRubricNoGo can override NO_GO
@@ -1139,7 +1141,8 @@ export async function runFixPhase(
       for (const fixTask of fixTasks) {
         const fixResult = fixResults.find(r => r.taskId === fixTask.id);
         if (fixResult) {
-          const fixRubricResult = evaluateWithRubric(fixResult, fixTask);
+          // Sprint 191 P191-1: projectRoot for spurious NO_GO reconcile (fix-task too)
+          const fixRubricResult = evaluateWithRubric(fixResult, fixTask, undefined, projectRoot);
           const fixEval = toTaskEvaluation(fixRubricResult);
           handleEvaluation(projectRoot, fixTask, fixEval, fixResult);
           evaluations.set(fixTask.id, fixEval);
