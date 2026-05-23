@@ -9,6 +9,7 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-190-009 | Tech debt from 190-009: Ollama Local LLM Provider (Sprint 190 W-F F-11) — implem | normal | sprint-190 | resolved |
 | debt-180-003 | Tech debt from 180-003: W1-2 — Nervous bootstrap fabrika tamamlandı. `createNerv | normal | sprint-180 | resolved |
 | debt-180-004 | Tech debt from 180-004: W2-1 — Nervous action handlers (Step C) implemented per  | normal | sprint-180 | resolved |
 | debt-180-006 | Tech debt from 180-006: Sprint 180 W3-1 — Sprint-controller nervous wire (Step D | normal | sprint-180 | resolved |
