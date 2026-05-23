@@ -75,7 +75,7 @@ These suspects turned out to be actively used.
 
 ## Unused Export Sampling
 
-Found **781** potentially unused exports across src/.
+Found **790** potentially unused exports across src/.
 Top 20 shown below (full list requires deeper analysis):
 
 | File | Export | Import Count |

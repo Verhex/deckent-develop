@@ -14,13 +14,15 @@
 // Usage:
 //   await notify('sprint-started', sprintId, 'Sprint başladı', '18 task planlandı');
 
-import { eventBus } from '../orchestra/event-bus.js';
 import {
   createNotification,
   toEventPayload,
   type NotificationEventName,
 } from './notification-dispatcher.js';
-import { getGlobalNotifyDispatcher } from './notify-registry.js';
+import {
+  getGlobalNotifyDispatcher,
+  getNotificationDispatcher,
+} from './notify-registry.js';
 import { debugLog } from './utils.js';
 
 // ─── Public API ─────────────────────────────────────────────────
@@ -59,17 +61,22 @@ export async function notify(
   }
 
   // 1. In-process event-bus emit — DECKENT→USER:NOTIFY channel
-  try {
-    eventBus.emit('deckent-event', {
-      type: 'NOTIFY',
-      source: 'brain',
-      target: 'user',
-      channel: 'DECKENT→USER:NOTIFY',
-      payload: toEventPayload(notification),
-      timestamp: notification.timestamp,
-    });
-  } catch (err) {
-    debugLog('notify:eventBusEmit', err);
+  // ADR-008: routed through notify-registry to avoid core/ → orchestra/ import.
+  // orchestra/event-bus.ts registers the dispatcher at module init.
+  const eventDispatcher = getNotificationDispatcher();
+  if (eventDispatcher) {
+    try {
+      eventDispatcher({
+        type: 'NOTIFY',
+        source: 'brain',
+        target: 'user',
+        channel: 'DECKENT→USER:NOTIFY',
+        payload: toEventPayload(notification),
+        timestamp: notification.timestamp,
+      });
+    } catch (err) {
+      debugLog('notify:eventBusEmit', err);
+    }
   }
 
   // 2. Global NotifyDispatcher — CLI + MCP + file adapters

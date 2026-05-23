@@ -16,6 +16,10 @@ import { join } from 'node:path';
 import type { DeckentEvent, ChannelCode } from './event-stream.js';
 import { DECKENT_DIR } from '../core/constants.js';
 import { debugLog } from '../core/utils.js';
+import {
+  setNotificationDispatcher,
+  type NotifyBusEvent,
+} from '../core/notify-registry.js';
 
 // ─── Types ───────────────────────────────────────────────────────
 
@@ -251,3 +255,11 @@ export class EventBus extends EventEmitter {
 // ─── Singleton ──────────────────────────────────────────────────
 
 export const eventBus = new EventBus();
+
+// ─── ADR-008 Dependency Inversion Wire ──────────────────────────
+// core/notify.ts must not import orchestra/. Instead we register an emit
+// function here at module load; notify.ts reads it via getNotificationDispatcher().
+// Direction stays orchestra → core (allowed). Side effect is idempotent.
+setNotificationDispatcher((evt: NotifyBusEvent) => {
+  eventBus.emit('deckent-event', evt);
+});

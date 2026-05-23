@@ -105,5 +105,6 @@ _No active technical debt._
 - Violation pattern: stale_heartbeat
 - Violation pattern: stale_heartbeat
 - Violation pattern: stale_heartbeat
+- Violation pattern: stale_heartbeat
 
-_Total entries: 326 | Generated: 2026-05-22_
+_Total entries: 327 | Generated: 2026-05-22_
