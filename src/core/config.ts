@@ -57,7 +57,13 @@ export const DEFAULT_TIMEOUT_CONFIG: TimeoutConfig = {
   effort_base: { low: 600, normal: 1200, high: 2400 },
   loc_scaling_enabled: true,
   history_scaling_enabled: true,
-  runtime_extension_enabled: false,
+  // Sprint 191 (Task 191-002): default flipped false → true. With ADR-064
+  // continuous-dispatch already landing high-effort opus tasks that legitimately
+  // run past the structured timeout (Sprint 190 dogfood: 4 partial workers
+  // confirmed via .hb freshness + non-empty git diff), the safer default is
+  // to grant a bounded heartbeat-aware extension rather than declare a
+  // synthetic NO_GO. Wire: evaluateRuntimeExtension in sprint-phases.ts.
+  runtime_extension_enabled: true,
 };
 
 // ─── Default Auto Docs Config ───────────────────────────────────────

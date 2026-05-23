@@ -122,6 +122,7 @@ import {
 // dependents PAUSED and DONE → dependents PENDING actually fire.
 import { applyCascadeToSprint, applyUnblockToSprint } from './sprint-spawner.js';
 import { writeEvent, getCurrentSprintId } from './event-stream.js';
+import { checkWorkerLiveness } from './worker-liveness.js';
 import type { FailureContext } from './result-evaluator.js';
 
 // ─── Sprint Controller (safe circular — all usages inside function bodies) ──
@@ -689,6 +690,158 @@ function releaseEvaluateLock(projectRoot: string, sprintId: string): void {
   } catch (e) { debugLog('releaseEvaluateLock', e); }
 }
 
+// ═══ Runtime Timeout Extension (Sprint 191 — Task 191-002) ═════════
+// Heartbeat-aware extension decision used by runEvaluatePhase before
+// declaring a synthetic NO_GO for a missing .result file.
+//
+// Wire contract (DIRECTIVES Sprint 191 Task 191-002):
+//   • Default ON (config.timeout.runtime_extension_enabled = true).
+//   • Heartbeat fresher than 90s → eligible.
+//   • Per-task hard cap of 3 extensions → +5min each → +15min total.
+//   • State is held in a caller-provided Map so re-entry preserves
+//     counters across evaluate cycles (FIX-phase parallel/retry callers
+//     would otherwise reset the counter every loop).
+
+/** Hard cap on runtime extensions per task (matches DIRECTIVES Task 191-002). */
+export const RUNTIME_EXTENSION_MAX = 3;
+/** Default per-extension grant in milliseconds (DIRECTIVES: +5 minutes). */
+export const RUNTIME_EXTENSION_MS = 5 * 60 * 1000;
+/** Default heartbeat freshness threshold in seconds (DIRECTIVES: last 90s). */
+export const RUNTIME_EXTENSION_HEARTBEAT_FRESH_S = 90;
+
+/** Map keyed by `${sprintId}::${taskId}` → extension count consumed. */
+export type ExtensionStateMap = Map<string, number>;
+
+/**
+ * Decision payload returned by {@link evaluateRuntimeExtension}.
+ */
+export interface RuntimeExtensionDecision {
+  /** True when caller should grant an extension instead of declaring NO_GO. */
+  granted: boolean;
+  /** Diagnostic reason — always present, useful for debugLog + events. */
+  reason:
+    | 'disabled'
+    | 'no_heartbeat'
+    | 'invalid_heartbeat'
+    | 'stale_heartbeat'
+    | 'cap_reached'
+    | 'granted';
+  /** Number of extensions consumed so far (after this call) when granted. */
+  extensionCount: number;
+  /** Time budget for this extension in ms (only when granted). */
+  extensionMs: number;
+}
+
+/**
+ * Decide whether a timed-out task should receive a runtime extension based
+ * on (a) the project's `runtime_extension_enabled` flag, (b) heartbeat
+ * freshness and (c) the per-task extension counter.
+ *
+ * Pure with respect to disk only at the heartbeat file — never mutates
+ * results or task state. The `state` Map is mutated in place when an
+ * extension is granted so the counter advances across calls.
+ *
+ * @param projectRoot     project root (heartbeat lives in `.tasks/`)
+ * @param sprintId        sprint id used to namespace the state key
+ * @param taskId          task id to evaluate
+ * @param config          resolved config (timeout.runtime_extension_enabled checked)
+ * @param state           caller-owned counter map (idempotent across re-entry)
+ * @param now             clock injection for tests (default Date.now)
+ */
+export function evaluateRuntimeExtension(
+  projectRoot: string,
+  sprintId: string,
+  taskId: string,
+  config: ResolvedConfig | undefined,
+  state: ExtensionStateMap,
+  now: () => number = Date.now,
+): RuntimeExtensionDecision {
+  const enabled = config?.timeout?.runtime_extension_enabled === true;
+  const key = `${sprintId}::${taskId}`;
+  const used = state.get(key) ?? 0;
+
+  if (!enabled) {
+    return { granted: false, reason: 'disabled', extensionCount: used, extensionMs: 0 };
+  }
+  if (used >= RUNTIME_EXTENSION_MAX) {
+    return { granted: false, reason: 'cap_reached', extensionCount: used, extensionMs: 0 };
+  }
+
+  const hbPath = join(projectRoot, TASKS_DIR, `task-${taskId}.hb`);
+  if (!existsSync(hbPath)) {
+    return { granted: false, reason: 'no_heartbeat', extensionCount: used, extensionMs: 0 };
+  }
+
+  let timestamp: string | undefined;
+  try {
+    const raw = readFileSync(hbPath, 'utf-8');
+    const hb = JSON.parse(raw) as { timestamp?: string };
+    timestamp = hb.timestamp;
+  } catch (e) {
+    debugLog('evaluateRuntimeExtension:parseHeartbeat', e);
+    return { granted: false, reason: 'invalid_heartbeat', extensionCount: used, extensionMs: 0 };
+  }
+
+  if (!timestamp) {
+    return { granted: false, reason: 'invalid_heartbeat', extensionCount: used, extensionMs: 0 };
+  }
+
+  const hbMs = new Date(timestamp).getTime();
+  if (!Number.isFinite(hbMs)) {
+    return { granted: false, reason: 'invalid_heartbeat', extensionCount: used, extensionMs: 0 };
+  }
+  const ageSeconds = (now() - hbMs) / 1000;
+  if (ageSeconds > RUNTIME_EXTENSION_HEARTBEAT_FRESH_S) {
+    return { granted: false, reason: 'stale_heartbeat', extensionCount: used, extensionMs: 0 };
+  }
+
+  const nextCount = used + 1;
+  state.set(key, nextCount);
+  return {
+    granted: true,
+    reason: 'granted',
+    extensionCount: nextCount,
+    extensionMs: RUNTIME_EXTENSION_MS,
+  };
+}
+
+/**
+ * Poll for a `.result` file with a bounded budget. Returns true if the
+ * file appears (and is parseable) within `budgetMs`, false on timeout.
+ *
+ * Used by {@link runEvaluatePhase} when an extension is granted — gives the
+ * still-progressing worker a chance to write its result before the synthetic
+ * NO_GO fires. Fail-soft: any parse or stat error simply continues the poll
+ * loop until the budget expires.
+ */
+export async function pollForResultFile(
+  projectRoot: string,
+  taskId: string,
+  budgetMs: number,
+  pollIntervalMs = 5_000,
+): Promise<TaskResult | null> {
+  const resultPath = join(projectRoot, TASKS_DIR, `task-${taskId}.result`);
+  const deadline = Date.now() + budgetMs;
+  while (Date.now() < deadline) {
+    try {
+      if (existsSync(resultPath)) {
+        const parsed = readJsonSafe<TaskResult>(resultPath);
+        if (parsed) return parsed;
+      }
+    } catch (e) { debugLog('pollForResultFile:read', e); }
+    await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
+  }
+  // Final check after the loop's last sleep — covers the case where the
+  // result lands exactly on the deadline boundary.
+  try {
+    if (existsSync(resultPath)) {
+      const parsed = readJsonSafe<TaskResult>(resultPath);
+      if (parsed) return parsed;
+    }
+  } catch (e) { debugLog('pollForResultFile:finalRead', e); }
+  return null;
+}
+
 /**
  * Run the EVALUATE phase: evaluate each task result, run CI regression checks,
  * handle debt, and run afterTask hooks.
@@ -708,6 +861,8 @@ export async function runEvaluatePhase(
   results: TaskResult[],
   evaluations: Map<string, TaskEvaluation>,
   _coverageThreshold = 90,
+  config?: ResolvedConfig,
+  extensionState?: ExtensionStateMap,
 ): Promise<void> {
   // ─── Idempotency Guard (Sprint 157 Task 002) ───────────────────
   // Acquire PID-bound lock; if a live evaluation is already running
@@ -715,6 +870,23 @@ export async function runEvaluatePhase(
   if (!tryAcquireEvaluateLock(projectRoot, sprint.id)) {
     debugLog('runEvaluatePhase:noop', `lock held — sprint=${sprint.id} pid=${process.pid}`);
     return;
+  }
+  // Sprint 191 Task 191-002: caller-supplied counter so the per-task
+  // extension cap survives FIX-phase re-entry; default to a fresh map
+  // (legacy callers without extension state behave as before).
+  const extState: ExtensionStateMap = extensionState ?? new Map();
+  // When the caller does not supply config (legacy sprint-controller
+  // call site), lazy-load it from disk so the runtime-extension wire
+  // is active by default. Fail-soft: any load error falls back to
+  // pre-Sprint-191 behavior (no extension, synthetic NO_GO on timeout).
+  let resolvedConfig: ResolvedConfig | undefined = config;
+  if (!resolvedConfig) {
+    try {
+      const { loadConfig } = await import('../core/config.js');
+      resolvedConfig = await loadConfig(projectRoot);
+    } catch (e) {
+      debugLog('runEvaluatePhase:loadConfig', e);
+    }
   }
   try {
     // Sprint 161 Task 2 (T-003): EVALUATE entry — phase reaches disk so
@@ -887,6 +1059,120 @@ export async function runEvaluatePhase(
           resolveDebt(projectRoot, `debt-${task.id}`, sprint.id);
         }
       } else {
+        // ─── Runtime Extension Attempt (Sprint 191 — Task 191-002) ──
+        // Before declaring a synthetic NO_GO for a missing .result,
+        // consult the heartbeat-aware extension policy. When granted,
+        // poll for the .result for up to `extensionMs` so a still-
+        // progressing worker can complete. Falls through to NO_GO when
+        // the extension is denied or the poll budget expires.
+        const extDecision = evaluateRuntimeExtension(
+          projectRoot, sprint.id, task.id, resolvedConfig, extState,
+        );
+        if (extDecision.granted) {
+          debugLog(
+            'runEvaluatePhase:extension',
+            `task=${task.id} grant=#${extDecision.extensionCount}/${RUNTIME_EXTENSION_MAX} budget=${extDecision.extensionMs}ms`,
+          );
+          try {
+            const sidForExt = getCurrentSprintId(projectRoot) ?? sprint.id;
+            writeEvent(
+              projectRoot, sidForExt, 'brain', 'worker',
+              'BRAIN→WORKER:TIMEOUT_EXTEND',
+              {
+                taskId: task.id,
+                extensionCount: extDecision.extensionCount,
+                extensionMs: extDecision.extensionMs,
+                reason: extDecision.reason,
+              },
+            );
+          } catch (e) { debugLog('runEvaluatePhase:ext-event', e); }
+
+          const lateResult = await pollForResultFile(
+            projectRoot, task.id, extDecision.extensionMs,
+          );
+          if (lateResult) {
+            // Late .result landed — push it into the collected pool so the
+            // normal evaluate path runs for this task. Mutate the local
+            // `results` array and resultsMap so downstream phases see it.
+            results.push(lateResult);
+            resultsMap.set(task.id, lateResult);
+            collectedIds.add(task.id);
+            debugLog(
+              'runEvaluatePhase:extension-hit',
+              `task=${task.id} produced .result during extension window`,
+            );
+            const rubricResult = evaluateWithRubric(lateResult, task, undefined, projectRoot);
+            const evaluation = toTaskEvaluation(rubricResult);
+            handleEvaluation(projectRoot, task, evaluation, lateResult);
+            evaluations.set(task.id, evaluation);
+            continue;
+          }
+          debugLog(
+            'runEvaluatePhase:extension-miss',
+            `task=${task.id} no .result after ${extDecision.extensionMs}ms — declaring NO_GO`,
+          );
+        } else {
+          debugLog(
+            'runEvaluatePhase:extension-denied',
+            `task=${task.id} reason=${extDecision.reason} used=${extDecision.extensionCount}`,
+          );
+        }
+
+        // ─── Sprint 191 hotfix — pre-Sprint 192 W-INTEGRITY ─────────────
+        // Memory: [[feedback_no_synthetic_results]] — sentetik veri ile NO_GO yasak.
+        // Consult 5-layer worker liveness BEFORE writing synthetic NO_GO:
+        //   - never-spawned (max_workers saturation / wave-barrier hold)
+        //       → SKIP synthetic; task stays unassigned for retro/cleanup
+        //         to surface as DEFERRED. No fix-task generated.
+        //   - alive (docker/hb/log fresh) → 60s grace poll; if result lands
+        //         evaluate normally, else fall through with honest label.
+        //   - dead (no signal) → genuine synthetic NO_GO with liveness tag.
+        const liveness = checkWorkerLiveness(task, projectRoot);
+        if (liveness.status === 'never-spawned') {
+          debugLog(
+            'runEvaluatePhase:never-dispatched',
+            `task=${task.id} reason=${liveness.reason}`,
+          );
+          try {
+            const sidNd = getCurrentSprintId(projectRoot) ?? sprint.id;
+            writeEvent(
+              projectRoot, sidNd, 'brain', 'worker',
+              'BRAIN→WORKER:NEVER_DISPATCHED',
+              {
+                taskId: task.id,
+                reason: liveness.reason,
+                signals: liveness.signals,
+              },
+            );
+          } catch (e) { debugLog('runEvaluatePhase:nd-event', e); }
+          continue;
+        }
+        if (liveness.status === 'alive') {
+          debugLog(
+            'runEvaluatePhase:alive-grace',
+            `task=${task.id} ${liveness.reason} — granting 60s grace poll`,
+          );
+          const graceResult = await pollForResultFile(projectRoot, task.id, 60_000);
+          if (graceResult) {
+            results.push(graceResult);
+            resultsMap.set(task.id, graceResult);
+            collectedIds.add(task.id);
+            debugLog(
+              'runEvaluatePhase:alive-grace-hit',
+              `task=${task.id} produced .result during grace window`,
+            );
+            const graceRubric = evaluateWithRubric(graceResult, task, undefined, projectRoot);
+            const graceEval = toTaskEvaluation(graceRubric);
+            handleEvaluation(projectRoot, task, graceEval, graceResult);
+            evaluations.set(task.id, graceEval);
+            continue;
+          }
+          debugLog(
+            'runEvaluatePhase:alive-grace-miss',
+            `task=${task.id} no .result after grace 60s — falling through to NO_GO with honest label`,
+          );
+        }
+
         const syntheticResult: TaskResult = {
           taskId: task.id,
           workerId: task.assignedWorker ?? 'unknown',
@@ -896,9 +1182,11 @@ export async function runEvaluatePhase(
           testsPassed: false,
           coverage: 0,
           selfAssessment: 'NO_GO',
-          notes: 'Timeout - no result received',
+          notes: extDecision.granted
+            ? `Timeout - no result received (extension #${extDecision.extensionCount} expired after ${extDecision.extensionMs}ms); liveness=${liveness.status}`
+            : `Timeout - no result received (extension denied: ${extDecision.reason}); liveness=${liveness.status}`,
         };
-        debugLog('runEvaluatePhase:timeout', `task=${task.id} — no result collected, marking NO_GO (timeout/missing)`);
+        debugLog('runEvaluatePhase:timeout', `task=${task.id} — no result collected, marking NO_GO (timeout/missing) liveness=${liveness.status}`);
         handleEvaluation(projectRoot, task, TaskEvaluation.NO_GO, syntheticResult);
         evaluations.set(task.id, TaskEvaluation.NO_GO);
         // DECKENT→USER:NOTIFY (Hot Fix H6) — timeout/missing NO_GO

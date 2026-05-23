@@ -25,7 +25,8 @@ describe('TimeoutConfig', () => {
       expect(t.effort_base).toEqual({ low: 600, normal: 1200, high: 2400 });
       expect(t.loc_scaling_enabled).toBe(true);
       expect(t.history_scaling_enabled).toBe(true);
-      expect(t.runtime_extension_enabled).toBe(false);
+      // Sprint 191 Task 191-002: default flipped false → true.
+      expect(t.runtime_extension_enabled).toBe(true);
     });
   });
 

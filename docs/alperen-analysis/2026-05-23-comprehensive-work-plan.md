@@ -958,3 +958,32 @@ Yukarıdaki P0 12 + W-L Karpathy Discipline Refactor (L-1..L-5 core + L-20 temp 
 ## Beta launch için zorunlu eşik (1 Haz 2026)
 
 Bu 12 P0 + Sprint 190 carry-over tamam olmalı. Sprint 192+ (Trinity dashboard reborn, Path A, Local LLM polish) buna bağlı.
+
+---
+
+# W-INTEGRITY — Synthetic Result Eradication (Sprint 192 İzleme + Reform)
+
+**Anchor:** Sprint 191 canlı kanıt — `runEvaluatePhase` 191-009..017 için synthetic NO_GO yazdı (8 task hiç spawn olmadı, max_workers=3 + Wave-0 27dk saturation). 14 fix-task gereksiz üretildi, agent stats çarpıtıldı.
+
+**Kullanıcı kuralı (Alperen 2026-05-24):** "Sentetik veriyle asla iş yapmamalıyız sentetik veri ihtimallerini 0lamalıyız. Time-trigger olsa bile ilerleme varsa NO_GO yazma. Zaman sınırlarını daha geniş tutalım."
+
+**Hotfix landed (Sprint 191, pre-Sprint 192):**
+- `src/orchestra/worker-liveness.ts` (new, ~155 LoC) — 5-layer liveness signal evaluator
+- `src/orchestra/sprint-phases.ts:1120` öncesi — never-spawned SKIP + alive grace 60s + dead synthetic with honest label
+- `tests/orchestra/worker-liveness.test.ts` (new, 9 test) — L1-L5 katman senaryoları
+- **Brain in-memory state etkilenmez — Sprint 191 mevcut process eski kod, Sprint 192 yeni davranış**
+
+**Sprint 192 W-INTEGRITY izleme + tamamlama task'ları:**
+
+| Task | Açıklama | Beklenen Etki |
+|------|----------|---------------|
+| **I-1** | Sprint 192'de hotfix etkisini ölç — never-dispatched, alive-grace-hit/miss, dead event sayıları retro'ya yaz | Veri-bazlı validation |
+| **I-2** | `sprint-controller.ts:821, 845` synthetic NO_GO blokları — aynı liveness check entegrasyonu (cleanup/recover path) | İkinci sentetik kaynağı kapanır |
+| **I-3** | EVALUATE phase trigger sıkılaştır — "all tasks dispatched OR explicitly DEFERRED" şartı; kısmi-dispatch'te EVALUATE'e geçme | Wave-3 task'lar spawn olmadan EVALUATE'e geçmez |
+| **I-4** | `TaskEvaluation.DEFERRED` enum + sprint retro reporting — DEFERRED task sayısı net rapor | Şeffaf retro |
+| **I-5** | Sprint-level adaptive timeout — effort × 2-3 multiplier (kullanıcı "zaman sınırlarını geniş tutalım") | Yetersiz timeout false NO_GO'sunu sıfırlar |
+| **I-6** | Lint rule `disallow-synthetic-result-without-liveness-check` (eslint custom veya scripts/) | CI guard — gelecek regresyon önleme |
+| **I-7** | Audit-trail event `BRAIN→WORKER:NEVER_DISPATCHED` dashboard widget — retro panelinde DEFERRED count | Kullanıcı görünür şeffaflık |
+
+**Onay:** Alperen 2026-05-24 onayladı — hotfix şimdi, Sprint 192'de izleme + reform.
+

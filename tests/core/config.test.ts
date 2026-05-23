@@ -758,6 +758,38 @@ describe('extended config defaults', () => {
   });
 });
 
+// ─── Sprint 191 Task 191-002 — Runtime Extension Default Flip ────────
+// The `runtime_extension_enabled` flag in `timeout` switched from `false`
+// (Sprint 145 introduction) to `true` (Sprint 191) so heartbeat-active
+// workers are granted bounded extensions instead of a synthetic NO_GO.
+describe('timeout.runtime_extension_enabled (Sprint 191 — default true)', () => {
+  it('default config has runtime_extension_enabled=true', () => {
+    const config = getDefaultConfig();
+    expect(config.timeout).toBeDefined();
+    expect(config.timeout!.runtime_extension_enabled).toBe(true);
+  });
+
+  it('honors explicit false override via validatePartialConfig deepMerge', async () => {
+    // Round-trip through validatePartialConfig + the underlying default merge
+    // to prove opt-out is still possible after the default flip.
+    const { deepMerge } = await import('../../src/core/config.js');
+    const merged = deepMerge(
+      getDefaultConfig() as unknown as Record<string, unknown>,
+      { timeout: { runtime_extension_enabled: false } } as Record<string, unknown>,
+    ) as unknown as { timeout: { runtime_extension_enabled: boolean } };
+    expect(merged.timeout.runtime_extension_enabled).toBe(false);
+  });
+
+  it('explicit true override is preserved (idempotent flip)', async () => {
+    const { deepMerge } = await import('../../src/core/config.js');
+    const merged = deepMerge(
+      getDefaultConfig() as unknown as Record<string, unknown>,
+      { timeout: { runtime_extension_enabled: true } } as Record<string, unknown>,
+    ) as unknown as { timeout: { runtime_extension_enabled: boolean } };
+    expect(merged.timeout.runtime_extension_enabled).toBe(true);
+  });
+});
+
 describe('extended config validation', () => {
   it('accepts output_mode=quiet via partial config', () => {
     expect(() => validatePartialConfig({ output_mode: 'quiet' } as Partial<import('../../src/core/types.js').DeckentConfig>)).not.toThrow();
