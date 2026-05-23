@@ -30,11 +30,11 @@ init → set_directives → plan → start → status → review → retro → c
 ## Sprint Lifecycle
 PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → CLEANUP
 
-## Tools (27)
+## Tools (31)
 - deckent_init: Initialize Deckent in the current project directory
 - deckent_set_directives: Write sprint goals and task definitions to DIRECTIVES.md
 - deckent_plan: Generate task plan from DIRECTIVES (mode: ai/structured/auto)
-- deckent_start: Spawn workers and begin sprint execution
+- deckent_start: Spawn workers and begin sprint execution (pre-spawn cost gate active — over-budget runs return COST_GATE_EXCEEDED unless acknowledgeCost=true)
 - deckent_status: Show live sprint progress, agent activity, and alerts
 - deckent_review: Evaluate sprint results — returns GO/NO_GO/GO_WITH_TECH_DEBT
 - deckent_retro: Read the retrospective and learnings from the last sprint
@@ -53,11 +53,15 @@ PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → CLEANUP
 - deckent_docs: Sprint lifecycle document management (add/remove/list)
 - deckent_explain: Explain sprint history and results
 - deckent_memory_query: Search project memory across all sources (ADR, sprint, debt, pattern)
+- deckent_watch: Subscribe to live sprint event stream via MCP logging notifications (backfill + push)
 - deckent_nervous_subscribe: Subscribe to Nervous System notifications
 - deckent_nervous_accept: Accept a pending nervous notification
 - deckent_nervous_reject: Reject a pending nervous notification
 - deckent_nervous_status: Show Nervous System dashboard (pending, recent, config)
 - deckent_nervous_config: Read/set Nervous System authority mode and overrides
+- deckent_feature_query: Query feature manifest by category (active/lightly_used/dormant/dead/all)
+- deckent_audit: Run Brain Self-Audit Gate for a sprint (tsc, vitest, honesty checks) — read-only
+- deckent_recover: Recover a crashed or stuck sprint (clean orphan IPC dirs, stale locks, archive tasks) — destructive
 
 ## Resources (8)
 - deckent://dashboard — Live sprint dashboard (agents, phases, alerts)

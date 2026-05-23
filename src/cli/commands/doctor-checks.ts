@@ -4,6 +4,8 @@ import { join } from 'node:path';
 import { platform } from 'node:os';
 import { spawnSync } from 'node:child_process';
 import type { DoctorResult } from '../../core/types.js';
+import type { ProviderAvailabilityDetail, ProviderAdapter } from '../../core/provider.js';
+import { runProviderDiagnostics as runProviderDiagnosticsImpl } from '../../core/provider.js';
 import {
   DECKENT_DIR, BRAIN_DIR, DEBT_FILE, DECISIONS_FILE,
   DIRECTIVES_FILE, LOCKS_DIR, DEBT_TABLE_HEADER, MEMORY_DB_FILE,
@@ -456,6 +458,24 @@ export function runDoctorChecks(root: string, providerNames?: string[], spawnBac
     ok: checks.filter(c => c.required).every(c => c.passed),
     checks,
   };
+}
+
+/**
+ * Build the 3 default provider adapters (Claude / Codex / Gemini) and run rich
+ * diagnostics on each. Used by `deckent doctor --providers` and the MCP
+ * `deckent_doctor` tool when `providers: true` is requested.
+ */
+export async function runProviderDiagnostics(root: string): Promise<ProviderAvailabilityDetail[]> {
+  // Lazy import to avoid pulling provider modules into hot doctor paths.
+  const { createClaudeAdapter } = await import('../../providers/claude.js');
+  const { createCodexAdapter } = await import('../../providers/codex.js');
+  const { createGeminiAdapter } = await import('../../providers/gemini.js');
+  const adapters: ProviderAdapter[] = [
+    createClaudeAdapter(root),
+    createCodexAdapter(root),
+    createGeminiAdapter(root),
+  ];
+  return runProviderDiagnosticsImpl(adapters);
 }
 
 export function runPreFlightHealthCheck(root: string): PreFlightResult {

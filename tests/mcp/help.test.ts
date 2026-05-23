@@ -3,12 +3,12 @@ import { DECKENT_MCP_INSTRUCTIONS } from '../../src/mcp/server.js';
 
 /**
  * Tests for MCP help.ts tool catalog and server.ts instructions.
- * Sprint 148 fix: Updated to reflect 27 tools (5 nervous tools added in Sprint 147).
+ * Sprint 189 fix: Updated to reflect 31 tools (watch/feature_query/audit/recover added).
  */
 
 describe('MCP Server Instructions', () => {
-  it('should declare 27 tools in the instructions header', () => {
-    expect(DECKENT_MCP_INSTRUCTIONS).toContain('## Tools (27)');
+  it('should declare 31 tools in the instructions header', () => {
+    expect(DECKENT_MCP_INSTRUCTIONS).toContain('## Tools (31)');
   });
 
   it('should list deckent_memory_query in instructions', () => {
@@ -26,7 +26,7 @@ describe('MCP Server Instructions', () => {
     expect(DECKENT_MCP_INSTRUCTIONS).not.toMatch(/deckent:\/\/retro — Last sprint retrospective \(RETRO\.md\)/);
   });
 
-  it('should list all 27 tool names in instructions', () => {
+  it('should list all 31 tool names in instructions', () => {
     const expectedTools = [
       'deckent_init',
       'deckent_set_directives',
@@ -50,17 +50,21 @@ describe('MCP Server Instructions', () => {
       'deckent_docs',
       'deckent_explain',
       'deckent_memory_query',
+      'deckent_watch',
       'deckent_nervous_subscribe',
       'deckent_nervous_accept',
       'deckent_nervous_reject',
       'deckent_nervous_status',
       'deckent_nervous_config',
+      'deckent_feature_query',
+      'deckent_audit',
+      'deckent_recover',
     ];
 
     for (const tool of expectedTools) {
       expect(DECKENT_MCP_INSTRUCTIONS).toContain(tool);
     }
-    expect(expectedTools).toHaveLength(27);
+    expect(expectedTools).toHaveLength(31);
   });
 
   it('should list all 8 resources in instructions', () => {

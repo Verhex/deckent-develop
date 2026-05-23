@@ -1,6 +1,7 @@
 import { z } from 'zod/v4';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { runDoctorChecks } from '../../cli/commands/doctor.js';
+import { runProviderDiagnostics } from '../../cli/commands/doctor-checks.js';
 import { getSystemProfile } from '../../core/system-profile.js';
 import { detectSubscription } from '../../core/subscription.js';
 import { enrichResponse } from '../helpers/enrich.js';
@@ -17,10 +18,11 @@ export function registerDoctorTool(server: McpServer): void {
       inputSchema: z.object({
         includeProfile: z.boolean().optional().default(false).describe('Also include system profile: CPU core count, total/free RAM, recommended max workers, and detected Claude subscription tier'),
         profile: z.boolean().optional().default(false).describe('Alias for includeProfile — show system profile: CPU cores, RAM, recommended max workers, Claude subscription tier.'),
+        providers: z.boolean().optional().default(false).describe('Include detailed provider diagnostics (binary path, version, auth) for Claude/Codex/Gemini in the response.'),
         json: z.boolean().optional().default(false).describe('Return raw JSON data without the human-readable summary wrapper. Useful for programmatic consumption or piping.'),
       }),
     },
-    async ({ includeProfile, profile, json }) => {
+    async ({ includeProfile, profile, providers, json }) => {
       const root = process.cwd();
 
       try {
@@ -32,6 +34,15 @@ export function registerDoctorTool(server: McpServer): void {
       const result = runDoctorChecks(root, undefined, spawnBackend);
 
       const response: Record<string, unknown> = { ...result };
+
+      // providers: include rich diagnostics for Claude/Codex/Gemini
+      if (providers) {
+        try {
+          response['providers'] = await runProviderDiagnostics(root);
+        } catch (err) {
+          response['providers'] = { error: err instanceof Error ? err.message : String(err) };
+        }
+      }
 
       // profile is an alias for includeProfile
       if (includeProfile || profile) {

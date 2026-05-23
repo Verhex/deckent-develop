@@ -7,7 +7,7 @@
 **The AI orchestrator for developers who want discipline.**
 
 <!-- AUTOGEN:START id="badges" -->
-[![npm version](https://img.shields.io/npm/v/deckent.svg)](https://www.npmjs.com/package/deckent) [![tests](https://img.shields.io/badge/tests-16774%2B-brightgreen)](https://github.com/VerhexIO/deckent) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![sprints](https://img.shields.io/badge/sprints-175%2B-teal)](https://github.com/VerhexIO/deckent) [![version](https://img.shields.io/badge/version-v1.0.0--beta.1-orange)](https://github.com/VerhexIO/deckent)
+[![npm version](https://img.shields.io/npm/v/deckent.svg)](https://www.npmjs.com/package/deckent) [![tests](https://img.shields.io/badge/tests-16912%2B-brightgreen)](https://github.com/VerhexIO/deckent) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![sprints](https://img.shields.io/badge/sprints-189%2B-teal)](https://github.com/VerhexIO/deckent) [![version](https://img.shields.io/badge/version-v1.0.0--beta.1-orange)](https://github.com/VerhexIO/deckent)
 <!-- AUTOGEN:END id="badges" -->
 
 Deckent is an AI agent orchestration CLI with two modes: **Sprint Mode** for structured multi-agent development sprints, and **Task Mode** for one-shot life assistant tasks. Write your goals, and Deckent plans tasks, assigns parallel AI workers, monitors quality, and delivers results — all with discipline.
@@ -149,7 +149,7 @@ Single-task execution. No PLAN/SPAWN phases. Ideal for quick commands, reminders
 ### Security & Safety
 - **AST Sandbox** — All skills run through AST validation before execution. No arbitrary code injection. Compared to OpenClaw's 13K+ skill hub with ~20% flagged as malicious, Deckent's sandbox validates every skill before it runs
 - **Scope Enforcement** — Workers may only touch files in their assigned `scope.filesWrite` — Auditor enforces this via `git diff --stat`
-- **RBAC Protocol** — ADR-037 Brain-Auditor-Worker authority matrix; strict role boundaries
+- **RBAC Protocol** — ADR-037 Brain-Auditor-Worker authority matrix; **advisory** role boundaries with audit trail (hard enforcement V2 post-GA)
 - **`.deck` Secret Interpolation** — Reference secrets in config as `$DECK:MY_TOKEN` — secrets loaded from encrypted `.deck` file at runtime, never committed
 
 ### Intelligence & Memory
@@ -205,7 +205,7 @@ See the [full competitive analysis](docs/analysis/competitive-analysis.md) for d
 | Multi-provider (Claude, Codex, Gemini) | **Yes** | No | No | Limited | No | — |
 | Built-in agents | **15** | — | — | 100+ | — | — |
 | Built-in skills | **21** | — | — | 13K+ (hub, ~20% flagged) | — | — |
-| Test coverage | **High** (≈95% target; not a hard gate) | — | — | — | — | — |
+| Test coverage | **High** (≈88% baseline, enforced gate — Sprint 189+, floors -5% with ratchet; see CONTRIBUTING.md) | — | — | — | — | — |
 | Price | **Free (MIT)** | Paid | Paid | Free | Free | — |
 
 ---

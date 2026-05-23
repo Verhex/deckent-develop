@@ -5147,3 +5147,40 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 188-012: W2-T12 — ADR uyumu + test sağlığı denetimi (DONE)
 
 ---
+## Sprint 189 — sprint-189
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-05-22
+**Duration:** 2591s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 23 |
+| Completed | 19 |
+| Tech Debt | 0 |
+| No-Go | 4 |
+| Coverage | NaN% |
+| Duration | 2590576ms |
+
+### Tasks
+
+- 189-001: 189-001 — core/notify.ts ADR-008 ihlali fix (dependency inversion) (DONE)
+- 189-002: 189-002 — Coverage threshold kapısı + CI gate (WrongStack WS-Z1) (DONE)
+- 189-003: 189-003 — MCP_INSTRUCTIONS 27→31 + 4 eksik tool + lint regression-guard (DONE)
+- 189-004: 189-004 — docs/reference/api.md Memory V2 stale referans temizliği (DONE)
+- 189-005: 189-005 — docs/reference/cli.md + cli-commands.md PROJECT-IDENTITY.md temizliği (DONE)
+- 189-006: 189-006 — Dashboard StatusPage 404 fix (App.tsx wire) (DONE)
+- 189-007: 189-007 — Provider CLI detection RC + deckent doctor --providers (DONE)
+- 189-008: 189-008 — deckent_start MCP cost-gate ekleme (Sprint 140 $42 aşımı tekrarı önleme) (DONE)
+- 189-009: 189-009 — deckent_kill MCP force/userExplicit + autoApprove parite (NO_GO)
+- 189-010: 189-010 — SECURITY.md threat model + ADR-037 advisory notu (WrongStack WS-Z3) (DONE)
+- 189-011: 189-011 — API endpoint envanteri + E2E HTTP test suite başlangıcı (NO_GO)
+- 189-012: 189-012 — IDENTITY.md MCP 27→31 sync + AUTOGEN drift fix (DONE)
+- 189-013: 189-013 — .claude/rules/auditor.md PATTERNS.md → memory.db rule güncelleme (DONE)
+- 189-014: 189-014 — directives-stress-simulator.mjs koruma + validate-publish duplicate temizlik (DONE)
+- 189-015: 189-015 — Test fail 36 kategorize + Sprint 190 fix plan (audit) (DONE)
+- 189-016: 189-016 — CHANGELOG sprint-reporter otomatik update wire (WrongStack WS-Z2 follow-up) (DONE)
+
+---

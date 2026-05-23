@@ -13,8 +13,8 @@ import {
 } from 'node:fs';
 import { join } from 'node:path';
 import type { ModelType, GeminiModel } from '../core/types.js';
-import type { ProviderAdapter, ProviderSpawnOptions } from '../core/provider.js';
-import { ProviderError } from '../core/provider.js';
+import type { ProviderAdapter, ProviderSpawnOptions, ProviderAvailabilityDetail } from '../core/provider.js';
+import { ProviderError, resolveBinaryPath, parseSemverFromOutput } from '../core/provider.js';
 import { TASKS_DIR } from '../core/constants.js';
 import type { ModelTier } from '../core/model-equivalence.js';
 import { getModelForProviderTier } from '../core/model-equivalence.js';
@@ -275,6 +275,72 @@ export class GeminiAdapter implements ProviderAdapter {
     }
     // Check 2: API key must be set
     return this.getApiKey() !== undefined;
+  }
+
+  // ─── diagnoseAvailability() ────────────────────────────────────────
+
+  /**
+   * Three-layer probe: binary detection → version parsing → auth check.
+   * Returns rich detail used by `deckent doctor --providers`.
+   *
+   * Partial state: binary installed but GOOGLE_API_KEY missing — produces
+   * actionable hint instead of silent false.
+   */
+  async diagnoseAvailability(): Promise<ProviderAvailabilityDetail> {
+    let binaryFound = false;
+    let versionRaw: string | undefined;
+    try {
+      const result = spawnSync('gemini', ['--version'], { encoding: 'utf-8', timeout: 5000 });
+      if (result.status === 0 && result.stdout) {
+        versionRaw = result.stdout.trim();
+        binaryFound = true;
+      }
+    } catch {
+      // spawn failure — binary not callable
+    }
+    // Best-effort binary path resolution — runs only when binary is callable.
+    const binaryPath = binaryFound ? resolveBinaryPath('gemini') : undefined;
+    const version = parseSemverFromOutput(versionRaw) ?? versionRaw;
+    const versionStatus: ProviderAvailabilityDetail['versionStatus'] = !binaryFound
+      ? 'missing'
+      : version
+        ? 'ok'
+        : 'unknown';
+
+    const apiKey = this.getApiKey();
+    const hasAuth = apiKey !== undefined && apiKey.length > 0;
+    const authMethod: ProviderAvailabilityDetail['authMethod'] = hasAuth ? 'api_key' : 'none';
+    const authStatus: ProviderAvailabilityDetail['authStatus'] = hasAuth ? 'ok' : 'missing';
+    const available = binaryFound && hasAuth;
+    const partial = binaryFound && !hasAuth;
+
+    let reason: string;
+    const hints: string[] = [];
+    if (!binaryFound) {
+      reason = 'Gemini CLI not found in PATH';
+      hints.push('Install: npm i -g @google/gemini-cli');
+    } else if (!hasAuth) {
+      reason = 'Gemini CLI installed but GOOGLE_API_KEY / DECKENT_GOOGLE_API_KEY not set';
+      hints.push('Set GOOGLE_API_KEY environment variable');
+      hints.push('Alternatively, add DECKENT_GOOGLE_API_KEY to .deck file');
+    } else {
+      reason = `Gemini CLI ${version ?? 'installed'} + API key configured`;
+    }
+
+    return {
+      name: 'gemini',
+      binaryFound,
+      binaryPath,
+      version,
+      versionStatus,
+      authMethod,
+      authStatus,
+      available,
+      partial,
+      models: [...GEMINI_MODELS] as ModelType[],
+      reason,
+      hints,
+    };
   }
 
   // ─── buildArgs() ───────────────────────────────────────────────────

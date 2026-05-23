@@ -1,4 +1,4 @@
-import type { ResolvedConfig, SprintResult } from '../../core/types.js';
+import type { ResolvedConfig, SprintResult, TaskResult } from '../../core/types.js';
 import type { MemoryStore } from '../../core/memory-store.js';
 export type { SprintResult } from '../../core/types.js';
 
@@ -10,6 +10,12 @@ export interface DocUpdateContext {
   isInternalProject: boolean;
   /** Memory V2 DB store. When provided, generators use DB-first reads instead of .md files. */
   store?: MemoryStore;
+  /**
+   * Optional task results captured at sprint finalize. Updaters that need to
+   * read worker-authored notes (e.g. changelog category prefixes) consume this
+   * array when available; pass-through stays backward compatible when omitted.
+   */
+  results?: TaskResult[];
 }
 
 export interface DocUpdateResult {

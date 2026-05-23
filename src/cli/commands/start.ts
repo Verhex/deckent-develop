@@ -16,6 +16,7 @@ import { getMessage } from '../helpers/messages.js';
 import { promptConfirm } from '../helpers/prompt.js';
 import { loadCostConfig, initCostConfig } from '../../core/cost-config-loader.js';
 import { estimateSprintCost, formatEstimate, type TaskCostInput } from '../../core/cost-calculator.js';
+import { evaluateCostGate } from '../../core/cost-gate.js';
 import { existsSync, unlinkSync, readFileSync, writeFileSync, mkdirSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -332,6 +333,8 @@ export function registerStart(program: Command): void {
 
         // ─── PRE-SPRINT COST GATE (User Safety Shield — Sprint 141) ─
         // Runs before spawn — prevents Sprint 140 $42 disaster from repeating.
+        // Sprint 189 Task 189-008: shared evaluateCostGate() helper — same
+        // logic now drives the MCP deckent_start path.
         if (!opts.force) {
           try {
             initCostConfig(root);
@@ -351,25 +354,20 @@ export function registerStart(program: Command): void {
               estimatedOutputTokens: t.effort === 'high' ? 4000 : t.effort === 'low' ? 500 : 1500,
               effort: t.effort as 'low' | 'normal' | 'high' | undefined,
             }));
-            const estimate = estimateSprintCost(costTasks, costConfig);
-            print(formatEstimate(estimate));
+            const gate = evaluateCostGate({ tasks: costTasks, costConfig });
+            print(formatEstimate(gate.estimate));
 
-            // Budget block
-            if (!estimate.withinBudget) {
+            if (!gate.ok) {
               if (sandboxState) restoreSandbox(root, sandboxState);
-              printError(new Error(
-                `Sprint cost $${estimate.costRealistic.toFixed(2)} exceeds budget $${estimate.budgetUsd.toFixed(2)}. ` +
-                `Override with --force or update cost_limits.sprint_max_usd in .deckent/cost-config.json.`,
-              ));
+              printError(new Error(gate.message + ' (CLI: override with --force.)'));
               process.exitCode = 1;
               return;
             }
 
             // Auto-confirm threshold
-            const autoConfirmBelow = costConfig.cost_limits.auto_confirm_below_usd ?? 2;
-            if (estimate.costRealistic > autoConfirmBelow) {
+            if (!gate.autoConfirm) {
               const confirmed = await promptConfirm(
-                `\nProceed with sprint at ~$${estimate.costRealistic.toFixed(2)}?`,
+                `\nProceed with sprint at ~$${gate.estimate.costRealistic.toFixed(2)}?`,
                 false,
               );
               if (!confirmed) {

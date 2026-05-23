@@ -8,6 +8,7 @@ export const ROUTES = [
   { path: "/memory", label: "Memory" },
   { path: "/config", label: "Config" },
   { path: "/chat", label: "Chat" },
+  { path: "/status", label: "Status" },
 ] as const;
 
 export type RoutePath = (typeof ROUTES)[number]["path"];

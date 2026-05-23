@@ -1,6 +1,46 @@
 # Changelog
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
+
+## [1.0.0-beta.1-sprint189] - 2026-05-22
+
+### Added
+
+- 189-002 — Coverage threshold kapısı + CI gate (WrongStack WS-Z1)
+- 189-003 — MCP_INSTRUCTIONS 27→31 + 4 eksik tool + lint regression-guard
+- 189-004 — docs/reference/api.md Memory V2 stale referans temizliği
+- 189-005 — docs/reference/cli.md + cli-commands.md PROJECT-IDENTITY.md temizliği
+- 189-007 — Provider CLI detection RC + deckent doctor --providers
+- 189-008 — deckent_start MCP cost-gate ekleme (Sprint 140 $42 aşımı tekrarı önleme)
+- 189-010 — SECURITY.md threat model + ADR-037 advisory notu (WrongStack WS-Z3)
+- 189-013 — .claude/rules/auditor.md PATTERNS.md → memory.db rule güncelleme
+- 189-014 — directives-stress-simulator.mjs koruma + validate-publish duplicate temizlik
+- 189-016 — CHANGELOG sprint-reporter otomatik update wire (WrongStack WS-Z2 follow-up)
+
+### Fixed
+
+- 189-001 — core/notify.ts ADR-008 ihlali fix (dependency inversion)
+- 189-006 — Dashboard StatusPage 404 fix (App.tsx wire)
+- 189-012 — IDENTITY.md MCP 27→31 sync + AUTOGEN drift fix
+- 189-015 — Test fail 36 kategorize + Sprint 190 fix plan (audit)
+
+
+_Tasks: 23 total, 19 done, 0 tech debt, 4 no-go_
+
+## [Unreleased]
+
+### Added
+
+- **feat(ci): coverage threshold gate aktif** — `vitest.config.ts` içinde `coverage.thresholds` bloğu (lines 82%, functions 89%, branches 80%, statements 82%) — kalibrasyon baseline 2026-05-22 (lines 87.96 | functions 94.61 | branches 85.19 | statements 87.96), her değer -5% floor (Sprint 189 WrongStack WS-Z1).
+- **feat(ci): coverage job non-zero exit gate** — `.github/workflows/ci.yml` `coverage` job threshold violation durumunda build kırar (`continue-on-error` yok; npm run vitest exit code'unu propagate eder).
+- **feat(ci): coverage.reportOnFailure=true** — Test fail olsa bile coverage raporu yazılır; gate her durumda değerlendirilir.
+- **docs(contributing): coverage ratchet politikası** — CONTRIBUTING.md "Coverage goal" bölümü güncellendi; obsolete "no enforced gate" notu kaldırıldı; sprint başına ~1% floor artırma kuralı dokümante edildi.
+- **docs(readme): coverage badge update** — README satır 208 "not a hard gate" → "enforced gate (≈88% baseline, floors -5%)" güncellendi.
+
+### Changed
+
+- **CI coverage artifact** — `actions/upload-artifact@v4` adımı artık `if: always()` ile çalışır; eşik ihlali durumunda da rapor yüklenir (debug kolaylığı).
+
 ## [1.0.0-beta.1-sprint188] - 2026-05-22
 
 ### Added

@@ -25,6 +25,8 @@ jobs:
       - name: Install dashboard dependencies
         run: npm ci --prefix src/dashboard --ignore-scripts
       - run: npm run lint
+      - name: MCP Instructions lint (tool count drift guard)
+        run: node scripts/lint-mcp-instructions.mjs
 
   security:
     name: Security Audit
@@ -189,6 +191,11 @@ jobs:
     name: Coverage Report
     runs-on: ubuntu-latest
     needs: [test-core, test-orchestra, test-cli, test-remaining]
+    # Sprint 189 (WrongStack WS-Z1): coverage gate aktif.
+    # vitest.config.ts içindeki coverage.thresholds (lines/functions/branches/statements)
+    # ihlal edilirse vitest non-zero exit verir, npm run propagates, bu job FAIL olur,
+    # build kırılır (no continue-on-error). Floors mevcut baseline'dan -5%
+    # kalibre; sprint başına ~1% ratchet politikası (CONTRIBUTING.md).
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -197,10 +204,14 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run ci:rebuild-native
-      - name: Run tests with coverage
+      - name: Run tests with coverage (threshold gate enforced)
+        # Threshold violation = exit 1 = job FAIL = CI red.
         run: npm run test:coverage
         timeout-minutes: 20
       - name: Upload coverage report
+        # always() — eşik ihlali durumunda bile rapor artefakt olarak yüklensin
+        # ki contributor coverage farkını görebilsin.
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: coverage-report

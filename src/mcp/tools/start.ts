@@ -14,6 +14,9 @@ import { writeJobState } from './job-runner.js';
 import { enrichResponse } from '../helpers/enrich.js';
 import { formatStartResponse, formatErrorResponse, wrapResponse } from '../helpers/format.js';
 import { isSprintLocked } from '../../core/multi-ide.js';
+import { initCostConfig, loadCostConfig } from '../../core/cost-config-loader.js';
+import type { TaskCostInput } from '../../core/cost-calculator.js';
+import { evaluateCostGate, buildCostGateErrorPayload } from '../../core/cost-gate.js';
 import {
   getIpcDir,
   IPC_CONFIG_FILE,
@@ -25,29 +28,37 @@ export function registerStartTool(server: McpServer): void {
     'deckent_start',
     {
       title: 'Start Sprint',
-      description: 'Start a full sprint in the background. Runs the complete lifecycle: PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → CLEANUP. Returns immediately with a jobId — the sprint continues asynchronously. Use deckent_status to monitor progress and deckent_review to evaluate results. Prerequisite: deckent_init + deckent_set_directives must have been run.',
+      description: 'Start a full sprint in the background. Runs the complete lifecycle: PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → CLEANUP. Pre-spawn cost gate (Sprint 189 T-008): if the estimated sprint cost exceeds cost_limits.sprint_max_usd (.deckent/cost-config.json), the tool returns COST_GATE_EXCEEDED — override with acknowledgeCost=true (or force=true to skip the gate entirely). Returns immediately with a jobId — the sprint continues asynchronously. Use deckent_status to monitor progress and deckent_review to evaluate results. Prerequisite: deckent_init + deckent_set_directives must have been run.',
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
       inputSchema: z.object({
-        autoApprove: z.boolean().optional().default(true).describe('Auto-approve all worker tool calls with --dangerously-skip-permissions. Deckent standard: workers MUST have full write permissions. Set false only for debugging.'),
+        autoApprove: z.boolean().optional().default(false).describe('Auto-approve worker tool calls with --dangerously-skip-permissions. CLI default is false; set true only when the caller has confirmed the run is safe (CLI/MCP parity — ADR-022-V2).'),
+        acknowledgeCost: z.boolean().optional().default(false).describe('Bypass the pre-spawn cost gate when the realistic estimate exceeds cost_limits.sprint_max_usd. The caller must explicitly acknowledge the over-budget run; otherwise deckent_start returns COST_GATE_EXCEEDED. Equivalent to CLI --force from the cost-gate perspective.'),
         dryRun: z.boolean().optional().default(false).describe('Plan the sprint without spawning workers. Returns the planned tasks list so you can review before committing. No workers are started, no files are changed.'),
-        force: z.boolean().optional().default(false).describe('Skip pre-flight doctor checks. Normally deckent_start runs health checks before spawning; use force=true to bypass when you know the environment is ready.'),
+        force: z.boolean().optional().default(false).describe('Skip pre-flight checks AND the cost gate. Use only when the environment is known-ready and the cost has been verified out-of-band. Equivalent to CLI --force.'),
         timeout: z.number().int().positive().optional().describe('Sprint maximum duration in milliseconds (default: 30 minutes = 1800000). Sprint is marked TIMEOUT if workers do not complete within this window.'),
         sandbox: z.boolean().optional().default(false).describe('Run sprint in sandbox mode: stashes local git changes before spawning and restores them after the sprint completes. Safe experimentation — no permanent changes on failure.'),
       }),
     },
-    async ({ dryRun, force, timeout, sandbox }) => {
+    async ({ autoApprove, acknowledgeCost, dryRun, force, timeout, sandbox }) => {
       const root = process.cwd();
-      // CLI/MCP Parity Notes:
-      // - autoApprove: IMMUTABLE true. CLI hardcodes true; MCP now hardcodes true at runSprint call.
-      //   The schema param is kept for API surface parity only (debugging use case).
+      // CLI/MCP Parity Notes (ADR-022-V2):
+      // - autoApprove: CLI default false (the schema param mirrors this). The
+      //   handler now passes the flag through to the detached sprint runner
+      //   so deckent_start is symmetric with `deckent start [--auto-approve]`
+      //   (Sprint 189 T-009 parity addition). Callers who require workers to
+      //   run with --dangerously-skip-permissions must pass autoApprove=true
+      //   explicitly; default false matches CLI behavior.
+      // - acknowledgeCost: Sprint 189 T-008 parity addition. CLI uses --force
+      //   to bypass the cost gate; MCP requires an explicit acknowledgeCost
+      //   flag so over-budget runs are always intentional.
       // - spawn_backend: Both CLI and MCP read from config via loadConfig() → sprint-controller
       //   uses config.spawn_backend automatically. No explicit handling needed here.
       // - timeout: Both pass timeoutMs to runSprint (undefined = 30min default in result-collector).
       //   CLI parses string→int; MCP accepts number directly. Behavior equivalent.
-      // - force: CLI skips both sprint lock check AND doctor pre-flight checks.
-      //   MCP skips only sprint lock check — no doctor check by design (non-interactive
-      //   context; doctor imports are in cli/ layer and cannot be imported from mcp/).
-      //   KNOWN DIVERGENCE: documented, acceptable for non-interactive MCP context.
+      // - force: CLI skips sprint lock check, doctor pre-flight checks AND the
+      //   cost gate. MCP force skips sprint lock + cost gate (no doctor check
+      //   by design — non-interactive context).
+      //   KNOWN DIVERGENCE: doctor pre-flight not run in MCP, acceptable.
 
       try {
         const config = await loadConfig(root);
@@ -122,6 +133,85 @@ export function registerStartTool(server: McpServer): void {
           };
         }
 
+        // ─── PRE-SPRINT COST GATE (Sprint 189 T-008) ──────────────
+        // Mirrors the CLI cost gate via shared evaluateCostGate() helper.
+        // Prevents Sprint 140-style $42 overruns originating from the MCP
+        // start path (which previously had no gate). Skipped when force=true.
+        if (!force) {
+          try {
+            initCostConfig(root);
+            const costConfig = loadCostConfig(root);
+
+            // Bootstrap providers so planSprint() can reach an adapter.
+            try {
+              await bootstrapProviders(config);
+            } catch (e) {
+              debugLog('start:costGate:bootstrapProviders', e);
+            }
+
+            const context = readContext(root);
+            const recommendation: SprintSizeRecommendation = {
+              size: 'full',
+              maxWorkers: typeof config.activeModeConfig.max_workers === 'number'
+                ? config.activeModeConfig.max_workers
+                : 4,
+              modelConstraint: null,
+              reason: 'Cost gate pre-plan',
+            };
+            const planForCost = await planSprint(root, config, context, recommendation, { dryRun: true });
+            const costTasks: TaskCostInput[] = planForCost.tasks.map((t) => ({
+              id: t.id,
+              model: t.model,
+              estimatedInputTokens: t.estimatedTokens ?? 2700,
+              estimatedOutputTokens: t.effort === 'high' ? 4000 : t.effort === 'low' ? 500 : 1500,
+              effort: t.effort as 'low' | 'normal' | 'high' | undefined,
+            }));
+
+            const gate = evaluateCostGate({
+              tasks: costTasks,
+              costConfig,
+              acknowledgeCost,
+            });
+
+            if (!gate.ok) {
+              const payload = buildCostGateErrorPayload(gate, 'acknowledgeCost');
+              const errData = {
+                error: true,
+                success: false,
+                code: payload.error,
+                estimated: payload.estimated,
+                budget: payload.budget,
+                override: payload.override,
+                message: payload.message,
+              };
+              const errSummary = formatErrorResponse({
+                code: payload.error,
+                message: payload.message,
+              });
+              return {
+                content: [{
+                  type: 'text' as const,
+                  text: JSON.stringify(wrapResponse(errData, errSummary)),
+                }],
+                isError: true,
+              };
+            }
+
+            // Over-budget but acknowledgeCost=true: log breadcrumb so the
+            // sprint runner can correlate the override in post-mortem.
+            if (gate.overrideApplied) {
+              debugLog('start:costGate:override', {
+                estimated: gate.estimate.costRealistic,
+                budget: gate.estimate.budgetUsd,
+              });
+            }
+          } catch (e) {
+            // Non-fatal: cost-config missing or planner failure should not
+            // prevent sprint start (mirrors CLI graceful-degradation).
+            debugLog('start:costGate:error', e);
+          }
+        }
+
         const jobId = `sprint-${Date.now()}`;
         const startedAt = new Date().toISOString();
 
@@ -137,7 +227,10 @@ export function registerStartTool(server: McpServer): void {
         const runnerConfig: SprintRunnerConfig = {
           projectRoot: root,
           jobId,
-          autoApprove: true, // Immutable — workers MUST have full write permissions
+          // Sprint 189 T-009: honor caller-supplied autoApprove (default false
+          // for CLI parity). Previously hardcoded to true which bypassed the
+          // schema default and made the surface param dead-letter.
+          autoApprove: autoApprove === true,
           sandboxMode: sandbox,
           timeoutMs: timeout,
         };

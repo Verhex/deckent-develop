@@ -116,7 +116,7 @@ Spec: `docs/superpowers/specs/2026-05-19-embedded-web-terminal-design.md`. Plan:
 | Metric | Value |
 |--------|-------|
 | Version | 1.0.0-beta.1 |
-| Sprint | sprint-188 |
+| Sprint | sprint-189 |
 | MCP Tools | 27 |
 | MCP Resources | 8 |
 | CLI Commands | 56+ |
@@ -973,13 +973,13 @@ Every blocker was directly verified in the codebase. False claims have been corr
 ## Sprint Metrics
 | Metric | Value |
 |--------|-------|
-| Sprint | sprint-188 |
-| Total Tasks | 12 |
-| Completed | 12 |
+| Sprint | sprint-189 |
+| Total Tasks | 23 |
+| Completed | 19 |
 | Tech Debt | 0 |
-| No-Go | 0 |
-| Duration | 27dk 54sn |
-| Coverage | 0.0% |
+| No-Go | 4 |
+| Duration | 43dk 10sn |
+| Coverage | N/A |
 
 ## Sprint History (Sprint 136-166)
 | Sprint | Tasks | Done | NO_GO | Duration | Avg Rubric | Theme |

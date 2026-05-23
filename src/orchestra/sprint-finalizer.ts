@@ -884,7 +884,7 @@ export async function finalizeSprint(
   // 9. Update project docs
   if (opts?.config) {
     try {
-      updateProjectDocs(projectRoot, { sprint, evaluations, metrics }, opts.config);
+      updateProjectDocs(projectRoot, { sprint, evaluations, metrics }, opts.config, results);
     } catch (e) { debugLog('finalizeSprint:updateProjectDocs', e); }
   }
 

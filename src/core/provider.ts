@@ -24,6 +24,45 @@ export interface ProviderWorkerInfo {
   pid?: number;
 }
 
+// ─── Provider Availability Diagnostics ───────────────────────────────
+
+/**
+ * Rich availability info for a single provider — used by doctor --providers
+ * and bootstrap diagnostics. Distinguishes between:
+ *   - binary missing (CLI not installed)
+ *   - binary present + auth missing (partial availability)
+ *   - binary + auth + version OK (full availability)
+ *
+ * Returned by `adapter.diagnoseAvailability()` and aggregated by
+ * `runProviderDiagnostics()`.
+ */
+export interface ProviderAvailabilityDetail {
+  /** Provider name, e.g. 'claude' | 'codex' | 'gemini' */
+  name: string;
+  /** Whether the CLI binary is found in PATH */
+  binaryFound: boolean;
+  /** Resolved absolute path of the binary (when found) */
+  binaryPath?: string;
+  /** Trimmed version output, e.g. "0.18.2" or full first line */
+  version?: string;
+  /** Coarse version status: 'ok' (matched), 'warn-mismatch' (minor diff), 'unknown' (parsable), 'missing' (no binary) */
+  versionStatus: 'ok' | 'warn-mismatch' | 'unknown' | 'missing';
+  /** Active auth method: 'session', 'api_key', 'none', or 'unknown' */
+  authMethod: 'session' | 'api_key' | 'none' | 'unknown';
+  /** Auth status: 'ok' (usable), 'missing' (no creds), 'expired', 'unknown' */
+  authStatus: 'ok' | 'missing' | 'expired' | 'unknown';
+  /** Full availability: binary + auth + (optional) version all OK */
+  available: boolean;
+  /** Partial availability: binary installed but auth missing — useful for hint UI */
+  partial: boolean;
+  /** Supported models (full list when binary present; empty if missing) */
+  models: ModelType[];
+  /** Human-readable status reason, e.g. "CLI installed, OPENAI_API_KEY missing" */
+  reason: string;
+  /** Suggested user actions, e.g. ["Set OPENAI_API_KEY", "Run codex login"] */
+  hints: string[];
+}
+
 // ─── ProviderAdapter Interface ───────────────────────────────────────
 /**
  * ProviderAdapter — abstract interface for AI provider backends.
@@ -79,6 +118,14 @@ export interface ProviderAdapter {
    * @returns command (CLI binary) and args array
    */
   buildPlannerCommand?(prompt: string, model: ModelType): { command: string; args: string[] };
+
+  /**
+   * Optional: rich availability diagnostic — returns binary/version/auth detail
+   * suitable for `deckent doctor --providers` and bootstrap UI hints. When not
+   * implemented, `runProviderDiagnostics()` falls back to `isAvailable()` + a
+   * synthesized detail record.
+   */
+  diagnoseAvailability?(): Promise<ProviderAvailabilityDetail>;
 
   /**
    * Optional: extract the agent's actual response from the CLI's stdout envelope.
@@ -238,6 +285,37 @@ export interface DetectedProvider {
 }
 
 /**
+ * Resolve the absolute path of a CLI binary by querying the OS lookup tool
+ * (`which` on POSIX, `where` on Windows). Used by provider diagnostics to
+ * surface the actual path of a detected binary.
+ */
+export function resolveBinaryPath(cmd: string): string | undefined {
+  try {
+    const isWindows = process.platform === 'win32';
+    const lookup = isWindows ? 'where' : 'which';
+    const result = spawnSync(lookup, [cmd], { encoding: 'utf-8', timeout: 3000 });
+    if (result.status === 0 && result.stdout) {
+      const firstLine = result.stdout.split(/\r?\n/).find(l => l.trim().length > 0);
+      return firstLine?.trim();
+    }
+  } catch {
+    // lookup tool unavailable
+  }
+  return undefined;
+}
+
+/**
+ * Parse a version string from arbitrary CLI output. Extracts the first
+ * `\d+\.\d+(\.\d+)?` substring, e.g. "codex 0.18.2 (rev abc)" → "0.18.2".
+ * Returns undefined if no semver pattern present.
+ */
+export function parseSemverFromOutput(raw: string | undefined): string | undefined {
+  if (!raw) return undefined;
+  const match = raw.match(/(\d+\.\d+(?:\.\d+)?)/);
+  return match ? match[1] : undefined;
+}
+
+/**
  * Try to detect a CLI tool version by running `<cmd> --version`.
  * Returns the version string on success, undefined on failure.
  * @internal
@@ -330,6 +408,83 @@ export async function detectAvailableProviders(): Promise<DetectedProvider[]> {
     detectCodex(),
     detectGemini(),
   ];
+}
+
+/**
+ * Run rich diagnostics for a list of provider adapters.
+ *
+ * Each adapter SHOULD implement `diagnoseAvailability()`. If not, we fall back
+ * to the legacy `isAvailable()` boolean and synthesize a minimal detail record.
+ *
+ * @param adapters  Provider adapters to probe (typically created via
+ *                  createClaudeAdapter/createCodexAdapter/createGeminiAdapter)
+ */
+export async function runProviderDiagnostics(
+  adapters: ProviderAdapter[],
+): Promise<ProviderAvailabilityDetail[]> {
+  const results: ProviderAvailabilityDetail[] = [];
+  for (const adapter of adapters) {
+    if (typeof adapter.diagnoseAvailability === 'function') {
+      try {
+        results.push(await adapter.diagnoseAvailability());
+        continue;
+      } catch (err) {
+        results.push({
+          name: adapter.name,
+          binaryFound: false,
+          versionStatus: 'unknown',
+          authMethod: 'unknown',
+          authStatus: 'unknown',
+          available: false,
+          partial: false,
+          models: [...adapter.supportedModels],
+          reason: `Diagnostic probe failed: ${err instanceof Error ? err.message : String(err)}`,
+          hints: ['Re-run `deckent doctor --providers` after fixing the environment'],
+        });
+        continue;
+      }
+    }
+    // Fallback: synthesize from isAvailable()
+    const isAvail = await adapter.isAvailable();
+    results.push({
+      name: adapter.name,
+      binaryFound: isAvail,
+      versionStatus: isAvail ? 'unknown' : 'missing',
+      authMethod: isAvail ? 'unknown' : 'none',
+      authStatus: isAvail ? 'unknown' : 'missing',
+      available: isAvail,
+      partial: false,
+      models: [...adapter.supportedModels],
+      reason: isAvail
+        ? `${adapter.name} reports available (legacy isAvailable())`
+        : `${adapter.name} reports unavailable`,
+      hints: isAvail ? [] : ['Adapter does not provide detailed diagnostics'],
+    });
+  }
+  return results;
+}
+
+/**
+ * Format a compact provider diagnostic table (human-readable).
+ * Each row: `STATUS  Provider  vX.Y.Z  AUTH  reason`.
+ */
+export function formatProviderDiagnostics(details: ProviderAvailabilityDetail[]): string {
+  const lines: string[] = ['Provider Diagnostics:'];
+  for (const d of details) {
+    const status = d.available ? '[OK]    ' : d.partial ? '[PARTIAL]' : '[MISSING]';
+    const versionLabel = d.version ? ` v${d.version}` : '';
+    const authLabel = d.authMethod === 'none' || d.authMethod === 'unknown'
+      ? '(no auth)'
+      : `(${d.authMethod})`;
+    lines.push(`  ${status} ${d.name}${versionLabel} ${authLabel} — ${d.reason}`);
+    if (d.binaryPath) {
+      lines.push(`        path: ${d.binaryPath}`);
+    }
+    for (const hint of d.hints) {
+      lines.push(`        hint: ${hint}`);
+    }
+  }
+  return lines.join('\n');
 }
 
 /**

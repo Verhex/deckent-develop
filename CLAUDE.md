@@ -93,13 +93,13 @@ Komutlar: `deckent status`, `deckent history`, `deckent retro`, `deckent recall 
 ## Sprint Metrics
 | Metric | Value |
 |--------|-------|
-| Sprint | sprint-188 |
-| Total Tasks | 12 |
-| Completed | 12 |
+| Sprint | sprint-189 |
+| Total Tasks | 23 |
+| Completed | 19 |
 | Tech Debt | 0 |
-| No-Go | 0 |
-| Duration | 27dk 54sn |
-| Coverage | 0.0% |
+| No-Go | 4 |
+| Duration | 43dk 10sn |
+| Coverage | N/A |
 
 ## Active Debt
 _No tech debt record._
@@ -107,4 +107,8 @@ _No tech debt record._
 ## Agent Performance
 | Agent | Tasks | Done | Success |
 |-------|-------|------|--------|
-| doc-writer | 12 | 12 | 100% |
+| bug-fixer | 1 | 1 | 100% |
+| doc-writer | 7 | 7 | 100% |
+| architect | 4 | 4 | 100% |
+| temp-react-ts-specialist | 3 | 2 | 67% |
+| api-builder | 1 | 0 | 0% |

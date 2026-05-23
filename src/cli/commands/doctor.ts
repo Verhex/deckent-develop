@@ -26,7 +26,8 @@ import type { CIBaseline, CIReport } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getMessage } from '../helpers/messages.js';
 import { ErrorRegistry } from '../../core/errors.js';
-import { detectAvailableProviders, formatDetectedProviders } from '../../core/provider.js';
+import { detectAvailableProviders, formatDetectedProviders, formatProviderDiagnostics } from '../../core/provider.js';
+import { runProviderDiagnostics } from './doctor-checks.js';
 import { detectEnvironment } from '../../core/environment.js';
 import { loadDeckSecrets, validateDeckFile, KNOWN_DECK_KEYS, isDeckFileCommitted } from '../../core/deck-file.js';
 import { getLangFromConfig } from '../helpers/config-reader.js';
@@ -945,7 +946,8 @@ export function registerDoctor(program: Command): void {
     .option('--legacy', 'Use legacy output format')
     .option('--json', 'Output results as JSON')
     .option('--pre-flight', 'Run pre-flight health check before sprint spawn (stricter gates)')
-    .action(async (opts: { profile?: boolean; legacy?: boolean; json?: boolean; preFlight?: boolean }) => {
+    .option('--providers', 'Show detailed provider diagnostics (binary, version, auth) for Claude/Codex/Gemini')
+    .action(async (opts: { profile?: boolean; legacy?: boolean; json?: boolean; preFlight?: boolean; providers?: boolean }) => {
       let root: string;
       try {
         root = resolveProjectRoot();
@@ -965,6 +967,19 @@ export function registerDoctor(program: Command): void {
         }
       } catch { /* use default */ }
       const result = runDoctorChecks(root, activeProviderNames, spawnBackend);
+
+      // --providers: detailed binary/version/auth diagnostics for all 3 providers
+      if (opts.providers) {
+        const diagnostics = await runProviderDiagnostics(root);
+        if (opts.json) {
+          print(JSON.stringify({ providers: diagnostics }, null, 2));
+          const anyMissing = diagnostics.some(d => !d.available && !d.partial);
+          if (anyMissing) process.exitCode = 1;
+          return;
+        }
+        print(formatProviderDiagnostics(diagnostics));
+        return;
+      }
 
       // --pre-flight: run extended pre-flight check and exit with abort signal
       if (opts.preFlight) {

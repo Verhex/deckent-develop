@@ -217,7 +217,7 @@ describe('MCP deckent_start — detached fork + IPC integration', () => {
     expect(typeof config.autoApprove).toBe('boolean');
   });
 
-  it('config.json has autoApprove hardcoded to true', async () => {
+  it('config.json autoApprove defaults to false (Sprint 189 T-009 — CLI parity)', async () => {
     const tool = await getStartTool();
     await tool.handler({});
 
@@ -226,7 +226,20 @@ describe('MCP deckent_start — detached fork + IPC integration', () => {
       readFileSync(join(ipcDirs[0]!, 'config.json'), 'utf-8'),
     ) as SprintRunnerConfig;
 
-    // autoApprove is immutable true — workers MUST have full write permissions
+    // Sprint 189 T-009: autoApprove was previously hardcoded true. Now the
+    // caller-supplied value flows through (default false for CLI parity).
+    expect(config.autoApprove).toBe(false);
+  });
+
+  it('config.json honors explicit autoApprove=true (opt-in old behavior)', async () => {
+    const tool = await getStartTool();
+    await tool.handler({ autoApprove: true });
+
+    const ipcDirs = findIpcDirs(testRoot);
+    const config = JSON.parse(
+      readFileSync(join(ipcDirs[0]!, 'config.json'), 'utf-8'),
+    ) as SprintRunnerConfig;
+
     expect(config.autoApprove).toBe(true);
   });
 

@@ -454,6 +454,7 @@ describe('finalizeSprint', () => {
       PROJECT_ROOT,
       expect.objectContaining({ sprint, evaluations }),
       config,
+      results,
     );
   });
 

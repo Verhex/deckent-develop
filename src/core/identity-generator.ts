@@ -1,7 +1,18 @@
 // ═══ Identity Generator ═══════════════════════════════════════════
-// Generates PROJECT-IDENTITY.md from live metrics + DB data.
-// Called by sprint-finalizer post-finalize hook chain.
-// Reuses helpers from sprint-docs-helpers.ts for format consistency.
+// Manages .deckent/workspace/IDENTITY.md lifecycle:
+//   - syncIdentityToDb: syncs managed IDENTITY.md → memory.db `identity` entry (Step 1b)
+//   - runPostFinalizeHooks: orchestrates post-sprint hook chain (Steps 1-4)
+//
+// IDENTITY.md ownership split (ADR-046):
+//   - AUTOGEN blocks (identity-tests, identity-summary, identity-status): managed by
+//     scripts/update-readme-stats.mjs (registration-based counts, run via `npm run docs:stats`)
+//   - ## Project Status section: autoSection in .deckent/docs.json (managed-docs pipeline)
+//     NOTE: managed-docs content-generators.ts uses file-based MCP count (vs registration-based
+//     in update-readme-stats.mjs). `update-readme-stats.mjs` is authoritative — it runs as
+//     `prepublishOnly` gate (`npm run docs:stats:check`). The managed-docs AUTOGEN block
+//     preservation ensures `identity-status` AUTOGEN values survive sprint finalization.
+//
+// @deprecated regenerateProjectIdentity — Sprint 166 ADR-046. Use managed-docs chain instead.
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -335,6 +346,97 @@ export async function syncIdentityToDb(projectRoot: string): Promise<IdentitySyn
     debugLog('syncIdentityToDb', e);
     return { success: false, entryId: null, reason: `error: ${e}` };
   }
+}
+
+// ─── AUTOGEN Scope Validation ────────────────────────────────────
+
+export interface AutogenScopeValidation {
+  ok: boolean;
+  findings: string[];
+  mcpToolCount: number | null;
+  blocks: { id: string; found: boolean; containsProjectStatus?: boolean }[];
+}
+
+/**
+ * Validate that IDENTITY.md AUTOGEN blocks cover the expected sections
+ * and that MCP tool count matches the registered count.
+ *
+ * Called by lint-identity-md.mjs and tests to prevent AUTOGEN drift.
+ */
+export function validateIdentityAutogenScope(projectRoot: string): AutogenScopeValidation {
+  const identityPath = join(projectRoot, WORKSPACE_DIR, 'IDENTITY.md');
+  if (!existsSync(identityPath)) {
+    return { ok: false, findings: ['IDENTITY.md not found'], mcpToolCount: null, blocks: [] };
+  }
+
+  const content = readFileSync(identityPath, 'utf-8');
+  const findings: string[] = [];
+  const blocks: AutogenScopeValidation['blocks'] = [];
+  let mcpToolCount: number | null = null;
+
+  // Check identity-status block exists and covers Project Status table
+  const statusStart = '<!-- AUTOGEN:START id="identity-status" -->';
+  const statusEnd = '<!-- AUTOGEN:END id="identity-status" -->';
+  const statusStartIdx = content.indexOf(statusStart);
+  const statusEndIdx = content.indexOf(statusEnd);
+
+  if (statusStartIdx === -1 || statusEndIdx === -1 || statusEndIdx <= statusStartIdx) {
+    findings.push('identity-status AUTOGEN block missing or malformed');
+    blocks.push({ id: 'identity-status', found: false });
+  } else {
+    const block = content.slice(statusStartIdx + statusStart.length, statusEndIdx);
+
+    // Verify MCP Tools row exists and extract count
+    const mcpMatch = block.match(/\|\s*MCP Tools\s*\|\s*(\d+)\s*\|/);
+    if (!mcpMatch) {
+      findings.push('identity-status AUTOGEN block missing MCP Tools row');
+    } else {
+      mcpToolCount = parseInt(mcpMatch[1]!, 10);
+      if (mcpToolCount < 31) {
+        findings.push(`MCP Tools count ${mcpToolCount} is below expected minimum 31`);
+      }
+    }
+
+    // Verify that ## Project Status heading immediately precedes the AUTOGEN block
+    const headingBefore = content.lastIndexOf('## Project Status', statusStartIdx);
+    const contentBetween = headingBefore !== -1
+      ? content.slice(headingBefore + '## Project Status'.length, statusStartIdx).trim()
+      : '';
+    const containsProjectStatus = headingBefore !== -1 && contentBetween === '';
+
+    if (!containsProjectStatus) {
+      findings.push('## Project Status heading does not immediately precede identity-status AUTOGEN block');
+    }
+
+    blocks.push({ id: 'identity-status', found: true, containsProjectStatus });
+  }
+
+  // Check identity-summary block exists and contains MCP count
+  const summaryStart = '<!-- AUTOGEN:START id="identity-summary" -->';
+  const summaryEnd = '<!-- AUTOGEN:END id="identity-summary" -->';
+  const summaryStartIdx = content.indexOf(summaryStart);
+  const summaryEndIdx = content.indexOf(summaryEnd);
+
+  if (summaryStartIdx === -1 || summaryEndIdx === -1 || summaryEndIdx <= summaryStartIdx) {
+    findings.push('identity-summary AUTOGEN block missing or malformed');
+    blocks.push({ id: 'identity-summary', found: false });
+  } else {
+    const block = content.slice(summaryStartIdx + summaryStart.length, summaryEndIdx);
+    const summaryMcpMatch = block.match(/MCP:\s*(\d+)\s*tools/);
+    if (!summaryMcpMatch) {
+      findings.push('identity-summary AUTOGEN block missing MCP tools line');
+    } else {
+      const summaryCount = parseInt(summaryMcpMatch[1]!, 10);
+      if (mcpToolCount !== null && summaryCount !== mcpToolCount) {
+        findings.push(
+          `MCP count mismatch: identity-status=${mcpToolCount} vs identity-summary=${summaryCount}`,
+        );
+      }
+    }
+    blocks.push({ id: 'identity-summary', found: true });
+  }
+
+  return { ok: findings.length === 0, findings, mcpToolCount, blocks };
 }
 
 // ─── Post-Finalize Hook Chain ─────────────────────────────────────

@@ -14,8 +14,8 @@ import {
 import { join } from 'node:path';
 import type { ModelType, OpenAIModel } from '../core/types.js';
 import { PROVIDER_MODEL_MAP, isOpenAIModel } from '../core/types.js';
-import type { ProviderAdapter, ProviderSpawnOptions } from '../core/provider.js';
-import { ProviderError } from '../core/provider.js';
+import type { ProviderAdapter, ProviderSpawnOptions, ProviderAvailabilityDetail } from '../core/provider.js';
+import { ProviderError, resolveBinaryPath, parseSemverFromOutput } from '../core/provider.js';
 import { TASKS_DIR } from '../core/constants.js';
 import type { ModelTier } from '../core/model-equivalence.js';
 import { getModelForProviderTier } from '../core/model-equivalence.js';
@@ -175,19 +175,88 @@ export class CodexAdapter implements ProviderAdapter {
    */
   async isAvailable(): Promise<boolean> {
     try {
-      // Check codex CLI availability first
       const versionResult = spawnSync('codex', ['--version'], {
         encoding: 'utf-8',
         timeout: 5_000,
       });
       if (versionResult.status !== 0) return false;
-
-      // Check auth — API key or subscription
-      const authMode = this.detectAuthMode();
-      return authMode !== 'none';
+      return this.detectAuthMode() !== 'none';
     } catch {
       return false;
     }
+  }
+
+  // ─── diagnoseAvailability() ───────────────────────────────────────
+
+  /**
+   * Three-layer probe: binary detection → version parsing → auth check.
+   * Auth probes both API key (OPENAI_API_KEY / DECKENT_OPENAI_API_KEY) and
+   * subscription (`codex auth status` "logged in" string).
+   *
+   * Partial state: binary OK but neither api_key nor subscription found.
+   */
+  async diagnoseAvailability(): Promise<ProviderAvailabilityDetail> {
+    let binaryFound = false;
+    let versionRaw: string | undefined;
+    try {
+      const result = spawnSync('codex', ['--version'], { encoding: 'utf-8', timeout: 5_000 });
+      if (result.status === 0 && result.stdout) {
+        versionRaw = result.stdout.trim();
+        binaryFound = true;
+      }
+    } catch {
+      // spawn failure
+    }
+    const binaryPath = binaryFound ? resolveBinaryPath('codex') : undefined;
+    const version = parseSemverFromOutput(versionRaw) ?? versionRaw;
+    const versionStatus: ProviderAvailabilityDetail['versionStatus'] = !binaryFound
+      ? 'missing'
+      : version
+        ? 'ok'
+        : 'unknown';
+
+    const authMode = binaryFound ? this.detectAuthMode() : 'none';
+    const authMethod: ProviderAvailabilityDetail['authMethod'] = authMode === 'api_key'
+      ? 'api_key'
+      : authMode === 'subscription'
+        ? 'session'
+        : 'none';
+    const authStatus: ProviderAvailabilityDetail['authStatus'] = authMode === 'none'
+      ? 'missing'
+      : 'ok';
+    const available = binaryFound && authMode !== 'none';
+    const partial = binaryFound && authMode === 'none';
+
+    let reason: string;
+    const hints: string[] = [];
+    if (!binaryFound) {
+      reason = 'Codex CLI not found in PATH';
+      hints.push('Install: npm i -g @openai/codex');
+    } else if (authMode === 'none') {
+      reason = 'Codex CLI installed but no authentication configured';
+      hints.push('Set OPENAI_API_KEY environment variable');
+      hints.push('Or run `codex login` to authenticate with ChatGPT subscription');
+      hints.push('Alternatively, add DECKENT_OPENAI_API_KEY to .deck file');
+    } else if (authMode === 'subscription') {
+      reason = `Codex CLI ${version ?? 'installed'} + ChatGPT subscription auth active`;
+    } else {
+      reason = `Codex CLI ${version ?? 'installed'} + OPENAI_API_KEY configured`;
+    }
+
+    return {
+      name: 'codex',
+      binaryFound,
+      binaryPath,
+      version,
+      versionStatus,
+      authMethod,
+      authStatus,
+      available,
+      partial,
+      models: [...CODEX_MODELS] as ModelType[],
+      reason,
+      hints,
+    };
   }
 
   /**

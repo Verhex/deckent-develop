@@ -5,15 +5,20 @@
  * - regenerateProjectIdentity (create, update, idempotency)
  * - runMemoryExport (happy path, missing DB, partial failure)
  * - runPostFinalizeHooks (full chain, skip options, rule regen hook, error isolation)
+ * - IDENTITY.md AUTOGEN block integrity (identity-status, MCP count consistency)
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { readFileSync as realReadFileSync, existsSync as realExistsSync } from 'node:fs';
+import { join as realJoin, dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   regenerateProjectIdentity,
   runMemoryExport,
   runPostFinalizeHooks,
+  validateIdentityAutogenScope,
 } from '../../src/core/identity-generator.js';
 import type {
   IdentityMetrics,
@@ -354,5 +359,172 @@ describe('runPostFinalizeHooks', () => {
 
     expect(result.ruleRegenCalled).toBe(true);
     expect(asyncRuleRegen).toHaveBeenCalledWith('/test');
+  });
+});
+
+// ═══ IDENTITY.md AUTOGEN block integrity ═══════════════════════════
+
+const PROJECT_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+const IDENTITY_PATH = realJoin(PROJECT_ROOT, '.deckent/workspace/IDENTITY.md');
+
+function extractAutogenBlockRaw(content: string, id: string): string | null {
+  const start = `<!-- AUTOGEN:START id="${id}" -->`;
+  const end = `<!-- AUTOGEN:END id="${id}" -->`;
+  const startIdx = content.indexOf(start);
+  const endIdx = content.indexOf(end);
+  if (startIdx === -1 || endIdx === -1 || endIdx <= startIdx) return null;
+  return content.slice(startIdx + start.length, endIdx).trim();
+}
+
+describe('IDENTITY.md AUTOGEN block integrity', () => {
+  let identityContent: string;
+
+  beforeEach(async () => {
+    // Use vi.importActual to bypass vi.mock('node:fs') hoisting
+    const realFs = await vi.importActual<typeof import('node:fs')>('node:fs');
+    identityContent = realFs.readFileSync(IDENTITY_PATH, 'utf-8');
+  });
+
+  it('identity-status AUTOGEN block exists in IDENTITY.md', () => {
+    const block = extractAutogenBlockRaw(identityContent, 'identity-status');
+    expect(block).not.toBeNull();
+    expect(block).toContain('| MCP Tools |');
+    expect(block).toContain('| MCP Resources |');
+  });
+
+  it('MCP Tools count in identity-status block is ≥ 27 (file-count lower bound)', () => {
+    const block = extractAutogenBlockRaw(identityContent, 'identity-status');
+    expect(block).not.toBeNull();
+    const match = block!.match(/\|\s*MCP Tools\s*\|\s*(\d+)\s*\|/);
+    expect(match).not.toBeNull();
+    const count = parseInt(match![1]!, 10);
+    expect(count).toBeGreaterThanOrEqual(27);
+  });
+
+  it('identity-status and identity-summary MCP counts are consistent', () => {
+    const statusBlock = extractAutogenBlockRaw(identityContent, 'identity-status');
+    const summaryBlock = extractAutogenBlockRaw(identityContent, 'identity-summary');
+    expect(statusBlock).not.toBeNull();
+    expect(summaryBlock).not.toBeNull();
+
+    const statusMatch = statusBlock!.match(/\|\s*MCP Tools\s*\|\s*(\d+)\s*\|/);
+    const summaryMatch = summaryBlock!.match(/MCP:\s*(\d+)\s*tools/);
+    expect(statusMatch).not.toBeNull();
+    expect(summaryMatch).not.toBeNull();
+
+    const statusCount = parseInt(statusMatch![1]!, 10);
+    const summaryCount = parseInt(summaryMatch![1]!, 10);
+    expect(statusCount).toBe(summaryCount);
+  });
+
+  // (a) MCP count is exactly 31
+  it('MCP Tools count in identity-status block is exactly 31', () => {
+    const block = extractAutogenBlockRaw(identityContent, 'identity-status');
+    expect(block).not.toBeNull();
+    const match = block!.match(/\|\s*MCP Tools\s*\|\s*(\d+)\s*\|/);
+    expect(match).not.toBeNull();
+    expect(parseInt(match![1]!, 10)).toBe(31);
+  });
+
+  // (b) Project Status table is inside identity-status AUTOGEN block
+  it('## Project Status heading immediately precedes identity-status AUTOGEN block', () => {
+    const statusStart = '<!-- AUTOGEN:START id="identity-status" -->';
+    const statusStartIdx = identityContent.indexOf(statusStart);
+    expect(statusStartIdx).toBeGreaterThan(-1);
+
+    const headingIdx = identityContent.lastIndexOf('## Project Status', statusStartIdx);
+    expect(headingIdx).toBeGreaterThan(-1);
+
+    // Content between the heading and AUTOGEN start must be only whitespace/newline
+    const between = identityContent.slice(headingIdx + '## Project Status'.length, statusStartIdx).trim();
+    expect(between).toBe('');
+  });
+
+  // (c) AUTOGEN block markers are well-formed (prerequisite for drift detection)
+  it('identity-status AUTOGEN start/end markers are properly paired', () => {
+    const startMarker = '<!-- AUTOGEN:START id="identity-status" -->';
+    const endMarker = '<!-- AUTOGEN:END id="identity-status" -->';
+    const startIdx = identityContent.indexOf(startMarker);
+    const endIdx = identityContent.indexOf(endMarker);
+
+    expect(startIdx).toBeGreaterThan(-1);
+    expect(endIdx).toBeGreaterThan(-1);
+    expect(endIdx).toBeGreaterThan(startIdx + startMarker.length);
+
+    // No nested AUTOGEN:START inside the block
+    const inner = identityContent.slice(startIdx + startMarker.length, endIdx);
+    expect(inner).not.toContain('<!-- AUTOGEN:START');
+  });
+});
+
+// ═══ validateIdentityAutogenScope ══════════════════════════════════
+
+describe('validateIdentityAutogenScope', () => {
+  it('returns ok=true for well-formed IDENTITY.md with MCP Tools=31', () => {
+    mockedExistsSync.mockReturnValue(true);
+    mockedReadFileSync.mockReturnValue(
+      '# Project Identity\n' +
+      '<!-- AUTOGEN:START id="identity-summary" -->\n' +
+      'MCP: 31 tools, 8 resources\n' +
+      '<!-- AUTOGEN:END id="identity-summary" -->\n' +
+      '## Project Status\n' +
+      '<!-- AUTOGEN:START id="identity-status" -->\n' +
+      '| Metric | Value |\n' +
+      '|--------|-------|\n' +
+      '| MCP Tools | 31 |\n' +
+      '<!-- AUTOGEN:END id="identity-status" -->\n',
+    );
+
+    const result = validateIdentityAutogenScope('/test');
+    expect(result.ok).toBe(true);
+    expect(result.findings).toHaveLength(0);
+    expect(result.mcpToolCount).toBe(31);
+  });
+
+  it('returns ok=false when MCP Tools count is below 31', () => {
+    mockedExistsSync.mockReturnValue(true);
+    mockedReadFileSync.mockReturnValue(
+      '## Project Status\n' +
+      '<!-- AUTOGEN:START id="identity-status" -->\n' +
+      '| MCP Tools | 27 |\n' +
+      '<!-- AUTOGEN:END id="identity-status" -->\n',
+    );
+
+    const result = validateIdentityAutogenScope('/test');
+    expect(result.ok).toBe(false);
+    expect(result.findings.some(f => f.includes('27'))).toBe(true);
+  });
+
+  it('returns ok=false when identity-status block is missing', () => {
+    mockedExistsSync.mockReturnValue(true);
+    mockedReadFileSync.mockReturnValue('# Project Identity\n## Project Status\n| MCP Tools | 31 |\n');
+
+    const result = validateIdentityAutogenScope('/test');
+    expect(result.ok).toBe(false);
+    expect(result.findings.some(f => f.includes('identity-status'))).toBe(true);
+  });
+
+  it('returns ok=false when IDENTITY.md does not exist', () => {
+    mockedExistsSync.mockReturnValue(false);
+
+    const result = validateIdentityAutogenScope('/test');
+    expect(result.ok).toBe(false);
+    expect(result.findings[0]).toContain('not found');
+  });
+
+  it('returns ok=false when Project Status does not immediately precede AUTOGEN block', () => {
+    mockedExistsSync.mockReturnValue(true);
+    mockedReadFileSync.mockReturnValue(
+      '# Project Identity\n' +
+      '## Project Status\n' +
+      'Some extra content here\n' +
+      '<!-- AUTOGEN:START id="identity-status" -->\n' +
+      '| MCP Tools | 31 |\n' +
+      '<!-- AUTOGEN:END id="identity-status" -->\n',
+    );
+
+    const result = validateIdentityAutogenScope('/test');
+    expect(result.ok).toBe(false);
+    expect(result.findings.some(f => f.includes('Project Status'))).toBe(true);
   });
 });

@@ -62,9 +62,11 @@ export function writeSprintLog(projectRoot: string, sprint: Sprint, metrics: Spr
  * @param projectRoot - Project root directory
  * @param sprintResult - Sprint result containing sprint, evaluations, and metrics
  * @param config - Optional resolved config; defaults are created if not provided
+ * @param results - Optional task results captured during the sprint (used by
+ *                  the changelog updater to parse worker-authored category hints)
  * @returns Array of document update results from each updater
  */
-export function updateProjectDocs(projectRoot: string, sprintResult: SprintResult, config?: ResolvedConfig): DocUpdateResult[] {
+export function updateProjectDocs(projectRoot: string, sprintResult: SprintResult, config?: ResolvedConfig, results?: TaskResult[]): DocUpdateResult[] {
   const isInternalProject = existsSync(join(projectRoot, 'DECKENT-MASTER-BLUEPRINT.md'));
   const resolvedConfig: ResolvedConfig = config ?? {
     mode: 'performance',
@@ -98,7 +100,7 @@ export function updateProjectDocs(projectRoot: string, sprintResult: SprintResul
       allowShellKind: true,
     },
   };
-  const ctx = { projectRoot, sprintResult, config: resolvedConfig, isInternalProject };
+  const ctx = { projectRoot, sprintResult, config: resolvedConfig, isInternalProject, results };
   const builtinResults = runAllUpdaters(ctx);
   // Run user-defined managed doc updates (non-fatal)
   try {

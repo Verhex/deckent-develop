@@ -3,8 +3,8 @@ import { readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ModelType } from '../core/types.js';
 import { CLAUDE_MODELS } from '../core/types.js';
-import type { ProviderAdapter, ProviderSpawnOptions } from '../core/provider.js';
-import { ProviderError } from '../core/provider.js';
+import type { ProviderAdapter, ProviderSpawnOptions, ProviderAvailabilityDetail } from '../core/provider.js';
+import { ProviderError, resolveBinaryPath, parseSemverFromOutput } from '../core/provider.js';
 import {
   spawnWorker,
   killWorker,
@@ -193,6 +193,86 @@ export class ClaudeAdapter implements ProviderAdapter {
     } catch {
       return false;
     }
+  }
+
+  // ─── diagnoseAvailability() ────────────────────────────────────────
+
+  /**
+   * Three-layer probe: binary detection → version parsing → session check.
+   * Claude CLI uses OAuth/session auth managed by the CLI itself — we treat
+   * a working `claude --version` as session-OK (the CLI handles login state).
+   * MCP backend always returns unavailable (not yet implemented).
+   */
+  async diagnoseAvailability(): Promise<ProviderAvailabilityDetail> {
+    if (this.backend === 'mcp') {
+      return {
+        name: 'claude',
+        binaryFound: false,
+        versionStatus: 'missing',
+        authMethod: 'none',
+        authStatus: 'missing',
+        available: false,
+        partial: false,
+        models: [...SUPPORTED_MODELS] as ModelType[],
+        reason: 'MCP backend selected but not yet implemented',
+        hints: ['Switch claude_backend to "tmux" or "subprocess"'],
+      };
+    }
+
+    let binaryFound = false;
+    let versionRaw: string | undefined;
+    try {
+      const result = spawnSync('claude', ['--version'], {
+        encoding: 'utf-8',
+        timeout: 5_000,
+        shell: process.platform === 'win32',
+      });
+      if (result.status === 0 && result.stdout) {
+        versionRaw = result.stdout.trim();
+        binaryFound = true;
+      }
+    } catch {
+      // spawn failure
+    }
+    const binaryPath = binaryFound ? resolveBinaryPath('claude') : undefined;
+    const version = parseSemverFromOutput(versionRaw) ?? versionRaw;
+    const versionStatus: ProviderAvailabilityDetail['versionStatus'] = !binaryFound
+      ? 'missing'
+      : version
+        ? 'ok'
+        : 'unknown';
+
+    // Claude CLI manages OAuth/session internally — binary presence implies
+    // a usable session-or-prompts-for-one flow. Caller should still run
+    // `claude config get account` for stricter auth probing (doctor --check-auth).
+    const available = binaryFound;
+    const partial = false;
+    const authMethod: ProviderAvailabilityDetail['authMethod'] = binaryFound ? 'session' : 'none';
+    const authStatus: ProviderAvailabilityDetail['authStatus'] = binaryFound ? 'ok' : 'missing';
+
+    let reason: string;
+    const hints: string[] = [];
+    if (!binaryFound) {
+      reason = 'Claude CLI not found in PATH';
+      hints.push('Install: npm i -g @anthropic-ai/claude-code');
+    } else {
+      reason = `Claude CLI ${version ?? 'installed'} — session auth managed by CLI`;
+    }
+
+    return {
+      name: 'claude',
+      binaryFound,
+      binaryPath,
+      version,
+      versionStatus,
+      authMethod,
+      authStatus,
+      available,
+      partial,
+      models: [...SUPPORTED_MODELS] as ModelType[],
+      reason,
+      hints,
+    };
   }
 
   /**

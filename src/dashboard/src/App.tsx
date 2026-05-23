@@ -8,6 +8,7 @@ import HistoryPage from "./pages/HistoryPage";
 import MemoryPage from "./pages/MemoryPage";
 import ConfigPage from "./pages/ConfigPage";
 import ChatPage from "./pages/ChatPage";
+import StatusPage from "./pages/StatusPage";
 
 function App() {
   return (
@@ -22,6 +23,7 @@ function App() {
               <Route path="/memory" element={<MemoryPage />} />
               <Route path="/config" element={<ConfigPage />} />
               <Route path="/chat" element={<ChatPage />} />
+              <Route path="/status" element={<StatusPage />} />
             </Route>
           </Routes>
         </BrowserRouter>

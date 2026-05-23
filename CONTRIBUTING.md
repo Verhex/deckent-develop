@@ -268,18 +268,38 @@ The project **aims for high coverage** (~95% target) on non-barrel source
 files. Barrel `index.ts` files and the dashboard are excluded from coverage
 (see the `exclude` list in `vitest.config.ts`).
 
-> **Honest note:** this 95% figure is a **policy/aspiration, not an enforced
-> gate**. `vitest.config.ts` defines no numeric coverage `thresholds`, so the
-> test run will not automatically fail below 95%. Reviewers check the
-> `npm run test:coverage` output manually.
+> **Enforced gate (Sprint 189+, WrongStack WS-Z1):** `vitest.config.ts` now
+> defines numeric `coverage.thresholds`, so `npm run test:coverage` (and the
+> CI `coverage` job) will **exit non-zero** if any dimension drops below the
+> current floor — the build turns red on regression.
+>
+> **Current floors** (calibrated -5% from the sprint-189 baseline 2026-05-22
+> lines 87.96 / functions 94.61 / branches 85.19 / statements 87.96):
+>
+> | Dimension  | Floor | Baseline |
+> |------------|-------|----------|
+> | Lines      | 82%   | 87.96%   |
+> | Functions  | 89%   | 94.61%   |
+> | Branches   | 80%   | 85.19%   |
+> | Statements | 82%   | 87.96%   |
+>
+> **Ratchet policy:** each sprint that improves coverage, raise the floor by
+> ~1% (or to `currentBaseline - 3`, whichever is lower). The ratchet is
+> manual today — bump the four numbers in `vitest.config.ts` during the
+> sprint that earns the improvement and note the new floor in the
+> `## [Unreleased]` block of `docs/CHANGELOG.md`. A `coverage:reportOnFailure`
+> flag is enabled so the report is written even when tests fail; this keeps
+> the gate evaluating on every CI run.
 
 ```bash
 npm run test:coverage
 # Inspect: Lines | Branches | Functions | Statements
+# If any dimension < floor → exit 1 (build fails in CI).
 ```
 
 New code should not meaningfully drop overall coverage. If a function is
-difficult to test, explain why in a PR comment.
+difficult to test, explain why in a PR comment. If your change *raises*
+coverage past the next ratchet step, bump the floors in the same PR.
 
 ### Writing tests
 
