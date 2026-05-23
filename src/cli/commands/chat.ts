@@ -1,0 +1,446 @@
+// ═══ Chat Command (Sprint 190 T-190-004) ════════════════════════════
+// Path B — `deckent chat` spawns the user's installed AI CLI
+// (claude/codex/gemini) with stdio inheritance, signal forwarding,
+// and DECKENT_MCP_AUTO_ATTACH=1 environment hint.
+//
+// MCP auto-attach wiring + tool-use loop control lives in T-190-005
+// (src/cli/helpers/mcp-attach.ts). This command just sets the env flag
+// so downstream attachment helpers can opt in.
+
+import { spawn, type ChildProcess } from 'node:child_process';
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
+import type { Command } from 'commander';
+
+import { ClaudeAdapter, type ProviderDetectResult } from '../../providers/claude.js';
+import { CodexAdapter } from '../../providers/codex.js';
+import { GeminiAdapter } from '../../providers/gemini.js';
+import { BRAIN_DIR, MEMORY_DB_FILE } from '../../core/constants.js';
+import { MemoryStore } from '../../core/memory-store.js';
+import type { ChatTurn } from '../../core/memory-types.js';
+import { print, printError } from '../helpers/output.js';
+import { ensureMcpAttached, type McpHost } from '../helpers/mcp-attach.js';
+import { resolveProjectRoot } from '../helpers/process.js';
+
+// ─── Types ──────────────────────────────────────────────────────────
+
+export type ChatTool = 'claude' | 'codex' | 'gemini';
+
+export interface ChatOptions {
+  tool?: ChatTool;
+  local?: boolean;
+  checkMcp?: boolean;
+  resume?: string;
+  resumeLimit?: string;
+}
+
+/** Default number of prior turns shown by `deckent chat --resume`. */
+export const DEFAULT_RESUME_LIMIT = 10;
+
+/** detect() result paired with the provider name that produced it. */
+interface ProviderProbe {
+  tool: ChatTool;
+  detect: ProviderDetectResult;
+}
+
+// ─── Constants ──────────────────────────────────────────────────────
+
+const NO_PROVIDER_MESSAGE =
+  'No AI CLI found. Install one of: claude (Anthropic), codex (OpenAI), ' +
+  'gemini (Google), or use `deckent chat --local` for Ollama.';
+
+/** Priority order — first ready provider wins during auto-detect. */
+const PROVIDER_PRIORITY: readonly ChatTool[] = ['claude', 'codex', 'gemini'];
+
+// ─── Naïve Mode (Sprint 190 T-190-007) ──────────────────────────────
+//
+// The user can say "merhaba" without triggering an MCP tool, OR ask
+// Deckent to do something actionable. The host AI CLI is told the rule
+// via a system prompt we inject (env var for all hosts + claude's
+// --append-system-prompt CLI flag for the Claude binary).
+
+/** Single source of truth for the casual-vs-task classifier. */
+const TASK_INTENT_KEYWORDS: readonly string[] = [
+  'start sprint',
+  'start a sprint',
+  'run sprint',
+  'launch sprint',
+  'kick off sprint',
+  'plan sprint',
+  'check status',
+  'sprint status',
+  'show status',
+  'show debt',
+  'show retro',
+  'fix bug',
+  'fix this bug',
+  'fix the bug',
+  'patch this',
+  'patch this bug',
+  'run task',
+  'run the task',
+  'execute task',
+  'remember that',
+  'save to memory',
+  'kill sprint',
+  'cleanup sprint',
+  'cleanup the sprint',
+  'recover sprint',
+  'query memory',
+  'search memory',
+  'plan a sprint',
+  'create a sprint',
+  'create sprint',
+];
+
+/** Words that strongly mark casual chit-chat — never trigger MCP. */
+const CASUAL_INTENT_KEYWORDS: readonly string[] = [
+  'merhaba',
+  'selam',
+  'hi',
+  'hello',
+  'hey',
+  'naber',
+  'good morning',
+  'good evening',
+  'good afternoon',
+  'how are you',
+  'what can you do',
+  'what is deckent',
+  "what's deckent",
+  'tell me about deckent',
+  'who are you',
+  'thanks',
+  'thank you',
+  'teşekkür',
+  'tesekkur',
+];
+
+/** Classifier output — used by both tests and runtime hints. */
+export type ChatIntent = 'casual' | 'task' | 'ambiguous';
+
+/**
+ * Lightweight, deterministic intent classifier shared by the system prompt
+ * documentation and any future runtime gate. Pure function — case-insensitive
+ * substring match on the canonical keyword tables above.
+ *
+ * Tie-break: an utterance that contains BOTH a task and a casual marker
+ * resolves to `'task'` (acting on the actionable verb is safer than
+ * answering casually and missing a request).
+ */
+export function classifyChatIntent(input: string): ChatIntent {
+  const normalized = input.toLowerCase().trim();
+  if (normalized.length === 0) return 'ambiguous';
+
+  if (matchesAny(normalized, TASK_INTENT_KEYWORDS)) return 'task';
+  if (matchesAny(normalized, CASUAL_INTENT_KEYWORDS)) return 'casual';
+  return 'ambiguous';
+}
+
+/**
+ * Word-boundary aware keyword match. Multi-word keywords (e.g. "start sprint")
+ * use the bare phrase since a substring hit inside a longer phrase still
+ * carries the intent. Single-word keywords (e.g. "hi") are anchored by
+ * non-word boundaries so they do not bleed into longer words like "thing".
+ */
+function matchesAny(text: string, keywords: readonly string[]): boolean {
+  for (const k of keywords) {
+    if (k.includes(' ')) {
+      if (text.includes(k)) return true;
+    } else {
+      const re = new RegExp(`(^|\\W)${escapeRegex(k)}(\\W|$)`);
+      if (re.test(text)) return true;
+    }
+  }
+  return false;
+}
+
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Canonical system prompt injected into the host AI CLI on `deckent chat`.
+ * Tests pin the wording so the Trinity AI-Assistant persona stays stable
+ * across refactors.
+ */
+export function buildNaiveSystemPrompt(): string {
+  return [
+    "You are Deckent's conversational assistant — the Trinity AI-Asistan persona.",
+    'You give the user one chat surface that is BOTH casual and task-driven.',
+    '',
+    'Decision heuristic (apply on EVERY user turn):',
+    '',
+    '1. CASUAL — greetings, questions about Deckent itself, brainstorming, small talk.',
+    '   Examples: "merhaba", "hi", "what can you do", "tell me about Deckent".',
+    '   → Respond naturally in plain language. DO NOT call any MCP tool.',
+    '',
+    '2. TASK — the user asks Deckent to do something actionable.',
+    '   Examples: "start a sprint to add rate limiting", "check sprint status",',
+    '   "fix this bug", "remember that the deploy freeze is June 1st", "query memory for X".',
+    '   → Invoke the matching Deckent MCP tool. Suggested mapping:',
+    '     • start / launch / kick off sprint  → deckent_start',
+    '     • check / show status              → deckent_status',
+    '     • plan / create sprint             → deckent_plan',
+    '     • fix this bug / run task          → deckent_run',
+    '     • query / search memory            → deckent_memory_query',
+    '     • remember / save note             → deckent_memory_query (then memory write)',
+    '     • kill / cleanup / recover sprint  → deckent_kill / deckent_cleanup / deckent_recover',
+    '',
+    '3. AMBIGUOUS — the request is unclear or could be either casual or actionable.',
+    '   → Ask ONE concise clarifying question before invoking any tool.',
+    '',
+    'Never fabricate tool results. If a tool errors, surface the error verbatim.',
+    'Stay within the Deckent MCP toolset; do not invent tools.',
+  ].join('\n');
+}
+
+// ─── Provider Detection ─────────────────────────────────────────────
+
+/**
+ * Probe every provider in priority order and return their detect() results.
+ * Exposed for tests — production callers should prefer {@link selectProvider}.
+ */
+export async function probeProviders(projectRoot: string): Promise<ProviderProbe[]> {
+  const adapters: Record<ChatTool, { detect: () => Promise<ProviderDetectResult> }> = {
+    claude: new ClaudeAdapter(projectRoot),
+    codex: new CodexAdapter(projectRoot),
+    gemini: new GeminiAdapter(projectRoot),
+  };
+
+  const probes: ProviderProbe[] = [];
+  for (const tool of PROVIDER_PRIORITY) {
+    try {
+      const detect = await adapters[tool].detect();
+      probes.push({ tool, detect });
+    } catch {
+      probes.push({
+        tool,
+        detect: { binary: false, auth: false, ready: false },
+      });
+    }
+  }
+  return probes;
+}
+
+/**
+ * Auto-detect: pick the first provider with `ready: true`, then fall back to
+ * the first `ready: 'partial'` (binary present, auth missing — still usable
+ * since the CLI itself can prompt for credentials interactively).
+ */
+export function selectProvider(probes: ProviderProbe[]): ProviderProbe | null {
+  const ready = probes.find(p => p.detect.ready === true);
+  if (ready) return ready;
+  const partial = probes.find(p => p.detect.ready === 'partial');
+  if (partial) return partial;
+  return null;
+}
+
+// ─── Chat Resume (Sprint 190 T-190-006) ─────────────────────────────
+
+/**
+ * Load the last N turns of a stored chat session for `deckent chat --resume`.
+ * Returns an empty array if the DB does not exist yet — the chat command
+ * still launches in that case (clean-slate session).
+ */
+export function loadChatResume(
+  projectRoot: string,
+  sessionId: string,
+  limit: number = DEFAULT_RESUME_LIMIT,
+): ChatTurn[] {
+  const dbPath = join(projectRoot, BRAIN_DIR, MEMORY_DB_FILE);
+  if (!existsSync(dbPath)) return [];
+
+  const store = new MemoryStore(dbPath);
+  try {
+    return store.getChatHistory(sessionId, limit);
+  } finally {
+    store.close();
+  }
+}
+
+/** Render a chat history block for `deckent chat --resume`. */
+export function renderChatResume(sessionId: string, turns: ChatTurn[]): string {
+  if (turns.length === 0) {
+    return `No prior turns for chat session "${sessionId}". Starting fresh.`;
+  }
+  const lines: string[] = [`Resuming chat session "${sessionId}" — last ${turns.length} turn(s):`];
+  for (const turn of turns) {
+    const prefix = turn.role === 'user' ? '› user' : '‹ assistant';
+    lines.push(`  ${prefix} (turn ${turn.turn_index}): ${turn.content}`);
+  }
+  return lines.join('\n');
+}
+
+// ─── Subprocess Spawn ───────────────────────────────────────────────
+
+export interface SpawnChatResult {
+  child: ChildProcess;
+  detach: () => void;
+}
+
+export interface SpawnChatOptions {
+  /**
+   * Inject the Trinity AI-Asistan naïve-mode system prompt. When true the
+   * prompt is forwarded two ways so each host can pick the channel it
+   * supports:
+   *   - `DECKENT_CHAT_SYSTEM_PROMPT` env var (all hosts)
+   *   - `--append-system-prompt <text>` CLI args (claude only — its
+   *     documented system-prompt injection flag)
+   * Default: `false` (bare spawn shape — preserved for legacy callers and
+   * unit tests that pin the minimal `args === []` contract).
+   */
+  naiveMode?: boolean;
+}
+
+/**
+ * Spawn the chosen AI CLI as a child process with stdio inherited so the
+ * user gets a full interactive terminal. SIGINT/SIGTERM are forwarded to
+ * the child for graceful Ctrl+C / shutdown.
+ */
+export function spawnChatProcess(
+  tool: ChatTool,
+  opts: SpawnChatOptions = {},
+): SpawnChatResult {
+  const naiveMode = opts.naiveMode === true;
+  const systemPrompt = naiveMode ? buildNaiveSystemPrompt() : null;
+
+  const env: NodeJS.ProcessEnv = {
+    ...process.env,
+    DECKENT_MCP_AUTO_ATTACH: '1',
+  };
+  if (systemPrompt) env.DECKENT_CHAT_SYSTEM_PROMPT = systemPrompt;
+
+  const args: string[] = naiveMode && tool === 'claude' && systemPrompt
+    ? ['--append-system-prompt', systemPrompt]
+    : [];
+
+  const child = spawn(tool, args, {
+    stdio: 'inherit',
+    env,
+    shell: process.platform === 'win32',
+  });
+
+  const forward = (signal: NodeJS.Signals) => () => {
+    if (!child.killed) {
+      try { child.kill(signal); } catch { /* child already gone */ }
+    }
+  };
+
+  const onSigint = forward('SIGINT');
+  const onSigterm = forward('SIGTERM');
+  process.on('SIGINT', onSigint);
+  process.on('SIGTERM', onSigterm);
+
+  const detach = () => {
+    process.removeListener('SIGINT', onSigint);
+    process.removeListener('SIGTERM', onSigterm);
+  };
+
+  return { child, detach };
+}
+
+// ─── Command Registration ───────────────────────────────────────────
+
+export function registerChat(program: Command): void {
+  program
+    .command('chat')
+    .description('Start a conversational session with Deckent. Uses your installed AI CLI.')
+    .option('--tool <name>', 'AI CLI to launch (claude | codex | gemini)')
+    .option('--local', 'Use a local LLM (Ollama) — reserved for T-190-009')
+    .option('--check-mcp', 'Verify Deckent MCP is attached before starting (T-190-005)')
+    .option('--resume <sessionId>', 'Resume a previous chat session — prints recent turns before launch')
+    .option('--resume-limit <n>', `Number of prior turns to show with --resume (default ${DEFAULT_RESUME_LIMIT})`)
+    .action(async (opts: ChatOptions) => {
+      const projectRoot = resolveProjectRoot();
+
+      if (opts.resume) {
+        const parsedLimit = opts.resumeLimit !== undefined
+          ? Number.parseInt(opts.resumeLimit, 10)
+          : DEFAULT_RESUME_LIMIT;
+        const limit = Number.isFinite(parsedLimit) && parsedLimit >= 0
+          ? parsedLimit
+          : DEFAULT_RESUME_LIMIT;
+        const turns = loadChatResume(projectRoot, opts.resume, limit);
+        print(renderChatResume(opts.resume, turns));
+      }
+
+      if (opts.local) {
+        printError(new Error(
+          'Local mode (--local) is not yet wired. Track Sprint 190 T-190-009 (Ollama provider).',
+        ));
+        process.exitCode = 1;
+        return;
+      }
+
+      const probes = await probeProviders(projectRoot);
+
+      let chosen: ProviderProbe | null;
+      if (opts.tool) {
+        if (!PROVIDER_PRIORITY.includes(opts.tool)) {
+          printError(new Error(`Unknown --tool "${opts.tool}". Expected one of: claude, codex, gemini.`));
+          process.exitCode = 1;
+          return;
+        }
+        const match = probes.find(p => p.tool === opts.tool);
+        if (!match || !match.detect.binary) {
+          printError(new Error(
+            `Provider "${opts.tool}" CLI not found in PATH. ${NO_PROVIDER_MESSAGE}`,
+          ));
+          process.exitCode = 1;
+          return;
+        }
+        chosen = match;
+      } else {
+        chosen = selectProvider(probes);
+        if (!chosen) {
+          printError(new Error(NO_PROVIDER_MESSAGE));
+          process.exitCode = 1;
+          return;
+        }
+      }
+
+      if (opts.checkMcp) {
+        const status = await ensureMcpAttached(chosen.tool as McpHost, {
+          checkOnly: true,
+          print,
+          printError: (msg: string) => printError(new Error(msg)),
+        });
+        if (status.attached) {
+          print(`✓ Deckent MCP attached to ${chosen.tool}.`);
+        }
+        return;
+      }
+
+      const statusHint = chosen.detect.ready === 'partial'
+        ? ' (binary OK, auth missing — the CLI will prompt for credentials)'
+        : '';
+      print(`Deckent chat → launching ${chosen.tool}${statusHint}`);
+      print('  DECKENT_MCP_AUTO_ATTACH=1 set for host-side MCP wiring.');
+
+      await ensureMcpAttached(chosen.tool as McpHost, {
+        print,
+        printError: (msg: string) => printError(new Error(msg)),
+      });
+
+      const { child, detach } = spawnChatProcess(chosen.tool, { naiveMode: true });
+
+      await new Promise<void>((resolve) => {
+        child.on('exit', (code, signal) => {
+          detach();
+          if (signal) {
+            process.exitCode = 1;
+          } else if (typeof code === 'number') {
+            process.exitCode = code;
+          }
+          resolve();
+        });
+        child.on('error', (err) => {
+          detach();
+          printError(new Error(`Failed to launch ${chosen!.tool}: ${err.message}`));
+          process.exitCode = 1;
+          resolve();
+        });
+      });
+    });
+}

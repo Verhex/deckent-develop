@@ -18,6 +18,8 @@ import type {
   EntryHistoryRecord,
   RelationType,
   MemoryRelation,
+  ChatRole,
+  ChatTurn,
 } from './memory-types.js';
 
 const SCHEMA_VERSION = 1;
@@ -938,6 +940,133 @@ export class MemoryStore {
       audit_hmac: string | null;
       created_at: string;
     }>;
+  }
+
+  // ── Chat (Sprint 190 T-190-006) ──────────────────────────────
+  //
+  // Chat turns are persisted as plain `entries` rows with `type='chat'` so
+  // they are automatically indexed by the FTS5 virtual table — `deckent
+  // recall "<query>"` therefore matches chat content out of the box.
+  //
+  // Entry shape per turn:
+  //   id        — `chat-<sessionId>-<turnIndex:0-padded>`
+  //   tags      — [`chat:<sessionId>`, `role:<role>`] for filtered retrieval
+  //   metadata  — { session_id, turn_index, role } JSON
+  //   source    — 'user' for user turns, 'system' for assistant turns
+  //                (constrained to EntrySource union)
+
+  /**
+   * Create a new chat session. Returns the canonical session id used in
+   * subsequent appendChatTurn() / getChatHistory() calls. If `sessionId`
+   * is omitted, generates one from the current timestamp.
+   *
+   * No row is written here — sessions are implicit, defined by the first
+   * appendChatTurn() call. The return value is purely a convention helper.
+   */
+  createChatSession(sessionId?: string): string {
+    if (sessionId && sessionId.trim().length > 0) {
+      return sessionId;
+    }
+    const ts = new Date().toISOString().replace(/[:.]/g, '-');
+    const rand = Math.random().toString(36).slice(2, 8);
+    return `chat-${ts}-${rand}`;
+  }
+
+  /**
+   * Append a single turn to a chat session. Returns the new turn's index
+   * (0-based, monotonically increasing per session).
+   *
+   * Idempotency note: this method does NOT deduplicate identical content —
+   * each call appends a new turn. Callers that retry must track turn
+   * indices externally.
+   */
+  appendChatTurn(sessionId: string, role: ChatRole, content: string): number {
+    if (!sessionId || sessionId.trim().length === 0) {
+      throw new DeckentError('DECKENT_E070', 'appendChatTurn requires a non-empty sessionId');
+    }
+
+    const nextIndex = this.getChatTurnCount(sessionId);
+    const paddedIndex = String(nextIndex).padStart(6, '0');
+    const id = `chat-${sessionId}-${paddedIndex}`;
+
+    this.insert({
+      id,
+      type: 'chat',
+      source: role === 'user' ? 'user' : 'system',
+      title: `[chat] ${sessionId} turn ${nextIndex} (${role})`,
+      content,
+      tags: [`chat:${sessionId}`, `role:${role}`],
+      metadata: { session_id: sessionId, turn_index: nextIndex, role },
+      decay_exempt: false,
+    });
+
+    return nextIndex;
+  }
+
+  /**
+   * Return all turns for a chat session in chronological order.
+   * Pass `limit` to retrieve only the most recent N turns (e.g. for
+   * `deckent chat --resume`).
+   */
+  getChatHistory(sessionId: string, limit?: number): ChatTurn[] {
+    if (!sessionId || sessionId.trim().length === 0) return [];
+
+    // Filter via tag join — `chat:<sessionId>` tag is set by appendChatTurn.
+    // Sort by id ASC; id encodes a 0-padded turn index so lexicographic
+    // order matches insertion order.
+    const rows = this.db.prepare(`
+      SELECT DISTINCT e.id, e.content, e.created_at, e.metadata
+      FROM entries e
+      INNER JOIN tags t ON t.entry_id = e.id
+      WHERE e.type = 'chat'
+        AND e.deleted_at IS NULL
+        AND t.tag = ?
+      ORDER BY e.id ASC
+    `).all(`chat:${sessionId}`) as Array<{
+      id: string;
+      content: string;
+      created_at: string;
+      metadata: string;
+    }>;
+
+    const turns: ChatTurn[] = rows.map(row => {
+      let parsed: { session_id?: string; turn_index?: number; role?: ChatRole } = {};
+      try {
+        parsed = JSON.parse(row.metadata) as typeof parsed;
+      } catch {
+        // Corrupt metadata — fall back to id-derived turn index.
+      }
+      const turnIndex = typeof parsed.turn_index === 'number'
+        ? parsed.turn_index
+        : Number.parseInt(row.id.slice(`chat-${sessionId}-`.length), 10) || 0;
+      const role: ChatRole = parsed.role === 'assistant' ? 'assistant' : 'user';
+      return {
+        session_id: sessionId,
+        turn_index: turnIndex,
+        role,
+        content: row.content,
+        timestamp: row.created_at,
+      };
+    });
+
+    if (typeof limit === 'number' && limit >= 0) {
+      if (limit === 0) return [];
+      if (turns.length > limit) return turns.slice(-limit);
+    }
+    return turns;
+  }
+
+  /** Internal helper — count chat turns for a given session. */
+  private getChatTurnCount(sessionId: string): number {
+    const row = this.db.prepare(`
+      SELECT COUNT(*) AS cnt
+      FROM entries e
+      INNER JOIN tags t ON t.entry_id = e.id
+      WHERE e.type = 'chat'
+        AND e.deleted_at IS NULL
+        AND t.tag = ?
+    `).get(`chat:${sessionId}`) as { cnt: number };
+    return row.cnt;
   }
 
   // ── Schema & Raw Access ──────────────────────────────────────

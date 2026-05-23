@@ -648,7 +648,22 @@ export async function finalizeSprint(
         skillMap.set(task.id, task.assignedSkills);
       }
     }
-    writeRetrospective(projectRoot, sprint, evaluations, metrics, undefined, skillMap.size > 0 ? skillMap : undefined, results);
+    const retroWriteResult = writeRetrospective(projectRoot, sprint, evaluations, metrics, undefined, skillMap.size > 0 ? skillMap : undefined, results);
+    // Sprint 190 carry-over [[project_sprint189_retro_db_missing]]:
+    // surface DB-write outcome so silent failures (Sprint 189 retro entry
+    // missing while patterns landed) cannot recur unnoticed. Non-fatal.
+    if (retroWriteResult.dbError) {
+      debugLog('finalizeSprint:writeRetrospective:dbWrite',
+        `Retro DB write failed for ${sprint.id} — ${retroWriteResult.dbError}`);
+    } else if (retroWriteResult.dbAttempted &&
+        (!retroWriteResult.sprintLogWritten || !retroWriteResult.retroWritten || !retroWriteResult.memoryWritten)) {
+      debugLog('finalizeSprint:writeRetrospective:dbPartial',
+        `Retro DB write partial for ${sprint.id} — sprintLog=${retroWriteResult.sprintLogWritten} ` +
+        `retro=${retroWriteResult.retroWritten} memory=${retroWriteResult.memoryWritten}`);
+    } else {
+      debugLog('finalizeSprint:writeRetrospective:dbOk',
+        `Retro DB rows persisted for ${sprint.id}`);
+    }
 
     // Append Code-Verified DONE section to the retro entry — B8 (DB-first).
     if (codeVerifiedTasks.length > 0) {

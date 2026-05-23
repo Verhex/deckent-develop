@@ -26,8 +26,7 @@ When acting as Worker: @.codex/rules/worker-default.md
 ## Agent Performance
 | Agent | Tasks | Done | Success |
 |-------|-------|------|--------|
-| bug-fixer | 1 | 1 | 100% |
-| doc-writer | 7 | 7 | 100% |
-| architect | 4 | 4 | 100% |
-| temp-react-ts-specialist | 3 | 2 | 67% |
+| architect | 5 | 4 | 80% |
+| temp-react-ts-specialist | 6 | 2 | 33% |
+| doc-writer | 4 | 3 | 75% |
 | api-builder | 1 | 0 | 0% |

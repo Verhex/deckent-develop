@@ -15,6 +15,7 @@ import { join } from 'node:path';
 import type { ModelType, GeminiModel } from '../core/types.js';
 import type { ProviderAdapter, ProviderSpawnOptions, ProviderAvailabilityDetail } from '../core/provider.js';
 import { ProviderError, resolveBinaryPath, parseSemverFromOutput } from '../core/provider.js';
+import type { ProviderDetectResult } from './claude.js';
 import { TASKS_DIR } from '../core/constants.js';
 import type { ModelTier } from '../core/model-equivalence.js';
 import { getModelForProviderTier } from '../core/model-equivalence.js';
@@ -340,6 +341,30 @@ export class GeminiAdapter implements ProviderAdapter {
       models: [...GEMINI_MODELS] as ModelType[],
       reason,
       hints,
+    };
+  }
+
+  // ─── detect() ──────────────────────────────────────────────────────
+
+  /**
+   * Compact 3-state availability probe — wraps {@link diagnoseAvailability}
+   * and projects the rich detail onto `{binary, version, auth, ready}`.
+   *
+   * Gemini auth = `GOOGLE_API_KEY` / `DECKENT_GOOGLE_API_KEY`. Binary OK
+   * without an API key → `ready: 'partial'`.
+   */
+  async detect(): Promise<ProviderDetectResult> {
+    const detail = await this.diagnoseAvailability();
+    const ready: true | false | 'partial' = detail.available
+      ? true
+      : detail.partial
+        ? 'partial'
+        : false;
+    return {
+      binary: detail.binaryFound,
+      version: detail.version,
+      auth: detail.authStatus === 'ok',
+      ready,
     };
   }
 

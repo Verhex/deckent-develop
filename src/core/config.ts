@@ -203,8 +203,21 @@ const VALID_MODES: readonly PlanMode[] = ['performance', 'balanced', 'economic',
 const VALID_MODELS = ALL_MODELS;
 const VALID_BRAIN_PLANNING = ['ai', 'structured', 'auto'] as const;
 
-/** All valid provider names */
+/** All valid provider names — original Anthropic/OpenAI/Google trio (subscription/API). */
 export const VALID_PROVIDERS: readonly ProviderName[] = Object.keys(PROVIDER_MODEL_MAP) as ProviderName[];
+
+/**
+ * VALID_PROVIDERS_ALL — extended set including local providers (Ollama).
+ *
+ * Sprint 190 W-F F-11: Ollama is added as a local LLM provider. Type widening
+ * for `ProviderName` lives in task-types.ts (out of scope for task 190-009);
+ * runtime validation accepts 'ollama' through this constant so users can run
+ * `deckent config set worker_provider ollama` without a validation error.
+ *
+ * Used by validateConfig() below — the existing VALID_PROVIDERS list is kept
+ * untouched for any caller that consumes it as a typed `ProviderName[]`.
+ */
+export const VALID_PROVIDERS_ALL: readonly string[] = [...VALID_PROVIDERS, 'ollama'];
 
 /**
  * Default mode definitions derived from MODE_PRESETS (single source of truth).
@@ -387,19 +400,21 @@ export function validateConfig(config: DeckentConfig): string[] {
   }
 
   // ─── Provider config validation ─────────────────────────────────────
+  // VALID_PROVIDERS_ALL includes 'ollama' (local LLM) on top of the typed
+  // VALID_PROVIDERS list — see Sprint 190 W-F F-11.
   if (config.brain_provider !== undefined &&
-      !(VALID_PROVIDERS as readonly string[]).includes(config.brain_provider)) {
-    errors.push(`Invalid value '${config.brain_provider}' for field 'brain_provider'. Valid: ${VALID_PROVIDERS.join(', ')}`);
+      !VALID_PROVIDERS_ALL.includes(config.brain_provider)) {
+    errors.push(`Invalid value '${config.brain_provider}' for field 'brain_provider'. Valid: ${VALID_PROVIDERS_ALL.join(', ')}`);
   }
 
   if (config.worker_provider !== undefined &&
-      !(VALID_PROVIDERS as readonly string[]).includes(config.worker_provider)) {
-    errors.push(`Invalid value '${config.worker_provider}' for field 'worker_provider'. Valid: ${VALID_PROVIDERS.join(', ')}`);
+      !VALID_PROVIDERS_ALL.includes(config.worker_provider)) {
+    errors.push(`Invalid value '${config.worker_provider}' for field 'worker_provider'. Valid: ${VALID_PROVIDERS_ALL.join(', ')}`);
   }
 
   if (config.fallback_provider !== undefined &&
-      !(VALID_PROVIDERS as readonly string[]).includes(config.fallback_provider)) {
-    errors.push(`Invalid value '${config.fallback_provider}' for field 'fallback_provider'. Valid: ${VALID_PROVIDERS.join(', ')}`);
+      !VALID_PROVIDERS_ALL.includes(config.fallback_provider)) {
+    errors.push(`Invalid value '${config.fallback_provider}' for field 'fallback_provider'. Valid: ${VALID_PROVIDERS_ALL.join(', ')}`);
   }
 
   if (config.provider_overrides !== undefined) {
@@ -407,8 +422,8 @@ export function validateConfig(config: DeckentConfig): string[] {
       errors.push('provider_overrides must be an object');
     } else {
       for (const [key, value] of Object.entries(config.provider_overrides)) {
-        if (!(VALID_PROVIDERS as readonly string[]).includes(value)) {
-          errors.push(`Invalid provider "${value}" in provider_overrides["${key}"]. Must be one of: ${VALID_PROVIDERS.join(', ')}`);
+        if (!VALID_PROVIDERS_ALL.includes(value)) {
+          errors.push(`Invalid provider "${value}" in provider_overrides["${key}"]. Must be one of: ${VALID_PROVIDERS_ALL.join(', ')}`);
         }
       }
     }
@@ -1303,23 +1318,23 @@ export const CONFIG_METADATA: Readonly<Record<string, ConfigMetadataEntry>> = {
   },
   brain_provider: {
     description: 'AI provider used for the Brain orchestrator (planning and evaluation).',
-    type: "'claude' | 'codex' | 'gemini'",
+    type: "'claude' | 'codex' | 'gemini' | 'ollama'",
     default: 'claude',
-    options: ['claude', 'codex', 'gemini'],
+    options: ['claude', 'codex', 'gemini', 'ollama'],
     category: 'Provider',
   },
   worker_provider: {
     description: 'Default AI provider for worker agents executing tasks.',
-    type: "'claude' | 'codex' | 'gemini'",
+    type: "'claude' | 'codex' | 'gemini' | 'ollama'",
     default: 'claude',
-    options: ['claude', 'codex', 'gemini'],
+    options: ['claude', 'codex', 'gemini', 'ollama'],
     category: 'Provider',
   },
   fallback_provider: {
     description: 'Provider to use when the primary provider is unavailable.',
-    type: "'claude' | 'codex' | 'gemini' | undefined",
+    type: "'claude' | 'codex' | 'gemini' | 'ollama' | undefined",
     default: undefined,
-    options: ['claude', 'codex', 'gemini'],
+    options: ['claude', 'codex', 'gemini', 'ollama'],
     category: 'Provider',
   },
   provider_overrides: {

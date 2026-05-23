@@ -32,6 +32,7 @@ import { registerFinalize } from './commands/finalize.js';
 import { registerExplain } from './commands/explain.js';
 import { registerSetDirectives } from './commands/set-directives.js';
 import { registerHeartbeat } from './commands/heartbeat.js';
+import { registerChat } from './commands/chat.js';
 import { registerCheckpoint } from './commands/checkpoint.js';
 import { registerDocs } from './commands/docs.js';
 import { registerOutput } from './commands/output.js';
@@ -48,6 +49,7 @@ import { registerFeatures } from './commands/features.js';
 import { registerAudit } from './commands/audit.js';
 import { registerAuditVerify } from './commands/audit-verify.js';
 import { registerRecover } from './commands/recover.js';
+import { registerModels } from './commands/models.js';
 import { showSplash } from './helpers/splash.js';
 
 /**
@@ -101,6 +103,7 @@ export function buildProgram(): Command {
   registerExplain(program);
   registerSetDirectives(program);
   registerHeartbeat(program);
+  registerChat(program);
   registerCheckpoint(program);
   registerDocs(program);
   registerOutput(program);
@@ -116,6 +119,7 @@ export function buildProgram(): Command {
   registerAudit(program);
   registerAuditVerify(program);
   registerRecover(program);
+  registerModels(program);
   registerHelp(program);
 
   return program;

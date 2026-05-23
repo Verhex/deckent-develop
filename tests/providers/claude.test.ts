@@ -366,6 +366,57 @@ describe('ClaudeAdapter', () => {
     });
   });
 
+  // ─── detect() — 3-state availability (Sprint 190 Task 190-002) ────
+
+  describe('detect()', () => {
+    it('returns ready=true when binary present (CLI manages session)', async () => {
+      mockSpawnSync.mockImplementation((cmd: string) => {
+        if (cmd === 'which' || cmd === 'where') {
+          return { status: 0, stdout: '/usr/local/bin/claude\n', stderr: '' };
+        }
+        return { status: 0, stdout: '1.0.45\n', stderr: '' };
+      });
+      const result = await adapter.detect();
+      expect(result.binary).toBe(true);
+      expect(result.auth).toBe(true);
+      expect(result.ready).toBe(true);
+      expect(result.version).toBe('1.0.45');
+    });
+
+    it('returns ready=false when claude --version fails', async () => {
+      mockSpawnSync.mockReturnValue({ status: 1, stdout: '', stderr: 'not found' });
+      const result = await adapter.detect();
+      expect(result.binary).toBe(false);
+      expect(result.auth).toBe(false);
+      expect(result.ready).toBe(false);
+    });
+
+    it('returns ready=false when spawnSync throws (ENOENT)', async () => {
+      mockSpawnSync.mockImplementation(() => { throw new Error('ENOENT'); });
+      const result = await adapter.detect();
+      expect(result.binary).toBe(false);
+      expect(result.ready).toBe(false);
+    });
+
+    it('returns ready=false for mcp backend (not yet implemented)', async () => {
+      const mcpAdapter = new ClaudeAdapter(projectDir, { claude_backend: 'mcp' });
+      const result = await mcpAdapter.detect();
+      expect(result.binary).toBe(false);
+      expect(result.ready).toBe(false);
+    });
+
+    it('shape conforms to ProviderDetectResult contract', async () => {
+      mockSpawnSync.mockImplementation((cmd: string) => {
+        if (cmd === 'which' || cmd === 'where') {
+          return { status: 0, stdout: '/usr/local/bin/claude\n', stderr: '' };
+        }
+        return { status: 0, stdout: '1.0.45\n', stderr: '' };
+      });
+      const result = await adapter.detect();
+      expect(Object.keys(result).sort()).toEqual(['auth', 'binary', 'ready', 'version']);
+    });
+  });
+
   // ─── isSessionActive() ───────────────────────────────────────────
 
   describe('isSessionActive()', () => {

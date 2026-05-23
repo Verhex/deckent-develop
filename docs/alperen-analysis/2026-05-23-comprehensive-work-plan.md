@@ -830,3 +830,97 @@ Her sprint sonunda **3 görünür değişim** raporlanmalı:
 ---
 
 **Son not:** Bu plan **iş maddesi kataloğu** — Sprint 189 DIRECTIVES.md değildir. Sprint 189 DIRECTIVES'i ayrı yazılacak; bu master plan'dan Faz 1 task'larının Dalga 1 alt-kümesi seçilecek. Plan her sprint sonu retro'da güncellenmeli (yeni bulgu / değişen öncelik / yapılan task).
+
+---
+
+# EK BÖLÜM — W-L Stream: Karpathy Discipline Refactor (2026-05-23 eklendi)
+
+**Hedef:** Tüm agent PROMPT.md + skill SKILL.md + worker rules `.claude/rules/*.md` dosyalarını **Karpathy 4-discipline + success-criteria** framework'üne göre refactor et. Talimat listesinden ölçülebilir kriter setine geçiş.
+**Anchor:** `https://github.com/multica-ai/andrej-karpathy-skills`, `[[project_karpathy_skill_discipline]]`, Alperen 2026-05-23
+**Faz:** 3 · **Sprint:** 191-193
+
+## W-L.1 — Karpathy 4-Discipline Framework Adoption
+
+| ID | İş | Detay | Efor | Öncelik |
+|----|----|-------|------|---------|
+| **L-1** | `.claude/rules/karpathy-disciplines.md` baseline framework dosyası | 4 disiplin core text (Think Before Coding / Simplicity First / Surgical Changes / Goal-Driven Execution) + Deckent-spesifik örnekler | normal | **P0** |
+| **L-2** | `.claude/rules/worker-default.md` refactor — 98 satırdan ~30 satıra | Karpathy 4-discipline frame + Deckent worker-specific success criteria (heartbeat, scope, .result format) | normal | **P0** |
+| **L-3** | `.claude/rules/brain.md` refactor — Karpathy frame altında | Brain decision criteria (GO/NO_GO eşikleri, FIX threshold, decay) | normal | **P0** |
+| **L-4** | `.claude/rules/auditor.md` refactor — Karpathy frame altında | Auditor verifiable scan criteria + alert thresholds | normal | **P0** |
+
+## W-L.2 — Agent PROMPT.md Refactor (15 agent + 3 temp/archive)
+
+| ID | İş | Detay | Efor | Öncelik |
+|----|----|-------|------|---------|
+| **L-5** | `agents/bug-fixer/PROMPT.md` refactor — 90→20 satır | "5 Whys" gibi yöntem listesi → "Root cause traced + regression test written + minimal diff" kriterleri | normal | **P0** |
+| **L-6** | `agents/architect/PROMPT.md` refactor | "Architecture coherent with ADRs + module boundaries respected + no circular deps" | normal | **P1** |
+| **L-7** | `agents/code-reviewer/PROMPT.md` refactor | "Issues found mapped to file:line + severity classified + actionable fix suggested" | normal | **P1** |
+| **L-8** | `agents/refactorer/PROMPT.md` refactor | "Behavior preserved (tests green) + complexity reduced (measurable metric) + surgical scope" | normal | **P1** |
+| **L-9** | `agents/api-builder/PROMPT.md` refactor | "Schema versioned + auth/rate-limit explicit + happy-path test green + error contract uniform" | normal | **P1** |
+| **L-10** | `agents/performance-analyzer/PROMPT.md` refactor | "Baseline measured + bottleneck identified file:line + improvement quantified (% or ms)" | normal | **P1** |
+| **L-11** | `agents/security-auditor/PROMPT.md` refactor | "OWASP categories scanned + findings severity-classified + mitigation traceable to ADR" | normal | **P1** |
+| **L-12** | `agents/accessibility-auditor/PROMPT.md` refactor | "WCAG level confirmed + violations file:line + a11y axe rule cited" | normal | **P2** |
+| **L-13** | `agents/data-engineer/PROMPT.md` refactor | "Data flow traced + idempotency verified + rollback path documented" | normal | **P2** |
+| **L-14** | `agents/devops-engineer/PROMPT.md` refactor | "CI step green + deploy reversible + observability hooks (log/metric/trace) added" | normal | **P2** |
+| **L-15** | `agents/frontend-designer/PROMPT.md` refactor | "Component visually distinct + responsive breakpoints verified + a11y semantic correct" | normal | **P2** |
+| **L-16** | `agents/migration-specialist/PROMPT.md` refactor | "Migration reversible (or one-way explicit) + breaking changes enumerated + ADR amendment" | normal | **P2** |
+| **L-17** | `agents/ci-guardian/PROMPT.md` refactor | "Test fail categorized + regression vs new fail distinguished + block_on_test_fail correct" | normal | **P2** |
+| **L-18** | `agents/doc-writer/PROMPT.md` refactor | "Doc traces to code (file:line) + no stale ref + heading structure + 3 link minimum" | normal | **P2** |
+| **L-19** | `agents/architecture-planner/PROMPT.md` refactor | "ADR proposed/amended + tradeoffs surfaced + dependency graph updated" | normal | **P2** |
+| **L-20** | Temp agent PROMPT.md generator template — `temp-skill-generator.ts` wire | Sprint 188 Bug B (archive, temp-react-specialist, temp-react-ts-specialist 3 agent PROMPT.md eksik); generator template Karpathy format yazsın | high | **P0** |
+
+## W-L.3 — Skill SKILL.md Refactor (21 skill)
+
+| ID | İş | Detay | Efor | Öncelik |
+|----|----|-------|------|---------|
+| **L-21** | `skills/typescript-expert/SKILL.md` refactor — rule-list'ten success-criteria'ya | "Strict mode no @ts-ignore + Result<T,E> for errors + utility types over duplicate definitions" | normal | **P1** |
+| **L-22** | `skills/testing-expert/SKILL.md` refactor | "TDD red→green→refactor + ≥3 test per behavior + mock only at boundary + coverage ratchet" | normal | **P1** |
+| **L-23** | `skills/anthropic-sdk/SKILL.md` refactor | "Prompt caching enabled + tool use schema validated + retry on rate limit + token budget tracked" | normal | **P1** |
+| **L-24** | `skills/security-specialist/SKILL.md` refactor | "OWASP top 10 mapped + input validated at boundary + secrets in .deck + audit log on auth events" | normal | **P1** |
+| **L-25** | `skills/performance-optimizer/SKILL.md` refactor | "Profiled (V8 inspector/perf) + bottleneck quantified + improvement ≥20% or no-op" | normal | **P1** |
+| **L-26** | `skills/devops-engineer/SKILL.md` refactor | "Pipeline declarative + idempotent + observable + reversible" | normal | **P2** |
+| **L-27** | `skills/database-migration/SKILL.md` refactor | "Migration reversible script + zero-downtime safe + dual-write window documented" | normal | **P2** |
+| **L-28** | `skills/react-specialist/SKILL.md` refactor | "Hooks rules respected + component pure + props typed + render perf measured" | normal | **P2** |
+| **L-29** | `skills/python-expert/SKILL.md` refactor | "Type hints + ruff clean + pytest ≥3 + venv isolated" | normal | **P3** |
+| **L-30** | `skills/ci-testing/SKILL.md` refactor | "Test runs in CI matrix + flaky retry max 3 + artifact uploaded on fail" | normal | **P2** |
+| **L-31** | `skills/accessibility-expert/SKILL.md` refactor | "axe scan green + keyboard navigable + screen reader tested + WCAG AA min" | normal | **P2** |
+| **L-32** | `skills/code-simplifier/SKILL.md` refactor | "Complexity metric reduced + behavior preserved + LoC -X% or ±10%" | normal | **P2** |
+| **L-33** | `skills/docker-expert/SKILL.md` refactor | "Multi-stage minimal + non-root user + healthcheck + size <500MB" | normal | **P2** |
+| **L-34** | `skills/frontend-design/SKILL.md` refactor | "Design tokens (color/space/font) + responsive + a11y + dark mode" | normal | **P2** |
+| **L-35** | `skills/git-expert/SKILL.md` refactor | "Conventional commit + branch hygiene + no force-push to main + signed if required" | normal | **P3** |
+| **L-36** | `skills/graphql-expert/SKILL.md` refactor | "Schema introspection + N+1 prevented + persisted query + depth limit" | normal | **P3** |
+| **L-37** | `skills/migration-expert/SKILL.md` refactor | "Codemod or migration script + breaking changes ADR + reversible or explicit one-way" | normal | **P3** |
+| **L-38** | `skills/monorepo-expert/SKILL.md` refactor | "Workspace boundary enforced + shared deps versioned + build cache hit" | normal | **P3** |
+| **L-39** | `skills/system-architect/SKILL.md` refactor | "C4 levels documented + non-functional reqs enumerated + ADR proposed" | normal | **P2** |
+| **L-40** | `skills/documentation-writer/SKILL.md` refactor | "Doc traces to code + 3 link min + heading structure + diataxis category" | normal | **P2** |
+| **L-41** | `skills/api-builder/SKILL.md` refactor | (agent L-9 ile aynı disiplin, skill versiyonu) | normal | **P2** |
+
+## W-L.4 — Verification + Evolution Integration
+
+| ID | İş | Detay | Efor | Öncelik |
+|----|----|-------|------|---------|
+| **L-42** | Karpathy framework + W-E evrimsel mimari bağlantısı | Her agent için success criteria = mutation hedefi; `prompt-evolution.ts` Karpathy kriterlerini ölçer | high | **P0** |
+| **L-43** | `scripts/lint-prompt-md-karpathy.mjs` regression-guard | Her PROMPT.md/SKILL.md Karpathy format'ına uygun mu (max 25 satır, success criteria block var mı, vb.) | normal | **P1** |
+| **L-44** | Worker prompt builder Karpathy framework injection | `task-builder.ts` worker prompt'a Karpathy 4-discipline header inject etsin | normal | **P1** |
+| **L-45** | Agent success rate ölçümü — Karpathy criteria match | Worker `.result.notes` Karpathy criteria karşılandı mı parse et + success-rate'e dahil et | high | **P2** |
+
+## Toplam W-L
+
+**Sayım:** 45 task (L-1..L-45) — Sprint 191-193 arasında 3 sprint'e bölünmüş.
+**Sprint dağılımı önerisi:**
+- **Sprint 191 — Karpathy Core + P0 Agents:** L-1..L-5 (rules baseline + 4 P0 agent), L-20 (temp template), L-42 (evolution bağ) = 8 task
+- **Sprint 192 — Agent + Critical Skills:** L-6..L-11, L-21..L-25 (10 critical agent + skill) + L-43, L-44 = 13 task
+- **Sprint 193 — Skill Tail + Polish:** L-12..L-19, L-26..L-41 (kalan agent + skill) + L-45 = ~24 task (3 dalga bölünür)
+
+**Beklenen kazanım:**
+- Toplam talimat satırı: ~1900 → ~600 (%68 azalma)
+- Agent success-rate ölçülebilir (mutation input data)
+- W-E (Evrimsel mimari) için kriter-bazlı evolution hedefleri
+- Sprint 188 Bug B (3 missing PROMPT.md) kalıcı fix (template generator)
+- "Don't tell it what to do, give it success criteria" — worker drift'i azalır
+
+**Bağ noktaları:**
+- `[[project_karpathy_skill_discipline]]` memory
+- `[[feedback_prompt_completeness_over_brevity]]` — uyum: Karpathy "completeness preserved" (criteria self-contained, talimat değil tasarruf)
+- W-E (Evrimsel Mimari) — Karpathy criteria = mutation hedefi
+- W-K (Dead Code Wire-Up) — prompt-evolution.ts canlanır, criteria-based feedback loop'la

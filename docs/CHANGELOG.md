@@ -2,6 +2,29 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint190] - 2026-05-23
+
+### Added
+
+- 190-002 — Provider isAvailable 3-state (binary+auth) + doctor mesajları
+- 190-008 — 19 TDD test (api-md+identity-refs) + 7 env-fail (codex-config ENOSPC + alert-emitter) yeşillenmesi
+- 190-011 — `deckent models list/refresh/tier` CLI + `deckent_models` MCP tool
+- 190-012 — README.md baştan yaz (Trinity vision + OSS GA-ready)
+- 190-013 — Getting Started 5dk + first-sprint + chat-mode docs
+
+### Changed
+
+- 190-009 — Ollama provider adapter (Local LLM, RTX 5090 vision) (completed with tech debt)
+
+### Fixed
+
+- 190-001 — IDENTITY.md sat30 AUTOGEN extend + Memory DB retro entry hook fix
+- 190-003 — Release workflow npm publish step + provenance + 9 test fix
+- 190-014 — docs/cookbook/ 3 örnek tarif (REST API, bug fix, doc update)
+
+
+_Tasks: 25 total, 9 done, 1 tech debt, 16 no-go_
+
 ## [1.0.0-beta.1-sprint189] - 2026-05-22
 
 ### Added

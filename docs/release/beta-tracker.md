@@ -116,10 +116,10 @@ Spec: `docs/superpowers/specs/2026-05-19-embedded-web-terminal-design.md`. Plan:
 | Metric | Value |
 |--------|-------|
 | Version | 1.0.0-beta.1 |
-| Sprint | sprint-189 |
-| MCP Tools | 27 |
+| Sprint | sprint-190 |
+| MCP Tools | 28 |
 | MCP Resources | 8 |
-| CLI Commands | 56+ |
+| CLI Commands | 58+ |
 | Dashboard Pages | 7 |
 | Agents | 15 built-in + 2 custom |
 | Skills | 21 built-in |
@@ -973,12 +973,12 @@ Every blocker was directly verified in the codebase. False claims have been corr
 ## Sprint Metrics
 | Metric | Value |
 |--------|-------|
-| Sprint | sprint-189 |
-| Total Tasks | 23 |
-| Completed | 19 |
-| Tech Debt | 0 |
-| No-Go | 4 |
-| Duration | 43dk 10sn |
+| Sprint | sprint-190 |
+| Total Tasks | 25 |
+| Completed | 9 |
+| Tech Debt | 1 |
+| No-Go | 16 |
+| Duration | 56dk 30sn |
 | Coverage | N/A |
 
 ## Sprint History (Sprint 136-166)

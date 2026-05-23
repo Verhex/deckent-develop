@@ -29,6 +29,28 @@ export interface ClaudeAdapterOptions {
   claude_backend?: ClaudeBackend;
 }
 
+/**
+ * Compact 3-state provider availability result.
+ * Returned by `adapter.detect()` — simpler than {@link ProviderAvailabilityDetail}
+ * and intended for callers that only care about binary + auth + overall readiness
+ * (e.g. `deckent doctor --providers` output, `deckent chat` provider auto-detect).
+ */
+export interface ProviderDetectResult {
+  /** Whether the CLI binary is installed and callable */
+  binary: boolean;
+  /** Parsed version string when available, e.g. "1.0.45" */
+  version?: string;
+  /** Whether auth credentials are configured (session/api_key/login) */
+  auth: boolean;
+  /**
+   * Overall readiness:
+   * - `true` — binary + auth both present (full availability)
+   * - `'partial'` — binary present but auth missing (actionable hint state)
+   * - `false` — binary not found (CLI missing)
+   */
+  ready: true | false | 'partial';
+}
+
 // ─── Constants ───────────────────────────────────────────────────────
 
 const SUPPORTED_MODELS: readonly ModelType[] = [...CLAUDE_MODELS];
@@ -272,6 +294,31 @@ export class ClaudeAdapter implements ProviderAdapter {
       models: [...SUPPORTED_MODELS] as ModelType[],
       reason,
       hints,
+    };
+  }
+
+  // ─── detect() ──────────────────────────────────────────────────────
+
+  /**
+   * Compact 3-state availability probe — wraps {@link diagnoseAvailability}
+   * and projects the rich detail onto `{binary, version, auth, ready}`.
+   *
+   * Claude CLI manages OAuth/session internally so binary presence implies
+   * `ready: true` (no separate `'partial'` state). MCP backend always
+   * returns `ready: false`.
+   */
+  async detect(): Promise<ProviderDetectResult> {
+    const detail = await this.diagnoseAvailability();
+    const ready: true | false | 'partial' = detail.available
+      ? true
+      : detail.partial
+        ? 'partial'
+        : false;
+    return {
+      binary: detail.binaryFound,
+      version: detail.version,
+      auth: detail.authStatus === 'ok',
+      ready,
     };
   }
 

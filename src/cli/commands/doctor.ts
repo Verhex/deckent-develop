@@ -5,7 +5,7 @@ import { spawnSync } from 'node:child_process';
 import type { Command } from 'commander';
 import { planInstall } from '../../core/provisioner.js';
 import type { DoctorResult, SystemProfile } from '../../core/types.js';
-import type { DetectedProvider } from '../../core/provider.js';
+import type { DetectedProvider, ProviderAvailabilityDetail } from '../../core/provider.js';
 import type { HealthCheckResult } from '../../orchestra/connector.js';
 import {
   DECKENT_DIR, BRAIN_DIR, DECISIONS_FILE,
@@ -26,7 +26,7 @@ import type { CIBaseline, CIReport } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getMessage } from '../helpers/messages.js';
 import { ErrorRegistry } from '../../core/errors.js';
-import { detectAvailableProviders, formatDetectedProviders, formatProviderDiagnostics } from '../../core/provider.js';
+import { detectAvailableProviders, formatDetectedProviders } from '../../core/provider.js';
 import { runProviderDiagnostics } from './doctor-checks.js';
 import { detectEnvironment } from '../../core/environment.js';
 import { loadDeckSecrets, validateDeckFile, KNOWN_DECK_KEYS, isDeckFileCommitted } from '../../core/deck-file.js';
@@ -414,6 +414,59 @@ export function getReadinessLabel(result: DoctorResult, brainLines: number, brai
   const failedOptional = result.checks.filter(c => !c.required && !c.passed);
   if (failedOptional.length > 0) return 'READY (with warnings)';
   return 'READY';
+}
+
+/**
+ * Provider-specific actionable hint shown when binary is present but auth is missing.
+ * Used by the `deckent doctor --providers` 3-state output.
+ */
+export function getProviderPartialHint(name: string): string {
+  switch (name) {
+    case 'codex': return 'set OPENAI_API_KEY';
+    case 'gemini': return 'set GOOGLE_API_KEY';
+    case 'claude': return 'run `claude login`';
+    default: return 'configure authentication';
+  }
+}
+
+/**
+ * Format provider diagnostics with ✓ / ⚠ / ✗ symbols and actionable messages.
+ *
+ * Output shape (per task 190-002 spec):
+ *   `✓ Claude (ready) — Claude CLI 1.0.45`
+ *   `⚠ Codex (binary OK, auth missing — set OPENAI_API_KEY)`
+ *   `✗ Gemini (binary not found)`
+ *
+ * Complements (does NOT replace) `formatProviderDiagnostics()` in core/provider.ts
+ * which keeps the legacy `[OK]/[PARTIAL]/[MISSING]` bracket markers for callers
+ * that depend on the older format.
+ */
+export function formatProviderDiagnosticsActionable(
+  details: ProviderAvailabilityDetail[],
+): string {
+  const lines: string[] = ['Provider Diagnostics:'];
+  for (const d of details) {
+    const symbol = d.available ? '✓' : d.partial ? '⚠' : '✗';
+    const label = capitalize(d.name);
+    let stateLabel: string;
+    if (d.available) {
+      const versionSuffix = d.version ? ` — ${label} CLI ${d.version}` : '';
+      stateLabel = `(ready)${versionSuffix}`;
+    } else if (d.partial) {
+      const hint = getProviderPartialHint(d.name);
+      stateLabel = `(binary OK, auth missing — ${hint})`;
+    } else {
+      stateLabel = '(binary not found)';
+    }
+    lines.push(`  ${symbol} ${label} ${stateLabel}`);
+    if (d.binaryPath && d.available) {
+      lines.push(`        path: ${d.binaryPath}`);
+    }
+    for (const hint of d.hints) {
+      lines.push(`        hint: ${hint}`);
+    }
+  }
+  return lines.join('\n');
 }
 
 /**
@@ -977,7 +1030,10 @@ export function registerDoctor(program: Command): void {
           if (anyMissing) process.exitCode = 1;
           return;
         }
-        print(formatProviderDiagnostics(diagnostics));
+        // Sprint 190 Task 190-002: ✓/⚠/✗ actionable format with per-provider hints.
+        // Legacy formatProviderDiagnostics still exported for callers needing
+        // the [OK]/[PARTIAL]/[MISSING] bracket markers.
+        print(formatProviderDiagnosticsActionable(diagnostics));
         return;
       }
 

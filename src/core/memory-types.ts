@@ -18,7 +18,23 @@ export type EntryType =
   | 'error'
   | 'identity'
   | 'audit'
+  | 'chat'
   | 'custom';
+
+// ─── Chat (Sprint 190 T-190-006) ─────────────────────────────────
+
+/** Role of a single chat turn. */
+export type ChatRole = 'user' | 'assistant';
+
+/** A single chat turn as returned by getChatHistory(). */
+export interface ChatTurn {
+  session_id: string;
+  turn_index: number;
+  role: ChatRole;
+  content: string;
+  /** ISO 8601 UTC timestamp. */
+  timestamp: string;
+}
 
 /** Who created this entry. */
 export type EntrySource =

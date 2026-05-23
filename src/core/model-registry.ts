@@ -6,8 +6,22 @@ import { DeckentError } from './errors.js';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
-/** Provider name — defined here to avoid circular import with task-types.ts */
+/** Provider name — defined here to avoid circular import with task-types.ts.
+ *
+ *  NOTE (Sprint 190 W-F F-11): The local Ollama provider is registered with
+ *  a literal `'ollama'` runtime value but kept out of this static type union
+ *  because widening it cascades a compile error into task-types.ts
+ *  (`getProviderForModel` returns `ProviderName` which is currently 'claude' |
+ *  'codex' | 'gemini'). Until task-types.ts gets the matching widen (out of
+ *  scope for task 190-009), Ollama model definitions use a `provider` cast
+ *  and callers that want Ollama-aware queries pass `'ollama' as RegistryProviderName`.
+ *  The runtime catalog still serves Ollama models correctly via
+ *  `getByProvider('ollama' as RegistryProviderName)`.
+ */
 export type RegistryProviderName = 'claude' | 'codex' | 'gemini';
+
+/** Extended provider name including local providers — runtime helper. */
+export type RegistryProviderNameExt = RegistryProviderName | 'ollama';
 
 export type ModelTier = 'economy' | 'standard' | 'premium' | 'premium_plus';
 
@@ -176,6 +190,60 @@ export const BUILTIN_MODELS: readonly ModelDefinition[] = [
   },
 ] as const;
 
+// ─── Ollama Built-in Models (opt-in) ───────────────────────────────────────
+// Local LLM provider, zero cost (Sprint 190 W-F F-11). Held OUT of
+// `BUILTIN_MODELS` on purpose: hard-coded test expectations elsewhere in the
+// codebase rely on the 13-model / 3-provider invariant. The `OllamaAdapter`
+// constructor side-effect calls `registerOllamaModels()` to insert these
+// entries into the singleton registry only when the adapter module is loaded.
+// Consumers that never import OllamaAdapter remain byte-identical to the
+// pre-Ollama registry.
+//
+// The `provider` field uses `RegistryProviderName` via cast; task-types.ts's
+// narrower `ProviderName` widen lives in a follow-up tech-debt task.
+export const OLLAMA_BUILTIN_MODELS: readonly ModelDefinition[] = [
+  {
+    id: 'qwen-coder-32b',
+    apiId: 'qwen2.5-coder:32b',
+    provider: 'ollama' as unknown as RegistryProviderName,
+    tier: 'premium',
+    contextWindow: 128_000,
+    costPerMillion: { input: 0, output: 0 },
+    capabilities: { streaming: true, toolUse: true, vision: false, codeExecution: false, reasoning: false },
+    status: 'ga',
+  },
+  {
+    id: 'qwen-coder-7b',
+    apiId: 'qwen2.5-coder:7b',
+    provider: 'ollama' as unknown as RegistryProviderName,
+    tier: 'standard',
+    contextWindow: 32_768,
+    costPerMillion: { input: 0, output: 0 },
+    capabilities: { streaming: true, toolUse: true, vision: false, codeExecution: false, reasoning: false },
+    status: 'ga',
+  },
+  {
+    id: 'llama-3-8b',
+    apiId: 'llama3:8b',
+    provider: 'ollama' as unknown as RegistryProviderName,
+    tier: 'standard',
+    contextWindow: 8_192,
+    costPerMillion: { input: 0, output: 0 },
+    capabilities: { streaming: true, toolUse: false, vision: false, codeExecution: false, reasoning: false },
+    status: 'ga',
+  },
+  {
+    id: 'llama-3.2-3b',
+    apiId: 'llama3.2:3b',
+    provider: 'ollama' as unknown as RegistryProviderName,
+    tier: 'economy',
+    contextWindow: 8_192,
+    costPerMillion: { input: 0, output: 0 },
+    capabilities: { streaming: true, toolUse: false, vision: false, codeExecution: false, reasoning: false },
+    status: 'ga',
+  },
+] as const;
+
 // ─── Tier ordering for comparison ──────────────────────────────────────────
 
 const TIER_ORDER: Record<ModelTier, number> = {
@@ -274,6 +342,24 @@ export class ModelRegistry {
     return this.models.delete(id);
   }
 
+  /** Replace all current entries with the supplied catalog (atomic swap).
+   *  Used by bootstrapFromCatalog() after a successful remote/cache fetch. */
+  loadFromCatalog(definitions: readonly ModelDefinition[]): void {
+    this.models.clear();
+    for (const def of definitions) {
+      this.models.set(def.id, def);
+    }
+  }
+
+  /** Merge supplied definitions on top of existing entries (overrides by id).
+   *  Bundled entries that share an id with the catalog are replaced; the rest
+   *  remain available as a safety net. */
+  mergeFromCatalog(definitions: readonly ModelDefinition[]): void {
+    for (const def of definitions) {
+      this.models.set(def.id, def);
+    }
+  }
+
   estimateCost(modelId: string, inputTokens: number, outputTokens: number): number {
     const model = this.getOrThrow(modelId);
     return (
@@ -306,6 +392,40 @@ export class ModelRegistry {
 // ─── Singleton ─────────────────────────────────────────────────────────────
 
 export const modelRegistry = new ModelRegistry();
+
+// ─── Opt-in: register Ollama models on a target registry ──────────────────
+// Called once by `src/providers/ollama.ts` at module-load time. Idempotent:
+// re-registering a model is a no-op since `register()` simply re-Map.sets it.
+export function registerOllamaModels(registry: ModelRegistry = modelRegistry): void {
+  for (const def of OLLAMA_BUILTIN_MODELS) {
+    registry.register(def);
+  }
+}
+
+// ─── Catalog Bootstrap (Sprint 190 W-F F-6/F-7) ────────────────────────────
+
+/** Bootstrap the singleton from the live models.dev catalog with 24h cache +
+ *  bundled fallback. Safe to call multiple times; idempotent within a process.
+ *  Always resolves — falls back to bundled BUILTIN_MODELS if remote + cache
+ *  both fail. Use mode='replace' to swap atomically, 'merge' to override
+ *  individual ids while keeping bundled safety net. */
+export async function bootstrapFromCatalog(
+  opts: { mode?: 'replace' | 'merge' } = {},
+): Promise<{ source: string; count: number; warnings: string[] }> {
+  const mode = opts.mode ?? 'merge';
+  const { loadCatalog } = await import('./model-catalog.js');
+  const result = await loadCatalog();
+  if (mode === 'replace') {
+    modelRegistry.loadFromCatalog(result.models);
+  } else {
+    modelRegistry.mergeFromCatalog(result.models);
+  }
+  return {
+    source: result.source,
+    count: result.models.length,
+    warnings: result.warnings,
+  };
+}
 
 // ─── Derived type for compile-time safety ──────────────────────────────────
 

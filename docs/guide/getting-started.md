@@ -82,9 +82,41 @@ my-project/
 
 ---
 
-## Step 3: Write Your Goal
+## Step 3: Choose Your Interface
 
-Open `DIRECTIVES.md` and describe what you want to build:
+Deckent offers two entry points — pick the one that fits your workflow:
+
+### Option A: Chat Interface
+
+Start a conversational session. Ask questions, brainstorm goals, or trigger tasks naturally:
+
+```bash
+deckent chat
+```
+
+Deckent will connect to your installed AI CLI (Claude, Codex, or Gemini) and attach the Deckent MCP server, giving the assistant access to all 31 Deckent tools.
+
+Example session:
+
+```
+You: What sprint tasks do we have left?
+Deckent: [queries memory and tasks] Here is the current status...
+
+You: Start a sprint to add a /health endpoint
+Deckent: [creates DIRECTIVES.md and starts the sprint] Done, spawning workers...
+```
+
+See [Chat Mode](chat-mode.md) for a complete walkthrough of naïve and task-driven conversations.
+
+### Option B: Sprint Interface
+
+Write your goals in `DIRECTIVES.md` and run the sprint directly:
+
+```bash
+deckent set-directives   # opens an editor or prompts for goals
+```
+
+Or edit `DIRECTIVES.md` manually:
 
 ```markdown
 # DIRECTIVES -- Sprint 1

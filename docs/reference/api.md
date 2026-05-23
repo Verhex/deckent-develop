@@ -429,17 +429,33 @@ const PROJECT_CONFIG_PATH = '.deckent/config.json';
 const GLOBAL_CONFIG_PATH  = '~/.deckent/config.json';  // resolved via homedir()
 ```
 
-### Brain Memory Files (relative to `.brain/`)
+### Brain Memory V2 — DB-First (relative to `.brain/`)
+
+Memory V2 stores all brain knowledge in a SQLite database (`memory.db`) as the
+single source of truth. Markdown files under `.brain/exports/` are auto-generated
+views regenerated after every sprint (see [Memory V2 Export Pipeline](#memory-v2-export-pipeline)).
 
 ```ts
-const MEMORY_FILE    = 'MEMORY.md';
-const DECISIONS_FILE = 'DECISIONS.md';
-const DEBT_FILE      = 'DEBT.md';
-const PATTERNS_FILE  = 'PATTERNS.md';
-const RETRO_FILE     = 'RETRO.md';
-const SPRINTS_DIR    = 'sprints';
-const ARCHIVE_DIR    = 'archive';
+// Primary storage — single source of truth (Memory V2 DB-first)
+const MEMORY_DB        = 'memory.db';                  // SQLite FTS5
+
+// Auto-generated views (read-only snapshots of the DB; auto-generated)
+const EXPORTS_DIR      = 'exports';                    // .brain/exports/
+const SUMMARY_EXPORT   = 'exports/summary.md';         // @-loaded context summary
+const DECISIONS_EXPORT = 'exports/decisions.md';       // ADR list
+const MEMORY_EXPORT    = 'exports/memory.md';          // sprint learnings
+const DEBT_EXPORT      = 'exports/debt.md';            // technical debt table
+
+// Legacy file (still file-based, NOT in DB)
+const PATTERNS_FILE    = 'PATTERNS.md';
+const SPRINTS_DIR      = 'sprints';
+const ARCHIVE_DIR      = 'archive';
 ```
+
+> **Memory V2 migration:** original `MEMORY.md`, `DECISIONS.md`, `DEBT.md` files
+> were promoted into the DB and archived under `.brain/archive/pre-v2/`. Generated
+> snapshots now live at `.brain/exports/memory.md` and `.brain/exports/debt.md` —
+> regenerate them via `deckent memory export`.
 
 ### Timing
 
@@ -488,6 +504,77 @@ const TMUX_AUDITOR_WINDOW  = 'auditor';
 const TMUX_DASHBOARD_WINDOW = 'dashboard';
 const TMUX_WORKER_PREFIX   = 'w-';   // Worker windows: w-{taskId}
 ```
+
+---
+
+## 2.b Core — Memory V2 (DB-First)
+
+**Source:** `src/core/memory-store.ts`, `src/core/memory-query.ts`,
+`src/core/memory-types.ts`, `src/core/memory-export.ts`
+**Storage:** SQLite (`better-sqlite3`) — `memory.db` is the single source of
+truth for all brain knowledge (ADR, memory, sprint, debt, pattern, retro, identity).
+
+### MemoryStore — Type-Specific Queries
+
+`MemoryStore` exposes a typed CRUD + query surface over `memory.db`. Common
+patterns:
+
+```ts
+import { MemoryStore } from 'deckent/core/memory-store';
+
+const store = new MemoryStore('.brain/memory.db');
+
+// Type-specific list (Memory V2 native — never parse .md files)
+const adrs        = store.getByType('adr');         // type='adr'
+const learnings   = store.getByType('memory');      // type='memory'
+const debtItems   = store.getByType('debt');        // type='debt'
+const patterns    = store.getByType('pattern');     // type='pattern'
+
+// Insert / upsert
+store.insert({ type: 'memory', sprint_id: 'sprint-190', title: '...', body: '...' });
+store.upsert({ type: 'retro',  sprint_id: 'sprint-190', body: '...' });
+```
+
+### `searchMemory` — FTS5 Full-Text Search
+
+`searchMemory` is the Memory V2 query entry point. It hits the FTS5 virtual
+table with a dual-layer Turkish-normalize index (original + `turkishNormalize`)
+so TR / EN / DE queries all reach %100 recall.
+
+```ts
+import { searchMemory } from 'deckent/core/memory-query';
+
+const results = searchMemory(store, {
+  text: 'docker heartbeat',               // FTS5 query
+  type: ['adr', 'memory'],                // filter by entry type
+  status: ['accepted'],                   // filter by status
+  sprint_range: { min: 135 },             // filter by sprint number
+  tags_contain: ['security'],             // entries must have ALL tags
+  limit: 5,                               // max results
+});
+```
+
+### Memory V2 Export Pipeline
+
+Markdown files under `.brain/exports/` are auto-generated read-only snapshots of
+`memory.db`. They are regenerated on every sprint finalize and can also be
+rebuilt manually:
+
+| Export path | Source query |
+|---|---|
+| `.brain/exports/summary.md` | aggregated context view (loaded via `@` references) |
+| `.brain/exports/decisions.md` | `store.getByType('adr')` |
+| `.brain/exports/memory.md` | `store.getByType('memory')` |
+| `.brain/exports/debt.md` | `store.getByType('debt')` |
+
+```bash
+# Regenerate all .brain/exports/*.md snapshots from the DB
+deckent memory export
+```
+
+> The legacy flat-file mirrors of memory / debt / decisions under `.brain/` have
+> been retired — they are no longer read by any runtime code. Existing copies
+> are archived under `.brain/archive/pre-v2/`.
 
 ---
 
@@ -804,7 +891,8 @@ function writeRetrospective(
 ): void
 ```
 
-Writes `.brain/RETRO.md` (overwrite) and appends a summary to `.brain/MEMORY.md`.
+Writes the `retro` entry into `.brain/memory.db` (upsert) and triggers a refresh
+of `.brain/exports/memory.md` (auto-generated snapshot of `type='memory'` entries).
 
 ---
 
@@ -1573,8 +1661,8 @@ Resources provide read-only context that MCP hosts can inject into the AI's cont
 |---|---|---|
 | `deckent://dashboard` | application/json | Current `DashboardState` with sprint progress, agents, alerts |
 | `deckent://directives` | text/markdown | Current contents of `DIRECTIVES.md` |
-| `deckent://memory` | text/markdown | Current contents of `.brain/MEMORY.md` (learned patterns) |
-| `deckent://debt` | text/markdown | Current contents of `.brain/DEBT.md` (technical debt items) |
+| `deckent://memory` | text/markdown | Auto-generated snapshot of `type='memory'` entries from `memory.db`, served as `.brain/exports/memory.md` (Memory V2) |
+| `deckent://debt` | text/markdown | Auto-generated snapshot of `type='debt'` entries from `memory.db`, served as `.brain/exports/debt.md` (Memory V2) |
 | `deckent://config` | application/json | Current project config from `.deckent/config.json` |
 | `deckent://retro` | text/markdown | Latest sprint retrospective report |
 | `deckent://tasks` | application/json | Current sprint task list and statuses |
@@ -1833,7 +1921,11 @@ curl http://localhost:3100/api/doctor
 
 #### `GET /api/memory`
 
-Returns the content of `.brain/MEMORY.md` as a JSON-wrapped string.
+Returns the content of the Memory V2 export at `.brain/exports/memory.md` as a
+JSON-wrapped string. The export is auto-generated from `memory.db` (single source
+of truth — see [Memory V2 Export Pipeline](#memory-v2-export-pipeline)). To refresh
+the snapshot programmatically use `deckent memory export` or call the underlying
+exporter (`exports/memory.md` is rewritten after every sprint finalize).
 
 **Authentication:** Not required.
 
@@ -1843,7 +1935,7 @@ Returns the content of `.brain/MEMORY.md` as a JSON-wrapped string.
 { "content": "## Sprint 036 Learnings\n- brain.ts split: 1312 → 58 lines\n..." }
 ```
 
-**Error `404`:** `{ "error": "Memory file not found" }`.
+**Error `404`:** `{ "error": "Memory export file not found — run \"deckent memory export\"" }`.
 
 ```bash
 curl http://localhost:3100/api/memory
@@ -1853,7 +1945,10 @@ curl http://localhost:3100/api/memory
 
 #### `GET /api/debt`
 
-Returns the content of `.brain/DEBT.md` as a JSON-wrapped string.
+Returns the content of the Memory V2 export at `.brain/exports/debt.md` as a
+JSON-wrapped string. The export is auto-generated from `memory.db` (single source
+of truth — see [Memory V2 Export Pipeline](#memory-v2-export-pipeline)). To refresh
+the snapshot programmatically use `deckent memory export`.
 
 **Authentication:** Not required.
 
@@ -1863,7 +1958,7 @@ Returns the content of `.brain/DEBT.md` as a JSON-wrapped string.
 { "content": "| ID | Description | Priority | Sprint |\n|---|---|---|---|\n| D-001 | ... |" }
 ```
 
-**Error `404`:** `{ "error": "Debt file not found" }`.
+**Error `404`:** `{ "error": "Debt export file not found — run \"deckent memory export\"" }`.
 
 ```bash
 curl http://localhost:3100/api/debt

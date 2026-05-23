@@ -68,6 +68,7 @@ const TOOLS: HelpToolInfo[] = [
   { name: 'deckent_docs', description: 'Sprint lifecycle document management (add/remove/list)', readOnly: false },
   { name: 'deckent_explain', description: 'Explain sprint history and results in natural language', readOnly: true },
   { name: 'deckent_memory_query', description: 'Search project memory across all sources (ADR, sprint, debt, pattern)', readOnly: true },
+  { name: 'deckent_models', description: 'Browse model catalog: list by provider, refresh from models.dev, look up tier', readOnly: true },
 ];
 
 const RESOURCES: HelpResourceInfo[] = [

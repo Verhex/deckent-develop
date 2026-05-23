@@ -101,19 +101,28 @@ describe('emitAlert', () => {
     // rule loader honours the frontmatter scope hint. The other three just
     // get plain markdown. Parity here means "file exists with the AUTO-START
     // marker", not "identical frontmatter". (Sprint 175 PR #16 CI dogfood.)
-    const providers = ['.codex', '.gemini', '.cursor'] as const;
-    const ruleFiles = ['brain.md', 'auditor.md', 'worker-default.md'] as const;
+    //
+    // Cursor uses the MDC format (`.mdc`) for Project Rules — plain `.md`
+    // files are silently ignored by Cursor. See cursorAdapter.fileExt() in
+    // src/core/rule-generator.ts:132-160. Sprint 190 alignment.
+    const providers = [
+      { dir: '.codex', ext: 'md' },
+      { dir: '.gemini', ext: 'md' },
+      { dir: '.cursor', ext: 'mdc' },
+    ] as const;
+    const ruleRoles = ['brain', 'auditor', 'worker-default'] as const;
 
-    for (const provider of providers) {
-      for (const file of ruleFiles) {
-        const fullPath = realJoin(projectRoot, provider, 'rules', file);
+    for (const { dir, ext } of providers) {
+      for (const role of ruleRoles) {
+        const fileName = `${role}.${ext}`;
+        const fullPath = realJoin(projectRoot, dir, 'rules', fileName);
         if (!realExists(fullPath)) {
-          throw new Error(`Missing rule file: ${provider}/rules/${file}`);
+          throw new Error(`Missing rule file: ${dir}/rules/${fileName}`);
         }
         const content = realRead(fullPath, 'utf-8') as string;
         expect(
           content,
-          `${provider}/rules/${file} must contain the AUTO-START marker`,
+          `${dir}/rules/${fileName} must contain the AUTO-START marker`,
         ).toContain('<!-- AUTO-START -->');
       }
     }

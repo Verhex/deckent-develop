@@ -34,8 +34,8 @@
     {
       "id": "identity-md",
       "path": ".deckent/workspace/IDENTITY.md",
-      "autoSections": ["Project Status"],
-      "protectedSections": []
+      "autoSections": [],
+      "protectedSections": ["Project Status"]
     },
     {
       "id": "blueprint-md",

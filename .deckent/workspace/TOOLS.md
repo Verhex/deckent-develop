@@ -26,6 +26,7 @@ Dashboard: deckent web
 | init | `deckent_init` |
 | kill | `deckent_kill` |
 | memory-query | `deckent_memory_query` |
+| models | `deckent_models` |
 | nervous | `deckent_nervous` |
 | plan | `deckent_plan` |
 | recover | `deckent_recover` |
@@ -38,7 +39,7 @@ Dashboard: deckent web
 | sync | `deckent_sync` |
 | watch | `deckent_watch` |
 
-_Total: 27 MCP tools_
+_Total: 28 MCP tools_
 
 **Key operational tools:** `deckent_audit`, `deckent_nervous`, `deckent_watch`, `deckent_recover`, `deckent_status`, `deckent_memory_query`
 
@@ -51,6 +52,7 @@ _Total: 27 MCP tools_
 | `attach` | deckent attach |
 | `audit` | deckent audit |
 | `audit-verify` | deckent audit-verify |
+| `chat` | deckent chat |
 | `checkpoint` | deckent checkpoint |
 | `cleanup` | deckent cleanup |
 | `config` | deckent config |
@@ -74,6 +76,7 @@ _Total: 27 MCP tools_
 | `kill` | deckent kill |
 | `memory` | deckent memory |
 | `mode` | deckent mode |
+| `models` | deckent models |
 | `nervous` | deckent nervous |
 | `onboard` | deckent onboard |
 | `output` | deckent output |
@@ -102,4 +105,4 @@ _Total: 27 MCP tools_
 | `watch` | deckent watch |
 | `web` | deckent web |
 
-_Total: 56 CLI command modules_
+_Total: 58 CLI command modules_

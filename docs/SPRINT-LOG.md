@@ -5184,3 +5184,40 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 189-016: 189-016 — CHANGELOG sprint-reporter otomatik update wire (WrongStack WS-Z2 follow-up) (DONE)
 
 ---
+## Sprint 190 — sprint-190
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-05-23
+**Duration:** 3390s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 25 |
+| Completed | 9 |
+| Tech Debt | 1 |
+| No-Go | 16 |
+| Coverage | NaN% |
+| Duration | 3390466ms |
+
+### Tasks
+
+- 190-001: 190-001 — IDENTITY.md sat30 AUTOGEN extend + Memory DB retro entry hook fix (DONE)
+- 190-002: 190-002 — Provider isAvailable 3-state (binary+auth) + doctor mesajları (DONE)
+- 190-003: 190-003 — Release workflow npm publish step + provenance + 9 test fix (DONE)
+- 190-004: 190-004 — `deckent chat` Path B subprocess + tty forward + MCP auto-attach env (NO_GO)
+- 190-005: 190-005 — MCP auto-attach helper + Claude/Codex/Gemini CLI integration (NO_GO)
+- 190-006: 190-006 — memory.db `chat` entry type + chat session/turn helpers + --resume (NO_GO)
+- 190-007: 190-007 — Naïve sohbet modu + system prompt heuristic + docs/guide/chat-mode.md (NO_GO)
+- 190-008: 190-008 — 19 TDD test (api-md+identity-refs) + 7 env-fail (codex-config ENOSPC + alert-emitter) yeşillenmesi (DONE)
+- 190-009: 190-009 — Ollama provider adapter (Local LLM, RTX 5090 vision) (GO_WITH_TECH_DEBT)
+- 190-010: 190-010 — models.dev live catalog + 24h cache + bundled fallback (NO_GO)
+- 190-011: 190-011 — `deckent models list/refresh/tier` CLI + `deckent_models` MCP tool (DONE)
+- 190-012: 190-012 — README.md baştan yaz (Trinity vision + OSS GA-ready) (DONE)
+- 190-013: 190-013 — Getting Started 5dk + first-sprint + chat-mode docs (DONE)
+- 190-014: 190-014 — docs/cookbook/ 3 örnek tarif (REST API, bug fix, doc update) (DONE)
+- 190-015: 190-015 — API E2E test extension (rate limit + auth + SSE 15+ test) (NO_GO)
+- 190-016: 190-016 — CONTRIBUTING + CODE_OF_CONDUCT + GitHub issue/PR templates (NO_GO)
+
+---

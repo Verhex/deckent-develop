@@ -710,6 +710,72 @@ describe('GeminiAdapter', () => {
     expect(adapter.getCliVersion()).toBeUndefined();
   });
 
+  // ─── detect() — 3-state availability (Sprint 190 Task 190-002) ────
+
+  describe('detect()', () => {
+    beforeEach(() => {
+      // Default: which/where lookup succeeds when version probe succeeds
+      mockSpawnSync.mockImplementation((cmd: string) => {
+        if (cmd === 'which' || cmd === 'where') {
+          return { status: 0, stdout: '/usr/local/bin/gemini\n', stderr: '' };
+        }
+        if (cmd === 'gemini') {
+          return { status: 0, stdout: '0.1.2\n', stderr: '' };
+        }
+        return { status: 1, stdout: '', stderr: '' };
+      });
+    });
+
+    it('returns ready=true when binary AND auth both present', async () => {
+      process.env.GOOGLE_API_KEY = 'AIzaSyTestKey123';
+      const result = await adapter.detect();
+      expect(result.binary).toBe(true);
+      expect(result.auth).toBe(true);
+      expect(result.ready).toBe(true);
+      expect(result.version).toBeDefined();
+    });
+
+    it("returns ready='partial' when binary present but GOOGLE_API_KEY missing", async () => {
+      delete process.env.GOOGLE_API_KEY;
+      delete process.env.DECKENT_GOOGLE_API_KEY;
+      const result = await adapter.detect();
+      expect(result.binary).toBe(true);
+      expect(result.auth).toBe(false);
+      expect(result.ready).toBe('partial');
+    });
+
+    it('returns ready=false when binary not found', async () => {
+      process.env.GOOGLE_API_KEY = 'AIzaSyTestKey123';
+      mockSpawnSync.mockImplementation(() => { throw new Error('ENOENT'); });
+      const result = await adapter.detect();
+      expect(result.binary).toBe(false);
+      expect(result.ready).toBe(false);
+    });
+
+    it('exposes parsed semver version string', async () => {
+      process.env.GOOGLE_API_KEY = 'AIzaSyTestKey123';
+      mockSpawnSync.mockImplementation((cmd: string) => {
+        if (cmd === 'which' || cmd === 'where') {
+          return { status: 0, stdout: '/usr/local/bin/gemini\n', stderr: '' };
+        }
+        if (cmd === 'gemini') {
+          return { status: 0, stdout: 'gemini-cli 0.3.7 (build abc)\n', stderr: '' };
+        }
+        return { status: 1, stdout: '', stderr: '' };
+      });
+      const result = await adapter.detect();
+      expect(result.version).toBe('0.3.7');
+    });
+
+    it('honors DECKENT_GOOGLE_API_KEY for partial→ready transition', async () => {
+      delete process.env.GOOGLE_API_KEY;
+      process.env.DECKENT_GOOGLE_API_KEY = 'AIzaDeckentKey';
+      const result = await adapter.detect();
+      expect(result.auth).toBe(true);
+      expect(result.ready).toBe(true);
+    });
+  });
+
   // ─── Factory ───────────────────────────────────────────────────────
 
   it('createGeminiAdapter returns GeminiAdapter instance', () => {

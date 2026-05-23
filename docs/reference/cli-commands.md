@@ -193,7 +193,7 @@ deckent test --directives my-directives.md --reporter junit
 
 ### `deckent finalize`
 
-Finalize a sprint: update MEMORY.md, RETRO.md, PROJECT-IDENTITY.md, config, run decay.
+Finalize a sprint: upsert the sprint's `retro` and `memory` entries in `memory.db`, refresh managed-docs (`.deckent/workspace/IDENTITY.md`, `CLAUDE.md`, …), regenerate `.brain/exports/*.md` snapshots, update config, and run decay.
 
 | Option | Description |
 |--------|-------------|

@@ -510,6 +510,85 @@ describe('CodexAdapter', () => {
     });
   });
 
+  // ─── detect() — 3-state availability (Sprint 190 Task 190-002) ────
+
+  describe('detect()', () => {
+    it('returns ready=true when binary present + OPENAI_API_KEY set', async () => {
+      process.env['OPENAI_API_KEY'] = 'sk-test-key';
+      mockSpawnSync.mockImplementation((cmd: string) => {
+        if (cmd === 'which' || cmd === 'where') {
+          return { status: 0, stdout: '/usr/local/bin/codex\n', stderr: '' };
+        }
+        return { status: 0, stdout: 'codex 0.18.2\n', stderr: '' };
+      });
+      const result = await adapter.detect();
+      expect(result.binary).toBe(true);
+      expect(result.auth).toBe(true);
+      expect(result.ready).toBe(true);
+      expect(result.version).toBe('0.18.2');
+    });
+
+    it("returns ready='partial' when binary present but no API key nor subscription", async () => {
+      delete process.env['OPENAI_API_KEY'];
+      delete process.env['DECKENT_OPENAI_API_KEY'];
+      mockSpawnSync.mockImplementation((cmd: string, args: string[]) => {
+        if (cmd === 'which' || cmd === 'where') {
+          return { status: 0, stdout: '/usr/local/bin/codex\n', stderr: '' };
+        }
+        if (cmd === 'codex' && args[0] === '--version') {
+          return { status: 0, stdout: 'codex 0.18.2\n', stderr: '' };
+        }
+        // codex auth status — not logged in
+        return { status: 1, stdout: '', stderr: 'not logged in' };
+      });
+      const result = await adapter.detect();
+      expect(result.binary).toBe(true);
+      expect(result.auth).toBe(false);
+      expect(result.ready).toBe('partial');
+    });
+
+    it('returns ready=false when binary not found', async () => {
+      process.env['OPENAI_API_KEY'] = 'sk-test-key';
+      mockSpawnSync.mockImplementation(() => { throw new Error('ENOENT'); });
+      const result = await adapter.detect();
+      expect(result.binary).toBe(false);
+      expect(result.ready).toBe(false);
+    });
+
+    it('returns ready=true via subscription auth (codex auth status logged in)', async () => {
+      delete process.env['OPENAI_API_KEY'];
+      delete process.env['DECKENT_OPENAI_API_KEY'];
+      mockSpawnSync.mockImplementation((cmd: string, args: string[]) => {
+        if (cmd === 'which' || cmd === 'where') {
+          return { status: 0, stdout: '/usr/local/bin/codex\n', stderr: '' };
+        }
+        if (cmd === 'codex' && args[0] === '--version') {
+          return { status: 0, stdout: 'codex 0.18.2\n', stderr: '' };
+        }
+        // codex auth status — logged in
+        return { status: 0, stdout: 'logged in as user@example.com\n', stderr: '' };
+      });
+      const result = await adapter.detect();
+      expect(result.binary).toBe(true);
+      expect(result.auth).toBe(true);
+      expect(result.ready).toBe(true);
+    });
+
+    it('detects DECKENT_OPENAI_API_KEY as valid auth source', async () => {
+      delete process.env['OPENAI_API_KEY'];
+      process.env['DECKENT_OPENAI_API_KEY'] = 'sk-deck-test';
+      mockSpawnSync.mockImplementation((cmd: string) => {
+        if (cmd === 'which' || cmd === 'where') {
+          return { status: 0, stdout: '/usr/local/bin/codex\n', stderr: '' };
+        }
+        return { status: 0, stdout: 'codex 0.18.2\n', stderr: '' };
+      });
+      const result = await adapter.detect();
+      expect(result.auth).toBe(true);
+      expect(result.ready).toBe(true);
+    });
+  });
+
   // ─── Accessors ─────────────────────────────────────────────────────
 
   describe('accessors', () => {

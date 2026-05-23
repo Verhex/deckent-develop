@@ -360,6 +360,26 @@ export function buildRetroLearnings(
 // ═══ Write Retrospective ═════════════════════════════════════════
 
 /**
+ * Result of a {@link writeRetrospective} invocation. Surfaces which DB rows
+ * landed and which failed so callers (and Sprint 190 carry-over bug RC tests)
+ * can detect the "Sprint 189 retro entry not written" pattern without having
+ * to query the DB themselves. Previously this was a `void` return — silent
+ * DB-write failures masked Sprint 189 carry-over [[project_sprint189_retro_db_missing]].
+ */
+export interface WriteRetrospectiveResult {
+  /** DB write attempted (file write + DB hook reached). */
+  dbAttempted: boolean;
+  /** `sprint-log-NNN` row upserted. */
+  sprintLogWritten: boolean;
+  /** `retro-<sprintId>` row upserted. */
+  retroWritten: boolean;
+  /** `mem-<sprintId>` row inserted (or skipped if pre-existing). */
+  memoryWritten: boolean;
+  /** Captured error message when the DB step throws; `null` when it succeeds. */
+  dbError: string | null;
+}
+
+/**
  * Write the sprint retrospective to RETRO.md and append learnings to MEMORY.md.
  * Includes metrics summary, per-task results, comparison with previous sprint,
  * usage report, agent performance, and skill performance sections.
@@ -378,7 +398,14 @@ export function writeRetrospective(
   agentMap?: Map<string, string>,
   skillMap?: Map<string, string[]>,
   results?: TaskResult[],
-): void {
+): WriteRetrospectiveResult {
+  const writeResult: WriteRetrospectiveResult = {
+    dbAttempted: false,
+    sprintLogWritten: false,
+    retroWritten: false,
+    memoryWritten: false,
+    dbError: null,
+  };
   const brainPath = join(projectRoot, BRAIN_DIR);
   mkdirSync(brainPath, { recursive: true });
 
@@ -471,6 +498,7 @@ export function writeRetrospective(
   // 168 plan L1384. Forensic: Sprint 167 finalize emitted `sprint-167`
   // instead of `sprint-log-167`, causing the audit query miss.
   if (existsSync(dbPath)) {
+    writeResult.dbAttempted = true;
     try {
       const store = new MemoryStore(dbPath);
       try {
@@ -489,6 +517,7 @@ export function writeRetrospective(
           status: 'active',
           tags: ['sprint', sprint.id],
         }, 'brain');
+        writeResult.sprintLogWritten = true;
 
         // Write/update retro entry
         store.upsert({
@@ -501,6 +530,7 @@ export function writeRetrospective(
           sprint_num: sprintNum,
           tags: ['retro', sprint.id],
         }, 'brain');
+        writeResult.retroWritten = true;
 
         // Write memory/learning entries (one per sprint, skip if already exists)
         const memId = `mem-${sprint.id}`;
@@ -516,14 +546,27 @@ export function writeRetrospective(
             sprint_num: sprintNum,
             tags: ['learning', sprint.id],
           });
+          writeResult.memoryWritten = true;
+        } else {
+          // Pre-existing memory entry is treated as success (idempotent finalize).
+          writeResult.memoryWritten = true;
         }
       } finally {
         store.close();
       }
-    } catch {
-      // DB write failure is non-fatal — file write already succeeded
+    } catch (e) {
+      // RC for Sprint 189 carry-over [[project_sprint189_retro_db_missing]]:
+      // the previous silent catch swallowed DB-write failures, leaving the
+      // memory.db without sprint/retro/memory rows while the file writes
+      // looked successful. Capture the error so callers and tests can detect
+      // the divergence; preserve non-fatal semantics (no rethrow — sprint
+      // finalize keeps running).
+      writeResult.dbError = e instanceof Error ? e.message : String(e);
+      debugLog('writeRetrospective:dbWrite', e);
     }
   }
+
+  return writeResult;
 }
 
 /**

@@ -217,7 +217,7 @@ deckent test --timeout 60000
 
 ## `finalize`
 
-Finalize a sprint: update MEMORY.md, RETRO.md, PROJECT-IDENTITY.md, config metadata, and optionally run memory decay.
+Finalize a sprint: upsert the sprint's `retro` and `memory` entries in `memory.db`, refresh managed-docs (`.deckent/workspace/IDENTITY.md`, `CLAUDE.md`, …), regenerate `.brain/exports/*.md` snapshots, update config metadata, and optionally run memory decay.
 
 **Usage:** `deckent finalize`
 
@@ -978,7 +978,7 @@ deckent web --dev
 | `deckent export` | Export memory.db to .brain/exports/*.md |
 | `deckent export [file]` | Export config to stdout or a file |
 | `deckent features` | List features from .deckent/features-manifest.json by category |
-| `deckent finalize` | Finalize a sprint: update MEMORY.md, RETRO.md, PROJECT-IDENTITY.md, config, run decay |
+| `deckent finalize` | Finalize a sprint: upsert retro/memory in `memory.db`, refresh `.deckent/workspace/IDENTITY.md` and `.brain/exports/*.md`, run decay |
 | `deckent get <key>` | Get a configuration value by key (supports dot notation) |
 | `deckent global <style>` | Set global default (sprint\|task) |
 | `deckent heartbeat` | Run proactive heartbeat tasks from .deckent/HEARTBEAT.md |

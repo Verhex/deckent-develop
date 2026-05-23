@@ -1,0 +1,625 @@
+// ─── OllamaAdapter ──────────────────────────────────────────────────────────
+// Local LLM provider — talks to a self-hosted Ollama server (default
+// http://localhost:11434). Sprint 190 W-F F-11. No API key, no third-party cost:
+// authentication is implicitly "your machine owns the model".
+
+import {
+  spawn,
+  type ChildProcess,
+  type SpawnOptions as NodeSpawnOptions,
+} from 'node:child_process';
+import {
+  writeFileSync,
+  mkdirSync,
+  existsSync,
+  openSync,
+  closeSync,
+} from 'node:fs';
+import { join } from 'node:path';
+
+import type { ModelType, OllamaModel } from '../core/types.js';
+import type {
+  ProviderAdapter,
+  ProviderSpawnOptions,
+  ProviderAvailabilityDetail,
+} from '../core/provider.js';
+import { ProviderError } from '../core/provider.js';
+import { TASKS_DIR } from '../core/constants.js';
+import type { ModelTier } from '../core/model-equivalence.js';
+import {
+  modelRegistry,
+  registerOllamaModels,
+  type RegistryProviderName,
+} from '../core/model-registry.js';
+
+// Side-effect: register Ollama model definitions into the singleton catalog
+// the first time this module is imported. Kept out of `BUILTIN_MODELS` so the
+// default 13-model / 3-provider invariant relied on by `tests/core/model-
+// registry.test.ts` (and any external consumer) holds when Ollama is unused.
+registerOllamaModels(modelRegistry);
+
+// `RegistryProviderName` doesn't yet include 'ollama' (see model-registry.ts
+// note — task-types.ts widening is out of scope for 190-009), so we cast at
+// the lookup site. The runtime registry holds the literal value correctly.
+const OLLAMA_PROVIDER = 'ollama' as unknown as RegistryProviderName;
+
+// ─── Constants ───────────────────────────────────────────────────────
+
+/** Default Ollama HTTP endpoint. Override via OLLAMA_HOST / DECKENT_OLLAMA_HOST. */
+const DEFAULT_OLLAMA_HOST = 'http://localhost:11434';
+
+/** HTTP probe timeout (ms) used for isAvailable() / diagnoseAvailability(). */
+const PROBE_TIMEOUT_MS = 3000;
+
+/** Models registered for the 'ollama' provider — derived from ModelRegistry. */
+const OLLAMA_MODELS: readonly OllamaModel[] = modelRegistry
+  .getByProvider(OLLAMA_PROVIDER)
+  .map(m => m.id as OllamaModel);
+
+// ─── Output Parser ───────────────────────────────────────────────────
+
+/**
+ * Parse stdout from `ollama` HTTP `/api/generate` (non-streaming JSON).
+ * Shape: `{ model, created_at, response, done, ... prompt_eval_count, eval_count }`.
+ * Falls back to raw stdout when the body is not valid JSON.
+ */
+export function parseOllamaOutput(stdout: string): {
+  response: string;
+  stats?: { inputTokens: number; outputTokens: number };
+} {
+  if (!stdout.trim()) {
+    return { response: '' };
+  }
+  try {
+    const parsed = JSON.parse(stdout);
+    const response =
+      typeof parsed?.response === 'string'
+        ? parsed.response
+        : typeof parsed?.message?.content === 'string'
+          ? parsed.message.content
+          : typeof parsed === 'string'
+            ? parsed
+            : JSON.stringify(parsed);
+
+    let stats: { inputTokens: number; outputTokens: number } | undefined;
+    if (
+      typeof parsed?.prompt_eval_count === 'number' &&
+      typeof parsed?.eval_count === 'number'
+    ) {
+      stats = {
+        inputTokens: parsed.prompt_eval_count,
+        outputTokens: parsed.eval_count,
+      };
+    }
+    return { response, stats };
+  } catch {
+    return { response: stdout.trim() };
+  }
+}
+
+// ─── Worker Entry ────────────────────────────────────────────────────
+
+interface OllamaWorkerEntry {
+  taskId: string;
+  process: ChildProcess;
+  logPath: string;
+  model: OllamaModel;
+  spawnedAt: string;
+  timeoutHandle?: ReturnType<typeof setTimeout>;
+}
+
+// ─── Detection Result ────────────────────────────────────────────────
+
+/**
+ * Rich detection payload — what an external caller gets back from
+ * `OllamaAdapter.detect()`. Mirrors the shape requested in the task spec
+ * (`{ binary, version, auth, ready }` style) with Ollama-specific fields.
+ */
+export interface OllamaDetectionResult {
+  available: boolean;
+  /** Resolved endpoint URL (post env-override). */
+  endpoint: string;
+  /** Server version string, when /api/version responds. */
+  version?: string;
+  /** Locally installed model tag names (from /api/tags). */
+  models: string[];
+  /** Auth status — always 'none' for local Ollama, but kept for shape parity. */
+  auth: 'none';
+  /** True when the server responded successfully within timeout. */
+  ready: boolean;
+  /** Human-readable reason for the result. */
+  reason: string;
+}
+
+// ─── OllamaAdapter ───────────────────────────────────────────────────
+
+/**
+ * OllamaAdapter — ProviderAdapter for a locally hosted Ollama server.
+ *
+ * Talks HTTP to `http://localhost:11434` by default; override via
+ * `OLLAMA_HOST` or `DECKENT_OLLAMA_HOST`. Worker spawn is implemented by
+ * invoking `curl` as a subprocess so the spawn lifecycle stays uniform with
+ * the other adapters (log file, kill via signal, etc.).
+ *
+ * Sprint 190 W-F F-11.
+ */
+export class OllamaAdapter implements ProviderAdapter {
+  readonly name = 'ollama';
+  // `OllamaModel` runs alongside the existing ModelType union but is not yet
+  // a member of it (task-types.ts widening is out of scope — see model-registry).
+  // The cast is structural-only; at runtime these are plain string ids.
+  readonly supportedModels: readonly ModelType[] =
+    OLLAMA_MODELS as unknown as readonly ModelType[];
+
+  private readonly projectDir: string;
+  private readonly workers = new Map<string, OllamaWorkerEntry>();
+
+  /** Default timeout in ms before a worker is killed automatically (0 = no timeout). */
+  protected defaultTimeoutMs: number;
+
+  /** Resolved endpoint base URL (no trailing slash). */
+  private readonly host: string;
+
+  /**
+   * Override for the global `fetch` — used by tests to inject a stub without
+   * touching the network. Falls back to the global fetch when unset.
+   */
+  private readonly fetchImpl: typeof fetch;
+
+  constructor(
+    projectDir: string,
+    opts?: { defaultTimeoutMs?: number; host?: string; fetchImpl?: typeof fetch },
+  ) {
+    this.projectDir = projectDir;
+    this.defaultTimeoutMs = opts?.defaultTimeoutMs ?? 0;
+    this.host = (opts?.host ?? this.resolveHost()).replace(/\/+$/, '');
+    this.fetchImpl = opts?.fetchImpl ?? ((...args) => fetch(...args));
+  }
+
+  // ─── spawn() ───────────────────────────────────────────────────────
+
+  spawn(
+    taskId: string,
+    model: ModelType,
+    prompt: string,
+    opts?: ProviderSpawnOptions,
+  ): void {
+    if (this.workers.has(taskId)) {
+      throw new ProviderError(
+        `Worker for task "${taskId}" is already running`,
+        this.name,
+      );
+    }
+    if (!this.isSupportedModel(model)) {
+      throw new ProviderError(
+        `Unsupported model "${model}" for Ollama provider. Supported: ${OLLAMA_MODELS.join(', ')}`,
+        this.name,
+      );
+    }
+
+    const dir = opts?.projectDir ?? this.projectDir;
+    const tasksDir = join(dir, TASKS_DIR);
+    ensureDir(tasksDir);
+
+    const logPath = join(tasksDir, `task-${taskId}.log`);
+    const logFd = openSync(logPath, 'a');
+
+    // We spawn `curl` so the worker lifecycle matches the other adapters
+    // (long-running ChildProcess that can be killed with SIGTERM).
+    const apiId = modelRegistry.get(model)?.apiId ?? model;
+    const body = JSON.stringify({ model: apiId, prompt, stream: false });
+    const args = [
+      '-s',
+      '-X',
+      'POST',
+      `${this.host}/api/generate`,
+      '-H',
+      'Content-Type: application/json',
+      '-d',
+      body,
+    ];
+
+    const spawnOpts: NodeSpawnOptions = {
+      cwd: dir,
+      stdio: ['ignore', logFd, logFd],
+      env: { ...process.env, ...(opts?.env ?? {}) },
+    };
+
+    const child = spawn('curl', args, spawnOpts);
+    closeSync(logFd);
+
+    this.writeHeartbeat(taskId, dir, 'EXECUTING');
+
+    const entry: OllamaWorkerEntry = {
+      taskId,
+      process: child,
+      logPath,
+      model: model as OllamaModel,
+      spawnedAt: new Date().toISOString(),
+    };
+
+    if (this.defaultTimeoutMs > 0) {
+      entry.timeoutHandle = setTimeout(() => {
+        this.killWithSignal(taskId, 'SIGKILL');
+      }, this.defaultTimeoutMs);
+    }
+
+    this.workers.set(taskId, entry);
+
+    child.once('exit', () => {
+      const w = this.workers.get(taskId);
+      if (w?.timeoutHandle) clearTimeout(w.timeoutHandle);
+      this.workers.delete(taskId);
+    });
+  }
+
+  // ─── kill() ────────────────────────────────────────────────────────
+
+  kill(taskId: string): void {
+    this.killWithSignal(taskId, 'SIGTERM');
+  }
+
+  // ─── listWorkers() ─────────────────────────────────────────────────
+
+  listWorkers(): string[] {
+    return Array.from(this.workers.keys());
+  }
+
+  // ─── isAvailable() ─────────────────────────────────────────────────
+
+  /**
+   * True when the Ollama server responds successfully to `/api/tags` within
+   * `PROBE_TIMEOUT_MS`. Returns false on any network/transport error — never
+   * throws, so callers can use this in cold-path startup probes.
+   */
+  async isAvailable(): Promise<boolean> {
+    try {
+      const res = await this.fetchWithTimeout(`${this.host}/api/tags`);
+      return res.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  // ─── detect() ──────────────────────────────────────────────────────
+
+  /**
+   * Probe the server and return rich status: endpoint, version, model list,
+   * ready flag. Used by `deckent doctor --providers` and the chat-mode
+   * naive provider picker. Never throws.
+   */
+  async detect(): Promise<OllamaDetectionResult> {
+    const base: OllamaDetectionResult = {
+      available: false,
+      endpoint: this.host,
+      models: [],
+      auth: 'none',
+      ready: false,
+      reason: 'Ollama server not reachable',
+    };
+    try {
+      const tagsRes = await this.fetchWithTimeout(`${this.host}/api/tags`);
+      if (!tagsRes.ok) {
+        return { ...base, reason: `Ollama /api/tags returned ${tagsRes.status}` };
+      }
+      const tagsBody = (await tagsRes.json()) as { models?: { name: string }[] };
+      const models = Array.isArray(tagsBody?.models)
+        ? tagsBody.models.map(m => m.name).filter(Boolean)
+        : [];
+
+      let version: string | undefined;
+      try {
+        const verRes = await this.fetchWithTimeout(`${this.host}/api/version`);
+        if (verRes.ok) {
+          const verBody = (await verRes.json()) as { version?: string };
+          version = typeof verBody?.version === 'string' ? verBody.version : undefined;
+        }
+      } catch {
+        // version endpoint is optional on older Ollama builds
+      }
+
+      return {
+        available: true,
+        endpoint: this.host,
+        version,
+        models,
+        auth: 'none',
+        ready: true,
+        reason: `Ollama server reachable (${models.length} model${models.length === 1 ? '' : 's'})`,
+      };
+    } catch (err) {
+      return {
+        ...base,
+        reason: `Ollama probe failed: ${err instanceof Error ? err.message : String(err)}`,
+      };
+    }
+  }
+
+  // ─── diagnoseAvailability() ────────────────────────────────────────
+
+  /**
+   * ProviderAdapter-shaped availability detail, derived from `detect()`. Local
+   * Ollama has no separate auth layer, so `authMethod` is always 'none' but
+   * `authStatus` is reported as 'ok' when the server is reachable (consistent
+   * with the "binary + auth OK" semantics other adapters use).
+   */
+  async diagnoseAvailability(): Promise<ProviderAvailabilityDetail> {
+    const d = await this.detect();
+    const versionStatus: ProviderAvailabilityDetail['versionStatus'] = d.ready
+      ? d.version
+        ? 'ok'
+        : 'unknown'
+      : 'missing';
+
+    const hints: string[] = [];
+    if (!d.ready) {
+      hints.push('Install Ollama: https://ollama.com/download');
+      hints.push('Start the server: `ollama serve`');
+      hints.push(`Or set OLLAMA_HOST=<url> (current: ${this.host})`);
+    } else if (d.models.length === 0) {
+      hints.push('Pull a model: `ollama pull qwen2.5-coder:7b`');
+    }
+
+    return {
+      name: 'ollama',
+      binaryFound: d.ready,
+      binaryPath: undefined,
+      version: d.version,
+      versionStatus,
+      authMethod: 'none',
+      authStatus: d.ready ? 'ok' : 'missing',
+      available: d.ready,
+      partial: false,
+      models: [...OLLAMA_MODELS] as unknown as ModelType[],
+      reason: d.reason,
+      hints,
+    };
+  }
+
+  // ─── complete() ────────────────────────────────────────────────────
+
+  /**
+   * Non-streaming completion via `/api/generate`. Returns the parsed
+   * response text plus optional token stats (from prompt_eval_count /
+   * eval_count). Mirrors the spec in the task description.
+   */
+  async complete(
+    prompt: string,
+    model: ModelType,
+  ): Promise<{ response: string; stats?: { inputTokens: number; outputTokens: number } }> {
+    if (!this.isSupportedModel(model)) {
+      throw new ProviderError(
+        `Unsupported model "${model}" for Ollama provider`,
+        this.name,
+      );
+    }
+    const apiId = modelRegistry.get(model)?.apiId ?? model;
+    const res = await this.fetchImpl(`${this.host}/api/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: apiId, prompt, stream: false }),
+    });
+    if (!res.ok) {
+      throw new ProviderError(
+        `Ollama /api/generate returned ${res.status}`,
+        this.name,
+      );
+    }
+    const text = await res.text();
+    return parseOllamaOutput(text);
+  }
+
+  // ─── stream() ──────────────────────────────────────────────────────
+
+  /**
+   * Streaming completion via `/api/chat`. Async-iterable over the
+   * incremental text chunks (NDJSON-decoded). Each chunk yields the
+   * cumulative text response.
+   */
+  async *stream(
+    prompt: string,
+    model: ModelType,
+  ): AsyncGenerator<string, void, void> {
+    if (!this.isSupportedModel(model)) {
+      throw new ProviderError(
+        `Unsupported model "${model}" for Ollama provider`,
+        this.name,
+      );
+    }
+    const apiId = modelRegistry.get(model)?.apiId ?? model;
+    const res = await this.fetchImpl(`${this.host}/api/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: apiId,
+        messages: [{ role: 'user', content: prompt }],
+        stream: true,
+      }),
+    });
+    if (!res.ok || !res.body) {
+      throw new ProviderError(
+        `Ollama /api/chat returned ${res.status}`,
+        this.name,
+      );
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const lines = buf.split('\n');
+      buf = lines.pop() ?? '';
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        try {
+          const parsed = JSON.parse(line);
+          const chunk =
+            typeof parsed?.message?.content === 'string'
+              ? parsed.message.content
+              : typeof parsed?.response === 'string'
+                ? parsed.response
+                : '';
+          if (chunk) yield chunk;
+        } catch {
+          // skip malformed NDJSON line
+        }
+      }
+    }
+  }
+
+  // ─── buildCommand() / buildPlannerCommand() ────────────────────────
+
+  buildCommand(
+    model: ModelType,
+    promptPath: string,
+    _opts?: Pick<ProviderSpawnOptions, 'allowedTools' | 'autoApprove'>,
+  ): string {
+    const apiId = modelRegistry.get(model)?.apiId ?? model;
+    return `curl -s -X POST "${this.host}/api/generate" -H "Content-Type: application/json" --data-binary @${promptPath} -d '{"model":"${apiId}","stream":false}'`;
+  }
+
+  buildPlannerCommand(prompt: string, model: ModelType): { command: string; args: string[] } {
+    const apiId = modelRegistry.get(model)?.apiId ?? model;
+    const body = JSON.stringify({ model: apiId, prompt, stream: false });
+    return {
+      command: 'curl',
+      args: [
+        '-s',
+        '-X',
+        'POST',
+        `${this.host}/api/generate`,
+        '-H',
+        'Content-Type: application/json',
+        '-d',
+        body,
+      ],
+    };
+  }
+
+  // ─── parseAgentResponse() ──────────────────────────────────────────
+
+  parseAgentResponse(raw: string): string {
+    return parseOllamaOutput(raw).response || raw;
+  }
+
+  // ─── getModelForTier() ─────────────────────────────────────────────
+
+  /**
+   * Get the recommended Ollama model for a given capability tier.
+   * Reads directly from ModelRegistry so the catalog stays the single
+   * source of truth (registry → tier map → model id).
+   */
+  getModelForTier(tier: ModelTier): OllamaModel {
+    const match = modelRegistry.getByProviderAndTier(OLLAMA_PROVIDER, tier);
+    if (match) return match.id as OllamaModel;
+    // Fallback chain: walk down tiers
+    const order: ModelTier[] = ['premium_plus', 'premium', 'standard', 'economy'];
+    for (let i = order.indexOf(tier) + 1; i < order.length; i++) {
+      const t = order[i];
+      if (!t) continue;
+      const m = modelRegistry.getByProviderAndTier(OLLAMA_PROVIDER, t);
+      if (m) return m.id as OllamaModel;
+    }
+    return 'llama-3.2-3b';
+  }
+
+  // ─── Accessors ─────────────────────────────────────────────────────
+
+  getHost(): string {
+    return this.host;
+  }
+
+  getWorkerEntry(taskId: string): OllamaWorkerEntry | undefined {
+    return this.workers.get(taskId);
+  }
+
+  getLogPath(taskId: string): string {
+    return join(this.projectDir, TASKS_DIR, `task-${taskId}.log`);
+  }
+
+  getProjectDir(): string {
+    return this.projectDir;
+  }
+
+  // ─── Internal helpers ──────────────────────────────────────────────
+
+  private resolveHost(): string {
+    return (
+      process.env['DECKENT_OLLAMA_HOST'] ??
+      process.env['OLLAMA_HOST'] ??
+      DEFAULT_OLLAMA_HOST
+    );
+  }
+
+  private isSupportedModel(model: ModelType): boolean {
+    return (OLLAMA_MODELS as readonly string[]).includes(model);
+  }
+
+  private async fetchWithTimeout(
+    url: string,
+    init?: RequestInit,
+    timeoutMs: number = PROBE_TIMEOUT_MS,
+  ): Promise<Response> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      return await this.fetchImpl(url, { ...init, signal: controller.signal });
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  private killWithSignal(taskId: string, signal: NodeJS.Signals): void {
+    const entry = this.workers.get(taskId);
+    if (!entry) {
+      throw new ProviderError(
+        `No running worker for task "${taskId}"`,
+        this.name,
+      );
+    }
+    if (entry.timeoutHandle) clearTimeout(entry.timeoutHandle);
+    entry.process.kill(signal);
+    this.workers.delete(taskId);
+  }
+
+  protected writeHeartbeat(taskId: string, dir: string, status: string): void {
+    const hbPath = join(dir, TASKS_DIR, `task-${taskId}.hb`);
+    const hb = {
+      workerId: `ollama-${taskId}`,
+      taskId,
+      status,
+      currentAction: 'Ollama HTTP worker running',
+      timestamp: new Date().toISOString(),
+      filesChangedCount: 0,
+      sequence: 0,
+    };
+    try {
+      writeFileSync(hbPath, JSON.stringify(hb, null, 2), 'utf-8');
+    } catch {
+      // Non-fatal: heartbeat write failure should not stop the worker
+    }
+  }
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────
+
+function ensureDir(dir: string): void {
+  if (!existsSync(dir)) {
+    mkdirSync(dir, { recursive: true });
+  }
+}
+
+// ─── Factory ─────────────────────────────────────────────────────────
+
+/**
+ * Create an OllamaAdapter for the given project directory.
+ */
+export function createOllamaAdapter(
+  projectDir: string,
+  opts?: { defaultTimeoutMs?: number; host?: string; fetchImpl?: typeof fetch },
+): OllamaAdapter {
+  return new OllamaAdapter(projectDir, opts);
+}
