@@ -648,7 +648,17 @@ export async function finalizeSprint(
         skillMap.set(task.id, task.assignedSkills);
       }
     }
-    const retroWriteResult = writeRetrospective(projectRoot, sprint, evaluations, metrics, undefined, skillMap.size > 0 ? skillMap : undefined, results);
+    // Sprint 192 Task 192-005: opt into createIfMissing so the chronic
+    // Sprint 167+ DB-gap [[project_sprint167_db_gap]] cannot recur — even
+    // a first-ever sprint on a fresh project now lands sprint-log + retro
+    // + mem rows.
+    const retroWriteResult = writeRetrospective(
+      projectRoot, sprint, evaluations, metrics,
+      undefined,
+      skillMap.size > 0 ? skillMap : undefined,
+      results,
+      { createIfMissing: true },
+    );
     // Sprint 190 carry-over [[project_sprint189_retro_db_missing]]:
     // surface DB-write outcome so silent failures (Sprint 189 retro entry
     // missing while patterns landed) cannot recur unnoticed. Non-fatal.
@@ -749,6 +759,9 @@ export async function finalizeSprint(
       for (const task of sprint.tasks) {
         const evaluation = evaluations.get(task.id);
         if (!evaluation) continue;
+        // Sprint 192 Task 192-010: DEFERRED tasks were never dispatched —
+        // agent stats must not be updated (worker did not execute).
+        if (evaluation === TaskEvaluation.DEFERRED) continue;
         const taskResult = resultsMap.get(task.id);
         const coverage = taskResult?.coverage ?? 0;
 

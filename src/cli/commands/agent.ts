@@ -498,6 +498,76 @@ export function registerAgent(program: Command): void {
       }
     });
 
+  // ─── agent reclassify ──────────────────────────────────────────
+  agentCmd
+    .command('reclassify')
+    .description('Reclassify a recorded task outcome (delta-applies agent/skill stats)')
+    .requiredOption('--sprint <id>', 'Sprint id (e.g. sprint-191)')
+    .requiredOption('--task <id>', 'Task id within the sprint')
+    .requiredOption('--decision <decision>', 'New evaluation: DONE | GO_WITH_TECH_DEBT | NO_GO')
+    .option('--reason <text>', 'Free-form justification for the audit trail')
+    .option('--no-audit', 'Skip writing the ADR-046 audit-trail entry to memory store')
+    .action(async (opts: { sprint: string; task: string; decision: string; reason?: string; audit?: boolean }) => {
+      try {
+        const root = resolveProjectRoot();
+        const valid = ['DONE', 'GO_WITH_TECH_DEBT', 'NO_GO'] as const;
+        if (!(valid as readonly string[]).includes(opts.decision)) {
+          throw new Error(`Invalid --decision "${opts.decision}". Valid values: ${valid.join(', ')}`);
+        }
+        const decision = opts.decision as typeof valid[number];
+
+        // Lazy-load OutcomeTracker (avoids loading at CLI startup if unused).
+        const { OutcomeTracker } = await import('../../orchestra/outcome-tracker.js');
+        const tracker = new OutcomeTracker(root);
+
+        // Lazy-load MemoryStore — better-sqlite3 may be absent in some installs.
+        let memoryStore: import('../../orchestra/outcome-tracker.js').ReclassifyAuditStore | undefined;
+        if (opts.audit !== false) {
+          try {
+            const memMod = await import('../../core/memory-store.js');
+            const dbPath = join(root, '.brain', 'memory.db');
+            if (existsSync(dbPath)) {
+              memoryStore = new memMod.MemoryStore(dbPath);
+            } else {
+              print('Note: .brain/memory.db not found — audit trail will be skipped.');
+            }
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            print(`Note: MemoryStore unavailable (${msg}) — audit trail will be skipped.`);
+          }
+        }
+
+        const result = tracker.reclassifyTaskOutcome(opts.sprint, opts.task, decision, {
+          reason: opts.reason,
+          memoryStore,
+        });
+
+        if (!result.changed) {
+          print(`No change: ${opts.task} already classified as ${decision} in ${opts.sprint}.`);
+          return;
+        }
+
+        print(`Reclassified ${opts.task} in ${opts.sprint}: ${result.previous} → ${result.current}`);
+        if (result.agentId) {
+          print(`  Agent: ${result.agentId}`);
+        }
+        if (result.skillIds.length > 0) {
+          print(`  Skills: ${result.skillIds.join(', ')}`);
+        }
+        if (opts.reason) {
+          print(`  Reason: ${opts.reason}`);
+        }
+        if (result.auditTrailWritten) {
+          print('  Audit-trail: written (retro entry, tag=adr-046)');
+        } else {
+          print('  Audit-trail: skipped');
+        }
+      } catch (error) {
+        printError(error);
+        process.exitCode = 1;
+      }
+    });
+
   // ─── agent info ────────────────────────────────────────────────
   agentCmd
     .command('info <name>')

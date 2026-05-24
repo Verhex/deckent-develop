@@ -420,11 +420,33 @@ export function getReadinessLabel(result: DoctorResult, brainLines: number, brai
  * Provider-specific actionable hint shown when binary is present but auth is missing.
  * Used by the `deckent doctor --providers` 3-state output.
  */
+/**
+ * Sprint 192 Task 192-007: Run provider diagnostics for Claude/Codex/Gemini AND
+ * Ollama. The base `runProviderDiagnostics` in `doctor-checks.ts` only covers
+ * the 3 cloud CLI providers; this wrapper additionally probes the local Ollama
+ * server so `deckent doctor --providers` reports all four providers in one shot.
+ *
+ * Ollama probe is cheap (HTTP ping with 3s timeout) and never throws.
+ */
+export async function runProviderDiagnosticsWithOllama(root: string): Promise<ProviderAvailabilityDetail[]> {
+  const base = await runProviderDiagnostics(root);
+  try {
+    const { createOllamaAdapter } = await import('../../providers/ollama.js');
+    const ollama = createOllamaAdapter(root);
+    const ollamaDiag = await ollama.diagnoseAvailability();
+    return [...base, ollamaDiag];
+  } catch {
+    // Lazy import / probe failure should never break the doctor output.
+    return base;
+  }
+}
+
 export function getProviderPartialHint(name: string): string {
   switch (name) {
     case 'codex': return 'set OPENAI_API_KEY';
     case 'gemini': return 'set GOOGLE_API_KEY';
     case 'claude': return 'run `claude login`';
+    case 'ollama': return 'pull a model: `ollama pull qwen2.5-coder:7b`';
     default: return 'configure authentication';
   }
 }
@@ -450,13 +472,19 @@ export function formatProviderDiagnosticsActionable(
     const label = capitalize(d.name);
     let stateLabel: string;
     if (d.available) {
-      const versionSuffix = d.version ? ` — ${label} CLI ${d.version}` : '';
+      // Ollama is an HTTP server, not a CLI — label its version line accordingly.
+      const versionRole = d.name === 'ollama' ? 'server' : 'CLI';
+      const versionSuffix = d.version ? ` — ${label} ${versionRole} ${d.version}` : '';
       stateLabel = `(ready)${versionSuffix}`;
     } else if (d.partial) {
       const hint = getProviderPartialHint(d.name);
-      stateLabel = `(binary OK, auth missing — ${hint})`;
+      // Sprint 192 Task 192-007: Ollama partial = server reachable, no models pulled.
+      // Other providers: binary OK, auth missing. Tailor the label so it reads correctly.
+      const partialReason = d.name === 'ollama' ? 'server reachable, no models' : 'binary OK, auth missing';
+      stateLabel = `(${partialReason} — ${hint})`;
     } else {
-      stateLabel = '(binary not found)';
+      // Ollama has no CLI binary — `false` ready state means the local server is unreachable.
+      stateLabel = d.name === 'ollama' ? '(server not reachable)' : '(binary not found)';
     }
     lines.push(`  ${symbol} ${label} ${stateLabel}`);
     if (d.binaryPath && d.available) {
@@ -1021,9 +1049,9 @@ export function registerDoctor(program: Command): void {
       } catch { /* use default */ }
       const result = runDoctorChecks(root, activeProviderNames, spawnBackend);
 
-      // --providers: detailed binary/version/auth diagnostics for all 3 providers
+      // --providers: detailed binary/version/auth diagnostics for Claude/Codex/Gemini + Ollama
       if (opts.providers) {
-        const diagnostics = await runProviderDiagnostics(root);
+        const diagnostics = await runProviderDiagnosticsWithOllama(root);
         if (opts.json) {
           print(JSON.stringify({ providers: diagnostics }, null, 2));
           const anyMissing = diagnostics.some(d => !d.available && !d.partial);

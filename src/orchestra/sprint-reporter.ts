@@ -171,3 +171,117 @@ export function computeSprintMetrics(input: SprintMetricsInput): GuardedSprintMe
   const coverageRatio = totalLines > 0 ? coveredLines / totalLines : null;
   return { durationMs, coverageRatio };
 }
+
+// ═══ Sprint 192 Task 192-008 — Liveness Stats Telemetry ═════════════
+//
+// Sprint 191 hotfix (07f07c9a) introduced a 5-layer worker-liveness gate
+// in runEvaluatePhase that now emits two structured events instead of
+// blindly writing synthetic NO_GO results:
+//
+//   • BRAIN→WORKER:NEVER_DISPATCHED  → task that never reached dispatcher
+//   • BRAIN→WORKER:TIMEOUT_EXTEND    → heartbeat-fresh task got +5min grant
+//
+// To make the hotfix impact data-verifiable, sprint-reporter exposes a
+// pure event-stream parser + a markdown formatter. Retro consumers (the
+// scope.filesWrite-restricted sprint-retro-writer wire is a follow-up;
+// out of this task's scope) concatenate the formatted section into the
+// sprint retro document. See `.tasks/task-192-008.plan` for the wiring
+// follow-up note.
+
+import { readEvents, CHANNELS } from './event-stream.js';
+import { TaskEvaluation } from '../core/task-types.js';
+
+/** Aggregated counts derived from the sprint event stream. */
+export interface LivenessStats {
+  /** Tasks the dispatcher never reached (max_workers saturation, etc.). */
+  neverDispatched: number;
+  /** Runtime extensions granted to heartbeat-fresh tasks (Sprint 145 T-019). */
+  extensionsGranted: number;
+}
+
+/**
+ * Read the structured event stream for a sprint and aggregate liveness
+ * telemetry counts.
+ *
+ * Pure with respect to the event log only (no mutations). Returns zero
+ * counts when the event file is missing or empty so callers can render
+ * the section unconditionally.
+ */
+export function collectLivenessStats(
+  projectRoot: string,
+  sprintId: string,
+): LivenessStats {
+  const neverDispatched = readEvents(projectRoot, sprintId, {
+    channel: CHANNELS.NEVER_DISPATCHED,
+  }).length;
+  const extensionsGranted = readEvents(projectRoot, sprintId, {
+    channel: CHANNELS.TIMEOUT_EXTEND,
+  }).length;
+  return { neverDispatched, extensionsGranted };
+}
+
+/**
+ * Format {@link LivenessStats} as a retro markdown section.
+ *
+ * The "Liveness Stats" heading is the contract surface — retro readers
+ * and downstream tooling key off this exact string. The section is
+ * always rendered (even when both counts are zero) so reviewers can
+ * distinguish "hotfix observed no triggers" from "hotfix not present".
+ */
+export function buildLivenessStatsSection(stats: LivenessStats): string {
+  const lines = [
+    '## Liveness Stats',
+    '',
+    `- Never dispatched: ${stats.neverDispatched} task${stats.neverDispatched === 1 ? '' : 's'}`,
+    `- Extensions granted: ${stats.extensionsGranted} task${stats.extensionsGranted === 1 ? '' : 's'}`,
+  ];
+  return lines.join('\n') + '\n';
+}
+
+// ═══ Sprint 192 Task 192-010 — Deferred Task Telemetry (W-INTEGRITY I-4) ══
+//
+// `TaskEvaluation.DEFERRED` marks tasks the dispatcher never reached before
+// the EVALUATE gate fired (max_workers saturation, wave throughput limits).
+// Distinct from PAUSED (depends-on-NO_GO) — DEFERRED does NOT cascade a
+// downstream fix (see debt-manager.handleCrossDependencies which filters
+// only NO_GO). Retro must surface the count so reviewers can attribute
+// "incomplete sprint" to saturation rather than worker failure.
+
+/** Aggregated DEFERRED counts derived from the per-task evaluation map. */
+export interface DeferredStats {
+  /** Tasks evaluated as DEFERRED (dispatcher saturation, no fix cascade). */
+  deferred: number;
+}
+
+/**
+ * Count DEFERRED evaluations from a per-task evaluation map.
+ *
+ * Pure function. PAUSED tasks (TaskStatus, depends-on-NO_GO) are NOT counted
+ * here — they remain in the existing cascade pipeline. Only `TaskEvaluation.DEFERRED`
+ * contributes to this metric.
+ */
+export function collectDeferredStats(
+  evaluations: Map<string, TaskEvaluation>,
+): DeferredStats {
+  let deferred = 0;
+  for (const ev of evaluations.values()) {
+    if (ev === TaskEvaluation.DEFERRED) deferred += 1;
+  }
+  return { deferred };
+}
+
+/**
+ * Format {@link DeferredStats} as a retro markdown section.
+ *
+ * The "Deferred Tasks" heading is the contract surface for downstream tooling
+ * and sprint-reporter consumers. Section is always rendered so reviewers can
+ * distinguish "zero saturation" from "section missing".
+ */
+export function buildDeferredSection(stats: DeferredStats): string {
+  const lines = [
+    '## Deferred Tasks',
+    '',
+    `- Deferred: ${stats.deferred} task${stats.deferred === 1 ? '' : 's'} (dispatcher saturation, no cascade)`,
+  ];
+  return lines.join('\n') + '\n';
+}

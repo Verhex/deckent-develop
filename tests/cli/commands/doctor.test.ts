@@ -53,6 +53,14 @@ vi.mock('../../../src/core/provider.js', () => ({
     { name: 'gemini', available: false, authMethod: 'none', models: [] },
   ]),
   formatDetectedProviders: vi.fn().mockReturnValue('Providers:\n  mock'),
+  // Sprint 192 Task 192-007: doctor-checks.ts:runProviderDiagnostics is built on
+  // top of this `runProviderDiagnostics` re-export — mocking it lets the Ollama
+  // wrapper test run without spawning real adapters.
+  runProviderDiagnostics: vi.fn().mockResolvedValue([
+    { name: 'claude', binaryFound: true, version: '2.1', versionStatus: 'ok', authMethod: 'session', authStatus: 'ok', available: true, partial: false, models: [], reason: 'ok', hints: [] },
+    { name: 'codex', binaryFound: false, versionStatus: 'missing', authMethod: 'none', authStatus: 'missing', available: false, partial: false, models: [], reason: 'missing', hints: [] },
+    { name: 'gemini', binaryFound: false, versionStatus: 'missing', authMethod: 'none', authStatus: 'missing', available: false, partial: false, models: [], reason: 'missing', hints: [] },
+  ]),
 }));
 
 vi.mock('../../../src/core/environment.js', () => ({
@@ -2152,5 +2160,114 @@ describe('checkGitignore', () => {
   it('is not a required check', () => {
     const check = checkGitignore('/mock/root');
     expect(check.required).toBe(false);
+  });
+});
+
+// ─── Sprint 192 Task 192-007 — Ollama in --providers ────────────────
+
+describe('getProviderPartialHint (Sprint 192 Task 192-007 — Ollama hint)', async () => {
+  const { getProviderPartialHint, formatProviderDiagnosticsActionable } = await import(
+    '../../../src/cli/commands/doctor.js'
+  );
+
+  it('returns the ollama-specific actionable hint', () => {
+    expect(getProviderPartialHint('ollama')).toMatch(/ollama pull/);
+  });
+
+  it('still returns sensible hints for the cloud CLI providers', () => {
+    expect(getProviderPartialHint('codex')).toMatch(/OPENAI_API_KEY/);
+    expect(getProviderPartialHint('gemini')).toMatch(/GOOGLE_API_KEY/);
+    expect(getProviderPartialHint('claude')).toMatch(/claude login/);
+  });
+
+  it('falls back to a generic message for unknown providers', () => {
+    expect(getProviderPartialHint('unknown-provider')).toMatch(/configure authentication/i);
+  });
+
+  it('formats an Ollama partial-state line with the "server reachable" reason', () => {
+    const out = formatProviderDiagnosticsActionable([
+      {
+        name: 'ollama',
+        binaryFound: true,
+        version: '0.1.30',
+        versionStatus: 'ok',
+        authMethod: 'none',
+        authStatus: 'ok',
+        available: false,
+        partial: true,
+        models: [],
+        reason: 'Ollama server reachable but no models installed',
+        hints: ['Pull a model: `ollama pull qwen2.5-coder:7b`'],
+      },
+    ]);
+
+    expect(out).toMatch(/server reachable, no models/);
+    expect(out).toMatch(/ollama pull/);
+  });
+
+  it('formats an Ollama unreachable line as "server not reachable"', () => {
+    const out = formatProviderDiagnosticsActionable([
+      {
+        name: 'ollama',
+        binaryFound: false,
+        versionStatus: 'missing',
+        authMethod: 'none',
+        authStatus: 'missing',
+        available: false,
+        partial: false,
+        models: [],
+        reason: 'Ollama probe failed: ECONNREFUSED',
+        hints: ['Install Ollama: https://ollama.com/download'],
+      },
+    ]);
+
+    expect(out).toMatch(/server not reachable/);
+  });
+
+  it('labels Ollama ready state with "server" instead of "CLI" in the version suffix', () => {
+    const out = formatProviderDiagnosticsActionable([
+      {
+        name: 'ollama',
+        binaryFound: true,
+        version: '0.1.30',
+        versionStatus: 'ok',
+        authMethod: 'none',
+        authStatus: 'ok',
+        available: true,
+        partial: false,
+        models: ['qwen2.5-coder:7b'],
+        reason: 'Ollama server reachable (1 model)',
+        hints: [],
+      },
+    ]);
+
+    expect(out).toMatch(/Ollama server 0\.1\.30/);
+    expect(out).not.toMatch(/Ollama CLI/);
+  });
+});
+
+describe('runProviderDiagnosticsWithOllama (Sprint 192 Task 192-007)', async () => {
+  const { runProviderDiagnosticsWithOllama } = await import(
+    '../../../src/cli/commands/doctor.js'
+  );
+
+  it('exists as an exported function from doctor.ts', () => {
+    expect(typeof runProviderDiagnosticsWithOllama).toBe('function');
+  });
+
+  it('returns an entry for every provider including ollama', async () => {
+    const r = await runProviderDiagnosticsWithOllama('/mock/root');
+    const names = r.map(p => p.name).sort();
+    expect(names).toContain('claude');
+    expect(names).toContain('codex');
+    expect(names).toContain('gemini');
+    expect(names).toContain('ollama');
+  });
+
+  it('ollama entry always carries the ollama-specific hints array', async () => {
+    const r = await runProviderDiagnosticsWithOllama('/mock/root');
+    const ollama = r.find(p => p.name === 'ollama');
+    expect(ollama).toBeDefined();
+    expect(Array.isArray(ollama!.hints)).toBe(true);
   });
 });

@@ -8,6 +8,7 @@ import type { TaskDNA, LearningBonus, IntentType } from '../core/routing-types.j
 import { LEARNING_BONUS_CAP } from '../core/routing-types.js';
 import { debugLog } from '../core/utils.js';
 import type { LearningConfig } from '../core/decision-config.js';
+import { ErrorRegistry } from '../core/errors.js';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -59,6 +60,41 @@ export interface LearningsData {
   recentSprints: string[];
   /** skill ID → sprint ID → per-sprint record */
   skillSprintHistory: Record<string, Record<string, SkillSprintRecord>>;
+}
+
+// ─── Reclassify Types ───────────────────────────────────────────────────────
+
+/** Minimal audit entry shape (subset of MemoryStore CreateEntryInput). */
+export interface ReclassifyAuditEntry {
+  id: string;
+  type: string;
+  title: string;
+  content: string;
+  sprint_id?: string;
+  sprint_num?: number;
+  tags?: string[];
+  metadata?: Record<string, unknown>;
+}
+
+/** Structural store contract — MemoryStore satisfies this via its `upsert` method. */
+export interface ReclassifyAuditStore {
+  upsert(input: ReclassifyAuditEntry, changedBy: string): void;
+}
+
+export interface ReclassifyOptions {
+  reason?: string;
+  memoryStore?: ReclassifyAuditStore;
+  /** Identifies the actor for audit-trail history (default: 'cli:agent-reclassify'). */
+  changedBy?: string;
+}
+
+export interface ReclassifyResult {
+  changed: boolean;
+  previous: RoutingOutcome['evaluation'];
+  current: RoutingOutcome['evaluation'];
+  agentId: string | null;
+  skillIds: string[];
+  auditTrailWritten: boolean;
 }
 
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -142,6 +178,161 @@ export class OutcomeTracker {
     this.saveSprintOutcome(outcome);
     // Save accumulated learnings
     this.saveLearnings();
+  }
+
+  /**
+   * Reclassify the evaluation of a previously recorded outcome.
+   *
+   * Idempotent: if the new decision matches the current one, returns `changed: false`
+   * without touching files or stats. Otherwise, applies a delta to agentPerformance,
+   * skillPerformance, skillSprintHistory, and synergyMatrix — totalTasks is NOT bumped
+   * (the task was already counted in recordOutcome). The sprint outcome file is
+   * mutated in place. If `memoryStore` is provided, an ADR-046 audit-trail retro entry
+   * is upserted.
+   */
+  reclassifyTaskOutcome(
+    sprintId: string,
+    taskId: string,
+    newDecision: RoutingOutcome['evaluation'],
+    opts: ReclassifyOptions = {},
+  ): ReclassifyResult {
+    const outcomesPath = join(this.projectRoot, OUTCOMES_DIR, `${sprintId}.json`);
+    if (!existsSync(outcomesPath)) {
+      throw ErrorRegistry.createError('DECKENT_E068', {
+        message: `No outcomes recorded for sprint ${sprintId}`,
+      });
+    }
+
+    let outcomes: RoutingOutcome[];
+    try {
+      outcomes = JSON.parse(readFileSync(outcomesPath, 'utf-8')) as RoutingOutcome[];
+    } catch (err) {
+      throw ErrorRegistry.createError('DECKENT_E069', {
+        message: `Failed to parse outcomes for sprint ${sprintId}: ${(err as Error).message}`,
+      });
+    }
+
+    const target = outcomes.find(o => o.taskId === taskId);
+    if (!target) {
+      throw ErrorRegistry.createError('DECKENT_E070', {
+        message: `Task ${taskId} not found in ${sprintId}`,
+      });
+    }
+
+    const previous = target.evaluation;
+    const agentId = target.agentId;
+    const skillIds = [...target.skillIds];
+
+    if (previous === newDecision) {
+      return {
+        changed: false,
+        previous,
+        current: newDecision,
+        agentId,
+        skillIds,
+        auditTrailWritten: false,
+      };
+    }
+
+    const wasSuccess = previous !== 'NO_GO';
+    const isSuccess = newDecision !== 'NO_GO';
+    const deltaSuccess = (isSuccess ? 1 : 0) - (wasSuccess ? 1 : 0); // -1, 0, +1
+
+    // Mutate the outcome record in memory (and persist below).
+    target.evaluation = newDecision;
+
+    // Persist outcomes file.
+    try {
+      writeFileSync(outcomesPath, JSON.stringify(outcomes, null, 2), 'utf-8');
+    } catch (err) {
+      throw ErrorRegistry.createError('DECKENT_E071', {
+        message: `Failed to write outcomes for sprint ${sprintId}: ${(err as Error).message}`,
+      });
+    }
+
+    // Apply delta to agent / skill performance (only when isSuccess actually flipped).
+    if (deltaSuccess !== 0) {
+      if (agentId && agentId !== 'generic') {
+        this.applyPerformanceDelta(
+          this.learnings.agentPerformance,
+          agentId,
+          target.taskDNA.intent.primary,
+          deltaSuccess,
+        );
+      }
+      for (const skillId of skillIds) {
+        this.applyPerformanceDelta(
+          this.learnings.skillPerformance,
+          skillId,
+          target.taskDNA.intent.primary,
+          deltaSuccess,
+        );
+        this.applySkillSprintHistoryDelta(skillId, sprintId, deltaSuccess);
+      }
+      // Synergy: agent+skill pairs
+      if (agentId && agentId !== 'generic') {
+        for (const skillId of skillIds) {
+          this.applySynergyDelta(`${agentId}+${skillId}`, deltaSuccess);
+        }
+      }
+      // Synergy: skill+skill pairs (sorted, matches recordOutcome)
+      for (let i = 0; i < skillIds.length; i++) {
+        for (let j = i + 1; j < skillIds.length; j++) {
+          const pair = [skillIds[i], skillIds[j]].sort().join('+');
+          this.applySynergyDelta(pair, deltaSuccess);
+        }
+      }
+    }
+
+    this.learnings.updatedAt = new Date().toISOString();
+    this.saveLearnings();
+
+    // Audit trail (ADR-046).
+    let auditTrailWritten = false;
+    if (opts.memoryStore) {
+      const sprintNum = parseInt(sprintId.replace(/\D/g, ''), 10) || 0;
+      const skillsDisplay = skillIds.length > 0 ? skillIds.join(', ') : '(none)';
+      const agentDisplay = agentId ?? '(none)';
+      const reasonLine = opts.reason ? `Reason: ${opts.reason}` : 'Reason: (not provided)';
+      const content = [
+        `Reclassify: ${previous} → ${newDecision}`,
+        `Sprint: ${sprintId}`,
+        `Task: ${taskId}`,
+        `Agent: ${agentDisplay}`,
+        `Skills: ${skillsDisplay}`,
+        reasonLine,
+      ].join('\n');
+      opts.memoryStore.upsert(
+        {
+          id: `reclassify-${sprintId}-${taskId}`,
+          type: 'retro',
+          title: `Reclassify ${taskId} (${previous} → ${newDecision})`,
+          content,
+          sprint_id: sprintId,
+          sprint_num: sprintNum,
+          tags: ['reclassify', 'audit-trail', 'adr-046'],
+          metadata: {
+            taskId,
+            previous,
+            current: newDecision,
+            agentId,
+            skillIds,
+            reason: opts.reason ?? null,
+          },
+        },
+        opts.changedBy ?? 'cli:agent-reclassify',
+      );
+      auditTrailWritten = true;
+    }
+
+    return {
+      changed: true,
+      previous,
+      current: newDecision,
+      agentId,
+      skillIds,
+      auditTrailWritten,
+    };
   }
 
   /**
@@ -423,6 +614,59 @@ export class OutcomeTracker {
     entry.successRate = successes / entry.tasks;
 
     // Update verdict
+    if (entry.tasks >= 3) {
+      if (entry.successRate >= 0.85) entry.verdict = 'synergy';
+      else if (entry.successRate < 0.5) entry.verdict = 'conflict';
+      else entry.verdict = 'neutral';
+    }
+  }
+
+  /**
+   * Delta-apply a success/fail flip to an entity perf record.
+   * totalTasks is NOT changed — only success/fail counts move by ±1.
+   * @param deltaSuccess +1 for fail→success, -1 for success→fail.
+   */
+  private applyPerformanceDelta(
+    store: Record<string, EntityPerformance>,
+    entityId: string,
+    intent: IntentType,
+    deltaSuccess: number,
+  ): void {
+    const perf = store[entityId];
+    if (!perf) return; // Nothing to delta — record was never created.
+
+    perf.successCount += deltaSuccess;
+    perf.failCount -= deltaSuccess;
+    if (perf.successCount < 0) perf.successCount = 0;
+    if (perf.failCount < 0) perf.failCount = 0;
+    perf.successRate = perf.totalTasks > 0 ? perf.successCount / perf.totalTasks : 0;
+
+    const intentPerf = perf.byIntent[intent];
+    if (intentPerf && intentPerf.tasks > 0) {
+      const prevSuccesses = Math.round(intentPerf.successRate * intentPerf.tasks);
+      const newSuccesses = Math.max(0, Math.min(intentPerf.tasks, prevSuccesses + deltaSuccess));
+      intentPerf.successRate = newSuccesses / intentPerf.tasks;
+    }
+  }
+
+  private applySkillSprintHistoryDelta(skillId: string, sprintId: string, deltaSuccess: number): void {
+    const history = this.learnings.skillSprintHistory[skillId];
+    if (!history) return;
+    const record = history[sprintId];
+    if (!record) return;
+    record.successCount += deltaSuccess;
+    record.failCount -= deltaSuccess;
+    if (record.successCount < 0) record.successCount = 0;
+    if (record.failCount < 0) record.failCount = 0;
+    // avgCoverage is unchanged — coverage of the task itself didn't change.
+  }
+
+  private applySynergyDelta(pair: string, deltaSuccess: number): void {
+    const entry = this.learnings.synergyMatrix.find(e => e.pair === pair);
+    if (!entry || entry.tasks === 0) return;
+    const prevSuccesses = Math.round(entry.successRate * entry.tasks);
+    const newSuccesses = Math.max(0, Math.min(entry.tasks, prevSuccesses + deltaSuccess));
+    entry.successRate = newSuccesses / entry.tasks;
     if (entry.tasks >= 3) {
       if (entry.successRate >= 0.85) entry.verdict = 'synergy';
       else if (entry.successRate < 0.5) entry.verdict = 'conflict';

@@ -1,6 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { mkdtempSync, rmSync, existsSync, readdirSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { DeckentError } from '../../src/core/errors.js';
-import { handleError } from '../../src/cli/helpers/error-handler.js';
+import {
+  handleError,
+  formatFatalAndExit,
+  installFatalHandlers,
+  __resetFatalHandlersForTest,
+} from '../../src/cli/helpers/error-handler.js';
 
 // ─── Capture stderr ─────────────────────────────────────────────────
 
@@ -95,5 +103,113 @@ describe('handleError — non-Error values', () => {
   it('handles number thrown as error', () => {
     handleError(42);
     expect(stderrOutput).toContain('42');
+  });
+});
+
+// ─── Fatal handler — formatFatalAndExit ─────────────────────────────
+
+describe('formatFatalAndExit', () => {
+  let exitSpy: ReturnType<typeof vi.spyOn>;
+  let tempCwd: string;
+  let originalCwd: string;
+  let originalDebug: string | undefined;
+
+  beforeEach(() => {
+    originalCwd = process.cwd();
+    tempCwd = mkdtempSync(join(tmpdir(), 'deckent-fatal-'));
+    process.chdir(tempCwd);
+    originalDebug = process.env.DECKENT_DEBUG;
+    delete process.env.DECKENT_DEBUG;
+    // process.exit is typed as (code?: number) => never. The mock
+    // returns undefined to keep the test alive; the cast satisfies
+    // the signature without polluting handler logic.
+    exitSpy = vi.spyOn(process, 'exit').mockImplementation(((_code?: number) => undefined) as never);
+  });
+
+  afterEach(() => {
+    exitSpy.mockRestore();
+    process.chdir(originalCwd);
+    rmSync(tempCwd, { recursive: true, force: true });
+    if (originalDebug === undefined) delete process.env.DECKENT_DEBUG;
+    else process.env.DECKENT_DEBUG = originalDebug;
+  });
+
+  it('writes FATAL line with error name and message', () => {
+    const err = new TypeError('boom');
+    formatFatalAndExit(err);
+    expect(stderrOutput).toContain('FATAL');
+    expect(stderrOutput).toContain('TypeError');
+    expect(stderrOutput).toContain('boom');
+    expect(exitSpy).toHaveBeenCalledWith(1);
+  });
+
+  it('includes stack trace when DECKENT_DEBUG=1', () => {
+    process.env.DECKENT_DEBUG = '1';
+    const err = new Error('explode');
+    formatFatalAndExit(err);
+    expect(stderrOutput).toContain('explode');
+    // err.stack contains lines beginning with "    at "
+    expect(stderrOutput).toMatch(/\n\s+at\s/);
+  });
+
+  it('omits stack trace when DECKENT_DEBUG unset', () => {
+    const err = new Error('quiet');
+    formatFatalAndExit(err);
+    const stackLines = stderrOutput.split('\n').filter((l) => l.match(/^\s+at\s/));
+    expect(stackLines.length).toBe(0);
+  });
+
+  it('writes a crash log under .deckent/crashes/', () => {
+    formatFatalAndExit(new Error('disk-trace'));
+    const crashDir = join(tempCwd, '.deckent', 'crashes');
+    expect(existsSync(crashDir)).toBe(true);
+    const files = readdirSync(crashDir);
+    expect(files.length).toBe(1);
+    expect(files[0]).toMatch(/\.log$/);
+  });
+
+  it('handles non-Error thrown values', () => {
+    formatFatalAndExit('raw fatal string');
+    expect(stderrOutput).toContain('FATAL');
+    expect(stderrOutput).toContain('NonError');
+    expect(stderrOutput).toContain('raw fatal string');
+  });
+});
+
+// ─── installFatalHandlers — wire / idempotency ──────────────────────
+
+describe('installFatalHandlers', () => {
+  beforeEach(() => {
+    __resetFatalHandlersForTest();
+  });
+
+  afterEach(() => {
+    __resetFatalHandlersForTest();
+  });
+
+  it('skips installation in vitest environment by default', () => {
+    // VITEST=true is set by the test runner.
+    const installed = installFatalHandlers();
+    expect(installed).toBe(false);
+  });
+
+  it('installs handlers when force=true and is idempotent on repeat', () => {
+    const before = process.listenerCount('uncaughtException');
+    const first = installFatalHandlers({ force: true });
+    expect(first).toBe(true);
+    expect(process.listenerCount('uncaughtException')).toBe(before + 1);
+    expect(process.listenerCount('unhandledRejection')).toBeGreaterThanOrEqual(1);
+
+    const second = installFatalHandlers({ force: true });
+    expect(second).toBe(false);
+    // No additional listener added on second call.
+    expect(process.listenerCount('uncaughtException')).toBe(before + 1);
+  });
+
+  it('reset helper removes both listeners', () => {
+    installFatalHandlers({ force: true });
+    const withInstalled = process.listenerCount('uncaughtException');
+    __resetFatalHandlersForTest();
+    expect(process.listenerCount('uncaughtException')).toBe(withInstalled - 1);
   });
 });

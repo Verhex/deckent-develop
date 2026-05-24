@@ -183,6 +183,99 @@ function now(): string {
   return new Date().toISOString();
 }
 
+// ═══ Pre-Dispatch Trigger Guard (Sprint 192 — Task 192-009 — W-INTEGRITY I-3) ══
+// Sprint 191 RC: runEvaluatePhase Wave-3 task'lar dispatch olmadan
+// tetiklendi. Premature evaluation hem evaluations Map'i kirletiyor hem de
+// cascade'i yanlış tetikliyor. Bu kapı: en az bir task hâlâ pre-dispatch ise
+// EVALUATE'e girme — log + event emit + return. Bayrak (enforceDispatchGate)
+// opt-in: yalnız sprint-controller production yolundan true geçer; mevcut
+// testler default false ile geriye-uyumlu kalır.
+
+/**
+ * Test seam: is a task "dispatched"? Returns true when ANY of the following
+ * dispatch signals are present:
+ *   • a `.result` file exists for it (caller already collected),
+ *   • the caller marked it explicitly DEFERRED,
+ *   • its in-memory `assignedWorker` is set,
+ *   • its on-disk task.json has `assignedWorker` set,
+ *   • a `.hb` heartbeat file exists on disk,
+ *   • its status is past PENDING/DRAFT
+ *     (CLAIMED/EXECUTING/TESTING/DOCUMENTING/DONE/NO_GO/PAUSED).
+ *
+ * Pure with respect to side effects (disk reads only; never mutates). Fail-
+ * safe: any I/O error is debugLog'd and the task is treated as dispatched so
+ * a transient FS issue cannot block evaluation indefinitely.
+ *
+ * @internal Exported for unit testing of the entry-guard semantics.
+ */
+export function isTaskDispatched(
+  projectRoot: string,
+  task: Task,
+  collectedIds: ReadonlySet<string>,
+  deferredIds: ReadonlySet<string>,
+): boolean {
+  if (collectedIds.has(task.id)) return true;
+  if (deferredIds.has(task.id)) return true;
+  if (typeof task.assignedWorker === 'string' && task.assignedWorker.length > 0) return true;
+  if (
+    task.status === TaskStatus.CLAIMED ||
+    task.status === TaskStatus.EXECUTING ||
+    task.status === TaskStatus.TESTING ||
+    task.status === TaskStatus.DOCUMENTING ||
+    task.status === TaskStatus.DONE ||
+    task.status === TaskStatus.NO_GO ||
+    task.status === TaskStatus.PAUSED
+  ) {
+    return true;
+  }
+  try {
+    const hbPath = join(projectRoot, TASKS_DIR, `task-${task.id}.hb`);
+    if (existsSync(hbPath)) return true;
+  } catch (e) { debugLog('isTaskDispatched:hb', e); }
+  try {
+    const freshPath = join(projectRoot, TASKS_DIR, `task-${task.id}.json`);
+    if (existsSync(freshPath)) {
+      const raw = readFileSync(freshPath, 'utf-8');
+      const fresh = JSON.parse(raw) as Partial<Task>;
+      if (typeof fresh.assignedWorker === 'string' && fresh.assignedWorker.length > 0) return true;
+      if (
+        fresh.status !== undefined &&
+        fresh.status !== TaskStatus.DRAFT &&
+        fresh.status !== TaskStatus.PENDING
+      ) {
+        return true;
+      }
+    }
+  } catch (e) { debugLog('isTaskDispatched:fresh', e); }
+  return false;
+}
+
+/**
+ * Returns the IDs of tasks that are not yet dispatched and not explicitly
+ * deferred. {@link runEvaluatePhase} uses this list (when its entry-guard is
+ * enforced) to early-return rather than fire premature evaluations on Wave-N
+ * tasks the dispatcher has not reached. Order matches `sprint.tasks` for
+ * deterministic debug logs.
+ *
+ * @internal Exported for unit testing.
+ */
+export function findUndispatchedTaskIds(
+  projectRoot: string,
+  sprint: Sprint,
+  results: readonly TaskResult[],
+  deferredIds?: ReadonlySet<string>,
+): string[] {
+  const collectedIds = new Set(results.map(r => r.taskId));
+  const deferred = deferredIds ?? new Set<string>();
+  const undispatched: string[] = [];
+  for (const task of sprint.tasks) {
+    if (!isTaskDispatched(projectRoot, task, collectedIds, deferred)) {
+      undispatched.push(task.id);
+    }
+  }
+  return undispatched;
+}
+
 /**
  * Persist a sprint phase + status transition to `.deckent/sprint-state.json`
  * so external observers (auditor, dashboard, recovery) can see the live
@@ -863,6 +956,8 @@ export async function runEvaluatePhase(
   _coverageThreshold = 90,
   config?: ResolvedConfig,
   extensionState?: ExtensionStateMap,
+  deferredTaskIds?: ReadonlySet<string>,
+  options?: { enforceDispatchGate?: boolean },
 ): Promise<void> {
   // ─── Idempotency Guard (Sprint 157 Task 002) ───────────────────
   // Acquire PID-bound lock; if a live evaluation is already running
@@ -889,6 +984,41 @@ export async function runEvaluatePhase(
     }
   }
   try {
+    // ─── Pre-Dispatch Trigger Guard (Sprint 192 — Task 192-009 — W-INTEGRITY I-3) ──
+    // Memory: Sprint 191 RC — runEvaluatePhase Wave-N task'lar dispatch
+    // olmadan tetiklendi → boş evaluations + bozuk cascade. Bayrak opt-in:
+    // sprint-controller production yolundan true geçer; mevcut testler
+    // ve recovery path'leri default false ile geriye uyumlu kalır. Guard
+    // tetiklenirse phase EXECUTE'da kalır (persistPhaseTransition yapılmaz)
+    // ve sonraki çağrı yine deneyebilir (finally lock release eder).
+    if (options?.enforceDispatchGate === true) {
+      const undispatched = findUndispatchedTaskIds(
+        projectRoot, sprint, results, deferredTaskIds,
+      );
+      if (undispatched.length > 0) {
+        debugLog(
+          'runEvaluatePhase:premature',
+          `premature EVALUATE — waiting for dispatch — undispatched=[${undispatched.join(',')}]`,
+        );
+        try {
+          const sidForGate = getCurrentSprintId(projectRoot) ?? sprint.id;
+          writeEvent(
+            projectRoot, sidForGate, 'brain', 'auditor',
+            'BRAIN→AUDITOR:EVALUATE_PREMATURE',
+            {
+              sprintId: sprint.id,
+              undispatchedTaskIds: undispatched,
+              totalTasks: sprint.tasks.length,
+              collectedResults: results.length,
+              deferredCount: deferredTaskIds?.size ?? 0,
+              timestamp: new Date().toISOString(),
+            },
+          );
+        } catch (e) { debugLog('runEvaluatePhase:premature-event', e); }
+        return;
+      }
+    }
+
     // Sprint 161 Task 2 (T-003): EVALUATE entry — phase reaches disk so
     // observers see the EXECUTE→EVALUATE transition. Previously sprint-
     // state.json froze on SPAWN through to CLEANUP (Sprint 159 forensic).
@@ -1059,6 +1189,18 @@ export async function runEvaluatePhase(
           resolveDebt(projectRoot, `debt-${task.id}`, sprint.id);
         }
       } else {
+        // ─── Explicit DEFERRED skip (Sprint 192 — Task 192-009 — W-INTEGRITY I-3) ──
+        // Caller has signalled this task was never dispatched and should
+        // not be force-NO_GO'd here — let retro (192-010 enum surface)
+        // report it. No synthetic result, no evaluation entry.
+        if (deferredTaskIds?.has(task.id)) {
+          debugLog(
+            'runEvaluatePhase:deferred-skip',
+            `task=${task.id} explicitly deferred — bypassing synthetic NO_GO`,
+          );
+          continue;
+        }
+
         // ─── Runtime Extension Attempt (Sprint 191 — Task 191-002) ──
         // Before declaring a synthetic NO_GO for a missing .result,
         // consult the heartbeat-aware extension policy. When granted,

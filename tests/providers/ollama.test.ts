@@ -93,7 +93,7 @@ describe('OllamaAdapter.detect', () => {
     expect(d.reason).toMatch(/failed|not reachable/i);
   });
 
-  it('returns an empty model list when /api/tags responds without a models array', async () => {
+  it('reports ready=partial when /api/tags responds without any models (Sprint 192 Task 192-007)', async () => {
     const fetchImpl = mockFetchSequence([
       () => jsonResponse({}),
       () => jsonResponse({ version: '0.1.0' }),
@@ -101,8 +101,37 @@ describe('OllamaAdapter.detect', () => {
     const adapter = new OllamaAdapter(PROJECT_DIR, { fetchImpl });
     const d = await adapter.detect();
 
-    expect(d.available).toBe(true);
+    // Server reachable but no models pulled → actionable partial state.
+    expect(d.available).toBe(false);
+    expect(d.ready).toBe('partial');
     expect(d.models).toEqual([]);
+    expect(d.reason).toMatch(/no models/i);
+  });
+
+  it('reports ready=partial with empty models array from /api/tags (Sprint 192 Task 192-007)', async () => {
+    const fetchImpl = mockFetchSequence([
+      () => jsonResponse({ models: [] }),
+      () => jsonResponse({ version: '0.1.0' }),
+    ]);
+    const adapter = new OllamaAdapter(PROJECT_DIR, { fetchImpl });
+    const d = await adapter.detect();
+
+    expect(d.ready).toBe('partial');
+    expect(d.available).toBe(false);
+    expect(d.models).toEqual([]);
+  });
+
+  it('reports ready=true once at least one model is present (Sprint 192 Task 192-007)', async () => {
+    const fetchImpl = mockFetchSequence([
+      () => jsonResponse({ models: [{ name: 'llama3:8b' }] }),
+      () => jsonResponse({ version: '0.1.0' }),
+    ]);
+    const adapter = new OllamaAdapter(PROJECT_DIR, { fetchImpl });
+    const d = await adapter.detect();
+
+    expect(d.ready).toBe(true);
+    expect(d.available).toBe(true);
+    expect(d.models).toEqual(['llama3:8b']);
   });
 });
 
@@ -171,9 +200,25 @@ describe('OllamaAdapter.diagnoseAvailability', () => {
     const diag = await adapter.diagnoseAvailability();
 
     expect(diag.available).toBe(true);
+    expect(diag.partial).toBe(false);
     expect(diag.version).toBe('0.1.30');
     expect(diag.versionStatus).toBe('ok');
     expect(diag.authStatus).toBe('ok');
+  });
+
+  it('shapes the result with partial=true when server reachable but no models (Sprint 192 Task 192-007)', async () => {
+    const fetchImpl = mockFetchSequence([
+      () => jsonResponse({ models: [] }),
+      () => jsonResponse({ version: '0.1.30' }),
+    ]);
+    const adapter = new OllamaAdapter(PROJECT_DIR, { fetchImpl });
+    const diag = await adapter.diagnoseAvailability();
+
+    expect(diag.available).toBe(false);
+    expect(diag.partial).toBe(true);
+    expect(diag.binaryFound).toBe(true);
+    expect(diag.authStatus).toBe('ok');
+    expect(diag.hints.some(h => /ollama pull/i.test(h))).toBe(true);
   });
 });
 

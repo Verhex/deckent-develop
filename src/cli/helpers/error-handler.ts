@@ -1,5 +1,7 @@
 // ─── Error Handler ──────────────────────────────────────────────────
 
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { DeckentError, formatHumanError } from '../../core/errors.js';
 
 export interface ErrorHandlerOpts {
@@ -81,4 +83,88 @@ function colorizeHumanError(text: string): string {
     .replace(/^(Why:)$/m, '\x1b[33m$1\x1b[0m')
     .replace(/^(How to fix:)$/m, '\x1b[32m$1\x1b[0m')
     .replace(/^(Docs:.+)$/m, '\x1b[36m$1\x1b[0m');
+}
+
+// ─── Fatal Handler (uncaughtException / unhandledRejection wire) ────
+
+function describeFatal(error: unknown): { name: string; message: string; stack?: string } {
+  if (error instanceof Error) {
+    return { name: error.name || 'Error', message: error.message, stack: error.stack };
+  }
+  return { name: 'NonError', message: String(error) };
+}
+
+/**
+ * Top-level fatal handler used by process.on('uncaughtException') and
+ * process.on('unhandledRejection'). Writes a single readable FATAL line
+ * to stderr, optional stack trace (DECKENT_DEBUG=1), best-effort crash
+ * log under .deckent/crashes/<timestamp>.log, then exits with code 1.
+ */
+export function formatFatalAndExit(error: unknown): never {
+  const { name, message, stack } = describeFatal(error);
+  const debug = process.env.DECKENT_DEBUG === '1';
+
+  process.stderr.write(`\x1b[31m✗ FATAL:\x1b[0m ${name}: ${message}\n`);
+  if (debug && stack) {
+    process.stderr.write(`${stack}\n`);
+  }
+
+  try {
+    const dir = join(process.cwd(), '.deckent', 'crashes');
+    mkdirSync(dir, { recursive: true });
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const body = [
+      `timestamp: ${new Date().toISOString()}`,
+      `name: ${name}`,
+      `message: ${message}`,
+      stack ? `stack:\n${stack}` : 'stack: <unavailable>',
+    ].join('\n') + '\n';
+    writeFileSync(join(dir, `${stamp}.log`), body, 'utf8');
+  } catch {
+    // Best-effort — fatal handler must never throw.
+  }
+
+  process.exit(1);
+}
+
+let fatalHandlersInstalled = false;
+
+function isTestEnv(): boolean {
+  return process.env.VITEST === 'true' || process.env.NODE_ENV === 'test';
+}
+
+export interface InstallFatalHandlersOpts {
+  /** Bypass the test-env skip (idempotency is still enforced). */
+  force?: boolean;
+}
+
+/**
+ * Install process-wide handlers for uncaughtException and
+ * unhandledRejection that delegate to formatFatalAndExit.
+ *
+ * Idempotent — once installed, repeat calls return false (force does
+ * not bypass this; use __resetFatalHandlersForTest to re-arm).
+ * Skips installation under VITEST / NODE_ENV=test to keep vitest
+ * isolation intact; pass { force: true } to override the test-env skip.
+ *
+ * Returns true if handlers were installed by this call, false otherwise.
+ */
+export function installFatalHandlers(opts: InstallFatalHandlersOpts = {}): boolean {
+  if (fatalHandlersInstalled) return false;
+  if (isTestEnv() && !opts.force) return false;
+
+  process.on('uncaughtException', formatFatalAndExit);
+  process.on('unhandledRejection', formatFatalAndExit);
+  fatalHandlersInstalled = true;
+  return true;
+}
+
+/**
+ * Test-only helper — reset module-scope state so tests can re-exercise
+ * installation logic. Not exported for production use.
+ */
+export function __resetFatalHandlersForTest(): void {
+  fatalHandlersInstalled = false;
+  process.removeListener('uncaughtException', formatFatalAndExit);
+  process.removeListener('unhandledRejection', formatFatalAndExit);
 }

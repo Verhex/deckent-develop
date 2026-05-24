@@ -531,6 +531,53 @@ registry.set('DECKENT_E067', {
   ],
 });
 
+// ─── Outcome Reclassify Codes (DECKENT_E068-E071) ───────────────────
+
+registry.set('DECKENT_E068', {
+  message: 'sprint outcomes file not found',
+  suggestion: 'Verify the sprint id is correct and the outcomes file exists',
+  whatHappened: 'No outcomes were recorded for the requested sprint.',
+  why: '.deckent/routing/outcomes/<sprintId>.json is missing — the sprint may have been cleaned or never ran.',
+  howToFix: [
+    'Check that .deckent/routing/outcomes/<sprintId>.json exists',
+    'Run `deckent history` to list known sprints',
+    'Re-run the sprint to regenerate the outcomes file',
+  ],
+});
+
+registry.set('DECKENT_E069', {
+  message: 'failed to parse outcomes file',
+  suggestion: 'Check the outcomes JSON file for syntax errors',
+  whatHappened: 'The outcomes file for the sprint could not be parsed as JSON.',
+  why: 'The file is corrupted, truncated, or was edited manually with invalid syntax.',
+  howToFix: [
+    'Open .deckent/routing/outcomes/<sprintId>.json and fix syntax errors',
+    'Restore the file from version control if possible',
+  ],
+});
+
+registry.set('DECKENT_E070', {
+  message: 'task not found in sprint outcomes',
+  suggestion: 'Verify the task id was actually executed in the sprint',
+  whatHappened: 'The requested task id was not found in the sprint outcomes file.',
+  why: 'The task may not have produced a routing outcome, or the id is misspelled.',
+  howToFix: [
+    'Run `deckent retro --sprint <id>` to list task ids',
+    'Check the outcomes file: .deckent/routing/outcomes/<sprintId>.json',
+  ],
+});
+
+registry.set('DECKENT_E071', {
+  message: 'failed to write outcomes file',
+  suggestion: 'Check filesystem permissions on .deckent/routing/outcomes/',
+  whatHappened: 'reclassifyTaskOutcome could not persist the updated outcomes file.',
+  why: 'The directory may be read-only, the disk full, or another process holds a lock.',
+  howToFix: [
+    'Check permissions: ls -la .deckent/routing/outcomes/',
+    'Free disk space and retry',
+  ],
+});
+
 // ─── ErrorRegistry API ──────────────────────────────────────────────
 
 export const ErrorRegistry = {

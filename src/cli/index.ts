@@ -51,15 +51,22 @@ import { registerAuditVerify } from './commands/audit-verify.js';
 import { registerRecover } from './commands/recover.js';
 import { registerModels } from './commands/models.js';
 import { showSplash } from './helpers/splash.js';
+import { installFatalHandlers } from './helpers/error-handler.js';
 
 /**
  * Build and configure the CLI program with all commands registered.
  * Does NOT call parseAsync — caller is responsible for parsing.
+ *
+ * Also installs top-level uncaughtException / unhandledRejection
+ * handlers on first call (idempotent; skipped under vitest).
  */
 export function buildProgram(): Command {
+  installFatalHandlers();
+
   const program = new Command()
     .name('deckent')
     .description('AI agent orchestration system — your AI development team, orchestrated.')
+    .showSuggestionAfterError(true)
     .option('-V, --version', 'output the version number with splash')
     .option('--version-json', 'output version info as JSON')
     .on('option:version', () => {

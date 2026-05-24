@@ -1,6 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { createDefaultConfig, getDefaultConfig } from '../../src/core/config.js';
-import type { ResolvedConfig } from '../../src/core/types.js';
+import {
+  createDefaultConfig,
+  getDefaultConfig,
+  deepMerge,
+  DEFAULT_TIMEOUT_CONFIG,
+} from '../../src/core/config.js';
+import type { DeckentConfig, ResolvedConfig } from '../../src/core/types.js';
 
 /**
  * Sprint 156 Task 2: dependency_pipeline_enabled default flip regression guard.
@@ -33,5 +38,56 @@ describe('createDefaultConfig — Sprint 156 dependency pipeline default flip', 
     // singleton return that would let one test poison another.
     (a as ResolvedConfig).dependency_pipeline_enabled = false;
     expect((b as ResolvedConfig).dependency_pipeline_enabled).toBe(true);
+  });
+});
+
+/**
+ * Sprint 192 Task 192-002 (Sprint 191 191-002 carry-over):
+ * `timeout.runtime_extension_enabled` default flip false → true regression guard.
+ *
+ * The source-level flip landed in Sprint 191 hotfix commit `07f07c9a`
+ * (DEFAULT_TIMEOUT_CONFIG in src/core/config.ts). This trio pins the contract
+ * from the `tests/core/config-defaults.test.ts` exemplar so that a future
+ * refactor reverting the default to false (or losing the field entirely)
+ * fails immediately — production users would otherwise lose the bounded
+ * heartbeat-aware extension and silently regress to synthetic NO_GO.
+ *
+ * Coverage: (a) default true, (b) explicit false override via deepMerge,
+ * (c) 3-layer merge precedence — project override wins over global.
+ */
+describe('createDefaultConfig — Sprint 192 runtime_extension_enabled default flip', () => {
+  it('runtime_extension_enabled is true by default', () => {
+    const cfg = getDefaultConfig();
+    expect(cfg.timeout?.runtime_extension_enabled).toBe(true);
+    // DEFAULT_TIMEOUT_CONFIG is the single source of truth — assert directly.
+    expect(DEFAULT_TIMEOUT_CONFIG.runtime_extension_enabled).toBe(true);
+  });
+
+  it('explicit false override is preserved through deepMerge', () => {
+    const base = createDefaultConfig();
+    const override: Partial<DeckentConfig> = {
+      timeout: { runtime_extension_enabled: false },
+    };
+    const merged = deepMerge(base, override);
+    expect(merged.timeout?.runtime_extension_enabled).toBe(false);
+    // Sibling defaults must remain intact — guards against override
+    // accidentally clobbering unrelated timeout fields.
+    expect(merged.timeout?.docker_min_timeout).toBe(1200);
+    expect(merged.timeout?.effort_base.high).toBe(2400);
+  });
+
+  it('3-layer merge precedence: project override wins over global', () => {
+    // Mirrors mergeConfigs(globalConfig, projectConfig) ordering: defaults
+    // first, then global, then project (project takes precedence).
+    const base = createDefaultConfig();
+    const globalCfg: Partial<DeckentConfig> = {
+      timeout: { runtime_extension_enabled: false },
+    };
+    const projectCfg: Partial<DeckentConfig> = {
+      timeout: { runtime_extension_enabled: true },
+    };
+    const afterGlobal = deepMerge(base, globalCfg);
+    const finalCfg = deepMerge(afterGlobal, projectCfg);
+    expect(finalCfg.timeout?.runtime_extension_enabled).toBe(true);
   });
 });

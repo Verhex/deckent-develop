@@ -86,6 +86,13 @@ export const CHANNELS = {
   // Timeout extension (Sprint 145 — Task 019)
   TIMEOUT_EXTEND: 'BRAIN→WORKER:TIMEOUT_EXTEND',
 
+  // Sprint 191 hotfix (07f07c9a) — emitted by runEvaluatePhase when the
+  // 5-layer worker-liveness gate reports `never-spawned`. The literal
+  // string is already used at the emit site; this constant pins the
+  // contract so retro consumers (sprint-reporter) can readEvents() by
+  // channel without re-deriving the string.
+  NEVER_DISPATCHED: 'BRAIN→WORKER:NEVER_DISPATCHED',
+
   // Sprint 168 C0c RC2 — scope collision spawn blocker
   // Emitted by sprint-controller / spawn pipeline when handleScopeCollision()
   // returns action='block'. Consumes AUDITOR→BRAIN:SCOPE_COLLISION_DETECTED.

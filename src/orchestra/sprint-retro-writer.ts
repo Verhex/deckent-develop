@@ -380,6 +380,25 @@ export interface WriteRetrospectiveResult {
 }
 
 /**
+ * Sprint 192 Task 192-005 — close the chronic Sprint 167+ DB-gap.
+ *
+ * Default writeRetrospective() behavior preserves the legacy clean-skip
+ * contract: when `.brain/memory.db` does not exist, the DB hook is a no-op
+ * and `dbAttempted=false`. The chronic gap symptom (Sprint 189/190 retro
+ * rows never landing) traced back to this exact short-circuit running on
+ * environments where finalize ran before any other DB seeding step.
+ *
+ * `createIfMissing: true` instructs the writer to auto-materialize
+ * `.brain/` + `memory.db` before attempting the upserts. sprint-finalizer
+ * opts in so the retro row always lands, even on the very first sprint
+ * in a fresh project.
+ */
+export interface WriteRetrospectiveOptions {
+  /** Auto-create `.brain/` + `memory.db` when missing (default: false, back-compat). */
+  createIfMissing?: boolean;
+}
+
+/**
  * Write the sprint retrospective to RETRO.md and append learnings to MEMORY.md.
  * Includes metrics summary, per-task results, comparison with previous sprint,
  * usage report, agent performance, and skill performance sections.
@@ -398,6 +417,7 @@ export function writeRetrospective(
   agentMap?: Map<string, string>,
   skillMap?: Map<string, string[]>,
   results?: TaskResult[],
+  opts?: WriteRetrospectiveOptions,
 ): WriteRetrospectiveResult {
   const writeResult: WriteRetrospectiveResult = {
     dbAttempted: false,
@@ -497,7 +517,14 @@ export function writeRetrospective(
   // canonical `sprint-log-${sprintNum}` per Sprint 143 plan L593 + Sprint
   // 168 plan L1384. Forensic: Sprint 167 finalize emitted `sprint-167`
   // instead of `sprint-log-167`, causing the audit query miss.
-  if (existsSync(dbPath)) {
+  // Sprint 192 Task 192-005: when `opts.createIfMissing` is true, materialize
+  // `.brain/memory.db` even when absent — closes the chronic gap
+  // ([[project_sprint167_db_gap]]) where finalize would silently skip on
+  // fresh projects.
+  if (opts?.createIfMissing && !existsSync(dbPath)) {
+    mkdirSync(brainPath, { recursive: true });
+  }
+  if (existsSync(dbPath) || opts?.createIfMissing) {
     writeResult.dbAttempted = true;
     try {
       const store = new MemoryStore(dbPath);
@@ -567,6 +594,108 @@ export function writeRetrospective(
   }
 
   return writeResult;
+}
+
+// ═══ Backfill (Sprint 192 Task 192-005) ════════════════════════════
+//
+// Chronic gap closure: sprints whose finalize ran before the DB existed
+// (Sprint 189/190 [[project_sprint167_db_gap]]) need a manual landing for
+// the canonical sprint-log + retro + mem trio. `backfillSprintRetro` is
+// the supported API for that — keeps the contract identical to
+// `writeRetrospective`'s DB block so the rows shape match what finalize
+// would have produced.
+
+export interface BackfillSprintRetroInput {
+  /** Canonical sprint ID, e.g. `sprint-189`. */
+  sprintId: string;
+  /** Retro markdown content to persist as the `retro-<sprintId>` body. */
+  retroContent: string;
+  /** Optional sprint-log content; defaults to a minimal generated summary. */
+  sprintLogContent?: string;
+  /** Optional memory content; defaults to a minimal generated learnings stub. */
+  memoryContent?: string;
+}
+
+/**
+ * Manually persist sprint-log + retro + mem rows for a sprint whose
+ * finalize never wrote them. Idempotent — second call upserts existing
+ * rows. Auto-creates `.brain/memory.db` when missing.
+ */
+export function backfillSprintRetro(
+  projectRoot: string,
+  input: BackfillSprintRetroInput,
+): WriteRetrospectiveResult {
+  const result: WriteRetrospectiveResult = {
+    dbAttempted: false,
+    sprintLogWritten: false,
+    retroWritten: false,
+    memoryWritten: false,
+    dbError: null,
+  };
+
+  const brainPath = join(projectRoot, BRAIN_DIR);
+  mkdirSync(brainPath, { recursive: true });
+  const dbPath = join(brainPath, MEMORY_DB_FILE);
+  const sprintNum = parseInt(input.sprintId.replace(/\D/g, ''), 10) || 0;
+
+  result.dbAttempted = true;
+  try {
+    const store = new MemoryStore(dbPath);
+    try {
+      store.upsert({
+        id: `sprint-log-${sprintNum}`,
+        type: 'sprint',
+        title: `Sprint ${input.sprintId}`,
+        content: input.sprintLogContent ?? `# ${input.sprintId}\n\n- Backfilled via backfillSprintRetro\n`,
+        source: 'brain',
+        sprint_id: input.sprintId,
+        sprint_num: sprintNum,
+        status: 'active',
+        tags: ['sprint', input.sprintId, 'backfill'],
+      }, 'brain');
+      result.sprintLogWritten = true;
+
+      store.upsert({
+        id: `retro-${input.sprintId}`,
+        type: 'retro',
+        title: `Sprint ${input.sprintId} Retrospective`,
+        content: input.retroContent,
+        source: 'brain',
+        sprint_id: input.sprintId,
+        sprint_num: sprintNum,
+        tags: ['retro', input.sprintId, 'backfill'],
+      }, 'brain');
+      result.retroWritten = true;
+
+      const memId = `mem-${input.sprintId}`;
+      const existing = store.getById(memId);
+      if (existing) {
+        if (input.memoryContent !== undefined && existing.content !== input.memoryContent) {
+          store.update(memId, { content: input.memoryContent }, 'brain');
+        }
+        result.memoryWritten = true;
+      } else {
+        store.insert({
+          id: memId,
+          type: 'memory',
+          title: `Sprint ${input.sprintId} Learnings`,
+          content: input.memoryContent ?? `## Sprint ${input.sprintId} Learnings\n- Backfilled via backfillSprintRetro\n`,
+          source: 'brain',
+          sprint_id: input.sprintId,
+          sprint_num: sprintNum,
+          tags: ['learning', input.sprintId, 'backfill'],
+        });
+        result.memoryWritten = true;
+      }
+    } finally {
+      store.close();
+    }
+  } catch (e) {
+    result.dbError = e instanceof Error ? e.message : String(e);
+    debugLog('backfillSprintRetro', e);
+  }
+
+  return result;
 }
 
 /**

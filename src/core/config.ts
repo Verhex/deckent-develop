@@ -47,7 +47,31 @@ import { interpolateConfig } from './deck-interpolation.js';
 type DeckentConfigWithPipeline = DeckentConfig & { dependency_pipeline_enabled?: boolean };
 
 // ─── Default Timeout Config ─────────────────────────────────────────
-export const DEFAULT_TIMEOUT_CONFIG: TimeoutConfig = {
+// Sprint 192 (Task 192-011, W-INTEGRITY I-5): adaptive timeout knobs added
+// without mutating `TimeoutConfig` in config-types.ts (out of this task's
+// scope). The local intersection type carries the two new fields so the
+// default object stays statically typed; consumers that read these through
+// `ResolvedConfig.timeout` use the helpers in sprint-controller.ts which
+// perform a runtime-safe lookup with the same defaults.
+export type AdaptiveTimeoutFields = {
+  /**
+   * Multiplier applied on top of `brainEstimateTimeout` (effort × loc × scope
+   * × history × backend) to enforce the user rule "zaman sınırlarını daha
+   * geniş tutalım". 1.0 = no change; values < 1 are rejected by validation.
+   */
+  adaptive_multiplier: number;
+  /**
+   * Maximum heartbeat-aware runtime extensions granted per task (raised from
+   * the legacy hard-coded `3` cap in sprint-phases.ts; the helper
+   * `getRuntimeExtensionMax` in sprint-controller.ts is the wire-point).
+   */
+  runtime_extension_max: number;
+};
+
+export const DEFAULT_ADAPTIVE_MULTIPLIER = 1.5;
+export const DEFAULT_RUNTIME_EXTENSION_MAX = 5;
+
+export const DEFAULT_TIMEOUT_CONFIG: TimeoutConfig & AdaptiveTimeoutFields = {
   docker_min_timeout: 1200,
   docker_max_timeout: 7200,
   tmux_min_timeout: 900,
@@ -64,6 +88,8 @@ export const DEFAULT_TIMEOUT_CONFIG: TimeoutConfig = {
   // to grant a bounded heartbeat-aware extension rather than declare a
   // synthetic NO_GO. Wire: evaluateRuntimeExtension in sprint-phases.ts.
   runtime_extension_enabled: true,
+  adaptive_multiplier: DEFAULT_ADAPTIVE_MULTIPLIER,
+  runtime_extension_max: DEFAULT_RUNTIME_EXTENSION_MAX,
 };
 
 // ─── Default Auto Docs Config ───────────────────────────────────────
@@ -544,6 +570,27 @@ export function validateConfig(config: DeckentConfig): string[] {
       const maxKey = `${backend}_max_timeout` as keyof TimeoutConfig;
       if ((t[maxKey] as number) <= (t[minKey] as number)) {
         errors.push(`timeout.${maxKey} must be greater than timeout.${minKey}`);
+      }
+    }
+
+    // Sprint 192 (Task 192-011): adaptive multiplier + extension cap.
+    // Read from the raw user partial so we surface the failure even when
+    // the deep-merged `t` would have fallen back to a sane default.
+    const adaptive = (config.timeout as Partial<AdaptiveTimeoutFields>);
+    if (adaptive.adaptive_multiplier !== undefined) {
+      const v = adaptive.adaptive_multiplier;
+      if (typeof v !== 'number' || !Number.isFinite(v) || v < 1.0) {
+        errors.push(
+          `Invalid value '${v}' for field 'timeout.adaptive_multiplier'. Must be a finite number >= 1.0.`,
+        );
+      }
+    }
+    if (adaptive.runtime_extension_max !== undefined) {
+      const v = adaptive.runtime_extension_max;
+      if (typeof v !== 'number' || !Number.isInteger(v) || v < 1) {
+        errors.push(
+          `Invalid value '${v}' for field 'timeout.runtime_extension_max'. Must be an integer >= 1.`,
+        );
       }
     }
   }

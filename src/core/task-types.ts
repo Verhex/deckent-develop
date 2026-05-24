@@ -133,10 +133,25 @@ export enum TaskStatus {
   PAUSED = 'PAUSED',
 }
 
+/**
+ * Brain's terminal evaluation outcome for a task.
+ *
+ * Sprint 192 Task 192-010 (W-INTEGRITY I-4) added `DEFERRED` for transparent
+ * retro reporting. Semantic distinction from existing TaskStatus.PAUSED:
+ *   • PAUSED   → task is blocked because a depended-upon task reached NO_GO
+ *                (dependency-scheduler.ts marks via TaskStatus); cascades a
+ *                downstream fix per debt-manager.handleCrossDependencies.
+ *   • DEFERRED → dispatcher saturation (max_workers cap or wave throughput);
+ *                the task never reached EXECUTE before the EVALUATE gate fired.
+ *                Cascade is NOT triggered (handleCrossDependencies filters
+ *                only NO_GO; DEFERRED is intentionally excluded so saturation
+ *                does not spawn xfix tasks downstream).
+ */
 export enum TaskEvaluation {
   DONE = 'DONE',
   GO_WITH_TECH_DEBT = 'GO_WITH_TECH_DEBT',
   NO_GO = 'NO_GO',
+  DEFERRED = 'DEFERRED',
 }
 
 export type SelfAssessment = 'DONE' | 'GO_WITH_TECH_DEBT' | 'NO_GO';

@@ -17,7 +17,7 @@ import { join } from 'node:path';
 // ─── Core (value imports) ──────────────────────────────────────────
 import {
   TaskEvaluation, SprintPhase,
-  SprintStatus,
+  SprintStatus, TaskStatus,
 } from '../core/types.js';
 
 // ─── Core (type imports) ───────────────────────────────────────────
@@ -30,6 +30,13 @@ import { TASKS_DIR } from '../core/constants.js';
 
 // ─── Core — utils ─────────────────────────────────────────────────
 import { readJsonSafe, debugLog, updateLastSprintId } from '../core/utils.js';
+
+// ─── Core — adaptive timeout defaults (Sprint 192 Task 192-011) ────
+import {
+  DEFAULT_ADAPTIVE_MULTIPLIER,
+  DEFAULT_RUNTIME_EXTENSION_MAX,
+} from '../core/config.js';
+import type { AdaptiveTimeoutFields } from '../core/config.js';
 
 // ─── Core — provider abstraction ──────────────────────────────────
 import type { ProviderAdapter } from '../core/provider.js';
@@ -59,8 +66,11 @@ import type { SafetyPoint } from './rollback.js';
 import {
   runPlanPhase, runSpawnPhase, runEvaluatePhase,
   runRollbackCheck, runFixPhase, runRetroPhase,
-  runCleanupPhase,
+  runCleanupPhase, pollForResultFile,
 } from './sprint-phases.js';
+
+// ─── Worker Liveness (Sprint 192 W-INTEGRITY I-2 — pre-synthetic gate) ─
+import { checkWorkerLiveness } from './worker-liveness.js';
 
 // ─── Result Collector ─────────────────────────────────────────────
 import {
@@ -241,6 +251,69 @@ function emitPhaseChange(oldPhase: string, newPhase: string, sprintId: string): 
   emitSprintEvent('SPRINT_PHASE_CHANGE', { oldPhase, newPhase, sprintId });
 }
 
+// ═══ Adaptive Timeout Helpers (Sprint 192 Task 192-011 — W-INTEGRITY I-5)
+//
+// User rule: "zaman sınırlarını daha geniş tutalım". These helpers are the
+// single read-point for the two new `TimeoutConfig` knobs introduced in
+// config.ts (`adaptive_multiplier`, `runtime_extension_max`). They live on
+// the sprint-controller because the controller is already the lifecycle
+// authority and is in this task's `scope.filesWrite`; sprint-phases.ts and
+// timeout-estimator.ts are out-of-scope here and will wire to these helpers
+// in a follow-up.
+//
+// All three helpers are pure, defensive, and safe to call with `undefined`
+// config (returns the documented defaults). They never throw.
+
+function readAdaptive(config?: ResolvedConfig): Partial<AdaptiveTimeoutFields> {
+  // ResolvedConfig.timeout is typed as TimeoutConfig (no adaptive fields),
+  // but the runtime object carries them when produced by mergeConfigs.
+  return (config?.timeout ?? {}) as Partial<AdaptiveTimeoutFields>;
+}
+
+/**
+ * Resolve the adaptive timeout multiplier for the active config.
+ * Falls back to {@link DEFAULT_ADAPTIVE_MULTIPLIER} (1.5) when the config
+ * is missing the field or the value is not a finite >= 1 number.
+ */
+export function getAdaptiveMultiplier(config?: ResolvedConfig): number {
+  const v = readAdaptive(config).adaptive_multiplier;
+  if (typeof v === 'number' && Number.isFinite(v) && v >= 1.0) {
+    return v;
+  }
+  return DEFAULT_ADAPTIVE_MULTIPLIER;
+}
+
+/**
+ * Resolve the max number of heartbeat-aware runtime extensions allowed for
+ * a single task. Falls back to {@link DEFAULT_RUNTIME_EXTENSION_MAX} (5)
+ * when the config is missing the field or the value is invalid.
+ *
+ * Wire-point for sprint-phases.ts `RUNTIME_EXTENSION_MAX` (currently a hard
+ * constant of 3 — to be replaced with a call to this helper).
+ */
+export function getRuntimeExtensionMax(config?: ResolvedConfig): number {
+  const v = readAdaptive(config).runtime_extension_max;
+  if (typeof v === 'number' && Number.isInteger(v) && v >= 1) {
+    return v;
+  }
+  return DEFAULT_RUNTIME_EXTENSION_MAX;
+}
+
+/**
+ * Apply the adaptive multiplier to a base timeout (in seconds). Returns
+ * `round(baseSeconds * multiplier)`. A non-positive `baseSeconds` (e.g.
+ * `0` meaning "disabled") is returned unchanged so callers can opt out
+ * with a sentinel.
+ */
+export function applyAdaptiveTimeout(
+  baseSeconds: number,
+  config?: ResolvedConfig,
+): number {
+  if (!Number.isFinite(baseSeconds) || baseSeconds <= 0) return baseSeconds;
+  const multiplier = getAdaptiveMultiplier(config);
+  return Math.round(baseSeconds * multiplier);
+}
+
 // ═══ Sprint 168 C0c — Plan↔Spawn Integration Helpers ══════════════
 //
 // Sprint 167 cascade root layer: the spawn pipeline operated on the in-memory
@@ -260,7 +333,7 @@ function emitPhaseChange(oldPhase: string, newPhase: string, sprintId: string): 
 
 import { handleScopeCollision } from './decision-engine.js';
 import type { ScopeCollisionPayload, SpawnDecision } from './decision-engine.js';
-import { writeEvent, CHANNELS } from './event-stream.js';
+import { writeEvent, CHANNELS, getCurrentSprintId } from './event-stream.js';
 
 // ═══ Nervous System Wire (Sprint 180 W3-1, NERVOUS-TODO §11.2 Step D) ══
 //
@@ -750,6 +823,23 @@ export async function runSprint(
     );
     scanInterval = initialScanInterval;
 
+    // ─── Sprint 192 Task 192-009 — Dispatch loop assignedWorker wire ───
+    // W-INTEGRITY I-3: spawn-spawner sets task.status=EXECUTING + persists
+    // to disk, but the in-memory task.assignedWorker stays undefined until
+    // the worker claims on disk. Mirror w-<id> in-memory for dispatched
+    // tasks (status=EXECUTING and NOT in the deferred-queue list) so
+    // worker-liveness L1 signal and the EVALUATE entry guard see consistent
+    // state even before the worker's claim-write lands.
+    try {
+      const queuedSet = new Set(taskQueue.map(t => t.id));
+      for (const task of sprint.tasks) {
+        if (queuedSet.has(task.id)) continue;
+        if (task.status === TaskStatus.EXECUTING && !task.assignedWorker) {
+          task.assignedWorker = `w-${task.id}`;
+        }
+      }
+    } catch (e) { debugLog('runSprint:wireAssignedWorker', e); }
+
     // Phase-transition checkpoint: SPAWN complete
     try { writePhaseCheckpoint(projectRoot, sprint, sprint.phase); } catch (e) { debugLog('runSprint:checkpoint:spawn', e); }
 
@@ -805,6 +895,58 @@ export async function runSprint(
             const lateResult = readJsonSafe<TaskResult>(resultPath);
             if (lateResult) results.push(lateResult);
           } else {
+            // ─── Sprint 192 Task 192-001 — W-INTEGRITY I-2 ────────────
+            // Memory: [[feedback_no_synthetic_results]] — sentetik NO_GO yasak.
+            // Sprint 191 hotfix sprint-phases.ts:1120 pattern'i; iki
+            // sprint-controller grace-kill bloğunu (cleanup + recover path)
+            // 5-layer worker liveness check ile öne kapısı.
+            //   never-spawned → SKIP synthetic; NEVER_DISPATCHED event;
+            //                   continue (task DEFERRED'a kalır, kill atılmaz).
+            //   alive         → 60s grace poll; result lands → evaluate,
+            //                   else fall through with `liveness=alive` tag.
+            //   dead          → genuine timeout, synthetic NO_GO ile devam,
+            //                   notes'a `liveness=dead` ekle.
+            const liveness = checkWorkerLiveness(task, projectRoot);
+            if (liveness.status === 'never-spawned') {
+              debugLog(
+                'graceKill:never-dispatched',
+                `task=${task.id} reason=${liveness.reason}`,
+              );
+              try {
+                const sidNd = getCurrentSprintId(projectRoot) ?? sprint.id;
+                writeEvent(
+                  projectRoot, sidNd, 'brain', 'worker',
+                  'BRAIN→WORKER:NEVER_DISPATCHED',
+                  {
+                    taskId: task.id,
+                    reason: liveness.reason,
+                    signals: liveness.signals,
+                    source: 'grace-kill',
+                  },
+                );
+              } catch (e) { debugLog('graceKill:nd-event', e); }
+              continue;
+            }
+            if (liveness.status === 'alive') {
+              debugLog(
+                'graceKill:alive-grace',
+                `task=${task.id} ${liveness.reason} — granting 60s grace poll`,
+              );
+              const graceResult = await pollForResultFile(projectRoot, task.id, 60_000);
+              if (graceResult) {
+                debugLog(
+                  'graceKill:alive-grace-hit',
+                  `task=${task.id} produced .result during grace window`,
+                );
+                results.push(graceResult);
+                continue;
+              }
+              debugLog(
+                'graceKill:alive-grace-miss',
+                `task=${task.id} no .result after grace 60s — falling through with liveness=alive label`,
+              );
+            }
+
             // Panic Guard: require user approval before killing workers
             const panicGuard = new PanicGuard(projectRoot);
             const decision = panicGuard.evaluate(
@@ -819,6 +961,7 @@ export async function runSprint(
             if (decision === 'BLOCK') {
               debugLog('graceKill:panicGuard', `Kill blocked for task ${task.id} — user approval required`);
               const syntheticResult: TaskResult = {
+                // checkWorkerLiveness gate applied above — liveness=${liveness.status}
                 taskId: task.id,
                 workerId: task.assignedWorker ?? `w-${task.id}`,
                 filesChanged: [],
@@ -827,7 +970,7 @@ export async function runSprint(
                 testsPassed: false,
                 coverage: 0,
                 selfAssessment: 'NO_GO',
-                notes: 'Worker had heartbeat but failed to write result within grace period — kill blocked by panic guard (user approval required)',
+                notes: `Worker had heartbeat but failed to write result within grace period — kill blocked by panic guard (user approval required); liveness=${liveness.status}`,
               };
               try {
                 await writeFile(resultPath, JSON.stringify(syntheticResult, null, 2), 'utf-8');
@@ -843,6 +986,7 @@ export async function runSprint(
               } catch (e) { debugLog('graceKill:killWorker', e); }
 
               const syntheticResult: TaskResult = {
+                // checkWorkerLiveness gate applied above — liveness=${liveness.status}
                 taskId: task.id,
                 workerId: task.assignedWorker ?? `w-${task.id}`,
                 filesChanged: [],
@@ -851,7 +995,7 @@ export async function runSprint(
                 testsPassed: false,
                 coverage: 0,
                 selfAssessment: 'NO_GO',
-                notes: 'Worker had heartbeat but failed to write result within grace period — killed (user-explicit override)',
+                notes: `Worker had heartbeat but failed to write result within grace period — killed (user-explicit override); liveness=${liveness.status}`,
               };
               try {
                 await writeFile(resultPath, JSON.stringify(syntheticResult, null, 2), 'utf-8');
@@ -875,7 +1019,51 @@ export async function runSprint(
   // adaptive aspirational target. Finalizer auto-learn may lower
   // `coverage_aspirational` over time; the gate must not slide with it.
   const evaluations = new Map<string, TaskEvaluation>();
-  await runEvaluatePhase(projectRoot, sprint, results, evaluations, config.coverage_hard_floor);
+
+  // ─── Sprint 192 Task 192-009 — Dispatcher deadline → DEFERRED set ───
+  // W-INTEGRITY I-3: by the time waitForResults returns, the dispatcher has
+  // exhausted its wait window (effort×2-3x via existing timeout config).
+  // Any task with no .result AND no .hb AND no assignedWorker AND still
+  // PENDING/DRAFT was never reached — mark DEFERRED so the EVALUATE entry
+  // guard proceeds rather than blocking the sprint on a wave that will
+  // never fire. Fail-safe: any I/O issue collapses to "no deferred".
+  const deferredTaskIds = new Set<string>();
+  try {
+    const collectedResultIds = new Set(results.map(r => r.taskId));
+    for (const t of sprint.tasks) {
+      if (collectedResultIds.has(t.id)) continue;
+      const resultPath = join(projectRoot, TASKS_DIR, `task-${t.id}.result`);
+      if (existsSync(resultPath)) continue;
+      const hbPath = join(projectRoot, TASKS_DIR, `task-${t.id}.hb`);
+      const hasHb = existsSync(hbPath);
+      const hasWorker = typeof t.assignedWorker === 'string' && t.assignedWorker.length > 0;
+      const isPrePending = t.status === TaskStatus.PENDING || t.status === TaskStatus.DRAFT;
+      if (!hasHb && !hasWorker && isPrePending) {
+        deferredTaskIds.add(t.id);
+      }
+    }
+    if (deferredTaskIds.size > 0) {
+      try {
+        const sidForDef = getCurrentSprintId(projectRoot) ?? sprint.id;
+        writeEvent(
+          projectRoot, sidForDef, 'brain', 'worker',
+          'BRAIN→WORKER:DISPATCH_DEADLINE_EXCEEDED',
+          {
+            taskIds: [...deferredTaskIds],
+            reason: 'never-dispatched-after-wait',
+            totalTasks: sprint.tasks.length,
+            collectedResults: results.length,
+            timestamp: new Date().toISOString(),
+          },
+        );
+      } catch (e) { debugLog('runSprint:dispatchDeferredEvent', e); }
+    }
+  } catch (e) { debugLog('runSprint:computeDeferred', e); }
+
+  await runEvaluatePhase(
+    projectRoot, sprint, results, evaluations, config.coverage_hard_floor,
+    undefined, undefined, deferredTaskIds, { enforceDispatchGate: true },
+  );
 
   // Honesty Check Metrics
   {

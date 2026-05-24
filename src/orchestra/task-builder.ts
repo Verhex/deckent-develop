@@ -1090,6 +1090,62 @@ export function queryRelevantADRs(taskDescription: string, taskScope: string[], 
   }
 }
 
+// ─── Karpathy 4-Discipline Injection (Sprint 192 192-006) ──────────────
+//
+// Append the Karpathy discipline block to every worker prompt as a final
+// cognitive anchor (Think → Simplicity → Surgical → Goal-Driven). Content
+// is loaded once per process from .claude/rules/karpathy-discipline.md and
+// cached at module level — sprint controller spawns many workers but the
+// rule file changes at most once per release.
+
+const KARPATHY_RULE_REL_PATH = join('.claude', 'rules', 'karpathy-discipline.md');
+const KARPATHY_SECTION_HEADER = '## Karpathy Discipline (mandatory)';
+
+let karpathyCache: { root: string; content: string | null } | null = null;
+
+/**
+ * Load `.claude/rules/karpathy-discipline.md` from disk with a module-level
+ * cache keyed by project root. Returns null when the file is absent so
+ * callers can silently skip injection — the rule is best-effort, not fatal.
+ * Exported so tests can clear and re-exercise the cache.
+ */
+export function loadKarpathyDiscipline(projectRoot?: string): string | null {
+  const root = projectRoot ?? process.cwd();
+  if (karpathyCache && karpathyCache.root === root) {
+    return karpathyCache.content;
+  }
+  let content: string | null = null;
+  try {
+    const filePath = join(root, KARPATHY_RULE_REL_PATH);
+    if (existsSync(filePath)) {
+      content = readFileSync(filePath, 'utf-8');
+    }
+  } catch (err) {
+    debugLog('loadKarpathyDiscipline', err instanceof Error ? err : new Error(String(err)));
+    content = null;
+  }
+  karpathyCache = { root, content };
+  return content;
+}
+
+/**
+ * Reset the Karpathy discipline cache. Test-only — callers in production
+ * code should rely on the per-process cache.
+ */
+export function _resetKarpathyCache(): void {
+  karpathyCache = null;
+}
+
+/**
+ * Build the Karpathy section appended to every worker prompt. Returns an
+ * empty string when the source file is missing (best-effort injection).
+ */
+function buildKarpathySection(projectRoot?: string): string {
+  const content = loadKarpathyDiscipline(projectRoot);
+  if (!content) return '';
+  return `\n\n${KARPATHY_SECTION_HEADER}\n\n${content.trim()}\n`;
+}
+
 /**
  * Build the full prompt string that will be sent to a worker agent.
  * Delegates to prompt-god-template.ts buildTaskPrompt() for unified prompt generation.
@@ -1142,6 +1198,8 @@ export function buildWorkerPrompt(
   };
 
   const artifact = buildTaskPrompt(task, ctx);
+  const karpathySection = buildKarpathySection();
+  const finalPrompt = karpathySection ? artifact.prompt + karpathySection : artifact.prompt;
 
   // Estimate prompt token size and write to task (legacy behavior)
   try {
@@ -1157,5 +1215,5 @@ export function buildWorkerPrompt(
     debugLog('buildWorkerPrompt:token-estimate', err instanceof Error ? err : new Error(String(err)));
   }
 
-  return artifact.prompt;
+  return finalPrompt;
 }

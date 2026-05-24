@@ -114,6 +114,10 @@ interface OllamaWorkerEntry {
  * Rich detection payload — what an external caller gets back from
  * `OllamaAdapter.detect()`. Mirrors the shape requested in the task spec
  * (`{ binary, version, auth, ready }` style) with Ollama-specific fields.
+ *
+ * Sprint 192 Task 192-007: `ready` is now 3-state aligning with the other
+ * provider adapters — `'partial'` when the server is reachable but no models
+ * are installed (actionable hint: `ollama pull <model>`).
  */
 export interface OllamaDetectionResult {
   available: boolean;
@@ -125,8 +129,13 @@ export interface OllamaDetectionResult {
   models: string[];
   /** Auth status — always 'none' for local Ollama, but kept for shape parity. */
   auth: 'none';
-  /** True when the server responded successfully within timeout. */
-  ready: boolean;
+  /**
+   * 3-state readiness:
+   * - `true` — server reachable and at least one model installed
+   * - `'partial'` — server reachable but no models pulled yet (actionable)
+   * - `false` — server unreachable
+   */
+  ready: true | false | 'partial';
   /** Human-readable reason for the result. */
   reason: string;
 }
@@ -318,14 +327,20 @@ export class OllamaAdapter implements ProviderAdapter {
         // version endpoint is optional on older Ollama builds
       }
 
+      // Sprint 192 Task 192-007: 3-state readiness — server reachable with
+      // zero models pulled is `'partial'` (actionable: `ollama pull <model>`).
+      const ready: true | 'partial' = models.length > 0 ? true : 'partial';
+      const reason = models.length > 0
+        ? `Ollama server reachable (${models.length} model${models.length === 1 ? '' : 's'})`
+        : 'Ollama server reachable but no models installed — pull a model to use it';
       return {
-        available: true,
+        available: models.length > 0,
         endpoint: this.host,
         version,
         models,
         auth: 'none',
-        ready: true,
-        reason: `Ollama server reachable (${models.length} model${models.length === 1 ? '' : 's'})`,
+        ready,
+        reason,
       };
     } catch (err) {
       return {
@@ -345,14 +360,17 @@ export class OllamaAdapter implements ProviderAdapter {
    */
   async diagnoseAvailability(): Promise<ProviderAvailabilityDetail> {
     const d = await this.detect();
-    const versionStatus: ProviderAvailabilityDetail['versionStatus'] = d.ready
+    // Reachability — "binary" means "server reachable" for Ollama; the local
+    // server stands in for the CLI binary used by the other adapters.
+    const reachable = d.ready !== false;
+    const versionStatus: ProviderAvailabilityDetail['versionStatus'] = reachable
       ? d.version
         ? 'ok'
         : 'unknown'
       : 'missing';
 
     const hints: string[] = [];
-    if (!d.ready) {
+    if (!reachable) {
       hints.push('Install Ollama: https://ollama.com/download');
       hints.push('Start the server: `ollama serve`');
       hints.push(`Or set OLLAMA_HOST=<url> (current: ${this.host})`);
@@ -362,14 +380,14 @@ export class OllamaAdapter implements ProviderAdapter {
 
     return {
       name: 'ollama',
-      binaryFound: d.ready,
+      binaryFound: reachable,
       binaryPath: undefined,
       version: d.version,
       versionStatus,
       authMethod: 'none',
-      authStatus: d.ready ? 'ok' : 'missing',
-      available: d.ready,
-      partial: false,
+      authStatus: reachable ? 'ok' : 'missing',
+      available: d.ready === true,
+      partial: d.ready === 'partial',
       models: [...OLLAMA_MODELS] as unknown as ModelType[],
       reason: d.reason,
       hints,
