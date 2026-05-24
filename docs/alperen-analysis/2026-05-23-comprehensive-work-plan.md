@@ -987,3 +987,52 @@ Bu 12 P0 + Sprint 190 carry-over tamam olmalı. Sprint 192+ (Trinity dashboard r
 
 **Onay:** Alperen 2026-05-24 onayladı — hotfix şimdi, Sprint 192'de izleme + reform.
 
+---
+
+# Sprint 191 191-017-fix — Sprint 190 Provider Carry-Over Closure Status (2026-05-23)
+
+**Parent task:** 191-017 (NO_GO — "Timeout - no result received"). Fix task closes the
+result-write gap; underlying source already landed during Sprint 190 cross-fixes.
+
+## Ask A — Provider isAvailable() 3-state (was 190-002)
+
+**Status:** ✓ DONE in tree (verified during 190-002-xfix and re-verified here).
+
+| Surface | File:line | State |
+|---------|-----------|-------|
+| `ProviderDetectResult` interface | `src/providers/claude.ts:38-52` | `ready: true \| false \| 'partial'` |
+| `ClaudeAdapter.detect()` | `src/providers/claude.ts:300-323` | binary OK → `ready:true` (CLI session) |
+| `CodexAdapter.detect()` | `src/providers/codex.ts:263-286` | binary OK + no auth → `ready:'partial'` |
+| `GeminiAdapter.detect()` | `src/providers/gemini.ts:347-369` | binary OK + no GOOGLE_API_KEY → `ready:'partial'` |
+| `OllamaAdapter.detect()` | `src/providers/ollama.ts:291-336` | server reachable → `ready:true`, else `false` |
+| `getProviderPartialHint()` | `src/cli/commands/doctor.ts:423-430` | per-provider actionable hint |
+| `formatProviderDiagnosticsActionable()` | `src/cli/commands/doctor.ts:444-470` | ✓ / ⚠ / ✗ format + hints |
+
+**Test coverage:** 378/378 PASS across in-scope files (89 gemini + 76 codex + 22 ollama
++ 4+4 isAvailable + 183 doctor).
+
+## Ask B — Ollama TECH_DEBT closure (was 190-009)
+
+**Status:** ⚠ Partial — 1 of 4 closed; 3 items deferred for out-of-scope filesWrite.
+
+| # | TECH_DEBT item | File | In 191-017-fix scope? |
+|---|----------------|------|----------------------|
+| 1 | `tests/core/model-registry.test.ts` invariant (13/3) — closed by 190-009-xfix | `src/core/model-registry.ts` + `src/providers/ollama.ts` opt-in registration | ✓ Done in Sprint 190 |
+| 2 | `ProviderName` union widening to 4 values, drop runtime casts | `src/core/task-types.ts` | ✗ Not in filesWrite |
+| 3 | `bootstrapProviders` + `detectOllama` factory wiring | `src/core/provider.ts` | ✗ Not in filesWrite |
+| 4 | `TIER_PROVIDER_MAP` ollama row for cross-provider tier remapping | `src/core/model-equivalence.ts` | ✗ Not in filesWrite |
+
+**Why items 2-4 are deferred:** 191-017-fix scope is limited to `providers/`,
+`cli/commands/`, `docs/alperen-analysis/`, and corresponding tests. Items 2-4 require
+writes into `src/core/` which the auditor would flag as boundary violations under
+ADR-037. They are documented here verbatim so the next sprint can pick them up with
+zero discovery cost — exact files, exact change needed.
+
+## Recommended follow-up
+
+- Sprint 192 candidate task: "Ollama core/ wire-up + ProviderName widen" with
+  `filesWrite: [src/core/task-types.ts, src/core/provider.ts, src/core/model-equivalence.ts]`
+  and corresponding tests in `tests/core/`. Effort: low (each item is <30 LoC additive).
+- User-visible impact today: `deckent config set worker_provider ollama` accepts the
+  value but the spawner cannot construct `OllamaAdapter` automatically — chat-mode
+  (Task 190-007) still works because it instantiates the adapter directly.
