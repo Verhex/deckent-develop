@@ -5259,3 +5259,43 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 191-017: 191-017 — Sprint 190 carry-over: provider isAvailable 3-state + Ollama TECH_DEBT closure (NO_GO)
 
 ---
+## Sprint 192 — sprint-192
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-05-24
+**Duration:** 3243s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 25 |
+| Completed | 5 |
+| Tech Debt | 1 |
+| No-Go | 20 |
+| Coverage | 8.6% |
+| Duration | 3243495ms |
+
+### Tasks
+
+- 192-001: 192-001 — sprint-controller.ts synthetic NO_GO bloklarına liveness check (W-INTEGRITY I-2) (NO_GO)
+- 192-002: 192-002 — runtime_extension_enabled default true (Sprint 191 191-002 carry-over) (NO_GO)
+- 192-003: 192-003 — outcome-tracker reclassifyTaskOutcome GERÇEK implementation (Sprint 191 191-003 carry-over — dishonest worker case) (GO_WITH_TECH_DEBT)
+- 192-004: 192-004 — CLI top-level error handler — uncaughtException + unhandledRejection (Sprint 191 191-007 carry-over) (NO_GO)
+- 192-005: 192-005 — sprint-finalizer retro hook DB write (Sprint 191 191-008 carry-over) (DONE)
+- 192-006: 192-006 — task-builder Karpathy block injection (Sprint 191 191-015 carry-over) (NO_GO)
+- 192-007: 192-007 — Provider isAvailable 3-state + Ollama TECH_DEBT (Sprint 191 191-017 carry-over) (DONE)
+- 192-008: 192-008 — Hotfix telemetri — never-dispatched + alive-grace event sayım retro'ya (W-INTEGRITY I-1) (DONE)
+- 192-009: 192-009 — EVALUATE phase trigger sıkılaştırma (W-INTEGRITY I-3) (NO_GO)
+- 192-010: 192-010 — TaskEvaluation.DEFERRED enum + retro reporting (W-INTEGRITY I-4) (DONE)
+- 192-011: 192-011 — Sprint-level adaptive timeout (W-INTEGRITY I-5) (NO_GO)
+- 192-012: 192-012 — Dishonest worker result detector (W-INTEGRITY I-8) (NO_GO)
+- 192-013: 192-013 — worker_memory_limit 4g→2g + max_workers 3→12 deney (W-M M-1) (NO_GO)
+- 192-014: 192-014 — NODE_OPTIONS --max-old-space-size-percentage container env (W-M M-2) (NO_GO)
+- 192-015: 192-015 — Adaptive scheduler — host RAM tespit + max_workers auto-calc (W-M M-3) (NO_GO)
+- 192-016: 192-016 — RAM telemetri — `docker stats` snapshot retro'ya + VDS/VPS analiz (W-M M-7) (NO_GO)
+- 192-017: 192-017 — 5 ek agent PROMPT.md Karpathy refactor (L-6: security-auditor, performance-analyzer, accessibility-auditor, data-engineer, devops-engineer) (NO_GO)
+- 192-018: 192-018 — 5 ek skill SKILL.md Karpathy refactor (L-7: python-expert, anthropic-sdk, frontend-design, docker-expert, git-expert) (NO_GO)
+- 192-019: 192-019 — Sprint 191 retroactive bulk reclassify (192-003 API kullanarak) (NO_GO)
+
+---

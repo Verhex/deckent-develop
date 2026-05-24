@@ -1,5 +1,10 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-192 Learnings
+- Sprint sprint-192 Learnings: ## Sprint sprint-192 Learnings
+- Placeholder — sprint still in-progress; will be overwritten by finalize.
+
+
 ## Sprint sprint-191 Learnings
 - Sprint sprint-191 Learnings: ## Sprint sprint-191 Learnings
 - 191-002 — `runtime_extension_enabled: true` default + worker timeout extension wire: NO_GO

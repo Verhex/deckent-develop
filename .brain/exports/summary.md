@@ -61,6 +61,9 @@
 | adr-064 | TOPP — Continuous Dispatch (Wave-Barrier Removal) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-192 Learnings** (sprint-192): ## Sprint sprint-192 Learnings
+- Placeholder — sprint still in-progress; will be overwritten by finalize.
+
 - **Sprint sprint-191 Learnings** (sprint-191): ## Sprint sprint-191 Learnings
 - 191-002 — `runtime_extension_enabled: true` default + worker timeout extension wire:...
 - **Sprint sprint-190 Learnings** (sprint-190): ## Sprint sprint-190 Learnings
@@ -78,8 +81,6 @@
 - W3-3 — v1.0.0-beta.1 final smoke (build:all + vitest + dashboard + serve): NO_GO — W...
 - **Sprint sprint-182 Learnings** (sprint-182): ## Sprint sprint-182 Learnings
 - W1-1 — Mock hygiene: orphan-cleaner-ipc + archive-debt `renameSync` ekle: NO_GO — Wo...
-- **Sprint sprint-181 Learnings** (sprint-181): ## Sprint sprint-181 Learnings
-- W1-1 — CI workflow'una dashboard deps install adımı ekle: NO_GO — W1-1 primary fix t...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -109,5 +110,7 @@ _No active technical debt._
 - Violation pattern: stale_heartbeat
 - Violation pattern: doc_sync_ground_truth_mismatch
 - Violation pattern: stale_heartbeat
+- Violation pattern: doc_sync_ground_truth_mismatch
+- Violation pattern: stale_heartbeat
 
-_Total entries: 340 | Generated: 2026-05-23_
+_Total entries: 346 | Generated: 2026-05-24_

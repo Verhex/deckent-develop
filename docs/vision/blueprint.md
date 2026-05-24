@@ -5,15 +5,15 @@
 ---
 
 ## Live Metrics
-| Metric | Value |
+| Metrik | Değer |
 |--------|-------|
-| Sprint | sprint-191 |
-| Total Tasks | 29 |
-| Completed | 3 |
-| Tech Debt | 0 |
-| No-Go | 26 |
-| Duration | 68dk 14sn |
-| Coverage | 13.6% |
+| Sprint | sprint-192 |
+| Toplam Task | 25 |
+| Tamamlanan | 5 |
+| Tech Debt | 1 |
+| No-Go | 20 |
+| Süre | 54dk 3sn |
+| Coverage | 8.6% |
 
 # TABLE OF CONTENTS
 

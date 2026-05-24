@@ -2,6 +2,25 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint192] - 2026-05-24
+
+### Added
+
+- 192-005 — sprint-finalizer retro hook DB write (Sprint 191 191-008 carry-over)
+- 192-007 — Provider isAvailable 3-state + Ollama TECH_DEBT (Sprint 191 191-017 carry-over)
+- 192-010 — TaskEvaluation.DEFERRED enum + retro reporting (W-INTEGRITY I-4)
+
+### Changed
+
+- 192-003 — outcome-tracker reclassifyTaskOutcome GERÇEK implementation (Sprint 191 191-003 carry-over — dishonest worker case) (completed with tech debt)
+
+### Fixed
+
+- 192-008 — Hotfix telemetri — never-dispatched + alive-grace event sayım retro'ya (W-INTEGRITY I-1)
+
+
+_Tasks: 25 total, 5 done, 1 tech debt, 20 no-go_
+
 ## [1.0.0-beta.1-sprint191] - 2026-05-23
 
 ### Added

@@ -113,10 +113,10 @@ Spec: `docs/superpowers/specs/2026-05-19-embedded-web-terminal-design.md`. Plan:
 ---
 
 ## Current Status
-| Metric | Value |
+| Metrik | Değer |
 |--------|-------|
 | Version | 1.0.0-beta.1 |
-| Sprint | sprint-191 |
+| Sprint | sprint-192 |
 | MCP Tools | 28 |
 | MCP Resources | 8 |
 | CLI Commands | 58+ |
@@ -971,15 +971,15 @@ Every blocker was directly verified in the codebase. False claims have been corr
 ---
 
 ## Sprint Metrics
-| Metric | Value |
+| Metrik | Değer |
 |--------|-------|
-| Sprint | sprint-191 |
-| Total Tasks | 29 |
-| Completed | 3 |
-| Tech Debt | 0 |
-| No-Go | 26 |
-| Duration | 68dk 14sn |
-| Coverage | 13.6% |
+| Sprint | sprint-192 |
+| Toplam Task | 25 |
+| Tamamlanan | 5 |
+| Tech Debt | 1 |
+| No-Go | 20 |
+| Süre | 54dk 3sn |
+| Coverage | 8.6% |
 
 ## Sprint History (Sprint 136-166)
 | Sprint | Tasks | Done | NO_GO | Duration | Avg Rubric | Theme |
@@ -1495,7 +1495,7 @@ Cache only reduces cost — tokens still occupy the context window:
 - [CMA Quickstart](https://platform.claude.com/docs/en/managed-agents/quickstart) — Agent creation, sessions, streaming guide
 
 ## Sprint History
-_No sprint history._
+_Sprint geçmişi yok._
 
 ## Sprint 163 — Detailed Summary
 
