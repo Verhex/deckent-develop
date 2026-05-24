@@ -116,6 +116,7 @@ Phase 3: SPAWN
 Phase 4: EXECUTE
   - Worker writes property + impl + DbC contract
   - [YENİ] Andon authority — worker proactively raises halt (Toyota Jidoka)
+  - **Karpathy 4-Discipline** worker execution contract (Sprint 191): Think-Before-Coding → Simplicity-First → Surgical-Changes → Goal-Driven-Execution (`.claude/rules/karpathy-discipline.md`). Discipline 4 (honest self-assessment + Goal-Driven Execution) = AEGIS Principle 3 (Adversarial Verification by Default) worker-side expression.
   - Heartbeat scan (Auditor)
 
 Phase 5: ADVERSE  [YENİ EXPLICIT PHASE]
@@ -294,6 +295,7 @@ Manifesto-style canonical principles:
 - **ADR-053** — TaskType Taxonomy (Sprint 172 accepted — çekirdek 3-tip taxonomy shipped; Roadmap/Tek-Kaynak deferred): AEGIS Phase 2 GOVERN içinde EffectClass classification dependency.
 - **ADR-055** — Hybrid Scoring 5-Layer (proposed): AEGIS Phase 6 EVALUATE'in canonical implementation.
 - **ADR-060** — Self-Awareness Propagation (proposed): AEGIS Layer 1 AWARENESS 5-channel context enrichment specification.
+- **Karpathy 4-Discipline Anchor** (`.claude/rules/karpathy-discipline.md`, Sprint 191 eklendi): AEGIS Phase 4 EXECUTE'in **worker-side canonical contract'ı**. 4 disiplin AEGIS prensipleriyle eşlenir: Discipline 1 (Think-Before-Coding) ↔ AEGIS Principle #5 (Cross-Workflow Institutional Memory — read before act), Discipline 3 (Surgical Changes) ↔ AEGIS ADR-037 RBAC scope.filesWrite enforcement, Discipline 4 (Goal-Driven + honest self-assessment) ↔ AEGIS Principle #3 (Adversarial Verification by Default — worker self-critique tier). Karpathy discipline, AEGIS Phase 4 Andon authority'nin yazılı norm halidir.
 
 **Prior art credit:**
 - **dollspace-gay/VSDD** — Adversarial verification via fresh-context critique pattern (AEGIS Phase 5 ADVERSE inheritance).
@@ -382,3 +384,5 @@ AEGIS VSDD'nin **superset'idir** — VSDD prensiplerinin çoğunu (adversarial v
 > - Ground-truth tutarlı: "15 vertical agent + 21 horizontal skill" (§Related ADR-041) güncel kataloğla eşleşir.
 >
 > Behavior unchanged; documentation alignment only.
+
+> **Amendment — Sprint 191 (Karpathy cross-reference):** Sprint 191 Worker Discipline Anchor projesi `.claude/rules/karpathy-discipline.md` dosyasını ekledi (4 disiplin: Think-Before-Coding, Simplicity-First, Surgical-Changes, Goal-Driven-Execution). Bu amendment AEGIS Phase 4 EXECUTE lifecycle adımına Karpathy 4-Discipline Anchor referansını ve §Related ADRs'e Karpathy Anchor cross-reference'ını ekler. Karpathy discipline AEGIS prensipleri #3 (Adversarial Verification — Discipline 4 honest self-assessment) ve #1 (Separation of Duties — Discipline 3 scope.filesWrite enforcement) ile örtüşür. No behavior change; documentation cross-reference only.

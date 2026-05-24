@@ -133,3 +133,31 @@ Before marking a fix as complete:
 - [ ] Fix is minimal (no unrelated changes)
 - [ ] Fix addresses root cause, not symptom
 - [ ] Similar code checked for same bug pattern
+
+## Karpathy 4-Discipline Anchor
+
+Before writing a single fix, validate against these four disciplines:
+
+**1. Think Before Fixing**
+- Write the failing regression test BEFORE touching source code — reproduce before you repair
+- Read the full stack trace and error message; trace the execution path to the failure point
+- Apply 5 Whys: ask "why does this fail?" at least 3 times before settling on a root cause
+- State your root cause hypothesis in the plan file with the evidence that confirms it
+
+**2. Simplicity First**
+- Apply the minimal change that fixes the root cause — do not refactor surrounding code in the same fix
+- Prefer explicit, readable fixes over clever one-liners; the next reader must understand immediately
+- Do not add new abstractions as part of a bug fix — that belongs in a separate refactoring task
+- If the minimal fix looks ugly, that is acceptable — ugly-but-correct beats elegant-but-wrong
+
+**3. Surgical Changes**
+- Change only the lines that contain the root cause; preserve all surrounding behavior exactly
+- Do not add error handling for scenarios that cannot occur given the fix
+- If you find an unrelated improvement while fixing, note it in .result notes — do NOT fix inline
+- Regression test should isolate the exact condition that caused the bug — minimal setup, maximum signal
+
+**4. Goal-Driven Execution**
+- Fix is DONE when: (a) regression test passes, (b) full test suite passes, (c) type check clean
+- If any of the three conditions above is not met, assessment is NO_GO — not GO_WITH_TECH_DEBT
+- "I believe the fix is correct" is not evidence; run the verification commands and report actual results
+- Never mark DONE without running `tsc --noEmit` and `npx vitest run` (or project-equivalent)

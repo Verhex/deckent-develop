@@ -11,7 +11,7 @@
 //
 // Exit codes: 0 = in sync, 1 = drift detected, 2 = error/bad args
 
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -148,10 +148,28 @@ export async function main(argv = process.argv.slice(2), opts = {}) {
   const root = opts.root ?? DEFAULT_ROOT;
 
   if (fix) {
-    // Delegate write to update-readme-stats
+    // Rewrite ONLY IDENTITY.md AUTOGEN blocks. We deliberately do not delegate to
+    // update-readme-stats --write because that target list also includes README.md /
+    // README-TR.md whose AUTOGEN markers may be missing in some checkouts — a
+    // failure there would block an IDENTITY.md fix this script is responsible for.
     const statsModule = await import('./update-readme-stats.mjs');
-    const code = statsModule.main(['--write'], { root });
-    return typeof code === 'number' ? code : 0;
+    const gens = statsModule.collectGenerations({ root });
+    const identityGen = gens.find((g) => g.target === IDENTITY_PATH);
+    if (!identityGen) {
+      process.stderr.write(`lint-identity-md: ${IDENTITY_PATH} not found in generation targets\n`);
+      return 1;
+    }
+    if (identityGen.renderError) {
+      process.stderr.write(`lint-identity-md: render error — ${identityGen.renderError}\n`);
+      return 1;
+    }
+    if (!identityGen.drift) {
+      process.stdout.write(`  ✓ ${IDENTITY_PATH} (in sync)\n`);
+      return 0;
+    }
+    writeFileSync(join(root, IDENTITY_PATH), identityGen.content);
+    process.stdout.write(`  ✎ ${IDENTITY_PATH} (updated)\n`);
+    return 0;
   }
 
   const result = await checkIdentityDrift({ root, verbose });

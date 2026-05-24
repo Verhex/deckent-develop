@@ -12,6 +12,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { readFileSync as realReadFileSync, existsSync as realExistsSync } from 'node:fs';
 import { join as realJoin, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import {
@@ -417,13 +418,34 @@ describe('IDENTITY.md AUTOGEN block integrity', () => {
     expect(statusCount).toBe(summaryCount);
   });
 
-  // (a) MCP count is exactly 31
-  it('MCP Tools count in identity-status block is exactly 31', () => {
+  // (a) MCP count matches the registered tool count produced by
+  // scripts/update-readme-stats.mjs (single source of truth). Previously this
+  // test pinned the count to 31, which became brittle each time a new MCP tool
+  // shipped (Sprint 190 deckent_models → 32). Sourcing the expected count from
+  // the generator keeps the assertion grounded in real registrations without
+  // hand-edits per sprint.
+  //
+  // Implementation note: we invoke the generator in a child process because
+  // this test file mocks `node:fs` at the top — calling `collectStats` via
+  // dynamic import would feed it the empty mock and return mcpTools=0.
+  it('MCP Tools count in identity-status block matches registered count from update-readme-stats', () => {
     const block = extractAutogenBlockRaw(identityContent, 'identity-status');
     expect(block).not.toBeNull();
     const match = block!.match(/\|\s*MCP Tools\s*\|\s*(\d+)\s*\|/);
     expect(match).not.toBeNull();
-    expect(parseInt(match![1]!, 10)).toBe(31);
+    const blockCount = parseInt(match![1]!, 10);
+
+    const scriptUrl = `file://${realJoin(PROJECT_ROOT, 'scripts/update-readme-stats.mjs').replace(/\\/g, '/')}`;
+    const proc = spawnSync('node', [
+      '-e',
+      `import('${scriptUrl}').then(m => { const s = m.collectStats({ root: ${JSON.stringify(PROJECT_ROOT)} }); process.stdout.write(String(s.mcpTools)); });`,
+    ], { encoding: 'utf-8' });
+    expect(proc.status).toBe(0);
+    const registeredCount = parseInt(proc.stdout.trim(), 10);
+    expect(Number.isFinite(registeredCount)).toBe(true);
+    expect(blockCount).toBe(registeredCount);
+    // Lower bound guard: must never regress below the Sprint 190 baseline.
+    expect(blockCount).toBeGreaterThanOrEqual(31);
   });
 
   // (b) Project Status table is inside identity-status AUTOGEN block
@@ -526,5 +548,102 @@ describe('validateIdentityAutogenScope', () => {
     const result = validateIdentityAutogenScope('/test');
     expect(result.ok).toBe(false);
     expect(result.findings.some(f => f.includes('Project Status'))).toBe(true);
+  });
+});
+
+// ═══ AUTOGEN extends Project Status — managed-doc contract ════════
+//
+// Sprint 191 Task 191-009: the ## Project Status table must live INSIDE the
+// `identity-status` AUTOGEN block so that sprint metric updates (MCP tool
+// count, sprint label, version) flow through scripts/update-readme-stats.mjs
+// and never require hand-edits. These tests pin the contract end-to-end
+// against the real IDENTITY.md plus the lint+generator pair.
+//
+// Subprocess invocation is intentional — this test file mocks `node:fs` at
+// the module top, which would feed the scripts an empty filesystem if called
+// via dynamic import. Spawning a fresh node process gives the scripts the
+// real fs they need.
+
+describe('AUTOGEN extends Project Status (Sprint 191 Task 191-009 contract)', () => {
+  let identityContent: string;
+  const IDENTITY_REL = '.deckent/workspace/IDENTITY.md';
+  const LINT_SCRIPT = realJoin(PROJECT_ROOT, 'scripts/lint-identity-md.mjs');
+
+  beforeEach(async () => {
+    const realFs = await vi.importActual<typeof import('node:fs')>('node:fs');
+    identityContent = realFs.readFileSync(IDENTITY_PATH, 'utf-8');
+  });
+
+  // (a) AUTOGEN extends Project Status: the entire metric table is bracketed
+  // by identity-status markers — no metric rows leak outside the block.
+  it('all Project Status metric rows live inside the identity-status AUTOGEN block', () => {
+    const startMarker = '<!-- AUTOGEN:START id="identity-status" -->';
+    const endMarker = '<!-- AUTOGEN:END id="identity-status" -->';
+    const startIdx = identityContent.indexOf(startMarker);
+    const endIdx = identityContent.indexOf(endMarker);
+    expect(startIdx).toBeGreaterThan(-1);
+    expect(endIdx).toBeGreaterThan(startIdx);
+
+    const inside = identityContent.slice(startIdx + startMarker.length, endIdx);
+    const outsideAfter = identityContent.slice(endIdx + endMarker.length);
+
+    const requiredRows = [
+      '| Version |',
+      '| Sprint |',
+      '| MCP Tools |',
+      '| MCP Resources |',
+      '| CLI Commands |',
+      '| Dashboard Pages |',
+      '| Agents |',
+      '| Skills |',
+      '| Providers |',
+    ];
+    for (const row of requiredRows) {
+      expect(inside).toContain(row);
+      expect(outsideAfter).not.toContain(row);
+    }
+  });
+
+  // (b) lint catches manual edit: mutating a managed metric outside the
+  // generator (simulating a hand-edit) must produce a non-zero exit from
+  // `lint-identity-md.mjs` (the CI guard).
+  it('lint script exits non-zero when a managed metric is hand-edited', async () => {
+    const realFs = await vi.importActual<typeof import('node:fs')>('node:fs');
+    const original = realFs.readFileSync(IDENTITY_PATH, 'utf-8');
+    const tampered = original.replace(/\|\s*MCP Tools\s*\|\s*\d+\s*\|/, '| MCP Tools | 99 |');
+    expect(tampered).not.toBe(original);
+
+    try {
+      realFs.writeFileSync(IDENTITY_PATH, tampered);
+      const proc = spawnSync('node', [LINT_SCRIPT], {
+        cwd: PROJECT_ROOT,
+        encoding: 'utf-8',
+      });
+      expect(proc.status).not.toBe(0);
+      // The drift report should mention the IDENTITY.md path so operators
+      // know where to look.
+      const combined = `${proc.stdout}${proc.stderr}`;
+      expect(combined).toContain(IDENTITY_REL);
+    } finally {
+      // Always restore — leaving the file tampered would poison every
+      // subsequent test in the suite.
+      realFs.writeFileSync(IDENTITY_PATH, original);
+    }
+  });
+
+  // (c) generator output stable across runs: invoking the lint script's
+  // --check mode twice in a row must report no drift (exit 0) once
+  // IDENTITY.md is regenerated. This guards against non-determinism in the
+  // generator (e.g., readdir ordering, hash collisions).
+  it('lint --check reports no drift across two consecutive runs', () => {
+    const runCheck = () => spawnSync('node', [LINT_SCRIPT], {
+      cwd: PROJECT_ROOT,
+      encoding: 'utf-8',
+    });
+    const first = runCheck();
+    const second = runCheck();
+    expect(first.status).toBe(0);
+    expect(second.status).toBe(0);
+    expect(second.stdout).toBe(first.stdout);
   });
 });

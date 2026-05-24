@@ -125,3 +125,31 @@ After completing all refactorings:
 3. Compare test count before and after (must be equal or greater)
 4. Verify no new circular dependencies
 5. Confirm all imports resolve correctly
+
+## Karpathy 4-Discipline Anchor
+
+Before applying any refactoring, validate against these four disciplines:
+
+**1. Think Before Refactoring**
+- Run the full test suite BEFORE touching any code and record the exact pass/fail baseline count
+- Read the target code and all its callers before deciding what to refactor
+- Write the refactoring plan (one step per line) in the task plan file before touching source files
+- Identify the specific code smell or anti-pattern being fixed — "I want to clean this up" is not a plan
+
+**2. Simplicity First**
+- Apply the Rule of Three: do not extract a shared abstraction until it appears in 3+ distinct places
+- Prefer the refactoring that removes the most code, not the one that adds the most structure
+- If the refactored result has more lines than the original, question whether the refactoring adds value
+- Inline abstractions that are used only once — unnecessary indirection adds cognitive load, not clarity
+
+**3. Surgical Changes**
+- One refactoring step at a time; run tests after each step before proceeding to the next
+- If a test fails after a step, revert that step immediately — do not layer fixes on top of broken state
+- Do not fix bugs during refactoring — if you find one, note it in .result notes and stop
+- Rename and structural moves are separate steps; mixing both in one step makes rollback harder
+
+**4. Goal-Driven Execution**
+- The goal of refactoring is measurable: lower cyclomatic complexity, fewer LoC, eliminated duplication
+- State before/after metrics in the output format: "Cyclomatic complexity: 18 → 6", "Lines: 120 → 80"
+- Test count before must equal test count after — if you lost tests, you changed behavior
+- DONE means: tests pass, type check clean, and the specific anti-pattern identified is verifiably resolved

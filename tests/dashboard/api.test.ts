@@ -1,11 +1,24 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { fetchJson, postJson, ApiError } from "../../src/dashboard/src/lib/api.js";
 
 const mockFetch = vi.fn();
+const originalWindow = (globalThis as { window?: unknown }).window;
 
 beforeEach(() => {
   vi.clearAllMocks();
   globalThis.fetch = mockFetch;
+  // Sprint 191 Task 191-010 — api client now reads
+  // `window.__DECKENT_API_TOKEN__` for the Authorization header. These tests
+  // run without it (token absent), so the header object is empty `{}`.
+  (globalThis as { window: unknown }).window = {};
+});
+
+afterEach(() => {
+  if (originalWindow === undefined) {
+    delete (globalThis as { window?: unknown }).window;
+  } else {
+    (globalThis as { window: unknown }).window = originalWindow;
+  }
 });
 
 describe("dashboard/lib/api", () => {
@@ -18,7 +31,9 @@ describe("dashboard/lib/api", () => {
 
       const result = await fetchJson("/api/status");
       expect(result).toEqual({ data: "test" });
-      expect(mockFetch).toHaveBeenCalledWith("/api/status");
+      // Sprint 191: fetchJson now always passes a `headers` object so the
+      // bootstrap Authorization header can be attached when present.
+      expect(mockFetch).toHaveBeenCalledWith("/api/status", { headers: {} });
     });
 
     it("throws ApiError on non-ok response", async () => {

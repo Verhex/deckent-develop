@@ -42,3 +42,17 @@
 - Co-locate types with their implementation. Shared types go in a dedicated `types.ts`.
 - Use `satisfies` operator for type-safe object literals that preserve narrow types.
 - Prefer `const` assertions for literal types: `as const`.
+
+## Anti-Patterns to Avoid
+- Using `any` because narrowing is hard — use `unknown` + type guard instead.
+- Deeply nested generics (>3 levels) — extract intermediate named types for readability.
+- Generic where a simple union suffices — generics earn their cost only when behavior varies by type.
+- `interface` for union types (`A | B`) — use `type`; interfaces cannot express unions.
+- Slapping `Partial<T>` on every update payload by default — type the actual optional fields explicitly.
+- Barrel re-exports from internal modules — they create circular dependency risk and slow tsc.
+- `as unknown as T` double-cast — almost always indicates a design flaw; fix the type, not the cast.
+
+## Karpathy Notes
+- **Simplicity first:** Start with the narrowest type that satisfies the constraint. Widen only when forced.
+- **Surgical changes:** Adding a type assertion (`as`) is a code smell — investigate why types don't align before casting.
+- **Goal-driven:** Every generic parameter must be justified by a specific call-site that needs it.

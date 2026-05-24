@@ -5,6 +5,8 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync, cpSync } from 'fs';
 import { join } from 'path';
 import type { OutcomeTracker, EntityPerformance } from './outcome-tracker.js';
+import { ensureAgentPromptMd } from './temp-agent-generator.js';
+import type { AgentDefinition } from '../core/agent-types.js';
 import { debugLog } from '../core/utils.js';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -130,6 +132,11 @@ export class PromotionPipeline {
               raw.id = entityId;
               raw._promotedAt = new Date().toISOString();
               writeFileSync(join(permDir, 'agent.json'), JSON.stringify(raw, null, 2), 'utf-8');
+              // Promotion gate: guarantee PROMPT.md exists on the promoted
+              // agent. If the temp directory was missing one (Sprint 190
+              // regression), render it from the template before the agent
+              // goes live.
+              ensurePromotedAgentPrompt(this.projectRoot, raw, entityId);
             } catch { /* non-fatal — manifest update failed */ }
             debugLog('promotion-pipeline:promote', `agent '${entityId}' promoted from persistent temp pool`);
             return true;
@@ -155,6 +162,15 @@ export class PromotionPipeline {
       // Copy to permanent location
       mkdirSync(permDir, { recursive: true });
       cpSync(tempEntityDir, permDir, { recursive: true });
+
+      // Promotion gate for agents only — ensure PROMPT.md is present after
+      // the copy so the promoted agent never hits the degraded fallback.
+      if (entityType === 'agent') {
+        try {
+          const raw = JSON.parse(readFileSync(join(permDir, 'agent.json'), 'utf-8'));
+          ensurePromotedAgentPrompt(this.projectRoot, raw, entityId);
+        } catch { /* non-fatal — agent.json missing or unreadable */ }
+      }
 
       debugLog('promotion-pipeline:promote', `${entityType} '${entityId}' promoted to ${permDir}`);
       return true;
@@ -268,6 +284,35 @@ export class PromotionPipeline {
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
+
+/**
+ * Idempotent: ensure the promoted agent has a PROMPT.md file. Used as the
+ * promotion gate so an agent never goes live without one — closes the
+ * Sprint 190 "PROMPT.md missing — degraded fallback" warning chain.
+ *
+ * `raw` is the parsed agent.json contents. Only the fields needed by
+ * renderAgentPromptMd are read (name, description, expertise).
+ */
+function ensurePromotedAgentPrompt(
+  projectRoot: string,
+  raw: Record<string, unknown>,
+  entityId: string,
+): void {
+  const agent: Pick<AgentDefinition, 'id' | 'name' | 'description' | 'expertise'> = {
+    id: entityId,
+    name: typeof raw['name'] === 'string' ? (raw['name'] as string) : entityId,
+    description: typeof raw['description'] === 'string' ? (raw['description'] as string) : '',
+    expertise: Array.isArray(raw['expertise'])
+      ? (raw['expertise'] as unknown[]).filter((x): x is string => typeof x === 'string')
+      : [],
+  };
+  try {
+    ensureAgentPromptMd(projectRoot, agent);
+  } catch (err) {
+    // Non-fatal: PROMPT.md generation must never block promotion.
+    debugLog('promotion-pipeline:ensurePromotedAgentPrompt', err);
+  }
+}
 
 function findTempEntityDir(tempBaseDir: string, entityId: string): string | null {
   if (!existsSync(tempBaseDir)) return null;

@@ -7,6 +7,7 @@ import { createSkillDefinition } from '../core/skill-types.js';
 import type { ActivationConfig } from '../core/routing-types.js';
 import type { AgentDefinition } from '../core/agent-types.js';
 import { createAgentDefinition } from '../core/agent-types.js';
+import { persistTempAgentPrompts } from './temp-agent-generator.js';
 
 // ─── Internal helpers ───────────────────────────────────────────────────────
 
@@ -331,8 +332,18 @@ const AGENT_TEMPLATES: AgentTemplate[] = [
  * Generate temporary agents from project stack analysis.
  * Template-based (no AI calls) — deterministic and zero-cost.
  * Returns at most one agent per template that matches the stack.
+ *
+ * When `projectRoot` is supplied the function also persists a Karpathy-aligned
+ * PROMPT.md for each generated agent via {@link persistTempAgentPrompts}.
+ * This closes the Sprint 190 "PROMPT.md missing — degraded fallback" warning
+ * surfaced by `agent-pool.ts:getAgentPrompt()`. The parameter is optional to
+ * preserve backward compatibility with callers that only need the in-memory
+ * agent definitions.
  */
-export function generateTempAgents(stack: ProjectStack): AgentDefinition[] {
+export function generateTempAgents(
+  stack: ProjectStack,
+  projectRoot?: string,
+): AgentDefinition[] {
   const lang = stack.language.toLowerCase();
   const fw = stack.framework.toLowerCase();
   const deps = stack.dependencies.map((d) => d.toLowerCase());
@@ -385,6 +396,13 @@ export function generateTempAgents(stack: ProjectStack): AgentDefinition[] {
     });
 
     agents.push(agent);
+  }
+
+  // When a projectRoot is supplied, materialise a PROMPT.md for every
+  // generated agent so agent-pool.ts:getAgentPrompt() resolves cleanly
+  // (source: 'prompt-md') instead of emitting the degraded fallback warning.
+  if (projectRoot && agents.length > 0) {
+    persistTempAgentPrompts(projectRoot, agents);
   }
 
   return agents;

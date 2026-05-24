@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { DashboardState } from "../types";
+import { buildSseUrl } from "../lib/api";
 
 export type SSEStatus = "connecting" | "connected" | "disconnected";
 
@@ -23,7 +24,10 @@ export function useSSEWithStatus(url = "/api/events"): SSEResult {
 
     function connect() {
       setStatus("connecting");
-      es = new EventSource(url);
+      // EventSource cannot send custom headers, so the bootstrap API token is
+      // attached as `?token=...` — the server matches it via the same
+      // constant-time compare used for the Bearer header path.
+      es = new EventSource(buildSseUrl(url));
 
       es.onopen = () => {
         setStatus("connected");

@@ -1,11 +1,24 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { fetchJson, postJson, ApiError } from "../../src/dashboard/src/lib/api.js";
 
 const mockFetch = vi.fn();
+const originalWindow = (globalThis as { window?: unknown }).window;
 
 beforeEach(() => {
   vi.clearAllMocks();
   globalThis.fetch = mockFetch;
+  // Sprint 191 Task 191-010 — api client reads `window.__DECKENT_API_TOKEN__`
+  // for the bootstrap Bearer header. Tests run without it, so the header
+  // object is empty `{}` on GET and `{ "Content-Type": ... }` on POST.
+  (globalThis as { window: unknown }).window = {};
+});
+
+afterEach(() => {
+  if (originalWindow === undefined) {
+    delete (globalThis as { window?: unknown }).window;
+  } else {
+    (globalThis as { window: unknown }).window = originalWindow;
+  }
 });
 
 // ─── Config API Integration — Dashboard Client ───────────────────
@@ -36,7 +49,9 @@ describe("Config API integration — dashboard client", () => {
 
       await fetchJson("/api/config");
 
-      expect(mockFetch).toHaveBeenCalledWith("/api/config");
+      // Sprint 191 Task 191-010: fetchJson passes a `headers` object so the
+      // bootstrap Authorization header can ride along when present.
+      expect(mockFetch).toHaveBeenCalledWith("/api/config", { headers: {} });
       expect(mockFetch).toHaveBeenCalledTimes(1);
     });
 
@@ -229,7 +244,7 @@ describe("Config API integration — dashboard client", () => {
       const result = await fetchJson<typeof defaults>("/api/config/defaults");
 
       expect(result).toEqual(defaults);
-      expect(mockFetch).toHaveBeenCalledWith("/api/config/defaults");
+      expect(mockFetch).toHaveBeenCalledWith("/api/config/defaults", { headers: {} });
     });
   });
 

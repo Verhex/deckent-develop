@@ -45,6 +45,16 @@
 ## Anti-Patterns to Avoid
 - Prop drilling beyond 2 levels. Use context or composition instead.
 - Storing server data in local state. Use TanStack Query, SWR, or equivalent.
-- useEffect for data fetching without cleanup or race condition handling.
+- `useEffect` for data fetching without cleanup or race condition handling.
 - Mutating state directly. Always create new references.
 - Index as key in dynamic lists. Use stable unique identifiers.
+- `React.memo` on every component preemptively — profile first, optimize second.
+- Derived state in `useState` — compute during render from source state, no effect needed.
+- Custom hook that wraps a single built-in hook with no added logic — just use the built-in.
+- Context for high-frequency updates (mouse position, scroll) — causes full subtree re-renders.
+- `useEffect` with an empty dependency array as a "run once" trick — it re-runs on remount in Strict Mode.
+
+## Karpathy Notes
+- **Simplicity first:** useState → useReducer → Context → external store. Move right only when the left cannot handle it.
+- **Think before coding:** Sketch the component tree and data flow before writing JSX. Identify which components own which state.
+- **Surgical changes:** A new hook should solve a problem that cannot be solved inline. If the hook body is shorter than its name + call, inline it.

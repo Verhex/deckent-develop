@@ -19,6 +19,7 @@ import { readJsonSafe } from '../core/utils.js';
 import { deepMerge } from '../core/config.js';
 import { watchDashboard } from './watcher.js';
 import { bearerAuthMiddleware, resolveAuthToken } from './auth.js';
+import { injectApiTokenIntoHtml, isLoopbackRemote } from './middleware/token.js';
 import { parseSprintLog } from '../cli/commands/history.js';
 import { runDoctorChecks } from '../cli/commands/doctor.js';
 import { killWorker } from '../orchestra/tmux.js';
@@ -446,7 +447,9 @@ async function handleRequest(
       return;
     }
 
-    if (url === '/api/events') {
+    // SSE: EventSource can append `?token=...` for auth (Sprint 191), so
+    // accept both bare and query-suffixed forms.
+    if (url === '/api/events' || url.startsWith('/api/events?')) {
       res.writeHead(200, {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
@@ -834,10 +837,14 @@ export function createHttpServer(
     );
   }
 
-  // Build auth middleware with health endpoint exempt
+  // Build auth middleware with health endpoint exempt. SSE clients
+  // (`EventSource`) cannot set Authorization headers, so `/api/events` opts
+  // into a `?token=...` query-parameter fallback — the dashboard appends the
+  // bootstrap token there. Same constant-time compare as the Bearer header.
   const authMiddleware = bearerAuthMiddleware({
     configToken: finalToken,
     exemptPaths: ['/health', '/api/health'],
+    queryTokenPaths: ['/api/events'],
   });
 
   const rateLimiter = rateLimitMax > 0 ? new RateLimiter(rateLimitMax) : undefined;
@@ -987,19 +994,30 @@ export function createHttpServer(
         return;
       }
 
-      // ─── Localhost-only terminal token injection into index.html ─
-      if (terminalToken && resolvedStaticDir && method === 'GET' &&
+      // ─── Localhost-only token injection into index.html ─
+      // Inject both:
+      //   - `window.__DECKENT_TERMINAL_TOKEN__` (existing terminal bootstrap)
+      //   - `window.__DECKENT_API_TOKEN__` (Sprint 191 — dashboard reads it and
+      //     attaches `Authorization: Bearer ...` on non-terminal fetches)
+      // Inject ONLY when at least one token is set AND the caller is loopback.
+      // Non-localhost callers receive the unmodified HTML so the tokens never
+      // leak across the network.
+      if (resolvedStaticDir && (terminalToken || finalToken) && method === 'GET' &&
           (urlPath === '/' || urlPath === '/index.html')) {
         const remoteAddr = req.socket.remoteAddress ?? '';
-        const isLocalhost = remoteAddr === '127.0.0.1' || remoteAddr === '::1' ||
-                            remoteAddr === '::ffff:127.0.0.1';
+        const isLocalhost = isLoopbackRemote(remoteAddr);
         if (isLocalhost) {
           const indexPath = join(resolvedStaticDir, 'index.html');
           if (existsSync(indexPath)) {
             try {
               let html = readFileSync(indexPath, 'utf-8');
-              const inject = `<script>window.__DECKENT_TERMINAL_TOKEN__ = ${JSON.stringify(terminalToken)};</script>`;
-              html = html.replace('</head>', inject + '</head>');
+              if (terminalToken) {
+                const inject = `<script>window.__DECKENT_TERMINAL_TOKEN__ = ${JSON.stringify(terminalToken)};</script>`;
+                html = html.replace('</head>', inject + '</head>');
+              }
+              if (finalToken) {
+                html = injectApiTokenIntoHtml(html, finalToken);
+              }
               res.writeHead(200, { 'Content-Type': 'text/html' });
               res.end(html);
               return;

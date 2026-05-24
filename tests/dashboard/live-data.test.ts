@@ -30,9 +30,12 @@ describe("dashboard/live-data — useSSE hook", () => {
     expect(content).toContain('"disconnected"');
   });
 
-  it("creates EventSource with url parameter", () => {
+  it("creates EventSource with the bootstrap-token-aware SSE URL", () => {
     const content = readFileSync(filePath, "utf-8");
-    expect(content).toContain("new EventSource(url)");
+    // Sprint 191 Task 191-010 — useSSE now wraps the URL via `buildSseUrl`
+    // so the bootstrap API token can ride as `?token=...` (EventSource
+    // cannot send custom headers).
+    expect(content).toContain("new EventSource(buildSseUrl(url))");
   });
 
   it("sets connected on onopen", () => {

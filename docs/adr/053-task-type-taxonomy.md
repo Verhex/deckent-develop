@@ -126,6 +126,10 @@ Sprint 156 T-009 (`assertSpawnSafe`) ve T-010 (Runtime File Lock) güvenlik katm
 - **ADR-037** — RBAC: `critical-irreversible` EffectClass → Alperen onay gating.
 - **ADR-041** — Agent Taxonomy: Horizontal skill seçimi task tipine göre filtrelenebilir (doc görevleri için `testing-expert` önerme).
 - **ADR-055** — Hybrid Scoring Pipeline (proposed): Bu ADR'nin TaskType'ları Hybrid Scoring'in Layer 1 (Schema) ve Layer 4 (Outcome) katmanlarına girdi sağlar.
+- **Karpathy 4-Discipline Anchor** (`.claude/rules/karpathy-discipline.md`, Sprint 191 eklendi): Worker agent'ların her TaskType'ı *nasıl* yürüttüğünü belirleyen execution-time disiplin kuralları. TaskType sınıflandırması Brain tarafından (plan-time), 4-discipline uygulaması Worker tarafından (execute-time) yapılır — iki katman tamamlayıcıdır. Her TaskType için vurgu farklılıkları:
+  - **`audit`**: Discipline 1 (Think-first: `scope.filesRead` listesindeki kaynak dosyalar rapor yazmadan önce tamamen okunmalı), Discipline 3 (Surgical: tek output dosyası constraint'i, izin verilmemiş dosyaya yazma → otomatik Auditor flag), Discipline 4 (Goal-Driven: her bulgu goCriteria'daki audit kriteri ile birebir eşlenmeli, izlenemeyen bulgu notta not edilmeli).
+  - **`document-write`**: Discipline 1 (Think-first: içerik yapısı taslak olarak planlanmalı), Discipline 2 (Simplicity-First: talep edilmeyen bölüm veya ek dosya eklenmemeli — YAGNI), Discipline 4 (Goal-Driven: her başlık ve paragraf goCriteria doküman kalitesi kriteriyle eşlenmeli).
+  - **`code-development`**: Tüm 4 discipline eşit ağırlıkla uygulanır; Discipline 3 (Surgical Changes) özellikle kritik — `scope.filesWrite` sınırı dışına çıkmak Auditor tarafından `git diff --stat` ile otomatik tespit edilir ve sprint NO_GO'ya yol açabilir.
 
 ---
 
@@ -138,3 +142,5 @@ Bu ADR, `rubric-registry.ts` içinde `Sprint 154 Bug B fix` olarak hayata geçir
 > - **Tek Kaynak Prensibi** uygulanmadı: `task-router.ts:45` (`'code'|'test'|'doc'|'design'|'unknown'`) ve `adr-selector.ts:45` çakışan `TaskType` tanımları Sprint 172'ye dek hâlâ bağımsızdır (ADR §Olumsuz bunu zaten kendi flag'ler — `rubric-registry.ts` yetkisi yalnız değerlendirme katmanıyla sınırlı kalır).
 >
 > Memory'deki taxonomy-vision (ADR-053/055/060 taslak seti) bağlamı korunur; yalnız ADR-053'ün **doğrulanmış çekirdeği** accepted'a alındı, geniş vizyon kapsamı değil. Behavior unchanged; documentation alignment only.
+
+> **Amendment — Sprint 191 (Karpathy cross-reference):** Sprint 191 Worker Discipline Anchor projesi `.claude/rules/karpathy-discipline.md` dosyasını ve `worker-default.md` Karpathy 4-Discipline Anchor bölümünü ekledi. Bu ADR, execute-time disiplin kurallarının **plan-time** tamamlayıcısıdır: ADR-053 *hangi* rubrikle değerlendirileceğini belirler (Brain sorumluluğu, plan-time), Karpathy 4-discipline *nasıl* yürütüleceğini belirler (Worker sorumluluğu, execute-time). §Related ADRs'e Karpathy Anchor referansı eklendi. Behavior unchanged; no code change.

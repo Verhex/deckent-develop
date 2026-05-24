@@ -95,4 +95,14 @@ paths: ["src/**","tests/**"]
 
 <!-- CUSTOM-START -->
 
+## Karpathy 4-Discipline Anchor
+
+MUST follow @karpathy-discipline.md when generating code.
+
+Before writing any code line, validate against all four disciplines:
+1. **Think Before Coding** — read + plan first, list ADR constraints, write .plan file
+2. **Simplicity First** — prefer existing patterns, YAGNI, avoid premature abstractions
+3. **Surgical Changes** — stay in scope.filesWrite, minimum-diff, preserve existing behavior
+4. **Goal-Driven Execution** — every change must map to a goCriteria item; honest self-assessment
+
 <!-- CUSTOM-END -->

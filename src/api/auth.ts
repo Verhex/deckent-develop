@@ -1,5 +1,6 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import { extractTokenFromQuery } from './middleware/token.js';
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -8,6 +9,14 @@ export interface AuthConfig {
   configToken?: string | null;
   /** Paths that bypass authentication (e.g. '/health', '/api/health') */
   exemptPaths?: string[];
+  /**
+   * Paths that may authenticate via `?token=...` query parameter when no
+   * Authorization header is present. Intended for transports that cannot
+   * send headers (e.g. `EventSource` / SSE). The query-token still goes
+   * through the same constant-time SHA-256 compare as the Bearer header,
+   * so the security properties are identical.
+   */
+  queryTokenPaths?: string[];
 }
 
 // ─── Token Resolution ───────────────────────────────────────────────
@@ -66,6 +75,7 @@ export function verifyBearerToken(
 export function bearerAuthMiddleware(config: AuthConfig) {
   const activeToken = resolveAuthToken(config.configToken);
   const exempt = new Set(config.exemptPaths ?? []);
+  const queryTokenPaths = new Set(config.queryTokenPaths ?? []);
 
   // Check explicit auth bypass via env var
   const authDisabled = process.env['DECKENT_API_AUTH_DISABLED'] === '1';
@@ -94,17 +104,33 @@ export function bearerAuthMiddleware(config: AuthConfig) {
       return false;
     }
 
-    const result = verifyBearerToken(req, activeToken);
+    const headerResult = verifyBearerToken(req, activeToken);
 
-    if (result === 'ok') return true;
+    if (headerResult === 'ok') return true;
 
-    if (result === 'missing') {
+    // Query-token fallback for transports that cannot set headers (SSE).
+    // Only the paths the server explicitly opted in (e.g. /api/events) are
+    // eligible, and the same constant-time compare is reused.
+    if (headerResult === 'missing' && queryTokenPaths.has(path)) {
+      const queryToken = extractTokenFromQuery(url);
+      if (queryToken !== null) {
+        const expected = hashToken(activeToken);
+        const actual = hashToken(queryToken);
+        if (timingSafeEqual(actual, expected)) return true;
+        // Wrong query token is a 403 — same shape as Bearer mismatch.
+        res.writeHead(403, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'forbidden' }));
+        return false;
+      }
+    }
+
+    if (headerResult === 'missing') {
       res.writeHead(401, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'authentication required' }));
       return false;
     }
 
-    // result === 'invalid'
+    // headerResult === 'invalid'
     res.writeHead(403, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'forbidden' }));
     return false;
