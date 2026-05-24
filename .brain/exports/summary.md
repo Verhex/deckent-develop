@@ -61,6 +61,14 @@
 | adr-064 | TOPP — Continuous Dispatch (Wave-Barrier Removal) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-191 Learnings** (sprint-191): ## Sprint sprint-191 Learnings
+- 191-002 — `runtime_extension_enabled: true` default + worker timeout extension wire:...
+- **Sprint sprint-190 Learnings** (sprint-190): ## Sprint sprint-190 Learnings
+- Docker OOM cycle drove ~14 false NO_GO (reclassify pending Sprint 191 Task 003)
+- 19...
+- **Sprint sprint-189 Learnings** (sprint-189): ## Sprint sprint-189 Learnings
+- 189-009 deckent_kill MCP parite: NO_GO — investigate root cause
+- 189-011 API endpoi...
 - **Sprint sprint-188 Learnings** (sprint-188): ## Sprint sprint-188 Learnings
 - **Sprint sprint-187 Learnings** (sprint-187): ## Sprint sprint-187 Learnings
 - **Sprint sprint-186 Learnings** (sprint-186): ## Sprint sprint-186 Learnings
@@ -72,14 +80,6 @@
 - W1-1 — Mock hygiene: orphan-cleaner-ipc + archive-debt `renameSync` ekle: NO_GO — Wo...
 - **Sprint sprint-181 Learnings** (sprint-181): ## Sprint sprint-181 Learnings
 - W1-1 — CI workflow'una dashboard deps install adımı ekle: NO_GO — W1-1 primary fix t...
-- **Sprint sprint-180 Learnings** (sprint-180): ## Sprint sprint-180 Learnings
-- W1-1 — sprint-state-tracker getSprintStateSnapshot (Step B): NO_GO — W1-1 sprint-sta...
-- **Sprint sprint-179 Learnings** (sprint-179): ## Sprint sprint-179 Learnings
-- W0-1 — Dependency aggregate fix-aware (Bug A foundation): GO_WITH_TECH_DEBT — W0-1 (...
-- **Sprint sprint-178 Learnings** (sprint-178): ## Sprint sprint-178 Learnings
-- Fix debt: Tech debt from 175-020-fix: All 5 automatic verification gates executed:
-
-...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -107,5 +107,7 @@ _No active technical debt._
 - Violation pattern: stale_heartbeat
 - Violation pattern: stale_heartbeat
 - Violation pattern: stale_heartbeat
+- Violation pattern: doc_sync_ground_truth_mismatch
+- Violation pattern: stale_heartbeat
 
-_Total entries: 329 | Generated: 2026-05-23_
+_Total entries: 340 | Generated: 2026-05-23_

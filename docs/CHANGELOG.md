@@ -2,6 +2,20 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint191] - 2026-05-23
+
+### Added
+
+- 191-001 — Docker worker memory budget — max_workers 6→3 + per-worker memory tuning
+- 191-006 — MCP `deckent_start` fire-and-forget Promise lifecycle hardening
+
+### Fixed
+
+- 191-005 — ci-guardian agent activation fix (Sprint 190 warning loop)
+
+
+_Tasks: 29 total, 3 done, 0 tech debt, 26 no-go_
+
 ## [1.0.0-beta.1-sprint190] - 2026-05-23
 
 ### Added

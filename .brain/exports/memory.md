@@ -1,5 +1,40 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-191 Learnings
+- Sprint sprint-191 Learnings: ## Sprint sprint-191 Learnings
+- 191-002 — `runtime_extension_enabled: true` default + worker timeout extension wire: NO_GO
+- 191-003 — Sprint 190 retroactive agent stats reclassify + outcome-tracker correction tool: NO_GO — Sprint 191 Task 003 — reclassifyTaskOutcome + agent reclassify CLI command + ADR-046 audit-trail wire.
+
+IMPLEMENTATION:
+
+- 191-004 — Cost-gate planSprint mode-respecting (start.ts:349 fix): NO_GO — Sprint 191 Task 191-004 — Cost-gate planSprint() mode-respecting + AI→structured fallback chain wired.
+
+## Changes
+
+### 
+- 191-007 — CLI top-level error handler — silent exit kill: NO_GO — CLI top-level error handler — silent exit kill (Sprint 191 P191-10).
+
+IMPLEMENTATION:
+1. src/cli/helpers/error-handler.t
+- 191-008 — Memory DB retro entry write hook — Sprint 167 chronic gap closure: NO_GO — Worker had heartbeat but failed to write result within grace period — kill blocked by panic guard (user approval require
+- 191-009 — IDENTITY.md AUTOGEN block extension (Project Status table managed): NO_GO
+- 191-010 — Dashboard non-terminal endpoints token bootstrap fix (auth): NO_GO
+- 191-011 — Temp agent PROMPT.md generator template (Sprint 190 7x warning): NO_GO
+- 191-012 — Karpathy 4-discipline anchor rule doc (.claude/rules/karpathy-discipline.md): NO_GO
+- 191-013 — Built-in agent PROMPT.md Karpathy refactor pass 1 (top 5 agents): NO_GO
+
+## Sprint sprint-190 Learnings
+- Sprint sprint-190 Learnings: ## Sprint sprint-190 Learnings
+- Docker OOM cycle drove ~14 false NO_GO (reclassify pending Sprint 191 Task 003)
+- 190-009 Ollama adapter: TECH_DEBT — list parse/tier mapping incomplete (Sprint 191 Task 017 closure)
+- Backfilled retroactively per Sprint 191 Task 008.
+
+## Sprint sprint-189 Learnings
+- Sprint sprint-189 Learnings: ## Sprint sprint-189 Learnings
+- 189-009 deckent_kill MCP parite: NO_GO — investigate root cause
+- 189-011 API endpoint E2E test suite: NO_GO — investigate root cause
+- Backfilled retroactively per Sprint 191 Task 008.
+
 ## Sprint sprint-188 Learnings
 - Sprint sprint-188 Learnings: ## Sprint sprint-188 Learnings
 

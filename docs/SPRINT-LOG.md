@@ -5221,3 +5221,41 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 190-016: 190-016 — CONTRIBUTING + CODE_OF_CONDUCT + GitHub issue/PR templates (NO_GO)
 
 ---
+## Sprint 191 — sprint-191
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-05-23
+**Duration:** 4094s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 29 |
+| Completed | 3 |
+| Tech Debt | 0 |
+| No-Go | 26 |
+| Coverage | 13.6% |
+| Duration | 4094141ms |
+
+### Tasks
+
+- 191-001: 191-001 — Docker worker memory budget — max_workers 6→3 + per-worker memory tuning (DONE)
+- 191-002: 191-002 — `runtime_extension_enabled: true` default + worker timeout extension wire (NO_GO)
+- 191-003: 191-003 — Sprint 190 retroactive agent stats reclassify + outcome-tracker correction tool (NO_GO)
+- 191-004: 191-004 — Cost-gate planSprint mode-respecting (start.ts:349 fix) (NO_GO)
+- 191-005: 191-005 — ci-guardian agent activation fix (Sprint 190 warning loop) (DONE)
+- 191-006: 191-006 — MCP `deckent_start` fire-and-forget Promise lifecycle hardening (DONE)
+- 191-007: 191-007 — CLI top-level error handler — silent exit kill (NO_GO)
+- 191-008: 191-008 — Memory DB retro entry write hook — Sprint 167 chronic gap closure (NO_GO)
+- 191-009: 191-009 — IDENTITY.md AUTOGEN block extension (Project Status table managed) (NO_GO)
+- 191-010: 191-010 — Dashboard non-terminal endpoints token bootstrap fix (auth) (NO_GO)
+- 191-011: 191-011 — Temp agent PROMPT.md generator template (Sprint 190 7x warning) (NO_GO)
+- 191-012: 191-012 — Karpathy 4-discipline anchor rule doc (.claude/rules/karpathy-discipline.md) (NO_GO)
+- 191-013: 191-013 — Built-in agent PROMPT.md Karpathy refactor pass 1 (top 5 agents) (NO_GO)
+- 191-014: 191-014 — Built-in skill SKILL.md Karpathy refactor pass 1 (top 5 skills) (NO_GO)
+- 191-015: 191-015 — Worker prompt template — Karpathy block injection (NO_GO)
+- 191-016: 191-016 — ADR-053 + ADR-061 (AEGIS) Karpathy cross-reference + amendment (NO_GO)
+- 191-017: 191-017 — Sprint 190 carry-over: provider isAvailable 3-state + Ollama TECH_DEBT closure (NO_GO)
+
+---
