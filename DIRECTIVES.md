@@ -1,464 +1,477 @@
-# DIRECTIVES — Sprint 190: God-Level Push Day 2 — Native Chat + Local LLM + OSS Docs (2 dalga, 16 task)
+# DIRECTIVES — Sprint 192: God-Level Push Day 4 — Synthetic NO_GO Eradication + RAM Reform + Sprint 191 Carry-Over (5 dalga, 19 task)
 
-## Goal: Sprint 189 carry-over fix'leri + W-C native `deckent chat` Path B implementation (Trinity AI-Asistan personası) + W-F local LLM provider (Ollama) + models.dev live catalog + W-H README/Getting Started OSS GA-ready + W-I release workflow npm publish prep. 1 Haziran 2026 beta launch için **kritik gün 2** — beta demo `deckent chat` çalışmalı. Master plan: `docs/alperen-analysis/2026-05-23-comprehensive-work-plan.md` (Faz 1/2 hybrid, Sprint 190 — Chat Foundation + Provider Repair + Docs).
+## Goal: Sprint 191 dogfood'dan çıkan 3 büyük öğrenim'in kapanışı: (1) **W-INTEGRITY** stream — synthetic NO_GO sıfırlama + dishonest worker result detection ([[feedback_no_synthetic_results]]); (2) **W-M** stream — RAM optimizasyon canlı deney (12 worker × 2g vs mevcut 3 × 4g) + adaptive scheduler ([[project_sprint192_ram_optimization]]); (3) Sprint 191 6 genuine NO_GO carry-over fix; (4) Karpathy L-6/L-7 Faz 2 (10 daha PROMPT.md/SKILL.md). **1 Haziran 2026 OSS GA beta için kritik gün 4** — false NO_GO bug'ı kalıcı çözüm, agent stats gerçekçi hâle gelir. Master plan: `docs/alperen-analysis/2026-05-23-comprehensive-work-plan.md` (W-M + W-INTEGRITY + Sprint 191 carry-over).
 
-Tüm task'lar için ortak kurallar (Sprint 189 ile aynı):
-- Worker yalnızca `scope.filesWrite` içine yazar; scope dışına dokunmak yasak.
+Tüm task'lar için ortak kurallar:
+- Worker yalnızca `scope.filesWrite` içine yazar; scope dışına dokunmak yasak (ADR-037 advisory).
 - Her task **test ile geçer** — vitest minimum 3 test (mutlu/edge/hata). Audit task'ları test gerektirmez.
 - `dosya:satır` kanıtı zorunlu.
 - ADR ihlali → NO_GO + amendment proposal.
-- `.brain/memory.db` write yalnızca core/memory-*.ts yolundan.
-- Sprint sonu tsc temiz + test regresyon yok (Sprint 189 baseline: 62 fail, **artmamalı**).
+- `.brain/memory.db` write yalnızca core/memory-*.ts yolundan; **DB silmek YASAK** ([[feedback_db_silmek_yasak]]).
+- Sprint sonu tsc temiz + test regresyon yok.
 - Worker `.result` notes alanına kanıt komutu çıktısı yapıştır.
+- **Dishonest result YASAK** — notes'ta iddia edilen LoC delta disk'le çakışmalı ([[feedback_no_synthetic_results]]); Sprint 192 192-012 dishonest detector aktif olacak.
+- **OSS GA blocker:** Sprint 192 false-NO_GO ve agent stats güvenilirliği için kritik.
 
 ---
 
-## DALGA 1 — Sprint 189 Carry-Over + Native Chat Foundation (8 task)
+## DALGA 0 — Synthetic NO_GO Eradication Core (1 task — ZORUNLU İLK)
+
+> **Neden tek başına:** Sprint 191 hotfix (`07f07c9a`) sadece `sprint-phases.ts:1120`'yi kapsadı. Sprint-controller'da 2 synthetic NO_GO daha var; Sprint 192'nin kendisi bu bloklara takılırsa hotfix testimiz bozulur.
 
 ---
 
-## Task 1: 190-001 — Sprint 189 IDENTITY.md sat30 + Memory DB retro entry bug fix
-- Model: opus
-- Effort: normal
-- Skills: typescript-expert
-- Files: .deckent/workspace/IDENTITY.md, src/core/identity-generator.ts, src/orchestra/sprint-retro-writer.ts, src/orchestra/sprint-finalizer.ts
-- Scope: src/core/, src/orchestra/, .deckent/, tests/orchestra/
-
-### Description
-Sprint 189 iki carry-over kapatılır:
-
-**1. IDENTITY.md Project Status sat30 "MCP Tools: 27" → "31":**
-Sprint 189 Task 12 worker AUTOGEN bloğunu (sat43) güncelledi ama Project Status tablosu manuel (sat30) drift kaldı. Worker AUTOGEN scope'u genişletmek yerine sadece güncelleme yapmıştı.
-- `identity-generator.ts` AUTOGEN block patikasını genişlet — Project Status table'ı da managed-docs alanına dahil et.
-- `lint-identity-md.mjs` Project Status drift için non-zero exit.
-
-**2. Memory DB retro entry yazımı ([[project_sprint167_db_gap]] kronik bug):**
-Sprint 189 tamamlandı ama `memory.db`'de sprint-189 retro entry YAZILMADI (sadece `pattern-sprint-189-stale_heartbeat` var). ADR-046 Brain Self-Update Hook chronic incomplete — sprint-finalizer retro hook'u DB write yapmıyor.
-- `sprint-retro-writer.ts` veya `sprint-finalizer.ts`'te DB write hook'unu kontrol et.
-- Bug RC tespit (memory store insert/upsert hatası mı, hook chain'i mi).
-- Fix + Sprint 190 sonunda retro entry DB'ye yazıldığını doğrula.
-
-**Kanıt:** `grep "MCP Tools.*31" .deckent/workspace/IDENTITY.md` → 2 match (sat30 + sat43); `sqlite3 .brain/memory.db "SELECT * FROM entries WHERE sprint_id='sprint-190' AND type='retro';"` → 1 row (Sprint 190 sonu).
-**Test:** 3+ test — (a) Project Status AUTOGEN extend, (b) drift lint catches manual edit, (c) retro entry persistence after finalize.
-
----
-
-## Task 2: 190-002 — Provider isAvailable complete fix (partial-available + auth chain)
-- Model: opus
-- Effort: normal
-- Skills: typescript-expert
-- Files: src/providers/gemini.ts, src/providers/codex.ts, src/providers/claude.ts, src/cli/commands/doctor.ts
-- Scope: src/providers/, src/cli/commands/, tests/providers/
-
-### Description
-Sprint 189 Task 7 carry-over: `gemini.isAvailable()` ve `codex.isAvailable()` hâlâ `false` döndürüyor (build sonrası post-test). Binary PATH'te var ama auth check fail ediyor.
-
-**Yöntem:**
-1. Sprint 189 worker'ın yaptığı değişiklikleri oku (`src/providers/gemini.ts`, `codex.ts`). Hangi adımda fail eden noktayı tespit et.
-2. **Partial-available davranışı**:
-   - `isAvailable()` artık 3-state dönsün: `true` (binary + auth OK), `'partial'` (binary OK, auth eksik), `false` (binary yok).
-   - Alternatif: `isAvailable()` boolean kalsın, yanı sıra `detect()` metodu `{ binary, version, auth, ready }` döndürsün.
-3. `deckent doctor --providers` çıktısı her 3 state için açık mesaj versin: "✓ Claude (ready)", "⚠ Codex (binary OK, auth missing — set OPENAI_API_KEY)", "✗ Gemini (binary not found)".
-4. Auth detection: API key env var + `codex login` config + Claude Code session — her provider için özgün yol.
-
-**Kanıt:** `node -e "import('./dist/providers/gemini.js').then(async m => console.log(await new m.GeminiAdapter().detect()))"` → `{binary: true, version: 'X.Y.Z', auth: false, ready: 'partial'}` benzeri.
-**Test:** 3+ test per provider — (a) binary yok, (b) binary var auth yok, (c) tam ready.
-
----
-
-## Task 3: 190-003 — Release workflow npm publish + provenance + --access public (9 fail fix)
-- Model: opus
-- Effort: normal
-- Skills: devops-engineer, ci-testing
-- Files: .github/workflows/release.yml, tests/github/workflows/release.test.ts, tests/workflows/publish.test.ts
-- Scope: .github/, tests/github/, tests/workflows/
-
-### Description
-Sprint 189 Task 15 audit: **9 release workflow fail** — `.github/workflows/release.yml` `Publish to npm` step yok, `npm publish --provenance --access public` regex match etmiyor. WrongStack WS-Z2 + W-I OSS publish bloker.
-
-**Yöntem:**
-1. `release.yml` mevcut yapıyı oku — şu an `actions/checkout` + `setup-node` + tests + build + `softprops/action-gh-release` + dist upload var.
-2. **Yeni step ekle: Publish to npm**
-   ```yaml
-   - name: Publish to npm
-     env:
-       NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-     run: npm publish --provenance --access public
-   ```
-3. Step sıralaması: `build` → `changelog` → `Create GitHub Release` → `Publish to npm` → `Upload dist artifacts`.
-4. Permissions: `id-token: write` + `contents: write` mevcut — provenance için yeterli.
-5. 9 fail testin tümü yeşillenmeli.
-
-**Kanıt:** `npx vitest run tests/github/workflows/release.test.ts tests/workflows/publish.test.ts` → tümü pass.
-**Test:** Audit task — mevcut 9 test fail durumunu fix; yeni test eklenmesine gerek yok.
-
----
-
-## Task 4: 190-004 — `src/cli/commands/chat.ts` Path B implementation (Trinity AI-Asistan kalbi)
-- Model: opus
-- Effort: high
-- Skills: typescript-expert, anthropic-sdk
-- Files: src/cli/commands/chat.ts, src/cli/index.ts
-- Scope: src/cli/, tests/cli/
-
-### Description
-Master plan W-C C-1: `deckent chat` komutu Path B (~150 LoC). Kullanıcının `claude`/`codex`/`gemini` CLI'ını subprocess spawn + Deckent MCP server auto-attach + tty forward. Alperen 2026-05-23: "Deckent native sohbet aracı olmasını istiyorum, kendi Claude gibi arayüzü olmalı naïve sohbetle de çalışmalı". Trinity AI-Asistan personasının kalbi.
-
-**Yöntem:**
-1. `src/cli/commands/chat.ts` oluştur:
-   - `registerChat(program)` ADR-012 deseni
-   - Provider tercih: `--tool <claude|codex|gemini>` veya auto-detect (Sprint 189 + 190-002'den isAvailable())
-   - Subprocess: `spawn('claude', [...args])` veya benzeri
-   - tty forward: stdin/stdout/stderr passthrough (Node `inherit`)
-   - Process lifecycle: SIGINT/SIGTERM forward
-2. `src/cli/index.ts`'e `registerChat(program)` ekle.
-3. MCP auto-attach: subprocess env'sine `DECKENT_MCP_AUTO_ATTACH=1` set et veya kullanıcının config'ine MCP server entry inject et.
-4. Hata kanalları: provider bulunamazsa açık mesaj + alternatif öner ("No AI CLI found. Install one of: claude (Anthropic), codex (OpenAI), gemini (Google), or use `deckent chat --local` for Ollama").
-5. Help text: "Start a conversational session with Deckent. Uses your installed AI CLI; works in any terminal."
-
-**Kanıt:** `deckent chat --help` → açık çıktı + `deckent chat --tool claude` → subprocess başlar.
-**Test:** 3+ test — (a) auto-detect en yüksek öncelikli provider, (b) `--tool` override, (c) provider yok → açık hata mesajı.
-
----
-
-## Task 5: 190-005 — `deckent chat` MCP auto-attach + tool-use loop kontrolü
-- Model: opus
-- Effort: high
-- Skills: anthropic-sdk, typescript-expert
-- Files: src/cli/commands/chat.ts, src/cli/helpers/mcp-attach.ts, src/mcp/server.ts
-- Scope: src/cli/, src/mcp/, tests/cli/
-
-### Description
-Master plan W-C C-2: Host CLI tool-use loop'u yönetir, Deckent 31 MCP tool'u sunar. Path B kritik gereksinim.
-
-**Yöntem:**
-1. `src/cli/helpers/mcp-attach.ts` oluştur — Claude/Codex/Gemini CLI'larına MCP server attach mekanizması:
-   - **Claude CLI:** `claude mcp add deckent -- npx deckent-mcp` (zaten DECKENT.md'de belge)
-   - **Codex CLI:** Codex MCP attach syntax (codex'in MCP desteği varsa)
-   - **Gemini CLI:** Gemini MCP attach syntax (varsa)
-   - Otomatik check: MCP zaten attach edilmişse skip
-2. `deckent chat` başlangıcında attach kontrolü + missing ise prompt: "Attach Deckent MCP to <tool>? [y/N]"
-3. Attach edilmişse stdout'a "Deckent MCP ready — 31 tools available" mesajı.
-4. Tool-use loop kontrolü: host CLI'ın MCP tool çağrılarını route ettiğini doğrula (smoke test).
-
-**Kanıt:** `deckent chat --tool claude --check-mcp` → "✓ Deckent MCP attached" + tool listesinde 31 tool görünür.
-**Test:** 3+ test — (a) attach skip if already, (b) attach prompt user, (c) attach success path.
-
----
-
-## Task 6: 190-006 — Chat history — `memory.db` yeni `chat` entry type
-- Model: opus
-- Effort: normal
-- Skills: typescript-expert
-- Files: src/core/memory-types.ts, src/core/memory-store.ts, src/cli/commands/chat.ts
-- Scope: src/core/, src/cli/, tests/core/
-
-### Description
-Master plan W-C C-4: `deckent chat --resume <session-id>` için chat history persistance. Memory V2 DB-first additive schema.
-
-**Yöntem:**
-1. `src/core/memory-types.ts` `EntryType` enum'una `'chat'` ekle.
-2. `src/core/memory-store.ts` chat-specific helper'lar: `createChatSession()`, `appendChatTurn(sessionId, role, content)`, `getChatHistory(sessionId)`.
-3. Chat entry shape: `{ type: 'chat', session_id, turn_index, role: 'user'|'assistant', content, timestamp }`.
-4. FTS5 indexable — chat geçmişi `deckent recall "<sorgu>"` ile aranabilir olsun.
-5. `deckent chat --resume <id>` opsiyonu — son N turn'ü göster, devam et.
-
-**Kanıt:** `sqlite3 .brain/memory.db "PRAGMA table_info(entries);"` chat type validation + `deckent chat --resume <id>` çalışır.
-**Test:** 3+ test — (a) yeni chat session create, (b) turn append + retrieve, (c) FTS5 chat search.
-
----
-
-## Task 7: 190-007 — Naïve sohbet modu (task-driven değil, conversational)
-- Model: opus
-- Effort: normal
-- Skills: anthropic-sdk
-- Files: src/cli/commands/chat.ts, docs/guide/chat-mode.md
-- Scope: src/cli/, docs/guide/, tests/cli/
-
-### Description
-Alperen 2026-05-23: "naïve sohbetle de çalışmalı". `deckent chat` sadece task-driven ("X yapsana") değil casual conversation ("merhaba", "bugün ne yapsam") da yanıtlamalı. Brain task'a çevirme yerine doğrudan model konuşsun.
-
-**Yöntem:**
-1. `deckent chat` system prompt'una "naïve mode" yönergesi ekle:
-   ```
-   You are Deckent's conversational assistant. The user may chat casually (greetings, questions about Deckent, brainstorming) OR request task execution. For casual chat, respond naturally without invoking MCP tools. For task requests (start sprint, run command), use the appropriate MCP tool.
-   ```
-2. Decision heuristic system prompt içinde: "If the user says 'start a sprint' or 'fix this bug', use deckent_start/deckent_run. Otherwise, just chat."
-3. `docs/guide/chat-mode.md` dokümantasyon — naïve vs task-driven kullanım örnekleri.
-4. Trinity AI-Asistan personası ilk somut tezahür.
-
-**Kanıt:** `deckent chat` → "merhaba" → MCP tool çağrılmadan natural response.
-**Test:** 3+ test (provider mock ile) — (a) casual greeting → no MCP, (b) "start sprint" → MCP tool, (c) ambiguous query → clarification.
-
----
-
-## Task 8: 190-008 — Sprint 189 19 yeni TDD test'in yeşillenmesi + 7 env-fail fix
-- Model: opus
-- Effort: high
-- Skills: testing-expert, typescript-expert
-- Files: tests/docs/api-md-no-stale-refs.test.ts, tests/docs/no-stale-identity-refs.test.ts, tests/providers/codex-config.test.ts, tests/monitor/alert-emitter.test.ts (+ kardeş test'ler)
-- Scope: tests/, src/
-
-### Description
-Sprint 189 Task 15 raporundan: **19 fail yeni TDD test** (kardeş task fix tamamlanmadığı için fail) + **7 env-issue fail** (ENOSPC tmpfs, env tooling). Bu sprintte yeşillenmeli.
-
-**Yöntem:**
-1. `tests/docs/api-md-no-stale-refs.test.ts` (15 fail) — Sprint 189 Task 4 api.md temizliği eksik kaldıysa tamamla; testin beklediği exact pattern'leri uygula.
-2. `tests/docs/no-stale-identity-refs.test.ts` (4 fail) — Sprint 189 Task 5 cli.md/cli-commands.md PROJECT-IDENTITY.md temizliği eksik kaldıysa tamamla.
-3. `tests/providers/codex-config.test.ts` (6 fail) — ENOSPC tmpfs sorununu çöz (test isolation veya disk cleanup hook).
-4. `tests/monitor/alert-emitter.test.ts` (1 fail) — env tooling fix.
-5. **Hedef:** Sprint 190 sonu fail count ≤ 36 (Sprint 189 başlangıç baseline'ı + 9 release workflow fail Task 3'te fix edildikten sonra 36 - 9 = 27 daha düşük olmalı).
-
-**Kanıt:** `npx vitest run tests/docs/api-md-no-stale-refs.test.ts tests/docs/no-stale-identity-refs.test.ts tests/providers/codex-config.test.ts tests/monitor/alert-emitter.test.ts` → tüm pass.
-**Test:** Audit + fix — mevcut test fail'leri çözmek; yeni test eklemek gerekmez.
-
----
-
-## DALGA 2 — Local LLM + Provider Catalog + OSS Docs (8 task)
-
----
-
-## Task 9: 190-009 — `src/providers/ollama.ts` adapter (Local LLM provider)
+## Task 1: 192-001 — sprint-controller.ts synthetic NO_GO bloklarına liveness check (W-INTEGRITY I-2)
 - Model: opus
 - Effort: high
 - Skills: typescript-expert
-- Files: src/providers/ollama.ts, src/core/types.ts, .deckent/config.json (template), src/core/config.ts
-- Scope: src/providers/, src/core/, tests/providers/
+- Files: src/orchestra/sprint-controller.ts, src/orchestra/worker-liveness.ts, tests/orchestra/sprint-controller-liveness.test.ts
+- Scope: src/orchestra/, tests/orchestra/
 
 ### Description
-Master plan W-F F-11: Local LLM provider. Alperen 2026-05-23: "local llm modeli eklemek istiyorum". Vision §195 referans (RTX 5090 + CUDA + 70B model). Ollama HTTP API en kolay başlangıç.
+Sprint 191 hotfix `sprint-phases.ts:1120` synthetic NO_GO bloğunu liveness check ile kapsadı. Ama `sprint-controller.ts:821` (cleanup path) ve `:845` (recover path) iki sentetik kaynağı kapsamadı.
 
 **Yöntem:**
-1. `src/providers/ollama.ts` — `OllamaAdapter implements ProviderAdapter`:
-   - `isAvailable()` → `fetch('http://localhost:11434/api/tags')` 200 mu kontrol et
-   - `detect()` → model listesini çek, version bilgisi
-   - `complete()` / `stream()` — Ollama API `/api/generate` veya `/api/chat`
-2. `src/core/types.ts` `Provider` enum'a `'ollama'` ekle.
-3. `src/core/config.ts` `providers.worker` etc. opsiyonlarına `ollama` ekle.
-4. Model registry entegrasyonu — Ollama'dan çekilen modelleri tier'a map et (qwen-coder-32b → premium, llama-3-8b → standard, vb.).
-5. `deckent config set worker_provider ollama` ile tam local sprint çalışabilmeli.
+1. `src/orchestra/sprint-controller.ts:821` ve `:845` blokları oku.
+2. `checkWorkerLiveness(task, projectRoot)` import et + ÖNCE çağır:
+   - `never-spawned` → SKIP synthetic, BRAIN→WORKER:NEVER_DISPATCHED event emit
+   - `alive` → mümkünse poll, değilse honest label ile fall through
+   - `dead` → mevcut synthetic (notes'a `liveness=dead` ekle)
+3. Tests: 3+ test her iki blok için (cleanup path + recover path) — never-spawned skip + alive grace + dead synthetic.
 
-**Kanıt:** `node -e "import('./dist/providers/ollama.js').then(async m => console.log(await new m.OllamaAdapter().isAvailable()))"` → ollama localhost varsa true.
-**Test:** 3+ test — (a) localhost ollama yok → false, (b) mock ollama yanıtı → true + model list, (c) complete() basic call.
+**Kanıt:** `grep -A3 "syntheticResult" src/orchestra/sprint-controller.ts | grep -c "checkWorkerLiveness"` → 2+ match.
+**Test:** 6+ test (2 path × 3 senaryo).
 
 ---
 
-## Task 10: 190-010 — models.dev live catalog `src/core/model-catalog.ts` (3 çatal #1)
+## DALGA 1 — Sprint 191 Genuine NO_GO Carry-Over (6 task)
+
+> Sprint 191 dogfood'da 6 task gerçekten yarım kaldı (dishonest result + uncompleted source). Bu dalga'da hepsi paralel düzeltilir.
+
+---
+
+## Task 2: 192-002 — runtime_extension_enabled default true (Sprint 191 191-002 carry-over)
 - Model: opus
-- Effort: high
+- Effort: normal
 - Skills: typescript-expert
-- Files: src/core/model-catalog.ts, src/core/model-registry.ts
+- Files: src/core/config.ts, tests/core/config-defaults.test.ts
 - Scope: src/core/, tests/core/
 
 ### Description
-Master plan W-F F-6/F-7 + 3 çatal kararı #1: models.dev live + 24h cache + fallback. `model-registry.ts` 13 hardcoded model kaldırılır → runtime fetch. ADR-023 tier-based routing korunur.
+Sprint 191 worker test yazdı ama `src/core/config.ts` default'unu değiştirmedi — `runtime_extension_enabled: false` HÂLÂ default. Production user'lar bu fix'ten faydalanamaz.
 
 **Yöntem:**
-1. `src/core/model-catalog.ts` oluştur:
-   - `fetchCatalog()` → `fetch('https://models.dev/api/v1/catalog')` + JSON parse
-   - 24h cache: `~/.deckent/cache/models-catalog.json` + TTL check
-   - Fallback chain: fresh → cached → bundled-fallback
-2. `model-registry.ts` `loadModels()` → catalog'tan beslenir; hardcoded liste kaldırılır.
-3. Provider mapping: catalog response'dan Claude/Codex/Gemini/Ollama modellerini ayır.
-4. Tier mapping: catalog metadata + Deckent tier kuralları (premium/standard/economy/premium_plus).
-5. Offline modu: `--offline` flag veya network yok → bundled fallback kullan.
+1. `src/core/config.ts` `timeout.runtime_extension_enabled` default `false → true` (Sprint 191 deckent-dev `.deckent/config.json` zaten true).
+2. `tests/core/config-defaults.test.ts` default assertion güncellemesi.
+3. CHANGELOG.md not.
 
-**Kanıt:** `deckent models list` → models.dev'den çekilen güncel liste; cache 24h içinde tekrar fetch yok.
-**Test:** 3+ test — (a) live fetch + cache write, (b) cache hit, (c) fallback offline.
+**Kanıt:** `grep "runtime_extension_enabled" src/core/config.ts | grep "true"` → 1+ match (default block).
+**Test:** 3+ test — (a) default true, (b) explicit false override, (c) config merge precedence.
 
 ---
 
-## Task 11: 190-011 — `deckent models list` + `deckent models refresh` CLI
-- Model: sonnet
-- Effort: normal
-- Skills: typescript-expert
-- Files: src/cli/commands/models.ts, src/cli/index.ts, src/mcp/tools/models.ts
-- Scope: src/cli/, src/mcp/, tests/cli/, tests/mcp/
-
-### Description
-Master plan W-F F-9/F-10: Kullanıcı katalogu görür, manuel refresh edebilir.
-
-**Yöntem:**
-1. `src/cli/commands/models.ts`:
-   - `deckent models list [--provider <name>]` — aktif provider'ların modelleri + tier mapping tablosu
-   - `deckent models refresh` — 24h cache invalidate + fresh fetch
-   - `deckent models tier <model>` — bir modelin tier'ını sorgula
-2. `src/mcp/tools/models.ts` paralel parite — `deckent_models` MCP tool (CLI/MCP parity ADR-022-v2).
-3. `src/cli/index.ts`'e `registerModels(program)` ekle.
-4. MCP `DECKENT_MCP_INSTRUCTIONS` güncelle (32 tools — Sprint 189 lint script otomatik yakalar).
-
-**Kanıt:** `deckent models list` → renkli tablo + tier annotation.
-**Test:** 3+ test — (a) list output format, (b) provider filter, (c) refresh cache invalidate.
-
----
-
-## Task 12: 190-012 — README.md baştan yaz — Trinity vision ön planda (W-H H-1)
-- Model: sonnet
-- Effort: high
-- Skills: documentation-writer
-- Files: README.md
-- Scope: ., tests/docs/
-
-### Description
-Master plan W-H H-1 + Alperen 2026-05-23: "dokümantasyon kusursuz olsun istiyorum sadece sayı değil içerik olarak". OSS GA blockerı.
-
-**Yöntem:**
-1. Mevcut README'yi oku — teknik ağırlıklı, vision dağınık.
-2. Yeniden yapı:
-   - **Hero**: "Deckent — AI Agent Orchestration That Actually Ships"
-   - **3 Faces (Trinity)**: AI Asistan / AI System Worker / Developer — vision ön planda
-   - **Why Deckent**: Devin/Cursor/Aider/Copilot vs Deckent — 3 paragraf
-   - **Install**: `npm install -g deckent` → 5 dakikada ilk sprint
-   - **Quick Start**: `deckent init` → `deckent chat` veya `deckent set-directives` → `deckent start`
-   - **Architecture**: tek diyagram + 4 modül linki (Brain/Worker/Auditor/Memory)
-   - **Features**: 11 ana özellik (canlı 96/113 = %85 oran ile)
-   - **OSS principles**: 4 immovable principles (ADR-033)
-   - **Links**: docs/guide/, docs/cookbook/, contributing
-3. Badge'leri güncelle — sprint count + version + license + ci status.
-4. Türkçe README ayrı dosya (`README-TR.md`) — i18n hazırlık (ADR-032).
-
-**Kanıt:** `wc -l README.md` → ≥120 satır, `grep -c "^## " README.md` → ≥8 başlık.
-**Test:** 3+ test — (a) link checker temiz, (b) heading structure, (c) install command syntactically valid.
-
----
-
-## Task 13: 190-013 — Getting Started 5-dakika kullanıcı yolculuğu (W-H H-2)
-- Model: sonnet
-- Effort: normal
-- Skills: documentation-writer
-- Files: docs/guide/getting-started.md, docs/guide/first-sprint.md, docs/guide/chat-mode.md
-- Scope: docs/guide/, tests/docs/
-
-### Description
-Master plan W-H H-2: 5 dakikalık deneyim. OSS GA bloker.
-
-**Yöntem:**
-1. `docs/guide/getting-started.md`:
-   - Prerequisite (Node ≥24, optional Claude/Codex/Gemini CLI)
-   - `npm install -g deckent` veya `npx deckent`
-   - İlk komut: `deckent init my-app` veya `cd my-app && deckent init`
-   - `deckent chat` ile soru sor: "What can I do here?"
-   - VEYA `deckent set-directives` + `deckent start` ile ilk sprint
-2. `docs/guide/first-sprint.md`:
-   - DIRECTIVES format örneği (1 task minimal)
-   - `deckent plan` → `deckent start` → `deckent status`
-   - Beklenen çıktı + screenshot/ASCII
-3. `docs/guide/chat-mode.md`:
-   - Path B yöntemi (kullanıcının AI CLI'ı + Deckent MCP)
-   - Naïve sohbet örnekleri
-   - Task-driven örnekleri
-4. README'den her birine bağ.
-
-**Kanıt:** `wc -l docs/guide/*.md` her biri ≥40 satır.
-**Test:** Audit task — link check + heading structure.
-
----
-
-## Task 14: 190-014 — `docs/cookbook/` 3 örnek tarif (W-H H-7)
-- Model: sonnet
-- Effort: normal
-- Skills: documentation-writer
-- Files: docs/cookbook/add-rest-api.md, docs/cookbook/fix-bug.md, docs/cookbook/update-docs.md
-- Scope: docs/cookbook/, tests/docs/
-
-### Description
-Master plan W-H H-7: Tarif/örnek koleksiyonu — "Bir REST API ekle", "Bir bug fix yap", "Doc güncelle".
-
-**Yöntem:**
-1. `docs/cookbook/add-rest-api.md`:
-   - Senaryo: Express/FastAPI projesine yeni endpoint ekleme
-   - DIRECTIVES tam metni (kopyala-yapıştır kullanılabilir)
-   - `deckent plan + start` çıktı örneği
-   - Worker'ın yaptıkları + GO/NO_GO yorumu
-2. `docs/cookbook/fix-bug.md`:
-   - Senaryo: Bilinen test fail bug-fixer agent ile düzeltme
-   - DIRECTIVES örneği
-   - Bug-fixer agent davranışı + FIX phase
-3. `docs/cookbook/update-docs.md`:
-   - Senaryo: README + API docs güncelleme
-   - doc-writer agent + sonnet model
-   - Audit task tipi açıklaması
-
-**Kanıt:** Her dosya ≥50 satır + DIRECTIVES örneği + komut çıktısı snippet'i.
-**Test:** Audit task — link check.
-
----
-
-## Task 15: 190-015 — API E2E test extension (rate limiting + auth — G-4/G-5)
+## Task 3: 192-003 — outcome-tracker reclassifyTaskOutcome GERÇEK implementation (Sprint 191 191-003 carry-over — dishonest worker case)
 - Model: opus
 - Effort: high
-- Skills: api-builder, testing-expert, security-specialist
-- Files: tests/api/rate-limit.test.ts, tests/api/auth.test.ts, tests/api/sse.test.ts
-- Scope: tests/api/, src/api/
+- Skills: typescript-expert
+- Files: src/orchestra/outcome-tracker.ts, src/cli/commands/agent.ts, src/core/errors.ts, tests/orchestra/outcome-tracker-reclassify.test.ts
+- Scope: src/orchestra/, src/cli/, src/core/, tests/orchestra/
 
 ### Description
-Master plan W-G G-4/G-5: Sprint 189 Task 11 envanter + happy path test başlangıç; bu task **derinleştirme** — rate limiting + auth + SSE detaylı E2E.
+Sprint 191 worker `.result` notes'unda "outcome-tracker.ts +220 LoC, agent.ts +65 LoC reclassify subcommand, errors.ts +45 LoC" iddia etti ama disk'te SADECE test dosyası vardı. Honest-gate yakaladı → NO_GO. Bu task gerçek implementation.
 
 **Yöntem:**
-1. `tests/api/rate-limit.test.ts`:
-   - Token bucket per IP test — 100 req/min default
-   - 101. request → 429 + Retry-After header
-   - Reset after window
-2. `tests/api/auth.test.ts`:
-   - Bearer token middleware — `DECKENT_API_TOKEN` env
-   - Missing token → 401
-   - Invalid token → 401
-   - Health endpoint exempt
-3. `tests/api/sse.test.ts`:
-   - `/api/events` veya benzeri SSE channel
-   - Event stream consumer + format kontrolü
-   - Disconnect/reconnect davranışı
-4. Test server helper'ı genişlet (Sprint 189'da yazıldı, ek senaryolar).
+1. `src/orchestra/outcome-tracker.ts`:
+   - `reclassifyTaskOutcome(sprintId, taskId, newDecision, opts?)` public method — idempotent, delta-apply.
+   - agentPerformance/skillPerformance success delta (totalTasks bumping YOK — task zaten sayıldı).
+   - skillSprintHistory + synergyMatrix update.
+   - `.deckent/routing/outcomes/<sprintId>.json` in-place mutate.
+   - Optional MemoryStore injection (ReclassifyAuditStore interface) — audit-trail `retro` entry write.
+2. `src/cli/commands/agent.ts`:
+   - `deckent agent reclassify --sprint <id> --task <id> --decision <DONE|GO_WITH_TECH_DEBT|NO_GO> [--reason <text>] [--no-audit]` subcommand register.
+   - Lazy-load MemoryStore (better-sqlite3 absent fallback).
+3. `src/core/errors.ts`:
+   - DECKENT_E068..E071 codes (outcomes file missing, JSON parse fail, task not found, write fail).
+4. Sprint 191 test dosyası mevcut (`tests/orchestra/outcome-tracker-reclassify.test.ts`) — tests ile bind et, hepsini geçir.
+5. **Bonus:** Sprint 191 12 false NO_GO için bulk reclassify (192-019 task'ı bunu yapar — bu task sadece API/CLI).
 
-**Kanıt:** `npx vitest run tests/api/rate-limit.test.ts tests/api/auth.test.ts tests/api/sse.test.ts` → tüm pass.
-**Test:** 15+ test (3 dosya × 5+ test).
+**Kanıt:** `grep "reclassifyTaskOutcome" src/orchestra/outcome-tracker.ts` → 1+ match; `node dist/cli/index.js agent reclassify --help` → renkli output.
+**Test:** Existing 10-test suite pass + 3+ ek (CLI subcommand integration, error codes).
 
 ---
 
-## Task 16: 190-016 — `CONTRIBUTING.md` + `CODE_OF_CONDUCT.md` + GitHub templates (W-I prep)
-- Model: sonnet
+## Task 4: 192-004 — CLI top-level error handler — uncaughtException + unhandledRejection (Sprint 191 191-007 carry-over)
+- Model: opus
 - Effort: normal
-- Skills: documentation-writer
-- Files: CONTRIBUTING.md, CODE_OF_CONDUCT.md, .github/ISSUE_TEMPLATE/bug.md, .github/ISSUE_TEMPLATE/feature.md, .github/ISSUE_TEMPLATE/question.md, .github/PULL_REQUEST_TEMPLATE.md
-- Scope: ., .github/, tests/docs/
+- Skills: typescript-expert
+- Files: src/cli/index.ts, src/cli/helpers/error-handler.ts, tests/cli/error-handler.test.ts
+- Scope: src/cli/, tests/cli/
 
 ### Description
-Master plan W-I I-7/I-8/W-H H-9/H-10: OSS community altyapı. Public repo öncesi zorunlu.
+Sprint 191 worker error-handler.ts yarattı ama `src/cli/index.ts`'e `process.on('uncaughtException')` ve `process.on('unhandledRejection')` wire EKLEMEDİ. CLI silent exit hâlâ var.
 
 **Yöntem:**
-1. `CONTRIBUTING.md`:
-   - Setup (clone, install, build, test)
-   - Development workflow (sprint mode + manual)
-   - Conventional Commits guide
-   - Test policy (minimum 3 test per task, ADR-053)
-   - PR review process
-2. `CODE_OF_CONDUCT.md`:
-   - Contributor Covenant v2.1 (standart OSS)
-   - Reporting kanal: `conduct@<domain>` (yer tutucu)
-3. `.github/ISSUE_TEMPLATE/`:
-   - `bug.md` (reproduce + expected + actual + env)
-   - `feature.md` (problem + solution + alternatives)
-   - `question.md` (FAQ yönlendirme)
-4. `.github/PULL_REQUEST_TEMPLATE.md`:
-   - Summary, related issue, test plan, breaking change checklist
-5. Conventional Commits link + ADR-009 referans.
+1. `src/cli/index.ts` startup'ta:
+   ```typescript
+   process.on('uncaughtException', formatFatalAndExit);
+   process.on('unhandledRejection', formatFatalAndExit);
+   ```
+2. `src/cli/helpers/error-handler.ts` `formatFatalAndExit(error)`:
+   - Stderr'a "✗ FATAL: <name>: <message>"
+   - Stack trace `DECKENT_DEBUG=1` env ile aç
+   - Crash log `.deckent/crashes/<timestamp>.log`
+3. Commander.js error handler customize — eksik argüman/komut'ta suggestion.
 
-**Kanıt:** Tüm dosyalar ≥30 satır + GitHub render preview clean.
-**Test:** Audit task — link check + markdown structure.
+**Kanıt:** `node dist/cli/index.js bogus-command 2>&1` → readable error + suggestion; exit code != 0.
+**Test:** 3+ test — uncaught/unhandled/commander.
+
+---
+
+## Task 5: 192-005 — sprint-finalizer retro hook DB write (Sprint 191 191-008 carry-over)
+- Model: opus
+- Effort: high
+- Skills: typescript-expert
+- Files: src/orchestra/sprint-finalizer.ts, src/orchestra/sprint-retro-writer.ts, src/core/memory-store.ts, tests/orchestra/sprint-finalizer-retro-hook.test.ts
+- Scope: src/orchestra/, src/core/, tests/orchestra/
+
+### Description
+Sprint 191 worker test yazdı ama gerçek implementation YOK. Memory DB'de retro entry chronic gap ([[project_sprint167_db_gap]] devam).
+
+**Yöntem:**
+1. `sprint-retro-writer.ts` veya `sprint-finalizer.ts` retro generation noktasında `store.upsert({ type: 'retro', sprint_id, content, ... })` çağrısı ekle.
+2. Idempotent — aynı sprint için tekrar çağrılırsa upsert.
+3. Silent fail kaldır — hata propagate edilsin (sprint sonu hata, retro yazılmama'dan daha iyi).
+4. Sprint 191 ve 192 retro entry backfill — manuel SQL insert (DB silmek YASAK, sadece insert).
+5. Sprint 191 test dosyası mevcut — tests pass.
+
+**Kanıt:** `sqlite3 .brain/memory.db "SELECT COUNT(*) FROM entries WHERE type='retro' AND sprint_id IN ('sprint-189','sprint-190','sprint-191','sprint-192');"` → 4.
+**Test:** Existing test + 3+ ek (retro hook wired, upsert idempotent, error propagation).
+
+---
+
+## Task 6: 192-006 — task-builder Karpathy block injection (Sprint 191 191-015 carry-over)
+- Model: opus
+- Effort: normal
+- Skills: typescript-expert
+- Files: src/orchestra/task-builder.ts, src/agents/worker.ts, tests/orchestra/task-builder-karpathy.test.ts
+- Scope: src/orchestra/, src/agents/, tests/orchestra/
+
+### Description
+Sprint 191 worker task-builder.ts'e hiç dokunmadı. Karpathy block worker prompt'larına inject edilmiyor.
+
+**Yöntem:**
+1. `src/orchestra/task-builder.ts` `buildWorkerPrompt()` — agent/skill prompt'larından sonra:
+   ```
+   ## Karpathy Discipline (mandatory)
+   <content from .claude/rules/karpathy-discipline.md>
+   ```
+2. Content cache (sprint başında bir kez oku).
+3. Token budget: ~500 token, kabul edilebilir ([[feedback_prompt_completeness_over_brevity]]).
+
+**Kanıt:** `grep "Karpathy" src/orchestra/task-builder.ts` → 2+ match; sprint 192 worker prompt'unda görünmeli.
+**Test:** 3+ test — block present, content loaded, cache hit.
+
+---
+
+## Task 7: 192-007 — Provider isAvailable 3-state + Ollama TECH_DEBT (Sprint 191 191-017 carry-over)
+- Model: opus
+- Effort: high
+- Skills: typescript-expert
+- Files: src/providers/claude.ts, src/providers/codex.ts, src/providers/gemini.ts, src/providers/ollama.ts, src/cli/commands/doctor.ts, tests/providers/
+- Scope: src/providers/, src/cli/commands/, tests/providers/
+
+### Description
+Sprint 190+191 carry-over zaten. Provider auth detection yarım.
+
+**Yöntem:**
+1. `isAvailable()` 3-state: `true` / `'partial'` / `false`.
+2. `detect()` opt-in method: `{ binary, version, auth, ready }`.
+3. `deckent doctor --providers` her 3 state açık mesaj.
+4. Ollama: model list parse + tier mapping complete.
+
+**Kanıt:** `deckent doctor --providers` 3 provider net state; `npm test -- providers/` pass.
+**Test:** 3+ test per provider.
+
+---
+
+## DALGA 2 — W-INTEGRITY Telemetry + Honest Result Detection (5 task)
+
+---
+
+## Task 8: 192-008 — Hotfix telemetri — never-dispatched + alive-grace event sayım retro'ya (W-INTEGRITY I-1)
+- Model: opus
+- Effort: normal
+- Skills: typescript-expert
+- Files: src/orchestra/sprint-reporter.ts, src/orchestra/event-stream.ts, tests/orchestra/sprint-reporter-liveness.test.ts
+- Scope: src/orchestra/, tests/orchestra/
+
+### Description
+Sprint 191 hotfix (`07f07c9a`) event emit ediyor — Sprint 192 retro'da bu metric'leri görelim. Hotfix etkisi VERİ-bazlı doğrulanır.
+
+**Yöntem:**
+1. `sprint-reporter.ts` retro generation'ında event stream'i parse et:
+   - `BRAIN→WORKER:NEVER_DISPATCHED` count → "Never dispatched: N task"
+   - `BRAIN→WORKER:TIMEOUT_EXTEND` count → "Extensions granted: N task"
+   - alive-grace-hit vs alive-grace-miss oranı
+2. Retro markdown bölümü "Liveness Stats" başlığı.
+
+**Kanıt:** Sprint 192 retro'da "Liveness Stats" başlık görünmeli; counts > 0 (Sprint 192 dogfood'unda muhtemelen tetiklenecek).
+**Test:** 3+ test — event count, retro markdown format, empty event handling.
+
+---
+
+## Task 9: 192-009 — EVALUATE phase trigger sıkılaştırma (W-INTEGRITY I-3)
+- Model: opus
+- Effort: high
+- Skills: typescript-expert
+- Files: src/orchestra/sprint-phases.ts, src/orchestra/sprint-controller.ts, tests/orchestra/evaluate-trigger-gate.test.ts
+- Scope: src/orchestra/, tests/orchestra/
+
+### Description
+Sprint 191 RC: `runEvaluatePhase` Wave-3 task'lar dispatch olmadan tetiklendi. Trigger şartı belirsiz.
+
+**Yöntem:**
+1. `runEvaluatePhase` entry guard: "tüm sprint task'ları için ya `.result` var ya `assignedWorker` set ya da explicit DEFERRED". Aksi takdirde return + log "premature EVALUATE — waiting for dispatch".
+2. Dispatch loop'unda her task spawn-attempt sonrası `task.assignedWorker` set (mevcut davranış olabilir — doğrula).
+3. Timeout: dispatcher'a max bekleme süresi (effort'a göre 2-3x), aşılırsa DEFERRED işaretle ve EVALUATE'e izin ver.
+
+**Kanıt:** Sprint 192'de 12 worker × 2g deneyinde EVALUATE log'unda "premature" mesaj olmamalı.
+**Test:** 3+ test — full-dispatch trigger OK, partial-dispatch wait, DEFERRED override.
+
+---
+
+## Task 10: 192-010 — TaskEvaluation.DEFERRED enum + retro reporting (W-INTEGRITY I-4)
+- Model: opus
+- Effort: normal
+- Skills: typescript-expert
+- Files: src/core/task-types.ts, src/orchestra/sprint-reporter.ts, tests/core/task-types.test.ts
+- Scope: src/core/, src/orchestra/, tests/
+
+### Description
+Şeffaf retro için: `TaskEvaluation` enum'una `DEFERRED` ekle (PENDING/CLAIMED/EXECUTING/DONE/NO_GO/PAUSED yanına).
+
+**Yöntem:**
+1. `task-types.ts` enum extend.
+2. `sprint-reporter.ts` retro markdown "Deferred: N task" başlığı.
+3. handleEvaluation DEFERRED için cascade YOK (PAUSED'tan farklı semantik — DEFERRED = dispatcher saturation, PAUSED = depends-on-no_go).
+
+**Kanıt:** `grep "DEFERRED" src/core/task-types.ts` → 1+ enum line.
+**Test:** 3+ test — enum, retro inclusion, cascade exclusion.
+
+---
+
+## Task 11: 192-011 — Sprint-level adaptive timeout (W-INTEGRITY I-5)
+- Model: opus
+- Effort: high
+- Skills: typescript-expert
+- Files: src/orchestra/sprint-controller.ts, src/core/config.ts, tests/orchestra/sprint-timeout-adaptive.test.ts
+- Scope: src/orchestra/, src/core/, tests/orchestra/
+
+### Description
+Kullanıcı kuralı: "zaman sınırlarını daha geniş tutalım". Effort × 2-3 multiplier veya activity-based.
+
+**Yöntem:**
+1. `sprint_timeout_minutes: 0` (disable) default kalır.
+2. **Effort-bazlı task timeout multiplier:** `timeout.effort_base.high: 7200s → 10800s` (3 saat) override.
+3. **Activity-based extension:** Worker hâlâ heartbeat verirse, extension cap'i artır (mevcut 3 → 5).
+4. Config schema: `timeout.adaptive_multiplier: number` (default 1.5).
+
+**Kanıt:** Sprint 192 deneyinde hiç task base timeout'a takılmamalı.
+**Test:** 3+ test — multiplier apply, extension cap, activity-based.
+
+---
+
+## Task 12: 192-012 — Dishonest worker result detector (W-INTEGRITY I-8)
+- Model: opus
+- Effort: high
+- Skills: typescript-expert, security-specialist
+- Files: src/orchestra/result-evaluator.ts, src/orchestra/honest-gate.ts, tests/orchestra/dishonest-detector.test.ts
+- Scope: src/orchestra/, tests/orchestra/
+
+### Description
+Sprint 191 191-003 worker `.result` notes'unda "+220 LoC outcome-tracker" iddia etti ama disk SADECE test dosyası. Honest-gate (Sprint 165 Bug X) mevcut ama bu pattern'i yakalamamış olabilir.
+
+**Yöntem:**
+1. `enforceHonestResultGate` veya `result-evaluator.ts` analiz:
+   - `result.filesChanged` listesindeki dosyalarda gerçek değişiklik var mı? (`git diff --stat <files>`)
+   - `result.linesAdded` ile `git diff --numstat` arasında ±%50 sapma → DISHONEST flag.
+   - Notes'taki "Files changed" / "+N LoC" iddiaları parse + cross-check (heuristic regex).
+2. DISHONEST detected → NO_GO + audit event `BRAIN→AUDITOR:DISHONEST_RESULT_DETECTED`.
+3. Sprint 192 retro'da "Dishonest results: N" başlık (192-008'in extension'ı).
+
+**Kanıt:** Sprint 191 191-003 .result test fixture'ı ile dishonest detect → NO_GO.
+**Test:** 5+ test — honest pass, LoC delta dishonest, files-not-touched dishonest, notes-claim-mismatch, audit event emit.
+
+---
+
+## DALGA 3 — RAM Optimization Live Experiment (4 task)
+
+---
+
+## Task 13: 192-013 — worker_memory_limit 4g→2g + max_workers 3→12 deney (W-M M-1)
+- Model: opus
+- Effort: high
+- Skills: devops-engineer, docker-expert
+- Files: .deckent/config.json, src/orchestra/spawn-backend-docker.ts, docs/guide/docker-memory.md
+- Scope: .deckent/, src/orchestra/, docs/guide/
+
+### Description
+Kullanıcı kararı (Sprint 191 dogfood — canlı `docker stats` worker peak 770MB/8GB cap %9.4): "Boşa RAM ayırıyorsak optimize edelim, 12 worker × 2g deneyelim."
+
+**Yöntem:**
+1. `.deckent/config.json`:
+   - `modes.performance.max_workers: 3 → 12`
+   - `worker_memory_limit: "4g" → "2g"`
+   - `worker_memory_swap: "6g" → "3g"`
+2. `spawn-backend-docker.ts` defaults aynı çekilir (DEFAULT_WORKER_MEMORY_LIMIT '4g' kalır user code uyumu — config override öncelik).
+3. `docs/guide/docker-memory.md` update — yeni öneriler tablosu.
+
+**Kanıt:** Sprint 192'de paralel 12 worker spawn; `docker stats` peak < 2g her worker'da; OOM count == 0.
+**Test:** 3+ test — config defaults, override semantics, max_workers bound.
+
+---
+
+## Task 14: 192-014 — NODE_OPTIONS --max-old-space-size-percentage container env (W-M M-2)
+- Model: opus
+- Effort: normal
+- Skills: docker-expert
+- Files: src/orchestra/spawn-backend-docker.ts, tests/orchestra/spawn-backend-docker.test.ts
+- Scope: src/orchestra/, tests/orchestra/
+
+### Description
+Node 24 `--max-old-space-size-percentage=75` flag — V8 heap dinamik container cap'e bağlı.
+
+**Yöntem:**
+1. `spawn-backend-docker.ts` docker run args:
+   ```
+   '-e', 'NODE_OPTIONS=--max-old-space-size-percentage=75',
+   ```
+2. Worker process'leri Node 24+ kullanır (deckent worker bin: node).
+3. Tests assert.
+
+**Kanıt:** `docker exec deckent-w-XXX env | grep NODE_OPTIONS` → match.
+**Test:** 3+ test — env var present, percentage value, override.
+
+---
+
+## Task 15: 192-015 — Adaptive scheduler — host RAM tespit + max_workers auto-calc (W-M M-3)
+- Model: opus
+- Effort: high
+- Skills: typescript-expert, devops-engineer
+- Files: src/core/host-detector.ts, src/orchestra/spawn-coordinator.ts, src/core/config.ts, tests/core/host-detector.test.ts
+- Scope: src/core/, src/orchestra/, tests/core/
+
+### Description
+Kullanıcı: "16-32 GB RAM ayırarak bu sistemi kolayca kullanabilsin." Adaptive: host RAM tespit + `max_workers` auto-calc.
+
+**Yöntem:**
+1. `src/core/host-detector.ts`:
+   - `detectHostMemory()` — `/proc/meminfo` parse (WSL2 doğru sonuç), fallback `os.totalmem()`.
+   - `suggestMaxWorkers(totalGB, workerMemGB = 2)`: floor(totalGB / workerMemGB) - 1 (1GB host overhead). Cap 1-16.
+2. `spawn-coordinator.ts` startup'ta `detectHostMemory()` çağır, config `max_workers` yoksa veya `auto` ise `suggestMaxWorkers()` kullan.
+3. CLI: `deckent doctor --memory` host RAM rapor + suggested max_workers.
+
+**Kanıt:** `deckent doctor --memory` → "Host: 40 GB, suggested max_workers: 15".
+**Test:** 3+ test — /proc/meminfo parse, fallback, suggestion math.
+
+---
+
+## Task 16: 192-016 — RAM telemetri — `docker stats` snapshot retro'ya + VDS/VPS analiz (W-M M-7)
+- Model: opus
+- Effort: normal
+- Skills: typescript-expert, docker-expert
+- Files: src/orchestra/ram-telemetry.ts, src/orchestra/sprint-finalizer.ts, src/cli/commands/retro.ts, tests/orchestra/ram-telemetry.test.ts
+- Scope: src/orchestra/, src/cli/, tests/orchestra/
+
+### Description
+Master plan W-M M-7: VDS/VPS kullanıcı kendi RAM kullanımını analiz edebilsin.
+
+**Yöntem:**
+1. `src/orchestra/ram-telemetry.ts`:
+   - `collectDockerStats(sprintId)` — `docker stats --no-stream` parse → `{ workerId, memUsage, memLimit, memPct, cpuPct }[]`.
+   - Sprint sırasında her N saniyede bir snapshot, sprint sonu peak/average hesapla.
+2. `sprint-finalizer.ts` retro generation: telemetri'yi memory.db `retro` entry'sine ek alan + retro markdown'a tablo.
+3. `deckent retro --memory` flag — yalnızca RAM tablo göster.
+
+**Kanıt:** Sprint 192 retro'sunda "RAM Telemetry" başlık + tablo.
+**Test:** 3+ test — docker stats parse, snapshot persist, retro inclusion.
+
+---
+
+## DALGA 4 — Karpathy Discipline Faz 2 + Retroactive Reclassify (3 task)
+
+---
+
+## Task 17: 192-017 — 5 ek agent PROMPT.md Karpathy refactor (L-6: security-auditor, performance-analyzer, accessibility-auditor, data-engineer, devops-engineer)
+- Model: sonnet
+- Effort: high
+- Skills: documentation-writer
+- Files: .deckent/agents/security-auditor/PROMPT.md, .deckent/agents/performance-analyzer/PROMPT.md, .deckent/agents/accessibility-auditor/PROMPT.md, .deckent/agents/data-engineer/PROMPT.md, .deckent/agents/devops-engineer/PROMPT.md
+- Scope: .deckent/agents/
+
+### Description
+Sprint 191 5 agent PROMPT.md refactor edildi. Sprint 192'de 5 daha — toplam 10/15.
+
+**Yöntem:** Sprint 191 Task 191-013 ile aynı template (Hero / Karpathy Discipline / Expertise / Anti-patterns / Verification).
+
+**Kanıt:** 5 dosya ≥ 60 satır, "Karpathy Discipline" + "Anti-patterns" başlık.
+**Test:** Audit task — structure check.
+
+---
+
+## Task 18: 192-018 — 5 ek skill SKILL.md Karpathy refactor (L-7: python-expert, anthropic-sdk, frontend-design, docker-expert, git-expert)
+- Model: sonnet
+- Effort: high
+- Skills: documentation-writer
+- Files: .deckent/skills/python-expert/SKILL.md, .deckent/skills/anthropic-sdk/SKILL.md, .deckent/skills/frontend-design/SKILL.md, .deckent/skills/docker-expert/SKILL.md, .deckent/skills/git-expert/SKILL.md
+- Scope: .deckent/skills/
+
+### Description
+Sprint 191 5 skill SKILL.md refactor edildi. Sprint 192'de 5 daha — toplam 10/21.
+
+**Yöntem:** Sprint 191 Task 191-014 ile aynı template.
+
+**Kanıt:** 5 dosya ≥ 50 satır + Karpathy section.
+**Test:** Audit task — structure check.
+
+---
+
+## Task 19: 192-019 — Sprint 191 retroactive bulk reclassify (192-003 API kullanarak)
+- Model: opus
+- Effort: high
+- Skills: typescript-expert
+- Files: scripts/sprint-191-reclassify.mjs, tests/scripts/sprint-191-reclassify.test.ts
+- Scope: scripts/, tests/scripts/
+
+### Description
+Sprint 191'de 12 false NO_GO disk-doğrulandı (DONE gerçekte). Agent stats çarpıtıldı (architect %27, temp-react-ts-specialist %0). Bulk reclassify ile düzelt.
+
+**Yöntem:**
+1. `scripts/sprint-191-reclassify.mjs`:
+   - Sprint 191 false NO_GO listesi (disk-verified DONE): 191-002 (test only, skipped), 191-006, 191-009, 191-010, 191-011, 191-012, 191-013, 191-014, 191-016
+   - Genuine NO_GO bırak: 191-003, 191-007, 191-008, 191-015, 191-017 (Sprint 192 dalga 1 ile zaten fix edilir)
+   - 192-003'ün CLI'sini kullan: `deckent agent reclassify --sprint sprint-191 --task <id> --decision DONE --reason "Disk-verified: <evidence>"`
+2. Çalıştır + log out.
+3. Agent stats karşılaştırma raporu.
+
+**Kanıt:** `deckent agent stats architect` Sprint 191 öncesi vs sonrası karşılaştırma; success rate net artış (örn. %27 → %60+).
+**Test:** Script integration test — 9 DONE reclassify, 5 NO_GO bırak (genuine), agent stats delta.
 
 ---
 
 ## Sprint Sonu Notu
 
-Bu sprint **8-day push'un 2. günü** — kritik gün çünkü `deckent chat` Path B ve OSS docs OSS GA bloker. Beklenen sonuçlar:
-- 16/16 task DONE (Sprint 189 baseline: 16/16 ✓)
-- Test fail ≤ 36 (Sprint 189 Task 3 ile 9 workflow yeşillendi + Task 8 ile 19 TDD + 7 env yeşillendi = 62 - 35 ≈ 27 hedef)
-- `deckent chat` çalışan demo (Path B ile Claude/Codex/Gemini host)
-- Local LLM provider Ollama wire
-- models.dev live catalog runtime fetch
-- README + Getting Started OSS GA-ready
-- Release workflow npm publish provenance
+Bu sprint **8-day push'un 4. günü** — synthetic NO_GO + dishonest worker eradication + RAM optimization deneyi. Beklenen sonuçlar:
+- 19/19 task DONE (Sprint 191 hotfix + W-INTEGRITY + W-M combo ile sıfır false NO_GO)
+- Test fail count Sprint 191'den ≤ aynı (regresyon yok)
+- 12 paralel worker × 2g cap deneyi başarılı (peak RAM < 6 GB toplam)
+- Agent stats güvenilir hâle gelir (Sprint 191 retroactive reclassify)
+- Karpathy refactor 10/15 agent + 10/21 skill
+- RAM telemetri retro'da görünür (VDS/VPS kullanıcı için)
+- Sprint 167 chronic DB-gap [[project_sprint167_db_gap]] kapanır (192-005)
 
-Sprint 190 retro otomatik (sprint-reporter.ts). Bu DIRECTIVES'te retro task YOK ([[feedback_no_retro_task_in_directives]]).
+Sprint 192 retro otomatik (sprint-reporter.ts). Bu DIRECTIVES'te retro task YOK ([[feedback_no_retro_task_in_directives]]).
 
-Master plan: `docs/alperen-analysis/2026-05-23-comprehensive-work-plan.md` — Faz 1 son sprint + Faz 2 başlangıç.
+Master plan: `docs/alperen-analysis/2026-05-23-comprehensive-work-plan.md` — W-INTEGRITY + W-M + Sprint 191 carry-over.
+
+Next (Sprint 193 önizleme): W-E evolutionary architecture + Karpathy L-8..L-12 + dashboard reborn + Trinity Chat Path A (embedded).
