@@ -1,287 +1,57 @@
-# DIRECTIVES — Sprint 192: God-Level Push Day 4 — Synthetic NO_GO Eradication + RAM Reform + Sprint 191 Carry-Over (5 dalga, 19 task)
+# DIRECTIVES — Sprint 193: God-Level Push Day 5 — Sprint 192 Carry-Over + W-AUTH + RAM Deney Canlandırma + Karpathy Faz 3 (5 dalga, 14 task)
 
-## Goal: Sprint 191 dogfood'dan çıkan 3 büyük öğrenim'in kapanışı: (1) **W-INTEGRITY** stream — synthetic NO_GO sıfırlama + dishonest worker result detection ([[feedback_no_synthetic_results]]); (2) **W-M** stream — RAM optimizasyon canlı deney (12 worker × 2g vs mevcut 3 × 4g) + adaptive scheduler ([[project_sprint192_ram_optimization]]); (3) Sprint 191 6 genuine NO_GO carry-over fix; (4) Karpathy L-6/L-7 Faz 2 (10 daha PROMPT.md/SKILL.md). **1 Haziran 2026 OSS GA beta için kritik gün 4** — false NO_GO bug'ı kalıcı çözüm, agent stats gerçekçi hâle gelir. Master plan: `docs/alperen-analysis/2026-05-23-comprehensive-work-plan.md` (W-M + W-INTEGRITY + Sprint 191 carry-over).
+## Goal: Sprint 192'den taşan **7 carry-over** + Sprint 192 ortasında çıkan **auth-loss silent fail** öğrenimi (`[[feedback_no_auth_touch_during_sprint]]`) → W-AUTH stream (3 task) + Sprint 191 agent stats düzeltme (192-019 retroactive reclassify) + Karpathy L-8/L-9 faz 3 (5+5 PROMPT.md/SKILL.md → toplam 15/15 agent + 15/21 skill). **1 Haziran 2026 OSS GA beta için kritik gün 5** — auth-loss kapatılır, RAM optimizasyon canlanır (12 worker × 2g deney), agent stats gerçekçi hâle gelir. Master plan: `docs/alperen-analysis/2026-05-23-comprehensive-work-plan.md` (W-INTEGRITY tail + W-M canlandırma + W-AUTH yeni).
 
 Tüm task'lar için ortak kurallar:
 - Worker yalnızca `scope.filesWrite` içine yazar; scope dışına dokunmak yasak (ADR-037 advisory).
 - Her task **test ile geçer** — vitest minimum 3 test (mutlu/edge/hata). Audit task'ları test gerektirmez.
 - `dosya:satır` kanıtı zorunlu.
 - ADR ihlali → NO_GO + amendment proposal.
-- `.brain/memory.db` write yalnızca core/memory-*.ts yolundan; **DB silmek YASAK** ([[feedback_db_silmek_yasak]]).
+- `.brain/memory.db` write yalnızca core/memory-*.ts yolundan; **DB silmek YASAK**.
 - Sprint sonu tsc temiz + test regresyon yok.
 - Worker `.result` notes alanına kanıt komutu çıktısı yapıştır.
-- **Dishonest result YASAK** — notes'ta iddia edilen LoC delta disk'le çakışmalı ([[feedback_no_synthetic_results]]); Sprint 192 192-012 dishonest detector aktif olacak.
-- **OSS GA blocker:** Sprint 192 false-NO_GO ve agent stats güvenilirliği için kritik.
+- **Dishonest result YASAK** — notes'ta iddia edilen LoC delta disk'le çakışmalı (Sprint 192 192-012 dishonest detector aktif).
+- **Sprint çalışırken /login, claude logout YASAK** — auth touchpoint silent fail riski ([[feedback_no_auth_touch_during_sprint]]).
 
 ---
 
-## DALGA 0 — Synthetic NO_GO Eradication Core (1 task — ZORUNLU İLK)
+## DALGA 0 — W-AUTH Survival (1 task — ZORUNLU İLK)
 
-> **Neden tek başına:** Sprint 191 hotfix (`07f07c9a`) sadece `sprint-phases.ts:1120`'yi kapsadı. Sprint-controller'da 2 synthetic NO_GO daha var; Sprint 192'nin kendisi bu bloklara takılırsa hotfix testimiz bozulur.
+> **Neden tek başına:** Sprint 192'de /login 8 task'ı silent fail'e götürdü. Bu fix olmadan Sprint 193 aynı tuzağa düşebilir.
 
 ---
 
-## Task 1: 192-001 — sprint-controller.ts synthetic NO_GO bloklarına liveness check (W-INTEGRITY I-2)
+## Task 1: 193-001 — Worker pre-spawn auth health check + fail-fast (W-AUTH A-1)
 - Model: opus
 - Effort: high
-- Skills: typescript-expert
-- Files: src/orchestra/sprint-controller.ts, src/orchestra/worker-liveness.ts, tests/orchestra/sprint-controller-liveness.test.ts
-- Scope: src/orchestra/, tests/orchestra/
+- Skills: typescript-expert, security-specialist
+- Files: src/agents/worker.ts, src/orchestra/spawn-backend-docker.ts, src/providers/claude.ts, src/orchestra/event-stream.ts, tests/agents/worker-auth-check.test.ts
+- Scope: src/agents/, src/orchestra/, src/providers/, tests/agents/
 
 ### Description
-Sprint 191 hotfix `sprint-phases.ts:1120` synthetic NO_GO bloğunu liveness check ile kapsadı. Ama `sprint-controller.ts:821` (cleanup path) ve `:845` (recover path) iki sentetik kaynağı kapsamadı.
+Sprint 192 RC: /login çalıştırıldığında worker container'lar Claude CLI auth kaybetti → `exitCode=0` ama `.result` boş (silent fail). Brain bunları synthetic NO_GO işaretledi. Memory: [[feedback_no_auth_touch_during_sprint]].
 
 **Yöntem:**
-1. `src/orchestra/sprint-controller.ts:821` ve `:845` blokları oku.
-2. `checkWorkerLiveness(task, projectRoot)` import et + ÖNCE çağır:
-   - `never-spawned` → SKIP synthetic, BRAIN→WORKER:NEVER_DISPATCHED event emit
-   - `alive` → mümkünse poll, değilse honest label ile fall through
-   - `dead` → mevcut synthetic (notes'a `liveness=dead` ekle)
-3. Tests: 3+ test her iki blok için (cleanup path + recover path) — never-spawned skip + alive grace + dead synthetic.
+1. `src/agents/worker.ts` startup'ta auth health check ÖNCE:
+   - `claude auth status` veya `claude --version` çağır
+   - Fail ise (`exitCode != 0` veya stdout boş) `.result` yaz: `{selfAssessment:'NO_GO', notes:'AUTH_FAILED: <stderr>', filesChanged:[]}` + audit event `WORKER→BRAIN:AUTH_FAILED` emit
+   - Exit kod 1 (clean fail) — Brain bunu real result olarak işler, synthetic NO_GO yazmaz
+2. `src/orchestra/spawn-backend-docker.ts` worker container env'inde `CLAUDE_AUTH_REQUIRED=1` set — worker bilir auth zorunlu (test env'ler skip için bypass var)
+3. `src/orchestra/event-stream.ts` `WORKER→BRAIN:AUTH_FAILED` event type ekle
+4. Sprint sonu retro'da "Auth failures: N" başlığı (Sprint 192 192-008 pattern)
 
-**Kanıt:** `grep -A3 "syntheticResult" src/orchestra/sprint-controller.ts | grep -c "checkWorkerLiveness"` → 2+ match.
-**Test:** 6+ test (2 path × 3 senaryo).
-
----
-
-## DALGA 1 — Sprint 191 Genuine NO_GO Carry-Over (6 task)
-
-> Sprint 191 dogfood'da 6 task gerçekten yarım kaldı (dishonest result + uncompleted source). Bu dalga'da hepsi paralel düzeltilir.
+**Kanıt:** `grep "AUTH_FAILED\|claude.*--version\|authHealthCheck" src/agents/worker.ts` → 2+ match.
+**Test:** 4+ test — (a) auth OK → normal flow, (b) auth fail → AUTH_FAILED result, (c) auth fail → audit event emit, (d) test env bypass.
 
 ---
 
-## Task 2: 192-002 — runtime_extension_enabled default true (Sprint 191 191-002 carry-over)
-- Model: opus
-- Effort: normal
-- Skills: typescript-expert
-- Files: src/core/config.ts, tests/core/config-defaults.test.ts
-- Scope: src/core/, tests/core/
+## DALGA 1 — Sprint 192 Carry-Over (7 task)
 
-### Description
-Sprint 191 worker test yazdı ama `src/core/config.ts` default'unu değiştirmedi — `runtime_extension_enabled: false` HÂLÂ default. Production user'lar bu fix'ten faydalanamaz.
-
-**Yöntem:**
-1. `src/core/config.ts` `timeout.runtime_extension_enabled` default `false → true` (Sprint 191 deckent-dev `.deckent/config.json` zaten true).
-2. `tests/core/config-defaults.test.ts` default assertion güncellemesi.
-3. CHANGELOG.md not.
-
-**Kanıt:** `grep "runtime_extension_enabled" src/core/config.ts | grep "true"` → 1+ match (default block).
-**Test:** 3+ test — (a) default true, (b) explicit false override, (c) config merge precedence.
+> Sprint 192 ortasında auth-loss nedeniyle 7 task spawn'a ulaşamadı veya .result yazamadı. Bu dalga'da hepsi yeniden yapılır.
 
 ---
 
-## Task 3: 192-003 — outcome-tracker reclassifyTaskOutcome GERÇEK implementation (Sprint 191 191-003 carry-over — dishonest worker case)
-- Model: opus
-- Effort: high
-- Skills: typescript-expert
-- Files: src/orchestra/outcome-tracker.ts, src/cli/commands/agent.ts, src/core/errors.ts, tests/orchestra/outcome-tracker-reclassify.test.ts
-- Scope: src/orchestra/, src/cli/, src/core/, tests/orchestra/
-
-### Description
-Sprint 191 worker `.result` notes'unda "outcome-tracker.ts +220 LoC, agent.ts +65 LoC reclassify subcommand, errors.ts +45 LoC" iddia etti ama disk'te SADECE test dosyası vardı. Honest-gate yakaladı → NO_GO. Bu task gerçek implementation.
-
-**Yöntem:**
-1. `src/orchestra/outcome-tracker.ts`:
-   - `reclassifyTaskOutcome(sprintId, taskId, newDecision, opts?)` public method — idempotent, delta-apply.
-   - agentPerformance/skillPerformance success delta (totalTasks bumping YOK — task zaten sayıldı).
-   - skillSprintHistory + synergyMatrix update.
-   - `.deckent/routing/outcomes/<sprintId>.json` in-place mutate.
-   - Optional MemoryStore injection (ReclassifyAuditStore interface) — audit-trail `retro` entry write.
-2. `src/cli/commands/agent.ts`:
-   - `deckent agent reclassify --sprint <id> --task <id> --decision <DONE|GO_WITH_TECH_DEBT|NO_GO> [--reason <text>] [--no-audit]` subcommand register.
-   - Lazy-load MemoryStore (better-sqlite3 absent fallback).
-3. `src/core/errors.ts`:
-   - DECKENT_E068..E071 codes (outcomes file missing, JSON parse fail, task not found, write fail).
-4. Sprint 191 test dosyası mevcut (`tests/orchestra/outcome-tracker-reclassify.test.ts`) — tests ile bind et, hepsini geçir.
-5. **Bonus:** Sprint 191 12 false NO_GO için bulk reclassify (192-019 task'ı bunu yapar — bu task sadece API/CLI).
-
-**Kanıt:** `grep "reclassifyTaskOutcome" src/orchestra/outcome-tracker.ts` → 1+ match; `node dist/cli/index.js agent reclassify --help` → renkli output.
-**Test:** Existing 10-test suite pass + 3+ ek (CLI subcommand integration, error codes).
-
----
-
-## Task 4: 192-004 — CLI top-level error handler — uncaughtException + unhandledRejection (Sprint 191 191-007 carry-over)
-- Model: opus
-- Effort: normal
-- Skills: typescript-expert
-- Files: src/cli/index.ts, src/cli/helpers/error-handler.ts, tests/cli/error-handler.test.ts
-- Scope: src/cli/, tests/cli/
-
-### Description
-Sprint 191 worker error-handler.ts yarattı ama `src/cli/index.ts`'e `process.on('uncaughtException')` ve `process.on('unhandledRejection')` wire EKLEMEDİ. CLI silent exit hâlâ var.
-
-**Yöntem:**
-1. `src/cli/index.ts` startup'ta:
-   ```typescript
-   process.on('uncaughtException', formatFatalAndExit);
-   process.on('unhandledRejection', formatFatalAndExit);
-   ```
-2. `src/cli/helpers/error-handler.ts` `formatFatalAndExit(error)`:
-   - Stderr'a "✗ FATAL: <name>: <message>"
-   - Stack trace `DECKENT_DEBUG=1` env ile aç
-   - Crash log `.deckent/crashes/<timestamp>.log`
-3. Commander.js error handler customize — eksik argüman/komut'ta suggestion.
-
-**Kanıt:** `node dist/cli/index.js bogus-command 2>&1` → readable error + suggestion; exit code != 0.
-**Test:** 3+ test — uncaught/unhandled/commander.
-
----
-
-## Task 5: 192-005 — sprint-finalizer retro hook DB write (Sprint 191 191-008 carry-over)
-- Model: opus
-- Effort: high
-- Skills: typescript-expert
-- Files: src/orchestra/sprint-finalizer.ts, src/orchestra/sprint-retro-writer.ts, src/core/memory-store.ts, tests/orchestra/sprint-finalizer-retro-hook.test.ts
-- Scope: src/orchestra/, src/core/, tests/orchestra/
-
-### Description
-Sprint 191 worker test yazdı ama gerçek implementation YOK. Memory DB'de retro entry chronic gap ([[project_sprint167_db_gap]] devam).
-
-**Yöntem:**
-1. `sprint-retro-writer.ts` veya `sprint-finalizer.ts` retro generation noktasında `store.upsert({ type: 'retro', sprint_id, content, ... })` çağrısı ekle.
-2. Idempotent — aynı sprint için tekrar çağrılırsa upsert.
-3. Silent fail kaldır — hata propagate edilsin (sprint sonu hata, retro yazılmama'dan daha iyi).
-4. Sprint 191 ve 192 retro entry backfill — manuel SQL insert (DB silmek YASAK, sadece insert).
-5. Sprint 191 test dosyası mevcut — tests pass.
-
-**Kanıt:** `sqlite3 .brain/memory.db "SELECT COUNT(*) FROM entries WHERE type='retro' AND sprint_id IN ('sprint-189','sprint-190','sprint-191','sprint-192');"` → 4.
-**Test:** Existing test + 3+ ek (retro hook wired, upsert idempotent, error propagation).
-
----
-
-## Task 6: 192-006 — task-builder Karpathy block injection (Sprint 191 191-015 carry-over)
-- Model: opus
-- Effort: normal
-- Skills: typescript-expert
-- Files: src/orchestra/task-builder.ts, src/agents/worker.ts, tests/orchestra/task-builder-karpathy.test.ts
-- Scope: src/orchestra/, src/agents/, tests/orchestra/
-
-### Description
-Sprint 191 worker task-builder.ts'e hiç dokunmadı. Karpathy block worker prompt'larına inject edilmiyor.
-
-**Yöntem:**
-1. `src/orchestra/task-builder.ts` `buildWorkerPrompt()` — agent/skill prompt'larından sonra:
-   ```
-   ## Karpathy Discipline (mandatory)
-   <content from .claude/rules/karpathy-discipline.md>
-   ```
-2. Content cache (sprint başında bir kez oku).
-3. Token budget: ~500 token, kabul edilebilir ([[feedback_prompt_completeness_over_brevity]]).
-
-**Kanıt:** `grep "Karpathy" src/orchestra/task-builder.ts` → 2+ match; sprint 192 worker prompt'unda görünmeli.
-**Test:** 3+ test — block present, content loaded, cache hit.
-
----
-
-## Task 7: 192-007 — Provider isAvailable 3-state + Ollama TECH_DEBT (Sprint 191 191-017 carry-over)
-- Model: opus
-- Effort: high
-- Skills: typescript-expert
-- Files: src/providers/claude.ts, src/providers/codex.ts, src/providers/gemini.ts, src/providers/ollama.ts, src/cli/commands/doctor.ts, tests/providers/
-- Scope: src/providers/, src/cli/commands/, tests/providers/
-
-### Description
-Sprint 190+191 carry-over zaten. Provider auth detection yarım.
-
-**Yöntem:**
-1. `isAvailable()` 3-state: `true` / `'partial'` / `false`.
-2. `detect()` opt-in method: `{ binary, version, auth, ready }`.
-3. `deckent doctor --providers` her 3 state açık mesaj.
-4. Ollama: model list parse + tier mapping complete.
-
-**Kanıt:** `deckent doctor --providers` 3 provider net state; `npm test -- providers/` pass.
-**Test:** 3+ test per provider.
-
----
-
-## DALGA 2 — W-INTEGRITY Telemetry + Honest Result Detection (5 task)
-
----
-
-## Task 8: 192-008 — Hotfix telemetri — never-dispatched + alive-grace event sayım retro'ya (W-INTEGRITY I-1)
-- Model: opus
-- Effort: normal
-- Skills: typescript-expert
-- Files: src/orchestra/sprint-reporter.ts, src/orchestra/event-stream.ts, tests/orchestra/sprint-reporter-liveness.test.ts
-- Scope: src/orchestra/, tests/orchestra/
-
-### Description
-Sprint 191 hotfix (`07f07c9a`) event emit ediyor — Sprint 192 retro'da bu metric'leri görelim. Hotfix etkisi VERİ-bazlı doğrulanır.
-
-**Yöntem:**
-1. `sprint-reporter.ts` retro generation'ında event stream'i parse et:
-   - `BRAIN→WORKER:NEVER_DISPATCHED` count → "Never dispatched: N task"
-   - `BRAIN→WORKER:TIMEOUT_EXTEND` count → "Extensions granted: N task"
-   - alive-grace-hit vs alive-grace-miss oranı
-2. Retro markdown bölümü "Liveness Stats" başlığı.
-
-**Kanıt:** Sprint 192 retro'da "Liveness Stats" başlık görünmeli; counts > 0 (Sprint 192 dogfood'unda muhtemelen tetiklenecek).
-**Test:** 3+ test — event count, retro markdown format, empty event handling.
-
----
-
-## Task 9: 192-009 — EVALUATE phase trigger sıkılaştırma (W-INTEGRITY I-3)
-- Model: opus
-- Effort: high
-- Skills: typescript-expert
-- Files: src/orchestra/sprint-phases.ts, src/orchestra/sprint-controller.ts, tests/orchestra/evaluate-trigger-gate.test.ts
-- Scope: src/orchestra/, tests/orchestra/
-
-### Description
-Sprint 191 RC: `runEvaluatePhase` Wave-3 task'lar dispatch olmadan tetiklendi. Trigger şartı belirsiz.
-
-**Yöntem:**
-1. `runEvaluatePhase` entry guard: "tüm sprint task'ları için ya `.result` var ya `assignedWorker` set ya da explicit DEFERRED". Aksi takdirde return + log "premature EVALUATE — waiting for dispatch".
-2. Dispatch loop'unda her task spawn-attempt sonrası `task.assignedWorker` set (mevcut davranış olabilir — doğrula).
-3. Timeout: dispatcher'a max bekleme süresi (effort'a göre 2-3x), aşılırsa DEFERRED işaretle ve EVALUATE'e izin ver.
-
-**Kanıt:** Sprint 192'de 12 worker × 2g deneyinde EVALUATE log'unda "premature" mesaj olmamalı.
-**Test:** 3+ test — full-dispatch trigger OK, partial-dispatch wait, DEFERRED override.
-
----
-
-## Task 10: 192-010 — TaskEvaluation.DEFERRED enum + retro reporting (W-INTEGRITY I-4)
-- Model: opus
-- Effort: normal
-- Skills: typescript-expert
-- Files: src/core/task-types.ts, src/orchestra/sprint-reporter.ts, tests/core/task-types.test.ts
-- Scope: src/core/, src/orchestra/, tests/
-
-### Description
-Şeffaf retro için: `TaskEvaluation` enum'una `DEFERRED` ekle (PENDING/CLAIMED/EXECUTING/DONE/NO_GO/PAUSED yanına).
-
-**Yöntem:**
-1. `task-types.ts` enum extend.
-2. `sprint-reporter.ts` retro markdown "Deferred: N task" başlığı.
-3. handleEvaluation DEFERRED için cascade YOK (PAUSED'tan farklı semantik — DEFERRED = dispatcher saturation, PAUSED = depends-on-no_go).
-
-**Kanıt:** `grep "DEFERRED" src/core/task-types.ts` → 1+ enum line.
-**Test:** 3+ test — enum, retro inclusion, cascade exclusion.
-
----
-
-## Task 11: 192-011 — Sprint-level adaptive timeout (W-INTEGRITY I-5)
-- Model: opus
-- Effort: high
-- Skills: typescript-expert
-- Files: src/orchestra/sprint-controller.ts, src/core/config.ts, tests/orchestra/sprint-timeout-adaptive.test.ts
-- Scope: src/orchestra/, src/core/, tests/orchestra/
-
-### Description
-Kullanıcı kuralı: "zaman sınırlarını daha geniş tutalım". Effort × 2-3 multiplier veya activity-based.
-
-**Yöntem:**
-1. `sprint_timeout_minutes: 0` (disable) default kalır.
-2. **Effort-bazlı task timeout multiplier:** `timeout.effort_base.high: 7200s → 10800s` (3 saat) override.
-3. **Activity-based extension:** Worker hâlâ heartbeat verirse, extension cap'i artır (mevcut 3 → 5).
-4. Config schema: `timeout.adaptive_multiplier: number` (default 1.5).
-
-**Kanıt:** Sprint 192 deneyinde hiç task base timeout'a takılmamalı.
-**Test:** 3+ test — multiplier apply, extension cap, activity-based.
-
----
-
-## Task 12: 192-012 — Dishonest worker result detector (W-INTEGRITY I-8)
+## Task 2: 193-002 — Dishonest worker result detector (Sprint 192 192-012 carry-over, W-INTEGRITY I-8)
 - Model: opus
 - Effort: high
 - Skills: typescript-expert, security-specialist
@@ -289,49 +59,45 @@ Kullanıcı kuralı: "zaman sınırlarını daha geniş tutalım". Effort × 2-3
 - Scope: src/orchestra/, tests/orchestra/
 
 ### Description
-Sprint 191 191-003 worker `.result` notes'unda "+220 LoC outcome-tracker" iddia etti ama disk SADECE test dosyası. Honest-gate (Sprint 165 Bug X) mevcut ama bu pattern'i yakalamamış olabilir.
+Sprint 191 191-003 worker `.result` notes'unda "+220 LoC outcome-tracker" iddia, disk sadece test. Honest-gate mevcut ama bu pattern'i yakalamamış. Sprint 192'de 192-003 worker bu sefer dürüst davrandı (Karpathy effect) — yine de detector kritik.
 
 **Yöntem:**
 1. `enforceHonestResultGate` veya `result-evaluator.ts` analiz:
    - `result.filesChanged` listesindeki dosyalarda gerçek değişiklik var mı? (`git diff --stat <files>`)
-   - `result.linesAdded` ile `git diff --numstat` arasında ±%50 sapma → DISHONEST flag.
-   - Notes'taki "Files changed" / "+N LoC" iddiaları parse + cross-check (heuristic regex).
-2. DISHONEST detected → NO_GO + audit event `BRAIN→AUDITOR:DISHONEST_RESULT_DETECTED`.
-3. Sprint 192 retro'da "Dishonest results: N" başlık (192-008'in extension'ı).
+   - `result.linesAdded` ile `git diff --numstat` arasında ±%50 sapma → DISHONEST flag
+   - Notes'taki "Files changed" / "+N LoC" iddiaları parse + cross-check (heuristic regex)
+2. DISHONEST detected → NO_GO + audit event `BRAIN→AUDITOR:DISHONEST_RESULT_DETECTED`
+3. Sprint retro'da "Dishonest results: N" başlık
 
 **Kanıt:** Sprint 191 191-003 .result test fixture'ı ile dishonest detect → NO_GO.
 **Test:** 5+ test — honest pass, LoC delta dishonest, files-not-touched dishonest, notes-claim-mismatch, audit event emit.
 
 ---
 
-## DALGA 3 — RAM Optimization Live Experiment (4 task)
-
----
-
-## Task 13: 192-013 — worker_memory_limit 4g→2g + max_workers 3→12 deney (W-M M-1)
+## Task 3: 193-003 — worker_memory_limit 4g→2g + max_workers 3→12 deney (Sprint 192 192-013 carry-over, W-M M-1)
 - Model: opus
-- Effort: high
+- Effort: normal
 - Skills: devops-engineer, docker-expert
 - Files: .deckent/config.json, src/orchestra/spawn-backend-docker.ts, docs/guide/docker-memory.md
 - Scope: .deckent/, src/orchestra/, docs/guide/
 
 ### Description
-Kullanıcı kararı (Sprint 191 dogfood — canlı `docker stats` worker peak 770MB/8GB cap %9.4): "Boşa RAM ayırıyorsak optimize edelim, 12 worker × 2g deneyelim."
+Kullanıcı kararı: "Boşa RAM ayırıyorsak optimize edelim, 12 worker × 2g deneyelim." Sprint 192'de yapılamadı (auth-loss).
 
 **Yöntem:**
 1. `.deckent/config.json`:
    - `modes.performance.max_workers: 3 → 12`
    - `worker_memory_limit: "4g" → "2g"`
    - `worker_memory_swap: "6g" → "3g"`
-2. `spawn-backend-docker.ts` defaults aynı çekilir (DEFAULT_WORKER_MEMORY_LIMIT '4g' kalır user code uyumu — config override öncelik).
-3. `docs/guide/docker-memory.md` update — yeni öneriler tablosu.
+2. `spawn-backend-docker.ts` defaults aynı çekilir (config override öncelik)
+3. `docs/guide/docker-memory.md` update — yeni öneriler tablosu
 
-**Kanıt:** Sprint 192'de paralel 12 worker spawn; `docker stats` peak < 2g her worker'da; OOM count == 0.
+**Kanıt:** Sprint 193'te paralel 12 worker spawn; `docker stats` peak < 2g her worker'da; OOM count == 0.
 **Test:** 3+ test — config defaults, override semantics, max_workers bound.
 
 ---
 
-## Task 14: 192-014 — NODE_OPTIONS --max-old-space-size-percentage container env (W-M M-2)
+## Task 4: 193-004 — NODE_OPTIONS --max-old-space-size-percentage container env (Sprint 192 192-014 carry-over, W-M M-2)
 - Model: opus
 - Effort: normal
 - Skills: docker-expert
@@ -339,44 +105,44 @@ Kullanıcı kararı (Sprint 191 dogfood — canlı `docker stats` worker peak 77
 - Scope: src/orchestra/, tests/orchestra/
 
 ### Description
-Node 24 `--max-old-space-size-percentage=75` flag — V8 heap dinamik container cap'e bağlı.
+Node 24 `--max-old-space-size-percentage=75` flag — V8 heap dinamik container cap'e bağlı. Sprint 192'de yapılamadı.
 
 **Yöntem:**
 1. `spawn-backend-docker.ts` docker run args:
    ```
    '-e', 'NODE_OPTIONS=--max-old-space-size-percentage=75',
    ```
-2. Worker process'leri Node 24+ kullanır (deckent worker bin: node).
-3. Tests assert.
+2. Worker process'leri Node 24+ kullanır
+3. Tests assert
 
 **Kanıt:** `docker exec deckent-w-XXX env | grep NODE_OPTIONS` → match.
 **Test:** 3+ test — env var present, percentage value, override.
 
 ---
 
-## Task 15: 192-015 — Adaptive scheduler — host RAM tespit + max_workers auto-calc (W-M M-3)
+## Task 5: 193-005 — Adaptive scheduler — host RAM tespit + max_workers auto-calc (Sprint 192 192-015 carry-over, W-M M-3)
 - Model: opus
 - Effort: high
 - Skills: typescript-expert, devops-engineer
-- Files: src/core/host-detector.ts, src/orchestra/spawn-coordinator.ts, src/core/config.ts, tests/core/host-detector.test.ts
-- Scope: src/core/, src/orchestra/, tests/core/
+- Files: src/core/host-detector.ts, src/orchestra/spawn-coordinator.ts, src/core/config.ts, src/cli/commands/doctor.ts, tests/core/host-detector.test.ts
+- Scope: src/core/, src/orchestra/, src/cli/, tests/core/
 
 ### Description
 Kullanıcı: "16-32 GB RAM ayırarak bu sistemi kolayca kullanabilsin." Adaptive: host RAM tespit + `max_workers` auto-calc.
 
 **Yöntem:**
 1. `src/core/host-detector.ts`:
-   - `detectHostMemory()` — `/proc/meminfo` parse (WSL2 doğru sonuç), fallback `os.totalmem()`.
-   - `suggestMaxWorkers(totalGB, workerMemGB = 2)`: floor(totalGB / workerMemGB) - 1 (1GB host overhead). Cap 1-16.
-2. `spawn-coordinator.ts` startup'ta `detectHostMemory()` çağır, config `max_workers` yoksa veya `auto` ise `suggestMaxWorkers()` kullan.
-3. CLI: `deckent doctor --memory` host RAM rapor + suggested max_workers.
+   - `detectHostMemory()` — `/proc/meminfo` parse (WSL2 doğru sonuç), fallback `os.totalmem()`
+   - `suggestMaxWorkers(totalGB, workerMemGB = 2)`: floor(totalGB / workerMemGB) - 1 (1GB host overhead). Cap 1-16
+2. `spawn-coordinator.ts` startup'ta `detectHostMemory()` çağır, config `max_workers` yoksa veya `auto` ise `suggestMaxWorkers()` kullan
+3. CLI: `deckent doctor --memory` host RAM rapor + suggested max_workers
 
 **Kanıt:** `deckent doctor --memory` → "Host: 40 GB, suggested max_workers: 15".
 **Test:** 3+ test — /proc/meminfo parse, fallback, suggestion math.
 
 ---
 
-## Task 16: 192-016 — RAM telemetri — `docker stats` snapshot retro'ya + VDS/VPS analiz (W-M M-7)
+## Task 6: 193-006 — RAM telemetri — docker stats snapshot retro'ya + VDS/VPS analiz (Sprint 192 192-016 carry-over, W-M M-7)
 - Model: opus
 - Effort: normal
 - Skills: typescript-expert, docker-expert
@@ -384,25 +150,21 @@ Kullanıcı: "16-32 GB RAM ayırarak bu sistemi kolayca kullanabilsin." Adaptive
 - Scope: src/orchestra/, src/cli/, tests/orchestra/
 
 ### Description
-Master plan W-M M-7: VDS/VPS kullanıcı kendi RAM kullanımını analiz edebilsin.
+VDS/VPS kullanıcı kendi RAM kullanımını analiz edebilsin.
 
 **Yöntem:**
 1. `src/orchestra/ram-telemetry.ts`:
-   - `collectDockerStats(sprintId)` — `docker stats --no-stream` parse → `{ workerId, memUsage, memLimit, memPct, cpuPct }[]`.
-   - Sprint sırasında her N saniyede bir snapshot, sprint sonu peak/average hesapla.
-2. `sprint-finalizer.ts` retro generation: telemetri'yi memory.db `retro` entry'sine ek alan + retro markdown'a tablo.
-3. `deckent retro --memory` flag — yalnızca RAM tablo göster.
+   - `collectDockerStats(sprintId)` — `docker stats --no-stream` parse → `{workerId, memUsage, memLimit, memPct, cpuPct}[]`
+   - Sprint sırasında her N saniyede bir snapshot, sprint sonu peak/average hesapla
+2. `sprint-finalizer.ts` retro generation: telemetri'yi memory.db `retro` entry'sine + retro markdown'a tablo
+3. `deckent retro --memory` flag — yalnızca RAM tablo göster
 
-**Kanıt:** Sprint 192 retro'sunda "RAM Telemetry" başlık + tablo.
+**Kanıt:** Sprint 193 retro'sunda "RAM Telemetry" başlık + tablo.
 **Test:** 3+ test — docker stats parse, snapshot persist, retro inclusion.
 
 ---
 
-## DALGA 4 — Karpathy Discipline Faz 2 + Retroactive Reclassify (3 task)
-
----
-
-## Task 17: 192-017 — 5 ek agent PROMPT.md Karpathy refactor (L-6: security-auditor, performance-analyzer, accessibility-auditor, data-engineer, devops-engineer)
+## Task 7: 193-007 — 5 ek agent PROMPT.md Karpathy refactor — L-8 (Sprint 192 192-017 carry-over)
 - Model: sonnet
 - Effort: high
 - Skills: documentation-writer
@@ -410,16 +172,23 @@ Master plan W-M M-7: VDS/VPS kullanıcı kendi RAM kullanımını analiz edebils
 - Scope: .deckent/agents/
 
 ### Description
-Sprint 191 5 agent PROMPT.md refactor edildi. Sprint 192'de 5 daha — toplam 10/15.
+Sprint 192 yapılamadı. 5 agent PROMPT.md Karpathy 4-discipline ile yeniden yaz — toplam 10/15.
 
-**Yöntem:** Sprint 191 Task 191-013 ile aynı template (Hero / Karpathy Discipline / Expertise / Anti-patterns / Verification).
+**Yöntem:** Sprint 191 Task 191-013 + Sprint 192 192-006 task-builder injection ile uyumlu (Karpathy block çift kaynak: PROMPT.md + runtime injection).
 
-**Kanıt:** 5 dosya ≥ 60 satır, "Karpathy Discipline" + "Anti-patterns" başlık.
-**Test:** Audit task — structure check.
+Template (her dosya):
+- **Hero** (2 cümle agent rolü)
+- **Karpathy Discipline section** (Think Before Coding / Simplicity First / Surgical Changes / Goal-Driven, agent-specific examples)
+- **Expertise**
+- **Anti-patterns**
+- **Verification checklist**
+
+**Kanıt:** Her 5 dosya ≥ 60 satır, `grep -c "Karpathy" .deckent/agents/<id>/PROMPT.md` → 2+ match.
+**Test:** Audit task — structure check (her dosyada "Karpathy Discipline" + "Anti-patterns" başlığı).
 
 ---
 
-## Task 18: 192-018 — 5 ek skill SKILL.md Karpathy refactor (L-7: python-expert, anthropic-sdk, frontend-design, docker-expert, git-expert)
+## Task 8: 193-008 — 5 ek skill SKILL.md Karpathy refactor — L-9 (Sprint 192 192-018 carry-over)
 - Model: sonnet
 - Effort: high
 - Skills: documentation-writer
@@ -427,51 +196,172 @@ Sprint 191 5 agent PROMPT.md refactor edildi. Sprint 192'de 5 daha — toplam 10
 - Scope: .deckent/skills/
 
 ### Description
-Sprint 191 5 skill SKILL.md refactor edildi. Sprint 192'de 5 daha — toplam 10/21.
+Sprint 192 yapılamadı. 5 skill SKILL.md Karpathy 4-discipline — toplam 10/21.
 
-**Yöntem:** Sprint 191 Task 191-014 ile aynı template.
+**Yöntem:** Sprint 191 Task 191-014 template ile aynı (Domain summary / Karpathy Discipline / Patterns / Anti-patterns / Examples / Verification).
 
-**Kanıt:** 5 dosya ≥ 50 satır + Karpathy section.
+**Kanıt:** Her 5 dosya ≥ 50 satır + Karpathy section.
 **Test:** Audit task — structure check.
 
 ---
 
-## Task 19: 192-019 — Sprint 191 retroactive bulk reclassify (192-003 API kullanarak)
+## DALGA 2 — Sprint 191 + 192 Retroactive Reclassify (1 task)
+
+---
+
+## Task 9: 193-009 — Sprint 191 + Sprint 192 retroactive bulk reclassify (Sprint 192 192-019 carry-over + Sprint 192 false NO_GO düzeltme)
 - Model: opus
 - Effort: high
 - Skills: typescript-expert
-- Files: scripts/sprint-191-reclassify.mjs, tests/scripts/sprint-191-reclassify.test.ts
+- Files: scripts/sprint-retroactive-reclassify.mjs, tests/scripts/sprint-retroactive-reclassify.test.ts
 - Scope: scripts/, tests/scripts/
 
 ### Description
-Sprint 191'de 12 false NO_GO disk-doğrulandı (DONE gerçekte). Agent stats çarpıtıldı (architect %27, temp-react-ts-specialist %0). Bulk reclassify ile düzelt.
+Sprint 191'de 12 false NO_GO (architect %27 → gerçek %65+). Sprint 192'de 8 false NO_GO (auth-lost) + 4 false NO_GO (Brain in-memory cache). Bulk reclassify ile düzelt.
 
 **Yöntem:**
-1. `scripts/sprint-191-reclassify.mjs`:
-   - Sprint 191 false NO_GO listesi (disk-verified DONE): 191-002 (test only, skipped), 191-006, 191-009, 191-010, 191-011, 191-012, 191-013, 191-014, 191-016
-   - Genuine NO_GO bırak: 191-003, 191-007, 191-008, 191-015, 191-017 (Sprint 192 dalga 1 ile zaten fix edilir)
-   - 192-003'ün CLI'sini kullan: `deckent agent reclassify --sprint sprint-191 --task <id> --decision DONE --reason "Disk-verified: <evidence>"`
-2. Çalıştır + log out.
-3. Agent stats karşılaştırma raporu.
+1. `scripts/sprint-retroactive-reclassify.mjs`:
+   - Sprint 191 disk-verified DONE listesi (11 task): 191-002, 006, 009, 010, 011, 012, 013, 014, 016
+   - Sprint 191 genuine NO_GO bırak: 191-003, 007, 008, 015, 017 (Sprint 192'de fix edildi)
+   - Sprint 192 disk-verified DONE listesi (12 task): 192-001..011 (192-002 TECH_DEBT)
+   - Sprint 192 auth-lost (will not reclassify, just audit): 192-012..019 → Sprint 193'te yeniden yapıldı, 193-002..008 success ile birleştir
+   - 192-003'ün CLI'sini kullan: `deckent agent reclassify --sprint <id> --task <id> --decision DONE --reason "Disk-verified: <evidence>"`
+2. Çalıştır + log out
+3. Agent stats karşılaştırma raporu (önce/sonra delta)
 
-**Kanıt:** `deckent agent stats architect` Sprint 191 öncesi vs sonrası karşılaştırma; success rate net artış (örn. %27 → %60+).
-**Test:** Script integration test — 9 DONE reclassify, 5 NO_GO bırak (genuine), agent stats delta.
+**Kanıt:** `deckent agent stats architect` Sprint 191+192 öncesi vs sonrası karşılaştırma; success rate net artış.
+**Test:** Script integration test — 21 DONE reclassify (11+12), 5 genuine NO_GO bırak.
+
+---
+
+## DALGA 3 — W-AUTH + W-INTEGRITY Telemetry Tail (2 task)
+
+---
+
+## Task 10: 193-010 — Auth health monitor — sprint öncesi pre-flight check (W-AUTH A-2)
+- Model: opus
+- Effort: normal
+- Skills: typescript-expert
+- Files: src/orchestra/sprint-controller.ts, src/cli/commands/doctor.ts, src/cli/commands/start.ts, tests/orchestra/auth-preflight.test.ts
+- Scope: src/orchestra/, src/cli/, tests/orchestra/
+
+### Description
+W-AUTH A-2: Sprint başlatmadan ÖNCE auth health doğrula. Kullanıcıya "auth kaybedildi, /login çalıştır ve tekrar dene" mesajı.
+
+**Yöntem:**
+1. `src/orchestra/sprint-controller.ts` `runSprint()` entry'sinde:
+   - Brain provider auth check (claude/codex/gemini) — `provider.isAvailable()` 3-state
+   - Fail ise sprint başlatma reddet + clear error mesajı: "Provider <X> auth required — run /login or set <ENV_VAR>"
+2. `src/cli/commands/start.ts` ek validation
+3. `src/cli/commands/doctor.ts --auth` flag — auth status detaylı rapor
+
+**Kanıt:** `claude logout && deckent start` → açık mesaj, sprint başlatılmıyor.
+**Test:** 3+ test — auth OK proceed, auth fail block, error message clarity.
+
+---
+
+## Task 11: 193-011 — Sprint 192 W-INTEGRITY I-1 telemetri tamamlama (auth_failed event count + retro section)
+- Model: opus
+- Effort: normal
+- Skills: typescript-expert
+- Files: src/orchestra/sprint-reporter.ts, tests/orchestra/sprint-reporter-auth.test.ts
+- Scope: src/orchestra/, tests/orchestra/
+
+### Description
+Sprint 192 192-008 liveness stats retro section eklendi. Sprint 193'te `WORKER→BRAIN:AUTH_FAILED` event sayımı ekle.
+
+**Yöntem:**
+1. `sprint-reporter.ts` retro generation'ında:
+   - `WORKER→BRAIN:AUTH_FAILED` count → "Auth failures: N task"
+   - `WORKER→BRAIN:NEVER_DISPATCHED` count (Sprint 191 hotfix event)
+   - alive-grace-hit/miss ratio (Sprint 191/192 hotfix data)
+2. Retro markdown "Worker Health" başlığı
+
+**Kanıt:** Sprint 193 retro'da "Worker Health" başlığı, "Auth failures: 0" görünür.
+**Test:** 3+ test — event count, retro markdown format, empty event handling.
+
+---
+
+## DALGA 4 — Sprint 191/192 Pending NO_GO Genuine Fix (3 task)
+
+---
+
+## Task 12: 193-012 — Sprint 191 191-007 + Sprint 192 192-009 EVALUATE phase entry guard kombine fix
+- Model: opus
+- Effort: high
+- Skills: typescript-expert
+- Files: src/orchestra/sprint-phases.ts, tests/orchestra/evaluate-entry-guard.test.ts
+- Scope: src/orchestra/, tests/orchestra/
+
+### Description
+Sprint 192 192-009 EVALUATE trigger gate +142 LoC eklendi ama Brain restart sonrası canlı doğrulanmadı. Sprint 193'te validate + edge case fix.
+
+**Yöntem:**
+1. `sprint-phases.ts` `runEvaluatePhase` entry guard'ı doğrula:
+   - Tüm task'lar için `.result` OR `assignedWorker` OR `DEFERRED` koşulu
+   - Edge case: deadlock — hiçbir task spawn edilmediyse (auth-fail), guard infinite wait?
+2. Timeout: dispatcher max bekleme süresi (effort × 3), aşılırsa DEFERRED işaretle
+3. Test edge case'leri: auth-fail tüm task'larda, partial dispatch, full dispatch
+
+**Kanıt:** Sprint 193'te "premature EVALUATE" log 0 kez, auth-fail durumunda guard infinite loop'a girmiyor.
+**Test:** 4+ test — full-dispatch trigger, partial wait, DEFERRED override, all-auth-fail timeout.
+
+---
+
+## Task 13: 193-013 — Karpathy faz 3 — task-builder Karpathy injection runtime validate + Sprint 192 192-006 + 192-008 telemetri canlı test
+- Model: opus
+- Effort: normal
+- Skills: typescript-expert
+- Files: src/orchestra/task-builder.ts, tests/orchestra/task-builder-karpathy-runtime.test.ts
+- Scope: src/orchestra/, tests/orchestra/
+
+### Description
+Sprint 192 192-006 task-builder Karpathy injection +60 LoC eklendi. Sprint 193'te runtime worker prompt'unda Karpathy block görünüyor mu test et.
+
+**Yöntem:**
+1. `buildWorkerPrompt()` output'una `Karpathy Discipline` heading geliyor mu integration test
+2. Content `.claude/rules/karpathy-discipline.md` source'tan okunuyor mu (cache hit)
+3. Token budget ölçüm — Karpathy block ~500 token
+
+**Kanıt:** Worker prompt fixture'ında "Karpathy Discipline" + "Think Before Coding" başlıkları.
+**Test:** 3+ test — block present, content loaded, cache hit.
+
+---
+
+## Task 14: 193-014 — Sprint 192 192-010 DEFERRED enum runtime wire validate + cascade exclusion test
+- Model: opus
+- Effort: normal
+- Skills: typescript-expert
+- Files: src/orchestra/sprint-controller.ts, src/orchestra/sprint-spawner.ts, tests/orchestra/deferred-cascade.test.ts
+- Scope: src/orchestra/, tests/orchestra/
+
+### Description
+Sprint 192 192-010 `TaskEvaluation.DEFERRED` enum eklendi. Sprint 193'te:
+- handleEvaluation DEFERRED için cascade YOK (PAUSED'tan farklı)
+- Retro'da "Deferred: N" başlık görünür (sprint-reporter wire)
+
+**Yöntem:**
+1. `sprint-spawner.ts` applyCascadeToSprint DEFERRED için skip
+2. `sprint-reporter.ts` DEFERRED count retro markdown
+3. Integration test
+
+**Kanıt:** DEFERRED task'ın dependents'ı PAUSED'a geçmez.
+**Test:** 3+ test — DEFERRED no cascade, retro count, enum wire.
 
 ---
 
 ## Sprint Sonu Notu
 
-Bu sprint **8-day push'un 4. günü** — synthetic NO_GO + dishonest worker eradication + RAM optimization deneyi. Beklenen sonuçlar:
-- 19/19 task DONE (Sprint 191 hotfix + W-INTEGRITY + W-M combo ile sıfır false NO_GO)
-- Test fail count Sprint 191'den ≤ aynı (regresyon yok)
-- 12 paralel worker × 2g cap deneyi başarılı (peak RAM < 6 GB toplam)
-- Agent stats güvenilir hâle gelir (Sprint 191 retroactive reclassify)
-- Karpathy refactor 10/15 agent + 10/21 skill
+Bu sprint **8-day push'un 5. günü** — Sprint 192 carry-over kapanış + auth-loss kalıcı fix + RAM optimizasyon canlanması. Beklenen sonuçlar:
+- 14/14 task DONE (W-AUTH 193-001 ile auth-loss silent fail kapanır)
+- 12 paralel worker × 2g cap deneyi canlı (peak RAM < 6 GB toplam)
+- Agent stats güvenilir hâle gelir (Sprint 191 + 192 retroactive reclassify)
+- Karpathy refactor 15/15 agent + 10/21 skill
 - RAM telemetri retro'da görünür (VDS/VPS kullanıcı için)
-- Sprint 167 chronic DB-gap [[project_sprint167_db_gap]] kapanır (192-005)
+- W-AUTH stream ilk meyve verir (auth health monitor)
 
-Sprint 192 retro otomatik (sprint-reporter.ts). Bu DIRECTIVES'te retro task YOK ([[feedback_no_retro_task_in_directives]]).
+Sprint 193 retro otomatik (sprint-reporter.ts). Bu DIRECTIVES'te retro task YOK.
 
-Master plan: `docs/alperen-analysis/2026-05-23-comprehensive-work-plan.md` — W-INTEGRITY + W-M + Sprint 191 carry-over.
+Master plan: `docs/alperen-analysis/2026-05-23-comprehensive-work-plan.md` — W-INTEGRITY tail + W-M canlandırma + W-AUTH yeni.
 
-Next (Sprint 193 önizleme): W-E evolutionary architecture + Karpathy L-8..L-12 + dashboard reborn + Trinity Chat Path A (embedded).
+Next (Sprint 194 önizleme): W-E evolutionary architecture + Karpathy L-10/L-11 + dashboard reborn + Trinity Chat Path A (embedded) + 1 Haziran beta paketleme.
