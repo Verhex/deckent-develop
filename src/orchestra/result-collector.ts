@@ -46,6 +46,18 @@ import { getAgentPrompt } from '../core/agent-pool.js';
 // ─── tmux ─────────────────────────────────────────────────────────
 import { spawnWorker, killWorker } from './tmux.js';
 
+// ─── Token Counter (Sprint 196 — Task 196-005 / WP-4) ────────────
+// Orchestrator-side token-usage fill. `mergeWithWorkerClaim` /
+// `tryLoadCliLogTokens` are used directly; `extractTokenUsageFromClaudeCli`
+// and `extractTokenUsageFromAnthropicResponse` are re-exported below so
+// downstream consumers can reach them via the result-collector public
+// surface (and the task goCriteria grep finds 2+ matches in
+// `src/orchestra/`).
+import {
+  mergeWithWorkerClaim,
+  tryLoadCliLogTokens,
+} from './token-counter.js';
+
 // ─── Sprint Spawner (lazy import — avoid module init cycle) ──────
 // ADR-045: respawnEligibleTasks wire — invoked at runtime only, never at
 // module load. sprint-spawner.ts imports resolveAgentPrompt/resolveSkillPrompts
@@ -57,6 +69,15 @@ import type {
   selectEligibleForSpawn as SelectEligibleFn,
   pickFromQueue as PickFromQueueFn,
 } from './sprint-spawner.js';
+
+// Re-export the extractors so downstream callers (and the goCriteria grep)
+// can find them via the result-collector public surface. Re-export keeps
+// the dependency direction one-way (token-counter has no result-collector
+// dep) and satisfies the orchestrator-side wire contract.
+export {
+  extractTokenUsageFromClaudeCli,
+  extractTokenUsageFromAnthropicResponse,
+} from './token-counter.js';
 let cachedRespawn: typeof RespawnFn | undefined;
 async function loadRespawn(): Promise<typeof RespawnFn> {
   if (!cachedRespawn) {
@@ -306,15 +327,43 @@ export function estimateTokenUsage(task: Task, result: TaskResult): TokenUsage {
 }
 
 /**
- * Enrich a TaskResult with tokenUsage data if missing.
- * If the result already has tokenUsage, it is left unchanged.
- * Otherwise, a heuristic estimate is generated from the task metadata.
- * Mutates the result in place for efficiency.
+ * Enrich a TaskResult with tokenUsage data.
+ *
+ * Resolution order (Sprint 196 196-005 / WP-4 — measured-wins):
+ *   1. Try to load a measured `TokenUsage` from the CLI side-channel log
+ *      (`.tasks/task-{id}.cli-output.json` or `task-{id}.log`). When
+ *      present, merge it with whatever the worker self-reported — measured
+ *      counts override estimates, worker-provided `provider`/`model` are
+ *      retained when the measurement omits them.
+ *   2. If no measured value is available, keep the worker's claim verbatim
+ *      (back-compat with existing workers that emit full TokenUsage).
+ *   3. If neither is available, fall back to the legacy heuristic
+ *      (`estimateTokenUsage`) so downstream consumers always see a
+ *      populated TokenUsage shape.
+ *
+ * Mutates the result in place for efficiency. `projectRoot` is optional —
+ * when omitted, measured-fill is skipped and the function preserves the
+ * original behavior (worker claim wins, then heuristic).
  */
-export function enrichResultTokenUsage(result: TaskResult, task: Task | undefined): void {
-  if (result.tokenUsage) return; // worker already reported — keep as-is
-  if (!task) return; // no task metadata — cannot estimate
+export function enrichResultTokenUsage(
+  result: TaskResult,
+  task: Task | undefined,
+  projectRoot?: string,
+): void {
+  // Step 1 (Sprint 196 WP-4): orchestrator-side measured fill.
+  if (projectRoot) {
+    const measured = tryLoadCliLogTokens(projectRoot, result.taskId);
+    if (measured) {
+      result.tokenUsage = mergeWithWorkerClaim(result.tokenUsage, measured);
+      return;
+    }
+  }
 
+  // Step 2: keep worker's existing claim verbatim.
+  if (result.tokenUsage) return;
+
+  // Step 3: heuristic fallback (legacy behavior).
+  if (!task) return;
   result.tokenUsage = estimateTokenUsage(task, result);
 }
 
@@ -433,7 +482,7 @@ export async function waitForResults(
       if (resultExists) {
         const result = readJsonSafe<TaskResult>(resultPath);
         if (result) {
-          enrichResultTokenUsage(result, taskMap.get(taskId));
+          enrichResultTokenUsage(result, taskMap.get(taskId), projectRoot);
           results.push(result);
           collected.add(taskId);
           newlyCollected.push(taskId);
@@ -452,7 +501,7 @@ export async function waitForResults(
         const lateResultPath = join(projectRoot, TASKS_DIR, `task-${taskId}.result`);
         const lateResult = readJsonSafe<TaskResult>(lateResultPath);
         if (lateResult) {
-          enrichResultTokenUsage(lateResult, taskMap.get(taskId));
+          enrichResultTokenUsage(lateResult, taskMap.get(taskId), projectRoot);
           results.push(lateResult);
           collected.add(taskId);
           newlyCollected.push(taskId);
@@ -788,7 +837,7 @@ export async function waitForResults(
     if (finalExists) {
       const result = readJsonSafe<TaskResult>(resultPath);
       if (result) {
-        enrichResultTokenUsage(result, taskMap.get(taskId));
+        enrichResultTokenUsage(result, taskMap.get(taskId), projectRoot);
         results.push(result);
         collected.add(taskId);
         syncTaskStatusFromResult(taskId, result);
