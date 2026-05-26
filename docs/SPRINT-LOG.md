@@ -5347,3 +5347,32 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 195-005: 195-005 (OPSIYONEL) — Dockerfile.worker Codex/Gemini install + sanity guide (DONE)
 
 ---
+## Sprint 196 — sprint-196
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-05-26
+**Duration:** 2473s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 11 |
+| Completed | 6 |
+| Tech Debt | 0 |
+| No-Go | 5 |
+| Coverage | NaN% |
+| Duration | 2473025ms |
+
+### Tasks
+
+- 196-001: 196-001 — Sprint 191/192/193/194/195 retroactive bulk reclassify (DONE)
+- 196-002: 196-002 — WP-1 Persona-task domain matcher (worker prompt routing fix) (DONE)
+- 196-003: 196-003 — WP-5 Anthropic prompt cache wire (9x cost save) (NO_GO)
+- 196-004: 196-004 — WP-3 Boundary guard scope auto-derive (test dizini otomatik) (DONE)
+- 196-005: 196-005 — WP-4 Token usage orchestrator-side fill (worker'dan kaldır) (NO_GO)
+- 196-006: 196-006 — WP-2 FIX worker idempotency mode flag (verify-only vs re-implement) (DONE)
+- 196-007: 196-007 — Test fail kategorize update (Sprint 195 sonrası 53 fail) (DONE)
+- 196-008: 196-008 — CHANGELOG Sprint 172-194 kalan entries (NO_GO)
+
+---

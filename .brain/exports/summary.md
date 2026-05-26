@@ -83,7 +83,7 @@
 - **Sprint sprint-185 Learnings** (sprint-185): ## Sprint sprint-185 Learnings
 
 ## Active Technical Debt
-- [NORMAL] Sprint sprint-193 rollback SUCCESS
+- [HIGH] Sprint sprint-193 rollback SUCCESS
 
 ## Active Patterns
 - Violation pattern: stale_heartbeat
@@ -114,5 +114,6 @@
 - Violation pattern: stale_heartbeat
 - Violation pattern: doc_sync_ground_truth_mismatch
 - Violation pattern: stale_heartbeat
+- Violation pattern: stale_heartbeat
 
-_Total entries: 358 | Generated: 2026-05-26_
+_Total entries: 359 | Generated: 2026-05-26_

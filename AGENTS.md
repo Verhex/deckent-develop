@@ -27,5 +27,5 @@ When acting as Worker: @.codex/rules/worker-default.md
 | Agent | Tasks | Done | Başarı |
 |-------|-------|------|--------|
 | architect | 3 | 3 | 100% |
-| doc-writer | 1 | 1 | 100% |
-| temp-react-ts-specialist | 1 | 0 | 0% |
+| temp-react-ts-specialist | 3 | 1 | 33% |
+| doc-writer | 2 | 1 | 50% |
