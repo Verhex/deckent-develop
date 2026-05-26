@@ -20,6 +20,8 @@ import { getDebtItems } from '../../core/debt-store.js';
 const DECISIONS_EXPORT_RELATIVE = 'exports/decisions.md';
 import { MemoryStore } from '../../core/memory-store.js';
 import { getSystemProfile } from '../../core/system-profile.js';
+import { detectHostMemory } from '../../core/host-detector.js';
+import { resolveAutoMaxWorkers } from '../../orchestra/spawn-coordinator.js';
 import { detectSubscription } from '../../core/subscription.js';
 import { print, formatDoctorResult, formatCIHealthSection } from '../helpers/output.js';
 import type { CIBaseline, CIReport } from '../helpers/output.js';
@@ -1028,7 +1030,8 @@ export function registerDoctor(program: Command): void {
     .option('--json', 'Output results as JSON')
     .option('--pre-flight', 'Run pre-flight health check before sprint spawn (stricter gates)')
     .option('--providers', 'Show detailed provider diagnostics (binary, version, auth) for Claude/Codex/Gemini')
-    .action(async (opts: { profile?: boolean; legacy?: boolean; json?: boolean; preFlight?: boolean; providers?: boolean }) => {
+    .option('--memory', 'Show host RAM detection (/proc/meminfo first, os.totalmem fallback) and suggested max_workers')
+    .action(async (opts: { profile?: boolean; legacy?: boolean; json?: boolean; preFlight?: boolean; providers?: boolean; memory?: boolean }) => {
       let root: string;
       try {
         root = resolveProjectRoot();
@@ -1062,6 +1065,22 @@ export function registerDoctor(program: Command): void {
         // Legacy formatProviderDiagnostics still exported for callers needing
         // the [OK]/[PARTIAL]/[MISSING] bracket markers.
         print(formatProviderDiagnosticsActionable(diagnostics));
+        return;
+      }
+
+      // --memory: host RAM detection + suggested max_workers (Sprint 194 Task 194-005)
+      if (opts.memory) {
+        const detection = detectHostMemory();
+        const suggested = resolveAutoMaxWorkers('auto');
+        if (opts.json) {
+          print(JSON.stringify({
+            totalGB: detection.totalGB,
+            source: detection.source,
+            suggestedMaxWorkers: suggested,
+          }, null, 2));
+          return;
+        }
+        print(`Host: ${detection.totalGB} GB (source=${detection.source}), suggested max_workers: ${suggested}`);
         return;
       }
 
