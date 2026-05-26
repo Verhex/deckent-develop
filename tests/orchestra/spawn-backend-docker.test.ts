@@ -254,3 +254,67 @@ describe('.deckent/config.json — Sprint 191 max_workers + memory normalization
     expect(api!.max_workers).toBeLessThanOrEqual(4);
   });
 });
+
+// ─── Sprint 193+: per-task authMode wire ──────────────────────────────────
+// feedback_container_auth_precedence: task.authMode === 'api' MUST skip the
+// ~/.claude session mount and REQUIRE ANTHROPIC_API_KEY. Default (undefined /
+// 'subscription') preserves the original mount so rate-limit-free subscription
+// workers keep working.
+
+describe('DockerSpawnBackend: per-task authMode (Sprint 193 wire)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    installSpawnRouter();
+  });
+
+  it('default (no authMode in task JSON) mounts ~/.claude into the container', async () => {
+    const fs = await import('node:fs');
+    vi.mocked(fs.readFileSync).mockImplementation(() => '{}');
+
+    const backend = new DockerSpawnBackend('/test/project');
+    backend.spawn('auth-default', 'sonnet', 'prompt');
+
+    expect(capturedDockerRunArgs.length).toBe(1);
+    const argv = capturedDockerRunArgs[0]!;
+    const hasClaudeMount = argv.some(arg => arg.includes('/.claude:'));
+    expect(hasClaudeMount).toBe(true);
+    const authEnvIdx = argv.indexOf('DECKENT_AUTH_MODE=subscription');
+    expect(authEnvIdx).toBeGreaterThan(-1);
+  });
+
+  it('authMode="api" in task JSON skips ~/.claude mount and stamps env=api', async () => {
+    const fs = await import('node:fs');
+    vi.mocked(fs.readFileSync).mockImplementation(() => JSON.stringify({ authMode: 'api' }));
+    const prevKey = process.env.ANTHROPIC_API_KEY;
+    process.env.ANTHROPIC_API_KEY = 'sk-ant-test';
+
+    try {
+      const backend = new DockerSpawnBackend('/test/project');
+      backend.spawn('auth-api', 'sonnet', 'prompt');
+
+      expect(capturedDockerRunArgs.length).toBe(1);
+      const argv = capturedDockerRunArgs[0]!;
+      const hasClaudeMount = argv.some(arg => arg.includes('/.claude:'));
+      expect(hasClaudeMount).toBe(false);
+      expect(argv.indexOf('DECKENT_AUTH_MODE=api')).toBeGreaterThan(-1);
+    } finally {
+      if (prevKey === undefined) delete process.env.ANTHROPIC_API_KEY;
+      else process.env.ANTHROPIC_API_KEY = prevKey;
+    }
+  });
+
+  it('authMode="api" without ANTHROPIC_API_KEY throws SpawnBackendError', async () => {
+    const fs = await import('node:fs');
+    vi.mocked(fs.readFileSync).mockImplementation(() => JSON.stringify({ authMode: 'api' }));
+    const prevKey = process.env.ANTHROPIC_API_KEY;
+    delete process.env.ANTHROPIC_API_KEY;
+
+    try {
+      const backend = new DockerSpawnBackend('/test/project');
+      expect(() => backend.spawn('auth-api-noenv', 'sonnet', 'prompt'))
+        .toThrow(/ANTHROPIC_API_KEY/);
+    } finally {
+      if (prevKey !== undefined) process.env.ANTHROPIC_API_KEY = prevKey;
+    }
+  });
+});

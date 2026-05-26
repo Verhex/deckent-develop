@@ -114,6 +114,7 @@ export interface CreateTaskParams {
   forceSkills?: string[];
   excludeAgent?: string[];
   excludeSkills?: string[];
+  authMode?: 'subscription' | 'api';
 }
 
 export interface ParsedDirectiveTask {
@@ -132,6 +133,8 @@ export interface ParsedDirectiveTask {
   dependencies?: string[];
   /** Task priority parsed from "- Priority: CRITICAL" (default: undefined → NORMAL) */
   priority?: TaskPriority;
+  /** Per-task auth mode parsed from "- Auth: subscription|api" */
+  authMode?: 'subscription' | 'api';
 }
 
 // ═══ Functions ════════════════════════════════════════════════════
@@ -341,6 +344,20 @@ export function parsePriorityDirective(line: string | undefined): TaskPriority |
   return VALID_PRIORITIES.includes(value) ? value as TaskPriority : undefined;
 }
 
+/**
+ * Parse the "- Auth: subscription|api" directive line.
+ * Returns undefined for unrecognized values (caller falls back to config `auth_mode`).
+ * Per-task `api` opts the worker container out of `~/.claude` session mount and
+ * REQUIRES `ANTHROPIC_API_KEY` in the env (enforced in spawn-backend-docker).
+ */
+export function parseAuthModeDirective(line: string | undefined): 'subscription' | 'api' | undefined {
+  if (!line) return undefined;
+  const value = line.replace(/.*Auth:\s*/i, '').trim().toLowerCase();
+  if (value === 'api') return 'api';
+  if (value === 'subscription') return 'subscription';
+  return undefined;
+}
+
 function now(): string {
   return new Date().toISOString();
 }
@@ -394,6 +411,7 @@ export function createTask(params: CreateTaskParams, sequence: number): Task {
     forceSkills: params.forceSkills,
     excludeAgent: params.excludeAgent,
     excludeSkills: params.excludeSkills,
+    authMode: params.authMode,
     assignedAgent: params.forceAgent ?? 'generic',
     assignedSkills: params.forceSkills ?? [],
     createdAt: now(),
@@ -802,6 +820,10 @@ export function parseStructuredDirectives(content: string): ParsedDirectiveTask[
     const priorityLine = lines.find(l => /^[\s-]*Priority:\s*/i.test(l.trim()));
     const parsedPriority = parsePriorityDirective(priorityLine);
 
+    // Extract optional Auth: line (e.g., "- Auth: api")
+    const authLine = lines.find(l => /^[\s-]*Auth:\s*/i.test(l.trim()));
+    const parsedAuthMode = parseAuthModeDirective(authLine);
+
     // Sprint 182 PQ-4 (F6): description = content after `### Description` heading
     // when present. Falls back to the full block when no heading is found, so
     // legacy DIRECTIVES.md files keep their old description=block behavior.
@@ -811,7 +833,7 @@ export function parseStructuredDirectives(content: string): ParsedDirectiveTask[
       : block.trim();
 
     const enrichedScope = enrichScopeWithTestFiles(scope, scope.filesWrite);
-    tasks.push({ title, description, scope: enrichedScope, testTarget, provider: parsedProvider, forceModel: parsedForceModel, forceEffort: parsedForceEffort, forceAgent, forceSkills, excludeSkills, dependencies, priority: parsedPriority });
+    tasks.push({ title, description, scope: enrichedScope, testTarget, provider: parsedProvider, forceModel: parsedForceModel, forceEffort: parsedForceEffort, forceAgent, forceSkills, excludeSkills, dependencies, priority: parsedPriority, authMode: parsedAuthMode });
   }
   return tasks;
 }
@@ -920,6 +942,10 @@ export function parseBulletOrNumberedTasks(content: string): ParsedDirectiveTask
         const priorityLineBullet = allLines.find(l => /Priority:\s*/i.test(l));
         const parsedPriorityBullet = parsePriorityDirective(priorityLineBullet);
 
+        // Extract Auth override
+        const authLineBullet = allLines.find(l => /Auth:\s*/i.test(l));
+        const parsedAuthModeBullet = parseAuthModeDirective(authLineBullet);
+
         const enrichedScope = enrichScopeWithTestFiles(scope, scope.filesWrite);
         tasks.push({
           title,
@@ -934,6 +960,7 @@ export function parseBulletOrNumberedTasks(content: string): ParsedDirectiveTask
           excludeSkills: excludeSkillsBullet,
           dependencies: dependenciesBullet,
           priority: parsedPriorityBullet,
+          authMode: parsedAuthModeBullet,
         });
 
         i = j;

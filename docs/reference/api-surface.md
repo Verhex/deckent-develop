@@ -37,6 +37,7 @@ Each task is stored as `.tasks/task-{id}.json`:
   "forceSkills": ["string[] (optional — skill id overrides from DIRECTIVES or AI planner)"],
   "excludeAgent": ["string[] (optional — agent ids to exclude from routing, forceSkills still apply)"],
   "excludeSkills": ["string[] (optional — skill ids to exclude from routing)"],
+  "authMode": "'subscription' | 'api' (optional — DIRECTIVES `- Auth:` override; 'api' skips ~/.claude mount and REQUIRES ANTHROPIC_API_KEY; default falls back to config auth_mode)",
   "routingMeta": {
     "taskDNA": "object (optional — TaskDNA used for v2 routing decisions)",
     "confidence": "string (optional — routing confidence score)",

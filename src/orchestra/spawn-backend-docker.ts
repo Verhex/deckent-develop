@@ -372,6 +372,20 @@ export class DockerSpawnBackend implements SpawnBackend {
     const containerCmd = `sh ${CONTAINER_WORKSPACE}/${TASKS_DIR}/${scriptFileName}`;
 
     const containerName = `${CONTAINER_PREFIX}${taskId}`;
+
+    // Per-task auth mode override (Sprint 193+: feedback_container_auth_precedence wire).
+    // task.authMode === 'api' → skip ~/.claude mount, REQUIRE ANTHROPIC_API_KEY in env.
+    // Anything else (undefined/'subscription') → default subscription behavior.
+    const taskAuthMode = this.readTaskAuthMode(dir, taskId);
+    const useApiOnly = taskAuthMode === 'api';
+    if (useApiOnly && !process.env.ANTHROPIC_API_KEY) {
+      throw new SpawnBackendError(
+        `Task ${taskId} declares "Auth: api" but ANTHROPIC_API_KEY is not set in env. ` +
+        `Either set the env var or change the task to "Auth: subscription".`,
+        'docker',
+      );
+    }
+
     const dockerArgs: string[] = [
       'run', '-d',
       '--name', containerName,
@@ -390,12 +404,16 @@ export class DockerSpawnBackend implements SpawnBackend {
       '-v', `${tasksDir}:${CONTAINER_WORKSPACE}/${TASKS_DIR}`,
       // .locks/ mounted read-write (file locking)
       '-v', `${join(dir, '.locks')}:${CONTAINER_WORKSPACE}/.locks`,
-      // Claude auth — mount host credentials into container HOME (rw: session-env must be writable)
-      '-v', `${join(home, '.claude')}:${containerHome}/.claude`,
-      // Claude config — ~/.claude.json (settings, permissions)
-      ...(existsSync(join(home, '.claude.json'))
-        ? ['-v', `${join(home, '.claude.json')}:${containerHome}/.claude.json`]
-        : []),
+      // Claude auth — mount host credentials only in subscription mode. When task
+      // opts into `api`, skip the mount so Claude CLI falls through to API key.
+      ...(useApiOnly
+        ? []
+        : [
+            '-v', `${join(home, '.claude')}:${containerHome}/.claude`,
+            ...(existsSync(join(home, '.claude.json'))
+              ? ['-v', `${join(home, '.claude.json')}:${containerHome}/.claude.json`]
+              : []),
+          ]),
       // Working directory
       '-w', CONTAINER_WORKSPACE,
     ];
@@ -409,6 +427,9 @@ export class DockerSpawnBackend implements SpawnBackend {
     // 16-hex-char random token unique to this worker invocation. Workers should use this
     // value as the `Idempotency-Key` header for any external API call so retries are safe.
     dockerArgs.push('-e', `IDEMPOTENCY_KEY=${promptId}`);
+    // Surface effective auth mode to the container (used by worker prompt for
+    // model self-awareness; not required by Claude CLI itself).
+    dockerArgs.push('-e', `DECKENT_AUTH_MODE=${useApiOnly ? 'api' : 'subscription'}`);
 
     // Pass API keys if available (for Codex/Gemini providers)
     const envKeys = ['ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'GOOGLE_API_KEY', 'DECKENT_DEBUG'];
@@ -743,6 +764,27 @@ export class DockerSpawnBackend implements SpawnBackend {
    * a parse failure). Throws `SpawnBackendError` on a real conflict so
    * the caller can surface the conflicting task id.
    */
+  /**
+   * Read the per-task auth mode override from `task-<taskId>.json`.
+   * Returns 'api' or 'subscription' when explicitly set on the task, or
+   * undefined when missing/malformed (caller treats undefined as subscription
+   * for backward compatibility).
+   */
+  private readTaskAuthMode(projectDir: string, taskId: string): 'subscription' | 'api' | undefined {
+    const taskJsonPath = join(projectDir, TASKS_DIR, `task-${taskId}.json`);
+    if (!existsSync(taskJsonPath)) return undefined;
+    try {
+      const raw = readFileSync(taskJsonPath, 'utf-8');
+      const parsed = JSON.parse(raw) as { authMode?: unknown };
+      if (parsed.authMode === 'api' || parsed.authMode === 'subscription') {
+        return parsed.authMode;
+      }
+    } catch (err) {
+      debugLog('docker-backend:auth-mode', `taskId=${taskId} failed to read authMode: ${(err as Error).message}`);
+    }
+    return undefined;
+  }
+
   private acquireSpawnTimeLocks(projectDir: string, taskId: string): void {
     const taskJsonPath = join(projectDir, TASKS_DIR, `task-${taskId}.json`);
     if (!existsSync(taskJsonPath)) {

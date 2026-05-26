@@ -201,6 +201,13 @@ export interface Task {
   excludeAgent?: string[];
   /** User-specified skill exclusions from DIRECTIVES.md (prefix: -) */
   excludeSkills?: string[];
+  /**
+   * Per-task auth mode override from DIRECTIVES.md (`- Auth: subscription|api`).
+   * When 'api', spawn-backend-docker skips `~/.claude` mount and REQUIRES
+   * `ANTHROPIC_API_KEY` in env. When undefined, falls back to config `auth_mode`
+   * via `readAuthMode()`. 'subscription' = default behavior (session mount).
+   */
+  authMode?: 'subscription' | 'api';
   /** Assigned agent ID (from agent pool) or 'generic' */
   assignedAgent?: string;
   /** Assigned skill IDs (from skill pool) */

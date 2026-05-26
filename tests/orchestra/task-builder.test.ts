@@ -6,6 +6,7 @@ import {
   parseStructuredDirectives,
   parseBulletOrNumberedTasks,
   parsePriorityDirective,
+  parseAuthModeDirective,
   plannerTaskToParams,
   resolveWorkerEffort,
   buildWorkerPrompt,
@@ -2177,5 +2178,62 @@ describe('buildWorkerPrompt — Honest Self-Assessment injection', () => {
     const planIndex = prompt.indexOf('.plan BEFORE coding');
     const codeIndex = prompt.indexOf('Write the code changes');
     expect(planIndex).toBeLessThan(codeIndex);
+  });
+});
+
+// ═══ parseAuthModeDirective (Sprint 193 wire) ═════════════════════════
+//
+// Per-task auth override parser. "api" → opts the worker out of the host
+// ~/.claude session mount (spawn-backend-docker uses ANTHROPIC_API_KEY instead).
+// "subscription" → explicit default. Unknown values fall back to undefined so
+// the spawn-backend can apply the config-level default.
+
+describe('parseAuthModeDirective', () => {
+  it('parses "- Auth: api" → "api"', () => {
+    expect(parseAuthModeDirective('- Auth: api')).toBe('api');
+  });
+
+  it('parses "- Auth: subscription" → "subscription"', () => {
+    expect(parseAuthModeDirective('- Auth: subscription')).toBe('subscription');
+  });
+
+  it('is case-insensitive', () => {
+    expect(parseAuthModeDirective('- Auth: API')).toBe('api');
+    expect(parseAuthModeDirective('  auth: Subscription')).toBe('subscription');
+  });
+
+  it('returns undefined for missing line, empty value, or unknown value', () => {
+    expect(parseAuthModeDirective(undefined)).toBeUndefined();
+    expect(parseAuthModeDirective('- Auth: ')).toBeUndefined();
+    expect(parseAuthModeDirective('- Auth: hybrid')).toBeUndefined();
+  });
+});
+
+describe('parseStructuredDirectives — authMode parsing', () => {
+  it('propagates "- Auth: api" from a structured task block to the parsed task', () => {
+    const content = `## Task 1: API mode opt-in
+- Model: sonnet
+- Auth: api
+- Files: src/core/config.ts
+- Scope: src/core/
+
+### Description
+Run this task with the API key instead of the subscription session.`;
+    const tasks = parseStructuredDirectives(content);
+    expect(tasks).toHaveLength(1);
+    expect(tasks[0]!.authMode).toBe('api');
+  });
+
+  it('leaves authMode undefined when no Auth: line is present', () => {
+    const content = `## Task 1: Default auth
+- Model: sonnet
+- Files: src/core/config.ts
+- Scope: src/core/
+
+### Description
+No auth directive — fall back to config default.`;
+    const tasks = parseStructuredDirectives(content);
+    expect(tasks).toHaveLength(1);
+    expect(tasks[0]!.authMode).toBeUndefined();
   });
 });
