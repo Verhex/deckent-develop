@@ -30,6 +30,44 @@ const CONTAINER_WORKSPACE = '/workspace';
 const DEFAULT_GRACEFUL_TIMEOUT_SECONDS = 15;
 const CONTAINER_PREFIX = 'deckent-w-';
 
+/**
+ * Sprint 191 T-001: WSL2-safe memory defaults. Pre-191 hardcoded `8g/12g` proved
+ * OOM-hostile on WSL2 hosts (~12-14GB total); cut to 4g/6g to break the exit-137
+ * cycle. Cross-checked with `.deckent/config.json` worker_memory_limit/swap.
+ */
+export const DEFAULT_WORKER_MEMORY_LIMIT = '4g';
+export const DEFAULT_WORKER_MEMORY_SWAP = '6g';
+
+/**
+ * Sprint 191 T-001: pure helper to normalize docker memory strings (e.g. `4g`,
+ * `4096m`, `4194304k`, `0.5g`, `4294967296`, `4294967296b`) into bytes for
+ * comparison. Returns null for malformed/missing/non-positive input.
+ *
+ * Exported for unit tests; backend internals use it to guard against config
+ * drift between `--memory` and `--memory-swap`.
+ */
+export function parseMemoryString(value: string | null | undefined): number | null {
+  if (value === null || value === undefined) return null;
+  const trimmed = String(value).trim();
+  if (!trimmed) return null;
+  const match = trimmed.match(/^([0-9]*\.?[0-9]+)\s*([kmgtb]?)$/i);
+  if (!match) return null;
+  const num = Number.parseFloat(match[1]!);
+  if (!Number.isFinite(num) || num <= 0) return null;
+  const unit = (match[2] ?? '').toLowerCase();
+  const multipliers: Record<string, number> = {
+    '': 1,
+    b: 1,
+    k: 1024,
+    m: 1024 ** 2,
+    g: 1024 ** 3,
+    t: 1024 ** 4,
+  };
+  const mul = multipliers[unit];
+  if (mul === undefined) return null;
+  return Math.floor(num * mul);
+}
+
 // ─── Sprint 163 T-002: Health Check + Retry Policy ──────────────────────────
 // container_start_failed previously masked four distinct failure modes
 // (image-missing, port-collision, resource-limit, instant-exit-success).
@@ -170,13 +208,17 @@ export class DockerSpawnBackend implements SpawnBackend {
   private readonly image: string;
   private readonly timeoutSeconds: number;
   private readonly gracefulTimeoutSeconds: number;
+  private readonly memoryLimit: string;
+  private readonly memorySwap: string;
   private readonly containers = new Map<string, { containerId: string; model: string }>(); // taskId → container info
 
-  constructor(projectDir: string, opts?: { image?: string; timeoutSeconds?: number; gracefulTimeoutSeconds?: number }) {
+  constructor(projectDir: string, opts?: { image?: string; timeoutSeconds?: number; gracefulTimeoutSeconds?: number; memoryLimit?: string; memorySwap?: string }) {
     this.projectDir = resolve(projectDir);
     this.image = opts?.image ?? DEFAULT_IMAGE;
     this.timeoutSeconds = opts?.timeoutSeconds ?? DEFAULT_TIMEOUT_SECONDS;
     this.gracefulTimeoutSeconds = opts?.gracefulTimeoutSeconds ?? DEFAULT_GRACEFUL_TIMEOUT_SECONDS;
+    this.memoryLimit = opts?.memoryLimit ?? DEFAULT_WORKER_MEMORY_LIMIT;
+    this.memorySwap = opts?.memorySwap ?? DEFAULT_WORKER_MEMORY_SWAP;
   }
 
   /**
@@ -421,8 +463,8 @@ export class DockerSpawnBackend implements SpawnBackend {
       // HOME must point to a directory that EXISTS in the container
       '-e', `HOME=${containerHome}`,
       // Memory limits — Claude CLI peak ~4-6GB (Sprint 166 Bug G OOM forensic), 8g + 12g headroom
-      '--memory', '8g',
-      '--memory-swap', '12g',
+      '--memory', this.memoryLimit,
+      '--memory-swap', this.memorySwap,
       // Writable HOME via tmpfs — Claude CLI needs to write config/cache here
       '--tmpfs', `${containerHome}:size=100m,uid=${uid},gid=${gid}`,
       // Project mounted read-write — workers need to create/edit files in scope

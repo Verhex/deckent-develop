@@ -33,6 +33,7 @@ These three faces are not separate modes — they work together. Chat to plan, s
 - Version: 1.0.0-beta.1 (June 2026 OSS GA)
 - Active providers: Claude (Anthropic CLI), Codex (OpenAI CLI), Gemini (Google CLI). Cursor planned post-GA.
 - Auth: Subscription default. API mode opt-in per-task via DIRECTIVES `- Auth: api` (requires Anthropic Tier 2+ for parallel sprints).
+- Security posture: Role boundaries are **advisory** in V1.0 — scope violations are detected and logged by the Auditor but not blocked at the OS/filesystem level. Hard runtime enforcement ships in V2 post-GA. See `SECURITY.md` for the full threat model.
 
 ---
 
