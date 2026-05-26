@@ -14,6 +14,34 @@ import { debugLog } from '../core/utils.js';
 import { validateWorkerCoverage } from './coverage-validator.js';
 import { reconcileSpuriousNoGo, reconcileRubricNoGo } from './mid-sprint-adapter.js';
 import { getRubric, coverageOptional } from './rubric-registry.js';
+import {
+  detectDishonestResult,
+  emitDishonestResultEvent,
+  type DishonestyReason,
+  type GitNumstatProvider,
+  type DishonestEventSink,
+} from './honest-gate.js';
+
+// Re-export the dishonest-detector surface so downstream callers can
+// reach it through the single result-evaluator entry point (Sprint 194
+// Task 194-002 — W-INTEGRITY I-8).
+export {
+  detectDishonestResult,
+  emitDishonestResultEvent,
+  parseNotesClaims,
+  createDefaultGitNumstatProvider,
+  makeStaticGitNumstatProvider,
+  DISHONEST_RESULT_DETECTED_CHANNEL,
+} from './honest-gate.js';
+export type {
+  DishonestyReason,
+  DishonestyFinding,
+  GitNumstatProvider,
+  DetectDishonestOptions,
+  NotesClaims,
+  FileNumstat,
+  DishonestEventSink,
+} from './honest-gate.js';
 
 // ─── Source code directory detection ──────────────────────────────────
 
@@ -1727,7 +1755,13 @@ export type HonestyViolation =
   | 'CODE_VERIFIED_STUB'
   | 'WORKER_CRASHED_NO_RESULT'
   | 'BOUNDARY_VIOLATION'
-  | 'SCOPE_VIOLATION_OR_EMPTY_WRITE';
+  | 'SCOPE_VIOLATION_OR_EMPTY_WRITE'
+  // Sprint 194 Task 194-002 — W-INTEGRITY I-8 dishonest-result detector codes.
+  // See honest-gate.ts for the detection logic; emitted by enforceHonestResultGate
+  // when {@link runDishonestyCheck} fires after structural gate passes.
+  | 'LOC_DELTA_MISMATCH'
+  | 'FILES_NOT_TOUCHED'
+  | 'NOTES_CLAIM_MISMATCH';
 
 /**
  * Result of running enforceHonestResultGate.
@@ -1905,6 +1939,99 @@ export function enforceHonestResultGate(
   }
 
   return { result, honest: true };
+}
+
+// ─── Dishonest-Result Gate (Sprint 194 Task 194-002 — W-INTEGRITY I-8) ──
+//
+// The structural gate above (enforceHonestResultGate) catches stub-shaped
+// .result files. The extension below catches *content* dishonesty —
+// claimed `linesAdded` / `filesChanged` / notes-LoC claims that don't
+// match git numstat. Sprint 191 191-003 motivating incident: notes
+// claimed "+220 LoC outcome-tracker" but disk delta was only a test file.
+
+/** Options for {@link runDishonestyCheck}. */
+export interface DishonestyCheckOptions {
+  /** Override the default ±50% tolerance for LoC delta drift. */
+  tolerance?: number;
+  /** Override the default 20-line minimum claim threshold. */
+  minLocThreshold?: number;
+  /**
+   * Sink used to emit the BRAIN→AUDITOR audit event when dishonest.
+   * Defaults to {@link emitDishonestResultEvent} writing through
+   * `writeEvent` from event-stream.ts. Tests pass a spy here.
+   */
+  emit?: DishonestEventSink;
+  /** Skip emission entirely (still downgrades the result). */
+  suppressEmit?: boolean;
+}
+
+/**
+ * Map a {@link DishonestyReason} from honest-gate into the broader
+ * {@link HonestyViolation} union used by result-evaluator. The string
+ * codes are identical — this is a typing bridge only.
+ */
+function dishonestyReasonToViolation(r: DishonestyReason): HonestyViolation {
+  return r;
+}
+
+/**
+ * Run the dishonest-result detector and, when a violation is found,
+ * (1) emit the BRAIN→AUDITOR:DISHONEST_RESULT_DETECTED audit event and
+ * (2) return a downgraded `{honest: false, ...}` HonestGateResult that
+ * the EVALUATE phase can feed straight into the existing NO_GO pipeline.
+ *
+ * Pure with respect to disk except for the event emit, which is
+ * fail-safe through writeEvent.
+ *
+ * This is the canonical wire-in for Sprint 194 Task 194-002. Callers in
+ * sprint-phases.ts should chain it after `enforceHonestResultGate`:
+ *
+ *   const structural = enforceHonestResultGate(result, task);
+ *   if (!structural.honest) return structural;
+ *   return runDishonestyCheck(result, task, git, { projectRoot, sprintId });
+ */
+export function runDishonestyCheck(
+  result: TaskResult,
+  task: Task,
+  git: GitNumstatProvider,
+  ctx: { projectRoot: string; sprintId: string },
+  opts: DishonestyCheckOptions = {},
+): HonestGateResult {
+  const finding = detectDishonestResult(result, git, {
+    tolerance: opts.tolerance,
+    minLocThreshold: opts.minLocThreshold,
+  });
+  if (!finding.dishonest || !finding.reason) {
+    return { result, honest: true };
+  }
+
+  const violation = dishonestyReasonToViolation(finding.reason);
+  const detail = finding.detail ?? `dishonest-result — ${finding.reason}`;
+  debugLog(
+    'runDishonestyCheck',
+    `Task ${task.id}: ${violation} — ${detail}`,
+  );
+
+  if (!opts.suppressEmit) {
+    try {
+      emitDishonestResultEvent(
+        ctx.projectRoot,
+        ctx.sprintId,
+        task.id,
+        finding,
+        opts.emit,
+      );
+    } catch (e) {
+      // Fail-safe: never crash EVALUATE phase on emit error
+      debugLog('runDishonestyCheck:emit', e);
+    }
+  }
+
+  return {
+    result: downgradeToNoGo(result, violation, detail),
+    honest: false,
+    violation,
+  };
 }
 
 /**
