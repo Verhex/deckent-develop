@@ -2,6 +2,37 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint195] - 2026-05-26
+
+### Added
+
+- 195-002 — CHANGELOG Sprint 157-194 backfill scripti
+- 195-003 — SECURITY.md ADR-037 V2 disclosure + README pre-beta durumu
+- 195-005 (OPSIYONEL) — Dockerfile.worker Codex/Gemini install + sanity guide
+
+### Fixed
+
+- 195-001 — Brain disk-verify gate (sentetik NO_GO 5 kaynak fix, W-INTEGRITY)
+
+
+_Tasks: 8 total, 6 done, 0 tech debt, 2 no-go_
+
+## [1.0.0-beta.1-sprint194] - 2026-05-26
+
+### Added
+
+- No completed tasks
+
+_Tasks: 0 total, 0 done, 0 tech debt, 0 no-go_
+
+## [1.0.0-beta.1-sprint193] - 2026-05-24
+
+### Added
+
+- No completed tasks
+
+_Tasks: 1 total, 0 done, 0 tech debt, 1 no-go_
+
 ## [1.0.0-beta.1-sprint192] - 2026-05-24
 
 ### Added
@@ -18,7 +49,6 @@
 
 - 192-008 — Hotfix telemetri — never-dispatched + alive-grace event sayım retro'ya (W-INTEGRITY I-1)
 
-
 _Tasks: 25 total, 5 done, 1 tech debt, 20 no-go_
 
 ## [1.0.0-beta.1-sprint191] - 2026-05-23
@@ -31,7 +61,6 @@ _Tasks: 25 total, 5 done, 1 tech debt, 20 no-go_
 ### Fixed
 
 - 191-005 — ci-guardian agent activation fix (Sprint 190 warning loop)
-
 
 _Tasks: 29 total, 3 done, 0 tech debt, 26 no-go_
 
@@ -54,7 +83,6 @@ _Tasks: 29 total, 3 done, 0 tech debt, 26 no-go_
 - 190-001 — IDENTITY.md sat30 AUTOGEN extend + Memory DB retro entry hook fix
 - 190-003 — Release workflow npm publish step + provenance + 9 test fix
 - 190-014 — docs/cookbook/ 3 örnek tarif (REST API, bug fix, doc update)
-
 
 _Tasks: 25 total, 9 done, 1 tech debt, 16 no-go_
 
@@ -80,22 +108,7 @@ _Tasks: 25 total, 9 done, 1 tech debt, 16 no-go_
 - 189-012 — IDENTITY.md MCP 27→31 sync + AUTOGEN drift fix
 - 189-015 — Test fail 36 kategorize + Sprint 190 fix plan (audit)
 
-
 _Tasks: 23 total, 19 done, 0 tech debt, 4 no-go_
-
-## [Unreleased]
-
-### Added
-
-- **feat(ci): coverage threshold gate aktif** — `vitest.config.ts` içinde `coverage.thresholds` bloğu (lines 82%, functions 89%, branches 80%, statements 82%) — kalibrasyon baseline 2026-05-22 (lines 87.96 | functions 94.61 | branches 85.19 | statements 87.96), her değer -5% floor (Sprint 189 WrongStack WS-Z1).
-- **feat(ci): coverage job non-zero exit gate** — `.github/workflows/ci.yml` `coverage` job threshold violation durumunda build kırar (`continue-on-error` yok; npm run vitest exit code'unu propagate eder).
-- **feat(ci): coverage.reportOnFailure=true** — Test fail olsa bile coverage raporu yazılır; gate her durumda değerlendirilir.
-- **docs(contributing): coverage ratchet politikası** — CONTRIBUTING.md "Coverage goal" bölümü güncellendi; obsolete "no enforced gate" notu kaldırıldı; sprint başına ~1% floor artırma kuralı dokümante edildi.
-- **docs(readme): coverage badge update** — README satır 208 "not a hard gate" → "enforced gate (≈88% baseline, floors -5%)" güncellendi.
-
-### Changed
-
-- **CI coverage artifact** — `actions/upload-artifact@v4` adımı artık `if: always()` ile çalışır; eşik ihlali durumunda da rapor yüklenir (debug kolaylığı).
 
 ## [1.0.0-beta.1-sprint188] - 2026-05-22
 
@@ -112,7 +125,6 @@ _Tasks: 23 total, 19 done, 0 tech debt, 4 no-go_
 - W1-T09 — feature envanteri ve doğruluk denetimi
 - W2-T10 — CLI↔MCP parity tam haritası
 
-
 _Tasks: 12 total, 12 done, 0 tech debt, 0 no-go_
 
 ## [1.0.0-beta.1-sprint187] - 2026-05-22
@@ -120,7 +132,6 @@ _Tasks: 12 total, 12 done, 0 tech debt, 0 no-go_
 ### Added
 
 - api-surface.md Memory V2 atıf güncellemesi
-
 
 _Tasks: 1 total, 1 done, 0 tech debt, 0 no-go_
 
@@ -139,8 +150,28 @@ _Tasks: 1 total, 1 done, 0 tech debt, 0 no-go_
 - Audit src/agents/prompt-analytics.ts
 - Audit src/agents/prompt-evolution.ts
 
-
 _Tasks: 69 total, 31 done, 0 tech debt, 38 no-go_
+
+## [1.0.0-beta.1-sprint185] - 2026-05-21
+
+### Added
+
+- Audit src/core/ tüm modüller (≈90 dosya, types/config/memory/routing/agent-pool/skill-pool)
+- Audit src/orchestra/ tüm modüller (≈76 dosya, sprint lifecycle/brain/planner/evaluator)
+- Audit src/cli/ tüm komutlar (≈46+ dosya, commander.js + register pattern)
+- Audit src/agents/ + src/nervous/ + src/monitor/ runtime modülleri (≈40 dosya)
+- Audit src/api/ + src/mcp/ + src/connectors/ + src/providers/ entegrasyon yüzeyleri (≈50 dosya)
+- Audit src/dashboard/ + src/extensions/vscode/ frontend yüzeyleri (≈100+ dosya)
+
+_Tasks: 7 total, 7 done, 0 tech debt, 0 no-go_
+
+## [1.0.0-beta.1-sprint184] - 2026-05-21
+
+### Added
+
+- No completed tasks
+
+_Tasks: 0 total, 0 done, 0 tech debt, 0 no-go_
 
 ## [1.0.0-beta.1-sprint183] - 2026-05-21
 
@@ -158,7 +189,6 @@ _Tasks: 69 total, 31 done, 0 tech debt, 38 no-go_
 
 - W1-3 — P0-3 Worker timeout root cause investigation + fix
 - W2-3 — Sprint 182 W2-2 recovery: title-prefix Dependencies resolver tamamla
-
 
 _Tasks: 13 total, 11 done, 0 tech debt, 2 no-go_
 
@@ -182,7 +212,6 @@ _Tasks: 13 total, 11 done, 0 tech debt, 2 no-go_
 - W3-PQ-1 — F1 `${IDEMPOTENCY_KEY}` injection fix
 - W3-PQ-4 — F5 + F6 DIRECTIVES parser fix (Files + title/desc)
 
-
 _Tasks: 24 total, 14 done, 0 tech debt, 10 no-go_
 
 ## [1.0.0-beta.1-sprint181] - 2026-05-21
@@ -191,7 +220,6 @@ _Tasks: 24 total, 14 done, 0 tech debt, 10 no-go_
 
 - W1-2 — package.json root scripts gözden geçir + tsc:dashboard alias
 - W2-1 — Sprint smoke + CI yeşil verify
-
 
 _Tasks: 5 total, 3 done, 0 tech debt, 2 no-go_
 
@@ -212,7 +240,6 @@ _Tasks: 5 total, 3 done, 0 tech debt, 2 no-go_
 - W4-2 — Panic guard onay UI (Layer 3 synergy) (completed with tech debt)
 - W5-2 — OSS GA docs review ★ BETA LAUNCH (completed with tech debt)
 - W5-3 — auto_restore=true + nervous user guide kısa giriş (completed with tech debt)
-
 
 _Tasks: 20 total, 12 done, 8 tech debt, 8 no-go_
 
@@ -237,7 +264,6 @@ _Tasks: 20 total, 12 done, 8 tech debt, 8 no-go_
 - W4-9 — Command guard (I3 default-deny remote) ★ BETA MUST (completed with tech debt)
 - W5-11 — mTLS hook (AuthProvider interface) ★ BETA MUST (completed with tech debt)
 
-
 _Tasks: 17 total, 17 done, 9 tech debt, 0 no-go_
 
 ## [1.0.0-beta.1-sprint178] - 2026-05-20
@@ -253,7 +279,6 @@ _Tasks: 17 total, 17 done, 9 tech debt, 0 no-go_
 
 - Fix debt: ADR-019 reconciliation: language-agnostic verify not implemented
 - 178-004 — CI flake fix (PID portability + mock hygiene)
-
 
 _Tasks: 11 total, 9 done, 0 tech debt, 2 no-go_
 
@@ -273,8 +298,15 @@ _Tasks: 11 total, 9 done, 0 tech debt, 2 no-go_
 
 - 177-002 — deckent kill cascade fix
 
-
 _Tasks: 7 total, 5 done, 1 tech debt, 2 no-go_
+
+## [1.0.0-beta.1-sprint176] - 2026-05-20
+
+### Added
+
+- No completed tasks
+
+_Tasks: 25 total, 0 done, 0 tech debt, 25 no-go_
 
 ## [1.0.0-beta.1-sprint175] - 2026-05-19
 
@@ -295,7 +327,6 @@ _Tasks: 7 total, 5 done, 1 tech debt, 2 no-go_
 
 - W4.3 — Final verification (completed with tech debt)
 
-
 _Tasks: 37 total, 21 done, 2 tech debt, 16 no-go_
 
 ## [1.0.0-beta.1-sprint174] - 2026-05-18
@@ -307,7 +338,6 @@ _Tasks: 37 total, 21 done, 2 tech debt, 16 no-go_
 - Canva bulk CSV — canva-kit/canva-bulk-sample.csv
 - Aylık üretim rehberi — canva-kit/monthly-brand-report-howto.md
 - Kit index + tutarlılık — canva-kit/README.md
-
 
 _Tasks: 7 total, 5 done, 0 tech debt, 2 no-go_
 
@@ -330,7 +360,6 @@ _Tasks: 7 total, 5 done, 0 tech debt, 2 no-go_
 
 - Fix debt: Tech debt from 170-001-fix: Code physically verified despite missing .result (Sp
 
-
 _Tasks: 22 total, 22 done, 0 tech debt, 0 no-go_
 
 ## [1.0.0-beta.1-sprint172] - 2026-05-18
@@ -344,6 +373,174 @@ _Tasks: 22 total, 22 done, 0 tech debt, 0 no-go_
 - B3 — kök → docs/ taşıma + redirect
 - B4 — worker-guide 3→1 + ADR-046 dup merge + reference rename
 
-
 _Tasks: 17 total, 6 done, 0 tech debt, 11 no-go_
 
+## [1.0.0-beta.1-sprint171] - 2026-05-15
+
+### Added
+
+- orchestra Lifecycle Audit
+- orchestra Routing + Evaluation Audit
+- orchestra Infra Audit
+- core Types + Config Audit
+- core Memory Subsystem Audit
+- core Pools + Routing Audit
+- agents Audit
+- nervous Audit
+- monitor + connectors Audit
+- providers + api Audit
+
+_Tasks: 31 total, 29 done, 0 tech debt, 2 no-go_
+
+## [1.0.0-beta.1-sprint170] - 2026-05-15
+
+### Added
+
+- P0-5 Docker Spawn Race Window Closure
+
+### Changed
+
+- P0-3 Tmux Prompt Filename TaskId-Aware (completed with tech debt)
+
+_Tasks: 6 total, 4 done, 2 tech debt, 2 no-go_
+
+## [1.0.0-beta.1-sprint169] - 2026-05-14
+
+### Added
+
+- H2 Stub Memory Entries Backfill
+- H3 OSS Pre-Flip Secret Scan Baseline
+
+### Changed
+
+- W3.2 Smoke Directive Dependency Parser Fix (completed with tech debt)
+- C1 Memory Relations Migration (completed with tech debt)
+- H4 Dashboard Build CI Gate (completed with tech debt)
+- C2 Bug Z3 Memory Rebuild Safety (completed with tech debt)
+- H1 ADR DB→FS Export Pipeline + ADR-046 Reverse Hook (completed with tech debt)
+- H5 dep_pipeline_enabled Flip + 3-Layer Doc Fix (completed with tech debt)
+
+_Tasks: 25 total, 24 done, 12 tech debt, 1 no-go_
+
+## [1.0.0-beta.1-sprint168] - 2026-05-14
+
+### Added
+
+- No completed tasks
+
+_Tasks: 4 total, 2 done, 0 tech debt, 2 no-go_
+
+## [1.0.0-beta.1-sprint167] - 2026-05-16
+
+### Added
+
+- T3 — ADR Compliance + Status Audit
+- T4 — Memory.db + Data Integrity Audit
+- T6 — Test + Build + Security + OSS Readiness Audit
+- T7 — Cross-Cutting Synthesis (Wave 2, T1-T6 dependent)
+- Sprint 167 T1 — Code Inventory + Dead Code + Unused Features Audit. READ-ONLY au
+- Sprint 167 T2 — Doc Inventory + Reference Validation + Ground-Truth Audit. READ-
+- Sprint 167 T7 RETRY — Cross-Cutting Synthesis with T1+T2 included. READ-ONLY met
+
+### Changed
+
+- T1 — Code Inventory + Dead Code + Unused Features Audit (completed with tech debt)
+
+_Tasks: 10 total, 9 done, 2 tech debt, 1 no-go_
+
+## [1.0.0-beta.1-sprint166] - 2026-05-14
+
+### Added
+
+- No completed tasks
+
+_Tasks: 11 total, 11 done, 0 tech debt, 0 no-go_
+
+## [1.0.0-beta.1-sprint165] - 2026-05-13
+
+### Added
+
+- No completed tasks
+
+_Tasks: 0 total, 0 done, 0 tech debt, 0 no-go_
+
+## [1.0.0-beta.1-sprint164] - 2026-05-13
+
+### Added
+
+- ADR-045 — Wave-Based Execution Semantics Contract (E3)
+- Gitignore Housekeeping — Runtime Artifact Patterns
+- respawnEligibleTasks Runtime Wire + task.status Inline Sync — Composite (E1+E2)
+- Integration Test Suite — Sprint 161 Forensic Replay + Multi-Wave Coverage (E-tests)
+
+### Fixed
+
+- Fix debt: Tech debt from 156-011-fix: Code physically verified despite missing .result (Sp
+
+_Tasks: 6 total, 5 done, 0 tech debt, 1 no-go_
+
+## [1.0.0-beta.1-sprint163] - 2026-05-12
+
+### Added
+
+- Brain Spurious NO_GO Reconciliation Wire Restore (B1)
+- Docker container_start_failed Health Check + Retry Policy (B2)
+- ADR-043 — Brain Crash Recovery Protocol (A1)
+- ADR-044 — Sprint State Observability Contract (A2)
+- Sprint 160 Security Review 3/3 (A3)
+- Brain Dogfood Smoke — Sprint 163 Self-Validation (C1)
+
+_Tasks: 6 total, 6 done, 0 tech debt, 0 no-go_
+
+## [1.0.0-beta.1-sprint162] - 2026-05-12
+
+### Added
+
+- State Recovery on Brain Restart (T-004)
+
+### Changed
+
+- Sprint Phase Observability + EvaluationAuditTrail Runtime Wire (T-003, composite) (completed with tech debt)
+
+_Tasks: 4 total, 2 done, 1 tech debt, 2 no-go_
+
+## [1.0.0-beta.1-sprint161] - 2026-05-13
+
+### Added
+
+- No completed tasks
+
+_Tasks: 0 total, 0 done, 0 tech debt, 0 no-go_
+
+## [1.0.0-beta.1-sprint160] - 2026-05-13
+
+### Added
+
+- No completed tasks
+
+_Tasks: 0 total, 0 done, 0 tech debt, 0 no-go_
+
+## [1.0.0-beta.1-sprint159] - 2026-05-13
+
+### Changed
+
+- EvaluationAuditTrail Foundation (completed with tech debt)
+- Dual-Evaluator Race Close (Bug X) (completed with tech debt)
+
+_Tasks: 15 total, 2 done, 2 tech debt, 13 no-go_
+
+## [1.0.0-beta.1-sprint158] - 2026-05-13
+
+### Added
+
+- No completed tasks
+
+_Tasks: 0 total, 0 done, 0 tech debt, 0 no-go_
+
+## [1.0.0-beta.1-sprint157] - 2026-05-13
+
+### Added
+
+- No completed tasks
+
+_Tasks: 0 total, 0 done, 0 tech debt, 0 no-go_
