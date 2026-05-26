@@ -2,6 +2,22 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint196] - 2026-05-26
+
+### Added
+
+- 196-001 — Sprint 191/192/193/194/195 retroactive bulk reclassify
+- 196-004 — WP-3 Boundary guard scope auto-derive (test dizini otomatik)
+- 196-007 — Test fail kategorize update (Sprint 195 sonrası 53 fail)
+
+### Fixed
+
+- 196-002 — WP-1 Persona-task domain matcher (worker prompt routing fix)
+- 196-006 — WP-2 FIX worker idempotency mode flag (verify-only vs re-implement)
+
+
+_Tasks: 11 total, 6 done, 0 tech debt, 5 no-go_
+
 ## [1.0.0-beta.1-sprint195] - 2026-05-26
 
 ### Added
