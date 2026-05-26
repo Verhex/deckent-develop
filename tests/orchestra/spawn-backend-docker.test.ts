@@ -233,8 +233,11 @@ describe('.deckent/config.json — Sprint 191 max_workers + memory normalization
 
   it('worker_memory_limit and worker_memory_swap are present at top level', async () => {
     const cfg = await loadProjectConfig();
-    expect(cfg.worker_memory_limit).toBe('4g');
-    expect(cfg.worker_memory_swap).toBe('6g');
+    // Sprint 197 task 197-004 (WSL2 OOM mitigation): lowered from 4g/6g →
+    // 3g/4g after Sprint 195/196 documented four worker OOM exits (137) on
+    // 12-14 GB WSL2 hosts with three parallel opus workers.
+    expect(cfg.worker_memory_limit).toBe('3g');
+    expect(cfg.worker_memory_swap).toBe('4g');
   });
 
   it('all modes have a numeric max_workers within the safe range [1, 8]', async () => {

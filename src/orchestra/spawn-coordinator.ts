@@ -49,16 +49,47 @@ export function _resetSpawnCoordinatorCache(): void {
 }
 
 /**
+ * WSL2 OOM-mitigation tier cap (Sprint 197 task 197-004).
+ *
+ * The per-worker formula in {@link suggestMaxWorkers} (`floor(totalGB /
+ * workerMemGB) - 1`) is correct on bare-metal hosts but generous on WSL2
+ * boxes where Linux + Brain + Auditor + Docker daemon already consume a
+ * meaningful slice of the VM's RAM. Sprint 195/196 saw four worker OOM
+ * exits (137) under three parallel opus tasks on 12-14 GB WSL2 hosts.
+ *
+ * This tier mirrors the conservative caps documented in DIRECTIVES 197:
+ *   - `<8GB`   → 1 worker
+ *   - `8-16GB` → 2 workers (default WSL2 dev box)
+ *   - `16-32GB`→ 3 workers
+ *   - `32GB+`  → 4 workers
+ *
+ * Pathological inputs (`NaN`, `≤0`) return the same safe default as
+ * {@link suggestMaxWorkers}: a single worker so spawn callers always get a
+ * usable number.
+ */
+export function tierBasedMaxWorkers(totalGB: number): number {
+  if (!Number.isFinite(totalGB) || totalGB <= 0) return 1;
+  if (totalGB < 8) return 1;
+  if (totalGB < 16) return 2;
+  if (totalGB < 32) return 3;
+  return 4;
+}
+
+/**
  * Resolve `max_workers` for the active spawn pipeline.
  *
  * Behaviour:
  *   - If `configured` is a number, it wins (operator override is respected).
  *   - If `configured` is `'auto'` or `undefined`, the host RAM is detected
- *     once and {@link suggestMaxWorkers} produces the recommendation using
- *     the per-worker budget (default 2 GB, matches `worker_memory_limit`).
+ *     once and the auto value is the **minimum** of the per-worker formula
+ *     ({@link suggestMaxWorkers}) and the WSL2 OOM tier cap
+ *     ({@link tierBasedMaxWorkers}). Taking the min keeps the per-worker
+ *     math relevant when the host is small AND prevents 32GB+ hosts from
+ *     spawning >4 workers — a safety bound observed empirically in Sprint
+ *     195/196 OOM postmortems.
  *
- * The return value is always clamped to a positive integer by
- * `suggestMaxWorkers` so spawn callers never see zero workers.
+ * The return value is always clamped to a positive integer so spawn
+ * callers never see zero workers.
  */
 export function resolveAutoMaxWorkers(
   configured: number | 'auto' | undefined,
@@ -68,5 +99,7 @@ export function resolveAutoMaxWorkers(
     return Math.floor(configured);
   }
   const detection = getDetectedHostMemory();
-  return suggestMaxWorkers(detection.totalGB, workerMemGB);
+  const perWorker = suggestMaxWorkers(detection.totalGB, workerMemGB);
+  const tierCap = tierBasedMaxWorkers(detection.totalGB);
+  return Math.min(perWorker, tierCap);
 }
