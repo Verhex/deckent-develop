@@ -216,6 +216,8 @@ export interface Task {
    * via `readAuthMode()`. 'subscription' = default behavior (session mount).
    */
   authMode?: 'subscription' | 'api';
+  /** Sprint 196 WP-2: Intent mode for FIX worker — how to approach the re-execution. */
+  fixMode?: 'verify-only' | 'amend' | 're-implement';
   /** Assigned agent ID (from agent pool) or 'generic' */
   assignedAgent?: string;
   /** Assigned skill IDs (from skill pool) */
@@ -235,6 +237,15 @@ export interface Task {
      * PLAN proceeds with override honored.
      */
     overrideWarnings?: string[];
+    /**
+     * Sprint 196 WP-3: Test-scope auto-derivation audit trail.
+     * Records which test file paths were inferred from scope.filesWrite.
+     */
+    scopeDerivation?: {
+      extraFiles: string[];
+      extraDirs: string[];
+      reason: string;
+    };
   };
   createdAt?: string;
   updatedAt?: string;

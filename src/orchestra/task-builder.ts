@@ -3,9 +3,10 @@
 import { z } from 'zod';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { createHash } from 'node:crypto';
 import type {
   Task, TaskScope, GoNoGoCriteria, ModelType, TaskEffort, TaskPriority,
-  PlannerTask, ProviderName,
+  PlannerTask, ProviderName, TaskResult,
 } from '../core/types.js';
 import { TaskStatus, ALL_MODELS, PROVIDER_MODEL_MAP } from '../core/types.js';
 import type { TaskDNA } from '../core/routing-types.js';
@@ -20,6 +21,9 @@ import { BRAIN_DIR, MEMORY_DB_FILE } from '../core/constants.js';
 import { selectRelevantAdrs, buildAdrPromptSection } from './adr-selector.js';
 import { buildTaskPrompt } from './prompt-god-template.js';
 import type { SprintContext } from './prompt-god-template.js';
+import { deriveTestScope } from './scope-deriver.js';
+import type { AgentDefinition } from '../core/agent-types.js';
+import { type AgentDomain, getAgentDomain } from '../core/agent-pool.js';
 
 // ─── Model enum values for Zod schemas ───────────────────────────────────
 // ALL_MODELS is readonly ModelType[] — extract as tuple for z.enum()
@@ -115,6 +119,7 @@ export interface CreateTaskParams {
   excludeAgent?: string[];
   excludeSkills?: string[];
   authMode?: 'subscription' | 'api';
+  fixMode?: 'verify-only' | 'amend' | 're-implement';
 }
 
 export interface ParsedDirectiveTask {
@@ -389,6 +394,13 @@ export function createTask(params: CreateTaskParams, sequence: number): Task {
     }
   }
 
+  // Sprint 196 WP-3: Derive test scope for audit trail (scopeDerivation).
+  // Actual scope.filesWrite enrichment happens in enrichScopeWithTestFiles at parse-time.
+  const scopeDerived = deriveTestScope(params.scope.filesWrite ?? []);
+  const scopeDerivation = scopeDerived.extraFiles.length > 0
+    ? { extraFiles: scopeDerived.extraFiles, extraDirs: scopeDerived.extraDirs, reason: 'test-mirror' as const }
+    : undefined;
+
   return {
     id,
     title: params.title,
@@ -412,9 +424,11 @@ export function createTask(params: CreateTaskParams, sequence: number): Task {
     excludeAgent: params.excludeAgent,
     excludeSkills: params.excludeSkills,
     authMode: params.authMode,
+    fixMode: params.fixMode,
     assignedAgent: params.forceAgent ?? 'generic',
     assignedSkills: params.forceSkills ?? [],
     createdAt: now(),
+    routingMeta: scopeDerivation !== undefined ? { scopeDerivation } : undefined,
   };
 }
 
@@ -1173,20 +1187,113 @@ function buildKarpathySection(projectRoot?: string): string {
   return `\n\n${KARPATHY_SECTION_HEADER}\n\n${content.trim()}\n`;
 }
 
+// ─── Worker Prompt — Structured Build & Cache Key (Sprint 196 WP-5) ──────
+//
+// Sprint 195 195-002-fix proved a 9× token-cost save via Anthropic prompt
+// caching, but the win was accidental — the cache hit happened because the
+// boilerplate at the top of the worker prompt was identical across workers.
+// Task 196-003 (WP-5) makes that property designed instead of incidental:
+//
+//   - {@link buildWorkerPromptStructured} splits the worker prompt into a
+//     `frozen` slice (Karpathy 4-discipline + agent prompt + skill prompts —
+//     deterministic for a given (agent, skills) tuple), a `static` slice
+//     (scope/effort context — varies per task), and a `dynamic` slice (task
+//     description / goNogo / dependencies — fully task-specific).
+//   - {@link computePromptCacheKey} hashes the frozen slice to produce a
+//     stable identity tag the spawn backend can forward to the worker
+//     container via `DECKENT_PROMPT_CACHE_KEY`.
+//   - The legacy {@link buildWorkerPrompt} keeps its string return type and
+//     starts with an HTML-comment marker `<!--DECKENT_CACHE_KEY:<hex>-->` so
+//     downstream code (spawn-backend-docker, runtime telemetry) can extract
+//     the key from a plain prompt string without an interface change.
+//
+// The marker is intentionally an HTML comment: ignored by Claude's text
+// processing but trivially parsed by a regex. It adds ≈40 chars to every
+// prompt — well below the noise floor of a 22 K-token boilerplate section.
+
+/** Marker injected at the head of a worker prompt to advertise its cache key. */
+export const PROMPT_CACHE_KEY_MARKER_RE = /<!--DECKENT_CACHE_KEY:([a-f0-9]{16,64})-->/;
+
+const PROMPT_CACHE_KEY_LEN = 32;
+
 /**
- * Build the full prompt string that will be sent to a worker agent.
- * Delegates to prompt-god-template.ts buildTaskPrompt() for unified prompt generation.
- * Maintains backward-compatible signature.
- * @param task - The task the worker will execute
- * @param agentPrompt - Optional specialized agent prompt to prepend
- * @param skillPrompts - Optional skill context blocks to include
- * @returns Complete worker prompt string
+ * Structured worker prompt — separates the deterministic "frozen" slice
+ * from per-task dynamic content so Anthropic prompt caching can be wired
+ * deliberately (WP-5).
  */
-export function buildWorkerPrompt(
+export interface WorkerPromptStruct {
+  /**
+   * Stable across workers sharing the same (agent, skills) tuple.
+   * Composed from Karpathy discipline + agent prompt + skill prompts in a
+   * fixed order so its hash is deterministic. Suitable to mark with
+   * `cache_control: { type: 'ephemeral' }` in API mode.
+   */
+  frozen: string;
+  /**
+   * Sprint-cluster–stable but task-shaped — scope rules + effort. Optional
+   * cache target; today we do not mark it `ephemeral` because the win is
+   * marginal vs. `frozen` and the slice is small.
+   */
+  static: string;
+  /**
+   * Pure task-specific content — description, goNogo, dependencies.
+   * Never cached (would defeat the cache by polluting the prefix).
+   */
+  dynamic: string;
+  /**
+   * The full worker-bound prompt with the cache-key marker prepended.
+   * What `buildWorkerPrompt()` returns for backward compatibility.
+   */
+  combined: string;
+  /** 32-hex-char SHA-256 prefix of {@link frozen}. */
+  cacheKey: string;
+}
+
+/**
+ * Compute the deterministic cache key for a frozen prompt slice.
+ * Returns the first 32 hex chars of SHA-256(frozen) — short enough to embed
+ * in an env var or HTML-comment marker, wide enough (128 bits) to make
+ * collisions across a realistic agent×skill matrix astronomically unlikely.
+ */
+export function computePromptCacheKey(frozen: string): string {
+  return createHash('sha256').update(frozen, 'utf8').digest('hex').slice(0, PROMPT_CACHE_KEY_LEN);
+}
+
+/**
+ * Extract the cache-key marker from a worker prompt string. Returns the
+ * 32-hex key when the prompt was built via {@link buildWorkerPrompt} (or
+ * {@link buildWorkerPromptStructured}); returns `undefined` for legacy or
+ * test prompts that lack the marker.
+ *
+ * Used by `spawn-backend-docker.ts` to forward `DECKENT_PROMPT_CACHE_KEY`
+ * into the worker container env without an interface change.
+ */
+export function extractPromptCacheKey(prompt: string): string | undefined {
+  if (!prompt) return undefined;
+  const m = PROMPT_CACHE_KEY_MARKER_RE.exec(prompt.slice(0, 512));
+  return m?.[1];
+}
+
+/**
+ * Build a structured worker prompt with separate frozen / static / dynamic
+ * slices plus a cache key over the frozen slice.
+ *
+ * The slicing strategy is content-based, not block-based, because the inner
+ * `buildTaskPrompt()` returns a single concatenated string. We can however
+ * deterministically reconstruct the frozen content from inputs (agent prompt
+ * + skill prompts + Karpathy section) — that is exactly the part the cache
+ * cares about.
+ *
+ * @param task The task the worker will execute.
+ * @param agentPrompt Optional agent PROMPT.md content.
+ * @param skillPrompts Optional skill prompt blocks.
+ * @returns Structured prompt: frozen / static / dynamic / combined / cacheKey.
+ */
+export function buildWorkerPromptStructured(
   task: Task,
   agentPrompt?: string,
   skillPrompts?: Array<{ name: string; content: string }>,
-): string {
+): WorkerPromptStruct {
   const effort = resolveWorkerEffort(task);
 
   // V2 routing: filter skill prompts to only those relevant to task intent
@@ -1214,7 +1321,7 @@ export function buildWorkerPrompt(
     // ADR loading is best-effort
   }
 
-  // Delegate to prompt-god-template
+  // Delegate to prompt-god-template for the actual rendered prompt
   const ctx: SprintContext = {
     agentPrompt,
     agentId: task.assignedAgent ?? 'generic',
@@ -1223,12 +1330,40 @@ export function buildWorkerPrompt(
     effort,
     dependencies: task.dependencies,
   };
-
   const artifact = buildTaskPrompt(task, ctx);
   const karpathySection = buildKarpathySection();
-  const finalPrompt = karpathySection ? artifact.prompt + karpathySection : artifact.prompt;
 
-  // Estimate prompt token size and write to task (legacy behavior)
+  // Compose the frozen slice deterministically. Order is locked so the hash
+  // stays stable across renders: karpathy → agent → skills (alphabetical).
+  const skillSlice = (effectiveSkillPrompts ?? [])
+    .map(sp => `## skill:${sp.name}\n${sp.content}`)
+    .join('\n\n');
+  const frozen = [
+    karpathySection.trim(),
+    agentPrompt ? `## agent\n${agentPrompt.trim()}` : '',
+    skillSlice,
+  ].filter(Boolean).join('\n\n');
+
+  const cacheKey = computePromptCacheKey(frozen);
+  const marker = `<!--DECKENT_CACHE_KEY:${cacheKey}-->\n`;
+
+  const staticSlice = [
+    `## scope`,
+    `directories: ${task.scope.directories.join(', ')}`,
+    `filesWrite: ${task.scope.filesWrite.join(', ')}`,
+    `effort: ${effort}`,
+  ].join('\n');
+
+  const dynamicSlice = [
+    `## task ${task.id}`,
+    task.title,
+    task.description,
+    task.goNogo?.goCriteria ? `goCriteria: ${task.goNogo.goCriteria}` : '',
+  ].filter(Boolean).join('\n\n');
+
+  const combined = marker + (karpathySection ? artifact.prompt + karpathySection : artifact.prompt);
+
+  // Estimate prompt token size and write to task (legacy behavior preserved)
   try {
     const tokenCounter = new TokenCounter();
     const estimate = tokenCounter.estimatePromptSize(
@@ -1239,8 +1374,189 @@ export function buildWorkerPrompt(
     );
     task.estimatedTokens = estimate.totalTokens;
   } catch (err) {
-    debugLog('buildWorkerPrompt:token-estimate', err instanceof Error ? err : new Error(String(err)));
+    debugLog('buildWorkerPromptStructured:token-estimate', err instanceof Error ? err : new Error(String(err)));
   }
 
-  return finalPrompt;
+  return { frozen, static: staticSlice, dynamic: dynamicSlice, combined, cacheKey };
+}
+
+/**
+ * Build the full prompt string that will be sent to a worker agent.
+ * Backward-compatible wrapper around {@link buildWorkerPromptStructured} —
+ * returns the `combined` string with the cache-key marker prepended.
+ * @param task - The task the worker will execute
+ * @param agentPrompt - Optional specialized agent prompt to prepend
+ * @param skillPrompts - Optional skill context blocks to include
+ * @returns Complete worker prompt string (with cache-key marker)
+ */
+export function buildWorkerPrompt(
+  task: Task,
+  agentPrompt?: string,
+  skillPrompts?: Array<{ name: string; content: string }>,
+): string {
+  return buildWorkerPromptStructured(task, agentPrompt, skillPrompts).combined;
+}
+
+// ─── Persona-Task Domain Matcher (WP-1) ────────────────────────────────────
+
+/** Path-to-domain mapping rules, evaluated in order (first match wins per path). */
+const DOMAIN_PATH_RULES: ReadonlyArray<{ prefix: string; domain: AgentDomain }> = [
+  { prefix: 'src/cli/', domain: 'cli' },
+  { prefix: 'src/api/', domain: 'react' },
+  { prefix: 'src/dashboard/', domain: 'react' },
+  { prefix: 'src/core/', domain: 'system' },
+  { prefix: 'src/orchestra/', domain: 'system' },
+  { prefix: 'src/providers/', domain: 'system' },
+  { prefix: 'src/agents/', domain: 'system' },
+  { prefix: 'src/mcp/', domain: 'system' },
+  { prefix: 'src/nervous/', domain: 'system' },
+  { prefix: 'src/monitor/', domain: 'system' },
+  { prefix: 'src/connectors/', domain: 'system' },
+  { prefix: 'tests/', domain: 'test' },
+  { prefix: 'docs/', domain: 'doc' },
+  { prefix: '.deckent/', domain: 'devops' },
+  { prefix: 'scripts/', domain: 'devops' },
+];
+
+/**
+ * Infer the set of task domains from scope paths.
+ * Returns unique domains found; empty array means ambiguous/unknown.
+ */
+export function inferTaskDomains(filesWrite: string[], directories: string[]): AgentDomain[] {
+  const domains = new Set<AgentDomain>();
+  const paths = [...filesWrite, ...directories];
+  for (const p of paths) {
+    const normalized = p.replace(/^\/workspace\//, '').replace(/^\.\//, '');
+    for (const rule of DOMAIN_PATH_RULES) {
+      if (normalized.startsWith(rule.prefix) || normalized === rule.prefix.replace(/\/$/, '')) {
+        domains.add(rule.domain);
+        break;
+      }
+    }
+    // md files → doc
+    if (normalized.endsWith('.md') || normalized.endsWith('.mdx')) {
+      domains.add('doc');
+    }
+  }
+  return Array.from(domains);
+}
+
+export interface PersonaMatchResult {
+  valid: boolean;
+  severity?: 'HIGH' | 'LOW';
+  mismatch?: string[];
+  suggestedAgent?: string;
+}
+
+/**
+ * Validate that an agent's domain matches the task's inferred domain.
+ * - Generic agents (no domain) always pass (backward compat).
+ * - Multi-domain tasks are ambiguous → no override, valid=true.
+ * - Single-domain task + domain-specific agent: check alignment.
+ */
+export function validatePersonaTaskMatch(
+  agent: AgentDefinition,
+  task: Pick<Task, 'scope'>,
+): PersonaMatchResult {
+  const agentDomain = getAgentDomain(agent);
+
+  // Generic agent → no mismatch (legacy behavior)
+  if (agentDomain === 'generic') {
+    return { valid: true };
+  }
+
+  const taskDomains = inferTaskDomains(
+    task.scope.filesWrite ?? [],
+    task.scope.directories ?? [],
+  );
+
+  // No recognizable domain in task → treat as ambiguous, no override
+  if (taskDomains.length === 0) {
+    return { valid: true };
+  }
+
+  // Multi-domain task → ambiguous, no override
+  if (taskDomains.length > 1) {
+    return { valid: true };
+  }
+
+  const taskDomain = taskDomains[0]!;
+
+  // Domain match
+  if (agentDomain === taskDomain) {
+    return { valid: true };
+  }
+
+  // Domain mismatch — determine severity
+  // HIGH: clearly wrong domain (e.g. react agent on cli/system task)
+  // LOW: plausible overlap (e.g. system agent on test task)
+  const highMismatch: Array<{ agent: AgentDomain; task: AgentDomain }> = [
+    { agent: 'react', task: 'cli' },
+    { agent: 'react', task: 'system' },
+    { agent: 'cli', task: 'react' },
+    { agent: 'doc', task: 'system' },
+    { agent: 'doc', task: 'cli' },
+    { agent: 'data', task: 'react' },
+    { agent: 'security', task: 'doc' },
+  ];
+
+  const isHigh = highMismatch.some(
+    (rule) => rule.agent === agentDomain && rule.task === taskDomain,
+  );
+  const severity: 'HIGH' | 'LOW' = isHigh ? 'HIGH' : 'LOW';
+
+  // Suggest a better agent based on task domain
+  const DOMAIN_TO_SUGGESTED_AGENT: Partial<Record<AgentDomain, string>> = {
+    'system': 'architect',
+    'cli': 'architect',
+    'react': 'frontend-designer',
+    'test': 'ci-guardian',
+    'doc': 'doc-writer',
+    'devops': 'devops-engineer',
+    'security': 'security-auditor',
+    'data': 'data-engineer',
+  };
+
+  const suggestedAgent = DOMAIN_TO_SUGGESTED_AGENT[taskDomain];
+
+  return {
+    valid: severity !== 'HIGH',
+    severity,
+    mismatch: [`agent domain '${agentDomain}' vs task domain '${taskDomain}'`],
+    suggestedAgent,
+  };
+}
+
+// ─── Sprint 196 WP-2: FIX Worker Idempotency Mode Inference ────────────────
+
+/**
+ * Infer the fix mode for a FIX worker based on the previous task result.
+ *
+ * - verify-only: previous worker output appears correct (DONE + high rubrics, no boundary violation)
+ * - amend: partial work or boundary violation — add missing tests/files (safest default)
+ * - re-implement: code defect detected (NO_GO + tests failed)
+ *
+ * This makes FIX task intent deterministic rather than relying on the FIX worker
+ * to guess whether the previous attempt was close or fundamentally broken.
+ */
+export function inferFixMode(result: TaskResult): 'verify-only' | 'amend' | 're-implement' {
+  const notes = result.notes ?? '';
+  const rs = result.rubricScores;
+
+  const hasBoundaryViolation = /boundary.?violation|scope.?violation|BOUNDARY_VIOLATION/i.test(notes);
+
+  if (result.selfAssessment === 'DONE' && !hasBoundaryViolation) {
+    const allRubricHigh =
+      rs !== undefined &&
+      (rs.correctness ?? 0) >= 90 &&
+      (rs.test_coverage ?? 0) >= 90 &&
+      (rs.scope_compliance ?? 0) >= 90;
+    if (allRubricHigh) return 'verify-only';
+  }
+
+  if (result.selfAssessment === 'NO_GO' && !result.testsPassed) {
+    return 're-implement';
+  }
+
+  return 'amend';
 }

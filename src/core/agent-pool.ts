@@ -5,6 +5,47 @@ import type { AgentDefinition, AgentPool } from './agent-types.js';
 import { createDefaultStats } from './agent-types.js';
 import { readJsonSafe } from './utils.js';
 
+// ─── Agent Domain ─────────────────────────────────────────────────────────────
+
+export type AgentDomain = 'cli' | 'react' | 'system' | 'test' | 'doc' | 'devops' | 'security' | 'data';
+
+// Module augmentation: adds domain? to AgentDefinition (backward compat — undefined → 'generic')
+declare module './agent-types.js' {
+  interface AgentDefinition {
+    domain?: AgentDomain;
+  }
+}
+
+/** Hardcoded domain map for built-in agents (agent.json domain field population is out of scope). */
+export const BUILTIN_AGENT_DOMAINS: Readonly<Record<string, AgentDomain>> = {
+  'architect': 'system',
+  'architecture-planner': 'system',
+  'bug-fixer': 'system',
+  'code-reviewer': 'system',
+  'refactorer': 'system',
+  'api-builder': 'react',
+  'frontend-designer': 'react',
+  'accessibility-auditor': 'react',
+  'doc-writer': 'doc',
+  'ci-guardian': 'test',
+  'security-auditor': 'security',
+  'performance-analyzer': 'system',
+  'data-engineer': 'data',
+  'devops-engineer': 'devops',
+  'migration-specialist': 'system',
+};
+
+/**
+ * Get the domain for an agent. Reads agent.domain if set (from agent.json),
+ * falls back to BUILTIN_AGENT_DOMAINS by id, then returns 'generic'.
+ */
+export function getAgentDomain(agent: AgentDefinition): AgentDomain | 'generic' {
+  if (agent.domain) return agent.domain;
+  const builtin = BUILTIN_AGENT_DOMAINS[agent.id];
+  if (builtin) return builtin;
+  return 'generic';
+}
+
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const AGENTS_DIR = '.deckent/agents';

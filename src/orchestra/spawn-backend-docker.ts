@@ -59,6 +59,27 @@ export type DockerErrorCode = (typeof DOCKER_ERROR_CODES)[keyof typeof DOCKER_ER
 // landed in Node 20.6; Deckent runtime is Node ≥24).
 export const WORKER_NODE_OPTIONS = 'NODE_OPTIONS=--max-old-space-size-percentage=75';
 
+// Sprint 196 T-196-003 (WP-5): Anthropic prompt-cache identity forwarded to
+// the worker container via env. `buildWorkerPrompt()` (task-builder.ts)
+// embeds `<!--DECKENT_CACHE_KEY:<hex>-->` at the head of the prompt; we
+// extract it here without a cross-module import so this backend stays
+// independent of orchestra/task-builder. The regex is intentionally a literal
+// duplicate of `PROMPT_CACHE_KEY_MARKER_RE` in task-builder.ts — if the format
+// ever changes, both sites must be updated.
+const PROMPT_CACHE_KEY_MARKER_RE = /<!--DECKENT_CACHE_KEY:([a-f0-9]{16,64})-->/;
+
+/**
+ * Pull the embedded prompt-cache identity tag out of a worker prompt string.
+ * Returns the hex key when present, undefined otherwise. Inspects only the
+ * first 512 chars (the marker is always at the head of the prompt) so this
+ * is O(1) regardless of prompt size.
+ */
+export function extractPromptCacheKey(prompt: string): string | undefined {
+  if (!prompt) return undefined;
+  const m = PROMPT_CACHE_KEY_MARKER_RE.exec(prompt.slice(0, 512));
+  return m?.[1];
+}
+
 /** Result of a single health-check inspect call. */
 export interface HealthCheckResult {
   /** Container is running normally — proceed with monitor. */
@@ -445,6 +466,17 @@ export class DockerSpawnBackend implements SpawnBackend {
     // Explicit -e overrides any leaked process.env.NODE_OPTIONS — workers must
     // get the deterministic Deckent value, not whatever the host shell carries.
     dockerArgs.push('-e', WORKER_NODE_OPTIONS);
+
+    // Sprint 196 T-196-003 (WP-5): forward Anthropic prompt-cache identity
+    // when the worker prompt advertises one (HTML-comment marker prepended by
+    // buildWorkerPrompt). Worker uses DECKENT_PROMPT_CACHE_KEY when invoking
+    // Anthropic SDK directly so cache_control: ephemeral binds to the same
+    // logical "frozen system prompt" across workers in the cluster.
+    const promptCacheKey = extractPromptCacheKey(prompt);
+    if (promptCacheKey) {
+      dockerArgs.push('-e', `DECKENT_PROMPT_CACHE_KEY=${promptCacheKey}`);
+      dockerArgs.push('-e', 'DECKENT_PROMPT_CACHE_ENABLED=1');
+    }
 
     // Pass API keys if available (for Codex/Gemini providers)
     const envKeys = ['ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'GOOGLE_API_KEY', 'DECKENT_DEBUG'];

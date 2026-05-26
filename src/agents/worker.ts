@@ -31,6 +31,37 @@ import {
   snapshotWorkerScope as _snapshotWorkerScope,
   writeStashRef as _writeStashRef,
 } from './worker-rollback.js';
+import type { TokenUsage } from '../core/task-types.js';
+
+// ─── Sprint 196 196-005 (WP-4): Token usage orchestrator-side fill ─
+//
+// The worker no longer owns accurate token counts — the LLM cannot
+// reliably estimate its own consumption (Sprint 195 195-002-fix showed a
+// 5.6× discrepancy between worker `estimatedTokens: 3.9K` and the
+// measured `inputTokens: 22K`). The orchestrator now reads the Claude
+// CLI JSON envelope (or Anthropic SDK response) directly and overrides
+// any worker self-report via `result-collector.enrichResultTokenUsage`.
+//
+// This helper exposes the minimal `TokenUsage` stub workers can attach
+// when they have no estimate at all — `{ provider, model }` plus zeroed
+// counts. The orchestrator-side fill will replace the zeros with
+// measured values; if no measurement is available, the legacy heuristic
+// in `result-collector.estimateTokenUsage` produces a reasonable
+// fallback. The presence of the stub guarantees the Sprint 140 result
+// schema check (which rejects missing tokenUsage as NO_GO) keeps
+// passing while measurement authority moves orchestrator-side.
+export function defaultTokenUsageStub(
+  provider: TokenUsage['provider'],
+  model: TokenUsage['model'],
+): TokenUsage {
+  return {
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheReadTokens: 0,
+    ...(provider ? { provider } : {}),
+    ...(model ? { model } : {}),
+  };
+}
 
 // ─── Re-export: worker-rollback.ts (Sprint 177 Task 1) ─────────────
 export {

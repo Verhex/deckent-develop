@@ -400,3 +400,147 @@ export function createClaudeAdapter(
 ): ClaudeAdapter {
   return new ClaudeAdapter(projectDir, opts);
 }
+
+// ─── Prompt Cache Wire (Sprint 196 — Task 196-003 / WP-5) ────────────
+//
+// Sprint 195 195-002-fix observed `cacheReadTokens: 85000` — a 9× cost save
+// driven by Anthropic prompt caching kicking in incidentally on the static
+// prompt boilerplate. This block exposes the cache surface as a designed
+// capability rather than a side effect:
+//
+//   - {@link CACHE_CONTROL_EPHEMERAL} — the cache_control marker constant
+//     callers attach to Anthropic API messages instead of hand-writing the
+//     object shape.
+//   - {@link parseCacheUsage} — reads cache_read/creation token counts out of
+//     the Claude CLI `--output-format json` envelope so the orchestrator can
+//     fill `tokenUsage.cacheReadTokens` from real measurements (paired with
+//     Task 196-005's WP-4 orchestrator-side token fill).
+//   - {@link attachCacheControlToMessages} — pure helper for API-mode wiring;
+//     marks the system message (or first content block) as ephemeral-cached.
+//
+// We deliberately keep these as pure helpers (no SDK dependency, no spawn
+// surface change) so the same module can be exercised by unit tests and
+// imported by any consumer that ends up calling the Anthropic SDK directly.
+
+/**
+ * Anthropic prompt-cache marker.
+ * Mark a system message or content block with this object to enable ephemeral
+ * (5-minute) prompt caching.
+ *
+ * Example:
+ * ```ts
+ * { type: 'text', text: FROZEN_PROMPT, cache_control: CACHE_CONTROL_EPHEMERAL }
+ * ```
+ */
+export const CACHE_CONTROL_EPHEMERAL = { type: 'ephemeral' } as const;
+
+export interface CacheUsageInfo {
+  /** Tokens read from prompt cache (a cache hit). 0 when no cache was used. */
+  cacheReadTokens: number;
+  /** Tokens written to the prompt cache on this call (cache creation). 0 when no creation. */
+  cacheCreationTokens: number;
+}
+
+/**
+ * Parse cache usage telemetry from a Claude CLI JSON envelope or Anthropic
+ * SDK message response.
+ *
+ * Accepts:
+ *   - Claude CLI `--output-format json` envelope:
+ *     `{ type: "result", usage: { cache_read_input_tokens, cache_creation_input_tokens } }`
+ *   - Raw Anthropic API message response shape:
+ *     `{ usage: { cache_read_input_tokens, cache_creation_input_tokens } }`
+ *   - String input → JSON-parsed first, then both shapes attempted.
+ *
+ * Returns `{ cacheReadTokens: 0, cacheCreationTokens: 0 }` for malformed input,
+ * missing fields, or initial workers where caching has not yet engaged.
+ */
+export function parseCacheUsage(raw: unknown): CacheUsageInfo {
+  let payload: unknown = raw;
+  if (typeof raw === 'string') {
+    const trimmed = raw.trim();
+    if (!trimmed.startsWith('{')) {
+      return { cacheReadTokens: 0, cacheCreationTokens: 0 };
+    }
+    try {
+      payload = JSON.parse(trimmed);
+    } catch {
+      return { cacheReadTokens: 0, cacheCreationTokens: 0 };
+    }
+  }
+  if (payload === null || typeof payload !== 'object') {
+    return { cacheReadTokens: 0, cacheCreationTokens: 0 };
+  }
+  const obj = payload as { usage?: unknown };
+  const usage = obj.usage;
+  if (usage === null || typeof usage !== 'object') {
+    return { cacheReadTokens: 0, cacheCreationTokens: 0 };
+  }
+  const u = usage as Record<string, unknown>;
+  const readVal = u['cache_read_input_tokens'];
+  const createVal = u['cache_creation_input_tokens'];
+  const cacheReadTokens = typeof readVal === 'number' && Number.isFinite(readVal) && readVal >= 0
+    ? Math.floor(readVal)
+    : 0;
+  const cacheCreationTokens = typeof createVal === 'number' && Number.isFinite(createVal) && createVal >= 0
+    ? Math.floor(createVal)
+    : 0;
+  return { cacheReadTokens, cacheCreationTokens };
+}
+
+/**
+ * Minimal Anthropic message-shape we care about for cache control.
+ * Mirrors the public SDK type without importing the SDK at runtime.
+ */
+export interface AnthropicMessageLike {
+  role: 'user' | 'assistant' | 'system';
+  content: string | Array<{ type: string; text?: string; cache_control?: unknown }>;
+}
+
+export interface AttachCacheControlOptions {
+  /** Target index inside the content array to mark. Defaults to last block. */
+  targetIndex?: number;
+}
+
+/**
+ * Pure helper: mark the first system message (or the largest text block on
+ * the first user message when no system role is present) with
+ * `cache_control: { type: 'ephemeral' }`. Idempotent — re-applying produces
+ * the same shape.
+ *
+ * Returns a new array; never mutates input.
+ *
+ * Sprint 196 196-003 (WP-5): wired by future API-mode adapters. Today the
+ * Claude CLI subscription path uses prompt-content hashing for cache hits;
+ * this helper is the on-ramp for direct-SDK usage where the caller controls
+ * the messages array.
+ */
+export function attachCacheControlToMessages(
+  messages: ReadonlyArray<AnthropicMessageLike>,
+  opts: AttachCacheControlOptions = {},
+): AnthropicMessageLike[] {
+  if (messages.length === 0) return [];
+
+  const result: AnthropicMessageLike[] = messages.map((m) => ({
+    role: m.role,
+    content: typeof m.content === 'string' ? m.content : m.content.map((b) => ({ ...b })),
+  }));
+
+  const systemIdx = result.findIndex((m) => m.role === 'system');
+  const targetMsgIdx = systemIdx >= 0 ? systemIdx : 0;
+  const target = result[targetMsgIdx]!;
+
+  // Normalize string content → content-block array so we can attach the marker.
+  if (typeof target.content === 'string') {
+    target.content = [{ type: 'text', text: target.content }];
+  }
+
+  const blocks = target.content;
+  if (blocks.length === 0) return result;
+  const idx = opts.targetIndex ?? blocks.length - 1;
+  const block = blocks[idx];
+  if (block) {
+    block.cache_control = { type: CACHE_CONTROL_EPHEMERAL.type };
+  }
+  return result;
+}
