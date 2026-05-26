@@ -61,6 +61,8 @@
 | adr-064 | TOPP — Continuous Dispatch (Wave-Barrier Removal) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-197 Learnings** (sprint-197): ## Sprint sprint-197 Learnings
+- 197-004 — WSL2 OOM mitigation (max_workers + worker_memory + adaptive): NO_GO — Spri...
 - **Sprint sprint-195 Learnings** (sprint-195): ## Sprint sprint-195 Learnings
 - 195-004 — models.dev bootstrap startup wire: NO_GO — bootstrapFromCatalog added to s...
 - **Sprint sprint-193 Learnings** (sprint-193): ## Sprint sprint-193 Learnings
@@ -80,10 +82,9 @@
 - **Sprint sprint-187 Learnings** (sprint-187): ## Sprint sprint-187 Learnings
 - **Sprint sprint-186 Learnings** (sprint-186): ## Sprint sprint-186 Learnings
 - Audit src/core/cascade-detector.ts: NO_GO — Worker exited without writing result (ex...
-- **Sprint sprint-185 Learnings** (sprint-185): ## Sprint sprint-185 Learnings
 
 ## Active Technical Debt
-- [HIGH] Sprint sprint-193 rollback SUCCESS
+- [CRITICAL] Sprint sprint-193 rollback SUCCESS
 
 ## Active Patterns
 - Violation pattern: stale_heartbeat
@@ -115,5 +116,6 @@
 - Violation pattern: doc_sync_ground_truth_mismatch
 - Violation pattern: stale_heartbeat
 - Violation pattern: stale_heartbeat
+- Violation pattern: stale_heartbeat
 
-_Total entries: 359 | Generated: 2026-05-26_
+_Total entries: 363 | Generated: 2026-05-26_

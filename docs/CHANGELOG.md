@@ -2,6 +2,21 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint197] - 2026-05-26
+
+### Added
+
+- 197-002 — Sprint 191-196 retroactive reclassify çalıştır (script run + audit)
+- 197-003 — CHANGELOG Sprint 172-194 kalan 19 entry backfill (script run)
+- 197-005 — Persona-task matcher canlı doğrulama + threshold tuning
+
+### Fixed
+
+- 197-001 — disk-verify gate untracked file detection fix
+
+
+_Tasks: 8 total, 6 done, 0 tech debt, 2 no-go_
+
 ## [1.0.0-beta.1-sprint196] - 2026-05-26
 
 ### Added

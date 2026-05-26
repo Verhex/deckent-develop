@@ -1,5 +1,11 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-197 Learnings
+- Sprint sprint-197 Learnings: ## Sprint sprint-197 Learnings
+- 197-004 — WSL2 OOM mitigation (max_workers + worker_memory + adaptive): NO_GO — Sprint 197 task 197-004 — WSL2 OOM mitigation.
+
+1. .deckent/config.json: modes.performance.max_workers 3→2, worker_memor
+
 ## Sprint sprint-195 Learnings
 - Sprint sprint-195 Learnings: ## Sprint sprint-195 Learnings
 - 195-004 — models.dev bootstrap startup wire: NO_GO — bootstrapFromCatalog added to src/core/model-catalog.ts (~36 LoC: idempotency flag, BootstrapOptions interface, exported

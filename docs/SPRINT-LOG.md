@@ -5376,3 +5376,29 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 196-008: 196-008 — CHANGELOG Sprint 172-194 kalan entries (NO_GO)
 
 ---
+## Sprint 197 — sprint-197
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-05-26
+**Duration:** 895s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 8 |
+| Completed | 6 |
+| Tech Debt | 0 |
+| No-Go | 2 |
+| Coverage | NaN% |
+| Duration | 895132ms |
+
+### Tasks
+
+- 197-001: 197-001 — disk-verify gate untracked file detection fix (DONE)
+- 197-002: 197-002 — Sprint 191-196 retroactive reclassify çalıştır (script run + audit) (DONE)
+- 197-003: 197-003 — CHANGELOG Sprint 172-194 kalan 19 entry backfill (script run) (DONE)
+- 197-004: 197-004 — WSL2 OOM mitigation (max_workers + worker_memory + adaptive) (NO_GO)
+- 197-005: 197-005 — Persona-task matcher canlı doğrulama + threshold tuning (DONE)
+
+---
