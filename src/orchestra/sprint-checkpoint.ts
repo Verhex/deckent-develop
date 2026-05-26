@@ -24,6 +24,9 @@ import {
   serializeDependencyGraph,
 } from './dependency-scheduler.js';
 import type { DependencyGraph } from './dependency-scheduler.js';
+// Sprint 195 195-001 (W-INTEGRITY) — disk-verify gate before recovery NO_GO.
+import { verifyDiskAgainstClaim, DISK_VS_CLAIM_MISMATCH_CHANNEL } from './disk-verify.js';
+import { writeEvent } from './event-stream.js';
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -593,10 +596,46 @@ export function restoreSprintFromCheckpoint(
       continue;
     }
     // No .result — mark task NO_GO on disk so EVALUATE has a deterministic input.
-    staleTasksMarkedNoGo.push(worker.taskId);
     const taskPath = join(projectRoot, TASKS_DIR, `task-${worker.taskId}.json`);
     const t = readJsonSafe<Task>(taskPath);
-    if (!t) continue;
+    if (!t) {
+      staleTasksMarkedNoGo.push(worker.taskId);
+      continue;
+    }
+    // Sprint 195 195-001 (W-INTEGRITY) — disk-verify gate: if the worker
+    // actually produced code on disk before crashing, demote the NO_GO to
+    // MANUAL_REVIEW_REQUIRED instead of silently losing the partial work.
+    const dv = verifyDiskAgainstClaim(projectRoot, t.scope);
+    if (dv.hasDiskEvidence) {
+      t.status = TaskStatus.MANUAL_REVIEW_REQUIRED;
+      const inMemory = tasks.find(x => x.id === worker.taskId);
+      if (inMemory) inMemory.status = TaskStatus.MANUAL_REVIEW_REQUIRED;
+      try {
+        writeFileSync(taskPath, JSON.stringify(t, null, 2), 'utf-8');
+      } catch (e) {
+        debugLog('restoreSprintFromCheckpoint:writeTask', e);
+      }
+      try {
+        writeEvent(
+          projectRoot,
+          sprintId,
+          'brain',
+          'auditor',
+          DISK_VS_CLAIM_MISMATCH_CHANNEL,
+          {
+            taskId: worker.taskId,
+            linesAdded: dv.linesAdded,
+            untrackedFiles: dv.untrackedFiles,
+            cause: 'checkpoint-recovery-stale-executing',
+            emittedAt: new Date().toISOString(),
+          },
+        );
+      } catch (e) {
+        debugLog('restoreSprintFromCheckpoint:diskVerifyEmit', e);
+      }
+      continue;
+    }
+    staleTasksMarkedNoGo.push(worker.taskId);
     t.status = TaskStatus.NO_GO;
     const inMemory = tasks.find(x => x.id === worker.taskId);
     if (inMemory) inMemory.status = TaskStatus.NO_GO;

@@ -19,8 +19,9 @@ describe('TaskStatus enum', () => {
     expect(TaskStatus.DOCUMENTING).toBe('DOCUMENTING');
   });
 
-  it('has 9 members', () => {
-    expect(Object.values(TaskStatus)).toHaveLength(9);
+  it('has 10 members', () => {
+    // Sprint 195 195-001: MANUAL_REVIEW_REQUIRED added for disk-verify gate.
+    expect(Object.values(TaskStatus)).toHaveLength(10);
   });
 
   it('DRAFT === "DRAFT"', () => {
@@ -29,8 +30,9 @@ describe('TaskStatus enum', () => {
 });
 
 describe('TaskEvaluation enum', () => {
-  it('has 3 members', () => {
-    expect(Object.values(TaskEvaluation)).toHaveLength(3);
+  it('has 4 members', () => {
+    // Sprint 192 192-010: DEFERRED added for dispatcher saturation reporting.
+    expect(Object.values(TaskEvaluation)).toHaveLength(4);
   });
 });
 

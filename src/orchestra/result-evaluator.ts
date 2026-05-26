@@ -1761,7 +1761,12 @@ export type HonestyViolation =
   // when {@link runDishonestyCheck} fires after structural gate passes.
   | 'LOC_DELTA_MISMATCH'
   | 'FILES_NOT_TOUCHED'
-  | 'NOTES_CLAIM_MISMATCH';
+  | 'NOTES_CLAIM_MISMATCH'
+  // Sprint 195 195-001 — W-INTEGRITY disk-verify gate. Emitted when the
+  // worker reported filesChanged=[] but on-disk evidence (git numstat /
+  // ls-files --others) shows real partial work; honest-gate carries the
+  // signal so result-evaluator can route it through the same downgrade path.
+  | 'MISSING_RESULT_BUT_DISK_HAS_WORK';
 
 /**
  * Result of running enforceHonestResultGate.

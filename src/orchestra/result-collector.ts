@@ -93,7 +93,10 @@ import { getSystemProfile } from '../core/system-profile.js';
 import { resolveEffectiveWorkers } from '../core/config.js';
 
 // Sprint 183 W1-2 — DEPENDENCY_BLOCKED debounce cleanup helper
-import { clearDependencyBlockedState } from './event-stream.js';
+import { clearDependencyBlockedState, writeEvent } from './event-stream.js';
+
+// Sprint 195 195-001 (W-INTEGRITY) — disk-verify gate before synthetic NO_GO.
+import { verifyDiskAgainstClaim, DISK_VS_CLAIM_MISMATCH_CHANNEL } from './disk-verify.js';
 
 // ═══ Results Map Helper ═══════════════════════════════════════════
 
@@ -458,17 +461,42 @@ export async function waitForResults(
           continue;
         }
 
-        const syntheticResult: TaskResult = {
-          taskId,
-          workerId: `w-${taskId}`,
-          filesChanged: [],
-          linesAdded: 0,
-          linesRemoved: 0,
-          testsPassed: false,
-          coverage: 0,
-          selfAssessment: 'NO_GO',
-          notes: 'Worker timeout — process exceeded time limit and was killed',
-        };
+        // Sprint 195 195-001 (W-INTEGRITY) — disk-verify gate.
+        // Before writing a synthetic NO_GO, check whether the worker actually
+        // produced code on disk. If so, convert to MANUAL_REVIEW_REQUIRED so a
+        // human can review the partial work instead of losing it to a false NO_GO.
+        const taskForScope = taskMap.get(taskId);
+        const diskVerify = taskForScope
+          ? verifyDiskAgainstClaim(projectRoot, taskForScope.scope)
+          : { hasDiskEvidence: false, linesAdded: 0, untrackedFiles: [] as string[] };
+
+        const syntheticResult: TaskResult = diskVerify.hasDiskEvidence
+          ? {
+              taskId,
+              workerId: `w-${taskId}`,
+              filesChanged: diskVerify.untrackedFiles,
+              linesAdded: diskVerify.linesAdded,
+              linesRemoved: 0,
+              testsPassed: false,
+              coverage: 0,
+              selfAssessment: 'NO_GO',
+              notes:
+                `Worker timeout — process exceeded time limit and was killed; ` +
+                `disk-verify found evidence (linesAdded=${diskVerify.linesAdded}, ` +
+                `untrackedFiles=${diskVerify.untrackedFiles.length}). ` +
+                `Status reclassified as MANUAL_REVIEW_REQUIRED — see sprint events.`,
+            }
+          : {
+              taskId,
+              workerId: `w-${taskId}`,
+              filesChanged: [],
+              linesAdded: 0,
+              linesRemoved: 0,
+              testsPassed: false,
+              coverage: 0,
+              selfAssessment: 'NO_GO',
+              notes: 'Worker timeout — process exceeded time limit and was killed',
+            };
         // Write synthetic result to disk so evaluate phase can also read it
         try {
           await writeFile(
@@ -481,6 +509,29 @@ export async function waitForResults(
         collected.add(taskId);
         newlyCollected.push(taskId);
         syncTaskStatusFromResult(taskId, syntheticResult);
+
+        if (diskVerify.hasDiskEvidence) {
+          // Override the status mutation: NO_GO → MANUAL_REVIEW_REQUIRED so the
+          // operator can triage on-disk work before cascade fix.
+          const taskRef = taskMap.get(taskId);
+          if (taskRef) taskRef.status = TaskStatus.MANUAL_REVIEW_REQUIRED;
+          try {
+            writeEvent(
+              projectRoot,
+              sprint.id,
+              'brain',
+              'auditor',
+              DISK_VS_CLAIM_MISMATCH_CHANNEL,
+              {
+                taskId,
+                linesAdded: diskVerify.linesAdded,
+                untrackedFiles: diskVerify.untrackedFiles,
+                cause: 'timeout-no-result',
+                emittedAt: new Date().toISOString(),
+              },
+            );
+          } catch (e) { debugLog('collectResults:diskVerifyEmit', e); }
+        }
       }
     }
     if (newlyCollected.length > 0) {

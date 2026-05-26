@@ -111,14 +111,16 @@ import type {
 // ─── Test 1: Barrel re-exports all enums correctly ──────────────────────────
 
 describe('types.ts barrel re-export — enums', () => {
-  it('re-exports TaskStatus with all 9 members', () => {
-    expect(Object.values(TaskStatus)).toHaveLength(9);
+  it('re-exports TaskStatus with all 10 members', () => {
+    // Sprint 195 195-001: MANUAL_REVIEW_REQUIRED added for disk-verify gate.
+    expect(Object.values(TaskStatus)).toHaveLength(10);
     expect(TaskStatus.DRAFT).toBe('DRAFT');
     expect(TaskStatus.DONE).toBe('DONE');
   });
 
-  it('re-exports TaskEvaluation with all 3 members', () => {
-    expect(Object.values(TaskEvaluation)).toHaveLength(3);
+  it('re-exports TaskEvaluation with all 4 members', () => {
+    // Sprint 192 192-010: DEFERRED added for dispatcher saturation reporting.
+    expect(Object.values(TaskEvaluation)).toHaveLength(4);
     expect(TaskEvaluation.GO_WITH_TECH_DEBT).toBe('GO_WITH_TECH_DEBT');
   });
 

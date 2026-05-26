@@ -17,9 +17,11 @@
 // downgrade to NO_GO and emit the BRAIN→AUDITOR audit event.
 
 import { spawnSync } from 'node:child_process';
-import type { TaskResult } from '../core/types.js';
+import type { TaskResult, TaskScope } from '../core/types.js';
 import { debugLog } from '../core/utils.js';
 import { writeEvent } from './event-stream.js';
+// Sprint 195 195-001 (W-INTEGRITY) — disk-verify for missing-but-on-disk work.
+import { verifyDiskAgainstClaim, type VerifyDiskOptions } from './disk-verify.js';
 
 // ─── Public API ───────────────────────────────────────────────────────
 
@@ -31,7 +33,11 @@ export const DISHONEST_RESULT_DETECTED_CHANNEL =
 export type DishonestyReason =
   | 'LOC_DELTA_MISMATCH'
   | 'FILES_NOT_TOUCHED'
-  | 'NOTES_CLAIM_MISMATCH';
+  | 'NOTES_CLAIM_MISMATCH'
+  // Sprint 195 195-001: worker reported empty filesChanged but disk-verify
+  // (git numstat / ls-files --others) found real work on disk. Indicates a
+  // synthetic NO_GO that would discard partial work without the gate.
+  | 'MISSING_RESULT_BUT_DISK_HAS_WORK';
 
 /** Per-file additions/removals from a git numstat snapshot. */
 export interface FileNumstat {
@@ -131,6 +137,19 @@ export interface DetectDishonestOptions {
    * Prevents trivial "1 line added" rounding noise from being flagged. Default 20.
    */
   minLocThreshold?: number;
+  /**
+   * Sprint 195 195-001 — disk-verify context for the
+   * MISSING_RESULT_BUT_DISK_HAS_WORK rule. When provided, the detector runs
+   * `verifyDiskAgainstClaim(projectRoot, scope)` on empty-`filesChanged`
+   * results to distinguish "honest no-op" from "lost work". Omit to keep
+   * the legacy early-return behavior (empty `filesChanged` → honest).
+   */
+  diskVerify?: {
+    projectRoot: string;
+    scope: TaskScope;
+    /** Inject test providers; defaults to git spawnSync. */
+    options?: VerifyDiskOptions;
+  };
 }
 
 /**
@@ -157,7 +176,33 @@ export function detectDishonestResult(
   const minLoc = opts.minLocThreshold ?? 20;
 
   const filesChanged = (result.filesChanged ?? []).map(normalizePath);
-  if (filesChanged.length === 0) return { dishonest: false };
+
+  // Sprint 195 195-001 — MISSING_RESULT_BUT_DISK_HAS_WORK rule.
+  // When filesChanged is empty, the legacy fast-path returned "honest". That
+  // misclassified synthetic NO_GO writes (worker exited without .result; Brain
+  // wrote an empty stub) as honest results, hiding lost work. When the caller
+  // provides a disk-verify context, we now check the filesystem before declaring
+  // honest. Without context, preserve the legacy behavior to avoid surprising
+  // callers that don't know about the new rule.
+  if (filesChanged.length === 0) {
+    if (!opts.diskVerify) return { dishonest: false };
+    const dv = verifyDiskAgainstClaim(
+      opts.diskVerify.projectRoot,
+      opts.diskVerify.scope,
+      opts.diskVerify.options,
+    );
+    if (!dv.hasDiskEvidence) return { dishonest: false };
+    return {
+      dishonest: true,
+      reason: 'MISSING_RESULT_BUT_DISK_HAS_WORK',
+      detail:
+        `result.filesChanged=[] but disk-verify found evidence ` +
+        `(linesAdded=${dv.linesAdded}, untrackedFiles=${dv.untrackedFiles.length})`,
+      claimedLines: result.linesAdded ?? 0,
+      actualLines: dv.linesAdded,
+      untouchedFiles: dv.untrackedFiles,
+    };
+  }
 
   // Pull ground truth for the union of result-claimed files and notes-claimed files
   const notesClaims = parseNotesClaims(result.notes);

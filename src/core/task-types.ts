@@ -131,6 +131,14 @@ export enum TaskStatus {
   DONE = 'DONE',
   NO_GO = 'NO_GO',
   PAUSED = 'PAUSED',
+  /**
+   * Sprint 195 195-001 (W-INTEGRITY): worker did not write `.result` but
+   * disk-verify (`verifyDiskAgainstClaim`) detected on-disk evidence
+   * (numstat delta or untracked files in scope). Brain converts the
+   * synthetic NO_GO into this status so a human can review the partial
+   * work before reroute. Treated as a non-terminal hint, NOT a success.
+   */
+  MANUAL_REVIEW_REQUIRED = 'MANUAL_REVIEW_REQUIRED',
 }
 
 /**
