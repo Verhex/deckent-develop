@@ -11,6 +11,7 @@
  *   - worker-log.ts: Structured log formatting & I/O
  */
 import { readFileSync, writeFileSync, existsSync, unlinkSync, mkdirSync, realpathSync, openSync, closeSync, fsyncSync, fstatSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { join, normalize, sep } from 'node:path';
 import { TaskStatus, AgentStatus } from '../core/types.js';
 import type {
@@ -589,4 +590,109 @@ export function emitWorkerQuestion(
     question,
     context: context ?? '',
   });
+}
+
+// ─── Sprint 194 W-AUTH A-1: Pre-spawn auth health check ─────────────
+//
+// Sprint 192 RC: /login during an active sprint caused worker containers to
+// lose Claude CLI auth → container exited with code 0 and an empty .result
+// (silent fail). Brain marked these as synthetic NO_GO with no diagnosable
+// signal. authHealthCheck() turns auth loss into an honest worker result so
+// Brain treats it as a real NO_GO and the sprint retro can count failures.
+//
+// Activation contract (env-gated, fail-open by default):
+//   • Skipped entirely unless `CLAUDE_AUTH_REQUIRED=1` — local/tmux/subprocess
+//     backends remain backward-compatible.
+//   • Bypassed when `DECKENT_AUTH_SKIP=1` — for test env / CI where the
+//     `claude` binary is intentionally unavailable.
+//   • spawn-backend-docker.ts sets `CLAUDE_AUTH_REQUIRED=1` on container env
+//     so docker workers always run this check before the actual task.
+
+export interface AuthHealthCheckResult {
+  /** true = auth OK or check skipped; false = AUTH_FAILED .result was written */
+  ok: boolean;
+  /** Set when ok=false — short stderr/diagnostic captured from claude CLI */
+  stderr?: string;
+  /** True when the check was skipped (env not set or test bypass) */
+  skipped?: boolean;
+}
+
+/**
+ * Run a pre-spawn Claude CLI auth health check.
+ *
+ * Behavior:
+ *   - When neither `CLAUDE_AUTH_REQUIRED` nor `DECKENT_AUTH_SKIP` indicates we
+ *     should check, returns `{ok: true, skipped: true}` without touching disk.
+ *   - When `CLAUDE_AUTH_REQUIRED=1` AND `DECKENT_AUTH_SKIP` unset:
+ *       runs `claude --version` (5s timeout). If exit != 0 OR stdout empty,
+ *       writes a real `.result` (selfAssessment NO_GO, notes `AUTH_FAILED: ...`,
+ *       filesChanged=[]) AND emits a `WORKER→BRAIN:AUTH_FAILED` event, then
+ *       returns `{ok: false, stderr}`. Caller should `process.exit(1)` so Brain
+ *       sees a clean fail with a real result on disk.
+ *   - When `DECKENT_AUTH_SKIP=1`, returns `{ok: true, skipped: true}`.
+ */
+export function authHealthCheck(
+  projectRoot: string,
+  taskId: string,
+  sprintId?: string,
+  env: NodeJS.ProcessEnv = process.env,
+): AuthHealthCheckResult {
+  const required = env.CLAUDE_AUTH_REQUIRED === '1';
+  const bypass = env.DECKENT_AUTH_SKIP === '1';
+  if (!required || bypass) {
+    return { ok: true, skipped: true };
+  }
+
+  let exitCode: number | null = null;
+  let stdout = '';
+  let stderr = '';
+  try {
+    const r = spawnSync('claude', ['--version'], {
+      encoding: 'utf-8',
+      timeout: 5_000,
+      shell: process.platform === 'win32',
+    });
+    exitCode = r.status;
+    stdout = (r.stdout ?? '').trim();
+    stderr = (r.stderr ?? '').trim();
+  } catch (err) {
+    exitCode = -1;
+    stderr = err instanceof Error ? err.message : String(err);
+  }
+
+  if (exitCode === 0 && stdout.length > 0) {
+    return { ok: true };
+  }
+
+  const diag = stderr.length > 0
+    ? stderr.slice(0, 400)
+    : `claude --version exitCode=${exitCode ?? 'null'} stdout="${stdout.slice(0, 60)}"`;
+
+  try {
+    const result: TaskResult = {
+      taskId,
+      workerId: env.DECKENT_WORKER_ID ?? `w-${taskId}`,
+      filesChanged: [],
+      linesAdded: 0,
+      linesRemoved: 0,
+      testsPassed: false,
+      coverage: 0,
+      selfAssessment: 'NO_GO',
+      notes: `AUTH_FAILED: ${diag}`,
+    };
+    writeResult(projectRoot, result, sprintId);
+  } catch (err) {
+    console.warn(`[deckent] authHealthCheck: writeResult failed for ${taskId}: ${err instanceof Error ? err.message : String(err)}`);
+  }
+
+  const sid = sprintId ?? getCurrentSprintId(projectRoot);
+  if (sid) {
+    writeEvent(projectRoot, sid, 'worker', 'brain', CHANNELS.AUTH_FAILED, {
+      taskId,
+      exitCode,
+      stderr: diag,
+    });
+  }
+
+  return { ok: false, stderr: diag };
 }

@@ -53,6 +53,12 @@ export const DOCKER_ERROR_CODES = {
 
 export type DockerErrorCode = (typeof DOCKER_ERROR_CODES)[keyof typeof DOCKER_ERROR_CODES];
 
+// Sprint 194 T-004 (W-M M-2): tell V8 inside the worker container to size its
+// max old-space heap as a percentage of the container's memory cgroup, rather
+// than the host RAM. Requires Node ≥20.6 (`--max-old-space-size-percentage`
+// landed in Node 20.6; Deckent runtime is Node ≥24).
+export const WORKER_NODE_OPTIONS = 'NODE_OPTIONS=--max-old-space-size-percentage=75';
+
 /** Result of a single health-check inspect call. */
 export interface HealthCheckResult {
   /** Container is running normally — proceed with monitor. */
@@ -430,6 +436,15 @@ export class DockerSpawnBackend implements SpawnBackend {
     // Surface effective auth mode to the container (used by worker prompt for
     // model self-awareness; not required by Claude CLI itself).
     dockerArgs.push('-e', `DECKENT_AUTH_MODE=${useApiOnly ? 'api' : 'subscription'}`);
+    // Sprint 194 W-AUTH A-1: tell the container's worker to run authHealthCheck
+    // (claude --version) before doing any task work, so a /login auth-loss
+    // during a sprint produces a real AUTH_FAILED .result instead of a silent
+    // exit 0. Skipped when worker.ts sees DECKENT_AUTH_SKIP=1 (test env).
+    dockerArgs.push('-e', 'CLAUDE_AUTH_REQUIRED=1');
+    // Sprint 194 T-004 (W-M M-2): bind V8 heap to the container memory cap.
+    // Explicit -e overrides any leaked process.env.NODE_OPTIONS — workers must
+    // get the deterministic Deckent value, not whatever the host shell carries.
+    dockerArgs.push('-e', WORKER_NODE_OPTIONS);
 
     // Pass API keys if available (for Codex/Gemini providers)
     const envKeys = ['ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'GOOGLE_API_KEY', 'DECKENT_DEBUG'];

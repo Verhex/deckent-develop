@@ -65,6 +65,7 @@ import {
   DEFAULT_WORKER_MEMORY_LIMIT,
   DEFAULT_WORKER_MEMORY_SWAP,
   parseMemoryString,
+  WORKER_NODE_OPTIONS,
 } from '../../src/orchestra/spawn-backend-docker.js';
 
 const mockSpawnSync = vi.mocked(spawnSync);
@@ -315,6 +316,68 @@ describe('DockerSpawnBackend: per-task authMode (Sprint 193 wire)', () => {
         .toThrow(/ANTHROPIC_API_KEY/);
     } finally {
       if (prevKey !== undefined) process.env.ANTHROPIC_API_KEY = prevKey;
+    }
+  });
+});
+
+// ─── Sprint 194 T-004 (W-M M-2): NODE_OPTIONS container env ────────────────
+// Node 24's --max-old-space-size-percentage=75 binds V8 heap to the container
+// memory cgroup instead of host RAM. The explicit `-e NODE_OPTIONS=...` pair
+// must be present on every docker run, must encode 75 as the percentage, and
+// must override anything the host shell leaks via process.env.NODE_OPTIONS.
+
+describe('DockerSpawnBackend: NODE_OPTIONS container env (Sprint 194 T-004)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    installSpawnRouter();
+  });
+
+  it('passes -e NODE_OPTIONS=... to docker run argv', () => {
+    const backend = new DockerSpawnBackend('/test/project');
+    backend.spawn('node-opts-present', 'sonnet', 'prompt-body');
+
+    expect(capturedDockerRunArgs.length).toBe(1);
+    const argv = capturedDockerRunArgs[0]!;
+    const idx = argv.indexOf(WORKER_NODE_OPTIONS);
+    expect(idx).toBeGreaterThan(-1);
+    // The value MUST be preceded by `-e` so docker treats it as an env-var spec.
+    expect(argv[idx - 1]).toBe('-e');
+  });
+
+  it('encodes the percentage value as 75 in the NODE_OPTIONS string', () => {
+    // Sentinel test: catches accidental edits to the percentage (e.g. 50/90)
+    // that would silently change every worker's V8 heap ceiling.
+    expect(WORKER_NODE_OPTIONS).toBe('NODE_OPTIONS=--max-old-space-size-percentage=75');
+
+    const backend = new DockerSpawnBackend('/test/project');
+    backend.spawn('node-opts-value', 'sonnet', 'prompt-body');
+
+    const argv = capturedDockerRunArgs[0]!;
+    const optsEntry = argv.find(a => a.startsWith('NODE_OPTIONS='));
+    expect(optsEntry).toBe('NODE_OPTIONS=--max-old-space-size-percentage=75');
+    expect(optsEntry).toMatch(/--max-old-space-size-percentage=75$/);
+  });
+
+  it('overrides any host process.env.NODE_OPTIONS — container always gets the Deckent value', () => {
+    // Simulate a host shell that has leaked a different NODE_OPTIONS into the
+    // parent process (e.g. a developer setting --inspect on their box). The
+    // container MUST still receive only the Deckent-defined value, exactly
+    // once, with no extra `-e NODE_OPTIONS=<host-value>` pair.
+    const prev = process.env.NODE_OPTIONS;
+    process.env.NODE_OPTIONS = '--inspect --max-old-space-size=2048';
+
+    try {
+      const backend = new DockerSpawnBackend('/test/project');
+      backend.spawn('node-opts-override', 'sonnet', 'prompt-body');
+
+      const argv = capturedDockerRunArgs[0]!;
+      const nodeOptionEntries = argv.filter(a => a.startsWith('NODE_OPTIONS='));
+      expect(nodeOptionEntries).toEqual([WORKER_NODE_OPTIONS]);
+      // The leaked host value must NOT have piggy-backed in.
+      expect(argv.some(a => a.includes('--inspect'))).toBe(false);
+    } finally {
+      if (prev === undefined) delete process.env.NODE_OPTIONS;
+      else process.env.NODE_OPTIONS = prev;
     }
   });
 });

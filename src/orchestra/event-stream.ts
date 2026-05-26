@@ -109,6 +109,13 @@ export const CHANNELS = {
   // reports a task is still blocked on unresolved deps. State-change-only
   // semantics live inside writeEvent (channel-aware dedupe).
   DEPENDENCY_BLOCKED: 'BRAIN→WORKER:DEPENDENCY_BLOCKED',
+
+  // Sprint 194 W-AUTH A-1 — worker pre-spawn auth health check failure.
+  // Emitted by worker.authHealthCheck() when `claude --version` fails (non-zero
+  // exit, empty stdout, or spawn error). Brain treats this as a real worker
+  // result (not synthetic NO_GO) so /login auth-loss during a sprint becomes a
+  // diagnosable failure mode instead of silent exit 0.
+  AUTH_FAILED: 'WORKER→BRAIN:AUTH_FAILED',
 } as const;
 
 export type ChannelCode = typeof CHANNELS[keyof typeof CHANNELS];
