@@ -4,6 +4,7 @@ import { buildProgram } from './index.js';
 import { handleCliError } from './helpers/process.js';
 import { interruptActiveSprint } from '../orchestra/sprint-controller.js';
 import { killAllSessions } from '../orchestra/tmux.js';
+import { bootstrapFromCatalog } from '../core/model-catalog.js';
 
 // ─── Node Version Guard ─────────────────────────────────────────────────────
 const [major] = process.versions.node.split('.').map(Number);
@@ -35,6 +36,11 @@ process.on('SIGINT', () => onSignal('SIGINT'));
 process.on('SIGTERM', () => onSignal('SIGTERM'));
 
 // ─── Entry ───────────────────────────────────────────────────────────────────
-buildProgram().parseAsync(process.argv).catch((err: unknown) => {
-  handleCliError(err);
-});
+buildProgram()
+  .hook('preAction', async () => {
+    await bootstrapFromCatalog({ offline: process.env['DECKENT_OFFLINE'] === '1' });
+  })
+  .parseAsync(process.argv)
+  .catch((err: unknown) => {
+    handleCliError(err);
+  });

@@ -14,6 +14,7 @@ import { join, dirname } from 'node:path';
 import { DeckentError } from './errors.js';
 import {
   BUILTIN_MODELS,
+  modelRegistry,
   type ModelDefinition,
   type ModelTier,
   type ModelStatus,
@@ -388,4 +389,42 @@ function mapCatalogToDefinitions(
     return getBundledCatalog();
   }
   return defs;
+}
+
+// ─── Bootstrap Helper ──────────────────────────────────────────────────────
+
+let _catalogBootstrapped = false;
+
+interface BootstrapOptions {
+  offline?: boolean;
+  force?: boolean;
+  /** @internal test seam */
+  _fetchImpl?: typeof fetch;
+  /** @internal test seam */
+  _cachePath?: string;
+  /** @internal test seam */
+  _registry?: { mergeFromCatalog: (models: ModelDefinition[]) => void };
+}
+
+/**
+ * Bootstrap the global ModelRegistry from the live models.dev catalog.
+ * 3-stage fallback: remote fetch → 24h cache → bundled BUILTIN_MODELS.
+ * Idempotent: no-op on repeated calls unless force:true is passed.
+ * Never throws — network errors fall back silently to bundled models.
+ */
+export async function bootstrapFromCatalog(opts?: BootstrapOptions): Promise<void> {
+  if (_catalogBootstrapped && !opts?.force) return;
+  try {
+    const result = await loadCatalog({
+      offline: opts?.offline,
+      forceRefresh: opts?.force,
+      fetchImpl: opts?._fetchImpl,
+      cachePath: opts?._cachePath,
+    });
+    const registry = opts?._registry ?? modelRegistry;
+    registry.mergeFromCatalog(result.models);
+    _catalogBootstrapped = true;
+  } catch {
+    // silent fallback — loadCatalog never throws, but guard unexpected errors
+  }
 }
