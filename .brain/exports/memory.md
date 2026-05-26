@@ -1,5 +1,13 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-195 Learnings
+- Sprint sprint-195 Learnings: ## Sprint sprint-195 Learnings
+- 195-004 — models.dev bootstrap startup wire: NO_GO — bootstrapFromCatalog added to src/core/model-catalog.ts (~36 LoC: idempotency flag, BootstrapOptions interface, exported
+
+## Sprint sprint-193 Learnings
+- Sprint sprint-193 Learnings: ## Sprint sprint-193 Learnings
+- SMOKE-001 — i18n en.json duplicate error.lock_conflict temizle: NO_GO — Worker exited without writing result (exitCode=0)
+
 ## Sprint sprint-192 Learnings
 - Sprint sprint-192 Learnings: ## Sprint sprint-192 Learnings
 - Placeholder — sprint still in-progress; will be overwritten by finalize.

@@ -61,6 +61,10 @@
 | adr-064 | TOPP — Continuous Dispatch (Wave-Barrier Removal) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-195 Learnings** (sprint-195): ## Sprint sprint-195 Learnings
+- 195-004 — models.dev bootstrap startup wire: NO_GO — bootstrapFromCatalog added to s...
+- **Sprint sprint-193 Learnings** (sprint-193): ## Sprint sprint-193 Learnings
+- SMOKE-001 — i18n en.json duplicate error.lock_conflict temizle: NO_GO — Worker exite...
 - **Sprint sprint-192 Learnings** (sprint-192): ## Sprint sprint-192 Learnings
 - Placeholder — sprint still in-progress; will be overwritten by finalize.
 
@@ -77,13 +81,9 @@
 - **Sprint sprint-186 Learnings** (sprint-186): ## Sprint sprint-186 Learnings
 - Audit src/core/cascade-detector.ts: NO_GO — Worker exited without writing result (ex...
 - **Sprint sprint-185 Learnings** (sprint-185): ## Sprint sprint-185 Learnings
-- **Sprint sprint-183 Learnings** (sprint-183): ## Sprint sprint-183 Learnings
-- W3-3 — v1.0.0-beta.1 final smoke (build:all + vitest + dashboard + serve): NO_GO — W...
-- **Sprint sprint-182 Learnings** (sprint-182): ## Sprint sprint-182 Learnings
-- W1-1 — Mock hygiene: orphan-cleaner-ipc + archive-debt `renameSync` ekle: NO_GO — Wo...
 
 ## Active Technical Debt
-_No active technical debt._
+- [NORMAL] Sprint sprint-193 rollback SUCCESS
 
 ## Active Patterns
 - Violation pattern: stale_heartbeat
@@ -112,5 +112,7 @@ _No active technical debt._
 - Violation pattern: stale_heartbeat
 - Violation pattern: doc_sync_ground_truth_mismatch
 - Violation pattern: stale_heartbeat
+- Violation pattern: doc_sync_ground_truth_mismatch
+- Violation pattern: stale_heartbeat
 
-_Total entries: 346 | Generated: 2026-05-24_
+_Total entries: 358 | Generated: 2026-05-26_

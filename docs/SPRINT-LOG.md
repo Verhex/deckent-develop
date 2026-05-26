@@ -5299,3 +5299,51 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 192-019: 192-019 — Sprint 191 retroactive bulk reclassify (192-003 API kullanarak) (NO_GO)
 
 ---
+## Sprint 193 — sprint-193
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-05-24
+**Duration:** 85s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 1 |
+| Completed | 0 |
+| Tech Debt | 0 |
+| No-Go | 1 |
+| Coverage | 0.0% |
+| Duration | 84786ms |
+
+### Tasks
+
+- 193-001: SMOKE-001 — i18n en.json duplicate error.lock_conflict temizle (NO_GO)
+
+---
+## Sprint 195 — sprint-195
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-05-26
+**Duration:** 1712s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 8 |
+| Completed | 6 |
+| Tech Debt | 0 |
+| No-Go | 2 |
+| Coverage | NaN% |
+| Duration | 1711631ms |
+
+### Tasks
+
+- 195-001: 195-001 — Brain disk-verify gate (sentetik NO_GO 5 kaynak fix, W-INTEGRITY) (DONE)
+- 195-002: 195-002 — CHANGELOG Sprint 157-194 backfill scripti (DONE)
+- 195-003: 195-003 — SECURITY.md ADR-037 V2 disclosure + README pre-beta durumu (DONE)
+- 195-004: 195-004 — models.dev bootstrap startup wire (NO_GO)
+- 195-005: 195-005 (OPSIYONEL) — Dockerfile.worker Codex/Gemini install + sanity guide (DONE)
+
+---

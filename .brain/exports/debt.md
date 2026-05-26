@@ -4,11 +4,15 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| rollback-sprint-193 | Sprint sprint-193 rollback SUCCESS | normal | sprint-193 | active |
 
 ## Resolved Technical Debt
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-194-001 | Tech debt from 194-001: Sprint 194 W-AUTH A-1 — worker pre-spawn auth health che | normal | sprint-194 | resolved |
+| debt-194-007 | Tech debt from 194-007: Worker exited without writing result (exitCode=0) | normal | sprint-194 | resolved |
+| debt-194-008 | Tech debt from 194-008: Worker exited without writing result (exitCode=0) | normal | sprint-194 | resolved |
 | debt-192-003 | Tech debt from 192-003: Sprint 191 191-003 carry-over — GERÇEK implementation:
 
  | normal | sprint-192 | resolved |

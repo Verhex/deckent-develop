@@ -93,13 +93,13 @@ Komutlar: `deckent status`, `deckent history`, `deckent retro`, `deckent recall 
 ## Sprint Metrics
 | Metrik | Değer |
 |--------|-------|
-| Sprint | sprint-192 |
-| Toplam Task | 25 |
-| Tamamlanan | 5 |
-| Tech Debt | 1 |
-| No-Go | 20 |
-| Süre | 54dk 3sn |
-| Coverage | 8.6% |
+| Sprint | sprint-195 |
+| Toplam Task | 8 |
+| Tamamlanan | 6 |
+| Tech Debt | 0 |
+| No-Go | 2 |
+| Süre | 28dk 31sn |
+| Coverage | N/A |
 
 ## Active Debt
 _Teknik borç kaydı yok._
@@ -107,7 +107,6 @@ _Teknik borç kaydı yok._
 ## Agent Performance
 | Agent | Tasks | Done | Başarı |
 |-------|-------|------|--------|
-| bug-fixer | 2 | 1 | 50% |
-| temp-react-ts-specialist | 10 | 2 | 20% |
-| architect | 2 | 2 | 100% |
-| doc-writer | 5 | 0 | 0% |
+| architect | 3 | 3 | 100% |
+| doc-writer | 1 | 1 | 100% |
+| temp-react-ts-specialist | 1 | 0 | 0% |
