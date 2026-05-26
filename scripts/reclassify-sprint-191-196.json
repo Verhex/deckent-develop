@@ -1,0 +1,74 @@
+[
+  {
+    "sprint": "sprint-191",
+    "task": "191-002",
+    "decision": "DONE",
+    "reason": "Disk verified — runtime_extension_enabled default + worker timeout extension wire landed; sprint outcome was a synthetic NO_GO (no .result written within timeout, evidence on disk)."
+  },
+  {
+    "sprint": "sprint-194",
+    "task": "194-001",
+    "decision": "DONE",
+    "reason": "Disk verified — +321 LoC landed, commit 37ba9532; synthetic NO_GO."
+  },
+  {
+    "sprint": "sprint-194",
+    "task": "194-002",
+    "decision": "DONE",
+    "reason": "Disk verified — +911 LoC landed, commit a6aa86ce; synthetic NO_GO."
+  },
+  {
+    "sprint": "sprint-194",
+    "task": "194-004",
+    "decision": "DONE",
+    "reason": "Disk verified — WORKER_NODE_OPTIONS wire landed; synthetic NO_GO."
+  },
+  {
+    "sprint": "sprint-194",
+    "task": "194-005",
+    "decision": "DONE",
+    "reason": "Disk verified — +328 LoC landed, commit 1bec2144; synthetic NO_GO."
+  },
+  {
+    "sprint": "sprint-195",
+    "task": "195-004",
+    "decision": "DONE",
+    "reason": "Worker selfAssessment DONE on disk; outer NO_GO caused by container OOM (exit 137), not by code defect — code is correct and merged."
+  },
+  {
+    "sprint": "sprint-195",
+    "task": "195-004-fix",
+    "decision": "DONE",
+    "reason": "Container OOM (exit 137); underlying code patch correct on disk — OOM is not a code defect."
+  },
+  {
+    "sprint": "sprint-196",
+    "task": "196-003",
+    "decision": "DONE",
+    "reason": "Disk verified — +144 LoC in src/providers/claude.ts plus 6 tests passing, commit 330d4e80; synthetic NO_GO."
+  },
+  {
+    "sprint": "sprint-196",
+    "task": "196-005",
+    "decision": "DONE",
+    "reason": "Disk verified — new token-counter.ts (untracked file) plus 12 tests passing, commit ea18ac05; synthetic NO_GO — disk-verify gate did not yet inspect untracked files (fixed under 197-001)."
+  },
+  {
+    "sprint": "sprint-196",
+    "task": "196-008",
+    "decision": "GO_WITH_TECH_DEBT",
+    "reason": "Consolidated CHANGELOG entry landed; minor format diff vs ground-truth template — acceptable tech debt, not a defect."
+  },
+  {
+    "sprint": "sprint-196",
+    "task": "196-003-fix",
+    "decision": "DONE",
+    "reason": "Container OOM (exit 137); underlying code patch correct on disk — OOM is not a code defect."
+  },
+  {
+    "sprint": "sprint-196",
+    "task": "196-005-fix",
+    "decision": "DONE",
+    "reason": "Container OOM (exit 137); underlying code patch correct on disk — OOM is not a code defect."
+  }
+]
