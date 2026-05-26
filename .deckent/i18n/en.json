@@ -105,7 +105,6 @@
   "error.no_directives": "DIRECTIVES.md not found. Create it with sprint goals, or run: deckent init",
   "error.config_invalid": "Configuration is invalid. Run: deckent doctor to diagnose",
   "error.scope_violation": "Worker exceeded assigned scope. Check task scope boundaries.",
-  "error.lock_conflict": "Another worker holds the lock. Wait or run: deckent cleanup",
   "error.usage_exceeded": "Usage threshold reached. Sprint has been auto-paused.",
   "error.build_failed": "Build failed. Run your project's type check / lint command to check for errors.",
   "error.git_not_found": "git not found. Install git to use deckent.",
