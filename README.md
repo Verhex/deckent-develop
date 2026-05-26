@@ -28,6 +28,12 @@ Deckent serves three distinct roles depending on how you engage with it:
 
 These three faces are not separate modes — they work together. Chat to plan, start to execute, extend to grow.
 
+## Status
+
+- Version: 1.0.0-beta.1 (June 2026 OSS GA)
+- Active providers: Claude (Anthropic CLI), Codex (OpenAI CLI), Gemini (Google CLI). Cursor planned post-GA.
+- Auth: Subscription default. API mode opt-in per-task via DIRECTIVES `- Auth: api` (requires Anthropic Tier 2+ for parallel sprints).
+
 ---
 
 ## Why Deckent

@@ -39,7 +39,7 @@ We will acknowledge receipt within 48 hours and aim to provide a fix within 7 da
 | MCP stdio channel | Tool call injection via malicious input | Input validation; stdio-only transport (no network) |
 | tmux session access | Same OS user sees all sessions | Document clearly — deckent is single-user by design |
 
-### Role Boundary Disclosure (ADR-037 V1.0)
+### Role Boundary Disclosure (ADR-037 V1.0 → V2)
 
 **ADR-037 V1.0 implements advisory/soft role boundaries.** The scope enforcement layer:
 - Detects violations via `git diff --stat` in the Auditor scan loop
@@ -48,7 +48,9 @@ We will acknowledge receipt within 48 hours and aim to provide a fix within 7 da
 
 Workers self-flag boundary violations (`BOUNDARY_VIOLATION → NO_GO`). Brain applies FIX/cascade on self-reported violations.
 
-Hard runtime enforcement (Layer-2) is planned for V2 post-GA. See [`docs/security/threat-model.md`](docs/security/threat-model.md) for full details.
+**V2 hard-runtime enforcement Timeline:** V2 hard-runtime enforcement is planned for post-GA (target: Sprint 200+, post-2026-06-15). Until then, scope violations are detected via `git diff --stat` audit-trail and emit BRAIN→AUDITOR warning events but do NOT block worker execution. Hard-runtime enforcement will transition to OS/filesystem-level restrictions in V2 post-GA.
+
+See [`docs/security/threat-model.md`](docs/security/threat-model.md) for full details.
 
 ## Security Model Overview
 
@@ -77,6 +79,7 @@ Workers run in separate tmux sessions or subprocess instances, providing process
 - **Credentials storage:** API keys stored in `~/.deckent/credentials/` use file permissions (0600) but are not encrypted at rest.
 - **tmux session visibility:** All tmux windows within the deckent session are accessible to the same OS user.
 - **ADR-037 V1.0 soft boundaries:** Role boundary violations are detected and logged but not blocked. Self-reporting by workers + Auditor audit trail is the enforcement mechanism in this release.
+- **Symlink resolution incomplete:** Symlink handling within scope enforcement is incomplete (ADR-034 Sprint 132 MEDIUM #10 open). Symbolic links to files outside scope may bypass scope checks. Targeted for V2 alongside ADR-037 hardening.
 
 ## Best Practices
 
