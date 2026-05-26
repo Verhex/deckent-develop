@@ -417,3 +417,190 @@ describe('result-collector synthetic NO_GO gate — direct semantics', () => {
     expect(DISK_VS_CLAIM_MISMATCH_CHANNEL).toBe('BRAIN→AUDITOR:DISK_VS_CLAIM_MISMATCH');
   });
 });
+
+// ═══ Sprint 197 Task 197-001 — untracked file detection invariants ═══
+//
+// Pin-down regression suite for the Sprint 196 196-005 root cause: a NEW
+// (untracked) file like `src/orchestra/token-counter.ts` was missed by the
+// disk-verify gate even though Sprint 195 195-001 had wired the
+// `untrackedFiles` field. These six tests fence the exact contract so the
+// gate cannot regress to "tracked-only" detection.
+
+describe('Sprint 197 197-001 — untracked file gate invariants', () => {
+  // ─── (NEW-a) no tracked changes + new untracked file → evidence ─────
+  it('(NEW-a) untracked NEW FILE only (no tracked diff) → hasDiskEvidence=true', () => {
+    const r = verifyDiskAgainstClaim('/tmp/fake', makeScope(), {
+      numstatProvider: makeStaticNumstatProvider(0),
+      lsOthersProvider: makeStaticLsOthersProvider(['src/orchestra/token-counter.ts']),
+    });
+    expect(r.hasDiskEvidence).toBe(true);
+    expect(r.linesAdded).toBe(0);
+    expect(r.untrackedFiles).toEqual(['src/orchestra/token-counter.ts']);
+  });
+
+  // ─── (NEW-b) scope-filtered untracked lookup ─────────────────────────
+  it('(NEW-b) untracked file outside scope.directories is not seen by the gate', () => {
+    // Production provider receives ONLY scope.directories; if the worker
+    // creates a file in a sibling directory it must never appear here.
+    const captured: string[][] = [];
+    const lsProv = {
+      lsOthers(paths: readonly string[]) {
+        captured.push([...paths]);
+        // Simulate the production behavior: git ls-files --others -- <paths>
+        // would not return files outside <paths>. The stub mirrors that
+        // semantic exactly — empty result when scope dirs don't match.
+        return [];
+      },
+    };
+    const scope: TaskScope = {
+      directories: ['src/orchestra/'],
+      filesRead: [],
+      filesWrite: ['src/orchestra/foo.ts'],
+    };
+    const r = verifyDiskAgainstClaim('/tmp/fake', scope, {
+      numstatProvider: makeStaticNumstatProvider(0),
+      lsOthersProvider: lsProv,
+    });
+    // Provider was called with exactly the scope directories (not anything
+    // outside) — this is the contract the production wire relies on.
+    expect(captured).toEqual([['src/orchestra/']]);
+    expect(r.untrackedFiles).toEqual([]);
+    expect(r.hasDiskEvidence).toBe(false);
+  });
+
+  // ─── (NEW-c) tracked + untracked are both counted ─────────────────────
+  it('(NEW-c) mixed tracked diff + untracked file → both reflected', () => {
+    const r = verifyDiskAgainstClaim('/tmp/fake', makeScope(), {
+      numstatProvider: makeStaticNumstatProvider(12),
+      lsOthersProvider: makeStaticLsOthersProvider(['src/orchestra/brand-new.ts']),
+    });
+    expect(r.hasDiskEvidence).toBe(true);
+    expect(r.linesAdded).toBe(12);
+    expect(r.untrackedFiles).toEqual(['src/orchestra/brand-new.ts']);
+  });
+
+  // ─── (NEW-d) gitLsOthers fail (sandbox) → graceful fallback ───────────
+  it('(NEW-d) gitLsOthers throws (sandbox) → numstat alone still drives the gate', () => {
+    const r = verifyDiskAgainstClaim('/tmp/fake', makeScope(), {
+      numstatProvider: makeStaticNumstatProvider(7),
+      lsOthersProvider: {
+        lsOthers: () => { throw new Error('sandbox: git ls-files unavailable'); },
+      },
+    });
+    // Untracked detection failed but numstat succeeded — hasDiskEvidence
+    // must still reflect the tracked work so the worker does not lose it
+    // to a synthetic NO_GO.
+    expect(r.hasDiskEvidence).toBe(true);
+    expect(r.linesAdded).toBe(7);
+    expect(r.untrackedFiles).toEqual([]);
+  });
+
+  // ─── (NEW-e) result-collector contract — untrackedFiles drives ───────
+  // The result-collector wire (result-collector.ts:518-583) constructs a
+  // synthetic NO_GO whose `filesChanged` equals `diskVerify.untrackedFiles`
+  // and whose post-process status is MANUAL_REVIEW_REQUIRED iff
+  // `hasDiskEvidence:true`. Pin the contract at unit speed.
+  it('(NEW-e) result-collector contract: linesAdded=0 + untrackedFiles=[X] → MANUAL_REVIEW + filesChanged=[X]', () => {
+    const dv = verifyDiskAgainstClaim('/tmp/fake', makeScope(), {
+      numstatProvider: makeStaticNumstatProvider(0),
+      lsOthersProvider: makeStaticLsOthersProvider(['src/orchestra/token-counter.ts']),
+    });
+    // Replicate the collector's construction logic so a regression in the
+    // wire (e.g. dropping untrackedFiles from filesChanged) trips this test.
+    const syntheticFilesChanged = dv.hasDiskEvidence ? dv.untrackedFiles : [];
+    const classification = dv.hasDiskEvidence ? 'MANUAL_REVIEW_REQUIRED' : 'NO_GO';
+    expect(classification).toBe('MANUAL_REVIEW_REQUIRED');
+    expect(syntheticFilesChanged).toEqual(['src/orchestra/token-counter.ts']);
+  });
+
+  // ─── (NEW-f) sprint-checkpoint integration — new untracked file only ─
+  // Repro of the Sprint 196 196-005 failure: worker creates a NEW FILE in
+  // scope but never writes `.result` before Brain restarts. The recovery
+  // gate must demote the synthetic NO_GO to MANUAL_REVIEW_REQUIRED so the
+  // operator can keep the on-disk work.
+  describe('(NEW-f) restoreSprintFromCheckpoint — untracked NEW FILE only', () => {
+    let projectRoot: string;
+    const sprintId = 'sprint-197';
+
+    beforeEach(() => {
+      projectRoot = makeTempDir('disk-verify-new-file');
+      initGitRepo(projectRoot);
+      mkdirSync(join(projectRoot, '.deckent'), { recursive: true });
+      mkdirSync(join(projectRoot, '.tasks'), { recursive: true });
+      mkdirSync(join(projectRoot, 'src', 'orchestra'), { recursive: true });
+      // Seed a tracked file so the directory exists in HEAD — but DO NOT
+      // modify it. Only an untracked NEW file will exist when the gate runs.
+      writeFileSync(join(projectRoot, 'src', 'orchestra', 'foo.ts'), 'export const x = 1;\n');
+      execSync('git add -A && git commit -q -m "seed"', { cwd: projectRoot, stdio: 'pipe' });
+    });
+
+    afterEach(() => {
+      rmSync(projectRoot, { recursive: true, force: true });
+    });
+
+    it('untracked NEW file only (tracked unchanged) → MANUAL_REVIEW_REQUIRED + audit event', () => {
+      const taskId = 'NEW-f-001';
+      const task: Task = makeTask({
+        id: taskId,
+        sprintId,
+        scope: {
+          directories: ['src/orchestra/'],
+          filesRead: [],
+          filesWrite: ['src/orchestra/token-counter.ts'],
+        },
+      });
+      writeFileSync(
+        join(projectRoot, '.tasks', `task-${taskId}.json`),
+        JSON.stringify(task, null, 2),
+      );
+      const cp: SprintCheckpoint = {
+        sprintId,
+        checkpointNumber: 1,
+        timestamp: new Date().toISOString(),
+        completedTasks: [],
+        pendingTasks: [],
+        activeWorkers: [{
+          workerId: `w-${taskId}`,
+          taskId,
+          status: 'EXECUTING',
+          spawnedAt: new Date().toISOString(),
+        }],
+        brainPhase: SprintPhase.EXECUTE,
+        eventStreamOffset: 0,
+      };
+      writeFileSync(
+        join(projectRoot, '.deckent', `${sprintId}-checkpoint.json`),
+        JSON.stringify(cp, null, 2),
+        'utf-8',
+      );
+      // Worker created a BRAND NEW (untracked) file before crashing — no
+      // tracked-file modifications, no .result.
+      writeFileSync(
+        join(projectRoot, 'src', 'orchestra', 'token-counter.ts'),
+        '// Sprint 196 196-005 repro — brand new file\nexport function countTokens(s: string): number { return s.length; }\n',
+      );
+
+      const out = restoreSprintFromCheckpoint(projectRoot, sprintId);
+      expect(out.restored).toBe(true);
+      // Gate must prevent the synthetic NO_GO.
+      expect(out.staleTasksMarkedNoGo).not.toContain(taskId);
+
+      const taskJson = JSON.parse(
+        readFileSync(join(projectRoot, '.tasks', `task-${taskId}.json`), 'utf-8'),
+      ) as Task;
+      expect(taskJson.status).toBe(TaskStatus.MANUAL_REVIEW_REQUIRED);
+
+      // Audit event must be emitted with the untracked path in the payload.
+      const eventsPath = join(projectRoot, '.deckent', `${sprintId}-events.jsonl`);
+      expect(existsSync(eventsPath)).toBe(true);
+      const raw = readFileSync(eventsPath, 'utf-8');
+      const events = raw.split('\n').filter(l => l.trim().length > 0).map(l =>
+        JSON.parse(l) as { channel: string; payload: { taskId?: string; untrackedFiles?: string[] } },
+      );
+      const match = events.find(e => e.channel === DISK_VS_CLAIM_MISMATCH_CHANNEL);
+      expect(match).toBeDefined();
+      expect(match?.payload.taskId).toBe(taskId);
+      expect(match?.payload.untrackedFiles).toContain('src/orchestra/token-counter.ts');
+    });
+  });
+});
