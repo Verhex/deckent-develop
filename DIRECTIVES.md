@@ -1,4 +1,4 @@
-# DIRECTIVES — Sprint 193: God-Level Push Day 5 — Sprint 192 Carry-Over + W-AUTH + RAM Deney Canlandırma + Karpathy Faz 3 (5 dalga, 14 task)
+# DIRECTIVES — Sprint 194: God-Level Push Day 5 — Sprint 192 Carry-Over + W-AUTH + RAM Deney Canlandırma + Karpathy Faz 3 (5 dalga, 14 task)
 
 ## Goal: Sprint 192'den taşan **7 carry-over** + Sprint 192 ortasında çıkan **auth-loss silent fail** öğrenimi (`[[feedback_no_auth_touch_during_sprint]]`) → W-AUTH stream (3 task) + Sprint 191 agent stats düzeltme (192-019 retroactive reclassify) + Karpathy L-8/L-9 faz 3 (5+5 PROMPT.md/SKILL.md → toplam 15/15 agent + 15/21 skill). **1 Haziran 2026 OSS GA beta için kritik gün 5** — auth-loss kapatılır, RAM optimizasyon canlanır (12 worker × 2g deney), agent stats gerçekçi hâle gelir. Master plan: `docs/alperen-analysis/2026-05-23-comprehensive-work-plan.md` (W-INTEGRITY tail + W-M canlandırma + W-AUTH yeni).
 
@@ -17,11 +17,11 @@ Tüm task'lar için ortak kurallar:
 
 ## DALGA 0 — W-AUTH Survival (1 task — ZORUNLU İLK)
 
-> **Neden tek başına:** Sprint 192'de /login 8 task'ı silent fail'e götürdü. Bu fix olmadan Sprint 193 aynı tuzağa düşebilir.
+> **Neden tek başına:** Sprint 192'de /login 8 task'ı silent fail'e götürdü. Bu fix olmadan Sprint 194 aynı tuzağa düşebilir.
 
 ---
 
-## Task 1: 193-001 — Worker pre-spawn auth health check + fail-fast (W-AUTH A-1)
+## Task 1: 194-001 — Worker pre-spawn auth health check + fail-fast (W-AUTH A-1)
 - Model: opus
 - Effort: high
 - Skills: typescript-expert, security-specialist
@@ -51,7 +51,7 @@ Sprint 192 RC: /login çalıştırıldığında worker container'lar Claude CLI 
 
 ---
 
-## Task 2: 193-002 — Dishonest worker result detector (Sprint 192 192-012 carry-over, W-INTEGRITY I-8)
+## Task 2: 194-002 — Dishonest worker result detector (Sprint 192 192-012 carry-over, W-INTEGRITY I-8)
 - Model: opus
 - Effort: high
 - Skills: typescript-expert, security-specialist
@@ -74,7 +74,7 @@ Sprint 191 191-003 worker `.result` notes'unda "+220 LoC outcome-tracker" iddia,
 
 ---
 
-## Task 3: 193-003 — worker_memory_limit 4g→2g + max_workers 3→12 deney (Sprint 192 192-013 carry-over, W-M M-1)
+## Task 3: 194-003 — worker_memory_limit 4g→2g + max_workers 3→12 deney (Sprint 192 192-013 carry-over, W-M M-1)
 - Model: opus
 - Effort: normal
 - Skills: devops-engineer, docker-expert
@@ -92,12 +92,12 @@ Kullanıcı kararı: "Boşa RAM ayırıyorsak optimize edelim, 12 worker × 2g d
 2. `spawn-backend-docker.ts` defaults aynı çekilir (config override öncelik)
 3. `docs/guide/docker-memory.md` update — yeni öneriler tablosu
 
-**Kanıt:** Sprint 193'te paralel 12 worker spawn; `docker stats` peak < 2g her worker'da; OOM count == 0.
+**Kanıt:** Sprint 194'te paralel 12 worker spawn; `docker stats` peak < 2g her worker'da; OOM count == 0.
 **Test:** 3+ test — config defaults, override semantics, max_workers bound.
 
 ---
 
-## Task 4: 193-004 — NODE_OPTIONS --max-old-space-size-percentage container env (Sprint 192 192-014 carry-over, W-M M-2)
+## Task 4: 194-004 — NODE_OPTIONS --max-old-space-size-percentage container env (Sprint 192 192-014 carry-over, W-M M-2)
 - Model: opus
 - Effort: normal
 - Skills: docker-expert
@@ -120,7 +120,7 @@ Node 24 `--max-old-space-size-percentage=75` flag — V8 heap dinamik container 
 
 ---
 
-## Task 5: 193-005 — Adaptive scheduler — host RAM tespit + max_workers auto-calc (Sprint 192 192-015 carry-over, W-M M-3)
+## Task 5: 194-005 — Adaptive scheduler — host RAM tespit + max_workers auto-calc (Sprint 192 192-015 carry-over, W-M M-3)
 - Model: opus
 - Effort: high
 - Skills: typescript-expert, devops-engineer
@@ -142,7 +142,7 @@ Kullanıcı: "16-32 GB RAM ayırarak bu sistemi kolayca kullanabilsin." Adaptive
 
 ---
 
-## Task 6: 193-006 — RAM telemetri — docker stats snapshot retro'ya + VDS/VPS analiz (Sprint 192 192-016 carry-over, W-M M-7)
+## Task 6: 194-006 — RAM telemetri — docker stats snapshot retro'ya + VDS/VPS analiz (Sprint 192 192-016 carry-over, W-M M-7)
 - Model: opus
 - Effort: normal
 - Skills: typescript-expert, docker-expert
@@ -159,12 +159,12 @@ VDS/VPS kullanıcı kendi RAM kullanımını analiz edebilsin.
 2. `sprint-finalizer.ts` retro generation: telemetri'yi memory.db `retro` entry'sine + retro markdown'a tablo
 3. `deckent retro --memory` flag — yalnızca RAM tablo göster
 
-**Kanıt:** Sprint 193 retro'sunda "RAM Telemetry" başlık + tablo.
+**Kanıt:** Sprint 194 retro'sunda "RAM Telemetry" başlık + tablo.
 **Test:** 3+ test — docker stats parse, snapshot persist, retro inclusion.
 
 ---
 
-## Task 7: 193-007 — 5 ek agent PROMPT.md Karpathy refactor — L-8 (Sprint 192 192-017 carry-over)
+## Task 7: 194-007 — 5 ek agent PROMPT.md Karpathy refactor — L-8 (Sprint 192 192-017 carry-over)
 - Model: sonnet
 - Effort: high
 - Skills: documentation-writer
@@ -188,7 +188,7 @@ Template (her dosya):
 
 ---
 
-## Task 8: 193-008 — 5 ek skill SKILL.md Karpathy refactor — L-9 (Sprint 192 192-018 carry-over)
+## Task 8: 194-008 — 5 ek skill SKILL.md Karpathy refactor — L-9 (Sprint 192 192-018 carry-over)
 - Model: sonnet
 - Effort: high
 - Skills: documentation-writer
@@ -209,7 +209,7 @@ Sprint 192 yapılamadı. 5 skill SKILL.md Karpathy 4-discipline — toplam 10/21
 
 ---
 
-## Task 9: 193-009 — Sprint 191 + Sprint 192 retroactive bulk reclassify (Sprint 192 192-019 carry-over + Sprint 192 false NO_GO düzeltme)
+## Task 9: 194-009 — Sprint 191 + Sprint 192 retroactive bulk reclassify (Sprint 192 192-019 carry-over + Sprint 192 false NO_GO düzeltme)
 - Model: opus
 - Effort: high
 - Skills: typescript-expert
@@ -224,7 +224,7 @@ Sprint 191'de 12 false NO_GO (architect %27 → gerçek %65+). Sprint 192'de 8 f
    - Sprint 191 disk-verified DONE listesi (11 task): 191-002, 006, 009, 010, 011, 012, 013, 014, 016
    - Sprint 191 genuine NO_GO bırak: 191-003, 007, 008, 015, 017 (Sprint 192'de fix edildi)
    - Sprint 192 disk-verified DONE listesi (12 task): 192-001..011 (192-002 TECH_DEBT)
-   - Sprint 192 auth-lost (will not reclassify, just audit): 192-012..019 → Sprint 193'te yeniden yapıldı, 193-002..008 success ile birleştir
+   - Sprint 192 auth-lost (will not reclassify, just audit): 192-012..019 → Sprint 194'te yeniden yapıldı, 194-002..008 success ile birleştir
    - 192-003'ün CLI'sini kullan: `deckent agent reclassify --sprint <id> --task <id> --decision DONE --reason "Disk-verified: <evidence>"`
 2. Çalıştır + log out
 3. Agent stats karşılaştırma raporu (önce/sonra delta)
@@ -238,7 +238,7 @@ Sprint 191'de 12 false NO_GO (architect %27 → gerçek %65+). Sprint 192'de 8 f
 
 ---
 
-## Task 10: 193-010 — Auth health monitor — sprint öncesi pre-flight check (W-AUTH A-2)
+## Task 10: 194-010 — Auth health monitor — sprint öncesi pre-flight check (W-AUTH A-2)
 - Model: opus
 - Effort: normal
 - Skills: typescript-expert
@@ -260,7 +260,7 @@ W-AUTH A-2: Sprint başlatmadan ÖNCE auth health doğrula. Kullanıcıya "auth 
 
 ---
 
-## Task 11: 193-011 — Sprint 192 W-INTEGRITY I-1 telemetri tamamlama (auth_failed event count + retro section)
+## Task 11: 194-011 — Sprint 192 W-INTEGRITY I-1 telemetri tamamlama (auth_failed event count + retro section)
 - Model: opus
 - Effort: normal
 - Skills: typescript-expert
@@ -268,7 +268,7 @@ W-AUTH A-2: Sprint başlatmadan ÖNCE auth health doğrula. Kullanıcıya "auth 
 - Scope: src/orchestra/, tests/orchestra/
 
 ### Description
-Sprint 192 192-008 liveness stats retro section eklendi. Sprint 193'te `WORKER→BRAIN:AUTH_FAILED` event sayımı ekle.
+Sprint 192 192-008 liveness stats retro section eklendi. Sprint 194'te `WORKER→BRAIN:AUTH_FAILED` event sayımı ekle.
 
 **Yöntem:**
 1. `sprint-reporter.ts` retro generation'ında:
@@ -277,7 +277,7 @@ Sprint 192 192-008 liveness stats retro section eklendi. Sprint 193'te `WORKER�
    - alive-grace-hit/miss ratio (Sprint 191/192 hotfix data)
 2. Retro markdown "Worker Health" başlığı
 
-**Kanıt:** Sprint 193 retro'da "Worker Health" başlığı, "Auth failures: 0" görünür.
+**Kanıt:** Sprint 194 retro'da "Worker Health" başlığı, "Auth failures: 0" görünür.
 **Test:** 3+ test — event count, retro markdown format, empty event handling.
 
 ---
@@ -286,7 +286,7 @@ Sprint 192 192-008 liveness stats retro section eklendi. Sprint 193'te `WORKER�
 
 ---
 
-## Task 12: 193-012 — Sprint 191 191-007 + Sprint 192 192-009 EVALUATE phase entry guard kombine fix
+## Task 12: 194-012 — Sprint 191 191-007 + Sprint 192 192-009 EVALUATE phase entry guard kombine fix
 - Model: opus
 - Effort: high
 - Skills: typescript-expert
@@ -294,7 +294,7 @@ Sprint 192 192-008 liveness stats retro section eklendi. Sprint 193'te `WORKER�
 - Scope: src/orchestra/, tests/orchestra/
 
 ### Description
-Sprint 192 192-009 EVALUATE trigger gate +142 LoC eklendi ama Brain restart sonrası canlı doğrulanmadı. Sprint 193'te validate + edge case fix.
+Sprint 192 192-009 EVALUATE trigger gate +142 LoC eklendi ama Brain restart sonrası canlı doğrulanmadı. Sprint 194'te validate + edge case fix.
 
 **Yöntem:**
 1. `sprint-phases.ts` `runEvaluatePhase` entry guard'ı doğrula:
@@ -303,12 +303,12 @@ Sprint 192 192-009 EVALUATE trigger gate +142 LoC eklendi ama Brain restart sonr
 2. Timeout: dispatcher max bekleme süresi (effort × 3), aşılırsa DEFERRED işaretle
 3. Test edge case'leri: auth-fail tüm task'larda, partial dispatch, full dispatch
 
-**Kanıt:** Sprint 193'te "premature EVALUATE" log 0 kez, auth-fail durumunda guard infinite loop'a girmiyor.
+**Kanıt:** Sprint 194'te "premature EVALUATE" log 0 kez, auth-fail durumunda guard infinite loop'a girmiyor.
 **Test:** 4+ test — full-dispatch trigger, partial wait, DEFERRED override, all-auth-fail timeout.
 
 ---
 
-## Task 13: 193-013 — Karpathy faz 3 — task-builder Karpathy injection runtime validate + Sprint 192 192-006 + 192-008 telemetri canlı test
+## Task 13: 194-013 — Karpathy faz 3 — task-builder Karpathy injection runtime validate + Sprint 192 192-006 + 192-008 telemetri canlı test
 - Model: opus
 - Effort: normal
 - Skills: typescript-expert
@@ -316,7 +316,7 @@ Sprint 192 192-009 EVALUATE trigger gate +142 LoC eklendi ama Brain restart sonr
 - Scope: src/orchestra/, tests/orchestra/
 
 ### Description
-Sprint 192 192-006 task-builder Karpathy injection +60 LoC eklendi. Sprint 193'te runtime worker prompt'unda Karpathy block görünüyor mu test et.
+Sprint 192 192-006 task-builder Karpathy injection +60 LoC eklendi. Sprint 194'te runtime worker prompt'unda Karpathy block görünüyor mu test et.
 
 **Yöntem:**
 1. `buildWorkerPrompt()` output'una `Karpathy Discipline` heading geliyor mu integration test
@@ -328,7 +328,7 @@ Sprint 192 192-006 task-builder Karpathy injection +60 LoC eklendi. Sprint 193't
 
 ---
 
-## Task 14: 193-014 — Sprint 192 192-010 DEFERRED enum runtime wire validate + cascade exclusion test
+## Task 14: 194-014 — Sprint 192 192-010 DEFERRED enum runtime wire validate + cascade exclusion test
 - Model: opus
 - Effort: normal
 - Skills: typescript-expert
@@ -336,7 +336,7 @@ Sprint 192 192-006 task-builder Karpathy injection +60 LoC eklendi. Sprint 193't
 - Scope: src/orchestra/, tests/orchestra/
 
 ### Description
-Sprint 192 192-010 `TaskEvaluation.DEFERRED` enum eklendi. Sprint 193'te:
+Sprint 192 192-010 `TaskEvaluation.DEFERRED` enum eklendi. Sprint 194'te:
 - handleEvaluation DEFERRED için cascade YOK (PAUSED'tan farklı)
 - Retro'da "Deferred: N" başlık görünür (sprint-reporter wire)
 
@@ -353,15 +353,15 @@ Sprint 192 192-010 `TaskEvaluation.DEFERRED` enum eklendi. Sprint 193'te:
 ## Sprint Sonu Notu
 
 Bu sprint **8-day push'un 5. günü** — Sprint 192 carry-over kapanış + auth-loss kalıcı fix + RAM optimizasyon canlanması. Beklenen sonuçlar:
-- 14/14 task DONE (W-AUTH 193-001 ile auth-loss silent fail kapanır)
+- 14/14 task DONE (W-AUTH 194-001 ile auth-loss silent fail kapanır)
 - 12 paralel worker × 2g cap deneyi canlı (peak RAM < 6 GB toplam)
 - Agent stats güvenilir hâle gelir (Sprint 191 + 192 retroactive reclassify)
 - Karpathy refactor 15/15 agent + 10/21 skill
 - RAM telemetri retro'da görünür (VDS/VPS kullanıcı için)
 - W-AUTH stream ilk meyve verir (auth health monitor)
 
-Sprint 193 retro otomatik (sprint-reporter.ts). Bu DIRECTIVES'te retro task YOK.
+Sprint 194 retro otomatik (sprint-reporter.ts). Bu DIRECTIVES'te retro task YOK.
 
 Master plan: `docs/alperen-analysis/2026-05-23-comprehensive-work-plan.md` — W-INTEGRITY tail + W-M canlandırma + W-AUTH yeni.
 
-Next (Sprint 194 önizleme): W-E evolutionary architecture + Karpathy L-10/L-11 + dashboard reborn + Trinity Chat Path A (embedded) + 1 Haziran beta paketleme.
+Next (Sprint 195 önizleme): W-E evolutionary architecture + Karpathy L-10/L-11 + dashboard reborn + Trinity Chat Path A (embedded) + 1 Haziran beta paketleme.
