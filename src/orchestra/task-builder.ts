@@ -1519,12 +1519,61 @@ export function validatePersonaTaskMatch(
 
   const suggestedAgent = DOMAIN_TO_SUGGESTED_AGENT[taskDomain];
 
+  if (severity === 'HIGH') {
+    debugLog(
+      'persona-match',
+      `HIGH mismatch: agent '${agent.id}' (domain='${agentDomain}') on task domain='${taskDomain}' — suggested='${suggestedAgent ?? 'none'}'`,
+    );
+  }
+
   return {
     valid: severity !== 'HIGH',
     severity,
     mismatch: [`agent domain '${agentDomain}' vs task domain '${taskDomain}'`],
     suggestedAgent,
   };
+}
+
+/**
+ * Post-selection persona-domain check.
+ * Call this after selectAgent() / routeTaskV2() to rotate agents with HIGH domain mismatches.
+ *
+ * Returns the same agentId if valid, or the suggestedAgent if HIGH mismatch detected.
+ * Wire point for sprint-planner.ts (see Sprint 197 task 197-005).
+ */
+export function applyPersonaDomainCheck(
+  selectedAgentId: string,
+  task: Pick<Task, 'scope'>,
+  pool: Map<string, AgentDefinition>,
+): { agentId: string; rotated: boolean; reason?: string } {
+  if (selectedAgentId === 'generic') {
+    return { agentId: 'generic', rotated: false };
+  }
+
+  const agent = pool.get(selectedAgentId);
+  if (!agent) {
+    return { agentId: selectedAgentId, rotated: false };
+  }
+
+  const result = validatePersonaTaskMatch(agent, task);
+  debugLog(
+    'persona-match',
+    `Agent '${selectedAgentId}': valid=${result.valid}, severity=${result.severity ?? 'none'}, suggested=${result.suggestedAgent ?? 'none'}`,
+  );
+
+  if (!result.valid && result.severity === 'HIGH' && result.suggestedAgent) {
+    debugLog(
+      'persona-match',
+      `Rotating '${selectedAgentId}' → '${result.suggestedAgent}' (HIGH domain mismatch)`,
+    );
+    return {
+      agentId: result.suggestedAgent,
+      rotated: true,
+      reason: result.mismatch?.[0] ?? 'domain mismatch',
+    };
+  }
+
+  return { agentId: selectedAgentId, rotated: false };
 }
 
 // ─── Sprint 196 WP-2: FIX Worker Idempotency Mode Inference ────────────────

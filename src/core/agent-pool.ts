@@ -36,13 +36,23 @@ export const BUILTIN_AGENT_DOMAINS: Readonly<Record<string, AgentDomain>> = {
 };
 
 /**
+ * Hardcoded domain overrides for known temp agents that lack a domain field in agent.json.
+ * Ensures validatePersonaTaskMatch can detect domain mismatches for these agents.
+ */
+export const TEMP_AGENT_DOMAINS: Readonly<Record<string, AgentDomain>> = {
+  'temp-react-ts-specialist': 'react',
+};
+
+/**
  * Get the domain for an agent. Reads agent.domain if set (from agent.json),
- * falls back to BUILTIN_AGENT_DOMAINS by id, then returns 'generic'.
+ * falls back to BUILTIN_AGENT_DOMAINS by id, then TEMP_AGENT_DOMAINS, then 'generic'.
  */
 export function getAgentDomain(agent: AgentDefinition): AgentDomain | 'generic' {
   if (agent.domain) return agent.domain;
   const builtin = BUILTIN_AGENT_DOMAINS[agent.id];
   if (builtin) return builtin;
+  const temp = TEMP_AGENT_DOMAINS[agent.id];
+  if (temp) return temp;
   return 'generic';
 }
 
