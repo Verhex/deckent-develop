@@ -385,7 +385,7 @@ describe('ModelRegistry', () => {
 
   describe('resolveApiId()', () => {
     it('returns correct API ID for Claude models', () => {
-      expect(registry.resolveApiId('opus')).toBe('claude-opus-4-6');
+      expect(registry.resolveApiId('opus')).toBe('claude-opus-4-8');
       expect(registry.resolveApiId('sonnet')).toBe('claude-sonnet-4-6');
       expect(registry.resolveApiId('haiku')).toBe('claude-haiku-4-5-20251001');
     });
