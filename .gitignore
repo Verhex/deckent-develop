@@ -131,3 +131,9 @@ kendimenot.md
 .test-e2e*
 
 !.brain/archive/
+
+# Core memory backup (local mirror of user-level memory — never publish)
+docs/core-memory/
+# Test temp dir leaks + editor backups (not source)
+.test-archive-debt-*/
+*.md.bak
