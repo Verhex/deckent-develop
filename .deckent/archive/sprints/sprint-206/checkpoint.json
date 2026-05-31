@@ -1,0 +1,20 @@
+{
+  "sprintId": "sprint-206",
+  "checkpointNumber": 6,
+  "timestamp": "2026-05-31T17:13:05.444Z",
+  "completedTasks": [
+    "206-001",
+    "206-002",
+    "206-003",
+    "206-004",
+    "206-005",
+    "206-006",
+    "206-007",
+    "206-008",
+    "206-009"
+  ],
+  "pendingTasks": [],
+  "activeWorkers": [],
+  "brainPhase": "FIX",
+  "eventStreamOffset": 58
+}

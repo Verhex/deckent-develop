@@ -1,0 +1,20 @@
+{
+  "sprintId": "sprint-205",
+  "checkpointNumber": 5,
+  "timestamp": "2026-05-31T15:56:45.502Z",
+  "completedTasks": [
+    "205-001",
+    "205-002",
+    "205-003",
+    "205-004",
+    "205-005",
+    "205-006",
+    "205-007",
+    "205-008",
+    "205-009"
+  ],
+  "pendingTasks": [],
+  "activeWorkers": [],
+  "brainPhase": "FIX",
+  "eventStreamOffset": 31
+}
