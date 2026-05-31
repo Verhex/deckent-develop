@@ -1,170 +1,166 @@
-# DIRECTIVES — Sprint 204: Wave-0 Hijyen (circular + ci-baseline + agent routing) + F2 Chat Streaming + F3 İskelet
+# DIRECTIVES — Sprint 205: Agent Routing Canlı Doğrulama + Flaky Temizlik + F3 Process Mode
 
-## Goal: 3 kök sorunu kapat (DALGA 0) + ileri-vizyon iş (DALGA 1 F2 native chat streaming/multi-turn, DALGA 2 F3 process mode iskelet). YÜRÜTME: bol-küçük-task + 10 worker. Her task TEK dosya/TEK sorumluluk, ≤200 LoC, effort≤normal (high YOK — timeout önlemi). Sprint 203 disk-verify 9/9 landed (Brain "6 NO_GO" sentetikti).
+## Goal: (DALGA 0) Sprint 204 agent routing fix'inin (204-003/004) build+restart sonrası CANLI çalıştığını doğrula — artık implementation task'ı built-in agent (refactorer/architect) seçmeli, scope-kör temp-react değil + 18 flaky/pre-existing test fail'ini temizle (baseline ~0 hedef). (DALGA 1) F3 process mode ilerlet (scheduled flows + cron iskelet). (DALGA 2) F4 enterprise başlangıç. YÜRÜTME: bol-küçük-task + 10 worker, her task TEK dosya/TEK sorumluluk, ≤200 LoC, effort≤normal (high YOK).
 
-Bağlam (Sprint 203 sonrası tam-suite analizi):
-- **16 test fail = PRE-EXISTING circular import** (model-equivalence.ts:15 top-level `modelRegistry.getByTier()` modül-yükleme anında çalışıyor; provider.ts→model-equivalence→model-registry zincirinde TDZ). Sprint 097'den beri var, Sprint 202/203 EKLEMEDİ. İzole testler PASS, tam-suite'te belirli import sırası tetikliyor.
-- **ci-baseline.json kronik sahte** (34 fail/0 pass) — sprint-sonu auto-regen API-key env'le vitest'i 0-pass çalıştırıp üzerine yazıyor.
-- **Agent routing boşluğu:** built-in 15 agent'ın hiçbiri `intent.primary: "implementation"` için aday değil (architect=design, refactorer=refactor, bug-fixer=bugfix...). Tek aday scope-kör `temp-react-ts-specialist` (impl@6) → her implementation task'ı onu seçiyor. deckent stack=typescript/none, doğru template `ts-architect` mevcut ama üretilmemiş; eski (Sprint 185) react agent'lar yer kapmış. Demote eşiği zayıf (%40 fail < %50).
+Bağlam (Sprint 204 sonrası):
+- Sprint 204 disk-verify 9/9 landed. Circular import DÜZELDİ (archive-directives + event-stream yeşil). Agent routing fix agent-pool.ts kaynağında — **disk agent.json'lar build+restart+sync sonrası regenere olunca canlı olur** (bu sprint o etkiyi test eder).
+- Tam-suite 18 fail: çoğu pre-existing flaky (start-lifecycle 7, docker-backend, identity-generator — izole de fail), 3'ü `spawn-backend-docker` testinin `max_workers=3` hardcode beklemesi (bizim max_workers=10 ayarımızla çakışıyor).
 
 ---
 
 ## Tüm task'lar için ortak kurallar
 
-- **Subscription mode ZORUNLU** — sprint `env -u ANTHROPIC_API_KEY -u DECKENT_CLAUDE_API_KEY` ile başlatılır. API mode YASAK ([[project_api_mode_deferred_post_beta]]).
-- Worker yalnızca scope.filesWrite içine yazar. Host-facing config'lere `/workspace` mutlak yolu YAZMA, `$CLAUDE_PROJECT_DIR`.
-- **KÜÇÜK TASK DİSİPLİNİ:** tek-dosya/tek-sorumluluk, ≤200 LoC, effort≤normal. high YASAK.
+- **Subscription mode ZORUNLU** — `env -u ANTHROPIC_API_KEY -u DECKENT_CLAUDE_API_KEY`. API mode YASAK ([[project_api_mode_deferred_post_beta]]).
+- Worker yalnızca scope.filesWrite. Host-facing config'lere `/workspace` YAZMA, `$CLAUDE_PROJECT_DIR`.
+- **KÜÇÜK TASK:** tek-dosya/tek-sorumluluk, ≤200 LoC, effort≤normal. high YASAK.
 - Her kod task'ı vitest min 4 test. `dosya:satır` kanıtı zorunlu.
-- **Dishonest YASAK** — gerçekten ölç, "zaten var +0/-0 DONE" tuzağı yok ([[feedback_trust_brain_eval_not_worker]]).
-- ESM `.js` import suffix zorunlu. ADR-010 sıfır yeni runtime dep.
-- Regresyon: yeni fail EKLEME. Hedef tam-suite fail 16→≤4 (Wave-0 circular düzelince düşer).
+- **Dishonest YASAK** — gerçekten ölç ([[feedback_trust_brain_eval_not_worker]]).
+- ESM `.js` suffix. ADR-010 sıfır yeni runtime dep.
+- Hedef: tam-suite fail 18→≤4.
 
 ---
 
-## DALGA 0 — Hijyen / Kök-Sorun (4 küçük task, paralel)
+## DALGA 0 — Routing Doğrulama + Flaky Temizlik (4 küçük task)
 
-## Task 1: 204-001 — Circular import fix: MODEL_TIERS lazy-init
-- Model: sonnet
+## Task 1: 205-001 — Agent routing canlı doğrulama testi (implementation→built-in)
+- Model: opus
 - Effort: normal
-- Skills: typescript-expert
-- Files: src/core/model-equivalence.ts, tests/core/model-equivalence-lazy.test.ts
+- Skills: typescript-expert, system-architect
+- Files: tests/core/routing-impl-builtin.test.ts, src/core/agent-pool.ts
 - Scope: src/core/, tests/core/
 
 ### Description
-**Problem:** model-equivalence.ts:14-19 `export const MODEL_TIERS = { premium: modelRegistry.getByTier('premium')... }` — modül yüklenir yüklenmez (top-level) `modelRegistry`'yi çağırıyor. provider.ts:5 → model-equivalence import edince, model-registry singleton henüz kurulmamışsa `getByTier is not a function` (circular/TDZ). 16 test bu yüzden tam-suite'te fail (izole PASS).
-**Çözüm:** MODEL_TIERS'i **lazy** yap — top-level çağrıyı kaldır, `getModelTiers()` fonksiyonu VEYA lazy getter ile sarmala (ilk erişimde hesapla, cache'le). Mevcut `MODEL_TIERS` tüketicilerini bul (`grep -rn "MODEL_TIERS" src/`) ve lazy erişime uyarla. Davranış birebir korunsun.
-**Kanıt:** `grep -n "getByTier" src/core/model-equivalence.ts` → top-level değil fonksiyon/getter içinde; `npx vitest run tests/orchestra/archive-directives.test.ts tests/core/model-equivalence-lazy.test.ts` → PASS (circular gitti)
-**Test:** ≥4 (lazy init çalışır, tier içerikleri doğru, cache idempotent, circular-import smoke)
+**Problem:** 204-003 built-in agent'lara implementation adaylığı ekledi ama canlı end-to-end test yok. Bir implementation task'ı gerçekten built-in (refactorer/architect) seçiyor mu, yoksa hâlâ temp-react mi?
+**Çözüm:** routeTaskV2 ile end-to-end test: implementation intent'li task + built-in+temp agent havuzu → built-in seçilmeli, temp-react KAZANMAMALI. Gerekirse agent-pool.ts'te ufak düzeltme (built-in impl skoru temp 6'yı geçsin). Sadece test + minimal fix.
+**Kanıt:** `npx vitest run tests/core/routing-impl-builtin.test.ts` → 4+ pass; implementation task'ı built-in agentId döndürür
+**Test:** ≥4 (impl→refactorer/architect, temp-react kaybeder, design→architect korunur, forceAgent override çalışır)
 
-## Task 2: 204-002 — ci-baseline auto-regen gerçek-değer fix
+## Task 2: 205-002 — spawn-backend-docker max_workers testi config-agnostic
+- Model: sonnet
+- Effort: low
+- Skills: typescript-expert, ci-testing
+- Files: tests/orchestra/spawn-backend-docker.test.ts
+- Scope: tests/orchestra/
+
+### Description
+**Problem:** spawn-backend-docker.test.ts:231 `expect(cfg.max_workers).toBe(3)` — gerçek config 10, bu yüzden 3 test fail. Test kırılgan: belirli değere değil, NUMBER tipine + makul aralığa bakmalı.
+**Çözüm:** `toBe(3)` → `typeof number` + `>= 1 && <= 20` aralık kontrolü. Test'in asıl amacı (string değil number) korunur, sabit-değer kırılganlığı gider. Sadece test düzelt.
+**Kanıt:** `grep -c "toBe(3)" tests/orchestra/spawn-backend-docker.test.ts` → 0; `npx vitest run tests/orchestra/spawn-backend-docker.test.ts` → max_workers testleri PASS
+**Test:** ≥3 (number tipi, makul aralık, memory normalize korunur)
+
+## Task 3: 205-003 — start-lifecycle flaky fix
 - Model: sonnet
 - Effort: normal
 - Skills: typescript-expert, ci-testing
-- Files: src/orchestra/sprint-docs-updater.ts, tests/orchestra/ci-baseline-honest.test.ts
-- Scope: src/orchestra/, tests/orchestra/
-- Dependencies: 204-001
+- Files: tests/mcp/start-lifecycle.test.ts
+- Scope: tests/mcp/
 
 ### Description
-**Problem:** Sprint-sonu ci-baseline.json regen, vitest'i API-key kalıntılı/yanlış env'le çalıştırıp `testPassed:0, testFailed:34` (tüm suite "fail") yazıyor. Gerçek: ~17700 pass. Bu sahte baseline her sprint disk-verify'ı kirletiyor.
-**Çözüm:** baseline yazımını **honest** yap: vitest 0-pass döndüyse (açık env/auth hatası) baseline'ı SIFIRLAMA — önceki geçerli değeri koru VEYA "baseline güncellenmedi: suspicious 0-pass" uyarısı yaz, eski değeri bırak. `testPassed===0 && testFailed>0` desenini "şüpheli" kabul et, üzerine yazma. (Nerede yazıldığını `grep -rn "ci-baseline\|testPassed" src/orchestra/` ile bul; sprint-docs-updater veya sprint-reporter olabilir — doğru dosyayı düzelt.)
-**Kanıt:** `grep -c "testPassed === 0\|suspicious\|0-pass\|preserve.*baseline" src/orchestra/sprint-docs-updater.ts` → ≥1; `npx vitest run tests/orchestra/ci-baseline-honest.test.ts` → 4+ pass
-**Test:** ≥4 (0-pass → eski korunur, gerçek değer → yazılır, ilk-baseline yok → yaz, idempotent)
+**Problem:** start-lifecycle.test.ts 7 test izole de fail (deckent_start fire-and-forget, active-sprint.json ordering, exit handler). Muhtemelen mock/state setup veya gerçek çevre bağımlılığı.
+**Çözüm:** Her fail testi izole çalıştır, kök-neden bul (mock eksik, env bağımlılık, race). Test-only fix — kaynak kodu DEĞİŞTİRME (eğer gerçek bug bulursan NO_GO + not). Mümkünse 7→0.
+**Kanıt:** `npx vitest run tests/mcp/start-lifecycle.test.ts` → fail ≤1
+**Test:** mevcut 9 testin ≥8'i pass
 
-## Task 3: 204-003 — Implementation intent için built-in agent adaylığı
-- Model: opus
-- Effort: normal
-- Skills: typescript-expert, system-architect
-- Files: src/core/agent-pool.ts, tests/core/agent-impl-candidate.test.ts
-- Scope: src/core/, tests/core/
-
-### Description
-**Problem:** Built-in 15 agent'ın HİÇBİRİ `intent.primary: "implementation"` activation kuralına sahip değil (architect=design@8, refactorer=refactor@10, bug-fixer=bugfix@10...). Bu yüzden her implementation task'ı scope-kör `temp-react-ts-specialist` (impl@6) tarafından kapılıyor. deckent React değil — yanlış agent.
-**Çözüm:** Built-in agent tanımlarında `refactorer` VE `architect`'e `implementation` intent'i için **orta puanlı** aday kuralı ekle (örn `{intent.primary:"implementation"}@7` refactorer, `@6` architect — kod-geliştirme genel implementation'ın doğal sahibi). Böylece built-in (≥6) scope-kör temp-react'i (6) tie-break + learning bonus ile geçer. Mevcut intent kuralları korunur (sadece ekleme). agent-pool.ts'teki built-in tanımlara dokun.
-**Kanıt:** `grep -c "implementation" src/core/agent-pool.ts` → ≥2; `npx vitest run tests/core/agent-impl-candidate.test.ts` → 4+ pass (implementation task'ı built-in agent seçer, temp değil)
-**Test:** ≥4 (impl→refactorer/architect aday, temp-react kazanmaz, design hâlâ architect, refactor hâlâ refactorer)
-
-## Task 4: 204-004 — Stale temp-agent demote eşiği + react-template stack-guard
+## Task 4: 205-004 — docker-backend + identity-generator + error-handling flaky fix
 - Model: sonnet
 - Effort: normal
-- Skills: typescript-expert, code-simplifier
-- Files: src/orchestra/promotion-pipeline.ts, tests/orchestra/temp-agent-demote.test.ts
-- Scope: src/orchestra/, tests/orchestra/
+- Skills: typescript-expert, ci-testing
+- Files: tests/e2e/docker-backend.test.ts, tests/core/identity-generator.test.ts, tests/core/error-handling-unification.test.ts
+- Scope: tests/e2e/, tests/core/
 
 ### Description
-**Problem:** `temp-react-ts-specialist` %60 success (=%40 fail) `maxFailRate=0.50` eşiğini geçemiyor → demote edilmiyor, 119 task boyunca takılı kaldı. Ayrıca react template'i TS-only (framework=none) projede üretilmemeli ama eski state kalmış.
-**Çözüm:** (1) Demote eşiğini **akıllılaştır**: `successRate < 0.65 && totalTasks >= 20` → düşük-performans demote (mevcut %50 fail eşiğine EK, OR mantığı). Built-in/permanent guard'ı koru (asla built-in demote etme). (2) Mevcut underperforming temp-react agent'ları bu eşik yakalasın. Stack-guard düzeltmesi opsiyonel-not (temp-agent-generator stack match) — bu task sadece demote logic.
-**Kanıt:** `grep -c "0.65\|underperform\|successRate <" src/orchestra/promotion-pipeline.ts` → ≥1; `npx vitest run tests/orchestra/temp-agent-demote.test.ts` → 4+ pass
-**Test:** ≥4 (%60@120task → demote, %85 → korunur, built-in asla demote, az-task → wait)
+**Problem:** docker-backend (list/kill taskId tracking), identity-generator (lint drift), error-handling-unification (generic throw) — izole de fail.
+**Çözüm:** Her birini izole çalıştır, test-only fix. Gerçek kaynak bug ise NO_GO + not (kaynak değiştirme). docker-oom-reproducer + claude-rules-no-legacy de bakılabilir (aynı kategori).
+**Kanıt:** `npx vitest run tests/e2e/docker-backend.test.ts tests/core/identity-generator.test.ts tests/core/error-handling-unification.test.ts` → fail ≤1
+**Test:** her dosyada mevcut testlerin ≥%90'ı pass
 
 ---
 
-## DALGA 1 — F2 Native Chat Streaming + Multi-turn (3 küçük task)
+## DALGA 1 — F3 Process Mode (3 küçük task)
 
-## Task 5: 204-005 — Native chat streaming response (Path C)
-- Model: opus
+## Task 5: 205-005 — Scheduled flow tipi + parser iskelet
+- Model: sonnet
 - Effort: normal
-- Skills: typescript-expert, anthropic-sdk
-- Files: src/cli/commands/chat-native.ts, tests/cli/chat-native-stream.test.ts
-- Scope: src/cli/, tests/cli/
-- Dependencies: 204-001
+- Skills: typescript-expert, system-architect
+- Files: src/core/scheduled-flow.ts, tests/core/scheduled-flow.test.ts
+- Scope: src/core/, tests/core/
 
 ### Description
-**Problem:** Sprint 203 chat-native.ts iskeleti tool-use loop var ama yanıt streaming değil (blocking). F2-003 streaming.
-**Çözüm:** chat-native loop'a streaming yanıt ekle — provider adapter streaming interface (varsa kullan, yoksa chunk-yield iskeleti). stdout'a incremental yaz. Gerçek SDK değil, adapter interface üzerinden (mock'lanabilir). ≤200 LoC ekleme.
-**Kanıt:** `grep -c "stream\|chunk\|write.*stdout\|async.*yield" src/cli/commands/chat-native.ts` → ≥2; `npx vitest run tests/cli/chat-native-stream.test.ts` → 4+ pass
-**Test:** ≥4 (stream chunk akışı, tam yanıt birleşir, boş stream, hata mid-stream)
+**Problem:** F3 process mode için scheduled flow (cron-benzeri tetikleyici) temeli yok. ROADMAP F3-002.
+**Çözüm:** İSKELET — `scheduled-flow.ts`: `ScheduledFlow` tipi (id, cronExpr, action, tenantId, enabled) + `parseCronExpr()` (basit 5-alan cron parse, validation) + `nextRun()` hesap iskeleti. Gerçek scheduler runtime DEĞİL, tip + parse. tenant-context.ts (204-008) ile entegre (tenantId alanı). ≤200 LoC.
+**Kanıt:** `ls src/core/scheduled-flow.ts`; `grep -c "ScheduledFlow\|parseCronExpr\|nextRun\|tenantId" src/core/scheduled-flow.ts` → ≥3; `npx vitest run tests/core/scheduled-flow.test.ts` → 4+ pass
+**Test:** ≥4 (cron parse geçerli, geçersiz cron reddi, nextRun hesap, tenant alan)
 
-## Task 6: 204-006 — Multi-turn context window (son N turn inject)
+## Task 6: 205-006 — Flow registry (CRUD + persist)
 - Model: sonnet
 - Effort: normal
 - Skills: typescript-expert
-- Files: src/cli/commands/chat-native.ts, tests/cli/chat-native-multiturn.test.ts
-- Scope: src/cli/, tests/cli/
-- Dependencies: 204-005
+- Files: src/core/flow-registry.ts, tests/core/flow-registry.test.ts
+- Scope: src/core/, tests/core/
+- Dependencies: 205-005
 
 ### Description
-**Problem:** chat-native her turn'ü bağımsız işliyor; önceki turn'ler context'e girmiyor (multi-turn yok).
-**Çözüm:** appendChatTurn ile kaydedilen son N turn'ü (Sprint 203'te wire edildi) provider çağrısına context olarak inject et. Sliding window (örn son 10 turn). Token-aware truncation basit.
-**Kanıt:** `grep -c "slice(-\|lastN\|recentTurns\|context.*turn" src/cli/commands/chat-native.ts` → ≥1; `npx vitest run tests/cli/chat-native-multiturn.test.ts` → 4+ pass
-**Test:** ≥4 (son N inject, window taşması truncate, ilk turn boş-context, sıra korunur)
+**Problem:** Scheduled flow'lar saklanmalı/yönetilmeli.
+**Çözüm:** `flow-registry.ts`: in-memory + JSON persist (`.deckent/flows/<tenantId>/`) CRUD (add/get/list/remove/enable). MemoryStore pattern'ine benzer ama ayrı dosya. ≤200 LoC.
+**Kanıt:** `grep -c "addFlow\|listFlows\|removeFlow\|FlowRegistry" src/core/flow-registry.ts` → ≥3; `npx vitest run tests/core/flow-registry.test.ts` → 4+ pass
+**Test:** ≥4 (add+get, list filter tenant, remove, persist roundtrip)
 
-## Task 7: 204-007 — Chat resume (--resume son oturumu yükle)
+## Task 7: 205-007 — deckent flow CLI komut iskelet (list/add)
 - Model: sonnet
 - Effort: low
 - Skills: typescript-expert
-- Files: src/cli/commands/chat.ts, tests/cli/chat-resume-flag.test.ts
+- Files: src/cli/commands/flow.ts, tests/cli/flow-command.test.ts
 - Scope: src/cli/, tests/cli/
-- Dependencies: 204-005
+- Dependencies: 205-006
 
 ### Description
-**Problem:** chat oturumu kapanınca geçmiş kayboluyor; resume yok.
-**Çözüm:** `deckent chat --native --resume` flag'i → memory'den son oturum turn'lerini yükle, devam et. appendChatTurn okuma.
-**Kanıt:** `grep -c "resume" src/cli/commands/chat.ts` → ≥2; `npx vitest run tests/cli/chat-resume-flag.test.ts` → 3+ pass
-**Test:** ≥3 (resume flag parse, geçmiş yükle, geçmiş yok → temiz başla)
+**Problem:** Flow registry'ye CLI erişimi yok.
+**Çözüm:** `deckent flow list` + `deckent flow add <cron> <action>` komut iskeleti (register<Flow>(program) pattern, ADR-012). flow-registry kullan. ≤200 LoC.
+**Kanıt:** `grep -c "flow\|registerFlow\|FlowRegistry" src/cli/commands/flow.ts` → ≥2; `npx vitest run tests/cli/flow-command.test.ts` → 3+ pass
+**Test:** ≥3 (list komut, add komut parse, boş registry)
 
 ---
 
-## DALGA 2 — F3 Process Mode İskelet (2 küçük task)
+## DALGA 2 — F4 Enterprise Başlangıç (2 küçük task)
 
-## Task 8: 204-008 — Multi-tenant tenantId iskelet
+## Task 8: 205-008 — Audit log query API iskelet
 - Model: sonnet
 - Effort: normal
-- Skills: typescript-expert, system-architect
-- Files: src/core/tenant-context.ts, tests/core/tenant-context.test.ts
+- Skills: typescript-expert, security-specialist
+- Files: src/core/audit-query.ts, tests/core/audit-query.test.ts
 - Scope: src/core/, tests/core/
 
 ### Description
-**Problem:** F3 process mode (AI System Worker yüzü) için tenant izolasyon temeli yok. ROADMAP F3-001.
-**Çözüm:** İSKELET — `tenant-context.ts` yeni dosya: `TenantContext` tipi (tenantId, isolationRoot, createdAt) + `resolveTenant()` (default 'local' tenant, env/config'ten okuma) + path-scoping helper (tenant başına `.deckent/tenants/<id>/` izolasyon yolu). Gerçek multi-tenant runtime DEĞİL, tip + resolver iskeleti. ≤200 LoC.
-**Kanıt:** `ls src/core/tenant-context.ts`; `grep -c "TenantContext\|resolveTenant\|tenantId" src/core/tenant-context.ts` → ≥3; `npx vitest run tests/core/tenant-context.test.ts` → 4+ pass
-**Test:** ≥4 (default local tenant, custom tenantId, isolation path, geçersiz id reddi)
+**Problem:** F4 enterprise için audit-trail sorgulanabilir değil (audit-key + HMAC chain var ama query yok). ROADMAP F4.
+**Çözüm:** İSKELET — `audit-query.ts`: mevcut audit event stream'i (event-stream.ts) okuyup filtreleme (by tenant, by action, by time-range). Sadece read/query, yeni audit yazımı DEĞİL. ≤200 LoC.
+**Kanıt:** `grep -c "queryAudit\|AuditQuery\|filter.*event" src/core/audit-query.ts` → ≥2; `npx vitest run tests/core/audit-query.test.ts` → 4+ pass
+**Test:** ≥4 (tenant filtre, action filtre, time-range, boş sonuç)
 
-## Task 9: 204-009 — F3 ADR taslağı + ROADMAP tracker güncelle
+## Task 9: 205-009 — F4 ADR taslağı + ROADMAP tracker güncelle
 - Model: sonnet
 - Effort: low
 - Skills: documentation-writer, system-architect
-- Files: docs/adr/067-process-mode-tenancy.md, docs/ROADMAP-GOD-LEVEL.md, tests/docs/adr-067.test.ts
+- Files: docs/adr/068-enterprise-foundation.md, docs/ROADMAP-GOD-LEVEL.md, tests/docs/adr-068.test.ts
 - Scope: docs/, tests/docs/
 
 ### Description
-**Problem:** F3 process mode kararı ADR'ye geçmemiş; ROADMAP tracker F2/F3 ilerlemeyi yansıtmıyor.
-**Çözüm:** ADR-067 taslağı (process mode + tenant izolasyon kararı, MADR formatı, status: proposed). ROADMAP §EXECUTION TRACKER: F2-003 streaming/multi-turn/resume DONE işaretle, F3-001 tenantId iskelet DONE, provider-free/konuşulabilir yüzdeleri güncelle.
-**Kanıt:** `grep -c "tenant\|process.mode\|isolation" docs/adr/067-process-mode-tenancy.md` → ≥2; `npx vitest run tests/docs/adr-067.test.ts` → 3+ pass
-**Test:** ≥3 (ADR-067 MADR yapı, tenant bölümü, ROADMAP F2/F3 güncel)
+**Problem:** F4 enterprise kararı ADR'ye geçmemiş; ROADMAP tracker F3/F4 ilerleme yansımıyor.
+**Çözüm:** ADR-068 taslağı (enterprise foundation: audit query + multi-tenant + scheduled flows, MADR, status: proposed). ROADMAP §EXECUTION TRACKER: F3-002 scheduled flows DONE, F4 başlangıç işaretle, yüzdeleri güncelle.
+**Kanıt:** `grep -c "enterprise\|audit.*query\|scheduled" docs/adr/068-enterprise-foundation.md` → ≥2; `npx vitest run tests/docs/adr-068.test.ts` → 3+ pass
+**Test:** ≥3 (ADR-068 MADR yapı, enterprise bölümü, ROADMAP F3/F4 güncel)
 
 ---
 
 ## Sprint Sonu Notu
 
-**Beklenen:** 8-9/9 DONE. Sprint 204 = hijyen kapanış (circular fix → tam-suite yeşile yakın, ci-baseline honest, agent routing düzeldi → built-in agent'lar implementation'a aday) + F2 chat streaming/multi-turn/resume + F3 tenant iskelet.
+**Beklenen:** 8-9/9 DONE. Sprint 205 = agent routing CANLI doğrulandı (built-in agent implementation'da seçiliyor) + flaky 18→≤4 (test sağlığı) + F3 process mode (scheduled flows + flow registry + CLI) + F4 enterprise başlangıç (audit query).
 
-**Sprint sonrası:** F3 process mode tamamla (scheduled flows + cron) → F4 enterprise. ROADMAP §EXECUTION TRACKER.
+**Sprint sonrası:** F4 enterprise tamamla → F5 evrimsel mimari. ROADMAP §EXECUTION TRACKER.
 
-**Pre-flight:** subscription env temiz (`env -u ANTHROPIC_API_KEY`), creds canlı, **build güncel (Alperen build:all + /mcp restart yaptı)**, config max_workers=10.
+**Pre-flight:** subscription env temiz, creds canlı, **build güncel (Alperen build:all + /mcp restart yaptı — 204 agent routing fix canlı)**, config max_workers=10.
 
 İlgili memory:
-- [[feedback_trust_brain_eval_not_worker]] — disk-verify ground truth, zaten-temiz tuzağı yok
-- [[feedback_build_mcp_restart_coordination]] — build+restart Alperen yapar
+- [[feedback_trust_brain_eval_not_worker]] — disk-verify ground truth
+- [[feedback_build_mcp_restart_coordination]] — build+restart Alperen yapar, "yapıldı" promptu beklenir
 - [[project_api_mode_deferred_post_beta]] — API mode yasak
-- [[project_4cli_subscription_vision]] — multi-provider subscription vizyon
 - [[feedback_brain_synthetic_nogo_disk_verify]] — sentetik NO_GO, disk-verify zorunlu
