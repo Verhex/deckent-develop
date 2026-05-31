@@ -5516,3 +5516,33 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 202-006: 202-006 — Provider-free smoke verify (sıfır-API-key + Ollama senaryosu) (NO_GO)
 
 ---
+## Sprint 203 — sprint-203
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-05-31
+**Duration:** 1102s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 14 |
+| Completed | 8 |
+| Tech Debt | 1 |
+| No-Go | 6 |
+| Coverage | 0.0% |
+| Duration | 1101618ms |
+
+### Tasks
+
+- 203-001: 203-001 — Docker provider-binary seçimi (claude/codex/gemini) (DONE)
+- 203-002: 203-002 — Docker provider-aware auth mount (GO_WITH_TECH_DEBT)
+- 203-003: 203-003 — Dockerfile.worker multi-CLI (build-arg opt-in) (DONE)
+- 203-004: 203-004 — Provider-free smoke genişlet (Docker yolu dahil) (DONE)
+- 203-005: 203-005 — Native chat tool-use loop iskelet (Path C foundation) (NO_GO)
+- 203-006: 203-006 — Chat history memory entegrasyonu (appendChatTurn wire) (NO_GO)
+- 203-007: 203-007 — chat-native CLI komut kaydı (deckent chat --native) (NO_GO)
+- 203-008: 203-008 — Kalan hardcode-3 değerlendirme + temizlik (DONE)
+- 203-009: 203-009 — ADR-066 provider-independence finalize + doc (DONE)
+
+---

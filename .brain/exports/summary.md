@@ -62,6 +62,8 @@
 | adr-065 | Develop / Product Two-Repo Split | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-203 Learnings** (sprint-203): ## Sprint sprint-203 Learnings
+- 203-002 — Docker provider-aware auth mount: GO_WITH_TECH_DEBT — Changed auth mount c...
 - **Sprint sprint-202 Learnings** (sprint-202): ## Sprint sprint-202 Learnings
 - 202-002 — Ollama model registry (tier→local model): NO_GO — Ollama model registry ti...
 - **Sprint sprint-201 Learnings** (sprint-201): ## Sprint sprint-201 Learnings
@@ -81,9 +83,6 @@
 
 - **Sprint sprint-191 Learnings** (sprint-191): ## Sprint sprint-191 Learnings
 - 191-002 — `runtime_extension_enabled: true` default + worker timeout extension wire:...
-- **Sprint sprint-190 Learnings** (sprint-190): ## Sprint sprint-190 Learnings
-- Docker OOM cycle drove ~14 false NO_GO (reclassify pending Sprint 191 Task 003)
-- 19...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -123,5 +122,6 @@ _No active technical debt._
 - Violation pattern: stale_heartbeat
 - Violation pattern: file_outside_scope
 - Violation pattern: stale_heartbeat
+- Violation pattern: stale_heartbeat
 
-_Total entries: 406 | Generated: 2026-05-31_
+_Total entries: 412 | Generated: 2026-05-31_

@@ -2,6 +2,23 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint203] - 2026-05-31
+
+### Added
+
+- 203-001 — Docker provider-binary seçimi (claude/codex/gemini)
+- 203-003 — Dockerfile.worker multi-CLI (build-arg opt-in)
+- 203-004 — Provider-free smoke genişlet (Docker yolu dahil)
+- 203-008 — Kalan hardcode-3 değerlendirme + temizlik
+- 203-009 — ADR-066 provider-independence finalize + doc
+
+### Changed
+
+- 203-002 — Docker provider-aware auth mount (completed with tech debt)
+
+
+_Tasks: 14 total, 8 done, 1 tech debt, 6 no-go_
+
 ## [1.0.0-beta.1-sprint202] - 2026-05-31
 
 ### Added

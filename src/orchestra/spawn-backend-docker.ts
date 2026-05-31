@@ -9,6 +9,7 @@ import { join, resolve } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { homedir, totalmem } from 'node:os';
 import type { ModelType } from '../core/types.js';
+import { getProviderForModel, UnknownModelError } from '../core/task-types.js';
 import { TASKS_DIR } from '../core/constants.js';
 import { debugLog } from '../core/utils.js';
 import {
@@ -96,6 +97,28 @@ export type DockerErrorCode = (typeof DOCKER_ERROR_CODES)[keyof typeof DOCKER_ER
 // than the host RAM. Requires Node ≥20.6 (`--max-old-space-size-percentage`
 // landed in Node 20.6; Deckent runtime is Node ≥24).
 export const WORKER_NODE_OPTIONS = 'NODE_OPTIONS=--max-old-space-size-percentage=75';
+
+/**
+ * Returns the CLI binary name for a given model.
+ * Ollama is HTTP-based and not available in Docker containers — falls back to 'claude'.
+ * Unknown models also fall back to 'claude' as a safe default.
+ */
+export function getProviderBinaryForModel(model: ModelType): string {
+  let provider: string;
+  try {
+    provider = getProviderForModel(model);
+  } catch (e) {
+    if (e instanceof UnknownModelError) {
+      provider = 'claude';
+    } else {
+      throw e;
+    }
+  }
+  if (provider === 'codex') return 'codex';
+  if (provider === 'gemini') return 'gemini';
+  // ollama is HTTP-based; Docker containers use claude CLI as fallback
+  return 'claude';
+}
 
 // Sprint 196 T-196-003 (WP-5): Anthropic prompt-cache identity forwarded to
 // the worker container via env. `buildWorkerPrompt()` (task-builder.ts)
@@ -309,7 +332,8 @@ export class DockerSpawnBackend implements SpawnBackend {
     const promptHostPath = join(tasksDir, promptFileName);
     writeFileSync(promptHostPath, prompt, 'utf-8');
 
-    // Build Claude CLI command inside container
+    // Build provider CLI command inside container
+    const providerBinary = getProviderBinaryForModel(model);
     const claudeArgs: string[] = ['-p', '-', '--model', model];
     if (opts?.allowedTools) {
       // Double-quote the value — allowedTools contains parentheses like Write(.tasks/)
@@ -319,7 +343,7 @@ export class DockerSpawnBackend implements SpawnBackend {
     // IMMUTABLE — Deckent standard: workers MUST have full write permissions
     claudeArgs.push('--dangerously-skip-permissions');
 
-    const claudeCmd = `claude ${claudeArgs.join(' ')}`;
+    const claudeCmd = `${providerBinary} ${claudeArgs.join(' ')}`;
     const resultPath = `${CONTAINER_WORKSPACE}/${TASKS_DIR}/task-${taskId}.result`;
     const timeoutPath = `${CONTAINER_WORKSPACE}/${TASKS_DIR}/task-${taskId}.timeout`;
     // Build docker run args
@@ -473,9 +497,9 @@ export class DockerSpawnBackend implements SpawnBackend {
       '-v', `${tasksDir}:${CONTAINER_WORKSPACE}/${TASKS_DIR}`,
       // .locks/ mounted read-write (file locking)
       '-v', `${join(dir, '.locks')}:${CONTAINER_WORKSPACE}/.locks`,
-      // Claude auth — mount host credentials only in subscription mode. When task
-      // opts into `api`, skip the mount so Claude CLI falls through to API key.
-      ...(useApiOnly
+      // provider-aware auth: claude→~/.claude mount, codex/gemini→API key env only.
+      // Skip mount when api auth mode or non-claude provider binary.
+      ...(useApiOnly || providerBinary !== 'claude'
         ? []
         : [
             '-v', `${join(home, '.claude')}:${containerHome}/.claude`,

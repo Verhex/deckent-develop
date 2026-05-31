@@ -10,8 +10,10 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { createInterface } from 'node:readline';
 import type { Command } from 'commander';
 
+import { runChatNativeLoop, type ChatProviderAdapter, type McpToolDispatcher } from './chat-native.js';
 import { ClaudeAdapter, type ProviderDetectResult } from '../../providers/claude.js';
 import { CodexAdapter } from '../../providers/codex.js';
 import { GeminiAdapter } from '../../providers/gemini.js';
@@ -29,6 +31,7 @@ export type ChatTool = 'claude' | 'codex' | 'gemini';
 export interface ChatOptions {
   tool?: ChatTool;
   local?: boolean;
+  native?: boolean;
   checkMcp?: boolean;
   resume?: string;
   resumeLimit?: string;
@@ -351,6 +354,7 @@ export function registerChat(program: Command): void {
     .option('--check-mcp', 'Verify Deckent MCP is attached before starting (T-190-005)')
     .option('--resume <sessionId>', 'Resume a previous chat session — prints recent turns before launch')
     .option('--resume-limit <n>', `Number of prior turns to show with --resume (default ${DEFAULT_RESUME_LIMIT})`)
+    .option('--native', 'Use native tool-use loop (Path C skeleton) instead of spawning host AI CLI')
     .action(async (opts: ChatOptions) => {
       const projectRoot = resolveProjectRoot();
 
@@ -370,6 +374,35 @@ export function registerChat(program: Command): void {
           'Local mode (--local) is not yet wired. Track Sprint 190 T-190-009 (Ollama provider).',
         ));
         process.exitCode = 1;
+        return;
+      }
+
+      if (opts.native) {
+        print('Deckent native chat (Path C skeleton) — provider not yet wired. Type :exit to quit.');
+        const stubProvider: ChatProviderAdapter = {
+          async send(_msgs) {
+            return { text: '[native] provider not yet connected to a real LLM', stopReason: 'end_turn' as const };
+          },
+        };
+        const stubDispatcher: McpToolDispatcher = {
+          async dispatch(name, _args) {
+            return `[native] tool "${name}" not yet wired`;
+          },
+        };
+        async function* readStdin(): AsyncGenerator<string> {
+          const rl = createInterface({ input: process.stdin });
+          try {
+            for await (const line of rl) yield line;
+          } finally {
+            rl.close();
+          }
+        }
+        await runChatNativeLoop({
+          provider: stubProvider,
+          dispatcher: stubDispatcher,
+          input: readStdin(),
+          output: print,
+        });
         return;
       }
 

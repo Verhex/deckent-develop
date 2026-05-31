@@ -9,6 +9,8 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-203-001 | Tech debt from 203-001: Added getProviderBinaryForModel() to spawn-backend-docke | normal | sprint-203 | resolved |
+| debt-203-002 | Tech debt from 203-002: Changed auth mount condition at line 502: added `|| prov | normal | sprint-203 | resolved |
 | debt-194-001 | Tech debt from 194-001: Sprint 194 W-AUTH A-1 — worker pre-spawn auth health che | normal | sprint-194 | resolved |
 | debt-194-007 | Tech debt from 194-007: Worker exited without writing result (exitCode=0) | normal | sprint-194 | resolved |
 | debt-194-008 | Tech debt from 194-008: Worker exited without writing result (exitCode=0) | normal | sprint-194 | resolved |

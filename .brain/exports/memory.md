@@ -1,5 +1,15 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-203 Learnings
+- Sprint sprint-203 Learnings: ## Sprint sprint-203 Learnings
+- 203-002 — Docker provider-aware auth mount: GO_WITH_TECH_DEBT — Changed auth mount condition at line 502: added `|| providerBinary !== 'claude'` so ~/.claude is only mounted for claude
+- 203-005 — Native chat tool-use loop iskelet (Path C foundation): NO_GO — Path C native chat tool-use loop skeleton delivered.
+
+=== What was built ===
+src/cli/commands/chat-native.ts (156 LoC, u
+- 203-006 — Chat history memory entegrasyonu (appendChatTurn wire): NO_GO — Wired MemoryStore into chat-native loop via dependency-injected ChatMemoryAdapter interface. Added 3 optional fields (me
+- 203-007 — chat-native CLI komut kaydı (deckent chat --native): NO_GO — Added --native flag to `deckent chat`. Changes: (1) Added `import { createInterface } from 'node:readline'` and `import 
+
 ## Sprint sprint-202 Learnings
 - Sprint sprint-202 Learnings: ## Sprint sprint-202 Learnings
 - 202-002 — Ollama model registry (tier→local model): NO_GO — Ollama model registry tier→local model resolution wired — Sprint 202 F1 DALGA 0 Task 2.

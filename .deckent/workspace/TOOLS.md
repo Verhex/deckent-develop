@@ -53,6 +53,7 @@ _Total: 28 MCP tools_
 | `audit` | deckent audit |
 | `audit-verify` | deckent audit-verify |
 | `chat` | deckent chat |
+| `chat-native` | deckent chat-native |
 | `checkpoint` | deckent checkpoint |
 | `cleanup` | deckent cleanup |
 | `config` | deckent config |
@@ -105,4 +106,4 @@ _Total: 28 MCP tools_
 | `watch` | deckent watch |
 | `web` | deckent web |
 
-_Total: 58 CLI command modules_
+_Total: 59 CLI command modules_

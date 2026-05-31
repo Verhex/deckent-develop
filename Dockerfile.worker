@@ -14,12 +14,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Claude Code CLI globally
+# Install Claude Code CLI globally (always present — default lean image)
 RUN npm i -g @anthropic-ai/claude-code
 
-# Optional: Install Codex and Gemini CLIs (uncomment if needed)
+# Optional provider CLIs — default lean (Claude-only). Opt-in via build args:
+#   docker build --build-arg INSTALL_CODEX=true ...
+#   docker build --build-arg INSTALL_GEMINI=true ...
+# Manual uncomment alternative (without build args):
 # RUN npm i -g @openai/codex
 # RUN npm i -g @google/gemini-cli
+ARG INSTALL_CODEX=false
+ARG INSTALL_GEMINI=false
+RUN if [ "$INSTALL_CODEX" = "true" ]; then npm i -g @openai/codex; fi
+RUN if [ "$INSTALL_GEMINI" = "true" ]; then npm i -g @google/gemini-cli; fi
 
 # Create writable home directory for non-root execution
 # spawn-backend-docker.ts uses --tmpfs /tmp/deckent-home, but this ensures
