@@ -2,10 +2,10 @@
   "sprintId": "sprint-208",
   "baseline": {
     "tscPassed": true,
-    "testCount": 18260,
-    "testPassed": 18197,
+    "testCount": 18185,
+    "testPassed": 18125,
     "testFailed": 2,
     "coverage": 0,
-    "timestamp": "2026-06-01T00:45:00.000Z"
+    "timestamp": "2026-06-01T00:50:00.000Z"
   }
 }
