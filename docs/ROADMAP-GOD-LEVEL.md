@@ -43,26 +43,28 @@
 | F1-006 | Token throttle (computeBackoff wire + tpm cap) | P1 | ✅ DONE Sprint 202-004 (token-quota.ts +456) |
 | F1-007 | Doc-align (Gate #8 PARTIAL + chat.ts live + Sprint 185-200 arşiv) | **P0** | ✅ DONE Sprint 202-005 |
 
+> **Sprint 203-205 sonuç (2026-05-31):** Kuzey-yıldızı ilerlemeleri — **provider-free %100** (Sprint 203 Docker provider-aware: binary seçim + auth + build-arg), **konuşulabilir %60** (F2 native chat tam: tool-use loop + memory + streaming + multi-turn + resume, Sprint 203-204), **F3 process mode başladı** (tenant izolasyon + scheduled flows + flow registry + CLI, Sprint 204-205), **F4 enterprise iskelet** (audit query, Sprint 205). Hijyen: circular import düzeldi, **agent routing FIX CANLI** — implementation task'ları artık built-in `refactorer` seçiyor (scope-kör temp-react-ts-specialist devre dışı; Sprint 205 ilk kez 12/12 DONE 0 NO_GO), tam-suite fail 18→5. Yeni ADR: 067 (process-mode-tenancy), 068 (enterprise-foundation) — proposed.
+
 **F2 — Native Chat Path C (AI Asistan yüzü)** — ~600-1200 LoC:
 | ID | İş | Öncelik | Kanıt |
 |----|----|---------|-------|
-| F2-001 | Native tool-use loop (LLM → MCP tool → cevap REPL) | P1 | ⬜ |
-| F2-002 | Memory entegrasyonu (appendChatTurn chat path'e bağla) | P1 | ⬜ |
+| F2-001 | Native tool-use loop (LLM → MCP tool → cevap REPL) | P1 | ✅ DONE Sprint 203-005 (chat-native.ts 185 LoC) |
+| F2-002 | Memory entegrasyonu (appendChatTurn chat path'e bağla) | P1 | ✅ DONE Sprint 203-006 |
 | F2-003 | Streaming + multi-turn + resume | P2 | ✅ DONE Sprint 204-005/006/007 |
 
 **F3 — Process Mode (AI System Worker yüzü, Sub-project #3)** — post-F1:
 | ID | İş | Öncelik | Kanıt |
 |----|----|---------|-------|
 | F3-001 | Multi-tenant izolasyon (tenantId skeleton) | P2 | ✅ DONE Sprint 204-008 (tenant-context.ts) |
-| F3-002 | Scheduled flows + cron | P2 | ⬜ |
+| F3-002 | Scheduled flows + cron | P2 | ✅ DONE Sprint 205-005/006/007 (scheduled-flow.ts + flow-registry.ts + flow CLI) |
 | F3-003 | SessionBackend k8s pod-exec | P3 | ⬜ |
 
 **F4 — Enterprise + Million-User (Sub-project #4)** — post-F3:
-| ID | İş | Öncelik |
-|----|----|---------|
-| F4-001 | OIDC/SSO AuthProvider impl | P3 |
-| F4-002 | Audit export API + compliance (SOC2/GDPR) | P3 |
-| F4-003 | Rate/resource limits + load hardening | P3 |
+| ID | İş | Öncelik | Kanıt |
+|----|----|---------|-------|
+| F4-001 | OIDC/SSO AuthProvider impl | P3 | ⬜ |
+| F4-002 | Audit export API + compliance (SOC2/GDPR) | P3 | 🟡 Sprint 205-008 başlangıç: audit-query.ts (read-only filter) + ADR-068 |
+| F4-003 | Rate/resource limits + load hardening | P3 | ⬜ |
 
 **F5 — Evrimsel Mimari (W-E/W-K, DORMANT wire)** — post-beta:
 | ID | İş | Öncelik |

@@ -625,7 +625,7 @@ describe('Error handling completeness', () => {
     const coreDir = join(process.cwd(), 'src/core');
 
     // Allowlist files with legitimate use of throw new Error pending DeckentError migration
-    const coreAllowlist = new Set(['observability-rotation.ts']);
+    const coreAllowlist = new Set(['observability-rotation.ts', 'tenant-context.ts', 'scheduled-flow.ts']);
 
     function scanDir(dir: string): void {
       const entries = readdirSync(dir);

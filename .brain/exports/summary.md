@@ -61,8 +61,10 @@
 | adr-064 | TOPP — Continuous Dispatch (Wave-Barrier Removal) | accepted |
 | adr-065 | Develop / Product Two-Repo Split | accepted |
 | adr-066 | Provider Independence — Multi-Provider Backend Parity | accepted |
+| adr-067 | Process Mode + Tenant Isolation — F3 Foundation | proposed |
 
 ## Recent Learnings
+- **Sprint sprint-205 Learnings** (sprint-205): ## Sprint sprint-205 Learnings
 - **Sprint sprint-204 Learnings** (sprint-204): ## Sprint sprint-204 Learnings
 - 204-003 — Implementation intent için built-in agent adaylığı: NO_GO — Added BUILTIN_...
 - **Sprint sprint-203 Learnings** (sprint-203): ## Sprint sprint-203 Learnings
@@ -81,9 +83,6 @@
 - 195-004 — models.dev bootstrap startup wire: NO_GO — bootstrapFromCatalog added to s...
 - **Sprint sprint-193 Learnings** (sprint-193): ## Sprint sprint-193 Learnings
 - SMOKE-001 — i18n en.json duplicate error.lock_conflict temizle: NO_GO — Worker exite...
-- **Sprint sprint-192 Learnings** (sprint-192): ## Sprint sprint-192 Learnings
-- Placeholder — sprint still in-progress; will be overwritten by finalize.
-
 
 ## Active Technical Debt
 _No active technical debt._
@@ -125,5 +124,8 @@ _No active technical debt._
 - Violation pattern: stale_heartbeat
 - Violation pattern: stale_heartbeat
 - Violation pattern: stale_heartbeat
+- Violation pattern: doc_sync_ground_truth_mismatch
+- Violation pattern: stale_heartbeat
+- Violation pattern: file_outside_scope
 
-_Total entries: 417 | Generated: 2026-05-31_
+_Total entries: 424 | Generated: 2026-05-31_

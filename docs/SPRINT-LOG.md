@@ -5576,3 +5576,33 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 204-009: 204-009 — F3 ADR taslağı + ROADMAP tracker güncelle (DONE)
 
 ---
+## Sprint 205 — sprint-205
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-05-31
+**Duration:** 818s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 12 |
+| Completed | 12 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 818023ms |
+
+### Tasks
+
+- 205-001: 205-001 — Agent routing canlı doğrulama testi (implementation→built-in) (DONE)
+- 205-002: 205-002 — spawn-backend-docker max_workers testi config-agnostic (DONE)
+- 205-003: 205-003 — start-lifecycle flaky fix (DONE)
+- 205-004: 205-004 — docker-backend + identity-generator + error-handling flaky fix (DONE)
+- 205-005: 205-005 — Scheduled flow tipi + parser iskelet (DONE)
+- 205-006: 205-006 — Flow registry (CRUD + persist) (DONE)
+- 205-007: 205-007 — deckent flow CLI komut iskelet (list/add) (DONE)
+- 205-008: 205-008 — Audit log query API iskelet (DONE)
+- 205-009: 205-009 — F4 ADR taslağı + ROADMAP tracker güncelle (DONE)
+
+---

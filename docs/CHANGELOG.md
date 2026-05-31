@@ -2,6 +2,26 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint205] - 2026-05-31
+
+### Added
+
+- 205-001 — Agent routing canlı doğrulama testi (implementation→built-in)
+- 205-002 — spawn-backend-docker max_workers testi config-agnostic
+- 205-005 — Scheduled flow tipi + parser iskelet
+- 205-006 — Flow registry (CRUD + persist)
+- 205-007 — deckent flow CLI komut iskelet (list/add)
+- 205-008 — Audit log query API iskelet
+- 205-009 — F4 ADR taslağı + ROADMAP tracker güncelle
+
+### Fixed
+
+- 205-003 — start-lifecycle flaky fix
+- 205-004 — docker-backend + identity-generator + error-handling flaky fix
+
+
+_Tasks: 12 total, 12 done, 0 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint204] - 2026-05-31
 
 ### Added

@@ -67,6 +67,7 @@ _Total: 28 MCP tools_
 | `explain` | deckent explain |
 | `features` | deckent features |
 | `finalize` | deckent finalize |
+| `flow` | deckent flow |
 | `heartbeat` | deckent heartbeat |
 | `help` | deckent help |
 | `history` | deckent history |
@@ -106,4 +107,4 @@ _Total: 28 MCP tools_
 | `watch` | deckent watch |
 | `web` | deckent web |
 
-_Total: 59 CLI command modules_
+_Total: 60 CLI command modules_

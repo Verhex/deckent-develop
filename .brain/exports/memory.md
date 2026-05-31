@@ -1,5 +1,8 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-205 Learnings
+- Sprint sprint-205 Learnings: ## Sprint sprint-205 Learnings
+
 ## Sprint sprint-204 Learnings
 - Sprint sprint-204 Learnings: ## Sprint sprint-204 Learnings
 - 204-003 — Implementation intent için built-in agent adaylığı: NO_GO — Added BUILTIN_IMPLEMENTATION_INTENT_RULES map (refactorer=7, architect=6) + applyBuiltinImplementationRules() helper in 
