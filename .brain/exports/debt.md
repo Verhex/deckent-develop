@@ -9,6 +9,7 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-207-001 | Tech debt from 207-001: DONE criteria met: (1) bundled opus apiId updated claude | normal | sprint-207 | resolved |
 | debt-203-001 | Tech debt from 203-001: Added getProviderBinaryForModel() to spawn-backend-docke | normal | sprint-203 | resolved |
 | debt-203-002 | Tech debt from 203-002: Changed auth mount condition at line 502: added `|| prov | normal | sprint-203 | resolved |
 | debt-194-001 | Tech debt from 194-001: Sprint 194 W-AUTH A-1 — worker pre-spawn auth health che | normal | sprint-194 | resolved |

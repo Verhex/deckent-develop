@@ -63,8 +63,11 @@
 | adr-066 | Provider Independence — Multi-Provider Backend Parity | accepted |
 | adr-067 | Process Mode + Tenant Isolation — F3 Foundation | proposed |
 | adr-068 | Enterprise Foundation — Audit Query + Multi-Tenant + Scheduled Flows | proposed |
+| adr-069 | Event-Driven Triggers + RBAC — F3 Webhook & F4 Role-Based Access Control | proposed |
 
 ## Recent Learnings
+- **Sprint sprint-207 Learnings** (sprint-207): ## Sprint sprint-207 Learnings
+- 207-001 — Model registry bundled apiId güncel + "stale" işareti: GO_WITH_TECH_DEBT —...
 - **Sprint sprint-206 Learnings** (sprint-206): ## Sprint sprint-206 Learnings
 - 206-003 — docker-oom gracefulTimeout forward fix: NO_GO — Root cause: test expectati...
 - **Sprint sprint-205 Learnings** (sprint-205): ## Sprint sprint-205 Learnings
@@ -82,8 +85,6 @@
 - 198-003 — managed-docs auditor.md template regression fix: NO_GO — Fixed the managed...
 - **Sprint sprint-197 Learnings** (sprint-197): ## Sprint sprint-197 Learnings
 - 197-004 — WSL2 OOM mitigation (max_workers + worker_memory + adaptive): NO_GO — Spri...
-- **Sprint sprint-195 Learnings** (sprint-195): ## Sprint sprint-195 Learnings
-- 195-004 — models.dev bootstrap startup wire: NO_GO — bootstrapFromCatalog added to s...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -129,5 +130,6 @@ _No active technical debt._
 - Violation pattern: stale_heartbeat
 - Violation pattern: file_outside_scope
 - Violation pattern: stale_heartbeat
+- Violation pattern: stale_heartbeat
 
-_Total entries: 429 | Generated: 2026-05-31_
+_Total entries: 435 | Generated: 2026-05-31_

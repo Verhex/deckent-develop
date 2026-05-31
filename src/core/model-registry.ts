@@ -54,12 +54,14 @@ export interface ModelDefinition {
 }
 
 // ─── Built-in Model Catalog ────────────────────────────────────────────────
+// Bundled snapshot = offline last-resort fallback. models.dev catalog is the
+// live source of truth; apiId values here must be kept current at build time.
 
 export const BUILTIN_MODELS: readonly ModelDefinition[] = [
   // Claude (3)
   {
     id: 'opus',
-    apiId: 'claude-opus-4-6',
+    apiId: 'claude-opus-4-8',
     provider: 'claude',
     tier: 'premium',
     contextWindow: 1_000_000,

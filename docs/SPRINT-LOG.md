@@ -5636,3 +5636,33 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 206-009: 206-009 — ADR-069 (event-driven + RBAC) + ROADMAP tracker güncelle (DONE)
 
 ---
+## Sprint 207 — sprint-207
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-05-31
+**Duration:** 952s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 9 |
+| Completed | 9 |
+| Tech Debt | 1 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 952452ms |
+
+### Tasks
+
+- 207-001: 207-001 — Model registry bundled apiId güncel + "stale" işareti (GO_WITH_TECH_DEBT)
+- 207-002: 207-002 — bootstrapFromCatalog apiId merge doğrula + wire (DONE)
+- 207-003: 207-003 — Cost-estimate çıktısı catalog-aware (parametrik model adı) (DONE)
+- 207-004: 207-004 — docker-backend test izolasyon (kill/list state) (DONE)
+- 207-005: 207-005 — managed-docs auditor template memory.db pattern (DONE)
+- 207-006: 207-006 — Brain-fix canlı doğrulama testi (coverage:null → 0 false-FIX) (DONE)
+- 207-007: 207-007 — RBAC enforce wire (audit-query'ye can() gate) (DONE)
+- 207-008: 207-008 — Flow scheduler + event-trigger birleşik dispatch (DONE)
+- 207-009: 207-009 — ADR-070 (Brain Evaluation Integrity + Zero-Hard-Code) + ROADMAP (DONE)
+
+---

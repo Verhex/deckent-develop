@@ -90,10 +90,15 @@ function cleanupTaskFiles(taskId: string): void {
 
 describe('Docker Backend Integration', () => {
   let backend: DockerSpawnBackend;
-  const testTaskId = `test-docker-${process.pid}`;
-  const containerName = `deckent-w-${testTaskId}`;
+  let testTaskId: string;
+  let containerName: string;
 
   beforeEach(() => {
+    // Unique ID per test — prevents container name conflicts across tests in the full suite.
+    // process.pid alone is shared across vitest worker threads (same host process),
+    // so adding Date.now() makes each test's container name unique.
+    testTaskId = `test-docker-${Date.now()}-${process.pid}`;
+    containerName = `deckent-w-${testTaskId}`;
     _clearAllPending();
     backend = new DockerSpawnBackend(PROJECT_ROOT);
     forceRemoveContainer(containerName);
@@ -104,12 +109,23 @@ describe('Docker Backend Integration', () => {
     _clearAllPending();
     forceRemoveContainer(containerName);
     forceRemoveContainer(`${containerName}-b`);
-    // Cleanup ALL test-docker artifacts (any PID, any suffix)
+    // Cleanup ALL test-docker artifacts (any PID/timestamp suffix)
     try {
       const files = fs.readdirSync(TEST_TASKS_DIR);
       for (const f of files) {
         if (f.startsWith('task-test-docker-') || f.startsWith('.prompt-') || f.startsWith('.worker-test-docker-')) {
           try { fs.unlinkSync(path.join(TEST_TASKS_DIR, f)); } catch { /* ok */ }
+        }
+      }
+    } catch { /* ok */ }
+    // Clean up any spawnlock files left by this test's task to prevent lock leakage.
+    try {
+      const locksDir = path.join(PROJECT_ROOT, '.locks');
+      if (fs.existsSync(locksDir)) {
+        for (const f of fs.readdirSync(locksDir)) {
+          if (f.endsWith('.spawnlock') && f.includes('test-docker-')) {
+            try { fs.unlinkSync(path.join(locksDir, f)); } catch { /* ok */ }
+          }
         }
       }
     } catch { /* ok */ }

@@ -39,6 +39,7 @@ paths: ["src/**","tests/**"]
 
 ## Active ADR Constraints
 
+- **ADR-070**: Brain Evaluation Integrity — Signal-Based Coverage Exemption + Zero-Hard-Code Principle — **Status:** accepted
 - **ADR-066**: Provider Independence — Multi-Provider Backend Parity — **Status:** accepted
 - **ADR-065**: Develop / Product Two-Repo Split — **Status:** accepted
 - **ADR-064**: TOPP — Continuous Dispatch (Wave-Barrier Removal) — **Status:** accepted

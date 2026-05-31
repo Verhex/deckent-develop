@@ -45,6 +45,8 @@
 
 > **Sprint 203-205 sonuç (2026-05-31):** Kuzey-yıldızı ilerlemeleri — **provider-free %100** (Sprint 203 Docker provider-aware: binary seçim + auth + build-arg), **konuşulabilir %60** (F2 native chat tam: tool-use loop + memory + streaming + multi-turn + resume, Sprint 203-204), **F3 process mode başladı** (tenant izolasyon + scheduled flows + flow registry + CLI, Sprint 204-205), **F4 enterprise iskelet** (audit query, Sprint 205). Hijyen: circular import düzeldi, **agent routing FIX CANLI** — implementation task'ları artık built-in `refactorer` seçiyor (scope-kör temp-react-ts-specialist devre dışı; Sprint 205 ilk kez 12/12 DONE 0 NO_GO), tam-suite fail 18→5. Yeni ADR: 067 (process-mode-tenancy), 068 (enterprise-foundation) — proposed.
 
+> **Sprint 207 sonuç (2026-05-31):** **zero-hardcode başlangıç** — bundled opus apiId güncel (`claude-opus-4-8`) + `bootstrapFromCatalog` apiId merge wire + `cost-calculator` parametrik model-label (Sprint 207-001/002/003, ADR-070). **Brain-fix canlı doğrulama DONE** — `coverage:null` false-FIX cascade → 0; `coverageOptional` artık sinyal-temelli (`wroteTests` flag, agent-bağımsız idempotent, Sprint 207 P0-1). **F4-001 RBAC gate wire** — `audit-query.ts` `queryAudit(params, role)` → `can()` enforce (Sprint 207-007, ADR-070). Yeni ADR: 070 (brain-eval-integrity + zero-hardcode) — accepted.
+
 **F2 — Native Chat Path C (AI Asistan yüzü)** — ~600-1200 LoC:
 | ID | İş | Öncelik | Kanıt |
 |----|----|---------|-------|
@@ -63,7 +65,7 @@
 **F4 — Enterprise + Million-User (Sub-project #4)** — post-F3:
 | ID | İş | Öncelik | Kanıt |
 |----|----|---------|-------|
-| F4-001 | OIDC/SSO AuthProvider impl + RBAC | P3 | 🟡 Sprint 206-008 iskelet: rbac.ts (Role + Permission + can(), ADR-069) |
+| F4-001 | OIDC/SSO AuthProvider impl + RBAC | P3 | 🟡 Sprint 206-008 iskelet: rbac.ts (Role + Permission + can(), ADR-069) + Sprint 207-007 RBAC gate wire: audit-query `queryAudit(params, role)` → `can()` enforce (ADR-070) |
 | F4-002 | Audit export API + compliance (SOC2/GDPR) | P3 | 🟡 Sprint 205-008 başlangıç: audit-query.ts (read-only filter) + ADR-068 |
 | F4-003 | Rate/resource limits + load hardening | P3 | ⬜ |
 

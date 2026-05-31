@@ -8,7 +8,7 @@ alwaysApply: false
 - NEVER write source code
 - All brain knowledge is in `.brain/memory.db` (SQLite) — query via MemoryStore, never parse .md files
 - ADR compliance: load ADRs from `store.getByType('adr')`, not from DECISIONS.md
-- Write patterns to DB: `store.upsert({ type: 'pattern', ... })`
+- Write patterns to DB: `store.insert({ type: 'pattern', ... })`
 - Scan every 30 seconds
 - Read all heartbeat files → detect stale agents (>2min = alert)
 - Run `git diff --stat` → detect boundary violations
@@ -36,6 +36,7 @@ alwaysApply: false
 
 ## Active ADR Constraints
 
+- **ADR-070**: Brain Evaluation Integrity — Signal-Based Coverage Exemption + Zero-Hard-Code Principle — **Status:** accepted
 - **ADR-066**: Provider Independence — Multi-Provider Backend Parity — **Status:** accepted
 - **ADR-065**: Develop / Product Two-Repo Split — **Status:** accepted
 - **ADR-064**: TOPP — Continuous Dispatch (Wave-Barrier Removal) — **Status:** accepted

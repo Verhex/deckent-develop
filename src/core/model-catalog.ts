@@ -403,7 +403,42 @@ interface BootstrapOptions {
   /** @internal test seam */
   _cachePath?: string;
   /** @internal test seam */
-  _registry?: { mergeFromCatalog: (models: ModelDefinition[]) => void };
+  _registry?: {
+    mergeFromCatalog: (models: ModelDefinition[]) => void;
+    /** Optional: used for apiId-aware merge. If absent, plain merge is used. */
+    getAllModels?: () => ModelDefinition[];
+  };
+}
+
+/**
+ * Merge remote catalog apiIds into existing (bundled) model definitions.
+ *
+ * The remote catalog (models.dev) typically uses full API IDs as its `id` field
+ * (e.g. `claude-opus-4-8`), while the bundled registry uses short logical IDs
+ * (e.g. `opus`). A plain merge-by-id therefore misses bundled entries.
+ *
+ * Match key: `remote.id === existing.apiId` — the remote model's id is the
+ * current API ID of a bundled entry. When matched, the bundled entry's `apiId`
+ * is replaced with `remote.apiId` (live source wins). Unmatched entries are
+ * returned unchanged (offline safety net).
+ */
+export function mergeApiIdOverrides(
+  existing: ModelDefinition[],
+  remote: ModelDefinition[],
+): ModelDefinition[] {
+  // Index remote models by their id (full API ID used by models.dev)
+  const remoteById = new Map<string, ModelDefinition>();
+  for (const rm of remote) {
+    remoteById.set(rm.id, rm);
+  }
+
+  return existing.map(bundled => {
+    const match = remoteById.get(bundled.apiId);
+    if (match && match.apiId && match.apiId !== bundled.apiId) {
+      return { ...bundled, apiId: match.apiId };
+    }
+    return bundled;
+  });
 }
 
 /**
@@ -422,7 +457,10 @@ export async function bootstrapFromCatalog(opts?: BootstrapOptions): Promise<voi
       cachePath: opts?._cachePath,
     });
     const registry = opts?._registry ?? modelRegistry;
-    registry.mergeFromCatalog(result.models);
+    // Apply apiId-aware override: remote entries update bundled apiIds by apiId match
+    const existing = registry.getAllModels?.() ?? modelRegistry.getAllModels();
+    const merged = mergeApiIdOverrides(existing, result.models);
+    registry.mergeFromCatalog(merged);
     _catalogBootstrapped = true;
   } catch {
     // silent fallback — loadCatalog never throws, but guard unexpected errors

@@ -20,6 +20,7 @@ import {
   type ModelPricing,
   type BillingMode,
 } from './cost-config-loader.js';
+import { modelRegistry } from './model-registry.js';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -51,6 +52,8 @@ export interface PerProviderBreakdown {
       cacheReadTokens: number;
       outputTokens: number;
       costUsd: number;
+      /** Live apiId from model-registry (overrides cost-config key for display) */
+      displayLabel?: string;
     }
   >;
   totalApiCostUsd: number;
@@ -159,6 +162,8 @@ interface TaskCostResult {
   costUsd: number;
 
   fits: boolean;
+  /** Live apiId from model-registry for this task's model (display label) */
+  displayLabel?: string;
 }
 
 function calculateTaskCost(
@@ -215,6 +220,9 @@ function calculateTaskCost(
   const totalInput = incrementalInput + cacheableContext;
   const fits = totalInput <= pricing.max_input_tokens;
 
+  // Resolve live apiId from model-registry (parametric label, avoids stale cost-config keys)
+  const displayLabel = modelRegistry.get(task.model)?.apiId;
+
   return {
     provider,
     modelId,
@@ -226,6 +234,7 @@ function calculateTaskCost(
     output: output * mult,
     costUsd,
     fits,
+    displayLabel,
   };
 }
 
@@ -267,7 +276,7 @@ export function estimateSprintCost(
       continue;
     }
 
-    const { provider, modelId, billingMode, uncachedInput, cacheCreation, cacheRead, output, costUsd, fits } = result;
+    const { provider, modelId, billingMode, uncachedInput, cacheCreation, cacheRead, output, costUsd, fits, displayLabel } = result;
 
     // Aggregate per-provider
     if (!perProvider[provider]) {
@@ -290,6 +299,7 @@ export function estimateSprintCost(
         cacheReadTokens: 0,
         outputTokens: 0,
         costUsd: 0,
+        displayLabel,
       };
     }
     const pm = pp.models[modelId]!;
@@ -421,7 +431,8 @@ export function formatEstimate(est: SprintCostEstimate): string {
   for (const [providerName, pp] of Object.entries(est.perProvider)) {
     const billing = pp.billingMode;
     for (const [modelId, mm] of Object.entries(pp.models)) {
-      lines.push(`  ${providerName}/${modelId.padEnd(25)} ${String(mm.taskCount).padStart(3)} task (${billing})`);
+      const label = mm.displayLabel ?? modelId;
+      lines.push(`  ${providerName}/${label.padEnd(25)} ${String(mm.taskCount).padStart(3)} task (${billing})`);
     }
   }
 

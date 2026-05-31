@@ -1,5 +1,9 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-207 Learnings
+- Sprint sprint-207 Learnings: ## Sprint sprint-207 Learnings
+- 207-001 — Model registry bundled apiId güncel + "stale" işareti: GO_WITH_TECH_DEBT — DONE criteria met: (1) bundled opus apiId updated claude-opus-4-6→claude-opus-4-8 (src/core/model-registry.ts:62). (2) B
+
 ## Sprint sprint-206 Learnings
 - Sprint sprint-206 Learnings: ## Sprint sprint-206 Learnings
 - 206-003 — docker-oom gracefulTimeout forward fix: NO_GO — Root cause: test expectation was stale, not a source bug. SpawnBackendFactory.create() correctly forwards gracefulTimeou

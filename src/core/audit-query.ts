@@ -5,6 +5,7 @@
 
 import { readEvents } from '../orchestra/event-stream.js';
 import type { DeckentEvent } from '../orchestra/event-stream.js';
+import { can, Permission } from './rbac.js';
 
 // ─── Types ────────────────────────────────────────────────────────
 
@@ -47,15 +48,28 @@ export interface AuditQueryResult {
  * then applies filters in this order: tenantId → channel → time-range.
  * Returns an empty matched array (never throws) on I/O failure.
  *
+ * When `role` is provided, enforces RBAC: the caller must have READ permission
+ * for the tenant scope. Calls `can(role, Permission.READ, tenantId)` — returns
+ * an empty result if the check fails (fail-closed, ADR-037).
+ *
  * @param projectRoot - Project root directory
  * @param sprintId    - Sprint identifier, e.g. "sprint-205"
  * @param query       - Filter parameters (all optional, AND semantics)
+ * @param role        - Optional caller role for RBAC enforcement
  */
 export function queryAudit(
   projectRoot: string,
   sprintId: string,
   query: AuditQuery = {},
+  role?: string,
 ): AuditQueryResult {
+  if (role !== undefined) {
+    const tenantId = query.tenantId ?? 'local';
+    if (!can(role, Permission.READ, tenantId)) {
+      return { sprintId, totalScanned: 0, matched: [] };
+    }
+  }
+
   const rawEvents = readEvents(projectRoot, sprintId);
   let filtered: DeckentEvent[] = rawEvents;
 

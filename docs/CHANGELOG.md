@@ -2,6 +2,29 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint207] - 2026-05-31
+
+### Added
+
+- 207-002 — bootstrapFromCatalog apiId merge doğrula + wire
+- 207-003 — Cost-estimate çıktısı catalog-aware (parametrik model adı)
+- 207-004 — docker-backend test izolasyon (kill/list state)
+- 207-005 — managed-docs auditor template memory.db pattern
+- 207-007 — RBAC enforce wire (audit-query'ye can() gate)
+- 207-008 — Flow scheduler + event-trigger birleşik dispatch
+- 207-009 — ADR-070 (Brain Evaluation Integrity + Zero-Hard-Code) + ROADMAP
+
+### Changed
+
+- 207-001 — Model registry bundled apiId güncel + "stale" işareti (completed with tech debt)
+
+### Fixed
+
+- 207-006 — Brain-fix canlı doğrulama testi (coverage:null → 0 false-FIX)
+
+
+_Tasks: 9 total, 9 done, 1 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint206] - 2026-05-31
 
 ### Added
