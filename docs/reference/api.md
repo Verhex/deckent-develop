@@ -470,13 +470,13 @@ const LOCK_STALE_THRESHOLD_MS       = 300_000;  // 5 minutes
 ### Memory Limits
 
 ```ts
-const MEMORY_MAX_LINES       = 200;
-const PATTERNS_MAX_LINES     = 80;
-const RETRO_MAX_LINES        = 100;
-const SPRINT_LOG_MAX_LINES   = 80;
-const BRAIN_TOTAL_LINE_BUDGET = 600;
-const MEMORY_DECAY_SPRINTS   = 5;    // Unused entries decay after 5 sprints
-const PATTERN_DECAY_SPRINTS  = 8;
+const MEMORY_MAX_LINES       = 1500;  // Sprint 140: 300→1500 (5x)
+const PATTERNS_MAX_LINES     = 800;   // Sprint 140: 150→800 (5.3x)
+const RETRO_MAX_LINES        = 400;   // Sprint 140: 120→400 (3.3x)
+const SPRINT_LOG_MAX_LINES   = 500;   // Sprint 140: 100→500 (5x)
+const BRAIN_TOTAL_LINE_BUDGET = 5000; // Sprint 140: 900→5000 (5.5x)
+const MEMORY_DECAY_SPRINTS   = 20;   // Unused entries decay after 20 sprints
+const PATTERN_DECAY_SPRINTS  = 25;
 ```
 
 ### Debt Escalation
@@ -491,7 +491,7 @@ const DEBT_CRITICAL_SPRINTS          = 3;  // Escalate to CRITICAL after 3 sprin
 ```ts
 const DEFAULT_LANGUAGE  = 'en';
 const DEFAULT_MODE      = 'performance';  // Legacy alias: 'max_plan'
-const DECKENT_VERSION   = '0.1.0';
+const DECKENT_VERSION   = '1.0.0-beta.1';
 const SUPPORTED_LANGUAGES = ['en', 'tr'];
 ```
 

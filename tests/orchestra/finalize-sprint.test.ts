@@ -379,6 +379,9 @@ describe('finalizeSprint', () => {
       undefined, // agentMap
       undefined, // skillMap
       results,
+      // Sprint 192 Task 192-005: createIfMissing opts forwarded by finalizeSprint
+      // to defend against the chronic Sprint 167+ DB-gap on fresh projects.
+      { createIfMissing: true },
     );
   });
 
@@ -586,6 +589,8 @@ describe('finalizeSprint', () => {
       undefined, // agentMap
       undefined, // skillMap
       results,
+      // Sprint 192 Task 192-005: createIfMissing forwarded.
+      { createIfMissing: true },
     );
   });
 

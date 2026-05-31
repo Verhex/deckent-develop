@@ -61,6 +61,8 @@
 | adr-064 | TOPP — Continuous Dispatch (Wave-Barrier Removal) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-201 Learnings** (sprint-201): ## Sprint sprint-201 Learnings
+- 201-006 — Test baseline 28 → ≤20 attack: NO_GO — TASK GOAL: reduce vitest fail count...
 - **Sprint sprint-200 Learnings** (sprint-200): ## Sprint sprint-200 Learnings
 - 198-002 — memory.db sprint-log finalize bug fix + Sprint 194/196 row backfill: NO_GO...
 - **Sprint sprint-199 Learnings** (sprint-199): ## Sprint sprint-199 Learnings
@@ -82,7 +84,6 @@
 - **Sprint sprint-189 Learnings** (sprint-189): ## Sprint sprint-189 Learnings
 - 189-009 deckent_kill MCP parite: NO_GO — investigate root cause
 - 189-011 API endpoi...
-- **Sprint sprint-188 Learnings** (sprint-188): ## Sprint sprint-188 Learnings
 
 ## Active Technical Debt
 _No active technical debt._
@@ -122,4 +123,4 @@ _No active technical debt._
 - Violation pattern: stale_heartbeat
 - Violation pattern: file_outside_scope
 
-_Total entries: 398 | Generated: 2026-05-31_
+_Total entries: 401 | Generated: 2026-05-31_

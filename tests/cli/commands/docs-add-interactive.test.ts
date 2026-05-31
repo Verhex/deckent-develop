@@ -21,14 +21,19 @@ afterEach(cleanup);
 
 describe('seedDocsConfig', () => {
   it('creates docs.json with default template content', () => {
+    // The seed template now includes both `claude-md` and `identity-md`
+    // (see src/cli/commands/init-templates/docs.json.template). Only the
+    // claude-md entry is asserted in detail; the identity-md addition is
+    // covered by managed-docs identity tests elsewhere.
     seedDocsConfig(TEST_ROOT);
     const config = loadDocsConfig(TEST_ROOT);
     expect(config).not.toBeNull();
     expect(config!.version).toBe(1);
-    expect(config!.docs).toHaveLength(1);
-    expect(config!.docs[0]!.id).toBe('claude-md');
-    expect(config!.docs[0]!.path).toBe('CLAUDE.md');
-    expect(config!.docs[0]!.autoSections).toEqual(['Sprint Metrics']);
+    expect(config!.docs.length).toBeGreaterThanOrEqual(1);
+    const claudeEntry = config!.docs.find(d => d.id === 'claude-md');
+    expect(claudeEntry).toBeDefined();
+    expect(claudeEntry!.path).toBe('CLAUDE.md');
+    expect(claudeEntry!.autoSections).toEqual(['Sprint Metrics']);
   });
 
   it('does not overwrite existing config', () => {

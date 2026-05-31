@@ -85,16 +85,18 @@ describe('TimeoutConfig', () => {
     });
   });
 
-  describe('validation — max_timeout <= 14400', () => {
-    it('throws when docker_max_timeout > 14400', () => {
+  describe('validation — max_timeout <= 86400', () => {
+    it('throws when docker_max_timeout > 86400', () => {
+      // Sprint 186 raised the cap 14400 (4h) → 86400 (24h) to support
+      // long per-file audit sprints. See src/core/config.ts:557.
       const config = createDefaultConfig();
-      config.timeout = { docker_max_timeout: 20000 };
+      config.timeout = { docker_max_timeout: 90000 };
       expect(() => validateConfig(config)).toThrow(ConfigValidationError);
       try {
         validateConfig(config);
       } catch (e) {
         expect((e as ConfigValidationError).message).toContain(
-          'timeout.docker_max_timeout must be <= 14400',
+          'timeout.docker_max_timeout must be <= 86400',
         );
       }
     });

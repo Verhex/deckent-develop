@@ -4,11 +4,12 @@ import { DECKENT_MCP_INSTRUCTIONS } from '../../src/mcp/server.js';
 /**
  * Tests for MCP help.ts tool catalog and server.ts instructions.
  * Sprint 189 fix: Updated to reflect 31 tools (watch/feature_query/audit/recover added).
+ * Sprint 201 fix: Updated to 32 tools (deckent_models added).
  */
 
 describe('MCP Server Instructions', () => {
-  it('should declare 31 tools in the instructions header', () => {
-    expect(DECKENT_MCP_INSTRUCTIONS).toContain('## Tools (31)');
+  it('should declare 32 tools in the instructions header', () => {
+    expect(DECKENT_MCP_INSTRUCTIONS).toContain('## Tools (32)');
   });
 
   it('should list deckent_memory_query in instructions', () => {
@@ -26,7 +27,7 @@ describe('MCP Server Instructions', () => {
     expect(DECKENT_MCP_INSTRUCTIONS).not.toMatch(/deckent:\/\/retro — Last sprint retrospective \(RETRO\.md\)/);
   });
 
-  it('should list all 31 tool names in instructions', () => {
+  it('should list all 32 tool names in instructions', () => {
     const expectedTools = [
       'deckent_init',
       'deckent_set_directives',
@@ -59,12 +60,13 @@ describe('MCP Server Instructions', () => {
       'deckent_feature_query',
       'deckent_audit',
       'deckent_recover',
+      'deckent_models',
     ];
 
     for (const tool of expectedTools) {
       expect(DECKENT_MCP_INSTRUCTIONS).toContain(tool);
     }
-    expect(expectedTools).toHaveLength(31);
+    expect(expectedTools).toHaveLength(32);
   });
 
   it('should list all 8 resources in instructions', () => {

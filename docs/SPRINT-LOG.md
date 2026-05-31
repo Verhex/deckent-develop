@@ -5462,3 +5462,30 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 200-009: 198-008 — Beta launch smoke pre-check (npm pack dry-run + 20-gate verify) (DONE)
 
 ---
+## Sprint 201 — sprint-201
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-05-31
+**Duration:** 2155s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 7 |
+| Completed | 5 |
+| Tech Debt | 0 |
+| No-Go | 2 |
+| Coverage | 0.0% |
+| Duration | 2154598ms |
+
+### Tasks
+
+- 201-001: 201-001 — README + landing içerik kullanıcı-dostu elden geçirme (DONE)
+- 201-002: 201-002 — W-H doc-drift long-tail kapat (api.md + reference temizlik) (DONE)
+- 201-003: 201-003 — develop→ürün yayın senkronizasyon script'i (DONE)
+- 201-004: 201-004 — İki-repo konumlandırma ADR + audit-report immutable note (DONE)
+- 201-005: 201-005 — Clean-clone smoke verify (deckent son haliyle çalışıyor kanıtı) (DONE)
+- 201-006: 201-006 — Test baseline 28 → ≤20 attack (NO_GO)
+
+---

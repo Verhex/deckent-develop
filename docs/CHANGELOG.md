@@ -2,6 +2,19 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint201] - 2026-05-31
+
+### Added
+
+- 201-001 — README + landing içerik kullanıcı-dostu elden geçirme
+- 201-002 — W-H doc-drift long-tail kapat (api.md + reference temizlik)
+- 201-003 — develop→ürün yayın senkronizasyon script'i
+- 201-004 — İki-repo konumlandırma ADR + audit-report immutable note
+- 201-005 — Clean-clone smoke verify (deckent son haliyle çalışıyor kanıtı)
+
+
+_Tasks: 7 total, 5 done, 0 tech debt, 2 no-go_
+
 ## [1.0.0-beta.1-sprint200] - 2026-05-31
 
 ### Added

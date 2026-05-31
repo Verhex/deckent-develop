@@ -354,11 +354,15 @@ describe('rule-generator', () => {
       expect(content).toContain('.brain/*');
     });
 
-    it('auditor gets dashboard/patterns paths', () => {
+    it('auditor gets dashboard path', () => {
+      // Sprint 198-003 / 198-004 — auditor frontmatter paths no longer include
+      // `.brain/PATTERNS.md`. Patterns are written to memory.db (SQLite), not
+      // to a flat .md file. The auditor only needs `.dashboard` to operate.
+      // See src/core/rule-generator.ts claudeAdapter() pathsMap.
       generateRules({ projectRoot: TEST_ROOT, adrs: [], providers: ['claude'], roles: ['auditor'] });
       const content = readFileSync(join(TEST_ROOT, '.claude', 'rules', 'auditor.md'), 'utf-8');
       expect(content).toContain('.dashboard');
-      expect(content).toContain('PATTERNS.md');
+      expect(content).not.toContain('PATTERNS.md');
     });
 
     it('worker gets src/tests paths', () => {

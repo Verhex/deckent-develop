@@ -51,6 +51,7 @@ deckent <command> [options]
 - [`deckent config`](#config) — Show or modify project configuration (
 - [`deckent archive-debt`](#archive-debt) — Archive resolved debt items from 
 - [`deckent doctor`](#doctor) — Check system dependencies and health
+- [`deckent models`](#models) — Browse and manage model catalog (list/refresh/tier lookup)
 
 ### Skills & Agents
 

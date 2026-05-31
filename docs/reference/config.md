@@ -75,6 +75,8 @@
 | `spawn_backend` | `'docker' \| 'tmux' \| 'subprocess' \| 'auto'` | (auto-detect) | — | Worker calistirma backend'i. `deckent init` sirasinda sistem kapasitesine gore otomatik belirlenir. |
 | `docker_image` | `string` | `'deckent-worker:latest'` | — | Docker worker container imaji. |
 | `docker_timeout` | `number` | `1200` | — | Docker container timeout (saniye). |
+| `worker_memory_limit` | `string` | `'2g'` | — | Docker worker container bellek limiti (orn. `'2g'`, `'512m'`). |
+| `worker_memory_swap` | `string` | `'3g'` | — | Docker worker container swap limiti. `worker_memory_limit`'ten buyuk olmali. |
 | `multi_ide_mode` | `boolean` | `false` | — | Birden fazla IDE ortamini destekle. |
 | `max_workers` | `number` | (auto-detect) | — | User-level override. Tum modlardan bagimsiz, top-level limit. Preset degerleri override eder. |
 
@@ -113,6 +115,7 @@
 | `cleanup_delay_ms` | `number` | `180000` | Cleanup'tan once bekleme (ms). 0 = hemen. |
 | `ai_planner_timeout` | `number` | `60000` | AI planner subprocess timeout (ms). |
 | `human_checkpoints` | `string[]` | `[]` | Insan onayi gereken fazlar: `'plan'`, `'evaluate'`, `'fix'`. Bos = tam otonom. |
+| `dependency_pipeline_enabled` | `boolean` | `true` | ADR-045 wave-based execution. `true` = Kahn algoritmasiyla topological wave spawning, cascade-on-NO_GO, unblock-on-DONE. `false` = Brain manuel wave yonetimi. **deckent-dev projesi kasitli `false`** (ADR-047). |
 
 ---
 

@@ -52,6 +52,7 @@
 | 43 | `features` | List feature flags and capabilities | — |
 | 44 | `audit` | Run Brain Self-Audit Gate | — |
 | 45 | `recover` | Recover from crashed/stuck sprint | — |
+| 46 | `models` | Browse and manage model catalog (list/refresh/tier) | `deckent_models` |
 | — | `help-info` | Show quick-reference help (alias: `info`) | `deckent_help` |
 
 ---

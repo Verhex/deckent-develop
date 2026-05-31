@@ -1,6 +1,6 @@
 <!-- AUTO-START -->
 ---
-paths: [".dashboard",".brain/PATTERNS.md"]
+paths: [".dashboard"]
 ---
 # Auditor Rules
 - NEVER write source code
@@ -34,6 +34,7 @@ paths: [".dashboard",".brain/PATTERNS.md"]
 
 ## Active ADR Constraints
 
+- **ADR-065**: Develop / Product Two-Repo Split — **Status:** accepted
 - **ADR-064**: TOPP — Continuous Dispatch (Wave-Barrier Removal) — **Status:** accepted
 - **ADR-062**: Embedded Web Terminal — PTY Sessions, WS Gateway, Auth & Audit — **Status:** accepted
 - **ADR-063**: Consent-Based Prerequisite Provisioning — > **Numbering note (Sprint 175):** This ADR was originally numbered 062 alongside

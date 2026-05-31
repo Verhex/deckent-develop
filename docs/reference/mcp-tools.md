@@ -5,7 +5,7 @@
 Deckent ships an MCP server that exposes orchestration to MCP-compatible IDEs (Claude Code, Cursor, etc.). The tools below are registered in `src/mcp/tools/*.ts` and surfaced via `deckent-mcp` stdio transport.
 
 <!-- AUTOGEN:START id="mcp-tools" -->
-> 31 tools registered. Generated from `src/mcp/tools/*.ts`.
+> 32 tools registered. Generated from `src/mcp/tools/*.ts`.
 
 | Tool | Title | Description |
 |------|-------|-------------|
@@ -24,6 +24,7 @@ Deckent ships an MCP server that exposes orchestration to MCP-compatible IDEs (C
 | `deckent_init` | Initialize Deckent | Initialize a Deckent project in the current directory. Creates all required directories (.deckent/, .brain/, .tasks/, .locks/, .claude/rules/) and configuration files (config.json, DECKENT.md, DIRECTIVES.md, brain files). Safe to re-run — existing config fields are preserved via merge, and files are only written if missing. After init, run deckent_set_directives → deckent_plan → deckent_start. |
 | `deckent_kill` | Kill Worker | Stop one or all running workers. Sets task status to PAUSED, removes heartbeat files, and releases any file locks owned by the task. Use when a worker is stuck (stale heartbeat), consuming too many resources, or needs to be restarted. After killing, run deckent_cleanup to remove task artifacts, then deckent_start to restart. |
 | `deckent_memory_query` | Memory Query | Search project memory — ADRs, sprint learnings, patterns, technical debt. |
+| `deckent_models` | Model Catalog | Browse and manage the Deckent model catalog. Actions: "list" — list all available models (optionally filtered by provider); "refresh" — force-refresh the catalog from models.dev; "tier" — look up the tier of a specific model. Catalog sources: remote (models.dev live), cache (24h TTL), bundled (offline fallback). ADR-022-v2: CLI/MCP parity with `deckent models` CLI command. |
 | `deckent_nervous_accept` | Nervous Accept | Accept a pending Nervous System notification/action. |
 | `deckent_nervous_config` | Nervous Config | Read or modify Nervous System configuration: authority mode preset, action overrides, and list available actions. |
 | `deckent_nervous_reject` | Nervous Reject | Reject a pending Nervous System notification/action. |

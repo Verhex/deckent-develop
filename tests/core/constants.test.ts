@@ -207,8 +207,10 @@ describe('tmux constants', () => {
 });
 
 describe('Brain AI planner constants', () => {
-  it('BRAIN_PLAN_TIMEOUT_MS === 60_000', () => {
-    expect(BRAIN_PLAN_TIMEOUT_MS).toBe(60_000);
+  it('BRAIN_PLAN_TIMEOUT_MS === 900_000', () => {
+    // Sprint 184 bumped 60_000 → 900_000 (Claude opus on 16K-char zero-config
+    // prompt empirically took ~434s; 60s caused SIGTERM). See src/core/constants.ts:104.
+    expect(BRAIN_PLAN_TIMEOUT_MS).toBe(900_000);
   });
 
   it('BRAIN_PLAN_MAX_CONTEXT_LINES === 200', () => {

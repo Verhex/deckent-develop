@@ -14,8 +14,11 @@ describe('docs.json schema validation (Bug R fix)', () => {
     const agentsEntry = parsed.docs.find(d => d.id === 'agents-md');
     expect(agentsEntry, 'agents-md entry missing from .deckent/docs.json').toBeDefined();
     expect(agentsEntry!.path).toBe('AGENTS.md');
-    expect(agentsEntry!.autoSections).toContain('Built-in Agents');
-    expect(agentsEntry!.autoSections).toContain('Last Updated');
+    // The auto-managed section list was narrowed to only `Agent Performance`
+    // after `Built-in Agents` and `Last Updated` were folded into the static
+    // protected portion of AGENTS.md. The protected-sections contract is the
+    // load-bearing half of Bug R; assert it explicitly.
+    expect(agentsEntry!.autoSections).toContain('Agent Performance');
     expect(agentsEntry!.protectedSections).toContain('Identity');
     expect(agentsEntry!.protectedSections).toContain('Architecture');
   });

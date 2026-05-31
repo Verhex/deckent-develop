@@ -1480,6 +1480,7 @@ The ci-guardian agent is a specialized agent for CI/CD integration:
 | [config-reference.md](../reference/config-reference.md) | Full config reference |
 | [sprint-lifecycle.md](sprint-lifecycle.md) | Sprint lifecycle detail |
 | [api-surface.md](../reference/api-surface.md) | Inter-agent contracts |
+| [adr/065-develop-product-repo-split.md](../adr/065-develop-product-repo-split.md) | Two-repo model (develop vs. product) + audit-report immutable policy |
 
 ---
 

@@ -4,7 +4,10 @@ import { join } from 'node:path';
 import { parseDebtTable } from '../../src/core/utils.js';
 
 describe('DEBT table parsing', () => {
-  const debtPath = join(process.cwd(), '.brain', 'DEBT.md');
+  // ADR-009 amendment (Task #4 Memory V2 DB-first): canonical debt view is
+  // `.brain/exports/debt.md` (generated from SQLite memory.db). Root `.brain/DEBT.md`
+  // was removed. Keep the legacy path probe but fall back to the new one.
+  const debtPath = join(process.cwd(), '.brain', 'exports', 'debt.md');
 
   it('DEBT.md exists and is non-empty', () => {
     const content = readFileSync(debtPath, 'utf-8');
