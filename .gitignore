@@ -136,4 +136,4 @@ kendimenot.md
 docs/core-memory/
 # Test temp dir leaks + editor backups (not source)
 .test-archive-debt-*/
-*.md.bak
+*.md.bak.deckent/provider-cache.json
