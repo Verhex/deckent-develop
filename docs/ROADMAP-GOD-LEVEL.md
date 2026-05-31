@@ -35,13 +35,13 @@
 **F1 — Provider Independence (kuzey-yıldızı temeli)** — kod-doğrulanmış, ~125 LoC P0 + hardening:
 | ID | İş | Öncelik | Kanıt |
 |----|----|---------|-------|
-| F1-001 | Ollama provider bootstrap kaydı (detectOllama + factory) | **P0** | provider.ts:405-411,682-695 Ollama detect/factory YOK |
-| F1-002 | Ollama model registry (tier→local model) | **P0** | model-registry.ts:62-82 sadece claude/codex/gemini |
-| F1-003 | Claude-hardcode temizliği (12 site `?? 'claude'`) | **P0** | task-router/model-selector/prompt-god/sprint-utils 12/12 doğrulandı |
-| F1-004 | Docker provider-aware CLI invocation | P1 | spawn-backend-docker.ts:322 hardcoded `claude` |
-| F1-005 | Dockerfile.worker multi-CLI (build-arg opt-in) | P1 | Dockerfile.worker:21-22 codex/gemini yorum |
-| F1-006 | Token throttle (computeBackoff wire + tpm cap) | P1 | anthropic-http-client.ts:290-316 ÖLÜ KOD (0 caller) |
-| F1-007 | Doc-align (Gate #8 PARTIAL + chat.ts live + Sprint 185-200 arşiv) | **P0** | beta-tracker:23 vs :493/495 çelişki |
+| F1-001 | Ollama provider bootstrap kaydı (detectOllama + factory) | **P0** | ✅ DONE Sprint 202-001 |
+| F1-002 | Ollama model registry (tier→local model) | **P0** | ✅ DONE Sprint 202-002 (ollama-models.ts) |
+| F1-003 | Claude-hardcode temizliği (12 site `?? 'claude'`) | **P0** | ✅ DONE Sprint 202-003 (getDefaultProvider, 10→3) |
+| F1-004 | Docker provider-aware CLI invocation | P1 | ⬜ Sprint 203-001/002 |
+| F1-005 | Dockerfile.worker multi-CLI (build-arg opt-in) | P1 | ⬜ Sprint 203-003 |
+| F1-006 | Token throttle (computeBackoff wire + tpm cap) | P1 | ✅ DONE Sprint 202-004 (token-quota.ts +456) |
+| F1-007 | Doc-align (Gate #8 PARTIAL + chat.ts live + Sprint 185-200 arşiv) | **P0** | ✅ DONE Sprint 202-005 |
 
 **F2 — Native Chat Path C (AI Asistan yüzü)** — ~600-1200 LoC:
 | ID | İş | Öncelik |
