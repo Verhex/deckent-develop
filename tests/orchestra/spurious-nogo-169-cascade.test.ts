@@ -11,13 +11,10 @@
 
 import { describe, it, expect } from 'vitest';
 import {
+  enforceHonestResultGate,
   validateResultSchema,
   evaluateWithRubric,
 } from '../../src/orchestra/result-evaluator.js';
-// Sprint 207: enforceHonestResultGate's canonical home is honest-gate.ts (its
-// re-export from result-evaluator was removed in Sprint 194). Importing it from
-// the wrong module made it `undefined` → "not a function" in isolated runs.
-import { enforceHonestResultGate } from '../../src/orchestra/honest-gate.js';
 import type { Task, TaskResult } from '../../src/core/task-types.js';
 
 function bugFixTask(id = '169-001', overrides: Partial<Task> = {}): Task {
