@@ -1,6 +1,8 @@
 # Deckent — Product Roadmap
 
-**Last updated:** 2026-05-31 — Sprint 195-197 Worker Prompt God-Level Stream + Disk-Verify Gate landed; Sprint 198 Brain dürüst raporlama closure in flight. 1 Haziran 2026 OSS beta launch window: 1 day. See `docs/release/beta-tracker.md` Sprint 184-197 ledger for the Sprint-by-Sprint outcome table.
+**Last updated:** 2026-05-31 — Sprint 202-205 kuzey-yıldızı stream landed: provider-free %100 (Ollama + Docker provider-aware), native chat %60 (Path C tool-use loop + streaming + multi-turn + resume), F3 process mode başladı (tenant + scheduled flows), F4 enterprise iskelet (audit query), agent routing fix CANLI (built-in agent seçiliyor). 1 Haziran 2026 OSS beta launch window.
+
+> **⚠ AKTİF PLAN:** Sprint-bazlı yürütme planı **[docs/ROADMAP-GOD-LEVEL.md](../ROADMAP-GOD-LEVEL.md) §EXECUTION TRACKER**'dadır (kod-doğrulanmış, canlı). Bu dosya ürün vizyonu çerçevesi için korunur. Güncel durum: provider-free %100 · konuşulabilir %60 · 3-yüz (Developer ~%90, System Worker ~%45, Asistan ~%50).
 
 > **"Install it. Run it. Own it."**
 >
