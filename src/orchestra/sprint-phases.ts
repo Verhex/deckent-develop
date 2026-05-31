@@ -1182,6 +1182,26 @@ export async function runEvaluatePhase(
         handleEvaluation(projectRoot, task, evaluation, result);
         evaluations.set(task.id, evaluation);
 
+        // Sprint 207 P1-2 (forensic Sprint 206): persist Brain's verdict back to the
+        // .result file. Until now the Brain decision lived only in the audit ledger
+        // (.deckent/evaluations/*.json); inspecting a .result showed the worker's
+        // self-claim ("DONE") with no trace of WHY a FIX was spawned — the exact
+        // observability gap that made the Sprint 206 false-FIX cascade hard to see.
+        // brainEvaluation + brainEvaluationReason are Brain-owned fields written
+        // alongside (never overwriting) the worker's selfAssessment.
+        try {
+          const resultPath = join(projectRoot, '.tasks', `task-${task.id}.result`);
+          if (existsSync(resultPath)) {
+            const persisted = readJsonSafe<TaskResult & { brainEvaluation?: string; brainEvaluationReason?: string }>(resultPath);
+            if (persisted) {
+              const verdictLabel = toAuditDecision(evaluation);
+              persisted.brainEvaluation = verdictLabel;
+              persisted.brainEvaluationReason = `rubric total ${rubricResult.totalScore} → ${verdictLabel}`;
+              writeFileSync(resultPath, JSON.stringify(persisted, null, 2) + '\n', 'utf-8');
+            }
+          }
+        } catch (e) { debugLog('runEvaluatePhase:persistBrainVerdict', e); }
+
         // Sprint 161 Task 2 (T-003): per-task forensic audit record.
         // Joins the rubric outcome with the task's rubric definition
         // (for threshold + weight) and writes a JSON file under

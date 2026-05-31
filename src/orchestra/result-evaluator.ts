@@ -643,7 +643,10 @@ export function validateResultSchema(result: TaskResult, task?: Task): ResultSch
     // Sprint 154 Bug B fix: doc-write and audit tasks may report coverage:null
     // because they don't produce executable code. The rubric registry tells us
     // whether coverage is required for this task's type.
-    if (!(task && coverageOptional(task))) {
+    // Sprint 207 P0-1: pass `result` so coverageOptional can use the signal-based
+    // path (wrote tests / tests passed) — agent-independent, breaks the false-FIX
+    // cascade where the same result was NO_GO under refactorer but DONE under bug-fixer.
+    if (!(task && coverageOptional(task, result))) {
       missingFields.push('coverage');
     }
   }
@@ -660,7 +663,7 @@ export function validateResultSchema(result: TaskResult, task?: Task): ResultSch
     // This generalizes P0-1 (Sprint 169, coverage-only) to the full
     // test-execution-dependent group — breaking the per-field spurious-NO_GO
     // patch cycle (Sprint 137-171 "her sprint farklı maske").
-    if (!(task && coverageOptional(task))) {
+    if (!(task && coverageOptional(task, result))) {
       missingFields.push('testsPassed');
     }
   }
@@ -740,10 +743,22 @@ export function scoreTestCoverage(result: TaskResult): RubricScore {
     };
   }
 
-  let score = Math.min(result.coverage, 100);
+  // Sprint 207 P0-3 (forensic Sprint 206): NaN propagation guard. When a worker
+  // omits coverage (undefined) or writes null, Math.min(undefined, 100) = NaN →
+  // totalScore = NaN → decision NO_GO ("score=NaN/100"), a false failure even for
+  // landed work. Normalize non-finite coverage to a neutral 0 here; combined with
+  // hasNewTests credit and the coverageOptional schema relaxation, a test-writing
+  // task is no longer punished for an unmeasured coverage number.
+  const cov = (typeof result.coverage === 'number' && Number.isFinite(result.coverage))
+    ? result.coverage
+    : 0;
+  let score = Math.min(cov, 100);
   if (hasNewTests) score = Math.min(score + 15, 100);
 
-  const reasons: string[] = [`coverage ${result.coverage}%`];
+  const covLabel = (typeof result.coverage === 'number' && Number.isFinite(result.coverage))
+    ? `${result.coverage}%`
+    : 'unmeasured';
+  const reasons: string[] = [`coverage ${covLabel}`];
   if (hasNewTests) reasons.push('new test files written');
 
   return { criterion: 'test_coverage', score, passed: score >= 50, reason: reasons.join('; ') };

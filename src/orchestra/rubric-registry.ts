@@ -194,6 +194,14 @@ const COVERAGE_OPTIONAL_AGENTS = new Set([
   'architect',
   'architecture-planner',
   'doc-writer',
+  // Sprint 207 P0-2 (forensic Sprint 206): refactorer + code-reviewer routinely
+  // report coverage:null (targeted edits / review work). Their omission caused 7
+  // false-FIX cycles in Sprint 206 — same result DONE under bug-fixer, NO_GO under
+  // refactorer. This is the BRIDGE fix; coverageOptional's signal-based path (P0-1)
+  // is the permanent agent-independent solution.
+  'refactorer',
+  'code-reviewer',
+  'refactorer-temp',
 ]);
 
 /**
@@ -210,10 +218,20 @@ const COVERAGE_OPTIONAL_AGENTS = new Set([
  * Fixes Sprint 153 Bug B (coverage:null → NO_GO on doc tasks) and
  * Sprint 169 169-001 (bug-fixer agent coverage:null cascade).
  */
-export function coverageOptional(task: Task): boolean {
+export function coverageOptional(task: Task, result?: { filesChanged?: string[]; testsPassed?: boolean }): boolean {
   if (detectTaskType(task) !== 'code-development') return true;
   const agent = task.assignedAgent;
   if (agent && COVERAGE_OPTIONAL_AGENTS.has(agent)) return true;
+  // Sprint 207 P0-1 (forensic Sprint 206): signal-based, agent-independent path.
+  // A code-development task that wrote new test files OR reports tests passing has
+  // demonstrably exercised its code — coverage:null is then a measurement gap, not
+  // a quality failure. This is deterministic + idempotent (attempt-1 and FIX-retry
+  // evaluate the SAME result identically regardless of which agent runs it), which
+  // permanently breaks the "every sprint a different mask" spurious-NO_GO cycle.
+  if (result) {
+    const wroteTests = result.filesChanged?.some(f => f.includes('.test.') || f.includes('.spec.')) ?? false;
+    if (wroteTests || result.testsPassed === true) return true;
+  }
   return false;
 }
 
