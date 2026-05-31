@@ -91,6 +91,20 @@
 
 > **Not (2026-05-31):** Auth altyapısı KISMEN var — per-task `- Auth:` override (spawn-backend-docker.ts:862 readTaskAuthMode) + config `auth_mode: subscription\|api\|hybrid` mevcut. AMA hybrid tam wire değil, API gerçek aktivasyon POST-BETA. Şu an default + zorunlu **subscription-first** ([[project_api_mode_deferred_post_beta]] — Tier-1 30K tok/min cap nedeniyle API beta sırasında YASAK). F6 ile her kombinasyon (cloud-sub / cloud-api / local-ollama / hybrid) seçilebilir olacak.
 
+**F7 — Dashboard & Control Plane (User + Enterprise Friendly)** — Alperen direktifi 2026-05-31, YÜKSEK öncelik:
+> **Vizyon:** Dashboard god-level — UI/UX harika tasarım + konsept, TAM işlevsel, herkesin (developer/şirket/sade kişi, 3-yüz) her işini kontrol edebildiği ve anladığı, tamamen user-enterprise friendly tek kontrol düzlemi. Mevcut: src/dashboard 44 tsx (Layout/Sidebar/WorkerCard/TaskCard/SprintChart/ActivityFeed/AgentDetail/DebtTable/DockPanel/SprintPhaseTimeline + i18n TR/EN + SSE/useApi) — altyapı VAR ama işlevsel/güncel değil + terminal zayıf + API auth-disabled olmadan çalışmıyor.
+
+| ID | İş | Öncelik | Durum/Kanıt |
+|----|----|---------|-------------|
+| F7-001 | API auth fix — `DECKENT_API_AUTH_DISABLED=1` olmadan güvenli çalışsın (token akışı + localhost auto-inject + prod-safe default) | **P1** | src/api/{server,auth}.ts + terminal/auth-provider.ts; şu an auth-disabled şart |
+| F7-002 | Dashboard canlı veri parite — tüm panel gerçek-zamanlı doğru (sprint/worker/agent/memory/debt/checkpoint) SSE/WS | **P1** | 44 tsx + useSSE/useApi var ama veri güncel/işlevsel değil |
+| F7-003 | UI/UX redesign — god-level tasarım+konsept (modern, sezgisel, responsive, dark/light, herkesin anladığı bilgi mimarisi) | **P1** | ThemeProvider + i18n temel var |
+| F7-004 | Terminal güçlendir — embedded web terminal (ADR-062) tam işlevsel, çok-oturum, kopyala/yapıştır, geçmiş | P2 | terminal-api.ts + ws-gateway zayıf |
+| F7-005 | Sprint kontrol paneli — plan/start/status/kill/review/retro UI'dan (onay-gate'li), canlı faz görselleştirme | P2 | NewSprintModal + SprintPhaseTimeline var |
+| F7-006 | Enterprise görünüm — multi-tenant dashboard (F4) + RBAC-aware UI (rol bazlı panel) + audit-log viewer + multi-project | P2 | F4 backend (rbac/tenant/audit) ile entegre |
+| F7-007 | Memory/ADR/debt explorer — FTS5 arama, ADR timeline, debt trend, pattern görsel | P3 | DebtTable + SimpleMarkdown genişlet |
+| F7-008 | Onboarding + herkes-için akış — sade kişi sihirbazı (init→directives→start), tooltip/rehber, sıfır-config | P3 | 3-yüz: sade kişi friendly |
+
 **Sıra:** F1 (P0) → F1 (P1) → F2 → F3 → F4 → F5 → F6. Bugün F1'den başlanır, dogfood + kontrol döngüsüyle ilerlenir. **Yürütme stratejisi (2026-05-31): bol-küçük-task (tek-sorumluluk, ≤200 LoC, effort≤normal — high YOK, timeout önler) + 10 worker = yüksek paralellik + hız.**
 
 ---
