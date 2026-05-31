@@ -17,7 +17,7 @@
 | Yüz | Kitle | Mode | Olgunluk | En büyük boşluk |
 |-----|-------|------|----------|------------------|
 | **AI Developer** | Geliştirici | Sprint Mode | **~%90** | Beta hazır; provider-free + quota-safe eksik |
-| **AI System Worker** | Şirket | Process Mode | **~%55** | Event-driven triggers + RBAC iskelet → tam multi-tenant runtime kalan |
+| **AI System Worker** | Şirket | Process Mode | **~%65** | Flow runtime daemon + self-dispatch guard DONE; tenant runtime + RBAC hierarchy DONE; F4 audit-writer DONE; F3-004 k8s kalan |
 | **AI Asistan** | Sade kişi | Chat Mode | **~%50** | F2-003 streaming/multi-turn/resume DONE (Sprint 204); F2-001/002 kalan |
 
 ### TAMAMLANAN (kanıtlı)
@@ -47,6 +47,8 @@
 
 > **Sprint 207 sonuç (2026-05-31):** **zero-hardcode başlangıç** — bundled opus apiId güncel (`claude-opus-4-8`) + `bootstrapFromCatalog` apiId merge wire + `cost-calculator` parametrik model-label (Sprint 207-001/002/003, ADR-070). **Brain-fix canlı doğrulama DONE** — `coverage:null` false-FIX cascade → 0; `coverageOptional` artık sinyal-temelli (`wroteTests` flag, agent-bağımsız idempotent, Sprint 207 P0-1). **F4-001 RBAC gate wire** — `audit-query.ts` `queryAudit(params, role)` → `can()` enforce (Sprint 207-007, ADR-070). Yeni ADR: 070 (brain-eval-integrity + zero-hardcode) — accepted.
 
+> **Sprint 208 sonuç (2026-05-31):** **zero-hardcode TAM** — `mergeFromCatalog` apiId-aware eşleşme kök-bug fix (208-001), CLI/help parametrik sayılar (208-002), brain-context model-label registry'den (208-003), `zero-hardcode-audit.mjs` lint guard CI (208-004, ADR-070 kalıcı koruma). **F3 otonom-mod temeli** — `FlowRuntime` daemon tick-loop (208-005), `SelfDispatchPolicy` + `evaluateDispatch` guard (requiresApproval=true, 208-006), `deckent flow run` CLI (208-007), `withTenant`/`currentTenant` runtime izolasyon (208-008). **F4 enterprise** — RBAC role hierarchy admin>operator>viewer + PERMISSION_MATRIX (208-009), flow-registry RBAC gate (208-010), `writeAuditEvent` yapılandırılmış audit yazımı (208-011), `EnterpriseConfig` opt-in schema (208-012). **F5 evrimsel başlangıç** — `evolvePrompt` outcome→prompt kural-temelli (208-013), adaptive-agent wire (208-014). Yeni ADR: 071 (autonomous-enterprise) — proposed.
+
 **F2 — Native Chat Path C (AI Asistan yüzü)** — ~600-1200 LoC:
 | ID | İş | Öncelik | Kanıt |
 |----|----|---------|-------|
@@ -61,19 +63,23 @@
 | F3-002 | Scheduled flows + cron | P2 | ✅ DONE Sprint 205-005/006/007 (scheduled-flow.ts + flow-registry.ts + flow CLI) |
 | F3-003 | Event-driven webhook/event triggers (EventTrigger + matchTrigger) | P3 | ✅ DONE Sprint 206-005 (event-trigger.ts, ADR-069) |
 | F3-004 | SessionBackend k8s pod-exec | P3 | ⬜ |
+| F3-005 | Flow runtime daemon (FlowRuntime tick-loop, start/stop) | P2 | ✅ DONE Sprint 208-005 (flow-runtime.ts) |
+| F3-006 | Self-dispatch protocol (SelfDispatchPolicy, requiresApproval guard) | P2 | ✅ DONE Sprint 208-006 (self-dispatch.ts, ADR-071) |
+| F3-007 | Tenant runtime context wire (withTenant, currentTenant, path isolation) | P2 | ✅ DONE Sprint 208-008 (tenant-context.ts extension) |
 
 **F4 — Enterprise + Million-User (Sub-project #4)** — post-F3:
 | ID | İş | Öncelik | Kanıt |
 |----|----|---------|-------|
-| F4-001 | OIDC/SSO AuthProvider impl + RBAC | P3 | 🟡 Sprint 206-008 iskelet: rbac.ts (Role + Permission + can(), ADR-069) + Sprint 207-007 RBAC gate wire: audit-query `queryAudit(params, role)` → `can()` enforce (ADR-070) |
-| F4-002 | Audit export API + compliance (SOC2/GDPR) | P3 | 🟡 Sprint 205-008 başlangıç: audit-query.ts (read-only filter) + ADR-068 |
+| F4-001 | OIDC/SSO AuthProvider impl + RBAC | P3 | 🟡 Sprint 206-008 iskelet: rbac.ts (Role + Permission + can(), ADR-069) + Sprint 207-007 RBAC gate wire + **Sprint 208-009 RBAC hierarchy (admin>operator>viewer, PERMISSION_MATRIX, ADR-071)** + Sprint 208-010 flow-registry RBAC gate |
+| F4-002 | Audit export API + compliance (SOC2/GDPR) | P3 | 🟡 Sprint 205-008 başlangıç: audit-query.ts (read-only filter) + ADR-068 + **Sprint 208-011 audit-writer.ts (writeAuditEvent, round-trip uyumlu, ADR-071)** |
 | F4-003 | Rate/resource limits + load hardening | P3 | ⬜ |
+| F4-004 | Enterprise config schema (tenancy + rbac + flow opt-in) | P3 | ✅ DONE Sprint 208-012 (enterprise-config.ts, EnterpriseConfig, parseEnterprise) |
 
 **F5 — Evrimsel Mimari (W-E/W-K, DORMANT wire)** — post-beta:
-| ID | İş | Öncelik |
-|----|----|---------|
-| F5-001 | prompt-evolution.ts wire (0 caller → live) | P3 |
-| F5-002 | adaptive-agent + cross-sprint-analyzer wire | P3 |
+| ID | İş | Öncelik | Kanıt |
+|----|----|---------|----|
+| F5-001 | prompt-evolution.ts wire (0 caller → live) | P3 | 🟡 Sprint 208-013: `evolvePrompt` kural-temelli iskelet (outcome→prompt öneri, LLM çağrısı yok) |
+| F5-002 | adaptive-agent + cross-sprint-analyzer wire | P3 | 🟡 Sprint 208-014: adaptive-agent wire + caller doğrulama |
 
 **F6 — Auth Flexibility (subscription/api/hybrid/local matrix)** — post-beta (API gerçek aktivasyon 1 Haziran sonrası):
 | ID | İş | Öncelik |
