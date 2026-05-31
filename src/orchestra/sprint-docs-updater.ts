@@ -20,6 +20,8 @@ import { resolveDebt } from './debt-manager.js';
 import { getDebtItems } from '../core/debt-store.js';
 import { debugLog } from '../core/utils.js';
 import { modelRegistry } from '../core/model-registry.js';
+import type { RegistryProviderName } from '../core/model-registry.js';
+import { getDefaultProviderName } from './sprint-utils.js';
 import { extractSprintNumber } from './sprint-metrics.js';
 import {
   buildSprintLogLines,
@@ -68,12 +70,21 @@ export function writeSprintLog(projectRoot: string, sprint: Sprint, metrics: Spr
  */
 export function updateProjectDocs(projectRoot: string, sprintResult: SprintResult, config?: ResolvedConfig, results?: TaskResult[]): DocUpdateResult[] {
   const isInternalProject = existsSync(join(projectRoot, 'DECKENT-MASTER-BLUEPRINT.md'));
+  // Sprint 202 Task 202-003: resolve the registry default provider before
+  // falling through to the hard-coded ('claude', 'premium') pair so that
+  // pure-Ollama / pure-Codex configs don't silently materialize an `'opus'`
+  // model their adapter can't run.
+  const defaultProviderName = getDefaultProviderName() as RegistryProviderName;
+  const defaultPremiumModelId =
+    modelRegistry.getByProviderAndTier(defaultProviderName, 'premium')?.id
+    ?? modelRegistry.getByProviderAndTier('claude', 'premium')?.id
+    ?? 'opus';
   const resolvedConfig: ResolvedConfig = config ?? {
     mode: 'performance',
     activeModeConfig: {
       max_workers: 8,
-      brain_model: (modelRegistry.getByProviderAndTier('claude', 'premium')?.id ?? 'opus') as ResolvedConfig['activeModeConfig']['brain_model'],
-      default_model: (modelRegistry.getByProviderAndTier('claude', 'premium')?.id ?? 'opus') as ResolvedConfig['activeModeConfig']['default_model'],
+      brain_model: defaultPremiumModelId as ResolvedConfig['activeModeConfig']['brain_model'],
+      default_model: defaultPremiumModelId as ResolvedConfig['activeModeConfig']['default_model'],
       haiku_allowed: true,
       brain_planning: 'auto',
     },

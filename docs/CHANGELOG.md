@@ -2,6 +2,17 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint202] - 2026-05-31
+
+### Added
+
+- 202-001 — Ollama provider bootstrap kaydı (detectOllama + factory)
+- 202-003 — Claude-hardcode temizliği (registry-default fallback)
+- 202-005 — Doc-align (Gate #8 PARTIAL + chat.ts live + Sprint 185-200 arşiv)
+
+
+_Tasks: 9 total, 4 done, 0 tech debt, 5 no-go_
+
 ## [1.0.0-beta.1-sprint201] - 2026-05-31
 
 ### Added

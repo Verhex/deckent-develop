@@ -5489,3 +5489,30 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 201-006: 201-006 — Test baseline 28 → ≤20 attack (NO_GO)
 
 ---
+## Sprint 202 — sprint-202
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-05-31
+**Duration:** 3379s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 9 |
+| Completed | 4 |
+| Tech Debt | 0 |
+| No-Go | 5 |
+| Coverage | 0.0% |
+| Duration | 3379359ms |
+
+### Tasks
+
+- 202-001: 202-001 — Ollama provider bootstrap kaydı (detectOllama + factory) (DONE)
+- 202-002: 202-002 — Ollama model registry (tier→local model) (NO_GO)
+- 202-003: 202-003 — Claude-hardcode temizliği (registry-default fallback) (DONE)
+- 202-004: 202-004 — Token throttle (computeBackoff wire + pre-spawn quota gate) (NO_GO)
+- 202-005: 202-005 — Doc-align (Gate #8 PARTIAL + chat.ts live + Sprint 185-200 arşiv) (DONE)
+- 202-006: 202-006 — Provider-free smoke verify (sıfır-API-key + Ollama senaryosu) (NO_GO)
+
+---
