@@ -1021,6 +1021,75 @@ export function runPreFlightHealthCheck(root: string): PreFlightResult {
   };
 }
 
+export interface RamExperimentReport {
+  hostGB: number;
+  source: string;
+  maxWorkers: number;
+  workerMemGB: number;
+  peakWorkerGB: number;
+  hostOverheadGB: number;
+  totalRequiredGB: number;
+  verdict: 'Safe' | 'Risky' | 'Cannot determine';
+  recommendation: string;
+}
+
+/** Parse worker_memory_limit config value ("2g", "512m", "1024k") to GB. Returns 2 for unknown. */
+export function parseWorkerMemoryGB(limit: string | undefined): number {
+  if (!limit) return 2;
+  const m = limit.trim().match(/^(\d+(?:\.\d+)?)(g|gb|m|mb|k|kb)?$/i);
+  if (!m) return 2;
+  const val = parseFloat(m[1] ?? '2');
+  const unit = (m[2] ?? 'g').toLowerCase();
+  if (unit.startsWith('m')) return val / 1024;
+  if (unit.startsWith('k')) return val / (1024 * 1024);
+  return val;
+}
+
+/** Compute peak-RAM requirement and verdict for a given worker config. */
+export function computeRamExperiment(
+  hostGB: number,
+  source: string,
+  maxWorkers: number,
+  workerMemGB: number,
+): RamExperimentReport {
+  const hostOverheadGB = 2;
+  const peakWorkerGB = maxWorkers * workerMemGB;
+  const totalRequiredGB = peakWorkerGB + hostOverheadGB;
+
+  let verdict: RamExperimentReport['verdict'];
+  let recommendation: string;
+
+  if (hostGB <= 0) {
+    verdict = 'Cannot determine';
+    recommendation = 'Cannot determine host RAM — verify manually before running multi-worker sprint.';
+  } else if (hostGB >= totalRequiredGB) {
+    verdict = 'Safe';
+    recommendation = `Host RAM (${hostGB} GB) ≥ required (${totalRequiredGB} GB). Config is safe.`;
+  } else {
+    verdict = 'Risky';
+    const needed = Math.ceil(totalRequiredGB + 1);
+    recommendation = `Host RAM (${hostGB} GB) < required (${totalRequiredGB} GB) — OOM risk. Recommend: set ~/.wslconfig memory=${needed}GB, restart WSL2.`;
+  }
+
+  return { hostGB, source, maxWorkers, workerMemGB, peakWorkerGB, hostOverheadGB, totalRequiredGB, verdict, recommendation };
+}
+
+/** Format a RamExperimentReport for human-readable CLI output. */
+export function formatRamExperiment(report: RamExperimentReport): string {
+  const symbol = report.verdict === 'Safe' ? '✓' : report.verdict === 'Risky' ? '⚠' : '?';
+  const lines = [
+    'RAM Experiment Report',
+    `Host RAM: ${report.hostGB} GB (source=${report.source})`,
+    `Current config: max_workers=${report.maxWorkers}, worker_memory_limit=${report.workerMemGB}g`,
+    `Peak RAM need: ${report.peakWorkerGB} GB (workers) + ${report.hostOverheadGB} GB (host overhead) = ${report.totalRequiredGB} GB`,
+    `Recommendation: ${symbol} ${report.verdict}`,
+  ];
+  if (report.verdict !== 'Safe') {
+    lines.push(`  ${report.recommendation}`);
+  }
+  return lines.join('\n');
+}
+
 export function registerDoctor(program: Command): void {
   program
     .command('doctor')
@@ -1031,7 +1100,8 @@ export function registerDoctor(program: Command): void {
     .option('--pre-flight', 'Run pre-flight health check before sprint spawn (stricter gates)')
     .option('--providers', 'Show detailed provider diagnostics (binary, version, auth) for Claude/Codex/Gemini')
     .option('--memory', 'Show host RAM detection (/proc/meminfo first, os.totalmem fallback) and suggested max_workers')
-    .action(async (opts: { profile?: boolean; legacy?: boolean; json?: boolean; preFlight?: boolean; providers?: boolean; memory?: boolean }) => {
+    .option('--ram-experiment', 'Show 6-worker × 2g RAM scenario verdict (Safe/Risky) based on current config and host RAM')
+    .action(async (opts: { profile?: boolean; legacy?: boolean; json?: boolean; preFlight?: boolean; providers?: boolean; memory?: boolean; ramExperiment?: boolean }) => {
       let root: string;
       try {
         root = resolveProjectRoot();
@@ -1081,6 +1151,31 @@ export function registerDoctor(program: Command): void {
           return;
         }
         print(`Host: ${detection.totalGB} GB (source=${detection.source}), suggested max_workers: ${suggested}`);
+        return;
+      }
+
+      // --ram-experiment: 6-worker × 2g scenario verdict (Sprint 198 Task 198-005)
+      if (opts.ramExperiment) {
+        const detection = detectHostMemory();
+        let maxWorkers = 6;
+        let workerMemoryLimit = '2g';
+        try {
+          const cfgPath = join(root, PROJECT_CONFIG_PATH);
+          if (existsSync(cfgPath)) {
+            const raw = JSON.parse(readFileSync(cfgPath, 'utf-8')) as Record<string, unknown>;
+            if (typeof raw['max_workers'] === 'number') maxWorkers = raw['max_workers'] as number;
+            if (typeof raw['worker_memory_limit'] === 'string') workerMemoryLimit = raw['worker_memory_limit'] as string;
+          }
+        } catch { /* use defaults */ }
+        const workerMemGB = parseWorkerMemoryGB(workerMemoryLimit);
+        const report = computeRamExperiment(detection.totalGB, detection.source, maxWorkers, workerMemGB);
+        if (opts.json) {
+          print(JSON.stringify(report, null, 2));
+          if (report.verdict === 'Risky') process.exitCode = 1;
+          return;
+        }
+        print(formatRamExperiment(report));
+        if (report.verdict === 'Risky') process.exitCode = 1;
         return;
       }
 

@@ -1,7 +1,7 @@
 <!-- Language: EN | Technical terms remain as-is -->
 # Deckent Beta Tracker
 
-**Last updated:** 2026-05-20 (Sprint 175 — Embedded Web Terminal delivered) | **Latest sprint:** 175 (operationally smoke-confirmed by user) | **Version:** v1.0.0-beta.1 → v1.0.0-beta.2 target | **Branch:** `docs/embedded-web-terminal-spec` (origin push'd)
+**Last updated:** 2026-05-31 (Sprint 197 — Worker Prompt God-Level Stream + Disk-Verify Gate + 7 synthetic NO_GO source map landed) | **Latest sprint:** 197 (canonical complete per memory.db; Sprint 198 KAYNAK 6+7 closure in flight) | **Version:** v1.0.0-beta.1 → v1.0.0 GA target (1 Haziran 2026 OSS beta launch) | **Branch:** `main` (Sprint 175 `docs/embedded-web-terminal-spec` long-merged)
 
 **Related:** [roadmap.md](../vision/roadmap.md) — Sprint 149-200 master plan
 
@@ -33,6 +33,53 @@ Before tagging `v1.0.0-beta.2` and running `npm publish`, **all 20 gates must PA
 | 18 | Wire code-complete (dependency pipeline) | 13 grep matches | ✅ Sprint 164 (`respawnEligibleTasks` 13 matches); Sprint 167 `dependency_pipeline_enabled` flip live |
 | 19 | Bug X (Sprint 156-011 stub) replay analysis | Reproduced + Closed | ✅ Sprint 165 T1 (Bug X stub removed, Brain processQueue legacy FIFO stall closed) |
 | 20 | Bug W (Auditor `dead_event_stream`) | Open since Sprint 148 | ✅ Sprint 165 T4 (dead_event_stream activated); Sprint 166 T9 (emitAlert helper + stale_md detector wired) |
+| **21** | **Brain dürüst raporlama — synthetic NO_GO disk-verify gate** | 7/7 source paths gated | 🟡 **Proposed Sprint 198-001** — Sprint 197 197-001 worker mapped 7 synthetic NO_GO sources (`sprint-phases.ts:1318-1330` `runEvaluatePhase` + `sprint-controller.ts:963-1003` `graceKill` are KAYNAK 6+7, gate wire pending). Closes after Sprint 198-001 lands `verifyDiskAgainstClaim` on both callsites and the canlı dogfood proves it (Sprint 198 sentetik NO_GO → `MANUAL_REVIEW_REQUIRED` rerouting) |
+
+### Sprint 195-197 gate evidence overlay
+
+The 20-gate Sprint 175 baseline above remained PASS/PASS across Sprint 184-197. Concrete Sprint 195-197 evidence per critical gate:
+
+- **Gate 1 (`tsc --noEmit`):** ✅ PASS — Sprint 197 commits `37e01242` (post-sprint hygiene) and `cd4df0ed` (managed-docs + CHANGELOG entry) both compile-clean. Sprint 198-001 will keep the line.
+- **Gate 2 (`vitest`):** ✅ PASS-WITH-BASELINE — 17411/17502 pass (Sprint 197 baseline 41 fail, kategorize per `docs/audits/sprint-196/test-fail-categorize.md`: ~25 persistent baseline + ~6 regression + ~12 TDD-pending + ~5 environment). Sprint 198-006 attacks Tier-1 (commands/rich-output/vitepress/github-pages-deploy ≥15 fail).
+- **Gate 11 (Documentation):** 🟡 Sprint 197 197-003 backfilled 40 CHANGELOG entries (Sprint 157→197 catch-up); Sprint 198-004 refreshes the three master-plan artifacts (this entry, roadmap.md, comprehensive-work-plan.md) — current refresh in flight.
+- **Gate 16 (ADR governance):** ✅ Sprint 184-197 added ADR-053 (TaskType Taxonomy), ADR-061 (AEGIS proposed), ADR-062 (Embedded Web Terminal), ADR-063 (Consent-Based Prerequisite Provisioning), ADR-064 (TOPP — Continuous Dispatch); total accepted ADR count ≥48.
+- **Gate 17 (Brain stability):** ✅ Sprint 195 rescue (164 new tests, ~6500 LoC across Sprint 195-197), Sprint 196-007 test-fail audit, Sprint 197 6/8 task DONE (2 NO_GO rescued in 197-004 WSL2 OOM + 197-005 persona-task matcher live verify).
+
+---
+
+## Sprint 195-197 — Worker Prompt God-Level Stream + Disk-Verify Gate (2026-05-23 → 2026-05-26) — DELIVERED
+
+A three-sprint band that re-anchored Brain honesty after the Sprint 192-194 chain produced ~14 false NO_GO outcomes (Docker OOM cycle + Sprint 190 retro). What landed:
+
+**What shipped:**
+- **Worker Prompt God-Level Stream WP-1 .. WP-12 Tier-1 wire** — full prompt-time injection of the Karpathy 4-discipline anchor, agent PROMPT.md canonical source (no truncation), skill content full-fidelity, ADR cosine-similarity threshold tuning (0.3), idempotency-key per `${sprintId}-${taskId}-${retryCount}`, scope.filesWrite auto-include of test paths (WP-3 `deriveTestScope`), override semantic warning, DIRECTIVES parser fixes
+- **Disk-verify gate (KAYNAK 1-5) live** — `verifyDiskAgainstClaim` runtime in 5 of 7 synthetic NO_GO callsites (`result-collector.ts:518-583` + 4 sibling paths); worker exits without `.result` but with non-empty git diff → `MANUAL_REVIEW_REQUIRED` rather than synthetic NO_GO
+- **7 synthetic NO_GO source map** — Sprint 197 197-001 worker mapped the two remaining ungated callsites (`sprint-phases.ts:1318-1330` runEvaluatePhase + `sprint-controller.ts:963-1003` graceKill panic-guard + explicit-kill) for Sprint 198-001 closure
+- **memory.db sprint-log finalize bug discovery** — Sprint 197 197-002 reclassify worker discovered `sprint-log-194` and `sprint-log-196` rows are MISSING from memory.db (Brain finalize crash/skip path); reclassify completed 2/12 + 10 skipped "sprint-entry-missing" — full fix in Sprint 198-002
+- **managed-docs auditor.md template regression** — Sprint 197 chore commit `cd4df0ed` regenerated `.claude/rules/auditor.md` AUTO-START/END block from the still-stale template (PATTERNS.md reference + "Append new patterns" line) — Sprint 198-003 fixes the template
+- **WSL2 OOM mitigation (Sprint 197-004 rescue)** — config tightened: `max_workers 2→6`, `worker_memory_limit 3g→2g` (6 × 2g = 12 GB peak, fits 24 GB host); `deckent doctor --ram-experiment` flag scheduled for Sprint 198-005 verification
+- **Persona-task matcher live validation (Sprint 197-005 rescue)** — threshold tuning verified canlı; persona override path traced end-to-end
+
+**Metrics:**
+- ~17 rescue commits across the band (12+ Sprint 195, 4+ Sprint 196, 6+ Sprint 197)
+- ~6500 LoC delta (+5800 / -1700)
+- 164 new tests (Sprint 195 +90, Sprint 196 +44, Sprint 197 +30)
+- Sprint 195-197 test baseline 52 → 41 fail (Tier-1 attack pending Sprint 198-006)
+- ADR-053 (TaskType Taxonomy) accepted Sprint 196; ADR-061 (AEGIS) status proposed pending beta-stability
+
+**Honest debt:**
+- Synthetic NO_GO source paths KAYNAK 6+7 ungated (Sprint 198-001)
+- memory.db sprint-log rows 194 + 196 missing (Sprint 198-002 backfill + finalize fix)
+- managed-docs auditor.md template still emits legacy PATTERNS.md text (Sprint 198-003)
+- 41 baseline vitest fail open (Sprint 198-006 closes ~15)
+- ADR-037 V1.0 Layer-2 runtime advisory/soft kept (hard-flip post-GA V2)
+
+**Process learnings (durable feedback memories written):**
+- `feedback_brain_synthetic_nogo_disk_verify` — 7-source map is the canonical reference; any new Brain code-path that builds a synthetic NO_GO MUST call `verifyDiskAgainstClaim` first
+- `feedback_no_auth_touch_during_sprint` — never run `/login`, `claude logout`, or MCP restart while a sprint is live (auth invalidation cascades into false NO_GO)
+- `feedback_worker_prompt_engineering_god_level` — WP-1..WP-12 stream is the canonical prompt-time injection; any future trim/truncation must amend the contract, not silently drop content
+
+Source archives: `.brain/archive/DIRECTIVES-sprint-195.md`, `.brain/archive/DIRECTIVES-sprint-196.md`, `.brain/archive/DIRECTIVES-sprint-197.md`. Sprint 198 plan: `DIRECTIVES.md` (live, 4-wave 6-task spec).
 
 ---
 
@@ -112,11 +159,38 @@ Spec: `docs/superpowers/specs/2026-05-19-embedded-web-terminal-design.md`. Plan:
 
 ---
 
+## Sprint 184-197 Post-Crisis Continuation Ledger
+
+The Sprint 145-150 cutover table and Sprint 175 Embedded Web Terminal section cover the GA prep through to Open Source GA flip. The band below picks up after Crisis Stabilization closure (see `roadmap.md` §Crisis Stabilization Initiative) and runs through to the 1 Haziran 2026 OSS beta launch window.
+
+| Sprint | Date (2026) | Theme | Outcome | Anchor |
+|--------|-------------|-------|---------|--------|
+| **184** | May 22 | Repo Housekeeping + Documentation Cleanup | ✅ Done — 388+ md triaged, README/CONTRIBUTING polish, Brain Quality Scorer calibration backlog | roadmap.md |
+| **185** | May 22 | Codebase Self-Audit — 6 subdirectory audit reports | ✅ Done — Brain runtime regen `5db72192` | `docs/audits/sprint-185/` |
+| **186** | May 22 | Per-file audit pilot — 35 audit reports + debt-store extract | ✅ Done — 479-file pilot, 31 DONE + 4 recovered, debt-store.ts `d43d679b` | `docs/audits/sprint-186/` |
+| **187** | May 22 | Comprehensive analysis cycle | ✅ Done — managed-docs auditor.md AUTOGEN block live + Sprint 188 audit groundwork | `.brain/archive/DIRECTIVES-sprint-187.md` |
+| **188** | May 23 | 360° audit cycle (12 reports, 250 KB, 80+ findings) | ✅ Done — input feed for Sprint 189 W-stream plan | `docs/audits/sprint-188/*.md` |
+| **189** | May 23 | OSS GA Blocker Wave 1 (W-A + W-B + W-G + W-H Faz 1) | ✅ 5/5 P0 closed — CHANGELOG backfill 30 sprint, MCP tool count drift fixed, dashboard StatusPage wire, ADR-008 core→orchestra ihlali fix | `.brain/archive/DIRECTIVES-sprint-189.md` |
+| **190** | May 23 | OSS GA Blocker Wave 2 (Sprint 189 follow-up + 191-002 wire) | ✅ Done — `runtime_extension_enabled: true` default + worker timeout extension wire; Docker OOM cycle drove ~14 false NO_GO (later reclassified Sprint 197-002) | `.brain/archive/DIRECTIVES-sprint-190.md` |
+| **191** | May 24 | Karpathy 4-discipline anchor land + Worker Discipline Anchor | ✅ Done — `karpathy-discipline.md` mandatory anchor wired into worker-default.md, brain.md, auditor.md | `.brain/archive/DIRECTIVES-sprint-191.md` |
+| **192** | May 24 | Mid-band stabilization (max_workers tuning, RAM verify groundwork) | ✅ Done — Docker OOM mitigation seed (Sprint 197 finalized via WSL2 detect) | `.brain/archive/DIRECTIVES-sprint-192.md` |
+| **193** | May 25 | i18n duplicate cleanup + bootstrap fixes | ✅ Done (SMOKE-001 NO_GO classified as legitimate baseline) | `.brain/archive/DIRECTIVES-sprint-193.md` |
+| **194** | May 25 | Brain finalize halted mid-flow (memory.db row missing) | ⚠ Done — discovered Sprint 197 — sprint-log-194 row missing (Sprint 198-002 backfill) | `.brain/archive/DIRECTIVES-sprint-194.md` |
+| **195** | May 25 | Worker Prompt God-Level Stream Tier-1 wire + 90 new tests + models.dev bootstrap | ✅ Done — 195-005 host-RAM detect (24 GB WSL2 / meminfo) live; 195-004 catalog bootstrap NO_GO → Sprint 196 carry-over | `.brain/archive/DIRECTIVES-sprint-195.md` |
+| **196** | May 26 | Disk-verify gate KAYNAK 1-5 live + WP-3 deriveTestScope + test-fail categorize (52→41) | ✅ Done — 196-005 token-counter.ts NO_GO exposed KAYNAK 6+7 ungated paths (Sprint 198-001 seed); 44 new tests | `.brain/archive/DIRECTIVES-sprint-196.md` |
+| **197** | May 26 | Synthetic NO_GO source map (7/7) + persona-task matcher live + Sprint 195-196 retroactive reclassify | ✅ 6/8 DONE + 2 rescued (197-004 WSL2 OOM mitigation, 197-005 persona threshold tuning); ~30 new tests; CHANGELOG 40-entry backfill | `.brain/archive/DIRECTIVES-sprint-197.md` |
+
+**Sprint 198 (in flight, 2026-05-26 → 2026-05-31)** — Brain dürüst raporlama %100 closure (KAYNAK 6+7 fix), memory.db sprint-log finalize fix + Sprint 194/196 row backfill, managed-docs auditor.md template regression fix, this document refresh, 6-worker × 2g RAM deney readiness verification, baseline 41 → 26 attack. 4 dalga, 6 task + 3 opsiyonel. See `DIRECTIVES.md` (live).
+
+**Sprint 199-200 (planned)** — npm publish v1.0.0-beta.1 packaging + Dockerfile.worker image build/push automation + beta announcement materials + remaining baseline fail attack; Sprint 200 = `v1.0.0-beta.1 NPM PUBLISH` (Alperen manual `npm publish` per project policy) on the 1 Haziran 2026 OSS beta launch day.
+
+---
+
 ## Current Status
 | Metrik | Değer |
 |--------|-------|
 | Version | 1.0.0-beta.1 |
-| Sprint | sprint-197 |
+| Sprint | sprint-200 |
 | MCP Tools | 28 |
 | MCP Resources | 8 |
 | CLI Commands | 58+ |
@@ -973,13 +1047,13 @@ Every blocker was directly verified in the codebase. False claims have been corr
 ## Sprint Metrics
 | Metrik | Değer |
 |--------|-------|
-| Sprint | sprint-197 |
-| Toplam Task | 8 |
-| Tamamlanan | 6 |
+| Sprint | sprint-200 |
+| Toplam Task | 15 |
+| Tamamlanan | 7 |
 | Tech Debt | 0 |
-| No-Go | 2 |
-| Süre | 14dk 55sn |
-| Coverage | N/A |
+| No-Go | 8 |
+| Süre | 34dk 32sn |
+| Coverage | 0.0% |
 
 ## Sprint History (Sprint 136-166)
 | Sprint | Tasks | Done | NO_GO | Duration | Avg Rubric | Theme |

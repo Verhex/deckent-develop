@@ -2,6 +2,38 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint200] - 2026-05-31
+
+### Added
+
+- 198-004 — Kapsamlı plan dosyaları Sprint 195-197 status refresh (3 dosya)
+- 198-005 — 6-worker × 2g config verify + RAM deney readiness audit
+- 198-007 — Sprint 191-196 retroactive reclassify re-run (12/12 hedef)
+- 198-008 — Beta launch smoke pre-check (npm pack dry-run + 20-gate verify)
+
+### Fixed
+
+- 198-001 — Sentetik NO_GO KAYNAK 6+7 fix (sprint-phases + sprint-controller gate wire)
+
+
+_Tasks: 15 total, 7 done, 0 tech debt, 8 no-go_
+
+## [1.0.0-beta.1-sprint199] - 2026-05-31
+
+### Added
+
+- 198-004 — Kapsamlı plan dosyaları Sprint 195-197 status refresh (3 dosya)
+- 198-009 — Memory backup auto-sync mekanizması (user-memory ↔ core-memory)
+- 198-008 — Beta launch smoke pre-check (npm pack dry-run + 20-gate verify)
+
+### Fixed
+
+- 198-001 — Sentetik NO_GO KAYNAK 6+7 fix (sprint-phases + sprint-controller gate wire)
+- 198-002 — memory.db sprint-log finalize bug fix + Sprint 194/196 row backfill
+
+
+_Tasks: 9 total, 5 done, 0 tech debt, 4 no-go_
+
 ## [1.0.0-beta.1-sprint197] - 2026-05-26
 
 ### Added

@@ -390,3 +390,26 @@ Memory V2 cleanup tasks — tolerate these until Sprint 198:
 ---
 
 **Rapor sonu** — `docs/audits/sprint-196/test-fail-categorize.md`. Audit task, code change'i yok. 57 fail → 18 kategori → Wave A-D fix prioriti.
+
+---
+
+## Sprint 197–198 Status Update (2026-05-31)
+
+| Sprint | Fail Count | Change | Notes |
+|--------|----------:|:------:|-------|
+| Sprint 196 (this report) | 57 | baseline | 18 kategori |
+| Sprint 197 | 41 | -16 | 197-001..006 rescue commits, ~6500 LoC |
+| Sprint 198 | ~26 (target) | -15 | 198-006 test baseline attack |
+
+**Sprint 197 progress:**
+- Wave A (kritik): MCP start lifecycle + Docker memory regression fixlendi
+- Wave B: CLI init rules regression kısmen fixlendi
+- Sprint 197 final: 41 fail (16 iyileşme, %28)
+
+**Sprint 198 status:**
+- 198-001 (Sentetik NO_GO KAYNAK 6+7 fix): Landed — sprint-phases + sprint-controller disk-verify gate
+- 198-002 (memory.db sprint-log finalize): Landed — backfill Sprint 194/196 rows
+- 198-003 (auditor.md template regression): Landed — PATTERNS.md ref kaldırıldı
+- 198-004 (plan dosyaları refresh): Landed — beta-tracker + roadmap + comprehensive-work-plan Sprint 197 sync
+- 198-005 (RAM experiment): Landed — `deckent doctor --ram-experiment` + docs/guide/ram-experiment.md
+- 198-006 (test baseline attack): Targeted — Wave C (CLI rich output + VitePress + GitHub Pages)

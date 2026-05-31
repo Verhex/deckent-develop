@@ -335,6 +335,65 @@ import { handleScopeCollision } from './decision-engine.js';
 import type { ScopeCollisionPayload, SpawnDecision } from './decision-engine.js';
 import { writeEvent, CHANNELS, getCurrentSprintId } from './event-stream.js';
 
+// ─── Disk-Verify Gate (Sprint 199 199-001 — Synthetic NO_GO Kaynak 7) ──
+// Mirrors the pattern at result-collector.ts:513-583 (Sprint 195 195-001).
+import {
+  verifyDiskAgainstClaim,
+  DISK_VS_CLAIM_MISMATCH_CHANNEL,
+  type DiskVerifyResult,
+  type VerifyDiskOptions,
+} from './disk-verify.js';
+
+/**
+ * Sprint 199 199-001 — Synthetic NO_GO Kaynak 7 gate.
+ *
+ * Before graceKill writes a synthetic NO_GO (either via panic-guard BLOCK
+ * or explicit-kill), verify whether the worker actually produced code on
+ * disk. If yes, enrich the result and signal the caller to set
+ * `task.status = MANUAL_REVIEW_REQUIRED` + emit
+ * `BRAIN→AUDITOR:DISK_VS_CLAIM_MISMATCH`. Idempotent: when the task is
+ * already MANUAL_REVIEW_REQUIRED, skip re-classification and skip the
+ * disk-verify call entirely so no duplicate audit event fires.
+ *
+ * Pure with respect to side effects — verifier is injectable for tests.
+ *
+ * @internal Exported for unit tests of the gate semantics.
+ */
+export function gateSyntheticGraceKillResult(
+  projectRoot: string,
+  task: Task,
+  baseResult: TaskResult,
+  cause: string,
+  opts?: VerifyDiskOptions,
+): { result: TaskResult; diskVerify: DiskVerifyResult; reclassified: boolean } {
+  // Idempotency: already MANUAL_REVIEW_REQUIRED → skip, no double event.
+  if (task.status === TaskStatus.MANUAL_REVIEW_REQUIRED) {
+    return {
+      result: baseResult,
+      diskVerify: { hasDiskEvidence: false, linesAdded: 0, untrackedFiles: [] },
+      reclassified: false,
+    };
+  }
+  const diskVerify = verifyDiskAgainstClaim(projectRoot, task.scope, opts);
+  if (!diskVerify.hasDiskEvidence) {
+    return { result: baseResult, diskVerify, reclassified: false };
+  }
+  const enrichedNotes =
+    `${baseResult.notes ?? ''}; disk-verify found evidence ` +
+    `(linesAdded=${diskVerify.linesAdded}, untrackedFiles=${diskVerify.untrackedFiles.length}, cause=${cause}). ` +
+    `Status reclassified as MANUAL_REVIEW_REQUIRED — see sprint events.`;
+  return {
+    result: {
+      ...baseResult,
+      filesChanged: diskVerify.untrackedFiles,
+      linesAdded: diskVerify.linesAdded,
+      notes: enrichedNotes,
+    },
+    diskVerify,
+    reclassified: true,
+  };
+}
+
 // ═══ Nervous System Wire (Sprint 180 W3-1, NERVOUS-TODO §11.2 Step D) ══
 //
 // `runSprint()` instantiates the nervous system at the top of its body and
@@ -960,7 +1019,7 @@ export async function runSprint(
 
             if (decision === 'BLOCK') {
               debugLog('graceKill:panicGuard', `Kill blocked for task ${task.id} — user approval required`);
-              const syntheticResult: TaskResult = {
+              const baseBlocked: TaskResult = {
                 // checkWorkerLiveness gate applied above — liveness=${liveness.status}
                 taskId: task.id,
                 workerId: task.assignedWorker ?? `w-${task.id}`,
@@ -972,10 +1031,32 @@ export async function runSprint(
                 selfAssessment: 'NO_GO',
                 notes: `Worker had heartbeat but failed to write result within grace period — kill blocked by panic guard (user approval required); liveness=${liveness.status}`,
               };
+              // Sprint 199 199-001 — Synthetic NO_GO Kaynak 7 gate (BLOCK path).
+              const gatedBlocked = gateSyntheticGraceKillResult(
+                projectRoot, task, baseBlocked, 'grace-kill-blocked',
+              );
+              const syntheticResult = gatedBlocked.result;
               try {
                 await writeFile(resultPath, JSON.stringify(syntheticResult, null, 2), 'utf-8');
               } catch (e) { debugLog('graceKill:writeResult', e); }
               results.push(syntheticResult);
+              if (gatedBlocked.reclassified) {
+                task.status = TaskStatus.MANUAL_REVIEW_REQUIRED;
+                try {
+                  const sidGate = getCurrentSprintId(projectRoot) ?? sprint.id;
+                  writeEvent(
+                    projectRoot, sidGate, 'brain', 'auditor',
+                    DISK_VS_CLAIM_MISMATCH_CHANNEL,
+                    {
+                      taskId: task.id,
+                      linesAdded: gatedBlocked.diskVerify.linesAdded,
+                      untrackedFiles: gatedBlocked.diskVerify.untrackedFiles,
+                      cause: 'grace-kill-blocked',
+                      emittedAt: new Date().toISOString(),
+                    },
+                  );
+                } catch (e) { debugLog('graceKill:diskGateEmit', e); }
+              }
             } else {
               try {
                 if (spawnBackend) spawnBackend.kill(task.id);
@@ -985,7 +1066,7 @@ export async function runSprint(
                 }
               } catch (e) { debugLog('graceKill:killWorker', e); }
 
-              const syntheticResult: TaskResult = {
+              const baseKilled: TaskResult = {
                 // checkWorkerLiveness gate applied above — liveness=${liveness.status}
                 taskId: task.id,
                 workerId: task.assignedWorker ?? `w-${task.id}`,
@@ -997,10 +1078,32 @@ export async function runSprint(
                 selfAssessment: 'NO_GO',
                 notes: `Worker had heartbeat but failed to write result within grace period — killed (user-explicit override); liveness=${liveness.status}`,
               };
+              // Sprint 199 199-001 — Synthetic NO_GO Kaynak 7 gate (explicit-kill path).
+              const gatedKilled = gateSyntheticGraceKillResult(
+                projectRoot, task, baseKilled, 'grace-kill-explicit',
+              );
+              const syntheticResult = gatedKilled.result;
               try {
                 await writeFile(resultPath, JSON.stringify(syntheticResult, null, 2), 'utf-8');
               } catch (e) { debugLog('graceKill:writeResult', e); }
               results.push(syntheticResult);
+              if (gatedKilled.reclassified) {
+                task.status = TaskStatus.MANUAL_REVIEW_REQUIRED;
+                try {
+                  const sidGate = getCurrentSprintId(projectRoot) ?? sprint.id;
+                  writeEvent(
+                    projectRoot, sidGate, 'brain', 'auditor',
+                    DISK_VS_CLAIM_MISMATCH_CHANNEL,
+                    {
+                      taskId: task.id,
+                      linesAdded: gatedKilled.diskVerify.linesAdded,
+                      untrackedFiles: gatedKilled.diskVerify.untrackedFiles,
+                      cause: 'grace-kill-explicit',
+                      emittedAt: new Date().toISOString(),
+                    },
+                  );
+                } catch (e) { debugLog('graceKill:diskGateEmit', e); }
+              }
             }
           }
         }

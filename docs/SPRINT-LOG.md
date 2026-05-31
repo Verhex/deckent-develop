@@ -5402,3 +5402,63 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 197-005: 197-005 — Persona-task matcher canlı doğrulama + threshold tuning (DONE)
 
 ---
+## Sprint 199 — sprint-199
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-05-31
+**Duration:** 2421s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 9 |
+| Completed | 5 |
+| Tech Debt | 0 |
+| No-Go | 4 |
+| Coverage | 0.0% |
+| Duration | 2421367ms |
+
+### Tasks
+
+- 199-001: 198-001 — Sentetik NO_GO KAYNAK 6+7 fix (sprint-phases + sprint-controller gate wire) (DONE)
+- 199-002: 198-002 — memory.db sprint-log finalize bug fix + Sprint 194/196 row backfill (DONE)
+- 199-003: 198-003 — managed-docs auditor.md template regression fix (NO_GO)
+- 199-004: 198-004 — Kapsamlı plan dosyaları Sprint 195-197 status refresh (3 dosya) (DONE)
+- 199-005: 198-005 — 6-worker × 2g config verify + RAM deney readiness audit (NO_GO)
+- 199-006: 198-006 — Test baseline 41 → 26 attack (en kolay 15 fail) (NO_GO)
+- 199-007: 198-007 — Sprint 191-196 retroactive reclassify re-run (12/12 hedef) (NO_GO)
+- 199-008: 198-009 — Memory backup auto-sync mekanizması (user-memory ↔ core-memory) (DONE)
+- 199-009: 198-008 — Beta launch smoke pre-check (npm pack dry-run + 20-gate verify) (DONE)
+
+---
+## Sprint 200 — sprint-200
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-05-31
+**Duration:** 2072s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 15 |
+| Completed | 7 |
+| Tech Debt | 0 |
+| No-Go | 8 |
+| Coverage | 0.0% |
+| Duration | 2072123ms |
+
+### Tasks
+
+- 200-001: 198-001 — Sentetik NO_GO KAYNAK 6+7 fix (sprint-phases + sprint-controller gate wire) (DONE)
+- 200-002: 198-002 — memory.db sprint-log finalize bug fix + Sprint 194/196 row backfill (NO_GO)
+- 200-003: 198-003 — managed-docs auditor.md template regression fix (NO_GO)
+- 200-004: 198-004 — Kapsamlı plan dosyaları Sprint 195-197 status refresh (3 dosya) (DONE)
+- 200-005: 198-005 — 6-worker × 2g config verify + RAM deney readiness audit (DONE)
+- 200-006: 198-006 — Test baseline 41 → 26 attack (en kolay 15 fail) (NO_GO)
+- 200-007: 198-007 — Sprint 191-196 retroactive reclassify re-run (12/12 hedef) (DONE)
+- 200-008: 198-009 — Memory backup auto-sync mekanizması (user-memory ↔ core-memory) (NO_GO)
+- 200-009: 198-008 — Beta launch smoke pre-check (npm pack dry-run + 20-gate verify) (DONE)
+
+---

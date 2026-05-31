@@ -1341,8 +1341,16 @@ describe('init command', () => {
       question: mockQuestion,
       close: vi.fn(),
     } as unknown as ReturnType<typeof createInterface>);
-    vi.mocked(existsSync).mockReturnValue(false);
-    vi.mocked(readFileSync).mockReturnValue('');
+    vi.mocked(existsSync).mockImplementation((p) =>
+      String(p).includes('rule-templates') || String(p).includes('.template.md'),
+    );
+    vi.mocked(readFileSync).mockImplementation((p) => {
+      const s = String(p);
+      if (s.includes('brain.template.md')) return '# Brain Rules\n- Sprint is NEVER left incomplete\n' as unknown as ReturnType<typeof readFileSync>;
+      if (s.includes('auditor.template.md')) return '# Auditor Rules\n- NEVER write source code\n' as unknown as ReturnType<typeof readFileSync>;
+      if (s.includes('worker-default.template.md')) return '# Worker Rules\n- Update heartbeat\n- Write result file\n' as unknown as ReturnType<typeof readFileSync>;
+      return '' as unknown as ReturnType<typeof readFileSync>;
+    });
 
     await runCommand(registerInit, ['init']);
 
@@ -1656,8 +1664,16 @@ describe('init command', () => {
       question: mockQuestion,
       close: vi.fn(),
     } as unknown as ReturnType<typeof createInterface>);
-    vi.mocked(existsSync).mockReturnValue(false);
-    vi.mocked(readFileSync).mockReturnValue('');
+    vi.mocked(existsSync).mockImplementation((p) =>
+      String(p).includes('rule-templates') || String(p).includes('.template.md'),
+    );
+    vi.mocked(readFileSync).mockImplementation((p) => {
+      const s = String(p);
+      if (s.includes('brain.template.md')) return '# Brain Rules\n- Sprint is NEVER left incomplete\n' as unknown as ReturnType<typeof readFileSync>;
+      if (s.includes('auditor.template.md')) return '# Auditor Rules\n- NEVER write source code\n' as unknown as ReturnType<typeof readFileSync>;
+      if (s.includes('worker-default.template.md')) return '# Worker Rules\n- Update heartbeat\n- Write result file\n' as unknown as ReturnType<typeof readFileSync>;
+      return '' as unknown as ReturnType<typeof readFileSync>;
+    });
 
     await runCommand(registerInit, ['init']);
 
@@ -1680,8 +1696,16 @@ describe('init command', () => {
       question: mockQuestion,
       close: vi.fn(),
     } as unknown as ReturnType<typeof createInterface>);
-    vi.mocked(existsSync).mockReturnValue(false);
-    vi.mocked(readFileSync).mockReturnValue('');
+    vi.mocked(existsSync).mockImplementation((p) =>
+      String(p).includes('rule-templates') || String(p).includes('.template.md'),
+    );
+    vi.mocked(readFileSync).mockImplementation((p) => {
+      const s = String(p);
+      if (s.includes('brain.template.md')) return '# Brain Rules\n- Sprint is NEVER left incomplete\n' as unknown as ReturnType<typeof readFileSync>;
+      if (s.includes('auditor.template.md')) return '# Auditor Rules\n- NEVER write source code\n' as unknown as ReturnType<typeof readFileSync>;
+      if (s.includes('worker-default.template.md')) return '# Worker Rules\n- Update heartbeat\n- Write result file\n' as unknown as ReturnType<typeof readFileSync>;
+      return '' as unknown as ReturnType<typeof readFileSync>;
+    });
 
     await runCommand(registerInit, ['init']);
 
@@ -1704,8 +1728,16 @@ describe('init command', () => {
       question: mockQuestion,
       close: vi.fn(),
     } as unknown as ReturnType<typeof createInterface>);
-    vi.mocked(existsSync).mockReturnValue(false);
-    vi.mocked(readFileSync).mockReturnValue('');
+    vi.mocked(existsSync).mockImplementation((p) =>
+      String(p).includes('rule-templates') || String(p).includes('.template.md'),
+    );
+    vi.mocked(readFileSync).mockImplementation((p) => {
+      const s = String(p);
+      if (s.includes('brain.template.md')) return '# Brain Rules\n- Sprint is NEVER left incomplete\n' as unknown as ReturnType<typeof readFileSync>;
+      if (s.includes('auditor.template.md')) return '# Auditor Rules\n- NEVER write source code\n' as unknown as ReturnType<typeof readFileSync>;
+      if (s.includes('worker-default.template.md')) return '# Worker Rules\n- Update heartbeat\n- Write result file\n' as unknown as ReturnType<typeof readFileSync>;
+      return '' as unknown as ReturnType<typeof readFileSync>;
+    });
 
     await runCommand(registerInit, ['init']);
 

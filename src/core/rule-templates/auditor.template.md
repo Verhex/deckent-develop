@@ -10,7 +10,6 @@
 - Detect circular dependencies / deadlocks
 - Monitor usage thresholds
 - Overwrite `.dashboard` on every scan (never append)
-- Append new patterns to `PATTERNS.md` (never overwrite)
 - Write alerts for critical issues
 
 ## Agent & Skill Monitoring

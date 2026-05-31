@@ -1,0 +1,12 @@
+{
+  "sprintId": "sprint-193",
+  "checkpointNumber": 5,
+  "timestamp": "2026-05-24T14:05:41.136Z",
+  "completedTasks": [
+    "193-001"
+  ],
+  "pendingTasks": [],
+  "activeWorkers": [],
+  "brainPhase": "FIX",
+  "eventStreamOffset": 6
+}

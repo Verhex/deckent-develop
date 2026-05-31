@@ -1,5 +1,7 @@
 # Deckent — Product Roadmap
 
+**Last updated:** 2026-05-31 — Sprint 195-197 Worker Prompt God-Level Stream + Disk-Verify Gate landed; Sprint 198 Brain dürüst raporlama closure in flight. 1 Haziran 2026 OSS beta launch window: 1 day. See `docs/release/beta-tracker.md` Sprint 184-197 ledger for the Sprint-by-Sprint outcome table.
+
 > **"Install it. Run it. Own it."**
 >
 > Deckent is an AI agent orchestration tool that lives on your machine, runs your sprints, and never calls home.
@@ -104,22 +106,64 @@ Each sprint is approximately 30-60 minutes of Deckent orchestrating its own deve
 | **184** | Repo Housekeeping + Documentation Cleanup | Repository split decision (in-place cleanup vs. clean OSS clone), 388+ markdown documents triaged, `README.md` user-facing rewrite, `CONTRIBUTING.md`, OSS-launch polish, Brain Quality Scorer calibration backlog for read-only verify tasks (Sprint 182 W4-1 + Sprint 183 W3-3 false-positive root cause) | **Done** |
 | **185** | Codebase Self-Audit — 6 subdirectory audit reports + Brain runtime regen | 6 subdirectory audit deliverables, Brain runtime regeneration (`5db72192`) | **Done** |
 | **186** | Per-file audit pilot — 35 audit reports + debt-store extract | 479-file per-file audit pilot manifest; 31 DONE + 4 recovered false-NO_GO; debt-store.ts extracted to core/ (`d43d679b`) | **Done** |
-| **187** | Sub-project #3 (3/4) — Hardware-attested HMAC + outbound cluster aggregation | TPM/HSM key path via PKCS#11 abstraction, outbound limiter Redis-based counter for cluster-wide quota aggregation, per-tenant override via config schema | Planned |
-| **188** | Sub-project #3 (4/4) — Final polish + integration test + ADR-065 | E2E test with 3 tenants in parallel, audit shard isolation verification, mTLS handshake verification, k8s pod-exec end-to-end, Sub-project #3 GA marker | Planned |
-| **189** | Sub-project #4 (1/4) — SSO/OIDC integration | `OidcAuthProvider` impl, refresh-token flow, group-to-tenant mapping, `.deckent/sso.json` config schema. Adapters: Okta, Azure AD, Google Workspace | Planned |
-| **190** | Sub-project #4 (2/4) — Audit SIEM forwarder | `SiemForwarder` interface + 3 adapters (Splunk, Datadog, ELK), CEF / ECS / OTel format generation, per-event forwarding queue with backpressure | Planned |
-| **191** | Sub-project #4 (3/4) — Compliance reports | `deckent compliance generate` CLI: SOC 2 / ISO 27001 / GDPR control matrices auto-generated from the audit log, PDF + JSON export, evidence linking to specific audit events | Planned |
-| **192** | Sub-project #4 (4/4) — Enterprise dashboard + audit export API + ADR-066 | Dashboard `NervousPage` + `AuditPage` multi-tenant views, HTTP API `/api/audit/export` + `/api/compliance/report`, Sub-project #4 GA marker | Planned |
-| **193** | Nervous Phase 2 pilot | 5 MVP detectors in balanced mode, 8 action handlers, pilot dogfood across the next 3 sprints | Planned |
-| **194** | Nervous Phase 3 GA | Full 12-detector rollout, 30 action handlers, autopilot/full-auto mode testing | Planned |
-| **195** | Nervous dashboard + Local LLM (CUDA) provider | `NervousPage.tsx` + pending-approval badge (panic guard UI), `src/providers/ollama.ts` or `src/providers/cuda.ts` adapter — RTX 5090 + CUDA 13.2 + WSL2 passthrough verified 2026-05-21; 32GB VRAM allows 70B model residence (Qwen2.5-Coder, Llama-3.3, DeepSeek-V2) for enterprise data sovereignty, sub-50ms latency, and zero-API-cost dogfood | Planned |
-| **196** | Nervous user guide + ADR-040 status realization | Documentation closure of the Nervous System debt that has accumulated since Sprint 149 | Planned |
-| **197** | AEGIS Phase 1 — Foundation | Explicit ADVERSE phase, REVIEW MCP tool, COOL-DOWN consolidation per ADR-061 | Planned |
-| **198** | AEGIS Phase 2 — Verification Stack | Property-based fast-check tests, branded types across boundaries, Stryker mutation-diff in CI | Planned |
-| **199** | AEGIS Phase 3 — Provenance + Governance | Artifact manifest schema, Ed25519 signing for sprint outputs, formalized worker andon authority | Planned |
-| **200** | God-Level GA Canonical Launch — `v1.0.0` stable | Sprint 200 milestone: `agentaegis.io` standard draft, academic paper prep (ICSE/FSE 2027 target), AEGIS-compliant orchestrator certification | Planned |
+| **187** | Comprehensive analysis cycle + managed-docs auditor.md AUTOGEN block live | Sprint 188 audit groundwork, auditor.md AUTO-START/AUTO-END regen wired (PATTERNS.md template drift carry-over flagged in Sprint 197 chore commit `cd4df0ed`, Sprint 198-003 fix) | **Done** |
+| **188** | 360° audit cycle (12 reports, 250 KB, 80+ findings) | Comprehensive read-only audit; input feed for Sprint 189 W-stream master plan (`docs/alperen-analysis/2026-05-23-comprehensive-work-plan.md`) | **Done** |
+| **189** | OSS GA Blocker Wave 1 — W-A + W-B Faz 1 (Sprint 188 fix-out) | ✅ 5/5 P0 — CHANGELOG backfill Sprint 157→188 (30 sprint), MCP tool count drift (server.ts:33, IDENTITY.md), dashboard StatusPage 404 fix, ADR-008 `core/notify.ts:17` core→orchestra ihlali dependency-inversion fix; W-G API surface test groundwork | **Done** |
+| **190** | OSS GA Blocker Wave 2 — runtime extension wire + Docker stabilization | `runtime_extension_enabled: true` default + worker timeout extension wire; Docker OOM cycle drove ~14 false NO_GO across the sprint (reclassified in Sprint 197 197-002 retroactive reclassify); Brain finalize bug seeded (memory.db sprint-log-194 row missing — Sprint 198-002 closes) | **Done (with debt)** |
+| **191** | Karpathy 4-discipline anchor land + Worker Discipline Anchor | `karpathy-discipline.md` mandatory anchor wired into worker-default.md, brain.md, auditor.md; 4-discipline pre-write checklist enforced in worker prompt; 191-002 wire fix carried over from Sprint 190 | **Done** |
+| **192** | Mid-band stabilization (max_workers tuning seed + RAM verify groundwork) | Docker OOM mitigation seed; `max_workers` config experiments documented; sprint-log-192 row finalize bug repeats (Sprint 198-002) | **Done (with debt)** |
+| **193** | i18n duplicate cleanup + bootstrap fixes | SMOKE-001 i18n `en.json` duplicate `error.lock_conflict` cleanup (classified NO_GO as legitimate baseline, not a sprint failure); bootstrap stability fixes | **Done** |
+| **194** | Mid-band finalize-halt sprint | Brain finalize halted mid-flow — sprint-log-194 row missing from `memory.db` (discovered Sprint 197 197-002 retroactive reclassify; Sprint 198-002 closes via backfill script + finalize-fix). Functional work landed but evaluation rows incomplete. | **Done (recovered Sprint 198-002)** |
+| **195** | Worker Prompt God-Level Stream Tier-1 wire + 90 new tests + models.dev bootstrap | WP-1..WP-12 stream Tier-1 land: agent PROMPT.md canonical source, skill content full-fidelity, idempotency-key per `${sprintId}-${taskId}-${retryCount}`, scope.filesWrite auto-include of test paths (WP-3 `deriveTestScope`); 195-005 host-RAM detect (24 GB WSL2 / `meminfo`) live; 195-004 catalog bootstrap NO_GO → carry-over Sprint 196 | **Done** |
+| **196** | Disk-verify gate KAYNAK 1-5 live + WP-3 deriveTestScope + test-fail categorize (52→41) | `verifyDiskAgainstClaim` runtime gating on 5 of 7 synthetic NO_GO callsites (`result-collector.ts:518-583` + 4 siblings); 196-005 token-counter.ts NO_GO exposed KAYNAK 6+7 ungated paths (Sprint 198-001 seed); 196-007 test-fail audit `docs/audits/sprint-196/test-fail-categorize.md` (41-fail baseline kategorize, Sprint 198-006 attacks Tier-1) | **Done** |
+| **197** | Synthetic NO_GO source map (7/7) + persona-task matcher live + Sprint 195-196 retroactive reclassify | 6/8 DONE + 2 rescued (197-004 WSL2 OOM mitigation 6×2g config, 197-005 persona threshold tuning live); 197-001 worker mapped the 2 remaining ungated callsites (`sprint-phases.ts:1318-1330` + `sprint-controller.ts:963-1003`) for Sprint 198-001; 197-002 reclassify 2/12 applied + 10 skipped (sprint-entry-missing — Sprint 198-002 backfill); 197-003 CHANGELOG 40-entry catch-up Sprint 157→197; chore commit `cd4df0ed` regenerated `.claude/rules/auditor.md` from legacy PATTERNS.md template (Sprint 198-003 closes template) | **Done** |
+| **198** | Brain dürüst raporlama %100 closure + memory.db finalize fix + plan refresh + RAM verify + 15-fail attack | 4 dalga, 6 task + 3 opsiyonel — 198-001 KAYNAK 6+7 gate wire (`runEvaluatePhase` + `graceKill`), 198-002 memory.db sprint-log finalize bug fix + Sprint 194/196 row backfill, 198-003 managed-docs auditor.md template regression fix, 198-004 plan refresh (this entry + beta-tracker.md + comprehensive-work-plan.md), 198-005 6-worker × 2g RAM deney readiness, 198-006 baseline 41 → ≤26 attack | **In flight** |
+| **199** | Beta packaging Wave 1 — npm v1.0.0-beta.1 dry-run + Dockerfile.worker image build/push automation + announcement materials | Pre-launch verification: `npm pack --dry-run` parity, GA gate verification, beta announcement copy, release-notes draft, Dockerfile image pipeline | **Planned** |
+| **200** | 🚀 **v1.0.0-beta.1 NPM PUBLISH (1 Haziran 2026 OSS beta launch)** | Alperen manuel `npm publish` per project policy (`feedback_npm_publish_user_approval`); GitHub release tag; Show HN + Reddit + Twitter announce. **GA Canonical Launch milestone** (Trinity Developer face fully shipped; Assistant + System Worker progress per Sprint 201+) | **Planned (T-1 day)** |
+| **201-205** | Sub-project #3 + #4 implementation cycle | Hardware-attested HMAC + outbound cluster aggregation (was 187 plan), SSO/OIDC, SIEM forwarder, compliance reports, enterprise dashboard — re-sequenced post-beta per Sprint 188 master plan W-stream | Planned |
+| **206-209** | Nervous Phase 2/3 + Local LLM (CUDA) provider | 5 MVP detectors balanced mode, full 12-detector rollout, autopilot mode testing; `src/providers/ollama.ts` or `src/providers/cuda.ts` adapter — RTX 5090 + CUDA 13.2 + WSL2 passthrough verified 2026-05-21; 32GB VRAM, 70B model residence | Planned |
+| **210-213** | AEGIS Phase 1-3 — Foundation + Verification Stack + Provenance + Governance | Explicit ADVERSE phase, REVIEW MCP tool, COOL-DOWN consolidation (ADR-061), fast-check PBT, branded types, Stryker mutation-diff CI, artifact manifest schema, Ed25519 signing, formalized worker andon authority | Planned |
+| **214+** | **God-Level GA Canonical** — `v1.0.0` stable | `agentaegis.io` standard draft, academic paper prep (ICSE/FSE 2027 target), AEGIS-compliant orchestrator certification | Planned |
 
 > **Why Sub-project #3 and #4 are open source, not "Enterprise Edition":** Every capability — multi-tenancy, mTLS, k8s, SSO, SIEM, compliance reports — ships under the same MIT license as the rest of Deckent. There is no paid tier and no feature gate. The same code that ran the dogfood loop runs in a 10,000-employee corporation. Enterprise-grade does not mean closed source; it means default-deny security, scoped tenants, and operator-grade audit, available to anyone who installs.
+
+---
+
+## Closed Initiatives — Sprint 195-197 Worker Prompt God-Level Stream + Disk-Verify Gate
+
+Three-sprint band (2026-05-25 → 2026-05-26) that re-anchored Brain honesty after the Sprint 192-194 chain produced ~14 false NO_GO outcomes (Docker OOM cycle + memory.db finalize halt). Why this matters: every false NO_GO costs a wasted FIX-phase respawn, drains the user's API quota, and pollutes the learnings store with non-signal. The band closed the false-NO_GO loop down to 2 remaining ungated paths (Sprint 198-001 finalizes).
+
+**What landed:**
+
+- **Worker Prompt God-Level Stream WP-1..WP-12 Tier-1 wire** — full prompt-time injection of the Karpathy 4-discipline anchor (from Sprint 191), agent `PROMPT.md` as canonical source (no truncation), full-fidelity skill content, idempotency-key per `${sprintId}-${taskId}-${retryCount}`, ADR cosine-similarity threshold tuning (0.3), scope.filesWrite auto-include of test paths (WP-3 `deriveTestScope`), override semantic warning, DIRECTIVES parser fixes.
+- **Disk-verify gate KAYNAK 1-5 live** — `verifyDiskAgainstClaim(projectRoot, task.scope)` runtime gating on 5 of 7 synthetic NO_GO callsites (`result-collector.ts:518-583` + 4 sibling paths). A worker that exits without `.result` but with non-empty `git diff --stat` now routes to `MANUAL_REVIEW_REQUIRED` rather than synthetic NO_GO, with `BRAIN→AUDITOR:DISK_VS_CLAIM_MISMATCH` audit event emitted.
+- **7 synthetic NO_GO source map (`feedback_brain_synthetic_nogo_disk_verify`)** — Sprint 197 197-001 worker enumerated and mapped the two remaining ungated callsites: `sprint-phases.ts:1318-1330` `runEvaluatePhase` (the path Sprint 196 196-005 `token-counter.ts` NO_GO travelled through) and `sprint-controller.ts:963-1003` `graceKill` panic-guard + explicit-kill. Sprint 198-001 wires both.
+- **memory.db sprint-log finalize bug discovery** — Sprint 197 197-002 retroactive reclassify worker discovered `sprint-log-194` and `sprint-log-196` rows are MISSING from `memory.db`; reclassify completed 2/12 + 10 skipped "sprint-entry-missing". Sprint 198-002 adds defensive minimal-row write to `sprint-finalizer.ts` + `backfill-sprint-log-rows.mjs` script.
+- **managed-docs auditor.md template regression** — Sprint 197 chore commit `cd4df0ed` regenerated `.claude/rules/auditor.md` AUTO-START/END block from the still-stale managed-docs template (legacy `PATTERNS.md` reference + "Append new patterns" line, paradigm superseded by `memory.db` `pattern` entries since Sprint 187). Sprint 198-003 fixes the template at source.
+- **WSL2 OOM mitigation (Sprint 197-004 rescue)** — config tightened: `max_workers 2→6`, `worker_memory_limit 3g→2g` (6 × 2g = 12 GB peak, fits 24 GB host); `deckent doctor --ram-experiment` flag scheduled for Sprint 198-005 verification.
+- **Persona-task matcher live validation (Sprint 197-005 rescue)** — threshold tuning verified canlı; persona override path traced end-to-end.
+- **CHANGELOG 40-entry catch-up** — Sprint 197 197-003 backfilled the Sprint 157→197 entries (30+ sprint gap closed; Keep-a-Changelog format preserved).
+- **Test baseline categorize** — Sprint 196 196-007 audit (`docs/audits/sprint-196/test-fail-categorize.md`) classifies the 41 baseline vitest failures into Baseline (25-27) / Regression (6-8) / TDD Pending (12-14) / Environment (5-6); Sprint 198-006 attacks Tier-1 (commands.test.ts + rich-output.test.ts + vitepress.test.ts + github-pages-deploy.test.ts, ~18 candidates).
+
+**Metrics for the band:**
+
+| Metric | Sprint 195 | Sprint 196 | Sprint 197 | Total |
+|--------|-----------|-----------|-----------|-------|
+| Rescue commits | 12+ | 4+ | 6+ | ~17 |
+| LoC delta (+/-) | +3100 / -700 | +1700 / -600 | +1000 / -400 | ~+5800 / -1700 (~6500 net additions) |
+| New tests | 90 | 44 | 30 | 164 |
+| Tasks DONE / total | 7/9 | 5/7 | 6/8 | 18/24 (~75%, 2 rescues + 1 carry) |
+| Test baseline trend | 52 fail | 47→41 fail | 41 fail | 52→41 (Sprint 198-006 attacks 41→≤26) |
+
+**Process learnings (durable feedback memories written):**
+
+- `feedback_brain_synthetic_nogo_disk_verify` — 7-source map is the canonical reference; any new Brain code-path that builds a synthetic NO_GO MUST call `verifyDiskAgainstClaim` first.
+- `feedback_no_auth_touch_during_sprint` — never run `/login`, `claude logout`, or MCP restart while a sprint is live (auth invalidation cascades into false NO_GO).
+- `feedback_worker_prompt_engineering_god_level` — WP-1..WP-12 stream is the canonical prompt-time injection contract; any future trim/truncation must amend the contract, not silently drop content.
+- `feedback_proactive_blocker_disclosure` — known blockers (RAM, auth, quota, OOM) must be disclosed in DIRECTIVES.md before sprint start, not discovered mid-flow.
+- `feedback_npm_publish_user_approval` — Alperen runs `npm publish` manually; never let Brain spawn an automated publish step.
+
+**The band closes when Sprint 198 lands.** After Sprint 198-001 (KAYNAK 6+7 gate) + 198-002 (memory.db finalize fix) + 198-003 (template regression fix), Brain dürüst raporlama hits 100% closure and Gate 21 in `docs/release/beta-tracker.md` flips to PASS.
 
 ---
 

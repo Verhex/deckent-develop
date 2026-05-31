@@ -61,6 +61,10 @@
 | adr-064 | TOPP — Continuous Dispatch (Wave-Barrier Removal) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-200 Learnings** (sprint-200): ## Sprint sprint-200 Learnings
+- 198-002 — memory.db sprint-log finalize bug fix + Sprint 194/196 row backfill: NO_GO...
+- **Sprint sprint-199 Learnings** (sprint-199): ## Sprint sprint-199 Learnings
+- 198-003 — managed-docs auditor.md template regression fix: NO_GO — Fixed the managed...
 - **Sprint sprint-197 Learnings** (sprint-197): ## Sprint sprint-197 Learnings
 - 197-004 — WSL2 OOM mitigation (max_workers + worker_memory + adaptive): NO_GO — Spri...
 - **Sprint sprint-195 Learnings** (sprint-195): ## Sprint sprint-195 Learnings
@@ -79,12 +83,9 @@
 - 189-009 deckent_kill MCP parite: NO_GO — investigate root cause
 - 189-011 API endpoi...
 - **Sprint sprint-188 Learnings** (sprint-188): ## Sprint sprint-188 Learnings
-- **Sprint sprint-187 Learnings** (sprint-187): ## Sprint sprint-187 Learnings
-- **Sprint sprint-186 Learnings** (sprint-186): ## Sprint sprint-186 Learnings
-- Audit src/core/cascade-detector.ts: NO_GO — Worker exited without writing result (ex...
 
 ## Active Technical Debt
-- [CRITICAL] Sprint sprint-193 rollback SUCCESS
+_No active technical debt._
 
 ## Active Patterns
 - Violation pattern: stale_heartbeat
@@ -117,5 +118,8 @@
 - Violation pattern: stale_heartbeat
 - Violation pattern: stale_heartbeat
 - Violation pattern: stale_heartbeat
+- Violation pattern: stale_heartbeat
+- Violation pattern: stale_heartbeat
+- Violation pattern: file_outside_scope
 
-_Total entries: 363 | Generated: 2026-05-26_
+_Total entries: 398 | Generated: 2026-05-31_

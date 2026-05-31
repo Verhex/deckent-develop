@@ -61,8 +61,9 @@ export default defineConfig({
     // Top navigation
     nav: [
       { text: 'Home', link: '/' },
-      { text: 'Guide', link: '/guide/getting-started', activeMatch: '^/guide/' },
+      { text: 'Docs', link: '/guide/getting-started', activeMatch: '^/guide/' },
       { text: 'Reference', link: '/reference/cli', activeMatch: '^/reference/' },
+      { text: 'Blog', link: '/guide/getting-started' },
       {
         text: 'GitHub',
         link: 'https://github.com/VerhexIO/deckent',
@@ -124,11 +125,26 @@ export default defineConfig({
       ],
       '/reference/': [
         {
-          text: 'CLI',
+          text: 'CLI Reference',
           collapsed: false,
           items: [
             { text: 'CLI Overview', link: '/reference/cli' },
             { text: 'CLI Commands', link: '/reference/cli-commands' },
+          ],
+        },
+        {
+          text: 'Architecture',
+          collapsed: false,
+          items: [
+            { text: 'API Surface', link: '/reference/api-surface' },
+          ],
+        },
+        {
+          text: 'Plugin Development',
+          collapsed: false,
+          items: [
+            { text: 'Managed Docs', link: '/reference/managed-docs' },
+            { text: 'Marketplace', link: '/reference/marketplace' },
           ],
         },
         {
@@ -140,11 +156,10 @@ export default defineConfig({
           ],
         },
         {
-          text: 'API',
+          text: 'API Reference',
           collapsed: false,
           items: [
             { text: 'API Overview', link: '/reference/api' },
-            { text: 'API Surface', link: '/reference/api-surface' },
             { text: 'API Examples', link: '/reference/api-examples' },
           ],
         },

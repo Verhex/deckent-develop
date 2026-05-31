@@ -125,6 +125,15 @@ import { writeEvent, getCurrentSprintId } from './event-stream.js';
 import { checkWorkerLiveness } from './worker-liveness.js';
 import type { FailureContext } from './result-evaluator.js';
 
+// ─── Disk-Verify Gate (Sprint 199 199-001 — Synthetic NO_GO Kaynak 6) ──
+// Mirrors the pattern at result-collector.ts:513-583 (Sprint 195 195-001).
+import {
+  verifyDiskAgainstClaim,
+  DISK_VS_CLAIM_MISMATCH_CHANNEL,
+  type DiskVerifyResult,
+  type VerifyDiskOptions,
+} from './disk-verify.js';
+
 // ─── Sprint Controller (safe circular — all usages inside function bodies) ──
 import {
   BrainError,
@@ -181,6 +190,48 @@ function buildFailureContext(result: TaskResult): FailureContext {
 
 function now(): string {
   return new Date().toISOString();
+}
+
+/**
+ * Sprint 199 199-001 — Synthetic NO_GO Kaynak 6 gate.
+ *
+ * Before runEvaluatePhase converts a missing `.result` into a synthetic
+ * NO_GO, verify whether the worker actually produced code on disk. If yes,
+ * enrich the result with disk findings and signal the caller to set
+ * `task.status = MANUAL_REVIEW_REQUIRED` + emit
+ * `BRAIN→AUDITOR:DISK_VS_CLAIM_MISMATCH`. If no, return the base result
+ * unchanged (legacy NO_GO behavior preserved).
+ *
+ * Mirrors result-collector.ts:513-583. Verifier is injectable via `opts`
+ * so unit tests can run without git or filesystem state.
+ *
+ * @internal Exported for unit tests of the gate semantics.
+ */
+export function gateSyntheticTimeoutResult(
+  projectRoot: string,
+  task: Task,
+  baseResult: TaskResult,
+  cause: string,
+  opts?: VerifyDiskOptions,
+): { result: TaskResult; diskVerify: DiskVerifyResult; reclassified: boolean } {
+  const diskVerify = verifyDiskAgainstClaim(projectRoot, task.scope, opts);
+  if (!diskVerify.hasDiskEvidence) {
+    return { result: baseResult, diskVerify, reclassified: false };
+  }
+  const enrichedNotes =
+    `${baseResult.notes ?? ''}; disk-verify found evidence ` +
+    `(linesAdded=${diskVerify.linesAdded}, untrackedFiles=${diskVerify.untrackedFiles.length}, cause=${cause}). ` +
+    `Status reclassified as MANUAL_REVIEW_REQUIRED — see sprint events.`;
+  return {
+    result: {
+      ...baseResult,
+      filesChanged: diskVerify.untrackedFiles,
+      linesAdded: diskVerify.linesAdded,
+      notes: enrichedNotes,
+    },
+    diskVerify,
+    reclassified: true,
+  };
 }
 
 // ═══ Pre-Dispatch Trigger Guard (Sprint 192 — Task 192-009 — W-INTEGRITY I-3) ══
@@ -1315,7 +1366,7 @@ export async function runEvaluatePhase(
           );
         }
 
-        const syntheticResult: TaskResult = {
+        const baseSynthetic: TaskResult = {
           taskId: task.id,
           workerId: task.assignedWorker ?? 'unknown',
           filesChanged: [],
@@ -1328,9 +1379,35 @@ export async function runEvaluatePhase(
             ? `Timeout - no result received (extension #${extDecision.extensionCount} expired after ${extDecision.extensionMs}ms); liveness=${liveness.status}`
             : `Timeout - no result received (extension denied: ${extDecision.reason}); liveness=${liveness.status}`,
         };
-        debugLog('runEvaluatePhase:timeout', `task=${task.id} — no result collected, marking NO_GO (timeout/missing) liveness=${liveness.status}`);
+
+        // Sprint 199 199-001 — Synthetic NO_GO Kaynak 6 gate.
+        // Verify disk before writing synthetic NO_GO. If worker produced
+        // code, reclassify as MANUAL_REVIEW_REQUIRED so an operator can
+        // triage on-disk work instead of losing it to a false NO_GO.
+        const gated = gateSyntheticTimeoutResult(
+          projectRoot, task, baseSynthetic, 'evaluate-no-result',
+        );
+        const syntheticResult = gated.result;
+        debugLog('runEvaluatePhase:timeout', `task=${task.id} — no result collected, marking NO_GO (timeout/missing) liveness=${liveness.status} reclassified=${gated.reclassified}`);
         handleEvaluation(projectRoot, task, TaskEvaluation.NO_GO, syntheticResult);
         evaluations.set(task.id, TaskEvaluation.NO_GO);
+        if (gated.reclassified) {
+          task.status = TaskStatus.MANUAL_REVIEW_REQUIRED;
+          try {
+            const sidGate = getCurrentSprintId(projectRoot) ?? sprint.id;
+            writeEvent(
+              projectRoot, sidGate, 'brain', 'auditor',
+              DISK_VS_CLAIM_MISMATCH_CHANNEL,
+              {
+                taskId: task.id,
+                linesAdded: gated.diskVerify.linesAdded,
+                untrackedFiles: gated.diskVerify.untrackedFiles,
+                cause: 'evaluate-no-result',
+                emittedAt: new Date().toISOString(),
+              },
+            );
+          } catch (e) { debugLog('runEvaluatePhase:diskGateEmit', e); }
+        }
         // DECKENT→USER:NOTIFY (Hot Fix H6) — timeout/missing NO_GO
         try {
           void notify(

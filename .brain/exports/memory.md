@@ -1,5 +1,26 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-200 Learnings
+- Sprint sprint-200 Learnings: ## Sprint sprint-200 Learnings
+- 198-002 — memory.db sprint-log finalize bug fix + Sprint 194/196 row backfill: NO_GO — Sprint 198 198-002 (memory.db sprint-log finalize bug fix + Sprint 194/196 row backfill) was already authored in a prior
+- 198-003 — managed-docs auditor.md template regression fix: NO_GO — All three regression sources fixed:
+1. src/core/rule-templates/auditor.template.md — removed 'Append new patterns to PAT
+- 198-006 — Test baseline 41 → 26 attack (en kolay 15 fail): NO_GO — Sprint 200 T-200-006 attack on 18 failing tests across 4 target files.
+
+BASELINE (verified at task start, all 4 files): 
+- 198-009 — Memory backup auto-sync mekanizması (user-memory ↔ core-memory): NO_GO — All three deliverables were already implemented from prior sprint work and are fully functional:
+
+1. scripts/sync-core-m
+
+## Sprint sprint-199 Learnings
+- Sprint sprint-199 Learnings: ## Sprint sprint-199 Learnings
+- 198-003 — managed-docs auditor.md template regression fix: NO_GO — Fixed the managed-docs auditor template regression (198-003).
+
+**Root cause location:** The template is at `src/core/rul
+- 198-005 — 6-worker × 2g config verify + RAM deney readiness audit: NO_GO — Worker exited without writing result (exitCode=0)
+- 198-006 — Test baseline 41 → 26 attack (en kolay 15 fail): NO_GO — Worker exited without writing result (exitCode=0)
+- 198-007 — Sprint 191-196 retroactive reclassify re-run (12/12 hedef): NO_GO — PREREQUISITE BLOCKER: Sprint 198-002 (memory.db sprint-log finalize + backfill) is not complete. The reclassify script e
+
 ## Sprint sprint-197 Learnings
 - Sprint sprint-197 Learnings: ## Sprint sprint-197 Learnings
 - 197-004 — WSL2 OOM mitigation (max_workers + worker_memory + adaptive): NO_GO — Sprint 197 task 197-004 — WSL2 OOM mitigation.

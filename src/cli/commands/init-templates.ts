@@ -73,6 +73,11 @@ Detaylı rehber: .deckent/docs/directives-guide.md
 - Claude (varsayılan), Codex (OPENAI_API_KEY), Gemini (GOOGLE_API_KEY)
 - Model eşdeğerleri: opus↔gpt-5↔gemini-2.5-pro, sonnet↔gpt-4.1↔gemini-2.5-flash
 
+## Agent Instructions
+Brain rolü için: @.claude/rules/brain.md
+Auditor rolü için: @.claude/rules/auditor.md
+Worker rolü için: @.claude/rules/worker-default.md
+
 ## Context
 @DIRECTIVES.md
 @.brain/exports/summary.md
@@ -128,6 +133,11 @@ Detailed guide: .deckent/docs/directives-guide.md
 ## Providers
 - Claude (default), Codex (OPENAI_API_KEY), Gemini (GOOGLE_API_KEY)
 - Model equivalence: opus↔gpt-5↔gemini-2.5-pro, sonnet↔gpt-4.1↔gemini-2.5-flash
+
+## Agent Instructions
+When acting as Brain: @.claude/rules/brain.md
+When acting as Auditor: @.claude/rules/auditor.md
+When acting as Worker: @.claude/rules/worker-default.md
 
 ## Context
 @DIRECTIVES.md

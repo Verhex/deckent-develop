@@ -280,7 +280,9 @@ ${scopeDirs}
 You may ONLY write to these files:
 ${scopeFiles}
 
-DO NOT touch files outside your scope — the auditor will flag violations.`;
+DO NOT touch files outside your scope — the auditor will flag violations.
+
+When writing host-facing config (hooks in \`.claude/settings.json\`, scripts in \`package.json\`, CI workflows), NEVER hard-code your container working directory (e.g. \`/workspace/...\`). That path does not exist on the user's host machine and will break at runtime. Use a portable form instead: \`$CLAUDE_PROJECT_DIR/...\`, a path relative to the project root, or a bare command resolved via PATH.`;
 }
 
 // ─── Dependencies Block Builder ────────────────────────────────────────

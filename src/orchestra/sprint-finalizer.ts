@@ -640,6 +640,7 @@ export async function finalizeSprint(
   // (Sprint 167 regression — DB+FS came out of sync when the wire was
   // partial). Unconditional invocation per ADR-046 §"Mimari Prensipler".
   debugLog('finalizeSprint:preRetro', `evaluations.size=${evaluations.size} keys=[${[...evaluations.keys()].join(',')}]`);
+  let sprintLogPersisted = false;
   try {
     // Build skillMap from tasks for Skill Performance table in RETRO.md
     const skillMap = new Map<string, string[]>();
@@ -659,6 +660,7 @@ export async function finalizeSprint(
       results,
       { createIfMissing: true },
     );
+    sprintLogPersisted = retroWriteResult.sprintLogWritten;
     // Sprint 190 carry-over [[project_sprint189_retro_db_missing]]:
     // surface DB-write outcome so silent failures (Sprint 189 retro entry
     // missing while patterns landed) cannot recur unnoticed. Non-fatal.
@@ -687,6 +689,43 @@ export async function finalizeSprint(
       appendRetroSection(projectRoot, sprint.id, '### Code-Verified DONE', section);
     }
   } catch (e) { debugLog('finalizeSprint:writeRetrospective', e); }
+
+  // Sprint 198 198-002 defensive fallback — guarantees a sprint-log DB
+  // row even when writeRetrospective threw or its own try/catch returned
+  // with sprintLogWritten=false. Closes the chronic finalize bug
+  // surfaced in Sprint 197 197-002 (sprint-log-194 + sprint-log-196
+  // missing). Minimal payload (sprintId + totalTasks + durationMs) is
+  // enough for downstream retroactive reclassify to land a Task
+  // Outcomes section in a future pass; full content is preferred but
+  // optional. Silent failures are forbidden — log the error explicitly.
+  if (!sprintLogPersisted) {
+    try {
+      const { MemoryStore } = await import('../core/memory-store.js');
+      const { MEMORY_DB_FILE } = await import('../core/constants.js');
+      const memDbPath = join(projectRoot, BRAIN_DIR, MEMORY_DB_FILE);
+      if (existsSync(memDbPath)) {
+        const store = new MemoryStore(memDbPath);
+        try {
+          store.upsertSprintLog(sprint.id, {
+            totalTasks: metrics?.totalTasks,
+            durationMs: metrics?.durationMs,
+            extraTags: ['defensive-fallback'],
+          });
+          sprintLogPersisted = true;
+          debugLog('finalizeSprint:sprintLogFallback',
+            `Defensive sprint-log row written for ${sprint.id}`);
+        } finally {
+          store.close();
+        }
+      } else {
+        debugLog('finalizeSprint:sprintLogFallback',
+          `memory.db missing at ${memDbPath} — fallback skipped`);
+      }
+    } catch (e) {
+      debugLog('finalizeSprint:sprintLogFallback',
+        `Defensive sprint-log write failed for ${sprint.id} — ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
 
   // 5. Legacy .brain/PROJECT-IDENTITY.md update removed — B6 (Memory V2).
   // Identity is DB-first: the memory.db `identity` entry is the source of

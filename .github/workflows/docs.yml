@@ -43,7 +43,7 @@ jobs:
         run: npm run ci:rebuild-native
 
       - name: Install docs dependencies
-        run: npm ci --prefix docs
+        run: npm install --prefix docs
 
       - name: Install dashboard dependencies
         run: npm ci --prefix src/dashboard --ignore-scripts
@@ -56,24 +56,23 @@ jobs:
         working-directory: docs
 
       - name: Create CNAME file for custom domain
-        run: echo "docs.deckent.ai" > docs/.vitepress/dist/CNAME
+        run: echo "docs.deckent.agency" > docs/.vitepress/dist/CNAME
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: docs/.vitepress/dist
 
-  # Deploy job disabled — GitHub Pages not configured on this repo.
-  # To enable: Settings → Pages → Source: "GitHub Actions", then uncomment below.
-  # deploy:
-  #   name: Deploy to GitHub Pages
-  #   needs: build
-  #   runs-on: ubuntu-latest
-  #   if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-  #   environment:
-  #     name: github-pages
-  #     url: ${{ steps.deployment.outputs.page_url }}
-  #   steps:
-  #     - name: Deploy to GitHub Pages
-  #       id: deployment
-  #       uses: actions/deploy-pages@v4
+  # Deploy job — enable by configuring Settings → Pages → Source: "GitHub Actions".
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

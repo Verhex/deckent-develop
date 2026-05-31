@@ -515,6 +515,67 @@ export class MemoryStore {
     txn();
   }
 
+  /**
+   * Atomic upsert of the canonical `sprint-log-<num>` entry. Single-call
+   * API used by sprint finalize (defensive fallback) and by the
+   * `scripts/backfill-sprint-log-rows.mjs` reconstruction tool. When a
+   * row already exists the call updates fields via {@link upsert}; when
+   * absent it inserts a fresh row. Returns the canonical entry id so
+   * callers can chain relations / audit writes.
+   *
+   * Sprint 198 198-002 — closes the chronic gap surfaced in Sprint 197
+   * 197-002 (sprint-log-194 + sprint-log-196 missing) where a thrown
+   * exception in metrics/retro paths left the DB without a sprint row
+   * while the file-side sprint log was already on disk.
+   */
+  upsertSprintLog(
+    sprintId: string,
+    payload: {
+      content?: string;
+      title?: string;
+      totalTasks?: number;
+      durationMs?: number;
+      extraTags?: string[];
+      source?: string;
+      changedBy?: string;
+    } = {},
+  ): string {
+    const sprintNum = parseInt(sprintId.replace(/\D/g, ''), 10) || 0;
+    const id = `sprint-log-${sprintNum}`;
+    const title = payload.title ?? `Sprint ${sprintId}`;
+    const baseTags = ['sprint', sprintId];
+    const tags = payload.extraTags && payload.extraTags.length > 0
+      ? Array.from(new Set([...baseTags, ...payload.extraTags]))
+      : baseTags;
+
+    let content = payload.content;
+    if (!content || content.length === 0) {
+      const lines: string[] = [`# ${sprintId}`, ''];
+      if (typeof payload.totalTasks === 'number') {
+        lines.push(`- Total tasks: ${payload.totalTasks}`);
+      }
+      if (typeof payload.durationMs === 'number') {
+        lines.push(`- Duration: ${payload.durationMs}ms`);
+      }
+      lines.push('- Backfilled via upsertSprintLog');
+      content = lines.join('\n');
+    }
+
+    this.upsert({
+      id,
+      type: 'sprint',
+      title,
+      content,
+      source: (payload.source ?? 'brain') as CreateEntryInput['source'],
+      sprint_id: sprintId,
+      sprint_num: sprintNum,
+      status: 'active',
+      tags,
+    }, payload.changedBy ?? 'brain');
+
+    return id;
+  }
+
   update(
     id: string,
     fields: Partial<{

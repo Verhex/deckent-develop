@@ -71,7 +71,7 @@ interface ProviderAdapter {
 function claudeAdapter(): ProviderAdapter {
   const pathsMap: Record<RuleRole, string[]> = {
     'brain': ['.tasks/*', '.brain/*'],
-    'auditor': ['.dashboard', '.brain/PATTERNS.md'],
+    'auditor': ['.dashboard'],
     'worker-default': ['src/**', 'tests/**'],
   };
 
@@ -136,7 +136,7 @@ function cursorAdapter(): ProviderAdapter {
   // by Cursor — hence fileExt() === 'mdc'.
   const globsMap: Record<RuleRole, string> = {
     'brain': '.tasks/**,.brain/**',
-    'auditor': '.dashboard,.brain/PATTERNS.md',
+    'auditor': '.dashboard',
     'worker-default': 'src/**,tests/**',
   };
   const descMap: Record<RuleRole, string> = {

@@ -37,19 +37,21 @@ Sprint 189 "fix-only" değil — **çok-akarsulu OSS GA programı**. Master plan
 
 ### 11 Work Stream
 
-| Stream | Başlık | Faz | Sprint | Anchor |
-|--------|--------|-----|--------|--------|
-| **W-A** | OSS GA Blokerleri (WrongStack zorunlulukları) | 1 | 189-190 | WS-Z1/Z2/Z3 |
-| **W-B** | Sprint 188 Doc/Wire Drift Düzeltmeleri | 1 | 189-190 | Audit raporları |
-| **W-C** | Native Chat (`deckent chat`) — Path B → A → C | 2 | 191-198 | WS-X1, ROADMAP-GOD §192, vision §200 |
-| **W-D** | Dashboard Yeniden Doğuş (UI/UX + Native) | 2 | 192-195 | ROADMAP-GOD §192 Sub-project #4 |
-| **W-E** | ⭐ Evrimsel Mimari Taçlandırma | 3 | 196-199 | Sprint 188 DORMANT agent evolution cluster |
-| **W-F** | Provider Repair + Local LLM + Live Catalog | 1-2 | 189-195 | 3 çatal #1, vision §195, WS-D3 |
-| **W-G** | API Surface Test + HTTP Validation | 1 | 189-190 | api-dashboard-consistency.md |
-| **W-H** | Dokümantasyon Kusursuzlaştırma (içerik + sayı) | 1-2 | 189-195 | doc-code-drift.md 25 madde |
-| **W-I** | OSS Publish Pipeline (public repo + npm + community) | 4 | 200-202 | Trinity vision, ADR-033 |
-| **W-J** | Million-User Hardening (perf + observability + security) | 4 | 200-205 | WS-Z3 + load-test-report |
-| **W-K** | Dead Code → Live Feature Wire-Up Programı | 3 | 196-199 | Sprint 188 dead inventory |
+> **Status snapshot (2026-05-31, post-Sprint-197):** ✅ = closed for the band • ⚠ = partial / carry-over open • ⬜ = not yet started. Detailed Sprint 189-197 landing per stream lives in *Appendix A — Sprint 189-197 Landing Summary* at the end of this document.
+
+| Stream | Başlık | Faz | Sprint | Anchor | Status (2026-05-31) |
+|--------|--------|-----|--------|--------|---------------------|
+| **W-A** | OSS GA Blokerleri (WrongStack zorunlulukları) | 1 | 189-190 | WS-Z1/Z2/Z3 | ✅ 5/5 P0 (A-1 coverage gate, A-2 CHANGELOG backfill Sprint 157→197 via 197-003, A-3 sprint-reporter wire, A-4 SECURITY.md update, A-5 ADR-037 advisory note) |
+| **W-B** | Sprint 188 Doc/Wire Drift Düzeltmeleri | 1 | 189-190 | Audit raporları | ✅ 23/35 (P0 + most P1 closed: B-1 ADR-008 fix, B-2/B-3 MCP count, B-4 lint guard, B-5 CLI count, B-7/B-8/B-9 Memory V2 doc cleanup — auditor.md template carry-over to Sprint 198-003; B-13 cost-gate, B-28 baseline categorize via 196-007). P2/P3 dağınık 12 madde Sprint 199+ |
+| **W-C** | Native Chat (`deckent chat`) — Path B → A → C | 2 | 191-198 | WS-X1, ROADMAP-GOD §192, vision §200 | ✅ Path B LIVE — `src/cli/commands/chat.ts` subprocess + MCP auto-attach + tty forward landed; C-4 (resume), C-5 (naïve sohbet), C-6 (demo video) Sprint 199-200. Path A + Path C remain phased post-beta |
+| **W-D** | Dashboard Yeniden Doğuş (UI/UX + Native) | 2 | 192-195 | ROADMAP-GOD §192 Sub-project #4 | ⬜ Deferred post-beta (Sprint 201+). Sprint 188 StatusPage 404 fix (B-10) is the only landed item; UX overhaul + Tauri native window not started — confirms `feedback_no_minimum_no_mvp_deckent` god-level scope is a multi-sprint pull |
+| **W-E** | ⭐ Evrimsel Mimari Taçlandırma | 3 | 196-199 | Sprint 188 DORMANT agent evolution cluster | ⬜ Faz 3 — DORMANT modules (`prompt-evolution.ts`, `adaptive-agent.ts`, `cross-sprint-analyzer.ts`, etc.) still wired-off pending Sprint 198 honesty closure + Sprint 200 OSS launch stabilization |
+| **W-F** | Provider Repair + Local LLM + Live Catalog | 1-2 | 189-195 | 3 çatal #1, vision §195, WS-D3 | ✅ Faz 1 P0 — Sprint 195-004 models.dev bootstrap startup wire landed (NO_GO classified as legitimate baseline since `bootstrapFromCatalog` is opt-in); Sprint 195-005 host-RAM detect 24 GB WSL2 / meminfo live. Local LLM (Ollama/CUDA) phased post-beta |
+| **W-G** | API Surface Test + HTTP Validation | 1 | 189-190 | api-dashboard-consistency.md | ✅ P0 — Sprint 189 baseline contract coverage + Sprint 197 197-005 persona-task matcher live verify covers the persona-routing surface |
+| **W-H** | Dokümantasyon Kusursuzlaştırma (içerik + sayı) | 1-2 | 189-195 | doc-code-drift.md 25 madde | ⚠ Partial — 14/25 doc-drift items closed (MCP count, CLI count, Memory V2 path, ADR list, README badges); 11 long-tail items (api.md Memory V2 9 satır + cli.md PROJECT-IDENTITY references) remain — auditor.md template via Sprint 198-003. **This refresh (Sprint 198-004) closes the 3 master-plan staleness items.** |
+| **W-I** | OSS Publish Pipeline (public repo + npm + community) | 4 | 200-202 | Trinity vision, ADR-033 | ⬜ Sprint 199-200 — npm pack dry-run + Dockerfile.worker image build/push (Sprint 199), `npm publish v1.0.0-beta.1` (Sprint 200, Alperen manual) |
+| **W-J** | Million-User Hardening (perf + observability + security) | 4 | 200-205 | WS-Z3 + load-test-report | ⬜ Post-beta. Sprint 196 has `docs/audits/sprint-196/load-test-report.md` baseline; full hardening Sprint 201+ |
+| **W-K** | Dead Code → Live Feature Wire-Up Programı | 3 | 196-199 | Sprint 188 dead inventory | ⬜ Sequenced after W-E (same DORMANT cluster); Sprint 200+ |
 
 ### Faz Hizalama
 
@@ -1036,3 +1038,54 @@ zero discovery cost — exact files, exact change needed.
 - User-visible impact today: `deckent config set worker_provider ollama` accepts the
   value but the spawner cannot construct `OllamaAdapter` automatically — chat-mode
   (Task 190-007) still works because it instantiates the adapter directly.
+
+---
+
+# Appendix A — Sprint 189-197 Landing Summary (2026-05-31 refresh)
+
+> Refreshed by Sprint 198-004 (this document refresh). Per-stream details are scattered across the W-A..W-K cards above; this appendix collapses them into a Sprint-major view so the reader can answer "what actually shipped in the band 189-197?" in a single table. Source archives: `.brain/archive/DIRECTIVES-sprint-189.md` through `.brain/archive/DIRECTIVES-sprint-197.md`; outcome ground-truth: `.deckent/archive/sprints/sprint-189/` through `sprint-196/` (Sprint 197 still in `.tasks/archive/`).
+
+| Sprint | Date (2026) | Tasks | DONE / total | Key achievement | W-stream landing |
+|--------|-------------|-------|--------------|-----------------|------------------|
+| **189** | May 23 | 9 | 8/9 (~89%) | OSS GA Blocker Wave 1 — CHANGELOG backfill Sprint 157→188 (A-2), MCP tool count drift fix (B-2/B-3), `core/notify.ts:17` ADR-008 ihlali dependency-inversion fix (B-1), dashboard StatusPage 404 wire (B-10), `lint-mcp-instructions.mjs` regression guard (B-4) | W-A (5/5 P0), W-B (P0 13 items), W-G (baseline contract coverage) |
+| **190** | May 23 | 13 | 9/13 (~69%) | `runtime_extension_enabled: true` default + worker timeout extension wire (191-002 carry); Ollama provider initial wire (190-007 chat-mode, 190-009 ⚠ tech-debt items 2-4 deferred); Docker OOM cycle drove ~14 false NO_GO (reclassified Sprint 197-002 retroactive — see `feedback_brain_synthetic_nogo_disk_verify`) | W-A (A-3 sprint-reporter wire), W-F (provider wire seed), W-B (B-13 cost-gate) |
+| **191** | May 24 | 17 | 14/17 (~82%) | Karpathy 4-discipline anchor land (`karpathy-discipline.md` wired into `worker-default.md` / `brain.md` / `auditor.md`); Worker Discipline Anchor adopted; 191-017-fix Ask A + Ask B (provider doctor split) | W-A (A-4/A-5 SECURITY.md update), W-F (F-2 provider doctor), W-H (H-5 anchor docs) |
+| **192** | May 24 | 11 | 8/11 (~73%) | Mid-band stabilization — `max_workers` config experiments documented, RAM verify groundwork seeded (Sprint 197-004 finalizes); sprint-log-192 row finalize bug repeats (Sprint 198-002 backfill) | W-B (drift cleanup), W-F (provider repair), W-J (load-test groundwork) |
+| **193** | May 25 | 7 | 6/7 (~86%) | SMOKE-001 i18n `en.json` duplicate `error.lock_conflict` cleanup (legitimate baseline NO_GO classification); bootstrap stability fixes | W-H (i18n docs), W-B (drift) |
+| **194** | May 25 | 9 | functional ✓, finalize ⚠ | Brain finalize halted mid-flow — `sprint-log-194` row missing from `memory.db` (discovered Sprint 197 197-002; Sprint 198-002 closes via `backfill-sprint-log-rows.mjs` + defensive minimal-row write in `sprint-finalizer.ts`). Functional work landed but evaluation rows incomplete. | (recovered via Sprint 198-002) |
+| **195** | May 25 | 9 | 7/9 (~78%) | **WP-1..WP-12 Tier-1 wire** — agent `PROMPT.md` canonical source, skill content full-fidelity, idempotency-key `${sprintId}-${taskId}-${retryCount}`, scope.filesWrite auto-include of test paths (WP-3 `deriveTestScope`); 195-005 host-RAM detect (24 GB WSL2 / `meminfo`) live; 195-004 catalog bootstrap NO_GO → Sprint 196 carry; +90 tests | W-F (catalog), W-J (load-test base), W-A (script hardening) |
+| **196** | May 26 | 7 | 5/7 (~71%) | **Disk-verify gate KAYNAK 1-5 live** — `verifyDiskAgainstClaim` runtime gating in `result-collector.ts:518-583` + 4 siblings; 196-005 token-counter.ts NO_GO exposed **KAYNAK 6+7 ungated** paths (Sprint 198-001 seed); 196-007 test-fail audit (`docs/audits/sprint-196/test-fail-categorize.md`) — 41-fail baseline kategorize; +44 tests | W-B (B-28 baseline categorize), W-A (gate hardening) |
+| **197** | May 26 | 8 | 6/8 (~75%) + 2 rescued | **7/7 synthetic NO_GO source map complete** (197-001) — `sprint-phases.ts:1318-1330` + `sprint-controller.ts:963-1003` identified for Sprint 198-001; **197-002 retroactive reclassify** 2/12 applied + 10 skipped (sprint-entry-missing — Sprint 198-002 backfill); **197-003 CHANGELOG 40-entry catch-up** Sprint 157→197; **197-004 WSL2 OOM mitigation** rescue (`max_workers 2→6`, `worker_memory_limit 3g→2g`); **197-005 persona-task matcher** live verify + threshold tuning rescue; chore commit `cd4df0ed` regenerated `auditor.md` from legacy PATTERNS.md template (Sprint 198-003 fixes); +30 tests | W-A (A-2/A-3 CHANGELOG), W-B (B-9 auditor.md carry), W-G (persona surface) |
+
+**Band totals (Sprint 189-197):**
+- 90 tasks dispatched, ~67 DONE first-pass + ~12 rescued ≈ **88% effective DONE**
+- ~17 rescue commits across Sprint 195-197 (the honest-gate band)
+- ~6500 net LoC delta (Sprint 195-197), 164 new tests
+- 5 of 7 synthetic NO_GO source paths gated (Sprint 198-001 closes 6+7)
+- Test baseline 52 → 41 fail (Sprint 198-006 attacks Tier-1 toward ≤26)
+- 5 new accepted ADRs in the window: ADR-053 (TaskType Taxonomy), ADR-062 (Embedded Web Terminal — pre-band), ADR-063 (Consent-Based Prerequisite Provisioning), ADR-064 (TOPP Continuous Dispatch); ADR-061 (AEGIS) remains proposed pending beta-stability
+- 8 durable feedback memories landed: `feedback_brain_synthetic_nogo_disk_verify`, `feedback_no_auth_touch_during_sprint`, `feedback_worker_prompt_engineering_god_level`, `feedback_proactive_blocker_disclosure`, `feedback_npm_publish_user_approval`, `feedback_no_minimum_no_mvp_deckent`, `feedback_trust_brain_eval_not_worker`, `feedback_trust_deckent_recovery`
+
+---
+
+# Appendix B — Faz 1 Checkpoint (2026-05-31): Beta Launch READY
+
+> Refreshed by Sprint 198-004 (1 day to 1 Haziran 2026 OSS beta launch).
+
+| Çıkış kriteri | Hedef | Sprint 198-004 anı durumu | Karar |
+|---------------|-------|---------------------------|-------|
+| OSS GA Blocker Wave 1 P0 (W-A 5/5) | All P0 closed | ✅ 5/5 closed | **GO** |
+| Sprint 188 doc/wire drift P0 (W-B) | All P0 closed | ✅ 13/13 P0 closed (auditor.md template carry → Sprint 198-003) | **GO with debt** (Sprint 198-003 closes) |
+| Native chat (W-C Path B) | LIVE | ✅ `deckent chat` subprocess + MCP auto-attach | **GO** |
+| Provider repair P0 (W-F-1) | Live catalog + host RAM detect | ✅ Sprint 195-005 host RAM live, models.dev bootstrap available (opt-in) | **GO** |
+| API surface test (W-G) | Baseline + persona | ✅ Sprint 189 baseline + Sprint 197-005 persona | **GO** |
+| Doc kusursuzlaştırma (W-H Faz 1) | Master plans + drift fix | ✅ This refresh (Sprint 198-004) closes the 3 master-plan staleness items; long-tail to Sprint 199+ | **GO with debt** |
+| Brain dürüst raporlama 7/7 | All 7 synthetic NO_GO source paths gated | ⚠ 5/7 live (KAYNAK 6+7 → Sprint 198-001 in flight) | **GO conditional** (Sprint 198-001 closes within band) |
+| memory.db sprint-log integrity | All sprint rows present | ⚠ Sprint 194/196 rows missing (Sprint 198-002 backfill in flight) | **GO conditional** (Sprint 198-002 closes within band) |
+| Managed-docs auditor.md template | New paradigm rendered | ⚠ Legacy text regressed by Sprint 197 chore commit (Sprint 198-003 in flight) | **GO conditional** (Sprint 198-003 closes within band) |
+| RAM 6-worker × 2g readiness | Host RAM ≥ 14 GB | ⚠ Config tightened Sprint 197-004; verification flag Sprint 198-005 in flight | **GO conditional** (Sprint 198-005 readiness check) |
+| Vitest baseline | Don't regress past 41 fail | ✅ 41 fail held since Sprint 196; Sprint 198-006 attacks Tier-1 toward ≤26 | **GO** |
+
+**Verdict (2026-05-31, T-1 day to launch):** Sprint 198 6-task zorunlu band is in flight; **once 198-001 + 198-002 + 198-003 land (all opus-tier, scoped per `DIRECTIVES.md`), every Faz 1 GO-conditional flips to GO** and the 1 Haziran 2026 OSS beta launch window is clean. Sprint 199 packaging (npm pack dry-run + Dockerfile.worker image + release notes) is the final gate; Sprint 200 = `npm publish v1.0.0-beta.1` (Alperen manual per `feedback_npm_publish_user_approval`).
+
+**No new scope expansion accepted between now and Sprint 200.** Any drift-bait (new W-stream items, Sprint 188 P2/P3 long-tail, Sprint 199-008 / 199-009 OPSIYONEL tasks beyond Sprint 198's spec) is parked to Sprint 201+.
