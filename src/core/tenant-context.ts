@@ -1,5 +1,6 @@
 import { join } from 'node:path';
 import { AsyncLocalStorage } from 'node:async_hooks';
+import { DeckentError } from './errors.js';
 
 /** Tenant isolation context for F3 process mode. */
 export interface TenantContext {
