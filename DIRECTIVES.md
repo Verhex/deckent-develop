@@ -1,10 +1,11 @@
-# DIRECTIVES — Sprint 206: Flow Wire + Flaky Sıfırlama + F3 Webhook + F2 Real Binding + F4 RBAC
+# DIRECTIVES — Sprint 207: Zero-Hard-Code + Flaky Sıfırlama + Brain-Fix Canlı Doğrulama + F4 RBAC Wire
 
-## Goal: (DALGA 0) Sprint 205'te eksik kalan flow CLI wire'ını tamamla + kalan 5 flaky/gap test'i sıfırla (baseline 5→0 hedef). (DALGA 1) F3-003 webhook/event triggers + F2 native chat'i gerçek provider adapter'a bağla (mock→subscription CLI path) + scheduled-flow runtime tick. (DALGA 2) F4 RBAC role-check iskelet + ADR. YÜRÜTME: bol-küçük-task + 10 worker, her task TEK dosya/TEK sorumluluk, ≤200 LoC, effort≤normal (high YOK).
+## Goal: GENİŞ KAPSAM. (DALGA 0) Zero-hard-code felsefesi: CLI/MCP çıktılarındaki stale/sabit değerleri canlı deckent verisine bağla (model apiId opus-4-6→canlı, model distribution parametrik). (DALGA 1) Kalan 2 flaky test'i sıfırla + Brain-fix canlı doğrulama (bu sprint 0 false-FIX bekleniyor — cc'nin coverage:null fix'i artık canlı). (DALGA 2) F4 RBAC wire + F3 process mode devam. YÜRÜTME: bol-küçük-task + 10 worker, her task TEK dosya/TEK sorumluluk, ≤200 LoC, effort≤normal (high YOK).
 
-Bağlam (Sprint 205 sonrası):
-- Sprint 205 12/12 DONE 0 NO_GO. **Agent routing CANLI** (refactorer seçiliyor). Tam-suite 18→5 fail.
-- Kalan 5 fail: (a) `registration-harness` ×2 — **205-007 flow.ts `registerFlow` export var AMA CLI entry'ye WIRE EDİLMEMİŞ** (gerçek gap), (b) `docker-backend` ×2 — test izolasyon/state çakışması (izole geçiyor), (c) `docker-oom-reproducer` ×1 — gracefulTimeout forward, (d) `claude-rules-no-legacy` ×2 — auditor.md managed-docs template legacy referans.
+Bağlam:
+- **Brain-fix CANLI** (commit ba617421, cc tarafından elle): coverage:null false-FIX cascade çözüldü — coverageOptional artık sinyal-temelli (test dosyası yazıldıysa muaf), agent-bağımsız idempotent. Build+restart yapıldı. **Bu sprint Brain'in 0 gereksiz FIX üretmesi beklenir — canlı doğrulama.**
+- **Zero-hard-code bulgusu** ([[feedback_zero_hardcode_live_data]]): `model-registry.ts:62` `apiId:'claude-opus-4-6'` bundled stale (güncel Opus 4.8). `bootstrapFromCatalog` çalışıyor ama apiId güncellenmiyor → cost-estimate çıktısı eski model gösteriyor. Model distribution `brain-context.ts` + `cost-calculator.ts`'ten basılıyor.
+- Kalan 2 flaky: `docker-backend` (kill/list test izolasyon, beforeEach var ama state sızıyor) + `managed-docs-auditor-template` (template memory.db pattern bekliyor).
 
 ---
 
@@ -13,29 +14,61 @@ Bağlam (Sprint 205 sonrası):
 - **Subscription mode ZORUNLU** — `env -u ANTHROPIC_API_KEY -u DECKENT_CLAUDE_API_KEY`. API mode YASAK ([[project_api_mode_deferred_post_beta]]).
 - Worker yalnızca scope.filesWrite. Host-facing config'lere `/workspace` YAZMA, `$CLAUDE_PROJECT_DIR`.
 - **KÜÇÜK TASK:** tek-dosya/tek-sorumluluk, ≤200 LoC, effort≤normal. high YASAK.
-- Her kod task'ı vitest min 4 test. `dosya:satır` kanıtı zorunlu.
-- **Dishonest YASAK** — gerçekten ölç ([[feedback_trust_brain_eval_not_worker]]). Zaten-temiz +0/-0 tuzağı yok.
+- Her kod task'ı vitest min 4 test. `dosya:satır` kanıtı zorunlu. **Yeni test dosyası yaz** (Brain coverage muafiyeti artık buna bağlı — [[feedback_brain_rubric_bridge_broken]]).
+- **Dishonest YASAK** — gerçekten ölç, zaten-temiz +0/-0 tuzağı yok ([[feedback_trust_brain_eval_not_worker]]).
 - ESM `.js` suffix. ADR-010 sıfır yeni runtime dep.
-- Hedef: tam-suite fail 5→0.
+- Hedef: tam-suite fail 2→0, regresyon yok.
 
 ---
 
-## DALGA 0 — Flow Wire + Flaky Sıfırlama (4 küçük task)
+## DALGA 0 — Zero-Hard-Code (3 küçük task)
 
-## Task 1: 206-001 — flow CLI registerFlow → CLI entry wire (gerçek gap)
+## Task 1: 207-001 — Model registry bundled apiId güncel + "stale" işareti
 - Model: sonnet
-- Effort: low
+- Effort: normal
 - Skills: typescript-expert
-- Files: src/cli/index.ts, tests/cli/flow-wire.test.ts
-- Scope: src/cli/, tests/cli/
+- Files: src/core/model-registry.ts, tests/core/model-registry-apiid.test.ts
+- Scope: src/core/, tests/core/
 
 ### Description
-**Problem:** 205-007 `src/cli/commands/flow.ts` `registerFlow(program)` export ediyor AMA CLI entry (src/cli/index.ts veya cli.ts — `grep -rln registerChat src/cli/` ile bul) bunu import+çağırmıyor. `registration-harness.test.ts` bu eksiği yakalıyor (2 fail). `deckent flow` komutu erişilemez durumda.
-**Çözüm:** CLI entry'de diğer register*'ların yanına `import { registerFlow } from './commands/flow.js'` + `registerFlow(program)` ekle (ADR-012 register<Name> pattern). Mevcut komut sırasını koru, sadece ekleme.
-**Kanıt:** `grep -c "registerFlow" <cli-entry-dosyası>` → ≥1 (import+çağrı); `npx vitest run tests/cli/registration-harness.test.ts tests/cli/flow-wire.test.ts` → flow.ts wire PASS
-**Test:** ≥4 (registerFlow import var, çağrılıyor, flow komutu kayıtlı, registration-harness geçer)
+**Problem:** model-registry.ts:62 `apiId:'claude-opus-4-6'` bundled snapshot stale — güncel Opus 4.8. bootstrapFromCatalog çalışsa bile apiId güncellenmiyor (models.dev'de yok veya bootstrap apiId merge etmiyor). Kullanıcı `deckent start` cost-estimate'te eski model görüyor.
+**Çözüm:** (1) Bundled opus apiId'yi `claude-opus-4-8`'e güncelle (sonnet/haiku doğru). (2) Bundled snapshot'a yorum: "bundled = offline son-çare, models.dev catalog canlı kaynak; apiId build-time güncel tutulmalı". (3) Eğer bootstrapFromCatalog apiId'yi güncellemiyor sa nedenini araştır + not (gerçek fix 207-002). SADECE bundled değer + yorum bu task'ta.
+**Kanıt:** `grep -c "claude-opus-4-8" src/core/model-registry.ts` → ≥1; `grep -c "claude-opus-4-6" src/core/model-registry.ts` → 0; `npx vitest run tests/core/model-registry-apiid.test.ts` → 4+ pass
+**Test:** ≥4 (opus apiId güncel, tier mapping korunur, 13-model invariant, bundled fallback çalışır)
 
-## Task 2: 206-002 — docker-backend test izolasyon fix (kill/list state)
+## Task 2: 207-002 — bootstrapFromCatalog apiId merge doğrula + wire
+- Model: sonnet
+- Effort: normal
+- Skills: typescript-expert
+- Files: src/core/model-catalog.ts, tests/core/catalog-apiid-merge.test.ts
+- Scope: src/core/, tests/core/
+- Dependencies: 207-001
+
+### Description
+**Problem:** bootstrapFromCatalog (model-catalog.ts) models.dev'den çekiyor ama canlı test'te opus apiId hâlâ bundled değer döndü — merge apiId'yi güncellemiyor olabilir. Zero-hard-code için canlı catalog apiId'yi ezmel i.
+**Çözüm:** Merge mantığını incele — remote catalog entry varsa bundled apiId üzerine yazsın (remote canlı kaynak). Remote'ta yoksa bundled korunur (offline güvenlik). Test mock catalog ile (gerçek fetch DEĞİL).
+**Kanıt:** `grep -c "apiId\|merge\|override" src/core/model-catalog.ts` → ≥2; `npx vitest run tests/core/catalog-apiid-merge.test.ts` → 4+ pass
+**Test:** ≥4 (remote apiId ezer, remote yok→bundled korunur, merge idempotent, offline fallback)
+
+## Task 3: 207-003 — Cost-estimate çıktısı catalog-aware (parametrik model adı)
+- Model: sonnet
+- Effort: normal
+- Skills: typescript-expert
+- Files: src/core/cost-calculator.ts, tests/core/cost-model-label.test.ts
+- Scope: src/core/, tests/core/
+- Dependencies: 207-001
+
+### Description
+**Problem:** `deckent start` "Model distribution" çıktısı registry apiId'sini doğrudan basıyor (`anthropic/claude-opus-4-6`). Stale değer kullanıcıya gidiyor. Zero-hard-code: çıktı canlı registry'den parametrik beslenmeli, sabit string olmamalı.
+**Çözüm:** cost-calculator model-label üretimini registry'nin canlı `get(model).apiId`'sinden al (207-001/002 sonrası güncel olur). Sabit/fallback string varsa kaldır. brain-context.ts da aynı deseni kullanıyorsa not düş (ayrı task gerekebilir).
+**Kanıt:** `grep -c "registry.get\|modelRegistry\|getModel\|\.apiId" src/core/cost-calculator.ts` → ≥1; hardcoded model string YOK; `npx vitest run tests/core/cost-model-label.test.ts` → 4+ pass
+**Test:** ≥4 (label canlı registry'den, bilinmeyen model graceful, tier doğru, provider prefix doğru)
+
+---
+
+## DALGA 1 — Flaky Sıfırlama + Brain-Fix Canlı Doğrulama (3 küçük task)
+
+## Task 4: 207-004 — docker-backend test izolasyon (kill/list state)
 - Model: sonnet
 - Effort: normal
 - Skills: typescript-expert, ci-testing
@@ -43,124 +76,93 @@ Bağlam (Sprint 205 sonrası):
 - Scope: tests/e2e/
 
 ### Description
-**Problem:** docker-backend.test.ts "kill() deregisters taskId" + "list() tracks multiple concurrent" izole PASS ama tam-suite'te FAIL — paylaşılan/global state başka testten sızıyor (test izolasyon sorunu, sıra-bağımlı flaky).
-**Çözüm:** beforeEach/afterEach ile state reset (registry temizle, mock sıfırla). Test-only fix — kaynak DEĞİŞTİRME. Gerçek kaynak bug bulursan NO_GO + not. Tam-suite'te de geçecek şekilde izole et.
-**Kanıt:** `npx vitest run tests/e2e/docker-backend.test.ts` → PASS; tam-suite'te de bu 2 test fail listesinde YOK
-**Test:** mevcut testlerin ≥%95'i pass (izole + tam-suite)
+**Problem:** docker-backend.test.ts "kill() deregisters taskId" + "list() tracks multiple concurrent" tam-suite'te fail, izole geçer — paylaşılan state başka testten sızıyor (beforeEach var ama yetersiz). Sprint 206-002 kısmi düzeltti, tam çözülmedi.
+**Çözüm:** State izolasyonunu tamamla — registry/mock'u beforeEach+afterEach ile tam reset, gerekirse test-local instance kullan. Test-only fix, kaynak DEĞİŞTİRME. Tam-suite'te de geçsin.
+**Kanıt:** `npx vitest run tests/e2e/docker-backend.test.ts` → PASS; tam-suite fail listesinde docker-backend YOK
+**Test:** mevcut 36 testin tamamı pass (izole + tam-suite simülasyon)
 
-## Task 3: 206-003 — docker-oom gracefulTimeout forward fix
+## Task 5: 207-005 — managed-docs auditor template memory.db pattern
 - Model: sonnet
-- Effort: normal
-- Skills: typescript-expert, ci-testing
-- Files: tests/e2e/docker-oom-reproducer.test.ts, src/orchestra/spawn-backend.ts
-- Scope: tests/e2e/, src/orchestra/
-
-### Description
-**Problem:** "SpawnBackendFactory forwards gracefulTimeoutSeconds to DockerSpawnBackend" fail. spawn-backend.ts'te gracefulTimeoutSeconds var (2 geçiş) ama factory→DockerSpawnBackend forward zinciri kopuk olabilir VEYA test beklentisi yanlış.
-**Çözüm:** Önce izole çalıştır, kök-neden: forward gerçekten kopuksa kaynakta minimal düzelt (factory'de gracefulTimeoutSeconds geç); test beklentisi yanlışsa test düzelt. Honest — hangisi olduğunu kanıtla.
-**Kanıt:** `npx vitest run tests/e2e/docker-oom-reproducer.test.ts` → PASS; `grep -c gracefulTimeoutSeconds src/orchestra/spawn-backend.ts` korunur/artar
-**Test:** ≥4 (forward çalışır, default değer, custom değer, factory zinciri)
-
-## Task 4: 206-004 — auditor.md managed-docs template legacy temizlik
-- Model: sonnet
-- Effort: normal
+- Effort: low
 - Skills: typescript-expert, documentation-writer
-- Files: src/cli/commands/init-templates/, tests/docs/claude-rules-no-legacy.test.ts
-- Scope: src/cli/, tests/docs/
+- Files: src/core/rule-templates/auditor.template.md, tests/orchestra/managed-docs-auditor-template.test.ts
+- Scope: src/core/, tests/orchestra/
 
 ### Description
-**Problem:** `claude-rules-no-legacy.test.ts` "(b) auditor.md contains memory.db pattern upsert instruction" fail. Managed-docs auditor.md template'i hâlâ legacy `PATTERNS.md` / "Append new patterns" referansı içeriyor (paradigm Sprint 187'de memory.db `pattern` entry'ye geçti). `grep -rln "PATTERNS.md\|Append new patterns" src/cli/commands/init-templates/` ile template'i bul.
-**Çözüm:** Template'te legacy referansı `store.insert({type:'pattern'})` / memory.db upsert talimatıyla değiştir. Test ne bekliyorsa ona uygun. Kaynak template düzelt (regen sonrası .claude/rules/auditor.md doğru olur).
-**Kanıt:** `npx vitest run tests/docs/claude-rules-no-legacy.test.ts` → PASS; template'te "PATTERNS.md" legacy referansı YOK
-**Test:** ≥3 (auditor.md memory.db pattern içerir, legacy referans yok, brain.md tutarlı)
+**Problem:** managed-docs-auditor-template.test.ts "(c) template contains memory.db pattern upsert instruction" fail. auditor.template.md memory.db pattern talimatı eksik/yanlış formatta (test belirli string bekliyor).
+**Çözüm:** Test'in beklediği memory.db pattern upsert talimatını template'e ekle (`store.insert({type:'pattern'})` veya test'in tam beklediği ifade). Test ne istiyorsa ona uydur. Regen sonrası .claude/rules/auditor.md doğru olur.
+**Kanıt:** `npx vitest run tests/orchestra/managed-docs-auditor-template.test.ts` → PASS; template'te memory.db pattern talimatı VAR
+**Test:** ≥3 (template memory.db pattern içerir, legacy referans yok, regen tutarlı)
 
----
-
-## DALGA 1 — F3 Webhook + F2 Real Binding + Scheduler (3 küçük task)
-
-## Task 5: 206-005 — F3-003 webhook/event trigger tipi + handler iskelet
-- Model: sonnet
-- Effort: normal
-- Skills: typescript-expert, system-architect
-- Files: src/core/event-trigger.ts, tests/core/event-trigger.test.ts
-- Scope: src/core/, tests/core/
-
-### Description
-**Problem:** F3 process mode'da scheduled-flow (cron) var ama event-driven trigger (webhook/event) yok. ROADMAP F3-003.
-**Çözüm:** İSKELET — `event-trigger.ts`: `EventTrigger` tipi (id, eventType, source, action, tenantId, enabled) + `matchTrigger(event, triggers)` (gelen event'i kayıtlı trigger'larla eşleştir) + scheduled-flow ile aynı tenant-scoping. Gerçek HTTP webhook listener DEĞİL, tip + matcher iskeleti. ≤200 LoC.
-**Kanıt:** `ls src/core/event-trigger.ts`; `grep -c "EventTrigger\|matchTrigger\|tenantId" src/core/event-trigger.ts` → ≥3; `npx vitest run tests/core/event-trigger.test.ts` → 4+ pass
-**Test:** ≥4 (trigger match, no-match, tenant filtre, disabled atla)
-
-## Task 6: 206-006 — F2 native chat gerçek provider adapter binding
+## Task 6: 207-006 — Brain-fix canlı doğrulama testi (coverage:null → 0 false-FIX)
 - Model: opus
 - Effort: normal
-- Skills: typescript-expert, anthropic-sdk
-- Files: src/cli/commands/chat-native.ts, tests/cli/chat-native-provider.test.ts
-- Scope: src/cli/, tests/cli/
+- Skills: typescript-expert, testing-expert
+- Files: tests/orchestra/brain-eval-integrity.test.ts, src/orchestra/result-evaluator.ts
+- Scope: tests/orchestra/, src/orchestra/
 
 ### Description
-**Problem:** chat-native.ts (Sprint 203-204) tool-use loop + streaming var ama provider çağrısı MOCK/iskelet. Gerçek provider adapter'a (subscription CLI path — claude CLI spawn, API DEĞİL) bağlanmalı.
-**Çözüm:** chat-native loop'taki mock provider çağrısını gerçek ProviderAdapter interface'ine bağla (provider.ts registry'den resolve). Subscription mode: claude CLI spawn path kullan (API key YOK). Streaming gerçek adapter stream'ine bağlansın. Test mock adapter ile (gerçek spawn değil). ≤200 LoC değişim.
-**Kanıt:** `grep -c "ProviderAdapter\|getProvider\|providerRegistry\|adapter.send\|adapter.stream" src/cli/commands/chat-native.ts` → ≥2; `npx vitest run tests/cli/chat-native-provider.test.ts` → 4+ pass
-**Test:** ≥4 (adapter resolve, subscription path, stream bind, mock round-trip)
-
-## Task 7: 206-007 — Scheduled-flow runtime tick/scheduler iskelet
-- Model: sonnet
-- Effort: normal
-- Skills: typescript-expert
-- Files: src/core/flow-scheduler.ts, tests/core/flow-scheduler.test.ts
-- Scope: src/core/, tests/core/
-- Dependencies: 206-005
-
-### Description
-**Problem:** scheduled-flow (205-005) + flow-registry (205-006) var ama periyodik tetikleyen runtime yok.
-**Çözüm:** `flow-scheduler.ts`: `tick(now)` — registry'deki flow'ları tara, nextRun ≤ now olanları "due" olarak döndür (action dispatch iskeleti). event-trigger (206-005) ile birleşik trigger kaynağı. Gerçek setInterval daemon DEĞİL, tick fonksiyonu (test edilebilir). ≤200 LoC.
-**Kanıt:** `grep -c "tick\|dueFlows\|FlowScheduler\|nextRun" src/core/flow-scheduler.ts` → ≥2; `npx vitest run tests/core/flow-scheduler.test.ts` → 4+ pass
-**Test:** ≥4 (due flow bulur, henüz-değil atla, disabled atla, çoklu flow sırala)
+**Problem:** cc'nin Brain-fix'i (coverage:null false-FIX, ba617421) canlı ama end-to-end regresyon koruması yok. Bu desen gelecekte tekrar açılmasın.
+**Çözüm:** Yeni `brain-eval-integrity.test.ts` — gerçek senaryo: refactorer agent + code-dev task + coverage:null + yeni test dosyası + selfAssessment:DONE → evaluateWithRubric DONE (NO_GO DEĞİL). Agent-independence (refactorer↔bug-fixer aynı sonuç). NaN guard. Salt-kaynak (test yok) hâlâ NO_GO. Kaynak değişmez (sadece test) — gerçek bug bulursan minimal fix + not.
+**Kanıt:** `ls tests/orchestra/brain-eval-integrity.test.ts`; `npx vitest run tests/orchestra/brain-eval-integrity.test.ts` → 5+ pass
+**Test:** ≥5 (coverage:null+test→DONE, agent-independence, NaN guard, src-only→NO_GO, idempotent)
 
 ---
 
-## DALGA 2 — F4 RBAC + ADR (2 küçük task)
+## DALGA 2 — F4 RBAC Wire + F3 Devam (3 küçük task)
 
-## Task 8: 206-008 — F4 RBAC role-check iskelet (tenant-aware permission)
+## Task 7: 207-007 — RBAC enforce wire (audit-query'ye can() gate)
 - Model: sonnet
 - Effort: normal
 - Skills: typescript-expert, security-specialist
-- Files: src/core/rbac.ts, tests/core/rbac.test.ts
+- Files: src/core/audit-query.ts, tests/core/audit-query-rbac.test.ts
 - Scope: src/core/, tests/core/
 
 ### Description
-**Problem:** F4 enterprise'da audit-query (205-008) var ama erişim kontrolü yok. ROADMAP F4-001.
-**Çözüm:** İSKELET — `rbac.ts`: `Role` tipi (admin/operator/viewer) + `Permission` enum + `can(role, action, tenantId)` check + tenant-context (204-008) ile entegre. Gerçek auth/session DEĞİL, role→permission matrix + check fonksiyonu. ≤200 LoC.
-**Kanıt:** `ls src/core/rbac.ts`; `grep -c "Role\|Permission\|can(" src/core/rbac.ts` → ≥3; `npx vitest run tests/core/rbac.test.ts` → 4+ pass
-**Test:** ≥4 (admin tüm izin, viewer read-only, tenant izolasyon, bilinmeyen rol reddi)
+**Problem:** Sprint 206'da rbac.ts (can/Role/Permission) + audit-query.ts ayrı iskeletler. RBAC enforce edilmiyor — audit-query erişim kontrolsüz.
+**Çözüm:** audit-query'ye RBAC gate ekle: `queryAudit(params, role)` — `can(role, 'audit:read', tenantId)` false ise boş/hata döndür. rbac.ts'i import et (Sprint 206 206-008). İskelet→wire.
+**Kanıt:** `grep -c "can(\|rbac\|Role\|Permission" src/core/audit-query.ts` → ≥2; `npx vitest run tests/core/audit-query-rbac.test.ts` → 4+ pass
+**Test:** ≥4 (viewer audit-read izin, viewer write reddi, admin tümü, tenant izolasyon)
 
-## Task 9: 206-009 — ADR-069 (event-driven + RBAC) + ROADMAP tracker güncelle
+## Task 8: 207-008 — Flow scheduler + event-trigger birleşik dispatch
+- Model: sonnet
+- Effort: normal
+- Skills: typescript-expert
+- Files: src/core/flow-scheduler.ts, tests/core/flow-dispatch.test.ts
+- Scope: src/core/, tests/core/
+
+### Description
+**Problem:** Sprint 206'da flow-scheduler (cron tick) + event-trigger (event match) ayrı. Birleşik "due flows + matched triggers" dispatch listesi yok.
+**Çözüm:** flow-scheduler'a `collectDue(now, events)` ekle — hem nextRun≤now scheduled flow'ları hem matchTrigger ile eşleşen event-trigger'ları birleşik döndür. Dispatch iskeleti (gerçek execute DEĞİL). event-trigger (206-005) import.
+**Kanıt:** `grep -c "collectDue\|matchTrigger\|dueFlows\|EventTrigger" src/core/flow-scheduler.ts` → ≥2; `npx vitest run tests/core/flow-dispatch.test.ts` → 4+ pass
+**Test:** ≥4 (scheduled due, event match, ikisi birleşik, hiçbiri due değil)
+
+## Task 9: 207-009 — ADR-070 (Brain Evaluation Integrity + Zero-Hard-Code) + ROADMAP
 - Model: sonnet
 - Effort: low
 - Skills: documentation-writer, system-architect
-- Files: docs/adr/069-event-driven-rbac.md, docs/ROADMAP-GOD-LEVEL.md, tests/docs/adr-069.test.ts
+- Files: docs/adr/070-brain-eval-integrity.md, docs/ROADMAP-GOD-LEVEL.md, tests/docs/adr-070.test.ts
 - Scope: docs/, tests/docs/
 
 ### Description
-**Problem:** F3-003 webhook + F4 RBAC kararları ADR'ye geçmemiş; ROADMAP tracker F3-003/F4-001 ilerleme yansımıyor.
-**Çözüm:** ADR-069 taslağı (event-driven triggers + RBAC, MADR, status: proposed). ROADMAP §EXECUTION TRACKER: F3-003 event-trigger DONE, F4-001 RBAC iskelet işaretle, yüzdeleri güncelle (AI System Worker yüzü ilerledi).
-**Kanıt:** `grep -c "event-driven\|webhook\|rbac\|RBAC" docs/adr/069-event-driven-rbac.md` → ≥2; `npx vitest run tests/docs/adr-069.test.ts` → 3+ pass
-**Test:** ≥3 (ADR-069 MADR yapı, event+rbac bölümü, ROADMAP F3/F4 güncel)
+**Problem:** Brain-eval fix (coverage:null sinyal-temelli) + zero-hard-code kararı ADR'ye geçmemiş; ROADMAP F4/zero-hardcode ilerleme yansımıyor.
+**Çözüm:** ADR-070 taslağı (Brain Evaluation Integrity: coverage muafiyeti sinyal-temelli agent-bağımsız + zero-hard-code prensibi, MADR, status: accepted — cc tarafından uygulandı). ROADMAP §EXECUTION TRACKER: zero-hardcode başlangıç, F4-001 RBAC wire, Brain-fix DONE.
+**Kanıt:** `grep -c "coverage\|signal\|zero-hard\|rbac" docs/adr/070-brain-eval-integrity.md` → ≥2; `npx vitest run tests/docs/adr-070.test.ts` → 3+ pass
+**Test:** ≥3 (ADR-070 MADR yapı, brain-eval bölümü, ROADMAP güncel)
 
 ---
 
 ## Sprint Sonu Notu
 
-**Beklenen:** 8-9/9 DONE. Sprint 206 = flow CLI tam wire + flaky 5→0 (test sağlığı tam yeşil) + F3 webhook/event + F2 gerçek provider binding + scheduler + F4 RBAC iskelet.
+**Beklenen:** 8-9/9 DONE. **KRİTİK CANLI DOĞRULAMA:** Bu sprint Brain'in **0 gereksiz FIX** üretmesi beklenir (cc'nin coverage:null fix'i canlı). Eğer hâlâ DONE task'lara FIX başlıyorsa fix tutmadı demektir — disk-verify ile incele. Sprint 207 = zero-hardcode başlangıç + flaky 2→0 + Brain-fix kanıtlı + F4 RBAC wire.
 
-**Sprint sonrası:** F2 native chat tam canlı test (gerçek subscription round-trip) + F4 RBAC tam + F5 evrimsel mimari. ROADMAP §EXECUTION TRACKER.
+**Sprint sonrası:** zero-hardcode tam audit (tüm CLI/MCP çıktıları) + F4 enterprise tamamla + F5 evrimsel. ROADMAP §EXECUTION TRACKER.
 
-**Pre-flight:** subscription env temiz, creds canlı, **build güncel (Alperen build:all + /mcp restart yaptı)**, config max_workers=10. **Sprint start'ı Alperen manuel çalıştırır** (`npx deckent start --auto-approve`).
+**Pre-flight:** subscription env temiz, creds canlı, **build+restart YAPILDI (Brain fix canlı, agent routing canlı)**, config max_workers=10. Sprint start'ı Alperen manuel çalıştırır.
 
 İlgili memory:
+- [[feedback_brain_rubric_bridge_broken]] — ✅ÇÖZÜLDÜ, bu sprint canlı doğrulama
+- [[feedback_zero_hardcode_live_data]] — zero-hardcode felsefesi, DALGA 0
 - [[feedback_trust_brain_eval_not_worker]] — disk-verify ground truth
-- [[feedback_build_mcp_restart_coordination]] — build+restart Alperen yapar, "yapıldı" promptu beklenir
-- [[project_api_mode_deferred_post_beta]] — API mode yasak (F2 binding subscription CLI path)
-- [[feedback_brain_synthetic_nogo_disk_verify]] — sentetik NO_GO, disk-verify zorunlu
-- [[project_4cli_subscription_vision]] — multi-provider subscription vizyon
+- [[feedback_build_mcp_restart_coordination]] — build+restart Alperen yapar
+- [[project_api_mode_deferred_post_beta]] — API mode yasak
