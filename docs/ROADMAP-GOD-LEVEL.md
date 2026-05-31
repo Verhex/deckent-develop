@@ -70,7 +70,17 @@
 | F5-001 | prompt-evolution.ts wire (0 caller → live) | P3 |
 | F5-002 | adaptive-agent + cross-sprint-analyzer wire | P3 |
 
-**Sıra:** F1 (P0) → F1 (P1) → F2 → F3 → F4 → F5. Bugün F1'den başlanır, dogfood + kontrol döngüsüyle ilerlenir.
+**F6 — Auth Flexibility (subscription/api/hybrid/local matrix)** — post-beta (API gerçek aktivasyon 1 Haziran sonrası):
+| ID | İş | Öncelik |
+|----|----|---------|
+| F6-001 | Per-task auth-mode tam wire (DIRECTIVES `- Auth: subscription\|api\|local` override) | P2 |
+| F6-002 | Hybrid mode (brain subscription + worker API/local karışık) | P2 |
+| F6-003 | Auth matrix test (subscription × api × hybrid × ollama-local her kombinasyon) | P2 |
+| F6-004 | API gerçek aktivasyon + tier-aware throttle (F1-006 token throttle ile birleşir) | P3 (post-beta) |
+
+> **Not (2026-05-31):** Auth altyapısı KISMEN var — per-task `- Auth:` override (spawn-backend-docker.ts:862 readTaskAuthMode) + config `auth_mode: subscription\|api\|hybrid` mevcut. AMA hybrid tam wire değil, API gerçek aktivasyon POST-BETA. Şu an default + zorunlu **subscription-first** ([[project_api_mode_deferred_post_beta]] — Tier-1 30K tok/min cap nedeniyle API beta sırasında YASAK). F6 ile her kombinasyon (cloud-sub / cloud-api / local-ollama / hybrid) seçilebilir olacak.
+
+**Sıra:** F1 (P0) → F1 (P1) → F2 → F3 → F4 → F5 → F6. Bugün F1'den başlanır, dogfood + kontrol döngüsüyle ilerlenir. **Yürütme stratejisi (2026-05-31): bol-küçük-task (tek-sorumluluk, ≤200 LoC, effort≤normal — high YOK, timeout önler) + 10 worker = yüksek paralellik + hız.**
 
 ---
 
@@ -108,7 +118,22 @@
 | ADR-064 | TOPP — Continuous Dispatch (Wave-Barrier Removal) | accepted | 178 |
 | ADR-048 (amendment) | Prompt Lifecycle Contract — F1-F8 worker prompt quality | accepted | 182 |
 
-### Sprint 184-200 Post-Beta Roadmap (CRİSİS STABİLİZATİON SONRASI)
+### Sprint 184-200 Post-Beta Roadmap — ⚠ HISTORICAL PLAN (superseded)
+
+> **⚠ HISTORICAL PLAN (superseded by §EXECUTION TRACKER above)** — The Sprint 184-200 roadmap below was written pre-dogfood (2026-05-21). Actual Sprints 184-201 diverged: Crisis Stabilization Initiative consumed 177-183, multi-tenant/AEGIS/Enterprise plans did not execute. See §EXECUTION TRACKER for the current state. This section is preserved for provenance — **do not delete**.
+
+#### Planned vs Actual Reconciliation (Sprint 185-200)
+
+| Sprint Range | Planned | Actual | Status |
+|--------------|---------|--------|--------|
+| 184 | Repo Housekeeping + Doc Cleanup | Repo housekeeping + ADR governance work | ✅ Partial (ADR migration + DECKENT.md) |
+| 185-188 | Sub-project #3: Multi-Tenant + k8s + mTLS | Crisis Stabilization → Worker Prompt Quality, Brain stability | ❌ Not executed — redirected to stability work |
+| 189-192 | Sub-project #4: Enterprise SSO/SIEM/Compliance | Brain stability + Docker OOM + Sprint 190 Path B (chat.ts) | ❌ Not executed — OSS-blocker & stability |
+| 193-196 | Nervous Faz 2/3 Pilot + GA | Sprint 193-201: Brain honesty + disk-verify + product polish | ❌ Not executed — audit/honesty work instead |
+| 197-200 | AEGIS Methodology Realization | Sprint 197-200: disk-verify gate, container-path leakage, beta polish | ❌ AEGIS not executed — beta stabilization instead |
+| 200 | God-Level GA `v1.0.0` stable | v1.0.0-beta.1 ready (not yet published as stable) | 🟡 beta.1 ready; stable post F1 |
+
+See §EXECUTION TRACKER for what actually shipped and the current sprint map.
 
 **Sprint 184 — Repo Housekeeping + Documentation Cleanup**
 
