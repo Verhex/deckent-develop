@@ -66,16 +66,19 @@ describe('mergeApiIdOverrides', () => {
     expect(second).toEqual(first);
   });
 
-  it('unmatched remote models do not affect existing bundled entries', () => {
+  it('unmatched remote models are appended; existing bundled entries stay intact', () => {
     const existing = [makeModel('opus', 'claude-opus-4-8')];
     // Remote has a completely different model; no apiId match
     const remote = [makeModel('gpt-5', 'gpt-5', 'codex')];
 
     const result = mergeApiIdOverrides(existing, remote);
 
-    expect(result).toHaveLength(1);
-    expect(result[0]!.id).toBe('opus');
-    expect(result[0]!.apiId).toBe('claude-opus-4-8'); // unchanged
+    // Zero-hardcode: unmatched remote is APPENDED (live catalog surfaces new
+    // models); the bundled 'opus' entry stays byte-identical. (model-catalog.ts:43)
+    expect(result).toHaveLength(2);
+    const opus = result.find(m => m.id === 'opus');
+    expect(opus?.apiId).toBe('claude-opus-4-8'); // unchanged
+    expect(result.some(m => m.id === 'gpt-5')).toBe(true); // appended
   });
 });
 

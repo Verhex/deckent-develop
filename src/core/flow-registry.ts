@@ -14,7 +14,7 @@ export class FlowRegistry {
 
   addFlow(flow: ScheduledFlow, role?: string): void {
     if (role !== undefined && !can(role, Permission.FLOW_MANAGE, flow.tenantId)) {
-      throw new Error(`Role '${role}' lacks flow:manage permission for tenant '${flow.tenantId}'`);
+      throw new DeckentError('E_RBAC_DENIED', `Role '${role}' lacks flow:manage permission for tenant '${flow.tenantId}'`);
     }
     this.flows.set(flow.id, flow);
     this._persist(flow);
@@ -36,7 +36,7 @@ export class FlowRegistry {
     const flow = this.flows.get(id);
     if (!flow) return false;
     if (role !== undefined && !can(role, Permission.FLOW_MANAGE, flow.tenantId)) {
-      throw new Error(`Role '${role}' lacks flow:manage permission for tenant '${flow.tenantId}'`);
+      throw new DeckentError('E_RBAC_DENIED', `Role '${role}' lacks flow:manage permission for tenant '${flow.tenantId}'`);
     }
     this.flows.delete(id);
     const filePath = this._flowPath(flow.tenantId, id);
@@ -48,7 +48,7 @@ export class FlowRegistry {
     const flow = this.flows.get(id);
     if (!flow) return false;
     if (role !== undefined && !can(role, Permission.FLOW_MANAGE, flow.tenantId)) {
-      throw new Error(`Role '${role}' lacks flow:manage permission for tenant '${flow.tenantId}'`);
+      throw new DeckentError('E_RBAC_DENIED', `Role '${role}' lacks flow:manage permission for tenant '${flow.tenantId}'`);
     }
     const updated = { ...flow, enabled };
     this.flows.set(id, updated);
