@@ -1,11 +1,76 @@
-# Deckent God-Level Roadmap — Sprint 149 → Sprint 200
+# Deckent God-Level Roadmap — Master Execution Plan
 
 **Created:** 2026-04-20 (Sprint 148 sonrası)
-**Status:** CANONICAL — Sprint 149-200 anchor document
-**Vision:** OpenClaw'ın god-level üstün hali — developer-first + life-assistant dual platform
-**Brainstorming:** Alperen onayları 12+ karar, 5 paralel agent kod tabanı analizi
-**Last update:** 2026-05-20 (Sprint 175 Embedded Web Terminal teslimat — aşağıdaki ⚡ 2026-05-20)
-**Reconciliation note:** §4 Master Roadmap + §5 20-Gate + §6 Debt = 2026-04-21 snapshot, historical. Güncel temel: ⚡ 2026-05-20.
+**Status:** CANONICAL — bu doküman = TEK master plan. Yapılanlar + beta GA kalanları + sub-project 2-4 + F1 provider-free, hepsi burada.
+**North Star (2026-05-31, Alperen onaylı):** deckent = **provider-free** (herhangi LLM — cloud abonelik VEYA local Ollama, sıfır-API-key seçeneği) + **konuşulabilir** (native chat REPL) + **3-yüz** (developer/şirket/sade kişi), MIT, kur-çalıştır AI orchestrator.
+**Locked kararlar:** (1) auth subscription-first, (2) Local LLM (Ollama) 1. sınıf vatandaş (spawner-wired), (3) doküman kod-gerçeğiyle hizalı.
+**Last update:** 2026-05-31 (kod-doğrulanmış 13-agent analiz; aşağıdaki §EXECUTION TRACKER güncel temel — alttaki ⚡ tarihli bölümler historical).
+
+---
+
+## 🎯 EXECUTION TRACKER (2026-05-31 — kod-doğrulanmış, canlı)
+
+> Bu bölüm aşağıdaki tüm tarihli ⚡ snapshot'ları SUPERSEDE eder. Alttakiler kanıt/iz olarak korunur (silinmez).
+
+### Trinity olgunluk (kod-gerçeği, doküman %'leri eski)
+
+| Yüz | Kitle | Mode | Olgunluk | En büyük boşluk |
+|-----|-------|------|----------|------------------|
+| **AI Developer** | Geliştirici | Sprint Mode | **~%90** | Beta hazır; provider-free + quota-safe eksik |
+| **AI System Worker** | Şirket | Process Mode | **~%40** | Multi-tenant izolasyon + scheduled flows |
+| **AI Asistan** | Sade kişi | Chat Mode | **~%35** | Native REPL (Path C) — şu an sadece Path B (CLI shell-out) |
+
+### TAMAMLANAN (kanıtlı)
+
+- **Beta GA hattı (Sprint 145-201):** tsc temiz, vitest 12 fail/17599 pass, coverage %89, 32 MCP tool, 49 CLI, Memory V2 (FTS5), i18n, cross-platform, Docker/tmux/subprocess backend, 15 agent + 21 skill, Nervous Faz-1, Hybrid Mode (ADR-042), 65 ADR.
+- **Crisis Stabilization (Sprint 177-183):** 8 simultan failure mode kapandı.
+- **Brain dürüstlük (Sprint 195-201):** 7/7 sentetik NO_GO disk-verify gate, container-path leakage gate, honesty closure.
+- **Sub-project #1 (Sprint 175):** Embedded Web Terminal GA (PTY + WS + auth + audit).
+- **Native chat Path B (Sprint 190):** `deckent chat` — kullanıcının CLI'ını spawn + naïve mode.
+- **models.dev canlı katalog:** fetch + 24h cache + bundled fallback.
+- **Provider abstraction:** ProviderAdapter + ProviderRegistry + 4 adapter (claude/codex/gemini/ollama).
+
+### KALAN İŞLER — Sprint Haritası (bugün aralıksız dogfood ile)
+
+**F1 — Provider Independence (kuzey-yıldızı temeli)** — kod-doğrulanmış, ~125 LoC P0 + hardening:
+| ID | İş | Öncelik | Kanıt |
+|----|----|---------|-------|
+| F1-001 | Ollama provider bootstrap kaydı (detectOllama + factory) | **P0** | provider.ts:405-411,682-695 Ollama detect/factory YOK |
+| F1-002 | Ollama model registry (tier→local model) | **P0** | model-registry.ts:62-82 sadece claude/codex/gemini |
+| F1-003 | Claude-hardcode temizliği (12 site `?? 'claude'`) | **P0** | task-router/model-selector/prompt-god/sprint-utils 12/12 doğrulandı |
+| F1-004 | Docker provider-aware CLI invocation | P1 | spawn-backend-docker.ts:322 hardcoded `claude` |
+| F1-005 | Dockerfile.worker multi-CLI (build-arg opt-in) | P1 | Dockerfile.worker:21-22 codex/gemini yorum |
+| F1-006 | Token throttle (computeBackoff wire + tpm cap) | P1 | anthropic-http-client.ts:290-316 ÖLÜ KOD (0 caller) |
+| F1-007 | Doc-align (Gate #8 PARTIAL + chat.ts live + Sprint 185-200 arşiv) | **P0** | beta-tracker:23 vs :493/495 çelişki |
+
+**F2 — Native Chat Path C (AI Asistan yüzü)** — ~600-1200 LoC:
+| ID | İş | Öncelik |
+|----|----|---------|
+| F2-001 | Native tool-use loop (LLM → MCP tool → cevap REPL) | P1 |
+| F2-002 | Memory entegrasyonu (appendChatTurn chat path'e bağla) | P1 |
+| F2-003 | Streaming + multi-turn + resume | P2 |
+
+**F3 — Process Mode (AI System Worker yüzü, Sub-project #3)** — post-F1:
+| ID | İş | Öncelik |
+|----|----|---------|
+| F3-001 | Multi-tenant izolasyon (gerçek tenantId) | P2 |
+| F3-002 | Scheduled flows + cron | P2 |
+| F3-003 | SessionBackend k8s pod-exec | P3 |
+
+**F4 — Enterprise + Million-User (Sub-project #4)** — post-F3:
+| ID | İş | Öncelik |
+|----|----|---------|
+| F4-001 | OIDC/SSO AuthProvider impl | P3 |
+| F4-002 | Audit export API + compliance (SOC2/GDPR) | P3 |
+| F4-003 | Rate/resource limits + load hardening | P3 |
+
+**F5 — Evrimsel Mimari (W-E/W-K, DORMANT wire)** — post-beta:
+| ID | İş | Öncelik |
+|----|----|---------|
+| F5-001 | prompt-evolution.ts wire (0 caller → live) | P3 |
+| F5-002 | adaptive-agent + cross-sprint-analyzer wire | P3 |
+
+**Sıra:** F1 (P0) → F1 (P1) → F2 → F3 → F4 → F5. Bugün F1'den başlanır, dogfood + kontrol döngüsüyle ilerlenir.
 
 ---
 
