@@ -33,7 +33,7 @@ Before tagging `v1.0.0-beta.2` and running `npm publish`, **all 20 gates must PA
 | 18 | Wire code-complete (dependency pipeline) | 13 grep matches | ✅ Sprint 164 (`respawnEligibleTasks` 13 matches); Sprint 167 `dependency_pipeline_enabled` flip live |
 | 19 | Bug X (Sprint 156-011 stub) replay analysis | Reproduced + Closed | ✅ Sprint 165 T1 (Bug X stub removed, Brain processQueue legacy FIFO stall closed) |
 | 20 | Bug W (Auditor `dead_event_stream`) | Open since Sprint 148 | ✅ Sprint 165 T4 (dead_event_stream activated); Sprint 166 T9 (emitAlert helper + stale_md detector wired) |
-| **21** | **Brain dürüst raporlama — synthetic NO_GO disk-verify gate** | 7/7 source paths gated | 🟡 **Proposed Sprint 198-001** — Sprint 197 197-001 worker mapped 7 synthetic NO_GO sources (`sprint-phases.ts:1318-1330` `runEvaluatePhase` + `sprint-controller.ts:963-1003` `graceKill` are KAYNAK 6+7, gate wire pending). Closes after Sprint 198-001 lands `verifyDiskAgainstClaim` on both callsites and the canlı dogfood proves it (Sprint 198 sentetik NO_GO → `MANUAL_REVIEW_REQUIRED` rerouting) |
+| **21** | **Brain dürüst raporlama — synthetic NO_GO disk-verify gate** | 7/7 source paths gated | ✅ **LANDED Sprint 200-001** (commit `2363c794`) — `verifyDiskAgainstClaim` now wired on the two remaining ungated callsites (`sprint-phases.ts` `runEvaluatePhase` + `sprint-controller.ts` `graceKill` panic-guard & explicit-kill = KAYNAK 6+7). Disk evidence present → `MANUAL_REVIEW_REQUIRED` instead of synthetic NO_GO; `BRAIN→AUDITOR:DISK_VS_CLAIM_MISMATCH` emitted. +188 LoC across both files, 11 gate tests pass. All 7/7 synthetic NO_GO source paths now disk-verified. |
 
 ### Sprint 195-197 gate evidence overlay
 
