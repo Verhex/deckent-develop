@@ -1,143 +1,53 @@
-# DIRECTIVES — Sprint 209: Agent Routing Dengeleme + F7 Dashboard API Auth + Hijyen + F3/F4 Devam
+# DIRECTIVES — Sprint 210: Routing CANLI Doğrulama + 4 Fail Hijyen + FIX Prompt İyileştirme + F3/F4/F7 Devam
 
-## Goal: BÜYÜK ÖLÇEK (14 task, 4 dalga, 10 worker). DALGA A: AGENT ROUTING DENGELE (Alperen sorunu — hep refactorer seçiliyor, 15 agent/21 skill atıl; intent çeşitlendir + multi-sinyal scoring). DALGA B: F7 dashboard API auth fix (auth-disabled bağımlılığı kalksın) + canlı veri. DALGA C: hijyen (docker-backend e2e son fail) + zero-hardcode kalan. DALGA D: F3 otonom mod + F4 enterprise devam. Her task TEK dosya/TEK sorumluluk, ≤200 LoC, effort≤normal, YENİ TEST DOSYASI zorunlu.
+## Goal: BÜYÜK ÖLÇEK (16 task, 4 dalga, 10 worker). DALGA A: routing fix CANLI doğrulama (build+restart sonrası agent çeşitliliği — api/security/frontend task'ları doğru agent'a gitmeli, hep refactorer DEĞİL) + 4 fail hijyen (tam-suite 4→0). DALGA B: FIX prompt iyileştirme ([[feedback_fix_prompt_quality]] — boş Task + yanlış agent). DALGA C: F7 dashboard devam (UI/UX + canlı veri). DALGA D: F3 otonom + F4 enterprise tamamla. Her task TEK dosya/TEK sorumluluk, ≤200 LoC, effort≤normal, YENİ TEST DOSYASI zorunlu.
 
 Bağlam:
-- Sprint 208: 16/16 DONE, 0 false-FIX (Brain sağlam), tam-suite 18189 pass / 2 fail (docker-backend e2e).
-- **Routing sorunu** ([[feedback_agent_routing_imbalance]]): 208'de 16 task'tan 15'i refactorer. Sprint 205 fix'i ters döndü — refactorer impl@7 her implementation task'ını kapıyor, intent-classifier çok kaba (her kod task'ı "implementation"). api-builder/security/frontend/data/devops/performance HİÇ kullanılmıyor.
-- **Dashboard** ([[project_dashboard_control_plane]]): API auth-disabled olmadan çalışmıyor; F7-001 ilk.
+- Sprint 209: 15/15 DONE, 1 meşru FIX, Brain sağlam. Routing fix KODU indi (209-001..004) ama plan eski kodla yapıldı (refactorer 13/14). **Build+restart YAPILDI → bu sprint routing CANLI, çeşitlilik beklenir.**
+- Kalan 4 fail (tam-suite): error-handling + error-registry-lint (209-010 honest-gate'in `throw new Error('unreachable')` çöp-tespit kodu lint'e takıldı — allowlist'e honest-gate.ts ekle), docker-backend e2e (full-suite contamination, izole geçer), health-check (gece-yarısı tarih flaky).
+- routing-distribution.mjs (209-005) canlı ölçüm aracı var — sprint sonu doğrulama için.
 
 ---
 
 ## Tüm task'lar için ortak kurallar
-- **Subscription mode ZORUNLU** — `env -u ANTHROPIC_API_KEY -u DECKENT_CLAUDE_API_KEY`. API mode YASAK.
+- **Subscription mode ZORUNLU** — `env -u ANTHROPIC_API_KEY -u DECKENT_CLAUDE_API_KEY`. API mode YASAK ([[project_api_mode_deferred_post_beta]]).
 - Worker yalnızca scope.filesWrite. Host-facing'e `/workspace` YAZMA, `$CLAUDE_PROJECT_DIR`.
 - **KÜÇÜK TASK:** tek-dosya/tek-sorumluluk, ≤200 LoC, effort≤normal. high YASAK.
 - **Her kod task'ı YENİ TEST DOSYASI** (min 4 test) — Brain coverage muafiyeti buna bağlı ([[feedback_brain_rubric_bridge_broken]]).
-- **Dishonest YASAK** — gerçekten ölç, +0/-0 tuzağı yok. **Modül-seviye çöp throw/placeholder BIRAKMA** (208'de enterprise-config/tenant-context'e bırakıldı). ESM `.js` suffix. ADR-010.
-- Hedef: tam-suite fail 2→0, regresyon yok.
+- **Dishonest YASAK** — gerçekten ölç, +0/-0 tuzağı yok. **Modül-seviye çöp throw/placeholder BIRAKMA** ([[feedback_fix_prompt_quality]]).
+- ESM `.js` suffix. ADR-010. Hedef: tam-suite 4→0, regresyon yok.
 
 ---
 
-## DALGA A — Agent Routing Dengeleme (5 task)
+## DALGA A — Routing Canlı Doğrulama + 4 Fail Hijyen (5 task)
 
-## Task 1: 209-001 — Intent-classifier çeşitlendirme (domain/scope→intent)
-- Model: opus
-- Effort: normal
-- Skills: typescript-expert, system-architect
-- Files: src/core/intent-classifier.ts, tests/core/intent-diversity.test.ts
-- Scope: src/core/, tests/core/
-
-### Description
-**Problem:** intent-classifier neredeyse her kod task'ını `intent.primary: implementation` yapıyor → refactorer kazanıyor. Domain/scope sinyalleri intent'i çeşitlendirmeli.
-**Çözüm:** scope path + description'dan intent türet: `src/api/`→api, `src/auth|security/`→security, `src/components|dashboard/`→design/frontend, `src/db|models/`→data, `.github|docker/`→devops, `docs/`→documentation. "implementation" sadece gerçekten generic kod için. Mevcut intent kategorileri korunur, çeşitlilik artar.
-**Kanıt:** `grep -c "api\|security\|frontend\|data\|devops" src/core/intent-classifier.ts` → artış; `npx vitest run tests/core/intent-diversity.test.ts` → 5+ pass
-**Test:** ≥5 (api scope→api intent, security→security, dashboard→design, db→data, generic→implementation)
-
-## Task 2: 209-002 — Multi-sinyal agent scoring (domain+scope ağırlık)
-- Model: opus
-- Effort: normal
-- Skills: typescript-expert
-- Files: src/core/routing-engine.ts, tests/core/routing-multisignal.test.ts
-- Scope: src/core/, tests/core/
-- Dependencies: 209-001
-
-### Description
-**Problem:** refactorer impl@7 tek-boyutlu kazanıyor. Domain match, scope path, skill synergy yeterince ağırlıklı değil.
-**Çözüm:** Agent scoring'e domain-match bonusu ekle (agent domain == task domain → +3). Böylece api task'ı api-builder'a (domain match) refactorer'dan (sadece impl@7) daha çok puan verir. refactorer aday KALIR ama tek-kazanan olmaz.
-**Kanıt:** `grep -c "domainMatch\|domain.*bonus\|scope.*score" src/core/routing-engine.ts` → ≥1; `npx vitest run tests/core/routing-multisignal.test.ts` → 4+ pass
-**Test:** ≥4 (api task→api-builder, security→security-auditor, generic→refactorer/architect, domain bonus uygulanır)
-
-## Task 3: 209-003 — refactorer impl skor dengeleme (7→tier)
+## Task 1: 210-001 — error-handling + error-registry-lint allowlist (honest-gate çöp-tespit)
 - Model: sonnet
 - Effort: low
-- Skills: typescript-expert
-- Files: src/core/agent-pool.ts, tests/core/agent-impl-balance.test.ts
-- Scope: src/core/, tests/core/
-- Dependencies: 209-002
+- Skills: typescript-expert, ci-testing
+- Files: tests/core/error-handling-unification.test.ts, tests/core/error-registry-lint.test.ts
+- Scope: tests/core/
 
 ### Description
-**Problem:** refactorer impl@7 + architect impl@6 çok yüksek — domain-spesifik agent'ları eziyor.
-**Çözüm:** refactorer/architect impl skorunu domain-aware yap: generic implementation'da aday (5) ama domain-spesifik task'ta domain-agent kazansın. DİKKAT: Sprint 205 fix'i geri ALMA (temp-react sorununa dönmesin) — built-in aday KALIR, sadece denge. 209-002 ile uyumlu.
-**Kanıt:** `grep -c "implementation" src/core/agent-pool.ts` → korunur; `npx vitest run tests/core/agent-impl-balance.test.ts` → 4+ pass
-**Test:** ≥4 (generic→refactorer aday, api→api-builder kazanır, temp-react kazanmaz, denge korunur)
+**Problem:** 209-010 honest-gate.ts'e `detectGarbageThrows` ekledi — bu kod `throw new Error('${keyword}')` STRING'ini (tespit deseni, gerçek throw değil) içeriyor. error-handling + error-registry-lint testleri ham metin tarayıp bunu "generic throw violation" sanıyor (2+2 fail). honest-gate.ts deseni KASITLI referanslıyor (monitor-adapter.ts gibi).
+**Çözüm:** İki testin allowlist'ine `honest-gate.ts` ekle (error-handling.ts:601 `allowlist = new Set([...])` + error-registry-lint expected violation count'unu güncelle). honest-gate'in çöp-tespit kodu meşru. Sadece test allowlist.
+**Kanıt:** `grep -c "honest-gate" tests/core/error-handling-unification.test.ts tests/core/error-registry-lint.test.ts` → ≥1; `npx vitest run tests/core/error-handling-unification.test.ts tests/core/error-registry-lint.test.ts` → PASS
+**Test:** mevcut testler PASS + honest-gate allowlist'te doğrulanır
 
-## Task 4: 209-004 — Skill routing denetimi + çeşitlendirme
-- Model: sonnet
-- Effort: normal
-- Skills: typescript-expert
-- Files: src/core/routing-engine.ts, tests/core/skill-routing-diversity.test.ts
-- Scope: src/core/, tests/core/
-- Dependencies: 209-001
-
-### Description
-**Problem:** 21 skill'in çoğu atıl — task'lara hep aynı skill atanıyor. Skill seçimi de çeşitlendirilmeli.
-**Çözüm:** Skill scoring'i intent+domain'e bağla (api intent→api-builder skill, security→security-specialist, react→react-specialist). typescript-expert default ama domain skill'i eklensin.
-**Kanıt:** `grep -c "domain.*skill\|skillBonus\|intent.*skill" src/core/routing-engine.ts` → ≥1; `npx vitest run tests/core/skill-routing-diversity.test.ts` → 4+ pass
-**Test:** ≥4 (api→api-builder skill, security→security-specialist, generic→typescript-expert, çeşitlilik)
-
-## Task 5: 209-005 — Routing dağılım analiz raporu (outcome-tracker)
+## Task 2: 210-002 — health-check gece-yarısı tarih flaky fix
 - Model: sonnet
 - Effort: low
-- Skills: typescript-expert
-- Files: scripts/routing-distribution.mjs, tests/scripts/routing-distribution.test.ts
-- Scope: scripts/, tests/scripts/
+- Skills: typescript-expert, ci-testing
+- Files: tests/orchestra/doc-updaters/health-check.test.ts
+- Scope: tests/orchestra/
 
 ### Description
-**Problem:** Routing dengesi ölçülemiyor — hangi agent/skill ne kadar kullanılıyor görünmüyor.
-**Çözüm:** `routing-distribution.mjs` — outcome-tracker/learnings'ten agent+skill kullanım dağılımı raporu (her agent kaç task, %). Dengesizlik tespiti (tek agent >%70 → uyarı). CI/manuel.
-**Kanıt:** `node scripts/routing-distribution.mjs` → dağılım çıktısı; `npx vitest run tests/scripts/routing-distribution.test.ts` → 4+ pass
-**Test:** ≥4 (dağılım hesap, dengesizlik uyarı, boş veri, yüzde doğru)
+**Problem:** health-check.test.ts:129 `expect(written).toContain('Last audit: ${yearMonth}')` — test BUGÜNÜN ay'ını (`2026-06`) bekliyor ama fixture dosyası dün yazılmış (`2026-05-31`). Gece-yarısı ay sınırında flaky.
+**Çözüm:** Test'i tarih-agnostik yap — ya fixture'ı test içinde güncel tarihle oluştur, ya da assertion'ı `Last audit:` prefix varlığına/regex'e bağla (sabit ay değil). Test-only, kaynak DEĞİŞTİRME.
+**Kanıt:** `npx vitest run tests/orchestra/doc-updaters/health-check.test.ts` → PASS; tarih-agnostik assertion
+**Test:** mevcut 10 test PASS (tarih sınırından bağımsız)
 
----
-
-## DALGA B — F7 Dashboard API Auth + Veri (3 task)
-
-## Task 6: 209-006 — API auth disabled-flag bağımlılığı kaldır (F7-001)
-- Model: opus
-- Effort: normal
-- Skills: typescript-expert, security-specialist
-- Files: src/api/auth.ts, tests/api/auth-no-disable-flag.test.ts
-- Scope: src/api/, tests/api/
-
-### Description
-**Problem:** `DECKENT_API_AUTH_DISABLED=1` olmadan dashboard çalışmıyor — insecure, prod-safe değil ([[project_dashboard_control_plane]]).
-**Çözüm:** Auth akışını düzelt — localhost caller'a token auto-inject düzgün çalışsın (disabled-flag gerekmeden), prod-safe default (uzak caller token ister, localhost dev otomatik). auth.ts token üretim/doğrulama zinciri.
-**Kanıt:** `grep -c "localhost\|autoInject\|auto-inject\|isLocal" src/api/auth.ts` → ≥1; `npx vitest run tests/api/auth-no-disable-flag.test.ts` → 4+ pass
-**Test:** ≥4 (localhost auto-token, uzak token-required, geçersiz token reddi, disabled-flag opsiyonel)
-
-## Task 7: 209-007 — Dashboard API endpoint canlı veri parite (F7-002)
-- Model: sonnet
-- Effort: normal
-- Skills: typescript-expert
-- Files: src/api/server.ts, tests/api/dashboard-data-parity.test.ts
-- Scope: src/api/, tests/api/
-- Dependencies: 209-006
-
-### Description
-**Problem:** Dashboard panel'leri güncel/doğru veri göstermiyor — API endpoint'leri eksik/eski.
-**Çözüm:** Dashboard'un ihtiyaç duyduğu endpoint'leri canlı veriye bağla (sprint durumu, worker, agent, memory, debt). Eksik endpoint ekle, eski olanı güncelle. SSE/polling ile gerçek-zamanlı.
-**Kanıt:** `grep -c "sprint\|worker\|agent\|memory\|debt" src/api/server.ts` → artış; `npx vitest run tests/api/dashboard-data-parity.test.ts` → 4+ pass
-**Test:** ≥4 (sprint endpoint, worker endpoint, memory endpoint, canlı güncelleme)
-
-## Task 8: 209-008 — mcp-attach tool count hardcode kaldır (208-002 bayrak)
-- Model: sonnet
-- Effort: low
-- Skills: typescript-expert
-- Files: src/cli/helpers/mcp-attach.ts, tests/cli/mcp-tool-count.test.ts
-- Scope: src/cli/, tests/cli/
-
-### Description
-**Problem:** mcp-attach.ts:63 `DECKENT_MCP_TOOL_COUNT = 31` hardcoded (208-002 worker bayrak etti) — zero-hardcode ihlali.
-**Çözüm:** Tool count'u MCP tool registry'den parametrik al (getCapabilityCounts pattern, 208-002). Sabit 31 kaldır.
-**Kanıt:** `grep -c "= 31\|DECKENT_MCP_TOOL_COUNT = " src/cli/helpers/mcp-attach.ts` → 0; `npx vitest run tests/cli/mcp-tool-count.test.ts` → 3+ pass
-**Test:** ≥3 (count registry'den, sabit yok, registry boşsa graceful)
-
----
-
-## DALGA C — Hijyen (2 task)
-
-## Task 9: 209-009 — docker-backend e2e izolasyon kalıcı fix (son fail)
+## Task 3: 210-003 — docker-backend full-suite contamination kalıcı fix
 - Model: sonnet
 - Effort: normal
 - Skills: typescript-expert, ci-testing
@@ -145,94 +55,210 @@ Bağlam:
 - Scope: tests/e2e/
 
 ### Description
-**Problem:** docker-backend.test.ts "kill()/list()" tam-suite'te fail (izole geçer) — Sprint 206/207/208'de kısmi denendi, tam çözülmedi. Son kalan tam-suite fail.
-**Çözüm:** State izolasyonunu KALICI çöz — her test bağımsız registry/mock instance, beforeEach+afterEach tam reset, paylaşılan global YOK. 3 ardışık tam-suite çalıştırmada stabil. Test-only.
-**Kanıt:** `npx vitest run tests/e2e/docker-backend.test.ts` → PASS (3x stabil); tam-suite fail listesinde YOK
-**Test:** mevcut 36 test stabil (flaky değil)
+**Problem:** docker-backend.test.ts izole 3x stabil (209-009-fix çözdü) ama TAM-SUITE'te hâlâ fail — başka test dosyasının bıraktığı global state/registry sızıntısı. Cross-test contamination.
+**Çözüm:** Test'i tam-suite'te de izole çalışacak şekilde güçlendir — test-local registry instance, beforeAll/afterAll tam reset, paylaşılan singleton'a bağımlılık kaldır. Hangi test'in state sızdırdığını bul (notes'a yaz). Test-only.
+**Kanıt:** `npx vitest run` (tam-suite) → docker-backend fail listesinde YOK; izole de PASS
+**Test:** tam-suite + izole stabil
 
-## Task 10: 209-010 — Sprint 208 worker-artefakt önleme (honest-gate güçlendir)
-- Model: sonnet
-- Effort: normal
-- Skills: typescript-expert
-- Files: src/orchestra/honest-gate.ts, tests/orchestra/honest-gate-garbage.test.ts
-- Scope: src/orchestra/, tests/orchestra/
-
-### Description
-**Problem:** Sprint 208'de worker'lar enterprise-config/tenant-context'e modül-seviye çöp (`throw new Error('unreachable')` ×8, `placeholder` ×2) bıraktı, honest-gate yakalamadı. Bu çöp yapısal bozukluk.
-**Çözüm:** honest-gate'e modül-seviye unreachable/placeholder throw tespiti ekle — `throw new Error('unreachable'|'placeholder'|'TODO')` veya fonksiyon-dışı throw → şüpheli işaretle. Worker .result honest-gate'ten geçerken bu pattern'i flag'le.
-**Kanıt:** `grep -c "unreachable\|placeholder\|garbage\|stub.*throw" src/orchestra/honest-gate.ts` → ≥1; `npx vitest run tests/orchestra/honest-gate-garbage.test.ts` → 4+ pass
-**Test:** ≥4 (unreachable throw tespit, placeholder tespit, temiz kod geçer, meşru throw geçer)
-
----
-
-## DALGA D — F3 Otonom + F4 Enterprise Devam (4 task)
-
-## Task 11: 209-011 — Self-dispatch flow-runtime entegrasyon (otonom tetik)
+## Task 4: 210-004 — Routing canlı doğrulama testi (build sonrası çeşitlilik)
 - Model: opus
 - Effort: normal
 - Skills: typescript-expert, system-architect
-- Files: src/core/self-dispatch.ts, tests/core/self-dispatch-runtime.test.ts
-- Scope: src/core/, tests/core/
+- Files: tests/core/routing-live-diversity.test.ts, src/core/routing-engine.ts
+- Scope: tests/core/, src/core/
 
 ### Description
-**Problem:** self-dispatch (208-006) + flow-runtime (208-005) ayrı. Otonom mod için flow-runtime tick → self-dispatch evaluate → (onaylıysa) dispatch zinciri gerek.
-**Çözüm:** self-dispatch'i flow-runtime'a bağla — tick'te policy evaluate, requiresApproval=TRUE ise dispatch'i "pending-approval" kuyruğuna koy (otomatik start YOK). Otonom yetenek, onay korunur.
-**Kanıt:** `grep -c "FlowRuntime\|tick\|pending.*approval\|evaluateDispatch" src/core/self-dispatch.ts` → ≥2; `npx vitest run tests/core/self-dispatch-runtime.test.ts` → 4+ pass
-**Test:** ≥4 (tick→evaluate, approval-pending kuyruk, auto-start yok, disabled skip)
+**Problem:** 209 routing fix (intent çeşitlendirme + multi-sinyal + gated default) kod indi ama end-to-end "doğru task→doğru agent" testi eksik. Bu sprint CANLI (build sonrası).
+**Çözüm:** End-to-end routing testi — gerçek task DNA'larıyla: `src/api/` task → api-builder, `src/auth/` → security-auditor, `src/dashboard/` → frontend-designer, `src/db/` → data-engineer, generic `src/core/` → refactorer/architect. Her biri doğru agent'a gitmeli, hepsi refactorer DEĞİL. Gerekirse routing-engine ufak düzeltme (domain bonus eksikse). 209-002 domain-match'i doğrula.
+**Kanıt:** `npx vitest run tests/core/routing-live-diversity.test.ts` → 5+ pass (5 farklı agent seçilir)
+**Test:** ≥5 (api→api-builder, auth→security, dashboard→frontend, db→data, generic→refactorer)
 
-## Task 12: 209-012 — RBAC + audit entegrasyon (yetkisiz işlem audit'lenir)
+## Task 5: 210-005 — Routing imbalance CI guard (dağılım eşik)
 - Model: sonnet
-- Effort: normal
-- Skills: typescript-expert, security-specialist
-- Files: src/core/rbac.ts, tests/core/rbac-audit.test.ts
-- Scope: src/core/, tests/core/
-- Dependencies: (208 rbac + audit-writer var)
+- Effort: low
+- Skills: typescript-expert, ci-testing
+- Files: tests/scripts/routing-imbalance-guard.test.ts, scripts/routing-distribution.mjs
+- Scope: tests/scripts/, scripts/
 
 ### Description
-**Problem:** RBAC (208-009) + audit-writer (208-011) ayrı. Yetkisiz erişim denemesi audit'lenmeli (enterprise güvenlik).
-**Çözüm:** can() reddinde audit-writer.writeAuditEvent çağır (action: 'access:denied', actor, target). RBAC kararı izlenebilir olsun.
-**Kanıt:** `grep -c "writeAuditEvent\|audit.*denied\|auditWriter" src/core/rbac.ts` → ≥1; `npx vitest run tests/core/rbac-audit.test.ts` → 4+ pass
-**Test:** ≥4 (deny→audit yazılır, allow→audit yok veya granted, tenant alan, actor kaydı)
+**Problem:** routing-distribution.mjs (209-005) rapor üretiyor ama CI'da dengesizlik tespiti otomatik değil. Tek agent >%70 → uyarı eşiği var ama gate yok.
+**Çözüm:** routing-distribution.mjs'e `--ci` mode ekle: tek-sprint dağılımında tek agent >%80 ise exit 1 (yeni dengesizlik regresyon guard'ı). Tarihsel veri değil, son-sprint dağılımı. Test ile doğrula.
+**Kanıt:** `node scripts/routing-distribution.mjs --ci` → çalışır; `npx vitest run tests/scripts/routing-imbalance-guard.test.ts` → 4+ pass
+**Test:** ≥4 (dengeli→exit0, dengesiz→exit1, eşik konfigüre, boş veri)
 
-## Task 13: 209-013 — Tenant-aware flow registry (multi-tenant izolasyon)
+---
+
+## DALGA B — FIX Prompt İyileştirme (3 task)
+
+## Task 6: 210-006 — FIX prompt enrichment (orijinal task description inject)
+- Model: opus
+- Effort: normal
+- Skills: typescript-expert, system-architect
+- Files: src/orchestra/debt-manager.ts, tests/orchestra/fix-task-enrichment.test.ts
+- Scope: src/orchestra/, tests/orchestra/
+
+### Description
+**Problem:** ([[feedback_fix_prompt_quality]]) FIX prompt'unda `=== Task ===` bölümü BOŞ — fix worker'a orijinal task description/Çözüm verilmiyor, sadece "Original worker notes: exited without result". Worker NE/NASIL düzelteceğini bilmiyor.
+**Çözüm:** debt-manager.ts fix-task oluştururken orijinal task'ın FULL description'ını + NO_GO reason'ını + somut fix yönergesini fix-task.description'a inject et. Fix worker görevi anlasın.
+**Kanıt:** `grep -c "originalDescription\|fix.*description\|NO_GO reason\|originalTask" src/orchestra/debt-manager.ts` → ≥1; `npx vitest run tests/orchestra/fix-task-enrichment.test.ts` → 4+ pass
+**Test:** ≥4 (description inject, NO_GO reason inject, boş description fallback, idempotent)
+
+## Task 7: 210-007 — FIX agent seçimi task türüne göre (sadece bug-fixer değil)
 - Model: sonnet
 - Effort: normal
 - Skills: typescript-expert
-- Files: src/core/flow-registry.ts, tests/core/flow-registry-tenant.test.ts
+- Files: src/orchestra/debt-manager.ts, tests/orchestra/fix-agent-selection.test.ts
+- Scope: src/orchestra/, tests/orchestra/
+- Dependencies: 210-006
+
+### Description
+**Problem:** ([[feedback_fix_prompt_quality]]) FIX hep bug-fixer agent atıyor — test-izolasyon task'ına bug-fixer'ın 5-Whys/bisect disiplini uymuyor.
+**Çözüm:** fix-task agent'ını orijinal task türüne/agent'ına göre seç: test task → ci-testing/orijinal agent, doc → doc-writer, exit-no-result → orijinal agent re-run. bug-fixer sadece gerçek bug-fix için. routeTaskV2 fix-task'a da uygulansın.
+**Kanıt:** `grep -c "fixAgent\|originalAgent\|fix.*route\|forceAgent" src/orchestra/debt-manager.ts` → ≥1; `npx vitest run tests/orchestra/fix-agent-selection.test.ts` → 4+ pass
+**Test:** ≥4 (test task→ci-testing, doc→doc-writer, bug→bug-fixer, orijinal agent korunur)
+
+## Task 8: 210-008 — Brain NO_GO note doğruluğu (gerçek sebep yaz)
+- Model: sonnet
+- Effort: low
+- Skills: typescript-expert
+- Files: src/orchestra/result-evaluator.ts, tests/orchestra/nogo-note-accuracy.test.ts
+- Scope: src/orchestra/, tests/orchestra/
+
+### Description
+**Problem:** ([[feedback_fix_prompt_quality]]) Brain "Worker exited without writing result" diyor ama result VAR (self=NO_GO). Note yanlış → debug zorlaşıyor.
+**Çözüm:** NO_GO note'unu gerçek sebebe bağla: result varsa self-assessment + files/lines yaz ("worker self-NO_GO, 0 files"), result yoksa "no result file". Yanlış "exited without result" notunu düzelt.
+**Kanıt:** `grep -c "self-NO_GO\|noResult\|exited.*result\|accurateReason" src/orchestra/result-evaluator.ts` → ≥1; `npx vitest run tests/orchestra/nogo-note-accuracy.test.ts` → 4+ pass
+**Test:** ≥4 (result-var note doğru, result-yok note doğru, self-NO_GO note, files=0 note)
+
+---
+
+## DALGA C — F7 Dashboard Devam (4 task)
+
+## Task 9: 210-009 — Dashboard sprint kontrol paneli (plan/start/status UI)
+- Model: sonnet
+- Effort: normal
+- Skills: react-specialist, frontend-design
+- Files: src/dashboard/src/components/SprintControlPanel.tsx, src/dashboard/src/components/SprintControlPanel.test.tsx
+- Scope: src/dashboard/
+
+### Description
+**Problem:** ([[project_dashboard_control_plane]] F7-005) Dashboard'dan sprint kontrolü (status görüntüleme, faz takibi) işlevsel değil.
+**Çözüm:** `SprintControlPanel.tsx` — canlı sprint durumu (faz, worker, ilerleme) + status butonları (onay-gate'li). useSSE/useApi ile gerçek-zamanlı. Mevcut SprintPhaseTimeline + WorkerCard kullan. start/kill UI-onaylı (gerçek tetik backend'e).
+**Kanıt:** `ls src/dashboard/src/components/SprintControlPanel.tsx`; `grep -c "useSSE\|useApi\|phase\|worker" src/dashboard/src/components/SprintControlPanel.tsx` → ≥2; `npm run test:dashboard -- SprintControlPanel` → 4+ pass
+**Test:** ≥4 (sprint durumu render, faz görselleştirme, worker listesi, boş durum)
+
+## Task 10: 210-010 — Dashboard agent/skill dağılım görünümü (routing şeffaflık)
+- Model: sonnet
+- Effort: normal
+- Skills: react-specialist, frontend-design
+- Files: src/dashboard/src/components/RoutingDistribution.tsx, src/dashboard/src/components/RoutingDistribution.test.tsx
+- Scope: src/dashboard/
+
+### Description
+**Problem:** routing-distribution.mjs (209-005) CLI raporu var ama dashboard'da görsel yok. Kullanıcı agent dağılımını/dengesizliğini göremiyor.
+**Çözüm:** `RoutingDistribution.tsx` — agent + skill kullanım dağılımı bar chart (SprintChart pattern), dengesizlik uyarısı (>%80 kırmızı). API endpoint'ten veri (routing learnings). F7 + routing şeffaflığı.
+**Kanıt:** `ls src/dashboard/src/components/RoutingDistribution.tsx`; `grep -c "agent\|skill\|distribution\|chart" src/dashboard/src/components/RoutingDistribution.tsx` → ≥2; `npm run test:dashboard -- RoutingDistribution` → 4+ pass
+**Test:** ≥4 (dağılım render, bar chart, dengesizlik uyarı, boş veri)
+
+## Task 11: 210-011 — Dashboard API routing endpoint
+- Model: sonnet
+- Effort: low
+- Skills: typescript-expert, api-builder
+- Files: src/api/server.ts, tests/api/routing-endpoint.test.ts
+- Scope: src/api/, tests/api/
+- Dependencies: 210-010
+
+### Description
+**Problem:** Dashboard RoutingDistribution (210-010) veri ister ama API endpoint yok.
+**Çözüm:** server.ts'e `/api/routing/distribution` endpoint ekle — routing-distribution.mjs computeDistribution() mantığını API'ye bağla (learnings.json oku, dağılım döndür). RBAC-aware (209-006 auth).
+**Kanıt:** `grep -c "routing/distribution\|computeDistribution\|routingDist" src/api/server.ts` → ≥1; `npx vitest run tests/api/routing-endpoint.test.ts` → 4+ pass
+**Test:** ≥4 (endpoint döner, dağılım format, auth gate, boş veri)
+
+## Task 12: 210-012 — Dashboard onboarding/empty-state iyileştirme (sade kişi)
+- Model: sonnet
+- Effort: low
+- Skills: react-specialist, frontend-design
+- Files: src/dashboard/src/components/Onboarding.tsx, src/dashboard/src/components/Onboarding.test.tsx
+- Scope: src/dashboard/
+
+### Description
+**Problem:** ([[project_dashboard_control_plane]] F7-008) Sade kişi için onboarding/rehber yok — boş dashboard kafa karıştırıcı.
+**Çözüm:** `Onboarding.tsx` — ilk-kullanım sihirbazı iskelet (init→directives→start adımları, tooltip). EmptyState genişletme. 3-yüz: sade kişi friendly. ≤200 LoC.
+**Kanıt:** `ls src/dashboard/src/components/Onboarding.tsx`; `grep -c "step\|onboard\|wizard\|init\|guide" src/dashboard/src/components/Onboarding.tsx` → ≥2; `npm run test:dashboard -- Onboarding` → 4+ pass
+**Test:** ≥4 (adım render, ilerleme, atla, tamamla)
+
+---
+
+## DALGA D — F3 Otonom + F4 Enterprise Tamamla (4 task)
+
+## Task 13: 210-013 — Self-dispatch pending-approval kuyruğu (otonom mod onay-gate)
+- Model: opus
+- Effort: normal
+- Skills: typescript-expert, system-architect
+- Files: src/core/self-dispatch.ts, tests/core/self-dispatch-queue.test.ts
 - Scope: src/core/, tests/core/
 
 ### Description
-**Problem:** flow-registry (208) + tenant-context (208 withTenant) ayrı. Flow'lar tenant-scoped saklanmalı.
-**Çözüm:** flow-registry persist path'ini currentTenant()'a bağla (`.deckent/tenants/<id>/flows/`). Tenant izolasyonu aktif — tenant A flow'u tenant B'de görünmez.
-**Kanıt:** `grep -c "currentTenant\|withTenant\|tenant.*path\|tenantId" src/core/flow-registry.ts` → ≥1; `npx vitest run tests/core/flow-registry-tenant.test.ts` → 4+ pass
-**Test:** ≥4 (tenant-scoped persist, izolasyon, default tenant, cross-tenant görünmez)
+**Problem:** self-dispatch (208/209) karar veriyor ama requiresApproval=TRUE olanlar için kuyruk yok — otonom mod onay-bekleyen dispatch'leri saklamalı.
+**Çözüm:** self-dispatch'e pending-approval queue ekle — evaluateDispatch dispatch=true + requiresApproval ise kuyruğa koy (otomatik start YOK). `listPendingDispatches()` + `approveDispatch(id)` iskeleti. Onay kuralı korunur. ≤200 LoC.
+**Kanıt:** `grep -c "pendingQueue\|listPending\|approveDispatch\|requiresApproval" src/core/self-dispatch.ts` → ≥2; `npx vitest run tests/core/self-dispatch-queue.test.ts` → 4+ pass
+**Test:** ≥4 (kuyruğa ekle, listele, onayla, otomatik-start yok)
 
-## Task 14: 209-014 — ADR-072 (routing dengeleme + dashboard auth) + ROADMAP
+## Task 14: 210-014 — RBAC CLI komut (deckent rbac check/grant iskelet)
+- Model: sonnet
+- Effort: normal
+- Skills: typescript-expert, security-specialist
+- Files: src/cli/commands/rbac.ts, tests/cli/rbac-command.test.ts
+- Scope: src/cli/, tests/cli/
+
+### Description
+**Problem:** RBAC (208/209 rbac.ts) var ama CLI erişimi yok — rol/izin yönetimi yapılamıyor.
+**Çözüm:** `deckent rbac check <role> <action>` + `deckent rbac roles` komut iskeleti (register pattern, ADR-012). rbac.ts can()/hierarchy kullan. ≤200 LoC.
+**Kanıt:** `grep -c "rbac\|registerRbac\|can(\|Role" src/cli/commands/rbac.ts` → ≥2; `npx vitest run tests/cli/rbac-command.test.ts` → 4+ pass
+**Test:** ≥4 (check izin var, check reddi, roles listele, geçersiz rol)
+
+## Task 15: 210-015 — Audit log CLI sorgu (deckent audit query iskelet)
+- Model: sonnet
+- Effort: normal
+- Skills: typescript-expert, security-specialist
+- Files: src/cli/commands/audit.ts, tests/cli/audit-command.test.ts
+- Scope: src/cli/, tests/cli/
+
+### Description
+**Problem:** audit-query (205/207) + audit-writer (208) var ama CLI sorgu yok.
+**Çözüm:** `deckent audit query [--tenant] [--action] [--since]` komut iskeleti — audit-query.queryAudit() bağla, RBAC-gate (209-007). register pattern. ≤200 LoC.
+**Kanıt:** `grep -c "audit\|queryAudit\|registerAudit\|tenant" src/cli/commands/audit.ts` → ≥2; `npx vitest run tests/cli/audit-command.test.ts` → 4+ pass
+**Test:** ≥4 (query döner, tenant filtre, action filtre, RBAC gate)
+
+## Task 16: 210-016 — ADR-073 (routing canlı + FIX prompt + dashboard) + ROADMAP
 - Model: sonnet
 - Effort: low
 - Skills: documentation-writer, system-architect
-- Files: docs/adr/072-routing-balance-dashboard.md, docs/ROADMAP-GOD-LEVEL.md, tests/docs/adr-072.test.ts
+- Files: docs/adr/073-routing-fix-dashboard.md, docs/ROADMAP-GOD-LEVEL.md, tests/docs/adr-073.test.ts
 - Scope: docs/, tests/docs/
 
 ### Description
-**Problem:** Routing dengeleme (multi-sinyal) + F7 dashboard auth kararları ADR'ye geçmemiş; ROADMAP F7 ilerleme yansımıyor.
-**Çözüm:** ADR-072 taslağı (routing multi-sinyal scoring + dashboard API auth-disabled bağımlılığı kaldırma, MADR, accepted). ROADMAP §EXECUTION TRACKER: F7-001 API auth + F7-002 veri parite, routing-balance; yüzde güncelle.
-**Kanıt:** `grep -c "routing\|multi-signal\|dashboard\|auth" docs/adr/072-routing-balance-dashboard.md` → ≥2; `npx vitest run tests/docs/adr-072.test.ts` → 3+ pass
-**Test:** ≥3 (ADR-072 MADR yapı, routing+dashboard bölüm, ROADMAP F7 güncel)
+**Problem:** Routing canlı doğrulama + FIX prompt iyileştirme + F7 dashboard ilerleme ADR/ROADMAP'e geçmemiş.
+**Çözüm:** ADR-073 (routing multi-sinyal canlı + FIX prompt enrichment + dashboard control plane, MADR, accepted). ROADMAP §EXECUTION TRACKER: routing-balance DONE, FIX-prompt, F7-002/005/008 ilerleme; yüzde güncelle.
+**Kanıt:** `grep -c "routing\|fix.*prompt\|dashboard\|F7" docs/adr/073-routing-fix-dashboard.md` → ≥2; `npx vitest run tests/docs/adr-073.test.ts` → 3+ pass
+**Test:** ≥3 (ADR-073 MADR, routing+fix+dashboard bölüm, ROADMAP güncel)
 
 ---
 
 ## Sprint Sonu Notu
 
-**Beklenen:** 12-14/14 DONE, 0 false-FIX (Brain sağlam). **ANA TEST:** agent routing dengesi — bu sprint farklı agent'lar seçilmeli (api-builder, security-auditor, frontend, api task'larında), hep refactorer DEĞİL. Sprint sonu routing-distribution.mjs ile doğrula.
+**Beklenen:** 14-16/16 DONE, 0 false-FIX. **ANA TEST:** routing CANLI çeşitlilik — bu sprint build+restart sonrası ilk, farklı agent'lar seçilmeli (api-builder/security/frontend api task'larında). Sprint sonu `node scripts/routing-distribution.mjs --ci` ile doğrula (tek agent <%80). + tam-suite 4→0.
 
-**Pre-flight:** subscription env temiz, creds canlı, **build+restart YAPILDI**, config max_workers=10. Sprint start'ı Alperen **gece 01:00'da** manuel çalıştırır.
+**Sprint sonrası:** routing canlı kanıt + F7 dashboard tam işlevsel + F3 otonom mod + F4 enterprise tamamlanır. ROADMAP §EXECUTION TRACKER.
+
+**Pre-flight:** subscription env temiz, creds canlı, **build+restart YAPILDI (routing fix + 209 tümü canlı)**, config max_workers=10. Sprint start Alperen manuel (uyumadan önce).
 
 İlgili memory:
-- [[feedback_agent_routing_imbalance]] — DALGA A ana hedef
-- [[project_dashboard_control_plane]] — F7 dashboard, DALGA B
+- [[feedback_agent_routing_imbalance]] — DALGA A ana hedef, routing CANLI test
+- [[feedback_fix_prompt_quality]] — DALGA B FIX prompt
+- [[project_dashboard_control_plane]] — DALGA C F7 dashboard
 - [[feedback_brain_rubric_bridge_broken]] — Brain sağlam, yeni test şart
-- [[feedback_scale_up_autonomous]] — büyük ölçek
-- [[feedback_trust_brain_eval_not_worker]] — disk-verify
-- [[feedback_build_mcp_restart_coordination]] — build Alperen
+- [[feedback_scale_up_autonomous]] — büyük ölçek + otonom mod
+- [[feedback_trust_brain_eval_not_worker]] — disk-verify ground truth
+- [[feedback_build_mcp_restart_coordination]] — build Alperen yapar
 - [[project_api_mode_deferred_post_beta]] — API mode yasak
