@@ -25,7 +25,7 @@ export function isValidTenantId(id: string): boolean {
  */
 export function tenantIsolationPath(projectRoot: string, tenantId: string): string {
   if (!isValidTenantId(tenantId)) {
-    throw new Error(`Invalid tenantId "${tenantId}": must match ${TENANT_ID_RE.source}`);
+    throw new DeckentError('E_INVALID_TENANT_ID', `Invalid tenantId "${tenantId}": must match ${TENANT_ID_RE.source}`);
   }
   return join(projectRoot, '.deckent', 'tenants', tenantId);
 }
@@ -44,7 +44,7 @@ export function resolveTenant(
     'local';
 
   if (!isValidTenantId(tenantId)) {
-    throw new Error(`Invalid tenantId "${tenantId}": must match ${TENANT_ID_RE.source}`);
+    throw new DeckentError('E_INVALID_TENANT_ID', `Invalid tenantId "${tenantId}": must match ${TENANT_ID_RE.source}`);
   }
 
   return {
