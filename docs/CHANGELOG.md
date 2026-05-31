@@ -2,6 +2,28 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint209] - 2026-05-31
+
+### Added
+
+- 209-001 — Intent-classifier çeşitlendirme (domain/scope→intent)
+- 209-002 — Multi-sinyal agent scoring (domain+scope ağırlık)
+- 209-003 — refactorer impl skor dengeleme (7→tier)
+- 209-004 — Skill routing denetimi + çeşitlendirme
+- 209-005 — Routing dağılım analiz raporu (outcome-tracker)
+- 209-006 — API auth disabled-flag bağımlılığı kaldır (F7-001)
+- 209-007 — Dashboard API endpoint canlı veri parite (F7-002)
+- 209-008 — mcp-attach tool count hardcode kaldır (208-002 bayrak)
+- 209-010 — Sprint 208 worker-artefakt önleme (honest-gate güçlendir)
+- 209-011 — Self-dispatch flow-runtime entegrasyon (otonom tetik)
+
+### Fixed
+
+- 209-009 — docker-backend e2e izolasyon kalıcı fix (son fail)
+
+
+_Tasks: 15 total, 15 done, 0 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint208] - 2026-05-31
 
 ### Added

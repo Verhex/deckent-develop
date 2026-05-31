@@ -395,6 +395,63 @@ export function makeStaticGitNumstatProvider(
   };
 }
 
+// ─── Garbage Throw Detector ───────────────────────────────────────────
+
+/**
+ * Keywords used in stub/placeholder throws that indicate structural garbage.
+ * Matches both single-quote and double-quote / backtick forms.
+ */
+const GARBAGE_THROW_KEYWORDS = ['unreachable', 'placeholder', 'TODO'] as const;
+
+/** Per-occurrence evidence of a garbage throw pattern. */
+export interface GarbageThrowMatch {
+  file: string;
+  pattern: string;
+  /** 1-based line number where the pattern was found. */
+  line: number;
+}
+
+/** Result of {@link detectGarbageThrows}. */
+export interface GarbageThrowFinding {
+  hasGarbageThrow: boolean;
+  matches: GarbageThrowMatch[];
+}
+
+/**
+ * Scan file contents for module-level stub throw patterns that indicate
+ * structural garbage left by workers (Sprint 208 incident: 8×unreachable,
+ * 2×placeholder in enterprise-config/tenant-context).
+ *
+ * Detects `throw new Error('unreachable'|'placeholder'|'TODO')` with any
+ * combination of single-quotes, double-quotes, or backticks. Returns all
+ * matches so callers can flag results or emit audit events.
+ *
+ * @param fileContents - Map of file path → file source text.
+ */
+export function detectGarbageThrows(
+  fileContents: Map<string, string>,
+): GarbageThrowFinding {
+  const matches: GarbageThrowMatch[] = [];
+
+  for (const [file, content] of fileContents) {
+    const lines = content.split('\n');
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i] ?? '';
+      for (const keyword of GARBAGE_THROW_KEYWORDS) {
+        // Match: throw new Error(<quote>keyword<quote>) with optional whitespace
+        const re = new RegExp(
+          `throw\\s+new\\s+Error\\s*\\(\\s*['"\`]${keyword}['"\`]\\s*\\)`,
+        );
+        if (re.test(line)) {
+          matches.push({ file, pattern: `throw new Error('${keyword}')`, line: i + 1 });
+        }
+      }
+    }
+  }
+
+  return { hasGarbageThrow: matches.length > 0, matches };
+}
+
 // ─── Internal Helpers ─────────────────────────────────────────────────
 
 function normalizePath(p: string): string {

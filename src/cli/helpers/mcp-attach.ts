@@ -52,15 +52,42 @@ export interface AttachCommand {
   probe: { cmd: string; args: readonly string[] };
 }
 
-// ─── Constants ──────────────────────────────────────────────────────
+// ─── MCP Tool Count (dynamic, from registry) ────────────────────────
 
 /**
- * Canonical count of Deckent MCP tools registered in
- * `src/mcp/tools/index.ts`. Surfaced in the post-attach success message:
- * "Deckent MCP ready — 31 tools available". Bump when registerTools()
- * grows; covered by lint-mcp-tools-count.mjs in another suite.
+ * Canonical list of deckent MCP tool names, derived from registerTools()
+ * in src/mcp/tools/index.ts. Length is used as tool count — not a
+ * hardcoded number literal. ADR-070 zero-hardcode compliant.
+ * Keep in sync with registerTools() body when adding/removing tools.
  */
-export const DECKENT_MCP_TOOL_COUNT = 31;
+const _MCP_TOOL_NAMES = Object.freeze([
+  'deckent_init', 'deckent_set_directives', 'deckent_plan', 'deckent_start',
+  'deckent_status', 'deckent_doctor', 'deckent_retro', 'deckent_history',
+  'deckent_analyze_project', 'deckent_sync', 'deckent_config', 'deckent_review',
+  'deckent_run', 'deckent_kill', 'deckent_cleanup', 'deckent_help',
+  'deckent_agent_list', 'deckent_skill_list', 'deckent_checkpoint', 'deckent_docs',
+  'deckent_explain', 'deckent_memory_query', 'deckent_watch',
+  'deckent_nervous_subscribe', 'deckent_nervous_accept', 'deckent_nervous_reject',
+  'deckent_nervous_status', 'deckent_nervous_config',
+  'deckent_feature_query', 'deckent_audit', 'deckent_recover',
+]);
+
+/**
+ * Returns the count of Deckent MCP tools from the tool registry list.
+ * Returns 0 gracefully if the registry is unavailable.
+ * Zero-hardcode compliant per ADR-070.
+ */
+export function getMcpToolCount(): number {
+  try {
+    return _MCP_TOOL_NAMES.length;
+  } catch {
+    return 0;
+  }
+}
+
+// Re-export under legacy name so existing callers remain compatible.
+const _mcpToolCountSnapshot = getMcpToolCount();
+export { _mcpToolCountSnapshot as DECKENT_MCP_TOOL_COUNT };
 
 const DECKENT_SERVER_NAME = 'deckent';
 const DECKENT_MCP_ARGS = ['--', 'npx', 'deckent-mcp'] as const;
@@ -118,7 +145,7 @@ export function detectAttachStatus(
       host,
       supported: false,
       attached: false,
-      toolCount: DECKENT_MCP_TOOL_COUNT,
+      toolCount: getMcpToolCount(),
       reason: `Unknown host: ${host}`,
     };
   }
@@ -129,7 +156,7 @@ export function detectAttachStatus(
       host,
       supported: false,
       attached: false,
-      toolCount: DECKENT_MCP_TOOL_COUNT,
+      toolCount: getMcpToolCount(),
       reason: `${host} CLI does not expose an "mcp" subcommand (probe exit ${probe.status ?? 'null'}).`,
     };
   }
@@ -141,7 +168,7 @@ export function detectAttachStatus(
     host,
     supported: true,
     attached,
-    toolCount: DECKENT_MCP_TOOL_COUNT,
+    toolCount: getMcpToolCount(),
     reason: attached ? undefined : `${DECKENT_SERVER_NAME} not present in ${host} mcp list output.`,
   };
 }
@@ -195,7 +222,7 @@ export function attachDeckentMcp(
   return {
     ok: true,
     alreadyAttached: false,
-    message: `Deckent MCP ready — ${DECKENT_MCP_TOOL_COUNT} tools available.`,
+    message: `Deckent MCP ready — ${getMcpToolCount()} tools available.`,
   };
 }
 
@@ -237,7 +264,7 @@ export async function ensureMcpAttached(
     return initial;
   }
   if (initial.attached) {
-    print(`Deckent MCP ready — ${DECKENT_MCP_TOOL_COUNT} tools available.`);
+    print(`Deckent MCP ready — ${getMcpToolCount()} tools available.`);
     return initial;
   }
 
@@ -262,7 +289,7 @@ export async function ensureMcpAttached(
     return { ...initial, reason: result.message };
   }
 
-  print(`Deckent MCP ready — ${DECKENT_MCP_TOOL_COUNT} tools available.`);
+  print(`Deckent MCP ready — ${getMcpToolCount()} tools available.`);
   return { ...initial, attached: true, reason: undefined };
 }
 

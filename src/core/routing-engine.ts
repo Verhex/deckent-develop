@@ -29,6 +29,7 @@ import { classifyIntent } from './intent-classifier.js';
 import { evaluateActivation, migrateV1AgentToActivation, migrateV1SkillToActivation, getDynamicExclusions } from './activation-engine.js';
 import { resolveComposition } from './skill-selector.js';
 import { modelRegistry } from './model-registry.js';
+import { getAgentDomain, type AgentDomain } from './agent-pool.js';
 import { debugLog } from './utils.js';
 
 // ─── Agent Fallback Chain ──────────────────────────────────────────────────
@@ -72,6 +73,95 @@ export function selectAgentByFallback(
     if (activeAgentIds.has(agentId)) return agentId;
   }
   return 'architect'; // ultimate fallback
+}
+
+// ─── Domain-Match Bonus (Sprint 209 — Task 209-002) ────────────────────────
+//
+// Multi-signal scoring fix. Until Sprint 209, agent selection used only
+// activation-rule score; refactorer's `intent.primary === 'implementation'`
+// rule (score 7) tied or beat every domain-specialized agent in the pool,
+// so api/security/devops tasks were all routed to refactorer.
+//
+// This adds a +DOMAIN_MATCH_BONUS boost when an agent's domain aligns
+// with the task — either via the task's intent (security task →
+// security-domain agent) or via a path-extracted domain name (src/api/ →
+// api-builder). Refactorer/architect still receive impl@7; the bonus
+// only adds a tiebreaker for domain-specialists.
+
+/** Score added when an agent's domain matches the task's intent or
+ *  one of its path-extracted domain names. Sized to match the skill
+ *  `stackBonus` so a domain-specialist + activation rule beats a
+ *  generic-impl candidate that has only `impl@7`. */
+export const DOMAIN_MATCH_BONUS = 3;
+
+/** Map task intent → the agent domain that should be boosted. Only
+ *  intents that map cleanly to an existing built-in agent domain are
+ *  listed; anything else (implementation, refactor, bugfix, …) yields
+ *  no domain bonus and falls through to standard scoring. */
+export const INTENT_TO_AGENT_DOMAIN: Partial<Record<IntentType, AgentDomain>> = {
+  security: 'security',
+  devops: 'devops',
+  design: 'react',
+  documentation: 'doc',
+  migration: 'data',
+};
+
+/** Map a path-extracted task domain name (TaskDNA.domains[].name) →
+ *  the specific built-in agent that owns that domain. Used when the
+ *  task intent itself doesn't carry the signal — e.g. an api task is
+ *  classified as `implementation` intent, but its `src/api/` scope
+ *  populates TaskDNA.domains with `api`, which is the routing hook. */
+export const TASK_DOMAIN_TO_AGENT_ID: Readonly<Record<string, string>> = {
+  api: 'api-builder',
+  auth: 'security-auditor',
+  dashboard: 'frontend-designer',
+  components: 'frontend-designer',
+  ui: 'frontend-designer',
+  db: 'data-engineer',
+  database: 'data-engineer',
+  models: 'data-engineer',
+  schemas: 'data-engineer',
+  docker: 'devops-engineer',
+  kubernetes: 'devops-engineer',
+  k8s: 'devops-engineer',
+  helm: 'devops-engineer',
+};
+
+/**
+ * Return the domain-match bonus for an agent against a task's DNA.
+ *
+ * Two match paths, either one yields +DOMAIN_MATCH_BONUS (no doubling):
+ *   1. Intent-to-domain: the task's primary intent maps to an agent
+ *      domain in INTENT_TO_AGENT_DOMAIN, and the agent's domain matches.
+ *   2. Task-domain-to-agent: the agent id appears in
+ *      TASK_DOMAIN_TO_AGENT_ID for one of the task's extracted domain
+ *      names.
+ *
+ * @param agentId      The agent id being scored.
+ * @param agentDomain  The agent's domain (from getAgentDomain).
+ * @param taskDNA      The classified task.
+ * @returns DOMAIN_MATCH_BONUS on match, 0 otherwise.
+ */
+export function getDomainMatchBonus(
+  agentId: string,
+  agentDomain: AgentDomain | 'generic',
+  taskDNA: TaskDNA,
+): number {
+  // Path 1: intent → agent domain
+  const targetDomain = INTENT_TO_AGENT_DOMAIN[taskDNA.intent.primary];
+  if (targetDomain && agentDomain === targetDomain) {
+    return DOMAIN_MATCH_BONUS;
+  }
+
+  // Path 2: extracted task domain name → specific agent id
+  for (const domain of taskDNA.domains) {
+    const expectedAgent = TASK_DOMAIN_TO_AGENT_ID[domain.name.toLowerCase()];
+    if (expectedAgent && expectedAgent === agentId) {
+      return DOMAIN_MATCH_BONUS;
+    }
+  }
+
+  return 0;
 }
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -314,12 +404,22 @@ function selectBestAgent(
 
     // Apply learning bonus
     const bonus = getLearningBonus(id, learningData);
-    const finalScore = result.score + bonus;
+
+    // Sprint 209 — multi-signal: domain-match bonus so a domain-specialized
+    // agent (api-builder / security-auditor / devops-engineer / …) beats
+    // the generic refactorer impl@7 candidate. Refactorer/architect still
+    // get impl@7; this is purely an additive tiebreaker.
+    const domainBonus = getDomainMatchBonus(id, getAgentDomain(agent), taskDNA);
+    if (domainBonus > 0) {
+      reasoning.push(`Agent '${id}' domain-match bonus: +${domainBonus} (intent=${taskDNA.intent.primary}, domains=[${taskDNA.domains.map(d => d.name).join(', ')}])`);
+    }
+
+    const finalScore = result.score + bonus + domainBonus;
 
     if (finalScore >= cfg.agentMinScore) {
       candidates.push({
         id,
-        rawScore: result.score,
+        rawScore: result.score + domainBonus,
         learningBonus: bonus,
         finalScore,
         matchedRules: result.matchedRules,
@@ -608,12 +708,62 @@ function getLearningBonus(entityId: string, learningData: LearningBonus[]): numb
   return Math.max(-LEARNING_BONUS_CAP, Math.min(LEARNING_BONUS_CAP, entry.bonus));
 }
 
+// ─── Skill Domain / Intent Bonus (Sprint 209-004) ──────────────────────────
+//
+// Counterpart to DOMAIN_MATCH_BONUS / TASK_DOMAIN_TO_AGENT_ID for agents.
+// When a task's primary intent or a path-extracted domain name maps to a
+// specific skill, that skill receives SKILL_DOMAIN_BONUS so domain-specialized
+// skills (api-builder, security-specialist, react-specialist, …) surface ahead
+// of the generic typescript-expert default.
+
+/** Score added when a skill's id matches the task's intent or domain signal.
+ *  Sized equal to DOMAIN_MATCH_BONUS so skill routing keeps pace with agent
+ *  domain routing introduced in Sprint 209-002. */
+export const SKILL_DOMAIN_BONUS = 3;
+
+/** Map task primary intent → the skill that best serves that intent.
+ *  documentation is excluded (handled by existing early-return at +2).
+ *  The intent→skill mapping gives domain-specific skills a tiebreaker when
+ *  the task intent is already classified beyond 'implementation'. */
+export const INTENT_TO_SKILL_ID: Partial<Record<IntentType, string>> = {
+  security:      'security-specialist',
+  devops:        'devops-engineer',
+  design:        'react-specialist',
+  migration:     'database-migration',
+  performance:   'performance-optimizer',
+  architecture:  'system-architect',
+};
+
+/** Map path-extracted task domain name (TaskDNA.domains[].name) → skill id.
+ *  Parallel to TASK_DOMAIN_TO_AGENT_ID; applied inside getIntentPriorityBonus
+ *  so that scope-path signals (src/api/, src/auth/, dashboard/) steer the
+ *  domain skill bonus even when intent is still 'implementation'. */
+export const TASK_DOMAIN_TO_SKILL_ID: Readonly<Record<string, string>> = {
+  api:        'api-builder',
+  auth:       'security-specialist',
+  security:   'security-specialist',
+  dashboard:  'react-specialist',
+  components: 'react-specialist',
+  frontend:   'react-specialist',
+  ui:         'react-specialist',
+  db:         'database-migration',
+  database:   'database-migration',
+  models:     'database-migration',
+  schemas:    'database-migration',
+  docker:     'docker-expert',
+  kubernetes: 'docker-expert',
+  k8s:        'docker-expert',
+  helm:       'docker-expert',
+};
+
 /**
  * Intent-based priority bonus for skill selection.
  * Boosts skills that align with the task's primary intent:
  * - testing → testing-expert +2
  * - documentation → documentation-writer +2
  * - implementation + typescript → typescript-expert +2
+ * - intent→skill mapping (security/devops/design/…) → domain skill +3
+ * - domain→skill mapping (api/auth/dashboard/…) → domain skill +3
  */
 function getIntentPriorityBonus(
   skillId: string,
@@ -632,6 +782,16 @@ function getIntentPriorityBonus(
       projectStack?.language?.toLowerCase() === 'typescript' ||
       taskDNA.domains.some(d => d.name.toLowerCase().includes('typescript'));
     if (isTypeScript) return 2;
+  }
+
+  // Sprint 209-004: intent→skill bonus (domain skill diversification via intent signal)
+  const intentSkillId = INTENT_TO_SKILL_ID[primary];
+  if (intentSkillId === skillId) return SKILL_DOMAIN_BONUS;
+
+  // Sprint 209-004: domain→skill bonus (domain skill diversification via scope path signal)
+  for (const domain of taskDNA.domains) {
+    const domainSkillId = TASK_DOMAIN_TO_SKILL_ID[domain.name.toLowerCase()];
+    if (domainSkillId === skillId) return SKILL_DOMAIN_BONUS;
   }
 
   return 0;

@@ -82,6 +82,7 @@ function cleanupTaskFiles(taskId: string): void {
     path.join(TEST_TASKS_DIR, `task-${taskId}.hb`),
     path.join(TEST_TASKS_DIR, `task-${taskId}.result`),
     path.join(TEST_TASKS_DIR, `task-${taskId}.timeout`),
+    path.join(TEST_TASKS_DIR, `task-${taskId}.log`),
   ];
   for (const p of files) {
     try { if (fs.existsSync(p)) fs.unlinkSync(p); } catch { /* ok */ }
@@ -103,13 +104,24 @@ describe('Docker Backend Integration', () => {
     testTaskId = `test-docker-${Date.now()}-${process.pid}-${++_dockerTestSeq}`;
     containerName = `deckent-w-${testTaskId}`;
     _clearAllPending();
-    // Broad cleanup BEFORE creating backend: catches stale .hb files that background
+    // Broad cleanup BEFORE creating backend: catches stale .hb/.log files that background
     // monitorContainer callbacks from previous tests may have written after afterEach ran.
     try {
       const files = fs.readdirSync(TEST_TASKS_DIR);
       for (const f of files) {
         if (f.startsWith('task-test-docker-') || f.startsWith('.prompt-') || f.startsWith('.worker-test-docker-')) {
           try { fs.unlinkSync(path.join(TEST_TASKS_DIR, f)); } catch { /* ok */ }
+        }
+      }
+    } catch { /* ok */ }
+    // Belt-and-suspenders: also clear stale spawnlocks from previous runs/crashes.
+    try {
+      const locksDir = path.join(PROJECT_ROOT, '.locks');
+      if (fs.existsSync(locksDir)) {
+        for (const f of fs.readdirSync(locksDir)) {
+          if (f.endsWith('.spawnlock') && f.includes('test-docker-')) {
+            try { fs.unlinkSync(path.join(locksDir, f)); } catch { /* ok */ }
+          }
         }
       }
     } catch { /* ok */ }
@@ -409,7 +421,7 @@ describe('Docker Backend Integration', () => {
 
   // ── Test 10: Docker log extraction writes .log file ───────────────────
   it.skipIf(!dockerAvailable)('monitorContainer extracts container stdout to .log file', async () => {
-    const logTaskId = `test-docker-${Date.now()}-log`;
+    const logTaskId = `test-docker-${Date.now()}-${process.pid}-${++_dockerTestSeq}-log`;
     const containerName = `deckent-w-${logTaskId}`;
     const logPath = path.join(TEST_TASKS_DIR, `task-${logTaskId}.log`);
     try {

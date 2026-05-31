@@ -5703,3 +5703,38 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 208-016: 208-016 — ADR-071 (F3 Otonom Mod + F4 Enterprise mimari) + ROADMAP (DONE)
 
 ---
+## Sprint 209 — sprint-209
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-05-31
+**Duration:** 2622s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 15 |
+| Completed | 15 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 2621945ms |
+
+### Tasks
+
+- 209-001: 209-001 — Intent-classifier çeşitlendirme (domain/scope→intent) (DONE)
+- 209-002: 209-002 — Multi-sinyal agent scoring (domain+scope ağırlık) (DONE)
+- 209-003: 209-003 — refactorer impl skor dengeleme (7→tier) (DONE)
+- 209-004: 209-004 — Skill routing denetimi + çeşitlendirme (DONE)
+- 209-005: 209-005 — Routing dağılım analiz raporu (outcome-tracker) (DONE)
+- 209-006: 209-006 — API auth disabled-flag bağımlılığı kaldır (F7-001) (DONE)
+- 209-007: 209-007 — Dashboard API endpoint canlı veri parite (F7-002) (DONE)
+- 209-008: 209-008 — mcp-attach tool count hardcode kaldır (208-002 bayrak) (DONE)
+- 209-009: 209-009 — docker-backend e2e izolasyon kalıcı fix (son fail) (DONE)
+- 209-010: 209-010 — Sprint 208 worker-artefakt önleme (honest-gate güçlendir) (DONE)
+- 209-011: 209-011 — Self-dispatch flow-runtime entegrasyon (otonom tetik) (DONE)
+- 209-012: 209-012 — RBAC + audit entegrasyon (yetkisiz işlem audit'lenir) (DONE)
+- 209-013: 209-013 — Tenant-aware flow registry (multi-tenant izolasyon) (DONE)
+- 209-014: 209-014 — ADR-072 (routing dengeleme + dashboard auth) + ROADMAP (DONE)
+
+---

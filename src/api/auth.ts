@@ -17,6 +17,40 @@ export interface AuthConfig {
    * so the security properties are identical.
    */
   queryTokenPaths?: string[];
+  /**
+   * When true (or env var `DECKENT_API_LOCALHOST_AUTO=1` is set), requests
+   * arriving from a loopback address (127.0.0.1 / ::1 / ::ffff:127.0.0.1)
+   * with NO `Authorization` header are treated as authenticated. Lets the
+   * local dashboard reach the API without setting `DECKENT_API_AUTH_DISABLED=1`
+   * — the latter is a blanket bypass that also lets remote callers through.
+   *
+   * Prod-safe: remote callers still require a valid Bearer token. A localhost
+   * request that *does* present an Authorization header is verified normally
+   * (a bad token still gets 403), so this only fills the missing-header gap.
+   */
+  allowLocalhostAutoInject?: boolean;
+}
+
+// ─── Localhost Detection ────────────────────────────────────────────
+
+const LOOPBACK_ADDRESSES = new Set([
+  '127.0.0.1',
+  '::1',
+  '::ffff:127.0.0.1',
+]);
+
+/**
+ * Returns true when `req.socket.remoteAddress` is a loopback address.
+ *
+ * Covers IPv4 (127.0.0.1), IPv6 (::1), and the IPv6-mapped IPv4 form
+ * (::ffff:127.0.0.1) that Node emits when a dual-stack server accepts
+ * a v4 connection. Requests with no socket (synthetic test fakes) are
+ * treated as non-localhost so existing unit tests keep their semantics.
+ */
+export function isLocalhostRequest(req: IncomingMessage): boolean {
+  const addr = req.socket?.remoteAddress;
+  if (!addr) return false;
+  return LOOPBACK_ADDRESSES.has(addr);
 }
 
 // ─── Token Resolution ───────────────────────────────────────────────
@@ -68,6 +102,9 @@ export function verifyBearerToken(
  *
  * - Default secure: if no token configured → 401 for all non-exempt requests.
  * - Explicit bypass: set DECKENT_API_AUTH_DISABLED=1 to disable auth (with stderr warning).
+ * - Localhost auto-inject (opt-in): when `allowLocalhostAutoInject` is true (or
+ *   `DECKENT_API_LOCALHOST_AUTO=1` env var is set), loopback callers without an
+ *   Authorization header pass through. Remote callers still require a token.
  * - Exempt paths (e.g. /health) always pass through.
  * - Missing/malformed token → 401 Unauthorized
  * - Wrong token → 403 Forbidden
@@ -76,6 +113,9 @@ export function bearerAuthMiddleware(config: AuthConfig) {
   const activeToken = resolveAuthToken(config.configToken);
   const exempt = new Set(config.exemptPaths ?? []);
   const queryTokenPaths = new Set(config.queryTokenPaths ?? []);
+  const allowLocalhostAuto =
+    config.allowLocalhostAutoInject === true ||
+    process.env['DECKENT_API_LOCALHOST_AUTO'] === '1';
 
   // Check explicit auth bypass via env var
   const authDisabled = process.env['DECKENT_API_AUTH_DISABLED'] === '1';
@@ -96,6 +136,18 @@ export function bearerAuthMiddleware(config: AuthConfig) {
     const url = req.url ?? '/';
     const path = url.split('?')[0] ?? url;
     if (exempt.has(path)) return true;
+
+    // Localhost auto-inject (opt-in): loopback callers with no Authorization
+    // header pass through. A localhost request that DOES present an
+    // Authorization header falls through to the normal verify path — a wrong
+    // token from localhost still earns a 403.
+    if (
+      allowLocalhostAuto &&
+      isLocalhostRequest(req) &&
+      !req.headers['authorization']
+    ) {
+      return true;
+    }
 
     // No token configured → default deny (secure by default)
     if (!activeToken) {

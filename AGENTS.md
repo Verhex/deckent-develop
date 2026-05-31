@@ -26,5 +26,5 @@ When acting as Worker: @.codex/rules/worker-default.md
 ## Agent Performance
 | Agent | Tasks | Done | Başarı |
 |-------|-------|------|--------|
-| refactorer | 15 | 15 | 100% |
+| refactorer | 13 | 13 | 100% |
 | doc-writer | 1 | 1 | 100% |

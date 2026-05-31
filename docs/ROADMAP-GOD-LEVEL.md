@@ -49,6 +49,8 @@
 
 > **Sprint 208 sonuç (2026-05-31):** **zero-hardcode TAM** — `mergeFromCatalog` apiId-aware eşleşme kök-bug fix (208-001), CLI/help parametrik sayılar (208-002), brain-context model-label registry'den (208-003), `zero-hardcode-audit.mjs` lint guard CI (208-004, ADR-070 kalıcı koruma). **F3 otonom-mod temeli** — `FlowRuntime` daemon tick-loop (208-005), `SelfDispatchPolicy` + `evaluateDispatch` guard (requiresApproval=true, 208-006), `deckent flow run` CLI (208-007), `withTenant`/`currentTenant` runtime izolasyon (208-008). **F4 enterprise** — RBAC role hierarchy admin>operator>viewer + PERMISSION_MATRIX (208-009), flow-registry RBAC gate (208-010), `writeAuditEvent` yapılandırılmış audit yazımı (208-011), `EnterpriseConfig` opt-in schema (208-012). **F5 evrimsel başlangıç** — `evolvePrompt` outcome→prompt kural-temelli (208-013), adaptive-agent wire (208-014). Yeni ADR: 071 (autonomous-enterprise) — proposed.
 
+> **Sprint 209 sonuç (2026-05-31):** **Agent routing dengeleme** — intent-classifier domain enrichment (scope-path → api/security/design/data/devops intent; Sprint 209-001), multi-sinyal agent scoring domain-match bonus +3 (Sprint 209-002), refactorer impl skor domain-aware denge (Sprint 209-003), skill routing çeşitlendirme (Sprint 209-004), routing-distribution.mjs dağılım raporu (Sprint 209-005). **F7 dashboard auth fix** — API auth localhost auto-inject, prod-safe default, DECKENT_API_AUTH_DISABLED artık opsiyonel (Sprint 209-006, **F7-001 DONE**), dashboard endpoint canlı veri parite (Sprint 209-007, **F7-002 DONE**). **F3/F4 devam** — self-dispatch flow-runtime entegrasyon (209-011), RBAC+audit entegrasyon (209-012), tenant-aware flow registry (209-013). Yeni ADR: 072 (routing-balance + dashboard-auth) — accepted.
+
 **F2 — Native Chat Path C (AI Asistan yüzü)** — ~600-1200 LoC:
 | ID | İş | Öncelik | Kanıt |
 |----|----|---------|-------|
@@ -96,8 +98,8 @@
 
 | ID | İş | Öncelik | Durum/Kanıt |
 |----|----|---------|-------------|
-| F7-001 | API auth fix — `DECKENT_API_AUTH_DISABLED=1` olmadan güvenli çalışsın (token akışı + localhost auto-inject + prod-safe default) | **P1** | src/api/{server,auth}.ts + terminal/auth-provider.ts; şu an auth-disabled şart |
-| F7-002 | Dashboard canlı veri parite — tüm panel gerçek-zamanlı doğru (sprint/worker/agent/memory/debt/checkpoint) SSE/WS | **P1** | 44 tsx + useSSE/useApi var ama veri güncel/işlevsel değil |
+| F7-001 | API auth fix — `DECKENT_API_AUTH_DISABLED=1` olmadan güvenli çalışsın (token akışı + localhost auto-inject + prod-safe default) | **P1** | 🟡 Sprint 209-006 auth fix DONE — localhost auto-inject, prod-safe default, disabled-flag opsiyonel (ADR-072) |
+| F7-002 | Dashboard canlı veri parite — tüm panel gerçek-zamanlı doğru (sprint/worker/agent/memory/debt/checkpoint) SSE/WS | **P1** | 🟡 Sprint 209-007 endpoint canlı veri parite DONE — sprint/worker/agent/memory/debt endpoint'leri aktif |
 | F7-003 | UI/UX redesign — god-level tasarım+konsept (modern, sezgisel, responsive, dark/light, herkesin anladığı bilgi mimarisi) | **P1** | ThemeProvider + i18n temel var |
 | F7-004 | Terminal güçlendir — embedded web terminal (ADR-062) tam işlevsel, çok-oturum, kopyala/yapıştır, geçmiş | P2 | terminal-api.ts + ws-gateway zayıf |
 | F7-005 | Sprint kontrol paneli — plan/start/status/kill/review/retro UI'dan (onay-gate'li), canlı faz görselleştirme | P2 | NewSprintModal + SprintPhaseTimeline var |

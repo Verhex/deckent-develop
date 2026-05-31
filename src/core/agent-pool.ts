@@ -21,6 +21,12 @@ import { readJsonSafe } from './utils.js';
 //   - Existing intent matches still dominate (refactor@10, design@8).
 //   - For pure implementation tasks, built-ins beat temp-react-ts-specialist (6)
 //     via the agent's primary candidacy score plus learning/synergy bonuses.
+//
+// Domain balance (Sprint 209 Task 209-002+003):
+//   Domain-specialized agents beat refactorer@7 via getDomainMatchBonus (+3):
+//     api-builder: 8 (domain rule) + 3 (bonus) = 11 > refactorer@7
+//     security-auditor: 10 (security intent) + 3 (bonus) = 13 > refactorer@7
+//   Refactorer remains the correct winner for generic (non-domain) impl tasks.
 export const BUILTIN_IMPLEMENTATION_INTENT_RULES: Readonly<
   Record<string, { score: number; name: string }>
 > = {

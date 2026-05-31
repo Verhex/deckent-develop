@@ -39,8 +39,16 @@ const OPERATION_KEYWORDS: Record<OperationType, string[]> = {
 // ─── Scope-based Intent Signals ─────────────────────────────────────────────
 
 const SCOPE_INTENT_SIGNALS: Array<{ pattern: RegExp; intent: IntentType; weight: number }> = [
+  // devops: CI configs (.github/, ci/, .circleci/) + container/orchestration assets
   { pattern: /^\.github\/|^ci\/|^\.circleci/i, intent: 'devops', weight: 3 },
-  { pattern: /security|auth/i, intent: 'security', weight: 2 },
+  { pattern: /(^|\/)docker\/|Dockerfile|(^|\/)k8s\/|(^|\/)kubernetes\/|(^|\/)helm\//i, intent: 'devops', weight: 3 },
+  // security: weight 3 (was 2) so a security-scoped task beats the implementation-default fallback
+  { pattern: /security|(^|\/)auth\//i, intent: 'security', weight: 3 },
+  // design / frontend: dashboard, components, frontend, ui paths
+  { pattern: /(^|\/)dashboard\/|(^|\/)components?\/|(^|\/)frontend\/|(^|\/)ui\//i, intent: 'design', weight: 4 },
+  // data / migration: db, models, schema paths — closest existing IntentType is 'migration';
+  // data-engineer agent also activates via domains.$contains('database')
+  { pattern: /(^|\/)db\/|(^|\/)database\/|(^|\/)models?\/|(^|\/)schemas?\//i, intent: 'migration', weight: 2 },
   { pattern: /docs?\//i, intent: 'documentation', weight: 2 },
   { pattern: /\.md$/i, intent: 'documentation', weight: 2 }, // .md file writes signal documentation
   { pattern: /test/i, intent: 'implementation', weight: 1 }, // test scope → implementation (test-coverage tag added separately)
@@ -126,7 +134,17 @@ export function detectPrimaryIntent(
 
   // CRITICAL FIX: Write ratio analysis prevents the detectTaskType ordering bug.
   // If most writes go to src/, it's implementation even if "test" keyword appears.
-  if (analysis.testWriteRatio < 0.3 && analysis.writeRatio['src/'] !== undefined) {
+  // Sprint 209: gate the default-implementation boost so a strong scope signal
+  // (security/design/devops/etc. with score ≥ 3) wins instead of being drowned
+  // out by the implementation default. This is the key fix for routing
+  // diversification — refactorer no longer rides the "everything is
+  // implementation" fallback into every domain-specific task.
+  const hasStrongNonImplSignal = scores.some(s => s.intent !== 'implementation' && s.score >= 3);
+  if (
+    !hasStrongNonImplSignal &&
+    analysis.testWriteRatio < 0.3 &&
+    analysis.writeRatio['src/'] !== undefined
+  ) {
     // Most writes are source code — boost implementation
     const implScore = scores.find(s => s.intent === 'implementation');
     if (implScore) {

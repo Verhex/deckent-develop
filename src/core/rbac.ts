@@ -1,8 +1,10 @@
 // ═══ RBAC Role-Check ═════════════════════════════════════════════════════════
 // F4 enterprise foundation — tenant-aware role/permission check (ROADMAP F4-001).
 // Sprint 206 (206-008) skeleton. Sprint 208 (208-009): role hierarchy + extended PERMISSION_MATRIX.
+// Sprint 209 (209-012): audit-trail on denial via writeAuditEvent.
 
 import { isValidTenantId } from './tenant-context.js';
+import { writeAuditEvent } from './audit-writer.js';
 
 // ─── Types ────────────────────────────────────────────────────────
 
@@ -56,6 +58,16 @@ export const PERMISSION_MATRIX: Record<Role, ReadonlySet<Permission>> = (() => {
 
 const VALID_ROLES = new Set<string>(['admin', 'operator', 'viewer']);
 
+// ─── Audit Context ────────────────────────────────────────────────
+
+/** Optional audit context passed to can() — enables denial audit-trail. */
+export interface AuditContext {
+  actor: string;
+  projectRoot: string;
+  sprintId: string;
+  target?: string;
+}
+
 // ─── Public API ───────────────────────────────────────────────────
 
 /** Returns true if the string is a known Role. */
@@ -71,9 +83,29 @@ export function isValidRole(role: string): role is Role {
  * - tenantId fails format validation (path-unsafe IDs)
  * - role is not a known Role
  * - role does not have the requested permission (including inherited)
+ *
+ * When auditCtx is provided and the check is denied, an 'access:denied' audit event
+ * is written via writeAuditEvent() for enterprise audit-trail (ADR-037).
  */
-export function can(role: string, action: Permission, tenantId: string): boolean {
-  if (!isValidTenantId(tenantId)) return false;
-  if (!isValidRole(role)) return false;
-  return PERMISSION_MATRIX[role].has(action);
+export function can(
+  role: string,
+  action: Permission,
+  tenantId: string,
+  auditCtx?: AuditContext,
+): boolean {
+  const allowed =
+    isValidTenantId(tenantId) &&
+    isValidRole(role) &&
+    PERMISSION_MATRIX[role].has(action);
+
+  if (!allowed && auditCtx !== undefined) {
+    writeAuditEvent(auditCtx.projectRoot, auditCtx.sprintId, {
+      tenantId: tenantId || 'unknown',
+      actor: auditCtx.actor,
+      action: 'access:denied',
+      target: auditCtx.target ?? action,
+    });
+  }
+
+  return allowed;
 }

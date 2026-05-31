@@ -1,4 +1,5 @@
 import type { DueDispatch } from './flow-scheduler.js';
+import type { DispatchCallback } from './flow-runtime.js';
 
 /**
  * Self-dispatch protocol skeleton (Sprint 208 — ROADMAP F3 otonom mod).
@@ -10,6 +11,12 @@ import type { DueDispatch } from './flow-scheduler.js';
  *
  * Human-approval rule: `requiresApproval` defaults to TRUE — preserves
  * "Alperen onayı olmadan sprint başlatma yasak" memory.
+ *
+ * Sprint 209 (Task 209-011) — FlowRuntime integration. `createSelfDispatchCallback`
+ * returns a DispatchCallback that, on every FlowRuntime tick, evaluates the
+ * policy against the due dispatches and pushes a PendingApprovalItem onto the
+ * caller-owned `pending-approval` queue when dispatch is approved. **No
+ * auto-start ever occurs** — Brain runSprint is never invoked by this module.
  */
 
 export type SelfDispatchTrigger = 'scheduled' | 'event' | 'threshold';
@@ -35,6 +42,20 @@ export interface SelfDispatchPolicy {
   threshold?: ThresholdConfig;
   /** Optional eventType filter for trigger === 'event'. Undefined matches any. */
   eventType?: string;
+  /** When true, the policy is skipped entirely on FlowRuntime tick. */
+  disabled?: boolean;
+}
+
+/**
+ * Queue item appended when a tick evaluation approves dispatch.
+ * Sprint 209 — pending-approval channel: human (Alperen) must accept before
+ * Brain.runSprint is invoked. This module never triggers runSprint itself.
+ */
+export interface PendingApprovalItem {
+  policyId: string;
+  decision: SelfDispatchDecision;
+  dispatches: DueDispatch[];
+  enqueuedAt: Date;
 }
 
 export type SelfDispatchContext =
@@ -156,5 +177,44 @@ export function evaluateDispatch(
     reason: crosses
       ? `threshold crossed: ${t.metric} ${t.operator} ${t.value} (actual=${context.value})`
       : `threshold not crossed: ${t.metric} ${t.operator} ${t.value} (actual=${context.value})`,
+  };
+}
+
+/**
+ * Build a {@link DispatchCallback} suitable for {@link FlowRuntime.start} or
+ * {@link FlowRuntime.tick}. Per tick:
+ *  - `policy.disabled === true` → return immediately (no eval, no queue push).
+ *  - otherwise run `evaluateDispatch(policy, { kind: 'scheduled', dispatches })`.
+ *  - if `decision.dispatch === true` push a {@link PendingApprovalItem} onto
+ *    `queue`. The pending-approval queue is caller-owned; the caller must
+ *    drain it after explicit human approval before invoking Brain.runSprint.
+ *  - **No auto-start.** This callback never invokes Brain or any side-effectful
+ *    sprint API — it only mutates `queue`.
+ *
+ * Intentionally narrow surface: this binding is for the 'scheduled' trigger
+ * path (FlowRuntime emits scheduled dispatches). Event/threshold triggers
+ * remain pure `evaluateDispatch` callers.
+ *
+ * @param policy   the self-dispatch policy to evaluate per tick
+ * @param queue    caller-owned pending-approval queue (mutated in place)
+ * @param options  optional clock override for deterministic `enqueuedAt`
+ */
+export function createSelfDispatchCallback(
+  policy: SelfDispatchPolicy,
+  queue: PendingApprovalItem[],
+  options: { clock?: () => Date } = {},
+): DispatchCallback {
+  const clock = options.clock ?? (() => new Date());
+  return (dispatches) => {
+    if (policy.disabled === true) return;
+    const decision = evaluateDispatch(policy, { kind: 'scheduled', dispatches });
+    if (decision.dispatch) {
+      queue.push({
+        policyId: policy.id,
+        decision,
+        dispatches,
+        enqueuedAt: clock(),
+      });
+    }
   };
 }

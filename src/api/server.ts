@@ -25,6 +25,7 @@ import { runDoctorChecks } from '../cli/commands/doctor.js';
 import { killWorker } from '../orchestra/tmux.js';
 import { loadConfig, createDefaultConfig, validatePartialConfig, ConfigValidationError } from '../core/config.js';
 import { readWorkerLog } from '../agents/worker.js';
+import { AgentPoolManager } from '../core/agent-pool.js';
 import {
   runSprint, readContext, planSprint, cleanup,
 } from '../orchestra/brain.js';
@@ -414,6 +415,46 @@ async function handleRequest(
       const files = readdirSync(tasksDir).filter(f => f.endsWith('.json') && f.startsWith('task-'));
       const tasks = files.map(f => readJsonSafe(join(tasksDir, f))).filter(Boolean);
       sendJson(res, tasks);
+      return;
+    }
+
+    // GET /api/workers — list active workers from .tasks/*.hb heartbeat files
+    if (url === '/api/workers') {
+      const tasksDir = join(projectRoot, TASKS_DIR);
+      if (!existsSync(tasksDir)) { sendJson(res, []); return; }
+      const hbFiles = readdirSync(tasksDir).filter(f => f.startsWith('task-') && f.endsWith('.hb'));
+      const workers = hbFiles.map((f) => {
+        const hb = readJsonSafe<Record<string, unknown>>(join(tasksDir, f));
+        if (!hb) return null;
+        const taskId = String(hb['taskId'] ?? '');
+        const taskFile = join(tasksDir, `task-${taskId}.json`);
+        const task = readJsonSafe<Record<string, unknown>>(taskFile);
+        return {
+          workerId: hb['workerId'] ?? null,
+          taskId,
+          status: hb['status'] ?? 'UNKNOWN',
+          sequence: hb['sequence'] ?? 0,
+          timestamp: hb['timestamp'] ?? null,
+          taskTitle: task ? String(task['title'] ?? '') : null,
+          taskStatus: task ? String(task['status'] ?? '') : null,
+        };
+      }).filter(Boolean);
+      sendJson(res, workers);
+      return;
+    }
+
+    // GET /api/agents — list enabled agents from agent pool
+    if (url === '/api/agents') {
+      const agentPool = new AgentPoolManager(projectRoot);
+      const agents = agentPool.listEnabled().map((a) => ({
+        id: a.id,
+        name: a.name,
+        source: a.source,
+        enabled: a.enabled,
+        totalUses: a.stats?.totalUses ?? 0,
+        successRate: a.stats?.successRate ?? 0,
+      }));
+      sendJson(res, agents);
       return;
     }
 

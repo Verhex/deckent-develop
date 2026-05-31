@@ -65,8 +65,10 @@
 | adr-068 | Enterprise Foundation — Audit Query + Multi-Tenant + Scheduled Flows | proposed |
 | adr-069 | Event-Driven Triggers + RBAC — F3 Webhook & F4 Role-Based Access Control | proposed |
 | adr-070 | Brain Evaluation Integrity — Signal-Based Coverage Exemption + Zero-Hard-Code Principle | accepted |
+| adr-071 | F3 Autonomous Mode (Self-Dispatch Guard) + F4 Enterprise RBAC/Tenant/Audit | proposed |
 
 ## Recent Learnings
+- **Sprint sprint-209 Learnings** (sprint-209): ## Sprint sprint-209 Learnings
 - **Sprint sprint-208 Learnings** (sprint-208): ## Sprint sprint-208 Learnings
 - **Sprint sprint-207 Learnings** (sprint-207): ## Sprint sprint-207 Learnings
 - 207-001 — Model registry bundled apiId güncel + "stale" işareti: GO_WITH_TECH_DEBT —...
@@ -83,8 +85,6 @@
 - 201-006 — Test baseline 28 → ≤20 attack: NO_GO — TASK GOAL: reduce vitest fail count...
 - **Sprint sprint-200 Learnings** (sprint-200): ## Sprint sprint-200 Learnings
 - 198-002 — memory.db sprint-log finalize bug fix + Sprint 194/196 row backfill: NO_GO...
-- **Sprint sprint-199 Learnings** (sprint-199): ## Sprint sprint-199 Learnings
-- 198-003 — managed-docs auditor.md template regression fix: NO_GO — Fixed the managed...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -132,5 +132,7 @@ _No active technical debt._
 - Violation pattern: stale_heartbeat
 - Violation pattern: stale_heartbeat
 - Violation pattern: stale_heartbeat
+- Violation pattern: stale_heartbeat
+- Violation pattern: file_outside_scope
 
-_Total entries: 440 | Generated: 2026-05-31_
+_Total entries: 446 | Generated: 2026-05-31_
