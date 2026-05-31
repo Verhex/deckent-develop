@@ -223,14 +223,17 @@ export function coverageOptional(task: Task, result?: { filesChanged?: string[];
   const agent = task.assignedAgent;
   if (agent && COVERAGE_OPTIONAL_AGENTS.has(agent)) return true;
   // Sprint 207 P0-1 (forensic Sprint 206): signal-based, agent-independent path.
-  // A code-development task that wrote new test files OR reports tests passing has
-  // demonstrably exercised its code — coverage:null is then a measurement gap, not
-  // a quality failure. This is deterministic + idempotent (attempt-1 and FIX-retry
-  // evaluate the SAME result identically regardless of which agent runs it), which
-  // permanently breaks the "every sprint a different mask" spurious-NO_GO cycle.
+  // A code-development task that wrote NEW TEST FILES has demonstrably exercised
+  // its code — coverage:null is then a measurement gap, not a quality failure.
+  // The signal is `.test.`/`.spec.` in filesChanged: objective and git-verifiable,
+  // unlike `testsPassed` (a worker self-claim). A pure source-only change with no
+  // tests still requires coverage (Sprint 153/154 anti-regression guard preserved).
+  // This is deterministic + idempotent — the SAME result evaluates identically
+  // regardless of which agent runs it, breaking the "every sprint a different mask"
+  // spurious-NO_GO cycle where 206 refactorer tasks were NO_GO but bug-fixer DONE.
   if (result) {
     const wroteTests = result.filesChanged?.some(f => f.includes('.test.') || f.includes('.spec.')) ?? false;
-    if (wroteTests || result.testsPassed === true) return true;
+    if (wroteTests) return true;
   }
   return false;
 }

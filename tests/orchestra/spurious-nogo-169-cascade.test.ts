@@ -11,10 +11,13 @@
 
 import { describe, it, expect } from 'vitest';
 import {
-  enforceHonestResultGate,
   validateResultSchema,
   evaluateWithRubric,
 } from '../../src/orchestra/result-evaluator.js';
+// Sprint 207: enforceHonestResultGate's canonical home is honest-gate.ts (its
+// re-export from result-evaluator was removed in Sprint 194). Importing it from
+// the wrong module made it `undefined` → "not a function" in isolated runs.
+import { enforceHonestResultGate } from '../../src/orchestra/honest-gate.js';
 import type { Task, TaskResult } from '../../src/core/task-types.js';
 
 function bugFixTask(id = '169-001', overrides: Partial<Task> = {}): Task {
@@ -169,14 +172,31 @@ describe('Sprint 169.5 P0 — Spurious NO_GO Cascade Prevention', () => {
       expect(schema.valid).toBe(true);
     });
 
-    it('generic code-development task without exempt agent still requires coverage', () => {
+    it('generic code-development task with source-only change (no tests) still requires coverage', () => {
+      // Sprint 207 P0-1: the schema relaxation is now SIGNAL-based, not agent-based.
+      // A generic-agent code task that wrote NO test file and reports coverage:null
+      // is genuinely missing coverage → must still fail schema (anti-regression guard).
       const task = bugFixTask('169-100', { assignedAgent: 'generic' });
-      const result = workerResult('169-100');
+      const result = workerResult('169-100', {
+        filesChanged: ['src/orchestra/sprint-spawner.ts', '.tasks/task-169-100.plan'],
+      });
 
       const schema = validateResultSchema(result, task);
 
       expect(schema.valid).toBe(false);
       expect(schema.missingFields).toContain('coverage');
+    });
+
+    it('generic code-development task that wrote a test file is exempt (P0-1 signal-based)', () => {
+      // The permanent fix: coverage:null is tolerated when the result shows new
+      // test files, regardless of which agent ran it — this is what rescued the
+      // Sprint 206 refactorer tasks that were false-NO_GO under the old allowlist.
+      const task = bugFixTask('169-101', { assignedAgent: 'generic' });
+      const result = workerResult('169-101'); // default filesChanged includes a .test. file
+
+      const schema = validateResultSchema(result, task);
+
+      expect(schema.valid).toBe(true);
     });
   });
 
