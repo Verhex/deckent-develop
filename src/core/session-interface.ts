@@ -14,6 +14,8 @@ const AUTH_ENV_VARS: Record<ProviderName, string | null> = {
   claude: null,          // session auth — no env var needed
   codex: 'OPENAI_API_KEY',
   gemini: 'GOOGLE_API_KEY',
+  // Ollama is local — no API key concept; reachability is the only "auth".
+  ollama: null,
 };
 
 /** Health check result for a single provider */

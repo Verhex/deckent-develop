@@ -59,8 +59,11 @@
 | adr-062 | Embedded Web Terminal — PTY Sessions, WS Gateway, Auth & Audit | accepted |
 | adr-063 | Consent-Based Prerequisite Provisioning | accepted |
 | adr-064 | TOPP — Continuous Dispatch (Wave-Barrier Removal) | accepted |
+| adr-065 | Develop / Product Two-Repo Split | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-202 Learnings** (sprint-202): ## Sprint sprint-202 Learnings
+- 202-002 — Ollama model registry (tier→local model): NO_GO — Ollama model registry ti...
 - **Sprint sprint-201 Learnings** (sprint-201): ## Sprint sprint-201 Learnings
 - 201-006 — Test baseline 28 → ≤20 attack: NO_GO — TASK GOAL: reduce vitest fail count...
 - **Sprint sprint-200 Learnings** (sprint-200): ## Sprint sprint-200 Learnings
@@ -81,9 +84,6 @@
 - **Sprint sprint-190 Learnings** (sprint-190): ## Sprint sprint-190 Learnings
 - Docker OOM cycle drove ~14 false NO_GO (reclassify pending Sprint 191 Task 003)
 - 19...
-- **Sprint sprint-189 Learnings** (sprint-189): ## Sprint sprint-189 Learnings
-- 189-009 deckent_kill MCP parite: NO_GO — investigate root cause
-- 189-011 API endpoi...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -122,5 +122,6 @@ _No active technical debt._
 - Violation pattern: stale_heartbeat
 - Violation pattern: stale_heartbeat
 - Violation pattern: file_outside_scope
+- Violation pattern: stale_heartbeat
 
-_Total entries: 401 | Generated: 2026-05-31_
+_Total entries: 406 | Generated: 2026-05-31_

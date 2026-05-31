@@ -44,6 +44,17 @@ const PROVIDER_CAPABILITIES: Record<ProviderName, ProviderCapability> = {
     maxContextTokens: 1_048_576,
     costPerMillionTokens: { input: 1.25, output: 10 },
   },
+  // Sprint 202 Task 202-001: Ollama is local — cost is zero, context window
+  // varies by model (qwen-coder ~32k, llama-3 ~8k). 32_000 is a conservative
+  // representative default; per-model context is in ModelRegistry.
+  ollama: {
+    streaming: true,
+    toolUse: false,
+    vision: false,
+    codeExecution: false,
+    maxContextTokens: 32_000,
+    costPerMillionTokens: { input: 0, output: 0 },
+  },
 };
 
 // ─── Valid provider names (for runtime validation) ──────────────────────────

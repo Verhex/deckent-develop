@@ -79,11 +79,12 @@ describe('detectAvailableProviders', () => {
     process.env = { ...originalEnv };
   });
 
-  it('returns array of 3 providers (claude, codex, gemini)', async () => {
+  it('returns array of 4 providers (claude, codex, gemini, ollama)', async () => {
+    // Sprint 202 Task 202-001: Ollama is now a 1st-class detection target.
     vi.mocked(spawnSync).mockReturnValue(makeSpawnResult(1, '') as ReturnType<typeof spawnSync>);
     const providers = await detectAvailableProviders();
-    expect(providers).toHaveLength(3);
-    expect(providers.map(p => p.name)).toEqual(['claude', 'codex', 'gemini']);
+    expect(providers).toHaveLength(4);
+    expect(providers.map(p => p.name)).toEqual(['claude', 'codex', 'gemini', 'ollama']);
   });
 
   it('detects Claude as available when CLI returns success', async () => {

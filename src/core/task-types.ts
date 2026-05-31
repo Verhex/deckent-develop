@@ -18,8 +18,16 @@ export type GeminiModel = 'gemini-2.5-pro' | 'gemini-2.5-flash' | 'gemini-2.0-fl
 /** Union of all supported model identifiers across providers */
 export type ModelType = ClaudeModel | OpenAIModel | GeminiModel;
 
-/** Supported AI provider names */
-export type ProviderName = 'claude' | 'codex' | 'gemini';
+/**
+ * Supported AI provider names.
+ *
+ * Sprint 202 Task 202-001 (F1 Provider Independence): widened to include
+ * `'ollama'` so the local-LLM provider becomes a first-class bootstrap target.
+ * Prior to this widening, `worker_provider=ollama` passed config validation
+ * but `getProviderAdapterForTask('ollama')` returned null → silent Claude
+ * fallback. See ADR-017 (provider adapter pattern) and provider.ts:detectOllama.
+ */
+export type ProviderName = 'claude' | 'codex' | 'gemini' | 'ollama';
 
 /** Mapping from each provider to its supported model list — derived from ModelRegistry */
 const _providerMap = Object.fromEntries(
@@ -32,6 +40,9 @@ export const PROVIDER_MODEL_MAP: Record<ProviderName, readonly ModelType[]> = {
   claude: _providerMap['claude'] ?? [],
   codex: _providerMap['codex'] ?? [],
   gemini: _providerMap['gemini'] ?? [],
+  // ollama models are registered lazily by providers/ollama.ts as a side-effect
+  // of importing the adapter; this key is populated once that module loads.
+  ollama: _providerMap['ollama'] ?? [],
 };
 
 /** All Claude model names (backward-compat convenience) */

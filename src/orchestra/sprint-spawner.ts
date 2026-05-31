@@ -26,6 +26,29 @@ import { debugLog } from '../core/utils.js';
 // ─── Core — config ────────────────────────────────────────────────
 import { resolveEffectiveWorkers } from '../core/config.js';
 
+// ─── Token Quota (Sprint 202 Task 202-004 — computeBackoff wire) ──
+// `token_throttle_ms` (config.ts default 500) is the inter-worker pacing floor;
+// `nextDelayMs` reads it and combines with `computeBackoff` (anthropic-http-
+// client.ts) so the dead-code path of Sprint 141 becomes live (Sprint 198 30k
+// tpm Tier-1 felaketi önleyici).
+import { nextDelayMs, sleep } from '../core/token-quota.js';
+
+/**
+ * Read `token_throttle_ms` from a ResolvedConfig via a local cast — the field
+ * is attached by `loadConfig`/`mergeConfigs` (config.ts intersection type) but
+ * is not yet declared on `ResolvedConfig` itself (config-types.ts is out of
+ * Sprint 202 Task 202-004 scope). Inlined here instead of as a helper in
+ * config.ts to avoid breaking the many `vi.mock('../../src/core/config.js')`
+ * partial mocks that don't enumerate new exports.
+ *
+ * Defaults to 500 ms (Sprint 198 Tier-1 burst mitigation).
+ */
+function readTokenThrottleMs(config: ResolvedConfig): number {
+  const raw = (config as ResolvedConfig & { token_throttle_ms?: number }).token_throttle_ms;
+  if (typeof raw !== 'number' || !Number.isFinite(raw) || raw < 0) return 500;
+  return raw;
+}
+
 // ─── Core — system profile ────────────────────────────────────────
 import { getSystemProfile } from '../core/system-profile.js';
 
@@ -327,12 +350,26 @@ export async function spawnWorkers(
   const waveId = config.dependency_pipeline_enabled ? 'dep-pipeline' : 'legacy';
   metric('wave.start', 0, { wave: waveId, count: String(activeTasks.length) });
 
+  // Sprint 202 Task 202-004 — inter-worker token throttle.
+  // Resolved here once so the throttle is consistent across the whole wave.
+  const throttleFloorMs = readTokenThrottleMs(config);
+  let spawnedThisWave = 0;
+
   for (const task of activeTasks) {
     // Sprint 168 W2.5 — C0c wire: skip blocked tasks (collision spawn-block).
     // BRAIN→SPAWN:BLOCKED was already emitted above; no TASK_ASSIGN, no spawn.
     if (blockedTaskIds.has(task.id)) {
       debugLog('spawnWorkers:skipBlocked', `Task ${task.id} blocked by scope collision`);
       continue;
+    }
+
+    // Sprint 202 Task 202-004 — pace spawns by token_throttle_ms (skip first).
+    // No RateLimitState is available at spawn-time (workers own the API call),
+    // so we pass `null` and let `nextDelayMs` fall back to the configured floor.
+    // computeBackoff will dominate if a future caller supplies a non-null state.
+    if (spawnedThisWave > 0 && throttleFloorMs > 0) {
+      const delayMs = nextDelayMs(null, 0, throttleFloorMs);
+      await sleep(delayMs);
     }
 
     // Sprint 168 W2.5 — C0c wire: fresh disk read of task.json (RC3).
@@ -432,6 +469,7 @@ export async function spawnWorkers(
       );
     } catch (e) { debugLog('spawnWorkers:writeTaskFile', e); }
 
+    spawnedThisWave++;
   }
 
   const agents: AgentInfo[] = activeTasks.map(task => ({
@@ -511,7 +549,16 @@ export async function respawnEligibleTasks(
 
   const backend = spawnOpts?.spawnBackend;
 
+  // Sprint 202 Task 202-004 — same inter-worker throttle as spawnWorkers().
+  const throttleFloorMs = readTokenThrottleMs(config);
+  let spawnedThisWave = 0;
+
   for (const task of toSpawn) {
+    if (spawnedThisWave > 0 && throttleFloorMs > 0) {
+      const delayMs = nextDelayMs(null, 0, throttleFloorMs);
+      await sleep(delayMs);
+    }
+
     const agentPrompt = await resolveAgentPrompt(projectRoot, task);
     const taskSkillPrompts = await resolveSkillPrompts(projectRoot, task);
     const prompt = buildWorkerPrompt(task, agentPrompt, taskSkillPrompts);
@@ -555,6 +602,8 @@ export async function respawnEligibleTasks(
         'utf-8',
       );
     } catch (e) { debugLog('respawnEligibleTasks:writeTaskFile', e); }
+
+    spawnedThisWave++;
   }
 
   const waveDuration = Date.now() - waveStart;

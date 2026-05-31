@@ -56,27 +56,35 @@ describe('provider-capabilities', () => {
   // ─── getProvidersWithCapability ───────────────────────────────────
 
   describe('getProvidersWithCapability', () => {
-    it('returns all providers for streaming', () => {
+    // Sprint 202 Task 202-001: Ollama joined the capability matrix. Its
+    // capability flags differ from claude/codex/gemini (streaming=true,
+    // toolUse=false, vision=false, codeExecution=false, cost=0), so per-cap
+    // expected counts vary — see each `it` block.
+    it('returns claude/codex/gemini/ollama for streaming', () => {
       const providers = getProvidersWithCapability('streaming');
       expect(providers).toContain('claude');
       expect(providers).toContain('codex');
       expect(providers).toContain('gemini');
-      expect(providers).toHaveLength(3);
+      expect(providers).toContain('ollama');
+      expect(providers).toHaveLength(4);
     });
 
-    it('returns all providers for toolUse', () => {
+    it('returns claude/codex/gemini for toolUse (ollama: false)', () => {
       const providers = getProvidersWithCapability('toolUse');
       expect(providers).toHaveLength(3);
+      expect(providers).not.toContain('ollama');
     });
 
-    it('returns all providers for maxContextTokens (non-zero)', () => {
+    it('returns all 4 providers for maxContextTokens (non-zero)', () => {
       const providers = getProvidersWithCapability('maxContextTokens');
-      expect(providers).toHaveLength(3);
+      expect(providers).toHaveLength(4);
     });
 
-    it('returns all providers for costPerMillionTokens', () => {
+    it('returns all 4 providers for costPerMillionTokens', () => {
+      // costPerMillionTokens is treated as "always has this capability" when
+      // the value is a non-null object — Ollama's {input:0,output:0} counts.
       const providers = getProvidersWithCapability('costPerMillionTokens');
-      expect(providers).toHaveLength(3);
+      expect(providers).toHaveLength(4);
     });
   });
 
@@ -119,12 +127,13 @@ describe('provider-capabilities', () => {
   // ─── getAllProviders ──────────────────────────────────────────────
 
   describe('getAllProviders', () => {
-    it('returns all three providers', () => {
+    it('returns all four providers (claude, codex, gemini, ollama)', () => {
       const all = getAllProviders();
-      expect(all).toHaveLength(3);
+      expect(all).toHaveLength(4);
       expect(all).toContain('claude');
       expect(all).toContain('codex');
       expect(all).toContain('gemini');
+      expect(all).toContain('ollama');
     });
   });
 });

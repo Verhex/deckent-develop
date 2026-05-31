@@ -20,7 +20,7 @@ Before tagging `v1.0.0-beta.2` and running `npm publish`, **all 20 gates must PA
 | 5 | All CLI commands functional | 45+ | ✅ PASS (55-56 commands — recall, remember, memory rebuild/export/stats included) |
 | 6 | `npm pack --dry-run` clean | 0 warnings | ✅ PASS (1.08 MB) |
 | 7 | Cross-platform: macOS + Linux + WSL2 | 3/3 | ✅ Sprint 148 |
-| 8 | Multi-provider: Claude + Codex + Gemini tested | 3/3 | ✅ Sprint 148 |
+| 8 | Multi-provider: Claude + Codex + Gemini tested | ⚠ PARTIAL | abstraction ready; Docker runtime=Claude-only; Codex/Gemini tmux/subprocess [^gate8] |
 | 9 | i18n: CLI 100% + MCP 100% + Dashboard 95%+ | 95%+ | ✅ Sprint 145 |
 | 10 | Memory V2 stress test pass | FTS5 + decay + rebuild | ✅ Sprint 145 + Sprint 166 (ADR-046 self-update hook chain confirmed) |
 | 11 | Documentation: README, API ref, config ref current | All synced | 🟡 Sprint 166 T8 living docs in (TOOLS/BOOT/WORKER-GUIDE auto-generators wired) — Sprint 168 docker e2e live re-verify pending |
@@ -34,6 +34,8 @@ Before tagging `v1.0.0-beta.2` and running `npm publish`, **all 20 gates must PA
 | 19 | Bug X (Sprint 156-011 stub) replay analysis | Reproduced + Closed | ✅ Sprint 165 T1 (Bug X stub removed, Brain processQueue legacy FIFO stall closed) |
 | 20 | Bug W (Auditor `dead_event_stream`) | Open since Sprint 148 | ✅ Sprint 165 T4 (dead_event_stream activated); Sprint 166 T9 (emitAlert helper + stale_md detector wired) |
 | **21** | **Brain dürüst raporlama — synthetic NO_GO disk-verify gate** | 7/7 source paths gated | ✅ **LANDED Sprint 200-001** (commit `2363c794`) — `verifyDiskAgainstClaim` now wired on the two remaining ungated callsites (`sprint-phases.ts` `runEvaluatePhase` + `sprint-controller.ts` `graceKill` panic-guard & explicit-kill = KAYNAK 6+7). Disk evidence present → `MANUAL_REVIEW_REQUIRED` instead of synthetic NO_GO; `BRAIN→AUDITOR:DISK_VS_CLAIM_MISMATCH` emitted. +188 LoC across both files, 11 gate tests pass. All 7/7 synthetic NO_GO source paths now disk-verified. |
+
+[^gate8]: Docker imaj tasarım gereği Claude-only. Codex/Gemini yalnızca tmux/subprocess backend ile çalışır. Tam provider parity F1-004/F1-005 kapsamında (P1, Sprint 202 sonrası).
 
 ### Sprint 195-197 gate evidence overlay
 
@@ -190,7 +192,7 @@ The Sprint 145-150 cutover table and Sprint 175 Embedded Web Terminal section co
 | Metrik | Değer |
 |--------|-------|
 | Version | 1.0.0-beta.1 |
-| Sprint | sprint-201 |
+| Sprint | sprint-202 |
 | MCP Tools | 28 |
 | MCP Resources | 8 |
 | CLI Commands | 58+ |
@@ -1047,12 +1049,12 @@ Every blocker was directly verified in the codebase. False claims have been corr
 ## Sprint Metrics
 | Metrik | Değer |
 |--------|-------|
-| Sprint | sprint-201 |
-| Toplam Task | 7 |
-| Tamamlanan | 5 |
+| Sprint | sprint-202 |
+| Toplam Task | 9 |
+| Tamamlanan | 4 |
 | Tech Debt | 0 |
-| No-Go | 2 |
-| Süre | 35dk 54sn |
+| No-Go | 5 |
+| Süre | 56dk 19sn |
 | Coverage | 0.0% |
 
 ## Sprint History (Sprint 136-166)

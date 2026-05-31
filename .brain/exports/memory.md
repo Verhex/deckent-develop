@@ -1,5 +1,14 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-202 Learnings
+- Sprint sprint-202 Learnings: ## Sprint sprint-202 Learnings
+- 202-002 — Ollama model registry (tier→local model): NO_GO — Ollama model registry tier→local model resolution wired — Sprint 202 F1 DALGA 0 Task 2.
+
+IMPLEMENTATION:
+1. NEW src/core
+- 202-004 — Token throttle (computeBackoff wire + pre-spawn quota gate): NO_GO — Worker exited without writing result (exitCode=0)
+- 202-006 — Provider-free smoke verify (sıfır-API-key + Ollama senaryosu): NO_GO
+
 ## Sprint sprint-201 Learnings
 - Sprint sprint-201 Learnings: ## Sprint sprint-201 Learnings
 - 201-006 — Test baseline 28 → ≤20 attack: NO_GO — TASK GOAL: reduce vitest fail count by ≥8 via the easy doc-sync/snapshot/count-drift lane. ACHIEVED: -8 fails (55 → 47),

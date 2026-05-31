@@ -23,6 +23,7 @@ import {
 
 import { readJsonSafe, debugLog } from '../core/utils.js';
 import { modelRegistry } from '../core/model-registry.js';
+import type { RegistryProviderName } from '../core/model-registry.js';
 import { getSystemProfile } from '../core/system-profile.js';
 
 import type { ProviderAdapter } from '../core/provider.js';
@@ -90,6 +91,11 @@ export function isStaleTaskFile(filePath: string, maxAgeMs: number = 86_400_000)
 /**
  * Check whether a provider uses the local tmux-based spawn mechanism.
  * Currently only the 'claude' provider uses tmux; all others use their adapter's spawn().
+ *
+ * Sprint 202 Task 202-003 note: the literal `'claude'` here is NOT a default
+ * fallback — it is a legitimate Claude-specific capability check (tmux is
+ * exclusive to the Claude provider). Codex/Gemini/Ollama all spawn through
+ * their adapter, not tmux. Do not generalize this comparison.
  * @internal
  */
 export function isTmuxProvider(providerName: ProviderName): boolean {
@@ -120,7 +126,18 @@ export function resolveMaxWorkersNumeric(config: ResolvedConfig, systemProfile?:
 export function resolveDefaultUsageCli(): string | undefined {
   try {
     const defaultAdapter = providerRegistry.getDefault();
-    const defaultModel = (modelRegistry.getByProviderAndTier('claude', 'premium')?.id ?? 'opus') as ModelType;
+    // Sprint 202 Task 202-003: resolve the registered default provider's tier
+    // model instead of hard-coding `('claude', 'premium')`. Pure-Ollama configs
+    // would otherwise silently fall through to `'opus'`, which Ollama cannot run.
+    // Ollama is registered in the catalog (Sprint 190 ollama-models.ts) but its
+    // type lives outside RegistryProviderName — cast follows the existing
+    // pattern documented in model-registry.ts.
+    const defaultProviderName = defaultAdapter.name as RegistryProviderName;
+    const defaultModel = (
+      modelRegistry.getByProviderAndTier(defaultProviderName, 'premium')?.id
+      ?? modelRegistry.getByProviderAndTier('claude', 'premium')?.id
+      ?? 'opus'
+    ) as ModelType;
     const cmdStr = defaultAdapter.buildCommand(defaultModel, '/dev/null');
     const firstToken = cmdStr.split(/\s+/)[0];
     return firstToken || undefined;
@@ -139,6 +156,26 @@ export function getDefaultProvider(): ProviderAdapter | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * Resolve a default ProviderName from the registry, falling back to the
+ * built-in `'claude'` literal only when the registry is empty.
+ *
+ * Sprint 202 Task 202-003 (F1 Provider Independence): this is the canonical
+ * last-resort floor for provider-neutral modules. Other modules MUST call
+ * `getDefaultProviderName()` instead of spelling `?? 'claude'` again — that
+ * keeps the literal contained to this single site (plus the `config.ts`
+ * factory default by design). The helper lives in `sprint-utils.ts` rather
+ * than `core/provider.ts` because the test suite consistently mocks
+ * `sprint-utils.ts` via `importOriginal()`, so adding new exports here does
+ * not break vi.mock factory-style mocks of `core/provider.ts`.
+ *
+ * @returns The registry's default provider name, or `'claude'` as final floor
+ */
+export function getDefaultProviderName(): ProviderName {
+  const adapter = getDefaultProvider();
+  return ((adapter?.name as ProviderName | undefined) ?? 'claude');
 }
 
 /**

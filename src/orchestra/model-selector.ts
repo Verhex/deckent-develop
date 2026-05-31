@@ -4,6 +4,7 @@ import type { TaskScope, ModelType, ResolvedConfig, PatternEntry, ProviderName }
 import { getModelTier } from '../core/types.js';
 import { getEquivalentModel, isModelAvailable } from '../core/model-equivalence.js';
 import type { ModelTier } from '../core/model-equivalence.js';
+import { getDefaultProviderName } from './sprint-utils.js';
 
 // ─── Tier Helpers ───────────────────────────────────────────────────
 
@@ -29,7 +30,13 @@ const TIER_CLAUDE_MODEL: Record<string, ModelType> = {
  * Maps the tier to its Claude reference model, then converts to target provider via equivalence.
  */
 function resolveTierToModel(tier: ModelTier, config: ResolvedConfig): ModelType {
-  const provider: ProviderName = config.worker_provider ?? config.brain_provider ?? 'claude';
+  // Sprint 202 Task 202-003: resolve via registry default before the absolute
+  // 'claude' floor so pure-Ollama configs don't silently map tiers through the
+  // Claude reference model when Claude isn't registered.
+  const provider: ProviderName =
+    config.worker_provider
+    ?? config.brain_provider
+    ?? getDefaultProviderName();
   const claudeModel: ModelType = TIER_CLAUDE_MODEL[tier] ?? 'sonnet';
   if (provider === 'claude') return claudeModel;
   return getEquivalentModel(claudeModel, provider);
@@ -209,7 +216,8 @@ export function resolveTaskModel(
   skillModels?: ModelType[],
   provider?: ProviderName,
 ): ModelType {
-  const targetProvider: ProviderName = provider ?? 'claude';
+  // Sprint 202 Task 202-003: registry default before the absolute 'claude' floor.
+  const targetProvider: ProviderName = provider ?? getDefaultProviderName();
 
   // Layer 0: user override from DIRECTIVES.md — bypasses all auto-selection
   if (forceModel) {

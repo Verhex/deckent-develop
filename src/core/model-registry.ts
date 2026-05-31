@@ -3,6 +3,7 @@
 // All other modules (task-types, model-equivalence, providers) delegate here.
 
 import { DeckentError } from './errors.js';
+import { OLLAMA_BUILTIN_MODELS } from './ollama-models.js';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -191,58 +192,11 @@ export const BUILTIN_MODELS: readonly ModelDefinition[] = [
 ] as const;
 
 // ─── Ollama Built-in Models (opt-in) ───────────────────────────────────────
-// Local LLM provider, zero cost (Sprint 190 W-F F-11). Held OUT of
-// `BUILTIN_MODELS` on purpose: hard-coded test expectations elsewhere in the
-// codebase rely on the 13-model / 3-provider invariant. The `OllamaAdapter`
-// constructor side-effect calls `registerOllamaModels()` to insert these
-// entries into the singleton registry only when the adapter module is loaded.
-// Consumers that never import OllamaAdapter remain byte-identical to the
-// pre-Ollama registry.
-//
-// The `provider` field uses `RegistryProviderName` via cast; task-types.ts's
-// narrower `ProviderName` widen lives in a follow-up tech-debt task.
-export const OLLAMA_BUILTIN_MODELS: readonly ModelDefinition[] = [
-  {
-    id: 'qwen-coder-32b',
-    apiId: 'qwen2.5-coder:32b',
-    provider: 'ollama' as unknown as RegistryProviderName,
-    tier: 'premium',
-    contextWindow: 128_000,
-    costPerMillion: { input: 0, output: 0 },
-    capabilities: { streaming: true, toolUse: true, vision: false, codeExecution: false, reasoning: false },
-    status: 'ga',
-  },
-  {
-    id: 'qwen-coder-7b',
-    apiId: 'qwen2.5-coder:7b',
-    provider: 'ollama' as unknown as RegistryProviderName,
-    tier: 'standard',
-    contextWindow: 32_768,
-    costPerMillion: { input: 0, output: 0 },
-    capabilities: { streaming: true, toolUse: true, vision: false, codeExecution: false, reasoning: false },
-    status: 'ga',
-  },
-  {
-    id: 'llama-3-8b',
-    apiId: 'llama3:8b',
-    provider: 'ollama' as unknown as RegistryProviderName,
-    tier: 'standard',
-    contextWindow: 8_192,
-    costPerMillion: { input: 0, output: 0 },
-    capabilities: { streaming: true, toolUse: false, vision: false, codeExecution: false, reasoning: false },
-    status: 'ga',
-  },
-  {
-    id: 'llama-3.2-3b',
-    apiId: 'llama3.2:3b',
-    provider: 'ollama' as unknown as RegistryProviderName,
-    tier: 'economy',
-    contextWindow: 8_192,
-    costPerMillion: { input: 0, output: 0 },
-    capabilities: { streaming: true, toolUse: false, vision: false, codeExecution: false, reasoning: false },
-    status: 'ga',
-  },
-] as const;
+// Re-export from `ollama-models.ts` (Sprint 202 F1 P0) — extracted so
+// Pure-Ollama/provider-free config can resolve `getByProviderAndTier('ollama',
+// tier)` without depending on the OllamaAdapter side-effect path. Kept out of
+// `BUILTIN_MODELS` on purpose so the 13-model / 3-provider invariant holds.
+export { OLLAMA_BUILTIN_MODELS } from './ollama-models.js';
 
 // ─── Tier ordering for comparison ──────────────────────────────────────────
 
@@ -288,7 +242,7 @@ export class ModelRegistry {
     return [...this.models.values()].filter(m => m.tier === tier);
   }
 
-  getByProviderAndTier(provider: RegistryProviderName, tier: ModelTier): ModelDefinition | undefined {
+  getByProviderAndTier(provider: RegistryProviderNameExt, tier: ModelTier): ModelDefinition | undefined {
     return [...this.models.values()].find(
       m => m.provider === provider && m.tier === tier && m.status === 'ga',
     );

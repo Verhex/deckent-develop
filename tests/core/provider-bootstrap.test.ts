@@ -238,7 +238,9 @@ describe('bootstrapProviders', () => {
       const totalHandled = result.registered.length + result.skipped.filter(
         s => !s.reason.includes('Configured brain_provider')
       ).length;
-      expect(totalHandled).toBeLessThanOrEqual(3);
+      // Sprint 202 Task 202-001: Ollama joined detectAvailableProviders so the
+      // upper bound is now 4 (claude, codex, gemini, ollama).
+      expect(totalHandled).toBeLessThanOrEqual(4);
     });
 
     it('should include reason string for each skipped provider', async () => {

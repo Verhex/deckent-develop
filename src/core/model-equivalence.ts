@@ -29,6 +29,10 @@ const PROVIDER_MODELS: Record<ProviderName, readonly MultiProviderModelType[]> =
   claude: _providerModels['claude'] ?? [],
   codex: _providerModels['codex'] ?? [],
   gemini: _providerModels['gemini'] ?? [],
+  // Ollama models are registered lazily by providers/ollama.ts; the key is
+  // populated once that adapter loads. Empty array is a safe default for
+  // cross-provider equivalence (no equivalent model found → fallback chain).
+  ollama: _providerModels['ollama'] ?? [],
 };
 
 // ─── Tier → Provider → Model Lookup — derived from ModelRegistry ───────────

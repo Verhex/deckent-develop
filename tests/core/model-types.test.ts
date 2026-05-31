@@ -36,8 +36,10 @@ describe('PROVIDER_MODEL_MAP', () => {
     expect(PROVIDER_MODEL_MAP.gemini).toEqual(['gemini-3.1-pro-preview', 'gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.0-flash']);
   });
 
-  it('has exactly 3 providers', () => {
-    expect(Object.keys(PROVIDER_MODEL_MAP)).toHaveLength(3);
+  it('has exactly 4 providers (claude, codex, gemini, ollama)', () => {
+    // Sprint 202 Task 202-001: ollama joined PROVIDER_MODEL_MAP as a key.
+    expect(Object.keys(PROVIDER_MODEL_MAP)).toHaveLength(4);
+    expect(Object.keys(PROVIDER_MODEL_MAP).sort()).toEqual(['claude', 'codex', 'gemini', 'ollama']);
   });
 });
 
@@ -278,9 +280,10 @@ describe('Type compatibility', () => {
     }
   });
 
-  it('ProviderName has exactly 3 valid values', () => {
-    const providers: ProviderName[] = ['claude', 'codex', 'gemini'];
-    expect(providers).toHaveLength(3);
+  it('ProviderName has exactly 4 valid values (claude, codex, gemini, ollama)', () => {
+    // Sprint 202 Task 202-001: ollama widened the union.
+    const providers: ProviderName[] = ['claude', 'codex', 'gemini', 'ollama'];
+    expect(providers).toHaveLength(4);
     for (const p of providers) {
       expect(PROVIDER_MODEL_MAP[p]).toBeDefined();
     }

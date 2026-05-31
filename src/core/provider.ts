@@ -273,6 +273,14 @@ export class ProviderRegistry {
 // ─── Global Registry Singleton ───────────────────────────────────────
 export const providerRegistry = new ProviderRegistry();
 
+// Sprint 202 Task 202-003: `getDefaultProvider` + `getDefaultProviderName`
+// helpers live in `src/orchestra/sprint-utils.ts` next to the existing
+// `getDefaultProvider`. Placing the registry-default helpers there (instead
+// of here) keeps them available to consumers that mock `core/provider.js`
+// with a literal `vi.mock(...)` factory — the `sprint-utils.ts` mocks across
+// the test suite consistently use `importOriginal()` and so propagate new
+// exports without per-test mock updates.
+
 // ─── Provider Auto-Detection ────────────────────────────────────────
 
 /** Result of detecting a single provider's availability */
@@ -375,6 +383,51 @@ function detectCodex(): DetectedProvider {
 }
 
 /**
+ * Detect Ollama local-server availability.
+ *
+ * Sprint 202 Task 202-001 (F1 Provider Independence): Ollama is a 1st-class
+ * spawn target. The probe is HTTP-only — there is no `ollama` CLI dependency
+ * at the orchestration layer; what matters is whether a local server is
+ * reachable. Endpoint resolution order:
+ *   1. `DECKENT_OLLAMA_HOST` env override
+ *   2. `OLLAMA_HOST` env (matches Ollama's own convention)
+ *   3. Default `http://localhost:11434`
+ *
+ * Always resolves — never throws. When the server is unreachable, returns
+ * `available: false` with `authMethod: 'none'`, mirroring the other detectors.
+ * The Ollama adapter (providers/ollama.ts) holds the rich diagnostics; this
+ * detection is intentionally minimal to keep bootstrap fast.
+ */
+async function detectOllama(): Promise<DetectedProvider> {
+  const host =
+    process.env['DECKENT_OLLAMA_HOST'] ??
+    process.env['OLLAMA_HOST'] ??
+    'http://localhost:11434';
+  const url = `${host.replace(/\/+$/, '')}/api/tags`;
+  let available = false;
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 3000);
+    try {
+      const res = await fetch(url, { signal: controller.signal });
+      available = res.ok;
+    } finally {
+      clearTimeout(timer);
+    }
+  } catch {
+    // Server unreachable, timed out, or fetch unavailable.
+    available = false;
+  }
+  return {
+    name: 'ollama',
+    available,
+    // Ollama is local — "your machine owns the model"; no auth concept.
+    authMethod: 'none',
+    models: [...PROVIDER_MODEL_MAP.ollama],
+  };
+}
+
+/**
  * Detect Gemini CLI availability.
  * Checks `gemini --version` CLI and GOOGLE_API_KEY / DECKENT_GOOGLE_API_KEY env variable.
  * Both CLI and API key are needed for full availability.
@@ -403,10 +456,14 @@ function detectGemini(): DetectedProvider {
  * For each provider, checks CLI availability and/or API key presence.
  */
 export async function detectAvailableProviders(): Promise<DetectedProvider[]> {
+  // Ollama probe is async (HTTP); CLI detectors are sync. Run the HTTP probe
+  // first so we honor the 3s timeout before assembling the result array.
+  const ollama = await detectOllama();
   return [
     detectClaude(),
     detectCodex(),
     detectGemini(),
+    ollama,
   ];
 }
 
@@ -692,6 +749,14 @@ export async function bootstrapProviders(
       const { createGeminiAdapter } = await import('../providers/gemini.js');
       return createGeminiAdapter(root);
     },
+    // Sprint 202 Task 202-001 (F1 Provider Independence): Ollama is now a
+    // 1st-class spawn target — bootstrap registers it so `worker_provider=
+    // ollama` resolves to a real adapter instead of silently falling back
+    // to Claude.
+    ollama: async () => {
+      const { createOllamaAdapter } = await import('../providers/ollama.js');
+      return createOllamaAdapter(root);
+    },
   };
 
   for (const provider of detected) {
@@ -732,8 +797,12 @@ export async function bootstrapProviders(
   }
 
   // Set default provider based on config
+  // Sprint 202 Task 202-003: when brain_provider is unset, prefer the first
+  // registered provider so a pure-Ollama config resolves to Ollama rather than
+  // silently falling through to a Claude literal that may not be registered.
   let defaultProvider: ProviderName | null = null;
-  const preferredDefault = config.brain_provider ?? 'claude';
+  const preferredDefault =
+    config.brain_provider ?? (registered[0] ?? 'claude');
 
   if (registry.hasProvider(preferredDefault)) {
     registry.setDefault(preferredDefault);

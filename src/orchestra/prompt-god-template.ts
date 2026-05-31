@@ -12,6 +12,7 @@ import type { MemoryEntryV2 } from '../core/memory-types.js';
 import { selectRelevantAdrs, buildAdrPromptSection } from './adr-selector.js';
 import { sanitizeScope } from './scope-sanitizer.js';
 import { truncateAtParagraph } from './task-builder.js';
+import { getDefaultProviderName } from './sprint-utils.js';
 
 // ─── Public Types ──────────────────────────────────────────────────────
 
@@ -614,7 +615,10 @@ Create .tasks/task-${task.id}.hb BEFORE starting work with workerId "w-${task.id
 Update periodically: increment sequence, refresh timestamp via new Date().toISOString() (UTC ISO 8601).`);
 
   // Result file + token usage
-  const provider = task.provider ?? 'claude';
+  // Sprint 202 Task 202-003: registry default before the absolute 'claude' floor
+  // so prompts emitted in pure-Ollama configs don't hard-code 'claude' into
+  // worker token-usage instructions.
+  const provider = task.provider ?? getDefaultProviderName();
   sections.push(`## Result File
 Write to: .tasks/task-${task.id}.result with taskId, filesChanged, testsPassed, selfAssessment ("DONE"|"GO_WITH_TECH_DEBT"|"NO_GO"), notes.
 MUST include tokenUsage with ALL four fields: { "inputTokens": <number>, "outputTokens": <number>, "cacheReadTokens": <number>, "provider": "${provider}", "model": "${task.model}" }.

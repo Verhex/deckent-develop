@@ -40,8 +40,8 @@ These are **not three products**. They are **three modes of the same product**. 
 **Today's maturity is uneven, and that is honest:**
 
 - **AI Developer** is ~95% — 180+ sprints of dogfooding. **`v1.0.0-beta.1` validated and READY** as of Sprint 183 (final smoke 6/6 GREEN). Publish gate is Alperen-manual per project policy.
-- **AI System Worker** is ~55% — embedded web terminal foundation shipped in Sprint 175 (PTY sessions, WS gateway, token auth, audit chain). Self-security invariants I1–I5 (prompt guard, command guard, outbound rate-limit, append-only HMAC audit chain, tenant-scoped isolation) landed in Sprint 179. Multi-tenant + k8s pod-exec + mTLS impl is Sub-project #3 (Sprint 185+). Enterprise SSO/SIEM/compliance is Sub-project #4 (Sprint 189+).
-- **AI Assistant** is ~30% — memory V2 (SQLite + FTS5, dual-layer Turkish normalize) is production, Nervous System Phase 1 smoke (12 detectors) is live, conversational shell direction is documented (see *Conversational Shell — Direction Under Consideration* below) but unbuilt.
+- **AI System Worker** is ~60% — embedded web terminal foundation shipped in Sprint 175 (PTY sessions, WS gateway, token auth, audit chain). Self-security invariants I1–I5 (prompt guard, command guard, outbound rate-limit, append-only HMAC audit chain, tenant-scoped isolation) landed in Sprint 179. Multi-tenant + k8s pod-exec + mTLS impl is Sub-project #3 (Sprint 185+). Enterprise SSO/SIEM/compliance is Sub-project #4 (Sprint 189+).
+- **AI Assistant** is ~35-40% — memory V2 (SQLite + FTS5, dual-layer Turkish normalize) is production, Nervous System Phase 1 smoke (12 detectors) is live, **Path B conversational shell is LIVE** (`deckent chat` / chat.ts, Sprint 190). Path A (dashboard-native) and Path C (native SDK REPL) are unbuilt.
 
 The maturity gap is expected. Building the Developer face first forced the engine to become real — the same engine that will run the other two faces. **The goal has always been all three.**
 
@@ -235,7 +235,9 @@ Deckent occupies a unique position: **open-source CLI sprint orchestration with 
 
 ## Conversational Shell — Direction Under Consideration
 
-> **Status:** Pending architecture decision (recorded 2026-05-20). Three viable paths are documented in `docs/ROADMAP-GOD-LEVEL.md` ⚡ 2026-05-20 (Discussion) with verified code-level inventory. This section captures the product-vision framing; the decision itself is open.
+> **Status:** Path B LIVE — `deckent chat` shipped in Sprint 190 (chat.ts, ~447 LoC). Path A (dashboard-native) and Path C (native SDK REPL) are unbuilt. Three paths are documented in `docs/ROADMAP-GOD-LEVEL.md` ⚡ 2026-05-20 (Discussion) with verified code-level inventory. This section captures the product-vision framing.
+
+> **UPDATE (Sprint 190):** Path B is LIVE. `deckent chat` spawns the user's installed AI CLI as a subprocess, auto-attaching the Deckent MCP server. ~150 LoC shipped. Path A/C remain unbuilt.
 
 Today Deckent works through imperative CLI commands and an MCP server (31+ tools). A developer types `deckent init && deckent plan && deckent start`, and orchestration runs. For users who already speak fluent CLI, this is fast. For users who want to *chat* — to describe what they want and let Deckent figure out which commands to invoke — there is a missing layer.
 

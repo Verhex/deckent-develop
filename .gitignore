@@ -140,3 +140,4 @@ docs/core-memory/
 
 # Runtime cache (rewrites timestamp every run — not source)
 .deckent/provider-cache.json
+vit-*.log

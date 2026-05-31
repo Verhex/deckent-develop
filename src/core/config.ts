@@ -46,6 +46,23 @@ import { interpolateConfig } from './deck-interpolation.js';
  */
 type DeckentConfigWithPipeline = DeckentConfig & { dependency_pipeline_enabled?: boolean };
 
+/**
+ * Local intersection alias for `token_throttle_ms` — the pre-spawn quota gate
+ * pacing knob added in Sprint 202 Task 202-004. Mirrors the
+ * `DeckentConfigWithPipeline` pattern: declared here so callers can read
+ * `config.token_throttle_ms` without modifying config-types.ts (out of this
+ * task's scope). Default 500 ms.
+ */
+type DeckentConfigWithThrottle = DeckentConfig & { token_throttle_ms?: number };
+
+/**
+ * ResolvedConfig augmented with `token_throttle_ms` so the field can flow
+ * through `loadConfig`/`mergeConfigs` without modifying config-types.ts
+ * (out of Sprint 202 Task 202-004 scope). Consumers should read the field
+ * via {@link getTokenThrottleMs}.
+ */
+type ResolvedConfigWithThrottle = ResolvedConfig & { token_throttle_ms?: number };
+
 // ─── Default Timeout Config ─────────────────────────────────────────
 // Sprint 192 (Task 192-011, W-INTEGRITY I-5): adaptive timeout knobs added
 // without mutating `TimeoutConfig` in config-types.ts (out of this task's
@@ -740,7 +757,7 @@ function getConfigMtime(projectRoot: string): number {
  * @returns A new DeckentConfig instance with default values
  */
 export function createDefaultConfig(): DeckentConfig {
-  const config: DeckentConfigWithPipeline = {
+  const config: DeckentConfigWithPipeline & DeckentConfigWithThrottle = {
     mode: DEFAULT_MODE,
     modes: structuredClone(DEFAULT_MODES),
     // Provider (Sprint 150 Decision 4 — grouped `providers` is canonical; flat keys deprecated)
@@ -827,6 +844,10 @@ export function createDefaultConfig(): DeckentConfig {
     dependency_pipeline_enabled: true,
     // Sprint checkpoint interval: how many terminal tasks before writing a checkpoint
     sprint_checkpoint_interval: 5,
+    // Sprint 202 Task 202-004 — pre-spawn pacing in ms (computeBackoff floor).
+    // 0 disables; 500 ms is the conservative default that prevented the
+    // Sprint 198 30k tpm Tier-1 burst.
+    token_throttle_ms: 500,
     // Timeout
     timeout: structuredClone(DEFAULT_TIMEOUT_CONFIG),
     // Observability (Sprint 150 Task 030 — metrics rotation defaults)
@@ -1068,7 +1089,7 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
     }
   }
 
-  const resolved: ResolvedConfig = {
+  const resolved: ResolvedConfigWithThrottle = {
     mode: config.mode,
     activeModeConfig,
     modes: config.modes,
@@ -1135,6 +1156,9 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
     ai_planner_timeout: config.ai_planner_timeout,
     // Sprint checkpoint interval
     sprint_checkpoint_interval: config.sprint_checkpoint_interval,
+    // Sprint 202 Task 202-004 — pre-spawn pacing (computeBackoff wire).
+    token_throttle_ms:
+      (config as DeckentConfigWithThrottle).token_throttle_ms ?? 500,
     // Timeout
     timeout: config.timeout
       ? deepMerge(DEFAULT_TIMEOUT_CONFIG, config.timeout as Partial<TimeoutConfig>)
@@ -1158,7 +1182,14 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
   };
 
   // ─── $DECK: interpolation ────────────────────────────────────────────
-  const interpolated = interpolateConfig(resolved, root) as ResolvedConfig;
+  // Sprint 202 Task 202-004: interpolation walks the object preserving all
+  // numeric fields, so `token_throttle_ms` survives. Cast to the wider type
+  // so callers (via `getTokenThrottleMs`) can read it without losing the
+  // attached field on the cached object.
+  const interpolated = interpolateConfig(resolved, root) as ResolvedConfigWithThrottle;
+  if (interpolated.token_throttle_ms === undefined) {
+    interpolated.token_throttle_ms = resolved.token_throttle_ms;
+  }
 
   // ─── Update cache ───────────────────────────────────────────────────
   cachedConfig = interpolated;
@@ -1739,7 +1770,7 @@ export function mergeConfigs(
   };
   const coverageGates = resolveCoverageGates(userCoverageInput);
 
-  return {
+  const merged: ResolvedConfigWithThrottle = {
     mode: config.mode,
     activeModeConfig,
     modes: config.modes,
@@ -1761,6 +1792,9 @@ export function mergeConfigs(
     // Sprint 156: default true unless overridden by user/project config
     dependency_pipeline_enabled:
       (config as DeckentConfigWithPipeline).dependency_pipeline_enabled ?? true,
+    // Sprint 202 Task 202-004 — pre-spawn pacing (computeBackoff wire).
+    token_throttle_ms:
+      (config as DeckentConfigWithThrottle).token_throttle_ms ?? 500,
     // Terminal (Sprint 175) — deepMerge applies any partial project override on
     // top of DEFAULT_TERMINAL_CONFIG so unspecified keys inherit defaults,
     // mirroring the model_strategy nested-merge pattern.
@@ -1768,5 +1802,6 @@ export function mergeConfigs(
       ? deepMerge(DEFAULT_TERMINAL_CONFIG, config.terminal as Partial<TerminalConfig>)
       : structuredClone(DEFAULT_TERMINAL_CONFIG),
   };
+  return merged;
 }
 

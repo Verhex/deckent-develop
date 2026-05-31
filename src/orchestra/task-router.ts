@@ -6,6 +6,7 @@ import type { Task } from '../core/types.js';
 import type { ProviderName, ModelType } from '../core/task-types.js';
 import type { ResolvedConfig } from '../core/config-types.js';
 import { PROVIDER_MODEL_MAP } from '../core/task-types.js';
+import { getDefaultProviderName } from './sprint-utils.js';
 import { brainEstimateTimeout } from './timeout-estimator.js';
 import type { SprintHistory } from './timeout-estimator.js';
 import { writeEvent, CHANNELS } from './event-stream.js';
@@ -61,7 +62,7 @@ const TASK_TYPE_TO_ROUTING_KEY: Record<TaskType, keyof SkillRoutingConfig | null
  * @returns True if the value is a recognized provider name
  */
 function isProviderName(value: string): value is ProviderName {
-  return value === 'claude' || value === 'codex' || value === 'gemini';
+  return value === 'claude' || value === 'codex' || value === 'gemini' || value === 'ollama';
 }
 
 /**
@@ -163,12 +164,16 @@ export function routeTask(
   const agent = task.assignedAgent ?? 'generic';
 
   // Guard: no providers available
+  // Sprint 202 Task 202-003: resolve via registry default before the absolute
+  // 'claude' floor so pure-Ollama configs don't silently route to a missing
+  // Claude adapter.
   if (availableProviders.length === 0) {
+    const fallback = getDefaultProviderName();
     return {
-      provider: 'claude',
+      provider: fallback,
       agent,
       skills,
-      reason: 'No providers available; falling back to claude (default)',
+      reason: `No providers available; falling back to '${fallback}' (registry default)`,
     };
   }
 
@@ -250,7 +255,8 @@ export function routeTask(
   }
 
   // ─── Priority 6: First available provider ─────────────────────────
-  const fallback = availableProviders[0] ?? 'claude' as ProviderName;
+  // Sprint 202 Task 202-003: registry-default before the absolute 'claude' floor.
+  const fallback = availableProviders[0] ?? getDefaultProviderName();
   return {
     provider: fallback,
     agent,
@@ -269,7 +275,8 @@ function ensureAvailable(preferred: ProviderName, available: ProviderName[]): Pr
   if (available.includes(preferred)) {
     return preferred;
   }
-  return available[0] ?? 'claude' as ProviderName;
+  // Sprint 202 Task 202-003: registry-default before the absolute 'claude' floor.
+  return available[0] ?? getDefaultProviderName();
 }
 
 // ─── Timeout Event Emission ────────────────────────────────────────

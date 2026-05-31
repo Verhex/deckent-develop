@@ -502,11 +502,14 @@ describe('loadConfig — mode alias resolution', () => {
 // ─── Multi-Provider Config ──────────────────────────────────────────
 
 describe('VALID_PROVIDERS', () => {
-  it('contains claude, codex, gemini', () => {
+  it('contains claude, codex, gemini, ollama', () => {
+    // Sprint 202 Task 202-001: ollama joined the ProviderName union and is
+    // therefore now an Object.keys(PROVIDER_MODEL_MAP) member.
     expect(VALID_PROVIDERS).toContain('claude');
     expect(VALID_PROVIDERS).toContain('codex');
     expect(VALID_PROVIDERS).toContain('gemini');
-    expect(VALID_PROVIDERS).toHaveLength(3);
+    expect(VALID_PROVIDERS).toContain('ollama');
+    expect(VALID_PROVIDERS).toHaveLength(4);
   });
 });
 
