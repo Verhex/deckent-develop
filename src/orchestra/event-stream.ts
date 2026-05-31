@@ -116,6 +116,13 @@ export const CHANNELS = {
   // result (not synthetic NO_GO) so /login auth-loss during a sprint becomes a
   // diagnosable failure mode instead of silent exit 0.
   AUTH_FAILED: 'WORKER→BRAIN:AUTH_FAILED',
+
+  // Sprint 201 — container-path leakage Layer-2 gate. Emitted by
+  // result-collector after sanitizeHostFacingFiles() rewrites a leaked
+  // container `/workspace` path in a host-facing config file. The canonical
+  // string is also exported as CONTAINER_PATH_SANITIZED_CHANNEL from
+  // container-path-sanitizer.ts (mirroring disk-verify's own channel const).
+  CONTAINER_PATH_SANITIZED: 'BRAIN→AUDITOR:CONTAINER_PATH_SANITIZED',
 } as const;
 
 export type ChannelCode = typeof CHANNELS[keyof typeof CHANNELS];

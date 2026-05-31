@@ -118,6 +118,34 @@ import { clearDependencyBlockedState, writeEvent } from './event-stream.js';
 
 // Sprint 195 195-001 (W-INTEGRITY) — disk-verify gate before synthetic NO_GO.
 import { verifyDiskAgainstClaim, DISK_VS_CLAIM_MISMATCH_CHANNEL } from './disk-verify.js';
+import {
+  sanitizeHostFacingFiles,
+  CONTAINER_PATH_SANITIZED_CHANNEL,
+} from './container-path-sanitizer.js';
+
+// ═══ Container-Path Sanitizer Wire (Sprint 201, Layer-2 gate) ═════
+//
+// Rewrite leaked container `/workspace` paths in host-facing config files a
+// worker may have written (hook commands, npm scripts, CI steps, compose,
+// Makefile, shell scripts). The sweep is synchronous and acts only on the
+// small host-facing subset of `filesChanged`; when it rewrites anything we
+// emit a BRAIN→AUDITOR audit event mirroring the disk-verify pattern.
+function sanitizeResultHostFacingFiles(
+  projectRoot: string,
+  sprintId: string,
+  taskId: string,
+  filesChanged: string[] | undefined,
+): void {
+  if (!Array.isArray(filesChanged) || filesChanged.length === 0) return;
+  const swept = sanitizeHostFacingFiles(projectRoot, filesChanged);
+  if (swept.totalRewrites > 0) {
+    writeEvent(projectRoot, sprintId, 'brain', 'auditor', CONTAINER_PATH_SANITIZED_CHANNEL, {
+      taskId,
+      files: swept.rewritten.map(r => r.file),
+      totalRewrites: swept.totalRewrites,
+    });
+  }
+}
 
 // ═══ Results Map Helper ═══════════════════════════════════════════
 
@@ -483,6 +511,7 @@ export async function waitForResults(
         const result = readJsonSafe<TaskResult>(resultPath);
         if (result) {
           enrichResultTokenUsage(result, taskMap.get(taskId), projectRoot);
+          sanitizeResultHostFacingFiles(projectRoot, sprint.id, taskId, result.filesChanged);
           results.push(result);
           collected.add(taskId);
           newlyCollected.push(taskId);
@@ -502,6 +531,7 @@ export async function waitForResults(
         const lateResult = readJsonSafe<TaskResult>(lateResultPath);
         if (lateResult) {
           enrichResultTokenUsage(lateResult, taskMap.get(taskId), projectRoot);
+          sanitizeResultHostFacingFiles(projectRoot, sprint.id, taskId, lateResult.filesChanged);
           results.push(lateResult);
           collected.add(taskId);
           newlyCollected.push(taskId);
@@ -838,6 +868,11 @@ export async function waitForResults(
       const result = readJsonSafe<TaskResult>(resultPath);
       if (result) {
         enrichResultTokenUsage(result, taskMap.get(taskId), projectRoot);
+        // Sprint 201 review-feedback — close the final-sweep race window: a
+        // worker whose real .result lands only after the watcher closed is a
+        // genuine worker-sourced filesChanged, same source as branches (a)/(b).
+        // The helper is idempotent + guarded, so this is harmless if already swept.
+        sanitizeResultHostFacingFiles(projectRoot, sprint.id, taskId, result.filesChanged);
         results.push(result);
         collected.add(taskId);
         syncTaskStatusFromResult(taskId, result);
