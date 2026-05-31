@@ -2,6 +2,7 @@ import { mkdirSync, writeFileSync, readFileSync, readdirSync, rmSync, existsSync
 import { join } from 'node:path';
 import type { ScheduledFlow } from './scheduled-flow.js';
 import { can, Permission } from './rbac.js';
+import { DeckentError } from './errors.js';
 
 export class FlowRegistry {
   private flows = new Map<string, ScheduledFlow>();
@@ -26,7 +27,7 @@ export class FlowRegistry {
 
   listFlows(tenantId?: string, role?: string): ScheduledFlow[] {
     if (role !== undefined && tenantId !== undefined && !can(role, Permission.READ, tenantId)) {
-      throw new Error(`Role '${role}' lacks read permission for tenant '${tenantId}'`);
+      throw new DeckentError('E_RBAC_DENIED', `Role '${role}' lacks read permission for tenant '${tenantId}'`);
     }
     const all = Array.from(this.flows.values());
     return tenantId === undefined ? all : all.filter(f => f.tenantId === tenantId);
