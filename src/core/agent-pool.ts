@@ -3,7 +3,59 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { AgentDefinition, AgentPool } from './agent-types.js';
 import { createDefaultStats } from './agent-types.js';
+import type { ActivationRule } from './routing-types.js';
+import { createDefaultActivationConfig } from './routing-types.js';
 import { readJsonSafe } from './utils.js';
+
+// ─── Built-in Implementation Intent Candidacy (Sprint 204 Task 204-003) ──────
+//
+// Built-in agent.json files do not declare `intent.primary: "implementation"`
+// activation rules — so every "implementation" task historically fell to the
+// scope-blind temp-react-ts-specialist (impl@6). Refactorer and architect are
+// the natural built-in homes for general code implementation; we inject
+// mid-tier implementation candidacy at load time so they out-rank the
+// scope-blind temp agent via tie-break + learning bonus, without touching the
+// individual agent.json files (which live outside this task's write scope).
+//
+// Scores are intentionally moderate (refactorer 7, architect 6) so that:
+//   - Existing intent matches still dominate (refactor@10, design@8).
+//   - For pure implementation tasks, built-ins beat temp-react-ts-specialist (6)
+//     via the agent's primary candidacy score plus learning/synergy bonuses.
+export const BUILTIN_IMPLEMENTATION_INTENT_RULES: Readonly<
+  Record<string, { score: number; name: string }>
+> = {
+  refactorer: { score: 7, name: 'implementation-candidate' },
+  architect: { score: 6, name: 'implementation-candidate' },
+};
+
+/**
+ * Inject a mid-tier `intent.primary === "implementation"` activation rule into
+ * known built-in agents (refactorer, architect) so they become viable
+ * candidates for generic implementation tasks. Idempotent: re-applying does
+ * not duplicate the rule. Returns true when the agent was modified.
+ */
+export function applyBuiltinImplementationRules(agent: AgentDefinition): boolean {
+  const ruleSpec = BUILTIN_IMPLEMENTATION_INTENT_RULES[agent.id];
+  if (!ruleSpec) return false;
+  if (agent.source !== 'builtin') return false;
+
+  if (!agent.activation) {
+    agent.activation = createDefaultActivationConfig();
+  }
+
+  const alreadyPresent = agent.activation.rules.some(
+    (r) => r.when['intent.primary'] === 'implementation',
+  );
+  if (alreadyPresent) return false;
+
+  const rule: ActivationRule = {
+    name: ruleSpec.name,
+    when: { 'intent.primary': 'implementation' },
+    score: ruleSpec.score,
+  };
+  agent.activation.rules.push(rule);
+  return true;
+}
 
 // ─── Agent Domain ─────────────────────────────────────────────────────────────
 
@@ -181,6 +233,7 @@ export class AgentPoolManager {
         const validation = AgentPoolManager.validateAgentDefinition(raw);
         if (validation.valid) {
           const agent = raw as unknown as AgentDefinition;
+          applyBuiltinImplementationRules(agent);
           pool.set(agent.id, agent);
         }
       }

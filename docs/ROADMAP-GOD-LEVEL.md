@@ -17,8 +17,8 @@
 | Yüz | Kitle | Mode | Olgunluk | En büyük boşluk |
 |-----|-------|------|----------|------------------|
 | **AI Developer** | Geliştirici | Sprint Mode | **~%90** | Beta hazır; provider-free + quota-safe eksik |
-| **AI System Worker** | Şirket | Process Mode | **~%40** | Multi-tenant izolasyon + scheduled flows |
-| **AI Asistan** | Sade kişi | Chat Mode | **~%35** | Native REPL (Path C) — şu an sadece Path B (CLI shell-out) |
+| **AI System Worker** | Şirket | Process Mode | **~%45** | Scheduled flows + tam multi-tenant runtime |
+| **AI Asistan** | Sade kişi | Chat Mode | **~%50** | F2-003 streaming/multi-turn/resume DONE (Sprint 204); F2-001/002 kalan |
 
 ### TAMAMLANAN (kanıtlı)
 
@@ -44,18 +44,18 @@
 | F1-007 | Doc-align (Gate #8 PARTIAL + chat.ts live + Sprint 185-200 arşiv) | **P0** | ✅ DONE Sprint 202-005 |
 
 **F2 — Native Chat Path C (AI Asistan yüzü)** — ~600-1200 LoC:
-| ID | İş | Öncelik |
-|----|----|---------|
-| F2-001 | Native tool-use loop (LLM → MCP tool → cevap REPL) | P1 |
-| F2-002 | Memory entegrasyonu (appendChatTurn chat path'e bağla) | P1 |
-| F2-003 | Streaming + multi-turn + resume | P2 |
+| ID | İş | Öncelik | Kanıt |
+|----|----|---------|-------|
+| F2-001 | Native tool-use loop (LLM → MCP tool → cevap REPL) | P1 | ⬜ |
+| F2-002 | Memory entegrasyonu (appendChatTurn chat path'e bağla) | P1 | ⬜ |
+| F2-003 | Streaming + multi-turn + resume | P2 | ✅ DONE Sprint 204-005/006/007 |
 
 **F3 — Process Mode (AI System Worker yüzü, Sub-project #3)** — post-F1:
-| ID | İş | Öncelik |
-|----|----|---------|
-| F3-001 | Multi-tenant izolasyon (gerçek tenantId) | P2 |
-| F3-002 | Scheduled flows + cron | P2 |
-| F3-003 | SessionBackend k8s pod-exec | P3 |
+| ID | İş | Öncelik | Kanıt |
+|----|----|---------|-------|
+| F3-001 | Multi-tenant izolasyon (tenantId skeleton) | P2 | ✅ DONE Sprint 204-008 (tenant-context.ts) |
+| F3-002 | Scheduled flows + cron | P2 | ⬜ |
+| F3-003 | SessionBackend k8s pod-exec | P3 | ⬜ |
 
 **F4 — Enterprise + Million-User (Sub-project #4)** — post-F3:
 | ID | İş | Öncelik |

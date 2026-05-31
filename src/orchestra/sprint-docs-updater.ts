@@ -246,6 +246,56 @@ export function autoDraftDecisions(
   return adrCount;
 }
 
+// ═══ CI Baseline — Honest Write Guard ════════════════════════════
+
+/**
+ * Write a CI baseline to `.deckent/ci-baseline.json` only when the result
+ * is trustworthy. A baseline with `testPassed === 0 && testFailed > 0` is
+ * treated as "suspicious" (vitest ran in a broken env — e.g. API-key leak
+ * causing auth failures) and the existing baseline is preserved unchanged.
+ *
+ * Rules:
+ *   - suspicious (testPassed === 0 && testFailed > 0) AND old baseline exists
+ *     → preserve old, emit warning, return false
+ *   - suspicious AND no old baseline exists
+ *     → write anyway (nothing to fall back to), return true
+ *   - not suspicious (testPassed > 0 OR testFailed === 0)
+ *     → write new baseline, return true
+ *
+ * Returns true when the baseline was written, false when preserved.
+ */
+export function writeHonestCiBaseline(
+  projectRoot: string,
+  data: {
+    sprintId: string;
+    baseline: {
+      tscPassed: boolean;
+      testCount: number;
+      testPassed: number;
+      testFailed: number;
+      coverage: number;
+      timestamp: string;
+    };
+  },
+): boolean {
+  const dir = join(projectRoot, '.deckent');
+  const baselinePath = join(dir, 'ci-baseline.json');
+
+  // Detect suspicious 0-pass pattern
+  const isSuspicious = data.baseline.testPassed === 0 && data.baseline.testFailed > 0;
+
+  if (isSuspicious && existsSync(baselinePath)) {
+    process.stderr.write(
+      `[ci-baseline] suspicious 0-pass (testFailed=${data.baseline.testFailed}) — preserve.*baseline preserved\n`,
+    );
+    return false;
+  }
+
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(baselinePath, JSON.stringify(data, null, 2), 'utf-8');
+  return true;
+}
+
 // ═══ Patterns — removed (B7, Memory V2 DB-first) ═════════════════
 // addRecurringPatternsToFile (legacy .brain/PATTERNS.md JSON writer) had no
 // production caller and was removed; violation patterns are recorded to the

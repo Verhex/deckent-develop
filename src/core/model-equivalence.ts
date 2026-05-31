@@ -11,12 +11,34 @@ export type MultiProviderModelType = ModelType;
 export type ModelTier = 'economy' | 'standard' | 'premium' | 'premium_plus';
 
 // ─── Tier Definitions — derived from ModelRegistry ─────────────────────────
-export const MODEL_TIERS = {
-  premium: modelRegistry.getByTier('premium').map(m => m.id),
-  standard: modelRegistry.getByTier('standard').map(m => m.id),
-  economy: modelRegistry.getByTier('economy').map(m => m.id),
-  premium_plus: modelRegistry.getByTier('premium_plus').map(m => m.id),
-} as const;
+// Lazy-initialized to avoid circular TDZ: provider.ts → model-equivalence →
+// model-registry before the singleton is fully constructed. getByTier is
+// called only on first property access, then cached.
+let _modelTiersCache: Record<ModelTier, string[]> | null = null;
+
+function _initModelTiers(): Record<ModelTier, string[]> {
+  if (_modelTiersCache === null) {
+    _modelTiersCache = {
+      premium: modelRegistry.getByTier('premium').map((m) => m.id),
+      standard: modelRegistry.getByTier('standard').map((m) => m.id),
+      economy: modelRegistry.getByTier('economy').map((m) => m.id),
+      premium_plus: modelRegistry.getByTier('premium_plus').map((m) => m.id),
+    };
+  }
+  return _modelTiersCache;
+}
+
+// Object.defineProperty getters keep keys enumerable (so Object.keys/values work)
+// while deferring getByTier calls to first property access.
+const _tiersObj = {} as Record<ModelTier, string[]>;
+for (const _tier of ['premium', 'standard', 'economy', 'premium_plus'] as ModelTier[]) {
+  Object.defineProperty(_tiersObj, _tier, {
+    get: () => _initModelTiers()[_tier],
+    enumerable: true,
+    configurable: true,
+  });
+}
+export const MODEL_TIERS: Record<ModelTier, string[]> = _tiersObj;
 
 // ─── Provider → Model Mapping — derived from ModelRegistry ─────────────────
 const _providerModels = Object.fromEntries(

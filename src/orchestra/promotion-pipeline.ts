@@ -34,6 +34,10 @@ export interface PromotionResult {
 const DEFAULT_PROMOTION: PromotionCriteria = { minTasks: 8, minSuccessRate: 0.85, minSprints: 3 };
 const DEFAULT_DEMOTION: DemotionCriteria = { maxFailRate: 0.50, minTasks: 5, unusedSprints: 5 };
 
+// Underperformer demotion: successRate < threshold AND enough task history (OR with maxFailRate)
+const UNDERPERFORM_MAX_SUCCESS_RATE = 0.65;
+const UNDERPERFORM_MIN_TASKS = 20;
+
 // ─── PromotionPipeline ──────────────────────────────────────────────────────
 
 export class PromotionPipeline {
@@ -275,6 +279,15 @@ export class PromotionPipeline {
       return {
         entityId, entityType, action: 'demote',
         reason: `Fail rate ${Math.round(failRate * 100)}% >= ${Math.round(c.maxFailRate * 100)}% threshold (${perf.totalTasks} tasks)`,
+        performance: perf,
+      };
+    }
+
+    // Underperformer check: successRate < 65% over >= 20 tasks triggers demotion even when below maxFailRate
+    if (perf.successRate < UNDERPERFORM_MAX_SUCCESS_RATE && perf.totalTasks >= UNDERPERFORM_MIN_TASKS) {
+      return {
+        entityId, entityType, action: 'demote',
+        reason: `Underperformer: success rate ${Math.round(perf.successRate * 100)}% < ${Math.round(UNDERPERFORM_MAX_SUCCESS_RATE * 100)}% over ${perf.totalTasks} tasks`,
         performance: perf,
       };
     }

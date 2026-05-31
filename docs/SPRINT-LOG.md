@@ -5546,3 +5546,33 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 203-009: 203-009 — ADR-066 provider-independence finalize + doc (DONE)
 
 ---
+## Sprint 204 — sprint-204
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-05-31
+**Duration:** 1160s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 15 |
+| Completed | 9 |
+| Tech Debt | 0 |
+| No-Go | 6 |
+| Coverage | 0.0% |
+| Duration | 1160137ms |
+
+### Tasks
+
+- 204-001: 204-001 — Circular import fix: MODEL_TIERS lazy-init (DONE)
+- 204-002: 204-002 — ci-baseline auto-regen gerçek-değer fix (DONE)
+- 204-003: 204-003 — Implementation intent için built-in agent adaylığı (NO_GO)
+- 204-004: 204-004 — Stale temp-agent demote eşiği + react-template stack-guard (DONE)
+- 204-005: 204-005 — Native chat streaming response (Path C) (NO_GO)
+- 204-006: 204-006 — Multi-turn context window (son N turn inject) (DONE)
+- 204-007: 204-007 — Chat resume (--resume son oturumu yükle) (DONE)
+- 204-008: 204-008 — Multi-tenant tenantId iskelet (NO_GO)
+- 204-009: 204-009 — F3 ADR taslağı + ROADMAP tracker güncelle (DONE)
+
+---

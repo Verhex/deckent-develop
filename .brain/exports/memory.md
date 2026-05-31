@@ -1,5 +1,11 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-204 Learnings
+- Sprint sprint-204 Learnings: ## Sprint sprint-204 Learnings
+- 204-003 — Implementation intent için built-in agent adaylığı: NO_GO — Added BUILTIN_IMPLEMENTATION_INTENT_RULES map (refactorer=7, architect=6) + applyBuiltinImplementationRules() helper in 
+- 204-005 — Native chat streaming response (Path C): NO_GO — F2-003 streaming added to chat-native loop via OPTIONAL ChatProviderAdapter.stream() method yielding StreamChunk { text?
+- 204-008 — Multi-tenant tenantId iskelet: NO_GO — Created src/core/tenant-context.ts with TenantContext interface, isValidTenantId(), tenantIsolationPath(), and resolveTe
+
 ## Sprint sprint-203 Learnings
 - Sprint sprint-203 Learnings: ## Sprint sprint-203 Learnings
 - 203-002 — Docker provider-aware auth mount: GO_WITH_TECH_DEBT — Changed auth mount condition at line 502: added `|| providerBinary !== 'claude'` so ~/.claude is only mounted for claude

@@ -2,6 +2,23 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint204] - 2026-05-31
+
+### Added
+
+- 204-004 — Stale temp-agent demote eşiği + react-template stack-guard
+- 204-006 — Multi-turn context window (son N turn inject)
+- 204-007 — Chat resume (--resume son oturumu yükle)
+- 204-009 — F3 ADR taslağı + ROADMAP tracker güncelle
+
+### Fixed
+
+- 204-001 — Circular import fix: MODEL_TIERS lazy-init
+- 204-002 — ci-baseline auto-regen gerçek-değer fix
+
+
+_Tasks: 15 total, 9 done, 0 tech debt, 6 no-go_
+
 ## [1.0.0-beta.1-sprint203] - 2026-05-31
 
 ### Added

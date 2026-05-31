@@ -44,9 +44,26 @@ export interface ProviderResponse {
   stopReason: 'end_turn' | 'tool_use';
 }
 
+/**
+ * One unit yielded by a streaming provider. Either a partial text delta to
+ * write to stdout, or the terminal `done` marker carrying the full response.
+ * A single chunk may carry both (final delta + done) so consumers don't have
+ * to special-case the last text fragment.
+ */
+export interface StreamChunk {
+  text?: string;
+  done?: ProviderResponse;
+}
+
 /** Pluggable LLM backend — tests inject a fake, future tasks wire SDKs. */
 export interface ChatProviderAdapter {
   send(messages: ChatMessage[]): Promise<ProviderResponse>;
+  /**
+   * Optional streaming variant. When defined, the loop drains it and writes
+   * each `chunk.text` to output as it arrives; the chunk carrying `done`
+   * supplies the final `ProviderResponse` used for tool-use branching.
+   */
+  stream?(messages: ChatMessage[]): AsyncIterable<StreamChunk>;
 }
 
 /** Pluggable MCP tool dispatcher — wraps the in-process MCP registry. */
@@ -76,6 +93,8 @@ export interface ChatNativeOptions {
   sessionId?: string;
   /** Load this many prior turns from memory on startup (0 = fresh session). */
   resumeLimit?: number;
+  /** Sliding context window: only the last N turns are sent to the provider. Undefined = no truncation. */
+  contextWindowSize?: number;
 }
 
 const DEFAULT_MAX_TURNS = 50;
@@ -102,6 +121,48 @@ export function parseToolCallFromText(text: string): ToolCall | null {
   } catch {
     return null;
   }
+}
+
+// ─── Streaming Bridge ───────────────────────────────────────────────
+//
+// Drains provider.stream when available: each text chunk is written to the
+// output sink as it arrives so users see incremental output; the chunk that
+// carries `done` supplies the final ProviderResponse used downstream.
+// Falls back to provider.send when stream is not implemented.
+
+export async function runProviderTurn(
+  provider: ChatProviderAdapter,
+  messages: ChatMessage[],
+  output: (line: string) => void,
+): Promise<ProviderResponse> {
+  if (!provider.stream) return provider.send(messages);
+
+  let collectedText = '';
+  let finalResponse: ProviderResponse | undefined;
+  for await (const chunk of provider.stream(messages)) {
+    if (typeof chunk.text === 'string' && chunk.text.length > 0) {
+      collectedText += chunk.text;
+      output(chunk.text);
+    }
+    if (chunk.done) finalResponse = chunk.done;
+  }
+  if (!finalResponse) {
+    return { text: collectedText, stopReason: 'end_turn' };
+  }
+  if (typeof finalResponse.text !== 'string' && collectedText.length > 0) {
+    return { ...finalResponse, text: collectedText };
+  }
+  return finalResponse;
+}
+
+// ─── Context Window Helper ──────────────────────────────────────────
+//
+// Returns the last `n` turns from the transcript (sliding window).
+// When `n` is undefined the full transcript is returned unchanged.
+
+export function getRecentTurns(transcript: ChatMessage[], n: number | undefined): ChatMessage[] {
+  if (n === undefined || n <= 0 || transcript.length <= n) return transcript;
+  return transcript.slice(-n);
 }
 
 // ─── The Loop ───────────────────────────────────────────────────────
@@ -150,7 +211,7 @@ export async function runChatNativeLoop(opts: ChatNativeOptions): Promise<ChatMe
     transcript.push({ role: 'user', content: line });
     memStore?.appendChatTurn(sessionId, 'user', line);
 
-    let response = await provider.send(transcript);
+    let response = await runProviderTurn(provider, getRecentTurns(transcript, opts.contextWindowSize), output);
     let toolHops = 0;
     while (response.stopReason === 'tool_use' && response.toolCalls?.length) {
       if (toolHops >= maxToolHops) {
@@ -170,13 +231,13 @@ export async function runChatNativeLoop(opts: ChatNativeOptions): Promise<ChatMe
         transcript.push({ role: 'tool', content: result, toolUseId: call.id });
       }
 
-      response = await provider.send(transcript);
+      response = await runProviderTurn(provider, getRecentTurns(transcript, opts.contextWindowSize), output);
     }
 
     const assistantText = response.text ?? '';
     transcript.push({ role: 'assistant', content: assistantText });
     if (assistantText.length > 0) {
-      output(assistantText);
+      if (!provider.stream) output(assistantText);
       memStore?.appendChatTurn(sessionId, 'assistant', assistantText);
     }
   }

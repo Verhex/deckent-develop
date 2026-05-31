@@ -60,8 +60,11 @@
 | adr-063 | Consent-Based Prerequisite Provisioning | accepted |
 | adr-064 | TOPP — Continuous Dispatch (Wave-Barrier Removal) | accepted |
 | adr-065 | Develop / Product Two-Repo Split | accepted |
+| adr-066 | Provider Independence — Multi-Provider Backend Parity | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-204 Learnings** (sprint-204): ## Sprint sprint-204 Learnings
+- 204-003 — Implementation intent için built-in agent adaylığı: NO_GO — Added BUILTIN_...
 - **Sprint sprint-203 Learnings** (sprint-203): ## Sprint sprint-203 Learnings
 - 203-002 — Docker provider-aware auth mount: GO_WITH_TECH_DEBT — Changed auth mount c...
 - **Sprint sprint-202 Learnings** (sprint-202): ## Sprint sprint-202 Learnings
@@ -81,8 +84,6 @@
 - **Sprint sprint-192 Learnings** (sprint-192): ## Sprint sprint-192 Learnings
 - Placeholder — sprint still in-progress; will be overwritten by finalize.
 
-- **Sprint sprint-191 Learnings** (sprint-191): ## Sprint sprint-191 Learnings
-- 191-002 — `runtime_extension_enabled: true` default + worker timeout extension wire:...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -123,5 +124,6 @@ _No active technical debt._
 - Violation pattern: file_outside_scope
 - Violation pattern: stale_heartbeat
 - Violation pattern: stale_heartbeat
+- Violation pattern: stale_heartbeat
 
-_Total entries: 412 | Generated: 2026-05-31_
+_Total entries: 417 | Generated: 2026-05-31_
