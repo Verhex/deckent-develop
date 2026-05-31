@@ -62,7 +62,7 @@ These fields sit at the root of `.deckent/config.json`:
 | `projectName` | `string` | `"deckent-project"` | Project name shown in dashboard and logs. |
 | `version` | `string` | (from package.json) | Deckent version. Usually not set manually. |
 | `brain_planning` | `BrainPlanningMode` | `"auto"` | Planning mode. Can also be set per-mode. |
-| `brain_provider` | `ProviderName` | `"claude"` | Provider for Brain planning and evaluation. One of: `claude`, `codex`, `gemini`. |
+| `brain_provider` | `ProviderName` | `"claude"` | Provider for Brain planning and evaluation. One of: `claude`, `codex`, `gemini`, `ollama`. Canonical form is the grouped `providers: { brain, worker }`; these flat keys are the deprecated alias. |
 | `worker_provider` | `ProviderName` | `"claude"` | Default provider for worker tasks. |
 | `fallback_provider` | `ProviderName` | -- | Fallback provider when primary fails. |
 | `last_sprint_id` | `string` | -- | Last sprint ID. Managed by Brain. Do not edit manually. |
@@ -140,9 +140,9 @@ Each mode block (`modes.<modeName>`) supports these fields:
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `max_workers` | number (1-20) | Yes | Maximum parallel workers for this mode. |
-| `brain_model` | `"opus"`, `"sonnet"`, or `"haiku"` | Yes | Model used by Brain for planning and evaluation. |
-| `default_model` | `"opus"`, `"sonnet"`, or `"haiku"` | Yes | Default model assigned to workers. |
+| `max_workers` | number (1-100) or `"auto"` | Yes | Maximum parallel workers for this mode. Values >= 20 emit a high-contention warning (not an error). `"auto"` resolves to `systemProfile.recommendedMaxWorkers`. |
+| `brain_model` | any model in the registry | Yes | Model used by Brain for planning and evaluation. Validated against `ALL_MODELS` (13 models across Claude/Codex/Gemini), not just the three Claude names. |
+| `default_model` | any model in the registry | Yes | Default model assigned to workers. Validated against `ALL_MODELS`. |
 | `haiku_allowed` | boolean | Yes | Whether Brain can assign `haiku` to workers. |
 | `budget_per_sprint` | number > 0 | No (API mode only) | Maximum USD budget per sprint. |
 | `requires` | string | No | Required environment variable name. |
@@ -430,15 +430,15 @@ Deckent validates the config on every load. A `ConfigValidationError` is thrown 
 |-------|-----------|
 | `mode` | Must be one of: `performance`, `balanced`, `economic`, `api` (legacy aliases `max_plan`, `max5x_plan`, `pro_plan` also accepted) |
 | `language` | Must be one of: `en`, `tr` |
-| `modes.<name>.max_workers` | Number between 1 and 20 (inclusive) |
-| `modes.<name>.brain_model` | One of: `opus`, `sonnet`, `haiku` |
-| `modes.<name>.default_model` | One of: `opus`, `sonnet`, `haiku` |
-| `modes.<name>.haiku_allowed` | Must be a boolean |
+| `modes.<name>.max_workers` | Number between 1 and 100 (inclusive) or `"auto"`; >= 20 warns |
+| `modes.<name>.brain_model` | Any model in `ALL_MODELS` (13-model registry) |
+| `modes.<name>.default_model` | Any model in `ALL_MODELS` (13-model registry) |
+| `modes.<name>.haiku_allowed` | Must be a boolean (deprecated; `false` maps to `min_tier: standard`) |
 | `modes.<name>.budget_per_sprint` | Positive number (API mode only) |
 | `modes.<name>.brain_planning` | One of: `ai`, `structured`, `auto` |
-| `brain_provider` | One of: `claude`, `codex`, `gemini` (if set) |
-| `worker_provider` | One of: `claude`, `codex`, `gemini` (if set) |
-| `fallback_provider` | One of: `claude`, `codex`, `gemini` (if set) |
+| `brain_provider` | One of: `claude`, `codex`, `gemini`, `ollama` (if set) |
+| `worker_provider` | One of: `claude`, `codex`, `gemini`, `ollama` (if set) |
+| `fallback_provider` | One of: `claude`, `codex`, `gemini`, `ollama` (if set) |
 | API mode + `ANTHROPIC_API_KEY` | Environment variable must be set when mode is `"api"` |
 
 ### Example Validation Error
@@ -446,7 +446,7 @@ Deckent validates the config on every load. A `ConfigValidationError` is thrown 
 ```
 ConfigValidationError: Config validation failed:
   - Invalid mode "turbo". Must be one of: performance, balanced, economic, api
-  - modes.performance.max_workers must be a number between 1 and 20
+  - modes.performance.max_workers must be a number between 1 and 100 (or "auto")
 ```
 
 ---
@@ -462,6 +462,9 @@ Deckent supports three AI providers. Configure them at the top level of your con
 | `claude` | Claude via Claude Code CLI (default) | `claude --version` |
 | `codex` | OpenAI Codex via Codex CLI | `codex --version` + `OPENAI_API_KEY` |
 | `gemini` | Google Gemini via API | `GOOGLE_API_KEY` env var |
+| `ollama` | Local LLM via Ollama (Sprint 190) | local Ollama runtime |
+
+> The grouped form `providers: { brain, worker }` is the canonical layout (Sprint 150). The flat `brain_provider` / `worker_provider` / `fallback_provider` keys are still accepted as a deprecated alias.
 
 ### Provider Config Fields
 
@@ -512,7 +515,7 @@ Deckent creates a git backup branch before each sprint starts. If all tasks fail
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| `rollback_policy` | `'auto' \| 'ask' \| 'never'` | `'never'` | When to trigger rollback. `auto` = roll back if all tasks NO_GO. `ask` = prompt user. `never` = disable. |
+| `rollback_policy` | `'never' \| 'on_failure' \| 'always'` | `'never'` | When to trigger rollback. `never` = disable (default). `on_failure` = revert when a task evaluation fails. `always` = revert regardless of outcome. Validated against this enum in `validateConfig` (config.ts:548). |
 
 ### How It Works
 
@@ -544,6 +547,221 @@ deckent config set rollback_policy never
 ```
 
 Source: `src/orchestra/rollback.ts`, `src/orchestra/sprint-phases.ts`
+
+---
+
+## 12. Spawn Backend & Worker Resources
+
+How workers are launched and their resource limits.
+
+| Key | Default (code) | Values | Description |
+|-----|----------------|--------|-------------|
+| `spawn_backend` | `"docker"` (config.ts:769, ADR-027) | `docker \| tmux \| subprocess \| auto` | Worker spawn mechanism. Also selects the timeout min/max band (see section 17). `tmux` is deprecated (spawn-backend.ts:263). |
+| `deckent_style` | `"sprint"` (config.ts:868) | `sprint \| task` | Runtime style. `sprint` = multi-task orchestration; `task` = one-shot assistant mode (task-mode-runner.ts:25). |
+| `worker_memory_limit` | `"2g"` (raw — not on `DeckentConfig` type) | e.g. `"2g"`, `"512m"` | Docker `--memory` cgroup limit per worker (spawn-backend-docker.ts:490). |
+| `worker_memory_swap` | `"3g"` (raw) | e.g. `"3g"` | Docker `--memory-swap` limit per worker (spawn-backend-docker.ts:491). |
+
+> `worker_memory_limit` / `worker_memory_swap` are Docker-backend-only extensions read directly from raw config (and surfaced by `deckent doctor`); they are not part of the typed `DeckentConfig`.
+
+---
+
+## 13. Tier-Based Model Strategy (`model_strategy`)
+
+Replaces hard-coded model names with provider-agnostic tiers. Starts from the mode preset (`mode-presets.ts`), then `config.model_strategy` overlays on top (config.ts:1051-1066). A custom mode falls back to the `balanced` preset.
+
+| Field | Values | Description |
+|-------|--------|-------------|
+| `brain_tier` | `premium_plus \| premium \| standard \| economy` | Tier for the Brain orchestrator. |
+| `worker_tier` | same | Default tier for worker tasks. |
+| `min_tier` | same | Floor — tasks cannot resolve below this tier. |
+| `max_tier` | same | Ceiling — tasks cannot resolve above this tier. |
+| `auto_upgrade` | boolean | Upgrade tier for high-complexity tasks. |
+| `auto_downgrade` | boolean | Downgrade tier for doc/test tasks. |
+
+Tier equivalence (DECKENT.md model registry): `premium` = opus / gpt-5 / gemini-2.5-pro; `standard` = sonnet / gpt-4.1 / gemini-2.5-flash; `economy` = haiku / gpt-5-mini / gemini-2.0-flash; `premium_plus` = o3 / gemini-3.1-pro-preview.
+
+---
+
+## 14. Auth Mode
+
+| Key | Default | Values | Description |
+|-----|---------|--------|-------------|
+| `auth_mode` | `"subscription"` (config.ts:770) | `subscription \| api \| hybrid` | `subscription` = Claude.ai session mount; `api` = uses `ANTHROPIC_API_KEY`; `hybrid` = both (`.deck` keys take precedence). Resolved by `readAuthMode()` (config.ts:1208), consumed in provider.ts:728. A per-task `- Auth:` directive overrides this. |
+
+---
+
+## 15. Sprint Lifecycle & Evaluation
+
+| Key | Default (code) | Values | Description |
+|-----|----------------|--------|-------------|
+| `fix_phase_enabled` | `true` (774) | boolean | Enables the FIX phase (retry failed tasks). |
+| `max_fix_retries` | `2` (775) | 0–10 (validate 540) | Max retries per task in FIX. |
+| `human_checkpoints` | `[]` (772) | array of `plan` / `evaluate` / `fix` | Pauses the sprint for manual approval at each listed gate (sprint-controller.ts ~595/680/885). Empty = fully autonomous. |
+| `coverage_threshold` | `90` (777, **deprecated**) | number | Legacy single gate; now seeds `coverage_aspirational` via `resolveCoverageGates` (config.ts:707-719). |
+| `coverage_hard_floor` | `50` (783) | 0–100 | Immutable EVALUATE floor. Clamped to `min(floor, aspirational)`. ADR-070. |
+| `coverage_aspirational` | `90` (784) | 0–100 | Target coverage; tuned by the finalizer when `adaptive_thresholds: true`. |
+| `max_reroutes` | `3` (785) | number | Max reroutes per task (mid-sprint-adapter.ts:46). |
+| `reroute_on_tech_debt` | `false` (786) | boolean | `true` also reroutes GO_WITH_TECH_DEBT tasks (mid-sprint-adapter.ts:47). |
+| `sprint_timeout_minutes` | `0` (787) | >= 0, **0 = unlimited** | Global sprint timeout (config.ts:1137). |
+| `routing_engine` | `"v2"` (828) | `v1 \| v2` (validate 652) | Task routing engine. v1 = keyword (legacy/FIX fallback); v2 = intent-based (sprint-planner.ts:351). |
+| `cleanup_delay_ms` | `180000` (830) | >= 0 ms | Delay before `.tasks/` files are deleted in CLEANUP. |
+| `rubric_max_retries` | `0` (822) | >= 0 | Rubric evaluation retries; 0 = disabled. |
+| `adaptive_thresholds` | `false` (824) | boolean | Auto-tunes `agent_min_score` + `coverage_aspirational` (sprint-finalizer.ts:1103). |
+| `agent_min_score` | `5` (825) | 1–10 | Minimum agent routing score (sprint-planner.ts:480). |
+| `adaptive_config` | `{min_samples:3, no_go_threshold:0.3, coverage_lookback:3}` (826) | object | Adaptive-tuning parameters (sprint-finalizer.ts:434). Inert while `adaptive_thresholds: false`. |
+| `dependency_pipeline_enabled` | `true` (844, ADR-045) | boolean | Wave-based spawning + cascade-on-NO_GO + unblock-on-DONE (sprint-spawner.ts:322/410). |
+| `sprint_checkpoint_interval` | `5` (846) | > 0 | Terminal tasks to complete before writing a resume checkpoint (sprint-spawner.ts:579). |
+| `token_throttle_ms` | `500` (850) | >= 0 ms | Pre-spawn pacing floor to avoid token bursts (Sprint 202, sprint-spawner.ts:46). 0 = disabled. |
+
+> **Coverage gate resolution:** `resolveCoverageGates` computes `aspirational = coverage_aspirational ?? coverage_threshold ?? 90`, `hard_floor = min(coverage_hard_floor ?? 50, aspirational)`, and mirrors `coverage_threshold = aspirational` for back-compat (config.ts:707-719).
+
+---
+
+## 16. Auditor, Locks & Memory
+
+| Key | Default | Values | Description |
+|-----|---------|--------|-------------|
+| `scan_interval` | `30` (794) | 5–600 s (validate 513) | Auditor scan-loop interval. |
+| `heartbeat_timeout` | `120` (795) | 30–600 s (validate 519) | Worker stale threshold (no heartbeat). |
+| `boundary_enforcement` | `true` (796) | boolean (validate 531) | Scope boundary checks via git diff. ADR-037 — advisory/soft (warns/emits, does not block). |
+| `lock_stale_threshold` | `300` (797) | 30–3600 s (validate 525) | Lock-file abandonment threshold. |
+| `memory_budget` | `5000` (789) | 100–10000 (validate 492) | Max total lines across `.brain/` (sprint-finalizer.ts:305). |
+| `decay_after_sprints` | `20` (790) | 1–100 (validate 498) | Decay memory entries older than N sprints. |
+| `patterns_enabled` | `true` (791) | boolean (validate 504) | Record violation/quality patterns at sprint end. |
+| `project_identity_enabled` | `true` (792) | boolean (validate 508) | Update IDENTITY (DB decay-exempt). |
+
+---
+
+## 17. Timeout Configuration (`timeout`)
+
+Consumer: `timeout-estimator.ts:94-157`. Estimate chain:
+
+```
+base = effort_base[effort]
+estimated = base × locMultiplier × scopeMultiplier × historyFactor × backendFactor
+final = clamp(estimated, <backend>_min_timeout, <backend>_max_timeout)
+```
+
+The clamp always wins — scaling factors can never push the final value outside the backend-specific band.
+
+| Key | Default | Constraint (validate) | Description |
+|-----|---------|------------------------|-------------|
+| `docker_min_timeout` / `docker_max_timeout` | `3600` / `14400` | min >= 300, max <= 86400, max > min (config.ts:567-591) | Docker task timeout band (seconds). |
+| `tmux_min_timeout` / `tmux_max_timeout` | `900` / `5400` | same | Tmux band. |
+| `subprocess_min_timeout` / `subprocess_max_timeout` | `1800` / `10800` | same | Subprocess band. |
+| `effort_base.{low,normal,high}` | `1800` / `3600` / `7200` | high > normal > low (config.ts:562) | Base seconds per effort level. |
+| `loc_scaling_enabled` | `true` | boolean | Scale by lines-of-code estimate. |
+| `history_scaling_enabled` | `true` | boolean | Scale by historical sprint timing. |
+| `runtime_extension_enabled` | `true` | boolean | Allow heartbeat-aware runtime extensions. |
+| `adaptive_multiplier` (optional) | `1.5` (config.ts:88) | >= 1.0, finite (validate 597) | Base timeout multiplier (sprint-controller.ts:278). |
+| `runtime_extension_max` (optional) | `5` (config.ts:89) | >= 1, integer (validate 605) | Max runtime extensions per task. |
+
+---
+
+## 18. Search, Notifications, Telemetry & Output
+
+| Key | Default | Values | Description |
+|-----|---------|--------|-------------|
+| `search_enabled` | `true` (801) | boolean | Online documentation search. |
+| `search_provider` | `"context7"` (802) | `context7 \| web \| none` (config-types:171) | Search backend. |
+| `search_cache_ttl` | `3600` (803) | >= 0 s | Search result cache TTL. |
+| `notify_on_complete` | `false` (805) | boolean | Emit a notification on sprint finalize (notify.ts:47). |
+| `notify_channel` | `null` (806) | `slack \| discord \| email \| webhook \| null` (config-types:179) | Delivery channel. |
+| `notify_url` | `null` (807) | URL or null | Webhook URL (required for `webhook` channel). |
+| `telemetry_enabled` | `false` (809) | boolean | Opt-in telemetry collection (telemetry.ts:15). |
+| `telemetry_anonymous` | `true` (810) | boolean | Strip PII from telemetry events. |
+| `detected_env` | `null` (812) | `vscode \| codex \| gemini \| cursor \| tmux \| shell \| null` (config-types:191) | Auto-detected environment. |
+| `multi_ide_mode` | `false` (813) | boolean | Support multiple simultaneous IDE instances. |
+| `output_splash` | `true` (815) | boolean | Kraken ASCII splash on init/version. |
+| `output_mode` | `"normal"` (816) | `quiet \| normal \| verbose` (config-types:147) | Output verbosity. |
+| `output_theme` | `"default"` (817) | `default \| minimal \| rich` (config-types:149) | Visual theme. |
+
+---
+
+## 19. Nervous System (`nervous_system`)
+
+Proactive meta-orchestrator (ADR-040).
+
+> **Master switch:** when `enabled: false`, `initNervousSystemForSprint()` returns `null` (sprint-controller.ts:499) and **every sub-setting below is inert.**
+
+| Key | Default (code) | Values | Description |
+|-----|----------------|--------|-------------|
+| `enabled` | `false` (875) | boolean | Master on/off switch. |
+| `mode` | `"balanced"` (876) | `strict \| balanced \| autopilot \| full-auto` (validate 618) | Authority/autonomy mode. |
+| `actionOverrides` | `{}` (877) | object | Per-action policy overrides. |
+| `safety_floor.locked_actions` | 5 actions (879) | KILL_LIVE_SPRINT, MANUAL_FILE_DELETE, COST_OVER_THRESHOLD, DESTRUCTIVE_GIT, ADR_DEPRECATE_ACCEPTED | Actions that always require manual approval, even in full-auto. |
+| `safety_floor.cost_threshold_usd` | `110` (886) | >= 0 | COST_OVER_THRESHOLD trigger ($). |
+| `safety_floor.bypass_allowed` | `false` (887) | boolean | Safety-floor bypass (code-locked to false). |
+| `notifications.channels.{mcp,cli,file,desktop}` | `true,true,true,false` (890) | boolean | Per-channel enable. |
+| `notifications.throttle_ms` | `300000` (891) | >= 0 ms | Min interval between same-group notifications. |
+| `notifications.group_info_window_ms` | `600000` (892) | >= 0 ms | Info-grouping window. |
+| `notifications.severity_min` | `"info"` (893) | `info \| warning \| critical \| emergency` (config-types:371) | Minimum surfaced severity. |
+| `notifications.quiet_hours.{start,end,timezone}` | `22:00` / `08:00` / `TRT` (894) | `"HH:MM"` / tz | Quiet hours. |
+| `notifications.cross_channel_dedup` | `true` (895) | boolean | Deduplicate by ID across channels. |
+| `history_retention_days` | `30` (918) | >= 1 (validate 639) | History JSONL retention (days). |
+
+### Detector defaults (code)
+
+| Detector | Default `enabled` | Threshold key | Note |
+|----------|-------------------|---------------|------|
+| `stale_worker` | `true` (898) | `threshold_ms` | StaleWorkerDetector. |
+| `scope_collision` | `true` (899) | — | File scope overlap. |
+| `debt_trend` | `true` (900) | `threshold_rate` (0–1) | Rising tech debt. |
+| `agent_routing` | `true` (901) | `anomaly_threshold` (0–1) | Routing anomaly. |
+| `directives_protection` | `true` (902) | `auto_restore` | DIRECTIVES.md protect + restore. |
+| `dead_event_stream` | `false` (904) | `threshold_ms` | Event-stream death. |
+| `cost_threshold`, `prompt_quality`, `worker_output_variance`, `self_modifying_warner` | `false` (905-908) | `reserve_for: sprint-148` | Reserved. |
+| `task_mode_idle`, `build_failure_recurrence`, `token_spike`, `agent_routing_anomaly`, `scope_collision_rate`, `notification_delivery_health` | `false` (911-916) | — | Sprint 180 W0 reserve (Phase 2/3). |
+
+> Detector enable flags only matter when `nervous_system.enabled: true`. A project config may set these opposite to the code defaults; the resolved file value wins.
+
+---
+
+## 20. Observability, Retention & Terminal
+
+| Key | Default (code) | Values | Description |
+|-----|----------------|--------|-------------|
+| `observability.rotation.maxSizeMB` | `1` (856) | number | metrics.jsonl rotation threshold (observability-rotation.ts:111). |
+| `observability.rotation.archiveFormat` | `"gzip"` (857) | `gzip` (config-types:325) | Archive format. |
+| `observability.rotation.keepLastN` | `10` (858) | number | Archives to retain. |
+| `sprint_file_retention.keep_last_n` | `10` (863) | number | Sprints kept in the project root (sprint-file-retention.ts:255). |
+| `sprint_file_retention.size_cap_mb` | `500` (864) | number | Total sprint-file size cap. |
+| `sprint_file_retention.archive_path` | `".deckent/archive/sprints/"` (865) | path | Archive directory. |
+| `terminal.enabled` | `true` | boolean | Embedded web terminal (ADR-062). |
+| `terminal.bind` | `"127.0.0.1"` | IP | WS bind address (localhost = safe default). |
+| `terminal.maxSessions` | `10` | number | Max concurrent PTY sessions. |
+| `terminal.idleTimeoutMs` | `1800000` | ms | Idle timeout for shell/ai kinds (deckent kind exempt). |
+| `terminal.scrollbackBytes` | `262144` | bytes | Per-session scrollback ring buffer (256 KB). |
+| `terminal.allowShellKind` | `true` | boolean | Allow plain `shell` sessions; if false, only `ai`/`deckent`. |
+
+---
+
+## 21. Prompt Tuning
+
+| Key | Default | Values | Description |
+|-----|---------|--------|-------------|
+| `prompt.adr_min_relevance` | `0.3` | 0.0–1.0 (validate 658) | ADR relevance filter for worker prompts (Sprint 182); ADRs scoring below the threshold are dropped (prompt-god-template). |
+
+---
+
+## 22. Inert / Unverified Fields
+
+These appear in config but have no active effect in the current code paths:
+
+- **`cost_optimization`** — validated but **no working consumer was found** (future feature).
+- **Top-level `max_workers`** — not effective; the active mode's `modes.<mode>.max_workers` shadows it (`resolveEffectiveWorkers`, config.ts:686). Set the per-mode value instead.
+- **Top-level `brain_planning`** — not an effective field on `DeckentConfig`; the real read is `modes.<mode>.brain_planning`. The top-level key only appears in REGEN template defaults (config.ts:1283).
+- **`rubric_max_retries`, `adaptive_config.*`** — inert while `adaptive_thresholds: false`.
+
+### Reproducing this verification
+
+```bash
+sed -n '760,920p' src/core/config.ts                  # DEFAULT_CONFIG values
+grep -n "VALID_\|includes(\|z.enum" src/core/config.ts # validation enums
+grep -n "?:" src/core/config-types.ts                  # union types
+grep -n "memory" src/orchestra/spawn-backend-docker.ts # docker memory flags
+sed -n '94,157p' src/orchestra/timeout-estimator.ts    # timeout estimate chain
+```
 
 ---
 
