@@ -38,6 +38,7 @@ import { DockerSpawnBackend, isDockerAvailable } from '../../src/orchestra/spawn
 import { detectOrphans, cleanupOrphanHBs } from '../../src/monitor/auditor.js';
 import { acquireLock, releaseLock, clearStaleLocks, checkLock } from '../../src/core/file-lock.js';
 import { LOCKS_DIR, TASKS_DIR } from '../../src/core/constants.js';
+import { _clearAllPending } from '../../src/core/active-workers.js';
 
 const PROJECT_ROOT = process.cwd();
 const TEST_TASKS_DIR = path.join(PROJECT_ROOT, '.tasks');
@@ -93,12 +94,14 @@ describe('Docker Backend Integration', () => {
   const containerName = `deckent-w-${testTaskId}`;
 
   beforeEach(() => {
+    _clearAllPending();
     backend = new DockerSpawnBackend(PROJECT_ROOT);
     forceRemoveContainer(containerName);
     cleanupTaskFiles(testTaskId);
   });
 
   afterEach(() => {
+    _clearAllPending();
     forceRemoveContainer(containerName);
     forceRemoveContainer(`${containerName}-b`);
     // Cleanup ALL test-docker artifacts (any PID, any suffix)

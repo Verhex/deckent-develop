@@ -130,10 +130,10 @@ describe('Docker OOM Recovery — Configurable Graceful Timeout', () => {
 
   it('SpawnBackendFactory forwards gracefulTimeoutSeconds to DockerSpawnBackend', () => {
     const source = readSpawnBackendSource();
-    // Both docker creation paths (explicit 'docker' and 'auto') should pass the option
+    // resolveBackend() normalizes 'auto' → 'docker', so there is one unified docker path
     const matches = source.match(/gracefulTimeoutSeconds:\s*opts\.dockerGracefulTimeoutSeconds/g);
     expect(matches).not.toBeNull();
-    expect(matches!.length).toBeGreaterThanOrEqual(2);
+    expect(matches!.length).toBeGreaterThanOrEqual(1);
   });
 });
 

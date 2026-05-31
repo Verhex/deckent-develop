@@ -2,6 +2,24 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint206] - 2026-05-31
+
+### Added
+
+- 206-001 — flow CLI registerFlow → CLI entry wire (gerçek gap)
+- 206-005 — F3-003 webhook/event trigger tipi + handler iskelet
+- 206-006 — F2 native chat gerçek provider adapter binding
+- 206-007 — Scheduled-flow runtime tick/scheduler iskelet
+- 206-008 — F4 RBAC role-check iskelet (tenant-aware permission)
+- 206-009 — ADR-069 (event-driven + RBAC) + ROADMAP tracker güncelle
+
+### Fixed
+
+- 206-002 — docker-backend test izolasyon fix (kill/list state)
+
+
+_Tasks: 16 total, 12 done, 0 tech debt, 4 no-go_
+
 ## [1.0.0-beta.1-sprint205] - 2026-05-31
 
 ### Added

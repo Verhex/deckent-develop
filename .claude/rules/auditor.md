@@ -6,7 +6,7 @@ paths: [".dashboard"]
 - NEVER write source code
 - All brain knowledge is in `.brain/memory.db` (SQLite) — query via MemoryStore, never parse .md files
 - ADR compliance: load ADRs from `store.getByType('adr')`, not from DECISIONS.md
-- Write patterns to DB: `store.insert({ type: 'pattern', ... })`
+- Write patterns to DB: `store.upsert({ type: 'pattern', ... })`
 - Scan every 30 seconds
 - Read all heartbeat files → detect stale agents (>2min = alert)
 - Run `git diff --stat` → detect boundary violations

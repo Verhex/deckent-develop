@@ -1,3 +1,10 @@
+import { spawn as nodeSpawn } from 'node:child_process';
+import {
+  providerRegistry as defaultProviderRegistry,
+  type ProviderAdapter,
+  type ProviderRegistry,
+} from '../../core/provider.js';
+
 // ═══ chat-native — Path C tool-use loop iskelet (Sprint 203 T-203-005) ═══
 //
 // Path B (`deckent chat`, src/cli/commands/chat.ts) spawns the user's host
@@ -243,4 +250,130 @@ export async function runChatNativeLoop(opts: ChatNativeOptions): Promise<ChatMe
   }
 
   return transcript;
+}
+
+// ─── Subscription Adapter Bridge (Sprint 206 T-206-006) ─────────────
+//
+// Wires the loop's ChatProviderAdapter shape onto a real provider — resolved
+// from the global ProviderRegistry — and drives the host CLI in SUBSCRIPTION
+// mode (session auth managed by the CLI itself; API keys are stripped from
+// the child env). API-mode is intentionally NOT routed through here per the
+// project DIRECTIVE `project_api_mode_deferred_post_beta`.
+
+/** Spawn shim — production wraps node:child_process.spawn, tests inject a fake. */
+export interface SubscriptionSpawnFn {
+  (binary: string, args: readonly string[], env: NodeJS.ProcessEnv): {
+    chunks: AsyncIterable<string>;
+    wait: Promise<{ exitCode: number | null }>;
+  };
+}
+
+export interface SubscriptionChatAdapterOptions {
+  /** Provider name to resolve from registry (omit → use registry default). */
+  providerName?: string;
+  /** Registry override (omit → use global providerRegistry singleton). */
+  registry?: ProviderRegistry;
+  /** Override the CLI binary (default: 'claude'). */
+  binary?: string;
+  /** Inject a custom spawn function — primarily for tests. */
+  spawnFn?: SubscriptionSpawnFn;
+  /** Args inserted before the prompt (default: ['--print'] — one-shot mode). */
+  extraArgs?: readonly string[];
+}
+
+/**
+ * Concatenate the transcript into one prompt blob suitable for a `--print`
+ * style one-shot invocation. Tool turns are tagged so the model can see
+ * earlier tool results in the same conversation.
+ */
+export function buildSubscriptionPrompt(messages: readonly ChatMessage[]): string {
+  return messages
+    .map((m) => {
+      const tag = m.role === 'tool' ? 'tool-result' : m.role;
+      return `<${tag}>${m.content}</${tag}>`;
+    })
+    .join('\n');
+}
+
+/**
+ * Default subscription spawn — invokes the CLI with the child env scrubbed
+ * of API keys so the binary falls through to its bundled session auth.
+ * Returns an async-iterable of stdout text chunks plus a wait promise that
+ * resolves once the child closes.
+ */
+export function defaultSubscriptionSpawn(
+  binary: string,
+  args: readonly string[],
+  env: NodeJS.ProcessEnv,
+): { chunks: AsyncIterable<string>; wait: Promise<{ exitCode: number | null }> } {
+  const child = nodeSpawn(binary, [...args], { env, stdio: ['ignore', 'pipe', 'pipe'] });
+  const chunks: AsyncIterable<string> = {
+    async *[Symbol.asyncIterator]() {
+      const stdout = child.stdout;
+      if (!stdout) return;
+      stdout.setEncoding('utf-8');
+      for await (const piece of stdout) yield String(piece);
+    },
+  };
+  const wait = new Promise<{ exitCode: number | null }>((resolve) => {
+    child.once('close', (code) => resolve({ exitCode: code }));
+  });
+  return { chunks, wait };
+}
+
+/**
+ * Build a ChatProviderAdapter that drives the host CLI in subscription mode.
+ *
+ * - Resolves a {@link ProviderAdapter} from the {@link ProviderRegistry} —
+ *   raising ProviderNotFoundError when the requested name is missing.
+ * - `send()` runs the CLI to completion and returns the concatenated stdout
+ *   as a single end_turn response.
+ * - `stream()` yields incremental stdout chunks as the CLI emits them and
+ *   finalizes with a `done` chunk carrying the full transcript.
+ */
+export function createSubscriptionChatAdapter(
+  opts: SubscriptionChatAdapterOptions = {},
+): ChatProviderAdapter {
+  const registry = opts.registry ?? defaultProviderRegistry;
+  // Resolve the provider — confirms registration; throws if missing.
+  // The resolved adapter is held so future per-provider routing can branch
+  // on adapter.name without changing the public factory signature.
+  const adapter: ProviderAdapter = opts.providerName !== undefined
+    ? registry.getProvider(opts.providerName)
+    : registry.getDefault();
+  void adapter;
+
+  const binary = opts.binary ?? 'claude';
+  const spawnFn = opts.spawnFn ?? defaultSubscriptionSpawn;
+  const extraArgs = opts.extraArgs ?? ['--print'];
+
+  function subscriptionEnv(): NodeJS.ProcessEnv {
+    const env: NodeJS.ProcessEnv = { ...process.env };
+    delete env['ANTHROPIC_API_KEY'];
+    delete env['DECKENT_CLAUDE_API_KEY'];
+    return env;
+  }
+
+  return {
+    async send(messages) {
+      const prompt = buildSubscriptionPrompt(messages);
+      const { chunks, wait } = spawnFn(binary, [...extraArgs, prompt], subscriptionEnv());
+      let text = '';
+      for await (const chunk of chunks) text += chunk;
+      await wait;
+      return { text, stopReason: 'end_turn' };
+    },
+    async *stream(messages) {
+      const prompt = buildSubscriptionPrompt(messages);
+      const { chunks, wait } = spawnFn(binary, [...extraArgs, prompt], subscriptionEnv());
+      let collected = '';
+      for await (const chunk of chunks) {
+        if (chunk.length === 0) continue;
+        collected += chunk;
+        yield { text: chunk };
+      }
+      await wait;
+      yield { done: { text: collected, stopReason: 'end_turn' } };
+    },
+  };
 }

@@ -5606,3 +5606,33 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 205-009: 205-009 — F4 ADR taslağı + ROADMAP tracker güncelle (DONE)
 
 ---
+## Sprint 206 — sprint-206
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-05-31
+**Duration:** 934s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 16 |
+| Completed | 12 |
+| Tech Debt | 0 |
+| No-Go | 4 |
+| Coverage | NaN% |
+| Duration | 933832ms |
+
+### Tasks
+
+- 206-001: 206-001 — flow CLI registerFlow → CLI entry wire (gerçek gap) (DONE)
+- 206-002: 206-002 — docker-backend test izolasyon fix (kill/list state) (DONE)
+- 206-003: 206-003 — docker-oom gracefulTimeout forward fix (NO_GO)
+- 206-004: 206-004 — auditor.md managed-docs template legacy temizlik (NO_GO)
+- 206-005: 206-005 — F3-003 webhook/event trigger tipi + handler iskelet (DONE)
+- 206-006: 206-006 — F2 native chat gerçek provider adapter binding (DONE)
+- 206-007: 206-007 — Scheduled-flow runtime tick/scheduler iskelet (DONE)
+- 206-008: 206-008 — F4 RBAC role-check iskelet (tenant-aware permission) (DONE)
+- 206-009: 206-009 — ADR-069 (event-driven + RBAC) + ROADMAP tracker güncelle (DONE)
+
+---

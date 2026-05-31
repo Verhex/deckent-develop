@@ -17,7 +17,7 @@
 | Yüz | Kitle | Mode | Olgunluk | En büyük boşluk |
 |-----|-------|------|----------|------------------|
 | **AI Developer** | Geliştirici | Sprint Mode | **~%90** | Beta hazır; provider-free + quota-safe eksik |
-| **AI System Worker** | Şirket | Process Mode | **~%45** | Scheduled flows + tam multi-tenant runtime |
+| **AI System Worker** | Şirket | Process Mode | **~%55** | Event-driven triggers + RBAC iskelet → tam multi-tenant runtime kalan |
 | **AI Asistan** | Sade kişi | Chat Mode | **~%50** | F2-003 streaming/multi-turn/resume DONE (Sprint 204); F2-001/002 kalan |
 
 ### TAMAMLANAN (kanıtlı)
@@ -57,12 +57,13 @@
 |----|----|---------|-------|
 | F3-001 | Multi-tenant izolasyon (tenantId skeleton) | P2 | ✅ DONE Sprint 204-008 (tenant-context.ts) |
 | F3-002 | Scheduled flows + cron | P2 | ✅ DONE Sprint 205-005/006/007 (scheduled-flow.ts + flow-registry.ts + flow CLI) |
-| F3-003 | SessionBackend k8s pod-exec | P3 | ⬜ |
+| F3-003 | Event-driven webhook/event triggers (EventTrigger + matchTrigger) | P3 | ✅ DONE Sprint 206-005 (event-trigger.ts, ADR-069) |
+| F3-004 | SessionBackend k8s pod-exec | P3 | ⬜ |
 
 **F4 — Enterprise + Million-User (Sub-project #4)** — post-F3:
 | ID | İş | Öncelik | Kanıt |
 |----|----|---------|-------|
-| F4-001 | OIDC/SSO AuthProvider impl | P3 | ⬜ |
+| F4-001 | OIDC/SSO AuthProvider impl + RBAC | P3 | 🟡 Sprint 206-008 iskelet: rbac.ts (Role + Permission + can(), ADR-069) |
 | F4-002 | Audit export API + compliance (SOC2/GDPR) | P3 | 🟡 Sprint 205-008 başlangıç: audit-query.ts (read-only filter) + ADR-068 |
 | F4-003 | Rate/resource limits + load hardening | P3 | ⬜ |
 

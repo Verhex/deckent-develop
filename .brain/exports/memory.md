@@ -1,5 +1,10 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-206 Learnings
+- Sprint sprint-206 Learnings: ## Sprint sprint-206 Learnings
+- 206-003 — docker-oom gracefulTimeout forward fix: NO_GO — Root cause: test expectation was stale, not a source bug. SpawnBackendFactory.create() correctly forwards gracefulTimeou
+- 206-004 — auditor.md managed-docs template legacy temizlik: NO_GO — Fixed legacy 'store.insert' → 'store.upsert' in auditor.md template and regenerated all provider rule files. The test wa
+
 ## Sprint sprint-205 Learnings
 - Sprint sprint-205 Learnings: ## Sprint sprint-205 Learnings
 

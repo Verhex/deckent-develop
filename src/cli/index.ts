@@ -50,6 +50,7 @@ import { registerAudit } from './commands/audit.js';
 import { registerAuditVerify } from './commands/audit-verify.js';
 import { registerRecover } from './commands/recover.js';
 import { registerModels } from './commands/models.js';
+import { registerFlow } from './commands/flow.js';
 import { showSplash } from './helpers/splash.js';
 import { installFatalHandlers } from './helpers/error-handler.js';
 
@@ -127,6 +128,7 @@ export function buildProgram(): Command {
   registerAuditVerify(program);
   registerRecover(program);
   registerModels(program);
+  registerFlow(program);
   registerHelp(program);
 
   return program;

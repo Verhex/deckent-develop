@@ -62,8 +62,11 @@
 | adr-065 | Develop / Product Two-Repo Split | accepted |
 | adr-066 | Provider Independence — Multi-Provider Backend Parity | accepted |
 | adr-067 | Process Mode + Tenant Isolation — F3 Foundation | proposed |
+| adr-068 | Enterprise Foundation — Audit Query + Multi-Tenant + Scheduled Flows | proposed |
 
 ## Recent Learnings
+- **Sprint sprint-206 Learnings** (sprint-206): ## Sprint sprint-206 Learnings
+- 206-003 — docker-oom gracefulTimeout forward fix: NO_GO — Root cause: test expectati...
 - **Sprint sprint-205 Learnings** (sprint-205): ## Sprint sprint-205 Learnings
 - **Sprint sprint-204 Learnings** (sprint-204): ## Sprint sprint-204 Learnings
 - 204-003 — Implementation intent için built-in agent adaylığı: NO_GO — Added BUILTIN_...
@@ -81,8 +84,6 @@
 - 197-004 — WSL2 OOM mitigation (max_workers + worker_memory + adaptive): NO_GO — Spri...
 - **Sprint sprint-195 Learnings** (sprint-195): ## Sprint sprint-195 Learnings
 - 195-004 — models.dev bootstrap startup wire: NO_GO — bootstrapFromCatalog added to s...
-- **Sprint sprint-193 Learnings** (sprint-193): ## Sprint sprint-193 Learnings
-- SMOKE-001 — i18n en.json duplicate error.lock_conflict temizle: NO_GO — Worker exite...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -127,5 +128,6 @@ _No active technical debt._
 - Violation pattern: doc_sync_ground_truth_mismatch
 - Violation pattern: stale_heartbeat
 - Violation pattern: file_outside_scope
+- Violation pattern: stale_heartbeat
 
-_Total entries: 424 | Generated: 2026-05-31_
+_Total entries: 429 | Generated: 2026-05-31_
