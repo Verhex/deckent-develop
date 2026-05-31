@@ -1,6 +1,7 @@
 import { mkdirSync, writeFileSync, readFileSync, readdirSync, rmSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ScheduledFlow } from './scheduled-flow.js';
+import { can, Permission } from './rbac.js';
 
 export class FlowRegistry {
   private flows = new Map<string, ScheduledFlow>();
@@ -11,7 +12,10 @@ export class FlowRegistry {
     this._loadFromDisk();
   }
 
-  addFlow(flow: ScheduledFlow): void {
+  addFlow(flow: ScheduledFlow, role?: string): void {
+    if (role !== undefined && !can(role, Permission.FLOW_MANAGE, flow.tenantId)) {
+      throw new Error(`Role '${role}' lacks flow:manage permission for tenant '${flow.tenantId}'`);
+    }
     this.flows.set(flow.id, flow);
     this._persist(flow);
   }
@@ -20,23 +24,32 @@ export class FlowRegistry {
     return this.flows.get(id);
   }
 
-  listFlows(tenantId?: string): ScheduledFlow[] {
+  listFlows(tenantId?: string, role?: string): ScheduledFlow[] {
+    if (role !== undefined && tenantId !== undefined && !can(role, Permission.READ, tenantId)) {
+      throw new Error(`Role '${role}' lacks read permission for tenant '${tenantId}'`);
+    }
     const all = Array.from(this.flows.values());
     return tenantId === undefined ? all : all.filter(f => f.tenantId === tenantId);
   }
 
-  removeFlow(id: string): boolean {
+  removeFlow(id: string, role?: string): boolean {
     const flow = this.flows.get(id);
     if (!flow) return false;
+    if (role !== undefined && !can(role, Permission.FLOW_MANAGE, flow.tenantId)) {
+      throw new Error(`Role '${role}' lacks flow:manage permission for tenant '${flow.tenantId}'`);
+    }
     this.flows.delete(id);
     const filePath = this._flowPath(flow.tenantId, id);
     if (existsSync(filePath)) rmSync(filePath);
     return true;
   }
 
-  enableFlow(id: string, enabled: boolean): boolean {
+  enableFlow(id: string, enabled: boolean, role?: string): boolean {
     const flow = this.flows.get(id);
     if (!flow) return false;
+    if (role !== undefined && !can(role, Permission.FLOW_MANAGE, flow.tenantId)) {
+      throw new Error(`Role '${role}' lacks flow:manage permission for tenant '${flow.tenantId}'`);
+    }
     const updated = { ...flow, enabled };
     this.flows.set(id, updated);
     this._persist(updated);

@@ -1,0 +1,108 @@
+// ─── Prompt Evolution (F5 Skeleton) ─────────────────────────────────────────
+// Rule-based prompt tuning — appends hint blocks to a base prompt based on
+// past routing outcomes. NOT an LLM call; pure string composition.
+// Integration point for OutcomeTracker (see outcome-tracker.ts) — accepts the
+// same RoutingOutcome shape so future callers can pipe sprint history in.
+
+import type { RoutingOutcome } from './outcome-tracker.js';
+
+export interface PromptEvolutionResult {
+  evolvedPrompt: string;
+  changes: string[];
+  outcomeCount: number;
+  successRate: number;
+}
+
+const SUCCESS_HEADER = '## Başarı Pattern (Outcome-Driven)';
+const FAILURE_HEADER = '## Risk Uyarısı (Outcome-Driven)';
+
+const MIN_SUCCESS_OUTCOMES = 3;
+const SUCCESS_RATE_THRESHOLD = 0.75;
+const MIN_FAILURE_OUTCOMES = 2;
+const TOP_ENTITY_LIMIT = 3;
+
+/**
+ * Evolve a base prompt by inspecting past routing outcomes and appending
+ * deterministic hint blocks (success reinforcement, failure warning).
+ *
+ * Rules:
+ *   1. Empty outcomes  → no-op.
+ *   2. ≥3 outcomes with success rate ≥0.75 → append SUCCESS block.
+ *   3. ≥2 NO_GO outcomes → append FAILURE block with corrective hints.
+ *   4. Idempotent — skips a block if its header already appears in basePrompt.
+ */
+export function evolvePrompt(
+  basePrompt: string,
+  outcomes: RoutingOutcome[],
+): PromptEvolutionResult {
+  if (outcomes.length === 0) {
+    return { evolvedPrompt: basePrompt, changes: [], outcomeCount: 0, successRate: 0 };
+  }
+
+  const successCount = outcomes.filter(o => o.evaluation !== 'NO_GO').length;
+  const failCount = outcomes.length - successCount;
+  const successRate = successCount / outcomes.length;
+
+  const changes: string[] = [];
+  const sections: string[] = [basePrompt];
+
+  if (successCount >= MIN_SUCCESS_OUTCOMES && successRate >= SUCCESS_RATE_THRESHOLD) {
+    if (!basePrompt.includes(SUCCESS_HEADER)) {
+      sections.push(buildSuccessBlock(outcomes, successRate));
+      changes.push('reinforced-success-pattern');
+    }
+  }
+
+  if (failCount >= MIN_FAILURE_OUTCOMES) {
+    if (!basePrompt.includes(FAILURE_HEADER)) {
+      sections.push(buildFailureBlock(outcomes, failCount));
+      changes.push('added-failure-warning');
+    }
+  }
+
+  return {
+    evolvedPrompt: sections.join('\n\n'),
+    changes,
+    outcomeCount: outcomes.length,
+    successRate,
+  };
+}
+
+function buildSuccessBlock(outcomes: RoutingOutcome[], rate: number): string {
+  const counts = countAgents(outcomes, 'success');
+  const topAgents = pickTop(counts).map(([id]) => id).join(', ');
+  const percent = Math.round(rate * 100);
+  const tail = topAgents.length > 0
+    ? ` Yüksek başarılı agent: ${topAgents}. Bu yaklaşımı sürdür.`
+    : '';
+  return `${SUCCESS_HEADER}\nGeçmiş ${outcomes.length} task'ta %${percent} başarı.${tail}`;
+}
+
+function buildFailureBlock(outcomes: RoutingOutcome[], failCount: number): string {
+  const counts = countAgents(outcomes, 'fail');
+  const topFails = pickTop(counts)
+    .map(([id, n]) => `${id} (${n}x)`)
+    .join(', ');
+  const tail = topFails.length > 0
+    ? ` Tekrarlanan başarısızlık: ${topFails}.`
+    : '';
+  return `${FAILURE_HEADER}\n${failCount}/${outcomes.length} geçmiş NO_GO.${tail} Bu pattern'i tekrarlamamaya dikkat et: gereksinim doğrulama, scope sınırı, test koşumu.`;
+}
+
+function countAgents(outcomes: RoutingOutcome[], side: 'success' | 'fail'): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const o of outcomes) {
+    const isFail = o.evaluation === 'NO_GO';
+    const wanted = side === 'fail' ? isFail : !isFail;
+    if (!wanted) continue;
+    if (!o.agentId || o.agentId === 'generic') continue;
+    counts.set(o.agentId, (counts.get(o.agentId) ?? 0) + 1);
+  }
+  return counts;
+}
+
+function pickTop(counts: Map<string, number>): Array<[string, number]> {
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, TOP_ENTITY_LIMIT);
+}

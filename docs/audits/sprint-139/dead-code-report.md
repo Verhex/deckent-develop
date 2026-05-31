@@ -8,7 +8,7 @@
 
 | Category | Modules | Total Lines |
 |----------|---------|-------------|
-| Dead | 3 | 561 |
+| Dead | 3 | 578 |
 | Dormant (ADR-protected) | 4 | 553 |
 | Lightly-Used | 0 | 0 |
 | Active | 1 | 121 |
@@ -30,7 +30,7 @@ These modules have **zero imports** in src/ and are not protected by any ADR.
 - **Action:** Safe to remove in Step 2
 
 ### src/orchestra/brain-context.ts
-- **Lines:** 268
+- **Lines:** 285
 - **Reason:** Context enrichment functions — not imported by any src/ file
 - **Imported by:** nobody
 - **Action:** Safe to remove in Step 2
@@ -75,7 +75,7 @@ These suspects turned out to be actively used.
 
 ## Unused Export Sampling
 
-Found **879** potentially unused exports across src/.
+Found **905** potentially unused exports across src/.
 Top 20 shown below (full list requires deeper analysis):
 
 | File | Export | Import Count |
@@ -103,7 +103,7 @@ Top 20 shown below (full list requires deeper analysis):
 
 ## Recommendations
 
-1. **Step 2 (Sprint 140+):** Remove Dead modules (3 files, ~561 LoC) with full test verification
+1. **Step 2 (Sprint 140+):** Remove Dead modules (3 files, ~578 LoC) with full test verification
 2. **ADR Amendment:** If V1 decision engine is no longer needed as reference, amend ADR-028 to allow removal (~553 LoC)
 3. **Lightly-Used Review:** Consider inlining single-consumer modules to reduce coupling
 4. **Unused Export Cleanup:** Review top unused exports for dead function-level code

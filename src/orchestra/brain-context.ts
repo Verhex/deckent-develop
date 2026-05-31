@@ -8,6 +8,19 @@ import type { ProjectStack, SkillDefinition } from '../core/skill-types.js';
 import type { AgentDefinition } from '../core/agent-types.js';
 import { BRAIN_DIR, SPRINTS_DIR } from '../core/constants.js';
 import { debugLog } from '../core/utils.js';
+import { modelRegistry } from '../core/model-registry.js';
+
+// ─── Registry-based model label resolution ───────────────────────────────
+
+/**
+ * Resolve a model ID to a display label using the live registry.
+ * Returns `provider/apiId` for known models, `modelId` for unknown ones.
+ */
+export function resolveModelLabel(modelId: string): string {
+  const def = modelRegistry.get(modelId);
+  if (!def) return modelId;
+  return `${def.provider}/${def.apiId}`;
+}
 
 // ═══ Task 23: Stack Context ═══════════════════════════════════════════════
 
@@ -147,10 +160,10 @@ export function formatHistoryContext(history: SprintHistoryData): string {
   // Success rate
   parts.push(`Success: ${(history.successRate * 100).toFixed(0)}%`);
 
-  // Model distribution
+  // Model distribution — resolve labels via live registry
   const modelParts: string[] = [];
   for (const [model, count] of Object.entries(history.models)) {
-    modelParts.push(`${model}:${count}`);
+    modelParts.push(`${resolveModelLabel(model)}:${count}`);
   }
   if (modelParts.length > 0) {
     parts.push(`Models: ${modelParts.join(', ')}`);
@@ -199,6 +212,10 @@ function _loadSprintHistory(projectRoot: string, maxSprints: number): SprintHist
     let doneTasks = 0;
     const noGoPatterns: string[] = [];
 
+    // Build model-match regex once from live registry (parametric — no hardcodes)
+    const registryIds = modelRegistry.getAllModelIds().map(id => id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+    const modelPattern = registryIds.length > 0 ? new RegExp(`\\| (${registryIds.join('|')}) \\|`) : null;
+
     for (const file of files) {
       const content = _readFileSafe(join(sprintsPath, file));
       const lines = content.split('\n');
@@ -228,9 +245,9 @@ function _loadSprintHistory(projectRoot: string, maxSprints: number): SprintHist
           taskTypes[type] = (taskTypes[type] ?? 0) + 1;
         }
 
-        // Parse model from metrics table
+        // Parse model from metrics table using registry-based pattern
         // e.g., "| opus | 5 |"
-        const modelMatch = line.match(/\| (opus|sonnet|haiku|gpt-4\.1|o3|o4-mini|gemini-2\.5-pro|gemini-2\.5-flash) \|/);
+        const modelMatch = modelPattern ? line.match(modelPattern) : null;
         if (modelMatch?.[1]) {
           const model = modelMatch[1];
           models[model] = (models[model] ?? 0) + 1;

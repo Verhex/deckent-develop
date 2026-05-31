@@ -2,6 +2,29 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint208] - 2026-05-31
+
+### Added
+
+- 208-002 — CLI sabit sayı çıktıları parametrik (agent/skill/tool count)
+- 208-003 — Model distribution çıktısı brain-context parametrik
+- 208-004 — Zero-hardcode audit raporu + lint guard
+- 208-005 — Flow scheduler runtime daemon (tick loop)
+- 208-006 — Self-dispatch protokol iskelet (otonom sprint tetikleme)
+- 208-007 — deckent flow run CLI (scheduled flow manuel tetik)
+- 208-008 — Tenant runtime context wire (multi-tenant izolasyon aktif)
+- 208-009 — RBAC role hierarchy + permission matrix tamamla
+- 208-010 — Flow-registry RBAC gate (flow:manage izni)
+- 208-011 — Audit event yazım API (query'nin yazma tarafı)
+
+### Fixed
+
+- 208-001 — mergeFromCatalog id eşleşme kök-bug fix
+- 208-015 — docker-backend e2e izolasyon kalıcı fix
+
+
+_Tasks: 16 total, 16 done, 0 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint207] - 2026-05-31
 
 ### Added

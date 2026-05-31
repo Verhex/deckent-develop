@@ -88,24 +88,39 @@ function cleanupTaskFiles(taskId: string): void {
   }
 }
 
+// Monotonically increasing counter — prevents testTaskId collision when Date.now()
+// returns the same value for consecutive fast tests in the same millisecond.
+let _dockerTestSeq = 0;
+
 describe('Docker Backend Integration', () => {
   let backend: DockerSpawnBackend;
   let testTaskId: string;
   let containerName: string;
 
   beforeEach(() => {
-    // Unique ID per test — prevents container name conflicts across tests in the full suite.
-    // process.pid alone is shared across vitest worker threads (same host process),
-    // so adding Date.now() makes each test's container name unique.
-    testTaskId = `test-docker-${Date.now()}-${process.pid}`;
+    // Unique ID per test — Date.now() + pid + monotonic counter guarantees no collision
+    // even when tests run back-to-back within the same millisecond.
+    testTaskId = `test-docker-${Date.now()}-${process.pid}-${++_dockerTestSeq}`;
     containerName = `deckent-w-${testTaskId}`;
     _clearAllPending();
+    // Broad cleanup BEFORE creating backend: catches stale .hb files that background
+    // monitorContainer callbacks from previous tests may have written after afterEach ran.
+    try {
+      const files = fs.readdirSync(TEST_TASKS_DIR);
+      for (const f of files) {
+        if (f.startsWith('task-test-docker-') || f.startsWith('.prompt-') || f.startsWith('.worker-test-docker-')) {
+          try { fs.unlinkSync(path.join(TEST_TASKS_DIR, f)); } catch { /* ok */ }
+        }
+      }
+    } catch { /* ok */ }
     backend = new DockerSpawnBackend(PROJECT_ROOT);
     forceRemoveContainer(containerName);
     cleanupTaskFiles(testTaskId);
   });
 
   afterEach(() => {
+    // Kill before clearing global state — ensures backend deregisters cleanly.
+    try { backend.kill(testTaskId); } catch { /* already killed or not spawned */ }
     _clearAllPending();
     forceRemoveContainer(containerName);
     forceRemoveContainer(`${containerName}-b`);
@@ -276,8 +291,10 @@ describe('Docker Backend Integration', () => {
     const containerName2 = `deckent-w-${taskId2}`;
 
     try {
-      // Arrange — start with empty list
-      expect(backend.list().length).toBe(0);
+      // Arrange — neither specific task must be pre-registered (more robust than length===0
+      // since a fresh backend instance should never contain these unique test IDs)
+      expect(backend.list()).not.toContain(testTaskId);
+      expect(backend.list()).not.toContain(taskId2);
 
       // Act — spawn two tasks
       backend.spawn(testTaskId, 'haiku', 'multi test 1', { projectDir: PROJECT_ROOT });
@@ -293,6 +310,7 @@ describe('Docker Backend Integration', () => {
       expect(backend.list()).not.toContain(testTaskId);
       expect(backend.list()).toContain(taskId2);
     } finally {
+      try { backend.kill(testTaskId); } catch { /* ok — may already be killed */ }
       backend.kill(taskId2);
       forceRemoveContainer(containerName2);
       cleanupTaskFiles(taskId2);

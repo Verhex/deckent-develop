@@ -10,6 +10,8 @@ import type { Command } from 'commander';
 import { print } from '../helpers/output.js';
 import { detectLang } from '../helpers/i18n.js';
 import { resolveProjectRoot } from '../helpers/process.js';
+import { AgentPoolManager } from '../../core/agent-pool.js';
+import { SkillPoolManager } from '../../core/skill-pool.js';
 
 // ─── Localized Help Content ─────────────────────────────────────────
 
@@ -116,6 +118,35 @@ function formatHelp(lang: 'en' | 'tr'): string {
 // ─── Exports for testing ────────────────────────────────────────────
 
 export { formatHelp, HELP_CONTENT };
+
+// ─── Dynamic Capability Counts ──────────────────────────────────────
+
+export interface CapabilityCounts {
+  agents: number;
+  skills: number;
+  tools: number;
+}
+
+/**
+ * Returns agent/skill counts from the runtime registries and tool count
+ * from the caller (MCP layer knows the real count). Never hardcodes totals.
+ * Zero-hardcode compliant per ADR-070.
+ */
+export function getCapabilityCounts(root: string, overrideToolCount = 0): CapabilityCounts {
+  let agents = 0;
+  let skills = 0;
+  try {
+    agents = new AgentPoolManager(root).listAgents().length;
+  } catch {
+    // registry unavailable — return 0 gracefully
+  }
+  try {
+    skills = new SkillPoolManager(root).listSkills().length;
+  } catch {
+    // registry unavailable — return 0 gracefully
+  }
+  return { agents, skills, tools: overrideToolCount };
+}
 
 // ─── Command Registration ───────────────────────────────────────────
 

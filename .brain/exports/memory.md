@@ -1,5 +1,8 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-208 Learnings
+- Sprint sprint-208 Learnings: ## Sprint sprint-208 Learnings
+
 ## Sprint sprint-207 Learnings
 - Sprint sprint-207 Learnings: ## Sprint sprint-207 Learnings
 - 207-001 — Model registry bundled apiId güncel + "stale" işareti: GO_WITH_TECH_DEBT — DONE criteria met: (1) bundled opus apiId updated claude-opus-4-6→claude-opus-4-8 (src/core/model-registry.ts:62). (2) B

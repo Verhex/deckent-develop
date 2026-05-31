@@ -5666,3 +5666,40 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 207-009: 207-009 — ADR-070 (Brain Evaluation Integrity + Zero-Hard-Code) + ROADMAP (DONE)
 
 ---
+## Sprint 208 — sprint-208
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-05-31
+**Duration:** 1059s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 16 |
+| Completed | 16 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 1058525ms |
+
+### Tasks
+
+- 208-001: 208-001 — mergeFromCatalog id eşleşme kök-bug fix (DONE)
+- 208-002: 208-002 — CLI sabit sayı çıktıları parametrik (agent/skill/tool count) (DONE)
+- 208-003: 208-003 — Model distribution çıktısı brain-context parametrik (DONE)
+- 208-004: 208-004 — Zero-hardcode audit raporu + lint guard (DONE)
+- 208-005: 208-005 — Flow scheduler runtime daemon (tick loop) (DONE)
+- 208-006: 208-006 — Self-dispatch protokol iskelet (otonom sprint tetikleme) (DONE)
+- 208-007: 208-007 — deckent flow run CLI (scheduled flow manuel tetik) (DONE)
+- 208-008: 208-008 — Tenant runtime context wire (multi-tenant izolasyon aktif) (DONE)
+- 208-009: 208-009 — RBAC role hierarchy + permission matrix tamamla (DONE)
+- 208-010: 208-010 — Flow-registry RBAC gate (flow:manage izni) (DONE)
+- 208-011: 208-011 — Audit event yazım API (query'nin yazma tarafı) (DONE)
+- 208-012: 208-012 — Enterprise config schema (tenant + rbac + flow ayarları) (DONE)
+- 208-013: 208-013 — Prompt-evolution iskelet (outcome→prompt tuning) (DONE)
+- 208-014: 208-014 — Adaptive-agent wire (runtime agent adaptation aktif) (DONE)
+- 208-015: 208-015 — docker-backend e2e izolasyon kalıcı fix (DONE)
+- 208-016: 208-016 — ADR-071 (F3 Otonom Mod + F4 Enterprise mimari) + ROADMAP (DONE)
+
+---

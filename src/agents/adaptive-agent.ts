@@ -1,5 +1,8 @@
 // ─── Adaptive Agent ─────────────────────────────────────────────────────────
 // Analyzes prompt effectiveness and suggests improvements. Never auto-applies.
+//
+// Integration point: import adaptAgent() from this module to wire outcome-based
+// adaptation into outcome-tracker or routing-engine callers.
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -210,4 +213,26 @@ export class AdaptiveAgent {
       changedSections: uniqueSections,
     };
   }
+}
+
+// ─── adaptAgent ─────────────────────────────────────────────────────────────
+// Module-level integration point. Callers (outcome-tracker, routing-engine)
+// import this function to trigger outcome-based adaptation.
+// Never auto-applies — always returns a diff for human review.
+
+export interface AdaptResult {
+  diff: PromptDiff;
+  effectiveness: EffectivenessResult;
+}
+
+const _sharedAgent = new AdaptiveAgent();
+
+export function adaptAgent(
+  agentId: string,
+  currentPrompt: string,
+  recentResults: ResultEntry[],
+): AdaptResult {
+  const effectiveness = _sharedAgent.analyzePromptEffectiveness(agentId, recentResults);
+  const diff = _sharedAgent.suggestPromptChange(agentId, currentPrompt, effectiveness.weaknesses);
+  return { diff, effectiveness };
 }

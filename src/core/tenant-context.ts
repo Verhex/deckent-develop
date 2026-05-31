@@ -1,4 +1,5 @@
 import { join } from 'node:path';
+import { AsyncLocalStorage } from 'node:async_hooks';
 
 /** Tenant isolation context for F3 process mode. */
 export interface TenantContext {
@@ -50,4 +51,43 @@ export function resolveTenant(
     isolationRoot: tenantIsolationPath(projectRoot, tenantId),
     createdAt: new Date().toISOString(),
   };
+}
+
+// ---------------------------------------------------------------------------
+// Runtime context — async-scoped tenant identity
+// ---------------------------------------------------------------------------
+
+const _tenantStore = new AsyncLocalStorage<TenantContext>();
+
+/**
+ * Run `fn` in a tenant-scoped async context.
+ * Any call to currentTenant() or tenantPath() inside fn (and its callees)
+ * will return context for `tenantId`.
+ */
+export function withTenant<T>(
+  tenantId: string,
+  projectRoot: string,
+  fn: () => T,
+): T {
+  const ctx = resolveTenant(projectRoot, { tenantId });
+  return _tenantStore.run(ctx, fn);
+}
+
+/**
+ * Returns the TenantContext active in the current async scope.
+ * Falls back to the 'local' tenant resolved against the process cwd
+ * when called outside a withTenant() scope.
+ */
+export function currentTenant(projectRoot = process.cwd()): TenantContext {
+  return _tenantStore.getStore() ?? resolveTenant(projectRoot);
+}
+
+/**
+ * Resolve a relative path under the current tenant's isolation root.
+ * Example: tenantPath('flows/my-flow.json') →
+ *   <isolationRoot>/flows/my-flow.json
+ */
+export function tenantPath(relativePath: string, projectRoot?: string): string {
+  const ctx = currentTenant(projectRoot);
+  return join(ctx.isolationRoot, relativePath);
 }

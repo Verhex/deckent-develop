@@ -411,34 +411,45 @@ interface BootstrapOptions {
 }
 
 /**
- * Merge remote catalog apiIds into existing (bundled) model definitions.
+ * Merge remote catalog into existing (bundled) model definitions — apiId-aware.
  *
- * The remote catalog (models.dev) typically uses full API IDs as its `id` field
- * (e.g. `claude-opus-4-8`), while the bundled registry uses short logical IDs
- * (e.g. `opus`). A plain merge-by-id therefore misses bundled entries.
+ * The remote catalog (models.dev) uses full API IDs as both its `id` and
+ * `apiId` fields (e.g. `claude-opus-4-8`), while the bundled registry uses
+ * short logical IDs (e.g. `opus`) with the current API ID in `apiId`.
  *
- * Match key: `remote.id === existing.apiId` — the remote model's id is the
- * current API ID of a bundled entry. When matched, the bundled entry's `apiId`
- * is replaced with `remote.apiId` (live source wins). Unmatched entries are
- * returned unchanged (offline safety net).
+ * Match: `remote.apiId === bundled.apiId` OR `remote.id === bundled.apiId`.
+ * On match the bundled entry's `apiId`, `costPerMillion`, and `contextWindow`
+ * are refreshed from the remote (live source wins), while `id` (the alias)
+ * and all other fields are preserved.
+ *
+ * Unmatched remote entries are appended as new entries so that upstream-only
+ * models reach the registry (offline-safe: if remote is empty, the result is
+ * just the existing bundled list).
  */
 export function mergeApiIdOverrides(
   existing: ModelDefinition[],
   remote: ModelDefinition[],
 ): ModelDefinition[] {
-  // Index remote models by their id (full API ID used by models.dev)
-  const remoteById = new Map<string, ModelDefinition>();
-  for (const rm of remote) {
-    remoteById.set(rm.id, rm);
-  }
+  const consumed = new Set<ModelDefinition>();
 
-  return existing.map(bundled => {
-    const match = remoteById.get(bundled.apiId);
-    if (match && match.apiId && match.apiId !== bundled.apiId) {
-      return { ...bundled, apiId: match.apiId };
-    }
-    return bundled;
+  const updated = existing.map(bundled => {
+    // apiId-aware match: remote.apiId OR remote.id equals bundled.apiId
+    const match = remote.find(
+      rm => !consumed.has(rm) && (rm.apiId === bundled.apiId || rm.id === bundled.apiId),
+    );
+    if (!match) return bundled;
+    consumed.add(match);
+    return {
+      ...bundled,
+      apiId: match.apiId,
+      costPerMillion: match.costPerMillion,
+      contextWindow: match.contextWindow,
+    };
   });
+
+  // Append unmatched remote entries as new registry entries
+  const unmatched = remote.filter(rm => !consumed.has(rm));
+  return unmatched.length === 0 ? updated : [...updated, ...unmatched];
 }
 
 /**
