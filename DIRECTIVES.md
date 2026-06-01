@@ -1,6 +1,6 @@
 # DIRECTIVES — Sprint 218: Dashboard GERÇEKTEN God-Level — İşlevsel + Güzel + Native (hollow F7 → run-proven)
 
-## Goal: DASHBOARD SPRINTİ (12 task, 4 dalga, 10 worker). Gerçek-kullanım denetimi ([[project_dashboard_realrun_findings]], 2026-06-01 tarayıcı testi) kanıtladı: serve API/token çalışıyor AMA dashboard hollow — sprint başlatınca DONUYOR, chat sadece status'a yanıt veriyor, Evolution/Nervous/Enterprise sayfaları (Sprint 215 "DONE") route+sidebar'a HİÇ bağlanmamış (dosya var, caller yok — wire-gap), tasarım skeleton-seviyesi. Bu sprint hepsini GERÇEKTEN çözer: DALGA 0: P0 donma fix (sprint-start serve'den detach). DALGA A: işlevsellik (4 sayfa route+sidebar wire, chat gerçek round-trip, DIRECTIVES editörü). DALGA B: tasarım god-level + native hız (modern UI/UX, sıfır freeze, tema tutarlılık). DALGA C: e2e kanıt + ADR. Her Tier-1 task ZORUNLU `Smoke:` satırı (216-002 Proof-of-Function gate artık dist'te canlı — sprint-içi otomatik koşar).
+## Goal: DASHBOARD SPRINTİ (13 task, 5 dalga, 10 worker). **DALGA ÖN: 🔴 git self-mutation guard P0 (ABSOLUTE FIRST — tek başına ilk wave, DONE+commit olmadan diğer wave'ler spawn edilmez; Sprint 216 bu bug'la kayboldu).** Gerçek-kullanım denetimi ([[project_dashboard_realrun_findings]], 2026-06-01 tarayıcı testi) kanıtladı: serve API/token çalışıyor AMA dashboard hollow — sprint başlatınca DONUYOR, chat sadece status'a yanıt veriyor, Evolution/Nervous/Enterprise sayfaları (Sprint 215 "DONE") route+sidebar'a HİÇ bağlanmamış (dosya var, caller yok — wire-gap), tasarım skeleton-seviyesi. Bu sprint hepsini GERÇEKTEN çözer: DALGA 0: P0 donma fix (sprint-start serve'den detach). DALGA A: işlevsellik (4 sayfa route+sidebar wire, chat gerçek round-trip, DIRECTIVES editörü). DALGA B: tasarım god-level + native hız (modern UI/UX, sıfır freeze, tema tutarlılık). DALGA C: e2e kanıt + ADR. Her Tier-1 task ZORUNLU `Smoke:` satırı (216-002 Proof-of-Function gate artık dist'te canlı — sprint-içi otomatik koşar).
 
 Bağlam:
 - **serve API/token RUN-PROVEN** (Sprint 216-006): `/api/status` 200, token auto-mint+inject çalışıyor. Dashboard'ın temeli sağlam.
@@ -16,6 +16,26 @@ Bağlam:
 - **🔑 WIRE-GAP ([[feedback_directive_kanit_letter_vs_goal]]):** "bağla/wire" task'ında scope ÇAĞIRAN dosyayı (App.tsx/Sidebar.tsx) içerir; kanıt-grep def-dosyasını (Page.tsx) dışlar → external caller ≥1. **USER-WORKING ([[feedback_wiring_pct_vs_user_working]]):** "wired" yetmez, kullanıcı erişebilmeli.
 - **🎨 GOD-LEVEL ([[feedback_no_minimum_no_mvp_deckent]]):** "Bu god-level mi?" — skeleton/placeholder kabul edilemez, native hız, sıfır freeze.
 - **KÜÇÜK TASK:** tek-dosya odaklı, ≤200 LoC, effort≤normal. high YASAK. Her kod task'ı YENİ TEST DOSYASI (min 4, hermetik). ESM `.js` suffix. Kök package.json'a yeni runtime dep YASAK (ADR-010). Dashboard testleri `tests/dashboard/`, mock'lu.
+
+---
+
+## DALGA ÖN — 🔴 P0 Git Self-Mutation Guard (ABSOLUTE FIRST — tek başına ilk wave)
+
+> **MUTLAK ÖNCELİK:** Bu task DONE + **commit** olmadan HİÇBİR diğer wave spawn EDİLMEZ. Yoksa 218 worker'ları (uncommitted kod yazarken) birbirinin/kendi işini siler — Sprint 216 tam böyle kayboldu.
+
+## Task 0: 218-013 — [P0 ABSOLUTE FIRST] Git self-mutation guard (deckent-dev tree'sinde reset/stash/commit NO-OP)
+- Model: opus
+- Effort: normal
+- Skills: typescript-expert, system-architect
+- Files: src/orchestra/rollback.ts, tests/orchestra/git-self-mutation-guard.test.ts
+- Scope: src/orchestra/, tests/orchestra/
+
+### Description
+**Problem (KANIT — Sprint 216 kaybı, [[project_deckent_self_git_mutation_bug]]):** worker-spawn rollback `createSafetyPoint` (`git stash push -m deckent-safety-*`) + `rollback` (`git reset --hard <sha>`, satır ~191) deckent-dev (dogfood) tree'sinde deckent'in KENDİ uncommitted işini sildi (Sprint 216 server.ts/rubric-registry/routing/task-builder değişiklikleri). Ayrıca bir süreç otonom `"exit-trap-test"` commit'i yaptı. `self-modifying-detector.ts` (ADR-039) self-project'i `package.json name:"deckent"` ile tespit ediyor AMA rollback.ts bunu kullanmıyor.
+**Çözüm:** rollback.ts `createSafetyPoint` + `rollback` — self-modifying-detector'ın self-project (isDeckentRepo) tespitini çağır; **self-project ise stash/reset NO-OP** (safety-point oluşturma, `git reset --hard` çalıştırma) + breadcrumb log (`[rollback] self-project — git mutation skipped`). Caller rollback.ts (def self-modifying-detector.ts hariç). worker-rollback.ts aynı guard'ı uygulasın (ayrı task değil, kapsamda değilse not düş). ADR-039 exemption genişletme.
+**Kanıt:** `grep -c "self.*project\|isDeckent\|no-op\|skip\|self-modifying" src/orchestra/rollback.ts` → ≥2; `grep -rl "self-modifying-detector\|isDeckent" src/orchestra/rollback.ts` → wire; `npx vitest run tests/orchestra/git-self-mutation-guard.test.ts` → 4+ pass
+**Test:** ≥4 (self-project→reset no-op, self-project→stash no-op/safety-point skip, user-project→reset hâlâ çalışır, breadcrumb log) — git mock'lu, gerçek reset YOK (hermetik)
+**Smoke:** `node -e "import('./dist/orchestra/rollback.js').then(m=>console.log(typeof m.rollback))"` → fonksiyon export edilir (self-project guard'lı)
 
 ---
 
@@ -210,7 +230,7 @@ Bağlam:
 
 **🟢 PROOF-OF-FUNCTION (gate canlı):** Tier-1 task'lar sprint-içi otomatik smoke gate'ten geçer. Ek olarak ben (cc) sprint sonu: gerçek `dist/cli/entry.js serve` boot → dashboard'dan sprint başlat (donmaz mı) + chat (cevap mı) + 8 sayfa (erişilir mi) run-verify edip çıktı göstereceğim. Tam tarayıcı render'ı sen doğrularsın.
 
-**Pre-flight:** **build:all + restart + RE-PLAN ŞART** (dashboard vite bundle + 218-001 detach + gate). `.tasks/` 217 placeholder dosyaları temizlensin (deckent plan yeni 218 üretir). config max_workers=10. Sprint start Alperen manuel (CLI veya — donma fix sonrası — dashboard).
+**Pre-flight:** **build:all + restart + RE-PLAN ŞART** (dashboard vite bundle + 218-001 detach + gate). **🔴 ÖNCE 218-013 git-guard'ı tek başına çalıştır → DONE → build → COMMIT → SONRA diğer wave'ler** (yoksa worker'lar uncommitted işini siler). `.tasks/` 217 placeholder dosyaları temizlensin. config max_workers=10. **Sprint CLI'dan başlat — dashboard'dan DEĞİL** (dashboard-start bug fix'lenene kadar; [[project_deckent_self_git_mutation_bug]]). **Her wave öncesi/sonrası `git log -1` + `git status` doğrula** (otonom commit/reset kapmasın).
 
 **Sprint sonrası:** TR MASTER-PLAN (dashboard gerçekten god-level olunca) + F2-007 streaming + npm publish hazırlık.
 
