@@ -3,6 +3,7 @@
 // Demotes permanent ones that underperform.
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync, cpSync } from 'fs';
+import { createHash } from 'node:crypto';
 import { join } from 'path';
 import type { OutcomeTracker, EntityPerformance } from './outcome-tracker.js';
 import { ensureAgentPromptMd } from './temp-agent-generator.js';
@@ -11,6 +12,12 @@ import { debugLog } from '../core/utils.js';
 import { AgentGenealogy } from '../agents/agent-genealogy.js';
 import { AgentRetirement } from '../agents/agent-retirement.js';
 import type { RetirementStats } from '../agents/agent-retirement.js';
+import {
+  adaptAgentRuntime,
+  type PromptDiff,
+  type ResultEntry,
+  type SkillAdaptation,
+} from '../agents/adaptive-agent.js';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -32,6 +39,22 @@ export interface PromotionResult {
   action: 'promote' | 'demote' | 'wait';
   reason: string;
   performance?: EntityPerformance;
+}
+
+// Identity-mutation loop (F5-008): low-success agent → adaptive variant.
+// Decision-gated via `requiresApproval`; idempotent via variant fingerprint.
+export interface IdentityMutationOpts {
+  successThreshold?: number;  // default 0.7 — mirrors adaptive-agent IMPROVEMENT_THRESHOLD
+  requiresApproval?: boolean; // default true — when true, propose without writing
+}
+
+export interface IdentityMutationResult {
+  action: 'mutated' | 'proposed' | 'noop';
+  agentId: string;
+  variantId: string | null;
+  reason: string;
+  promptDiff?: PromptDiff;
+  skillAdaptation?: SkillAdaptation;
 }
 
 const DEFAULT_PROMOTION: PromotionCriteria = { minTasks: 8, minSuccessRate: 0.85, minSprints: 3 };
@@ -246,6 +269,93 @@ export class PromotionPipeline {
     }
   }
 
+  /**
+   * F5-008 — Active identity-mutation loop.
+   *
+   * When an agent's recent success rate is below `successThreshold`, this method
+   * applies the adaptive-agent suggestion (prompt + skill repertoire) by writing
+   * a new variant agent and recording the lineage in genealogy. Decision-gated:
+   * defaults to `requiresApproval: true` which returns a proposal without
+   * touching disk. Idempotent: identical inputs → identical variant id → no-op
+   * on the second call.
+   *
+   * Caller: PromotionPipeline (this file). The adaptive-agent module only
+   * defines the suggestion API; this is the live application site.
+   */
+  runIdentityMutation(
+    agentId: string,
+    currentPrompt: string,
+    currentSkills: string[],
+    recentResults: ResultEntry[],
+    opts: IdentityMutationOpts = {},
+  ): IdentityMutationResult {
+    const successThreshold = opts.successThreshold ?? 0.7;
+    const requiresApproval = opts.requiresApproval ?? true;
+
+    const adapt = adaptAgentRuntime(agentId, currentPrompt, currentSkills, recentResults);
+
+    if (!adapt.effectiveness.needsImprovement || adapt.effectiveness.successRate >= successThreshold) {
+      return {
+        action: 'noop',
+        agentId,
+        variantId: null,
+        reason: `success rate ${Math.round(adapt.effectiveness.successRate * 100)}% ≥ ${Math.round(successThreshold * 100)}% — no mutation needed`,
+        promptDiff: adapt.promptDiff,
+        skillAdaptation: adapt.skillAdaptation,
+      };
+    }
+
+    const mutatedSkills = Array.from(new Set([...currentSkills, ...adapt.skillAdaptation.suggestAdd])).sort();
+    const fingerprint = computeVariantFingerprint(adapt.promptDiff.suggested, mutatedSkills);
+    const variantId = `${agentId}-mut-${fingerprint}`;
+
+    if (requiresApproval) {
+      return {
+        action: 'proposed',
+        agentId,
+        variantId,
+        reason: `proposal: ${adapt.skillAdaptation.reason}`,
+        promptDiff: adapt.promptDiff,
+        skillAdaptation: adapt.skillAdaptation,
+      };
+    }
+
+    // Idempotency: if the variant directory already exists, this is a re-run on the same baseline.
+    const variantDir = join(this.projectRoot, '.deckent', 'agents', variantId);
+    if (existsSync(join(variantDir, 'agent.json'))) {
+      return {
+        action: 'noop',
+        agentId,
+        variantId,
+        reason: 'already-mutated',
+        promptDiff: adapt.promptDiff,
+        skillAdaptation: adapt.skillAdaptation,
+      };
+    }
+
+    writeVariantArtifacts(variantDir, {
+      id: variantId,
+      parentId: agentId,
+      skills: mutatedSkills,
+      prompt: adapt.promptDiff.suggested,
+    });
+
+    try {
+      this.genealogy.registerAgent(variantId, agentId, `identity-mutation: ${adapt.skillAdaptation.reason}`);
+    } catch (err) {
+      debugLog('promotion-pipeline:runIdentityMutation', err);
+    }
+
+    return {
+      action: 'mutated',
+      agentId,
+      variantId,
+      reason: adapt.skillAdaptation.reason,
+      promptDiff: adapt.promptDiff,
+      skillAdaptation: adapt.skillAdaptation,
+    };
+  }
+
   // ─── Internal ───────────────────────────────────────────────────────────
 
   private evaluateEntityPromotion(
@@ -355,6 +465,37 @@ function ensurePromotedAgentPrompt(
     // Non-fatal: PROMPT.md generation must never block promotion.
     debugLog('promotion-pipeline:ensurePromotedAgentPrompt', err);
   }
+}
+
+/**
+ * Stable 8-char fingerprint over (suggested prompt + sorted skill list). Used
+ * as the variant id suffix so identical inputs always resolve to the same
+ * variant directory — that's how runIdentityMutation stays idempotent.
+ */
+function computeVariantFingerprint(suggestedPrompt: string, sortedSkills: string[]): string {
+  const payload = `${suggestedPrompt}\n--skills--\n${sortedSkills.join(',')}`;
+  return createHash('sha256').update(payload).digest('hex').slice(0, 8);
+}
+
+/**
+ * Persist the variant agent artifacts (agent.json + PROMPT.md) under the
+ * variant directory. Writer is idempotent at the caller layer (existsSync
+ * guard in runIdentityMutation), so this only ever runs once per variant.
+ */
+function writeVariantArtifacts(
+  variantDir: string,
+  v: { id: string; parentId: string; skills: string[]; prompt: string },
+): void {
+  mkdirSync(variantDir, { recursive: true });
+  const manifest = {
+    id: v.id,
+    source: 'mutated',
+    parentId: v.parentId,
+    skills: v.skills,
+    _mutatedAt: new Date().toISOString(),
+  };
+  writeFileSync(join(variantDir, 'agent.json'), JSON.stringify(manifest, null, 2), 'utf-8');
+  writeFileSync(join(variantDir, 'PROMPT.md'), v.prompt, 'utf-8');
 }
 
 function findTempEntityDir(tempBaseDir: string, entityId: string): string | null {

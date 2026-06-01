@@ -9,6 +9,7 @@ import {
   renderIdentityStatus,
   renderIdentityTests,
   replaceAutogenBlock,
+  injectAutogenBlock,
   collectGenerations,
   main,
   // @ts-expect-error — .mjs script lacks .d.ts; import works at runtime via vitest's esm loader
@@ -248,6 +249,31 @@ describe('replaceAutogenBlock', () => {
   });
 });
 
+// ─── injectAutogenBlock ──────────────────────────────────────────────────────
+
+describe('injectAutogenBlock', () => {
+  it('appends a valid AUTOGEN block to content that lacks markers', () => {
+    const result = injectAutogenBlock('# README\n', 'badges', 'badge-line');
+    expect(result).toContain('<!-- AUTOGEN:START id="badges" -->');
+    expect(result).toContain('badge-line');
+    expect(result).toContain('<!-- AUTOGEN:END id="badges" -->');
+    expect(result).toContain('# README');
+  });
+
+  it('preserves existing content before the injected block', () => {
+    const existing = 'line1\nline2\n';
+    const result = injectAutogenBlock(existing, 'stat-counts', 'counts');
+    expect(result.startsWith('line1\nline2\n')).toBe(true);
+  });
+
+  it('produces a block that replaceAutogenBlock can subsequently update', () => {
+    const injected = injectAutogenBlock('# head\n', 'badges', 'original-body');
+    const updated = replaceAutogenBlock(injected, 'badges', 'new-body');
+    expect(updated).toContain('new-body');
+    expect(updated).not.toContain('original-body');
+  });
+});
+
 // ─── collectGenerations (drift detection) ────────────────────────────────────
 
 describe('collectGenerations', () => {
@@ -310,6 +336,27 @@ describe('main (CLI entry)', () => {
     writeFileSync(join(tmpRoot, '.deckent/workspace/IDENTITY.md'), '# no markers\n');
     const exit = main(['--check'], { root: tmpRoot });
     expect(exit).toBe(1);
+  });
+
+  it('--write auto-injects AUTOGEN markers when absent (exit 0)', () => {
+    seedMinimalProject(tmpRoot);
+    // Files exist but have NO AUTOGEN markers — write mode should inject them
+    writeFileSync(join(tmpRoot, 'README.md'), '# deckent\n\nNo markers here.\n');
+    writeFileSync(join(tmpRoot, 'README-TR.md'), '# deckent\n\nNo markers here.\n');
+    mkdirSync(join(tmpRoot, '.deckent/workspace'), { recursive: true });
+    writeFileSync(join(tmpRoot, '.deckent/workspace/IDENTITY.md'), '# Identity\n\nNo markers.\n');
+
+    const writeExit = main(['--write'], { root: tmpRoot });
+    expect(writeExit).toBe(0);
+
+    // After injection, check mode must also pass
+    const checkExit = main(['--check'], { root: tmpRoot });
+    expect(checkExit).toBe(0);
+
+    // Verify markers are present in the written README
+    const readme = readFileSync(join(tmpRoot, 'README.md'), 'utf-8');
+    expect(readme).toContain('<!-- AUTOGEN:START id="badges" -->');
+    expect(readme).toContain('<!-- AUTOGEN:END id="badges" -->');
   });
 
   it('exit 0 after --write then --check (round-trip)', () => {

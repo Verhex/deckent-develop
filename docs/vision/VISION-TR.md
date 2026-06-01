@@ -114,11 +114,11 @@ Deckent'in OpenClaw/Cowork/Devin kategorisine girdiği nokta — başka bir tek-
 | Metrik | Değer |
 |--------|-------|
 | Version | 1.0.0-beta.1 |
-| Sprint | sprint-214 |
+| Sprint | sprint-215 |
 | MCP Tools | 32 |
 | MCP Resources | 8 |
 | CLI Commands | 52+ |
-| Dashboard Pages | 7 |
+| Dashboard Pages | 11 |
 | Agents | 15 built-in + 2 custom |
 | Skills | 21 built-in |
 | Providers | 3 (Claude, Codex, Gemini) |
@@ -146,10 +146,10 @@ _Sprint geçmişi yok._
 ## Sprint Metrics
 | Metrik | Değer |
 |--------|-------|
-| Sprint | sprint-214 |
-| Toplam Task | 25 |
-| Tamamlanan | 25 |
+| Sprint | sprint-215 |
+| Toplam Task | 24 |
+| Tamamlanan | 24 |
 | Tech Debt | 0 |
 | No-Go | 0 |
-| Süre | 35dk 31sn |
+| Süre | 29dk 8sn |
 | Coverage | N/A |

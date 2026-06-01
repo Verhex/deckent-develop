@@ -339,6 +339,16 @@ export function replaceAutogenBlock(content, blockId, newBody) {
   return `${before}\n${body}${after}`;
 }
 
+// Append a new AUTOGEN block when markers are absent from the content.
+// Used by collectGenerations when a file exists but lacks AUTOGEN scaffolding.
+export function injectAutogenBlock(content, blockId, body) {
+  const start = AUTOGEN_START(blockId);
+  const end = AUTOGEN_END(blockId);
+  const block = body.endsWith('\n') ? body : body + '\n';
+  const base = content.endsWith('\n') ? content : content + '\n';
+  return `${base}\n${start}\n${block}${end}\n`;
+}
+
 // ─── Generation descriptors ──────────────────────────────────────────────────
 
 export function collectGenerations({ root = DEFAULT_ROOT, coverage } = {}) {
@@ -381,18 +391,18 @@ export function collectGenerations({ root = DEFAULT_ROOT, coverage } = {}) {
     const exists = existsSync(targetPath);
     const actual = exists ? readFileSync(targetPath, 'utf-8') : '';
     let expected = actual;
-    let renderError = null;
     if (exists) {
-      try {
-        for (const b of t.blocks) {
-          const hasMarker =
-            expected.includes(`<!-- AUTOGEN:START id="${b.id}" -->`) &&
-            expected.includes(`<!-- AUTOGEN:END id="${b.id}" -->`);
-          if (!hasMarker && b.optional) continue;
+      for (const b of t.blocks) {
+        const hasMarker =
+          expected.includes(`<!-- AUTOGEN:START id="${b.id}" -->`) &&
+          expected.includes(`<!-- AUTOGEN:END id="${b.id}" -->`);
+        if (!hasMarker && b.optional) continue;
+        if (!hasMarker) {
+          // Markers absent — inject the full block at the end of the file.
+          expected = injectAutogenBlock(expected, b.id, b.body);
+        } else {
           expected = replaceAutogenBlock(expected, b.id, b.body);
         }
-      } catch (err) {
-        renderError = err instanceof Error ? err.message : String(err);
       }
     }
     out.push({
@@ -401,8 +411,8 @@ export function collectGenerations({ root = DEFAULT_ROOT, coverage } = {}) {
       exists,
       actual,
       content: expected,
-      drift: !exists || renderError !== null || actual !== expected,
-      renderError,
+      drift: !exists || actual !== expected,
+      renderError: null,
       stats,
     });
   }

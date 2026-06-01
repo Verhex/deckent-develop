@@ -37,6 +37,7 @@ import {
 } from '../connectors/incoming-router.js';
 import { loadDeckSecrets } from '../core/deck-file.js';
 import { buildChatReply } from './chat-handler.js';
+import { registerEvolutionRoutes } from './evolution-endpoint.js';
 
 const MIME_TYPES: Record<string, string> = {
   '.html': 'text/html',
@@ -580,6 +581,11 @@ async function handleRequest(
           // fall through to 404
         }
       }
+    }
+
+    // Evolution endpoints: /api/evolution/genealogy, /retirement, /prompt-metrics
+    if (url.startsWith('/api/evolution/')) {
+      if (registerEvolutionRoutes(url, res, projectRoot)) return;
     }
 
     // GET with no matching route

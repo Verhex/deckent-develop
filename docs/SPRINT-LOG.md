@@ -5890,3 +5890,46 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 214-021: 214-020 — README badge sync (190+→214) + ci-baseline garbage fix (DONE)
 
 ---
+## Sprint 215 — sprint-215
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-06-01
+**Duration:** 1749s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 24 |
+| Completed | 24 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 1748989ms |
+
+### Tasks
+
+- 215-001: Fix debt: Tech debt from 210-009-fix: Root cause of NO_GO (test_coverage=65): original wor (DONE)
+- 215-002: 215-001 — `deckent test:ci-sim` clean-state reproducer (DONE)
+- 215-003: 215-002 — CI-hermeticity lint guard (test gitignored state okumasın) (DONE)
+- 215-004: 215-003 — test-HOME isolation helper + sızan testlere uygula (DONE)
+- 215-005: 215-004 — F1-009 bootstrap-register: OpenAI-compat provider'ları kaydet (dormant→usable) [P0] (DONE)
+- 215-006: 215-005 — F1-010 subs→API overflow orchestration (DONE)
+- 215-007: 215-006 — F6-006 per-worker auth/provider task JSON (Sprint/Task/Process) (DONE)
+- 215-008: 215-007 — Multi-provider eşzamanlı e2e smoke (3-subs + API + local mix) (DONE)
+- 215-009: 215-008 — F7-003 UI/UX redesign (bilgi mimarisi + responsive + dark/light tutarlılık) (DONE)
+- 215-010: 215-009 — F7-004 terminal güçlendirme (çok-oturum + geçmiş + kopyala/yapıştır) (DONE)
+- 215-011: 215-010 — F7-006 enterprise view (multi-tenant + RBAC UI) (DONE)
+- 215-012: 215-011 — F7-007 memory/ADR/debt explorer (FTS5 arama + ADR timeline) (DONE)
+- 215-013: 215-012 — Evolution API endpoint'leri (genealogy/retirement/prompt-metrics → /api) (DONE)
+- 215-014: 215-013 — F7-010 /evolution dashboard sayfası (genealogy tree + retirement timeline + prompt-diff) (DONE)
+- 215-015: 215-014 — F5-008 aktif identity-mutation loop (düşük başarı→agent kimlik refactor) [moat] (DONE)
+- 215-016: 215-015 — F7-009 Nervous System UI sayfası (pending-approval/panic-guard badge) (DONE)
+- 215-017: 215-016 — Routing: frontend-design→frontend-designer mapping tamamla (DONE)
+- 215-018: 215-017 — Routing diversity guard genişlet (frontend mapping doğrula) (DONE)
+- 215-019: 215-018 — Doc-drift sync: module count (90→111) + README badge generator (DONE)
+- 215-020: 215-019 — CLAUDE/DECKENT module-count generator sync (managed-docs) (DONE)
+- 215-021: 215-020 — ADR-078 (CI-hermeticity + 8-provider runtime + evolution-loop + dashboard) + MASTER-PLAN (DONE)
+- 215-022: 215-021 — CI-hermeticity rule + ci-guardian/ci-testing routing kalıcılaştır (DONE)
+
+---

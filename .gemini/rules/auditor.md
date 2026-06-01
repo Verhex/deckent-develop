@@ -31,6 +31,7 @@
 
 ## Active ADR Constraints
 
+- **ADR-078**: CI-Hermeticity Standard + 8-Provider Runtime + Active Identity-Mutation Loop + Dashboard God-Level — **Status:** accepted
 - **ADR-076**: Auth-Precedence Fix + User-Facing Surfaces (serve token-inject, Path A chat, IDE extension) — **Status:** accepted
 - **ADR-077**: Multi-Provider 8-Fleet + OpenAI-Compatible HTTP Adapter — **Status:** accepted
 - **ADR-075**: F5 Evolution Runtime Wiring + Routing Skill→Agent Affinity + Managed-Docs Code-Derived Counts — **Status:** accepted
@@ -45,8 +46,8 @@
 - **ADR-063**: Consent-Based Prerequisite Provisioning — > **Numbering note (Sprint 175):** This ADR was originally numbered 062 alongside
 - **ADR-010**: Tek Runtime Dependency — commander.js — **Status:** accepted
 - **ADR-037**: Brain-Auditor-Worker Authority Matrix — RBAC Protocol V1.0 — **Status:** accepted
-- **ADR-048**: Prompt Lifecycle Contract — **Status:** accepted
 - **ADR-047**: Manuel Subagent Dispatch Protocol — **Status:** accepted
+- **ADR-048**: Prompt Lifecycle Contract — **Status:** accepted
 - **ADR-046**: Brain Self-Update Hook Architecture — **Status:** accepted
 - **ADR-045**: Wave-Based Execution Semantics — respawnEligibleTasks Runtime Wire — **Status:** accepted
 - **ADR-043**: Brain Crash Recovery Protocol — **Status:** accepted
@@ -91,7 +92,6 @@
 - **ADR-009**: DEBT.md Markdown Tablo Formatı — **Status:** accepted
 - **ADR-011**: node:readline/promises — Built-in Prompt — **Status:** accepted
 - **ADR-012**: register\<Name\>(program) Pattern — **Status:** accepted
-- **ADR-022-V2**: CLI/MCP Feature Parity — Parametre Eşitleme + Eksik Komutlar (Updated Sprint 085) — **Status:** accepted
 <!-- AUTO-END -->
 
 <!-- CUSTOM-START -->

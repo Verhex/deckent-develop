@@ -289,4 +289,36 @@ describe('routing diversity guard (Sprint 212-009)', () => {
     expect(mapValues).not.toContain('bug-fixer');
     expect(mapValues).not.toContain('code-reviewer');
   });
+
+  // Test 7: 215-016 — frontend-design and react-specialist give zero affinity to architecture-planner
+  // Regression guard: Sprint 213/214 saw UI tasks routed to architecture-planner instead of
+  // frontend-designer when frontend-design/react-specialist skills were assigned.
+  it('215-016: frontend-design and react-specialist skills yield zero affinity bonus for architecture-planner', () => {
+    // architecture-planner must NOT receive bonus for frontend skills
+    expect(getSkillAgentAffinityBonus('architecture-planner', ['frontend-design'])).toBe(0);
+    expect(getSkillAgentAffinityBonus('architecture-planner', ['react-specialist'])).toBe(0);
+    expect(getSkillAgentAffinityBonus('architecture-planner', ['frontend-design', 'react-specialist'])).toBe(0);
+    // frontend-designer MUST receive the bonus for these skills
+    expect(getSkillAgentAffinityBonus('frontend-designer', ['frontend-design'])).toBe(SKILL_AGENT_AFFINITY_BONUS);
+    expect(getSkillAgentAffinityBonus('frontend-designer', ['react-specialist'])).toBe(SKILL_AGENT_AFFINITY_BONUS);
+    // Both skills map in SKILL_AGENT_MAP to frontend-designer, not architecture-planner
+    expect(SKILL_AGENT_MAP['frontend-design']).toBe('frontend-designer');
+    expect(SKILL_AGENT_MAP['react-specialist']).toBe('frontend-designer');
+    expect(SKILL_AGENT_MAP['frontend-design']).not.toBe('architecture-planner');
+    expect(SKILL_AGENT_MAP['react-specialist']).not.toBe('architecture-planner');
+  });
+
+  // Test 8: 215-016 UI routing diversity — UI tasks never route to architecture-planner
+  // Validates the full routing path: UI/frontend task DNA → frontend-designer (not architecture-planner).
+  it('215-016: UI/frontend tasks never route to architecture-planner', () => {
+    const uiTasks = SPRINT_TASKS.filter(tc => tc.category === 'ui');
+    expect(uiTasks.length).toBeGreaterThanOrEqual(2);
+    for (const tc of uiTasks) {
+      const { agentId, reasoning } = routeTaskV2(tc.task, pool, new Map());
+      expect(
+        agentId,
+        `'${tc.label}' routed to architecture-planner (should never happen for UI tasks). Routing:\n${reasoning.join('\n')}`,
+      ).not.toBe('architecture-planner');
+    }
+  });
 });

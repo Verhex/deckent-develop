@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import React from "react";
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, screen, cleanup } from "@testing-library/react";
+import { render, screen, cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { LanguageProvider } from "../i18n/LanguageProvider";
 import { SprintControlPanel } from "./SprintControlPanel";
 import type { DashboardState, AgentInfo } from "../types";
@@ -22,6 +22,7 @@ vi.mock("../lib/api", () => ({
 
 import { useSSEWithStatus } from "../hooks/useSSE";
 import { useApi } from "../hooks/useApi";
+import { postJson } from "../lib/api";
 
 afterEach(() => {
   cleanup();
@@ -190,5 +191,114 @@ describe("SprintControlPanel", () => {
 
     expect(screen.getByTestId("sprint-control-panel")).toBeTruthy();
     expect(screen.getByText("sprint-api")).toBeTruthy();
+  });
+
+  it("renders empty state when state.idle is true", () => {
+    const state = makeState({ idle: true });
+    vi.mocked(useSSEWithStatus).mockReturnValue({ data: state, status: "connected" });
+    vi.mocked(useApi).mockReturnValue({ data: null, loading: false, error: null, refetch: vi.fn() });
+
+    renderWithProviders(<SprintControlPanel />);
+
+    expect(screen.getByTestId("sprint-control-panel-empty")).toBeTruthy();
+    expect(screen.queryByTestId("sprint-control-panel")).toBeNull();
+  });
+
+  it("falls back to secondary variant when phase is unknown", () => {
+    const state = makeState({
+      sprint: { id: "sprint-210", number: 210, phase: "UNKNOWN_PHASE", status: "running" },
+    });
+    vi.mocked(useSSEWithStatus).mockReturnValue({ data: state, status: "connected" });
+    vi.mocked(useApi).mockReturnValue({ data: null, loading: false, error: null, refetch: vi.fn() });
+
+    renderWithProviders(<SprintControlPanel />);
+
+    const badge = screen.getByTestId("phase-badge");
+    expect(badge.textContent).toBe("UNKNOWN_PHASE");
+  });
+
+  it("handleKillAll: confirms, posts and refetches when accepted", async () => {
+    const refetch = vi.fn();
+    const state = makeState();
+    vi.mocked(useSSEWithStatus).mockReturnValue({ data: state, status: "connected" });
+    vi.mocked(useApi).mockReturnValue({ data: null, loading: false, error: null, refetch });
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+
+    renderWithProviders(<SprintControlPanel />);
+    fireEvent.click(screen.getByTestId("kill-all-btn"));
+
+    await waitFor(() => {
+      expect(postJson).toHaveBeenCalledWith("/api/kill/all");
+      expect(refetch).toHaveBeenCalled();
+    });
+
+    confirmSpy.mockRestore();
+  });
+
+  it("handleKillAll: cancels and does NOT post when user declines confirm", () => {
+    const refetch = vi.fn();
+    const state = makeState();
+    vi.mocked(useSSEWithStatus).mockReturnValue({ data: state, status: "connected" });
+    vi.mocked(useApi).mockReturnValue({ data: null, loading: false, error: null, refetch });
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
+
+    renderWithProviders(<SprintControlPanel />);
+    fireEvent.click(screen.getByTestId("kill-all-btn"));
+
+    expect(postJson).not.toHaveBeenCalled();
+    expect(refetch).not.toHaveBeenCalled();
+    confirmSpy.mockRestore();
+  });
+
+  it("handleKillAll: swallows postJson error without throwing", async () => {
+    const refetch = vi.fn();
+    const state = makeState();
+    vi.mocked(useSSEWithStatus).mockReturnValue({ data: state, status: "connected" });
+    vi.mocked(useApi).mockReturnValue({ data: null, loading: false, error: null, refetch });
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+    vi.mocked(postJson).mockRejectedValueOnce(new Error("network down"));
+
+    renderWithProviders(<SprintControlPanel />);
+    fireEvent.click(screen.getByTestId("kill-all-btn"));
+
+    await waitFor(() => {
+      expect(postJson).toHaveBeenCalledWith("/api/kill/all");
+    });
+    // refetch is skipped on error; loading flag clears via finally
+    expect(refetch).not.toHaveBeenCalled();
+
+    confirmSpy.mockRestore();
+  });
+
+  it("handleCleanup: confirms, posts /api/cleanup and refetches", async () => {
+    const refetch = vi.fn();
+    const state = makeState();
+    vi.mocked(useSSEWithStatus).mockReturnValue({ data: state, status: "connected" });
+    vi.mocked(useApi).mockReturnValue({ data: null, loading: false, error: null, refetch });
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+
+    renderWithProviders(<SprintControlPanel />);
+    fireEvent.click(screen.getByTestId("cleanup-btn"));
+
+    await waitFor(() => {
+      expect(postJson).toHaveBeenCalledWith("/api/cleanup");
+      expect(refetch).toHaveBeenCalled();
+    });
+
+    confirmSpy.mockRestore();
+  });
+
+  it("handleCleanup: cancel path does not call postJson", () => {
+    const refetch = vi.fn();
+    const state = makeState();
+    vi.mocked(useSSEWithStatus).mockReturnValue({ data: state, status: "connected" });
+    vi.mocked(useApi).mockReturnValue({ data: null, loading: false, error: null, refetch });
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
+
+    renderWithProviders(<SprintControlPanel />);
+    fireEvent.click(screen.getByTestId("cleanup-btn"));
+
+    expect(postJson).not.toHaveBeenCalled();
+    confirmSpy.mockRestore();
   });
 });

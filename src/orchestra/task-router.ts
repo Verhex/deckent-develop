@@ -26,6 +26,8 @@ export interface TaskRouterConfig {
   skill_routing?: SkillRoutingConfig;
   brain_provider?: string;
   worker_provider?: string;
+  /** Config-level auth mode — resolved after task.authMode override (ADR-076) */
+  auth_mode?: 'subscription' | 'api';
 }
 
 /** Result of routing a task to a provider, agent, and skills */
@@ -40,6 +42,11 @@ export interface TaskRouting {
   reason: string;
   /** Estimated timeout in seconds from Brain heuristic estimator (optional) */
   timeoutSeconds?: number;
+  /**
+   * Resolved auth mode for this worker — uniform across Sprint/Task/Process modes.
+   * Priority: task.authMode (DIRECTIVES) > config.auth_mode > 'subscription'.
+   */
+  authMode: 'subscription' | 'api';
 }
 
 /** Task type categories detected from scope and file patterns */
@@ -137,6 +144,31 @@ export function detectTaskType(task: Task): TaskType {
   return 'unknown';
 }
 
+// ─── Per-Worker Auth Resolution ─────────────────────────────────────
+
+/**
+ * Resolve the auth mode for a single worker with uniform priority across
+ * Sprint / Task / Process dispatch modes.
+ *
+ * Priority chain (highest → lowest):
+ * 1. task.authMode — DIRECTIVES `- Auth:` override (per-task)
+ * 2. config.auth_mode — project-level default from .deckent/config.json
+ * 3. 'subscription' — built-in fallback
+ *
+ * @param task - The task being routed
+ * @param config - TaskRouterConfig carrying the project-level auth_mode
+ * @returns Resolved auth mode: 'subscription' or 'api'
+ */
+export function resolveWorkerAuth(task: Task, config: TaskRouterConfig): 'subscription' | 'api' {
+  if (task.authMode === 'subscription' || task.authMode === 'api') {
+    return task.authMode;
+  }
+  if (config.auth_mode === 'api') {
+    return 'api';
+  }
+  return 'subscription';
+}
+
 // ─── Main Router ────────────────────────────────────────────────────
 
 /**
@@ -162,6 +194,7 @@ export function routeTask(
 ): TaskRouting {
   const skills = task.assignedSkills ?? [];
   const agent = task.assignedAgent ?? 'generic';
+  const authMode = resolveWorkerAuth(task, config);
 
   // Guard: no providers available
   // Sprint 202 Task 202-003: resolve via registry default before the absolute
@@ -174,6 +207,7 @@ export function routeTask(
       agent,
       skills,
       reason: `No providers available; falling back to '${fallback}' (registry default)`,
+      authMode,
     };
   }
 
@@ -193,6 +227,7 @@ export function routeTask(
         reason: provider === configProvider
           ? `Config skill_routing.${routingKey} = '${configProvider}' for ${taskType} task`
           : `Config skill_routing.${routingKey} = '${configProvider}' (unavailable, fell back to '${provider}')`,
+        authMode,
       };
     }
   }
@@ -209,6 +244,7 @@ export function routeTask(
         reason: provider === inferred
           ? `Task forceModel '${task.forceModel}' → provider '${inferred}'`
           : `Task forceModel '${task.forceModel}' → provider '${inferred}' (unavailable, fell back to '${provider}')`,
+        authMode,
       };
     }
   }
@@ -223,6 +259,7 @@ export function routeTask(
       reason: provider === task.provider
         ? `Task provider field '${task.provider}'`
         : `Task provider field '${task.provider}' (unavailable, fell back to '${provider}')`,
+      authMode,
     };
   }
 
@@ -238,6 +275,7 @@ export function routeTask(
       reason: provider === routing.default
         ? `Config skill_routing.default = '${routing.default}'`
         : `Config skill_routing.default = '${routing.default}' (unavailable, fell back to '${provider}')`,
+      authMode,
     };
   }
 
@@ -251,6 +289,7 @@ export function routeTask(
       reason: provider === config.worker_provider
         ? `Config worker_provider = '${config.worker_provider}'`
         : `Config worker_provider = '${config.worker_provider}' (unavailable, fell back to '${provider}')`,
+      authMode,
     };
   }
 
@@ -262,6 +301,7 @@ export function routeTask(
     agent,
     skills,
     reason: `Default: first available provider '${fallback}'`,
+    authMode,
   };
 }
 

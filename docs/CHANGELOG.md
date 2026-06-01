@@ -2,6 +2,28 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint215] - 2026-06-01
+
+### Added
+
+- 215-001 — `deckent test:ci-sim` clean-state reproducer
+- 215-002 — CI-hermeticity lint guard (test gitignored state okumasın)
+- 215-003 — test-HOME isolation helper + sızan testlere uygula
+- 215-004 — F1-009 bootstrap-register: OpenAI-compat provider'ları kaydet (dormant→usable) [P0]
+- 215-005 — F1-010 subs→API overflow orchestration
+- 215-006 — F6-006 per-worker auth/provider task JSON (Sprint/Task/Process)
+- 215-007 — Multi-provider eşzamanlı e2e smoke (3-subs + API + local mix)
+- 215-008 — F7-003 UI/UX redesign (bilgi mimarisi + responsive + dark/light tutarlılık)
+- 215-009 — F7-004 terminal güçlendirme (çok-oturum + geçmiş + kopyala/yapıştır)
+- 215-010 — F7-006 enterprise view (multi-tenant + RBAC UI)
+
+### Fixed
+
+- Fix debt: Tech debt from 210-009-fix: Root cause of NO_GO (test_coverage=65): original wor
+
+
+_Tasks: 24 total, 24 done, 0 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint214] - 2026-06-01
 
 ### Added
