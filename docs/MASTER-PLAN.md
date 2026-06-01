@@ -21,6 +21,8 @@ Three immovable pillars (Alperen-approved 2026-05-31):
 
 **The moat — evolutionary architecture:** Deckent learns from every sprint. Brain reads its own retros, routing outcomes feed agent/skill selection, prompt-evolution and adaptive-agent tune behavior over time. This self-improvement loop — not any single feature — is the core differentiator. Positioning: **the anti-Devin** (open-source, self-hosted, provider-agnostic, discipline-driven vs single-agent SaaS).
 
+**Positioning evolution (2026-06-01, Alperen):** Deckent is no longer just "a product you install" — it is becoming an **AI runtime ecosystem**: one engine that is (a) the individual developer's orchestrator, (b) the individual user's autonomous agent, and (c) the enterprise's god-level orchestration ecosystem — at million-user / million-environment / million-agent scale. Easy install, low requirements, evolving/learning. Enterprise (incl. ERP) is a *runtime target*, not a separate edition (ADR-033 holds).
+
 ---
 
 ## 2. Trinity — Three Faces (maturity & path to 100%)
@@ -47,6 +49,14 @@ Three immovable pillars (Alperen-approved 2026-05-31):
   - **Doc-code drift (partial):** managed-docs generator now code-derived for module counts; README badge and "96% context reduction" claim still need verification (§7 W-H).
   - **IDE extension stub:** `extensions/vscode/` scaffold created; full implementation Sprint 213-214.
 
+> ### ⚠️ User-Visible Reality vs Wiring % (honest, Alperen 2026-06-01)
+> The F1–F10 percentages above measure **internal wiring**, NOT **end-to-end user-working UX**. A live user check exposed three gaps the percentages hide:
+> - **`npx deckent serve`** loads the dashboard (GET) but POST actions (start/kill) return 401 — the auto-generated API token (`server.ts:918`) is **not injected into the served dashboard** (only the terminal token is). Workaround today: `DECKENT_API_AUTH_DISABLED=1`. → Sprint 213 Wave A.
+> - **`deckent chat`** is Path B: it spawns the user's installed `claude`/`codex`/`gemini` CLI and errors "No AI CLI found" if none is in PATH. Not zero-prerequisite. → Sprint 213 Wave A (Path A embedded chat).
+> - **Web UI/UX** renders (Vite build present) but is unpolished (F7-003 ~30%). → Sprint 213 Wave A.
+>
+> **Developer face (Sprint Mode) genuinely works** (212 sprints of dogfood). The Assistant/Company faces have wiring but are not yet user-ready. Sprint 213 closes this gap before adding more surfaces.
+
 ---
 
 ## 4. Feature Status Matrix (F1–F7, reconciled)
@@ -58,6 +68,8 @@ Three immovable pillars (Alperen-approved 2026-05-31):
 | F1-004 | Docker provider-aware CLI invocation (binary select + auth + build-arg) | ⬜ P1 |
 | F1-005 | Dockerfile.worker multi-CLI (build-arg opt-in) | ⬜ P1 (depends F1-004) |
 | F1-008 | **Naive (conversational) chat mode** + intent classifier (CASUAL vs TASK→MCP tool invoke) | ✅ DONE — `src/cli/commands/chat.ts` (`classifyChatIntent`, `buildNaiveSystemPrompt`); delegates tool dispatch to host CLI via MCP auto-attach |
+| F1-009 | **8-provider simultaneous fleet** (Alperen 2026-06-01) — run Claude+Gemini+Codex subscriptions + ≥5 API providers (DeepSeek, Qwen, GLM, …) + local Ollama **at the same time**, coordinated | ⬜ proposed — foundation exists (ProviderAdapter registry + `model-catalog.ts` models.dev fetch + 4 adapters: claude/codex/gemini/ollama). **Missing:** OpenAI-compatible adapter for DeepSeek/Qwed/GLM (api-key wired from models.dev), simultaneous multi-provider coordinator, per-worker provider assignment at scale |
+| F1-010 | **Provider/auth load-balancing** — when a subscription hits its rate/quota limit, overflow that worker to an API provider automatically (subs *and* API together for max throughput) | ⬜ proposed — extends F6 authMode; today `authMode` is a static per-task field, no dynamic subs→api overflow orchestration |
 
 ### F2 — Native Chat — **~90%**
 | ID | Item | Status |
@@ -96,6 +108,7 @@ Three immovable pillars (Alperen-approved 2026-05-31):
 | F5-005 | **Dormant evolution modules** → real callers (E-2 `prompt-rollback.ts`, E-4 `agent-genealogy.ts`, E-5 `agent-retirement.ts`, E-6 `specialization-drift.ts`) | ✅ DONE (Sprint 212 — all 4 modules now have external callers in `promotion-pipeline.ts` and `sprint-reporter.ts`) |
 | F5-006 | **Evolution visibility** — retro "Next Sprint Behavior Changes" section | ✅ DONE (Sprint 212 — `sprint-retro-writer.ts` behavior-changes section) |
 | F5-007 | **Evolution dashboard page** (`/evolution`: genealogy tree + retirement timeline + prompt-diff viewer) | ⬜ Sprint 216 (backend ready, no frontend layer) |
+| F5-008 | **Active identity-mutation loop at scale** (Alperen 2026-06-01) — when an agent's success rate drops, actually mutate/refactor its identity (prompt+skill repertoire), not just *suggest*. Toward million customizable, evolvable agents/skills across million environments | ⬜ proposed — Sprint 212 wired the *suggestion* path (adaptive-agent → outcome-tracker, genealogy/retirement); the closed-loop "low-success → auto-refactor identity → genealogy record → A/B verify" is the next step. The core moat at scale |
 
 ### F6 — Auth Flexibility — **~50%**
 | ID | Item | Status |
@@ -105,6 +118,7 @@ Three immovable pillars (Alperen-approved 2026-05-31):
 | F6-003 | Auth matrix test (4 combinations) | ⬜ |
 | F6-004 | API real activation + tier-aware throttle | ⬜ **POST-BETA** (Tier-1 30K tok/min cap; subscription-only during beta) |
 | F6-005 | **Live model catalog** (`model-catalog.ts` models.dev fetch + 24h cache + bundled fallback; `deckent models list/refresh/tier`) | ✅ DONE — 13 bundled models as offline fallback, overlaid by live catalog via `mergeApiIdOverrides`; ADR-023 tier routing preserved |
+| F6-006 | **Per-worker auth/provider in task JSON across all 3 modes** (Sprint/Task/Process) — premium architecture so each worker picks subs-or-API-or-local correctly | ⚠️ partial — task JSON `authMode` field exists (api-surface.md); needs first-class per-worker `provider`+`authMode` resolution wired uniformly across Sprint/Task/Process mode + paired with F1-010 overflow |
 
 ### F7 — Dashboard & Control Plane — **~75%**
 | ID | Item | Status |
@@ -156,6 +170,7 @@ Three immovable pillars (Alperen-approved 2026-05-31):
 | **#3-ext** | Brain Evolution — retro **"Next Sprint Behavior Changes"** section | ⬜ not built | `sprint-retro-writer.ts` lacks behavior-mutation diff (agent prompt mutation, skill repertoire gained/strengthened/retired, Brain decision-pattern change); ≥3 visible-changes satisfaction threshold not implemented |
 | **#3-mesh** | Distributed Agent Mesh — multi-host worker mesh (workers across nodes, not single-host) | ⬜ proposed (Copilot analysis, Sprint 212) | builds on sub-#3 k8s pod-exec (F3-004); today all workers run on one host. Cross-node scheduling + shared memory/lock coordination is the new scope |
 | **#4** | Enterprise integrations (RBAC/audit/rate done; SSO/SIEM/compliance) | ✅ core done | SSO/SIEM/compliance depth (optional) |
+| **#ERP** | ERP runtime integration (Alperen 2026-06-01) — Deckent runs *inside* enterprise: process automation, file usage, **DB access (read-only first)**, controlled management | ⬜ proposed | builds on Process Mode (F3) + Capability Broker (F8 `db.query`/`erp.read` capabilities, scoped read-only) + RBAC (ADR-037) + approval gate. The concrete "runtime ecosystem" vertical; least-privilege per ADR-037 |
 | **#5** | Local LLM (Ollama/CUDA) | ⚠️ partial (adapter live, fully-local preset missing) | `OllamaAdapter` (HTTP probe + spawn) + `OLLAMA_BUILTIN_MODELS` (qwen2.5-coder:32b/7b, llama3:8b, llama3.2:3b) with tier mapping are implemented; missing: `worker_provider:ollama` fully-local sprint preset + data-sovereignty test (closed-network, zero-API-cost). RTX 5090 + CUDA 13.2 + WSL2 ready (32GB VRAM → 70B) |
 
 ---
@@ -244,7 +259,8 @@ Per Alperen's direction: **combine sprints, write larger comprehensive tasks** (
 | Sprint | Theme | Scope |
 |--------|-------|-------|
 | **212** | **Stability/Hygiene + Evolution crowning** | F5-004 real external callers (prompt-evolution + adaptive-agent wired into sprint lifecycle, scope includes caller modules); agent routing skew fix (skill→agent signal: frontend-design→frontend-designer, security-specialist→security-auditor); doc-reality sync; ≥1 forward task |
-| **213–214** | **IDE Extension (new sub-project)** | `extensions/vscode/` from scratch — sidebar (live agent status), command palette (`Deckent: Start Sprint`), status bar (progress/usage), terminal management, inline agent-edit decorations, settings UI; `deckent` command native in IDEs |
+| **213** | **User-Facing Make-It-Work + IDE Extension (BOTH — Alperen 2026-06-01)** | **Wave A (make existing surfaces actually work for a user):** `serve` localhost out-of-box — inject the auto-generated API token into the served dashboard (same pattern as the terminal token) so POST actions work without manual `DECKENT_API_AUTH_DISABLED`; **Path A embedded dashboard chat** (host-CLI-free, on the Sprint-175 PTY/WS stack) so chat works without an installed claude/codex CLI; F7-003 UI/UX pass. **Wave B (IDE extension):** `extensions/vscode/` real impl — sidebar (live agent status), command palette (`Deckent: Start Sprint`), status bar, `deckent` command native in IDEs |
+| **214** | **IDE depth + chat/UX hardening** | JetBrains, inline agent-edit decorations, settings UI; Path A chat hardening; F7-004/006/007 |
 | **215** | **Web UI Chat tab (Path A)** | Dashboard "Deckent Chat" surface on the embedded-terminal stack; multi-tenant by inheritance |
 | **216** | **Dashboard god-level redesign (F7-003) + F7-004/006/007** | UI/UX redesign, terminal polish, enterprise view, memory/ADR explorer |
 | **217+** | **F2 streaming + Native SDK (Path C)** | Real streaming; ADR-010 amendment; SDK migration; zero-prerequisite `npx deckent` chat — Q3 2026 |
