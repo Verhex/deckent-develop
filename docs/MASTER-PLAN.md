@@ -59,13 +59,16 @@ Three immovable pillars (Alperen-approved 2026-05-31):
   - **F2 streaming:** Path A embedded chat backend connected; real streaming (F2-007) remains post-beta.
   - **F7-003 UI/UX:** Layout responsive/dark-light pass done (Sprint 214); full god-level redesign remains Sprint 216.
 
-> ### ⚠️ User-Visible Reality vs Wiring % (honest, Alperen 2026-06-01)
-> The F1–F10 percentages above measure **internal wiring**, NOT **end-to-end user-working UX**. Sprint 214 closed the three gaps from the pre-214 audit:
-> - **`npx deckent serve`** — ✅ Sprint 214 fix: localhost token injected into served dashboard (ADR-076 Part B); POST actions work without `DECKENT_API_AUTH_DISABLED=1`.
-> - **`deckent chat`** — ✅ Sprint 214 fix: Path A embedded chat backend (no host CLI required). Path B (host CLI) still works; Path C (native SDK) is post-beta.
-> - **Web UI/UX** — ✅ Sprint 214 partial fix: Layout responsive/dark-light pass (F7-003 ~45%). Full god-level redesign Sprint 216.
+> ### ⚠️ User-Visible Reality vs Wiring % — DASHBOARD RUN-AUDIT (Alperen 2026-06-01, evidence-based)
+> The F1–F10 percentages measure **internal wiring**, NOT **end-to-end user-working UX**. Real-binary audit on 2026-06-01:
+> - **`npx deckent serve` API/token** — ✅ **RUN-PROVEN (Sprint 216-006):** localhost auto-mints API token + injects `__DECKENT_API_TOKEN__` → `/api/status` 200 (Bearer), real data; 401 without (auth enforced). `/api/evolution/genealogy`, `/api/memory/search` 200.
+> - **🔴 P0 — sprint-start FREEZES the dashboard:** starting a sprint from the UI runs `runSprint` in the same serve process → event loop blocks → HTTP stops → UI hangs in skeleton-loading. **Fix: detach sprint-start from serve** (child-process/fire-and-forget). *(serve log: `Sprint started via dashboard` → freeze.)*
+> - **🔴 Chat hollow** — only answers `status` intent; no real conversational round-trip (216-008 backend exists, ChatPage not wired).
+> - **🔴 Missing pages** — sidebar shows 5 (Dashboard/History/Memory/Config/Chat); **Evolution/Nervous/Enterprise (Sprint 215 "DONE") are NOT in sidebar/route** — those F7-006/009/010 DONEs are hollow.
+> - **🎨 Design must improve** — current UI is functional-skeleton, not god-level. F7-003 visual/UX redesign (modern, native-speed, zero freeze) is core Sprint 217 work, not cosmetic.
+> - **✅ Real:** terminals work; runs from project dir; plan+spawn mechanics work (217-001 docker worker spawned healthy).
 >
-> **Developer face (Sprint Mode) genuinely works** (214 sprints of dogfood). Sprint 214 promoted the Assistant face from "wired but not user-ready" to "works out of the box for subscription users."
+> **Developer face (Sprint Mode) genuinely works** (216 sprints of dogfood). serve API/data-load is run-proven; the **dashboard is only partially user-working** — full fix is **Sprint 217** under the Proof-of-Function DoD (§11, real browser/HTTP `Smoke:` proof; now live in code so these can't be marked DONE without a real run). Tracked: memory `project_dashboard_realrun_findings`.
 
 ---
 

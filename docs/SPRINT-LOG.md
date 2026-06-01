@@ -5933,3 +5933,25 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 215-022: 215-021 — CI-hermeticity rule + ci-guardian/ci-testing routing kalıcılaştır (DONE)
 
 ---
+## Sprint 217 — sprint-217
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-06-01
+**Duration:** 674s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 2 |
+| Completed | 0 |
+| Tech Debt | 0 |
+| No-Go | 2 |
+| Coverage | 0.0% |
+| Duration | 674211ms |
+
+### Tasks
+
+- 217-001: new sprint (NO_GO)
+
+---

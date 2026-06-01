@@ -7110,3 +7110,597 @@ The hardcoded counts are removed. Every sprint finalization regenerates the arch
 - `src/orchestra/prompt-evolution.ts`, `src/agents/adaptive-agent.ts`
 - `src/core/activation-engine.ts` (SKILL_AGENT_MAP, getSkillAgentAffinityBonus)
 - `src/orchestra/managed-docs/content-generators.ts` (countModules, architecture-map generator)
+
+
+---
+
+## adr-076: Auth-Precedence Fix + User-Facing Surfaces (serve token-inject, Path A chat, IDE extension)
+
+**Status:** accepted
+
+# ADR-076: Auth-Precedence Fix + User-Facing Surfaces (serve token-inject, Path A chat, IDE extension)
+
+**Status:** accepted
+
+**Date:** 2026-06-01
+
+**Accepted:** Sprint 214
+
+---
+
+## Context
+
+Sprint 213 was killed (PID-confirmed) because all workers exited with exit-0 and no `.result` files — a mass synthetic NO_GO. Root cause analysis identified three distinct problems that blocked the user-facing surfaces from working end-to-end:
+
+### Problem A — Auth-Precedence Bug (P0, `spawn-backend-docker.ts`)
+
+`spawn-backend-docker.ts` env-forwarding loop (lines 547–553) passed `ANTHROPIC_API_KEY` from the host environment into every Docker container unconditionally, regardless of `auth_mode` or `useApiOnly` state. When the host had `ANTHROPIC_API_KEY` set (common for developers), the container's `claude` CLI detected the key and switched to **API mode** — ignoring `~/.claude` session credentials. With a Tier-1-capped key (30K tokens/min), each worker hit rate limits and timed out → exit-0 → no `.result` → mass synthetic NO_GO.
+
+Users were forced to run `env -u ANTHROPIC_API_KEY npx deckent start` as a workaround, defeating the purpose of `auth_mode: subscription`.
+
+### Problem B — Dashboard `serve` Returns 401 on POST
+
+`npx deckent serve` serves the React dashboard correctly on GET, but every POST action (start sprint, kill, etc.) returned 401. The auto-generated API token (`server.ts` finalToken) was printed to the terminal only — it was never injected into the served `index.html`. The browser had no way to obtain the token for Authorization headers. Workaround: `DECKENT_API_AUTH_DISABLED=1`, which removes all auth.
+
+### Problem C — `deckent chat` Requires Host CLI
+
+`deckent chat` (Path B) works by spawning the user's installed `claude`/`codex`/`gemini` CLI. When no CLI is in PATH, it errors "No AI CLI found" with no guidance. Users with subscription credentials but no standalone CLI are locked out. A Path A embedded chat (server-side ProviderAdapter, no host CLI required) was needed.
+
+### Problem D — IDE Extension Was Scaffold-Only
+
+`extensions/vscode/` was created as an empty scaffold (Sprint 212) with no real activation, commands, sidebar, statusbar, or settings bridge.
+
+---
+
+## Decision
+
+### Part A — Provider+Auth-Aware Env-Forwarding
+
+`spawn-backend-docker.ts` env-forwarding updated to be auth-mode-aware:
+
+- **Claude + subscription mode** (`!useApiOnly`, `authMode !== 'api'`): `ANTHROPIC_API_KEY` is **not forwarded** to the container. The `~/.claude` session mount provides credentials instead.
+- **Claude + API mode** (`useApiOnly || authMode === 'api'`): `ANTHROPIC_API_KEY` is forwarded as before.
+- **Codex workers**: `OPENAI_API_KEY` forwarded (provider-specific).
+- **Gemini workers**: `GOOGLE_API_KEY` forwarded (provider-specific).
+
+This is a surgical change: the existing `-e KEY=value` Docker arg generation is guarded by an `if (!isSubscriptionMode || provider !== 'claude')` condition. API-mode behavior is fully preserved.
+
+### Part B — Localhost Token Injection into Served Dashboard
+
+`server.ts` injects `window.__DECKENT_API_TOKEN__` into the served `index.html` **only when binding to localhost** (127.0.0.1 / ::1). Non-localhost binds (production, remote) do not inject the token — security boundary preserved.
+
+The dashboard's `useApi.ts` hook reads `window.__DECKENT_API_TOKEN__` and adds `Authorization: Bearer <token>` to all fetch requests (GET + POST) when the value is present. When absent (remote bind, or auth disabled), requests are made without the header (backward-compatible).
+
+### Part C — Path A Embedded Chat Backend
+
+`src/api/chat-backend.ts` exposes an API/SSE endpoint that bridges browser chat messages to the server-side `runChatNativeLoop` (ProviderAdapter + MCP dispatch). Users can chat without any host CLI installed. The endpoint uses the existing session/auth middleware and supports multi-turn with mock-adapter for tests.
+
+### Part D — VS Code Extension Real Implementation
+
+`extensions/vscode/src/extension.ts` implements `activate(context)` — registers commands, sidebar TreeDataProvider, statusbar item, and settings bridge. Key files:
+- `commands.ts`: `deckent.startSprint` (integrated terminal), `deckent.showDashboard` (openExternal), `deckent.status` (output channel)
+- `sidebar.ts`: TreeDataProvider showing active sprint, workers, task statuses
+- `statusbar.ts`: StatusBarItem with sprint progress (X/Y) + click→dashboard
+- `settings.ts`: bridges `deckent.*` VSCode settings ↔ `.deckent/config.json`
+
+All extension tests mock the `vscode` module — no `vscode` runtime dependency in tests.
+
+---
+
+## Consequences
+
+**Positive:**
+- `npx deckent start` with `auth_mode: subscription` now works without `env -u ANTHROPIC_API_KEY`. Sprint 215+ does not require the manual workaround.
+- `npx deckent serve` on localhost is fully functional out-of-the-box — POST actions (start/kill/review) work without any environment variable overrides.
+- Users with subscription credentials but no host CLI can chat via the dashboard.
+- VS Code users get native IDE integration — sidebar, command palette, status bar — without leaving their editor.
+
+**Negative:**
+- The auth-aware forwarding only covers Docker backend. tmux/subprocess backends do not have the same isolation concern (they inherit host env directly without `-e` injection). This asymmetry is acceptable for V1: Docker is the primary backend for subscription mode.
+- Token injection is localhost-only. Remote dashboard deployments still require manual `DECKENT_API_AUTH_DISABLED=1` or a reverse-proxy that handles auth. This is the correct security default.
+- Path A chat backend shares the API server process. High-load chat sessions could affect sprint API responsiveness; process isolation is a post-beta concern (sub-#3).
+
+---
+
+## Alternatives Considered
+
+- **Global auth disable as default** — remove the 401 entirely by default. Rejected: eliminates auth protection for any user who runs `deckent serve` on a shared network. Localhost-only token injection is a minimal-risk subset.
+- **Separate chat server process** — run `chat-backend` as a standalone daemon. Rejected: deployment complexity; the existing API server already has the session middleware and MCP integration.
+- **Auth-forwarding opt-in flag in task JSON** — let workers declare `"forwardApiKey": true`. Rejected: unnecessary complexity; the subscription vs API mode is already captured by `authMode` (api-surface.md contract).
+- **VSCode extension as separate npm package** — decouple the extension from the main repo. Rejected: premature split; ADR-065 two-repo strategy is for the develop/product binary split, not IDE extensions. Extensions/vscode stays in the monorepo for the beta phase.
+
+---
+
+## References
+
+- Sprint 213 kill incident: mass synthetic NO_GO root cause analysis — `[[feedback_container_auth_precedence]]`
+- Sprint 214 — P0 auth-precedence fix (214-001) + serve token-inject (214-003, 214-004) + Path A chat (214-006, 214-007) + IDE extension (214-009 through 214-013)
+- `src/orchestra/spawn-backend-docker.ts` — env-forwarding auth-aware (Part A)
+- `src/api/server.ts` — localhost token injection (Part B)
+- `src/api/chat-backend.ts` — embedded chat endpoint (Part C)
+- `extensions/vscode/src/extension.ts`, `commands.ts`, `sidebar.ts`, `statusbar.ts`, `settings.ts` — IDE extension (Part D)
+- ADR-027: Hybrid Spawn Backend (Docker auth model)
+- ADR-034: Multi-Project Isolation (per-project security boundaries)
+- ADR-074: Native Chat Real Round-Trip (Path B baseline; this ADR adds Path A)
+- `[[feedback_wiring_pct_vs_user_working]]` — user-working proof requirement
+
+
+---
+
+## adr-077: Multi-Provider 8-Fleet + OpenAI-Compatible HTTP Adapter
+
+**Status:** accepted
+
+# ADR-077: Multi-Provider 8-Fleet + OpenAI-Compatible HTTP Adapter
+
+**Status:** accepted
+
+**Date:** 2026-06-01
+
+**Accepted:** Sprint 214
+
+---
+
+## Context
+
+### Provider Architecture Pre-Sprint-214
+
+Deckent's three existing cloud provider adapters (`claude/codex/gemini`) are all **CLI-spawn** adapters: they run the vendor's CLI binary (`claude`, `codex`, `gemini`) as a subprocess and parse stdout. This model works for subscriptions where the CLI handles auth, but it has a hard constraint: **providers without a CLI cannot be added**.
+
+A Sprint 213 provider audit confirmed the architectural fact:
+
+| Provider | CLI available? | API shape |
+|----------|---------------|-----------|
+| Anthropic (Claude) | ✅ `claude` CLI | custom |
+| OpenAI (Codex) | ✅ `codex` CLI | custom |
+| Google (Gemini) | ✅ `gemini` CLI | custom |
+| DeepSeek | ❌ no CLI | OpenAI-compatible |
+| Qwen (Alibaba DashScope) | ❌ no CLI | OpenAI-compatible |
+| GLM / Zhipu AI | ❌ no CLI | OpenAI-compatible |
+| Mistral | ❌ no CLI | OpenAI-compatible |
+| Groq | ❌ no CLI | OpenAI-compatible |
+
+DeepSeek, Qwen, GLM, Mistral, Groq, and every other third-party API provider expose the same REST interface: `POST /chat/completions` with OpenAI-shaped request/response bodies. One HTTP adapter handles all of them.
+
+### Additional Gaps Confirmed by the Audit
+
+1. **`model-catalog.ts` `PROVIDER_MAP`** only maps `anthropic`, `openai`, `google`. New provider names are unmapped → routing fallback to default.
+2. **`ProviderName` type** is hardcoded `'claude' | 'codex' | 'gemini'`. A third-party provider registered in the registry has no type coverage.
+3. **Per-provider API keys** are not stored in `.deck` (ADR-014 secret system). Bootstrap auto-registration does not run when keys are present.
+4. **Simultaneous mix** (3 CLI-subscription + N HTTP-API + local Ollama) was never validated as coexisting in the same registry.
+
+### Business Motivation
+
+F1-009 (8-provider fleet) is a core differentiator: the "provider-free" pillar means users can mix and match any combination of subscription + API + local providers. DeepSeek's cost advantage (~1/30th of Claude Opus), Qwen's multilingual strength, and GLM's China-region availability are concrete user needs. The same sprint workflow that runs on Claude must run seamlessly on DeepSeek.
+
+**Note:** "API mode forbidden during beta" (ADR-074, `[[project_api_mode_deferred_post_beta]]`) applies to **Anthropic Tier-1 API** only. Third-party API providers (DeepSeek, Qwen, GLM) do **not** violate this constraint — they are separate accounts with separate keys and no subscription/API conflict.
+
+---
+
+## Decision
+
+### Part A — `OpenAICompatibleAdapter` (HTTP fetch, single adapter for N providers)
+
+`src/providers/openai-compatible.ts` implements the `ProviderAdapter` interface:
+
+- **Config shape:** `{ baseURL: string, apiKeyEnv: string, models: string[], name: string }`
+- **`send(prompt, options)`:** `fetch(baseURL + '/chat/completions', { method: 'POST', headers: { Authorization: 'Bearer <key>', 'Content-Type': 'application/json' }, body: JSON.stringify({ model, messages, ... }) })` — parses `choices[0].message.content` from the JSON response.
+- **`isAvailable()`:** returns `!!process.env[apiKeyEnv]` (or `.deck` secret value if present).
+- **`stream()`:** stub returning async iterator over single message (streaming V2, post-beta, ADR-074 §F2-007).
+- **Built-in presets:**
+  - `DeepSeek`: `baseURL: 'https://api.deepseek.com/v1'`, `apiKeyEnv: 'DEEPSEEK_API_KEY'`
+  - `Qwen/DashScope`: `baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1'`, `apiKeyEnv: 'DASHSCOPE_API_KEY'`
+  - `GLM/Zhipu`: `baseURL: 'https://open.bigmodel.cn/api/paas/v4'`, `apiKeyEnv: 'ZHIPU_API_KEY'`
+
+No new runtime dependencies — Node.js built-in `fetch` (available Node.js ≥18, required ≥24 per ADR-001). ADR-010 (Tek Runtime Dependency) preserved.
+
+### Part B — `PROVIDER_MAP` Extension + Dynamic `ProviderName`
+
+`src/core/model-catalog.ts` extended:
+
+- `PROVIDER_MAP` adds entries for `deepseek`, `qwen`, `zhipu`, and a generic `openai-compat` passthrough key.
+- `ProviderName` type is widened: instead of a closed union, the type becomes `'claude' | 'codex' | 'gemini' | string` (open string for registered provider names). This preserves compile-time checking for the three built-ins while accepting any registered provider at runtime without a type error.
+- `getProviderTier(providerName)` falls back to `'standard'` for unknown providers (safe default).
+
+### Part C — Per-Provider Key Bootstrap + Auto-Register
+
+`src/core/provider.ts` bootstrap phase:
+
+1. Checks for `DEEPSEEK_API_KEY`, `DASHSCOPE_API_KEY`, `ZHIPU_API_KEY` in environment and `.deck` secrets (ADR-014 `readDeckSecret`).
+2. For each present key: instantiates the corresponding `OpenAICompatibleAdapter` preset and calls `registerProvider(name, adapter)`.
+3. Missing key → silent skip (no error, no warning spam). Graceful degradation: users without DeepSeek keys are not affected.
+4. Bootstrap runs once at process start (same lifecycle as Claude/Codex/Gemini registration).
+
+### Part D — Simultaneous Multi-Provider Coexistence Smoke
+
+`scripts/multi-provider-smoke.mjs` validates that 3+ providers (mock claude + mock ollama + real OpenAICompatibleAdapter in test mode) can coexist in the registry and that per-task provider routing selects the correct adapter (not always the first registered). This is a **registry coexistence test**, not a live API call.
+
+---
+
+## Consequences
+
+**Positive:**
+- Any OpenAI-API-compatible provider can be added with a 3-line config object — no new adapter file needed.
+- DeepSeek/Qwen/GLM users can run Deckent sprints at dramatically lower cost (DeepSeek-V3 ~$0.27/M tokens vs Claude Sonnet ~$3/M).
+- `ProviderName` widening preserves backward compatibility: existing code that checks `provider === 'claude'` continues to work; new code can pass any registered name.
+- Simultaneous fleet (CLI-subs + HTTP-API + local Ollama) is validated as coexisting.
+
+**Negative:**
+- HTTP adapter latency model differs from CLI-spawn: no local process startup overhead, but every call is a network round-trip. Timeout defaults (currently CLI-spawn tuned) may need adjustment for HTTP providers (lower per-call latency but higher variance).
+- `fetch` error handling is surface-level in V1 (non-200 → throw, no retry). Retry/backoff is a post-beta concern (F1-010 load-balancing).
+- `ProviderName` open-string widening loses exhaustiveness checking. A future dedicated `ProviderRegistry.listRegistered()` return type can restore type safety without closing the union.
+- Bootstrap auto-register reads env at startup only. Hot-add (adding a key at runtime) requires process restart.
+
+---
+
+## Alternatives Considered
+
+- **Separate adapter file per provider** (`deepseek-adapter.ts`, `qwen-adapter.ts`, etc.) — rejected: pure duplication; all share the identical `/chat/completions` interface. ADR-010 simplicity principle applies.
+- **`litellm` or `openai` npm package as dependency** — rejected: ADR-010 (Tek Runtime Dependency = commander.js only). Built-in `fetch` is sufficient for `POST /chat/completions`.
+- **Hard-close `ProviderName` union (add `| 'deepseek' | 'qwen' | 'zhipu'`)** — rejected: creates maintenance burden for every future provider. Open string is the correct extensibility point; built-in providers are the exhaustive-check boundary.
+- **User-managed YAML/JSON provider registry** — rejected: over-engineering for V1. Auto-register from env keys is the minimal, correct bootstrap. Custom registry is a post-beta extension point.
+- **Streaming-first adapter** — rejected: streaming is F2-007 (post-beta). Non-streaming works for all sprint task types (code gen, review, docs). Single-turn request/response matches the existing CLI-spawn model.
+
+---
+
+## References
+
+- Sprint 214 — F1-009 8-provider (214-014 OpenAICompatibleAdapter, 214-015 PROVIDER_MAP, 214-016 bootstrap, 214-017 smoke)
+- Sprint 213 provider audit — confirmed CLI-spawn vs HTTP-API architectural split
+- `src/providers/openai-compatible.ts` — HTTP adapter implementation (Part A)
+- `src/core/model-catalog.ts` — PROVIDER_MAP + ProviderName dynamic (Part B)
+- `src/core/provider.ts` — bootstrap auto-register (Part C)
+- `scripts/multi-provider-smoke.mjs` — coexistence validation (Part D)
+- ADR-023: Plan Tier Generalizasyonu — provider-agnostic tier names (tier mapping preserved)
+- ADR-066: Provider Independence — Multi-Provider Backend Parity (this ADR extends the fleet)
+- ADR-010: Tek Runtime Dependency (Node built-in fetch, no new npm deps)
+- ADR-014: .deck Secret File System (per-provider key storage)
+- `[[project_deckent_runtime_ecosystem]]` — 8-provider + runtime ecosystem direction
+- `[[project_api_mode_deferred_post_beta]]` — Anthropic Tier-1 API deferred; 3rd-party unaffected
+- DeepSeek API: https://api.deepseek.com/v1 (OpenAI-compatible)
+- Qwen DashScope: https://dashscope.aliyuncs.com/compatible-mode/v1 (OpenAI-compatible)
+- GLM/Zhipu: https://open.bigmodel.cn/api/paas/v4 (OpenAI-compatible)
+
+
+---
+
+## adr-078: CI-Hermeticity Standard + 8-Provider Runtime + Active Identity-Mutation Loop + Dashboard God-Level
+
+**Status:** accepted
+
+# ADR-078: CI-Hermeticity Standard + 8-Provider Runtime + Active Identity-Mutation Loop + Dashboard God-Level
+
+**Status:** accepted
+
+**Date:** 2026-06-01
+
+**Accepted:** Sprint 215
+
+---
+
+## Context
+
+### CI-Hermeticity Gap
+
+Sprint 214 fixed the immediate CI failures (commit `b67c000`), but the root-cause pattern — tests reading gitignored local state (`.deckent/config.json`, `.brain/memory.db`, `~/.deckent`) — was not structurally prevented. A new test written without awareness of the rule would silently re-couple to local state and break CI on the next push.
+
+Three specific gaps remained:
+
+1. **No local CI reproducer** — no `npm run test:ci-sim` command to hide gitignored files and run the full suite locally before pushing. Developers could not reproduce CI failures on their own machine.
+2. **No lint guard** — no automated check to detect `readFileSync('.deckent/config.json')` without a skip-if-absent guard in test files. A new hermetic violation would only surface in CI (minutes of feedback loop, not seconds).
+3. **No HOME isolation helper** — some tests leaked credential/config dotfiles to the project root by running with the real HOME. No `withSandboxHome()` utility existed to redirect HOME to a tmpdir per-test.
+
+### 8-Provider Fleet Wire-Gap (F1-009)
+
+Sprint 214 built `OpenAICompatibleAdapter` (`src/providers/openai-compatible.ts`) with presets for DeepSeek, Qwen/DashScope, and GLM/Zhipu. The adapter, PROVIDER_MAP extension, and ProviderName type widening were all complete. However a disk-verify finding confirmed that **nothing in `provider.ts` called `registerProvider` for these adapters** — the providers existed in code but were never registered into the runtime registry. DeepSeek/Qwen/GLM were built but dormant (not selectable at runtime).
+
+Two additional gaps accompanied the bootstrap gap:
+- **Subscription→API overflow** — when a subscription provider hits its rate/quota limit, workers had no automatic path to overflow to an equivalent API provider. `authMode` was a static per-task field; no dynamic overflow logic existed.
+- **Per-worker auth/provider uniformity** — task JSON `authMode` field existed but the `provider` + `authMode` resolution chain was not applied uniformly across Sprint/Task/Process modes in `task-router.ts`.
+
+### F5-008 Identity-Mutation Loop Gap
+
+Sprint 212 wired the *suggestion* path for agent evolution: `adaptive-agent` produces adaptation suggestions → `outcome-tracker` records them. Sprint 214 introduced `agent-genealogy.ts` and `agent-retirement.ts` as live modules with external callers. However the **closed-loop** — low success rate triggers an actual mutation of the agent's identity (prompt rewrite + skill repertoire change), which is then recorded in the genealogy and creates a new versioned variant — was not implemented. The mutation stayed at the "proposal" stage; no `applyAdaptation` was called.
+
+### Dashboard God-Level (F7) Gap
+
+Sprint 214 addressed F7-003 layout-level (responsive grid, ThemeProvider dark/light, sidebar/header structure — ~45% complete). The remaining god-level surfaces were untouched:
+
+- F7-004 terminal: multi-session management, command history ring buffer, clipboard helper — ~60% complete
+- F7-006 enterprise view: multi-tenant list, RBAC role matrix, audit log table, rate-limit status — UI completely absent despite F4 backend at 100%
+- F7-007 memory/ADR/debt explorer: FTS5 search, ADR timeline, debt table — ~20% complete
+- F7-009 nervous UI: pending-approval list, accept/reject actions, panic-guard badge, detector status — not built
+- F7-010 evolution dashboard: agent genealogy tree, retirement timeline, prompt-diff viewer — not built (backend modules live, no frontend)
+
+The evolution backend (F5 modules) also lacked a dedicated HTTP API to expose `agent-genealogy`, `agent-retirement`, and `prompt-metrics` data to the dashboard.
+
+---
+
+## Decision
+
+### Part A — CI-Hermeticity Standard
+
+Three artifacts establish the hermeticity standard as a permanent, enforced discipline:
+
+**`scripts/test-ci-sim.mjs` (`npm run test:ci-sim`):** Renames `.deckent/config.json`, `.brain/memory.db`, and `.brain/` to temporary backup names before running `CI=1 vitest run`, then restores them in a `try/finally` block regardless of outcome. This script exactly reproduces the CI environment locally — developers can run it before pushing to catch non-hermetic tests within seconds. The restore-on-fail guarantee means no state is ever lost even when the suite crashes.
+
+**`scripts/lint-test-hermeticity.mjs`:** Scans `tests/**/*.ts` files for direct `readFileSync` calls targeting `.deckent/config.json` or `.brain/memory.db` without a skip-if-absent guard or fixture pattern. Reports violations as `file:line` pairs. Can be integrated into CI as a pre-push lint. Maintains an allowlist for files that explicitly use skip-if-absent patterns.
+
+**`tests/helpers/sandbox-home.ts`:** Exports `withSandboxHome(fn)` (async wrapper) and `useSandboxHome()` (beforeEach/afterEach hook factory). Each call redirects `process.env.HOME` to a unique `os.tmpdir()/deckent-sandbox-<uuid>` directory and cleans it up after the test. No project root or real HOME directory is touched. Nested calls are independent. Used by credential, PTY, and config tests.
+
+These three artifacts are anchored in `.claude/rules/karpathy-discipline.md` under the "Test Hermeticity" section so future workers encounter the rule before writing tests.
+
+**Routing standard:** CI-related tasks (test infra, pipeline fixes, hermetic reproducer) are routed to **ci-guardian agent** + **ci-testing skill** via `activation-engine.ts`. This ensures the routing engine selects the right specialization for CI hygiene work automatically.
+
+### Part B — 8-Provider Bootstrap-Register + Overflow + Per-Worker Auth
+
+**Bootstrap-register (`src/core/provider.ts`):** The provider bootstrap phase now checks for `DEEPSEEK_API_KEY`, `DASHSCOPE_API_KEY`, and `ZHIPU_API_KEY` in environment variables and `.deck` secrets (ADR-014). For each present key, the corresponding `OpenAICompatibleAdapter` preset is instantiated and registered via `registerProvider(name, adapter)`. Missing keys are silently skipped — users without DeepSeek keys are unaffected. This is the wire that makes F1-009 runtime-usable: DeepSeek/Qwen/GLM are now selectable at runtime when keys are present.
+
+**Subscription→API overflow (`src/core/provider-overflow.ts`):** New module `resolveWithOverflow(task, registry)` — when a task's primary subscription provider emits a rate/quota-exceeded signal, the function selects an equivalent-tier API provider from the registry as a fallback. The decision is tier-preserving: a `premium` subscription overflow selects a `premium` API provider (not economy). If no equivalent API provider is available, the function degrades gracefully (returns the original provider, no throw). This module integrates with `token-quota.ts` for quota signal detection.
+
+**Per-worker auth resolution (`src/orchestra/task-router.ts`):** The `provider` + `authMode` fields are now resolved first-class for every worker across Sprint/Task/Process modes. Resolution order: DIRECTIVES override (`- Provider:`, `- Auth:`) > config defaults > system default. The resolution is uniform — the same logic path runs regardless of dispatch mode. This pairs with F1-010 overflow so per-worker overflow decisions are consistent.
+
+**Multi-provider smoke (`scripts/multi-provider-fleet-smoke.mjs`):** Registers mock instances of all 8 provider types (claude, codex, gemini, deepseek, qwen, zhipu, ollamaLocal, plus a generic openai-compat) into a registry, routes a mixed task set, and asserts each task lands on the correct adapter. Validates simultaneous coexistence of subscription + API + local providers without interference.
+
+### Part C — Active Identity-Mutation Loop (F5-008)
+
+**`src/orchestra/promotion-pipeline.ts`** extended with `applyAdaptation(agent, proposal, registry)`:
+
+1. When an agent's rolling success rate falls below the configured threshold (default: 60%), `adaptive-agent` has already produced an `AdaptationProposal` (skill additions/removals, prompt delta, specialization hint).
+2. `applyAdaptation` applies the proposal: rewrites the agent's `systemPrompt` field, adjusts `assignedSkills`, records the original identity as the parent in `agent-genealogy.ts` via `recordGenealogy(parent, child)`, and writes a new agent variant with a versioned ID (`agentId-v{N+1}`).
+3. The mutation is guarded: `requiresApproval: true` in the proposal triggers a nervous-system checkpoint before application (ADR-040). Agents in active tasks are not mutated mid-sprint.
+4. The result is an A/B testable variant — both parent and child coexist; the next sprint's routing engine scores both and the winner survives via standard promotion/demotion rules.
+
+This closes the loop: low-success → adaptive-agent proposes → `applyAdaptation` executes → genealogy records → A/B verify. The core moat at scale is now active (not just proposed).
+
+### Part D — Dashboard God-Level
+
+**`src/dashboard/src/components/AppShell.tsx`:** Top-level layout shell replacing ad-hoc layout in individual pages. Defines a CSS grid (header + sidebar + content), responsive breakpoints (mobile: stacked / tablet: side-nav collapsed / desktop: full sidebar), and dark/light token system (`data-theme` attribute propagation). Navigation hierarchy follows information architecture: Sprint → Dashboard → Evolution → Memory → Enterprise → Nervous → Terminal.
+
+**`src/dashboard/src/lib/terminal-sessions.ts`:** Multi-session management (session list, active-session switch, session lifecycle), command history ring buffer (up/down navigation, configurable size), and clipboard helper functions. Designed for the ADR-062 WS gateway interface — session IDs map to PTY instances.
+
+**`src/dashboard/src/pages/EnterprisePage.tsx`:** Tenant list view, RBAC role matrix (admin > operator > viewer columns), audit log table (filterable by tenant/action/time), and rate-limit status per tenant. Consumes existing F4 API endpoints via `useApi`. Read-first (no write actions in V1).
+
+**`src/dashboard/src/pages/MemoryExplorerPage.tsx`:** FTS5 search box (calls `/api/memory/search`), ADR timeline (sorted by sprint, status badge), debt table (open items). Renders ADR content as markdown via `SimpleMarkdown`. Filterable by type (adr/memory/debt/pattern).
+
+**`src/dashboard/src/pages/NervousPage.tsx`:** Pending-approval list (calls `/api/nervous/pending`), accept/reject buttons (calls `nervous_accept`/`nervous_reject` endpoints), panic-guard badge (active/inactive), detector status list. Polls every 30 seconds for new approvals.
+
+**`src/dashboard/src/pages/EvolutionPage.tsx`:** Three tabs — (1) Agent Genealogy Tree: hierarchical node tree from `/api/evolution/genealogy`, child nodes indented by depth; (2) Retirement Timeline: sorted by `retiredAt`, shows id/source/reason/stats; (3) Prompt Diff: table from `/api/evolution/prompt-metrics` showing agentId/version/successRate/trend/experimentStatus.
+
+**`src/api/evolution-endpoint.ts`:** Three read-only GET endpoints registered into `server.ts`:
+- `GET /api/evolution/genealogy` — agent family tree from `agent-genealogy.ts`
+- `GET /api/evolution/retirement` — retired agents from `agent-retirement.ts`
+- `GET /api/evolution/prompt-metrics` — prompt experiment metrics from `prompt-metrics.ts`
+
+All endpoints return empty arrays when no data is present (graceful empty state).
+
+---
+
+## Consequences
+
+**Positive:**
+- CI-hermeticity is now a first-class discipline with tooling (`test:ci-sim`), lint enforcement (`lint-test-hermeticity.mjs`), and a reusable helper (`sandbox-home.ts`). Regression from non-hermetic tests is structurally detectable before push.
+- DeepSeek/Qwen/GLM are runtime-usable when API keys are present — F1-009 moves from dormant to ~95% complete. Cost advantage (DeepSeek-V3 ~$0.27/M tokens vs Claude Sonnet ~$3/M) is now accessible.
+- The evolutionary moat is closed-loop: agents that underperform are now actually mutated (not just annotated) — identity-mutation is live with genealogy tracking and A/B testable variants.
+- Dashboard now covers all 7 god-level surfaces (AppShell + terminal-sessions + EnterprisePage + MemoryExplorerPage + NervousPage + EvolutionPage) with F4/F5 data surfaced in UI for the first time.
+
+**Negative:**
+- `test:ci-sim` renames files in-place — if the process is killed between rename and restore (SIGKILL, not SIGTERM), the backup files are stranded. Recovery requires manual rename. The try/finally block covers SIGTERM but not SIGKILL.
+- `applyAdaptation` mutation is guarded by `requiresApproval` but the checkpoint flow adds latency — high-frequency agents with frequent success drops will queue many approvals. Rate-limiting the mutation frequency (e.g., max one mutation per 3 sprints per agent) is a post-beta refinement.
+- Provider overflow relies on a quota-exceeded signal from the adapter — the signal shape is provider-specific and may not be emitted for all failure types (e.g., HTTP 429 vs timeout). Overflow coverage is partial in V1.
+- Dashboard pages use `useApi` with polling — no real-time SSE/WS push. F7-004 terminal real-time requires F2-007 streaming (post-beta).
+
+---
+
+## Alternatives Considered
+
+**CI-Hermeticity:**
+- **CI-only enforcement (GitHub Actions env guard)** — rejected: feedback loop is minutes (CI) not seconds (local). Local reproducer is the right layer.
+- **Vitest `globalSetup` that hides files** — considered: more automated but hides the pattern from developers who need to understand why tests fail locally when files are present. Explicit `test:ci-sim` is more educational.
+- **`dotenv-expand` + CI env injection** — rejected: doesn't address `readFileSync` paths at test sites; solves env vars, not file I/O.
+
+**8-Provider Bootstrap:**
+- **User-managed YAML provider registry** — rejected: over-engineering for V1; env-key auto-registration is the minimal, correct bootstrap for three known providers.
+- **Lazy registration (on first routing request)** — considered: avoids startup cost but complicates provider availability checks and `isAvailable()` semantics. Eager bootstrap at startup is simpler and consistent with Claude/Codex/Gemini registration.
+
+**Identity-Mutation Loop:**
+- **Mutation without approval gate** — rejected: uncontrolled identity mutation of active agents could cascade failures across sprints. Checkpoint gate (ADR-040 nervous system) is mandatory.
+- **Separate `mutation-engine.ts` module** — rejected: `promotion-pipeline.ts` already owns the promotion/demotion lifecycle; `applyAdaptation` is a natural extension of the same decision surface. YAGNI (ADR-010 simplicity principle).
+
+**Dashboard:**
+- **Unified mega-page** — rejected: monolithic page defeats information architecture; seven distinct concerns map cleanly to seven routes.
+- **Server-side rendering (SSR)** — rejected: React SPA is the established pattern (Vite + ADR-001 TypeScript); SSR would introduce a new server runtime dependency and is not required for the current read-mostly dashboard.
+
+---
+
+## References
+
+- Sprint 215 — CI-hermeticity kalıcılaştır + 8-provider fleet + dashboard god-level + evrim görünürlüğü
+- `scripts/test-ci-sim.mjs` — clean-state CI reproducer (Part A)
+- `scripts/lint-test-hermeticity.mjs` — hermeticity lint guard (Part A)
+- `tests/helpers/sandbox-home.ts` — HOME isolation helper (Part A)
+- `.claude/rules/karpathy-discipline.md` — Test Hermeticity anchor rule (Part A)
+- `src/core/provider.ts` — bootstrap auto-register (Part B)
+- `src/core/provider-overflow.ts` — subscription→API overflow (Part B)
+- `src/orchestra/task-router.ts` — per-worker auth resolution (Part B)
+- `scripts/multi-provider-fleet-smoke.mjs` — 8-provider coexistence validation (Part B)
+- `src/orchestra/promotion-pipeline.ts` — `applyAdaptation` identity-mutation (Part C)
+- `src/orchestra/adaptive-agent.ts` — `AdaptationProposal` source (Part C)
+- `src/orchestra/agent-genealogy.ts` — genealogy record target (Part C)
+- `src/api/evolution-endpoint.ts` — evolution REST API (Part D)
+- `src/dashboard/src/components/AppShell.tsx` — layout shell (Part D)
+- `src/dashboard/src/lib/terminal-sessions.ts` — terminal multi-session (Part D)
+- `src/dashboard/src/pages/EnterprisePage.tsx` — enterprise UI (Part D)
+- `src/dashboard/src/pages/MemoryExplorerPage.tsx` — memory/ADR explorer (Part D)
+- `src/dashboard/src/pages/NervousPage.tsx` — nervous system UI (Part D)
+- `src/dashboard/src/pages/EvolutionPage.tsx` — evolution dashboard (Part D)
+- ADR-077: Multi-Provider 8-Fleet + OpenAI-Compatible HTTP Adapter (bootstrap prerequisite)
+- ADR-075: F5 Evolution Runtime Wiring (identity-mutation closes the F5 loop)
+- ADR-040: Nervous System Architecture (approval gate for identity mutations)
+- ADR-037: Brain-Auditor-Worker Authority Matrix (scope enforcement, hermeticity boundary)
+- ADR-014: .deck Secret File System (per-provider key storage for bootstrap)
+- ADR-010: Tek Runtime Dependency (no new npm deps in hermeticity tooling or overflow module)
+- `[[project_ci_green_root_causes]]` — CI hermeticity root-cause pattern map
+- `[[project_test_home_leak]]` — HOME sandbox motivation
+- `[[project_deckent_runtime_ecosystem]]` — 8-provider + evolving agent + god-level dashboard vision
+- `[[project_dashboard_control_plane]]` — F7 god-level scope
+
+
+---
+
+## adr-079: Proof-of-Function DoD — Tier-0/Tier-1 Classification + Sprint-Inner Run-Verify Gate
+
+**Status:** accepted
+
+# ADR-079: Proof-of-Function DoD — Tier-0/Tier-1 Classification + Sprint-Inner Run-Verify Gate
+
+**Status:** accepted
+
+**Date:** 2026-06-01
+
+**Accepted:** Sprint 216
+
+---
+
+## Context
+
+### The Hollow-DONE Problem
+
+Sprint 214 shipped "serve token-inject DONE" based on a mocked unit test. A real-binary run on 2026-06-01 (`node dist/cli/entry.js serve`) contradicted that verdict:
+
+- Server boots, dashboard HTML returns HTTP 200 with correct `<title>`.
+- On localhost, **no API token is auto-minted** — `__DECKENT_API_TOKEN__` is absent from the served HTML (log: "No API token configured").
+- `/api/status` returns **401** — every dashboard data call fails.
+- Result: dashboard is **non-functional despite a DONE stamp**.
+
+The root cause was definitional: no distinction existed between *wiring proof* (the function is connected) and *user-working proof* (a real human running the binary gets a working experience). Mocked unit tests can only certify the former.
+
+This gap extended beyond `serve`:
+- `deckent chat` was "wired" (Path A backend connected) but had not been run-verified to produce a real round-trip response.
+- Dashboard pages rendered but every data endpoint returned 401 — invisible behind the mocked-test curtain.
+
+### Missing Classification Signal
+
+`detectTaskType()` in `rubric-registry.ts` classified tasks as `audit`, `document-write`, or `code-development`. There was no signal indicating whether a task touched a **user-facing surface** (CLI command a human runs, dashboard page, API endpoint) versus an **internal structural concern** (provider registration, F5 callers, type fixes, refactors). Without this signal:
+
+- User-surface tasks were evaluated by the same rubric as internal tasks — no run-verify requirement.
+- The routing engine had no way to prefer surface-aware agents (`api-builder`, `frontend-designer`, `ci-guardian`) over the generic `refactorer` for UI/serve/CLI work.
+- DIRECTIVES had no canonical slot for a real-binary smoke command.
+
+### Prior Mitigations That Were Insufficient
+
+- **disk-verify gate** (Sprint 138, ADR-035): verifies files exist on disk — does not boot a server or assert HTTP status.
+- **ADR-076 Part B** (Sprint 214): intended to fix `serve` token injection via a mocked unit test — the test never asserted on real served HTML.
+- **Sprint 215 `test:ci-sim`** (ADR-078): guards hermeticity (no local-state leakage) — not user-working verification.
+
+---
+
+## Decision
+
+### Tier Classification — `isUserSurfaceTask()`
+
+A new **parallel boolean** (not a 4th TaskType) `isUserSurfaceTask(task): boolean` is added to `rubric-registry.ts`. It inspects `scope.filesWrite` (and `scope.directories` as fallback) for the following prefixes:
+
+- `src/cli/commands/` — CLI commands a human runs directly
+- `src/dashboard/` — React dashboard pages and components
+- `src/api/` — HTTP API endpoints (serve, chat-backend, memory-search, etc.)
+
+Tasks matching any prefix are **Tier-1 (user-surface)**. All other tasks remain **Tier-0 (internal/structural)**. A single task can be both a `code-development` task and Tier-1 — the tiers are orthogonal to TaskType.
+
+**Tier-0 DoD (unchanged):** unit test + `tsc --noEmit` + structural grep proof. The proof is externally verifiable without running a binary.
+
+**Tier-1 DoD:** all Tier-0 criteria **plus** a recorded real-binary run. Mocked unit test alone = `GO_WITH_TECH_DEBT`, never `DONE`.
+
+### `Smoke:` Directive Line
+
+DIRECTIVES gains a mandatory `Smoke:` line for every Tier-1 task, alongside the existing `Kanıt:` and `Test:` lines:
+
+```
+**Smoke:** `node dist/cli/entry.js serve --port 3211 --no-terminal &` → `curl -s localhost:3211/ | grep -c __DECKENT_API_TOKEN__` ≥1 AND `curl -so/dev/null -w '%{http_code}' localhost:3211/api/status` = 200
+```
+
+`task-builder.ts` parses `- Smoke:` / `**Smoke:**` lines into `task.smoke = { command, expect }` — an optional field on the task JSON schema (`api-surface.md`).
+
+### Sprint-Inner Smoke Gate — `proof-of-function.ts`
+
+`src/orchestra/proof-of-function.ts` exports `verifyProofOfFunction(task, projectRoot, result)`:
+
+1. Checks `isUserSurfaceTask(task)` — if Tier-0, returns `{ passed: true, skipped: true }` immediately (no-op).
+2. Checks `task.smoke` — if absent (no `Smoke:` directive), returns `{ passed: true, skipped: true }` (gate is opt-in via DIRECTIVES authoring).
+3. Executes the smoke command via **async `spawn`** (host-side, not inside the worker container).
+4. Asserts the output against `task.smoke.expect` (regex or substring match).
+5. Returns `{ passed, evidence, command }`.
+
+`result-evaluator.ts` calls `verifyProofOfFunction` after `evaluateWithRubric`. On failure:
+- Downgrades `selfAssessment` from `DONE` → `GO_WITH_TECH_DEBT`.
+- Emits `PROOF_OF_FUNCTION_MISMATCH` on the audit channel (same channel as `DISK_VS_CLAIM_MISMATCH_CHANNEL`).
+- Records evidence in the result notes so the next FIX iteration knows what failed.
+
+Workers do **not** boot servers themselves — the gate runs in the Brain process where `localhost` binds reliably.
+
+### Routing: Surface-Aware Domain Bonus
+
+`routing-engine.ts` `getDomainMatchBonus()` gains a user-surface branch: when `isUserSurfaceTask` is true, domain bonuses are amplified so surface-aware agents beat the generic `refactorer`:
+
+- `dashboard` / UI patterns → `frontend-designer` domain bonus boosted.
+- `api/` / `serve` patterns → `api-builder` domain bonus boosted.
+- `e2e` / test-harness patterns → `ci-guardian` domain bonus boosted.
+
+The same `isUserSurfaceTask` signal is read from `TaskDNA` tags or derived from scope, ensuring routing and gate decisions are driven by the same source.
+
+### Permanent Regression Guard
+
+`scripts/test-e2e-surfaces.mjs` (`npm run test:e2e-surfaces`) boots the real `dist/cli/entry.js serve` binary on a random port (async spawn), asserts:
+- HTTP root `/` returns 200.
+- Served HTML contains `__DECKENT_API_TOKEN__`.
+- `/api/status` returns 200.
+
+Tears down the server in a `try/finally` block. Complements `test:ci-sim` (hermeticity guard) for the user-working axis.
+
+---
+
+## Consequences
+
+**Positive:**
+- Hollow-DONE stamps are structurally impossible for Tier-1 tasks: the gate runs in-sprint and auto-downgrades if the binary fails.
+- Routing collapse (`refactorer` dominance on UI/serve tasks) is corrected — surface-aware agents are preferred without manual `forceAgent` overrides.
+- `test:e2e-surfaces` provides a permanent regression guard analogous to `test:ci-sim` for hermeticity.
+- `isUserSurfaceTask()` is a single, stable signal reused by rubric, gate, and routing — no duplication.
+- Workers are not required to understand the classification — it is computed automatically from their declared `scope.filesWrite`.
+
+**Negative:**
+- Tier-1 gate adds latency at EVALUATE phase (smoke command execution). Mitigation: gate only runs when `task.smoke` is present; absent `Smoke:` lines result in an immediate no-op.
+- Workers may forget to add the `Smoke:` directive line. Mitigation: `worker-default.md` anchors the rule; Brain FIX phase catches the missing smoke line through rubric pressure.
+- Real-binary smoke requires a built `dist/` — gate skips (no-op) when `dist/cli/entry.js` is absent (e.g. fresh checkout without a build). Permanent guard `test:e2e-surfaces` has a dist-absent skip-guard for CI.
+- The `Smoke:` format is freeform text parsed with a simple regex — edge cases (multi-line commands, Windows path separators) may require future normalization. V1 scope: single-line command on a Linux/macOS/WSL2 host.
+
+---
+
+## Alternatives Considered
+
+**Post-sprint manual verification only** — Brain or Alperen runs smoke commands after the sprint. Rejected: manual gate depends on human discipline, not enforced automatically; the Sprint 214 hollow-DONE passed because no human re-ran the binary post-sprint.
+
+**Add `run-proven` as a 4th TaskType** — classify tasks as `run-proven` instead of a parallel boolean. Rejected: a CLI task that fixes an auth bug is both `code-development` and Tier-1 user-surface. Orthogonal booleans compose correctly; a 4th type forces a choice.
+
+**Always-on smoke (every task, regardless of `Smoke:` presence)** — gate runs even if no `Smoke:` directive is written. Rejected: tasks without a smoke command cannot be verified automatically; forcing the gate would create false NO_GO results for tasks that have no meaningful smoke command. Opt-in via `Smoke:` directive is the correct model.
+
+**Worker-side smoke execution** — worker boots the server and curls it from inside the container. Rejected: containers in Docker backend cannot reliably bind and curl `localhost` (port namespace isolation, no host-network by default). Brain-side execution is the only reliable path.
+
+**Separate post-sprint-smoke pipeline only** — no in-sprint gate, only a post-sprint audit. Rejected: post-sprint-smoke path (`post-sprint-smoke.ts`) exists and is useful for regression checks across all surfaces after a sprint; in-sprint gate is needed so a failed surface causes the *current task* to be reclassified before the retro, not discovered as a regression in the next sprint.
+
+---
+
+## References
+
+- `src/orchestra/rubric-registry.ts` — `isUserSurfaceTask()`, `PROOF_OF_FUNCTION_CRITERION`
+- `src/orchestra/proof-of-function.ts` — `verifyProofOfFunction()`, async spawn gate
+- `src/orchestra/result-evaluator.ts` — wire: `verifyProofOfFunction` after `evaluateWithRubric`
+- `src/orchestra/task-builder.ts` — `Smoke:` directive parse → `task.smoke`
+- `src/core/routing-engine.ts` — `getDomainMatchBonus()` surface-aware domain bonus
+- `scripts/test-e2e-surfaces.mjs` — permanent regression guard (`npm run test:e2e-surfaces`)
+- `.claude/rules/karpathy-discipline.md` — "Proof-of-Function DoD" CUSTOM section
+- `.claude/rules/worker-default.md` — "Proof-of-Function (Tier-1 user-surface)" section
+- ADR-035 (Verification Protocol Standard) — prior art for multi-channel verification
+- ADR-070 (Brain Evaluation Integrity) — zero-hard-code principle and signal-based coverage
+- ADR-078 (CI-Hermeticity Standard) — parallel discipline: `test:ci-sim` guards hermeticity, `test:e2e-surfaces` guards user-working
+- Sprint 216 evidence: `serve` localhost auto-mint landed (`src/api/server.ts:921-935`); `/api/status` confirmed 200 run-proven.

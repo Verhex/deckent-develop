@@ -918,9 +918,21 @@ export function createHttpServer(
   }
 
   // Resolve final token: explicit param > env var fallback
-  const finalToken = resolveAuthToken(resolvedToken);
+  let finalToken = resolveAuthToken(resolvedToken);
 
-  // Inform at startup about auth status
+  // Sprint 216-006 (reconstructed Sprint 218 after a git reset --hard wiped the
+  // original uncommitted change). On a loopback bind with no configured token,
+  // auto-mint an API token so the dashboard served from the same origin receives
+  // a working `__DECKENT_API_TOKEN__` injection and `/api/*` returns 200 instead
+  // of 401. Without this the dashboard loads but every data call fails. Remote
+  // binds still require an explicit token (no silent auth on non-loopback).
+  const isLoopbackHost = host === '127.0.0.1' || host === '::1' || host === 'localhost';
+  if (!finalToken && isLoopbackHost && process.env['DECKENT_API_AUTH_DISABLED'] !== '1') {
+    finalToken = randomBytes(32).toString('hex');
+    process.stderr.write(`[deckent:info] Auto-minted localhost API token: ${finalToken}\n`);
+  }
+
+  // Inform at startup about auth status (only reached on a remote bind with no token)
   if (!finalToken && process.env['DECKENT_API_AUTH_DISABLED'] !== '1') {
     process.stderr.write(
       '[deckent:info] No API token configured. All API requests will require auth (401). Set DECKENT_API_TOKEN or config.api_auth_token to provide a token.\n',

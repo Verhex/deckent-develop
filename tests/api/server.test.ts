@@ -1423,11 +1423,13 @@ describe('createHttpServer', () => {
     });
 
     it('logs an info message to stderr when no token is configured', async () => {
-      api = createHttpServer(PROJECT_ROOT, 0);
+      // Non-loopback host: localhost auto-mints an API token (216-006), so the
+      // "no token configured" warning only surfaces for remote binds.
+      api = createHttpServer(PROJECT_ROOT, { port: 0, host: '0.0.0.0' });
       await new Promise<void>((r) => api.server.once('listening', r));
 
       const calls = stderrSpy2.mock.calls.map((c) => String(c[0]));
-      const infoCall = calls.find((s) => s.includes('[deckent:info]'));
+      const infoCall = calls.find((s) => s.includes('[deckent:info]') && s.includes('No API token'));
       expect(infoCall).toBeDefined();
       expect(infoCall).toContain('No API token configured');
     });
@@ -1442,7 +1444,7 @@ describe('createHttpServer', () => {
     });
 
     it('info message is logged exactly once at server creation, not per request', async () => {
-      api = createHttpServer(PROJECT_ROOT, 0);
+      api = createHttpServer(PROJECT_ROOT, { port: 0, host: '0.0.0.0' });
       await new Promise<void>((r) => api.server.once('listening', r));
 
       const infoCalls = stderrSpy2.mock.calls
@@ -1452,7 +1454,7 @@ describe('createHttpServer', () => {
     });
 
     it('info message includes how to configure auth token', async () => {
-      api = createHttpServer(PROJECT_ROOT, 0);
+      api = createHttpServer(PROJECT_ROOT, { port: 0, host: '0.0.0.0' });
       await new Promise<void>((r) => api.server.once('listening', r));
 
       const calls = stderrSpy2.mock.calls.map((c) => String(c[0]));

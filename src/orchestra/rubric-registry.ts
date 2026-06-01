@@ -180,6 +180,30 @@ export function getRubric(task: Task): EvaluationRubric {
 }
 
 /**
+ * User-surface (Tier-1) prefixes — human-facing surfaces that require
+ * Proof-of-Function verification (real-binary Smoke run, not a mocked test).
+ */
+const USER_SURFACE_PREFIXES = ['src/cli/commands/', 'src/dashboard/', 'src/api/'];
+
+/**
+ * True when a task writes to a user-facing surface (CLI command, dashboard,
+ * or HTTP API). Such tasks are Tier-1: a mocked unit test alone is NOT enough
+ * to mark them DONE — `proof-of-function.ts` runs the task's `Smoke:` command
+ * against the real binary and downgrades DONE→GO_WITH_TECH_DEBT on failure.
+ *
+ * Parallel signal to {@link detectTaskType} (NOT a 4th TaskType): a CLI task is
+ * still `code-development` AND user-surface. Sprint 216-001; reconstructed
+ * Sprint 218 after a `git reset --hard` wiped the original uncommitted change.
+ */
+export function isUserSurfaceTask(task: Task): boolean {
+  const paths = [...(task.scope?.filesWrite ?? []), ...(task.scope?.directories ?? [])];
+  return paths.some((p) => {
+    const norm = p.replace(/\\/g, '/').replace(/^\.?\//, '');
+    return USER_SURFACE_PREFIXES.some((prefix) => norm.startsWith(prefix));
+  });
+}
+
+/**
  * Agents whose output is not always a coverage-instrumentable surface.
  * Bug-fixer (forensic + targeted patches), security-auditor (audit reports),
  * architect / architecture-planner (design + ADR work), and doc-writer

@@ -1,5 +1,16 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-217 Learnings
+- Sprint sprint-217 Learnings: ## Sprint sprint-217 Learnings
+- new sprint: NO_GO — Placeholder 'new sprint' task — no implementation work defined. DIRECTIVES.md contains only 'new sprint' with no concret
+
+## Sprint sprint-216 Learnings
+- Sprint sprint-216 Learnings: ## Sprint sprint-216 Learnings
+- 216-006 — [P0] serve localhost API-token auto-mint + `__DECKENT_API_TOKEN__` inject → /api/status 200: GO_WITH_TECH_DEBT — Implementation:
+  src/api/server.ts:921-935 — `finalToken` changed from `const` to `let`, followed by a 4-line auto-mint
+- 216-012 — Memory explorer FTS5 gerçek endpoint (arama gerçek sonuç döndürür): GO_WITH_TECH_DEBT — Implementation:
+- src/api/memory-search-endpoint.ts (NEW, 47 LoC): registerMemorySearch() — GET /api/memory/search?q= → 
+
 ## Sprint sprint-214 Learnings
 - Sprint sprint-214 Learnings: ## Sprint sprint-214 Learnings
 

@@ -4,12 +4,17 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
-| debt-210-009-fix | Tech debt from 210-009-fix: Root cause of NO_GO (test_coverage=65): original wor | critical | sprint-210 | active |
+| rollback-sprint-217 | Sprint sprint-217 rollback SUCCESS | normal | sprint-217 | active |
 
 ## Resolved Technical Debt
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-216-006 | Tech debt from 216-006: Implementation:
+  src/api/server.ts:921-935 — `finalToke | normal | sprint-216 | resolved |
+| debt-216-012 | Tech debt from 216-012: Implementation:
+- src/api/memory-search-endpoint.ts (NEW | normal | sprint-216 | resolved |
+| debt-210-009-fix | Tech debt from 210-009-fix: Root cause of NO_GO (test_coverage=65): original wor | critical | sprint-210 | resolved |
 | debt-207-001 | Tech debt from 207-001: DONE criteria met: (1) bundled opus apiId updated claude | normal | sprint-207 | resolved |
 | debt-203-001 | Tech debt from 203-001: Added getProviderBinaryForModel() to spawn-backend-docke | normal | sprint-203 | resolved |
 | debt-203-002 | Tech debt from 203-002: Changed auth mount condition at line 502: added `|| prov | normal | sprint-203 | resolved |
