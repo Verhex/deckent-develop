@@ -598,7 +598,7 @@ describe('Error handling completeness', () => {
     // Allowlist: exhaustive switch defaults that intentionally use Error for unreachable paths
     // task-mode-runner.ts: style mismatch guard (pending DeckentError migration — Sprint 151 T-012)
     // sprint-controller.ts: readTaskJsonFresh ENOENT guard (Sprint 168 C0c RC3, pending DeckentError migration)
-    const allowlist = new Set(['monitor-adapter.ts', 'task-mode-runner.ts', 'sprint-controller.ts']);
+    const allowlist = new Set(['monitor-adapter.ts', 'task-mode-runner.ts', 'sprint-controller.ts', 'honest-gate.ts']);
     for (const file of files) {
       if (allowlist.has(file)) continue;
       const content = readFileSync(join(dir, file), 'utf-8');

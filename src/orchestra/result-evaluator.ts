@@ -2212,6 +2212,33 @@ export function writeHonestSentinelResult(
 
 // ─── FIX Context Enrichment (D-3) ──────────────────────────────────
 
+/** Pattern written by tmux/docker backends when a worker exits without producing a .result file. */
+const NO_RESULT_CRASH_PATTERN = 'exited without writing result';
+
+/**
+ * Build an accurate NO_GO cause description distinguishing worker self-NO_GO
+ * from crash-generated synthetic results (no .result file on disk).
+ *
+ * Sprint 210 210-008: "Worker exited without writing result" was reported even
+ * when a .result file EXISTS with selfAssessment=NO_GO, making debug harder.
+ *
+ * - result is a crash fallback (noResult) → "no result file (worker exited without writing result)"
+ * - result is a genuine worker self-NO_GO → "worker self-NO_GO, N files, X lines added"
+ */
+export function buildAccurateNoGoNote(result: TaskResult): string {
+  const notes = result.notes ?? '';
+  const isNoResult = notes.includes(NO_RESULT_CRASH_PATTERN);
+  if (isNoResult) {
+    return 'no result file (worker exited without writing result)';
+  }
+  if (result.selfAssessment === 'NO_GO') {
+    const files = result.filesChanged?.length ?? 0;
+    const lines = result.linesAdded ?? 0;
+    return `worker self-NO_GO, ${files} files, ${lines} lines added`;
+  }
+  return `evaluation NO_GO (selfAssessment=${result.selfAssessment ?? 'unknown'})`;
+}
+
 /**
  * Build an enriched reason string for FIX tasks that includes specific
  * rubric scores and failure details instead of generic "Task X NO_GO".
@@ -2225,7 +2252,8 @@ export function buildEnrichedFixReason(
   result: TaskResult,
   rubricResult?: EvaluationResult,
 ): string {
-  const parts: string[] = [`Task ${taskId} evaluated as NO_GO`];
+  const accurateReason = buildAccurateNoGoNote(result);
+  const parts: string[] = [`Task ${taskId} evaluated as NO_GO`, accurateReason];
 
   if (rubricResult) {
     parts.push(`totalScore=${rubricResult.totalScore}`);

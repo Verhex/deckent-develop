@@ -4,6 +4,7 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-210-009-fix | Tech debt from 210-009-fix: Root cause of NO_GO (test_coverage=65): original wor | normal | sprint-210 | active |
 
 ## Resolved Technical Debt
 

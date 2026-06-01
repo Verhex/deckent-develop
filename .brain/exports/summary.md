@@ -66,8 +66,11 @@
 | adr-069 | Event-Driven Triggers + RBAC — F3 Webhook & F4 Role-Based Access Control | proposed |
 | adr-070 | Brain Evaluation Integrity — Signal-Based Coverage Exemption + Zero-Hard-Code Principle | accepted |
 | adr-071 | F3 Autonomous Mode (Self-Dispatch Guard) + F4 Enterprise RBAC/Tenant/Audit | proposed |
+| adr-072 | Agent Routing Balance (Multi-Signal Scoring) + Dashboard API Auth Hardening | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-210 Learnings** (sprint-210): ## Sprint sprint-210 Learnings
+- 210-009 — Dashboard sprint kontrol paneli (plan/start/status UI): GO_WITH_TECH_DEBT ...
 - **Sprint sprint-209 Learnings** (sprint-209): ## Sprint sprint-209 Learnings
 - **Sprint sprint-208 Learnings** (sprint-208): ## Sprint sprint-208 Learnings
 - **Sprint sprint-207 Learnings** (sprint-207): ## Sprint sprint-207 Learnings
@@ -83,11 +86,9 @@
 - 202-002 — Ollama model registry (tier→local model): NO_GO — Ollama model registry ti...
 - **Sprint sprint-201 Learnings** (sprint-201): ## Sprint sprint-201 Learnings
 - 201-006 — Test baseline 28 → ≤20 attack: NO_GO — TASK GOAL: reduce vitest fail count...
-- **Sprint sprint-200 Learnings** (sprint-200): ## Sprint sprint-200 Learnings
-- 198-002 — memory.db sprint-log finalize bug fix + Sprint 194/196 row backfill: NO_GO...
 
 ## Active Technical Debt
-_No active technical debt._
+- [NORMAL] Tech debt from 210-009-fix: Root cause of NO_GO (test_coverage=65): original wor
 
 ## Active Patterns
 - Violation pattern: stale_heartbeat
@@ -134,5 +135,7 @@ _No active technical debt._
 - Violation pattern: stale_heartbeat
 - Violation pattern: stale_heartbeat
 - Violation pattern: file_outside_scope
+- Violation pattern: stale_heartbeat
+- Violation pattern: file_outside_scope
 
-_Total entries: 446 | Generated: 2026-05-31_
+_Total entries: 453 | Generated: 2026-06-01_

@@ -5738,3 +5738,40 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 209-014: 209-014 — ADR-072 (routing dengeleme + dashboard auth) + ROADMAP (DONE)
 
 ---
+## Sprint 210 — sprint-210
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-06-01
+**Duration:** 1668s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 20 |
+| Completed | 20 |
+| Tech Debt | 2 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 1668039ms |
+
+### Tasks
+
+- 210-001: 210-001 — error-handling + error-registry-lint allowlist (honest-gate çöp-tespit) (DONE)
+- 210-002: 210-002 — health-check gece-yarısı tarih flaky fix (DONE)
+- 210-003: 210-003 — docker-backend full-suite contamination kalıcı fix (DONE)
+- 210-004: 210-004 — Routing canlı doğrulama testi (build sonrası çeşitlilik) (DONE)
+- 210-005: 210-005 — Routing imbalance CI guard (dağılım eşik) (DONE)
+- 210-006: 210-006 — FIX prompt enrichment (orijinal task description inject) (DONE)
+- 210-007: 210-007 — FIX agent seçimi task türüne göre (sadece bug-fixer değil) (DONE)
+- 210-008: 210-008 — Brain NO_GO note doğruluğu (gerçek sebep yaz) (DONE)
+- 210-009: 210-009 — Dashboard sprint kontrol paneli (plan/start/status UI) (GO_WITH_TECH_DEBT)
+- 210-010: 210-010 — Dashboard agent/skill dağılım görünümü (routing şeffaflık) (DONE)
+- 210-011: 210-011 — Dashboard API routing endpoint (DONE)
+- 210-012: 210-012 — Dashboard onboarding/empty-state iyileştirme (sade kişi) (DONE)
+- 210-013: 210-013 — Self-dispatch pending-approval kuyruğu (otonom mod onay-gate) (DONE)
+- 210-014: 210-014 — RBAC CLI komut (deckent rbac check/grant iskelet) (DONE)
+- 210-015: 210-015 — Audit log CLI sorgu (deckent audit query iskelet) (DONE)
+- 210-016: 210-016 — ADR-073 (routing canlı + FIX prompt + dashboard) + ROADMAP (DONE)
+
+---

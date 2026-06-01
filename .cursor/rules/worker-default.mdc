@@ -41,6 +41,7 @@ alwaysApply: false
 
 ## Active ADR Constraints
 
+- **ADR-073**: Routing Live Validation + FIX Prompt Enrichment + Dashboard Control Plane — **Status:** accepted
 - **ADR-072**: Agent Routing Balance (Multi-Signal Scoring) + Dashboard API Auth Hardening — **Status:** accepted
 - **ADR-070**: Brain Evaluation Integrity — Signal-Based Coverage Exemption + Zero-Hard-Code Principle — **Status:** accepted
 - **ADR-066**: Provider Independence — Multi-Provider Backend Parity — **Status:** accepted

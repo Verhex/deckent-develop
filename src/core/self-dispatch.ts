@@ -218,3 +218,82 @@ export function createSelfDispatchCallback(
     }
   };
 }
+
+/**
+ * Pending-approval queue entry (Sprint 210 — Task 210-013).
+ * Identified by a generated id so `approveDispatch(id)` can target it.
+ */
+export interface PendingDispatchEntry {
+  id: string;
+  policyId: string;
+  decision: SelfDispatchDecision;
+  dispatches: DueDispatch[];
+  enqueuedAt: Date;
+  status: 'pending' | 'approved';
+  approvedAt?: Date;
+}
+
+/**
+ * Module-internal pending-approval queue for self-dispatch (Sprint 210).
+ *
+ * Otonom mod onay-gate: when `evaluateDispatch` returns `dispatch=true &&
+ * requiresApproval=true`, `evaluateAndEnqueue` records the item. Items stay
+ * `pending` until `approveDispatch(id)` flips them to `approved`. This class
+ * NEVER invokes Brain.runSprint or any side-effectful sprint API — it only
+ * stores entries. The caller drains approved entries after human acceptance.
+ *
+ * Scoped to `scheduled` trigger contexts (event/threshold contexts have no
+ * DueDispatch list to enqueue).
+ */
+export class PendingDispatchQueue {
+  private readonly entries: PendingDispatchEntry[] = [];
+  private counter = 0;
+  private readonly clock: () => Date;
+
+  constructor(options: { clock?: () => Date } = {}) {
+    this.clock = options.clock ?? (() => new Date());
+  }
+
+  /**
+   * Evaluate policy against context and enqueue if dispatch is approved AND
+   * requires human approval. Returns the new entry, or null when not enqueued.
+   * Non-scheduled contexts always return null (no DueDispatch list to store).
+   */
+  evaluateAndEnqueue(
+    policy: SelfDispatchPolicy,
+    context: SelfDispatchContext,
+  ): PendingDispatchEntry | null {
+    const decision = evaluateDispatch(policy, context);
+    if (!decision.dispatch || !decision.requiresApproval) return null;
+    if (context.kind !== 'scheduled') return null;
+    const entry: PendingDispatchEntry = {
+      id: `pd-${++this.counter}`,
+      policyId: policy.id,
+      decision,
+      dispatches: context.dispatches,
+      enqueuedAt: this.clock(),
+      status: 'pending',
+    };
+    this.entries.push(entry);
+    return entry;
+  }
+
+  /** Return entries still awaiting human approval. */
+  listPendingDispatches(): PendingDispatchEntry[] {
+    return this.entries.filter((e) => e.status === 'pending');
+  }
+
+  /**
+   * Transition a pending entry to `approved` and stamp `approvedAt`.
+   * Returns the updated entry, or null if id is unknown or already approved.
+   * Approving does NOT auto-start — caller must invoke Brain.runSprint
+   * explicitly after observing the approved entry.
+   */
+  approveDispatch(id: string): PendingDispatchEntry | null {
+    const entry = this.entries.find((e) => e.id === id);
+    if (!entry || entry.status !== 'pending') return null;
+    entry.status = 'approved';
+    entry.approvedAt = this.clock();
+    return entry;
+  }
+}

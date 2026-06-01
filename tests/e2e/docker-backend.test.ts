@@ -29,7 +29,7 @@
 //   T19: state machine FAILED fallback on missing .result (unit)
 //   T20: Docker backend timeout marker written on container_start_failed
 
-import { describe, it, expect, beforeEach, afterEach, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { tmpdir } from 'node:os';
@@ -42,6 +42,33 @@ import { _clearAllPending } from '../../src/core/active-workers.js';
 
 const PROJECT_ROOT = process.cwd();
 const TEST_TASKS_DIR = path.join(PROJECT_ROOT, '.tasks');
+
+// Suite-level pre-flight: flush any stale test-docker artifacts left by a prior
+// interrupted run (e.g. CI killed mid-suite or monitorContainer wrote after cleanup).
+// This runs ONCE before any describe block — it is the first line of defence against
+// cross-run contamination of the real /workspace/.tasks/ directory.
+beforeAll(() => {
+  _clearAllPending();
+  try {
+    if (fs.existsSync(TEST_TASKS_DIR)) {
+      for (const f of fs.readdirSync(TEST_TASKS_DIR)) {
+        if (f.startsWith('task-test-docker-') || f.startsWith('.prompt-test-docker-') || f.startsWith('.worker-test-docker-')) {
+          try { fs.unlinkSync(path.join(TEST_TASKS_DIR, f)); } catch { /* ok */ }
+        }
+      }
+    }
+  } catch { /* ok */ }
+  try {
+    const locksDir = path.join(PROJECT_ROOT, LOCKS_DIR);
+    if (fs.existsSync(locksDir)) {
+      for (const f of fs.readdirSync(locksDir)) {
+        if (f.endsWith('.spawnlock') && f.includes('test-docker-')) {
+          try { fs.unlinkSync(path.join(locksDir, f)); } catch { /* ok */ }
+        }
+      }
+    }
+  } catch { /* ok */ }
+});
 
 // Docker tests require BOTH: Docker daemon running AND deckent-worker image built
 function isDockerReady(): boolean {
@@ -451,14 +478,29 @@ describe('Docker Backend Integration', () => {
     }
   }, 30_000);
 
-  // Final cleanup — monitorContainer writes .hb/.timeout asynchronously AFTER afterEach runs
+  // Final cleanup — monitorContainer writes .hb/.timeout asynchronously AFTER afterEach runs.
+  // Wait 3s (up from 2s) to catch slower async callbacks in CI environments, then sweep
+  // all test-docker artifacts plus any residual spawnlocks.
   afterAll(async () => {
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    _clearAllPending();
+    await new Promise(resolve => setTimeout(resolve, 3000));
     try {
-      const files = fs.readdirSync(TEST_TASKS_DIR);
-      for (const f of files) {
-        if (f.startsWith('task-test-docker-') || f.startsWith('.prompt-') || f.startsWith('.worker-test-docker-')) {
-          try { fs.unlinkSync(path.join(TEST_TASKS_DIR, f)); } catch { /* ok */ }
+      if (fs.existsSync(TEST_TASKS_DIR)) {
+        const files = fs.readdirSync(TEST_TASKS_DIR);
+        for (const f of files) {
+          if (f.startsWith('task-test-docker-') || f.startsWith('.prompt-') || f.startsWith('.worker-test-docker-')) {
+            try { fs.unlinkSync(path.join(TEST_TASKS_DIR, f)); } catch { /* ok */ }
+          }
+        }
+      }
+    } catch { /* ok */ }
+    try {
+      const locksDir = path.join(PROJECT_ROOT, LOCKS_DIR);
+      if (fs.existsSync(locksDir)) {
+        for (const f of fs.readdirSync(locksDir)) {
+          if (f.endsWith('.spawnlock') && f.includes('test-docker-')) {
+            try { fs.unlinkSync(path.join(locksDir, f)); } catch { /* ok */ }
+          }
         }
       }
     } catch { /* ok */ }
@@ -471,7 +513,15 @@ describe('Docker Backend Integration', () => {
 //   heartbeat cache invalidation, and state machine transitions.
 
 function makeTmpRoot(): string {
-  const root = fs.mkdtempSync(path.join(tmpdir(), 'deckent-docker-parity-'));
+  // Prefer /tmp but fall back to a workspace-local temp dir if /tmp is full (ENOSPC in CI).
+  let base = tmpdir();
+  try {
+    fs.accessSync(base, fs.constants.W_OK);
+  } catch {
+    base = path.join(PROJECT_ROOT, '.tmp-test');
+    fs.mkdirSync(base, { recursive: true });
+  }
+  const root = fs.mkdtempSync(path.join(base, 'deckent-docker-parity-'));
   fs.mkdirSync(path.join(root, TASKS_DIR), { recursive: true });
   fs.mkdirSync(path.join(root, LOCKS_DIR), { recursive: true });
   return root;

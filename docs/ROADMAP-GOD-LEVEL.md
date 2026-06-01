@@ -51,6 +51,8 @@
 
 > **Sprint 209 sonuç (2026-05-31):** **Agent routing dengeleme** — intent-classifier domain enrichment (scope-path → api/security/design/data/devops intent; Sprint 209-001), multi-sinyal agent scoring domain-match bonus +3 (Sprint 209-002), refactorer impl skor domain-aware denge (Sprint 209-003), skill routing çeşitlendirme (Sprint 209-004), routing-distribution.mjs dağılım raporu (Sprint 209-005). **F7 dashboard auth fix** — API auth localhost auto-inject, prod-safe default, DECKENT_API_AUTH_DISABLED artık opsiyonel (Sprint 209-006, **F7-001 DONE**), dashboard endpoint canlı veri parite (Sprint 209-007, **F7-002 DONE**). **F3/F4 devam** — self-dispatch flow-runtime entegrasyon (209-011), RBAC+audit entegrasyon (209-012), tenant-aware flow registry (209-013). Yeni ADR: 072 (routing-balance + dashboard-auth) — accepted.
 
+> **Sprint 210 sonuç (2026-05-31):** **Routing canlı doğrulama** — build+restart sonrası ilk CANLI sprint; routing live diversity testi (src/api→api-builder, src/auth→security-auditor, src/dashboard→frontend-designer, src/db→data-engineer; Sprint 210-004, **routing-balance DONE**), routing-distribution.mjs `--ci` mode imbalance guard exit-1 (Sprint 210-005). **4 fail hijyen** — error-handling + error-registry-lint allowlist (honest-gate.ts; Sprint 210-001), health-check tarih-agnostik fix (Sprint 210-002), docker-backend full-suite contamination fix (Sprint 210-003). **FIX prompt iyileştirme** — debt-manager.ts orijinal task description + NO_GO reason inject (Sprint 210-006, **FIX prompt enrichment DONE**), FIX agent task-türüne göre seçim/selectFixAgent (Sprint 210-007), result-evaluator NO_GO note doğruluğu (Sprint 210-008). **F7 dashboard devam** — SprintControlPanel canlı sprint durumu + faz + worker (Sprint 210-009, **F7-005 DONE**), RoutingDistribution bar chart + imbalance uyarı (Sprint 210-010), `/api/routing/distribution` endpoint (Sprint 210-011), Onboarding 3-adım sihirbazı init→directives→start (Sprint 210-012, **F7-008 DONE**). **F3/F4** — self-dispatch pending-approval kuyruğu (Sprint 210-013), RBAC CLI komut iskeleti (Sprint 210-014), audit log CLI sorgu (Sprint 210-015). Yeni ADR: 073 (routing live + FIX prompt + dashboard control plane) — accepted.
+
 **F2 — Native Chat Path C (AI Asistan yüzü)** — ~600-1200 LoC:
 | ID | İş | Öncelik | Kanıt |
 |----|----|---------|-------|
@@ -102,10 +104,10 @@
 | F7-002 | Dashboard canlı veri parite — tüm panel gerçek-zamanlı doğru (sprint/worker/agent/memory/debt/checkpoint) SSE/WS | **P1** | 🟡 Sprint 209-007 endpoint canlı veri parite DONE — sprint/worker/agent/memory/debt endpoint'leri aktif |
 | F7-003 | UI/UX redesign — god-level tasarım+konsept (modern, sezgisel, responsive, dark/light, herkesin anladığı bilgi mimarisi) | **P1** | ThemeProvider + i18n temel var |
 | F7-004 | Terminal güçlendir — embedded web terminal (ADR-062) tam işlevsel, çok-oturum, kopyala/yapıştır, geçmiş | P2 | terminal-api.ts + ws-gateway zayıf |
-| F7-005 | Sprint kontrol paneli — plan/start/status/kill/review/retro UI'dan (onay-gate'li), canlı faz görselleştirme | P2 | NewSprintModal + SprintPhaseTimeline var |
+| F7-005 | Sprint kontrol paneli — plan/start/status/kill/review/retro UI'dan (onay-gate'li), canlı faz görselleştirme | P2 | 🟡 Sprint 210-009 SprintControlPanel DONE — canlı faz + worker listesi + SSE (SprintPhaseTimeline + WorkerCard kullanır) |
 | F7-006 | Enterprise görünüm — multi-tenant dashboard (F4) + RBAC-aware UI (rol bazlı panel) + audit-log viewer + multi-project | P2 | F4 backend (rbac/tenant/audit) ile entegre |
 | F7-007 | Memory/ADR/debt explorer — FTS5 arama, ADR timeline, debt trend, pattern görsel | P3 | DebtTable + SimpleMarkdown genişlet |
-| F7-008 | Onboarding + herkes-için akış — sade kişi sihirbazı (init→directives→start), tooltip/rehber, sıfır-config | P3 | 3-yüz: sade kişi friendly |
+| F7-008 | Onboarding + herkes-için akış — sade kişi sihirbazı (init→directives→start), tooltip/rehber, sıfır-config | P3 | 🟡 Sprint 210-012 Onboarding DONE — 3-adım sihirbazı (init→directives→start), skip, localStorage tercihi |
 
 **Sıra:** F1 (P0) → F1 (P1) → F2 → F3 → F4 → F5 → F6. Bugün F1'den başlanır, dogfood + kontrol döngüsüyle ilerlenir. **Yürütme stratejisi (2026-05-31): bol-küçük-task (tek-sorumluluk, ≤200 LoC, effort≤normal — high YOK, timeout önler) + 10 worker = yüksek paralellik + hız.**
 

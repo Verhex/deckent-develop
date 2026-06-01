@@ -270,6 +270,32 @@ function countTaskBlocks(content: string): number {
   return matches ? matches.length : 0;
 }
 
+function computeRoutingDistribution(
+  performanceMap: Record<string, { totalTasks?: number }>,
+): { entries: Array<{ id: string; tasks: number; pct: number }>; total: number } {
+  const entries = Object.entries(performanceMap);
+  if (entries.length === 0) return { entries: [], total: 0 };
+  const total = entries.reduce((s, [, p]) => s + (p.totalTasks ?? 0), 0);
+  if (total === 0) return { entries: entries.map(([id]) => ({ id, tasks: 0, pct: 0 })), total: 0 };
+  const result = entries
+    .map(([id, p]) => ({
+      id,
+      tasks: p.totalTasks ?? 0,
+      pct: Math.round(((p.totalTasks ?? 0) / total) * 1000) / 10,
+    }))
+    .sort((a, b) => b.tasks - a.tasks);
+  return { entries: result, total };
+}
+
+function detectRoutingImbalance(
+  entries: Array<{ id: string; pct: number }>,
+  threshold = 80,
+): string[] {
+  return entries
+    .filter((e) => e.pct > threshold)
+    .map((e) => `IMBALANCE: "${e.id}" dominates with ${e.pct}% (threshold: ${threshold}%)`);
+}
+
 // ─── Route Handler ───────────────────────────────────────────────
 
 async function handleRequest(
@@ -455,6 +481,23 @@ async function handleRequest(
         successRate: a.stats?.successRate ?? 0,
       }));
       sendJson(res, agents);
+      return;
+    }
+
+    // GET /api/routing/distribution — agent+skill routing distribution from learnings.json
+    if (url === '/api/routing/distribution') {
+      const learningsPath = join(projectRoot, '.deckent', 'routing', 'learnings.json');
+      const learnings = readJsonSafe<Record<string, unknown>>(learningsPath);
+      if (!learnings) {
+        sendJson(res, { agents: { entries: [], total: 0 }, skills: { entries: [], total: 0 }, warnings: [], totalOutcomes: 0 });
+        return;
+      }
+      const agentPerf = (learnings['agentPerformance'] ?? {}) as Record<string, { totalTasks?: number }>;
+      const skillPerf = (learnings['skillPerformance'] ?? {}) as Record<string, { totalTasks?: number }>;
+      const agentDist = computeRoutingDistribution(agentPerf);
+      const skillDist = computeRoutingDistribution(skillPerf);
+      const warnings = detectRoutingImbalance([...agentDist.entries, ...skillDist.entries]);
+      sendJson(res, { agents: agentDist, skills: skillDist, warnings, totalOutcomes: learnings['totalOutcomes'] ?? 0 });
       return;
     }
 

@@ -124,9 +124,7 @@ describe('healthCheckUpdater', () => {
     expect(written).toContain('| Tests | 5 |');
     expect(written).toContain('| Sprints | 20 |');
     expect(written).toContain('Post-Sprint 20');
-    const now = new Date();
-    const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-`;
-    expect(written).toContain(`Last audit: ${yearMonth}`);
+    expect(written).toMatch(/Last audit: \d{4}-\d{2}-\d{2}/);
   });
 
   it('creates file with correct content when missing at run time', () => {

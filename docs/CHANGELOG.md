@@ -2,6 +2,36 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint210] - 2026-06-01
+
+### Added
+
+- 210-001 — error-handling + error-registry-lint allowlist (honest-gate çöp-tespit)
+- 210-004 — Routing canlı doğrulama testi (build sonrası çeşitlilik)
+- 210-005 — Routing imbalance CI guard (dağılım eşik)
+- 210-008 — Brain NO_GO note doğruluğu (gerçek sebep yaz)
+- 210-010 — Dashboard agent/skill dağılım görünümü (routing şeffaflık)
+- 210-011 — Dashboard API routing endpoint
+- 210-012 — Dashboard onboarding/empty-state iyileştirme (sade kişi)
+- 210-013 — Self-dispatch pending-approval kuyruğu (otonom mod onay-gate)
+- 210-014 — RBAC CLI komut (deckent rbac check/grant iskelet)
+- 210-015 — Audit log CLI sorgu (deckent audit query iskelet)
+
+### Changed
+
+- 210-009 — Dashboard sprint kontrol paneli (plan/start/status UI) (completed with tech debt)
+
+### Fixed
+
+- 210-002 — health-check gece-yarısı tarih flaky fix
+- 210-003 — docker-backend full-suite contamination kalıcı fix
+- 210-006 — FIX prompt enrichment (orijinal task description inject)
+- 210-007 — FIX agent seçimi task türüne göre (sadece bug-fixer değil)
+- 210-016 — ADR-073 (routing canlı + FIX prompt + dashboard) + ROADMAP
+
+
+_Tasks: 20 total, 20 done, 2 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint209] - 2026-05-31
 
 ### Added

@@ -131,6 +131,48 @@ export function rotateAgentForFix(agent: string | undefined | null): string {
 }
 
 /**
+ * Select the fix agent based on the original task's type and failure mode.
+ *
+ * Instead of always rotating to a fresh-eyes counterpart (which sends a test
+ * failure to bug-fixer), this maps the task type to the most appropriate
+ * specialist. Exit-no-result (crashed worker) re-runs with the original agent
+ * rather than introducing unnecessary rotation.
+ *
+ * @param task - The failing original task
+ * @param exitedWithoutResult - True when the worker produced no output at all
+ * @returns Agent id to assign to the fix task
+ */
+export function selectFixAgent(task: Task, exitedWithoutResult: boolean): string {
+  const originalAgent = task.assignedAgent ?? '';
+
+  if (exitedWithoutResult) {
+    return originalAgent || DEFAULT_FRESH_EYES_AGENT;
+  }
+
+  const skills = task.assignedSkills ?? [];
+  const title = (task.title ?? '').toLowerCase();
+
+  const isTestTask =
+    originalAgent === 'ci-guardian' ||
+    skills.includes('ci-testing') ||
+    /\b(test|spec|vitest|jest)\b/.test(title);
+
+  const isDocTask =
+    originalAgent === 'doc-writer' ||
+    skills.includes('documentation-writer') ||
+    /\b(doc|readme|changelog|adr)\b/.test(title);
+
+  const isBugTask =
+    originalAgent === 'bug-fixer' ||
+    /\b(fix|bug|crash|regression|hotfix)\b/.test(title);
+
+  if (isTestTask) return originalAgent || 'ci-guardian';
+  if (isDocTask) return 'doc-writer';
+  if (isBugTask) return 'bug-fixer';
+  return rotateAgentForFix(originalAgent);
+}
+
+/**
  * Compute the additional companion skills to inject alongside a rotated agent.
  * For architect → code-reviewer, we add a bug-fixer-flavored skill to ensure
  * the fix worker has a debug-first mindset (matches DIRECTIVES intent
@@ -267,19 +309,42 @@ export function handleEvaluation(
   if ((result.linesAdded ?? 0) === 0) fixReasonParts.push('zero lines added — worker may have crashed');
   const enrichedReason = fixReasonParts.join('; ');
 
-  const fixDescription = [
-    `Priority fix for NO_GO task ${task.id}.`,
-    result.notes ? `Original worker notes: ${result.notes.slice(0, 500)}` : '',
-    result.rubricScores ? `Rubric: correctness=${result.rubricScores.correctness ?? '?'}, test_coverage=${result.rubricScores.test_coverage ?? '?'}, scope_compliance=${result.rubricScores.scope_compliance ?? '?'}` : '',
-    `Expected scope: ${(task.scope?.directories ?? []).join(', ')}`,
-    `Files that should change: ${(task.scope?.filesWrite ?? []).join(', ')}`,
-  ].filter(Boolean).join('\n');
+  // Sprint 210 Task 6 — FIX prompt enrichment ([[feedback_fix_prompt_quality]])
+  // The fix worker MUST receive the originalDescription + NO_GO reason + concrete
+  // fix guidance so it knows WHAT the task was and HOW to recover. Previously the
+  // `=== Task ===` block reached the worker empty and the only context was
+  // "Original worker notes: exited without result" — worker had no idea what to do.
+  const originalTaskDescription = (task.description ?? '').trim();
+  const originalDescriptionBlock = originalTaskDescription.length > 0
+    ? originalTaskDescription.slice(0, 2000)
+    : '(original task description unavailable)';
 
-  // ── Fresh-Eyes Rotation (Sprint 156 Task 012) ───────────────────
-  // Replace original model + agent with a rotated pair so the fix worker
-  // approaches the failure with a different reasoning style. This
-  // changes the existing "copy model/agent" behaviour intentionally.
+  const fixSections: string[] = [
+    `Priority fix for NO_GO task ${task.id}.`,
+    `## Original Task\n${originalDescriptionBlock}`,
+    `## NO_GO Reason\n${enrichedReason}`,
+  ];
+  if (result.notes) {
+    fixSections.push(`## Original Worker Notes\n${result.notes.slice(0, 500)}`);
+  }
+  if (result.rubricScores) {
+    const rs = result.rubricScores;
+    fixSections.push(`## Rubric\ncorrectness=${rs.correctness ?? '?'}, test_coverage=${rs.test_coverage ?? '?'}, scope_compliance=${rs.scope_compliance ?? '?'}`);
+  }
+  fixSections.push(
+    `## Scope\nExpected directories: ${(task.scope?.directories ?? []).join(', ')}\nFiles that should change: ${(task.scope?.filesWrite ?? []).join(', ')}`,
+    '## Fix Guidance\n1. Re-read the Original Task section above — your fix MUST satisfy its goCriteria.\n2. Run the Kanıt verification commands from the original task before declaring DONE.\n3. Do NOT inflate selfAssessment — if root-cause is unclear write NO_GO with details.\n4. Stay within Scope above — Auditor will flag any out-of-scope writes.',
+  );
+  const fixDescription = fixSections.join('\n\n');
+
+  // ── Fix Agent Selection (Sprint 210 Task 7) ─────────────────────
+  // Select the fix agent based on original task type — test tasks keep
+  // a test-focused agent, doc tasks get doc-writer, bug tasks get
+  // bug-fixer, exit-no-result re-runs with the original agent.
+  // Model rotation remains via applyFreshEyesRotation (unchanged).
   const rotationStrategy = applyFreshEyesRotation(task);
+  const exitedWithoutResult = (result.filesChanged?.length ?? 0) === 0 && (result.linesAdded ?? 0) === 0;
+  const fixAgent = selectFixAgent(task, exitedWithoutResult);
   const rotatedSkills = Array.from(new Set([
     ...(task.assignedSkills ?? []),
     ...rotationStrategy.addedSkills,
@@ -301,8 +366,8 @@ export function handleEvaluation(
     sprintId: task.sprintId,
     isPriorityFix: true,
     fixForTaskId: task.id,
-    assignedAgent: rotationStrategy.rotatedAgent,
-    forceAgent: rotationStrategy.rotatedAgent,
+    assignedAgent: fixAgent,
+    forceAgent: fixAgent,
     assignedSkills: rotatedSkills,
     forceSkills: rotatedSkills.length > 0 ? rotatedSkills : undefined,
     createdAt: now(),

@@ -50,6 +50,22 @@ export function detectImbalance(distributionEntries, threshold = 70) {
   return warnings;
 }
 
+/**
+ * CI guard: checks whether any agent exceeds the imbalance threshold.
+ * Returns { passed: true, violations: [] } when healthy, or
+ * { passed: false, violations: string[] } when an agent dominates.
+ * Default CI threshold is 80% (stricter than the warning threshold of 70%).
+ */
+export function ciGuard(distributionEntries, threshold = 80) {
+  const violations = [];
+  for (const { id, pct } of distributionEntries) {
+    if (pct > threshold) {
+      violations.push(`"${id}" at ${pct}% exceeds CI threshold of ${threshold}%`);
+    }
+  }
+  return { passed: violations.length === 0, violations };
+}
+
 /** Load learnings.json from <rootDir>/.deckent/routing/learnings.json */
 export function loadLearnings(rootDir) {
   const p = join(rootDir, '.deckent', 'routing', 'learnings.json');
@@ -70,19 +86,37 @@ function main() {
     ? resolve(args[rootIdx + 1])
     : process.cwd();
   const asJson = args.includes('--json');
+  const ciMode = args.includes('--ci');
   const threshIdx = args.indexOf('--threshold');
   const threshold = threshIdx !== -1 && args[threshIdx + 1]
     ? Number(args[threshIdx + 1])
-    : 70;
+    : ciMode ? 80 : 70;
 
   const learnings = loadLearnings(rootDir);
   if (!learnings) {
+    if (ciMode) {
+      // No data = no imbalance to detect
+      console.log('CI: OK — no routing data found (treating as balanced)');
+      process.exit(0);
+    }
     console.error(`No learnings.json found at ${rootDir}/.deckent/routing/learnings.json`);
     process.exit(1);
   }
 
   const agentDist = computeDistribution(learnings.agentPerformance ?? {});
   const skillDist = computeDistribution(learnings.skillPerformance ?? {});
+
+  if (ciMode) {
+    const { passed, violations } = ciGuard(agentDist.entries, threshold);
+    if (!passed) {
+      console.error('CI FAIL — Routing imbalance detected:');
+      for (const v of violations) console.error(`  ${v}`);
+      process.exit(1);
+    }
+    console.log(`CI: OK — routing balanced (threshold: ${threshold}%)`);
+    process.exit(0);
+  }
+
   const agentWarnings = detectImbalance(agentDist.entries, threshold);
   const skillWarnings = detectImbalance(skillDist.entries, threshold);
   const allWarnings = [...agentWarnings, ...skillWarnings];

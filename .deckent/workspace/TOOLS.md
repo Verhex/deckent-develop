@@ -85,6 +85,7 @@ _Total: 28 MCP tools_
 | `plan` | deckent plan |
 | `plugin` | deckent plugin |
 | `quick-start` | deckent quick-start |
+| `rbac` | deckent rbac |
 | `recall` | deckent recall |
 | `recover` | deckent recover |
 | `remember` | deckent remember |
@@ -107,4 +108,4 @@ _Total: 28 MCP tools_
 | `watch` | deckent watch |
 | `web` | deckent web |
 
-_Total: 60 CLI command modules_
+_Total: 61 CLI command modules_
