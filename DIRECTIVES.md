@@ -23,37 +23,36 @@ Bağlam:
 
 > **MUTLAK ÖNCELİK:** Bu task DONE + **commit** olmadan HİÇBİR diğer wave spawn EDİLMEZ. Yoksa 218 worker'ları (uncommitted kod yazarken) birbirinin/kendi işini siler — Sprint 216 tam böyle kayboldu.
 
-## Task 0: 218-013 — [P0 ABSOLUTE FIRST] Git self-mutation guard (deckent-dev tree'sinde reset/stash/commit NO-OP)
-- Model: opus
-- Effort: normal
-- Skills: typescript-expert, system-architect
-- Files: src/orchestra/rollback.ts, tests/orchestra/git-self-mutation-guard.test.ts
-- Scope: src/orchestra/, tests/orchestra/
+## Task 0: 218-013 — [✅ KONTROL — kod izole `deckent run` ile yapıldı + commit 64c97c2f; YENİDEN YAZMA YASAK] Git self-mutation guard
+- Model: sonnet
+- Effort: low
+- Skills: typescript-expert
+- Files: tests/orchestra/git-self-mutation-guard.test.ts
+- Scope: tests/orchestra/
 
 ### Description
-**Problem (KANIT — Sprint 216 kaybı, [[project_deckent_self_git_mutation_bug]]):** worker-spawn rollback `createSafetyPoint` (`git stash push -m deckent-safety-*`) + `rollback` (`git reset --hard <sha>`, satır ~191) deckent-dev (dogfood) tree'sinde deckent'in KENDİ uncommitted işini sildi (Sprint 216 server.ts/rubric-registry/routing/task-builder değişiklikleri). Ayrıca bir süreç otonom `"exit-trap-test"` commit'i yaptı. `self-modifying-detector.ts` (ADR-039) self-project'i `package.json name:"deckent"` ile tespit ediyor AMA rollback.ts bunu kullanmıyor.
-**Çözüm:** rollback.ts `createSafetyPoint` + `rollback` — self-modifying-detector'ın self-project (isDeckentRepo) tespitini çağır; **self-project ise stash/reset NO-OP** (safety-point oluşturma, `git reset --hard` çalıştırma) + breadcrumb log (`[rollback] self-project — git mutation skipped`). Caller rollback.ts (def self-modifying-detector.ts hariç). worker-rollback.ts aynı guard'ı uygulasın (ayrı task değil, kapsamda değilse not düş). ADR-039 exemption genişletme.
-**Kanıt:** `grep -c "self.*project\|isDeckent\|no-op\|skip\|self-modifying" src/orchestra/rollback.ts` → ≥2; `grep -rl "self-modifying-detector\|isDeckent" src/orchestra/rollback.ts` → wire; `npx vitest run tests/orchestra/git-self-mutation-guard.test.ts` → 4+ pass
-**Test:** ≥4 (self-project→reset no-op, self-project→stash no-op/safety-point skip, user-project→reset hâlâ çalışır, breadcrumb log) — git mock'lu, gerçek reset YOK (hermetik)
-**Smoke:** `node -e "import('./dist/orchestra/rollback.js').then(m=>console.log(typeof m.rollback))"` → fonksiyon export edilir (self-project guard'lı)
+**✅ KOD YAPILDI + COMMIT (64c97c2f) — bu task SADECE KONTROL, yeniden yazma YASAK ([[project_deckent_self_git_mutation_bug]]):** `rollback.ts` `createSafetyPoint` + `rollback` artık `detectDeckentRepo` (ADR-039) ile self-project'te stash/`git reset --hard` NO-OP yapıyor + breadcrumb log. Sprint 216'yı silen kök bug kapatıldı; user-project rollback değişmedi.
+**KONTROL (doğrula, değiştirme):** `rollback.ts`'de guard mevcut + git-self-mutation-guard testi geçiyor + rollback regresyonu bozulmamış mı doğrula. Eksik/bozuksa NO_GO, sağlamsa DONE. Kaynak `rollback.ts`'ye DOKUNMA (zaten doğru + commit'li).
+**Kanıt:** `grep -c "detectDeckentRepo\|self-project\|skipped" src/orchestra/rollback.ts` → ≥2; `npx vitest run tests/orchestra/git-self-mutation-guard.test.ts` → 6 pass; `npx vitest run tests/orchestra/rollback.test.ts` → 54 pass (regresyon yok)
+**Test:** mevcut 6 git-guard + 54 rollback testi geçer (yeni yazma yok — kontrol)
 
 ---
 
 ## DALGA 0 — P0 Donma Fix (1 task)
 
-## Task 1: 218-001 — [P0] Dashboard sprint-start serve'i DONDURMASIN (runSprint detach)
-- Model: opus
-- Effort: normal
-- Skills: typescript-expert, api-builder
-- Files: src/api/sprint-job-runner.ts, tests/api/sprint-job-runner.test.ts
-- Scope: src/api/, tests/api/
+## Task 1: 218-001 — [✅ KONTROL — kod izole `deckent run` ile yapıldı + commit 9e2e7d34; YENİDEN YAZMA YASAK] sprint-start detach
+- Model: sonnet
+- Effort: low
+- Skills: typescript-expert
+- Files: tests/api/sprint-job-runner.test.ts
+- Scope: tests/api/
 
 ### Description
-**Problem (GERÇEK KANIT):** `server.ts:630` dashboard sprint-start `runSprint(...)`'i AYNI serve process'inde çalıştırıyor → Node event loop bloke → serve HTTP'ye yanıt veremiyor → dashboard skeleton-loading'de DONUYOR ([[project_dashboard_realrun_findings]]).
-**Çözüm:** `sprint-job-runner.ts` — `startSprintDetached(projectRoot, opts)`: sprint'i serve process'inden AYIR (`child_process.spawn('deckent', ['start','--auto-approve'], {detached:true, stdio:'ignore'})` veya eşdeğer fire-and-forget), jobId döndür, serve HTTP loop'u HİÇ bloke olmasın. `server.ts` sprint-start handler (satır ~622-630) bunu çağırsın (caller server.ts; def sprint-job-runner.ts hariç).
-**Kanıt:** `grep -c "startSprintDetached\|spawn\|detached\|jobId" src/api/sprint-job-runner.ts` → ≥2; `grep -rl "startSprintDetached\|sprint-job-runner" src/api/server.ts` → wire; `npx vitest run tests/api/sprint-job-runner.test.ts` → 4+ pass
-**Test:** ≥4 (detached spawn çağrılır, jobId döner, serve bloke olmaz mock, hata graceful) — mock spawn (hermetik)
-**Smoke:** `env -u ANTHROPIC_API_KEY node dist/cli/entry.js serve --port 3218 --no-terminal &` → sprint-start POST sonrası `curl -so/dev/null -w '%{http_code}' -H "Authorization: Bearer $TOKEN" localhost:3218/api/status` = **200** (serve DONMAZ, sprint-start sonrası hâlâ yanıt verir)
+**✅ KOD YAPILDI + COMMIT (9e2e7d34) — bu task SADECE KONTROL, yeniden yazma YASAK ([[project_dashboard_realrun_findings]]):** `src/api/sprint-job-runner.ts` `startSprintDetached()` sprint'i detached child process olarak spawn ediyor (`detached:true, stdio:'ignore', unref`); `server.ts` `/api/start` ona wire'lı → serve event loop bloke OLMUYOR → dashboard donmuyor.
+**KONTROL (doğrula, değiştirme):** `sprint-job-runner.ts`'de `startSprintDetached` mevcut + server.ts wire'lı + testler geçiyor mu doğrula. Kaynağa DOKUNMA (zaten doğru + commit'li). Eksikse NO_GO, sağlamsa DONE.
+**Kanıt:** `grep -c "startSprintDetached\|detached\|unref" src/api/sprint-job-runner.ts` → ≥2; `grep -rl "startSprintDetached" src/api/server.ts` → wire; `npx vitest run tests/api/sprint-job-runner.test.ts tests/api/server.test.ts` → pass
+**Test:** mevcut testler geçer (yeni yazma yok — kontrol)
+**Smoke:** `env -u ANTHROPIC_API_KEY node dist/cli/entry.js serve --port 3218 --no-terminal &` → sprint-start sonrası `/api/status` = **200** (serve DONMAZ)
 
 ---
 
