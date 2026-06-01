@@ -2,9 +2,31 @@ import { describe, it, expect } from 'vitest';
 import { findExports, auditKnownSuspects, generateReport } from '../../scripts/dead-code-audit.mjs';
 import { resolve, join } from 'node:path';
 import { existsSync } from 'node:fs';
-import { spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 
 const projectRoot = resolve(import.meta.dirname, '..', '..');
+
+// Run the audit script via ASYNC spawn. The audit walks the whole codebase and
+// takes 30–60s (longer under coverage instrumentation). A blocking spawnSync
+// would freeze the vitest worker thread for that whole time, starving the
+// worker→main `onTaskUpdate` RPC heartbeat → vitest aborts with
+// "Timeout calling onTaskUpdate" (the months-long Coverage-job CI failure).
+// Async spawn keeps the worker's event loop responsive.
+function runAuditScript(extraArgs: string[] = []): Promise<{ status: number; stdout: string }> {
+  return new Promise((resolve_, reject) => {
+    const child = spawn(
+      'node',
+      [join(projectRoot, 'scripts', 'dead-code-audit.mjs'), '--root', projectRoot, ...extraArgs],
+      { stdio: ['ignore', 'pipe', 'ignore'] },
+    );
+    let stdout = '';
+    child.stdout.setEncoding('utf-8');
+    child.stdout.on('data', (d: string) => { stdout += d; });
+    const timer = setTimeout(() => { child.kill('SIGKILL'); reject(new Error('audit script timeout (120s)')); }, 120_000);
+    child.on('error', (err) => { clearTimeout(timer); reject(err); });
+    child.on('close', (code) => { clearTimeout(timer); resolve_({ status: code ?? -1, stdout }); });
+  });
+}
 
 // ─── findExports ──────────────────────────────────────────────────────────
 
@@ -156,29 +178,14 @@ describe('generateReport', () => {
 // ─── Script execution ─────────────────────────────────────────────────────
 
 describe('dead-code-audit.mjs script execution', () => {
-  it('runs successfully with exit code 0', () => {
-    const result = spawnSync('node', [
-      join(projectRoot, 'scripts', 'dead-code-audit.mjs'),
-      '--root', projectRoot,
-    ], {
-      encoding: 'utf-8',
-      timeout: 120_000,
-    });
-
+  it('runs successfully with exit code 0', async () => {
+    const result = await runAuditScript();
     expect(result.status).toBe(0);
     expect(result.stdout).toContain('Audit complete');
   }, 150_000);
 
-  it('produces JSON output with --json flag', () => {
-    const result = spawnSync('node', [
-      join(projectRoot, 'scripts', 'dead-code-audit.mjs'),
-      '--root', projectRoot,
-      '--json',
-    ], {
-      encoding: 'utf-8',
-      timeout: 120_000,
-    });
-
+  it('produces JSON output with --json flag', async () => {
+    const result = await runAuditScript(['--json']);
     expect(result.status).toBe(0);
     // JSON output should contain suspectResults
     expect(result.stdout).toContain('"suspectResults"');
