@@ -53,6 +53,8 @@
 
 > **Sprint 210 sonuç (2026-05-31):** **Routing canlı doğrulama** — build+restart sonrası ilk CANLI sprint; routing live diversity testi (src/api→api-builder, src/auth→security-auditor, src/dashboard→frontend-designer, src/db→data-engineer; Sprint 210-004, **routing-balance DONE**), routing-distribution.mjs `--ci` mode imbalance guard exit-1 (Sprint 210-005). **4 fail hijyen** — error-handling + error-registry-lint allowlist (honest-gate.ts; Sprint 210-001), health-check tarih-agnostik fix (Sprint 210-002), docker-backend full-suite contamination fix (Sprint 210-003). **FIX prompt iyileştirme** — debt-manager.ts orijinal task description + NO_GO reason inject (Sprint 210-006, **FIX prompt enrichment DONE**), FIX agent task-türüne göre seçim/selectFixAgent (Sprint 210-007), result-evaluator NO_GO note doğruluğu (Sprint 210-008). **F7 dashboard devam** — SprintControlPanel canlı sprint durumu + faz + worker (Sprint 210-009, **F7-005 DONE**), RoutingDistribution bar chart + imbalance uyarı (Sprint 210-010), `/api/routing/distribution` endpoint (Sprint 210-011), Onboarding 3-adım sihirbazı init→directives→start (Sprint 210-012, **F7-008 DONE**). **F3/F4** — self-dispatch pending-approval kuyruğu (Sprint 210-013), RBAC CLI komut iskeleti (Sprint 210-014), audit log CLI sorgu (Sprint 210-015). Yeni ADR: 073 (routing live + FIX prompt + dashboard control plane) — accepted.
 
+> **Sprint 210 kapanış hijyeni (2026-06-01):** Sprint 210'un bıraktığı 5 fail → **0 (TAM YEŞİL, 18287 pass)**. (1) fresh-eyes-rotation ×3: `selectFixAgent` title-keyword sınıflaması ('Test task' jenerik başlığı yanlış yakalıyordu) → agent/skill sinyaline çevrildi (bug-fixer korunur, diğerleri fresh-eyes rotate). (2) registration-harness: `registerRbac` (210-014) index.ts'e WIRE EDİLMEMİŞTİ (209 flow-wire gap tekrarı) → import+çağrı eklendi. (3) docker-backend e2e kararsız: KÖK NEDEN vitest hook timeout — afterEach 2× forceRemoveContainer (10s each) default 10s hookTimeout'u aşıyordu → beforeEach/afterEach 30s + ağır e2e test 30-45s timeout + 12 eski deckent container temizliği. 2 ardışık run 36/36 stabil. **Sprint 206'dan beri ilk tam-yeşil suite.** İlgili: routing CANLI çeşitlilik kanıtlandı (Sprint 210 agent dağılımı: refactorer 10 + frontend-designer 3 + api-builder 1 + architect 1 + doc-writer 1 — Sprint 208'de 15/16 refactorer'dı).
+
 **F2 — Native Chat Path C (AI Asistan yüzü)** — ~600-1200 LoC:
 | ID | İş | Öncelik | Kanıt |
 |----|----|---------|-------|
@@ -100,14 +102,14 @@
 
 | ID | İş | Öncelik | Durum/Kanıt |
 |----|----|---------|-------------|
-| F7-001 | API auth fix — `DECKENT_API_AUTH_DISABLED=1` olmadan güvenli çalışsın (token akışı + localhost auto-inject + prod-safe default) | **P1** | 🟡 Sprint 209-006 auth fix DONE — localhost auto-inject, prod-safe default, disabled-flag opsiyonel (ADR-072) |
-| F7-002 | Dashboard canlı veri parite — tüm panel gerçek-zamanlı doğru (sprint/worker/agent/memory/debt/checkpoint) SSE/WS | **P1** | 🟡 Sprint 209-007 endpoint canlı veri parite DONE — sprint/worker/agent/memory/debt endpoint'leri aktif |
+| F7-001 | API auth fix — `DECKENT_API_AUTH_DISABLED=1` olmadan güvenli çalışsın (token akışı + localhost auto-inject + prod-safe default) | **P1** | ✅ DONE Sprint 209-006 auth fix — localhost auto-inject, prod-safe default, disabled-flag opsiyonel (ADR-072) |
+| F7-002 | Dashboard canlı veri parite — tüm panel gerçek-zamanlı doğru (sprint/worker/agent/memory/debt/checkpoint) SSE/WS | **P1** | ✅ DONE Sprint 209-007 endpoint canlı veri parite — sprint/worker/agent/memory/debt endpoint'leri aktif |
 | F7-003 | UI/UX redesign — god-level tasarım+konsept (modern, sezgisel, responsive, dark/light, herkesin anladığı bilgi mimarisi) | **P1** | ThemeProvider + i18n temel var |
 | F7-004 | Terminal güçlendir — embedded web terminal (ADR-062) tam işlevsel, çok-oturum, kopyala/yapıştır, geçmiş | P2 | terminal-api.ts + ws-gateway zayıf |
-| F7-005 | Sprint kontrol paneli — plan/start/status/kill/review/retro UI'dan (onay-gate'li), canlı faz görselleştirme | P2 | 🟡 Sprint 210-009 SprintControlPanel DONE — canlı faz + worker listesi + SSE (SprintPhaseTimeline + WorkerCard kullanır) |
+| F7-005 | Sprint kontrol paneli — plan/start/status/kill/review/retro UI'dan (onay-gate'li), canlı faz görselleştirme | P2 | ✅ DONE Sprint 210-009 SprintControlPanel — canlı faz + worker listesi + SSE (SprintPhaseTimeline + WorkerCard kullanır) |
 | F7-006 | Enterprise görünüm — multi-tenant dashboard (F4) + RBAC-aware UI (rol bazlı panel) + audit-log viewer + multi-project | P2 | F4 backend (rbac/tenant/audit) ile entegre |
 | F7-007 | Memory/ADR/debt explorer — FTS5 arama, ADR timeline, debt trend, pattern görsel | P3 | DebtTable + SimpleMarkdown genişlet |
-| F7-008 | Onboarding + herkes-için akış — sade kişi sihirbazı (init→directives→start), tooltip/rehber, sıfır-config | P3 | 🟡 Sprint 210-012 Onboarding DONE — 3-adım sihirbazı (init→directives→start), skip, localStorage tercihi |
+| F7-008 | Onboarding + herkes-için akış — sade kişi sihirbazı (init→directives→start), tooltip/rehber, sıfır-config | P3 | ✅ DONE Sprint 210-012 Onboarding — 3-adım sihirbazı (init→directives→start), skip, localStorage tercihi |
 
 **Sıra:** F1 (P0) → F1 (P1) → F2 → F3 → F4 → F5 → F6. Bugün F1'den başlanır, dogfood + kontrol döngüsüyle ilerlenir. **Yürütme stratejisi (2026-05-31): bol-küçük-task (tek-sorumluluk, ≤200 LoC, effort≤normal — high YOK, timeout önler) + 10 worker = yüksek paralellik + hız.**
 
