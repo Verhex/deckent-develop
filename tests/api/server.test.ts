@@ -50,6 +50,10 @@ vi.mock('../../src/orchestra/brain.js', () => ({
   cleanup: vi.fn(),
 }));
 
+vi.mock('../../src/api/sprint-job-runner.js', () => ({
+  startSprintDetached: vi.fn(() => ({ jobId: `job-${Date.now()}` })),
+}));
+
 import { readFileSync, existsSync, readdirSync, writeFileSync, watch } from 'node:fs';
 import { createHttpServer, parseBody, _resetActiveJob, type HttpApi } from '../../src/api/server.js';
 import { watchDashboard } from '../../src/api/watcher.js';
@@ -59,6 +63,7 @@ import { readWorkerLog } from '../../src/agents/worker.js';
 import { readJsonSafe } from '../../src/core/utils.js';
 import { runSprint, cleanup } from '../../src/orchestra/brain.js';
 import { validatePartialConfig, deepMerge } from '../../src/core/config.js';
+import { startSprintDetached } from '../../src/api/sprint-job-runner.js';
 
 const mockReadFileSync = vi.mocked(readFileSync);
 const mockExistsSync = vi.mocked(existsSync);
@@ -69,6 +74,7 @@ const mockKillWorker = vi.mocked(killWorker);
 const mockReadWorkerLog = vi.mocked(readWorkerLog);
 const mockRunSprint = vi.mocked(runSprint);
 const mockCleanup = vi.mocked(cleanup);
+const mockStartSprintDetached = vi.mocked(startSprintDetached);
 const mockReadJsonSafe = vi.mocked(readJsonSafe);
 const mockValidatePartialConfig = vi.mocked(validatePartialConfig);
 const mockDeepMerge = vi.mocked(deepMerge);
@@ -932,7 +938,11 @@ describe('createHttpServer', () => {
     });
 
     it('returns completed job after sprint finishes', async () => {
-      mockRunSprint.mockResolvedValue({ id: 'sprint-001', status: 'COMPLETE' } as never);
+      mockStartSprintDetached.mockImplementation((_root, _opts, onExit) => {
+        const jobId = `job-${Date.now()}`;
+        setTimeout(() => onExit?.(0), 10);
+        return { jobId };
+      });
 
       api = createHttpServer(PROJECT_ROOT, 0);
       await new Promise<void>((r) => api.server.once('listening', r));
@@ -940,18 +950,21 @@ describe('createHttpServer', () => {
       const startRes = await request(api, '/api/start', 'POST', {});
       const { jobId } = JSON.parse(startRes.body) as { jobId: string };
 
-      // Wait for the background promise to resolve
+      // Wait for the detached process exit callback
       await new Promise((r) => setTimeout(r, 50));
 
       const res = await request(api, `/api/job/${jobId}`);
       expect(res.status).toBe(200);
       const body = JSON.parse(res.body);
       expect(body.status).toBe('completed');
-      expect(body.result).toEqual({ id: 'sprint-001', status: 'COMPLETE' });
     });
 
     it('returns failed job when sprint errors', async () => {
-      mockRunSprint.mockRejectedValue(new Error('Spawn failed'));
+      mockStartSprintDetached.mockImplementation((_root, _opts, onExit) => {
+        const jobId = `job-${Date.now()}`;
+        setTimeout(() => onExit?.(1), 10);
+        return { jobId };
+      });
 
       api = createHttpServer(PROJECT_ROOT, 0);
       await new Promise<void>((r) => api.server.once('listening', r));
@@ -965,7 +978,6 @@ describe('createHttpServer', () => {
       expect(res.status).toBe(200);
       const body = JSON.parse(res.body);
       expect(body.status).toBe('failed');
-      expect(body.error).toBe('Spawn failed');
     });
   });
 

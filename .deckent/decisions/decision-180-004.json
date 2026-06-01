@@ -1,0 +1,79 @@
+{
+  "taskId": "180-004",
+  "sprintId": "sprint-180",
+  "steps": [
+    {
+      "step": 2,
+      "name": "routing-step-2",
+      "input": {
+        "taskId": "180-004",
+        "title": "W2-1 — Nervous action handlers (Step C)",
+        "scope": [
+          "src/nervous/",
+          "tests/nervous/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "architect",
+        "skills": [
+          "typescript-expert",
+          "system-architect",
+          "testing-expert"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Agent forced by override: architect"
+    },
+    {
+      "step": 3,
+      "name": "routing-step-3",
+      "input": {
+        "taskId": "180-004",
+        "title": "W2-1 — Nervous action handlers (Step C)",
+        "scope": [
+          "src/nervous/",
+          "tests/nervous/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "architect",
+        "skills": [
+          "typescript-expert",
+          "system-architect",
+          "testing-expert"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Skill budget: max 2 (medium task, 1 module(s), effort=normal)"
+    },
+    {
+      "step": 4,
+      "name": "routing-step-4",
+      "input": {
+        "taskId": "180-004",
+        "title": "W2-1 — Nervous action handlers (Step C)",
+        "scope": [
+          "src/nervous/",
+          "tests/nervous/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "architect",
+        "skills": [
+          "typescript-expert",
+          "system-architect",
+          "testing-expert"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Skills forced by override: [typescript-expert, system-architect, testing-expert]"
+    }
+  ],
+  "decidedAt": "2026-05-20T16:19:47.195Z"
+}

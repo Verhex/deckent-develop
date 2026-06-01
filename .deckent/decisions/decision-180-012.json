@@ -1,0 +1,79 @@
+{
+  "taskId": "180-012",
+  "sprintId": "sprint-180",
+  "steps": [
+    {
+      "step": 2,
+      "name": "routing-step-2",
+      "input": {
+        "taskId": "180-012",
+        "title": "W5-1 — npm publish v1.0.0-beta.1 readiness ★ BETA LAUNCH",
+        "scope": [
+          "tests/scripts/",
+          "./",
+          "scripts/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "devops-engineer",
+        "skills": [
+          "devops-engineer",
+          "typescript-expert"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Agent forced by override: devops-engineer"
+    },
+    {
+      "step": 3,
+      "name": "routing-step-3",
+      "input": {
+        "taskId": "180-012",
+        "title": "W5-1 — npm publish v1.0.0-beta.1 readiness ★ BETA LAUNCH",
+        "scope": [
+          "tests/scripts/",
+          "./",
+          "scripts/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "devops-engineer",
+        "skills": [
+          "devops-engineer",
+          "typescript-expert"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Skill budget: max 2 (medium task, 2 module(s), effort=normal)"
+    },
+    {
+      "step": 4,
+      "name": "routing-step-4",
+      "input": {
+        "taskId": "180-012",
+        "title": "W5-1 — npm publish v1.0.0-beta.1 readiness ★ BETA LAUNCH",
+        "scope": [
+          "tests/scripts/",
+          "./",
+          "scripts/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "devops-engineer",
+        "skills": [
+          "devops-engineer",
+          "typescript-expert"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Skills forced by override: [devops-engineer, typescript-expert]"
+    }
+  ],
+  "decidedAt": "2026-05-20T16:19:47.201Z"
+}

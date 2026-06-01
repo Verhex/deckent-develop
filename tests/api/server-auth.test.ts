@@ -43,6 +43,10 @@ vi.mock('../../src/orchestra/brain.js', () => ({
   cleanup: vi.fn(),
 }));
 
+vi.mock('../../src/api/sprint-job-runner.js', () => ({
+  startSprintDetached: vi.fn(() => ({ jobId: `job-${Date.now()}` })),
+}));
+
 import { createHttpServer, _resetActiveJob, type HttpApi } from '../../src/api/server.js';
 import { resolveAuthToken, verifyBearerToken, bearerAuthMiddleware } from '../../src/api/auth.js';
 

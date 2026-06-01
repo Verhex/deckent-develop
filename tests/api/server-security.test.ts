@@ -55,10 +55,15 @@ vi.mock('../../src/orchestra/brain.js', () => ({
   planSprint: vi.fn(() => ({ id: 'sprint-001', number: 1, tasks: [] })),
 }));
 
+vi.mock('../../src/api/sprint-job-runner.js', () => ({
+  startSprintDetached: vi.fn(() => ({ jobId: `job-${Date.now()}` })),
+}));
+
 import { writeFileSync } from 'node:fs';
 import { createHttpServer, parseBody, _resetActiveJob, RateLimiter, type HttpApi } from '../../src/api/server.js';
 import { readJsonSafe } from '../../src/core/utils.js';
 import { deepMerge } from '../../src/core/config.js';
+import { startSprintDetached } from '../../src/api/sprint-job-runner.js';
 
 const mockWriteFileSync = vi.mocked(writeFileSync);
 const mockReadJsonSafe = vi.mocked(readJsonSafe);
@@ -355,8 +360,11 @@ describe('Server Security Hardening', () => {
   // ─── H) Multi-Sprint Job Tracking ─────────────────────────
   describe('multi-sprint job tracking', () => {
     it('tracks multiple completed jobs', async () => {
-      const { runSprint: mockRS } = await import('../../src/orchestra/brain.js');
-      vi.mocked(mockRS).mockResolvedValue({ id: 'sprint-001', status: 'COMPLETE' } as never);
+      vi.mocked(startSprintDetached).mockImplementation((_root, _opts, onExit) => {
+        const jobId = `job-${Date.now()}`;
+        setTimeout(() => onExit?.(0), 10);
+        return { jobId };
+      });
 
       api = createHttpServer(PROJECT_ROOT, { port: 0, rateLimit: 0 });
       await new Promise<void>((r) => api.server.once('listening', r));
@@ -366,7 +374,7 @@ describe('Server Security Hardening', () => {
       expect(res1.status).toBe(202);
       const { jobId: jobId1 } = JSON.parse(res1.body);
 
-      // Wait for completion
+      // Wait for completion (detached process exit callback fires)
       await new Promise((r) => setTimeout(r, 50));
 
       // Start second job (first is done, so not blocked)

@@ -38,6 +38,10 @@ vi.mock('../../src/orchestra/brain.js', () => ({
   planSprint: vi.fn(async () => ({ id: 'sprint-001', number: 1, tasks: [] })),
 }));
 
+vi.mock('../../src/api/sprint-job-runner.js', () => ({
+  startSprintDetached: vi.fn(() => ({ jobId: `job-${Date.now()}` })),
+}));
+
 import {
   parseBody,
   createHttpServer,

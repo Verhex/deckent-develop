@@ -1,0 +1,79 @@
+{
+  "taskId": "177-003",
+  "sprintId": "sprint-177",
+  "steps": [
+    {
+      "step": 2,
+      "name": "routing-step-2",
+      "input": {
+        "taskId": "177-003",
+        "title": "177-002 — deckent kill cascade fix",
+        "scope": [
+          "src/cli/commands/",
+          "src/orchestra/",
+          "tests/cli/",
+          "src/cli/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "bug-fixer",
+        "skills": [
+          "typescript-expert"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Agent forced by override: bug-fixer"
+    },
+    {
+      "step": 3,
+      "name": "routing-step-3",
+      "input": {
+        "taskId": "177-003",
+        "title": "177-002 — deckent kill cascade fix",
+        "scope": [
+          "src/cli/commands/",
+          "src/orchestra/",
+          "tests/cli/",
+          "src/cli/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "bug-fixer",
+        "skills": [
+          "typescript-expert"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Skill budget: max 3 (large task, 2 module(s), effort=normal)"
+    },
+    {
+      "step": 4,
+      "name": "routing-step-4",
+      "input": {
+        "taskId": "177-003",
+        "title": "177-002 — deckent kill cascade fix",
+        "scope": [
+          "src/cli/commands/",
+          "src/orchestra/",
+          "tests/cli/",
+          "src/cli/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "bug-fixer",
+        "skills": [
+          "typescript-expert"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Skills forced by override: [typescript-expert]"
+    }
+  ],
+  "decidedAt": "2026-05-20T10:18:24.242Z"
+}

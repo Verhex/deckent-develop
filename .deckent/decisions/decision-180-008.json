@@ -1,0 +1,73 @@
+{
+  "taskId": "180-008",
+  "sprintId": "sprint-180",
+  "steps": [
+    {
+      "step": 2,
+      "name": "routing-step-2",
+      "input": {
+        "taskId": "180-008",
+        "title": "W3-3 — Nervous integration runtime test",
+        "scope": [
+          "tests/nervous/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "bug-fixer",
+        "skills": [
+          "typescript-expert",
+          "testing-expert"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Agent forced by override: bug-fixer"
+    },
+    {
+      "step": 3,
+      "name": "routing-step-3",
+      "input": {
+        "taskId": "180-008",
+        "title": "W3-3 — Nervous integration runtime test",
+        "scope": [
+          "tests/nervous/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "bug-fixer",
+        "skills": [
+          "typescript-expert",
+          "testing-expert"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Skill budget: max 1 (small task, 1 module(s), effort=normal)"
+    },
+    {
+      "step": 4,
+      "name": "routing-step-4",
+      "input": {
+        "taskId": "180-008",
+        "title": "W3-3 — Nervous integration runtime test",
+        "scope": [
+          "tests/nervous/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "bug-fixer",
+        "skills": [
+          "typescript-expert",
+          "testing-expert"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Skills forced by override: [typescript-expert, testing-expert]"
+    }
+  ],
+  "decidedAt": "2026-05-20T16:19:47.198Z"
+}

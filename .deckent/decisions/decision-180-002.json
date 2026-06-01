@@ -1,0 +1,73 @@
+{
+  "taskId": "180-002",
+  "sprintId": "sprint-180",
+  "steps": [
+    {
+      "step": 2,
+      "name": "routing-step-2",
+      "input": {
+        "taskId": "180-002",
+        "title": "W1-1 — sprint-state-tracker getSprintStateSnapshot (Step B)",
+        "scope": [
+          "src/orchestra/",
+          "tests/orchestra/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "api-builder",
+        "skills": [
+          "typescript-expert"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Agent forced by override: api-builder"
+    },
+    {
+      "step": 3,
+      "name": "routing-step-3",
+      "input": {
+        "taskId": "180-002",
+        "title": "W1-1 — sprint-state-tracker getSprintStateSnapshot (Step B)",
+        "scope": [
+          "src/orchestra/",
+          "tests/orchestra/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "api-builder",
+        "skills": [
+          "typescript-expert"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Skill budget: max 1 (small task, 1 module(s), effort=normal)"
+    },
+    {
+      "step": 4,
+      "name": "routing-step-4",
+      "input": {
+        "taskId": "180-002",
+        "title": "W1-1 — sprint-state-tracker getSprintStateSnapshot (Step B)",
+        "scope": [
+          "src/orchestra/",
+          "tests/orchestra/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "api-builder",
+        "skills": [
+          "typescript-expert"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Skills forced by override: [typescript-expert]"
+    }
+  ],
+  "decidedAt": "2026-05-20T16:19:47.192Z"
+}

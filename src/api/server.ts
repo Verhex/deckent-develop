@@ -27,8 +27,9 @@ import { loadConfig, createDefaultConfig, validatePartialConfig, ConfigValidatio
 import { readWorkerLog } from '../agents/worker.js';
 import { AgentPoolManager } from '../core/agent-pool.js';
 import {
-  runSprint, readContext, planSprint, cleanup,
+  readContext, planSprint, cleanup,
 } from '../orchestra/brain.js';
+import { startSprintDetached } from './sprint-job-runner.js';
 import {
   IncomingMessageRouter,
   isValidConnectorId,
@@ -623,23 +624,21 @@ async function handleRequest(
         return;
       }
       const b = parsed.data;
-      const jobId = `job-${Date.now()}`;
+      const { jobId } = startSprintDetached(
+        projectRoot,
+        { autoApprove: b.autoApprove },
+        (code) => {
+          const j = activeJobs.get(jobId);
+          if (j) {
+            if (code === 0) { j.status = 'completed'; }
+            else { j.status = 'failed'; j.error = `Sprint exited with code ${code ?? 'null'}`; }
+          }
+        },
+      );
       const job: ActiveJob = { id: jobId, status: 'running' };
       activeJobs.set(jobId, job);
       console.log(`[deckent] Sprint started via dashboard (jobId: ${jobId})`);
       sendJson(res, { jobId, status: 'started' }, 202);
-
-      // Run sprint in background
-      loadConfig(projectRoot)
-        .then((config) => runSprint(projectRoot, config, { autoApprove: b.autoApprove }))
-        .then((result) => {
-          const j = activeJobs.get(jobId);
-          if (j) { j.status = 'completed'; j.result = result; }
-        })
-        .catch((err: unknown) => {
-          const j = activeJobs.get(jobId);
-          if (j) { j.status = 'failed'; j.error = err instanceof Error ? err.message : String(err); }
-        });
       return;
     }
 

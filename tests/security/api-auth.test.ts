@@ -41,6 +41,10 @@ vi.mock('../../src/orchestra/brain.js', () => ({
   })),
 }));
 
+vi.mock('../../src/api/sprint-job-runner.js', () => ({
+  startSprintDetached: vi.fn(() => ({ jobId: `job-${Date.now()}` })),
+}));
+
 import { existsSync, writeFileSync } from 'node:fs';
 import { createHttpServer, generateApiToken, _resetActiveJob, type HttpApi } from '../../src/api/server.js';
 

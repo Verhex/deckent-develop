@@ -1,0 +1,73 @@
+{
+  "taskId": "180-001",
+  "sprintId": "sprint-180",
+  "steps": [
+    {
+      "step": 2,
+      "name": "routing-step-2",
+      "input": {
+        "taskId": "180-001",
+        "title": "W0 — Nervous config schema sync (Step F)",
+        "scope": [
+          "src/core/",
+          "tests/core/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "refactorer",
+        "skills": [
+          "typescript-expert"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Agent forced by override: refactorer"
+    },
+    {
+      "step": 3,
+      "name": "routing-step-3",
+      "input": {
+        "taskId": "180-001",
+        "title": "W0 — Nervous config schema sync (Step F)",
+        "scope": [
+          "src/core/",
+          "tests/core/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "refactorer",
+        "skills": [
+          "typescript-expert"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Skill budget: max 2 (medium task, 1 module(s), effort=normal)"
+    },
+    {
+      "step": 4,
+      "name": "routing-step-4",
+      "input": {
+        "taskId": "180-001",
+        "title": "W0 — Nervous config schema sync (Step F)",
+        "scope": [
+          "src/core/",
+          "tests/core/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "refactorer",
+        "skills": [
+          "typescript-expert"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Skills forced by override: [typescript-expert]"
+    }
+  ],
+  "decidedAt": "2026-05-20T16:19:47.191Z"
+}
