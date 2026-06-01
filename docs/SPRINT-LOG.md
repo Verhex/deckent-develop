@@ -5848,3 +5848,45 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 212-015: 212-015 — ADR-075 (F5 runtime wiring + routing skill→agent + doc-generator) + MASTER-PLAN status (DONE)
 
 ---
+## Sprint 214 — sprint-214
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-06-01
+**Duration:** 2132s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 25 |
+| Completed | 25 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 2131836ms |
+
+### Tasks
+
+- 214-001: Fix debt: Tech debt from 210-009-fix: Root cause of NO_GO (test_coverage=65): original wor (DONE)
+- 214-002: 214-001 — Docker env-forwarding provider+auth-aware (ANTHROPIC_API_KEY subscription'da strip) (DONE)
+- 214-003: 214-002 — Auth-mode resolution guard + smoke (config subscription effective) (DONE)
+- 214-004: 214-003 — serve: API token'ı dashboard'a inject (localhost out-of-box, 401 fix) (DONE)
+- 214-005: 214-004 — dashboard: inject API token'ı isteğe ekle (useApi Bearer) (DONE)
+- 214-006: 214-005 — serve localhost out-of-box smoke (POST 200, API-disabled YOK) (DONE)
+- 214-007: 214-006 — Path A embedded chat backend (host-CLI'SIZ, server-side ProviderAdapter) (DONE)
+- 214-008: 214-007 — Dashboard Chat tab → chat-backend wire (Path A frontend) (DONE)
+- 214-009: 214-008 — F7-003 UI/UX pass: Layout responsive + dark/light + Sidebar (DONE)
+- 214-010: 214-009 — VS Code extension gerçek activation + CLI/MCP köprü (DONE)
+- 214-011: 214-010 — Command palette handler'lar (Start Sprint / Show Dashboard / Status) (DONE)
+- 214-012: 214-011 — Sidebar TreeView: canlı agent/sprint durumu (DONE)
+- 214-013: 214-012 — Status bar: sprint progress + tıkla→dashboard (DONE)
+- 214-014: 214-013 — Settings köprü (.deckent/config.json ↔ vscode settings) (DONE)
+- 214-015: 214-014 — OpenAICompatibleAdapter (HTTP /chat/completions — DeepSeek/Qwen/GLM) (DONE)
+- 214-016: 214-015 — ProviderName dinamik + model-catalog PROVIDER_MAP genişlet (DONE)
+- 214-017: 214-016 — Per-provider key (.deck) + bootstrap auto-register (DONE)
+- 214-018: 214-017 — Multi-provider eşzamanlı routing smoke (mix coexist) (DONE)
+- 214-019: 214-018 — chat CLI robust hata UX (host-CLI yoksa net yönlendirme) (DONE)
+- 214-020: 214-019 — ADR-076 (auth-precedence + user-facing surfaces) + ADR-077 (8-provider) + MASTER-PLAN status (DONE)
+- 214-021: 214-020 — README badge sync (190+→214) + ci-baseline garbage fix (DONE)
+
+---

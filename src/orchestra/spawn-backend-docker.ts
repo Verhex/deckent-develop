@@ -544,12 +544,30 @@ export class DockerSpawnBackend implements SpawnBackend {
       dockerArgs.push('-e', 'DECKENT_PROMPT_CACHE_ENABLED=1');
     }
 
-    // Pass API keys if available (for Codex/Gemini providers)
-    const envKeys = ['ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'GOOGLE_API_KEY', 'DECKENT_DEBUG'];
-    for (const key of envKeys) {
-      if (process.env[key]) {
-        dockerArgs.push('-e', `${key}=${process.env[key]}`);
-      }
+    // Sprint 214 T-214-001 — provider + auth-aware env forwarding.
+    //
+    // ANTHROPIC_API_KEY MUST NOT leak into the container when the worker is a
+    // claude provider in subscription mode: the claude CLI prefers the env var
+    // over the mounted ~/.claude session, so forwarding the host key silently
+    // demotes `auth_mode: subscription` into API mode → Tier-1 timeout under
+    // post-beta budgets. Forward Anthropic key ONLY when useApiOnly === true
+    // (line 474 already requires it for that branch). For non-claude providers
+    // the key is irrelevant — strip it to avoid cross-provider auth confusion.
+    //
+    // OPENAI_API_KEY / GOOGLE_API_KEY are forwarded only when the spawned
+    // provider can actually use them (codex/gemini). DECKENT_DEBUG is auth-
+    // orthogonal and always forwarded when set on the host.
+    if (useApiOnly && process.env.ANTHROPIC_API_KEY) {
+      dockerArgs.push('-e', `ANTHROPIC_API_KEY=${process.env.ANTHROPIC_API_KEY}`);
+    }
+    if (providerBinary !== 'claude' && process.env.OPENAI_API_KEY) {
+      dockerArgs.push('-e', `OPENAI_API_KEY=${process.env.OPENAI_API_KEY}`);
+    }
+    if (providerBinary !== 'claude' && process.env.GOOGLE_API_KEY) {
+      dockerArgs.push('-e', `GOOGLE_API_KEY=${process.env.GOOGLE_API_KEY}`);
+    }
+    if (process.env.DECKENT_DEBUG) {
+      dockerArgs.push('-e', `DECKENT_DEBUG=${process.env.DECKENT_DEBUG}`);
     }
 
     // Container image and command

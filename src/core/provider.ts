@@ -682,6 +682,26 @@ export function applyDeckSecretsToEnv(
     providerEnvOverrides['gemini'] = { GOOGLE_API_KEY: googleKey };
   }
 
+  // OpenAI-compatible providers: deck key → canonical env var
+  // DeepSeek: DECKENT_DEEPSEEK_API_KEY → DEEPSEEK_API_KEY
+  const deepseekKey = secrets['DECKENT_DEEPSEEK_API_KEY'];
+  if (deepseekKey && deepseekKey.length > 0) {
+    process.env['DEEPSEEK_API_KEY'] = deepseekKey;
+    providerEnvOverrides['deepseek'] = { DEEPSEEK_API_KEY: deepseekKey };
+  }
+  // Qwen: DECKENT_DASHSCOPE_API_KEY → DASHSCOPE_API_KEY
+  const dashscopeKey = secrets['DECKENT_DASHSCOPE_API_KEY'];
+  if (dashscopeKey && dashscopeKey.length > 0) {
+    process.env['DASHSCOPE_API_KEY'] = dashscopeKey;
+    providerEnvOverrides['qwen'] = { DASHSCOPE_API_KEY: dashscopeKey };
+  }
+  // Zhipu/GLM: DECKENT_ZHIPU_API_KEY → ZHIPU_API_KEY
+  const zhipuKey = secrets['DECKENT_ZHIPU_API_KEY'];
+  if (zhipuKey && zhipuKey.length > 0) {
+    process.env['ZHIPU_API_KEY'] = zhipuKey;
+    providerEnvOverrides['zhipu'] = { ZHIPU_API_KEY: zhipuKey };
+  }
+
   return providerEnvOverrides;
 }
 
@@ -793,6 +813,38 @@ export async function bootstrapProviders(
         name: provider.name,
         reason: `Failed to create adapter for ${provider.name}`,
       });
+    }
+  }
+
+  // ─── Bootstrap OpenAI-compatible providers (DeepSeek, Qwen, Zhipu/GLM) ──
+  // Register an OpenAICompatibleAdapter for each provider whose API key is
+  // present in process.env (either from .deck via applyDeckSecretsToEnv above
+  // or from the host environment directly). No key → skip gracefully (ADR-014).
+  const openaiCompatCandidates = [
+    { name: 'deepseek', envKey: 'DEEPSEEK_API_KEY',  preset: 'deepseek' as const },
+    { name: 'qwen',     envKey: 'DASHSCOPE_API_KEY', preset: 'qwen'     as const },
+    { name: 'zhipu',    envKey: 'ZHIPU_API_KEY',     preset: 'glm'      as const },
+  ];
+  const anyOpenAICompatKey = openaiCompatCandidates.some(c => Boolean(process.env[c.envKey]));
+  if (anyOpenAICompatKey) {
+    const { OPENAI_COMPAT_PRESETS } = await import('../providers/openai-compatible.js');
+    for (const candidate of openaiCompatCandidates) {
+      const apiKey = process.env[candidate.envKey];
+      if (!apiKey) {
+        skipped.push({ name: candidate.name as unknown as ProviderName, reason: `${candidate.envKey} not set` });
+        continue;
+      }
+      if (registry.hasProvider(candidate.name)) {
+        registered.push(candidate.name as unknown as ProviderName);
+        continue;
+      }
+      try {
+        const adapter = OPENAI_COMPAT_PRESETS[candidate.preset]();
+        registry.registerProvider(adapter);
+        registered.push(candidate.name as unknown as ProviderName);
+      } catch {
+        skipped.push({ name: candidate.name as unknown as ProviderName, reason: `Failed to create OpenAICompatibleAdapter for ${candidate.name}` });
+      }
     }
   }
 

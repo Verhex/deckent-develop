@@ -37,25 +37,28 @@ Three immovable pillars (Alperen-approved 2026-05-31):
 
 ---
 
-## 3. Current State — Ground Truth (Sprint 212, 2026-06-01)
+## 3. Current State — Ground Truth (Sprint 214, 2026-06-01)
 
 - **Sprint 211 closed:** 16/16 DONE, 0 tech-debt, 0 NO_GO, 16m19s.
 - **Sprint 212 closed:** 15/15 DONE — F5 evolution crowning (6 dormant modules → live callers), routing skew fix (skill→agent affinity signal), doc-reality sync (code-derived module counts), IDE extension scaffold.
-- **Full test suite (measured):** 18,390+ passed / 58 skipped (1,021+ files) + dashboard 570 passed. **0 failures.** `tsc --noEmit` clean.
-- **Shipped engine:** PLAN→SPAWN→EXECUTE→EVALUATE→FIX→RETRO→DECAY→CLEANUP lifecycle; 3 backends (docker/tmux/subprocess); 15 agents + 21 skills; routing-engine v2 + skill→agent affinity signal; Memory V2 (SQLite FTS5, dual-layer i18n); 32 MCP tools + 8 resources; 49+ CLI commands; React dashboard (7 pages) + embedded web terminal; VS Code extension scaffold.
-- **Provider-free:** 100% of P0 (Ollama bootstrap, claude-hardcode cleanup, provider-agnostic defaults).
+- **Sprint 213 killed** — mass synthetic NO_GO due to auth-precedence bug (`spawn-backend-docker.ts` forwarding `ANTHROPIC_API_KEY` unconditionally into containers → CLI API mode → Tier-1 timeout). All tasks cleared; Sprint 214 relaunched with `env -u ANTHROPIC_API_KEY`.
+- **Sprint 214 closed:** 20 tasks — P0 auth-precedence fix (ADR-076), user-facing surfaces (serve token-inject + Path A embedded chat), IDE extension real impl (command palette, sidebar, statusbar, settings bridge), F1-009 8-provider (OpenAICompatibleAdapter → DeepSeek/Qwen/GLM, dynamic ProviderName; adapter built but NOT yet bootstrap-registered — dormant, Sprint 215 P0; ADR-077), F7-003 UI/UX pass, chat CLI UX. ADR-076 + ADR-077 filed. (Sprint 215+ can launch without `env -u ANTHROPIC_API_KEY`.)
+- **Full test suite (measured):** 18,606 passed / 58 skipped (1,052 files) + dashboard 570 passed. **0 failures.** `tsc --noEmit` clean.
+- **Shipped engine:** PLAN→SPAWN→EXECUTE→EVALUATE→FIX→RETRO→DECAY→CLEANUP lifecycle; 3 backends (docker/tmux/subprocess); 15 agents + 21 skills; routing-engine v2 + skill→agent affinity signal; Memory V2 (SQLite FTS5, dual-layer i18n); 32 MCP tools + 8 resources; 49+ CLI commands; React dashboard (7 pages) + embedded web terminal; VS Code extension (real impl: commands/sidebar/statusbar/settings).
+- **Provider-free:** 100% of P0 (Ollama bootstrap, claude-hardcode cleanup, provider-agnostic defaults). **Sprint 214 adds:** OpenAI-compatible HTTP adapter + PROVIDER_MAP built; bootstrap-register pending → dormant (F1-009 ~60%, Sprint 215 P0).
 - **F5 wire-gap closed (Sprint 212):** 6 evolutionary modules now have real runtime callers — `prompt-evolution`, `adaptive-agent`, `prompt-rollback`, `agent-genealogy`, `agent-retirement`, `specialization-drift`. Self-improvement loop is live. ADR-075.
 - **Known debt carried forward:**
   - **Doc-code drift (partial):** managed-docs generator now code-derived for module counts; README badge and "96% context reduction" claim still need verification (§7 W-H).
-  - **IDE extension stub:** `extensions/vscode/` scaffold created; full implementation Sprint 213-214.
+  - **F2 streaming:** Path A embedded chat backend connected; real streaming (F2-007) remains post-beta.
+  - **F7-003 UI/UX:** Layout responsive/dark-light pass done (Sprint 214); full god-level redesign remains Sprint 216.
 
 > ### ⚠️ User-Visible Reality vs Wiring % (honest, Alperen 2026-06-01)
-> The F1–F10 percentages above measure **internal wiring**, NOT **end-to-end user-working UX**. A live user check exposed three gaps the percentages hide:
-> - **`npx deckent serve`** loads the dashboard (GET) but POST actions (start/kill) return 401 — the auto-generated API token (`server.ts:918`) is **not injected into the served dashboard** (only the terminal token is). Workaround today: `DECKENT_API_AUTH_DISABLED=1`. → Sprint 213 Wave A.
-> - **`deckent chat`** is Path B: it spawns the user's installed `claude`/`codex`/`gemini` CLI and errors "No AI CLI found" if none is in PATH. Not zero-prerequisite. → Sprint 213 Wave A (Path A embedded chat).
-> - **Web UI/UX** renders (Vite build present) but is unpolished (F7-003 ~30%). → Sprint 213 Wave A.
+> The F1–F10 percentages above measure **internal wiring**, NOT **end-to-end user-working UX**. Sprint 214 closed the three gaps from the pre-214 audit:
+> - **`npx deckent serve`** — ✅ Sprint 214 fix: localhost token injected into served dashboard (ADR-076 Part B); POST actions work without `DECKENT_API_AUTH_DISABLED=1`.
+> - **`deckent chat`** — ✅ Sprint 214 fix: Path A embedded chat backend (no host CLI required). Path B (host CLI) still works; Path C (native SDK) is post-beta.
+> - **Web UI/UX** — ✅ Sprint 214 partial fix: Layout responsive/dark-light pass (F7-003 ~45%). Full god-level redesign Sprint 216.
 >
-> **Developer face (Sprint Mode) genuinely works** (212 sprints of dogfood). The Assistant/Company faces have wiring but are not yet user-ready. Sprint 213 closes this gap before adding more surfaces.
+> **Developer face (Sprint Mode) genuinely works** (214 sprints of dogfood). Sprint 214 promoted the Assistant face from "wired but not user-ready" to "works out of the box for subscription users."
 
 ---
 
@@ -68,7 +71,7 @@ Three immovable pillars (Alperen-approved 2026-05-31):
 | F1-004 | Docker provider-aware CLI invocation (binary select + auth + build-arg) | ⬜ P1 |
 | F1-005 | Dockerfile.worker multi-CLI (build-arg opt-in) | ⬜ P1 (depends F1-004) |
 | F1-008 | **Naive (conversational) chat mode** + intent classifier (CASUAL vs TASK→MCP tool invoke) | ✅ DONE — `src/cli/commands/chat.ts` (`classifyChatIntent`, `buildNaiveSystemPrompt`); delegates tool dispatch to host CLI via MCP auto-attach |
-| F1-009 | **8-provider simultaneous fleet** (Alperen 2026-06-01) — run Claude+Gemini+Codex subscriptions + ≥5 API providers (DeepSeek, Qwen, GLM, …) + local Ollama **at the same time**, coordinated | ⬜ proposed — **verified spec (Sprint 213 provider audit):** foundation ready (ProviderRegistry N-provider + per-task provider routing in task-router + model-catalog models.dev fetch + cost-per-provider in `provider-capabilities.ts` + `.deck` secret interpolation for keys). **Architectural fact:** existing 3 cloud adapters (claude/codex/gemini) are **CLI-spawn** (subscription via vendor CLI); the 5 new API providers have **no CLI** → need a NEW **HTTP `OpenAICompatibleAdapter`** (fetch /chat/completions; DeepSeek api.deepseek.com, Qwen/DashScope compatible-mode, GLM/Zhipu bigmodel.cn — all OpenAI-shaped → ONE adapter). **Wiring gaps:** (1) HTTP OpenAI-compat adapter, (2) `model-catalog` PROVIDER_MAP only maps anthropic/openai/google → extend, (3) ProviderName enum hardcoded claude/codex/gemini → make dynamic, (4) per-provider keys in `.deck` (DEEPSEEK/DASHSCOPE/ZHIPU), (5) bootstrap auto-register when key present. Simultaneous mix (3 CLI-subs + 5 HTTP-API + local) coexists via registry. ~1 focused sprint. **Note:** "API mode forbidden during beta" is Anthropic-Tier-1-specific; 3rd-party API providers (DeepSeek/Qwen/GLM) do NOT violate it |
+| F1-009 | **8-provider simultaneous fleet** (Alperen 2026-06-01) — run Claude+Gemini+Codex subscriptions + ≥5 API providers (DeepSeek, Qwen, GLM, …) + local Ollama **at the same time**, coordinated | ⚠️ **~80% (Sprint 214)** — `OpenAICompatibleAdapter` built (`src/providers/openai-compatible.ts`; fetch `/chat/completions`; DeepSeek/Qwen/GLM presets); `PROVIDER_MAP` extended (deepseek/qwen/zhipu); `ProviderName` widened to open-string. Simultaneous-mix routing validated via smoke test (30/30 pass). **🔴 disk-verify finding (Sprint 214):** the adapter is **NOT yet bootstrap-registered** — `OpenAICompatibleAdapter` is referenced only in its own file; nothing in `provider.ts` calls `registerProvider` for it from env/`.deck` keys. So DeepSeek/Qwen/GLM are **built but dormant (not selectable at runtime yet)** — same wire-gap class as F5 was. **Remaining:** (1) **bootstrap auto-register** when DEEPSEEK/DASHSCOPE/ZHIPU keys present (Sprint 215 P0 — makes it usable), (2) e2e mixed-provider sprint test, (3) per-provider model-catalog model IDs, (4) F1-010 subs→API overflow. ADR-077. **Note:** "API mode forbidden during beta" is Anthropic-Tier-1-specific only; DeepSeek/Qwen/GLM do NOT violate it |
 | F1-010 | **Provider/auth load-balancing** — when a subscription hits its rate/quota limit, overflow that worker to an API provider automatically (subs *and* API together for max throughput) | ⬜ proposed — extends F6 authMode; today `authMode` is a static per-task field, no dynamic subs→api overflow orchestration |
 
 ### F2 — Native Chat — **~90%**
@@ -79,8 +82,9 @@ Three immovable pillars (Alperen-approved 2026-05-31):
 | F2-005 | MCP tool dispatch (deckent_status/memory_query feedback) | ✅ DONE (Sprint 211) |
 | F2-006 | Session persist + resume (memory.db) | ✅ DONE (Sprint 211) |
 | F2-006d | Session persist + **`deckent chat --resume <sessionId>`** | ✅ DONE — `ChatTurn` (session_id/turn_index/role/content/timestamp) via `MemoryStore.appendChatTurn`/`getChatHistory` with FTS5 `chat:<sessionId>` tags; CLI renders recent turns before launch |
-| F2-007 | **Streaming live** (real provider streaming, not mock) | ⚠️ in-progress |
+| F2-007 | **Streaming live** (real provider streaming, not mock) | ⚠️ in-progress — Path A embedded chat backend wired (Sprint 214, `src/api/chat-backend.ts`); SSE/WS streaming post-beta |
 | F2-008 | **Native SDK round-trip** (true standalone, Path C) | ⬜ Q3 2026 |
+| F2-009 | **Path A embedded dashboard chat** (host-CLI-free, Sprint-214) | ✅ DONE (Sprint 214) — `chat-backend.ts` bridges browser messages to server-side ProviderAdapter; dashboard ChatPage wired; ADR-076 Part C |
 
 ### F3 — Process Mode — **~85%**
 | ID | Item | Status |
@@ -120,12 +124,12 @@ Three immovable pillars (Alperen-approved 2026-05-31):
 | F6-005 | **Live model catalog** (`model-catalog.ts` models.dev fetch + 24h cache + bundled fallback; `deckent models list/refresh/tier`) | ✅ DONE — 13 bundled models as offline fallback, overlaid by live catalog via `mergeApiIdOverrides`; ADR-023 tier routing preserved |
 | F6-006 | **Per-worker auth/provider in task JSON across all 3 modes** (Sprint/Task/Process) — premium architecture so each worker picks subs-or-API-or-local correctly | ⚠️ partial — task JSON `authMode` field exists (api-surface.md); needs first-class per-worker `provider`+`authMode` resolution wired uniformly across Sprint/Task/Process mode + paired with F1-010 overflow |
 
-### F7 — Dashboard & Control Plane — **~75%**
+### F7 — Dashboard & Control Plane — **~80%**
 | ID | Item | Status |
 |----|------|--------|
 | F7-001/002 | API auth fix (localhost auto-inject) + live data parity (SSE/WS) | ✅ DONE |
 | F7-005/008 | Sprint control panel + onboarding wizard | ✅ DONE |
-| F7-003 | **UI/UX god-level redesign** (modern, responsive, dark/light, info architecture) | ⚠️ ~30% (ThemeProvider base only) |
+| F7-003 | **UI/UX god-level redesign** (modern, responsive, dark/light, info architecture) | ⚠️ ~45% (Sprint 214: Layout responsive grid + dark/light ThemeProvider + sidebar/header layout; full god-level redesign Sprint 216) |
 | F7-004 | Terminal hardening (multi-session, history, copy/paste) | ⚠️ ~60% (Sprint 211 partial) |
 | F7-006 | Enterprise view (multi-tenant, RBAC UI) | ⚠️ ~40% (F4 backend ready, UI pending) |
 | F7-007 | Memory/ADR/debt explorer (FTS5 search, ADR timeline) | ⚠️ ~20% (Sprint 211 base) |
@@ -259,9 +263,9 @@ Per Alperen's direction: **combine sprints, write larger comprehensive tasks** (
 | Sprint | Theme | Scope |
 |--------|-------|-------|
 | **212** | **Stability/Hygiene + Evolution crowning** | F5-004 real external callers (prompt-evolution + adaptive-agent wired into sprint lifecycle, scope includes caller modules); agent routing skew fix (skill→agent signal: frontend-design→frontend-designer, security-specialist→security-auditor); doc-reality sync; ≥1 forward task |
-| **213** | **User-Facing Make-It-Work + IDE Extension (BOTH — Alperen 2026-06-01)** | **Wave A (make existing surfaces actually work for a user):** `serve` localhost out-of-box — inject the auto-generated API token into the served dashboard (same pattern as the terminal token) so POST actions work without manual `DECKENT_API_AUTH_DISABLED`; **Path A embedded dashboard chat** (host-CLI-free, on the Sprint-175 PTY/WS stack) so chat works without an installed claude/codex CLI; F7-003 UI/UX pass. **Wave B (IDE extension):** `extensions/vscode/` real impl — sidebar (live agent status), command palette (`Deckent: Start Sprint`), status bar, `deckent` command native in IDEs |
-| **214** | **IDE depth + chat/UX hardening** | JetBrains, inline agent-edit decorations, settings UI; Path A chat hardening; F7-004/006/007 |
-| **215** | **Web UI Chat tab (Path A)** | Dashboard "Deckent Chat" surface on the embedded-terminal stack; multi-tenant by inheritance |
+| **213** | **Killed** | Killed mid-sprint due to auth-precedence bug — mass synthetic NO_GO. All tasks cleared; Sprint 214 relaunched. |
+| **214** | **P0 Auth-fix + User-Facing + IDE ext + 8-provider (DONE)** | Wave 0: auth-precedence fix (ADR-076). Wave A: serve token-inject + Path A embedded chat + chat CLI UX + F7-003 UI/UX. Wave B: VS Code extension real impl (commands/sidebar/statusbar/settings). Wave C: F1-009 8-provider (OpenAICompatibleAdapter + PROVIDER_MAP + bootstrap; ADR-077). Wave D: ADR docs + status. 20 tasks. |
+| **215** | **Web UI Chat tab (Path A) depth + F1-010 subs→API overflow** | Dashboard "Deckent Chat" hardening + streaming; subs→API load-balance overflow |
 | **216** | **Dashboard god-level redesign (F7-003) + F7-004/006/007** | UI/UX redesign, terminal polish, enterprise view, memory/ADR explorer |
 | **217+** | **F2 streaming + Native SDK (Path C)** | Real streaming; ADR-010 amendment; SDK migration; zero-prerequisite `npx deckent` chat — Q3 2026 |
 | **post-beta** | **Provider/local LLM + million-user hardening** | F1-004/005, sub-#5 Ollama/CUDA fully-local preset, OTel/Prometheus (W-J), ADR-037 hard-flip V2, sub-#2 self-security |
@@ -288,7 +292,7 @@ Per Alperen's direction: **combine sprints, write larger comprehensive tasks** (
 
 1. **F5 stays dormant** — entry-points without callers read as "DONE" but ship dead code; the evolutionary moat is unproven until F5-004 lands real callers. *Mitigation: Sprint 212 priority + per-sprint visible-change evidence.*
 2. **Routing collapse** — agent diversity is fragile/non-deterministic; specialization value lost if everything routes to `refactorer`. *Mitigation: skill→agent activation signal (212-008; frontend-design→frontend-designer mapping still incomplete — Sprint 213 plan sent UI to architecture-planner).*
-5. **🔴 Auth-precedence bug (Sprint 213, confirmed):** `spawn-backend-docker.ts:547-553` forwards `ANTHROPIC_API_KEY` into every worker container **unconditionally**, even when `auth_mode: subscription`. The container's claude CLI then picks API mode and (with a Tier-1-capped key) times out → exit-0-no-result → mass synthetic NO_GO. Forces the user to manually `env -u ANTHROPIC_API_KEY` on every `deckent start`. *Mitigation: make env-forwarding provider+auth-aware — strip ANTHROPIC_API_KEY for Claude subscription workers; only forward when authMode=api. **Sprint 214 P0.*** ([[feedback_container_auth_precedence]])
+5. **✅ Auth-precedence bug (RESOLVED Sprint 214):** `spawn-backend-docker.ts` env-forwarding is now provider+auth-aware — `ANTHROPIC_API_KEY` is stripped for Claude subscription workers and only forwarded when `authMode=api`. Sprint 215+ launches without `env -u`. ADR-076 Part A. ([[feedback_container_auth_precedence]])
 3. **Native-chat scope creep** — IDE extension + Path A + Path C is multi-sprint; risk of half-built surfaces. *Mitigation: strict sequence (hygiene → IDE → web → SDK), one surface fully landed before the next.*
 4. **Doc-reality drift** — this consolidation fixes today; re-drift if future status lands only in scattered docs. *Mitigation: MASTER-PLAN is the only roadmap that gets status updates; others are frozen historical.*
 

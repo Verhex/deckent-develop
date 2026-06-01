@@ -99,7 +99,7 @@ export interface CatalogLoadOptions {
 
 // ─── Provider Mapping ──────────────────────────────────────────────────────
 
-const PROVIDER_ALIASES: Record<string, RegistryProviderName | 'ollama'> = {
+const PROVIDER_ALIASES: Record<string, string> = {
   // Canonical
   claude: 'claude',
   codex: 'codex',
@@ -111,6 +111,7 @@ const PROVIDER_ALIASES: Record<string, RegistryProviderName | 'ollama'> = {
   // OpenAI flavors
   openai: 'codex',
   'openai.codex': 'codex',
+  'openai-compat': 'openai-compat',
   // Google flavors
   google: 'gemini',
   'google.gemini': 'gemini',
@@ -118,12 +119,30 @@ const PROVIDER_ALIASES: Record<string, RegistryProviderName | 'ollama'> = {
   // Local LLM flavors
   local: 'ollama',
   llamacpp: 'ollama',
+  // OpenAI-compatible providers (deepseek/qwen/zhipu/glm)
+  deepseek: 'deepseek',
+  qwen: 'qwen',
+  dashscope: 'qwen',
+  zhipu: 'zhipu',
+  glm: 'zhipu',
 };
 
-export function normalizeProvider(raw: string): RegistryProviderName | 'ollama' | null {
+/** Runtime-registered dynamic providers (e.g. openai-compat adapters). */
+const _dynamicProviderRegistry = new Map<string, string>();
+
+/** Register a dynamic provider name so normalizeProvider resolves it.
+ *  Optionally map it to a canonical name (defaults to the name itself). */
+export function registerDynamicProvider(name: string, canonicalName?: string): void {
+  const key = name.toLowerCase().trim();
+  _dynamicProviderRegistry.set(key, canonicalName ?? key);
+}
+
+export function normalizeProvider(raw: string): string | null {
   const key = raw.toLowerCase().trim();
   const mapped = PROVIDER_ALIASES[key];
   if (mapped) return mapped;
+  const dynamic = _dynamicProviderRegistry.get(key);
+  if (dynamic) return dynamic;
   return null;
 }
 

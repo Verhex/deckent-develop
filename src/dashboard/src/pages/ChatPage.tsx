@@ -6,6 +6,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useSSE } from "../hooks/useSSE";
 import { postJson } from "../lib/api";
+import { useApi } from "../lib/useApi";
 import { useTranslation } from "../i18n/LanguageProvider";
 import { Badge } from "../components/ui/badge";
 import { Textarea } from "../components/ui/textarea";
@@ -239,6 +240,7 @@ let msgIdCounter = 0;
 export default function ChatPage() {
   const { t } = useTranslation();
   const sseState = useSSE("/api/events");
+  const { post } = useApi();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [notifications, setNotifications] = useState<NotifyEvent[]>([]);
   const [sending, setSending] = useState(false);
@@ -270,7 +272,7 @@ export default function ChatPage() {
     setSending(true);
 
     try {
-      const response = await postJson<{ reply: string }>("/api/chat", { message: content });
+      const response = await post<{ reply: string }>("/api/chat", { message: content });
       const assistantMsg: ChatMessage = {
         id: `msg-${++msgIdCounter}`,
         role: "assistant",
@@ -289,7 +291,7 @@ export default function ChatPage() {
     } finally {
       setSending(false);
     }
-  }, [t]);
+  }, [t, post]);
 
   return (
     <div className="flex flex-col md:flex-row h-[calc(100vh-4rem)] -m-6">

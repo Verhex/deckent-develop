@@ -141,10 +141,13 @@ export function Layout() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { data: sseState, status: sseStatus } = useSSEWithStatus("/api/events");
 
+  // Layout strategy: responsive grid — sidebar breakpoint md+ (hidden mobile), lg+ wider sidebar
+  // Dark/light theme: dark:bg-zinc-950 / dark:bg-zinc-900 — ThemeProvider controls html class
+
   return (
     <div className="flex h-screen bg-zinc-950 dark:bg-zinc-950">
-      {/* Desktop sidebar — responsive: hidden on mobile, visible md+ */}
-      <aside className="hidden md:flex w-[240px] flex-col border-r border-zinc-800 dark:border-zinc-800 bg-zinc-900 dark:bg-zinc-900 p-4">
+      {/* Desktop sidebar — responsive: hidden on mobile, visible md+ breakpoint */}
+      <aside className="hidden md:flex w-[240px] lg:w-[260px] flex-col border-r border-zinc-800 dark:border-zinc-800 bg-zinc-900 dark:bg-zinc-900 p-4">
         <SidebarContent sseState={sseState} sseStatus={sseStatus} />
       </aside>
 

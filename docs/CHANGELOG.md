@@ -2,6 +2,30 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint214] - 2026-06-01
+
+### Added
+
+- 214-001 — Docker env-forwarding provider+auth-aware (ANTHROPIC_API_KEY subscription'da strip)
+- 214-002 — Auth-mode resolution guard + smoke (config subscription effective)
+- 214-004 — dashboard: inject API token'ı isteğe ekle (useApi Bearer)
+- 214-005 — serve localhost out-of-box smoke (POST 200, API-disabled YOK)
+- 214-006 — Path A embedded chat backend (host-CLI'SIZ, server-side ProviderAdapter)
+- 214-007 — Dashboard Chat tab → chat-backend wire (Path A frontend)
+- 214-008 — F7-003 UI/UX pass: Layout responsive + dark/light + Sidebar
+- 214-009 — VS Code extension gerçek activation + CLI/MCP köprü
+- 214-010 — Command palette handler'lar (Start Sprint / Show Dashboard / Status)
+- 214-011 — Sidebar TreeView: canlı agent/sprint durumu
+
+### Fixed
+
+- Fix debt: Tech debt from 210-009-fix: Root cause of NO_GO (test_coverage=65): original wor
+- 214-003 — serve: API token'ı dashboard'a inject (localhost out-of-box, 401 fix)
+- 214-020 — README badge sync (190+→214) + ci-baseline garbage fix
+
+
+_Tasks: 25 total, 25 done, 0 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint212] - 2026-06-01
 
 ### Added

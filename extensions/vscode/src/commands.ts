@@ -11,12 +11,18 @@ export interface StatusBarItem {
   dispose(): void;
 }
 
+export interface OutputChannel {
+  appendLine(line: string): void;
+  show(): void;
+}
+
 export interface CommandsVsCodeApi {
   commands: {
     registerCommand(id: string, handler: () => void): { dispose(): void };
   };
   window: {
     createTerminal(name: string): { sendText(text: string): void; show(): void };
+    createOutputChannel(name: string): OutputChannel;
     createStatusBarItem(): StatusBarItem;
     showInformationMessage(message: string): void;
   };
@@ -36,6 +42,11 @@ export function handleCommand(id: string, vscode: CommandsVsCodeApi): void {
     terminal.sendText('deckent start');
   } else if (id === 'deckent.showDashboard') {
     vscode.env.openExternal(DASHBOARD_URL);
+  } else if (id === 'deckent.status') {
+    const channel = vscode.window.createOutputChannel('Deckent');
+    channel.appendLine('Deckent: checking sprint status...');
+    channel.appendLine('Run: deckent status');
+    channel.show();
   }
   // unknown command: no-op (graceful)
 }

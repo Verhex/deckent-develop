@@ -49,8 +49,14 @@ interface ProviderProbe {
 // ─── Constants ──────────────────────────────────────────────────────
 
 const NO_PROVIDER_MESSAGE =
-  'No AI CLI found. Install one of: claude (Anthropic), codex (OpenAI), ' +
-  'gemini (Google), or use `deckent chat --local` for Ollama.';
+  'No AI CLI found. Searched: claude (Anthropic), codex (OpenAI), gemini (Google).\n' +
+  'Install options:\n' +
+  '  • claude  — https://claude.ai/download  (npm: npm install -g @anthropic-ai/claude-code)\n' +
+  '  • codex   — npm install -g @openai/codex\n' +
+  '  • gemini  — npm install -g @google/gemini-cli\n' +
+  'Alternatives:\n' +
+  '  • deckent chat --native  — built-in chat (no host CLI required)\n' +
+  '  • deckent serve          — open dashboard chat in your browser';
 
 /** Priority order — first ready provider wins during auto-detect. */
 const PROVIDER_PRIORITY: readonly ChatTool[] = ['claude', 'codex', 'gemini'];

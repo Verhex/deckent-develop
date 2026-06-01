@@ -143,3 +143,13 @@ docs/core-memory/
 vit-*.log
 .deckent/archive/sprints/
 docs/audits/sprint-*/load-test-report.md
+
+# Worker container HOME-leak guard + secrets (Sprint 214 — never commit)
+.bash_history
+.deckent/.keyring
+.codex/
+.gemini/
+.npm/
+.tmp-test/
+.test-e2e-*/
+.brain/archive/
