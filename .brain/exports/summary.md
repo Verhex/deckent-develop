@@ -69,8 +69,10 @@
 | adr-072 | Agent Routing Balance (Multi-Signal Scoring) + Dashboard API Auth Hardening | accepted |
 | adr-073 | Routing Live Validation + FIX Prompt Enrichment + Dashboard Control Plane | accepted |
 | adr-074 | Native Chat Real Round-Trip + Enterprise RBAC/Audit/Rate + F5 Evolution Wire | accepted |
+| adr-075 | F5 Evolution Runtime Wiring + Routing Skill→Agent Affinity + Managed-Docs Code-Derived Counts | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-214 Learnings** (sprint-214): ## Sprint sprint-214 Learnings
 - **Sprint sprint-212 Learnings** (sprint-212): ## Sprint sprint-212 Learnings
 - **Sprint sprint-211 Learnings** (sprint-211): ## Sprint sprint-211 Learnings
 - **Sprint sprint-210 Learnings** (sprint-210): ## Sprint sprint-210 Learnings
@@ -84,8 +86,6 @@
 - **Sprint sprint-205 Learnings** (sprint-205): ## Sprint sprint-205 Learnings
 - **Sprint sprint-204 Learnings** (sprint-204): ## Sprint sprint-204 Learnings
 - 204-003 — Implementation intent için built-in agent adaylığı: NO_GO — Added BUILTIN_...
-- **Sprint sprint-203 Learnings** (sprint-203): ## Sprint sprint-203 Learnings
-- 203-002 — Docker provider-aware auth mount: GO_WITH_TECH_DEBT — Changed auth mount c...
 
 ## Active Technical Debt
 - [CRITICAL] Tech debt from 210-009-fix: Root cause of NO_GO (test_coverage=65): original wor
@@ -138,5 +138,6 @@
 - Violation pattern: stale_heartbeat
 - Violation pattern: file_outside_scope
 - Violation pattern: stale_heartbeat
+- Violation pattern: stale_heartbeat
 
-_Total entries: 462 | Generated: 2026-06-01_
+_Total entries: 467 | Generated: 2026-06-01_

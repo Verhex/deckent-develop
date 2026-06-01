@@ -34,6 +34,8 @@ paths: [".dashboard"]
 
 ## Active ADR Constraints
 
+- **ADR-076**: Auth-Precedence Fix + User-Facing Surfaces (serve token-inject, Path A chat, IDE extension) — **Status:** accepted
+- **ADR-077**: Multi-Provider 8-Fleet + OpenAI-Compatible HTTP Adapter — **Status:** accepted
 - **ADR-075**: F5 Evolution Runtime Wiring + Routing Skill→Agent Affinity + Managed-Docs Code-Derived Counts — **Status:** accepted
 - **ADR-074**: Native Chat Real Round-Trip + Enterprise RBAC/Audit/Rate + F5 Evolution Wire — **Status:** accepted
 - **ADR-073**: Routing Live Validation + FIX Prompt Enrichment + Dashboard Control Plane — **Status:** accepted
