@@ -162,7 +162,7 @@ For users in high-sensitivity environments, the recommendation is to run deckent
 
 ## Vulnerability Disclosure
 
-See [SECURITY.md](../../SECURITY.md) for the full disclosure policy.
+See [SECURITY.md](https://github.com/VerhexIO/deckent/blob/main/SECURITY.md) for the full disclosure policy.
 
 **Summary:**
 1. Report via [GitHub Security Advisory](https://github.com/VerhexIO/deckent/security/advisories/new) (preferred — private by default)

@@ -148,7 +148,7 @@ db.close();
 - **Tokenizer:** `unicode61 remove_diacritics 2`
 - **Search:** Dual-layer (original + `turkishNormalize()`) for TR/EN/DE 100% recall
 
-See [`docs/architecture/memory-system.md`](../architecture/memory-system.md) for full
+See [`docs/architecture/memory-system.md`](https://github.com/VerhexIO/deckent/blob/main/docs/architecture/memory-system.md) for full
 architecture documentation.
 
 ---

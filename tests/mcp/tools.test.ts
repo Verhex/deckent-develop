@@ -30,6 +30,28 @@ vi.mock('../../src/core/config.js', () => ({
   loadConfig: vi.fn(),
 }));
 
+// deckent_retro reads from Memory V2 DB (MemoryStore), NOT a flat file — the
+// node:fs mock above does NOT intercept better-sqlite3's native reads, so
+// without this the test depended on the dev machine's real .brain/memory.db
+// (green local, red CI where the gitignored DB is absent). Mock MemoryStore so
+// the retro test is hermetic. getByType/getById return a retro entry; the
+// "no retro" test bypasses this via existsSync→false (returns before MemoryStore).
+vi.mock('../../src/core/memory-store.js', () => {
+  const RETRO = { content: '# Retrospective\n- Learned X', sprint_id: 'sprint-1' };
+  return {
+    MemoryStore: vi.fn().mockImplementation(() => ({
+      getById: vi.fn(() => RETRO),
+      getByType: vi.fn(() => [RETRO]),
+      search: vi.fn(() => []),
+      searchMemory: vi.fn(() => []),
+      insert: vi.fn(),
+      upsert: vi.fn(),
+      getStats: vi.fn(() => ({})),
+      close: vi.fn(),
+    })),
+  };
+});
+
 vi.mock('../../src/core/utils.js', () => ({
   countBrainLines: vi.fn().mockReturnValue(100),
   ensureDeckentImport: vi.fn(),

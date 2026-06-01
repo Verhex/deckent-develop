@@ -154,4 +154,4 @@ Deckent uses Node 24+ APIs (readline/promises, ESM, native crypto). Older versio
 - [Quickstart Guide](quickstart.md) — run your first sprint in 5 minutes
 - [Getting Started](getting-started.md) — step-by-step walkthrough
 - [Config Reference](../reference/config-reference.md) — all configuration options
-- [Troubleshooting](../development/troubleshooting.md) — common issues and fixes
+- [Troubleshooting](https://github.com/VerhexIO/deckent/blob/main/docs/development/troubleshooting.md) — common issues and fixes

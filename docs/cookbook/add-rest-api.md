@@ -218,5 +218,5 @@ The retrospective records what worked, what did not, and persists learnings to `
 
 - [Getting Started](/guide/getting-started)
 - [Your First Sprint](/guide/first-sprint)
-- [DIRECTIVES Format Reference](/reference/directives)
+- [DIRECTIVES Format Reference](https://github.com/VerhexIO/deckent/blob/main/DECKENT.md)
 - [Agent Reference — api-builder](/reference/agents#api-builder)

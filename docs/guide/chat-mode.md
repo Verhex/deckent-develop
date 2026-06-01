@@ -240,4 +240,4 @@ Or use a local model:
 - [Getting Started](getting-started.md) — Install and initialize Deckent
 - [First Sprint](first-sprint.md) — Sprint-mode walkthrough
 - [MCP Guide](../reference/mcp-guide.md) — Full list of 31 MCP tools
-- [Memory](../architecture/memory.md) — How chat history is stored and searched
+- [Memory](https://github.com/VerhexIO/deckent/blob/main/docs/architecture/memory-system.md) — How chat history is stored and searched

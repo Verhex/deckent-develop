@@ -69,9 +69,13 @@ describe('buildWorkerPrompt — skillPrompts parameter', () => {
     const skillPrompts = [{ name: 'verbose-skill', content: longContent }];
     const prompt = buildWorkerPrompt(task, undefined, skillPrompts);
     expect(prompt).toContain(longContent);
-    const skillSection = prompt.split('--- verbose-skill ---')[1]?.split('\n=== ')[0] ?? '';
+    // Full 3000-char content is injected uncapped (asserted above via toContain).
+    // The section boundary (`\n=== `) can drift across environments (ADR/rule
+    // injection differs local vs CI), so an exact ===3000 is brittle; counting
+    // from the marker and asserting >= 3000 proves "no per-item cap" robustly.
+    const skillSection = prompt.split('--- verbose-skill ---')[1] ?? '';
     const xCount = (skillSection.match(/X/g) || []).length;
-    expect(xCount).toBe(3000);
+    expect(xCount).toBeGreaterThanOrEqual(3000);
   });
 
   it('injects every skill without total-section cap (Sprint 182 PQ-2 F2)', () => {

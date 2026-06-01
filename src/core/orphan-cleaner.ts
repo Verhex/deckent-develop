@@ -374,7 +374,10 @@ export function cleanOrphanIpcDirs(
       // concurrent deckent_start that hasn't written config.json yet).
       try {
         const stat = statSync(entryPath);
-        const ageMs = now - stat.mtimeMs;
+        // Clamp to 0: on some filesystems/CI runners a freshly-created dir's
+        // mtime can be >= now (coarse timestamp granularity / clock skew),
+        // yielding a negative age that would wrongly skip with minAgeMs=0.
+        const ageMs = Math.max(0, now - stat.mtimeMs);
         if (ageMs < minAgeMs) {
           debugLog('orphan-cleaner:cleanOrphanIpcDirs', `Skipping young config-less dir: ${entry} (age=${Math.round(ageMs)}ms < minAge=${minAgeMs}ms)`);
           continue;
@@ -401,7 +404,8 @@ export function cleanOrphanIpcDirs(
         if (pid === undefined) {
           try {
             const stat = statSync(configPath);
-            const ageMs = now - stat.mtimeMs;
+            // Clamp to 0 (CI fresh-dir mtime may be >= now → negative age).
+            const ageMs = Math.max(0, now - stat.mtimeMs);
             if (ageMs < minAgeMs) {
               debugLog('orphan-cleaner:cleanOrphanIpcDirs', `Skipping young pid-less IPC dir: ${entry} (config age=${Math.round(ageMs)}ms)`);
               continue;
