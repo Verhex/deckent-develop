@@ -35,16 +35,17 @@ Three immovable pillars (Alperen-approved 2026-05-31):
 
 ---
 
-## 3. Current State — Ground Truth (Sprint 211, 2026-06-01)
+## 3. Current State — Ground Truth (Sprint 212, 2026-06-01)
 
 - **Sprint 211 closed:** 16/16 DONE, 0 tech-debt, 0 NO_GO, 16m19s.
-- **Full test suite (measured):** 18,390 passed / 58 skipped (1,021 files) + dashboard 570 passed. **0 failures.** `tsc --noEmit` clean.
-- **Shipped engine:** PLAN→SPAWN→EXECUTE→EVALUATE→FIX→RETRO→DECAY→CLEANUP lifecycle; 3 backends (docker/tmux/subprocess); 15 agents + 21 skills; routing-engine v2; Memory V2 (SQLite FTS5, dual-layer i18n); 32 MCP tools + 8 resources; 49+ CLI commands; React dashboard (7 pages) + embedded web terminal.
+- **Sprint 212 closed:** 15/15 DONE — F5 evolution crowning (6 dormant modules → live callers), routing skew fix (skill→agent affinity signal), doc-reality sync (code-derived module counts), IDE extension scaffold.
+- **Full test suite (measured):** 18,390+ passed / 58 skipped (1,021+ files) + dashboard 570 passed. **0 failures.** `tsc --noEmit` clean.
+- **Shipped engine:** PLAN→SPAWN→EXECUTE→EVALUATE→FIX→RETRO→DECAY→CLEANUP lifecycle; 3 backends (docker/tmux/subprocess); 15 agents + 21 skills; routing-engine v2 + skill→agent affinity signal; Memory V2 (SQLite FTS5, dual-layer i18n); 32 MCP tools + 8 resources; 49+ CLI commands; React dashboard (7 pages) + embedded web terminal; VS Code extension scaffold.
 - **Provider-free:** 100% of P0 (Ollama bootstrap, claude-hardcode cleanup, provider-agnostic defaults).
-- **Known debt carried into Sprint 212** (honest):
-  - **F5 wire-gap:** `prompt-evolution` + `adaptive-agent` have integration entry-points but **0 external callers** — still dormant at runtime. Only `cross-sprint-analyzer` is genuinely wired (via `deckent evolve` CLI). Root cause: per-task scope split the module from its caller, and proof-greps counted the def file. (See memory `feedback_directive_kanit_letter_vs_goal`.)
-  - **Agent routing skew:** plan-time/runtime distribution collapsed to 12/16 `refactorer` again. Skill routing diversifies correctly, but agent selection does not. (See memory `feedback_agent_routing_imbalance`.)
-  - **Doc-code drift (Sprint 211 audit):** module counts stale in CLAUDE.md/DECKENT.md — `src/core/` is **111** `.ts` files (docs say 90, +21), `src/orchestra/` is **88** (docs say 76, +12); README badge reads "sprints-190+" (should be 211+); the "96% context reduction" Memory V2 claim has no `docs/benchmark/memory-v2.md` proof file. Tracked under §7 W-H.
+- **F5 wire-gap closed (Sprint 212):** 6 evolutionary modules now have real runtime callers — `prompt-evolution`, `adaptive-agent`, `prompt-rollback`, `agent-genealogy`, `agent-retirement`, `specialization-drift`. Self-improvement loop is live. ADR-075.
+- **Known debt carried forward:**
+  - **Doc-code drift (partial):** managed-docs generator now code-derived for module counts; README badge and "96% context reduction" claim still need verification (§7 W-H).
+  - **IDE extension stub:** `extensions/vscode/` scaffold created; full implementation Sprint 213-214.
 
 ---
 
@@ -74,6 +75,7 @@ Three immovable pillars (Alperen-approved 2026-05-31):
 |----|------|--------|
 | F3-001/002/003/005/006/007 | Tenant context, scheduled flows, event triggers, flow runtime, self-dispatch guard | ✅ DONE |
 | F3-004 | SessionBackend k8s pod-exec | ⬜ P3 (post multi-tenant Phase 2) |
+| F3-008 | **Workflow Composer** — declarative/visual multi-step flow definition on top of scheduled-flow + flow-registry | ⬜ proposed (Copilot analysis, Sprint 212) — flows exist as code; a composable DAG/visual editor is the new layer |
 
 ### F4 — Enterprise — **✅ 100%**
 | ID | Item | Status |
@@ -84,14 +86,16 @@ Three immovable pillars (Alperen-approved 2026-05-31):
 | F4-004 | Enterprise config schema (opt-in) | ✅ DONE (Sprint 208) |
 | — | SSO/OIDC depth, SIEM forwarder, compliance report generator | ⬜ optional post-212 |
 
-### F5 — Evolutionary Architecture — **~60% (wire-gap)**
+### F5 — Evolutionary Architecture — **✅ ~90% (wire-gap closed Sprint 212)**
 | ID | Item | Status |
 |----|------|--------|
-| F5-001 | prompt-evolution → outcome-tracker (rule-based suggestions) | ⚠️ entry-point only, **0 external caller** |
-| F5-002 | adaptive-agent runtime adaptation | ⚠️ entry-point only, **0 external caller** |
+| F5-001 | prompt-evolution → sprint-reporter (rule-based suggestions in retro) | ✅ DONE (Sprint 212 — `collectPromptEvolutionSuggestion` in `sprint-reporter.ts`) |
+| F5-002 | adaptive-agent → outcome-tracker (skill add/remove suggestions) | ✅ DONE (Sprint 212 — `adaptAgentRuntime` called in `outcome-tracker.ts`) |
 | F5-003 | cross-sprint-analyzer (trend report) + `deckent evolve` CLI | ✅ DONE (genuinely wired) |
-| F5-004 | **Real runtime callers** (sprint lifecycle invokes F5-001/002) | ⬜ Sprint 212 (hygiene priority) |
-| F5-005 | **Dormant evolution modules** (E-2 `prompt-rollback.ts`, E-4 `agent-genealogy.ts`, E-5 `agent-retirement.ts`, E-6 `specialization-drift.ts`) | ⚠️ implemented + tested but **0 external callers** — feature-complete in `src/agents/`, run only in test context; same wire-gap class as F5-001/002 |
+| F5-004 | **Real runtime callers** (sprint lifecycle invokes F5-001/002/005) | ✅ DONE (Sprint 212 — ADR-075 — 6 external callers wired) |
+| F5-005 | **Dormant evolution modules** → real callers (E-2 `prompt-rollback.ts`, E-4 `agent-genealogy.ts`, E-5 `agent-retirement.ts`, E-6 `specialization-drift.ts`) | ✅ DONE (Sprint 212 — all 4 modules now have external callers in `promotion-pipeline.ts` and `sprint-reporter.ts`) |
+| F5-006 | **Evolution visibility** — retro "Next Sprint Behavior Changes" section | ✅ DONE (Sprint 212 — `sprint-retro-writer.ts` behavior-changes section) |
+| F5-007 | **Evolution dashboard page** (`/evolution`: genealogy tree + retirement timeline + prompt-diff viewer) | ⬜ Sprint 216 (backend ready, no frontend layer) |
 
 ### F6 — Auth Flexibility — **~50%**
 | ID | Item | Status |
@@ -114,6 +118,32 @@ Three immovable pillars (Alperen-approved 2026-05-31):
 | F7-009 | **Nervous System UI** — `NervousPage.tsx` + pending-approval / panic-guard badge | ⬜ not built — server-side approval flow exists (`src/nervous/executor.ts`); no dashboard page/route (7 pages, no `/nervous`) |
 | F7-010 | **Evolution dashboard page** (`/evolution`: genealogy tree + retirement timeline + prompt-diff viewer) | ⬜ not built — backend modules exist (`agent-genealogy.ts`, `agent-retirement.ts`, `prompt-evolution.ts`, `prompt-metrics.ts`) but no frontend layer |
 
+### F8 — Capability Broker — **⬜ not built (proposed)**
+> *Source: Copilot enterprise-vision analysis (Sprint 212), DNA-filtered & code-verified. A `capability` abstraction above skills/connectors so an agent calls `mail.search` without knowing the backend.*
+
+| ID | Item | Status |
+|----|------|--------|
+| F8-001 | Capability abstraction layer — `capability.invoke(name, args)` resolving to one of N backends (`mail.search` → IMAP / Graph / Exchange) | ⬜ proposed — no `CapabilityBroker` in `src/`; today routing is provider-level (`provider.ts`) + skill/tool-level, not capability-level |
+| F8-002 | Capability registry + per-capability backend selection (config/availability driven) | ⬜ proposed — extends connector-pool pattern (`src/connectors/connector-pool.ts`) |
+| F8-003 | Capability-scoped permissions (`workbook.read` style, least-privilege per agent) | ⬜ proposed — finer-grained than current scope.filesWrite / ADR-037 RBAC |
+
+### F9 — MCP Client / Dynamic Discovery — **⬜ not built (proposed, high-value)**
+> *Source: Copilot analysis. Today Deckent is an MCP **server** (exposes 32 tools); it cannot **consume** external MCP servers. Making it an MCP **client** opens the whole MCP ecosystem to Deckent agents — DNA-aligned (self-hosted, no vendor lock).*
+
+| ID | Item | Status |
+|----|------|--------|
+| F9-001 | MCP client — connect to external MCP servers, list/call their tools from within a sprint/chat | ⬜ proposed — no `McpClient` in `src/`; only the server side exists |
+| F9-002 | Dynamic tool discovery — register discovered external tools into the routing/tool registry at runtime | ⬜ proposed |
+| F9-003 | Trust/approval gate for external MCP tools (risky external calls → checkpoint, reuse nervous approval) | ⬜ proposed — reuses existing approval flow |
+
+### F10 — Policy Engine (maturation) — **⚠️ partial (proposed unification)**
+> *Source: Copilot analysis. Unify the three existing decision surfaces into one declarative, self-hosted policy engine (OPA-style) — not a new dependency, a consolidation.*
+
+| ID | Item | Status |
+|----|------|--------|
+| F10-001 | Unify RBAC (`rbac.ts`/ADR-037) + activation rules (`activation-engine.ts`) + condition evaluator (`condition-evaluator.ts`) under one policy model | ⚠️ pieces exist, not unified |
+| F10-002 | Risk-tagged operation gating (`shell.exec`, `mail.send`, `erp.write`, `filesystem.delete` → mandatory approval) | ⬜ proposed — extends checkpoint/nervous approval with operation-risk tags |
+
 ---
 
 ## 5. Sub-Projects — Agentic-OS Pipeline (#1–#5)
@@ -124,6 +154,7 @@ Three immovable pillars (Alperen-approved 2026-05-31):
 | **#2** | Self-security (prompt/command guard, planner state-hygiene) | ⬜ **not started** | full scope |
 | **#3** | Million-scale (multi-tenant isolation, k8s, mTLS, rate limits) | ⚠️ partial | Only `LocalTokenAuthProvider` (SHA-256 single-token); `verifyClientCert?()` is a no-op seam — **no** `RemoteTokenAuthProvider`/mTLS, **no** audit shard, **no** SQLite row-level security; per-tenant `rate-limiter.ts` is the only landed piece. TPM/HSM (PKCS#11) + Redis cluster aggregation not built. Sprint 185–188 plan was redirected to stability work |
 | **#3-ext** | Brain Evolution — retro **"Next Sprint Behavior Changes"** section | ⬜ not built | `sprint-retro-writer.ts` lacks behavior-mutation diff (agent prompt mutation, skill repertoire gained/strengthened/retired, Brain decision-pattern change); ≥3 visible-changes satisfaction threshold not implemented |
+| **#3-mesh** | Distributed Agent Mesh — multi-host worker mesh (workers across nodes, not single-host) | ⬜ proposed (Copilot analysis, Sprint 212) | builds on sub-#3 k8s pod-exec (F3-004); today all workers run on one host. Cross-node scheduling + shared memory/lock coordination is the new scope |
 | **#4** | Enterprise integrations (RBAC/audit/rate done; SSO/SIEM/compliance) | ✅ core done | SSO/SIEM/compliance depth (optional) |
 | **#5** | Local LLM (Ollama/CUDA) | ⚠️ partial (adapter live, fully-local preset missing) | `OllamaAdapter` (HTTP probe + spawn) + `OLLAMA_BUILTIN_MODELS` (qwen2.5-coder:32b/7b, llama3:8b, llama3.2:3b) with tier mapping are implemented; missing: `worker_provider:ollama` fully-local sprint preset + data-sovereignty test (closed-network, zero-API-cost). RTX 5090 + CUDA 13.2 + WSL2 ready (32GB VRAM → 70B) |
 
@@ -160,7 +191,7 @@ Most beta-critical streams already landed across Sprints 189–211. Remaining:
 | W-B | Doc/wire drift fixes | ✅ mostly | doc-reality sync (e.g. extensions/vscode reference) |
 | W-C | Native chat (Path B→A→C) | Path B ✅ | Path A + C + IDE ext (see §6) |
 | W-D | Dashboard rebirth (UI/UX) | ⬜ | F7-003 god-level redesign |
-| **W-E** | **Evolutionary architecture crowning** | ⚠️ wire-gap | F5-004 real callers (Sprint 212) |
+| **W-E** | **Evolutionary architecture crowning** | ✅ done | F5-004 real callers landed Sprint 212 (ADR-075) — 6 modules live; F5-007 dashboard page remains |
 | W-F | Provider repair + local LLM + live catalog | ✅ P0 | F1-004/005, sub-#5 activation |
 | W-G | API surface tests | ✅ done | — |
 | W-H | Documentation perfection | ⚠️ partial | this consolidation + ref sync |
@@ -220,6 +251,7 @@ Per Alperen's direction: **combine sprints, write larger comprehensive tasks** (
 | **post-beta** | **Provider/local LLM + million-user hardening** | F1-004/005, sub-#5 Ollama/CUDA fully-local preset, OTel/Prometheus (W-J), ADR-037 hard-flip V2, sub-#2 self-security |
 | **post-beta (gated)** | **Voice + Mobile (milestone-gated)** | Voice (STT Whisper, wake-word Porcupine, TTS, real-time streaming) gated behind **10K GitHub stars**; Mobile (React Native iOS/Android MCP client, APNs+FCM push, Contacts/GPS/camera skills) gated behind **50K stars**. Both not built — zero source references |
 | **post-beta (if approved)** | **AEGIS methodology (ADR-061)** | Forward-looking spec (status=proposed): 3 layers, 5 roles, 8 artifacts, 9-phase lifecycle, EffectClass-aware verification. Phase 0–5 (orig. Sprint 175–200) never executed — no `src/aegis/`. Phase-1 foundation is the entry point if approved |
+| **post-beta (ecosystem)** | **Capability Broker (F8) + MCP Client (F9) + Policy Engine (F10) + Workflow Composer (F3-008) + Agent Mesh (#3-mesh)** | From the Copilot enterprise-vision analysis (Sprint 212), DNA-filtered. F9 (consume external MCP servers) is the highest-value, ecosystem-opening one. All self-hosted, no new SaaS dependency. Sequence after the native-chat arc |
 
 ---
 
@@ -250,6 +282,9 @@ Per Alperen's direction: **combine sprints, write larger comprehensive tasks** (
 Items surfaced during the Sprint 211 doc-consolidation audit that were intentionally **not** added to the active plan, with reasons (so nothing silently vanishes):
 
 - **Cloud-hosted SaaS offering** — rejected by ADR-033 (Product-Not-Service); permanent non-goal.
+- **Microsoft-ecosystem core integration** (Graph / Teams / Outlook / Excel / Word / SharePoint) — from the Copilot analysis; considered & **deferred as optional, post-GA, non-core**. May ship as opt-in `connectors/` (the existing Discord/Telegram/WhatsApp pattern) but must NOT become a core direction — it would dilute the provider-free / self-hosted / anti-Devin DNA. Not an "Enterprise Edition."
+- **LangSmith / external trace SaaS** — rejected: violates "never calls home". Use self-hosted OTel + own trace-graph (W-J) instead.
+- **"Enterprise Operating Layer" positioning** — the Copilot framing; Deckent stays "install-and-run, MIT, self-hosted", not a managed enterprise platform. Enterprise *capabilities* ship under MIT (no gated edition).
 - **Extra provider adapters** (Groq, Fireworks, Together, litellm), **embeddings/RAG**, **SWE-bench harness**, **monorepo planner**, **skill template gallery**, **blog campaign** — P3+/aspirational; Claude/OpenAI/Google/Ollama footprint meets beta GA.
 - **`deckentd` daemon, Electron tray, native-window framework** — redundant vs Tauri/PWA + embedded terminal; out of scope.
 - **Vector DB, Devin-style wiki semantic indexing, multi-model critique layer, browser/computer-use, deploy capability, progressive-disclosure UX, intent-classifier learning loop, hardware-attested HMAC** — post-GA vision/competitive-gap items with no current code foundation.
