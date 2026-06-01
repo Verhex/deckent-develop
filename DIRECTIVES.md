@@ -1,269 +1,269 @@
-# DIRECTIVES — Sprint 211: F2 Native Chat Tam Canlı + F4 Enterprise Tamamla + F5 Evrimsel + F7 Dashboard Polish
+# DIRECTIVES — Sprint 212: F5 Evrim Crowning (dormant→CANLI gerçek caller) + Routing skew fix + Doc-reality sync + IDE seed
 
-## Goal: BÜYÜK ÖLÇEK (16 task, 4 dalga, 10 worker). DALGA A: F2 native chat gerçek provider round-trip (mock→canlı subscription CLI, streaming). DALGA B: F4 enterprise tamamla (RBAC enforcement runtime + audit compliance export + rate limit). DALGA C: F5 evrimsel mimari wire (prompt-evolution + adaptive-agent runtime'a bağla). DALGA D: F7 dashboard polish (UI/UX + terminal + canlı bağlantı). Her task TEK dosya/TEK sorumluluk, ≤200 LoC, effort≤normal, YENİ TEST DOSYASI zorunlu.
+## Goal: BÜYÜK ÖLÇEK (15 task, 4 dalga, 10 worker). MASTER-PLAN §10 önceliği #1 = STABİLİTE/HİJYEN + EVRİM CROWNING. DALGA A: F5 evrimsel modülleri (prompt-evolution, adaptive-agent, agent-genealogy, agent-retirement, specialization-drift, prompt-rollback) sprint lifecycle'a GERÇEK external caller ile bağla — dormant→canlı. DALGA B: evrimi GÖRÜNÜR kıl (retro "Next Sprint Behavior Changes") + routing skew fix (skill→agent sinyali). DALGA C: doc-reality sync (managed-docs generator code-derived sayılar). DALGA D: IDE extension scaffold (Sprint 213-214 tohumu) + ADR-075. Her task TEK dosya odaklı/TEK sorumluluk, ≤200 LoC, effort≤normal, YENİ TEST DOSYASI zorunlu.
 
 Bağlam:
-- Sprint 207-210: tam-suite YEŞİL (18287 pass / 0 fail), Brain sağlam (0 sahte-FIX), routing CANLI çeşitlilik (refactorer 10 + frontend 3 + api-builder 1 + architect 1 + doc-writer 1). Provider-free %100, konuşulabilir %60, F3 process mode + F4 enterprise iskelet + F7 dashboard başladı.
-- F2 native chat (chat-native.ts): tool-use loop + streaming + multi-turn + resume VAR ama provider çağrısı hâlâ mock/adapter-interface (gerçek SDK/CLI round-trip kısmi).
-- F4: rbac.ts hierarchy + audit-writer + enterprise-config VAR ama runtime enforcement + compliance export eksik.
-- F5: prompt-evolution.ts + adaptive-agent.ts iskelet VAR ama runtime'da çağrılmıyor (0-caller dormant).
-- F7: SprintControlPanel + RoutingDistribution + Onboarding + auth fix VAR ama UI/UX polish + terminal güçlendirme eksik.
+- Sprint 211: 16/16 DONE, tam-suite 18390+570 pass / 0 fail. F4 enterprise %100, F2 native chat ~%80, F7 dashboard polish başladı.
+- **AÇIK BORÇ (Sprint 211 disk-verify):** F5 wire-gap — prompt-evolution + adaptive-agent + 4 dormant evrim modülü (prompt-rollback/agent-genealogy/agent-retirement/specialization-drift) implement+test EDİLMİŞ ama **0 external caller** (sadece test bağlamında çalışıyor, runtime'da çağrılmıyor). cross-sprint-analyzer gerçekten bağlı (evolve CLI). Routing skew geri döndü (12/16 refactorer).
+- F5 evrimsel mimari = ürünün ANA farklılaştırıcısı ([[project_deckent_god_level_vision]]). "wire DONE" ama 0-caller = ölü kod. Bu sprint onu CANLI yapar.
 
 ---
 
 ## Tüm task'lar için ortak kurallar
 - **Subscription mode ZORUNLU** — `env -u ANTHROPIC_API_KEY -u DECKENT_CLAUDE_API_KEY`. API mode YASAK ([[project_api_mode_deferred_post_beta]]).
-- Worker yalnızca scope.filesWrite. Host-facing'e `/workspace` YAZMA, `$CLAUDE_PROJECT_DIR`.
-- **KÜÇÜK TASK:** tek-dosya/tek-sorumluluk, ≤200 LoC, effort≤normal. high YASAK.
+- Worker yalnızca scope.filesWrite. Host-facing'e `/workspace` YAZMA.
+- **KÜÇÜK TASK:** tek-dosya odaklı/tek-sorumluluk, ≤200 LoC, effort≤normal. high YASAK.
 - **Her kod task'ı YENİ TEST DOSYASI** (min 4 test) — Brain coverage muafiyeti buna bağlı ([[feedback_brain_rubric_bridge_broken]]).
-- **Dishonest YASAK** — gerçekten ölç, +0/-0 tuzağı yok. Modül-seviye çöp throw/placeholder BIRAKMA ([[feedback_fix_prompt_quality]]). CLI komutları index.ts'e WIRE et (registerX import+çağrı — 209/210'da unutuldu).
-- **Test dosyası doğru dizinde:** dashboard testleri `tests/dashboard/`, diğerleri `tests/<modül>/` (210'da scope-dışı test yazımı boundary-violation oldu).
-- ESM `.js` suffix. ADR-010. Hedef: tam-suite 0 fail KORUNUR, regresyon yok.
+- **🔑 WIRE-GAP DERSİ ZORUNLU ([[feedback_directive_kanit_letter_vs_goal]]):** "dormant→canlı / wire" task'larında: (1) scope.filesWrite **ÇAĞIRAN modülü İÇERİR** (sadece modül-tanımı değil), (2) kanıt-grep **def-dosyasını DIŞLAR** — `grep -rl "X" src/ | grep -v test | grep -v "<def-file>.ts"` → external caller ≥1. Modül-içi helper eklemek "wire" SAYILMAZ. Gerçek runtime caller şart.
+- **Dishonest YASAK** — gerçekten ölç, +0/-0 tuzağı yok. Modül-seviye çöp/placeholder BIRAKMA ([[feedback_fix_prompt_quality]]). CLI komutları index.ts'e WIRE et (registerX import+çağrı).
+- **ADR-008 layering:** Brain (sprint-controller) tek-yönlü import. orchestra→agents import gerekiyorsa ADR-008'i ihlal ETME — gerekirse sprint-controller veya core/ interface üzerinden route et.
+- **Test dosyası doğru dizinde:** dashboard testleri `tests/dashboard/`, diğerleri `tests/<modül>/`.
+- ESM `.js` suffix. ADR-010 (yeni runtime dep YASAK — node built-in veya mevcut paket). Hedef: tam-suite 0 fail KORUNUR, regresyon yok.
 
 ---
 
-## DALGA A — F2 Native Chat Tam Canlı (4 task)
+## DALGA A — F5 Evrim Crowning: dormant→CANLI gerçek caller (6 task)
 
-## Task 1: 211-001 — chat-native gerçek ProviderAdapter round-trip (subscription CLI)
-- Model: opus
-- Effort: normal
-- Skills: typescript-expert, anthropic-sdk
-- Files: src/cli/commands/chat-native.ts, tests/cli/chat-native-roundtrip.test.ts
-- Scope: src/cli/, tests/cli/
-
-### Description
-**Problem:** chat-native.ts tool-use loop var ama provider çağrısı mock/iskelet. Gerçek subscription CLI (claude -p) round-trip eksik.
-**Çözüm:** chat-native loop'u gerçek ProviderAdapter'a bağla (provider.ts registry resolve → subscription CLI spawn path, API DEĞİL). Mock yerine canlı adapter; test mock-adapter ile (gerçek spawn değil) round-trip doğrula.
-**Kanıt:** `grep -c "ProviderAdapter\|providerRegistry\|adapter.send\|spawn.*claude" src/cli/commands/chat-native.ts` → ≥2; `npx vitest run tests/cli/chat-native-roundtrip.test.ts` → 4+ pass
-**Test:** ≥4 (adapter resolve, round-trip mock, subscription path, hata)
-
-## Task 2: 211-002 — chat-native tool dispatch gerçek MCP tool çağrısı
-- Model: opus
-- Effort: normal
-- Skills: typescript-expert, anthropic-sdk
-- Files: src/cli/commands/chat-native.ts, tests/cli/chat-native-tooldispatch.test.ts
-- Scope: src/cli/, tests/cli/
-- Dependencies: 211-001
-
-### Description
-**Problem:** tool-use loop tool-call parse ediyor ama MCP tool dispatch mock. Gerçek deckent MCP tool registry'sine bağlanmalı.
-**Çözüm:** tool-call → MCP tool registry dispatch (deckent_status/memory_query gibi read-only tool'lar). Sonuç loop'a geri. Test mock tool registry ile.
-**Kanıt:** `grep -c "mcp.*dispatch\|toolRegistry\|callTool\|MCP_TOOLS" src/cli/commands/chat-native.ts` → ≥1; `npx vitest run tests/cli/chat-native-tooldispatch.test.ts` → 4+ pass
-**Test:** ≥4 (tool dispatch, sonuç geri, bilinmeyen tool, çoklu tool)
-
-## Task 3: 211-003 — chat session persist + resume (memory.db chat entry)
-- Model: sonnet
-- Effort: normal
-- Skills: typescript-expert
-- Files: src/cli/commands/chat-native.ts, tests/cli/chat-native-persist.test.ts
-- Scope: src/cli/, tests/cli/
-- Dependencies: 211-001
-
-### Description
-**Problem:** chat appendChatTurn var ama tam session persist + resume (son N turn memory.db'den) kısmi.
-**Çözüm:** Her turn memory.db chat entry'ye yaz, `--resume` son oturumu yükle, multi-turn context window. MemoryStore.appendChatTurn + getChatHistory kullan.
-**Kanıt:** `grep -c "appendChatTurn\|getChatHistory\|resume\|sessionId" src/cli/commands/chat-native.ts` → ≥2; `npx vitest run tests/cli/chat-native-persist.test.ts` → 4+ pass
-**Test:** ≥4 (turn persist, resume yükle, boş history, window truncate)
-
-## Task 4: 211-004 — chat CLI canlı smoke (deckent chat --native end-to-end)
-- Model: sonnet
-- Effort: normal
-- Skills: ci-testing, typescript-expert
-- Files: scripts/chat-native-smoke.mjs, tests/scripts/chat-native-smoke.test.ts
-- Scope: scripts/, tests/scripts/
-- Dependencies: 211-001, 211-002
-
-### Description
-**Problem:** chat-native end-to-end smoke yok — gerçek akış doğrulanmıyor.
-**Çözüm:** `chat-native-smoke.mjs` — chat-native loop'u mock-provider + mock-tool ile uçtan-uca simüle (gerçek spawn değil): user input → adapter → tool → response → persist. Routing/akış doğrulaması.
-**Kanıt:** `node scripts/chat-native-smoke.mjs` → PASS; `npx vitest run tests/scripts/chat-native-smoke.test.ts` → 4+ pass
-**Test:** ≥4 (akış simüle, tool round-trip, persist, exit)
-
----
-
-## DALGA B — F4 Enterprise Tamamla (4 task)
-
-## Task 5: 211-005 — RBAC runtime enforcement wire (sprint komutlarına gate)
-- Model: sonnet
-- Effort: normal
-- Skills: typescript-expert, security-specialist
-- Files: src/core/rbac.ts, tests/core/rbac-runtime-enforce.test.ts
-- Scope: src/core/, tests/core/
-
-### Description
-**Problem:** rbac.ts can()/hierarchy var ama runtime'da sprint/flow komutlarına gate uygulanmıyor (enterprise-config.rbac.enabled true iken).
-**Çözüm:** `enforceRbac(role, action, tenantId)` helper — config.rbac.enabled ise can() çağır, false ise NO_OP (geriye uyumlu). Sprint/flow giriş noktalarına wire için export. İskelet→enforce.
-**Kanıt:** `grep -c "enforceRbac\|rbac.enabled\|NO_OP\|bypass" src/core/rbac.ts` → ≥1; `npx vitest run tests/core/rbac-runtime-enforce.test.ts` → 4+ pass
-**Test:** ≥4 (enabled+izin var, enabled+reddi, disabled NO_OP, tenant)
-
-## Task 6: 211-006 — Audit compliance export (SOC2/GDPR JSON/CSV)
-- Model: sonnet
-- Effort: normal
-- Skills: typescript-expert, security-specialist
-- Files: src/core/audit-export.ts, tests/core/audit-export.test.ts
-- Scope: src/core/, tests/core/
-
-### Description
-**Problem:** audit-query + audit-writer var ama compliance export (denetlenebilir JSON/CSV rapor) yok. ROADMAP F4-002.
-**Çözüm:** `audit-export.ts` — `exportAuditLog(format, filter)` JSON + CSV (tenant/action/time-range), HMAC chain doğrulama dahil. audit-query okuma kullan.
-**Kanıt:** `grep -c "exportAuditLog\|csv\|json\|compliance" src/core/audit-export.ts` → ≥2; `npx vitest run tests/core/audit-export.test.ts` → 4+ pass
-**Test:** ≥4 (JSON export, CSV export, filtre, HMAC doğrula)
-
-## Task 7: 211-007 — Rate/resource limit guard (enterprise hardening)
-- Model: sonnet
-- Effort: normal
-- Skills: typescript-expert, security-specialist
-- Files: src/core/rate-limiter.ts, tests/core/rate-limiter.test.ts
-- Scope: src/core/, tests/core/
-
-### Description
-**Problem:** ROADMAP F4-003 — rate/resource limit yok (multi-tenant abuse koruması).
-**Çözüm:** `rate-limiter.ts` — token-bucket veya sliding-window per-tenant rate limit (`checkLimit(tenantId, action)`). enterprise-config.flow.maxConcurrent ile entegre. İskelet, gerçek throttle değil — limit kontrol.
-**Kanıt:** `grep -c "checkLimit\|RateLimiter\|tokenBucket\|tenant" src/core/rate-limiter.ts` → ≥2; `npx vitest run tests/core/rate-limiter.test.ts` → 4+ pass
-**Test:** ≥4 (limit altı izin, limit üstü red, reset, tenant izolasyon)
-
-## Task 8: 211-008 — RBAC CLI grant/revoke tamamla
-- Model: sonnet
-- Effort: low
-- Skills: typescript-expert, security-specialist
-- Files: src/cli/commands/rbac.ts, tests/cli/rbac-grant.test.ts
-- Scope: src/cli/, tests/cli/
-
-### Description
-**Problem:** rbac CLI (210-014) check/roles var ama grant/revoke (rol atama) eksik.
-**Çözüm:** `deckent rbac grant <user> <role>` + `revoke` komutu — rol atamasını config/store'a yaz. Mevcut register pattern. (CLI zaten index.ts'e wire'lı — 211-hijyen).
-**Kanıt:** `grep -c "grant\|revoke" src/cli/commands/rbac.ts` → ≥2; `npx vitest run tests/cli/rbac-grant.test.ts` → 3+ pass
-**Test:** ≥3 (grant, revoke, geçersiz rol)
-
----
-
-## DALGA C — F5 Evrimsel Mimari Wire (4 task)
-
-## Task 9: 211-009 — prompt-evolution outcome-tracker wire (dormant→canlı)
+## Task 1: 212-001 — prompt-evolution RETRO'ya gerçek caller (sprint-reporter wire)
 - Model: opus
 - Effort: normal
 - Skills: typescript-expert, system-architect
-- Files: src/orchestra/prompt-evolution.ts, tests/orchestra/prompt-evolution-wire.test.ts
+- Files: src/orchestra/sprint-reporter.ts, tests/orchestra/prompt-evolution-retro-wire.test.ts
 - Scope: src/orchestra/, tests/orchestra/
+- Dependencies:
 
 ### Description
-**Problem:** prompt-evolution.ts evolvePrompt var ama 0-caller (dormant). outcome-tracker'dan beslenmeli.
-**Çözüm:** prompt-evolution'ı outcome-tracker'a bağla — sprint sonu outcome pattern'lerini oku, prompt iyileştirme önerisi üret (kural-temelli, LLM değil). Caller wire + öneri çıktısı (uygulamaz, önerir).
-**Kanıt:** `grep -rc "evolvePrompt\|promptEvolution" src/orchestra/ | grep -v test` → caller ≥1; `npx vitest run tests/orchestra/prompt-evolution-wire.test.ts` → 4+ pass
-**Test:** ≥4 (outcome→öneri, başarı pattern, başarısızlık pattern, boş)
+**Problem:** prompt-evolution.ts `wirePromptEvolutionFromOutcomes` VAR ama hiçbir runtime modül çağırmıyor (0 external caller).
+**Çözüm:** sprint-reporter.ts RETRO/learnings yazımında `wirePromptEvolutionFromOutcomes`'u ÇAĞIR — sprint sonu outcome'larından prompt iyileştirme önerisi üret, retro çıktısına/memory'ye yaz (uygulamaz, önerir). Caller sprint-reporter.ts'te (def-dosyası prompt-evolution.ts DEĞİL).
+**Kanıt:** `grep -rl "wirePromptEvolutionFromOutcomes\|evolvePrompt" src/ | grep -v test | grep -v "prompt-evolution.ts"` → ≥1 (gerçek external caller); `npx vitest run tests/orchestra/prompt-evolution-retro-wire.test.ts` → 4+ pass
+**Test:** ≥4 (caller tetikler, öneri üretilir, boş outcome no-op, retro çıktısına yazılır)
 
-## Task 10: 211-010 — adaptive-agent runtime adaptation wire
+## Task 2: 212-002 — adaptive-agent outcome-tracker'a gerçek caller wire
+- Model: opus
+- Effort: normal
+- Skills: typescript-expert, system-architect
+- Files: src/orchestra/outcome-tracker.ts, tests/orchestra/adaptive-agent-outcome-wire.test.ts
+- Scope: src/orchestra/, tests/orchestra/
+- Dependencies:
+
+### Description
+**Problem:** adaptive-agent.ts `adaptAgentRuntime` VAR ama 0 external caller (Sprint 211 scope outcome-tracker'a wire'ı engellemişti).
+**Çözüm:** outcome-tracker.ts sprint outcome kaydında `adaptAgentRuntime`'ı ÇAĞIR — agent başarı oranına göre skill ekle/çıkar önerisi üret, outcome metadata'ya yaz. ADR-008 layering'e dikkat (agents/→orchestra import yönü: orchestra→agents OK, forbidden trio değil; gerekirse core/ interface). Caller outcome-tracker.ts'te.
+**Kanıt:** `grep -rl "adaptAgentRuntime\|adaptAgent" src/ | grep -v test | grep -v "adaptive-agent.ts"` → ≥1 external caller; `npx vitest run tests/orchestra/adaptive-agent-outcome-wire.test.ts` → 4+ pass
+**Test:** ≥4 (caller tetikler, başarılı agent no-change, başarısız agent skill önerisi, idempotent)
+
+## Task 3: 212-003 — agent-genealogy promotion-pipeline'a gerçek caller wire
 - Model: sonnet
 - Effort: normal
 - Skills: typescript-expert
-- Files: src/agents/adaptive-agent.ts, tests/agents/adaptive-agent-runtime.test.ts
-- Scope: src/agents/, tests/agents/
+- Files: src/orchestra/promotion-pipeline.ts, tests/orchestra/agent-genealogy-wire.test.ts
+- Scope: src/orchestra/, tests/orchestra/
+- Dependencies:
 
 ### Description
-**Problem:** adaptive-agent.ts iskelet, runtime'da agent adaptation aktif değil (209/208'de wire denendi, tam değil).
-**Çözüm:** adaptive-agent'ı routing/outcome'a bağla — agent başarı oranına göre runtime adaptation (skill ekleme/çıkarma önerisi). Caller doğrula veya wire et. Honest: zaten wire'lıysa "verified" + caller kanıtı.
-**Kanıt:** `grep -rc "adaptAgent\|AdaptiveAgent\|adaptive-agent" src/ | grep -v test` → caller ≥1; `npx vitest run tests/agents/adaptive-agent-runtime.test.ts` → 4+ pass
-**Test:** ≥4 (adaptation tetik, no-op, outcome entegrasyon, idempotent)
+**Problem:** agent-genealogy.ts implement+test edilmiş ama 0 external caller.
+**Çözüm:** promotion-pipeline.ts temp→permanent promosyon/demotion sırasında agent-genealogy'yi ÇAĞIR — agent soyağacını (parent agent, mutation, sprint) kaydet. Caller promotion-pipeline.ts'te.
+**Kanıt:** `grep -rl "genealogy\|AgentGenealogy\|recordLineage" src/ | grep -v test | grep -v "agent-genealogy.ts"` → ≥1 external caller; `npx vitest run tests/orchestra/agent-genealogy-wire.test.ts` → 4+ pass
+**Test:** ≥4 (promosyonda lineage kayıt, demotion, parent zinciri, boş)
 
-## Task 11: 211-011 — cross-sprint analyzer (evrim trend)
+## Task 4: 212-004 — agent-retirement DECAY/promotion'a gerçek caller wire
 - Model: sonnet
 - Effort: normal
 - Skills: typescript-expert
-- Files: src/orchestra/cross-sprint-analyzer.ts, tests/orchestra/cross-sprint-analyzer.test.ts
+- Files: src/orchestra/promotion-pipeline.ts, tests/orchestra/agent-retirement-wire.test.ts
 - Scope: src/orchestra/, tests/orchestra/
+- Dependencies: 212-003
 
 ### Description
-**Problem:** F5 evrim için sprint'ler arası trend analizi yok (hangi pattern iyileşiyor/kötüleşiyor).
-**Çözüm:** `cross-sprint-analyzer.ts` — son N sprint outcome'larından trend (agent başarı trendi, skill etkinliği, NO_GO pattern'leri). Rapor üretir. memory.db sprint entry'lerini okur.
-**Kanıt:** `grep -c "analyzeTrend\|CrossSprint\|trend" src/orchestra/cross-sprint-analyzer.ts` → ≥2; `npx vitest run tests/orchestra/cross-sprint-analyzer.test.ts` → 4+ pass
-**Test:** ≥4 (trend hesap, iyileşme, kötüleşme, boş veri)
+**Problem:** agent-retirement.ts implement+test edilmiş ama 0 external caller.
+**Çözüm:** promotion-pipeline.ts demotion/LRU-evict akışında agent-retirement'ı ÇAĞIR — düşük başarılı temp agent'ı emekliye ayır (retire kaydı + sebep). Caller promotion-pipeline.ts'te. (212-003 ile aynı dosya — sıralı, çakışma önlemi.)
+**Kanıt:** `grep -rl "retirement\|AgentRetirement\|retireAgent" src/ | grep -v test | grep -v "agent-retirement.ts"` → ≥1 external caller; `npx vitest run tests/orchestra/agent-retirement-wire.test.ts` → 4+ pass
+**Test:** ≥4 (düşük-başarı retire, yüksek-başarı koru, retire sebebi, idempotent)
 
-## Task 12: 211-012 — Evrim CLI (deckent evolve report iskelet)
+## Task 5: 212-005 — specialization-drift retro/outcome'a gerçek caller wire
 - Model: sonnet
-- Effort: low
+- Effort: normal
 - Skills: typescript-expert
-- Files: src/cli/commands/evolve.ts, tests/cli/evolve-command.test.ts
-- Scope: src/cli/, tests/cli/
-- Dependencies: 211-011
+- Files: src/orchestra/sprint-reporter.ts, tests/orchestra/specialization-drift-wire.test.ts
+- Scope: src/orchestra/, tests/orchestra/
+- Dependencies: 212-001
 
 ### Description
-**Problem:** Evrim analizine CLI erişimi yok.
-**Çözüm:** `deckent evolve report` — cross-sprint-analyzer + prompt-evolution önerilerini göster. register pattern + **index.ts'e WIRE et** (registerEvolve import+çağrı, 209/210 gap önlemi).
-**Kanıt:** `grep -c "registerEvolve" src/cli/index.ts` → ≥1; `grep -c "evolve\|analyzeTrend" src/cli/commands/evolve.ts` → ≥2; `npx vitest run tests/cli/evolve-command.test.ts` → 3+ pass
-**Test:** ≥3 (report komut, wire teyit, boş veri)
+**Problem:** specialization-drift.ts implement+test edilmiş ama 0 external caller.
+**Çözüm:** sprint-reporter.ts retro/performans bölümünde specialization-drift'i ÇAĞIR — agent'ların uzmanlık alanından sapmasını (drift) tespit et, rapora yaz. Caller sprint-reporter.ts'te. (212-001 ile aynı dosya — sıralı.)
+**Kanıt:** `grep -rl "specializationDrift\|SpecializationDrift\|detectDrift" src/ | grep -v test | grep -v "specialization-drift.ts"` → ≥1 external caller; `npx vitest run tests/orchestra/specialization-drift-wire.test.ts` → 4+ pass
+**Test:** ≥4 (drift tespit, drift yok, çoklu agent, boş veri)
+
+## Task 6: 212-006 — prompt-rollback evolution flow'a gerçek caller wire
+- Model: sonnet
+- Effort: normal
+- Skills: typescript-expert
+- Files: src/orchestra/prompt-evolution.ts, tests/orchestra/prompt-rollback-wire.test.ts
+- Scope: src/orchestra/, tests/orchestra/
+- Dependencies: 212-001
+
+### Description
+**Problem:** prompt-rollback.ts implement+test edilmiş ama 0 external caller.
+**Çözüm:** prompt-evolution.ts içinde, evrilen prompt düşük performans gösterdiğinde prompt-rollback'i ÇAĞIR — önceki prompt versiyonuna geri dön önerisi. Caller prompt-evolution.ts'te (rollback için bu meşru caller; def-dosyası prompt-rollback.ts'i dışla).
+**Kanıt:** `grep -rl "rollback\|PromptRollback\|revertPrompt" src/ | grep -v test | grep -v "prompt-rollback.ts"` → ≥1 external caller; `npx vitest run tests/orchestra/prompt-rollback-wire.test.ts` → 4+ pass
+**Test:** ≥4 (düşük-perf rollback, iyi-perf koru, versiyon zinciri, boş)
 
 ---
 
-## DALGA D — F7 Dashboard Polish (4 task)
+## DALGA B — Evrimi Görünür Kıl + Routing Skew Fix (3 task)
 
-## Task 13: 211-013 — Dashboard UI/UX polish (responsive + dark/light tutarlılık)
-- Model: sonnet
+## Task 7: 212-007 — Retro "Next Sprint Behavior Changes" bölümü (evrim görünürlüğü)
+- Model: opus
 - Effort: normal
-- Skills: react-specialist, frontend-design
-- Files: src/dashboard/src/components/Layout.tsx, tests/dashboard/Layout.test.tsx
-- Scope: src/dashboard/, tests/dashboard/
+- Skills: typescript-expert, system-architect
+- Files: src/orchestra/sprint-retro-writer.ts, tests/orchestra/retro-behavior-changes.test.ts
+- Scope: src/orchestra/, tests/orchestra/
+- Dependencies: 212-002
 
 ### Description
-**Problem:** ([[project_dashboard_control_plane]] F7-003) Dashboard UI/UX tutarsız — responsive + dark/light + bilgi mimarisi polish gerek.
-**Çözüm:** Layout.tsx polish — responsive grid, dark/light tutarlılık (ThemeProvider), sidebar/header düzen. Mevcut component'leri koru, görsel tutarlılık. Test tests/dashboard/'da.
-**Kanıt:** `grep -c "responsive\|dark\|theme\|grid" src/dashboard/src/components/Layout.tsx` → ≥2; `npm run test:dashboard -- Layout` → 4+ pass
-**Test:** ≥4 (render, theme toggle, responsive, sidebar)
+**Problem:** ([[project_deckent_god_level_vision]] MASTER-PLAN §5 #3-ext) retro Summary/Highlights/Metrics/Learnings yazıyor ama evrimin GÖRÜNÜR çıktısı yok — kullanıcı "kazanım hissedemiyorum" diyor.
+**Çözüm:** sprint-retro-writer.ts'e **"Next Sprint Behavior Changes"** bölümü ekle — agent prompt mutasyonu, skill repertuvarı (kazanılan/güçlenen/emekli), Brain karar-pattern değişikliği (212-002 adaptive + 212-003/004 genealogy/retirement çıktılarından). Her sprint ≥3 görünür değişiklik hedefi.
+**Kanıt:** `grep -c "Behavior Changes\|behaviorChanges\|nextSprintChanges" src/orchestra/sprint-retro-writer.ts` → ≥2; `npx vitest run tests/orchestra/retro-behavior-changes.test.ts` → 4+ pass
+**Test:** ≥4 (bölüm render, agent mutasyon listele, skill değişim, boş→graceful)
 
-## Task 14: 211-014 — Dashboard terminal güçlendirme (çok-oturum + geçmiş)
-- Model: sonnet
+## Task 8: 212-008 — Routing skew fix: skill→agent aktivasyon sinyali
+- Model: opus
 - Effort: normal
-- Skills: react-specialist, typescript-expert
-- Files: src/dashboard/src/lib/terminal-api.ts, tests/dashboard/terminal-api.test.ts
-- Scope: src/dashboard/, tests/dashboard/
+- Skills: typescript-expert, system-architect
+- Files: src/core/activation-engine.ts, tests/core/skill-agent-signal.test.ts
+- Scope: src/core/, tests/core/
+- Dependencies:
 
 ### Description
-**Problem:** ([[project_dashboard_control_plane]] F7-004) Embedded terminal zayıf — çok-oturum + geçmiş + kopyala/yapıştır eksik.
-**Çözüm:** terminal-api.ts güçlendir — çok-oturum yönetimi (session list), komut geçmişi (up/down), buffer. ws-gateway (ADR-062) ile uyumlu. Test tests/dashboard/.
-**Kanıt:** `grep -c "session\|history\|buffer\|multiSession" src/dashboard/src/lib/terminal-api.ts` → ≥2; `npm run test:dashboard -- terminal-api` → 4+ pass
-**Test:** ≥4 (session aç, geçmiş, çoklu session, buffer)
+**Problem:** ([[feedback_agent_routing_imbalance]]) Skill routing çeşitli (frontend-design, security-specialist atanıyor) ama AGENT seçimi 12/16 refactorer'a collapse ediyor. Skill→agent sinyali eksik.
+**Çözüm:** activation-engine.ts'e skill→agent affinity sinyali ekle — assignedSkills'e göre agent skorunu artır: frontend-design/react-specialist → frontend-designer, security-specialist → security-auditor, api-builder skill → api-builder agent, documentation-writer → doc-writer. refactorer aday KALIR ama tek-kazanan olmasın ([[feedback_agent_routing_imbalance]] DİKKAT: Sprint 205 fix'i geri alma).
+**Kanıt:** `grep -c "skillAgentAffinity\|skill.*agent.*signal\|SKILL_AGENT_MAP" src/core/activation-engine.ts` → ≥1; `npx vitest run tests/core/skill-agent-signal.test.ts` → 4+ pass
+**Test:** ≥4 (frontend skill→frontend-designer, security→security-auditor, refactorer hâlâ aday, çoklu-skill)
 
-## Task 15: 211-015 — Dashboard memory/ADR explorer (FTS5 arama görünüm)
+## Task 9: 212-009 — Routing çeşitlilik guard testi (regresyon önleme)
 - Model: sonnet
 - Effort: normal
-- Skills: react-specialist, frontend-design
-- Files: src/dashboard/src/components/MemoryExplorer.tsx, tests/dashboard/MemoryExplorer.test.tsx
-- Scope: src/dashboard/, tests/dashboard/
+- Skills: typescript-expert, testing-expert
+- Files: tests/core/routing-diversity-guard.test.ts
+- Scope: tests/core/
+- Dependencies: 212-008
 
 ### Description
-**Problem:** ([[project_dashboard_control_plane]] F7-007) Memory/ADR/debt explorer yok — FTS5 arama + ADR timeline görünümü.
-**Çözüm:** `MemoryExplorer.tsx` — memory.db arama (FTS5 endpoint), ADR listesi, debt tablosu. useApi ile veri. SimpleMarkdown render. Test tests/dashboard/.
-**Kanıt:** `ls src/dashboard/src/components/MemoryExplorer.tsx`; `grep -c "search\|memory\|adr\|fts" src/dashboard/src/components/MemoryExplorer.tsx` → ≥2; `npm run test:dashboard -- MemoryExplorer` → 4+ pass
-**Test:** ≥4 (arama render, ADR liste, debt tablo, boş sonuç)
+**Problem:** Routing skew sessizce geri dönüyor (Sprint 209-210 düzeldi, 211 nüks). Regresyon guard yok.
+**Çözüm:** `routing-diversity-guard.test.ts` — temsili 16-task karışık DNA seti (UI, security, API, doc, impl) route et, agent dağılımının çeşitli olduğunu assert et (tek agent ≤%60, ≥4 farklı agent). 212-008 sinyalini doğrular.
+**Kanıt:** `npx vitest run tests/core/routing-diversity-guard.test.ts` → 4+ pass; tek-agent payı ≤%60 assert
+**Test:** ≥4 (karışık set çeşitlilik, UI→frontend, security→security-auditor, tek-agent cap)
 
-## Task 16: 211-016 — ADR-074 (F2 canlı + F4 enterprise + F5 evrim) + ROADMAP
+---
+
+## DALGA C — Doc-Reality Sync (3 task)
+
+## Task 10: 212-010 — managed-docs generator: code-derived module sayıları
+- Model: sonnet
+- Effort: normal
+- Skills: typescript-expert
+- Files: src/orchestra/managed-docs/content-generators.ts, tests/orchestra/content-generators-counts.test.ts
+- Scope: src/orchestra/, tests/orchestra/
+- Dependencies:
+
+### Description
+**Problem:** ([[feedback_zero_hardcode_live_data]]) CLAUDE.md/DECKENT.md "core 90 modules, orchestra 76" diyor; gerçek **core 111, orchestra 88**. Generator stale/hardcoded sayı üretiyor.
+**Çözüm:** content-generators.ts'te architecture module sayılarını **runtime'da diskten say** (fs okuma: `src/core/*.ts`, `src/orchestra/*.ts` vb.) — hardcode kaldır. Regen sonrası CLAUDE/DECKENT doğru.
+**Kanıt:** `grep -c "readdirSync\|countModules\|\.ts.*length\|moduleCount" src/orchestra/managed-docs/content-generators.ts` → ≥1; `npx vitest run tests/orchestra/content-generators-counts.test.ts` → 4+ pass
+**Test:** ≥4 (core sayı code-derived, orchestra sayı, hardcode yok, dizin değişince güncellenir)
+
+## Task 11: 212-011 — VISION/IDENTITY "by the numbers" generator: live MCP/CLI sayıları
+- Model: sonnet
+- Effort: normal
+- Skills: typescript-expert
+- Files: src/orchestra/managed-docs/content-generators.ts, tests/orchestra/content-generators-numbers.test.ts
+- Scope: src/orchestra/, tests/orchestra/
+- Dependencies: 212-010
+
+### Description
+**Problem:** VISION.md "by the numbers" 28 MCP tools / 62+ CLI gösteriyor; gerçek **32 MCP / 49+ CLI** (IDENTITY canonical). Generator drift. (212-010 ile aynı dosya — sıralı.)
+**Çözüm:** content-generators.ts MCP tool + CLI command sayısını kod kayıtlarından türet (mcp registry + cli registerX). VISION/IDENTITY/CLAUDE tutarlı 32/49+ üretsin.
+**Kanıt:** `grep -c "mcpToolCount\|cliCommandCount\|deckent_.*length\|registerCount" src/orchestra/managed-docs/content-generators.ts` → ≥1; `npx vitest run tests/orchestra/content-generators-numbers.test.ts` → 4+ pass
+**Test:** ≥4 (MCP=32 code-derived, CLI live, tutarlılık, drift yok)
+
+## Task 12: 212-012 — README badge + Memory V2 benchmark proof
+- Model: sonnet
+- Effort: low
+- Skills: documentation-writer
+- Files: docs/benchmark/memory-v2.md, tests/docs/memory-v2-benchmark.test.ts
+- Scope: docs/, tests/docs/
+- Dependencies:
+
+### Description
+**Problem:** ([[feedback_zero_hardcode_live_data]]) README "96% context reduction" iddiası kanıtsız (proof dosyası yok); MASTER-PLAN §9 doc-debt.
+**Çözüm:** `docs/benchmark/memory-v2.md` — Memory V2 context-reduction ölçüm metodolojisi + gerçek sayılar (eski .md tüketimi vs FTS5 summary). İddiayı KANITLA veya gerçek ölçülen yüzdeye düzelt (dürüst). README badge notu bu dosyaya bağlanır.
+**Kanıt:** `ls docs/benchmark/memory-v2.md`; `grep -c "context\|reduction\|FTS5\|token" docs/benchmark/memory-v2.md` → ≥2; `npx vitest run tests/docs/memory-v2-benchmark.test.ts` → 3+ pass
+**Test:** ≥3 (benchmark dosyası var, metodoloji bölümü, sayı doğrulanabilir)
+
+---
+
+## DALGA D — IDE Extension Seed + ADR (3 task)
+
+## Task 13: 212-013 — extensions/vscode/ scaffold (Sprint 213-214 tohumu)
+- Model: sonnet
+- Effort: normal
+- Skills: typescript-expert
+- Files: extensions/vscode/package.json, extensions/vscode/src/extension.ts, tests/extensions/vscode-activation.test.ts
+- Scope: extensions/, tests/extensions/
+- Dependencies:
+
+### Description
+**Problem:** ([[project_dashboard_control_plane]] MASTER-PLAN §6 IDE ext) `extensions/vscode/` diskte YOK — CLAUDE.md mimari satırı yanlış. IDE'de `deckent` komutu için temel yok.
+**Çözüm:** VS Code extension scaffold — `package.json` (extension manifest: name, engines.vscode, contributes.commands), `src/extension.ts` (activate/deactivate + `deckent.startSprint`/`deckent.showDashboard` komut kayıt iskeleti, gerçek impl Sprint 213-214). Minimal, derlenir, test edilir. YENİ runtime dep YASAK (vscode types devDep olur — package.json'da, kök package.json'a dokunma).
+**Kanıt:** `ls extensions/vscode/package.json extensions/vscode/src/extension.ts`; `grep -c "activate\|contributes\|deckent\." extensions/vscode/package.json extensions/vscode/src/extension.ts` → ≥2; `npx vitest run tests/extensions/vscode-activation.test.ts` → 4+ pass
+**Test:** ≥4 (activate çağrılır, komut kaydı, manifest geçerli, deactivate)
+
+## Task 14: 212-014 — VS Code command palette + status bar stub
+- Model: sonnet
+- Effort: normal
+- Skills: typescript-expert
+- Files: extensions/vscode/src/commands.ts, tests/extensions/vscode-commands.test.ts
+- Scope: extensions/, tests/extensions/
+- Dependencies: 212-013
+
+### Description
+**Problem:** Extension scaffold var ama komut handler'ları + status bar yok.
+**Çözüm:** `commands.ts` — `deckent.startSprint` (terminal'de `deckent start` çağırma iskeleti), `deckent.showDashboard` (dashboard URL aç), status bar item (sprint progress placeholder). Gerçek MCP bağlantısı Sprint 213-214; bu stub + test.
+**Kanıt:** `grep -c "registerCommand\|StatusBar\|startSprint\|showDashboard" extensions/vscode/src/commands.ts` → ≥2; `npx vitest run tests/extensions/vscode-commands.test.ts` → 4+ pass
+**Test:** ≥4 (startSprint handler, showDashboard handler, status bar create, bilinmeyen komut)
+
+## Task 15: 212-015 — ADR-075 (F5 runtime wiring + routing skill→agent + doc-generator) + MASTER-PLAN status
 - Model: sonnet
 - Effort: low
 - Skills: documentation-writer, system-architect
-- Files: docs/adr/074-native-chat-enterprise-evolution.md, docs/ROADMAP-GOD-LEVEL.md, tests/docs/adr-074.test.ts
+- Files: docs/adr/075-evolution-runtime-wiring.md, docs/MASTER-PLAN.md, tests/docs/adr-075.test.ts
 - Scope: docs/, tests/docs/
+- Dependencies: 212-001, 212-008, 212-010
 
 ### Description
-**Problem:** F2 canlı + F4 enterprise tamamlama + F5 evrim wire kararları ADR/ROADMAP'e geçmemiş.
-**Çözüm:** ADR-074 (native chat real round-trip + enterprise RBAC/audit/rate + F5 evolution wire, MADR, accepted). ROADMAP §EXECUTION TRACKER: F2 %80, F4 tamamlandı, F5 başladı; yüzde güncelle.
-**Kanıt:** `grep -c "native chat\|enterprise\|evolution\|rate" docs/adr/074-native-chat-enterprise-evolution.md` → ≥2; `npx vitest run tests/docs/adr-074.test.ts` → 3+ pass
-**Test:** ≥3 (ADR-074 MADR, F2/F4/F5 bölüm, ROADMAP güncel)
+**Problem:** F5 evrim runtime wiring + routing skill→agent sinyali + doc-generator code-derived kararları ADR/MASTER-PLAN'e geçmemiş.
+**Çözüm:** ADR-075 (F5 evolutionary modules runtime caller wiring + routing skill→agent affinity + managed-docs code-derived counts, MADR v3, accepted). MASTER-PLAN §4 F5 + §3 + §7 W-E status güncelle (212 sonuçlarına göre: dormant→canlı). MASTER-PLAN status güncellemesi DOC-POLICY Tier-1 kuralına uygun (tek roadmap).
+**Kanıt:** `grep -c "evolution\|runtime\|caller\|routing\|affinity" docs/adr/075-evolution-runtime-wiring.md` → ≥2; `grep -c "F5-004\|212" docs/MASTER-PLAN.md` → ≥1; `npx vitest run tests/docs/adr-075.test.ts` → 3+ pass
+**Test:** ≥3 (ADR-075 MADR bölümleri, MASTER-PLAN F5 güncel, accepted status)
 
 ---
 
 ## Sprint Sonu Notu
 
-**Beklenen:** 14-16/16 DONE, 0 false-FIX. F2 native chat gerçek round-trip (konuşulabilir %80), F4 enterprise tamamlandı (RBAC enforce + audit export + rate limit), F5 evrimsel wire (prompt-evolution + adaptive-agent canlı), F7 dashboard polish. tam-suite 0 fail KORUNUR.
+**Beklenen:** 13-15/15 DONE, 0 false-FIX. F5 evrimsel mimari CANLI (6 modül gerçek external caller — dormant→canlı, wire-gap kapandı), evrim GÖRÜNÜR (retro behavior-changes), routing çeşitlilik fix (skill→agent), doc-reality sync (code-derived sayılar), IDE extension scaffold (Sprint 213-214 tohumu). tam-suite 0 fail KORUNUR.
 
-**Sprint sonrası:** F2 streaming canlı + F5 evrim tam runtime + beta GA hazırlık. ROADMAP §EXECUTION TRACKER.
+**Sprint sonrası:** Sprint 213-214 IDE extension tam impl (MASTER-PLAN §10). Routing çeşitlilik canlı dağılımda doğrulanır. F5 evrim runtime'da görünür kazanım.
 
 **Pre-flight:** subscription env temiz, creds canlı, **build+restart + RE-PLAN YAPILDI** (routing canlı), config max_workers=10. Sprint start Alperen manuel.
 
 İlgili memory:
+- [[feedback_directive_kanit_letter_vs_goal]] — 🔑 wire-gap dersi: scope çağıran modülü içerir, kanıt def-dosyasını dışlar
+- [[feedback_agent_routing_imbalance]] — routing skew fix, çeşitlilik korunmalı, Sprint 205 fix geri alma
 - [[feedback_brain_rubric_bridge_broken]] — Brain sağlam, yeni test şart
-- [[feedback_agent_routing_imbalance]] — routing canlı (çözüldü), çeşitlilik korunmalı
-- [[feedback_fix_prompt_quality]] — FIX prompt enrichment + CLI index.ts wire
+- [[feedback_fix_prompt_quality]] — FIX prompt + CLI index.ts wire
 - [[feedback_scale_up_autonomous]] — büyük ölçek + otonom mod
-- [[project_dashboard_control_plane]] — F7 dashboard god-level
 - [[feedback_trust_brain_eval_not_worker]] — disk-verify ground truth
+- [[feedback_zero_hardcode_live_data]] — code-derived sayılar, hardcode yok
 - [[feedback_build_mcp_restart_coordination]] — build Alperen + RE-PLAN şart
-- [[project_api_mode_deferred_post_beta]] — API mode yasak (F2 subscription CLI)
+- [[project_deckent_god_level_vision]] — evrimsel mimari ana farklılaştırıcı
+- [[project_api_mode_deferred_post_beta]] — API mode yasak (subscription)
