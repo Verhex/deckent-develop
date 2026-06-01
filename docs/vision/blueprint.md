@@ -2,6 +2,8 @@
 ## AI Agent Orchestration System — Complete Implementation Reference
 ### Version 3.1 — May 2026 — Verhex (Updated Sprint 166)
 
+> **Note:** This is a Sprint-166-stamped architecture snapshot. Sprint-dated statements below are historical records (true as of that sprint) and are intentionally preserved. For the current reconciled roadmap and status (Sprint 211+), see [`docs/MASTER-PLAN.md`](../MASTER-PLAN.md). Structural facts (counts) are kept current.
+
 ---
 
 ## Live Metrics
@@ -408,7 +410,7 @@ my-project/
 │   │   ├── server.ts               # 16 endpoints + SSE stream
 │   │   └── watcher.ts              # Dashboard file watcher
 │   ├── cli/                          # CLI commands (57 files, 55+ commands)
-│   ├── mcp/                          # MCP server (31 tools + 8 resources)
+│   ├── mcp/                          # MCP server (32 tools + 8 resources)
 │   │   ├── server.ts                # Entry point (McpServer + stdio)
 │   │   ├── tools/                   # 29 files (28 handlers; nervous.ts registers 5 nervous_* tools)
 │   │   │   ├── init.ts             # deckent_init
@@ -1530,7 +1532,7 @@ Deckent ran itself for the first time:
 ## Sprint 11: Web Dashboard
 
 - React + Vite + Tailwind web dashboard (`src/dashboard/`)
-- 6 pages: Dashboard, Settings, History, Memory, Config, Status
+- 7 pages: Dashboard, Settings, History, Memory, Config, Status, Chat
 - shadcn/ui component library (14 UI components)
 - SSE real-time updates via file watcher
 - SprintChart with Recharts, DebtTable, NewSprintModal
@@ -2002,7 +2004,7 @@ $ deckent start "Build REST API for user management"
 | 8 | Documentation, API docs, MCP dogfooding | Done |
 | 9 | Analyzer tool, CI, dynamic version, archive-debt | Done |
 | 10 | HTTP API+SSE, terminal dashboard, sprint ID refactor | Done |
-| 11 | Web Dashboard (React+Vite+Tailwind, 6 pages) | Done |
+| 11 | Web Dashboard (React+Vite+Tailwind, 7 pages) | Done |
 | 12-13 | Brain AI planning, Auditor in-process, .deckent structure | Done |
 | 14 | Auditor live integration, .deckent finalization | Done |
 | 15 | Deckent bağımsızlık, self-hosting, DECKENT.md, sync | Done |
