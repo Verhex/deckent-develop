@@ -10,6 +10,7 @@ import { spawnSync } from 'node:child_process';
 import { ErrorRegistry } from '../core/errors.js';
 import { debugLog } from '../core/utils.js';
 import { recordRollbackDebt } from '../core/debt-store.js';
+import { detectDeckentRepo } from './self-modifying-detector.js';
 
 // ─── Types ────────────────────────────────────────────────────────
 
@@ -102,6 +103,18 @@ export function getCurrentBranch(projectRoot: string): string {
  * @returns SafetyPoint metadata
  */
 export function createSafetyPoint(projectRoot: string, sprintId: string): SafetyPoint {
+  // ADR-039: self-project guard — skip git mutation in deckent-dev dogfood tree
+  if (detectDeckentRepo(projectRoot)) {
+    debugLog('rollback', '[rollback] self-project — git mutation skipped (createSafetyPoint no-op)');
+    return {
+      id: sprintId,
+      branchName: `deckent-backup-${sprintId}`,
+      commitSha: getCurrentCommitSha(projectRoot),
+      createdAt: new Date().toISOString(),
+      wasClean: true,
+    };
+  }
+
   const branchName = `deckent-backup-${sprintId}`;
   const wasClean = isCleanWorkingTree(projectRoot);
 
@@ -161,6 +174,12 @@ export function createSafetyPoint(projectRoot: string, sprintId: string): Safety
  * @param safetyPoint - the SafetyPoint returned by createSafetyPoint
  */
 export function rollback(projectRoot: string, safetyPoint: SafetyPoint): RollbackResult {
+  // ADR-039: self-project guard — skip git reset --hard in deckent-dev dogfood tree
+  if (detectDeckentRepo(projectRoot)) {
+    debugLog('rollback', '[rollback] self-project — git mutation skipped (rollback no-op)');
+    return { success: true, message: '[rollback] self-project — git mutation skipped' };
+  }
+
   const { branchName, commitSha } = safetyPoint;
 
   // Verify the branch exists
