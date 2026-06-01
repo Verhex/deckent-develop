@@ -64,6 +64,7 @@ _Total: 28 MCP tools_
 | `doctor` | deckent doctor |
 | `doctor-checks` | deckent doctor-checks |
 | `doctor-format` | deckent doctor-format |
+| `evolve` | deckent evolve |
 | `explain` | deckent explain |
 | `features` | deckent features |
 | `finalize` | deckent finalize |
@@ -108,4 +109,4 @@ _Total: 28 MCP tools_
 | `watch` | deckent watch |
 | `web` | deckent web |
 
-_Total: 61 CLI command modules_
+_Total: 62 CLI command modules_

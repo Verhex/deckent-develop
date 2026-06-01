@@ -2,6 +2,24 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint211] - 2026-06-01
+
+### Added
+
+- 211-001 — chat-native gerçek ProviderAdapter round-trip (subscription CLI)
+- 211-002 — chat-native tool dispatch gerçek MCP tool çağrısı
+- 211-003 — chat session persist + resume (memory.db chat entry)
+- 211-004 — chat CLI canlı smoke (deckent chat --native end-to-end)
+- 211-005 — RBAC runtime enforcement wire (sprint komutlarına gate)
+- 211-006 — Audit compliance export (SOC2/GDPR JSON/CSV)
+- 211-007 — Rate/resource limit guard (enterprise hardening)
+- 211-008 — RBAC CLI grant/revoke tamamla
+- 211-009 — prompt-evolution outcome-tracker wire (dormant→canlı)
+- 211-010 — adaptive-agent runtime adaptation wire
+
+
+_Tasks: 16 total, 16 done, 0 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint210] - 2026-06-01
 
 ### Added

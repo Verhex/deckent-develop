@@ -78,6 +78,70 @@ export interface McpToolDispatcher {
   dispatch(name: string, args: Record<string, unknown>): Promise<string>;
 }
 
+// ─── mcp tool dispatch — toolRegistry bridge (Sprint 211 T-211-002) ─
+//
+// Bridges the loop's McpToolDispatcher onto a real, in-process mcp tool
+// dispatch surface (toolRegistry: get(name)/list()). Read-only tools
+// like deckent_status / deckent_memory_query are the intended call
+// surface for a chat session — the registry shape is duck-typed so
+// tests, the production server-side toolRegistry, or a custom allow-
+// listed wrapper can all satisfy it without pulling the MCP server
+// SDK into the loop module.
+
+/** One entry in an in-process MCP tool registry. */
+export interface McpToolEntry {
+  name: string;
+  invoke(args: Record<string, unknown>): Promise<string | object> | string | object;
+}
+
+/** Minimal lookup surface — get a tool by name, list available names. */
+export interface McpToolRegistry {
+  get(name: string): McpToolEntry | undefined;
+  list(): readonly string[];
+}
+
+export interface McpDispatcherOptions {
+  registry: McpToolRegistry;
+  /**
+   * Optional name allow-list. When set, dispatch refuses tools outside it
+   * with a tagged error string — useful for restricting chat sessions to
+   * read-only tools without modifying the registry itself.
+   */
+  allowList?: readonly string[];
+}
+
+/**
+ * Build an McpToolDispatcher backed by a real MCP tool registry. The
+ * returned dispatcher NEVER throws out of `dispatch()` — invocation errors
+ * and unknown tools are returned as `[mcp-error] …` strings so the chat
+ * loop can feed them back to the model as tool_result content.
+ *
+ * Non-string registry return values are JSON-stringified to honour the
+ * existing McpToolDispatcher.dispatch contract (Promise<string>).
+ */
+export function createMcpToolDispatcher(opts: McpDispatcherOptions): McpToolDispatcher {
+  const { registry: toolRegistry, allowList } = opts;
+  const allowed = allowList ? new Set(allowList) : null;
+  return {
+    async dispatch(name, args) {
+      if (allowed && !allowed.has(name)) {
+        return `[mcp-error] tool not allowed: ${name}`;
+      }
+      const entry = toolRegistry.get(name);
+      if (!entry) {
+        return `[mcp-error] unknown tool: ${name}`;
+      }
+      try {
+        const out = await entry.invoke(args);
+        return typeof out === 'string' ? out : JSON.stringify(out);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        return `[mcp-error] ${name}: ${msg}`;
+      }
+    },
+  };
+}
+
 /** Minimal memory interface for chat session persistence (duck-typed for MemoryStore). */
 export interface ChatMemoryAdapter {
   appendChatTurn(sessionId: string, role: 'user' | 'assistant', content: string): number;

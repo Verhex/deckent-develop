@@ -1,5 +1,8 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-211 Learnings
+- Sprint sprint-211 Learnings: ## Sprint sprint-211 Learnings
+
 ## Sprint sprint-210 Learnings
 - Sprint sprint-210 Learnings: ## Sprint sprint-210 Learnings
 - 210-009 — Dashboard sprint kontrol paneli (plan/start/status UI): GO_WITH_TECH_DEBT — SprintControlPanel.tsx is fully implemented: useSSEWithStatus for live data, useApi for fallback, SprintPhaseTimeline + 

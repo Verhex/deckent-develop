@@ -52,6 +52,7 @@ import { registerRecover } from './commands/recover.js';
 import { registerModels } from './commands/models.js';
 import { registerFlow } from './commands/flow.js';
 import { registerRbac } from './commands/rbac.js';
+import { registerEvolve } from './commands/evolve.js';
 import { showSplash } from './helpers/splash.js';
 import { installFatalHandlers } from './helpers/error-handler.js';
 
@@ -131,6 +132,7 @@ export function buildProgram(): Command {
   registerModels(program);
   registerFlow(program);
   registerRbac(program);
+  registerEvolve(program);
   registerHelp(program);
 
   return program;

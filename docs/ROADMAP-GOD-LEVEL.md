@@ -4,11 +4,11 @@
 **Status:** CANONICAL — bu doküman = TEK master plan. Yapılanlar + beta GA kalanları + sub-project 2-4 + F1 provider-free, hepsi burada.
 **North Star (2026-05-31, Alperen onaylı):** deckent = **provider-free** (herhangi LLM — cloud abonelik VEYA local Ollama, sıfır-API-key seçeneği) + **konuşulabilir** (native chat REPL) + **3-yüz** (developer/şirket/sade kişi), MIT, kur-çalıştır AI orchestrator.
 **Locked kararlar:** (1) auth subscription-first, (2) Local LLM (Ollama) 1. sınıf vatandaş (spawner-wired), (3) doküman kod-gerçeğiyle hizalı.
-**Last update:** 2026-05-31 (kod-doğrulanmış 13-agent analiz; aşağıdaki §EXECUTION TRACKER güncel temel — alttaki ⚡ tarihli bölümler historical).
+**Last update:** 2026-06-01 (Sprint 211 — F2 native chat real round-trip + F4 enterprise tamamlandı + F5 evrimsel wire; §EXECUTION TRACKER güncellendi).
 
 ---
 
-## 🎯 EXECUTION TRACKER (2026-05-31 — kod-doğrulanmış, canlı)
+## 🎯 EXECUTION TRACKER (2026-06-01 — Sprint 211 güncellendi)
 
 > Bu bölüm aşağıdaki tüm tarihli ⚡ snapshot'ları SUPERSEDE eder. Alttakiler kanıt/iz olarak korunur (silinmez).
 
@@ -17,8 +17,8 @@
 | Yüz | Kitle | Mode | Olgunluk | En büyük boşluk |
 |-----|-------|------|----------|------------------|
 | **AI Developer** | Geliştirici | Sprint Mode | **~%90** | Beta hazır; provider-free + quota-safe eksik |
-| **AI System Worker** | Şirket | Process Mode | **~%65** | Flow runtime daemon + self-dispatch guard DONE; tenant runtime + RBAC hierarchy DONE; F4 audit-writer DONE; F3-004 k8s kalan |
-| **AI Asistan** | Sade kişi | Chat Mode | **~%50** | F2-003 streaming/multi-turn/resume DONE (Sprint 204); F2-001/002 kalan |
+| **AI System Worker** | Şirket | Process Mode | **~%80** | F4 enterprise DONE (RBAC enforce + audit export + rate limit); F3-004 k8s kalan |
+| **AI Asistan** | Sade kişi | Chat Mode | **~%80** | F2 native chat gerçek round-trip DONE (Sprint 211); F2 streaming canlı kalan |
 
 ### TAMAMLANAN (kanıtlı)
 
@@ -55,12 +55,17 @@
 
 > **Sprint 210 kapanış hijyeni (2026-06-01):** Sprint 210'un bıraktığı 5 fail → **0 (TAM YEŞİL, 18287 pass)**. (1) fresh-eyes-rotation ×3: `selectFixAgent` title-keyword sınıflaması ('Test task' jenerik başlığı yanlış yakalıyordu) → agent/skill sinyaline çevrildi (bug-fixer korunur, diğerleri fresh-eyes rotate). (2) registration-harness: `registerRbac` (210-014) index.ts'e WIRE EDİLMEMİŞTİ (209 flow-wire gap tekrarı) → import+çağrı eklendi. (3) docker-backend e2e kararsız: KÖK NEDEN vitest hook timeout — afterEach 2× forceRemoveContainer (10s each) default 10s hookTimeout'u aşıyordu → beforeEach/afterEach 30s + ağır e2e test 30-45s timeout + 12 eski deckent container temizliği. 2 ardışık run 36/36 stabil. **Sprint 206'dan beri ilk tam-yeşil suite.** İlgili: routing CANLI çeşitlilik kanıtlandı (Sprint 210 agent dağılımı: refactorer 10 + frontend-designer 3 + api-builder 1 + architect 1 + doc-writer 1 — Sprint 208'de 15/16 refactorer'dı).
 
+> **Sprint 211 sonuç (2026-06-01):** **F2 native chat gerçek round-trip** — `chat-native.ts` `ProviderAdapter` registry wire (subscription CLI spawn path; Sprint 211-001, **konuşulabilir ~%80**), MCP tool dispatch gerçek registry (deckent_status/memory_query; Sprint 211-002), session persist+resume memory.db (Sprint 211-003), end-to-end smoke (Sprint 211-004). **F4 enterprise TAMAMLANDI** — `enforceRbac(role, action, tenantId)` NO_OP bypass (config.rbac.enabled; Sprint 211-005, **F4-001 DONE**), `exportAuditLog(format, filter)` JSON+CSV+HMAC (Sprint 211-006, **F4-002 DONE**), `rate-limiter.ts` token-bucket per-tenant checkLimit (Sprint 211-007, **F4-003 DONE**), RBAC CLI grant/revoke (Sprint 211-008). **F5 evrimsel wire BAŞLADI** — prompt-evolution→outcome-tracker wire canlı (Sprint 211-009, **F5-001 DONE**), adaptive-agent wire doğrulandı (Sprint 211-010, **F5-002 DONE**), cross-sprint-analyzer trend raporu (Sprint 211-011), `deckent evolve report` CLI+index.ts wire (Sprint 211-012). **F7 dashboard polish** — Layout.tsx responsive+dark/light (Sprint 211-013), terminal-api.ts çok-oturum+geçmiş (Sprint 211-014), MemoryExplorer FTS5 arama (Sprint 211-015). Yeni ADR: 074 (native chat real round-trip + enterprise RBAC/audit/rate + F5 evolution wire) — accepted.
+
 **F2 — Native Chat Path C (AI Asistan yüzü)** — ~600-1200 LoC:
 | ID | İş | Öncelik | Kanıt |
 |----|----|---------|-------|
 | F2-001 | Native tool-use loop (LLM → MCP tool → cevap REPL) | P1 | ✅ DONE Sprint 203-005 (chat-native.ts 185 LoC) |
 | F2-002 | Memory entegrasyonu (appendChatTurn chat path'e bağla) | P1 | ✅ DONE Sprint 203-006 |
 | F2-003 | Streaming + multi-turn + resume | P2 | ✅ DONE Sprint 204-005/006/007 |
+| F2-004 | Real ProviderAdapter round-trip (subscription CLI spawn, live registry) | P1 | ✅ DONE Sprint 211-001 (chat-native.ts ProviderAdapter wire) |
+| F2-005 | MCP tool dispatch (deckent_status/memory_query loop geri besleme) | P1 | ✅ DONE Sprint 211-002 (toolRegistry callTool) |
+| F2-006 | Session persist + resume (memory.db getChatHistory --resume) | P2 | ✅ DONE Sprint 211-003 |
 
 **F3 — Process Mode (AI System Worker yüzü, Sub-project #3)** — post-F1:
 | ID | İş | Öncelik | Kanıt |
@@ -76,16 +81,16 @@
 **F4 — Enterprise + Million-User (Sub-project #4)** — post-F3:
 | ID | İş | Öncelik | Kanıt |
 |----|----|---------|-------|
-| F4-001 | OIDC/SSO AuthProvider impl + RBAC | P3 | 🟡 Sprint 206-008 iskelet: rbac.ts (Role + Permission + can(), ADR-069) + Sprint 207-007 RBAC gate wire + **Sprint 208-009 RBAC hierarchy (admin>operator>viewer, PERMISSION_MATRIX, ADR-071)** + Sprint 208-010 flow-registry RBAC gate |
-| F4-002 | Audit export API + compliance (SOC2/GDPR) | P3 | 🟡 Sprint 205-008 başlangıç: audit-query.ts (read-only filter) + ADR-068 + **Sprint 208-011 audit-writer.ts (writeAuditEvent, round-trip uyumlu, ADR-071)** |
-| F4-003 | Rate/resource limits + load hardening | P3 | ⬜ |
+| F4-001 | OIDC/SSO AuthProvider impl + RBAC | P3 | ✅ DONE Sprint 206-008 iskelet + Sprint 207-007 gate + Sprint 208-009 hierarchy + **Sprint 211-005 `enforceRbac` runtime enforcement + Sprint 211-008 grant/revoke CLI** |
+| F4-002 | Audit export API + compliance (SOC2/GDPR) | P3 | ✅ DONE Sprint 205-008 + Sprint 208-011 audit-writer + **Sprint 211-006 `exportAuditLog` JSON+CSV+HMAC (audit-export.ts)** |
+| F4-003 | Rate/resource limits + load hardening | P3 | ✅ DONE Sprint 211-007 rate-limiter.ts (token-bucket per-tenant checkLimit, enterprise-config.flow.maxConcurrent) |
 | F4-004 | Enterprise config schema (tenancy + rbac + flow opt-in) | P3 | ✅ DONE Sprint 208-012 (enterprise-config.ts, EnterpriseConfig, parseEnterprise) |
 
 **F5 — Evrimsel Mimari (W-E/W-K, DORMANT wire)** — post-beta:
 | ID | İş | Öncelik | Kanıt |
 |----|----|---------|----|
-| F5-001 | prompt-evolution.ts wire (0 caller → live) | P3 | 🟡 Sprint 208-013: `evolvePrompt` kural-temelli iskelet (outcome→prompt öneri, LLM çağrısı yok) |
-| F5-002 | adaptive-agent + cross-sprint-analyzer wire | P3 | 🟡 Sprint 208-014: adaptive-agent wire + caller doğrulama |
+| F5-001 | prompt-evolution.ts wire (0 caller → live) | P3 | ✅ DONE Sprint 208-013 iskelet + **Sprint 211-009 outcome-tracker wire (canlı caller, kural-temelli öneri)** |
+| F5-002 | adaptive-agent + cross-sprint-analyzer wire | P3 | ✅ DONE Sprint 208-014 + **Sprint 211-010 wire doğrulandı + Sprint 211-011 cross-sprint-analyzer (trend analiz)** |
 
 **F6 — Auth Flexibility (subscription/api/hybrid/local matrix)** — post-beta (API gerçek aktivasyon 1 Haziran sonrası):
 | ID | İş | Öncelik |

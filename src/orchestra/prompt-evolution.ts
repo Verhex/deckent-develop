@@ -4,7 +4,11 @@
 // Integration point for OutcomeTracker (see outcome-tracker.ts) — accepts the
 // same RoutingOutcome shape so future callers can pipe sprint history in.
 
+import { readFileSync, existsSync } from 'fs';
+import { join } from 'path';
 import type { RoutingOutcome } from './outcome-tracker.js';
+
+const OUTCOMES_DIR = '.deckent/routing/outcomes';
 
 export interface PromptEvolutionResult {
   evolvedPrompt: string;
@@ -105,4 +109,50 @@ function pickTop(counts: Map<string, number>): Array<[string, number]> {
   return [...counts.entries()]
     .sort((a, b) => b[1] - a[1])
     .slice(0, TOP_ENTITY_LIMIT);
+}
+
+// ─── Outcome-Tracker Wire ───────────────────────────────────────────────────
+// Reads the sprint outcome file written by OutcomeTracker.saveSprintOutcome
+// (at `<projectRoot>/.deckent/routing/outcomes/<sprintId>.json`) and feeds the
+// outcomes into evolvePrompt. Suggestion-only — does not mutate any agent
+// prompt, config, or stored learnings. Caller for the dormant evolvePrompt().
+
+export interface PromptEvolutionWireOptions {
+  projectRoot: string;
+  sprintId: string;
+  basePrompt: string;
+}
+
+/**
+ * Wire: load sprint outcomes from disk and produce an evolved-prompt
+ * suggestion. Missing / unreadable / malformed outcome files degrade
+ * gracefully to a no-op (returns basePrompt unchanged).
+ */
+export function wirePromptEvolutionFromOutcomes(
+  opts: PromptEvolutionWireOptions,
+): PromptEvolutionResult {
+  const outcomes = loadSprintOutcomes(opts.projectRoot, opts.sprintId);
+  return evolvePrompt(opts.basePrompt, outcomes);
+}
+
+/**
+ * Companion helper exposed for callers that already hold outcomes in memory
+ * (e.g. when chaining off OutcomeTracker without an intermediate file read).
+ */
+export function evolvePromptFromSprintOutcomes(
+  basePrompt: string,
+  outcomes: RoutingOutcome[],
+): PromptEvolutionResult {
+  return evolvePrompt(basePrompt, outcomes);
+}
+
+function loadSprintOutcomes(projectRoot: string, sprintId: string): RoutingOutcome[] {
+  const filePath = join(projectRoot, OUTCOMES_DIR, `${sprintId}.json`);
+  if (!existsSync(filePath)) return [];
+  try {
+    const parsed = JSON.parse(readFileSync(filePath, 'utf-8'));
+    return Array.isArray(parsed) ? (parsed as RoutingOutcome[]) : [];
+  } catch {
+    return [];
+  }
 }

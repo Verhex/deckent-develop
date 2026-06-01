@@ -5775,3 +5775,40 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 210-016: 210-016 — ADR-073 (routing canlı + FIX prompt + dashboard) + ROADMAP (DONE)
 
 ---
+## Sprint 211 — sprint-211
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-06-01
+**Duration:** 980s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 16 |
+| Completed | 16 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 979583ms |
+
+### Tasks
+
+- 211-001: 211-001 — chat-native gerçek ProviderAdapter round-trip (subscription CLI) (DONE)
+- 211-002: 211-002 — chat-native tool dispatch gerçek MCP tool çağrısı (DONE)
+- 211-003: 211-003 — chat session persist + resume (memory.db chat entry) (DONE)
+- 211-004: 211-004 — chat CLI canlı smoke (deckent chat --native end-to-end) (DONE)
+- 211-005: 211-005 — RBAC runtime enforcement wire (sprint komutlarına gate) (DONE)
+- 211-006: 211-006 — Audit compliance export (SOC2/GDPR JSON/CSV) (DONE)
+- 211-007: 211-007 — Rate/resource limit guard (enterprise hardening) (DONE)
+- 211-008: 211-008 — RBAC CLI grant/revoke tamamla (DONE)
+- 211-009: 211-009 — prompt-evolution outcome-tracker wire (dormant→canlı) (DONE)
+- 211-010: 211-010 — adaptive-agent runtime adaptation wire (DONE)
+- 211-011: 211-011 — cross-sprint analyzer (evrim trend) (DONE)
+- 211-012: 211-012 — Evrim CLI (deckent evolve report iskelet) (DONE)
+- 211-013: 211-013 — Dashboard UI/UX polish (responsive + dark/light tutarlılık) (DONE)
+- 211-014: 211-014 — Dashboard terminal güçlendirme (çok-oturum + geçmiş) (DONE)
+- 211-015: 211-015 — Dashboard memory/ADR explorer (FTS5 arama görünüm) (DONE)
+- 211-016: 211-016 — ADR-074 (F2 canlı + F4 enterprise + F5 evrim) + ROADMAP (DONE)
+
+---

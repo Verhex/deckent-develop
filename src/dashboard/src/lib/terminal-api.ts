@@ -57,3 +57,70 @@ export async function killSession(id: string): Promise<void> {
     headers: authHeaders(),
   });
 }
+
+/** Client-side multi-session registry — tracks open sessions in the SPA. */
+export class SessionRegistry {
+  private sessions: Map<string, SessionMeta> = new Map();
+
+  add(meta: SessionMeta): void {
+    this.sessions.set(meta.id, meta);
+  }
+
+  remove(id: string): void {
+    this.sessions.delete(id);
+  }
+
+  list(): SessionMeta[] {
+    return Array.from(this.sessions.values());
+  }
+
+  get(id: string): SessionMeta | undefined {
+    return this.sessions.get(id);
+  }
+}
+
+/** Per-session command history with up/down navigation (like shell readline). */
+export class CommandHistory {
+  private entries: string[] = [];
+  private cursor = -1;
+
+  push(cmd: string): void {
+    if (cmd && cmd !== this.entries[0]) this.entries.unshift(cmd);
+    this.cursor = -1;
+  }
+
+  navigate(direction: 'up' | 'down'): string | undefined {
+    if (direction === 'up') {
+      if (this.cursor < this.entries.length - 1) this.cursor++;
+    } else {
+      if (this.cursor > -1) this.cursor--;
+    }
+    return this.cursor === -1 ? undefined : this.entries[this.cursor];
+  }
+
+  getAll(): string[] {
+    return [...this.entries];
+  }
+
+  reset(): void {
+    this.cursor = -1;
+  }
+}
+
+/** Per-session output buffer — accumulates PTY output chunks for scrollback replay. */
+export class SessionBuffer {
+  private buffers: Map<string, string[]> = new Map();
+
+  append(sessionId: string, data: string): void {
+    if (!this.buffers.has(sessionId)) this.buffers.set(sessionId, []);
+    this.buffers.get(sessionId)!.push(data);
+  }
+
+  get(sessionId: string): string {
+    return (this.buffers.get(sessionId) ?? []).join('');
+  }
+
+  clear(sessionId: string): void {
+    this.buffers.delete(sessionId);
+  }
+}

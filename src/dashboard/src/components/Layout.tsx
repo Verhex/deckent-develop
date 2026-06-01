@@ -1,7 +1,8 @@
 import { NavLink, Outlet } from "react-router-dom";
 import { useState } from "react";
-import { LayoutDashboard, History, Brain, Menu, SlidersHorizontal, Globe, MessageCircle } from "lucide-react";
+import { LayoutDashboard, History, Brain, Menu, SlidersHorizontal, Globe, MessageCircle, Sun, Moon } from "lucide-react";
 import { cn } from "../lib/utils";
+import { useTheme } from "./ThemeProvider";
 import { Sheet, SheetTrigger, SheetContent } from "./ui/sheet";
 import { ScrollArea } from "./ui/scroll-area";
 import { Badge } from "./ui/badge";
@@ -62,6 +63,21 @@ function LanguageSwitcher() {
   );
 }
 
+function ThemeToggle() {
+  const { theme, setTheme } = useTheme();
+  return (
+    <button
+      onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+      className="flex items-center gap-2 rounded-md px-3 py-1.5 text-xs text-zinc-400 dark:text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200 dark:hover:text-zinc-200 transition-all duration-200"
+      aria-label="Toggle dark/light theme"
+      data-testid="theme-toggle"
+    >
+      {theme === "dark" ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
+      {theme === "dark" ? "Light" : "Dark"}
+    </button>
+  );
+}
+
 const SSE_COLORS: Record<SSEStatus, string> = {
   connected: "bg-green-500",
   connecting: "bg-yellow-500",
@@ -109,12 +125,13 @@ function SidebarContent({ onNavigate, sseState, sseStatus }: { onNavigate?: () =
         )}
       </div>
       <NavLinks onNavigate={onNavigate} />
-      <div className="mt-auto pt-4 border-t border-zinc-800 space-y-2">
+      <div className="mt-auto pt-4 border-t border-zinc-800 dark:border-zinc-800 space-y-2">
         <div className="flex items-center gap-2 px-3">
           <span className={`h-2 w-2 rounded-full ${SSE_COLORS[sseStatus]}`} />
           <span className="text-xs text-zinc-500">{t(SSE_LABEL_KEYS[sseStatus])}</span>
         </div>
         <LanguageSwitcher />
+        <ThemeToggle />
       </div>
     </>
   );
@@ -125,9 +142,9 @@ export function Layout() {
   const { data: sseState, status: sseStatus } = useSSEWithStatus("/api/events");
 
   return (
-    <div className="flex h-screen bg-zinc-950">
-      {/* Desktop sidebar */}
-      <aside className="hidden md:flex w-[240px] flex-col border-r border-zinc-800 bg-zinc-900 p-4">
+    <div className="flex h-screen bg-zinc-950 dark:bg-zinc-950">
+      {/* Desktop sidebar — responsive: hidden on mobile, visible md+ */}
+      <aside className="hidden md:flex w-[240px] flex-col border-r border-zinc-800 dark:border-zinc-800 bg-zinc-900 dark:bg-zinc-900 p-4">
         <SidebarContent sseState={sseState} sseStatus={sseStatus} />
       </aside>
 
@@ -141,7 +158,7 @@ export function Layout() {
       {/* Main content */}
       <div className="flex flex-1 flex-col overflow-hidden">
         {/* Mobile header */}
-        <header className="flex md:hidden items-center border-b border-zinc-800 bg-zinc-900 px-4 py-3">
+        <header className="flex md:hidden items-center border-b border-zinc-800 dark:border-zinc-800 bg-zinc-900 dark:bg-zinc-900 px-4 py-3">
           <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
             <SheetTrigger aria-label="Toggle menu">
               <Menu className="h-5 w-5 text-zinc-400" />

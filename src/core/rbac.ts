@@ -109,3 +109,21 @@ export function can(
 
   return allowed;
 }
+
+/**
+ * Runtime enforcement gate — checks RBAC only when `rbacConfig.enabled` is true.
+ * When RBAC is disabled (default), this is a NO_OP that always returns true (backward-compatible).
+ * Intended for wiring into sprint/flow entry points without breaking non-enterprise setups.
+ *
+ * Usage: `if (!enforceRbac(role, action, tenantId, config.enterprise?.rbac)) throw ...`
+ */
+export function enforceRbac(
+  role: string,
+  action: Permission,
+  tenantId: string,
+  rbacConfig?: { enabled: boolean },
+): boolean {
+  // NO_OP bypass when rbac.enabled is false or config not provided
+  if (!rbacConfig?.enabled) return true;
+  return can(role, action, tenantId);
+}

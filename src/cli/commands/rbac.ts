@@ -9,6 +9,16 @@ import { print, printError } from '../helpers/output.js';
 
 const DEFAULT_TENANT = 'default';
 
+// ─── User Role Store (in-memory) ─────────────────────────────────────────────
+// Maps userId → Role for runtime grant/revoke CLI operations.
+
+export const userRoles = new Map<string, Role>();
+
+/** Clear store — for test isolation only. */
+export function clearUserRoles(): void {
+  userRoles.clear();
+}
+
 // ─── registerRbac ─────────────────────────────────────────────────────────────
 
 export function registerRbac(program: Command): void {
@@ -52,5 +62,35 @@ export function registerRbac(program: Command): void {
         print(`  ${role.padEnd(14)}${perms}`);
       }
       print('');
+    });
+
+  // ── deckent rbac grant <user> <role> ────────────────────────────────────────
+  rbac
+    .command('grant <user> <role>')
+    .description('Assign a role to a user')
+    .action((user: string, role: string) => {
+      if (!isValidRole(role)) {
+        printError(new Error(`Unknown role: "${role}". Valid roles: admin, operator, viewer`));
+        process.exitCode = 1;
+        return;
+      }
+      userRoles.set(user, role);
+      print(`  GRANTED  ${user} → ${role}`);
+      process.exitCode = 0;
+    });
+
+  // ── deckent rbac revoke <user> ───────────────────────────────────────────────
+  rbac
+    .command('revoke <user>')
+    .description('Remove the role assignment for a user')
+    .action((user: string) => {
+      if (!userRoles.has(user)) {
+        print(`  WARN     no role assigned to "${user}"`);
+        process.exitCode = 0;
+        return;
+      }
+      userRoles.delete(user);
+      print(`  REVOKED  ${user}`);
+      process.exitCode = 0;
     });
 }

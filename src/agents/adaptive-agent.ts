@@ -236,3 +236,62 @@ export function adaptAgent(
   const diff = _sharedAgent.suggestPromptChange(agentId, currentPrompt, effectiveness.weaknesses);
   return { diff, effectiveness };
 }
+
+// ─── Runtime adaptation (skill add/remove suggestions) ───────────────────────
+// Extends adaptAgent with skill-level recommendations based on weakness patterns.
+// Rule-based, no LLM. Suggestions must be reviewed before application.
+
+export interface SkillAdaptation {
+  agentId: string;
+  suggestAdd: string[];
+  suggestRemove: string[];
+  reason: string;
+}
+
+export interface RuntimeAdaptResult {
+  effectiveness: EffectivenessResult;
+  promptDiff: PromptDiff;
+  skillAdaptation: SkillAdaptation;
+}
+
+// Maps weakness pattern ids to skills that address them.
+const WEAKNESS_SKILL_MAP: Record<string, string> = {
+  'low-coverage': 'testing-expert',
+  'inconsistent-coverage': 'testing-expert',
+  'high-nogo-rate': 'code-simplifier',
+  'tech-debt-heavy': 'testing-expert',
+};
+
+export function adaptAgentRuntime(
+  agentId: string,
+  currentPrompt: string,
+  currentSkills: string[],
+  recentResults: ResultEntry[],
+): RuntimeAdaptResult {
+  const effectiveness = _sharedAgent.analyzePromptEffectiveness(agentId, recentResults);
+  const promptDiff = _sharedAgent.suggestPromptChange(agentId, currentPrompt, effectiveness.weaknesses);
+
+  const suggestAdd: string[] = [];
+  for (const pattern of WEAKNESS_PATTERNS) {
+    const skill = WEAKNESS_SKILL_MAP[pattern.id];
+    if (skill && !currentSkills.includes(skill)) {
+      // Only suggest if the weakness is detected in recent results
+      const recentSprintIds = [...new Set(recentResults.map(r => r.sprintId))].sort().slice(-RECENT_WINDOW);
+      const recent = recentResults.filter(r => recentSprintIds.includes(r.sprintId));
+      if (recent.length > 0 && pattern.detect(recent)) {
+        suggestAdd.push(skill);
+      }
+    }
+  }
+
+  const uniqueAdd = [...new Set(suggestAdd)];
+  const reason = uniqueAdd.length > 0
+    ? `Detected weaknesses suggest adding: ${uniqueAdd.join(', ')}`
+    : 'No skill changes needed — agent performing within acceptable thresholds';
+
+  return {
+    effectiveness,
+    promptDiff,
+    skillAdaptation: { agentId, suggestAdd: uniqueAdd, suggestRemove: [], reason },
+  };
+}
