@@ -5,6 +5,19 @@ export default defineConfig({
     include: ['tests/**/*.test.ts'],
     exclude: ['tests/dashboard/**', 'node_modules'],
     testTimeout: 10000,
+    // CI-CD stability (Sprint 214): the Coverage job ran on a 2-core GitHub
+    // runner; after all tests PASS, every fork serialises v8 coverage data back
+    // to the main process at teardown. With unbounded forks competing for 2
+    // cores, that teardown RPC starved and tripped vitest's "Timeout calling
+    // onTaskUpdate" → exit 1 (the months-long Coverage-job failure that blocked
+    // coverage report + build from ever running). Bounding forks to the core
+    // count under CI gives each fork CPU to finish its teardown RPC. Local dev
+    // keeps full parallelism (maxForks undefined).
+    pool: 'forks',
+    poolOptions: {
+      forks: { maxForks: process.env.CI ? 2 : undefined },
+    },
+    teardownTimeout: 30000,
     coverage: {
       provider: 'v8',
       include: ['src/**/*.ts'],
