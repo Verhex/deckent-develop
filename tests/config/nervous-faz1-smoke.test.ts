@@ -5,14 +5,25 @@ import { NERVOUS_SYSTEM_SCHEMA } from '../../src/core/config.js';
 
 const root = resolve(import.meta.dirname, '..', '..');
 
-function readNervousConfig() {
-  const raw = readFileSync(resolve(root, '.deckent', 'config.json'), 'utf-8');
-  const full = JSON.parse(raw) as Record<string, unknown>;
-  return full['nervous_system'] as Record<string, unknown>;
+// Returns null when the live project config is absent (gitignored → not in a
+// fresh CI checkout). Dogfood self-check of THIS project's nervous config; the
+// whole suite skips where the file doesn't exist (hermeticity — no dependence
+// on local state, no collection-time ENOENT crash).
+function readNervousConfig(): Record<string, unknown> | null {
+  try {
+    const raw = readFileSync(resolve(root, '.deckent', 'config.json'), 'utf-8');
+    const full = JSON.parse(raw) as Record<string, unknown>;
+    return full['nervous_system'] as Record<string, unknown>;
+  } catch {
+    return null;
+  }
 }
 
-describe('Nervous Faz 1 smoke config (.deckent/config.json)', () => {
-  const ns = readNervousConfig();
+const loadedNs = readNervousConfig();
+const hasConfig = loadedNs !== null;
+
+describe.skipIf(!hasConfig)('Nervous Faz 1 smoke config (.deckent/config.json)', () => {
+  const ns = loadedNs ?? {};
   // The dogfood project flips `enabled` between sprints depending on whether
   // the current sprint is actively exercising nervous-system runtime. The
   // schema/shape assertions below are always relevant; the strict
