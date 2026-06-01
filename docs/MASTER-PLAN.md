@@ -1,7 +1,7 @@
 # Deckent — Master Plan
 
 > **Status:** CANONICAL — this is the single source of truth for vision, current state, remaining work, business plan, and sequencing.
-> **Last reconciled:** 2026-06-01 (Sprint 211 complete).
+> **Last reconciled:** 2026-06-01 (Sprint 214 complete; CI-CD root cause diagnosed).
 > **Version:** v1.0.0-beta.1 · **Beta GA window:** 2026-06-01 (OSS public beta).
 > **Supersedes (now historical, preserved for provenance):** `docs/ROADMAP-GOD-LEVEL.md`, `docs/vision/roadmap.md`, `docs/release/roadmap.md`, `docs/alperen-analysis/2026-05-23-comprehensive-work-plan.md`, `docs/release/beta-tracker.md`. Those documents used pre-Sprint-211 sprint numbering (189–200) that never executed 1:1 — this plan is the reconciled reality.
 
@@ -249,10 +249,11 @@ Recently closed (Sprint 192–211):
 - **memory.db sprint-log finalize fix + backfill** — ✅ Sprint 197 missing-row bug fixed (`sprint-finalizer.ts` defensive `upsertSprintLog`); reconstruction tool `scripts/backfill-sprint-log-rows.mjs`.
 
 Conditional/open:
+- **🔴 CI-CD RED (months-broken — root cause diagnosed Sprint 214):** GitHub Actions `CI` + `Build and Deploy Docs` workflows FAIL while local `vitest run` is 0-fail (18,606 pass). **Root cause: non-hermetic tests coupled to gitignored local state.** (1) `tests/orchestra/spawn-backend-docker.test.ts` reads the live `.deckent/config.json` (gitignored → `ENOENT` in fresh CI checkout) for max_workers/memory assertions; (2) `tests/mcp/tools.test.ts:441` (`deckent_retro`) reads `.brain/memory.db` retro (gitignored → `parsed.content` null → `toContain` throws); (3) minor `3005≠3000` timing flake; (4) Docs (vitepress) build error. Local passes because the dev machine HAS `.deckent/`+`.brain/`; CI doesn't. **Same family as `project_test_home_leak`** (tests not isolated from local state). **Fix = Sprint 215** (hermetic fixtures + `test:ci-sim` clean-state reproducer + ci-guardian/ci-testing routing).
 - **Multi-provider runtime** — abstraction ready; docker backend Claude-only, tmux/subprocess support Codex/Gemini (full docker parity = F1-004/005).
 - **Messaging trio** (Discord/Telegram/WhatsApp) — scaffold present, token activation pending.
-- **M1–M4 monitoring baseline auto-blocker** — ⬜ not built. No baseline-metric gate (cache-key/rule-regen/ADR-insert/stale-md), no cumulative-token >900K checkpoint, no P0 sprint-halt blocker; `auditor.ts` does task-timeout + lock cleanup only. Post-beta observability gate.
-- **Documentation sync** — MASTER-PLAN consolidation done; remaining: README badge (190+ → 211+), unverified "96% context reduction" claim (no benchmark file), CLAUDE.md/DECKENT.md module-count re-sync (§3).
+- **M1–M4 monitoring baseline auto-blocker** — ⬜ not built. Post-beta observability gate.
+- **Documentation sync** — MASTER-PLAN consolidation done; remaining: README badge (190+ → 214+), unverified "96% context reduction" claim (no benchmark file), CLAUDE.md/DECKENT.md module-count re-sync (§3).
 
 ---
 
@@ -265,7 +266,7 @@ Per Alperen's direction: **combine sprints, write larger comprehensive tasks** (
 | **212** | **Stability/Hygiene + Evolution crowning** | F5-004 real external callers (prompt-evolution + adaptive-agent wired into sprint lifecycle, scope includes caller modules); agent routing skew fix (skill→agent signal: frontend-design→frontend-designer, security-specialist→security-auditor); doc-reality sync; ≥1 forward task |
 | **213** | **Killed** | Killed mid-sprint due to auth-precedence bug — mass synthetic NO_GO. All tasks cleared; Sprint 214 relaunched. |
 | **214** | **P0 Auth-fix + User-Facing + IDE ext + 8-provider (DONE)** | Wave 0: auth-precedence fix (ADR-076). Wave A: serve token-inject + Path A embedded chat + chat CLI UX + F7-003 UI/UX. Wave B: VS Code extension real impl (commands/sidebar/statusbar/settings). Wave C: F1-009 8-provider (OpenAICompatibleAdapter + PROVIDER_MAP + bootstrap; ADR-077). Wave D: ADR docs + status. 20 tasks. |
-| **215** | **Web UI Chat tab (Path A) depth + F1-010 subs→API overflow** | Dashboard "Deckent Chat" hardening + streaming; subs→API load-balance overflow |
+| **215** | **🔴 CI-CD GREEN + Test Hermeticity (P0) + F1-009 bootstrap + test-HOME isolation** | **P0 CI-CD repair:** make non-hermetic tests self-contained — `spawn-backend-docker.test.ts` + `tools.test.ts` (deckent_retro) must use tmp fixtures, NOT the gitignored live `.deckent/config.json` / `.brain/memory.db`; add `npm run test:ci-sim` (clean-state run that reproduces CI locally before push); fix Docs (vitepress) build; fix `3005≠3000` flake. **Routing:** ci-guardian agent + ci-testing skill (both exist) — define a CI-hermeticity rule set (tests never depend on gitignored local state; CI=fresh checkout). **F1-009 bootstrap-register (P0):** wire `OpenAICompatibleAdapter` into `provider.ts` bootstrap (register when DEEPSEEK/DASHSCOPE/ZHIPU keys present) — makes DeepSeek/Qwen/GLM actually usable (currently dormant). **test-HOME isolation** (`project_test_home_leak`): tests sandbox `HOME` to `os.tmpdir()` + cleanup; lint guard for stray project-root dotfiles. Then: Path A chat depth + F1-010 overflow if budget remains. |
 | **216** | **Dashboard god-level redesign (F7-003) + F7-004/006/007** | UI/UX redesign, terminal polish, enterprise view, memory/ADR explorer |
 | **217+** | **F2 streaming + Native SDK (Path C)** | Real streaming; ADR-010 amendment; SDK migration; zero-prerequisite `npx deckent` chat — Q3 2026 |
 | **post-beta** | **Provider/local LLM + million-user hardening** | F1-004/005, sub-#5 Ollama/CUDA fully-local preset, OTel/Prometheus (W-J), ADR-037 hard-flip V2, sub-#2 self-security |
@@ -295,6 +296,7 @@ Per Alperen's direction: **combine sprints, write larger comprehensive tasks** (
 5. **✅ Auth-precedence bug (RESOLVED Sprint 214):** `spawn-backend-docker.ts` env-forwarding is now provider+auth-aware — `ANTHROPIC_API_KEY` is stripped for Claude subscription workers and only forwarded when `authMode=api`. Sprint 215+ launches without `env -u`. ADR-076 Part A. ([[feedback_container_auth_precedence]])
 3. **Native-chat scope creep** — IDE extension + Path A + Path C is multi-sprint; risk of half-built surfaces. *Mitigation: strict sequence (hygiene → IDE → web → SDK), one surface fully landed before the next.*
 4. **Doc-reality drift** — this consolidation fixes today; re-drift if future status lands only in scattered docs. *Mitigation: MASTER-PLAN is the only roadmap that gets status updates; others are frozen historical.*
+6. **🔴 Non-hermetic tests (months-broken CI):** the local `vitest run` (0-fail) and CI disagree because some tests read gitignored local state (`.deckent/config.json`, `.brain/memory.db`). Green-local ≠ green-CI has masked this for months and blocks the OSS public-repo flip. *Mitigation: Sprint 215 P0 — hermetic fixtures + `test:ci-sim` so local reproduces CI; CI-hermeticity rule + ci-guardian/ci-testing.* ([[project_test_home_leak]])
 
 ---
 
