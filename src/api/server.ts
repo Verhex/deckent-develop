@@ -40,6 +40,7 @@ import { loadDeckSecrets } from '../core/deck-file.js';
 import { buildChatReply } from './chat-handler.js';
 import { registerEvolutionRoutes } from './evolution-endpoint.js';
 import { registerMemorySearch } from './memory-search-endpoint.js';
+import { registerNervousRoutes } from './nervous-endpoint.js';
 
 const MIME_TYPES: Record<string, string> = {
   '.html': 'text/html',
@@ -592,6 +593,7 @@ async function handleRequest(
 
     // Memory FTS5 search: /api/memory/search?q= (216-012)
     if (registerMemorySearch(url, res, projectRoot)) return;
+    if (registerNervousRoutes(url, method, res, projectRoot)) return;
 
     // GET with no matching route
     sendError(res, 404, 'Not found');
@@ -612,6 +614,8 @@ async function handleRequest(
       }
       return;
     }
+
+    if (registerNervousRoutes(url, method, res, projectRoot)) return;
 
     if (url === '/api/start') {
       const parsed = StartSchema.safeParse(body);
