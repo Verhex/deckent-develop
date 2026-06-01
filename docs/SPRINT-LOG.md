@@ -5955,3 +5955,37 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 217-001: new sprint (NO_GO)
 
 ---
+## Sprint 218 — sprint-218
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-06-01
+**Duration:** 1241s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 13 |
+| Completed | 13 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 1241038ms |
+
+### Tasks
+
+- 218-001: 218-013 — [✅ KONTROL — kod izole `deckent run` ile yapıldı + commit 64c97c2f; YENİDEN YAZMA YASAK] Git self-mutation guard (DONE)
+- 218-002: 218-001 — [✅ KONTROL — kod izole `deckent run` ile yapıldı + commit 9e2e7d34; YENİDEN YAZMA YASAK] sprint-start detach (DONE)
+- 218-003: 218-002 — Eksik sayfaları route+sidebar'a bağla (Evolution/Nervous/Enterprise/MemoryExplorer) (DONE)
+- 218-004: 218-003 — Chat gerçek round-trip (ChatPage → backend, status-only DEĞİL) (DONE)
+- 218-005: 218-004 — Dashboard DIRECTIVES editörü (gerçek içerikli sprint başlat, boş "new sprint" değil) (DONE)
+- 218-006: 218-005 — Dashboard sayfaları gerçek veri bağlı (Nervous loading+error+empty) (DONE)
+- 218-007: 218-006 — God-level layout shell (modern bilgi mimarisi, responsive, sıfır skeleton-freeze) (DONE)
+- 218-008: 218-007 — Native hız: skeleton-freeze kaldır, akıllı polling/SSE, stale-while-revalidate (DONE)
+- 218-009: 218-008 — Tema tutarlılık + görsel polish (dark/light token, component tutarlılık) (DONE)
+- 218-010: 218-009 — Sprint kontrol paneli polish (canlı durum + worker grid + faz göstergesi) (DONE)
+- 218-011: 218-010 — test:e2e-surfaces dashboard genişlet (8 sayfa endpoint + sprint-start-donmaz) (DONE)
+- 218-012: 218-011 — ADR-080 (Dashboard God-Level + sprint-start detach) + MASTER-PLAN status (DONE)
+- 218-013: 218-012 — Dashboard kullanıcı rehberi + onboarding (gerçek ekran akışı) (DONE)
+
+---

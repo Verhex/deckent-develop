@@ -76,6 +76,7 @@
 | adr-079 | Proof-of-Function DoD — Tier-0/Tier-1 Classification + Sprint-Inner Run-Verify Gate | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-218 Learnings** (sprint-218): ## Sprint sprint-218 Learnings
 - **Sprint sprint-217 Learnings** (sprint-217): ## Sprint sprint-217 Learnings
 - new sprint: NO_GO — Placeholder 'new sprint' task — no implementation work defined. ...
 - **Sprint sprint-216 Learnings** (sprint-216): ## Sprint sprint-216 Learnings
@@ -89,11 +90,9 @@
 - **Sprint sprint-208 Learnings** (sprint-208): ## Sprint sprint-208 Learnings
 - **Sprint sprint-207 Learnings** (sprint-207): ## Sprint sprint-207 Learnings
 - 207-001 — Model registry bundled apiId güncel + "stale" işareti: GO_WITH_TECH_DEBT —...
-- **Sprint sprint-206 Learnings** (sprint-206): ## Sprint sprint-206 Learnings
-- 206-003 — docker-oom gracefulTimeout forward fix: NO_GO — Root cause: test expectati...
 
 ## Active Technical Debt
-- [NORMAL] Sprint sprint-217 rollback SUCCESS
+- [HIGH] Sprint sprint-217 rollback SUCCESS
 
 ## Active Patterns
 - Violation pattern: stale_heartbeat
@@ -146,5 +145,6 @@
 - Violation pattern: stale_heartbeat
 - Violation pattern: stale_heartbeat
 - Violation pattern: stale_heartbeat
+- Violation pattern: stale_heartbeat
 
-_Total entries: 482 | Generated: 2026-06-01_
+_Total entries: 486 | Generated: 2026-06-01_

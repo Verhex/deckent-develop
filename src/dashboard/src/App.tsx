@@ -9,6 +9,10 @@ import MemoryPage from "./pages/MemoryPage";
 import ConfigPage from "./pages/ConfigPage";
 import ChatPage from "./pages/ChatPage";
 import StatusPage from "./pages/StatusPage";
+import EvolutionPage from "./pages/EvolutionPage";
+import NervousPage from "./pages/NervousPage";
+import EnterprisePage from "./pages/EnterprisePage";
+import MemoryExplorerPage from "./pages/MemoryExplorerPage";
 
 function App() {
   return (
@@ -24,6 +28,10 @@ function App() {
               <Route path="/config" element={<ConfigPage />} />
               <Route path="/chat" element={<ChatPage />} />
               <Route path="/status" element={<StatusPage />} />
+              <Route path="/evolution" element={<EvolutionPage />} />
+              <Route path="/nervous" element={<NervousPage />} />
+              <Route path="/enterprise" element={<EnterprisePage />} />
+              <Route path="/memory-explorer" element={<MemoryExplorerPage />} />
             </Route>
           </Routes>
         </BrowserRouter>

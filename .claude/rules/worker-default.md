@@ -39,6 +39,7 @@ paths: ["src/**","tests/**"]
 
 ## Active ADR Constraints
 
+- **ADR-080**: Dashboard God-Level — Sprint-Start Detach + Hollow-Page Wire + Chat Round-Trip + Native UI — **Status:** accepted
 - **ADR-079**: Proof-of-Function DoD — Tier-0/Tier-1 Classification + Sprint-Inner Run-Verify Gate — **Status:** accepted
 - **ADR-078**: CI-Hermeticity Standard + 8-Provider Runtime + Active Identity-Mutation Loop + Dashboard God-Level — **Status:** accepted
 - **ADR-076**: Auth-Precedence Fix + User-Facing Surfaces (serve token-inject, Path A chat, IDE extension) — **Status:** accepted

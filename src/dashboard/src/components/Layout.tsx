@@ -141,13 +141,27 @@ export function Layout() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { data: sseState, status: sseStatus } = useSSEWithStatus("/api/events");
 
-  // Layout strategy: responsive grid — sidebar breakpoint md+ (hidden mobile), lg+ wider sidebar
-  // Dark/light theme: dark:bg-zinc-950 / dark:bg-zinc-900 — ThemeProvider controls html class
+  // God-level shell hierarchy (Sprint 218 task 218-007, builds on AppShell Sprint 215):
+  //   header (desktop banner + mobile menu) + sidebar (md+) + content grid + dock terminal.
+  // Layout strategy: responsive grid — sidebar breakpoint md+ (hidden mobile), lg+ wider sidebar.
+  // Dark/light theme: dark:bg-zinc-950 / dark:bg-zinc-900 — ThemeProvider controls html class.
+  // Loading-state: when SSE has no data yet (connecting+null), render a branded
+  //   "Connecting" panel — NOT a skeleton-freeze — so the user sees a meaningful state
+  //   instead of an empty/pulsing layout. Honors `motion-safe:` for prefers-reduced-motion.
+
+  const isInitialLoading = sseStatus === "connecting" && sseState === null;
 
   return (
-    <div className="flex h-screen bg-zinc-950 dark:bg-zinc-950">
+    <div
+      data-testid="layout-shell"
+      className="flex h-screen bg-zinc-950 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100"
+    >
       {/* Desktop sidebar — responsive: hidden on mobile, visible md+ breakpoint */}
-      <aside className="hidden md:flex w-[240px] lg:w-[260px] flex-col border-r border-zinc-800 dark:border-zinc-800 bg-zinc-900 dark:bg-zinc-900 p-4">
+      <aside
+        data-testid="layout-sidebar"
+        aria-label="Primary navigation"
+        className="hidden md:flex w-[240px] lg:w-[260px] flex-col border-r border-zinc-800 dark:border-zinc-800 bg-zinc-900 dark:bg-zinc-900 p-4"
+      >
         <SidebarContent sseState={sseState} sseStatus={sseStatus} />
       </aside>
 
@@ -170,14 +184,87 @@ export function Layout() {
           <span className="ml-3 text-sm font-bold text-zinc-100">deckent</span>
         </header>
 
+        {/* Desktop header banner — visible md+ for intuitive top-level hierarchy */}
+        <header
+          role="banner"
+          data-testid="layout-desktop-header"
+          className="hidden md:flex h-12 shrink-0 items-center justify-between border-b border-zinc-800 dark:border-zinc-800 bg-zinc-950/80 dark:bg-zinc-950/80 px-6 backdrop-blur"
+        >
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-semibold tracking-tight text-zinc-100">
+              {sseState?.sprint?.id ?? "deckent"}
+            </span>
+            {sseState?.sprint?.phase && (
+              <Badge variant="info" className="text-[10px] px-1.5 py-0">
+                {sseState.sprint.phase}
+              </Badge>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <span
+              aria-hidden="true"
+              className={`h-2 w-2 rounded-full ${SSE_COLORS[sseStatus]}`}
+            />
+            <span className="text-xs text-zinc-500">{sseStatus}</span>
+          </div>
+        </header>
+
         <ScrollArea className="flex-1 p-6 pb-8">
-          <Outlet />
+          <main
+            role="main"
+            aria-label="Main content"
+            data-testid="layout-content-grid"
+            className="grid grid-cols-1 gap-6"
+          >
+            {isInitialLoading ? (
+              <LayoutLoadingState />
+            ) : (
+              <Outlet />
+            )}
+          </main>
         </ScrollArea>
       </div>
 
       <DockPanel>
         <TerminalPanel />
       </DockPanel>
+    </div>
+  );
+}
+
+/**
+ * Meaningful loading-state: shown only on first SSE connect when no data has arrived yet.
+ * Avoids the "skeleton-freeze" anti-pattern — gives the user an intentional, branded
+ * "we're connecting" affordance. `motion-safe:` ensures the pulse animation is suppressed
+ * for users with prefers-reduced-motion.
+ */
+function LayoutLoadingState() {
+  const { t } = useTranslation();
+  return (
+    <div
+      data-testid="layout-loading-state"
+      role="status"
+      aria-live="polite"
+      className="flex min-h-[40vh] flex-col items-center justify-center gap-3 text-center"
+    >
+      <div className="flex items-center gap-3">
+        <img
+          src="/logo.png"
+          alt=""
+          aria-hidden="true"
+          className="h-8 w-8 motion-safe:animate-pulse"
+          style={{ imageRendering: 'pixelated' }}
+        />
+        <span className="text-lg font-semibold tracking-tight text-zinc-100">
+          deckent
+        </span>
+      </div>
+      <p className="text-sm text-zinc-400">
+        {t('common.connecting')}…
+      </p>
+      <p className="text-xs text-zinc-500 max-w-sm">
+        {t('layout.subtitle')}
+      </p>
     </div>
   );
 }

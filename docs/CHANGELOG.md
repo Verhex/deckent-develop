@@ -2,6 +2,24 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint218] - 2026-06-01
+
+### Added
+
+- 218-013 — [✅ KONTROL — kod izole `deckent run` ile yapıldı + commit 64c97c2f; YENİDEN YAZMA YASAK] Git self-mutation guard
+- 218-001 — [✅ KONTROL — kod izole `deckent run` ile yapıldı + commit 9e2e7d34; YENİDEN YAZMA YASAK] sprint-start detach
+- 218-002 — Eksik sayfaları route+sidebar'a bağla (Evolution/Nervous/Enterprise/MemoryExplorer)
+- 218-003 — Chat gerçek round-trip (ChatPage → backend, status-only DEĞİL)
+- 218-004 — Dashboard DIRECTIVES editörü (gerçek içerikli sprint başlat, boş "new sprint" değil)
+- 218-005 — Dashboard sayfaları gerçek veri bağlı (Nervous loading+error+empty)
+- 218-006 — God-level layout shell (modern bilgi mimarisi, responsive, sıfır skeleton-freeze)
+- 218-007 — Native hız: skeleton-freeze kaldır, akıllı polling/SSE, stale-while-revalidate
+- 218-008 — Tema tutarlılık + görsel polish (dark/light token, component tutarlılık)
+- 218-009 — Sprint kontrol paneli polish (canlı durum + worker grid + faz göstergesi)
+
+
+_Tasks: 13 total, 13 done, 0 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint217] - 2026-06-01
 
 ### Added

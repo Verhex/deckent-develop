@@ -16,6 +16,8 @@ import { useTranslation } from "../i18n/LanguageProvider";
 import type { TranslatorProp } from "../i18n/types";
 import { fetchJson, postJson, ApiError } from "../lib/api";
 import type { DashboardState, Alert } from "../types";
+import { useLiveData } from "../lib/use-live-data";
+import { DirectivesEditor } from "../components/DirectivesEditor";
 
 // WelcomeScreen: shown when no active sprint
 interface WelcomeScreenProps {
@@ -98,6 +100,10 @@ function relativeTime(isoDate: string, t: TranslatorProp): string {
 export default function DashboardPage() {
   const { t } = useTranslation();
   const sseState = useSSE("/api/events");
+  const { data: polledState } = useLiveData<DashboardState>("/api/status", {
+    enabled: !sseState,
+    pollIntervalMs: 5000,
+  });
   const [fallbackState, setFallbackState] = useState<DashboardState | null>(null);
   const [noSprint, setNoSprint] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
@@ -123,7 +129,7 @@ export default function DashboardPage() {
     }
   }, [sseState]);
 
-  const state = sseState ?? fallbackState;
+  const state = sseState ?? polledState ?? fallbackState;
 
   const handleCleanup = useCallback(async () => {
     if (!confirm(t('dashboard.confirm_cleanup'))) return;
@@ -243,6 +249,11 @@ export default function DashboardPage() {
           lastSprintMetrics={state?.lastSprint?.metrics}
           onNewSprint={() => setModalOpen(true)}
         />
+      )}
+
+      {/* DIRECTIVES editor — edit sprint directives before starting */}
+      {!initialLoading && noSprint && (
+        <DirectivesEditor />
       )}
 
       {/* Sprint Status Card */}

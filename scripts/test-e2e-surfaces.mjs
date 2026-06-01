@@ -160,6 +160,65 @@ export async function assertSurfaces(baseUrl, opts = {}) {
   return { pass, evidence, rootStatus, hasTokenPlaceholder, statusCode, token };
 }
 
+// ─── Dashboard surface + sprint-start no-freeze assertions (218-011) ──────────
+
+const DASHBOARD_ENDPOINTS = ['/api/evolution/genealogy', '/api/evolution/retirement', '/api/evolution/prompt-metrics', '/api/memory/search?q=test'];
+
+async function safeFetchStatus(fetchImpl, url, init) {
+  try { return (await fetchImpl(url, init)).status; }
+  catch (err) { return `error:${err instanceof Error ? err.message : String(err)}`; }
+}
+
+// Asserts served HTML carries a built bundle AND read-only dashboard endpoints
+// respond 200 with a Bearer token. `/api/nervous/status` accepts non-401 (route
+// pending wire in 218-005; gate asserts auth passes, not route exists).
+export async function assertDashboardSurfaces(baseUrl, opts = {}) {
+  const fetchImpl = opts.fetchImpl ?? globalThis.fetch;
+  const token = opts.token ?? null;
+  const headers = token ? { Authorization: `Bearer ${token}` } : {};
+  const rootRes = await fetchImpl(`${baseUrl}/`);
+  const rootBody = await rootRes.text();
+  const rootStatus = rootRes.status;
+  const hasBundle = rootBody.includes('/assets/index-') || rootBody.includes('<script type="module"');
+  const endpointStatuses = {};
+  for (const ep of DASHBOARD_ENDPOINTS) {
+    endpointStatuses[ep] = await safeFetchStatus(fetchImpl, `${baseUrl}${ep}`, { headers });
+  }
+  const nervousStatus = await safeFetchStatus(fetchImpl, `${baseUrl}/api/nervous/status`, { headers });
+  endpointStatuses['/api/nervous/status'] = nervousStatus;
+  const checks = {
+    'root=200': rootStatus === 200,
+    'bundle-present': hasBundle,
+    '/api/evolution/genealogy=200': endpointStatuses['/api/evolution/genealogy'] === 200,
+    '/api/evolution/retirement=200': endpointStatuses['/api/evolution/retirement'] === 200,
+    '/api/evolution/prompt-metrics=200': endpointStatuses['/api/evolution/prompt-metrics'] === 200,
+    '/api/memory/search=200': endpointStatuses['/api/memory/search?q=test'] === 200,
+    '/api/nervous/status!=401': nervousStatus !== 401,
+  };
+  const failed = Object.entries(checks).filter(([, ok]) => !ok).map(([k]) => k);
+  const pass = failed.length === 0;
+  const evidence = pass ? `dashboard: bundle+5 endpoints OK (nervous=${nervousStatus})` : `dashboard failed: ${failed.join(', ')}`;
+  return { pass, evidence, checks, endpointStatuses, rootStatus, hasBundle };
+}
+
+// Asserts POST /api/start does NOT block the serve event loop: start sprint
+// (expect 202 or 409 already-running), then immediately poll /api/status
+// (MUST be 200). 218-001 wired `startSprintDetached` to prevent this freeze.
+export async function assertSprintStartNoFreeze(baseUrl, opts = {}) {
+  const fetchImpl = opts.fetchImpl ?? globalThis.fetch;
+  const token = opts.token ?? null;
+  const authHeader = token ? { Authorization: `Bearer ${token}` } : {};
+  const startStatus = await safeFetchStatus(fetchImpl, `${baseUrl}/api/start`, {
+    method: 'POST', headers: { ...authHeader, 'Content-Type': 'application/json' }, body: '{}',
+  });
+  const statusAfter = await safeFetchStatus(fetchImpl, `${baseUrl}/api/status`, { headers: authHeader });
+  const pass = (startStatus === 202 || startStatus === 409) && statusAfter === 200;
+  const evidence = pass
+    ? `sprint-start no-freeze: start=${startStatus} status-after=${statusAfter}`
+    : `sprint-start FREEZE detected: start=${startStatus} status-after=${statusAfter}`;
+  return { pass, evidence, startStatus, statusAfter };
+}
+
 // ─── Orchestrator ─────────────────────────────────────────────────────────────
 
 /**
@@ -185,33 +244,32 @@ export async function runE2E(opts = {}) {
   const port = opts.port ?? (await findFreePort());
   const { child, baseUrlPromise, cwd, sandboxHome } = bootServer({ ...opts, entry, port });
 
-  let assertResult = null;
+  let assertResult = null, dashboardResult = null, sprintStartResult = null;
   try {
     const baseUrl = await baseUrlPromise;
     assertResult = await assertSurfaces(baseUrl, { fetchImpl: opts.fetchImpl });
+    // 218-011: dashboard + sprint-start no-freeze (skip when base auth fails).
+    if (assertResult.pass) {
+      const passOpts = { fetchImpl: opts.fetchImpl, token: assertResult.token };
+      dashboardResult = await assertDashboardSurfaces(baseUrl, passOpts);
+      sprintStartResult = await assertSprintStartNoFreeze(baseUrl, passOpts);
+    }
   } catch (err) {
-    assertResult = {
-      pass: false,
-      evidence: `error: ${err instanceof Error ? err.message : String(err)}`,
-    };
+    assertResult = { pass: false, evidence: `error: ${err instanceof Error ? err.message : String(err)}` };
   } finally {
-    // Always kill the child — even if assertions threw before completing.
-    try {
-      if (child && !child.killed) child.kill(killSignal);
-    } catch { /* best-effort */ }
-    // Cleanup tmpdirs we created.
+    try { if (child && !child.killed) child.kill(killSignal); } catch { /* best-effort */ }
     if (!opts.cwd) { try { rmSync(cwd, { recursive: true, force: true }); } catch { /* ignore */ } }
     if (!opts.sandboxHome) { try { rmSync(sandboxHome, { recursive: true, force: true }); } catch { /* ignore */ } }
   }
-
+  const aggregatePass = assertResult.pass && (dashboardResult === null || dashboardResult.pass) && (sprintStartResult === null || sprintStartResult.pass);
+  const evidence = [assertResult.evidence, dashboardResult?.evidence, sprintStartResult?.evidence].filter(Boolean).join(' | ');
   return {
-    pass: assertResult.pass,
-    evidence: assertResult.evidence,
-    rootStatus: assertResult.rootStatus,
-    hasTokenPlaceholder: assertResult.hasTokenPlaceholder,
-    statusCode: assertResult.statusCode,
-    port,
-    durationMs: Date.now() - startedAt,
+    pass: aggregatePass, evidence,
+    rootStatus: assertResult.rootStatus, hasTokenPlaceholder: assertResult.hasTokenPlaceholder, statusCode: assertResult.statusCode,
+    dashboardPass: dashboardResult ? dashboardResult.pass : null,
+    sprintStartPass: sprintStartResult ? sprintStartResult.pass : null,
+    dashboard: dashboardResult, sprintStart: sprintStartResult,
+    port, durationMs: Date.now() - startedAt,
   };
 }
 

@@ -7,7 +7,7 @@
  * canonical source and the inline copy in Layout.tsx is deleted.
  */
 import { NavLink } from "react-router-dom";
-import { LayoutDashboard, History, Brain, SlidersHorizontal, MessageCircle, Activity } from "lucide-react";
+import { LayoutDashboard, History, Brain, SlidersHorizontal, MessageCircle, Activity, GitBranch, Bell, Building2, Search } from "lucide-react";
 import { cn } from "../lib/utils";
 import { useTranslation } from "../i18n/LanguageProvider";
 import type { TranslationKey } from "../i18n/en";
@@ -15,6 +15,8 @@ import type { TranslationKey } from "../i18n/en";
 export type NavItem = {
   to: string;
   labelKey: TranslationKey;
+  /** Literal label override used when no TranslationKey exists yet (renders verbatim). */
+  label?: string;
   icon: typeof LayoutDashboard;
 };
 
@@ -25,6 +27,10 @@ export const navItems: ReadonlyArray<NavItem> = [
   { to: "/config", labelKey: "nav.config", icon: SlidersHorizontal },
   { to: "/chat", labelKey: "nav.chat", icon: MessageCircle },
   { to: "/status", labelKey: "dashboard.status", icon: Activity },
+  { to: "/evolution", labelKey: "nav.dashboard", label: "Evolution", icon: GitBranch },
+  { to: "/nervous", labelKey: "nav.dashboard", label: "Nervous", icon: Bell },
+  { to: "/enterprise", labelKey: "nav.dashboard", label: "Enterprise", icon: Building2 },
+  { to: "/memory-explorer", labelKey: "nav.dashboard", label: "Memory Explorer", icon: Search },
 ];
 
 interface SidebarNavLinksProps {
@@ -35,7 +41,7 @@ export function SidebarNavLinks({ onNavigate }: SidebarNavLinksProps) {
   const { t } = useTranslation();
   return (
     <nav className="flex flex-col gap-1">
-      {navItems.map(({ to, labelKey, icon: Icon }) => (
+      {navItems.map(({ to, labelKey, label, icon: Icon }) => (
         <NavLink
           key={to}
           to={to}
@@ -51,7 +57,7 @@ export function SidebarNavLinks({ onNavigate }: SidebarNavLinksProps) {
           }
         >
           <Icon className="h-4 w-4" />
-          {t(labelKey)}
+          {label ?? t(labelKey)}
         </NavLink>
       ))}
     </nav>

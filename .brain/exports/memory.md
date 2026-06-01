@@ -1,5 +1,8 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-218 Learnings
+- Sprint sprint-218 Learnings: ## Sprint sprint-218 Learnings
+
 ## Sprint sprint-217 Learnings
 - Sprint sprint-217 Learnings: ## Sprint sprint-217 Learnings
 - new sprint: NO_GO — Placeholder 'new sprint' task — no implementation work defined. DIRECTIVES.md contains only 'new sprint' with no concret
