@@ -5812,3 +5812,39 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 211-016: 211-016 — ADR-074 (F2 canlı + F4 enterprise + F5 evrim) + ROADMAP (DONE)
 
 ---
+## Sprint 212 — sprint-212
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-06-01
+**Duration:** 1017s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 15 |
+| Completed | 15 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 6.7% |
+| Duration | 1016651ms |
+
+### Tasks
+
+- 212-001: 212-001 — prompt-evolution RETRO'ya gerçek caller (sprint-reporter wire) (DONE)
+- 212-002: 212-002 — adaptive-agent outcome-tracker'a gerçek caller wire (DONE)
+- 212-003: 212-003 — agent-genealogy promotion-pipeline'a gerçek caller wire (DONE)
+- 212-004: 212-004 — agent-retirement DECAY/promotion'a gerçek caller wire (DONE)
+- 212-005: 212-005 — specialization-drift retro/outcome'a gerçek caller wire (DONE)
+- 212-006: 212-006 — prompt-rollback evolution flow'a gerçek caller wire (DONE)
+- 212-007: 212-007 — Retro "Next Sprint Behavior Changes" bölümü (evrim görünürlüğü) (DONE)
+- 212-008: 212-008 — Routing skew fix: skill→agent aktivasyon sinyali (DONE)
+- 212-009: 212-009 — Routing çeşitlilik guard testi (regresyon önleme) (DONE)
+- 212-010: 212-010 — managed-docs generator: code-derived module sayıları (DONE)
+- 212-011: 212-011 — VISION/IDENTITY "by the numbers" generator: live MCP/CLI sayıları (DONE)
+- 212-012: 212-012 — README badge + Memory V2 benchmark proof (DONE)
+- 212-013: 212-013 — extensions/vscode/ scaffold (Sprint 213-214 tohumu) (DONE)
+- 212-014: 212-014 — VS Code command palette + status bar stub (DONE)
+- 212-015: 212-015 — ADR-075 (F5 runtime wiring + routing skill→agent + doc-generator) + MASTER-PLAN status (DONE)
+
+---

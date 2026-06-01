@@ -285,3 +285,169 @@ export function buildDeferredSection(stats: DeferredStats): string {
   ];
   return lines.join('\n') + '\n';
 }
+
+// ═══ Sprint 212 Task 212-001 — Prompt Evolution Retro Wire ═════════════
+//
+// F5 evolutionary modules were implemented + tested in earlier sprints but
+// shipped with **zero external callers** — dormant code, runtime-invisible.
+// This wire makes `wirePromptEvolutionFromOutcomes` a real retro consumer:
+// sprint-reporter reads the sprint outcome file and produces a markdown
+// suggestion block. SUGGESTION-ONLY — no agent prompt mutation, no disk
+// write to anything but the eventual retro document (caller's responsibility).
+//
+// Mirrors the Sprint 192 liveness/deferred section pattern: a `collect*`
+// helper that pulls data, plus a `build*Section` helper that renders the
+// markdown contract surface. The heading "Prompt Evolution Suggestion" is
+// the stable hook downstream retro readers key off.
+//
+// @see ADR-035 / ADR-037 — wiring respects RBAC: sprint-reporter is in
+//      orchestra (Brain-side), prompt-evolution is a sibling pure helper.
+
+import {
+  wirePromptEvolutionFromOutcomes,
+  type PromptEvolutionResult,
+} from './prompt-evolution.js';
+
+export type { PromptEvolutionResult } from './prompt-evolution.js';
+
+/** Arguments accepted by {@link collectPromptEvolutionSuggestion}. */
+export interface PromptEvolutionSuggestionInput {
+  /** Project root — the directory that owns `.deckent/routing/outcomes`. */
+  projectRoot: string;
+  /** Sprint id used as the outcome filename stem (e.g. `sprint-212`). */
+  sprintId: string;
+  /**
+   * Seed prompt for the evolution pass. Retro callers can pass the empty
+   * string when they only want the change list + evolved suffix.
+   */
+  basePrompt?: string;
+}
+
+/**
+ * Read sprint outcomes from disk and produce a prompt-evolution suggestion.
+ *
+ * This is the **external caller** that the dormant
+ * {@link wirePromptEvolutionFromOutcomes} has been missing — it lifts the
+ * F5 evolutionary loop out of test-only scope into the live RETRO phase.
+ *
+ * Pure with respect to disk: it READS the routing outcomes file but writes
+ * nothing. The returned {@link PromptEvolutionResult} is a suggestion that
+ * downstream retro consumers may render via
+ * {@link buildPromptEvolutionSection}.
+ */
+export function collectPromptEvolutionSuggestion(
+  input: PromptEvolutionSuggestionInput,
+): PromptEvolutionResult {
+  return wirePromptEvolutionFromOutcomes({
+    projectRoot: input.projectRoot,
+    sprintId: input.sprintId,
+    basePrompt: input.basePrompt ?? '',
+  });
+}
+
+/**
+ * Format a {@link PromptEvolutionResult} as a retro markdown section.
+ *
+ * The "Prompt Evolution Suggestion" heading is the contract surface —
+ * retro readers and downstream tooling key off this exact string. The
+ * section is always rendered (even when no changes were suggested) so
+ * reviewers can distinguish "no signal this sprint" from "F5 wire missing".
+ */
+export function buildPromptEvolutionSection(
+  result: PromptEvolutionResult,
+): string {
+  const percent = Math.round(result.successRate * 100);
+  const changeLine =
+    result.changes.length === 0
+      ? '- Suggested changes: none'
+      : `- Suggested changes: ${result.changes.join(', ')}`;
+  const lines = [
+    '## Prompt Evolution Suggestion',
+    '',
+    `- Outcomes considered: ${result.outcomeCount}`,
+    `- Success rate: ${percent}%`,
+    changeLine,
+  ];
+  if (result.changes.length > 0 && result.evolvedPrompt.trim().length > 0) {
+    lines.push('', '### Evolved Prompt (suggestion — not applied)', '', result.evolvedPrompt);
+  }
+  return lines.join('\n') + '\n';
+}
+
+// ═══ Sprint 212 Task 212-005 — Specialization Drift Retro Wire ══════════
+//
+// `specialization-drift.ts` (`SpecializationDriftDetector`) was implemented
+// and tested but had **zero external callers** — dormant code, invisible at
+// runtime. This wire makes it a live retro consumer: sprint-reporter reads
+// per-agent task execution data and surfaces drift scores + recommendations
+// in the sprint retro. SUGGESTION-ONLY — no agent mutation, no disk writes.
+//
+// Mirrors the Sprint 192 liveness/deferred and Sprint 212 prompt-evolution
+// section pattern: a pure `collect*` helper + a `build*Section` formatter.
+// The "Specialization Drift" heading is the stable contract surface.
+//
+// @see ADR-041 — Agent Taxonomy (horizontal skills vs vertical agents)
+
+import {
+  SpecializationDriftDetector,
+  type DriftReport,
+  type RecentResult,
+} from '../agents/specialization-drift.js';
+
+export type { DriftReport, RecentResult } from '../agents/specialization-drift.js';
+
+/** Input descriptor for a single agent's drift analysis. */
+export interface AgentDriftInput {
+  /** The agent's identifier (e.g. `refactorer`). */
+  agentId: string;
+  /** Keywords declaring the agent's intended specialization. */
+  triggerKeywords: string[];
+  /** Recent task results used to infer the agent's actual work domain. */
+  recentResults: RecentResult[];
+}
+
+/**
+ * Detect specialization drift for a list of agents.
+ *
+ * This is the **external caller** that makes the dormant
+ * {@link SpecializationDriftDetector} live: sprint-reporter calls it during
+ * the RETRO phase to flag agents whose recent task execution diverges from
+ * their declared trigger keywords.
+ *
+ * Pure function — no side effects, no I/O. Returns one {@link DriftReport}
+ * per input entry; empty input returns an empty array.
+ */
+export function collectSpecializationDriftReports(
+  agents: AgentDriftInput[],
+): DriftReport[] {
+  const detector = new SpecializationDriftDetector();
+  return agents.map(({ agentId, triggerKeywords, recentResults }) =>
+    detector.detect(agentId, triggerKeywords, recentResults),
+  );
+}
+
+/**
+ * Format an array of {@link DriftReport}s as a retro markdown section.
+ *
+ * The "Specialization Drift" heading is the contract surface for retro
+ * readers and downstream tooling. The section is always rendered (even
+ * when the input is empty) so reviewers can distinguish "all agents
+ * aligned" from "drift analysis not run".
+ */
+export function buildSpecializationDriftSection(reports: DriftReport[]): string {
+  const lines = ['## Specialization Drift', ''];
+
+  if (reports.length === 0) {
+    lines.push('- No agent drift data available.');
+    return lines.join('\n') + '\n';
+  }
+
+  for (const r of reports) {
+    const pct = Math.round(r.driftScore * 100);
+    lines.push(
+      `- **${r.agentId}**: drift ${pct}% — recommendation: ${r.recommendation}`,
+    );
+  }
+
+  return lines.join('\n') + '\n';
+}

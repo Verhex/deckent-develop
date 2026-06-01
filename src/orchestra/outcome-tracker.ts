@@ -9,6 +9,7 @@ import { LEARNING_BONUS_CAP } from '../core/routing-types.js';
 import { debugLog } from '../core/utils.js';
 import type { LearningConfig } from '../core/decision-config.js';
 import { ErrorRegistry } from '../core/errors.js';
+import { adaptAgentRuntime, type ResultEntry, type SkillAdaptation } from '../agents/adaptive-agent.js';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -22,6 +23,12 @@ export interface RoutingOutcome {
   coverage: number;
   qualityScore?: number; // 0-100 from QualityAssessor
   routingVersion: 'v1' | 'v2';
+  /**
+   * Advisory skill add/remove suggestion produced by adaptAgentRuntime
+   * over recent ResultEntry history. Never auto-applied — Brain reviews.
+   * See ADR-035/037 (advisory metadata) and src/agents/adaptive-agent.ts.
+   */
+  skillAdaptation?: SkillAdaptation;
 }
 
 export interface EntityPerformance {
@@ -174,10 +181,54 @@ export class OutcomeTracker {
     this.learnings.totalOutcomes++;
     this.learnings.updatedAt = new Date().toISOString();
 
+    // Advisory: ask adaptive-agent for skill add/remove suggestion based on
+    // recent ResultEntry history for this agent. Attached as outcome metadata.
+    const adaptation = this.generateSkillAdaptation(outcome);
+    if (adaptation) {
+      outcome.skillAdaptation = adaptation;
+    }
+
     // Save sprint outcome
     this.saveSprintOutcome(outcome);
     // Save accumulated learnings
     this.saveLearnings();
+  }
+
+  /**
+   * Build recent ResultEntry[] for this agent from prior sprint outcome files
+   * and the current in-flight outcome, then call adaptAgentRuntime to produce
+   * a skill add/remove suggestion. Returns undefined for generic/null agents.
+   */
+  private generateSkillAdaptation(outcome: RoutingOutcome): SkillAdaptation | undefined {
+    if (!outcome.agentId || outcome.agentId === 'generic') return undefined;
+
+    const priorSprints = this.learnings.recentSprints.filter(s => s !== outcome.sprintId);
+    const windowSprints = priorSprints.slice(-this.RECENT_SPRINT_WINDOW);
+    const recentResults: ResultEntry[] = [];
+
+    for (const sprintId of windowSprints) {
+      const filePath = join(this.projectRoot, OUTCOMES_DIR, `${sprintId}.json`);
+      try {
+        if (!existsSync(filePath)) continue;
+        const prior = JSON.parse(readFileSync(filePath, 'utf-8')) as RoutingOutcome[];
+        for (const o of prior) {
+          if (o.agentId === outcome.agentId) {
+            recentResults.push({ evaluation: o.evaluation, coverage: o.coverage, sprintId: o.sprintId });
+          }
+        }
+      } catch (err) {
+        debugLog('outcome-tracker:adapt-runtime-read', err);
+      }
+    }
+
+    recentResults.push({
+      evaluation: outcome.evaluation,
+      coverage: outcome.coverage,
+      sprintId: outcome.sprintId,
+    });
+
+    const { skillAdaptation } = adaptAgentRuntime(outcome.agentId, '', outcome.skillIds, recentResults);
+    return skillAdaptation;
   }
 
   /**

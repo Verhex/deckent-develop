@@ -7,6 +7,8 @@
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import type { RoutingOutcome } from './outcome-tracker.js';
+import { PromptRollback } from '../agents/prompt-rollback.js';
+import type { RollbackResult } from '../agents/prompt-rollback.js';
 
 const OUTCOMES_DIR = '.deckent/routing/outcomes';
 
@@ -155,4 +157,62 @@ function loadSprintOutcomes(projectRoot: string, sprintId: string): RoutingOutco
   } catch {
     return [];
   }
+}
+
+// ─── Rollback Wire ──────────────────────────────────────────────────────────
+// When an evolved prompt shows low performance (successRate < 50% with ≥3
+// outcomes), delegate to PromptRollback to suggest reverting to the best
+// historical prompt version. This is the real external caller that activates
+// the dormant prompt-rollback module in the evolution flow.
+
+export interface PromptRollbackSuggestion {
+  agentId: string;
+  rolledBackTo: number;
+  reason: string;
+}
+
+export interface PromptEvolutionWithRollback extends PromptEvolutionResult {
+  rollbackSuggestion?: PromptRollbackSuggestion;
+}
+
+/**
+ * Evolve a prompt and, when the outcome history shows poor performance,
+ * call PromptRollback to suggest reverting to the best historical version.
+ * Returns an extended result that includes the optional rollback suggestion.
+ */
+export function evolvePromptCheckRollback(
+  basePrompt: string,
+  outcomes: RoutingOutcome[],
+  agentId: string,
+  projectRoot: string,
+): PromptEvolutionWithRollback {
+  const evolved = evolvePrompt(basePrompt, outcomes);
+
+  if (outcomes.length === 0) {
+    return evolved;
+  }
+
+  const rb = new PromptRollback(projectRoot);
+  const needsRollback = rb.shouldRollback(agentId, {
+    uses: outcomes.length,
+    successRate: evolved.successRate,
+  });
+
+  if (!needsRollback) {
+    return evolved;
+  }
+
+  const result: RollbackResult | null = rb.rollbackPrompt(agentId);
+  if (!result) {
+    return evolved;
+  }
+
+  return {
+    ...evolved,
+    rollbackSuggestion: {
+      agentId,
+      rolledBackTo: result.rolledBackTo,
+      reason: result.reason,
+    },
+  };
 }

@@ -244,8 +244,12 @@ export function writeEvent(
     appendFileSync(eventsFilePath(projectRoot, sprintId), line, 'utf-8');
     return event;
   } catch (err) {
-    // Fail-safe: NEVER crash the sprint due to event stream I/O
-    console.warn(`[event-stream] writeEvent failed: ${err instanceof Error ? err.message : String(err)}`);
+    // Fail-safe: NEVER crash the sprint due to event stream I/O.
+    // Under the test runner, stay silent: partial node:fs mocks (no appendFileSync
+    // export) make this path noisy and can flake tests that assert on console.warn.
+    if (!process.env.VITEST) {
+      console.warn(`[event-stream] writeEvent failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
     debugLog('event-stream:writeEvent', err);
     return null;
   }

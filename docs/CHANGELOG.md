@@ -2,6 +2,28 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint212] - 2026-06-01
+
+### Added
+
+- 212-001 — prompt-evolution RETRO'ya gerçek caller (sprint-reporter wire)
+- 212-002 — adaptive-agent outcome-tracker'a gerçek caller wire
+- 212-003 — agent-genealogy promotion-pipeline'a gerçek caller wire
+- 212-004 — agent-retirement DECAY/promotion'a gerçek caller wire
+- 212-005 — specialization-drift retro/outcome'a gerçek caller wire
+- 212-006 — prompt-rollback evolution flow'a gerçek caller wire
+- 212-007 — Retro "Next Sprint Behavior Changes" bölümü (evrim görünürlüğü)
+- 212-009 — Routing çeşitlilik guard testi (regresyon önleme)
+- 212-010 — managed-docs generator: code-derived module sayıları
+- 212-011 — VISION/IDENTITY "by the numbers" generator: live MCP/CLI sayıları
+
+### Fixed
+
+- 212-008 — Routing skew fix: skill→agent aktivasyon sinyali
+
+
+_Tasks: 15 total, 15 done, 0 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint211] - 2026-06-01
 
 ### Added

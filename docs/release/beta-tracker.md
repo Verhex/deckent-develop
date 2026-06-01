@@ -194,7 +194,7 @@ The Sprint 145-150 cutover table and Sprint 175 Embedded Web Terminal section co
 | Metrik | Değer |
 |--------|-------|
 | Version | 1.0.0-beta.1 |
-| Sprint | sprint-211 |
+| Sprint | sprint-212 |
 | MCP Tools | 28 |
 | MCP Resources | 8 |
 | CLI Commands | 62+ |
@@ -1051,13 +1051,13 @@ Every blocker was directly verified in the codebase. False claims have been corr
 ## Sprint Metrics
 | Metrik | Değer |
 |--------|-------|
-| Sprint | sprint-211 |
-| Toplam Task | 16 |
-| Tamamlanan | 16 |
+| Sprint | sprint-212 |
+| Toplam Task | 15 |
+| Tamamlanan | 15 |
 | Tech Debt | 0 |
 | No-Go | 0 |
-| Süre | 16dk 19sn |
-| Coverage | 0.0% |
+| Süre | 16dk 56sn |
+| Coverage | 6.7% |
 
 ## Sprint History (Sprint 136-166)
 | Sprint | Tasks | Done | NO_GO | Duration | Avg Rubric | Theme |

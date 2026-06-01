@@ -1,6 +1,6 @@
 // ─── Sprint Retro Writer ─────────────────────────────────────────
 // Extracted from sprint-reporter.ts — retro generation, learnings, memory, decay
-import { existsSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { TaskEvaluation, TaskStatus } from '../core/types.js';
 import type {
@@ -59,6 +59,106 @@ export function trimMemoryWithHeader(lines: string[], maxLines: number): string 
   return [...header, ...tail].join('\n');
 }
 
+// ═══ Next Sprint Behavior Changes (Sprint 212 Task 7) ════════════
+//
+// Make F5 evolution visible after each sprint. Renders agent skill mutations
+// (212-002 adaptAgentRuntime → RoutingOutcome.skillAdaptation), and accepts
+// future genealogy / retirement signals (212-003 / 212-004) via the optional
+// inputs on buildNextSprintBehaviorChanges — user feedback: "kazanım hissedemiyorum"
+// (evolution happened but was invisible).
+
+/** Shape of a single skill-adaptation row consumed by the retro renderer.
+ *  Matches `RoutingOutcome.skillAdaptation` from outcome-tracker (Task 212-002)
+ *  without importing the full RoutingOutcome type to avoid coupling. */
+export interface SkillAdaptationInput {
+  agentId: string;
+  suggestAdd: string[];
+  suggestRemove: string[];
+  reason: string;
+}
+
+/** Future-extension placeholder for genealogy entries (Task 212-003). */
+export interface GenealogyChangeInput {
+  agentId: string;
+  parentAgentId?: string;
+  mutation?: string;
+}
+
+/** Future-extension placeholder for retirement entries (Task 212-004). */
+export interface RetirementChangeInput {
+  agentId: string;
+  reason?: string;
+}
+
+/** A single rendered line in the "Next Sprint Behavior Changes" section. */
+export interface BehaviorChange {
+  category:
+    | 'agent-skill-add'
+    | 'agent-skill-remove'
+    | 'agent-genealogy'
+    | 'agent-retirement'
+    | 'decision-pattern';
+  summary: string;
+}
+
+export interface BehaviorChangeInputs {
+  skillAdaptations?: SkillAdaptationInput[];
+  /** Optional — Task 212-003 wire (degrades gracefully when absent). */
+  genealogy?: GenealogyChangeInput[];
+  /** Optional — Task 212-004 wire (degrades gracefully when absent). */
+  retirements?: RetirementChangeInput[];
+}
+
+/**
+ * Build the list of nextSprintChanges visible in the retro. Each non-empty
+ * suggestion (skill add/remove, genealogy lineage, retirement) becomes one
+ * BehaviorChange row. Returns an empty array when nothing to report — caller
+ * suppresses the section header in that case (graceful empty).
+ */
+export function buildNextSprintBehaviorChanges(
+  inputs?: BehaviorChangeInputs,
+): BehaviorChange[] {
+  const changes: BehaviorChange[] = [];
+  if (!inputs) return changes;
+
+  for (const adapt of inputs.skillAdaptations ?? []) {
+    if (adapt.suggestAdd && adapt.suggestAdd.length > 0) {
+      const skillList = adapt.suggestAdd.join(', ');
+      const reason = adapt.reason ? ` (${adapt.reason})` : '';
+      changes.push({
+        category: 'agent-skill-add',
+        summary: `${adapt.agentId}: gain skill${adapt.suggestAdd.length !== 1 ? 's' : ''} ${skillList}${reason}`,
+      });
+    }
+    if (adapt.suggestRemove && adapt.suggestRemove.length > 0) {
+      const skillList = adapt.suggestRemove.join(', ');
+      changes.push({
+        category: 'agent-skill-remove',
+        summary: `${adapt.agentId}: drop skill${adapt.suggestRemove.length !== 1 ? 's' : ''} ${skillList}`,
+      });
+    }
+  }
+
+  for (const lineage of inputs.genealogy ?? []) {
+    const parent = lineage.parentAgentId ? ` from ${lineage.parentAgentId}` : '';
+    const mutation = lineage.mutation ? ` — ${lineage.mutation}` : '';
+    changes.push({
+      category: 'agent-genealogy',
+      summary: `${lineage.agentId}: lineage recorded${parent}${mutation}`,
+    });
+  }
+
+  for (const retire of inputs.retirements ?? []) {
+    const reason = retire.reason ? ` (${retire.reason})` : '';
+    changes.push({
+      category: 'agent-retirement',
+      summary: `${retire.agentId}: retired${reason}`,
+    });
+  }
+
+  return changes;
+}
+
 // ═══ Human-Friendly RETRO Format ═════════════════════════════════
 
 export interface HumanRetroData {
@@ -71,6 +171,8 @@ export interface HumanRetroData {
   previousMetrics?: SprintMetrics | null;
   patterns?: PatternEntry[];
   debt?: DebtItem[];
+  /** Sprint 212 Task 7: visible evolution per sprint (skill mutations, genealogy, retirement). */
+  behaviorChanges?: BehaviorChange[];
 }
 
 /**
@@ -181,6 +283,19 @@ export function formatHumanRetro(data: HumanRetroData): string {
     lines.push('## Learnings');
     for (const l of learnings) {
       lines.push(`- ${l}`);
+    }
+    lines.push('');
+  }
+
+  // ─── Next Sprint Behavior Changes (Sprint 212 Task 7) ──────────
+  // Surfaces F5 evolution outputs (skill mutations from 212-002, genealogy
+  // from 212-003, retirement from 212-004) so each sprint shows a visible
+  // delta. Section is omitted when no behavior changes are observed.
+  const behaviorChanges = data.behaviorChanges ?? [];
+  if (behaviorChanges.length > 0) {
+    lines.push('## Next Sprint Behavior Changes');
+    for (const change of behaviorChanges) {
+      lines.push(`- [${change.category}] ${change.summary}`);
     }
     lines.push('');
   }
@@ -357,6 +472,33 @@ export function buildRetroLearnings(
   return items;
 }
 
+// ═══ Behavior Changes — Outcomes File Loader (Sprint 212 Task 7) ═
+//
+// Reads `.deckent/routing/outcomes/<sprintId>.json` (the same file outcome-tracker
+// writes via saveSprintOutcome) and extracts every `skillAdaptation` field so the
+// retro renderer can surface them as "Next Sprint Behavior Changes". Returns an
+// empty array when the file is missing or malformed — degrades gracefully.
+export function loadBehaviorChangesFromOutcomes(
+  projectRoot: string,
+  sprintId: string,
+): BehaviorChange[] {
+  const outcomesPath = join(projectRoot, '.deckent/routing/outcomes', `${sprintId}.json`);
+  if (!existsSync(outcomesPath)) return [];
+
+  try {
+    const raw = readFileSync(outcomesPath, 'utf-8');
+    const outcomes = JSON.parse(raw) as Array<{ skillAdaptation?: SkillAdaptationInput }>;
+    const skillAdaptations: SkillAdaptationInput[] = [];
+    for (const o of outcomes) {
+      if (o.skillAdaptation) skillAdaptations.push(o.skillAdaptation);
+    }
+    return buildNextSprintBehaviorChanges({ skillAdaptations });
+  } catch (e) {
+    debugLog('sprint-retro-writer:loadBehaviorChangesFromOutcomes', e);
+    return [];
+  }
+}
+
 // ═══ Write Retrospective ═════════════════════════════════════════
 
 /**
@@ -477,6 +619,12 @@ export function writeRetrospective(
     } catch (e) { debugLog('writeRetrospective:readFromDB', e); }
   }
 
+  // Sprint 212 Task 7: load routing outcomes from disk (written by outcome-tracker
+  // via Task 212-002 wire) and extract per-agent skillAdaptation rows so the retro
+  // can render "Next Sprint Behavior Changes". Silent no-op when the outcomes
+  // file is absent (e.g. first sprint, or test envs without routing wired).
+  const behaviorChanges = loadBehaviorChangesFromOutcomes(projectRoot, sprint.id);
+
   // Generate human-friendly RETRO content
   const retroContent = formatHumanRetro({
     sprint,
@@ -488,6 +636,7 @@ export function writeRetrospective(
     previousMetrics,
     patterns,
     debt,
+    behaviorChanges,
   });
 
   // B8 (Memory V2): the legacy `.brain/RETRO.md` + `.brain/MEMORY.md` file

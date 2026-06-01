@@ -1,0 +1,33 @@
+{
+  "name": "deckent-vscode",
+  "displayName": "Deckent",
+  "description": "VS Code integration for Deckent AI agent orchestration — sprint control from the IDE.",
+  "version": "0.0.1",
+  "publisher": "deckent",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["Other"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "deckent.startSprint",
+        "title": "Deckent: Start Sprint"
+      },
+      {
+        "command": "deckent.showDashboard",
+        "title": "Deckent: Show Dashboard"
+      }
+    ]
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.0.0"
+  }
+}

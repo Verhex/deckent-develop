@@ -318,3 +318,90 @@ export function getDynamicExclusions(
 
   return [...exclusions];
 }
+
+// ─── Skill→Agent Affinity Signal (Sprint 212-008) ──────────────────────────
+//
+// Routing skew fix: skill routing diversifies (frontend-design, security-specialist,
+// api-builder skills attach to tasks) but AGENT selection collapses to refactorer
+// for ~75% of a sprint because the routing engine has no skill→agent bonus.
+//
+// SKILL_AGENT_MAP wires the implicit affinity: when a domain skill is in the
+// task's assigned skill set, the corresponding domain agent receives
+// SKILL_AGENT_AFFINITY_BONUS in agent scoring. Refactorer remains a viable
+// candidate (no penalty, no negative score) — the bonus is purely additive,
+// preserving Sprint 205's "refactorer-still-eligible" guard.
+//
+// The mapping mirrors the natural skill↔agent specialization pairs in the
+// built-in pool (DECKENT.md "Built-in Agents 15" / "Built-in Skills 21").
+
+/** Score added to an agent when at least one of the task's assigned skills
+ *  maps to that agent in SKILL_AGENT_MAP. Equal to DOMAIN_MATCH_BONUS in
+ *  routing-engine.ts so skill-derived affinity is on par with intent/domain
+ *  derived affinity — no signal dominates. */
+export const SKILL_AGENT_AFFINITY_BONUS = 3;
+
+/**
+ * Map a built-in skill id → the built-in agent id whose specialization aligns
+ * with that skill. Multiple skills can map to the same agent (e.g. both
+ * `frontend-design` and `react-specialist` → `frontend-designer`).
+ *
+ * Refactorer, architect, code-reviewer, bug-fixer are intentionally absent —
+ * they are generalist agents that should be selected via base activation
+ * scoring (intent/domain rules), not by skill→agent affinity.
+ */
+export const SKILL_AGENT_MAP: Readonly<Record<string, string>> = {
+  // Frontend / UI cluster
+  'frontend-design':       'frontend-designer',
+  'react-specialist':      'frontend-designer',
+  'accessibility-expert':  'accessibility-auditor',
+
+  // Security cluster
+  'security-specialist':   'security-auditor',
+
+  // API cluster
+  'api-builder':           'api-builder',
+  'graphql-expert':        'api-builder',
+
+  // Docs cluster
+  'documentation-writer':  'doc-writer',
+
+  // DevOps / infra cluster
+  'docker-expert':         'devops-engineer',
+  'devops-engineer':       'devops-engineer',
+  'ci-testing':            'ci-guardian',
+
+  // Data / migration cluster
+  'database-migration':    'data-engineer',
+  'migration-expert':      'migration-specialist',
+
+  // Performance / architecture cluster
+  'performance-optimizer': 'performance-analyzer',
+  'system-architect':      'architect',
+};
+
+/**
+ * Skill→agent affinity bonus for agent scoring.
+ *
+ * Returns SKILL_AGENT_AFFINITY_BONUS when at least one skill in
+ * `assignedSkills` maps to `agentId` via SKILL_AGENT_MAP. The bonus is
+ * capped at one application (matching DOMAIN_MATCH_BONUS semantics) so a
+ * task with three frontend skills still grants frontend-designer +3, not +9.
+ *
+ * @param agentId         The agent being scored.
+ * @param assignedSkills  Skill ids the routing engine plans to assign
+ *                        (or has assigned) to this task.
+ * @returns SKILL_AGENT_AFFINITY_BONUS if any assigned skill maps to
+ *          agentId, 0 otherwise.
+ */
+export function getSkillAgentAffinityBonus(
+  agentId: string,
+  assignedSkills: readonly string[] | undefined,
+): number {
+  if (!assignedSkills || assignedSkills.length === 0) return 0;
+  for (const skillId of assignedSkills) {
+    if (SKILL_AGENT_MAP[skillId] === agentId) {
+      return SKILL_AGENT_AFFINITY_BONUS;
+    }
+  }
+  return 0;
+}

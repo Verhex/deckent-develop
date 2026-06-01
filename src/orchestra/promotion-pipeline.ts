@@ -8,6 +8,9 @@ import type { OutcomeTracker, EntityPerformance } from './outcome-tracker.js';
 import { ensureAgentPromptMd } from './temp-agent-generator.js';
 import type { AgentDefinition } from '../core/agent-types.js';
 import { debugLog } from '../core/utils.js';
+import { AgentGenealogy } from '../agents/agent-genealogy.js';
+import { AgentRetirement } from '../agents/agent-retirement.js';
+import type { RetirementStats } from '../agents/agent-retirement.js';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -44,6 +47,8 @@ export class PromotionPipeline {
   private readonly projectRoot: string;
   private readonly promotionCriteria: PromotionCriteria;
   private readonly demotionCriteria: DemotionCriteria;
+  private readonly genealogy: AgentGenealogy;
+  private readonly retirement: AgentRetirement;
 
   constructor(
     projectRoot: string,
@@ -53,6 +58,8 @@ export class PromotionPipeline {
     this.projectRoot = projectRoot;
     this.promotionCriteria = { ...DEFAULT_PROMOTION, ...promotionCriteria };
     this.demotionCriteria = { ...DEFAULT_DEMOTION, ...demotionCriteria };
+    this.genealogy = new AgentGenealogy(projectRoot);
+    this.retirement = new AgentRetirement(projectRoot);
   }
 
   /**
@@ -142,6 +149,7 @@ export class PromotionPipeline {
               // goes live.
               ensurePromotedAgentPrompt(this.projectRoot, raw, entityId);
             } catch { /* non-fatal — manifest update failed */ }
+            try { this.genealogy.registerAgent(entityId, null, 'promoted to permanent'); } catch { /* non-fatal */ }
             debugLog('promotion-pipeline:promote', `agent '${entityId}' promoted from persistent temp pool`);
             return true;
           }
@@ -174,6 +182,7 @@ export class PromotionPipeline {
           const raw = JSON.parse(readFileSync(join(permDir, 'agent.json'), 'utf-8'));
           ensurePromotedAgentPrompt(this.projectRoot, raw, entityId);
         } catch { /* non-fatal — agent.json missing or unreadable */ }
+        try { this.genealogy.registerAgent(entityId, null, 'promoted to permanent'); } catch { /* non-fatal */ }
       }
 
       debugLog('promotion-pipeline:promote', `${entityType} '${entityId}' promoted to ${permDir}`);
@@ -207,6 +216,27 @@ export class PromotionPipeline {
       raw.enabled = false;
       raw._demotedAt = new Date().toISOString();
       writeFileSync(manifestFile, JSON.stringify(raw, null, 2), 'utf-8');
+
+      if (entityType === 'agent') {
+        try { this.genealogy.removeAgent(entityId); } catch { /* non-fatal */ }
+        // Evaluate for full retirement beyond simple disable
+        const agentStats = typeof raw.stats === 'object' && raw.stats !== null
+          ? (raw.stats as Record<string, unknown>)
+          : {};
+        const retirementStats: RetirementStats = {
+          successRate: typeof agentStats.successRate === 'number' ? agentStats.successRate : 0,
+          totalUses: typeof agentStats.totalUses === 'number' ? agentStats.totalUses : 0,
+          sprintsParticipated: typeof agentStats.sprintsParticipated === 'number' ? agentStats.sprintsParticipated : 0,
+        };
+        const agentSource = (raw.source === 'builtin' || raw.source === 'user' || raw.source === 'learned')
+          ? (raw.source as 'builtin' | 'user' | 'learned')
+          : 'user';
+        const retirementEval = this.retirement.evaluateForRetirement(entityId, retirementStats, agentSource);
+        if (retirementEval.shouldRetire) {
+          const retireReason = `Demotion-retirement: ${retirementEval.reasons.join('; ')}`;
+          try { this.retirement.retire(entityId, retireReason); } catch { /* non-fatal */ }
+        }
+      }
 
       debugLog('promotion-pipeline:demote', `${entityType} '${entityId}' demoted (disabled)`);
       return true;

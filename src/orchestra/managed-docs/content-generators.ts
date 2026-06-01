@@ -106,6 +106,38 @@ export function getAllGenerators(): SectionGenerator[] {
 }
 
 /**
+ * Count .ts module files in a directory (non-recursive).
+ * Returns 0 if the directory does not exist.
+ */
+export function countModules(dir: string): number {
+  if (!existsSync(dir)) return 0;
+  return readdirSync(dir).filter(f => f.endsWith('.ts')).length;
+}
+
+/**
+ * Count MCP tools registered in src/mcp/server.ts by scanning unique deckent_ names.
+ * More accurate than file counting since server.ts is the registration source of truth.
+ */
+export function mcpToolCount(projectRoot: string): number {
+  const serverPath = join(projectRoot, 'src', 'mcp', 'server.ts');
+  if (!existsSync(serverPath)) return 0;
+  const src = readFileSync(serverPath, 'utf-8');
+  const matches = src.match(/deckent_[a-z_]+/g) ?? [];
+  return new Set(matches).size;
+}
+
+/**
+ * Count CLI commands registered in src/cli/index.ts by counting register[A-Z] imports.
+ * Each import line corresponds to one registered top-level CLI command.
+ */
+export function cliCommandCount(projectRoot: string): number {
+  const indexPath = join(projectRoot, 'src', 'cli', 'index.ts');
+  if (!existsSync(indexPath)) return 0;
+  const src = readFileSync(indexPath, 'utf-8');
+  return (src.match(/^import \{ register[A-Z]/gm) ?? []).length;
+}
+
+/**
  * Generate content for all auto sections.
  * Returns a map of sectionTitle → generated markdown content.
  * Optional `extraGenerators` are searched before built-ins (user overrides).
@@ -587,11 +619,8 @@ register({
     const s = i18n(ctx);
     const srcDir = join(ctx.projectRoot, 'src');
 
-    // MCP tools (exclude index.ts and job-runner.ts helper)
-    const mcpDir = join(srcDir, 'mcp', 'tools');
-    const mcpTools = existsSync(mcpDir)
-      ? readdirSync(mcpDir).filter(f => f.endsWith('.ts') && f !== 'index.ts' && f !== 'job-runner.ts').length
-      : 0;
+    // MCP tools — derived from server.ts registered deckent_ names (canonical count)
+    const mcpTools = mcpToolCount(ctx.projectRoot);
 
     // MCP resources (exclude index.ts)
     const resDir = join(srcDir, 'mcp', 'resources');
@@ -605,11 +634,8 @@ register({
       ? readdirSync(pagesDir).filter(f => f.endsWith('.tsx')).length
       : 0;
 
-    // CLI commands (exclude index.ts)
-    const cliDir = join(srcDir, 'cli', 'commands');
-    const cliCmds = existsSync(cliDir)
-      ? readdirSync(cliDir).filter(f => f.endsWith('.ts') && f !== 'index.ts').length
-      : 0;
+    // CLI commands — derived from cli/index.ts register* imports (canonical count)
+    const cliCmds = cliCommandCount(ctx.projectRoot);
 
     // Version from package.json
     const pkgPath = join(ctx.projectRoot, 'package.json');
@@ -663,5 +689,36 @@ register({
       `| Skills | ${skillLabel} |`,
       `| Providers | ${providerLabel} |`,
     ].join('\n');
+  },
+});
+
+// ─── Architecture Map ─────────────────────────────────────────────────────
+
+register({
+  id: 'architecture-map',
+  patterns: ['architecture', 'architecture map', 'module counts', 'architecture overview'],
+  patternsByLang: {
+    tr: ['mimari', 'mimari haritası', 'modül sayıları'],
+    de: ['architektur', 'architekturübersicht'],
+    es: ['arquitectura', 'mapa de arquitectura'],
+  },
+  generate(ctx: DocUpdateContext): string {
+    const s = i18n(ctx);
+    const srcDir = join(ctx.projectRoot, 'src');
+    if (!existsSync(srcDir)) return s.srcNotFound;
+
+    const KEY_DIRS = [
+      'core', 'orchestra', 'agents', 'nervous', 'monitor',
+      'connectors', 'providers', 'api', 'mcp', 'cli',
+    ];
+
+    const rows: string[] = [`| ${s.module} | ${s.fileCount} |`, '|-------|-------------|'];
+    for (const dir of KEY_DIRS) {
+      const moduleCount = countModules(join(srcDir, dir));
+      if (moduleCount > 0) {
+        rows.push(`| ${dir}/ | ${moduleCount} |`);
+      }
+    }
+    return rows.join('\n');
   },
 });
