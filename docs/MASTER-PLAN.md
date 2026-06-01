@@ -44,6 +44,7 @@ Three immovable pillars (Alperen-approved 2026-05-31):
 - **Known debt carried into Sprint 212** (honest):
   - **F5 wire-gap:** `prompt-evolution` + `adaptive-agent` have integration entry-points but **0 external callers** — still dormant at runtime. Only `cross-sprint-analyzer` is genuinely wired (via `deckent evolve` CLI). Root cause: per-task scope split the module from its caller, and proof-greps counted the def file. (See memory `feedback_directive_kanit_letter_vs_goal`.)
   - **Agent routing skew:** plan-time/runtime distribution collapsed to 12/16 `refactorer` again. Skill routing diversifies correctly, but agent selection does not. (See memory `feedback_agent_routing_imbalance`.)
+  - **Doc-code drift (Sprint 211 audit):** module counts stale in CLAUDE.md/DECKENT.md — `src/core/` is **111** `.ts` files (docs say 90, +21), `src/orchestra/` is **88** (docs say 76, +12); README badge reads "sprints-190+" (should be 211+); the "96% context reduction" Memory V2 claim has no `docs/benchmark/memory-v2.md` proof file. Tracked under §7 W-H.
 
 ---
 
@@ -55,6 +56,7 @@ Three immovable pillars (Alperen-approved 2026-05-31):
 | F1-001/002/003/006/007 | Ollama bootstrap, provider-agnostic defaults, claude-hardcode cleanup, token throttle | ✅ DONE |
 | F1-004 | Docker provider-aware CLI invocation (binary select + auth + build-arg) | ⬜ P1 |
 | F1-005 | Dockerfile.worker multi-CLI (build-arg opt-in) | ⬜ P1 (depends F1-004) |
+| F1-008 | **Naive (conversational) chat mode** + intent classifier (CASUAL vs TASK→MCP tool invoke) | ✅ DONE — `src/cli/commands/chat.ts` (`classifyChatIntent`, `buildNaiveSystemPrompt`); delegates tool dispatch to host CLI via MCP auto-attach |
 
 ### F2 — Native Chat — **~90%**
 | ID | Item | Status |
@@ -63,6 +65,7 @@ Three immovable pillars (Alperen-approved 2026-05-31):
 | F2-004 | Real ProviderAdapter round-trip (subscription CLI spawn, live registry) | ✅ DONE (Sprint 211) |
 | F2-005 | MCP tool dispatch (deckent_status/memory_query feedback) | ✅ DONE (Sprint 211) |
 | F2-006 | Session persist + resume (memory.db) | ✅ DONE (Sprint 211) |
+| F2-006d | Session persist + **`deckent chat --resume <sessionId>`** | ✅ DONE — `ChatTurn` (session_id/turn_index/role/content/timestamp) via `MemoryStore.appendChatTurn`/`getChatHistory` with FTS5 `chat:<sessionId>` tags; CLI renders recent turns before launch |
 | F2-007 | **Streaming live** (real provider streaming, not mock) | ⚠️ in-progress |
 | F2-008 | **Native SDK round-trip** (true standalone, Path C) | ⬜ Q3 2026 |
 
@@ -88,14 +91,16 @@ Three immovable pillars (Alperen-approved 2026-05-31):
 | F5-002 | adaptive-agent runtime adaptation | ⚠️ entry-point only, **0 external caller** |
 | F5-003 | cross-sprint-analyzer (trend report) + `deckent evolve` CLI | ✅ DONE (genuinely wired) |
 | F5-004 | **Real runtime callers** (sprint lifecycle invokes F5-001/002) | ⬜ Sprint 212 (hygiene priority) |
+| F5-005 | **Dormant evolution modules** (E-2 `prompt-rollback.ts`, E-4 `agent-genealogy.ts`, E-5 `agent-retirement.ts`, E-6 `specialization-drift.ts`) | ⚠️ implemented + tested but **0 external callers** — feature-complete in `src/agents/`, run only in test context; same wire-gap class as F5-001/002 |
 
 ### F6 — Auth Flexibility — **~50%**
 | ID | Item | Status |
 |----|------|--------|
-| F6-001 | Per-task `- Auth:` override | ⚠️ partial (readTaskAuthMode exists) |
+| F6-001 | Per-task `- Auth:` override | ⚠️ partial — `readTaskAuthMode` exists; DIRECTIVES `Provider:` parsing + fallback chain (`resolveProviderWithFallback`/`getEquivalentModel`) wired w/ `tests/core/provider-fallback.test.ts`; **missing:** e2e mixed-provider sprint test (Claude brain + Codex worker + Gemini auditor, real MCP dispatch) |
 | F6-002 | Hybrid mode (subscription brain + API/local workers) | ⚠️ config exists, not fully wired |
 | F6-003 | Auth matrix test (4 combinations) | ⬜ |
 | F6-004 | API real activation + tier-aware throttle | ⬜ **POST-BETA** (Tier-1 30K tok/min cap; subscription-only during beta) |
+| F6-005 | **Live model catalog** (`model-catalog.ts` models.dev fetch + 24h cache + bundled fallback; `deckent models list/refresh/tier`) | ✅ DONE — 13 bundled models as offline fallback, overlaid by live catalog via `mergeApiIdOverrides`; ADR-023 tier routing preserved |
 
 ### F7 — Dashboard & Control Plane — **~75%**
 | ID | Item | Status |
@@ -106,6 +111,8 @@ Three immovable pillars (Alperen-approved 2026-05-31):
 | F7-004 | Terminal hardening (multi-session, history, copy/paste) | ⚠️ ~60% (Sprint 211 partial) |
 | F7-006 | Enterprise view (multi-tenant, RBAC UI) | ⚠️ ~40% (F4 backend ready, UI pending) |
 | F7-007 | Memory/ADR/debt explorer (FTS5 search, ADR timeline) | ⚠️ ~20% (Sprint 211 base) |
+| F7-009 | **Nervous System UI** — `NervousPage.tsx` + pending-approval / panic-guard badge | ⬜ not built — server-side approval flow exists (`src/nervous/executor.ts`); no dashboard page/route (7 pages, no `/nervous`) |
+| F7-010 | **Evolution dashboard page** (`/evolution`: genealogy tree + retirement timeline + prompt-diff viewer) | ⬜ not built — backend modules exist (`agent-genealogy.ts`, `agent-retirement.ts`, `prompt-evolution.ts`, `prompt-metrics.ts`) but no frontend layer |
 
 ---
 
@@ -115,9 +122,10 @@ Three immovable pillars (Alperen-approved 2026-05-31):
 |---|-------------|--------|-----------|
 | **#1** | Embedded Web Terminal (PTY + WS gateway + token auth + audit; ADR-062) | ✅ **GA** (Sprint 175) | F7-004 polish |
 | **#2** | Self-security (prompt/command guard, planner state-hygiene) | ⬜ **not started** | full scope |
-| **#3** | Million-scale (multi-tenant isolation, k8s, mTLS, rate limits) | ⚠️ partial | F3-004 k8s pod-exec, mTLS impl, audit shard |
+| **#3** | Million-scale (multi-tenant isolation, k8s, mTLS, rate limits) | ⚠️ partial | Only `LocalTokenAuthProvider` (SHA-256 single-token); `verifyClientCert?()` is a no-op seam — **no** `RemoteTokenAuthProvider`/mTLS, **no** audit shard, **no** SQLite row-level security; per-tenant `rate-limiter.ts` is the only landed piece. TPM/HSM (PKCS#11) + Redis cluster aggregation not built. Sprint 185–188 plan was redirected to stability work |
+| **#3-ext** | Brain Evolution — retro **"Next Sprint Behavior Changes"** section | ⬜ not built | `sprint-retro-writer.ts` lacks behavior-mutation diff (agent prompt mutation, skill repertoire gained/strengthened/retired, Brain decision-pattern change); ≥3 visible-changes satisfaction threshold not implemented |
 | **#4** | Enterprise integrations (RBAC/audit/rate done; SSO/SIEM/compliance) | ✅ core done | SSO/SIEM/compliance depth (optional) |
-| **#5** | Local LLM (Ollama/CUDA) | ⬜ infra ready | adapter activation (RTX 5090 + CUDA 13.2 + WSL2 ready; 32GB VRAM → 70B residence) |
+| **#5** | Local LLM (Ollama/CUDA) | ⚠️ partial (adapter live, fully-local preset missing) | `OllamaAdapter` (HTTP probe + spawn) + `OLLAMA_BUILTIN_MODELS` (qwen2.5-coder:32b/7b, llama3:8b, llama3.2:3b) with tier mapping are implemented; missing: `worker_provider:ollama` fully-local sprint preset + data-sovereignty test (closed-network, zero-API-cost). RTX 5090 + CUDA 13.2 + WSL2 ready (32GB VRAM → 70B) |
 
 ---
 
@@ -159,6 +167,11 @@ Most beta-critical streams already landed across Sprints 189–211. Remaining:
 | W-I | OSS publish pipeline | ⬜ | public repo flip, npm publish (Alperen manual) |
 | W-J | Million-user hardening | ⬜ post-beta | OTel/Prometheus, ADR-037 RBAC hard-flip V2 |
 | W-K | Dead-code → live-feature wire-up | ⚠️ | overlaps W-E (F5 callers) |
+| W-INTEGRITY | Brain integrity hardening (Sprint 192) | ✅ done | — (`worker-liveness.ts` liveness checks, EVALUATE skips DEFERRED, `TaskEvaluation.DEFERRED`, adaptive `runtime_extension`, liveness-gated synthetic-result lint, `NEVER_DISPATCHED` event + retro reporting) |
+| W-H (detail) | Documentation deliverables gap | ⚠️ partial | Missing: `docs/cookbook/`, full EN user guide, lifecycle/API-surface diagrams, `why-deckent-vs-X`, demo videos, `docs/benchmark/memory-v2.md` (96% claim), `docs/security/threat-model.md`, `docs/adr-index.md`, `npm run docs:test` |
+| W-J (detail) | Performance hardening | ⬜ not built | cold-start <500ms (now ~2s eager imports), lazy-load commands, agent/skill-cache lazy-loader, Memory V2 query index, worker-spawn <3s SLA, `tests/load/`, OTel/Prometheus |
+| W-B (detail) | CLI/MCP parity gaps | ⚠️ partial | MCP missing vs CLI: `deckent_agent_manage`/`deckent_skill_manage` (list-only), `deckent_memory_manage` (query-only), `deckent_cost`; ~20 missing options across history/retro/review/run/explain; no `lint-cli-mcp-parity.mjs` guard |
+| W-A (detail) | i18n contribution path | ⚠️ partial | Dashboard EN/TR + CLI i18n + content-generators present; missing "add-a-language" contribution guide + MCP tool descriptions hardcoded English (no i18n wrapper) |
 
 ---
 
@@ -170,17 +183,26 @@ Most beta-critical streams already landed across Sprints 189–211. Remaining:
 - **Marketing channels:** Show HN, Reddit (r/LocalLLaMA, r/programming, r/opensource), Twitter/X, Turkish dev community, Discord, Dev.to, landing page + demo video.
 - **Competitive position:** the only OSS tool combining multi-agent parallel execution + sprint lifecycle + scope enforcement + memory/learning + multi-provider + MCP-native. Free vs Devin ($20/mo), Cowork (M365), Perplexity ($200/mo).
 - **Growth target:** million users (god-level, no-MVP scope).
+- **DeckentHub (skill marketplace, shipped seed):** `deckent-hub/skills/` holds the 20-skill seed set (spotify-control, telegram-bot, calendar-google, email-imap, weather-forecast, rss-reader, web-scraper, github-issues, slack-notifier, notion-sync, todoist, spotify-playlist, youtube-downloader, reddit-fetcher, twitter-post, screenshot-vision, file-organizer, currency-converter, translator, discord-moderator). `deckent skill publish` = sandbox + Ed25519 sign (`src/core/signature.ts`, @noble/ed25519) + registry push. Hub is a local directory, not yet flipped to a separate `VerhexIO/deckent-hub` repo.
+- **DeckentHub growth + governance (planned):** signing infra done, CI `validate-skill.yml` scaffolded, `rating-system.ts` present. **Not built:** moderation queue, CI auto key-rotation, phased registry growth 20→50→100 with vector search. Post-beta maturation track.
+- **OSS publish pipeline — decisions outstanding:** Done: `.gitignore` excludes `.brain/`/`.tasks/`/`.locks/`, `package.json bin.deckent`, validate-publish engine/entry-point gates. **Undecided/not built:** monorepo-vs-split flip, sensitive-info scrub (no git-filter-repo/BFG/gitleaks pre-commit), final npm package name, `.github/ISSUE_TEMPLATE/`, PR template, `FUNDING.yml`, landing page.
+- **AEGIS public standard track (post-beta, deferred):** ADR-061 Phase 5 names `agentaegis.io` (open standard repo), an AEGIS-compliant-orchestrator certification program, and academic papers (ICSE/FSE 2027, NeurIPS 2026 multi-agent track). Not built — no domain, spec draft, or paper artifacts; deferred until AEGIS Phase 1–4 ship.
 
 ---
 
 ## 9. Beta Gates (status as of 2026-06-01)
 
-20 of the original gates pass: `tsc` clean, vitest ≥99.5% (now 18,390/18,448), coverage, all MCP tools (32) + CLI commands (49+) functional, `npm pack` clean, cross-platform (macOS/Linux/WSL2), multi-provider abstraction, i18n, Memory V2 stress, zero CRITICAL/HIGH debt, ADR governance, Brain stability, synthetic-NO_GO disk-verify gate.
+20 of the original gates pass: `tsc` clean, vitest **18,390 passed / 58 skipped (1,021 files) + dashboard 570 passed (0 failures)**, coverage, all MCP tools (32) + CLI commands (49+) functional, `npm pack` clean, cross-platform (macOS/Linux/WSL2), multi-provider abstraction, i18n, Memory V2 stress, zero CRITICAL/HIGH debt, ADR governance, Brain stability, synthetic-NO_GO disk-verify gate.
+
+Recently closed (Sprint 192–211):
+- **Synthetic NO_GO KAYNAK 6+7 closure** — ✅ both timeout-synthesis (`gateSyntheticTimeoutResult`) and graceKill panic-guard (`gateSyntheticGraceKillResult`) now call `verifyDiskAgainstClaim`, emit `DISK_VS_CLAIM_MISMATCH`, and reclassify to MANUAL_REVIEW_REQUIRED on disk contradiction. Disk-verify gate 100% closed across both paths.
+- **memory.db sprint-log finalize fix + backfill** — ✅ Sprint 197 missing-row bug fixed (`sprint-finalizer.ts` defensive `upsertSprintLog`); reconstruction tool `scripts/backfill-sprint-log-rows.mjs`.
 
 Conditional/open:
 - **Multi-provider runtime** — abstraction ready; docker backend Claude-only, tmux/subprocess support Codex/Gemini (full docker parity = F1-004/005).
 - **Messaging trio** (Discord/Telegram/WhatsApp) — scaffold present, token activation pending.
-- **Documentation sync** — this MASTER-PLAN consolidation + reference re-verify.
+- **M1–M4 monitoring baseline auto-blocker** — ⬜ not built. No baseline-metric gate (cache-key/rule-regen/ADR-insert/stale-md), no cumulative-token >900K checkpoint, no P0 sprint-halt blocker; `auditor.ts` does task-timeout + lock cleanup only. Post-beta observability gate.
+- **Documentation sync** — MASTER-PLAN consolidation done; remaining: README badge (190+ → 211+), unverified "96% context reduction" claim (no benchmark file), CLAUDE.md/DECKENT.md module-count re-sync (§3).
 
 ---
 
@@ -195,7 +217,9 @@ Per Alperen's direction: **combine sprints, write larger comprehensive tasks** (
 | **215** | **Web UI Chat tab (Path A)** | Dashboard "Deckent Chat" surface on the embedded-terminal stack; multi-tenant by inheritance |
 | **216** | **Dashboard god-level redesign (F7-003) + F7-004/006/007** | UI/UX redesign, terminal polish, enterprise view, memory/ADR explorer |
 | **217+** | **F2 streaming + Native SDK (Path C)** | Real streaming; ADR-010 amendment; SDK migration; zero-prerequisite `npx deckent` chat — Q3 2026 |
-| **post-beta** | **Provider/local LLM + million-user hardening** | F1-004/005, sub-#5 Ollama/CUDA, OTel/Prometheus, ADR-037 hard-flip V2, sub-#2 self-security |
+| **post-beta** | **Provider/local LLM + million-user hardening** | F1-004/005, sub-#5 Ollama/CUDA fully-local preset, OTel/Prometheus (W-J), ADR-037 hard-flip V2, sub-#2 self-security |
+| **post-beta (gated)** | **Voice + Mobile (milestone-gated)** | Voice (STT Whisper, wake-word Porcupine, TTS, real-time streaming) gated behind **10K GitHub stars**; Mobile (React Native iOS/Android MCP client, APNs+FCM push, Contacts/GPS/camera skills) gated behind **50K stars**. Both not built — zero source references |
+| **post-beta (if approved)** | **AEGIS methodology (ADR-061)** | Forward-looking spec (status=proposed): 3 layers, 5 roles, 8 artifacts, 9-phase lifecycle, EffectClass-aware verification. Phase 0–5 (orig. Sprint 175–200) never executed — no `src/aegis/`. Phase-1 foundation is the entry point if approved |
 
 ---
 
@@ -218,6 +242,19 @@ Per Alperen's direction: **combine sprints, write larger comprehensive tasks** (
 2. **Routing collapse** — agent diversity is fragile/non-deterministic; specialization value lost if everything routes to `refactorer`. *Mitigation: skill→agent activation signal.*
 3. **Native-chat scope creep** — IDE extension + Path A + Path C is multi-sprint; risk of half-built surfaces. *Mitigation: strict sequence (hygiene → IDE → web → SDK), one surface fully landed before the next.*
 4. **Doc-reality drift** — this consolidation fixes today; re-drift if future status lands only in scattered docs. *Mitigation: MASTER-PLAN is the only roadmap that gets status updates; others are frozen historical.*
+
+---
+
+## 13. Explicitly Out-of-Scope (considered & deferred — recorded for zero-loss)
+
+Items surfaced during the Sprint 211 doc-consolidation audit that were intentionally **not** added to the active plan, with reasons (so nothing silently vanishes):
+
+- **Cloud-hosted SaaS offering** — rejected by ADR-033 (Product-Not-Service); permanent non-goal.
+- **Extra provider adapters** (Groq, Fireworks, Together, litellm), **embeddings/RAG**, **SWE-bench harness**, **monorepo planner**, **skill template gallery**, **blog campaign** — P3+/aspirational; Claude/OpenAI/Google/Ollama footprint meets beta GA.
+- **`deckentd` daemon, Electron tray, native-window framework** — redundant vs Tauri/PWA + embedded terminal; out of scope.
+- **Vector DB, Devin-style wiki semantic indexing, multi-model critique layer, browser/computer-use, deploy capability, progressive-disclosure UX, intent-classifier learning loop, hardware-attested HMAC** — post-GA vision/competitive-gap items with no current code foundation.
+- **Verified non-issues** (claimed bugs that don't exist): memory-rebuild CLI split (Bug Z3 — semantics already correct), `auditor.md` PATTERNS.md regression (template clean), dedicated `brain-self-update.ts` module (hooks already dispersed correctly).
+- **Already-adequately-represented partials** (Reversibility/EffectClass, TaskType extensibility, ADR-055 Hybrid Scoring, ADR-060 Self-Awareness, Nervous Phase 2/3, context-aware routing, rule-evolver) — folded into existing §3/§4/§5/§7 status text rather than duplicated.
 
 ---
 
