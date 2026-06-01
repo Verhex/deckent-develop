@@ -155,7 +155,7 @@ describe('Docker Backend Integration', () => {
     backend = new DockerSpawnBackend(PROJECT_ROOT);
     forceRemoveContainer(containerName);
     cleanupTaskFiles(testTaskId);
-  });
+  }, 30_000);
 
   afterEach(() => {
     // Kill before clearing global state — ensures backend deregisters cleanly.
@@ -183,7 +183,10 @@ describe('Docker Backend Integration', () => {
         }
       }
     } catch { /* ok */ }
-  });
+    // Sprint 211 hygiene: afterEach runs 2× forceRemoveContainer (10s each) +
+    // cleanup; raised hook timeout to 30s so real-docker teardown never trips
+    // the 10s default hookTimeout (the "Hook timed out" intermittent failures).
+  }, 30_000);
 
   // ─── Test 1: isAvailable() matches sync isDockerAvailable() ─────────────
 
@@ -284,7 +287,8 @@ describe('Docker Backend Integration', () => {
 
     // Assert — deregistered immediately after kill()
     expect(backend.list()).not.toContain(testTaskId);
-  });
+    // Sprint 211 hygiene: real docker spawn+kill exceeds the 10s default under load.
+  }, 30_000);
 
   // ─── Test 6: Container cleanup after natural exit ─────────────────────────
   // After claude exits and monitorContainer() fires, the container must be removed.
@@ -321,7 +325,7 @@ describe('Docker Backend Integration', () => {
     // docker rm -f fires before delete(), but there may be a brief async delay
     await waitMs(200);
     expect(backend.list()).not.toContain(testTaskId);
-  }, 15_000);
+  }, 45_000);
 
   // ─── Test 7: list() tracks multiple concurrent spawns ─────────────────────
 
@@ -354,7 +358,9 @@ describe('Docker Backend Integration', () => {
       forceRemoveContainer(containerName2);
       cleanupTaskFiles(taskId2);
     }
-  });
+    // Sprint 211 hygiene: two real docker spawns + kill exceed the 10s default.
+    // Raised to 30s (matches the other multi-container e2e tests below).
+  }, 30_000);
 
   // ─── Test 8: monitorContainer updates heartbeat with backend: docker ─────
   // After container exits naturally, monitorContainer() must write hb with backend field.

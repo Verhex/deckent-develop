@@ -337,7 +337,13 @@ describe('handleEvaluation NO_GO with fresh-eyes rotation', () => {
     expect(skills).toContain('code-simplifier');
   });
 
-  it('fix task on sonnet+bug-fixer preserves sonnet, rotates agent to code-reviewer', () => {
+  it('fix task on sonnet+bug-fixer preserves sonnet AND keeps bug-fixer (Sprint 210-007 selectFixAgent)', () => {
+    // Sprint 210 Task 7 ([[feedback_fix_prompt_quality]]): a bug-fixer original
+    // is already a debug specialist — selectFixAgent keeps it rather than
+    // rotating to code-reviewer (which would lose the debug-first lens). Model
+    // is still preserved (C-03). Fresh-eyes rotation applies to non-bug agents
+    // (architect/refactorer/security → code-reviewer), which the unit tests
+    // for rotateAgentForFix above still cover.
     const task = makeTask({ model: 'sonnet', assignedAgent: 'bug-fixer' });
     const result = makeTaskResult({ selfAssessment: 'NO_GO' });
 
@@ -346,7 +352,7 @@ describe('handleEvaluation NO_GO with fresh-eyes rotation', () => {
     const callArgs = vi.mocked(writeFileSync).mock.calls[0]!;
     const writtenContent = JSON.parse(callArgs[1] as string) as Record<string, unknown>;
     expect(writtenContent['model']).toBe('sonnet'); // C-03: model preserved
-    expect(writtenContent['assignedAgent']).toBe('code-reviewer');
+    expect(writtenContent['assignedAgent']).toBe('bug-fixer'); // 210-007: bug-fixer kept
   });
 });
 

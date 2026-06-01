@@ -149,26 +149,30 @@ export function selectFixAgent(task: Task, exitedWithoutResult: boolean): string
     return originalAgent || DEFAULT_FRESH_EYES_AGENT;
   }
 
+  // Sprint 210 Task 7 + 211 hygiene: classify by AGENT + SKILL signals only.
+  // Title-keyword matching was too aggressive — a generic "Test task" title
+  // tripped isTestTask and suppressed the fresh-eyes rotation that the
+  // fresh-eyes contract (rotateAgentForFix) requires. Agent/skill are the
+  // authoritative routing signals; title is noisy free-text.
   const skills = task.assignedSkills ?? [];
-  const title = (task.title ?? '').toLowerCase();
 
   const isTestTask =
     originalAgent === 'ci-guardian' ||
-    skills.includes('ci-testing') ||
-    /\b(test|spec|vitest|jest)\b/.test(title);
+    skills.includes('ci-testing');
 
   const isDocTask =
     originalAgent === 'doc-writer' ||
-    skills.includes('documentation-writer') ||
-    /\b(doc|readme|changelog|adr)\b/.test(title);
+    skills.includes('documentation-writer');
 
-  const isBugTask =
-    originalAgent === 'bug-fixer' ||
-    /\b(fix|bug|crash|regression|hotfix)\b/.test(title);
+  // bug-fixer originals stay put — already a debug specialist, no fresh-eyes
+  // rotation needed (rotating a bug-fixer to code-reviewer loses debug focus).
+  const isBugTask = originalAgent === 'bug-fixer';
 
   if (isTestTask) return originalAgent || 'ci-guardian';
   if (isDocTask) return 'doc-writer';
   if (isBugTask) return 'bug-fixer';
+  // Everything else (architect, refactorer, security-auditor, generic) falls
+  // through to fresh-eyes rotation so the retry gets a different lens.
   return rotateAgentForFix(originalAgent);
 }
 
