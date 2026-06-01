@@ -1,31 +1,62 @@
-# DIRECTIVES — Sprint 213: User-Facing Make-It-Work (serve+chat+UX) + IDE Extension — HER İKİSİ
+# DIRECTIVES — Sprint 214: P0 Auth-Precedence Fix + User-Facing (213 yeniden) + IDE Extension + F1-009 8-Provider
 
-## Goal: BÜYÜK ÖLÇEK (15 task, 3 dalga, 10 worker). MASTER-PLAN §10 Sprint 213 = HER İKİSİ. DALGA A (User-Facing Make-It-Work): mevcut yüzeyleri kullanıcı-gözü ÇALIŞIR yap — `npx deckent serve` localhost out-of-box (API token dashboard'a inject → DECKENT_API_AUTH_DISABLED gerekmez), Path A embedded dashboard chat (host-CLI'SIZ, server-side ProviderAdapter), chat CLI robust hata UX, F7-003 UI/UX god-level pass. DALGA B (IDE Extension): extensions/vscode/ GERÇEK impl — activation + command palette + sidebar tree (canlı agent/sprint) + status bar + settings. DALGA C: ADR-076 + MASTER-PLAN status + README badge. Her task TEK dosya odaklı/TEK sorumluluk, ≤200 LoC, effort≤normal, YENİ TEST DOSYASI zorunlu.
+## Goal: ÇOK BÜYÜK ÖLÇEK (20 task, 5 dalga, 10 worker). DALGA 0 (P0): auth-precedence bug fix — `npx deckent start` (env-u olmadan) config `auth_mode: subscription`'a saygı duysun (ANTHROPIC_API_KEY container'a koşulsuz geçmesin). DALGA A: user-facing make-it-work (serve out-of-box token-inject + Path A embedded chat host-CLI'sız + chat CLI robust UX + F7-003 UI/UX) — Sprint 213 başarısız oldu (API timeout), yeniden. DALGA B: IDE extension gerçek impl. DALGA C: F1-009 8-provider (OpenAI-uyumlu generic adapter → DeepSeek/Qwen/GLM + dinamik ProviderName + .deck key + bootstrap). DALGA D: ADR + status. Her task TEK dosya odaklı, ≤200 LoC, effort≤normal, YENİ TEST DOSYASI zorunlu.
 
 Bağlam:
-- Sprint 212: 15/15 DONE, F5 evrim CANLI (6/6 caller), routing skill→agent sinyali (212-008) **artık build'li/canlı** → bu sprint'te UI task'ları frontend-designer, güvenlik api-builder/security-auditor'a gitmeli (çeşitlilik beklenir).
-- **User-facing gerçek (MASTER-PLAN §3 ⚠️):** `serve` POST 401 (API token dashboard'a inject edilmiyor — sadece terminal token), `chat` host-CLI bağımlı (Path B "No AI CLI found"), UI/UX %30. Bu sprint bu üçünü kapatır.
-- Wiring% ≠ user-working% ([[feedback_wiring_pct_vs_user_working]]): her yüzey için uçtan-uca gerçek akış doğrulanmalı, "wired" demek yetmez.
+- **Sprint 213 KILL edildi** (PID-confirmed) — tüm worker'lar `env -u` olmadan başlatıldığı için ANTHROPIC_API_KEY ile API moduna gidip timeout → exit-0 → toplu sahte NO_GO. .tasks temizlendi.
+- **Kök bug (KESİN, `spawn-backend-docker.ts:547-553`):** envKeys ANTHROPIC_API_KEY'i `auth_mode` FARK ETMEKSİZİN container'a `-e` ile geçiriyor → CLI API moduna kayıyor. Bu sprint bunu kalıcı çözer ([[feedback_container_auth_precedence]]).
+- F5 evrim canlı (Sprint 212), provider altyapısı 8-provider'a hazır (audit doğrulandı: 3 CLI-spawn adapter + registry + models.dev catalog + .deck secrets; eksik = HTTP OpenAI-compat adapter).
 
 ---
 
 ## Tüm task'lar için ortak kurallar
-- **Subscription mode ZORUNLU** — `env -u ANTHROPIC_API_KEY -u DECKENT_CLAUDE_API_KEY`. API mode YASAK ([[project_api_mode_deferred_post_beta]]).
-- Worker yalnızca scope.filesWrite.
-- **KÜÇÜK TASK:** tek-dosya odaklı/tek-sorumluluk, ≤200 LoC, effort≤normal. high YASAK.
-- **Her kod task'ı YENİ TEST DOSYASI** (min 4 test) — Brain coverage muafiyeti buna bağlı ([[feedback_brain_rubric_bridge_broken]]).
-- **🔑 WIRE-GAP DERSİ ([[feedback_directive_kanit_letter_vs_goal]]):** "bağla/wire" task'ında scope ÇAĞIRAN dosyayı içerir, kanıt-grep def-dosyasını dışlar → gerçek external caller ≥1.
-- **🔑 USER-WORKING KANITI ([[feedback_wiring_pct_vs_user_working]]):** yüzey task'larında uçtan-uca akışı test et (serve→POST→200, chat→mesaj→cevap), "fonksiyon var" yetmez.
-- **Dishonest YASAK** — gerçekten ölç. CLI komutları index.ts'e WIRE et. Modül-seviye çöp/placeholder BIRAKMA ([[feedback_fix_prompt_quality]]).
-- **VS Code extension:** `vscode` modülü test'te MOCK'lanır (gerçek VS Code host gerekmez). `@types/vscode` SADECE extensions/vscode/package.json devDep — **kök package.json'a DOKUNMA** (ADR-010).
-- **Test dosyası doğru dizinde:** dashboard→`tests/dashboard/`, extension→`tests/extensions/`, api→`tests/api/`, cli→`tests/cli/`, scripts→`tests/scripts/`.
-- ESM `.js` suffix. ADR-010 (yeni kök runtime dep YASAK). Hedef: tam-suite 0 fail KORUNUR, regresyon yok.
+- **⚠️ Bu sprint HÂLÂ `env -u ANTHROPIC_API_KEY -u DECKENT_CLAUDE_API_KEY` ile başlatılır** — 214-001 auth fix GELECEK sprint'leri kurtarır (dist build sonrası), bu run'ın worker'ları eski dist'te. API mode YASAK ([[project_api_mode_deferred_post_beta]]).
+- Worker yalnızca scope.filesWrite. **KÜÇÜK TASK:** tek-dosya odaklı/tek-sorumluluk, ≤200 LoC, effort≤normal. high YASAK.
+- **Her kod task'ı YENİ TEST DOSYASI** (min 4 test) ([[feedback_brain_rubric_bridge_broken]]).
+- **🔑 WIRE-GAP DERSİ:** "bağla/wire" task'ında scope ÇAĞIRAN dosyayı içerir, kanıt-grep def-dosyasını dışlar → external caller ≥1 ([[feedback_directive_kanit_letter_vs_goal]]).
+- **🔑 USER-WORKING KANITI:** yüzey task'larında uçtan-uca akış test et (serve→POST→200, chat→cevap), "wired" yetmez ([[feedback_wiring_pct_vs_user_working]]).
+- **Dishonest YASAK** — gerçekten ölç. CLI komutları index.ts'e WIRE et. Çöp/placeholder BIRAKMA ([[feedback_fix_prompt_quality]]).
+- **VS Code extension:** `vscode` modülü test'te MOCK; `@types/vscode` SADECE extensions/vscode/package.json devDep — **kök package.json'a DOKUNMA** (ADR-010).
+- **Yeni provider key'leri** `.deck` secret (ADR-014) + config `providers` — kök package.json'a yeni runtime dep EKLEME (fetch built-in).
+- Test doğru dizinde: dashboard→tests/dashboard/, extension→tests/extensions/, api→tests/api/, cli→tests/cli/, orchestra→tests/orchestra/, core→tests/core/, scripts→tests/scripts/.
+- ESM `.js` suffix. Hedef: tam-suite 0 fail KORUNUR.
 
 ---
 
-## DALGA A — User-Facing Make-It-Work (8 task)
+## DALGA 0 — P0 Auth-Precedence Fix (2 task)
 
-## Task 1: 213-001 — serve: API token'ı dashboard'a inject (localhost out-of-box, 401 fix)
+## Task 1: 214-001 — Docker env-forwarding provider+auth-aware (ANTHROPIC_API_KEY subscription'da strip)
+- Model: opus
+- Effort: normal
+- Skills: typescript-expert, security-specialist
+- Files: src/orchestra/spawn-backend-docker.ts, tests/orchestra/docker-auth-precedence.test.ts
+- Scope: src/orchestra/, tests/orchestra/
+
+### Description
+**Problem (KESİN):** `spawn-backend-docker.ts:547-553` envKeys döngüsü `ANTHROPIC_API_KEY`'i host env'de varsa container'a KOŞULSUZ geçiriyor — `useApiOnly` (subscription/api) FARK ETMİYOR. Container'daki claude CLI key'i görünce API moduna geçiyor → config `auth_mode: subscription` etkisiz → Tier-1 timeout. Kullanıcı her `deckent start`'ta `env -u` yapmak zorunda.
+**Çözüm:** env-forwarding'i **provider+auth-aware** yap: Claude worker + subscription (`!useApiOnly`) → `ANTHROPIC_API_KEY`'i container'a GEÇİRME (CLI subscription ~/.claude'a düşsün). Sadece `useApiOnly` (authMode=api) iken geçir. OPENAI_API_KEY/GOOGLE_API_KEY forwarding'i provider'a göre (codex→OPENAI, gemini→GOOGLE) veya mevcut davranışı koru ama Anthropic'i subscription'da strip et. Surgical, mevcut api-mode davranışını bozma.
+**Kanıt:** `grep -c "useApiOnly\|subscription.*strip\|skip.*ANTHROPIC\|authMode" src/orchestra/spawn-backend-docker.ts` (forwarding bloğunda auth-aware mantık) ≥1; `npx vitest run tests/orchestra/docker-auth-precedence.test.ts` → 4+ pass
+**Test:** ≥4 (subscription+ANTHROPIC_API_KEY set → dockerArgs'a ANTHROPIC EKLENMEZ, api mode → eklenir, codex→OPENAI geçer, gemini→GOOGLE geçer)
+
+## Task 2: 214-002 — Auth-mode resolution guard + smoke (config subscription effective)
+- Model: sonnet
+- Effort: normal
+- Skills: typescript-expert, ci-testing
+- Files: scripts/auth-mode-resolution-smoke.mjs, tests/scripts/auth-mode-resolution-smoke.test.ts
+- Scope: scripts/, tests/scripts/
+- Dependencies: 214-001
+
+### Description
+**Problem:** "config subscription → gerçekten subscription" uçtan-uca doğrulanmıyor.
+**Çözüm:** `auth-mode-resolution-smoke.mjs` — ANTHROPIC_API_KEY set + config auth_mode=subscription iken docker spawn arg'larının ANTHROPIC_API_KEY İÇERMEDİĞİNİ doğrula (gerçek container DEĞİL, arg-build assertion). api mode iken içerdiğini doğrula.
+**Kanıt:** `node scripts/auth-mode-resolution-smoke.mjs` → PASS; `npx vitest run tests/scripts/auth-mode-resolution-smoke.test.ts` → 4+ pass
+**Test:** ≥4 (subscription arg'da yok, api arg'da var, default subscription, mixed env)
+
+---
+
+## DALGA A — User-Facing Make-It-Work (6 task)
+
+## Task 3: 214-003 — serve: API token'ı dashboard'a inject (localhost out-of-box, 401 fix)
 - Model: opus
 - Effort: normal
 - Skills: api-builder, security-specialist
@@ -33,40 +64,40 @@ Bağlam:
 - Scope: src/api/, tests/api/
 
 ### Description
-**Problem (MASTER-PLAN §3):** `npx deckent serve` dashboard'ı yüklüyor (GET) ama POST (start/kill) → 401. API token auto-üretiliyor (`server.ts:918 randomUUID`) ama browser'a inject EDİLMİYOR (sadece terminal token inject'li). Kullanıcı `DECKENT_API_AUTH_DISABLED=1` yapmak zorunda.
-**Çözüm:** Served index.html'e — terminal token pattern'iyle aynı — `window.__DECKENT_API_TOKEN__` enjekte et (SADECE localhost bind'de; non-localhost'ta YASAK, güvenlik). Token = auto-generated finalToken. Böylece dashboard Authorization header'ı atayabilir.
-**Kanıt:** `grep -c "__DECKENT_API_TOKEN__\|injectApiToken" src/api/server.ts` → ≥1; localhost-only guard testte doğrulanır; `npx vitest run tests/api/serve-token-inject.test.ts` → 4+ pass
-**Test:** ≥4 (localhost inject var, non-localhost inject YOK, token = finalToken, auth-disabled modunda no-op)
+**Problem:** `npx deckent serve` dashboard GET yükler ama POST→401; auto-token (`server.ts:918`) browser'a inject edilmiyor (sadece terminal token). Kullanıcı `DECKENT_API_AUTH_DISABLED=1` zorunda.
+**Çözüm:** Served index.html'e `window.__DECKENT_API_TOKEN__` enjekte (SADECE localhost bind; non-localhost YASAK). Token = finalToken. Terminal-token pattern'iyle aynı.
+**Kanıt:** `grep -c "__DECKENT_API_TOKEN__\|injectApiToken" src/api/server.ts` → ≥1; `npx vitest run tests/api/serve-token-inject.test.ts` → 4+ pass
+**Test:** ≥4 (localhost inject, non-localhost YOK, token=finalToken, auth-disabled no-op)
 
-## Task 2: 213-002 — dashboard: inject edilen API token'ı isteğe ekle (useApi)
+## Task 4: 214-004 — dashboard: inject API token'ı isteğe ekle (useApi Bearer)
 - Model: sonnet
 - Effort: normal
 - Skills: react-specialist, typescript-expert
 - Files: src/dashboard/src/lib/useApi.ts, tests/dashboard/useApi-token.test.ts
 - Scope: src/dashboard/, tests/dashboard/
-- Dependencies: 213-001
+- Dependencies: 214-003
 
 ### Description
-**Problem:** Dashboard fetch/POST Authorization header'ı atamıyor → 213-001 inject'i kullanılmıyor.
-**Çözüm:** useApi (veya api client) `window.__DECKENT_API_TOKEN__` varsa `Authorization: Bearer <token>` ekle (GET+POST). Token yoksa header'sız (geriye uyumlu).
+**Problem:** Dashboard fetch Authorization atamıyor → inject kullanılmıyor.
+**Çözüm:** `window.__DECKENT_API_TOKEN__` varsa `Authorization: Bearer` ekle (GET+POST), yoksa header'sız (geriye uyumlu).
 **Kanıt:** `grep -c "__DECKENT_API_TOKEN__\|Authorization\|Bearer" src/dashboard/src/lib/useApi.ts` → ≥1; `npm run test:dashboard -- useApi-token` → 4+ pass
-**Test:** ≥4 (token varsa header eklenir, yoksa eklenmez, POST'a uygulanır, GET'e uygulanır)
+**Test:** ≥4 (token header eklenir, yoksa eklenmez, POST, GET)
 
-## Task 3: 213-003 — serve localhost out-of-box smoke (POST 200, API-disabled YOK)
+## Task 5: 214-005 — serve localhost out-of-box smoke (POST 200, API-disabled YOK)
 - Model: sonnet
 - Effort: normal
 - Skills: ci-testing, typescript-expert
 - Files: scripts/serve-localhost-smoke.mjs, tests/scripts/serve-localhost-smoke.test.ts
 - Scope: scripts/, tests/scripts/
-- Dependencies: 213-001, 213-002
+- Dependencies: 214-003, 214-004
 
 ### Description
-**Problem:** serve'in user-working olduğu uçtan-uca doğrulanmıyor.
-**Çözüm:** `serve-localhost-smoke.mjs` — server'ı localhost'ta başlat (DECKENT_API_AUTH_DISABLED OLMADAN), index.html'den inject token'ı oku, korunan bir POST endpoint'e Bearer token ile istek at → 200 (401 DEĞİL) doğrula. Server'ı kapat.
-**Kanıt:** `node scripts/serve-localhost-smoke.mjs` → PASS (POST 200); `npx vitest run tests/scripts/serve-localhost-smoke.test.ts` → 4+ pass
-**Test:** ≥4 (token okunur, POST 200, token'sız POST 401, server kapanır)
+**Problem:** serve user-working uçtan-uca doğrulanmıyor.
+**Çözüm:** `serve-localhost-smoke.mjs` — localhost server başlat (API_AUTH_DISABLED OLMADAN), index.html'den token oku, korunan POST'a Bearer ile → 200 (401 değil). Server kapat.
+**Kanıt:** `node scripts/serve-localhost-smoke.mjs` → PASS; `npx vitest run tests/scripts/serve-localhost-smoke.test.ts` → 4+ pass
+**Test:** ≥4 (token okunur, POST 200, token'sız 401, server kapanır)
 
-## Task 4: 213-004 — Path A: embedded chat backend (host-CLI'SIZ, server-side ProviderAdapter)
+## Task 6: 214-006 — Path A embedded chat backend (host-CLI'SIZ, server-side ProviderAdapter)
 - Model: opus
 - Effort: normal
 - Skills: anthropic-sdk, typescript-expert
@@ -74,39 +105,26 @@ Bağlam:
 - Scope: src/api/, tests/api/
 
 ### Description
-**Problem:** `deckent chat` (Path B) host claude/codex CLI'ı PATH'te gerektiriyor — browser kullanıcısı için yok. Dashboard'da çalışan chat surface yok.
-**Çözüm:** `chat-backend.ts` — F2 `runChatNativeLoop`'u (ProviderAdapter + MCP dispatch, subscription CLI spawn server-side) bir API/SSE endpoint'e bağla. Browser mesaj gönderir → server ProviderAdapter ile cevap üretir → döner. Kullanıcının kendi CLI'sı GEREKMEZ (deckent host'u subscription'lı claude'u zaten spawn ediyor). Test mock-adapter ile (gerçek spawn değil).
-**Kanıt:** `grep -c "runChatNativeLoop\|ProviderAdapter\|chat.*endpoint\|/api/chat" src/api/chat-backend.ts` → ≥2; `npx vitest run tests/api/chat-backend.test.ts` → 4+ pass
-**Test:** ≥4 (mesaj→cevap round-trip mock, MCP tool dispatch, hata path, çoklu-turn)
+**Problem:** `deckent chat` (Path B) host CLI gerektiriyor; browser'da çalışan chat yok.
+**Çözüm:** `chat-backend.ts` — F2 `runChatNativeLoop`'u (ProviderAdapter + MCP dispatch, server-side subscription spawn) API/SSE endpoint'e bağla. Browser mesaj→server cevap. Kullanıcı CLI'sı GEREKMEZ. Test mock-adapter ile.
+**Kanıt:** `grep -c "runChatNativeLoop\|ProviderAdapter\|/api/chat\|chat.*endpoint" src/api/chat-backend.ts` → ≥2; `npx vitest run tests/api/chat-backend.test.ts` → 4+ pass
+**Test:** ≥4 (mesaj→cevap mock, MCP tool dispatch, hata, çoklu-turn)
 
-## Task 5: 213-005 — Dashboard Chat tab → chat-backend wire (Path A frontend)
+## Task 7: 214-007 — Dashboard Chat tab → chat-backend wire (Path A frontend)
 - Model: sonnet
 - Effort: normal
 - Skills: react-specialist, frontend-design
 - Files: src/dashboard/src/pages/ChatPage.tsx, tests/dashboard/ChatPage.test.tsx
 - Scope: src/dashboard/, tests/dashboard/
-- Dependencies: 213-004
+- Dependencies: 214-006
 
 ### Description
-**Problem:** ChatPage.tsx var ama chat-backend'e bağlı değil — çalışan chat surface yok.
-**Çözüm:** ChatPage'i 213-004 endpoint'ine bağla — mesaj listesi render, input, gönder→cevap, loading state. useApi (213-002 token'lı) kullan. Boş/hata state'leri.
+**Problem:** ChatPage.tsx chat-backend'e bağlı değil.
+**Çözüm:** ChatPage'i 214-006 endpoint'ine bağla — mesaj listesi, input, gönder→cevap, loading/boş/hata state. useApi (214-004 token) kullan.
 **Kanıt:** `grep -c "chat-backend\|/api/chat\|sendMessage\|useApi" src/dashboard/src/pages/ChatPage.tsx` → ≥1; `npm run test:dashboard -- ChatPage` → 4+ pass
-**Test:** ≥4 (mesaj render, gönder çağrısı, cevap göster, boş state)
+**Test:** ≥4 (mesaj render, gönder, cevap, boş state)
 
-## Task 6: 213-006 — chat CLI robust hata UX (host-CLI yoksa net yönlendirme)
-- Model: sonnet
-- Effort: low
-- Skills: typescript-expert
-- Files: src/cli/commands/chat.ts, tests/cli/chat-no-cli-fallback.test.ts
-- Scope: src/cli/, tests/cli/
-
-### Description
-**Problem:** Host CLI yoksa `chat.ts` kriptik "No AI CLI found" veriyor — kullanıcı ne yapacağını bilmiyor.
-**Çözüm:** Net actionable hata: hangi CLI'lar aranır, nasıl kurulur, alternatif `--native` veya dashboard chat (213-004) önerisi. Mevcut spawn davranışını koru (surgical).
-**Kanıt:** `grep -c "native\|dashboard\|install\|deckent serve" src/cli/commands/chat.ts` → ≥1; `npx vitest run tests/cli/chat-no-cli-fallback.test.ts` → 4+ pass
-**Test:** ≥4 (no-CLI net mesaj, --native önerisi, kurulum ipucu, CLI varsa normal akış)
-
-## Task 7: 213-007 — F7-003 UI/UX pass: Layout responsive + dark/light + bilgi mimarisi
+## Task 8: 214-008 — F7-003 UI/UX pass: Layout responsive + dark/light + Sidebar
 - Model: sonnet
 - Effort: normal
 - Skills: react-specialist, frontend-design
@@ -114,29 +132,16 @@ Bağlam:
 - Scope: src/dashboard/, tests/dashboard/
 
 ### Description
-**Problem:** ([[project_dashboard_control_plane]] F7-003 ~%30) UI/UX kötü — responsive + dark/light tutarlılık + bilgi mimarisi polish gerek.
-**Çözüm:** Layout.tsx god-level pass — responsive grid breakpoint'leri, dark/light tutarlılık (ThemeProvider), spacing/tipografi hiyerarşisi, sidebar+header düzen. Mevcut component'leri koru, görsel tutarlılık.
+**Problem:** ([[project_dashboard_control_plane]] F7-003 ~%30) UI/UX kötü.
+**Çözüm:** Layout.tsx god-level pass — responsive grid breakpoint, dark/light tutarlılık (ThemeProvider), spacing/tipografi hiyerarşisi, sidebar+header düzen. Mevcut component koru.
 **Kanıt:** `grep -c "responsive\|dark\|theme\|breakpoint\|grid" src/dashboard/src/components/Layout.tsx` → ≥3; `npm run test:dashboard -- Layout-ux` → 4+ pass
-**Test:** ≥4 (render, theme toggle, responsive breakpoint, bilgi-mimarisi düzen)
-
-## Task 8: 213-008 — F7-003 UI/UX pass: Sidebar navigasyon + empty/loading state'ler
-- Model: sonnet
-- Effort: normal
-- Skills: react-specialist, frontend-design
-- Files: src/dashboard/src/components/Sidebar.tsx, tests/dashboard/Sidebar-ux.test.tsx
-- Scope: src/dashboard/, tests/dashboard/
-
-### Description
-**Problem:** Sidebar/navigasyon polish + empty/loading state'ler eksik (sade kişi anlamıyor).
-**Çözüm:** Sidebar.tsx — net navigasyon (7 sayfa: Dashboard/Status/History/Memory/Config/Settings/Chat), aktif-sayfa vurgusu, empty/loading state, responsive collapse. Sezgisel bilgi mimarisi.
-**Kanıt:** `grep -c "active\|nav\|empty\|loading\|collapse" src/dashboard/src/components/Sidebar.tsx` → ≥2; `npm run test:dashboard -- Sidebar-ux` → 4+ pass
-**Test:** ≥4 (7 nav öğesi, aktif vurgu, empty state, responsive collapse)
+**Test:** ≥4 (render, theme toggle, responsive, düzen)
 
 ---
 
 ## DALGA B — IDE Extension Gerçek İmpl (5 task)
 
-## Task 9: 213-009 — VS Code extension gerçek activation + CLI/MCP köprü
+## Task 9: 214-009 — VS Code extension gerçek activation + CLI/MCP köprü
 - Model: opus
 - Effort: normal
 - Skills: typescript-expert
@@ -144,115 +149,180 @@ Bağlam:
 - Scope: extensions/, tests/extensions/
 
 ### Description
-**Problem:** 212-013 scaffold iskelet; gerçek activation + deckent CLI/MCP tespiti yok.
-**Çözüm:** extension.ts `activate(context)` — command/sidebar/statusbar kayıtlarını başlat, workspace'te deckent tespit et (CLI veya MCP), `deactivate` temizlik. `vscode` modülü test'te mock'lanır.
+**Çözüm:** extension.ts `activate(context)` — command/sidebar/statusbar kayıt, workspace'te deckent tespit (CLI/MCP), `deactivate` temizlik. `vscode` test'te mock.
 **Kanıt:** `grep -c "activate\|registerCommand\|subscriptions\|deactivate" extensions/vscode/src/extension.ts` → ≥3; `npx vitest run tests/extensions/extension-activate.test.ts` → 4+ pass
-**Test:** ≥4 (activate kayıtları yapar, deckent tespit, deactivate temizler, mock vscode)
+**Test:** ≥4 (activate kayıt, deckent tespit, deactivate, mock vscode)
 
-## Task 10: 213-010 — Command palette gerçek handler'lar (Start Sprint / Show Dashboard / Status)
+## Task 10: 214-010 — Command palette handler'lar (Start Sprint / Show Dashboard / Status)
 - Model: sonnet
 - Effort: normal
 - Skills: typescript-expert
 - Files: extensions/vscode/src/commands.ts, tests/extensions/extension-commands.test.ts
 - Scope: extensions/, tests/extensions/
-- Dependencies: 213-009
+- Dependencies: 214-009
 
 ### Description
-**Problem:** 212-014 komut stub'ları; gerçek aksiyon yok.
-**Çözüm:** `deckent.startSprint` → integrated terminal'de `deckent start`; `deckent.showDashboard` → serve URL'i aç (vscode.env.openExternal); `deckent.status` → `deckent status` çıktısını output channel'a. vscode API mock'lu test.
+**Çözüm:** `deckent.startSprint`→integrated terminal `deckent start`; `deckent.showDashboard`→serve URL (openExternal); `deckent.status`→output channel. mock vscode test.
 **Kanıt:** `grep -c "startSprint\|showDashboard\|createTerminal\|openExternal" extensions/vscode/src/commands.ts` → ≥2; `npx vitest run tests/extensions/extension-commands.test.ts` → 4+ pass
 **Test:** ≥4 (startSprint terminal, showDashboard URL, status output, bilinmeyen komut)
 
-## Task 11: 213-011 — Sidebar TreeView: canlı agent/sprint durumu
+## Task 11: 214-011 — Sidebar TreeView: canlı agent/sprint durumu
 - Model: sonnet
 - Effort: normal
 - Skills: typescript-expert
 - Files: extensions/vscode/src/sidebar.ts, tests/extensions/extension-sidebar.test.ts
 - Scope: extensions/, tests/extensions/
-- Dependencies: 213-009
+- Dependencies: 214-009
 
 ### Description
-**Problem:** IDE'de canlı sprint/agent görünürlüğü yok.
-**Çözüm:** `sidebar.ts` TreeDataProvider — aktif sprint, worker'lar, task durumları (deckent status JSON veya .tasks/ oku). Refresh + tree node'lar. vscode.TreeItem mock'lu test.
+**Çözüm:** `sidebar.ts` TreeDataProvider — aktif sprint, worker'lar, task durumları (deckent status JSON / .tasks oku). refresh + node'lar. mock test.
 **Kanıt:** `grep -c "TreeDataProvider\|getChildren\|TreeItem\|refresh" extensions/vscode/src/sidebar.ts` → ≥2; `npx vitest run tests/extensions/extension-sidebar.test.ts` → 4+ pass
-**Test:** ≥4 (tree root, worker node'lar, refresh, boş sprint)
+**Test:** ≥4 (tree root, worker node, refresh, boş sprint)
 
-## Task 12: 213-012 — Status bar: sprint progress + usage
+## Task 12: 214-012 — Status bar: sprint progress + tıkla→dashboard
 - Model: sonnet
 - Effort: low
 - Skills: typescript-expert
 - Files: extensions/vscode/src/statusbar.ts, tests/extensions/extension-statusbar.test.ts
 - Scope: extensions/, tests/extensions/
-- Dependencies: 213-009
+- Dependencies: 214-009
 
 ### Description
-**Problem:** IDE status bar'da deckent göstergesi yok.
-**Çözüm:** `statusbar.ts` — StatusBarItem: sprint ilerleme (X/Y task) + tıkla→dashboard. Periyodik güncelleme. mock'lu test.
-**Kanıt:** `grep -c "StatusBarItem\|createStatusBarItem\|progress\|text" extensions/vscode/src/statusbar.ts` → ≥2; `npx vitest run tests/extensions/extension-statusbar.test.ts` → 3+ pass
+**Çözüm:** `statusbar.ts` StatusBarItem — sprint ilerleme (X/Y) + tıkla→dashboard. periyodik güncelle. mock test.
+**Kanıt:** `grep -c "StatusBarItem\|createStatusBarItem\|progress\|command" extensions/vscode/src/statusbar.ts` → ≥2; `npx vitest run tests/extensions/extension-statusbar.test.ts` → 3+ pass
 **Test:** ≥3 (item create, progress metin, tıkla komut)
 
-## Task 13: 213-013 — Settings UI (contributes.configuration → .deckent/config.json)
+## Task 13: 214-013 — Settings köprü (.deckent/config.json ↔ vscode settings)
 - Model: sonnet
 - Effort: normal
 - Skills: typescript-expert
 - Files: extensions/vscode/src/settings.ts, tests/extensions/extension-settings.test.ts
 - Scope: extensions/, tests/extensions/
-- Dependencies: 213-009
+- Dependencies: 214-009
 
 ### Description
-**Problem:** Config'i IDE'den yönetme yok.
-**Çözüm:** `settings.ts` — VS Code settings (`deckent.*`) ↔ `.deckent/config.json` köprü (oku/yaz: max_workers, brain_provider, worker_provider). package.json `contributes.configuration` şeması (bu task package.json'a da yazabilir — scope extensions/). mock'lu test.
+**Çözüm:** `settings.ts` — vscode `deckent.*` settings ↔ `.deckent/config.json` (max_workers, brain_provider, worker_provider oku/yaz). package.json `contributes.configuration` şeması (extensions/ scope). mock test.
 **Kanıt:** `grep -c "configuration\|getConfiguration\|config.json\|max_workers" extensions/vscode/src/settings.ts` → ≥2; `npx vitest run tests/extensions/extension-settings.test.ts` → 4+ pass
-**Test:** ≥4 (config oku, config yaz, varsayılan, geçersiz değer)
+**Test:** ≥4 (config oku, yaz, varsayılan, geçersiz)
 
 ---
 
-## DALGA C — ADR + Status (2 task)
+## DALGA C — F1-009 8-Provider (4 task)
 
-## Task 14: 213-014 — ADR-076 (user-facing surfaces + IDE extension) + MASTER-PLAN status
+## Task 14: 214-014 — OpenAICompatibleAdapter (HTTP /chat/completions — DeepSeek/Qwen/GLM)
+- Model: opus
+- Effort: normal
+- Skills: typescript-expert, anthropic-sdk
+- Files: src/providers/openai-compatible.ts, tests/providers/openai-compatible.test.ts
+- Scope: src/providers/, tests/providers/
+
+### Description
+**Problem (audit):** 3 cloud adapter CLI-spawn; DeepSeek/Qwen/GLM'in CLI'ı yok — HTTP OpenAI-uyumlu adapter gerekir. Hepsi `/chat/completions` uyumlu → TEK adapter.
+**Çözüm:** `openai-compatible.ts` — ProviderAdapter impl: `{baseURL, apiKeyEnv, models}` config; `send` = fetch POST `/chat/completions` (OpenAI şema); `isAvailable` = apiKey var mı. Node built-in fetch (yeni dep YOK). DeepSeek (api.deepseek.com/v1), Qwen (dashscope compatible-mode), GLM (open.bigmodel.cn) preset'leri.
+**Kanıt:** `grep -c "ProviderAdapter\|chat/completions\|baseURL\|fetch\|apiKey" src/providers/openai-compatible.ts` → ≥3; `npx vitest run tests/providers/openai-compatible.test.ts` → 4+ pass (fetch mock)
+**Test:** ≥4 (send round-trip mock, isAvailable key var/yok, DeepSeek preset, hata)
+
+## Task 15: 214-015 — ProviderName dinamik + model-catalog PROVIDER_MAP genişlet
+- Model: sonnet
+- Effort: normal
+- Skills: typescript-expert
+- Files: src/core/model-catalog.ts, tests/core/provider-map-extend.test.ts
+- Scope: src/core/, tests/core/
+- Dependencies: 214-014
+
+### Description
+**Problem:** PROVIDER_MAP yalnız anthropic/openai/google; ProviderName enum hardcoded → deepseek/qwen/zhipu unmapped.
+**Çözüm:** PROVIDER_MAP'e deepseek/qwen/zhipu(glm) ekle (veya openai-compatible için generic passthrough); ProviderName'i dinamik/genişletilebilir yap (registered provider adlarını kabul et).
+**Kanıt:** `grep -c "deepseek\|qwen\|zhipu\|glm\|openai-compat\|dynamic" src/core/model-catalog.ts` → ≥2; `npx vitest run tests/core/provider-map-extend.test.ts` → 4+ pass
+**Test:** ≥4 (deepseek map, qwen map, glm map, bilinmeyen graceful)
+
+## Task 16: 214-016 — Per-provider key (.deck) + bootstrap auto-register
+- Model: sonnet
+- Effort: normal
+- Skills: typescript-expert, security-specialist
+- Files: src/core/provider.ts, tests/core/provider-bootstrap-openai-compat.test.ts
+- Scope: src/core/, tests/core/
+- Dependencies: 214-014
+
+### Description
+**Problem:** OpenAI-compat provider'lar registry'ye otomatik kayıt olmuyor; key wiring yok.
+**Çözüm:** Bootstrap'ta — DEEPSEEK_API_KEY/DASHSCOPE_API_KEY/ZHIPU_API_KEY (.deck veya env) varsa ilgili OpenAICompatibleAdapter'ı `registerProvider` et. Key yoksa skip (graceful). `.deck` secret okuma kullan (ADR-014).
+**Kanıt:** `grep -c "registerProvider\|OpenAICompatible\|DEEPSEEK\|deck.*key\|apiKeyEnv" src/core/provider.ts` → ≥2; `npx vitest run tests/core/provider-bootstrap-openai-compat.test.ts` → 4+ pass
+**Test:** ≥4 (key varsa register, yoksa skip, çoklu provider, .deck okuma)
+
+## Task 17: 214-017 — Multi-provider eşzamanlı routing smoke (mix coexist)
+- Model: sonnet
+- Effort: normal
+- Skills: typescript-expert, ci-testing
+- Files: scripts/multi-provider-smoke.mjs, tests/scripts/multi-provider-smoke.test.ts
+- Scope: scripts/, tests/scripts/
+- Dependencies: 214-014, 214-016
+
+### Description
+**Problem:** 3 CLI-subs + N HTTP-API + local'in registry'de eşzamanlı koexist'i doğrulanmıyor.
+**Çözüm:** `multi-provider-smoke.mjs` — registry'ye claude(mock)+ollama(mock)+openai-compat(mock) register et, per-task provider routing'in doğru adapter'ı seçtiğini doğrula (eşzamanlı mix). Gerçek API çağrısı DEĞİL.
+**Kanıt:** `node scripts/multi-provider-smoke.mjs` → PASS; `npx vitest run tests/scripts/multi-provider-smoke.test.ts` → 4+ pass
+**Test:** ≥4 (3 provider register, per-task seçim, bilinmeyen provider fallback, mix coexist)
+
+---
+
+## DALGA D — ADR + Status (3 task)
+
+## Task 18: 214-018 — chat CLI robust hata UX (host-CLI yoksa net yönlendirme)
+- Model: sonnet
+- Effort: low
+- Skills: typescript-expert
+- Files: src/cli/commands/chat.ts, tests/cli/chat-no-cli-fallback.test.ts
+- Scope: src/cli/, tests/cli/
+
+### Description
+**Çözüm:** Host CLI yoksa net hata: aranan CLI'lar, kurulum, `--native` veya dashboard chat (214-006) önerisi. Mevcut spawn davranışı korunur.
+**Kanıt:** `grep -c "native\|dashboard\|install\|deckent serve" src/cli/commands/chat.ts` → ≥1; `npx vitest run tests/cli/chat-no-cli-fallback.test.ts` → 4+ pass
+**Test:** ≥4 (no-CLI net mesaj, --native öneri, kurulum ipucu, CLI varsa normal)
+
+## Task 19: 214-019 — ADR-076 (auth-precedence + user-facing surfaces) + ADR-077 (8-provider) + MASTER-PLAN status
 - Model: sonnet
 - Effort: low
 - Skills: documentation-writer, system-architect
-- Files: docs/adr/076-user-facing-surfaces-ide.md, docs/MASTER-PLAN.md, tests/docs/adr-076.test.ts
+- Files: docs/adr/076-auth-precedence-user-surfaces.md, docs/adr/077-multi-provider-openai-compat.md, docs/MASTER-PLAN.md, tests/docs/adr-214.test.ts
 - Scope: docs/, tests/docs/
-- Dependencies: 213-001, 213-004, 213-009
+- Dependencies: 214-001, 214-014
 
 ### Description
-**Problem:** serve token-inject + Path A embedded chat + IDE extension kararları ADR/MASTER-PLAN'e geçmemiş.
-**Çözüm:** ADR-076 (serve localhost token-inject + Path A embedded chat backend + VS Code extension architecture, MADR v3, accepted). MASTER-PLAN §3 user-facing notu + §6 + F7-003/F2 status güncelle (213 sonuçları). DOC-POLICY Tier-1 (tek roadmap).
-**Kanıt:** `grep -c "serve\|embedded chat\|extension\|token" docs/adr/076-user-facing-surfaces-ide.md` → ≥3; `grep -c "213" docs/MASTER-PLAN.md` → ≥1; `npx vitest run tests/docs/adr-076.test.ts` → 3+ pass
-**Test:** ≥3 (ADR-076 MADR bölümleri, MASTER-PLAN güncel, accepted)
+**Çözüm:** ADR-076 (env-forwarding auth-aware + serve token-inject + Path A chat + IDE extension, MADR, accepted); ADR-077 (OpenAICompatibleAdapter + dinamik ProviderName + 8-provider fleet, MADR, accepted). MASTER-PLAN §3/§4 F1-009/F2/F7 + §12 Risk #5 status güncelle (214 sonuçları). DOC-POLICY Tier-1.
+**Kanıt:** `grep -c "auth\|token\|extension" docs/adr/076-*.md` → ≥3; `grep -c "OpenAICompatible\|provider\|DeepSeek" docs/adr/077-*.md` → ≥2; `grep -c "214" docs/MASTER-PLAN.md` → ≥1; `npx vitest run tests/docs/adr-214.test.ts` → 3+ pass
+**Test:** ≥3 (ADR-076 MADR, ADR-077 MADR, MASTER-PLAN güncel)
 
-## Task 15: 213-015 — README badge sync (190+→211+) + sayı doğrulama
-- Model: haiku
+## Task 20: 214-020 — README badge sync (190+→214) + ci-baseline garbage fix
+- Model: sonnet
 - Effort: low
-- Skills: documentation-writer
-- Files: README.md, tests/docs/readme-badge.test.ts
-- Scope: ., tests/docs/
+- Skills: documentation-writer, typescript-expert
+- Files: README.md, scripts/ci-baseline-detect.mjs, tests/scripts/ci-baseline-detect.test.ts
+- Scope: ., scripts/, tests/scripts/
 
 ### Description
-**Problem:** ([[feedback_zero_hardcode_live_data]] MASTER-PLAN §9) README badge "sprints-190+" (gerçek 213+); başka stale sayı olabilir.
-**Çözüm:** README badge'i güncel sprint'e çek (213+), MCP 32 / agent 15 / skill 21 gibi sayıları IDENTITY canonical ile hizala. SADECE README.md (kök) + test. ("96% context reduction" iddiası 212-012 benchmark'a bağlandıysa koru, değilse qualify et.)
-**Kanıt:** `grep -c "sprints-2\|211\|213" README.md` → ≥1; eski "190+" YOK; `npx vitest run tests/docs/readme-badge.test.ts` → 3+ pass
-**Test:** ≥3 (badge güncel, stale 190 yok, sayı tutarlı)
+**Problem:** README badge "sprints-190+" stale; ci-baseline.json `testCount:17,passed:0,failed:17` GARBAGE (gerçek 18484) — baseline-detector worker-bağlamında bozuk sayı yazıyor.
+**Çözüm:** README badge güncel (214+, MCP 32/agent 15/skill 21). ci-baseline detector'ı düzelt — gerçek vitest sayısını yazsın (17/0/17 garbage'ı üreten yolu fix; sayı parse hatası/yanlış bağlam). (`scripts/` altında detector varsa orada, yoksa nereden yazılıyorsa.)
+**Kanıt:** `grep -c "21[0-9]\|214" README.md` → ≥1 (eski 190 YOK); ci-baseline garbage üretmiyor; `npx vitest run tests/scripts/ci-baseline-detect.test.ts` → 3+ pass
+**Test:** ≥3 (badge güncel, baseline gerçek sayı, 17/0/17 garbage yok)
 
 ---
 
 ## Sprint Sonu Notu
 
-**Beklenen:** 13-15/15 DONE, 0 false-FIX. **serve out-of-box çalışır** (POST 200, API-disabled gerekmez), **dashboard chat çalışır** (host-CLI'sız), **chat CLI net hata UX**, **dashboard UI/UX god-level adım**, **VS Code extension gerçek** (activation+palette+sidebar+statusbar+settings — `deckent` IDE'de canlı). tam-suite 0 fail KORUNUR. Routing çeşitlilik (212-008 canlı): UI→frontend-designer, serve→api-builder/security beklenir.
+**Beklenen:** 17-20/20 DONE, 0 false-FIX. **auth-precedence FİX** (gelecek `deckent start` env-u'suz subscription'a saygı), **serve out-of-box** (POST 200), **dashboard chat çalışır** (host-CLI'sız), **F7-003 UI/UX adım**, **VS Code extension gerçek**, **8-provider** (OpenAI-compat adapter → DeepSeek/Qwen/GLM register-ready, eşzamanlı mix). tam-suite 0 fail KORUNUR.
 
-**Sprint sonrası:** Sprint 214 IDE depth + chat/UX hardening; sonra ecosystem (F8/F9/F10) + 8-provider (F1-009/010) + ERP. Provider-doğruluk analizi sprint sürerken.
+**Pre-flight:** **⚠️ Bu sprint `env -u ANTHROPIC_API_KEY -u DECKENT_CLAUDE_API_KEY npx deckent start --auto-approve` ile başlatılır** (214-001 fix dist-build sonrası Sprint 215'ten itibaren env-u'yu gereksiz kılar). subscription creds canlı, **build+restart + RE-PLAN YAPILDI**, config max_workers=10, auth_mode=subscription. Sprint start Alperen manuel.
 
-**Pre-flight:** subscription env temiz, **build+restart + RE-PLAN YAPILDI** (212-008 routing canlı), config max_workers=10. Sprint start Alperen manuel.
+**Sprint sonrası:** 214-001 build'le canlı → Sprint 215 env-u'suz başlatılabilir (doğrula). F1-010 subs→API overflow + ERP + ecosystem (F8/F9/F10) sonraki arklar.
 
 İlgili memory:
-- [[feedback_wiring_pct_vs_user_working]] — 🔑 user-working kanıtı (serve/chat uçtan-uca dene)
-- [[feedback_directive_kanit_letter_vs_goal]] — wire-gap dersi (scope çağıranı içerir, kanıt def-dosyasını dışlar)
-- [[feedback_agent_routing_imbalance]] — routing çeşitlilik (212-008 canlı, doğrulanmalı)
-- [[project_dashboard_control_plane]] — F7 dashboard god-level
-- [[project_deckent_runtime_ecosystem]] — runtime ecosystem yönü
-- [[feedback_brain_rubric_bridge_broken]] — yeni test şart
+- [[feedback_container_auth_precedence]] — 🔑 auth-precedence kök fix (214-001)
+- [[feedback_wiring_pct_vs_user_working]] — user-working kanıtı (serve/chat uçtan-uca)
+- [[feedback_directive_kanit_letter_vs_goal]] — wire-gap dersi
+- [[feedback_agent_routing_imbalance]] — routing çeşitlilik (212-008 canlı)
+- [[project_deckent_runtime_ecosystem]] — 8-provider + runtime ecosystem yönü
+- [[feedback_brain_synthetic_nogo_disk_verify]] — sahte NO_GO disk-verify
 - [[feedback_fix_prompt_quality]] — CLI index.ts wire
-- [[project_api_mode_deferred_post_beta]] — subscription-only
+- [[project_api_mode_deferred_post_beta]] — subscription-only (Anthropic); 3rd-party API ayrı
 - [[feedback_build_mcp_restart_coordination]] — build Alperen + RE-PLAN şart
