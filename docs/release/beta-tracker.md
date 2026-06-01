@@ -1,4 +1,6 @@
 <!-- Language: EN | Technical terms remain as-is -->
+> ⚠️ **SUPERSEDED (2026-06-01, Sprint 211).** Beta-gate status consolidated into [`docs/MASTER-PLAN.md`](../MASTER-PLAN.md) §9 — the single source of truth. Preserved for provenance.
+
 # Deckent Beta Tracker
 
 **Last updated:** 2026-05-31 (Sprint 197 — Worker Prompt God-Level Stream + Disk-Verify Gate + 7 synthetic NO_GO source map landed) | **Latest sprint:** 197 (canonical complete per memory.db; Sprint 198 KAYNAK 6+7 closure in flight) | **Version:** v1.0.0-beta.1 → v1.0.0 GA target (1 Haziran 2026 OSS beta launch) | **Branch:** `main` (Sprint 175 `docs/embedded-web-terminal-spec` long-merged)

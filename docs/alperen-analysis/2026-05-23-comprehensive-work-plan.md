@@ -1,3 +1,5 @@
+> ⚠️ **SUPERSEDED (2026-06-01, Sprint 211).** Work streams (W-A…W-K) consolidated into [`docs/MASTER-PLAN.md`](../MASTER-PLAN.md) §7 — the single source of truth. Preserved for provenance; the 189–200 sprint plan here never executed 1:1 (Crisis Stabilization consumed 177–183).
+
 # Deckent — Kapsamlı İş Planı (2026-05-23)
 
 **Tarih:** 2026-05-23

@@ -1,3 +1,5 @@
+> ⚠️ **SUPERSEDED (2026-06-01, Sprint 211).** The single source of truth is now [`docs/MASTER-PLAN.md`](./MASTER-PLAN.md). This document is preserved as a historical detailed tracker — do not update status here; update MASTER-PLAN instead.
+
 # Deckent God-Level Roadmap — Master Execution Plan
 
 **Created:** 2026-04-20 (Sprint 148 sonrası)

@@ -1,3 +1,5 @@
+> ⚠️ **SUPERSEDED (2026-06-01, Sprint 211).** Consolidated into [`docs/MASTER-PLAN.md`](../MASTER-PLAN.md) — the single source of truth. Note: "Phase 5: VSCode Extension" lives in MASTER-PLAN §6 (Native Chat Everywhere → IDE extension). Preserved for provenance.
+
 # Deckent Roadmap
 
 > Your AI development team, orchestrated.

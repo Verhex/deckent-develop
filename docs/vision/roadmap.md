@@ -1,3 +1,5 @@
+> ⚠️ **SUPERSEDED (2026-06-01, Sprint 211).** Consolidated into [`docs/MASTER-PLAN.md`](../MASTER-PLAN.md) — the single source of truth. Preserved for provenance; sprint numbers here are pre-211 historical.
+
 # Deckent — Product Roadmap
 
 **Last updated:** 2026-05-31 — Sprint 202-205 kuzey-yıldızı stream landed: provider-free %100 (Ollama + Docker provider-aware), native chat %60 (Path C tool-use loop + streaming + multi-turn + resume), F3 process mode başladı (tenant + scheduled flows), F4 enterprise iskelet (audit query), agent routing fix CANLI (built-in agent seçiliyor). 1 Haziran 2026 OSS beta launch window.
