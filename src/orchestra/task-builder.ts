@@ -140,6 +140,25 @@ export interface ParsedDirectiveTask {
   priority?: TaskPriority;
   /** Per-task auth mode parsed from "- Auth: subscription|api" */
   authMode?: 'subscription' | 'api';
+  /** Tier-1 Proof-of-Function smoke (216-004): real-binary command + expected output, split on `→`. */
+  smoke?: { command: string; expect: string };
+}
+
+/**
+ * Extract a Tier-1 `Smoke:` directive from a task block: `**Smoke:** <cmd> → <expect>`
+ * or `- Smoke: <cmd> → <expect>`. Returns undefined when absent or missing the
+ * `→` separator. Sprint 216-004; reconstructed Sprint 218 after a git reset.
+ */
+export function extractSmoke(text: string): { command: string; expect: string } | undefined {
+  const m = text.match(/(?:[-*]\s*)?\*{0,2}Smoke:?\*{0,2}\s*(.+)/i);
+  if (!m) return undefined;
+  const rest = m[1]!.trim();
+  const arrowIdx = rest.indexOf('→');
+  if (arrowIdx === -1) return undefined;
+  const command = rest.slice(0, arrowIdx).trim();
+  const expect = rest.slice(arrowIdx + 1).trim();
+  if (!command || !expect) return undefined;
+  return { command, expect };
 }
 
 // ═══ Functions ════════════════════════════════════════════════════
@@ -847,7 +866,7 @@ export function parseStructuredDirectives(content: string): ParsedDirectiveTask[
       : block.trim();
 
     const enrichedScope = enrichScopeWithTestFiles(scope, scope.filesWrite);
-    tasks.push({ title, description, scope: enrichedScope, testTarget, provider: parsedProvider, forceModel: parsedForceModel, forceEffort: parsedForceEffort, forceAgent, forceSkills, excludeSkills, dependencies, priority: parsedPriority, authMode: parsedAuthMode });
+    tasks.push({ title, description, scope: enrichedScope, testTarget, provider: parsedProvider, forceModel: parsedForceModel, forceEffort: parsedForceEffort, forceAgent, forceSkills, excludeSkills, dependencies, priority: parsedPriority, authMode: parsedAuthMode, smoke: extractSmoke(block) });
   }
   return tasks;
 }
@@ -975,6 +994,7 @@ export function parseBulletOrNumberedTasks(content: string): ParsedDirectiveTask
           dependencies: dependenciesBullet,
           priority: parsedPriorityBullet,
           authMode: parsedAuthModeBullet,
+          smoke: extractSmoke(allLines.join('\n')),
         });
 
         i = j;

@@ -38,6 +38,7 @@ import {
 import { loadDeckSecrets } from '../core/deck-file.js';
 import { buildChatReply } from './chat-handler.js';
 import { registerEvolutionRoutes } from './evolution-endpoint.js';
+import { registerMemorySearch } from './memory-search-endpoint.js';
 
 const MIME_TYPES: Record<string, string> = {
   '.html': 'text/html',
@@ -587,6 +588,9 @@ async function handleRequest(
     if (url.startsWith('/api/evolution/')) {
       if (registerEvolutionRoutes(url, res, projectRoot)) return;
     }
+
+    // Memory FTS5 search: /api/memory/search?q= (216-012)
+    if (registerMemorySearch(url, res, projectRoot)) return;
 
     // GET with no matching route
     sendError(res, 404, 'Not found');

@@ -194,9 +194,15 @@ function PromptDiffTable({ data, loading }: { data: PromptMetricsReport[] | null
 }
 
 export default function EvolutionPage() {
-  const { data: genealogy, loading: genealogyLoading } = useApi<FamilyTree>("/api/evolution/genealogy");
-  const { data: retirement, loading: retirementLoading } = useApi<RetiredAgentRecord[]>("/api/evolution/retirement");
-  const { data: promptMetrics, loading: promptLoading } = useApi<PromptMetricsReport[]>("/api/evolution/prompt-metrics");
+  const { data: genealogy, loading: genealogyLoading, error: genealogyError } = useApi<FamilyTree>("/api/evolution/genealogy");
+  const { data: retirement, loading: retirementLoading, error: retirementError } = useApi<RetiredAgentRecord[]>("/api/evolution/retirement");
+  const { data: promptMetrics, loading: promptLoading, error: promptError } = useApi<PromptMetricsReport[]>("/api/evolution/prompt-metrics");
+
+  // Sprint 216-011 (reconstructed Sprint 218): per-tab error banner. On 401/500
+  // the tab shows the error (data-testid=evolution-error) instead of its tree.
+  const errBanner = (msg: string) => (
+    <div data-testid="evolution-error" className="text-red-400 py-8 text-center text-sm">{msg}</div>
+  );
 
   return (
     <div className="space-y-6" data-testid="evolution-page">
@@ -221,7 +227,7 @@ export default function EvolutionPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <GenealogyTree data={genealogy} loading={genealogyLoading} />
+              {genealogyError ? errBanner(genealogyError) : <GenealogyTree data={genealogy} loading={genealogyLoading} />}
             </CardContent>
           </Card>
         </TabsContent>
@@ -235,7 +241,7 @@ export default function EvolutionPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <RetirementTimeline data={retirement} loading={retirementLoading} />
+              {retirementError ? errBanner(retirementError) : <RetirementTimeline data={retirement} loading={retirementLoading} />}
             </CardContent>
           </Card>
         </TabsContent>
@@ -249,7 +255,7 @@ export default function EvolutionPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <PromptDiffTable data={promptMetrics} loading={promptLoading} />
+              {promptError ? errBanner(promptError) : <PromptDiffTable data={promptMetrics} loading={promptLoading} />}
             </CardContent>
           </Card>
         </TabsContent>

@@ -164,6 +164,59 @@ export function getDomainMatchBonus(
   return 0;
 }
 
+/**
+ * User-surface routing (Sprint 216-003; reconstructed Sprint 218 after a
+ * `git reset --hard` wiped the original). A user-facing surface (cli / dashboard
+ * / api / serve / e2e harness) must route to its surface-owner agent, not
+ * collapse to refactorer's generic impl@7. The bonus (8) clears refactorer's 7
+ * even when the agent's own activation rule does not fire (e.g. api-builder's
+ * `domains $contains 'api'` rule is silent for a `cli` domain).
+ */
+export const USER_SURFACE_BONUS = 8;
+
+/** Surface domain name (from TaskDNA.domains/tags) → owning agent id. */
+export const SURFACE_DOMAIN_TO_AGENT_ID: Readonly<Record<string, string>> = {
+  cli: 'api-builder',
+  commands: 'api-builder',
+  serve: 'api-builder',
+  api: 'api-builder',
+  dashboard: 'frontend-designer',
+  components: 'frontend-designer',
+  ui: 'frontend-designer',
+  e2e: 'ci-guardian',
+  harness: 'ci-guardian',
+};
+
+/** Agents eligible for the user-surface bonus (surface owners). */
+export const USER_SURFACE_AGENTS: ReadonlySet<string> = new Set([
+  'api-builder',
+  'frontend-designer',
+  'ci-guardian',
+]);
+
+/**
+ * Returns USER_SURFACE_BONUS when `agentId` is the surface owner of one of the
+ * task's surface domains/tags, else 0. Non-surface agents (refactorer, …) never
+ * receive it — that is the anti-collapse guarantee.
+ */
+export function getUserSurfaceBonus(agentId: string, taskDNA: TaskDNA): number {
+  if (!USER_SURFACE_AGENTS.has(agentId)) return 0;
+  const signals = [
+    ...taskDNA.domains.map((d) => d.name.toLowerCase()),
+    ...((taskDNA.tags ?? []) as string[]).map((t) => String(t).toLowerCase()),
+  ];
+  // Security/auth tasks belong to security-auditor even when they touch
+  // `src/api/` — the surface bonus must NOT divert them to api-builder.
+  const hasSecuritySignal =
+    taskDNA.intent.primary === 'security' ||
+    signals.some((s) => s === 'auth' || s === 'security' || s === 'rbac');
+  if (hasSecuritySignal && agentId === 'api-builder') return 0;
+  for (const s of signals) {
+    if (SURFACE_DOMAIN_TO_AGENT_ID[s] === agentId) return USER_SURFACE_BONUS;
+  }
+  return 0;
+}
+
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 export interface RoutingOptions {
@@ -388,9 +441,20 @@ function selectBestAgent(
 
   for (const [id, agent] of pool) {
     if (!agent.enabled) continue;
+
+    // Sprint 216-003 — user-surface bonus. A surface-owner agent on its own
+    // surface (cli/api→api-builder, dashboard→frontend-designer, e2e→ci-guardian)
+    // gets +USER_SURFACE_BONUS and BYPASSES excludes (override + activation), so
+    // a user-facing task cannot collapse to refactorer's generic impl@7.
+    const surfaceBonus = getUserSurfaceBonus(id, taskDNA);
+
     if (excludeAgents.includes(id)) {
-      reasoning.push(`Agent '${id}' excluded by override`);
-      continue;
+      if (surfaceBonus > 0) {
+        reasoning.push(`Agent '${id}' surface exclude bypass (user-surface owner)`);
+      } else {
+        reasoning.push(`Agent '${id}' excluded by override`);
+        continue;
+      }
     }
 
     // Get activation config (v2 or migrated from v1)
@@ -398,8 +462,12 @@ function selectBestAgent(
     const result = evaluateActivation(taskDNA, activation);
 
     if (result.excluded) {
-      reasoning.push(`Agent '${id}' excluded: ${result.excludeReason}`);
-      continue;
+      if (surfaceBonus > 0) {
+        reasoning.push(`Agent '${id}' surface exclude bypass: ${result.excludeReason}`);
+      } else {
+        reasoning.push(`Agent '${id}' excluded: ${result.excludeReason}`);
+        continue;
+      }
     }
 
     // Apply learning bonus
@@ -413,13 +481,16 @@ function selectBestAgent(
     if (domainBonus > 0) {
       reasoning.push(`Agent '${id}' domain-match bonus: +${domainBonus} (intent=${taskDNA.intent.primary}, domains=[${taskDNA.domains.map(d => d.name).join(', ')}])`);
     }
+    if (surfaceBonus > 0) {
+      reasoning.push(`Agent '${id}' user-surface bonus: +${surfaceBonus} (domains=[${taskDNA.domains.map(d => d.name).join(', ')}])`);
+    }
 
-    const finalScore = result.score + bonus + domainBonus;
+    const finalScore = result.score + bonus + domainBonus + surfaceBonus;
 
     if (finalScore >= cfg.agentMinScore) {
       candidates.push({
         id,
-        rawScore: result.score + domainBonus,
+        rawScore: result.score + domainBonus + surfaceBonus,
         learningBonus: bonus,
         finalScore,
         matchedRules: result.matchedRules,

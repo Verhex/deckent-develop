@@ -116,4 +116,18 @@ Before writing any code line, validate against all four disciplines:
 3. **Surgical Changes** — stay in scope.filesWrite, minimum-diff, preserve existing behavior
 4. **Goal-Driven Execution** — every change must map to a goCriteria item; honest self-assessment
 
+## Proof-of-Function (Tier-1 user-surface)
+
+A **user-surface** task (writes to `src/cli/commands/`, `src/dashboard/`, or `src/api/`) is
+Tier-1 and MUST carry a `Smoke:` directive line — a run-proven real-binary command plus its
+expected output (e.g. `Smoke: node dist/cli/entry.js serve --port 3211 → /api/status = 200`).
+Only a real-binary run (run-proven) closes a Tier-1 task — not a unit test.
+
+- **A mock-only test alone = GO_WITH_TECH_DEBT, never DONE.** The test must assert on the
+  REAL served HTML / real CLI stdout, not a mock. deckent runs the `Smoke:` command host-side
+  in-sprint (post-sprint-smoke) and downgrades DONE→GO_WITH_TECH_DEBT if it fails.
+- Tier-0 (internal/structural — `src/core/`, refactors) stays unit-test-sufficient.
+- Routing: surface tasks → `frontend-designer` (dashboard) / `api-builder` (api·serve·cli) /
+  `ci-guardian` (e2e harness). See ADR-079 + @karpathy-discipline.md (Proof-of-Function DoD).
+
 <!-- CUSTOM-END -->

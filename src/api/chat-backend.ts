@@ -148,6 +148,21 @@ export async function handleChatBackendRequest(
 }
 
 /**
+ * Convenience round-trip: message + adapter (+ optional deps/sessionId) →
+ * ChatBackendResponse. Thin wrapper over {@link handleChatBackendRequest} for
+ * callers (and ChatPage) that hold an adapter directly rather than a request +
+ * deps pair. Sprint 216-008; reconstructed Sprint 218 after a `git reset --hard`.
+ */
+export async function handleChatMessage(
+  message: string,
+  adapter: ChatProviderAdapter,
+  opts: Omit<ChatBackendDeps, 'provider'> & { sessionId?: string } = {},
+): Promise<ChatBackendResponse> {
+  const { sessionId, ...deps } = opts;
+  return handleChatBackendRequest({ message, sessionId }, { provider: adapter, ...deps });
+}
+
+/**
  * Type-only re-export so server.ts can type the registry-resolved
  * adapter alongside the loop adapter without a second import path.
  * (Production wire: registry.getProvider(...) → createSubscriptionChatAdapter

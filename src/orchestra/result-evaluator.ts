@@ -43,6 +43,10 @@ export type {
   DishonestEventSink,
 } from './honest-gate.js';
 
+// Sprint 216-002 (reconstructed Sprint 218): re-export the Proof-of-Function
+// gate so callers reach it through the evaluator surface.
+export { verifyProofOfFunction, PROOF_OF_FUNCTION_MISMATCH_CHANNEL } from './proof-of-function.js';
+
 // ─── Source code directory detection ──────────────────────────────────
 
 /** Source code directory prefixes — anything outside these is treated as a doc task */

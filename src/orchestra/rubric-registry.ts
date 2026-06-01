@@ -175,8 +175,25 @@ export function detectTaskType(task: Task): TaskType {
  * Equivalent to `RUBRIC_REGISTRY[detectTaskType(task)]` but exposed as a
  * function so callers cannot mutate the underlying registry object.
  */
+/**
+ * Placeholder criterion appended to a user-surface task's rubric. weight=0 and
+ * threshold=0 so it does NOT alter the existing score math — it is a slot that
+ * `proof-of-function.ts` reads to drive the in-sprint Smoke gate (216-001/002).
+ */
+export const PROOF_OF_FUNCTION_CRITERION = {
+  name: 'proof-of-function',
+  weight: 0,
+  threshold: 0,
+  evaluator: 'pattern',
+} as const;
+
 export function getRubric(task: Task): EvaluationRubric {
-  return RUBRIC_REGISTRY[detectTaskType(task)];
+  const base = RUBRIC_REGISTRY[detectTaskType(task)];
+  // Tier-1 (user-surface) tasks get the proof-of-function criterion appended.
+  // Return a fresh object so the frozen base rubric is never mutated; Tier-0
+  // tasks get the base rubric by reference (identity preserved for consumers).
+  if (!isUserSurfaceTask(task)) return base;
+  return { ...base, criteria: [...base.criteria, { ...PROOF_OF_FUNCTION_CRITERION }] };
 }
 
 /**

@@ -169,7 +169,10 @@ describe('script artifact', () => {
     expect(Array.isArray(DEFAULT_STASH_TARGETS)).toBe(true);
     // Default stash list MUST cover the two paths the task body names explicitly.
     expect(DEFAULT_STASH_TARGETS).toContain('.deckent/config.json');
-    expect(DEFAULT_STASH_TARGETS).toContain('.brain');
+    // Stash ONLY gitignored state — `.brain/memory.db`, NOT all of `.brain`
+    // (`.brain/exports/*` is git-tracked + present in CI). Narrowed to avoid
+    // over-hiding committed exports (data-loss-safe; Sprint 215 hotfix).
+    expect(DEFAULT_STASH_TARGETS).toContain('.brain/memory.db');
   });
 
   it('script file exists and is within the ≤200 LoC budget', () => {

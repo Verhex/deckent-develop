@@ -43,7 +43,10 @@ Three immovable pillars (Alperen-approved 2026-05-31):
 
 ---
 
-## 3. Current State — Ground Truth (Sprint 214, 2026-06-01)
+## 3. Current State — Ground Truth (Sprint 216, 2026-06-01)
+
+- **Sprint 216** (**216**) — ✅ **DONE** (Proof-of-Function DoD, **ADR-079** accepted; implementation landed Sprint 216). `isUserSurfaceTask` Tier-0/Tier-1 classification + in-sprint Smoke gate (`proof-of-function.ts`) + routing surface bonus + `task-builder` Smoke parse + `test:e2e-surfaces`. **serve dashboard F7-001 FIXED** — localhost API-token auto-mint + inject → `/api/status` 200 (run-proven, not mocked). ⚠️ **Incident:** Sprint 216's uncommitted code was wiped by deckent's worker-spawn `git reset --hard`/stash (Sprint 177 rollback) when sprint-217 launched from the dashboard; reconstructed + committed Sprint 218. **Root bug → Sprint 218 P0:** worker-spawn must not reset the deckent-dev tree (ADR-039 self-modifying exemption).
+
 
 - **Sprint 211 closed:** 16/16 DONE, 0 tech-debt, 0 NO_GO, 16m19s.
 - **Sprint 212 closed:** 15/15 DONE — F5 evolution crowning (6 dormant modules → live callers), routing skew fix (skill→agent affinity signal), doc-reality sync (code-derived module counts), IDE extension scaffold.
