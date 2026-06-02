@@ -73,7 +73,7 @@ export function createPromptRegion(
 // dokunulmaz (eski stderr braille spinner'ın çakışması YOK). İlk token gelince
 // stop() fiili siler → `● deckent` kalır, cevap altına akar. Non-TTY → no-op.
 
-const THINKING_VERBS: readonly string[] = [
+export const THINKING_VERBS: readonly string[] = [
   'düşünüyor',
   'şahlanıyor',
   'derinlere dalıyor',
@@ -84,8 +84,15 @@ const THINKING_VERBS: readonly string[] = [
   'yoğunlaşıyor',
 ];
 
-const TICK_MS = 700;
-const HEADER = '\x1b[35m\x1b[1m● deckent\x1b[0m'; // bold magenta, chat-layout ile uyumlu
+const BRAILLE: readonly string[] = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+const TICK_MS = 90;
+
+// Kraken marka renkleri (splash.ts ile birebir): gövde teal, DECKENT gold.
+const KRAKEN_TEAL = '\x1b[38;2;77;184;164m';
+const KRAKEN_GOLD = '\x1b[1;38;2;196;168;85m';
+const RESET_C = '\x1b[0m';
+// `● deckent` — `●` teal (kraken gövdesi), `deckent` gold (DECKENT marka).
+const HEADER = `${KRAKEN_TEAL}●${RESET_C} ${KRAKEN_GOLD}deckent${RESET_C}`;
 
 export interface ThinkingTicker {
   start(): void;
@@ -93,40 +100,47 @@ export interface ThinkingTicker {
 }
 
 /**
- * `● deckent · <fiil>…` dönen düşünme göstergesi. Kendi satırında in-place
- * animasyon (`\r` + clear-line) yapar — prompt tur sırasında pinli değildir
- * (Model: prompt tur-arası gösterilir), bu yüzden çakışma yok. start() →
- * `● deckent · <fiil>…` döndürür; stop() → satırı temizleyip `● deckent` +
- * newline bırakır, böylece cevap token'ları bir sonraki satırda **inline**
- * (raw, pürüzsüz) akar. Non-TTY → no-op (test/pipe temiz).
+ * `⠋ ● deckent · <fiil>…` düşünme göstergesi. Fiil **prompt başına SABİT** —
+ * her tur rastgele tek bir fiil seçilir ve süre boyunca DEĞİŞMEZ (kullanıcı
+ * isteği); sadece baştaki braille noktası döner (hareket/çalışıyor sinyali).
+ * Kendi satırında in-place (`\r` + clear-line), prompt tur-arası gösterildiği
+ * için çakışma yok. stop() → satırı temizleyip kraken-renkli `● deckent` +
+ * newline bırakır → cevap altına inline akar. Non-TTY → no-op.
+ *
+ * `opts.verb` verilirse o kullanılır (deterministik test); yoksa rastgele.
  */
 export function createThinkingTicker(
   out: NodeJS.WriteStream,
-  opts: { isTty?: boolean } = {},
+  opts: { isTty?: boolean; verb?: string } = {},
 ): ThinkingTicker {
   const isTty = opts.isTty ?? out.isTTY === true;
   let timer: ReturnType<typeof setInterval> | null = null;
-  let i = 0;
+  let frame = 0;
+  let verb = opts.verb ?? THINKING_VERBS[0] as string;
 
-  const paint = (verb: string): void => {
-    out.write(`\r\x1b[2K${HEADER} \x1b[2m· ${verb}…\x1b[0m`);
+  const paint = (): void => {
+    out.write(`\r\x1b[2K${BRAILLE[frame % BRAILLE.length]} ${HEADER} \x1b[2m· ${verb}…${RESET_C}`);
   };
 
   return {
     start(): void {
       if (!isTty || timer !== null) return;
-      i = 0;
-      paint(THINKING_VERBS[0] as string);
+      // Prompt başına SABİT rastgele fiil (sürekli değişmesin — kullanıcı isteği).
+      if (opts.verb === undefined) {
+        verb = THINKING_VERBS[Math.floor(Math.random() * THINKING_VERBS.length)] as string;
+      }
+      frame = 0;
+      paint();
       timer = setInterval(() => {
-        i = (i + 1) % THINKING_VERBS.length;
-        paint(THINKING_VERBS[i] as string);
+        frame++; // sadece braille noktası döner; fiil SABİT kalır
+        paint();
       }, TICK_MS);
     },
     stop(): void {
       if (timer === null) return;
       clearInterval(timer);
       timer = null;
-      // Fiili sil, sade `● deckent` + newline bırak → cevap altına inline akar.
+      // Fiili sil, sade kraken-renkli `● deckent` + newline → cevap altına akar.
       out.write(`\r\x1b[2K${HEADER}\n`);
     },
   };

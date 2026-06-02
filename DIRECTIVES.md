@@ -239,6 +239,20 @@ Bağlam (Alperen+cc run-verify 2026-06-02, [[project_terminal_dashboard_ux_evolu
 
 ---
 
+## DALGA G — Oturum-3 ekleme (Alperen direktifi: izin/menü/polish)
+
+- **224-016 ✅ İzin hafızası:** `.deckent/settings.local.json` `permissions.allow` (claude-code uyumlu); 3-yollu onay (y/a/N), "hep izin ver" kalıcı + bir daha sormaz. (gitignore'lu)
+- **224-017 ✅ `/` komut menüsü:** readline completer — Tab ile slash komut listesi/tamamlama.
+- **224-018 Polish batch (kısmen):**
+  - ✅ `● deckent` **kraken marka renginde** (teal `●` + gold `deckent`, splash.ts ile uyumlu).
+  - ✅ Düşünme fiili **prompt başına SABİT** (rastgele tek fiil seçilir, sürekli değişmez; sadece braille noktası döner).
+  - 🔜 **Markdown `**bold**` / `` `code` `` streaming render** (token-token akışla uyumlu stateful renderer — `**` literal görünmesin).
+  - 🔜 **Token sayacı + süre** (claude `result` event `usage` + tur süresi → cevap sonrası dim footer `⏱ 3.2s · 1.2k tok`). Loop turn-start/end + usage capture gerekir.
+  - 🔜 **Türkçe karakter şekil-bozukluğu** (somut repro lazım — UTF-8 çıkış yolu denetimi).
+  - 🔜 **Tıklanır dosya yolları** (VSCode terminal otomatik linkler; düz-yol bas + gerekirse osc-8 link).
+
+---
+
 **Beklenen:** 11-13/13 DONE, 0 false-FIX. **Native REPL GERÇEKTEN claude-code gibi:** line-editing+history+ok-tuş (224-001), tek-görünüm prompt (224-002), akıcı multi-turn (224-003) + paste-tek-mesaj (224-004), **gerçekten dosya yazar/aksiyon alır** (224-005/006/007 — interaktif y/N+multi-select onayla), `/nervous` görünür (224-008) + banner (224-009) + nervous güvenli açık (224-010), pürüzsüz streaming (224-011). CI yeşil KORUNUR.
 
 **🟢 RUN-VERIFY (cc sprint sonu):** gerçek `dist/cli/entry.js` GERÇEK TTY'de — ↑ history + ←/→ + Del (ham escape yok), kullanıcı satırı tek-görünüm, 2./3. mesaj cevaplanır, paste tek-mesaj, "X.md yaz" → onay → **dosya OLUŞUR**, `/nervous` pending, akış pürüzsüz. `node scripts/repl-smoke-verify.mjs` + `agentic-do-verify.mjs` yeşil. Mock-only DONE YOK.

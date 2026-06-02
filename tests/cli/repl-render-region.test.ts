@@ -90,18 +90,19 @@ describe('createThinkingTicker — rotating-verb indicator (T-224-014)', () => {
     expect(out.writes.length).toBe(0);
   });
 
-  it('TTY → start shows `● deckent` + a verb, then rotates on tick', () => {
+  it('TTY → start shows `● deckent` + a FIXED verb; only the braille frame animates', () => {
     vi.useFakeTimers();
     try {
       const out = fakeOut(true);
-      const ticker = createThinkingTicker(out, { isTty: true });
+      const ticker = createThinkingTicker(out, { isTty: true, verb: 'şahlanıyor' });
       ticker.start();
       const first = out.writes.join('');
       expect(first).toContain('deckent');
-      expect(first).toContain('düşünüyor'); // first verb
+      expect(first).toContain('şahlanıyor');
       out.writes.length = 0;
-      vi.advanceTimersByTime(700);
-      expect(out.writes.join('')).toContain('şahlanıyor'); // rotated to next verb
+      vi.advanceTimersByTime(90);
+      // The verb stays the SAME across ticks (user request: not constantly changing).
+      expect(out.writes.join('')).toContain('şahlanıyor');
       ticker.stop();
     } finally {
       vi.useRealTimers();
