@@ -606,16 +606,15 @@ export async function launchDefaultRepl(): Promise<void> {
   // (else the markers show literally). Non-TTY → passthrough (pipe unchanged).
   const streamMd = createStreamMarkdown(isTty);
 
-  // T-224-019 — pinned-input-bar (OPT-IN: DECKENT_PINNED_BAR=1). When enabled on
-  // a TTY, provider output is line-buffered and each complete line is written
-  // ABOVE the prompt via region.writeAbove, which redraws the `› ` prompt below
-  // after every line — so the prompt stays PINNED at the bottom while the reply
-  // streams above (the user's "prompt bar kayboluyor" complaint). Streaming is
-  // line-granular here (not token). DEFAULT OFF → the verified Model-C raw-inline
-  // path is unchanged; this opt-in path is for morning TTY visual-tuning before
-  // it becomes the default. (Pinned + smooth-token-stream together needs a full
-  // render loop — tracked for the collaborative session.)
-  const pinnedBar = isTty && process.env['DECKENT_PINNED_BAR'] === '1';
+  // T-224-019 — pinned-input-bar. On a TTY, provider output is line-buffered and
+  // each complete line is written ABOVE the prompt via region.writeAbove, which
+  // redraws the `› ` prompt below after every line — so the prompt stays PINNED
+  // at the bottom while the reply streams above (Alperen: "prompt bar kesin
+  // korunmalı"). DEFAULT ON (PTY-verified: clean exit, kraken ticker + ⏱ footer
+  // + reply all render). Streaming is line-granular (not token-smooth); the
+  // opt-OUT `DECKENT_PINNED_BAR=0` restores the raw token-smooth path for anyone
+  // who prefers it. (Pinned + token-smooth together needs a full render loop.)
+  const pinnedBar = isTty && process.env['DECKENT_PINNED_BAR'] !== '0';
   const lineSink = pinnedBar
     ? createLineBufferedSink((line) => region.writeAbove(streamMd.feed(line) + streamMd.flush()))
     : null;
