@@ -1,6 +1,6 @@
 # DIRECTIVES — Sprint 219: Native Agentic Deckent — terminalde `claude` gibi + Agentic OS
 
-## Goal: NATIVE AGENTIC SPRINTİ (14 task, 6 dalga, 10 worker). + DALGA F: blueprint.md/vision baştan-aşağı güncelle (deckent NE/NEREDE SSOT-of-identity) + otonom agentic runtime temeli (yetki-sınırlı sürekli mod). **god-level format — MVP ASLA.** HEDEF (Alperen): `deckent` terminalde `claude` gibi native conversational agentic REPL olsun — argümansız `deckent` yazınca doğrudan sohbet açılsın, doğal dille konuş → deckent senin için sprint/status/memory/dosya aksiyonlarını yapsın. **Agentic OS.** DALGA A: native REPL (`deckent` argümansız → agentic chat; `deckent chat --native` gerçek round-trip run-proven). DALGA B: agentic tool-use (doğal dil → MCP aksiyon + onay kapısı). DALGA C: F2 streaming (token-stream, claude gibi akan cevap). DALGA D: dashboard kalıcı-fix (Layout/Sidebar tek-kaynak + cache-bust + render-test) + 8-sayfa garanti. DALGA E: TR MASTER-PLAN + ADR-081. Her Tier-1 task `Smoke:` satırlı (gerçek-binary kanıt).
+## Goal: NATIVE AGENTIC SPRINTİ (16 task, 7 dalga, 10 worker). + DALGA G: plan-akış wire-gap kapat (routing routeTaskV2 surface-bonus + planner Smoke-field taşıma — dogfood kendi plan-akışını düzeltir, etki 220+). + DALGA F: blueprint.md/vision baştan-aşağı güncelle (deckent NE/NEREDE SSOT-of-identity) + otonom agentic runtime temeli (yetki-sınırlı sürekli mod). **god-level format — MVP ASLA.** HEDEF (Alperen): `deckent` terminalde `claude` gibi native conversational agentic REPL olsun — argümansız `deckent` yazınca doğrudan sohbet açılsın, doğal dille konuş → deckent senin için sprint/status/memory/dosya aksiyonlarını yapsın. **Agentic OS.** DALGA A: native REPL (`deckent` argümansız → agentic chat; `deckent chat --native` gerçek round-trip run-proven). DALGA B: agentic tool-use (doğal dil → MCP aksiyon + onay kapısı). DALGA C: F2 streaming (token-stream, claude gibi akan cevap). DALGA D: dashboard kalıcı-fix (Layout/Sidebar tek-kaynak + cache-bust + render-test) + 8-sayfa garanti. DALGA E: TR MASTER-PLAN + ADR-081. Her Tier-1 task `Smoke:` satırlı (gerçek-binary kanıt).
 
 Bağlam:
 - **git-guard AKTİF** (dist'te) — worker-spawn deckent-dev'i resetlemez (Sprint 216 felaketi tekrarlanamaz). Sprint güvenli.
@@ -227,6 +227,38 @@ Bağlam:
 **Çözüm:** `autonomous-runtime.ts` — `runAutonomousCycle(config)`: event/trigger (scheduled-flow F3 + nervous) → analiz → RBAC (ADR-037) + onay-kapısı (nervous) içinde aksiyon → audit. İSKELET + karar mantığı (gerçek ERP write değil — read-first, aksiyon önerisi + onaylı çalıştırma). Mevcut F3 scheduled-flows + nervous approval üstüne. Caller iskelet (gerçek runtime wire Sprint 220).
 **Kanıt:** `grep -c "runAutonomousCycle\|authority\|RBAC\|approval\|trigger\|autonomous" src/orchestra/autonomous-runtime.ts` → ≥3; `npx vitest run tests/orchestra/autonomous-runtime.test.ts` → 4+ pass
 **Test:** ≥4 (trigger→cycle, yetki-içi aksiyon onaylı, yetki-dışı→reddedilir/onay-bekler, audit kaydı) — mock (hermetik)
+
+---
+
+## DALGA G — Plan-Akış Wire-Gap Kapat (2 task — dogfood kendi routing/Smoke'unu düzeltir)
+
+> Sprint 219 plan analizi (cc): 216-003 (surface routing) + 216-004 (Smoke parse) kodu dist'te VAR ama **plan-akışına bağlı değil** — `task-router` eski `routeTask` kullanıyor (routeTaskV2 surface-bonus değil → cli/commands surface task'ları refactorer'a) + `plannerTaskToParams` smoke alanını taşımıyor (Smoke=0). Bu wave bu iki wire-gap'i kapatır; bir sonraki sprint doğru router+Smoke kullanır. **Bu sprint'i etkilemez (zaten planlandı) — etki 220+.**
+
+## Task 15: 219-015 — Plan-time routing routeTaskV2 wire (surface-bonus plan'da devrede)
+- Model: opus
+- Effort: normal
+- Skills: typescript-expert, system-architect
+- Files: src/orchestra/task-router.ts, tests/orchestra/router-surface-wire.test.ts
+- Scope: src/orchestra/, tests/orchestra/
+
+### Description
+**Problem (cc plan analizi):** `task-router.ts` agent ataması eski `routeTask` (190) kullanıyor; `routeTaskV2` (getUserSurfaceBonus, 216-003) DEĞİL. Sonuç: `src/cli/commands/`, `src/dashboard/`, `src/api/` surface task'ları **refactorer'a** gidiyor (Sprint 219 plan: refactorer 8/14). api-builder/frontend-designer olmalı.
+**Çözüm:** task-router agent ataması `routeTaskV2`'yi (surface-bonus + domain-bonus) çağırsın VEYA `routeTask`'a `getUserSurfaceBonus` entegre et. **DİKKAT:** routing davranışı değişir → kapsamlı test (mevcut routing testleri bozulmamalı + surface→doğru agent). Caller task-router (def routing-engine hariç).
+**Kanıt:** `grep -c "routeTaskV2\|getUserSurfaceBonus" src/orchestra/task-router.ts` → ≥1; `npx vitest run tests/orchestra/router-surface-wire.test.ts` → 4+ pass; mevcut routing testleri yeşil
+**Test:** ≥4 (cli/commands→api-builder, dashboard→frontend-designer, src/core→refactorer/architect korunur, mevcut routing regresyon yok)
+
+## Task 16: 219-016 — Plan-time Smoke-field taşıma (plannerTaskToParams → task.smoke)
+- Model: sonnet
+- Effort: normal
+- Skills: typescript-expert
+- Files: src/orchestra/task-builder.ts, tests/orchestra/planner-smoke-wire.test.ts
+- Scope: src/orchestra/, tests/orchestra/
+
+### Description
+**Problem (cc plan analizi):** `parseStructuredDirectives` smoke parse ediyor (extractSmoke, 216-004) AMA `plannerTaskToParams` / `createTask` `smoke` alanını CreateTaskParams → task JSON'a TAŞIMIYOR → plan'da Smoke=0 → Proof-of-Function gate input'suz.
+**Çözüm:** task-builder `plannerTaskToParams` + `CreateTaskParams` + `createTask` — `smoke` alanını ParsedDirectiveTask'tan task JSON'a propagate et. Plan sonrası Tier-1 task.smoke dolu olsun. api-surface.md task şeması uyumlu.
+**Kanıt:** `grep -c "smoke" src/orchestra/task-builder.ts` → ≥4; `npx vitest run tests/orchestra/planner-smoke-wire.test.ts` → 4+ pass
+**Test:** ≥4 (parsed.smoke→params→task JSON, Smoke'suz task undefined, Tier-1 dolu, structured plan smoke korunur)
 
 ---
 
