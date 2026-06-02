@@ -580,8 +580,11 @@ describe('Error handling completeness', () => {
     const { readFileSync, readdirSync } = await import('node:fs');
     const { join } = await import('node:path');
     const dir = join(process.cwd(), 'src/cli/commands');
-    // agent.ts and skill.ts use throw new Error for operational errors (git clone, model validation)
-    const ALLOWED_FILES = new Set(['agent.ts', 'skill.ts']);
+    // agent.ts and skill.ts use throw new Error for operational errors (git clone, model validation).
+    // chat-session.ts (spawn pipe missing) and chat-provider-parity.ts (Ollama/OpenAI-compat HTTP
+    // failures) throw for the same operational-error category — network/spawn faults surfaced to the
+    // caller, not domain errors warranting a registered DeckentError code.
+    const ALLOWED_FILES = new Set(['agent.ts', 'skill.ts', 'chat-session.ts', 'chat-provider-parity.ts']);
     const files = readdirSync(dir).filter(f => f.endsWith('.ts') && !ALLOWED_FILES.has(f));
     for (const file of files) {
       const content = readFileSync(join(dir, file), 'utf-8');
