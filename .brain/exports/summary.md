@@ -77,6 +77,7 @@
 | adr-080 | Dashboard God-Level — Sprint-Start Detach + Hollow-Page Wire + Chat Round-Trip + Native UI | accepted |
 | adr-081 | Native Agentic Deckent — `deckent` argümansız REPL + Agentic Tool-Use + F2 Streaming + Agentic-OS Direction | accepted |
 | adr-082 | Native-LLM-Wire + Nervous-Activation + Dashboard-v2 Canlı | accepted |
+| adr-083 | REPL-UX-Evolution + Provider-Parity + Local-Model-Foundation | accepted |
 
 ## Recent Learnings
 - **Sprint sprint-221 Learnings** (sprint-221): ## Sprint sprint-221 Learnings
@@ -152,5 +153,6 @@ _No active technical debt._
 - Violation pattern: stale_heartbeat
 - Violation pattern: stale_heartbeat
 - Violation pattern: stale_heartbeat
+- Violation pattern: stale_heartbeat
 
-_Total entries: 501 | Generated: 2026-06-02_
+_Total entries: 504 | Generated: 2026-06-02_

@@ -8,7 +8,8 @@ import { handleCliError } from './helpers/process.js';
 import { interruptActiveSprint } from '../orchestra/sprint-controller.js';
 import { killAllSessions } from '../orchestra/tmux.js';
 import { bootstrapFromCatalog } from '../core/model-catalog.js';
-import { loadConfig, resolveChatProvider, type ChatProviderName } from '../core/config.js';
+import { loadConfig, resolveChatProvider, resolveChatConfig, type ChatProviderName } from '../core/config.js';
+import { renderStatusLine, type StatusLineContext } from './commands/chat-status-line.js';
 import {
   runChatNativeLoop,
   buildSubscriptionPrompt,
@@ -102,6 +103,68 @@ function extraArgsForProvider(name: ChatProviderName): readonly string[] {
     case 'claude': return ['--print'];
     default:       return ['--print'];
   }
+}
+
+/**
+ * Sprint 222 Task 222-002 — streaming args (per-token NDJSON output).
+ *
+ * The default `--print` mode for claude flushes the entire response as one
+ * stdout chunk → REPL feels frozen until completion. `--output-format
+ * stream-json --verbose` flips the CLI into NDJSON event-stream mode where
+ * each assistant message turn (typically a sentence or sub-sentence) is
+ * emitted as a single complete JSON line as soon as it is produced (ADR-017
+ * stream-json contract). codex (`exec --full-auto`) already streams text
+ * incrementally over stdout — no flag needed. gemini stream-json schema
+ * differs from claude's and is deferred (out of this task's scope).
+ */
+function streamingArgsForProvider(name: 'claude' | 'codex' | 'gemini'): readonly string[] {
+  switch (name) {
+    case 'claude': return ['--print', '--output-format', 'stream-json', '--verbose'];
+    case 'codex':  return ['exec', '--full-auto'];
+    case 'gemini': return ['-p'];
+  }
+}
+
+/**
+ * Sprint 222 Task 222-002 — extract the assistant text delta from one
+ * NDJSON line emitted by `claude --output-format stream-json --verbose`.
+ *
+ * Returns:
+ *   - `string` — partial assistant text delta (caller yields to the stream).
+ *   - `null`   — valid JSON event but no text (e.g. `system`/`result`/
+ *                ping events). Caller skips silently.
+ *   - `undefined` — line is not a parseable JSON object. Caller falls back
+ *                   to raw-text passthrough so the legacy `--print` batch
+ *                   mode and the existing `streams chunks as they arrive`
+ *                   test in `native-repl-wire.test.ts` keep working.
+ *
+ * Exported so the test suite can drive both the happy + edge branches
+ * without spinning up the full streaming pipeline.
+ */
+export function extractClaudeStreamDelta(line: string): string | null | undefined {
+  if (line.length === 0 || line.charCodeAt(0) !== 0x7B /* '{' */) return undefined;
+  let obj: unknown;
+  try {
+    obj = JSON.parse(line);
+  } catch {
+    return undefined;
+  }
+  if (!obj || typeof obj !== 'object') return null;
+  const event = obj as { type?: string; message?: { content?: unknown } };
+  if (event.type !== 'assistant') return null;
+  const content = event.message?.content;
+  if (!Array.isArray(content)) return null;
+  let delta = '';
+  for (const part of content) {
+    if (
+      part && typeof part === 'object'
+      && (part as { type?: string }).type === 'text'
+      && typeof (part as { text?: unknown }).text === 'string'
+    ) {
+      delta += (part as { text: string }).text;
+    }
+  }
+  return delta;
 }
 
 /** Subscription mode env — drop API-key vars so the CLI uses its bundled session auth. */
@@ -250,12 +313,56 @@ export function buildReplProvider(
     },
     async *stream(messages) {
       const prompt = buildSubscriptionPrompt(messages);
-      const { chunks, wait } = spawnFn(binary, [...extraArgs, prompt], subscriptionReplEnv());
+      // Sprint 222 Task 222-002 — request per-token stream-json (claude) so the
+      // CLI flushes deltas as they arrive instead of dumping the full response
+      // as one batched chunk. Legacy non-JSON stdout (codex/gemini, or any
+      // future fallback) is detected on the first chunk and passes through
+      // unchanged so existing callers / tests stay green.
+      const args = streamingArgsForProvider(name);
+      const { chunks, wait } = spawnFn(binary, [...args, prompt], subscriptionReplEnv());
       let collected = '';
+      let buffer = '';
+      let mode: 'unknown' | 'raw' | 'ndjson' = 'unknown';
       for await (const chunk of chunks) {
         if (chunk.length === 0) continue;
-        collected += chunk;
-        yield { text: chunk };
+        if (mode === 'unknown') {
+          mode = chunk.charCodeAt(0) === 0x7B /* '{' */ ? 'ndjson' : 'raw';
+        }
+        if (mode === 'raw') {
+          collected += chunk;
+          yield { text: chunk };
+          continue;
+        }
+        // ndjson: buffer across chunk boundaries, drain complete lines.
+        buffer += chunk;
+        let nlIdx: number;
+        while ((nlIdx = buffer.indexOf('\n')) >= 0) {
+          const line = buffer.slice(0, nlIdx);
+          buffer = buffer.slice(nlIdx + 1);
+          if (line.length === 0) continue;
+          const delta = extractClaudeStreamDelta(line);
+          if (delta === undefined) {
+            // Looked like NDJSON but didn't parse — never swallow data.
+            collected += line + '\n';
+            yield { text: line + '\n' };
+          } else if (delta !== null && delta.length > 0) {
+            collected += delta;
+            yield { text: delta };
+          }
+        }
+      }
+      // Flush trailing partial line (no terminating newline) — only relevant
+      // in ndjson mode; raw mode already emitted everything inline above.
+      if (mode === 'ndjson' && buffer.length > 0) {
+        const delta = extractClaudeStreamDelta(buffer);
+        if (delta === undefined) {
+          collected += buffer;
+          yield { text: buffer };
+        } else if (delta !== null && delta.length > 0) {
+          collected += delta;
+          yield { text: delta };
+        }
+        buffer = '';
       }
       await wait;
       yield { done: { text: collected, stopReason: 'end_turn' } };
@@ -319,7 +426,23 @@ export async function launchDefaultRepl(): Promise<void> {
     process.exit(1);
     return;
   }
-  process.stdout.write(`deckent (${providerName}) — type :exit to quit\n`);
+  // Sprint 222 Task 222-006 — render status line (provider + dir + sprint).
+  // Reads chat.status_line from config; defaults to show-all when absent.
+  let statusLineCfg: boolean | undefined;
+  try {
+    const cfg = await loadConfig();
+    const chatCfg = resolveChatConfig(cfg);
+    statusLineCfg = typeof chatCfg.status_line === 'boolean' ? chatCfg.status_line : undefined;
+  } catch {
+    statusLineCfg = undefined;
+  }
+  const statusCtx: StatusLineContext = {
+    provider: providerName,
+    dir: process.cwd(),
+    activeSprint: null,
+  };
+  const statusLineText = renderStatusLine(statusCtx, statusLineCfg);
+  process.stdout.write(statusLineText ? statusLineText + '\n' : '');
 
   async function* readStdin(): AsyncGenerator<string> {
     const rl = createInterface({ input: process.stdin });

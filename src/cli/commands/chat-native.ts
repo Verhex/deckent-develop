@@ -7,6 +7,11 @@ import {
 import { handleReplCommand } from './chat-repl-ux.js';
 import { classifyAgenticIntent, dispatchAgenticIntent } from './chat-agentic-dispatch.js';
 import { requireConfirmIfRisky, type AgenticAction } from './agentic-confirm.js';
+import { buildSlashRegistry, renderHelp, resolveSlash } from './chat-slash-registry.js';
+import {
+  dispatchEnterpriseSlash,
+  type EnterpriseSpawnFn,
+} from './chat-enterprise-bridge.js';
 
 // ═══ chat-native — Path C tool-use loop iskelet (Sprint 203 T-203-005) ═══
 //
@@ -197,6 +202,14 @@ export interface ChatNativeOptions {
    * inject a stub to drive both branches deterministically.
    */
   agenticConfirm?: (action: AgenticAction) => Promise<boolean>;
+  /**
+   * Sprint 222 T-222-007 — enterprise slash bridge spawn injection. The
+   * enterprise slashes (/cost /audit /rbac /flow) shell out to the deckent
+   * CLI for their underlying handlers. Tests supply a fake `EnterpriseSpawnFn`
+   * to stay hermetic — when omitted, {@link dispatchEnterpriseSlash} uses its
+   * built-in child_process spawn against `dist/cli/entry.js`.
+   */
+  enterpriseSpawn?: EnterpriseSpawnFn;
 }
 
 const DEFAULT_MAX_TURNS = 50;
@@ -312,6 +325,63 @@ export async function runChatNativeLoop(opts: ChatNativeOptions): Promise<ChatMe
     if (slash.action === 'exit') break;
     if (slash.action === 'clear') {
       transcript.length = 0;
+      continue;
+    }
+    // Sprint 222 T-222-007 — enterprise slash bridge wire. /cost /audit /rbac
+    // /flow shell out to the deckent enterprise CLI via dispatchEnterpriseSlash
+    // (def file chat-enterprise-bridge.ts excluded from kanıt grep). The check
+    // runs BEFORE the slash registry so enterprise slashes intercept cleanly
+    // and never round-trip to claude. Tests inject `opts.enterpriseSpawn` to
+    // stay hermetic; production uses the built-in child_process spawn.
+    if (line.startsWith('/')) {
+      const parts = line.split(/\s+/);
+      const slashName = (parts[0] ?? '').toLowerCase();
+      const extraArgs = parts.slice(1);
+      const enterpriseResult = await dispatchEnterpriseSlash(
+        slashName,
+        extraArgs,
+        opts.enterpriseSpawn ? { spawnFn: opts.enterpriseSpawn } : {},
+      );
+      if (enterpriseResult.handled) {
+        output(enterpriseResult.output);
+        transcript.push({ role: 'user', content: line });
+        transcript.push({ role: 'assistant', content: enterpriseResult.output });
+        memStore?.appendChatTurn(sessionId, 'user', line);
+        memStore?.appendChatTurn(sessionId, 'assistant', enterpriseResult.output);
+        continue;
+      }
+    }
+    // Sprint 222 T-222-005 — slash registry wire. Extended slash commands
+    // (/help, /status, /recall, /plan, /sprint) resolve via the live
+    // catalog in chat-slash-registry.ts. `/help` renders the registry
+    // INSTANTLY without round-tripping to claude (was 15.9s). Agentic
+    // slashes dispatch through the same dispatcher as agenticDispatch,
+    // gated by the risky-confirm function. Fires regardless of the
+    // `agenticDispatch` flag — an explicit slash is unambiguous user
+    // intent, while the flag only gates natural-language classification.
+    const slashAction = resolveSlash(line, buildSlashRegistry());
+    if (slashAction.action === 'help') {
+      output(renderHelp(slashAction.registry));
+      continue;
+    }
+    if (slashAction.action === 'agentic') {
+      const action: AgenticAction = {
+        name: slashAction.tool,
+        description: `slash → ${slashAction.tool}`,
+        args: slashAction.args,
+      };
+      const confirmFn = opts.agenticConfirm ?? requireConfirmIfRisky;
+      const approved = await confirmFn(action);
+      if (!approved) {
+        output(`[slash] cancelled: ${slashAction.tool}`);
+        continue;
+      }
+      const slashResult = await dispatcher.dispatch(slashAction.tool, slashAction.args);
+      output(slashResult);
+      transcript.push({ role: 'user', content: line });
+      transcript.push({ role: 'assistant', content: slashResult });
+      memStore?.appendChatTurn(sessionId, 'user', line);
+      memStore?.appendChatTurn(sessionId, 'assistant', slashResult);
       continue;
     }
     // Sprint 221 T-221-002 — agentic dispatch wire. After the slash check,

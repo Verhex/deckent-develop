@@ -60,8 +60,11 @@ _Total: 28 MCP tools_
 | `chat-mode` | deckent chat-mode |
 | `chat-native` | deckent chat-native |
 | `chat-provider-parity` | deckent chat-provider-parity |
+| `chat-render` | deckent chat-render |
 | `chat-repl-ux` | deckent chat-repl-ux |
+| `chat-session` | deckent chat-session |
 | `chat-slash-registry` | deckent chat-slash-registry |
+| `chat-spinner` | deckent chat-spinner |
 | `chat-status-line` | deckent chat-status-line |
 | `checkpoint` | deckent checkpoint |
 | `cleanup` | deckent cleanup |
@@ -118,4 +121,4 @@ _Total: 28 MCP tools_
 | `watch` | deckent watch |
 | `web` | deckent web |
 
-_Total: 71 CLI command modules_
+_Total: 74 CLI command modules_

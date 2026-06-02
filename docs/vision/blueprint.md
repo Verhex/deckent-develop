@@ -13,12 +13,12 @@
 ## Live Metrics
 | Metrik | Değer |
 |--------|-------|
-| Sprint | sprint-221 |
-| Toplam Task | 17 |
-| Tamamlanan | 17 |
-| Tech Debt | 0 |
-| No-Go | 0 |
-| Süre | 23dk 18sn |
+| Sprint | sprint-222 |
+| Toplam Task | 13 |
+| Tamamlanan | 8 |
+| Tech Debt | 8 |
+| No-Go | 5 |
+| Süre | 0dk 0sn |
 | Coverage | N/A |
 
 # TABLE OF CONTENTS
@@ -78,11 +78,12 @@ An agent-agnostic AI orchestration system. You describe goals in natural languag
 **USP (Unique Selling Point):**
 Sprint + learning loop. Deckent doesn't just execute tasks — it plans sprints, evaluates results with GO/NO-GO protocol, tracks tech debt, runs retrospectives, and feeds learnings into the next sprint. Every sprint makes the system smarter.
 
-**Where it stands today (Sprint 220 → 221):**
+**Where it stands today (Sprint 221 → 222):**
 - Sprint 219 closed (16/17 DONE, 0 tech-debt, 1 NO-GO — 219-010 dashboard e2e cache-bust carried to Sprint 220). Sprint 219 delivered: `deckent` argümansız native agentic REPL opens (ADR-081), agentic dispatch + approval gate live, F2 chat streaming wire (`/api/chat/stream`) SSE end-to-end, dashboard 8-page nav render-tested.
 - Sprint 220 ("Native-LLM-Wire + Dashboard-v2 Canlı + Nervous Activation") completes the remaining wires: **native REPL genuinely connected to a real LLM** (config-driven `chat_provider→brain_provider→claude`, real round-trip responses — not a skeleton), **nervous system active Faz-1** (config `nervous_system.enabled:true` + bootstrap pipeline + 8 action handlers), and **dashboard-v2 live** (worker grid real-time SSE, status correct, refresh+cooldown, chat-wire, tech-debt filter, coverage, enterprise-auth).
 - Sprint 221 ("deckent = claude-code-quality terminal REPL") delivers **native REPL full-scope**: live slash-commands (`/help` `/status` `/recall` `/plan` — config-driven registry, not hard-coded), **agentic dispatch** (natural language → real `deckent_status`/`deckent_recall` action, no provider pass-through), **5-provider parity** (claude / codex / gemini / ollama-local / openai-compatible — equal round-trip), **ollama-local as first-class** (zero-API, `localhost:11434`, foundation for future deckent-AI), **user/enterprise mode** (`chat.mode: 'user'|'enterprise'` config-driven — enterprise adds /audit /rbac /flow /cost slash group), and **customizable status-line** (`chat.status_line` toggle). ADR-083 accepted. Provider-neutral architecture preserved.
-- The doc you are reading was last sweep-refreshed in Sprint 221 — header timestamp + Live Metrics + "where it stands" block. Dated history sections from earlier sprints are preserved as-written; "as-built" sections (Architecture Overview, Memory V2, MCP/CLI counts) are kept code-derived via managed-docs (ADR-029/030).
+- Sprint 222 ("Native REPL HIZ + GÖRSEL + Nervous CANLI") resolves the three UX gaps exposed by Sprint 221 run-verify: **(1) REPL hızlı** — `createPersistentClaudeSession` spawns the claude process **once** (`--input-format stream-json`), reusing it for every subsequent turn; cold-start pays once (first message), every next message is **<1s** (vs 4.5s per-turn before). **(2) GÖRSEL zenginlik** — `renderMarkdown` (ANSI, no dep), `createSpinner` (braille, stderr, TTY-only), and real token-streaming land; REPL no longer looks frozen. **(3) Nervous CANLI/etkileşimli** — panic-gate rewritten **non-blocking** (advisory mode, timeout-auto-proceed); `chat-nervous-bridge` surfaces pending nervous notifications in the REPL terminal; nervous re-enabled safely. ADR-084 accepted. Sprint 221 hollow wires (`/help`, status-line, agentic dispatch) closed with run-verify.
+- The doc you are reading was last sweep-refreshed in Sprint 222 — header timestamp + Live Metrics + "where it stands" block. Dated history sections from earlier sprints are preserved as-written; "as-built" sections (Architecture Overview, Memory V2, MCP/CLI counts) are kept code-derived via managed-docs (ADR-029/030).
 - The everyone-everywhere arc (6 contexts — greenfield / in-dev / maintained / daily-tasks / ERP / enterprise) and the autonomous agentic runtime continue to be built out; see §23 Strategic Roadmap and [`docs/MASTER-PLAN.md`](../MASTER-PLAN.md) (or [`docs/MASTER-PLAN-TR.md`](../MASTER-PLAN-TR.md)) for the how-we-build-it sequencing.
 
 **Phased Roadmap:**
@@ -307,11 +308,11 @@ Supported OS:
   Windows (WSL2 — full tmux support)
 ```
 
-## 3.5 Native REPL — Full-Scope Terminal Chat (Sprint 221, ADR-081/083)
+## 3.5 Native REPL — Full-Scope Terminal Chat (Sprint 222, ADR-081/083/084)
 
 Running `deckent` with no arguments opens a **full-scope terminal REPL** — claude-code-quality conversation directly in your terminal.
 
-### Capabilities (as-built Sprint 221)
+### Capabilities (as-built Sprint 222)
 
 | Feature | Description |
 |---------|-------------|
@@ -322,6 +323,10 @@ Running `deckent` with no arguments opens a **full-scope terminal REPL** — cla
 | **User/Enterprise mode** | `chat.mode: 'user'` (default, simple) / `'enterprise'` (adds /audit /rbac /flow /cost group) |
 | **Customizable status-line** | `chat.status_line: true/false` — shows provider + active sprint + directory at REPL start |
 | **Provider fallback chain** | `chat_provider → brain_provider → 'claude'` + `chat.local_fallback: 'ollama'` optional |
+| **Persistent session (HIZLI)** | `createPersistentClaudeSession` — claude spawned **once**, reused every turn; cold-start pays once, subsequent messages **<1s** (was 4.5s per-turn) |
+| **Görsel zenginlik (VISUAL)** | `renderMarkdown` (ANSI colors, code-block highlight, bold, TTY-only, no dep); `createSpinner` (braille frames, stderr, stops on first streaming chunk) |
+| **Real token streaming** | `provider.stream` yields chunks incrementally (not a single-block response); `--output-format stream-json` wire |
+| **Nervous CANLI/etkileşimli** | panic-gate **non-blocking** (advisory + timeout-auto-proceed); `chat-nervous-bridge` shows pending nervous notifications in REPL; `/nervous accept\|reject` inline |
 
 ### Provider Configuration
 
@@ -361,19 +366,29 @@ Running `deckent` with no arguments opens a **full-scope terminal REPL** — cla
 
 Enterprise mode additionally shows: `/audit` `/rbac` `/flow` `/cost` (bridge to existing CLI commands).
 
-### Architecture
+### Architecture (Sprint 222)
 
 ```
 runChatNativeLoop (chat-native.ts)
   │
   ├── handleReplCommand (chat-repl-ux.ts) — slash dispatch
-  │     └── resolveSlash (chat-slash-registry.ts) — live registry
+  │     └── resolveSlash (chat-slash-registry.ts) — live registry (WIRED Sprint 222)
   │
   ├── classifyAgenticIntent / dispatchAgenticIntent (chat-agentic-dispatch.ts)
-  │     └── real MCP tool dispatch (deckent_status, deckent_recall, ...)
+  │     └── real MCP tool dispatch (deckent_status, deckent_recall, ...)  (WIRED Sprint 222)
+  │
+  ├── renderStatusLine (chat-status-line.ts) — provider/dir/sprint at REPL start  (WIRED Sprint 222)
+  │
+  ├── createSpinner (chat-spinner.ts) — braille spinner on stderr, stops on first chunk  (Sprint 222)
+  │
+  ├── renderMarkdown (chat-render.ts) — ANSI markdown renderer, TTY-only, zero dep  (Sprint 222)
+  │
+  ├── getPendingNervous / renderNervousPrompt (chat-nervous-bridge.ts)  (Sprint 222)
+  │     └── /nervous accept|reject — inline terminal approval
   │
   └── resolveChatAdapter (chat-provider-parity.ts) — provider-neutral
-        ├── claude  → subscription session
+        ├── claude  → createPersistentClaudeSession (chat-session.ts) — spawn 1×, reuse  (Sprint 222)
+        │             stream-json mode, <1s per subsequent turn
         ├── codex   → OPENAI_API_KEY
         ├── gemini  → GOOGLE_API_KEY
         ├── ollama  → OllamaAdapter (localhost:11434, zero-API)

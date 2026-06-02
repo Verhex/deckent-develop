@@ -26,7 +26,6 @@ When acting as Worker: @.codex/rules/worker-default.md
 ## Agent Performance
 | Agent | Tasks | Done | Başarı |
 |-------|-------|------|--------|
-| api-builder | 9 | 9 | 100% |
-| refactorer | 4 | 4 | 100% |
-| frontend-designer | 2 | 2 | 100% |
-| doc-writer | 2 | 2 | 100% |
+| api-builder | 8 | 7 | 88% |
+| refactorer | 3 | 0 | 0% |
+| doc-writer | 2 | 1 | 50% |

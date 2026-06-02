@@ -6102,3 +6102,37 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 221-017: 221-017 — AI planner subscription-spawn fix + sessiz-fallback → AÇIK uyarı (dürüstlük) (DONE)
 
 ---
+## Sprint 222 — sprint-222
+
+**Status:** COMPLETE
+**Date:** 2026-06-02
+**Duration:** 0s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 13 |
+| Completed | 8 |
+| Tech Debt | 8 |
+| No-Go | 5 |
+| Coverage | NaN% |
+| Duration | 0ms |
+
+### Tasks
+
+- 222-001: 222-001 — [P0] Persistent claude session (per-turn cold-start 4.5s → reuse <1s) (GO_WITH_TECH_DEBT)
+- 222-002: 222-002 — Gerçek token-token streaming (claude --print toplu → incremental akış) (GO_WITH_TECH_DEBT)
+- 222-003: 222-003 — Spinner/progress feedback (yanıt beklerken görsel, donma hissi bitsin) (GO_WITH_TECH_DEBT)
+- 222-004: 222-004 — Markdown + renk render (claude-code gibi zengin output) (GO_WITH_TECH_DEBT)
+- 222-005: 222-005 — slash-registry REPL'e GERÇEK-wire (/help anında, 221-003 hollow fix) (GO_WITH_TECH_DEBT)
+- 222-006: 222-006 — status-line REPL'e GERÇEK-bas (221-004 hollow fix) (GO_WITH_TECH_DEBT)
+- 222-007: 222-007 — agentic-dispatch + enterprise-bridge runtime-wire (221-002/008 hollow fix) (GO_WITH_TECH_DEBT)
+- 222-008: 222-008 — [P0] Panic-gate NON-BLOCKING (sessiz spawn-blok TAMAMEN kaldır) (NO_GO)
+- 222-009: 222-009 — Nervous terminal-görünür (REPL'de pending + accept/reject, sessiz-IPC bitsin) (NO_GO)
+- 222-010: 222-010 — Nervous güvenli re-enable + dashboard-canlı (non-blocking olduktan SONRA) (NO_GO)
+- 222-011: 222-011 — ADR-084 (REPL-Perf Persistent-Session + Nervous-Interactive) + MASTER-PLAN (NO_GO)
+- 222-012: 222-012 — README + blueprint güncel (hızlı native REPL + nervous-canlı) (GO_WITH_TECH_DEBT)
+- 222-013: 222-013 — Sprint 221 TECH_DEBT gerçek-kapatma (Smoke run-verify, hollow→çalışır) (NO_GO)
+
+---

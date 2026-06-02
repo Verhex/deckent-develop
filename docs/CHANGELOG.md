@@ -2,6 +2,23 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint222] - 2026-06-02
+
+
+### Changed
+
+- 222-001 — [P0] Persistent claude session (per-turn cold-start 4.5s → reuse <1s) (completed with tech debt)
+- 222-002 — Gerçek token-token streaming (claude --print toplu → incremental akış) (completed with tech debt)
+- 222-003 — Spinner/progress feedback (yanıt beklerken görsel, donma hissi bitsin) (completed with tech debt)
+- 222-004 — Markdown + renk render (claude-code gibi zengin output) (completed with tech debt)
+- 222-005 — slash-registry REPL'e GERÇEK-wire (/help anında, 221-003 hollow fix) (completed with tech debt)
+- 222-006 — status-line REPL'e GERÇEK-bas (221-004 hollow fix) (completed with tech debt)
+- 222-007 — agentic-dispatch + enterprise-bridge runtime-wire (221-002/008 hollow fix) (completed with tech debt)
+- 222-012 — README + blueprint güncel (hızlı native REPL + nervous-canlı) (completed with tech debt)
+
+
+_Tasks: 13 total, 8 done, 8 tech debt, 5 no-go_
+
 ## [1.0.0-beta.1-sprint221] - 2026-06-02
 
 ### Added
