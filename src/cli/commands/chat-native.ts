@@ -236,6 +236,19 @@ export interface ChatNativeOptions {
    * keep their own UI semantics.
    */
   thinkingIndicator?: { start(): void; stop(): void };
+  /**
+   * Sprint 224 T-224-002 — interactive-TTY echo guard. When true, the input
+   * is read by a `terminal: true` readline (224-001) which ALREADY echoes the
+   * typed line to the screen. Re-emitting it via `renderUserMessage` would
+   * double-print the prompt ("prompt tekrar gidiyor"), so on an interactive
+   * TTY the layout user-echo is suppressed and we rely on readline's own echo
+   * (the `› ` prompt prefix is supplied by the entry point). On non-TTY/pipe
+   * callers there is NO readline echo, so the `› line` echo is kept — this
+   * preserves the existing chat-native pipe-output assertions and the HTTP
+   * backend contract. Set from `process.stdout.isTTY` by the REPL entry point;
+   * default false.
+   */
+  interactiveTty?: boolean;
 }
 
 const DEFAULT_MAX_TURNS = 50;
@@ -462,7 +475,11 @@ export async function runChatNativeLoop(opts: ChatNativeOptions): Promise<ChatMe
     // turn shows up as a discrete block in the REPL. Slash and agentic
     // paths above already `continue` before this point, so they keep their
     // own UI semantics unchanged.
-    if (layoutOn) emitLayout(renderUserMessage(line));
+    // Sprint 224 T-224-002 — on an interactive TTY the `terminal: true`
+    // readline already echoed this line (with the `› ` prompt prefix), so
+    // re-emitting it would double-print. Suppress the layout echo there;
+    // keep it on non-TTY/pipe where there is no readline echo.
+    if (layoutOn && opts.interactiveTty !== true) emitLayout(renderUserMessage(line));
 
     transcript.push({ role: 'user', content: line });
     memStore?.appendChatTurn(sessionId, 'user', line);

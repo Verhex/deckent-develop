@@ -208,6 +208,37 @@ Bağlam (Alperen+cc run-verify 2026-06-02, [[project_terminal_dashboard_ux_evolu
 
 ---
 
+## DALGA F — Ekleme (oturum-2 Alperen direktifi) (2 task)
+
+## Task 14: 224-014 — [P0] Sabit alt-prompt penceresi (claude-code: input altta sabit, output üste akar, korunan buffer + art-arda kuyruk)
+- Model: opus
+- Effort: high
+- Skills: typescript-expert, frontend-design
+- Files: src/cli/commands/chat-render-region.ts, src/cli/entry.ts, tests/cli/repl-render-region.test.ts
+- Scope: src/cli/, tests/cli/
+- Dependencies: 224-001, 224-003
+### Description
+**Problem (Alperen direktifi):** claude-code'daki gibi **sabit alt-prompt penceresi** yok — input altta pinli durmuyor, cevap akarken yazdığın korunmuyor, art-arda mesaj iletilemiyor, gönderilen mesajlar scrollback'e (üste) düzgün kaymıyor.
+**Çözüm (ADR-010 — yeni-dep YOK, Node readline+ANSI):** 224-001 `terminal:true` readline üstüne **render-disiplini**: YENİ `chat-render-region.ts` — `writeAbovePrompt(rl, text)`: `rl.line`+cursor sakla → `readline.clearLine/cursorTo` → çıktıyı prompt'un ÜSTÜNE bas → `rl.prompt(true)` ile korunan buffer'ı yeniden çiz (kullanıcı yazdığı KAYBOLMAZ). entry.ts: stream/cevap çıktısı bu helper'dan; **input-queue** (tur işlenirken gelen satırlar kuyruğa, sırayla işlenir → art-arda). Caller entry.ts.
+**Kanıt:** `grep -c "writeAbovePrompt\|clearLine\|cursorTo\|prompt(true)\|queue" src/cli/commands/chat-render-region.ts src/cli/entry.ts` → ≥3; `npx vitest run tests/cli/repl-render-region.test.ts` → 4+ pass
+**Test:** ≥4 (buffer-korunur, output-üste, queue-sıralı, non-TTY→düz) — hermetik (fake rl/stream)
+**Smoke (GERÇEK TTY):** cevap akarken yaz → yazdığın korunur + çıktı üste akar; art-arda 2 mesaj → ikisi sırayla cevaplanır; input hep altta sabit.
+
+## Task 15: 224-015 — AI plan mode fix (dürüst hata + gerçekten-çalışır, sessiz-structured-fallback bitir)
+- Model: opus
+- Effort: high
+- Skills: typescript-expert
+- Files: src/orchestra/planner.ts, src/orchestra/sprint-planner.ts, src/cli/commands/plan.ts, tests/orchestra/ai-planner-honest-fallback.test.ts
+- Scope: src/orchestra/, src/cli/, tests/orchestra/
+### Description
+**Problem (Explore + [[feedback_ai_planner_silent_fallback]]):** `callBrainPlanner()` (planner.ts:375-395) tüm hata türlerini tek `null`'a indirger (spawn/timeout/parse/validation ayırt edilemez); `spawnSync`+10s timeout gerçek plan üretimini aşabilir; CLI bootstrap (plan.ts:40-49) sessizce structured'a düşer (sebep gizli). throw/fallback (sprint-planner.ts:278-294) Sprint 221-017'de zaten doğru.
+**Çözüm:** `callBrainPlanner()` → **discriminant union** (`{ok:true,data}` | `{ok:false,reason,message}`); `resolveAdapter` ProviderError→`no_providers`. `planSprint()` discriminant tüket: ai+fail→BrainError **detaylı**, auto+fail→console.error detaylı+structured. CLI bootstrap→provider+gerçek-hata logla (sessiz DEĞİL). Timeout config'lenebilir (`brain_plan_timeout_ms` artır). Not: structured deckent-dev için mükemmel — AI mode user-project kritik.
+**Kanıt:** `grep -c "ok:\s*false\|reason\|discriminant\|no_providers\|brain_plan_timeout" src/orchestra/planner.ts` → ≥2; `npx vitest run tests/orchestra/ai-planner-honest-fallback.test.ts` → 4+ pass
+**Test:** ≥4 (ai+fail→detaylı-throw, auto+fail→detaylı-log+structured, no-provider→reason, discriminant ok-path) — hermetik (mock spawn)
+**Smoke:** `deckent plan --mode ai` fail→**dürüst sebep** (sessiz structured DEĞİL); başarılıysa AI task üretir.
+
+---
+
 **Beklenen:** 11-13/13 DONE, 0 false-FIX. **Native REPL GERÇEKTEN claude-code gibi:** line-editing+history+ok-tuş (224-001), tek-görünüm prompt (224-002), akıcı multi-turn (224-003) + paste-tek-mesaj (224-004), **gerçekten dosya yazar/aksiyon alır** (224-005/006/007 — interaktif y/N+multi-select onayla), `/nervous` görünür (224-008) + banner (224-009) + nervous güvenli açık (224-010), pürüzsüz streaming (224-011). CI yeşil KORUNUR.
 
 **🟢 RUN-VERIFY (cc sprint sonu):** gerçek `dist/cli/entry.js` GERÇEK TTY'de — ↑ history + ←/→ + Del (ham escape yok), kullanıcı satırı tek-görünüm, 2./3. mesaj cevaplanır, paste tek-mesaj, "X.md yaz" → onay → **dosya OLUŞUR**, `/nervous` pending, akış pürüzsüz. `node scripts/repl-smoke-verify.mjs` + `agentic-do-verify.mjs` yeşil. Mock-only DONE YOK.

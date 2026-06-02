@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { createInterface } from 'node:readline';
+import { createInterface, type ReadLineOptions } from 'node:readline';
 import { realpathSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { buildProgram } from './index.js';
@@ -26,6 +26,7 @@ import {
 } from './commands/chat-session.js';
 import { createSpinner } from './commands/chat-spinner.js';
 import { createCliToolDispatcher } from './commands/chat-tool-bridge.js';
+import { createPromptRegion, createLineQueue, createThinkingTicker } from './commands/chat-render-region.js';
 import {
   OPENAI_COMPAT_PRESETS,
   type OpenAICompatPresetName,
@@ -433,6 +434,23 @@ async function resolveReplProviderForCwd(): Promise<ReplProviderName> {
 }
 
 /**
+ * Sprint 224 T-224-001 — readline options for the REPL stdin reader.
+ *
+ * On a TTY we enable full terminal mode: `output` + `terminal: true` turn on
+ * readline's line-editing (←/→ cursor, backspace/Delete), ↑/↓ history
+ * (`historySize`) and arrow-key handling, so raw escape sequences (`^[[A`) no
+ * longer leak into the buffer. Non-TTY/pipe contexts get the line-only reader
+ * (no echo, deterministic) so tests, HTTP backends and `printf | deckent`
+ * smoke runs are unaffected. Exported so the selection logic is unit-testable
+ * without a real terminal.
+ */
+export function replReadlineOptions(isTty: boolean): ReadLineOptions {
+  return isTty
+    ? { input: process.stdin, output: process.stdout, terminal: true, historySize: 100 }
+    : { input: process.stdin };
+}
+
+/**
  * Launch the default REPL (bare `deckent`). Connects stdin to runChatNativeLoop
  * with a real {@link ChatProviderAdapter} so the user gets a real LLM round-trip
  * instead of the legacy skeleton message.
@@ -466,32 +484,55 @@ export async function launchDefaultRepl(): Promise<void> {
   const statusLineText = renderStatusLine(statusCtx, statusLineCfg);
   process.stdout.write(statusLineText ? statusLineText + '\n' : '');
 
-  async function* readStdin(): AsyncGenerator<string> {
-    const rl = createInterface({ input: process.stdin });
-    try {
-      for await (const line of rl) yield line;
-    } finally {
-      rl.close();
-    }
+  // Sprint 224 — interactive REPL render model.
+  //
+  // T-224-001 terminal-mode readline (line-editing/history/arrow-keys) +
+  // T-224-014 pinned-prompt render region: ONE readline owns the `› ` input
+  // line at the bottom; provider output is written ABOVE it via writeAbove so
+  // streamed replies and the still-editable input never collide (the
+  // "düşünüyor…fd" garble). The animated braille spinner is intentionally NOT
+  // used on an interactive TTY — it `\r`-overwrites the same bottom line as
+  // readline and was the main collision source; the `● deckent` header plus the
+  // streamed tokens are the working indicator instead. createLineQueue buffers
+  // lines typed during a turn so back-to-back sends are processed in order
+  // ("art arda"). Non-TTY/pipe keeps the simple line iterator + plain output so
+  // tests, HTTP backends and `printf | deckent` smoke runs are byte-for-byte
+  // unchanged (spinner stays a no-op there).
+  const isTty = process.stdin.isTTY === true && process.stdout.isTTY === true;
+  const rl = createInterface(replReadlineOptions(isTty));
+  const region = createPromptRegion(rl, process.stdout, { isTty });
+
+  async function* simpleLines(): AsyncGenerator<string> {
+    for await (const line of rl) yield line;
   }
 
-  // Real MCP dispatcher — slash commands (/status, /recall, /sprint) now
-  // shell out to the deckent CLI instead of the prior "not yet wired" stub.
+  // Real MCP dispatcher — slash commands (/status, /recall, /sprint) shell out
+  // to the deckent CLI instead of the prior "not yet wired" stub.
   const dispatcher = createCliToolDispatcher();
-  // TTY-only braille spinner shown while the provider is producing a reply
-  // (no-op on pipes, so smoke/test output stays clean). The loop stops it on
-  // the first byte of output.
-  const spinner = createSpinner('düşünüyor…');
+
+  if (isTty) region.reprompt(); // show the initial `› ` prompt
 
   await runChatNativeLoop({
     provider,
     dispatcher,
-    input: readStdin(),
-    output: (line) => process.stdout.write(line.endsWith('\n') ? line : line + '\n'),
+    input: isTty ? createLineQueue(rl) : simpleLines(),
+    output: isTty
+      ? (line) => region.writeAbove(line)
+      : (line) => process.stdout.write(line.endsWith('\n') ? line : line + '\n'),
     gracefulErrors: true,
     layoutEnabled: true,
-    thinkingIndicator: spinner,
+    // T-224-014 — on an interactive TTY a rotating-verb ticker updates the
+    // `● deckent · <fiil>…` line in place ABOVE the pinned prompt (claude-code
+    // feel, collision-free). Off-TTY the braille spinner stays a no-op.
+    thinkingIndicator: isTty
+      ? createThinkingTicker(rl, process.stdout, { isTty })
+      : createSpinner('düşünüyor…'),
+    // T-224-002 — on an interactive TTY readline already echoes the typed line,
+    // so the loop suppresses its own `› line` echo to avoid the double-print.
+    interactiveTty: isTty,
   });
+
+  rl.close();
 
   // Sprint 223 T-223-001 — persistent claude session cleanup. The `:exit`
   // slash drops out of runChatNativeLoop, so we kill the warm claude child
