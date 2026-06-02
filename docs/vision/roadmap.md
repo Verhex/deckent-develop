@@ -4,7 +4,7 @@
 
 **Last updated:** 2026-05-31 — Sprint 202-205 kuzey-yıldızı stream landed: provider-free %100 (Ollama + Docker provider-aware), native chat %60 (Path C tool-use loop + streaming + multi-turn + resume), F3 process mode başladı (tenant + scheduled flows), F4 enterprise iskelet (audit query), agent routing fix CANLI (built-in agent seçiliyor). 1 Haziran 2026 OSS beta launch window.
 
-> **⚠ AKTİF PLAN:** Sprint-bazlı yürütme planı **[docs/ROADMAP-GOD-LEVEL.md](../ROADMAP-GOD-LEVEL.md) §EXECUTION TRACKER**'dadır (kod-doğrulanmış, canlı). Bu dosya ürün vizyonu çerçevesi için korunur. Güncel durum: provider-free %100 · konuşulabilir %60 · 3-yüz (Developer ~%90, System Worker ~%45, Asistan ~%50).
+> **⚠ AKTİF PLAN:** Sprint-bazlı yürütme planı artık **[docs/MASTER-PLAN.md](../MASTER-PLAN.md) §10 Sequencing**'tedir (geliştirme SSOT, kod-doğrulanmış, canlı). Eski `ROADMAP-GOD-LEVEL.md` MASTER-PLAN'e konsolide edildi → `docs/archive/`. Bu dosya ürün vizyonu çerçevesi için korunur. Güncel durum (Sprint 220): provider-free %100 · konuşulabilir (native REPL gerçek round-trip) · 3-yüz (Developer ~%90, System Worker ~%85, Asistan ~%85).
 
 > **"Install it. Run it. Own it."**
 >
