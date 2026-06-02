@@ -91,7 +91,9 @@ const DETECTOR_ACTIVE_PHASE: SprintStateSnapshot['currentPhase'] = 'EXECUTE';
 
 export class NervousObserver extends EventEmitter {
   private readonly fsWatchers: Map<string, FSWatcher> = new Map();
-  private cronTimer: ReturnType<typeof setInterval> | null = null;
+  // Sprint 223 T8: cron uses recursive setTimeout (not setInterval) so the
+  // next delay can be re-evaluated each tick — required for idle-throttle.
+  private cronTimer: ReturnType<typeof setTimeout> | null = null;
   private _isStarted = false;
   private readonly detectorRegistry: DetectorRegistry | null;
 
@@ -104,6 +106,12 @@ export class NervousObserver extends EventEmitter {
     private readonly cronIntervalMs: number = 15_000,
     detectorConfig?: DetectorConfig,
     private readonly sprintStateProvider: SprintStateProvider = () => IDLE_SPRINT_STATE,
+    // Sprint 223 T8 (resource-optimize): when sprint phase is IDLE, the cron
+    // tick interval is multiplied by this factor so a quiescent project does
+    // not waste CPU/RAM on observer scan loops. `1` (default) preserves the
+    // pre-Sprint-223 behavior; values >1 throttle the IDLE-phase cadence.
+    // Wired from config `nervous_system.idle_throttle` (multiplier; 1=off).
+    private readonly idleThrottleMultiplier: number = 1,
   ) {
     super();
     assertBrainScope('NervousObserver');
@@ -150,9 +158,9 @@ export class NervousObserver extends EventEmitter {
     }
     this.fsWatchers.clear();
 
-    // Cron timer'ı temizle
+    // Cron timer'ı temizle (Sprint 223 T8: recursive setTimeout → clearTimeout)
     if (this.cronTimer !== null) {
-      clearInterval(this.cronTimer);
+      clearTimeout(this.cronTimer);
       this.cronTimer = null;
     }
 
@@ -289,18 +297,58 @@ export class NervousObserver extends EventEmitter {
 
   // ─── Cron Tick ─────────────────────────────────────────────────
 
+  /**
+   * Sprint 223 T8 (resource-optimize): cron uses a recursive setTimeout so
+   * the next tick's delay can be re-evaluated against the current sprint
+   * phase. When `idleThrottleMultiplier > 1` AND the sprint phase is IDLE,
+   * the next cron tick is delayed by `cronIntervalMs * multiplier`. This
+   * drops observer scan-loop frequency to a minimum on idle projects
+   * without disabling cron entirely.
+   *
+   * When the multiplier is 1 (default) the behavior is identical to the
+   * pre-Sprint-223 setInterval cadence — preserves backwards compatibility.
+   */
   private startCronTick(): void {
-    this.cronTimer = setInterval(() => {
+    this.scheduleNextCronTick(this.cronIntervalMs);
+  }
+
+  /**
+   * Compute the next cron interval based on the current sprint phase and
+   * the configured idle-throttle multiplier.
+   *
+   * IDLE phase + multiplier>1 → throttled (cronIntervalMs × multiplier).
+   * Any other phase, or multiplier=1 → normal cronIntervalMs.
+   */
+  private nextCronIntervalMs(): number {
+    if (this.idleThrottleMultiplier <= 1) return this.cronIntervalMs;
+    const phase = this.sprintStateProvider().currentPhase;
+    if (phase === 'IDLE') {
+      return this.cronIntervalMs * this.idleThrottleMultiplier;
+    }
+    return this.cronIntervalMs;
+  }
+
+  /**
+   * Schedule the next cron tick. After firing, emits a 'cron'/'TICK'
+   * ObserverEvent and recursively schedules the next tick with a freshly
+   * computed delay (so phase transitions reshape future cadence).
+   */
+  private scheduleNextCronTick(delayMs: number): void {
+    const timer = setTimeout(() => {
       const event = this.buildEvent('cron', 'TICK', {
-        intervalMs: this.cronIntervalMs,
+        intervalMs: delayMs,
       });
       this.emitObserve(event);
-    }, this.cronIntervalMs);
-
-    // Timer should not keep process alive
-    if (this.cronTimer && typeof this.cronTimer === 'object' && 'unref' in this.cronTimer) {
-      this.cronTimer.unref();
+      // Recursive: only re-arm while observer is still running.
+      if (this._isStarted) {
+        this.scheduleNextCronTick(this.nextCronIntervalMs());
+      }
+    }, delayMs);
+    // Cron timer should never keep the process alive.
+    if (timer && typeof timer === 'object' && 'unref' in timer) {
+      timer.unref();
     }
+    this.cronTimer = timer;
   }
 
   // ─── Event Builder ─────────────────────────────────────────────

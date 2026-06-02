@@ -13,7 +13,7 @@ import { spawnSync } from 'node:child_process';
 
 // ─── Core (value imports) ──────────────────────────────────────────
 import {
-  TaskEvaluation,
+  TaskEvaluation, SprintStatus, SprintPhase,
 } from '../core/types.js';
 
 // ─── Core (type imports) ───────────────────────────────────────────
@@ -96,6 +96,14 @@ import { createPreArchiveSnapshot, classifyTaskFiles } from './task-restoration.
 
 // ─── Notify (DECKENT→USER:NOTIFY — Hot Fix H6) ────────────────────
 import { notify } from '../core/notify.js';
+
+// ─── Sprint State + PID cleanup (Sprint 223 Task 013) ─────────────
+// Mark sprint-state.json as terminal (COMPLETE/COMPLETE) and remove
+// `.deckent/pids/<id>.pid` + `.snapshot.json` so the next `deckent start`
+// no longer detects this sprint as an orphan and does not re-resume it
+// in the FIX phase.
+import { writeSprintState, SPRINT_STATE_FILE } from './sprint-utils.js';
+import { clearPid } from './sprint-pid-manager.js';
 
 
 // ═══ Types ════════════════════════════════════════════════════════
@@ -1336,5 +1344,42 @@ export async function finalizeSprint(
     );
   } catch (e) { debugLog('finalizeSprint:notify:sprint-finalized', e); }
 
+  // 15. Terminal sprint-state + PID/snapshot cleanup (Sprint 223 Task 013)
+  debugLog('finalizeSprint:breadcrumb', 'Step 15 (terminalStateCleanup) — entering');
+  persistFinalSprintState(projectRoot, sprint);
+  debugLog('finalizeSprint:breadcrumb', 'Step 15 (terminalStateCleanup) — done');
+
   return metrics;
+}
+
+/**
+ * Sprint 223 Task 013 — finalize sprint-state COMPLETED + pids cleanup.
+ *
+ * Root cause (Sprint 222→223 transition): `deckent finalize --force` wrote
+ * RETRO / MEMORY / config but left `.deckent/sprint-state.json` at
+ * `status:ACTIVE, phase:EXECUTE` and the dead `.deckent/pids/<id>.pid` in
+ * place. The next `deckent start` then either reported the sprint as an
+ * orphan (PID dead) or wrongly resumed the finished sprint in FIX, blocking
+ * the next sprint from launching.
+ *
+ * Fix: stamp the sprint as `SprintStatus.COMPLETE` / `SprintPhase.COMPLETE`,
+ * overwrite `.deckent/sprint-state.json` only when it already exists (so
+ * fresh checkouts don't gain a phantom state file), then drop the PID +
+ * snapshot files via `clearPid` (which is itself idempotent on missing
+ * files). Both steps are wrapped in non-fatal try/catch — finalize must
+ * never crash because of a stale tmp file.
+ */
+export function persistFinalSprintState(projectRoot: string, sprint: Sprint): void {
+  try {
+    sprint.status = SprintStatus.COMPLETE;
+    sprint.phase = SprintPhase.COMPLETE;
+    sprint.completedAt = sprint.completedAt ?? new Date().toISOString();
+    const statePath = join(projectRoot, SPRINT_STATE_FILE);
+    if (existsSync(statePath)) {
+      writeSprintState(projectRoot, sprint);
+    }
+  } catch (e) { debugLog('persistFinalSprintState:writeSprintState', e); }
+  try {
+    clearPid(projectRoot, sprint.id);
+  } catch (e) { debugLog('persistFinalSprintState:clearPid', e); }
 }
