@@ -6,6 +6,7 @@ import {
 } from '../../core/provider.js';
 import { handleReplCommand } from './chat-repl-ux.js';
 import { renderUserMessage, renderAssistantHeader, messageSeparator } from './chat-layout.js';
+import { renderToolActivity } from './chat-render-region.js';
 import { classifyAgenticIntent, dispatchAgenticIntent } from './chat-agentic-dispatch.js';
 import { requireConfirmIfRisky, type AgenticAction } from './agentic-confirm.js';
 import { buildSlashRegistry, renderHelp, resolveSlash } from './chat-slash-registry.js';
@@ -604,6 +605,11 @@ export async function runChatNativeLoop(opts: ChatNativeOptions): Promise<ChatMe
         });
 
         for (const call of response.toolCalls) {
+          // Sprint 224 T-224-022 — live activity: show what deckent is doing
+          // (which tool, on what) while it runs, instead of a silent wait.
+          if (layoutOn && opts.interactiveTty === true) {
+            trackedOutput(`\n${renderToolActivity(call.name, call.args, true)}\n`);
+          }
           const result = await dispatcher.dispatch(call.name, call.args);
           transcript.push({ role: 'tool', content: result, toolUseId: call.id });
         }

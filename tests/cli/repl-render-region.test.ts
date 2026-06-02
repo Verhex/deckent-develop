@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
-import { createPromptRegion, createLineQueue, createThinkingTicker, createPasteCoalescer } from '../../src/cli/commands/chat-render-region.js';
+import { createPromptRegion, createLineQueue, createThinkingTicker, createPasteCoalescer, renderToolActivity } from '../../src/cli/commands/chat-render-region.js';
 
 // Sprint 224 T-224-014 — pinned-prompt render region.
 // Hermetic: fake readline interface + fake write stream, no real TTY.
@@ -181,5 +181,24 @@ describe('createPasteCoalescer — multi-line paste → one message (T-224-004)'
       pc.flush();
       expect(msgs).toEqual(['a\nb']);
     } finally { vi.useRealTimers(); }
+  });
+});
+
+describe('renderToolActivity — live tool activity line (T-224-022)', () => {
+  it('known tool → Turkish verb + target (non-TTY plain)', () => {
+    const s = renderToolActivity('deckent_write_file', { path: 'a.md' }, false);
+    expect(s).toBe('🔧 dosya yazıyor: a.md…');
+  });
+
+  it('bash → komut çalıştırıyor + cmd', () => {
+    expect(renderToolActivity('deckent_bash', { cmd: 'ls' }, false)).toBe('🔧 komut çalıştırıyor: ls…');
+  });
+
+  it('unknown tool → raw name', () => {
+    expect(renderToolActivity('deckent_mystery', {}, false)).toBe('🔧 deckent_mystery…');
+  });
+
+  it('TTY → dim-wrapped (ANSI)', () => {
+    expect(renderToolActivity('deckent_read_file', { path: 'x' }, true)).toMatch(/\x1b\[2m.*\x1b\[0m/);
   });
 });

@@ -152,6 +152,43 @@ export function createThinkingTicker(
  * kapanınca (`close`) iterator biter. Strict-sequential async-iterator'ın
  * aksine, tur-arası bloke olmaz: kullanıcı cevap beklerken yazmaya devam eder.
  */
+// ─── Live activity line (Sprint 224 T-224-022) ─────────────────────
+//
+// "Anlık beklerken deckent NE yapıyor görünmeli" — bir tool çalıştırılırken
+// (agentic-DO: write/edit/bash/...) düşünme bölgesinde dim bir aktivite satırı
+// gösterir (`🔧 dosya yazıyor: a.md`). claude-code'un adım-görünürlüğü gibi.
+// TTY-only stil; non-TTY düz metin.
+
+const TOOL_VERBS: Readonly<Record<string, string>> = {
+  deckent_write_file: 'dosya yazıyor',
+  deckent_edit_file: 'dosya düzenliyor',
+  deckent_read_file: 'dosya okuyor',
+  deckent_bash: 'komut çalıştırıyor',
+  deckent_status: 'durum alıyor',
+  deckent_memory_query: 'hafızada arıyor',
+  deckent_history: 'geçmişe bakıyor',
+  deckent_plan: 'plan hazırlıyor',
+};
+
+/**
+ * Bir tool dispatch'i için canlı aktivite satırı. Tanınan tool'lar Türkçe fiil
+ * alır (deckent_write_file → "dosya yazıyor"); bilinmeyen → ham ad. Hedef
+ * (path/cmd) varsa eklenir. TTY → dim; non-TTY → düz.
+ */
+export function renderToolActivity(
+  toolName: string,
+  args?: Record<string, unknown>,
+  tty?: boolean,
+): string {
+  const isTty = tty !== undefined ? tty : process.stdout.isTTY === true;
+  const verb = TOOL_VERBS[toolName] ?? toolName;
+  const target =
+    (args && (args['path'] ?? args['cmd'] ?? args['command'] ?? args['query'])) ?? '';
+  const targetStr = target ? `: ${String(target)}` : '';
+  const line = `🔧 ${verb}${targetStr}…`;
+  return isTty ? `\x1b[2m${line}\x1b[0m` : line;
+}
+
 // ─── Paste coalescer (Sprint 224 T-224-004) ────────────────────────
 //
 // Çok-satırlı yapıştırma terminale her satırı ayrı 'line' event'i olarak gelir
