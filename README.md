@@ -31,8 +31,8 @@ These three faces are not separate modes — they work together. Chat to plan, s
 ## Status
 
 - Version: 1.0.0-beta.1 (June 2026 OSS GA)
-- Active providers: Claude (Anthropic CLI), Codex (OpenAI CLI), Gemini (Google CLI). Cursor planned post-GA.
-- Auth: Subscription default. API mode opt-in per-task via DIRECTIVES `- Auth: api` (requires Anthropic Tier 2+ for parallel sprints).
+- **Provider-agnostic by design** — bring any LLM: cloud subscriptions (Claude / OpenAI Codex / Google Gemini), OpenAI-compatible APIs (DeepSeek / Qwen / GLM), or fully-local **Ollama** with zero API key. No provider is privileged; pick yours in config or per task. Cursor planned post-GA.
+- Auth: Subscription default, per-task `- Auth: api` opt-in. (During beta, subscription mode is recommended; API tiers vary by provider.)
 - Security posture: Role boundaries are **advisory** in V1.0 — scope violations are detected and logged by the Auditor but not blocked at the OS/filesystem level. Hard runtime enforcement ships in V2 post-GA. See `SECURITY.md` for the full threat model.
 
 ---
@@ -163,12 +163,14 @@ Four core modules — each documented separately:
 
 ## OSS Principles
 
-Deckent is built on four immovable principles (ADR-033):
+**"Open source for open world."** One MIT product — from a solo developer on a laptop to a 10,000-person enterprise. The full power of multi-agent orchestration, given to everyone; **no separate "Enterprise Edition", no gated features** (ADR-033). Built on four immovable principles:
 
-1. **Open Source First** — MIT license, public repo, community-driven. No features locked behind a paywall.
+1. **Open Source First** — MIT license, public repo, community-driven. Nothing locked behind a paywall — ever.
 2. **Discipline Over Convenience** — Quality gates, scope enforcement, and audit trails exist for a reason. Deckent will not skip them.
-3. **Multi-Provider, Not Locked In** — Supports Claude, Codex, and Gemini. No provider lock-in by design.
+3. **Provider-Agnostic, Not Locked In** — Any LLM: Claude, OpenAI Codex, Google Gemini, OpenAI-compatible APIs (DeepSeek/Qwen/GLM), or fully-local Ollama. No provider is privileged.
 4. **Memory Compounds** — Every sprint makes the system smarter. Learnings are persisted, recalled, and enforced in future sprints.
+
+> We compare with peers (Devin, Cursor, Claude Code, Aider, Cowork) on capability — we never position as "anti" anyone.
 
 ---
 
@@ -178,12 +180,13 @@ Deckent is built on four immovable principles (ADR-033):
 |-------------|---------|-------|
 | Node.js | >= 24 | `node --version` |
 | git | any | `git --version` |
-| Claude Code CLI | any | `claude --version` |
+| **At least one provider** | any | a subscription CLI (`claude` / `codex` / `gemini`), an OpenAI-compatible API key (DeepSeek/Qwen/GLM), **or** local `ollama` |
 | tmux | any (optional, Linux/macOS) | `tmux -V` |
-| OpenAI Codex CLI | any (optional) | `codex --version` |
-| Google Gemini CLI | any (optional) | `gemini --version` |
+| Docker | any (optional, isolated workers) | `docker --version` |
 
-**Claude Subscription:** Pro, Max 5x, Max 20x, or API key (pay-as-you-go). `deckent init` auto-detects everything and, with your consent, installs missing provider CLIs.
+**Any provider works — none is required over the others.** All three subscription CLIs run as first-class peers: `claude` (Anthropic), `codex` (OpenAI), and `gemini` (Google). **If you have a provider's CLI installed and signed in, Deckent drives its workers using your existing subscription — no per-token API key, no extra cost.** That is the core of Deckent's provider-free DNA: your `claude` / `codex` / `gemini` subscription (or local Ollama, zero key) powers the orchestrator. You can also use OpenAI-compatible API keys (DeepSeek/Qwen/GLM) when you prefer. `deckent init` auto-detects your stack + available provider CLIs and, with your consent, helps install missing ones.
+
+> **Provider freedom, concretely:** have `claude`, `codex`, and `gemini` CLIs all installed → Deckent can run a mixed-provider fleet (e.g. Claude brain + Codex/Gemini workers) entirely on subscriptions, no API billing. Or go fully local with Ollama. You are never locked to one vendor or forced onto pay-per-token.
 
 ---
 
@@ -247,13 +250,14 @@ See `deckent help` for the full command reference, or read [docs/reference/cli.m
 
 ## MCP Integration
 
-Deckent integrates with Claude Code via the Model Context Protocol:
+Deckent ships an MCP server, so **any MCP-compatible AI tool** (Claude Code, Cursor, and others) can drive it:
 
 ```bash
+# Example (Claude Code) — any MCP client works the same way
 claude mcp add deckent -- npx deckent-mcp
 ```
 
-31 MCP tools + 8 MCP resources. Run `deckent help-info` for the full list, or see [docs/reference/mcp-guide.md](docs/reference/mcp-guide.md).
+32 MCP tools + 8 MCP resources. Run `deckent help-info` for the full list, or see [docs/reference/mcp-guide.md](docs/reference/mcp-guide.md).
 
 ---
 
