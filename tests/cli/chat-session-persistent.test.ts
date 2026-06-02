@@ -4,6 +4,8 @@ import { Writable } from 'node:stream';
 import {
   createPersistentClaudeSession,
   parseStreamJsonLine,
+  parseDeckentToolCalls,
+  DECKENT_AGENTIC_SYSTEM_PROMPT,
   defaultPersistentSpawn,
   buildSubscriptionEnv,
   DEFAULT_PERSISTENT_ARGS,
@@ -335,5 +337,90 @@ describe('chat-session — helpers', () => {
     expect(h.wait).toBeInstanceOf(Promise);
     expect(typeof h.kill).toBe('function');
     h.kill();
+  });
+});
+
+// ─── Agentic tool-use brain (Sprint 224 T-224-005/006) ──────────────
+
+describe('parseDeckentToolCalls', () => {
+  it('parses a single <deckent_tool> directive into a ToolCall', () => {
+    const calls = parseDeckentToolCalls(
+      '<deckent_tool>{"name":"deckent_write_file","args":{"path":"a.md","content":"hi"}}</deckent_tool>',
+    );
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.name).toBe('deckent_write_file');
+    expect(calls[0]?.args).toEqual({ path: 'a.md', content: 'hi' });
+    expect(calls[0]?.id).toBe('tool-0');
+  });
+
+  it('parses multiple directives with positional ids', () => {
+    const calls = parseDeckentToolCalls(
+      '<deckent_tool>{"name":"deckent_read_file","args":{"path":"a"}}</deckent_tool> ' +
+        '<deckent_tool>{"name":"deckent_bash","args":{"cmd":"ls"}}</deckent_tool>',
+    );
+    expect(calls.map((c) => c.name)).toEqual(['deckent_read_file', 'deckent_bash']);
+    expect(calls.map((c) => c.id)).toEqual(['tool-0', 'tool-1']);
+  });
+
+  it('skips malformed JSON tags and returns [] for plain prose', () => {
+    expect(parseDeckentToolCalls('<deckent_tool>not json</deckent_tool>')).toEqual([]);
+    expect(parseDeckentToolCalls('sadece normal bir cevap')).toEqual([]);
+    expect(parseDeckentToolCalls('')).toEqual([]);
+  });
+});
+
+describe('createPersistentClaudeSession — agentic tool_use', () => {
+  it('surfaces <deckent_tool> reply as stopReason:tool_use + toolCalls', async () => {
+    const mock = makeMockSpawn();
+    const spawnFn = vi.fn(() => mock.handle) as unknown as PersistentSpawnFn;
+    const session = createPersistentClaudeSession({ spawnFn });
+
+    const chunks: Array<{ text?: string; done?: { stopReason: string; toolCalls?: unknown[] } }> = [];
+    const drain = (async () => {
+      for await (const c of session.stream([{ role: 'user', content: 'a.md yaz' }])) chunks.push(c);
+    })();
+    mock.pushLine(
+      JSON.stringify({
+        type: 'stream_event',
+        event: { type: 'content_block_delta', delta: { text: '<deckent_tool>{"name":"deckent_write_file","args":{"path":"a.md","content":"x"}}</deckent_tool>' } },
+      }),
+    );
+    mock.pushLine(JSON.stringify({ type: 'result', result: '' }));
+    mock.closeStream();
+    await drain;
+
+    const done = chunks.find((c) => c.done)?.done;
+    expect(done?.stopReason).toBe('tool_use');
+    expect(done?.toolCalls?.[0]).toMatchObject({ name: 'deckent_write_file' });
+  });
+
+  it('feeds a tool result back as a user turn (so the model replies, not re-loops)', async () => {
+    const mock = makeMockSpawn();
+    const spawnFn = vi.fn(() => mock.handle) as unknown as PersistentSpawnFn;
+    const session = createPersistentClaudeSession({ spawnFn });
+
+    const drain = (async () => {
+      for await (const _c of session.stream([
+        { role: 'user', content: 'a.md yaz' },
+        { role: 'tool', content: '[deckent] yazıldı: a.md', toolUseId: 'tool-0' },
+      ])) { /* consume */ }
+    })();
+    mock.pushLine(JSON.stringify({ type: 'result', result: 'Tamam, a.md oluşturuldu.' }));
+    mock.closeStream();
+    await drain;
+
+    // The stdin write for this turn must carry the tool result (not the original prompt).
+    expect(mock.writes.join('')).toContain('deckent tool sonucu');
+  });
+
+  it('passes the agentic system prompt via --append-system-prompt when set', () => {
+    const mock = makeMockSpawn();
+    const spawnFn = vi.fn(() => mock.handle) as unknown as PersistentSpawnFn & ReturnType<typeof vi.fn>;
+    const session = createPersistentClaudeSession({ spawnFn, systemPrompt: DECKENT_AGENTIC_SYSTEM_PROMPT });
+    // Trigger lazy spawn.
+    void session.stream([{ role: 'user', content: 'selam' }]).next();
+    const args = (spawnFn.mock.calls[0]?.[1] ?? []) as string[];
+    expect(args).toContain('--append-system-prompt');
+    expect(args).toContain(DECKENT_AGENTIC_SYSTEM_PROMPT);
   });
 });

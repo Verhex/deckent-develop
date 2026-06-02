@@ -35,6 +35,7 @@ import type {
   ChatMessage,
   ChatProviderAdapter,
   StreamChunk,
+  ToolCall,
 } from './chat-native.js';
 
 // ─── Types ──────────────────────────────────────────────────────────
@@ -61,6 +62,64 @@ export interface PersistentClaudeSessionOptions {
   extraArgs?: readonly string[];
   /** Env override (default: process.env minus ANTHROPIC_API_KEY for subscription auth). */
   env?: NodeJS.ProcessEnv;
+  /**
+   * Sprint 224 T-224-005/006 — agentic system prompt. When set, it is passed
+   * via `--append-system-prompt` so the model emits `<deckent_tool>{json}</…>`
+   * directives for file/shell actions, which {@link parseDeckentToolCalls}
+   * turns into tool_use the REPL loop confirms + executes. Omit for plain chat.
+   */
+  systemPrompt?: string;
+}
+
+// ─── Agentic tool-use tag protocol (Sprint 224 T-224-005/006) ────────
+//
+// Provider-agnostic, text-based tool-use: the model is instructed (system
+// prompt) to emit `<deckent_tool>{"name":"deckent_write_file","args":{…}}</…>`
+// for actions. We parse those tags out of the reply and surface them as
+// ToolCall objects so runChatNativeLoop dispatches them (through the confirm-
+// gated tool-exec dispatcher). The text-tag approach avoids coupling to any
+// one provider's native tool_use schema (claude/codex/gemini all just emit text).
+
+const DECKENT_TOOL_TAG_RE = /<deckent_tool>\s*([\s\S]*?)\s*<\/deckent_tool>/gi;
+
+/** Default agentic system prompt — instructs the model to emit tool tags. */
+export const DECKENT_AGENTIC_SYSTEM_PROMPT = [
+  'Sen deckent: doğal dilde sohbet eden, ama dosya/komut AKSİYONU gerektiğinde',
+  'GERÇEKTEN iş yapabilen bir AI agent\'sın. Kullanıcı bir dosya yazmanı/düzenlemeni/',
+  'okumanı veya komut çalıştırmanı isterse, AÇIKLAMA YAPMA — yalnızca tek satır şu',
+  'etiketi üret:',
+  '<deckent_tool>{"name":"<tool>","args":{...}}</deckent_tool>',
+  'Geçerli tool\'lar: deckent_write_file{path,content}, deckent_read_file{path},',
+  'deckent_edit_file{path,old,new}, deckent_bash{cmd}. Aksiyon gerekmiyorsa normal',
+  'sohbet et. Etiketten sonra deckent onay alıp çalıştırır ve sonucu sana iletir;',
+  'o zaman kullanıcıya kısaca sonucu bildirirsin.',
+].join(' ');
+
+/**
+ * Parse `<deckent_tool>…</deckent_tool>` directives out of a reply into
+ * ToolCall objects. Ids are positional (`tool-<n>`) so they are deterministic
+ * (no Date.now/Math.random). Malformed JSON tags are skipped silently.
+ */
+export function parseDeckentToolCalls(text: string): ToolCall[] {
+  if (typeof text !== 'string' || text.length === 0) return [];
+  const calls: ToolCall[] = [];
+  let m: RegExpExecArray | null;
+  DECKENT_TOOL_TAG_RE.lastIndex = 0;
+  while ((m = DECKENT_TOOL_TAG_RE.exec(text)) !== null) {
+    const body = (m[1] ?? '').trim();
+    if (!body) continue;
+    try {
+      const parsed = JSON.parse(body) as { name?: unknown; args?: unknown };
+      if (typeof parsed.name !== 'string') continue;
+      const args = parsed.args && typeof parsed.args === 'object'
+        ? (parsed.args as Record<string, unknown>)
+        : {};
+      calls.push({ id: `tool-${calls.length}`, name: parsed.name, args });
+    } catch {
+      // skip malformed tag
+    }
+  }
+  return calls;
 }
 
 /** Session interface — extends ChatProviderAdapter with lifecycle controls + counters. */
@@ -231,7 +290,12 @@ export function createPersistentClaudeSession(
 ): PersistentClaudeSession {
   const binary = opts.binary ?? 'claude';
   const spawnFn = opts.spawnFn ?? defaultPersistentSpawn;
-  const extraArgs = opts.extraArgs ?? DEFAULT_PERSISTENT_ARGS;
+  const baseArgs = opts.extraArgs ?? DEFAULT_PERSISTENT_ARGS;
+  // T-224-005/006 — append the agentic system prompt once at spawn so the model
+  // emits <deckent_tool> directives for actions across the whole session.
+  const extraArgs = opts.systemPrompt
+    ? [...baseArgs, '--append-system-prompt', opts.systemPrompt]
+    : baseArgs;
   const env = opts.env ?? buildSubscriptionEnv();
 
   let handle: PersistentClaudeHandle | null = null;
@@ -260,6 +324,18 @@ export function createPersistentClaudeSession(
     return '';
   }
 
+  // T-224-005/006 — what to send to the model for THIS turn. After a tool the
+  // loop appends a `tool` result message and re-invokes; feed that result back
+  // (as a user turn) so the model knows the action ran and replies to the user
+  // (a final, tag-free message) instead of re-emitting the tool tag in a loop.
+  function turnInput(messages: readonly ChatMessage[]): string {
+    const last = messages[messages.length - 1];
+    if (last && last.role === 'tool') {
+      return `[deckent tool sonucu]\n${last.content}\n\nKullanıcıya kısaca sonucu bildir.`;
+    }
+    return lastUserText(messages);
+  }
+
   async function* runTurn(prompt: string): AsyncGenerator<StreamChunk> {
     const h = ensureSpawn();
     h.stdin.write(buildUserMessageLine(prompt));
@@ -282,6 +358,14 @@ export function createPersistentClaudeSession(
         break;
       }
     }
+    // T-224-005/006 — if the reply carries <deckent_tool> directives, surface
+    // them as tool_use so the loop confirms + executes them; otherwise it's a
+    // normal end_turn reply.
+    const toolCalls = parseDeckentToolCalls(collected);
+    if (toolCalls.length > 0) {
+      yield { done: { text: collected, stopReason: 'tool_use', toolCalls } };
+      return;
+    }
     yield { done: { text: collected, stopReason: 'end_turn' } };
   }
 
@@ -297,14 +381,14 @@ export function createPersistentClaudeSession(
     },
     async send(messages) {
       let collected = '';
-      for await (const chunk of runTurn(lastUserText(messages))) {
+      for await (const chunk of runTurn(turnInput(messages))) {
         if (chunk.text) collected += chunk.text;
         if (chunk.done) return chunk.done;
       }
       return { text: collected, stopReason: 'end_turn' };
     },
     async *stream(messages) {
-      yield* runTurn(lastUserText(messages));
+      yield* runTurn(turnInput(messages));
     },
     async exit() {
       if (!handle || exited) return;
