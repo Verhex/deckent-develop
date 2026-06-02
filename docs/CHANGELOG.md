@@ -2,6 +2,24 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint219] - 2026-06-02
+
+### Added
+
+- 219-001 — `deckent` argümansız → agentic chat REPL (claude modeli) [P0]
+- 219-002 — `deckent chat --native` gerçek round-trip run-proven
+- 219-003 — REPL UX god-level (prompt, history, çok-satır, exit, Ctrl-C)
+- 219-004 — REPL'de doğal dil → MCP/deckent aksiyon dispatch (agentic)
+- 219-005 — Agentic aksiyon onay kapısı (riskli → confirm)
+- 219-006 — Agentic session persist (REPL hafıza + devam)
+- 219-007 — chat-backend token-streaming (F2-007, gerçek SSE)
+- 219-008 — REPL + dashboard stream render (akan cevap göster)
+- 219-009 — Dashboard nav tek-kaynak + RENDER-based test (kaynak-grep değil)
+- 219-011 — TR MASTER-PLAN (Türkçe, güncel dürüst durumla)
+
+
+_Tasks: 17 total, 16 done, 0 tech debt, 1 no-go_
+
 ## [1.0.0-beta.1-sprint218] - 2026-06-01
 
 ### Added

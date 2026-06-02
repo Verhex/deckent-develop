@@ -84,7 +84,9 @@ describe('README.md', () => {
     expect(content).toContain('Node.js');
     expect(content).toContain('>= 24');
     expect(content).toContain('git');
-    expect(content).toContain('Claude Code CLI');
+    // Provider-neutral (2026-06-02): README no longer requires Claude specifically —
+    // any provider CLI (claude/codex/gemini) or Ollama. Assert the neutral framing.
+    expect(content).toContain('At least one provider');
   });
 
   it('contains CLI Usage section with examples', () => {

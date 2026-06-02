@@ -4,7 +4,7 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
-| rollback-sprint-217 | Sprint sprint-217 rollback SUCCESS | high | sprint-217 | active |
+| rollback-sprint-217 | Sprint sprint-217 rollback SUCCESS | critical | sprint-217 | active |
 
 ## Resolved Technical Debt
 

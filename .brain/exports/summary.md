@@ -74,8 +74,11 @@
 | adr-077 | Multi-Provider 8-Fleet + OpenAI-Compatible HTTP Adapter | accepted |
 | adr-078 | CI-Hermeticity Standard + 8-Provider Runtime + Active Identity-Mutation Loop + Dashboard God-Level | accepted |
 | adr-079 | Proof-of-Function DoD — Tier-0/Tier-1 Classification + Sprint-Inner Run-Verify Gate | accepted |
+| adr-080 | Dashboard God-Level — Sprint-Start Detach + Hollow-Page Wire + Chat Round-Trip + Native UI | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-219 Learnings** (sprint-219): ## Sprint sprint-219 Learnings
+- 219-010 — Dashboard cache-bust + tarayıcı-e2e smoke (8 sayfa gerçekten yüklenir): NO_GO
 - **Sprint sprint-218 Learnings** (sprint-218): ## Sprint sprint-218 Learnings
 - **Sprint sprint-217 Learnings** (sprint-217): ## Sprint sprint-217 Learnings
 - new sprint: NO_GO — Placeholder 'new sprint' task — no implementation work defined. ...
@@ -88,11 +91,9 @@
 - 210-009 — Dashboard sprint kontrol paneli (plan/start/status UI): GO_WITH_TECH_DEBT ...
 - **Sprint sprint-209 Learnings** (sprint-209): ## Sprint sprint-209 Learnings
 - **Sprint sprint-208 Learnings** (sprint-208): ## Sprint sprint-208 Learnings
-- **Sprint sprint-207 Learnings** (sprint-207): ## Sprint sprint-207 Learnings
-- 207-001 — Model registry bundled apiId güncel + "stale" işareti: GO_WITH_TECH_DEBT —...
 
 ## Active Technical Debt
-- [HIGH] Sprint sprint-217 rollback SUCCESS
+- [CRITICAL] Sprint sprint-217 rollback SUCCESS
 
 ## Active Patterns
 - Violation pattern: stale_heartbeat
@@ -146,5 +147,6 @@
 - Violation pattern: stale_heartbeat
 - Violation pattern: stale_heartbeat
 - Violation pattern: stale_heartbeat
+- Violation pattern: stale_heartbeat
 
-_Total entries: 486 | Generated: 2026-06-01_
+_Total entries: 491 | Generated: 2026-06-02_

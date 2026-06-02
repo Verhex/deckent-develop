@@ -10,6 +10,8 @@ import { getDefaultProviderName } from './sprint-utils.js';
 import { brainEstimateTimeout } from './timeout-estimator.js';
 import type { SprintHistory } from './timeout-estimator.js';
 import { writeEvent, CHANNELS } from './event-stream.js';
+import { getUserSurfaceBonus, USER_SURFACE_AGENTS } from '../core/routing-engine.js';
+import { classifyIntent } from '../core/intent-classifier.js';
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -169,6 +171,44 @@ export function resolveWorkerAuth(task: Task, config: TaskRouterConfig): 'subscr
   return 'subscription';
 }
 
+// ─── User-Surface Agent Resolution (Sprint 219-015) ─────────────────
+
+/**
+ * Apply routing-engine's user-surface bonus at plan/spawn time. When a task
+ * touches a user-facing surface (cli/commands, api, dashboard, ui, e2e) and
+ * the user has not pinned `forceAgent`, return the matching surface-owner
+ * agent (api-builder / frontend-designer / ci-guardian). Returns `null` when
+ * no surface match applies — caller preserves the previously assigned agent.
+ *
+ * Sprint 219-015: closes the wire-gap where V1 plans collapsed cli/api/
+ * dashboard tasks onto refactorer's generic impl@7. Security-bearing tasks
+ * touching `src/api/` are handled inside `getUserSurfaceBonus` (returns 0 for
+ * api-builder so security-auditor wins).
+ *
+ * @param task - The task being routed
+ * @returns Surface-owner agent id, or null if no surface match
+ */
+export function applyUserSurfaceBonus(task: Task): string | null {
+  // Honor explicit user override — forceAgent wins over surface routing.
+  if (task.forceAgent) return null;
+
+  try {
+    const taskDNA = classifyIntent({
+      title: task.title,
+      description: task.description,
+      scope: task.scope,
+    });
+    for (const candidate of USER_SURFACE_AGENTS) {
+      if (getUserSurfaceBonus(candidate, taskDNA) > 0) {
+        return candidate;
+      }
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
 // ─── Main Router ────────────────────────────────────────────────────
 
 /**
@@ -193,7 +233,11 @@ export function routeTask(
   availableProviders: ProviderName[],
 ): TaskRouting {
   const skills = task.assignedSkills ?? [];
-  const agent = task.assignedAgent ?? 'generic';
+  // Sprint 219-015: route user-surface tasks (cli/api/dashboard/e2e) to their
+  // surface-owner agent before falling back to whatever the planner assigned.
+  // Prevents collapse onto refactorer's generic impl@7. forceAgent honored upstream.
+  const surfaceAgent = applyUserSurfaceBonus(task);
+  const agent = surfaceAgent ?? task.assignedAgent ?? 'generic';
   const authMode = resolveWorkerAuth(task, config);
 
   // Guard: no providers available

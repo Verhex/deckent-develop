@@ -17,7 +17,7 @@ describe('doc-honesty', () => {
   });
 
   it('Sprint 185-200 section is marked historical in ROADMAP-GOD-LEVEL.md', () => {
-    const content = readFileSync(join(root, 'docs/ROADMAP-GOD-LEVEL.md'), 'utf8');
+    const content = readFileSync(join(root, 'docs/archive/ROADMAP-GOD-LEVEL.md'), 'utf8');
     const hasHistorical = /historical plan/i.test(content);
     const hasSuperseded = /superseded/i.test(content);
     const hasExecutionTracker = /EXECUTION TRACKER/i.test(content);

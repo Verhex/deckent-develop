@@ -38,6 +38,7 @@ import {
 } from '../connectors/incoming-router.js';
 import { loadDeckSecrets } from '../core/deck-file.js';
 import { buildChatReply } from './chat-handler.js';
+import { streamChatMessage, streamToSseLines, type ChatProviderAdapter } from './chat-stream.js';
 import { registerEvolutionRoutes } from './evolution-endpoint.js';
 import { registerMemorySearch } from './memory-search-endpoint.js';
 import { registerNervousRoutes } from './nervous-endpoint.js';
@@ -115,6 +116,19 @@ const SetDirectivesSchema = z.object({ content: z.string().min(1) });
 const ChatSchema = z.object({ message: z.string() });
 const ConfigSchema = z.record(z.string(), z.unknown());
 const WORKER_ID_RE = /^[a-zA-Z0-9-]+$/;
+
+// ─── Chat-Stream Adapter Hook (Sprint 219 T-219-007) ────────────
+// Tests inject a deterministic ChatProviderAdapter via setChatStreamAdapter;
+// production wiring of a real subscription adapter is deferred to a follow-up
+// task. With no adapter configured the /api/chat/stream endpoint emits a
+// single `error` event so the surface never 500s.
+let chatStreamAdapter: ChatProviderAdapter | null = null;
+
+/** Test/wiring hook — install (or clear) the ChatProviderAdapter used by
+ *  the `/api/chat/stream` SSE endpoint. Pass null to reset. */
+export function setChatStreamAdapter(adapter: ChatProviderAdapter | null): void {
+  chatStreamAdapter = adapter;
+}
 
 // ─── Active Job Tracking ─────────────────────────────────────────
 interface ActiveJob {
@@ -548,6 +562,50 @@ async function handleRequest(
       sseClients.add(res);
       req.on('close', () => { sseClients.delete(res); });
       if (initWatcher) initWatcher();
+      return;
+    }
+
+    // chat-stream SSE (Sprint 219 T-219-007 / F2-007): EventSource only
+    // supports GET, so the user message rides on a `?message=…` query string.
+    if (url === '/api/chat/stream' || url.startsWith('/api/chat/stream?')) {
+      const qIdx = url.indexOf('?');
+      const query = qIdx >= 0 ? new URLSearchParams(url.slice(qIdx + 1)) : new URLSearchParams();
+      const message = query.get('message') ?? '';
+
+      res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+        'Access-Control-Allow-Origin': allowedOrigin,
+      });
+      res.write('retry: 3000\n\n');
+
+      let closed = false;
+      req.on('close', () => { closed = true; });
+
+      const adapter = chatStreamAdapter;
+      if (!adapter) {
+        res.write(`data: ${JSON.stringify({ type: 'error', message: 'chat-stream: no adapter configured' })}\n\n`);
+        res.end();
+        return;
+      }
+
+      void (async () => {
+        try {
+          const events = streamChatMessage(message, adapter);
+          for await (const line of streamToSseLines(events)) {
+            if (closed) break;
+            res.write(line);
+          }
+        } catch (err) {
+          if (!closed) {
+            const msg = err instanceof Error ? err.message : String(err);
+            res.write(`data: ${JSON.stringify({ type: 'error', message: msg })}\n\n`);
+          }
+        } finally {
+          if (!closed) res.end();
+        }
+      })();
       return;
     }
 

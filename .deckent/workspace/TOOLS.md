@@ -47,13 +47,17 @@ _Total: 28 MCP tools_
 | Command Module | Description |
 |---------------|-------------|
 | `agent` | deckent agent |
+| `agentic-confirm` | deckent agentic-confirm |
+| `agentic-session` | deckent agentic-session |
 | `analyze` | deckent analyze |
 | `archive-debt` | deckent archive-debt |
 | `attach` | deckent attach |
 | `audit` | deckent audit |
 | `audit-verify` | deckent audit-verify |
 | `chat` | deckent chat |
+| `chat-agentic-dispatch` | deckent chat-agentic-dispatch |
 | `chat-native` | deckent chat-native |
+| `chat-repl-ux` | deckent chat-repl-ux |
 | `checkpoint` | deckent checkpoint |
 | `cleanup` | deckent cleanup |
 | `config` | deckent config |
@@ -109,4 +113,4 @@ _Total: 28 MCP tools_
 | `watch` | deckent watch |
 | `web` | deckent web |
 
-_Total: 62 CLI command modules_
+_Total: 66 CLI command modules_

@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const ADR_PATH = join(process.cwd(), 'docs/adr/070-brain-eval-integrity.md');
-const ROADMAP_PATH = join(process.cwd(), 'docs/ROADMAP-GOD-LEVEL.md');
+const ROADMAP_PATH = join(process.cwd(), 'docs/archive/ROADMAP-GOD-LEVEL.md');
 
 describe('ADR-070: Brain Evaluation Integrity + Zero-Hard-Code', () => {
   it('ADR file exists with MADR structure (Context, Decision, Consequences, Alternatives, Status accepted)', () => {

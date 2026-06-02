@@ -36,6 +36,7 @@
 
 ## Active ADR Constraints
 
+- **ADR-081**: Native Agentic Deckent — `deckent` argümansız REPL + Agentic Tool-Use + F2 Streaming + Agentic-OS Direction — **Status:** accepted
 - **ADR-080**: Dashboard God-Level — Sprint-Start Detach + Hollow-Page Wire + Chat Round-Trip + Native UI — **Status:** accepted
 - **ADR-079**: Proof-of-Function DoD — Tier-0/Tier-1 Classification + Sprint-Inner Run-Verify Gate — **Status:** accepted
 - **ADR-078**: CI-Hermeticity Standard + 8-Provider Runtime + Active Identity-Mutation Loop + Dashboard God-Level — **Status:** accepted

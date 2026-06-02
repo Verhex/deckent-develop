@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const ADR_PATH = join(process.cwd(), 'docs/adr/072-routing-balance-dashboard.md');
-const ROADMAP_PATH = join(process.cwd(), 'docs/ROADMAP-GOD-LEVEL.md');
+const ROADMAP_PATH = join(process.cwd(), 'docs/archive/ROADMAP-GOD-LEVEL.md');
 
 describe('ADR-072: Agent Routing Balance + Dashboard API Auth', () => {
   it('ADR file exists with MADR structure (Context, Decision, Consequences, Alternatives Considered, Status accepted)', () => {

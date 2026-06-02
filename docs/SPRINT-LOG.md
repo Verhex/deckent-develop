@@ -5989,3 +5989,40 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 218-013: 218-012 — Dashboard kullanıcı rehberi + onboarding (gerçek ekran akışı) (DONE)
 
 ---
+## Sprint 219 — sprint-219
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-06-02
+**Duration:** 2329s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 17 |
+| Completed | 16 |
+| Tech Debt | 0 |
+| No-Go | 1 |
+| Coverage | 0.0% |
+| Duration | 2329344ms |
+
+### Tasks
+
+- 219-001: 219-001 — `deckent` argümansız → agentic chat REPL (claude modeli) [P0] (DONE)
+- 219-002: 219-002 — `deckent chat --native` gerçek round-trip run-proven (DONE)
+- 219-003: 219-003 — REPL UX god-level (prompt, history, çok-satır, exit, Ctrl-C) (DONE)
+- 219-004: 219-004 — REPL'de doğal dil → MCP/deckent aksiyon dispatch (agentic) (DONE)
+- 219-005: 219-005 — Agentic aksiyon onay kapısı (riskli → confirm) (DONE)
+- 219-006: 219-006 — Agentic session persist (REPL hafıza + devam) (DONE)
+- 219-007: 219-007 — chat-backend token-streaming (F2-007, gerçek SSE) (DONE)
+- 219-008: 219-008 — REPL + dashboard stream render (akan cevap göster) (DONE)
+- 219-009: 219-009 — Dashboard nav tek-kaynak + RENDER-based test (kaynak-grep değil) (DONE)
+- 219-010: 219-010 — Dashboard cache-bust + tarayıcı-e2e smoke (8 sayfa gerçekten yüklenir) (NO_GO)
+- 219-011: 219-011 — TR MASTER-PLAN (Türkçe, güncel dürüst durumla) (DONE)
+- 219-012: 219-012 — ADR-081 (Native Agentic Deckent) + MASTER-PLAN status (DONE)
+- 219-013: 219-013 — blueprint.md + docs/vision/* baştan-aşağı güncelle (deckent NE/NEREDE — SSOT-of-identity) (DONE)
+- 219-014: 219-014 — Otonom agentic runtime temeli (yetki-sınırlı sürekli mod iskeleti) (DONE)
+- 219-015: 219-015 — Plan-time routing routeTaskV2 wire (surface-bonus plan'da devrede) (DONE)
+- 219-016: 219-016 — Plan-time Smoke-field taşıma (plannerTaskToParams → task.smoke) (DONE)
+
+---

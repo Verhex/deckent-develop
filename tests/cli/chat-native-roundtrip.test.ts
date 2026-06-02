@@ -4,6 +4,7 @@ import {
   createSubscriptionChatAdapter,
   runChatNativeLoop,
   type ChatMessage,
+  type ChatProviderAdapter,
   type McpToolDispatcher,
   type SubscriptionSpawnFn,
 } from '../../src/cli/commands/chat-native.js';
@@ -226,6 +227,77 @@ describe('chat-native round-trip — full loop end-to-end with subscription adap
     expect(userTurns).toEqual(['first', 'second']);
     expect(assistantTurns).toEqual(['answer-1', 'answer-2']);
     expect(outputs).toEqual(['answer-1', 'answer-2']);
+  });
+});
+
+// Sprint 219 T-219-002 — empty-input + provider-error graceful handling.
+// Hardens runChatNativeLoop so the REPL session survives the two most common
+// real-world failure modes: blank/whitespace user input, and a provider throw
+// (spawn failure, network error, malformed adapter). Both must NOT crash the
+// loop — the session continues accepting subsequent user turns.
+
+describe('chat-native round-trip — boş/hata graceful (T-219-002)', () => {
+  it('boş mesaj: skips empty/whitespace input without invoking the adapter', async () => {
+    const send = vi.fn().mockResolvedValue({ text: 'real-answer', stopReason: 'end_turn' as const });
+    const provider: ChatProviderAdapter = { send };
+    const dispatcher: McpToolDispatcher = { dispatch: vi.fn() };
+    const outputs: string[] = [];
+
+    async function* inputs(): AsyncIterable<string> {
+      yield '';
+      yield '   ';
+      yield '\t\n';
+      yield 'real question';
+    }
+
+    const transcript = await runChatNativeLoop({
+      provider,
+      dispatcher,
+      input: inputs(),
+      output: (l) => outputs.push(l),
+      maxTurns: 5,
+    });
+
+    expect(send).toHaveBeenCalledTimes(1);
+    const userTurns = transcript.filter((m) => m.role === 'user').map((m) => m.content);
+    expect(userTurns).toEqual(['real question']);
+    const assistantTurns = transcript.filter((m) => m.role === 'assistant').map((m) => m.content);
+    expect(assistantTurns).toEqual(['real-answer']);
+    expect(outputs).toContain('real-answer');
+  });
+
+  it('hata graceful: continues session when adapter.send throws', async () => {
+    const send = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('spawn ENOENT claude'))
+      .mockResolvedValueOnce({ text: 'recovered', stopReason: 'end_turn' as const });
+    const provider: ChatProviderAdapter = { send };
+    const dispatcher: McpToolDispatcher = { dispatch: vi.fn() };
+    const outputs: string[] = [];
+
+    async function* twoTurns(): AsyncIterable<string> {
+      yield 'first-will-fail';
+      yield 'second-will-recover';
+    }
+
+    const transcript = await runChatNativeLoop({
+      provider,
+      dispatcher,
+      input: twoTurns(),
+      output: (l) => outputs.push(l),
+      maxTurns: 5,
+      gracefulErrors: true,
+    });
+
+    expect(send).toHaveBeenCalledTimes(2);
+    // First turn: error surfaced via output, but session continued.
+    expect(outputs.some((o) => o.includes('[chat-native] error') && o.includes('spawn ENOENT'))).toBe(true);
+    expect(outputs).toContain('recovered');
+    // Transcript carries the failure as a tagged assistant turn followed by the recovery turn.
+    const assistantTurns = transcript.filter((m) => m.role === 'assistant').map((m) => m.content);
+    expect(assistantTurns).toHaveLength(2);
+    expect(assistantTurns[0]).toContain('[chat-native] error');
+    expect(assistantTurns[1]).toBe('recovered');
   });
 });
 

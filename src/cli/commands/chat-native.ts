@@ -166,6 +166,15 @@ export interface ChatNativeOptions {
   resumeLimit?: number;
   /** Sliding context window: only the last N turns are sent to the provider. Undefined = no truncation. */
   contextWindowSize?: number;
+  /**
+   * Sprint 219 T-219-002 — REPL hata graceful: when true, pre-call provider
+   * failures (spawn ENOENT, network down, adapter throws BEFORE emitting any
+   * output) are caught, surfaced as a tagged error turn, and the session
+   * continues. Mid-stream errors (output already emitted) still propagate.
+   * Default false preserves the prior `runChatNativeLoop` contract used by
+   * `src/api/chat-backend.ts` callers that need errors to bubble.
+   */
+  gracefulErrors?: boolean;
 }
 
 const DEFAULT_MAX_TURNS = 50;
@@ -282,34 +291,54 @@ export async function runChatNativeLoop(opts: ChatNativeOptions): Promise<ChatMe
     transcript.push({ role: 'user', content: line });
     memStore?.appendChatTurn(sessionId, 'user', line);
 
-    let response = await runProviderTurn(provider, getRecentTurns(transcript, opts.contextWindowSize), output);
-    let toolHops = 0;
-    while (response.stopReason === 'tool_use' && response.toolCalls?.length) {
-      if (toolHops >= maxToolHops) {
-        output(`[chat-native] maxToolHops (${maxToolHops}) reached — aborting tool chain.`);
-        break;
+    // Sprint 219 T-219-002 — pre-call round-trip error guard (opt-in via
+    // `gracefulErrors`). Wraps the per-turn body so a pre-call provider
+    // failure (spawn ENOENT, network down, adapter throws before emitting
+    // any output) is surfaced as a tagged error turn instead of crashing
+    // the REPL session. Mid-stream errors (output already emitted) still
+    // propagate so the chat-native-stream "mid-stream error" contract and
+    // the chat-backend HTTP propagation contract are preserved.
+    let outputCount = 0;
+    const trackedOutput = opts.gracefulErrors
+      ? (text: string): void => { outputCount++; output(text); }
+      : output;
+    try {
+      let response = await runProviderTurn(provider, getRecentTurns(transcript, opts.contextWindowSize), trackedOutput);
+      let toolHops = 0;
+      while (response.stopReason === 'tool_use' && response.toolCalls?.length) {
+        if (toolHops >= maxToolHops) {
+          trackedOutput(`[chat-native] maxToolHops (${maxToolHops}) reached — aborting tool chain.`);
+          break;
+        }
+        toolHops++;
+
+        transcript.push({
+          role: 'assistant',
+          content: response.text ?? '',
+          toolCalls: response.toolCalls,
+        });
+
+        for (const call of response.toolCalls) {
+          const result = await dispatcher.dispatch(call.name, call.args);
+          transcript.push({ role: 'tool', content: result, toolUseId: call.id });
+        }
+
+        response = await runProviderTurn(provider, getRecentTurns(transcript, opts.contextWindowSize), trackedOutput);
       }
-      toolHops++;
 
-      transcript.push({
-        role: 'assistant',
-        content: response.text ?? '',
-        toolCalls: response.toolCalls,
-      });
-
-      for (const call of response.toolCalls) {
-        const result = await dispatcher.dispatch(call.name, call.args);
-        transcript.push({ role: 'tool', content: result, toolUseId: call.id });
+      const assistantText = response.text ?? '';
+      transcript.push({ role: 'assistant', content: assistantText });
+      if (assistantText.length > 0) {
+        if (!provider.stream) trackedOutput(assistantText);
+        memStore?.appendChatTurn(sessionId, 'assistant', assistantText);
       }
-
-      response = await runProviderTurn(provider, getRecentTurns(transcript, opts.contextWindowSize), output);
-    }
-
-    const assistantText = response.text ?? '';
-    transcript.push({ role: 'assistant', content: assistantText });
-    if (assistantText.length > 0) {
-      if (!provider.stream) output(assistantText);
-      memStore?.appendChatTurn(sessionId, 'assistant', assistantText);
+    } catch (err) {
+      if (!opts.gracefulErrors || outputCount > 0) throw err;
+      const msg = err instanceof Error ? err.message : String(err);
+      const errorTurn = `[chat-native] error: ${msg}`;
+      output(errorTurn);
+      transcript.push({ role: 'assistant', content: errorTurn });
+      memStore?.appendChatTurn(sessionId, 'assistant', errorTurn);
     }
   }
 

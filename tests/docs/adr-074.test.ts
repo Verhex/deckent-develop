@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const ADR_PATH = join(process.cwd(), 'docs/adr/074-native-chat-enterprise-evolution.md');
-const ROADMAP_PATH = join(process.cwd(), 'docs/ROADMAP-GOD-LEVEL.md');
+const ROADMAP_PATH = join(process.cwd(), 'docs/archive/ROADMAP-GOD-LEVEL.md');
 
 describe('ADR-074: Native Chat Real Round-Trip + Enterprise RBAC/Audit/Rate + F5 Evolution Wire', () => {
   it('ADR file exists with MADR structure (Context, Decision, Consequences, Alternatives Considered, Status accepted)', () => {

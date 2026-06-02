@@ -8,7 +8,7 @@
 
 Deckent is building toward a fully autonomous AI development assistant — in the same category as OpenClaw, Microsoft Copilot Cowork, and Devin. The current phase is **AI agent orchestration**: a multi-agent CLI that plans, executes, and evaluates development tasks in parallel sprints. This is not the destination — it is the foundation.
 
-The long-term goal: Deckent becomes an always-on, self-improving development teammate. It understands your codebase, learns from every sprint, plans proactively, and operates with minimal human input. Open source, self-hosted, provider-agnostic — the anti-Devin.
+The long-term goal: Deckent becomes an always-on, self-improving development teammate. It understands your codebase, learns from every sprint, plans proactively, and operates with minimal human input. Open source, self-hosted, provider-agnostic — **"open source for open world"** rather than positioned against any single peer. We compare with Devin / Cursor / Claude Code / Cowork on capability, never as opposition; deckent's distinctive shape is the **core + enterprise-layer** split that lets the same MIT product scale from a solo dev's laptop to a 10,000-person enterprise without forking.
 
 ---
 
@@ -116,7 +116,7 @@ This is where Deckent enters the OpenClaw/Cowork/Devin category — not as anoth
 | Metrik | Değer |
 |--------|-------|
 | Version | 1.0.0-beta.1 |
-| Sprint | sprint-218 |
+| Sprint | sprint-219 |
 | MCP Tools | 32 |
 | MCP Resources | 8 |
 | CLI Commands | 52+ |
@@ -131,10 +131,10 @@ _Sprint geçmişi yok._
 ## Sprint Metrics
 | Metrik | Değer |
 |--------|-------|
-| Sprint | sprint-218 |
-| Toplam Task | 13 |
-| Tamamlanan | 13 |
+| Sprint | sprint-219 |
+| Toplam Task | 17 |
+| Tamamlanan | 16 |
 | Tech Debt | 0 |
-| No-Go | 0 |
-| Süre | 20dk 41sn |
+| No-Go | 1 |
+| Süre | 38dk 49sn |
 | Coverage | 0.0% |

@@ -120,6 +120,8 @@ export interface CreateTaskParams {
   excludeSkills?: string[];
   authMode?: 'subscription' | 'api';
   fixMode?: 'verify-only' | 'amend' | 're-implement';
+  /** Tier-1 Proof-of-Function smoke directive propagated from ParsedDirectiveTask (216-004). */
+  smoke?: { command: string; expect: string };
 }
 
 export interface ParsedDirectiveTask {
@@ -393,7 +395,7 @@ function now(): string {
  * @param sequence - Sequence number within the sprint, used for ID generation
  * @returns A fully constructed Task object with status and timestamps
  */
-export function createTask(params: CreateTaskParams, sequence: number): Task {
+export function createTask(params: CreateTaskParams, sequence: number): Task & { smoke?: { command: string; expect: string } } {
   const sprintNumber = params.sprintId.replace('sprint-', '');
   const id = `${sprintNumber}-${String(sequence).padStart(3, '0')}`;
 
@@ -448,6 +450,7 @@ export function createTask(params: CreateTaskParams, sequence: number): Task {
     assignedSkills: params.forceSkills ?? [],
     createdAt: now(),
     routingMeta: scopeDerivation !== undefined ? { scopeDerivation } : undefined,
+    smoke: params.smoke,
   };
 }
 
@@ -1017,7 +1020,7 @@ export function parseBulletOrNumberedTasks(content: string): ParsedDirectiveTask
  * @returns Parameters suitable for passing to createTask
  */
 export function plannerTaskToParams(
-  pt: PlannerTask,
+  pt: PlannerTask & { smoke?: { command: string; expect: string } },
   sprintId: string,
   modelOverride: ModelType,
   initialStatus?: TaskStatus,
@@ -1038,6 +1041,7 @@ export function plannerTaskToParams(
     forceSkills: pt.forceSkills,
     excludeAgent: pt.excludeAgent,
     excludeSkills: pt.excludeSkills,
+    smoke: pt.smoke,
   };
 }
 

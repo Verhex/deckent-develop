@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const ADR_PATH = join(process.cwd(), 'docs/adr/067-process-mode-tenancy.md');
-const ROADMAP_PATH = join(process.cwd(), 'docs/ROADMAP-GOD-LEVEL.md');
+const ROADMAP_PATH = join(process.cwd(), 'docs/archive/ROADMAP-GOD-LEVEL.md');
 
 describe('ADR-067: process mode tenancy', () => {
   it('ADR file exists', () => {

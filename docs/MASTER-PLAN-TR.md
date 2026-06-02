@@ -1,7 +1,7 @@
 # Deckent — Ana Plan (Türkçe)
 
 > **Durum:** KANONİK geliştirme planının Türkçe sürümü. İngilizce kaynak + her zaman güncel: [`docs/MASTER-PLAN.md`](MASTER-PLAN.md). Bu TR sürüm Alperen incelemesi için; çelişki olursa EN sürüm esastır.
-> **Son uyum:** 2026-06-02 (Sprint 218 kapandı, Sprint 219 planlandı). **Sürüm:** v1.0.0-beta.1.
+> **Son uyum:** 2026-06-02 (Sprint 218 kapandı, Sprint 219 aktif). **Sürüm:** v1.0.0-beta.1.
 > **Doküman rolleri:** `MASTER-PLAN.md` = NASIL geliştiriyoruz (yol haritası — geliştirme SSOT). `docs/vision/blueprint.md` = deckent NE'dir/NEREDE (kimlik SSOT).
 
 ---
@@ -107,7 +107,7 @@ Hedef: `deckent` terminalde `claude` gibi native conversational agentic REPL. **
 ---
 
 ## 10. Sıralama (Sprint 219+)
-- **219** ✅ planlandı — Native Agentic Deckent (REPL + tool-use + streaming + dashboard kalıcı + TR doc + otonom temel). 14 task.
+- **219** 🔄 **AKTİF** — Native Agentic Deckent (16 task, 7 dalga, 10 worker). DALGA A: `deckent` argümansız → agentic REPL, chat round-trip, REPL UX god-level. DALGA B: agentic tool-use (doğal dil → MCP aksiyon, onay kapısı, session persist). DALGA C: F2 streaming (token-stream SSE + dashboard render). DALGA D: dashboard nav tek-kaynak + cache-bust (8-sayfa kalıcı). DALGA E: TR MASTER-PLAN + ADR-081. DALGA F: blueprint.md + otonom runtime iskeleti. DALGA G: plan-akış wire-gap (routeTaskV2 surface-bonus + Smoke-field taşıma).
 - **220 adayı** — GA-readiness (secret-scrub + .github + 96%-claim + threat-model) + otonom agentic tam-wire + onboarding/everywhere (6-senaryo preset).
 - **post-beta** — provider/local-LLM, milyon-ölçek hardening (OTel), self-security, F8/F9/F10 ekosistem.
 - **gated** — Voice (10K star), Mobile (50K star).

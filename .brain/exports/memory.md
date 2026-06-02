@@ -1,5 +1,9 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-219 Learnings
+- Sprint sprint-219 Learnings: ## Sprint sprint-219 Learnings
+- 219-010 — Dashboard cache-bust + tarayıcı-e2e smoke (8 sayfa gerçekten yüklenir): NO_GO
+
 ## Sprint sprint-218 Learnings
 - Sprint sprint-218 Learnings: ## Sprint sprint-218 Learnings
 

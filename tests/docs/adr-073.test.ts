@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const ADR_PATH = join(process.cwd(), 'docs/adr/073-routing-fix-dashboard.md');
-const ROADMAP_PATH = join(process.cwd(), 'docs/ROADMAP-GOD-LEVEL.md');
+const ROADMAP_PATH = join(process.cwd(), 'docs/archive/ROADMAP-GOD-LEVEL.md');
 
 describe('ADR-073: Routing Live Validation + FIX Prompt Enrichment + Dashboard Control Plane', () => {
   it('ADR file exists with MADR structure (Context, Decision, Consequences, Alternatives Considered, Status accepted)', () => {

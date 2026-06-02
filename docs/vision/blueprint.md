@@ -4,7 +4,7 @@
 
 > **Doc role (Alperen 2026-06-02 — SSOT split):** `blueprint.md` = **WHAT deckent is and WHERE it stands** (identity, capabilities, architecture-as-built, positioning). `docs/MASTER-PLAN.md` = **HOW we build it** (roadmap, sequencing, remaining work — development SSOT). `docs/vision/*` track the evolving story and are updated as we progress. Live Metrics + structural counts are auto-current; the deep §-bodies below are being brought fully current in Sprint 219 (doc-refresh task).
 
-> **What deckent is (2026-06-02):** the **god-level orchestration + enterprise layer of an open agent**, made so easy a single user wields the same power — **one MIT product** from a solo dev's laptop to a 10,000-person enterprise. **"Open source for open world."** We compare with peers (Devin, Cursor, Claude Code, Cowork) on capability; never "anti-X". ([[project_deckent_positioning]])
+> **What deckent is (2026-06-02):** the **god-level orchestration + enterprise layer of an open agent**, made so easy a single user wields the same power — **one MIT product** from a solo dev's laptop to a 10,000-person enterprise. **"Open source for open world."** We compare with peers (Devin, Cursor, Claude Code, Cowork) on capability — never as opposition. The architecture is a **core + enterprise-layer** split: the core is the same multi-agent orchestration every user runs; the enterprise layer (RBAC, audit, multi-tenant, scheduled flows) bolts on without forking. ([[project_deckent_positioning]])
 
 > **Where it's heading — autonomous agentic runtime:** beyond on-demand sprints, deckent runs **continuously and autonomously within defined authority bounds** — install it into an enterprise and it tracks orders, analyzes, checks MRP, and acts on customer requests inside RBAC + approval limits. Built on Process Mode (F3) + scheduled-flows + nervous approval + Capability Broker (F8 ERP) + ADR-037 authority matrix. **"Deckent orchestered for everyone everywhere"** across 6 contexts (greenfield / in-dev / maintained / daily-tasks / ERP / enterprise). ([[project_deckent_everyone_everywhere]])
 
@@ -13,12 +13,12 @@
 ## Live Metrics
 | Metrik | Değer |
 |--------|-------|
-| Sprint | sprint-218 |
-| Toplam Task | 13 |
-| Tamamlanan | 13 |
+| Sprint | sprint-219 |
+| Toplam Task | 17 |
+| Tamamlanan | 16 |
 | Tech Debt | 0 |
-| No-Go | 0 |
-| Süre | 20dk 41sn |
+| No-Go | 1 |
+| Süre | 38dk 49sn |
 | Coverage | 0.0% |
 
 # TABLE OF CONTENTS
@@ -77,6 +77,11 @@ An agent-agnostic AI orchestration system. You describe goals in natural languag
 
 **USP (Unique Selling Point):**
 Sprint + learning loop. Deckent doesn't just execute tasks — it plans sprints, evaluates results with GO/NO-GO protocol, tracks tech debt, runs retrospectives, and feeds learnings into the next sprint. Every sprint makes the system smarter.
+
+**Where it stands today (Sprint 218 → 219):**
+- Sprint 218 closed (13/13 DONE, 0 NO_GO, 0 tech-debt). Sprint 219 ("Native Agentic Deckent") is the on-going work to make `deckent` argümansız behave like `claude`: argümansız invocation opens a native agentic REPL, natural-language drives MCP/CLI actions through an approval gate, the dashboard's 8-page nav is render-tested + cache-busted, and the F2 chat streaming wire (`/api/chat/stream`) lands SSE token streaming end-to-end.
+- The doc you are reading was last sweep-refreshed in Sprint 219 — header timestamp + Sprint 218 metrics block + positioning section. Dated history sections from earlier sprints are preserved as-written; "as-built" sections (Architecture Overview, Memory V2, MCP/CLI counts) are kept code-derived via managed-docs (ADR-029/030).
+- The everyone-everywhere arc (6 contexts — greenfield / in-dev / maintained / daily-tasks / ERP / enterprise) and the autonomous agentic runtime (Sprint 220+) are the next horizons; see §23 Strategic Roadmap and [`docs/MASTER-PLAN.md`](../MASTER-PLAN.md) (or [`docs/MASTER-PLAN-TR.md`](../MASTER-PLAN-TR.md)) for the how-we-build-it sequencing.
 
 **Phased Roadmap:**
 | Phase | Focus | Target Audience | Sprint Range |
