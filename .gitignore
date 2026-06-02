@@ -47,6 +47,7 @@ coverage/
 .deckent/routing/
 .deckent/config.json
 .deckent/config.json.bak.*
+.deckent/settings.local.json
 .deckent/ci-baseline.json
 .deckent/safety-point.json
 .deckent/project-stack.json
