@@ -2,6 +2,8 @@ import { z } from 'zod/v4';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { loadConfig } from '../../core/config.js';
 import { readContext, planSprint } from '../../orchestra/brain.js';
+import { bootstrapProviders } from '../../core/provider.js';
+import { debugLog } from '../../core/utils.js';
 import type { BrainPlanningMode, SprintSizeRecommendation } from '../../core/types.js';
 import { enrichResponse } from '../helpers/enrich.js';
 import { formatPlanResponse, wrapResponse } from '../helpers/format.js';
@@ -51,6 +53,15 @@ export function registerPlanTool(server: McpServer): void {
 
       try {
       const config = await loadConfig(root);
+      // AI planning needs a registered provider. The MCP process does not bootstrap
+      // the registry on its own (unlike `deckent start`), so `mode: 'ai'` hit
+      // "No providers registered". Bootstrap from config (brain_provider etc.) here,
+      // mirroring CLI `deckent plan`. Idempotent; failure degrades to structured.
+      try {
+        await bootstrapProviders(config, root);
+      } catch (e) {
+        debugLog('mcp:plan:bootstrapProviders', e);
+      }
       const context = readContext(root);
       const recommendation: SprintSizeRecommendation = {
         size: 'full',
