@@ -9,6 +9,7 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-224-001 | Tech debt from 224-001: Implemented honest-fallback for AI planner per directive | normal | sprint-224 | resolved |
 | debt-220-004 | Tech debt from 220-004: Worker exited without writing result (exitCode=0) | normal | sprint-220 | resolved |
 | rollback-sprint-217 | Sprint sprint-217 rollback SUCCESS | critical | sprint-217 | resolved |
 | debt-216-006 | Tech debt from 216-006: Implementation:

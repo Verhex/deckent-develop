@@ -126,10 +126,52 @@ export function evaluateLayoutSeparation(stdout) {
   return { pass: true };
 }
 
+// ─── Sprint 224 T-224-027 — extended evaluation functions ─────────────────────
+
+/**
+ * Evaluate terminal-mode: REPL exits cleanly on stdin EOF without hanging.
+ * In non-TTY (piped) mode the REPL should boot and exit within the time limit.
+ */
+export function evaluateTerminalMode(stdout, elapsed) {
+  if (elapsed > 3_000) {
+    return { pass: false, reason: `terminal-mode: REPL took ${elapsed}ms to exit — possible hang (expected <3000ms)` };
+  }
+  if (!stdout && elapsed > 1_000) {
+    return { pass: false, reason: 'terminal-mode: stdout empty and elapsed >1s — REPL may have stalled' };
+  }
+  return { pass: true };
+}
+
+/**
+ * Evaluate perms auto-approve: off-TTY mode must not block on permission prompts.
+ * If the permission prompt text appears in stdout, the REPL is incorrectly
+ * showing interactive prompts to a non-TTY caller.
+ */
+export function evaluatePermsAutoApprove(stdout) {
+  const permPrompt = 'izin ver';
+  if (stdout && stdout.includes(permPrompt)) {
+    return { pass: false, reason: `perms-auto: permission prompt ("${permPrompt}") appeared in non-TTY output — off-TTY should auto-approve` };
+  }
+  return { pass: true };
+}
+
+/**
+ * Evaluate slash-menu: the slash command system responds with the command list.
+ * A /help call must show at least one of the known slash command indicators.
+ */
+export function evaluateSlashMenu(stdout) {
+  const indicators = ['Komutlar', '/exit', '/help', '/status', '/recall'];
+  const found = indicators.some((ind) => stdout && stdout.includes(ind));
+  if (!found) {
+    return { pass: false, reason: `slash-menu: no slash command indicator found in stdout (checked: ${indicators.join(', ')})` };
+  }
+  return { pass: true };
+}
+
 // ─── runSmoke ─────────────────────────────────────────────────────────────────
 
 /**
- * Run all 4 REPL smoke checks against dist/cli/entry.js.
+ * Run all REPL smoke checks against dist/cli/entry.js.
  * Returns { pass, skipped?, reason?, scenarios }.
  *
  * When entryPath does not exist (dist not built) returns skipped=true immediately
@@ -146,6 +188,9 @@ export async function runSmoke({ entryPath = ENTRY_JS } = {}) {
         'SKIP status-line (dist missing)',
         'SKIP perf-reuse (dist missing)',
         'SKIP layout-separation (dist missing)',
+        'SKIP terminal-mode (dist missing)',
+        'SKIP perms-auto-approve (dist missing)',
+        'SKIP slash-menu (dist missing)',
       ],
     };
   }
@@ -207,6 +252,45 @@ export async function runSmoke({ entryPath = ENTRY_JS } = {}) {
     else failed.push(`layout-separation: ${r.reason}`);
   } catch (err) {
     failed.push(`layout-separation: spawn error: ${err.message}`);
+  }
+
+  // ── Check 5: terminal-mode (clean exit on stdin EOF) ────────────────────────
+  try {
+    const { stdout: stdoutTerm, elapsed: elapsedTerm } = await spawnReplWithInput('', {
+      timeoutMs: 4_000,
+      entryPath,
+    });
+    const r = evaluateTerminalMode(stdoutTerm, elapsedTerm);
+    if (r.pass) passed.push('terminal-mode');
+    else failed.push(`terminal-mode: ${r.reason}`);
+  } catch (err) {
+    failed.push(`terminal-mode: spawn error: ${err.message}`);
+  }
+
+  // ── Check 6: perms auto-approve (no prompt in non-TTY) ──────────────────────
+  try {
+    const { stdout: stdoutPerms } = await spawnReplWithInput('/help\n/exit\n', {
+      timeoutMs: 3_000,
+      entryPath,
+    });
+    const r = evaluatePermsAutoApprove(stdoutPerms);
+    if (r.pass) passed.push('perms-auto-approve');
+    else failed.push(`perms-auto-approve: ${r.reason}`);
+  } catch (err) {
+    failed.push(`perms-auto-approve: spawn error: ${err.message}`);
+  }
+
+  // ── Check 7: slash-menu (/help lists commands) ───────────────────────────────
+  try {
+    const { stdout: stdoutMenu } = await spawnReplWithInput('/help\n/exit\n', {
+      timeoutMs: 3_000,
+      entryPath,
+    });
+    const r = evaluateSlashMenu(stdoutMenu);
+    if (r.pass) passed.push('slash-menu');
+    else failed.push(`slash-menu: ${r.reason}`);
+  } catch (err) {
+    failed.push(`slash-menu: spawn error: ${err.message}`);
   }
 
   return {

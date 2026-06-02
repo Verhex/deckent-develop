@@ -1,11 +1,14 @@
 /**
- * Sprint 221 Task 221-017 — AI planner honest-fallback contract.
+ * Sprint 224 Task 224-001 (extends Sprint 221 Task 221-017) —
+ * AI planner honest-fallback contract with discriminant `PlannerCallResult`.
  *
- * Verifies that `planSprint()` no longer falls back to structured mode silently when the
- * AI planner returns null. Instead:
- *  - mode === 'ai'   → throws BrainError that names the brain_provider tried.
- *  - mode === 'auto' → emits an explicit `console.error` warning + structured fallback.
- *  - mode === 'auto' + AI success → uses AI result, no warning.
+ * Verifies that `planSprint()` no longer silently drops to structured mode when the
+ * AI planner fails. The contract now surfaces a discriminant
+ * `{ ok: false, reason, message }` so the caller can show *why* AI mode failed:
+ *  - mode === 'ai'   + failure → throws BrainError naming `provider` + `reason` + detailed `message`
+ *  - mode === 'auto' + failure → `console.error` with `provider` + `reason` + detailed `message`
+ *  - mode === 'ai'   + `no_providers` → throws BrainError naming `reason=no_providers`
+ *  - mode === 'ai'   + success → uses `data.tasks`, no warning emitted
  *  - subscription-spawn routing → `callBrainPlanner` is invoked with the
  *    `config.brain_provider`-resolved adapter (no claude bias, no API-key dependency).
  *
@@ -61,6 +64,15 @@ vi.mock('../../src/monitor/auditor.js', () => ({
 }));
 
 vi.mock('../../src/orchestra/planner.js', () => ({
+  // Sprint 224 task 224-001 — sprint-planner uses `callBrainPlannerWithReason` for
+  // honest-fallback. Default = honest spawn_failed discriminant; each test overrides.
+  callBrainPlannerWithReason: vi.fn().mockReturnValue({
+    ok: false,
+    reason: 'spawn_failed',
+    message: 'default mock — subscription spawn returned no output',
+  }),
+  // Legacy `callBrainPlanner` kept on the mock for backward compat (other tests
+  // assume it exists). Not used by sprint-planner in this suite.
   callBrainPlanner: vi.fn().mockReturnValue(null),
 }));
 
@@ -138,7 +150,7 @@ vi.mock('../../src/core/utils.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../src/core/utils.js')>();
   return {
     ...actual,
-    getNextSprintId: vi.fn().mockReturnValue('sprint-221'),
+    getNextSprintId: vi.fn().mockReturnValue('sprint-224'),
   };
 });
 
@@ -154,17 +166,18 @@ vi.mock('../../src/core/memory-store.js', () => ({
 
 import { planSprint } from '../../src/orchestra/sprint-planner.js';
 import { BrainError } from '../../src/orchestra/sprint-lifecycle.js';
-import { callBrainPlanner } from '../../src/orchestra/planner.js';
+import { callBrainPlannerWithReason } from '../../src/orchestra/planner.js';
+import type { PlannerCallResult } from '../../src/orchestra/planner.js';
 import { providerRegistry } from '../../src/core/provider.js';
 
-const mockedCallBrainPlanner = vi.mocked(callBrainPlanner);
+const mockedCallBrainPlanner = vi.mocked(callBrainPlannerWithReason);
 const mockedHasProvider = vi.mocked(providerRegistry.hasProvider);
 const mockedGetProvider = vi.mocked(providerRegistry.getProvider);
 const mockedGetDefault = vi.mocked(providerRegistry.getDefault);
 
 // ─── Fixtures ─────────────────────────────────────────────────────
 
-const ROOT = '/project-221';
+const ROOT = '/project-224';
 
 function makeConfig(brainProvider?: 'claude' | 'ollama'): ResolvedConfig {
   return {
@@ -178,7 +191,7 @@ function makeConfig(brainProvider?: 'claude' | 'ollama'): ResolvedConfig {
     },
     modes: {} as never,
     language: 'tr',
-    projectName: 'test-221',
+    projectName: 'test-224',
     projectRoot: ROOT,
     version: '0.1.0',
     ...(brainProvider ? { brain_provider: brainProvider } : {}),
@@ -222,13 +235,19 @@ const validAiPlannerResult = {
   reasoning: 'AI plan rationale',
 };
 
+const okResult: PlannerCallResult = { ok: true, data: validAiPlannerResult };
+
 // ─── Test setup / teardown ────────────────────────────────────────
 
 let errorSpy: ReturnType<typeof vi.spyOn>;
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockedCallBrainPlanner.mockReturnValue(null);
+  mockedCallBrainPlanner.mockReturnValue({
+    ok: false,
+    reason: 'spawn_failed',
+    message: 'default mock — subscription spawn returned no output',
+  });
   mockedHasProvider.mockImplementation((name) => providerFixtures.registered.has(name));
   mockedGetProvider.mockImplementation(
     (name) => providerFixtures.registered.get(name) ?? providerFixtures.claudeAdapter,
@@ -243,17 +262,15 @@ afterEach(() => {
 
 // ─── Tests ────────────────────────────────────────────────────────
 
-describe('Sprint 221 / Task 221-017 — AI planner honest-fallback', () => {
-  it('mode=ai + AI null → throws BrainError naming the brain_provider (subscription-spawn fail surfaced)', async () => {
-    mockedCallBrainPlanner.mockReturnValue(null);
+describe('Sprint 224 / Task 224-001 — AI planner discriminant honest-fallback', () => {
+  it('mode=ai + reason=spawn_failed → throws BrainError naming provider + reason + detailed message', async () => {
+    mockedCallBrainPlanner.mockReturnValue({
+      ok: false,
+      reason: 'spawn_failed',
+      message: 'provider=claude exited with status=1, stderr=CLI not found',
+    });
     const config = makeConfig('claude');
 
-    await expect(
-      planSprint(ROOT, config, makeContext('Task A'), recommendation, { mode: 'ai' }),
-    ).rejects.toThrow(BrainError);
-
-    // Second invocation to inspect the actual message — keep mocks deterministic.
-    mockedCallBrainPlanner.mockReturnValue(null);
     let caught: Error | undefined;
     try {
       await planSprint(ROOT, config, makeContext('Task A'), recommendation, { mode: 'ai' });
@@ -263,11 +280,17 @@ describe('Sprint 221 / Task 221-017 — AI planner honest-fallback', () => {
     expect(caught).toBeInstanceOf(BrainError);
     expect(caught!.message).toMatch(/AI planner failed/);
     expect(caught!.message).toMatch(/provider=claude/);
+    expect(caught!.message).toMatch(/reason=spawn_failed/);
+    expect(caught!.message).toMatch(/CLI not found/);
     expect(caught!.message).toMatch(/structured moda düşülmedi/);
   });
 
-  it('mode=auto + AI null → console.error warning emitted + structured fallback succeeds (no silent drop)', async () => {
-    mockedCallBrainPlanner.mockReturnValue(null);
+  it('mode=auto + reason=parse_failed → console.error with reason + detail + structured fallback succeeds', async () => {
+    mockedCallBrainPlanner.mockReturnValue({
+      ok: false,
+      reason: 'parse_failed',
+      message: 'provider=claude returned unparseable output (length=42): garbage stdout snippet',
+    });
     const config = makeConfig('claude');
 
     const sprint = await planSprint(
@@ -280,19 +303,39 @@ describe('Sprint 221 / Task 221-017 — AI planner honest-fallback', () => {
 
     expect(sprint.planningMode).toBe('fallback');
     expect(sprint.tasks.length).toBeGreaterThan(0);
-    // Honest fallback warning must mention provider + falling back / structured moda.
     const messages = errorSpy.mock.calls.map((c) => String(c[0]));
     const hit = messages.find(
       (m) =>
         m.includes('AI planner failed') &&
         m.includes('provider=claude') &&
+        m.includes('reason=parse_failed') &&
+        m.includes('garbage stdout snippet') &&
         (m.includes('structured moda') || m.includes('falling back')),
     );
     expect(hit).toBeDefined();
   });
 
-  it('mode=ai + AI success → uses AI result, planningMode=ai, no fallback warning', async () => {
-    mockedCallBrainPlanner.mockReturnValue(validAiPlannerResult);
+  it('mode=ai + reason=no_providers → throws BrainError with reason=no_providers (registry empty)', async () => {
+    mockedCallBrainPlanner.mockReturnValue({
+      ok: false,
+      reason: 'no_providers',
+      message: 'Provider registry empty or missing requested provider: No providers registered',
+    });
+    const config = makeConfig('claude');
+
+    let caught: Error | undefined;
+    try {
+      await planSprint(ROOT, config, makeContext('Task A'), recommendation, { mode: 'ai' });
+    } catch (e) {
+      caught = e as Error;
+    }
+    expect(caught).toBeInstanceOf(BrainError);
+    expect(caught!.message).toMatch(/reason=no_providers/);
+    expect(caught!.message).toMatch(/Provider registry empty/);
+  });
+
+  it('mode=ai + ok=true (success path) → uses data.tasks, planningMode=ai, no warning emitted', async () => {
+    mockedCallBrainPlanner.mockReturnValue(okResult);
     const config = makeConfig('claude');
 
     const sprint = await planSprint(
@@ -305,13 +348,12 @@ describe('Sprint 221 / Task 221-017 — AI planner honest-fallback', () => {
 
     expect(sprint.planningMode).toBe('ai');
     expect(sprint.tasks.some((t) => t.title === 'AI Planned Task')).toBe(true);
-    // No "AI planner failed" warning when AI succeeds.
     const messages = errorSpy.mock.calls.map((c) => String(c[0]));
     expect(messages.find((m) => m.includes('AI planner failed'))).toBeUndefined();
   });
 
-  it('subscription-spawn → callBrainPlanner receives the brain_provider-resolved adapter (not a hardcoded default)', async () => {
-    mockedCallBrainPlanner.mockReturnValue(validAiPlannerResult);
+  it('subscription-spawn: callBrainPlanner receives the brain_provider-resolved adapter (no hardcoded default)', async () => {
+    mockedCallBrainPlanner.mockReturnValue(okResult);
     const config = makeConfig('ollama');
 
     await planSprint(
@@ -325,26 +367,37 @@ describe('Sprint 221 / Task 221-017 — AI planner honest-fallback', () => {
     expect(mockedHasProvider).toHaveBeenCalledWith('ollama');
     expect(mockedGetProvider).toHaveBeenCalledWith('ollama');
     expect(mockedCallBrainPlanner).toHaveBeenCalledTimes(1);
-    // Adapter passed as 5th positional arg must be the ollama adapter (subscription
-    // CLI spawn — no ANTHROPIC_API_KEY claude fallback).
     const adapterArg = mockedCallBrainPlanner.mock.calls[0]![4];
     expect(adapterArg).toBe(providerFixtures.ollamaAdapter);
   });
 
-  it('mode=auto + AI success → uses AI result with no fallback warning (success path symmetric)', async () => {
-    mockedCallBrainPlanner.mockReturnValue(validAiPlannerResult);
+  it('mode=auto + reason=timeout → console.error mentions timeout + brain_plan_timeout_ms hint + structured fallback', async () => {
+    mockedCallBrainPlanner.mockReturnValue({
+      ok: false,
+      reason: 'timeout',
+      message:
+        'Subscription spawn timed out after 900000ms (provider=claude). ' +
+        'Consider raising brain_plan_timeout_ms in config or passing a larger timeout.',
+    });
     const config = makeConfig('claude');
 
     const sprint = await planSprint(
       ROOT,
       config,
-      makeContext(''),
+      makeContext('Task A\nTask B'),
       recommendation,
       { mode: 'auto' },
     );
 
-    expect(sprint.planningMode).toBe('ai');
+    expect(sprint.planningMode).toBe('fallback');
     const messages = errorSpy.mock.calls.map((c) => String(c[0]));
-    expect(messages.find((m) => m.includes('AI planner failed'))).toBeUndefined();
+    const hit = messages.find(
+      (m) =>
+        m.includes('reason=timeout') &&
+        m.includes('brain_plan_timeout_ms') &&
+        (m.includes('structured moda') || m.includes('falling back')),
+    );
+    expect(hit).toBeDefined();
   });
+
 });

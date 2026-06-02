@@ -8321,3 +8321,198 @@ Layout'u sprint içinde sıfırdan yazmak. Reddedildi: Karpathy Discipline 3 (Su
 - `src/core/config.ts` — `resolveChatProvider`, `CHAT_CONFIG_SCHEMA`
 - Memory: `project_terminal_dashboard_ux_evolution` — Sprint 221 yönü (claude-code-UX evrim)
 - Memory: `feedback_directive_kanit_letter_vs_goal` — wire-gap (def-dosya dışla, çağıran-modül ölç)
+
+
+---
+
+## adr-085: Persistent-Session Wire + GUI-UX Terminal-Layout + Nervous Non-Blocking/Optimize
+
+**Status:** accepted
+
+# ADR-085: Persistent-Session Wire + GUI-UX Terminal-Layout + Nervous Non-Blocking/Optimize
+
+**Status:** accepted
+
+**Date:** 2026-06-02
+
+**Accepted:** Sprint 223
+
+---
+
+## Context
+
+### Sprint 222 Wire-Gap — Persistent-Session Hollow
+
+Sprint 222 shipped `chat-session.ts` (`createPersistentClaudeSession`, 313 lines, 16 tests, stream-json reuse) but `entry.ts` never imported it. `buildReplProvider` claude branch kept calling per-turn `spawnFn(binary, [...args, prompt])` — spawning a new claude child process on every message. Measured consequence:
+
+- **1 message:** ~5.4 s (cold-start, acceptable)
+- **2 messages:** ~17 s (two full cold-starts, no reuse) 🔴
+- `grep createPersistentClaudeSession src/cli/entry.ts` → **0** (confirmed hollow)
+
+This was the Sprint 222 lesson: a module shipped + tested ≠ a module wired. The persistent-session module had 16 passing tests yet was a 0-caller module at runtime.
+
+### GUI-UX Terminal Design at Zero
+
+Sprint 222 delivered `chat-render.ts` (markdown content formatting) but **conversation layout** — who said what, visual separation between user input and deckent response — was absent. REPL output was a flat stream:
+
+- User input not echoed visually after submission
+- Deckent responses had no header/prefix/color separator
+- No turn boundaries: all text scrolled as one undifferentiated block
+- No claude-code-style conversation hierarchy
+
+### Nervous Panic-Gate Silent Block
+
+The Nervous System (`enabled:true`) caused sprint SPAWN to stall indefinitely:
+
+- `panic-gate` wrote marker files to `.deckent/panic-ipc/pending/`
+- Spawn busy-poll waited for approval that never appeared in the terminal
+- A/B test confirmed: Nervous ON → stuck, Nervous OFF → sprint ran normally
+- Root-cause: panic-gate was **synchronous and blocking** on the critical worker-spawn path
+- Sprint 222 tasks 008/009/013 hit OOM (2g container) + silent-block → NO_GO carry
+
+### Resource Overhead
+
+With the Nervous observer running, RAM and CPU usage increased measurably — making deckent impractical on lower-spec machines. The scan loop ran continuously regardless of sprint state.
+
+---
+
+## Decision
+
+Sprint 223 closed all four gaps across four waves.
+
+### Wave A — Speed: Persistent-Session Wire
+
+**223-001 — `entry.ts` buildReplProvider claude branch rewired:**
+
+`buildReplProvider` claude branch now calls `createPersistentClaudeSession(binary, args)` from `chat-session.ts` and holds the session object for the REPL lifetime. Each send/stream call reuses the warm claude child process — no new spawn per message. Session is killed on `:exit` (`session.exit()`).
+
+- Codex/Gemini/Ollama/openai-compat branches remain per-turn (only claude pays a cold-start large enough to warrant a persistent session)
+- `grep -c createPersistentClaudeSession src/cli/entry.ts` → ≥1 (callers verified)
+- 2nd message warm-reuse target: <1 s (vs 7–8 s cold per message previously)
+
+**223-002 — `chat-session.ts` stream() persistent+streaming unified:**
+
+`stream()` method yields NDJSON delta tokens from the warm persistent process — real-time incremental output without blocking until full response. Reuse and streaming compose: warm session + token-by-token delivery.
+
+### Wave B — GUI-UX: Terminal Layout
+
+**223-003 — `chat-layout.ts` message separation primitives:**
+
+New module exposes three layout primitives for REPL conversation rendering:
+
+- `renderUserMessage(text)` — prefixes user input with `›` indicator + color, making user turns visible and distinct
+- `renderAssistantHeader()` — prints a deckent response header/prefix before assistant content begins
+- `messageSeparator()` — thin visual separator between conversation turns
+
+TTY-only: when stdout is a pipe, output is plain text (no ANSI escape codes injected into non-interactive streams). Follows ADR-010 (Node.js built-in ANSI — no new runtime dependency).
+
+**223-004 — `chat-native.ts` REPL layout wire:**
+
+`runChatNativeLoop` calls layout primitives at the right moments:
+
+- `renderUserMessage(line)` — immediately after the user submits a line (visible echo)
+- `renderAssistantHeader()` — before streaming the deckent response
+- `messageSeparator()` — after the response completes
+
+This is the wire that makes 223-003 visible. Def-file (`chat-layout.ts`) excluded from caller grep — `chat-native.ts` is the caller.
+
+**223-005 — `chat-banner.ts` REPL welcome:**
+
+`renderBanner(ctx)` — clean welcome at REPL launch: deckent name + active provider + working directory. Short `/help` hint. Consistent color language with status-line and layout. `entry.ts` calls on REPL start. TTY-only.
+
+### Wave C — Nervous: Non-Blocking + Visible + Lighter
+
+**223-006 — `panic-gate.ts` non-blocking primitive:**
+
+Extracted `panic-gate.ts` with two explicit APIs:
+
+- `evaluatePanicGate(opts)` — **synchronous**, default mode `'advisory'`: returns `PROCEED` immediately + emits a visible stderr warning. Spawn never waits on this path.
+- `awaitPanicGateApproval(opts)` — **async** with a hard timeout (default 10 000 ms). On timeout returns `'TIMEOUT_AUTO_PROCEED'` — sprint continues rather than hanging indefinitely.
+
+`safety_floor` locked actions are preserved: critical-path gates (explicitly locked operations) still block in `awaiting-approval` mode. The change is scoped to the default advisory path.
+
+**223-007 — `chat-nervous-bridge.ts` terminal-visible nervous:**
+
+REPL `/nervous` slash command reads `.deckent/panic-ipc/pending/` and renders pending nervous proposals with `accept`/`reject` actions inline. Uses 223-003 layout for visual consistency. Pending proposals surface in the REPL instead of being buried in a file.
+
+**223-008 — `observer.ts` resource optimization:**
+
+- `scan_interval` configurable (default increased from continuous to batched cadence)
+- Lazy-detector: only detectors registered as active run; idle detectors skip
+- Idle-throttle: when no sprint is active, scan frequency drops to minimal
+
+**223-009 — Nervous re-enabled after 223-006 DONE:**
+
+`.deckent/config.json` `nervous_system.enabled` set back to `true` after the non-blocking primitive landed (223-006 prerequisite). Mode: `balanced`. Scan interval optimized (223-008). The sprint-spawn path is now safe regardless of Nervous state.
+
+### Wave D — ADR + Docs + Verification
+
+**223-010 — REPL smoke-verify harness:**
+`scripts/repl-smoke-verify.mjs` — run-proven checks against `dist/cli/entry.js`: `/help` response time, 2-message performance (persistent reuse <8 s), conversation layout separation.
+
+**223-011 — This ADR + MASTER-PLAN update** (this task).
+
+**223-012 — blueprint.md updated:** native REPL speed (persistent, 2nd message <1 s) + GUI-UX (user↔deckent visual separation) + nervous lightweight.
+
+**223-013 — `sprint-finalizer.ts` orphan fix:** finalize now writes `status:'COMPLETED'` to `sprint-state.json` + clears `pids/<sprintId>.pid` — eliminates the "orphan sprint detected" false-positive on next start.
+
+---
+
+## Consequences
+
+### Positive
+
+- **REPL speed:** 2nd message warm-reuse — target <1 s (vs ~7–8 s cold per turn previously). 2-message total: <8 s (vs ~17 s). The persistent-session module's promise is now fulfilled at runtime, not just in tests.
+- **Conversation legibility:** `renderUserMessage`/`renderAssistantHeader`/`messageSeparator` give deckent a claude-code-quality conversation layout. User input is visible; deckent responses are clearly demarcated.
+- **Nervous unblocks sprints:** `evaluatePanicGate` advisory mode returns immediately — worker-spawn critical path is no longer dependent on Nervous approval latency. Nervous is re-enabled safely.
+- **Resource footprint reduced:** idle-throttle + lazy-detector reduce RAM/CPU overhead when no sprint is active.
+- **Sprint lifecycle clean:** `sprint-finalizer.ts` orphan fix prevents false-positive "orphan sprint" on next `deckent start`.
+
+### Negative / Limitations
+
+- **persistent-session claude-only:** Codex/Gemini/Ollama remain per-turn. Justification: claude CLI cold-start (~4.5 s) is large enough to warrant a persistent session; other CLIs have faster initialization.
+- **Hermetic test boundary:** Tests mock the spawn path; real-binary persistent-session performance verified via smoke script (`repl-smoke-verify.mjs`), not unit tests.
+- **Nervous `awaiting-approval` mode still blocking (by design):** `awaitPanicGateApproval` with `mode:'awaiting-approval'` still waits (up to timeout). This is correct behavior for explicit approval-required gates — the advisory path is the default.
+- **GUI-UX TTY-only:** pipe output is plain text. This is correct behavior (scripts should not receive ANSI codes), but interactive visual testing requires a real TTY.
+
+---
+
+## Alternatives Considered
+
+### Keep Per-Turn Spawn (Sprint 222 Status Quo)
+
+Keep `spawnFn(binary, [...args, prompt])` per-turn and simply accept the ~7 s per-message latency. Rejected: Alperen run-verify confirmed 17 s for 2 messages — this is not "deckent gerçekten hızlı" (deckent genuinely fast). The persistent-session module existed and was tested; wiring it was the minimum-diff fix.
+
+### Panic-Gate: Hard Timeout Only (No Advisory Mode)
+
+Replace the silent-block with a fixed 10-second timeout, always waiting. Rejected: a 10-second stall on every sprint start is visible latency and no better UX than the old block for the common case. Advisory mode (default: proceed immediately + warn) is the right default; explicit `awaiting-approval` mode for operations that genuinely need a gate.
+
+### Nervous Remain Disabled
+
+Leave `nervous_system.enabled: false` permanently post-222. Rejected: Nervous is a core feature (ADR-040); disabling it permanently would be a regression. The correct fix is making the gate non-blocking so Nervous can be re-enabled safely.
+
+### Separate Chat-Layout as a New Runtime Dependency (e.g. chalk)
+
+Use an npm package for terminal color/formatting. Rejected: ADR-010 (Tek Runtime Dependency — zero new runtime deps). Node.js built-in ANSI escape codes (`\x1b[...]`) suffice for the required primitives.
+
+---
+
+## References
+
+- Sprint 223 — feat(sprint-223): persistent-session wire + GUI-UX + nervous non-blocking
+- ADR-083 — REPL-UX-Evolution + Provider-Parity + Local-Model-Foundation (Sprint 221 predecessor)
+- ADR-082 — Native-LLM-Wire + Nervous-Activation (Sprint 220)
+- ADR-081 — Native Agentic Deckent — `deckent` argümansız REPL (Sprint 219)
+- ADR-040 — Nervous System Architecture — Proactive Meta-Orchestrator
+- ADR-010 — Tek Runtime Dependency (no new runtime deps — Node ANSI only)
+- `src/cli/entry.ts` — `buildReplProvider` claude branch (persistent-session wire)
+- `src/cli/commands/chat-session.ts` — `createPersistentClaudeSession`, `stream()`
+- `src/cli/commands/chat-layout.ts` — `renderUserMessage`, `renderAssistantHeader`, `messageSeparator`
+- `src/cli/commands/chat-native.ts` — `runChatNativeLoop` (layout wire)
+- `src/cli/commands/chat-banner.ts` — `renderBanner`
+- `src/cli/commands/chat-nervous-bridge.ts` — `getPendingNervous`, `renderNervousPrompt`
+- `src/nervous/panic-gate.ts` — `evaluatePanicGate`, `awaitPanicGateApproval`
+- `src/nervous/observer.ts` — resource-optimized scan loop
+- Memory: `project_terminal_dashboard_ux_evolution` — persistent wire-gap + GUI-UX + speed measurement
+- Memory: `project_nervous_panic_gate_silent_block` — panic-gate spawn-block + OOM-config
+- Memory: `feedback_wiring_pct_vs_user_working` — module shipped ≠ module wired (Sprint 222 lesson)

@@ -1,5 +1,6 @@
 // ─── Node Builtins ─────────────────────────────────────────────────
 import { spawnSync } from 'node:child_process';
+import type { SpawnSyncReturns } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { z } from 'zod';
@@ -363,14 +364,165 @@ export function resolveAdapter(adapter?: ProviderAdapter): ProviderAdapter {
 // ─── callBrainPlanner ─────────────────────────────────────────────
 
 /**
- * @internal Used only within orchestra/ — invokes the AI planner subprocess.
- * Not part of the public API surface.
+ * Discriminated failure reason for AI planner invocation.
+ *
+ * - `spawn_failed`: subprocess could not start, exited non-zero, or returned empty stdout
+ * - `timeout`: subprocess killed by SIGTERM after exceeding `brain_plan_timeout_ms`
+ * - `parse_failed`: stdout could not be JSON-parsed or stripped of provider envelope
+ * - `validation_failed`: parsed JSON failed Zod schema validation (PlannerResultSchema)
+ * - `no_providers`: ProviderRegistry empty or requested provider missing
+ */
+export type PlannerFailureReason =
+  | 'spawn_failed'
+  | 'timeout'
+  | 'parse_failed'
+  | 'validation_failed'
+  | 'no_providers';
+
+/**
+ * Discriminated union returned by `callBrainPlanner`. Replaces the legacy
+ * `PlannerResult | null` shape so callers can distinguish *why* the AI planner
+ * failed and surface the real reason instead of silently dropping to structured.
+ *
+ * See [[feedback_ai_planner_silent_fallback]].
+ */
+export type PlannerCallResult =
+  | { ok: true; data: PlannerResult }
+  | { ok: false; reason: PlannerFailureReason; message: string };
+
+/**
+ * @internal Used only within orchestra/ — invokes the AI planner subprocess and
+ * returns a discriminated `PlannerCallResult`. On failure, `reason` names the
+ * exact category (`spawn_failed` / `timeout` / `parse_failed` / `validation_failed`
+ * / `no_providers`) and `message` carries provider/stderr/timeout detail so the
+ * caller (planSprint) can surface it to the user instead of falling back silently.
+ *
+ * This is the canonical entry point for Sprint 224 task 224-001's honest-fallback
+ * contract. The legacy `callBrainPlanner()` thin wrapper below delegates to this
+ * function and collapses failure to `null` for backward compatibility with older
+ * call sites (other test files that mock `callBrainPlanner` returning null).
  *
  * @param adapter  Optional ProviderAdapter. If omitted, uses ProviderRegistry.getDefault().
- *                 Throws if no provider is available (no silent fallback).
+ *                 Returns `{ok: false, reason: 'no_providers'}` if no provider is available.
+ * @param timeout  Subprocess timeout in milliseconds. Defaults to BRAIN_PLAN_TIMEOUT_MS.
+ *                 Configurable via `brain_plan_timeout_ms` (sprint-planner wires it
+ *                 from ResolvedConfig). Default is 900s (Sprint 184) for opus on
+ *                 large zero-config prompts.
  * @param worstCombinations  Optional output from OutcomeTracker.getWorstCombinations().
  *   Injects GECMIS SONUCLAR / past results block into the AI planner prompt so the
  *   planner avoids historically poor agent+skill combinations.
+ */
+export function callBrainPlannerWithReason(
+  context: BrainContext,
+  recommendation: SprintSizeRecommendation,
+  model: ModelType,
+  projectName: string,
+  adapter?: ProviderAdapter,
+  timeout?: number,
+  worstCombinations?: string,
+): PlannerCallResult {
+  const prompt = buildPlanPrompt(context, recommendation, projectName, undefined, 'tr', worstCombinations);
+
+  // resolveAdapter throws ProviderError when registry is empty or provider missing.
+  // Surface as `no_providers` reason so the caller does not silently fall back.
+  let resolved: ProviderAdapter;
+  try {
+    resolved = resolveAdapter(adapter);
+  } catch (e) {
+    const detail = e instanceof Error ? e.message : String(e);
+    return {
+      ok: false,
+      reason: 'no_providers',
+      message: `Provider registry empty or missing requested provider: ${detail}`,
+    };
+  }
+
+  let cmdInfo: { command: string; args: string[] };
+  try {
+    cmdInfo = buildPlannerSpawnArgs(resolved, prompt, model);
+  } catch (e) {
+    const detail = e instanceof Error ? e.message : String(e);
+    return {
+      ok: false,
+      reason: 'spawn_failed',
+      message: `Could not build planner command for provider=${resolved.name}: ${detail}`,
+    };
+  }
+
+  const effectiveTimeout = timeout ?? BRAIN_PLAN_TIMEOUT_MS;
+
+  let result: SpawnSyncReturns<string>;
+  try {
+    result = spawnSync(cmdInfo.command, cmdInfo.args, {
+      encoding: 'utf-8',
+      timeout: effectiveTimeout,
+    });
+  } catch (e) {
+    const detail = e instanceof Error ? e.message : String(e);
+    return {
+      ok: false,
+      reason: 'spawn_failed',
+      message: `spawnSync threw for provider=${resolved.name}: ${detail}`,
+    };
+  }
+
+  // SIGTERM signal from spawnSync indicates the process was killed at the
+  // configured timeout. Surface as `timeout` so the caller can suggest
+  // raising brain_plan_timeout_ms.
+  if (result.signal === 'SIGTERM') {
+    return {
+      ok: false,
+      reason: 'timeout',
+      message:
+        `Subscription spawn timed out after ${effectiveTimeout}ms (provider=${resolved.name}). ` +
+        `Consider raising brain_plan_timeout_ms in config or passing a larger timeout.`,
+    };
+  }
+
+  if (result.error) {
+    return {
+      ok: false,
+      reason: 'spawn_failed',
+      message: `spawnSync error for provider=${resolved.name}: ${result.error.message}`,
+    };
+  }
+
+  if (result.status !== 0 || !result.stdout) {
+    const stderr = (result.stderr ?? '').toString().slice(0, 500);
+    return {
+      ok: false,
+      reason: 'spawn_failed',
+      message:
+        `provider=${resolved.name} exited with status=${result.status ?? 'null'}, ` +
+        `stdout=${result.stdout ? `${result.stdout.length} bytes` : 'empty'}, stderr=${stderr}`,
+    };
+  }
+
+  const parsed = parsePlannerResponse(result.stdout, resolved);
+  if (!parsed) {
+    const snippet = result.stdout.slice(0, 200).replace(/\n/g, ' ');
+    return {
+      ok: false,
+      reason: 'parse_failed',
+      message:
+        `provider=${resolved.name} returned unparseable output (length=${result.stdout.length}): ${snippet}`,
+    };
+  }
+
+  return { ok: true, data: parsed };
+}
+
+/**
+ * @internal Legacy thin wrapper preserved for backward compatibility with
+ * pre-Sprint-224 call sites and test mocks that expect `PlannerResult | null`.
+ *
+ * New code (and Sprint 224 task 224-001's honest-fallback path) MUST call
+ * `callBrainPlannerWithReason` instead so failure details (`reason`, `message`)
+ * surface to the user. This wrapper drops them.
+ *
+ * Note: when no provider is registered this wrapper throws (mirrors the original
+ * behavior — see `tests/orchestra/planner.test.ts` "throws when registry is empty"),
+ * because `no_providers` was originally a thrown ProviderError, not a null return.
  */
 export function callBrainPlanner(
   context: BrainContext,
@@ -381,17 +533,15 @@ export function callBrainPlanner(
   timeout?: number,
   worstCombinations?: string,
 ): PlannerResult | null {
-  const prompt = buildPlanPrompt(context, recommendation, projectName, undefined, 'tr', worstCombinations);
-  const resolved = resolveAdapter(adapter);
-  const { command, args } = buildPlannerSpawnArgs(resolved, prompt, model);
-
-  const result = spawnSync(command, args, {
-    encoding: 'utf-8',
-    timeout: timeout ?? BRAIN_PLAN_TIMEOUT_MS,
-  });
-
-  if (result.status !== 0 || !result.stdout) return null;
-  return parsePlannerResponse(result.stdout, resolved);
+  const result = callBrainPlannerWithReason(
+    context, recommendation, model, projectName, adapter, timeout, worstCombinations,
+  );
+  if (result.ok) return result.data;
+  if (result.reason === 'no_providers') {
+    // Preserve legacy throw contract (ProviderError surfaces via thrown Error).
+    throw new ProviderError(result.message, adapter?.name ?? '');
+  }
+  return null;
 }
 
 // ─── Zero-Config AI Planner ───────────────────────────────────────

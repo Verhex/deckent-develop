@@ -39,11 +39,20 @@ export function registerPlan(program: Command): void {
         } else {
           try {
             await bootstrapProviders(config);
-          } catch {
-            // Provider bootstrap failed (no API key, etc.) — fall back to structured mode
+          } catch (bootErr) {
+            // Provider bootstrap failed (no API key, etc.) — fall back to structured mode.
+            // Sprint 224 task 224-001: log the actual error + brain_provider so the
+            // user knows *why* AI mode was unavailable instead of a silent reason.
+            const provider = config.brain_provider ?? 'unknown';
+            const reason = bootErr instanceof Error ? bootErr.message : String(bootErr);
             if (!planMode) {
-              print('[warn] Provider bootstrap failed — falling back to structured mode.');
+              print(
+                `[warn] Provider bootstrap failed (provider=${provider}): ${reason} — ` +
+                `falling back to structured mode.`,
+              );
               planMode = 'structured';
+            } else {
+              print(`[warn] Provider bootstrap failed (provider=${provider}): ${reason}`);
             }
           }
         }

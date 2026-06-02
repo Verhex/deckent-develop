@@ -6136,3 +6136,30 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 222-013: 222-013 — Sprint 221 TECH_DEBT gerçek-kapatma (Smoke run-verify, hollow→çalışır) (NO_GO)
 
 ---
+## Sprint 224 — sprint-224
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-06-02
+**Duration:** 1183s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 6 |
+| Completed | 6 |
+| Tech Debt | 1 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 1183230ms |
+
+### Tasks
+
+- 224-001: 224-015 — [P0] AI plan-mode fix (dürüst hata + gerçekten-çalışır) (GO_WITH_TECH_DEBT)
+- 224-002: 224-008 — [P0] `/nervous` slash wire (kurtarılan bridge → chat-native caller) (DONE)
+- 224-003: 224-009 — Banner wire (kurtarılan chat-banner → entry.ts REPL açılış) (DONE)
+- 224-004: 224-010 — Nervous güvenli re-enable + A/B (panic-gate non-blocking main'de) (DONE)
+- 224-005: 224-027 — Smoke harness'lar (agentic-DO + REPL run-proven, scripts/) (DONE)
+- 224-006: 224-012 — ADR-086 (Native CLI Parity) + MASTER-PLAN §10 güncel (DONE)
+
+---

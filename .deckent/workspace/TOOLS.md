@@ -56,16 +56,23 @@ _Total: 28 MCP tools_
 | `audit-verify` | deckent audit-verify |
 | `chat` | deckent chat |
 | `chat-agentic-dispatch` | deckent chat-agentic-dispatch |
+| `chat-banner` | deckent chat-banner |
 | `chat-enterprise-bridge` | deckent chat-enterprise-bridge |
+| `chat-layout` | deckent chat-layout |
 | `chat-mode` | deckent chat-mode |
 | `chat-native` | deckent chat-native |
+| `chat-nervous-bridge` | deckent chat-nervous-bridge |
+| `chat-permissions` | deckent chat-permissions |
 | `chat-provider-parity` | deckent chat-provider-parity |
 | `chat-render` | deckent chat-render |
+| `chat-render-region` | deckent chat-render-region |
 | `chat-repl-ux` | deckent chat-repl-ux |
 | `chat-session` | deckent chat-session |
 | `chat-slash-registry` | deckent chat-slash-registry |
 | `chat-spinner` | deckent chat-spinner |
 | `chat-status-line` | deckent chat-status-line |
+| `chat-tool-bridge` | deckent chat-tool-bridge |
+| `chat-tool-exec` | deckent chat-tool-exec |
 | `checkpoint` | deckent checkpoint |
 | `cleanup` | deckent cleanup |
 | `config` | deckent config |
@@ -121,4 +128,4 @@ _Total: 28 MCP tools_
 | `watch` | deckent watch |
 | `web` | deckent web |
 
-_Total: 74 CLI command modules_
+_Total: 81 CLI command modules_

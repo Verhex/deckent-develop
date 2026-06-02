@@ -2,6 +2,23 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint224] - 2026-06-02
+
+### Added
+
+- 224-008 — [P0] `/nervous` slash wire (kurtarılan bridge → chat-native caller)
+- 224-009 — Banner wire (kurtarılan chat-banner → entry.ts REPL açılış)
+- 224-010 — Nervous güvenli re-enable + A/B (panic-gate non-blocking main'de)
+- 224-027 — Smoke harness'lar (agentic-DO + REPL run-proven, scripts/)
+- 224-012 — ADR-086 (Native CLI Parity) + MASTER-PLAN §10 güncel
+
+### Changed
+
+- 224-015 — [P0] AI plan-mode fix (dürüst hata + gerçekten-çalışır) (completed with tech debt)
+
+
+_Tasks: 6 total, 6 done, 1 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint222] - 2026-06-02
 
 

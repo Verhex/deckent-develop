@@ -50,7 +50,51 @@ import { SkillPoolManager } from '../core/skill-pool.js';
 import { selectSkills } from '../core/skill-selector.js';
 
 // ─── Planner ─────────────────────────────────────────────────────
-import { callBrainPlanner } from './planner.js';
+import { callBrainPlanner, callBrainPlannerWithReason } from './planner.js';
+import type { PlannerCallResult, PlannerFailureReason } from './planner.js';
+
+/**
+ * Resolve the planner-call function, with a legacy-mock fallback.
+ *
+ * Older test files (`vi.mock('../../src/orchestra/planner.js', () => ({ callBrainPlanner: vi.fn().mockReturnValue(null) }))`)
+ * only provide `callBrainPlanner` in their mock factory. Vitest throws when the
+ * test imports `callBrainPlannerWithReason` from such a mocked module ("No
+ * callBrainPlannerWithReason export is defined on the mock"). We wrap the
+ * access in try/catch so those tests keep working without modifying them
+ * (out of scope for task 224-001). On the fallback path we synthesize a
+ * `parse_failed` reason from the legacy null return.
+ */
+function resolveCallBrainPlanner(): (
+  ...args: Parameters<typeof callBrainPlannerWithReason>
+) => PlannerCallResult {
+  let withReasonFn: typeof callBrainPlannerWithReason | undefined;
+  try {
+    withReasonFn = callBrainPlannerWithReason;
+  } catch {
+    withReasonFn = undefined;
+  }
+  if (typeof withReasonFn === 'function') {
+    return withReasonFn;
+  }
+  return (...args): PlannerCallResult => {
+    try {
+      const r = callBrainPlanner(...args);
+      if (r) return { ok: true, data: r };
+      return {
+        ok: false,
+        reason: 'parse_failed' as PlannerFailureReason,
+        message: 'AI planner returned null (legacy mock or unexpected fall-through).',
+      };
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      return {
+        ok: false,
+        reason: 'no_providers' as PlannerFailureReason,
+        message,
+      };
+    }
+  };
+}
 
 // ─── Auditor ──────────────────────────────────────────────────────
 import { detectDeadlocks } from '../monitor/auditor.js';
@@ -240,17 +284,27 @@ export async function planSprint(
       debugLog('planSprint:worstCombinations', e);
     }
 
-    plannerResult = callBrainPlanner(
+    // brain_plan_timeout_ms: optional ResolvedConfig override (Sprint 224 — task
+     // 224-001). Read via index-access so we do not need to extend config-types
+     // until a follow-up sprint formalises the field. Defaults to BRAIN_PLAN_TIMEOUT_MS.
+    const planTimeout =
+      (config as unknown as { brain_plan_timeout_ms?: number }).brain_plan_timeout_ms
+      ?? config.ai_planner_timeout
+      ?? undefined;
+
+    const plannerCallFn = resolveCallBrainPlanner();
+    const callResult: PlannerCallResult = plannerCallFn(
       context,
       recommendation,
       brainModel,
       config.projectName,
       brainAdapter,
-      undefined,
+      planTimeout,
       worstCombinations,
     );
 
-    if (plannerResult) {
+    if (callResult.ok) {
+      plannerResult = callResult.data;
       const directiveTaskCount = parseStructuredDirectives(context.directives).length;
       if (planMode === 'auto' && directiveTaskCount > 0 && plannerResult.tasks.length < directiveTaskCount) {
         console.error(
@@ -276,19 +330,20 @@ export async function planSprint(
         }
       }
     } else if (planMode === 'ai') {
-      // Strict ai-mode: subscription-spawn failed; surface the brain_provider so the
-      // user knows what was tried. structured moda düşülmedi (mode=ai).
+      // Strict ai-mode: surface the actual failure reason + message so the user
+      // sees *why* (spawn_failed / timeout / parse_failed / no_providers / …)
+      // instead of a generic "failed" message. structured moda düşülmedi (mode=ai).
       throw new BrainError(
-        `AI planner failed (provider=${brainProviderName ?? 'unknown'}). ` +
-        `Subscription-spawn returned no parseable output. structured moda düşülmedi (mode=ai).`,
+        `AI planner failed (provider=${brainProviderName ?? 'unknown'}, reason=${callResult.reason}). ` +
+        `${callResult.message} structured moda düşülmedi (mode=ai).`,
         SprintPhase.PLAN,
       );
     } else {
-      // auto mode + AI null: previously silent. Now emit an explicit warning so the
-      // user knows AI was tried+failed and structured fallback ran.
+      // auto mode + AI failure: emit an explicit warning with the actual reason
+      // + message so the user can debug (no silent drop).
       console.error(
-        `[Brain] AI planner failed (provider=${brainProviderName ?? 'unknown'}) — ` +
-        `structured moda düşülüyor (falling back to structured mode).`,
+        `[Brain] AI planner failed (provider=${brainProviderName ?? 'unknown'}, reason=${callResult.reason}): ` +
+        `${callResult.message} — structured moda düşülüyor (falling back to structured mode).`,
       );
       usedMode = 'fallback';
     }

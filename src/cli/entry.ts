@@ -26,6 +26,7 @@ import {
   type PersistentSpawnFn,
 } from './commands/chat-session.js';
 import { createSpinner } from './commands/chat-spinner.js';
+import { renderBanner } from './commands/chat-banner.js';
 import { createCliToolDispatcher } from './commands/chat-tool-bridge.js';
 import { createToolExecDispatcher } from './commands/chat-tool-exec.js';
 import { createPermissionStore } from './commands/chat-permissions.js';
@@ -491,6 +492,7 @@ export async function launchDefaultRepl(): Promise<void> {
   };
   const statusLineText = renderStatusLine(statusCtx, statusLineCfg);
   process.stdout.write(statusLineText ? statusLineText + '\n' : '');
+  process.stdout.write(renderBanner(statusCtx));
 
   // Sprint 224 — interactive REPL render model.
   //

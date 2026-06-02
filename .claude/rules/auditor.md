@@ -34,6 +34,8 @@ paths: [".dashboard"]
 
 ## Active ADR Constraints
 
+- **ADR-086**: Native CLI Parity — F11 Feature Set (Sprint 224) — **Status:** accepted
+- **ADR-085**: Persistent-Session Wire + GUI-UX Terminal-Layout + Nervous Non-Blocking/Optimize — **Status:** accepted
 - **ADR-083**: REPL-UX-Evolution + Provider-Parity + Local-Model-Foundation — **Status:** accepted
 - **ADR-082**: Native-LLM-Wire + Nervous-Activation + Dashboard-v2 Canlı — **Status:** accepted
 - **ADR-081**: Native Agentic Deckent — `deckent` argümansız REPL + Agentic Tool-Use + F2 Streaming + Agentic-OS Direction — **Status:** accepted

@@ -78,8 +78,13 @@
 | adr-081 | Native Agentic Deckent — `deckent` argümansız REPL + Agentic Tool-Use + F2 Streaming + Agentic-OS Direction | accepted |
 | adr-082 | Native-LLM-Wire + Nervous-Activation + Dashboard-v2 Canlı | accepted |
 | adr-083 | REPL-UX-Evolution + Provider-Parity + Local-Model-Foundation | accepted |
+| adr-085 | Persistent-Session Wire + GUI-UX Terminal-Layout + Nervous Non-Blocking/Optimize | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-224 Learnings** (sprint-224): ## Sprint sprint-224 Learnings
+- 224-015 — [P0] AI plan-mode fix (dürüst hata + gerçekten-çalışır): GO_WITH_TECH_DEBT...
+- **Sprint sprint-223 Learnings** (sprint-223): ## Sprint sprint-223 Learnings
+- **Sprint sprint-222 Learnings** (sprint-222): ## Sprint sprint-222 Learnings
 - **Sprint sprint-221 Learnings** (sprint-221): ## Sprint sprint-221 Learnings
 - **Sprint sprint-220 Learnings** (sprint-220): ## Sprint sprint-220 Learnings
 - 220-003 — Agentic REPL canlı MCP dispatch (doğal dil→gerçek aksiyon): GO_WITH_TECH_D...
@@ -91,10 +96,6 @@
 - **Sprint sprint-216 Learnings** (sprint-216): ## Sprint sprint-216 Learnings
 - 216-006 — [P0] serve localhost API-token auto-mint + `__DECKENT_API_TOKEN__` inject ...
 - **Sprint sprint-214 Learnings** (sprint-214): ## Sprint sprint-214 Learnings
-- **Sprint sprint-212 Learnings** (sprint-212): ## Sprint sprint-212 Learnings
-- **Sprint sprint-211 Learnings** (sprint-211): ## Sprint sprint-211 Learnings
-- **Sprint sprint-210 Learnings** (sprint-210): ## Sprint sprint-210 Learnings
-- 210-009 — Dashboard sprint kontrol paneli (plan/start/status UI): GO_WITH_TECH_DEBT ...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -155,4 +156,4 @@ _No active technical debt._
 - Violation pattern: stale_heartbeat
 - Violation pattern: stale_heartbeat
 
-_Total entries: 504 | Generated: 2026-06-02_
+_Total entries: 514 | Generated: 2026-06-02_

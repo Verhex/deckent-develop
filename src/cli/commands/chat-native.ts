@@ -13,6 +13,11 @@ import {
   dispatchEnterpriseSlash,
   type EnterpriseSpawnFn,
 } from './chat-enterprise-bridge.js';
+import {
+  getPendingNervous,
+  renderNervousPrompt,
+  handleNervousSlash,
+} from './chat-nervous-bridge.js';
 
 // ═══ chat-native — Path C tool-use loop iskelet (Sprint 203 T-203-005) ═══
 //
@@ -249,6 +254,14 @@ export interface ChatNativeOptions {
    * default false.
    */
   interactiveTty?: boolean;
+  /**
+   * Sprint 224 T-224-002 — `/nervous` slash wire root. The `/nervous` slash
+   * (list/accept/reject) reads .deckent/nervous-pending.json under this root
+   * via the chat-nervous-bridge module. Tests inject a tmpdir; production
+   * defaults to `process.cwd()` so the live `deckent` REPL points at the
+   * current project. Caller-only here — the def lives in chat-nervous-bridge.ts.
+   */
+  nervousRoot?: string;
 }
 
 const DEFAULT_MAX_TURNS = 50;
@@ -372,6 +385,34 @@ export async function runChatNativeLoop(opts: ChatNativeOptions): Promise<ChatMe
     if (slash.action === 'exit') break;
     if (slash.action === 'clear') {
       transcript.length = 0;
+      continue;
+    }
+    // Sprint 224 T-224-002 — `/nervous` slash wire (chat-nervous-bridge caller).
+    // Intercepts `/nervous`, `/nervous accept <id>`, `/nervous reject <id>` so
+    // pending nervous notifications are visible+actionable from the REPL. Runs
+    // BEFORE the enterprise+registry path so the slash never round-trips to
+    // claude. `nervousRoot` defaults to `process.cwd()` for the live REPL; tests
+    // inject a tmpdir fixture for hermetic file I/O.
+    if (line.startsWith('/nervous')) {
+      const parts = line.split(/\s+/);
+      const nervousArgs = parts.slice(1);
+      const nervousRoot = opts.nervousRoot ?? process.cwd();
+      const pending = getPendingNervous(nervousRoot);
+      const isPlainList = nervousArgs.length === 0;
+      const banner = isPlainList
+        ? renderNervousPrompt(pending, opts.interactiveTty === true)
+        : '';
+      const slashResult = handleNervousSlash(
+        nervousArgs,
+        nervousRoot,
+        opts.interactiveTty === true,
+      );
+      const emitText = banner.length > 0 ? `${banner}\n${slashResult}` : slashResult;
+      output(emitText);
+      transcript.push({ role: 'user', content: line });
+      transcript.push({ role: 'assistant', content: emitText });
+      memStore?.appendChatTurn(sessionId, 'user', line);
+      memStore?.appendChatTurn(sessionId, 'assistant', emitText);
       continue;
     }
     // Sprint 222 T-222-007 — enterprise slash bridge wire. /cost /audit /rbac

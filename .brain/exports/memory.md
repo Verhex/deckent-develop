@@ -1,5 +1,18 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-224 Learnings
+- Sprint sprint-224 Learnings: ## Sprint sprint-224 Learnings
+- 224-015 — [P0] AI plan-mode fix (dürüst hata + gerçekten-çalışır): GO_WITH_TECH_DEBT — Implemented honest-fallback for AI planner per directive 224-015.
+
+=== What was done ===
+- src/orchestra/planner.ts: Add
+
+## Sprint sprint-223 Learnings
+- Sprint sprint-223 Learnings: ## Sprint sprint-223 Learnings
+
+## Sprint sprint-222 Learnings
+- Sprint sprint-222 Learnings: ## Sprint sprint-222 Learnings
+
 ## Sprint sprint-221 Learnings
 - Sprint sprint-221 Learnings: ## Sprint sprint-221 Learnings
 
