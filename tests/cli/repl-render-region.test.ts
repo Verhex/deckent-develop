@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
-import { createPromptRegion, createLineQueue, createThinkingTicker, createPasteCoalescer, renderToolActivity } from '../../src/cli/commands/chat-render-region.js';
+import { createPromptRegion, createLineQueue, createThinkingTicker, createPasteCoalescer, renderToolActivity, createLineBufferedSink } from '../../src/cli/commands/chat-render-region.js';
 
 // Sprint 224 T-224-014 — pinned-prompt render region.
 // Hermetic: fake readline interface + fake write stream, no real TTY.
@@ -200,5 +200,39 @@ describe('renderToolActivity — live tool activity line (T-224-022)', () => {
 
   it('TTY → dim-wrapped (ANSI)', () => {
     expect(renderToolActivity('deckent_read_file', { path: 'x' }, true)).toMatch(/\x1b\[2m.*\x1b\[0m/);
+  });
+});
+
+describe('createLineBufferedSink — pinned-bar line streaming (T-224-019)', () => {
+  it('emits a complete line only on \\n; holds the partial', () => {
+    const lines: string[] = [];
+    const s = createLineBufferedSink((l) => lines.push(l));
+    s.feed('hello ');
+    expect(lines).toEqual([]);            // no newline yet
+    s.feed('world\n');
+    expect(lines).toEqual(['hello world']);
+  });
+
+  it('splits multiple newlines in one chunk', () => {
+    const lines: string[] = [];
+    const s = createLineBufferedSink((l) => lines.push(l));
+    s.feed('a\nb\nc\n');
+    expect(lines).toEqual(['a', 'b', 'c']);
+  });
+
+  it('flush emits the trailing partial line', () => {
+    const lines: string[] = [];
+    const s = createLineBufferedSink((l) => lines.push(l));
+    s.feed('partial');
+    s.flush();
+    expect(lines).toEqual(['partial']);
+  });
+
+  it('flush with empty buffer is a no-op', () => {
+    const lines: string[] = [];
+    const s = createLineBufferedSink((l) => lines.push(l));
+    s.feed('x\n');
+    s.flush();
+    expect(lines).toEqual(['x']);
   });
 });

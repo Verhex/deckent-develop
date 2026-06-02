@@ -31,7 +31,7 @@ import { createCliToolDispatcher } from './commands/chat-tool-bridge.js';
 import { createToolExecDispatcher } from './commands/chat-tool-exec.js';
 import { createPermissionStore } from './commands/chat-permissions.js';
 import { slashCompleter } from './commands/chat-slash-registry.js';
-import { createPromptRegion, createThinkingTicker, createPasteCoalescer } from './commands/chat-render-region.js';
+import { createPromptRegion, createThinkingTicker, createPasteCoalescer, createLineBufferedSink } from './commands/chat-render-region.js';
 import { createStreamMarkdown } from './commands/chat-render.js';
 import {
   OPENAI_COMPAT_PRESETS,
@@ -606,6 +606,20 @@ export async function launchDefaultRepl(): Promise<void> {
   // (else the markers show literally). Non-TTY → passthrough (pipe unchanged).
   const streamMd = createStreamMarkdown(isTty);
 
+  // T-224-019 — pinned-input-bar (OPT-IN: DECKENT_PINNED_BAR=1). When enabled on
+  // a TTY, provider output is line-buffered and each complete line is written
+  // ABOVE the prompt via region.writeAbove, which redraws the `› ` prompt below
+  // after every line — so the prompt stays PINNED at the bottom while the reply
+  // streams above (the user's "prompt bar kayboluyor" complaint). Streaming is
+  // line-granular here (not token). DEFAULT OFF → the verified Model-C raw-inline
+  // path is unchanged; this opt-in path is for morning TTY visual-tuning before
+  // it becomes the default. (Pinned + smooth-token-stream together needs a full
+  // render loop — tracked for the collaborative session.)
+  const pinnedBar = isTty && process.env['DECKENT_PINNED_BAR'] === '1';
+  const lineSink = pinnedBar
+    ? createLineBufferedSink((line) => region.writeAbove(streamMd.feed(line) + streamMd.flush()))
+    : null;
+
   await runChatNativeLoop({
     provider,
     dispatcher,
@@ -616,9 +630,11 @@ export async function launchDefaultRepl(): Promise<void> {
     // streaming-markdown transform so bold/code render live. The loop closes
     // each turn with a single newline. Off-TTY keeps the line-buffered sink
     // (pipe/HTTP/tests byte-for-byte unchanged).
-    output: isTty
-      ? (line) => process.stdout.write(streamMd.feed(line))
-      : (line) => process.stdout.write(line.endsWith('\n') ? line : line + '\n'),
+    output: pinnedBar
+      ? (line) => lineSink!.feed(line)
+      : isTty
+        ? (line) => process.stdout.write(streamMd.feed(line))
+        : (line) => process.stdout.write(line.endsWith('\n') ? line : line + '\n'),
     gracefulErrors: true,
     layoutEnabled: true,
     // T-224-014 — rotating-verb ticker animates `● deckent · <fiil>…` on its

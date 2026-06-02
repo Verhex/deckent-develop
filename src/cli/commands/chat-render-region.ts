@@ -46,6 +46,17 @@ export function createPromptRegion(
   const prompt = opts.prompt ?? DEFAULT_PROMPT;
   if (isTty) rl.setPrompt(prompt);
 
+  // T-224-019 — rl.prompt() throws `Error: readline was closed` if a late
+  // output flush arrives after :exit closed the interface (warm-session tail
+  // chunk during teardown). Guard it: a closed-rl reprompt is a no-op, not a crash.
+  const safePrompt = (): void => {
+    try {
+      rl.prompt(true);
+    } catch {
+      /* readline closed during teardown — ignore */
+    }
+  };
+
   return {
     writeAbove(text: string): void {
       const block = text.endsWith('\n') ? text : text + '\n';
@@ -57,10 +68,10 @@ export function createPromptRegion(
       cursorTo(out, 0);
       clearLine(out, 0);
       out.write(block);
-      rl.prompt(true);
+      safePrompt();
     },
     reprompt(): void {
-      if (isTty) rl.prompt(true);
+      if (isTty) safePrompt();
     },
   };
 }
@@ -152,6 +163,42 @@ export function createThinkingTicker(
  * kapanınca (`close`) iterator biter. Strict-sequential async-iterator'ın
  * aksine, tur-arası bloke olmaz: kullanıcı cevap beklerken yazmaya devam eder.
  */
+// ─── Line-buffered sink — pinned-bar streaming (Sprint 224 T-224-019) ──────
+//
+// claude-code "prompt altta SABİT, cevap üste akar" için: streamed token'ları
+// satırlara tamponlar, her TAM satırı emitLine ile basar. emitLine =
+// region.writeAbove → clearLine + satır + \n + rl.prompt(true), yani prompt her
+// satırdan sonra altta yeniden çizilir (SABİT kalır, "kaybolmaz"). Akış
+// satır-granüler (token-granüler değil) ama prompt hep görünür — kullanıcının
+// birincil şikayetini ("prompt bar kayboluyor") çözer. flush() tur sonunda kalan
+// kısmi satırı basar. Pure + testable; entry.ts flag-gated (DECKENT_PINNED_BAR=1)
+// kullanır — default Model-C (raw inline) değişmez, çalışan REPL riske girmez.
+
+export interface LineBufferedSink {
+  feed(chunk: string): void;
+  flush(): void;
+}
+
+export function createLineBufferedSink(emitLine: (line: string) => void): LineBufferedSink {
+  let buf = '';
+  return {
+    feed(chunk: string): void {
+      buf += chunk;
+      let nl: number;
+      while ((nl = buf.indexOf('\n')) >= 0) {
+        emitLine(buf.slice(0, nl));
+        buf = buf.slice(nl + 1);
+      }
+    },
+    flush(): void {
+      if (buf.length > 0) {
+        emitLine(buf);
+        buf = '';
+      }
+    },
+  };
+}
+
 // ─── Live activity line (Sprint 224 T-224-022) ─────────────────────
 //
 // "Anlık beklerken deckent NE yapıyor görünmeli" — bir tool çalıştırılırken
