@@ -21,12 +21,14 @@ import {
 } from './commands/chat-native.js';
 import {
   createPersistentClaudeSession,
+  DECKENT_AGENTIC_SYSTEM_PROMPT,
   type PersistentClaudeSession,
   type PersistentSpawnFn,
 } from './commands/chat-session.js';
 import { createSpinner } from './commands/chat-spinner.js';
 import { createCliToolDispatcher } from './commands/chat-tool-bridge.js';
-import { createPromptRegion, createLineQueue, createThinkingTicker } from './commands/chat-render-region.js';
+import { createToolExecDispatcher } from './commands/chat-tool-exec.js';
+import { createPromptRegion, createThinkingTicker } from './commands/chat-render-region.js';
 import {
   OPENAI_COMPAT_PRESETS,
   type OpenAICompatPresetName,
@@ -323,9 +325,13 @@ export function buildReplProvider(
   // the per-turn path so the existing repl-streaming/native-repl-wire suites
   // remain green.
   if (name === 'claude' && (opts.persistentSpawnFn || !opts.spawnFn)) {
-    return createPersistentClaudeSession(
-      opts.persistentSpawnFn ? { spawnFn: opts.persistentSpawnFn } : {},
-    );
+    // T-224-005/006 — append the agentic system prompt so the model emits
+    // <deckent_tool> directives for file/shell actions (the REPL confirms +
+    // executes them via the tool-exec dispatcher). Plain chat is unaffected.
+    return createPersistentClaudeSession({
+      systemPrompt: DECKENT_AGENTIC_SYSTEM_PROMPT,
+      ...(opts.persistentSpawnFn ? { spawnFn: opts.persistentSpawnFn } : {}),
+    });
   }
 
   const binary = name;
@@ -502,21 +508,68 @@ export async function launchDefaultRepl(): Promise<void> {
   const rl = createInterface(replReadlineOptions(isTty));
   const region = createPromptRegion(rl, process.stdout, { isTty });
 
+  // T-224-006 — input arbiter. A single 'line' handler routes each typed line
+  // either to a PENDING confirm (askConfirm) or to the chat queue, so the
+  // interactive y/N tool confirm shares the REPL's ONE stdin/readline instead
+  // of opening a second (colliding) interface. The `› ` prompt is (re)shown
+  // only when idle (between turns / at startup), never mid-turn, so streamed
+  // output never collides with it. Back-to-back lines queue ("art arda").
+  const lineBuf: string[] = [];
+  let lineWake: (() => void) | null = null;
+  let inputClosed = false;
+  let pendingAnswer: ((line: string) => void) | null = null;
+  rl.on('line', (line: string) => {
+    if (pendingAnswer) { const p = pendingAnswer; pendingAnswer = null; p(line); return; }
+    lineBuf.push(line);
+    if (lineWake) { const w = lineWake; lineWake = null; w(); }
+  });
+  rl.on('close', () => {
+    inputClosed = true;
+    if (pendingAnswer) { const p = pendingAnswer; pendingAnswer = null; p(''); }
+    if (lineWake) { const w = lineWake; lineWake = null; w(); }
+  });
+  async function* arbitratedInput(): AsyncGenerator<string> {
+    while (true) {
+      while (lineBuf.length > 0) yield lineBuf.shift() as string;
+      if (inputClosed) return;
+      region.reprompt();
+      await new Promise<void>((r) => { lineWake = r; });
+    }
+  }
   async function* simpleLines(): AsyncGenerator<string> {
     for await (const line of rl) yield line;
   }
+  // Interactive y/N confirm for side-effecting tools — reads the next line via
+  // the arbiter (TTY). Off-TTY auto-approves (pipe/smoke/tests stay headless).
+  const askConfirm = (summary: string, _toolName: string): Promise<boolean> => {
+    process.stdout.write(`\n\x1b[33m${summary}\x1b[0m\nçalıştırılsın mı? (y/N) `);
+    return new Promise<boolean>((resolve) => {
+      pendingAnswer = (line) => resolve(line.trim().toLowerCase() === 'y');
+    });
+  };
 
-  // Real MCP dispatcher — slash commands (/status, /recall, /sprint) shell out
-  // to the deckent CLI instead of the prior "not yet wired" stub.
-  const dispatcher = createCliToolDispatcher();
+  // T-224-005 — combined dispatcher: deckent_* action tools (write/edit/read/
+  // bash) go to the confirm-gated tool-exec layer; read-only status/recall/
+  // history slashes stay on the CLI bridge.
+  const cliDispatcher = createCliToolDispatcher();
+  const execDispatcher = createToolExecDispatcher({
+    cwd: process.cwd(),
+    confirm: isTty ? askConfirm : async () => true,
+  });
+  const EXEC_TOOLS = new Set([
+    'deckent_write_file', 'deckent_read_file', 'deckent_edit_file', 'deckent_bash',
+  ]);
+  const dispatcher = {
+    dispatch: (toolName: string, args: Record<string, unknown>): Promise<string> =>
+      EXEC_TOOLS.has(toolName)
+        ? execDispatcher.dispatch(toolName, args)
+        : cliDispatcher.dispatch(toolName, args),
+  };
 
   await runChatNativeLoop({
     provider,
     dispatcher,
-    // T-224-014 — back-to-back input queue. The `› ` prompt is (re)shown only
-    // when idle (onIdle → region.reprompt), i.e. between turns and at startup,
-    // never mid-turn — so streamed output never collides with the prompt.
-    input: isTty ? createLineQueue(rl, () => region.reprompt()) : simpleLines(),
+    input: isTty ? arbitratedInput() : simpleLines(),
     // T-224-011 — on an interactive TTY write provider output RAW (no forced
     // newline) so streamed token deltas concatenate INLINE (smooth, claude-code
     // feel) instead of one-fragment-per-line. The loop closes each turn with a
