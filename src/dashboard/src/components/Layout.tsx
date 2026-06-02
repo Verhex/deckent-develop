@@ -1,6 +1,6 @@
 import { NavLink, Outlet } from "react-router-dom";
 import { useState } from "react";
-import { LayoutDashboard, History, Brain, Menu, SlidersHorizontal, Globe, MessageCircle, Sun, Moon } from "lucide-react";
+import { LayoutDashboard, History, Brain, Menu, SlidersHorizontal, Globe, MessageCircle, Sun, Moon, Activity, GitBranch, Bell, Building2, Search } from "lucide-react";
 import { cn } from "../lib/utils";
 import { useTheme } from "./ThemeProvider";
 import { Sheet, SheetTrigger, SheetContent } from "./ui/sheet";
@@ -14,19 +14,28 @@ import { useTranslation } from "../i18n/LanguageProvider";
 import type { DashboardState } from "../types";
 import type { TranslationKey } from "../i18n/en";
 
-const navItems: ReadonlyArray<{ to: string; labelKey: TranslationKey; icon: typeof LayoutDashboard }> = [
+// Sprint 219 fix: Layout's inline navItems was stale (5 links) — missing
+// Evolution/Nervous/Enterprise/Memory-Explorer + status, even though App.tsx
+// routed all 10. That was the "dashboard shows 5 not 8 pages" bug. Now mirrors
+// Sidebar.tsx's 10-link set so the rendered sidebar matches the routes.
+const navItems: ReadonlyArray<{ to: string; labelKey: TranslationKey; label?: string; icon: typeof LayoutDashboard }> = [
   { to: "/", labelKey: "nav.dashboard", icon: LayoutDashboard },
   { to: "/history", labelKey: "nav.history", icon: History },
   { to: "/memory", labelKey: "nav.memory", icon: Brain },
   { to: "/config", labelKey: "nav.config", icon: SlidersHorizontal },
   { to: "/chat", labelKey: "nav.chat", icon: MessageCircle },
+  { to: "/status", labelKey: "dashboard.status", label: "Status", icon: Activity },
+  { to: "/evolution", labelKey: "nav.dashboard", label: "Evolution", icon: GitBranch },
+  { to: "/nervous", labelKey: "nav.dashboard", label: "Nervous", icon: Bell },
+  { to: "/enterprise", labelKey: "nav.dashboard", label: "Enterprise", icon: Building2 },
+  { to: "/memory-explorer", labelKey: "nav.dashboard", label: "Memory Explorer", icon: Search },
 ];
 
 function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   const { t } = useTranslation();
   return (
     <nav className="flex flex-col gap-1">
-      {navItems.map(({ to, labelKey, icon: Icon }) => (
+      {navItems.map(({ to, labelKey, label, icon: Icon }) => (
         <NavLink
           key={to}
           to={to}
@@ -42,7 +51,7 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
           }
         >
           <Icon className="h-4 w-4" />
-          {t(labelKey)}
+          {label ?? t(labelKey)}
         </NavLink>
       ))}
     </nav>
