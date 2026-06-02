@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { createInterface } from 'node:readline';
+import { realpathSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { buildProgram } from './index.js';
 import { handleCliError } from './helpers/process.js';
@@ -289,7 +290,16 @@ function isEntryMain(): boolean {
   const argv1 = process.argv[1];
   if (!argv1) return false;
   try {
-    return fileURLToPath(import.meta.url) === argv1;
+    const here = fileURLToPath(import.meta.url);
+    if (here === argv1) return true;
+    // npm-link / global bin: argv[1] is a symlink (e.g. ~/.nvm/.../bin/deckent)
+    // pointing at this file. Resolve it so `deckent` / `npx deckent` fire main,
+    // not just `node dist/cli/entry.js`.
+    try {
+      return here === realpathSync(argv1);
+    } catch {
+      return false;
+    }
   } catch {
     return false;
   }
