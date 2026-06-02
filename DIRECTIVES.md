@@ -206,12 +206,12 @@ Bağlam:
 - Model: opus
 - Effort: normal
 - Skills: documentation-writer, system-architect
-- Files: docs/vision/blueprint.md, tests/docs/blueprint-current.test.ts
+- Files: docs/vision/blueprint.md, docs/vision/blueprint-TR.md, tests/docs/blueprint-current.test.ts
 - Scope: docs/, tests/docs/
 
 ### Description
 **Problem (Alperen):** `blueprint.md` (2869 satır) Sprint 166'da stale. Bu doküman = deckent'in **NE olduğu + NEREDE olduğu** SSOT-of-identity (MASTER-PLAN = nasıl-geliştirilir). Güncel değil.
-**Çözüm:** blueprint.md'yi baştan-aşağı GÜNCELLE — güncel mimari (core+enterprise-layer, 32 MCP/49 CLI, native agentic REPL, dashboard 8 sayfa, memory V2, git-guard), positioning ("açık agent'ın god-level orkestre+enterprise hali, bireysele kolay", anti-X YOK, "open source for open world"), 6-senaryo (sıfır/dev/maintained/daily/ERP/enterprise), otonom agentic vizyon. Tarih-damgalı geçmiş bölümler korunur; "as-built" bölümler code-derived/güncel. `docs/vision/VISION.md` + `VISION-TR.md` + `competitive-analysis.md` (anti-X→kıyasla) ilerleyişe göre senkron. Stale Sprint-166 ifadeleri güncelle.
+**Çözüm:** blueprint.md'yi baştan-aşağı GÜNCELLE — güncel mimari (core+enterprise-layer, 32 MCP/49 CLI, native agentic REPL, dashboard 8 sayfa, memory V2, git-guard), positioning ("açık agent'ın god-level orkestre+enterprise hali, bireysele kolay", anti-X YOK, "open source for open world"), 6-senaryo (sıfır/dev/maintained/daily/ERP/enterprise), otonom agentic vizyon. Tarih-damgalı geçmiş bölümler korunur; "as-built" bölümler code-derived/güncel. `docs/vision/VISION.md` + `VISION-TR.md` + `competitive-analysis.md` (anti-X→kıyasla) ilerleyişe göre senkron. Stale Sprint-166 ifadeleri güncelle. **AYRICA `docs/vision/blueprint-TR.md` oluştur** (blueprint'in tam Türkçe sürümü — kimlik/yetenek/mimari/positioning/otonom vizyon). MASTER-PLAN-TR.md (cc tarafından oluşturuldu) ile tutarlı.
 **Kanıt:** `grep -c "Sprint 21[6-9]\|open source for open world\|otonom\|autonomous\|core.*enterprise-layer\|everyone everywhere" docs/vision/blueprint.md` → ≥4; `grep -c "anti-Devin\|anti-X" docs/vision/blueprint.md` → 0; `npx vitest run tests/docs/blueprint-current.test.ts` → 3+ pass
 **Test:** ≥3 (güncel-Sprint referansı, anti-X yok, positioning+6-senaryo mevcut)
 
