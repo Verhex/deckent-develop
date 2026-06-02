@@ -5,6 +5,7 @@ import {
   type ProviderRegistry,
 } from '../../core/provider.js';
 import { handleReplCommand } from './chat-repl-ux.js';
+import { renderUserMessage, renderAssistantHeader, messageSeparator } from './chat-layout.js';
 import { classifyAgenticIntent, dispatchAgenticIntent } from './chat-agentic-dispatch.js';
 import { requireConfirmIfRisky, type AgenticAction } from './agentic-confirm.js';
 import { buildSlashRegistry, renderHelp, resolveSlash } from './chat-slash-registry.js';
@@ -210,6 +211,31 @@ export interface ChatNativeOptions {
    * built-in child_process spawn against `dist/cli/entry.js`.
    */
   enterpriseSpawn?: EnterpriseSpawnFn;
+  /**
+   * Sprint 223 T-223-004 — chat-layout wire toggle. When true, each
+   * provider-driven turn emits visual chrome via chat-layout so user input
+   * and Deckent replies are clearly distinguishable in the REPL:
+   *   - `renderUserMessage(line)` echoes the user line with the `›` prefix
+   *   - `renderAssistantHeader()` announces the Deckent block before reply
+   *   - `messageSeparator()` follows the assistant body
+   * The chat-layout module is TTY-aware (plain prefixes on pipe contexts,
+   * bold ANSI colour on TTY), so this flag controls structure only — never
+   * raw colour escapes. Default `false` preserves the prior contract for
+   * HTTP backends, slash-only callers, and the existing chat-native test
+   * suites whose output assertions predate the chrome. The REPL entry point
+   * (src/cli/entry.ts) opts in to render the conversation layout.
+   */
+  layoutEnabled?: boolean;
+  /**
+   * Optional "thinking" indicator started right after the assistant header is
+   * emitted and stopped on the first byte of provider output (or in the
+   * per-turn `finally` if the response is empty). Duck-typed to the
+   * chat-spinner `Spinner` shape so the REPL entry point can pass a TTY-only
+   * braille spinner while HTTP/test callers omit it (no-op). Only the
+   * provider-driven path uses it — slash/agentic turns `continue` earlier and
+   * keep their own UI semantics.
+   */
+  thinkingIndicator?: { start(): void; stop(): void };
 }
 
 const DEFAULT_MAX_TURNS = 50;
@@ -301,6 +327,14 @@ export async function runChatNativeLoop(opts: ChatNativeOptions): Promise<ChatMe
     ? opts.sessionId
     : `chat-${Date.now()}`;
   const resumeLimit = opts.resumeLimit ?? 0;
+  // Sprint 223 T-223-004 — chat-layout wire. emitLayout suppresses empty
+  // strings (messageSeparator returns '' on non-TTY) so callers see only
+  // meaningful chrome. Default-off so existing HTTP/test callers keep their
+  // raw output contract; the REPL entry point opts in.
+  const layoutOn = opts.layoutEnabled === true;
+  const emitLayout = (text: string): void => {
+    if (text.length > 0) output(text);
+  };
 
   const transcript: ChatMessage[] = [];
   let turnCount = 0;
@@ -423,8 +457,25 @@ export async function runChatNativeLoop(opts: ChatNativeOptions): Promise<ChatMe
     }
     turnCount++;
 
+    // Sprint 223 T-223-004 — chat-layout wire (caller of chat-layout.ts).
+    // Echo the user line with `›` prefix before the provider call so each
+    // turn shows up as a discrete block in the REPL. Slash and agentic
+    // paths above already `continue` before this point, so they keep their
+    // own UI semantics unchanged.
+    if (layoutOn) emitLayout(renderUserMessage(line));
+
     transcript.push({ role: 'user', content: line });
     memStore?.appendChatTurn(sessionId, 'user', line);
+
+    // Sprint 223 T-223-004 — assistant block header. Announces `● deckent`
+    // immediately before the streaming/send call so users see who is about
+    // to speak even on slow first-token providers.
+    if (layoutOn) emitLayout(renderAssistantHeader());
+
+    // "Thinking" indicator — started after the header, stopped on the first
+    // byte of provider output (see stopIndicator below) or in the per-turn
+    // `finally` for empty responses. No-op when no indicator is supplied.
+    opts.thinkingIndicator?.start();
 
     // Sprint 219 T-219-002 — pre-call round-trip error guard (opt-in via
     // `gracefulErrors`). Wraps the per-turn body so a pre-call provider
@@ -434,9 +485,17 @@ export async function runChatNativeLoop(opts: ChatNativeOptions): Promise<ChatMe
     // propagate so the chat-native-stream "mid-stream error" contract and
     // the chat-backend HTTP propagation contract are preserved.
     let outputCount = 0;
-    const trackedOutput = opts.gracefulErrors
-      ? (text: string): void => { outputCount++; output(text); }
-      : output;
+    let indicatorStopped = false;
+    const stopIndicator = (): void => {
+      if (indicatorStopped) return;
+      indicatorStopped = true;
+      opts.thinkingIndicator?.stop();
+    };
+    const trackedOutput = (text: string): void => {
+      stopIndicator();
+      if (opts.gracefulErrors) outputCount++;
+      output(text);
+    };
     try {
       let response = await runProviderTurn(provider, getRecentTurns(transcript, opts.contextWindowSize), trackedOutput);
       let toolHops = 0;
@@ -474,7 +533,16 @@ export async function runChatNativeLoop(opts: ChatNativeOptions): Promise<ChatMe
       output(errorTurn);
       transcript.push({ role: 'assistant', content: errorTurn });
       memStore?.appendChatTurn(sessionId, 'assistant', errorTurn);
+    } finally {
+      // Safety net: ensure the indicator stops even when the provider emits
+      // no output (empty end_turn) so a stray spinner never lingers.
+      stopIndicator();
     }
+
+    // Sprint 223 T-223-004 — close the turn with a thin separator so the
+    // next user prompt starts in a fresh visual block. On non-TTY callers
+    // messageSeparator returns '' and emitLayout drops it.
+    if (layoutOn) emitLayout(messageSeparator());
   }
 
   return transcript;
