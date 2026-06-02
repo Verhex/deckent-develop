@@ -5,6 +5,7 @@
 import { useState, useEffect } from "react";
 import { SprintSummary, type TaskInfo } from "../components/SprintSummary";
 import { useSSE } from "../hooks/useSSE";
+import { useLiveData } from "../lib/use-live-data";
 import { fetchJson, ApiError } from "../lib/api";
 import { useTranslation } from "../i18n/LanguageProvider";
 import type { DashboardState } from "../types";
@@ -13,8 +14,10 @@ export default function StatusPage() {
   const { t } = useTranslation();
   const sseState = useSSE("/api/events");
   const [fallbackState, setFallbackState] = useState<DashboardState | null>(null);
-  const [tasks, setTasks] = useState<TaskInfo[]>([]);
   const [noSprint, setNoSprint] = useState(false);
+
+  // Real-time task polling — done/working/no_go status updates every 5s
+  const liveTasks = useLiveData<TaskInfo[]>("/api/tasks", { pollIntervalMs: 5000 });
 
   useEffect(() => {
     if (!sseState) {
@@ -31,14 +34,8 @@ export default function StatusPage() {
     }
   }, [sseState]);
 
-  // Fetch task details for the summary
-  useEffect(() => {
-    fetchJson<TaskInfo[]>("/api/tasks")
-      .then(setTasks)
-      .catch(() => setTasks([]));
-  }, [sseState, fallbackState]);
-
   const state = sseState ?? fallbackState;
+  const tasks = liveTasks.data ?? [];
 
   if (noSprint) {
     return (
@@ -60,7 +57,7 @@ export default function StatusPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-testid="status-page">
       <h1 className="text-2xl font-bold text-zinc-100">{t('status.title')}</h1>
       <SprintSummary state={state} tasks={tasks} />
     </div>

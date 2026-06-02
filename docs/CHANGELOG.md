@@ -2,6 +2,33 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint220] - 2026-06-02
+
+### Added
+
+- 220-001 — [P0] Native REPL gerçek provider-wire (config-driven: chat_provider→brain_provider→claude)
+- 220-002 — `chat --native` flag + --message/--once gerçek round-trip
+- 220-004 — Canlı worker grid (sabit-6 değil, real-time SSE)
+- 220-005 — Status sayfası gerçek-zaman (done işler "done" görünsün)
+- 220-006 — Refresh + cooldown (user-tetikli güncelleme)
+- 220-007 — Evolution/ADR-timeline veri + ChatPage gerçek-wire
+- 220-009 — Tech-debt sayfası filtre (sprint/severity/status)
+- 220-010 — Enterprise sayfa auth-wire + alerts dedup (provider-neutral tek-uyarı)
+- 220-011 — Nervous bootstrap + config enable (dormant→aktif)
+- 220-012 — Nervous action-handlers (MVP 8 low-risk) + smoke
+
+### Changed
+
+- 220-003 — Agentic REPL canlı MCP dispatch (doğal dil→gerçek aksiyon) (completed with tech debt)
+
+### Fixed
+
+- Fix debt: Sprint sprint-217 rollback SUCCESS
+- 220-008 — Config brain-budget fix + coverage takip (history)
+
+
+_Tasks: 18 total, 18 done, 1 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint219] - 2026-06-02
 
 ### Added

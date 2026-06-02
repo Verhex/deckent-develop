@@ -75,8 +75,11 @@
 | adr-078 | CI-Hermeticity Standard + 8-Provider Runtime + Active Identity-Mutation Loop + Dashboard God-Level | accepted |
 | adr-079 | Proof-of-Function DoD — Tier-0/Tier-1 Classification + Sprint-Inner Run-Verify Gate | accepted |
 | adr-080 | Dashboard God-Level — Sprint-Start Detach + Hollow-Page Wire + Chat Round-Trip + Native UI | accepted |
+| adr-081 | Native Agentic Deckent — `deckent` argümansız REPL + Agentic Tool-Use + F2 Streaming + Agentic-OS Direction | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-220 Learnings** (sprint-220): ## Sprint sprint-220 Learnings
+- 220-003 — Agentic REPL canlı MCP dispatch (doğal dil→gerçek aksiyon): GO_WITH_TECH_D...
 - **Sprint sprint-219 Learnings** (sprint-219): ## Sprint sprint-219 Learnings
 - 219-010 — Dashboard cache-bust + tarayıcı-e2e smoke (8 sayfa gerçekten yüklenir): NO_GO
 - **Sprint sprint-218 Learnings** (sprint-218): ## Sprint sprint-218 Learnings
@@ -90,10 +93,9 @@
 - **Sprint sprint-210 Learnings** (sprint-210): ## Sprint sprint-210 Learnings
 - 210-009 — Dashboard sprint kontrol paneli (plan/start/status UI): GO_WITH_TECH_DEBT ...
 - **Sprint sprint-209 Learnings** (sprint-209): ## Sprint sprint-209 Learnings
-- **Sprint sprint-208 Learnings** (sprint-208): ## Sprint sprint-208 Learnings
 
 ## Active Technical Debt
-- [CRITICAL] Sprint sprint-217 rollback SUCCESS
+_No active technical debt._
 
 ## Active Patterns
 - Violation pattern: stale_heartbeat
@@ -149,4 +151,4 @@
 - Violation pattern: stale_heartbeat
 - Violation pattern: stale_heartbeat
 
-_Total entries: 491 | Generated: 2026-06-02_
+_Total entries: 496 | Generated: 2026-06-02_

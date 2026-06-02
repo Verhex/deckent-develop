@@ -4,12 +4,13 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
-| rollback-sprint-217 | Sprint sprint-217 rollback SUCCESS | critical | sprint-217 | active |
 
 ## Resolved Technical Debt
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-220-004 | Tech debt from 220-004: Worker exited without writing result (exitCode=0) | normal | sprint-220 | resolved |
+| rollback-sprint-217 | Sprint sprint-217 rollback SUCCESS | critical | sprint-217 | resolved |
 | debt-216-006 | Tech debt from 216-006: Implementation:
   src/api/server.ts:921-935 — `finalToke | normal | sprint-216 | resolved |
 | debt-216-012 | Tech debt from 216-012: Implementation:

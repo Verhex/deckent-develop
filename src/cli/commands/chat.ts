@@ -13,7 +13,7 @@ import { join } from 'node:path';
 import { createInterface } from 'node:readline';
 import type { Command } from 'commander';
 
-import { runChatNativeLoop, type ChatProviderAdapter, type McpToolDispatcher } from './chat-native.js';
+import { runChatNativeLoop, createSubscriptionChatAdapter, type ChatProviderAdapter, type McpToolDispatcher } from './chat-native.js';
 import { ClaudeAdapter, type ProviderDetectResult } from '../../providers/claude.js';
 import { CodexAdapter } from '../../providers/codex.js';
 import { GeminiAdapter } from '../../providers/gemini.js';
@@ -35,6 +35,8 @@ export interface ChatOptions {
   checkMcp?: boolean;
   resume?: string;
   resumeLimit?: string;
+  once?: boolean;
+  message?: string;
 }
 
 /** Default number of prior turns shown by `deckent chat --resume`. */
@@ -360,7 +362,9 @@ export function registerChat(program: Command): void {
     .option('--check-mcp', 'Verify Deckent MCP is attached before starting (T-190-005)')
     .option('--resume <sessionId>', 'Resume a previous chat session — prints recent turns before launch')
     .option('--resume-limit <n>', `Number of prior turns to show with --resume (default ${DEFAULT_RESUME_LIMIT})`)
-    .option('--native', 'Use native tool-use loop (Path C skeleton) instead of spawning host AI CLI')
+    .option('--native', 'Use native tool-use loop instead of spawning host AI CLI')
+    .option('--once', 'Single-turn mode: send one message and exit (use with --native)')
+    .option('--message <text>', 'Message text for single-turn mode (implies --native --once)')
     .action(async (opts: ChatOptions) => {
       const projectRoot = resolveProjectRoot();
 
@@ -383,18 +387,53 @@ export function registerChat(program: Command): void {
         return;
       }
 
-      if (opts.native) {
-        print('Deckent native chat (Path C skeleton) — provider not yet wired. Type :exit to quit.');
-        const stubProvider: ChatProviderAdapter = {
-          async send(_msgs) {
-            return { text: '[native] provider not yet connected to a real LLM', stopReason: 'end_turn' as const };
-          },
-        };
+      const isNativeMode = opts.native === true || opts.message !== undefined;
+      if (isNativeMode) {
+        const isOnce = opts.once === true || opts.message !== undefined;
+
+        let nativeProvider: ChatProviderAdapter;
+        try {
+          nativeProvider = createSubscriptionChatAdapter();
+        } catch {
+          nativeProvider = {
+            async send(_msgs) {
+              return { text: '[native] provider not yet connected to a real LLM', stopReason: 'end_turn' as const };
+            },
+          };
+        }
+
         const stubDispatcher: McpToolDispatcher = {
           async dispatch(name, _args) {
             return `[native] tool "${name}" not yet wired`;
           },
         };
+
+        if (isOnce) {
+          async function* singleTurnInput(): AsyncGenerator<string> {
+            if (opts.message !== undefined) {
+              yield opts.message;
+              return;
+            }
+            const rl = createInterface({ input: process.stdin });
+            for await (const line of rl) {
+              rl.close();
+              yield line;
+              return;
+            }
+          }
+          await runChatNativeLoop({
+            provider: nativeProvider,
+            dispatcher: stubDispatcher,
+            input: singleTurnInput(),
+            output: print,
+            maxTurns: 1,
+            gracefulErrors: true,
+          });
+          return;
+        }
+
+        // Interactive REPL mode
+        print('Deckent native chat. Type :exit to quit.');
         async function* readStdin(): AsyncGenerator<string> {
           const rl = createInterface({ input: process.stdin });
           try {
@@ -404,7 +443,7 @@ export function registerChat(program: Command): void {
           }
         }
         await runChatNativeLoop({
-          provider: stubProvider,
+          provider: nativeProvider,
           dispatcher: stubDispatcher,
           input: readStdin(),
           output: print,

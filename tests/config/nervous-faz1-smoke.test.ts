@@ -43,8 +43,10 @@ describe.skipIf(!hasConfig)('Nervous Faz 1 smoke config (.deckent/config.json)',
     expect(ns['enabled']).toBe(true);
   });
 
-  it('nervous_system.mode is strict', () => {
-    expect(ns['mode']).toBe('strict');
+  it('nervous_system.mode is a valid authority preset', () => {
+    // Mode is config-driven (Sprint 220-013: dogfood activated nervous at
+    // 'balanced'). Assert a valid authority preset, not a hardcoded one.
+    expect(['strict', 'balanced', 'autopilot', 'full-auto']).toContain(ns['mode']);
   });
 
   it('notifications.severity_min is critical', () => {

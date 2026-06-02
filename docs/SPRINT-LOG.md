@@ -6026,3 +6026,41 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 219-016: 219-016 — Plan-time Smoke-field taşıma (plannerTaskToParams → task.smoke) (DONE)
 
 ---
+## Sprint 220 — sprint-220
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-06-02
+**Duration:** 1506s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 18 |
+| Completed | 18 |
+| Tech Debt | 1 |
+| No-Go | 0 |
+| Coverage | 5.9% |
+| Duration | 1506338ms |
+
+### Tasks
+
+- 220-001: Fix debt: Sprint sprint-217 rollback SUCCESS (DONE)
+- 220-002: 220-001 — [P0] Native REPL gerçek provider-wire (config-driven: chat_provider→brain_provider→claude) (DONE)
+- 220-003: 220-002 — `chat --native` flag + --message/--once gerçek round-trip (DONE)
+- 220-004: 220-003 — Agentic REPL canlı MCP dispatch (doğal dil→gerçek aksiyon) (GO_WITH_TECH_DEBT)
+- 220-005: 220-004 — Canlı worker grid (sabit-6 değil, real-time SSE) (DONE)
+- 220-006: 220-005 — Status sayfası gerçek-zaman (done işler "done" görünsün) (DONE)
+- 220-007: 220-006 — Refresh + cooldown (user-tetikli güncelleme) (DONE)
+- 220-008: 220-007 — Evolution/ADR-timeline veri + ChatPage gerçek-wire (DONE)
+- 220-009: 220-008 — Config brain-budget fix + coverage takip (history) (DONE)
+- 220-010: 220-009 — Tech-debt sayfası filtre (sprint/severity/status) (DONE)
+- 220-011: 220-010 — Enterprise sayfa auth-wire + alerts dedup (provider-neutral tek-uyarı) (DONE)
+- 220-012: 220-011 — Nervous bootstrap + config enable (dormant→aktif) (DONE)
+- 220-013: 220-012 — Nervous action-handlers (MVP 8 low-risk) + smoke (DONE)
+- 220-014: 220-013 — Nervous config enable (deckent-dev) + dashboard canlı data (DONE)
+- 220-015: 220-014 — 219-010 dashboard cache-bust e2e (carry NO_GO) (DONE)
+- 220-016: 220-015 — ADR-082 (Native-LLM-Wire + Nervous-Activation + Dashboard-v2) + MASTER-PLAN (DONE)
+- 220-017: 220-016 — README + blueprint güncel-tut (native gerçek-cevap + nervous-active) (DONE)
+
+---

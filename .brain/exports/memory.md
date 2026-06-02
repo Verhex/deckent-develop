@@ -1,5 +1,9 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-220 Learnings
+- Sprint sprint-220 Learnings: ## Sprint sprint-220 Learnings
+- 220-003 — Agentic REPL canlı MCP dispatch (doğal dil→gerçek aksiyon): GO_WITH_TECH_DEBT — Worker exited without writing result (exitCode=0)
+
 ## Sprint sprint-219 Learnings
 - Sprint sprint-219 Learnings: ## Sprint sprint-219 Learnings
 - 219-010 — Dashboard cache-bust + tarayıcı-e2e smoke (8 sayfa gerçekten yüklenir): NO_GO

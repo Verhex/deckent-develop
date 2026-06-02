@@ -1,10 +1,8 @@
 // tests/nervous/action-handlers.test.ts
 //
-// Nervous Action Handlers — Step C — Sprint 180 Task W2-1
+// Nervous Action Handlers — Step C — Sprint 180 Task W2-1, Sprint 220 expansion.
 //
-// 4 MVP unit tests (WORKER_RESPAWN, ORPHAN_TASK_ARCHIVE, STALE_LOCK_RELEASE,
-// DEAD_EVENT_STREAM_CLEANUP) + 1 stub default test + 1 integration test
-// (createActionHandler chains with Executor).
+// 4 original MVP handlers + 5 new low-risk handlers + integration + type + idempotency.
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
@@ -24,7 +22,9 @@ import type {
 
 function createMockDeps(): Required<Pick<
   ActionHandlerDeps,
-  'killWorker' | 'spawnWorker' | 'archiveOrphanTasks' | 'releaseLock' | 'cleanDeadEventStream' | 'projectRoot'
+  | 'killWorker' | 'spawnWorker' | 'archiveOrphanTasks' | 'releaseLock' | 'cleanDeadEventStream'
+  | 'rotateLogs' | 'invalidateCache' | 'cleanIpcDir' | 'generateDebtReport' | 'emitMetric'
+  | 'projectRoot'
 >> {
   return {
     killWorker: vi.fn(),
@@ -32,6 +32,11 @@ function createMockDeps(): Required<Pick<
     archiveOrphanTasks: vi.fn(() => 3),
     releaseLock: vi.fn(),
     cleanDeadEventStream: vi.fn(() => 1),
+    rotateLogs: vi.fn(),
+    invalidateCache: vi.fn(),
+    cleanIpcDir: vi.fn(() => 2),
+    generateDebtReport: vi.fn(),
+    emitMetric: vi.fn(),
     projectRoot: '/tmp/test-project',
   };
 }
@@ -77,7 +82,7 @@ function createAction(
   };
 }
 
-// ─── Unit Tests — 4 MVP handlers ────────────────────────────────────────────
+// ─── Unit Tests — 4 original MVP handlers ───────────────────────────────────
 
 describe('action-handlers — MVP handlers', () => {
   let deps: ReturnType<typeof createMockDeps>;
@@ -145,10 +150,9 @@ describe('action-handlers — MVP handlers', () => {
     );
   });
 
-  // Test 5: Stub default — any other action ID returns `unimplemented`
+  // Test 5: Stub default — non-MVP action IDs return `unimplemented`
   it('returns `unimplemented` for non-MVP action IDs', async () => {
     const otherIds = [
-      'LOG_ROTATION',
       'DIRECTIVES_WRITE',
       'PROMPT_BUILDER_TWEAK',
       'SPRINT_START',
@@ -194,6 +198,98 @@ describe('action-handlers — MVP handlers', () => {
   });
 });
 
+// ─── Unit Tests — 5 new low-risk handlers ───────────────────────────────────
+
+describe('action-handlers — new low-risk handlers', () => {
+  let deps: ReturnType<typeof createMockDeps>;
+
+  beforeEach(() => {
+    deps = createMockDeps();
+  });
+
+  // Test 9: LOG_ROTATION → rotateLogs invoked
+  it('handles LOG_ROTATION by invoking rotateLogs', async () => {
+    const result = await dispatchAction('LOG_ROTATION', {}, deps);
+
+    expect(result.outcome).toBe('success');
+    expect(deps.rotateLogs).toHaveBeenCalledWith('/tmp/test-project');
+  });
+
+  // Test 10: CACHE_INVALIDATE → invalidateCache invoked (default cacheType='all')
+  it('handles CACHE_INVALIDATE with default cacheType=all', async () => {
+    const result = await dispatchAction('CACHE_INVALIDATE', {}, deps);
+
+    expect(result.outcome).toBe('success');
+    expect(deps.invalidateCache).toHaveBeenCalledWith('/tmp/test-project', 'all');
+  });
+
+  // Test 11: CACHE_INVALIDATE → custom cacheType forwarded
+  it('handles CACHE_INVALIDATE with custom cacheType', async () => {
+    const result = await dispatchAction('CACHE_INVALIDATE', { cacheType: 'routing' }, deps);
+
+    expect(result.outcome).toBe('success');
+    expect(deps.invalidateCache).toHaveBeenCalledWith('/tmp/test-project', 'routing');
+  });
+
+  // Test 12: IPC_DIR_CLEANUP → cleanIpcDir invoked
+  it('handles IPC_DIR_CLEANUP by invoking cleanIpcDir', async () => {
+    const result = await dispatchAction('IPC_DIR_CLEANUP', {}, deps);
+
+    expect(result.outcome).toBe('success');
+    expect(deps.cleanIpcDir).toHaveBeenCalledWith('/tmp/test-project');
+  });
+
+  // Test 13: DEBT_TRENDING_REPORT → generateDebtReport invoked
+  it('handles DEBT_TRENDING_REPORT by invoking generateDebtReport', async () => {
+    const result = await dispatchAction('DEBT_TRENDING_REPORT', {}, deps);
+
+    expect(result.outcome).toBe('success');
+    expect(deps.generateDebtReport).toHaveBeenCalledWith('/tmp/test-project');
+  });
+
+  // Test 14: METRIC_EMIT → emitMetric invoked with name + value
+  it('handles METRIC_EMIT by invoking emitMetric', async () => {
+    const result = await dispatchAction(
+      'METRIC_EMIT',
+      { metricName: 'sprint.duration', value: 42 },
+      deps,
+    );
+
+    expect(result.outcome).toBe('success');
+    expect(deps.emitMetric).toHaveBeenCalledWith('/tmp/test-project', 'sprint.duration', 42);
+  });
+
+  // Test 15: METRIC_EMIT → default value=1 when not provided
+  it('handles METRIC_EMIT with default value=1 when value omitted', async () => {
+    const result = await dispatchAction(
+      'METRIC_EMIT',
+      { metricName: 'heartbeat.ping' },
+      deps,
+    );
+
+    expect(result.outcome).toBe('success');
+    expect(deps.emitMetric).toHaveBeenCalledWith('/tmp/test-project', 'heartbeat.ping', 1);
+  });
+
+  // Test 16: METRIC_EMIT missing metricName → failure
+  it('returns failure for METRIC_EMIT with missing metricName', async () => {
+    const result = await dispatchAction('METRIC_EMIT', {}, deps);
+
+    expect(result.outcome).toBe('failure');
+    expect(result.error).toMatch(/metricName/i);
+  });
+
+  // Test 17: Idempotency — calling LOG_ROTATION twice produces same result
+  it('LOG_ROTATION is idempotent (calling twice yields success both times)', async () => {
+    const r1 = await dispatchAction('LOG_ROTATION', {}, deps);
+    const r2 = await dispatchAction('LOG_ROTATION', {}, deps);
+
+    expect(r1.outcome).toBe('success');
+    expect(r2.outcome).toBe('success');
+    expect(deps.rotateLogs).toHaveBeenCalledTimes(2);
+  });
+});
+
 // ─── Integration Test — createActionHandler + Executor chain ────────────────
 
 describe('action-handlers — Executor integration', () => {
@@ -234,12 +330,28 @@ describe('action-handlers — Executor integration', () => {
     const handler = createActionHandler(deps);
 
     // Call directly via executor-shaped signature
-    const result = await handler('LOG_ROTATION', {});
+    const result = await handler('DIRECTIVES_WRITE', {});
 
     // Bridged to ActionHandler interface (success | failure)
     expect(result.outcome).toBe('failure');
     expect(result.error).toMatch(/unimplemented/i);
-    expect(result.error).toContain('LOG_ROTATION');
+    expect(result.error).toContain('DIRECTIVES_WRITE');
+  });
+
+  it('createActionHandler executes new low-risk LOG_ROTATION via Executor', async () => {
+    const deps = createMockDeps();
+    const handler = createActionHandler(deps);
+
+    const history = createMockHistory();
+    const executor = new Executor(history, handler);
+
+    const action = createAction({ id: 'LOG_ROTATION', policy: 'autonomous', payload: {} });
+    const notification = createNotification({ actions: [action] });
+
+    const records = await executor.handle(notification);
+
+    expect(records[0].outcome).toBe('success');
+    expect(deps.rotateLogs).toHaveBeenCalledWith('/tmp/test-project');
   });
 });
 

@@ -7,6 +7,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useSSE } from "../hooks/useSSE";
 import { postJson } from "../lib/api";
 import { useApi } from "../lib/useApi";
+import { streamChatResponse } from "../lib/chat-stream-client";
 import { useTranslation } from "../i18n/LanguageProvider";
 import { Badge } from "../components/ui/badge";
 import { Textarea } from "../components/ui/textarea";
@@ -271,25 +272,65 @@ export default function ChatPage() {
     setMessages((prev) => [...prev, userMsg]);
     setSending(true);
 
+    // Assistant placeholder — content is filled incrementally by stream chunks
+    // (akan cevap) or by the /api/chat POST round-trip fallback.
+    const assistantId = `msg-${++msgIdCounter}`;
+    setMessages((prev) => [...prev, {
+      id: assistantId,
+      role: "assistant",
+      content: "",
+      timestamp: new Date().toISOString(),
+    }]);
+
+    let streamedContent = "";
+    let streamFinished = false;
+    let ctrl: { close: () => void } | null = null;
+
+    // Open SSE stream for incremental token rendering (219-008 wire).
+    try {
+      ctrl = streamChatResponse({
+        message: content,
+        handlers: {
+          onChunk: (text) => {
+            streamedContent += text;
+            setMessages((prev) => prev.map((m) =>
+              m.id === assistantId ? { ...m, content: streamedContent } : m
+            ));
+          },
+          onDone: (reply) => {
+            streamFinished = true;
+            setMessages((prev) => prev.map((m) =>
+              m.id === assistantId ? { ...m, content: reply } : m
+            ));
+            setSending(false);
+          },
+          onError: () => {
+            // Stream errors are swallowed — POST round-trip is the fallback path.
+          },
+        },
+      });
+    } catch {
+      // EventSource unavailable — POST fallback below handles the response.
+    }
+
+    // POST round-trip (Bearer via useApi) — fallback when stream emits nothing.
     try {
       const response = await post<{ reply: string }>("/api/chat", { message: content });
-      const assistantMsg: ChatMessage = {
-        id: `msg-${++msgIdCounter}`,
-        role: "assistant",
-        content: response.reply,
-        timestamp: new Date().toISOString(),
-      };
-      setMessages((prev) => [...prev, assistantMsg]);
+      if (!streamFinished && streamedContent === "") {
+        setMessages((prev) => prev.map((m) =>
+          m.id === assistantId ? { ...m, content: response.reply } : m
+        ));
+        ctrl?.close();
+        setSending(false);
+      }
     } catch {
-      const errorMsg: ChatMessage = {
-        id: `msg-${++msgIdCounter}`,
-        role: "assistant",
-        content: t("chat.error_response"),
-        timestamp: new Date().toISOString(),
-      };
-      setMessages((prev) => [...prev, errorMsg]);
-    } finally {
-      setSending(false);
+      if (!streamFinished && streamedContent === "") {
+        setMessages((prev) => prev.map((m) =>
+          m.id === assistantId ? { ...m, content: t("chat.error_response") } : m
+        ));
+        ctrl?.close();
+        setSending(false);
+      }
     }
   }, [t, post]);
 

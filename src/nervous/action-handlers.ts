@@ -14,12 +14,14 @@
 import { ACTION_REGISTRY } from './action-registry.js';
 import type { ActionHandler } from './executor.js';
 
-type ActionHandlerResult = Awaited<ReturnType<ActionHandler>>;
+type ExecutorBridgeResult = Awaited<ReturnType<ActionHandler>>;
 
 export type ActionDispatchResult =
   | { outcome: 'success' }
   | { outcome: 'failure'; error: string }
   | { outcome: 'unimplemented'; actionId: string };
+
+export type ActionHandlerResult = ActionDispatchResult;
 
 export interface ActionHandlerDeps {
   killWorker: (taskId: string) => void;
@@ -27,6 +29,11 @@ export interface ActionHandlerDeps {
   archiveOrphanTasks: (projectRoot: string, sprintId: string) => void;
   releaseLock: (projectRoot: string, filePath: string, workerId: string) => void;
   cleanDeadEventStream: (projectRoot: string, sprintId: string) => number;
+  rotateLogs: (projectRoot: string) => void;
+  invalidateCache: (projectRoot: string, cacheType: string) => void;
+  cleanIpcDir: (projectRoot: string) => number;
+  generateDebtReport: (projectRoot: string) => void;
+  emitMetric: (projectRoot: string, metricName: string, value: number) => void;
   projectRoot: string;
 }
 
@@ -35,6 +42,11 @@ const MVP_ACTION_IDS = new Set([
   'ORPHAN_TASK_ARCHIVE',
   'STALE_LOCK_RELEASE',
   'DEAD_EVENT_STREAM_CLEANUP',
+  'LOG_ROTATION',
+  'CACHE_INVALIDATE',
+  'IPC_DIR_CLEANUP',
+  'DEBT_TRENDING_REPORT',
+  'METRIC_EMIT',
 ]);
 
 function success(): ActionDispatchResult {
@@ -95,6 +107,49 @@ async function handleDeadEventStreamCleanup(
   return success();
 }
 
+async function handleLogRotation(
+  _payload: Record<string, unknown>,
+  deps: ActionHandlerDeps,
+): Promise<ActionDispatchResult> {
+  deps.rotateLogs(deps.projectRoot);
+  return success();
+}
+
+async function handleCacheInvalidate(
+  payload: Record<string, unknown>,
+  deps: ActionHandlerDeps,
+): Promise<ActionDispatchResult> {
+  const cacheType = typeof payload['cacheType'] === 'string' ? payload['cacheType'] : 'all';
+  deps.invalidateCache(deps.projectRoot, cacheType);
+  return success();
+}
+
+async function handleIpcDirCleanup(
+  _payload: Record<string, unknown>,
+  deps: ActionHandlerDeps,
+): Promise<ActionDispatchResult> {
+  deps.cleanIpcDir(deps.projectRoot);
+  return success();
+}
+
+async function handleDebtTrendingReport(
+  _payload: Record<string, unknown>,
+  deps: ActionHandlerDeps,
+): Promise<ActionDispatchResult> {
+  deps.generateDebtReport(deps.projectRoot);
+  return success();
+}
+
+async function handleMetricEmit(
+  payload: Record<string, unknown>,
+  deps: ActionHandlerDeps,
+): Promise<ActionDispatchResult> {
+  const metricName = requireString(payload, 'metricName');
+  const value = typeof payload['value'] === 'number' ? payload['value'] : 1;
+  deps.emitMetric(deps.projectRoot, metricName, value);
+  return success();
+}
+
 let defaultDeps: ActionHandlerDeps | null = null;
 
 async function loadDefaultDeps(): Promise<ActionHandlerDeps> {
@@ -122,6 +177,22 @@ async function loadDefaultDeps(): Promise<ActionHandlerDeps> {
     cleanDeadEventStream: (_projectRoot: string, _sprintId: string) => {
       // event-bus has no prune helper yet — Faz 2 will wire this.
       return 0;
+    },
+    rotateLogs: (_projectRoot: string) => {
+      // Sprint log rotation — Faz 2 wire.
+    },
+    invalidateCache: (_projectRoot: string, _cacheType: string) => {
+      // Build/routing cache invalidation — Faz 2 wire.
+    },
+    cleanIpcDir: (_projectRoot: string) => {
+      // IPC dir cleanup — Faz 2 wire.
+      return 0;
+    },
+    generateDebtReport: (_projectRoot: string) => {
+      // Debt trending report generation — Faz 2 wire.
+    },
+    emitMetric: (_projectRoot: string, _metricName: string, _value: number) => {
+      // Metric emit — Faz 2 wire.
     },
     projectRoot: process.cwd(),
   };
@@ -155,6 +226,16 @@ export async function dispatchAction(
         return await handleStaleLockRelease(payload, resolved);
       case 'DEAD_EVENT_STREAM_CLEANUP':
         return await handleDeadEventStreamCleanup(payload, resolved);
+      case 'LOG_ROTATION':
+        return await handleLogRotation(payload, resolved);
+      case 'CACHE_INVALIDATE':
+        return await handleCacheInvalidate(payload, resolved);
+      case 'IPC_DIR_CLEANUP':
+        return await handleIpcDirCleanup(payload, resolved);
+      case 'DEBT_TRENDING_REPORT':
+        return await handleDebtTrendingReport(payload, resolved);
+      case 'METRIC_EMIT':
+        return await handleMetricEmit(payload, resolved);
       default:
         return unimplemented(actionId);
     }
@@ -170,7 +251,7 @@ export async function dispatchAction(
  * outcome contract holds.
  */
 export function createActionHandler(deps?: Partial<ActionHandlerDeps>): ActionHandler {
-  return async (actionId: string, payload: unknown): Promise<ActionHandlerResult> => {
+  return async (actionId: string, payload: unknown): Promise<ExecutorBridgeResult> => {
     const result = await dispatchAction(actionId, (payload as Record<string, unknown>) ?? {}, deps);
     if (result.outcome === 'unimplemented') {
       return {

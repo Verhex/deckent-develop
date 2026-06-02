@@ -59,6 +59,18 @@ export function getDebtItems(projectRoot: string, opts?: { activeOnly?: boolean 
   if (!store) return [];
   try {
     const entries = store.getByType('debt');
+    // Lazy reconciliation: a rollback that succeeded is a closed historical
+    // event, not active debt. Auto-resolve any stale entries written before
+    // recordRollbackDebt set the correct status (see ADR-009 / debt-store fix).
+    for (const e of entries) {
+      if (e.status === 'resolved') continue;
+      let meta: Record<string, unknown>;
+      try { meta = JSON.parse(e.metadata || '{}') as Record<string, unknown>; } catch { continue; }
+      if (meta.kind === 'rollback' && meta.rollbackSuccess === true) {
+        store.update(e.id, { status: 'resolved' });
+        e.status = 'resolved';
+      }
+    }
     const filtered = opts?.activeOnly
       ? entries.filter(e => e.status !== 'resolved')
       : entries;
@@ -91,14 +103,17 @@ export function recordRollbackDebt(
   try {
     const id = `rollback-${sprintId}`;
     if (store.getById(id)) return; // idempotent
-    const status = success ? 'SUCCESS' : 'FAILED';
+    const label = success ? 'SUCCESS' : 'FAILED';
+    // A successful rollback is a closed historical event — record it as resolved
+    // so it does not accumulate as active critical debt over subsequent sprints.
+    // Only FAILED rollbacks remain active (they signal a real problem to address).
     store.insert({
       id,
       type: 'debt',
-      title: `Sprint ${sprintId} rollback ${status}`.slice(0, 80),
-      content: `Sprint ${sprintId} rollback ${status}: ${message}`,
+      title: `Sprint ${sprintId} rollback ${label}`.slice(0, 80),
+      content: `Sprint ${sprintId} rollback ${label}: ${message}`,
       source: 'brain',
-      status: 'active',
+      status: success ? 'resolved' : 'active',
       priority: 'normal',
       sprint_id: sprintId,
       sprint_num: parseSprintNumber(sprintId),

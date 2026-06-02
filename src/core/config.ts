@@ -63,6 +63,38 @@ type DeckentConfigWithThrottle = DeckentConfig & { token_throttle_ms?: number };
  */
 type ResolvedConfigWithThrottle = ResolvedConfig & { token_throttle_ms?: number };
 
+/**
+ * Sprint 220 Task 220-001 — `chat_provider` is the optional override for the
+ * native REPL (`deckent` argümansız → `deckent chat --native`) provider. It
+ * sits next to `brain_provider` so users can decouple the planner provider
+ * (e.g. opus) from the REPL provider (e.g. ollama-local). Local intersection
+ * aliases follow the existing `…WithPipeline`/`…WithThrottle` pattern so the
+ * shared `config-types.ts` interface stays untouched.
+ */
+export type ChatProviderName = 'claude' | 'codex' | 'gemini' | 'ollama';
+type DeckentConfigWithChatProvider = DeckentConfig & { chat_provider?: ChatProviderName };
+type ResolvedConfigWithChatProvider = ResolvedConfig & { chat_provider?: ChatProviderName };
+
+/**
+ * Resolve the REPL chat provider via the documented fallback chain:
+ *   1. config.chat_provider (explicit REPL override)
+ *   2. config.brain_provider (project's primary provider)
+ *   3. 'claude' (safe default — most users have `claude` installed)
+ *
+ * Returns 'claude' for any value outside the allowed set so a corrupt config
+ * cannot crash the REPL boot path. Pure function; safe for sync callers.
+ */
+export function resolveChatProvider(
+  config: Partial<ResolvedConfig> | Partial<DeckentConfig> | undefined | null,
+): ChatProviderName {
+  if (!config) return 'claude';
+  const widened = config as Partial<ResolvedConfigWithChatProvider & DeckentConfigWithChatProvider>;
+  const candidate = widened.chat_provider ?? widened.brain_provider ?? 'claude';
+  return (candidate === 'claude' || candidate === 'codex' || candidate === 'gemini' || candidate === 'ollama')
+    ? candidate
+    : 'claude';
+}
+
 // ─── Default Timeout Config ─────────────────────────────────────────
 // Sprint 192 (Task 192-011, W-INTEGRITY I-5): adaptive timeout knobs added
 // without mutating `TimeoutConfig` in config-types.ts (out of this task's
@@ -454,6 +486,13 @@ export function validateConfig(config: DeckentConfig): string[] {
   if (config.brain_provider !== undefined &&
       !VALID_PROVIDERS_ALL.includes(config.brain_provider)) {
     errors.push(`Invalid value '${config.brain_provider}' for field 'brain_provider'. Valid: ${VALID_PROVIDERS_ALL.join(', ')}`);
+  }
+
+  // Sprint 220 Task 220-001 — chat_provider validation (optional REPL override).
+  const cfgWithChat = config as DeckentConfigWithChatProvider;
+  if (cfgWithChat.chat_provider !== undefined &&
+      !VALID_PROVIDERS_ALL.includes(cfgWithChat.chat_provider)) {
+    errors.push(`Invalid value '${cfgWithChat.chat_provider}' for field 'chat_provider'. Valid: ${VALID_PROVIDERS_ALL.join(', ')}`);
   }
 
   if (config.worker_provider !== undefined &&
@@ -1089,7 +1128,7 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
     }
   }
 
-  const resolved: ResolvedConfigWithThrottle = {
+  const resolved: ResolvedConfigWithThrottle & ResolvedConfigWithChatProvider = {
     mode: config.mode,
     activeModeConfig,
     modes: config.modes,
@@ -1106,6 +1145,8 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
     brain_provider: config.brain_provider,
     worker_provider: config.worker_provider,
     fallback_provider: config.fallback_provider,
+    // Sprint 220 Task 220-001 — optional native REPL provider override.
+    chat_provider: (config as DeckentConfigWithChatProvider).chat_provider,
     // Memory
     memory_budget: config.memory_budget,
     decay_after_sprints: config.decay_after_sprints,
@@ -1186,9 +1227,13 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
   // numeric fields, so `token_throttle_ms` survives. Cast to the wider type
   // so callers (via `getTokenThrottleMs`) can read it without losing the
   // attached field on the cached object.
-  const interpolated = interpolateConfig(resolved, root) as ResolvedConfigWithThrottle;
+  const interpolated = interpolateConfig(resolved, root) as ResolvedConfigWithThrottle & ResolvedConfigWithChatProvider;
   if (interpolated.token_throttle_ms === undefined) {
     interpolated.token_throttle_ms = resolved.token_throttle_ms;
+  }
+  // Sprint 220 Task 220-001 — preserve chat_provider through interpolation.
+  if (interpolated.chat_provider === undefined) {
+    interpolated.chat_provider = resolved.chat_provider;
   }
 
   // ─── Update cache ───────────────────────────────────────────────────
@@ -1404,6 +1449,13 @@ export const CONFIG_METADATA: Readonly<Record<string, ConfigMetadataEntry>> = {
     description: 'AI provider used for the Brain orchestrator (planning and evaluation).',
     type: "'claude' | 'codex' | 'gemini' | 'ollama'",
     default: 'claude',
+    options: ['claude', 'codex', 'gemini', 'ollama'],
+    category: 'Provider',
+  },
+  chat_provider: {
+    description: 'Native REPL provider override (deckent argümansız). Fallback chain: chat_provider → brain_provider → claude. Set independently from brain_provider to decouple planner from REPL (e.g. brain=opus, repl=ollama).',
+    type: "'claude' | 'codex' | 'gemini' | 'ollama' | undefined",
+    default: undefined,
     options: ['claude', 'codex', 'gemini', 'ollama'],
     category: 'Provider',
   },
@@ -1770,7 +1822,7 @@ export function mergeConfigs(
   };
   const coverageGates = resolveCoverageGates(userCoverageInput);
 
-  const merged: ResolvedConfigWithThrottle = {
+  const merged: ResolvedConfigWithThrottle & ResolvedConfigWithChatProvider = {
     mode: config.mode,
     activeModeConfig,
     modes: config.modes,
@@ -1780,6 +1832,8 @@ export function mergeConfigs(
     version: config.version ?? DECKENT_VERSION,
     auto_docs: config.auto_docs ?? { ...DEFAULT_AUTO_DOCS },
     skills: config.skills,
+    // Sprint 220 Task 220-001 — optional native REPL provider override.
+    chat_provider: (config as DeckentConfigWithChatProvider).chat_provider,
     // Sprint 179 W2-4: see resolveCoverageGates docstring for split semantics.
     ...coverageGates,
     max_reroutes: config.max_reroutes ?? 3,

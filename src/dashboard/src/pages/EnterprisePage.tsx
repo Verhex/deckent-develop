@@ -4,7 +4,8 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "../components/ui/tabs"
 import { Badge } from "../components/ui/badge";
 import { SkeletonTable } from "../components/Skeleton";
 import EmptyState from "../components/EmptyState";
-import { Building2, Shield, FileText, Gauge } from "lucide-react";
+import { Building2, Shield, FileText, Gauge, AlertTriangle } from "lucide-react";
+import type { Alert } from "../types";
 
 interface TenantInfo {
   id: string;
@@ -37,19 +38,77 @@ interface RateLimitInfo {
 
 const ROLE_ORDER: Record<string, number> = { admin: 0, operator: 1, viewer: 2 };
 
+const DOC_SYNC_RE = /CLAUDE\.md|GEMINI\.md|AGENTS\.md|doc.sync|docs not synced/i;
+const PROVIDER_LABEL = "CLAUDE/GEMINI/AGENTS";
+
+function dedupDocSyncAlerts(alerts: Alert[]): Alert[] {
+  let docSyncSeen = false;
+  return alerts.reduce<Alert[]>((acc, alert) => {
+    if (DOC_SYNC_RE.test(alert.message)) {
+      if (!docSyncSeen) {
+        docSyncSeen = true;
+        acc.push({ ...alert, message: `Provider docs not synced (${PROVIDER_LABEL})` });
+      }
+    } else {
+      acc.push(alert);
+    }
+    return acc;
+  }, []);
+}
+
 export default function EnterprisePage() {
   const { data: tenants, loading: tenantsLoading, error: tenantsError } = useApi<TenantInfo[]>("/api/enterprise/tenants");
   const { data: rbac, loading: rbacLoading, error: rbacError } = useApi<RbacRole[]>("/api/enterprise/rbac");
   const { data: audit, loading: auditLoading, error: auditError } = useApi<AuditEntry[]>("/api/enterprise/audit");
   const { data: rate, loading: rateLoading, error: rateError } = useApi<RateLimitInfo[]>("/api/enterprise/rate");
+  const { data: statusData } = useApi<{ alerts: Alert[] }>("/api/status");
 
   const sortedRbac = rbac
     ? [...rbac].sort((a, b) => (ROLE_ORDER[a.role] ?? 99) - (ROLE_ORDER[b.role] ?? 99))
     : null;
 
+  // Authorization: Bearer token auto-attached by fetchJson (lib/api.ts authHeaders)
+  const token = typeof window !== "undefined"
+    ? (window as unknown as { __DECKENT_API_TOKEN__?: string }).__DECKENT_API_TOKEN__
+    : undefined;
+  const rawAlerts: Alert[] = statusData?.alerts ?? [];
+  const dedupedAlerts = dedupDocSyncAlerts(rawAlerts);
+
   return (
     <div className="space-y-6" data-testid="enterprise-page">
-      <h1 className="text-2xl font-bold text-zinc-100">Enterprise</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-zinc-100">Enterprise</h1>
+        <div className="flex items-center gap-2" data-testid="enterprise-auth-status">
+          <Badge className={token ? "bg-green-900 text-green-300" : "bg-zinc-700 text-zinc-400"}>
+            {token ? "Authenticated" : "No auth token"}
+          </Badge>
+          {token && (
+            <span className="text-xs text-zinc-500 font-mono">Authorization: Bearer ···</span>
+          )}
+        </div>
+      </div>
+
+      {dedupedAlerts.length > 0 && (
+        <div className="space-y-2" data-testid="enterprise-alerts">
+          {dedupedAlerts.map((alert, i) => (
+            <div
+              key={i}
+              className="flex items-center gap-2 rounded-md border border-zinc-700 bg-zinc-900/60 px-3 py-2"
+              data-testid="enterprise-alert-item"
+            >
+              <AlertTriangle className="h-4 w-4 text-yellow-400 shrink-0" />
+              <Badge className={
+                alert.level === "CRITICAL" ? "bg-red-900 text-red-300" :
+                alert.level === "WARNING" ? "bg-yellow-900 text-yellow-300" :
+                "bg-zinc-700 text-zinc-400"
+              }>
+                {alert.level}
+              </Badge>
+              <span className="text-sm text-zinc-300">{alert.message}</span>
+            </div>
+          ))}
+        </div>
+      )}
 
       <Tabs defaultValue="tenants">
         <TabsList>

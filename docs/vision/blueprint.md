@@ -1,8 +1,8 @@
 # DECKENT MASTER BLUEPRINT
 ## AI Agent Orchestration System — Complete Implementation Reference
-### Version 3.2 — June 2026 — Verhex (header refreshed Sprint 219)
+### Version 3.2 — June 2026 — Verhex (header refreshed Sprint 220)
 
-> **Doc role (Alperen 2026-06-02 — SSOT split):** `blueprint.md` = **WHAT deckent is and WHERE it stands** (identity, capabilities, architecture-as-built, positioning). `docs/MASTER-PLAN.md` = **HOW we build it** (roadmap, sequencing, remaining work — development SSOT). `docs/vision/*` track the evolving story and are updated as we progress. Live Metrics + structural counts are auto-current; the deep §-bodies below are being brought fully current in Sprint 219 (doc-refresh task).
+> **Doc role (Alperen 2026-06-02 — SSOT split):** `blueprint.md` = **WHAT deckent is and WHERE it stands** (identity, capabilities, architecture-as-built, positioning). `docs/MASTER-PLAN.md` = **HOW we build it** (roadmap, sequencing, remaining work — development SSOT). `docs/vision/*` track the evolving story and are updated as we progress. Live Metrics + structural counts are auto-current; the deep §-bodies below are being brought fully current in Sprint 220 (doc-refresh task).
 
 > **What deckent is (2026-06-02):** the **god-level orchestration + enterprise layer of an open agent**, made so easy a single user wields the same power — **one MIT product** from a solo dev's laptop to a 10,000-person enterprise. **"Open source for open world."** We compare with peers (Devin, Cursor, Claude Code, Cowork) on capability — never as opposition. The architecture is a **core + enterprise-layer** split: the core is the same multi-agent orchestration every user runs; the enterprise layer (RBAC, audit, multi-tenant, scheduled flows) bolts on without forking. ([[project_deckent_positioning]])
 
@@ -13,13 +13,13 @@
 ## Live Metrics
 | Metrik | Değer |
 |--------|-------|
-| Sprint | sprint-219 |
-| Toplam Task | 17 |
-| Tamamlanan | 16 |
-| Tech Debt | 0 |
-| No-Go | 1 |
-| Süre | 38dk 49sn |
-| Coverage | 0.0% |
+| Sprint | sprint-220 |
+| Toplam Task | 18 |
+| Tamamlanan | 18 |
+| Tech Debt | 1 |
+| No-Go | 0 |
+| Süre | 25dk 6sn |
+| Coverage | 5.9% |
 
 # TABLE OF CONTENTS
 
@@ -78,10 +78,11 @@ An agent-agnostic AI orchestration system. You describe goals in natural languag
 **USP (Unique Selling Point):**
 Sprint + learning loop. Deckent doesn't just execute tasks — it plans sprints, evaluates results with GO/NO-GO protocol, tracks tech debt, runs retrospectives, and feeds learnings into the next sprint. Every sprint makes the system smarter.
 
-**Where it stands today (Sprint 218 → 219):**
-- Sprint 218 closed (13/13 DONE, 0 NO_GO, 0 tech-debt). Sprint 219 ("Native Agentic Deckent") is the on-going work to make `deckent` argümansız behave like `claude`: argümansız invocation opens a native agentic REPL, natural-language drives MCP/CLI actions through an approval gate, the dashboard's 8-page nav is render-tested + cache-busted, and the F2 chat streaming wire (`/api/chat/stream`) lands SSE token streaming end-to-end.
-- The doc you are reading was last sweep-refreshed in Sprint 219 — header timestamp + Sprint 218 metrics block + positioning section. Dated history sections from earlier sprints are preserved as-written; "as-built" sections (Architecture Overview, Memory V2, MCP/CLI counts) are kept code-derived via managed-docs (ADR-029/030).
-- The everyone-everywhere arc (6 contexts — greenfield / in-dev / maintained / daily-tasks / ERP / enterprise) and the autonomous agentic runtime (Sprint 220+) are the next horizons; see §23 Strategic Roadmap and [`docs/MASTER-PLAN.md`](../MASTER-PLAN.md) (or [`docs/MASTER-PLAN-TR.md`](../MASTER-PLAN-TR.md)) for the how-we-build-it sequencing.
+**Where it stands today (Sprint 219 → 220):**
+- Sprint 219 closed (16/17 DONE, 0 tech-debt, 1 NO-GO — 219-010 dashboard e2e cache-bust carried to Sprint 220). Sprint 219 delivered: `deckent` argümansız native agentic REPL opens (ADR-081), agentic dispatch + approval gate live, F2 chat streaming wire (`/api/chat/stream`) SSE end-to-end, dashboard 8-page nav render-tested.
+- Sprint 220 ("Native-LLM-Wire + Dashboard-v2 Canlı + Nervous Activation") completes the remaining wires: **native REPL genuinely connected to a real LLM** (config-driven `chat_provider→brain_provider→claude`, real round-trip responses — not a skeleton), **nervous system active Faz-1** (config `nervous_system.enabled:true` + bootstrap pipeline + 8 action handlers), and **dashboard-v2 live** (worker grid real-time SSE, status correct, refresh+cooldown, chat-wire, tech-debt filter, coverage, enterprise-auth).
+- The doc you are reading was last sweep-refreshed in Sprint 220 — header timestamp + Live Metrics + "where it stands" block. Dated history sections from earlier sprints are preserved as-written; "as-built" sections (Architecture Overview, Memory V2, MCP/CLI counts) are kept code-derived via managed-docs (ADR-029/030).
+- The everyone-everywhere arc (6 contexts — greenfield / in-dev / maintained / daily-tasks / ERP / enterprise) and the autonomous agentic runtime continue to be built out; see §23 Strategic Roadmap and [`docs/MASTER-PLAN.md`](../MASTER-PLAN.md) (or [`docs/MASTER-PLAN-TR.md`](../MASTER-PLAN-TR.md)) for the how-we-build-it sequencing.
 
 **Phased Roadmap:**
 | Phase | Focus | Target Audience | Sprint Range |
