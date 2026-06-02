@@ -28,6 +28,8 @@ import {
 import { createSpinner } from './commands/chat-spinner.js';
 import { createCliToolDispatcher } from './commands/chat-tool-bridge.js';
 import { createToolExecDispatcher } from './commands/chat-tool-exec.js';
+import { createPermissionStore } from './commands/chat-permissions.js';
+import { slashCompleter } from './commands/chat-slash-registry.js';
 import { createPromptRegion, createThinkingTicker } from './commands/chat-render-region.js';
 import {
   OPENAI_COMPAT_PRESETS,
@@ -505,7 +507,10 @@ export async function launchDefaultRepl(): Promise<void> {
   // tests, HTTP backends and `printf | deckent` smoke runs are byte-for-byte
   // unchanged (spinner stays a no-op there).
   const isTty = process.stdin.isTTY === true && process.stdout.isTTY === true;
-  const rl = createInterface(replReadlineOptions(isTty));
+  // T-224-017 — `/` command menu: a slash completer gives claude-code-style
+  // Tab-completion/listing of slash commands on a TTY.
+  const baseReadlineOpts = replReadlineOptions(isTty);
+  const rl = createInterface(isTty ? { ...baseReadlineOpts, completer: slashCompleter } : baseReadlineOpts);
   const region = createPromptRegion(rl, process.stdout, { isTty });
 
   // T-224-006 — input arbiter. A single 'line' handler routes each typed line
@@ -539,12 +544,30 @@ export async function launchDefaultRepl(): Promise<void> {
   async function* simpleLines(): AsyncGenerator<string> {
     for await (const line of rl) yield line;
   }
-  // Interactive y/N confirm for side-effecting tools — reads the next line via
-  // the arbiter (TTY). Off-TTY auto-approves (pipe/smoke/tests stay headless).
-  const askConfirm = (summary: string, _toolName: string): Promise<boolean> => {
-    process.stdout.write(`\n\x1b[33m${summary}\x1b[0m\nçalıştırılsın mı? (y/N) `);
+  // T-224-016 — permission memory. Approvals can be persisted to
+  // .deckent/repl-permissions.json so a remembered tool is auto-approved and
+  // never re-asked (claude-code settings.allow feel).
+  const perms = createPermissionStore(process.cwd());
+
+  // Interactive confirm for side-effecting tools — reads the next line via the
+  // arbiter (TTY, single stdin). 3-way: y = bir kez · a = bu tool'a hep izin
+  // ver (persist) · N = reddet. Remembered tools skip the prompt entirely.
+  // Off-TTY auto-approves (pipe/smoke/tests stay headless).
+  const askConfirm = (summary: string, toolName: string): Promise<boolean> => {
+    if (perms.isAllowed(toolName)) return Promise.resolve(true);
+    process.stdout.write(
+      `\n\x1b[33m${summary}\x1b[0m\n(y = izin ver · a = bu tool'a hep izin ver · N = reddet) `,
+    );
     return new Promise<boolean>((resolve) => {
-      pendingAnswer = (line) => resolve(line.trim().toLowerCase() === 'y');
+      pendingAnswer = (line) => {
+        const ans = line.trim().toLowerCase();
+        if (ans === 'a') {
+          perms.allow(toolName);
+          resolve(true);
+        } else {
+          resolve(ans === 'y');
+        }
+      };
     });
   };
 

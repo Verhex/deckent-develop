@@ -129,3 +129,5 @@ describe('createThinkingTicker — rotating-verb indicator (T-224-014)', () => {
     }
   });
 });
+
+// (slashCompleter lives in chat-slash-registry; tested in its own block below)

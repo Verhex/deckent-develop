@@ -117,6 +117,21 @@ export function renderHelp(registry: SlashRegistry): string {
 }
 
 /**
+ * readline completer (Sprint 224 T-224-017) — claude-code tarzı `/` komut menüsü.
+ * Kullanıcı `/` yazıp Tab'a basınca eşleşen slash komutları listelenir/tamamlanır.
+ * Non-slash satırlarda boş döner (normal sohbet). readline kontratı:
+ *   dönüş `[matches, line]`; tek match → tamamlar, çok match → menü listeler.
+ */
+export function slashCompleter(line: string): [string[], string] {
+  if (!line.startsWith('/')) return [[], line];
+  const names = buildSlashRegistry()
+    .map((c) => c.name)
+    .filter((n) => n !== '/quit'); // alias gizli
+  const hits = names.filter((n) => n.startsWith(line));
+  return [hits.length > 0 ? hits : names, line];
+}
+
+/**
  * Resolve a raw REPL line against the slash registry.
  *
  * Lines that do NOT start with '/' always return `{ action: 'none' }` so the
