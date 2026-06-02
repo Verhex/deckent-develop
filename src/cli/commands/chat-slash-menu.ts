@@ -60,6 +60,27 @@ export function renderSlashMenu(matches: readonly SlashCommand[], selected: numb
   return lines.join('\n');
 }
 
+/**
+ * entry.ts keypress-wire kararı (Sprint 224 T-224-020 — GÜVENLİ varyant).
+ *
+ * Gerçek-TTY canlı-filtreli popup, readline prompt'u üzerinde in-place cursor
+ * yönetimi ister (alt-satırda scroll/glitch riski) — çalışan pinned-REPL'i
+ * bozmamak için onun yerine: kullanıcı bir başına `/` yazınca komut menüsü
+ * pinned prompt'un ÜSTÜNE **bir kez** yazılır (writeAbove — prompt altta sabit,
+ * yazılan `/` korunur), sonra refine'i Tab-completer (224-017) yapar. Böylece
+ * scrollback'e tekrar tekrar menü basılmaz (spam yok) ve cursor-takeover yok.
+ *
+ * @returns show: menüyü şimdi yaz · shownFor: yeni "en son gösterilen" işaret.
+ */
+export function slashMenuOnKeypress(
+  line: string,
+  shownFor: string | null,
+): { show: boolean; shownFor: string | null } {
+  if (line === '/' && shownFor !== '/') return { show: true, shownFor: '/' };
+  if (!line.startsWith('/')) return { show: false, shownFor: null };
+  return { show: false, shownFor };
+}
+
 /** Bir keypress'in menüye etkisi. */
 export type SlashKey =
   | { type: 'char'; ch: string }

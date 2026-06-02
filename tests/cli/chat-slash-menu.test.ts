@@ -79,3 +79,23 @@ describe('reduceSlashMenu (T-224-020)', () => {
     expect(reduceSlashMenu(open, reg, { type: 'escape' }).state.open).toBe(false);
   });
 });
+
+import { slashMenuOnKeypress } from '../../src/cli/commands/chat-slash-menu.js';
+
+describe('slashMenuOnKeypress — safe one-shot trigger (T-224-020 wire)', () => {
+  it('lone "/" → show once, marks shownFor', () => {
+    expect(slashMenuOnKeypress('/', null)).toEqual({ show: true, shownFor: '/' });
+  });
+  it('already shown for "/" → does not re-show (no scrollback spam)', () => {
+    expect(slashMenuOnKeypress('/', '/')).toEqual({ show: false, shownFor: '/' });
+  });
+  it('refined query "/st" → no re-show (Tab completer handles it)', () => {
+    expect(slashMenuOnKeypress('/st', '/')).toEqual({ show: false, shownFor: '/' });
+  });
+  it('non-slash line → reset shownFor so menu can reopen later', () => {
+    expect(slashMenuOnKeypress('hello', '/')).toEqual({ show: false, shownFor: null });
+  });
+  it('empty line → reset', () => {
+    expect(slashMenuOnKeypress('', '/')).toEqual({ show: false, shownFor: null });
+  });
+});

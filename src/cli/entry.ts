@@ -30,7 +30,8 @@ import { renderBanner } from './commands/chat-banner.js';
 import { createCliToolDispatcher } from './commands/chat-tool-bridge.js';
 import { createToolExecDispatcher } from './commands/chat-tool-exec.js';
 import { createPermissionStore } from './commands/chat-permissions.js';
-import { slashCompleter } from './commands/chat-slash-registry.js';
+import { slashCompleter, buildSlashRegistry } from './commands/chat-slash-registry.js';
+import { slashMenuOnKeypress, renderSlashMenu, filterSlashCommands } from './commands/chat-slash-menu.js';
 import { createPromptRegion, createThinkingTicker, createPasteCoalescer, createLineBufferedSink } from './commands/chat-render-region.js';
 import { createStreamMarkdown } from './commands/chat-render.js';
 import {
@@ -515,6 +516,27 @@ export async function launchDefaultRepl(): Promise<void> {
   const baseReadlineOpts = replReadlineOptions(isTty);
   const rl = createInterface(isTty ? { ...baseReadlineOpts, completer: slashCompleter } : baseReadlineOpts);
   const region = createPromptRegion(rl, process.stdout, { isTty });
+
+  // T-224-020 — interactive `/` menu. When the user types a lone `/`, write the
+  // command menu ONCE above the pinned prompt (the verified writeAbove path —
+  // prompt stays pinned, the typed `/` is preserved). Refinement is handled by
+  // the Tab completer (224-017). This is the safe wire: no cursor-takeover, so
+  // the working line-editing REPL is never destabilised. Off-TTY: no-op.
+  if (isTty) {
+    const slashRegistry = buildSlashRegistry();
+    let menuShownFor: string | null = null;
+    process.stdin.on('keypress', () => {
+      // Defer so readline has updated rl.line for this keystroke.
+      setImmediate(() => {
+        const line = (rl as unknown as { line?: string }).line ?? '';
+        const next = slashMenuOnKeypress(line, menuShownFor);
+        menuShownFor = next.shownFor;
+        if (next.show) {
+          region.writeAbove(renderSlashMenu(filterSlashCommands(slashRegistry, '/'), 0, isTty));
+        }
+      });
+    });
+  }
 
   // T-224-006 — input arbiter. A single 'line' handler routes each typed line
   // either to a PENDING confirm (askConfirm) or to the chat queue, so the
