@@ -1,6 +1,6 @@
 # DIRECTIVES — Sprint 220: Native-LLM-Wire (deckent gerçekten konuşur) + Dashboard-v2 Canlı + Nervous Activation
 
-## Goal: BÜYÜK SPRINT (16 task, 6 dalga, 10 worker). Sprint 219 run-verify dürüst bulgusu: `deckent` argümansız REPL AÇILIYOR ama gerçek LLM'e bağlı DEĞİL ("provider not yet wired" — kabuk var, beyin yok). Bu sprint deckent'i **gerçekten-konuşan claude-benzeri**ne taşır + dashboard'ı **tam-canlı/işlevsel** yapar + nervous'u **aktif** eder. DALGA A: native REPL gerçek subscription provider-wire (P0 — `deckent` yaz→gerçek cevap). DALGA B: dashboard canlı (worker grid real-time, status doğru, refresh+cooldown, evolution/ADR veri, chat-wire). DALGA C: dashboard polish (config-budget, tech-debt filtre, coverage takip, enterprise-auth, alerts-dedup). DALGA D: nervous activation (config + bootstrap + handlers + smoke). DALGA E: 219-010 carry + ADR. **god-level — MVP ASLA.** Her Tier-1 task `Smoke:` satırlı.
+## Goal: BÜYÜK SPRINT (16 task, 6 dalga, 10 worker). Sprint 219 run-verify dürüst bulgusu: `deckent` argümansız REPL AÇILIYOR ama gerçek LLM'e bağlı DEĞİL ("provider not yet wired" — kabuk var, beyin yok). Bu sprint deckent'i **gerçekten-konuşan claude-benzeri**ne taşır + dashboard'ı **tam-canlı/işlevsel** yapar + nervous'u **aktif** eder. DALGA A: native REPL gerçek provider-wire (P0 — `deckent` yaz→gerçek cevap; **config-driven `chat_provider`→`brain_provider`→claude, ollama-local dahil — başta claude ama customize-edilebilir**). DALGA B: dashboard canlı (worker grid real-time, status doğru, refresh+cooldown, evolution/ADR veri, chat-wire). DALGA C: dashboard polish (config-budget, tech-debt filtre, coverage takip, enterprise-auth, alerts-dedup). DALGA D: nervous activation (config + bootstrap + handlers + smoke). DALGA E: 219-010 carry + ADR. **god-level — MVP ASLA.** Her Tier-1 task `Smoke:` satırlı.
 
 Bağlam:
 - **219-015/016 dist'te** (routeTaskV2 surface-bonus + smoke-field) → bu sprint plan'ında **routing düzelmeli** (cli/dashboard/api surface → api-builder/frontend-designer, refactorer-collapse bitmeli) + **Smoke parse olmalı** (Tier-1 task.smoke dolu). Plan analizinde DOĞRULA.
@@ -21,18 +21,18 @@ Bağlam:
 
 ## DALGA A — Native REPL Gerçekten Konuşsun (3 task)
 
-## Task 1: 220-001 — [P0] Native REPL gerçek subscription provider-wire (`deckent` yaz→gerçek cevap)
+## Task 1: 220-001 — [P0] Native REPL gerçek provider-wire (config-driven: chat_provider→brain_provider→claude)
 - Model: opus
 - Effort: normal
 - Skills: anthropic-sdk, typescript-expert
-- Files: src/cli/entry.ts, tests/cli/native-repl-wire.test.ts
-- Scope: src/cli/, tests/cli/
+- Files: src/cli/entry.ts, src/core/config.ts, tests/cli/native-repl-wire.test.ts
+- Scope: src/cli/, src/core/, tests/cli/
 
 ### Description
 **Problem (219 run-verify):** `deckent` argümansız REPL açılıyor AMA "provider not yet wired — not connected to a real LLM" (skeleton). `createSubscriptionChatAdapter` (chat-native.ts:427) VAR ama REPL launch'ı kullanmıyor.
-**Çözüm:** entry.ts native REPL launch'ı (219-001) — `createSubscriptionChatAdapter(config)` ile gerçek provider'ı `runChatNativeLoop`'a ver (subscription claude/codex/gemini CLI spawn). "provider not yet wired" mesajı KALKSIN, gerçek round-trip. Provider yoksa net hata (skeleton değil). Caller entry.ts (def chat-native.ts hariç).
-**Kanıt:** `grep -c "createSubscriptionChatAdapter\|provider\|adapter" src/cli/entry.ts` → ≥2; `grep -c "provider not yet wired" src/cli/commands/chat-native.ts` → bu mesaj artık launch'ta tetiklenmemeli; `npx vitest run tests/cli/native-repl-wire.test.ts` → 4+ pass
-**Test:** ≥4 (adapter wire, gerçek-cevap mock-adapter, provider-yok net-hata, REPL launch adapter'lı)
+**Çözüm (Alperen 2026-06-02 — provider-free, customize-edilebilir):** REPL provider'ı **config-driven resolve et**: `config.chat_provider ?? config.brain_provider ?? 'claude'` (fallback chain). Yeni opsiyonel `chat_provider` config key (config.ts schema + default undefined → brain_provider'a düşer). entry.ts native REPL launch'ı bu resolved provider ile gerçek adapter kur (`createSubscriptionChatAdapter` claude/codex/gemini CLI spawn VEYA **OllamaAdapter** local — zero-API). "provider not yet wired" KALKSIN, gerçek round-trip. **Başta claude default ama config'ten codex/gemini/ollama'ya değiştirilebilir** (Brain=opus iken REPL=ollama-local olabilir). Provider yoksa net hata (skeleton değil). Caller entry.ts (def chat-native.ts/adapter hariç).
+**Kanıt:** `grep -c "chat_provider\|brain_provider\|createSubscriptionChatAdapter\|Ollama\|adapter" src/cli/entry.ts` → ≥2; `grep -c "chat_provider" src/core/config.ts` → ≥1; `npx vitest run tests/cli/native-repl-wire.test.ts` → 4+ pass
+**Test:** ≥4 (default→claude, chat_provider override (codex/ollama), brain_provider fallback, gerçek-cevap mock-adapter, provider-yok net-hata)
 **Smoke:** `echo "kısaca selam de" | env -u ANTHROPIC_API_KEY node dist/cli/entry.js 2>&1 | head -8` → gerçek asistan cevabı ("provider not wired" DEĞİL)
 
 ## Task 2: 220-002 — `chat --native` flag + --message/--once gerçek round-trip
