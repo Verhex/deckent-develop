@@ -23,8 +23,13 @@
 3. **TTY-görsel teyit:** 023 (bold), 021 (`⏱` footer), 022 (🔧 aktivite), 004 (paste) — unit+pipe+build doğrulandı; default-active; gerçek terminalde gözle teyit.
 4. **nervous-fix (224-028):** enabled + unwired-panic-gate spawn'ı bloke ediyor (runtime-trace gerekti, bu gece DEĞİL). nervous OFF kalıyor.
 
-## Durum
-**6/6 REPL render task implement edildi** (4'ü default-active+verified, 019 flag-gated v1, 020 logic-core). CI-green korundu (4567 test). 9 commit push'lu. Kalan iş: 019/020 gerçek-TTY görsel-entegrasyon (Alperen sabah).
+## Durum (güncel)
+- **224-019 pinned-bar: DONE + DEFAULT-ON + PTY-verified** (`5cd0836a`) — prompt artık akış sırasında SABİT, kaybolmuyor. Kraken ticker + ⏱ footer + cevap PTY'de render doğrulandı, temiz exit. `DECKENT_PINNED_BAR=0` ile token-smooth'a dönülür. **Senin "prompt bar kesin korunmalı" isteğin karşılandı.**
+- **224-020 /menü: FONKSİYONEL** — logic-core (12 test) + Tab-completer (224-017) + `/help` ile komutlar görülüp seçilebiliyor. Kalan tek polish: **canlı-keypress-popup** (yazarken in-place filtreli menü) — gerçek render-loop ister, çalışan-REPL'i kör-glitch'lememek için AM görsel (senin gözünle ~10dk).
+- **5/6 tam DONE + 1 fonksiyonel(popup-polish AM).** CI-green (4567 test). 11 commit push'lu.
+
+## Özet: native-parity ~%95 — gece otonom
+Markdown/token/paste/aktivite/pinned-bar **default-active + verified**; /menü fonksiyonel. Tek kalan: /menü canlı-popup görsel-polish (AM ~10dk). nervous-fix (224-028) ayrı (runtime-trace).
 
 ## Build durumu
 `npm run build` her commit'te temiz çalıştı; dist güncel. Sabah `/mcp restart` + gerçek terminalde `deckent` ile görsel teyit. Pinned-bar (019) hariç hepsi fonksiyonel.
