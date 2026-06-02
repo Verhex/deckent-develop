@@ -5,6 +5,7 @@ import {
   classifyActionRisk,
   confirmAction,
   requireConfirmIfRisky,
+  selectOption,
   type AgenticAction,
 } from '../../src/cli/commands/agentic-confirm.js';
 
@@ -143,5 +144,49 @@ describe('requireConfirmIfRisky', () => {
       { input: inputStream('y'), output: sinkStream() },
     );
     expect(result).toBe(true);
+  });
+});
+
+// ─── selectOption (Sprint 224 T-224-006) ────────────────────────────
+
+describe('selectOption — multi-select prompt', () => {
+  const choices = ['markdown', 'txt', 'json'];
+
+  it('returns the chosen index (1-based input → 0-based index)', async () => {
+    const i = await selectOption('Hangi format?', choices, {
+      input: inputStream('2'),
+      output: sinkStream(),
+    });
+    expect(i).toBe(1);
+  });
+
+  it('empty input → defaultIndex', async () => {
+    const i = await selectOption('Hangi format?', choices, {
+      input: inputStream(''),
+      output: sinkStream(),
+      defaultIndex: 2,
+    });
+    expect(i).toBe(2);
+  });
+
+  it('out-of-range input → defaultIndex (0 default)', async () => {
+    const i = await selectOption('Hangi format?', choices, {
+      input: inputStream('9'),
+      output: sinkStream(),
+    });
+    expect(i).toBe(0);
+  });
+
+  it('non-numeric input → defaultIndex', async () => {
+    const i = await selectOption('Hangi format?', choices, {
+      input: inputStream('abc'),
+      output: sinkStream(),
+    });
+    expect(i).toBe(0);
+  });
+
+  it('empty choices → fallback without prompting', async () => {
+    const i = await selectOption('Boş?', [], { input: inputStream('1'), output: sinkStream() });
+    expect(i).toBe(0);
   });
 });

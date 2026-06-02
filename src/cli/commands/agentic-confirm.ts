@@ -65,3 +65,43 @@ export async function requireConfirmIfRisky(action: AgenticAction, opts?: Confir
   if (classifyActionRisk(action) === 'safe') return true;
   return confirmAction(action, opts);
 }
+
+// ─── Multi-select prompt (Sprint 224 T-224-006) ──────────────────────
+
+export interface SelectOptionsConfig extends ConfirmOptions {
+  /** Default index returned on empty input / non-interactive. Default 0. */
+  defaultIndex?: number;
+}
+
+/**
+ * claude-code tarzı çoktan-seçmeli interaktif prompt. Numaralı seçenekleri
+ * listeler, kullanıcı 1-N girer (boş → default). Seçilen index'i döner;
+ * geçersiz/iptal → defaultIndex. Skill'ler bu yapıyla kullanıcıya seçenek
+ * sunabilir ("hangi formatta yazayım? 1) md 2) txt 3) json").
+ *
+ * node:readline/promises (ADR-010, dep-yok). Hermetik: opts.input/output
+ * enjekte edilir; non-TTY/boş input → defaultIndex (deterministik).
+ */
+export async function selectOption(
+  question: string,
+  choices: readonly string[],
+  opts?: SelectOptionsConfig,
+): Promise<number> {
+  const fallback = opts?.defaultIndex ?? 0;
+  if (choices.length === 0) return fallback;
+  const rl = createInterface({
+    input: opts?.input ?? process.stdin,
+    output: opts?.output ?? process.stdout,
+  });
+  try {
+    const menu = choices.map((c, i) => `  ${i + 1}) ${c}`).join('\n');
+    const answer = await rl.question(`\n${question}\n${menu}\nSeçim (1-${choices.length}, default ${fallback + 1}): `);
+    const trimmed = answer.trim();
+    if (trimmed.length === 0) return fallback;
+    const n = Number.parseInt(trimmed, 10);
+    if (Number.isInteger(n) && n >= 1 && n <= choices.length) return n - 1;
+    return fallback;
+  } finally {
+    rl.close();
+  }
+}
