@@ -16,12 +16,15 @@
 
 **nervous:** OFF (224-004 re-enable etmişti → geri kapatıldım; non-blocking wire yok, block riski). config local (gitignored).
 
-## 🔴 SABAH (collaborative — gerçek TTY gerek, kör-kodla riskli)
+## 🟡 SABAH (v1 var — gerçek-TTY görsel-tune + default-enable)
 
-1. **224-019 pinned-input-bar (P0):** prompt altta SABİT + token üste akış. **Render-loop + readline çakışması** çözümü gerek (scroll-region `\x1b[1;rows-1r` + prompt bottom-row, VEYA readline'ı custom keypress ile değiştir). Headless PTY ile escape-doğrulanır ama görsel-akış senin terminalinde kesinleşir. **En çok istediğin P0 — birlikte ~30dk.**
-2. **224-020 /menü keypress-wire:** mantık çekirdeği hazır+testli (`chat-slash-menu.ts`); `readline keypress` event'ine bağlama + görsel-tune TTY'de.
-3. **TTY-görsel doğrulamalar:** 023 (bold render), 021 (footer), 022 (aktivite), 004 (paste) — hepsi unit+pipe doğrulandı; gerçek terminalde görsel teyit (senin gözünle).
-4. **nervous-fix (224-028):** enabled + unwired-panic-gate spawn'ı bloke ediyor (runtime-trace gerekti, bu gece DEĞİL). Çözülene dek nervous OFF.
+1. **224-019 pinned-input-bar (P0) — v1 FLAG-GATED commit'li** (`b8f97c6d`): `DECKENT_PINNED_BAR=1` ile prompt altta sabit + cevap satır-satır üste akar (`createLineBufferedSink` + writeAbove). **Default OFF** → çalışan Model-C değişmedi. PTY-capture render'ı DOĞRULADI; bilinen pürüz: PTY-teardown + satır-granüler akış (token-granüler+pinned tam render-loop ister). **Sabah:** `DECKENT_PINNED_BAR=1 deckent` ile görsel-tune → iyiyse default'a al.
+2. **224-020 /menü — mantık çekirdeği commit'li** (`2cc0d246`, `chat-slash-menu.ts`, 12 test). **Sabah:** `readline keypress` event'ine bağla (`reduceSlashMenu`+`renderSlashMenu`) + görsel-tune.
+3. **TTY-görsel teyit:** 023 (bold), 021 (`⏱` footer), 022 (🔧 aktivite), 004 (paste) — unit+pipe+build doğrulandı; default-active; gerçek terminalde gözle teyit.
+4. **nervous-fix (224-028):** enabled + unwired-panic-gate spawn'ı bloke ediyor (runtime-trace gerekti, bu gece DEĞİL). nervous OFF kalıyor.
+
+## Durum
+**6/6 REPL render task implement edildi** (4'ü default-active+verified, 019 flag-gated v1, 020 logic-core). CI-green korundu (4567 test). 9 commit push'lu. Kalan iş: 019/020 gerçek-TTY görsel-entegrasyon (Alperen sabah).
 
 ## Build durumu
 `npm run build` her commit'te temiz çalıştı; dist güncel. Sabah `/mcp restart` + gerçek terminalde `deckent` ile görsel teyit. Pinned-bar (019) hariç hepsi fonksiyonel.
