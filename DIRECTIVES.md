@@ -1,6 +1,6 @@
 # DIRECTIVES — Sprint 219: Native Agentic Deckent — terminalde `claude` gibi + Agentic OS
 
-## Goal: NATIVE AGENTIC SPRINTİ (12 task, 5 dalga, 10 worker). HEDEF (Alperen): `deckent` terminalde `claude` gibi native conversational agentic REPL olsun — argümansız `deckent` yazınca doğrudan sohbet açılsın, doğal dille konuş → deckent senin için sprint/status/memory/dosya aksiyonlarını yapsın. **Agentic OS.** DALGA A: native REPL (`deckent` argümansız → agentic chat; `deckent chat --native` gerçek round-trip run-proven). DALGA B: agentic tool-use (doğal dil → MCP aksiyon + onay kapısı). DALGA C: F2 streaming (token-stream, claude gibi akan cevap). DALGA D: dashboard kalıcı-fix (Layout/Sidebar tek-kaynak + cache-bust + render-test) + 8-sayfa garanti. DALGA E: TR MASTER-PLAN + ADR-081. Her Tier-1 task `Smoke:` satırlı (gerçek-binary kanıt).
+## Goal: NATIVE AGENTIC SPRINTİ (14 task, 6 dalga, 10 worker). + DALGA F: blueprint.md/vision baştan-aşağı güncelle (deckent NE/NEREDE SSOT-of-identity) + otonom agentic runtime temeli (yetki-sınırlı sürekli mod). **god-level format — MVP ASLA.** HEDEF (Alperen): `deckent` terminalde `claude` gibi native conversational agentic REPL olsun — argümansız `deckent` yazınca doğrudan sohbet açılsın, doğal dille konuş → deckent senin için sprint/status/memory/dosya aksiyonlarını yapsın. **Agentic OS.** DALGA A: native REPL (`deckent` argümansız → agentic chat; `deckent chat --native` gerçek round-trip run-proven). DALGA B: agentic tool-use (doğal dil → MCP aksiyon + onay kapısı). DALGA C: F2 streaming (token-stream, claude gibi akan cevap). DALGA D: dashboard kalıcı-fix (Layout/Sidebar tek-kaynak + cache-bust + render-test) + 8-sayfa garanti. DALGA E: TR MASTER-PLAN + ADR-081. Her Tier-1 task `Smoke:` satırlı (gerçek-binary kanıt).
 
 Bağlam:
 - **git-guard AKTİF** (dist'te) — worker-spawn deckent-dev'i resetlemez (Sprint 216 felaketi tekrarlanamaz). Sprint güvenli.
@@ -197,6 +197,36 @@ Bağlam:
 **Çözüm:** ADR-081 (`deckent` argümansız agentic REPL + agentic tool-use + F2 streaming + agentic-os yönü, MADR, accepted). MASTER-PLAN §3/§4 F2-007/008 streaming, §6 native chat → DONE, §10 Sprint 219, dashboard 8-sayfa kalıcı-fix güncelle.
 **Kanıt:** `grep -c "native\|agentic\|REPL\|streaming" docs/adr/081-*.md` → ≥3; `grep -c "219" docs/MASTER-PLAN.md` → ≥1; `npx vitest run tests/docs/adr-081.test.ts` → 3+ pass
 **Test:** ≥3 (ADR-081 MADR, MASTER-PLAN güncel, accepted)
+
+---
+
+## DALGA F — Kimlik Dokümanı + Otonom Temel (2 task)
+
+## Task 13: 219-013 — blueprint.md + docs/vision/* baştan-aşağı güncelle (deckent NE/NEREDE — SSOT-of-identity)
+- Model: opus
+- Effort: normal
+- Skills: documentation-writer, system-architect
+- Files: docs/vision/blueprint.md, tests/docs/blueprint-current.test.ts
+- Scope: docs/, tests/docs/
+
+### Description
+**Problem (Alperen):** `blueprint.md` (2869 satır) Sprint 166'da stale. Bu doküman = deckent'in **NE olduğu + NEREDE olduğu** SSOT-of-identity (MASTER-PLAN = nasıl-geliştirilir). Güncel değil.
+**Çözüm:** blueprint.md'yi baştan-aşağı GÜNCELLE — güncel mimari (core+enterprise-layer, 32 MCP/49 CLI, native agentic REPL, dashboard 8 sayfa, memory V2, git-guard), positioning ("açık agent'ın god-level orkestre+enterprise hali, bireysele kolay", anti-X YOK, "open source for open world"), 6-senaryo (sıfır/dev/maintained/daily/ERP/enterprise), otonom agentic vizyon. Tarih-damgalı geçmiş bölümler korunur; "as-built" bölümler code-derived/güncel. `docs/vision/VISION.md` + `VISION-TR.md` + `competitive-analysis.md` (anti-X→kıyasla) ilerleyişe göre senkron. Stale Sprint-166 ifadeleri güncelle.
+**Kanıt:** `grep -c "Sprint 21[6-9]\|open source for open world\|otonom\|autonomous\|core.*enterprise-layer\|everyone everywhere" docs/vision/blueprint.md` → ≥4; `grep -c "anti-Devin\|anti-X" docs/vision/blueprint.md` → 0; `npx vitest run tests/docs/blueprint-current.test.ts` → 3+ pass
+**Test:** ≥3 (güncel-Sprint referansı, anti-X yok, positioning+6-senaryo mevcut)
+
+## Task 14: 219-014 — Otonom agentic runtime temeli (yetki-sınırlı sürekli mod iskeleti)
+- Model: opus
+- Effort: normal
+- Skills: typescript-expert, system-architect
+- Files: src/orchestra/autonomous-runtime.ts, tests/orchestra/autonomous-runtime.test.ts
+- Scope: src/orchestra/, tests/orchestra/
+
+### Description
+**Problem (HEDEF [[project_deckent_everyone_everywhere]]):** deckent on-demand sprint yapıyor; **sürekli+otonom yetki-sınırlı mod** yok (sipariş/MRP takip → RBAC+onay sınırında aksiyon). Enterprise otonom-agent vizyonu yarım.
+**Çözüm:** `autonomous-runtime.ts` — `runAutonomousCycle(config)`: event/trigger (scheduled-flow F3 + nervous) → analiz → RBAC (ADR-037) + onay-kapısı (nervous) içinde aksiyon → audit. İSKELET + karar mantığı (gerçek ERP write değil — read-first, aksiyon önerisi + onaylı çalıştırma). Mevcut F3 scheduled-flows + nervous approval üstüne. Caller iskelet (gerçek runtime wire Sprint 220).
+**Kanıt:** `grep -c "runAutonomousCycle\|authority\|RBAC\|approval\|trigger\|autonomous" src/orchestra/autonomous-runtime.ts` → ≥3; `npx vitest run tests/orchestra/autonomous-runtime.test.ts` → 4+ pass
+**Test:** ≥4 (trigger→cycle, yetki-içi aksiyon onaylı, yetki-dışı→reddedilir/onay-bekler, audit kaydı) — mock (hermetik)
 
 ---
 

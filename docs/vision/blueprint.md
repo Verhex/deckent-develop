@@ -1,8 +1,12 @@
 # DECKENT MASTER BLUEPRINT
 ## AI Agent Orchestration System — Complete Implementation Reference
-### Version 3.1 — May 2026 — Verhex (Updated Sprint 166)
+### Version 3.2 — June 2026 — Verhex (header refreshed Sprint 219)
 
-> **Note:** This is a Sprint-166-stamped architecture snapshot. Sprint-dated statements below are historical records (true as of that sprint) and are intentionally preserved. For the current reconciled roadmap and status (Sprint 211+), see [`docs/MASTER-PLAN.md`](../MASTER-PLAN.md). Structural facts (counts) are kept current.
+> **Doc role (Alperen 2026-06-02 — SSOT split):** `blueprint.md` = **WHAT deckent is and WHERE it stands** (identity, capabilities, architecture-as-built, positioning). `docs/MASTER-PLAN.md` = **HOW we build it** (roadmap, sequencing, remaining work — development SSOT). `docs/vision/*` track the evolving story and are updated as we progress. Live Metrics + structural counts are auto-current; the deep §-bodies below are being brought fully current in Sprint 219 (doc-refresh task).
+
+> **What deckent is (2026-06-02):** the **god-level orchestration + enterprise layer of an open agent**, made so easy a single user wields the same power — **one MIT product** from a solo dev's laptop to a 10,000-person enterprise. **"Open source for open world."** We compare with peers (Devin, Cursor, Claude Code, Cowork) on capability; never "anti-X". ([[project_deckent_positioning]])
+
+> **Where it's heading — autonomous agentic runtime:** beyond on-demand sprints, deckent runs **continuously and autonomously within defined authority bounds** — install it into an enterprise and it tracks orders, analyzes, checks MRP, and acts on customer requests inside RBAC + approval limits. Built on Process Mode (F3) + scheduled-flows + nervous approval + Capability Broker (F8 ERP) + ADR-037 authority matrix. **"Deckent orchestered for everyone everywhere"** across 6 contexts (greenfield / in-dev / maintained / daily-tasks / ERP / enterprise). ([[project_deckent_everyone_everywhere]])
 
 ---
 
