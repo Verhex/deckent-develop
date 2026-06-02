@@ -76,8 +76,10 @@
 | adr-079 | Proof-of-Function DoD — Tier-0/Tier-1 Classification + Sprint-Inner Run-Verify Gate | accepted |
 | adr-080 | Dashboard God-Level — Sprint-Start Detach + Hollow-Page Wire + Chat Round-Trip + Native UI | accepted |
 | adr-081 | Native Agentic Deckent — `deckent` argümansız REPL + Agentic Tool-Use + F2 Streaming + Agentic-OS Direction | accepted |
+| adr-082 | Native-LLM-Wire + Nervous-Activation + Dashboard-v2 Canlı | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-221 Learnings** (sprint-221): ## Sprint sprint-221 Learnings
 - **Sprint sprint-220 Learnings** (sprint-220): ## Sprint sprint-220 Learnings
 - 220-003 — Agentic REPL canlı MCP dispatch (doğal dil→gerçek aksiyon): GO_WITH_TECH_D...
 - **Sprint sprint-219 Learnings** (sprint-219): ## Sprint sprint-219 Learnings
@@ -92,7 +94,6 @@
 - **Sprint sprint-211 Learnings** (sprint-211): ## Sprint sprint-211 Learnings
 - **Sprint sprint-210 Learnings** (sprint-210): ## Sprint sprint-210 Learnings
 - 210-009 — Dashboard sprint kontrol paneli (plan/start/status UI): GO_WITH_TECH_DEBT ...
-- **Sprint sprint-209 Learnings** (sprint-209): ## Sprint sprint-209 Learnings
 
 ## Active Technical Debt
 _No active technical debt._
@@ -150,5 +151,6 @@ _No active technical debt._
 - Violation pattern: stale_heartbeat
 - Violation pattern: stale_heartbeat
 - Violation pattern: stale_heartbeat
+- Violation pattern: stale_heartbeat
 
-_Total entries: 496 | Generated: 2026-06-02_
+_Total entries: 501 | Generated: 2026-06-02_

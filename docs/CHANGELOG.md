@@ -2,6 +2,30 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint221] - 2026-06-02
+
+### Added
+
+- 221-001 — [P0] runChatNativeLoop → handleReplCommand canlı slash-wire
+- 221-002 — [P0] runChatNativeLoop → agentic dispatch canlı-wire (220-004 carry, doğal dil→aksiyon)
+- 221-003 — Canlı slash-registry (/help /status /recall /plan dinamik, hard-code değil) + sade liste
+- 221-004 — REPL status-line (provider/sprint/dizin) + özelleştirilebilir (config-driven)
+- 221-005 — [P0] Provider-resolve genişlet: ollama-local + openai-compat REPL round-trip (zero-API)
+- 221-006 — Provider-parity test matrisi (5 provider REPL round-trip eşitliği)
+- 221-007 — Provider fallback chain + yoklukta net hata (skeleton-yasak)
+- 221-008 — REPL'den enterprise komut köprüsü (/audit /rbac /flow /cost → mevcut CLI)
+- 221-009 — User/Enterprise mod (sade-default, enterprise opt-in, config-driven)
+- 221-010 — Özelleştirilebilir chat config (schema + default) — provider/mod/status-line/slash
+
+### Fixed
+
+- 221-013 — [P0] CLI kurulum/komut-çıktı fix (`deckent`/`npx deckent serve` terminalde sessiz → çalışsın)
+- 221-014 — Smoke-219-016 hotfix (plannerTaskToParams smoke-field gate'e geçsin)
+- 221-017 — AI planner subscription-spawn fix + sessiz-fallback → AÇIK uyarı (dürüstlük)
+
+
+_Tasks: 17 total, 17 done, 0 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint220] - 2026-06-02
 
 ### Added

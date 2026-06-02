@@ -1,5 +1,8 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-221 Learnings
+- Sprint sprint-221 Learnings: ## Sprint sprint-221 Learnings
+
 ## Sprint sprint-220 Learnings
 - Sprint sprint-220 Learnings: ## Sprint sprint-220 Learnings
 - 220-003 — Agentic REPL canlı MCP dispatch (doğal dil→gerçek aksiyon): GO_WITH_TECH_DEBT — Worker exited without writing result (exitCode=0)

@@ -19,6 +19,10 @@ import {
   type ProviderResponse,
   type SubscriptionSpawnFn,
 } from './commands/chat-native.js';
+import {
+  OPENAI_COMPAT_PRESETS,
+  type OpenAICompatPresetName,
+} from '../providers/openai-compatible.js';
 
 // ─── Default REPL Routing (Sprint 219 T-219-001) ────────────────────────────
 //
@@ -115,6 +119,11 @@ function subscriptionReplEnv(): NodeJS.ProcessEnv {
  *
  * Uses the global `fetch` (Node 18+; project requires Node >= 24) so no new
  * runtime dependency is introduced (ADR-010 compliance).
+ *
+ * Sprint 221 Task 221-005: connection-refused / DNS failures are wrapped
+ * with a NET error (`Ollama (<host>) erişilemedi…`) so the smoke command
+ * (`DECKENT_CHAT_PROVIDER=ollama … node dist/cli/entry.js`) surfaces a
+ * clear "ollama serve" hint instead of an opaque `TypeError: fetch failed`.
  */
 function buildOllamaReplAdapter(opts?: { fetchFn?: typeof fetch }): ChatProviderAdapter {
   const host = (process.env['DECKENT_OLLAMA_HOST'] ?? 'http://localhost:11434').replace(/\/$/, '');
@@ -123,16 +132,55 @@ function buildOllamaReplAdapter(opts?: { fetchFn?: typeof fetch }): ChatProvider
   return {
     async send(messages: ChatMessage[]): Promise<ProviderResponse> {
       const prompt = buildSubscriptionPrompt(messages);
-      const res = await fetchImpl(`${host}/api/generate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model, prompt, stream: false }),
-      });
+      let res: Response;
+      try {
+        res = await fetchImpl(`${host}/api/generate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model, prompt, stream: false }),
+        });
+      } catch (err) {
+        const reason = err instanceof Error ? err.message : String(err);
+        throw new Error(
+          `Ollama (${host}) erişilemedi: ${reason}. ` +
+          `'ollama serve' ile başlatın veya DECKENT_OLLAMA_HOST ile farklı host belirtin.`,
+        );
+      }
       if (!res.ok) {
         throw new Error(`Ollama request failed: ${res.status} ${res.statusText}`);
       }
       const data = (await res.json()) as { response?: string };
       return { text: data.response ?? '', stopReason: 'end_turn' };
+    },
+  };
+}
+
+/**
+ * Sprint 221 Task 221-005 — OpenAI-compatible REPL adapter. Bridges the
+ * REPL's {@link ChatProviderAdapter} contract onto
+ * {@link OpenAICompatibleAdapter} from src/providers/openai-compatible.ts so
+ * users can pick `deepseek` / `qwen` / `glm` via DECKENT_CHAT_PROVIDER
+ * (or a future config wire) without growing a second adapter implementation.
+ *
+ * The upstream adapter needs an `apiKey` env var (DEEPSEEK_API_KEY etc.);
+ * `send()` surfaces a `ProviderError` when it's missing so the REPL prints
+ * a clear actionable message instead of a "provider not yet wired" skeleton.
+ */
+function buildOpenAICompatReplAdapter(
+  presetName: OpenAICompatPresetName,
+  opts?: { fetchFn?: typeof fetch },
+): ChatProviderAdapter {
+  const factory = OPENAI_COMPAT_PRESETS[presetName];
+  const adapter = factory(opts?.fetchFn);
+  const firstSupported = (adapter.supportedModels[0] as string | undefined) ?? 'unknown';
+  const model = process.env['DECKENT_OPENAI_COMPAT_MODEL'] ?? firstSupported;
+  return {
+    async send(messages: ChatMessage[]): Promise<ProviderResponse> {
+      const chatMessages = messages
+        .filter((m) => m.role === 'user' || m.role === 'assistant')
+        .map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content }));
+      const result = await adapter.send(chatMessages, model);
+      return { text: result.content, stopReason: 'end_turn' };
     },
   };
 }
@@ -146,9 +194,26 @@ export interface BuildReplProviderOptions {
 }
 
 /**
+ * Sprint 221 Task 221-005 — widened union accepted by {@link buildReplProvider}
+ * so the REPL can dispatch to OpenAI-compatible HTTP backends (`deepseek` /
+ * `qwen` / `glm`) without modifying the narrower {@link ChatProviderName}
+ * union owned by `core/config.ts` (out of this task's scope). Selected via
+ * the `DECKENT_CHAT_PROVIDER` env override (see {@link resolveReplProviderForCwd}).
+ */
+export type ReplProviderName = ChatProviderName | OpenAICompatPresetName;
+
+const OPENAI_COMPAT_NAMES: readonly OpenAICompatPresetName[] = ['deepseek', 'qwen', 'glm'];
+
+function isOpenAICompatName(name: string): name is OpenAICompatPresetName {
+  return (OPENAI_COMPAT_NAMES as readonly string[]).includes(name);
+}
+
+/**
  * Build a real {@link ChatProviderAdapter} for the native REPL.
  *
  * - `'ollama'`               → HTTP fetch adapter (zero external API).
+ * - `'deepseek' | 'qwen' | 'glm'` → OpenAI-compatible HTTP adapter via
+ *   `OPENAI_COMPAT_PRESETS` (apiKey from preset env var; Sprint 221 T-005).
  * - `'claude' | 'codex' | 'gemini'` → spawn the host CLI in print/one-shot
  *   mode. The shape mirrors createSubscriptionChatAdapter (chat-native.ts)
  *   without the global registry lookup so the REPL boot does not require a
@@ -156,15 +221,18 @@ export interface BuildReplProviderOptions {
  * - anything else            → throws a clear `Unknown REPL provider …` error.
  */
 export function buildReplProvider(
-  name: ChatProviderName,
+  name: ReplProviderName,
   opts: BuildReplProviderOptions = {},
 ): ChatProviderAdapter {
   if (name === 'ollama') {
     return buildOllamaReplAdapter(opts.fetchFn ? { fetchFn: opts.fetchFn } : {});
   }
+  if (isOpenAICompatName(name)) {
+    return buildOpenAICompatReplAdapter(name, opts.fetchFn ? { fetchFn: opts.fetchFn } : {});
+  }
   if (name !== 'claude' && name !== 'codex' && name !== 'gemini') {
     throw new Error(
-      `Unknown REPL provider: "${String(name)}". Valid: claude, codex, gemini, ollama.`,
+      `Unknown REPL provider: "${String(name)}". Valid: claude, codex, gemini, ollama, deepseek, qwen, glm.`,
     );
   }
   const binary = name;
@@ -195,8 +263,31 @@ export function buildReplProvider(
   };
 }
 
-/** Resolve the REPL provider from disk config; falls back to 'claude' when load fails. */
-async function resolveReplProviderForCwd(): Promise<ChatProviderName> {
+const ALL_REPL_PROVIDER_NAMES: readonly ReplProviderName[] = [
+  'claude', 'codex', 'gemini', 'ollama', 'deepseek', 'qwen', 'glm',
+];
+
+function isValidReplProviderName(name: string): name is ReplProviderName {
+  return (ALL_REPL_PROVIDER_NAMES as readonly string[]).includes(name);
+}
+
+/**
+ * Resolve the REPL provider for the current cwd.
+ *
+ * Precedence (Sprint 221 Task 221-005):
+ *   1. `DECKENT_CHAT_PROVIDER` env override — power-user / smoke command path
+ *      (e.g. `DECKENT_CHAT_PROVIDER=ollama node dist/cli/entry.js`). Accepts
+ *      the widened {@link ReplProviderName} union (ollama + openai-compat
+ *      presets) so the smoke command can hit those without disk config.
+ *   2. `config.chat_provider` → `config.brain_provider` → `'claude'` via
+ *      {@link resolveChatProvider} (Sprint 220 Task 220-001 fallback chain).
+ *
+ * Invalid env values fall through to disk config so a typo cannot stall the
+ * REPL boot path.
+ */
+async function resolveReplProviderForCwd(): Promise<ReplProviderName> {
+  const envOverride = process.env['DECKENT_CHAT_PROVIDER'];
+  if (envOverride && isValidReplProviderName(envOverride)) return envOverride;
   try {
     const cfg = await loadConfig();
     return resolveChatProvider(cfg);
@@ -305,6 +396,10 @@ function isEntryMain(): boolean {
   }
 }
 
+// Sprint 221 Task 221-013: routing contract — argümansız (no args) → REPL;
+// argümanlı (`help` / `serve` / `--version` / unknown / any subcommand) →
+// Commander. Verified by tests/cli/cli-bin-invocation.test.ts so the global
+// `deckent` / `npx deckent <cmd>` cannot silently fall back to the REPL.
 if (isEntryMain()) {
   if (shouldLaunchDefaultRepl(process.argv)) {
     launchDefaultRepl().catch((err: unknown) => {

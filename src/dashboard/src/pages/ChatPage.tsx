@@ -22,6 +22,28 @@ interface ChatMessage {
   role: "user" | "assistant";
   content: string;
   timestamp: string;
+  isSlash?: boolean;
+}
+
+// ── Slash registry (terminal-parity with task 221-003) ──────────
+// Same set surfaced by the native REPL slash registry. Backend agentic intent
+// classifier handles /status, /recall, /plan; /clear and /help are local UX.
+// Authorization: Bearer <token> is attached server-side by useApi.post — see
+// src/dashboard/src/lib/useApi.ts.
+const SLASH_COMMANDS: ReadonlyArray<{ name: string; desc: string; local: boolean }> = [
+  { name: "/help", desc: "Slash komut listesi", local: true },
+  { name: "/clear", desc: "Konuşmayı temizle", local: true },
+  { name: "/status", desc: "Sprint durumu", local: false },
+  { name: "/recall", desc: "Hafıza ara", local: false },
+  { name: "/plan", desc: "Sprint planı", local: false },
+];
+
+function isSlash(line: string): boolean {
+  return line.startsWith("/");
+}
+
+function buildHelpText(): string {
+  return SLASH_COMMANDS.map((c) => `${c.name} — ${c.desc}`).join("\n");
 }
 
 interface NotifyEvent {
@@ -54,27 +76,46 @@ function ChatInput({ onSend, disabled }: { onSend: (msg: string) => void; disabl
     }
   };
 
+  const slashHints = isSlash(value)
+    ? SLASH_COMMANDS.filter((c) => c.name.startsWith(value.split(/\s/)[0]))
+    : [];
+
   return (
-    <div className="flex gap-2 items-end border-t border-zinc-800 bg-zinc-900 p-4">
-      <Textarea
-        ref={textareaRef}
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        onKeyDown={handleKeyDown}
-        placeholder={t("chat.input_placeholder")}
-        className="min-h-[44px] max-h-[120px] resize-none"
-        disabled={disabled}
-        data-testid="chat-input"
-      />
-      <button
-        onClick={handleSubmit}
-        disabled={disabled || !value.trim()}
-        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-blue-600 text-white transition-colors hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-        data-testid="chat-send"
-        aria-label={t("chat.send")}
-      >
-        <Send className="h-4 w-4" />
-      </button>
+    <div className="flex flex-col border-t border-zinc-800 bg-zinc-900">
+      {slashHints.length > 0 && (
+        <div
+          className="border-b border-zinc-800 px-4 py-2 text-xs"
+          data-testid="slash-hint"
+        >
+          {slashHints.map((c) => (
+            <div key={c.name} className="flex gap-2 py-0.5">
+              <span className="font-mono text-blue-400">{c.name}</span>
+              <span className="text-zinc-500">{c.desc}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="flex gap-2 items-end p-4">
+        <Textarea
+          ref={textareaRef}
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder={t("chat.input_placeholder")}
+          className="min-h-[44px] max-h-[120px] resize-none"
+          disabled={disabled}
+          data-testid="chat-input"
+        />
+        <button
+          onClick={handleSubmit}
+          disabled={disabled || !value.trim()}
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-blue-600 text-white transition-colors hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+          data-testid="chat-send"
+          aria-label={t("chat.send")}
+        >
+          <Send className="h-4 w-4" />
+        </button>
+      </div>
     </div>
   );
 }
@@ -113,9 +154,12 @@ function ChatHistory({ messages }: { messages: ChatMessage[] }) {
             <div
               className={`max-w-[80%] rounded-lg px-4 py-2 text-sm ${
                 msg.role === "user"
-                  ? "bg-blue-600 text-white"
+                  ? msg.isSlash
+                    ? "bg-blue-900 text-blue-100 font-mono"
+                    : "bg-blue-600 text-white"
                   : "bg-zinc-800 text-zinc-100"
               }`}
+              data-slash={msg.isSlash ? "true" : undefined}
             >
               <p className="whitespace-pre-wrap">{msg.content}</p>
               <span className="mt-1 block text-[10px] opacity-60">
@@ -263,11 +307,42 @@ export default function ChatPage() {
   }, [sseState?.alerts]);
 
   const handleSend = useCallback(async (content: string) => {
+    // Slash-command interception (terminal-parity, task 221-003).
+    // Local slashes (/clear, /help) never hit the backend; agentic slashes
+    // (/status, /recall, /plan) fall through to the standard POST+stream.
+    if (isSlash(content)) {
+      const cmd = content.split(/\s/)[0];
+      if (cmd === "/clear") {
+        setMessages([]);
+        return;
+      }
+      if (cmd === "/help") {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `msg-${++msgIdCounter}`,
+            role: "user",
+            content,
+            timestamp: new Date().toISOString(),
+            isSlash: true,
+          },
+          {
+            id: `msg-${++msgIdCounter}`,
+            role: "assistant",
+            content: buildHelpText(),
+            timestamp: new Date().toISOString(),
+          },
+        ]);
+        return;
+      }
+    }
+
     const userMsg: ChatMessage = {
       id: `msg-${++msgIdCounter}`,
       role: "user",
       content,
       timestamp: new Date().toISOString(),
+      isSlash: isSlash(content),
     };
     setMessages((prev) => [...prev, userMsg]);
     setSending(true);

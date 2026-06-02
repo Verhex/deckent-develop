@@ -18,41 +18,71 @@ import type { TranslationKey } from "../i18n/en";
 // Evolution/Nervous/Enterprise/Memory-Explorer + status, even though App.tsx
 // routed all 10. That was the "dashboard shows 5 not 8 pages" bug. Now mirrors
 // Sidebar.tsx's 10-link set so the rendered sidebar matches the routes.
-const navItems: ReadonlyArray<{ to: string; labelKey: TranslationKey; label?: string; icon: typeof LayoutDashboard }> = [
-  { to: "/", labelKey: "nav.dashboard", icon: LayoutDashboard },
-  { to: "/history", labelKey: "nav.history", icon: History },
-  { to: "/memory", labelKey: "nav.memory", icon: Brain },
-  { to: "/config", labelKey: "nav.config", icon: SlidersHorizontal },
-  { to: "/chat", labelKey: "nav.chat", icon: MessageCircle },
-  { to: "/status", labelKey: "dashboard.status", label: "Status", icon: Activity },
-  { to: "/evolution", labelKey: "nav.dashboard", label: "Evolution", icon: GitBranch },
-  { to: "/nervous", labelKey: "nav.dashboard", label: "Nervous", icon: Bell },
-  { to: "/enterprise", labelKey: "nav.dashboard", label: "Enterprise", icon: Building2 },
-  { to: "/memory-explorer", labelKey: "nav.dashboard", label: "Memory Explorer", icon: Search },
+// Sprint 221: chat-first layout — Chat moved to top; nav grouped: Konuş/İzle/Yönet.
+type NavItemDef = { to: string; labelKey: TranslationKey; label?: string; icon: typeof LayoutDashboard };
+
+const navGroups: ReadonlyArray<{ groupLabel: string; items: ReadonlyArray<NavItemDef> }> = [
+  {
+    groupLabel: "Konuş",
+    items: [
+      { to: "/chat", labelKey: "nav.chat", icon: MessageCircle },
+    ],
+  },
+  {
+    groupLabel: "İzle",
+    items: [
+      { to: "/", labelKey: "nav.dashboard", icon: LayoutDashboard },
+      { to: "/status", labelKey: "dashboard.status", label: "Status", icon: Activity },
+      { to: "/history", labelKey: "nav.history", icon: History },
+      { to: "/evolution", labelKey: "nav.dashboard", label: "Evolution", icon: GitBranch },
+      { to: "/nervous", labelKey: "nav.dashboard", label: "Nervous", icon: Bell },
+    ],
+  },
+  {
+    groupLabel: "Yönet",
+    items: [
+      { to: "/memory", labelKey: "nav.memory", icon: Brain },
+      { to: "/memory-explorer", labelKey: "nav.dashboard", label: "Memory Explorer", icon: Search },
+      { to: "/config", labelKey: "nav.config", icon: SlidersHorizontal },
+      { to: "/enterprise", labelKey: "nav.dashboard", label: "Enterprise", icon: Building2 },
+    ],
+  },
 ];
+
+// Flat navItems kept for backwards-compat (chat-first order)
+const navItems: ReadonlyArray<NavItemDef> = navGroups.flatMap((g) => g.items);
 
 function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   const { t } = useTranslation();
   return (
-    <nav className="flex flex-col gap-1">
-      {navItems.map(({ to, labelKey, label, icon: Icon }) => (
-        <NavLink
-          key={to}
-          to={to}
-          end={to === "/"}
-          onClick={onNavigate}
-          className={({ isActive }) =>
-            cn(
-              "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-all duration-200",
-              isActive
-                ? "bg-zinc-800 text-zinc-100 border-l-2 border-blue-500"
-                : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200 border-l-2 border-transparent",
-            )
-          }
-        >
-          <Icon className="h-4 w-4" />
-          {label ?? t(labelKey)}
-        </NavLink>
+    <nav className="flex flex-col gap-3" data-testid="layout-nav">
+      {navGroups.map(({ groupLabel, items }) => (
+        <div key={groupLabel} data-nav-group={groupLabel}>
+          <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+            {groupLabel}
+          </p>
+          <div className="flex flex-col gap-0.5">
+            {items.map(({ to, labelKey, label, icon: Icon }) => (
+              <NavLink
+                key={to}
+                to={to}
+                end={to === "/"}
+                onClick={onNavigate}
+                className={({ isActive }) =>
+                  cn(
+                    "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-all duration-200",
+                    isActive
+                      ? "bg-zinc-800 text-zinc-100 border-l-2 border-blue-500"
+                      : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200 border-l-2 border-transparent",
+                  )
+                }
+              >
+                <Icon className="h-4 w-4" />
+                {label ?? t(labelKey)}
+              </NavLink>
+            ))}
+          </div>
+        </div>
       ))}
     </nav>
   );

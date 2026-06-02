@@ -6064,3 +6064,41 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 220-017: 220-016 — README + blueprint güncel-tut (native gerçek-cevap + nervous-active) (DONE)
 
 ---
+## Sprint 221 — sprint-221
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-06-02
+**Duration:** 1398s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 17 |
+| Completed | 17 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 1398140ms |
+
+### Tasks
+
+- 221-001: 221-001 — [P0] runChatNativeLoop → handleReplCommand canlı slash-wire (DONE)
+- 221-002: 221-002 — [P0] runChatNativeLoop → agentic dispatch canlı-wire (220-004 carry, doğal dil→aksiyon) (DONE)
+- 221-003: 221-003 — Canlı slash-registry (/help /status /recall /plan dinamik, hard-code değil) + sade liste (DONE)
+- 221-004: 221-004 — REPL status-line (provider/sprint/dizin) + özelleştirilebilir (config-driven) (DONE)
+- 221-005: 221-005 — [P0] Provider-resolve genişlet: ollama-local + openai-compat REPL round-trip (zero-API) (DONE)
+- 221-006: 221-006 — Provider-parity test matrisi (5 provider REPL round-trip eşitliği) (DONE)
+- 221-007: 221-007 — Provider fallback chain + yoklukta net hata (skeleton-yasak) (DONE)
+- 221-008: 221-008 — REPL'den enterprise komut köprüsü (/audit /rbac /flow /cost → mevcut CLI) (DONE)
+- 221-009: 221-009 — User/Enterprise mod (sade-default, enterprise opt-in, config-driven) (DONE)
+- 221-010: 221-010 — Özelleştirilebilir chat config (schema + default) — provider/mod/status-line/slash (DONE)
+- 221-011: 221-011 — Dashboard ChatPage streaming + slash-komut UI (terminal-paritesi) (DONE)
+- 221-012: 221-012 — Dashboard konuşma-merkezli layout (chat öne, sade bilgi mimarisi) (DONE)
+- 221-013: 221-013 — [P0] CLI kurulum/komut-çıktı fix (`deckent`/`npx deckent serve` terminalde sessiz → çalışsın) (DONE)
+- 221-014: 221-014 — Smoke-219-016 hotfix (plannerTaskToParams smoke-field gate'e geçsin) (DONE)
+- 221-015: 221-015 — ADR-083 (REPL-UX-Evolution + Provider-Parity + Local-Model-Foundation) + MASTER-PLAN (DONE)
+- 221-016: 221-016 — README + blueprint güncel (native-REPL tam-kapsam + local-model + provider-parity) (DONE)
+- 221-017: 221-017 — AI planner subscription-spawn fix + sessiz-fallback → AÇIK uyarı (dürüstlük) (DONE)
+
+---

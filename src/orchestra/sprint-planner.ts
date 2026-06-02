@@ -276,8 +276,20 @@ export async function planSprint(
         }
       }
     } else if (planMode === 'ai') {
-      throw new BrainError('AI planner failed', SprintPhase.PLAN);
+      // Strict ai-mode: subscription-spawn failed; surface the brain_provider so the
+      // user knows what was tried. structured moda düşülmedi (mode=ai).
+      throw new BrainError(
+        `AI planner failed (provider=${brainProviderName ?? 'unknown'}). ` +
+        `Subscription-spawn returned no parseable output. structured moda düşülmedi (mode=ai).`,
+        SprintPhase.PLAN,
+      );
     } else {
+      // auto mode + AI null: previously silent. Now emit an explicit warning so the
+      // user knows AI was tried+failed and structured fallback ran.
+      console.error(
+        `[Brain] AI planner failed (provider=${brainProviderName ?? 'unknown'}) — ` +
+        `structured moda düşülüyor (falling back to structured mode).`,
+      );
       usedMode = 'fallback';
     }
   }

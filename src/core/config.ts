@@ -95,6 +95,58 @@ export function resolveChatProvider(
     : 'claude';
 }
 
+/** Typed error thrown by {@link assertChatProviderAvailable}. */
+export class ChatProviderError extends Error {
+  readonly code: 'PROVIDER_UNAVAILABLE';
+  readonly provider: ChatProviderName;
+  constructor(provider: ChatProviderName, detail?: string) {
+    const msg = `[deckent] Chat provider '${provider}' is unavailable.${detail ? ' ' + detail : ''} Check your config or run \`deckent doctor\`.`;
+    super(msg);
+    this.name = 'ChatProviderError';
+    this.code = 'PROVIDER_UNAVAILABLE';
+    this.provider = provider;
+  }
+}
+
+/**
+ * Resolve the REPL chat provider with optional local-model fallback.
+ *
+ * Extended fallback chain:
+ *   1. config.chat_provider (explicit REPL override)
+ *   2. config.brain_provider (project's primary provider)
+ *   3. config.chat?.local_fallback (e.g. 'ollama') when set
+ *   4. 'claude' (safe default)
+ *
+ * @param isAvailable Optional sync probe — when provided, if the resolved provider
+ *   returns false the function falls back to `chat.local_fallback` (if configured).
+ *   Does NOT throw; throwing is left to {@link assertChatProviderAvailable}.
+ */
+export function resolveChatProviderWithFallback(
+  config: Partial<ResolvedConfig> | Partial<DeckentConfig> | undefined | null,
+  isAvailable?: (provider: ChatProviderName) => boolean,
+): ChatProviderName {
+  const primary = resolveChatProvider(config);
+  if (!isAvailable || isAvailable(primary)) return primary;
+
+  // Primary unavailable — check chat.local_fallback
+  const chatBlock = (config as Record<string, unknown>)?.['chat'] as Record<string, unknown> | undefined;
+  const localFallback = chatBlock?.['local_fallback'];
+  if (localFallback === 'ollama') return 'ollama';
+  return primary; // caller decides what to do; assertChatProviderAvailable can throw
+}
+
+/**
+ * Assert that a resolved provider is available. Throws {@link ChatProviderError}
+ * with a clear, actionable message (not a skeleton / silent failure).
+ */
+export function assertChatProviderAvailable(
+  provider: ChatProviderName,
+  available: boolean,
+  detail?: string,
+): void {
+  if (!available) throw new ChatProviderError(provider, detail);
+}
+
 // ─── Default Timeout Config ─────────────────────────────────────────
 // Sprint 192 (Task 192-011, W-INTEGRITY I-5): adaptive timeout knobs added
 // without mutating `TimeoutConfig` in config-types.ts (out of this task's
@@ -255,6 +307,40 @@ export const NERVOUS_SYSTEM_SCHEMA = z
     history_retention_days: z.number().int().min(1),
   })
   .strict();
+
+// ─── Chat Config Schema (Sprint 221 Task 221-010) ────────────────────
+// Single source of truth for the `chat` config block. All fields are
+// optional — absence produces sade/default behaviour. Tasks 221-004,
+// 221-007, and 221-009 consume this schema.
+
+/** Zod schema for the optional `chat` block in .deckent/config.json. */
+export const CHAT_CONFIG_SCHEMA = z
+  .object({
+    provider: z.enum(['claude', 'codex', 'gemini', 'ollama']).optional(),
+    mode: z.enum(['user', 'enterprise']).optional(),
+    status_line: z.union([z.boolean(), z.array(z.string())]).optional(),
+    local_fallback: z.literal('ollama').optional(),
+    slash_extra: z.array(z.string()).optional(),
+  })
+  .strict();
+
+/** TypeScript type derived from {@link CHAT_CONFIG_SCHEMA}. */
+export type ChatConfig = z.infer<typeof CHAT_CONFIG_SCHEMA>;
+
+/**
+ * Extract and Zod-validate the `chat` block from any config shape.
+ * Returns an empty ChatConfig (sade defaults) when the block is absent,
+ * non-object, or fails validation.
+ */
+export function resolveChatConfig(
+  config: Partial<ResolvedConfig> | Partial<DeckentConfig> | undefined | null,
+): ChatConfig {
+  if (!config) return {};
+  const raw = (config as Record<string, unknown>)['chat'];
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  const result = CHAT_CONFIG_SCHEMA.safeParse(raw);
+  return result.success ? result.data : {};
+}
 
 // ─── Mode Aliases ────────────────────────────────────────────────────
 
@@ -700,6 +786,18 @@ export function validateConfig(config: DeckentConfig): string[] {
       errors.push(
         `Invalid value '${v}' for field 'prompt.adr_min_relevance'. Must be a number in [0, 1].`,
       );
+    }
+  }
+
+  // ─── Chat config validation (Sprint 221 Task 221-010) ───────────────
+  const chatBlock = (config as unknown as Record<string, unknown>)['chat'];
+  if (chatBlock !== undefined) {
+    const chatResult = CHAT_CONFIG_SCHEMA.safeParse(chatBlock);
+    if (!chatResult.success) {
+      for (const issue of chatResult.error.issues) {
+        const path = issue.path.length > 0 ? `chat.${issue.path.join('.')}` : 'chat';
+        errors.push(`${path}: ${issue.message}`);
+      }
     }
   }
 

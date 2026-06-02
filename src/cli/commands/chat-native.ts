@@ -4,6 +4,9 @@ import {
   type ProviderAdapter,
   type ProviderRegistry,
 } from '../../core/provider.js';
+import { handleReplCommand } from './chat-repl-ux.js';
+import { classifyAgenticIntent, dispatchAgenticIntent } from './chat-agentic-dispatch.js';
+import { requireConfirmIfRisky, type AgenticAction } from './agentic-confirm.js';
 
 // ═══ chat-native — Path C tool-use loop iskelet (Sprint 203 T-203-005) ═══
 //
@@ -175,6 +178,25 @@ export interface ChatNativeOptions {
    * `src/api/chat-backend.ts` callers that need errors to bubble.
    */
   gracefulErrors?: boolean;
+  /**
+   * Sprint 221 T-221-002 — natural-language → MCP tool routing. When true,
+   * each REPL line is first classified via {@link classifyAgenticIntent}; if
+   * it matches a deckent_* tool (status/history/recall/plan) the call is
+   * gated through {@link requireConfirmIfRisky} and then dispatched through
+   * the supplied `dispatcher`, skipping the provider turn entirely. Default
+   * false preserves the pre-T-221-002 behaviour for existing callers
+   * (chat-backend.ts, the chat-native-* test suite) whose canned inputs
+   * include phrases like "check status" or "how are we doing?" that would
+   * otherwise be intercepted by the STATUS_RE.
+   */
+  agenticDispatch?: boolean;
+  /**
+   * Injection point for the risky-confirm gate used when `agenticDispatch`
+   * matches a tool. Defaults to {@link requireConfirmIfRisky} (auto-approves
+   * safe read-only tools, prompts on stdin/stdout for risky ones). Tests
+   * inject a stub to drive both branches deterministically.
+   */
+  agenticConfirm?: (action: AgenticAction) => Promise<boolean>;
 }
 
 const DEFAULT_MAX_TURNS = 50;
@@ -281,6 +303,49 @@ export async function runChatNativeLoop(opts: ChatNativeOptions): Promise<ChatMe
   for await (const rawLine of input) {
     const line = rawLine.trim();
     if (line.length === 0) continue;
+    // Sprint 221 T-221-001 — slash command wire. Handle /exit, /quit, /clear
+    // here so they work for ALL input sources (createReplLines filters them
+    // at the readline layer, but HTTP backend / tests / agentic dispatch
+    // pass raw lines straight through). `handleReplCommand` lives in
+    // chat-repl-ux.ts; this is the caller, def excluded from grep.
+    const slash = handleReplCommand(line);
+    if (slash.action === 'exit') break;
+    if (slash.action === 'clear') {
+      transcript.length = 0;
+      continue;
+    }
+    // Sprint 221 T-221-002 — agentic dispatch wire. After the slash check,
+    // classify the line as a deckent_* MCP tool intent (status/history/
+    // recall/plan). On match: gate risky tools through the confirm function,
+    // then dispatch through the same `dispatcher` used for provider-driven
+    // tool_use. The result is echoed to output and recorded in the
+    // transcript+memory so context survives across turns. Opt-in via
+    // `agenticDispatch` to preserve backward compatibility with existing
+    // callers (chat-backend.ts) and tests whose canned inputs may collide
+    // with the natural-language regexes in chat-agentic-dispatch.ts.
+    if (opts.agenticDispatch) {
+      const intent = classifyAgenticIntent(line);
+      if (intent.tool !== null) {
+        const action: AgenticAction = {
+          name: intent.tool,
+          description: `agentic intent → ${intent.tool}`,
+          args: intent.args,
+        };
+        const confirmFn = opts.agenticConfirm ?? requireConfirmIfRisky;
+        const approved = await confirmFn(action);
+        if (!approved) {
+          output(`[agentic] cancelled: ${intent.tool}`);
+          continue;
+        }
+        const agenticResult = await dispatchAgenticIntent(line, dispatcher);
+        output(agenticResult.output);
+        transcript.push({ role: 'user', content: line });
+        transcript.push({ role: 'assistant', content: agenticResult.output });
+        memStore?.appendChatTurn(sessionId, 'user', line);
+        memStore?.appendChatTurn(sessionId, 'assistant', agenticResult.output);
+        continue;
+      }
+    }
     if (EXIT_COMMANDS.includes(line.toLowerCase())) break;
     if (turnCount >= maxTurns) {
       output(`[chat-native] maxTurns (${maxTurns}) reached — ending session.`);
