@@ -16,10 +16,16 @@ import {
   defaultSubscriptionSpawn,
   type ChatMessage,
   type ChatProviderAdapter,
-  type McpToolDispatcher,
   type ProviderResponse,
   type SubscriptionSpawnFn,
 } from './commands/chat-native.js';
+import {
+  createPersistentClaudeSession,
+  type PersistentClaudeSession,
+  type PersistentSpawnFn,
+} from './commands/chat-session.js';
+import { createSpinner } from './commands/chat-spinner.js';
+import { createCliToolDispatcher } from './commands/chat-tool-bridge.js';
 import {
   OPENAI_COMPAT_PRESETS,
   type OpenAICompatPresetName,
@@ -254,6 +260,13 @@ export interface BuildReplProviderOptions {
   spawnFn?: SubscriptionSpawnFn;
   /** Custom fetch — injected by tests so the Ollama branch never hits the network. */
   fetchFn?: typeof fetch;
+  /**
+   * Sprint 223 T-223-001 — persistent claude spawn injection. When supplied
+   * (or when `spawnFn` is absent on the claude branch), the REPL builds a
+   * {@link createPersistentClaudeSession} so a single warm child is reused
+   * across every turn instead of paying the per-turn cold-start.
+   */
+  persistentSpawnFn?: PersistentSpawnFn;
 }
 
 /**
@@ -298,6 +311,22 @@ export function buildReplProvider(
       `Unknown REPL provider: "${String(name)}". Valid: claude, codex, gemini, ollama, deepseek, qwen, glm.`,
     );
   }
+
+  // Sprint 223 T-223-001 — persistent claude session wire. The default REPL
+  // path (no `spawnFn` injected) and the new persistent-wire tests
+  // (`persistentSpawnFn` injected) both spawn ONE warm claude child and reuse
+  // it across every turn — eliminating the per-turn ~4.5s cold-start that
+  // made the 2-message REPL feel ~17s. codex/gemini stay per-turn here; only
+  // claude pays a cold-start big enough to justify the persistent stream-json
+  // session. Legacy tests that inject `spawnFn` (SubscriptionSpawnFn) keep
+  // the per-turn path so the existing repl-streaming/native-repl-wire suites
+  // remain green.
+  if (name === 'claude' && (opts.persistentSpawnFn || !opts.spawnFn)) {
+    return createPersistentClaudeSession(
+      opts.persistentSpawnFn ? { spawnFn: opts.persistentSpawnFn } : {},
+    );
+  }
+
   const binary = name;
   const extraArgs = extraArgsForProvider(name);
   const spawnFn: SubscriptionSpawnFn = opts.spawnFn ?? defaultSubscriptionSpawn;
@@ -403,13 +432,6 @@ async function resolveReplProviderForCwd(): Promise<ReplProviderName> {
   }
 }
 
-/** No-op MCP dispatcher used until the REPL grows agentic tool-use (220-003). */
-const NOOP_MCP_DISPATCHER: McpToolDispatcher = {
-  async dispatch(name) {
-    return `[chat-native] tool "${name}" not yet wired`;
-  },
-};
-
 /**
  * Launch the default REPL (bare `deckent`). Connects stdin to runChatNativeLoop
  * with a real {@link ChatProviderAdapter} so the user gets a real LLM round-trip
@@ -453,13 +475,32 @@ export async function launchDefaultRepl(): Promise<void> {
     }
   }
 
+  // Real MCP dispatcher — slash commands (/status, /recall, /sprint) now
+  // shell out to the deckent CLI instead of the prior "not yet wired" stub.
+  const dispatcher = createCliToolDispatcher();
+  // TTY-only braille spinner shown while the provider is producing a reply
+  // (no-op on pipes, so smoke/test output stays clean). The loop stops it on
+  // the first byte of output.
+  const spinner = createSpinner('düşünüyor…');
+
   await runChatNativeLoop({
     provider,
-    dispatcher: NOOP_MCP_DISPATCHER,
+    dispatcher,
     input: readStdin(),
     output: (line) => process.stdout.write(line.endsWith('\n') ? line : line + '\n'),
     gracefulErrors: true,
+    layoutEnabled: true,
+    thinkingIndicator: spinner,
   });
+
+  // Sprint 223 T-223-001 — persistent claude session cleanup. The `:exit`
+  // slash drops out of runChatNativeLoop, so we kill the warm claude child
+  // here. Duck-typed: only PersistentClaudeSession exposes `exit`, so the
+  // codex/gemini/ollama/openai-compat branches are unaffected.
+  const maybeSession = provider as Partial<PersistentClaudeSession>;
+  if (typeof maybeSession.exit === 'function') {
+    await maybeSession.exit();
+  }
 }
 
 // ─── Node Version Guard ─────────────────────────────────────────────────────
