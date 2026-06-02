@@ -253,6 +253,111 @@ Bağlam (Alperen+cc run-verify 2026-06-02, [[project_terminal_dashboard_ux_evolu
 
 ---
 
+## DALGA H — Native CLI Parity (F11, deckent DOGFOOD koşar) — claude-code/codex/gemini kalitesi
+
+> **Base:** `recover-sprint223-nervous-finalizer` main'e merge edildikten SONRA, deckent bu dalgayı dogfood'lar. Hepsi `src/cli/commands/` + `src/cli/entry.ts` user-surface → **Tier-1, Smoke ZORUNLU** (gerçek TTY davranışı). Mock-only = GO_WITH_TECH_DEBT.
+
+## Task 19: 224-019 — [P0] Pinned input bar (prompt ALTTA SABİT, token'lar ÜSTÜNE akar — claude-code render loop)
+- Model: opus
+- Effort: high
+- Skills: typescript-expert, frontend-design
+- Files: src/cli/commands/chat-render-region.ts, src/cli/entry.ts, tests/cli/repl-pinned-bar.test.ts
+- Scope: src/cli/, tests/cli/
+### Description
+**Problem (Alperen run-verify):** Token-token yazarken `› ` prompt bar KAYBOLUYOR — çıktı en alt satıra yazıyor, prompt sabit kalmıyor. claude-code'da input bar **her zaman altta sabit**, cevap token'ları **üstüne** akar.
+**Çözüm:** Render loop — tur sırasında prompt'u alt satırda PİNLİ tut; her streamed token gelince: cursor'u response bölgesine al (prompt'un üstü), token'ı oraya **inline** yaz, prompt satırını koru/yeniden çiz. ANSI cursor save/restore (`\x1b7`/`\x1b8`) + clearLine + satır-bütçesi. Kullanıcı yazdığı korunur (rl.line). Smooth streaming (224-011) bozulmadan. Non-TTY düz.
+**Kanıt:** `grep -c "pin\|save\|restore\|cursorTo\|prompt(true)\|\\\\x1b7" src/cli/commands/chat-render-region.ts src/cli/entry.ts` → ≥4; `npx vitest run tests/cli/repl-pinned-bar.test.ts` → 4+ pass
+**Test:** ≥4 (token→üste yazar, prompt→altta kalır, buffer korunur, non-TTY düz) — hermetik (fake rl/out)
+**Smoke (GERÇEK TTY):** cevap token-token akarken `› ` prompt bar **altta sabit kalır** (kaybolmaz), token'lar üstte akar.
+
+## Task 20: 224-020 — [P0] İnteraktif `/` menü (yazarken canlı popup — Tab değil)
+- Model: opus
+- Effort: high
+- Skills: typescript-expert, frontend-design
+- Files: src/cli/commands/chat-slash-menu.ts, src/cli/entry.ts, tests/cli/repl-slash-menu.test.ts
+- Scope: src/cli/, tests/cli/
+### Description
+**Problem:** `/` basınca aktif/etkileşimli bir bar görünmüyor (sadece Tab-completion var). claude-code'da `/` yazınca anında **canlı menü** açılır, yazdıkça filtrelenir, ↑/↓ + Enter seçilir.
+**Çözüm:** `chat-slash-menu.ts` — keypress-driven: input `/` ile başlayınca prompt'un üstünde canlı komut menüsü render et (buildSlashRegistry'den), her tuşta filtrele, ↑/↓ vurgu, Enter seç/çalıştır, Esc kapat. readline keypress events (`rl.input.on('keypress')` veya raw-mode). Non-TTY → no-op (completer fallback).
+**Kanıt:** `grep -c "keypress\|menu\|filter\|highlight\|/" src/cli/commands/chat-slash-menu.ts` → ≥3; `npx vitest run tests/cli/repl-slash-menu.test.ts` → 4+ pass
+**Test:** ≥4 (/ açar, filtre, ↑/↓ seçim, Esc kapat) — hermetik (keypress mock)
+**Smoke (GERÇEK TTY):** `/` yazınca canlı menü görünür + filtrelenir.
+
+## Task 21: 224-021 — Token sayacı + süre (her tur sonu `⏱ 3.2s · 1.2k tok`)
+- Model: opus
+- Effort: normal
+- Skills: typescript-expert, anthropic-sdk
+- Files: src/cli/commands/chat-session.ts, src/cli/commands/chat-native.ts, tests/cli/turn-stats.test.ts
+- Scope: src/cli/, tests/cli/
+### Description
+**Problem:** Token sayacı YOK, süre YOK. claude-code her cevap sonu token+süre gösterir.
+**Çözüm:** chat-session.ts — claude `result` event'inden `usage` (input/output tokens) yakala, ProviderResponse'a ekle. chat-native.ts — tur başı/sonu süre ölç; tur sonu dim footer `⏱ <süre>s · <tok> tok` bas (TTY). Non-TTY/test sessiz.
+**Kanıt:** `grep -c "usage\|tokens\|elapsed\|duration\|⏱" src/cli/commands/chat-session.ts src/cli/commands/chat-native.ts` → ≥3; `npx vitest run tests/cli/turn-stats.test.ts` → 4+ pass
+**Test:** ≥4 (usage parse, süre ölçüm, footer format, usage-yok→sessiz) — hermetik
+**Smoke:** cevap sonu `⏱ … · … tok` görünür.
+
+## Task 22: 224-022 — Canlı aktivite görünümü (beklerken NE yaptığını göster)
+- Model: opus
+- Effort: normal
+- Skills: typescript-expert
+- Files: src/cli/commands/chat-render-region.ts, src/cli/commands/chat-native.ts, tests/cli/activity-view.test.ts
+- Scope: src/cli/, tests/cli/
+### Description
+**Problem (Alperen):** Anlık beklerken deckent'in NE yaptığı görünmüyor (sadece "düşünüyor"). claude-code tool çağrılarını/adımları gösterir.
+**Çözüm:** tool_use dispatch sırasında "🔧 <tool> çalışıyor: <özet>" gibi canlı satır göster (thinking region'da). Tur içi adımlar görünür. Non-TTY düz.
+**Kanıt:** `grep -c "activity\|tool\|🔧\|step\|running" src/cli/commands/chat-render-region.ts src/cli/commands/chat-native.ts` → ≥2; `npx vitest run tests/cli/activity-view.test.ts` → 4+ pass
+**Test:** ≥4 (tool-aktivite görünür, çok-adım, biter→temizlenir, non-TTY) — hermetik
+
+## Task 23: 224-023 — Markdown streaming render (`**bold**`/`` `code` ``/liste — literal `**` görünmesin)
+- Model: opus
+- Effort: high
+- Skills: typescript-expert
+- Files: src/cli/commands/chat-render.ts, src/cli/entry.ts, tests/cli/stream-markdown.test.ts
+- Scope: src/cli/, tests/cli/
+### Description
+**Problem:** `**` arası metin literal görünüyor (Model C raw stream → markdown render edilmiyor).
+**Çözüm:** chat-render.ts `createStreamMarkdown()` — stateful streaming transform: chunk-chunk gelirken `**bold**` → BOLD, `` `code` `` → DIM, satır-başı `- ` → `• `. Chunk sınırında bölünen marker'ı tampona al. entry.ts TTY output bu transform'dan geçsin; tur sonu flush. Smooth streaming (224-011) korunur.
+**Kanıt:** `grep -c "createStreamMarkdown\|feed\|flush\|bold\|\\*\\*" src/cli/commands/chat-render.ts` → ≥3; `npx vitest run tests/cli/stream-markdown.test.ts` → 5+ pass
+**Test:** ≥5 (bold render, code render, chunk-bölünmüş marker, liste, non-TTY düz) — hermetik
+**Smoke:** markdownlu cevap → `**` görünmez, kalın render olur.
+
+## Task 24: 224-024 — UTF-8 / Türkçe karakter doğruluğu (şekil-bozukluğu fix)
+- Model: sonnet
+- Effort: normal
+- Skills: typescript-expert
+- Files: src/cli/commands/chat-render-region.ts, tests/cli/utf8-render.test.ts
+- Scope: src/cli/, tests/cli/
+### Description
+**Problem (Alperen):** Türkçe karakter şekil-bozuklukları. Render/encoding yolunda UTF-8 bütünlüğü denetlenmeli (stdout encoding, byte-bölme, çok-byte karakter).
+**Çözüm:** Çıkış yollarının UTF-8 (setEncoding/Buffer) bütünlüğünü doğrula; çok-byte karakter chunk sınırında bölünmesin. Türkçe (ı/ş/ğ/ç/ö/ü) test fixture.
+**Kanıt:** `npx vitest run tests/cli/utf8-render.test.ts` → 4+ pass
+**Test:** ≥4 (Türkçe render bütün, byte-bölme yok, emoji/braille, non-TTY) — hermetik
+
+## Task 25: 224-025 — Tıklanır dosya yolları (VSCode osc-8)
+- Model: sonnet
+- Effort: low
+- Skills: typescript-expert
+- Files: src/cli/commands/chat-render.ts, tests/cli/clickable-paths.test.ts
+- Scope: src/cli/, tests/cli/
+### Description
+**Çözüm:** Cevaptaki dosya yollarını osc-8 hyperlink (`\x1b]8;;file://...\x1b\\`) ile sar (TTY), VSCode terminal tıklanır. Düz-yol fallback.
+**Kanıt:** `grep -c "osc\|8;;\|file://\|link" src/cli/commands/chat-render.ts` → ≥2; `npx vitest run tests/cli/clickable-paths.test.ts` → 3+ pass
+**Test:** ≥3 (path→osc8 link, non-path dokunma, non-TTY düz)
+
+## Task 26: 224-026 — Multi-provider native parity (codex/gemini de persistent+agentic+akış)
+- Model: opus
+- Effort: high
+- Skills: typescript-expert, anthropic-sdk
+- Files: src/cli/entry.ts, src/cli/commands/chat-provider-parity.ts, tests/cli/provider-parity-native.test.ts
+- Scope: src/cli/, tests/cli/
+### Description
+**Problem:** Sadece claude persistent+agentic; codex/gemini per-turn (yavaş, agentic yok). Multi-provider native parity şart.
+**Çözüm:** codex/gemini için de warm-session + streaming + agentic tool-use (provider-agnostik `<deckent_tool>` zaten var). Her provider aynı REPL kalitesi.
+**Kanıt:** `grep -c "codex\|gemini\|persistent\|stream\|parity" src/cli/commands/chat-provider-parity.ts` → ≥3; `npx vitest run tests/cli/provider-parity-native.test.ts` → 4+ pass
+**Test:** ≥4 (codex warm+stream, gemini warm+stream, agentic parity, fallback) — hermetik (mock spawn)
+
+---
+
 **Beklenen:** 11-13/13 DONE, 0 false-FIX. **Native REPL GERÇEKTEN claude-code gibi:** line-editing+history+ok-tuş (224-001), tek-görünüm prompt (224-002), akıcı multi-turn (224-003) + paste-tek-mesaj (224-004), **gerçekten dosya yazar/aksiyon alır** (224-005/006/007 — interaktif y/N+multi-select onayla), `/nervous` görünür (224-008) + banner (224-009) + nervous güvenli açık (224-010), pürüzsüz streaming (224-011). CI yeşil KORUNUR.
 
 **🟢 RUN-VERIFY (cc sprint sonu):** gerçek `dist/cli/entry.js` GERÇEK TTY'de — ↑ history + ←/→ + Del (ham escape yok), kullanıcı satırı tek-görünüm, 2./3. mesaj cevaplanır, paste tek-mesaj, "X.md yaz" → onay → **dosya OLUŞUR**, `/nervous` pending, akış pürüzsüz. `node scripts/repl-smoke-verify.mjs` + `agentic-do-verify.mjs` yeşil. Mock-only DONE YOK.
