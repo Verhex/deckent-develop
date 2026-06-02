@@ -32,6 +32,7 @@ import { createToolExecDispatcher } from './commands/chat-tool-exec.js';
 import { createPermissionStore } from './commands/chat-permissions.js';
 import { slashCompleter } from './commands/chat-slash-registry.js';
 import { createPromptRegion, createThinkingTicker } from './commands/chat-render-region.js';
+import { createStreamMarkdown } from './commands/chat-render.js';
 import {
   OPENAI_COMPAT_PRESETS,
   type OpenAICompatPresetName,
@@ -591,17 +592,23 @@ export async function launchDefaultRepl(): Promise<void> {
         : cliDispatcher.dispatch(toolName, args),
   };
 
+  // T-224-023 — streaming markdown. On a TTY the reply streams token-by-token,
+  // so `**bold**` / `` `code` `` are rendered inline via this stateful transform
+  // (else the markers show literally). Non-TTY → passthrough (pipe unchanged).
+  const streamMd = createStreamMarkdown(isTty);
+
   await runChatNativeLoop({
     provider,
     dispatcher,
     input: isTty ? arbitratedInput() : simpleLines(),
     // T-224-011 — on an interactive TTY write provider output RAW (no forced
     // newline) so streamed token deltas concatenate INLINE (smooth, claude-code
-    // feel) instead of one-fragment-per-line. The loop closes each turn with a
-    // single newline. Off-TTY keeps the line-buffered sink (pipe/HTTP/tests
-    // byte-for-byte unchanged).
+    // feel) instead of one-fragment-per-line. T-224-023 — fed through the
+    // streaming-markdown transform so bold/code render live. The loop closes
+    // each turn with a single newline. Off-TTY keeps the line-buffered sink
+    // (pipe/HTTP/tests byte-for-byte unchanged).
     output: isTty
-      ? (line) => process.stdout.write(line)
+      ? (line) => process.stdout.write(streamMd.feed(line))
       : (line) => process.stdout.write(line.endsWith('\n') ? line : line + '\n'),
     gracefulErrors: true,
     layoutEnabled: true,
