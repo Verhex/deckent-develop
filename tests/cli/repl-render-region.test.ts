@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
-import { createPromptRegion, createLineQueue, createThinkingTicker } from '../../src/cli/commands/chat-render-region.js';
+import { createPromptRegion, createLineQueue, createThinkingTicker, createPasteCoalescer } from '../../src/cli/commands/chat-render-region.js';
 
 // Sprint 224 T-224-014 — pinned-prompt render region.
 // Hermetic: fake readline interface + fake write stream, no real TTY.
@@ -132,3 +132,54 @@ describe('createThinkingTicker — rotating-verb indicator (T-224-014)', () => {
 });
 
 // (slashCompleter lives in chat-slash-registry; tested in its own block below)
+
+describe('createPasteCoalescer — multi-line paste → one message (T-224-004)', () => {
+  it('coalesces a burst of lines (within window) into ONE message', () => {
+    vi.useFakeTimers();
+    try {
+      const msgs: string[] = [];
+      const pc = createPasteCoalescer((m) => msgs.push(m), 40);
+      pc.feed('line one');
+      pc.feed('line two');
+      pc.feed('line three');
+      vi.advanceTimersByTime(40);
+      expect(msgs).toEqual(['line one\nline two\nline three']);
+    } finally { vi.useRealTimers(); }
+  });
+
+  it('single line → one message after the window', () => {
+    vi.useFakeTimers();
+    try {
+      const msgs: string[] = [];
+      const pc = createPasteCoalescer((m) => msgs.push(m), 40);
+      pc.feed('solo');
+      expect(msgs).toEqual([]); // not yet
+      vi.advanceTimersByTime(40);
+      expect(msgs).toEqual(['solo']);
+    } finally { vi.useRealTimers(); }
+  });
+
+  it('two bursts separated by > window → two messages', () => {
+    vi.useFakeTimers();
+    try {
+      const msgs: string[] = [];
+      const pc = createPasteCoalescer((m) => msgs.push(m), 40);
+      pc.feed('first');
+      vi.advanceTimersByTime(50);
+      pc.feed('second');
+      vi.advanceTimersByTime(50);
+      expect(msgs).toEqual(['first', 'second']);
+    } finally { vi.useRealTimers(); }
+  });
+
+  it('flush() emits the buffered message immediately', () => {
+    vi.useFakeTimers();
+    try {
+      const msgs: string[] = [];
+      const pc = createPasteCoalescer((m) => msgs.push(m), 40);
+      pc.feed('a'); pc.feed('b');
+      pc.flush();
+      expect(msgs).toEqual(['a\nb']);
+    } finally { vi.useRealTimers(); }
+  });
+});

@@ -31,7 +31,7 @@ import { createCliToolDispatcher } from './commands/chat-tool-bridge.js';
 import { createToolExecDispatcher } from './commands/chat-tool-exec.js';
 import { createPermissionStore } from './commands/chat-permissions.js';
 import { slashCompleter } from './commands/chat-slash-registry.js';
-import { createPromptRegion, createThinkingTicker } from './commands/chat-render-region.js';
+import { createPromptRegion, createThinkingTicker, createPasteCoalescer } from './commands/chat-render-region.js';
 import { createStreamMarkdown } from './commands/chat-render.js';
 import {
   OPENAI_COMPAT_PRESETS,
@@ -526,14 +526,23 @@ export async function launchDefaultRepl(): Promise<void> {
   let lineWake: (() => void) | null = null;
   let inputClosed = false;
   let pendingAnswer: ((line: string) => void) | null = null;
+  const enqueue = (msg: string): void => {
+    lineBuf.push(msg);
+    if (lineWake) { const w = lineWake; lineWake = null; w(); }
+  };
+  // T-224-004 — paste coalescer: multi-line paste arrives as a burst of 'line'
+  // events; coalesce them into ONE message (else each line is a separate turn).
+  // Single typed line → emitted after the small window. Confirm answers bypass
+  // this (handled before feed). Only on an interactive TTY.
+  const paste = isTty ? createPasteCoalescer(enqueue) : null;
   rl.on('line', (line: string) => {
     if (pendingAnswer) { const p = pendingAnswer; pendingAnswer = null; p(line); return; }
-    lineBuf.push(line);
-    if (lineWake) { const w = lineWake; lineWake = null; w(); }
+    if (paste) paste.feed(line); else enqueue(line);
   });
   rl.on('close', () => {
     inputClosed = true;
     if (pendingAnswer) { const p = pendingAnswer; pendingAnswer = null; p(''); }
+    paste?.flush();
     if (lineWake) { const w = lineWake; lineWake = null; w(); }
   });
   async function* arbitratedInput(): AsyncGenerator<string> {

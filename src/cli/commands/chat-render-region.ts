@@ -152,6 +152,46 @@ export function createThinkingTicker(
  * kapanınca (`close`) iterator biter. Strict-sequential async-iterator'ın
  * aksine, tur-arası bloke olmaz: kullanıcı cevap beklerken yazmaya devam eder.
  */
+// ─── Paste coalescer (Sprint 224 T-224-004) ────────────────────────
+//
+// Çok-satırlı yapıştırma terminale her satırı ayrı 'line' event'i olarak gelir
+// → her satır ayrı tur → ayrı cevap beklenir (kopyala-yapıştır kırık). Coalescer
+// kısa bir pencere (windowMs) içinde art-arda gelen satırları TEK mesajda
+// (\n ile) birleştirir; pencere boşalınca emit eder. Tek satır → pencere kadar
+// (≈40ms) gecikmeyle tek mesaj. Bilinçli art-arda gönderim (saniyeler arayla) →
+// ayrı mesajlar. flush() bekleyen tamponu hemen boşaltır (exit/teardown).
+
+export interface PasteCoalescer {
+  feed(line: string): void;
+  flush(): void;
+}
+
+export function createPasteCoalescer(
+  emit: (message: string) => void,
+  windowMs = 40,
+): PasteCoalescer {
+  let buf: string[] = [];
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const fire = (): void => {
+    timer = null;
+    if (buf.length === 0) return;
+    const msg = buf.join('\n');
+    buf = [];
+    emit(msg);
+  };
+  return {
+    feed(line: string): void {
+      buf.push(line);
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(fire, windowMs);
+    },
+    flush(): void {
+      if (timer) clearTimeout(timer);
+      fire();
+    },
+  };
+}
+
 export async function* createLineQueue(
   rl: Pick<ReadlineInterface, 'on'>,
   onIdle?: () => void,
