@@ -45,14 +45,17 @@ export function registerPlan(program: Command): void {
             // user knows *why* AI mode was unavailable instead of a silent reason.
             const provider = config.brain_provider ?? 'unknown';
             const reason = bootErr instanceof Error ? bootErr.message : String(bootErr);
+            // Only warn on an ACTUAL silent fallback (auto/ai mode → structured).
+            // When the user explicitly passed --structured, a bootstrap failure
+            // is expected/irrelevant (no AI needed) — staying structured is not a
+            // surprise, so it must NOT print a warning (T-224-001 honesty applies
+            // to the silent-auto-fallback, not the explicit-structured choice).
             if (!planMode) {
               print(
                 `[warn] Provider bootstrap failed (provider=${provider}): ${reason} — ` +
                 `falling back to structured mode.`,
               );
               planMode = 'structured';
-            } else {
-              print(`[warn] Provider bootstrap failed (provider=${provider}): ${reason}`);
             }
           }
         }
