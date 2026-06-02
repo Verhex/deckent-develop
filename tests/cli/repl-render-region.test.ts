@@ -84,20 +84,17 @@ describe('createLineQueue — buffered back-to-back input (T-224-014)', () => {
 describe('createThinkingTicker — rotating-verb indicator (T-224-014)', () => {
   it('non-TTY → start/stop are no-ops (no writes, no throw)', () => {
     const out = fakeOut(false);
-    const rl = { prompt: vi.fn() };
-    const ticker = createThinkingTicker(rl, out, { isTty: false });
+    const ticker = createThinkingTicker(out, { isTty: false });
     ticker.start();
     ticker.stop();
     expect(out.writes.length).toBe(0);
-    expect(rl.prompt).not.toHaveBeenCalled();
   });
 
   it('TTY → start shows `● deckent` + a verb, then rotates on tick', () => {
     vi.useFakeTimers();
     try {
       const out = fakeOut(true);
-      const rl = { prompt: vi.fn() };
-      const ticker = createThinkingTicker(rl, out, { isTty: true });
+      const ticker = createThinkingTicker(out, { isTty: true });
       ticker.start();
       const first = out.writes.join('');
       expect(first).toContain('deckent');
@@ -111,14 +108,18 @@ describe('createThinkingTicker — rotating-verb indicator (T-224-014)', () => {
     }
   });
 
-  it('TTY → stop clears the timer and finalizes to plain `● deckent` (no verb)', () => {
+  it('TTY → stop finalizes to plain `● deckent` + newline and clears the timer', () => {
     vi.useFakeTimers();
     try {
       const out = fakeOut(true);
-      const rl = { prompt: vi.fn() };
-      const ticker = createThinkingTicker(rl, out, { isTty: true });
+      const ticker = createThinkingTicker(out, { isTty: true });
       ticker.start();
+      out.writes.length = 0;
       ticker.stop();
+      // Finalize line carries the header and a trailing newline (reply streams below).
+      const finalWrite = out.writes.join('');
+      expect(finalWrite).toContain('deckent');
+      expect(finalWrite.endsWith('\n')).toBe(true);
       out.writes.length = 0;
       // After stop, advancing time must NOT rotate (timer cleared).
       vi.advanceTimersByTime(2100);

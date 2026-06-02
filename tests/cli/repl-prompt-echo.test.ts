@@ -42,7 +42,7 @@ describe('runChatNativeLoop — interactive-TTY echo guard (T-224-002)', () => {
     expect(joined()).not.toContain('› selam');
   });
 
-  it('interactiveTty: true → still emits the assistant header', async () => {
+  it('interactiveTty: true → suppresses the loop header (ticker owns `● deckent`), reply still streams', async () => {
     const { output, joined } = collect();
     await runChatNativeLoop({
       provider: endTurnProvider('cevap'),
@@ -52,8 +52,10 @@ describe('runChatNativeLoop — interactive-TTY echo guard (T-224-002)', () => {
       layoutEnabled: true,
       interactiveTty: true,
     });
-    expect(joined()).toContain('deckent'); // renderAssistantHeader → "● deckent"
-    expect(joined()).toContain('cevap');   // the reply body
+    // On a TTY the rotating-verb ticker renders `● deckent`, so the loop must
+    // NOT also emit the layout header (would duplicate). The reply still streams.
+    expect(joined()).not.toContain('● deckent');
+    expect(joined()).toContain('cevap');
   });
 
   it('non-TTY (interactiveTty omitted) → KEEPS the `› line` echo (pipe contract)', async () => {

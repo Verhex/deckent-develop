@@ -137,6 +137,28 @@ describe('parseStreamJsonLine', () => {
     expect(parseStreamJsonLine(JSON.stringify({ type: 'system', subtype: 'init' })).text).toBe('');
     expect(parseStreamJsonLine(JSON.stringify({ type: 'content_block_delta' })).text).toBe('');
   });
+
+  // Sprint 224 T-224-011 — claude `--include-partial-messages` wraps deltas in a
+  // `stream_event` envelope. Without unwrapping, NO incremental token is matched
+  // and the reply only arrives via the final `result` (dumped at once = chunky/slow).
+  it('unwraps stream_event envelope to extract incremental token deltas', () => {
+    const r = parseStreamJsonLine(
+      JSON.stringify({
+        type: 'stream_event',
+        event: { type: 'content_block_delta', delta: { type: 'text_delta', text: 'mer' } },
+      }),
+    );
+    expect(r.text).toBe('mer');
+    expect(r.done).toBe(false);
+  });
+
+  it('ignores non-delta stream_event envelopes (message_start, etc.)', () => {
+    expect(
+      parseStreamJsonLine(
+        JSON.stringify({ type: 'stream_event', event: { type: 'message_start', message: {} } }),
+      ).text,
+    ).toBe('');
+  });
 });
 
 // ─── createPersistentClaudeSession — single spawn across turns ──────

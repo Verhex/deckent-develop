@@ -487,7 +487,11 @@ export async function runChatNativeLoop(opts: ChatNativeOptions): Promise<ChatMe
     // Sprint 223 T-223-004 — assistant block header. Announces `● deckent`
     // immediately before the streaming/send call so users see who is about
     // to speak even on slow first-token providers.
-    if (layoutOn) emitLayout(renderAssistantHeader());
+    // Sprint 224 T-224-011/014 — on an interactive TTY the thinking ticker
+    // OWNS the `● deckent · <fiil>…` line and finalizes it to `● deckent` on
+    // first token, so the loop must NOT also emit a separate header (would
+    // duplicate). Off-TTY keeps the header so pipe/HTTP output is unchanged.
+    if (layoutOn && opts.interactiveTty !== true) emitLayout(renderAssistantHeader());
 
     // "Thinking" indicator — started after the header, stopped on the first
     // byte of provider output (see stopIndicator below) or in the per-turn
@@ -556,10 +560,12 @@ export async function runChatNativeLoop(opts: ChatNativeOptions): Promise<ChatMe
       stopIndicator();
     }
 
-    // Sprint 223 T-223-004 — close the turn with a thin separator so the
-    // next user prompt starts in a fresh visual block. On non-TTY callers
-    // messageSeparator returns '' and emitLayout drops it.
-    if (layoutOn) emitLayout(messageSeparator());
+    // Close the turn. Sprint 224 T-224-011 — on an interactive TTY the reply
+    // streamed inline (raw, no trailing newline), so emit a single newline to
+    // close the response line before the `› ` prompt is redrawn for the next
+    // turn. Off-TTY keeps the thin separator (messageSeparator returns '' on
+    // non-TTY anyway, so emitLayout drops it and pipe output is unchanged).
+    if (layoutOn) emitLayout(opts.interactiveTty === true ? '\n' : messageSeparator());
   }
 
   return transcript;

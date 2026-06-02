@@ -184,13 +184,27 @@ export function parseStreamJsonLine(raw: string): ParsedStreamEvent {
   if (obj === null || typeof obj !== 'object') return { text: '', done: false };
   const rec = obj as Record<string, unknown>;
 
+  // `result` is emitted at the top level (end-of-turn marker).
   if (rec['type'] === 'result') {
     const resultText = typeof rec['result'] === 'string' ? (rec['result'] as string) : '';
     return { text: '', done: true, resultText };
   }
 
-  if (rec['type'] === 'content_block_delta') {
-    const delta = rec['delta'];
+  // Sprint 224 T-224-011 — claude `--include-partial-messages` wraps the SSE
+  // stream in an envelope: `{ type: 'stream_event', event: { type:
+  // 'content_block_delta', delta: { text } } }`. The incremental token deltas
+  // live INSIDE `event`, so we must unwrap it — otherwise no partial deltas are
+  // ever matched and the whole reply only arrives via the final `result`
+  // event, making the REPL feel like it dumps the answer at once (chunky/slow).
+  // Fall back to the raw record so un-wrapped `content_block_delta` lines
+  // (other providers / older formats / existing tests) still parse.
+  const evt =
+    rec['type'] === 'stream_event' && rec['event'] !== null && typeof rec['event'] === 'object'
+      ? (rec['event'] as Record<string, unknown>)
+      : rec;
+
+  if (evt['type'] === 'content_block_delta') {
+    const delta = evt['delta'];
     if (delta !== null && typeof delta === 'object') {
       const t = (delta as Record<string, unknown>)['text'];
       if (typeof t === 'string') return { text: t, done: false };

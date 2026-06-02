@@ -510,22 +510,28 @@ export async function launchDefaultRepl(): Promise<void> {
   // to the deckent CLI instead of the prior "not yet wired" stub.
   const dispatcher = createCliToolDispatcher();
 
-  if (isTty) region.reprompt(); // show the initial `› ` prompt
-
   await runChatNativeLoop({
     provider,
     dispatcher,
-    input: isTty ? createLineQueue(rl) : simpleLines(),
+    // T-224-014 — back-to-back input queue. The `› ` prompt is (re)shown only
+    // when idle (onIdle → region.reprompt), i.e. between turns and at startup,
+    // never mid-turn — so streamed output never collides with the prompt.
+    input: isTty ? createLineQueue(rl, () => region.reprompt()) : simpleLines(),
+    // T-224-011 — on an interactive TTY write provider output RAW (no forced
+    // newline) so streamed token deltas concatenate INLINE (smooth, claude-code
+    // feel) instead of one-fragment-per-line. The loop closes each turn with a
+    // single newline. Off-TTY keeps the line-buffered sink (pipe/HTTP/tests
+    // byte-for-byte unchanged).
     output: isTty
-      ? (line) => region.writeAbove(line)
+      ? (line) => process.stdout.write(line)
       : (line) => process.stdout.write(line.endsWith('\n') ? line : line + '\n'),
     gracefulErrors: true,
     layoutEnabled: true,
-    // T-224-014 — on an interactive TTY a rotating-verb ticker updates the
-    // `● deckent · <fiil>…` line in place ABOVE the pinned prompt (claude-code
-    // feel, collision-free). Off-TTY the braille spinner stays a no-op.
+    // T-224-014 — rotating-verb ticker animates `● deckent · <fiil>…` on its
+    // own line during thinking and finalizes to `● deckent` + newline on the
+    // first token (reply then streams inline below). Off-TTY: no-op spinner.
     thinkingIndicator: isTty
-      ? createThinkingTicker(rl, process.stdout, { isTty })
+      ? createThinkingTicker(process.stdout, { isTty })
       : createSpinner('düşünüyor…'),
     // T-224-002 — on an interactive TTY readline already echoes the typed line,
     // so the loop suppresses its own `› line` echo to avoid the double-print.

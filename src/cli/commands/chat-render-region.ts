@@ -93,12 +93,14 @@ export interface ThinkingTicker {
 }
 
 /**
- * `● deckent · <fiil>…` dönen düşünme göstergesi. start() → header satırını
- * (prompt'un 1 üstü) timer ile günceller; stop() → fiili silip `● deckent`
- * bırakır + prompt'u yeniden çizer. Non-TTY → no-op (test/pipe temiz).
+ * `● deckent · <fiil>…` dönen düşünme göstergesi. Kendi satırında in-place
+ * animasyon (`\r` + clear-line) yapar — prompt tur sırasında pinli değildir
+ * (Model: prompt tur-arası gösterilir), bu yüzden çakışma yok. start() →
+ * `● deckent · <fiil>…` döndürür; stop() → satırı temizleyip `● deckent` +
+ * newline bırakır, böylece cevap token'ları bir sonraki satırda **inline**
+ * (raw, pürüzsüz) akar. Non-TTY → no-op (test/pipe temiz).
  */
 export function createThinkingTicker(
-  rl: Pick<ReadlineInterface, 'prompt'>,
   out: NodeJS.WriteStream,
   opts: { isTty?: boolean } = {},
 ): ThinkingTicker {
@@ -106,30 +108,26 @@ export function createThinkingTicker(
   let timer: ReturnType<typeof setInterval> | null = null;
   let i = 0;
 
-  // Header satırını (prompt'un 1 üstü) verilen metinle yeniden yaz, sonra
-  // prompt'a geri dön + yeniden çiz. Cursor reprompt sonrası prompt satırında.
-  const rewriteHeader = (text: string): void => {
-    out.write('\x1b[1A\r\x1b[2K'); // yukarı 1, col0, satırı temizle (header satırı)
-    out.write(text);
-    out.write('\r\x1b[1B'); // col0, aşağı 1 (prompt satırına dön)
-    rl.prompt(true); // prompt + korunan buffer yeniden çiz
+  const paint = (verb: string): void => {
+    out.write(`\r\x1b[2K${HEADER} \x1b[2m· ${verb}…\x1b[0m`);
   };
 
   return {
     start(): void {
       if (!isTty || timer !== null) return;
       i = 0;
-      rewriteHeader(`${HEADER} \x1b[2m· ${THINKING_VERBS[0]}…\x1b[0m`);
+      paint(THINKING_VERBS[0] as string);
       timer = setInterval(() => {
         i = (i + 1) % THINKING_VERBS.length;
-        rewriteHeader(`${HEADER} \x1b[2m· ${THINKING_VERBS[i]}…\x1b[0m`);
+        paint(THINKING_VERBS[i] as string);
       }, TICK_MS);
     },
     stop(): void {
       if (timer === null) return;
       clearInterval(timer);
       timer = null;
-      rewriteHeader(HEADER); // fiili sil, sade `● deckent` bırak
+      // Fiili sil, sade `● deckent` + newline bırak → cevap altına inline akar.
+      out.write(`\r\x1b[2K${HEADER}\n`);
     },
   };
 }
@@ -142,6 +140,7 @@ export function createThinkingTicker(
  */
 export async function* createLineQueue(
   rl: Pick<ReadlineInterface, 'on'>,
+  onIdle?: () => void,
 ): AsyncGenerator<string> {
   const buf: string[] = [];
   let wake: (() => void) | null = null;
@@ -166,6 +165,10 @@ export async function* createLineQueue(
       yield buf.shift() as string;
     }
     if (closed) return;
+    // Idle: no buffered line → the REPL is waiting for input. Show the `› `
+    // prompt here (between turns) so it appears exactly when ready, never
+    // mid-turn. Skipped while lines are queued (back-to-back stays snappy).
+    onIdle?.();
     await new Promise<void>((resolve) => {
       wake = resolve;
     });
