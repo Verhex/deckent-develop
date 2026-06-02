@@ -223,6 +223,8 @@ export interface ParsedStreamEvent {
   done: boolean;
   /** Final aggregated text from the `result` event — fallback when no deltas arrived. */
   resultText?: string;
+  /** Sprint 224 T-224-021 — token usage from the `result` event (for the stats footer). */
+  usage?: { inputTokens: number; outputTokens: number };
 }
 
 /**
@@ -246,7 +248,16 @@ export function parseStreamJsonLine(raw: string): ParsedStreamEvent {
   // `result` is emitted at the top level (end-of-turn marker).
   if (rec['type'] === 'result') {
     const resultText = typeof rec['result'] === 'string' ? (rec['result'] as string) : '';
-    return { text: '', done: true, resultText };
+    // T-224-021 — pull token usage off the result event for the stats footer.
+    let usage: ParsedStreamEvent['usage'];
+    const u = rec['usage'];
+    if (u !== null && typeof u === 'object') {
+      const ur = u as Record<string, unknown>;
+      const inTok = typeof ur['input_tokens'] === 'number' ? (ur['input_tokens'] as number) : 0;
+      const outTok = typeof ur['output_tokens'] === 'number' ? (ur['output_tokens'] as number) : 0;
+      usage = { inputTokens: inTok, outputTokens: outTok };
+    }
+    return { text: '', done: true, resultText, usage };
   }
 
   // Sprint 224 T-224-011 — claude `--include-partial-messages` wraps the SSE
@@ -342,6 +353,7 @@ export function createPersistentClaudeSession(
     const it = lineIter;
     if (!it) return;
     let collected = '';
+    let lastUsage: ParsedStreamEvent['usage']; // T-224-021 — token usage off the result event
     while (true) {
       const next = await it.next();
       if (next.done) break;
@@ -351,6 +363,7 @@ export function createPersistentClaudeSession(
         yield { text: parsed.text };
       }
       if (parsed.done) {
+        if (parsed.usage) lastUsage = parsed.usage;
         if (collected.length === 0 && parsed.resultText) {
           collected = parsed.resultText;
           yield { text: parsed.resultText };
@@ -360,13 +373,13 @@ export function createPersistentClaudeSession(
     }
     // T-224-005/006 — if the reply carries <deckent_tool> directives, surface
     // them as tool_use so the loop confirms + executes them; otherwise it's a
-    // normal end_turn reply.
+    // normal end_turn reply. T-224-021 — carry token usage for the stats footer.
     const toolCalls = parseDeckentToolCalls(collected);
     if (toolCalls.length > 0) {
-      yield { done: { text: collected, stopReason: 'tool_use', toolCalls } };
+      yield { done: { text: collected, stopReason: 'tool_use', toolCalls, usage: lastUsage } };
       return;
     }
-    yield { done: { text: collected, stopReason: 'end_turn' } };
+    yield { done: { text: collected, stopReason: 'end_turn', usage: lastUsage } };
   }
 
   return {

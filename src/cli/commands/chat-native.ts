@@ -63,6 +63,13 @@ export interface ProviderResponse {
   text?: string;
   toolCalls?: ToolCall[];
   stopReason: 'end_turn' | 'tool_use';
+  /**
+   * Sprint 224 T-224-021 — optional token usage for the per-turn stats footer
+   * (`⏱ 3.2s · 240 tok`). Populated by adapters that surface it (the persistent
+   * claude session reads it from the stream-json `result` event); omitted by
+   * adapters/tests that don't, in which case only the elapsed time is shown.
+   */
+  usage?: { inputTokens: number; outputTokens: number };
 }
 
 /**
@@ -267,6 +274,24 @@ export interface ChatNativeOptions {
 const DEFAULT_MAX_TURNS = 50;
 const DEFAULT_MAX_TOOL_HOPS = 10;
 const EXIT_COMMANDS: readonly string[] = [':exit', ':quit'];
+
+// ─── Per-turn stats footer (Sprint 224 T-224-021) ──────────────────
+//
+// `⏱ 3.2s · 240 tok` — dim line shown after each interactive-TTY reply.
+// Elapsed is always shown; token count only when the provider surfaced usage
+// (the persistent claude session reads it from the stream-json `result`
+// event). Exported for unit tests.
+function formatTokenCount(n: number): string {
+  return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
+}
+export function renderTurnStatsFooter(
+  elapsedMs: number,
+  usage?: { inputTokens: number; outputTokens: number },
+): string {
+  const parts = [`${(elapsedMs / 1000).toFixed(1)}s`];
+  if (usage) parts.push(`${formatTokenCount(usage.outputTokens)} tok`);
+  return `\x1b[2m⏱ ${parts.join(' · ')}\x1b[0m`;
+}
 
 // ─── Fallback Tool-Call Parser ──────────────────────────────────────
 //
@@ -558,6 +583,10 @@ export async function runChatNativeLoop(opts: ChatNativeOptions): Promise<ChatMe
       if (opts.gracefulErrors) outputCount++;
       output(text);
     };
+    // Sprint 224 T-224-021 — per-turn stats. Measure wall-clock from just
+    // before the provider call; capture token usage off the final response.
+    const turnStart = Date.now();
+    let turnUsage: ProviderResponse['usage'];
     try {
       let response = await runProviderTurn(provider, getRecentTurns(transcript, opts.contextWindowSize), trackedOutput);
       let toolHops = 0;
@@ -583,6 +612,7 @@ export async function runChatNativeLoop(opts: ChatNativeOptions): Promise<ChatMe
       }
 
       const assistantText = response.text ?? '';
+      turnUsage = response.usage; // T-224-021 — for the stats footer
       transcript.push({ role: 'assistant', content: assistantText });
       if (assistantText.length > 0) {
         if (!provider.stream) trackedOutput(assistantText);
@@ -606,7 +636,17 @@ export async function runChatNativeLoop(opts: ChatNativeOptions): Promise<ChatMe
     // close the response line before the `› ` prompt is redrawn for the next
     // turn. Off-TTY keeps the thin separator (messageSeparator returns '' on
     // non-TTY anyway, so emitLayout drops it and pipe output is unchanged).
-    if (layoutOn) emitLayout(opts.interactiveTty === true ? '\n' : messageSeparator());
+    // Sprint 224 T-224-021 — on an interactive TTY, replace the bare newline
+    // with a dim stats footer `⏱ 3.2s · 240 tok` (elapsed always; token count
+    // when the provider surfaced usage). Closes the response line, shows the
+    // footer, then a newline so the next `› ` prompt starts fresh.
+    if (layoutOn) {
+      if (opts.interactiveTty === true) {
+        emitLayout('\n' + renderTurnStatsFooter(Date.now() - turnStart, turnUsage) + '\n');
+      } else {
+        emitLayout(messageSeparator());
+      }
+    }
   }
 
   return transcript;
