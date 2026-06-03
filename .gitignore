@@ -144,6 +144,7 @@ docs/core-memory/
 vit-*.log
 .deckent/archive/sprints/
 docs/audits/sprint-*/load-test-report.md
+docs/audits/sprint-139/dead-code-report.md
 
 # Worker container HOME-leak guard + secrets (Sprint 214 — never commit)
 .bash_history
