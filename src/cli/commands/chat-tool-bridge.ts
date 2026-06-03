@@ -17,10 +17,11 @@ import type { McpToolDispatcher } from './chat-native.js';
 
 // ─── Tool → CLI subcommand map ─────────────────────────────────────────────
 //
-// Allow-list of read-only tools that are safe to spawn headlessly. Anything
-// outside this map (notably deckent_plan — interactive, disk-writing, long)
-// is refused with a tagged error so the headless spawn never hangs on a
-// stdin confirmation prompt.
+// Allow-list of read-only MCP tools that are safe to spawn headlessly (each
+// finishes quickly and never blocks on a stdin confirmation prompt). Anything
+// outside this map (notably deckent_plan / start / run — interactive, long, or
+// disk-writing) is refused with a tagged error so the headless spawn never
+// hangs. Positional args (e.g. `/audit sprint-224`) flow through `args._rest`.
 
 const TOOL_COMMANDS: Readonly<Record<string, readonly string[]>> = {
   deckent_status: ['status'],
@@ -28,9 +29,21 @@ const TOOL_COMMANDS: Readonly<Record<string, readonly string[]>> = {
   deckent_retro: ['retro'],
   deckent_doctor: ['doctor'],
   deckent_models: ['models'],
+  deckent_analyze_project: ['analyze'],
+  deckent_review: ['review'],
+  deckent_explain: ['explain'],
+  deckent_agent_list: ['agent', 'list'],
+  deckent_skill_list: ['skill', 'list'],
+  deckent_feature_query: ['features'],
+  // NOTE: deckent_audit is intentionally NOT here — `deckent audit` runs the
+  // Brain self-audit gate (provider-backed evaluation) and can block 30-60s+,
+  // which would freeze the REPL turn. Run it standalone via `deckent audit`.
   // deckent_memory_query is special-cased below: it needs the `query` arg
   // appended as the `recall <query>` positional.
 };
+
+/** Safety net: kill a headless CLI spawn that runs longer than this (ms). */
+const SPAWN_TIMEOUT_MS = 30_000;
 
 // ─── Spawn injection ────────────────────────────────────────────────────────
 
@@ -50,18 +63,33 @@ function resolveEntryPath(): string {
 }
 
 function defaultSpawnFn(args: string[]): Promise<string> {
-  return new Promise<string>((resolve) => {
+  return new Promise<string>((resolve, reject) => {
     const entryPath = resolveEntryPath();
     const child = spawn(process.execPath, [entryPath, ...args], {
       stdio: ['ignore', 'pipe', 'pipe'],
       env: { ...process.env },
     });
     let out = '';
+    let settled = false;
+    // Safety net: if a command runs past the budget (an unexpectedly slow or
+    // auth-blocked subcommand), kill it and surface a tagged error rather than
+    // freezing the REPL turn forever.
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      try { child.kill('SIGKILL'); } catch { /* already gone */ }
+      reject(new Error(`timed out after ${SPAWN_TIMEOUT_MS / 1000}s`));
+    }, SPAWN_TIMEOUT_MS);
     child.stdout?.setEncoding('utf-8');
     child.stderr?.setEncoding('utf-8');
     child.stdout?.on('data', (chunk: string) => { out += chunk; });
     child.stderr?.on('data', (chunk: string) => { out += chunk; });
-    child.once('close', () => resolve(out.trim()));
+    child.once('close', () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(out.trim());
+    });
   });
 }
 
@@ -89,6 +117,12 @@ export function createCliToolDispatcher(opts: CliToolDispatcherOptions = {}): Mc
         const base = TOOL_COMMANDS[name];
         if (!base) return `[mcp-error] tool not allowed: ${name}`;
         cliArgs = [...base];
+        // Positional args from a slash line (e.g. `/audit sprint-224`) arrive
+        // as args._rest; append the string entries to the subcommand.
+        const rest = args['_rest'];
+        if (Array.isArray(rest)) {
+          for (const r of rest) if (typeof r === 'string') cliArgs.push(r);
+        }
       }
       try {
         return await spawnFn(cliArgs);

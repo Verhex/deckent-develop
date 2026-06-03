@@ -62,4 +62,47 @@ describe('createCliToolDispatcher — chat-tool-bridge.ts', () => {
     const out = await d.dispatch('deckent_status', {});
     expect(out).toBe('[mcp-error] deckent_status: ENOENT');
   });
+
+  // ─── Faz A: expanded read-only command coverage ──────────────────────────
+
+  it.each([
+    ['deckent_retro', ['retro']],
+    ['deckent_doctor', ['doctor']],
+    ['deckent_models', ['models']],
+    ['deckent_analyze_project', ['analyze']],
+    ['deckent_review', ['review']],
+    ['deckent_explain', ['explain']],
+    ['deckent_agent_list', ['agent', 'list']],
+    ['deckent_skill_list', ['skill', 'list']],
+    ['deckent_feature_query', ['features']],
+  ])('%s → spawns %j', async (tool, expectedArgs) => {
+    const spawnFn = vi.fn().mockResolvedValue('ok') as unknown as CliToolSpawnFn;
+    const d = createCliToolDispatcher({ spawnFn });
+    const out = await d.dispatch(tool, { root: '.' });
+    expect(out).toBe('ok');
+    expect(spawnFn).toHaveBeenCalledWith(expectedArgs);
+  });
+
+  it('appends _rest positional args to the subcommand (e.g. /explain sprint-224)', async () => {
+    const spawnFn = vi.fn().mockResolvedValue('explain ok') as unknown as CliToolSpawnFn;
+    const d = createCliToolDispatcher({ spawnFn });
+    const out = await d.dispatch('deckent_explain', { _rest: ['sprint-224'] });
+    expect(out).toBe('explain ok');
+    expect(spawnFn).toHaveBeenCalledWith(['explain', 'sprint-224']);
+  });
+
+  it('deckent_audit → tool not allowed (slow/auth-blocked, gated)', async () => {
+    const spawnFn = vi.fn() as unknown as CliToolSpawnFn;
+    const d = createCliToolDispatcher({ spawnFn });
+    const out = await d.dispatch('deckent_audit', { _rest: ['sprint-224'] });
+    expect(out).toBe('[mcp-error] tool not allowed: deckent_audit');
+    expect(spawnFn).not.toHaveBeenCalled();
+  });
+
+  it('ignores a non-array _rest (defensive)', async () => {
+    const spawnFn = vi.fn().mockResolvedValue('ok') as unknown as CliToolSpawnFn;
+    const d = createCliToolDispatcher({ spawnFn });
+    await d.dispatch('deckent_review', { _rest: 'not-an-array' });
+    expect(spawnFn).toHaveBeenCalledWith(['review']);
+  });
 });

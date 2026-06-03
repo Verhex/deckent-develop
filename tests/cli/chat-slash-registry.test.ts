@@ -176,6 +176,40 @@ describe('resolveSlash — /recall with inline query', () => {
   });
 });
 
+describe('resolveSlash — Faz A expanded read-only commands', () => {
+  it.each([
+    ['/analyze', 'deckent_analyze_project'],
+    ['/review', 'deckent_review'],
+    ['/explain', 'deckent_explain'],
+    ['/agents', 'deckent_agent_list'],
+    ['/skills', 'deckent_skill_list'],
+    ['/features', 'deckent_feature_query'],
+  ])('%s → agentic %s', (slash, tool) => {
+    const registry = buildSlashRegistry();
+    const names = registry.map((c) => c.name);
+    expect(names).toContain(slash);
+    const result = resolveSlash(slash, registry);
+    expect(result.action).toBe('agentic');
+    if (result.action === 'agentic') expect(result.tool).toBe(tool);
+  });
+
+  it('/explain sprint-224 → positional flows through args._rest', () => {
+    const registry = buildSlashRegistry();
+    const result = resolveSlash('/explain sprint-224', registry);
+    expect(result.action).toBe('agentic');
+    if (result.action === 'agentic') {
+      expect(result.tool).toBe('deckent_explain');
+      expect(result.args['_rest']).toEqual(['sprint-224']);
+    }
+  });
+
+  it('read-only commands without args set no _rest', () => {
+    const registry = buildSlashRegistry();
+    const result = resolveSlash('/review', registry);
+    if (result.action === 'agentic') expect(result.args['_rest']).toBeUndefined();
+  });
+});
+
 describe('resolveSlash — /help, /exit, /clear, unknown', () => {
   it('/help → action:help with registry', () => {
     const registry = buildSlashRegistry();

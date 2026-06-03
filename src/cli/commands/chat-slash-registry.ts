@@ -46,7 +46,7 @@ export type SlashAction =
 // This catalog IS the "deckent yetenek kataloğu" for the REPL surface.
 // To add a new slash command, add one entry here — nothing else changes.
 
-const SLASH_CATALOG: readonly Omit<SlashCommand, never>[] = [
+const SLASH_CATALOG: readonly SlashCommand[] = [
   {
     name: '/help',
     desc: 'Kullanılabilir komutları listele',
@@ -91,6 +91,42 @@ const SLASH_CATALOG: readonly Omit<SlashCommand, never>[] = [
     name: '/models',
     desc: 'Model & provider kayıtlarını listele',
     agenticTool: 'deckent_models',
+    agenticArgs: {},
+  },
+  {
+    name: '/analyze',
+    desc: 'Proje stack & sağlık analizi',
+    agenticTool: 'deckent_analyze_project',
+    agenticArgs: { root: '.' },
+  },
+  {
+    name: '/review',
+    desc: 'Son sprint sonucunu değerlendir (GO/NO_GO)',
+    agenticTool: 'deckent_review',
+    agenticArgs: { root: '.' },
+  },
+  {
+    name: '/explain',
+    desc: 'Sprint sonuçlarını açıkla',
+    agenticTool: 'deckent_explain',
+    agenticArgs: { root: '.' },
+  },
+  {
+    name: '/agents',
+    desc: 'Kayıtlı agent havuzunu listele',
+    agenticTool: 'deckent_agent_list',
+    agenticArgs: {},
+  },
+  {
+    name: '/skills',
+    desc: 'Kayıtlı skill havuzunu listele',
+    agenticTool: 'deckent_skill_list',
+    agenticArgs: {},
+  },
+  {
+    name: '/features',
+    desc: 'Özellik manifestini sorgula',
+    agenticTool: 'deckent_feature_query',
     agenticArgs: {},
   },
   {
@@ -192,8 +228,12 @@ export function resolveSlash(line: string, registry: SlashRegistry): SlashAction
   const entry = registry.find((r) => r.name.toLowerCase() === name);
   if (entry?.agenticTool) {
     const args: Record<string, unknown> = { ...(entry.agenticArgs ?? {}) };
-    if (entry.agenticTool === 'deckent_memory_query' && rest.length > 0) {
-      args['query'] = rest.join(' ');
+    if (entry.agenticTool === 'deckent_memory_query') {
+      if (rest.length > 0) args['query'] = rest.join(' ');
+    } else if (rest.length > 0) {
+      // Generic positional passthrough — e.g. `/audit sprint-224` →
+      // dispatcher appends these to the CLI subcommand (chat-tool-bridge).
+      args['_rest'] = rest;
     }
     return { action: 'agentic', tool: entry.agenticTool, args };
   }
