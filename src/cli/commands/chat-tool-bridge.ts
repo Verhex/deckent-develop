@@ -28,7 +28,8 @@ const TOOL_COMMANDS: Readonly<Record<string, readonly string[]>> = {
   deckent_history: ['history'],
   deckent_retro: ['retro'],
   deckent_doctor: ['doctor'],
-  deckent_models: ['models'],
+  // `models` is a parent command (bare → help); the catalog lives under `list`.
+  deckent_models: ['models', 'list'],
   deckent_analyze_project: ['analyze'],
   deckent_review: ['review'],
   deckent_explain: ['explain'],
@@ -39,6 +40,9 @@ const TOOL_COMMANDS: Readonly<Record<string, readonly string[]>> = {
   // config.json and are confirm-gated one layer up (run.tsx classifyTool).
   deckent_config: ['config'],
   // ── Write tools (confirm-gated) ──
+  // plan writes .tasks/ JSON from DIRECTIVES; respects the project's configured
+  // planning mode. Confirm-gated + the 30s timeout guards a slow AI plan.
+  deckent_plan: ['plan'],
   deckent_sync: ['sync'],
   deckent_checkpoint: ['checkpoint'],
   // ── Destructive tools (always-confirm; run.tsx never auto-approves these) ──

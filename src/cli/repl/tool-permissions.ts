@@ -23,6 +23,7 @@ const ALWAYS_CONFIRM: ReadonlySet<string> = new Set([
 
 /** Write tools — confirm once; "a" remembered for the session. */
 const CONFIRM_TOOLS: ReadonlySet<string> = new Set([
+  'deckent_plan',
   'deckent_sync',
   'deckent_set_directives',
   'deckent_docs',

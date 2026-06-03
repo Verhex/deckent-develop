@@ -41,12 +41,12 @@ describe('createCliToolDispatcher — chat-tool-bridge.ts', () => {
     expect(spawnFn).not.toHaveBeenCalled();
   });
 
-  it('deckent_plan → tool not allowed (gated), no spawn', async () => {
-    const spawnFn = vi.fn() as unknown as CliToolSpawnFn;
+  it('deckent_plan → spawns `plan` (confirm-gated one layer up in run.tsx)', async () => {
+    const spawnFn = vi.fn().mockResolvedValue('planned') as unknown as CliToolSpawnFn;
     const d = createCliToolDispatcher({ spawnFn });
     const out = await d.dispatch('deckent_plan', { mode: 'auto' });
-    expect(out).toBe('[mcp-error] tool not allowed: deckent_plan');
-    expect(spawnFn).not.toHaveBeenCalled();
+    expect(out).toBe('planned');
+    expect(spawnFn).toHaveBeenCalledWith(['plan']);
   });
 
   it('unknown tool → tool not allowed, no spawn', async () => {
@@ -69,7 +69,7 @@ describe('createCliToolDispatcher — chat-tool-bridge.ts', () => {
   it.each([
     ['deckent_retro', ['retro']],
     ['deckent_doctor', ['doctor']],
-    ['deckent_models', ['models']],
+    ['deckent_models', ['models', 'list']],
     ['deckent_analyze_project', ['analyze']],
     ['deckent_review', ['review']],
     ['deckent_explain', ['explain']],
@@ -107,6 +107,7 @@ describe('createCliToolDispatcher — chat-tool-bridge.ts', () => {
   });
 
   it.each([
+    ['deckent_plan', ['plan']],
     ['deckent_sync', ['sync']],
     ['deckent_checkpoint', ['checkpoint']],
     ['deckent_kill', ['kill']],

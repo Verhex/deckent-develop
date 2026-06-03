@@ -22,6 +22,7 @@ describe('classifyTool — REPL confirm hierarchy', () => {
   });
 
   it('write tools → confirm (once, "a" remembered)', () => {
+    expect(classifyTool('deckent_plan', {})).toBe('confirm');
     expect(classifyTool('deckent_sync', {})).toBe('confirm');
     expect(classifyTool('deckent_set_directives', {})).toBe('confirm');
     expect(classifyTool('deckent_docs', {})).toBe('confirm');
