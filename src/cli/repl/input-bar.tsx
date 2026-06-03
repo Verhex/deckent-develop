@@ -143,18 +143,30 @@ export function InputBar(props: InputBarProps): ReactElement {
   // claude-code-style framed input box, with the interactive menu ABOVE it.
   return (
     <Box flexDirection="column">
-      {matches.length > 0 && (
-        <Box flexDirection="column" marginBottom={0}>
-          {matches.slice(0, 8).map((c, i) => (
-            <Text key={c.name}>
-              <Text color={i === sel ? GOLD : TEAL}>{i === sel ? '❯ ' : '  '}</Text>
-              <Text color={i === sel ? GOLD : undefined} bold={i === sel}>{c.name.padEnd(10)}</Text>
-              <Text dimColor> {c.desc}</Text>
-            </Text>
-          ))}
-          {menuHint ? <Text dimColor>{`  ${menuHint}`}</Text> : null}
-        </Box>
-      )}
+      {matches.length > 0 && (() => {
+        // Scroll window: keep the selected row visible even past the cap.
+        const WINDOW = 8;
+        const start = Math.max(0, Math.min(sel - (WINDOW >> 1), matches.length - WINDOW));
+        const lo = Math.max(0, start);
+        const visible = matches.slice(lo, lo + WINDOW);
+        return (
+          <Box flexDirection="column" marginBottom={0}>
+            {lo > 0 ? <Text dimColor>{`  ↑ ${lo} more`}</Text> : null}
+            {visible.map((c, vi) => {
+              const i = lo + vi;
+              return (
+                <Text key={c.name}>
+                  <Text color={i === sel ? GOLD : TEAL}>{i === sel ? '❯ ' : '  '}</Text>
+                  <Text color={i === sel ? GOLD : undefined} bold={i === sel}>{c.name.padEnd(10)}</Text>
+                  <Text dimColor> {c.desc}</Text>
+                </Text>
+              );
+            })}
+            {lo + WINDOW < matches.length ? <Text dimColor>{`  ↓ ${matches.length - lo - WINDOW} more`}</Text> : null}
+            {menuHint ? <Text dimColor>{`  ${menuHint}`}</Text> : null}
+          </Box>
+        );
+      })()}
       <Box borderStyle="round" borderColor={TEAL} paddingX={1}>
         <Text color={TEAL}>{'› '}</Text>
         <CaretText state={state} />

@@ -259,6 +259,11 @@ export function ReplApp(props: ReplAppProps): ReactElement {
       pushTurn('assistant', labels.queueCleared);
       return;
     }
+    // /clear must clear the Ink screen (history), not just the loop transcript.
+    if (trimmed.toLowerCase() === '/clear') {
+      setTurns([]); setReply(''); replyAccum.current = '';
+      return;
+    }
     // /model <id> · /provider <name> — runtime switch (handled here, not the loop).
     const sw = trimmed.match(/^\/(model|provider)(?:\s+(\S+))?$/i);
     if (sw) {
@@ -304,13 +309,23 @@ export function ReplApp(props: ReplAppProps): ReactElement {
     <Box flexDirection="column">
       <Static items={turns}>{(turn) => <TurnView key={turn.id} turn={turn} />}</Static>
 
-      {/* Live streaming reply (moves into <Static> at the turn boundary). */}
-      {reply.length > 0 && (
-        <Box flexDirection="column" marginTop={1}>
-          <DeckentHeader />
-          <Text>{reply}</Text>
-        </Box>
-      )}
+      {/* Live streaming reply — only the LAST N lines are shown so the dynamic
+          (non-Static) region stays BOUNDED. A tall dynamic region forces Ink to
+          cursor-up+erase many lines each frame, which desyncs/drifts the input
+          in some terminals (WSL/Windows Terminal). The FULL reply (markdown-
+          rendered) lands in <Static> at the turn boundary. */}
+      {reply.length > 0 && (() => {
+        const LINES = 10;
+        const all = reply.split('\n');
+        const shown = all.length > LINES ? all.slice(-LINES).join('\n') : reply;
+        return (
+          <Box flexDirection="column" marginTop={1}>
+            <DeckentHeader />
+            {all.length > LINES ? <Text dimColor>{`  … ${all.length - LINES} satır yukarıda`}</Text> : null}
+            <Text>{shown}</Text>
+          </Box>
+        );
+      })()}
 
       {/* Confirm modal. */}
       {confirm && (
