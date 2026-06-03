@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
   createCliToolDispatcher,
+  cliArgsFor,
   type CliToolSpawnFn,
 } from '../../src/cli/commands/chat-tool-bridge.js';
 
@@ -91,6 +92,20 @@ describe('createCliToolDispatcher — chat-tool-bridge.ts', () => {
     expect(spawnFn).toHaveBeenCalledWith(['explain', 'sprint-224']);
   });
 
+  it('deckent_config (show) → spawns `config`', async () => {
+    const spawnFn = vi.fn().mockResolvedValue('{...}') as unknown as CliToolSpawnFn;
+    const d = createCliToolDispatcher({ spawnFn });
+    await d.dispatch('deckent_config', {});
+    expect(spawnFn).toHaveBeenCalledWith(['config']);
+  });
+
+  it('deckent_config set → spawns `config set <k> <v>` via _rest', async () => {
+    const spawnFn = vi.fn().mockResolvedValue('✓') as unknown as CliToolSpawnFn;
+    const d = createCliToolDispatcher({ spawnFn });
+    await d.dispatch('deckent_config', { _rest: ['set', 'max_workers', '4'] });
+    expect(spawnFn).toHaveBeenCalledWith(['config', 'set', 'max_workers', '4']);
+  });
+
   it('deckent_audit → tool not allowed (slow/auth-blocked, gated)', async () => {
     const spawnFn = vi.fn() as unknown as CliToolSpawnFn;
     const d = createCliToolDispatcher({ spawnFn });
@@ -104,5 +119,21 @@ describe('createCliToolDispatcher — chat-tool-bridge.ts', () => {
     const d = createCliToolDispatcher({ spawnFn });
     await d.dispatch('deckent_review', { _rest: 'not-an-array' });
     expect(spawnFn).toHaveBeenCalledWith(['review']);
+  });
+});
+
+describe('cliArgsFor — resolved argv (shared by dispatch + confirm modal)', () => {
+  it('maps an allow-listed tool to its subcommand', () => {
+    expect(cliArgsFor('deckent_status', {})).toEqual(['status']);
+    expect(cliArgsFor('deckent_agent_list', {})).toEqual(['agent', 'list']);
+  });
+
+  it('appends _rest positional args', () => {
+    expect(cliArgsFor('deckent_config', { _rest: ['set', 'k', 'v'] })).toEqual(['config', 'set', 'k', 'v']);
+  });
+
+  it('returns null for a tool not in the allow-list', () => {
+    expect(cliArgsFor('deckent_kill', {})).toBeNull();
+    expect(cliArgsFor('deckent_memory_query', { query: 'x' })).toBeNull();
   });
 });

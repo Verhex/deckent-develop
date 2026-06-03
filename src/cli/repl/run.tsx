@@ -7,9 +7,10 @@
 import { render } from 'ink';
 import { ReplApp, ReplErrorBoundary, type ConfirmTrigger, type ToolSink, type ToolInfo } from './app.js';
 import type { ChatProviderAdapter } from '../commands/chat-native.js';
-import { createCliToolDispatcher } from '../commands/chat-tool-bridge.js';
+import { createCliToolDispatcher, cliArgsFor } from '../commands/chat-tool-bridge.js';
 import { createToolExecDispatcher } from '../commands/chat-tool-exec.js';
 import { createPermissionStore } from '../commands/chat-permissions.js';
+import { classifyTool } from './tool-permissions.js';
 import { buildSlashRegistry } from '../commands/chat-slash-registry.js';
 import { getMessage, getLanguage } from '../helpers/messages.js';
 import { loadConfig } from '../../core/config.js';
@@ -51,6 +52,15 @@ export async function runInkRepl(
     if (answer === 'a') perms.allow(toolName);
     return answer !== 'n';
   };
+  // ALWAYS_CONFIRM tier (kill/cleanup/recover): re-confirm every time. A
+  // remembered "a", the perms allow-list, and full-auto mode are ALL overridden
+  // — honors the "never run these without asking" safety rule. "a" here acts as
+  // a one-time yes and is NOT persisted.
+  const askConfirmAlways = async (summary: string): Promise<boolean> => {
+    if (!confirmTrigger) return false;
+    const answer = await confirmTrigger(summary);
+    return answer !== 'n';
+  };
 
   const cliDispatcher = createCliToolDispatcher();
   const execDispatcher = createToolExecDispatcher({ cwd: () => process.cwd(), confirm: askConfirm });
@@ -79,6 +89,23 @@ export async function runInkRepl(
   };
   const dispatcher = {
     dispatch: async (toolName: string, args: Record<string, unknown>): Promise<string> => {
+      // CLI-bridge tools (config set, sync, kill, …) are confirm-gated by tier
+      // before they run. EXEC_TOOLS (write/edit/bash) have their own confirm
+      // inside execDispatcher, so they bypass this gate.
+      if (!EXEC_TOOLS.has(toolName)) {
+        const tier = classifyTool(toolName, args);
+        if (tier !== 'read') {
+          const argv = cliArgsFor(toolName, args) ?? [toolName];
+          const summary = `${t('tui.confirm_run')}: deckent ${argv.join(' ')}`;
+          const ok = tier === 'always'
+            ? await askConfirmAlways(summary)
+            : await askConfirm(summary, toolName);
+          if (!ok) {
+            if (process.stdin.isTTY) { try { process.stdin.setRawMode(true); } catch { /* not a tty */ } }
+            return `[${t('tui.cmd_cancelled')}] deckent ${argv.join(' ')}`;
+          }
+        }
+      }
       const result = EXEC_TOOLS.has(toolName)
         ? await execDispatcher.dispatch(toolName, args)
         : await cliDispatcher.dispatch(toolName, args);

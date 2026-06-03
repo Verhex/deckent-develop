@@ -208,6 +208,17 @@ describe('resolveSlash — Faz A expanded read-only commands', () => {
     const result = resolveSlash('/review', registry);
     if (result.action === 'agentic') expect(result.args['_rest']).toBeUndefined();
   });
+
+  it('/config set max_workers 4 → deckent_config with _rest', () => {
+    const registry = buildSlashRegistry();
+    expect(registry.map((c) => c.name)).toContain('/config');
+    const result = resolveSlash('/config set max_workers 4', registry);
+    expect(result.action).toBe('agentic');
+    if (result.action === 'agentic') {
+      expect(result.tool).toBe('deckent_config');
+      expect(result.args['_rest']).toEqual(['set', 'max_workers', '4']);
+    }
+  });
 });
 
 describe('resolveSlash — /help, /exit, /clear, unknown', () => {

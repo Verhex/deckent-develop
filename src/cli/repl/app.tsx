@@ -239,6 +239,12 @@ export function ReplApp(props: ReplAppProps): ReactElement {
     void runChatNativeLoop({
       provider,
       dispatcher,
+      // The loop's built-in risky-confirm (requireConfirmIfRisky) uses readline,
+      // which fights Ink's raw-mode stdin and hangs the REPL. In the Ink path,
+      // confirmation is owned by the dispatcher gate (run.tsx classifyTool →
+      // Ink confirm modal), so auto-approve here and let that single authority
+      // ask. Read-only tools pass through; write/destructive ones still prompt.
+      agenticConfirm: async () => true,
       input: inputIter(),
       // Stream tokens straight through the segmenter: completed lines/blocks flow
       // into the scrollback immediately (real-time readable — Alperen: "yukarıya

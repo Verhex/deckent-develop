@@ -35,6 +35,9 @@ const TOOL_COMMANDS: Readonly<Record<string, readonly string[]>> = {
   deckent_agent_list: ['agent', 'list'],
   deckent_skill_list: ['skill', 'list'],
   deckent_feature_query: ['features'],
+  // config: show (no _rest) is read-only; `config set/import/migrate` mutate
+  // config.json and are confirm-gated one layer up (run.tsx classifyTool).
+  deckent_config: ['config'],
   // NOTE: deckent_audit is intentionally NOT here — `deckent audit` runs the
   // Brain self-audit gate (provider-backed evaluation) and can block 30-60s+,
   // which would freeze the REPL turn. Run it standalone via `deckent audit`.
@@ -96,13 +99,36 @@ function defaultSpawnFn(args: string[]): Promise<string> {
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 /**
- * Build an McpToolDispatcher that runs read-only deckent CLI subcommands.
+ * Resolve an MCP tool name + args to the deckent CLI argv it would spawn.
  *
- * Supported: deckent_status, deckent_history, deckent_memory_query (recall).
- * Any other tool — including deckent_plan — returns a `[mcp-error] tool not
- * allowed: <name>` string. Per the McpToolDispatcher contract, dispatch NEVER
- * throws: spawn failures and bad args are returned as `[mcp-error] …` strings
- * so the chat loop can surface them as ordinary turn output.
+ * Returns null for a tool not in the allow-list. Used by both the dispatcher
+ * (to spawn) and the REPL confirm modal (to show the user the exact command
+ * that will run). deckent_memory_query is NOT covered here — it is special-cased
+ * in dispatch because its `query` arg maps to a `recall <query>` positional.
+ */
+export function cliArgsFor(name: string, args: Record<string, unknown>): string[] | null {
+  const base = TOOL_COMMANDS[name];
+  if (!base) return null;
+  const cliArgs = [...base];
+  // Positional args from a slash line (e.g. `/config set k v`) arrive as
+  // args._rest; append the string entries to the subcommand.
+  const rest = args['_rest'];
+  if (Array.isArray(rest)) {
+    for (const r of rest) if (typeof r === 'string') cliArgs.push(r);
+  }
+  return cliArgs;
+}
+
+/**
+ * Build an McpToolDispatcher that runs deckent CLI subcommands headlessly.
+ *
+ * Supports the read-only allow-list (TOOL_COMMANDS) plus deckent_config and
+ * deckent_memory_query (recall). Any tool outside the allow-list returns a
+ * `[mcp-error] tool not allowed: <name>` string. Per the McpToolDispatcher
+ * contract, dispatch NEVER throws: spawn failures, timeouts, and bad args are
+ * returned as `[mcp-error] …` strings so the chat loop can surface them as
+ * ordinary turn output. Write/destructive confirmation is enforced one layer
+ * up (run.tsx, via tool-permissions.classifyTool) before dispatch is called.
  */
 export function createCliToolDispatcher(opts: CliToolDispatcherOptions = {}): McpToolDispatcher {
   const spawnFn = opts.spawnFn ?? defaultSpawnFn;
@@ -114,15 +140,9 @@ export function createCliToolDispatcher(opts: CliToolDispatcherOptions = {}): Mc
         if (query.length === 0) return '[mcp-error] recall: query required';
         cliArgs = ['recall', query];
       } else {
-        const base = TOOL_COMMANDS[name];
-        if (!base) return `[mcp-error] tool not allowed: ${name}`;
-        cliArgs = [...base];
-        // Positional args from a slash line (e.g. `/audit sprint-224`) arrive
-        // as args._rest; append the string entries to the subcommand.
-        const rest = args['_rest'];
-        if (Array.isArray(rest)) {
-          for (const r of rest) if (typeof r === 'string') cliArgs.push(r);
-        }
+        const built = cliArgsFor(name, args);
+        if (!built) return `[mcp-error] tool not allowed: ${name}`;
+        cliArgs = built;
       }
       try {
         return await spawnFn(cliArgs);

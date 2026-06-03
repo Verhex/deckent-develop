@@ -130,6 +130,12 @@ const SLASH_CATALOG: readonly SlashCommand[] = [
     agenticArgs: {},
   },
   {
+    name: '/config',
+    desc: 'Yapılandırmayı göster/değiştir (örn: /config set max_workers 4)',
+    agenticTool: 'deckent_config',
+    agenticArgs: {},
+  },
+  {
     name: '/model',
     desc: 'Modeli değiştir (örn: /model sonnet)',
   },

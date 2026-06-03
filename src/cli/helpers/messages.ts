@@ -372,6 +372,14 @@ const MESSAGES: MessageMap = {
     en: 'ready · your turn',
     tr: 'hazır · sıra sende',
   },
+  'tui.confirm_run': {
+    en: 'Run',
+    tr: 'Çalıştır',
+  },
+  'tui.cmd_cancelled': {
+    en: 'cancelled',
+    tr: 'iptal edildi',
+  },
   'tool.wrote_file': {
     en: 'wrote file',
     tr: 'dosya yazıldı',

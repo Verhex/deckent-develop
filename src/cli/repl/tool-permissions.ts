@@ -1,0 +1,51 @@
+// ═══ tool-permissions — REPL dispatch confirm classification ═════════════════
+//
+// The REPL routes slash commands to deckent CLI subcommands (chat-tool-bridge).
+// Read-only commands run silently; write/destructive ones must confirm first.
+// This module is the single source of truth for that classification — a pure
+// function so it is unit-testable without the Ink render stack.
+//
+// Hierarchy (Alperen's "tool-hook" decision):
+//   read    → run silently.
+//   confirm → ask once (y/a/N); "a" is remembered for the session.
+//   always  → ask EVERY time; a remembered "a" / allow-list / full-auto mode is
+//             OVERRIDDEN. Honors the "never run kill/cleanup without asking"
+//             safety rule — these mutate live sprint state irreversibly.
+
+export type ToolPermission = 'read' | 'confirm' | 'always';
+
+/** Destructive tools — always re-confirm, never auto-approvable. */
+const ALWAYS_CONFIRM: ReadonlySet<string> = new Set([
+  'deckent_kill',
+  'deckent_cleanup',
+  'deckent_recover',
+]);
+
+/** Write tools — confirm once; "a" remembered for the session. */
+const CONFIRM_TOOLS: ReadonlySet<string> = new Set([
+  'deckent_sync',
+  'deckent_set_directives',
+  'deckent_docs',
+  'deckent_checkpoint',
+]);
+
+/** `deckent config` subcommands that mutate config.json (vs. read-only show/get/list/keys). */
+const CONFIG_WRITE_SUBS: ReadonlySet<string> = new Set(['set', 'import', 'migrate']);
+
+/**
+ * Classify a tool dispatch into its confirmation tier.
+ *
+ * `args._rest` carries the positional words from the slash line (e.g.
+ * `/config set k v` → `['set','k','v']`), used to tell a config WRITE from a
+ * config READ.
+ */
+export function classifyTool(tool: string, args: Record<string, unknown>): ToolPermission {
+  if (ALWAYS_CONFIRM.has(tool)) return 'always';
+  if (CONFIRM_TOOLS.has(tool)) return 'confirm';
+  if (tool === 'deckent_config') {
+    const rest = args['_rest'];
+    const sub = Array.isArray(rest) && typeof rest[0] === 'string' ? rest[0] : '';
+    return CONFIG_WRITE_SUBS.has(sub) ? 'confirm' : 'read';
+  }
+  return 'read';
+}
