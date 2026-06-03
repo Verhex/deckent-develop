@@ -16,7 +16,7 @@
  *   1 — audit failed (I/O error or invalid project)
  *
  * Usage:
- *   node scripts/dead-code-audit.mjs [--root <path>] [--json]
+ *   node scripts/dead-code-audit.mjs [--root <path>] [--json] [--no-report] [--report-dir <dir>]
  */
 
 import { spawnSync } from 'node:child_process';
@@ -31,6 +31,14 @@ const rootIdx = args.indexOf('--root');
 const projectRoot = rootIdx !== -1 && args[rootIdx + 1]
   ? resolve(args[rootIdx + 1])
   : process.cwd();
+// Report-write controls (keep tests hermetic — never write into the real
+// git-tracked docs tree). `--no-report` skips the write; `--report-dir <dir>`
+// redirects it. Default stays docs/audits/sprint-139 for manual/CI runs.
+const noReport = args.includes('--no-report');
+const reportDirIdx = args.indexOf('--report-dir');
+const reportDirOverride = reportDirIdx !== -1 && args[reportDirIdx + 1]
+  ? resolve(args[reportDirIdx + 1])
+  : null;
 
 // ─── Known suspects (Sprint 132 audit + ADR-028) ──────────────────────────
 
@@ -460,12 +468,17 @@ function main() {
   console.log('Phase 3: Generating report...');
   const report = generateReport({ suspectResults, unusedExports });
 
-  // Write markdown report
-  const reportDir = join(projectRoot, 'docs', 'audits', 'sprint-139');
-  mkdirSync(reportDir, { recursive: true });
-  const reportPath = join(reportDir, 'dead-code-report.md');
-  writeFileSync(reportPath, report, 'utf-8');
-  console.log(`  Report written: ${relative(projectRoot, reportPath)}`);
+  // Write markdown report (skip with --no-report; redirect with --report-dir
+  // so hermetic tests never touch the real git-tracked docs tree).
+  if (noReport) {
+    console.log('  Report write skipped (--no-report).');
+  } else {
+    const reportDir = reportDirOverride ?? join(projectRoot, 'docs', 'audits', 'sprint-139');
+    mkdirSync(reportDir, { recursive: true });
+    const reportPath = join(reportDir, 'dead-code-report.md');
+    writeFileSync(reportPath, report, 'utf-8');
+    console.log(`  Report written: ${reportPath}`);
+  }
 
   // JSON output
   if (outputJson) {

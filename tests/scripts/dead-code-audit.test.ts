@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { findExports, auditKnownSuspects, generateReport } from '../../scripts/dead-code-audit.mjs';
 import { resolve, join } from 'node:path';
-import { existsSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { spawn } from 'node:child_process';
 
 const projectRoot = resolve(import.meta.dirname, '..', '..');
@@ -178,22 +179,33 @@ describe('generateReport', () => {
 // ─── Script execution ─────────────────────────────────────────────────────
 
 describe('dead-code-audit.mjs script execution', () => {
+  // Hermetic: the script audits the real repo (read-only) but must NEVER write
+  // its report into the real git-tracked docs tree. `--no-report` skips the
+  // write; `--report-dir <dir>` redirects it to a tmpdir. Without these the
+  // suite kept rewriting docs/audits/sprint-139/dead-code-report.md on every
+  // run (the git-flicker fixed alongside this — see .gitignore).
   it('runs successfully with exit code 0', async () => {
-    const result = await runAuditScript();
+    const result = await runAuditScript(['--no-report']);
     expect(result.status).toBe(0);
     expect(result.stdout).toContain('Audit complete');
   }, 150_000);
 
   it('produces JSON output with --json flag', async () => {
-    const result = await runAuditScript(['--json']);
+    const result = await runAuditScript(['--json', '--no-report']);
     expect(result.status).toBe(0);
     // JSON output should contain suspectResults
     expect(result.stdout).toContain('"suspectResults"');
     expect(result.stdout).toContain('"summary"');
   }, 150_000);
 
-  it('generates report file', () => {
-    const reportPath = join(projectRoot, 'docs', 'audits', 'sprint-139', 'dead-code-report.md');
-    expect(existsSync(reportPath)).toBe(true);
-  });
+  it('writes the report to a --report-dir without touching the real docs tree', async () => {
+    const outDir = mkdtempSync(join(tmpdir(), 'deckent-deadcode-'));
+    try {
+      const result = await runAuditScript(['--report-dir', outDir]);
+      expect(result.status).toBe(0);
+      expect(existsSync(join(outDir, 'dead-code-report.md'))).toBe(true);
+    } finally {
+      rmSync(outDir, { recursive: true, force: true });
+    }
+  }, 150_000);
 });
