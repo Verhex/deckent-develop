@@ -210,6 +210,8 @@ export class PinnedTui {
   private state: InputState = EMPTY_INPUT;
   private readonly history = new InputHistory();
   private outCol = 1; // current column of the streaming output line (1-based)
+  /** Where the cursor currently sits: the pinned input line or the output region. */
+  private cursorAt: 'input' | 'output' = 'input';
   private started = false;
   private closed = false;
   private readonly queue: string[] = [];
@@ -230,6 +232,7 @@ export class PinnedTui {
   }
 
   private get rows(): number { return this.out.rows && this.out.rows > 2 ? this.out.rows : 24; }
+  private get cols(): number { return this.out.columns && this.out.columns > 0 ? this.out.columns : 80; }
   private get inputRow(): number { return this.rows; }
   private get outBottom(): number { return this.rows - 1; }
 
@@ -269,23 +272,33 @@ export class PinnedTui {
   onInterrupt(fn: () => void): void { this.onInt = fn; }
 
   /**
-   * Stream provider output into the scroll region above the input. Handles
-   * embedded newlines (scrolls the region) and keeps the input line redrawn.
+   * Stream provider output into the scroll region above the input.
+   *
+   * Key design (fixes the mid-word garble + glued-prompt bugs): the input line
+   * on row R is preserved by the scroll region, so it is NOT redrawn per token.
+   * We only reposition the cursor ONCE when resuming from the input line; during
+   * a streaming burst the terminal advances/wraps/scrolls the cursor naturally,
+   * so there is no per-token moveTo drift. `outCol` tracks the column only to
+   * resume correctly after the cursor was parked on the input line.
    */
   write(text: string): void {
     if (text.length === 0 || this.closed) return;
-    let buf = tui.hideCursor() + tui.moveTo(this.outBottom, this.outCol);
+    const cols = this.cols;
+    let buf = '';
+    if (this.cursorAt === 'input') {
+      buf += tui.hideCursor() + tui.moveTo(this.outBottom, this.outCol);
+      this.cursorAt = 'output';
+    }
     for (const ch of text) {
       if (ch === '\n') {
-        buf += '\r\n';      // newline inside the scroll region → scroll up
+        buf += '\r\n';      // newline at the region bottom → scroll up
         this.outCol = 1;
       } else {
         buf += ch;
         this.outCol += 1;
+        if (this.outCol > cols) this.outCol = 1; // terminal auto-wrapped + scrolled
       }
     }
-    // Redraw the pinned input line and return the cursor to it.
-    buf += tui.renderInput(this.inputRow, this.promptPlain, this.state) + tui.showCursor();
     this.out.write(buf);
   }
 
@@ -297,8 +310,22 @@ export class PinnedTui {
     while (true) {
       while (this.queue.length > 0) yield this.queue.shift() as string;
       if (this.closed) return;
+      this.goIdle();
       await new Promise<void>((r) => { this.wake = r; });
     }
+  }
+
+  /**
+   * Transition to idle (waiting for input): if the cursor is in the output
+   * region (a turn just finished), drop to a fresh line so the reply is not
+   * glued to the pinned input, then redraw + focus the input line.
+   */
+  private goIdle(): void {
+    if (this.cursorAt === 'output') {
+      this.out.write('\r\n');
+      this.outCol = 1;
+    }
+    this.redrawInput();
   }
 
   /**
@@ -354,7 +381,8 @@ export class PinnedTui {
   }
 
   private redrawInput(): void {
-    this.out.write(tui.renderInput(this.inputRow, this.promptPlain, this.state));
+    this.out.write(tui.showCursor() + tui.renderInput(this.inputRow, this.promptPlain, this.state));
+    this.cursorAt = 'input';
   }
 
   private onResize(): void {
