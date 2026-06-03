@@ -5,7 +5,7 @@
 // and injected into the string-free component.
 
 import { render } from 'ink';
-import { ReplApp, type ConfirmTrigger } from './app.js';
+import { ReplApp, type ConfirmTrigger, type ToolSink, type ToolInfo } from './app.js';
 import type { ChatProviderAdapter } from '../commands/chat-native.js';
 import { createCliToolDispatcher } from '../commands/chat-tool-bridge.js';
 import { createToolExecDispatcher } from '../commands/chat-tool-exec.js';
@@ -36,9 +36,34 @@ export async function runInkRepl(provider: ChatProviderAdapter, providerName: st
 
   const cliDispatcher = createCliToolDispatcher();
   const execDispatcher = createToolExecDispatcher({ cwd: process.cwd(), confirm: askConfirm });
+
+  // Tool/change block sink: after a side-effecting tool completes, emit a
+  // localized ToolInfo so the App renders a claude-code-style change block.
+  let toolSink: ToolSink | null = null;
+  const lineCount = (v: unknown): number | undefined =>
+    typeof v === 'string' ? v.split('\n').filter((_, i, a) => i < a.length - 1 || a[i] !== '').length : undefined;
+  const toolInfoFor = (name: string, args: Record<string, unknown>): ToolInfo | null => {
+    const path = typeof args['path'] === 'string' ? args['path'] : '';
+    switch (name) {
+      case 'deckent_write_file': return { verb: t('tool.wrote_file'), target: path, added: lineCount(args['content']) };
+      case 'deckent_edit_file': return { verb: t('tool.edited_file'), target: path };
+      case 'deckent_read_file': return { verb: t('tool.read_file'), target: path };
+      case 'deckent_bash': return { verb: t('tool.ran_cmd'), target: typeof args['cmd'] === 'string' ? args['cmd'] : '' };
+      default: return null;
+    }
+  };
   const dispatcher = {
-    dispatch: (toolName: string, args: Record<string, unknown>): Promise<string> =>
-      EXEC_TOOLS.has(toolName) ? execDispatcher.dispatch(toolName, args) : cliDispatcher.dispatch(toolName, args),
+    dispatch: async (toolName: string, args: Record<string, unknown>): Promise<string> => {
+      const result = EXEC_TOOLS.has(toolName)
+        ? await execDispatcher.dispatch(toolName, args)
+        : await cliDispatcher.dispatch(toolName, args);
+      const info = toolInfoFor(toolName, args);
+      // Only surface a change block for a real action (not a denied/no-op).
+      if (toolSink && info && !result.startsWith('[mcp-error]') && !/reddedildi|denied/i.test(result)) {
+        toolSink(info);
+      }
+      return result;
+    },
   };
 
   const { waitUntilExit } = render(
@@ -55,6 +80,7 @@ export async function runInkRepl(provider: ChatProviderAdapter, providerName: st
         confirmHint: t('tui.confirm_hint'),
       }}
       registerConfirm={(trigger) => { confirmTrigger = trigger; }}
+      registerToolSink={(sink) => { toolSink = sink; }}
     />,
   );
 

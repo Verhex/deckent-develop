@@ -18,6 +18,17 @@ import { InputBar } from './input-bar.js';
 export type ConfirmAnswer = 'y' | 'a' | 'n';
 export type ConfirmTrigger = (summary: string) => Promise<ConfirmAnswer>;
 
+/** A completed tool action, rendered as a claude-code-style change block. The
+ * caller (run.tsx) localizes `verb`/`note`; the App owns the colored layout. */
+export interface ToolInfo {
+  verb: string;       // localized, e.g. "dosya yazıldı"
+  target: string;     // path / command
+  added?: number;     // lines added → green
+  removed?: number;   // lines removed → red
+  note?: string;      // extra dim detail (e.g. truncated output)
+}
+export type ToolSink = (info: ToolInfo) => void;
+
 /** Localized labels — injected by the caller (i18n-first; component is string-free). */
 export interface ReplLabels {
   thinking: string;     // "düşünüyor…"
@@ -34,9 +45,11 @@ export interface ReplAppProps {
   providerName: string;
   cwd: string;
   registerConfirm: (trigger: ConfirmTrigger) => void;
+  /** Register the sink the dispatcher calls to render a tool/change block. */
+  registerToolSink: (sink: ToolSink) => void;
 }
 
-interface Turn { id: number; role: 'user' | 'assistant'; text: string; }
+interface Turn { id: number; role: 'user' | 'assistant' | 'tool'; text: string; tool?: ToolInfo; }
 
 const TEAL = '#4DB8A4';
 const GOLD = '#C4A855';
@@ -65,6 +78,23 @@ function TurnView({ turn }: { turn: Turn }): ReactElement {
       </Box>
     );
   }
+  if (turn.role === 'tool' && turn.tool) {
+    const { verb, target, added, removed, note } = turn.tool;
+    const hasDelta = added !== undefined || removed !== undefined || note !== undefined;
+    return (
+      <Box flexDirection="column" marginTop={1}>
+        <Text><Text color={TEAL}>● </Text><Text bold>{verb}</Text><Text dimColor> {target}</Text></Text>
+        {hasDelta && (
+          <Text>
+            {'  ⎿ '}
+            {added !== undefined ? <Text color="green">+{added} </Text> : null}
+            {removed !== undefined ? <Text color="red">-{removed} </Text> : null}
+            {note !== undefined ? <Text dimColor>{note}</Text> : null}
+          </Text>
+        )}
+      </Box>
+    );
+  }
   return (
     <Box flexDirection="column" marginTop={1}>
       <DeckentHeader />
@@ -74,7 +104,7 @@ function TurnView({ turn }: { turn: Turn }): ReactElement {
 }
 
 export function ReplApp(props: ReplAppProps): ReactElement {
-  const { provider, dispatcher, labels, providerName, cwd, registerConfirm } = props;
+  const { provider, dispatcher, labels, providerName, cwd, registerConfirm, registerToolSink } = props;
   const { exit } = useApp();
 
   const [turns, setTurns] = useState<Turn[]>([]);
@@ -85,6 +115,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
 
   const idRef = useRef(1);
   const replyAccum = useRef('');
+  const flushTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const queue = useRef<string[]>([]);
   const wake = useRef<(() => void) | null>(null);
   const confirmResolve = useRef<((a: ConfirmAnswer) => void) | null>(null);
@@ -99,6 +130,20 @@ export function ReplApp(props: ReplAppProps): ReactElement {
       setConfirm({ summary });
     }));
   }, [registerConfirm]);
+
+  // Tool/change blocks: a completed tool action becomes a 'tool' turn in the
+  // history (rendered as ● verb target / ⎿ +added -removed). Finalize any live
+  // reply first so the block lands AFTER the text that requested it.
+  useEffect(() => {
+    registerToolSink((info: ToolInfo) => {
+      if (replyAccum.current.length > 0) {
+        pushTurn('assistant', replyAccum.current);
+        replyAccum.current = '';
+        setReply('');
+      }
+      setTurns((t) => [...t, { id: idRef.current++, role: 'tool', text: '', tool: info }]);
+    });
+  }, [registerToolSink]);
 
   useEffect(() => {
     if (started.current) return;
@@ -125,7 +170,20 @@ export function ReplApp(props: ReplAppProps): ReactElement {
       provider,
       dispatcher,
       input: inputIter(),
-      output: (text: string) => { replyAccum.current += text; setReply(replyAccum.current); },
+      // Chunked streaming (Alperen: "token token değil cümle cümle"): tokens
+      // accumulate into replyAccum (always complete), but the rendered reply is
+      // flushed on a sentence/line boundary or a calm ~90ms tick — so the flow
+      // appears in meaningful chunks, not a jittery per-token crawl.
+      output: (text: string) => {
+        replyAccum.current += text;
+        const atBoundary = /[.!?:;\n)]\s*$/.test(text);
+        if (atBoundary) {
+          if (flushTimer.current) { clearTimeout(flushTimer.current); flushTimer.current = null; }
+          setReply(replyAccum.current);
+        } else if (!flushTimer.current) {
+          flushTimer.current = setTimeout(() => { flushTimer.current = null; setReply(replyAccum.current); }, 90);
+        }
+      },
       thinkingIndicator: { start: () => setBusy(true), stop: () => setBusy(false) },
       interactiveTty: true,
       layoutEnabled: false,

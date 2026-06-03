@@ -340,6 +340,22 @@ const MESSAGES: MessageMap = {
     en: 'ready · your turn',
     tr: 'hazır · sıra sende',
   },
+  'tool.wrote_file': {
+    en: 'wrote file',
+    tr: 'dosya yazıldı',
+  },
+  'tool.edited_file': {
+    en: 'edited file',
+    tr: 'dosya düzenlendi',
+  },
+  'tool.read_file': {
+    en: 'read file',
+    tr: 'dosya okundu',
+  },
+  'tool.ran_cmd': {
+    en: 'ran command',
+    tr: 'komut çalıştırıldı',
+  },
 };
 
 /**
