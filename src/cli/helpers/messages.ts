@@ -356,6 +356,14 @@ const MESSAGES: MessageMap = {
     en: 'queue cleared',
     tr: 'kuyruk temizlendi',
   },
+  'tui.cd_to': {
+    en: 'working dir',
+    tr: 'dizin',
+  },
+  'tui.cd_fail': {
+    en: 'cannot change dir',
+    tr: 'dizin değiştirilemedi',
+  },
   'tui.generating': {
     en: 'generating…',
     tr: 'üretiliyor…',

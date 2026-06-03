@@ -106,6 +106,10 @@ const SLASH_CATALOG: readonly Omit<SlashCommand, never>[] = [
     desc: 'Onay modu: suggest | auto-edit | full-auto',
   },
   {
+    name: '/cd',
+    desc: 'Çalışma dizinini değiştir (örn: /cd ~/deckent-dev)',
+  },
+  {
     name: '/cancel',
     desc: 'Kuyruktaki bekleyen mesajları iptal et',
   },

@@ -53,7 +53,7 @@ export async function runInkRepl(
   };
 
   const cliDispatcher = createCliToolDispatcher();
-  const execDispatcher = createToolExecDispatcher({ cwd: process.cwd(), confirm: askConfirm });
+  const execDispatcher = createToolExecDispatcher({ cwd: () => process.cwd(), confirm: askConfirm });
 
   // Tool/change block sink: after a side-effecting tool completes, emit a
   // localized ToolInfo so the App renders a claude-code-style change block.
@@ -128,6 +128,8 @@ export async function runInkRepl(
         approvalSet: t('tui.approval_set'),
         approvalUsage: t('tui.approval_usage'),
         queueCleared: t('tui.queue_cleared'),
+        cdTo: t('tui.cd_to'),
+        cdFail: t('tui.cd_fail'),
       }}
       registerConfirm={(trigger) => { confirmTrigger = trigger; }}
       registerToolSink={(sink) => { toolSink = sink; }}

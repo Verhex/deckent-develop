@@ -26,8 +26,9 @@ const SIDE_EFFECTING: ReadonlySet<string> = new Set([
 ]);
 
 export interface ToolExecOptions {
-  /** Tool'ların çözümleneceği kök dizin. Default `process.cwd()`. */
-  cwd?: string;
+  /** Tool'ların çözümleneceği kök dizin. Default `process.cwd()`. A function is
+   * resolved per-dispatch so the REPL's /cd (process.chdir) is followed live. */
+  cwd?: string | (() => string);
   /**
    * Yan-etkili tool'lar için onay kapısı (claude-code y/N hissi). `true` →
    * çalıştır, `false` → iptal. Default auto-approve (test/headless). REPL
@@ -73,13 +74,14 @@ function defaultBashRun(cmd: string, cwd: string): Promise<string> {
  *   • deckent_bash       {cmd}             → komut çalıştır (onaylı)
  */
 export function createToolExecDispatcher(opts: ToolExecOptions = {}): McpToolDispatcher {
-  const cwd = opts.cwd ?? process.cwd();
+  const resolveCwd = (): string => (typeof opts.cwd === 'function' ? opts.cwd() : (opts.cwd ?? process.cwd()));
   const confirm = opts.confirm ?? (async () => true);
   const bashRun = opts.bashRun ?? defaultBashRun;
 
   // cwd dışına çıkışı engelle (path traversal). Geçerli mutlak yolu döner ya da null.
   const inScope = (p: string): string | null => {
     if (typeof p !== 'string' || p.length === 0) return null;
+    const cwd = resolveCwd();
     const abs = isAbsolute(p) ? p : resolve(cwd, p);
     const rel = relative(cwd, abs);
     if (rel === '' || rel.startsWith('..') || isAbsolute(rel)) {
@@ -125,7 +127,7 @@ export function createToolExecDispatcher(opts: ToolExecOptions = {}): McpToolDis
           case 'deckent_bash': {
             const cmd = String(args['cmd'] ?? args['command'] ?? '');
             if (cmd.length === 0) return `[mcp-error] deckent_bash: boş komut`;
-            return await bashRun(cmd, cwd);
+            return await bashRun(cmd, resolveCwd());
           }
           default:
             return `[mcp-error] unknown tool: ${name}`;

@@ -11,6 +11,7 @@
 
 import { Box, Text, Static, useInput, useApp } from 'ink';
 import { useState, useRef, useEffect, Component, type ReactElement, type ReactNode } from 'react';
+import { homedir } from 'node:os';
 import { runChatNativeLoop, type ChatProviderAdapter, type McpToolDispatcher } from '../commands/chat-native.js';
 import { renderMarkdown } from '../commands/chat-render.js';
 import { InputBar } from './input-bar.js';
@@ -44,6 +45,8 @@ export interface ReplLabels {
   approvalSet: string;  // "onay modu"
   approvalUsage: string;// "kullanım: /approve suggest|auto-edit|full-auto. aktif:"
   queueCleared: string; // "kuyruk temizlendi"
+  cdTo: string;         // "dizin"
+  cdFail: string;       // "dizin değiştirilemedi"
 }
 
 /**
@@ -139,10 +142,11 @@ function TurnView({ turn }: { turn: Turn }): ReactElement {
 }
 
 export function ReplApp(props: ReplAppProps): ReactElement {
-  const { provider, dispatcher, labels, cwd, registerConfirm, registerToolSink, slashRegistry, initialSelection, onSwitch, onApprovalMode } = props;
+  const { provider, dispatcher, labels, registerConfirm, registerToolSink, slashRegistry, initialSelection, onSwitch, onApprovalMode } = props;
   const { exit } = useApp();
   const [selection, setSelection] = useState<ActiveSelection>(initialSelection);
   const [approval, setApproval] = useState<ApprovalMode>('suggest');
+  const [cwd, setCwd] = useState(props.cwd);
 
   const [turns, setTurns] = useState<Turn[]>([]);
   const [reply, setReply] = useState('');
@@ -262,6 +266,20 @@ export function ReplApp(props: ReplAppProps): ReactElement {
     // /clear must clear the Ink screen (history), not just the loop transcript.
     if (trimmed.toLowerCase() === '/clear') {
       setTurns([]); setReply(''); replyAccum.current = '';
+      return;
+    }
+    // /cd <path> — change the working dir (file tools + status follow it live).
+    const cd = trimmed.match(/^\/cd(?:\s+(.+))?$/i);
+    if (cd) {
+      pushTurn('user', trimmed);
+      const arg = cd[1]?.trim();
+      if (arg) {
+        try {
+          process.chdir(arg.startsWith('~') ? arg.replace(/^~/, homedir()) : arg);
+          setCwd(process.cwd());
+          pushTurn('assistant', `${labels.cdTo}: ${process.cwd()}`);
+        } catch { pushTurn('assistant', `${labels.cdFail}: ${arg}`); }
+      } else { pushTurn('assistant', process.cwd()); }
       return;
     }
     // /model <id> · /provider <name> — runtime switch (handled here, not the loop).
