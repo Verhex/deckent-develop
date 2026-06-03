@@ -106,6 +106,10 @@ const SLASH_CATALOG: readonly Omit<SlashCommand, never>[] = [
     desc: 'Onay modu: suggest | auto-edit | full-auto',
   },
   {
+    name: '/cancel',
+    desc: 'Kuyruktaki bekleyen mesajları iptal et',
+  },
+  {
     name: '/clear',
     desc: 'Ekranı temizle',
   },

@@ -5,7 +5,7 @@
 // and injected into the string-free component.
 
 import { render } from 'ink';
-import { ReplApp, type ConfirmTrigger, type ToolSink, type ToolInfo } from './app.js';
+import { ReplApp, ReplErrorBoundary, type ConfirmTrigger, type ToolSink, type ToolInfo } from './app.js';
 import type { ChatProviderAdapter } from '../commands/chat-native.js';
 import { createCliToolDispatcher } from '../commands/chat-tool-bridge.js';
 import { createToolExecDispatcher } from '../commands/chat-tool-exec.js';
@@ -92,6 +92,7 @@ export async function runInkRepl(
   };
 
   const { waitUntilExit } = render(
+    <ReplErrorBoundary>
     <ReplApp
       provider={switcher.proxy}
       dispatcher={dispatcher}
@@ -112,10 +113,12 @@ export async function runInkRepl(
         switchUsage: t('tui.switch_usage'),
         approvalSet: t('tui.approval_set'),
         approvalUsage: t('tui.approval_usage'),
+        queueCleared: t('tui.queue_cleared'),
       }}
       registerConfirm={(trigger) => { confirmTrigger = trigger; }}
       registerToolSink={(sink) => { toolSink = sink; }}
-    />,
+    />
+    </ReplErrorBoundary>,
   );
 
   await waitUntilExit();

@@ -10,7 +10,7 @@
 // all user-facing labels arrive via props (getMessage resolved by the caller).
 
 import { Box, Text, Static, useInput, useApp } from 'ink';
-import { useState, useRef, useEffect, type ReactElement } from 'react';
+import { useState, useRef, useEffect, Component, type ReactElement, type ReactNode } from 'react';
 import { runChatNativeLoop, type ChatProviderAdapter, type McpToolDispatcher } from '../commands/chat-native.js';
 import { renderMarkdown } from '../commands/chat-render.js';
 import { InputBar } from './input-bar.js';
@@ -43,6 +43,20 @@ export interface ReplLabels {
   switchUsage: string;  // "kullanım: /model <ad> · /provider <ad>"
   approvalSet: string;  // "onay modu"
   approvalUsage: string;// "kullanım: /approve suggest|auto-edit|full-auto. aktif:"
+  queueCleared: string; // "kuyruk temizlendi"
+}
+
+/**
+ * Error boundary — a render error in any child shows a one-line message instead
+ * of crashing the whole REPL (enterprise robustness).
+ */
+export class ReplErrorBoundary extends Component<{ children: ReactNode }, { err: Error | null }> {
+  state: { err: Error | null } = { err: null };
+  static getDerivedStateFromError(err: Error): { err: Error } { return { err }; }
+  override render(): ReactNode {
+    if (this.state.err) return <Text color="red">{`⚠ REPL render hatası: ${this.state.err.message}`}</Text>;
+    return this.props.children;
+  }
 }
 
 export interface ReplAppProps {
@@ -235,6 +249,12 @@ export function ReplApp(props: ReplAppProps): ReactElement {
     const trimmed = line.trim();
     if (trimmed.length === 0) return;
     if (['/exit', '/quit', ':exit', ':quit'].includes(trimmed.toLowerCase())) { exit(); return; }
+    if (trimmed.toLowerCase() === '/cancel') {
+      pushTurn('user', trimmed);
+      queue.current = []; setQueued([]);
+      pushTurn('assistant', labels.queueCleared);
+      return;
+    }
     // /model <id> · /provider <name> — runtime switch (handled here, not the loop).
     const sw = trimmed.match(/^\/(model|provider)(?:\s+(\S+))?$/i);
     if (sw) {
@@ -317,6 +337,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
         active={confirm === null}
         onSubmit={handleSubmit}
         onInterrupt={() => exit()}
+        onClear={() => { setTurns([]); setReply(''); replyAccum.current = ''; }}
         slashRegistry={slashRegistry}
         menuHint={labels.menuHint}
       />

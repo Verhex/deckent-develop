@@ -352,6 +352,10 @@ const MESSAGES: MessageMap = {
     en: 'usage: /approve suggest|auto-edit|full-auto. current:',
     tr: 'kullanım: /approve suggest|auto-edit|full-auto. aktif:',
   },
+  'tui.queue_cleared': {
+    en: 'queue cleared',
+    tr: 'kuyruk temizlendi',
+  },
   'tui.generating': {
     en: 'generating…',
     tr: 'üretiliyor…',

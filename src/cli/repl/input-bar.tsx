@@ -24,6 +24,8 @@ export interface InputBarProps {
   onSubmit: (line: string) => void;
   /** Ctrl-C with an empty buffer. */
   onInterrupt: () => void;
+  /** Ctrl-L → clear the screen/history. */
+  onClear?: () => void;
   /** Slash command catalog — when set, typing `/` opens an interactive menu. */
   slashRegistry?: SlashRegistry;
   /** Localized hint shown under the menu (e.g. "↑↓ gez · Enter seç · Esc kapat"). */
@@ -70,7 +72,7 @@ function CaretText({ state }: { state: InputState }): ReactElement {
 }
 
 export function InputBar(props: InputBarProps): ReactElement {
-  const { active, onSubmit, onInterrupt, slashRegistry, menuHint } = props;
+  const { active, onSubmit, onInterrupt, onClear, slashRegistry, menuHint } = props;
   const [state, setState] = useState<InputState>(EMPTY_INPUT);
   const [menuSel, setMenuSel] = useState(0);
   const stateRef = useRef<InputState>(EMPTY_INPUT);
@@ -83,6 +85,8 @@ export function InputBar(props: InputBarProps): ReactElement {
     if (process.env['DECKENT_INK_DEBUG'] === '1') {
       try { appendFileSync('/tmp/ink-keys.log', JSON.stringify({ input, key }) + '\n'); } catch { /* ignore */ }
     }
+
+    if (key.ctrl && (input === 'l' || input === '\f')) { onClear?.(); return; } // Ctrl-L → clear
 
     // ── Interactive slash menu: intercept nav keys while it is open ──
     const matches = slashMenuMatches(slashRegistry, stateRef.current.buffer);
@@ -97,16 +101,21 @@ export function InputBar(props: InputBarProps): ReactElement {
       // any other key falls through to editInput → re-filters; reset selection
     }
 
-    // A batched/pasted chunk that embeds Enter: split so each completed line
-    // submits and the trailing part stays in the buffer (real Enter is a lone
-    // `return` key handled by editInput below).
+    // A batched chunk that contains a newline. Two cases:
+    //  • MULTI-LINE paste (internal newline) → insert as ONE message, newlines
+    //    kept (Alperen: "paste tek mesaj"); the user reviews + presses Enter.
+    //  • single line + trailing newline ("text\r") → submit it. (A real lone
+    //    Enter keystroke is key.return, handled by editInput below.)
     if (!key.return && /[\r\n]/.test(input)) {
-      const segs = input.split(/\r\n|\r|\n/);
-      const cur = stateRef.current.buffer;
-      onSubmit(cur + (segs[0] ?? ''));
-      for (let i = 1; i < segs.length - 1; i++) onSubmit(segs[i] ?? '');
-      const tail = segs[segs.length - 1] ?? '';
-      set({ buffer: tail, cursor: tail.length });
+      const withoutTrailing = input.replace(/[\r\n]+$/, '');
+      if (/[\r\n]/.test(withoutTrailing)) {
+        const text = input.replace(/\r\n?/g, '\n');
+        const s = stateRef.current;
+        set({ buffer: s.buffer.slice(0, s.cursor) + text + s.buffer.slice(s.cursor), cursor: s.cursor + text.length });
+      } else {
+        onSubmit(stateRef.current.buffer + withoutTrailing);
+        set(EMPTY_INPUT);
+      }
       return;
     }
 
