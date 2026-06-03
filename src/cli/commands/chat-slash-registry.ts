@@ -102,6 +102,10 @@ const SLASH_CATALOG: readonly Omit<SlashCommand, never>[] = [
     desc: 'Provider değiştir (örn: /provider codex)',
   },
   {
+    name: '/approve',
+    desc: 'Onay modu: suggest | auto-edit | full-auto',
+  },
+  {
     name: '/clear',
     desc: 'Ekranı temizle',
   },

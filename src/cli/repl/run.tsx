@@ -39,8 +39,13 @@ export async function runInkRepl(
 
   // The App registers its modal trigger here; the dispatcher confirm awaits it.
   let confirmTrigger: ConfirmTrigger | null = null;
+  // Approval mode (claude-code style): suggest = always ask · auto-edit = auto
+  // file ops, ask shell · full-auto = auto everything. Switched via /approve.
+  let approvalMode: 'suggest' | 'auto-edit' | 'full-auto' = 'suggest';
   const askConfirm = async (summary: string, toolName: string): Promise<boolean> => {
     if (perms.isAllowed(toolName)) return true;
+    if (approvalMode === 'full-auto') return true;
+    if (approvalMode === 'auto-edit' && toolName !== 'deckent_bash') return true;
     if (!confirmTrigger) return false;
     const answer = await confirmTrigger(summary);
     if (answer === 'a') perms.allow(toolName);
@@ -59,7 +64,14 @@ export async function runInkRepl(
     const path = typeof args['path'] === 'string' ? args['path'] : '';
     switch (name) {
       case 'deckent_write_file': return { verb: t('tool.wrote_file'), target: path, added: lineCount(args['content']) };
-      case 'deckent_edit_file': return { verb: t('tool.edited_file'), target: path };
+      case 'deckent_edit_file': {
+        // Real +added / -removed from the old→new strings the edit applied.
+        const info: ToolInfo = { verb: t('tool.edited_file'), target: path };
+        const rm = lineCount(args['old']); const ad = lineCount(args['new']);
+        if (ad !== undefined) info.added = ad;
+        if (rm !== undefined) info.removed = rm;
+        return info;
+      }
       case 'deckent_read_file': return { verb: t('tool.read_file'), target: path };
       case 'deckent_bash': return { verb: t('tool.ran_cmd'), target: typeof args['cmd'] === 'string' ? args['cmd'] : '' };
       default: return null;
@@ -88,6 +100,7 @@ export async function runInkRepl(
       slashRegistry={buildSlashRegistry()}
       initialSelection={switcher.current()}
       onSwitch={(sel) => { switcher.switchTo(sel); return switcher.current(); }}
+      onApprovalMode={(m) => { approvalMode = m; }}
       labels={{
         thinking: t('tui.thinking'),
         generating: t('tui.generating'),
@@ -97,6 +110,8 @@ export async function runInkRepl(
         menuHint: t('tui.menu_hint'),
         switched: t('tui.switched'),
         switchUsage: t('tui.switch_usage'),
+        approvalSet: t('tui.approval_set'),
+        approvalUsage: t('tui.approval_usage'),
       }}
       registerConfirm={(trigger) => { confirmTrigger = trigger; }}
       registerToolSink={(sink) => { toolSink = sink; }}

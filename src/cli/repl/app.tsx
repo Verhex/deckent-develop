@@ -41,6 +41,8 @@ export interface ReplLabels {
   menuHint: string;     // "↑↓ gez · Enter seç · Tab tamamla · Esc kapat"
   switched: string;     // "geçildi"
   switchUsage: string;  // "kullanım: /model <ad> · /provider <ad>"
+  approvalSet: string;  // "onay modu"
+  approvalUsage: string;// "kullanım: /approve suggest|auto-edit|full-auto. aktif:"
 }
 
 export interface ReplAppProps {
@@ -58,7 +60,11 @@ export interface ReplAppProps {
   initialSelection: ActiveSelection;
   /** Switch model/provider; returns the resulting active selection. */
   onSwitch: (sel: Partial<ActiveSelection>) => ActiveSelection;
+  /** Set the agentic approval mode (suggest / auto-edit / full-auto). */
+  onApprovalMode: (mode: 'suggest' | 'auto-edit' | 'full-auto') => void;
 }
+
+type ApprovalMode = 'suggest' | 'auto-edit' | 'full-auto';
 
 interface TurnStats { elapsedMs: number; tokens?: number; }
 interface Turn { id: number; role: 'user' | 'assistant' | 'tool'; text: string; tool?: ToolInfo; stats?: TurnStats; }
@@ -119,9 +125,10 @@ function TurnView({ turn }: { turn: Turn }): ReactElement {
 }
 
 export function ReplApp(props: ReplAppProps): ReactElement {
-  const { provider, dispatcher, labels, cwd, registerConfirm, registerToolSink, slashRegistry, initialSelection, onSwitch } = props;
+  const { provider, dispatcher, labels, cwd, registerConfirm, registerToolSink, slashRegistry, initialSelection, onSwitch, onApprovalMode } = props;
   const { exit } = useApp();
   const [selection, setSelection] = useState<ActiveSelection>(initialSelection);
+  const [approval, setApproval] = useState<ApprovalMode>('suggest');
 
   const [turns, setTurns] = useState<Turn[]>([]);
   const [reply, setReply] = useState('');
@@ -243,6 +250,15 @@ export function ReplApp(props: ReplAppProps): ReactElement {
       }
       return;
     }
+    // /approve <mode> — agentic approval mode (suggest / auto-edit / full-auto).
+    const ap = trimmed.match(/^\/approve(?:\s+(suggest|auto-edit|full-auto))?$/i);
+    if (ap) {
+      pushTurn('user', trimmed);
+      const mode = ap[1] as ApprovalMode | undefined;
+      if (mode) { onApprovalMode(mode); setApproval(mode); pushTurn('assistant', `${labels.approvalSet}: ${mode}`); }
+      else { pushTurn('assistant', `${labels.approvalUsage} (${approval})`); }
+      return;
+    }
     queue.current.push(trimmed);
     setQueued([...queue.current]);
     if (wake.current) { const w = wake.current; wake.current = null; w(); }
@@ -311,6 +327,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
         {selection.model ? <Text color={GOLD}>{` · ${selection.model}`}</Text> : null}
         <Text dimColor>{`  ${cwd}`}</Text>
         {sessionTok > 0 ? <Text dimColor>{`  · Σ ${sessionTok} tok`}</Text> : null}
+        {approval !== 'suggest' ? <Text color={GOLD}>{`  · ⚡${approval}`}</Text> : null}
       </Box>
     </Box>
   );

@@ -344,6 +344,14 @@ const MESSAGES: MessageMap = {
     en: 'usage: /model <id> · /provider <name>. current:',
     tr: 'kullanım: /model <id> · /provider <ad>. aktif:',
   },
+  'tui.approval_set': {
+    en: 'approval mode',
+    tr: 'onay modu',
+  },
+  'tui.approval_usage': {
+    en: 'usage: /approve suggest|auto-edit|full-auto. current:',
+    tr: 'kullanım: /approve suggest|auto-edit|full-auto. aktif:',
+  },
   'tui.generating': {
     en: 'generating…',
     tr: 'üretiliyor…',
