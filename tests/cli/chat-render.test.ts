@@ -5,6 +5,7 @@ import { renderMarkdown } from '../../src/cli/commands/chat-render.js';
 const RESET = '\x1b[0m';
 const BOLD  = '\x1b[1m';
 const DIM   = '\x1b[2m';
+const CYAN  = '\x1b[36m';
 
 describe('renderMarkdown', () => {
   it('renders fenced code blocks with DIM (grey) ANSI code', () => {
@@ -17,11 +18,11 @@ describe('renderMarkdown', () => {
     expect(output).not.toContain('```');
   });
 
-  it('renders ATX headings with BOLD ANSI code', () => {
+  it('renders ATX headings with a visual hierarchy (# bold-cyan, ## bold)', () => {
     const input = '# Main Title\n## Section\nBody text.';
     const output = renderMarkdown(input, true);
-    expect(output).toContain(`${BOLD}Main Title${RESET}`);
-    expect(output).toContain(`${BOLD}Section${RESET}`);
+    expect(output).toContain(`${BOLD}${CYAN}Main Title${RESET}`); // level 1 → bold + cyan
+    expect(output).toContain(`${BOLD}Section${RESET}`);            // level 2 → bold
     // heading markers stripped
     expect(output).not.toMatch(/^#+ /m);
   });
