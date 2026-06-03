@@ -27,7 +27,7 @@
 ```bash
 # Sprint yaşam döngüsü (temel akış)
 deckent init                        # Projeyi başlat (.deckent/, .brain/, .tasks/)
-deckent plan --mode structured      # DIRECTIVES.md'yi oku, task JSON'larını oluştur
+deckent plan --structured      # DIRECTIVES.md'yi oku, task JSON'larını oluştur
 deckent start                       # Worker'ları spawn et, sprint başlat
 deckent status                      # Aktif sprint durumunu göster
 deckent review                      # GO / NO_GO / GO_WITH_TECH_DEBT değerlendirmesi

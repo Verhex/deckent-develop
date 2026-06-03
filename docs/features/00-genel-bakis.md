@@ -35,7 +35,7 @@ deckent init
 deckent set-directives
 
 # Planla + çalıştır
-deckent plan --mode structured
+deckent plan --structured
 deckent start
 
 # Durumu izle

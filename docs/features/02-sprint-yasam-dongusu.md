@@ -35,7 +35,7 @@ PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → CLEANUP
 
 ```bash
 # Sprint başlatmak
-deckent plan --mode structured   # görevleri planla
+deckent plan --structured   # görevleri planla
 deckent start                    # sprint'i başlat
 
 # İlerlemeyi izlemek

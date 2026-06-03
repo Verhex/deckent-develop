@@ -37,7 +37,7 @@ routeTaskV2()
 
 ```bash
 # Routing kararını görüntülemek için plan çıktısına bak:
-deckent plan --mode structured
+deckent plan --structured
 # Çıktıda her görev için: "Agent: api-builder (confidence: high)" satırı görünür.
 
 # Belirli bir görevi manuel tetiklemek:
