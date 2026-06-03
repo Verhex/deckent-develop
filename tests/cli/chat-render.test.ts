@@ -55,12 +55,14 @@ describe('renderMarkdown', () => {
     expect(output).not.toMatch(/`npm install`/);
   });
 
-  it('renders unordered list items as bullet points', () => {
+  it('renders unordered list items as cyan bullet points (indent-preserving)', () => {
     const input = '- first item\n- second item\n* third item';
     const output = renderMarkdown(input, true);
-    expect(output).toContain('  • first item');
-    expect(output).toContain('  • second item');
-    expect(output).toContain('  • third item');
+    const strip = (s: string) => s.replace(/\x1b\[[0-9;]*m/g, '');
+    expect(strip(output)).toContain('• first item');
+    expect(strip(output)).toContain('• second item');
+    expect(strip(output)).toContain('• third item');
+    expect(output).toContain(`${CYAN}•${RESET}`); // cyan bullet
   });
 
   it('handles empty string without throwing', () => {
@@ -117,5 +119,66 @@ describe('renderMarkdown — links, URLs, file paths (Sprint 224 readability)', 
     // the URL is one hyperlink; no stray cyan path-coloring inside it
     expect(out).toContain('\x1b]8;;https://github.com/anthropics/claude-code\x07');
     expect(out).not.toContain('\x1b[36manthropics');
+  });
+});
+
+describe('renderMarkdown — block elements (E1: tables, code, admonitions, kbd, …)', () => {
+  const strip = (s: string) => s.replace(/\x1b\][0-9;]*[^\x07]*\x07/g, '').replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, '');
+
+  it('table → boxed + aligned (├ ┼ │ borders, headers bold)', () => {
+    const out = renderMarkdown('| A | B |\n|---|--:|\n| 1 | 2 |', true);
+    const plain = strip(out);
+    expect(plain).toContain('┌'); expect(plain).toContain('┼'); expect(plain).toContain('│');
+    expect(plain).toContain('A'); expect(plain).toContain('1');
+    expect(out).toContain('\x1b[1m'); // header bold
+  });
+
+  it('fenced code block → framed box with language label', () => {
+    const out = renderMarkdown('```ts\nconst x = 1;\n```', true);
+    const plain = strip(out);
+    expect(plain).toContain('╭'); expect(plain).toContain('ts'); expect(plain).toContain('const x = 1;');
+    expect(plain).toContain('╰');
+  });
+
+  it('admonition [!WARNING] → colored icon header + left bar', () => {
+    const out = renderMarkdown('> [!WARNING]\n> dikkat et', true);
+    expect(out).toContain('\x1b[33m'); // yellow
+    expect(strip(out)).toContain('WARNING');
+    expect(strip(out)).toContain('▌');
+  });
+
+  it('<kbd> → inverse badge', () => {
+    const out = renderMarkdown('bas <kbd>Ctrl</kbd>', true);
+    expect(out).toContain('\x1b[7m'); // inverse
+    expect(strip(out)).toContain('Ctrl');
+  });
+
+  it('strikethrough ~~x~~ → STRIKE ansi', () => {
+    expect(renderMarkdown('~~eski~~', true)).toContain('\x1b[9m');
+  });
+
+  it('horizontal rule --- → dim line', () => {
+    expect(strip(renderMarkdown('---', true))).toContain('─');
+  });
+
+  it('ordered list 1. → cyan number', () => {
+    const out = renderMarkdown('1. ilk\n2. iki', true);
+    expect(strip(out)).toContain('1.'); expect(out).toContain('\x1b[36m');
+  });
+
+  it('blockquote > → left bar', () => {
+    expect(strip(renderMarkdown('> alıntı', true))).toContain('▌');
+  });
+
+  it('code block content is NOT corrupted by inline path/bold passes', () => {
+    const out = renderMarkdown('```js\nconst p = "src/a.ts"; // **not bold**\n```', true);
+    const plain = strip(out);
+    expect(plain).toContain('src/a.ts');       // path text intact
+    expect(plain).toContain('**not bold**');   // markdown inside code NOT processed
+  });
+
+  it('non-TTY → all block elements pass through unchanged', () => {
+    const md = '| A |\n|---|\n| 1 |\n```ts\nx\n```';
+    expect(renderMarkdown(md, false)).toBe(md);
   });
 });
