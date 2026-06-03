@@ -91,6 +91,14 @@ export async function runInkRepl(
     },
   };
 
+  // Alternate-screen mode (opt-in: DECKENT_ALTSCREEN=1). Ink renders into a
+  // separate screen buffer (like vim/htop) so its frame erases never touch the
+  // main scrollback — fixes terminals where the default in-place rendering blanks
+  // or drifts the screen (e.g. VS Code integrated terminal). Trade-off: no native
+  // scrollback during the session; the main screen is restored on exit.
+  const altScreen = process.env['DECKENT_ALTSCREEN'] === '1';
+  if (altScreen) process.stdout.write('\x1b[?1049h\x1b[2J\x1b[H');
+
   const { waitUntilExit } = render(
     <ReplErrorBoundary>
     <ReplApp
@@ -123,6 +131,7 @@ export async function runInkRepl(
 
   await waitUntilExit();
 
+  if (altScreen) process.stdout.write('\x1b[?1049l'); // restore the main screen
   // Bounded teardown of the active session, then deterministic exit (Ink unmount
   // + restored stdin can otherwise keep the event loop alive).
   await Promise.race([switcher.exit(), new Promise((r) => setTimeout(r, 1000))]);
