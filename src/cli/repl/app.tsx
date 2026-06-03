@@ -60,7 +60,8 @@ export interface ReplAppProps {
   onSwitch: (sel: Partial<ActiveSelection>) => ActiveSelection;
 }
 
-interface Turn { id: number; role: 'user' | 'assistant' | 'tool'; text: string; tool?: ToolInfo; }
+interface TurnStats { elapsedMs: number; tokens?: number; }
+interface Turn { id: number; role: 'user' | 'assistant' | 'tool'; text: string; tool?: ToolInfo; stats?: TurnStats; }
 
 const TEAL = '#4DB8A4';
 const GOLD = '#C4A855';
@@ -110,6 +111,9 @@ function TurnView({ turn }: { turn: Turn }): ReactElement {
     <Box flexDirection="column" marginTop={1}>
       <DeckentHeader />
       <Text>{renderMarkdown(turn.text, true)}</Text>
+      {turn.stats ? (
+        <Text dimColor>{`⏱ ${(turn.stats.elapsedMs / 1000).toFixed(1)}s${turn.stats.tokens ? ` · ${turn.stats.tokens} tok` : ''}`}</Text>
+      ) : null}
     </Box>
   );
 }
@@ -125,8 +129,10 @@ export function ReplApp(props: ReplAppProps): ReactElement {
   const [queued, setQueued] = useState<string[]>([]);
   const [confirm, setConfirm] = useState<{ summary: string } | null>(null);
 
+  const [sessionTok, setSessionTok] = useState(0);
   const idRef = useRef(1);
   const replyAccum = useRef('');
+  const lastStats = useRef<TurnStats | null>(null);
   const flushTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const queue = useRef<string[]>([]);
   const wake = useRef<(() => void) | null>(null);
@@ -163,8 +169,10 @@ export function ReplApp(props: ReplAppProps): ReactElement {
 
     const finalizeReply = (): void => {
       if (replyAccum.current.length > 0) {
-        pushTurn('assistant', replyAccum.current);
+        const stats = lastStats.current ?? undefined;
+        setTurns((t) => [...t, { id: idRef.current++, role: 'assistant', text: replyAccum.current, ...(stats ? { stats } : {}) }]);
         replyAccum.current = '';
+        lastStats.current = null;
         setReply('');
       }
     };
@@ -208,6 +216,11 @@ export function ReplApp(props: ReplAppProps): ReactElement {
       interactiveTty: true,
       layoutEnabled: false,
       gracefulErrors: true,
+      onTurnEnd: (s) => {
+        const tokens = s.usage?.outputTokens;
+        lastStats.current = { elapsedMs: s.elapsedMs, ...(tokens !== undefined ? { tokens } : {}) };
+        if (tokens) setSessionTok((n) => n + tokens);
+      },
     }).then(() => exit()).catch(() => exit());
   }, [provider, dispatcher, exit]);
 
@@ -297,6 +310,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
         <Text color={TEAL}>{selection.provider}</Text>
         {selection.model ? <Text color={GOLD}>{` · ${selection.model}`}</Text> : null}
         <Text dimColor>{`  ${cwd}`}</Text>
+        {sessionTok > 0 ? <Text dimColor>{`  · Σ ${sessionTok} tok`}</Text> : null}
       </Box>
     </Box>
   );

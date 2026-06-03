@@ -250,6 +250,12 @@ export interface ChatNativeOptions {
    */
   thinkingIndicator?: { start(): void; stop(): void };
   /**
+   * Sprint 224 E4 — fires at the end of every assistant turn with the elapsed
+   * time + token usage, so a non-layout (Ink) consumer can render its own stats
+   * footer and accumulate session totals. Independent of `layoutEnabled`.
+   */
+  onTurnEnd?: (stats: { elapsedMs: number; usage?: ProviderResponse['usage'] }) => void;
+  /**
    * Sprint 224 T-224-002 — interactive-TTY echo guard. When true, the input
    * is read by a `terminal: true` readline (224-001) which ALREADY echoes the
    * typed line to the screen. Re-emitting it via `renderUserMessage` would
@@ -653,6 +659,8 @@ export async function runChatNativeLoop(opts: ChatNativeOptions): Promise<ChatMe
         emitLayout(messageSeparator());
       }
     }
+    // E4 — report turn stats to a non-layout (Ink) consumer for its own footer.
+    opts.onTurnEnd?.({ elapsedMs: Date.now() - turnStart, usage: turnUsage });
   }
 
   return transcript;
