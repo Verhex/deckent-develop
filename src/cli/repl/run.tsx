@@ -82,6 +82,11 @@ export async function runInkRepl(
       const result = EXEC_TOOLS.has(toolName)
         ? await execDispatcher.dispatch(toolName, args)
         : await cliDispatcher.dispatch(toolName, args);
+      // WSL fix: spawning a child subprocess (the CLI tool bridge runs
+      // `node entry.js <cmd>`) can reset the parent TTY back to cooked mode →
+      // Ink's keypresses then echo raw (`^[[A`) and arrows die. Re-assert raw
+      // mode after every dispatch so input keeps working post-command.
+      if (process.stdin.isTTY) { try { process.stdin.setRawMode(true); } catch { /* not a tty */ } }
       const info = toolInfoFor(toolName, args);
       // Only surface a change block for a real action (not a denied/no-op).
       if (toolSink && info && !result.startsWith('[mcp-error]') && !/reddedildi|denied/i.test(result)) {
@@ -91,12 +96,13 @@ export async function runInkRepl(
     },
   };
 
-  // Alternate-screen mode (opt-in: DECKENT_ALTSCREEN=1). Ink renders into a
-  // separate screen buffer (like vim/htop) so its frame erases never touch the
-  // main scrollback — fixes terminals where the default in-place rendering blanks
-  // or drifts the screen (e.g. VS Code integrated terminal). Trade-off: no native
-  // scrollback during the session; the main screen is restored on exit.
-  const altScreen = process.env['DECKENT_ALTSCREEN'] === '1';
+  // Alternate-screen mode (DEFAULT ON for the Ink path; disable with
+  // DECKENT_ALTSCREEN=0). Ink renders into a separate screen buffer (like vim/
+  // htop) so its frame erases never touch the main scrollback — fixes terminals
+  // (plain WSL / Windows Terminal) where the default in-place rendering drifts or
+  // blanks the screen. Trade-off: no native scrollback during the session; the
+  // main screen is restored on exit.
+  const altScreen = process.env['DECKENT_ALTSCREEN'] !== '0';
   if (altScreen) process.stdout.write('\x1b[?1049h\x1b[2J\x1b[H');
 
   const { waitUntilExit } = render(

@@ -496,12 +496,15 @@ export async function launchDefaultRepl(): Promise<void> {
   // that replaces the hand-rolled raw-ANSI TUI). Opt-in via DECKENT_INK=1 while
   // it is verified; will become the default once it reaches parity. Dynamic
   // import keeps Ink/React out of the non-REPL CLI startup path.
-  // Sprint 224 E7 — the Ink REPL is now the DEFAULT for an interactive TTY
-  // (enterprise-grade native parity: markdown/tables/code, interactive /menu,
-  // model·provider switch, token footer, agentic diff, paste-as-one, …). The
-  // legacy readline/scroll-region paths remain reachable via DECKENT_INK=0 as a
-  // one-release escape hatch (full removal is a follow-up cleanup).
-  const inkMode = isTtyEarly && process.env['DECKENT_INK'] !== '0';
+  // Sprint 224 — the Ink REPL delivers the enterprise-grade native experience
+  // (markdown/tables/code, interactive /menu, model·provider switch, token
+  // footer, agentic diff, …) and is verified in a clean xterm pty. HOWEVER it
+  // misbehaves in the VS Code integrated WSL terminal (screen blank/drift + lost
+  // raw mode → arrow keys echo `^[[A`), which is not reproducible in a clean
+  // pty. Until that environment-specific Ink issue is fixed, Ink is OPT-IN
+  // (DECKENT_INK=1) and the compatible readline path stays the default so the
+  // REPL works everywhere.
+  const inkMode = isTtyEarly && process.env['DECKENT_INK'] === '1';
   if (inkMode) {
     const { runInkRepl } = await import('./repl/run.js');
     await runInkRepl(provider, providerName, (sel) =>
