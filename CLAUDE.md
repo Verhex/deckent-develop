@@ -3,6 +3,23 @@
 
 # Project: deckent
 
+## ⚠️ Quality Bar — Direct Hand-Coding (MANDATORY, applies to ME)
+Bu bölüm, deckent üzerinde **doğrudan kod yazdığım her an** (hybrid dogfood, REPL/TUI/CLI el-kodlama)
+bağlayıcıdır. deckent **god-level, enterprise-grade** bir üründür — ona yakışır şekilde çalış.
+Kalite her seferinde kullanıcının prompt'uyla düzeltilmemeli; **ilk seferde doğru** olmalı.
+
+- **i18n-FIRST — kullanıcıya görünen string'i ASLA hardcode etme.** Tüm user-facing metin
+  `getMessage(key, lang)` (`src/cli/helpers/messages.ts`, en/tr) üzerinden gelir. Mekanizma
+  modülleri (TUI/render/controller) **string-free** olur → label'lar caller'dan enjekte edilir,
+  İngilizce default. Hardcode TR/EN = teknik borç, kabul edilmez.
+- **No tech debt by default.** Kısa-yol/placeholder/MVP YOK. Bir şeyi eksik bırakıyorsan
+  açıkça işaretle + nedenini söyle; sessizce borç bırakma.
+- **Proof-of-function.** User-surface değişiklik → gerçek-binary run-verify (mock-only yetmez).
+  Test hermetik (tmpdir, async spawn, no spawnSync), CI yeşil korunur.
+- **Surgical + mevcut-pattern.** Var olan i18n/config/routing sistemlerini kullan, yeniden icat etme.
+- **Riskli/görsel kod kör-default-on edilmez** — flag-gated + doğrula, sonra default.
+- Şüphe varsa: "Bu god-level/enterprise mi, i18n-temiz mi, borç bırakıyor mu?" diye sor — sonra yaz.
+
 ## Rules
 @DIRECTIVES.md
 @.brain/exports/summary.md

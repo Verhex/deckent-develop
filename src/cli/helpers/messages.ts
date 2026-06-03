@@ -304,6 +304,30 @@ const MESSAGES: MessageMap = {
     en: 'Node.js version too low. Upgrade to >=24.0.0.',
     tr: 'Node.js sürümü çok düşük. >=24.0.0 sürümüne yükseltin.',
   },
+  'tui.intro': {
+    en: 'deckent — pinned-bottom TUI (experimental). Type /exit to quit.',
+    tr: 'deckent — alt-sabit TUI (deneysel). /exit ile çık.',
+  },
+  'tui.thinking': {
+    en: 'thinking…',
+    tr: 'düşünüyor…',
+  },
+  'tui.confirm_hint': {
+    en: '(y = allow · a = always allow · N = deny)',
+    tr: '(y = izin · a = hep izin · N = reddet)',
+  },
+  'tui.confirm_granted': {
+    en: 'allowed',
+    tr: 'izin verildi',
+  },
+  'tui.confirm_always': {
+    en: 'always allowed',
+    tr: 'hep izin verildi',
+  },
+  'tui.confirm_denied': {
+    en: 'denied',
+    tr: 'reddedildi',
+  },
 };
 
 /**

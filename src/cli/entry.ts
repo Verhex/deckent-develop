@@ -33,6 +33,8 @@ import { createPermissionStore } from './commands/chat-permissions.js';
 import { slashCompleter, buildSlashRegistry } from './commands/chat-slash-registry.js';
 import { slashMenuOnKeypress, renderSlashMenu, filterSlashCommands } from './commands/chat-slash-menu.js';
 import { createPromptRegion, createThinkingTicker, createPasteCoalescer, createLineBufferedSink } from './commands/chat-render-region.js';
+import { PinnedTui } from './commands/chat-pinned-tui.js';
+import { getMessage, getLanguage } from './helpers/messages.js';
 import { createStreamMarkdown } from './commands/chat-render.js';
 import {
   OPENAI_COMPAT_PRESETS,
@@ -511,6 +513,17 @@ export async function launchDefaultRepl(): Promise<void> {
   // tests, HTTP backends and `printf | deckent` smoke runs are byte-for-byte
   // unchanged (spinner stays a no-op there).
   const isTty = process.stdin.isTTY === true && process.stdout.isTTY === true;
+
+  // T-224-019 v2 — true bottom-pinned TUI (DECSTBM scroll region + manual input
+  // line). EXPERIMENTAL, opt-in via DECKENT_TUI=1. This is the real claude-code
+  // fixed-input-bar (readline's writeAbove approach could not pin). Self-test +
+  // visual-verify before it becomes the default. Falls through to the readline
+  // path otherwise.
+  if (isTty && process.env['DECKENT_TUI'] === '1') {
+    await runPinnedTuiRepl(provider);
+    return;
+  }
+
   // T-224-017 — `/` command menu: a slash completer gives claude-code-style
   // Tab-completion/listing of slash commands on a TTY.
   const baseReadlineOpts = replReadlineOptions(isTty);
@@ -628,15 +641,15 @@ export async function launchDefaultRepl(): Promise<void> {
   // (else the markers show literally). Non-TTY → passthrough (pipe unchanged).
   const streamMd = createStreamMarkdown(isTty);
 
-  // T-224-019 — pinned-input-bar. On a TTY, provider output is line-buffered and
-  // each complete line is written ABOVE the prompt via region.writeAbove, which
-  // redraws the `› ` prompt below after every line — so the prompt stays PINNED
-  // at the bottom while the reply streams above (Alperen: "prompt bar kesin
-  // korunmalı"). DEFAULT ON (PTY-verified: clean exit, kraken ticker + ⏱ footer
-  // + reply all render). Streaming is line-granular (not token-smooth); the
-  // opt-OUT `DECKENT_PINNED_BAR=0` restores the raw token-smooth path for anyone
-  // who prefers it. (Pinned + token-smooth together needs a full render loop.)
-  const pinnedBar = isTty && process.env['DECKENT_PINNED_BAR'] !== '0';
+  // T-224-019 — pinned-input-bar (line-buffered writeAbove). HONEST NOTE: this
+  // approach does NOT truly pin the prompt to the terminal bottom — writeAbove
+  // pushes the `› ` prompt DOWN one line per output line (it descends through
+  // the screen, "yukarıdan aşağıya kayıyor"), and the line-buffering breaks the
+  // token-smooth stream (felt slow). A true claude-code bottom-pinned bar needs
+  // a scroll-region (DECSTBM) + manual input line — built separately as
+  // chat-pinned-tui. So this path is now DEFAULT OFF (opt-in DECKENT_PINNED_BAR=1
+  // for experiments); the default restores the fast raw token-smooth stream.
+  const pinnedBar = isTty && process.env['DECKENT_PINNED_BAR'] === '1';
   const lineSink = pinnedBar
     ? createLineBufferedSink((line) => region.writeAbove(streamMd.feed(line) + streamMd.flush()))
     : null;
@@ -678,6 +691,75 @@ export async function launchDefaultRepl(): Promise<void> {
   const maybeSession = provider as Partial<PersistentClaudeSession>;
   if (typeof maybeSession.exit === 'function') {
     await maybeSession.exit();
+  }
+}
+
+/**
+ * T-224-019 v2 — bottom-pinned TUI REPL loop. The {@link PinnedTui} controller
+ * owns raw-mode stdin + a DECSTBM scroll region: the `› ` input is pinned to the
+ * last terminal row, provider output streams above it, and side-effecting tools
+ * confirm via a single-key (y/a/N) modal. Experimental (DECKENT_TUI=1).
+ */
+async function runPinnedTuiRepl(provider: ChatProviderAdapter): Promise<void> {
+  const DIM = '\x1b[2m';
+  const TEAL = '\x1b[38;2;77;184;164m';
+  const RESET = '\x1b[0m';
+  // i18n-first: resolve language once, inject localized labels into the
+  // string-free TUI controller (getMessage, never hardcoded).
+  let lang = 'en';
+  try { lang = getLanguage((await loadConfig()).language); } catch { /* default en */ }
+  const t = (key: string): string => getMessage(key, lang);
+  const ctl = new PinnedTui({
+    out: process.stdout,
+    input: process.stdin,
+    labels: {
+      confirmHint: t('tui.confirm_hint'),
+      confirmGranted: t('tui.confirm_granted'),
+      confirmAlways: t('tui.confirm_always'),
+      confirmDenied: t('tui.confirm_denied'),
+    },
+  });
+  const streamMd = createStreamMarkdown(true);
+  const perms = createPermissionStore(process.cwd());
+
+  const askConfirm = async (summary: string, toolName: string): Promise<boolean> => {
+    if (perms.isAllowed(toolName)) return true;
+    const answer = await ctl.confirm(summary);
+    if (answer === 'a') perms.allow(toolName);
+    return answer !== 'n';
+  };
+
+  const cliDispatcher = createCliToolDispatcher();
+  const execDispatcher = createToolExecDispatcher({ cwd: process.cwd(), confirm: askConfirm });
+  const EXEC_TOOLS = new Set(['deckent_write_file', 'deckent_read_file', 'deckent_edit_file', 'deckent_bash']);
+  const dispatcher = {
+    dispatch: (toolName: string, args: Record<string, unknown>): Promise<string> =>
+      EXEC_TOOLS.has(toolName) ? execDispatcher.dispatch(toolName, args) : cliDispatcher.dispatch(toolName, args),
+  };
+
+  ctl.start();
+  ctl.writeLine(`${DIM}${t('tui.intro')}${RESET}`);
+  ctl.onInterrupt(() => ctl.stop());
+
+  try {
+    await runChatNativeLoop({
+      provider,
+      dispatcher,
+      input: ctl.lines(),
+      // Stream tokens into the scroll region (markdown-rendered), prompt stays pinned.
+      output: (text: string) => ctl.write(streamMd.feed(text)),
+      gracefulErrors: true,
+      layoutEnabled: false, // the controller echoes the user turn + we stream the reply
+      interactiveTty: true,
+      thinkingIndicator: {
+        start: () => ctl.writeLine(`${TEAL}● deckent${RESET} ${DIM}· ${t('tui.thinking')}${RESET}`),
+        stop: () => { /* reply streams next */ },
+      },
+    });
+  } finally {
+    ctl.stop();
+    const maybeSession = provider as Partial<PersistentClaudeSession>;
+    if (typeof maybeSession.exit === 'function') await maybeSession.exit();
   }
 }
 
