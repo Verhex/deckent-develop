@@ -17,6 +17,7 @@ import { renderMarkdown } from '../commands/chat-render.js';
 import { InputBar } from './input-bar.js';
 import type { SlashRegistry } from '../commands/chat-slash-registry.js';
 import type { ActiveSelection } from './provider-switch.js';
+import { createStreamSegmenter, type StreamSegmenter } from './stream-segmenter.js';
 
 export type ConfirmAnswer = 'y' | 'a' | 'n';
 export type ConfirmTrigger = (summary: string) => Promise<ConfirmAnswer>;
@@ -84,7 +85,11 @@ export interface ReplAppProps {
 type ApprovalMode = 'suggest' | 'auto-edit' | 'full-auto';
 
 interface TurnStats { elapsedMs: number; tokens?: number; }
-interface Turn { id: number; role: 'user' | 'assistant' | 'tool'; text: string; tool?: ToolInfo; stats?: TurnStats; }
+// Streaming model: a reply is a 'head' (● deckent) then a series of 'seg' units
+// (prose lines / finished code+table blocks) that flow into <Static> as they
+// complete, then a 'foot' (⏱ stats). Each lands in scrollback immediately, so
+// the user reads in real time and the dynamic region stays tiny (no drift).
+interface Turn { id: number; role: 'user' | 'head' | 'seg' | 'foot' | 'tool'; text: string; tool?: ToolInfo; stats?: TurnStats; }
 
 const TEAL = '#4DB8A4';
 const GOLD = '#C4A855';
@@ -130,15 +135,14 @@ function TurnView({ turn }: { turn: Turn }): ReactElement {
       </Box>
     );
   }
-  return (
-    <Box flexDirection="column" marginTop={1}>
-      <DeckentHeader />
-      <Text>{renderMarkdown(turn.text, true)}</Text>
-      {turn.stats ? (
-        <Text dimColor>{`⏱ ${(turn.stats.elapsedMs / 1000).toFixed(1)}s${turn.stats.tokens ? ` · ${turn.stats.tokens} tok` : ''}`}</Text>
-      ) : null}
-    </Box>
-  );
+  if (turn.role === 'head') return <Box marginTop={1}><DeckentHeader /></Box>;
+  if (turn.role === 'foot') {
+    const s = turn.stats;
+    return <Text dimColor>{`⏱ ${s ? (s.elapsedMs / 1000).toFixed(1) : '0'}s${s?.tokens ? ` · ${s.tokens} tok` : ''}`}</Text>;
+  }
+  // 'seg' — one completed reply line/block, rendered markdown, no margin (flows
+  // directly under the head + previous segments).
+  return <Text>{renderMarkdown(turn.text, true)}</Text>;
 }
 
 export function ReplApp(props: ReplAppProps): ReactElement {
@@ -149,16 +153,17 @@ export function ReplApp(props: ReplAppProps): ReactElement {
   const [cwd, setCwd] = useState(props.cwd);
 
   const [turns, setTurns] = useState<Turn[]>([]);
-  const [reply, setReply] = useState('');
+  const [partial, setPartial] = useState(''); // in-progress (incomplete) reply line
   const [busy, setBusy] = useState(false);
+  const [working, setWorking] = useState(false); // a turn is in progress (streaming)
   const [queued, setQueued] = useState<string[]>([]);
   const [confirm, setConfirm] = useState<{ summary: string } | null>(null);
 
   const [sessionTok, setSessionTok] = useState(0);
   const idRef = useRef(1);
-  const replyAccum = useRef('');
   const lastStats = useRef<TurnStats | null>(null);
-  const flushTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const headPushed = useRef(false);       // ● deckent header emitted for this turn?
+  const segmenter = useRef<StreamSegmenter | null>(null);
   const queue = useRef<string[]>([]);
   const wake = useRef<(() => void) | null>(null);
   const confirmResolve = useRef<((a: ConfirmAnswer) => void) | null>(null);
@@ -166,6 +171,17 @@ export function ReplApp(props: ReplAppProps): ReactElement {
 
   const pushTurn = (role: Turn['role'], text: string): void =>
     setTurns((t) => [...t, { id: idRef.current++, role, text }]);
+
+  // Push one completed reply segment (a line or a finished code/table block);
+  // emit the '● deckent' head once per reply, before the first segment.
+  const pushSegment = (markdown: string): void => {
+    setTurns((t) => {
+      const next = [...t];
+      if (!headPushed.current) { headPushed.current = true; next.push({ id: idRef.current++, role: 'head', text: '' }); }
+      next.push({ id: idRef.current++, role: 'seg', text: markdown });
+      return next;
+    });
+  };
 
   useEffect(() => {
     registerConfirm((summary: string) => new Promise<ConfirmAnswer>((resolve) => {
@@ -179,11 +195,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
   // reply first so the block lands AFTER the text that requested it.
   useEffect(() => {
     registerToolSink((info: ToolInfo) => {
-      if (replyAccum.current.length > 0) {
-        pushTurn('assistant', replyAccum.current);
-        replyAccum.current = '';
-        setReply('');
-      }
+      segmenter.current?.flush(); setPartial(''); // commit any in-flight reply first
       setTurns((t) => [...t, { id: idRef.current++, role: 'tool', text: '', tool: info }]);
     });
   }, [registerToolSink]);
@@ -192,17 +204,20 @@ export function ReplApp(props: ReplAppProps): ReactElement {
     if (started.current) return;
     started.current = true;
 
+    // One segmenter for the whole session: completed lines/blocks emit into
+    // <Static> immediately (flow into scrollback, readable in real time, like
+    // Claude Code); the dynamic region only ever holds the in-progress partial
+    // line → no tall re-render, no drift.
+    segmenter.current = createStreamSegmenter((seg) => pushSegment(seg.markdown));
+
     const finalizeReply = (): void => {
-      if (replyAccum.current.length > 0) {
-        // Capture text + stats in LOCALS first: the setTurns updater runs lazily
-        // (next render), so reading replyAccum.current inside it would see the
-        // already-cleared '' below → empty assistant turn. (E4 regression.)
-        const text = replyAccum.current;
+      segmenter.current?.flush();   // emit the trailing partial line / open block
+      setPartial('');
+      if (headPushed.current) {     // close the reply with a stats footer
         const stats = lastStats.current ?? undefined;
-        replyAccum.current = '';
         lastStats.current = null;
-        setReply('');
-        setTurns((t) => [...t, { id: idRef.current++, role: 'assistant', text, ...(stats ? { stats } : {}) }]);
+        headPushed.current = false;
+        setTurns((t) => [...t, { id: idRef.current++, role: 'foot', text: '', ...(stats ? { stats } : {}) }]);
       }
     };
 
@@ -212,12 +227,10 @@ export function ReplApp(props: ReplAppProps): ReactElement {
           const line = queue.current.shift() as string;
           setQueued([...queue.current]);
           pushTurn('user', line);
+          setWorking(true);
           yield line;
-          // The consumer pulls the next line only once THIS turn finished
-          // streaming → finalize the reply NOW (move it into <Static>, render
-          // markdown, drop to the idle '✓ hazır' phase, stop re-rendering so
-          // mouse-scroll / selection / copy work).
-          finalizeReply();
+          finalizeReply(); // turn finished streaming → close it out
+          setWorking(false);
         }
         await new Promise<void>((r) => { wake.current = r; });
       }
@@ -227,19 +240,12 @@ export function ReplApp(props: ReplAppProps): ReactElement {
       provider,
       dispatcher,
       input: inputIter(),
-      // Chunked streaming (Alperen: "token token değil cümle cümle"): tokens
-      // accumulate into replyAccum (always complete), but the rendered reply is
-      // flushed on a sentence/line boundary or a calm ~90ms tick — so the flow
-      // appears in meaningful chunks, not a jittery per-token crawl.
+      // Stream tokens straight through the segmenter: completed lines/blocks flow
+      // into the scrollback immediately (real-time readable — Alperen: "yukarıya
+      // yazdır, beklemeyelim"); the in-progress partial line shows live + small.
       output: (text: string) => {
-        replyAccum.current += text;
-        const atBoundary = /[.!?:;\n)]\s*$/.test(text);
-        if (atBoundary) {
-          if (flushTimer.current) { clearTimeout(flushTimer.current); flushTimer.current = null; }
-          setReply(replyAccum.current);
-        } else if (!flushTimer.current) {
-          flushTimer.current = setTimeout(() => { flushTimer.current = null; setReply(replyAccum.current); }, 90);
-        }
+        segmenter.current?.feed(text);
+        setPartial(segmenter.current?.partial() ?? '');
       },
       thinkingIndicator: { start: () => setBusy(true), stop: () => setBusy(false) },
       interactiveTty: true,
@@ -260,12 +266,12 @@ export function ReplApp(props: ReplAppProps): ReactElement {
     if (trimmed.toLowerCase() === '/cancel') {
       pushTurn('user', trimmed);
       queue.current = []; setQueued([]);
-      pushTurn('assistant', labels.queueCleared);
+      pushTurn('seg', labels.queueCleared);
       return;
     }
     // /clear must clear the Ink screen (history), not just the loop transcript.
     if (trimmed.toLowerCase() === '/clear') {
-      setTurns([]); setReply(''); replyAccum.current = '';
+      setTurns([]); setPartial(''); headPushed.current = false;
       return;
     }
     // /cd <path> — change the working dir (file tools + status follow it live).
@@ -277,9 +283,9 @@ export function ReplApp(props: ReplAppProps): ReactElement {
         try {
           process.chdir(arg.startsWith('~') ? arg.replace(/^~/, homedir()) : arg);
           setCwd(process.cwd());
-          pushTurn('assistant', `${labels.cdTo}: ${process.cwd()}`);
-        } catch { pushTurn('assistant', `${labels.cdFail}: ${arg}`); }
-      } else { pushTurn('assistant', process.cwd()); }
+          pushTurn('seg', `${labels.cdTo}: ${process.cwd()}`);
+        } catch { pushTurn('seg', `${labels.cdFail}: ${arg}`); }
+      } else { pushTurn('seg', process.cwd()); }
       return;
     }
     // /model <id> · /provider <name> — runtime switch (handled here, not the loop).
@@ -291,9 +297,9 @@ export function ReplApp(props: ReplAppProps): ReactElement {
       if (arg) {
         const next = onSwitch(kind === 'model' ? { model: arg } : { provider: arg });
         setSelection(next);
-        pushTurn('assistant', `${labels.switched}: ${next.provider}${next.model ? ` · ${next.model}` : ''}`);
+        pushTurn('seg', `${labels.switched}: ${next.provider}${next.model ? ` · ${next.model}` : ''}`);
       } else {
-        pushTurn('assistant', `${labels.switchUsage}\n${selection.provider}${selection.model ? ` · ${selection.model}` : ''}`);
+        pushTurn('seg', `${labels.switchUsage}\n${selection.provider}${selection.model ? ` · ${selection.model}` : ''}`);
       }
       return;
     }
@@ -302,8 +308,8 @@ export function ReplApp(props: ReplAppProps): ReactElement {
     if (ap) {
       pushTurn('user', trimmed);
       const mode = ap[1] as ApprovalMode | undefined;
-      if (mode) { onApprovalMode(mode); setApproval(mode); pushTurn('assistant', `${labels.approvalSet}: ${mode}`); }
-      else { pushTurn('assistant', `${labels.approvalUsage} (${approval})`); }
+      if (mode) { onApprovalMode(mode); setApproval(mode); pushTurn('seg', `${labels.approvalSet}: ${mode}`); }
+      else { pushTurn('seg', `${labels.approvalUsage} (${approval})`); }
       return;
     }
     queue.current.push(trimmed);
@@ -321,29 +327,16 @@ export function ReplApp(props: ReplAppProps): ReactElement {
 
   // Persistent phase anchor — the orientation signal ("am I working / done?").
   const phase: 'thinking' | 'generating' | 'idle' =
-    reply.length > 0 ? 'generating' : busy ? 'thinking' : 'idle';
+    busy ? 'thinking' : working ? 'generating' : 'idle';
 
   return (
     <Box flexDirection="column">
       <Static items={turns}>{(turn) => <TurnView key={turn.id} turn={turn} />}</Static>
 
-      {/* Live streaming reply — only the LAST N lines are shown so the dynamic
-          (non-Static) region stays BOUNDED. A tall dynamic region forces Ink to
-          cursor-up+erase many lines each frame, which desyncs/drifts the input
-          in some terminals (WSL/Windows Terminal). The FULL reply (markdown-
-          rendered) lands in <Static> at the turn boundary. */}
-      {reply.length > 0 && (() => {
-        const LINES = 10;
-        const all = reply.split('\n');
-        const shown = all.length > LINES ? all.slice(-LINES).join('\n') : reply;
-        return (
-          <Box flexDirection="column" marginTop={1}>
-            <DeckentHeader />
-            {all.length > LINES ? <Text dimColor>{`  … ${all.length - LINES} satır yukarıda`}</Text> : null}
-            <Text>{shown}</Text>
-          </Box>
-        );
-      })()}
+      {/* In-progress (incomplete) line — the only streamed text in the dynamic
+          region (one line). Completed lines/blocks already flowed into <Static>
+          above (readable in real time, native scrollback, no tall re-render). */}
+      {partial.length > 0 && <Text>{partial}</Text>}
 
       {/* Confirm modal. */}
       {confirm && (
@@ -374,7 +367,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
         active={confirm === null}
         onSubmit={handleSubmit}
         onInterrupt={() => exit()}
-        onClear={() => { setTurns([]); setReply(''); replyAccum.current = ''; }}
+        onClear={() => { setTurns([]); setPartial(''); headPushed.current = false; }}
         slashRegistry={slashRegistry}
         menuHint={labels.menuHint}
       />
