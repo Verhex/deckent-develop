@@ -10,7 +10,7 @@ import { Box, Text, useInput } from 'ink';
 import { useState, useRef, type ReactElement } from 'react';
 import { appendFileSync } from 'node:fs';
 import type { Key } from 'node:readline';
-import { editInput, EMPTY_INPUT, InputHistory, type InputState } from '../commands/chat-pinned-tui.js';
+import { editInput, EMPTY_INPUT, InputHistory, type InputState } from './line-edit.js';
 import { filterSlashCommands } from '../commands/chat-slash-menu.js';
 import type { SlashRegistry, SlashCommand } from '../commands/chat-slash-registry.js';
 

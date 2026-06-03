@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { Key } from 'node:readline';
-import { editInput, EMPTY_INPUT, InputHistory, tui, type InputState } from '../../src/cli/commands/chat-pinned-tui.js';
+import { editInput, EMPTY_INPUT, InputHistory, type InputState } from '../../src/cli/repl/line-edit.js';
 
 // Sprint 224 T-224-019 v2 — pure pieces of the bottom-pinned TUI.
 // Hermetic: no real TTY, no ANSI side-effects — only the reducers/builders.
@@ -116,21 +116,5 @@ describe('InputHistory — navigation (T-224-019 v2)', () => {
     h.push('same'); h.push('same');
     expect(h.navigate(-1, 'l')).toBe('same');
     expect(h.navigate(-1, 'l')).toBe('same'); // only one entry
-  });
-});
-
-describe('tui — ANSI builders (T-224-019 v2)', () => {
-  it('setScrollRegion reserves rows 1..bottom', () => {
-    expect(tui.setScrollRegion(23)).toBe('\x1b[1;23r');
-  });
-  it('resetScrollRegion clears the region', () => {
-    expect(tui.resetScrollRegion()).toBe('\x1b[r');
-  });
-  it('renderInput draws prompt+buffer at the row and positions the cursor', () => {
-    const s = tui.renderInput(24, '› ', { buffer: 'hi', cursor: 1 });
-    expect(s).toContain('\x1b[24;1H');     // move to input row, col 1
-    expect(s).toContain('\x1b[2K');         // clear the line
-    expect(s).toContain('hi');              // the buffer
-    expect(s).toContain('\x1b[24;4H');      // cursor at promptWidth(2)+cursor(1)+1 = 4
   });
 });

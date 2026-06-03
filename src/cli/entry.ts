@@ -33,9 +33,7 @@ import { createPermissionStore } from './commands/chat-permissions.js';
 import { slashCompleter, buildSlashRegistry } from './commands/chat-slash-registry.js';
 import { slashMenuOnKeypress, renderSlashMenu, filterSlashCommands } from './commands/chat-slash-menu.js';
 import { createPromptRegion, createThinkingTicker, createPasteCoalescer, createLineBufferedSink } from './commands/chat-render-region.js';
-import { PinnedTui } from './commands/chat-pinned-tui.js';
-import { getMessage, getLanguage } from './helpers/messages.js';
-import { createStreamMarkdown, renderMarkdown } from './commands/chat-render.js';
+import { createStreamMarkdown } from './commands/chat-render.js';
 import {
   OPENAI_COMPAT_PRESETS,
   type OpenAICompatPresetName,
@@ -510,10 +508,7 @@ export async function launchDefaultRepl(): Promise<void> {
     return;
   }
 
-  const tuiMode = isTtyEarly && process.env['DECKENT_TUI'] === '1';
-  if (!tuiMode) {
-    process.stdout.write(renderBanner({ provider: providerName, dir: process.cwd() }));
-  }
+  process.stdout.write(renderBanner({ provider: providerName, dir: process.cwd() }));
 
   // Sprint 224 — interactive REPL render model.
   //
@@ -531,15 +526,8 @@ export async function launchDefaultRepl(): Promise<void> {
   // unchanged (spinner stays a no-op there).
   const isTty = process.stdin.isTTY === true && process.stdout.isTTY === true;
 
-  // T-224-019 v2 — true bottom-pinned TUI (DECSTBM scroll region + manual input
-  // line). EXPERIMENTAL, opt-in via DECKENT_TUI=1. This is the real claude-code
-  // fixed-input-bar (readline's writeAbove approach could not pin). Self-test +
-  // visual-verify before it becomes the default. Falls through to the readline
-  // path otherwise.
-  if (isTty && process.env['DECKENT_TUI'] === '1') {
-    await runPinnedTuiRepl(provider);
-    return;
-  }
+  // (Legacy readline path — reached only via DECKENT_INK=0. The experimental
+  // scroll-region TUI path was retired in favour of the Ink default.)
 
   // T-224-017 — `/` command menu: a slash completer gives claude-code-style
   // Tab-completion/listing of slash commands on a TTY.
@@ -708,82 +696,6 @@ export async function launchDefaultRepl(): Promise<void> {
   const maybeSession = provider as Partial<PersistentClaudeSession>;
   if (typeof maybeSession.exit === 'function') {
     await maybeSession.exit();
-  }
-}
-
-/**
- * T-224-019 v2 — bottom-pinned TUI REPL loop. The {@link PinnedTui} controller
- * owns raw-mode stdin + a DECSTBM scroll region: the `› ` input is pinned to the
- * last terminal row, provider output streams above it, and side-effecting tools
- * confirm via a single-key (y/a/N) modal. Experimental (DECKENT_TUI=1).
- */
-async function runPinnedTuiRepl(provider: ChatProviderAdapter): Promise<void> {
-  const DIM = '\x1b[2m';
-  const BOLD = '\x1b[1m';
-  const TEAL = '\x1b[38;2;77;184;164m';
-  const RESET = '\x1b[0m';
-  // i18n-first: resolve language once, inject localized labels into the
-  // string-free TUI controller (getMessage, never hardcoded).
-  let lang = 'en';
-  try { lang = getLanguage((await loadConfig()).language); } catch { /* default en */ }
-  const t = (key: string): string => getMessage(key, lang);
-  const ctl = new PinnedTui({
-    out: process.stdout,
-    input: process.stdin,
-    labels: {
-      confirmHint: t('tui.confirm_hint'),
-      confirmGranted: t('tui.confirm_granted'),
-      confirmAlways: t('tui.confirm_always'),
-      confirmDenied: t('tui.confirm_denied'),
-    },
-    // Tokens stream raw (smooth); each completed line is re-rendered through
-    // renderMarkdown (links → clickable OSC-8, bold/code/headings/lists, file
-    // paths → cyan). Best of both: live streaming + correct markdown per line.
-    renderLine: (line) => renderMarkdown(line, true),
-  });
-  const perms = createPermissionStore(process.cwd());
-
-  const askConfirm = async (summary: string, toolName: string): Promise<boolean> => {
-    if (perms.isAllowed(toolName)) return true;
-    const answer = await ctl.confirm(summary);
-    if (answer === 'a') perms.allow(toolName);
-    return answer !== 'n';
-  };
-
-  const cliDispatcher = createCliToolDispatcher();
-  const execDispatcher = createToolExecDispatcher({ cwd: process.cwd(), confirm: askConfirm });
-  const EXEC_TOOLS = new Set(['deckent_write_file', 'deckent_read_file', 'deckent_edit_file', 'deckent_bash']);
-  const dispatcher = {
-    dispatch: (toolName: string, args: Record<string, unknown>): Promise<string> =>
-      EXEC_TOOLS.has(toolName) ? execDispatcher.dispatch(toolName, args) : cliDispatcher.dispatch(toolName, args),
-  };
-
-  ctl.start();
-  ctl.writeLine(`${DIM}${t('tui.intro')}${RESET}`);
-  ctl.onInterrupt(() => ctl.stop());
-
-  try {
-    await runChatNativeLoop({
-      provider,
-      dispatcher,
-      input: ctl.lines(),
-      // Stream tokens raw+smooth; each completed line re-renders via renderLine.
-      output: (text: string) => ctl.writeStreaming(text),
-      gracefulErrors: true,
-      layoutEnabled: false, // the controller echoes the user turn + we stream the reply
-      interactiveTty: true,
-      // Clean `● deckent` block header (kraken-colored) marks the assistant turn
-      // — distinct from the user's `›` echo; the "· düşünüyor…" marker is
-      // transient (wiped when the first reply token arrives, not left in history).
-      thinkingIndicator: {
-        start: () => { ctl.writeLine(`${TEAL}●${RESET} ${BOLD}deckent${RESET}`); ctl.setThinking(`${DIM}· ${t('tui.thinking')}${RESET}`); },
-        stop: () => ctl.clearThinking(),
-      },
-    });
-  } finally {
-    ctl.stop();
-    const maybeSession = provider as Partial<PersistentClaudeSession>;
-    if (typeof maybeSession.exit === 'function') await maybeSession.exit();
   }
 }
 
