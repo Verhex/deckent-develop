@@ -11,8 +11,11 @@ import { useState, useRef, type ReactElement } from 'react';
 import { appendFileSync } from 'node:fs';
 import type { Key } from 'node:readline';
 import { editInput, EMPTY_INPUT, InputHistory, type InputState } from '../commands/chat-pinned-tui.js';
+import { filterSlashCommands } from '../commands/chat-slash-menu.js';
+import type { SlashRegistry, SlashCommand } from '../commands/chat-slash-registry.js';
 
 const TEAL = '#4DB8A4';
+const GOLD = '#C4A855';
 
 export interface InputBarProps {
   /** Active only when the REPL is accepting input (false during a confirm modal). */
@@ -21,6 +24,17 @@ export interface InputBarProps {
   onSubmit: (line: string) => void;
   /** Ctrl-C with an empty buffer. */
   onInterrupt: () => void;
+  /** Slash command catalog — when set, typing `/` opens an interactive menu. */
+  slashRegistry?: SlashRegistry;
+  /** Localized hint shown under the menu (e.g. "↑↓ gez · Enter seç · Esc kapat"). */
+  menuHint?: string;
+}
+
+/** Interactive slash menu is open when the buffer is a bare `/command` prefix
+ * (no space/args yet) and at least one command matches. */
+function slashMenuMatches(registry: SlashRegistry | undefined, buffer: string): SlashCommand[] {
+  if (!registry || !buffer.startsWith('/') || buffer.includes(' ')) return [];
+  return filterSlashCommands(registry, buffer);
 }
 
 /** Map an Ink keypress to the node:readline Key shape editInput expects.
@@ -56,22 +70,39 @@ function CaretText({ state }: { state: InputState }): ReactElement {
 }
 
 export function InputBar(props: InputBarProps): ReactElement {
-  const { active, onSubmit, onInterrupt } = props;
+  const { active, onSubmit, onInterrupt, slashRegistry, menuHint } = props;
   const [state, setState] = useState<InputState>(EMPTY_INPUT);
+  const [menuSel, setMenuSel] = useState(0);
   const stateRef = useRef<InputState>(EMPTY_INPUT);
+  const menuSelRef = useRef(0);
   const history = useRef(new InputHistory());
   const set = (s: InputState): void => { stateRef.current = s; setState(s); };
+  const setSel = (n: number): void => { menuSelRef.current = n; setMenuSel(n); };
 
   useInput((input, key) => {
     if (process.env['DECKENT_INK_DEBUG'] === '1') {
       try { appendFileSync('/tmp/ink-keys.log', JSON.stringify({ input, key }) + '\n'); } catch { /* ignore */ }
     }
+
+    // ── Interactive slash menu: intercept nav keys while it is open ──
+    const matches = slashMenuMatches(slashRegistry, stateRef.current.buffer);
+    if (matches.length > 0) {
+      const n = matches.length;
+      const sel = ((menuSelRef.current % n) + n) % n;
+      if (key.upArrow) { setSel((sel - 1 + n) % n); return; }
+      if (key.downArrow) { setSel((sel + 1) % n); return; }
+      if (key.escape) { set(EMPTY_INPUT); setSel(0); return; }
+      if (key.tab) { const name = matches[sel]?.name ?? ''; set({ buffer: name + ' ', cursor: name.length + 1 }); setSel(0); return; }
+      if (key.return) { const name = matches[sel]?.name ?? stateRef.current.buffer; onSubmit(name); set(EMPTY_INPUT); setSel(0); return; }
+      // any other key falls through to editInput → re-filters; reset selection
+    }
+
     // A batched/pasted chunk that embeds Enter: split so each completed line
     // submits and the trailing part stays in the buffer (real Enter is a lone
     // `return` key handled by editInput below).
     if (!key.return && /[\r\n]/.test(input)) {
       const segs = input.split(/\r\n|\r|\n/);
-      let cur = stateRef.current.buffer;
+      const cur = stateRef.current.buffer;
       onSubmit(cur + (segs[0] ?? ''));
       for (let i = 1; i < segs.length - 1; i++) onSubmit(segs[i] ?? '');
       const tail = segs[segs.length - 1] ?? '';
@@ -94,13 +125,31 @@ export function InputBar(props: InputBarProps): ReactElement {
       return;
     }
     set(res.state);
+    setSel(0); // buffer changed → re-filter from the top
   }, { isActive: active });
 
-  // claude-code-style framed input box (Alperen: "iki tasarımsal çizgi arası").
+  const matches = slashMenuMatches(slashRegistry, state.buffer);
+  const sel = matches.length > 0 ? ((menuSel % matches.length) + matches.length) % matches.length : 0;
+
+  // claude-code-style framed input box, with the interactive menu ABOVE it.
   return (
-    <Box borderStyle="round" borderColor={TEAL} paddingX={1}>
-      <Text color={TEAL}>{'› '}</Text>
-      <CaretText state={state} />
+    <Box flexDirection="column">
+      {matches.length > 0 && (
+        <Box flexDirection="column" marginBottom={0}>
+          {matches.slice(0, 8).map((c, i) => (
+            <Text key={c.name}>
+              <Text color={i === sel ? GOLD : TEAL}>{i === sel ? '❯ ' : '  '}</Text>
+              <Text color={i === sel ? GOLD : undefined} bold={i === sel}>{c.name.padEnd(10)}</Text>
+              <Text dimColor> {c.desc}</Text>
+            </Text>
+          ))}
+          {menuHint ? <Text dimColor>{`  ${menuHint}`}</Text> : null}
+        </Box>
+      )}
+      <Box borderStyle="round" borderColor={TEAL} paddingX={1}>
+        <Text color={TEAL}>{'› '}</Text>
+        <CaretText state={state} />
+      </Box>
     </Box>
   );
 }

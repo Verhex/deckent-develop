@@ -332,6 +332,10 @@ const MESSAGES: MessageMap = {
     en: 'queued',
     tr: 'kuyrukta',
   },
+  'tui.menu_hint': {
+    en: '↑↓ move · Enter select · Tab complete · Esc close',
+    tr: '↑↓ gez · Enter seç · Tab tamamla · Esc kapat',
+  },
   'tui.generating': {
     en: 'generating…',
     tr: 'üretiliyor…',

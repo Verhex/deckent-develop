@@ -10,6 +10,7 @@ import type { ChatProviderAdapter } from '../commands/chat-native.js';
 import { createCliToolDispatcher } from '../commands/chat-tool-bridge.js';
 import { createToolExecDispatcher } from '../commands/chat-tool-exec.js';
 import { createPermissionStore } from '../commands/chat-permissions.js';
+import { buildSlashRegistry } from '../commands/chat-slash-registry.js';
 import { getMessage, getLanguage } from '../helpers/messages.js';
 import { loadConfig } from '../../core/config.js';
 import type { PersistentClaudeSession } from '../commands/chat-session.js';
@@ -72,12 +73,14 @@ export async function runInkRepl(provider: ChatProviderAdapter, providerName: st
       dispatcher={dispatcher}
       providerName={providerName}
       cwd={process.cwd()}
+      slashRegistry={buildSlashRegistry()}
       labels={{
         thinking: t('tui.thinking'),
         generating: t('tui.generating'),
         ready: t('tui.ready'),
         queued: t('tui.queued'),
         confirmHint: t('tui.confirm_hint'),
+        menuHint: t('tui.menu_hint'),
       }}
       registerConfirm={(trigger) => { confirmTrigger = trigger; }}
       registerToolSink={(sink) => { toolSink = sink; }}

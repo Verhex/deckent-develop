@@ -25,6 +25,9 @@ import type { McpToolDispatcher } from './chat-native.js';
 const TOOL_COMMANDS: Readonly<Record<string, readonly string[]>> = {
   deckent_status: ['status'],
   deckent_history: ['history'],
+  deckent_retro: ['retro'],
+  deckent_doctor: ['doctor'],
+  deckent_models: ['models'],
   // deckent_memory_query is special-cased below: it needs the `query` arg
   // appended as the `recall <query>` positional.
 };

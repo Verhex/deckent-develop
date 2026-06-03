@@ -76,6 +76,24 @@ const SLASH_CATALOG: readonly Omit<SlashCommand, never>[] = [
     agenticArgs: { root: '.' },
   },
   {
+    name: '/retro',
+    desc: 'Son sprint retrospektifini göster',
+    agenticTool: 'deckent_retro',
+    agenticArgs: { root: '.' },
+  },
+  {
+    name: '/doctor',
+    desc: 'Codebase sağlığını kontrol et',
+    agenticTool: 'deckent_doctor',
+    agenticArgs: { root: '.' },
+  },
+  {
+    name: '/models',
+    desc: 'Model & provider kayıtlarını listele',
+    agenticTool: 'deckent_models',
+    agenticArgs: {},
+  },
+  {
     name: '/clear',
     desc: 'Ekranı temizle',
   },

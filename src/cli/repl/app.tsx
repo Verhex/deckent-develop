@@ -14,6 +14,7 @@ import { useState, useRef, useEffect, type ReactElement } from 'react';
 import { runChatNativeLoop, type ChatProviderAdapter, type McpToolDispatcher } from '../commands/chat-native.js';
 import { renderMarkdown } from '../commands/chat-render.js';
 import { InputBar } from './input-bar.js';
+import type { SlashRegistry } from '../commands/chat-slash-registry.js';
 
 export type ConfirmAnswer = 'y' | 'a' | 'n';
 export type ConfirmTrigger = (summary: string) => Promise<ConfirmAnswer>;
@@ -36,6 +37,7 @@ export interface ReplLabels {
   ready: string;        // "hazır · sıra sende"
   queued: string;       // "kuyrukta"
   confirmHint: string;  // "(y = izin · a = hep izin · N = reddet)"
+  menuHint: string;     // "↑↓ gez · Enter seç · Tab tamamla · Esc kapat"
 }
 
 export interface ReplAppProps {
@@ -47,6 +49,8 @@ export interface ReplAppProps {
   registerConfirm: (trigger: ConfirmTrigger) => void;
   /** Register the sink the dispatcher calls to render a tool/change block. */
   registerToolSink: (sink: ToolSink) => void;
+  /** Slash command catalog for the interactive `/` menu. */
+  slashRegistry: SlashRegistry;
 }
 
 interface Turn { id: number; role: 'user' | 'assistant' | 'tool'; text: string; tool?: ToolInfo; }
@@ -104,7 +108,7 @@ function TurnView({ turn }: { turn: Turn }): ReactElement {
 }
 
 export function ReplApp(props: ReplAppProps): ReactElement {
-  const { provider, dispatcher, labels, providerName, cwd, registerConfirm, registerToolSink } = props;
+  const { provider, dispatcher, labels, providerName, cwd, registerConfirm, registerToolSink, slashRegistry } = props;
   const { exit } = useApp();
 
   const [turns, setTurns] = useState<Turn[]>([]);
@@ -256,8 +260,14 @@ export function ReplApp(props: ReplAppProps): ReactElement {
           : <><Spinner /><Text color={GOLD} bold> deckent </Text><Text dimColor>{`· ${phase === 'thinking' ? labels.thinking : labels.generating}`}</Text></>}
       </Box>
 
-      {/* Pinned input with a VISIBLE cursor — always the last element → bottom. */}
-      <InputBar active={confirm === null} onSubmit={handleSubmit} onInterrupt={() => exit()} />
+      {/* Pinned input with a VISIBLE cursor + interactive /menu — always last. */}
+      <InputBar
+        active={confirm === null}
+        onSubmit={handleSubmit}
+        onInterrupt={() => exit()}
+        slashRegistry={slashRegistry}
+        menuHint={labels.menuHint}
+      />
 
       <Box>
         <Text dimColor>{`deckent  ${providerName}  ${cwd}`}</Text>
