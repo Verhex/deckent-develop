@@ -8,8 +8,7 @@ import { handleCliError } from './helpers/process.js';
 import { interruptActiveSprint } from '../orchestra/sprint-controller.js';
 import { killAllSessions } from '../orchestra/tmux.js';
 import { bootstrapFromCatalog } from '../core/model-catalog.js';
-import { loadConfig, resolveChatProvider, resolveChatConfig, type ChatProviderName } from '../core/config.js';
-import { renderStatusLine, type StatusLineContext } from './commands/chat-status-line.js';
+import { loadConfig, resolveChatProvider, type ChatProviderName } from '../core/config.js';
 import {
   runChatNativeLoop,
   buildSubscriptionPrompt,
@@ -479,24 +478,17 @@ export async function launchDefaultRepl(): Promise<void> {
     process.exit(1);
     return;
   }
-  // Sprint 222 Task 222-006 — render status line (provider + dir + sprint).
-  // Reads chat.status_line from config; defaults to show-all when absent.
-  let statusLineCfg: boolean | undefined;
-  try {
-    const cfg = await loadConfig();
-    const chatCfg = resolveChatConfig(cfg);
-    statusLineCfg = typeof chatCfg.status_line === 'boolean' ? chatCfg.status_line : undefined;
-  } catch {
-    statusLineCfg = undefined;
+  // Welcome chrome. The banner shows `deckent  provider  dir` + the /help hint.
+  // (Sprint 222's separate status-line print was dropped here: at boot
+  // activeSprint is null, so it was byte-identical to the banner header and
+  // produced a visible duplicate. renderStatusLine stays exported for
+  // sprint-aware status surfaces.) In TUI mode the banner is skipped — the
+  // scroll-region TUI prints its own intro.
+  const isTtyEarly = process.stdin.isTTY === true && process.stdout.isTTY === true;
+  const tuiMode = isTtyEarly && process.env['DECKENT_TUI'] === '1';
+  if (!tuiMode) {
+    process.stdout.write(renderBanner({ provider: providerName, dir: process.cwd() }));
   }
-  const statusCtx: StatusLineContext = {
-    provider: providerName,
-    dir: process.cwd(),
-    activeSprint: null,
-  };
-  const statusLineText = renderStatusLine(statusCtx, statusLineCfg);
-  process.stdout.write(statusLineText ? statusLineText + '\n' : '');
-  process.stdout.write(renderBanner(statusCtx));
 
   // Sprint 224 — interactive REPL render model.
   //
