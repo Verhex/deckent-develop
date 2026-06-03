@@ -12,7 +12,7 @@
 import { Box, Text, Static, useInput, useApp } from 'ink';
 import { useState, useRef, useEffect, Component, type ReactElement, type ReactNode } from 'react';
 import { homedir } from 'node:os';
-import { runChatNativeLoop, type ChatProviderAdapter, type McpToolDispatcher } from '../commands/chat-native.js';
+import { runChatNativeLoop, type ChatProviderAdapter, type McpToolDispatcher, type ChatMemoryAdapter } from '../commands/chat-native.js';
 import { renderMarkdown } from '../commands/chat-render.js';
 import { InputBar } from './input-bar.js';
 import type { SlashRegistry } from '../commands/chat-slash-registry.js';
@@ -80,6 +80,12 @@ export interface ReplAppProps {
   onSwitch: (sel: Partial<ActiveSelection>) => ActiveSelection;
   /** Set the agentic approval mode (suggest / auto-edit / full-auto). */
   onApprovalMode: (mode: 'suggest' | 'auto-edit' | 'full-auto') => void;
+  /** Optional chat-memory adapter — persists turns and powers /resume. */
+  memory?: ChatMemoryAdapter;
+  /** Active chat session id (new turns append here; /resume switches it). */
+  sessionId?: string;
+  /** UI language for loop-emitted strings (/resume picker). */
+  lang?: string;
 }
 
 type ApprovalMode = 'suggest' | 'auto-edit' | 'full-auto';
@@ -146,7 +152,7 @@ function TurnView({ turn }: { turn: Turn }): ReactElement {
 }
 
 export function ReplApp(props: ReplAppProps): ReactElement {
-  const { provider, dispatcher, labels, registerConfirm, registerToolSink, slashRegistry, initialSelection, onSwitch, onApprovalMode } = props;
+  const { provider, dispatcher, labels, registerConfirm, registerToolSink, slashRegistry, initialSelection, onSwitch, onApprovalMode, memory, sessionId, lang } = props;
   const { exit } = useApp();
   const [selection, setSelection] = useState<ActiveSelection>(initialSelection);
   const [approval, setApproval] = useState<ApprovalMode>('suggest');
@@ -245,6 +251,11 @@ export function ReplApp(props: ReplAppProps): ReactElement {
       // Ink confirm modal), so auto-approve here and let that single authority
       // ask. Read-only tools pass through; write/destructive ones still prompt.
       agenticConfirm: async () => true,
+      // Chat persistence + /resume: when a memory adapter is wired, every turn
+      // is saved under sessionId and /resume can list/load prior sessions.
+      ...(memory ? { memory } : {}),
+      ...(sessionId ? { sessionId } : {}),
+      ...(lang ? { lang } : {}),
       input: inputIter(),
       // Stream tokens straight through the segmenter: completed lines/blocks flow
       // into the scrollback immediately (real-time readable — Alperen: "yukarıya

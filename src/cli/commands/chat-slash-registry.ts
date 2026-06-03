@@ -143,6 +143,11 @@ const SLASH_CATALOG: readonly SlashCommand[] = [
     desc: 'Bekleyen nervous bildirimleri (örn: /nervous accept <id>)',
   },
   {
+    // Meta-command: handled in the chat loop (chat-resume) BEFORE the registry.
+    name: '/resume',
+    desc: 'Önceki sohbet oturumunu sürdür (örn: /resume 1)',
+  },
+  {
     name: '/model',
     desc: 'Modeli değiştir (örn: /model sonnet)',
   },

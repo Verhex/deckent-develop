@@ -153,3 +153,41 @@ describe('MemoryStore.appendChatTurn + getChatHistory', () => {
     expect(history.map(t => t.role)).toEqual(['user', 'assistant']);
   });
 });
+
+describe('MemoryStore.listChatSessions', () => {
+  it('returns one summary per session with turn count and preview', () => {
+    store.appendChatTurn('sess-a', 'user', 'first question about docker');
+    store.appendChatTurn('sess-a', 'assistant', 'an answer');
+    store.appendChatTurn('sess-b', 'user', 'second session hello');
+
+    const sessions = store.listChatSessions();
+    const ids = sessions.map((s) => s.sessionId).sort();
+    expect(ids).toEqual(['sess-a', 'sess-b']);
+    const a = sessions.find((s) => s.sessionId === 'sess-a');
+    expect(a?.turnCount).toBe(2);
+    expect(a?.preview).toBe('first question about docker');
+    expect(a?.lastAt).toBeTruthy();
+  });
+
+  it('orders most-recently-active first and respects the limit', () => {
+    store.appendChatTurn('old', 'user', 'old one');
+    store.appendChatTurn('new', 'user', 'new one');
+    store.appendChatTurn('new', 'user', 'newer still');
+
+    const limited = store.listChatSessions(1);
+    expect(limited).toHaveLength(1);
+    expect(limited[0]?.sessionId).toBe('new');
+  });
+
+  it('truncates a long preview to ~60 chars with an ellipsis', () => {
+    const long = 'x'.repeat(120);
+    store.appendChatTurn('long-sess', 'user', long);
+    const [s] = store.listChatSessions();
+    expect(s?.preview.length).toBeLessThanOrEqual(60);
+    expect(s?.preview.endsWith('…')).toBe(true);
+  });
+
+  it('returns an empty array when there are no chat sessions', () => {
+    expect(store.listChatSessions()).toEqual([]);
+  });
+});

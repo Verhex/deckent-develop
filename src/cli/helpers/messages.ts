@@ -380,6 +380,34 @@ const MESSAGES: MessageMap = {
     en: 'cancelled',
     tr: 'iptal edildi',
   },
+  'tui.resume_list_header': {
+    en: 'Past chat sessions:',
+    tr: 'Geçmiş sohbet oturumları:',
+  },
+  'tui.resume_hint': {
+    en: 'Tip: /resume <number> to continue a session',
+    tr: 'İpucu: /resume <numara> ile oturumu sürdür',
+  },
+  'tui.resume_none': {
+    en: 'No past chat sessions yet.',
+    tr: 'Henüz geçmiş sohbet oturumu yok.',
+  },
+  'tui.resume_loaded': {
+    en: 'Resuming session "{session}" — last {count} turn(s):',
+    tr: '"{session}" oturumu sürdürülüyor — son {count} tur:',
+  },
+  'tui.resume_not_found': {
+    en: 'No turns found for session "{session}".',
+    tr: '"{session}" oturumu için tur bulunamadı.',
+  },
+  'tui.resume_no_memory': {
+    en: 'Memory store is not available — cannot resume.',
+    tr: 'Hafıza deposu kullanılamıyor — sürdürülemez.',
+  },
+  'tui.resume_turn_count': {
+    en: '{count} turns',
+    tr: '{count} tur',
+  },
   'tool.wrote_file': {
     en: 'wrote file',
     tr: 'dosya yazıldı',

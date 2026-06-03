@@ -15,6 +15,10 @@ import { buildSlashRegistry } from '../commands/chat-slash-registry.js';
 import { getMessage, getLanguage } from '../helpers/messages.js';
 import { loadConfig } from '../../core/config.js';
 import { createSwitchableProvider, type ActiveSelection } from './provider-switch.js';
+import { MemoryStore } from '../../core/memory-store.js';
+import { BRAIN_DIR, MEMORY_DB_FILE } from '../../core/constants.js';
+import { join } from 'node:path';
+import { existsSync } from 'node:fs';
 
 const EXEC_TOOLS = new Set(['deckent_write_file', 'deckent_read_file', 'deckent_edit_file', 'deckent_bash']);
 
@@ -32,6 +36,20 @@ export async function runInkRepl(
   const t = (key: string): string => getMessage(key, lang);
 
   const perms = createPermissionStore(process.cwd());
+
+  // Chat persistence + /resume. Open the project's memory.db so every turn is
+  // saved and /resume can list/load prior sessions. Best-effort: a DB-open
+  // failure (e.g. read-only fs) must not block the REPL, so we degrade to a
+  // no-memory session. sessionId is fresh per launch; /resume switches it.
+  let memory: MemoryStore | undefined;
+  let sessionId: string | undefined;
+  try {
+    const dbPath = join(process.cwd(), BRAIN_DIR, MEMORY_DB_FILE);
+    if (existsSync(join(process.cwd(), BRAIN_DIR))) {
+      memory = new MemoryStore(dbPath);
+      sessionId = memory.createChatSession();
+    }
+  } catch { memory = undefined; sessionId = undefined; }
 
   // Runtime model/provider switching: the loop holds a stable proxy; /model and
   // /provider rebuild the underlying adapter (the warm boot session is reused
@@ -142,6 +160,9 @@ export async function runInkRepl(
       initialSelection={switcher.current()}
       onSwitch={(sel) => { switcher.switchTo(sel); return switcher.current(); }}
       onApprovalMode={(m) => { approvalMode = m; }}
+      {...(memory ? { memory } : {})}
+      {...(sessionId ? { sessionId } : {})}
+      lang={lang}
       labels={{
         thinking: t('tui.thinking'),
         generating: t('tui.generating'),
@@ -166,6 +187,7 @@ export async function runInkRepl(
   await waitUntilExit();
 
   if (altScreen) process.stdout.write('\x1b[?1049l'); // restore the main screen
+  try { memory?.close(); } catch { /* already closed */ }
   // Bounded teardown of the active session, then deterministic exit (Ink unmount
   // + restored stdin can otherwise keep the event loop alive).
   await Promise.race([switcher.exit(), new Promise((r) => setTimeout(r, 1000))]);

@@ -137,6 +137,86 @@ describe('chat-native persist — resume yükle', () => {
   });
 });
 
+// ─── Test 3: /resume slash (Faz D) ──────────────────────────────────
+
+function mockMemoryWithSessions(
+  sessions: Array<{ sessionId: string; turnCount: number; lastAt: string; preview: string }>,
+  historyBySession: Record<string, Array<{ role: string; content: string }>>,
+): ChatMemoryAdapter {
+  return {
+    appendChatTurn: vi.fn(() => 0),
+    getChatHistory: vi.fn((sid: string) => historyBySession[sid] ?? []),
+    listChatSessions: vi.fn(() => sessions),
+  };
+}
+
+describe('chat-native — /resume slash', () => {
+  it('/resume (no arg) lists recent sessions', async () => {
+    const out: string[] = [];
+    const adapter = mockMemoryWithSessions(
+      [{ sessionId: 's1', turnCount: 3, lastAt: '2026-06-03T10:00:00Z', preview: 'deploy help' }],
+      {},
+    );
+    await runChatNativeLoop(baseOpts({
+      provider: { send: vi.fn(async () => ({ text: '', stopReason: 'end_turn' as const })) },
+      dispatcher: stubDispatcher(),
+      input: lines('/resume'),
+      output: (l) => out.push(l),
+      memory: adapter,
+      lang: 'en',
+    }));
+    expect(out.join('\n')).toContain('1. deploy help');
+  });
+
+  it('/resume <n> loads that session into the transcript and switches it', async () => {
+    const out: string[] = [];
+    const adapter = mockMemoryWithSessions(
+      [{ sessionId: 'sX', turnCount: 2, lastAt: '2026-06-03T10:00:00Z', preview: 'first q' }],
+      { sX: [{ role: 'user', content: 'first q' }, { role: 'assistant', content: 'first a' }] },
+    );
+    const appendSpy = adapter.appendChatTurn as ReturnType<typeof vi.fn>;
+    const transcript = await runChatNativeLoop(baseOpts({
+      provider: { send: vi.fn(async () => ({ text: 'reply', stopReason: 'end_turn' as const })) },
+      dispatcher: stubDispatcher(),
+      input: lines('/resume', '/resume 1', 'continue please'),
+      output: (l) => out.push(l),
+      memory: adapter,
+      lang: 'en',
+    }));
+    // Resumed history is at the front of the transcript (model context restored)
+    expect(transcript[0]).toMatchObject({ role: 'user', content: 'first q' });
+    expect(transcript[1]).toMatchObject({ role: 'assistant', content: 'first a' });
+    // New turn appended to the RESUMED session id (sX), not the auto session
+    const userAppend = appendSpy.mock.calls.find((c) => c[1] === 'user' && c[2] === 'continue please');
+    expect(userAppend?.[0]).toBe('sX');
+  });
+
+  it('/resume <bad> reports not-found', async () => {
+    const out: string[] = [];
+    await runChatNativeLoop(baseOpts({
+      provider: { send: vi.fn(async () => ({ text: '', stopReason: 'end_turn' as const })) },
+      dispatcher: stubDispatcher(),
+      input: lines('/resume nope-id'),
+      output: (l) => out.push(l),
+      memory: mockMemoryWithSessions([], {}),
+      lang: 'en',
+    }));
+    expect(out.join('\n')).toMatch(/no turns found/i);
+  });
+
+  it('/resume with no memory adapter reports memory unavailable', async () => {
+    const out: string[] = [];
+    await runChatNativeLoop(baseOpts({
+      provider: { send: vi.fn(async () => ({ text: '', stopReason: 'end_turn' as const })) },
+      dispatcher: stubDispatcher(),
+      input: lines('/resume'),
+      output: (l) => out.push(l),
+      lang: 'en',
+    }));
+    expect(out.join('\n')).toMatch(/memory store is not available/i);
+  });
+});
+
 // ─── Test 3: boş history ─────────────────────────────────────────────
 
 describe('chat-native persist — boş history', () => {

@@ -19,6 +19,12 @@ import {
   renderNervousPrompt,
   handleNervousSlash,
 } from './chat-nervous-bridge.js';
+import {
+  renderSessionList,
+  resolveResumeTarget,
+  renderResumedHistory,
+} from './chat-resume.js';
+import { getMessage } from '../helpers/messages.js';
 
 // ═══ chat-native — Path C tool-use loop iskelet (Sprint 203 T-203-005) ═══
 //
@@ -168,6 +174,8 @@ export function createMcpToolDispatcher(opts: McpDispatcherOptions): McpToolDisp
 export interface ChatMemoryAdapter {
   appendChatTurn(sessionId: string, role: 'user' | 'assistant', content: string): number;
   getChatHistory(sessionId: string, limit?: number): ReadonlyArray<{ role: string; content: string }>;
+  /** List recent chat sessions for the /resume picker (most-recently-active first). */
+  listChatSessions?(limit?: number): ReadonlyArray<{ sessionId: string; turnCount: number; lastAt: string; preview: string }>;
 }
 
 export interface ChatNativeOptions {
@@ -276,6 +284,12 @@ export interface ChatNativeOptions {
    * current project. Caller-only here — the def lives in chat-nervous-bridge.ts.
    */
   nervousRoot?: string;
+  /**
+   * UI language for loop-emitted user-facing strings (currently the `/resume`
+   * picker/blocks). Defaults to 'en'. The Ink REPL passes the resolved config
+   * language so /resume output is localized (i18n-first).
+   */
+  lang?: string;
 }
 
 const DEFAULT_MAX_TURNS = 50;
@@ -381,10 +395,15 @@ export async function runChatNativeLoop(opts: ChatNativeOptions): Promise<ChatMe
   const maxTurns = opts.maxTurns ?? DEFAULT_MAX_TURNS;
   const maxToolHops = opts.maxToolHops ?? DEFAULT_MAX_TOOL_HOPS;
   const memStore = opts.memory;
-  const sessionId = (opts.sessionId && opts.sessionId.trim().length > 0)
+  // Mutable: `/resume` switches the active session id so subsequent turns
+  // append to (and continue) the resumed conversation.
+  let sessionId = (opts.sessionId && opts.sessionId.trim().length > 0)
     ? opts.sessionId
     : `chat-${Date.now()}`;
   const resumeLimit = opts.resumeLimit ?? 0;
+  const lang = opts.lang ?? 'en';
+  // Most recently shown /resume list — lets `/resume <n>` pick by number.
+  let lastResumeList: ReadonlyArray<{ sessionId: string; turnCount: number; lastAt: string; preview: string }> = [];
   // Sprint 223 T-223-004 — chat-layout wire. emitLayout suppresses empty
   // strings (messageSeparator returns '' on non-TTY) so callers see only
   // meaningful chrome. Default-off so existing HTTP/test callers keep their
@@ -445,6 +464,38 @@ export async function runChatNativeLoop(opts: ChatNativeOptions): Promise<ChatMe
       transcript.push({ role: 'assistant', content: emitText });
       memStore?.appendChatTurn(sessionId, 'user', line);
       memStore?.appendChatTurn(sessionId, 'assistant', emitText);
+      continue;
+    }
+    // Faz D — `/resume` chat-session resume. `/resume` lists recent sessions;
+    // `/resume <n|id>` loads that session's history into the transcript (so the
+    // model regains context) AND switches the active sessionId (so new turns
+    // continue it). Runs BEFORE the registry so it never round-trips to claude.
+    if (line === '/resume' || line.startsWith('/resume ')) {
+      const arg = line.slice('/resume'.length).trim();
+      let emitText: string;
+      if (!memStore || typeof memStore.listChatSessions !== 'function') {
+        emitText = getMessage('tui.resume_no_memory', lang);
+      } else if (arg.length === 0) {
+        lastResumeList = memStore.listChatSessions(10);
+        emitText = renderSessionList(lastResumeList, lang);
+      } else {
+        const sessions = lastResumeList.length > 0 ? lastResumeList : memStore.listChatSessions(20);
+        const target = resolveResumeTarget(arg, sessions);
+        const history = target ? memStore.getChatHistory(target) : [];
+        if (!target || history.length === 0) {
+          emitText = getMessage('tui.resume_not_found', lang, { session: target ?? arg });
+        } else {
+          // Replace the in-memory transcript with the resumed context and
+          // switch the active session so subsequent turns append/continue it.
+          transcript.length = 0;
+          for (const turn of history) {
+            transcript.push({ role: turn.role === 'assistant' ? 'assistant' : 'user', content: turn.content });
+          }
+          sessionId = target;
+          emitText = renderResumedHistory(target, history, lang);
+        }
+      }
+      output(emitText);
       continue;
     }
     // Sprint 222 T-222-007 — enterprise slash bridge wire. /cost /audit /rbac

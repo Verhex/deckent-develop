@@ -20,6 +20,7 @@ import type {
   MemoryRelation,
   ChatRole,
   ChatTurn,
+  ChatSessionSummary,
 } from './memory-types.js';
 
 const SCHEMA_VERSION = 1;
@@ -1115,6 +1116,50 @@ export class MemoryStore {
       if (turns.length > limit) return turns.slice(-limit);
     }
     return turns;
+  }
+
+  /**
+   * List recent chat sessions, most-recently-active first. Powers the REPL
+   * `/resume` picker. Each summary carries the turn count, last-activity
+   * timestamp, and a preview (first user turn) as a human-readable label.
+   */
+  listChatSessions(limit = 10): ChatSessionSummary[] {
+    // Group by the `chat:<sessionId>` tag; strip the 5-char `chat:` prefix to
+    // recover the session id. ORDER BY last activity DESC for a recency picker.
+    const rows = this.db.prepare(`
+      SELECT substr(t.tag, 6) AS session_id,
+             COUNT(DISTINCT e.id) AS turn_count,
+             MAX(e.created_at) AS last_at,
+             MAX(e.rowid) AS max_rowid
+      FROM entries e
+      INNER JOIN tags t ON t.entry_id = e.id
+      WHERE e.type = 'chat'
+        AND e.deleted_at IS NULL
+        AND t.tag LIKE 'chat:%'
+      GROUP BY t.tag
+      ORDER BY last_at DESC, max_rowid DESC
+      LIMIT ?
+    `).all(Math.max(0, limit)) as Array<{ session_id: string; turn_count: number; last_at: string; max_rowid: number }>;
+
+    // Preview = first user turn of each session (one small lookup per session).
+    const firstUser = this.db.prepare(`
+      SELECT e.content
+      FROM entries e
+      INNER JOIN tags t ON t.entry_id = e.id
+      WHERE e.type = 'chat'
+        AND e.deleted_at IS NULL
+        AND e.source = 'user'
+        AND t.tag = ?
+      ORDER BY e.id ASC
+      LIMIT 1
+    `);
+
+    return rows.map((r) => {
+      const row = firstUser.get(`chat:${r.session_id}`) as { content: string } | undefined;
+      const raw = (row?.content ?? '').replace(/\s+/g, ' ').trim();
+      const preview = raw.length > 60 ? `${raw.slice(0, 57)}…` : raw;
+      return { sessionId: r.session_id, turnCount: r.turn_count, lastAt: r.last_at, preview };
+    });
   }
 
   /** Internal helper — count chat turns for a given session. */

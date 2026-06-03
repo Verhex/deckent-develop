@@ -36,6 +36,17 @@ export interface ChatTurn {
   timestamp: string;
 }
 
+/** A chat session summary as returned by listChatSessions() — for /resume pickers. */
+export interface ChatSessionSummary {
+  sessionId: string;
+  /** Number of turns (user + assistant) in the session. */
+  turnCount: number;
+  /** ISO 8601 UTC timestamp of the most recent turn. */
+  lastAt: string;
+  /** First user-turn content, truncated — a human-readable label for the session. */
+  preview: string;
+}
+
 /** Who created this entry. */
 export type EntrySource =
   | 'system'
