@@ -149,18 +149,26 @@ export function ReplApp(props: ReplAppProps): ReactElement {
     if (started.current) return;
     started.current = true;
 
+    const finalizeReply = (): void => {
+      if (replyAccum.current.length > 0) {
+        pushTurn('assistant', replyAccum.current);
+        replyAccum.current = '';
+        setReply('');
+      }
+    };
+
     async function* inputIter(): AsyncGenerator<string> {
       for (;;) {
-        if (replyAccum.current.length > 0) {
-          pushTurn('assistant', replyAccum.current);
-          replyAccum.current = '';
-          setReply('');
-        }
         while (queue.current.length > 0) {
           const line = queue.current.shift() as string;
           setQueued([...queue.current]);
           pushTurn('user', line);
           yield line;
+          // The consumer pulls the next line only once THIS turn finished
+          // streaming → finalize the reply NOW (move it into <Static>, render
+          // markdown, drop to the idle '✓ hazır' phase, stop re-rendering so
+          // mouse-scroll / selection / copy work).
+          finalizeReply();
         }
         await new Promise<void>((r) => { wake.current = r; });
       }

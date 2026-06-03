@@ -22,7 +22,9 @@ export interface InputBarProps {
   onInterrupt: () => void;
 }
 
-/** Map an Ink keypress to the node:readline Key shape editInput expects. */
+/** Map an Ink keypress to the node:readline Key shape editInput expects.
+ * Ink exposes arrows but NOT Home/End — those arrive as raw escape sequences
+ * (xterm: ESC[H / ESC[F, or ESC[1~ / ESC[4~), so detect them from `input`. */
 function inkToKey(input: string, key: Parameters<Parameters<typeof useInput>[0]>[1]): Key {
   if (key.leftArrow) return { name: 'left' } as Key;
   if (key.rightArrow) return { name: 'right' } as Key;
@@ -31,6 +33,8 @@ function inkToKey(input: string, key: Parameters<Parameters<typeof useInput>[0]>
   if (key.return) return { name: 'return' } as Key;
   if (key.backspace) return { name: 'backspace' } as Key;
   if (key.delete) return { name: 'delete' } as Key;
+  if (input === '\x1b[H' || input === '\x1b[1~' || input === '\x1bOH') return { name: 'home' } as Key;
+  if (input === '\x1b[F' || input === '\x1b[4~' || input === '\x1bOF') return { name: 'end' } as Key;
   if (key.ctrl) return { name: input, ctrl: true } as Key;
   return { name: input, sequence: input } as Key;
 }
