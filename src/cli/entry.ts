@@ -485,6 +485,17 @@ export async function launchDefaultRepl(): Promise<void> {
   // sprint-aware status surfaces.) In TUI mode the banner is skipped — the
   // scroll-region TUI prints its own intro.
   const isTtyEarly = process.stdin.isTTY === true && process.stdout.isTTY === true;
+
+  // Sprint 224 — Ink REPL (React-for-CLI, the enterprise-grade native foundation
+  // that replaces the hand-rolled raw-ANSI TUI). Opt-in via DECKENT_INK=1 while
+  // it is verified; will become the default once it reaches parity. Dynamic
+  // import keeps Ink/React out of the non-REPL CLI startup path.
+  if (isTtyEarly && process.env['DECKENT_INK'] === '1') {
+    const { runInkRepl } = await import('./repl/run.js');
+    await runInkRepl(provider, providerName);
+    return;
+  }
+
   const tuiMode = isTtyEarly && process.env['DECKENT_TUI'] === '1';
   if (!tuiMode) {
     process.stdout.write(renderBanner({ provider: providerName, dir: process.cwd() }));

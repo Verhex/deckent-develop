@@ -328,6 +328,10 @@ const MESSAGES: MessageMap = {
     en: 'denied',
     tr: 'reddedildi',
   },
+  'tui.queued': {
+    en: 'queued',
+    tr: 'kuyrukta',
+  },
 };
 
 /**
