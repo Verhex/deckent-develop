@@ -47,7 +47,13 @@ export async function runInkRepl(provider: ChatProviderAdapter, providerName: st
       dispatcher={dispatcher}
       providerName={providerName}
       cwd={process.cwd()}
-      labels={{ thinking: t('tui.thinking'), queued: t('tui.queued'), confirmHint: t('tui.confirm_hint') }}
+      labels={{
+        thinking: t('tui.thinking'),
+        generating: t('tui.generating'),
+        ready: t('tui.ready'),
+        queued: t('tui.queued'),
+        confirmHint: t('tui.confirm_hint'),
+      }}
       registerConfirm={(trigger) => { confirmTrigger = trigger; }}
     />,
   );

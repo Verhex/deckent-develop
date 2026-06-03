@@ -3,29 +3,28 @@
 // Why Ink: the hand-rolled raw-ANSI TUI could not deliver native feel (multi-line
 // overwrite, broken queue, cursor drift). Ink's full-frame reconciler owns the
 // render — completed turns live in <Static> (rendered once, scroll naturally),
-// the streaming reply + spinner live below, and the input is the LAST element so
-// it is ALWAYS pinned to the bottom. claude-code + gemini-cli use the same base.
-//
-// Engine vs view: runChatNativeLoop stays the engine (agentic tools, slash,
-// session) — this App drives it with an Ink-backed input iterator + output
-// callback and renders the resulting state. The component is i18n-string-free:
+// the streaming reply + a persistent status anchor live below, and the input is
+// the LAST element so it is ALWAYS pinned at the bottom. claude-code uses the
+// same base. Engine vs view: runChatNativeLoop stays the engine; this App drives
+// it via an input iterator + output callback and renders the state. String-free:
 // all user-facing labels arrive via props (getMessage resolved by the caller).
 
 import { Box, Text, Static, useInput, useApp } from 'ink';
 import { useState, useRef, useEffect, type ReactElement } from 'react';
 import { runChatNativeLoop, type ChatProviderAdapter, type McpToolDispatcher } from '../commands/chat-native.js';
 import { renderMarkdown } from '../commands/chat-render.js';
+import { InputBar } from './input-bar.js';
 
-/** Single-key confirm answer. */
 export type ConfirmAnswer = 'y' | 'a' | 'n';
-/** The App registers this trigger; the dispatcher calls it to raise the modal. */
 export type ConfirmTrigger = (summary: string) => Promise<ConfirmAnswer>;
 
 /** Localized labels — injected by the caller (i18n-first; component is string-free). */
 export interface ReplLabels {
-  thinking: string;
-  queued: string;        // "kuyrukta" — followed by a count
-  confirmHint: string;   // "(y = izin · a = hep izin · N = reddet)"
+  thinking: string;     // "düşünüyor…"
+  generating: string;   // "üretiliyor…"
+  ready: string;        // "hazır · sıra sende"
+  queued: string;       // "kuyrukta"
+  confirmHint: string;  // "(y = izin · a = hep izin · N = reddet)"
 }
 
 export interface ReplAppProps {
@@ -34,8 +33,6 @@ export interface ReplAppProps {
   labels: ReplLabels;
   providerName: string;
   cwd: string;
-  /** Called once on mount with the modal trigger, so the dispatcher's confirm
-   * (created in the caller) can raise the App's y/a/N modal and await a key. */
   registerConfirm: (trigger: ConfirmTrigger) => void;
 }
 
@@ -55,12 +52,10 @@ function Spinner(): ReactElement {
   return <Text color={TEAL}>{frames[i]}</Text>;
 }
 
-/** Assistant block header `● deckent` (kraken colors). */
 function DeckentHeader(): ReactElement {
   return <Text><Text color={TEAL}>● </Text><Text color={GOLD} bold>deckent</Text></Text>;
 }
 
-/** A completed turn: user `› …` (dim) or assistant header + rendered markdown. */
 function TurnView({ turn }: { turn: Turn }): ReactElement {
   if (turn.role === 'user') {
     return (
@@ -85,11 +80,9 @@ export function ReplApp(props: ReplAppProps): ReactElement {
   const [turns, setTurns] = useState<Turn[]>([]);
   const [reply, setReply] = useState('');
   const [busy, setBusy] = useState(false);
-  const [input, setInput] = useState('');
-  const [queuedCount, setQueuedCount] = useState(0);
+  const [queued, setQueued] = useState<string[]>([]);
   const [confirm, setConfirm] = useState<{ summary: string } | null>(null);
 
-  // Bridges between the async engine (runChatNativeLoop) and React state.
   const idRef = useRef(1);
   const replyAccum = useRef('');
   const queue = useRef<string[]>([]);
@@ -97,15 +90,9 @@ export function ReplApp(props: ReplAppProps): ReactElement {
   const confirmResolve = useRef<((a: ConfirmAnswer) => void) | null>(null);
   const started = useRef(false);
 
-  // Mirror the input in a ref so keystroke handling (which may arrive batched)
-  // reads the current value synchronously without waiting for a state flush.
-  const inputRef = useRef('');
-  const setInputBoth = (v: string): void => { inputRef.current = v; setInput(v); };
-
   const pushTurn = (role: Turn['role'], text: string): void =>
     setTurns((t) => [...t, { id: idRef.current++, role, text }]);
 
-  // Register the confirm modal trigger for the dispatcher (once).
   useEffect(() => {
     registerConfirm((summary: string) => new Promise<ConfirmAnswer>((resolve) => {
       confirmResolve.current = resolve;
@@ -113,8 +100,6 @@ export function ReplApp(props: ReplAppProps): ReactElement {
     }));
   }, [registerConfirm]);
 
-  // Start the engine ONCE. The input iterator finalizes the previous assistant
-  // reply (into <Static>) right before pulling the next user line.
   useEffect(() => {
     if (started.current) return;
     started.current = true;
@@ -128,7 +113,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
         }
         while (queue.current.length > 0) {
           const line = queue.current.shift() as string;
-          setQueuedCount(queue.current.length);
+          setQueued([...queue.current]);
           pushTurn('user', line);
           yield line;
         }
@@ -148,43 +133,26 @@ export function ReplApp(props: ReplAppProps): ReactElement {
     }).then(() => exit()).catch(() => exit());
   }, [provider, dispatcher, exit]);
 
-  // Submit one completed line: exit slashes quit directly (the engine loop only
-  // breaks on the colon form), everything else is queued for the engine.
-  const submitLine = (line: string): void => {
+  const handleSubmit = (line: string): void => {
     const trimmed = line.trim();
     if (trimmed.length === 0) return;
     if (['/exit', '/quit', ':exit', ':quit'].includes(trimmed.toLowerCase())) { exit(); return; }
     queue.current.push(trimmed);
-    setQueuedCount(queue.current.length);
+    setQueued([...queue.current]);
     if (wake.current) { const w = wake.current; wake.current = null; w(); }
   };
 
-  useInput((ch, key) => {
-    if (confirm) {
-      const answer: ConfirmAnswer = ch === 'y' ? 'y' : ch === 'a' ? 'a' : 'n';
-      setConfirm(null);
-      const r = confirmResolve.current; confirmResolve.current = null;
-      r?.(answer);
-      return;
-    }
-    if (key.ctrl && ch === 'c') { exit(); return; }
-    // Real Enter arrives as a `return` key event (lone keystroke).
-    if (key.return) { submitLine(inputRef.current); setInputBoth(''); return; }
-    if (key.backspace || key.delete) { setInputBoth(inputRef.current.slice(0, -1)); return; }
-    if (key.ctrl || key.meta || key.escape) return;
-    if (!ch) return;
-    // `ch` may be a batched/pasted block that embeds newlines (Enter delivered
-    // inside a chunk, not as a lone `return`). Split on newlines: completed
-    // segments submit, the trailing segment stays in the input buffer.
-    if (/[\r\n]/.test(ch)) {
-      const segs = ch.split(/\r\n|\r|\n/);
-      submitLine(inputRef.current + (segs[0] ?? ''));
-      for (let i = 1; i < segs.length - 1; i++) submitLine(segs[i] ?? '');
-      setInputBoth(segs[segs.length - 1] ?? '');
-      return;
-    }
-    setInputBoth(inputRef.current + ch);
-  });
+  // Confirm modal owns input only while it is open (single-key y / a / N).
+  useInput((input) => {
+    const answer: ConfirmAnswer = input === 'y' ? 'y' : input === 'a' ? 'a' : 'n';
+    setConfirm(null);
+    const r = confirmResolve.current; confirmResolve.current = null;
+    r?.(answer);
+  }, { isActive: confirm !== null });
+
+  // Persistent phase anchor — the orientation signal ("am I working / done?").
+  const phase: 'thinking' | 'generating' | 'idle' =
+    reply.length > 0 ? 'generating' : busy ? 'thinking' : 'idle';
 
   return (
     <Box flexDirection="column">
@@ -198,13 +166,6 @@ export function ReplApp(props: ReplAppProps): ReactElement {
         </Box>
       )}
 
-      {/* Thinking indicator (while busy, before the first token). */}
-      {busy && reply.length === 0 && (
-        <Box marginTop={1}>
-          <Spinner /><Text color={GOLD} bold> deckent </Text><Text dimColor>· {labels.thinking}</Text>
-        </Box>
-      )}
-
       {/* Confirm modal. */}
       {confirm && (
         <Box flexDirection="column" marginTop={1}>
@@ -213,12 +174,25 @@ export function ReplApp(props: ReplAppProps): ReactElement {
         </Box>
       )}
 
-      {/* Pinned input — ALWAYS the last interactive element → bottom of frame. */}
+      {/* Queue preview — what is waiting while deckent is busy. */}
+      {queued.length > 0 && (
+        <Box flexDirection="column" marginTop={1}>
+          {queued.map((q, i) => (
+            <Text key={i} dimColor>{`  ⋯ ${labels.queued} ${i + 1}: ${q.length > 60 ? q.slice(0, 60) + '…' : q}`}</Text>
+          ))}
+        </Box>
+      )}
+
+      {/* Persistent status anchor (always present → "where am I / busy or done"). */}
       <Box marginTop={1}>
-        <Text color={TEAL}>{'› '}</Text>
-        <Text>{input}</Text>
-        <Text dimColor>{queuedCount > 0 ? `  (${labels.queued}: ${queuedCount})` : ''}</Text>
+        {phase === 'idle'
+          ? <Text dimColor>{`✓ ${labels.ready}`}</Text>
+          : <><Spinner /><Text color={GOLD} bold> deckent </Text><Text dimColor>{`· ${phase === 'thinking' ? labels.thinking : labels.generating}`}</Text></>}
       </Box>
+
+      {/* Pinned input with a VISIBLE cursor — always the last element → bottom. */}
+      <InputBar active={confirm === null} onSubmit={handleSubmit} onInterrupt={() => exit()} />
+
       <Box>
         <Text dimColor>{`deckent  ${providerName}  ${cwd}`}</Text>
       </Box>

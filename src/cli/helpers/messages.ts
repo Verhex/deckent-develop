@@ -332,6 +332,14 @@ const MESSAGES: MessageMap = {
     en: 'queued',
     tr: 'kuyrukta',
   },
+  'tui.generating': {
+    en: 'generating…',
+    tr: 'üretiliyor…',
+  },
+  'tui.ready': {
+    en: 'ready · your turn',
+    tr: 'hazır · sıra sende',
+  },
 };
 
 /**
