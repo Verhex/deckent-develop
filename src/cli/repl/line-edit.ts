@@ -114,4 +114,12 @@ export class InputHistory {
     if (this.idx < 0) { this.idx = 0; }
     return this.items[this.idx] ?? live;
   }
+
+  /** Reverse search (Ctrl-R): entries containing `query` (case-insensitive),
+   * most-recent first. Empty query → all entries (most-recent first). */
+  search(query: string): string[] {
+    const q = query.toLowerCase();
+    const hits = q.length === 0 ? this.items.slice() : this.items.filter((e) => e.toLowerCase().includes(q));
+    return hits.reverse();
+  }
 }

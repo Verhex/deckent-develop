@@ -75,11 +75,14 @@ export function InputBar(props: InputBarProps): ReactElement {
   const { active, onSubmit, onInterrupt, onClear, slashRegistry, menuHint } = props;
   const [state, setState] = useState<InputState>(EMPTY_INPUT);
   const [menuSel, setMenuSel] = useState(0);
+  const [search, setSearch] = useState<{ q: string; idx: number } | null>(null);
   const stateRef = useRef<InputState>(EMPTY_INPUT);
   const menuSelRef = useRef(0);
+  const searchRef = useRef<{ q: string; idx: number } | null>(null);
   const history = useRef(new InputHistory());
   const set = (s: InputState): void => { stateRef.current = s; setState(s); };
   const setSel = (n: number): void => { menuSelRef.current = n; setMenuSel(n); };
+  const setSearchBoth = (s: { q: string; idx: number } | null): void => { searchRef.current = s; setSearch(s); };
 
   useInput((input, key) => {
     if (process.env['DECKENT_INK_DEBUG'] === '1') {
@@ -87,6 +90,27 @@ export function InputBar(props: InputBarProps): ReactElement {
     }
 
     if (key.ctrl && (input === 'l' || input === '\f')) { onClear?.(); return; } // Ctrl-L → clear
+
+    // ── Ctrl-R reverse history search ──
+    if (key.ctrl && input === 'r') {
+      const cur = searchRef.current;
+      setSearchBoth(cur ? { q: cur.q, idx: cur.idx + 1 } : { q: '', idx: 0 }); // open, or cycle older
+      return;
+    }
+    if (searchRef.current) {
+      const s = searchRef.current;
+      if (key.escape) { setSearchBoth(null); return; } // cancel, keep buffer
+      if (key.return) {
+        const hits = history.current.search(s.q);
+        const m = hits.length > 0 ? (hits[s.idx % hits.length] ?? '') : '';
+        setSearchBoth(null);
+        if (m) set({ buffer: m, cursor: m.length });
+        return;
+      }
+      if (key.backspace || key.delete) { setSearchBoth({ q: s.q.slice(0, -1), idx: 0 }); return; }
+      if (input && !key.ctrl && !key.meta && !key.tab && input.charCodeAt(0) >= 0x20) { setSearchBoth({ q: s.q + input, idx: 0 }); return; }
+      return; // swallow other keys while searching
+    }
 
     // ── Interactive slash menu: intercept nav keys while it is open ──
     const matches = slashMenuMatches(slashRegistry, stateRef.current.buffer);
@@ -113,7 +137,9 @@ export function InputBar(props: InputBarProps): ReactElement {
         const s = stateRef.current;
         set({ buffer: s.buffer.slice(0, s.cursor) + text + s.buffer.slice(s.cursor), cursor: s.cursor + text.length });
       } else {
-        onSubmit(stateRef.current.buffer + withoutTrailing);
+        const line = stateRef.current.buffer + withoutTrailing;
+        history.current.push(line); // keep history (Ctrl-R) consistent with the lone-Enter path
+        onSubmit(line);
         set(EMPTY_INPUT);
       }
       return;
@@ -137,12 +163,23 @@ export function InputBar(props: InputBarProps): ReactElement {
     setSel(0); // buffer changed → re-filter from the top
   }, { isActive: active });
 
-  const matches = slashMenuMatches(slashRegistry, state.buffer);
+  const matches = search ? [] : slashMenuMatches(slashRegistry, state.buffer);
   const sel = matches.length > 0 ? ((menuSel % matches.length) + matches.length) % matches.length : 0;
+
+  // Reverse-search line (Ctrl-R): current match shown live as you refine the query.
+  const searchHits = search ? history.current.search(search.q) : [];
+  const searchMatch = searchHits.length > 0 ? (searchHits[search!.idx % searchHits.length] ?? '') : '';
 
   // claude-code-style framed input box, with the interactive menu ABOVE it.
   return (
     <Box flexDirection="column">
+      {search ? (
+        <Box>
+          <Text color={GOLD}>{`(reverse-i-search) `}</Text>
+          <Text dimColor>{`'${search.q}': `}</Text>
+          <Text>{searchMatch || '—'}</Text>
+        </Box>
+      ) : null}
       {matches.length > 0 && (() => {
         // Scroll window: keep the selected row visible even past the cap.
         const WINDOW = 8;

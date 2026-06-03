@@ -118,3 +118,23 @@ describe('InputHistory — navigation (T-224-019 v2)', () => {
     expect(h.navigate(-1, 'l')).toBe('same'); // only one entry
   });
 });
+
+describe('InputHistory.search — Ctrl-R reverse search', () => {
+  it('returns matching entries most-recent-first', () => {
+    const h = new InputHistory();
+    h.push('deploy prod'); h.push('git status'); h.push('deploy staging');
+    expect(h.search('deploy')).toEqual(['deploy staging', 'deploy prod']);
+  });
+  it('is case-insensitive', () => {
+    const h = new InputHistory(); h.push('Build All');
+    expect(h.search('build')).toEqual(['Build All']);
+  });
+  it('empty query → all entries most-recent-first', () => {
+    const h = new InputHistory(); h.push('a'); h.push('b');
+    expect(h.search('')).toEqual(['b', 'a']);
+  });
+  it('no match → empty', () => {
+    const h = new InputHistory(); h.push('x');
+    expect(h.search('zzz')).toEqual([]);
+  });
+});
