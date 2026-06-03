@@ -37,6 +37,31 @@ function truncateNotes(notes: string): string {
   return firstLine;
 }
 
+/**
+ * Render a human-readable task label by stripping the leading DIRECTIVES
+ * slot-id prefix ("NNN-NNN — …") from the title.
+ *
+ * `task.title` embeds the plan-slot id, which can differ from the real
+ * `task.id` after auto-debt prepend offset drift (e.g. id=198-006 but
+ * title="198-005 — …"). We strip the prefix so labels read cleanly and the
+ * canonical id is shown exactly once by the caller. A spaced separator is
+ * required so date-like tokens ("2024-01-report") are never mistaken for a
+ * slot prefix. Falls back to the full title, then the id, when empty.
+ */
+export function renderTaskLabel(task: { id: string; title: string }): string {
+  const title = (task.title ?? '').trim();
+  const stripped = title.replace(/^\d+-\d+\s+[—–-]\s+/, '').trim();
+  return stripped || title || task.id;
+}
+
+/** First sentence (or first line) of a notes blob, capped for compact display. */
+function firstSentence(notes: string): string {
+  const firstLine = (notes.split('\n')[0] ?? '').trim();
+  const dot = firstLine.indexOf('. ');
+  const sentence = dot > 0 ? firstLine.slice(0, dot + 1) : firstLine;
+  return sentence.length > 100 ? sentence.slice(0, 97) + '...' : sentence;
+}
+
 // ═══ Memory Trimming ═════════════════════════════════════════════
 
 /** Header-preserving memory trim: keep first HEADER_LINES lines, trim middle, keep recent entries */
@@ -352,11 +377,19 @@ export function formatRubricScoresSection(
 /** Build highlight items for retro — things that went well. */
 export function buildRetroHighlights(
   sprint: Sprint,
-  _evaluations: Map<string, TaskEvaluation>,
+  evaluations: Map<string, TaskEvaluation>,
   results?: TaskResult[],
   previousMetrics?: SprintMetrics,
 ): string[] {
   const items: string[] = [];
+
+  // Name the top DONE deliverables so the retro shows WHAT shipped, not just
+  // aggregate counters. Capped to keep the Highlights section scannable.
+  const DELIVERED_CAP = 5;
+  const delivered = sprint.tasks.filter(t => evaluations.get(t.id) === TaskEvaluation.DONE);
+  for (const task of delivered.slice(0, DELIVERED_CAP)) {
+    items.push(`Delivered: ${renderTaskLabel(task)}`);
+  }
 
   const firstTry = countFirstTryTasks(results);
   if (firstTry > 0) {
@@ -470,6 +503,57 @@ export function buildRetroLearnings(
   }
 
   return items;
+}
+
+/**
+ * Build the per-sprint `memory` entry content (the `mem-sprint-NNN` row).
+ *
+ * Two sections so retrospective reads carry both the problems and the wins:
+ *   - problem lines (NO_GO / GO_WITH_TECH_DEBT) — kept first, with worker notes;
+ *   - a `## Gains` section naming the DONE deliverables (with the first sentence
+ *     of the worker's notes), so all-DONE sprints are no longer near-empty.
+ * Each section is capped independently so a DONE-heavy sprint can never crowd
+ * out a problem line, and the export stays within the MEMORY line budget.
+ */
+export function buildSprintMemoryContent(
+  sprint: Sprint,
+  evaluations: Map<string, TaskEvaluation>,
+  results?: TaskResult[],
+): string {
+  const PROBLEM_CAP = 10;
+  const GAINS_CAP = 8;
+  const lines: string[] = [`## Sprint ${sprint.id} Learnings`];
+
+  // Problems first — NO_GO / tech debt keep priority.
+  let problemCount = 0;
+  for (const task of sprint.tasks) {
+    if (problemCount >= PROBLEM_CAP) break;
+    const ev = evaluations.get(task.id);
+    if (ev === TaskEvaluation.NO_GO || ev === TaskEvaluation.GO_WITH_TECH_DEBT) {
+      const result = results?.find(r => r.taskId === task.id);
+      const notes = result?.notes ? ` — ${result.notes.slice(0, 120)}` : '';
+      lines.push(`- ${task.title}: ${ev}${notes}`);
+      problemCount++;
+    }
+  }
+
+  // Gains — what the sprint actually delivered.
+  const doneTasks = sprint.tasks.filter(t => evaluations.get(t.id) === TaskEvaluation.DONE);
+  if (doneTasks.length > 0) {
+    lines.push('');
+    lines.push('## Gains');
+    const shown = doneTasks.slice(0, GAINS_CAP);
+    for (const task of shown) {
+      const result = results?.find(r => r.taskId === task.id);
+      const note = result?.notes ? ` — ${firstSentence(result.notes)}` : '';
+      lines.push(`- ${task.id} — ${renderTaskLabel(task)}${note}`);
+    }
+    if (doneTasks.length > shown.length) {
+      lines.push(`- …and ${doneTasks.length - shown.length} more delivered`);
+    }
+  }
+
+  return lines.join('\n');
 }
 
 // ═══ Behavior Changes — Outcomes File Loader (Sprint 212 Task 7) ═
@@ -646,17 +730,9 @@ export function writeRetrospective(
   // DB; sprint learnings are surfaced via `.brain/exports/memory.md`.
 
   // Build per-sprint learnings (persisted to the DB `memory` entry below).
-  const learnings: string[] = [`## Sprint ${sprint.id} Learnings`];
-  for (const task of sprint.tasks) {
-    const ev = evaluations.get(task.id);
-    if (ev === TaskEvaluation.NO_GO || ev === TaskEvaluation.GO_WITH_TECH_DEBT) {
-      // (D) Include result.notes for richer learnings
-      const result = results?.find(r => r.taskId === task.id);
-      const notes = result?.notes ? ` — ${result.notes.slice(0, 120)}` : '';
-      learnings.push(`- ${task.title}: ${ev}${notes}`);
-    }
-    if (learnings.length >= 11) break; // header + max 10
-  }
+  // Problems (NO_GO / tech debt) AND a Gains section for DONE deliverables —
+  // see buildSprintMemoryContent.
+  const learningContent = buildSprintMemoryContent(sprint, evaluations, results);
 
   // ─── DB write: sprint + retro + memory entries ──────────────
   // Bug U fix (Sprint 166): also write type='sprint' so each sprint has
@@ -711,7 +787,6 @@ export function writeRetrospective(
         // Write memory/learning entries (one per sprint, skip if already exists)
         const memId = `mem-${sprint.id}`;
         if (!store.getById(memId)) {
-          const learningContent = learnings.join('\n');
           store.insert({
             id: memId,
             type: 'memory',
@@ -889,7 +964,7 @@ export function appendRetroSection(
  * Sprint 166 Bug U fix — gives downstream consumers (memory-query, summary
  * export) a single row per sprint with at-a-glance metrics.
  */
-function buildSprintEntrySummary(
+export function buildSprintEntrySummary(
   sprint: Sprint,
   metrics: SprintMetrics,
   evaluations: Map<string, TaskEvaluation>,
@@ -913,7 +988,9 @@ function buildSprintEntrySummary(
     lines.push('## Task Outcomes');
     for (const task of sprint.tasks) {
       const ev: string = evaluations.get(task.id) ?? 'PENDING';
-      lines.push(`- ${task.id}: ${ev}`);
+      // `- id: EV — clean-title` — the title is parser-safe (parseTaskOutcomes
+      // anchors on id + decision and tolerates a trailing label).
+      lines.push(`- ${task.id}: ${ev} — ${renderTaskLabel(task)}`);
     }
   }
 

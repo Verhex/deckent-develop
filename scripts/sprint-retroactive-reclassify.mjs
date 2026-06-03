@@ -92,7 +92,10 @@ export function parseTaskOutcomes(content) {
       continue;
     }
     if (!inSection) continue;
-    const m = line.match(/^-\s+([0-9A-Za-z_.\-]+)\s*:\s*([A-Z_]+)\s*$/);
+    // Tolerate an optional trailing " — <title>" label after the decision
+    // (buildSprintEntrySummary enriches lines with the clean task title).
+    // The decision token still anchors on id + [A-Z_]+; \b ends it cleanly.
+    const m = line.match(/^-\s+([0-9A-Za-z_.\-]+)\s*:\s*([A-Z_]+)\b.*$/);
     if (m) outcomes.set(m[1], m[2]);
   }
   return outcomes;
@@ -109,7 +112,9 @@ export function rewriteTaskOutcome(content, taskId, newDecision) {
   const lines = content.split('\n');
   let replaced = false;
   for (let i = 0; i < lines.length; i++) {
-    const m = lines[i].match(/^(-\s+)([0-9A-Za-z_.\-]+)(\s*:\s*)([A-Z_]+)(\s*)$/);
+    // Group 5 captures everything after the decision (trailing whitespace OR
+    // a " — <title>" label) so the title survives a decision rewrite.
+    const m = lines[i].match(/^(-\s+)([0-9A-Za-z_.\-]+)(\s*:\s*)([A-Z_]+)(.*)$/);
     if (m && m[2] === taskId) {
       lines[i] = `${m[1]}${m[2]}${m[3]}${newDecision}${m[5]}`;
       replaced = true;

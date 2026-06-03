@@ -118,7 +118,7 @@ describe('writeRetrospective — Memory V2 DB-first (B8)', () => {
     expect(sprintEntry!.type).toBe('sprint');
   });
 
-  it('writes a `memory` learnings entry containing tech-debt / no-go tasks only', () => {
+  it('writes a `memory` learnings entry with problems AND a Gains section for DONE work', () => {
     const sprint = makeSprint({
       tasks: [
         makeTask({ id: '001', title: 'Done task' }),
@@ -139,9 +139,12 @@ describe('writeRetrospective — Memory V2 DB-first (B8)', () => {
     const mem = read('mem-sprint-201');
     expect(mem).not.toBeNull();
     expect(mem!.type).toBe('memory');
+    // problems are still captured
     expect(mem!.content).toContain('Debt task');
     expect(mem!.content).toContain('Failed task');
-    expect(mem!.content).not.toContain('Done task');
+    // DONE work is now captured as a delivered gain (was previously dropped)
+    expect(mem!.content).toContain('## Gains');
+    expect(mem!.content).toContain('Done task');
   });
 
   it('does not duplicate the learnings entry when called twice for the same sprint', () => {

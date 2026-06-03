@@ -85,6 +85,13 @@ describe('parseTaskOutcomes', () => {
     expect(map.has('999-999')).toBe(false);
     expect(map.get('001-001')).toBe('DONE');
   });
+
+  it('reads the decision from title-enriched lines ("- id: EV — title")', () => {
+    const body = '## Task Outcomes\n- 198-006: DONE — 6-worker × 2g config verify\n- 210-002: NO_GO — fix flaky test\n';
+    const map = parseTaskOutcomes(body);
+    expect(map.get('198-006')).toBe('DONE');
+    expect(map.get('210-002')).toBe('NO_GO');
+  });
 });
 
 describe('rewriteTaskOutcome', () => {
@@ -101,6 +108,16 @@ describe('rewriteTaskOutcome', () => {
 
   it('throws for an invalid decision string', () => {
     expect(() => rewriteTaskOutcome(SPRINT_195_BODY, '195-004', 'WAT' as any)).toThrow(/Invalid decision/);
+  });
+
+  it('preserves the title suffix when rewriting a title-enriched line', () => {
+    const body = '# sprint-300\n\n- Completed: 0\n- NO_GO: 1\n- GO_WITH_TECH_DEBT: 0\n\n## Task Outcomes\n- 300-001: NO_GO — wire routing v2\n';
+    const updated = rewriteTaskOutcome(body, '300-001', 'DONE');
+    expect(updated).toMatch(/- 300-001: DONE — wire routing v2/);
+    expect(updated).toMatch(/- Completed: 1/);
+    expect(updated).toMatch(/- NO_GO: 0/);
+    // the decision is still machine-readable after the rewrite
+    expect(parseTaskOutcomes(updated).get('300-001')).toBe('DONE');
   });
 });
 
