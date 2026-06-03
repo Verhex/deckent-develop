@@ -209,6 +209,13 @@ describe('resolveSlash — Faz A expanded read-only commands', () => {
     if (result.action === 'agentic') expect(result.args['_rest']).toBeUndefined();
   });
 
+  it('/nervous is a meta-command (in catalog, no agenticTool)', () => {
+    const registry = buildSlashRegistry();
+    const nervous = registry.find((c) => c.name === '/nervous');
+    expect(nervous).toBeDefined();
+    expect(nervous?.agenticTool).toBeUndefined();
+  });
+
   it('/config set max_workers 4 → deckent_config with _rest', () => {
     const registry = buildSlashRegistry();
     expect(registry.map((c) => c.name)).toContain('/config');

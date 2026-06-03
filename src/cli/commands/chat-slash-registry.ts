@@ -136,6 +136,13 @@ const SLASH_CATALOG: readonly SlashCommand[] = [
     agenticArgs: {},
   },
   {
+    // Meta-command: handled directly by the chat loop (chat-native.ts) BEFORE
+    // the registry, via the nervous bridge — listed here only for /help + menu
+    // visibility (no agenticTool, like /model and /cd).
+    name: '/nervous',
+    desc: 'Bekleyen nervous bildirimleri (örn: /nervous accept <id>)',
+  },
+  {
     name: '/model',
     desc: 'Modeli değiştir (örn: /model sonnet)',
   },
