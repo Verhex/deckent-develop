@@ -694,6 +694,7 @@ export async function launchDefaultRepl(): Promise<void> {
  */
 async function runPinnedTuiRepl(provider: ChatProviderAdapter): Promise<void> {
   const DIM = '\x1b[2m';
+  const BOLD = '\x1b[1m';
   const TEAL = '\x1b[38;2;77;184;164m';
   const RESET = '\x1b[0m';
   // i18n-first: resolve language once, inject localized labels into the
@@ -710,14 +711,11 @@ async function runPinnedTuiRepl(provider: ChatProviderAdapter): Promise<void> {
       confirmAlways: t('tui.confirm_always'),
       confirmDenied: t('tui.confirm_denied'),
     },
+    // Tokens stream raw (smooth); each completed line is re-rendered through
+    // renderMarkdown (links → clickable OSC-8, bold/code/headings/lists, file
+    // paths → cyan). Best of both: live streaming + correct markdown per line.
+    renderLine: (line) => renderMarkdown(line, true),
   });
-  // Line-buffered full markdown render: each complete reply line is rendered
-  // through renderMarkdown (links → clickable OSC-8, headings/lists/bold/code,
-  // file paths → cyan) then written into the scroll region. Line-granular (not
-  // token) is the right grain for FORMATTED content — links/headings need the
-  // whole line; the scroll region keeps the input pinned + smooth. The loop's
-  // per-turn trailing newline flushes the final line.
-  const lineSink = createLineBufferedSink((line) => ctl.write(renderMarkdown(line, true) + '\n'));
   const perms = createPermissionStore(process.cwd());
 
   const askConfirm = async (summary: string, toolName: string): Promise<boolean> => {
@@ -738,24 +736,23 @@ async function runPinnedTuiRepl(provider: ChatProviderAdapter): Promise<void> {
   ctl.start();
   ctl.writeLine(`${DIM}${t('tui.intro')}${RESET}`);
   ctl.onInterrupt(() => ctl.stop());
-  // Flush the final reply line (held by the line buffer until a newline) when
-  // the turn ends — otherwise a single-line reply never renders. flush() invokes
-  // the sink callback (renderMarkdown → ctl.write) for the held partial line.
-  ctl.onIdle(() => lineSink.flush());
 
   try {
     await runChatNativeLoop({
       provider,
       dispatcher,
       input: ctl.lines(),
-      // Feed tokens to the line buffer; complete lines render via renderMarkdown.
-      output: (text: string) => lineSink.feed(text),
+      // Stream tokens raw+smooth; each completed line re-renders via renderLine.
+      output: (text: string) => ctl.writeStreaming(text),
       gracefulErrors: true,
       layoutEnabled: false, // the controller echoes the user turn + we stream the reply
       interactiveTty: true,
+      // Clean `● deckent` block header (kraken-colored) marks the assistant turn
+      // — distinct from the user's `›` echo; the "· düşünüyor…" marker is
+      // transient (wiped when the first reply token arrives, not left in history).
       thinkingIndicator: {
-        start: () => ctl.writeLine(`${TEAL}● deckent${RESET} ${DIM}· ${t('tui.thinking')}${RESET}`),
-        stop: () => { /* reply streams next */ },
+        start: () => { ctl.writeLine(`${TEAL}●${RESET} ${BOLD}deckent${RESET}`); ctl.setThinking(`${DIM}· ${t('tui.thinking')}${RESET}`); },
+        stop: () => ctl.clearThinking(),
       },
     });
   } finally {

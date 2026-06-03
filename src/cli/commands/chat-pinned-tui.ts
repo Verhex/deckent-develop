@@ -187,6 +187,12 @@ export interface PinnedTuiOptions {
   prompt?: string;
   /** Localized labels (default English). */
   labels?: TuiLabels;
+  /**
+   * Renders a COMPLETE output line (markdown → ANSI: links/bold/paths). Applied
+   * by writeStreaming() when a line finishes, so tokens stream raw+smooth and
+   * the line is re-rendered once it is whole. Default: identity (no rendering).
+   */
+  renderLine?: (line: string) => string;
 }
 
 /**
@@ -207,6 +213,11 @@ export class PinnedTui {
   private readonly input: NodeJS.ReadStream;
   private readonly promptPlain: string;
   private readonly labels: TuiLabels;
+  private readonly renderLine: (line: string) => string;
+  /** Text streamed on the current (unfinished) output line — re-rendered on \n. */
+  private lineAccum = '';
+  /** True while a transient "thinking…" marker occupies the bottom output row. */
+  private thinkingShown = false;
   private state: InputState = EMPTY_INPUT;
   private readonly history = new InputHistory();
   private outCol = 1; // current column of the streaming output line (1-based)
@@ -229,6 +240,7 @@ export class PinnedTui {
     this.input = opts.input;
     this.promptPlain = opts.prompt ?? '› ';
     this.labels = opts.labels ?? DEFAULT_TUI_LABELS;
+    this.renderLine = opts.renderLine ?? ((s) => s);
     this.keyListener = (_str, key) => this.handleKey(key);
     this.resizeListener = () => this.onResize();
   }
@@ -312,6 +324,69 @@ export class PinnedTui {
   /** Write a full line (adds a trailing newline) into the output region. */
   writeLine(text: string): void { this.write(text + '\n'); }
 
+  /**
+   * Stream provider tokens with smooth raw output PLUS per-line markdown: each
+   * char is written immediately (token-smooth feel), and when a line completes
+   * (`\n`) it is re-rendered in place via `renderLine` (links/bold/paths appear
+   * once the line is whole). Lines longer than the terminal width are left raw
+   * (a single clearLine can't safely rewrite a wrapped line).
+   */
+  writeStreaming(text: string): void {
+    if (this.closed || text.length === 0) return;
+    const cols = this.cols;
+    let buf = '';
+    if (this.cursorAt === 'input') {
+      buf += tui.hideCursor() + tui.moveTo(this.outBottom, this.outCol);
+      this.cursorAt = 'output';
+    }
+    for (const ch of text) {
+      if (ch === '\n') {
+        if (this.lineAccum.length > 0 && this.lineAccum.length <= cols) {
+          buf += '\r' + tui.clearLine() + this.renderLine(this.lineAccum);
+        }
+        buf += '\r\n';
+        this.lineAccum = '';
+        this.outCol = 1;
+      } else {
+        buf += ch;
+        this.lineAccum += ch;
+        this.outCol += 1;
+        if (this.outCol > cols) this.outCol = 1; // terminal auto-wrapped
+      }
+    }
+    this.out.write(buf);
+  }
+
+  /** Re-render + terminate the final streamed line (no trailing newline arrived). */
+  flushStreaming(): void {
+    if (this.closed || this.lineAccum.length === 0) return;
+    const fits = this.lineAccum.length <= this.cols;
+    this.out.write((fits ? '\r' + tui.clearLine() + this.renderLine(this.lineAccum) : '') + '\r\n');
+    this.lineAccum = '';
+    this.outCol = 1;
+  }
+
+  /**
+   * Show a transient marker (e.g. "düşünüyor…") on the bottom output row, with
+   * NO newline — it is wiped by {@link clearThinking} when the first reply token
+   * arrives, so it never lingers in the scrollback (claude-code feel).
+   */
+  setThinking(text: string): void {
+    if (this.closed) return;
+    let buf = '';
+    if (this.cursorAt === 'input') { buf += tui.moveTo(this.outBottom, this.outCol); this.cursorAt = 'output'; }
+    this.out.write(buf + text);
+    this.thinkingShown = true;
+  }
+
+  /** Wipe the transient thinking marker (reply streams from the cleared row). */
+  clearThinking(): void {
+    if (!this.thinkingShown || this.closed) return;
+    this.out.write('\r' + tui.clearLine());
+    this.outCol = 1;
+    this.thinkingShown = false;
+  }
+
   /** Async iterator of submitted input lines; ends when stdin closes / EOF. */
   async *lines(): AsyncGenerator<string> {
     while (true) {
@@ -328,7 +403,8 @@ export class PinnedTui {
    * glued to the pinned input, then redraw + focus the input line.
    */
   private goIdle(): void {
-    if (this.onIdleCb) this.onIdleCb(); // flush any buffered final line first
+    this.flushStreaming();              // re-render + terminate the final reply line
+    if (this.onIdleCb) this.onIdleCb(); // caller hook (e.g. footer)
     if (this.cursorAt === 'output') {
       this.out.write('\r\n');
       this.outCol = 1;
