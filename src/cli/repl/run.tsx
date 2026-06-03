@@ -96,13 +96,12 @@ export async function runInkRepl(
     },
   };
 
-  // Alternate-screen mode (DEFAULT ON for the Ink path; disable with
-  // DECKENT_ALTSCREEN=0). Ink renders into a separate screen buffer (like vim/
-  // htop) so its frame erases never touch the main scrollback — fixes terminals
-  // (plain WSL / Windows Terminal) where the default in-place rendering drifts or
-  // blanks the screen. Trade-off: no native scrollback during the session; the
-  // main screen is restored on exit.
-  const altScreen = process.env['DECKENT_ALTSCREEN'] !== '0';
+  // Alternate-screen mode (OPT-IN: DECKENT_ALTSCREEN=1). It fixed the WSL
+  // drift/blank but REMOVES native scrollback — long replies couldn't be scrolled
+  // ("akış kayıp"). Default OFF so the main screen keeps native scrollback; the
+  // raw-mode re-assert (above) already fixes the post-command raw echo, and the
+  // un-truncated reply flows into the scrollback you can scroll up through.
+  const altScreen = process.env['DECKENT_ALTSCREEN'] === '1';
   if (altScreen) process.stdout.write('\x1b[?1049h\x1b[2J\x1b[H');
 
   const { waitUntilExit } = render(
