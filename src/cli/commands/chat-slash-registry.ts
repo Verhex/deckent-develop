@@ -148,6 +148,36 @@ const SLASH_CATALOG: readonly SlashCommand[] = [
     desc: 'Önceki sohbet oturumunu sürdür (örn: /resume 1)',
   },
   {
+    name: '/sync',
+    desc: 'Agent/skill manifest + routing senkronize et (onay ister)',
+    agenticTool: 'deckent_sync',
+    agenticArgs: {},
+  },
+  {
+    name: '/checkpoint',
+    desc: 'Checkpoint onayla/reddet (örn: /checkpoint approve <sprint> <faz>)',
+    agenticTool: 'deckent_checkpoint',
+    agenticArgs: {},
+  },
+  {
+    name: '/kill',
+    desc: '⚠️ Aktif sprint/worker durdur (her seferinde onay)',
+    agenticTool: 'deckent_kill',
+    agenticArgs: {},
+  },
+  {
+    name: '/cleanup',
+    desc: '⚠️ Task dosyalarını arşivle, sprint temizle (her seferinde onay)',
+    agenticTool: 'deckent_cleanup',
+    agenticArgs: {},
+  },
+  {
+    name: '/recover',
+    desc: '⚠️ Çökmüş sprint kurtar (örn: /recover sprint-224, her seferinde onay)',
+    agenticTool: 'deckent_recover',
+    agenticArgs: {},
+  },
+  {
     name: '/model',
     desc: 'Modeli değiştir (örn: /model sonnet)',
   },

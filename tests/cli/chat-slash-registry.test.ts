@@ -216,6 +216,29 @@ describe('resolveSlash — Faz A expanded read-only commands', () => {
     expect(nervous?.agenticTool).toBeUndefined();
   });
 
+  it.each([
+    ['/sync', 'deckent_sync'],
+    ['/checkpoint', 'deckent_checkpoint'],
+    ['/kill', 'deckent_kill'],
+    ['/cleanup', 'deckent_cleanup'],
+    ['/recover', 'deckent_recover'],
+  ])('%s → agentic %s (Faz E write/destructive)', (slash, tool) => {
+    const registry = buildSlashRegistry();
+    expect(registry.map((c) => c.name)).toContain(slash);
+    const result = resolveSlash(slash, registry);
+    expect(result.action).toBe('agentic');
+    if (result.action === 'agentic') expect(result.tool).toBe(tool);
+  });
+
+  it('/recover sprint-224 → deckent_recover with _rest', () => {
+    const registry = buildSlashRegistry();
+    const result = resolveSlash('/recover sprint-224', registry);
+    if (result.action === 'agentic') {
+      expect(result.tool).toBe('deckent_recover');
+      expect(result.args['_rest']).toEqual(['sprint-224']);
+    }
+  });
+
   it('/config set max_workers 4 → deckent_config with _rest', () => {
     const registry = buildSlashRegistry();
     expect(registry.map((c) => c.name)).toContain('/config');

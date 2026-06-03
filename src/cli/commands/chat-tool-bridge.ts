@@ -38,9 +38,19 @@ const TOOL_COMMANDS: Readonly<Record<string, readonly string[]>> = {
   // config: show (no _rest) is read-only; `config set/import/migrate` mutate
   // config.json and are confirm-gated one layer up (run.tsx classifyTool).
   deckent_config: ['config'],
-  // NOTE: deckent_audit is intentionally NOT here — `deckent audit` runs the
-  // Brain self-audit gate (provider-backed evaluation) and can block 30-60s+,
-  // which would freeze the REPL turn. Run it standalone via `deckent audit`.
+  // ── Write tools (confirm-gated) ──
+  deckent_sync: ['sync'],
+  deckent_checkpoint: ['checkpoint'],
+  // ── Destructive tools (always-confirm; run.tsx never auto-approves these) ──
+  deckent_kill: ['kill'],
+  deckent_cleanup: ['cleanup'],
+  // recover prompts via readline unless --force; the REPL's always-confirm modal
+  // IS the confirmation, so bake in --force to avoid a headless stdin hang.
+  deckent_recover: ['recover', '--force'],
+  // NOTE: deckent_start / run / watch are intentionally NOT here — long-running
+  // (a sprint / worker / live stream) would block the REPL turn. deckent_audit
+  // (provider-backed self-audit gate, 30-60s+) and deckent_set_directives
+  // (stdin content) are also excluded. Run those standalone via the CLI.
   // deckent_memory_query is special-cased below: it needs the `query` arg
   // appended as the `recall <query>` positional.
 };

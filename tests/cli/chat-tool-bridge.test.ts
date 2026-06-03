@@ -52,8 +52,8 @@ describe('createCliToolDispatcher — chat-tool-bridge.ts', () => {
   it('unknown tool → tool not allowed, no spawn', async () => {
     const spawnFn = vi.fn() as unknown as CliToolSpawnFn;
     const d = createCliToolDispatcher({ spawnFn });
-    const out = await d.dispatch('deckent_kill', { target: 'all' });
-    expect(out).toBe('[mcp-error] tool not allowed: deckent_kill');
+    const out = await d.dispatch('deckent_made_up', { target: 'all' });
+    expect(out).toBe('[mcp-error] tool not allowed: deckent_made_up');
     expect(spawnFn).not.toHaveBeenCalled();
   });
 
@@ -106,6 +106,32 @@ describe('createCliToolDispatcher — chat-tool-bridge.ts', () => {
     expect(spawnFn).toHaveBeenCalledWith(['config', 'set', 'max_workers', '4']);
   });
 
+  it.each([
+    ['deckent_sync', ['sync']],
+    ['deckent_checkpoint', ['checkpoint']],
+    ['deckent_kill', ['kill']],
+    ['deckent_cleanup', ['cleanup']],
+  ])('%s → spawns %j (Faz E write/destructive)', async (tool, expected) => {
+    const spawnFn = vi.fn().mockResolvedValue('ok') as unknown as CliToolSpawnFn;
+    const d = createCliToolDispatcher({ spawnFn });
+    await d.dispatch(tool, {});
+    expect(spawnFn).toHaveBeenCalledWith(expected);
+  });
+
+  it('deckent_recover → bakes in --force (avoids headless readline hang)', async () => {
+    const spawnFn = vi.fn().mockResolvedValue('recovered') as unknown as CliToolSpawnFn;
+    const d = createCliToolDispatcher({ spawnFn });
+    await d.dispatch('deckent_recover', { _rest: ['sprint-224'] });
+    expect(spawnFn).toHaveBeenCalledWith(['recover', '--force', 'sprint-224']);
+  });
+
+  it('deckent_kill passes through user flags via _rest', async () => {
+    const spawnFn = vi.fn().mockResolvedValue('killed') as unknown as CliToolSpawnFn;
+    const d = createCliToolDispatcher({ spawnFn });
+    await d.dispatch('deckent_kill', { _rest: ['--all'] });
+    expect(spawnFn).toHaveBeenCalledWith(['kill', '--all']);
+  });
+
   it('deckent_audit → tool not allowed (slow/auth-blocked, gated)', async () => {
     const spawnFn = vi.fn() as unknown as CliToolSpawnFn;
     const d = createCliToolDispatcher({ spawnFn });
@@ -133,7 +159,7 @@ describe('cliArgsFor — resolved argv (shared by dispatch + confirm modal)', ()
   });
 
   it('returns null for a tool not in the allow-list', () => {
-    expect(cliArgsFor('deckent_kill', {})).toBeNull();
+    expect(cliArgsFor('deckent_made_up', {})).toBeNull();
     expect(cliArgsFor('deckent_memory_query', { query: 'x' })).toBeNull();
   });
 });
