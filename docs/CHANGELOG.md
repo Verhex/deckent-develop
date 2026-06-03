@@ -2,6 +2,24 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint225] - 2026-06-03
+
+### Added
+
+- FX-01 — Genel Bakış + Mimari
+- FX-02 — Sprint Yaşam Döngüsü + Task Routing
+- FX-03 — Model Registry/Multi-Provider + Memory V2
+- FX-04 — Agents + Skills
+- FX-05 — Spawn Backend'ler + Dependency Waves
+- FX-06 — Result Evaluation + Auditor/RBAC
+- FX-07 — Event-Stream/Observability + Native REPL
+- FX-08 — Dashboard + MCP Entegrasyonu
+- FX-09 — CLI Komutları + Evolution Pipeline
+- FX-10 — Nervous System (roadmap) + Vizyon/Yol Haritası
+
+
+_Tasks: 12 total, 12 done, 0 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint224] - 2026-06-02
 
 ### Added

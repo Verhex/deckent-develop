@@ -67,7 +67,9 @@ _Total: 28 MCP tools_
 | `chat-render` | deckent chat-render |
 | `chat-render-region` | deckent chat-render-region |
 | `chat-repl-ux` | deckent chat-repl-ux |
+| `chat-resume` | deckent chat-resume |
 | `chat-session` | deckent chat-session |
+| `chat-slash-menu` | deckent chat-slash-menu |
 | `chat-slash-registry` | deckent chat-slash-registry |
 | `chat-spinner` | deckent chat-spinner |
 | `chat-status-line` | deckent chat-status-line |
@@ -128,4 +130,4 @@ _Total: 28 MCP tools_
 | `watch` | deckent watch |
 | `web` | deckent web |
 
-_Total: 81 CLI command modules_
+_Total: 83 CLI command modules_

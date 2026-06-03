@@ -6163,3 +6163,34 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 224-006: 224-012 — ADR-086 (Native CLI Parity) + MASTER-PLAN §10 güncel (DONE)
 
 ---
+## Sprint 225 — sprint-225
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-06-03
+**Duration:** 1077s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 12 |
+| Completed | 12 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 1077221ms |
+
+### Tasks
+
+- 225-001: FX-01 — Genel Bakış + Mimari (DONE)
+- 225-002: FX-02 — Sprint Yaşam Döngüsü + Task Routing (DONE)
+- 225-003: FX-03 — Model Registry/Multi-Provider + Memory V2 (DONE)
+- 225-004: FX-04 — Agents + Skills (DONE)
+- 225-005: FX-05 — Spawn Backend'ler + Dependency Waves (DONE)
+- 225-006: FX-06 — Result Evaluation + Auditor/RBAC (DONE)
+- 225-007: FX-07 — Event-Stream/Observability + Native REPL (DONE)
+- 225-008: FX-08 — Dashboard + MCP Entegrasyonu (DONE)
+- 225-009: FX-09 — CLI Komutları + Evolution Pipeline (DONE)
+- 225-010: FX-10 — Nervous System (roadmap) + Vizyon/Yol Haritası (DONE)
+
+---
