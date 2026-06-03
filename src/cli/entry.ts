@@ -35,7 +35,7 @@ import { slashMenuOnKeypress, renderSlashMenu, filterSlashCommands } from './com
 import { createPromptRegion, createThinkingTicker, createPasteCoalescer, createLineBufferedSink } from './commands/chat-render-region.js';
 import { PinnedTui } from './commands/chat-pinned-tui.js';
 import { getMessage, getLanguage } from './helpers/messages.js';
-import { createStreamMarkdown } from './commands/chat-render.js';
+import { createStreamMarkdown, renderMarkdown } from './commands/chat-render.js';
 import {
   OPENAI_COMPAT_PRESETS,
   type OpenAICompatPresetName,
@@ -719,7 +719,13 @@ async function runPinnedTuiRepl(provider: ChatProviderAdapter): Promise<void> {
       confirmDenied: t('tui.confirm_denied'),
     },
   });
-  const streamMd = createStreamMarkdown(true);
+  // Line-buffered full markdown render: each complete reply line is rendered
+  // through renderMarkdown (links → clickable OSC-8, headings/lists/bold/code,
+  // file paths → cyan) then written into the scroll region. Line-granular (not
+  // token) is the right grain for FORMATTED content — links/headings need the
+  // whole line; the scroll region keeps the input pinned + smooth. The loop's
+  // per-turn trailing newline flushes the final line.
+  const lineSink = createLineBufferedSink((line) => ctl.write(renderMarkdown(line, true) + '\n'));
   const perms = createPermissionStore(process.cwd());
 
   const askConfirm = async (summary: string, toolName: string): Promise<boolean> => {
@@ -740,14 +746,18 @@ async function runPinnedTuiRepl(provider: ChatProviderAdapter): Promise<void> {
   ctl.start();
   ctl.writeLine(`${DIM}${t('tui.intro')}${RESET}`);
   ctl.onInterrupt(() => ctl.stop());
+  // Flush the final reply line (held by the line buffer until a newline) when
+  // the turn ends — otherwise a single-line reply never renders. flush() invokes
+  // the sink callback (renderMarkdown → ctl.write) for the held partial line.
+  ctl.onIdle(() => lineSink.flush());
 
   try {
     await runChatNativeLoop({
       provider,
       dispatcher,
       input: ctl.lines(),
-      // Stream tokens into the scroll region (markdown-rendered), prompt stays pinned.
-      output: (text: string) => ctl.write(streamMd.feed(text)),
+      // Feed tokens to the line buffer; complete lines render via renderMarkdown.
+      output: (text: string) => lineSink.feed(text),
       gracefulErrors: true,
       layoutEnabled: false, // the controller echoes the user turn + we stream the reply
       interactiveTty: true,

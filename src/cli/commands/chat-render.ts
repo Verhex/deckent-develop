@@ -2,6 +2,17 @@
 const RESET = '\x1b[0m';
 const BOLD  = '\x1b[1m';
 const DIM   = '\x1b[2m'; // grey — used for code blocks
+const CYAN  = '\x1b[36m';
+const UNDER = '\x1b[4m';
+
+/**
+ * Wrap visible text as an OSC-8 terminal hyperlink (clickable in VS Code /
+ * iTerm / modern terminals). Falls back gracefully — terminals that ignore
+ * OSC-8 just print the visible text. `\x1b]8;;URL\x07 TEXT \x1b]8;;\x07`.
+ */
+function hyperlink(url: string, text: string): string {
+  return `\x1b]8;;${url}\x07${CYAN}${UNDER}${text}${RESET}\x1b]8;;\x07`;
+}
 
 /**
  * Render markdown text to ANSI-colored output for TTY terminals.
@@ -25,11 +36,33 @@ export function renderMarkdown(text: string, tty?: boolean): string {
   // Inline code (`code`) — only outside already-processed fenced blocks
   result = result.replace(/`([^`\n]+)`/g, (_: string, code: string) => `${DIM}${code}${RESET}`);
 
+  // Markdown links [text](url) → clickable OSC-8 hyperlink (process BEFORE bare
+  // URLs so the link's own URL isn't matched twice). Optional "title" tolerated.
+  result = result.replace(
+    /\[([^\]\n]+)\]\((\S+?)(?:\s+"[^"]*")?\)/g,
+    (_: string, text: string, url: string) => hyperlink(url, text),
+  );
+
+  // Bare URLs (http/https) → clickable. Negative lookbehind for ';' skips the
+  // URL already embedded in an OSC-8 sequence (8;;URL) emitted just above.
+  result = result.replace(
+    /(?<![;\w])(https?:\/\/[^\s)<>\]]+)/g,
+    (_: string, url: string) => hyperlink(url, url),
+  );
+
   // ATX headings (# Heading, ## Heading, …)
   result = result.replace(/^(#{1,6}) (.+)$/gm, (_: string, _hashes: string, content: string) => `${BOLD}${content}${RESET}`);
 
   // Bold (**text**)
   result = result.replace(/\*\*([^*\n]+)\*\*/g, (_: string, content: string) => `${BOLD}${content}${RESET}`);
+
+  // Project file paths → cyan for readability (VS Code auto-detects the path
+  // for click-to-open). Conservative: known top dirs, or a path with a code
+  // extension. Lookbehind avoids matching inside a URL (preceded by / : . or word).
+  result = result.replace(
+    /(?<![\w/:.])((?:src|docs|tests|scripts|\.brain|\.deckent|\.claude)\/[\w./-]+|[\w-]+\/[\w./-]+\.(?:ts|tsx|md|json|mjs|cjs|js))(?::\d+)?/g,
+    (m: string) => `${CYAN}${m}${RESET}`,
+  );
 
   // Unordered list items (- item or * item at line start)
   result = result.replace(/^[*-] (.+)$/gm, (_: string, content: string) => `  • ${content}`);

@@ -217,6 +217,8 @@ export class PinnedTui {
   private readonly queue: string[] = [];
   private wake: (() => void) | null = null;
   private onInt: (() => void) | null = null;
+  /** Called when the turn ends and we return to idle (e.g. flush a line buffer). */
+  private onIdleCb: (() => void) | null = null;
   /** When set, the next y/a/n keystroke resolves a pending confirm modal. */
   private pendingConfirm: ((answer: 'y' | 'a' | 'n') => void) | null = null;
   private readonly keyListener: (str: string | undefined, key: Key) => void;
@@ -271,6 +273,11 @@ export class PinnedTui {
   /** Register a Ctrl-C handler (e.g. to interrupt a turn). */
   onInterrupt(fn: () => void): void { this.onInt = fn; }
 
+  /** Register a callback fired when a turn ends (returning to idle) — used to
+   * flush a line buffer so the final reply line is written even without a
+   * trailing newline. */
+  onIdle(fn: () => void): void { this.onIdleCb = fn; }
+
   /**
    * Stream provider output into the scroll region above the input.
    *
@@ -321,6 +328,7 @@ export class PinnedTui {
    * glued to the pinned input, then redraw + focus the input line.
    */
   private goIdle(): void {
+    if (this.onIdleCb) this.onIdleCb(); // flush any buffered final line first
     if (this.cursorAt === 'output') {
       this.out.write('\r\n');
       this.outCol = 1;

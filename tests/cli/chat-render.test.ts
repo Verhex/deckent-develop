@@ -72,3 +72,49 @@ describe('renderMarkdown', () => {
     expect(renderMarkdown(input, true)).toBe(input);
   });
 });
+
+import { renderMarkdown as renderMd2 } from '../../src/cli/commands/chat-render.js';
+
+describe('renderMarkdown — links, URLs, file paths (Sprint 224 readability)', () => {
+  it('markdown link → OSC-8 hyperlink with cyan-underlined text', () => {
+    const out = renderMd2('see [Docs](https://docs.anthropic.com)', true);
+    expect(out).toContain('\x1b]8;;https://docs.anthropic.com\x07'); // OSC-8 open
+    expect(out).toContain('Docs');
+    expect(out).toContain('\x1b]8;;\x07'); // OSC-8 close
+    expect(out).not.toContain('[Docs]'); // raw markdown gone
+  });
+
+  it('bare URL → clickable OSC-8', () => {
+    const out = renderMd2('go to https://github.com/x/y now', true);
+    expect(out).toContain('\x1b]8;;https://github.com/x/y\x07');
+  });
+
+  it('does NOT double-wrap a URL already inside a markdown link', () => {
+    const out = renderMd2('[API](https://docs.anthropic.com/en/api)', true);
+    // exactly one OSC-8 open for that URL
+    const opens = out.split('\x1b]8;;https://docs.anthropic.com/en/api\x07').length - 1;
+    expect(opens).toBe(1);
+  });
+
+  it('project file path → cyan colored', () => {
+    const out = renderMd2('edit src/cli/commands/chat-native.ts please', true);
+    expect(out).toContain('\x1b[36msrc/cli/commands/chat-native.ts\x1b[0m');
+  });
+
+  it('file path with line number → colored incl. :NN', () => {
+    const out = renderMd2('at src/cli/entry.ts:42 there', true);
+    expect(out).toContain('\x1b[36msrc/cli/entry.ts:42\x1b[0m');
+  });
+
+  it('non-TTY → passthrough (no ANSI, no OSC-8)', () => {
+    const out = renderMd2('[Docs](https://x.io) and src/a.ts', false);
+    expect(out).toBe('[Docs](https://x.io) and src/a.ts');
+  });
+
+  it('does not colorize a path segment inside a URL', () => {
+    const out = renderMd2('https://github.com/anthropics/claude-code', true);
+    // the URL is one hyperlink; no stray cyan path-coloring inside it
+    expect(out).toContain('\x1b]8;;https://github.com/anthropics/claude-code\x07');
+    expect(out).not.toContain('\x1b[36manthropics');
+  });
+});
