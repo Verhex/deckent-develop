@@ -21,6 +21,7 @@ import {
 import {
   createPersistentClaudeSession,
   DECKENT_AGENTIC_SYSTEM_PROMPT,
+  DEFAULT_PERSISTENT_ARGS,
   type PersistentClaudeSession,
   type PersistentSpawnFn,
 } from './commands/chat-session.js';
@@ -276,6 +277,8 @@ export interface BuildReplProviderOptions {
    * across every turn instead of paying the per-turn cold-start.
    */
   persistentSpawnFn?: PersistentSpawnFn;
+  /** Model id to pass to the host CLI (`--model`). Omit → provider default. */
+  model?: string;
 }
 
 /**
@@ -336,12 +339,15 @@ export function buildReplProvider(
     // executes them via the tool-exec dispatcher). Plain chat is unaffected.
     return createPersistentClaudeSession({
       systemPrompt: DECKENT_AGENTIC_SYSTEM_PROMPT,
+      ...(opts.model ? { extraArgs: [...DEFAULT_PERSISTENT_ARGS, '--model', opts.model] } : {}),
       ...(opts.persistentSpawnFn ? { spawnFn: opts.persistentSpawnFn } : {}),
     });
   }
 
   const binary = name;
-  const extraArgs = extraArgsForProvider(name);
+  const extraArgs = opts.model
+    ? [...extraArgsForProvider(name), '--model', opts.model]
+    : extraArgsForProvider(name);
   const spawnFn: SubscriptionSpawnFn = opts.spawnFn ?? defaultSubscriptionSpawn;
 
   return {
@@ -492,7 +498,8 @@ export async function launchDefaultRepl(): Promise<void> {
   // import keeps Ink/React out of the non-REPL CLI startup path.
   if (isTtyEarly && process.env['DECKENT_INK'] === '1') {
     const { runInkRepl } = await import('./repl/run.js');
-    await runInkRepl(provider, providerName);
+    await runInkRepl(provider, providerName, (sel) =>
+      buildReplProvider(sel.provider as ReplProviderName, sel.model ? { model: sel.model } : {}));
     return;
   }
 

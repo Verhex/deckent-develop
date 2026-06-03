@@ -15,6 +15,7 @@ import { runChatNativeLoop, type ChatProviderAdapter, type McpToolDispatcher } f
 import { renderMarkdown } from '../commands/chat-render.js';
 import { InputBar } from './input-bar.js';
 import type { SlashRegistry } from '../commands/chat-slash-registry.js';
+import type { ActiveSelection } from './provider-switch.js';
 
 export type ConfirmAnswer = 'y' | 'a' | 'n';
 export type ConfirmTrigger = (summary: string) => Promise<ConfirmAnswer>;
@@ -38,6 +39,8 @@ export interface ReplLabels {
   queued: string;       // "kuyrukta"
   confirmHint: string;  // "(y = izin · a = hep izin · N = reddet)"
   menuHint: string;     // "↑↓ gez · Enter seç · Tab tamamla · Esc kapat"
+  switched: string;     // "geçildi"
+  switchUsage: string;  // "kullanım: /model <ad> · /provider <ad>"
 }
 
 export interface ReplAppProps {
@@ -51,6 +54,10 @@ export interface ReplAppProps {
   registerToolSink: (sink: ToolSink) => void;
   /** Slash command catalog for the interactive `/` menu. */
   slashRegistry: SlashRegistry;
+  /** Initial model/provider selection (shown in the status bar). */
+  initialSelection: ActiveSelection;
+  /** Switch model/provider; returns the resulting active selection. */
+  onSwitch: (sel: Partial<ActiveSelection>) => ActiveSelection;
 }
 
 interface Turn { id: number; role: 'user' | 'assistant' | 'tool'; text: string; tool?: ToolInfo; }
@@ -108,8 +115,9 @@ function TurnView({ turn }: { turn: Turn }): ReactElement {
 }
 
 export function ReplApp(props: ReplAppProps): ReactElement {
-  const { provider, dispatcher, labels, providerName, cwd, registerConfirm, registerToolSink, slashRegistry } = props;
+  const { provider, dispatcher, labels, cwd, registerConfirm, registerToolSink, slashRegistry, initialSelection, onSwitch } = props;
   const { exit } = useApp();
+  const [selection, setSelection] = useState<ActiveSelection>(initialSelection);
 
   const [turns, setTurns] = useState<Turn[]>([]);
   const [reply, setReply] = useState('');
@@ -207,6 +215,21 @@ export function ReplApp(props: ReplAppProps): ReactElement {
     const trimmed = line.trim();
     if (trimmed.length === 0) return;
     if (['/exit', '/quit', ':exit', ':quit'].includes(trimmed.toLowerCase())) { exit(); return; }
+    // /model <id> · /provider <name> — runtime switch (handled here, not the loop).
+    const sw = trimmed.match(/^\/(model|provider)(?:\s+(\S+))?$/i);
+    if (sw) {
+      const kind = (sw[1] as string).toLowerCase();
+      const arg = sw[2];
+      pushTurn('user', trimmed);
+      if (arg) {
+        const next = onSwitch(kind === 'model' ? { model: arg } : { provider: arg });
+        setSelection(next);
+        pushTurn('assistant', `${labels.switched}: ${next.provider}${next.model ? ` · ${next.model}` : ''}`);
+      } else {
+        pushTurn('assistant', `${labels.switchUsage}\n${selection.provider}${selection.model ? ` · ${selection.model}` : ''}`);
+      }
+      return;
+    }
     queue.current.push(trimmed);
     setQueued([...queue.current]);
     if (wake.current) { const w = wake.current; wake.current = null; w(); }
@@ -270,7 +293,10 @@ export function ReplApp(props: ReplAppProps): ReactElement {
       />
 
       <Box>
-        <Text dimColor>{`deckent  ${providerName}  ${cwd}`}</Text>
+        <Text dimColor>{'deckent  '}</Text>
+        <Text color={TEAL}>{selection.provider}</Text>
+        {selection.model ? <Text color={GOLD}>{` · ${selection.model}`}</Text> : null}
+        <Text dimColor>{`  ${cwd}`}</Text>
       </Box>
     </Box>
   );

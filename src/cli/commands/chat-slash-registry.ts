@@ -94,6 +94,14 @@ const SLASH_CATALOG: readonly Omit<SlashCommand, never>[] = [
     agenticArgs: {},
   },
   {
+    name: '/model',
+    desc: 'Modeli değiştir (örn: /model sonnet)',
+  },
+  {
+    name: '/provider',
+    desc: 'Provider değiştir (örn: /provider codex)',
+  },
+  {
     name: '/clear',
     desc: 'Ekranı temizle',
   },

@@ -13,17 +13,29 @@ import { createPermissionStore } from '../commands/chat-permissions.js';
 import { buildSlashRegistry } from '../commands/chat-slash-registry.js';
 import { getMessage, getLanguage } from '../helpers/messages.js';
 import { loadConfig } from '../../core/config.js';
-import type { PersistentClaudeSession } from '../commands/chat-session.js';
+import { createSwitchableProvider, type ActiveSelection } from './provider-switch.js';
 
 const EXEC_TOOLS = new Set(['deckent_write_file', 'deckent_read_file', 'deckent_edit_file', 'deckent_bash']);
 
+/** Rebuilds a provider adapter for a selection (entry.ts passes buildReplProvider). */
+export type ProviderRebuild = (sel: ActiveSelection) => ChatProviderAdapter;
+
 /** Mount the Ink REPL for an interactive TTY and run until the user exits. */
-export async function runInkRepl(provider: ChatProviderAdapter, providerName: string): Promise<void> {
+export async function runInkRepl(
+  provider: ChatProviderAdapter,
+  providerName: string,
+  rebuild: ProviderRebuild,
+): Promise<void> {
   let lang = 'en';
   try { lang = getLanguage((await loadConfig()).language); } catch { /* default en */ }
   const t = (key: string): string => getMessage(key, lang);
 
   const perms = createPermissionStore(process.cwd());
+
+  // Runtime model/provider switching: the loop holds a stable proxy; /model and
+  // /provider rebuild the underlying adapter (the warm boot session is reused
+  // for the initial selection).
+  const switcher = createSwitchableProvider({ provider: providerName, model: null }, rebuild, provider);
 
   // The App registers its modal trigger here; the dispatcher confirm awaits it.
   let confirmTrigger: ConfirmTrigger | null = null;
@@ -69,11 +81,13 @@ export async function runInkRepl(provider: ChatProviderAdapter, providerName: st
 
   const { waitUntilExit } = render(
     <ReplApp
-      provider={provider}
+      provider={switcher.proxy}
       dispatcher={dispatcher}
       providerName={providerName}
       cwd={process.cwd()}
       slashRegistry={buildSlashRegistry()}
+      initialSelection={switcher.current()}
+      onSwitch={(sel) => { switcher.switchTo(sel); return switcher.current(); }}
       labels={{
         thinking: t('tui.thinking'),
         generating: t('tui.generating'),
@@ -81,6 +95,8 @@ export async function runInkRepl(provider: ChatProviderAdapter, providerName: st
         queued: t('tui.queued'),
         confirmHint: t('tui.confirm_hint'),
         menuHint: t('tui.menu_hint'),
+        switched: t('tui.switched'),
+        switchUsage: t('tui.switch_usage'),
       }}
       registerConfirm={(trigger) => { confirmTrigger = trigger; }}
       registerToolSink={(sink) => { toolSink = sink; }}
@@ -89,16 +105,8 @@ export async function runInkRepl(provider: ChatProviderAdapter, providerName: st
 
   await waitUntilExit();
 
-  // Best-effort warm-session teardown, then force exit: after Ink unmounts the
-  // persistent claude child + restored stdin can keep the event loop alive, so a
-  // user-requested /exit must terminate deterministically (bounded so a stuck
-  // child can't hang the quit).
-  const maybeSession = provider as Partial<PersistentClaudeSession>;
-  if (typeof maybeSession.exit === 'function') {
-    await Promise.race([
-      Promise.resolve(maybeSession.exit()).catch(() => undefined),
-      new Promise((r) => setTimeout(r, 1000)),
-    ]);
-  }
+  // Bounded teardown of the active session, then deterministic exit (Ink unmount
+  // + restored stdin can otherwise keep the event loop alive).
+  await Promise.race([switcher.exit(), new Promise((r) => setTimeout(r, 1000))]);
   process.exit(0);
 }

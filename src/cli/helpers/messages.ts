@@ -336,6 +336,14 @@ const MESSAGES: MessageMap = {
     en: '↑↓ move · Enter select · Tab complete · Esc close',
     tr: '↑↓ gez · Enter seç · Tab tamamla · Esc kapat',
   },
+  'tui.switched': {
+    en: 'switched to',
+    tr: 'geçildi',
+  },
+  'tui.switch_usage': {
+    en: 'usage: /model <id> · /provider <name>. current:',
+    tr: 'kullanım: /model <id> · /provider <ad>. aktif:',
+  },
   'tui.generating': {
     en: 'generating…',
     tr: 'üretiliyor…',
