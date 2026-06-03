@@ -496,7 +496,13 @@ export async function launchDefaultRepl(): Promise<void> {
   // that replaces the hand-rolled raw-ANSI TUI). Opt-in via DECKENT_INK=1 while
   // it is verified; will become the default once it reaches parity. Dynamic
   // import keeps Ink/React out of the non-REPL CLI startup path.
-  if (isTtyEarly && process.env['DECKENT_INK'] === '1') {
+  // Sprint 224 E7 — the Ink REPL is now the DEFAULT for an interactive TTY
+  // (enterprise-grade native parity: markdown/tables/code, interactive /menu,
+  // model·provider switch, token footer, agentic diff, paste-as-one, …). The
+  // legacy readline/scroll-region paths remain reachable via DECKENT_INK=0 as a
+  // one-release escape hatch (full removal is a follow-up cleanup).
+  const inkMode = isTtyEarly && process.env['DECKENT_INK'] !== '0';
+  if (inkMode) {
     const { runInkRepl } = await import('./repl/run.js');
     await runInkRepl(provider, providerName, (sel) =>
       buildReplProvider(sel.provider as ReplProviderName, sel.model ? { model: sel.model } : {}));
