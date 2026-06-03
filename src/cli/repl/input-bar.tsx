@@ -8,6 +8,7 @@
 
 import { Box, Text, useInput } from 'ink';
 import { useState, useRef, type ReactElement } from 'react';
+import { appendFileSync } from 'node:fs';
 import type { Key } from 'node:readline';
 import { editInput, EMPTY_INPUT, InputHistory, type InputState } from '../commands/chat-pinned-tui.js';
 
@@ -33,8 +34,8 @@ function inkToKey(input: string, key: Parameters<Parameters<typeof useInput>[0]>
   if (key.return) return { name: 'return' } as Key;
   if (key.backspace) return { name: 'backspace' } as Key;
   if (key.delete) return { name: 'delete' } as Key;
-  if (input === '\x1b[H' || input === '\x1b[1~' || input === '\x1bOH') return { name: 'home' } as Key;
-  if (input === '\x1b[F' || input === '\x1b[4~' || input === '\x1bOF') return { name: 'end' } as Key;
+  if ((key as { home?: boolean }).home) return { name: 'home' } as Key;
+  if ((key as { end?: boolean }).end) return { name: 'end' } as Key;
   if (key.ctrl) return { name: input, ctrl: true } as Key;
   return { name: input, sequence: input } as Key;
 }
@@ -62,6 +63,9 @@ export function InputBar(props: InputBarProps): ReactElement {
   const set = (s: InputState): void => { stateRef.current = s; setState(s); };
 
   useInput((input, key) => {
+    if (process.env['DECKENT_INK_DEBUG'] === '1') {
+      try { appendFileSync('/tmp/ink-keys.log', JSON.stringify({ input, key }) + '\n'); } catch { /* ignore */ }
+    }
     // A batched/pasted chunk that embeds Enter: split so each completed line
     // submits and the trailing part stays in the buffer (real Enter is a lone
     // `return` key handled by editInput below).
@@ -92,8 +96,9 @@ export function InputBar(props: InputBarProps): ReactElement {
     set(res.state);
   }, { isActive: active });
 
+  // claude-code-style framed input box (Alperen: "iki tasarımsal çizgi arası").
   return (
-    <Box>
+    <Box borderStyle="round" borderColor={TEAL} paddingX={1}>
       <Text color={TEAL}>{'› '}</Text>
       <CaretText state={state} />
     </Box>

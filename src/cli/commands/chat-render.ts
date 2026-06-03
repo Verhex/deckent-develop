@@ -4,6 +4,7 @@ const BOLD  = '\x1b[1m';
 const DIM   = '\x1b[2m'; // grey — used for code blocks
 const CYAN  = '\x1b[36m';
 const UNDER = '\x1b[4m';
+const ITALIC = '\x1b[3m';
 
 /**
  * Wrap visible text as an OSC-8 terminal hyperlink (clickable in VS Code /
@@ -36,11 +37,14 @@ export function renderMarkdown(text: string, tty?: boolean): string {
   // Inline code (`code`) — only outside already-processed fenced blocks
   result = result.replace(/`([^`\n]+)`/g, (_: string, code: string) => `${DIM}${code}${RESET}`);
 
-  // Markdown links [text](url) → clickable OSC-8 hyperlink (process BEFORE bare
-  // URLs so the link's own URL isn't matched twice). Optional "title" tolerated.
+  // Markdown links [text](url): only http(s) become clickable OSC-8 hyperlinks.
+  // A relative/local target (./docs/guide.md, #anchor) is NOT a URI the terminal
+  // can open — render it as cyan text + a dim path so it stays readable instead
+  // of a broken hyperlink. Process BEFORE bare URLs.
   result = result.replace(
     /\[([^\]\n]+)\]\((\S+?)(?:\s+"[^"]*")?\)/g,
-    (_: string, text: string, url: string) => hyperlink(url, text),
+    (_: string, text: string, url: string) =>
+      /^https?:\/\//.test(url) ? hyperlink(url, text) : `${CYAN}${text}${RESET} ${DIM}(${url})${RESET}`,
   );
 
   // Bare URLs (http/https) → clickable. Negative lookbehind for ';' skips the
@@ -50,22 +54,33 @@ export function renderMarkdown(text: string, tty?: boolean): string {
     (_: string, url: string) => hyperlink(url, url),
   );
 
-  // ATX headings (# Heading, ## Heading, …)
-  result = result.replace(/^(#{1,6}) (.+)$/gm, (_: string, _hashes: string, content: string) => `${BOLD}${content}${RESET}`);
+  // ATX headings — visual hierarchy: # bold-cyan, ## bold, ### dim-bold.
+  result = result.replace(/^(#{1,6}) (.+)$/gm, (_: string, hashes: string, content: string) => {
+    const level = hashes.length;
+    if (level === 1) return `${BOLD}${CYAN}${content}${RESET}`;
+    if (level === 2) return `${BOLD}${content}${RESET}`;
+    return `${BOLD}${DIM}${content}${RESET}`;
+  });
 
-  // Bold (**text**)
-  result = result.replace(/\*\*([^*\n]+)\*\*/g, (_: string, content: string) => `${BOLD}${content}${RESET}`);
-
-  // Project file paths → cyan for readability (VS Code auto-detects the path
-  // for click-to-open). Conservative: known top dirs, or a path with a code
-  // extension. Lookbehind avoids matching inside a URL (preceded by / : . or word).
-  result = result.replace(
-    /(?<![\w/:.])((?:src|docs|tests|scripts|\.brain|\.deckent|\.claude)\/[\w./-]+|[\w-]+\/[\w./-]+\.(?:ts|tsx|md|json|mjs|cjs|js))(?::\d+)?/g,
-    (m: string) => `${CYAN}${m}${RESET}`,
-  );
+  // Bold + italic (***…*** before **…** before *…*/_…_ so markers don't clash).
+  result = result.replace(/\*\*\*([^*\n]+)\*\*\*/g, (_: string, c: string) => `${BOLD}${ITALIC}${c}${RESET}`);
+  result = result.replace(/\*\*([^*\n]+)\*\*/g, (_: string, c: string) => `${BOLD}${c}${RESET}`);
+  result = result.replace(/(?<!\*)\*([^*\n]+)\*(?!\*)/g, (_: string, c: string) => `${ITALIC}${c}${RESET}`);
+  result = result.replace(/(?<![\w\\])_([^_\n]+)_(?![\w])/g, (_: string, c: string) => `${ITALIC}${c}${RESET}`);
 
   // Unordered list items (- item or * item at line start)
   result = result.replace(/^[*-] (.+)$/gm, (_: string, content: string) => `  • ${content}`);
+
+  // Project file paths → cyan (VS Code click-to-open). Done LAST and ANSI-safe:
+  // split on existing escape sequences and only colour PLAIN segments, so paths
+  // never corrupt an already-emitted code/link/bold escape (the `\x1b[2m`+path
+  // collision bug).
+  const ANSI_RUN = /(\x1b\[[0-9;]*m|\x1b\]8;;[^\x07]*\x07)/;
+  const PATH = /(?<![\w/:.@-])((?:src|docs|tests|scripts|\.brain|\.deckent|\.claude)\/[\w./-]+|[\w-]+\/[\w./-]+\.(?:ts|tsx|md|json|mjs|cjs|js))(?::\d+)?/g;
+  result = result
+    .split(ANSI_RUN)
+    .map((seg) => (ANSI_RUN.test(seg) ? seg : seg.replace(PATH, (m) => `${CYAN}${m}${RESET}`)))
+    .join('');
 
   return result;
 }
