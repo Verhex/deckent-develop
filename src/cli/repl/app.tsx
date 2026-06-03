@@ -190,11 +190,15 @@ export function ReplApp(props: ReplAppProps): ReactElement {
 
     const finalizeReply = (): void => {
       if (replyAccum.current.length > 0) {
+        // Capture text + stats in LOCALS first: the setTurns updater runs lazily
+        // (next render), so reading replyAccum.current inside it would see the
+        // already-cleared '' below → empty assistant turn. (E4 regression.)
+        const text = replyAccum.current;
         const stats = lastStats.current ?? undefined;
-        setTurns((t) => [...t, { id: idRef.current++, role: 'assistant', text: replyAccum.current, ...(stats ? { stats } : {}) }]);
         replyAccum.current = '';
         lastStats.current = null;
         setReply('');
+        setTurns((t) => [...t, { id: idRef.current++, role: 'assistant', text, ...(stats ? { stats } : {}) }]);
       }
     };
 
