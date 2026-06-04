@@ -6247,3 +6247,28 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 227-004: 227-004 — Brain-integrity regression e2e (3 bug birlikte) (DONE)
 
 ---
+## Sprint 228 — sprint-228
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-06-04
+**Duration:** 889s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 5 |
+| Completed | 5 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 889242ms |
+
+### Tasks
+
+- 228-001: 228-001 — [P0] autonomous CLI i18n retrofit (hardcode → getMessage) (DONE)
+- 228-002: 228-002 — features-manifest entry (sync-manifest.mjs → regenerate) (DONE)
+- 228-003: 228-003 — Autonomous usage doc (TR/EN, güvenlik modeli dahil) (DONE)
+- 228-004: 228-004 — Autonomous e2e smoke harness (gerçek-binary start→status→stop) (DONE)
+
+---

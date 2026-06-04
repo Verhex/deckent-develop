@@ -80,6 +80,14 @@
 | adr-086 | Native CLI Parity — F11 Feature Set (Sprint 224) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-228 Learnings** (sprint-228): ## Sprint sprint-228 Learnings
+
+## Gains
+- 228-001 — [P0] autonomous CLI i18n retrofit (hardcode → getMessage) — Work...
+- **Sprint sprint-227 Learnings** (sprint-227): ## Sprint sprint-227 Learnings
+
+## Gains
+- 227-001 — Rubric total diagnostic fix (coverage:null → renormalize) — Spri...
 - **Sprint sprint-226 Learnings** (sprint-226): ## Sprint sprint-226 Learnings
 
 ## Gains
@@ -91,4 +99,4 @@ _No active technical debt._
 ## Active Patterns
 - Violation pattern: stale_heartbeat
 
-_Total entries: 110 | Generated: 2026-06-04_
+_Total entries: 116 | Generated: 2026-06-04_

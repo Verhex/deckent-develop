@@ -1,14 +1,13 @@
 {
   "_meta": {
     "version": "2.0",
-    "generatedAt": "2026-06-04T12:52:25.202Z",
+    "generatedAt": "2026-06-04T13:53:55.666Z",
     "generatedBy": "scripts/sync-manifest.mjs",
-    "sprintId": "sprint-227",
+    "sprintId": "sprint-228",
     "description": "Feature usage manifest — curated feature catalog (FEATURE_DEFINITIONS in scripts/sync-manifest.mjs) bucketed by an import-count heuristic plus manual lifecycle annotations. NOT a full import-graph analysis. Categories: active, lightly_used, dormant, dead.",
     "usageWindow": "last-10-sprints",
     "sourceAnalysis": {
       "sprintsChecked": [
-        "sprint-218",
         "sprint-219",
         "sprint-220",
         "sprint-221",
@@ -17,7 +16,8 @@
         "sprint-224",
         "sprint-225",
         "sprint-226",
-        "sprint-227"
+        "sprint-227",
+        "sprint-228"
       ],
       "methodology": "curated catalog + grep-based import count (basename match) + @deprecated detection + manual blockedBy/deprecatedSince/supersededBy annotations"
     }
@@ -177,6 +177,21 @@
         "src/orchestra/rollback.ts"
       ],
       "description": "Triggered only when all sprint tasks are NO_GO and rollback_policy is configured.",
+      "importCount": "high"
+    },
+    {
+      "id": "autonomous-runtime",
+      "label": "Autonomous Runtime — F3-009 authority-bounded loop",
+      "files": [
+        "src/orchestra/autonomous/runtime-loop.ts",
+        "src/orchestra/autonomous/action-adapter.ts",
+        "src/orchestra/autonomous/approval-adapter.ts",
+        "src/orchestra/autonomous/audit-adapter.ts",
+        "src/orchestra/autonomous/authority-adapter.ts",
+        "src/orchestra/autonomous/trigger-adapter.ts",
+        "src/cli/commands/autonomous.ts"
+      ],
+      "description": "F3-009 authority-bounded autonomous loop. CLI start/status/stop subcommands wire trigger→authority→approval→action→audit pipeline. Default-deny: no auto-approve, no auto-sprint-start. AS-6 / ADR-037 / ADR-040.",
       "importCount": "high"
     }
   ],

@@ -16,7 +16,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node
 import { join } from 'node:path';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { print, printError } from '../helpers/output.js';
-import { getLanguage } from '../helpers/messages.js';
+import { getLanguage, getMessage } from '../helpers/messages.js';
 import {
   buildAutonomousRuntime,
   runAutonomousLoop,
@@ -26,47 +26,6 @@ import type { ActionHandler } from '../../nervous/executor.js';
 import type { ScheduledFlow } from '../../core/scheduled-flow.js';
 import type { SelfDispatchPolicy } from '../../core/self-dispatch.js';
 import type { AutonomousRuntimeConfig } from '../../orchestra/autonomous-runtime.js';
-
-// ─── Local i18n (en/tr) — scoped to this command (i18n-FIRST) ─────────
-
-const LOCAL_MESSAGES: Record<string, { en: string; tr: string }> = {
-  'autonomous.start_banner': {
-    en: 'Autonomous runtime started — {flows} flow(s), default-deny + approval-gate active',
-    tr: 'Otonom runtime başladı — {flows} flow, default-deny + onay-kapısı aktif',
-  },
-  'autonomous.start_done': {
-    en: 'Autonomous loop finished ({iterations} cycles, reason: {reason})',
-    tr: 'Otonom döngü tamamlandı ({iterations} cycle, sebep: {reason})',
-  },
-  'autonomous.status_header': {
-    en: 'Autonomous runtime status',
-    tr: 'Otonom runtime durumu',
-  },
-  'autonomous.status_pending': {
-    en: 'Pending approvals: {count}',
-    tr: 'Bekleyen onay: {count}',
-  },
-  'autonomous.status_no_audit': {
-    en: 'No audit events yet.',
-    tr: 'Henüz audit kaydı yok.',
-  },
-  'autonomous.status_recent_audit': {
-    en: 'Recent audit ({count}):',
-    tr: 'Son audit ({count}):',
-  },
-  'autonomous.stop_marker_written': {
-    en: 'Stop signal written — active loop will halt after the in-flight cycle.',
-    tr: 'Durdurma sinyali yazıldı — aktif döngü mevcut cycle sonrası duracak.',
-  },
-};
-
-function tr(key: string, lang: string, vars?: Record<string, string>): string {
-  const entry = LOCAL_MESSAGES[key];
-  if (!entry) return key;
-  const template = lang === 'tr' ? entry.tr : entry.en;
-  if (!vars) return template;
-  return template.replace(/\{(\w+)\}/g, (_, name: string) => vars[name] ?? `{${name}}`);
-}
 
 // ─── Filesystem layout helpers ────────────────────────────────────────
 
@@ -151,7 +110,7 @@ export async function handleStart(opts: AutonomousStartOptions): Promise<void> {
     ? Math.max(0, parseInt(opts.maxIterations, 10) || 0)
     : undefined;
 
-  print(tr('autonomous.start_banner', lang, { flows: String(flows.length) }));
+  print(getMessage('autonomous.start_banner', lang, { flows: String(flows.length) }));
 
   // Wrap sleep so the stop marker triggers abort.
   const sleep = (ms: number): Promise<void> =>
@@ -168,7 +127,7 @@ export async function handleStart(opts: AutonomousStartOptions): Promise<void> {
       signal: controller.signal,
       sleep,
     });
-    print(tr('autonomous.start_done', lang, {
+    print(getMessage('autonomous.start_done', lang, {
       iterations: String(summary.iterations),
       reason: summary.reason,
     }));
@@ -212,13 +171,13 @@ export function handleStatus(opts: AutonomousStatusOptions): void {
   }
   const recent = auditLines.slice(-5);
 
-  print(tr('autonomous.status_header', lang));
-  print(tr('autonomous.status_pending', lang, { count: String(pendingCount) }));
+  print(getMessage('autonomous.status_header', lang));
+  print(getMessage('autonomous.status_pending', lang, { count: String(pendingCount) }));
   if (recent.length === 0) {
-    print(tr('autonomous.status_no_audit', lang));
+    print(getMessage('autonomous.status_no_audit', lang));
     return;
   }
-  print(tr('autonomous.status_recent_audit', lang, { count: String(recent.length) }));
+  print(getMessage('autonomous.status_recent_audit', lang, { count: String(recent.length) }));
   for (const line of recent) {
     try {
       const ev = JSON.parse(line) as { payload?: Record<string, unknown>; timestamp?: string };
@@ -246,7 +205,7 @@ export function handleStop(opts: AutonomousStopOptions): void {
   const root = opts.root ?? resolveProjectRoot();
   ensureAutonomousDir(root);
   writeFileSync(stopMarkerPath(root), new Date().toISOString(), 'utf-8');
-  print(tr('autonomous.stop_marker_written', lang));
+  print(getMessage('autonomous.stop_marker_written', lang));
 }
 
 // ─── register ─────────────────────────────────────────────────────────

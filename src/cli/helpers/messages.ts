@@ -424,6 +424,36 @@ const MESSAGES: MessageMap = {
     en: 'ran command',
     tr: 'komut çalıştırıldı',
   },
+
+  // ─── autonomous command (Sprint 228 — 228-001 i18n retrofit) ─────────
+  'autonomous.start_banner': {
+    en: 'Autonomous runtime started — {flows} flow(s), default-deny + approval-gate active',
+    tr: 'Otonom runtime başladı — {flows} flow, default-deny + onay-kapısı aktif',
+  },
+  'autonomous.start_done': {
+    en: 'Autonomous loop finished ({iterations} cycles, reason: {reason})',
+    tr: 'Otonom döngü tamamlandı ({iterations} cycle, sebep: {reason})',
+  },
+  'autonomous.status_header': {
+    en: 'Autonomous runtime status',
+    tr: 'Otonom runtime durumu',
+  },
+  'autonomous.status_pending': {
+    en: 'Pending approvals: {count}',
+    tr: 'Bekleyen onay: {count}',
+  },
+  'autonomous.status_no_audit': {
+    en: 'No audit events yet.',
+    tr: 'Henüz audit kaydı yok.',
+  },
+  'autonomous.status_recent_audit': {
+    en: 'Recent audit ({count}):',
+    tr: 'Son audit ({count}):',
+  },
+  'autonomous.stop_marker_written': {
+    en: 'Stop signal written — active loop will halt after the in-flight cycle.',
+    tr: 'Durdurma sinyali yazıldı — aktif döngü mevcut cycle sonrası duracak.',
+  },
 };
 
 /**

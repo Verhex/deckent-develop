@@ -2,6 +2,18 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint228] - 2026-06-04
+
+### Added
+
+- 228-001 — [P0] autonomous CLI i18n retrofit (hardcode → getMessage)
+- 228-002 — features-manifest entry (sync-manifest.mjs → regenerate)
+- 228-003 — Autonomous usage doc (TR/EN, güvenlik modeli dahil)
+- 228-004 — Autonomous e2e smoke harness (gerçek-binary start→status→stop)
+
+
+_Tasks: 5 total, 5 done, 0 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint227] - 2026-06-04
 
 ### Added

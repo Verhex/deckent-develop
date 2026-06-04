@@ -65,6 +65,9 @@ const FEATURE_DEFINITIONS = [
   { id: 'ecosystem-intelligence', label: 'Ecosystem Intelligence — Skill Activation Persistence', files: ['src/orchestra/ecosystem-intelligence.ts'], description: 'analyzeNewSkill + persistSkillActivation called from CLI skill add workflow.', blockedBy: 'analysis output not consumed by routing-engine-v2' },
   { id: 'human-checkpoint-cli', label: 'Human Checkpoint — Sprint Pause for Human Approval', files: ['src/cli/commands/checkpoint.ts', 'src/orchestra/sprint-lifecycle.ts'], description: 'Sprint checkpoint approval system. Requires CHECKPOINT_INTERVAL config.', blockedBy: 'opt-in config, rarely set' },
 
+  // Active — live wired features that import-count heuristic under-counts
+  { id: 'autonomous-runtime', label: 'Autonomous Runtime — F3-009 authority-bounded loop', files: ['src/orchestra/autonomous/runtime-loop.ts', 'src/orchestra/autonomous/action-adapter.ts', 'src/orchestra/autonomous/approval-adapter.ts', 'src/orchestra/autonomous/audit-adapter.ts', 'src/orchestra/autonomous/authority-adapter.ts', 'src/orchestra/autonomous/trigger-adapter.ts', 'src/cli/commands/autonomous.ts'], description: 'F3-009 authority-bounded autonomous loop. CLI start/status/stop subcommands wire trigger→authority→approval→action→audit pipeline. Default-deny: no auto-approve, no auto-sprint-start. AS-6 / ADR-037 / ADR-040.', forceCategory: 'active' },
+
   // Dead
   { id: 'decision-orchestrator-v1', label: 'Decision Orchestrator V1 — Keyword-Based Routing (Deprecated)', files: ['src/orchestra/decision-engine.ts', 'src/orchestra/decision-logger.ts', 'src/orchestra/decision-replay.ts'], description: 'Sprint 031 V1 keyword-based routing. @deprecated since Sprint 066. Superseded by routeTaskV2().', deprecatedSince: 'Sprint 066', supersededBy: 'routing-engine-v2', adrRef: 'ADR-028' },
   { id: 'parallel-pipeline-manager-standalone', label: 'ParallelPipelineManager — Legacy Wave Builder (Superseded)', files: ['src/orchestra/parallel-pipeline.ts'], description: 'Original topological wave builder. Primary execution path superseded by dependency-scheduler.', supersededBy: 'dependency-scheduler' },
@@ -145,6 +148,9 @@ function checkFilesExist(files) {
 function categorizeFeature(feature) {
   // Explicit dead markers
   if (feature.deprecatedSince || feature.supersededBy) return 'dead';
+
+  // Explicit category override — for live features where heuristic under-counts imports
+  if (feature.forceCategory) return feature.forceCategory;
 
   // Check file existence
   const { exists, missing } = checkFilesExist(feature.files);
