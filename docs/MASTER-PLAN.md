@@ -261,7 +261,7 @@ F1-009 (8-provider fleet, ~95% iç-wiring — **gerçek any-key worker fleet = b
 |----|------------|---------------|-------|--------------------------|-------|
 | **AS-1** | Dormant wake-up + ölçek sertleştirme | uykudaki primitive'leri uyandır + 50-100 worker ölçek | 🔜 kısmen planlı | Sprint 225/226, W-K(226), W-K-detail (1/2/4/7), F3-010, F7-004 | Windows Job-Object, PTY `worker-attach`, RBAC-hard pre-write, 429-switch, cost↔billing köprüsü, auditor-async, docker-parallel spawn, `planDispatch` wire (kullanıcının 21-task planından merge) |
 | **AS-2** | Gerçek multi-provider / any-key | per-worker mixed fleet, config-registry, agentic HTTP-worker, Bedrock | ✅ **tasarım §4A** | F1-009..015, F6 | Faz 1-4 impl (Ollama-first, API cost-deferred) |
-| **AS-3** | Zero-hardcode + tam i18n | ~170 dosyada hardcoded string → `getMessage`; canlı-veri (stale const yok); "every-nation" | 🔜 planlı | W-A (i18n), W-K-detail (8/9), `feedback_zero_hardcode_live_data`, `feedback_god_level_i18n_quality_bar` | `getMessage` 31 → tüm user-facing; MCP tool-desc i18n wrapper; `.codex`/`.gemini` rules sync; multi-provider docs accuracy |
+| **AS-3** | Zero-hardcode + tam i18n | per-locale catalog + dynamic SUPPORTED_LANGS + add-a-language; tüm user-facing string→catalog; canlı-veri (stale const yok); "every-nation" | ✅ **tasarım §4E** | W-A, W-K-detail (8/9), ADR-032, `feedback_god_level_i18n_quality_bar`, `feedback_zero_hardcode_live_data` | Faz 1-3 impl (catalog infra+guard → tam sweep → add-a-language+live-data) |
 | **AS-4** | Provider-native yetenekler | her sağlayıcının kendi gücü: Claude plugins / ultracode (workflow) / provider-native MCP / skills / subagents — provider-agnostic Capability Realization Layer + fallback | ✅ **tasarım §4D** | F11-014/015, AS-5 (MCP köprü), AS-2 | Faz 1-3 impl (persona/MCP native → skills/plugins → nested workflow flag-gated) |
 | **AS-5** | MCP-CLIENT (dünyayla entegrasyon) | deckent'i server-only'den **MCP tüketicisine** evriltme; Claude-parity (her ortamda kur/kullan); harici sistemlerle veri alışverişi, enterprise-grade | ✅ **tasarım §4C** | F9-001/002/003, F11-015, F8, #ERP | Faz 1-3 impl (broker+REPL+CLI → worker → otonom/enterprise) |
 | **AS-6** | Otonom + process/batch mode | uzun-yaşayan, event-driven, yetki-sınırlı; "sadece developer değil herkes için" agentic-OS | 🔜 Sprint 225 + F3 | F3-001..009, Sprint 225, ADR-040 (nervous) / ADR-037 (RBAC) | 5 adapter + sürekli loop + `deckent autonomous` CLI (225); batch-mode; full-autonomy süreçleri |
@@ -329,6 +329,36 @@ deckent bir worker/REPL için soyut **capability set** bildirir: `{persona, nati
 
 ### Çapraz ref
 F11-014 (multi-provider parity) · F11-015 · **AS-5** (native MCP passthrough köprü) · **AS-2** (provider-agnostic core korunur) · ADR-079 (proof-of-function) · ADR-010. Memory: `feedback_prompt_completeness_over_brevity` (text-injection bugünkü temel — fallback olarak korunur) · `project_deckent_runtime_ecosystem`.
+
+---
+
+## 4E. AS-3 — Zero-Hardcode + Full i18n (every-nation)
+
+> **Comprehensive design — 2026-06-04 (Alperen).** İki track: **A (i18n)** kullanıcıya görünen TÜM string `getMessage`/locale-catalog'a; **B (zero-hardcode live-data)** stale-const yerine canlı-veri. Hedef: **milyon-user / her-millet** + "iddia kalmasın" tutarlılığı. CLAUDE.md **i18n-FIRST** quality bar'ın executable hâli (`feedback_god_level_i18n_quality_bar`).
+
+### Track A — i18n: per-locale catalog + dynamic + enforcement
+Bugün: `getMessage(key,lang)` var ama `SUPPORTED_LANGS=['en','tr']` **hardcoded**, tek `messages.ts` (478 satır), getMessage yalnız ~31 dosyada.
+1. **Catalog altyapısı:** `messages.ts` → `src/cli/locales/<xx>.json` (en canonical) + dynamic loader; **`SUPPORTED_LANGS` diskteki kataloglardan türetilir** (sabit union kalkar); en fallback; `{placeholder}` interpolation korunur; lazy-load (cold-start guard).
+2. **String extraction sweep:** kullanıcıya görünen TÜM hardcoded string → key + catalog. Yüzeyler: CLI stdout / REPL / dashboard (React i18n) / **MCP tool-description** / error / wizard / notification.
+3. **add-a-language path:** yeni dil = `locales/<xx>.json` düşür (kod değişmez); contribution guide; opsiyonel **local-Ollama makine-çeviri seed** (never-calls-home; en→xx taslak, insan düzeltir).
+4. **Enforcement guard:** `lint-i18n-hardcode.mjs` — user-surface dosyalarda yeni hardcoded user-facing literal → **CI FAIL** (i18n-first quality bar executable; test-hermeticity guard pattern'i).
+5. **MCP tool-desc i18n + `.codex`/`.gemini` rules sync** (W-A / W-K-detail 9).
+
+### Track B — Zero-hardcode live-data
+1. **Stale-const audit:** model ID'ler, sayımlar (agent/skill/tool counts), versiyonlar, fiyat → canlı kaynaktan (model-registry, code-derived, package.json). `feedback_zero_hardcode_live_data` (stale `opus-4-6` bundled fallback bulgusu).
+2. **Live-data guard:** kritik user-facing sayı/ID için stale-const lint.
+
+### Mimari notlar
+- Provider-agnostic mekanizma modülleri **string-free** kalır (label caller'dan enjekte, en default) — CLAUDE.md kuralı; AS-3 bunu tüm kod tabanına yayar.
+- Dashboard React i18n ayrı katman ama **aynı catalog kaynağını** paylaşabilir.
+
+### Fazlama
+- **Faz 1 — Catalog infra + guard + core CLI sweep:** `locales/` + dynamic loader + `SUPPORTED_LANGS` dynamic + `lint-i18n-hardcode` + en/tr migrate + yüksek-trafik CLI/REPL string'leri.
+- **Faz 2 — Tam yüzey sweep:** dashboard + MCP tool-desc + error/wizard/notification + `.codex`/`.gemini` rules sync.
+- **Faz 3 — add-a-language + Track B:** contribution path + Ollama-seed + zero-hardcode live-data audit/guard.
+
+### Çapraz ref
+W-A (i18n contribution) · W-K-detail 8/9 · ADR-032 (i18n pattern) · ADR-013/018 (per-provider rule gen). Memory: `feedback_god_level_i18n_quality_bar` · `feedback_zero_hardcode_live_data` · `project_deckent_everyone_everywhere` (every-nation).
 
 ---
 
@@ -455,6 +485,7 @@ Per Alperen's direction: **combine sprints, write larger comprehensive tasks** (
 | **AS-5·P1** | **🔜 MCP-client broker + REPL + yönetim CLI (Claude-parity)** | §4C AS-5 Faz 1 — `McpClientBroker` (`src/mcp-client/`, SDK Client, yeni dep yok) + 3-scope `.mcp.json` + `deckent mcp add/list/remove` + `/mcp` + dynamic discovery + REPL confirm-gate dispatch + audit. Thin e2e: yerel stdio reference server ekle→listele→agentic çağır→audit. Yerel/ücretsiz. F9-001/002, F11-015. |
 | **AS-5·P2–P3** | **🔜 Worker surface + otonom/enterprise MCP-client** | §4C AS-5 Faz 2-3 — worker tool-injection + IPC→broker + RBAC scope/non-leak test (P2); AS-6 action-executor wire + remote HTTP+OAuth + per-tenant isolation + risk-tagged approval + dashboard MCP sayfası (P3). F9-003, F10-002, ADR-037/040. |
 | **AS-4·P1–P3** | **🔜 Provider-native capabilities (Capability Realization Layer)** | §4D AS-4 Faz 1-3 — CapabilitySpec + `realizeCapabilities` + Claude `--append-system-prompt`/`--agents`/`--mcp-config` native + graceful text-fallback (P1, AS-5 köprü); native skills/plugins `--setting-sources`/superpowers opt-in (P2); nested ultracode/Workflow flag-gated + cost-gate (P3). Multi-provider parity korunur (AS-2). |
+| **AS-3·P1–P3** | **🔜 Zero-hardcode + full i18n (every-nation)** | §4E AS-3 Faz 1-3 — per-locale `locales/<xx>.json` catalog + dynamic `SUPPORTED_LANGS` + `lint-i18n-hardcode` guard + en/tr migrate (P1); tam yüzey sweep (dashboard/MCP-desc/error/wizard) + `.codex`/`.gemini` rules sync (P2); add-a-language path + local-Ollama çeviri-seed + Track B zero-hardcode live-data audit/guard (P3). |
 | **227+** | **F2 Native SDK (Path C) + F9 MCP-client + Publish Readiness** | Real standalone SDK; zero-prerequisite `npx deckent`; MCP client (consume external); secret-scrub/gitleaks; .github eksikleri; 96%-claim doğrulama; threat-model — Q3 2026 |
 | **post-beta** | **Provider/local LLM + million-user hardening** | F1-004/005, sub-#5 Ollama/CUDA fully-local preset, OTel/Prometheus (W-J), ADR-037 hard-flip V2, sub-#2 self-security |
 | **post-beta (gated)** | **Voice + Mobile (milestone-gated)** | Voice (STT Whisper, wake-word Porcupine, TTS, real-time streaming) gated behind **10K GitHub stars**; Mobile (React Native iOS/Android MCP client, APNs+FCM push, Contacts/GPS/camera skills) gated behind **50K stars**. Both not built — zero source references |
