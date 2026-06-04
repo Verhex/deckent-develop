@@ -463,6 +463,27 @@ Per Alperen's direction: **combine sprints, write larger comprehensive tasks** (
 
 ---
 
+## 10A. Completion Roadmap — 5-10 Sprint Arc (AS sequencing)
+
+> **Onaylı sıra (Alperen 2026-06-04):** run-ready'ler önce, sonra fresh-design. **"Tamamlanmış ürün = agentic run ecosystem"** bu arkla gerçekleşir (DIRECTIVES 224 ✅ + 225/226 + AS-1…AS-6). Her sprint koşmadan önce DIRECTIVES.md'de **tek-sprint'e izole** + **commit-first** (`project_deckent_self_git_mutation_bug`). Sprint sayacı label'dan bağımsız otomatik artar. **Şu anki baş: S1 = Sprint 225.**
+
+| # | Sprint | İçerik | Alt-sistem | Maliyet | Durum |
+|---|--------|--------|------------|---------|-------|
+| **S1** | Sprint 225 | Otonom Runtime Wire (F3-009, 7 task) | AS-6 çekirdek | subs | ✅ run-ready (DIRECTIVES) |
+| **S2** | Sprint 226 | Platform + Dormant-wake (8 task) | AS-1 çekirdek | subs | ✅ run-ready (DIRECTIVES) |
+| **S3** | AS-5·P1 | MCP-client broker + REPL + `deckent mcp` CLI (Claude-parity) | AS-5 §4C | local/free | tasarım ✅ |
+| **S4** | AS-4·P1 | Capability Realization Layer + Claude native passthrough | AS-4 §4D | subs | tasarım ✅ |
+| **S5** | AS-2·P1 | Ollama agentic-worker foundation (anahtarsız) | AS-2 §4A | local/free | hafta sonu Ollama sonrası |
+| **S6** | AS-1·ext | Hardening kalan: Job-Object, worker-attach PTY, RBAC-hard, 429-switch, cost-billing, auditor-async, docker-parallel, planDispatch | AS-1 | subs | 21-task merge |
+| **S7** | AS-3 | Zero-hardcode + i18n sweep (`getMessage` → tüm user-facing; canlı-veri) | AS-3 | subs | mekanik |
+| **S8** | AS-5·P2 + AS-4·P2 | Worker MCP surface + RBAC; native skills/plugins (`--setting-sources`/superpowers) | AS-4/5 | subs/local | tasarım ✅ |
+| **S9** | AS-6 full + AS-5·P3 | process/batch mode + autonomous polish; otonom/enterprise MCP (remote+OAuth, per-tenant) | AS-6/5 | subs | — |
+| **S10** | AS-2·P2-P4 + AS-4·P3 | mixed-fleet/Bedrock (sandbox/cost-gated) + nested ultracode/Workflow + GA polish | AS-2/4 | API (sandbox) | cost-deferred |
+
+> **Dürüst kapsam:** S1-S9 subscription/local (cost-safe, beta-içi koşulabilir); **S10** API mixed-fleet/Bedrock → sandbox/cost-gated, post-beta/ayrı proje (`project_api_mode_deferred_post_beta`). 10 sprint sonunda her alt-sistemin **çekirdeği canlı + beta-GA-ready**; uç fazlar (full API mixed-fleet, nested workflow, full-autonomy) post-beta'ya sarkabilir — abartısız tahmin.
+
+---
+
 ## 11. Anchor Rules / DNA / Governance (unchanged)
 
 - **No MVP, ever** — god-level scope; ask "is this god-level?" (`feedback_no_minimum_no_mvp_deckent`).
