@@ -30,10 +30,6 @@ import {
   verifyResultPersisted,
   writeResult,
 } from '../../src/agents/worker.js';
-import {
-  LARGE_PROMPT_THRESHOLD_CHARS,
-  isLargePrompt,
-} from '../../src/orchestra/spawn-backend.js';
 
 // ─── Helpers ───────────────────────────────────────────────────────────
 
@@ -214,25 +210,3 @@ describe('Sprint 183 W1-3 — H2: verifyResultPersisted post-write disk verifica
   });
 });
 
-// ─── H3: spawn-backend large-prompt guard ─────────────────────────────
-
-describe('Sprint 183 W1-3 — H3: large-prompt guard exported from spawn-backend', () => {
-  it('exports LARGE_PROMPT_THRESHOLD_CHARS at a sensible value (≥30K, ≤100K)', () => {
-    expect(typeof LARGE_PROMPT_THRESHOLD_CHARS).toBe('number');
-    expect(LARGE_PROMPT_THRESHOLD_CHARS).toBeGreaterThanOrEqual(30_000);
-    expect(LARGE_PROMPT_THRESHOLD_CHARS).toBeLessThanOrEqual(100_000);
-  });
-
-  it('isLargePrompt returns true for >threshold prompt and false for small prompt', () => {
-    const small = 'a'.repeat(1_000);
-    expect(isLargePrompt(small)).toBe(false);
-
-    const huge = 'b'.repeat(LARGE_PROMPT_THRESHOLD_CHARS + 1);
-    expect(isLargePrompt(huge)).toBe(true);
-  });
-
-  it('isLargePrompt is exact at the threshold — strictly greater than triggers true', () => {
-    const atThreshold = 'c'.repeat(LARGE_PROMPT_THRESHOLD_CHARS);
-    expect(isLargePrompt(atThreshold)).toBe(false);
-  });
-});

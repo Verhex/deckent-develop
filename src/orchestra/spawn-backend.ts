@@ -70,33 +70,6 @@ export interface SpawnBackendOptions extends ProviderSpawnOptions {
   taskTimeoutSeconds?: number;
 }
 
-// ─── Large-Prompt Guard (Sprint 183 W1-3) ─────────────────────────────────────
-
-/**
- * Maximum char count for a worker prompt before it counts as "large" and
- * triggers a structured warning during {@link spawn}.
- *
- * **Why 50K?** Sprint 182 forensic (`docs/audits/sprint-183/worker-timeout-rc.md`):
- * five workers exited with `exitCode=0` but never wrote `.result` after their
- * prompts ballooned past ≈50K chars — long dep chains (11 predecessor digests)
- * caused Claude CLI to silently context-stall. The threshold is conservative
- * (Claude 3.5 Opus accepts ~200K tokens ≈ 800K chars); we flag well before the
- * hard limit so the orchestrator can log + investigate before the worker dies
- * silently. Pair with `DEPENDENCY_ENTRY_MAX_CHARS` in
- * `prompt-god-template.ts` which caps the upstream growth source.
- */
-export const LARGE_PROMPT_THRESHOLD_CHARS = 50_000;
-
-/**
- * Returns true when a prompt is large enough to merit a forensic warning.
- *
- * Uses strict-greater-than so a prompt sitting *exactly* on the threshold is
- * not flagged — gives a stable boundary for tests + downstream alert dedupe.
- */
-export function isLargePrompt(prompt: string): boolean {
-  return prompt.length > LARGE_PROMPT_THRESHOLD_CHARS;
-}
-
 // ─── SpawnBackendError ────────────────────────────────────────────────────────
 
 export class SpawnBackendError extends Error {
