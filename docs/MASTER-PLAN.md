@@ -362,6 +362,24 @@ W-A (i18n contribution) · W-K-detail 8/9 · ADR-032 (i18n pattern) · ADR-013/0
 
 ---
 
+## 4F. Brain Integrity — sprint-226 RETRO/Export/Decay Bug Cluster (🔴 P0)
+
+> **Bulundu 2026-06-04**, sprint-226 (autonomous runtime) sonrası analizde. Sprint ÇIKTISI iyi (disk-verified: 7/7 adapter+CLI+test) ama **Brain'in defter-tutması bozuldu** — RETRO/EVALUATE/DECAY/export fazında 3 bug. ADR-070 (Evaluation Integrity) ailesi. **P0: export + memory-wipe HER sprintte tekrarlıyor → tekrar veri kaybı, fix'e kadar.**
+
+### Bug 1 — Rubric total sabit 78.75 (kalite ayrımı yok)
+`sprint-phases.ts:1199` `rubric total ${totalScore}` basıyor. `totalScore` (`result-evaluator.ts:1192`) = Σ scoreCriterion×weight; `scoreCriterion` (`:1188`) **sinyalden** hesaplıyor, **worker'ın self-rubricScores'unu YOK SAYIYOR**. İyi-biçimli her DONE sonucu için (testsPassed:true + DONE + in-scope + notes≥100 + **coverage:null**): correctness 100(.4) + test_coverage **~15**(.25, coverage:null→cov0) + scope 100(.2) + doc 100(.15) = **her zaman 78.75**. sprint-218/224/226 hep aynı. Karar bozulmaz (78.75≥passingScore→DONE) ama rubric **non-diagnostic**. **Fix:** coverage yapısal-null'da ağırlıkları renormalize et / worker rubricScores'u dahil et / gerçek coverage sinyali. [[feedback_brain_rubric_bridge_broken]] kalıntısı.
+
+### Bug 2 — Sprint-içi export `.brain/exports/*.md`'yi boşaltıyor (P0 veri-kaybı)
+sprint-226 RETRO/export, DB'de 75 ADR varken exports'u **boşalttı** (`decisions.md` 8518→2 satır, **0 ADR**). Standalone `deckent memory export` ÇALIŞIYOR (631 ADR ref geri yazdı) → **sprint-finalizer'ın export yolu buggy** (yanlış zamanlama / kısmi DB / farklı kod yolu) CLI'a karşı. **Fix:** sprint-finalizer export çağrısını bul; **dolu export'u boşla EZME** (guard: DB'de N ADR var ama render boş → abort + öncekini koru).
+
+### Bug 3 — Memory learnings DB'den silindi (P0, [[feedback_db_silmek_yasak]])
+sprint-226 sonrası DB memory/sprint/pattern/retro **1'er taneye** düştü, `decay_after_sprints=20` olmasına rağmen (~20 sprint kalmalıydı). 159 önceki learning DB'den uçtu (git HEAD memory.md'de 160 vardı). ADR'ler hayatta (decay-exempt). **Fix:** DECAY + RETRO memory-write'ı denetle; decay decay_after_sprints'e uymalı, asla 1'e collapse etmemeli; guard (entries'in >%X'ini düşürecek decay reddedilir). History git HEAD memory.md'den kurtarılır.
+
+### Operasyonel önlem (fix'e kadar — bağlayıcı)
+Her sprint sonrası: `cp .brain/memory.db .brain/memory.db.bak` + `deckent memory export` + doğrula (ADR sayısı ~75) + gerekiyorsa `git checkout HEAD -- .brain/exports/memory.md` (history) + commit. Reset-bug ([[project_deckent_self_git_mutation_bug]]) + bu export-bug birlikte → **her sprint ÖNCESİ commit + DB backup ŞART.**
+
+---
+
 ## 5. Sub-Projects — Agentic-OS Pipeline (#1–#5)
 
 | # | Sub-project | Status | Remaining |
@@ -502,6 +520,7 @@ Per Alperen's direction: **combine sprints, write larger comprehensive tasks** (
 |---|--------|--------|------------|---------|-------|
 | **S1** | Sprint 226 | Otonom Runtime Wire (F3-009, 7 task) | AS-6 çekirdek | subs | ✅ run-ready (DIRECTIVES) |
 | **S2** | Sprint 227 | Platform + Dormant-wake (8 task) | AS-1 çekirdek | subs | ✅ run-ready (DIRECTIVES) |
+| **S-INT** | **🔴 P0 Brain RETRO/Export/Decay integrity fix** | §4F — rubric-78.75 (non-diagnostic) + sprint-içi export-wipe (.md boşalıyor) + memory-decay-wipe (159 learning DB'den uçtu). **Öneri: platform'dan ÖNCE** — her sprint veri kaybediyor. ADR-070 ailesi. | subs | tasarım §4F |
 | **S3** | AS-5·P1 | MCP-client broker + REPL + `deckent mcp` CLI (Claude-parity) | AS-5 §4C | local/free | tasarım ✅ |
 | **S4** | AS-4·P1 | Capability Realization Layer + Claude native passthrough | AS-4 §4D | subs | tasarım ✅ |
 | **S5** | AS-2·P1 | Ollama agentic-worker foundation (anahtarsız) | AS-2 §4A | local/free | hafta sonu Ollama sonrası |
