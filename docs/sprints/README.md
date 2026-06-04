@@ -3,7 +3,7 @@
 Bu dizin, **Completion Roadmap** (MASTER-PLAN §10A) sprint'lerinin koşulabilir DIRECTIVES task tanımlarını tutar.
 
 ## Konvansiyon (gotcha: `deckent plan` tüm DIRECTIVES.md'yi okur)
-- **Live `DIRECTIVES.md` (repo kökü) = o an koşulan TEK sprint.** Şu an: **Sprint 227 (S-INT — Brain-integrity fix, §4F)**. *(Sprint 226 autonomous KOŞTU+DONE → `.brain/archive/DIRECTIVES-sprint-226-autonomous-DONE.md`.)*
+- **Live `DIRECTIVES.md` (repo kökü) = o an koşulan TEK sprint.** Şu an: **Sprint 229 (AS-5·P1 — MCP-Client)**. *(226 autonomous, 227 S-INT, 228 autonomous-finalization KOŞTU+DONE → `.brain/archive/`.)*
 - **Backlog (bu dizin) = sıradaki sprint'ler**, hazır ama henüz koşulmuyor.
 - **Geçmiş (`.brain/archive/`) = koşulmuş/eski sprint'ler** (gitignored, on-disk).
 
@@ -21,9 +21,10 @@ deckent plan && deckent start
 | Roadmap | Dosya | Alt-sistem | Maliyet | Durum |
 |---------|-------|------------|---------|-------|
 | **S1** | `.brain/archive/…226-autonomous-DONE.md` | Sprint 226 — Otonom Runtime (AS-6) | subs | ✅ **KOŞTU/DONE 7/7** |
-| **S-INT** | `DIRECTIVES.md` (live) + `S-INT-brain-integrity.md` | Sprint 227 — Brain RETRO/export/decay fix (§4F, P0) | subs | ✅ **live, run-ready** |
+| **S-INT** | `.brain/archive/…227-S-INT-DONE.md` | Sprint 227 — Brain RETRO/export/decay fix (§4F, P0) | subs | ✅ **KOŞTU/DONE 4/4** (built+validated) |
+| **228** | `.brain/archive/…228-autonomous-finalization-DONE.md` | Autonomous finalize (i18n+manifest+doc+e2e) | subs | ✅ **KOŞTU/DONE 5/5** |
 | **S2** | `.brain/archive/DIRECTIVES-sprint-227-platform.md` | Sprint 227 — Platform/Dormant (AS-1) | subs | ✅ arşivde, swap-ready |
-| **S3** | `S3-AS5-P1-mcp-client.md` | AS-5·P1 MCP-client broker+REPL+CLI | local/free | ✅ hazır |
+| **229** | `DIRECTIVES.md` (live) + `S229-AS5-P1-mcp-client.md` | AS-5·P1 MCP-client broker+REPL+CLI | local/free | ✅ **live, run-ready** |
 | **S4** | `S4-AS4-P1-capability-layer.md` | AS-4·P1 Capability Realization Layer | subs | ✅ hazır |
 | **S7** | `S7-AS3-P1-i18n-zerohardcode.md` | AS-3·P1 i18n catalog + zero-hardcode guard | subs | ✅ hazır |
 | **S5** | _(TODO)_ | AS-2·P1 Ollama agentic-worker | local/free | hafta sonu Ollama sonrası |

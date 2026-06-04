@@ -1,67 +1,80 @@
-# DIRECTIVES — Sprint 228: Autonomous Feature Finalization (i18n + manifest + doc + e2e)
+# DIRECTIVES — Sprint 229 (AS-5·P1 — MCP-Client): MCP-Client Broker + REPL + Yönetim CLI (Claude-parity)
 
-## Goal: Sprint-226'da inen `deckent autonomous` CLI (F3-009 / AS-6) **canlı + çalışıyor** ama eksik kalanları kapat: (1) CLI **hardcoded string** içeriyor (getMessage=0, CLAUDE.md i18n-FIRST ihlali — 226-007 borcu), (2) **features-manifest.json'da yok** (sync-manifest.mjs FEATURE_DEFINITIONS'a eklenmeli), (3) **usage dokümantasyonu yok**, (4) gerçek-binary **e2e smoke** yok. Bu sprint hepsini god-level kapatır. **Build sonrası ilk sprint → integrity-fix'leri (rubric/export/decay) de canlı doğrular (temiz koşmalı, wipe YOK).** **RUN-VERIFY, hermetik, CI yeşil KORUNUR.**
+## Goal: deckent'i MCP **tüketicisine** evirten ilk dilim (MASTER-PLAN §4C Faz 1). Merkezi `McpClientBroker` harici MCP server'larına bağlanır (yerel stdio + uzak HTTP), tool'larını keşfeder, REPL agentic loop'ta **confirm-gate + audit** ile çağırır; `deckent mcp add/list/remove/get` CLI + `/mcp` REPL (Claude-parity). **SDK zaten dep** (`@modelcontextprotocol/sdk ^1.27.1`) → yeni dep YOK. Worker/otonom yüzeyleri Faz 2-3 (kapsam DIŞI). **god-level, RUN-VERIFY, CI yeşil KORUNUR.**
 
 ## Ortak kurallar
-- **🟢 RUN-VERIFY (ADR-079):** kanıt çağıran-dosyada; user-surface → `Smoke:` gerçek-binary. Mock-only = GO_WITH_TECH_DEBT.
-- **🔴 HERMETİK:** tmpdir + sandbox HOME, async spawn (spawnSync YASAK), `test:ci-sim` yeşil.
-- **🔴 i18n-FIRST (CLAUDE.md):** user-facing string ASLA hardcode — `getMessage(key, lang)`, en/tr. Mekanizma string-free.
-- ESM `.js`. ≤200 LoC/task, YENİ test dosyası, sadece kendi filesWrite'ına yaz.
+- **🟢 RUN-VERIFY (ADR-079):** kanıt **çağıran** dosyada (def DIŞLA); user-surface → `Smoke:` gerçek-binary şart. Mock-only = GO_WITH_TECH_DEBT.
+- **🔴 HERMETİK:** tmpdir + sandbox HOME, **async spawn (spawnSync YASAK)**, `npm run test:ci-sim` yeşil. CI yeşil KORUNUR.
+- ESM `.js` uzantısı. ≤200 LoC/task, YENİ test dosyası, **sadece kendi filesWrite'ına yaz** (paralel-güvenlik).
+- **🔴 Güvenlik (§4C omurga):** harici MCP çağrısı keyfi yan-etkili → her çağrı **confirm-gate (tool-permissions)** + **audit (event-stream)**. İz bırakmadan harici aksiyon YOK. (RBAC/scope Faz 2.)
 
 ---
 
-## Task 1: 228-001 — [P0] autonomous CLI i18n retrofit (hardcode → getMessage)
+## Task 1: 229-001 — McpClientBroker çekirdek (SDK Client + stdio/HTTP transport)
+- Model: opus
+- Effort: high
+- Skills: typescript-expert
+- Files: src/mcp-client/broker.ts, src/mcp-client/types.ts, tests/mcp-client/broker.test.ts
+- Scope: src/mcp-client/, tests/mcp-client/
+### Description
+Yeni merkezi yönetici. SDK `Client` (`@modelcontextprotocol/sdk/client/index.js`) + `StdioClientTransport` (`.../client/stdio.js`) ve `StreamableHTTPClientTransport` (`.../client/streamableHttp.js`). `McpClientBroker`: `connect(serverDef)`, `listTools(server)`, `callTool(server, tool, args)`, `disconnect(server)`, connection pool + lifecycle (reconnect/health). Audit-hook **inject edilebilir** (`onCall?: (record)=>void`) — Task 5 wire eder (def burada, çağrı caller'da). Yeni dep YOK.
+**Kanıt:** `grep -c "Client\|StdioClientTransport\|StreamableHTTP\|callTool" src/mcp-client/broker.ts` → ≥3; `npx vitest run tests/mcp-client/broker.test.ts` → 4+ pass
+**Test:** ≥4 (stdio connect+listTools, callTool sonuç döner, disconnect temizler, server-yok→graceful hata) — hermetik (fake/mock MCP server, in-memory transport)
+**Smoke:** (Tier-0 internal) unit yeterli.
+
+## Task 2: 229-002 — 3-scope config (.mcp.json project/user/local merge)
+- Model: sonnet
+- Effort: normal
+- Skills: typescript-expert
+- Files: src/mcp-client/config.ts, tests/mcp-client/mcp-config.test.ts
+- Scope: src/mcp-client/, tests/mcp-client/
+### Description
+Claude-parity scope modeli: **project** (`./.mcp.json`, git'te) + **user** (global `~/.deckent/mcp.json`) + **local** (kişisel/gizli) 3-katman merge (ADR-004 pattern). `loadMcpServers(root)` → `{ <name>: { transport:'stdio', command, args, env } | { transport:'http', url, headers } }`. Secret `.deck` ile çözülür (AS-2 pattern). Scope-precedence: local > project > user.
+**Kanıt:** `grep -c "mcp.json\|project\|user\|local\|merge" src/mcp-client/config.ts` → ≥3; `npx vitest run tests/mcp-client/mcp-config.test.ts` → 3+ pass
+**Test:** ≥3 (3-scope merge precedence, stdio+http def parse, dosya-yok→boş graceful) — hermetik (tmpdir .mcp.json fixture)
+**Smoke:** (Tier-0) unit yeterli.
+
+## Task 3: 229-003 — Dynamic discovery + namespaced tool registry
+- Model: sonnet
+- Effort: normal
+- Skills: typescript-expert
+- Files: src/mcp-client/registry.ts, tests/mcp-client/mcp-registry.test.ts
+- Scope: src/mcp-client/, tests/mcp-client/
+- Dependencies: 229-001
+### Description
+Connect'te broker `tools/list` (+ `resources/list`) → tool'ları **namespaced** kaydet (`<server>__<tool>`) — deckent'in 32 kendi tool'uyla çakışmasın. `McpToolRegistry`: `register(server, tools)`, `resolve(namespacedName) → {server, tool}`, `list()`. Reconnect'te refresh. Caller registry dosyasında (def broker DIŞLA).
+**Kanıt:** `grep -c "__\|namespace\|listTools\|resolve" src/mcp-client/registry.ts` → ≥3; `npx vitest run tests/mcp-client/mcp-registry.test.ts` → 3+ pass
+**Test:** ≥3 (namespaced kayıt, resolve doğru server+tool, çakışma-yok, refresh idempotent) — hermetik
+**Smoke:** (Tier-0) unit yeterli.
+
+## Task 4: 229-004 — [Tier-1] `deckent mcp` yönetim CLI (add/list/remove/get)
 - Model: opus
 - Effort: normal
+- Skills: api-builder, typescript-expert
+- Files: src/cli/commands/mcp.ts, src/cli/index.ts, tests/cli/mcp-command.test.ts
+- Scope: src/cli/commands/, src/cli/, tests/cli/
+- Dependencies: 229-002
+### Description
+Claude-parity CLI (`claude mcp …` zihinsel modeli): `deckent mcp add <name> <cmd|url> [--scope project|user|local] [--transport stdio|http]`, `mcp list`, `mcp remove <name>`, `mcp get <name>`. `registerMcp(program)` (ADR-012 pattern) + **`src/cli/index.ts`'e WIRE** (0-caller olmasın). add/remove `.mcp.json` (Task 2 config) yazar. i18n: `getMessage` (hardcode string YOK — CLAUDE.md i18n-FIRST). Caller mcp.ts + index.ts.
+**Kanıt:** `grep -c "registerMcp\|mcp.*add\|loadMcpServers" src/cli/commands/mcp.ts` → ≥2; `grep -c "registerMcp" src/cli/index.ts` → ≥1 (WIRE); `npx vitest run tests/cli/mcp-command.test.ts` → 4+ pass
+**Test:** ≥4 (add→.mcp.json yazar, list→server'ları döker, remove→siler, scope flag onurlanır) — hermetik (tmpdir, async spawn)
+**Smoke (Tier-1 ZORUNLU):** `env -u ANTHROPIC_API_KEY node dist/cli/entry.js mcp list 2>&1 | head` → kayıtlı server listesi (veya "kayıtlı server yok") — "Unknown command" DEĞİL, gerçek-binary çıktı.
+
+## Task 5: 229-005 — [Tier-1] REPL `/mcp` dispatch + confirm-gate + audit composition
+- Model: opus
+- Effort: high
 - Skills: typescript-expert
-- Files: src/cli/commands/autonomous.ts, src/cli/helpers/messages.ts, tests/cli/autonomous-i18n.test.ts
-- Scope: src/cli/commands/, src/cli/helpers/, tests/cli/
+- Files: src/cli/commands/chat-mcp-bridge.ts, tests/cli/repl-mcp-dispatch.test.ts
+- Scope: src/cli/commands/, tests/cli/
+- Dependencies: 229-001, 229-003
 ### Description
-**Borç (226-007):** `autonomous.ts` tüm user-facing string'leri hardcoded ("Autonomous runtime status", "Pending approvals: N", "No audit events yet", start/stop mesajları) — `getMessage` 0 kullanım. **Çözüm:** tüm user-facing çıktıyı `getMessage(key, lang)`'a taşı; `messages.ts`'e en/tr key'ler ekle (`autonomous_status_header`, `autonomous_pending`, `autonomous_no_audit`, `autonomous_started`, `autonomous_stopped`, vb. — `{placeholder}` interpolation ile sayılar). `--lang` opsiyonu zaten var → onurlanmalı. Mekanizma string-free, label caller'dan. Caller autonomous.ts.
-**Kanıt:** `grep -c "getMessage" src/cli/commands/autonomous.ts` → ≥5 (hardcode'dan dönüş); `grep -cE "console\.(log\|error)\(['\\\`][A-Z]" src/cli/commands/autonomous.ts` → 0 (düz string kalmadı); `npx vitest run tests/cli/autonomous-i18n.test.ts` → 4+ pass
-**Test:** ≥4 (status en, status tr, pending-count interpolation, no-audit mesajı i18n) — hermetik (tmpdir)
-**Smoke (Tier-1 ZORUNLU):** `LANG=tr env -u ANTHROPIC_API_KEY node dist/cli/entry.js autonomous status 2>&1 | head` → TR çıktı (catalog'tan); `--help` + status İngilizce default — hardcode-EN değil.
-
-## Task 2: 228-002 — features-manifest entry (sync-manifest.mjs → regenerate)
-- Model: sonnet
-- Effort: normal
-- Skills: typescript-expert
-- Files: scripts/sync-manifest.mjs, .deckent/features-manifest.json, tests/scripts/manifest-autonomous.test.ts
-- Scope: scripts/, .deckent/, tests/scripts/
-### Description
-**Eksik:** autonomous-runtime features-manifest'te yok. Manifest `scripts/sync-manifest.mjs` `FEATURE_DEFINITIONS`'tan üretiliyor (elle JSON düzenleme YOK). **Çözüm:** `FEATURE_DEFINITIONS`'a `autonomous-runtime` entry ekle (id, label "Autonomous Runtime — F3-009 authority-bounded loop", files: `src/orchestra/autonomous/*` + `src/cli/commands/autonomous.ts`, description, **active** bucket — CLI wired + canlı). Regenerate `.deckent/features-manifest.json`. Caller sync-manifest.mjs.
-**Kanıt:** `grep -c "autonomous" scripts/sync-manifest.mjs` → ≥1; `grep -c "autonomous-runtime\|Autonomous Runtime" .deckent/features-manifest.json` → ≥1 (regenerate sonrası); `npx vitest run tests/scripts/manifest-autonomous.test.ts` → 3+ pass
-**Test:** ≥3 (FEATURE_DEFINITIONS'ta autonomous var, regenerate manifest'e yazar, active bucket'ta) — hermetik
-**Smoke:** `node scripts/sync-manifest.mjs && grep -c autonomous .deckent/features-manifest.json` → ≥1.
-
-## Task 3: 228-003 — Autonomous usage doc (TR/EN, güvenlik modeli dahil)
-- Model: sonnet
-- Effort: normal
-- Skills: documentation-writer
-- Files: docs/guide/autonomous.md, tests/docs/autonomous-doc.test.ts
-- Scope: docs/, tests/docs/
-### Description
-**Eksik:** otonom kullanım dokümantasyonu yok. **Çözüm:** `docs/guide/autonomous.md` — `start|status|stop` komutları + opsiyonlar (--interval-ms/--max-iterations/--root/--lang); **döngü mimarisi** (Trigger→Authority→Approval→Action→Audit); **güvenlik invariant'ı** (default-deny + insan-onay-gate, OTO-APPROVE YOK, oto-sprint-start YOK); AS-6 / F3-009 bağlamı; örnek çıktılar. Kod-doğru (gerçek subcommand/opsiyon adları). Test ground-truth doğrular.
-**Kanıt:** `grep -cE "autonomous (start\|status\|stop)\|default-deny\|--max-iterations\|F3-009" docs/guide/autonomous.md` → ≥4; `npx vitest run tests/docs/autonomous-doc.test.ts` → 3+ pass
-**Test:** ≥3 (komutlar koda uyar, güvenlik-modeli anlatılmış, opsiyonlar doğru) — kod-referanslı
-**Smoke:** (Tier-0 docs) unit yeterli.
-
-## Task 4: 228-004 — Autonomous e2e smoke harness (gerçek-binary start→status→stop)
-- Model: sonnet
-- Effort: normal
-- Skills: ci-testing, typescript-expert
-- Files: scripts/autonomous-smoke.mjs, tests/scripts/autonomous-smoke.test.ts
-- Scope: scripts/, tests/scripts/
-### Description
-**Çözüm:** `scripts/autonomous-smoke.mjs` — gerçek `dist/cli/entry.js autonomous`: `start --max-iterations 2 --interval-ms 200` (bounded, tmpdir root) → loop 2-tick temiz koşar + `.result`/audit yazılır → `status` pending/audit gösterir → temiz exit (PASS/FAIL). Async spawn, timeout-guard, tmpdir-izole. Default-deny korunur (oto-aksiyon yok). Caller scripts.
-**Kanıt:** `grep -cE "autonomous\|start\|status\|max-iterations\|entry.js\|spawn" scripts/autonomous-smoke.mjs` → ≥4; `npx vitest run tests/scripts/autonomous-smoke.test.ts` → 3+ pass
-**Test:** ≥3 (bounded-start temiz exit, status-çıktı, tmpdir-izole) — async hermetik
-**Smoke (Tier-1):** `node scripts/autonomous-smoke.mjs` → bounded loop 2-tick PASS (run-proven).
+REPL composition: `/mcp` slash → broker'dan namespaced tool'ları listele; agentic loop bir `<server>__<tool>` çağırınca → **tool-permissions `classifyTool` confirm-gate** (read/confirm/always) + broker `callTool` + **audit sink** (event-stream `writeEvent` — Task 1 `onCall` hook'una bağla). chat-slash-registry'ye `/mcp` ekle + chat-tool-bridge dispatch'e MCP yolu. Caller chat-mcp-bridge.ts (def broker/event-stream/tool-permissions DIŞLA — burada İÇERİ alınıp çağrılır).
+**Kanıt:** `grep -c "callTool\|writeEvent\|classifyTool\|broker\|mcp" src/cli/commands/chat-mcp-bridge.ts` → ≥3 (ÇAĞRI); `npx vitest run tests/cli/repl-mcp-dispatch.test.ts` → 4+ pass
+**Test:** ≥4 (/mcp listele, namespaced çağrı→confirm sorar, confirm-onay→callTool+audit yazılır, reddet→çağrı yok) — hermetik (mock broker + tmpdir audit)
+**Smoke (Tier-1 ZORUNLU):** `printf '/mcp\n/exit\n' | env -u ANTHROPIC_API_KEY node dist/cli/entry.js 2>&1 | head` → MCP server/tool listesi (veya "MCP server yok") — "Unknown command" DEĞİL.
 
 ---
 
-**Beklenen:** 4/4 DONE. Tek wave (4 distinct filesWrite — autonomous.ts+messages / sync-manifest+json / docs / scripts). `deckent autonomous` artık: i18n-temiz + manifest'te + dokümante + e2e-proven. **Bonus:** build sonrası ilk sprint → integrity-fix'ler (rubric diagnostic / export-guard / decay-safety) canlı doğrulanır — export/memory wipe OLMAMALI, rubric 78.75'e sabitlenmemeli. Koşu sonrası kontrol: `grep -cE "adr-" .brain/exports/decisions.md` (≥75 korunmalı, wipe yok).
+**Beklenen:** 5/5 DONE. Wave-1 (229-001, 229-002 paralel) → Wave-2 (229-003→229-001'e bağlı; 229-004→229-002; 229-005→229-001+003). MCP-client çekirdeği canlı: yerel stdio reference server (örn. `@modelcontextprotocol/server-everything`) eklenir, `/mcp` listeler, REPL agentic confirm'li çağırır, audit kaydı düşer. Yerel/ücretsiz. CI yeşil KORUNUR. **Faz 2-3 (worker surface + RBAC + otonom + remote OAuth + dashboard) ayrı.**
 
-**Pre-flight:** main temiz+commit'li+push'lu ✅ + DB backup. build:all + /mcp restart + RE-PLAN (Alperen). **CLI'dan `env -u ANTHROPIC_API_KEY`**.
-
-İlgili: MASTER-PLAN §4A/AS-6 · F3-009 · ADR-037 (RBAC) · ADR-040 (nervous) · ADR-012 (CLI register) · CLAUDE.md i18n-FIRST. Memory: [[feedback_god_level_i18n_quality_bar]] · [[feedback_proof_of_function_dod]] · [[project_brain_integrity_sprint226_cluster]] (bu sprint fix'leri canlı-test eder).
+İlgili: MASTER-PLAN §4C (AS-5) · F9-001/002/003 · F11-015 · ADR-037 (RBAC, Faz 2) · ADR-040 (nervous) · ADR-062 (audit) · ADR-012 (CLI register) · ADR-010 (SDK zaten dep). Memory: `feedback_proof_of_function_dod` · `feedback_directive_kanit_letter_vs_goal` · `project_ci_green_root_causes` · `feedback_god_level_i18n_quality_bar`.
