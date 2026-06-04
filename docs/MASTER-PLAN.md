@@ -365,6 +365,8 @@ W-A (i18n contribution) · W-K-detail 8/9 · ADR-032 (i18n pattern) · ADR-013/0
 ## 4F. Brain Integrity — sprint-226 RETRO/Export/Decay Bug Cluster (🔴 P0)
 
 > **Bulundu 2026-06-04**, sprint-226 (autonomous runtime) sonrası analizde. Sprint ÇIKTISI iyi (disk-verified: 7/7 adapter+CLI+test) ama **Brain'in defter-tutması bozuldu** — RETRO/EVALUATE/DECAY/export fazında 3 bug. ADR-070 (Evaluation Integrity) ailesi. **P0: export + memory-wipe HER sprintte tekrarlıyor → tekrar veri kaybı, fix'e kadar.**
+>
+> **✅ ÇÖZÜLDÜ — Sprint 227 (S-INT), commit `c58bb50d`:** 227-001 rubric renormalize (coverage:null→ ~100, sabit 78.75 öldü), 227-002 `writeGuardedExports` (boş-overwrite reddi), 227-003 decay `skipDelete`(sprint_num>0) + catastrophic >%50/≥10-batch abort, 227-004 regression. 4/4 DONE, disk-verified, tsc temiz. **Build sonrası aktif → sprint-228+ export/decay TEMİZ.** (227 kendisi eski-dist'le koştuğu için memory.md/debt.md'yi tekrar wipe etti → HEAD'den restore edildi.) **Açık design-debt (227-003, worker→Brain surface):** `CATASTROPHIC_BATCH_MIN=10` floor pragmatik — prod DB'de <10 non-exempt entry varsa guard bypass olur. Follow-up: (a) floor'u 3'e indir + `memory-store.test.ts` batch'lerini güncelle (ayrı sprint), VEYA (b) config knob yap.
 
 ### Bug 1 — Rubric total sabit 78.75 (kalite ayrımı yok)
 `sprint-phases.ts:1199` `rubric total ${totalScore}` basıyor. `totalScore` (`result-evaluator.ts:1192`) = Σ scoreCriterion×weight; `scoreCriterion` (`:1188`) **sinyalden** hesaplıyor, **worker'ın self-rubricScores'unu YOK SAYIYOR**. İyi-biçimli her DONE sonucu için (testsPassed:true + DONE + in-scope + notes≥100 + **coverage:null**): correctness 100(.4) + test_coverage **~15**(.25, coverage:null→cov0) + scope 100(.2) + doc 100(.15) = **her zaman 78.75**. sprint-218/224/226 hep aynı. Karar bozulmaz (78.75≥passingScore→DONE) ama rubric **non-diagnostic**. **Fix:** coverage yapısal-null'da ağırlıkları renormalize et / worker rubricScores'u dahil et / gerçek coverage sinyali. [[feedback_brain_rubric_bridge_broken]] kalıntısı.
@@ -520,7 +522,7 @@ Per Alperen's direction: **combine sprints, write larger comprehensive tasks** (
 |---|--------|--------|------------|---------|-------|
 | **S1** | Sprint 226 | Otonom Runtime Wire (F3-009, 7 task) | AS-6 çekirdek | subs | ✅ run-ready (DIRECTIVES) |
 | **S2** | Sprint 227 | Platform + Dormant-wake (8 task) | AS-1 çekirdek | subs | ✅ run-ready (DIRECTIVES) |
-| **S-INT** | **🔴 P0 Brain RETRO/Export/Decay integrity fix** | §4F — rubric-78.75 (non-diagnostic) + sprint-içi export-wipe (.md boşalıyor) + memory-decay-wipe (159 learning DB'den uçtu). **Öneri: platform'dan ÖNCE** — her sprint veri kaybediyor. ADR-070 ailesi. | subs | tasarım §4F |
+| **S-INT** | **🔴 P0 Brain RETRO/Export/Decay integrity fix** | §4F — rubric-78.75 (non-diagnostic) + sprint-içi export-wipe (.md boşalıyor) + memory-decay-wipe (159 learning DB'den uçtu). **Öneri: platform'dan ÖNCE** — her sprint veri kaybediyor. ADR-070 ailesi. | subs | ✅ **DONE Sprint 227** (c58bb50d; build-pending → 228+ aktif) |
 | **S3** | AS-5·P1 | MCP-client broker + REPL + `deckent mcp` CLI (Claude-parity) | AS-5 §4C | local/free | tasarım ✅ |
 | **S4** | AS-4·P1 | Capability Realization Layer + Claude native passthrough | AS-4 §4D | subs | tasarım ✅ |
 | **S5** | AS-2·P1 | Ollama agentic-worker foundation (anahtarsız) | AS-2 §4A | local/free | hafta sonu Ollama sonrası |
