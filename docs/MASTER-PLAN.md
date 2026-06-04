@@ -380,6 +380,14 @@ sprint-226 sonrası DB memory/sprint/pattern/retro **1'er taneye** düştü, `de
 ### Operasyonel önlem (fix'e kadar — bağlayıcı)
 Her sprint sonrası: `cp .brain/memory.db .brain/memory.db.bak` + `deckent memory export` + doğrula (ADR sayısı ~75) + gerekiyorsa `git checkout HEAD -- .brain/exports/memory.md` (history) + commit. Reset-bug ([[project_deckent_self_git_mutation_bug]]) + bu export-bug birlikte → **her sprint ÖNCESİ commit + DB backup ŞART.**
 
+### 🔬 Kök Neden Analizi — "memory neden kayboldu" (2026-06-04, kesin)
+1. **Tetik:** sprint-226 öncesi `memory` entry'leri **`sprint_num=0`** ile kayıtlıydı (INTEGER alan boş — eski import/rebuild yalnız `sprint_id` string'ini set etmiş). 
+2. **Mass-wipe:** sprint-226'nın **eski** decay sorgusu `sprint_num < threshold` (threshold=226-20=**206**, `>0` guard YOK) → `0 < 206` TÜM undated entry'ler için doğru → **132-224 arası ~159 satır silindi**; hayatta kalan tek "1" = sprint-226 (sprint_num=226, pencere içi, decay sonrası yazıldı). **ADR'ler `decay_exempt=1` → dokunulmadı** (yani "DB reset" değil, undated-non-exempt hedefli decay-wipe).
+3. **Fix (227-003):** `AND sprint_num > 0` skipDelete + >%50 catastrophic-abort → tekrar etmez. Write-path (`sprint-retro-writer.ts:768+`) zaten `sprint_num` set ediyor → yeni entry'ler güvenli.
+4. **Recovery (2026-06-04):** `parseMemoryMd` ile git `memory.md`'den **87 learning (132-228) additive re-import** → DB memory 3→90; **ADR/chat/diğer DOKUNULMADI** (sadece `type=memory` INSERT, DELETE yok). Yedekler 7→**2** (`bak-sprint228-complete` güncel + `archive-deep-20260522` derin debt/retro/pattern).
+5. **By-design not:** fix'le bile decay 20-sprint'ten eski entry'leri (memory budget) trim eder → restore edilen 132-207 sonraki decay'de düşebilir (DOĞRU); **git `memory.md` kalıcı arşiv**. Kalıcı DB-tutma istenirse: `decay_after_sprints` artır VEYA eski-önemli entry'leri `decay_exempt`.
+6. **Açık follow-up:** undated (sprint_num=0) eski satırlara **defensive backfill** (`backfillSprintMemoriesFromSprintsDir` mevcut) — guard zaten koruyor ama temizlik için.
+
 ---
 
 ## 5. Sub-Projects — Agentic-OS Pipeline (#1–#5)
