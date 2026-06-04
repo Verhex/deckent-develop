@@ -1,7 +1,7 @@
 // ─── Builtin Skill Quality Invariants ───────────────────────────────────────
 // Guards the maturity, factual cleanliness, and builtins↔.deckent sync of the
 // bundled expert skills. These skills are injected raw into worker prompts
-// (resolveSkillPrompts → buildWorkerPromptStructured), so a missing section,
+// (resolveSkillPrompts → buildWorkerPrompt), so a missing section,
 // a stale model ID, or drift between the shipped source and the dogfood copy
 // degrades every worker that loads them.
 //

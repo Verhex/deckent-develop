@@ -63,6 +63,20 @@ export interface SprintContext {
 const CHARS_PER_TOKEN = 4;
 
 /**
+ * Concise, provider-agnostic Karpathy 4-discipline anchor injected into every
+ * worker prompt. Replaces the former full `karpathy-discipline.md` document
+ * append (~2.1K tokens/worker): the full depth still reaches Claude workers via
+ * the `.claude/rules` project context and every worker via the per-skill
+ * "Karpathy Notes" sections, so this short anchor preserves the cognitive
+ * effect at a fraction of the token cost — uniformly across Claude/Codex/Gemini.
+ */
+const KARPATHY_ESSENCE = `## Karpathy Discipline
+1. **Think before coding** — read the scope + ADRs, plan first, name your assumptions.
+2. **Simplicity first** — reuse existing patterns; YAGNI; no premature abstraction.
+3. **Surgical changes** — stay inside scope.filesWrite; minimum-diff; preserve existing behavior.
+4. **Goal-driven** — map every change to the goCriteria above; assess yourself honestly.`;
+
+/**
  * Default minimum ADR relevance score (Sprint 182 PQ-5 / F7).
  *
  * Threshold below which ADRs are dropped from the worker prompt's mandatory
@@ -176,7 +190,10 @@ export function buildTaskPrompt(task: Task, ctx: SprintContext): PromptArtifact 
 
 function buildAgentBlock(agentId: string, agentPrompt?: string): string {
   if (!agentPrompt) return '';
-  return `=== Agent: ${agentId} ===\n${agentPrompt}\n\n=== Task ===\n`;
+  // The task itself is rendered later under the "## Your Task" header; do not
+  // emit a dangling "=== Task ===" header here (it would sit above the Skills/
+  // ADR blocks with no body and mislead the worker about where the task is).
+  return `=== Agent: ${agentId} ===\n${agentPrompt}`;
 }
 
 // ─── Skill Block Builder ───────────────────────────────────────────────
@@ -575,7 +592,7 @@ ${task.description}
 
 - Model: ${task.model}
 - Effort: ${effort}
-
+${task.goNogo?.goCriteria ? `\n## Definition of Done (goCriteria — your work is judged against this)\n${task.goNogo.goCriteria}${task.goNogo.noGoCriteria ? `\nNO-GO if: ${task.goNogo.noGoCriteria}` : ''}\n` : ''}
 ## Idempotency Key
 ${idempotencyKey}
 Use this key for external API calls (Idempotency-Key header) to make retries safe.`);
@@ -614,35 +631,20 @@ If tests fail after 3 attempts → selfAssessment = "NO_GO" with error details`)
 Create .tasks/task-${task.id}.hb BEFORE starting work with workerId "w-${task.id}", status "EXECUTING".
 Update periodically: increment sequence, refresh timestamp via new Date().toISOString() (UTC ISO 8601).`);
 
-  // Result file + token usage
+  // Result + self-assessment — single authority section. Folds the former
+  // separate "## Result File" and "## Honest Self-Assessment" sections so the
+  // result/verdict instructions are stated once instead of 4×.
   // Sprint 202 Task 202-003: registry default before the absolute 'claude' floor
   // so prompts emitted in pure-Ollama configs don't hard-code 'claude' into
   // worker token-usage instructions.
   const provider = task.provider ?? getDefaultProviderName();
-  sections.push(`## Result File
-Write to: .tasks/task-${task.id}.result with taskId, filesChanged, testsPassed, selfAssessment ("DONE"|"GO_WITH_TECH_DEBT"|"NO_GO"), notes.
-MUST include tokenUsage with ALL four fields: { "inputTokens": <number>, "outputTokens": <number>, "cacheReadTokens": <number>, "provider": "${provider}", "model": "${task.model}" }.
-  - inputTokens: your best estimate of prompt/input tokens consumed (REQUIRED — use 0 only if truly unknown)
-  - outputTokens: your best estimate of completion/output tokens produced (REQUIRED — use 0 only if truly unknown)
-  - cacheReadTokens: cache read tokens if applicable (optional, default 0)
-  - provider: MUST be "${provider}" (hardcoded for this task)
-  - model: MUST be "${task.model}" (hardcoded for this task)
-Sprint 140 will reject results with missing tokenUsage as NO_GO. Partial tokenUsage (missing provider/model) generates warnings in Sprint 139.
-The result file is REQUIRED — without it your work cannot be evaluated.
+  sections.push(`## Result & Self-Assessment
+Write .tasks/task-${task.id}.result with: taskId, filesChanged, testsPassed, selfAssessment ("DONE"|"GO_WITH_TECH_DEBT"|"NO_GO"), notes, and tokenUsage with ALL four fields { "inputTokens": <number>, "outputTokens": <number>, "cacheReadTokens": <number>, "provider": "${provider}", "model": "${task.model}" } (provider/model hardcoded as shown; a missing tokenUsage is rejected as NO_GO).
+Assess yourself honestly against the goCriteria above: compare the baseline state to the end state and judge how much you ACTUALLY completed. "Code written" ≠ "DONE". <80% → GO_WITH_TECH_DEBT (name the gap); <50% → NO_GO (explain).
+CRITICAL: never exit without writing the .result file — even on failure, write selfAssessment "NO_GO" with error details. A missing result file stalls the entire sprint.`);
 
-CRITICAL: You MUST write a .result file before exiting. Even if tests fail, write selfAssessment: "NO_GO" with error details. Never exit without writing .tasks/task-${task.id}.result — a missing result file causes the entire sprint to stall.`);
-
-  // Honest self-assessment
-  sections.push(`## Honest Self-Assessment Required
-Before writing .result with selfAssessment: DONE, you MUST verify:
-1. Baseline state: what was the test/code state before your work?
-2. End state: what is it now?
-3. Delta: how much of the task did you ACTUALLY complete?
-
-If <80%, write GO_WITH_TECH_DEBT with specific gap.
-If <50%, write NO_GO with explanation.
-"DONE" means functional outcome matches task spec fully.
-"Code written" ≠ "DONE".`);
+  // Karpathy 4-discipline cognitive anchor (concise, provider-agnostic).
+  sections.push(KARPATHY_ESSENCE);
 
   return sections.join('\n\n');
 }

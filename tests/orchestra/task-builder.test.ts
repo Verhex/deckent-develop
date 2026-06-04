@@ -483,7 +483,7 @@ describe('buildWorkerPrompt', () => {
   it('includes "Result File" section with correct path', () => {
     const task = makeTask({ id: '025-007' });
     const prompt = buildWorkerPrompt(task);
-    expect(prompt).toContain('## Result File');
+    expect(prompt).toContain('## Result & Self-Assessment');
     expect(prompt).toContain('.tasks/task-025-007.result');
   });
 
@@ -537,10 +537,10 @@ describe('buildWorkerPrompt', () => {
     expect(prompt).toContain('w-040-001');
   });
 
-  it('result file is marked as REQUIRED', () => {
+  it('result file is marked as mandatory (never exit without it)', () => {
     const task = makeTask();
     const prompt = buildWorkerPrompt(task);
-    expect(prompt).toContain('REQUIRED');
+    expect(prompt).toContain('never exit without writing the .result file');
   });
 
   it('prompt is significantly shorter than original (~80 lines target)', () => {
@@ -569,7 +569,7 @@ describe('buildWorkerPrompt', () => {
   it('includes MUST-level token tracking instruction in result file section', () => {
     const task = makeTask();
     const prompt = buildWorkerPrompt(task);
-    expect(prompt).toContain('MUST include tokenUsage');
+    expect(prompt).toContain('tokenUsage with ALL four fields');
     expect(prompt).toContain('inputTokens');
     expect(prompt).toContain('outputTokens');
     expect(prompt).toContain('provider');
@@ -582,10 +582,10 @@ describe('buildWorkerPrompt', () => {
     expect(prompt).toContain('"model": "gpt-4.1"');
   });
 
-  it('mentions Sprint 140 hard NO_GO consequence for missing tokenUsage', () => {
+  it('states the NO_GO consequence for missing tokenUsage', () => {
     const task = makeTask();
     const prompt = buildWorkerPrompt(task);
-    expect(prompt).toContain('Sprint 140');
+    expect(prompt).toContain('missing tokenUsage');
     expect(prompt).toContain('NO_GO');
   });
 });
@@ -681,7 +681,9 @@ describe('buildWorkerPrompt — agentPrompt parameter', () => {
     const prompt = buildWorkerPrompt(task, 'You are a security specialist.');
     expect(prompt).toContain('=== Agent: security-auditor ===');
     expect(prompt).toContain('You are a security specialist.');
-    expect(prompt).toContain('=== Task ===');
+    // No dangling "=== Task ===" header — the real header is "## Your Task".
+    expect(prompt).not.toContain('=== Task ===');
+    expect(prompt).toContain('## Your Task');
   });
 
   it('does not include agent block when agentPrompt is undefined', () => {
@@ -702,7 +704,7 @@ describe('buildWorkerPrompt — agentPrompt parameter', () => {
     const task = makeTask({ assignedAgent: 'test-agent' });
     const prompt = buildWorkerPrompt(task, longPrompt);
     // agentPrompt is included without truncation (Sprint 147+ behavior)
-    const agentSection = prompt.split('=== Task ===')[0]!;
+    const agentSection = prompt.split('## Your Task')[0]!;
     const xCount = (agentSection.match(/X/g) || []).length;
     expect(xCount).toBe(3000);
   });
@@ -2135,10 +2137,11 @@ describe('buildWorkerPrompt — ADR injection', () => {
 // ─── buildWorkerPrompt — Honest Self-Assessment injection ────────────────────
 
 describe('buildWorkerPrompt — Honest Self-Assessment injection', () => {
-  it('includes Honest Self-Assessment section in prompt', () => {
+  it('includes the self-assessment authority section in prompt', () => {
     const task = makeTask();
     const prompt = buildWorkerPrompt(task);
-    expect(prompt).toContain('Honest Self-Assessment Required');
+    expect(prompt).toContain('## Result & Self-Assessment');
+    expect(prompt).toContain('Assess yourself honestly');
   });
 
   it('includes the 80% GO_WITH_TECH_DEBT threshold instruction', () => {
@@ -2155,12 +2158,12 @@ describe('buildWorkerPrompt — Honest Self-Assessment injection', () => {
     expect(prompt).toContain('NO_GO');
   });
 
-  it('includes the delta verification instructions (baseline/end/delta)', () => {
+  it('instructs an honest baseline→end delta judgement', () => {
     const task = makeTask();
     const prompt = buildWorkerPrompt(task);
-    expect(prompt).toContain('Baseline state');
-    expect(prompt).toContain('End state');
-    expect(prompt).toContain('Delta');
+    expect(prompt).toContain('baseline state');
+    expect(prompt).toContain('end state');
+    expect(prompt).toContain('ACTUALLY completed');
   });
 
   it('clarifies that "Code written" ≠ "DONE"', () => {

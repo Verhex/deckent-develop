@@ -306,13 +306,13 @@ describe('buildTaskPrompt', () => {
     expect(result.prompt).toContain('cacheReadTokens');
   });
 
-  // Test 15: Honest assessment block present
-  it('should include honest self-assessment block', () => {
+  // Test 15: self-assessment authority block present (merged Result + honesty)
+  it('should include the result & self-assessment block', () => {
     const task = makeTask();
     const ctx = makeCtx();
     const result = buildTaskPrompt(task, ctx);
 
-    expect(result.prompt).toContain('Honest Self-Assessment');
+    expect(result.prompt).toContain('## Result & Self-Assessment');
     expect(result.prompt).toContain('GO_WITH_TECH_DEBT');
     expect(result.prompt).toContain('"Code written" ≠ "DONE"');
   });

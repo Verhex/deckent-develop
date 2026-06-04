@@ -3,7 +3,6 @@
 import { z } from 'zod';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { createHash } from 'node:crypto';
 import type {
   Task, TaskScope, GoNoGoCriteria, ModelType, TaskEffort, TaskPriority,
   PlannerTask, ProviderName, TaskResult,
@@ -13,7 +12,6 @@ import type { TaskDNA } from '../core/routing-types.js';
 import { calculateModelScore } from './model-selector.js';
 import { debugLog } from '../core/utils.js';
 import { filterSkillPromptsByDNA } from './prompt-token-optimizer.js';
-import { TokenCounter } from '../core/token-counter.js';
 import { MemoryStore } from '../core/memory-store.js';
 import type { MemoryEntryV2 } from '../core/memory-types.js';
 import { searchMemory } from '../core/memory-query.js';
@@ -1155,172 +1153,29 @@ export function queryRelevantADRs(taskDescription: string, taskScope: string[], 
   }
 }
 
-// ─── Karpathy 4-Discipline Injection (Sprint 192 192-006) ──────────────
-//
-// Append the Karpathy discipline block to every worker prompt as a final
-// cognitive anchor (Think → Simplicity → Surgical → Goal-Driven). Content
-// is loaded once per process from .claude/rules/karpathy-discipline.md and
-// cached at module level — sprint controller spawns many workers but the
-// rule file changes at most once per release.
-
-const KARPATHY_RULE_REL_PATH = join('.claude', 'rules', 'karpathy-discipline.md');
-const KARPATHY_SECTION_HEADER = '## Karpathy Discipline (mandatory)';
-
-let karpathyCache: { root: string; content: string | null } | null = null;
-
 /**
- * Load `.claude/rules/karpathy-discipline.md` from disk with a module-level
- * cache keyed by project root. Returns null when the file is absent so
- * callers can silently skip injection — the rule is best-effort, not fatal.
- * Exported so tests can clear and re-exercise the cache.
- */
-export function loadKarpathyDiscipline(projectRoot?: string): string | null {
-  const root = projectRoot ?? process.cwd();
-  if (karpathyCache && karpathyCache.root === root) {
-    return karpathyCache.content;
-  }
-  let content: string | null = null;
-  try {
-    const filePath = join(root, KARPATHY_RULE_REL_PATH);
-    if (existsSync(filePath)) {
-      content = readFileSync(filePath, 'utf-8');
-    }
-  } catch (err) {
-    debugLog('loadKarpathyDiscipline', err instanceof Error ? err : new Error(String(err)));
-    content = null;
-  }
-  karpathyCache = { root, content };
-  return content;
-}
-
-/**
- * Reset the Karpathy discipline cache. Test-only — callers in production
- * code should rely on the per-process cache.
- */
-export function _resetKarpathyCache(): void {
-  karpathyCache = null;
-}
-
-/**
- * Build the Karpathy section appended to every worker prompt. Returns an
- * empty string when the source file is missing (best-effort injection).
- */
-function buildKarpathySection(projectRoot?: string): string {
-  const content = loadKarpathyDiscipline(projectRoot);
-  if (!content) return '';
-  return `\n\n${KARPATHY_SECTION_HEADER}\n\n${content.trim()}\n`;
-}
-
-// ─── Worker Prompt — Structured Build & Cache Key (Sprint 196 WP-5) ──────
-//
-// Sprint 195 195-002-fix proved a 9× token-cost save via Anthropic prompt
-// caching, but the win was accidental — the cache hit happened because the
-// boilerplate at the top of the worker prompt was identical across workers.
-// Task 196-003 (WP-5) makes that property designed instead of incidental:
-//
-//   - {@link buildWorkerPromptStructured} splits the worker prompt into a
-//     `frozen` slice (Karpathy 4-discipline + agent prompt + skill prompts —
-//     deterministic for a given (agent, skills) tuple), a `static` slice
-//     (scope/effort context — varies per task), and a `dynamic` slice (task
-//     description / goNogo / dependencies — fully task-specific).
-//   - {@link computePromptCacheKey} hashes the frozen slice to produce a
-//     stable identity tag the spawn backend can forward to the worker
-//     container via `DECKENT_PROMPT_CACHE_KEY`.
-//   - The legacy {@link buildWorkerPrompt} keeps its string return type and
-//     starts with an HTML-comment marker `<!--DECKENT_CACHE_KEY:<hex>-->` so
-//     downstream code (spawn-backend-docker, runtime telemetry) can extract
-//     the key from a plain prompt string without an interface change.
-//
-// The marker is intentionally an HTML comment: ignored by Claude's text
-// processing but trivially parsed by a regex. It adds ≈40 chars to every
-// prompt — well below the noise floor of a 22 K-token boilerplate section.
-
-/** Marker injected at the head of a worker prompt to advertise its cache key. */
-export const PROMPT_CACHE_KEY_MARKER_RE = /<!--DECKENT_CACHE_KEY:([a-f0-9]{16,64})-->/;
-
-const PROMPT_CACHE_KEY_LEN = 32;
-
-/**
- * Structured worker prompt — separates the deterministic "frozen" slice
- * from per-task dynamic content so Anthropic prompt caching can be wired
- * deliberately (WP-5).
- */
-export interface WorkerPromptStruct {
-  /**
-   * Stable across workers sharing the same (agent, skills) tuple.
-   * Composed from Karpathy discipline + agent prompt + skill prompts in a
-   * fixed order so its hash is deterministic. Suitable to mark with
-   * `cache_control: { type: 'ephemeral' }` in API mode.
-   */
-  frozen: string;
-  /**
-   * Sprint-cluster–stable but task-shaped — scope rules + effort. Optional
-   * cache target; today we do not mark it `ephemeral` because the win is
-   * marginal vs. `frozen` and the slice is small.
-   */
-  static: string;
-  /**
-   * Pure task-specific content — description, goNogo, dependencies.
-   * Never cached (would defeat the cache by polluting the prefix).
-   */
-  dynamic: string;
-  /**
-   * The full worker-bound prompt with the cache-key marker prepended.
-   * What `buildWorkerPrompt()` returns for backward compatibility.
-   */
-  combined: string;
-  /** 32-hex-char SHA-256 prefix of {@link frozen}. */
-  cacheKey: string;
-}
-
-/**
- * Compute the deterministic cache key for a frozen prompt slice.
- * Returns the first 32 hex chars of SHA-256(frozen) — short enough to embed
- * in an env var or HTML-comment marker, wide enough (128 bits) to make
- * collisions across a realistic agent×skill matrix astronomically unlikely.
- */
-export function computePromptCacheKey(frozen: string): string {
-  return createHash('sha256').update(frozen, 'utf8').digest('hex').slice(0, PROMPT_CACHE_KEY_LEN);
-}
-
-/**
- * Extract the cache-key marker from a worker prompt string. Returns the
- * 32-hex key when the prompt was built via {@link buildWorkerPrompt} (or
- * {@link buildWorkerPromptStructured}); returns `undefined` for legacy or
- * test prompts that lack the marker.
+ * Build the full prompt string sent to a worker agent.
  *
- * Used by `spawn-backend-docker.ts` to forward `DECKENT_PROMPT_CACHE_KEY`
- * into the worker container env without an interface change.
- */
-export function extractPromptCacheKey(prompt: string): string | undefined {
-  if (!prompt) return undefined;
-  const m = PROMPT_CACHE_KEY_MARKER_RE.exec(prompt.slice(0, 512));
-  return m?.[1];
-}
-
-/**
- * Build a structured worker prompt with separate frozen / static / dynamic
- * slices plus a cache key over the frozen slice.
- *
- * The slicing strategy is content-based, not block-based, because the inner
- * `buildTaskPrompt()` returns a single concatenated string. We can however
- * deterministically reconstruct the frozen content from inputs (agent prompt
- * + skill prompts + Karpathy section) — that is exactly the part the cache
- * cares about.
+ * Provider-agnostic single source: the returned string is written verbatim to
+ * the `.prompt` file and consumed identically by the tmux / subprocess / docker
+ * backends across Claude, Codex and Gemini. Token estimation comes from the
+ * rendered artifact's own accurate count (covers agent + skills + ADRs +
+ * Karpathy + scope + deps + template), which downstream routing context-fit,
+ * throttle and cost tracking read via `task.estimatedTokens`.
  *
  * @param task The task the worker will execute.
  * @param agentPrompt Optional agent PROMPT.md content.
  * @param skillPrompts Optional skill prompt blocks.
- * @returns Structured prompt: frozen / static / dynamic / combined / cacheKey.
+ * @returns The assembled worker prompt (also sets `task.estimatedTokens`).
  */
-export function buildWorkerPromptStructured(
+export function buildWorkerPrompt(
   task: Task,
   agentPrompt?: string,
   skillPrompts?: Array<{ name: string; content: string }>,
-): WorkerPromptStruct {
+): string {
   const effort = resolveWorkerEffort(task);
 
-  // V2 routing: filter skill prompts to only those relevant to task intent
+  // V2 routing: filter skill prompts to only those relevant to task intent.
   const isV2 = task.routingMeta?.routingVersion === 'v2';
   const rawDNA = task.routingMeta?.taskDNA;
   let effectiveSkillPrompts = skillPrompts;
@@ -1328,7 +1183,7 @@ export function buildWorkerPromptStructured(
     effectiveSkillPrompts = filterSkillPromptsByDNA(skillPrompts, rawDNA as TaskDNA);
   }
 
-  // Load ADRs from Memory V2 if available (for prompt-god-template ADR scoring)
+  // Load accepted ADRs from Memory V2 if available (best-effort) for the ADR block.
   let allAdrs: MemoryEntryV2[] | undefined;
   try {
     const root = process.cwd();
@@ -1345,7 +1200,6 @@ export function buildWorkerPromptStructured(
     // ADR loading is best-effort
   }
 
-  // Delegate to prompt-god-template for the actual rendered prompt
   const ctx: SprintContext = {
     agentPrompt,
     agentId: task.assignedAgent ?? 'generic',
@@ -1355,70 +1209,11 @@ export function buildWorkerPromptStructured(
     dependencies: task.dependencies,
   };
   const artifact = buildTaskPrompt(task, ctx);
-  const karpathySection = buildKarpathySection();
 
-  // Compose the frozen slice deterministically. Order is locked so the hash
-  // stays stable across renders: karpathy → agent → skills (alphabetical).
-  const skillSlice = (effectiveSkillPrompts ?? [])
-    .map(sp => `## skill:${sp.name}\n${sp.content}`)
-    .join('\n\n');
-  const frozen = [
-    karpathySection.trim(),
-    agentPrompt ? `## agent\n${agentPrompt.trim()}` : '',
-    skillSlice,
-  ].filter(Boolean).join('\n\n');
+  // Single accurate token estimate from the actual assembled prompt.
+  task.estimatedTokens = artifact.metadata.estimatedTokens;
 
-  const cacheKey = computePromptCacheKey(frozen);
-  const marker = `<!--DECKENT_CACHE_KEY:${cacheKey}-->\n`;
-
-  const staticSlice = [
-    `## scope`,
-    `directories: ${task.scope.directories.join(', ')}`,
-    `filesWrite: ${task.scope.filesWrite.join(', ')}`,
-    `effort: ${effort}`,
-  ].join('\n');
-
-  const dynamicSlice = [
-    `## task ${task.id}`,
-    task.title,
-    task.description,
-    task.goNogo?.goCriteria ? `goCriteria: ${task.goNogo.goCriteria}` : '',
-  ].filter(Boolean).join('\n\n');
-
-  const combined = marker + (karpathySection ? artifact.prompt + karpathySection : artifact.prompt);
-
-  // Estimate prompt token size and write to task (legacy behavior preserved)
-  try {
-    const tokenCounter = new TokenCounter();
-    const estimate = tokenCounter.estimatePromptSize(
-      agentPrompt ?? '',
-      (effectiveSkillPrompts ?? []).map(sp => sp.content),
-      task.description,
-      task.model,
-    );
-    task.estimatedTokens = estimate.totalTokens;
-  } catch (err) {
-    debugLog('buildWorkerPromptStructured:token-estimate', err instanceof Error ? err : new Error(String(err)));
-  }
-
-  return { frozen, static: staticSlice, dynamic: dynamicSlice, combined, cacheKey };
-}
-
-/**
- * Build the full prompt string that will be sent to a worker agent.
- * Backward-compatible wrapper around {@link buildWorkerPromptStructured} —
- * returns the `combined` string with the cache-key marker prepended.
- * @param task - The task the worker will execute
- * @param agentPrompt - Optional specialized agent prompt to prepend
- * @param skillPrompts - Optional skill context blocks to include
- * @returns Complete worker prompt string (with cache-key marker)
- */
-export function buildWorkerPrompt(
-  task: Task,
-  agentPrompt?: string,
-  skillPrompts?: Array<{ name: string; content: string }>,
-): string {
-  return buildWorkerPromptStructured(task, agentPrompt, skillPrompts).combined;
+  return artifact.prompt;
 }
 
 // ─── Persona-Task Domain Matcher (WP-1) ────────────────────────────────────

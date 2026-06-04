@@ -502,9 +502,9 @@ describe('DEBT-005: buildWorkerPrompt — test-writing instructions', () => {
     expect(prompt).toContain('tsc --noEmit');
   });
 
-  it('marks result file as REQUIRED', () => {
+  it('marks the result file as mandatory (never exit without it)', () => {
     const prompt = buildWorkerPrompt(makeTask());
-    expect(prompt).toContain('REQUIRED');
+    expect(prompt).toContain('never exit without writing the .result file');
   });
 
   it('references result file fields in condensed format', () => {

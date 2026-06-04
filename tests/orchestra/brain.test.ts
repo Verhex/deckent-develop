@@ -530,10 +530,10 @@ describe('buildWorkerPrompt', () => {
     expect(prompt).toContain('WORKER-GUIDE.md');
   });
 
-  it('marks result file as REQUIRED', () => {
+  it('marks the result file as mandatory (never exit without it)', () => {
     const task = makeTask({ id: '003-007' });
     const prompt = buildWorkerPrompt(task);
-    expect(prompt).toContain('REQUIRED');
+    expect(prompt).toContain('never exit without writing the .result file');
     expect(prompt).toContain('.tasks/task-003-007.result');
   });
 });
