@@ -184,9 +184,9 @@ Three immovable pillars (Alperen-approved 2026-05-31):
 
 | ID | Item | Status |
 |----|------|--------|
-| F9-001 | MCP client — connect to external MCP servers, list/call their tools from within a sprint/chat | ⬜ proposed — no `McpClient` in `src/`; only the server side exists |
-| F9-002 | Dynamic tool discovery — register discovered external tools into the routing/tool registry at runtime | ⬜ proposed |
-| F9-003 | Trust/approval gate for external MCP tools (risky external calls → checkpoint, reuse nervous approval) | ⬜ proposed — reuses existing approval flow |
+| F9-001 | MCP client — connect to external MCP servers, list/call their tools from within a sprint/chat | 🔜 **AS-5 (§4C)** — central `McpClientBroker` (`src/mcp-client/`, new); SDK `Client` already available (`@modelcontextprotocol/sdk ^1.27.1`, no new dep); stdio + StreamableHTTP/SSE + OAuth; Claude-parity `deckent mcp add/list/remove` + 3-scope `.mcp.json`. |
+| F9-002 | Dynamic tool discovery — register discovered external tools into the routing/tool registry at runtime | 🔜 **AS-5 (§4C)** — `tools/list`+`resources/list`+`prompts/list` on connect → namespaced (`<server>__<tool>`) runtime registration; reconnect refresh. |
+| F9-003 | Trust/approval gate for external MCP tools (risky external calls → checkpoint, reuse nervous approval) | 🔜 **AS-5 (§4C)** — broker single choke-point: RBAC (ADR-037) + risk-tagged approval (tool-permissions / nervous, NO auto-approve) + audit (event-stream) + worker scope. Consolidates F10-002. |
 
 ### F10 — Policy Engine (maturation) — **⚠️ partial (proposed unification)**
 > *Source: Copilot analysis. Unify the three existing decision surfaces into one declarative, self-hosted policy engine (OPA-style) — not a new dependency, a consolidation.*
@@ -263,10 +263,40 @@ F1-009 (8-provider fleet, ~95% iç-wiring — **gerçek any-key worker fleet = b
 | **AS-2** | Gerçek multi-provider / any-key | per-worker mixed fleet, config-registry, agentic HTTP-worker, Bedrock | ✅ **tasarım §4A** | F1-009..015, F6 | Faz 1-4 impl (Ollama-first, API cost-deferred) |
 | **AS-3** | Zero-hardcode + tam i18n | ~170 dosyada hardcoded string → `getMessage`; canlı-veri (stale const yok); "every-nation" | 🔜 planlı | W-A (i18n), W-K-detail (8/9), `feedback_zero_hardcode_live_data`, `feedback_god_level_i18n_quality_bar` | `getMessage` 31 → tüm user-facing; MCP tool-desc i18n wrapper; `.codex`/`.gemini` rules sync; multi-provider docs accuracy |
 | **AS-4** | Provider-native yetenekler | her sağlayıcının kendi gücü: Claude plugins / ultracode (workflow) / provider-native MCP kullanımı | 🔜 proposed | F11-015 (REPL MCP), F9 | mimari brainstorm gerek (her provider'ın native capability yüzeyi) |
-| **AS-5** | MCP-CLIENT (dünyayla entegrasyon) | deckent'i server-only'den **MCP tüketicisine** evriltme; harici sistemlerle veri alışverişi, enterprise-grade | 🔜 proposed (yüksek değer) | F9-001/002/003, F11-015, F8 (capability broker), #ERP | greenfield — bugün yalnız MCP **server** var (`src/mcp/`), client yok |
+| **AS-5** | MCP-CLIENT (dünyayla entegrasyon) | deckent'i server-only'den **MCP tüketicisine** evriltme; Claude-parity (her ortamda kur/kullan); harici sistemlerle veri alışverişi, enterprise-grade | ✅ **tasarım §4C** | F9-001/002/003, F11-015, F8, #ERP | Faz 1-3 impl (broker+REPL+CLI → worker → otonom/enterprise) |
 | **AS-6** | Otonom + process/batch mode | uzun-yaşayan, event-driven, yetki-sınırlı; "sadece developer değil herkes için" agentic-OS | 🔜 Sprint 225 + F3 | F3-001..009, Sprint 225, ADR-040 (nervous) / ADR-037 (RBAC) | 5 adapter + sürekli loop + `deckent autonomous` CLI (225); batch-mode; full-autonomy süreçleri |
 
 *Not: §5 (Sub-Projects #1-#5) eski agentic-OS pipeline çerçevesidir; **AS-1…AS-6 kalan işin güncel decompose'udur** — örtüştükleri yerde AS-* önceliklidir. Güvenlik invariant'ı (AS-6): default-deny + insan-onay-gate, oto-sprint-start YOK; AS-6 bir ürün-hedefi, benim/Brain'in sprint-başlatma iznini değiştirmez.*
+
+---
+
+## 4C. AS-5 — MCP-Client (deckent dünyayla entegre — MCP tüketicisi)
+
+> **Comprehensive design — 2026-06-04 (Alperen).** deckent'i server-only'den **MCP TÜKETİCİSİne** evriltme: harici MCP server'larına (yerel subprocess veya uzak/enterprise) bağlanır, tool/resource/prompt'larını keşfeder, deckent'in eylediği **HER yüzeyde** (REPL + sprint worker + AS-6 otonom + dashboard) kullanır. **Hedef: Claude Code'un MCP'yi her ortamda kurup kullandığı mimari tutarlılık + güç — deckent'te birebir parity, enterprise-grade / god-level.** "Dünyadaki tüm sistemlerle entegrasyon, veri alışverişi" (F9). SDK zaten dep (`@modelcontextprotocol/sdk ^1.27.1`) → **yeni dep YOK** (aynı SDK'nın `Client` tarafı).
+
+### 🎯 Claude-parity (mimari tutarlılık + güç)
+- **Yönetim CLI:** `deckent mcp add|list|remove|get` (claude `claude mcp …` ile aynı zihinsel model; ADR-012 register pattern) + REPL `/mcp` komutu + dashboard MCP sayfası.
+- **3-scope config:** **project** (`.mcp.json`, takımla paylaşılır, git'te) + **user** (global, tüm projeler) + **local** (kişisel/gizli) — Claude Code scope modeli, 3-katman merge (ADR-004 ile uyumlu).
+- **Tam transport gücü:** `stdio` (yerel subprocess) + `StreamableHTTP`/`SSE` (uzak/enterprise) + uzak server'lar için **OAuth** akışı.
+- **Tam yüzey:** kurulan bir MCP server **her yerde** çalışır (REPL, sprint worker, otonom, dashboard) — Claude'daki gibi "her ortamda kullanır."
+
+### 🔴 Güvenlik omurgası — tek choke-point (RBAC / Approval / Audit)
+Harici MCP tool'ları keyfi yan-etkili (mail.send, db.write, shell). AS-2'nin auth-izolasyon kontratının AS-5 karşılığı: **her harici MCP çağrısı broker'dan (tek choke-point) geçer** → (1) **RBAC** (ADR-037: hangi agent/worker/tenant hangi server'ı), (2) **risk-tagged approval** (REPL'de tool-permissions confirm/always hiyerarşisi; otonom'da nervous approval-gate, **OTO-APPROVE YOK**), (3) **audit** (event-stream `writeEvent` — her çağrı iz bırakır), (4) **scope** (worker yalnız izinli server'lara). İz bırakmadan harici aksiyon YOK. (F9-003 + F10-002 risk-tag.)
+
+### Mimari bileşenler
+1. **McpClientBroker (`src/mcp-client/`, yeni)** — tek merkezi yönetici; SDK `Client` + transports; connection pool + lifecycle (connect/reconnect/health); **tüm yüzeyler buradan geçer** (merkezi RBAC/audit choke-point).
+2. **3-scope config + yönetim** — `.mcp.json` (project) + user + local merge; `deckent mcp add/list/remove/get` CLI + `/mcp` REPL + dashboard. Secret `.deck` (AS-2 pattern) / OAuth token store.
+3. **Dynamic discovery (F9-002)** — connect'te `tools/list` + `resources/list` + `prompts/list`; runtime'da **namespaced** (`<server>__<tool>`) tool-registry kaydı; reconnect refresh.
+4. **Surface bridges** — REPL (agentic loop, confirm-gated) · Worker (prompt'a izinli tool inject + IPC→broker) · Otonom (AS-6 action-executor, authority+approval) · Dashboard (MCP sayfası).
+5. **Trust/RBAC/Audit** — mevcut tool-permissions + ADR-037 + event-stream + nervous **reuse** (yeni güvenlik sistemi değil, consolidation).
+
+### Fazlama
+- **Faz 1 — Broker + REPL + yönetim CLI (F9-001 + F11-015):** McpClientBroker + 3-scope config + `deckent mcp add/list/remove` + `/mcp` + dynamic discovery + REPL dispatch + confirm-gate + audit. **Thin e2e:** yerel stdio reference server (`everything`/`filesystem`) ekle → `/mcp` listele → REPL agentic birini çağır (confirm'li) → audit kaydı. Yerel, ücretsiz.
+- **Faz 2 — Worker surface + RBAC:** worker tool-injection + IPC→broker bridge + RBAC scope + scope/non-leak testi (sprint task'ı harici MCP çağırır).
+- **Faz 3 — Otonom + enterprise:** AS-6 action-executor wire + remote HTTP+OAuth transport + per-tenant isolation + risk-tagged approval (F10-002) + dashboard MCP yönetim sayfası.
+
+### Çapraz ref
+F9-001/002/003 · F11-015 (REPL MCP) · F8 (capability broker — üst soyutlama; MCP-client onun bir backend'i olabilir) · #ERP · **AS-4** (provider-native MCP ile akraba) · **AS-6** (otonom tüketici) · ADR-037 (RBAC) / ADR-040 (nervous) / ADR-062 (audit chain) / ADR-004 (3-katman config) / ADR-012 (CLI register) / ADR-010 (SDK zaten dep). Memory: `project_deckent_runtime_ecosystem` · `project_embedded_web_terminal`.
 
 ---
 
@@ -390,6 +420,8 @@ Per Alperen's direction: **combine sprints, write larger comprehensive tasks** (
 | **226** | **🔜 Platform + Model-wire + Dormant-activation** | DIRECTIVES Sprint 226 (8 task, kod-doğrulanmış, tek-wave paralel). 226-001 Windows backend (F3-010); 226-002 ⭐ models.dev dinamik map (F1-011); 226-003 ecosystem→routing; 226-004 self-mod enforcement flag-gated; 226-005 ADR-038 ölü/orphan disposition (`multi-agent.ts`+`decision-replay.ts`); 226-006 worker-koordinasyon wire (handoff+heartbeat→sprint-controller); 226-007 shared-memory wire (worker context); 226-008 [P0] docker live-monitor (SSE mount + `watch --follow` + WorkerCard). W-K (Sprint 226) ile eş. Brand-foundation (A1) hariç (paralel Ink REPL, Alperen elle). |
 | **AS-2·P1** | **🔜 Multi-provider foundation + Ollama agentic-worker e2e (ANAHTARSIZ)** | §4A AS-2 Faz 1 — config-driven provider registry + `ProviderName`→string + **agentic HTTP-worker** + per-worker **auth-izolasyon kontrat/test**; Ollama (local, zero-cost) ilk gerçek agentic worker → sprint içinde `.result`. Subscription-safe, API key gerekmez. **Hafta sonu Ollama kurulumu sonrası.** F1-012/013/014. |
 | **AS-2·P2–P4** | **🔜 Mixed fleet + REPL switcher / failover / Bedrock (API flag-gated OFF)** | §4A AS-2 Faz 2-4 — any-key OpenAI-compat config + per-worker mixed fleet + REPL/terminal provider-switch parity + non-leak fleet test (P2); overflow/fallback/429-switch + models.dev dynamic (P3, F1-010/011); Bedrock SigV4 +Vertex (P4, F1-015). **Maliyet:** yalnız ucuz-key basit sprint / ayrı sandbox proje / deckent-hub geliştirmesinde egzersiz; beta'da default-OFF. AS-6/F3 otonomun enabler'ı. |
+| **AS-5·P1** | **🔜 MCP-client broker + REPL + yönetim CLI (Claude-parity)** | §4C AS-5 Faz 1 — `McpClientBroker` (`src/mcp-client/`, SDK Client, yeni dep yok) + 3-scope `.mcp.json` + `deckent mcp add/list/remove` + `/mcp` + dynamic discovery + REPL confirm-gate dispatch + audit. Thin e2e: yerel stdio reference server ekle→listele→agentic çağır→audit. Yerel/ücretsiz. F9-001/002, F11-015. |
+| **AS-5·P2–P3** | **🔜 Worker surface + otonom/enterprise MCP-client** | §4C AS-5 Faz 2-3 — worker tool-injection + IPC→broker + RBAC scope/non-leak test (P2); AS-6 action-executor wire + remote HTTP+OAuth + per-tenant isolation + risk-tagged approval + dashboard MCP sayfası (P3). F9-003, F10-002, ADR-037/040. |
 | **227+** | **F2 Native SDK (Path C) + F9 MCP-client + Publish Readiness** | Real standalone SDK; zero-prerequisite `npx deckent`; MCP client (consume external); secret-scrub/gitleaks; .github eksikleri; 96%-claim doğrulama; threat-model — Q3 2026 |
 | **post-beta** | **Provider/local LLM + million-user hardening** | F1-004/005, sub-#5 Ollama/CUDA fully-local preset, OTel/Prometheus (W-J), ADR-037 hard-flip V2, sub-#2 self-security |
 | **post-beta (gated)** | **Voice + Mobile (milestone-gated)** | Voice (STT Whisper, wake-word Porcupine, TTS, real-time streaming) gated behind **10K GitHub stars**; Mobile (React Native iOS/Android MCP client, APNs+FCM push, Contacts/GPS/camera skills) gated behind **50K stars**. Both not built — zero source references |
