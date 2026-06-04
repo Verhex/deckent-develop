@@ -1,11 +1,11 @@
-<!-- DIRECTIVES İZOLE: yalnız Sprint 225 (Completion Roadmap S1 — Otonom Runtime Wire / F3-009). -->
+<!-- DIRECTIVES İZOLE: yalnız Sprint 226 (Completion Roadmap S1 — Otonom Runtime Wire / F3-009). -->
 <!-- Diğer planlar arşivde + MASTER-PLAN'de (kayıp YOK):
        Sprint 224 (mostly-done dogfood) → .brain/archive/DIRECTIVES-sprint-224-dogfood.md
-       Sprint 226 (platform/dormant backlog) → .brain/archive/DIRECTIVES-sprint-226-platform.md
+       Sprint 227 (platform/dormant backlog) → .brain/archive/DIRECTIVES-sprint-227-platform.md
        Tüm plan + AS-1..AS-6 derin tasarım + 10-sprint roadmap → docs/MASTER-PLAN.md (§4A-§4E, §4B, §10A)
        Başka sprint koşmak için: ilgili arşiv bölümünü buraya geri taşı (swap), sonra plan+start. -->
 
-# DIRECTIVES — Sprint 225 (sıradaki/aday): Otonom Sürekli Runtime Wire (F3-009)
+# DIRECTIVES — Sprint 226 (sıradaki/aday): Otonom Sürekli Runtime Wire (F3-009)
 
 ## Goal: **AI-System-Worker north-star'ın ilk gerçek adımı** ([[project_deckent_everyone_everywhere]] · [[feedback_scale_up_autonomous]] · MASTER-PLAN F3-009). `src/orchestra/autonomous-runtime.ts` **DI-iskelet** (Sprint 219-014): `runAutonomousCycle(config, deps)` döngüsü var (trigger→authority→approval→execute→audit) ama 5 adapter'ı (TriggerSource/AuthorityChecker/ApprovalGate/ActionExecutor/AuditSink) hep mock — **gerçek subsistemlere bağlı DEĞİL** (Sprint 220 başka yöne gitti, wire hiç inmedi). Bu sprint **5 gerçek adapter + sürekli loop + CLI** yazar; iskeleti dormant'tan çıkarır. **Otonom = uzun-yaşayan/event-driven, YETKİ-SINIRLI** mod (20dk sprint DEĞİL). **god-level, RUN-VERIFY, CI yeşil KORUNUR.**
 
@@ -23,7 +23,7 @@ Hedef modüller (hepsi diskte ✅, worker bunları SARAR — yeniden yazmaz): `s
 
 ---
 
-## Task 1: 225-001 — Authority adapter (checkAuthority → AuthorityChecker)
+## Task 1: 226-001 — Authority adapter (checkAuthority → AuthorityChecker)
 - Model: sonnet
 - Effort: normal
 - Skills: typescript-expert, security-specialist
@@ -35,7 +35,7 @@ Hedef modüller (hepsi diskte ✅, worker bunları SARAR — yeniden yazmaz): `s
 **Test:** ≥4 (allowed-map, needs_approval-map, denied-map, bilinmeyen→default-deny) — hermetik
 **Smoke:** (Tier-0) unit yeterli.
 
-## Task 2: 225-002 — Audit adapter (writeEvent → AuditSink)
+## Task 2: 226-002 — Audit adapter (writeEvent → AuditSink)
 - Model: sonnet
 - Effort: low
 - Skills: typescript-expert
@@ -47,7 +47,7 @@ Hedef modüller (hepsi diskte ✅, worker bunları SARAR — yeniden yazmaz): `s
 **Test:** ≥3 (record→event yazılır, alanlar korunur, tmpdir-izole) — hermetik (tmpdir stream)
 **Smoke:** (Tier-0) unit yeterli.
 
-## Task 3: 225-003 — Approval gate adapter (nervous Executor → ApprovalGate, OTO-APPROVE YOK)
+## Task 3: 226-003 — Approval gate adapter (nervous Executor → ApprovalGate, OTO-APPROVE YOK)
 - Model: opus
 - Effort: normal
 - Skills: typescript-expert, security-specialist
@@ -59,7 +59,7 @@ Hedef modüller (hepsi diskte ✅, worker bunları SARAR — yeniden yazmaz): `s
 **Test:** ≥4 (enqueue→pending, accept→approved, reject→rejected, **oto-approve-yok invariant**) — hermetik (tmpdir ipc)
 **Smoke:** (Tier-0) unit yeterli.
 
-## Task 4: 225-004 — Action executor adapter (ActionHandler registry → ActionExecutor)
+## Task 4: 226-004 — Action executor adapter (ActionHandler registry → ActionExecutor)
 - Model: sonnet
 - Effort: normal
 - Skills: typescript-expert
@@ -71,7 +71,7 @@ Hedef modüller (hepsi diskte ✅, worker bunları SARAR — yeniden yazmaz): `s
 **Test:** ≥4 (handler-bulur→ok, handler-yok→fail, handler-throw→{ok:false,error}, payload-geçer) — hermetik
 **Smoke:** (Tier-0) unit yeterli.
 
-## Task 5: 225-005 — Trigger source adapter (scheduled-flow + self-dispatch → TriggerSource)
+## Task 5: 226-005 — Trigger source adapter (scheduled-flow + self-dispatch → TriggerSource)
 - Model: opus
 - Effort: normal
 - Skills: typescript-expert
@@ -83,37 +83,37 @@ Hedef modüller (hepsi diskte ✅, worker bunları SARAR — yeniden yazmaz): `s
 **Test:** ≥4 (due-flow→trigger, idle→null, requiresApproval-korunur, çok-flow sıralı) — hermetik (tmpdir flow fixture)
 **Smoke:** (Tier-0) unit yeterli.
 
-## Task 6: 225-006 — [P0] Sürekli loop + composition root (DORMANT'I ÖLDÜRÜR)
+## Task 6: 226-006 — [P0] Sürekli loop + composition root (DORMANT'I ÖLDÜRÜR)
 - Model: opus
 - Effort: high
 - Skills: typescript-expert
 - Files: src/orchestra/autonomous/runtime-loop.ts, tests/orchestra/autonomous-runtime-loop.test.ts
 - Scope: src/orchestra/autonomous/, tests/orchestra/
-- Dependencies: 225-001, 225-002, 225-003, 225-004, 225-005
+- Dependencies: 226-001, 226-002, 226-003, 226-004, 226-005
 ### Description
-**🔴 Bu task wire'ın can damarı — 5 adapter'ı GERÇEKTEN çağırır (0-caller dormancy'yi bitirir).** `buildAutonomousRuntime(config)` composition root → 5 gerçek adapter'ı (225-001..005) assemble eder + `runAutonomousLoop(config, deps, {intervalMs, maxIterations?, signal})` sürekli tick: her tick `runAutonomousCycle` çağırır (idle→bekle, aksiyon→authority/approval/execute/audit). `maxIterations`/`signal` ile test-deterministik + temiz stop. flow-runtime tick-pattern'ini izle. Caller runtime-loop.ts (def `autonomous-runtime.ts` + 5 adapter DIŞLA — burada İÇERİ alınır+çağrılır).
+**🔴 Bu task wire'ın can damarı — 5 adapter'ı GERÇEKTEN çağırır (0-caller dormancy'yi bitirir).** `buildAutonomousRuntime(config)` composition root → 5 gerçek adapter'ı (226-001..005) assemble eder + `runAutonomousLoop(config, deps, {intervalMs, maxIterations?, signal})` sürekli tick: her tick `runAutonomousCycle` çağırır (idle→bekle, aksiyon→authority/approval/execute/audit). `maxIterations`/`signal` ile test-deterministik + temiz stop. flow-runtime tick-pattern'ini izle. Caller runtime-loop.ts (def `autonomous-runtime.ts` + 5 adapter DIŞLA — burada İÇERİ alınır+çağrılır).
 **Kanıt:** `grep -c "runAutonomousCycle\|authority-adapter\|audit-adapter\|approval-adapter\|action-adapter\|trigger-adapter\|makeAuthorityChecker\|makeAuditSink" src/orchestra/autonomous/runtime-loop.ts` → ≥5 (5 adapter + cycle ÇAĞRISI); `npx vitest run tests/orchestra/autonomous-runtime-loop.test.ts` → 5+ pass
 **Test:** ≥5 (loop N-tick koşar, idle-tick bekler, denied-cycle audit yazar, needs_approval→pending durur, maxIterations/signal temiz-stop) — hermetik (5 adapter gerçek, tmpdir; mock-only=GO_WITH_TECH_DEBT)
 **Smoke:** (Tier-0 orchestra) gerçek 5-adapter ile loop 3-tick koşar; unit yeterli.
 
-## Task 7: 225-007 — [P0] `deckent autonomous` CLI (start/stop/status, Tier-1 user-surface)
+## Task 7: 226-007 — [P0] `deckent autonomous` CLI (start/stop/status, Tier-1 user-surface)
 - Model: opus
 - Effort: normal
 - Skills: typescript-expert, api-builder
 - Files: src/cli/commands/autonomous.ts, tests/cli/autonomous-command.test.ts
 - Scope: src/cli/commands/, tests/cli/
-- Dependencies: 225-006
+- Dependencies: 226-006
 ### Description
-`deckent autonomous start|status|stop` komutu — `registerAutonomous(program)` (ADR-012 pattern), `buildAutonomousRuntime`+`runAutonomousLoop`'u (225-006) sarar. `start` → loop'u **authority+approval sınırlı** başlatır (default-deny korunur, oto-sprint-start YOK), `status` → aktif/pending/son-audit özeti, `stop` → temiz dur. CLI helpers/i18n kullan (hardcode string YOK — CLAUDE.md i18n-FIRST). index.ts'e WIRE et (0-caller olmasın). Caller autonomous.ts + index.ts (def runtime-loop.ts DIŞLA).
+`deckent autonomous start|status|stop` komutu — `registerAutonomous(program)` (ADR-012 pattern), `buildAutonomousRuntime`+`runAutonomousLoop`'u (226-006) sarar. `start` → loop'u **authority+approval sınırlı** başlatır (default-deny korunur, oto-sprint-start YOK), `status` → aktif/pending/son-audit özeti, `stop` → temiz dur. CLI helpers/i18n kullan (hardcode string YOK — CLAUDE.md i18n-FIRST). index.ts'e WIRE et (0-caller olmasın). Caller autonomous.ts + index.ts (def runtime-loop.ts DIŞLA).
 **Kanıt:** `grep -c "buildAutonomousRuntime\|runAutonomousLoop\|registerAutonomous" src/cli/commands/autonomous.ts` → ≥2 (ÇAĞRI); `grep -c "registerAutonomous" src/cli/index.ts` → ≥1 (WIRE); `npx vitest run tests/cli/autonomous-command.test.ts` → 4+ pass
 **Test:** ≥4 (start→loop kurar, status→özet, stop→temiz, default-deny korunur) — hermetik (tmpdir, async spawn)
 **Smoke (Tier-1 ZORUNLU):** `env -u ANTHROPIC_API_KEY node dist/cli/entry.js autonomous status 2>&1 | head` → otonom durum özeti (pending/son-audit) — "Unknown command" DEĞİL, gerçek-binary çıktı.
 
 ---
 
-**Beklenen:** 7/7 DONE, 0 false-FIX. Wave-1 (225-001..005) paralel ayrık-dosya → çakışma yok; Wave-2 (225-006 → 225-007) elle sıra (dependency_pipeline_enabled=false). **F3-009 ~%40→~%80:** iskelet 5 gerçek adapter + sürekli loop + CLI ile **dormant'tan çıkar**, otonom-mod-temeli canlı. **Güvenlik invariant'ı:** default-deny + insan-onay-gate korunur, oto-sprint-start YOK. CI yeşil KORUNUR.
+**Beklenen:** 7/7 DONE, 0 false-FIX. Wave-1 (226-001..005) paralel ayrık-dosya → çakışma yok; Wave-2 (226-006 → 226-007) elle sıra (dependency_pipeline_enabled=false). **F3-009 ~%40→~%80:** iskelet 5 gerçek adapter + sürekli loop + CLI ile **dormant'tan çıkar**, otonom-mod-temeli canlı. **Güvenlik invariant'ı:** default-deny + insan-onay-gate korunur, oto-sprint-start YOK. CI yeşil KORUNUR.
 
-**Pre-flight:** main temiz+commit'li+push'lu. build:all + restart + RE-PLAN ŞART. **CLI'dan `env -u ANTHROPIC_API_KEY`**. Wave-1 sonrası 225-006, onun sonrası 225-007 (elle sıra). Her wave sonrası `git log -1` + `git stash list` (reset kontrol — [[project_deckent_self_git_mutation_bug]]).
+**Pre-flight:** main temiz+commit'li+push'lu. build:all + restart + RE-PLAN ŞART. **CLI'dan `env -u ANTHROPIC_API_KEY`**. Wave-1 sonrası 226-006, onun sonrası 226-007 (elle sıra). Her wave sonrası `git log -1` + `git stash list` (reset kontrol — [[project_deckent_self_git_mutation_bug]]).
 
 İlgili memory: [[project_deckent_everyone_everywhere]] · [[feedback_scale_up_autonomous]] · [[project_deckent_runtime_ecosystem]] · [[feedback_proof_of_function_dod]] · [[feedback_directive_kanit_letter_vs_goal]] · [[project_ci_green_root_causes]] · [[project_deckent_self_git_mutation_bug]]
 İlgili ADR: ADR-037 (RBAC authority) · ADR-040 (nervous approval) · ADR-042 (hybrid/process mode) · ADR-008 (brain centrality) · F3-009 (MASTER-PLAN)
