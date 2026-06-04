@@ -59,3 +59,17 @@ Common rules for all codemod tools:
 - Use snapshot tests to detect unintended changes in output format during migration.
 - Integration tests are more valuable than unit tests during migration — they catch interaction bugs.
 - Run performance benchmarks before and after migration to detect regressions.
+
+## Anti-Patterns to Avoid
+- Big-bang rewrite when incremental is possible — prefer strangler-fig / branch-by-abstraction; big-bang only for small, well-tested subsystems.
+- A migration with no documented rollback plan — every change needs a tested path back before deploy.
+- Non-idempotent codemods — running twice must produce the same result; test against input→expected fixtures.
+- Upgrading the primary dependency before its peers — bump bottom-up and run the suite after each step, not just at the end.
+- Removing the old code path the moment the new one ships — keep it (behind a flag or tag) for at least one release cycle.
+- Hardcoding migration toggles as booleans — gate behind feature flags and test both states in CI.
+- Skipping the changelog for intermediate major versions — breaking changes hide between your version and the target.
+
+## Karpathy Notes
+- **Think before coding:** Catalog every breaking change (API / behavior / dependency / config) and write the migration guide before touching code.
+- **Surgical:** Migrate behind an abstraction so old and new coexist. Each step stays reversible and independently shippable.
+- **Goal-driven:** Integration tests catch the interaction bugs unit tests miss during migration — weight them heavily, and benchmark before/after.

@@ -48,3 +48,17 @@
 - Use `git cherry-pick <sha>` to apply a single commit from another branch. Prefer merge/rebase for multiple commits.
 - Use `git reflog` to recover lost commits after a bad rebase or reset. Reflog entries persist for 90 days by default.
 - Use `git tag -a v1.0.0 -m "Release 1.0.0"` for annotated release tags. Push tags explicitly: `git push --tags`.
+
+## Anti-Patterns to Avoid
+- Rebasing commits already pushed to a shared branch — rewriting public history forces conflicts on everyone.
+- `git push --force` to a shared branch — use `--force-with-lease` so you don't clobber someone else's push.
+- One giant commit mixing feature, refactor, and formatting — split by intent so each commit is reviewable and revertable.
+- Committing generated artifacts or secrets — they live in history forever; `.gitignore` first, scan before commit.
+- `git add -A` blindly — stage deliberately; sweeping in unrelated changes muddies the diff.
+- Slow pre-commit hooks (>10s) — developers bypass them with `--no-verify`; keep hooks fast and focused.
+- Resolving a conflict by picking one side without reading both — understand each branch's intent, then run the tests.
+
+## Karpathy Notes
+- **Surgical:** A commit is a unit of intent. If you need "and" to describe it, split it — small commits bisect and revert cleanly.
+- **Think before coding:** Pick the branch strategy that fits the release cadence (trunk-based for continuous deployment), not the most elaborate one.
+- **Goal-driven:** History is documentation. Write commit messages a future debugger (or `git bisect`) will thank you for.

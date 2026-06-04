@@ -151,3 +151,17 @@ Before marking any task DONE, verify ALL of these:
 - [ ] No skipped tests left in (`.skip`, `xfail`, `t.Skip()`)
 
 **NEVER mark a task DONE if static analysis fails.** Type/lint errors block the entire build.
+
+## Anti-Patterns to Avoid
+- Hardcoding `npm test` / `vitest` without detecting the stack — read the toolchain first (see the Language Adaptation table).
+- Marking a task DONE while type check or lint still errors — static-analysis failures block the whole build.
+- Running the full suite before staged tests — you wait minutes to learn a core test failed in seconds.
+- Leaving `.skip` / `xfail` / `t.Skip()` in to make CI green — a skipped test is an untested path, not a passing one.
+- `spawnSync` for test subprocesses — it blocks the event loop and causes CI timeouts; use async `spawn`.
+- Reading gitignored local state (`.deckent/config.json`, `~/.deckent`) in tests — it fails on a fresh CI checkout; use tmpdir fixtures.
+- Treating coverage % as the goal — high coverage with weak assertions catches nothing.
+
+## Karpathy Notes
+- **Goal-driven:** The goal is a green build on a fresh checkout, not on your machine. Run `test:ci-sim` (hidden gitignored state) before claiming done.
+- **Think before coding:** Capture the test-count baseline at sprint start so you can prove no regression at the end.
+- **Surgical:** A failing test is a signal. Read it before changing it — the test may be right and the new code wrong.

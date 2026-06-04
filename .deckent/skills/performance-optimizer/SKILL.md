@@ -58,3 +58,17 @@
 - Implement request deduplication: if the same request is in-flight, return the same promise.
 - Set appropriate cache headers: Cache-Control, ETag, Last-Modified.
 - Compress API responses. Use streaming for large payloads.
+
+## Anti-Patterns to Avoid
+- Optimizing before profiling — premature optimization wastes effort on code that isn't the bottleneck. Measure first.
+- Benchmarking with averages only — report p50/p95/p99; tail latency is what users feel.
+- `SELECT *` and per-row queries in hot paths — fetch needed columns, batch, and index WHERE/JOIN columns.
+- Memoizing everything (`React.memo`/`useMemo`) by default — memo has cost; apply it where the profiler shows re-renders.
+- Caching without an eviction or TTL policy — an unbounded cache is a memory leak with extra steps.
+- Loading large files fully into memory — stream them; an O(n) algorithm with O(n) RAM still OOMs at scale.
+- Optimizing startup code that runs once — spend the budget on the critical path that runs N times.
+
+## Karpathy Notes
+- **Think before coding:** Profile in production-like conditions and find the one bottleneck before changing anything. Guessing wastes the budget.
+- **Goal-driven:** Tie every optimization to a measured number (latency, memory, bundle size). If you can't measure the win, don't ship the complexity.
+- **Simplicity first:** The simplest fix is often the biggest — an index, a batch, a cache header — before clever algorithmic rewrites.

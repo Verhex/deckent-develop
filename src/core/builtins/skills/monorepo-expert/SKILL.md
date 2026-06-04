@@ -52,3 +52,17 @@
 - Cache `node_modules` and build outputs in CI using the package manager's built-in caching.
 - Deploy apps independently — a change in `app-a` should not trigger `app-b` deployment.
 - Use Docker multi-stage builds with `--filter` to create minimal images per app.
+
+## Anti-Patterns to Avoid
+- Circular dependencies between packages — enforce a layered graph (core → shared → apps); cycles break caching and builds.
+- Over-broad `outputs` (`dist/**`) in turbo/nx config — imprecise outputs tank cache-hit rates.
+- Full rebuilds in CI instead of affected-only — run `--filter`/`--affected` so unchanged packages stay cached.
+- Internal deps via fixed versions instead of `workspace:*` — you get version skew and stale local linking.
+- Duplicated tsconfig/eslint/prettier per package — centralize in a shared config package; one standard.
+- Publishing changed packages non-atomically — release them together or consumers hit version mismatch.
+- No boundary enforcement — without `eslint-plugin-boundaries`, layer violations creep in until the graph is spaghetti.
+
+## Karpathy Notes
+- **Think before coding:** Define the dependency direction (who may import whom) before adding packages — retrofitting boundaries is painful.
+- **Simplicity first:** Add a shared package only when 3+ packages need it. A premature `@org/utils` becomes a dumping ground.
+- **Goal-driven:** Caching and `--affected` exist to make CI fast. Configure `inputs`/`outputs` precisely or the speedup evaporates.

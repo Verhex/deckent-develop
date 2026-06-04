@@ -53,3 +53,8 @@
 - Images with `alt=""` that are not purely decorative.
 - Auto-playing media without pause controls.
 - Timeout-based interactions without extension or warning mechanisms.
+
+## Karpathy Notes
+- **Think before coding:** Reach for the native element first (`<button>`, `<nav>`, `<label>`). The first rule of ARIA is: don't use ARIA when HTML already conveys the semantics.
+- **Goal-driven:** Every control must be operable by keyboard alone, and every state must survive without color. Verify with keyboard-only navigation and a screen reader — not just a linter.
+- **Surgical:** Adding `role`/`aria-*` is a claim about behavior you must then implement (focus moves, arrow keys). Don't bolt on ARIA you won't wire up — it actively misleads assistive tech.

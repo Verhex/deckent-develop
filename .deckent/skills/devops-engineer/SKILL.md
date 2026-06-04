@@ -63,3 +63,17 @@
 - Centralize logs with ELK stack, Datadog, or CloudWatch.
 - Use log levels appropriately: ERROR (action needed), WARN (unusual but handled), INFO (state changes), DEBUG (development only).
 - Include correlation IDs in all logs to trace requests across services.
+
+## Anti-Patterns to Avoid
+- `FROM node:latest` (or any unpinned tag) — pin a versioned or digest-pinned base for reproducible builds.
+- Running the container as root — add a non-root `USER` before `CMD`.
+- Baking secrets into image layers or passing them as build args — use runtime env or secret mounts; layers are permanent.
+- Pinning GitHub Actions to a mutable tag (`@v4`) for security-sensitive steps — pin to a full commit SHA.
+- Logging environment-variable values — log only their names; values leak credentials.
+- Alerting on causes (high CPU) instead of symptoms (high error rate / latency) — page on what users actually feel.
+- Creating cloud resources by hand — manage them as code (Terraform/Pulumi) with remote, locked state.
+
+## Karpathy Notes
+- **Think before coding:** Decide the trust and failure model first — what runs as root, where secrets live, what happens when a dependency is down.
+- **Simplicity first:** Reach for Kubernetes or a service mesh only when scale demands it. A pinned image + health check + structured logs covers most needs.
+- **Goal-driven:** Every layer, action pin, and probe must map to a concrete reproducibility, security, or availability requirement.

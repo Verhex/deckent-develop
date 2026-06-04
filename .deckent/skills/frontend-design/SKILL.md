@@ -47,3 +47,17 @@
 - Use consistent border radius: `rounded-md` for cards, `rounded-lg` for modals, `rounded-full` for avatars/pills.
 - Apply focus-visible rings (`focus-visible:ring-2 ring-ring ring-offset-2`) for keyboard accessibility.
 - Use `sr-only` class for screen-reader-only labels on icon-only buttons.
+
+## Anti-Patterns to Avoid
+- `@apply` everywhere to recreate traditional CSS files — it defeats utility-first colocation; reserve it for genuinely repeated component classes.
+- Arbitrary values (`[17px]`) scattered instead of theme tokens — extend `tailwind.config` so the scale stays consistent.
+- Desktop-first styles patched with `max-*` overrides — design mobile-first and layer `sm:`/`md:`/`lg:` upward.
+- `outline: none` / removing focus rings for looks — keyboard users lose all orientation; provide a visible `focus-visible` ring.
+- Conveying state by color alone — add an icon or text so colorblind users and dark mode still parse it.
+- Animations with no `prefers-reduced-motion` guard — wrap them in `motion-safe:` to respect the OS setting.
+- Raw hex colors inline instead of semantic tokens (`primary`, `muted`) — themes and dark mode break without the token layer.
+
+## Karpathy Notes
+- **Think before coding:** Commit to an aesthetic direction (and the token scale that expresses it) before writing markup — retrofitting consistency is expensive.
+- **Simplicity first:** Compose from utilities and existing tokens. Extract a component class only when the same pattern repeats 3+ times.
+- **Goal-driven:** Every visual choice serves hierarchy or usability. Decoration that fights legibility or accessibility is a regression, not polish.

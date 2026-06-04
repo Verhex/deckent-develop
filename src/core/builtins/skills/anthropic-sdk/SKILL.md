@@ -2,7 +2,7 @@
 
 ## Messages API
 - Always use `client.messages.create()` with explicit `model`, `max_tokens`, and `messages` parameters.
-- Prefer `claude-sonnet-4-20250514` for general tasks, `claude-opus-4-20250514` for complex reasoning, `claude-haiku-235-20250325` for fast/cheap operations.
+- Select the model by tier, never a hardcoded dated ID (which silently rots): the latest Opus for complex reasoning, the latest Sonnet for general tasks, the latest Haiku for fast/cheap operations. Resolve the exact current model ID from the Anthropic model catalog (or deckent's model-registry) at call time — as of this writing `claude-opus-4-8`, `claude-sonnet-4-6`, `claude-haiku-4-5-20251001`. Always verify against the latest published IDs.
 - Set `max_tokens` to a reasonable value for the expected output length. Never leave it at the default without consideration.
 - Use the `system` parameter for persistent instructions. Keep system prompts concise and directive.
 
@@ -47,3 +47,17 @@
 - Set timeouts on the client constructor: `new Anthropic({ timeout: 60_000 })`.
 - Use `client.with_options()` for per-request overrides (headers, timeout) without modifying the shared client.
 - Version-pin the SDK in package.json to avoid breaking changes on minor updates.
+
+## Anti-Patterns to Avoid
+- Hardcoding a dated model ID as a constant — it rots the moment a new model ships; resolve from the catalog/registry by tier.
+- Leaving `max_tokens` at an arbitrary large value — size it to the expected output; oversized caps waste budget and latency.
+- Re-sending large static system prompts or tool definitions uncached — add `cache_control: { type: "ephemeral" }` to cut input-token cost on repeated calls.
+- Catching `RateLimitError` with a fixed-delay retry — honor the `retry-after` header and use exponential backoff with jitter.
+- Dropping `tool_use`/`tool_result` blocks from history on multi-turn tool use — the model loses context and loops.
+- Logging full request/response bodies — they carry user PII and secrets; log the request ID (`response.id`) instead.
+- Reconstructing streamed tool input ad hoc — accumulate `input_json_delta` events, then `JSON.parse` once at `content_block_stop`.
+
+## Karpathy Notes
+- **Think before coding:** Decide the tier (Opus/Sonnet/Haiku) and whether the call needs tools, streaming, or caching before writing it — these shape the whole request.
+- **Simplicity first:** Start with a single `messages.create()`. Add streaming, batching, and tool loops only when the use case actually requires them.
+- **Goal-driven:** Every token in the system prompt and tool schema is paid on every call. Trim anything that does not change the model's output.

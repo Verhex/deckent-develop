@@ -64,3 +64,18 @@
 - Use error-handling middleware as the final layer to catch and format all errors consistently.
 - Keep middleware functions small and focused on a single concern.
 - Use CORS with explicit allowed origins. Never use `*` in production.
+
+## Anti-Patterns to Avoid
+- Verb in resource paths (`/getUser`, `/createOrder`) — use HTTP method + noun.
+- Nesting resources more than 2 levels deep — flattens to `/resource/:id/sub` at most.
+- Returning 200 with `{ success: false }` — use correct HTTP status codes.
+- Different error formats per endpoint — establish one error schema and use it everywhere.
+- Version bumping for non-breaking additions — use feature flags or optional fields instead.
+- Premature versioning (`/v1/` from day one) — add versioning when you have an actual breaking change.
+- Exposing internal identifiers (DB auto-increment IDs) in URLs — use UUIDs or opaque tokens.
+- Skipping input validation on "internal" endpoints — treat every HTTP entry point as a trust boundary.
+
+## Karpathy Notes
+- **Simplicity first:** Design the smallest API surface that satisfies the use case. Endpoints are contracts — adding is easy, removing is breaking.
+- **Think before coding:** Write the OpenAPI spec (or at least the request/response shapes) before implementing the handler.
+- **Goal-driven:** Each endpoint must have a single, clear responsibility. If you're using "and" in the endpoint description, split it.

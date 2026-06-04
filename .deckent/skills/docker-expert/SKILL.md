@@ -48,3 +48,17 @@
 - Use `--omit=dev` for production Node.js dependencies. Dev dependencies can add 200MB+.
 - Audit final image with `docker history <image>` to identify large layers. Target < 200MB for Node.js apps.
 - Consider `FROM scratch` or Google distroless for Go/Rust binaries that are statically compiled.
+
+## Anti-Patterns to Avoid
+- Single-stage build shipping compilers and dev deps — use multi-stage; copy only the artifact into the runtime image.
+- `COPY . .` before installing dependencies — copy lockfiles first so `install` stays cached when only source changes.
+- `latest` base tag — pin a specific version or digest for reproducible builds.
+- Running as root in the final image — create and switch to a non-root user before `CMD`.
+- Embedding secrets via `ENV` or build args — they persist in layers; use `--secret` mounts or runtime env.
+- Forgetting `.dockerignore` — a fat build context (`node_modules`, `.git`) slows every build.
+- `ADD` for plain local files — use `COPY`; reserve `ADD` for tar extraction or URL fetch semantics.
+
+## Karpathy Notes
+- **Simplicity first:** Start from the smallest viable base (alpine/distroless). Add packages only when the build actually fails without them.
+- **Surgical:** Order instructions least-changing first. One misplaced `COPY` invalidates every downstream layer's cache.
+- **Goal-driven:** Each layer should shrink the image or speed the build. Audit with `docker history`; cut layers that do neither.

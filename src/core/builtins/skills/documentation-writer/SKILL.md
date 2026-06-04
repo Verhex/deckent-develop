@@ -58,3 +58,17 @@
 - Explanation docs: understanding-oriented ("How the plugin system works"). Focus on why, not how.
 - Reference docs: information-oriented (API reference). Complete, accurate, terse.
 - Separate these four types. Do not mix tutorial style with reference style.
+
+## Anti-Patterns to Avoid
+- Code examples in the README that are never run — outdated snippets erode trust faster than missing docs.
+- Documenting every private/internal function exhaustively — over-documenting internals is maintenance debt; document the public surface.
+- Batching changelog entries in a separate later PR — update the changelog in the same PR as the change, from the user's perspective.
+- Editing an old ADR in place to reflect a new decision — ADRs are immutable; write a new one that supersedes it.
+- Mixing tutorial prose into reference docs — keep the four doc types (tutorial / how-to / explanation / reference) separate.
+- Passive voice and 40-word sentences — use present tense, active voice, one idea per paragraph.
+- Shipping placeholder or `TODO` sections as "documentation" — an honest gap beats a fake-complete page.
+
+## Karpathy Notes
+- **Goal-driven:** Write for a specific reader and task. "Get running in 2 minutes" and "complete API reference" are different goals — don't blur them.
+- **Simplicity first:** The shortest doc that unblocks the reader wins. Move depth into `docs/`, keep the README scannable.
+- **Surgical:** Update the doc in the same change as the code it describes. Doc drift is silent until it misleads someone.

@@ -49,3 +49,17 @@
 - Can this parameter list be shortened by using defaults or an options object?
 - Can this class be replaced with a plain function + closure?
 - Is this abstraction layer adding value, or just indirection?
+
+## Anti-Patterns to Avoid
+- Abstracting before the Rule of Three — fewer than 3 real duplications means the abstraction is a guess.
+- Extracting a one-call helper whose name is longer than its body — inline it; the indirection adds no clarity.
+- Replacing a clear `if/else` with a clever nested ternary — clever is not simple; optimize for the next reader.
+- Deleting "dead" code without grep-proving zero callers — version control is the backup, but verify zero references first.
+- Flattening nesting by hoisting logic into a `done` flag — early returns and guard clauses beat a boolean state machine.
+- Reformatting an entire function while changing one line — it buries the real diff and destroys `git blame`.
+- Wrapping the whole function body in one try/catch — narrow it to the single call that can actually throw.
+
+## Karpathy Notes
+- **Simplicity first:** Prefer duplication over the wrong abstraction. Copy-paste is cheaper to fix later than untangling a bad shared layer.
+- **Surgical:** Simplification is still a change — touch only the lines that get simpler, preserve behavior, keep existing tests green.
+- **Goal-driven:** Each refactor must make the call-site or the read easier. If it does neither, drop it.

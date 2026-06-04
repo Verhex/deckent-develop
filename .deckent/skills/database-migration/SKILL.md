@@ -44,3 +44,17 @@
 - Use factory functions (Faker, Factory) for generating realistic test data.
 - Seed data scripts must be idempotent: use `INSERT ... ON CONFLICT DO NOTHING` or upsert patterns.
 - Separate reference data seeds (countries, currencies) from test data seeds.
+
+## Anti-Patterns to Avoid
+- Editing a migration already applied to staging/production — create a new forward migration; never mutate applied history.
+- A migration with no `down` function — every change must be reversible, or rollback is impossible.
+- Dropping a column in the same deploy as the code that stops using it — use expand-contract (add → backfill → switch reads → remove later).
+- `SELECT *` in application queries — fetch only the columns you need; `*` breaks on schema change and wastes I/O.
+- Accessing related rows inside a loop — that is the N+1 pattern; eager-load with a JOIN or DataLoader.
+- Long transactions wrapping network or file I/O — they hold locks and deadlock; keep transactions short and DB-only.
+- Unindexed foreign keys — most engines do not auto-index them; every FK used in a JOIN/WHERE needs an index.
+
+## Karpathy Notes
+- **Think before coding:** Test the migration against production-sized data before deploy — a change that locks a large table is an outage.
+- **Surgical:** Schema changes are append-first. Add the new shape, backfill, switch reads, then remove the old — never a destructive big-bang.
+- **Goal-driven:** Every index earns its write cost. Add one to serve a real query pattern, not "just in case."

@@ -48,16 +48,13 @@ Use the test framework matching your project's stack. The principles are the sam
 - `toMatchInlineSnapshot()` for small, readable snapshot assertions.
 
 ### pytest (Python)
-- Use `pytest.fixture` for setup/teardown; prefer function scope over module/session scope.
-- `unittest.mock.patch` or `pytest-mock`'s `mocker.patch` for mocking.
+- Use `pytest.fixture` for setup/teardown; prefer function scope over session scope.
 - `@pytest.mark.parametrize` for data-driven tests instead of loops.
-- `freezegun` for time-dependent tests.
+- `freezegun` for time-dependent tests; `mocker.patch` for mocking.
 
 ### Go testing
 - Co-locate test files: `foo.go` → `foo_test.go`; use `_test` package for black-box testing.
-- `t.Parallel()` for independent test cases; `t.Helper()` in assertion helpers.
-- `testing.T.Cleanup()` for teardown.
-- `testify/assert` or `testify/require` for readable assertions.
+- `t.Parallel()` for independent cases; `testify/assert` or `require` for readable assertions.
 
 ## Snapshot Testing
 - Use snapshots for UI component output and serialized data structures.
@@ -71,3 +68,18 @@ Use the test framework matching your project's stack. The principles are the sam
 - Cache dependencies and build artifacts to reduce CI time.
 - Run slow tests (E2E, integration) on a separate schedule or only for merge commits.
 - Report test results and coverage as PR comments or status checks.
+
+## Anti-Patterns to Avoid
+- Testing implementation details (internal method calls, private state) — test observable behavior.
+- Writing tests after the fact to hit a coverage number — coverage without intent is noise.
+- One giant test that covers multiple behaviors — split into focused tests with descriptive names.
+- `beforeAll` with mutable shared state — tests become order-dependent and flaky.
+- Mocking the module under test — mock its dependencies, never the subject itself.
+- `expect(true).toBe(true)` style assertions — they pass even when code is broken.
+- Resetting mocks manually in each test — use `vi.restoreAllMocks()` in `afterEach`.
+- Real timers in tests (`setTimeout`, `Date.now()`) — use fake timers for determinism.
+
+## Karpathy Notes
+- **Simplicity first:** Three focused unit tests beat one complex integration test. Add complexity only when the unit test cannot catch the bug.
+- **Goal-driven:** Coverage is a means, not an end. Ask "what behavior am I protecting?" before writing each test.
+- **Surgical:** A failing test is a specification. Read it carefully before changing it — the test may be right and the code wrong.

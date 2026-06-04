@@ -49,3 +49,17 @@
 - Use `contextlib.suppress` for expected exceptions that should be silently ignored.
 - Log exceptions with `logger.exception()` to capture stack traces.
 - Use `else` clause in try blocks for code that should run only when no exception occurred.
+
+## Anti-Patterns to Avoid
+- Bare `except:` — it swallows `KeyboardInterrupt`/`SystemExit` and hides bugs; catch specific exception types.
+- Mutable default arguments (`def f(x=[])`) — the default is shared across calls; use `None` and create inside.
+- `os.path` string-juggling for paths — use `pathlib.Path`; it is object-oriented and cross-platform.
+- Missing type hints on public functions — add them and run `mypy --strict`/`pyright` in CI.
+- Mixing sync calls into async code without bridging — it blocks the event loop; use `asyncio.to_thread`/executors.
+- `%` or `.format()` for interpolation — use f-strings for readability and speed.
+- Installing into the global interpreter — isolate with `venv`/`poetry`/`uv` and pin versions in the lockfile.
+
+## Karpathy Notes
+- **Simplicity first:** Reach for a `@dataclass` or `NamedTuple` before a full class; use Pydantic only at validation boundaries (API edges).
+- **Goal-driven:** Add type hints and `Protocol`s where they catch real errors, not as decoration. Let `mypy` prove the contract.
+- **Surgical:** Catch the narrowest exception at the narrowest scope. A broad `except Exception` around a whole function hides the failing line.

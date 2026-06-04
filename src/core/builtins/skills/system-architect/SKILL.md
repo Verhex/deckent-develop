@@ -60,3 +60,17 @@ Before any breaking change:
 - [ ] Old type aliases still available (marked @deprecated)
 - [ ] Tests cover both old and new paths
 - [ ] Migration creates backup before writing
+
+## Anti-Patterns to Avoid
+- Scattering metadata across files instead of one registry entry — a new model/agent/skill should be one object added, zero other files touched.
+- Hardcoding provider-specific model names in business logic — abstract through tiers; let the registry resolve tier → concrete model.
+- Renaming config fields in place — add the new field, migrate old→new, keep parsing both across a deprecation window.
+- Breaking an exported signature with no delegating shim — keep the old signature, forward to the new implementation, mark `@deprecated`.
+- Designing for hypothetical future scale — solve today's requirement; extensibility you don't need is complexity you pay for now.
+- One module owning many reasons to change — split by business concern so each module has a single axis of change.
+- A breaking change with no migration or backup step — write the migration and snapshot before mutating persisted state.
+
+## Karpathy Notes
+- **Think before coding:** Identify the single source of truth and the dependency direction before writing modules. Architecture is mostly deciding what depends on what.
+- **Simplicity first:** Prefer a registry plus tier abstraction over bespoke per-provider branches. The simplest design that preserves backward compatibility wins.
+- **Goal-driven:** Every abstraction layer must make the call-site simpler. If it only adds indirection, collapse it.

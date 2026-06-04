@@ -51,3 +51,18 @@
 - Review dependency changelogs before upgrading. Watch for supply chain attacks.
 - Minimize dependencies. Each dependency is an attack surface.
 - Use lockfiles and verify integrity hashes.
+
+## Anti-Patterns to Avoid
+- Client-side-only validation — server must re-validate every input independently.
+- Storing secrets in source code, even in test files — they end up in git history.
+- `algorithm: 'none'` in JWT — always verify algorithm explicitly against an allowlist.
+- Broad CORS (`*`) with credentials — combine only with explicit origins.
+- Logging request bodies wholesale — they contain passwords, tokens, PII.
+- MD5 or SHA-1 for password hashing — use bcrypt (cost ≥12) or argon2id.
+- Security by obscurity (hiding endpoints, mangling IDs) as the primary control — use real authorization.
+- Catching and swallowing authentication exceptions — fail securely (deny, log, alert).
+
+## Karpathy Notes
+- **Think before coding:** Identify trust boundaries before writing any security-relevant code. Draw them explicitly: what data comes from users? From third parties? From internal services?
+- **Simplicity first:** Defense in depth does not mean complex code. Simple, layered controls (validate input, check permission, log action) beat clever single-layer solutions.
+- **Goal-driven:** Every security control must map to a specific threat. If you cannot name the attack it prevents, question whether it belongs.

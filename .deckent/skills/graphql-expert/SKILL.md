@@ -56,3 +56,17 @@
 - Use input types (`input CreateUserInput`) — never accept raw JSON or generic `String` for structured data.
 - Validate business rules in the service layer, not in resolvers. Return typed errors for invalid input.
 - Limit query depth and complexity using `graphql-depth-limit` and `graphql-query-complexity` to prevent abuse.
+
+## Anti-Patterns to Avoid
+- Resolvers that query the database per parent row — the classic N+1; batch with a per-request DataLoader.
+- Modeling the schema after database tables — design around the client's domain, not your storage layout.
+- Returning internal errors (stack traces, SQL) to clients — map expected failures to typed union errors with a `code`.
+- Nullable-by-default fields — mark non-null unless absence is genuinely meaningful; nullability is contagious for clients.
+- Unbounded `first`/`last` and unlimited query depth — cap page size and apply depth/complexity limits to prevent abuse.
+- Side effects in Query resolvers — queries must be read-only and idempotent; mutations own all writes.
+- Hand-maintaining types derived from the schema — generate them with `graphql-codegen` on every schema change.
+
+## Karpathy Notes
+- **Think before coding:** Design the schema as a product contract first. Adding a field is easy; changing or removing one breaks clients.
+- **Simplicity first:** Keep resolvers thin — delegate to services. A resolver that contains business logic is hard to test and reuse.
+- **Goal-driven:** Every field a resolver returns should be data it owns. Push relational fetches to field resolvers plus DataLoader.
