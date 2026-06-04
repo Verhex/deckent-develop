@@ -91,6 +91,16 @@ import { writeEvent, CHANNELS, getCurrentSprintId } from './event-stream.js';
 import { runPostFinalizeHooks } from '../core/identity-generator.js';
 import type { PostFinalizeHookResult } from '../core/identity-generator.js';
 
+// ─── Export-wipe guard (Sprint 227 task 227-002) ──────────────────
+// runMemoryExport (identity-generator.ts) overwrites .brain/exports/*.md
+// unconditionally; in sprint-226 this wiped decisions.md from 8518 to 2 lines
+// while the DB still held 75 ADRs. We bypass runMemoryExport and call the
+// guarded writer here instead — it refuses to overwrite when the render
+// collapses to the "no entries" marker while the DB has entries.
+import { writeGuardedExports } from '../core/memory-export.js';
+import { MemoryStore } from '../core/memory-store.js';
+import { MEMORY_DB_FILE } from '../core/constants.js';
+
 // ─── Task Restoration / Auto-Archive Guard (Sprint 143 Task 13) ───
 import { createPreArchiveSnapshot, classifyTaskFiles } from './task-restoration.js';
 
@@ -1306,9 +1316,47 @@ export async function finalizeSprint(
         durationMs: metrics.durationMs,
       },
       onRuleRegen: resolvedOnRuleRegen,
-      skipMemoryExport: opts?.skipMemoryExport,
+      // Sprint 227 task 227-002: always skip the unsafe runMemoryExport.
+      // We do the export ourselves via writeGuardedExports below so the
+      // sanity guard runs on every finalize cycle, not just opted-in callers.
+      skipMemoryExport: true,
       skipIdentityRegen: opts?.skipIdentityRegen,
     });
+
+    // Sprint 227 task 227-002 — guarded export.
+    // Runs AFTER runPostFinalizeHooks so post-Step-3 ADR inserts are
+    // reflected in the rendered .md files. Caller can still opt out via
+    // opts.skipMemoryExport (preserves prior semantics).
+    if (!opts?.skipMemoryExport) {
+      try {
+        const dbPath = join(projectRoot, BRAIN_DIR, MEMORY_DB_FILE);
+        if (existsSync(dbPath)) {
+          const exportsDir = join(projectRoot, BRAIN_DIR, 'exports');
+          const store = new MemoryStore(dbPath);
+          try {
+            const guarded = writeGuardedExports(store, exportsDir);
+            debugLog('finalizeSprint:writeGuardedExports',
+              `written=${guarded.written.length} skipped=${guarded.skipped.length} ` +
+              `warnings=${guarded.warnings.length}`);
+            for (const w of guarded.warnings) {
+              debugLog('finalizeSprint:writeGuardedExports:warn', w);
+            }
+            // Reflect the guarded run onto postFinalizeResult.memoryExport so
+            // downstream consumers see a non-null result (the caller-visible
+            // contract did not change).
+            postFinalizeResult.memoryExport = {
+              success: guarded.warnings.length === 0,
+              filesWritten: guarded.written,
+              errors: guarded.warnings,
+            };
+          } finally {
+            store.close();
+          }
+        }
+      } catch (e) {
+        debugLog('finalizeSprint:writeGuardedExports', `guarded export failed: ${e}`);
+      }
+    }
     debugLog('finalizeSprint:postFinalizeHooks',
       `memExport=${postFinalizeResult.memoryExport?.filesWritten.length ?? 'skipped'} ` +
       `identity=${postFinalizeResult.identityRegen?.reason ?? 'skipped'} ` +

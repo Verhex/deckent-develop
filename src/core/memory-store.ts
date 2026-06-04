@@ -835,18 +835,61 @@ export class MemoryStore {
     txn();
   }
 
-  decay(currentSprintNum: number, decayAfterSprints: number): { deletedCount: number } {
+  decay(
+    currentSprintNum: number,
+    decayAfterSprints: number,
+  ): { deletedCount: number; aborted?: boolean } {
     const threshold = currentSprintNum - decayAfterSprints;
 
-    // Find entries to decay
+    // Catastrophic-decay guard parameters ([[feedback_db_silmek_yasak]]):
+    // If a single decay batch would wipe more than CATASTROPHIC_RATIO of all
+    // non-exempt active entries — and the batch is itself large enough to be
+    // "catastrophic" (>= CATASTROPHIC_BATCH_MIN) — abort, warn, and preserve.
+    // The MIN_BATCH gate keeps the guard from firing on tiny dev/test DBs.
+    const CATASTROPHIC_BATCH_MIN = 10;
+    const CATASTROPHIC_RATIO = 0.5; // > 0.5 → abort
+
+    // Total non-exempt active entries (denominator for catastrophic ratio).
+    const nonExemptTotal = (this.db.prepare(`
+      SELECT COUNT(*) as cnt FROM entries
+      WHERE decay_exempt = 0 AND deleted_at IS NULL
+    `).get() as { cnt: number }).cnt;
+
+    // Find entries to decay. Two safety conditions vs the original filter:
+    //   1. `sprint_num < threshold` keeps the window boundary intact —
+    //      entries with sprint_num >= (currentSprintNum - decayAfterSprints)
+    //      stay alive (within retention window).
+    //   2. `sprint_num > 0` is a skipDelete guard: entries with the schema
+    //      default (sprint_num=0, i.e. inserted without a sprint number or
+    //      unparseable) are PRESERVED — we never default-delete undated rows.
     const toDecay = this.db.prepare(`
       SELECT id FROM entries
       WHERE sprint_num < ?
+        AND sprint_num > 0
         AND decay_exempt = 0
         AND deleted_at IS NULL
     `).all(threshold) as Array<{ id: string }>;
 
     if (toDecay.length === 0) return { deletedCount: 0 };
+
+    // Catastrophic-decay guard: refuse a single batch that would wipe more
+    // than half of all non-exempt entries (only when the batch is itself
+    // large enough to be "catastrophic"). Preserves historical learnings on
+    // accidental misconfiguration / parse drift.
+    if (
+      toDecay.length >= CATASTROPHIC_BATCH_MIN &&
+      nonExemptTotal > 0 &&
+      toDecay.length / nonExemptTotal > CATASTROPHIC_RATIO
+    ) {
+      const pct = ((toDecay.length / nonExemptTotal) * 100).toFixed(1);
+
+      console.warn(
+        `[memory-store] decay aborted: catastrophic batch ` +
+        `(${toDecay.length}/${nonExemptTotal} = ${pct}% > ` +
+        `${CATASTROPHIC_RATIO * 100}% threshold) — entries preserved`,
+      );
+      return { deletedCount: 0, aborted: true };
+    }
 
     const updateStmt = this.db.prepare(
       `UPDATE entries SET deleted_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`,

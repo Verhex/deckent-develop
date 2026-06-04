@@ -7,12 +7,18 @@
  *
  * Also exports `exportAdrsToFs` for DB→FS reverse sync (Sprint 169 H1,
  * bi-directional hook contract per ADR-046 Amendment 2026-05-15).
+ *
+ * `writeGuardedExports` (Sprint 227 task 227-002) is the sanity-checked
+ * writer: it refuses to overwrite an existing .md with an empty render
+ * when the DB still contains entries of the corresponding type. This
+ * blocks the catastrophic wipe path observed in sprint-226 (decisions.md
+ * 8518→2 lines while the DB held 75 ADRs).
  */
 
 import { mkdirSync, existsSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { MemoryStore } from './memory-store.js';
-import type { MemoryEntryV2 } from './memory-types.js';
+import type { MemoryEntryV2, EntryType } from './memory-types.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────
 
@@ -358,6 +364,81 @@ export function exportAdrsToFs(
     } catch (e) {
       result.errors.push(`${adr.id}: ${e instanceof Error ? e.message : String(e)}`);
     }
+  }
+
+  return result;
+}
+
+// ─── writeGuardedExports (Sprint 227 task 227-002) ─────────────────
+
+/**
+ * Per-file outcome of writeGuardedExports.
+ */
+export interface GuardedExportResult {
+  written: string[];
+  skipped: string[];
+  warnings: string[];
+}
+
+interface GuardedExportSpec {
+  name: string;
+  render: (store: MemoryStore) => string;
+  entryType: EntryType;
+  emptyMarker: string;
+}
+
+const GUARDED_EXPORT_SPECS: GuardedExportSpec[] = [
+  { name: 'summary.md',   render: exportSummaryMd,   entryType: 'adr',    emptyMarker: '_No architecture decisions recorded._' },
+  { name: 'decisions.md', render: exportDecisionsMd, entryType: 'adr',    emptyMarker: '_No architecture decisions recorded._' },
+  { name: 'memory.md',    render: exportMemoryMd,    entryType: 'memory', emptyMarker: '_No learnings recorded._' },
+];
+
+/**
+ * Render and write export .md snapshots with a sanity guard.
+ *
+ * For each file: render content, count DB entries of the relevant type,
+ * and refuse to overwrite when the DB has entries but the render
+ * collapsed to the renderer's "no entries" marker — preserving the
+ * previous on-disk file and surfacing a warning. Blocks the wipe path
+ * observed in sprint-226 (decisions.md 8518→2 lines while DB held 75 ADRs).
+ *
+ * `debt.md` is written unconditionally (its renderer always emits a
+ * non-empty table header; debt loss was not the catastrophic case).
+ */
+export function writeGuardedExports(
+  store: MemoryStore,
+  exportsDir: string,
+): GuardedExportResult {
+  mkdirSync(exportsDir, { recursive: true });
+
+  const result: GuardedExportResult = { written: [], skipped: [], warnings: [] };
+
+  for (const spec of GUARDED_EXPORT_SPECS) {
+    const content = spec.render(store);
+    const filePath = join(exportsDir, spec.name);
+    const dbCount = store.getByType(spec.entryType).length;
+    const renderIsEmpty = content.includes(spec.emptyMarker);
+
+    if (dbCount > 0 && renderIsEmpty) {
+      const warning =
+        `export-wipe-guard: refused to write ${spec.name} — ` +
+        `DB has ${dbCount} ${spec.entryType} entries but render is empty ` +
+        `(preserving previous file at ${filePath})`;
+      result.warnings.push(warning);
+      result.skipped.push(spec.name);
+      continue;
+    }
+
+    writeFileSync(filePath, content, 'utf-8');
+    result.written.push(spec.name);
+  }
+
+  try {
+    const debtContent = exportDebtMd(store);
+    writeFileSync(join(exportsDir, 'debt.md'), debtContent, 'utf-8');
+    result.written.push('debt.md');
+  } catch (e) {
+    result.warnings.push(`debt.md: ${e instanceof Error ? e.message : String(e)}`);
   }
 
   return result;

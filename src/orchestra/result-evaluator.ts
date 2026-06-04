@@ -690,6 +690,23 @@ export function validateResultSchema(result: TaskResult, task?: Task): ResultSch
 
 // ─── Rubric-Based Evaluation ────────────────────────────────────────
 
+/**
+ * Sprint 227 227-001: Coverage is "structurally absent" when the result has no
+ * measurable coverage number (null / undefined / NaN). A reported numeric 0 is
+ * still a measurement (worker exercised the surface but covered 0 lines),
+ * not absence. Used by `evaluateWithRubric` to renormalize remaining rubric
+ * weights so a coverage-less perfect task scores ~100 instead of being pinned
+ * at 78.75 by the missing `test_coverage` 0.25 weight.
+ *
+ * Sprint 207 P0-3 already normalizes non-finite coverage to 0 inside
+ * `scoreTestCoverage`; this helper detects the same condition one layer up so
+ * the rubric math can reweight (`coverageAbsent` path) rather than silently
+ * pull the total down.
+ */
+function isCoverageStructurallyAbsent(result: TaskResult): boolean {
+  return !(typeof result.coverage === 'number' && Number.isFinite(result.coverage));
+}
+
 /** Default rubric used when no custom rubric is provided */
 export const DEFAULT_RUBRIC: EvaluationRubric = {
   criteria: [
@@ -1183,13 +1200,35 @@ export function evaluateWithRubric(
 
   const rubricScores: RubricScore[] = [];
   let totalScore = 0;
+  // Sprint 227 227-001: Sum of weights excluded from the total because the
+  // corresponding criterion is structurally unmeasured (only `test_coverage`
+  // today). Used to renormalize the remaining weights so a coverage-less
+  // perfect task is not pinned at 78.75/100. Numeric coverage (including 0)
+  // is still treated as measured and contributes as before.
+  let absentWeight = 0;
 
   for (const criterion of merged.criteria) {
     const scored = scoreCriterion(criterion.name, result, task);
     // Override passed based on per-criterion threshold
     scored.passed = scored.score >= criterion.threshold;
     rubricScores.push(scored);
+
+    if (criterion.name === 'test_coverage' && isCoverageStructurallyAbsent(result)) {
+      // Skip from weighted sum; reweight remaining criteria below.
+      absentWeight += criterion.weight;
+      continue;
+    }
     totalScore += scored.score * criterion.weight;
+  }
+
+  // Sprint 227 227-001: Renormalize when criteria were excluded due to
+  // structural absence. Divides accumulated score by (1 - absentWeight) so
+  // the remaining criteria fill the full budget (e.g. for the default rubric,
+  // removing test_coverage's 0.25 weight scales correctness/scope/documentation
+  // by 1/0.75). Guarded against absentWeight ≥ 1 (all criteria absent → fall
+  // back to the un-normalized 0 to preserve passingScore semantics).
+  if (absentWeight > 0 && absentWeight < 1) {
+    totalScore = totalScore / (1 - absentWeight);
   }
 
   totalScore = Math.round(totalScore * 100) / 100;

@@ -6222,3 +6222,28 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 226-007: 226-007 — [P0] `deckent autonomous` CLI (start/stop/status, Tier-1 user-surface) (DONE)
 
 ---
+## Sprint 227 — sprint-227
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-06-04
+**Duration:** 1125s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 4 |
+| Completed | 4 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 1124748ms |
+
+### Tasks
+
+- 227-001: 227-001 — Rubric total diagnostic fix (coverage:null → renormalize) (DONE)
+- 227-002: 227-002 — [P0] Export-wipe guard (dolu .md'yi boşla EZME) (DONE)
+- 227-003: 227-003 — [P0] Decay safety (decay_after_sprints'e uy, collapse ETME) (DONE)
+- 227-004: 227-004 — Brain-integrity regression e2e (3 bug birlikte) (DONE)
+
+---

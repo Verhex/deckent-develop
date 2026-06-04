@@ -2,6 +2,21 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint227] - 2026-06-04
+
+### Added
+
+- 227-002 — [P0] Export-wipe guard (dolu .md'yi boşla EZME)
+- 227-003 — [P0] Decay safety (decay_after_sprints'e uy, collapse ETME)
+
+### Fixed
+
+- 227-001 — Rubric total diagnostic fix (coverage:null → renormalize)
+- 227-004 — Brain-integrity regression e2e (3 bug birlikte)
+
+
+_Tasks: 4 total, 4 done, 0 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint226] - 2026-06-04
 
 ### Added
