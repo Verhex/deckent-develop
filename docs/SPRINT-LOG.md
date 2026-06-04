@@ -6194,3 +6194,31 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 225-010: FX-10 — Nervous System (roadmap) + Vizyon/Yol Haritası (DONE)
 
 ---
+## Sprint 226 — sprint-226
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-06-04
+**Duration:** 1322s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 7 |
+| Completed | 7 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 1321979ms |
+
+### Tasks
+
+- 226-001: 226-001 — Authority adapter (checkAuthority → AuthorityChecker) (DONE)
+- 226-002: 226-002 — Audit adapter (writeEvent → AuditSink) (DONE)
+- 226-003: 226-003 — Approval gate adapter (nervous Executor → ApprovalGate, OTO-APPROVE YOK) (DONE)
+- 226-004: 226-004 — Action executor adapter (ActionHandler registry → ActionExecutor) (DONE)
+- 226-005: 226-005 — Trigger source adapter (scheduled-flow + self-dispatch → TriggerSource) (DONE)
+- 226-006: 226-006 — [P0] Sürekli loop + composition root (DORMANT'I ÖLDÜRÜR) (DONE)
+- 226-007: 226-007 — [P0] `deckent autonomous` CLI (start/stop/status, Tier-1 user-surface) (DONE)
+
+---

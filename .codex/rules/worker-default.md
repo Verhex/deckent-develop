@@ -37,7 +37,6 @@
 ## Active ADR Constraints
 
 - **ADR-086**: Native CLI Parity — F11 Feature Set (Sprint 224) — **Status:** accepted
-- **ADR-085**: Persistent-Session Wire + GUI-UX Terminal-Layout + Nervous Non-Blocking/Optimize — **Status:** accepted
 - **ADR-083**: REPL-UX-Evolution + Provider-Parity + Local-Model-Foundation — **Status:** accepted
 - **ADR-082**: Native-LLM-Wire + Nervous-Activation + Dashboard-v2 Canlı — **Status:** accepted
 - **ADR-081**: Native Agentic Deckent — `deckent` argümansız REPL + Agentic Tool-Use + F2 Streaming + Agentic-OS Direction — **Status:** accepted
@@ -58,8 +57,8 @@
 - **ADR-063**: Consent-Based Prerequisite Provisioning — > **Numbering note (Sprint 175):** This ADR was originally numbered 062 alongside
 - **ADR-010**: Tek Runtime Dependency — commander.js — **Status:** accepted
 - **ADR-037**: Brain-Auditor-Worker Authority Matrix — RBAC Protocol V1.0 — **Status:** accepted
-- **ADR-048**: Prompt Lifecycle Contract — **Status:** accepted
 - **ADR-047**: Manuel Subagent Dispatch Protocol — **Status:** accepted
+- **ADR-048**: Prompt Lifecycle Contract — **Status:** accepted
 - **ADR-046**: Brain Self-Update Hook Architecture — **Status:** accepted
 - **ADR-045**: Wave-Based Execution Semantics — respawnEligibleTasks Runtime Wire — **Status:** accepted
 - **ADR-043**: Brain Crash Recovery Protocol — **Status:** accepted
@@ -104,7 +103,6 @@
 - **ADR-009**: DEBT.md Markdown Tablo Formatı — **Status:** accepted
 - **ADR-011**: node:readline/promises — Built-in Prompt — **Status:** accepted
 - **ADR-012**: register\<Name\>(program) Pattern — **Status:** accepted
-- **ADR-022-V2**: CLI/MCP Feature Parity — Parametre Eşitleme + Eksik Komutlar (Updated Sprint 085) — **Status:** accepted
 <!-- AUTO-END -->
 
 <!-- CUSTOM-START -->

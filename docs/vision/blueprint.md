@@ -13,12 +13,12 @@
 ## Live Metrics
 | Metrik | Değer |
 |--------|-------|
-| Sprint | sprint-225 |
-| Toplam Task | 12 |
-| Tamamlanan | 12 |
+| Sprint | sprint-226 |
+| Toplam Task | 7 |
+| Tamamlanan | 7 |
 | Tech Debt | 0 |
 | No-Go | 0 |
-| Süre | 17dk 57sn |
+| Süre | 22dk 1sn |
 | Coverage | N/A |
 
 # TABLE OF CONTENTS

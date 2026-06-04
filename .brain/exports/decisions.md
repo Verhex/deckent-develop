@@ -584,37 +584,6 @@ MCP-only komut yoktur — her MCP aracının bir CLI karşılığı vardır. Ort
 
 ---
 
-## adr-022-v2: CLI/MCP Feature Parity — Parametre Eşitleme + Eksik Komutlar (Updated Sprint 085)
-
-**Status:** accepted
-
-**Supersedes:** ADR-022 v1 (Sprint 067)
-
-**Context:** Sprint 085'te MCP tool parametreleştirilmesi tamamlandı. `deckent_init`, `deckent_start`, `deckent_status`, `deckent_doctor`, `deckent_retro`, `deckent_history` araçlarına CLI karşılıkları olanyla eşit parametreler eklendi. Ayrıca `deckent_agent_list` ve `deckent_skill_list` araçları CLI-only olan `deckent agent list` ve `deckent skill list` komutlarını MCP'ye getirdi.
-
-**Decision:** CLI-only komutlar altyapı/terminal işlemleridir ve MCP'de yer almaz:
-- **Altyapı:** `attach`, `spawn`, `watch` — tmux oturum yönetimi
-- **Sunucu/UI:** `dashboard`, `web`, `serve` — arabirim başlatma
-- **Kurulum:** `upgrade`, `onboard` — setup sihirbazları
-- **Eklenti:** `plugin install`, `plugin list`, `plugin create` — eklenti yönetimi
-
-MCP-only komutlar yoktur — tüm MCP araçlarının CLI karşılığı mevcuttur.
-
-**Tam Parity:** 19 MCP araç = 19 CLI komutu (Sprint 085 sonrası):
-- Core: `init`, `set-directives`, `plan`, `start`, `status`, `doctor`, `retro`, `history`
-- Management: `analyze`, `sync`, `config`, `usage`, `review`
-- Execution: `run`, `kill`, `cleanup`
-- Meta: `help`, `agent-list`, `skill-list`
-
-**Consequence:**
-- Kullanıcı CLI'da yapabildiği her şeyi MCP (Claude Code, VS Code, JetBrains) üzerinden de yapabilir
-- MCP tool sayısı 16'dan 19'a çıktı (`deckent_agent_list`, `deckent_skill_list` eklendi)
-- CLI komut sayısı 32'den 33'e çıktı (`set-directives` eklendi)
-- Parametre parity: tüm MCP araçları CLI komutlarıyla aynı giriş/çıkış şemasını kullanır
-- Altyapı komutları (attach, web, serve, plugin) sadece CLI'da tutulur, MCP'de eksik kalır intentional olarak
-
----
-
 ## adr-023: Plan Tier Generalizasyonu — Provider-Agnostic Tier İsimleri (Sprint 072)
 
 **Status:** accepted
@@ -8325,136 +8294,117 @@ Layout'u sprint içinde sıfırdan yazmak. Reddedildi: Karpathy Discipline 3 (Su
 
 ---
 
-## adr-085: Persistent-Session Wire + GUI-UX Terminal-Layout + Nervous Non-Blocking/Optimize
+## adr-086: Native CLI Parity — F11 Feature Set (Sprint 224)
 
 **Status:** accepted
 
-# ADR-085: Persistent-Session Wire + GUI-UX Terminal-Layout + Nervous Non-Blocking/Optimize
+# ADR-086: Native CLI Parity — F11 Feature Set (Sprint 224)
 
 **Status:** accepted
 
 **Date:** 2026-06-02
 
-**Accepted:** Sprint 223
+**Accepted:** Sprint 224
 
 ---
 
 ## Context
 
-### Sprint 222 Wire-Gap — Persistent-Session Hollow
+### The Gap
 
-Sprint 222 shipped `chat-session.ts` (`createPersistentClaudeSession`, 313 lines, 16 tests, stream-json reuse) but `entry.ts` never imported it. `buildReplProvider` claude branch kept calling per-turn `spawnFn(binary, [...args, prompt])` — spawning a new claude child process on every message. Measured consequence:
+After ADR-083 (Sprint 221 — REPL Tam-Kapsam + Provider-Parity), `deckent` had a working
+REPL with agentic dispatch, slash-registry, and status-line. However, a full `claude-code /
+codex / gemini CLI` quality bar remained unmet:
 
-- **1 message:** ~5.4 s (cold-start, acceptable)
-- **2 messages:** ~17 s (two full cold-starts, no reuse) 🔴
-- `grep createPersistentClaudeSession src/cli/entry.ts` → **0** (confirmed hollow)
+- **Terminal-mode input missing:** readline was in line-mode, not terminal-mode. No ↑/↓
+  history, no ←/→ cursor movement, raw escape sequences leaked to output.
+- **Streaming was chunky:** the Claude `stream_event` envelope was not unwrapped — the
+  entire assistant reply arrived as one block instead of token-by-token.
+- **Thinking indicator had no brand:** a bare spinner, no kraken brand, no fixed-per-prompt
+  verb, no braille-progress.
+- **Agentic-DO had no tool layer:** `deckent` could orchestrate workers but had no own
+  write/edit/read/bash tooling for the REPL session. `<deckent_tool>` protocol for
+  provider-agnostic tool dispatch was absent.
+- **Permission memory was absent:** every agentic action prompted `y/N` with no `always`
+  option — no `.deckent/settings.local.json` persist (claude-code style).
+- **`/nervous` slash was not wired:** `chat-nervous-bridge.ts` existed but was not called
+  from `chat-native.ts` slash handler — `/nervous` returned "Unknown command".
+- **Banner was zero-caller:** `renderBanner` existed in `chat-banner.ts` but `entry.ts`
+  never called it.
+- **AI plan-mode failed silently:** `callBrainPlanner()` collapsed all error types
+  (spawn/timeout/parse/validation/no-provider) into a single `null` and the CLI silently
+  fell back to structured-mode with no explanation.
 
-This was the Sprint 222 lesson: a module shipped + tested ≠ a module wired. The persistent-session module had 16 passing tests yet was a 0-caller module at runtime.
+These gaps collectively kept F11 below `claude-code` quality. Alperen's direction:
+"deckent REPL must offer the FULL feature set + polish + speed of claude-code / codex /
+gemini CLIs — multi-model, multi-provider, native, fast."
 
-### GUI-UX Terminal Design at Zero
+### ADR-081/082/083 Foundation
 
-Sprint 222 delivered `chat-render.ts` (markdown content formatting) but **conversation layout** — who said what, visual separation between user input and deckent response — was absent. REPL output was a flat stream:
-
-- User input not echoed visually after submission
-- Deckent responses had no header/prefix/color separator
-- No turn boundaries: all text scrolled as one undifferentiated block
-- No claude-code-style conversation hierarchy
-
-### Nervous Panic-Gate Silent Block
-
-The Nervous System (`enabled:true`) caused sprint SPAWN to stall indefinitely:
-
-- `panic-gate` wrote marker files to `.deckent/panic-ipc/pending/`
-- Spawn busy-poll waited for approval that never appeared in the terminal
-- A/B test confirmed: Nervous ON → stuck, Nervous OFF → sprint ran normally
-- Root-cause: panic-gate was **synchronous and blocking** on the critical worker-spawn path
-- Sprint 222 tasks 008/009/013 hit OOM (2g container) + silent-block → NO_GO carry
-
-### Resource Overhead
-
-With the Nervous observer running, RAM and CPU usage increased measurably — making deckent impractical on lower-spec machines. The scan loop ran continuously regardless of sprint state.
+This ADR builds on:
+- **ADR-081** — agentic REPL shell, `runChatNativeLoop` (Sprint 219)
+- **ADR-082** — native LLM wire, config-driven provider, REPL gerçek cevap (Sprint 220)
+- **ADR-083** — REPL tam-kapsam, provider-parity 5-fleet, local-model foundation (Sprint 221)
 
 ---
 
 ## Decision
 
-Sprint 223 closed all four gaps across four waves.
+Sprint 224 closed the F11 parity gap in two phases: hand-coded recovery branch (merged to
+main before dogfood), and parallel deckent dogfood wave (orthogonal, distinct-file tasks).
 
-### Wave A — Speed: Persistent-Session Wire
+### Recovery Branch (main — before dogfood)
 
-**223-001 — `entry.ts` buildReplProvider claude branch rewired:**
+**F11-002 — Terminal-mode input (224-001):**
+`src/cli/commands/chat-native.ts` — readline switched to `terminal: true` mode. Line-editing
+(↑/↓ history, ←/→ cursor, Del, Ctrl-A/E) work in the REPL. No raw escape leak.
 
-`buildReplProvider` claude branch now calls `createPersistentClaudeSession(binary, args)` from `chat-session.ts` and holds the session object for the REPL lifetime. Each send/stream call reuses the warm claude child process — no new spawn per message. Session is killed on `:exit` (`session.exit()`).
+**F11-003 — Real token-by-token streaming (224-011):**
+Claude `stream_event` SSE envelope unwrapped — each text delta rendered immediately. Was
+dumping whole reply at once (chunky/slow); now true streaming.
 
-- Codex/Gemini/Ollama/openai-compat branches remain per-turn (only claude pays a cold-start large enough to warrant a persistent session)
-- `grep -c createPersistentClaudeSession src/cli/entry.ts` → ≥1 (callers verified)
-- 2nd message warm-reuse target: <1 s (vs 7–8 s cold per message previously)
+**F11-004 — Thinking indicator (224-014/018):**
+`● deckent · <fiil>…` kraken-brand colored header. Verb fixed per-prompt (not cycling per
+frame). Braille spinner in the wait region. Sprint 224-018 added color (`chalk` already in
+deps; no new runtime dependency per ADR-010).
 
-**223-002 — `chat-session.ts` stream() persistent+streaming unified:**
+**F11-005/wire — Agentic-DO tool layer (224-005/006/wire):**
+`src/cli/commands/chat-agentic-do.ts` — write/edit/read/bash tool layer, provider-agnostic
+`<deckent_tool>` protocol. `dispatchAgenticDo` called from `runChatNativeLoop`. Confirm-gate
+for write/bash (y/a/N). Scope-bounded to REPL session cwd.
 
-`stream()` method yields NDJSON delta tokens from the warm persistent process — real-time incremental output without blocking until full response. Reuse and streaming compose: warm session + token-by-token delivery.
+**F11-006 — Permission memory (224-016):**
+`.deckent/settings.local.json` — `permissions.allow[]` array, claude-code style 3-way
+`y/a/N` prompt. `a` = always → appended to allow list, not asked again. Gitignored.
 
-### Wave B — GUI-UX: Terminal Layout
+### Dogfood Wave (Sprint 224 — parallel deckent workers)
 
-**223-003 — `chat-layout.ts` message separation primitives:**
+**224-015 — AI plan-mode fix:**
+`callBrainPlanner()` → discriminant union `{ok:true,data}|{ok:false,reason,message}` with
+`reason: spawn_failed|timeout|parse_failed|validation_failed|no_providers`. CLI bootstrap
+logs detailed reason before falling back to structured. Timeout configurable via
+`brain_plan_timeout_ms`.
 
-New module exposes three layout primitives for REPL conversation rendering:
+**224-008 — `/nervous` slash wire:**
+`chat-native.ts` slash handler → `getPendingNervous()` + `renderNervousPrompt()` called on
+`/nervous`. Pending proposals listed with accept/reject flow. Was "Unknown command" before.
 
-- `renderUserMessage(text)` — prefixes user input with `›` indicator + color, making user turns visible and distinct
-- `renderAssistantHeader()` — prints a deckent response header/prefix before assistant content begins
-- `messageSeparator()` — thin visual separator between conversation turns
+**224-009 — Banner wire:**
+`entry.ts` `launchDefaultRepl` calls `renderBanner(ctx)` on TTY at startup (status-line
+adjacent). Zero-caller bug fixed.
 
-TTY-only: when stdout is a pipe, output is plain text (no ANSI escape codes injected into non-interactive streams). Follows ADR-010 (Node.js built-in ANSI — no new runtime dependency).
+**224-010 — Nervous safe re-enable:**
+`.deckent/config.json` `nervous_system.enabled: true` — panic-gate.ts non-blocking (223-006)
++ observer.ts (223-008) already in main → safe. A/B verified: nervous ON → sprint SPAWN
+not blocked.
 
-**223-004 — `chat-native.ts` REPL layout wire:**
+**224-027 — Smoke harnesses:**
+`scripts/agentic-do-verify.mjs` — real `dist/cli/entry.js` agentic-write E2E (tmpdir-isolated,
+async spawn, PASS/FAIL). `scripts/repl-smoke-verify.mjs` extended: terminal-mode /
+streaming / permission-memory / `/`-menu all run-proven.
 
-`runChatNativeLoop` calls layout primitives at the right moments:
-
-- `renderUserMessage(line)` — immediately after the user submits a line (visible echo)
-- `renderAssistantHeader()` — before streaming the deckent response
-- `messageSeparator()` — after the response completes
-
-This is the wire that makes 223-003 visible. Def-file (`chat-layout.ts`) excluded from caller grep — `chat-native.ts` is the caller.
-
-**223-005 — `chat-banner.ts` REPL welcome:**
-
-`renderBanner(ctx)` — clean welcome at REPL launch: deckent name + active provider + working directory. Short `/help` hint. Consistent color language with status-line and layout. `entry.ts` calls on REPL start. TTY-only.
-
-### Wave C — Nervous: Non-Blocking + Visible + Lighter
-
-**223-006 — `panic-gate.ts` non-blocking primitive:**
-
-Extracted `panic-gate.ts` with two explicit APIs:
-
-- `evaluatePanicGate(opts)` — **synchronous**, default mode `'advisory'`: returns `PROCEED` immediately + emits a visible stderr warning. Spawn never waits on this path.
-- `awaitPanicGateApproval(opts)` — **async** with a hard timeout (default 10 000 ms). On timeout returns `'TIMEOUT_AUTO_PROCEED'` — sprint continues rather than hanging indefinitely.
-
-`safety_floor` locked actions are preserved: critical-path gates (explicitly locked operations) still block in `awaiting-approval` mode. The change is scoped to the default advisory path.
-
-**223-007 — `chat-nervous-bridge.ts` terminal-visible nervous:**
-
-REPL `/nervous` slash command reads `.deckent/panic-ipc/pending/` and renders pending nervous proposals with `accept`/`reject` actions inline. Uses 223-003 layout for visual consistency. Pending proposals surface in the REPL instead of being buried in a file.
-
-**223-008 — `observer.ts` resource optimization:**
-
-- `scan_interval` configurable (default increased from continuous to batched cadence)
-- Lazy-detector: only detectors registered as active run; idle detectors skip
-- Idle-throttle: when no sprint is active, scan frequency drops to minimal
-
-**223-009 — Nervous re-enabled after 223-006 DONE:**
-
-`.deckent/config.json` `nervous_system.enabled` set back to `true` after the non-blocking primitive landed (223-006 prerequisite). Mode: `balanced`. Scan interval optimized (223-008). The sprint-spawn path is now safe regardless of Nervous state.
-
-### Wave D — ADR + Docs + Verification
-
-**223-010 — REPL smoke-verify harness:**
-`scripts/repl-smoke-verify.mjs` — run-proven checks against `dist/cli/entry.js`: `/help` response time, 2-message performance (persistent reuse <8 s), conversation layout separation.
-
-**223-011 — This ADR + MASTER-PLAN update** (this task).
-
-**223-012 — blueprint.md updated:** native REPL speed (persistent, 2nd message <1 s) + GUI-UX (user↔deckent visual separation) + nervous lightweight.
-
-**223-013 — `sprint-finalizer.ts` orphan fix:** finalize now writes `status:'COMPLETED'` to `sprint-state.json` + clears `pids/<sprintId>.pid` — eliminates the "orphan sprint detected" false-positive on next start.
+**224-012 (this ADR + MASTER-PLAN update):**
+ADR-086 accepted; MASTER-PLAN §10 Sprint 224 outcome + F11 status updated.
 
 ---
 
@@ -8462,57 +8412,78 @@ REPL `/nervous` slash command reads `.deckent/panic-ipc/pending/` and renders pe
 
 ### Positive
 
-- **REPL speed:** 2nd message warm-reuse — target <1 s (vs ~7–8 s cold per turn previously). 2-message total: <8 s (vs ~17 s). The persistent-session module's promise is now fulfilled at runtime, not just in tests.
-- **Conversation legibility:** `renderUserMessage`/`renderAssistantHeader`/`messageSeparator` give deckent a claude-code-quality conversation layout. User input is visible; deckent responses are clearly demarcated.
-- **Nervous unblocks sprints:** `evaluatePanicGate` advisory mode returns immediately — worker-spawn critical path is no longer dependent on Nervous approval latency. Nervous is re-enabled safely.
-- **Resource footprint reduced:** idle-throttle + lazy-detector reduce RAM/CPU overhead when no sprint is active.
-- **Sprint lifecycle clean:** `sprint-finalizer.ts` orphan fix prevents false-positive "orphan sprint" on next `deckent start`.
+- **Terminal-mode parity:** readline terminal-mode gives ↑/↓ history, cursor movement —
+  matches claude-code CLI UX.
+- **True streaming:** token-by-token rendering from Claude SSE; no more chunky whole-reply.
+- **Brand identity in motion:** kraken `● deckent · <fiil>…` header — recognizable,
+  consistent per ADR-021.
+- **Agentic-DO unblocked:** write/edit/read/bash in REPL session, `<deckent_tool>` protocol
+  provider-agnostic. Agentic-DO E2E smoke run-proven.
+- **Permission memory:** claude-code-style `always` option — power users not prompted
+  repeatedly. `.deckent/settings.local.json` gitignored, per-machine.
+- **`/nervous` slash live:** pending nervous proposals accessible from REPL without leaving
+  the session.
+- **AI planner honest:** discriminant error union surfaces real failure reason; no more
+  silent structured fallback.
+- **Nervous re-enabled:** proactive meta-orchestrator active again after Sprint 223 disable.
+- **Smoke harnesses:** agentic-DO write-verify + REPL smoke all run-proven, not mock-only.
 
 ### Negative / Limitations
 
-- **persistent-session claude-only:** Codex/Gemini/Ollama remain per-turn. Justification: claude CLI cold-start (~4.5 s) is large enough to warrant a persistent session; other CLIs have faster initialization.
-- **Hermetic test boundary:** Tests mock the spawn path; real-binary persistent-session performance verified via smoke script (`repl-smoke-verify.mjs`), not unit tests.
-- **Nervous `awaiting-approval` mode still blocking (by design):** `awaitPanicGateApproval` with `mode:'awaiting-approval'` still waits (up to timeout). This is correct behavior for explicit approval-required gates — the advisory path is the default.
-- **GUI-UX TTY-only:** pipe output is plain text. This is correct behavior (scripts should not receive ANSI codes), but interactive visual testing requires a real TTY.
+- **F11-007 (pinned input bar), F11-008 (interactive `/` menu), F11-009 (markdown-stream),
+  F11-010 (token-counter), F11-011 (live activity), F11-012 (UTF-8/Turkish), F11-013
+  (clickable paths):** not in Sprint 224 dogfood scope — REPL render core is coupled and
+  handled by hand in separate session to avoid parallel collision.
+- **F11-014 (multi-provider parity):** codex/gemini per-turn today; persistent + agentic
+  parity post-Sprint 224.
+- **Agentic-DO hermetic test boundary:** real `dist/cli/entry.js` required; smoke skips if
+  `dist/` absent (hermetic CI compliance).
+- **nervous A/B advisory:** SPAWN non-blocking confirmed but nervous runtime still advisory
+  V1 — hard-flip post-GA V2 per ADR-037.
 
 ---
 
 ## Alternatives Considered
 
-### Keep Per-Turn Spawn (Sprint 222 Status Quo)
+### Continue Chunky Streaming (no token-by-token)
 
-Keep `spawnFn(binary, [...args, prompt])` per-turn and simply accept the ~7 s per-message latency. Rejected: Alperen run-verify confirmed 17 s for 2 messages — this is not "deckent gerçekten hızlı" (deckent genuinely fast). The persistent-session module existed and was tested; wiring it was the minimum-diff fix.
+Deferring streaming fix would have kept the per-turn latency perception poor. Rejected:
+the streaming wire (`stream_event` unwrap) was a two-file change — surgical, high impact.
 
-### Panic-Gate: Hard Timeout Only (No Advisory Mode)
+### New readline Abstraction Layer
 
-Replace the silent-block with a fixed 10-second timeout, always waiting. Rejected: a 10-second stall on every sprint start is visible latency and no better UX than the old block for the common case. Advisory mode (default: proceed immediately + warn) is the right default; explicit `awaiting-approval` mode for operations that genuinely need a gate.
+Introduce a separate `terminal-readline.ts` wrapper for TTY mode. Rejected: Karpathy
+Discipline 2 (Simplicity) — a single `terminal: true` option in the existing readline
+init achieved the goal. No new abstraction needed.
 
-### Nervous Remain Disabled
+### spawnSync for Agentic-DO Tools
 
-Leave `nervous_system.enabled: false` permanently post-222. Rejected: Nervous is a core feature (ADR-040); disabling it permanently would be a regression. The correct fix is making the gate non-blocking so Nervous can be re-enabled safely.
+`spawnSync` for the bash tool in agentic-DO. Rejected: ADR-006 (spawnSync Security Pattern)
+forbids blocking sync for user commands; CI-hermeticity rule also blocks `spawnSync` in
+tests. Async `spawn` with timeout guard used instead.
 
-### Separate Chat-Layout as a New Runtime Dependency (e.g. chalk)
+### Permission Memory in memory.db
 
-Use an npm package for terminal color/formatting. Rejected: ADR-010 (Tek Runtime Dependency — zero new runtime deps). Node.js built-in ANSI escape codes (`\x1b[...]`) suffice for the required primitives.
+Store `permissions.allow` in SQLite `memory.db`. Rejected: per-machine settings (not
+project-wide knowledge) belong outside the git-tracked memory; `.deckent/settings.local.json`
+(gitignored, flat JSON) matches the claude-code `settings.local.json` pattern.
 
 ---
 
 ## References
 
-- Sprint 223 — feat(sprint-223): persistent-session wire + GUI-UX + nervous non-blocking
-- ADR-083 — REPL-UX-Evolution + Provider-Parity + Local-Model-Foundation (Sprint 221 predecessor)
-- ADR-082 — Native-LLM-Wire + Nervous-Activation (Sprint 220)
-- ADR-081 — Native Agentic Deckent — `deckent` argümansız REPL (Sprint 219)
-- ADR-040 — Nervous System Architecture — Proactive Meta-Orchestrator
-- ADR-010 — Tek Runtime Dependency (no new runtime deps — Node ANSI only)
-- `src/cli/entry.ts` — `buildReplProvider` claude branch (persistent-session wire)
-- `src/cli/commands/chat-session.ts` — `createPersistentClaudeSession`, `stream()`
-- `src/cli/commands/chat-layout.ts` — `renderUserMessage`, `renderAssistantHeader`, `messageSeparator`
-- `src/cli/commands/chat-native.ts` — `runChatNativeLoop` (layout wire)
-- `src/cli/commands/chat-banner.ts` — `renderBanner`
-- `src/cli/commands/chat-nervous-bridge.ts` — `getPendingNervous`, `renderNervousPrompt`
-- `src/nervous/panic-gate.ts` — `evaluatePanicGate`, `awaitPanicGateApproval`
-- `src/nervous/observer.ts` — resource-optimized scan loop
-- Memory: `project_terminal_dashboard_ux_evolution` — persistent wire-gap + GUI-UX + speed measurement
-- Memory: `project_nervous_panic_gate_silent_block` — panic-gate spawn-block + OOM-config
-- Memory: `feedback_wiring_pct_vs_user_working` — module shipped ≠ module wired (Sprint 222 lesson)
+- Sprint 224 — feat: Native CLI Parity (F11) + nervous wire + AI plan-fix + smoke harnesses
+- ADR-083 — REPL Tam-Kapsam + Provider-Parity (Sprint 221 predecessor)
+- ADR-082 — Native-LLM-Wire (Sprint 220)
+- ADR-081 — Native Agentic Deckent (Sprint 219)
+- ADR-079 — Proof-of-Function DoD (Tier-0/Tier-1 + Smoke gate)
+- ADR-021 — Kraken ASCII Brand Identity
+- ADR-010 — Tek Runtime Dependency (no new deps — chalk already in deps)
+- ADR-006 — spawnSync Security Pattern (agentic bash tool uses async spawn)
+- `src/cli/commands/chat-native.ts` — terminal-mode readline + `/nervous` wire + agentic-DO wire
+- `src/cli/commands/chat-agentic-do.ts` — `<deckent_tool>` protocol, write/edit/read/bash
+- `src/cli/entry.ts` — `renderBanner` call, permission-memory init
+- `src/orchestra/planner.ts` — discriminant union `callBrainPlanner`
+- `scripts/agentic-do-verify.mjs` — run-proven agentic-write E2E smoke
+- `scripts/repl-smoke-verify.mjs` — REPL smoke harness (terminal/streaming/perms/menu)
+- `.deckent/config.json` — `nervous_system.enabled: true` (re-enabled Sprint 224-010)

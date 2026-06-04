@@ -2,6 +2,21 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint226] - 2026-06-04
+
+### Added
+
+- 226-001 — Authority adapter (checkAuthority → AuthorityChecker)
+- 226-002 — Audit adapter (writeEvent → AuditSink)
+- 226-003 — Approval gate adapter (nervous Executor → ApprovalGate, OTO-APPROVE YOK)
+- 226-004 — Action executor adapter (ActionHandler registry → ActionExecutor)
+- 226-005 — Trigger source adapter (scheduled-flow + self-dispatch → TriggerSource)
+- 226-006 — [P0] Sürekli loop + composition root (DORMANT'I ÖLDÜRÜR)
+- 226-007 — [P0] `deckent autonomous` CLI (start/stop/status, Tier-1 user-surface)
+
+
+_Tasks: 7 total, 7 done, 0 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint225] - 2026-06-03
 
 ### Added
