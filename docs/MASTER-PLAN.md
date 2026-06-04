@@ -496,7 +496,7 @@ Per Alperen's direction: **combine sprints, write larger comprehensive tasks** (
 
 ## 10A. Completion Roadmap — 5-10 Sprint Arc (AS sequencing)
 
-> **Onaylı sıra (Alperen 2026-06-04):** run-ready'ler önce, sonra fresh-design. **"Tamamlanmış ürün = agentic run ecosystem"** bu arkla gerçekleşir (DIRECTIVES 224 ✅ + 225/226 + AS-1…AS-6). Her sprint koşmadan önce DIRECTIVES.md'de **tek-sprint'e izole** + **commit-first** (`project_deckent_self_git_mutation_bug`). Sprint sayacı label'dan bağımsız otomatik artar. **Şu anki baş: S1 = Sprint 225.**
+> **Onaylı sıra (Alperen 2026-06-04):** run-ready'ler önce, sonra fresh-design. **"Tamamlanmış ürün = agentic run ecosystem"** bu arkla gerçekleşir (DIRECTIVES 224 ✅ + 225/226 + AS-1…AS-6). Her sprint koşmadan önce DIRECTIVES.md'de **tek-sprint'e izole** + **commit-first** (`project_deckent_self_git_mutation_bug`). Sprint sayacı label'dan bağımsız otomatik artar. **Şu anki baş: S1 = Sprint 225** (live `DIRECTIVES.md`). **Koşulabilir backlog DIRECTIVES'ler:** `docs/sprints/` (S3 AS-5·P1, S4 AS-4·P1, S7 AS-3·P1 hazır; S2=226 `.brain/archive/`'de; S5/S6/S8-10 TODO) — swap rehberi `docs/sprints/README.md`.
 
 | # | Sprint | İçerik | Alt-sistem | Maliyet | Durum |
 |---|--------|--------|------------|---------|-------|
