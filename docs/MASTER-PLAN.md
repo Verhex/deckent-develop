@@ -262,7 +262,7 @@ F1-009 (8-provider fleet, ~95% iç-wiring — **gerçek any-key worker fleet = b
 | **AS-1** | Dormant wake-up + ölçek sertleştirme | uykudaki primitive'leri uyandır + 50-100 worker ölçek | 🔜 kısmen planlı | Sprint 225/226, W-K(226), W-K-detail (1/2/4/7), F3-010, F7-004 | Windows Job-Object, PTY `worker-attach`, RBAC-hard pre-write, 429-switch, cost↔billing köprüsü, auditor-async, docker-parallel spawn, `planDispatch` wire (kullanıcının 21-task planından merge) |
 | **AS-2** | Gerçek multi-provider / any-key | per-worker mixed fleet, config-registry, agentic HTTP-worker, Bedrock | ✅ **tasarım §4A** | F1-009..015, F6 | Faz 1-4 impl (Ollama-first, API cost-deferred) |
 | **AS-3** | Zero-hardcode + tam i18n | ~170 dosyada hardcoded string → `getMessage`; canlı-veri (stale const yok); "every-nation" | 🔜 planlı | W-A (i18n), W-K-detail (8/9), `feedback_zero_hardcode_live_data`, `feedback_god_level_i18n_quality_bar` | `getMessage` 31 → tüm user-facing; MCP tool-desc i18n wrapper; `.codex`/`.gemini` rules sync; multi-provider docs accuracy |
-| **AS-4** | Provider-native yetenekler | her sağlayıcının kendi gücü: Claude plugins / ultracode (workflow) / provider-native MCP kullanımı | 🔜 proposed | F11-015 (REPL MCP), F9 | mimari brainstorm gerek (her provider'ın native capability yüzeyi) |
+| **AS-4** | Provider-native yetenekler | her sağlayıcının kendi gücü: Claude plugins / ultracode (workflow) / provider-native MCP / skills / subagents — provider-agnostic Capability Realization Layer + fallback | ✅ **tasarım §4D** | F11-014/015, AS-5 (MCP köprü), AS-2 | Faz 1-3 impl (persona/MCP native → skills/plugins → nested workflow flag-gated) |
 | **AS-5** | MCP-CLIENT (dünyayla entegrasyon) | deckent'i server-only'den **MCP tüketicisine** evriltme; Claude-parity (her ortamda kur/kullan); harici sistemlerle veri alışverişi, enterprise-grade | ✅ **tasarım §4C** | F9-001/002/003, F11-015, F8, #ERP | Faz 1-3 impl (broker+REPL+CLI → worker → otonom/enterprise) |
 | **AS-6** | Otonom + process/batch mode | uzun-yaşayan, event-driven, yetki-sınırlı; "sadece developer değil herkes için" agentic-OS | 🔜 Sprint 225 + F3 | F3-001..009, Sprint 225, ADR-040 (nervous) / ADR-037 (RBAC) | 5 adapter + sürekli loop + `deckent autonomous` CLI (225); batch-mode; full-autonomy süreçleri |
 
@@ -297,6 +297,38 @@ Harici MCP tool'ları keyfi yan-etkili (mail.send, db.write, shell). AS-2'nin au
 
 ### Çapraz ref
 F9-001/002/003 · F11-015 (REPL MCP) · F8 (capability broker — üst soyutlama; MCP-client onun bir backend'i olabilir) · #ERP · **AS-4** (provider-native MCP ile akraba) · **AS-6** (otonom tüketici) · ADR-037 (RBAC) / ADR-040 (nervous) / ADR-062 (audit chain) / ADR-004 (3-katman config) / ADR-012 (CLI register) / ADR-010 (SDK zaten dep). Memory: `project_deckent_runtime_ecosystem` · `project_embedded_web_terminal`.
+
+---
+
+## 4D. AS-4 — Provider-Native Capabilities (Capability Realization Layer)
+
+> **Comprehensive design — 2026-06-04 (Alperen).** Bugün deckent provider CLI'larını **çıplak prompt + text-injection** ile çağırıyor (Karpathy/ADR/skill metin); hiçbir native güç (Claude plugins / ultracode-Workflow / native MCP / native skills / subagents) kullanılmıyor. AS-4 her sağlayıcının **KENDİ gücünü** açar — ama multi-provider parity'yi (AS-2) bozmadan: provider-agnostic **Capability Realization Layer**.
+
+### Çekirdek prensip — soyut yetenek → per-provider native gerçekleme + graceful fallback
+deckent bir worker/REPL için soyut **capability set** bildirir: `{persona, nativeTools, mcpServers, nativeSkills, workflow}`. Her `ProviderAdapter` bunları **native** gerçekler; desteklemeyen **text-injection'a düşer** (bugünkü davranış = fallback). Böylece Gemini/ollama bozulmaz, Claude tam gücü açar.
+
+| Soyut capability | Claude native | Codex/Gemini | Fallback (hepsi) |
+|---|---|---|---|
+| persona (agent) | `--append-system-prompt` + `--agents` (subagent) | muadil flag/config | prompt'a text |
+| nativeTools | `--allowedTools` (zaten) + native tool seti | `--full-auto` / approval-mode | text talimat |
+| mcpServers | `--mcp-config` (provider KENDİ MCP'sini koşar) | codex/gemini mcp config | AS-5 broker (deckent-side) |
+| nativeSkills | `--setting-sources` + `.claude/skills`/plugins | — | skill metin (bugünkü) |
+| workflow (ultracode) | Claude Workflow tool (nested orchestration) | — | tek-pass worker |
+
+### Mimari bileşenler
+1. **CapabilitySpec + Realizer** — task/worker capability set'i; `adapter.realizeCapabilities(spec) → {extraArgs, extraEnv, promptAugment}` (opsiyonel adapter metodu).
+2. **ProviderAdapter genişletme** — Claude adapter native flag üretir (`--append-system-prompt`/`--agents`/`--mcp-config`/`--setting-sources`); diğerleri muadil ya da fallback.
+3. **Claude-first impl** — `buildCommand`'a capability-derived args; `.claude/` native skill/plugin/subagent + plugin marketplace (superpowers vb.) opt-in; `--mcp-config` **AS-5 broker config'inden türetilir** (AS-4 ↔ AS-5 köprü).
+4. **Nested orchestration (ultracode/Workflow) — flag-gated ayrı faz** — Claude worker session-içi Workflow koşar (deckent→Claude→sub-agents). Güçlü ama recursive/maliyet → **default-OFF, flag-gated, cost-gate sınırlı**.
+5. **Graceful degradation contract** — capability desteklenmiyorsa sessizce text-fallback (+opsiyonel log); davranış-eşdeğer (mevcut text-injection `feedback_prompt_completeness_over_brevity` korunur).
+
+### Fazlama
+- **Faz 1 — Capability Realizer + Claude persona/MCP native:** CapabilitySpec + `realizeCapabilities` + Claude `--append-system-prompt`/`--agents`/`--mcp-config` (AS-5 ile) + fallback contract. Worker persona native + Claude kendi MCP'sini koşar.
+- **Faz 2 — Native skills/plugins:** `--setting-sources` + `.claude/skills`/plugin (superpowers vb.) opt-in; deckent-skill → native-skill map.
+- **Faz 3 — Nested workflow (ultracode), flag-gated:** Claude Workflow nested orchestration + cost-gate guard; Codex/Gemini muadil keşfi.
+
+### Çapraz ref
+F11-014 (multi-provider parity) · F11-015 · **AS-5** (native MCP passthrough köprü) · **AS-2** (provider-agnostic core korunur) · ADR-079 (proof-of-function) · ADR-010. Memory: `feedback_prompt_completeness_over_brevity` (text-injection bugünkü temel — fallback olarak korunur) · `project_deckent_runtime_ecosystem`.
 
 ---
 
@@ -422,6 +454,7 @@ Per Alperen's direction: **combine sprints, write larger comprehensive tasks** (
 | **AS-2·P2–P4** | **🔜 Mixed fleet + REPL switcher / failover / Bedrock (API flag-gated OFF)** | §4A AS-2 Faz 2-4 — any-key OpenAI-compat config + per-worker mixed fleet + REPL/terminal provider-switch parity + non-leak fleet test (P2); overflow/fallback/429-switch + models.dev dynamic (P3, F1-010/011); Bedrock SigV4 +Vertex (P4, F1-015). **Maliyet:** yalnız ucuz-key basit sprint / ayrı sandbox proje / deckent-hub geliştirmesinde egzersiz; beta'da default-OFF. AS-6/F3 otonomun enabler'ı. |
 | **AS-5·P1** | **🔜 MCP-client broker + REPL + yönetim CLI (Claude-parity)** | §4C AS-5 Faz 1 — `McpClientBroker` (`src/mcp-client/`, SDK Client, yeni dep yok) + 3-scope `.mcp.json` + `deckent mcp add/list/remove` + `/mcp` + dynamic discovery + REPL confirm-gate dispatch + audit. Thin e2e: yerel stdio reference server ekle→listele→agentic çağır→audit. Yerel/ücretsiz. F9-001/002, F11-015. |
 | **AS-5·P2–P3** | **🔜 Worker surface + otonom/enterprise MCP-client** | §4C AS-5 Faz 2-3 — worker tool-injection + IPC→broker + RBAC scope/non-leak test (P2); AS-6 action-executor wire + remote HTTP+OAuth + per-tenant isolation + risk-tagged approval + dashboard MCP sayfası (P3). F9-003, F10-002, ADR-037/040. |
+| **AS-4·P1–P3** | **🔜 Provider-native capabilities (Capability Realization Layer)** | §4D AS-4 Faz 1-3 — CapabilitySpec + `realizeCapabilities` + Claude `--append-system-prompt`/`--agents`/`--mcp-config` native + graceful text-fallback (P1, AS-5 köprü); native skills/plugins `--setting-sources`/superpowers opt-in (P2); nested ultracode/Workflow flag-gated + cost-gate (P3). Multi-provider parity korunur (AS-2). |
 | **227+** | **F2 Native SDK (Path C) + F9 MCP-client + Publish Readiness** | Real standalone SDK; zero-prerequisite `npx deckent`; MCP client (consume external); secret-scrub/gitleaks; .github eksikleri; 96%-claim doğrulama; threat-model — Q3 2026 |
 | **post-beta** | **Provider/local LLM + million-user hardening** | F1-004/005, sub-#5 Ollama/CUDA fully-local preset, OTel/Prometheus (W-J), ADR-037 hard-flip V2, sub-#2 self-security |
 | **post-beta (gated)** | **Voice + Mobile (milestone-gated)** | Voice (STT Whisper, wake-word Porcupine, TTS, real-time streaming) gated behind **10K GitHub stars**; Mobile (React Native iOS/Android MCP client, APNs+FCM push, Contacts/GPS/camera skills) gated behind **50K stars**. Both not built — zero source references |
