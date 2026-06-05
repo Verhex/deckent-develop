@@ -29,6 +29,14 @@ export interface TriggerSourceDeps {
   scheduler?: FlowScheduler;
   /** Optional clock for deterministic tests. */
   clock?: () => Date;
+  /**
+   * Optional re-drive source (APPROVE-006 run-on-approve). Yields a parked
+   * trigger whose human decision is recorded, so the loop applies the approval
+   * promptly instead of waiting for the flow's next fire. Checked FIRST — ahead
+   * of scheduled flows and even when `policy.disabled` — because a recorded
+   * human approval is an explicit instruction the loop should honour.
+   */
+  resolvedProvider?: () => AutonomousTrigger | null;
 }
 
 /** Payload carried by triggers produced from scheduled-flow dispatches. */
@@ -62,6 +70,11 @@ export function makeTriggerSource(deps: TriggerSourceDeps): TriggerSource {
 
   return {
     async next(): Promise<AutonomousTrigger | null> {
+      // APPROVE-006: a recorded human approval is re-emitted first — ahead of
+      // queued/scheduled triggers and even when the policy is disabled.
+      const resolved = deps.resolvedProvider?.();
+      if (resolved) return resolved;
+
       const queued = queue.shift();
       if (queued) return queued;
 

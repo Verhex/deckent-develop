@@ -35,6 +35,13 @@ export interface PendingApproval {
   action: string;
   requestedBy: string;
   enqueuedAt: string;
+  /**
+   * Full parked trigger, stored so the loop can REPLAY it once a decision is
+   * recorded (APPROVE-006 run-on-approve). Optional for backward compat with
+   * older 4-field pending.json entries — takeResolved() reconstructs a minimal
+   * trigger when absent.
+   */
+  trigger?: AutonomousTrigger;
 }
 
 export interface ApprovalGateAdapter extends ApprovalGate {
@@ -44,6 +51,14 @@ export interface ApprovalGateAdapter extends ApprovalGate {
   reject(triggerId: string, reason?: string): void;
   /** Snapshot of currently-pending approvals. */
   pending(): readonly PendingApproval[];
+  /**
+   * Return a parked trigger whose decision is recorded ON DISK (cross-process),
+   * so the trigger source can re-emit it and the cycle's request() consumes the
+   * decision (APPROVE-006). Returns ONLY decided triggers — never an undecided
+   * park (which would busy-loop the zero-sleep active path). Does NOT consume:
+   * request() removes the pending entry + decision when it applies them.
+   */
+  takeResolved(): AutonomousTrigger | null;
 }
 
 export interface ApprovalGateOptions {
@@ -163,6 +178,7 @@ export function makeApprovalGate(opts: ApprovalGateOptions = {}): ApprovalGateAd
           action: trigger.action,
           requestedBy: trigger.requestedBy,
           enqueuedAt: now(),
+          trigger,
         });
         persist();
       }
@@ -194,6 +210,27 @@ export function makeApprovalGate(opts: ApprovalGateOptions = {}): ApprovalGateAd
 
     pending(): readonly PendingApproval[] {
       return [...pendingMap.values()];
+    },
+
+    takeResolved(): AutonomousTrigger | null {
+      // Disk-backed (cross-process): the human decision was written by a
+      // separate `autonomous approve/reject` process, so consult decisions.json
+      // — NOT the in-memory `resolved` map (which is empty in the loop process).
+      const decisions = loadDecisions();
+      for (const entry of pendingMap.values()) {
+        const decision = decisions[entry.triggerId];
+        if (decision && decision.outcome !== 'pending') {
+          return (
+            entry.trigger ?? {
+              id: entry.triggerId,
+              source: 'autonomous-redrive',
+              action: entry.action,
+              requestedBy: entry.requestedBy,
+            }
+          );
+        }
+      }
+      return null;
     },
   };
 }

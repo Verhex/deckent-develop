@@ -86,6 +86,9 @@ export function buildAutonomousRuntime(
     flows: opts.flows,
     policy: opts.policy,
     clock: opts.clock,
+    // APPROVE-006: re-drive parked approvals once a human decision is recorded
+    // so the loop applies it within the next cycle (run-on-approve).
+    resolvedProvider: () => approvalGate.takeResolved(),
   });
 
   const deps: AutonomousRuntimeDeps = {
