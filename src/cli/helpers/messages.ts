@@ -454,6 +454,51 @@ const MESSAGES: MessageMap = {
     en: 'Stop signal written — active loop will halt after the in-flight cycle.',
     tr: 'Durdurma sinyali yazıldı — aktif döngü mevcut cycle sonrası duracak.',
   },
+  // ─── autonomous approve/reject/pending + live feedback (APPROVE-002, §4G) ──
+  'autonomous.approve_done': {
+    en: '✓ Approved: {triggerId} (decision recorded — applied when this trigger is next re-evaluated).',
+    tr: '✓ Onaylandı: {triggerId} (karar kaydedildi — bu tetik tekrar değerlendirildiğinde uygulanır).',
+  },
+  'autonomous.reject_done': {
+    en: '✗ Rejected: {triggerId}',
+    tr: '✗ Reddedildi: {triggerId}',
+  },
+  'autonomous.resolve_not_found': {
+    en: 'No pending trigger found: {triggerId}',
+    tr: 'Bekleyen tetik bulunamadı: {triggerId}',
+  },
+  'autonomous.id_required': {
+    en: 'A trigger id is required.',
+    tr: 'Tetik id gerekli.',
+  },
+  'autonomous.pending_header': {
+    en: 'Pending approvals ({count}):',
+    tr: 'Bekleyen onaylar ({count}):',
+  },
+  'autonomous.pending_none': {
+    en: 'No pending approvals.',
+    tr: 'Bekleyen onay yok.',
+  },
+  'autonomous.pending_row': {
+    en: '  - {triggerId} | {action} | by {requestedBy} | {enqueuedAt}',
+    tr: '  - {triggerId} | {action} | {requestedBy} | {enqueuedAt}',
+  },
+  'autonomous.tick': {
+    en: '[autonomous] {outcome} — {action} ({triggerId}): {reason}',
+    tr: '[autonomous] {outcome} — {action} ({triggerId}): {reason}',
+  },
+  'autonomous.notify_pending_title': {
+    en: 'Autonomous approval required',
+    tr: 'Otonom onay gerekiyor',
+  },
+  'autonomous.notify_pending_summary': {
+    en: '{action} ({triggerId}) is awaiting human approval — run: deckent autonomous approve {triggerId}',
+    tr: '{action} ({triggerId}) insan onayı bekliyor — çalıştır: deckent autonomous approve {triggerId}',
+  },
+  'autonomous.audit_row': {
+    en: '  - {ts} {action} -> {outcome}: {reason}',
+    tr: '  - {ts} {action} -> {outcome}: {reason}',
+  },
 };
 
 /**

@@ -21,7 +21,7 @@ import {
   readFileSync,
   writeFileSync,
 } from 'node:fs';
-import { dirname } from 'node:path';
+import { dirname, join } from 'node:path';
 import type { Executor } from '../../nervous/executor.js';
 import type {
   ApprovalDecision,
@@ -49,6 +49,14 @@ export interface ApprovalGateAdapter extends ApprovalGate {
 export interface ApprovalGateOptions {
   /** Optional file path for persisting the pending queue (224-008 shape). */
   pendingPath?: string;
+  /**
+   * Optional file path for persisting cross-process decisions. Defaults to a
+   * `decisions.json` sibling of pendingPath. This is the channel that lets a
+   * separate `deckent autonomous approve/reject` process resolve the running
+   * loop's gate: accept()/reject() record the human decision here, and request()
+   * re-reads it on every cycle. (APPROVE-001, MASTER-PLAN §4G.)
+   */
+  decisionsPath?: string;
   /** Optional clock override for deterministic tests. */
   now?: () => string;
   /** Optional nervous Executor delegate — accept/reject also calls resolveApproval. */
@@ -66,6 +74,47 @@ export function makeApprovalGate(opts: ApprovalGateOptions = {}): ApprovalGateAd
   const now = opts.now ?? isoNow;
   const pendingMap = new Map<string, PendingApproval>();
   const resolved = new Map<string, ApprovalDecision>();
+
+  // Cross-process decision channel — sibling of pending.json unless overridden.
+  const decisionsPath =
+    opts.decisionsPath ??
+    (opts.pendingPath
+      ? join(dirname(opts.pendingPath), 'decisions.json')
+      : undefined);
+
+  type DecisionMap = Record<string, ApprovalDecision>;
+
+  function loadDecisions(): DecisionMap {
+    if (!decisionsPath || !existsSync(decisionsPath)) return {};
+    try {
+      const data = JSON.parse(readFileSync(decisionsPath, 'utf-8'));
+      return data && typeof data === 'object' ? (data as DecisionMap) : {};
+    } catch {
+      return {};
+    }
+  }
+
+  function writeDecisions(map: DecisionMap): void {
+    if (!decisionsPath) return;
+    const dir = dirname(decisionsPath);
+    if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+    writeFileSync(decisionsPath, JSON.stringify(map, null, 2) + '\n', 'utf-8');
+  }
+
+  function recordDecision(triggerId: string, decision: ApprovalDecision): void {
+    const map = loadDecisions();
+    map[triggerId] = decision;
+    writeDecisions(map);
+  }
+
+  function clearDecision(triggerId: string): void {
+    if (!decisionsPath) return;
+    const map = loadDecisions();
+    if (triggerId in map) {
+      delete map[triggerId];
+      writeDecisions(map);
+    }
+  }
 
   if (opts.pendingPath && existsSync(opts.pendingPath)) {
     try {
@@ -93,10 +142,17 @@ export function makeApprovalGate(opts: ApprovalGateOptions = {}): ApprovalGateAd
 
   return {
     request(trigger: AutonomousTrigger): Promise<ApprovalDecision> {
-      const decision = resolved.get(trigger.id);
+      // A decision may arrive in-memory (same-process accept/reject) OR on disk
+      // (a separate `autonomous approve/reject` process) — check both.
+      let decision = resolved.get(trigger.id);
+      if (!decision || decision.outcome === 'pending') {
+        const onDisk = loadDecisions()[trigger.id];
+        if (onDisk && onDisk.outcome !== 'pending') decision = onDisk;
+      }
       if (decision && decision.outcome !== 'pending') {
         resolved.delete(trigger.id);
         pendingMap.delete(trigger.id);
+        clearDecision(trigger.id);
         persist();
         return Promise.resolve(decision);
       }
@@ -117,18 +173,22 @@ export function makeApprovalGate(opts: ApprovalGateOptions = {}): ApprovalGateAd
     },
 
     accept(triggerId: string, reason?: string): void {
-      resolved.set(triggerId, {
+      const decision: ApprovalDecision = {
         outcome: 'approved',
         reason: reason ?? 'user accepted',
-      });
+      };
+      resolved.set(triggerId, decision);
+      recordDecision(triggerId, decision); // cross-process channel
       opts.executor?.resolveApproval(triggerId, 'accepted');
     },
 
     reject(triggerId: string, reason?: string): void {
-      resolved.set(triggerId, {
+      const decision: ApprovalDecision = {
         outcome: 'rejected',
         reason: reason ?? 'user rejected',
-      });
+      };
+      resolved.set(triggerId, decision);
+      recordDecision(triggerId, decision); // cross-process channel
       opts.executor?.resolveApproval(triggerId, 'rejected');
     },
 

@@ -21,11 +21,20 @@ import {
   buildAutonomousRuntime,
   runAutonomousLoop,
 } from '../../orchestra/autonomous/runtime-loop.js';
+import {
+  makeApprovalGate,
+  type ApprovalGateAdapter,
+} from '../../orchestra/autonomous/approval-adapter.js';
 import { FlowRegistry } from '../../core/flow-registry.js';
+import { notifyAsync } from '../../core/notify.js';
+import { bootstrapNotifyDispatcher } from '../../core/notify-bootstrap.js';
 import type { ActionHandler } from '../../nervous/executor.js';
 import type { ScheduledFlow } from '../../core/scheduled-flow.js';
 import type { SelfDispatchPolicy } from '../../core/self-dispatch.js';
-import type { AutonomousRuntimeConfig } from '../../orchestra/autonomous-runtime.js';
+import type {
+  AutonomousCycleResult,
+  AutonomousRuntimeConfig,
+} from '../../orchestra/autonomous-runtime.js';
 
 // ─── Filesystem layout helpers ────────────────────────────────────────
 
@@ -110,6 +119,11 @@ export async function handleStart(opts: AutonomousStartOptions): Promise<void> {
     ? Math.max(0, parseInt(opts.maxIterations, 10) || 0)
     : undefined;
 
+  // Wire DECKENT→USER:NOTIFY so parked approvals + cycle outcomes reach this
+  // terminal — without it notify() is a silent no-op in pure-CLI runs (§4G).
+  bootstrapNotifyDispatcher({ projectRoot: root });
+  const onTick = makeTickReporter(lang);
+
   print(getMessage('autonomous.start_banner', lang, { flows: String(flows.length) }));
 
   // Wrap sleep so the stop marker triggers abort.
@@ -126,6 +140,7 @@ export async function handleStart(opts: AutonomousStartOptions): Promise<void> {
       maxIterations,
       signal: controller.signal,
       sleep,
+      onTick,
     });
     print(getMessage('autonomous.start_done', lang, {
       iterations: String(summary.iterations),
@@ -186,7 +201,7 @@ export function handleStatus(opts: AutonomousStatusOptions): void {
       const action = (payload['action'] as string | undefined) ?? '?';
       const outcome = (payload['outcome'] as string | undefined) ?? '?';
       const reason = (payload['reason'] as string | undefined) ?? '';
-      print(`  - ${ts} ${action} -> ${outcome}: ${reason}`);
+      print(getMessage('autonomous.audit_row', lang, { ts, action, outcome, reason }));
     } catch {
       // skip malformed audit line
     }
@@ -206,6 +221,139 @@ export function handleStop(opts: AutonomousStopOptions): void {
   ensureAutonomousDir(root);
   writeFileSync(stopMarkerPath(root), new Date().toISOString(), 'utf-8');
   print(getMessage('autonomous.stop_marker_written', lang));
+}
+
+// ─── live feedback (onTick reporter) (APPROVE-002, §4G) ────────────────
+
+export interface TickReporterDeps {
+  /** Output sink — defaults to the CLI print helper. */
+  print?: (line: string) => void;
+  /** Notification sink — defaults to notifyAsync (DECKENT→USER:NOTIFY). */
+  notify?: typeof notifyAsync;
+}
+
+/**
+ * Per-cycle observer wired into runAutonomousLoop.onTick. Prints a feedback
+ * line on outcome change (idle no_trigger suppressed) and fires ONE
+ * notification the first time a trigger parks pending — re-arming if that
+ * trigger later resolves, so a re-park notifies again but a still-pending
+ * trigger does not spam every cycle.
+ */
+export function makeTickReporter(
+  lang: string,
+  deps: TickReporterDeps = {},
+): (result: AutonomousCycleResult) => void {
+  const out = deps.print ?? print;
+  const notifyFn = deps.notify ?? notifyAsync;
+  const notified = new Set<string>();
+  let lastKey = '';
+  return (result: AutonomousCycleResult): void => {
+    if (result.outcome === 'no_trigger') return;
+    const t = result.trigger;
+    const id = t?.id ?? '?';
+    const key = `${id}:${result.outcome}`;
+    if (key !== lastKey) {
+      out(
+        getMessage('autonomous.tick', lang, {
+          outcome: result.outcome,
+          action: t?.action ?? '?',
+          triggerId: id,
+          reason: result.reason,
+        }),
+      );
+      lastKey = key;
+    }
+    if (result.outcome === 'pending' && t && !notified.has(id)) {
+      notified.add(id);
+      notifyFn(
+        'human-checkpoint-required',
+        'autonomous',
+        getMessage('autonomous.notify_pending_title', lang),
+        getMessage('autonomous.notify_pending_summary', lang, {
+          action: t.action,
+          triggerId: id,
+        }),
+      );
+    }
+    if (t && result.outcome !== 'pending') notified.delete(id);
+  };
+}
+
+// ─── approve / reject / pending (APPROVE-002, §4G) ─────────────────────
+
+/** Build a gate bound to this project's pending queue (decisions.json sibling). */
+function approvalGateFor(root: string): ApprovalGateAdapter {
+  return makeApprovalGate({ pendingPath: pendingPath(root) });
+}
+
+export interface AutonomousResolveOptions {
+  triggerId: string;
+  reason?: string;
+  root?: string;
+  lang?: string;
+}
+
+/**
+ * Resolve a parked trigger. Runs in a process SEPARATE from `autonomous start`,
+ * so it records the decision via the file-mediated channel (APPROVE-001); the
+ * running loop applies it on its next cycle. ADR-040: only an explicit
+ * approve/reject resolves — never auto-approve.
+ */
+export function handleApprove(opts: AutonomousResolveOptions): void {
+  resolveTrigger(opts, 'approve');
+}
+
+export function handleReject(opts: AutonomousResolveOptions): void {
+  resolveTrigger(opts, 'reject');
+}
+
+function resolveTrigger(opts: AutonomousResolveOptions, kind: 'approve' | 'reject'): void {
+  const lang = getLanguage(opts.lang);
+  const root = opts.root ?? resolveProjectRoot();
+  if (!opts.triggerId) {
+    printError(new Error(getMessage('autonomous.id_required', lang)));
+    process.exitCode = 1;
+    return;
+  }
+  const gate = approvalGateFor(root);
+  const isPending = gate.pending().some((p) => p.triggerId === opts.triggerId);
+  if (!isPending) {
+    printError(new Error(getMessage('autonomous.resolve_not_found', lang, { triggerId: opts.triggerId })));
+    process.exitCode = 1;
+    return;
+  }
+  if (kind === 'approve') {
+    gate.accept(opts.triggerId, opts.reason);
+    print(getMessage('autonomous.approve_done', lang, { triggerId: opts.triggerId }));
+  } else {
+    gate.reject(opts.triggerId, opts.reason);
+    print(getMessage('autonomous.reject_done', lang, { triggerId: opts.triggerId }));
+  }
+}
+
+export interface AutonomousPendingOptions {
+  root?: string;
+  lang?: string;
+}
+
+/** List parked approvals awaiting a human accept/reject. */
+export function handlePending(opts: AutonomousPendingOptions): void {
+  const lang = getLanguage(opts.lang);
+  const root = opts.root ?? resolveProjectRoot();
+  const items = approvalGateFor(root).pending();
+  if (items.length === 0) {
+    print(getMessage('autonomous.pending_none', lang));
+    return;
+  }
+  print(getMessage('autonomous.pending_header', lang, { count: String(items.length) }));
+  for (const p of items) {
+    print(getMessage('autonomous.pending_row', lang, {
+      triggerId: p.triggerId,
+      action: p.action,
+      requestedBy: p.requestedBy,
+      enqueuedAt: p.enqueuedAt,
+    }));
+  }
 }
 
 // ─── register ─────────────────────────────────────────────────────────
@@ -253,6 +401,50 @@ export function registerAutonomous(program: Command): void {
     .action((opts: AutonomousStopOptions) => {
       try {
         handleStop(opts);
+      } catch (err) {
+        printError(err);
+        process.exitCode = 1;
+      }
+    });
+
+  cmd
+    .command('pending')
+    .description('List parked approvals awaiting human accept/reject')
+    .option('--root <path>', 'Project root override')
+    .option('--lang <code>', 'Language override (en|tr)')
+    .action((opts: AutonomousPendingOptions) => {
+      try {
+        handlePending(opts);
+      } catch (err) {
+        printError(err);
+        process.exitCode = 1;
+      }
+    });
+
+  cmd
+    .command('approve <triggerId>')
+    .description('Approve a parked trigger — resolves the running loop\'s gate')
+    .option('--reason <text>', 'Optional reason recorded with the decision')
+    .option('--root <path>', 'Project root override')
+    .option('--lang <code>', 'Language override (en|tr)')
+    .action((triggerId: string, opts: Omit<AutonomousResolveOptions, 'triggerId'>) => {
+      try {
+        handleApprove({ triggerId, ...opts });
+      } catch (err) {
+        printError(err);
+        process.exitCode = 1;
+      }
+    });
+
+  cmd
+    .command('reject <triggerId>')
+    .description('Reject a parked trigger — resolves the running loop\'s gate')
+    .option('--reason <text>', 'Optional reason recorded with the decision')
+    .option('--root <path>', 'Project root override')
+    .option('--lang <code>', 'Language override (en|tr)')
+    .action((triggerId: string, opts: Omit<AutonomousResolveOptions, 'triggerId'>) => {
+      try {
+        handleReject({ triggerId, ...opts });
       } catch (err) {
         printError(err);
         process.exitCode = 1;
