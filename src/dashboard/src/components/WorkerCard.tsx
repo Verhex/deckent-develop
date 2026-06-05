@@ -7,13 +7,14 @@ import { useTranslation } from "../i18n/LanguageProvider";
 import type { TranslatorProp } from "../i18n/types";
 import { buildSseUrl } from "../lib/api";
 
-const STATUS_BORDER: Record<string, string> = {
-  EXECUTING: "border border-l-4 border-brand-500 animate-pulse",
-  DONE: "border-2 border-green-500",
-  NO_GO: "border-2 border-red-500",
-  ERROR: "border-2 border-red-500",
-  PAUSED: "border-2 border-yellow-500",
-  IDLE: "border-2 border-zinc-700",
+// 2px top status bar (handoff §3): EXECUTING teal gradient, DONE green, etc.
+const STATUS_BAR: Record<string, string> = {
+  EXECUTING: "bg-gradient-to-r from-brand-600 to-brand-400 animate-pulse",
+  DONE: "bg-green-500",
+  NO_GO: "bg-red-500",
+  ERROR: "bg-red-500",
+  PAUSED: "bg-yellow-500",
+  IDLE: "bg-zinc-600",
 };
 
 const STATUS_BADGE: Record<string, "info" | "success" | "critical" | "secondary" | "warning"> = {
@@ -52,6 +53,33 @@ function getModelIcon(model: string): string {
     if (lower.includes(key)) return icon;
   }
   return "🤖";
+}
+
+/** Derive the model tier (gold label) from the model id — client-side, no API
+ *  field (AgentInfo carries only `model`). Mirrors model-registry tiers. */
+type ModelTier = "premium" | "standard" | "economy";
+function getModelTier(model: string): ModelTier {
+  const m = model.toLowerCase();
+  if (m.includes("opus") || m.includes("o3") || m.includes("2.5-pro") || m.includes("gemini-3") || /gpt-5(?!-mini)/.test(m)) {
+    return "premium";
+  }
+  if (m.includes("sonnet") || m.includes("o4-mini") || m.includes("2.5-flash") || /gpt-4\.1(?!-mini)/.test(m)) {
+    return "standard";
+  }
+  return "economy";
+}
+
+/** Derive provider + brand color from the model id (handoff provider colors). */
+const PROVIDER_META = {
+  claude: { label: "Claude", color: "#D97757" },
+  codex: { label: "Codex", color: "#10A37F" },
+  gemini: { label: "Gemini", color: "#4285F4" },
+} as const;
+function getProvider(model: string): { label: string; color: string } {
+  const m = model.toLowerCase();
+  if (m.includes("gpt") || m.includes("o3") || m.includes("o4")) return PROVIDER_META.codex;
+  if (m.includes("gemini")) return PROVIDER_META.gemini;
+  return PROVIDER_META.claude;
 }
 
 function elapsed(startedAt?: string): string {
@@ -130,10 +158,12 @@ function useLiveLogTail(taskId: string | undefined, enabled: boolean): string[] 
 
 export function WorkerCard({ agent, onClick, onKill }: WorkerCardProps) {
   const { t } = useTranslation();
-  const borderClass = STATUS_BORDER[agent.status] ?? "border-zinc-700";
+  const statusBar = STATUS_BAR[agent.status] ?? "bg-zinc-600";
   const badgeVariant = STATUS_BADGE[agent.status] ?? "secondary";
   const statusIcon = STATUS_ICON[agent.status] ?? "○";
   const modelIcon = getModelIcon(agent.model);
+  const tier = getModelTier(agent.model);
+  const provider = getProvider(agent.model);
   const liveLog = useLiveLogTail(
     agent.taskId,
     agent.status === "EXECUTING" && agent.backend === "docker",
@@ -141,15 +171,25 @@ export function WorkerCard({ agent, onClick, onKill }: WorkerCardProps) {
 
   return (
     <div
-      className={`rounded-lg ${borderClass} bg-zinc-900 p-4 cursor-pointer transition-all duration-200 hover:bg-zinc-800/80 hover:scale-[1.02] shadow-lg shadow-zinc-950/50`}
+      className="relative overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900 p-4 cursor-pointer transition-all duration-200 hover:bg-zinc-800/80 hover:-translate-y-0.5 shadow-lg shadow-zinc-950/50"
       onClick={onClick}
     >
-      {/* Header: Worker ID + Model badge + Backend badge */}
+      {/* 2px top status bar (handoff §3) */}
+      <div className={`absolute inset-x-0 top-0 h-0.5 ${statusBar}`} data-testid="worker-status-bar" />
+
+      {/* Header: Worker ID + provider bar + tier + Model/Backend badges */}
       <div className="flex items-center justify-between mb-3">
         <span className="font-mono text-sm text-zinc-100">
           🤖 {agent.id}
         </span>
         <div className="flex items-center gap-1.5">
+          {/* Provider color bar (3px) — Claude clay / Codex green / Gemini blue */}
+          <span
+            className="inline-block h-3.5 w-[3px] rounded-full"
+            style={{ backgroundColor: provider.color }}
+            title={provider.label}
+            data-testid="worker-provider-bar"
+          />
           {agent.backend && BACKEND_BADGE[agent.backend] && (
             <span className={`text-xs px-1.5 py-0.5 rounded font-mono ${BACKEND_BADGE[agent.backend].className}`}>
               {BACKEND_BADGE[agent.backend].label}
@@ -158,6 +198,10 @@ export function WorkerCard({ agent, onClick, onKill }: WorkerCardProps) {
           <Badge variant="outline" className="text-xs">
             {modelIcon} {agent.model}
           </Badge>
+          {/* Tier label — gold (handoff signature) */}
+          <span className="font-mono text-[10px] uppercase tracking-wide text-gold" data-testid="worker-tier">
+            {tier}
+          </span>
         </div>
       </div>
 

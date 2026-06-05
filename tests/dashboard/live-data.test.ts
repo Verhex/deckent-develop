@@ -83,9 +83,9 @@ describe("dashboard/live-data — WorkerCard", () => {
     expect(existsSync(filePath)).toBe(true);
   });
 
-  it("defines STATUS_BORDER mapping", () => {
+  it("defines STATUS_BAR mapping", () => {
     const content = readFileSync(filePath, "utf-8");
-    expect(content).toContain("STATUS_BORDER");
+    expect(content).toContain("STATUS_BAR");
   });
 
   it("EXECUTING status has animate-pulse class", () => {
@@ -93,14 +93,14 @@ describe("dashboard/live-data — WorkerCard", () => {
     expect(content).toMatch(/EXECUTING.*animate-pulse/);
   });
 
-  it("DONE status has green border", () => {
+  it("DONE status has green status bar", () => {
     const content = readFileSync(filePath, "utf-8");
-    expect(content).toMatch(/DONE.*border-green/);
+    expect(content).toMatch(/DONE.*bg-green/);
   });
 
-  it("NO_GO status has red border", () => {
+  it("NO_GO status has red status bar", () => {
     const content = readFileSync(filePath, "utf-8");
-    expect(content).toMatch(/NO_GO.*border-red/);
+    expect(content).toMatch(/NO_GO.*bg-red/);
   });
 
   it("renders agent id", () => {
