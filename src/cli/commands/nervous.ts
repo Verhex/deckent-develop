@@ -10,6 +10,7 @@ import { join } from 'node:path';
 import { existsSync, readFileSync, writeFileSync, appendFileSync, mkdirSync, watchFile, unwatchFile, readdirSync } from 'node:fs';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { print, printError } from '../helpers/output.js';
+import { getLanguage, getMessage } from '../helpers/messages.js';
 import type {
   NervousNotification,
   ExecutionRecord,
@@ -155,15 +156,15 @@ function generateRecordForDecision(
 
 // ─── Time Formatting ────────────────────────────────────────────────────────
 
-function timeAgo(isoString: string): string {
+function timeAgo(isoString: string, lang: string): string {
   const diff = Date.now() - new Date(isoString).getTime();
   const minutes = Math.floor(diff / 60000);
-  if (minutes < 1) return 'az önce';
-  if (minutes < 60) return `${minutes}dk önce`;
+  if (minutes < 1) return getMessage('nervous.time_just_now', lang);
+  if (minutes < 60) return getMessage('nervous.time_minutes', lang, { n: String(minutes) });
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}sa önce`;
+  if (hours < 24) return getMessage('nervous.time_hours', lang, { n: String(hours) });
   const days = Math.floor(hours / 24);
-  return `${days}g önce`;
+  return getMessage('nervous.time_days', lang, { n: String(days) });
 }
 
 function parseSinceDuration(since: string): number {
@@ -180,25 +181,25 @@ function parseSinceDuration(since: string): number {
 
 // ─── Dashboard Action ───────────────────────────────────────────────────────
 
-function showDashboard(root: string): void {
+function showDashboard(root: string, lang: string): void {
   const pending = readPendingNotifications(root);
   const history = readHistoryRecords(root);
   const config = readNervousConfig(root);
 
   print('');
-  print(colorize('  🧠 Deckent Nervous System', BOLD));
+  print(colorize('  ' + getMessage('nervous.dashboard_title', lang), BOLD));
   print('');
 
   // Pending notifications
   if (pending.length === 0) {
-    print(colorize('  No pending notifications.', DIM));
+    print(colorize('  ' + getMessage('nervous.no_pending', lang), DIM));
   } else {
-    print(colorize('  Pending:', BOLD));
+    print(colorize('  ' + getMessage('nervous.pending_header', lang), BOLD));
     for (let i = 0; i < pending.length; i++) {
       const n = pending[i]!;
       print(`    [${i + 1}] ${severityIcon(n.severity)} — ${n.detectorId}  ${DIM}(${n.id.slice(0, 12)})${RESET}`);
       print(`        ${n.message}`);
-      print(`        Actions: ${colorize('accept', GREEN)}, ${colorize('reject', RED)}, edit, ignore`);
+      print(`        ${getMessage('nervous.actions_label', lang)} ${colorize('accept', GREEN)}, ${colorize('reject', RED)}, edit, ignore`);
     }
   }
 
@@ -207,17 +208,17 @@ function showDashboard(root: string): void {
   // Recent history (last 5)
   const recent = history.slice(-5).reverse();
   if (recent.length > 0) {
-    print(colorize(`  Recent (last ${recent.length}):`, BOLD));
+    print(colorize('  ' + getMessage('nervous.recent_header', lang, { count: String(recent.length) }), BOLD));
     for (const r of recent) {
       const icon = outcomeIcon(r.decision, r.outcome);
       const policyLabel = r.decision === 'autonomous'
-        ? DIM + '(autonomous)' + RESET
+        ? DIM + getMessage('nervous.label_autonomous', lang) + RESET
         : r.decision === 'accepted'
-          ? '(accepted)'
+          ? getMessage('nervous.label_accepted', lang)
           : r.decision === 'rejected'
-            ? colorize('(rejected by user)', RED)
+            ? colorize(getMessage('nervous.label_rejected', lang), RED)
             : `(${r.decision})`;
-      print(`    ${icon} ${r.actionId} ${policyLabel} — ${DIM}${timeAgo(r.executedAt)}${RESET}`);
+      print(`    ${icon} ${r.actionId} ${policyLabel} — ${DIM}${timeAgo(r.executedAt, lang)}${RESET}`);
     }
   }
 
@@ -226,20 +227,24 @@ function showDashboard(root: string): void {
   // Config summary
   const overrideCount = Object.keys(config.actionOverrides ?? {}).length;
   const quietStr = config.quietHours
-    ? `${config.quietHours.start}-${config.quietHours.end} TRT`
+    ? `${config.quietHours.start}-${config.quietHours.end}`
     : 'off';
-  print(`  Config: mode=${colorize(config.mode, MAGENTA)} · overrides=${overrideCount} · quiet=${quietStr}`);
+  print('  ' + getMessage('nervous.config_summary', lang, {
+    mode: colorize(config.mode, MAGENTA),
+    overrides: String(overrideCount),
+    quiet: quietStr,
+  }));
   print('');
 }
 
 // ─── Accept Action ──────────────────────────────────────────────────────────
 
-function handleAccept(root: string, id: string): void {
+function handleAccept(root: string, id: string, lang: string): void {
   const pending = readPendingNotifications(root);
   const idx = pending.findIndex(n => n.id === id || n.id.startsWith(id));
 
   if (idx === -1) {
-    printError(`Pending notification not found: ${id}`);
+    printError(getMessage('nervous.not_found_pending', lang, { id }));
     process.exitCode = 1;
     return;
   }
@@ -252,17 +257,19 @@ function handleAccept(root: string, id: string): void {
   pending.splice(idx, 1);
   writePendingNotifications(root, pending);
 
-  print(colorize(`  ✓ Accepted: ${notification.actions[0]?.id ?? notification.id}`, GREEN));
+  print(colorize('  ' + getMessage('nervous.accepted', lang, {
+    action: notification.actions[0]?.id ?? notification.id,
+  }), GREEN));
 }
 
 // ─── Reject Action ──────────────────────────────────────────────────────────
 
-function handleReject(root: string, id: string, reason?: string): void {
+function handleReject(root: string, id: string, lang: string, reason?: string): void {
   const pending = readPendingNotifications(root);
   const idx = pending.findIndex(n => n.id === id || n.id.startsWith(id));
 
   if (idx === -1) {
-    printError(`Pending notification not found: ${id}`);
+    printError(getMessage('nervous.not_found_pending', lang, { id }));
     process.exitCode = 1;
     return;
   }
@@ -275,18 +282,21 @@ function handleReject(root: string, id: string, reason?: string): void {
   pending.splice(idx, 1);
   writePendingNotifications(root, pending);
 
-  const reasonStr = reason ? ` (reason: ${reason})` : '';
-  print(colorize(`  ✗ Rejected: ${notification.actions[0]?.id ?? notification.id}${reasonStr}`, RED));
+  const reasonStr = reason ? getMessage('nervous.reject_reason', lang, { reason }) : '';
+  print(colorize('  ' + getMessage('nervous.rejected', lang, {
+    action: notification.actions[0]?.id ?? notification.id,
+    reason: reasonStr,
+  }), RED));
 }
 
 // ─── Edit Action ────────────────────────────────────────────────────────────
 
-function handleEdit(root: string, id: string): void {
+function handleEdit(root: string, id: string, lang: string): void {
   const pending = readPendingNotifications(root);
   const idx = pending.findIndex(n => n.id === id || n.id.startsWith(id));
 
   if (idx === -1) {
-    printError(`Pending notification not found: ${id}`);
+    printError(getMessage('nervous.not_found_pending', lang, { id }));
     process.exitCode = 1;
     return;
   }
@@ -302,12 +312,14 @@ function handleEdit(root: string, id: string): void {
   pending.splice(idx, 1);
   writePendingNotifications(root, pending);
 
-  print(colorize(`  ✎ Edited & accepted: ${notification.actions[0]?.id ?? notification.id}`, CYAN));
+  print(colorize('  ' + getMessage('nervous.edited', lang, {
+    action: notification.actions[0]?.id ?? notification.id,
+  }), CYAN));
 }
 
 // ─── Undo Action ────────────────────────────────────────────────────────────
 
-function handleUndo(root: string, actionId: string): void {
+function handleUndo(root: string, actionId: string, lang: string): void {
   const history = readHistoryRecords(root);
   const reversible = history
     .filter(r => r.reversible && r.outcome === 'success')
@@ -316,7 +328,7 @@ function handleUndo(root: string, actionId: string): void {
   const target = reversible.find(r => r.id === actionId || r.actionId === actionId || r.id.startsWith(actionId));
 
   if (!target) {
-    printError(`No reversible action found: ${actionId}`);
+    printError(getMessage('nervous.not_found_reversible', lang, { id: actionId }));
     process.exitCode = 1;
     return;
   }
@@ -334,12 +346,15 @@ function handleUndo(root: string, actionId: string): void {
   };
 
   appendHistoryRecord(root, undoRecord);
-  print(colorize(`  ↩ Undone: ${target.actionId} (${target.id.slice(0, 8)})`, YELLOW));
+  print(colorize('  ' + getMessage('nervous.undone', lang, {
+    action: target.actionId,
+    id: target.id.slice(0, 8),
+  }), YELLOW));
 }
 
 // ─── History Action ─────────────────────────────────────────────────────────
 
-function showHistory(root: string, limit: number, since?: string): void {
+function showHistory(root: string, limit: number, lang: string, since?: string): void {
   let records = readHistoryRecords(root);
 
   if (since) {
@@ -350,16 +365,16 @@ function showHistory(root: string, limit: number, since?: string): void {
   records = records.slice(-limit).reverse();
 
   if (records.length === 0) {
-    print(colorize('  No history records found.', DIM));
+    print(colorize('  ' + getMessage('nervous.history_empty', lang), DIM));
     return;
   }
 
   print('');
-  print(colorize('  Nervous System History:', BOLD));
+  print(colorize('  ' + getMessage('nervous.history_header', lang), BOLD));
   print('');
   for (const r of records) {
     const icon = outcomeIcon(r.decision, r.outcome);
-    const timeStr = colorize(timeAgo(r.executedAt), DIM);
+    const timeStr = colorize(timeAgo(r.executedAt, lang), DIM);
     print(`  ${icon} ${r.actionId} [${r.decision}] — ${timeStr}`);
   }
   print('');
@@ -367,7 +382,7 @@ function showHistory(root: string, limit: number, since?: string): void {
 
 // ─── Log Follow Action ──────────────────────────────────────────────────────
 
-function showLog(root: string, follow: boolean): void {
+function showLog(root: string, follow: boolean, lang: string): void {
   const historyPath = getHistoryPath(root);
 
   // Show existing content
@@ -386,7 +401,7 @@ function showLog(root: string, follow: boolean): void {
 
   if (!follow) return;
 
-  print(colorize('  --- watching for new entries (Ctrl+C to exit) ---', DIM));
+  print(colorize('  ' + getMessage('nervous.log_watching', lang), DIM));
 
   let lastSize = existsSync(historyPath)
     ? readFileSync(historyPath, 'utf-8').length
@@ -575,24 +590,36 @@ export async function nervousBaselineRefresh(opts: { root: string }): Promise<vo
 
 // ─── Register Command ───────────────────────────────────────────────────────
 
+/**
+ * Resolve --lang from a command, tolerating commander attaching the flag to the
+ * parent `nervous` command rather than the invoked subcommand.
+ */
+function langOf(cmd: Command): string {
+  const own = (cmd.opts() as { lang?: string }).lang;
+  const parent = (cmd.parent?.opts() as { lang?: string } | undefined)?.lang;
+  return getLanguage(own ?? parent);
+}
+
 export function registerNervous(program: Command): void {
   const nervousCmd = program
     .command('nervous')
-    .description('Nervous System dashboard — monitor, accept, reject proactive suggestions');
+    .description('Nervous System dashboard — monitor, accept, reject proactive suggestions')
+    .option('--lang <code>', 'Language override (en|tr)');
 
   // Default action: show dashboard
-  nervousCmd.action(() => {
+  nervousCmd.action((_opts: unknown, cmd: Command) => {
     const root = resolveProjectRoot();
-    showDashboard(root);
+    showDashboard(root, langOf(cmd));
   });
 
   // deckent nervous accept <id>
   nervousCmd
     .command('accept <id>')
     .description('Accept a pending nervous system suggestion')
-    .action((id: string) => {
+    .option('--lang <code>', 'Language override (en|tr)')
+    .action((id: string, _opts: unknown, cmd: Command) => {
       const root = resolveProjectRoot();
-      handleAccept(root, id);
+      handleAccept(root, id, langOf(cmd));
     });
 
   // deckent nervous reject <id>
@@ -600,27 +627,30 @@ export function registerNervous(program: Command): void {
     .command('reject <id>')
     .description('Reject a pending nervous system suggestion')
     .option('--reason <text>', 'Rejection reason')
-    .action((id: string, opts: { reason?: string }) => {
+    .option('--lang <code>', 'Language override (en|tr)')
+    .action((id: string, opts: { reason?: string }, cmd: Command) => {
       const root = resolveProjectRoot();
-      handleReject(root, id, opts.reason);
+      handleReject(root, id, langOf(cmd), opts.reason);
     });
 
   // deckent nervous edit <id>
   nervousCmd
     .command('edit <id>')
     .description('Modify and accept a pending suggestion')
-    .action((id: string) => {
+    .option('--lang <code>', 'Language override (en|tr)')
+    .action((id: string, _opts: unknown, cmd: Command) => {
       const root = resolveProjectRoot();
-      handleEdit(root, id);
+      handleEdit(root, id, langOf(cmd));
     });
 
   // deckent nervous undo <action-id>
   nervousCmd
     .command('undo <action-id>')
     .description('Undo a recent reversible action')
-    .action((actionId: string) => {
+    .option('--lang <code>', 'Language override (en|tr)')
+    .action((actionId: string, _opts: unknown, cmd: Command) => {
       const root = resolveProjectRoot();
-      handleUndo(root, actionId);
+      handleUndo(root, actionId, langOf(cmd));
     });
 
   // deckent nervous history
@@ -629,9 +659,10 @@ export function registerNervous(program: Command): void {
     .description('View nervous system action history')
     .option('--limit <n>', 'Number of records to show', '20')
     .option('--since <duration>', 'Show records since (e.g. 1d, 2h, 30m)')
-    .action((opts: { limit: string; since?: string }) => {
+    .option('--lang <code>', 'Language override (en|tr)')
+    .action((opts: { limit: string; since?: string }, cmd: Command) => {
       const root = resolveProjectRoot();
-      showHistory(root, parseInt(opts.limit, 10) || 20, opts.since);
+      showHistory(root, parseInt(opts.limit, 10) || 20, langOf(cmd), opts.since);
     });
 
   // deckent nervous log
@@ -639,9 +670,10 @@ export function registerNervous(program: Command): void {
     .command('log')
     .description('View raw nervous system log')
     .option('--follow', 'Watch for new entries (live tail)')
-    .action((opts: { follow?: boolean }) => {
+    .option('--lang <code>', 'Language override (en|tr)')
+    .action((opts: { follow?: boolean }, cmd: Command) => {
       const root = resolveProjectRoot();
-      showLog(root, opts.follow === true);
+      showLog(root, opts.follow === true, langOf(cmd));
     });
 
   // deckent nervous accept-panic <task-id> (Sprint 180 W4-2)

@@ -242,6 +242,51 @@ const MESSAGES: MessageMap = {
     en: 'Checkpoint not found: {sprintId}/{phase}',
     tr: 'Checkpoint bulunamadı: {sprintId}/{phase}',
   },
+  // ─── nervous command (MSG-002, §4G) ──────────────────────────────────
+  'nervous.dashboard_title': { en: '🧠 Deckent Nervous System', tr: '🧠 Deckent Nervous System' },
+  'nervous.no_pending': { en: 'No pending notifications.', tr: 'Bekleyen bildirim yok.' },
+  'nervous.pending_header': { en: 'Pending:', tr: 'Bekleyen:' },
+  'nervous.actions_label': { en: 'Actions:', tr: 'Eylemler:' },
+  'nervous.recent_header': { en: 'Recent (last {count}):', tr: 'Son ({count}):' },
+  'nervous.label_autonomous': { en: '(autonomous)', tr: '(otonom)' },
+  'nervous.label_accepted': { en: '(accepted)', tr: '(kabul edildi)' },
+  'nervous.label_rejected': { en: '(rejected by user)', tr: '(kullanıcı reddetti)' },
+  'nervous.config_summary': {
+    en: 'Config: mode={mode} · overrides={overrides} · quiet={quiet}',
+    tr: 'Yapılandırma: mod={mode} · override={overrides} · sessiz={quiet}',
+  },
+  'nervous.accepted': { en: '✓ Accepted: {action}', tr: '✓ Kabul edildi: {action}' },
+  'nervous.rejected': { en: '✗ Rejected: {action}{reason}', tr: '✗ Reddedildi: {action}{reason}' },
+  'nervous.reject_reason': { en: ' (reason: {reason})', tr: ' (sebep: {reason})' },
+  'nervous.edited': { en: '✎ Edited & accepted: {action}', tr: '✎ Düzenlendi & kabul edildi: {action}' },
+  'nervous.undone': { en: '↩ Undone: {action} ({id})', tr: '↩ Geri alındı: {action} ({id})' },
+  'nervous.not_found_pending': {
+    en: 'Pending notification not found: {id}',
+    tr: 'Bekleyen bildirim bulunamadı: {id}',
+  },
+  'nervous.not_found_reversible': {
+    en: 'No reversible action found: {id}',
+    tr: 'Geri alınabilir eylem bulunamadı: {id}',
+  },
+  'nervous.history_empty': { en: 'No history records found.', tr: 'Geçmiş kaydı bulunamadı.' },
+  'nervous.history_header': { en: 'Nervous System History:', tr: 'Nervous System Geçmişi:' },
+  'nervous.log_watching': {
+    en: '--- watching for new entries (Ctrl+C to exit) ---',
+    tr: '--- yeni kayıtlar izleniyor (çıkmak için Ctrl+C) ---',
+  },
+  'nervous.time_just_now': { en: 'just now', tr: 'az önce' },
+  'nervous.time_minutes': { en: '{n}m ago', tr: '{n}dk önce' },
+  'nervous.time_hours': { en: '{n}h ago', tr: '{n}sa önce' },
+  'nervous.time_days': { en: '{n}d ago', tr: '{n}g önce' },
+  'nervous.slash_id_required': {
+    en: '[nervous] id required: /nervous {sub} <id>',
+    tr: '[nervous] id gerekli: /nervous {sub} <id>',
+  },
+  'nervous.slash_not_found': { en: '[nervous] not found: {id}', tr: '[nervous] bulunamadı: {id}' },
+  'nervous.slash_empty': {
+    en: 'nervous: no pending notifications',
+    tr: 'nervous: bekleyen bildirim yok',
+  },
 
   // ─── spawn command ─────────────────────────────────────────────────
   'spawn.worker_spawned': {

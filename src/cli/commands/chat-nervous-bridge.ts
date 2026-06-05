@@ -13,6 +13,7 @@
 
 import { existsSync, readFileSync, writeFileSync, appendFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { getLanguage, getMessage } from '../helpers/messages.js';
 import type { NervousNotification } from '../../core/nervous-types.js';
 
 // ─── ANSI (Node built-in, ADR-010) ──────────────────────────────────────────
@@ -128,19 +129,21 @@ export function handleNervousSlash(
   args: readonly string[],
   root: string,
   tty?: boolean,
+  lang?: string,
 ): string {
   const isTTY = tty !== undefined ? tty : process.stdout.isTTY === true;
+  const lng = getLanguage(lang);
   const sub = args[0] ?? 'list';
 
   if (sub === 'accept' || sub === 'reject') {
     const id = args[1] ?? '';
     if (!id) {
-      return `[nervous] id gerekli: /nervous ${sub} <id>`;
+      return getMessage('nervous.slash_id_required', lng, { sub });
     }
     const pending = getPendingNervous(root);
     const idx = pending.findIndex(n => n.id === id || n.id.startsWith(id));
     if (idx === -1) {
-      return `[nervous] bulunamadı: ${id}`;
+      return getMessage('nervous.slash_not_found', lng, { id });
     }
     const notification = pending[idx]!;
     const decision = sub === 'accept' ? 'accepted' : 'rejected';
@@ -158,9 +161,8 @@ export function handleNervousSlash(
   // Default: list pending
   const pending = getPendingNervous(root);
   if (pending.length === 0) {
-    return isTTY
-      ? `${DIM}nervous: bekleyen bildirim yok${RESET}`
-      : 'nervous: bekleyen bildirim yok';
+    const empty = getMessage('nervous.slash_empty', lng);
+    return isTTY ? `${DIM}${empty}${RESET}` : empty;
   }
   const lines = pending.map(
     n => `  ${severityPrefix(n.severity)} ${n.id.slice(0, 12)} — ${n.detectorId} [${n.severity}]`,
