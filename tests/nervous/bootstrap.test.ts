@@ -10,7 +10,14 @@
 // 4. observer.start invoked at bootstrap
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import type { NervousSystemConfig, SprintStateSnapshot } from '../../src/core/nervous-types.js';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import type {
+  NervousSystemConfig,
+  SprintStateSnapshot,
+  NervousNotification,
+} from '../../src/core/nervous-types.js';
 
 // ─── Mock EventBus (Observer subscribes on start) ──────────────────────────
 const { mockEventBus } = vi.hoisted(() => ({
@@ -46,7 +53,11 @@ vi.mock('node:fs', async (importOriginal) => {
 });
 
 // ─── Import after mocks ────────────────────────────────────────────────────
-import { createNervousSystemIfEnabled } from '../../src/nervous/bootstrap.js';
+import {
+  createNervousSystemIfEnabled,
+  makeFilePendingStore,
+} from '../../src/nervous/bootstrap.js';
+import { getPendingNervous } from '../../src/cli/commands/chat-nervous-bridge.js';
 
 // ─── Test Helpers ──────────────────────────────────────────────────────────
 function makeNervousConfig(overrides: Partial<NervousSystemConfig> = {}): NervousSystemConfig {
@@ -127,5 +138,71 @@ describe('createNervousSystemIfEnabled', () => {
     expect(result.observer.isStarted).toBe(false);
     // dispose() is idempotent — second call should not throw
     expect(() => result.dispose()).not.toThrow();
+  });
+});
+
+// ─── APPROVE-004/005 (§4G) — approval round-trip wiring ─────────────────────
+
+describe('createNervousSystemIfEnabled — approval round-trip wiring (APPROVE-005)', () => {
+  const wrapper = { nervous_system: makeNervousConfig({ enabled: true }) };
+  const stubHandler = async (): Promise<{ outcome: 'success' }> => ({ outcome: 'success' });
+
+  it('wires NervousIpcQueue.startPolling so MCP IPC approvals reach the executor', () => {
+    const startPolling = vi.fn(() => ({ dispose: vi.fn() }));
+    const handle = createNervousSystemIfEnabled(
+      wrapper,
+      '/tmp/project',
+      idleProvider,
+      stubHandler,
+      { ipcQueue: { startPolling } },
+    );
+    expect(startPolling).toHaveBeenCalledOnce();
+    expect(typeof startPolling.mock.calls[0]?.[0]).toBe('function');
+    handle?.dispose();
+  });
+
+  it('dispose() stops the IPC polling', () => {
+    const dispose = vi.fn();
+    const startPolling = vi.fn(() => ({ dispose }));
+    const handle = createNervousSystemIfEnabled(
+      wrapper,
+      '/tmp/project',
+      idleProvider,
+      stubHandler,
+      { ipcQueue: { startPolling } },
+    );
+    handle?.dispose();
+    expect(dispose).toHaveBeenCalled();
+  });
+});
+
+describe('makeFilePendingStore — CLI-readable nervous-pending.json (APPROVE-004)', () => {
+  let root: string;
+  beforeEach(() => {
+    root = mkdtempSync(join(tmpdir(), 'nervous-store-'));
+  });
+  afterEach(() => rmSync(root, { recursive: true, force: true }));
+
+  function notif(id: string): NervousNotification {
+    return {
+      id,
+      type: 't',
+      title: 'T',
+      message: 'M',
+      severity: 'warning',
+      createdAt: '2026-06-05T00:00:00.000Z',
+      detectorId: 'd',
+      actions: [],
+      timeoutMs: null,
+    };
+  }
+
+  it('add() persists a notification the CLI bridge reads; remove() drops it', () => {
+    const store = makeFilePendingStore(root);
+    store.add(notif('n1'));
+    store.add(notif('n2'));
+    expect(getPendingNervous(root).map((n) => n.id).sort()).toEqual(['n1', 'n2']);
+    store.remove('n1');
+    expect(getPendingNervous(root).map((n) => n.id)).toEqual(['n2']);
   });
 });

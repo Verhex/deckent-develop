@@ -12,15 +12,19 @@
 //
 // ADR-008 uyumlu: bootstrap sadece nervous/ + core/ import eder.
 
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { NervousObserver } from './observer.js';
 import { DecisionEngine } from './decision-engine.js';
 import { Proposer } from './proposer.js';
 import { NervousDispatcher } from './dispatcher.js';
 import { Executor } from './executor.js';
 import { NervousHistory } from './history.js';
-import type { ActionHandler } from './executor.js';
+import { NervousIpcQueue } from './ipc-queue.js';
+import type { ActionHandler, PendingApprovalStore } from './executor.js';
 import type {
   DetectorResult,
+  NervousNotification,
   NervousSystemConfig,
   ObserverEvent,
   SprintStateSnapshot,
@@ -47,6 +51,52 @@ export interface NervousSystemHandle {
   dispose: () => void;
 }
 
+/** Injectable dependencies (testability) — defaults wire the real file/IPC paths. */
+export interface NervousBootstrapDeps {
+  /** IPC queue polled for MCP accept/reject approvals (APPROVE-005). */
+  ipcQueue?: Pick<NervousIpcQueue, 'startPolling'>;
+  /** Pending approval persistence (APPROVE-004). */
+  pendingStore?: PendingApprovalStore;
+}
+
+const PENDING_FILE = 'nervous-pending.json';
+
+/**
+ * File-backed PendingApprovalStore (APPROVE-004, §4G). Persists parked approvals
+ * as the same `NervousNotification[]` shape that `deckent nervous` and the REPL
+ * `/nervous` bridge read from `.deckent/nervous-pending.json`, so executor-parked
+ * approvals become visible to the operator instead of an always-empty queue.
+ */
+export function makeFilePendingStore(projectRoot: string): PendingApprovalStore {
+  const path = join(projectRoot, '.deckent', PENDING_FILE);
+  const read = (): NervousNotification[] => {
+    if (!existsSync(path)) return [];
+    try {
+      const data = JSON.parse(readFileSync(path, 'utf-8'));
+      return Array.isArray(data) ? (data as NervousNotification[]) : [];
+    } catch {
+      return [];
+    }
+  };
+  const write = (items: NervousNotification[]): void => {
+    const dir = dirname(path);
+    if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+    writeFileSync(path, JSON.stringify(items, null, 2) + '\n', 'utf-8');
+  };
+  return {
+    add(notification: NervousNotification): void {
+      const items = read().filter((n) => n.id !== notification.id);
+      items.push(notification);
+      write(items);
+    },
+    remove(notificationId: string): void {
+      const items = read();
+      const next = items.filter((n) => n.id !== notificationId);
+      if (next.length !== items.length) write(next);
+    },
+  };
+}
+
 /**
  * Nervous System tam pipeline'ını instantiate eder ve `'detection'` event
  * chain'ini wire eder. Tüm modüller Brain scope'unda yaşar (ADR-037).
@@ -62,6 +112,7 @@ export function createNervousSystemIfEnabled(
   projectRoot: string,
   sprintStateProvider: () => SprintStateSnapshot,
   actionHandler: ActionHandler = stubActionHandler,
+  deps: NervousBootstrapDeps = {},
 ): NervousSystemHandle | null {
   const nervousConfig = config.nervous_system as NervousSystemConfig | undefined;
   if (!nervousConfig?.enabled) {
@@ -79,7 +130,17 @@ export function createNervousSystemIfEnabled(
   const proposer = new Proposer(nervousConfig);
   const dispatcher = new NervousDispatcher(nervousConfig, projectRoot);
   const history = new NervousHistory(projectRoot);
-  const executor = new Executor(history, actionHandler);
+  const pendingStore = deps.pendingStore ?? makeFilePendingStore(projectRoot);
+  const executor = new Executor(history, actionHandler, pendingStore);
+
+  // APPROVE-005 (§4G): poll the MCP IPC queue so `deckent_nervous_accept/reject`
+  // (which write approval files) resolve the running executor's pending map —
+  // previously startPolling had zero production callers, so MCP decisions were
+  // silently discarded.
+  const ipcQueue = deps.ipcQueue ?? new NervousIpcQueue(projectRoot);
+  const pollHandle = ipcQueue.startPolling((req) => {
+    executor.resolveApproval(req.notificationId, req.decision);
+  });
 
   observer.on('detection', (result: DetectorResult, event: ObserverEvent) => {
     void runPipeline(result, event, decisionEngine, proposer, dispatcher, executor);
@@ -100,6 +161,11 @@ export function createNervousSystemIfEnabled(
       executor.shutdown();
     } catch (err) {
       console.error('[NervousBootstrap] executor.shutdown() failed:', err);
+    }
+    try {
+      pollHandle.dispose();
+    } catch (err) {
+      console.error('[NervousBootstrap] ipc poll dispose() failed:', err);
     }
   };
 

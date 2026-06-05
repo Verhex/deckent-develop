@@ -32,6 +32,17 @@ export interface ActionHandler {
   }>;
 }
 
+/**
+ * Sink for parked approvals (APPROVE-004, §4G). The Executor calls add() when a
+ * notification parks awaiting a human decision and remove() when it resolves, so
+ * the parked queue is visible to `deckent nervous` / REPL `/nervous` (which read
+ * .deckent/nervous-pending.json). Injected by bootstrap; string-free here.
+ */
+export interface PendingApprovalStore {
+  add(notification: NervousNotification): void;
+  remove(notificationId: string): void;
+}
+
 // ─── Timeout Constants ───────────────────────────────────────────────────────
 
 const TIMEOUT_MAP: Readonly<Record<string, number>> = {
@@ -52,6 +63,7 @@ export class Executor {
   constructor(
     private readonly history: NervousHistory,
     private readonly actionHandler: ActionHandler,
+    private readonly pendingStore?: PendingApprovalStore,
   ) {}
 
   /**
@@ -77,6 +89,7 @@ export class Executor {
     if (pending) {
       pending.resolve(decision);
       this.pendingApprovals.delete(notificationId);
+      this.pendingStore?.remove(notificationId);
     }
   }
 
@@ -171,6 +184,7 @@ export class Executor {
       const timer = setTimeout(async () => {
         this.pendingTimers.delete(notification.id);
         this.pendingApprovals.delete(notification.id);
+        this.pendingStore?.remove(notification.id);
 
         try {
           const result = await this.actionHandler(action.id, action.payload ?? {});
@@ -235,6 +249,7 @@ export class Executor {
           }
         },
       });
+      this.pendingStore?.add(notification);
     });
   }
 
@@ -278,6 +293,7 @@ export class Executor {
           }
         },
       });
+      this.pendingStore?.add(notification);
     });
   }
 
