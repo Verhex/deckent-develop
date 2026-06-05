@@ -1,92 +1,132 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-229 Learnings
+- Sprint sprint-229 Learnings: ## Sprint sprint-229 Learnings
+
+## Gains
+- 229-001 — McpClientBroker çekirdek (SDK Client + stdio/HTTP transport) — McpClientBroker implemented per Sprint 229 Task 229-001 spec: SDK Client + StdioClientTransport +...
+- 229-002 — 3-scope config (.mcp.json project/user/local merge) — Implemented 3-scope MCP config system (local > project > user merge, ADR-004 pattern).
+- 229-003 — Dynamic discovery + namespaced tool registry — McpToolRegistry implemented per Sprint 229 Task 229-003 spec.
+- 229-004 — [Tier-1] `deckent mcp` yönetim CLI (add/list/remove/get) — Implemented Claude-parity `deckent mcp` management CLI (Sprint 229 — AS-5·P1 Task 229-004).
+- 229-005 — [Tier-1] REPL `/mcp` dispatch + confirm-gate + audit composition — Bridge MODULE + 5 hermetic tests delivered (kanit grep 46 ≥ 3; vitest 5 ≥ 4 pass; tsc --noEmit cl...
+
+## Sprint sprint-228 Learnings
+- Sprint sprint-228 Learnings: ## Sprint sprint-228 Learnings
+
+## Gains
+- 228-001 — [P0] autonomous CLI i18n retrofit (hardcode → getMessage) — Worker exited without writing result (exitCode=0)
+- 228-002 — features-manifest entry (sync-manifest.mjs → regenerate) — Added autonomous-runtime to FEATURE_DEFINITIONS in scripts/sync-manifest.mjs with id='autonomous-...
+- 228-003 — Autonomous usage doc (TR/EN, güvenlik modeli dahil) — Created docs/guide/autonomous.md covering: all 3 subcommands (start/status/stop) with exact optio...
+- 228-004 — Autonomous e2e smoke harness (gerçek-binary start→status→stop) — Created scripts/autonomous-smoke.mjs — real binary e2e smoke harness for `deckent autonomous star...
+
+## Sprint sprint-227 Learnings
+- Sprint sprint-227 Learnings: ## Sprint sprint-227 Learnings
+
+## Gains
+- 227-001 — Rubric total diagnostic fix (coverage:null → renormalize) — Sprint 227 227-001 — Rubric total diagnostic fix.
+- 227-002 — [P0] Export-wipe guard (dolu .md'yi boşla EZME) — Export-wipe guard implemented.
+- 227-003 — [P0] Decay safety (decay_after_sprints'e uy, collapse ETME) — 227-003 Decay safety implemented.
+- 227-004 — Brain-integrity regression e2e (3 bug birlikte) — Sprint 227 227-004 — Brain-integrity regression e2e.
+
+## Sprint sprint-226 Learnings
+- Sprint sprint-226 Learnings: ## Sprint sprint-226 Learnings
+
+## Gains
+- 226-001 — Authority adapter (checkAuthority → AuthorityChecker) — Created authority-adapter.ts wrapping checkAuthority from authority-enforcer.ts.
+- 226-002 — Audit adapter (writeEvent → AuditSink) — makeAuditSink(projectRoot, sprintId='autonomous') wraps writeEvent from event-stream.ts.
+- 226-003 — Approval gate adapter (nervous Executor → ApprovalGate, OTO-APPROVE YOK) — ApprovalGate adapter that wraps the nervous approval queue (Executor.resolveApproval pattern + 22...
+- 226-004 — Action executor adapter (ActionHandler registry → ActionExecutor) — Implemented makeActionExecutor(handlers: Map<string, ActionHandler>): ActionExecutor.
+- 226-005 — Trigger source adapter (scheduled-flow + self-dispatch → TriggerSource) — Created src/orchestra/autonomous/trigger-adapter.ts (97 LoC) — makeTriggerSource(deps) factory th...
+- 226-006 — [P0] Sürekli loop + composition root (DORMANT'I ÖLDÜRÜR) — Composition root + tick loop: src/orchestra/autonomous/runtime-loop.ts (165 LoC).
+- 226-007 — [P0] `deckent autonomous` CLI (start/stop/status, Tier-1 user-surface) — Sprint 226 Task 226-007 — `deckent autonomous` CLI (start/stop/status) Tier-1 user-surface delive...
+
 ## Sprint sprint-224 Learnings
-- Sprint sprint-224 Learnings: ## Sprint sprint-224 Learnings
+- Sprint 224 Learnings: - Sprint sprint-224 Learnings: ## Sprint sprint-224 Learnings
 - 224-015 — [P0] AI plan-mode fix (dürüst hata + gerçekten-çalışır): GO_WITH_TECH_DEBT — Implemented honest-fallback for AI planner per directive 224-015.
 
 === What was done ===
 - src/orchestra/planner.ts: Add
 
 ## Sprint sprint-223 Learnings
-- Sprint sprint-223 Learnings: ## Sprint sprint-223 Learnings
+- Sprint 223 Learnings: - Sprint sprint-223 Learnings: ## Sprint sprint-223 Learnings
 
 ## Sprint sprint-222 Learnings
-- Sprint sprint-222 Learnings: ## Sprint sprint-222 Learnings
+- Sprint 222 Learnings: - Sprint sprint-222 Learnings: ## Sprint sprint-222 Learnings
 
 ## Sprint sprint-221 Learnings
-- Sprint sprint-221 Learnings: ## Sprint sprint-221 Learnings
+- Sprint 221 Learnings: - Sprint sprint-221 Learnings: ## Sprint sprint-221 Learnings
 
 ## Sprint sprint-220 Learnings
-- Sprint sprint-220 Learnings: ## Sprint sprint-220 Learnings
+- Sprint 220 Learnings: - Sprint sprint-220 Learnings: ## Sprint sprint-220 Learnings
 - 220-003 — Agentic REPL canlı MCP dispatch (doğal dil→gerçek aksiyon): GO_WITH_TECH_DEBT — Worker exited without writing result (exitCode=0)
 
 ## Sprint sprint-219 Learnings
-- Sprint sprint-219 Learnings: ## Sprint sprint-219 Learnings
+- Sprint 219 Learnings: - Sprint sprint-219 Learnings: ## Sprint sprint-219 Learnings
 - 219-010 — Dashboard cache-bust + tarayıcı-e2e smoke (8 sayfa gerçekten yüklenir): NO_GO
 
 ## Sprint sprint-218 Learnings
-- Sprint sprint-218 Learnings: ## Sprint sprint-218 Learnings
+- Sprint 218 Learnings: - Sprint sprint-218 Learnings: ## Sprint sprint-218 Learnings
 
 ## Sprint sprint-217 Learnings
-- Sprint sprint-217 Learnings: ## Sprint sprint-217 Learnings
+- Sprint 217 Learnings: - Sprint sprint-217 Learnings: ## Sprint sprint-217 Learnings
 - new sprint: NO_GO — Placeholder 'new sprint' task — no implementation work defined. DIRECTIVES.md contains only 'new sprint' with no concret
 
 ## Sprint sprint-216 Learnings
-- Sprint sprint-216 Learnings: ## Sprint sprint-216 Learnings
+- Sprint 216 Learnings: - Sprint sprint-216 Learnings: ## Sprint sprint-216 Learnings
 - 216-006 — [P0] serve localhost API-token auto-mint + `__DECKENT_API_TOKEN__` inject → /api/status 200: GO_WITH_TECH_DEBT — Implementation:
   src/api/server.ts:921-935 — `finalToken` changed from `const` to `let`, followed by a 4-line auto-mint
 - 216-012 — Memory explorer FTS5 gerçek endpoint (arama gerçek sonuç döndürür): GO_WITH_TECH_DEBT — Implementation:
-- src/api/memory-search-endpoint.ts (NEW, 47 LoC): registerMemorySearch() — GET /api/memory/search?q= → 
+- src/api/memory-search-endpoint.ts (NEW, 47 LoC): registerMemorySearch() — GET /api/memory/search?q= →
 
 ## Sprint sprint-214 Learnings
-- Sprint sprint-214 Learnings: ## Sprint sprint-214 Learnings
+- Sprint 214 Learnings: - Sprint sprint-214 Learnings: ## Sprint sprint-214 Learnings
 
 ## Sprint sprint-212 Learnings
-- Sprint sprint-212 Learnings: ## Sprint sprint-212 Learnings
+- Sprint 212 Learnings: - Sprint sprint-212 Learnings: ## Sprint sprint-212 Learnings
 
 ## Sprint sprint-211 Learnings
-- Sprint sprint-211 Learnings: ## Sprint sprint-211 Learnings
+- Sprint 211 Learnings: - Sprint sprint-211 Learnings: ## Sprint sprint-211 Learnings
 
 ## Sprint sprint-210 Learnings
-- Sprint sprint-210 Learnings: ## Sprint sprint-210 Learnings
-- 210-009 — Dashboard sprint kontrol paneli (plan/start/status UI): GO_WITH_TECH_DEBT — SprintControlPanel.tsx is fully implemented: useSSEWithStatus for live data, useApi for fallback, SprintPhaseTimeline + 
+- Sprint 210 Learnings: - Sprint sprint-210 Learnings: ## Sprint sprint-210 Learnings
+- 210-009 — Dashboard sprint kontrol paneli (plan/start/status UI): GO_WITH_TECH_DEBT — SprintControlPanel.tsx is fully implemented: useSSEWithStatus for live data, useApi for fallback, SprintPhaseTimeline +
 
 ## Sprint sprint-209 Learnings
-- Sprint sprint-209 Learnings: ## Sprint sprint-209 Learnings
+- Sprint 209 Learnings: - Sprint sprint-209 Learnings: ## Sprint sprint-209 Learnings
 
 ## Sprint sprint-208 Learnings
-- Sprint sprint-208 Learnings: ## Sprint sprint-208 Learnings
+- Sprint 208 Learnings: - Sprint sprint-208 Learnings: ## Sprint sprint-208 Learnings
 
 ## Sprint sprint-207 Learnings
-- Sprint sprint-207 Learnings: ## Sprint sprint-207 Learnings
+- Sprint 207 Learnings: - Sprint sprint-207 Learnings: ## Sprint sprint-207 Learnings
 - 207-001 — Model registry bundled apiId güncel + "stale" işareti: GO_WITH_TECH_DEBT — DONE criteria met: (1) bundled opus apiId updated claude-opus-4-6→claude-opus-4-8 (src/core/model-registry.ts:62). (2) B
 
 ## Sprint sprint-206 Learnings
-- Sprint sprint-206 Learnings: ## Sprint sprint-206 Learnings
+- Sprint 206 Learnings: - Sprint sprint-206 Learnings: ## Sprint sprint-206 Learnings
 - 206-003 — docker-oom gracefulTimeout forward fix: NO_GO — Root cause: test expectation was stale, not a source bug. SpawnBackendFactory.create() correctly forwards gracefulTimeou
 - 206-004 — auditor.md managed-docs template legacy temizlik: NO_GO — Fixed legacy 'store.insert' → 'store.upsert' in auditor.md template and regenerated all provider rule files. The test wa
 
 ## Sprint sprint-205 Learnings
-- Sprint sprint-205 Learnings: ## Sprint sprint-205 Learnings
+- Sprint 205 Learnings: - Sprint sprint-205 Learnings: ## Sprint sprint-205 Learnings
 
 ## Sprint sprint-204 Learnings
-- Sprint sprint-204 Learnings: ## Sprint sprint-204 Learnings
+- Sprint 204 Learnings: - Sprint sprint-204 Learnings: ## Sprint sprint-204 Learnings
 - 204-003 — Implementation intent için built-in agent adaylığı: NO_GO — Added BUILTIN_IMPLEMENTATION_INTENT_RULES map (refactorer=7, architect=6) + applyBuiltinImplementationRules() helper in 
 - 204-005 — Native chat streaming response (Path C): NO_GO — F2-003 streaming added to chat-native loop via OPTIONAL ChatProviderAdapter.stream() method yielding StreamChunk { text?
 - 204-008 — Multi-tenant tenantId iskelet: NO_GO — Created src/core/tenant-context.ts with TenantContext interface, isValidTenantId(), tenantIsolationPath(), and resolveTe
 
 ## Sprint sprint-203 Learnings
-- Sprint sprint-203 Learnings: ## Sprint sprint-203 Learnings
+- Sprint 203 Learnings: - Sprint sprint-203 Learnings: ## Sprint sprint-203 Learnings
 - 203-002 — Docker provider-aware auth mount: GO_WITH_TECH_DEBT — Changed auth mount condition at line 502: added `|| providerBinary !== 'claude'` so ~/.claude is only mounted for claude
 - 203-005 — Native chat tool-use loop iskelet (Path C foundation): NO_GO — Path C native chat tool-use loop skeleton delivered.
 
 === What was built ===
 src/cli/commands/chat-native.ts (156 LoC, u
 - 203-006 — Chat history memory entegrasyonu (appendChatTurn wire): NO_GO — Wired MemoryStore into chat-native loop via dependency-injected ChatMemoryAdapter interface. Added 3 optional fields (me
-- 203-007 — chat-native CLI komut kaydı (deckent chat --native): NO_GO — Added --native flag to `deckent chat`. Changes: (1) Added `import { createInterface } from 'node:readline'` and `import 
+- 203-007 — chat-native CLI komut kaydı (deckent chat --native): NO_GO — Added --native flag to `deckent chat`. Changes: (1) Added `import { createInterface } from 'node:readline'` and `import
 
 ## Sprint sprint-202 Learnings
-- Sprint sprint-202 Learnings: ## Sprint sprint-202 Learnings
+- Sprint 202 Learnings: - Sprint sprint-202 Learnings: ## Sprint sprint-202 Learnings
 - 202-002 — Ollama model registry (tier→local model): NO_GO — Ollama model registry tier→local model resolution wired — Sprint 202 F1 DALGA 0 Task 2.
 
 IMPLEMENTATION:
@@ -95,11 +135,11 @@ IMPLEMENTATION:
 - 202-006 — Provider-free smoke verify (sıfır-API-key + Ollama senaryosu): NO_GO
 
 ## Sprint sprint-201 Learnings
-- Sprint sprint-201 Learnings: ## Sprint sprint-201 Learnings
+- Sprint 201 Learnings: - Sprint sprint-201 Learnings: ## Sprint sprint-201 Learnings
 - 201-006 — Test baseline 28 → ≤20 attack: NO_GO — TASK GOAL: reduce vitest fail count by ≥8 via the easy doc-sync/snapshot/count-drift lane. ACHIEVED: -8 fails (55 → 47),
 
 ## Sprint sprint-200 Learnings
-- Sprint sprint-200 Learnings: ## Sprint sprint-200 Learnings
+- Sprint 200 Learnings: - Sprint sprint-200 Learnings: ## Sprint sprint-200 Learnings
 - 198-002 — memory.db sprint-log finalize bug fix + Sprint 194/196 row backfill: NO_GO — Sprint 198 198-002 (memory.db sprint-log finalize bug fix + Sprint 194/196 row backfill) was already authored in a prior
 - 198-003 — managed-docs auditor.md template regression fix: NO_GO — All three regression sources fixed:
 1. src/core/rule-templates/auditor.template.md — removed 'Append new patterns to PAT
@@ -111,7 +151,7 @@ BASELINE (verified at task start, all 4 files):
 1. scripts/sync-core-m
 
 ## Sprint sprint-199 Learnings
-- Sprint sprint-199 Learnings: ## Sprint sprint-199 Learnings
+- Sprint 199 Learnings: - Sprint sprint-199 Learnings: ## Sprint sprint-199 Learnings
 - 198-003 — managed-docs auditor.md template regression fix: NO_GO — Fixed the managed-docs auditor template regression (198-003).
 
 **Root cause location:** The template is at `src/core/rul
@@ -120,26 +160,25 @@ BASELINE (verified at task start, all 4 files):
 - 198-007 — Sprint 191-196 retroactive reclassify re-run (12/12 hedef): NO_GO — PREREQUISITE BLOCKER: Sprint 198-002 (memory.db sprint-log finalize + backfill) is not complete. The reclassify script e
 
 ## Sprint sprint-197 Learnings
-- Sprint sprint-197 Learnings: ## Sprint sprint-197 Learnings
+- Sprint 197 Learnings: - Sprint sprint-197 Learnings: ## Sprint sprint-197 Learnings
 - 197-004 — WSL2 OOM mitigation (max_workers + worker_memory + adaptive): NO_GO — Sprint 197 task 197-004 — WSL2 OOM mitigation.
 
 1. .deckent/config.json: modes.performance.max_workers 3→2, worker_memor
 
 ## Sprint sprint-195 Learnings
-- Sprint sprint-195 Learnings: ## Sprint sprint-195 Learnings
+- Sprint 195 Learnings: - Sprint sprint-195 Learnings: ## Sprint sprint-195 Learnings
 - 195-004 — models.dev bootstrap startup wire: NO_GO — bootstrapFromCatalog added to src/core/model-catalog.ts (~36 LoC: idempotency flag, BootstrapOptions interface, exported
 
 ## Sprint sprint-193 Learnings
-- Sprint sprint-193 Learnings: ## Sprint sprint-193 Learnings
+- Sprint 193 Learnings: - Sprint sprint-193 Learnings: ## Sprint sprint-193 Learnings
 - SMOKE-001 — i18n en.json duplicate error.lock_conflict temizle: NO_GO — Worker exited without writing result (exitCode=0)
 
 ## Sprint sprint-192 Learnings
-- Sprint sprint-192 Learnings: ## Sprint sprint-192 Learnings
+- Sprint 192 Learnings: - Sprint sprint-192 Learnings: ## Sprint sprint-192 Learnings
 - Placeholder — sprint still in-progress; will be overwritten by finalize.
 
-
 ## Sprint sprint-191 Learnings
-- Sprint sprint-191 Learnings: ## Sprint sprint-191 Learnings
+- Sprint 191 Learnings: - Sprint sprint-191 Learnings: ## Sprint sprint-191 Learnings
 - 191-002 — `runtime_extension_enabled: true` default + worker timeout extension wire: NO_GO
 - 191-003 — Sprint 190 retroactive agent stats reclassify + outcome-tracker correction tool: NO_GO — Sprint 191 Task 003 — reclassifyTaskOutcome + agent reclassify CLI command + ADR-046 audit-trail wire.
 
@@ -162,25 +201,25 @@ IMPLEMENTATION:
 - 191-013 — Built-in agent PROMPT.md Karpathy refactor pass 1 (top 5 agents): NO_GO
 
 ## Sprint sprint-190 Learnings
-- Sprint sprint-190 Learnings: ## Sprint sprint-190 Learnings
+- Sprint 190 Learnings: - Sprint sprint-190 Learnings: ## Sprint sprint-190 Learnings
 - Docker OOM cycle drove ~14 false NO_GO (reclassify pending Sprint 191 Task 003)
 - 190-009 Ollama adapter: TECH_DEBT — list parse/tier mapping incomplete (Sprint 191 Task 017 closure)
 - Backfilled retroactively per Sprint 191 Task 008.
 
 ## Sprint sprint-189 Learnings
-- Sprint sprint-189 Learnings: ## Sprint sprint-189 Learnings
+- Sprint 189 Learnings: - Sprint sprint-189 Learnings: ## Sprint sprint-189 Learnings
 - 189-009 deckent_kill MCP parite: NO_GO — investigate root cause
 - 189-011 API endpoint E2E test suite: NO_GO — investigate root cause
 - Backfilled retroactively per Sprint 191 Task 008.
 
 ## Sprint sprint-188 Learnings
-- Sprint sprint-188 Learnings: ## Sprint sprint-188 Learnings
+- Sprint 188 Learnings: - Sprint sprint-188 Learnings: ## Sprint sprint-188 Learnings
 
 ## Sprint sprint-187 Learnings
-- Sprint sprint-187 Learnings: ## Sprint sprint-187 Learnings
+- Sprint 187 Learnings: - Sprint sprint-187 Learnings: ## Sprint sprint-187 Learnings
 
 ## Sprint sprint-186 Learnings
-- Sprint sprint-186 Learnings: ## Sprint sprint-186 Learnings
+- Sprint 186 Learnings: - Sprint sprint-186 Learnings: ## Sprint sprint-186 Learnings
 - Audit src/core/cascade-detector.ts: NO_GO — Worker exited without writing result (exitCode=0)
 - Audit src/core/ci-learning.ts: NO_GO — Worker exited without writing result (exitCode=0)
 - Audit src/core/condition-evaluator.ts: NO_GO — Worker exited without writing result (exitCode=0)
@@ -193,14 +232,14 @@ IMPLEMENTATION:
 - Audit src/core/cost-config-loader.ts: NO_GO — Worker exited without writing result (exitCode=0)
 
 ## Sprint sprint-185 Learnings
-- Sprint sprint-185 Learnings: ## Sprint sprint-185 Learnings
+- Sprint 185 Learnings: - Sprint sprint-185 Learnings: ## Sprint sprint-185 Learnings
 
 ## Sprint sprint-183 Learnings
-- Sprint sprint-183 Learnings: ## Sprint sprint-183 Learnings
-- W3-3 — v1.0.0-beta.1 final smoke (build:all + vitest + dashboard + serve): NO_GO — W3-3 final smoke gate: 6/6 GREEN. Read-only verification task, no source changes. Gate-by-gate: (1) `npm run build:all` 
+- Sprint 183 Learnings: - Sprint sprint-183 Learnings: ## Sprint sprint-183 Learnings
+- W3-3 — v1.0.0-beta.1 final smoke (build:all + vitest + dashboard + serve): NO_GO — W3-3 final smoke gate: 6/6 GREEN. Read-only verification task, no source changes. Gate-by-gate: (1) `npm run build:all`
 
 ## Sprint sprint-182 Learnings
-- Sprint sprint-182 Learnings: ## Sprint sprint-182 Learnings
+- Sprint 182 Learnings: - Sprint sprint-182 Learnings: ## Sprint sprint-182 Learnings
 - W1-1 — Mock hygiene: orphan-cleaner-ipc + archive-debt `renameSync` ekle: NO_GO — Worker exited without writing result (exitCode=0)
 - W1-3 — Full vitest sweep CI=true parity verify: NO_GO — Worker exited without writing result (exitCode=0)
 - W2-2 — Auto-debt prepend offset drift fix (Dependencies title-prefix resolver): NO_GO — Worker exited without writing result (exitCode=0)
@@ -211,11 +250,11 @@ Gate verdicts:
   [PASS] pack_size_and_count — 2.7 MB (2,83
 
 ## Sprint sprint-181 Learnings
-- Sprint sprint-181 Learnings: ## Sprint sprint-181 Learnings
+- Sprint 181 Learnings: - Sprint sprint-181 Learnings: ## Sprint sprint-181 Learnings
 - W1-1 — CI workflow'una dashboard deps install adımı ekle: NO_GO — W1-1 primary fix tamamlandı: (1) .github/workflows/ci.yml typecheck job'una `npm ci --prefix src/dashboard --ignore-scri
 
 ## Sprint sprint-180 Learnings
-- Sprint sprint-180 Learnings: ## Sprint sprint-180 Learnings
+- Sprint 180 Learnings: - Sprint sprint-180 Learnings: ## Sprint sprint-180 Learnings
 - W1-1 — sprint-state-tracker getSprintStateSnapshot (Step B): NO_GO — W1-1 sprint-state-tracker — getSprintStateSnapshot(projectRoot) exports a fresh SprintStateSnapshot built from .deckent/
 - W1-2 — Nervous bootstrap fabrika (Step A): GO_WITH_TECH_DEBT — W1-2 — Nervous bootstrap fabrika tamamlandı. `createNervousSystemIfEnabled(config, projectRoot, sprintStateProvider, act
 - W2-1 — Nervous action handlers (Step C): GO_WITH_TECH_DEBT — W2-1 — Nervous action handlers (Step C) implemented per NERVOUS-TODO §11.2 Step C. Module exports: ActionHandlerResult (
@@ -230,7 +269,7 @@ Gate verdicts:
 - W5-1 — npm publish v1.0.0-beta.1 readiness ★ BETA LAUNCH: NO_GO — W5-1 npm publish readiness — 6 gate validator + 20 unit tests + package.json wiring. DELIVERABLES: (1) scripts/validate-
 
 ## Sprint sprint-179 Learnings
-- Sprint sprint-179 Learnings: ## Sprint sprint-179 Learnings
+- Sprint 179 Learnings: - Sprint sprint-179 Learnings: ## Sprint sprint-179 Learnings
 - W0-1 — Dependency aggregate fix-aware (Bug A foundation): GO_WITH_TECH_DEBT — W0-1 (Bug A foundation) tamamlandı. TDD akışı RED→GREEN. 5/5 case PASS: (a) getAggregateVerdict ana NO_GO + fix DONE → D
 - W1-1 — Auto-debt empty-scope inheritance: GO_WITH_TECH_DEBT — W1-1 Auto-debt empty-scope inheritance implemented. (1) DebtItem extended with optional class ('verified-no-result' | 's
 - W2-3 — DEP0190 shell:true win32-only conditional: GO_WITH_TECH_DEBT — DEP0190 fix: 3 call-sites changed from shell:true to shell:process.platform==='win32'.
@@ -246,18 +285,18 @@ IMPLEMENTATION (src/api/terminal/command-guard.ts, NEW):
 - W5-11 — mTLS hook (AuthProvider interface) ★ BETA MUST: GO_WITH_TECH_DEBT — W5-11 mTLS hook (AuthProvider interface) tam implement edildi. AuthProvider interface'e optional `verifyClientCert?(cert
 
 ## Sprint sprint-178 Learnings
-- Sprint sprint-178 Learnings: ## Sprint sprint-178 Learnings
+- Sprint 178 Learnings: - Sprint sprint-178 Learnings: ## Sprint sprint-178 Learnings
 - Fix debt: Tech debt from 175-020-fix: All 5 automatic verification gates executed:
 
 1. npm: NO_GO — Priority fix for debt-175-020-fix (CRITICAL, open 3 sprints). Task JSON ships with EMPTY scope (scope.directories=[], sc
 
 ## Sprint sprint-177 Learnings
-- Sprint sprint-177 Learnings: ## Sprint sprint-177 Learnings
+- Sprint 177 Learnings: - Sprint sprint-177 Learnings: ## Sprint sprint-177 Learnings
 - Fix debt: ADR-019 reconciliation: language-agnostic verify not implemented: NO_GO — Worker exited without writing result (exitCode=0)
 - 177-003 — Tmux backend deprecate path: GO_WITH_TECH_DEBT — 3 required TDD tests PASS (default→docker + explicit-warns + warn-once). Functional requirements fully met: resolveBacke
 
 ## Sprint sprint-176 Learnings
-- Sprint sprint-176 Learnings: ## Sprint sprint-176 Learnings
+- Sprint 176 Learnings: - Sprint sprint-176 Learnings: ## Sprint sprint-176 Learnings
 - Fix debt: ADR-019 reconciliation: language-agnostic verify not implemented: NO_GO — REFUSED — empty-scope debt-injection dispatch. The task as dispatched is a live reproduction of the exact bug that W1-1 
 - W1-1 — Auto-debt empty-scope inheritance: NO_GO — Worker exited without writing result file
 - W1-2 — Re-plan orphan task file cleanup: NO_GO
@@ -270,7 +309,7 @@ IMPLEMENTATION (src/api/terminal/command-guard.ts, NEW):
 - W4-9 — Command guard (I3 default-deny remote): NO_GO — Worker exited without writing result file
 
 ## Sprint sprint-175 Learnings
-- Sprint sprint-175 Learnings: ## Sprint sprint-175 Learnings
+- Sprint 175 Learnings: - Sprint sprint-175 Learnings: ## Sprint sprint-175 Learnings
 - W1.2 — SessionBackend + LocalPtyBackend: NO_GO — W1.2 — SessionBackend interface + LocalPtyBackend implementation, plan §Task 1.2 ile birebir aynı. RED→GREEN TDD akışı:
 
 - W1.4 — PtySessionManager: NO_GO — W1.4 PtySessionManager — implemented per plan §1.4. TDD: wrote 4 tests first (bounded ring, detach≠kill, maxSessions, id
@@ -288,14 +327,14 @@ Flow (1 it(), real `node-pt
 - W4.3 — Final verification: GO_WITH_TECH_DEBT — Worker had heartbeat but failed to write result within grace period — kill blocked by panic guard (user approval require
 
 ## Sprint sprint-174 Learnings
-- Sprint sprint-174 Learnings: ## Sprint sprint-174 Learnings
+- Sprint 174 Learnings: - Sprint sprint-174 Learnings: ## Sprint sprint-174 Learnings
 - Fix debt: Tech debt from 170-001-fix: Code physically verified despite missing .result (Sp: NO_GO — Worker exited without writing result (exitCode=0)
 
 ## Sprint sprint-173 Learnings
-- Sprint sprint-173 Learnings: ## Sprint sprint-173 Learnings
+- Sprint 173 Learnings: - Sprint sprint-173 Learnings: ## Sprint sprint-173 Learnings
 
 ## Sprint sprint-172 Learnings
-- Sprint sprint-172 Learnings: ## Sprint sprint-172 Learnings
+- Sprint 172 Learnings: - Sprint sprint-172 Learnings: ## Sprint sprint-172 Learnings
 - C1 — update-readme-stats.mjs auto-gen + CI gate: NO_GO — TDD discipline: önce tests/scripts/update-readme-stats.test.ts yazıldı (RED — script yok, import fail), sonra scripts/up
 - C2 — reference docs auto-gen (MCP/ADR/CLI/agents): NO_GO — Sprint 172 Task C2 — reference docs auto-gen (5 üretici TDD). RED: tests/scripts/gen-reference-docs.test.ts ilk çalıştır
 - C3 — lint:link dead-link gate: NO_GO — Sprint 172 C3 — lint:link dead-link gate. TDD RED→GREEN: 28/28 unit test pass. `node scripts/lint-links.mjs` exit 0 (156
@@ -307,11 +346,11 @@ Flow (1 it(), real `node-pt
 - B5 — deckent-hub kararı + examples workspace fix: NO_GO — Step 1 TAMAMLANDI: examples/quickstart/package.json 'workspace:*' → '^1.0.0-beta.1'. OSS kullanıcıları artık 'npm instal
 
 ## Sprint sprint-171 Learnings
-- Sprint sprint-171 Learnings: ## Sprint sprint-171 Learnings
+- Sprint 171 Learnings: - Sprint sprint-171 Learnings: ## Sprint sprint-171 Learnings
 - Doc Audit Root: NO_GO — Sprint 171 Task 23 — Doc Audit Root tamamlandı. Repo kökündeki 19 markdown dosyası tek tek denetlendi (DIRECTIVES'in idd
 
 ## Sprint sprint-170 Learnings
-- Sprint sprint-170 Learnings: ## Sprint sprint-170 Learnings
+- Sprint 170 Learnings: - Sprint sprint-170 Learnings: ## Sprint sprint-170 Learnings
 - P0-3 Tmux Prompt Filename TaskId-Aware: GO_WITH_TECH_DEBT — Sprint 170 P0-3 (Bug 2B / ADR-048 §Negative closure) — fix architecturally complete; 3/3 mandated TDD tests GREEN; 5 pre
 - P0-5 Docker Spawn Race Window Closure: GO_WITH_TECH_DEBT — P0-5 Docker Spawn Race Window Closure — Sprint 169 Bug 2A eradication. TDD red-green disciplined: 6 tests written first 
 - Fix: P0-6 Event Stream Prompt Write/Delete Visibility: NO_GO — Worker exited without writing result (exitCode=0)
@@ -321,7 +360,7 @@ Flow (1 it(), real `node-pt
 1. src/orchestra/event-stream.ts: CHANNELS.P
 
 ## Sprint sprint-169 Learnings
-- Sprint sprint-169 Learnings: ## Sprint sprint-169 Learnings
+- Sprint 169 Learnings: - Sprint sprint-169 Learnings: ## Sprint sprint-169 Learnings
 - W3.1 C0c Collision Detection Live Trigger Investigation + Fix: NO_GO — W3.1 RC identified as path-normalization gap (RC-C from plan §2.1). `detectScopeCollisions` (conflict-resolver.ts:173) c
 - W3.2 Smoke Directive Dependency Parser Fix: NO_GO — Sprint 169 W3.2 fix: parseDependencyField helper added (src/orchestra/task-builder.ts:186) accepting 3 formats — bare st
 - C1 Memory Relations Migration: NO_GO — Sprint 169 C1 — Memory Relations Migration complete.
@@ -334,11 +373,11 @@ What changed:
 - H1 ADR DB→FS Export Pipeline + ADR-046 Reverse Hook: NO_GO — Sprint 169 H1 — ADR DB→FS Export Pipeline + ADR-046 Bi-Directional Hook amendment COMPLETE. (1) src/core/memory-export.t
 
 ## Sprint sprint-168 Learnings
-- Sprint sprint-168 Learnings: ## Sprint sprint-168 Learnings
+- Sprint 168 Learnings: - Sprint sprint-168 Learnings: ## Sprint sprint-168 Learnings
 - T3 Kill Recovery Simulation (DEPENDS T1): NO_GO — Task blocked by unmet dependency. Task 168-003 (T3 Kill Recovery Simulation) depends on task sprint-168-smoke-T1 (T1 Sco
 
 ## Sprint sprint-167 Learnings
-- Sprint sprint-167 Learnings: # Sprint sprint-167 Learnings
+- Sprint 167 Learnings: - Sprint sprint-167 Learnings: # Sprint sprint-167 Learnings
 
 Sprint 167 Read-Only Self-Audit deliverable'ları (kaynak: .audit/sprint-167/T*.md — hiçbir source/doc mutasyonu yok, salt tespit).
 
@@ -369,7 +408,7 @@ Kaynak: T7-cross-cutting-synthesis.md + T7-brain-crash-addendum.md. Meta-audit k
 - Read-only self-audit deseni Sprint 171'in 29-task mega-audit'inin doğrudan atası.
 
 ## Sprint sprint-166 Learnings
-- Sprint sprint-166 Learnings: # Sprint sprint-166 Learnings
+- Sprint 166 Learnings: - Sprint sprint-166 Learnings: # Sprint sprint-166 Learnings
 
 ## 4 Architectural Root Cause Fix
 1. **Bug M (adrInsert hook):** docs/adr/*.md → memory.db migration eksikti. Step 3 unconditional invocation pattern + syncAdrFilesToDb upsert ile çözüldü. ADR-046 Section 5.1 Step Ordering Contract kontract.
@@ -402,7 +441,7 @@ Kaynak: T7-cross-cutting-synthesis.md + T7-brain-crash-addendum.md. Meta-audit k
 - Sprint 166 manuel backfill script (bu script) ile bu açık kapatıldı (UPDATE entries SET sprint_id=metadata.originSprintId)
 
 ## Sprint sprint-165 Learnings
-- Sprint sprint-165 Learnings: ## Sprint sprint-165 Learnings
+- Sprint 165 Learnings: - Sprint sprint-165 Learnings: ## Sprint sprint-165 Learnings
 - Sprint 165 Learnings: # sprint-165
 
 ## Metrics
@@ -425,25 +464,25 @@ Skills: -
 |------|-------|--------|--------|
 
 ## Sprint sprint-164 Learnings
-- Sprint sprint-164 Learnings: ## Sprint sprint-164 Learnings
+- Sprint 164 Learnings: - Sprint sprint-164 Learnings: ## Sprint sprint-164 Learnings
 - Vitest Gate +1 Fail Closure — Chronic Regression Eradication: NO_GO — Vitest gate +1 fail chronic regression closure — TAMAMLANDI. Discovery: full vitest run 17 fail / 8 dosya tespit etti (n
 
 ## Sprint sprint-163 Learnings
-- Sprint sprint-163 Learnings: ## Sprint sprint-163 Learnings
+- Sprint 163 Learnings: - Sprint sprint-163 Learnings: ## Sprint sprint-163 Learnings
 
 ## Sprint sprint-162 Learnings
-- Sprint sprint-162 Learnings: ## Sprint sprint-162 Learnings
+- Sprint 162 Learnings: - Sprint sprint-162 Learnings: ## Sprint sprint-162 Learnings
 - Sprint Phase Observability + EvaluationAuditTrail Runtime Wire (T-003, composite): GO_WITH_TECH_DEBT — T-003 composite (phase observability + EvaluationAuditTrail runtime wire) complete. persistPhaseTransition helper export
 - Crash Injection Integration Test + E2E Smoke (T-007): NO_GO — T-007 — 9/9 tests PASS (6 crash injection + 3 e2e smoke). Crash file: 6 it() blocks S1-S6 (grep -nE 'S[1-6]:' → 18 match
 
 ## Sprint sprint-161 Learnings
-- Sprint 161 Learnings: Sprint 161 learnings — no .brain/sprints/sprint-161.md log was available at backfill time. Stub inserted by Sprint 166 Task 6 (Bug U+V).
+- Sprint 161 Learnings: - Sprint 161 Learnings: Sprint 161 learnings — no .brain/sprints/sprint-161.md log was available at backfill time. Stub inserted by Sprint 166 Task 6 (Bug U+V).
 
 ## Sprint sprint-160 Learnings
-- Sprint 160 Learnings: Sprint 160 learnings — no .brain/sprints/sprint-160.md log was available at backfill time. Stub inserted by Sprint 166 Task 6 (Bug U+V).
+- Sprint 160 Learnings: - Sprint 160 Learnings: Sprint 160 learnings — no .brain/sprints/sprint-160.md log was available at backfill time. Stub inserted by Sprint 166 Task 6 (Bug U+V).
 
 ## Sprint sprint-159 Learnings
-- Sprint 159 Learnings: # sprint-159
+- Sprint 159 Learnings: - Sprint 159 Learnings: # sprint-159
 
 ## Metrics
 | Metric | Value |
@@ -480,13 +519,13 @@ Skills: typescript-expert, system-architect, security-specialist, documentation-
 | 159-015: Sprint 157 Retro + Bug Close Forensic | doc-writer | documentation-writer | NO_GO |
 
 ## Sprint sprint-158 Learnings
-- Sprint 158 Learnings: Sprint 158 learnings — no .brain/sprints/sprint-158.md log was available at backfill time. Stub inserted by Sprint 166 Task 6 (Bug U+V).
+- Sprint 158 Learnings: - Sprint 158 Learnings: Sprint 158 learnings — no .brain/sprints/sprint-158.md log was available at backfill time. Stub inserted by Sprint 166 Task 6 (Bug U+V).
 
 ## Sprint sprint-157 Learnings
-- Sprint 157 Learnings: Sprint 157 learnings — no .brain/sprints/sprint-157.md log was available at backfill time. Stub inserted by Sprint 166 Task 6 (Bug U+V).
+- Sprint 157 Learnings: - Sprint 157 Learnings: Sprint 157 learnings — no .brain/sprints/sprint-157.md log was available at backfill time. Stub inserted by Sprint 166 Task 6 (Bug U+V).
 
 ## Sprint sprint-156 Learnings
-- Sprint sprint-156 Learnings: ## Sprint sprint-156 Learnings
+- Sprint 156 Learnings: - Sprint sprint-156 Learnings: ## Sprint sprint-156 Learnings
 - Workflow Rename VERIFY (read-only audit): NO_GO — Audit-only task completed. All 3 primary workflow files (ci.yml, docs.yml, cross-platform-e2e.yml) confirmed to use bran
 - dependency_pipeline_enabled Default Flip: NO_GO — Sprint 156 Task 2 — dependency_pipeline_enabled default flipped from undefined (falsy) → true. Three precise changes ins
 - Cascade/Unblock Runtime Wire: GO_WITH_TECH_DEBT — Sprint 156 Task 003 complete. Wired applyCascadeToSprint into runEvaluatePhase (after each NO_GO with a real result file
@@ -503,15 +542,15 @@ WHAT WAS DONE:
 - EffectClass Annotation rubric-registry: GO_WITH_TECH_DEBT — EffectClass annotation eklendi. src/orchestra/rubric-registry.ts'e: (1) EffectClass type union ('pure'|'reversible'|'ide
 
 ## Sprint sprint-155 Learnings
-- Sprint sprint-155 Learnings: ## Sprint sprint-155 Learnings
+- Sprint 155 Learnings: - Sprint sprint-155 Learnings: ## Sprint sprint-155 Learnings
 
 ## Sprint sprint-154 Learnings
-- Sprint sprint-154 Learnings: ## Sprint sprint-154 Learnings
+- Sprint 154 Learnings: - Sprint sprint-154 Learnings: ## Sprint sprint-154 Learnings
 - RubricRegistry Core Foundation: NO_GO — RubricRegistry foundation created at src/orchestra/rubric-registry.ts (196 LoC). Spec compliance: (1) TaskType taxonomy 
 - RubricRegistry Test Suite: NO_GO — Created tests/orchestra/rubric-registry.test.ts with 26 test cases (exceeds 20+ requirement): isAuditTask (7), isDocumen
 
 ## Sprint sprint-153 Learnings
-- Sprint sprint-153 Learnings: ## Sprint sprint-153 Learnings
+- Sprint 153 Learnings: - Sprint sprint-153 Learnings: ## Sprint sprint-153 Learnings
 - Brain 8-Phase Sprint Lifecycle: NO_GO — Brain 8-Phase Sprint Lifecycle dokümantasyonu oluşturuldu. Her faz için Amaç, Kritik Karar ve Temel I/O bölümleri yazıld
 - Memory V2 SQLite Schema: NO_GO — Memory V2 SQLite schema documentation written. File docs/smoke-2026-05-12/T-SMOKE-03.md created with 1001 words (minimum
 - Multi-Provider Routing: NO_GO — docs/smoke-2026-05-12/T-SMOKE-04.md oluşturuldu. 587 kelime (gerekli ≥200). İçerik: multi-provider genel bakış tablosu, 
@@ -522,10 +561,10 @@ WHAT WAS DONE:
 - Beta GA 20-Gate Listesi: NO_GO — Beta GA 20-Gate dökümanı oluşturuldu. Her kapı için açıklama, ölçüm kriteri ve Sprint 152 sonu durumu (PASS/IN_PROGRESS)
 
 ## Sprint sprint-152 Learnings
-- Sprint 152 Learnings: Sprint 152 learnings — no .brain/sprints/sprint-152.md log was available at backfill time. Stub inserted by Sprint 166 Task 6 (Bug U+V).
+- Sprint 152 Learnings: - Sprint 152 Learnings: Sprint 152 learnings — no .brain/sprints/sprint-152.md log was available at backfill time. Stub inserted by Sprint 166 Task 6 (Bug U+V).
 
 ## Sprint sprint-151 Learnings
-- Sprint sprint-151 Learnings: ## Sprint sprint-151 Learnings
+- Sprint 151 Learnings: - Sprint sprint-151 Learnings: ## Sprint sprint-151 Learnings
 - Public Repo Flip — VerhexIO/deckent-dev → VerhexIO/deckent: GO_WITH_TECH_DEBT — DURUM: ../deckent-public dizini mevcut değil — Alperen'in önce git clone yapması gerekiyor. Handoff dökümanı bu senaryoy
 - Discord Bot Deploy + Smoke Test: GO_WITH_TECH_DEBT — ## Tamamlanan İşler
 
@@ -534,7 +573,7 @@ WHAT WAS DONE:
 - Nervous System 6-10 Detector Activation (Sprint 147 Plan): GO_WITH_TECH_DEBT — 5 yeni nervous system detector oluşturuldu (6→11 toplam): BuildFailureRecurrenceDetector, TokenSpikeDetector, AgentRouti
 
 ## Sprint sprint-150 Learnings
-- Sprint sprint-150 Learnings: ## Sprint sprint-150 Learnings
+- Sprint 150 Learnings: - Sprint sprint-150 Learnings: ## Sprint sprint-150 Learnings
 - Docker Worker Exit Pattern Final Fix (Sprint 146+148 Debt): GO_WITH_TECH_DEBT — Docker Worker Exit Pattern Final Fix completed. 3 changes: (1) containers Map now stores {containerId, model} so host-si
 - Scope Sanitizer Code Snippet False Positive Fix (Sprint 148 Debt): NO_GO — All requirements from Sprint 148 debt already implemented in Sprint 149. Verified: (1) isPlaceholderPath() rejects foo/b
 - Auditor Stale Alert Race Condition Fix (Sprint 148 Debt): GO_WITH_TECH_DEBT — Auditor stale alert race condition fix was already implemented in Sprint 149 (auditor.ts lines 293-316 + heartbeat-types
@@ -548,19 +587,19 @@ WHAT WAS DONE:
 - `deckent audit` + `deckent recover` User-Facing CLI + MCP Yüzeyi: GO_WITH_TECH_DEBT — Implemented `deckent audit` + `deckent recover` CLI commands and `deckent_audit` + `deckent_recover` MCP tools. Full ADR
 
 ## Sprint sprint-149 Learnings
-- Sprint sprint-149 Learnings: ## Sprint sprint-149 Learnings
+- Sprint 149 Learnings: - Sprint sprint-149 Learnings: ## Sprint sprint-149 Learnings
 - `deckent mode` CLI Command: GO_WITH_TECH_DEBT — Created `deckent mode` CLI command with 5 subcommands: show, sprint, task, auto, global. Follows ADR-012 register<Name>(
 
 ## Sprint sprint-148 Learnings
-- Sprint sprint-148 Learnings: ## Sprint sprint-148 Learnings
+- Sprint 148 Learnings: - Sprint sprint-148 Learnings: ## Sprint sprint-148 Learnings
 - Vitest Triage — 135 Fail → < 50 Fail: NO_GO — Docker worker exited without writing result file
-- Sprint 146 T-146-011 Docker Worker Exit Pattern Root Cause Fix: GO_WITH_TECH_DEBT — Docker Worker Exit Pattern root cause fixed. Problem: Container SIGKILL (exit 137, OOM kill) bypasses all shell traps — 
+- Sprint 146 T-146-011 Docker Worker Exit Pattern Root Cause Fix: GO_WITH_TECH_DEBT — Docker Worker Exit Pattern root cause fixed. Problem: Container SIGKILL (exit 137, OOM kill) bypasses all shell traps —
 
 ## Sprint sprint-147 Learnings
-- Sprint sprint-147 Learnings: ## Sprint sprint-147 Learnings
+- Sprint 147 Learnings: - Sprint sprint-147 Learnings: ## Sprint sprint-147 Learnings
 
 ## Sprint sprint-146 Learnings
-- Sprint sprint-146 Learnings: ## Sprint sprint-146 Learnings
+- Sprint 146 Learnings: - Sprint sprint-146 Learnings: ## Sprint sprint-146 Learnings
 - Agent Truncation Bug Fix: GO_WITH_TECH_DEBT — Root cause: task-builder.ts:761 had `agentPrompt.slice(0, 2000)` which truncated agent prompts to 2000 chars. This cause
 - ADR Relevance Scoring Engine: GO_WITH_TECH_DEBT — ADR Relevance Scoring Engine implemented. Created src/orchestra/adr-selector.ts (~330 LoC) with: selectRelevantAdrs() sc
 - Scope Sanitizer: GO_WITH_TECH_DEBT — Created scope-sanitizer.ts with 8 filter rules (absolute path reject, path traversal reject, dist/ remove, extension-onl
@@ -570,7 +609,7 @@ WHAT WAS DONE:
 - Sprint 145 vitest Regression Fix: NO_GO — Docker worker exited without writing result file
 
 ## Sprint sprint-145 Learnings
-- Sprint sprint-145 Learnings: ## Sprint sprint-145 Learnings
+- Sprint 145 Learnings: - Sprint sprint-145 Learnings: ## Sprint sprint-145 Learnings
 - Brain Heuristic Timeout Estimator: NO_GO — Brain Heuristic Timeout Estimator implemented as specified. New file timeout-estimator.ts (~170 LoC) with brainEstimateT
 - EventBus Abstraction + Subscribe API: GO_WITH_TECH_DEBT — EventBus Abstraction + Subscribe API implemented as specified.
 
@@ -589,20 +628,20 @@ WHAT WAS DONE:
 - Result Atomicity Guarantee — TIMEOUT_WITH_WORK Partial Result: GO_WITH_TECH_DEBT — TIMEOUT_WITH_WORK partial result mechanism implemented across 4 source files + 1 test file (14 tests). Changes: (1) Dock
 
 ## Sprint sprint-144 Learnings
-- Sprint sprint-144 Learnings: ## Sprint sprint-144 Learnings
+- Sprint 144 Learnings: - Sprint sprint-144 Learnings: ## Sprint sprint-144 Learnings
 - worker.ts Split (1669 → 4 dosya): NO_GO — Worker timeout — process exceeded time limit and was killed
 - Ölü Kod Silme Wave A (Agent + V1 Routing, 17 dosya, 2780 LoC): NO_GO — Worker timeout — process exceeded time limit and was killed
 - Ölü Kod Silme Wave B (Orchestra Sahipsiz + Feature Flag, 12 dosya, 2139 LoC): NO_GO — Docker worker exited without writing result file
 - Event Stream Emit Wire: GO_WITH_TECH_DEBT — Sprint 138 event-stream.ts foundation wired into Brain, Worker, and Auditor. 7 new CHANNELS constants added: SPRINT_STAR
-- Retro sprint-id Normalize: GO_WITH_TECH_DEBT — Retro sprint-id normalize completed: (1) sprint-retro-writer.ts already used canonical `retro-${sprint.id}` format → no 
+- Retro sprint-id Normalize: GO_WITH_TECH_DEBT — Retro sprint-id normalize completed: (1) sprint-retro-writer.ts already used canonical `retro-${sprint.id}` format → no
 
 ## Sprint sprint-143 Learnings
-- Sprint sprint-143 Learnings: ## Sprint sprint-143 Learnings
+- Sprint 143 Learnings: - Sprint sprint-143 Learnings: ## Sprint sprint-143 Learnings
 - Memory V2 Tam Migrasyon (ci-reporter + managed-docs): NO_GO — Docker worker exited without writing result file
 - MCP Disconnect Fix (Background Sprint Runner): GO_WITH_TECH_DEBT — MCP Disconnect Fix implemented. sprint-runner-entry.ts provides a detached child process entry point for running sprints
 
 ## Sprint sprint-142 Learnings
-- Sprint sprint-142 Learnings: ## Sprint sprint-142 Learnings
+- Sprint 142 Learnings: - Sprint sprint-142 Learnings: ## Sprint sprint-142 Learnings
 - src/core/ batch 1 — Memory V2 modulleri: GO_WITH_TECH_DEBT — Read-only deep analysis of 10 files completed. 10 per-file reports written to .deckent/sprint-god-analysis/src/core/. Al
 - src/core/ batch 2 — Types + Routing: GO_WITH_TECH_DEBT — Read-only deep analysis completed for 10 files in src/core/ batch 2 (Types + Routing). All 10 files analyzed with 16-sec
 - src/core/ batch 4 — Provider + Model + Notification: GO_WITH_TECH_DEBT — Read-only deep analysis of 10 assigned files + 1 bonus (webhook.ts) = 11 analysis reports. All reports follow the 16-sec
@@ -618,7 +657,7 @@ WHAT WAS DONE:
 - src/orchestra/ batch 4 — Event stream + Pattern + Decision: GO_WITH_TECH_DEBT — Read-only deep analysis of 10 orchestra files completed. 10 per-file reports written using 16-section template. All repo
 
 ## Sprint sprint-141 Learnings
-- Sprint sprint-141 Learnings: ## Sprint sprint-141 Learnings
+- Sprint 141 Learnings: - Sprint sprint-141 Learnings: ## Sprint sprint-141 Learnings
 - src/orchestra/ Analysis (82 dosya): NO_GO — Docker worker exited without writing result file
 - src/cli/ Analysis (75 dosya): GO_WITH_TECH_DEBT — src/cli/ analizi tamamlandı. 75 rapor dosyası oluşturuldu (.deckent/sprint-140-analysis/src/cli/ altında). Tüm dosyalar 
 - src/agents/ + src/providers/ + src/monitor/ + src/api/ + src/extensions/ Analysis (30 dosya): NO_GO — Docker worker exited without writing result file
@@ -628,25 +667,25 @@ WHAT WAS DONE:
 - META — Dead Code + Type Safety + Security: GO_WITH_TECH_DEBT — Read-only cross-cutting analysis completed: (1) Dead Code — 4 fully dead modules (~360 LoC), 14+ unused exports, ADR-038
 - META — ADR Compliance + CLI/MCP Parity + i18n: GO_WITH_TECH_DEBT — Comprehensive 3-section cross-cutting analysis completed: (1) ADR Compliance: 40/40 ADRs audited — 36 COMPLIANT, 2 PARTI
 - META — Test Coverage Map + Performance + Error Handling + TODO inventory: GO_WITH_TECH_DEBT — Completed all 4 cross-cutting analyses. Report at .deckent/sprint-140-analysis/meta/coverage-perf-errors-todo.md (563 li
-- META — Memory V2 Integrity Verification: GO_WITH_TECH_DEBT — Memory V2 Integrity Verification completed. 482-line report covering all 7 dimensions: (1) DB Schema: 5/5 tables + FTS5 
+- META — Memory V2 Integrity Verification: GO_WITH_TECH_DEBT — Memory V2 Integrity Verification completed. 482-line report covering all 7 dimensions: (1) DB Schema: 5/5 tables + FTS5
 
 ## Sprint sprint-140 Learnings
-- Sprint 140 Learnings: Sprint 140 learnings — no .brain/sprints/sprint-140.md log was available at backfill time. Stub inserted by Sprint 166 Task 6 (Bug U+V).
+- Sprint 140 Learnings: - Sprint 140 Learnings: Sprint 140 learnings — no .brain/sprints/sprint-140.md log was available at backfill time. Stub inserted by Sprint 166 Task 6 (Bug U+V).
 
 ## Sprint sprint-139 Learnings
-- Sprint 139 Learnings: ## Sprint sprint-139 Learnings
+- Sprint 139 Learnings: - Sprint 139 Learnings: ## Sprint sprint-139 Learnings
 
 ## Sprint sprint-138 Learnings
-- Sprint 138 Learnings: - ADR-035 Verification Protocol Standard: GO_WITH_TECH_DEBT — ADR-035 Brain ↔ Worker ↔ Auditor Verification Protocol Standard başarıyla .brain/DECISIONS.md dosyasına eklendi. 15 kana
+- Sprint 138 Learnings: - Sprint 138 Learnings: - ADR-035 Verification Protocol Standard: GO_WITH_TECH_DEBT — ADR-035 Brain ↔ Worker ↔ Auditor Verification Protocol Standard başarıyla .brain/DECISIONS.md dosyasına eklendi. 15 kana
 - Worker Honest Assessment Calibration v2: GO_WITH_TECH_DEBT — Worker Honest Assessment Calibration v2 tamamlandı. 3 alt-iş uygulandı:
 
 1. Alt-iş A (task-builder.ts): buildWorkerPromp
 
 ## Sprint sprint-137 Learnings
-- Sprint 137 Learnings: - Brain Budget Decay No-Op Bug Fix: GO_WITH_TECH_DEBT — Fixed brain budget decay no-op bug in runDecay() (debt-manager.ts). Root cause: shouldRun guard used total linesBefore (
+- Sprint 137 Learnings: - Sprint 137 Learnings: - Brain Budget Decay No-Op Bug Fix: GO_WITH_TECH_DEBT — Fixed brain budget decay no-op bug in runDecay() (debt-manager.ts). Root cause: shouldRun guard used total linesBefore (
 
 ## Sprint sprint-136 Learnings
-- Sprint 136 Learnings: - 5 Test Regression Fix (Sprint 136 Opener): GO_WITH_TECH_DEBT — 5 target test files (start-sandbox, start, i18n-integration, docker-backend, error-handling-unification) all pass (262 t
+- Sprint 136 Learnings: - Sprint 136 Learnings: - 5 Test Regression Fix (Sprint 136 Opener): GO_WITH_TECH_DEBT — 5 target test files (start-sandbox, start, i18n-integration, docker-backend, error-handling-unification) all pass (262 t
 - Async I/O İlk Kademe (Hot Path fs.promises Migration): NO_GO — Docker worker exited without writing result file
 - Brain Spurious NO_GO Evaluation Reconciliation (Sprint 135 N9): GO_WITH_TECH_DEBT — Brain Spurious NO_GO Evaluation Reconciliation implemented. Added tryCodeVerifiedDone() helper to result-evaluator.ts wi
 - `.deckent/sprint-NNN-gate.json` Output Wiring (Sprint 135 N5): GO_WITH_TECH_DEBT — gate.json wiring implemented. Added `import { promises as fsPromises } from 'node:fs'` to sprint-finalizer.ts. Inside th
@@ -658,7 +697,7 @@ WHAT WAS DONE:
 - sprint-docs-helpers.ts Test Coverage (Sprint 135 T-010 Debt): GO_WITH_TECH_DEBT — Wrote comprehensive unit tests for sprint-docs-helpers.ts module. 61 test cases covering all 8 exported functions: build
 
 ## Sprint sprint-135 Learnings
-- Sprint 135 Learnings: - Docker Backend Graceful Shutdown (Docker Bug Offensive Root Cause Fix): GO_WITH_TECH_DEBT — Docker graceful shutdown offensive root cause fix implemented. Changes: (1) spawn-backend-docker.ts kill() method: docke
+- Sprint 135 Learnings: - Sprint 135 Learnings: - Docker Backend Graceful Shutdown (Docker Bug Offensive Root Cause Fix): GO_WITH_TECH_DEBT — Docker graceful shutdown offensive root cause fix implemented. Changes: (1) spawn-backend-docker.ts kill() method: docke
 - askBrain() Extraction Finish — Conservative Move + Re-Export Shim: NO_GO — Docker worker exited without writing result file
 - Structured Planner Priority + Dependencies Parsing: GO_WITH_TECH_DEBT — parseStructuredDirectives() and parseBulletOrNumberedTasks() now parse '- Priority: CRITICAL|HIGH|NORMAL|LOW' lines. New
 - GO_WITH_GATE_FAILURE Status Propagation Wire: GO_WITH_TECH_DEBT — GO_WITH_GATE_FAILURE status propagation wire implemented:
@@ -667,10 +706,10 @@ WHAT WAS DONE:
 - Brain Memory Budget Enforcement + Config Sync: GO_WITH_TECH_DEBT — Brain Memory Budget Enforcement + Config Sync tamamlandı. (1) DECAY_EXEMPT constant: DECISIONS.md ve PROJECT-IDENTITY.md
 
 ## Sprint sprint-134 Learnings
-- Sprint 134 Learnings: Sprint 134 learnings — no .brain/sprints/sprint-134.md log was available at backfill time. Stub inserted by Sprint 166 Task 6 (Bug U+V).
+- Sprint 134 Learnings: - Sprint 134 Learnings: Sprint 134 learnings — no .brain/sprints/sprint-134.md log was available at backfill time. Stub inserted by Sprint 166 Task 6 (Bug U+V).
 
 ## Sprint sprint-133 Learnings
-- Sprint 133 Learnings: - HTTP API Bearer Token Auth: GO_WITH_TECH_DEBT — HTTP API Bearer Token Authentication implemented. Changes:
+- Sprint 133 Learnings: - Sprint 133 Learnings: - HTTP API Bearer Token Auth: GO_WITH_TECH_DEBT — HTTP API Bearer Token Authentication implemented. Changes:
 
 1. NEW FILE: src/api/auth.ts — bearerAuthMiddleware with res
 - loadConfig() Module-Level Cache: GO_WITH_TECH_DEBT — loadConfig() module-level cache implemented. Changes: (1) Added module-level cachedConfig/cacheStamp/cachedProjectRoot v
@@ -678,7 +717,7 @@ WHAT WAS DONE:
 - Competitive Analysis Güncelleme: GO_WITH_TECH_DEBT — Competitive analysis fully updated for April 2026. Changes: (1) competitive-analysis.md — title updated 'March 2026' → '
 
 ## Sprint sprint-132 Learnings
-- Sprint 132 Learnings: 
+- Sprint 132 Learnings: - Sprint 132 Learnings: 
 
 ## Sprint unknown Learnings
 - help: help

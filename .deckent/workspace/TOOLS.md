@@ -60,6 +60,7 @@ _Total: 28 MCP tools_
 | `chat-banner` | deckent chat-banner |
 | `chat-enterprise-bridge` | deckent chat-enterprise-bridge |
 | `chat-layout` | deckent chat-layout |
+| `chat-mcp-bridge` | deckent chat-mcp-bridge |
 | `chat-mode` | deckent chat-mode |
 | `chat-native` | deckent chat-native |
 | `chat-nervous-bridge` | deckent chat-nervous-bridge |
@@ -99,6 +100,7 @@ _Total: 28 MCP tools_
 | `init-templates` | deckent init-templates |
 | `init-wizard` | deckent init-wizard |
 | `kill` | deckent kill |
+| `mcp` | deckent mcp |
 | `memory` | deckent memory |
 | `mode` | deckent mode |
 | `models` | deckent models |
@@ -131,4 +133,4 @@ _Total: 28 MCP tools_
 | `watch` | deckent watch |
 | `web` | deckent web |
 
-_Total: 84 CLI command modules_
+_Total: 86 CLI command modules_

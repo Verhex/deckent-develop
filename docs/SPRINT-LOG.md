@@ -6272,3 +6272,29 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 228-004: 228-004 — Autonomous e2e smoke harness (gerçek-binary start→status→stop) (DONE)
 
 ---
+## Sprint 229 — sprint-229
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-06-04
+**Duration:** 1086s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 5 |
+| Completed | 5 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 1086498ms |
+
+### Tasks
+
+- 229-001: 229-001 — McpClientBroker çekirdek (SDK Client + stdio/HTTP transport) (DONE)
+- 229-002: 229-002 — 3-scope config (.mcp.json project/user/local merge) (DONE)
+- 229-003: 229-003 — Dynamic discovery + namespaced tool registry (DONE)
+- 229-004: 229-004 — [Tier-1] `deckent mcp` yönetim CLI (add/list/remove/get) (DONE)
+- 229-005: 229-005 — [Tier-1] REPL `/mcp` dispatch + confirm-gate + audit composition (DONE)
+
+---

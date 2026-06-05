@@ -2,6 +2,19 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint229] - 2026-06-04
+
+### Added
+
+- 229-001 — McpClientBroker çekirdek (SDK Client + stdio/HTTP transport)
+- 229-002 — 3-scope config (.mcp.json project/user/local merge)
+- 229-003 — Dynamic discovery + namespaced tool registry
+- 229-004 — [Tier-1] `deckent mcp` yönetim CLI (add/list/remove/get)
+- 229-005 — [Tier-1] REPL `/mcp` dispatch + confirm-gate + audit composition
+
+
+_Tasks: 5 total, 5 done, 0 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint228] - 2026-06-04
 
 ### Added

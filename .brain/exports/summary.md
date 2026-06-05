@@ -80,6 +80,10 @@
 | adr-086 | Native CLI Parity — F11 Feature Set (Sprint 224) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-229 Learnings** (sprint-229): ## Sprint sprint-229 Learnings
+
+## Gains
+- 229-001 — McpClientBroker çekirdek (SDK Client + stdio/HTTP transport) — M...
 - **Sprint sprint-228 Learnings** (sprint-228): ## Sprint sprint-228 Learnings
 
 ## Gains
@@ -92,6 +96,15 @@
 
 ## Gains
 - 226-001 — Authority adapter (checkAuthority → AuthorityChecker) — Created ...
+- **Sprint 224 Learnings** (sprint-224): - Sprint sprint-224 Learnings: ## Sprint sprint-224 Learnings
+- 224-015 — [P0] AI plan-mode fix (dürüst hata + gerçek...
+- **Sprint 223 Learnings** (sprint-223): - Sprint sprint-223 Learnings: ## Sprint sprint-223 Learnings
+- **Sprint 222 Learnings** (sprint-222): - Sprint sprint-222 Learnings: ## Sprint sprint-222 Learnings
+- **Sprint 221 Learnings** (sprint-221): - Sprint sprint-221 Learnings: ## Sprint sprint-221 Learnings
+- **Sprint 220 Learnings** (sprint-220): - Sprint sprint-220 Learnings: ## Sprint sprint-220 Learnings
+- 220-003 — Agentic REPL canlı MCP dispatch (doğal dil→...
+- **Sprint 219 Learnings** (sprint-219): - Sprint sprint-219 Learnings: ## Sprint sprint-219 Learnings
+- 219-010 — Dashboard cache-bust + tarayıcı-e2e smoke (...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -99,4 +112,4 @@ _No active technical debt._
 ## Active Patterns
 - Violation pattern: stale_heartbeat
 
-_Total entries: 116 | Generated: 2026-06-04_
+_Total entries: 206 | Generated: 2026-06-04_

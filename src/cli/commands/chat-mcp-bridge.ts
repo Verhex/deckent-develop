@@ -1,0 +1,325 @@
+// ═══ chat-mcp-bridge — REPL ↔ outgoing MCP-client composition ════════════════
+//
+// Sprint 229 Task 229-005 (AS-5·P1).
+//
+// This module is the CALLER that wires three already-existing pieces together
+// so the REPL can talk to harici (external) MCP servers via the broker built
+// in Task 229-001:
+//
+//   1) `McpClientBroker`   — JSON-RPC over stdio/HTTP (src/mcp-client/broker.ts)
+//   2) `McpToolRegistry`   — `<server>__<tool>` namespacing (src/mcp-client/registry.ts)
+//   3) `classifyTool`      — REPL confirm-gate tiers (src/cli/repl/tool-permissions.ts)
+//   4) `writeEvent`        — sprint event-stream audit sink (src/orchestra/event-stream.ts)
+//
+// External MCP calls are arbitrary-side-effect (DIRECTIVES Sprint 229 §4C
+// omurga). Every dispatch goes through `classifyTool` + a confirm callback +
+// `writeEvent`. The broker also has its own `onCall` audit hook (Task 229-001);
+// `createMcpAuditSink` here builds that hook so the broker construction site
+// can wire it in — keeping the dependency direction one-way (broker does NOT
+// import event-stream, ADR-008).
+
+import type {
+  McpServerDef,
+  McpToolCallRecord,
+  McpToolDescriptor,
+} from '../../mcp-client/types.js';
+import {
+  McpToolRegistry,
+  type NamespacedTool,
+} from '../../mcp-client/registry.js';
+import { loadMcpServers } from '../../mcp-client/config.js';
+import { classifyTool, type ToolPermission } from '../repl/tool-permissions.js';
+import { writeEvent } from '../../orchestra/event-stream.js';
+
+// ─── Types ──────────────────────────────────────────────────────────────────
+
+/**
+ * Duck-typed broker shape — the production class `McpClientBroker` (229-001)
+ * already satisfies it. Lets tests pass a tiny fake without rebuilding the
+ * SDK transport stack.
+ */
+export interface BridgeBrokerLike {
+  connect(name: string, def: McpServerDef): Promise<void>;
+  listTools(name: string): Promise<McpToolDescriptor[]>;
+  callTool(
+    name: string,
+    tool: string,
+    args?: Record<string, unknown>,
+  ): Promise<unknown>;
+  isConnected(name: string): boolean;
+  list(): string[];
+}
+
+/** Shape passed to the REPL confirm callback when a dispatch needs approval. */
+export interface McpConfirmAction {
+  /** Namespaced tool name (e.g. `everything__echo`). */
+  name: string;
+  /** Resolved server. */
+  server: string;
+  /** Resolved tool. */
+  tool: string;
+  /** Permission tier from `classifyTool` (always 'confirm' or stricter for MCP). */
+  tier: ToolPermission;
+  args: Record<string, unknown>;
+  description: string;
+}
+
+/** Async confirm callback — true approves, false rejects. */
+export type McpConfirmFn = (action: McpConfirmAction) => Promise<boolean>;
+
+/** Result of `dispatch()`. Never throws — error info is encoded in the shape. */
+export interface McpDispatchResult {
+  ok: boolean;
+  /** Raw stringified tool output, error tag, or cancellation notice. */
+  output: string;
+  /** True if the user rejected the confirm prompt. */
+  cancelled?: boolean;
+  /** Tier the classifier returned (for caller logging). */
+  tier?: ToolPermission;
+}
+
+export interface McpBridgeOptions {
+  broker: BridgeBrokerLike;
+  registry: McpToolRegistry;
+  /** Project root for event-stream audit writes. */
+  projectRoot: string;
+  /** Sprint id for audit; defaults to `'repl'` when no sprint is active. */
+  sprintId?: string;
+  /**
+   * Override the audit sink (tests). Defaults to one that calls `writeEvent`
+   * directly. Always invoked — both broker.onCall success/error records AND
+   * the bridge's own cancellation records flow through it.
+   */
+  audit?: (record: McpAuditRecord) => void;
+}
+
+/**
+ * Wider audit record than `McpToolCallRecord` — adds `'cancelled'` and
+ * `'unknown-tool'` outcomes that originate INSIDE the bridge (the broker only
+ * emits on actual `callTool` invocations).
+ */
+export interface McpAuditRecord extends Omit<McpToolCallRecord, 'outcome'> {
+  outcome: 'ok' | 'error' | 'cancelled' | 'unknown-tool';
+  namespacedName?: string;
+}
+
+// ─── Audit sink — feeds the broker's `onCall` hook into event-stream ────────
+
+/** Channel codes emitted to the sprint event stream. */
+export const MCP_AUDIT_CHANNEL = 'DECKENT→USER:MCP_TOOL_CALL';
+
+/**
+ * Build a closure that mirrors a `McpToolCallRecord` into the sprint event
+ * stream via `writeEvent`. Pass the return value as
+ * `new McpClientBroker({ onCall: createMcpAuditSink(root) })` at construction
+ * time so broker callsites are unchanged — the audit wire is one-way.
+ *
+ * For the REPL (no active sprint) the channel still writes under a synthetic
+ * sprint id (default `'repl'`) so a session always has a tracable JSONL log
+ * under `.deckent/<sprintId>-events.jsonl`.
+ */
+export function createMcpAuditSink(
+  projectRoot: string,
+  sprintId?: string,
+): (record: McpToolCallRecord) => void {
+  const sid = sprintId ?? 'repl';
+  return (record) => {
+    writeEvent(projectRoot, sid, 'deckent', 'user', MCP_AUDIT_CHANNEL, record);
+  };
+}
+
+// ─── Listing helpers ─────────────────────────────────────────────────────────
+
+/**
+ * Render the namespaced tool list as human-readable lines for the `/mcp`
+ * slash command. One entry per tool, formatted `server__tool — description`.
+ * When `servers` is empty the first line names that fact explicitly so the
+ * REPL doesn't show a blank block.
+ */
+export function renderMcpSlashLines(registry: McpToolRegistry): string[] {
+  const tools = registry.list();
+  if (tools.length === 0) {
+    return ['MCP server yok'];
+  }
+  return tools.map((t) => formatTool(t));
+}
+
+function formatTool(t: NamespacedTool): string {
+  const desc = t.descriptor.description ? ` — ${t.descriptor.description}` : '';
+  return `${t.namespacedName}${desc}`;
+}
+
+// ─── Bridge factory ──────────────────────────────────────────────────────────
+
+const MCP_NS_SEP = '__';
+
+/**
+ * Compose broker + registry + classifyTool + writeEvent into one REPL-shaped
+ * surface. The returned object is intentionally tiny — connecting/refreshing
+ * is split from dispatch so a single round of `loadAndConnectAll()` at REPL
+ * startup populates the registry, then `/mcp` listing and dispatch are O(1).
+ */
+export function buildMcpBridge(opts: McpBridgeOptions): {
+  listSlashLines(): string[];
+  listTools(): NamespacedTool[];
+  dispatch(
+    namespacedName: string,
+    args: Record<string, unknown>,
+    confirmFn: McpConfirmFn,
+  ): Promise<McpDispatchResult>;
+  connectAndRefresh(name: string, def: McpServerDef): Promise<NamespacedTool[]>;
+  loadAndConnectAll(): Promise<string[]>;
+} {
+  const { broker, registry, projectRoot, sprintId } = opts;
+  const audit =
+    opts.audit ??
+    ((record: McpAuditRecord): void => {
+      writeEvent(
+        projectRoot,
+        sprintId ?? 'repl',
+        'deckent',
+        'user',
+        MCP_AUDIT_CHANNEL,
+        record,
+      );
+    });
+
+  return {
+    listSlashLines(): string[] {
+      return renderMcpSlashLines(registry);
+    },
+
+    listTools(): NamespacedTool[] {
+      return registry.list();
+    },
+
+    async connectAndRefresh(
+      name: string,
+      def: McpServerDef,
+    ): Promise<NamespacedTool[]> {
+      if (!broker.isConnected(name)) {
+        await broker.connect(name, def);
+      }
+      const tools = await broker.listTools(name);
+      registry.register(name, tools);
+      return registry.listForServer(name);
+    },
+
+    async loadAndConnectAll(): Promise<string[]> {
+      const servers = loadMcpServers(projectRoot);
+      const connected: string[] = [];
+      for (const [name, def] of Object.entries(servers)) {
+        try {
+          if (!broker.isConnected(name)) {
+            await broker.connect(name, def);
+          }
+          const tools = await broker.listTools(name);
+          registry.register(name, tools);
+          connected.push(name);
+        } catch {
+          // Skip a misbehaving server — the REPL stays usable.
+        }
+      }
+      return connected;
+    },
+
+    async dispatch(
+      namespacedName: string,
+      args: Record<string, unknown>,
+      confirmFn: McpConfirmFn,
+    ): Promise<McpDispatchResult> {
+      const resolved = registry.resolve(namespacedName);
+      if (!resolved) {
+        const startedAt = new Date().toISOString();
+        audit({
+          server: namespacedName.split(MCP_NS_SEP)[0] ?? '',
+          tool: '',
+          args,
+          startedAt,
+          durationMs: 0,
+          outcome: 'unknown-tool',
+          namespacedName,
+        });
+        return {
+          ok: false,
+          output: `[mcp-error] unknown tool: ${namespacedName}`,
+        };
+      }
+
+      // Permission tier — classifyTool returns 'read' for unknown names; for
+      // external MCP calls we ALWAYS promote at least to 'confirm' since
+      // their side-effects are not part of the deckent_* allow-list. The
+      // classifyTool result is still consulted so a namespaced name that
+      // accidentally collides with an 'always'-tier deckent name (e.g.
+      // `deckent_kill__nope`) is not silently downgraded.
+      const baseTier = classifyTool(namespacedName, args);
+      const tier: ToolPermission =
+        baseTier === 'read' ? 'confirm' : baseTier;
+
+      const action: McpConfirmAction = {
+        name: namespacedName,
+        server: resolved.server,
+        tool: resolved.tool,
+        tier,
+        args,
+        description: `mcp → ${resolved.server} :: ${resolved.tool}`,
+      };
+
+      const approved = await confirmFn(action);
+      const startedAt = new Date().toISOString();
+      if (!approved) {
+        audit({
+          server: resolved.server,
+          tool: resolved.tool,
+          args,
+          startedAt,
+          durationMs: 0,
+          outcome: 'cancelled',
+          namespacedName,
+        });
+        return {
+          ok: false,
+          cancelled: true,
+          output: `[mcp] cancelled: ${namespacedName}`,
+          tier,
+        };
+      }
+
+      const t0 = Date.now();
+      try {
+        const result = await broker.callTool(resolved.server, resolved.tool, args);
+        audit({
+          server: resolved.server,
+          tool: resolved.tool,
+          args,
+          startedAt,
+          durationMs: Date.now() - t0,
+          outcome: 'ok',
+          namespacedName,
+        });
+        return {
+          ok: true,
+          output: typeof result === 'string' ? result : JSON.stringify(result),
+          tier,
+        };
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        audit({
+          server: resolved.server,
+          tool: resolved.tool,
+          args,
+          startedAt,
+          durationMs: Date.now() - t0,
+          outcome: 'error',
+          error: msg,
+          namespacedName,
+        });
+        return {
+          ok: false,
+          output: `[mcp-error] ${namespacedName}: ${msg}`,
+          tier,
+        };
+      }
+    },
+  };
+}
