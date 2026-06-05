@@ -216,9 +216,20 @@ below. Recreate pixel-faithfully using your existing shadcn/Tailwind setup.
   interval appends lines. In production, replace mocked feeds/sim with your SSE
   stream and real command execution.
 
-## Assets
-- Decko mascot: `assets/decko-conductor-glow.png` (sidebar brand), `decko-mascot.png`,
-  favicon `assets/favicon.png`. Verhex mark `assets/verhex-logo.png`.
+## Assets (`assets/`)
+Brand images used by the console are bundled in `assets/` (so `reference/`
+renders standalone — its `../assets/…` paths resolve here):
+
+| File | Used by | Where |
+|------|---------|-------|
+| `assets/decko-conductor-glow.png` | `reference/Sidebar.jsx` | sidebar brand mark (40px) |
+| `assets/favicon.png` | `reference/index.html` | favicon |
+| `assets/decko-mascot.png` | (brand, courtesy) | alt mascot / marketing |
+| `assets/verhex-logo.png` | (brand, courtesy) | Verhex parent attribution |
+
+In your real app, keep using your existing brand assets — these are provided so
+the reference renders and so you can match the exact sidebar mark.
+
 - Icons: **Lucide** (already used by the app). Names referenced: `cpu, gem, zap,
   leaf, container, terminal, square-terminal, bot, hard-hat, file-code-2, loader,
   check-check, clock, activity, skull, chevron-right/-down/-up, eraser,
@@ -238,9 +249,18 @@ below. Recreate pixel-faithfully using your existing shadcn/Tailwind setup.
 | `App.jsx` | Shell, routing, mobile nav, sprint simulation |
 
 Plus, at the package root:
+- `colors_and_type.css` — the base design-system tokens the reference consumes
+  (zinc neutrals, status colors, type scale). `reference/index.html` links it.
 - `deckent-theme.css` — paste-ready shadcn `.dark` variables (teal/gold).
 - `deckent-theme.tailwind.js` — `theme.extend` fonts + brand/gold colors + the
   blue→brand find/replace map.
+- `assets/` — brand images used by the reference (see Assets above).
+
+### Preview the reference
+The `reference/` bundle is **self-contained** — open `reference/index.html` in a
+browser (no build step; React/Babel/Lucide load from CDN). The terminal uses
+**clean monospace glyphs only** (no emoji-presentation characters), with
+`font-variant-emoji: text` + `white-space: pre-wrap` so columns stay aligned.
 
 ## Screenshots (`screens/`)
 Hi-fi reference captures of the re-themed console (1920-wide, dark teal/gold):

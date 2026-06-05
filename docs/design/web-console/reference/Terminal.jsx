@@ -1,6 +1,7 @@
 /* Terminal.jsx — interactive dockable web terminal.
    Multi-session tabs, live-streaming log tail, a working command input
-   (help / status / recall / clear / start), collapse + maximize. */
+   (help / status / recall / clear / start), collapse + maximize.
+   Clean monospace glyphs only — no emoji-presentation characters. */
 const { useState, useEffect, useRef, useCallback } = React;
 
 const SESSIONS = {
@@ -8,36 +9,36 @@ const SESSIONS = {
     label: "deckent — start", icon: "square-terminal",
     base: [
       { t: "prompt", txt: "$ deckent start" },
-      { t: "dim", txt: "✓ loaded DIRECTIVES.md — 4 tasks" },
-      { t: "teal", txt: "[Brain] PLAN  → scoped 4 tasks, assigned tiers" },
-      { t: "teal", txt: "[Brain] SPAWN → 3 workers (docker · tmux · tmux)" },
-      { t: "gold", txt: "[w-221-001] opus     · architect      · EXECUTING" },
-      { t: "gold", txt: "[w-221-002] sonnet   · refactorer     · EXECUTING" },
-      { t: "gold", txt: "[w-221-003] opus     · api-builder    · EXECUTING" },
-      { t: "dim", txt: "[Auditor] scan #14 — heartbeats OK, 0 scope violations" },
-      { t: "ok", txt: "[w-221-001] ✓ DONE  GO — 6 tests passed, 2 files" },
+      { t: "dim", txt: "loaded DIRECTIVES.md — 4 tasks" },
+      { t: "teal", txt: "[Brain] PLAN  -> scoped 4 tasks, assigned tiers" },
+      { t: "teal", txt: "[Brain] SPAWN -> 3 workers (docker · tmux · tmux)" },
+      { t: "gold", txt: "[w-221-001] opus     architect      EXECUTING" },
+      { t: "gold", txt: "[w-221-002] sonnet   refactorer     EXECUTING" },
+      { t: "gold", txt: "[w-221-003] opus     api-builder    EXECUTING" },
+      { t: "dim", txt: "[Auditor] scan #14 — heartbeats OK, 0 violations" },
+      { t: "ok", txt: "[w-221-001] DONE  GO — 6 tests passed, 2 files" },
     ],
     live: [
       { t: "dim", txt: "[Auditor] scan #§ — heartbeats OK, 0 violations" },
-      { t: "gold", txt: "[w-221-002] sonnet   · refactorer     · heartbeat ✓ §s" },
-      { t: "teal", txt: "[Brain] EVAL  → task-221-002 verdict pending" },
-      { t: "ok", txt: "[w-221-003] ✓ DONE  GO — 3 tests passed, 2 files" },
-      { t: "dim", txt: "[Memory] persisted 2 decisions → .brain/memory.db" },
+      { t: "gold", txt: "[w-221-002] sonnet   refactorer     heartbeat OK · §s" },
+      { t: "teal", txt: "[Brain] EVAL  -> task-221-002 verdict pending" },
+      { t: "ok", txt: "[w-221-003] DONE  GO — 3 tests passed, 2 files" },
+      { t: "dim", txt: "[Memory] persisted 2 decisions -> .brain/memory.db" },
     ],
   },
   claude: {
     label: "claude (w-221-001)", icon: "bot",
     base: [
-      { t: "dim", txt: "● claude-code · w-221-001 · architect" },
-      { t: "plain", txt: "Reading src/memory/ … 6 files" },
-      { t: "teal", txt: "⏺ Edit  src/memory/fts5.ts  (+48 −6)" },
-      { t: "teal", txt: "⏺ Write tests/memory.fts5.test.ts  (+92)" },
-      { t: "ok", txt: "✓ 6 tests passed in 1.8s" },
+      { t: "dim", txt: "claude-code · w-221-001 · architect" },
+      { t: "plain", txt: "reading src/memory/ … 6 files" },
+      { t: "teal", txt: "edit   src/memory/fts5.ts             (+48 -6)" },
+      { t: "teal", txt: "write  tests/memory.fts5.test.ts      (+92)" },
+      { t: "ok", txt: "6 tests passed in 1.8s" },
     ],
     live: [
-      { t: "plain", txt: "Thinking… resolving fts5 tokenizer config" },
-      { t: "teal", txt: "⏺ Edit  src/memory/decay.ts  (+12 −3)" },
-      { t: "dim", txt: "context: 41k / 200k tokens" },
+      { t: "plain", txt: "thinking… resolving fts5 tokenizer config" },
+      { t: "teal", txt: "edit   src/memory/decay.ts            (+12 -3)" },
+      { t: "dim", txt: "context 41k / 200k tokens" },
     ],
   },
   bash: {
@@ -150,7 +151,7 @@ function Terminal() {
             {feeds[active].map((l, i) => <div key={i}><span className={CLS[l.t] || ""}>{l.txt}</span></div>)}
           </div>
           <form className="dock-input" onSubmit={submit}>
-            <span className="term-prompt">deckent ❯</span>
+            <span className="term-prompt">deckent</span><span className="term-caret">&#9656;</span>
             <input value={input} onChange={(e) => setInput(e.target.value)} spellCheck="false" autoComplete="off"
                    placeholder="type a command — try “help”, “status”, “recall docker”" />
           </form>
