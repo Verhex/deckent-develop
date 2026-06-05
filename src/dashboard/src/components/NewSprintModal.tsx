@@ -124,7 +124,7 @@ export function NewSprintModal({ open, onOpenChange }: NewSprintModalProps) {
             <ul className="max-h-48 space-y-1 overflow-auto text-sm">
               {plan.tasks.map((task) => (
                 <li key={task.id} className="rounded bg-zinc-800 px-3 py-1.5">
-                  <span className="font-mono text-blue-400">{task.id}</span>{" "}
+                  <span className="font-mono text-brand-300">{task.id}</span>{" "}
                   <span className="text-zinc-300">{task.title}</span>
                 </li>
               ))}

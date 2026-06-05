@@ -174,7 +174,7 @@ export default function EnterprisePage() {
                   {sortedRbac.map((entry) => (
                     <div key={entry.role} className="rounded-md border border-zinc-800 p-4">
                       <div className="flex items-center gap-2 mb-3">
-                        <Shield className="w-4 h-4 text-blue-400" />
+                        <Shield className="w-4 h-4 text-brand-300" />
                         <span className="font-semibold text-zinc-100 capitalize">{entry.role}</span>
                         <Badge className={
                           entry.role === "admin" ? "bg-red-900 text-red-300" :

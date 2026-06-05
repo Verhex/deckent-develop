@@ -197,7 +197,7 @@ export default function DashboardPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-zinc-100 bg-clip-text text-transparent">
+        <h1 className="text-2xl font-bold bg-gradient-to-r from-brand-400 to-zinc-100 bg-clip-text text-transparent">
           {t("dashboard.title")}
         </h1>
         <div className="flex items-center gap-2">
@@ -261,7 +261,7 @@ export default function DashboardPage() {
         <Card className="border-zinc-800 bg-zinc-900 shadow-lg shadow-zinc-950/50 transition-all duration-200">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="flex items-center gap-2 text-zinc-100">
-              <Activity className="h-5 w-5 text-blue-400" />
+              <Activity className="h-5 w-5 text-brand-300" />
               {t("dashboard.sprint_status")}
             </CardTitle>
             {state.sprint?.phase && (
@@ -315,7 +315,7 @@ export default function DashboardPage() {
               total={total}
               segments={[
                 { value: done, color: "bg-green-500", label: `${t('dashboard.done')}: ${done}` },
-                { value: active, color: "bg-blue-500", label: `${t('dashboard.active')}: ${active}` },
+                { value: active, color: "bg-brand-500", label: `${t('dashboard.active')}: ${active}` },
                 {
                   value: Math.max(0, pending),
                   color: "bg-zinc-600",

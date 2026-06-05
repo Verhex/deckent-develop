@@ -51,7 +51,7 @@ export function getTaskStatusColor(status: string): string {
     case "CODING":
     case "TESTING":
     case "VERIFYING":
-      return "text-blue-400";
+      return "text-brand-300";
     case "NO_GO":
     case "ERROR":
       return "text-yellow-400";
@@ -70,7 +70,7 @@ export function getTaskStatusBg(status: string): string {
     case "CODING":
     case "TESTING":
     case "VERIFYING":
-      return "bg-blue-900/30 border-blue-800/50";
+      return "bg-brand-bg/30 border-brand-800/50";
     case "NO_GO":
     case "ERROR":
       return "bg-yellow-900/30 border-yellow-800/50";
@@ -264,7 +264,7 @@ export function SprintSummary({ state, tasks = [] }: SprintSummaryProps) {
               total={total}
               segments={[
                 { value: done, color: "bg-green-500", label: t('sprint_summary.done_count').replace('{{n}}', String(done)) },
-                { value: active, color: "bg-blue-500", label: t('sprint_summary.active_count').replace('{{n}}', String(active)) },
+                { value: active, color: "bg-brand-500", label: t('sprint_summary.active_count').replace('{{n}}', String(active)) },
                 { value: pending, color: "bg-zinc-600", label: t('sprint_summary.queued_count').replace('{{n}}', String(pending)) },
               ]}
               className="h-6"
@@ -278,7 +278,7 @@ export function SprintSummary({ state, tasks = [] }: SprintSummaryProps) {
               <CheckCircle className="h-4 w-4" />
               {t('sprint_summary.n_done').replace('{{n}}', String(done))}
             </span>
-            <span className="flex items-center gap-1.5 text-blue-400">
+            <span className="flex items-center gap-1.5 text-brand-300">
               <Loader2 className="h-4 w-4" />
               {t('sprint_summary.n_active').replace('{{n}}', String(active))}
             </span>
@@ -304,7 +304,7 @@ export function SprintSummary({ state, tasks = [] }: SprintSummaryProps) {
         <Card className="border-zinc-800 bg-zinc-900">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-zinc-100">
-              <Cpu className="h-5 w-5 text-blue-400" />
+              <Cpu className="h-5 w-5 text-brand-300" />
               {t('sprint_summary.whats_happening')}
             </CardTitle>
           </CardHeader>
@@ -313,10 +313,10 @@ export function SprintSummary({ state, tasks = [] }: SprintSummaryProps) {
               {activeAgents.map((agent) => (
                 <div
                   key={agent.id}
-                  className="flex items-center justify-between rounded-md bg-blue-900/20 border border-blue-800/30 px-3 py-2"
+                  className="flex items-center justify-between rounded-md bg-brand-bg/20 border border-brand-800/30 px-3 py-2"
                 >
                   <div className="flex items-center gap-2">
-                    <Loader2 className="h-4 w-4 animate-spin text-blue-400" />
+                    <Loader2 className="h-4 w-4 animate-spin text-brand-300" />
                     <span className="text-sm text-zinc-200">
                       {agent.taskId ?? agent.id}
                     </span>

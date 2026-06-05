@@ -8,7 +8,7 @@ import type { TranslatorProp } from "../i18n/types";
 import { buildSseUrl } from "../lib/api";
 
 const STATUS_BORDER: Record<string, string> = {
-  EXECUTING: "border border-l-4 border-blue-500 animate-pulse",
+  EXECUTING: "border border-l-4 border-brand-500 animate-pulse",
   DONE: "border-2 border-green-500",
   NO_GO: "border-2 border-red-500",
   ERROR: "border-2 border-red-500",
@@ -41,7 +41,7 @@ const MODEL_ICON: Record<string, string> = {
 };
 
 const BACKEND_BADGE: Record<string, { label: string; className: string }> = {
-  docker: { label: "Docker", className: "bg-blue-900/50 text-blue-300 border border-blue-700" },
+  docker: { label: "Docker", className: "bg-brand-bg/50 text-brand-300 border border-brand-700" },
   tmux: { label: "tmux", className: "bg-green-900/50 text-green-300 border border-green-700" },
   subprocess: { label: "subprocess", className: "bg-orange-900/50 text-orange-300 border border-orange-700" },
 };

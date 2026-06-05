@@ -39,7 +39,7 @@ export function SprintPhaseTimeline({ currentPhase }: SprintPhaseTimelineProps) 
                     className={[
                       "flex items-center justify-center rounded-full transition-all duration-300",
                       isActive
-                        ? "w-5 h-5 bg-blue-500 ring-2 ring-blue-400 ring-offset-1 ring-offset-zinc-900 animate-pulse"
+                        ? "w-5 h-5 bg-brand-500 ring-2 ring-brand-400 ring-offset-1 ring-offset-zinc-900 shadow-[0_0_0_3px_rgba(84,168,156,0.35)] animate-pulse"
                         : isCompleted
                         ? "w-4 h-4 bg-green-500"
                         : "w-4 h-4 border-2 border-zinc-600 bg-zinc-900",
@@ -66,7 +66,7 @@ export function SprintPhaseTimeline({ currentPhase }: SprintPhaseTimelineProps) 
                     className={[
                       "text-xs mt-1 whitespace-nowrap",
                       isActive
-                        ? "text-blue-400 font-semibold"
+                        ? "text-brand-300 font-semibold"
                         : isCompleted
                         ? "text-green-400"
                         : "text-zinc-500",

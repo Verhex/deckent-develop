@@ -57,7 +57,7 @@ function severityBadgeClass(severity: string): string {
   if (s === "critical") return "bg-red-900 text-red-200";
   if (s === "high") return "bg-orange-900 text-orange-200";
   if (s === "normal") return "bg-zinc-700 text-zinc-300";
-  if (s === "low") return "bg-blue-900 text-blue-200";
+  if (s === "low") return "bg-brand-bg text-brand-fg";
   return "bg-zinc-700 text-zinc-400";
 }
 
@@ -114,7 +114,7 @@ export default function DebtPage() {
                   placeholder="Search..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-7 pr-3 py-1 text-sm bg-zinc-800 border border-zinc-700 text-zinc-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 w-40"
+                  className="pl-7 pr-3 py-1 text-sm bg-zinc-800 border border-zinc-700 text-zinc-200 rounded focus:outline-none focus:ring-1 focus:ring-ring w-40"
                   aria-label="Search debt entries"
                 />
               </div>
@@ -123,7 +123,7 @@ export default function DebtPage() {
                 data-testid="debt-severity-filter"
                 value={severityFilter}
                 onChange={(e) => setSeverityFilter(e.target.value as SeverityFilter)}
-                className="bg-zinc-800 border border-zinc-700 text-zinc-200 text-sm rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="bg-zinc-800 border border-zinc-700 text-zinc-200 text-sm rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-ring"
                 aria-label="Filter by severity"
               >
                 <option value="all">All Severities</option>
@@ -137,7 +137,7 @@ export default function DebtPage() {
                 data-testid="debt-status-filter"
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
-                className="bg-zinc-800 border border-zinc-700 text-zinc-200 text-sm rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="bg-zinc-800 border border-zinc-700 text-zinc-200 text-sm rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-ring"
                 aria-label="Filter by status"
               >
                 <option value="all">All Statuses</option>
@@ -149,7 +149,7 @@ export default function DebtPage() {
                 data-testid="debt-sprint-filter"
                 value={sprintFilter}
                 onChange={(e) => setSprintFilter(e.target.value)}
-                className="bg-zinc-800 border border-zinc-700 text-zinc-200 text-sm rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="bg-zinc-800 border border-zinc-700 text-zinc-200 text-sm rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-ring"
                 aria-label="Filter by sprint"
               >
                 <option value="all">All Sprints</option>

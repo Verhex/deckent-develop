@@ -89,7 +89,7 @@ function ChatInput({ onSend, disabled }: { onSend: (msg: string) => void; disabl
         >
           {slashHints.map((c) => (
             <div key={c.name} className="flex gap-2 py-0.5">
-              <span className="font-mono text-blue-400">{c.name}</span>
+              <span className="font-mono text-brand-300">{c.name}</span>
               <span className="text-zinc-500">{c.desc}</span>
             </div>
           ))}
@@ -109,7 +109,7 @@ function ChatInput({ onSend, disabled }: { onSend: (msg: string) => void; disabl
         <button
           onClick={handleSubmit}
           disabled={disabled || !value.trim()}
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-blue-600 text-white transition-colors hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-brand-600 text-white transition-colors hover:bg-brand-500 disabled:opacity-50 disabled:cursor-not-allowed"
           data-testid="chat-send"
           aria-label={t("chat.send")}
         >
@@ -147,7 +147,7 @@ function ChatHistory({ messages }: { messages: ChatMessage[] }) {
             className={`flex gap-3 ${msg.role === "user" ? "justify-end" : "justify-start"}`}
           >
             {msg.role === "assistant" && (
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-900 text-blue-300">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-bg text-brand-300">
                 <Bot className="h-4 w-4" />
               </div>
             )}
@@ -155,8 +155,8 @@ function ChatHistory({ messages }: { messages: ChatMessage[] }) {
               className={`max-w-[80%] rounded-lg px-4 py-2 text-sm ${
                 msg.role === "user"
                   ? msg.isSlash
-                    ? "bg-blue-900 text-blue-100 font-mono"
-                    : "bg-blue-600 text-white"
+                    ? "bg-brand-bg text-brand-fg font-mono"
+                    : "bg-brand-600 text-white"
                   : "bg-zinc-800 text-zinc-100"
               }`}
               data-slash={msg.isSlash ? "true" : undefined}
@@ -415,7 +415,7 @@ export default function ChatPage() {
       <div className="flex flex-1 flex-col min-w-0">
         {/* Header */}
         <div className="flex items-center gap-2 border-b border-zinc-800 px-4 py-3 bg-zinc-900/50">
-          <Bot className="h-5 w-5 text-blue-400" />
+          <Bot className="h-5 w-5 text-brand-300" />
           <h1 className="text-sm font-bold text-zinc-100">{t("chat.title")}</h1>
         </div>
 

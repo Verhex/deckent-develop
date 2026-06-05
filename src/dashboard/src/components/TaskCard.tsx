@@ -49,7 +49,7 @@ export function getCardColor(status: string): string {
     case "CODING":
     case "TESTING":
     case "VERIFYING":
-      return "border-blue-800/50 bg-blue-900/20";
+      return "border-brand-800/50 bg-brand-bg/20";
     case "NO_GO":
     case "ERROR":
       return "border-red-800/50 bg-red-900/20";
@@ -87,7 +87,7 @@ export function getCardIconColor(status: string): string {
     case "CODING":
     case "TESTING":
     case "VERIFYING":
-      return "text-blue-400";
+      return "text-brand-300";
     case "NO_GO":
     case "ERROR":
       return "text-red-400";

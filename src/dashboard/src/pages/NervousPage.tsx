@@ -88,7 +88,7 @@ export default function NervousPage() {
       <Card className="bg-zinc-900 border-zinc-800">
         <CardHeader>
           <CardTitle className="text-zinc-100 flex items-center gap-2">
-            <Activity className="w-4 h-4 text-blue-400" />
+            <Activity className="w-4 h-4 text-brand-300" />
             Detector Status
           </CardTitle>
         </CardHeader>
@@ -101,7 +101,7 @@ export default function NervousPage() {
                 <Badge
                   key={detector.id}
                   data-testid={`detector-${detector.id}`}
-                  className={detector.enabled ? "bg-blue-900 text-blue-300" : "bg-zinc-700 text-zinc-500"}
+                  className={detector.enabled ? "bg-brand-bg text-brand-300" : "bg-zinc-700 text-zinc-500"}
                   title={`Triggered ${detector.triggerCount} times`}
                 >
                   {detector.name}

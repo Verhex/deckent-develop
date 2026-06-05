@@ -11,7 +11,7 @@ type StatusFilter = "all" | "accepted" | "proposed" | "deprecated" | "rejected";
 function timelineDotClass(status: string): string {
   const s = status.toLowerCase();
   if (s === "accepted") return "bg-green-500";
-  if (s === "proposed") return "bg-blue-500";
+  if (s === "proposed") return "bg-brand-500";
   if (s === "deprecated") return "bg-zinc-500";
   if (s === "rejected") return "bg-red-500";
   return "bg-zinc-400";
@@ -20,7 +20,7 @@ function timelineDotClass(status: string): string {
 function statusBadgeClass(status: string): string {
   const s = status.toLowerCase();
   if (s === "accepted") return "bg-green-900 text-green-200";
-  if (s === "proposed") return "bg-blue-900 text-blue-200";
+  if (s === "proposed") return "bg-brand-bg text-brand-fg";
   if (s === "deprecated") return "bg-zinc-700 text-zinc-400";
   if (s === "rejected") return "bg-red-900 text-red-200";
   return "bg-zinc-700 text-zinc-300";
@@ -101,7 +101,7 @@ export default function MemoryExplorerPage() {
   return (
     <div data-testid="memory-explorer-page" className="space-y-6">
       <div className="flex items-center gap-2">
-        <Brain className="w-6 h-6 text-blue-400" />
+        <Brain className="w-6 h-6 text-brand-300" />
         <h1 className="text-2xl font-bold text-zinc-100">Memory &amp; ADR Explorer</h1>
       </div>
 
@@ -122,7 +122,7 @@ export default function MemoryExplorerPage() {
                 data-testid="timeline-status-filter"
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
-                className="bg-zinc-800 border border-zinc-700 text-zinc-200 text-sm rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="bg-zinc-800 border border-zinc-700 text-zinc-200 text-sm rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-ring"
                 aria-label="Filter ADRs by status"
               >
                 <option value="all">All</option>

@@ -38,7 +38,7 @@ function formatElapsed(createdAt: string): string {
 
 function getStatusColor(status: string): string {
   switch (status.toUpperCase()) {
-    case "EXECUTING": return "bg-blue-500/20 text-blue-300 border-blue-500/40";
+    case "EXECUTING": return "bg-brand-500/20 text-brand-300 border-brand-500/40";
     case "DONE": return "bg-green-500/20 text-green-300 border-green-500/40";
     case "NO_GO": return "bg-red-500/20 text-red-300 border-red-500/40";
     case "CLAIMED": return "bg-yellow-500/20 text-yellow-300 border-yellow-500/40";
@@ -199,7 +199,7 @@ export function AgentDetail({ taskId, onClose, apiBase = "" }: AgentDetailProps)
             {descTruncated && (
               <button
                 onClick={() => setDescExpanded((v) => !v)}
-                className="text-blue-400 hover:text-blue-300 mt-1"
+                className="text-brand-300 hover:text-brand-300 mt-1"
               >
                 {descExpanded ? t("agent.show_less") : t("agent.show_more")}
               </button>

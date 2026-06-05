@@ -67,7 +67,7 @@ export function Onboarding({ onComplete, onSkip }: OnboardingProps) {
                 i < currentStep
                   ? "bg-green-600 text-white"
                   : i === currentStep
-                    ? "bg-blue-600 text-white"
+                    ? "bg-brand-600 text-white"
                     : "bg-zinc-800 text-zinc-500"
               }`}
               data-testid={`onboarding-step-indicator-${i}`}
@@ -87,7 +87,7 @@ export function Onboarding({ onComplete, onSkip }: OnboardingProps) {
 
       {/* Step icon */}
       <div className="rounded-full bg-zinc-800 p-5 mb-6">
-        <Icon className="w-10 h-10 text-blue-400" />
+        <Icon className="w-10 h-10 text-brand-300" />
       </div>
 
       {/* Step content */}
@@ -117,7 +117,7 @@ export function Onboarding({ onComplete, onSkip }: OnboardingProps) {
         </button>
         <button
           onClick={handleNext}
-          className="px-5 py-2 text-sm font-medium rounded-md bg-blue-600 text-white hover:bg-blue-500 transition-colors"
+          className="px-5 py-2 text-sm font-medium rounded-md bg-brand-600 text-white hover:bg-brand-500 transition-colors"
           data-testid="onboarding-next"
         >
           {isLast ? "Get started" : "Next"}

@@ -94,7 +94,7 @@ export function SprintControlPanel() {
       <Card className="border-zinc-800 bg-zinc-900 shadow-lg shadow-zinc-950/50">
         <CardHeader className="flex flex-row items-center justify-between pb-2">
           <CardTitle className="flex items-center gap-2 text-zinc-100">
-            <Activity className="h-5 w-5 text-blue-400" />
+            <Activity className="h-5 w-5 text-brand-300" />
             Sprint Control
           </CardTitle>
           <div className="flex items-center gap-2">
@@ -163,7 +163,7 @@ export function SprintControlPanel() {
               total={total}
               segments={[
                 { value: done, color: "bg-green-500", label: `Done: ${done}` },
-                { value: active, color: "bg-blue-500", label: `Active: ${active}` },
+                { value: active, color: "bg-brand-500", label: `Active: ${active}` },
                 { value: pending, color: "bg-zinc-600", label: `Pending: ${pending}` },
               ]}
             />

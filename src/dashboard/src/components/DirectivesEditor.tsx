@@ -52,7 +52,7 @@ export function DirectivesEditor({ onContentChange }: DirectivesEditorProps) {
     <Card className="border-zinc-800 bg-zinc-900 shadow-lg shadow-zinc-950/50">
       <CardHeader className="flex flex-row items-center justify-between pb-2">
         <CardTitle className="flex items-center gap-2 text-zinc-100">
-          <FileText className="h-5 w-5 text-blue-400" />
+          <FileText className="h-5 w-5 text-brand-300" />
           DIRECTIVES Editor
         </CardTitle>
         <Button

@@ -70,7 +70,7 @@ interface MemoryExplorerProps {
 function statusBadgeClass(status: string): string {
   const s = status.toLowerCase();
   if (s === "accepted") return "bg-green-900 text-green-200";
-  if (s === "proposed") return "bg-blue-900 text-blue-200";
+  if (s === "proposed") return "bg-brand-bg text-brand-fg";
   if (s === "deprecated") return "bg-zinc-700 text-zinc-400";
   if (s === "rejected") return "bg-red-900 text-red-200";
   return "bg-zinc-700 text-zinc-300";

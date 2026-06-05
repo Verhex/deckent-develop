@@ -38,7 +38,7 @@ export function DockPanel({ children }: { children: ReactNode }) {
           role="separator"
           aria-label="resize terminal"
           aria-orientation="horizontal"
-          className="absolute top-0 left-0 right-0 h-1 cursor-ns-resize bg-transparent hover:bg-blue-500/40 transition-colors"
+          className="absolute top-0 left-0 right-0 h-1 cursor-ns-resize bg-transparent hover:bg-brand-500/40 transition-colors"
           onMouseDown={startResize}
         />
       )}

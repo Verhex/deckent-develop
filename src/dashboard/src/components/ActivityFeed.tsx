@@ -158,7 +158,7 @@ export function ActivityFeed({ state, hasSprint }: ActivityFeedProps) {
     <Card className="border-zinc-800 bg-zinc-900 flex flex-col h-full">
       <CardHeader className="pb-2">
         <CardTitle className="text-zinc-100 text-sm font-semibold flex items-center gap-2">
-          <span className="inline-block w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
+          <span className="inline-block w-2 h-2 rounded-full bg-brand-400 animate-pulse" />
           {t("activity.title")}
         </CardTitle>
       </CardHeader>

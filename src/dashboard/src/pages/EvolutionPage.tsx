@@ -75,7 +75,7 @@ function GenealogyTree({ data, loading }: { data: FamilyTree | null; loading: bo
         className="py-1"
       >
         <div className="flex items-center gap-2">
-          <GitBranch className="w-3 h-3 text-blue-400 shrink-0" />
+          <GitBranch className="w-3 h-3 text-brand-300 shrink-0" />
           <span className="font-mono text-sm text-zinc-200">{agentId}</span>
           {node?.reason && (
             <span className="text-xs text-zinc-500 truncate">{node.reason}</span>
@@ -178,7 +178,7 @@ function PromptDiffTable({ data, loading }: { data: PromptMetricsReport[] | null
               </td>
               <td className="py-2">
                 <Badge className={
-                  report.experimentStatus === "active" ? "bg-blue-900 text-blue-300" :
+                  report.experimentStatus === "active" ? "bg-brand-bg text-brand-300" :
                   report.experimentStatus === "completed" ? "bg-green-900 text-green-300" :
                   "bg-zinc-700 text-zinc-500"
                 }>

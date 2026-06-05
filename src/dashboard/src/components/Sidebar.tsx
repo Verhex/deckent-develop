@@ -51,7 +51,7 @@ export function SidebarNavLinks({ onNavigate }: SidebarNavLinksProps) {
             cn(
               "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-all duration-200",
               isActive
-                ? "bg-zinc-800 text-zinc-100 border-l-2 border-blue-500"
+                ? "bg-zinc-800 text-zinc-100 border-l-2 border-gold"
                 : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200 border-l-2 border-transparent",
             )
           }

@@ -125,7 +125,7 @@ export default function HistoryPage() {
                         key={record.id}
                         className="border-b border-zinc-800 hover:bg-zinc-800/50"
                       >
-                        <td className="px-4 py-3 font-mono text-blue-400">{record.sprint}</td>
+                        <td className="px-4 py-3 font-mono text-brand-300">{record.sprint}</td>
                         <td className="px-4 py-3 text-zinc-200">{record.tasks}</td>
                         <td className="px-4 py-3 text-green-400">{record.completed}</td>
                         <td className="px-4 py-3">
