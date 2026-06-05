@@ -688,6 +688,42 @@ const MESSAGES: MessageMap = {
     en: '  - {ts} {action} -> {outcome}: {reason}',
     tr: '  - {ts} {action} -> {outcome}: {reason}',
   },
+
+  // ─── memory backup subcommand ──────────────────────────────────
+  'memory.backup.desc': {
+    en: 'Create a WAL-safe backup of memory.db',
+    tr: 'memory.db dosyasının WAL-güvenli yedeğini oluştur',
+  },
+  'memory.backup.not_found': {
+    en: 'memory.db not found. Nothing to backup.',
+    tr: 'memory.db bulunamadı. Yedeklenecek dosya yok.',
+  },
+  'memory.backup.success': {
+    en: 'Backup created: {path} ({count} entries)',
+    tr: 'Yedek oluşturuldu: {path} ({count} giriş)',
+  },
+  'memory.backup.checkpoint_done': {
+    en: 'WAL checkpoint complete',
+    tr: 'WAL checkpoint tamamlandı',
+  },
+  'memory.backup.error': {
+    en: 'Backup failed: {error}',
+    tr: 'Yedekleme başarısız: {error}',
+  },
+
+  // ─── inbound bot command acks (BOT-002, §4G) ───────────────────
+  'bot.approve_ack': {
+    en: '✅ Approved: {id}',
+    tr: '✅ Onaylandı: {id}',
+  },
+  'bot.reject_ack': {
+    en: '❌ Rejected: {id}',
+    tr: '❌ Reddedildi: {id}',
+  },
+  'bot.not_found': {
+    en: '⚠️ No pending approval found (unknown or expired): {id}',
+    tr: '⚠️ Bekleyen onay bulunamadı (bilinmiyor veya süresi doldu): {id}',
+  },
 };
 
 /**
