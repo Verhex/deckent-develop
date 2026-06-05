@@ -134,18 +134,17 @@ function SidebarContent({ onNavigate, sseState, sseStatus }: { onNavigate?: () =
   return (
     <>
       <div className="mb-4 px-3">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5">
           <img
-            src="/logo.png"
+            src="/decko-mascot.png"
             alt="Deckent"
-            className="h-7 w-7 shrink-0"
-            style={{ imageRendering: 'pixelated' }}
+            className="h-10 w-10 shrink-0"
           />
-          <h1 className="text-lg font-bold text-zinc-100 tracking-tight">
+          <h1 className="text-lg font-extrabold text-zinc-100 tracking-[-0.03em] leading-none">
             deckent
           </h1>
         </div>
-        <p className="text-xs text-zinc-500">{t('layout.subtitle')}</p>
+        <p className="mt-1.5 text-xs text-zinc-500">{t('layout.subtitle')}</p>
       </div>
       {sseState?.sprint && (
         <div className="mb-4 px-3 flex items-center gap-2">
@@ -288,11 +287,10 @@ function LayoutLoadingState() {
     >
       <div className="flex items-center gap-3">
         <img
-          src="/logo.png"
+          src="/decko-mascot.png"
           alt=""
           aria-hidden="true"
-          className="h-8 w-8 motion-safe:animate-pulse"
-          style={{ imageRendering: 'pixelated' }}
+          className="h-9 w-9 motion-safe:animate-pulse"
         />
         <span className="text-lg font-semibold tracking-tight text-zinc-100">
           deckent

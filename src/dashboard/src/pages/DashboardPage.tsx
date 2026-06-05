@@ -97,6 +97,35 @@ function relativeTime(isoDate: string, t: TranslatorProp): string {
   return t('common.hours_ago', { n: hrs });
 }
 
+// Mockup stat card — big numeral (text-3xl/700) + label with optional status dot.
+function StatCard({ value, label, mono, dot }: { value: string; label: string; mono?: boolean; dot?: "green" | "amber" }) {
+  return (
+    <div className="rounded-lg border border-zinc-800 bg-zinc-900 px-[18px] py-4 shadow-sm shadow-zinc-950/40">
+      <div className={`text-3xl font-bold leading-none tracking-[-0.02em] text-zinc-100 ${mono ? "font-mono" : ""}`}>
+        {value}
+      </div>
+      <div className="mt-2 flex items-center gap-1.5 text-xs text-zinc-400">
+        {dot && (
+          <span className={`inline-block h-1.5 w-1.5 rounded-full ${dot === "green" ? "bg-green-500" : "bg-yellow-500"}`} />
+        )}
+        {label}
+      </div>
+    </div>
+  );
+}
+
+function StatRow({ sprintId, done, total, exec, phase }: { sprintId?: string; done: number; total: number; exec: number; phase: string }) {
+  const { t } = useTranslation();
+  return (
+    <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+      <StatCard value={sprintId ? sprintId.replace("sprint-", "#") : "—"} label={t("dashboard.stat_active_sprint")} mono />
+      <StatCard value={`${done}/${total}`} label={t("dashboard.stat_tasks_complete")} dot="green" />
+      <StatCard value={String(exec)} label={t("dashboard.stat_executing")} dot="amber" />
+      <StatCard value={phase} label={t("dashboard.stat_phase")} mono />
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   const { t } = useTranslation();
   const sseState = useSSE("/api/events");
@@ -197,9 +226,14 @@ export default function DashboardPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold bg-gradient-to-r from-brand-400 to-zinc-100 bg-clip-text text-transparent">
-          {t("dashboard.title")}
-        </h1>
+        <div>
+          <h1 className="text-2xl font-extrabold tracking-[-0.03em] text-zinc-100">
+            {t("nav.dashboard")}
+          </h1>
+          <p className="mt-1 text-sm text-zinc-400">
+            {state?.sprint ? t("dashboard.subtitle", { n: agents.length }) : t("welcome.start_hint")}
+          </p>
+        </div>
         <div className="flex items-center gap-2">
           {showCleanup && (
             <Button
@@ -229,6 +263,17 @@ export default function DashboardPage() {
           </Button>
         </div>
       </div>
+
+      {/* Stat row — 4 prominent metrics (mockup §2) */}
+      {state?.sprint && (
+        <StatRow
+          sprintId={state.sprint.id}
+          done={done}
+          total={total}
+          exec={active}
+          phase={phase ?? "IDLE"}
+        />
+      )}
 
       {/* Skeleton: shown during initial data load */}
       {initialLoading && !sseState && (
