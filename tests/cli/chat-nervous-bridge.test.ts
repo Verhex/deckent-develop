@@ -141,7 +141,7 @@ describe('handleNervousSlash', () => {
   });
 
   it('reports "bekleyen yok" when pending is empty on list', () => {
-    const result = handleNervousSlash(['list'], root, false);
+    const result = handleNervousSlash(['list'], root, false, 'tr');
     expect(result).toContain('bekleyen');
   });
 
@@ -196,13 +196,13 @@ describe('handleNervousSlash', () => {
   });
 
   it('returns error when id missing for accept', () => {
-    const result = handleNervousSlash(['accept'], root, false);
+    const result = handleNervousSlash(['accept'], root, false, 'tr');
     expect(result).toContain('id gerekli');
   });
 
   it('returns error when notification not found', () => {
     writePending(root, [makeNotification()]);
-    const result = handleNervousSlash(['accept', 'nonexistent-id'], root, false);
+    const result = handleNervousSlash(['accept', 'nonexistent-id'], root, false, 'tr');
     expect(result).toContain('bulunamadı');
   });
 
@@ -216,7 +216,7 @@ describe('handleNervousSlash', () => {
 
   it('pending-yok → silent empty on list (no TTY)', () => {
     // When no pending file exists, list returns quiet message
-    const result = handleNervousSlash(['list'], root, false);
+    const result = handleNervousSlash(['list'], root, false, 'tr');
     expect(result).toContain('bekleyen');
     // Should NOT throw, not show error codes
     expect(result).not.toContain('[error]');

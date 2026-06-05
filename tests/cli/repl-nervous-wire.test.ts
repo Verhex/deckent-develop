@@ -198,6 +198,7 @@ describe('/nervous slash wire — chat-native', () => {
       input: feed('/nervous', '/exit'),
       output: sink,
       nervousRoot: root,
+      lang: 'tr', // REPL session language drives the localized /nervous output (MSG-002)
     }));
 
     const out = lines.join('\n');

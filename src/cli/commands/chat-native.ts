@@ -457,6 +457,7 @@ export async function runChatNativeLoop(opts: ChatNativeOptions): Promise<ChatMe
         nervousArgs,
         nervousRoot,
         opts.interactiveTty === true,
+        lang,
       );
       const emitText = banner.length > 0 ? `${banner}\n${slashResult}` : slashResult;
       output(emitText);
