@@ -1,72 +1,59 @@
-# DIRECTIVES — Sprint 231: Brain Convergence / Kalite (beta-gate hardening)
+# DIRECTIVES — Sprint 232: Memory-Loss Kökten Kapanış (decay 3-bug zinciri)
 
-## Goal: **Beta gate'in "az-buglu + güvenilir çekirdek" parçası.** Bu dalga, son sprint'lerin (226-230) dogfood'unda yakalanan Brain defter-tutma + değerlendirme bug'larını kökten kapatır: (1) **exit-0-no-result FALSE NO_GO** — disk-verify'ın `.result`-var yolunda **non-uniform** uygulanması (Sprint 230: 003 kurtarıldı, 008 kurtarılamadı), (2) **debt.md export-wipe** asimetrisi, (3) **decay catastrophic-abort** küçük-DB bypass'ı, (4) ileri-vizyon: **HandoffProtocol recovery wiring**. Her iddia file:line grep-doğrulandı. **Her task DISTINCT filesWrite → tam paralel-güvenli (tek wave). src/dashboard'a DOKUNULMAZ** (paralel dashboard re-theme çalışması var). **god-level, hermetik, CI yeşil KORUNUR.**
+## Goal: **Memory-wipe'ı KÖKTEN bitir.** Sprint 226/231 canlı dogfood'unda 3. kez tekrarlayan memory-loss'un kök-neden zinciri file:line grep-doğrulandı (sprint-231 canlı kanıt: memory 91→1, chat 30→0, retro/sprint 4→1; adr 75 exempt kurtuldu): (1) **🔴 PRIMARY — `decay_after_sprints=20` config runDecay'e GEÇMİYOR** → `debt-manager.ts:641` hardcoded `8`'e düşüyor (threshold 223, çok agresif), (2) **learnings (memory/retro/sprint/pattern) decay-exempt DEĞİL** → siliniyorlar (sadece adr/identity exempt), (3) **catastrophic-abort `>` kullanıyor** → tam %50'de (125/250) tetiklenmiyor. **3 task DISTINCT filesWrite → tam paralel-güvenli (tek wave, "2-3 beraber"). src/dashboard'a DOKUNULMAZ** (paralel dashboard FAZ5 var). **god-level, hermetik, CI yeşil KORUNUR.**
 
 ## Ortak kurallar
-- **🟢 RUN-VERIFY ([[feedback_proof_of_function_dod]]):** kanıt **çağıran** dosyada (def DIŞLA, [[feedback_directive_kanit_letter_vs_goal]]). Bu sprint tamamen **Tier-0 (internal/orchestra/core)** → unit-test yeterli, Smoke YOK.
-- **🔴 HERMETİK ([[project_ci_green_root_causes]]):** tmpdir + sandbox HOME, **async spawn (spawnSync YASAK)**, `test:ci-sim` yeşil. CI yeşil KORUNUR.
-- **🔴 DISK-VERIFY GROUND TRUTH ([[feedback_trust_brain_eval_not_worker]]):** Brain kararı disk + testsPassed'e dayanır, rubric'e değil.
-- ESM `.js`. Subscription (`env -u ANTHROPIC_API_KEY`). ≤200 LoC tercih, YENİ TEST DOSYASI. **Sadece kendi filesWrite'ına yaz** (paralel-güvenlik). Tek wave (4 task distinct dosya); `dependency_pipeline_enabled=false` → Brain manuel.
+- **🟢 RUN-VERIFY ([[feedback_proof_of_function_dod]]):** kanıt **çağıran** dosyada (def DIŞLA). Bu sprint çoğunlukla **Tier-0 (orchestra/core)**; 232-003 `memory backup` CLI'sı Tier-1 değil (internal-op) → unit yeterli, ama backup gerçek-dosya üretmeli (run-verify).
+- **🔴 HERMETİK ([[project_ci_green_root_causes]]):** tmpdir + sandbox HOME, async spawn (spawnSync YASAK), `test:ci-sim` yeşil. CI yeşil KORUNUR.
+- **🔴 NEVER-LOSE-MEMORY ([[feedback_db_silmek_yasak]] · [[project_brain_integrity_sprint226_cluster]]):** learnings asla sessizce uçmaz; decay config'e uyar + abort defansif.
+- ESM `.js`. Subscription (`env -u ANTHROPIC_API_KEY`). ≤200 LoC tercih, YENİ TEST DOSYASI. **Sadece kendi filesWrite'ına yaz** (paralel-güvenlik). Tek wave (3 task distinct dosya); `dependency_pipeline_enabled=false` → Brain manuel.
 
 ---
 
-## Task 1: 231-001 — [P0] ⭐ exit-0-no-result uniform disk-verify (FALSE NO_GO kökü)
+## Task 1: 232-001 — [P0] ⭐ decay_after_sprints config wire (PRIMARY kök)
 - Model: opus
-- Effort: high
+- Effort: normal
 - Skills: typescript-expert
-- Files: src/orchestra/result-collector.ts, tests/orchestra/synthetic-nogo-diskverify.test.ts
+- Files: src/orchestra/sprint-finalizer.ts, src/orchestra/debt-manager.ts, tests/orchestra/decay-config-wire.test.ts
 - Scope: src/orchestra/, tests/orchestra/
 ### Description
-**Problem (doğrulandı):** Docker EXIT-trap (`spawn-backend-docker.ts:397`) worker exit-0-no-result'ta sentetik `{selfAssessment:"NO_GO", filesChanged:[], notes:"Worker exited without writing result (exitCode=…)"}` `.result` yazar. `collectResults` (`result-collector.ts:503`) bu `.result`-var yolunu (`:508-521`) **disk-verify'sız** toplar; oysa `.timeout` marker yolu (`:523-614`, `:548-550`) `verifyDiskAgainstClaim(projectRoot, scope)` uygular → **NON-UNIFORM**. Sonuç (Sprint 230): 230-003 evaluateWithRubric'in `reconcileSpuriousNoGo` git-diff'iyle tesadüfen kurtuldu ama 230-008 kurtulamadı — iş diskte tam olmasına rağmen NO_GO kaldı (`verifyDiskAgainstClaim` `disk-verify.ts:78`).
-**Çözüm:** `collectResults`'ta sentetik-NO_GO tespitini (`selfAssessment==="NO_GO"` && `notes` "Worker exited without writing result" içerir && `filesChanged.length===0`) `.timeout` yoluyla **AYNI** disk-verify'a tabi tut: `verifyDiskAgainstClaim` → `hasDiskEvidence` ise sonucu zenginleştir (filesChanged/linesAdded doldur) + `MANUAL_REVIEW_REQUIRED`'a reklasifiye et (sentetik raw-NO_GO YERİNE), `BRAIN→AUDITOR:DISK_VS_CLAIM_MISMATCH` emit (mevcut pattern). Disk-evidence yoksa NO_GO kalır. Caller `result-collector.ts` (def `disk-verify.ts` DIŞLA). **Davranış uniform: initial-eval = timeout-path = synthetic-path.**
-**Kanıt:** `grep -c "verifyDiskAgainstClaim\|hasDiskEvidence" src/orchestra/result-collector.ts` → **≥3** (timeout yolu 1 + sentetik yolu ≥2 yeni ÇAĞRI); `npx vitest run tests/orchestra/synthetic-nogo-diskverify.test.ts` → 4+ pass
-**Test:** ≥4 (sentetik-NO_GO + disk-evidence → MANUAL_REVIEW/zenginleşir; sentetik-NO_GO + disk-evidence-yok → NO_GO kalır; normal DONE result dokunulmaz; timeout-path regresyon-yok) — hermetik (tmpdir, sahte .result + git-diff mock)
+**Problem (doğrulandı):** `sprint-finalizer.ts:782-794` decay'i çağırırken **`config.decay_after_sprints`'i GEÇMİYOR**; `runDecay` (`debt-manager.ts:639-667`, `:641`) `decaySprints` parametresini **hardcoded `8`** default'una düşürüyor. Sonuç: config'de `decay_after_sprints=20` (`config.ts:927`) olmasına rağmen decay 8-sprint penceresiyle (threshold = currentSprint−8 = 223) koşuyor → çok daha derin kesim → memory-loss'un PRIMARY tetikleyicisi.
+**Çözüm:** `sprint-finalizer.ts`'te decay çağrılarına (`runDecay(...)` her iki yol: budget-force + normal) `config.decay_after_sprints`'i **explicit geçir**; `runDecay`/`debt-manager.ts` imzasını config-değerini onurlandıracak şekilde wire et (hardcoded 8 fallback yalnızca config undefined ise). **Caller `sprint-finalizer.ts` + `debt-manager.ts` (her ikisi de bu task'ın scope'unda — config akışı).** decay() def (`memory-store.ts`) DIŞLA.
+**Kanıt:** `grep -c "decay_after_sprints" src/orchestra/sprint-finalizer.ts src/orchestra/debt-manager.ts` → ≥2 (config akışı wire); `npx vitest run tests/orchestra/decay-config-wire.test.ts` → 3+ pass
+**Test:** ≥3 (config decay_after_sprints=20 → runDecay 20 alır/threshold doğru; config undefined → fallback; finalize decay'e config'i geçirir — hermetik, mock store.decay spy ile geçen değeri assert et)
 **Smoke:** (Tier-0 orchestra) unit yeterli.
 
-## Task 2: 231-002 — debt.md export-wipe guard (asimetri kapat)
+## Task 2: 232-002 — [P0] learnings decay-exempt (memory/retro/sprint/pattern)
 - Model: sonnet
 - Effort: normal
 - Skills: typescript-expert
-- Files: src/core/memory-export.ts, tests/core/debt-export-guard.test.ts
-- Scope: src/core/, tests/core/
+- Files: src/orchestra/sprint-retro-writer.ts, src/orchestra/auditor.ts, tests/orchestra/learnings-decay-exempt.test.ts
+- Scope: src/orchestra/, tests/orchestra/
 ### Description
-**Problem (doğrulandı):** `writeGuardedExports` (`memory-export.ts:408`) `GUARDED_EXPORT_SPECS` (`:390-394`) summary/decisions/memory'yi `dbCount>0 && renderIsEmpty → yazma` ile korur ama **debt.md guarded-loop DIŞINDA** koşulsuz yazılır (`:436-442`) → DB'de debt VARKEN render boş çıkarsa fuller git-tracked debt.md **EZİLİR** (§4F residual; diğer export'larla asimetri).
-**Çözüm:** debt.md'yi `GUARDED_EXPORT_SPECS`'e ekle (`entryType:'debt'`, uygun `emptyMarker` — `exportDebtMd`'nin 0-debt çıktısıyla eşleş) VEYA aynı `dbCount>0 && renderIsEmpty` guard'ına al; koşulsuz yazımı kaldır. **0-legit-debt → minimal yazım DOĞRU (wipe değil)**; korunan senaryo: DB'de debt var + render collapse. Caller `memory-export.ts`.
-**Kanıt:** `grep -A6 "GUARDED_EXPORT_SPECS" src/core/memory-export.ts | grep -c "debt"` → ≥1 (guarded'a girdi); `npx vitest run tests/core/debt-export-guard.test.ts` → 3+ pass
-**Test:** ≥3 (DB'de debt var + render-empty → debt.md EZİLMEZ; DB 0-debt → minimal yazılır OK; debt var + render dolu → normal yazılır) — hermetik (tmpdir DB)
+**Problem (doğrulandı):** Learning-tipi entry'ler `decay_exempt` set ETMEDEN insert ediliyor → default `false` → decay siliyor. `sprint-retro-writer.ts` (sprint `:761-771`, retro `:775-784`, memory `:790-811`) + `auditor.ts` (pattern `:640-649`) hiçbiri `decay_exempt:true` vermiyor; oysa adr (`adr-seed.ts`) + identity (`identity-generator.ts:338`) exempt. Kullanıcı TÜM history'yi recall etmek istiyor → learnings asla auto-silinmemeli.
+**Çözüm:** `sprint-retro-writer.ts`'teki memory + retro + sprint insert/upsert çağrılarına ve `auditor.ts`'teki pattern insert'ine **`decay_exempt: true`** ekle. Böylece learnings ADR gibi kalıcı (git memory.md export zaten arşiv; DB de kaybetmesin). **Caller `sprint-retro-writer.ts` + `auditor.ts`.** memory-store.ts def DIŞLA. (chat: bu task kapsamı dışı — ayrı, ephemeral.)
+**Kanıt:** `grep -c "decay_exempt: true\|decay_exempt:true" src/orchestra/sprint-retro-writer.ts src/orchestra/auditor.ts` → ≥4; `npx vitest run tests/orchestra/learnings-decay-exempt.test.ts` → 4+ pass
+**Test:** ≥4 (insert edilen memory/retro/sprint/pattern entry'leri decay_exempt=1; bu entry'ler decay()'de SURVIVE eder (eski sprint_num olsa bile); adr/identity etkilenmez — hermetik tmpdir DB)
 **Smoke:** (Tier-0) unit yeterli.
 
-## Task 3: 231-003 — decay catastrophic-abort küçük-DB bypass fix
-- Model: sonnet
-- Effort: low
-- Skills: typescript-expert
-- Files: src/core/memory-store.ts, tests/core/decay-catastrophic-small-db.test.ts
-- Scope: src/core/, tests/core/
-### Description
-**Problem (doğrulandı):** `decay()` (`memory-store.ts:838`) catastrophic-abort (`:849` `CATASTROPHIC_BATCH_MIN=10`, `:850` `CATASTROPHIC_RATIO=0.5`) **`toDecay.length >= 10 && ratio > 0.5`** ister → küçük DB'de (ör. 5 entry, 3 decay = %60) abort **bypass edilir** → tüm learnings uçabilir (onboarding/dev DB riski; §4F açık design-debt).
-**Çözüm:** Floor'u DB-boyut-farkında yap: `nonExemptTotal > 0` ise **ratio-abort her zaman** uygulansın (küçük DB dahil), `CATASTROPHIC_BATCH_MIN` sadece çok-küçük meşru-decay'i (ör. 1-2 entry) korusun — öneri: floor=3 + ratio>0.5 VEYA `nonExemptTotal<10` iken ratio-only. **Riskli-default-on EDİLMEZ** — mevcut meşru decay bozulmamalı. Caller `memory-store.ts`.
-**Kanıt:** `grep -c "CATASTROPHIC\|nonExemptTotal\|aborted" src/core/memory-store.ts` → ≥3; `npx vitest run tests/core/decay-catastrophic-small-db.test.ts` → 3+ pass
-**Test:** ≥3 (küçük DB %60 decay → aborted:true; meşru küçük decay (1-2/küçük) → proceeds; büyük DB normal decay → proceeds, regresyon-yok) — hermetik (tmpdir DB)
-**Smoke:** (Tier-0) unit yeterli.
-
-## Task 4: 231-004 — [forward] HandoffProtocol recovery wiring (failHandoff + listHandoffs)
+## Task 3: 232-003 — [P1] abort `>=` operatörü + WAL-safe `deckent memory backup` CLI
 - Model: sonnet
 - Effort: normal
 - Skills: typescript-expert
-- Files: src/orchestra/sprint-controller.ts, tests/orchestra/handoff-recovery-wire.test.ts
-- Scope: src/orchestra/, tests/orchestra/
+- Files: src/core/memory-store.ts, src/cli/commands/memory.ts, tests/core/memory-backup-and-abort.test.ts
+- Scope: src/core/, src/cli/, tests/core/
 ### Description
-**Problem (doğrulandı):** `HandoffProtocol` (`handoff-protocol.ts`) Sprint 230-006'da wire edildi ama yalnız `createHandoff`+`executeHandoff` çağrılıyor; **`failHandoff()` + `listHandoffs()` 0-caller** (state machine pending→ready/failed populate ediliyor ama recovery/sorgu yok).
-**Çözüm:** sprint-controller recovery yoluna wire et: bağımlı task NO_GO/fail olduğunda o task'ın bekleyen handoff'unu **`failHandoff()`** ile işaretle (downstream'i yanlış-ready bırakma) + sprint-finalize/observability'de **`listHandoffs()`** ile durum özetle (audit/event-stream). **🔴 Wire-point `sprint-controller.ts` — def `handoff-protocol.ts` DIŞLA.** Mevcut handoff wire pattern'ini (230-006) izle, kırma. Caller `sprint-controller.ts`.
-**Kanıt:** `grep -c "failHandoff\|listHandoffs" src/orchestra/sprint-controller.ts` → ≥2 (ÇAĞRI); `npx vitest run tests/orchestra/handoff-recovery-wire.test.ts` → 3+ pass
-**Test:** ≥3 (bağımlı-task-fail → handoff failHandoff'lanır, listHandoffs durum döner, mevcut createHandoff/executeHandoff akışı bozulmaz) — hermetik (tmpdir)
-**Smoke:** (Tier-0 orchestra) unit yeterli.
+**Problem (doğrulandı):** (a) `memory-store.ts:883` catastrophic-abort `toDecay.length / nonExemptTotal > CATASTROPHIC_RATIO` **strict `>`** → tam %50'de (125/250=0.5) tetiklenmiyor; `>=` olmalı (defansif, sınır-dahil). (b) WAL-safe backup CLI yok → pre-sprint `cp memory.db` WAL modunda BOŞ kopya üretiyor (sprint-231 kanıt: 100KB boş yedek). `MemoryStore.getRawDb()` (`:1235`) + better-sqlite3 `db.backup()` + `pragma wal_checkpoint` mevcut.
+**Çözüm:** (a) `memory-store.ts:883` `>` → `>=` (tek-karakter, abort %50-dahil yakalar). (b) `cli/commands/memory.ts`'e (`stats`'tan sonra, `:139`) **`memory backup [--output <path>] [--checkpoint]`** subcommand ekle: `store.getRawDb()` → `pragma('wal_checkpoint(TRUNCATE)')` → `db.backup(out)` → non-boş checkpoint'li .db üretir; default out `.brain/memory.db.bak-<sprintId>-<ts>` (ts caller'dan/Date değil — i18n mesajı `getMessage`). **Caller memory-store.ts (operatör) + cli/commands/memory.ts (subcommand).**
+**Kanıt:** `grep -c "wal_checkpoint\|\.backup(" src/cli/commands/memory.ts` → ≥1; `grep -c ">= CATASTROPHIC_RATIO\|>=CATASTROPHIC" src/core/memory-store.ts` → ≥1; `npx vitest run tests/core/memory-backup-and-abort.test.ts` → 4+ pass
+**Test:** ≥4 (tam %50 decay → aborted:true (>= fix); >%50 → aborted; backup non-boş + entry-count korunur (gerçek tmpdir DB backup); backup WAL-checkpoint'li) — hermetik
+**Smoke:** backup gerçek-dosya üretir (run-verify: tmpdir DB → backup → entry-count eşit, dosya>0).
 
 ---
 
-**Beklenen:** 4/4 DONE, 0 false-FIX (231-001 zaten false-NO_GO kökünü kapatıyor — meta-doğrulama), 0 scope-collision (distinct dosya: result-collector / memory-export / memory-store / sprint-controller → tek wave). **src/dashboard'a SIFIR dokunuş** (paralel dashboard re-theme güvenli). 231-001 (disk-verify P0) en yüksek değer — beta güvenilirlik. CI yeşil KORUNUR.
+**Beklenen:** 3/3 DONE, 0 NO_GO, 0 scope-collision (distinct: sprint-finalizer+debt-manager / sprint-retro-writer+auditor / memory-store+cli-memory → tek wave). **src/dashboard'a SIFIR dokunuş.** Bu sprint, memory-loss'u **3 katmanda** kapatır: config-doğru (232-001 PRIMARY) + learnings-kalıcı (232-002) + abort-defansif & WAL-safe-backup (232-003). Build sonrası bir daha wipe OLMAMALI. CI yeşil KORUNUR.
 
-**Pre-flight:** main temiz+commit'li+push'lu ✅ (reset-bug güvenli — [[project_deckent_self_git_mutation_bug]]). DB backup. **CLI'dan `env -u ANTHROPIC_API_KEY`** (API yasak). Tek wave (4 task paralel ayrık-dosya). Her wave sonrası `git log -1` + `git stash list` (reset kontrol). Sprint sonrası `deckent memory export` → ADR export sayısı ≥75 korunmalı (decisions/memory/debt wipe YOK).
+**Pre-flight:** main temiz+commit'li+push'lu ✅ (reset-bug — [[project_deckent_self_git_mutation_bug]]). **DB WAL-checkpoint'li yedek alındı** (`bak-sprint231-recovered`, 206 entry — çıplak cp DEĞİL). **CLI'dan `env -u ANTHROPIC_API_KEY`**. `brain_planning=structured` (AI-hang yok). Tek wave (3 paralel ayrık-dosya). Her wave sonrası git log + git stash list (reset kontrol). Sprint sonrası DB entry-count ≥206 korunmalı (`deckent memory stats` → memory≥91); wipe olursa `bak-sprint231-recovered`'dan restore.
 
-İlgili memory: [[feedback_brain_synthetic_nogo_disk_verify]] · [[feedback_proof_of_function_dod]] · [[project_ci_green_root_causes]] · [[feedback_trust_brain_eval_not_worker]] · [[project_brain_integrity_sprint226_cluster]] · [[feedback_directive_kanit_letter_vs_goal]]
-İlgili ADR: ADR-070 (eval integrity + disk-verify) · ADR-035 (verification protocol) · ADR-027 (spawn backend) · ADR-045 (wave/handoff)
+İlgili memory: [[project_brain_integrity_sprint226_cluster]] · [[feedback_db_silmek_yasak]] · [[feedback_trust_brain_eval_not_worker]] · [[project_ci_green_root_causes]] · [[feedback_proof_of_function_dod]]
+İlgili ADR: ADR-070 (eval/memory integrity) · ADR-046 (self-update hook) · ADR-009 (debt format)
