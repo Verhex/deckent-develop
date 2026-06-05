@@ -15,6 +15,8 @@ import {
   parkBotAction,
   takeBotAction,
   listBotActions,
+  checkExecutable,
+  isSprintScopedDestructive,
 } from '../../src/connectors/bot-action-store.js';
 
 let root: string;
@@ -61,5 +63,69 @@ describe('bot-action store', () => {
     const prefix = id.slice(0, 6);
     const taken = takeBotAction(root, prefix);
     expect(taken?.id).toBe(id);
+  });
+
+  it('park stores a TTL (expiresAt) on every action', () => {
+    parkBotAction(root, { tool: 'deckent_plan', args: {}, channelId: '1', ttlMs: 1000 });
+    const [a] = listBotActions(root);
+    expect(a!.expiresAt).toBeTruthy();
+    expect(Date.parse(a!.expiresAt)).toBeGreaterThan(Date.parse(a!.parkedAt));
+  });
+
+  it('park binds the active sprint for sprint-scoped destructive tools only', () => {
+    const kill = parkBotAction(root, { tool: 'deckent_kill', args: {}, channelId: '1', boundSprintId: 'sprint-232' });
+    const plan = parkBotAction(root, { tool: 'deckent_plan', args: {}, channelId: '1', boundSprintId: 'sprint-232' });
+    const all = listBotActions(root);
+    expect(all.find((a) => a.id === kill)!.boundSprintId).toBe('sprint-232');
+    // plan is not sprint-scoped destructive — even if a sprint id is passed it stays unbound
+    expect(all.find((a) => a.id === plan)!.boundSprintId).toBeUndefined();
+  });
+});
+
+describe('isSprintScopedDestructive', () => {
+  it('kill / cleanup / recover are sprint-scoped destructive', () => {
+    for (const t of ['deckent_kill', 'deckent_cleanup', 'deckent_recover']) {
+      expect(isSprintScopedDestructive(t)).toBe(true);
+    }
+  });
+  it('plan / sync / status are NOT (TTL only, no sprint binding)', () => {
+    for (const t of ['deckent_plan', 'deckent_sync', 'deckent_status']) {
+      expect(isSprintScopedDestructive(t)).toBe(false);
+    }
+  });
+});
+
+describe('checkExecutable (TTL + sprint-binding re-verify)', () => {
+  const base = {
+    id: 'a1', tool: 'deckent_kill', args: {}, channelId: '1',
+    parkedAt: '2026-06-05T10:00:00.000Z',
+    expiresAt: '2026-06-05T11:00:00.000Z',
+    boundSprintId: 'sprint-232',
+  };
+
+  it('within TTL + bound sprint still active → ok', () => {
+    const r = checkExecutable(base, { now: Date.parse('2026-06-05T10:30:00Z'), currentSprintId: 'sprint-232' });
+    expect(r.ok).toBe(true);
+  });
+
+  it('🔴 expired → refused (backlog-replay / forgotten approval)', () => {
+    const r = checkExecutable(base, { now: Date.parse('2026-06-05T12:00:00Z'), currentSprintId: 'sprint-232' });
+    expect(r).toEqual({ ok: false, reason: 'expired' });
+  });
+
+  it('🔴 bound sprint no longer active (different sprint) → refused (the wrong-kill scenario)', () => {
+    const r = checkExecutable(base, { now: Date.parse('2026-06-05T10:30:00Z'), currentSprintId: 'sprint-233' });
+    expect(r).toEqual({ ok: false, reason: 'sprint-changed' });
+  });
+
+  it('🔴 bound sprint but NOTHING active now (user killed it manually) → refused', () => {
+    const r = checkExecutable(base, { now: Date.parse('2026-06-05T10:30:00Z'), currentSprintId: null });
+    expect(r).toEqual({ ok: false, reason: 'sprint-changed' });
+  });
+
+  it('unbound action (e.g. plan) → only TTL matters, sprint id ignored', () => {
+    const unbound = { ...base, tool: 'deckent_plan', boundSprintId: undefined };
+    const r = checkExecutable(unbound, { now: Date.parse('2026-06-05T10:30:00Z'), currentSprintId: 'sprint-999' });
+    expect(r.ok).toBe(true);
   });
 });

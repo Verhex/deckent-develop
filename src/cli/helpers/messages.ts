@@ -808,6 +808,26 @@ const MESSAGES: MessageMap = {
     en: '  • {tool}({args}) — approve {id} / reject {id}',
     tr: '  • {tool}({args}) — approve {id} / reject {id}',
   },
+  'bot.action_expired': {
+    en: '⏲️ Expired — {tool} was not executed (the approval was too old). Ask again if you still want it.',
+    tr: '⏲️ Süresi doldu — {tool} çalıştırılmadı (onay çok eskidi). Hâlâ istiyorsan tekrar iste.',
+  },
+  'bot.action_sprint_changed': {
+    en: '🛡️ Not executed — {tool} was tied to sprint {sprint}, which is no longer the active sprint. Refusing so a stale command can\'t hit a different sprint.',
+    tr: '🛡️ Çalıştırılmadı — {tool}, {sprint} sprint\'ine bağlıydı ama o artık aktif sprint değil. Bayat bir komut başka sprint\'i vurmasın diye reddedildi.',
+  },
+  'bot.kill_done': {
+    en: '✅ Killed sprint {sprint} (pid {pid}).',
+    tr: '✅ {sprint} sprint\'i öldürüldü (pid {pid}).',
+  },
+  'bot.kill_reused': {
+    en: '🛡️ Not executed — sprint {sprint}\'s process is gone and its pid now belongs to something else. Refusing to signal a foreign process.',
+    tr: '🛡️ Çalıştırılmadı — {sprint} sprint\'inin process\'i gitmiş ve pid\'i artık başka bir şeye ait. Yabancı bir process\'e sinyal göndermeyi reddediyorum.',
+  },
+  'bot.kill_already_stopped': {
+    en: 'ℹ️ Sprint {sprint} is already stopped — nothing to kill.',
+    tr: 'ℹ️ {sprint} sprint\'i zaten durmuş — öldürülecek bir şey yok.',
+  },
 };
 
 /**

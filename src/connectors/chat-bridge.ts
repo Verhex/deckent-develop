@@ -28,7 +28,8 @@ import { createCliToolDispatcher } from '../cli/commands/chat-tool-bridge.js';
 import { createPersistentClaudeSession } from '../cli/commands/chat-session.js';
 import { classifyActionRisk, type AgenticAction } from '../cli/commands/agentic-confirm.js';
 import { makeGatedDispatcher, DECKENT_BOT_SYSTEM_PROMPT } from './bot-agentic.js';
-import { parkBotAction } from './bot-action-store.js';
+import { parkBotAction, isSprintScopedDestructive } from './bot-action-store.js';
+import { getCurrentSprintId } from '../monitor/sprint-state.js';
 
 /** Default provider: subscription claude (API key stripped → session auth, no tool_use). */
 function defaultSubscriptionProvider(): ChatProviderAdapter {
@@ -122,7 +123,17 @@ export function makeChatResponder(deps: ChatResponderDeps = {}): ChatResponder {
       const inner = deps.dispatcher ?? createCliToolDispatcher();
       dispatcher = makeGatedDispatcher({
         inner,
-        park: (tool, args) => parkBotAction(root, { tool, args, channelId: sessionId }),
+        park: (tool, args) =>
+          parkBotAction(root, {
+            tool,
+            args,
+            channelId: sessionId,
+            // Bind the active sprint for destructive tools so a later approval
+            // can't hit a different/later sprint (re-verified at execute time).
+            ...(isSprintScopedDestructive(tool)
+              ? { boundSprintId: getCurrentSprintId(root) ?? undefined }
+              : {}),
+          }),
         lang,
       });
       confirm = async () => true; // gating lives in the wrapper, not here

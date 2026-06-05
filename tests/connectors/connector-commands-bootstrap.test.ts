@@ -210,6 +210,82 @@ describe('bootstrapConnectorCommands', () => {
     }
   });
 
+  it('🔴 approve a kill BOUND to a sprint that is no longer active → REFUSED, kill not run', async () => {
+    const { mkdtempSync, rmSync, mkdirSync, writeFileSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const { parkBotAction } = await import('../../src/connectors/bot-action-store.js');
+    const root = mkdtempSync(join(tmpdir(), 'bind-'));
+    try {
+      // a NEW sprint is active now…
+      mkdirSync(join(root, '.deckent'), { recursive: true });
+      writeFileSync(join(root, '.deckent', 'sprint-state.json'), JSON.stringify({ sprintId: 'sprint-NEW' }));
+      // …but the parked kill was bound to the OLD sprint
+      const id = parkBotAction(root, { tool: 'deckent_kill', args: {}, channelId: '555', boundSprintId: 'sprint-OLD' });
+      const fake = fakeConnector('telegram');
+      const actionDispatcher = { dispatch: vi.fn(async () => 'SHOULD NOT RUN') };
+      await bootstrapConnectorCommands(root, cfg, { makeConnector: () => fake, actionDispatcher });
+
+      fake._emit(incoming(`approve ${id}`, '555'));
+      await vi.waitFor(() => {
+        const texts = fake.sendMessage.mock.calls.map((c) => (c[0] as { text: string }).text).join('\n');
+        expect(texts.toLowerCase()).toMatch(/not executed|çalıştırılmadı|sprint-old/i);
+      });
+      expect(actionDispatcher.dispatch).not.toHaveBeenCalled(); // never executed
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('approve a kill bound to the ACTIVE sprint → routes to killSprintById (not the generic dispatcher)', async () => {
+    const { mkdtempSync, rmSync, mkdirSync, writeFileSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const { parkBotAction } = await import('../../src/connectors/bot-action-store.js');
+    const root = mkdtempSync(join(tmpdir(), 'bind-'));
+    try {
+      mkdirSync(join(root, '.deckent'), { recursive: true });
+      writeFileSync(join(root, '.deckent', 'sprint-state.json'), JSON.stringify({ sprintId: 'sprint-LIVE' }));
+      const id = parkBotAction(root, { tool: 'deckent_kill', args: {}, channelId: '555', boundSprintId: 'sprint-LIVE' });
+      const fake = fakeConnector('telegram');
+      const actionDispatcher = { dispatch: vi.fn(async () => 'GENERIC KILL') };
+      await bootstrapConnectorCommands(root, cfg, { makeConnector: () => fake, actionDispatcher });
+
+      fake._emit(incoming(`approve ${id}`, '555'));
+      // no pid file for sprint-LIVE → killSprintById returns already-stopped (proves routing)
+      await vi.waitFor(() => {
+        const texts = fake.sendMessage.mock.calls.map((c) => (c[0] as { text: string }).text).join('\n');
+        expect(texts.toLowerCase()).toMatch(/already stopped|zaten durmuş|sprint-live/i);
+      });
+      expect(actionDispatcher.dispatch).not.toHaveBeenCalled(); // routed to killSprintById, not generic
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('🔴 approve an EXPIRED parked action → REFUSED, not executed', async () => {
+    const { mkdtempSync, rmSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const { parkBotAction } = await import('../../src/connectors/bot-action-store.js');
+    const root = mkdtempSync(join(tmpdir(), 'ttl-'));
+    try {
+      const id = parkBotAction(root, { tool: 'deckent_plan', args: {}, channelId: '555', ttlMs: -100000 }); // already expired
+      const fake = fakeConnector('telegram');
+      const actionDispatcher = { dispatch: vi.fn(async () => 'SHOULD NOT RUN') };
+      await bootstrapConnectorCommands(root, cfg, { makeConnector: () => fake, actionDispatcher });
+
+      fake._emit(incoming(`approve ${id}`, '555'));
+      await vi.waitFor(() => {
+        const texts = fake.sendMessage.mock.calls.map((c) => (c[0] as { text: string }).text).join('\n');
+        expect(texts.toLowerCase()).toMatch(/expired|süresi doldu/i);
+      });
+      expect(actionDispatcher.dispatch).not.toHaveBeenCalled();
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('unresolved $DECK token → skipped, nothing started, adapter null', async () => {
     const make = vi.fn();
     const { adapter } = await bootstrapConnectorCommands('/root',

@@ -21,9 +21,11 @@ import { makeIncomingCommandRouter, type CommandResolver, type ResolveOutcome } 
 import { makeCommandResolver } from './incoming-command-resolver.js';
 import { chunkMessage, type ChatResponder } from './chat-bridge.js';
 import { isBotSlash, handleBotSlash } from './bot-commands.js';
-import { takeBotAction } from './bot-action-store.js';
+import { takeBotAction, checkExecutable } from './bot-action-store.js';
 import { createCliToolDispatcher } from '../cli/commands/chat-tool-bridge.js';
 import type { McpToolDispatcher } from '../cli/commands/chat-native.js';
+import { killSprintById } from '../cli/commands/kill.js';
+import { getCurrentSprintId } from '../monitor/sprint-state.js';
 import { getMessage } from '../cli/helpers/messages.js';
 
 type NotifyConnectorsConfig = NonNullable<DeckentConfig['notify_connectors']>;
@@ -171,7 +173,34 @@ export async function bootstrapConnectorCommands(
       if (action === 'reject') {
         return { status: 'resolved', reply: getMessage('bot.action_rejected', lang, { tool: parked.tool }) };
       }
+      // Re-verify at execute time (advisor's two flat rules): TTL + sprint-binding.
+      // A stale/backlog approval, or one tied to a sprint that is no longer active,
+      // is REFUSED — never executed (this is the wrong-kill-next-sprint guard).
+      const exec = checkExecutable(parked, { now: Date.now(), currentSprintId: getCurrentSprintId(root) });
+      if (!exec.ok) {
+        const key = exec.reason === 'expired' ? 'bot.action_expired' : 'bot.action_sprint_changed';
+        return {
+          status: 'resolved',
+          reply: getMessage(key, lang, { tool: parked.tool, sprint: parked.boundSprintId ?? '—' }),
+        };
+      }
       try {
+        // A bound kill routes to the ownership-validated precise primitive — kills
+        // EXACTLY the bound sprint (never --all, never a pid-reused foreign process).
+        if (parked.tool === 'deckent_kill' && parked.boundSprintId) {
+          const r = await killSprintById(root, parked.boundSprintId);
+          const key =
+            r.status === 'killed' ? 'bot.kill_done'
+            : r.status === 'reused' ? 'bot.kill_reused'
+            : 'bot.kill_already_stopped';
+          return {
+            status: 'resolved',
+            reply: getMessage(key, lang, {
+              sprint: parked.boundSprintId,
+              pid: r.status === 'killed' ? String(r.pid) : '',
+            }),
+          };
+        }
         const result = await actionDispatcher.dispatch(parked.tool, parked.args);
         const body = getMessage('bot.action_done', lang, { tool: parked.tool }) + '\n' + truncate(result);
         return { status: 'resolved', reply: body };

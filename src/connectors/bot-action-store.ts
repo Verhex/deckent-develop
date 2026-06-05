@@ -22,12 +22,66 @@ export interface BotAction {
   readonly args: Record<string, unknown>;
   readonly channelId: string;
   readonly parkedAt: string;
+  /** Absolute expiry (ISO). A stale/backlog/forgotten approval past this is refused. */
+  readonly expiresAt: string;
+  /**
+   * The sprint active WHEN this was parked — set ONLY for sprint-scoped
+   * destructive tools (kill/cleanup/recover). At execute time it is re-verified
+   * against the currently-active sprint; a mismatch refuses, so an approval can
+   * never hit a different/later sprint than the one it was about.
+   */
+  readonly boundSprintId?: string;
 }
 
 export interface ParkBotActionInput {
   readonly tool: string;
   readonly args: Record<string, unknown>;
   readonly channelId: string;
+  /** Time-to-live in ms (default 1h). */
+  readonly ttlMs?: number;
+  /** Active sprint id to bind (ignored unless the tool is sprint-scoped destructive). */
+  readonly boundSprintId?: string;
+}
+
+/** Default parked-action TTL: 1 hour. Long enough to act, short enough to bound staleness. */
+const DEFAULT_TTL_MS = 60 * 60 * 1000;
+
+/** Tools whose effect is scoped to a specific sprint and destructive → bind + re-verify. */
+const SPRINT_SCOPED_DESTRUCTIVE: ReadonlySet<string> = new Set([
+  'deckent_kill',
+  'deckent_cleanup',
+  'deckent_recover',
+]);
+
+/** True when a tool's effect must be bound to the sprint active at park time. */
+export function isSprintScopedDestructive(tool: string): boolean {
+  return SPRINT_SCOPED_DESTRUCTIVE.has(tool);
+}
+
+export interface ExecutabilityContext {
+  /** Current wall-clock (ms) — injected for tests. */
+  readonly now: number;
+  /** The sprint active NOW (getCurrentSprintId), or null if none. */
+  readonly currentSprintId: string | null;
+}
+
+export type Executability = { ok: true } | { ok: false; reason: 'expired' | 'sprint-changed' };
+
+/**
+ * Re-verify a parked action at execute time (advisor's two flat rules):
+ *  1. TTL (universal) — past expiresAt → 'expired'.
+ *  2. Sprint-binding (destructive only) — boundSprintId ≠ the currently-active
+ *     sprint → 'sprint-changed' (covers "different sprint" AND "nothing active
+ *     now because the user killed it manually").
+ */
+export function checkExecutable(action: BotAction, ctx: ExecutabilityContext): Executability {
+  if (action.expiresAt && ctx.now > Date.parse(action.expiresAt)) {
+    return { ok: false, reason: 'expired' };
+  }
+  if (action.boundSprintId && action.boundSprintId !== ctx.currentSprintId) {
+    return { ok: false, reason: 'sprint-changed' };
+  }
+  return { ok: true };
 }
 
 function storeDir(root: string): string {
@@ -42,13 +96,19 @@ function actionPath(root: string, id: string): string {
 export function parkBotAction(root: string, input: ParkBotActionInput): string {
   const dir = storeDir(root);
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-  const id = `act-${Date.now().toString(36)}-${randomBytes(3).toString('hex')}`;
+  const now = Date.now();
+  const id = `act-${now.toString(36)}-${randomBytes(3).toString('hex')}`;
   const action: BotAction = {
     id,
     tool: input.tool,
     args: input.args ?? {},
     channelId: input.channelId,
-    parkedAt: new Date().toISOString(),
+    parkedAt: new Date(now).toISOString(),
+    expiresAt: new Date(now + (input.ttlMs ?? DEFAULT_TTL_MS)).toISOString(),
+    // Bind the sprint ONLY for sprint-scoped destructive tools (kill/cleanup/recover).
+    ...(input.boundSprintId && isSprintScopedDestructive(input.tool)
+      ? { boundSprintId: input.boundSprintId }
+      : {}),
   };
   writeFileSync(actionPath(root, id), JSON.stringify(action, null, 2) + '\n', 'utf-8');
   return id;
