@@ -209,7 +209,18 @@ export default function DashboardPage() {
   }, [sseState]);
 
   const agents = state?.agents ?? [];
-  const alerts = state?.alerts ?? [];
+  // Tame alert-spam (repeated stale-md etc.): collapse identical level+message,
+  // keep first with an occurrence count, cap to 6 distinct.
+  const rawAlerts = state?.alerts ?? [];
+  const dedupMap = new Map<string, Alert & { count: number }>();
+  for (const a of rawAlerts) {
+    const key = `${a.level}|${a.message}`;
+    const prev = dedupMap.get(key);
+    if (prev) prev.count += 1;
+    else dedupMap.set(key, { ...a, count: 1 });
+  }
+  const alerts = Array.from(dedupMap.values()).slice(0, 6);
+  const alertOverflow = Math.max(0, dedupMap.size - 6);
   const progress = state?.progress;
 
   const done = progress?.done ?? 0;
@@ -342,41 +353,39 @@ export default function DashboardPage() {
                 </p>
               </div>
             </div>
+            {total > 0 && (
+              <div className="mt-4">
+                <Progress
+                  total={total}
+                  segments={[
+                    { value: done, color: "bg-green-500", label: `${t('dashboard.done')}: ${done}` },
+                    { value: active, color: "bg-brand-500", label: `${t('dashboard.active')}: ${active}` },
+                    {
+                      value: Math.max(0, pending),
+                      color: "bg-zinc-600",
+                      label: `${t('dashboard.pending')}: ${Math.max(0, pending)}`,
+                    },
+                  ]}
+                />
+                <p className="mt-2 text-xs text-zinc-500">
+                  {done}/{total} {t("dashboard.done")} · {active} {t("dashboard.running")} · {Math.max(0, pending)} {t("dashboard.queued")}
+                </p>
+              </div>
+            )}
+            <p className="mt-5 mb-2 text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+              {t("dashboard.lifecycle")}
+            </p>
             <SprintPhaseTimeline currentPhase={state.sprint.phase} />
           </CardContent>
         </Card>
       )}
 
-      {/* Usage Card removed — no real token tracking available via Claude CLI */}
-
-      {/* Progress Section */}
-      {total > 0 && (
-        <Card className="border-zinc-800 bg-zinc-900 shadow-lg shadow-zinc-950/50">
-          <CardHeader>
-            <CardTitle className="text-zinc-100">{t("dashboard.progress")}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <Progress
-              total={total}
-              segments={[
-                { value: done, color: "bg-green-500", label: `${t('dashboard.done')}: ${done}` },
-                { value: active, color: "bg-brand-500", label: `${t('dashboard.active')}: ${active}` },
-                {
-                  value: Math.max(0, pending),
-                  color: "bg-zinc-600",
-                  label: `${t('dashboard.pending')}: ${Math.max(0, pending)}`,
-                },
-              ]}
-            />
-            <p className="text-sm text-zinc-400">
-              {done}/{total} {t("dashboard.done")}, {active} {t("dashboard.running")},{" "}
-              {Math.max(0, pending)} {t("dashboard.queued")}
-            </p>
-          </CardContent>
-        </Card>
+      {/* Workers section (mockup §2: section-label + grid) */}
+      {agents.length > 0 && (
+        <p className="text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+          {t("dashboard.workers_label")}
+        </p>
       )}
-
-      {/* Workers (2/3) + Activity Feed (1/3) */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Worker Cards — 2/3 */}
         <div className="lg:col-span-2">
@@ -404,7 +413,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <ul className="space-y-2">
-              {alerts.map((alert: Alert, i: number) => {
+              {alerts.map((alert, i: number) => {
                 const Icon = ALERT_ICON[alert.level] ?? Info;
                 return (
                   <li
@@ -417,6 +426,9 @@ export default function DashboardPage() {
                         <Badge variant={ALERT_VARIANT[alert.level] ?? "info"}>
                           {alert.level.toUpperCase()}
                         </Badge>
+                        {alert.count > 1 && (
+                          <span className="font-mono text-[10px] text-zinc-500">×{alert.count}</span>
+                        )}
                         <span className="text-xs text-zinc-500">
                           {alert.timestamp}
                         </span>
@@ -429,6 +441,9 @@ export default function DashboardPage() {
                 );
               })}
             </ul>
+            {alertOverflow > 0 && (
+              <p className="mt-2 text-xs text-zinc-500">+{alertOverflow} more</p>
+            )}
           </CardContent>
         </Card>
       )}
