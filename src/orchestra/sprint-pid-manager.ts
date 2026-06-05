@@ -11,6 +11,11 @@ import { join, dirname } from 'node:path';
 import { DECKENT_DIR, BRAIN_DIR } from '../core/constants.js';
 import { ErrorRegistry } from '../core/errors.js';
 import { isPidAlive } from '../core/pid-liveness.js';
+import {
+  processStartToken,
+  verifyPidOwnership,
+  type OwnershipStatus,
+} from '../core/pid-ownership.js';
 
 // ─── Types ────────────────────────────────────────────────────────
 
@@ -79,7 +84,48 @@ export function writePid(root: string, sprintId: string): void {
     pid: process.pid,
     sprintId,
     startedAt: new Date().toISOString(),
+    // Capture the kernel start token so a later kill can prove this exact
+    // process (not a pid-reused impostor) before signalling. Additive — old
+    // readers ignore it; old pid files without it degrade to 'unknown'.
+    startToken: processStartToken(process.pid),
   }, null, 2));
+}
+
+/**
+ * Read the full pid record (pid + startToken) for a sprint, or null. Used by the
+ * ownership guard; readPid() stays for callers that only need the number.
+ */
+export function readPidRecord(
+  root: string,
+  sprintId: string,
+): { pid: number; sprintId: string; startedAt?: string; startToken?: string | null } | null {
+  const filePath = pidFilePath(root, sprintId);
+  try {
+    const data = JSON.parse(readFileSync(filePath, 'utf-8')) as {
+      pid?: number;
+      sprintId?: string;
+      startedAt?: string;
+      startToken?: string | null;
+    };
+    if (typeof data.pid !== 'number') return null;
+    return {
+      pid: data.pid,
+      sprintId: data.sprintId ?? sprintId,
+      startedAt: data.startedAt,
+      startToken: data.startToken ?? null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Classify whether the coordinator recorded for `sprintId` is still that exact
+ * live process: 'owned' / 'reused' (pid recycled — never signal) / 'dead' /
+ * 'unknown' (alive but unprovable — old pid file or non-Linux).
+ */
+export function verifySprintOwnership(root: string, sprintId: string): OwnershipStatus {
+  return verifyPidOwnership(readPidRecord(root, sprintId));
 }
 
 /**

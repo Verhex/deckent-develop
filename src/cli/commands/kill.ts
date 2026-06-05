@@ -12,7 +12,7 @@ import { SpawnBackendFactory } from '../../orchestra/spawn-backend.js';
 import { getProviderForModel } from '../../core/task-types.js';
 import type { ModelType } from '../../core/types.js';
 import {
-  listPidFiles, readPid, isProcessAlive,
+  listPidFiles, readPid, isProcessAlive, verifySprintOwnership,
 } from '../../orchestra/sprint-pid-manager.js';
 import { cleanupSprintMetadata } from '../../orchestra/sprint-controller.js';
 import { writeEvent } from '../../orchestra/event-stream.js';
@@ -217,6 +217,56 @@ function delay(ms: number): Promise<void> {
   return new Promise(resolve => { setTimeout(resolve, ms); });
 }
 
+/** Outcome of a sprint-targeted kill. */
+export type KillSprintResult =
+  | { readonly status: 'killed'; readonly sprintId: string; readonly pid: number }
+  | { readonly status: 'reused'; readonly sprintId: string }
+  | { readonly status: 'already-stopped'; readonly sprintId: string };
+
+/**
+ * Kill EXACTLY one sprint's coordinator, ownership-validated — the precise
+ * primitive the bot uses instead of `--all` so a stale/approved kill can never
+ * hit a different sprint. 'reused' (pid recycled) → REFUSE, signal nothing.
+ * 'dead' → already stopped (clean up the stale pid). 'owned'/'unknown' → SIGTERM,
+ * grace, SIGKILL straggler, then cleanup THIS sprint's metadata only.
+ */
+export async function killSprintById(
+  root: string,
+  sprintId: string,
+  opts: { graceMs?: number } = {},
+): Promise<KillSprintResult> {
+  const ownership = verifySprintOwnership(root, sprintId);
+  if (ownership === 'reused') {
+    // The recorded coordinator is gone and the pid now belongs to a foreign
+    // process — refuse. Drop the misleading pid file so it can't mislead again.
+    try { cleanupSprintMetadata(root, sprintId); } catch { /* fail-safe */ }
+    return { status: 'reused', sprintId };
+  }
+  if (ownership === 'dead') {
+    try { cleanupSprintMetadata(root, sprintId); } catch { /* fail-safe */ }
+    return { status: 'already-stopped', sprintId };
+  }
+
+  const pid = readPid(root, sprintId);
+  if (pid === null || !isProcessAlive(pid)) {
+    try { cleanupSprintMetadata(root, sprintId); } catch { /* fail-safe */ }
+    return { status: 'already-stopped', sprintId };
+  }
+
+  safeSignal(pid, 'SIGTERM');
+  await delay(opts.graceMs ?? CONTROLLER_GRACE_MS);
+  if (isProcessAlive(pid)) safeSignal(pid, 'SIGKILL');
+  try { cleanupSprintMetadata(root, sprintId); } catch { /* fail-safe */ }
+  try {
+    writeEvent(root, sprintId, 'brain', '*', 'BRAIN→*:SPRINT_KILLED', {
+      killedAt: new Date().toISOString(),
+      controllerPids: [pid],
+      targeted: true,
+    });
+  } catch { /* fail-safe */ }
+  return { status: 'killed', sprintId, pid };
+}
+
 async function killAllCascade(
   root: string,
   lang: string,
@@ -247,6 +297,11 @@ async function killAllCascade(
       const pid = readPid(root, sid);
       if (pid === null) continue;
       if (!isProcessAlive(pid)) continue;
+      // 🔴 pid-reuse catastrophe guard (B2): never signal a pid that the OS
+      // recycled to a DIFFERENT process. 'reused' → skip (the recorded sprint
+      // is already gone; the live pid belongs to someone else). 'owned' and
+      // 'unknown' (old pid file / non-Linux) preserve prior behavior.
+      if (verifySprintOwnership(root, sid) === 'reused') continue;
       safeSignal(pid, 'SIGTERM');
       sigTermedPids.push(pid);
     } catch {

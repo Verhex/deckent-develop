@@ -35,6 +35,9 @@ vi.mock('../../src/orchestra/sprint-pid-manager.js', () => ({
   readPid: vi.fn(),
   isProcessAlive: vi.fn(),
   clearPid: vi.fn(),
+  // pid-reuse guard (§4G/B2): 'unknown' = alive but unprovable (these synthetic
+  // pid records carry no startToken) → cascade preserves prior behavior (signals).
+  verifySprintOwnership: vi.fn(() => 'unknown'),
 }));
 
 vi.mock('../../src/orchestra/sprint-controller.js', () => ({
