@@ -87,7 +87,9 @@ async function runKillAll(extra: string[] = []): Promise<void> {
   program.exitOverride();
   registerKill(program);
   try {
-    await program.parseAsync(['node', 'test', 'kill', '--all', ...extra]);
+    // --user-explicit opts into the destructive cascade (CONFIRM-001 gate);
+    // these tests verify cascade mechanics, not the confirmation prompt.
+    await program.parseAsync(['node', 'test', 'kill', '--all', '--user-explicit', ...extra]);
   } catch {
     // commander exitOverride may throw
   }

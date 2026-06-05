@@ -200,6 +200,26 @@ const MESSAGES: MessageMap = {
     en: 'No active workers found.',
     tr: 'Aktif worker bulunamadı.',
   },
+  'kill.all_confirm_warning': {
+    en: '⚠ This will cascade-kill ALL active workers and the controller. This cannot be undone.',
+    tr: '⚠ Bu, TÜM aktif worker\'ları ve controller\'ı cascade-kill eder. Geri alınamaz.',
+  },
+  'kill.all_confirm_prompt': {
+    en: 'Kill all?',
+    tr: 'Hepsini öldür?',
+  },
+  'kill.all_aborted': {
+    en: 'Aborted — no workers killed. Pass --force or --user-explicit to skip this prompt.',
+    tr: 'İptal edildi — worker öldürülmedi. Bu onayı atlamak için --force veya --user-explicit kullanın.',
+  },
+  'agent.delete_confirm_prompt': {
+    en: 'Permanently delete agent \'{name}\' and all its files?',
+    tr: '\'{name}\' agent\'ını ve tüm dosyalarını kalıcı olarak sil?',
+  },
+  'agent.delete_aborted': {
+    en: 'Aborted — agent \'{name}\' not deleted. Pass --force to skip this prompt.',
+    tr: 'İptal edildi — \'{name}\' agent\'ı silinmedi. Bu onayı atlamak için --force kullanın.',
+  },
 
   // ─── spawn command ─────────────────────────────────────────────────
   'spawn.worker_spawned': {

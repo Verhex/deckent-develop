@@ -4,6 +4,8 @@ import { join } from 'node:path';
 import type { Command } from 'commander';
 import { print, printError, formatTable } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
+import { promptConfirm } from '../helpers/prompt.js';
+import { getLanguage, getMessage } from '../helpers/messages.js';
 import { ErrorRegistry } from '../../core/errors.js';
 import { ALL_MODELS } from '../../core/types.js';
 import { BRAIN_DIR, SPRINTS_DIR } from '../../core/constants.js';
@@ -212,6 +214,26 @@ function loadAgentSprintStats(root: string, agentName: string): AgentSprintStat[
 
 // ─── Registration ───────────────────────────────────────────────────
 
+/** Interactive confirmation for the destructive `agent delete`. Non-interactive
+ *  (no TTY) returns false so a scripted run must opt in via --force. */
+async function interactiveAgentDeleteConfirm(name: string, lang: string): Promise<boolean> {
+  if (!process.stdin.isTTY) return false;
+  return promptConfirm(getMessage('agent.delete_confirm_prompt', lang, { name }), false);
+}
+
+/**
+ * Decide whether `agent delete` may proceed (CONFIRM-002, §4G). --force bypasses
+ * the prompt; otherwise the confirm callback decides — a recursive rmSync of the
+ * agent directory must be human-confirmed.
+ */
+export async function shouldProceedAgentDelete(
+  opts: { force?: boolean },
+  confirm: () => Promise<boolean>,
+): Promise<boolean> {
+  if (opts.force) return true;
+  return confirm();
+}
+
 export function registerAgent(program: Command): void {
   const agentCmd = program.command('agent').description('Manage agent pool');
 
@@ -408,7 +430,8 @@ export function registerAgent(program: Command): void {
   agentCmd
     .command('delete <name>')
     .description('Delete an agent from the pool')
-    .action(async (name: string) => {
+    .option('--force', 'Skip the confirmation prompt')
+    .action(async (name: string, opts: { force?: boolean }) => {
       try {
         const root = resolveProjectRoot();
         const agentDir = join(getAgentsDir(root), name);
@@ -416,6 +439,14 @@ export function registerAgent(program: Command): void {
           throw ErrorRegistry.createError('DECKENT_E031', {
             message: `Agent '${name}' not found`,
           });
+        }
+        const lang = getLanguage();
+        const proceed = await shouldProceedAgentDelete(opts, () =>
+          interactiveAgentDeleteConfirm(name, lang),
+        );
+        if (!proceed) {
+          print(getMessage('agent.delete_aborted', lang, { name }));
+          return;
         }
         rmSync(agentDir, { recursive: true, force: true });
         print(`Agent '${name}' deleted.`);

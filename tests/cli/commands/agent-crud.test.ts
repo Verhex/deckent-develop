@@ -75,7 +75,7 @@ describe('agent CRUD commands', () => {
       const agentDir = makeAgent('test-agent');
       expect(existsSync(agentDir)).toBe(true);
 
-      await run(['agent', 'delete', 'test-agent']);
+      await run(['agent', 'delete', 'test-agent', '--force']);
 
       expect(existsSync(agentDir)).toBe(false);
       expect(output.some((o) => o.includes("'test-agent' deleted"))).toBe(true);
@@ -83,7 +83,7 @@ describe('agent CRUD commands', () => {
 
     it('should not have directory after delete', async () => {
       makeAgent('doomed');
-      await run(['agent', 'delete', 'doomed']);
+      await run(['agent', 'delete', 'doomed', '--force']);
       expect(existsSync(join(testRoot, '.deckent/agents/doomed'))).toBe(false);
     });
 

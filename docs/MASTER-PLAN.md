@@ -434,8 +434,10 @@ Her sprint sonrası: `cp .brain/memory.db .brain/memory.db.bak` + `deckent memor
 | | P2 | MSG-004 config-nervous CLI i18n (interactive TUI + PRESET_DESCRIPTIONS) | T1 | `cli/commands/config-nervous.ts` | MSG-001 |
 | **DASH** — dashboard control plane | P1 | DASH-001 `/api/kill/all`→`killAllSessions` (500 fix) + SSE autonomous events/pending watch | T1 | `api/server.ts` | — |
 | | P1 | DASH-002 sidebar Bell pending-count badge (`/api/nervous/status`) | T1 | `dashboard/src/components/Layout.tsx` | — |
-| **CONFIRM** — destructive-action onay kapısı | P0 | CONFIRM-001 `kill --all` y/N confirm (veya `--user-explicit`/`--force`) | T1 | `cli/commands/kill.ts` | — |
-| | P1 | CONFIRM-002 `agent delete` y/N + `--force` (recover.ts deseni) | T1 | `cli/commands/agent.ts` | — |
+| **CONFIRM** — destructive-action onay kapısı | P0 | ✅ CONFIRM-001 `kill --all` y/N confirm (veya `--user-explicit`/`--force`); non-TTY→flag-zorunlu | T1 | `cli/commands/kill.ts` | — |
+| | P1 | ✅ CONFIRM-002 `agent delete` y/N + `--force` (recover.ts deseni); non-TTY→flag-zorunlu | T1 | `cli/commands/agent.ts` | — |
+
+> **✅ CONFIRM epic el-kodlandı (2026-06-05, TDD):** İkisi de inject-edilebilir gate (`shouldProceedKillAll`/`shouldProceedAgentDelete` — `--force`/`--user-explicit` bypass, değilse confirm; non-TTY→false=flag-zorunlu → scripted-silent-cascade önlenir). ADR-040 no-silent-destructive. i18n-FIRST (kill.all_confirm/aborted + agent.delete_confirm/aborted, en+tr). **Kanıt:** RED→GREEN; `kill-all-confirm` 4/4 + `agent-delete-confirm` 3/3; davranış-değişikliği nedeniyle mevcut cascade testleri `--user-explicit`/`--force` opt-in ile güncellendi (kill 30 + agent 10 yeşil). **Smoke (Tier-1 gerçek-binary):** `kill --all`→abort/no-cascade, `--user-explicit`→geçer; `agent delete`→abort+dizin korundu, `--force`→silindi; `agent delete ghost`→not-found (confirm'den önce). Karpathy YAGNI: ortak util çıkarılmadı (2 callsite, farklı flag).
 | **BOT** — connector + legacy notify | P1 | BOT-001 `notify_channel`→`ConnectorPool` broadcast (Discord/Telegram, .deck secret) | T0 | `connectors/connector-bootstrap.ts` | WIRE-001 |
 | | P1 | BOT-002 `INCOMING_MESSAGE`→approve/reject parse + gate çöz | T0 | `connectors/incoming-command-router.ts` | APPROVE-001 |
 | **DEFER** — Phase-2/S9 (label-only, defect DEĞİL) | P2 | DEFER-001 autonomous MCP control + API/dashboard approval surface (S9 remote/OAuth) | T1 | `mcp/tools/autonomous.ts`, `api/autonomous-endpoint.ts` | APPROVE-001 |

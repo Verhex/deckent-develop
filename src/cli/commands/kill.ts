@@ -6,6 +6,7 @@ import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { loadConfig } from '../../core/config.js';
 import { getMessage } from '../helpers/messages.js';
+import { promptConfirm } from '../helpers/prompt.js';
 import { TASKS_DIR, LOCKS_DIR } from '../../core/constants.js';
 import { SpawnBackendFactory } from '../../orchestra/spawn-backend.js';
 import { getProviderForModel } from '../../core/task-types.js';
@@ -298,6 +299,31 @@ async function killAllCascade(
   }
 }
 
+/**
+ * Interactive confirmation for the destructive `--all` cascade. A non-interactive
+ * session (no TTY) returns false so the operator must opt in explicitly via
+ * --force / --user-explicit rather than have a scripted run cascade-kill silently.
+ */
+async function interactiveKillAllConfirm(lang: string): Promise<boolean> {
+  if (!process.stdin.isTTY) return false;
+  print(getMessage('kill.all_confirm_warning', lang));
+  return promptConfirm(getMessage('kill.all_confirm_prompt', lang), false);
+}
+
+/**
+ * Decide whether `kill --all` may proceed (CONFIRM-001, §4G). An explicit flag
+ * (--force / --user-explicit) bypasses the prompt; otherwise the confirm callback
+ * decides. ADR-040 no-silent-destructive: cascade-killing all workers + the
+ * controller must be human-confirmed.
+ */
+export async function shouldProceedKillAll(
+  opts: { force?: boolean; userExplicit?: boolean },
+  confirm: () => Promise<boolean>,
+): Promise<boolean> {
+  if (opts.force || opts.userExplicit) return true;
+  return confirm();
+}
+
 export function registerKill(program: Command): void {
   program
     .command('kill [taskId]')
@@ -311,6 +337,13 @@ export function registerKill(program: Command): void {
       const lang = config.language ?? 'en';
 
       if (opts.all) {
+        const proceed = await shouldProceedKillAll(opts, () =>
+          interactiveKillAllConfirm(lang),
+        );
+        if (!proceed) {
+          print(getMessage('kill.all_aborted', lang));
+          return;
+        }
         await killAllCascade(root, lang);
         return;
       }

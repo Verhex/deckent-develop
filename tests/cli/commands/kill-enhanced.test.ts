@@ -140,7 +140,7 @@ describe('kill command enhanced', () => {
     setupTaskFile('001-001', 'EXECUTING');
     setupTaskFile('001-002', 'EXECUTING');
     setupTaskFile('001-003', 'DONE');
-    await runCommand(['kill', '--all']);
+    await runCommand(['kill', '--all', '--user-explicit']);
     expect(mockKillWorker).toHaveBeenCalledTimes(2);
     const t1 = JSON.parse(readFileSync(join(mockRoot, '.tasks', 'task-001-001.json'), 'utf-8'));
     const t2 = JSON.parse(readFileSync(join(mockRoot, '.tasks', 'task-001-002.json'), 'utf-8'));
@@ -152,7 +152,7 @@ describe('kill command enhanced', () => {
 
   it('kills CLAIMED tasks with --all', async () => {
     setupTaskFile('001-001', 'CLAIMED');
-    await runCommand(['kill', '--all']);
+    await runCommand(['kill', '--all', '--user-explicit']);
     expect(mockKillWorker).toHaveBeenCalledWith('001-001');
     const t = JSON.parse(readFileSync(join(mockRoot, '.tasks', 'task-001-001.json'), 'utf-8'));
     expect(t.status).toBe('PAUSED');
@@ -160,13 +160,13 @@ describe('kill command enhanced', () => {
 
   it('reports no active workers with --all on empty tasks dir', async () => {
     mkdirSync(join(mockRoot, '.tasks'), { recursive: true });
-    await runCommand(['kill', '--all']);
+    await runCommand(['kill', '--all', '--user-explicit']);
     expect(print).toHaveBeenCalledWith(expect.stringContaining('No active'));
     expect(mockKillWorker).not.toHaveBeenCalled();
   });
 
   it('reports no active workers when tasks dir does not exist', async () => {
-    await runCommand(['kill', '--all']);
+    await runCommand(['kill', '--all', '--user-explicit']);
     expect(print).toHaveBeenCalledWith(expect.stringContaining('No active'));
   });
 
