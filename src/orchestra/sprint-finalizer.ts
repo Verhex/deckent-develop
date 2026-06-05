@@ -780,15 +780,20 @@ export async function finalizeSprint(
   } catch (e) { debugLog('finalizeSprint:updateLastSprintId', e); }
 
   // 7. Run decay if over budget (uses auditBrainBudget for decayable-only accounting)
+  // Sprint 232 PRIMARY fix: pass config.decay_after_sprints to runDecay so the
+  // user-configured retention window (default 20) is honored. Previously the
+  // option was dropped and runDecay fell back to a hardcoded 8 — too aggressive,
+  // causing memory-loss across sprint-226/231 dogfood.
   if (!opts?.skipDecay) {
     try {
       const memBudget = opts?.config?.memory_budget ?? 900;
+      const decayAfterSprints = opts?.config?.decay_after_sprints;
       const budgetAudit = auditBrainBudget(projectRoot, memBudget);
       if (budgetAudit.status === 'OVER') {
-        debugLog('finalizeSprint:runDecay', `Brain budget OVER: ${budgetAudit.decayableLines} decayable lines > ${memBudget} budget (${budgetAudit.permanentLines} permanent exempt)`);
-        runDecay(projectRoot, sprint.id, { force: true, memoryBudget: memBudget });
+        debugLog('finalizeSprint:runDecay', `Brain budget OVER: ${budgetAudit.decayableLines} decayable lines > ${memBudget} budget (${budgetAudit.permanentLines} permanent exempt, decay_after_sprints=${decayAfterSprints ?? 'default'})`);
+        runDecay(projectRoot, sprint.id, { force: true, memoryBudget: memBudget, decaySprints: decayAfterSprints });
       } else {
-        runDecay(projectRoot, sprint.id, { memoryBudget: memBudget });
+        runDecay(projectRoot, sprint.id, { memoryBudget: memBudget, decaySprints: decayAfterSprints });
       }
     } catch (e) { debugLog('finalizeSprint:runDecay', e); }
   }

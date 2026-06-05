@@ -768,6 +768,7 @@ export function writeRetrospective(
           sprint_num: sprintNum,
           status: 'active',
           tags: ['sprint', sprint.id],
+          decay_exempt: true,
         }, 'brain');
         writeResult.sprintLogWritten = true;
 
@@ -781,6 +782,7 @@ export function writeRetrospective(
           sprint_id: sprint.id,
           sprint_num: sprintNum,
           tags: ['retro', sprint.id],
+          decay_exempt: true,
         }, 'brain');
         writeResult.retroWritten = true;
 
@@ -796,6 +798,7 @@ export function writeRetrospective(
             sprint_id: sprint.id,
             sprint_num: sprintNum,
             tags: ['learning', sprint.id],
+            decay_exempt: true,
           });
           writeResult.memoryWritten = true;
         } else {
@@ -876,6 +879,7 @@ export function backfillSprintRetro(
         sprint_num: sprintNum,
         status: 'active',
         tags: ['sprint', input.sprintId, 'backfill'],
+        decay_exempt: true,
       }, 'brain');
       result.sprintLogWritten = true;
 
@@ -888,6 +892,7 @@ export function backfillSprintRetro(
         sprint_id: input.sprintId,
         sprint_num: sprintNum,
         tags: ['retro', input.sprintId, 'backfill'],
+        decay_exempt: true,
       }, 'brain');
       result.retroWritten = true;
 
@@ -908,6 +913,7 @@ export function backfillSprintRetro(
           sprint_id: input.sprintId,
           sprint_num: sprintNum,
           tags: ['learning', input.sprintId, 'backfill'],
+          decay_exempt: true,
         });
         result.memoryWritten = true;
       }

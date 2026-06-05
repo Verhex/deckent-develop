@@ -15,7 +15,7 @@
  * 8518→2 lines while the DB held 75 ADRs).
  */
 
-import { mkdirSync, existsSync, statSync, writeFileSync } from 'node:fs';
+import { mkdirSync, existsSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { MemoryStore } from './memory-store.js';
 import type { MemoryEntryV2, EntryType } from './memory-types.js';
@@ -433,6 +433,19 @@ export function writeGuardedExports(
       result.warnings.push(warning);
       result.skipped.push(spec.name);
       continue;
+    }
+
+    if (dbCount === 0 && existsSync(filePath)) {
+      const diskContent = readFileSync(filePath, 'utf-8');
+      if (diskContent.trim().length > 0 && !diskContent.includes(spec.emptyMarker)) {
+        const warning =
+          `export-wipe-guard: refused to write ${spec.name} — ` +
+          `DB is empty but disk file has content ` +
+          `(preserving previous file at ${filePath})`;
+        result.warnings.push(warning);
+        result.skipped.push(spec.name);
+        continue;
+      }
     }
 
     writeFileSync(filePath, content, 'utf-8');

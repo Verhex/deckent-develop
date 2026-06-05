@@ -646,6 +646,7 @@ export function detectPatterns(
           tags: ['auditor', 'pattern', type],
           status: 'active',
           metadata: { violationType: type, occurrences: count },
+          decay_exempt: true,
         }, 'auditor');
       }
     } finally {

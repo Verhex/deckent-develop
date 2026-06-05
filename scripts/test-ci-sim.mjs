@@ -19,7 +19,9 @@ import { existsSync, renameSync, rmSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const REPO_ROOT = resolve(fileURLToPath(import.meta.url), '..', '..');
+const REPO_ROOT = process.env.CI_SIM_ROOT
+  ? resolve(process.env.CI_SIM_ROOT)
+  : resolve(fileURLToPath(import.meta.url), '..', '..');
 
 // Paths that may carry gitignored local state — hidden during the simulated CI run.
 // Stash ONLY gitignored local state — what a fresh CI checkout genuinely
@@ -82,6 +84,10 @@ export function restorePaths(stashed) {
  * spawnSync blocks the worker loop). Returns { code, signal }.
  */
 export function runVitest(extraArgs = [], opts = {}) {
+  const sleepMs = parseInt(process.env.CI_SIM_RUNNER_SLEEP_MS ?? '0', 10);
+  if (sleepMs > 0) {
+    return new Promise((r) => setTimeout(() => r({ code: 0, signal: null }), sleepMs));
+  }
   const env = { ...process.env, CI: '1', ...(opts.env ?? {}) };
   const cwd = opts.cwd ?? REPO_ROOT;
   const stdio = opts.stdio ?? 'inherit';
@@ -108,6 +114,7 @@ export async function runCiSim(opts = {}) {
 
   try {
     stashed = stashPaths(targets, suffix, rootDir);
+    opts.onStash?.(stashed);
     if (opts.dryRun) {
       runOutcome = { code: 0, signal: null, skipped: true };
     } else {
@@ -148,8 +155,18 @@ function parseArgs(argv) {
 const invokedDirectly = process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1]);
 if (invokedDirectly) {
   const opts = parseArgs(process.argv);
+  let stashedForSignal = [];
+  const signalHandler = (sig) => {
+    process.stderr.write(`[ci-sim] received ${sig}, restoring stash...\n`);
+    restorePaths(stashedForSignal);
+    process.exit(2);
+  };
+  process.on('SIGINT', signalHandler);
+  process.on('SIGTERM', signalHandler);
   process.stderr.write(`[ci-sim] stashing local state: ${DEFAULT_STASH_TARGETS.join(', ')}\n`);
-  const result = await runCiSim(opts);
+  const result = await runCiSim({ ...opts, onStash: (s) => { stashedForSignal = s; } });
+  process.off('SIGINT', signalHandler);
+  process.off('SIGTERM', signalHandler);
   if (result.restoreErrors?.length) {
     process.stderr.write(`[ci-sim] WARN restore errors: ${JSON.stringify(result.restoreErrors)}\n`);
   }

@@ -623,6 +623,15 @@ export function auditBrainBudget(projectRoot: string, budget = 900): BrainBudget
 
 export interface RunDecayOptions {
   memoryBudget?: number;
+  /**
+   * Decay retention window — entries older than `currentSprint - decaySprints` are
+   * candidates for soft-delete (excluding decay_exempt entries like ADRs).
+   *
+   * Callers MUST pass `config.decay_after_sprints` so user config (default 20) is
+   * honored. The `8` fallback below is ONLY for callers that have no config access
+   * (legacy compat). Silently dropping a configured value of 20 to the hardcoded 8
+   * is the Sprint 232 PRIMARY memory-loss bug — do not regress.
+   */
   decaySprints?: number;
   force?: boolean;
 }
@@ -633,11 +642,15 @@ export interface RunDecayOptions {
  * archives old sprint logs, and trims MEMORY.md if needed.
  * @param projectRoot - Project root directory
  * @param sprintId - Current sprint ID for retention calculations
- * @param opts - Optional settings; force=true runs decay even under budget
+ * @param opts - Optional settings; force=true runs decay even under budget.
+ *   `opts.decaySprints` MUST be wired from `config.decay_after_sprints` by the
+ *   caller; the hardcoded `8` fallback is only used when undefined.
  * @returns Summary of what was removed and the before/after line counts
  */
 export function runDecay(projectRoot: string, sprintId: string, opts?: RunDecayOptions): DecayResult {
   const budget = opts?.memoryBudget ?? 900;
+  // Honor caller-provided config.decay_after_sprints; fall back to 8 only when
+  // explicitly undefined (legacy callers without config access).
   const decaySprints = opts?.decaySprints ?? 8;
 
   // ── Memory V2: DB-first ────────────────────────────────────────

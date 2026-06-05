@@ -848,7 +848,7 @@ export class MemoryStore {
     // Floor=3: batches of 1-2 entries are never catastrophic regardless of DB size;
     // batches of 3+ that exceed 50% of non-exempt entries abort (small DB included).
     const CATASTROPHIC_BATCH_MIN = 3;
-    const CATASTROPHIC_RATIO = 0.5; // > 0.5 → abort
+    const CATASTROPHIC_RATIO = 0.5; // >= 0.5 → abort (boundary-inclusive, defensive)
 
     // Total non-exempt active entries (denominator for catastrophic ratio).
     const nonExemptTotal = (this.db.prepare(`
@@ -880,13 +880,13 @@ export class MemoryStore {
     if (
       toDecay.length >= CATASTROPHIC_BATCH_MIN &&
       nonExemptTotal > 0 &&
-      toDecay.length / nonExemptTotal > CATASTROPHIC_RATIO
+      toDecay.length / nonExemptTotal >= CATASTROPHIC_RATIO
     ) {
       const pct = ((toDecay.length / nonExemptTotal) * 100).toFixed(1);
 
       console.warn(
         `[memory-store] decay aborted: catastrophic batch ` +
-        `(${toDecay.length}/${nonExemptTotal} = ${pct}% > ` +
+        `(${toDecay.length}/${nonExemptTotal} = ${pct}% >= ` +
         `${CATASTROPHIC_RATIO * 100}% threshold) — entries preserved`,
       );
       return { deletedCount: 0, aborted: true };

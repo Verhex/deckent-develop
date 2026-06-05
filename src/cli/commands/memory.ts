@@ -9,6 +9,8 @@ import { syncAdrFilesToDb } from '../../core/adr-file-sync.js';
 import { BRAIN_DIR, MEMORY_DB_FILE, MEMORY_EXPORTS_DIR } from '../../core/constants.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { print, printError } from '../helpers/output.js';
+import { loadConfig } from '../../core/config.js';
+import { getMessage, getLanguage } from '../helpers/messages.js';
 import type { EntryRelation } from '../../core/memory-types.js';
 
 export function registerMemory(program: Command): void {
@@ -133,6 +135,57 @@ export function registerMemory(program: Command): void {
         print(`    ────────────`);
         print(`    Total: ${total}`);
         print(`    Schema: v${store.getSchemaVersion()}`);
+      } finally {
+        store.close();
+      }
+    });
+
+  // ── Backup subcommand ─────────────────────────────────────────
+  mem.command('backup')
+    .description(getMessage('memory.backup.desc', 'en'))
+    .option('--output <path>', 'Output path for backup file')
+    .option('--checkpoint', 'Print WAL checkpoint info before backup (checkpoint always runs)')
+    .action(async (opts: { output?: string; checkpoint?: boolean }) => {
+      const root = resolveProjectRoot();
+      const config = await loadConfig(root).catch(() => ({ language: 'en', last_sprint_id: undefined as string | undefined }));
+      const lang = getLanguage((config as { language?: string }).language);
+      const dbPath = join(root, BRAIN_DIR, MEMORY_DB_FILE);
+
+      if (!existsSync(dbPath)) {
+        printError(getMessage('memory.backup.not_found', lang));
+        return;
+      }
+
+      const store = new MemoryStore(dbPath);
+      try {
+        const db = store.getRawDb();
+
+        // Always run WAL checkpoint to flush write-ahead log into main DB file
+        // so the backup contains a consistent, fully-written snapshot.
+        db.pragma('wal_checkpoint(TRUNCATE)');
+        if (opts.checkpoint) {
+          print(getMessage('memory.backup.checkpoint_done', lang));
+        }
+
+        const sprintId = (config as { last_sprint_id?: string }).last_sprint_id ?? 'manual';
+        const ts = Date.now();
+        const outPath = opts.output ?? join(root, BRAIN_DIR, `memory.db.bak-${sprintId}-${ts}`);
+
+        await db.backup(outPath);
+
+        // Verify backup integrity by counting active entries
+        const backupStore = new MemoryStore(outPath);
+        let count = 0;
+        try {
+          count = backupStore.totalCount();
+        } finally {
+          backupStore.close();
+        }
+
+        print(getMessage('memory.backup.success', lang, { path: outPath, count: String(count) }));
+      } catch (err) {
+        const error = err instanceof Error ? err.message : String(err);
+        printError(getMessage('memory.backup.error', lang, { error }));
       } finally {
         store.close();
       }
