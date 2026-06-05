@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import type { Command } from 'commander';
 import { print, printError, formatTable } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
+import { getLanguage, getMessage } from '../helpers/messages.js';
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -71,8 +72,10 @@ export function registerCheckpoint(program: Command): void {
     .description('List all checkpoints')
     .option('--pending', 'Show only pending checkpoints')
     .option('--json', 'Output as JSON')
-    .action((opts: { pending?: boolean; json?: boolean }) => {
+    .option('--lang <code>', 'Language override (en|tr)')
+    .action((opts: { pending?: boolean; json?: boolean; lang?: string }) => {
       try {
+        const lang = getLanguage(opts.lang);
         const root = resolveProjectRoot();
         let checkpoints = listCheckpoints(root);
 
@@ -81,7 +84,7 @@ export function registerCheckpoint(program: Command): void {
         }
 
         if (checkpoints.length === 0) {
-          print('No checkpoints found.');
+          print(getMessage('checkpoint.list_empty', lang));
           return;
         }
 
@@ -96,7 +99,13 @@ export function registerCheckpoint(program: Command): void {
           return;
         }
 
-        const headers = ['Sprint', 'Phase', 'Status', 'Summary', 'Created'];
+        const headers = [
+          getMessage('checkpoint.col_sprint', lang),
+          getMessage('checkpoint.col_phase', lang),
+          getMessage('checkpoint.col_status', lang),
+          getMessage('checkpoint.col_summary', lang),
+          getMessage('checkpoint.col_created', lang),
+        ];
         const rows = checkpoints.map(c => [
           c.sprintId,
           c.phase,
@@ -116,14 +125,16 @@ export function registerCheckpoint(program: Command): void {
   cmd
     .command('approve <sprintId> <phase>')
     .description('Approve a pending checkpoint')
-    .action((sprintId: string, phase: string) => {
+    .option('--lang <code>', 'Language override (en|tr)')
+    .action((sprintId: string, phase: string, opts: { lang?: string }) => {
       try {
+        const lang = getLanguage(opts.lang);
         const root = resolveProjectRoot();
         const updated = updateCheckpointStatus(root, sprintId, phase, 'approved');
         if (updated) {
-          print(`Checkpoint ${sprintId}/${phase} approved.`);
+          print(getMessage('checkpoint.approved', lang, { sprintId, phase }));
         } else {
-          printError(`Checkpoint not found: ${sprintId}/${phase}`);
+          printError(getMessage('checkpoint.not_found', lang, { sprintId, phase }));
           process.exitCode = 1;
         }
       } catch (error) {
@@ -135,14 +146,16 @@ export function registerCheckpoint(program: Command): void {
   cmd
     .command('reject <sprintId> <phase>')
     .description('Reject a pending checkpoint')
-    .action((sprintId: string, phase: string) => {
+    .option('--lang <code>', 'Language override (en|tr)')
+    .action((sprintId: string, phase: string, opts: { lang?: string }) => {
       try {
+        const lang = getLanguage(opts.lang);
         const root = resolveProjectRoot();
         const updated = updateCheckpointStatus(root, sprintId, phase, 'rejected');
         if (updated) {
-          print(`Checkpoint ${sprintId}/${phase} rejected.`);
+          print(getMessage('checkpoint.rejected', lang, { sprintId, phase }));
         } else {
-          printError(`Checkpoint not found: ${sprintId}/${phase}`);
+          printError(getMessage('checkpoint.not_found', lang, { sprintId, phase }));
           process.exitCode = 1;
         }
       } catch (error) {

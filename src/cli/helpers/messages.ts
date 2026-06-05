@@ -220,6 +220,28 @@ const MESSAGES: MessageMap = {
     en: 'Aborted — agent \'{name}\' not deleted. Pass --force to skip this prompt.',
     tr: 'İptal edildi — \'{name}\' agent\'ı silinmedi. Bu onayı atlamak için --force kullanın.',
   },
+  // ─── checkpoint command (MSG-003, §4G) ───────────────────────────────
+  'checkpoint.list_empty': {
+    en: 'No checkpoints found.',
+    tr: 'Checkpoint bulunamadı.',
+  },
+  'checkpoint.col_sprint': { en: 'Sprint', tr: 'Sprint' },
+  'checkpoint.col_phase': { en: 'Phase', tr: 'Faz' },
+  'checkpoint.col_status': { en: 'Status', tr: 'Durum' },
+  'checkpoint.col_summary': { en: 'Summary', tr: 'Özet' },
+  'checkpoint.col_created': { en: 'Created', tr: 'Oluşturuldu' },
+  'checkpoint.approved': {
+    en: 'Checkpoint {sprintId}/{phase} approved.',
+    tr: 'Checkpoint {sprintId}/{phase} onaylandı.',
+  },
+  'checkpoint.rejected': {
+    en: 'Checkpoint {sprintId}/{phase} rejected.',
+    tr: 'Checkpoint {sprintId}/{phase} reddedildi.',
+  },
+  'checkpoint.not_found': {
+    en: 'Checkpoint not found: {sprintId}/{phase}',
+    tr: 'Checkpoint bulunamadı: {sprintId}/{phase}',
+  },
 
   // ─── spawn command ─────────────────────────────────────────────────
   'spawn.worker_spawned': {
