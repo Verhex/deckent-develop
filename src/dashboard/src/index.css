@@ -1,26 +1,53 @@
 @import "tailwindcss";
 
 @theme {
+  /* ── Neutrals — shadcn dark-zinc (unchanged; card elevated to zinc-900) ── */
   --color-background: #09090b;
   --color-foreground: #fafafa;
-  --color-card: #09090b;
+  --color-card: #18181b;
   --color-card-foreground: #fafafa;
   --color-popover: #09090b;
   --color-popover-foreground: #fafafa;
-  --color-primary: #fafafa;
-  --color-primary-foreground: #18181b;
   --color-secondary: #27272a;
   --color-secondary-foreground: #fafafa;
   --color-muted: #27272a;
   --color-muted-foreground: #a1a1aa;
   --color-accent: #27272a;
   --color-accent-foreground: #fafafa;
-  --color-destructive: #7f1d1d;
+  --color-destructive: #ef4444;
   --color-destructive-foreground: #fafafa;
   --color-border: #27272a;
   --color-input: #27272a;
-  --color-ring: #d4d4d8;
-  --radius: 0.5rem;
+
+  /* ── Brand accent — teal (functional accent; was blue) ───────────────── */
+  --color-primary: #54a89c;
+  --color-primary-foreground: #0d2420;
+  --color-ring: #54a89c;
+  --color-brand-50: #eaf4ef;
+  --color-brand-100: #d9ece5;
+  --color-brand-200: #b6d8ce;
+  --color-brand-300: #8fcdbe;
+  --color-brand-400: #6fbcae;
+  --color-brand-500: #54a89c;
+  --color-brand-600: #3e9384;
+  --color-brand-700: #2f7568;
+  --color-brand-800: #246060;
+  --color-brand-900: #1a4a45;
+  --color-brand-bg: #11332d;
+  --color-brand-fg: #bfe6dc;
+
+  /* ── Gold — secondary highlight / ornament ───────────────────────────── */
+  --color-gold: #c0b46c;
+  --color-gold-soft: #d6cb8c;
+  --color-gold-deep: #9a8736;
+  --color-gold-tint: #1e1b0e;
+
+  /* ── Typography — Hanken Grotesk (UI) + IBM Plex Mono (mono/terminal) ─── */
+  --font-sans: "Hanken Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* ── Radius — squared, technical look (lg ≈ 4px) ─────────────────────── */
+  --radius: 0.25rem;
 }
 
 html {
@@ -30,7 +57,7 @@ html {
 body {
   background-color: #09090b;
   color: #fafafa;
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family: var(--font-sans);
   margin: 0;
   min-height: 100vh;
 }
