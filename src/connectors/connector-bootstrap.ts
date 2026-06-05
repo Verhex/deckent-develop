@@ -20,6 +20,7 @@ import {
 import { makeIncomingCommandRouter, type CommandResolver, type ResolveOutcome } from './incoming-command-router.js';
 import { makeCommandResolver } from './incoming-command-resolver.js';
 import { chunkMessage, type ChatResponder } from './chat-bridge.js';
+import { isBotSlash, handleBotSlash } from './bot-commands.js';
 import { takeBotAction } from './bot-action-store.js';
 import { createCliToolDispatcher } from '../cli/commands/chat-tool-bridge.js';
 import type { McpToolDispatcher } from '../cli/commands/chat-native.js';
@@ -218,9 +219,22 @@ export async function bootstrapConnectorCommands(
             ...(chat
               ? {
                   onChat: async (channelId: string, text: string): Promise<void> => {
-                    // Authorized non-command → full agentic conversation. The
-                    // router already enforced the chat_id chokepoint.
+                    // Authorized non-command. The router already enforced the
+                    // chat_id chokepoint.
                     try {
+                      // Curated bot slash → bot surface ONLY. Intercept EVERY
+                      // slash so the chat engine's 30-command CLI registry never
+                      // leaks (and is never a gate-bypass — slashes are read-only).
+                      if (isBotSlash(text)) {
+                        const reply = await handleBotSlash(text, {
+                          root,
+                          lang,
+                          readOnlyDispatcher: actionDispatcher,
+                        });
+                        for (const part of chunkMessage(reply)) await send(channelId, part);
+                        return;
+                      }
+                      // Natural language → full agentic conversation.
                       await send(channelId, getMessage('bot.chat_thinking', lang));
                       const reply = await chat(channelId, text);
                       const body = reply.trim() || getMessage('bot.chat_empty', lang);

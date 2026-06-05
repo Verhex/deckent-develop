@@ -764,6 +764,50 @@ const MESSAGES: MessageMap = {
     en: '⚠️ {tool} failed: {error}',
     tr: '⚠️ {tool} başarısız: {error}',
   },
+
+  // ─── curated bot command surface (BOT-003 slice 2c) ────────────
+  'bot.unknown_command': {
+    en: 'Unknown command. Type /help to see what I can do — or just write naturally and I\'ll act (asking approval for risky things).',
+    tr: 'Bilinmeyen komut. Neler yapabildiğimi görmek için /help yaz — ya da doğal dilde yaz, ben hallederim (riskli işler için onay isterim).',
+  },
+  'bot.help_body': {
+    en: [
+      '🤖 deckent bot — commands:',
+      '  /help      this list',
+      '  /status    current sprint status',
+      '  /history   recent sprints',
+      '  /pending   actions awaiting your approval',
+      '',
+      '🔐 approve <id>  /  reject <id>   — approve or reject a parked action',
+      '',
+      '💬 Or just write naturally — ask anything, or tell me what to do.',
+      '   I run read-only things instantly and ask "approve <id>" before anything risky.',
+    ].join('\n'),
+    tr: [
+      '🤖 deckent bot — komutlar:',
+      '  /help      bu liste',
+      '  /status    aktif sprint durumu',
+      '  /history   son sprint\'ler',
+      '  /pending   onayını bekleyen işlemler',
+      '',
+      '🔐 approve <id>  /  reject <id>   — parklanmış işlemi onayla veya reddet',
+      '',
+      '💬 Ya da doğal dilde yaz — soru sor veya ne yapmamı istediğini söyle.',
+      '   Salt-okunur şeyleri anında yaparım, riskli her şeyden önce "approve <id>" isterim.',
+    ].join('\n'),
+  },
+  'bot.pending_header': {
+    en: '🔐 Actions awaiting your approval:',
+    tr: '🔐 Onayını bekleyen işlemler:',
+  },
+  'bot.pending_none': {
+    en: 'No actions awaiting approval.',
+    tr: 'Onay bekleyen işlem yok.',
+  },
+  'bot.pending_row': {
+    en: '  • {tool}({args}) — approve {id} / reject {id}',
+    tr: '  • {tool}({args}) — approve {id} / reject {id}',
+  },
 };
 
 /**

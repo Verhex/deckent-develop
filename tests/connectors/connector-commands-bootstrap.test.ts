@@ -102,6 +102,35 @@ describe('bootstrapConnectorCommands', () => {
     expect(texts.some((t) => t.includes('Sprint 232'))).toBe(true);
   });
 
+  it('/help → curated bot help, chat responder NOT called (no CLI leak)', async () => {
+    const fake = fakeConnector('telegram');
+    const chat = vi.fn(async () => 'should not reach chat');
+    await bootstrapConnectorCommands('/root', cfg, {
+      makeConnector: () => fake,
+      resolve: vi.fn(async () => 'resolved'),
+      chat,
+      actionDispatcher: { dispatch: vi.fn(async () => 'x') },
+    });
+    fake._emit(incoming('/help', '555'));
+    await vi.waitFor(() => expect(fake.sendMessage).toHaveBeenCalled());
+    const texts = fake.sendMessage.mock.calls.map((c) => (c[0] as { text: string }).text).join('\n');
+    expect(texts).toContain('/status');         // bot surface
+    expect(texts).not.toContain('/kill');        // NOT the CLI dump
+    expect(chat).not.toHaveBeenCalled();         // never fell through to the engine
+  });
+
+  it('/status slash → read-only dispatcher, NOT the chat engine', async () => {
+    const fake = fakeConnector('telegram');
+    const chat = vi.fn(async () => 'nope');
+    const actionDispatcher = { dispatch: vi.fn(async () => 'STATUS: sprint-232') };
+    await bootstrapConnectorCommands('/root', cfg, {
+      makeConnector: () => fake, resolve: vi.fn(async () => 'resolved'), chat, actionDispatcher,
+    });
+    fake._emit(incoming('/status', '555'));
+    await vi.waitFor(() => expect(actionDispatcher.dispatch).toHaveBeenCalledWith('deckent_status', {}));
+    expect(chat).not.toHaveBeenCalled();
+  });
+
   it('unauthorized non-command → chat responder NOT called (RCE chokepoint)', async () => {
     const fake = fakeConnector('telegram');
     const chat = vi.fn(async () => 'should not run');
