@@ -81,6 +81,70 @@ describe('makeChatResponder', () => {
   });
 });
 
+describe('makeChatResponder — agentic mode (slice 2: model tool_use, gated)', () => {
+  it('🔴 model-driven RISKY tool → parked durably + inner NOT executed (dispatcher chokepoint)', async () => {
+    const { mkdtempSync, rmSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const { listBotActions } = await import('../../src/connectors/bot-action-store.js');
+    const root = mkdtempSync(join(tmpdir(), 'bot-agentic-'));
+    try {
+      let turn = 0;
+      const provider: ChatProviderAdapter = {
+        async send() {
+          turn++;
+          if (turn === 1) {
+            return {
+              stopReason: 'tool_use' as const,
+              toolCalls: [{ id: 't1', name: 'deckent_plan', args: { directive: 'Sprint 300' } }],
+            };
+          }
+          return { text: 'Onayını istedim — approve yazınca çalışacak.', stopReason: 'end_turn' as const };
+        },
+      };
+      const innerSpy: McpToolDispatcher = { dispatch: vi.fn(async () => 'SHOULD NOT RUN') };
+      const respond = makeChatResponder({ agentic: true, root, provider, dispatcher: innerSpy });
+
+      const reply = await respond('555', 'plan a new sprint please');
+      expect(innerSpy.dispatch).not.toHaveBeenCalled();          // risky never executed
+      const parked = listBotActions(root);
+      expect(parked).toHaveLength(1);                            // durably parked
+      expect(parked[0]).toMatchObject({ tool: 'deckent_plan', channelId: '555' });
+      expect(reply.length).toBeGreaterThan(0);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('model-driven READ-ONLY tool → inner executes (grounded), nothing parked', async () => {
+    const { mkdtempSync, rmSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const { listBotActions } = await import('../../src/connectors/bot-action-store.js');
+    const root = mkdtempSync(join(tmpdir(), 'bot-agentic-'));
+    try {
+      let turn = 0;
+      const provider: ChatProviderAdapter = {
+        async send() {
+          turn++;
+          if (turn === 1) {
+            return { stopReason: 'tool_use' as const, toolCalls: [{ id: 't1', name: 'deckent_status', args: {} }] };
+          }
+          return { text: 'Sprint 232 tamam.', stopReason: 'end_turn' as const };
+        },
+      };
+      const innerSpy: McpToolDispatcher = { dispatch: vi.fn(async () => 'STATUS: sprint-232 done') };
+      const respond = makeChatResponder({ agentic: true, root, provider, dispatcher: innerSpy });
+
+      await respond('555', 'how is the sprint');
+      expect(innerSpy.dispatch).toHaveBeenCalledWith('deckent_status', {}); // read-only auto-ran
+      expect(listBotActions(root)).toHaveLength(0);                          // nothing parked
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
 describe('chunkMessage', () => {
   it('returns a single chunk when under the limit', () => {
     expect(chunkMessage('short', 4000)).toEqual(['short']);

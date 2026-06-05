@@ -45,9 +45,11 @@ export async function handleBotListen(opts: BotListenOptions = {}): Promise<void
   const bootstrap =
     opts.bootstrap ??
     ((r, n): Promise<ConnectorCommandsHandle> =>
-      // Full conversational head: authorized non-command messages drive the
-      // native agentic engine (subscription provider → no destructive surface).
-      bootstrapConnectorCommands(r, n, { chat: makeChatResponder() }));
+      // Full conversational head with model-driven actions (slice 2): the agentic
+      // provider can call tools; the gated dispatcher auto-runs read-only ones and
+      // PARKS risky ones for phone approval (approve <id>) — no destructive
+      // action ever executes without explicit human approval.
+      bootstrapConnectorCommands(r, n, { chat: makeChatResponder({ agentic: true, root: r, lang }) }));
   const handle = await bootstrap(root, config.notify_connectors);
 
   if (handle.active.length === 0) {

@@ -217,6 +217,11 @@ export async function bootstrapConnectorCommands(
           // best-effort shutdown
         }
       }
+      try {
+        await deps.chat?.dispose?.(); // release the warm agentic provider child
+      } catch {
+        // best-effort
+      }
     },
   };
 }

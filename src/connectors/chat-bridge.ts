@@ -25,7 +25,10 @@ import {
   type ChatMemoryAdapter,
 } from '../cli/commands/chat-native.js';
 import { createCliToolDispatcher } from '../cli/commands/chat-tool-bridge.js';
+import { createPersistentClaudeSession } from '../cli/commands/chat-session.js';
 import { classifyActionRisk, type AgenticAction } from '../cli/commands/agentic-confirm.js';
+import { makeGatedDispatcher, DECKENT_BOT_SYSTEM_PROMPT } from './bot-agentic.js';
+import { parkBotAction } from './bot-action-store.js';
 
 /** Default provider: subscription claude (API key stripped → session auth, no tool_use). */
 function defaultSubscriptionProvider(): ChatProviderAdapter {
@@ -61,22 +64,73 @@ export interface ChatResponderDeps {
   maxToolHops?: number;
   /** Prior turns to load from memory for context (default 30 when memory wired). */
   resumeLimit?: number;
+  /**
+   * Slice 2 — agentic mode: use a tool_use-capable persistent provider (the model
+   * can drive actions) and route every tool through the GATED dispatcher
+   * (read-only auto-exec, risky → park for phone approval). Requires `root` for
+   * the durable action store. Default false = slice-1 subscription chat.
+   */
+  agentic?: boolean;
+  /** Project root — required for `agentic` (durable parked-action store). */
+  root?: string;
+  /** Ack/parked-action message language. */
+  lang?: string;
 }
 
-export type ChatResponder = (sessionId: string, text: string) => Promise<string>;
+export interface ChatResponder {
+  (sessionId: string, text: string): Promise<string>;
+  /** Release the warm persistent provider child (agentic mode). Best-effort. */
+  dispose?(): Promise<void>;
+}
 
 /**
  * Build a responder: (sessionId, text) → agentic reply. Turns for the SAME
  * sessionId are serialized (queued) so concurrent/overlapping messages never
  * corrupt the shared conversation; different sessions run concurrently.
  */
+type PersistentProvider = ChatProviderAdapter & { exit?(): Promise<void> };
+
 export function makeChatResponder(deps: ChatResponderDeps = {}): ChatResponder {
   const chains = new Map<string, Promise<unknown>>();
+  const lang = deps.lang ?? 'en';
+
+  // Agentic mode holds ONE warm persistent child across every turn (the whole
+  // point — eliminates per-message cold-start); created lazily on first use.
+  let persistent: PersistentProvider | undefined;
+  function agenticProvider(): ChatProviderAdapter {
+    if (deps.provider) return deps.provider;
+    if (!persistent) {
+      persistent = createPersistentClaudeSession({ systemPrompt: DECKENT_BOT_SYSTEM_PROMPT });
+    }
+    return persistent;
+  }
 
   async function runTurn(sessionId: string, text: string): Promise<string> {
-    const provider = deps.provider ?? defaultSubscriptionProvider();
-    const dispatcher = deps.dispatcher ?? createCliToolDispatcher();
     const collected: string[] = [];
+
+    // Provider + dispatcher differ by mode. Agentic: tool_use provider + GATED
+    // dispatcher (the single safety chokepoint — model tool_use is otherwise
+    // ungated by the loop). Slice 1: subscription (no tool_use) + deny-risky.
+    let provider: ChatProviderAdapter;
+    let dispatcher: McpToolDispatcher;
+    let confirm: (action: AgenticAction) => Promise<boolean>;
+
+    if (deps.agentic) {
+      if (!deps.root) throw new Error('chat-bridge: agentic mode requires `root` for the action store');
+      const root = deps.root;
+      provider = agenticProvider();
+      const inner = deps.dispatcher ?? createCliToolDispatcher();
+      dispatcher = makeGatedDispatcher({
+        inner,
+        park: (tool, args) => parkBotAction(root, { tool, args, channelId: sessionId }),
+        lang,
+      });
+      confirm = async () => true; // gating lives in the wrapper, not here
+    } else {
+      provider = deps.provider ?? defaultSubscriptionProvider();
+      dispatcher = deps.dispatcher ?? createCliToolDispatcher();
+      confirm = deps.confirm ?? denyRiskyConfirm;
+    }
 
     const transcript = await runChatNativeLoop({
       provider,
@@ -84,7 +138,7 @@ export function makeChatResponder(deps: ChatResponderDeps = {}): ChatResponder {
       input: singleMessage(text),
       output: (line) => { if (line) collected.push(line); },
       agenticDispatch: true,
-      agenticConfirm: deps.confirm ?? denyRiskyConfirm,
+      agenticConfirm: confirm,
       gracefulErrors: true, // a provider failure becomes a tagged turn, not a throw
       maxTurns: deps.maxTurns ?? 1,
       maxToolHops: deps.maxToolHops ?? 6,
@@ -98,7 +152,7 @@ export function makeChatResponder(deps: ChatResponderDeps = {}): ChatResponder {
     return lastAssistantText(transcript);
   }
 
-  return (sessionId: string, text: string): Promise<string> => {
+  const responder = ((sessionId: string, text: string): Promise<string> => {
     const prev = chains.get(sessionId) ?? Promise.resolve();
     const next = prev.catch(() => undefined).then(() => runTurn(sessionId, text));
     chains.set(
@@ -108,7 +162,17 @@ export function makeChatResponder(deps: ChatResponderDeps = {}): ChatResponder {
       }),
     );
     return next;
+  }) as ChatResponder;
+
+  responder.dispose = async (): Promise<void> => {
+    try {
+      await persistent?.exit?.();
+    } catch {
+      // best-effort — the child also dies with the host process
+    }
   };
+
+  return responder;
 }
 
 async function* singleMessage(text: string): AsyncIterable<string> {
