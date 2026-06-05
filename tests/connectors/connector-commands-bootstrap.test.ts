@@ -27,7 +27,9 @@ function fakeConnector(id: 'telegram' | 'discord') {
 }
 
 function incoming(text: string, channelId: string): IncomingMessage {
-  return { id: 'm', connector: 'telegram', fromUser: 'u', channelId, text, timestamp: '2026-06-05T00:00:00Z' };
+  // Fresh timestamp so the backlog-replay guard (acceptFrom = bootstrap time) treats
+  // it as a live message, not buffered backlog.
+  return { id: 'm', connector: 'telegram', fromUser: 'u', channelId, text, timestamp: new Date().toISOString() };
 }
 
 const cfg = { telegram: { enabled: true, token: 'bot:tok', chat_id: '555' } };

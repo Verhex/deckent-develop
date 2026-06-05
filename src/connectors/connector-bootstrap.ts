@@ -218,6 +218,9 @@ export async function bootstrapConnectorCommands(
   };
   const targets: ConnectorTarget[] = [];
   const started: IMessageConnector[] = [];
+  // Backlog-replay guard cutoff: only process messages sent at/after the moment
+  // this listener came up (buffered backlog from while it was offline is dropped).
+  const acceptFrom = Date.now();
 
   if (notifyConnectors) {
     for (const id of SUPPORTED) {
@@ -245,6 +248,7 @@ export async function bootstrapConnectorCommands(
             resolve,
             reply: send,
             lang,
+            acceptFrom,
             ...(chat
               ? {
                   onChat: async (channelId: string, text: string): Promise<void> => {

@@ -828,6 +828,40 @@ const MESSAGES: MessageMap = {
     en: 'ℹ️ Sprint {sprint} is already stopped — nothing to kill.',
     tr: 'ℹ️ {sprint} sprint\'i zaten durmuş — öldürülecek bir şey yok.',
   },
+
+  // ─── bot daemon (start/stop/status) ────────────────────────────
+  'bot.daemon_desc': {
+    en: 'Run the bot listener as a background daemon',
+    tr: 'Bot dinleyicisini arka plan daemon\'ı olarak çalıştır',
+  },
+  'bot.daemon_started': {
+    en: '🟢 Bot daemon started (pid {pid}). Always-on while this machine is up. Stop with: deckent bot stop',
+    tr: '🟢 Bot daemon başladı (pid {pid}). Makine açık olduğu sürece çalışır. Durdurmak için: deckent bot stop',
+  },
+  'bot.daemon_reboot_note': {
+    en: 'Note: a daemon does NOT survive a reboot/crash — use a systemd/pm2 service for that.',
+    tr: 'Not: daemon yeniden başlatma/çökmeden SONRA yaşamaz — bunun için systemd/pm2 servisi kullan.',
+  },
+  'bot.daemon_already': {
+    en: 'ℹ️ Bot daemon is already running (pid {pid}).',
+    tr: 'ℹ️ Bot daemon zaten çalışıyor (pid {pid}).',
+  },
+  'bot.daemon_spawn_failed': {
+    en: '⚠️ Failed to start the bot daemon.',
+    tr: '⚠️ Bot daemon başlatılamadı.',
+  },
+  'bot.daemon_stopped': {
+    en: '🛑 Bot daemon stopped (pid {pid}).',
+    tr: '🛑 Bot daemon durduruldu (pid {pid}).',
+  },
+  'bot.daemon_not_running': {
+    en: 'Bot daemon is not running.',
+    tr: 'Bot daemon çalışmıyor.',
+  },
+  'bot.daemon_status_running': {
+    en: '🟢 Bot daemon is running (pid {pid}).',
+    tr: '🟢 Bot daemon çalışıyor (pid {pid}).',
+  },
 };
 
 /**

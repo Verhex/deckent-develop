@@ -16,7 +16,7 @@ import type { ConnectorConfig, OutgoingMessage } from './types.js';
 /** Minimal Telegraf type surface we rely on (avoids hard import-time dependency) */
 interface TelegrafInstance {
   on(event: string, handler: (ctx: TelegramTextContext) => void): void;
-  launch(): Promise<void>;
+  launch(opts?: { dropPendingUpdates?: boolean }): Promise<void>;
   stop(): void;
   telegram: {
     sendMessage(chatId: string | number, text: string): Promise<unknown>;
@@ -76,7 +76,10 @@ export class TelegramConnector extends BaseConnector {
     // Telegraf v4 launch() in long-polling mode does not resolve until stop() —
     // awaiting it would hang startup. Fire it and return; polling runs in the
     // background and the registered 'text' handler receives inbound messages.
-    void this.bot.launch().catch(() => {
+    // dropPendingUpdates discards the backlog buffered while we were offline so a
+    // stale "approve <id>" can't replay on reconnect (defense in depth atop the
+    // router's acceptFrom guard + parked-action TTL).
+    void this.bot.launch({ dropPendingUpdates: true }).catch(() => {
       // Launch/poll failure must not crash the host (BOT-002 inbound is best-effort).
     });
     await super.start(config);

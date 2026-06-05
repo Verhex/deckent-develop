@@ -60,6 +60,14 @@ export interface IncomingCommandRouterOptions {
   readonly onChat?: (channelId: string, text: string) => void | Promise<void>;
   /** Message language for acks (default 'en'). */
   readonly lang?: string;
+  /**
+   * Backlog-replay guard: epoch ms before which inbound messages are dropped.
+   * When the bot reconnects after being offline, the platform delivers buffered
+   * updates — an old "approve <id>" could replay. Set to the listener's start
+   * time so only live messages are processed. (Defense in depth atop parked-action
+   * TTL.) Omit to disable age filtering.
+   */
+  readonly acceptFrom?: number;
 }
 
 const COMMAND_RE = /^\/?(approve|reject)\s+(\S+)$/i;
@@ -85,7 +93,15 @@ export function makeIncomingCommandRouter(
   const authorized = new Set(opts.authorizedChatIds);
   const lang = opts.lang ?? 'en';
 
+  const acceptFrom = opts.acceptFrom;
   return (m: IncomingMessage): void => {
+    // 🔴 Backlog-replay guard: drop messages older than the listener start so a
+    //    buffered "approve <id>" can't replay on reconnect. Unparseable timestamp
+    //    is treated as fresh (never block a live message on a bad clock).
+    if (acceptFrom !== undefined) {
+      const ts = Date.parse(m.timestamp);
+      if (Number.isFinite(ts) && ts < acceptFrom) return;
+    }
     const cmd = parseCommand(m.text);
     // 🔴 Security gate (single chokepoint): an unauthorized sender reaches NEITHER
     //    the resolver NOR the chat engine, and gets no ack — silent-ignore so the

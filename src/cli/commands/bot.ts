@@ -20,6 +20,9 @@ import {
   type ConnectorCommandsHandle,
 } from '../../connectors/connector-bootstrap.js';
 import { makeChatResponder } from '../../connectors/chat-bridge.js';
+import {
+  writeBotPid, clearBotPid, readBotPid, stopBot, startBotDaemon,
+} from '../../connectors/bot-daemon.js';
 import type { DeckentConfig } from '../../core/types.js';
 
 export interface BotListenOptions {
@@ -60,13 +63,58 @@ export async function handleBotListen(opts: BotListenOptions = {}): Promise<void
 
   print(getMessage('bot.listen_active', lang, { connectors: handle.active.join(', ') }));
 
+  // Record this listener's pid so `bot status`/`bot stop` can manage it, whether
+  // it was launched via `bot start` (detached) or `bot listen` directly.
+  writeBotPid(root);
+
   const wait = opts.waitForever ?? waitForSignal;
   try {
     await wait();
   } finally {
     await handle.dispose();
+    clearBotPid(root);
     print(getMessage('bot.listen_stopped', lang));
   }
+}
+
+/** `deckent bot start` — run the listener detached (always-on while the box is up). */
+export function handleBotStart(opts: { root?: string; lang?: string } = {}): void {
+  const lang = getLanguage(opts.lang);
+  const root = opts.root ?? resolveProjectRoot();
+  const res = startBotDaemon(root);
+  if (res.status === 'already-running') {
+    console.log(getMessage('bot.daemon_already', lang, { pid: String(res.pid) }));
+  } else if (res.status === 'spawn-failed') {
+    console.log(getMessage('bot.daemon_spawn_failed', lang));
+    process.exitCode = 1;
+  } else {
+    console.log(getMessage('bot.daemon_started', lang, { pid: String(res.pid) }));
+    console.log(getMessage('bot.daemon_reboot_note', lang));
+  }
+}
+
+/** `deckent bot stop` — stop a running bot daemon. */
+export function handleBotStop(opts: { root?: string; lang?: string } = {}): void {
+  const lang = getLanguage(opts.lang);
+  const root = opts.root ?? resolveProjectRoot();
+  const res = stopBot(root);
+  console.log(
+    res.status === 'stopped'
+      ? getMessage('bot.daemon_stopped', lang, { pid: String(res.pid) })
+      : getMessage('bot.daemon_not_running', lang),
+  );
+}
+
+/** `deckent bot status` — report whether the bot daemon is running. */
+export function handleBotStatus(opts: { root?: string; lang?: string } = {}): void {
+  const lang = getLanguage(opts.lang);
+  const root = opts.root ?? resolveProjectRoot();
+  const pid = readBotPid(root);
+  console.log(
+    pid !== null
+      ? getMessage('bot.daemon_status_running', lang, { pid: String(pid) })
+      : getMessage('bot.daemon_not_running', lang),
+  );
 }
 
 /** Block until SIGINT/SIGTERM, then resolve (handlers cleaned up). */
@@ -95,4 +143,25 @@ export function registerBot(program: Command): void {
     .action(async (opts: { root?: string; lang?: string }) => {
       await handleBotListen(opts);
     });
+
+  cmd
+    .command('start')
+    .description(getMessage('bot.daemon_desc', getLanguage(undefined)))
+    .option('--root <path>', 'Project root override')
+    .option('--lang <code>', 'Language override (en|tr)')
+    .action((opts: { root?: string; lang?: string }) => { handleBotStart(opts); });
+
+  cmd
+    .command('stop')
+    .description('Stop the bot daemon')
+    .option('--root <path>', 'Project root override')
+    .option('--lang <code>', 'Language override (en|tr)')
+    .action((opts: { root?: string; lang?: string }) => { handleBotStop(opts); });
+
+  cmd
+    .command('status')
+    .description('Show whether the bot daemon is running')
+    .option('--root <path>', 'Project root override')
+    .option('--lang <code>', 'Language override (en|tr)')
+    .action((opts: { root?: string; lang?: string }) => { handleBotStatus(opts); });
 }

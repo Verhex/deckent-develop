@@ -132,6 +132,43 @@ describe('makeIncomingCommandRouter — authorized dispatch', () => {
   });
 });
 
+describe('makeIncomingCommandRouter — backlog-replay guard (acceptFrom)', () => {
+  it('🔴 a stale message (timestamp before acceptFrom) is DROPPED — no resolve, no chat, no reply', async () => {
+    const resolve = vi.fn(async () => 'resolved' as const);
+    const onChat = vi.fn(async () => {});
+    const reply = vi.fn(async () => {});
+    const handler = makeIncomingCommandRouter({
+      authorizedChatIds: ['7374744018'],
+      resolve, onChat, reply,
+      acceptFrom: Date.parse('2026-06-05T12:00:00.000Z'),
+    });
+    // sent while the bot was offline (an hour earlier) → backlog replay on reconnect
+    handler(msg({ text: 'approve abc', timestamp: '2026-06-05T11:00:00.000Z' }));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(resolve).not.toHaveBeenCalled();
+    expect(onChat).not.toHaveBeenCalled();
+    expect(reply).not.toHaveBeenCalled();
+  });
+
+  it('a fresh message (timestamp at/after acceptFrom) is processed normally', async () => {
+    const resolve = vi.fn(async () => 'resolved' as const);
+    const handler = makeIncomingCommandRouter({
+      authorizedChatIds: ['7374744018'],
+      resolve,
+      acceptFrom: Date.parse('2026-06-05T12:00:00.000Z'),
+    });
+    handler(msg({ text: 'approve abc', timestamp: '2026-06-05T12:00:05.000Z' }));
+    await vi.waitFor(() => expect(resolve).toHaveBeenCalledWith('abc', 'approve'));
+  });
+
+  it('no acceptFrom configured → no age filtering (back-compat)', async () => {
+    const resolve = vi.fn(async () => 'resolved' as const);
+    const handler = makeIncomingCommandRouter({ authorizedChatIds: ['7374744018'], resolve });
+    handler(msg({ text: 'approve abc', timestamp: '2000-01-01T00:00:00.000Z' }));
+    await vi.waitFor(() => expect(resolve).toHaveBeenCalled());
+  });
+});
+
 describe('makeIncomingCommandRouter — chat fallback (onChat)', () => {
   it('authorized non-command → onChat(channelId, text), resolve NOT called', async () => {
     const resolve = vi.fn(async () => 'resolved' as const);
