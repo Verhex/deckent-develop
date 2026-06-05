@@ -66,7 +66,7 @@
 
 **Beklenen:** 4/4 DONE, 0 false-FIX (231-001 zaten false-NO_GO kökünü kapatıyor — meta-doğrulama), 0 scope-collision (distinct dosya: result-collector / memory-export / memory-store / sprint-controller → tek wave). **src/dashboard'a SIFIR dokunuş** (paralel dashboard re-theme güvenli). 231-001 (disk-verify P0) en yüksek değer — beta güvenilirlik. CI yeşil KORUNUR.
 
-**Pre-flight:** main temiz+commit'li+push'lu ✅ (reset-bug güvenli — [[project_deckent_self_git_mutation_bug]]). DB backup. **CLI'dan `env -u ANTHROPIC_API_KEY`** (API yasak). Tek wave (4 task paralel ayrık-dosya). Her wave sonrası `git log -1` + `git stash list` (reset kontrol). Sprint sonrası `deckent memory export` + `grep -cE "adr-" .brain/exports/decisions.md` (≥75 korunmalı, wipe yok).
+**Pre-flight:** main temiz+commit'li+push'lu ✅ (reset-bug güvenli — [[project_deckent_self_git_mutation_bug]]). DB backup. **CLI'dan `env -u ANTHROPIC_API_KEY`** (API yasak). Tek wave (4 task paralel ayrık-dosya). Her wave sonrası `git log -1` + `git stash list` (reset kontrol). Sprint sonrası `deckent memory export` → ADR export sayısı ≥75 korunmalı (decisions/memory/debt wipe YOK).
 
 İlgili memory: [[feedback_brain_synthetic_nogo_disk_verify]] · [[feedback_proof_of_function_dod]] · [[project_ci_green_root_causes]] · [[feedback_trust_brain_eval_not_worker]] · [[project_brain_integrity_sprint226_cluster]] · [[feedback_directive_kanit_letter_vs_goal]]
 İlgili ADR: ADR-070 (eval integrity + disk-verify) · ADR-035 (verification protocol) · ADR-027 (spawn backend) · ADR-045 (wave/handoff)
