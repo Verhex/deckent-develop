@@ -86,6 +86,35 @@ describe('bootstrapConnectorCommands', () => {
     expect(fake.stop).toHaveBeenCalledTimes(1);
   });
 
+  it('authorized non-command → chat responder called + reply chunks sent (full conversation)', async () => {
+    const fake = fakeConnector('telegram');
+    const chat = vi.fn(async () => 'Sprint 232 tamamlandı, 0 tech debt.');
+    await bootstrapConnectorCommands('/root', cfg, {
+      makeConnector: () => fake,
+      resolve: vi.fn(async () => 'resolved'),
+      chat,
+    });
+    fake._emit(incoming('durum ne alemde?', '555'));
+    await vi.waitFor(() => expect(chat).toHaveBeenCalledWith('555', 'durum ne alemde?'));
+    // a thinking ack + the reply land on the same chat
+    await vi.waitFor(() => expect(fake.sendMessage.mock.calls.length).toBeGreaterThanOrEqual(2));
+    const texts = fake.sendMessage.mock.calls.map((c) => (c[0] as { text: string }).text);
+    expect(texts.some((t) => t.includes('Sprint 232'))).toBe(true);
+  });
+
+  it('unauthorized non-command → chat responder NOT called (RCE chokepoint)', async () => {
+    const fake = fakeConnector('telegram');
+    const chat = vi.fn(async () => 'should not run');
+    await bootstrapConnectorCommands('/root', cfg, {
+      makeConnector: () => fake,
+      resolve: vi.fn(async () => 'resolved'),
+      chat,
+    });
+    fake._emit(incoming('run anything', '999-stranger'));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(chat).not.toHaveBeenCalled();
+  });
+
   it('unresolved $DECK token → skipped, nothing started, adapter null', async () => {
     const make = vi.fn();
     const { adapter } = await bootstrapConnectorCommands('/root',

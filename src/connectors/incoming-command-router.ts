@@ -45,6 +45,14 @@ export interface IncomingCommandRouterOptions {
   readonly resolve: CommandResolver;
   /** Ack the result back to the channel. Omit to run silently. */
   readonly reply?: ReplyFn;
+  /**
+   * Chat fallback for authorized messages that are NOT approve/reject commands.
+   * Drives the agentic chat engine (full conversation). Called ONLY after the
+   * sender passes the same authorized-chat_id gate as commands — chat inherits
+   * the exact same auth chokepoint (a stranger must never reach the engine).
+   * Omit to keep non-command messages silently ignored (back-compat).
+   */
+  readonly onChat?: (channelId: string, text: string) => void | Promise<void>;
   /** Message language for acks (default 'en'). */
   readonly lang?: string;
 }
@@ -74,12 +82,21 @@ export function makeIncomingCommandRouter(
 
   return (m: IncomingMessage): void => {
     const cmd = parseCommand(m.text);
-    if (!cmd) return; // chatter / malformed → silent (no reply spam)
-    // 🔴 Security gate: an unauthorized sender's valid command never reaches the
-    //    resolver and gets no ack (silent-ignore — the bot is not a stranger's oracle).
+    // 🔴 Security gate (single chokepoint): an unauthorized sender reaches NEITHER
+    //    the resolver NOR the chat engine, and gets no ack — silent-ignore so the
+    //    bot is never a stranger's oracle (and, with chat, never a stranger's RCE).
     if (!authorized.has(m.channelId)) return;
 
-    void resolveAndAck(opts.resolve, opts.reply, lang, m.channelId, cmd);
+    if (cmd) {
+      void resolveAndAck(opts.resolve, opts.reply, lang, m.channelId, cmd);
+      return;
+    }
+    // Authorized non-command → agentic chat fallback (if wired), else silent.
+    if (opts.onChat) {
+      void Promise.resolve(opts.onChat(m.channelId, m.text)).catch(() => {
+        // Fail-safe: a throwing chat path must never crash the inbound poller.
+      });
+    }
   };
 }
 

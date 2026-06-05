@@ -19,6 +19,8 @@ import {
 } from './connector-notify-adapter.js';
 import { makeIncomingCommandRouter, type CommandResolver } from './incoming-command-router.js';
 import { makeCommandResolver } from './incoming-command-resolver.js';
+import { chunkMessage, type ChatResponder } from './chat-bridge.js';
+import { getMessage } from '../cli/helpers/messages.js';
 
 type NotifyConnectorsConfig = NonNullable<DeckentConfig['notify_connectors']>;
 
@@ -106,6 +108,11 @@ export async function buildConnectorNotificationAdapter(
 export interface ConnectorCommandsDeps extends ConnectorBootstrapDeps {
   /** Resolve an approval command. Default: disk-backed resolver bound to `root`. */
   resolve?: CommandResolver;
+  /**
+   * Full agentic chat responder for authorized non-command messages (Telegram as
+   * a conversation head). Omit → non-command messages stay silently ignored.
+   */
+  chat?: ChatResponder;
   /** Language for inbound acks. */
   lang?: string;
 }
@@ -159,13 +166,31 @@ export async function bootstrapConnectorCommands(
         const connector = deps.makeConnector ? deps.makeConnector(id) : await loadConnector(id);
         if (!connector) continue;
         const chatId = String(cfg.chat_id);
+        const send = (channelId: string, text: string): Promise<void> =>
+          connector.sendMessage({ connector: connector.id, channelId, text });
+        const chat = deps.chat;
         connector.onMessage(
           makeIncomingCommandRouter({
             authorizedChatIds: [chatId],
             resolve,
-            reply: (channelId, text) =>
-              connector.sendMessage({ connector: connector.id, channelId, text }),
+            reply: send,
             lang,
+            ...(chat
+              ? {
+                  onChat: async (channelId: string, text: string): Promise<void> => {
+                    // Authorized non-command → full agentic conversation. The
+                    // router already enforced the chat_id chokepoint.
+                    try {
+                      await send(channelId, getMessage('bot.chat_thinking', lang));
+                      const reply = await chat(channelId, text);
+                      const body = reply.trim() || getMessage('bot.chat_empty', lang);
+                      for (const part of chunkMessage(body)) await send(channelId, part);
+                    } catch {
+                      await send(channelId, getMessage('bot.chat_error', lang)).catch(() => undefined);
+                    }
+                  },
+                }
+              : {}),
           }),
         );
         // INBOUND: full start() — launches the poll (non-blocking) AND enables send.

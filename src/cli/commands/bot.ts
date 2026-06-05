@@ -19,6 +19,7 @@ import {
   bootstrapConnectorCommands,
   type ConnectorCommandsHandle,
 } from '../../connectors/connector-bootstrap.js';
+import { makeChatResponder } from '../../connectors/chat-bridge.js';
 import type { DeckentConfig } from '../../core/types.js';
 
 export interface BotListenOptions {
@@ -42,7 +43,11 @@ export async function handleBotListen(opts: BotListenOptions = {}): Promise<void
 
   const config = await loadConfig(root);
   const bootstrap =
-    opts.bootstrap ?? ((r, n): Promise<ConnectorCommandsHandle> => bootstrapConnectorCommands(r, n));
+    opts.bootstrap ??
+    ((r, n): Promise<ConnectorCommandsHandle> =>
+      // Full conversational head: authorized non-command messages drive the
+      // native agentic engine (subscription provider → no destructive surface).
+      bootstrapConnectorCommands(r, n, { chat: makeChatResponder() }));
   const handle = await bootstrap(root, config.notify_connectors);
 
   if (handle.active.length === 0) {

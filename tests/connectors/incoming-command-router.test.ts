@@ -131,3 +131,62 @@ describe('makeIncomingCommandRouter — authorized dispatch', () => {
     await vi.waitFor(() => expect(resolve).toHaveBeenCalled());
   });
 });
+
+describe('makeIncomingCommandRouter — chat fallback (onChat)', () => {
+  it('authorized non-command → onChat(channelId, text), resolve NOT called', async () => {
+    const resolve = vi.fn(async () => 'resolved' as const);
+    const onChat = vi.fn(async () => {});
+    const handler = makeIncomingCommandRouter({
+      authorizedChatIds: ['7374744018'],
+      resolve,
+      onChat,
+    });
+    handler(msg({ text: 'sprint durumu nedir?' }));
+    await vi.waitFor(() => expect(onChat).toHaveBeenCalledWith('7374744018', 'sprint durumu nedir?'));
+    expect(resolve).not.toHaveBeenCalled();
+  });
+
+  it('🔴 UNAUTHORIZED non-command → onChat NOT called (chat inherits the same auth chokepoint)', async () => {
+    const onChat = vi.fn(async () => {});
+    const handler = makeIncomingCommandRouter({
+      authorizedChatIds: ['7374744018'],
+      resolve: vi.fn(async () => 'resolved' as const),
+      onChat,
+    });
+    handler(msg({ channelId: '999-stranger', text: 'run rm -rf /' }));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(onChat).not.toHaveBeenCalled();
+  });
+
+  it('a command still routes to resolve, NOT onChat', async () => {
+    const resolve = vi.fn(async () => 'resolved' as const);
+    const onChat = vi.fn(async () => {});
+    const handler = makeIncomingCommandRouter({
+      authorizedChatIds: ['7374744018'],
+      resolve,
+      onChat,
+    });
+    handler(msg({ text: 'approve abc' }));
+    await vi.waitFor(() => expect(resolve).toHaveBeenCalledWith('abc', 'approve'));
+    expect(onChat).not.toHaveBeenCalled();
+  });
+
+  it('no onChat configured → authorized non-command is silently ignored (back-compat)', async () => {
+    const resolve = vi.fn(async () => 'resolved' as const);
+    const handler = makeIncomingCommandRouter({ authorizedChatIds: ['7374744018'], resolve });
+    expect(() => handler(msg({ text: 'just chatting' }))).not.toThrow();
+    await new Promise((r) => setTimeout(r, 10));
+    expect(resolve).not.toHaveBeenCalled();
+  });
+
+  it('a throwing onChat never escapes the handler (fail-safe)', async () => {
+    const onChat = vi.fn(async () => { throw new Error('chat boom'); });
+    const handler = makeIncomingCommandRouter({
+      authorizedChatIds: ['7374744018'],
+      resolve: vi.fn(async () => 'resolved' as const),
+      onChat,
+    });
+    expect(() => handler(msg({ text: 'hello' }))).not.toThrow();
+    await vi.waitFor(() => expect(onChat).toHaveBeenCalled());
+  });
+});

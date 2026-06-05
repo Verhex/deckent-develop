@@ -740,6 +740,18 @@ const MESSAGES: MessageMap = {
     en: 'Stopped listening for inbound commands.',
     tr: 'Inbound komut dinleme durduruldu.',
   },
+  'bot.chat_thinking': {
+    en: '💭 thinking…',
+    tr: '💭 düşünüyorum…',
+  },
+  'bot.chat_empty': {
+    en: '(no response)',
+    tr: '(yanıt yok)',
+  },
+  'bot.chat_error': {
+    en: '⚠️ Could not process that message — try again.',
+    tr: '⚠️ Bu mesaj işlenemedi — tekrar dene.',
+  },
 };
 
 /**
