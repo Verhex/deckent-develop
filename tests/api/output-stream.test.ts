@@ -1,6 +1,6 @@
 // ═══ Output Stream SSE Endpoint Tests ══════════════════════════════════════
 // Sprint 139 — Task 049: Web Dashboard Hook Point
-// Tests for src/dashboard/api/output-stream.ts
+// Tests for src/api/output-stream.ts
 //
 // Coverage:
 //   - writeSseEvent: writes correct format, handles closed response
@@ -22,12 +22,12 @@ import {
   type OutputStreamEvent,
   type SnapshotEvent,
   type ErrorEvent,
-} from '../../../src/dashboard/api/output-stream.js';
-import { OutputCollector } from '../../../src/core/output-collector.js';
+} from '../../src/api/output-stream.js';
+import { OutputCollector } from '../../src/core/output-collector.js';
 
 // ─── Mock output-collector ───────────────────────────────────────────────────
 
-vi.mock('../../../src/core/output-collector.js', () => {
+vi.mock('../../src/core/output-collector.js', () => {
   const MockOutputCollector = vi.fn().mockImplementation(() => ({
     getSnapshot: vi.fn().mockReturnValue(null),
     getActiveWorkers: vi.fn().mockReturnValue([]),

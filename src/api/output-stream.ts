@@ -20,8 +20,8 @@
 // to display real-time worker output in the dashboard UI.
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { OutputCollector } from '../../core/output-collector.js';
-import type { OutputSnapshot, OutputEntry } from '../../core/output-collector.js';
+import { OutputCollector } from '../core/output-collector.js';
+import type { OutputSnapshot, OutputEntry } from '../core/output-collector.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

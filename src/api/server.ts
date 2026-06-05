@@ -43,7 +43,7 @@ import { registerEvolutionRoutes } from './evolution-endpoint.js';
 import { registerMemorySearch } from './memory-search-endpoint.js';
 import { registerNervousRoutes } from './nervous-endpoint.js';
 import { registerCoverageRoutes } from './coverage-endpoint.js';
-import { handleOutputStream, isOutputStreamRequest } from '../dashboard/api/output-stream.js';
+import { handleOutputStream, isOutputStreamRequest } from './output-stream.js';
 import { createOutputCollector, type OutputCollector } from '../core/output-collector.js';
 
 const MIME_TYPES: Record<string, string> = {
