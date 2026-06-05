@@ -6298,3 +6298,32 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 229-005: 229-005 — [Tier-1] REPL `/mcp` dispatch + confirm-gate + audit composition (DONE)
 
 ---
+## Sprint 230 — sprint-230
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-06-05
+**Duration:** 1333s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 10 |
+| Completed | 8 |
+| Tech Debt | 0 |
+| No-Go | 2 |
+| Coverage | 0.0% |
+| Duration | 1333238ms |
+
+### Tasks
+
+- 230-001: 230-001 — Windows-native backend (win32 → subprocess, POSIX-sleep → Node timer) (DONE)
+- 230-002: 230-002 — [P0] ⭐ models.dev native wire (PROVIDER_MODEL_MAP statik → dinamik) (DONE)
+- 230-003: 230-003 — ecosystem-intelligence → routing-engine tüketimi (DONE)
+- 230-004: 230-004 — self-modifying-detector enforcement (user-project flag-gated) (DONE)
+- 230-005: 230-005 — Ölü/orphan disposition (ADR-038): multi-agent.ts + decision-replay.ts (DONE)
+- 230-006: 230-006 — Worker-koordinasyon lifecycle wire (handoff + heartbeat-daemon → sprint-controller) (DONE)
+- 230-007: 230-007 — shared-memory wire (worker↔worker, read-mostly) (DONE)
+- 230-008: 230-008 — [P0] Docker live-monitor wire (SSE mount + watch --follow + WorkerCard) (NO_GO)
+
+---

@@ -1,5 +1,9 @@
 # Deckent vs Rakipler: Stratejik Karsilastirma Analizi
 
+> ⚠️ **GÜNCELLİK NOTU:** Bu belge 27 Mart 2026 tarihlidir. Güncellenmiş, doğrulanmış ve genişletilmiş
+> sürüm (Hermes-Agent, OpenHands, goose, LangGraph dahil + canlı primary-kaynak verisi) için bkz:
+> [`competitive-analysis-2026-06.md`](competitive-analysis-2026-06.md) (5 Haziran 2026).
+
 **Tarih:** 27 Mart 2026 | **Belge Tipi:** Dahili Strateji Raporu
 
 ---

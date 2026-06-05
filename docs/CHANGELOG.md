@@ -2,6 +2,21 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint230] - 2026-06-05
+
+### Added
+
+- 230-001 — Windows-native backend (win32 → subprocess, POSIX-sleep → Node timer)
+- 230-002 — [P0] ⭐ models.dev native wire (PROVIDER_MODEL_MAP statik → dinamik)
+- 230-003 — ecosystem-intelligence → routing-engine tüketimi
+- 230-004 — self-modifying-detector enforcement (user-project flag-gated)
+- 230-005 — Ölü/orphan disposition (ADR-038): multi-agent.ts + decision-replay.ts
+- 230-006 — Worker-koordinasyon lifecycle wire (handoff + heartbeat-daemon → sprint-controller)
+- 230-007 — shared-memory wire (worker↔worker, read-mostly)
+
+
+_Tasks: 10 total, 8 done, 0 tech debt, 2 no-go_
+
 ## [1.0.0-beta.1-sprint229] - 2026-06-04
 
 ### Added
