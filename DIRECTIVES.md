@@ -1,6 +1,6 @@
 # DIRECTIVES — Sprint 232: Memory-Loss Kökten Kapanış (decay 3-bug zinciri)
 
-## Goal: **Memory-wipe'ı KÖKTEN bitir.** Sprint 226/231 canlı dogfood'unda 3. kez tekrarlayan memory-loss'un kök-neden zinciri file:line grep-doğrulandı (sprint-231 canlı kanıt: memory 91→1, chat 30→0, retro/sprint 4→1; adr 75 exempt kurtuldu): (1) **🔴 PRIMARY — `decay_after_sprints=20` config runDecay'e GEÇMİYOR** → `debt-manager.ts:641` hardcoded `8`'e düşüyor (threshold 223, çok agresif), (2) **learnings (memory/retro/sprint/pattern) decay-exempt DEĞİL** → siliniyorlar (sadece adr/identity exempt), (3) **catastrophic-abort `>` kullanıyor** → tam %50'de (125/250) tetiklenmiyor. **3 task DISTINCT filesWrite → tam paralel-güvenli (tek wave, "2-3 beraber"). src/dashboard'a DOKUNULMAZ** (paralel dashboard FAZ5 var). **god-level, hermetik, CI yeşil KORUNUR.**
+## Goal: **Memory-wipe'ı KÖKTEN bitir.** Sprint 226/231 canlı dogfood'unda 3. kez tekrarlayan memory-loss'un kök-neden zinciri file:line grep-doğrulandı (sprint-231 canlı kanıt: memory 91→1, chat 30→0, retro/sprint 4→1; adr 75 exempt kurtuldu): (1) **🔴 PRIMARY — `decay_after_sprints=20` config runDecay'e GEÇMİYOR** → `debt-manager.ts:641` hardcoded `8`'e düşüyor (threshold 223, çok agresif), (2) **learnings (memory/retro/sprint/pattern) decay-exempt DEĞİL** → siliniyorlar (sadece adr/identity exempt), (3) **catastrophic-abort `>` kullanıyor** → tam %50'de (125/250) tetiklenmiyor. **+ §4G handoff 2 edge:** (4) **ci-sim SIGINT-restore yok** → interrupted ci-sim canlı memory.db'yi boş bırakır (sprint-231 empty-backup semptomu), (5) **writeGuardedExports dbCount===0'ı korumuyor** → boş-DB'de dolu disk-export ezilir (decay-dışı boşluk). **5 task DISTINCT filesWrite → tam paralel-güvenli (tek wave). src/dashboard'a DOKUNULMAZ** (paralel dashboard FAZ5 var). **god-level, hermetik, CI yeşil KORUNUR.**
 
 ## Ortak kurallar
 - **🟢 RUN-VERIFY ([[feedback_proof_of_function_dod]]):** kanıt **çağıran** dosyada (def DIŞLA). Bu sprint çoğunlukla **Tier-0 (orchestra/core)**; 232-003 `memory backup` CLI'sı Tier-1 değil (internal-op) → unit yeterli, ama backup gerçek-dosya üretmeli (run-verify).
@@ -49,9 +49,35 @@
 **Test:** ≥4 (tam %50 decay → aborted:true (>= fix); >%50 → aborted; backup non-boş + entry-count korunur (gerçek tmpdir DB backup); backup WAL-checkpoint'li) — hermetik
 **Smoke:** backup gerçek-dosya üretir (run-verify: tmpdir DB → backup → entry-count eşit, dosya>0).
 
+## Task 4: 232-004 — [P1] ci-sim SIGINT/SIGTERM restore handler (GAP A)
+- Model: sonnet
+- Effort: low
+- Skills: ci-testing, typescript-expert
+- Files: scripts/test-ci-sim.mjs, tests/scripts/ci-sim-signal-restore.test.ts
+- Scope: scripts/, tests/scripts/
+### Description
+**Problem (doğrulandı):** `scripts/test-ci-sim.mjs` try/finally + `restorePaths` (`:53`) var ama **SIGINT/SIGTERM handler YOK** → Ctrl-C ile yarıda kesilen ci-sim'de finally ÇALIŞMAZ → `.brain/memory.db` stash'te kalır, canlı memory.db kalıcı BOŞ (veri stash'te güvende ama operatör "DB silindi" görür — sprint-231 empty-backup'ın gerçek nedeni).
+**Çözüm:** `process.on('SIGINT', ...)` + `process.on('SIGTERM', ...)` ekle → `restorePaths(stashed)` çağır → temiz exit (kod 2). Mevcut try/finally korunur (restorePaths zaten idempotent/try-catch'li → çift-restore zararsız). Caller test-ci-sim.mjs.
+**Kanıt:** `grep -cE "process.on\(.(SIGINT|SIGTERM)" scripts/test-ci-sim.mjs` → ≥2; `npx vitest run tests/scripts/ci-sim-signal-restore.test.ts` → 2+ pass
+**Test:** ≥2 (spawn ci-sim child → SIGINT gönder → memory.db geri yüklendi assert; SIGTERM → restore) — async hermetik (spawn, tmpdir, spawnSync YASAK)
+**Smoke:** (script) unit yeterli.
+
+## Task 5: 232-005 — [P1] writeGuardedExports dbCount===0 disk-protect (GAP B)
+- Model: sonnet
+- Effort: normal
+- Skills: typescript-expert
+- Files: src/core/memory-export.ts, tests/core/export-empty-db-guard.test.ts
+- Scope: src/core/, tests/core/
+### Description
+**Problem (doğrulandı):** `writeGuardedExports` guard (`memory-export.ts:427`) SADECE `if (dbCount > 0 && renderIsEmpty)` → **dbCount===0'da guard düşer** → diskteki DOLU .md `writeFileSync` ile BOŞ ezilir. DB herhangi bir sebeple boşken (ci-sim penceresi / interrupted ci-sim / manuel) export çalışırsa sağlam exports silinir; guard mevcut DİSK dosyasını kontrol etmiyor (yalnız DB-count vs render). 231-003 decay-floor decay'den-boşalmayı kapattı, bu decay-DIŞI boşluk için kalan açık.
+**Çözüm:** guard'a ek koşul — `dbCount===0 && existsSync(filePath) && mevcut-dosya-DOLU (içerik emptyMarker İÇERMİYOR / anlamlı satır var) → yazmayı REDDET + warn + skipped'a ekle`. Böylece boş-DB'de dolu disk-export korunur. Caller memory-export.ts (231-002 ile aynı fonksiyon, çakışma yok — 232 hiçbir task memory-export'a dokunmuyor).
+**Kanıt:** `grep -cE "dbCount === 0|existsSync" src/core/memory-export.ts` → ≥1; `npx vitest run tests/core/export-empty-db-guard.test.ts` → 3+ pass
+**Test:** ≥3 (boş DB + dolu disk decisions.md → KORUNDU/skipped; boş DB + boş/yok disk → normal yaz; dbCount>0 normal akış regresyon-yok) — hermetik tmpdir
+**Smoke:** (Tier-0) unit yeterli.
+
 ---
 
-**Beklenen:** 3/3 DONE, 0 NO_GO, 0 scope-collision (distinct: sprint-finalizer+debt-manager / sprint-retro-writer+auditor / memory-store+cli-memory → tek wave). **src/dashboard'a SIFIR dokunuş.** Bu sprint, memory-loss'u **3 katmanda** kapatır: config-doğru (232-001 PRIMARY) + learnings-kalıcı (232-002) + abort-defansif & WAL-safe-backup (232-003). Build sonrası bir daha wipe OLMAMALI. CI yeşil KORUNUR.
+**Beklenen:** 5/5 DONE, 0 NO_GO, 0 scope-collision (distinct: sprint-finalizer+debt-manager / sprint-retro-writer+auditor / memory-store+cli-memory / test-ci-sim / memory-export → tek wave). **src/dashboard'a SIFIR dokunuş.** Bu sprint, memory-loss'u **5 katmanda** kapatır: config-doğru (232-001 PRIMARY) + learnings-kalıcı (232-002) + abort-defansif & WAL-safe-backup (232-003) + ci-sim-interrupt-safe (232-004) + boş-DB-export-koruma (232-005). Build sonrası bir daha wipe OLMAMALI. CI yeşil KORUNUR.
 
 **Pre-flight:** main temiz+commit'li+push'lu ✅ (reset-bug — [[project_deckent_self_git_mutation_bug]]). **DB WAL-checkpoint'li yedek alındı** (`bak-sprint231-recovered`, 206 entry — çıplak cp DEĞİL). **CLI'dan `env -u ANTHROPIC_API_KEY`**. `brain_planning=structured` (AI-hang yok). Tek wave (3 paralel ayrık-dosya). Her wave sonrası git log + git stash list (reset kontrol). Sprint sonrası DB entry-count ≥206 korunmalı (`deckent memory stats` → memory≥91); wipe olursa `bak-sprint231-recovered`'dan restore.
 
