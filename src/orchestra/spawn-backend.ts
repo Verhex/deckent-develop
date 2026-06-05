@@ -225,7 +225,7 @@ export function resetTmuxDeprecationWarning(): void {
  */
 export function resolveBackend(backend: string): string {
   if (backend === 'auto') {
-    return 'docker';
+    return process.platform === 'win32' ? 'subprocess' : 'docker';
   }
 
   if (backend === 'tmux') {

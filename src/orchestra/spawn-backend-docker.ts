@@ -794,7 +794,7 @@ export class DockerSpawnBackend implements SpawnBackend {
     const resultPath = join(this.projectDir, TASKS_DIR, `task-${taskId}.result`);
     if (!existsSync(resultPath)) {
       for (let i = 0; i < 10; i++) {
-        spawnSync('sleep', ['0.5'], { timeout: 2_000 });
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 500);
         if (existsSync(resultPath)) break;
       }
     }

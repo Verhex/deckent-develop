@@ -93,6 +93,10 @@ import type { SprintStateSnapshot } from './sprint-pid-manager.js';
 import { unlinkSync } from 'node:fs';
 import { DECKENT_DIR } from '../core/constants.js';
 
+// ─── Coordination Wire (handoff + heartbeat lifecycle) ────────────
+import { HandoffProtocol } from './handoff-protocol.js';
+import { HeartbeatDaemon } from './heartbeat-daemon.js';
+
 // ─── Sprint Checkpoint (phase-transition auto-checkpoint) ────────
 import { writePhaseCheckpoint, restoreSprintFromCheckpoint } from './sprint-checkpoint.js';
 
@@ -605,6 +609,63 @@ export interface RunSprintOptions {
   rollback?: boolean;
   /** Optional Connector instance — when provided, router uses connector.getAvailableProviders() */
   connector?: Connector;
+  /** Set to false to opt out of automatic HeartbeatDaemon start/stop during sprint (default: enabled) */
+  enableHeartbeatDaemon?: boolean;
+}
+
+// ═══ Coordination Wire Helpers ════════════════════════════════════
+
+/**
+ * Create handoff records for completed tasks whose dependent tasks exist in the sprint.
+ * Called after the EXECUTE phase results are collected (EXECUTE/WAVE_BUILD transition).
+ * Skips NO_GO results and results with empty filesChanged. Exported for testability.
+ */
+export function wireHandoffsForCompletedTasks(
+  projectRoot: string,
+  sprint: Sprint,
+  results: TaskResult[],
+): void {
+  if (!sprint.tasks || sprint.tasks.length === 0) return;
+
+  const handoffProtocol = new HandoffProtocol(projectRoot);
+
+  // Build reverse dependency map: for each taskId, which tasks depend on it?
+  const dependentsOf = new Map<string, string[]>();
+  for (const task of sprint.tasks) {
+    for (const depId of (task.dependencies ?? [])) {
+      if (!dependentsOf.has(depId)) dependentsOf.set(depId, []);
+      dependentsOf.get(depId)!.push(task.id);
+    }
+  }
+
+  for (const result of results) {
+    if (result.selfAssessment === 'NO_GO') continue;
+    const artifacts = (result.filesChanged ?? []).filter(Boolean);
+    if (artifacts.length === 0) continue;
+    const dependents = dependentsOf.get(result.taskId) ?? [];
+    for (const depId of dependents) {
+      try {
+        const handoff = handoffProtocol.createHandoff(result.taskId, depId, artifacts);
+        handoffProtocol.executeHandoff(handoff.id);
+      } catch (e) {
+        debugLog('wireHandoffsForCompletedTasks', e);
+      }
+    }
+  }
+}
+
+/**
+ * Create and start a HeartbeatDaemon for the sprint duration.
+ * Returns null when enabled=false (opt-out). Exported for testability.
+ */
+export function createAndStartHeartbeatDaemon(
+  projectRoot: string,
+  enabled: boolean,
+): HeartbeatDaemon | null {
+  if (!enabled) return null;
+  const daemon = new HeartbeatDaemon(projectRoot);
+  try { daemon.start(); } catch (e) { debugLog('heartbeatDaemon:start', e); }
+  return daemon;
 }
 
 // ═══ Core Functions (kept in this file) ═══════════════════════════
@@ -713,6 +774,7 @@ export async function runSprint(
   // below regardless of how runSprint exits (success, abort, throw).
   // Default-off respect: returns null when `nervous_system.enabled !== true`.
   const nervous = await initNervousSystemForSprint(config, projectRoot);
+  let heartbeatDaemon: HeartbeatDaemon | null = null;
 
   try {
   // ═══ State Recovery on Brain Restart (Sprint 162 — Task T-004) ════
@@ -881,6 +943,9 @@ export async function runSprint(
       projectRoot, sprint, config, opts, spawnBackend,
     );
     scanInterval = initialScanInterval;
+
+    // Start heartbeat daemon for sprint duration (opt-out: opts.enableHeartbeatDaemon === false)
+    heartbeatDaemon = createAndStartHeartbeatDaemon(projectRoot, opts?.enableHeartbeatDaemon !== false);
 
     // ─── Sprint 192 Task 192-009 — Dispatch loop assignedWorker wire ───
     // W-INTEGRITY I-3: spawn-spawner sets task.status=EXECUTING + persists
@@ -1110,6 +1175,11 @@ export async function runSprint(
       }
     } catch (e) { debugLog('graceKill:main', e); }
 
+    // Wire handoffs for completed tasks → dependent tasks (EXECUTE/WAVE_BUILD transition)
+    try {
+      wireHandoffsForCompletedTasks(projectRoot, sprint, results);
+    } catch (e) { debugLog('runSprint:wireHandoffs', e); }
+
     // Phase-transition checkpoint: EXECUTE complete
     try { writePhaseCheckpoint(projectRoot, sprint, sprint.phase); } catch (e) { debugLog('runSprint:checkpoint:execute', e); }
 
@@ -1236,6 +1306,12 @@ export async function runSprint(
   emitSprintEvent('SPRINT_RETRO_COMPLETE', { sprintId: sprint.id });
   emitPhaseChange(SprintPhase.RETRO, SprintPhase.DECAY, sprint.id);
 
+  // Stop heartbeat daemon before cleanup
+  if (heartbeatDaemon) {
+    try { heartbeatDaemon.stop(); } catch (e) { debugLog('runSprint:heartbeatDaemon:stop', e); }
+    heartbeatDaemon = null;
+  }
+
   // Phase 8: CLEANUP
   scanInterval = runCleanupPhase(projectRoot, sprint, config, opts, scanInterval, spawnBackend);
 
@@ -1271,5 +1347,9 @@ export async function runSprint(
     // Sprint 180 W3-1: nervous system lives in sprint scope — tear down on
     // every exit path (success, BrainError, human-checkpoint abort, throw).
     disposeNervousSystem(nervous);
+    // Fail-safe: stop heartbeat daemon if not yet stopped (e.g., early exception)
+    if (heartbeatDaemon) {
+      try { heartbeatDaemon.stop(); } catch { /* best effort */ }
+    }
   }
 }

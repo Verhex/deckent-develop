@@ -83,6 +83,33 @@ export function getTaskProvider(root: string, taskId: string): string {
   }
 }
 
+/** Read the spawn backend (docker/tmux/subprocess) for a task from its
+ *  heartbeat file. Returns null when no heartbeat is present or the field
+ *  is missing — caller falls back to the existing tmux/subprocess flow. */
+export function getTaskBackend(root: string, taskId: string): string | null {
+  const hbPath = join(root, TASKS_DIR, `task-${taskId}.hb`);
+  if (!existsSync(hbPath)) return null;
+  try {
+    const data = JSON.parse(readFileSync(hbPath, 'utf-8')) as { backend?: string };
+    return data.backend ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** Follow docker container logs for a worker — async spawn so the event
+ *  loop is never blocked. Container name follows the deckent-w-<taskId>
+ *  convention from spawn-backend-docker.ts (CONTAINER_PREFIX). */
+export function watchDockerLogs(taskId: string): void {
+  const containerName = `deckent-w-${taskId}`;
+  print(`Following docker logs: ${containerName}`);
+  print('Press Ctrl+C to stop.');
+  const proc = spawn('docker', ['logs', '-f', containerName], { stdio: 'inherit' });
+  proc.on('error', (err) => {
+    printError(new Error(`Failed to follow docker logs: ${err.message}`));
+  });
+}
+
 /** Watch subprocess worker log file for non-tmux providers (codex/gemini). */
 export function watchSubprocessLog(root: string, taskId: string): void {
   const logPath = join(root, TASKS_DIR, `task-${taskId}.log`);
@@ -123,7 +150,14 @@ export function registerWatch(program: Command): void {
         return;
       }
 
-      if (!isSessionActive()) {
+      // Docker workers don't run inside tmux — skip the session check when
+      // the user is following a docker-backed task so the smoke command can
+      // stream logs without requiring a tmux server.
+      const followingDocker =
+        opts.follow !== undefined &&
+        getTaskBackend(root, opts.follow) === 'docker';
+
+      if (!followingDocker && !isSessionActive()) {
         printError(new Error('No tmux session found. Run `deckent start` first.'));
         process.exitCode = 1;
         return;
@@ -139,6 +173,16 @@ export function registerWatch(program: Command): void {
           if (taskSprintId && currentSprintId && taskSprintId !== currentSprintId) {
             print(`Warning: Task ${taskId} is from sprint ${taskSprintId}, but current sprint is ${currentSprintId}.`);
             print('The worker window may be stale or already cleaned up.');
+          }
+
+          // Docker backend: stream container logs via `docker logs -f` so
+          // the user sees live output instead of the snapshot that `logs
+          // --tail` would produce. Falls through to provider/tmux paths
+          // when the heartbeat reports a non-docker backend.
+          const backend = getTaskBackend(root, taskId);
+          if (backend === 'docker') {
+            watchDockerLogs(taskId);
+            return;
           }
 
           // B) Subprocess log viewer for non-claude providers

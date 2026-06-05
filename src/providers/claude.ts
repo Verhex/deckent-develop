@@ -2,7 +2,7 @@ import { spawnSync } from 'node:child_process';
 import { readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ModelType } from '../core/types.js';
-import { CLAUDE_MODELS } from '../core/types.js';
+import { modelRegistry } from '../core/model-registry.js';
 import type { ProviderAdapter, ProviderSpawnOptions, ProviderAvailabilityDetail } from '../core/provider.js';
 import { ProviderError, resolveBinaryPath, parseSemverFromOutput } from '../core/provider.js';
 import {
@@ -53,7 +53,17 @@ export interface ProviderDetectResult {
 
 // ─── Constants ───────────────────────────────────────────────────────
 
-const SUPPORTED_MODELS: readonly ModelType[] = [...CLAUDE_MODELS];
+/**
+ * Live registry lookup for Claude-provider models.
+ *
+ * Sprint 230 Task 230-002: replaced the static `CLAUDE_MODELS` snapshot so
+ * models added at runtime via `bootstrapFromCatalog()` (models.dev) flow
+ * through to `supportedModels` + `diagnoseAvailability().models` without
+ * a process restart.
+ */
+function getSupportedClaudeModels(): readonly ModelType[] {
+  return modelRegistry.getByProvider('claude').map(m => m.id) as readonly ModelType[];
+}
 
 /**
  * Informative error message for MCP backend — includes sprint context,
@@ -79,7 +89,10 @@ const MCP_NOT_IMPLEMENTED_MESSAGE =
  */
 export class ClaudeAdapter implements ProviderAdapter {
   readonly name = 'claude-tmux';
-  readonly supportedModels: readonly ModelType[] = SUPPORTED_MODELS;
+  /** Live registry view — recomputed on every access so models.dev additions surface immediately. */
+  get supportedModels(): readonly ModelType[] {
+    return getSupportedClaudeModels();
+  }
 
   private readonly projectDir: string;
   private readonly backend: ClaudeBackend;
@@ -235,7 +248,7 @@ export class ClaudeAdapter implements ProviderAdapter {
         authStatus: 'missing',
         available: false,
         partial: false,
-        models: [...SUPPORTED_MODELS] as ModelType[],
+        models: [...getSupportedClaudeModels()] as ModelType[],
         reason: 'MCP backend selected but not yet implemented',
         hints: ['Switch claude_backend to "tmux" or "subprocess"'],
       };
@@ -291,7 +304,7 @@ export class ClaudeAdapter implements ProviderAdapter {
       authStatus,
       available,
       partial,
-      models: [...SUPPORTED_MODELS] as ModelType[],
+      models: [...getSupportedClaudeModels()] as ModelType[],
       reason,
       hints,
     };

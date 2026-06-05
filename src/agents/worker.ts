@@ -32,6 +32,9 @@ import {
   writeStashRef as _writeStashRef,
 } from './worker-rollback.js';
 import type { TokenUsage } from '../core/task-types.js';
+import { SharedMemory } from '../orchestra/shared-memory.js';
+export type { SharedMemoryEntry } from '../orchestra/shared-memory.js';
+export { SharedMemory };
 
 // ─── Sprint 196 196-005 (WP-4): Token usage orchestrator-side fill ─
 //
@@ -197,6 +200,18 @@ export class ScopeViolationError extends Error {
     super(message);
     this.name = 'ScopeViolationError';
   }
+}
+
+// ─── Shared Memory — Worker Context ────────────────────────────────
+
+/**
+ * Returns a SharedMemory instance scoped to the given project root.
+ * Workers in the same sprint share the same .tasks/shared/ directory,
+ * making this read-mostly inter-worker coordination available without
+ * going through the orchestrator.
+ */
+export function getSharedMemory(projectRoot: string, ttlMs?: number): SharedMemory {
+  return new SharedMemory(projectRoot, ttlMs);
 }
 
 // ─── Internal Helpers ───────────────────────────────────────────────

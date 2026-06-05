@@ -13,7 +13,8 @@ import {
 } from 'node:fs';
 import { join } from 'node:path';
 import type { ModelType, OpenAIModel } from '../core/types.js';
-import { PROVIDER_MODEL_MAP, isOpenAIModel } from '../core/types.js';
+import { isOpenAIModel } from '../core/types.js';
+import { modelRegistry } from '../core/model-registry.js';
 import type { ProviderAdapter, ProviderSpawnOptions, ProviderAvailabilityDetail } from '../core/provider.js';
 import { ProviderError, resolveBinaryPath, parseSemverFromOutput } from '../core/provider.js';
 import type { ProviderDetectResult } from './claude.js';
@@ -23,7 +24,16 @@ import { getModelForProviderTier } from '../core/model-equivalence.js';
 
 // ─── Constants ───────────────────────────────────────────────────────
 
-const CODEX_MODELS: readonly OpenAIModel[] = [...PROVIDER_MODEL_MAP.codex] as OpenAIModel[];
+/**
+ * Live registry lookup for Codex-provider models.
+ *
+ * Sprint 230 Task 230-002: replaced static `PROVIDER_MODEL_MAP.codex` snapshot
+ * so models added at runtime by `bootstrapFromCatalog()` (models.dev) become
+ * spawnable without restarting the process.
+ */
+function getCodexModels(): readonly OpenAIModel[] {
+  return modelRegistry.getByProvider('codex').map(m => m.id as OpenAIModel);
+}
 
 /**
  * Tier-based model mapping for Codex CLI.
@@ -65,7 +75,10 @@ interface CodexWorkerEntry {
  */
 export class CodexAdapter implements ProviderAdapter {
   readonly name = 'codex';
-  readonly supportedModels: readonly ModelType[] = CODEX_MODELS;
+  /** Live registry view — recomputed on every access so models.dev additions surface immediately. */
+  get supportedModels(): readonly ModelType[] {
+    return getCodexModels() as readonly ModelType[];
+  }
 
   private readonly projectDir: string;
   private readonly workers = new Map<string, CodexWorkerEntry>();
@@ -88,7 +101,7 @@ export class CodexAdapter implements ProviderAdapter {
   ): void {
     if (!isOpenAIModel(model)) {
       throw new ProviderError(
-        `Unsupported model "${model}" for codex provider. Supported: ${CODEX_MODELS.join(', ')}`,
+        `Unsupported model "${model}" for codex provider. Supported: ${getCodexModels().join(', ')}`,
         this.name,
       );
     }
@@ -254,7 +267,7 @@ export class CodexAdapter implements ProviderAdapter {
       authStatus,
       available,
       partial,
-      models: [...CODEX_MODELS] as ModelType[],
+      models: [...getCodexModels()] as ModelType[],
       reason,
       hints,
     };

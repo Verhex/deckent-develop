@@ -15,8 +15,15 @@ export type OpenAIModel = 'gpt-5' | 'gpt-5-mini' | 'gpt-4.1' | 'gpt-4.1-mini' | 
 /** Gemini model identifiers */
 export type GeminiModel = 'gemini-2.5-pro' | 'gemini-2.5-flash' | 'gemini-2.0-flash' | 'gemini-3.1-pro-preview';
 
-/** Union of all supported model identifiers across providers */
-export type ModelType = ClaudeModel | OpenAIModel | GeminiModel;
+/**
+ * Union of all supported model identifiers across providers.
+ *
+ * The `(string & {})` tail keeps autocomplete + narrowing for the literal IDs
+ * above while accepting arbitrary runtime model IDs registered dynamically by
+ * `bootstrapFromCatalog()` (models.dev). Registry-validation guards the
+ * runtime side; the literal union covers the bundled builtin-13 surface.
+ */
+export type ModelType = ClaudeModel | OpenAIModel | GeminiModel | (string & {});
 
 /**
  * Supported AI provider names.
@@ -29,21 +36,39 @@ export type ModelType = ClaudeModel | OpenAIModel | GeminiModel;
  */
 export type ProviderName = 'claude' | 'codex' | 'gemini' | 'ollama';
 
-/** Mapping from each provider to its supported model list — derived from ModelRegistry */
-const _providerMap = Object.fromEntries(
-  modelRegistry.getAllProviders().map(p => [
-    p,
-    modelRegistry.getByProvider(p).map(m => m.id) as readonly ModelType[],
-  ]),
+/**
+ * Mapping from each provider to its supported model list.
+ *
+ * Sprint 230 Task 230-002: each property is now a **live getter** over
+ * `modelRegistry.getByProvider(p)` rather than a frozen module-load snapshot.
+ * This lets `bootstrapFromCatalog()` (models.dev) and lazy provider
+ * registrations (e.g. ollama) flow through without restarting the process.
+ * Existing readers (`PROVIDER_MODEL_MAP.codex`, `Object.keys/.entries`) still
+ * work — each access returns a fresh, registry-derived array.
+ */
+export const PROVIDER_MODEL_MAP: Record<ProviderName, readonly ModelType[]> = Object.defineProperties(
+  {} as Record<ProviderName, readonly ModelType[]>,
+  {
+    claude: {
+      get: () => modelRegistry.getByProvider('claude').map(m => m.id) as readonly ModelType[],
+      enumerable: true,
+    },
+    codex: {
+      get: () => modelRegistry.getByProvider('codex').map(m => m.id) as readonly ModelType[],
+      enumerable: true,
+    },
+    gemini: {
+      get: () => modelRegistry.getByProvider('gemini').map(m => m.id) as readonly ModelType[],
+      enumerable: true,
+    },
+    // ollama models are registered lazily by providers/ollama.ts; getter reads
+    // whatever is currently in the registry under the 'ollama' provider key.
+    ollama: {
+      get: () => modelRegistry.getAllModels().filter(m => m.provider as string === 'ollama').map(m => m.id) as readonly ModelType[],
+      enumerable: true,
+    },
+  },
 );
-export const PROVIDER_MODEL_MAP: Record<ProviderName, readonly ModelType[]> = {
-  claude: _providerMap['claude'] ?? [],
-  codex: _providerMap['codex'] ?? [],
-  gemini: _providerMap['gemini'] ?? [],
-  // ollama models are registered lazily by providers/ollama.ts as a side-effect
-  // of importing the adapter; this key is populated once that module loads.
-  ollama: _providerMap['ollama'] ?? [],
-};
 
 /** All Claude model names (backward-compat convenience) */
 export const CLAUDE_MODELS: readonly ClaudeModel[] = modelRegistry
@@ -93,19 +118,32 @@ export function getProviderForModel(model: ModelType): ProviderName {
   return def.provider;
 }
 
-/** Type guard: checks whether a model is a Claude model */
+/** Type guard: checks whether a model belongs to the Claude provider.
+ *
+ *  Sprint 230 Task 230-002: switched from module-load CLAUDE_MODELS snapshot
+ *  to a live `modelRegistry.get()` lookup so models added at runtime
+ *  (bootstrapFromCatalog / register) pass the guard.
+ */
 export function isClaudeModel(model: ModelType): model is ClaudeModel {
-  return (CLAUDE_MODELS as readonly string[]).includes(model);
+  return modelRegistry.get(model)?.provider === 'claude';
 }
 
-/** Type guard: checks whether a model is an OpenAI/Codex model */
+/** Type guard: checks whether a model belongs to the OpenAI/Codex provider.
+ *
+ *  Sprint 230 Task 230-002: switched from module-load PROVIDER_MODEL_MAP.codex
+ *  snapshot to a live `modelRegistry.get()` lookup.
+ */
 export function isOpenAIModel(model: ModelType): model is OpenAIModel {
-  return (PROVIDER_MODEL_MAP.codex as readonly string[]).includes(model);
+  return modelRegistry.get(model)?.provider === 'codex';
 }
 
-/** Type guard: checks whether a model is a Gemini model */
+/** Type guard: checks whether a model belongs to the Gemini provider.
+ *
+ *  Sprint 230 Task 230-002: switched from module-load PROVIDER_MODEL_MAP.gemini
+ *  snapshot to a live `modelRegistry.get()` lookup.
+ */
 export function isGeminiModel(model: ModelType): model is GeminiModel {
-  return (PROVIDER_MODEL_MAP.gemini as readonly string[]).includes(model);
+  return modelRegistry.get(model)?.provider === 'gemini';
 }
 
 /**

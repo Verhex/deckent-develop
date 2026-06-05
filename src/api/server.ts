@@ -43,6 +43,8 @@ import { registerEvolutionRoutes } from './evolution-endpoint.js';
 import { registerMemorySearch } from './memory-search-endpoint.js';
 import { registerNervousRoutes } from './nervous-endpoint.js';
 import { registerCoverageRoutes } from './coverage-endpoint.js';
+import { handleOutputStream, isOutputStreamRequest } from '../dashboard/api/output-stream.js';
+import { createOutputCollector, type OutputCollector } from '../core/output-collector.js';
 
 const MIME_TYPES: Record<string, string> = {
   '.html': 'text/html',
@@ -328,6 +330,7 @@ async function handleRequest(
   _apiToken?: string | null,
   rateLimiter?: RateLimiter,
   authMiddleware?: (req: IncomingMessage, res: ServerResponse) => boolean,
+  outputCollector?: OutputCollector,
 ): Promise<void> {
   // Normalize /api/v1/... → /api/... for backward compat
   const rawUrl = req.url ?? '/';
@@ -563,6 +566,14 @@ async function handleRequest(
       sseClients.add(res);
       req.on('close', () => { sseClients.delete(res); });
       if (initWatcher) initWatcher();
+      return;
+    }
+
+    // Worker output SSE (Sprint 230 T-230-008): live log fan-out for the
+    // dashboard. Mounted via isOutputStreamRequest so the route matches the
+    // exact /api/output-stream path and ignores unrelated GETs.
+    if (outputCollector && isOutputStreamRequest(req)) {
+      handleOutputStream(req, res, outputCollector);
       return;
     }
 
@@ -1022,6 +1033,14 @@ export function createHttpServer(
   const dashPath = join(projectRoot, DASHBOARD_FILE);
   const sseClients = new Set<ServerResponse>();
 
+  // Lazy OutputCollector for /api/output-stream SSE (Sprint 230 T-230-008).
+  // One per server — workers attach via the docker/tmux/subprocess backends.
+  let outputCollector: OutputCollector | null = null;
+  function getOutputCollector(): OutputCollector {
+    if (!outputCollector) outputCollector = createOutputCollector(projectRoot);
+    return outputCollector;
+  }
+
   // Watch dashboard file for SSE — lazy start
   let watcher: ReturnType<typeof watchDashboard> | null = null;
 
@@ -1196,7 +1215,7 @@ export function createHttpServer(
         }
       }
 
-      await handleRequest(req, res, projectRoot, dashPath, sseClients, resolvedStaticDir, initWatcher, finalToken, rateLimiter, authMiddleware);
+      await handleRequest(req, res, projectRoot, dashPath, sseClients, resolvedStaticDir, initWatcher, finalToken, rateLimiter, authMiddleware, getOutputCollector());
     })().catch((err: unknown) => {
       sendError(res, 500, err instanceof Error ? err.message : 'Internal server error');
     });
@@ -1234,6 +1253,7 @@ export function createHttpServer(
         client.end();
       }
       sseClients.clear();
+      outputCollector?.dispose();
       return new Promise((resolve) => {
         server.close(() => resolve());
       });

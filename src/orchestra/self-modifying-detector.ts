@@ -161,3 +161,90 @@ export function isSelfModifyingSprint(
 
   return tasks.some(task => isSelfModifying(task, projectRoot));
 }
+
+// ─── Enforcement API ────────────────────────────────────────────────
+
+/**
+ * Result of a self-modification enforcement check.
+ *
+ * - 'advisory': violation is logged/warned but does not block the task
+ * - 'enforce': violation should block the task (NO_GO escalation)
+ */
+export interface SelfModEnforceResult {
+  /** Whether the task is flagged as self-modifying */
+  selfModifying: boolean;
+  /** Enforcement decision: advisory (warn) or enforce (block) */
+  mode: 'advisory' | 'enforce';
+  /** Human-readable reason for the decision */
+  reason: string;
+}
+
+/**
+ * Flag-gated enforcement check for self-modifying tasks.
+ *
+ * Enforcement rules (ADR-039):
+ * - **Deckent-dev (dogfood):** always 'advisory' — self-modification is expected
+ *   and intentional. The `enforceEnabled` flag is ignored.
+ * - **User project + enforceEnabled=true:** returns 'enforce' if the task
+ *   writes to self-modifying patterns (config opt-in).
+ * - **User project + enforceEnabled=false (default):** returns 'advisory'.
+ *
+ * This function is a pure enforcement *decision* — it does not block anything
+ * itself. Callers (authority-enforcer, sprint-controller) act on the result.
+ *
+ * @param task - Task with scope to check
+ * @param projectRoot - Absolute path to the project root
+ * @param enforceEnabled - Whether enforcement is enabled for user projects
+ *   (from config `self_mod_enforce: true`). Ignored for deckent-dev.
+ * @returns SelfModEnforceResult with mode and reason
+ */
+export function enforceSelfModifyingTask(
+  task: SelfModifyCheckable,
+  projectRoot: string,
+  enforceEnabled: boolean,
+): SelfModEnforceResult {
+  // ADR-039: deckent-dev is always advisory — self-modification is dogfood mode
+  if (detectDeckentRepo(projectRoot)) {
+    return {
+      selfModifying: isSelfModifying(task, projectRoot),
+      mode: 'advisory',
+      reason: 'Deckent dogfood mode: self-modification is advisory (ADR-039)',
+    };
+  }
+
+  // User project: check if the task is self-modifying at all
+  // For user projects, isSelfModifying always returns false (detectDeckentRepo=false).
+  // Re-check write scope directly against source patterns for user project enforcement.
+  const writePaths = [
+    ...(task.scope.directories ?? []),
+    ...(task.scope.filesWrite ?? []),
+  ];
+  const touchesSourcePatterns = writePaths.some(p => {
+    const normalized = p.trim();
+    return normalized && DECKENT_SOURCE_PATTERNS.some(
+      pattern => normalized.startsWith(pattern) || pattern.startsWith(normalized),
+    );
+  });
+
+  if (!touchesSourcePatterns) {
+    return {
+      selfModifying: false,
+      mode: 'advisory',
+      reason: 'Task does not write to self-modifying patterns',
+    };
+  }
+
+  if (enforceEnabled) {
+    return {
+      selfModifying: true,
+      mode: 'enforce',
+      reason: 'User project: self_mod_enforce=true — task writes to orchestration source patterns',
+    };
+  }
+
+  return {
+    selfModifying: true,
+    mode: 'advisory',
+    reason: 'User project: self_mod_enforce=false (default) — self-modification advisory only',
+  };
+}

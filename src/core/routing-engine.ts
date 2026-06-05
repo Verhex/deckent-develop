@@ -27,6 +27,7 @@ import {
 } from './routing-types.js';
 import { classifyIntent } from './intent-classifier.js';
 import { evaluateActivation, migrateV1AgentToActivation, migrateV1SkillToActivation, getDynamicExclusions } from './activation-engine.js';
+import { analyzeSkillInMemory } from '../orchestra/ecosystem-intelligence.js';
 import { resolveComposition } from './skill-selector.js';
 import { modelRegistry } from './model-registry.js';
 import { getAgentDomain, type AgentDomain } from './agent-pool.js';
@@ -765,6 +766,18 @@ function getAgentActivation(agent: AgentDefinition): ActivationConfig {
 
 function getSkillActivation(skill: SkillDefinition): ActivationConfig {
   if (skill.activation) return skill.activation;
+  // Ecosystem intelligence: derive intent-based activation from skill metadata.
+  // Richer signal than V1 migration for skills without a persisted V2 manifest.
+  const ecosystemActivation = analyzeSkillInMemory({
+    id: skill.id,
+    name: skill.name,
+    description: skill.description,
+    category: skill.category,
+    triggers: skill.triggers,
+  });
+  if (ecosystemActivation.rules.some(r => r.score >= 5)) {
+    return ecosystemActivation;
+  }
   return migrateV1SkillToActivation(
     skill.triggers,
     skill.category,

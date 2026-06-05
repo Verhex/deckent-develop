@@ -1,9 +1,11 @@
+import { useEffect, useState } from "react";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Skull } from "lucide-react";
 import type { AgentInfo } from "../types";
 import { useTranslation } from "../i18n/LanguageProvider";
 import type { TranslatorProp } from "../i18n/types";
+import { buildSseUrl } from "../lib/api";
 
 const STATUS_BORDER: Record<string, string> = {
   EXECUTING: "border border-l-4 border-blue-500 animate-pulse",
@@ -79,12 +81,63 @@ interface WorkerCardProps {
   onKill: (id: string) => void;
 }
 
+const LIVE_LOG_TAIL = 5;
+
+/** Sprint 230 T-230-008: subscribe to /api/output-stream and surface the last
+ *  few lines on the worker card. Returns an empty array until the SSE channel
+ *  delivers data; cleans up on unmount. Defensively no-ops when EventSource
+ *  is unavailable (server-side render, hardened test environments). */
+function useLiveLogTail(taskId: string | undefined, enabled: boolean): string[] {
+  const [lines, setLines] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!enabled || !taskId) {
+      setLines([]);
+      return;
+    }
+    if (typeof EventSource === "undefined") return;
+
+    const url = buildSseUrl(`/api/output-stream?taskId=${encodeURIComponent(taskId)}`);
+    const es = new EventSource(url);
+
+    function handle(event: MessageEvent): void {
+      try {
+        const payload = JSON.parse(event.data) as {
+          lines?: Array<{ line?: string }>;
+          snapshot?: { lines?: Array<{ line?: string }> };
+        };
+        const next = payload.snapshot?.lines ?? payload.lines ?? [];
+        if (next.length === 0) return;
+        setLines((prev) => {
+          const merged = [...prev, ...next.map((e) => e.line ?? "").filter(Boolean)];
+          return merged.slice(-LIVE_LOG_TAIL);
+        });
+      } catch {
+        // ignore malformed payloads
+      }
+    }
+
+    es.addEventListener("snapshot", handle as EventListener);
+    es.addEventListener("output", handle as EventListener);
+
+    return () => {
+      es.close();
+    };
+  }, [taskId, enabled]);
+
+  return lines;
+}
+
 export function WorkerCard({ agent, onClick, onKill }: WorkerCardProps) {
   const { t } = useTranslation();
   const borderClass = STATUS_BORDER[agent.status] ?? "border-zinc-700";
   const badgeVariant = STATUS_BADGE[agent.status] ?? "secondary";
   const statusIcon = STATUS_ICON[agent.status] ?? "○";
   const modelIcon = getModelIcon(agent.model);
+  const liveLog = useLiveLogTail(
+    agent.taskId,
+    agent.status === "EXECUTING" && agent.backend === "docker",
+  );
 
   return (
     <div
@@ -133,6 +186,16 @@ export function WorkerCard({ agent, onClick, onKill }: WorkerCardProps) {
         <p className="text-xs text-zinc-500 truncate mb-3 italic">
           {agent.currentAction}
         </p>
+      )}
+
+      {/* Live docker log tail (Sprint 230 T-230-008) */}
+      {liveLog.length > 0 && (
+        <pre
+          data-testid="worker-live-log"
+          className="text-[10px] text-zinc-400 bg-zinc-950/60 rounded p-2 mb-3 max-h-24 overflow-hidden font-mono whitespace-pre-wrap"
+        >
+          {liveLog.join("\n")}
+        </pre>
       )}
 
       <div className="h-px bg-zinc-800 mb-3" />

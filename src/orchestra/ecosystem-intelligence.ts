@@ -165,6 +165,75 @@ export function analyzeNewSkill(skillPath: string): ActivationConfig {
 }
 
 /**
+ * Analyze a skill's in-memory metadata to generate V2 activation rules.
+ * Unlike analyzeNewSkill(), requires no filesystem access — all data is taken
+ * from the already-loaded skill definition fields.
+ *
+ * Used by the routing engine to enrich skill activation for V1 (trigger-based)
+ * skills not yet persisted via `skill install` (which writes V2 rules to manifest.json).
+ *
+ * @param data - Subset of SkillDefinition fields available in-memory
+ * @returns ActivationConfig with intent-based activation and exclusion rules
+ */
+export function analyzeSkillInMemory(data: {
+  id?: string;
+  name?: string;
+  description?: string;
+  category?: string;
+  triggers?: string[];
+}): ActivationConfig {
+  const id       = (data.id          ?? '').toLowerCase();
+  const name     = (data.name        ?? '').toLowerCase();
+  const desc     = (data.description ?? '').toLowerCase();
+  const category = (data.category    ?? '').toLowerCase();
+  const triggers = Array.isArray(data.triggers) ? data.triggers : [];
+
+  const allWords = [id, name, desc, category, ...triggers]
+    .flatMap(w => w.split(/[\s_-]+/))
+    .map(w => w.toLowerCase())
+    .filter(Boolean);
+
+  const intentScores = new Map<IntentType, number>();
+  for (const word of allWords) {
+    const intent = KEYWORD_TO_INTENT[word];
+    if (intent) {
+      intentScores.set(intent, (intentScores.get(intent) ?? 0) + 1);
+    }
+  }
+
+  const catIntent = CATEGORY_TO_INTENT[category];
+  if (catIntent) {
+    intentScores.set(catIntent, (intentScores.get(catIntent) ?? 0) + 1);
+  }
+
+  const sortedIntents = [...intentScores.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3);
+
+  const rules: ActivationRule[] = sortedIntents.map(([intent, count]) => ({
+    name: `${id || 'skill'}-${intent}`,
+    when: { 'intent.primary': intent },
+    score: count >= 3 ? 10 : count >= 2 ? 8 : 5,
+  }));
+
+  if (rules.length === 0) {
+    rules.push({
+      name: `${id || 'skill'}-default`,
+      when: { 'intent.primary': 'implementation' as IntentType },
+      score: 3,
+    });
+  }
+
+  const primaryIntent = sortedIntents[0]?.[0];
+  const excludedIntents = primaryIntent ? (EXCLUSION_RULES[primaryIntent] ?? []) : [];
+  const exclude: ExclusionRule[] = excludedIntents.map(excl => ({
+    when: { 'intent.primary': excl },
+  }));
+
+  return { rules, exclude, minScore: 5 };
+}
+
+/**
  * Persist a generated ActivationConfig into a skill's manifest.json.
  * Skips write if the manifest already has manifestVersion 2 (idempotent).
  *

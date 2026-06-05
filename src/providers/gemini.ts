@@ -23,9 +23,16 @@ import { modelRegistry } from '../core/model-registry.js';
 
 // ─── Constants ───────────────────────────────────────────────────────
 
-const GEMINI_MODELS: readonly GeminiModel[] = modelRegistry
-  .getByProvider('gemini')
-  .map(m => m.id as GeminiModel);
+/**
+ * Live registry lookup for Gemini-provider models.
+ *
+ * Sprint 230 Task 230-002: replaced the module-load snapshot so models added
+ * at runtime via `bootstrapFromCatalog()` (models.dev) become spawnable
+ * without restarting the process.
+ */
+function getGeminiModels(): readonly GeminiModel[] {
+  return modelRegistry.getByProvider('gemini').map(m => m.id as GeminiModel);
+}
 
 /**
  * Tier-based model mapping for Gemini CLI.
@@ -164,7 +171,10 @@ interface GeminiWorkerEntry {
  */
 export class GeminiAdapter implements ProviderAdapter {
   readonly name = 'gemini';
-  readonly supportedModels: readonly ModelType[] = GEMINI_MODELS;
+  /** Live registry view — recomputed on every access so models.dev additions surface immediately. */
+  get supportedModels(): readonly ModelType[] {
+    return getGeminiModels() as readonly ModelType[];
+  }
 
   private readonly projectDir: string;
   private readonly workers = new Map<string, GeminiWorkerEntry>();
@@ -194,7 +204,7 @@ export class GeminiAdapter implements ProviderAdapter {
 
     if (!this.isSupportedModel(model)) {
       throw new ProviderError(
-        `Unsupported model "${model}" for Gemini provider. Supported: ${GEMINI_MODELS.join(', ')}`,
+        `Unsupported model "${model}" for Gemini provider. Supported: ${getGeminiModels().join(', ')}`,
         this.name,
       );
     }
@@ -338,7 +348,7 @@ export class GeminiAdapter implements ProviderAdapter {
       authStatus,
       available,
       partial,
-      models: [...GEMINI_MODELS] as ModelType[],
+      models: [...getGeminiModels()] as ModelType[],
       reason,
       hints,
     };
@@ -566,7 +576,10 @@ export class GeminiAdapter implements ProviderAdapter {
   }
 
   private isSupportedModel(model: ModelType): model is GeminiModel {
-    return (GEMINI_MODELS as readonly string[]).includes(model);
+    // Sprint 230 Task 230-002: live registry lookup (provider === 'gemini')
+    // replaces module-load `GEMINI_MODELS` snapshot so models.dev additions
+    // pass at spawn time.
+    return modelRegistry.get(model)?.provider === 'gemini';
   }
 
   getApiKey(): string | undefined {
