@@ -115,6 +115,15 @@ export const en = {
   'worker.detail': 'Detail',
   'worker.no_workers': 'No workers yet — start a sprint',
 
+  // Terminal dock
+  'terminal.dock.label': 'Terminal',
+  'terminal.dock.expand': 'expand',
+  'terminal.dock.collapse': 'collapse',
+  'terminal.dock.maximize': 'maximize',
+  'terminal.dock.restore': 'restore',
+  'terminal.dock.toggle': 'Toggle terminal',
+  'terminal.dock.resize': 'Resize terminal',
+
   // Welcome Screen
   'welcome.no_sprint': 'No active sprint.',
   'welcome.start_hint': 'Use the New Sprint button to begin.',

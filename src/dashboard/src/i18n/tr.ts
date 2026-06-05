@@ -117,6 +117,15 @@ export const tr: Record<TranslationKey, string> = {
   'worker.detail': 'Detay',
   'worker.no_workers': 'Henüz worker yok — sprint başlatın',
 
+  // Terminal dock
+  'terminal.dock.label': 'Terminal',
+  'terminal.dock.expand': 'aç',
+  'terminal.dock.collapse': 'kapat',
+  'terminal.dock.maximize': 'büyüt',
+  'terminal.dock.restore': 'geri al',
+  'terminal.dock.toggle': 'Terminali aç/kapat',
+  'terminal.dock.resize': 'Terminali yeniden boyutlandır',
+
   // Welcome Screen
   'welcome.no_sprint': 'Aktif sprint yok.',
   'welcome.start_hint': 'Başlamak için Yeni Sprint butonunu kullanın.',

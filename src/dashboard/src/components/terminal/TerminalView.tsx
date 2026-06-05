@@ -16,7 +16,29 @@ export function TerminalView({ sessionId }: TerminalViewProps) {
 
   useEffect(() => {
     if (!elRef.current) return;
-    const term = new Terminal({ convertEol: true, fontSize: 13 });
+    const term = new Terminal({
+      convertEol: true,
+      fontSize: 13,
+      fontFamily: '"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace',
+      // deckent teal/gold logbook theme (handoff §5)
+      theme: {
+        background: '#0a0f0e',
+        foreground: '#cfe3da',
+        cursor: '#5fcaa9',
+        cursorAccent: '#0a0f0e',
+        selectionBackground: 'rgba(84,168,156,0.30)',
+        green: '#5fcaa9',
+        brightGreen: '#7fcdbe',
+        cyan: '#7fcdbe',
+        brightCyan: '#bfe6dc',
+        yellow: '#d6cb8c',
+        brightYellow: '#d6cb8c',
+        red: '#f0a3a3',
+        brightRed: '#f0a3a3',
+        white: '#cfe3da',
+        brightWhite: '#ffffff',
+      },
+    });
     const fit = new FitAddon();
     term.loadAddon(fit);
     term.open(elRef.current);

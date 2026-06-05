@@ -3,14 +3,21 @@ import '@testing-library/jest-dom/vitest';
 import { describe, it, expect } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { DockPanel } from '../../../src/dashboard/src/components/DockPanel';
+import { LanguageProvider } from '../../../src/dashboard/src/i18n/LanguageProvider';
+
+function renderDock(body: string) {
+  return render(
+    <LanguageProvider>
+      <DockPanel>
+        <div>{body}</div>
+      </DockPanel>
+    </LanguageProvider>,
+  );
+}
 
 describe('DockPanel', () => {
   it('starts collapsed and toggles open via the terminal toggle button', () => {
-    render(
-      <DockPanel>
-        <div>PANELBODY</div>
-      </DockPanel>,
-    );
+    renderDock('PANELBODY');
 
     expect(screen.queryByText('PANELBODY')).not.toBeVisible();
 
@@ -20,11 +27,7 @@ describe('DockPanel', () => {
   });
 
   it('toggles back to collapsed on a second click', () => {
-    render(
-      <DockPanel>
-        <div>PANELBODY2</div>
-      </DockPanel>,
-    );
+    renderDock('PANELBODY2');
 
     const toggle = screen.getByRole('button', { name: /terminal/i });
     fireEvent.click(toggle);
@@ -34,14 +37,28 @@ describe('DockPanel', () => {
   });
 
   it('exposes a resize separator only when expanded', () => {
-    render(
-      <DockPanel>
-        <div>PANELBODY3</div>
-      </DockPanel>,
-    );
+    renderDock('PANELBODY3');
 
     expect(screen.queryByRole('separator', { name: /resize terminal/i })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: /terminal/i }));
     expect(screen.getByRole('separator', { name: /resize terminal/i })).toBeInTheDocument();
+  });
+
+  it('maximizes and restores the dock, hiding the resize separator while maximized', () => {
+    const { container } = renderDock('PANELBODY4');
+    const panel = container.querySelector('[data-dock-panel="true"]') as HTMLElement;
+
+    // Maximize control is only available once the dock is expanded.
+    expect(screen.queryByRole('button', { name: /maximize/i })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /terminal/i }));
+    expect(panel).toHaveAttribute('data-maximized', 'false');
+
+    fireEvent.click(screen.getByRole('button', { name: /maximize/i }));
+    expect(panel).toHaveAttribute('data-maximized', 'true');
+    // While maximized the drag-resize separator is suppressed (fixed 70vh).
+    expect(screen.queryByRole('separator', { name: /resize terminal/i })).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: /restore/i }));
+    expect(panel).toHaveAttribute('data-maximized', 'false');
   });
 });
