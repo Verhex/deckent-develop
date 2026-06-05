@@ -12,6 +12,7 @@ import { join } from 'node:path';
 import type { Command } from 'commander';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { print, printError } from '../helpers/output.js';
+import { getLanguage, getMessage } from '../helpers/messages.js';
 import { ACTION_BY_ID, isSafetyFloorAction } from '../../nervous/action-registry.js';
 import type { AuthorityMode, ApprovalPolicy } from '../../core/nervous-types.js';
 
@@ -31,32 +32,20 @@ const VALID_POLICIES: ReadonlyArray<ApprovalPolicy> = [
   'approve',
 ];
 
-// Matrix description for each preset
-const PRESET_DESCRIPTIONS: Record<AuthorityMode, { low: ApprovalPolicy; medium: ApprovalPolicy; high: ApprovalPolicy; description: string }> = {
-  strict: {
-    low: 'suggest-30m',
-    medium: 'approve',
-    high: 'approve',
-    description: 'Enterprise / yeni kullanıcı — tüm medium/high eylemler onay bekler',
-  },
-  balanced: {
-    low: 'autonomous',
-    medium: 'suggest-30m',
-    high: 'approve',
-    description: 'Varsayılan — düşük risk otonom, orta 30dk öneri, yüksek onay',
-  },
-  autopilot: {
-    low: 'autonomous',
-    medium: 'autonomous',
-    high: 'suggest-5m',
-    description: 'Güvenilir kullanıcı — düşük/orta otonom, yüksek 5dk öneri',
-  },
-  'full-auto': {
-    low: 'autonomous',
-    medium: 'autonomous',
-    high: 'autonomous',
-    description: 'CI/CD / hands-off — tümü otonom (safety floor hariç)',
-  },
+// Risk→policy mapping for each preset. Descriptions are i18n keys (MSG-004) so
+// the matrix table is fully localized rather than mixing hardcoded Turkish prose.
+const PRESET_DESCRIPTIONS: Record<AuthorityMode, { low: ApprovalPolicy; medium: ApprovalPolicy; high: ApprovalPolicy }> = {
+  strict: { low: 'suggest-30m', medium: 'approve', high: 'approve' },
+  balanced: { low: 'autonomous', medium: 'suggest-30m', high: 'approve' },
+  autopilot: { low: 'autonomous', medium: 'autonomous', high: 'suggest-5m' },
+  'full-auto': { low: 'autonomous', medium: 'autonomous', high: 'autonomous' },
+};
+
+const PRESET_DESC_KEY: Record<AuthorityMode, string> = {
+  strict: 'config_nervous.preset_strict',
+  balanced: 'config_nervous.preset_balanced',
+  autopilot: 'config_nervous.preset_autopilot',
+  'full-auto': 'config_nervous.preset_full_auto',
 };
 
 // ─── ANSI Helpers ────────────────────────────────────────────────────────────
@@ -136,11 +125,13 @@ function writeNervousSection(root: string, nervousSection: NervousConfigSection)
 // ─── Actions ─────────────────────────────────────────────────────────────────
 
 /** `deckent config nervous set mode <preset>` */
-export function handleSetMode(root: string, preset: string): void {
+export function handleSetMode(root: string, preset: string, lang: string = 'en'): void {
+  const lng = getLanguage(lang);
   if (!(VALID_PRESETS as string[]).includes(preset)) {
-    printError(
-      `Invalid preset: "${preset}". Valid values: ${VALID_PRESETS.join(', ')}`,
-    );
+    printError(getMessage('config_nervous.invalid_preset', lng, {
+      preset,
+      values: VALID_PRESETS.join(', '),
+    }));
     process.exitCode = 1;
     return;
   }
@@ -148,43 +139,36 @@ export function handleSetMode(root: string, preset: string): void {
   const ns = readNervousSection(root);
   const updated: NervousConfigSection = { ...ns, mode: preset as AuthorityMode };
   writeNervousSection(root, updated);
-  print(c(`  ✓ Mode set to: ${preset}`, GREEN));
+  print(c('  ' + getMessage('config_nervous.mode_set', lng, { preset }), GREEN));
 }
 
 /** `deckent config nervous override <ACTION_ID> <policy>` */
-export function handleOverride(root: string, actionId: string, policy: string): void {
+export function handleOverride(root: string, actionId: string, policy: string, lang: string = 'en'): void {
+  const lng = getLanguage(lang);
   // Validate action ID exists
   if (!ACTION_BY_ID.has(actionId)) {
-    printError(
-      `Invalid action ID: "${actionId}". Run \`deckent config nervous list\` to see all 30 actions.`,
-    );
+    printError(getMessage('config_nervous.invalid_action', lng, { id: actionId }));
     process.exitCode = 1;
     return;
   }
 
   // Safety floor protection — cannot be overridden to non-approve
   if (isSafetyFloorAction(actionId) && policy !== 'approve') {
-    print(
-      c(
-        `  ⚠ Safety floor action "${actionId}" cannot be set to "${policy}".`,
-        YELLOW,
-      ),
-    );
-    print(
-      c(
-        '    Safety floor actions always require explicit user approval.',
-        DIM,
-      ),
-    );
+    print(c('  ' + getMessage('config_nervous.safety_floor_blocked', lng, {
+      id: actionId,
+      policy,
+    }), YELLOW));
+    print(c('    ' + getMessage('config_nervous.safety_floor_note', lng), DIM));
     process.exitCode = 1;
     return;
   }
 
   // Validate policy
   if (!(VALID_POLICIES as string[]).includes(policy)) {
-    printError(
-      `Invalid policy: "${policy}". Valid values: ${VALID_POLICIES.join(', ')}`,
-    );
+    printError(getMessage('config_nervous.invalid_policy', lng, {
+      policy,
+      values: VALID_POLICIES.join(', '),
+    }));
     process.exitCode = 1;
     return;
   }
@@ -198,36 +182,38 @@ export function handleOverride(root: string, actionId: string, policy: string): 
     },
   };
   writeNervousSection(root, updated);
-  print(c(`  ✓ Override set: ${actionId} → ${policy}`, GREEN));
+  print(c('  ' + getMessage('config_nervous.override_set', lng, { id: actionId, policy }), GREEN));
 }
 
 /** `deckent config nervous list` */
-export function handleList(root: string): void {
+export function handleList(root: string, lang: string = 'en'): void {
+  const lng = getLanguage(lang);
   const ns = readNervousSection(root);
 
   print('');
-  print(c('  Nervous System Authority Matrix:', BOLD));
+  print(c('  ' + getMessage('config_nervous.matrix_title', lng), BOLD));
   print('');
 
   // Table header
-  const col1 = 'Preset'.padEnd(12);
-  const col2 = 'Low Risk'.padEnd(14);
-  const col3 = 'Medium Risk'.padEnd(14);
-  const col4 = 'High Risk'.padEnd(14);
-  const col5 = 'Description';
+  const col1 = getMessage('config_nervous.col_preset', lng).padEnd(12);
+  const col2 = getMessage('config_nervous.col_low', lng).padEnd(14);
+  const col3 = getMessage('config_nervous.col_medium', lng).padEnd(14);
+  const col4 = getMessage('config_nervous.col_high', lng).padEnd(14);
+  const col5 = getMessage('config_nervous.col_description', lng);
   print(`  ${c(col1, BOLD)}${c(col2, BOLD)}${c(col3, BOLD)}${c(col4, BOLD)}${c(col5, BOLD)}`);
   print(`  ${'-'.repeat(76)}`);
 
   for (const preset of VALID_PRESETS) {
     const desc = PRESET_DESCRIPTIONS[preset];
+    const description = getMessage(PRESET_DESC_KEY[preset]!, lng);
     const isActive = preset === ns.mode;
     const presetLabel = isActive
       ? c(preset.padEnd(12), MAGENTA, BOLD)
       : preset.padEnd(12);
-    const activeMarker = isActive ? c(' ◀ active', MAGENTA) : '';
+    const activeMarker = isActive ? c(getMessage('config_nervous.active_marker', lng), MAGENTA) : '';
 
     print(
-      `  ${presetLabel}${policyColor(desc.low).padEnd(14)}${policyColor(desc.medium).padEnd(14)}${policyColor(desc.high).padEnd(14)}${desc.description}${activeMarker}`,
+      `  ${presetLabel}${policyColor(desc.low).padEnd(14)}${policyColor(desc.medium).padEnd(14)}${policyColor(desc.high).padEnd(14)}${description}${activeMarker}`,
     );
   }
 
@@ -237,18 +223,18 @@ export function handleList(root: string): void {
   const overrides = ns.actionOverrides ?? {};
   const overrideEntries = Object.entries(overrides);
   if (overrideEntries.length > 0) {
-    print(c('  Active Overrides:', BOLD));
+    print(c('  ' + getMessage('config_nervous.active_overrides', lng), BOLD));
     for (const [actionId, policy] of overrideEntries) {
       print(`    ${c(actionId, CYAN)} → ${policyColor(policy)}`);
     }
     print('');
   } else {
-    print(c('  No active overrides.', DIM));
+    print(c('  ' + getMessage('config_nervous.no_overrides', lng), DIM));
     print('');
   }
 
   // Safety floor reminder
-  print(c('  Safety Floor (always approve):', DIM));
+  print(c('  ' + getMessage('config_nervous.safety_floor_label', lng), DIM));
   const SAFETY_FLOOR_IDS = [
     'KILL_LIVE_SPRINT',
     'MANUAL_FILE_DELETE',
@@ -261,34 +247,36 @@ export function handleList(root: string): void {
 }
 
 /** `deckent config nervous reset` */
-export function handleReset(root: string): void {
+export function handleReset(root: string, lang: string = 'en'): void {
+  const lng = getLanguage(lang);
   const ns = readNervousSection(root);
   const updated: NervousConfigSection = { ...ns, actionOverrides: {} };
   writeNervousSection(root, updated);
-  print(c('  ✓ Action overrides reset to preset defaults.', GREEN));
+  print(c('  ' + getMessage('config_nervous.reset_done', lng), GREEN));
 }
 
 /** `deckent config nervous` (interactive) */
-async function handleInteractive(root: string): Promise<void> {
+async function handleInteractive(root: string, lang: string = 'en'): Promise<void> {
+  const lng = getLanguage(lang);
   const ns = readNervousSection(root);
 
   print('');
-  print(c('  🧠 Nervous System Configuration', BOLD));
-  print(c(`  Current mode: ${ns.mode}`, DIM));
+  print(c('  ' + getMessage('config_nervous.interactive_title', lng), BOLD));
+  print(c('  ' + getMessage('config_nervous.current_mode', lng, { mode: ns.mode }), DIM));
   print('');
-  print('  Available presets:');
+  print('  ' + getMessage('config_nervous.available_presets', lng));
   VALID_PRESETS.forEach((p, i) => {
-    const active = p === ns.mode ? c(' (current)', MAGENTA) : '';
-    print(`    ${i + 1}. ${c(p, CYAN)}${active} — ${PRESET_DESCRIPTIONS[p]!.description}`);
+    const active = p === ns.mode ? c(getMessage('config_nervous.preset_current', lng), MAGENTA) : '';
+    print(`    ${i + 1}. ${c(p, CYAN)}${active} — ${getMessage(PRESET_DESC_KEY[p]!, lng)}`);
   });
   print('');
 
   // Check if stdin is a TTY — if not, just show current config
   if (!process.stdin.isTTY) {
-    print(c('  (Non-interactive mode — use subcommands to modify config)', DIM));
-    print(`  Mode: ${c(ns.mode, MAGENTA)}`);
+    print(c('  ' + getMessage('config_nervous.non_interactive', lng), DIM));
+    print(`  ${getMessage('config_nervous.ni_mode', lng, { mode: c(ns.mode, MAGENTA) })}`);
     const overrideCount = Object.keys(ns.actionOverrides ?? {}).length;
-    print(`  Overrides: ${overrideCount}`);
+    print(`  ${getMessage('config_nervous.ni_overrides', lng, { count: String(overrideCount) })}`);
     print('');
     return;
   }
@@ -300,27 +288,30 @@ async function handleInteractive(root: string): Promise<void> {
 
   try {
     const answer = await rl.question(
-      `  Select preset (1-${VALID_PRESETS.length}) or press Enter to keep "${ns.mode}": `,
+      '  ' + getMessage('config_nervous.select_prompt', lng, {
+        max: String(VALID_PRESETS.length),
+        mode: ns.mode,
+      }),
     );
 
     const trimmed = answer.trim();
     if (trimmed === '') {
-      print(c(`  No change — mode remains: ${ns.mode}`, DIM));
+      print(c('  ' + getMessage('config_nervous.no_change', lng, { mode: ns.mode }), DIM));
     } else {
       const num = parseInt(trimmed, 10);
       if (!isNaN(num) && num >= 1 && num <= VALID_PRESETS.length) {
         const selected = VALID_PRESETS[num - 1]!;
         const updated: NervousConfigSection = { ...ns, mode: selected };
         writeNervousSection(root, updated);
-        print(c(`  ✓ Mode updated to: ${selected}`, GREEN));
+        print(c('  ' + getMessage('config_nervous.mode_updated', lng, { mode: selected }), GREEN));
       } else {
         // Try as preset name
         if ((VALID_PRESETS as string[]).includes(trimmed)) {
           const updated: NervousConfigSection = { ...ns, mode: trimmed as AuthorityMode };
           writeNervousSection(root, updated);
-          print(c(`  ✓ Mode updated to: ${trimmed}`, GREEN));
+          print(c('  ' + getMessage('config_nervous.mode_updated', lng, { mode: trimmed }), GREEN));
         } else {
-          printError(`Invalid selection: "${trimmed}"`);
+          printError(getMessage('config_nervous.invalid_selection', lng, { value: trimmed }));
           process.exitCode = 1;
         }
       }
@@ -329,15 +320,15 @@ async function handleInteractive(root: string): Promise<void> {
     print('');
     const overrides = ns.actionOverrides ?? {};
     if (Object.keys(overrides).length > 0) {
-      print(c('  Active overrides:', BOLD));
+      print(c('  ' + getMessage('config_nervous.active_overrides', lng), BOLD));
       for (const [actionId, policy] of Object.entries(overrides)) {
         print(`    ${c(actionId, CYAN)} → ${policyColor(policy)}`);
       }
-      const resetAnswer = await rl.question('  Reset overrides? [y/N]: ');
+      const resetAnswer = await rl.question('  ' + getMessage('config_nervous.reset_prompt', lng));
       if (resetAnswer.trim().toLowerCase() === 'y') {
         const current = readNervousSection(root);
         writeNervousSection(root, { ...current, actionOverrides: {} });
-        print(c('  ✓ Overrides reset.', GREEN));
+        print(c('  ' + getMessage('config_nervous.overrides_reset', lng), GREEN));
       }
     }
   } finally {
@@ -365,9 +356,10 @@ export function registerConfigNervous(program: Command): void {
     .description(
       'Configure Nervous System authority mode and action overrides',
     )
-    .action(async () => {
+    .option('--lang <code>', 'Language override (en|tr)')
+    .action(async (_opts: unknown, cmd: Command) => {
       const root = resolveProjectRoot();
-      await handleInteractive(root);
+      await handleInteractive(root, langOf(cmd));
     });
 
   // deckent config nervous set mode <preset>
@@ -376,12 +368,14 @@ export function registerConfigNervous(program: Command): void {
     .description('Set a nervous system configuration value')
     .argument('<key>', 'Configuration key (e.g. mode)')
     .argument('<value>', 'Value to set')
-    .action((key: string, value: string) => {
+    .option('--lang <code>', 'Language override (en|tr)')
+    .action((key: string, value: string, _opts: unknown, cmd: Command) => {
       const root = resolveProjectRoot();
+      const lang = langOf(cmd);
       if (key === 'mode') {
-        handleSetMode(root, value);
+        handleSetMode(root, value, lang);
       } else {
-        printError(`Unknown nervous config key: "${key}". Supported: mode`);
+        printError(getMessage('config_nervous.unknown_key', lang, { key }));
         process.exitCode = 1;
       }
     });
@@ -390,26 +384,40 @@ export function registerConfigNervous(program: Command): void {
   nervousCmd
     .command('override <actionId> <policy>')
     .description('Set a per-action policy override')
-    .action((actionId: string, policy: string) => {
+    .option('--lang <code>', 'Language override (en|tr)')
+    .action((actionId: string, policy: string, _opts: unknown, cmd: Command) => {
       const root = resolveProjectRoot();
-      handleOverride(root, actionId, policy);
+      handleOverride(root, actionId, policy, langOf(cmd));
     });
 
   // deckent config nervous list
   nervousCmd
     .command('list')
     .description('Show current authority matrix with all presets')
-    .action(() => {
+    .option('--lang <code>', 'Language override (en|tr)')
+    .action((_opts: unknown, cmd: Command) => {
       const root = resolveProjectRoot();
-      handleList(root);
+      handleList(root, langOf(cmd));
     });
 
   // deckent config nervous reset
   nervousCmd
     .command('reset')
     .description('Reset all action overrides to preset defaults')
-    .action(() => {
+    .option('--lang <code>', 'Language override (en|tr)')
+    .action((_opts: unknown, cmd: Command) => {
       const root = resolveProjectRoot();
-      handleReset(root);
+      handleReset(root, langOf(cmd));
     });
+}
+
+/**
+ * Resolve --lang from a command, tolerating commander attaching the flag to an
+ * ancestor (`config nervous`) rather than the invoked sub-subcommand.
+ */
+function langOf(cmd: Command): string {
+  const own = (cmd.opts() as { lang?: string }).lang;
+  const parent = (cmd.parent?.opts() as { lang?: string } | undefined)?.lang;
+  const grand = (cmd.parent?.parent?.opts() as { lang?: string } | undefined)?.lang;
+  return getLanguage(own ?? parent ?? grand);
 }

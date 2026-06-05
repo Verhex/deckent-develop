@@ -287,6 +287,100 @@ const MESSAGES: MessageMap = {
     en: 'nervous: no pending notifications',
     tr: 'nervous: bekleyen bildirim yok',
   },
+  // ─── config nervous command (MSG-004, §4G) ───────────────────────────
+  'config_nervous.mode_set': { en: '✓ Mode set to: {preset}', tr: '✓ Mod ayarlandı: {preset}' },
+  'config_nervous.invalid_preset': {
+    en: 'Invalid preset: "{preset}". Valid values: {values}',
+    tr: 'Geçersiz preset: "{preset}". Geçerli değerler: {values}',
+  },
+  'config_nervous.invalid_action': {
+    en: 'Invalid action ID: "{id}". Run `deckent config nervous list` to see all 30 actions.',
+    tr: 'Geçersiz eylem ID: "{id}". Tüm eylemleri görmek için `deckent config nervous list` çalıştırın.',
+  },
+  'config_nervous.safety_floor_blocked': {
+    en: '⚠ Safety floor action "{id}" cannot be set to "{policy}".',
+    tr: '⚠ Safety floor eylemi "{id}" "{policy}" yapılamaz.',
+  },
+  'config_nervous.safety_floor_note': {
+    en: 'Safety floor actions always require explicit user approval.',
+    tr: 'Safety floor eylemleri her zaman açık kullanıcı onayı gerektirir.',
+  },
+  'config_nervous.invalid_policy': {
+    en: 'Invalid policy: "{policy}". Valid values: {values}',
+    tr: 'Geçersiz policy: "{policy}". Geçerli değerler: {values}',
+  },
+  'config_nervous.override_set': {
+    en: '✓ Override set: {id} → {policy}',
+    tr: '✓ Override ayarlandı: {id} → {policy}',
+  },
+  'config_nervous.matrix_title': {
+    en: 'Nervous System Authority Matrix:',
+    tr: 'Nervous System Yetki Matrisi:',
+  },
+  'config_nervous.col_preset': { en: 'Preset', tr: 'Preset' },
+  'config_nervous.col_low': { en: 'Low Risk', tr: 'Düşük Risk' },
+  'config_nervous.col_medium': { en: 'Medium Risk', tr: 'Orta Risk' },
+  'config_nervous.col_high': { en: 'High Risk', tr: 'Yüksek Risk' },
+  'config_nervous.col_description': { en: 'Description', tr: 'Açıklama' },
+  'config_nervous.active_marker': { en: ' ◀ active', tr: ' ◀ aktif' },
+  'config_nervous.preset_strict': {
+    en: 'Enterprise / new user — all medium/high actions require approval',
+    tr: 'Enterprise / yeni kullanıcı — tüm medium/high eylemler onay bekler',
+  },
+  'config_nervous.preset_balanced': {
+    en: 'Default — low-risk autonomous, medium 30m suggestion, high approval',
+    tr: 'Varsayılan — düşük risk otonom, orta 30dk öneri, yüksek onay',
+  },
+  'config_nervous.preset_autopilot': {
+    en: 'Trusted user — low/medium autonomous, high 5m suggestion',
+    tr: 'Güvenilir kullanıcı — düşük/orta otonom, yüksek 5dk öneri',
+  },
+  'config_nervous.preset_full_auto': {
+    en: 'CI/CD / hands-off — all autonomous (except safety floor)',
+    tr: 'CI/CD / hands-off — tümü otonom (safety floor hariç)',
+  },
+  'config_nervous.active_overrides': { en: 'Active Overrides:', tr: 'Aktif Override\'lar:' },
+  'config_nervous.no_overrides': { en: 'No active overrides.', tr: 'Aktif override yok.' },
+  'config_nervous.safety_floor_label': {
+    en: 'Safety Floor (always approve):',
+    tr: 'Safety Floor (her zaman onay):',
+  },
+  'config_nervous.reset_done': {
+    en: '✓ Action overrides reset to preset defaults.',
+    tr: '✓ Eylem override\'ları preset varsayılanına sıfırlandı.',
+  },
+  'config_nervous.interactive_title': {
+    en: '🧠 Nervous System Configuration',
+    tr: '🧠 Nervous System Yapılandırması',
+  },
+  'config_nervous.current_mode': { en: 'Current mode: {mode}', tr: 'Mevcut mod: {mode}' },
+  'config_nervous.available_presets': { en: 'Available presets:', tr: 'Mevcut presetler:' },
+  'config_nervous.preset_current': { en: ' (current)', tr: ' (mevcut)' },
+  'config_nervous.non_interactive': {
+    en: '(Non-interactive mode — use subcommands to modify config)',
+    tr: '(Etkileşimsiz mod — değiştirmek için subcommand kullanın)',
+  },
+  'config_nervous.ni_mode': { en: 'Mode: {mode}', tr: 'Mod: {mode}' },
+  'config_nervous.ni_overrides': { en: 'Overrides: {count}', tr: 'Override: {count}' },
+  'config_nervous.select_prompt': {
+    en: 'Select preset (1-{max}) or press Enter to keep "{mode}": ',
+    tr: 'Preset seç (1-{max}) veya "{mode}" için Enter: ',
+  },
+  'config_nervous.no_change': {
+    en: 'No change — mode remains: {mode}',
+    tr: 'Değişiklik yok — mod: {mode}',
+  },
+  'config_nervous.mode_updated': { en: '✓ Mode updated to: {mode}', tr: '✓ Mod güncellendi: {mode}' },
+  'config_nervous.invalid_selection': {
+    en: 'Invalid selection: "{value}"',
+    tr: 'Geçersiz seçim: "{value}"',
+  },
+  'config_nervous.reset_prompt': { en: 'Reset overrides? [y/N]: ', tr: 'Override\'ları sıfırla? [y/N]: ' },
+  'config_nervous.overrides_reset': { en: '✓ Overrides reset.', tr: '✓ Override\'lar sıfırlandı.' },
+  'config_nervous.unknown_key': {
+    en: 'Unknown nervous config key: "{key}". Supported: mode',
+    tr: 'Bilinmeyen nervous config anahtarı: "{key}". Desteklenen: mode',
+  },
 
   // ─── spawn command ─────────────────────────────────────────────────
   'spawn.worker_spawned': {
