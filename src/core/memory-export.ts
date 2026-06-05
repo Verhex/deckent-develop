@@ -206,6 +206,12 @@ export function exportDebtMd(store: MemoryStore): string {
   lines.push('');
 
   const allDebt = store.getByType('debt');
+
+  if (allDebt.length === 0) {
+    lines.push('_No technical debt recorded._');
+    return lines.join('\n');
+  }
+
   const active = allDebt.filter(d => d.status !== 'resolved');
   const resolved = allDebt.filter(d => d.status === 'resolved');
 
@@ -391,6 +397,7 @@ const GUARDED_EXPORT_SPECS: GuardedExportSpec[] = [
   { name: 'summary.md',   render: exportSummaryMd,   entryType: 'adr',    emptyMarker: '_No architecture decisions recorded._' },
   { name: 'decisions.md', render: exportDecisionsMd, entryType: 'adr',    emptyMarker: '_No architecture decisions recorded._' },
   { name: 'memory.md',    render: exportMemoryMd,    entryType: 'memory', emptyMarker: '_No learnings recorded._' },
+  { name: 'debt.md',      render: exportDebtMd,      entryType: 'debt',   emptyMarker: '_No technical debt recorded._' },
 ];
 
 /**
@@ -402,8 +409,7 @@ const GUARDED_EXPORT_SPECS: GuardedExportSpec[] = [
  * previous on-disk file and surfacing a warning. Blocks the wipe path
  * observed in sprint-226 (decisions.md 8518→2 lines while DB held 75 ADRs).
  *
- * `debt.md` is written unconditionally (its renderer always emits a
- * non-empty table header; debt loss was not the catastrophic case).
+ * All four export files (summary, decisions, memory, debt) are guarded.
  */
 export function writeGuardedExports(
   store: MemoryStore,
@@ -431,14 +437,6 @@ export function writeGuardedExports(
 
     writeFileSync(filePath, content, 'utf-8');
     result.written.push(spec.name);
-  }
-
-  try {
-    const debtContent = exportDebtMd(store);
-    writeFileSync(join(exportsDir, 'debt.md'), debtContent, 'utf-8');
-    result.written.push('debt.md');
-  } catch (e) {
-    result.warnings.push(`debt.md: ${e instanceof Error ? e.message : String(e)}`);
   }
 
   return result;

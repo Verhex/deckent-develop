@@ -655,6 +655,65 @@ export function wireHandoffsForCompletedTasks(
 }
 
 /**
+ * Mark pending handoffs as failed for tasks evaluated as NO_GO.
+ * Prevents downstream tasks from seeing a valid handoff from a failed source.
+ * Called after EVALUATE phase. Exported for testability.
+ */
+export function failHandoffsForNoGoTasks(
+  projectRoot: string,
+  _sprint: Sprint,
+  evaluations: Map<string, TaskEvaluation>,
+): void {
+  const noGoTaskIds = new Set<string>();
+  for (const [taskId, eval_] of evaluations) {
+    if (eval_ === TaskEvaluation.NO_GO) noGoTaskIds.add(taskId);
+  }
+  if (noGoTaskIds.size === 0) return;
+
+  const handoffProtocol = new HandoffProtocol(projectRoot);
+  const allHandoffs = handoffProtocol.listHandoffs();
+
+  for (const handoff of allHandoffs) {
+    if (handoff.status !== 'pending') continue;
+    if (noGoTaskIds.has(handoff.fromTaskId)) {
+      try {
+        handoffProtocol.failHandoff(handoff.id, `Source task ${handoff.fromTaskId} evaluated as NO_GO`);
+      } catch (e) { debugLog('failHandoffsForNoGoTasks:failHandoff', e); }
+    }
+  }
+}
+
+/**
+ * Emit a BRAIN→AUDITOR:HANDOFF_SUMMARY event with listHandoffs() state.
+ * Called at sprint finalize/observability. Exported for testability.
+ */
+export function summarizeHandoffsObservability(
+  projectRoot: string,
+  sprint: Sprint,
+): void {
+  const handoffProtocol = new HandoffProtocol(projectRoot);
+  const handoffs = handoffProtocol.listHandoffs();
+  if (handoffs.length === 0) return;
+
+  const summary = {
+    total: handoffs.length,
+    ready: handoffs.filter(h => h.status === 'ready').length,
+    failed: handoffs.filter(h => h.status === 'failed').length,
+    pending: handoffs.filter(h => h.status === 'pending').length,
+    handoffs: handoffs.map(h => ({ id: h.id, from: h.fromTaskId, to: h.toTaskId, status: h.status, failReason: h.failReason })),
+  };
+
+  try {
+    const sid = getCurrentSprintId(projectRoot) ?? sprint.id;
+    writeEvent(
+      projectRoot, sid, 'brain', 'auditor',
+      'BRAIN→AUDITOR:HANDOFF_SUMMARY',
+      { sprintId: sprint.id, ...summary, timestamp: new Date().toISOString() },
+    );
+  } catch (e) { debugLog('summarizeHandoffsObservability:writeEvent', e); }
+}
+
+/**
  * Create and start a HeartbeatDaemon for the sprint duration.
  * Returns null when enabled=false (opt-out). Exported for testability.
  */
@@ -1238,6 +1297,11 @@ export async function runSprint(
     undefined, undefined, deferredTaskIds, { enforceDispatchGate: true },
   );
 
+  // Mark pending handoffs from NO_GO tasks as failed (downstream integrity)
+  try {
+    failHandoffsForNoGoTasks(projectRoot, sprint, evaluations);
+  } catch (e) { debugLog('runSprint:failHandoffs', e); }
+
   // Honesty Check Metrics
   {
     const HONESTY_PATTERNS = [/pre-existing/i, /unrelated/i];
@@ -1295,6 +1359,11 @@ export async function runSprint(
 
   // Phase-transition checkpoint: FIX complete
   try { writePhaseCheckpoint(projectRoot, sprint, sprint.phase); } catch (e) { debugLog('runSprint:checkpoint:fix', e); }
+
+  // Handoff observability: summarize all handoff states for audit/event-stream
+  try {
+    summarizeHandoffsObservability(projectRoot, sprint);
+  } catch (e) { debugLog('runSprint:handoffSummary', e); }
 
   // Nervous System: FIX→RETRO
   emitPhaseChange(SprintPhase.FIX, SprintPhase.RETRO, sprint.id);

@@ -510,12 +510,66 @@ export async function waitForResults(
       if (resultExists) {
         const result = readJsonSafe<TaskResult>(resultPath);
         if (result) {
+          // Sprint 231 T1 — synthetic exit-0-no-result uniform disk-verify gate.
+          // Docker EXIT trap (spawn-backend-docker.ts) writes a NO_GO `.result`
+          // when the worker exits cleanly without producing one. Shape:
+          //   selfAssessment="NO_GO" + filesChanged=[] +
+          //   notes "Worker exited without writing result (exitCode=...)".
+          // Without this gate the `.result`-exists branch would skip disk-verify
+          // and mask real on-disk work — non-uniform with the timeout-path
+          // (lines 543-613) which already runs verifyDiskAgainstClaim. Mirror
+          // that pattern: if disk evidence exists, enrich filesChanged/linesAdded
+          // in place, reclassify task status to MANUAL_REVIEW_REQUIRED, and
+          // emit BRAIN→AUDITOR:DISK_VS_CLAIM_MISMATCH. Disk-evidence absent →
+          // NO_GO stays (legacy behavior preserved).
+          const isSyntheticExitNoResult =
+            result.selfAssessment === 'NO_GO'
+            && (!result.filesChanged || result.filesChanged.length === 0)
+            && typeof result.notes === 'string'
+            && result.notes.includes('Worker exited without writing result');
+          let reclassifyToManualReview = false;
+          if (isSyntheticExitNoResult) {
+            const taskForScope = taskMap.get(taskId);
+            const diskVerify = taskForScope
+              ? verifyDiskAgainstClaim(projectRoot, taskForScope.scope)
+              : { hasDiskEvidence: false, linesAdded: 0, untrackedFiles: [] as string[] };
+            if (diskVerify.hasDiskEvidence) {
+              result.filesChanged = diskVerify.untrackedFiles;
+              result.linesAdded = diskVerify.linesAdded;
+              result.notes =
+                `${result.notes} | disk-verify found evidence ` +
+                `(linesAdded=${diskVerify.linesAdded}, ` +
+                `untrackedFiles=${diskVerify.untrackedFiles.length}). ` +
+                `Status reclassified as MANUAL_REVIEW_REQUIRED — see sprint events.`;
+              reclassifyToManualReview = true;
+              try {
+                writeEvent(
+                  projectRoot,
+                  sprint.id,
+                  'brain',
+                  'auditor',
+                  DISK_VS_CLAIM_MISMATCH_CHANNEL,
+                  {
+                    taskId,
+                    linesAdded: diskVerify.linesAdded,
+                    untrackedFiles: diskVerify.untrackedFiles,
+                    cause: 'exit-0-no-result',
+                    emittedAt: new Date().toISOString(),
+                  },
+                );
+              } catch (e) { debugLog('collectResults:syntheticDiskVerifyEmit', e); }
+            }
+          }
           enrichResultTokenUsage(result, taskMap.get(taskId), projectRoot);
           sanitizeResultHostFacingFiles(projectRoot, sprint.id, taskId, result.filesChanged);
           results.push(result);
           collected.add(taskId);
           newlyCollected.push(taskId);
           syncTaskStatusFromResult(taskId, result);
+          if (reclassifyToManualReview) {
+            const taskRef = taskMap.get(taskId);
+            if (taskRef) taskRef.status = TaskStatus.MANUAL_REVIEW_REQUIRED;
+          }
           metric('result.collected', 1, { taskId });
           continue;
         }

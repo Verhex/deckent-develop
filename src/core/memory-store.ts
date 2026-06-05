@@ -845,8 +845,9 @@ export class MemoryStore {
     // If a single decay batch would wipe more than CATASTROPHIC_RATIO of all
     // non-exempt active entries — and the batch is itself large enough to be
     // "catastrophic" (>= CATASTROPHIC_BATCH_MIN) — abort, warn, and preserve.
-    // The MIN_BATCH gate keeps the guard from firing on tiny dev/test DBs.
-    const CATASTROPHIC_BATCH_MIN = 10;
+    // Floor=3: batches of 1-2 entries are never catastrophic regardless of DB size;
+    // batches of 3+ that exceed 50% of non-exempt entries abort (small DB included).
+    const CATASTROPHIC_BATCH_MIN = 3;
     const CATASTROPHIC_RATIO = 0.5; // > 0.5 → abort
 
     // Total non-exempt active entries (denominator for catastrophic ratio).
