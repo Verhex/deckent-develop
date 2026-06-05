@@ -25,8 +25,13 @@ export interface ParsedCommand {
   readonly id: string;
 }
 
-/** Outcome of attempting to resolve a gate for a given id. */
-export type ResolveOutcome = 'resolved' | 'not-found';
+/**
+ * Outcome of attempting to resolve a gate for a given id. The string forms get a
+ * generic ack; the object form lets a resolver supply its OWN reply text — used
+ * when approving a parked bot-action EXECUTES it and the user should see the
+ * execution result, not a generic "approved".
+ */
+export type ResolveOutcome = 'resolved' | 'not-found' | { readonly status: 'resolved'; readonly reply: string };
 
 /**
  * Resolves an approval gate. Injected so the router stays pure and gate-agnostic;
@@ -110,6 +115,11 @@ async function resolveAndAck(
   try {
     const outcome = await resolve(cmd.id, cmd.action);
     if (!reply) return;
+    if (typeof outcome === 'object') {
+      // Resolver supplied its own reply (e.g. a bot-action execution result).
+      await reply(channelId, outcome.reply);
+      return;
+    }
     const key =
       outcome === 'not-found'
         ? 'bot.not_found'

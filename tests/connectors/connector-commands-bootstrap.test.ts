@@ -115,6 +115,72 @@ describe('bootstrapConnectorCommands', () => {
     expect(chat).not.toHaveBeenCalled();
   });
 
+  it('approve <id> of a parked bot-action → executes it + replies the result (slice 2b)', async () => {
+    const { mkdtempSync, rmSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const { parkBotAction, listBotActions } = await import('../../src/connectors/bot-action-store.js');
+    const root = mkdtempSync(join(tmpdir(), 'bot2b-'));
+    try {
+      const fake = fakeConnector('telegram');
+      const id = parkBotAction(root, { tool: 'deckent_plan', args: { directive: 'S300' }, channelId: '555' });
+      const actionDispatcher = { dispatch: vi.fn(async () => 'PLAN CREATED: 3 tasks') };
+      await bootstrapConnectorCommands(root, cfg, { makeConnector: () => fake, actionDispatcher });
+
+      fake._emit(incoming(`approve ${id}`, '555'));
+      await vi.waitFor(() => expect(actionDispatcher.dispatch).toHaveBeenCalledWith('deckent_plan', { directive: 'S300' }));
+      await vi.waitFor(() => {
+        const texts = fake.sendMessage.mock.calls.map((c) => (c[0] as { text: string }).text);
+        expect(texts.some((t) => t.includes('PLAN CREATED'))).toBe(true);
+      });
+      expect(listBotActions(root)).toHaveLength(0); // consumed
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('approve a parked bot-action TWICE → executes once (idempotent, consume-once)', async () => {
+    const { mkdtempSync, rmSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const { parkBotAction } = await import('../../src/connectors/bot-action-store.js');
+    const root = mkdtempSync(join(tmpdir(), 'bot2b-'));
+    try {
+      const fake = fakeConnector('telegram');
+      const id = parkBotAction(root, { tool: 'deckent_kill', args: {}, channelId: '555' });
+      const actionDispatcher = { dispatch: vi.fn(async () => 'killed') };
+      await bootstrapConnectorCommands(root, cfg, { makeConnector: () => fake, actionDispatcher });
+
+      fake._emit(incoming(`approve ${id}`, '555'));
+      await vi.waitFor(() => expect(actionDispatcher.dispatch).toHaveBeenCalledTimes(1));
+      fake._emit(incoming(`approve ${id}`, '555'));
+      await new Promise((r) => setTimeout(r, 30));
+      expect(actionDispatcher.dispatch).toHaveBeenCalledTimes(1); // never twice
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('reject <id> of a parked bot-action → NOT executed, discarded', async () => {
+    const { mkdtempSync, rmSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const { parkBotAction, listBotActions } = await import('../../src/connectors/bot-action-store.js');
+    const root = mkdtempSync(join(tmpdir(), 'bot2b-'));
+    try {
+      const fake = fakeConnector('telegram');
+      const id = parkBotAction(root, { tool: 'deckent_cleanup', args: {}, channelId: '555' });
+      const actionDispatcher = { dispatch: vi.fn(async () => 'ran') };
+      await bootstrapConnectorCommands(root, cfg, { makeConnector: () => fake, actionDispatcher });
+
+      fake._emit(incoming(`reject ${id}`, '555'));
+      await vi.waitFor(() => expect(listBotActions(root)).toHaveLength(0)); // discarded
+      expect(actionDispatcher.dispatch).not.toHaveBeenCalled();            // never ran
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('unresolved $DECK token → skipped, nothing started, adapter null', async () => {
     const make = vi.fn();
     const { adapter } = await bootstrapConnectorCommands('/root',

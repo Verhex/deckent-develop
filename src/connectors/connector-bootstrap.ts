@@ -17,12 +17,20 @@ import {
   makeConnectorNotificationAdapter,
   type ConnectorTarget,
 } from './connector-notify-adapter.js';
-import { makeIncomingCommandRouter, type CommandResolver } from './incoming-command-router.js';
+import { makeIncomingCommandRouter, type CommandResolver, type ResolveOutcome } from './incoming-command-router.js';
 import { makeCommandResolver } from './incoming-command-resolver.js';
 import { chunkMessage, type ChatResponder } from './chat-bridge.js';
+import { takeBotAction } from './bot-action-store.js';
+import { createCliToolDispatcher } from '../cli/commands/chat-tool-bridge.js';
+import type { McpToolDispatcher } from '../cli/commands/chat-native.js';
 import { getMessage } from '../cli/helpers/messages.js';
 
 type NotifyConnectorsConfig = NonNullable<DeckentConfig['notify_connectors']>;
+
+/** Keep an executed-action reply within one Telegram message. */
+function truncate(text: string, limit = 3500): string {
+  return text.length > limit ? text.slice(0, limit) + '\n…(truncated)' : text;
+}
 
 export interface ConnectorBootstrapDeps {
   /** Test/override hook: construct a connector instead of lazy-loading the real module. */
@@ -113,6 +121,11 @@ export interface ConnectorCommandsDeps extends ConnectorBootstrapDeps {
    * a conversation head). Omit → non-command messages stay silently ignored.
    */
   chat?: ChatResponder;
+  /**
+   * Dispatcher that EXECUTES a parked bot-action when the user approves it (slice
+   * 2b). Default: the CLI tool bridge. Already-approved → raw (ungated) execution.
+   */
+  actionDispatcher?: McpToolDispatcher;
   /** Language for inbound acks. */
   lang?: string;
 }
@@ -144,8 +157,35 @@ export async function bootstrapConnectorCommands(
   notifyConnectors: NotifyConnectorsConfig | undefined,
   deps: ConnectorCommandsDeps = {},
 ): Promise<ConnectorCommandsHandle> {
-  const resolve = deps.resolve ?? makeCommandResolver(root);
   const lang = deps.lang ?? 'en';
+  const gateResolve = deps.resolve ?? makeCommandResolver(root);
+  const actionDispatcher = deps.actionDispatcher ?? createCliToolDispatcher();
+  // Composite resolver: a parked bot-action (slice 2b) is the THIRD gate type —
+  // unlike autonomous/nervous (consumed by their own loops), approving here
+  // EXECUTES the action in-process and replies the result. Falls through to the
+  // autonomous/nervous gate resolver when the id is not a parked bot-action.
+  const resolve: CommandResolver = async (id, action): Promise<ResolveOutcome> => {
+    const parked = takeBotAction(root, id); // consume-once → approve twice ≠ run twice
+    if (parked) {
+      if (action === 'reject') {
+        return { status: 'resolved', reply: getMessage('bot.action_rejected', lang, { tool: parked.tool }) };
+      }
+      try {
+        const result = await actionDispatcher.dispatch(parked.tool, parked.args);
+        const body = getMessage('bot.action_done', lang, { tool: parked.tool }) + '\n' + truncate(result);
+        return { status: 'resolved', reply: body };
+      } catch (err) {
+        return {
+          status: 'resolved',
+          reply: getMessage('bot.action_failed', lang, {
+            tool: parked.tool,
+            error: err instanceof Error ? err.message : String(err),
+          }),
+        };
+      }
+    }
+    return gateResolve(id, action);
+  };
   const targets: ConnectorTarget[] = [];
   const started: IMessageConnector[] = [];
 

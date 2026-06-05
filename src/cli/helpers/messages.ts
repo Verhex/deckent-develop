@@ -752,6 +752,18 @@ const MESSAGES: MessageMap = {
     en: '⚠️ Could not process that message — try again.',
     tr: '⚠️ Bu mesaj işlenemedi — tekrar dene.',
   },
+  'bot.action_done': {
+    en: '✅ Executed {tool}:',
+    tr: '✅ {tool} çalıştırıldı:',
+  },
+  'bot.action_rejected': {
+    en: '❌ Rejected — {tool} was not executed.',
+    tr: '❌ Reddedildi — {tool} çalıştırılmadı.',
+  },
+  'bot.action_failed': {
+    en: '⚠️ {tool} failed: {error}',
+    tr: '⚠️ {tool} başarısız: {error}',
+  },
 };
 
 /**
