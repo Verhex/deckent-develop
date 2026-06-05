@@ -73,7 +73,12 @@ export class TelegramConnector extends BaseConnector {
       });
     });
 
-    await this.bot.launch();
+    // Telegraf v4 launch() in long-polling mode does not resolve until stop() —
+    // awaiting it would hang startup. Fire it and return; polling runs in the
+    // background and the registered 'text' handler receives inbound messages.
+    void this.bot.launch().catch(() => {
+      // Launch/poll failure must not crash the host (BOT-002 inbound is best-effort).
+    });
     await super.start(config);
   }
 

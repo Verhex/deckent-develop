@@ -66,6 +66,22 @@ describe('TelegramConnector', () => {
     expect(connector.isHealthy()).toBe(true);
   });
 
+  it('start does NOT await launch() — resolves even though long-poll launch never settles (BOT-002)', async () => {
+    // Telegraf v4 launch() in long-polling mode does not resolve until stop();
+    // awaiting it would hang startup. start() must fire launch() and return.
+    const { MockTelegraf, instance } = createMockTelegraf();
+    instance.launch = vi.fn(() => new Promise<void>(() => {})); // never settles
+    const connector = new TelegramConnector(MockTelegraf as any);
+
+    await Promise.race([
+      connector.start(makeConfig()),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('start() hung on launch()')), 200)),
+    ]);
+
+    expect(instance.launch).toHaveBeenCalledTimes(1);
+    expect(connector.isStarted).toBe(true);
+  });
+
   it('start disabled — no-op, bot not created', async () => {
     const { MockTelegraf } = createMockTelegraf();
     const connector = new TelegramConnector(MockTelegraf as any);

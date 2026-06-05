@@ -17,6 +17,8 @@ import {
   makeConnectorNotificationAdapter,
   type ConnectorTarget,
 } from './connector-notify-adapter.js';
+import { makeIncomingCommandRouter, type CommandResolver } from './incoming-command-router.js';
+import { makeCommandResolver } from './incoming-command-resolver.js';
 
 type NotifyConnectorsConfig = NonNullable<DeckentConfig['notify_connectors']>;
 
@@ -97,4 +99,96 @@ export async function buildConnectorNotificationAdapter(
   const targets = await buildConnectorTargets(notifyConnectors, deps);
   if (targets.length === 0) return null;
   return makeConnectorNotificationAdapter(targets);
+}
+
+// ─── BOT-002 — inbound command transport ──────────────────────────────────
+
+export interface ConnectorCommandsDeps extends ConnectorBootstrapDeps {
+  /** Resolve an approval command. Default: disk-backed resolver bound to `root`. */
+  resolve?: CommandResolver;
+  /** Language for inbound acks. */
+  lang?: string;
+}
+
+export interface ConnectorCommandsHandle {
+  /**
+   * NotificationAdapter over the SAME inbound instances — one connector object
+   * per platform serves both directions (poll + send), so there is no second
+   * poller and no 409 conflict. Null when nothing was brought up.
+   */
+  readonly adapter: NotificationAdapter | null;
+  /** Stop every started connector (poller + send path). Best-effort. */
+  dispose(): Promise<void>;
+}
+
+/**
+ * Bring up each enabled connector in INBOUND mode (full start → non-blocking
+ * poll), register the approve/reject command router on it, and reply acks back
+ * through the same connector. Returns a NotificationAdapter over those instances
+ * so the outbound notify wire reuses them (see ConnectorCommandsHandle.adapter).
+ *
+ * Same fail-safe contract as the outbound bootstrap: unresolved $DECK token /
+ * missing chat_id / missing dep / start error → log + skip, never crash startup.
+ */
+export async function bootstrapConnectorCommands(
+  root: string,
+  notifyConnectors: NotifyConnectorsConfig | undefined,
+  deps: ConnectorCommandsDeps = {},
+): Promise<ConnectorCommandsHandle> {
+  const resolve = deps.resolve ?? makeCommandResolver(root);
+  const lang = deps.lang ?? 'en';
+  const targets: ConnectorTarget[] = [];
+  const started: IMessageConnector[] = [];
+
+  if (notifyConnectors) {
+    for (const id of SUPPORTED) {
+      const cfg = notifyConnectors[id];
+      if (!cfg?.enabled) continue;
+      if (!cfg.token || cfg.token.startsWith('$DECK:')) {
+        console.error(`[connector-bootstrap] ${id}: token unresolved/missing — skipping (check .deck)`);
+        continue;
+      }
+      if (!cfg.chat_id) {
+        console.error(`[connector-bootstrap] ${id}: chat_id missing — skipping`);
+        continue;
+      }
+
+      try {
+        const connector = deps.makeConnector ? deps.makeConnector(id) : await loadConnector(id);
+        if (!connector) continue;
+        const chatId = String(cfg.chat_id);
+        connector.onMessage(
+          makeIncomingCommandRouter({
+            authorizedChatIds: [chatId],
+            resolve,
+            reply: (channelId, text) =>
+              connector.sendMessage({ connector: connector.id, channelId, text }),
+            lang,
+          }),
+        );
+        // INBOUND: full start() — launches the poll (non-blocking) AND enables send.
+        await connector.start({ enabled: true, token: cfg.token });
+        started.push(connector);
+        targets.push({ connector, chatId });
+      } catch (err) {
+        console.error(
+          `[connector-bootstrap] ${id} inbound start failed — skipping: ` +
+            `${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    }
+  }
+
+  return {
+    adapter: targets.length > 0 ? makeConnectorNotificationAdapter(targets) : null,
+    async dispose(): Promise<void> {
+      for (const c of started) {
+        try {
+          await c.stop();
+        } catch {
+          // best-effort shutdown
+        }
+      }
+    },
+  };
 }
