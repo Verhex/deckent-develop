@@ -2,6 +2,34 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint232] - 2026-06-05
+
+### Added
+
+- 232-001 — [P0] decay_after_sprints config wire (PRIMARY kök)
+- 232-002 — [P0] learnings decay-exempt (memory/retro/sprint/pattern)
+- 232-003 — [P1] abort >= operatörü + WAL-safe deckent memory backup CLI
+- 232-004 — [P1] ci-sim SIGINT/SIGTERM restore handler (GAP A)
+- 232-005 — [P1] writeGuardedExports dbCount===0 disk-protect (GAP B)
+
+
+_Tasks: 7 total, 7 done, 0 tech debt, 0 no-go_
+
+## [1.0.0-beta.1-sprint231] - 2026-06-05
+
+### Added
+
+- 231-001 — [P0] exit-0-no-result uniform disk-verify (FALSE NO_GO kökü)
+- 231-002 — debt.md export-wipe guard (asimetri kapat)
+- 231-004 — [forward] HandoffProtocol recovery wiring (failHandoff + listHandoffs)
+
+### Fixed
+
+- 231-003 — decay catastrophic-abort küçük-DB bypass fix
+
+
+_Tasks: 4 total, 4 done, 0 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint230] - 2026-06-05
 
 ### Added

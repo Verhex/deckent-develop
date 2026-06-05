@@ -6327,3 +6327,54 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 230-008: 230-008 — [P0] Docker live-monitor wire (SSE mount + watch --follow + WorkerCard) (NO_GO)
 
 ---
+## Sprint 231 — sprint-231
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-06-05
+**Duration:** 675s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 4 |
+| Completed | 4 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 675221ms |
+
+### Tasks
+
+- 231-001: 231-001 — [P0] exit-0-no-result uniform disk-verify (FALSE NO_GO kökü) (DONE)
+- 231-002: 231-002 — debt.md export-wipe guard (asimetri kapat) (DONE)
+- 231-003: 231-003 — decay catastrophic-abort küçük-DB bypass fix (DONE)
+- 231-004: 231-004 — [forward] HandoffProtocol recovery wiring (failHandoff + listHandoffs) (DONE)
+
+---
+## Sprint 232 — sprint-232
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-06-05
+**Duration:** 1401s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 7 |
+| Completed | 7 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 1400680ms |
+
+### Tasks
+
+- 232-001: 232-001 — [P0] decay_after_sprints config wire (PRIMARY kök) (DONE)
+- 232-002: 232-002 — [P0] learnings decay-exempt (memory/retro/sprint/pattern) (DONE)
+- 232-003: 232-003 — [P1] abort >= operatörü + WAL-safe deckent memory backup CLI (DONE)
+- 232-004: 232-004 — [P1] ci-sim SIGINT/SIGTERM restore handler (GAP A) (DONE)
+- 232-005: 232-005 — [P1] writeGuardedExports dbCount===0 disk-protect (GAP B) (DONE)
+
+---

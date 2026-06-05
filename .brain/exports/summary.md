@@ -80,6 +80,10 @@
 | adr-086 | Native CLI Parity — F11 Feature Set (Sprint 224) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-232 Learnings** (sprint-232): ## Sprint sprint-232 Learnings
+
+## Gains
+- 232-001 — [P0] decay_after_sprints config wire (PRIMARY kök) — Sprint 232 ...
 - **Sprint sprint-229 Learnings** (sprint-229): ## Sprint sprint-229 Learnings
 
 ## Gains
@@ -103,13 +107,12 @@
 - **Sprint 221 Learnings** (sprint-221): - Sprint sprint-221 Learnings: ## Sprint sprint-221 Learnings
 - **Sprint 220 Learnings** (sprint-220): - Sprint sprint-220 Learnings: ## Sprint sprint-220 Learnings
 - 220-003 — Agentic REPL canlı MCP dispatch (doğal dil→...
-- **Sprint 219 Learnings** (sprint-219): - Sprint sprint-219 Learnings: ## Sprint sprint-219 Learnings
-- 219-010 — Dashboard cache-bust + tarayıcı-e2e smoke (...
 
 ## Active Technical Debt
 _No active technical debt._
 
 ## Active Patterns
 - Violation pattern: stale_heartbeat
+- Violation pattern: file_outside_scope
 
-_Total entries: 206 | Generated: 2026-06-04_
+_Total entries: 222 | Generated: 2026-06-05_

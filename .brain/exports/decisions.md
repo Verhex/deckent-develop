@@ -1967,6 +1967,56 @@ Bu ADR, ADR-028'in removal'ını TALEP ETMİYOR — yalnızca Sprint 142'de reas
 >
 > Behavior unchanged; documentation alignment only (records the real outcome vs the original plan).
 
+---
+
+## Sprint 230 Disposition Re-verification (2026-06-05)
+
+### `src/orchestra/multi-agent.ts` — NEW ENTRY (absent from original ADR-038)
+
+**Re-verification result:** 0-caller in production `src/` code confirmed.
+
+```
+grep -rl "from.*multi-agent" src/   # → empty (no production import)
+grep -rl "multi-agent" src/ --include="*.ts" | grep -v "multi-agent.ts"
+# → src/mcp/server.ts (doc comment only), src/cli/helpers/cursor-config.ts (doc comment only)
+```
+
+**Test callers (blocking deletion):**
+- `tests/orchestra/multi-agent.test.ts` — imports `definePipeline`, `runPipeline`, `PipelineStep`, `PipelineExecutor`
+- `tests/core/error-handling-unification.test.ts` — dynamically imports `definePipeline`
+
+**Disposition decision: DEFER — test cleanup required before deletion.**
+`multi-agent.ts` is a 0-caller orphan in production code. However, deleting the source file
+without also removing its test callers would break the test suite. Removing those test files
+was outside the Sprint 230 task scope. The module is retained; a future sprint must: (1)
+confirm no wiring value, (2) remove `tests/orchestra/multi-agent.test.ts` and the
+`multi-agent` sections in `tests/core/error-handling-unification.test.ts`, then (3) delete
+`src/orchestra/multi-agent.ts`.
+
+**Rollback:** N/A — no deletion performed.
+
+---
+
+### `src/orchestra/decision-replay.ts` — RE-VERIFIED (Kademe 3 status unchanged)
+
+**Re-verification result:** 0-caller in production `src/` code confirmed.
+
+```
+grep -rl "from.*decision-replay" src/   # → empty (no production import)
+```
+
+**Test callers (maintaining Kademe 3 protection):**
+- `tests/orchestra/decision-replay.test.ts` — imports `replayDecision`, `diffDecisions`
+- `tests/core/non-null-safety.test.ts` — imports `diffDecisions`
+
+**Disposition decision: KEEP — ADR-028 protection unchanged.**
+`decision-replay.ts` remains in Kademe 3 (ADR-028 V1 reference / audit tool). Production
+0-caller status confirmed as of Sprint 230. Test callers also prevent safe deletion without
+broader scope. ADR-028 amendment required before disposal; scheduled for reassessment
+Sprint 142+ (original plan), now overdue — escalate in next architecture review.
+
+**Rollback:** N/A — no changes to source file.
+
 
 ---
 

@@ -1,5 +1,15 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-232 Learnings
+- Sprint sprint-232 Learnings: ## Sprint sprint-232 Learnings
+
+## Gains
+- 232-001 — [P0] decay_after_sprints config wire (PRIMARY kök) — Sprint 232 PRIMARY memory-loss kök kapatıldı.
+- 232-002 — [P0] learnings decay-exempt (memory/retro/sprint/pattern) — Added decay_exempt:true to 6 locations in sprint-retro-writer.ts (writeRetrospective: sprint/retr...
+- 232-003 — [P1] abort >= operatörü + WAL-safe deckent memory backup CLI — Worker exited without writing result (exitCode=0)
+- 232-004 — [P1] ci-sim SIGINT/SIGTERM restore handler (GAP A) — Added SIGINT/SIGTERM signal handlers to scripts/test-ci-sim.mjs.
+- 232-005 — [P1] writeGuardedExports dbCount===0 disk-protect (GAP B) — Added dbCount===0 disk-protect guard to writeGuardedExports.
+
 ## Sprint sprint-229 Learnings
 - Sprint sprint-229 Learnings: ## Sprint sprint-229 Learnings
 

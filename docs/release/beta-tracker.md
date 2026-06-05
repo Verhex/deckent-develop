@@ -191,10 +191,10 @@ The Sprint 145-150 cutover table and Sprint 175 Embedded Web Terminal section co
 ---
 
 ## Current Status
-| Metrik | Değer |
+| Metric | Value |
 |--------|-------|
 | Version | 1.0.0-beta.1 |
-| Sprint | sprint-230 |
+| Sprint | sprint-232 |
 | MCP Tools | 32 |
 | MCP Resources | 8 |
 | CLI Commands | 54+ |
@@ -1049,14 +1049,14 @@ Every blocker was directly verified in the codebase. False claims have been corr
 ---
 
 ## Sprint Metrics
-| Metrik | Değer |
+| Metric | Value |
 |--------|-------|
-| Sprint | sprint-230 |
-| Toplam Task | 10 |
-| Tamamlanan | 8 |
+| Sprint | sprint-232 |
+| Total Tasks | 7 |
+| Completed | 7 |
 | Tech Debt | 0 |
-| No-Go | 2 |
-| Süre | 22dk 13sn |
+| No-Go | 0 |
+| Duration | 23dk 20sn |
 | Coverage | 0.0% |
 
 ## Sprint History (Sprint 136-166)
@@ -1573,7 +1573,7 @@ Cache only reduces cost — tokens still occupy the context window:
 - [CMA Quickstart](https://platform.claude.com/docs/en/managed-agents/quickstart) — Agent creation, sessions, streaming guide
 
 ## Sprint History
-_Sprint geçmişi yok._
+_No sprint history._
 
 ## Sprint 163 — Detailed Summary
 
