@@ -175,10 +175,22 @@ export interface DeckentConfig {
   // ─── Notifications ─────────────────────────────────────────────────
   /** Notify on sprint completion (default: false) */
   notify_on_complete?: boolean;
-  /** Notification channel */
+  /** Notification channel (legacy — superseded by notify_connectors; never wired) */
   notify_channel?: 'slack' | 'discord' | 'email' | 'webhook' | null;
-  /** Notification webhook URL */
+  /** Notification webhook URL (legacy — superseded by notify_connectors) */
   notify_url?: string | null;
+  /**
+   * Outbound messaging connectors (BOT-001, §4G). Sprint notifications fan out
+   * to each enabled connector at its chat_id. Tokens via .deck ($DECK:NAME),
+   * resolved at config load. Supersedes the legacy notify_channel/notify_url.
+   */
+  notify_connectors?: Partial<Record<'telegram' | 'discord', {
+    enabled: boolean;
+    /** Bot token — use "$DECK:TELEGRAM_TOKEN" (resolved from .deck). */
+    token: string;
+    /** Target chat/channel id the notifications are sent to. */
+    chat_id: string;
+  }>>;
 
   // ─── Telemetry ─────────────────────────────────────────────────────
   /** Telemetry enabled (default: false) */
@@ -505,6 +517,10 @@ export interface ResolvedConfig {
   decay_after_sprints?: number;
   patterns_enabled?: boolean;
   project_identity_enabled?: boolean;
+  /** Outbound messaging connectors (BOT-001, §4G) — passed through from project config, tokens .deck-resolved. */
+  notify_connectors?: DeckentConfig['notify_connectors'];
+  /** Notify on sprint completion (passed through). */
+  notify_on_complete?: boolean;
   // Auditor
   scan_interval?: number;
   heartbeat_timeout?: number;

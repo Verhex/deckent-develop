@@ -223,7 +223,13 @@ async function main(): Promise<void> {
     // runner. DECKENT_PARENT_PID is inherited from the MCP host that spawned us,
     // so lifecycle notify() calls reach the operator's terminal + notify-log.jsonl
     // instead of being silently dropped (the "safe-but-deaf" gap).
-    bootstrapNotifyDispatcher({ projectRoot });
+    // BOT-001: fan notifications out to messaging connectors (Telegram/Discord) too.
+    const { buildConnectorNotificationAdapter } = await import('../connectors/connector-bootstrap.js');
+    const connectorAdapter = await buildConnectorNotificationAdapter(config.notify_connectors);
+    bootstrapNotifyDispatcher({
+      projectRoot,
+      extraAdapters: connectorAdapter ? [connectorAdapter] : [],
+    });
 
     writeIpcStatus(ipcDir, {
       phase: 'RUNNING',

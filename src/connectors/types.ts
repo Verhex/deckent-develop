@@ -56,6 +56,14 @@ export interface IMessageConnector {
   /** Start the connector with the given config. No-op if config.enabled is false. */
   start(config: ConnectorConfig): Promise<void>;
 
+  /**
+   * Start in OUTBOUND-only mode (no inbound poller). For platforms whose full
+   * start() launches a blocking long-poll (Telegram), this brings up just the
+   * send path so an outbound-only notification wire never hangs. Defaults to
+   * start() in BaseConnector; the inbound poller belongs to BOT-002.
+   */
+  startOutbound?(config: ConnectorConfig): Promise<void>;
+
   /** Gracefully stop the connector, releasing resources. */
   stop(): Promise<void>;
 

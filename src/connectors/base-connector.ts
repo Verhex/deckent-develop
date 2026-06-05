@@ -38,6 +38,15 @@ export abstract class BaseConnector implements IMessageConnector {
   }
 
   /**
+   * Start in outbound-only mode. Default delegates to start(); subclasses whose
+   * start() launches a blocking inbound poller (Telegram) override this to bring
+   * up only the send path (BOT-001).
+   */
+  async startOutbound(config: ConnectorConfig): Promise<void> {
+    await this.start(config);
+  }
+
+  /**
    * Stop the connector and release resources.
    * Subclasses should call `super.stop()` after platform-specific cleanup.
    */

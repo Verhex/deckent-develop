@@ -77,6 +77,23 @@ export class TelegramConnector extends BaseConnector {
     await super.start(config);
   }
 
+  /**
+   * Outbound-only init (BOT-001): create the Telegraf instance for sending but
+   * do NOT call launch(). In long-polling mode Telegraf's launch() does not
+   * resolve until stop(), which would hang an awaited startup — and the inbound
+   * poller is BOT-002's concern. sendMessage() works without launch().
+   */
+  async startOutbound(config: ConnectorConfig): Promise<void> {
+    if (!config.enabled) {
+      await super.start(config);
+      return;
+    }
+    const TelegrafCtor = this.TelegrafClass ?? await this.loadTelegraf();
+    this.bot = new TelegrafCtor(config.token);
+    // No launch() — outbound only.
+    await super.start(config);
+  }
+
   async stop(): Promise<void> {
     if (this.bot) {
       this.bot.stop();
