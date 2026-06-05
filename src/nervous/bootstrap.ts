@@ -20,7 +20,11 @@ import { Proposer } from './proposer.js';
 import { NervousDispatcher } from './dispatcher.js';
 import { Executor } from './executor.js';
 import { NervousHistory } from './history.js';
-import { NervousIpcQueue } from './ipc-queue.js';
+import {
+  NervousIpcQueue,
+  writeNervousHeartbeat,
+  clearNervousHeartbeat,
+} from './ipc-queue.js';
 import type { ActionHandler, PendingApprovalStore } from './executor.js';
 import type {
   DetectorResult,
@@ -142,6 +146,13 @@ export function createNervousSystemIfEnabled(
     executor.resolveApproval(req.notificationId, req.decision);
   });
 
+  // APPROVE-007 (§4G): heartbeat so a separate `deckent nervous accept` process
+  // can detect a live executor and route approvals through the IPC queue (vs
+  // dismiss-only fallback). Cleared on dispose so liveness is accurate.
+  writeNervousHeartbeat(projectRoot);
+  const heartbeatTimer = setInterval(() => writeNervousHeartbeat(projectRoot), 2000);
+  if (typeof heartbeatTimer.unref === 'function') heartbeatTimer.unref();
+
   observer.on('detection', (result: DetectorResult, event: ObserverEvent) => {
     void runPipeline(result, event, decisionEngine, proposer, dispatcher, executor);
   });
@@ -166,6 +177,12 @@ export function createNervousSystemIfEnabled(
       pollHandle.dispose();
     } catch (err) {
       console.error('[NervousBootstrap] ipc poll dispose() failed:', err);
+    }
+    try {
+      clearInterval(heartbeatTimer);
+      clearNervousHeartbeat(projectRoot);
+    } catch (err) {
+      console.error('[NervousBootstrap] heartbeat cleanup failed:', err);
     }
   };
 

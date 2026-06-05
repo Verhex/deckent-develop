@@ -164,7 +164,7 @@ describe('deckent nervous CLI', () => {
   });
 
   // Test 3: accept → resolves approval
-  it('accepts a pending notification and moves to history', () => {
+  it('accept with no live executor → dismissed (removed, no execution; APPROVE-007)', () => {
     const notification = makeNotification({ id: 'ns-147-0042' });
     writePending(testRoot, [notification]);
 
@@ -175,17 +175,18 @@ describe('deckent nervous CLI', () => {
       program.parse(['node', 'deckent', 'nervous', 'accept', 'ns-147-0042'], { from: 'node' });
     });
 
-    expect(output).toContain('Accepted');
+    // No nervous executor running → accept falls back to dismiss-only.
+    expect(output.toLowerCase()).toContain('no live');
 
-    // Verify pending is now empty
+    // Removed from the pending queue.
     const pending = JSON.parse(readFileSync(join(testRoot, '.deckent', 'nervous-pending.json'), 'utf-8'));
     expect(pending).toHaveLength(0);
 
-    // Verify history has the record
-    const historyContent = readFileSync(join(testRoot, '.deckent', 'nervous-history.jsonl'), 'utf-8');
-    const record = JSON.parse(historyContent.trim()) as ExecutionRecord;
-    expect(record.decision).toBe('accepted');
-    expect(record.notificationId).toBe('ns-147-0042');
+    // No 'accepted' history record — nothing executed (audit honesty). The live
+    // IPC → executor → execute path is covered by tests/cli/nervous-ipc-route.test.ts.
+    let hist = '';
+    try { hist = readFileSync(join(testRoot, '.deckent', 'nervous-history.jsonl'), 'utf-8'); } catch { /* none */ }
+    expect(hist).not.toContain('"decision":"accepted"');
   });
 
   // Test 4: reject --reason → rejection recorded

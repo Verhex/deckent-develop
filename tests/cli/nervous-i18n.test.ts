@@ -72,10 +72,12 @@ describe('nervous CLI i18n (MSG-002)', () => {
     expect(tr).not.toContain('No pending notifications');
   });
 
-  it('accept confirmation is localized', async () => {
+  it('accept confirmation is localized (dismiss fallback — no live executor)', async () => {
     plantPending(mockRoot, 'n1');
+    // No nervous executor runs in this test → accept falls back to dismiss
+    // (APPROVE-007); the fallback message is localized too.
     const tr = await captureStdout(() => runCli(['nervous', 'accept', 'n1', '--lang', 'tr']));
-    expect(tr).toContain('Kabul edildi');
+    expect(tr).toContain('kapatıldı');
   });
 
   it('history empty-state is localized', async () => {

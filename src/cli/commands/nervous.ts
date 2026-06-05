@@ -18,6 +18,7 @@ import type {
   Severity,
 } from '../../core/nervous-types.js';
 import { getActiveDirectivesProtection } from '../../nervous/observer.js';
+import { NervousIpcQueue, isNervousPollerAlive } from '../../nervous/ipc-queue.js';
 
 // ─── ANSI Color Helpers ─────────────────────────────────────────────────────
 
@@ -239,7 +240,7 @@ function showDashboard(root: string, lang: string): void {
 
 // ─── Accept Action ──────────────────────────────────────────────────────────
 
-function handleAccept(root: string, id: string, lang: string): void {
+async function handleAccept(root: string, id: string, lang: string): Promise<void> {
   const pending = readPendingNotifications(root);
   const idx = pending.findIndex(n => n.id === id || n.id.startsWith(id));
 
@@ -250,21 +251,29 @@ function handleAccept(root: string, id: string, lang: string): void {
   }
 
   const notification = pending[idx]!;
-  const record = generateRecordForDecision(notification, 'accepted');
-  appendHistoryRecord(root, record);
+  const action = notification.actions[0]?.id ?? notification.id;
 
-  // Remove from pending
+  // APPROVE-007 (§4G): when a nervous executor is live, route the decision
+  // through the IPC queue — the executor executes the action AND owns the
+  // pending-queue + history (single writer; no two-writer race). The CLI must
+  // NOT mutate pending/history here.
+  if (isNervousPollerAlive(root)) {
+    await new NervousIpcQueue(root).writeApproval({ notificationId: notification.id, decision: 'accepted' });
+    print(colorize('  ' + getMessage('nervous.sent_to_executor', lang, { action }), GREEN));
+    return;
+  }
+
+  // Dismiss-only fallback: no live executor → the action CANNOT run. Remove it
+  // from the queue but do NOT write an 'accepted' history record (that would be
+  // an audit lie — nothing executed). Warn the operator.
   pending.splice(idx, 1);
   writePendingNotifications(root, pending);
-
-  print(colorize('  ' + getMessage('nervous.accepted', lang, {
-    action: notification.actions[0]?.id ?? notification.id,
-  }), GREEN));
+  print(colorize('  ' + getMessage('nervous.dismissed_no_executor', lang, { action }), YELLOW));
 }
 
 // ─── Reject Action ──────────────────────────────────────────────────────────
 
-function handleReject(root: string, id: string, lang: string, reason?: string): void {
+async function handleReject(root: string, id: string, lang: string, reason?: string): Promise<void> {
   const pending = readPendingNotifications(root);
   const idx = pending.findIndex(n => n.id === id || n.id.startsWith(id));
 
@@ -275,16 +284,26 @@ function handleReject(root: string, id: string, lang: string, reason?: string): 
   }
 
   const notification = pending[idx]!;
+  const action = notification.actions[0]?.id ?? notification.id;
+
+  // APPROVE-007: route to the live executor so its parked approval promise
+  // actually resolves (else it hangs). The executor records the rejection.
+  if (isNervousPollerAlive(root)) {
+    await new NervousIpcQueue(root).writeApproval({ notificationId: notification.id, decision: 'rejected', reason });
+    print(colorize('  ' + getMessage('nervous.sent_to_executor', lang, { action }), GREEN));
+    return;
+  }
+
+  // Fallback: reject does not execute anything, so recording 'rejected' + removing
+  // from the queue is the complete, honest outcome even without a live executor.
   const record = generateRecordForDecision(notification, 'rejected', reason);
   appendHistoryRecord(root, record);
-
-  // Remove from pending
   pending.splice(idx, 1);
   writePendingNotifications(root, pending);
 
   const reasonStr = reason ? getMessage('nervous.reject_reason', lang, { reason }) : '';
   print(colorize('  ' + getMessage('nervous.rejected', lang, {
-    action: notification.actions[0]?.id ?? notification.id,
+    action,
     reason: reasonStr,
   }), RED));
 }
@@ -617,9 +636,9 @@ export function registerNervous(program: Command): void {
     .command('accept <id>')
     .description('Accept a pending nervous system suggestion')
     .option('--lang <code>', 'Language override (en|tr)')
-    .action((id: string, _opts: unknown, cmd: Command) => {
+    .action(async (id: string, _opts: unknown, cmd: Command) => {
       const root = resolveProjectRoot();
-      handleAccept(root, id, langOf(cmd));
+      await handleAccept(root, id, langOf(cmd));
     });
 
   // deckent nervous reject <id>
@@ -628,9 +647,9 @@ export function registerNervous(program: Command): void {
     .description('Reject a pending nervous system suggestion')
     .option('--reason <text>', 'Rejection reason')
     .option('--lang <code>', 'Language override (en|tr)')
-    .action((id: string, opts: { reason?: string }, cmd: Command) => {
+    .action(async (id: string, opts: { reason?: string }, cmd: Command) => {
       const root = resolveProjectRoot();
-      handleReject(root, id, langOf(cmd), opts.reason);
+      await handleReject(root, id, langOf(cmd), opts.reason);
     });
 
   // deckent nervous edit <id>

@@ -287,6 +287,14 @@ const MESSAGES: MessageMap = {
     en: 'nervous: no pending notifications',
     tr: 'nervous: bekleyen bildirim yok',
   },
+  'nervous.sent_to_executor': {
+    en: '✓ Sent to the nervous executor: {action}',
+    tr: '✓ Nervous executor\'a iletildi: {action}',
+  },
+  'nervous.dismissed_no_executor': {
+    en: '⚠ {action} — no live nervous process, dismissed without executing',
+    tr: '⚠ {action} — canlı nervous süreci yok, çalıştırılmadan kapatıldı',
+  },
   // ─── config nervous command (MSG-004, §4G) ───────────────────────────
   'config_nervous.mode_set': { en: '✓ Mode set to: {preset}', tr: '✓ Mod ayarlandı: {preset}' },
   'config_nervous.invalid_preset': {

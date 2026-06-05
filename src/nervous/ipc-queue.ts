@@ -17,8 +17,58 @@
 
 import { mkdir, readFile, readdir, rename, writeFile } from 'node:fs/promises';
 import { randomBytes } from 'node:crypto';
-import { existsSync } from 'node:fs';
-import { basename, join } from 'node:path';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { basename, dirname, join } from 'node:path';
+
+// ─── Nervous Poller Liveness (APPROVE-007, §4G) ───────────────────────────────
+//
+// A heartbeat file lets a short-lived CLI process (`deckent nervous accept`)
+// decide whether a long-running nervous executor is alive and will consume an
+// IPC approval. Heartbeat over raw-pid avoids pid-reuse false positives: a
+// crashed executor leaves a stale timestamp, and `staleMs` ages it out.
+
+/** Heartbeat file path under the nervous IPC dir. */
+export function heartbeatPath(projectRoot: string): string {
+  return join(projectRoot, '.deckent', 'nervous-ipc', 'heartbeat');
+}
+
+/** Stamp the heartbeat with the current time (best-effort, never throws). */
+export function writeNervousHeartbeat(projectRoot: string): void {
+  const p = heartbeatPath(projectRoot);
+  try {
+    mkdirSync(dirname(p), { recursive: true });
+    writeFileSync(p, String(Date.now()), 'utf-8');
+  } catch {
+    /* best-effort */
+  }
+}
+
+/** Remove the heartbeat (clean shutdown → immediately reports not-alive). */
+export function clearNervousHeartbeat(projectRoot: string): void {
+  try {
+    rmSync(heartbeatPath(projectRoot), { force: true });
+  } catch {
+    /* best-effort */
+  }
+}
+
+/**
+ * True when a fresh heartbeat (within `staleMs`) is present — i.e. a nervous
+ * executor is running and will consume IPC approvals. Note: this is a snapshot;
+ * the executor can still exit in the TOCTOU window between this check and the
+ * approval being consumed (handled by the caller's wording, not a guarantee).
+ */
+export function isNervousPollerAlive(projectRoot: string, staleMs = 5000): boolean {
+  const p = heartbeatPath(projectRoot);
+  if (!existsSync(p)) return false;
+  try {
+    const ts = parseInt(readFileSync(p, 'utf-8').trim(), 10);
+    if (!Number.isFinite(ts)) return false;
+    return Date.now() - ts < staleMs;
+  } catch {
+    return false;
+  }
+}
 
 // ─── Public Types ───────────────────────────────────────────────────────────
 
