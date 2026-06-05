@@ -73,20 +73,20 @@ describe("getTaskStatusColor", () => {
     expect(getTaskStatusColor("DONE")).toBe("text-green-400");
   });
 
-  it("returns blue for EXECUTING", () => {
-    expect(getTaskStatusColor("EXECUTING")).toBe("text-blue-400");
+  it("returns teal for EXECUTING", () => {
+    expect(getTaskStatusColor("EXECUTING")).toBe("text-brand-300");
   });
 
-  it("returns blue for TESTING", () => {
-    expect(getTaskStatusColor("TESTING")).toBe("text-blue-400");
+  it("returns teal for TESTING", () => {
+    expect(getTaskStatusColor("TESTING")).toBe("text-brand-300");
   });
 
-  it("returns blue for VERIFYING", () => {
-    expect(getTaskStatusColor("VERIFYING")).toBe("text-blue-400");
+  it("returns teal for VERIFYING", () => {
+    expect(getTaskStatusColor("VERIFYING")).toBe("text-brand-300");
   });
 
-  it("returns blue for CODING", () => {
-    expect(getTaskStatusColor("CODING")).toBe("text-blue-400");
+  it("returns teal for CODING", () => {
+    expect(getTaskStatusColor("CODING")).toBe("text-brand-300");
   });
 
   it("returns yellow for NO_GO", () => {
@@ -113,8 +113,8 @@ describe("getTaskStatusBg", () => {
     expect(getTaskStatusBg("DONE")).toContain("bg-green");
   });
 
-  it("returns blue bg for EXECUTING", () => {
-    expect(getTaskStatusBg("EXECUTING")).toContain("bg-blue");
+  it("returns teal bg for EXECUTING", () => {
+    expect(getTaskStatusBg("EXECUTING")).toContain("bg-brand");
   });
 
   it("returns yellow bg for NO_GO", () => {

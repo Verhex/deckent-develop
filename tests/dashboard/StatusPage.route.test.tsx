@@ -123,7 +123,7 @@ describe("dashboard/StatusPage — route wiring (189-006)", () => {
       const content = readFileSync(sidebarPath, "utf-8");
       expect(content).toContain("NavLink");
       expect(content).toContain("isActive");
-      expect(content).toContain("border-blue-500");
+      expect(content).toContain("border-gold");
     });
   });
 });

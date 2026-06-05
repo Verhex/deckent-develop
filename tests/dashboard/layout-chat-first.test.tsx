@@ -39,9 +39,9 @@ describe("Layout — chat-first nav ordering", () => {
     expect(content).toContain('groupLabel: "Yönet"');
   });
 
-  it("active-link styling is preserved (border-l-2 border-blue-500 on active)", () => {
+  it("active-link styling is preserved (border-l-2 border-gold on active)", () => {
     const content = layout();
-    expect(content).toContain("border-l-2 border-blue-500");
+    expect(content).toContain("border-l-2 border-gold");
     expect(content).toContain("isActive");
   });
 });

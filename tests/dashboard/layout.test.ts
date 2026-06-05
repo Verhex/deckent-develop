@@ -56,7 +56,7 @@ describe("dashboard layout + router + navigation", () => {
     it("has active link styling with bg-zinc-800 and blue border", () => {
       const content = layout();
       expect(content).toContain("bg-zinc-800");
-      expect(content).toContain("border-blue-500");
+      expect(content).toContain("border-gold");
     });
 
     it("sidebar uses bg-zinc-900 border-r border-zinc-800", () => {

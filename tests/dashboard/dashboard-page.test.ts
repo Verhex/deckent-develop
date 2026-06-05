@@ -51,7 +51,7 @@ describe("dashboard page — DashboardPage.tsx", () => {
     const content = readFileSync(filePath, "utf-8");
     expect(content).toContain("Progress");
     expect(content).toContain("bg-green-500");
-    expect(content).toContain("bg-blue-500");
+    expect(content).toContain("bg-brand-500");
     expect(content).toContain("bg-zinc-600");
     expect(content).toContain("done");
     expect(content).toContain("active");

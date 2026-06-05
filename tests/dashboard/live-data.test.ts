@@ -213,9 +213,9 @@ describe("dashboard/live-data — SprintPhaseTimeline", () => {
     }
   });
 
-  it("active phase has bg-blue-500 and animate-pulse", () => {
+  it("active phase has bg-brand-500 and animate-pulse", () => {
     const content = readFileSync(filePath, "utf-8");
-    expect(content).toContain("bg-blue-500");
+    expect(content).toContain("bg-brand-500");
     expect(content).toContain("animate-pulse");
   });
 

@@ -97,7 +97,7 @@ describe("AppShell — navigation", () => {
     expect(content).toContain("NavLink");
     expect(content).toContain("isActive");
     // Active state styling with blue accent border
-    expect(content).toContain("border-blue-500");
+    expect(content).toContain("border-gold");
   });
 
   it("uses useTranslation for i18n nav labels", () => {

@@ -45,20 +45,20 @@ describe("getCardColor", () => {
     expect(getCardColor("DONE")).toContain("green");
   });
 
-  it("returns blue for EXECUTING", () => {
-    expect(getCardColor("EXECUTING")).toContain("blue");
+  it("returns teal for EXECUTING", () => {
+    expect(getCardColor("EXECUTING")).toContain("brand");
   });
 
-  it("returns blue for CODING", () => {
-    expect(getCardColor("CODING")).toContain("blue");
+  it("returns teal for CODING", () => {
+    expect(getCardColor("CODING")).toContain("brand");
   });
 
-  it("returns blue for TESTING", () => {
-    expect(getCardColor("TESTING")).toContain("blue");
+  it("returns teal for TESTING", () => {
+    expect(getCardColor("TESTING")).toContain("brand");
   });
 
-  it("returns blue for VERIFYING", () => {
-    expect(getCardColor("VERIFYING")).toContain("blue");
+  it("returns teal for VERIFYING", () => {
+    expect(getCardColor("VERIFYING")).toContain("brand");
   });
 
   it("returns red for NO_GO", () => {
@@ -104,9 +104,9 @@ describe("getCardIconColor", () => {
     expect(getCardIconColor("DONE")).toBe("text-green-400");
   });
 
-  it("returns blue for active statuses", () => {
-    expect(getCardIconColor("EXECUTING")).toBe("text-blue-400");
-    expect(getCardIconColor("CODING")).toBe("text-blue-400");
+  it("returns teal for active statuses", () => {
+    expect(getCardIconColor("EXECUTING")).toBe("text-brand-300");
+    expect(getCardIconColor("CODING")).toBe("text-brand-300");
   });
 
   it("returns red for NO_GO", () => {
@@ -250,10 +250,10 @@ describe("TaskCard component", () => {
     expect(card.className).toContain("green");
   });
 
-  it("shows correct color for EXECUTING status (blue)", () => {
+  it("shows correct color for EXECUTING status (teal)", () => {
     renderWithProviders(<TaskCard task={makeTask({ status: "EXECUTING" })} />);
     const card = screen.getByTestId("task-card-041-001");
-    expect(card.className).toContain("blue");
+    expect(card.className).toContain("brand");
   });
 
   it("shows correct color for NO_GO status (red)", () => {
