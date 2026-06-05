@@ -412,8 +412,10 @@ Her sprint sonrası: `cp .brain/memory.db .brain/memory.db.bak` + `deckent memor
 
 | Epic | P | Task | Tier | Files (owner) | Bağımlılık |
 |------|---|------|------|---------------|-----------|
-| **WIRE** — NotifyDispatcher → CLI terminal | P0 | WIRE-001 `initializeNotifyDispatcher`'ı backend-agnostik helper'a çıkar | T0 | `core/notify-bootstrap.ts` | — |
-| | P0 | WIRE-002 CLI start + detached runner'dan notify-bootstrap çağır | T1 | `cli/commands/start.ts`, `orchestra/sprint-runner-entry.ts` | WIRE-001 |
+| **WIRE** — NotifyDispatcher → CLI terminal | P0 | ✅ WIRE-001 `initializeNotifyDispatcher`'ı backend-agnostik helper'a çıkar (`bootstrapNotifyDispatcher`) — server.ts delege, duplikasyon kaldırıldı | T0 | `core/notify-bootstrap.ts` | — |
+| | P0 | ✅ WIRE-002 CLI start + detached runner'dan notify-bootstrap çağır | T1 | `cli/commands/start.ts`, `orchestra/sprint-runner-entry.ts` | WIRE-001 |
+
+> **✅ WIRE epic el-kodlandı (2026-06-05, hand-code dogfood):** `bootstrapNotifyDispatcher` (string-free, CLI→extra→file adapter; `DECKENT_PARENT_PID` inherited-safe), `mcp/server.ts` delege (adapter sırası korundu), CLI `start` (dry-run öncesi) + detached `sprint-runner-entry` wire. **Delivery kanıtı:** `tests/core/notify-bootstrap.test.ts` 5/5 (notify('human-checkpoint-required')→file-adapter jsonl + extra-adapter + CLI stderr; critical=anında awaited, flaky değil). **Reachability:** `start --dry-run` gerçek-binary EXIT=0. tsc temiz, regresyon yok (server/notify/dispatcher 28 + start 18 yeşil). Kalan epic'ler (APPROVE→CONFIRM→MSG→REPL→DASH→BOT→DEFER) sprint'lerle.
 | **APPROVE** — park edilen onaylar çözülebilir | P0 | APPROVE-001 approval-adapter **dosya-aracılı cross-process** çözüm (decision persist; `request()` her tick yeniden okur) | T0 | `orchestra/autonomous/approval-adapter.ts` | — |
 | | P0 | APPROVE-002 autonomous CLI: `onTick` feedback + `approve/reject/pending` subcommand + audit-line i18n | T1 | `cli/commands/autonomous.ts` | APPROVE-001, MSG-001 |
 | | P0 | APPROVE-003 park-notification: ilk-enqueue'de **bir kez** `notify()` | T0 | `orchestra/autonomous/audit-adapter.ts` | WIRE-001 |

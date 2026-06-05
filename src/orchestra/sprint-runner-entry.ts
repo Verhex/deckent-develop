@@ -10,6 +10,7 @@
 import { readFileSync, writeFileSync, existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { redactSensitive } from './sensitive-redactor.js';
+import { bootstrapNotifyDispatcher } from '../core/notify-bootstrap.js';
 
 // ─── IPC File Names ──────────────────────────────────────────────
 export const IPC_CONFIG_FILE = 'config.json';
@@ -217,6 +218,12 @@ async function main(): Promise<void> {
     });
 
     const bootstrap = await bootstrapProviders(config, projectRoot);
+
+    // WIRE-002 (MASTER-PLAN §4G): wire DECKENT→USER:NOTIFY for this detached
+    // runner. DECKENT_PARENT_PID is inherited from the MCP host that spawned us,
+    // so lifecycle notify() calls reach the operator's terminal + notify-log.jsonl
+    // instead of being silently dropped (the "safe-but-deaf" gap).
+    bootstrapNotifyDispatcher({ projectRoot });
 
     writeIpcStatus(ipcDir, {
       phase: 'RUNNING',

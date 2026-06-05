@@ -14,6 +14,7 @@ import { print, printError, formatSprintSummary, formatTable } from '../helpers/
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getMessage } from '../helpers/messages.js';
 import { promptConfirm } from '../helpers/prompt.js';
+import { bootstrapNotifyDispatcher } from '../../core/notify-bootstrap.js';
 import { loadCostConfig, initCostConfig } from '../../core/cost-config-loader.js';
 import { estimateSprintCost, formatEstimate, type TaskCostInput } from '../../core/cost-calculator.js';
 import { evaluateCostGate } from '../../core/cost-gate.js';
@@ -276,6 +277,13 @@ export function registerStart(program: Command): void {
             return;
           }
         }
+
+        // WIRE-002 (MASTER-PLAN §4G): wire DECKENT→USER:NOTIFY to this terminal.
+        // Pure-CLI sprints previously had a null global dispatcher, so every
+        // notify() (task-done, sprint-finalized, human-checkpoint-required) was
+        // a silent no-op. Bootstrap once the command is committed to running so
+        // lifecycle notifications reach the operator + .deckent/notify-log.jsonl.
+        bootstrapNotifyDispatcher({ projectRoot: root });
 
         // Dry-run mode: plan only, no spawn
         if (opts.dryRun) {

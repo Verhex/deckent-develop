@@ -8,10 +8,8 @@ import { DECKENT_VERSION, DECKENT_DIR } from '../core/constants.js';
 import { registerTools } from './tools/index.js';
 import { registerResources } from './resources/index.js';
 import { McpNotificationAdapter } from '../core/notify-adapters/mcp-adapter.js';
-import { CliNotificationAdapter } from '../core/notify-adapters/cli-adapter.js';
-import { FileNotificationAdapter } from '../core/notify-adapters/file-adapter.js';
 import { NotifyDispatcher } from '../core/notification-dispatcher.js';
-import { setGlobalNotifyDispatcher } from '../core/notify-registry.js';
+import { bootstrapNotifyDispatcher } from '../core/notify-bootstrap.js';
 import {
   acquireSingletonLock,
   releaseSingletonLock,
@@ -111,32 +109,20 @@ export let mcpNotifyAdapter: McpNotificationAdapter | null = null;
  * Fire-and-forget at MCP startup so lifecycle hooks (sprint-controller,
  * sprint-finalizer, result-evaluator) can emit DECKENT→USER:NOTIFY.
  *
- * Sets DECKENT_PARENT_PID env for CliNotificationAdapter parent-TTY detection.
+ * Delegates the CLI + file adapter wiring to the backend-agnostic
+ * bootstrapNotifyDispatcher (WIRE-001), passing the MCP adapter as an extra so
+ * adapter order (CLI → MCP → file) and parent-TTY env setup stay identical.
  */
 export function initializeNotifyDispatcher(
   server: McpServer,
   projectRoot: string,
 ): NotifyDispatcher {
-  // Set parent PID env for CLI adapter (Claude Code terminal's stdout fd on Linux)
-  if (!process.env['DECKENT_PARENT_PID']) {
-    process.env['DECKENT_PARENT_PID'] = String(process.ppid);
-  }
-
-  const dispatcher = new NotifyDispatcher(1000); // 1s throttle (non-critical)
-
-  // CLI parent-TTY adapter
-  dispatcher.addAdapter(new CliNotificationAdapter());
-
-  // MCP notifications/message adapter (reuses the singleton bound below)
+  // MCP notifications/message adapter (reuses the singleton bound in createServer)
   const mcpAdapter = mcpNotifyAdapter ?? new McpNotificationAdapter(server);
-  dispatcher.addAdapter(mcpAdapter);
-
-  // File JSONL adapter (audit trail at .deckent/notify-log.jsonl)
-  const notifyLogPath = join(projectRoot, DECKENT_DIR, 'notify-log.jsonl');
-  dispatcher.addAdapter(new FileNotificationAdapter(notifyLogPath));
-
-  setGlobalNotifyDispatcher(dispatcher);
-  return dispatcher;
+  return bootstrapNotifyDispatcher({
+    projectRoot,
+    extraAdapters: [mcpAdapter],
+  });
 }
 
 export function createServer(): McpServer {
