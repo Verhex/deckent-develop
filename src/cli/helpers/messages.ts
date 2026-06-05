@@ -724,6 +724,22 @@ const MESSAGES: MessageMap = {
     en: '⚠️ No pending approval found (unknown or expired): {id}',
     tr: '⚠️ Bekleyen onay bulunamadı (bilinmiyor veya süresi doldu): {id}',
   },
+  'bot.listen_desc': {
+    en: 'Listen for inbound approve/reject commands from messaging connectors',
+    tr: 'Mesaj connector\'larından gelen approve/reject komutlarını dinle',
+  },
+  'bot.listen_none': {
+    en: 'No messaging connectors configured for inbound commands — nothing to listen on. Set notify_connectors.{telegram|discord}.{enabled,token,chat_id} (token via .deck).',
+    tr: 'Inbound komutlar için yapılandırılmış mesaj connector\'ı yok — dinlenecek bir şey yok. notify_connectors.{telegram|discord}.{enabled,token,chat_id} ayarla (token .deck ile).',
+  },
+  'bot.listen_active': {
+    en: '🟢 Listening for approve/reject on: {connectors}. Reply "approve <id>" or "reject <id>" from the configured chat. Ctrl-C to stop.',
+    tr: '🟢 approve/reject dinleniyor: {connectors}. Yapılandırılmış sohbetten "approve <id>" veya "reject <id>" yaz. Durdurmak için Ctrl-C.',
+  },
+  'bot.listen_stopped': {
+    en: 'Stopped listening for inbound commands.',
+    tr: 'Inbound komut dinleme durduruldu.',
+  },
 };
 
 /**

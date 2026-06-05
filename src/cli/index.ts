@@ -54,6 +54,7 @@ import { registerFlow } from './commands/flow.js';
 import { registerRbac } from './commands/rbac.js';
 import { registerEvolve } from './commands/evolve.js';
 import { registerAutonomous } from './commands/autonomous.js';
+import { registerBot } from './commands/bot.js';
 import { registerMcp } from './commands/mcp.js';
 import { showSplash } from './helpers/splash.js';
 import { installFatalHandlers } from './helpers/error-handler.js';
@@ -136,6 +137,7 @@ export function buildProgram(): Command {
   registerRbac(program);
   registerEvolve(program);
   registerAutonomous(program);
+  registerBot(program);
   registerMcp(program);
   registerHelp(program);
 

@@ -117,6 +117,8 @@ export interface ConnectorCommandsHandle {
    * poller and no 409 conflict. Null when nothing was brought up.
    */
   readonly adapter: NotificationAdapter | null;
+  /** Ids of the connectors actually listening (for the host banner). */
+  readonly active: ConnectorId[];
   /** Stop every started connector (poller + send path). Best-effort. */
   dispose(): Promise<void>;
 }
@@ -181,6 +183,7 @@ export async function bootstrapConnectorCommands(
 
   return {
     adapter: targets.length > 0 ? makeConnectorNotificationAdapter(targets) : null,
+    active: started.map((c) => c.id),
     async dispose(): Promise<void> {
       for (const c of started) {
         try {
