@@ -234,8 +234,24 @@ export async function planSprint(
 ): Promise<Sprint> {
   const sprintId = getNextSprintId(projectRoot);
   const defaultModel = recommendation.modelConstraint ?? config.activeModeConfig.default_model;
-  const planMode = options?.mode ?? config.activeModeConfig.brain_planning ?? 'auto';
+  let planMode = options?.mode ?? config.activeModeConfig.brain_planning ?? 'auto';
   const initialStatus = options?.asDraft ? TaskStatus.DRAFT : TaskStatus.PENDING;
+
+  // Sprint 238 İŞ1: Per-task `- Provider:`/`- Model:` directives are deterministic
+  // routing decisions that must be honored EXACTLY. AI planning cannot guarantee a
+  // 1:1 directive→task mapping (it may split/merge tasks), so whenever DIRECTIVES
+  // carry explicit provider/model overrides we route to structured planning in any
+  // mode — extending the existing auto→structured fallback (count-mismatch) below.
+  const parsedDirectives = parseStructuredDirectives(context.directives);
+  if (planMode !== 'structured' && parsedDirectives.some(t => t.provider || t.forceModel)) {
+    if (planMode === 'ai') {
+      console.error(
+        '[Brain] Per-task provider/model overrides present in DIRECTIVES — using ' +
+        'structured planning to honor them exactly (AI planning cannot guarantee exact routing).',
+      );
+    }
+    planMode = 'structured';
+  }
 
   const tasks: Task[] = [];
   let seq = 1;
@@ -306,7 +322,7 @@ export async function planSprint(
 
     if (callResult.ok) {
       plannerResult = callResult.data;
-      const directiveTaskCount = parseStructuredDirectives(context.directives).length;
+      const directiveTaskCount = parsedDirectives.length;
       if (planMode === 'auto' && directiveTaskCount > 0 && plannerResult.tasks.length < directiveTaskCount) {
         console.error(
           `[Brain] AI planner returned ${plannerResult.tasks.length} tasks, ` +
@@ -352,7 +368,7 @@ export async function planSprint(
 
   // Structured fallback (mode === 'structured' || AI fail + auto)
   if (!plannerResult && (planMode === 'structured' || planMode === 'auto')) {
-    const structuredTasks = parseStructuredDirectives(context.directives);
+    const structuredTasks = parsedDirectives;
     const directiveSources: Array<{ title: string; description: string; scope: TaskScope; provider?: import('../core/types.js').ProviderName; forceModel?: import('../core/types.js').ModelType; forceEffort?: import('../core/types.js').TaskEffort; testTarget?: string; forceAgent?: string; forceSkills?: string[]; excludeAgent?: string[]; excludeSkills?: string[]; priority?: import('../core/types.js').TaskPriority; dependencies?: string[]; authMode?: 'subscription' | 'api' }> =
       structuredTasks.length > 0
         ? structuredTasks
@@ -414,7 +430,7 @@ export async function planSprint(
   }
 
   // D) Safeguard: warn if AI planner produced >2x the directive task count
-  const directiveTaskCountForGuard = parseStructuredDirectives(context.directives).length;
+  const directiveTaskCountForGuard = parsedDirectives.length;
   if (directiveTaskCountForGuard > 0 && tasks.length > directiveTaskCountForGuard * 2) {
     console.error(
       `[Brain] Warning: ${tasks.length} tasks planned but directives only contain ${directiveTaskCountForGuard} tasks (>2x). ` +
