@@ -4,7 +4,7 @@ import type { TaskScope, ModelType, ResolvedConfig, PatternEntry, ProviderName }
 import { getModelTier } from '../core/types.js';
 import { getEquivalentModel, isModelAvailable } from '../core/model-equivalence.js';
 import type { ModelTier } from '../core/model-equivalence.js';
-import { getDefaultProviderName } from './sprint-utils.js';
+import { getDefaultProviderName, isAdapterProvider } from './sprint-utils.js';
 
 // ─── Tier Helpers ───────────────────────────────────────────────────
 
@@ -221,6 +221,13 @@ export function resolveTaskModel(
 
   // Layer 0: user override from DIRECTIVES.md — bypasses all auto-selection
   if (forceModel) {
+    // Sprint 236: adapter-providers (ollama) use dynamic, locally-pulled tags
+    // that aren't in the static PROVIDER_MODELS / TIER_PROVIDER_MAP — the user's
+    // forceModel is authoritative; skip the static-map availability/equivalence
+    // path (which would throw "No equivalent model" for an ollama tag).
+    if (isAdapterProvider(targetProvider)) {
+      return forceModel;
+    }
     // Validate forceModel against target provider; if mismatch, map to equivalent
     if (!isModelAvailable(forceModel, targetProvider)) {
       return getEquivalentModel(forceModel, targetProvider);

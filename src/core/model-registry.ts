@@ -358,6 +358,32 @@ export function registerOllamaModels(registry: ModelRegistry = modelRegistry): v
   }
 }
 
+// ─── On-demand dynamic Ollama tag registration (Sprint 236) ────────────────
+// The model-registry is the single source of truth every lookup reads
+// (getTier / getProviderForModel / resolveApiId / cost). A locally-pulled
+// Ollama tag (e.g. `qwen3.6:27b`) is NOT in the static catalog, so plan-time
+// lookups throw "Unknown model" before the OllamaAdapter ever runs. Registering
+// the tag on-demand makes it a first-class model across plan→route→spawn in ONE
+// move (vs special-casing every callsite). Idempotent. ONLY ollama tags are
+// auto-registered here — genuinely-unknown cloud models still throw (real-bug
+// signal preserved). tier='standard' routes it like a mid-tier worker; cost=0.
+export function ensureOllamaModelRegistered(
+  tag: string,
+  registry: ModelRegistry = modelRegistry,
+): void {
+  if (!tag || registry.has(tag)) return;
+  registry.register({
+    id: tag,
+    apiId: tag,
+    provider: 'ollama' as unknown as RegistryProviderName,
+    tier: 'standard',
+    contextWindow: 32_768,
+    costPerMillion: { input: 0, output: 0 },
+    capabilities: { streaming: true, toolUse: true, vision: false, codeExecution: false, reasoning: false },
+    status: 'ga',
+  });
+}
+
 // ─── Catalog Bootstrap (Sprint 190 W-F F-6/F-7) ────────────────────────────
 
 /** Bootstrap the singleton from the live models.dev catalog with 24h cache +

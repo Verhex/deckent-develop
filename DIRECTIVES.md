@@ -1,39 +1,47 @@
-# DIRECTIVES — Sprint 235: Per-Task Ollama Provider+Model Flow (gerçek ollama-sprint enabler)
+# DIRECTIVES — Sprint 236: Mixed-Fleet Finale — Ollama (qwen3.6) + Claude (sonnet) EŞZAMANLI
 
-## Goal: **`- Provider: ollama` + `- Model: <ollama-tag>` DIRECTIVES'te plan-time'dan sağ geçsin** → task.provider='ollama' + task.model='qwen3.6:27b' olarak OllamaAdapter.spawn'a (Sprint 234 routing) ulaşsın → qwen3.6 gerçek koşsun. Bugünkü zincir-kopukluğu (doğrulandı): `task-builder.ts` plan-time'da (a) `- Provider:`'ı `Object.keys(PROVIDER_MODEL_MAP)`'e karşı doğruluyor (satır 832/953) — ollama yoksa düşürür (oysa `task-router.ts:74 isProviderName` ollama'yı kabul ediyor = TUTARSIZLIK); (b) `- Model:`'i statik `ALL_MODELS`'e karşı doğruluyor (satır 816) — `qwen3.6:27b` registry'de yok → `undefined` → default model'e düşer (`refreshSupportedModels` OllamaAdapter cache'ini besliyor, ALL_MODELS'i DEĞİL). Sonuç: provider=ollama task **default sonnet** ile spawn → OllamaAdapter `/api/chat {model:sonnet}` → ollama'da yok → FAIL. Bu sprint zinciri kapatır → AS-2 Faz 2 tamam, gerçek ollama-sprint mümkün. F1-013 (Sprint 233) + spawn-routing (Sprint 234) ✅ ön-koşul.
+## Goal: **AS-2 vizyonunun ilk tam turu — tek sprint'te iki provider AYNI ANDA.** 1 task yerel **ollama (qwen3.6:27b, host node entry → localhost:11434)** + 1 task **claude (sonnet, docker backend)** — paralel, tek wave. Sprint 234 routing (`isAdapterProvider`) bunu sağlıyor: ollama task'ı host `OllamaAdapter.spawn`'a, claude task'ı docker backend'e gider — **aynı sprint'te eş-zamanlı.** İkisi de **basit dokümantasyon** görevi (düşük risk, gerçek-fayda, agentic loop'u kanıtlar). Bu, F1-013→234→235 zincirinin **canlı uçtan-uca mixed-fleet kanıtı**: qwen3.6 (claude değil!) gerçek bir deckent task'ı yapar, Brain GO verir; aynı anda claude/sonnet ikinci task'ı yapar.
 
 ## Ortak kurallar
-- **god-level, no-MVP** · **i18n-FIRST** (getMessage; internal muaf) · **No tech debt**.
-- **🔴 HERMETİK**: tmpdir + sandbox, async spawn (spawnSync/execSync YASAK), CI yeşil KORUNUR.
-- **🔴 SURGICAL** (core task-builder — yüksek-regresyon): minimum-diff; mevcut provider/model parse davranışı (claude/codex/gemini/opus/sonnet/haiku) BOZULMAZ; her iki parse site tutarlı.
-- **ADR-008:** task-builder import yönü temiz (circular dep YOK — `isAdapterProvider` sprint-utils'te; gerekirse core-level küçük helper veya doğrudan `provider==='ollama'` kontrolü, circular'dan kaçın).
-- ESM `.js`. Subscription. structured planning.
+- **i18n-FIRST** (user-facing string getMessage; doc içeriği muaf — markdown). **No tech debt.**
+- **🔴 distinct filesWrite** (parallel-safety): iki task farklı dosyaya yazar (collision yok) → tek wave eş-zamanlı.
+- ESM `.js`. Subscription. structured planning. `dependency_pipeline` açık ama bu sprint dependency yok (paralel).
 - **.result kontratı:** `docs/reference/api-surface.md`.
+- Not: doc-write task'ları (ADR-053 TaskType) → test/coverage beklenmez; goCriteria = doğru+eksiksiz markdown.
 
 ---
 
-## Task 1: 235-001 — [P0] Per-task ollama provider+model plan-time acceptance
-- Model: opus
-- Effort: high
-- Skills: typescript-expert
-- Files: src/orchestra/task-builder.ts, tests/orchestra/task-builder-ollama-flow.test.ts
-- Scope: src/orchestra/, tests/orchestra/
+## Task 1: 236-001 — [Ollama/qwen3.6] Yerel-model worker kullanım kılavuzu
+- Provider: ollama
+- Model: qwen3.6:27b
+- Effort: normal
+- Files: docs/guide/local-model-workers.md
+- Scope: docs/guide/
 ### Description
-`task-builder.ts`'te DIRECTIVES parse'ını ollama-uyumlu yap (HER İKİ parse site: ~810-834 + ~945-954):
-1. **Provider acceptance:** `- Provider: ollama` kabul edilsin. `validProviders = Object.keys(PROVIDER_MODEL_MAP)` ollama içermiyor → doğru kaynağa bağla: `config.ts`'teki **`VALID_PROVIDERS_ALL`** (ollama dahil) veya `task-router`'ın `isProviderName`'i ile **hizala** (tek-doğruluk-kaynağı tutarlılığı). PROVIDER_MODEL_MAP'i şişirmeden.
-2. **Model pass-through:** provider **adapter-provider** ise (`isAdapterProvider(provider)` veya `provider==='ollama'`) `- Model: <tag>` `ALL_MODELS`'te OLMASA bile KABUL et (raw tag pass-through; OllamaAdapter spawn'da `/api/tags` ile dinamik doğrular — Sprint 234). **Provider parse'ı Model parse'tan ÖNCE** hesapla (şu an Model 810, Provider 827 → reorder veya rawProvider'ı erken çıkar). Non-adapter provider'da mevcut `ALL_MODELS` validation KORUNUR (regresyon-yok).
-3. **Akış garantisi:** parsedForceModel/forceModel → `task.model`/`forceModel`'e ulaşır (spawn OllamaAdapter'a bu tag'i geçirir; Sprint 234 sprint-spawner zaten `model`'i adapter.spawn'a veriyor).
-**Kanıt:** `grep -cE "VALID_PROVIDERS_ALL|isProviderName|isAdapterProvider|provider === 'ollama'" src/orchestra/task-builder.ts` → ≥2; `npx vitest run tests/orchestra/task-builder-ollama-flow.test.ts` → 4+ pass.
-**Test:** ≥4 hermetik: (1) `- Provider: ollama` → parsedProvider='ollama' (drop YOK); (2) `- Provider: ollama` + `- Model: qwen3.6:27b` → forceModel='qwen3.6:27b' (ALL_MODELS'te olmamasına rağmen, pass-through); (3) `- Provider: claude` + `- Model: gibberish99` → forceModel=undefined (non-adapter regresyon KORUNUR); (4) ikinci parse site (~945) de aynı davranış. spawnSync YASAK.
-**Smoke:** (Tier-0 orchestra) unit yeterli; gerçek-ollama-sprint proof'u host-side (Brain, sprint sonrası).
+`docs/guide/local-model-workers.md` adında özlü bir kullanıcı kılavuzu yaz. Önce `docs/superpowers/specs/2026-06-06-ollama-agentic-worker-harness-design.md` ve `src/agents/agentic-worker-runner.ts`'i oku, sonra şunları anlat: (1) Ollama kurulumu + `ollama pull <model>`, (2) per-task `- Provider: ollama` + `- Model: <tag>` ile yapılandırma, (3) agentic tool-loop nasıl çalışır (read_file/write_file/edit_file/run_bash/task_done), (4) worker'ın host'ta (localhost:11434) çalıştığı ve scope-enforced olduğu. Açık başlıklar, kısa örnekler. Bitince `task_done` ile DONE.
+**Kanıt:** `docs/guide/local-model-workers.md` var + "ollama pull" + "Provider: ollama" + "task_done" geçer (`grep -lE "ollama pull|Provider: ollama" docs/guide/local-model-workers.md`).
+**Test:** yok (doc-write task; markdown doğruluğu).
+**Smoke:** (doc) — gerçek qwen3.6 host'ta üretir (Brain post-sprint disk-verify: dosya var + içerik anlamlı).
+
+## Task 2: 236-002 — [Claude/sonnet] Çoklu-provider filo kılavuzu
+- Provider: claude
+- Model: sonnet
+- Effort: low
+- Files: docs/guide/multi-provider-fleet.md
+- Scope: docs/guide/
+### Description
+`docs/guide/multi-provider-fleet.md` adında özlü bir kılavuz yaz. `docs/MASTER-PLAN.md` §4A (AS-2) ve `src/orchestra/sprint-spawner.ts` (`isAdapterProvider` routing) referansıyla şunları anlat: per-task `- Provider:` seçimi; claude/codex/gemini'nin configured backend (docker) üzerinden, ollama'nın host-adapter üzerinden koştuğu; **tek sprint'in birden çok provider'ı eş-zamanlı karıştırabildiği** (örn. bu sprint: ollama + claude paralel). Açık başlıklar, kısa örnek DIRECTIVES bloğu. Özetle bitir.
+**Kanıt:** `docs/guide/multi-provider-fleet.md` var + "Provider:" + "mixed" veya "eş-zamanlı/paralel" geçer.
+**Test:** yok (doc-write task).
+**Smoke:** (doc) unit/disk-verify yeterli.
 
 ---
 
-**Beklenen:** 1/1 DONE, 0 NO_GO. Tek task tek wave. `ollama.ts`/`sprint-spawner.ts`/`types.ts` DEĞİŞMEZ (validation'ı mevcut VALID_PROVIDERS_ALL/isProviderName'e bağla, yeni kaynak yaratma). CI yeşil; memory ≥231.
+**Beklenen:** 2/2 DONE, 0 NO_GO. **Distinct filesWrite** (local-model-workers.md vs multi-provider-fleet.md, ikisi de docs/guide/ ama ayrı dosya → collision yok) → **paralel tek-wave, EŞ-ZAMANLI**. 236-001 host'ta qwen3.6, 236-002 docker'da claude/sonnet — aynı anda. Bu, mixed-fleet'in canlı kanıtı.
 
-**Pre-flight (Brain — yapıldı):** main temiz+push'lu ✅ · WAL-safe DB backup (231) ✅ · structured planning.
+**Pre-flight (Brain — yapıldı):** main temiz+push'lu ✅ · WAL-safe DB backup (236 entry) ✅ · ollama servisi açık (qwen3.6:27b yüklü) · structured planning.
 
-**Proof-of-function (sprint sonrası, Brain host-side):** gerçek `deckent start` (tek-task) `- Provider: ollama` + `- Model: qwen3.6:27b` → qwen3.6 **canlı** kod yapar (plan kabul eder → 234 routing host'a → harness loop) → `.result` DONE + dosya değişti → Brain GO. F1-013→234→235 zincirinin **nihai uçtan-uca** kanıtı.
+**Proof-of-function (Brain post-sprint):** disk-verify — her iki doc var + anlamlı; özellikle **236-001'in qwen3.6 (host) tarafından, 236-002'nin claude (docker) tarafından** üretildiğini sprint event/worker-log'dan doğrula (mixed-fleet kanıtı). False-NO_GO olursa disk-verify ([[feedback_trust_brain_eval_not_worker]]).
 
-İlgili: [[project_ollama_worker_stub_gap]] · [[project_4cli_subscription_vision]] · [[project_air_gapped_offline_pillar]] · [[feedback_directive_kanit_letter_vs_goal]] · [[feedback_trust_brain_eval_not_worker]]
-İlgili ADR: ADR-008 (import yönü) · ADR-037 · ADR-079 · ADR-010 · ADR-027 (spawn)
+İlgili: [[project_4cli_subscription_vision]] (mixed-fleet vizyon) · [[project_ollama_worker_stub_gap]] · [[feedback_proof_of_function_dod]] · [[feedback_trust_brain_eval_not_worker]]
+İlgili ADR: ADR-027 (spawn) · ADR-037 · ADR-053 (TaskType doc-write) · ADR-079

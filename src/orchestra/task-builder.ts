@@ -10,6 +10,7 @@ import type {
 import { TaskStatus, ALL_MODELS, PROVIDER_MODEL_MAP } from '../core/types.js';
 import { VALID_PROVIDERS_ALL } from '../core/config.js';
 import { isAdapterProvider } from './sprint-utils.js';
+import { modelRegistry, ensureOllamaModelRegistered } from '../core/model-registry.js';
 import type { TaskDNA } from '../core/routing-types.js';
 import { calculateModelScore } from './model-selector.js';
 import { debugLog } from '../core/utils.js';
@@ -398,6 +399,16 @@ function now(): string {
 export function createTask(params: CreateTaskParams, sequence: number): Task & { smoke?: { command: string; expect: string } } {
   const sprintNumber = params.sprintId.replace('sprint-', '');
   const id = `${sprintNumber}-${String(sequence).padStart(3, '0')}`;
+
+  // Sprint 236: register locally-pulled Ollama tags on-demand BEFORE any
+  // registry lookup (tier/provider/apiId during routing) so a `- Model: <tag>`
+  // not in the static catalog doesn't throw "Unknown model". Adapter-providers
+  // only — cloud models keep throwing on genuinely-unknown ids.
+  if (params.provider && isAdapterProvider(params.provider)) {
+    for (const m of [params.forceModel, params.model]) {
+      if (m && !modelRegistry.has(m)) ensureOllamaModelRegistered(m);
+    }
+  }
 
   // Validate model-provider compatibility when both are specified
   let provider = params.provider;

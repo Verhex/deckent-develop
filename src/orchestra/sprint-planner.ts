@@ -38,7 +38,8 @@ import { MemoryStore } from '../core/memory-store.js';
 import { getNextSprintId, readJsonSafe, debugLog } from '../core/utils.js';
 
 // ─── Sprint Utilities ─────────────────────────────────────────────
-import { readFileSafe, extractGoNogoCriteria } from './sprint-utils.js';
+import { readFileSafe, extractGoNogoCriteria, isAdapterProvider } from './sprint-utils.js';
+import { modelRegistry, ensureOllamaModelRegistered } from '../core/model-registry.js';
 
 // ─── Core — provider abstraction ──────────────────────────────────
 import type { ProviderAdapter } from '../core/provider.js';
@@ -352,7 +353,7 @@ export async function planSprint(
   // Structured fallback (mode === 'structured' || AI fail + auto)
   if (!plannerResult && (planMode === 'structured' || planMode === 'auto')) {
     const structuredTasks = parseStructuredDirectives(context.directives);
-    const directiveSources: Array<{ title: string; description: string; scope: TaskScope; forceModel?: import('../core/types.js').ModelType; forceEffort?: import('../core/types.js').TaskEffort; testTarget?: string; forceAgent?: string; forceSkills?: string[]; excludeAgent?: string[]; excludeSkills?: string[]; priority?: import('../core/types.js').TaskPriority; dependencies?: string[]; authMode?: 'subscription' | 'api' }> =
+    const directiveSources: Array<{ title: string; description: string; scope: TaskScope; provider?: import('../core/types.js').ProviderName; forceModel?: import('../core/types.js').ModelType; forceEffort?: import('../core/types.js').TaskEffort; testTarget?: string; forceAgent?: string; forceSkills?: string[]; excludeAgent?: string[]; excludeSkills?: string[]; priority?: import('../core/types.js').TaskPriority; dependencies?: string[]; authMode?: 'subscription' | 'api' }> =
       structuredTasks.length > 0
         ? structuredTasks
         : context.directives
@@ -368,8 +369,14 @@ export async function planSprint(
     const parsedPatterns = deduplicatePatterns(parsePatterns(patternsRaw));
 
     for (const src of directiveSources) {
+      // Sprint 236: register locally-pulled ollama tags BEFORE model resolution
+      // (resolveTaskModel → registry lookups) so a `- Model: <tag>` not in the
+      // static catalog doesn't throw "Unknown model". Adapter-providers only.
+      if (src.provider && isAdapterProvider(src.provider) && src.forceModel && !modelRegistry.has(src.forceModel)) {
+        ensureOllamaModelRegistered(src.forceModel);
+      }
       const resolvedModel = recommendation.modelConstraint ??
-        resolveTaskModel(src.title, src.description, src.scope, config, parsedPatterns, src.forceModel);
+        resolveTaskModel(src.title, src.description, src.scope, config, parsedPatterns, src.forceModel, undefined, src.provider);
       const resolvedEffort = src.forceEffort ?? 'normal';
       tasks.push(createTask({
         title: src.title,
@@ -381,6 +388,7 @@ export async function planSprint(
           ? `Directive (model: ${resolvedModel} -- user override)`
           : `Directive (model: ${resolvedModel} -- resolved from scope/complexity/plan)`,
         scope: src.scope,
+        provider: src.provider,
         dependencies: src.dependencies ?? [],
         goNogo: extractGoNogoCriteria(src.description, src.testTarget),
         sprintId,
