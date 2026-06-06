@@ -27,7 +27,7 @@ import {
 import { createCliToolDispatcher } from '../cli/commands/chat-tool-bridge.js';
 import { createPersistentClaudeSession } from '../cli/commands/chat-session.js';
 import { classifyActionRisk, type AgenticAction } from '../cli/commands/agentic-confirm.js';
-import { makeGatedDispatcher, DECKENT_BOT_SYSTEM_PROMPT } from './bot-agentic.js';
+import { makeGatedDispatcher, hasRealPendingCheckpoint, DECKENT_BOT_SYSTEM_PROMPT } from './bot-agentic.js';
 import { parkBotAction, isSprintScopedDestructive } from './bot-action-store.js';
 import { getCurrentSprintId } from '../monitor/sprint-state.js';
 
@@ -134,6 +134,10 @@ export function makeChatResponder(deps: ChatResponderDeps = {}): ChatResponder {
               ? { boundSprintId: getCurrentSprintId(root) ?? undefined }
               : {}),
           }),
+        // Sprint 238 İŞ3: suppress the spurious "checkpoint awaiting approval"
+        // alarm — a model-initiated deckent_checkpoint with nothing pending is a
+        // no-op, not an approval gate.
+        hasPendingCheckpoint: () => hasRealPendingCheckpoint(root),
         lang,
       });
       confirm = async () => true; // gating lives in the wrapper, not here

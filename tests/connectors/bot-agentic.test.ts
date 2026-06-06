@@ -8,10 +8,14 @@
  * risky tools PARK an approval (informed: tool + args + id) and DO NOT execute.
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import {
   isRiskyBotTool,
   makeGatedDispatcher,
+  hasRealPendingCheckpoint,
   DECKENT_BOT_SYSTEM_PROMPT,
 } from '../../src/connectors/bot-agentic.js';
 import type { McpToolDispatcher } from '../../src/cli/commands/chat-native.js';
@@ -75,5 +79,92 @@ describe('DECKENT_BOT_SYSTEM_PROMPT', () => {
     expect(DECKENT_BOT_SYSTEM_PROMPT).toContain('<deckent_tool>');
     expect(DECKENT_BOT_SYSTEM_PROMPT).not.toContain('deckent_bash');
     expect(DECKENT_BOT_SYSTEM_PROMPT).not.toContain('deckent_write_file');
+  });
+});
+
+// ─── Sprint 238 İŞ3 — spurious checkpoint false-alarm guard ──────────────────
+describe('makeGatedDispatcher — deckent_checkpoint false-alarm guard', () => {
+  const inner: McpToolDispatcher = { dispatch: vi.fn(async (n: string) => `[ran] ${n}`) };
+
+  it('answers benignly (no park) when NO checkpoint is pending', async () => {
+    const park = vi.fn(() => 'PARK-ID');
+    const innerSpy: McpToolDispatcher = { dispatch: vi.fn(async () => '[ran]') };
+    const gated = makeGatedDispatcher({ inner: innerSpy, park, hasPendingCheckpoint: () => false });
+
+    const out = await gated.dispatch('deckent_checkpoint', {});
+    expect(out).toMatch(/not blocked|bloke değil/i);
+    expect(out).not.toMatch(/APPROVAL REQUIRED|ONAY GEREKLİ/i);
+    expect(park).not.toHaveBeenCalled();           // no false alarm
+    expect(innerSpy.dispatch).not.toHaveBeenCalled(); // and no state change
+  });
+
+  it('still PARKS deckent_checkpoint when a checkpoint IS pending (gate preserved)', async () => {
+    const park = vi.fn(() => 'PARK-ID');
+    const gated = makeGatedDispatcher({ inner, park, hasPendingCheckpoint: () => true });
+
+    const out = await gated.dispatch('deckent_checkpoint', { action: 'approve' });
+    expect(out).toMatch(/APPROVAL REQUIRED|ONAY GEREKLİ/i);
+    expect(park).toHaveBeenCalledWith('deckent_checkpoint', { action: 'approve' });
+  });
+
+  it('without a hasPendingCheckpoint probe, parks as before (backward compatible)', async () => {
+    const park = vi.fn(() => 'PARK-ID');
+    const gated = makeGatedDispatcher({ inner, park });
+
+    const out = await gated.dispatch('deckent_checkpoint', {});
+    expect(out).toMatch(/APPROVAL REQUIRED/i);
+    expect(park).toHaveBeenCalled();
+  });
+
+  it('the guard is checkpoint-specific — other risky tools are still parked', async () => {
+    const park = vi.fn(() => 'PARK-ID');
+    const gated = makeGatedDispatcher({ inner, park, hasPendingCheckpoint: () => false });
+
+    const out = await gated.dispatch('deckent_kill', { target: 'all' });
+    expect(out).toMatch(/APPROVAL REQUIRED/i);
+    expect(park).toHaveBeenCalledWith('deckent_kill', { target: 'all' });
+  });
+
+  it('emits the benign message in Turkish when lang=tr', async () => {
+    const gated = makeGatedDispatcher({
+      inner, park: () => 'x', hasPendingCheckpoint: () => false, lang: 'tr',
+    });
+    const out = await gated.dispatch('deckent_checkpoint', {});
+    expect(out).toContain('bloke değil');
+  });
+});
+
+describe('hasRealPendingCheckpoint', () => {
+  let root: string;
+
+  beforeEach(() => { root = mkdtempSync(join(tmpdir(), 'cp-pending-')); });
+  afterEach(() => { rmSync(root, { recursive: true, force: true }); });
+
+  function writeCheckpoint(name: string, status: string): void {
+    const dir = join(root, '.deckent', 'checkpoints');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, name), JSON.stringify({ phase: 'PLAN', summary: 's', status, createdAt: '' }), 'utf-8');
+  }
+
+  it('returns false when the checkpoints dir does not exist', () => {
+    expect(hasRealPendingCheckpoint(root)).toBe(false);
+  });
+
+  it('returns true when a checkpoint file has status pending', () => {
+    writeCheckpoint('checkpoint-sprint-238-PLAN.json', 'pending');
+    expect(hasRealPendingCheckpoint(root)).toBe(true);
+  });
+
+  it('returns false when all checkpoints are approved/rejected (none pending)', () => {
+    writeCheckpoint('checkpoint-sprint-238-PLAN.json', 'approved');
+    writeCheckpoint('checkpoint-sprint-238-SPAWN.json', 'rejected');
+    expect(hasRealPendingCheckpoint(root)).toBe(false);
+  });
+
+  it('skips malformed checkpoint files without throwing', () => {
+    const dir = join(root, '.deckent', 'checkpoints');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'checkpoint-x-PLAN.json'), '{not json', 'utf-8');
+    expect(hasRealPendingCheckpoint(root)).toBe(false);
   });
 });

@@ -17,6 +17,8 @@
  * fat-finger), even when gated. The bot system prompt advertises ONLY these.
  */
 
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import type { McpToolDispatcher } from '../cli/commands/chat-native.js';
 
 /**
@@ -44,6 +46,33 @@ export function isRiskyBotTool(name: string): boolean {
   return !READ_ONLY_BOT_TOOLS.has(name);
 }
 
+/**
+ * True when a real checkpoint is awaiting human approval right now — i.e. a
+ * `.deckent/checkpoints/checkpoint-*.json` with `status: "pending"`. Mirrors the
+ * checkpoint CLI's storage contract (cli/commands/checkpoint.ts) without
+ * importing it (keeps connectors independent of cli/commands).
+ *
+ * Sprint 238 İŞ3: the agentic bot would PARK a model-initiated `deckent_checkpoint`
+ * call as "🔐 APPROVAL REQUIRED", which the user read as a real pending checkpoint
+ * and panicked over — even though nothing was pending and the sprint was never
+ * blocked ([[project_spurious_bot_checkpoint_notify]]). This guard lets the
+ * dispatcher answer benignly when there is genuinely nothing to approve.
+ */
+export function hasRealPendingCheckpoint(root: string): boolean {
+  const dir = join(root, '.deckent', 'checkpoints');
+  if (!existsSync(dir)) return false;
+  try {
+    for (const f of readdirSync(dir)) {
+      if (!f.startsWith('checkpoint-') || !f.endsWith('.json')) continue;
+      try {
+        const cp = JSON.parse(readFileSync(join(dir, f), 'utf-8')) as { status?: string };
+        if (cp.status === 'pending') return true;
+      } catch { /* skip malformed checkpoint file */ }
+    }
+  } catch { /* unreadable dir → treat as nothing pending */ }
+  return false;
+}
+
 /** Park a risky action for later approval; returns the approval id. */
 export type ParkAction = (tool: string, args: Record<string, unknown>) => string;
 
@@ -54,6 +83,13 @@ export interface GatedDispatcherDeps {
   readonly park: ParkAction;
   /** Optional language for the parked-action message (default 'en'). */
   readonly lang?: string;
+  /**
+   * Optional probe for a real pending checkpoint. When provided and it returns
+   * false, a model-initiated `deckent_checkpoint` call is answered benignly
+   * instead of parked — killing the spurious "checkpoint awaiting approval"
+   * alarm (Sprint 238 İŞ3). Omitted → legacy behavior (checkpoint is parked).
+   */
+  readonly hasPendingCheckpoint?: () => boolean;
 }
 
 /**
@@ -64,6 +100,18 @@ export function makeGatedDispatcher(deps: GatedDispatcherDeps): McpToolDispatche
   const lang = deps.lang ?? 'en';
   return {
     async dispatch(name: string, args: Record<string, unknown>): Promise<string> {
+      // Sprint 238 İŞ3: a model-initiated `deckent_checkpoint` with NOTHING
+      // pending is a no-op — parking it as "approval required" produces a false
+      // "checkpoint awaiting approval" alarm (the sprint is not blocked). Answer
+      // benignly when there is no real pending checkpoint; a genuine pending
+      // checkpoint still goes through the gate below.
+      if (
+        name === 'deckent_checkpoint' &&
+        deps.hasPendingCheckpoint &&
+        !deps.hasPendingCheckpoint()
+      ) {
+        return noPendingCheckpointMessage(lang);
+      }
       if (isRiskyBotTool(name)) {
         const id = deps.park(name, args);
         return parkedActionMessage(id, name, args, lang);
@@ -102,6 +150,18 @@ function parkedActionMessage(
     `This action is awaiting human approval; nothing has run yet. ` +
     `To approve, reply: approve ${id} — to reject: reject ${id}.`
   );
+}
+
+/**
+ * Benign tool_result for `deckent_checkpoint` when nothing is pending. States
+ * plainly that the sprint is NOT blocked so the model relays "nothing to do"
+ * rather than an alarming "approval required" (Sprint 238 İŞ3).
+ */
+function noPendingCheckpointMessage(lang: string): string {
+  if (lang === 'tr') {
+    return 'Şu an onay bekleyen bir checkpoint yok — sprint bloke değil, yapılacak bir şey yok.';
+  }
+  return 'No checkpoint is awaiting approval — the sprint is not blocked; nothing to do.';
 }
 
 function summarizeArgs(args: Record<string, unknown>): string {
