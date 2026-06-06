@@ -80,6 +80,10 @@
 | adr-086 | Native CLI Parity — F11 Feature Set (Sprint 224) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-233 Learnings** (sprint-233): ## Sprint sprint-233 Learnings
+
+## Gains
+- 233-001 — [Wave 1] Core agentic worker runner + tool şemaları + scope-guar...
 - **Sprint sprint-232 Learnings** (sprint-232): ## Sprint sprint-232 Learnings
 
 ## Gains
@@ -105,8 +109,6 @@
 - **Sprint 223 Learnings** (sprint-223): - Sprint sprint-223 Learnings: ## Sprint sprint-223 Learnings
 - **Sprint 222 Learnings** (sprint-222): - Sprint sprint-222 Learnings: ## Sprint sprint-222 Learnings
 - **Sprint 221 Learnings** (sprint-221): - Sprint sprint-221 Learnings: ## Sprint sprint-221 Learnings
-- **Sprint 220 Learnings** (sprint-220): - Sprint sprint-220 Learnings: ## Sprint sprint-220 Learnings
-- 220-003 — Agentic REPL canlı MCP dispatch (doğal dil→...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -115,4 +117,4 @@ _No active technical debt._
 - Violation pattern: stale_heartbeat
 - Violation pattern: file_outside_scope
 
-_Total entries: 222 | Generated: 2026-06-05_
+_Total entries: 231 | Generated: 2026-06-06_

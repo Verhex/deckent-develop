@@ -55,6 +55,7 @@ _Total: 28 MCP tools_
 | `audit` | deckent audit |
 | `audit-verify` | deckent audit-verify |
 | `autonomous` | deckent autonomous |
+| `bot` | deckent bot |
 | `chat` | deckent chat |
 | `chat-agentic-dispatch` | deckent chat-agentic-dispatch |
 | `chat-banner` | deckent chat-banner |
@@ -133,4 +134,4 @@ _Total: 28 MCP tools_
 | `watch` | deckent watch |
 | `web` | deckent web |
 
-_Total: 86 CLI command modules_
+_Total: 87 CLI command modules_

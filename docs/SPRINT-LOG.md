@@ -6378,3 +6378,26 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 232-005: 232-005 — [P1] writeGuardedExports dbCount===0 disk-protect (GAP B) (DONE)
 
 ---
+## Sprint 233 — sprint-233
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-06-06
+**Duration:** 1388s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 2 |
+| Completed | 2 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 1388089ms |
+
+### Tasks
+
+- 233-001: 233-001 — [Wave 1] Core agentic worker runner + tool şemaları + scope-guard (DONE)
+- 233-002: 233-002 — [Wave 2 · depends 233-001] Subprocess entry + OllamaAdapter wiring + dinamik model kabul (DONE)
+
+---

@@ -1,5 +1,12 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-233 Learnings
+- Sprint sprint-233 Learnings: ## Sprint sprint-233 Learnings
+
+## Gains
+- 233-001 — [Wave 1] Core agentic worker runner + tool şemaları + scope-guard — F1-013 Wave 1 complete.
+- 233-002 — [Wave 2 · depends 233-001] Subprocess entry + OllamaAdapter wiring + dinamik model kabul — Wave 2 of F1-013: agentic-worker-entry subprocess shim created (217 LoC) + ollama.ts surgical 2-p...
+
 ## Sprint sprint-232 Learnings
 - Sprint sprint-232 Learnings: ## Sprint sprint-232 Learnings
 

@@ -110,12 +110,12 @@ Komutlar: `deckent status`, `deckent history`, `deckent retro`, `deckent recall 
 ## Sprint Metrics
 | Metric | Value |
 |--------|-------|
-| Sprint | sprint-232 |
-| Total Tasks | 7 |
-| Completed | 7 |
+| Sprint | sprint-233 |
+| Total Tasks | 2 |
+| Completed | 2 |
 | Tech Debt | 0 |
 | No-Go | 0 |
-| Duration | 23dk 20sn |
+| Duration | 23dk 8sn |
 | Coverage | 0.0% |
 
 ## Active Debt
@@ -124,5 +124,5 @@ _No tech debt record._
 ## Agent Performance
 | Agent | Tasks | Done | Success |
 |-------|-------|------|--------|
-| refactorer | 4 | 4 | 100% |
 | api-builder | 1 | 1 | 100% |
+| refactorer | 1 | 1 | 100% |

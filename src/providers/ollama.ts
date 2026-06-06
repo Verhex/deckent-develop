@@ -16,6 +16,7 @@ import {
   closeSync,
 } from 'node:fs';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import type { ModelType, OllamaModel } from '../core/types.js';
 import type {
@@ -50,6 +51,16 @@ const DEFAULT_OLLAMA_HOST = 'http://localhost:11434';
 
 /** HTTP probe timeout (ms) used for isAvailable() / diagnoseAvailability(). */
 const PROBE_TIMEOUT_MS = 3000;
+
+/**
+ * Default path to the compiled agentic worker entry script (T-233-002).
+ * Resolved from this module's own URL — production: `dist/providers/ollama.js`
+ * → `dist/agents/agentic-worker-entry.js`. Tests inject a stub via the
+ * `workerEntryPath` constructor option.
+ */
+const DEFAULT_WORKER_ENTRY_PATH = fileURLToPath(
+  new URL('../agents/agentic-worker-entry.js', import.meta.url),
+);
 
 /** Models registered for the 'ollama' provider — derived from ModelRegistry. */
 const OLLAMA_MODELS: readonly OllamaModel[] = modelRegistry
@@ -175,14 +186,43 @@ export class OllamaAdapter implements ProviderAdapter {
    */
   private readonly fetchImpl: typeof fetch;
 
+  /**
+   * Path to the agentic-worker-entry.js compiled script. Override in tests to
+   * stub the entry without touching disk. Production resolves to
+   * `dist/agents/agentic-worker-entry.js`.
+   */
+  private readonly workerEntryPath: string;
+
+  /**
+   * Override for `node:child_process.spawn` — used by tests to capture launch
+   * args without firing real subprocesses. Defaults to the real `spawn`.
+   */
+  private readonly spawnImpl: typeof spawn;
+
+  /**
+   * Cache of model ids returned by the live `/api/tags` probe (T-233-002).
+   * Populated by `refreshSupportedModels()` and consulted by `isSupportedModel`
+   * as a dynamic acceptance layer alongside the static catalog. `null` means
+   * "no probe yet"; only the static catalog is honored.
+   */
+  private dynamicModelsCache: Set<string> | null = null;
+
   constructor(
     projectDir: string,
-    opts?: { defaultTimeoutMs?: number; host?: string; fetchImpl?: typeof fetch },
+    opts?: {
+      defaultTimeoutMs?: number;
+      host?: string;
+      fetchImpl?: typeof fetch;
+      workerEntryPath?: string;
+      spawnImpl?: typeof spawn;
+    },
   ) {
     this.projectDir = projectDir;
     this.defaultTimeoutMs = opts?.defaultTimeoutMs ?? 0;
     this.host = (opts?.host ?? this.resolveHost()).replace(/\/+$/, '');
     this.fetchImpl = opts?.fetchImpl ?? ((...args) => fetch(...args));
+    this.workerEntryPath = opts?.workerEntryPath ?? DEFAULT_WORKER_ENTRY_PATH;
+    this.spawnImpl = opts?.spawnImpl ?? spawn;
   }
 
   // ─── spawn() ───────────────────────────────────────────────────────
@@ -190,7 +230,10 @@ export class OllamaAdapter implements ProviderAdapter {
   spawn(
     taskId: string,
     model: ModelType,
-    prompt: string,
+    // The agentic worker reads the prompt from `.tasks/task-{id}.json`
+    // (description field) inside the spawned node process; we keep the
+    // ProviderAdapter signature unchanged but no longer forward this string.
+    _prompt: string,
     opts?: ProviderSpawnOptions,
   ): void {
     if (this.workers.has(taskId)) {
@@ -213,20 +256,12 @@ export class OllamaAdapter implements ProviderAdapter {
     const logPath = join(tasksDir, `task-${taskId}.log`);
     const logFd = openSync(logPath, 'a');
 
-    // We spawn `curl` so the worker lifecycle matches the other adapters
-    // (long-running ChildProcess that can be killed with SIGTERM).
+    // T-233-002: spawn the agentic worker entry as a long-running node
+    // subprocess (replaces the prior one-shot `curl /api/generate`). The
+    // entry reads task json, drives the runner's tool-calling loop, and
+    // writes a structured `.result`. Lifecycle (workers map, heartbeat,
+    // timeout SIGKILL, kill SIGTERM, exit cleanup) is unchanged.
     const apiId = modelRegistry.get(model)?.apiId ?? model;
-    const body = JSON.stringify({ model: apiId, prompt, stream: false });
-    const args = [
-      '-s',
-      '-X',
-      'POST',
-      `${this.host}/api/generate`,
-      '-H',
-      'Content-Type: application/json',
-      '-d',
-      body,
-    ];
 
     const spawnOpts: NodeSpawnOptions = {
       cwd: dir,
@@ -234,7 +269,11 @@ export class OllamaAdapter implements ProviderAdapter {
       env: { ...process.env, ...(opts?.env ?? {}) },
     };
 
-    const child = spawn('curl', args, spawnOpts);
+    const child = this.spawnImpl(
+      'node',
+      [this.workerEntryPath, taskId, apiId, this.host],
+      spawnOpts,
+    );
     closeSync(logFd);
 
     this.writeHeartbeat(taskId, dir, 'EXECUTING');
@@ -572,8 +611,39 @@ export class OllamaAdapter implements ProviderAdapter {
     );
   }
 
-  private isSupportedModel(model: ModelType): boolean {
-    return (OLLAMA_MODELS as readonly string[]).includes(model);
+  /**
+   * Probe the live `/api/tags` endpoint and cache the model name list so
+   * subsequent `isSupportedModel` calls accept any installed model — not
+   * just the static 4-entry catalog used for tier-routing defaults.
+   *
+   * T-233-002: this is what lets `qwen3.6:27b` (and any other locally pulled
+   * model) be a valid spawn target. Production callers should invoke this
+   * once at startup; failures are swallowed (the static catalog stays as
+   * the fallback).
+   */
+  async refreshSupportedModels(): Promise<void> {
+    try {
+      const res = await this.fetchWithTimeout(`${this.host}/api/tags`);
+      if (!res.ok) return;
+      const body = (await res.json()) as { models?: { name: string }[] };
+      const names = Array.isArray(body?.models)
+        ? body.models.map(m => m.name).filter((n): n is string => typeof n === 'string' && n.length > 0)
+        : [];
+      this.dynamicModelsCache = new Set(names);
+    } catch {
+      // Probe failure: leave the existing cache intact (null or prior set).
+    }
+  }
+
+  /**
+   * True if `model` is in the static catalog OR in the dynamic `/api/tags`
+   * cache populated by `refreshSupportedModels()`. Public so callers (and
+   * tests) can check acceptance without going through spawn().
+   */
+  isSupportedModel(model: ModelType): boolean {
+    if ((OLLAMA_MODELS as readonly string[]).includes(model)) return true;
+    if (this.dynamicModelsCache?.has(model as string)) return true;
+    return false;
   }
 
   private async fetchWithTimeout(

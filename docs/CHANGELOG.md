@@ -2,6 +2,16 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint233] - 2026-06-06
+
+### Added
+
+- 233-001 — [Wave 1] Core agentic worker runner + tool şemaları + scope-guard
+- 233-002 — [Wave 2 · depends 233-001] Subprocess entry + OllamaAdapter wiring + dinamik model kabul
+
+
+_Tasks: 2 total, 2 done, 0 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint232] - 2026-06-05
 
 ### Added

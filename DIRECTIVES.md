@@ -1,85 +1,66 @@
-# DIRECTIVES — Sprint 232: Memory-Loss Kökten Kapanış (decay 3-bug zinciri)
+# DIRECTIVES — Sprint 233: F1-013 Local-Model Agentic Worker Harness (AS-2 Faz 1)
 
-## Goal: **Memory-wipe'ı KÖKTEN bitir.** Sprint 226/231 canlı dogfood'unda 3. kez tekrarlayan memory-loss'un kök-neden zinciri file:line grep-doğrulandı (sprint-231 canlı kanıt: memory 91→1, chat 30→0, retro/sprint 4→1; adr 75 exempt kurtuldu): (1) **🔴 PRIMARY — `decay_after_sprints=20` config runDecay'e GEÇMİYOR** → `debt-manager.ts:641` hardcoded `8`'e düşüyor (threshold 223, çok agresif), (2) **learnings (memory/retro/sprint/pattern) decay-exempt DEĞİL** → siliniyorlar (sadece adr/identity exempt), (3) **catastrophic-abort `>` kullanıyor** → tam %50'de (125/250) tetiklenmiyor. **+ §4G handoff 2 edge:** (4) **ci-sim SIGINT-restore yok** → interrupted ci-sim canlı memory.db'yi boş bırakır (sprint-231 empty-backup semptomu), (5) **writeGuardedExports dbCount===0'ı korumuyor** → boş-DB'de dolu disk-export ezilir (decay-dışı boşluk). **5 task DISTINCT filesWrite → tam paralel-güvenli (tek wave). src/dashboard'a DOKUNULMAZ** (paralel dashboard FAZ5 var). **god-level, hermetik, CI yeşil KORUNUR.**
+## Goal: **Yerel Ollama modelini (qwen3.6:27b) gerçek bir deckent worker'ı yap.** Bugün `OllamaAdapter.spawn` tek-atış `curl /api/generate` → çıktıyı `.log`'a yazıp bitiyor (dosya-edit/test/`.result`/tool-loop YOK — [[project_ollama_worker_stub_gap]]). Bu sprint, **native tool-calling agentic loop** kurar: model `read_file/write_file/edit_file/run_bash/task_done` araçlarını çağırır → deckent çalıştırır (scope-enforced) → yapılandırılmış `.result` yazar → Brain GO/NO_GO değerlendirir. **v1 = tek-task uçtan uca** (multi-task/mixed-fleet AS-2 Faz 2, ayrı). Tasarım: `docs/superpowers/specs/2026-06-06-ollama-agentic-worker-harness-design.md` (TAM OKU — bağlayıcı kontrat). Bu, Agentic Multi-Provider Mixed-Fleet (MASTER-PLAN §4A AS-2) enabler'ı; runner provider-agnostik kurulur (sonra OpenAI-compat/GLM'e genişler) ama v1'de yalnız ollama wire+test edilir.
 
 ## Ortak kurallar
-- **🟢 RUN-VERIFY ([[feedback_proof_of_function_dod]]):** kanıt **çağıran** dosyada (def DIŞLA). Bu sprint çoğunlukla **Tier-0 (orchestra/core)**; 232-003 `memory backup` CLI'sı Tier-1 değil (internal-op) → unit yeterli, ama backup gerçek-dosya üretmeli (run-verify).
-- **🔴 HERMETİK ([[project_ci_green_root_causes]]):** tmpdir + sandbox HOME, async spawn (spawnSync YASAK), `test:ci-sim` yeşil. CI yeşil KORUNUR.
-- **🔴 NEVER-LOSE-MEMORY ([[feedback_db_silmek_yasak]] · [[project_brain_integrity_sprint226_cluster]]):** learnings asla sessizce uçmaz; decay config'e uyar + abort defansif.
-- ESM `.js`. Subscription (`env -u ANTHROPIC_API_KEY`). ≤200 LoC tercih, YENİ TEST DOSYASI. **Sadece kendi filesWrite'ına yaz** (paralel-güvenlik). Tek wave (3 task distinct dosya); `dependency_pipeline_enabled=false` → Brain manuel.
+- **god-level, no-MVP** ([[feedback_no_minimum_no_mvp_deckent]]): kısa-yol/placeholder YOK; eksik bırakacaksan açıkça işaretle.
+- **i18n-FIRST** ([[feedback_god_level_i18n_quality_bar]]): user-facing string `getMessage(key,lang)` (en/tr); mekanizma modülleri string-free (label caller'dan). Runner/tools internal log'ları i18n gerektirmez ama kullanıcıya görünen mesaj varsa getMessage.
+- **🔴 HERMETİK** ([[project_ci_green_root_causes]]): testler tmpdir + sandbox HOME; **async spawn (spawnSync/execSync YASAK** — onTaskUpdate dersi); `fetchImpl` inject ile gerçek ağ YOK; `npm run test:ci-sim` yeşil; CI yeşil KORUNUR.
+- **🔴 reuse, reinvent etme** (Karpathy D2): `chat-tool-exec.ts`'in `createToolExecDispatcher({confirm})`'ı headless-reusable (confirm default auto-approve) — onu KULLAN, **chat-tool-exec.ts'i DEĞİŞTİRME** (scope dışı). Scope-enforcement'ı confirm-hook'una / dispatcher wrapper'ına bağla.
+- **proof-of-function** ([[feedback_proof_of_function_dod]] · ADR-079): worker'lar **docker** backend → host ollama'ya erişemez; bu yüzden **live qwen3.6 smoke HOST-SIDE** koşulur (Brain/Alperen), worker yalnız hermetik unit yazar. Mock-only test = GO_WITH_TECH_DEBT, ama bu Tier-0 internal modüller → unit yeterli; live-smoke ayrı host-gate.
+- ESM `.js` uzantısı zorunlu. Subscription (`env -u ANTHROPIC_API_KEY`). `brain_planning=structured` (AI-hang yok). `dependency_pipeline_enabled=false` → Brain manuel wave. **Sadece kendi `filesWrite`'ına yaz** (parallel-safety).
+- **.result kontratı:** `docs/reference/api-surface.md` (taskId, filesChanged, linesAdded/Removed, testsPassed, coverage, selfAssessment, notes, evaluationDecision).
 
 ---
 
-## Task 1: 232-001 — [P0] ⭐ decay_after_sprints config wire (PRIMARY kök)
+## Task 1: 233-001 — [Wave 1] Core agentic worker runner + tool şemaları + scope-guard
 - Model: opus
-- Effort: normal
-- Skills: typescript-expert
-- Files: src/orchestra/sprint-finalizer.ts, src/orchestra/debt-manager.ts, tests/orchestra/decay-config-wire.test.ts
-- Scope: src/orchestra/, tests/orchestra/
-### Description
-**Problem (doğrulandı):** `sprint-finalizer.ts:782-794` decay'i çağırırken **`config.decay_after_sprints`'i GEÇMİYOR**; `runDecay` (`debt-manager.ts:639-667`, `:641`) `decaySprints` parametresini **hardcoded `8`** default'una düşürüyor. Sonuç: config'de `decay_after_sprints=20` (`config.ts:927`) olmasına rağmen decay 8-sprint penceresiyle (threshold = currentSprint−8 = 223) koşuyor → çok daha derin kesim → memory-loss'un PRIMARY tetikleyicisi.
-**Çözüm:** `sprint-finalizer.ts`'te decay çağrılarına (`runDecay(...)` her iki yol: budget-force + normal) `config.decay_after_sprints`'i **explicit geçir**; `runDecay`/`debt-manager.ts` imzasını config-değerini onurlandıracak şekilde wire et (hardcoded 8 fallback yalnızca config undefined ise). **Caller `sprint-finalizer.ts` + `debt-manager.ts` (her ikisi de bu task'ın scope'unda — config akışı).** decay() def (`memory-store.ts`) DIŞLA.
-**Kanıt:** `grep -c "decay_after_sprints" src/orchestra/sprint-finalizer.ts src/orchestra/debt-manager.ts` → ≥2 (config akışı wire); `npx vitest run tests/orchestra/decay-config-wire.test.ts` → 3+ pass
-**Test:** ≥3 (config decay_after_sprints=20 → runDecay 20 alır/threshold doğru; config undefined → fallback; finalize decay'e config'i geçirir — hermetik, mock store.decay spy ile geçen değeri assert et)
-**Smoke:** (Tier-0 orchestra) unit yeterli.
+- Effort: high
+- Skills: typescript-expert, anthropic-sdk
+- Files: src/agents/agentic-worker-runner.ts, src/agents/agentic-worker-tools.ts, src/agents/scope-guard.ts, tests/agents/agentic-worker-runner.test.ts
+- Scope: src/agents/, tests/agents/
 
-## Task 2: 232-002 — [P0] learnings decay-exempt (memory/retro/sprint/pattern)
-- Model: sonnet
-- Effort: normal
-- Skills: typescript-expert
-- Files: src/orchestra/sprint-retro-writer.ts, src/orchestra/auditor.ts, tests/orchestra/learnings-decay-exempt.test.ts
-- Scope: src/orchestra/, tests/orchestra/
 ### Description
-**Problem (doğrulandı):** Learning-tipi entry'ler `decay_exempt` set ETMEDEN insert ediliyor → default `false` → decay siliyor. `sprint-retro-writer.ts` (sprint `:761-771`, retro `:775-784`, memory `:790-811`) + `auditor.ts` (pattern `:640-649`) hiçbiri `decay_exempt:true` vermiyor; oysa adr (`adr-seed.ts`) + identity (`identity-generator.ts:338`) exempt. Kullanıcı TÜM history'yi recall etmek istiyor → learnings asla auto-silinmemeli.
-**Çözüm:** `sprint-retro-writer.ts`'teki memory + retro + sprint insert/upsert çağrılarına ve `auditor.ts`'teki pattern insert'ine **`decay_exempt: true`** ekle. Böylece learnings ADR gibi kalıcı (git memory.md export zaten arşiv; DB de kaybetmesin). **Caller `sprint-retro-writer.ts` + `auditor.ts`.** memory-store.ts def DIŞLA. (chat: bu task kapsamı dışı — ayrı, ephemeral.)
-**Kanıt:** `grep -c "decay_exempt: true\|decay_exempt:true" src/orchestra/sprint-retro-writer.ts src/orchestra/auditor.ts` → ≥4; `npx vitest run tests/orchestra/learnings-decay-exempt.test.ts` → 4+ pass
-**Test:** ≥4 (insert edilen memory/retro/sprint/pattern entry'leri decay_exempt=1; bu entry'ler decay()'de SURVIVE eder (eski sprint_num olsa bile); adr/identity etkilenmez — hermetik tmpdir DB)
-**Smoke:** (Tier-0) unit yeterli.
+Spec §3.1.1 + §4 + §5 + §6 + §7'yi uygula. **`agentic-worker-runner.ts`** çekirdek döngü: `{taskId, model, host, prompt, scope, goNogo, maxIterations, fetchImpl?, dispatcher?}` alır → sistem mesajı (araçları+task+scope+goNogo tanıtır) kurar → loop: `POST ${host}/api/chat {model, messages, tools, stream:false}` → `message.tool_calls` parse → her birini dispatcher ile çalıştır → sonucu `{role:'tool', content}` olarak ekle → tekrar. **Bitiş:** model `task_done` çağırır (selfAssessment/notes kullan) VEYA `tool_calls` boş (content-only → done) VEYA `maxIterations`(25) aşıldı (→ filesChanged varsa GO_WITH_TECH_DEBT, yoksa NO_GO). Yapılandırılmış sonuç döndür (filesChanged write/edit çağrılarından izlenir; testsPassed run_bash test-exit'inden çıkarsanır).
 
-## Task 3: 232-003 — [P1] abort `>=` operatörü + WAL-safe `deckent memory backup` CLI
-- Model: sonnet
-- Effort: normal
-- Skills: typescript-expert
-- Files: src/core/memory-store.ts, src/cli/commands/memory.ts, tests/core/memory-backup-and-abort.test.ts
-- Scope: src/core/, src/cli/, tests/core/
-### Description
-**Problem (doğrulandı):** (a) `memory-store.ts:883` catastrophic-abort `toDecay.length / nonExemptTotal > CATASTROPHIC_RATIO` **strict `>`** → tam %50'de (125/250=0.5) tetiklenmiyor; `>=` olmalı (defansif, sınır-dahil). (b) WAL-safe backup CLI yok → pre-sprint `cp memory.db` WAL modunda BOŞ kopya üretiyor (sprint-231 kanıt: 100KB boş yedek). `MemoryStore.getRawDb()` (`:1235`) + better-sqlite3 `db.backup()` + `pragma wal_checkpoint` mevcut.
-**Çözüm:** (a) `memory-store.ts:883` `>` → `>=` (tek-karakter, abort %50-dahil yakalar). (b) `cli/commands/memory.ts`'e (`stats`'tan sonra, `:139`) **`memory backup [--output <path>] [--checkpoint]`** subcommand ekle: `store.getRawDb()` → `pragma('wal_checkpoint(TRUNCATE)')` → `db.backup(out)` → non-boş checkpoint'li .db üretir; default out `.brain/memory.db.bak-<sprintId>-<ts>` (ts caller'dan/Date değil — i18n mesajı `getMessage`). **Caller memory-store.ts (operatör) + cli/commands/memory.ts (subcommand).**
-**Kanıt:** `grep -c "wal_checkpoint\|\.backup(" src/cli/commands/memory.ts` → ≥1; `grep -c ">= CATASTROPHIC_RATIO\|>=CATASTROPHIC" src/core/memory-store.ts` → ≥1; `npx vitest run tests/core/memory-backup-and-abort.test.ts` → 4+ pass
-**Test:** ≥4 (tam %50 decay → aborted:true (>= fix); >%50 → aborted; backup non-boş + entry-count korunur (gerçek tmpdir DB backup); backup WAL-checkpoint'li) — hermetik
-**Smoke:** backup gerçek-dosya üretir (run-verify: tmpdir DB → backup → entry-count eşit, dosya>0).
+**`agentic-worker-tools.ts`:** native Ollama `tools` JSON-schema'ları — `read_file{path}`, `write_file{path,content}`, `edit_file{path,old,new}`, `run_bash{cmd}`, `task_done{selfAssessment,notes}` (spec §4 tablosu).
 
-## Task 4: 232-004 — [P1] ci-sim SIGINT/SIGTERM restore handler (GAP A)
-- Model: sonnet
-- Effort: low
-- Skills: ci-testing, typescript-expert
-- Files: scripts/test-ci-sim.mjs, tests/scripts/ci-sim-signal-restore.test.ts
-- Scope: scripts/, tests/scripts/
-### Description
-**Problem (doğrulandı):** `scripts/test-ci-sim.mjs` try/finally + `restorePaths` (`:53`) var ama **SIGINT/SIGTERM handler YOK** → Ctrl-C ile yarıda kesilen ci-sim'de finally ÇALIŞMAZ → `.brain/memory.db` stash'te kalır, canlı memory.db kalıcı BOŞ (veri stash'te güvende ama operatör "DB silindi" görür — sprint-231 empty-backup'ın gerçek nedeni).
-**Çözüm:** `process.on('SIGINT', ...)` + `process.on('SIGTERM', ...)` ekle → `restorePaths(stashed)` çağır → temiz exit (kod 2). Mevcut try/finally korunur (restorePaths zaten idempotent/try-catch'li → çift-restore zararsız). Caller test-ci-sim.mjs.
-**Kanıt:** `grep -cE "process.on\(.(SIGINT|SIGTERM)" scripts/test-ci-sim.mjs` → ≥2; `npx vitest run tests/scripts/ci-sim-signal-restore.test.ts` → 2+ pass
-**Test:** ≥2 (spawn ci-sim child → SIGINT gönder → memory.db geri yüklendi assert; SIGTERM → restore) — async hermetik (spawn, tmpdir, spawnSync YASAK)
-**Smoke:** (script) unit yeterli.
+**`scope-guard.ts`:** `isPathInScope(path, scope)` — write/edit hedefi `scope.filesWrite` + `scope.directories` içinde mi; **dışı → sert-red** (araç sonucu hata string'i döner, model self-correct eder; sessiz-skip YOK). Runner, `createToolExecDispatcher`'ı scope-enforcing confirm/wrapper ile sarar.
 
-## Task 5: 232-005 — [P1] writeGuardedExports dbCount===0 disk-protect (GAP B)
-- Model: sonnet
-- Effort: normal
-- Skills: typescript-expert
-- Files: src/core/memory-export.ts, tests/core/export-empty-db-guard.test.ts
-- Scope: src/core/, tests/core/
-### Description
-**Problem (doğrulandı):** `writeGuardedExports` guard (`memory-export.ts:427`) SADECE `if (dbCount > 0 && renderIsEmpty)` → **dbCount===0'da guard düşer** → diskteki DOLU .md `writeFileSync` ile BOŞ ezilir. DB herhangi bir sebeple boşken (ci-sim penceresi / interrupted ci-sim / manuel) export çalışırsa sağlam exports silinir; guard mevcut DİSK dosyasını kontrol etmiyor (yalnız DB-count vs render). 231-003 decay-floor decay'den-boşalmayı kapattı, bu decay-DIŞI boşluk için kalan açık.
-**Çözüm:** guard'a ek koşul — `dbCount===0 && existsSync(filePath) && mevcut-dosya-DOLU (içerik emptyMarker İÇERMİYOR / anlamlı satır var) → yazmayı REDDET + warn + skipped'a ekle`. Böylece boş-DB'de dolu disk-export korunur. Caller memory-export.ts (231-002 ile aynı fonksiyon, çakışma yok — 232 hiçbir task memory-export'a dokunmuyor).
-**Kanıt:** `grep -cE "dbCount === 0|existsSync" src/core/memory-export.ts` → ≥1; `npx vitest run tests/core/export-empty-db-guard.test.ts` → 3+ pass
-**Test:** ≥3 (boş DB + dolu disk decisions.md → KORUNDU/skipped; boş DB + boş/yok disk → normal yaz; dbCount>0 normal akış regresyon-yok) — hermetik tmpdir
-**Smoke:** (Tier-0) unit yeterli.
+**Kararlar:** bash serbest+logged; scope ihlali sert-red; max-iter 25 config-surfaced.
+
+**Kanıt:** `grep -c "api/chat\|tool_calls\|task_done" src/agents/agentic-worker-runner.ts` → ≥3; `grep -c "isPathInScope\|filesWrite" src/agents/scope-guard.ts` → ≥1; `npx vitest run tests/agents/agentic-worker-runner.test.ts` → 6+ pass.
+**Test:** ≥6 hermetik (`fetchImpl` inject, scripted tool_calls dizisi, tmpdir sandbox): (1) write/edit araçları dosyayı değiştirir, (2) scope-dışı write SERT-RED + hata modele geri beslenir, (3) `.result` shape doğru (filesChanged/selfAssessment), (4) max-iter cap → GO_WITH_TECH_DEBT/NO_GO, (5) `task_done` assessment onurlanır, (6) api-error/unreachable → NO_GO+sebep.
+**Smoke:** (Tier-0 internal) unit yeterli.
 
 ---
 
-**Beklenen:** 5/5 DONE, 0 NO_GO, 0 scope-collision (distinct: sprint-finalizer+debt-manager / sprint-retro-writer+auditor / memory-store+cli-memory / test-ci-sim / memory-export → tek wave). **src/dashboard'a SIFIR dokunuş.** Bu sprint, memory-loss'u **5 katmanda** kapatır: config-doğru (232-001 PRIMARY) + learnings-kalıcı (232-002) + abort-defansif & WAL-safe-backup (232-003) + ci-sim-interrupt-safe (232-004) + boş-DB-export-koruma (232-005). Build sonrası bir daha wipe OLMAMALI. CI yeşil KORUNUR.
+## Task 2: 233-002 — [Wave 2 · depends 233-001] Subprocess entry + OllamaAdapter wiring + dinamik model kabul
+- Model: opus
+- Effort: high
+- Skills: typescript-expert
+- Files: src/agents/agentic-worker-entry.ts, src/providers/ollama.ts, tests/providers/ollama-agentic-worker.test.ts
+- Scope: src/agents/, src/providers/, tests/providers/
+- Dependencies: 233-001
 
-**Pre-flight:** main temiz+commit'li+push'lu ✅ (reset-bug — [[project_deckent_self_git_mutation_bug]]). **DB WAL-checkpoint'li yedek alındı** (`bak-sprint231-recovered`, 206 entry — çıplak cp DEĞİL). **CLI'dan `env -u ANTHROPIC_API_KEY`**. `brain_planning=structured` (AI-hang yok). Tek wave (3 paralel ayrık-dosya). Her wave sonrası git log + git stash list (reset kontrol). Sprint sonrası DB entry-count ≥206 korunmalı (`deckent memory stats` → memory≥91); wipe olursa `bak-sprint231-recovered`'dan restore.
+### Description
+Spec §3.1.2 + §3.2'yi uygula (233-001'in runner'ını kullanır).
 
-İlgili memory: [[project_brain_integrity_sprint226_cluster]] · [[feedback_db_silmek_yasak]] · [[feedback_trust_brain_eval_not_worker]] · [[project_ci_green_root_causes]] · [[feedback_proof_of_function_dod]]
-İlgili ADR: ADR-070 (eval/memory integrity) · ADR-046 (self-update hook) · ADR-009 (debt format)
+**`agentic-worker-entry.ts`:** ince subprocess entrypoint — `argv: <taskId> <model> <host>` → `.tasks/task-{id}.json` oku → runner'ı gerçek deps ile kur (fetch, fs-root=projectDir, scope task'tan) → heartbeat geçişleri yaz (EXECUTING→DONE) → runner çağır → `.tasks/task-{id}.result` yaz (api-surface formatı). Hata/throw → NO_GO `.result` + non-zero exit.
+
+**`src/providers/ollama.ts` düzenle (yalnız bu 2 nokta):**
+1. `spawn()`: tek-atış `curl /api/generate` yerine → `spawn('node', [entryPath, taskId, apiId, host], {cwd, stdio:[ignore,logFd,logFd], env})`. **Mevcut lifecycle KORUNUR** (workers map, heartbeat, timeout SIGKILL, kill SIGTERM, exit cleanup).
+2. `isSupportedModel()`: canlı `/api/tags` listesindeki herhangi modeli kabul et (probe cache'le), statik 4-katalog fallback (tier-routing default'ları için 4 built-in kalır). qwen3.6:27b (listede yok) kabul EDİLMELİ.
+
+**Kanıt:** `grep -c "agentic-worker-entry\|spawn('node'\|spawn(\"node\"" src/providers/ollama.ts` → ≥1; `grep -c "api/tags" src/providers/ollama.ts` → ≥1 (isSupportedModel'de dinamik); `npx vitest run tests/providers/ollama-agentic-worker.test.ts` → 4+ pass.
+**Test:** ≥4 hermetik (tmpdir, fetchImpl/spawn-stub): (1) spawn node-entry'yi doğru argv ile başlatır (curl DEĞİL), (2) isSupportedModel `/api/tags`'teki keyfi modeli kabul + statik fallback, (3) entry task.json→.result akışı (mock runner), (4) lifecycle: kill/timeout korunur (regresyon).
+**Smoke (host-side, ADR-079 — Brain/Alperen koşar, worker DEĞİL):** gerçek qwen3.6 → `env -u ANTHROPIC_API_KEY node dist/agents/agentic-worker-entry.js smoke-001 qwen3.6:27b http://localhost:11434` (scope'lu küçük task: bir dosyaya yorum ekle) → `.result.selfAssessment` yazıldı + dosya GERÇEKTEN değişti.
+
+---
+
+**Beklenen:** 2/2 DONE, 0 NO_GO. Wave 1 (233-001) → Wave 2 (233-002, runner'ı kullanır). Distinct filesWrite (collision yok). **chat-tool-exec.ts DEĞİŞMEZ** (reuse-only). Sprint sonrası host-side live-smoke (qwen3.6) yeşil olmalı = proof-of-function. CI yeşil KORUNUR; memory ≥226.
+
+**Pre-flight (Brain — yapıldı):** main temiz+push'lu ✅ · WAL-safe DB backup (226 entry, `bak-manual-*`) ✅ · CLI'dan `env -u ANTHROPIC_API_KEY` · structured planning · tek-tek wave (dependency manuel).
+
+İlgili: [[project_ollama_worker_stub_gap]] · [[project_4cli_subscription_vision]] · [[feedback_proof_of_function_dod]] · [[project_ci_green_root_causes]] · [[feedback_trust_brain_eval_not_worker]]
+İlgili ADR: ADR-079 (proof-of-function) · ADR-037 (RBAC scope) · ADR-027 (spawn backend) · ADR-010 (no-new-dep)
