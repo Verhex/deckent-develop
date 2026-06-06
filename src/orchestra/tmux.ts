@@ -6,6 +6,7 @@ import type { ModelType } from '../core/types.js';
 import type { ProviderAdapter } from '../core/provider.js';
 import { debugLog } from '../core/utils.js';
 import { validateTaskId } from '../core/validators.js';
+import { modelRegistry } from '../core/model-registry.js';
 import {
   TMUX_SESSION_NAME,
   TMUX_AUDITOR_WINDOW,
@@ -111,7 +112,7 @@ export function buildWorkerCommand(
 
   // Default: Claude CLI syntax (backward compat)
   // Use stdin redirection from file — no shell metacharacter risk
-  let cmd = `claude -p - --model ${model}`;
+  let cmd = `claude -p - --model ${modelRegistry.get(model)?.apiId ?? model}`;
   if (opts?.allowedTools) {
     // allowedTools is a controlled string (never user input)
     cmd += ` --allowedTools '${opts.allowedTools}'`;

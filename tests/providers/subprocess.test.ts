@@ -115,7 +115,7 @@ describe('SubprocessSpawnBackend', () => {
       setupMockChild();
       backend.spawn('task-001', 'opus', 'test prompt');
       const [, args] = mockSpawn.mock.calls[0];
-      expect(args).toContain('opus');
+      expect(args).toContain('claude-opus-4-8');
     });
 
     it('should include --model flag in args', () => {
@@ -124,7 +124,7 @@ describe('SubprocessSpawnBackend', () => {
       const [, args] = mockSpawn.mock.calls[0];
       const modelIdx = args.indexOf('--model');
       expect(modelIdx).toBeGreaterThan(-1);
-      expect(args[modelIdx + 1]).toBe('sonnet');
+      expect(args[modelIdx + 1]).toBe('claude-sonnet-4-6');
     });
 
     it('should write prompt via stdin', () => {
@@ -328,7 +328,7 @@ describe('SubprocessSpawnBackend', () => {
   describe('buildCommand()', () => {
     it('should build basic command', () => {
       const cmd = backend.buildCommand('opus', '/tmp/prompt.txt');
-      expect(cmd).toBe('claude -p - --model opus < /tmp/prompt.txt');
+      expect(cmd).toBe('claude -p - --model claude-opus-4-8 < /tmp/prompt.txt');
     });
 
     it('should include --allowedTools when provided', () => {
@@ -629,12 +629,12 @@ describe('SubprocessSpawnBackend — Provider Decoupling', () => {
 
   it('should export CLAUDE_SUBPROCESS_CONFIG with buildArgs producing correct args', () => {
     const args = CLAUDE_SUBPROCESS_CONFIG.buildArgs('sonnet');
-    expect(args).toEqual(['-p', '-', '--model', 'sonnet']);
+    expect(args).toEqual(['-p', '-', '--model', 'claude-sonnet-4-6']);
   });
 
   it('should export CLAUDE_SUBPROCESS_CONFIG with buildCommandString producing correct command', () => {
     const cmd = CLAUDE_SUBPROCESS_CONFIG.buildCommandString('opus', '/tmp/p.txt');
-    expect(cmd).toBe('claude -p - --model opus < /tmp/p.txt');
+    expect(cmd).toBe('claude -p - --model claude-opus-4-8 < /tmp/p.txt');
   });
 
   it('should store providerConfig accessible via getProviderConfig()', () => {

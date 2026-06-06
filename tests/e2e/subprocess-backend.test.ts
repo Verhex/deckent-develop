@@ -625,7 +625,7 @@ describe('Subprocess Backend E2E', () => {
       expect(args).toContain('-p');
       expect(args).toContain('-');
       expect(args).toContain('--model');
-      expect(args).toContain('opus');
+      expect(args).toContain('claude-opus-4-8');
     });
 
     it('buildArgs includes allowedTools when provided', () => {
@@ -650,7 +650,7 @@ describe('Subprocess Backend E2E', () => {
         allowedTools: 'Read',
         autoApprove: true,
       });
-      expect(cmd).toContain('claude -p - --model opus');
+      expect(cmd).toContain('claude -p - --model claude-opus-4-8');
       expect(cmd).toContain("--allowedTools 'Read'");
       expect(cmd).toContain('--dangerously-skip-permissions');
       expect(cmd).toContain('< /tmp/prompt.txt');

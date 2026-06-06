@@ -16,6 +16,7 @@ import { CLAUDE_MODELS } from '../core/types.js';
 import type { ProviderAdapter, ProviderSpawnOptions } from '../core/provider.js';
 import { ProviderError } from '../core/provider.js';
 import { TASKS_DIR } from '../core/constants.js';
+import { modelRegistry } from '../core/model-registry.js';
 
 // ─── SubprocessProviderConfig ───────────────────────────────────────
 /**
@@ -54,7 +55,8 @@ export const CLAUDE_SUBPROCESS_CONFIG: SubprocessProviderConfig = {
   name: 'claude-subprocess',
   supportedModels: [...CLAUDE_MODELS],
   buildArgs(model: ModelType, opts?: ProviderSpawnOptions): string[] {
-    const args = ['-p', '-', '--model', model];
+    // Sprint 237: real model name (apiId, e.g. claude-opus-4-8), not alias.
+    const args = ['-p', '-', '--model', modelRegistry.get(model)?.apiId ?? model];
     if (opts?.allowedTools) {
       args.push('--allowedTools', opts.allowedTools);
     }
@@ -64,7 +66,7 @@ export const CLAUDE_SUBPROCESS_CONFIG: SubprocessProviderConfig = {
     return args;
   },
   buildCommandString(model: ModelType, promptPath: string, opts?: Pick<ProviderSpawnOptions, 'allowedTools' | 'autoApprove'>): string {
-    let cmd = `claude -p - --model ${model}`;
+    let cmd = `claude -p - --model ${modelRegistry.get(model)?.apiId ?? model}`;
     if (opts?.allowedTools) {
       cmd += ` --allowedTools '${opts.allowedTools}'`;
     }

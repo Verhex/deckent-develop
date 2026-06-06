@@ -346,8 +346,13 @@ export class ClaudeAdapter implements ProviderAdapter {
     promptPath: string,
     opts?: Pick<ProviderSpawnOptions, 'allowedTools' | 'autoApprove'>,
   ): string {
+    // Sprint 237: pass the real model name (apiId, e.g. claude-opus-4-8) to the
+    // CLI, NOT the short alias ('opus') — so the worker runs the EXACT current
+    // version (no 4-6/4-8 confusion) and logs show it. apiId is live from
+    // models.dev via bootstrapFromCatalog (parametric, no hardcode).
+    const apiId = modelRegistry.get(model)?.apiId ?? model;
     if (this.backend === 'subprocess') {
-      let cmd = `claude -p "${promptPath}" --dangerously-skip-permissions --model ${model}`;
+      let cmd = `claude -p "${promptPath}" --dangerously-skip-permissions --model ${apiId}`;
       if (opts?.allowedTools) {
         cmd += ` --allowedTools '${opts.allowedTools}'`;
       }
@@ -355,7 +360,7 @@ export class ClaudeAdapter implements ProviderAdapter {
     }
 
     // tmux backend (default)
-    let cmd = `claude -p - --model ${model}`;
+    let cmd = `claude -p - --model ${apiId}`;
     if (opts?.allowedTools) {
       cmd += ` --allowedTools '${opts.allowedTools}'`;
     }

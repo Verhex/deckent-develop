@@ -10,6 +10,7 @@ import { randomBytes } from 'node:crypto';
 import { homedir, totalmem } from 'node:os';
 import type { ModelType } from '../core/types.js';
 import { getProviderForModel, UnknownModelError } from '../core/task-types.js';
+import { modelRegistry } from '../core/model-registry.js';
 import { TASKS_DIR } from '../core/constants.js';
 import { debugLog } from '../core/utils.js';
 import {
@@ -333,7 +334,9 @@ export class DockerSpawnBackend implements SpawnBackend {
 
     // Build provider CLI command inside container
     const providerBinary = getProviderBinaryForModel(model);
-    const claudeArgs: string[] = ['-p', '-', '--model', model];
+    // Sprint 237: pass real model name (apiId, e.g. claude-opus-4-8) not alias.
+    const apiId = modelRegistry.get(model)?.apiId ?? model;
+    const claudeArgs: string[] = ['-p', '-', '--model', apiId];
     if (opts?.allowedTools) {
       // Double-quote the value — allowedTools contains parentheses like Write(.tasks/)
       // which sh (dash) interprets as subshell syntax without quoting

@@ -325,9 +325,10 @@ describe('ClaudeAdapter', () => {
   // ─── buildCommand() ──────────────────────────────────────────────
 
   describe('buildCommand()', () => {
-    it('should build basic command without opts', () => {
+    it('should build basic command without opts (real model name, not alias)', () => {
+      // Sprint 237: --model carries the real apiId (claude-opus-4-8), not 'opus'
       const cmd = adapter.buildCommand('opus', '/tmp/prompt.txt');
-      expect(cmd).toBe('claude -p - --model opus < /tmp/prompt.txt');
+      expect(cmd).toBe('claude -p - --model claude-opus-4-8 < /tmp/prompt.txt');
     });
 
     it('should include --allowedTools when provided', () => {
@@ -350,10 +351,13 @@ describe('ClaudeAdapter', () => {
       expect(cmd).toContain('< /path/to/prompt.txt');
     });
 
-    it('should use correct model in command', () => {
-      expect(adapter.buildCommand('opus', '/p')).toContain('--model opus');
-      expect(adapter.buildCommand('sonnet', '/p')).toContain('--model sonnet');
-      expect(adapter.buildCommand('haiku', '/p')).toContain('--model haiku');
+    it('should pass the real model apiId (not the short alias) to --model', () => {
+      // alias → real version-pinned name via registry (live from models.dev)
+      expect(adapter.buildCommand('opus', '/p')).toContain('--model claude-opus-4-8');
+      expect(adapter.buildCommand('sonnet', '/p')).toContain('--model claude-sonnet-4-6');
+      expect(adapter.buildCommand('haiku', '/p')).toContain('--model claude-haiku-4-5-20251001');
+      // never the bare alias
+      expect(adapter.buildCommand('opus', '/p')).not.toContain('--model opus ');
     });
 
     it('should combine allowedTools and autoApprove', () => {
@@ -510,7 +514,7 @@ describe('ClaudeAdapter — claude_backend', () => {
   it('should build tmux-style command when backend is tmux', () => {
     const adapter = new ClaudeAdapter(projectDir, { claude_backend: 'tmux' });
     const cmd = adapter.buildCommand('opus', '/tmp/prompt.txt');
-    expect(cmd).toBe('claude -p - --model opus < /tmp/prompt.txt');
+    expect(cmd).toBe('claude -p - --model claude-opus-4-8 < /tmp/prompt.txt');
   });
 
   // ─── subprocess mode ──────────────────────────────────────────────
@@ -539,7 +543,7 @@ describe('ClaudeAdapter — claude_backend', () => {
     const adapter = new ClaudeAdapter(projectDir, { claude_backend: 'subprocess' });
     const cmd = adapter.buildCommand('opus', '/tmp/prompt.txt');
     expect(cmd).toContain('--dangerously-skip-permissions');
-    expect(cmd).toContain('--model opus');
+    expect(cmd).toContain('--model claude-opus-4-8');
     expect(cmd).toContain('claude -p "/tmp/prompt.txt"');
     expect(cmd).not.toContain('< /tmp/prompt.txt');
   });
