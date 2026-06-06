@@ -18,7 +18,10 @@ import { fileURLToPath } from 'node:url';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
-export type BillingMode = 'api' | 'subscription' | 'free_tier';
+// 'local' — on-device inference (e.g. Ollama): zero USD cost, no third-party
+// billing, and NO subscription quota draw (distinct from 'free_tier', a metered
+// free allowance on a hosted API). Sprint 238 İŞ4.
+export type BillingMode = 'api' | 'subscription' | 'free_tier' | 'local';
 export type SubscriptionMethod = 'cccost_interceptor' | 'admin_api' | 'none';
 export type DeckentTier = 'economy' | 'standard' | 'premium' | 'premium_plus';
 

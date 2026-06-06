@@ -303,9 +303,9 @@
     "ollama": {
       "enabled": true,
       "billing_modes_supported": [
-        "subscription"
+        "local"
       ],
-      "default_billing_mode": "subscription",
+      "default_billing_mode": "local",
       "api_endpoint": "http://localhost:11434",
       "_note": "Local Ollama models — zero cost (on-device inference, no third-party billing). Dynamically-pulled tags not listed here also cost 0; add as needed or rely on provider=ollama → 0 fallback.",
       "models": {

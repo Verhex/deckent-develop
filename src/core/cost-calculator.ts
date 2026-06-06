@@ -214,6 +214,9 @@ function calculateTaskCost(
     costUsd = 0;
   } else if (billingMode === 'free_tier') {
     costUsd = 0;
+  } else if (billingMode === 'local') {
+    // Local on-device inference (Ollama): zero USD, no subscription quota draw.
+    costUsd = 0;
   }
 
   // Context fit check
@@ -449,6 +452,8 @@ export function formatEstimate(est: SprintCostEstimate): string {
     } else if (pp.billingMode === 'subscription') {
       const pct = pp.subscriptionQuotaPercent?.toFixed(1) ?? '0.0';
       lines.push(`  ${providerName.padEnd(20)} $0 (subscription, ~${pct}% daily quota)`);
+    } else if (pp.billingMode === 'local') {
+      lines.push(`  ${providerName.padEnd(20)} $0 (local)`);
     } else {
       lines.push(`  ${providerName.padEnd(20)} $0 (free tier)`);
     }

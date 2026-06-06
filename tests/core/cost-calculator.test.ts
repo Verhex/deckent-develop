@@ -383,4 +383,58 @@ describe('cost-calculator', () => {
       expect(est.withinBudget).toBe(false); // $5 sprint budget in TEST_CONFIG
     });
   });
+
+  // ─── Sprint 238 İŞ4 — ollama 'local' billing label ────────────────────────
+  describe('local billing mode (ollama on-device)', () => {
+    const LOCAL_CONFIG: CostConfig = {
+      _version: '1.0',
+      providers: {
+        ollama: {
+          enabled: true,
+          billing_modes_supported: ['local'],
+          default_billing_mode: 'local',
+          models: {
+            'qwen3.6:27b': {
+              input_cost_per_token: 0,
+              output_cost_per_token: 0,
+              max_input_tokens: 262144,
+              max_output_tokens: 16384,
+              supports_prompt_caching: false,
+              enabled: true,
+            },
+          },
+        },
+      },
+      cost_limits: { sprint_max_usd: 5.0, daily_max_usd: 50.0 },
+      update_config: { sources_priority: ['litellm'] },
+    } as unknown as CostConfig;
+
+    it('resolves ollama task to billingMode=local with $0 cost', () => {
+      const tasks: TaskCostInput[] = [
+        { id: 'OLL-1', model: 'qwen3.6:27b', estimatedInputTokens: 500_000, estimatedOutputTokens: 50_000 },
+      ];
+      const est = estimateSprintCost(tasks, LOCAL_CONFIG, {
+        cacheHitRatio: 0, retryMultiplier: 1.0, cacheableContextTokens: 0,
+      });
+      const ollama = est.perProvider['ollama'];
+      expect(ollama).toBeDefined();
+      expect(ollama!.billingMode).toBe('local');
+      expect(est.totalApiCostUsd).toBe(0);
+      expect(est.withinBudget).toBe(true);
+    });
+
+    it('renders "(local)" — not "(subscription)" or "(free tier)" — in the formatted estimate', () => {
+      const tasks: TaskCostInput[] = [
+        { id: 'OLL-1', model: 'qwen3.6:27b', estimatedInputTokens: 100_000, estimatedOutputTokens: 10_000 },
+      ];
+      const est = estimateSprintCost(tasks, LOCAL_CONFIG, {
+        cacheHitRatio: 0, retryMultiplier: 1.0, cacheableContextTokens: 0,
+      });
+      const out = formatEstimate(est);
+      expect(out).toContain('$0 (local)');
+      expect(out).toContain('(local)'); // model distribution line too
+      expect(out).not.toContain('(subscription)');
+      expect(out).not.toContain('(free tier)');
+    });
+  });
 });
