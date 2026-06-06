@@ -2,6 +2,29 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint237] - 2026-06-06
+
+### Added
+
+- 236-002 — [Claude/sonnet] Çoklu-provider filo kılavuzu
+
+### Changed
+
+- 236-001 — [Ollama/qwen3.6] Yerel-model worker kullanım kılavuzu (completed with tech debt)
+
+
+_Tasks: 2 total, 2 done, 1 tech debt, 0 no-go_
+
+## [1.0.0-beta.1-sprint236] - 2026-06-06
+
+### Added
+
+- 236-001 — [Ollama/qwen3.6] Yerel-model worker kullanım kılavuzu
+- 236-002 — [Claude/sonnet] Çoklu-provider filo kılavuzu
+
+
+_Tasks: 2 total, 2 done, 0 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint235] - 2026-06-06
 
 ### Added

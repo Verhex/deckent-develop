@@ -1,5 +1,19 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-237 Learnings
+- Sprint sprint-237 Learnings: ## Sprint sprint-237 Learnings
+- 236-001 — [Ollama/qwen3.6] Yerel-model worker kullanım kılavuzu: GO_WITH_TECH_DEBT — docs/guide/local-model-workers.md yazıldı. İçerik: (1) Ollama kurulumu + `ollama pull`, (2) `Provider: ollama` / `Model:
+
+## Gains
+- 237-002 — [Claude/sonnet] Çoklu-provider filo kılavuzu — docs/guide/multi-provider-fleet.md exists and is complete (147 lines).
+
+## Sprint sprint-236 Learnings
+- Sprint sprint-236 Learnings: ## Sprint sprint-236 Learnings
+
+## Gains
+- 236-001 — [Ollama/qwen3.6] Yerel-model worker kullanım kılavuzu — Created docs/guide/local-model-workers.md covering all 4 required topics: (1) Ollama installation...
+- 236-002 — [Claude/sonnet] Çoklu-provider filo kılavuzu — Created docs/guide/multi-provider-fleet.md (146 lines).
+
 ## Sprint sprint-235 Learnings
 - Sprint sprint-235 Learnings: ## Sprint sprint-235 Learnings
 

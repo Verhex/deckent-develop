@@ -80,6 +80,12 @@
 | adr-086 | Native CLI Parity — F11 Feature Set (Sprint 224) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-237 Learnings** (sprint-237): ## Sprint sprint-237 Learnings
+- 236-001 — [Ollama/qwen3.6] Yerel-model worker kullanım kılavuzu: GO_WITH_TECH_DEBT —...
+- **Sprint sprint-236 Learnings** (sprint-236): ## Sprint sprint-236 Learnings
+
+## Gains
+- 236-001 — [Ollama/qwen3.6] Yerel-model worker kullanım kılavuzu — Created ...
 - **Sprint sprint-235 Learnings** (sprint-235): ## Sprint sprint-235 Learnings
 
 ## Gains
@@ -110,8 +116,6 @@
 - 226-001 — Authority adapter (checkAuthority → AuthorityChecker) — Created ...
 - **Sprint 224 Learnings** (sprint-224): - Sprint sprint-224 Learnings: ## Sprint sprint-224 Learnings
 - 224-015 — [P0] AI plan-mode fix (dürüst hata + gerçek...
-- **Sprint 223 Learnings** (sprint-223): - Sprint sprint-223 Learnings: ## Sprint sprint-223 Learnings
-- **Sprint 222 Learnings** (sprint-222): - Sprint sprint-222 Learnings: ## Sprint sprint-222 Learnings
 
 ## Active Technical Debt
 _No active technical debt._
@@ -121,4 +125,4 @@ _No active technical debt._
 - Violation pattern: file_outside_scope
 - Violation pattern: file_outside_scope
 
-_Total entries: 236 | Generated: 2026-06-06_
+_Total entries: 243 | Generated: 2026-06-06_

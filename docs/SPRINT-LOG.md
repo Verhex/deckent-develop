@@ -6446,3 +6446,49 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 235-001: 235-001 — [P0] Per-task ollama provider+model plan-time acceptance (DONE)
 
 ---
+## Sprint 236 — sprint-236
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-06-06
+**Duration:** 379s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 2 |
+| Completed | 2 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 378545ms |
+
+### Tasks
+
+- 236-001: 236-001 — [Ollama/qwen3.6] Yerel-model worker kullanım kılavuzu (DONE)
+- 236-002: 236-002 — [Claude/sonnet] Çoklu-provider filo kılavuzu (DONE)
+
+---
+## Sprint 237 — sprint-237
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-06-06
+**Duration:** 339s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 2 |
+| Completed | 2 |
+| Tech Debt | 1 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 338677ms |
+
+### Tasks
+
+- 237-001: 236-001 — [Ollama/qwen3.6] Yerel-model worker kullanım kılavuzu (GO_WITH_TECH_DEBT)
+- 237-002: 236-002 — [Claude/sonnet] Çoklu-provider filo kılavuzu (DONE)
+
+---

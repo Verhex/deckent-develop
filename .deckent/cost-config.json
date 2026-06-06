@@ -14,11 +14,11 @@
       "api_endpoint": "https://api.anthropic.com",
       "models": {
         "claude-opus-4-6": {
-          "input_cost_per_token": 0.000005,
-          "output_cost_per_token": 0.000025,
-          "cache_creation_input_token_cost": 0.00000625,
-          "cache_creation_input_token_cost_above_1hr": 0.00001,
-          "cache_read_input_token_cost": 5e-7,
+          "input_cost_per_token": 5e-06,
+          "output_cost_per_token": 2.5e-05,
+          "cache_creation_input_token_cost": 6.25e-06,
+          "cache_creation_input_token_cost_above_1hr": 1e-05,
+          "cache_read_input_token_cost": 5e-07,
           "max_input_tokens": 1000000,
           "max_output_tokens": 128000,
           "supports_prompt_caching": true,
@@ -35,11 +35,11 @@
           "_verified_at": "2026-04-15"
         },
         "claude-sonnet-4-6": {
-          "input_cost_per_token": 0.000003,
-          "output_cost_per_token": 0.000015,
-          "cache_creation_input_token_cost": 0.00000375,
+          "input_cost_per_token": 3e-06,
+          "output_cost_per_token": 1.5e-05,
+          "cache_creation_input_token_cost": 3.75e-06,
           "cache_creation_input_token_cost_above_1hr": null,
-          "cache_read_input_token_cost": 3e-7,
+          "cache_read_input_token_cost": 3e-07,
           "max_input_tokens": 1000000,
           "max_output_tokens": 64000,
           "supports_prompt_caching": true,
@@ -57,11 +57,11 @@
           "_notes": "Sonnet 4.6 upgraded to 1M context in 2026 (was 200K in Sonnet 4.5). Does not support 1h extended cache."
         },
         "claude-haiku-4-5": {
-          "input_cost_per_token": 0.000001,
-          "output_cost_per_token": 0.000005,
-          "cache_creation_input_token_cost": 0.00000125,
-          "cache_creation_input_token_cost_above_1hr": 0.000002,
-          "cache_read_input_token_cost": 1e-7,
+          "input_cost_per_token": 1e-06,
+          "output_cost_per_token": 5e-06,
+          "cache_creation_input_token_cost": 1.25e-06,
+          "cache_creation_input_token_cost_above_1hr": 2e-06,
+          "cache_read_input_token_cost": 1e-07,
           "max_input_tokens": 200000,
           "max_output_tokens": 64000,
           "supports_prompt_caching": true,
@@ -117,11 +117,11 @@
       "api_endpoint": "https://api.openai.com",
       "models": {
         "gpt-5": {
-          "input_cost_per_token": 0.00000125,
-          "output_cost_per_token": 0.00001,
+          "input_cost_per_token": 1.25e-06,
+          "output_cost_per_token": 1e-05,
           "cache_creation_input_token_cost": null,
           "cache_creation_input_token_cost_above_1hr": null,
-          "cache_read_input_token_cost": 1.25e-7,
+          "cache_read_input_token_cost": 1.25e-07,
           "max_input_tokens": 272000,
           "max_output_tokens": 128000,
           "supports_prompt_caching": true,
@@ -139,10 +139,10 @@
           "_notes": "OpenAI auto-caches (no explicit cache_control needed). Reasoning tokens billed at output rate, folded into output_tokens."
         },
         "gpt-5-mini": {
-          "input_cost_per_token": 2.5e-7,
-          "output_cost_per_token": 0.000002,
+          "input_cost_per_token": 2.5e-07,
+          "output_cost_per_token": 2e-06,
           "cache_creation_input_token_cost": null,
-          "cache_read_input_token_cost": 2.5e-8,
+          "cache_read_input_token_cost": 2.5e-08,
           "max_input_tokens": 272000,
           "max_output_tokens": 128000,
           "supports_prompt_caching": true,
@@ -158,10 +158,10 @@
           "_verified_at": "2026-04-15"
         },
         "gpt-5-nano": {
-          "input_cost_per_token": 5e-8,
-          "output_cost_per_token": 4e-7,
+          "input_cost_per_token": 5e-08,
+          "output_cost_per_token": 4e-07,
           "cache_creation_input_token_cost": null,
-          "cache_read_input_token_cost": 5e-9,
+          "cache_read_input_token_cost": 5e-09,
           "max_input_tokens": 272000,
           "max_output_tokens": 128000,
           "supports_prompt_caching": true,
@@ -176,9 +176,9 @@
           "_verified_at": "2026-04-15"
         },
         "o3": {
-          "input_cost_per_token": 0.00001,
-          "output_cost_per_token": 0.00004,
-          "cache_read_input_token_cost": 0.0000025,
+          "input_cost_per_token": 1e-05,
+          "output_cost_per_token": 4e-05,
+          "cache_read_input_token_cost": 2.5e-06,
           "max_input_tokens": 200000,
           "max_output_tokens": 100000,
           "supports_prompt_caching": true,
@@ -226,10 +226,10 @@
       "api_endpoint": "https://generativelanguage.googleapis.com",
       "models": {
         "gemini-3-1-pro-preview": {
-          "input_cost_per_token": 0.000002,
-          "output_cost_per_token": 0.000012,
+          "input_cost_per_token": 2e-06,
+          "output_cost_per_token": 1.2e-05,
           "cache_creation_input_token_cost": null,
-          "cache_read_input_token_cost": 2e-7,
+          "cache_read_input_token_cost": 2e-07,
           "max_input_tokens": 2000000,
           "max_output_tokens": 64000,
           "supports_prompt_caching": true,
@@ -245,9 +245,9 @@
           "_verified_at": "2026-04-15"
         },
         "gemini-2-5-pro": {
-          "input_cost_per_token": 0.00000125,
-          "output_cost_per_token": 0.00001,
-          "cache_read_input_token_cost": 1.25e-7,
+          "input_cost_per_token": 1.25e-06,
+          "output_cost_per_token": 1e-05,
+          "cache_read_input_token_cost": 1.25e-07,
           "max_input_tokens": 2000000,
           "max_output_tokens": 64000,
           "supports_prompt_caching": true,
@@ -261,9 +261,9 @@
           "_verified_at": "2026-04-15"
         },
         "gemini-2-5-flash": {
-          "input_cost_per_token": 3e-7,
-          "output_cost_per_token": 0.0000025,
-          "cache_read_input_token_cost": 3e-8,
+          "input_cost_per_token": 3e-07,
+          "output_cost_per_token": 2.5e-06,
+          "cache_read_input_token_cost": 3e-08,
           "max_input_tokens": 1000000,
           "max_output_tokens": 64000,
           "supports_prompt_caching": true,
@@ -278,9 +278,9 @@
           "_notes": "Free tier: 15 RPM, 1M TPM, 1500 RPD"
         },
         "gemini-2-0-flash": {
-          "input_cost_per_token": 1e-7,
-          "output_cost_per_token": 4e-7,
-          "cache_read_input_token_cost": 2.5e-8,
+          "input_cost_per_token": 1e-07,
+          "output_cost_per_token": 4e-07,
+          "cache_read_input_token_cost": 2.5e-08,
           "max_input_tokens": 1000000,
           "max_output_tokens": 8192,
           "supports_prompt_caching": true,
@@ -298,6 +298,102 @@
         "method": "none",
         "supported": false,
         "reason": "Gemini Advanced is web/mobile subscription. API billing through Google Cloud is separate. Architectural impossibility — use API key for cost tracking."
+      }
+    },
+    "ollama": {
+      "enabled": true,
+      "billing_modes_supported": [
+        "subscription"
+      ],
+      "default_billing_mode": "subscription",
+      "api_endpoint": "http://localhost:11434",
+      "_note": "Local Ollama models — zero cost (on-device inference, no third-party billing). Dynamically-pulled tags not listed here also cost 0; add as needed or rely on provider=ollama → 0 fallback.",
+      "models": {
+        "qwen3.6:27b": {
+          "input_cost_per_token": 0,
+          "output_cost_per_token": 0,
+          "cache_creation_input_token_cost": 0,
+          "cache_read_input_token_cost": 0,
+          "max_input_tokens": 262144,
+          "max_output_tokens": 16384,
+          "supports_prompt_caching": false,
+          "supports_reasoning": false,
+          "supports_vision": false,
+          "supports_tool_choice": true,
+          "deckent_tier": "standard",
+          "deckent_aliases": [],
+          "enabled": true,
+          "_source": "local-ollama (zero-cost, never-calls-home)",
+          "_verified_at": "2026-06-06"
+        },
+        "qwen2.5-coder:32b": {
+          "input_cost_per_token": 0,
+          "output_cost_per_token": 0,
+          "cache_creation_input_token_cost": 0,
+          "cache_read_input_token_cost": 0,
+          "max_input_tokens": 131072,
+          "max_output_tokens": 16384,
+          "supports_prompt_caching": false,
+          "supports_reasoning": false,
+          "supports_vision": false,
+          "supports_tool_choice": true,
+          "deckent_tier": "premium",
+          "deckent_aliases": [],
+          "enabled": true,
+          "_source": "local-ollama (zero-cost, never-calls-home)",
+          "_verified_at": "2026-06-06"
+        },
+        "qwen2.5-coder:7b": {
+          "input_cost_per_token": 0,
+          "output_cost_per_token": 0,
+          "cache_creation_input_token_cost": 0,
+          "cache_read_input_token_cost": 0,
+          "max_input_tokens": 32768,
+          "max_output_tokens": 16384,
+          "supports_prompt_caching": false,
+          "supports_reasoning": false,
+          "supports_vision": false,
+          "supports_tool_choice": true,
+          "deckent_tier": "standard",
+          "deckent_aliases": [],
+          "enabled": true,
+          "_source": "local-ollama (zero-cost, never-calls-home)",
+          "_verified_at": "2026-06-06"
+        },
+        "llama3:8b": {
+          "input_cost_per_token": 0,
+          "output_cost_per_token": 0,
+          "cache_creation_input_token_cost": 0,
+          "cache_read_input_token_cost": 0,
+          "max_input_tokens": 8192,
+          "max_output_tokens": 16384,
+          "supports_prompt_caching": false,
+          "supports_reasoning": false,
+          "supports_vision": false,
+          "supports_tool_choice": true,
+          "deckent_tier": "standard",
+          "deckent_aliases": [],
+          "enabled": true,
+          "_source": "local-ollama (zero-cost, never-calls-home)",
+          "_verified_at": "2026-06-06"
+        },
+        "llama3.2:3b": {
+          "input_cost_per_token": 0,
+          "output_cost_per_token": 0,
+          "cache_creation_input_token_cost": 0,
+          "cache_read_input_token_cost": 0,
+          "max_input_tokens": 8192,
+          "max_output_tokens": 16384,
+          "supports_prompt_caching": false,
+          "supports_reasoning": false,
+          "supports_vision": false,
+          "supports_tool_choice": true,
+          "deckent_tier": "economy",
+          "deckent_aliases": [],
+          "enabled": true,
+          "_source": "local-ollama (zero-cost, never-calls-home)",
+          "_verified_at": "2026-06-06"
+        }
       }
     }
   },
