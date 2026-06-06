@@ -147,14 +147,7 @@ jobs:
       - run: npm ci
       - run: npm run ci:rebuild-native
       - name: Run docs and scripts tests
-        # maxForks=1: dead-code-audit.test.ts (83s) and scripts.test.ts (65s)
-        # each spawn CPU-bound child scripts (full-repo AST walks). With 2 forks
-        # on a 2-core runner both children peg both cores, starving the worker→
-        # main onTaskUpdate RPC heartbeat → vitest exits 1 even though all 1232
-        # tests pass. A single fork keeps at most one child running, leaving a
-        # core free for the heartbeat. The heavy files dominate wall-time anyway,
-        # so serialising the fast files costs ~nothing (~80s total).
-        run: npx vitest run tests/docs/ tests/scripts/ --pool=forks --poolOptions.forks.maxForks=1
+        run: npx vitest run tests/docs/ tests/scripts/ --pool=forks
         timeout-minutes: 5
 
   test-dashboard:

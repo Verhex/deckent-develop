@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { execSync, spawnSync } from 'child_process';
+import { describe, it, expect, beforeEach, afterEach, beforeAll } from 'vitest';
+import { spawn } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
@@ -11,25 +11,55 @@ const TMP_TEST_DIR = path.join(PROJECT_ROOT, '.tmp-script-tests');
 
 const isWindows = process.platform === 'win32';
 
-// Helper to run shell scripts
-function runScript(scriptName: string, args: string[] = [], options: any = {}) {
-  const scriptPath = path.join(SCRIPTS_DIR, scriptName);
-  const command = `bash ${scriptPath} ${args.join(' ')}`;
-
-  try {
-    const result = execSync(command, {
+// ASYNC subprocess runner. A blocking execSync/spawnSync freezes the vitest
+// worker's event loop for the whole subprocess (verify-publish.sh runs npm pack;
+// `npm run build` takes 30–60s on CI). While blocked the worker cannot service
+// the worker→main `onTaskUpdate` RPC heartbeat, which birpc aborts after ~60s →
+// "Timeout calling onTaskUpdate" → vitest exits 1 even though every test passes
+// (the chronic Docs+Scripts / Coverage CI failure). Async spawn keeps the event
+// loop responsive. Mirrors the helper in dead-code-audit.test.ts.
+function runScriptAsync(
+  scriptName: string,
+  args: string[] = [],
+  timeoutMs = 60000,
+): Promise<{ success: boolean; output: string; error?: string }> {
+  return new Promise((resolve) => {
+    const scriptPath = path.join(SCRIPTS_DIR, scriptName);
+    const child = spawn('bash', [scriptPath, ...args], {
       cwd: PROJECT_ROOT,
-      encoding: 'utf-8',
-      stdio: options.stdio || ['pipe', 'pipe', 'pipe'],
-      ...options,
+      stdio: ['ignore', 'pipe', 'pipe'],
     });
-    return { success: true, output: result };
-  } catch (error: any) {
-    return { success: false, output: error.stdout || '', error: error.message };
-  }
+    let stdout = '';
+    child.stdout.setEncoding('utf-8');
+    child.stdout.on('data', (d: string) => { stdout += d; });
+    child.stderr.setEncoding('utf-8');
+    child.stderr.on('data', () => { /* drained to avoid backpressure; output asserts use stdout */ });
+    const timer = setTimeout(() => { child.kill('SIGKILL'); resolve({ success: false, output: stdout, error: 'timeout' }); }, timeoutMs);
+    child.on('error', (err) => { clearTimeout(timer); resolve({ success: false, output: stdout, error: err.message }); });
+    child.on('close', (code) => { clearTimeout(timer); resolve({ success: code === 0, output: stdout, error: code === 0 ? undefined : `exit ${code}` }); });
+  });
+}
+
+// Build the project via ASYNC spawn (event loop stays responsive). Returns true
+// when dist/ was produced. Build may fail in CI (no tsc output), so build-
+// dependent tests skip at runtime when this is false.
+function runBuildAsync(timeoutMs = 120000): Promise<boolean> {
+  return new Promise((resolve) => {
+    const child = spawn('npm', ['run', 'build'], { cwd: PROJECT_ROOT, stdio: 'ignore' });
+    const timer = setTimeout(() => { child.kill('SIGKILL'); resolve(false); }, timeoutMs);
+    child.on('error', () => { clearTimeout(timer); resolve(false); });
+    child.on('close', (code) => { clearTimeout(timer); resolve(code === 0); });
+  });
 }
 
 describe.skipIf(isWindows)('OSS Scripts', () => {
+  // Built once for the whole file; skipIf can't await, so build-dependent tests
+  // check `canBuild` at runtime via ctx.skip() instead of it.skipIf.
+  let canBuild = false;
+  beforeAll(async () => {
+    canBuild = await runBuildAsync();
+  }, 130000);
+
   beforeEach(() => {
     // Ensure test directory exists
     if (!fs.existsSync(TMP_TEST_DIR)) {
@@ -38,58 +68,52 @@ describe.skipIf(isWindows)('OSS Scripts', () => {
   });
 
   afterEach(() => {
-    // Cleanup test directory
+    // Cleanup test directory (fs.rmSync — no subprocess needed)
     if (fs.existsSync(TMP_TEST_DIR)) {
-      execSync(`rm -rf ${TMP_TEST_DIR}`);
+      fs.rmSync(TMP_TEST_DIR, { recursive: true, force: true });
     }
   });
 
   describe('verify-publish.sh', () => {
-    // Build may fail in CI (no tsc output / dist/), so tests that depend on
-    // a successful build are skipped when dist/ cannot be produced.
-    const canBuild = (() => {
-      try {
-        execSync('npm run build', { cwd: PROJECT_ROOT, stdio: 'pipe', timeout: 60000 });
-        return true;
-      } catch {
-        return false;
-      }
-    })();
-
-    it.skipIf(!canBuild)('should verify publish readiness with correct structure', { timeout: 60000 }, () => {
-      const result = runScript('verify-publish.sh', []);
+    it('should verify publish readiness with correct structure', { timeout: 60000 }, async (ctx) => {
+      if (!canBuild) return ctx.skip();
+      const result = await runScriptAsync('verify-publish.sh', []);
       expect(result.success).toBe(true);
       expect(result.output).toContain('Package verification passed');
     });
 
-    it('should check version format in package.json', { timeout: 60000 }, () => {
-      const result = runScript('verify-publish.sh', []);
+    it('should check version format in package.json', { timeout: 60000 }, async () => {
+      const result = await runScriptAsync('verify-publish.sh', []);
       expect(result.output).toMatch(/Version: \d+\.\d+\.\d+/);
     });
 
-    it.skipIf(!canBuild)('should verify dist/ directory exists after build', { timeout: 60000 }, () => {
-      const result = runScript('verify-publish.sh', []);
+    it('should verify dist/ directory exists after build', { timeout: 60000 }, async (ctx) => {
+      if (!canBuild) return ctx.skip();
+      const result = await runScriptAsync('verify-publish.sh', []);
       expect(result.output).toContain('Checking dist/ contents');
       expect(result.output).toContain('Files in dist/');
     });
 
-    it.skipIf(!canBuild)('should check for required dist files (index.js and index.d.ts)', { timeout: 60000 }, () => {
-      const result = runScript('verify-publish.sh', []);
+    it('should check for required dist files (index.js and index.d.ts)', { timeout: 60000 }, async (ctx) => {
+      if (!canBuild) return ctx.skip();
+      const result = await runScriptAsync('verify-publish.sh', []);
       expect(result.output).toContain('index.js and index.d.ts present');
     });
 
-    it.skipIf(!canBuild)('should run npm pack --dry-run and check output', { timeout: 60000 }, () => {
-      const result = runScript('verify-publish.sh', []);
+    it('should run npm pack --dry-run and check output', { timeout: 60000 }, async (ctx) => {
+      if (!canBuild) return ctx.skip();
+      const result = await runScriptAsync('verify-publish.sh', []);
       expect(result.output).toContain('Running npm pack --dry-run');
       expect(result.output).toContain('Files to be published');
     });
 
-    it.skipIf(!canBuild)('should verify README.md and LICENSE in package', { timeout: 60000 }, () => {
-      const result = runScript('verify-publish.sh', []);
+    it('should verify README.md and LICENSE in package', { timeout: 60000 }, async (ctx) => {
+      if (!canBuild) return ctx.skip();
+      const result = await runScriptAsync('verify-publish.sh', []);
       expect(result.output).toContain('Ready to publish');
     });
 
-    it('should fail if version format is invalid', () => {
+    it('should fail if version format is invalid', async () => {
       // Create a temp package.json with invalid version
       const tmpPkgPath = path.join(TMP_TEST_DIR, 'package.json');
       const pkgData = JSON.parse(fs.readFileSync(path.join(PROJECT_ROOT, 'package.json'), 'utf-8'));
@@ -101,7 +125,7 @@ describe.skipIf(isWindows)('OSS Scripts', () => {
       const backup = fs.readFileSync(origPath);
       fs.writeFileSync(origPath, JSON.stringify(pkgData));
 
-      const result = runScript('verify-publish.sh', []);
+      const result = await runScriptAsync('verify-publish.sh', []);
 
       // Restore backup
       fs.writeFileSync(origPath, backup);
@@ -112,38 +136,38 @@ describe.skipIf(isWindows)('OSS Scripts', () => {
   });
 
   describe('changelog.sh', () => {
-    it('should generate changelog in dry-run mode', () => {
-      const result = runScript('changelog.sh', ['--dry-run']);
+    it('should generate changelog in dry-run mode', async () => {
+      const result = await runScriptAsync('changelog.sh', ['--dry-run']);
       expect(result.success).toBe(true);
       expect(result.output).toContain('Changelog section');
     });
 
-    it('should show current version in changelog output', () => {
-      const result = runScript('changelog.sh', ['--dry-run']);
+    it('should show current version in changelog output', async () => {
+      const result = await runScriptAsync('changelog.sh', ['--dry-run']);
       const pkgJson = JSON.parse(fs.readFileSync(path.join(PROJECT_ROOT, 'package.json'), 'utf-8'));
       expect(result.output).toContain(pkgJson.version);
     });
 
-    it('should show release date in changelog', () => {
-      const result = runScript('changelog.sh', ['--dry-run']);
+    it('should show release date in changelog', async () => {
+      const result = await runScriptAsync('changelog.sh', ['--dry-run']);
       // Use local date (matching shell's `date +%Y-%m-%d`) not UTC
       const now = new Date();
       const localDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
       expect(result.output).toContain(localDate);
     });
 
-    it('should parse conventional commits if present', () => {
-      const result = runScript('changelog.sh', ['--dry-run']);
+    it('should parse conventional commits if present', async () => {
+      const result = await runScriptAsync('changelog.sh', ['--dry-run']);
       // The output should be valid markdown
       expect(result.output).toContain('##'); // Markdown header
     });
 
-    it('should handle --dry-run mode without modifying CHANGELOG.md', () => {
+    it('should handle --dry-run mode without modifying CHANGELOG.md', async () => {
       const changelogPath = path.join(PROJECT_ROOT, 'CHANGELOG.md');
       const existsBefore = fs.existsSync(changelogPath);
       const contentBefore = existsBefore ? fs.readFileSync(changelogPath, 'utf-8') : null;
 
-      runScript('changelog.sh', ['--dry-run']);
+      await runScriptAsync('changelog.sh', ['--dry-run']);
 
       const existsAfter = fs.existsSync(changelogPath);
       const contentAfter = existsAfter ? fs.readFileSync(changelogPath, 'utf-8') : null;
@@ -152,8 +176,8 @@ describe.skipIf(isWindows)('OSS Scripts', () => {
       expect(existsBefore === existsAfter && contentBefore === contentAfter).toBe(true);
     });
 
-    it('should require valid arguments', () => {
-      const result = runScript('changelog.sh', ['invalid-arg', 'another-arg']);
+    it('should require valid arguments', async () => {
+      const result = await runScriptAsync('changelog.sh', ['invalid-arg', 'another-arg']);
       // changelog.sh may not output anything if tag doesn't exist, which is ok
       // It's forgiving with args and interprets them as git refs
       expect(result.success === true || result.output === '').toBe(true);
@@ -161,23 +185,23 @@ describe.skipIf(isWindows)('OSS Scripts', () => {
   });
 
   describe('bump-version.sh', () => {
-    it('should show usage if no arguments provided', () => {
-      const result = runScript('bump-version.sh', []);
+    it('should show usage if no arguments provided', async () => {
+      const result = await runScriptAsync('bump-version.sh', []);
       expect(result.success).toBe(false);
       expect(result.output).toContain('Usage:');
     });
 
-    it('should support major, minor, patch bump types', () => {
-      ['major', 'minor', 'patch'].forEach((bumpType) => {
-        const result = runScript('bump-version.sh', [bumpType, '--dry-run']);
+    it('should support major, minor, patch bump types', async () => {
+      for (const bumpType of ['major', 'minor', 'patch']) {
+        const result = await runScriptAsync('bump-version.sh', [bumpType, '--dry-run']);
         expect(result.success).toBe(true);
         expect(result.output).toContain('Current version:');
         expect(result.output).toContain('New version:');
-      });
+      }
     });
 
-    it('should show what changes would occur in --dry-run mode', () => {
-      const result = runScript('bump-version.sh', ['minor', '--dry-run']);
+    it('should show what changes would occur in --dry-run mode', async () => {
+      const result = await runScriptAsync('bump-version.sh', ['minor', '--dry-run']);
       expect(result.success).toBe(true);
       expect(result.output).toContain('Dry-run mode');
       expect(result.output).toContain('Changes would be');
@@ -185,28 +209,28 @@ describe.skipIf(isWindows)('OSS Scripts', () => {
       expect(result.output).toContain('Create git tag');
     });
 
-    it('should reject invalid bump types', () => {
-      const result = runScript('bump-version.sh', ['invalid']);
+    it('should reject invalid bump types', async () => {
+      const result = await runScriptAsync('bump-version.sh', ['invalid']);
       expect(result.success).toBe(false);
       expect(result.output).toContain('Invalid bump type');
     });
 
-    it('should parse semantic version correctly', () => {
-      const result = runScript('bump-version.sh', ['patch', '--dry-run']);
+    it('should parse semantic version correctly', async () => {
+      const result = await runScriptAsync('bump-version.sh', ['patch', '--dry-run']);
       const pkgJson = JSON.parse(fs.readFileSync(path.join(PROJECT_ROOT, 'package.json'), 'utf-8'));
       expect(result.output).toContain(pkgJson.version);
     });
 
-    it('should show next steps after version bump would complete', () => {
-      const result = runScript('bump-version.sh', ['major', '--dry-run']);
+    it('should show next steps after version bump would complete', async () => {
+      const result = await runScriptAsync('bump-version.sh', ['major', '--dry-run']);
       expect(result.success).toBe(true);
       // In dry-run mode, it shows "Run without --dry-run to apply"
       // which implies the next steps will happen after that
       expect(result.output).toContain('without --dry-run');
     });
 
-    it('should handle pre-release or build metadata in version', () => {
-      const result = runScript('bump-version.sh', ['patch', '--dry-run']);
+    it('should handle pre-release or build metadata in version', async () => {
+      const result = await runScriptAsync('bump-version.sh', ['patch', '--dry-run']);
       // Should successfully parse version even with metadata
       expect(result.success).toBe(true);
     });
@@ -230,17 +254,16 @@ describe.skipIf(isWindows)('OSS Scripts', () => {
       });
     });
 
-    it('changelog.sh should execute without errors in dry-run', { timeout: 10000 }, () => {
-      const result = runScript('changelog.sh', ['--dry-run']);
+    it('changelog.sh should execute without errors in dry-run', { timeout: 10000 }, async () => {
+      const result = await runScriptAsync('changelog.sh', ['--dry-run']);
       expect(result.success).toBe(true);
     });
 
-    it('bump-version.sh should recognize all bump types', { timeout: 10000 }, () => {
-      const types = ['major', 'minor', 'patch'];
-      types.forEach((type) => {
-        const result = runScript('bump-version.sh', [type, '--dry-run']);
+    it('bump-version.sh should recognize all bump types', { timeout: 10000 }, async () => {
+      for (const type of ['major', 'minor', 'patch']) {
+        const result = await runScriptAsync('bump-version.sh', [type, '--dry-run']);
         expect(result.success).toBe(true);
-      });
+      }
     });
   });
 });
