@@ -13,6 +13,7 @@ import { ALL_MODELS } from '../core/types.js';
 import { BRAIN_PLAN_TIMEOUT_MS, BRAIN_PLAN_MAX_CONTEXT_LINES } from '../core/constants.js';
 import type { ProviderAdapter } from '../core/provider.js';
 import { providerRegistry, ProviderError } from '../core/provider.js';
+import { modelRegistry } from '../core/model-registry.js';
 import { debugLog } from '../core/utils.js';
 
 // ─── Model enum values for Zod schemas ───────────────────────────────────
@@ -343,9 +344,14 @@ export function buildPlannerSpawnArgs(
   if (!firstToken) {
     throw new ProviderError(`Provider "${adapter.name}" returned empty buildCommand result`, adapter.name);
   }
+  // Sprint 238 İŞ5: pass the real model name (apiId, e.g. claude-opus-4-8) to the
+  // brain planner CLI, not the alias — so AI planning targets the exact version
+  // (no 4-6/4-8 confusion), matching the worker-spawn fix (Sprint 237). Falls back
+  // to the raw model for unregistered tags (ollama) / custom CLIs.
+  const apiId = modelRegistry.get(model)?.apiId ?? model;
   return {
     command: firstToken,
-    args: ['-p', prompt, '--model', model, '--output-format', 'json'],
+    args: ['-p', prompt, '--model', apiId, '--output-format', 'json'],
   };
 }
 

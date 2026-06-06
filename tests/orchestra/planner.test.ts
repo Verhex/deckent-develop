@@ -283,7 +283,8 @@ describe('buildPlannerSpawnArgs', () => {
   it('builds generic args when adapter lacks buildPlannerCommand', () => {
     const adapter = makeMockAdapter();
     const result = buildPlannerSpawnArgs(adapter, 'my prompt', 'sonnet');
-    expect(result.args).toEqual(['-p', 'my prompt', '--model', 'sonnet', '--output-format', 'json']);
+    // Sprint 238 İŞ5: planner passes the real apiId (claude-sonnet-4-6), not the alias.
+    expect(result.args).toEqual(['-p', 'my prompt', '--model', 'claude-sonnet-4-6', '--output-format', 'json']);
   });
 
   it('extracts "codex" from codex adapter buildCommand', () => {
@@ -349,7 +350,7 @@ describe('callBrainPlanner with adapter', () => {
 
     expect(mockedSpawnSync).toHaveBeenCalledWith(
       'mock-cli',
-      expect.arrayContaining(['-p', expect.any(String), '--model', 'opus', '--output-format', 'json']),
+      expect.arrayContaining(['-p', expect.any(String), '--model', 'claude-opus-4-8', '--output-format', 'json']),
       expect.objectContaining({ encoding: 'utf-8', timeout: BRAIN_PLAN_TIMEOUT_MS }),
     );
   });
@@ -364,7 +365,7 @@ describe('callBrainPlanner with adapter', () => {
 
     expect(mockedSpawnSync).toHaveBeenCalledWith(
       'codex',
-      expect.arrayContaining(['--model', 'sonnet']),
+      expect.arrayContaining(['--model', 'claude-sonnet-4-6']),
       expect.any(Object),
     );
   });
@@ -380,7 +381,7 @@ describe('callBrainPlanner with adapter', () => {
 
     expect(mockedSpawnSync).toHaveBeenCalledWith(
       'mock-cli',
-      expect.arrayContaining(['--model', 'opus']),
+      expect.arrayContaining(['--model', 'claude-opus-4-8']),
       expect.any(Object),
     );
   });
@@ -446,7 +447,8 @@ describe('callBrainPlanner with adapter', () => {
 
     const args = mockedSpawnSync.mock.calls[0]![1] as string[];
     const modelIdx = args.indexOf('--model');
-    expect(args[modelIdx + 1]).toBe('haiku');
+    // Sprint 238 İŞ5: planner passes the real apiId, not the alias.
+    expect(args[modelIdx + 1]).toBe('claude-haiku-4-5-20251001');
   });
 });
 
@@ -469,7 +471,7 @@ describe('callZeroConfigPlanner', () => {
 
     expect(mockedSpawnSync).toHaveBeenCalledWith(
       'codex',
-      expect.arrayContaining(['--model', 'sonnet']),
+      expect.arrayContaining(['--model', 'claude-sonnet-4-6']),
       expect.any(Object),
     );
   });
@@ -485,7 +487,7 @@ describe('callZeroConfigPlanner', () => {
 
     expect(mockedSpawnSync).toHaveBeenCalledWith(
       'codex',
-      expect.arrayContaining(['--model', 'opus']),
+      expect.arrayContaining(['--model', 'claude-opus-4-8']),
       expect.any(Object),
     );
   });
