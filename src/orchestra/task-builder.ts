@@ -8,6 +8,8 @@ import type {
   PlannerTask, ProviderName, TaskResult,
 } from '../core/types.js';
 import { TaskStatus, ALL_MODELS, PROVIDER_MODEL_MAP } from '../core/types.js';
+import { VALID_PROVIDERS_ALL } from '../core/config.js';
+import { isAdapterProvider } from './sprint-utils.js';
 import type { TaskDNA } from '../core/routing-types.js';
 import { calculateModelScore } from './model-selector.js';
 import { debugLog } from '../core/utils.js';
@@ -807,13 +809,29 @@ export function parseStructuredDirectives(content: string): ParsedDirectiveTask[
       ? testLine.trim().replace(/^-\s+/, '').replace(/^Test:\s*/i, '').trim()
       : undefined;
 
-    // Extract optional Model: override (e.g., "Model: opus")
+    // Extract optional Provider: override (e.g., "Provider: codex", "Provider: ollama")
+    // NOTE: Provider parse runs BEFORE Model parse — adapter-providers (e.g. ollama)
+    // accept raw model tags (pass-through) that are not in the static ALL_MODELS list.
+    const providerLine = lines.find(l => /^[\s-]*Provider:\s*/i.test(l.trim()));
+    const rawProvider = providerLine
+      ? providerLine.trim().replace(/^-\s+/, '').replace(/^Provider:\s*/i, '').trim().toLowerCase()
+      : undefined;
+    // VALID_PROVIDERS_ALL is the canonical extended source (includes 'ollama' alongside claude/codex/gemini).
+    const parsedProvider = (rawProvider && VALID_PROVIDERS_ALL.includes(rawProvider) ? rawProvider : undefined) as ProviderName | undefined;
+
+    // Extract optional Model: override (e.g., "Model: opus", "Model: qwen3.6:27b")
     const modelLine = lines.find(l => /^[\s-]*Model:\s*/i.test(l.trim()));
     const forceModel = modelLine
       ? modelLine.trim().replace(/^-\s+/, '').replace(/^Model:\s*/i, '').trim().toLowerCase()
       : undefined;
-    // safe: ALL_MODELS.includes() confirms the string is a valid ModelType before assignment
-    const parsedForceModel = (forceModel && (ALL_MODELS as readonly string[]).includes(forceModel) ? forceModel : undefined) as ModelType | undefined;
+    // For adapter-providers (ollama → host-HTTP), accept raw model tag as pass-through;
+    // OllamaAdapter validates dynamically via /api/tags at spawn (Sprint 234).
+    // For typed providers (claude/codex/gemini), keep ALL_MODELS validation.
+    const parsedForceModel = (forceModel
+      ? (parsedProvider && isAdapterProvider(parsedProvider)
+          ? forceModel
+          : ((ALL_MODELS as readonly string[]).includes(forceModel) ? forceModel : undefined))
+      : undefined) as ModelType | undefined;
 
     // Extract optional Effort: override (e.g., "Effort: max")
     const effortLine = lines.find(l => /^[\s-]*Effort:\s*/i.test(l.trim()));
@@ -823,15 +841,6 @@ export function parseStructuredDirectives(content: string): ParsedDirectiveTask[
     const validEfforts: string[] = ['low', 'normal', 'high'];
     // safe: validEfforts.includes() confirms the string is a valid TaskEffort before assignment
     const parsedForceEffort = (forceEffort && validEfforts.includes(forceEffort) ? forceEffort : undefined) as TaskEffort | undefined;
-
-    // Extract optional Provider: override (e.g., "Provider: codex")
-    const providerLine = lines.find(l => /^[\s-]*Provider:\s*/i.test(l.trim()));
-    const rawProvider = providerLine
-      ? providerLine.trim().replace(/^-\s+/, '').replace(/^Provider:\s*/i, '').trim().toLowerCase()
-      : undefined;
-    const validProviders = Object.keys(PROVIDER_MODEL_MAP);
-    // safe: validProviders.includes() confirms the string is a valid ProviderName before assignment
-    const parsedProvider = (rawProvider && validProviders.includes(rawProvider) ? rawProvider : undefined) as ProviderName | undefined;
 
     // Extract optional Agent: override (e.g., "Agent: security-auditor" or "Agent: none")
     const agentLine = lines.find(l => /^[\s-]*Agent:\s*/i.test(l.trim()));
@@ -936,22 +945,27 @@ export function parseBulletOrNumberedTasks(content: string): ParsedDirectiveTask
           };
         }, { directories: [], filesRead: [], filesWrite: [] });
 
-        // Extract Model override
+        // Extract Provider override — Provider parse BEFORE Model parse so adapter-providers
+        // (e.g. ollama) can pass-through raw model tags that are not in static ALL_MODELS.
+        const providerLine = allLines.find(l => /Provider:\s*/i.test(l));
+        const rawProvider = providerLine ? providerLine.replace(/.*Provider:\s*/i, '').trim().toLowerCase() : undefined;
+        // VALID_PROVIDERS_ALL is the canonical extended source (includes 'ollama').
+        const parsedProvider = (rawProvider && VALID_PROVIDERS_ALL.includes(rawProvider) ? rawProvider : undefined) as ProviderName | undefined;
+
+        // Extract Model override — adapter-providers accept raw tag pass-through.
         const modelLine = allLines.find(l => /Model:\s*/i.test(l));
         const rawModel = modelLine ? modelLine.replace(/.*Model:\s*/i, '').trim().toLowerCase() : undefined;
-        const parsedForceModel = (rawModel && (ALL_MODELS as readonly string[]).includes(rawModel) ? rawModel : undefined) as ModelType | undefined;
+        const parsedForceModel = (rawModel
+          ? (parsedProvider && isAdapterProvider(parsedProvider)
+              ? rawModel
+              : ((ALL_MODELS as readonly string[]).includes(rawModel) ? rawModel : undefined))
+          : undefined) as ModelType | undefined;
 
         // Extract Effort override
         const effortLine = allLines.find(l => /Effort:\s*/i.test(l));
         const rawEffort = effortLine ? effortLine.replace(/.*Effort:\s*/i, '').trim().toLowerCase() : undefined;
         const validEfforts = ['low', 'normal', 'high'];
         const parsedForceEffort = (rawEffort && validEfforts.includes(rawEffort) ? rawEffort : undefined) as TaskEffort | undefined;
-
-        // Extract Provider override
-        const providerLine = allLines.find(l => /Provider:\s*/i.test(l));
-        const rawProvider = providerLine ? providerLine.replace(/.*Provider:\s*/i, '').trim().toLowerCase() : undefined;
-        const validProviders = Object.keys(PROVIDER_MODEL_MAP);
-        const parsedProvider = (rawProvider && validProviders.includes(rawProvider) ? rawProvider : undefined) as ProviderName | undefined;
 
         // Extract test target
         const testLine = allLines.find(l => /Test:\s*/i.test(l));

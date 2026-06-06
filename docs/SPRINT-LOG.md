@@ -6424,3 +6424,25 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 234-002: 234-002 — [P1] entry .result tamlığı (linesAdded/Removed + tokenUsage) (DONE)
 
 ---
+## Sprint 235 — sprint-235
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-06-06
+**Duration:** 912s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 2 |
+| Completed | 2 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 912400ms |
+
+### Tasks
+
+- 235-001: 235-001 — [P0] Per-task ollama provider+model plan-time acceptance (DONE)
+
+---

@@ -2,6 +2,15 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint235] - 2026-06-06
+
+### Added
+
+- 235-001 — [P0] Per-task ollama provider+model plan-time acceptance
+
+
+_Tasks: 2 total, 2 done, 0 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint234] - 2026-06-06
 
 ### Added

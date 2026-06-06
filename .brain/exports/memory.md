@@ -1,5 +1,11 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-235 Learnings
+- Sprint sprint-235 Learnings: ## Sprint sprint-235 Learnings
+
+## Gains
+- 235-001 — [P0] Per-task ollama provider+model plan-time acceptance — Worker had heartbeat but failed to write result within grace period — kill blocked by panic guard...
+
 ## Sprint sprint-233 Learnings
 - Sprint sprint-233 Learnings: ## Sprint sprint-233 Learnings
 

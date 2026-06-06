@@ -80,6 +80,10 @@
 | adr-086 | Native CLI Parity — F11 Feature Set (Sprint 224) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-235 Learnings** (sprint-235): ## Sprint sprint-235 Learnings
+
+## Gains
+- 235-001 — [P0] Per-task ollama provider+model plan-time acceptance — Worke...
 - **Sprint sprint-233 Learnings** (sprint-233): ## Sprint sprint-233 Learnings
 
 ## Gains
@@ -108,7 +112,6 @@
 - 224-015 — [P0] AI plan-mode fix (dürüst hata + gerçek...
 - **Sprint 223 Learnings** (sprint-223): - Sprint sprint-223 Learnings: ## Sprint sprint-223 Learnings
 - **Sprint 222 Learnings** (sprint-222): - Sprint sprint-222 Learnings: ## Sprint sprint-222 Learnings
-- **Sprint 221 Learnings** (sprint-221): - Sprint sprint-221 Learnings: ## Sprint sprint-221 Learnings
 
 ## Active Technical Debt
 _No active technical debt._
@@ -116,5 +119,6 @@ _No active technical debt._
 ## Active Patterns
 - Violation pattern: stale_heartbeat
 - Violation pattern: file_outside_scope
+- Violation pattern: file_outside_scope
 
-_Total entries: 231 | Generated: 2026-06-06_
+_Total entries: 236 | Generated: 2026-06-06_
