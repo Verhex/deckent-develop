@@ -16,8 +16,10 @@ const ROOT = join(import.meta.dirname ?? dirname(new URL(import.meta.url).pathna
 const SRC = join(ROOT, 'src');
 const DIST = join(ROOT, 'dist');
 
-/** File extensions to copy (non-TS assets). */
-const ASSET_EXTENSIONS = ['.json', '.md'];
+/** File extensions to copy (non-TS assets). `.template` is read at runtime by
+ *  docs-config.ts (seedDocsConfig) — without it `deckent init` silently falls
+ *  back to an inline minimal docs.json. */
+const ASSET_EXTENSIONS = ['.json', '.md', '.template'];
 
 /** Bin entries from package.json — must have execute bit (Sprint 154 audit A2.F6/A3.F1). */
 const BIN_FILES = ['dist/cli/entry.js', 'dist/mcp/server.js'];

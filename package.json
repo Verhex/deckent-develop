@@ -16,7 +16,7 @@
     }
   },
   "scripts": {
-    "build": "tsc && node scripts/copy-assets.mjs",
+    "build": "npm run clean && tsc && node scripts/copy-assets.mjs",
     "dev": "tsc --watch",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -25,8 +25,7 @@
     "test:e2e-surfaces": "node scripts/test-e2e-surfaces.mjs",
     "test:dashboard": "vitest run --config vitest.dashboard.config.ts",
     "build:dashboard": "node scripts/build-dashboard.mjs",
-    "build:all": "tsc && node scripts/copy-assets.mjs && npm run build:dashboard",
-    "postbuild": "npm run build:dashboard",
+    "build:all": "npm run clean && tsc && node scripts/copy-assets.mjs && npm run build:dashboard",
     "lint": "tsc --noEmit && tsc --noEmit -p src/dashboard",
     "tsc:dashboard": "tsc --noEmit -p src/dashboard",
     "install:all": "npm ci && npm ci --prefix src/dashboard",
@@ -36,6 +35,7 @@
     "clean": "rm -rf dist",
     "ci:rebuild-native": "npm rebuild better-sqlite3 --ignore-scripts=false",
     "validate:publish": "node scripts/validate-publish.mjs",
+    "release": "npm run docs:stats:check && npm run docs:ref:check && npm run build:all && npm run validate:publish",
     "docs:generate-cli": "npx tsx scripts/generate-cli-docs.ts",
     "docs:ref": "node scripts/gen-reference-docs.mjs --write",
     "docs:ref:check": "node scripts/gen-reference-docs.mjs --check",
