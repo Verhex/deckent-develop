@@ -310,7 +310,22 @@ describe('Memory V2 Prod-Readiness', () => {
       sprint_num: 99,
     });
 
-    expect(store.totalCount()).toBe(7); // 1 exempt + 5 old + 1 recent
+    // Additional recent (surviving) entries so the decay batch stays UNDER the
+    // catastrophic-abort ratio (>= 50% of non-exempt aborts — see memory-store.ts
+    // decay() guard, asserted in memory-backup-and-abort.test.ts). With 5 old +
+    // 6 recent = 11 non-exempt, 5/11 = 45% < 50% → decay proceeds normally.
+    for (let i = 0; i < 5; i++) {
+      store.insert({
+        id: `recent-extra-${i}`,
+        type: 'memory',
+        title: `Recent Extra ${i}`,
+        content: 'From sprint 98, should survive.',
+        source: 'brain',
+        sprint_num: 98,
+      });
+    }
+
+    expect(store.totalCount()).toBe(12); // 1 exempt + 5 old + 6 recent
 
     // Decay: current=100, decay_after=3 → threshold=97
     // Entries with sprint_num < 97 AND not exempt → soft-deleted
@@ -335,7 +350,7 @@ describe('Memory V2 Prod-Readiness', () => {
     }
 
     // totalCount reflects active only
-    expect(store.totalCount()).toBe(2); // exempt + recent
+    expect(store.totalCount()).toBe(7); // exempt + 6 recent
   });
 
   // ── Test 6: Export → .md → reimport roundtrip ────────────────────

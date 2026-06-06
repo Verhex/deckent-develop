@@ -584,7 +584,10 @@ describe('Error handling completeness', () => {
     // chat-session.ts (spawn pipe missing) and chat-provider-parity.ts (Ollama/OpenAI-compat HTTP
     // failures) throw for the same operational-error category — network/spawn faults surfaced to the
     // caller, not domain errors warranting a registered DeckentError code.
-    const ALLOWED_FILES = new Set(['agent.ts', 'skill.ts', 'chat-session.ts', 'chat-provider-parity.ts']);
+    // mcp.ts throws for CLI input/config validation (invalid kv-pair/scope/transport, missing HTTP
+    // url, server-not-found) — all i18n'd operational faults surfaced to the caller, same category,
+    // not domain errors warranting a registered DeckentError code.
+    const ALLOWED_FILES = new Set(['agent.ts', 'skill.ts', 'chat-session.ts', 'chat-provider-parity.ts', 'mcp.ts']);
     const files = readdirSync(dir).filter(f => f.endsWith('.ts') && !ALLOWED_FILES.has(f));
     for (const file of files) {
       const content = readFileSync(join(dir, file), 'utf-8');
