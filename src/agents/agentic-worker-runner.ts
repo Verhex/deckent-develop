@@ -78,6 +78,21 @@ export interface AgenticRunnerOptions {
   logger?: (line: string) => void;
 }
 
+/**
+ * Token-usage shape returned by the runner. Filled from Ollama `/api/chat`'s
+ * top-level `eval_count` (output tokens) and `prompt_eval_count` (input tokens),
+ * summed across every loop turn. Provider is hard-coded to `ollama` because the
+ * loop core only speaks Ollama's native tool-calling endpoint; AS-2 Faz 2 will
+ * widen this when openai-compatible adapters land.
+ */
+export interface AgenticTokenUsage {
+  inputTokens: number;
+  outputTokens: number;
+  provider: 'ollama';
+  /** Local inference has no per-call cost. Kept for downstream uniformity. */
+  cost: number;
+}
+
 export interface AgenticRunnerResult {
   taskId: string;
   /** Project-relative paths of files actually written or edited. */
@@ -94,6 +109,12 @@ export interface AgenticRunnerResult {
     | 'no_tool_calls'
     | 'max_iterations'
     | 'api_error';
+  /**
+   * Tokens consumed across all `/api/chat` turns. Always set by
+   * `runAgenticWorker` (every return path); optional only to permit
+   * incomplete test mocks that pre-date T-234-002.
+   */
+  tokenUsage?: AgenticTokenUsage;
 }
 
 // ─── Internal message types (Ollama /api/chat shape) ────────────────────────
@@ -120,6 +141,9 @@ interface OllamaChatResponse {
     content?: string;
     tool_calls?: OllamaToolCall[];
   };
+  /** Top-level fields per Ollama /api/chat — present when `done:true`. */
+  eval_count?: number;
+  prompt_eval_count?: number;
 }
 
 // ─── System prompt ──────────────────────────────────────────────────────────
@@ -263,6 +287,17 @@ export async function runAgenticWorker(
   const filesChanged = new Set<string>();
   let testsPassed: boolean | undefined;
   let iterations = 0;
+  // Token accounting: summed across every /api/chat turn. Ollama returns
+  // prompt_eval_count (input) and eval_count (output) at the top level when
+  // `done:true`. Provider hard-coded `ollama`; cost=0 (local inference).
+  let inputTokens = 0;
+  let outputTokens = 0;
+  const tokenUsage = (): AgenticTokenUsage => ({
+    inputTokens,
+    outputTokens,
+    provider: 'ollama',
+    cost: 0,
+  });
 
   // ─── Outer loop ───
   for (let iter = 0; iter < maxIterations; iter++) {
@@ -286,6 +321,7 @@ export async function runAgenticWorker(
         notes: `Ollama /api/chat unreachable: ${msg}`,
         iterations,
         terminationReason: 'api_error',
+        tokenUsage: tokenUsage(),
       };
     }
 
@@ -300,6 +336,7 @@ export async function runAgenticWorker(
         notes: `Ollama /api/chat returned ${chatRes.status}: ${body.slice(0, 500)}`,
         iterations,
         terminationReason: 'api_error',
+        tokenUsage: tokenUsage(),
       };
     }
 
@@ -316,7 +353,17 @@ export async function runAgenticWorker(
         notes: `Ollama /api/chat returned non-JSON body: ${msg}`,
         iterations,
         terminationReason: 'api_error',
+        tokenUsage: tokenUsage(),
       };
+    }
+
+    // Accumulate token counts from this turn (Ollama omits them on stream
+    // chunks; on `stream:false` they appear once `done:true`).
+    if (typeof parsed.prompt_eval_count === 'number' && Number.isFinite(parsed.prompt_eval_count)) {
+      inputTokens += parsed.prompt_eval_count;
+    }
+    if (typeof parsed.eval_count === 'number' && Number.isFinite(parsed.eval_count)) {
+      outputTokens += parsed.eval_count;
     }
 
     const assistantContent = parsed.message?.content ?? '';
@@ -344,6 +391,7 @@ export async function runAgenticWorker(
         notes: note,
         iterations,
         terminationReason: 'no_tool_calls',
+        tokenUsage: tokenUsage(),
       };
     }
 
@@ -370,6 +418,7 @@ export async function runAgenticWorker(
           notes: note,
           iterations,
           terminationReason: 'task_done',
+          tokenUsage: tokenUsage(),
         };
       }
 
@@ -432,5 +481,6 @@ export async function runAgenticWorker(
     notes: note,
     iterations,
     terminationReason: 'max_iterations',
+    tokenUsage: tokenUsage(),
   };
 }

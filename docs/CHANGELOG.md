@@ -2,6 +2,16 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint234] - 2026-06-06
+
+### Added
+
+- 234-001 — [P0] Per-provider host-adapter spawn routing (ollama docker'a düşmesin)
+- 234-002 — [P1] entry .result tamlığı (linesAdded/Removed + tokenUsage)
+
+
+_Tasks: 2 total, 2 done, 0 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint233] - 2026-06-06
 
 ### Added

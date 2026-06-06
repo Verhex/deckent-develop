@@ -55,7 +55,7 @@ import { getSystemProfile } from '../core/system-profile.js';
 // ─── Sprint Utilities ─────────────────────────────────────────────
 import {
   now,
-  isTmuxProvider, resolveTaskProvider, getProviderAdapterForTask,
+  isTmuxProvider, isAdapterProvider, resolveTaskProvider, getProviderAdapterForTask,
 } from './sprint-utils.js';
 
 // ─── Spawn backend abstraction ───────────────────────────────────
@@ -426,7 +426,33 @@ export async function spawnWorkers(
     );
 
     // Single spawn path — NEVER spawn the same task twice.
-    if (backend) {
+    //
+    // Sprint 234 AS-2 Faz 2: host-HTTP adapter providers (`isAdapterProvider`)
+    // bypass any configured backend. The previous priority order let a docker
+    // backend silently swallow ollama tasks and route them to the `claude`
+    // CLI fallback in `spawn-backend-docker.ts:getProviderBinaryForModel`.
+    // Now: if the task's provider is a host-HTTP adapter and its adapter is
+    // registered, refresh dynamic model acceptance and use `adapter.spawn`.
+    // `refreshSupportedModels` is optional (`?.`) so non-Ollama adapters that
+    // do not implement it remain compatible.
+    const adapterRouted = isAdapterProvider(taskProvider)
+      ? getProviderAdapterForTask(taskProvider)
+      : null;
+    if (adapterRouted) {
+      // `refreshSupportedModels` is optional on the ProviderAdapter contract
+      // (OllamaAdapter implements it for `/api/tags` dynamic acceptance; others
+      // may not). Structural narrow lets us call it without widening the core
+      // interface.
+      const refresh = (adapterRouted as { refreshSupportedModels?: () => Promise<void> }).refreshSupportedModels;
+      if (typeof refresh === 'function') {
+        await refresh.call(adapterRouted);
+      }
+      adapterRouted.spawn(task.id, model, prompt, {
+        allowedTools,
+        autoApprove: spawnOpts?.autoApprove ?? false,
+        projectDir: projectRoot,
+      });
+    } else if (backend) {
       backend.spawn(task.id, model, prompt, {
         allowedTools,
         autoApprove: spawnOpts?.autoApprove ?? false,
@@ -572,7 +598,23 @@ export async function respawnEligibleTasks(
     // Sprint 156 Task 012 — observability for fresh-eyes rotation on fix tasks
     emitRotationMetricIfApplicable(projectRoot, sprint.id, task);
 
-    if (backend) {
+    // Sprint 234 AS-2 Faz 2: same host-HTTP adapter routing as `spawnWorkers`.
+    // Wave-2+ respawns must honor the predicate so ollama tasks promoted from
+    // PENDING during dependency unblock also reach the host adapter.
+    const adapterRouted = isAdapterProvider(taskProvider)
+      ? getProviderAdapterForTask(taskProvider)
+      : null;
+    if (adapterRouted) {
+      const refresh = (adapterRouted as { refreshSupportedModels?: () => Promise<void> }).refreshSupportedModels;
+      if (typeof refresh === 'function') {
+        await refresh.call(adapterRouted);
+      }
+      adapterRouted.spawn(task.id, task.model, prompt, {
+        allowedTools,
+        autoApprove: spawnOpts?.autoApprove ?? false,
+        projectDir: projectRoot,
+      });
+    } else if (backend) {
       backend.spawn(task.id, task.model, prompt, {
         allowedTools,
         autoApprove: spawnOpts?.autoApprove ?? false,

@@ -6401,3 +6401,26 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 233-002: 233-002 — [Wave 2 · depends 233-001] Subprocess entry + OllamaAdapter wiring + dinamik model kabul (DONE)
 
 ---
+## Sprint 234 — sprint-234
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-06-06
+**Duration:** 1190s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 2 |
+| Completed | 2 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 1189611ms |
+
+### Tasks
+
+- 234-001: 234-001 — [P0] Per-provider host-adapter spawn routing (ollama docker'a düşmesin) (DONE)
+- 234-002: 234-002 — [P1] entry .result tamlığı (linesAdded/Removed + tokenUsage) (DONE)
+
+---

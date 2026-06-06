@@ -102,6 +102,37 @@ export function isTmuxProvider(providerName: ProviderName): boolean {
   return providerName === 'claude';
 }
 
+/**
+ * Check whether a provider is a **host-HTTP adapter provider** that MUST be
+ * spawned via its host `ProviderAdapter.spawn(...)` rather than through a
+ * container/tmux backend.
+ *
+ * Why this exists (Sprint 234 AS-2 Faz 2):
+ * Host-HTTP providers reach a service listening on the host (e.g. Ollama's
+ * `localhost:11434`) via the spawned worker's node entry script. They cannot
+ * run inside the Docker worker image because the container's loopback
+ * interface does not route to the host Ollama daemon, and they cannot run
+ * inside a tmux pane because they do not invoke a `claude` CLI. The only
+ * correct spawn path is the host `adapter.spawn()` registered in
+ * `providerRegistry`.
+ *
+ * Before this predicate existed, `sprint-spawner.ts` preferred any provided
+ * spawn backend (typically `docker`) over the adapter, which silently routed
+ * ollama tasks to `spawn-backend-docker.ts` where `getProviderForModel`
+ * would degrade them to the `claude` CLI — the wrong tool entirely.
+ *
+ * Extension point: when an OpenAI-compatible HTTP adapter ("openai-compat")
+ * is added under the same pattern (local server, host-HTTP only), append its
+ * provider name to this predicate. Keep the list tight — only providers
+ * that genuinely cannot tolerate a container/tmux backend belong here.
+ *
+ * @returns true for `'ollama'`; false for `'claude'`, `'codex'`, `'gemini'`
+ * @internal
+ */
+export function isAdapterProvider(providerName: ProviderName): boolean {
+  return providerName === 'ollama';
+}
+
 
 // ═══ Config Helpers ══════════════════════════════════════════════════
 

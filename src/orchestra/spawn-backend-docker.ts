@@ -100,8 +100,17 @@ export const WORKER_NODE_OPTIONS = 'NODE_OPTIONS=--max-old-space-size-percentage
 
 /**
  * Returns the CLI binary name for a given model.
- * Ollama is HTTP-based and not available in Docker containers — falls back to 'claude'.
- * Unknown models also fall back to 'claude' as a safe default.
+ *
+ * Sprint 234 AS-2 Faz 2 — host-HTTP defensive honest-fail:
+ * Ollama is a host-HTTP provider; `sprint-spawner.ts:isAdapterProvider` should
+ * route ollama tasks to the host `OllamaAdapter.spawn(...)` BEFORE this
+ * function is ever consulted. If routing fails and ollama still reaches the
+ * Docker backend, we emit an explicit warning (no longer silent) so the
+ * regression surfaces in logs immediately, then preserve the legacy 'claude'
+ * fallback so the in-flight container does not crash mid-sprint. The warning
+ * is the defensive honest-fail signal that Layer-2 routing dropped the task.
+ *
+ * Unknown models also fall back to 'claude' as a safe default (legacy).
  */
 export function getProviderBinaryForModel(model: ModelType): string {
   let provider: string;
@@ -116,7 +125,18 @@ export function getProviderBinaryForModel(model: ModelType): string {
   }
   if (provider === 'codex') return 'codex';
   if (provider === 'gemini') return 'gemini';
-  // ollama is HTTP-based; Docker containers use claude CLI as fallback
+  if (provider === 'ollama') {
+    // Routing fix (sprint-spawner isAdapterProvider) should have prevented
+    // ollama from reaching this function. Surface the regression honestly
+    // instead of silently degrading to the claude CLI.
+    const warning = `[deckent:spawn-backend-docker] Ollama provider routed to Docker backend for model "${model}" — `
+      + 'host adapter routing missed this task (sprint-spawner.ts isAdapterProvider). '
+      + 'Falling back to "claude" CLI to avoid mid-sprint crash, but the spawn is INCORRECT. '
+      + 'Investigate: providerRegistry must have an OllamaAdapter registered and isAdapterProvider(\'ollama\') must return true.';
+    console.warn(warning);
+    debugLog('docker-backend:ollama-misroute', warning);
+    return 'claude';
+  }
   return 'claude';
 }
 

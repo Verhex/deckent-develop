@@ -275,6 +275,10 @@ vi.mock('../../src/orchestra/sprint-utils.js', () => ({
   isDocTask: vi.fn().mockReturnValue(false),
   isStaleTaskFile: vi.fn().mockReturnValue(false),
   isTmuxProvider: vi.fn().mockReturnValue(true),
+  // Sprint 234 AS-2 Faz 2: sprint-spawner now consults isAdapterProvider
+  // before the backend.spawn priority block. Default `false` preserves the
+  // pre-Sprint-234 cascade (backend → adapter → tmux) for tests in this file.
+  isAdapterProvider: vi.fn().mockReturnValue(false),
   resolveDefaultUsageCli: vi.fn().mockReturnValue(''),
   getDefaultProvider: vi.fn().mockReturnValue('claude'),
   resolveTaskProvider: vi.fn().mockReturnValue('claude'),
