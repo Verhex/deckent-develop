@@ -205,4 +205,51 @@ describe('buildCostGateErrorPayload', () => {
     const payload = buildCostGateErrorPayload(exceeded, 'force');
     expect(payload.override).toBe('force');
   });
+
+  // ─── Sprint 238 İŞ10 — estimate↔gate bridge for 'local' (ollama) ──────────
+  // The cost gate keys on estimate.costRealistic / withinBudget. A local
+  // on-device task must contribute $0, so an all-ollama sprint passes the gate
+  // with auto-confirm and never trips the budget — even when the budget is tiny.
+  describe('local billing bridge (ollama on-device)', () => {
+    function makeLocalConfig(sprintMaxUsd = 0.01): CostConfig {
+      return {
+        _version: '1.0',
+        providers: {
+          ollama: {
+            enabled: true,
+            billing_modes_supported: ['local'],
+            default_billing_mode: 'local',
+            models: {
+              'qwen3.6:27b': {
+                input_cost_per_token: 0,
+                output_cost_per_token: 0,
+                max_input_tokens: 262144,
+                max_output_tokens: 16384,
+                supports_prompt_caching: false,
+                enabled: true,
+              },
+            },
+          },
+        },
+        cost_limits: { sprint_max_usd: sprintMaxUsd, daily_max_usd: 50, auto_confirm_below_usd: 2 },
+        update_config: { sources_priority: ['bundled'] },
+      } as unknown as CostConfig;
+    }
+
+    it('all-ollama sprint passes the gate at $0 with auto-confirm, even on a $0.01 budget', () => {
+      const tasks: TaskCostInput[] = [
+        { id: 'OLL-1', model: 'qwen3.6:27b', estimatedInputTokens: 500_000, estimatedOutputTokens: 50_000 },
+        { id: 'OLL-2', model: 'qwen3.6:27b', estimatedInputTokens: 800_000, estimatedOutputTokens: 80_000 },
+      ];
+      const result = evaluateCostGate({ tasks, costConfig: makeLocalConfig(0.01) });
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.estimate.costRealistic).toBe(0);
+        expect(result.estimate.withinBudget).toBe(true);
+        expect(result.autoConfirm).toBe(true);
+        // No subscription quota draw for a local task.
+        expect(result.estimate.subscriptionImpact?.['ollama']).toBeUndefined();
+      }
+    });
+  });
 });
