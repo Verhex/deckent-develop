@@ -256,6 +256,28 @@ API çağrıları maliyetli; **şu an bu maliyete katlanılmıyor.** Bu yüzden:
 ### Çapraz referanslar
 F1-009 (8-provider fleet, ~95% iç-wiring — **gerçek any-key worker fleet = bu AS-2**) · F1-010/011/012/013/014/015 · F6 (auth flexibility) · **AS-6 / F3-009 (otonom — AS-2 enabler)** · ADR-076 (auth-precedence) · ADR-077 (multi-provider) · ADR-010 (no-new-dep). Memory: `feedback_container_auth_precedence` · `project_api_mode_deferred_post_beta` · `feedback_zero_hardcode_live_data` · `project_deckent_runtime_ecosystem` · `project_4cli_subscription_vision`.
 
+### 🟢 2026-06-06 — Ollama kuruldu + F1-013 harness tasarımı ONAYLI (Faz 1 başlıyor)
+
+**Kurulum (canlı doğrulandı):** Ollama v0.30.6 WSL systemd servisi (`127.0.0.1:11434`); model **`qwen3.6:27b`** (17GB q4_K_M GGUF, 256K context, native tool-calling). RTX 5090'da **%100 GPU** (21GB VRAM), **74 tok/s** sıcak. `/api/chat` + `tools` → yapısal `tool_calls` döndürüyor (proof-of-function ✅). Detay: [[project_ollama_worker_stub_gap]].
+
+**Kod durumu doğrulandı (mixed-fleet altyapısının çoğu VAR):**
+- ✅ Per-task override: `task-builder.ts:827` `- Provider:` parse + `task-router.ts:297` Priority-1 `task.provider`; `- Model:`/`- Agent:` de var.
+- ✅ Codex subscription: `codex.ts` `CodexAuthMode='api_key'|'subscription'|'none'` (`codex auth status`, API-key opsiyonel).
+- ❌ **Gemini API-key ZORUNLU**: `gemini.ts:212-216` apiKey yoksa throw → subs-CLI/OAuth desteklenmiyor (F1-014/F6 kapsamı, codex pattern'iyle düzeltilecek).
+- ❌ **Ollama worker = tek-atış stub** (`ollama.ts:190` spawn → `curl /api/generate` → `.log`; dosya-edit/test/`.result`/tool-loop YOK).
+
+**F1-013 — Agentic HTTP-worker — ONAYLI SOMUT TASARIM (v1: tek-task uçtan uca → sonra multi):**
+1. **`worker-agentic-runner.ts`** (yeni) — loop: task prompt+scope+goNogo → Ollama `/api/chat`+`tools` → `tool_calls` parse → çalıştır → sonuç mesaj olarak geri besle → `task_done` / max-iter'a kadar → yapılandırılmış `.result` yaz.
+2. **Tool seti (native JSON-schema):** `read_file`, `write_file`, `edit_file`, `run_bash`, `task_done{selfAssessment,notes}`.
+3. **Executor yeniden-kullanım:** `chat-tool-exec.ts` read/write/edit/bash impl'leri + **scope-enforcement** (write/edit yalnız `scope.filesWrite`; dışı → araç modele hata döner). ADR-037 RBAC; AS-2 per-worker auth-izolasyon kontratıyla hizalı.
+4. **Wiring:** `OllamaAdapter.spawn` tek-atış curl → agentic runner (heartbeat/kill/timeout lifecycle korunur).
+5. **Model kabul fix:** `isSupportedModel` → dinamik `/api/tags` (sabit-4-liste yerine; qwen3.6:27b kabul).
+6. **Kararlar (Alperen onaylı):** bash serbest+logged · scope ihlali sert-red · max-iter 25 (config'li). **Hata:** max-iter aşımı→GO_WITH_TECH_DEBT/NO_GO; API hata→NO_GO+sebep. **Test:** hermetik `fetchImpl` inject (scripted tool_calls, tmpdir, scope assert) + canlı qwen3.6 smoke.
+
+**Build yöntemi (Alperen):** spec hazır olunca seç — (a) elle kodla, (b) spec→DIRECTIVES→dogfood sprint (Brain Opus + **Claude** worker'ları harness'ı kurar → ürün **yerel** worker kazanır = bootstrap). Spec: `docs/superpowers/specs/2026-06-06-ollama-agentic-worker-harness-design.md`.
+
+**Sıra (AS-2 fazlarıyla hizalı):** F1-013 harness (=AS-2 Faz 1, ŞİMDİ) → AS-2 Faz 2 mixed-fleet eşzamanlı doğrulama (canlı: 1 sprint'te ollama+claude paralel) → Gemini subs (F1-014/F6) → Brain provider-auto-distribution ("right-model-right-work", routing-engine enhance) → F1-010/011 failover+models.dev.
+
 ---
 
 ## 4B. Agentic Run Ecosystem — Sub-System Map (AS-1 … AS-6)
@@ -265,7 +287,7 @@ F1-009 (8-provider fleet, ~95% iç-wiring — **gerçek any-key worker fleet = b
 | AS | Alt-sistem | Kapsam (özet) | Durum | Eşleştiği F-ID / sprint | Kalan |
 |----|------------|---------------|-------|--------------------------|-------|
 | **AS-1** | Dormant wake-up + ölçek sertleştirme | uykudaki primitive'leri uyandır + 50-100 worker ölçek | 🔜 **Sprint 230 LIVE** (8 task: Windows/models.dev/docker-monitor/dormant) | Sprint 230, W-K, W-K-detail (1/2/4/7), F3-010, F7-004 | Windows Job-Object, PTY `worker-attach`, RBAC-hard pre-write, 429-switch, cost↔billing köprüsü, auditor-async, docker-parallel spawn, `planDispatch` wire (kullanıcının 21-task planından merge) |
-| **AS-2** | Gerçek multi-provider / any-key | per-worker mixed fleet, config-registry, agentic HTTP-worker, Bedrock | ✅ **tasarım §4A** | F1-009..015, F6 | Faz 1-4 impl (Ollama-first, API cost-deferred) |
+| **AS-2** | Gerçek multi-provider / any-key | per-worker mixed fleet, config-registry, agentic HTTP-worker, Bedrock | ✅ tasarım §4A · 🔜 **Faz 1 başlıyor** (Ollama+qwen3.6:27b kuruldu 06-06, F1-013 harness tasarımı onaylı) | F1-009..015, F6 | Faz 1 harness impl (ŞİMDİ) → Faz 2-4 (mixed-fleet/failover, API cost-deferred) |
 | **AS-3** | Zero-hardcode + tam i18n | per-locale catalog + dynamic SUPPORTED_LANGS + add-a-language; tüm user-facing string→catalog; canlı-veri (stale const yok); "every-nation" | ✅ **tasarım §4E** | W-A, W-K-detail (8/9), ADR-032, `feedback_god_level_i18n_quality_bar`, `feedback_zero_hardcode_live_data` | Faz 1-3 impl (catalog infra+guard → tam sweep → add-a-language+live-data) |
 | **AS-4** | Provider-native yetenekler | her sağlayıcının kendi gücü: Claude plugins / ultracode (workflow) / provider-native MCP / skills / subagents — provider-agnostic Capability Realization Layer + fallback | ✅ **tasarım §4D** | F11-014/015, AS-5 (MCP köprü), AS-2 | Faz 1-3 impl (persona/MCP native → skills/plugins → nested workflow flag-gated) |
 | **AS-5** | MCP-CLIENT (dünyayla entegrasyon) | deckent'i server-only'den **MCP tüketicisine** evriltme; Claude-parity (her ortamda kur/kullan); harici sistemlerle veri alışverişi, enterprise-grade | ✅ **P1 DONE (Sprint 229)** · §4C | F9-001/002/003, F11-015, F8, #ERP | **Faz 1 ✅** (broker+REPL+`deckent mcp` CLI, 5/5); Faz 2-3 (worker+RBAC → otonom/enterprise+OAuth) kalan |
