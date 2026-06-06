@@ -292,6 +292,7 @@ F1-009 (8-provider fleet, ~95% iç-wiring — **gerçek any-key worker fleet = b
 | **AS-4** | Provider-native yetenekler | her sağlayıcının kendi gücü: Claude plugins / ultracode (workflow) / provider-native MCP / skills / subagents — provider-agnostic Capability Realization Layer + fallback | ✅ **tasarım §4D** | F11-014/015, AS-5 (MCP köprü), AS-2 | Faz 1-3 impl (persona/MCP native → skills/plugins → nested workflow flag-gated) |
 | **AS-5** | MCP-CLIENT (dünyayla entegrasyon) | deckent'i server-only'den **MCP tüketicisine** evriltme; Claude-parity (her ortamda kur/kullan); harici sistemlerle veri alışverişi, enterprise-grade | ✅ **P1 DONE (Sprint 229)** · §4C | F9-001/002/003, F11-015, F8, #ERP | **Faz 1 ✅** (broker+REPL+`deckent mcp` CLI, 5/5); Faz 2-3 (worker+RBAC → otonom/enterprise+OAuth) kalan |
 | **AS-6** | Otonom + process/batch mode | uzun-yaşayan, event-driven, yetki-sınırlı; "sadece developer değil herkes için" agentic-OS | 🔜 Sprint 226 + F3 | F3-001..009, Sprint 226, ADR-040 (nervous) / ADR-037 (RBAC) | 5 adapter + sürekli loop + `deckent autonomous` CLI (226); batch-mode; full-autonomy süreçleri |
+| **AS-7** | Air-Gapped / Offline-First mode | garantili kapalı-devre: global `--offline` flag, ollama-only enforce, host-backend default, sıfır phone-home, offline install bundle, conformance test | ✅ **tasarım §4H** (2026-06-06) | AS-2 (ollama worker = ön-koşul), F6 (auth), #ERP/enterprise | F1-013 (ollama worker ✅ Sprint 233) → offline-flag wire + ollama-only + host-backend + bundle + conformance |
 
 *Not: §5 (Sub-Projects #1-#5) eski agentic-OS pipeline çerçevesidir; **AS-1…AS-6 kalan işin güncel decompose'udur** — örtüştükleri yerde AS-* önceliklidir. Güvenlik invariant'ı (AS-6): default-deny + insan-onay-gate, oto-sprint-start YOK; AS-6 bir ürün-hedefi, benim/Brain'in sprint-başlatma iznini değiştirmez.*
 
@@ -511,6 +512,40 @@ Her sprint sonrası: `cp .brain/memory.db .brain/memory.db.bak` + `deckent memor
 - nervous MCP undo/edit = fırsatçı P2 parity (bloklamaz).
 
 İlgili: [[feedback_proof_of_function_dod]] (Tier-1 Smoke) · [[feedback_god_level_i18n_quality_bar]] (i18n-FIRST) · [[feedback_directive_kanit_letter_vs_goal]] (def-dışla, caller'da grep) · [[project_mcp_client_not_wired_s229]] (REPL-002 `/mcp` wire = G1) · [[project_native_repl_tool_parity_gap]] · ADR-040 (nervous approval) · ADR-037 (RBAC default-deny) · ADR-062 (audit) · ADR-071 (autonomous, proposed). **Sıra:** WIRE → APPROVE (producer-first APPROVE-001!) → CONFIRM → MSG → REPL → DASH → BOT → DEFER. Tek wave (distinct files); `dependency_pipeline_enabled=false` → Brain manuel wave.
+
+---
+
+## 4H. AS-7 — Air-Gapped / Offline-First Mode (data-sovereignty pillar)
+
+> **Comprehensive design — 2026-06-06 (Alperen).** deckent **garantili kapalı-devre** çalışabilmeli: yerel model (Ollama, GPU) + deckent, **internet OLMADAN**, sıfır veri-dışarı. Ollama zaten offline (yerel inference, never-calls-home). Asıl ürün değeri **veri egemenliği**: gizlilik-odaklı birey, offline-dev takımı, ve regüle enterprise (savunma/finans/sağlık) — verinin ağdan çıkmadığı, sertifikalanabilir bir mod.
+
+### Kod-denetim durumu (2026-06-06, doğrulandı — air-gap %~80 hazır)
+- ✅ **Phone-home YOK:** `telemetry.ts` `telemetry_enabled` default **false** + `flush()` sadece event return eder (HTTP göndermez).
+- ✅ **Offline katalog yolu VAR:** `model-catalog.ts:83` `offline?` flag → "skip network entirely" → 24h cache → **bundled BUILTIN_MODELS** fallback. Ollama yerel (ağsız).
+- 🔴 **Global wire YOK:** `bootstrapFromCatalog()` `loadCatalog()`'u argümansız çağırır → `offline` propagate olmuyor; startup'ta yine ağ dener (offline timeout gecikmesi).
+- 🔴 **Cloud provider'lar internet ister** (Claude/Codex/Gemini) → air-gap = **ollama-only enforce** gerekir.
+- 🔴 **Docker backend image çeker** → air-gap **host/subprocess backend** kullanmalı (AS-2 §4A routing fix ollama'yı zaten docker'sız host'a alıyor — air-gap'in temel taşı).
+- 🔴 **pricing-updater** (litellm/openrouter fetch) + **plugin** (git/https) → offline modda gate'lenmeli. **Offline install bundle** yok.
+
+### Personalar
+- **User (gizlilik):** offline bundle/tek-seferlik kurulum → ollama+model+deckent → `--offline`, ollama-only → sıfır veri dışarı.
+- **Developer:** üstüne **yerel-model worker kod-sprint'leri** (F1-013 harness) → tamamen offline AI-dev; agentic loop GPU'da.
+- **Enterprise:** on-prem deckent + on-prem ollama (paylaşımlı GPU) + on-prem MCP (AS-5) + RBAC/audit/multi-tenant (ADR-037/062/068) + offline bundle + conformance.
+
+### Mimari bileşenler
+1. **Global `offline` config + `deckent --offline`** → `loadCatalog`/pricing/plugin/provider-probe HEPSİ skip; cache→bundled; assert-no-network.
+2. **ollama-only enforce** (offline'da cloud provider'lar routing'den düşer; sadece local/host-HTTP).
+3. **host-backend default** (offline'da docker pull yok; subprocess/tmux + AS-2 host-adapter routing).
+4. **Offline install bundle** (deckent+deps+ollama+model pre-pack; firewall-arkası deploy).
+5. **Air-gap conformance test** (offline modda sıfır-outbound-paket kanıtı — proof-of-function).
+
+### Fazlama
+- **Faz 1 — Global offline flag + ollama-only + host-backend** (AS-2 §4A Faz 1-2 sonrası; F1-013 ✅ ön-koşul tamam).
+- **Faz 2 — Offline bundle + pricing/plugin gate + conformance test.**
+- **Faz 3 — Enterprise on-prem paketi** (on-prem MCP + RBAC/tenant + deploy guide).
+
+### Çapraz ref
+AS-2 §4A (ollama worker = ön-koşul, host-adapter routing) · AS-5 §4C (on-prem MCP) · AS-6 (otonom on-prem) · F6 (auth) · #ERP/enterprise · ADR-037/062/068. Memory: `project_4cli_subscription_vision` (Ollama zero-cost/never-calls-home) · `project_deckent_runtime_ecosystem` · `project_air_gapped_offline_pillar`.
 
 ---
 
