@@ -6,12 +6,12 @@ the connected providers, within an authority + policy governance model. It is bu
 scale from a solo user to an enterprise on one engine, and is **flag-gated and disabled
 by default**.
 
-> **Status (2026-06-07, sub-project 1).** The engine's pieces are implemented,
-> reviewed, and tested, and the **backlog management CLI is live** (proven against the
-> real binary). The **live `deckent autonomous start` loop is not yet wired to the new
-> engine** — `start` still runs the inert Sprint-226 path (no work executes). End-to-end
-> live execution (start → drain backlog → run via the fleet) is the next follow-up. Use
-> the backlog CLI today; `start` will drive it once wired. See *Current limitations*.
+> **Status (2026-06-07, sub-project 1 — landed).** The engine is implemented, reviewed,
+> tested, and merged. **`deckent autonomous start` drives it end-to-end** (flag-gated by
+> `config.autonomous.enabled`, default-off): it recovers crashed state, drains the
+> backlog through the three gates, and executes each due entry via the fleet — proven
+> against the real binary. The backlog management CLI is live. Remaining work is reactive
+> trigger breadth and a concurrent execution pool (sub-projects 2+); see *Current limitations*.
 
 ---
 
@@ -146,12 +146,8 @@ registers the execute-dispatcher under the backlog action, installs the hybrid t
 
 ## Current limitations (honest status)
 
-- **`deckent autonomous start` does not yet drive this engine.** The `start` command
-  still uses the Sprint-226 path with an empty action-handler registry, so starting it
-  executes nothing. The new `buildEngineRuntime` is composed and unit/smoke-tested but
-  not yet wired into `start`. Wiring `start` → `buildEngineRuntime` with the real
-  `runTaskMode`/`runSprint` runners + `recoverBacklog`-on-start is the immediate
-  follow-up that makes live end-to-end execution runnable.
+- **No MCP tool yet.** `deckent autonomous` (start/backlog/status) is CLI-only; there is
+  no `deckent_autonomous*` MCP tool. CLI/MCP parity is a follow-up.
 - **Reactive triggers** (nervous detectors / webhooks / repo-watch) are accepted through
   a typed adapter interface but their breadth is sub-project 2.
 - **Concurrency** is serial in pass 1 (`ExecutionPool` size 1); the interface is built so
