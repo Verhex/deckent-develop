@@ -133,6 +133,7 @@ export function backlogRemove(o: { root: string; id: string; lang: string }): vo
   if (bl.entries.length === before) {
     throw new Error(getMessage('autonomous.backlog.not_found', o.lang, { id: o.id }));
   }
+  mkdirSync(dirname(path), { recursive: true });
   atomicWriteFileSync(path, JSON.stringify(bl, null, 2));
 }
 
