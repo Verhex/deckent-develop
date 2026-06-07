@@ -1,7 +1,7 @@
 {
   "_meta": {
     "version": "2.0",
-    "generatedAt": "2026-06-07T19:05:13.471Z",
+    "generatedAt": "2026-06-07T20:46:58.827Z",
     "generatedBy": "scripts/sync-manifest.mjs",
     "sprintId": "sprint-237",
     "description": "Feature usage manifest — curated feature catalog (FEATURE_DEFINITIONS in scripts/sync-manifest.mjs) bucketed by an import-count heuristic plus manual lifecycle annotations. NOT a full import-graph analysis. Categories: active, lightly_used, dormant, dead.",
@@ -196,11 +196,15 @@
         "src/orchestra/autonomous/audit-adapter.ts",
         "src/orchestra/autonomous/authority-adapter.ts",
         "src/orchestra/autonomous/trigger-adapter.ts",
+        "src/orchestra/autonomous/reactive/reactive-types.ts",
+        "src/orchestra/autonomous/reactive/reactive-map.ts",
+        "src/orchestra/autonomous/reactive/reactive-ingester.ts",
+        "src/orchestra/autonomous/reactive/nervous-reactive-source.ts",
         "src/cli/commands/autonomous.ts"
       ],
-      "description": "F3-009 backlog-driven autonomous engine (sub-project 1, 2026-06-07). Durable backlog (recurring+one-off+reactive entries; per-entry policy/provider/kind; atomic writeback + crash recovery) → 3-gate governance (RBAC authority ADR-037 → per-task policy auto|approval-required → EffectClass risk ADR-055) → execute-dispatcher (task→runTaskMode | sprint→runSprint) → audit. Hybrid trigger (backlog∪scheduled-flow∪reactive), concurrency-ready ExecutionPool, composition root buildEngineRuntime, flag-gated config.autonomous (default enabled:false). Live `deckent autonomous start` drives the engine end-to-end (flag-gated config.autonomous.enabled, default-off; buildEngineRuntime + real runTaskMode/runSprint runners + crash recovery; smoke-proven) plus `backlog add/list/remove` + status. AS-6 / ADR-037 / ADR-040.",
+      "description": "F3-009 backlog-driven autonomous engine (sub-projects 1+2, 2026-06-07). Durable backlog (recurring+one-off+reactive entries; per-entry policy/provider/kind; atomic writeback + crash recovery) → 3-gate governance (RBAC authority ADR-037 → per-task policy auto|approval-required → EffectClass risk ADR-055) → execute-dispatcher (task→runTaskMode | sprint→runSprint) → audit. Hybrid trigger (backlog∪scheduled-flow∪reactive), concurrency-ready ExecutionPool, composition root buildEngineRuntime, flag-gated config.autonomous (default enabled:false). Live `deckent autonomous start` drives the engine end-to-end (flag-gated config.autonomous.enabled, default-off; buildEngineRuntime + real runTaskMode/runSprint runners + crash recovery; smoke-proven) plus `backlog add/list/remove` + status. Sub-project 2: nervous-detector reactive bridge (detection→declarative reactive-map→durable backlog entry via an ingester; dedup; flag-gated config.autonomous.reactive default-off) — built + unit-tested + wired into start (attach-only). AS-6 / ADR-037 / ADR-040.",
       "importCount": "high",
-      "parityGap": "CLI-only — no MCP tool for autonomous start/backlog/status yet; reactive-trigger breadth (nervous/webhook/repo-watch) + concurrent ExecutionPool remain (sub-projects 2+)"
+      "parityGap": "CLI-only — no MCP tool for autonomous start/backlog/status yet. Reactive bridge is ATTACH-ONLY: the nervous observer is not driven in `start` (and built-in detectors are EXECUTE-phase-gated), so live detections do not yet flow — observer-driving + webhook/repo-watch sources remain (sub-project 2 continuation). Concurrent ExecutionPool also remains."
     }
   ],
   "lightly_used": [
