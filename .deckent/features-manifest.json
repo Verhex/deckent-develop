@@ -1,7 +1,7 @@
 {
   "_meta": {
     "version": "2.0",
-    "generatedAt": "2026-06-06T15:41:35.489Z",
+    "generatedAt": "2026-06-07T17:02:01.768Z",
     "generatedBy": "scripts/sync-manifest.mjs",
     "sprintId": "sprint-237",
     "description": "Feature usage manifest — curated feature catalog (FEATURE_DEFINITIONS in scripts/sync-manifest.mjs) bucketed by an import-count heuristic plus manual lifecycle annotations. NOT a full import-graph analysis. Categories: active, lightly_used, dormant, dead.",
@@ -181,9 +181,16 @@
     },
     {
       "id": "autonomous-runtime",
-      "label": "Autonomous Runtime — F3-009 authority-bounded loop",
+      "label": "Autonomous Execution Engine — F3-009 backlog-driven authority-bounded loop",
       "files": [
+        "src/orchestra/autonomous-runtime.ts",
         "src/orchestra/autonomous/runtime-loop.ts",
+        "src/orchestra/autonomous/backlog.ts",
+        "src/orchestra/autonomous/backlog-types.ts",
+        "src/orchestra/autonomous/policy-gate.ts",
+        "src/orchestra/autonomous/execute-dispatcher.ts",
+        "src/orchestra/autonomous/backlog-trigger.ts",
+        "src/orchestra/autonomous/execution-pool.ts",
         "src/orchestra/autonomous/action-adapter.ts",
         "src/orchestra/autonomous/approval-adapter.ts",
         "src/orchestra/autonomous/audit-adapter.ts",
@@ -191,8 +198,9 @@
         "src/orchestra/autonomous/trigger-adapter.ts",
         "src/cli/commands/autonomous.ts"
       ],
-      "description": "F3-009 authority-bounded autonomous loop. CLI start/status/stop subcommands wire trigger→authority→approval→action→audit pipeline. Default-deny: no auto-approve, no auto-sprint-start. AS-6 / ADR-037 / ADR-040.",
-      "importCount": "high"
+      "description": "F3-009 backlog-driven autonomous engine (sub-project 1, 2026-06-07). Durable backlog (recurring+one-off+reactive entries; per-entry policy/provider/kind; atomic writeback + crash recovery) → 3-gate governance (RBAC authority ADR-037 → per-task policy auto|approval-required → EffectClass risk ADR-055) → execute-dispatcher (task→runTaskMode | sprint→runSprint) → audit. Hybrid trigger (backlog∪scheduled-flow∪reactive), concurrency-ready ExecutionPool, composition root buildEngineRuntime, flag-gated config.autonomous (default enabled:false). Live `deckent autonomous backlog add/list/remove` + status. AS-6 / ADR-037 / ADR-040.",
+      "importCount": "high",
+      "parityGap": "live `deckent autonomous start` still uses the inert Sprint-226 path (empty action handlers); buildEngineRuntime is composed + unit/smoke-tested but NOT yet wired into the start command → end-to-end live execution (start→drain backlog→fleet) pending (sub-project 1 follow-up before sub-project 2)"
     }
   ],
   "lightly_used": [
