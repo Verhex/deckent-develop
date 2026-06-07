@@ -71,14 +71,25 @@ export interface EntryTokenUsage {
   model: string;
 }
 
-/** api-surface `.result` shape — keep field names + types stable for Brain. */
+/**
+ * api-surface `.result` shape — keep field names + types stable for Brain.
+ *
+ * `testsPassed` and `coverage` are nullable: the agentic worker has NO coverage
+ * instrumentation and may run no tests at all (e.g. a doc task). `null` is the
+ * honest "not measured" — distinct from a measured `false`/`0`. This mirrors what
+ * capable claude/codex workers emit, so Brain's `coverageOptional` schema
+ * relaxation + `isCoverageStructurallyAbsent` reweight treat ollama results
+ * identically. The previous hardcoded `false`/`0` was a fabricated measurement
+ * that suppressed Brain's anti-regression signal (Sprint 153/154): a genuine code
+ * task with no tests now honestly reaches NO_GO instead of a fake GO_WITH_TECH_DEBT.
+ */
 export interface EntryResultFile {
   taskId: string;
   filesChanged: string[];
   linesAdded: number;
   linesRemoved: number;
-  testsPassed: boolean;
-  coverage: number;
+  testsPassed: boolean | null;
+  coverage: number | null;
   selfAssessment: SelfAssessment;
   notes: string;
   tokenUsage: EntryTokenUsage;
@@ -289,8 +300,13 @@ async function buildResultFromRunner(
     filesChanged: runResult.filesChanged,
     linesAdded,
     linesRemoved,
-    testsPassed: runResult.testsPassed ?? false,
-    coverage: 0,
+    // Honest "not measured" (null), not a fabricated measurement. The runner
+    // sniffs `testsPassed` only when a test command actually ran (undefined → no
+    // tests → null); coverage is never instrumented by the agentic loop, so it is
+    // structurally absent. Brain's coverageOptional/isCoverageStructurallyAbsent
+    // consume null exactly as they do for claude/codex workers (İŞ2, provider parity).
+    testsPassed: runResult.testsPassed ?? null,
+    coverage: null,
     selfAssessment: runResult.selfAssessment,
     notes,
     tokenUsage: {

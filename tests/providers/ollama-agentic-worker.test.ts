@@ -263,8 +263,11 @@ describe('runWorkerEntry — T-233-002 entry shim end-to-end', () => {
     expect(onDisk['filesChanged']).toEqual(['allowed.ts']);
     expect(typeof onDisk['linesAdded']).toBe('number');
     expect(typeof onDisk['linesRemoved']).toBe('number');
-    expect(typeof onDisk['testsPassed']).toBe('boolean');
-    expect(typeof onDisk['coverage']).toBe('number');
+    // testsPassed/coverage are nullable (İŞ2): a measured testsPassed (true here)
+    // is preserved; coverage is uninstrumented by the agentic loop → honest null.
+    expect(onDisk['testsPassed'] === null || typeof onDisk['testsPassed'] === 'boolean').toBe(true);
+    expect(onDisk['coverage'] === null || typeof onDisk['coverage'] === 'number').toBe(true);
+    expect(onDisk['coverage']).toBeNull();
     expect(onDisk['selfAssessment']).toBe('DONE');
     expect(onDisk['notes']).toMatch(/comment added/);
     expect(onDisk['evaluationDecision']).toBe('DONE');

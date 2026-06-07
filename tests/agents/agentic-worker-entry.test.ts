@@ -277,8 +277,13 @@ describe('runWorkerEntry / computeNumstat — T-234-002 .result completeness', (
     expect(Array.isArray(onDisk.filesChanged)).toBe(true);
     expect(typeof onDisk.linesAdded).toBe('number');
     expect(typeof onDisk.linesRemoved).toBe('number');
-    expect(typeof onDisk.testsPassed).toBe('boolean');
-    expect(typeof onDisk.coverage).toBe('number');
+    // testsPassed/coverage are nullable (İŞ2): the runner returned a measured
+    // `false` here, so it is preserved as a boolean; coverage is never instrumented
+    // by the agentic loop → honest null. Contract: boolean|null and number|null.
+    expect(onDisk.testsPassed === null || typeof onDisk.testsPassed === 'boolean').toBe(true);
+    expect(onDisk.testsPassed).toBe(false); // measured false from runner, not coerced
+    expect(onDisk.coverage === null || typeof onDisk.coverage === 'number').toBe(true);
+    expect(onDisk.coverage).toBeNull(); // agentic worker has no coverage instrumentation
     expect(['DONE', 'GO_WITH_TECH_DEBT', 'NO_GO']).toContain(onDisk.selfAssessment);
     expect(typeof onDisk.notes).toBe('string');
     expect(onDisk.evaluationDecision).toBe(onDisk.selfAssessment);
@@ -331,5 +336,57 @@ describe('runWorkerEntry / computeNumstat — T-234-002 .result completeness', (
     expect(result.linesAdded).toBe(4);
     expect(result.linesRemoved).toBe(0);
     expect(result.notes).toBe('wrote fresh');
+  });
+
+  // ── Test 6 (İŞ2): no test ran → honest null testsPassed + null coverage ──
+  // The runner leaves testsPassed undefined when no test command was sniffed
+  // (e.g. a doc task). The worker must emit `null` ("not measured"), NOT a
+  // fabricated `false`/`0` — so Brain's coverageOptional relaxation +
+  // isCoverageStructurallyAbsent reweight treat ollama like a claude worker.
+  it('emits testsPassed:null + coverage:null when the runner ran no tests (honest absence, not fabricated 0/false)', async () => {
+    const taskId = '238-is2-t6';
+    seedTaskJson(projectDir, taskId);
+    const runResult: AgenticRunnerResult = {
+      taskId,
+      filesChanged: ['docs/guide/x.md'],
+      testsPassed: undefined, // no test command ran
+      selfAssessment: 'DONE',
+      notes: 'doc written',
+      iterations: 1,
+      terminationReason: 'task_done',
+      tokenUsage: { inputTokens: 10, outputTokens: 5, provider: 'ollama', cost: 0 },
+    };
+    const { result } = await runWorkerEntry(
+      [taskId, 'qwen3.6:27b', 'http://localhost:11434'],
+      projectDir,
+      { runner: mockRunner(runResult) },
+    );
+    expect(result.testsPassed).toBeNull();
+    expect(result.coverage).toBeNull();
+  });
+
+  // ── Test 7 (İŞ2): a sniffed testsPassed is preserved (not nulled) ──
+  // When the runner DID observe a test run, that measured boolean is honest
+  // signal and must survive to .result; only coverage stays null (uninstrumented).
+  it('preserves a measured testsPassed:true from the runner while coverage stays null', async () => {
+    const taskId = '238-is2-t7';
+    seedTaskJson(projectDir, taskId);
+    const runResult: AgenticRunnerResult = {
+      taskId,
+      filesChanged: ['src/x.ts', 'tests/x.test.ts'],
+      testsPassed: true, // runner sniffed a passing test command
+      selfAssessment: 'DONE',
+      notes: 'code + test',
+      iterations: 2,
+      terminationReason: 'task_done',
+      tokenUsage: { inputTokens: 10, outputTokens: 5, provider: 'ollama', cost: 0 },
+    };
+    const { result } = await runWorkerEntry(
+      [taskId, 'qwen3.6:27b', 'http://localhost:11434'],
+      projectDir,
+      { runner: mockRunner(runResult) },
+    );
+    expect(result.testsPassed).toBe(true);
+    expect(result.coverage).toBeNull();
   });
 });
