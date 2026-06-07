@@ -27,7 +27,12 @@ describe('policy-gate', () => {
   it('risk-tagged + idempotent effect → park (only pure/reversible auto-safe)', () => {
     expect(decidePolicy({ ...base, policy: 'risk-tagged' }, 'idempotent').decision).toBe('park');
   });
-  it('every decision carries a non-empty reason', () => {
-    expect(decidePolicy(base).reason.length).toBeGreaterThan(0);
+  it('risk-tagged + compensable effect → park', () => {
+    expect(decidePolicy({ ...base, policy: 'risk-tagged' }, 'compensable').decision).toBe('park');
+  });
+  it('every policy branch carries a non-empty reason', () => {
+    expect(decidePolicy({ ...base, policy: 'auto' }).reason.length).toBeGreaterThan(0);
+    expect(decidePolicy({ ...base, policy: 'approval-required' }).reason.length).toBeGreaterThan(0);
+    expect(decidePolicy({ ...base, policy: 'risk-tagged' }, 'critical-irreversible').reason.length).toBeGreaterThan(0);
   });
 });
