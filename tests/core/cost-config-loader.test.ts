@@ -170,6 +170,23 @@ describe('cost-config-loader', () => {
       expect(config.providers.google).toBeDefined();
     });
 
+    it('bundled baseline ships ollama as a zero-cost local provider (fresh user sees "(local)") — İŞ4', () => {
+      // A fresh `npx deckent` user with no cost-config.json must still get the
+      // local-billing label for on-device ollama, not "(subscription)". The
+      // baseline seeds it (provider=ollama → 0 fallback still applies for
+      // dynamically-pulled tags not listed here).
+      const config = loadCostConfig(tmpDir, { forceReload: true });
+      const ollama = config.providers.ollama;
+      expect(ollama).toBeDefined();
+      expect(ollama!.billing_modes_supported).toContain('local');
+      expect(ollama!.default_billing_mode).toBe('local');
+      // Every seeded model is genuinely zero-cost (on-device, never calls home).
+      for (const [id, model] of Object.entries(ollama!.models)) {
+        expect(model.input_cost_per_token, `${id} input`).toBe(0);
+        expect(model.output_cost_per_token, `${id} output`).toBe(0);
+      }
+    });
+
     it('throws CostConfigError on malformed JSON', () => {
       const configDir = join(tmpDir, '.deckent');
       mkdirSync(configDir, { recursive: true });
