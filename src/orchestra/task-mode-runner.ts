@@ -73,10 +73,10 @@ function assertTaskMode(config: ResolvedConfig): void {
  * 4. Spawn worker via multi-provider backend
  * 5. Return task ID + backend info
  */
-export function runTaskMode(
+export async function runTaskMode(
   ctx: TaskModeContext,
   config: ResolvedConfig,
-): TaskModeResult {
+): Promise<TaskModeResult> {
   assertTaskMode(config);
 
   const projectRoot = ctx.projectRoot ?? process.cwd();
@@ -105,7 +105,7 @@ export function runTaskMode(
   }
 
   // Spawn worker
-  const { backend, provider } = spawnWorkerMultiProvider(
+  const { backend, provider } = await spawnWorkerMultiProvider(
     taskId,
     model,
     prompt,

@@ -274,7 +274,7 @@ export function registerRun(program: Command): void {
         // Spawn worker via config-aware backend
         const prompt = buildWorkerPrompt(task, agentPrompt, skillPrompts);
         const cfg = await loadConfig(root).catch(() => ({} as { spawn_backend?: string; docker_image?: string; docker_timeout?: number }));
-        const { backend } = spawnWorkerMultiProvider(taskId, model, prompt, root, {
+        const { backend } = await spawnWorkerMultiProvider(taskId, model, prompt, root, {
           autoApprove,
           spawnBackend: cfg.spawn_backend,
           dockerImage: cfg.docker_image,

@@ -46,6 +46,17 @@ vi.mock('../../../src/orchestra/spawn-backend.js', () => ({
   },
 }));
 
+// sprint-utils: isAdapterProvider returns false for all models used in this test suite
+// (sonnet/opus/haiku/gpt-4.1/gemini) — adapter path is not exercised here.
+vi.mock('../../../src/orchestra/sprint-utils.js', async (importOriginal) => {
+  const actual = await importOriginal() as Record<string, unknown>;
+  return {
+    ...actual,
+    isAdapterProvider: vi.fn(() => false),
+    getProviderAdapterForTask: vi.fn(() => null),
+  };
+});
+
 import { readTask } from '../../../src/agents/worker.js';
 import { ensureSession, spawnWorker } from '../../../src/orchestra/tmux.js';
 import { print, printError } from '../../../src/cli/helpers/output.js';
@@ -319,31 +330,31 @@ describe('spawnWorkerMultiProvider', () => {
     vi.mocked(spawnWorker).mockImplementation(() => {});
   });
 
-  it('returns tmux backend and claude provider for Claude models', () => {
-    const result = spawnWorkerMultiProvider('001', 'sonnet', 'prompt', '/root', {});
+  it('returns tmux backend and claude provider for Claude models', async () => {
+    const result = await spawnWorkerMultiProvider('001', 'sonnet', 'prompt', '/root', {});
     expect(result.backend).toBe('tmux');
     expect(result.provider).toBe('claude');
   });
 
-  it('returns subprocess backend and codex provider for OpenAI models', () => {
+  it('returns subprocess backend and codex provider for OpenAI models', async () => {
     const mockBackend = { spawn: vi.fn(), kill: vi.fn(), list: vi.fn() };
     vi.mocked(SpawnBackendFactory.create).mockReturnValue(mockBackend as any);
-    const result = spawnWorkerMultiProvider('002', 'gpt-4.1', 'prompt', '/root', {});
+    const result = await spawnWorkerMultiProvider('002', 'gpt-4.1', 'prompt', '/root', {});
     expect(result.backend).toBe('subprocess');
     expect(result.provider).toBe('codex');
     expect(mockBackend.spawn).toHaveBeenCalled();
   });
 
-  it('returns subprocess backend and gemini provider for Gemini models', () => {
+  it('returns subprocess backend and gemini provider for Gemini models', async () => {
     const mockBackend = { spawn: vi.fn(), kill: vi.fn(), list: vi.fn() };
     vi.mocked(SpawnBackendFactory.create).mockReturnValue(mockBackend as any);
-    const result = spawnWorkerMultiProvider('003', 'gemini-2.5-pro', 'prompt', '/root', {});
+    const result = await spawnWorkerMultiProvider('003', 'gemini-2.5-pro', 'prompt', '/root', {});
     expect(result.backend).toBe('subprocess');
     expect(result.provider).toBe('gemini');
   });
 
-  it('passes allowedTools to tmux spawnWorker for Claude models', () => {
-    spawnWorkerMultiProvider('004', 'opus', 'prompt', '/root', {
+  it('passes allowedTools to tmux spawnWorker for Claude models', async () => {
+    await spawnWorkerMultiProvider('004', 'opus', 'prompt', '/root', {
       allowedTools: 'Read,Write,Edit,Bash,Glob,Grep',
     });
     expect(spawnWorker).toHaveBeenCalledWith(
@@ -352,10 +363,10 @@ describe('spawnWorkerMultiProvider', () => {
     );
   });
 
-  it('passes allowedTools to subprocess backend for non-Claude models', () => {
+  it('passes allowedTools to subprocess backend for non-Claude models', async () => {
     const mockBackend = { spawn: vi.fn(), kill: vi.fn(), list: vi.fn() };
     vi.mocked(SpawnBackendFactory.create).mockReturnValue(mockBackend as any);
-    spawnWorkerMultiProvider('005', 'gpt-4.1-mini', 'prompt', '/root', {
+    await spawnWorkerMultiProvider('005', 'gpt-4.1-mini', 'prompt', '/root', {
       allowedTools: 'Read,Bash',
     });
     expect(mockBackend.spawn).toHaveBeenCalledWith(
