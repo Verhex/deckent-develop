@@ -13,7 +13,7 @@
 
 import { Command } from 'commander';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { print, printError } from '../helpers/output.js';
 import { getLanguage, getMessage } from '../helpers/messages.js';
@@ -35,6 +35,9 @@ import type {
   AutonomousCycleResult,
   AutonomousRuntimeConfig,
 } from '../../orchestra/autonomous-runtime.js';
+import { loadBacklog, validateBacklogEntry } from '../../orchestra/autonomous/backlog.js';
+import { atomicWriteFileSync } from '../../agents/worker-lifecycle.js';
+import type { BacklogEntry } from '../../orchestra/autonomous/backlog-types.js';
 
 // ─── Filesystem layout helpers ────────────────────────────────────────
 
@@ -76,6 +79,61 @@ function defaultPolicy(): SelfDispatchPolicy {
     action: 'start',
     guard: { requiresApproval: true },
   };
+}
+
+// ─── Backlog helpers (Task 7) ─────────────────────────────────────────
+
+function defaultBacklogPath(root: string): string {
+  return join(autonomousDir(root), 'backlog.json');
+}
+
+export interface BacklogAddOptions {
+  root: string;
+  id: string;
+  title: string;
+  kind: 'task' | 'sprint';
+  description: string;
+  policy: BacklogEntry['policy'];
+  lang: string;
+}
+
+export function backlogAdd(o: BacklogAddOptions): void {
+  const path = defaultBacklogPath(o.root);
+  const bl = loadBacklog(path);
+  if (bl.entries.some((e) => e.id === o.id)) {
+    throw new Error(getMessage('autonomous.backlog.duplicate', o.lang, { id: o.id }));
+  }
+  const entry: BacklogEntry = {
+    id: o.id,
+    title: o.title,
+    kind: o.kind,
+    spec: { description: o.description },
+    policy: o.policy,
+    trigger: { type: 'one-off' },
+    status: 'pending',
+    lastRun: null,
+    lastResult: null,
+  };
+  const err = validateBacklogEntry(entry);
+  if (err) throw new Error(err);
+  bl.entries.push(entry);
+  mkdirSync(dirname(path), { recursive: true });
+  atomicWriteFileSync(path, JSON.stringify(bl, null, 2));
+}
+
+export function backlogList(o: { root: string }): BacklogEntry[] {
+  return loadBacklog(defaultBacklogPath(o.root)).entries;
+}
+
+export function backlogRemove(o: { root: string; id: string; lang: string }): void {
+  const path = defaultBacklogPath(o.root);
+  const bl = loadBacklog(path);
+  const before = bl.entries.length;
+  bl.entries = bl.entries.filter((e) => e.id !== o.id);
+  if (bl.entries.length === before) {
+    throw new Error(getMessage('autonomous.backlog.not_found', o.lang, { id: o.id }));
+  }
+  atomicWriteFileSync(path, JSON.stringify(bl, null, 2));
 }
 
 // ─── start ────────────────────────────────────────────────────────────
@@ -185,6 +243,25 @@ export function handleStatus(opts: AutonomousStatusOptions): void {
     }
   }
   const recent = auditLines.slice(-5);
+
+  // Backlog summary
+  try {
+    const entries = backlogList({ root });
+    const counts = { pending: 0, running: 0, parked: 0, done: 0, failed: 0 };
+    for (const e of entries) {
+      if (e.status in counts) counts[e.status as keyof typeof counts]++;
+    }
+    print(getMessage('autonomous.backlog.summary', lang, {
+      total: String(entries.length),
+      pending: String(counts.pending),
+      running: String(counts.running),
+      parked: String(counts.parked),
+      done: String(counts.done),
+      failed: String(counts.failed),
+    }));
+  } catch {
+    // tolerated — no backlog file yet
+  }
 
   print(getMessage('autonomous.status_header', lang));
   print(getMessage('autonomous.status_pending', lang, { count: String(pendingCount) }));
@@ -445,6 +522,85 @@ export function registerAutonomous(program: Command): void {
     .action((triggerId: string, opts: Omit<AutonomousResolveOptions, 'triggerId'>) => {
       try {
         handleReject({ triggerId, ...opts });
+      } catch (err) {
+        printError(err);
+        process.exitCode = 1;
+      }
+    });
+
+  // ─── backlog ──────────────────────────────────────────────────────────
+  const backlog = cmd
+    .command('backlog')
+    .description('Manage the autonomous backlog (add / list / remove entries)');
+
+  backlog
+    .command('add')
+    .description('Add a new entry to the autonomous backlog')
+    .requiredOption('--id <id>', 'Unique entry id')
+    .requiredOption('--title <title>', 'Human-readable title')
+    .option('--kind <kind>', 'Entry kind: task (default) or sprint', 'task')
+    .option('--description <text>', 'Task description or directives ref', '')
+    .option('--policy <policy>', 'Policy: auto (default), approval-required, or risk-tagged', 'auto')
+    .option('--root <path>', 'Project root override')
+    .option('--lang <code>', 'Language override (en|tr)')
+    .action((opts: {
+      id: string; title: string; kind: string; description: string;
+      policy: string; root?: string; lang?: string;
+    }) => {
+      try {
+        const lang = getLanguage(opts.lang);
+        const root = opts.root ?? resolveProjectRoot();
+        backlogAdd({
+          root, id: opts.id, title: opts.title,
+          kind: (opts.kind === 'sprint' ? 'sprint' : 'task'),
+          description: opts.description,
+          policy: (opts.policy as BacklogEntry['policy']),
+          lang,
+        });
+        print(getMessage('autonomous.backlog.added', lang, { id: opts.id }));
+      } catch (err) {
+        printError(err);
+        process.exitCode = 1;
+      }
+    });
+
+  backlog
+    .command('list')
+    .description('List autonomous backlog entries')
+    .option('--root <path>', 'Project root override')
+    .option('--lang <code>', 'Language override (en|tr)')
+    .action((opts: { root?: string; lang?: string }) => {
+      try {
+        const lang = getLanguage(opts.lang);
+        const root = opts.root ?? resolveProjectRoot();
+        const entries = backlogList({ root });
+        if (entries.length === 0) {
+          print(getMessage('autonomous.backlog.empty', lang));
+          return;
+        }
+        print(getMessage('autonomous.backlog.list_header', lang, { count: String(entries.length) }));
+        for (const e of entries) {
+          print(getMessage('autonomous.backlog.list_row', lang, {
+            status: e.status, id: e.id, title: e.title, kind: e.kind, policy: e.policy,
+          }));
+        }
+      } catch (err) {
+        printError(err);
+        process.exitCode = 1;
+      }
+    });
+
+  backlog
+    .command('remove <id>')
+    .description('Remove an entry from the autonomous backlog')
+    .option('--root <path>', 'Project root override')
+    .option('--lang <code>', 'Language override (en|tr)')
+    .action((id: string, opts: { root?: string; lang?: string }) => {
+      try {
+        const lang = getLanguage(opts.lang);
+        const root = opts.root ?? resolveProjectRoot();
+        backlogRemove({ root, id, lang });
+        print(getMessage('autonomous.backlog.removed', lang, { id }));
       } catch (err) {
         printError(err);
         process.exitCode = 1;

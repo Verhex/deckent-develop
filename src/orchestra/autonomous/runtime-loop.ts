@@ -23,6 +23,7 @@ import {
   type AutonomousCycleResult,
   type AutonomousRuntimeConfig,
   type AutonomousRuntimeDeps,
+  type TriggerSource,
 } from '../autonomous-runtime.js';
 import { makeAuthorityChecker } from './authority-adapter.js';
 import { makeAuditSink } from './audit-adapter.js';
@@ -32,6 +33,24 @@ import {
 } from './approval-adapter.js';
 import { makeActionExecutor } from './action-adapter.js';
 import { makeTriggerSource } from './trigger-adapter.js';
+// ─── Engine composition root (Task 7) imports ────────────────────────
+import type { ResolvedConfig } from '../../core/config-types.js';
+import type { PolicyGate } from '../autonomous-runtime.js';
+import {
+  makeBacklogTriggerSource,
+  makeHybridTriggerSource,
+} from './backlog-trigger.js';
+import {
+  makeExecuteDispatcher,
+  AUTONOMOUS_EXECUTE_ACTION,
+  type ExecuteDispatcherDeps,
+} from './execute-dispatcher.js';
+import { decidePolicy } from './policy-gate.js';
+import { loadBacklog } from './backlog.js';
+import type { BacklogEntry } from './backlog-types.js';
+
+// Re-export TriggerSource so callers can type reactiveSource without importing autonomous-runtime.
+export type { TriggerSource } from '../autonomous-runtime.js';
 
 // ─── Composition root ─────────────────────────────────────────────────
 
@@ -101,6 +120,77 @@ export function buildAutonomousRuntime(
   };
 
   return { deps, approvalGate };
+}
+
+// ─── Engine composition root (Task 7) ────────────────────────────────
+
+export interface BuildEngineRuntimeOptions {
+  projectRoot: string;
+  config: ResolvedConfig;
+  backlogPath: string;
+  flows: ScheduledFlow[];
+  policy: SelfDispatchPolicy;
+  runTask: ExecuteDispatcherDeps['runTask'];
+  runSprint: ExecuteDispatcherDeps['runSprint'];
+  /** Optional extra trigger source (e.g. a reactive/webhook source) added last. */
+  reactiveSource?: TriggerSource;
+  clock?: () => Date;
+  now?: () => string;
+}
+
+/**
+ * Compose the full autonomous engine from all Task 1-6 adapters.
+ * - Wires the execute-dispatcher into the action-handler registry.
+ * - Wraps the base bundle's trigger source with a backlog + optional reactive source.
+ * - Installs a policy gate that routes backlog triggers through decidePolicy(G2/G3).
+ * Pure construction — no I/O, no ticking.
+ */
+export function buildEngineRuntime(
+  opts: BuildEngineRuntimeOptions,
+): AutonomousRuntimeBundle {
+  const handlers = new Map<string, ActionHandler>();
+  handlers.set(
+    AUTONOMOUS_EXECUTE_ACTION,
+    makeExecuteDispatcher({
+      projectRoot: opts.projectRoot,
+      config: opts.config,
+      runTask: opts.runTask,
+      runSprint: opts.runSprint,
+    }),
+  );
+
+  const base = buildAutonomousRuntime({
+    projectRoot: opts.projectRoot,
+    flows: opts.flows,
+    policy: opts.policy,
+    actionHandlers: handlers,
+    clock: opts.clock,
+    now: opts.now,
+  });
+
+  // Compose: backlog-due → existing scheduled-flow source → optional reactive.
+  const backlogSrc = makeBacklogTriggerSource(
+    () => loadBacklog(opts.backlogPath),
+    opts.clock ?? (() => new Date()),
+  );
+  const sources: TriggerSource[] = [backlogSrc, base.deps.triggerSource];
+  if (opts.reactiveSource) sources.push(opts.reactiveSource);
+  base.deps.triggerSource = makeHybridTriggerSource(sources);
+
+  // G2/G3 policy gate: backlog entries route through decidePolicy; non-backlog
+  // triggers (scheduled-flow, reactive) return 'auto' (authority-only flow).
+  const policyGate: PolicyGate = {
+    decide(trigger) {
+      const entry = (trigger.payload as { entry?: BacklogEntry } | undefined)?.entry;
+      if (!entry) {
+        return { decision: 'auto', reason: 'no entry (non-backlog trigger) → authority-only' };
+      }
+      return decidePolicy(entry);
+    },
+  };
+  base.deps.policyGate = policyGate;
+
+  return base;
 }
 
 // ─── Continuous tick loop ─────────────────────────────────────────────

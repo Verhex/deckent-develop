@@ -689,6 +689,40 @@ const MESSAGES: MessageMap = {
     tr: '  - {ts} {action} -> {outcome}: {reason}',
   },
 
+  // ─── autonomous backlog subcommand (Task 7) ──────────────────────────
+  'autonomous.backlog.added': {
+    en: 'Backlog entry added: {id}',
+    tr: 'Backlog kaydı eklendi: {id}',
+  },
+  'autonomous.backlog.removed': {
+    en: 'Backlog entry removed: {id}',
+    tr: 'Backlog kaydı silindi: {id}',
+  },
+  'autonomous.backlog.empty': {
+    en: 'No backlog entries.',
+    tr: 'Backlog kaydı yok.',
+  },
+  'autonomous.backlog.not_found': {
+    en: 'Backlog entry not found: {id}',
+    tr: 'Backlog kaydı bulunamadı: {id}',
+  },
+  'autonomous.backlog.duplicate': {
+    en: 'Backlog entry already exists: {id}',
+    tr: 'Backlog kaydı zaten var: {id}',
+  },
+  'autonomous.backlog.summary': {
+    en: 'Backlog: {total} entries — pending:{pending} running:{running} parked:{parked} done:{done} failed:{failed}',
+    tr: 'Backlog: {total} kayıt — bekleyen:{pending} çalışan:{running} beklemede:{parked} tamam:{done} hata:{failed}',
+  },
+  'autonomous.backlog.list_header': {
+    en: 'Backlog ({count} entries):',
+    tr: 'Backlog ({count} kayıt):',
+  },
+  'autonomous.backlog.list_row': {
+    en: '  - [{status}] {id}: {title} (kind:{kind} policy:{policy})',
+    tr: '  - [{status}] {id}: {title} (tür:{kind} politika:{policy})',
+  },
+
   // ─── memory backup subcommand ──────────────────────────────────
   'memory.backup.desc': {
     en: 'Create a WAL-safe backup of memory.db',
