@@ -592,13 +592,18 @@ export function registerAutonomous(program: Command): void {
     });
 
   backlog
-    .command('remove <id>')
-    .description('Remove an entry from the autonomous backlog')
+    .command('remove [id]')
+    .description('Remove an entry from the autonomous backlog (positional id or --id)')
+    .option('--id <id>', 'Entry id to remove (consistent with `backlog add --id`; alternative to the positional argument)')
     .option('--root <path>', 'Project root override')
     .option('--lang <code>', 'Language override (en|tr)')
-    .action((id: string, opts: { root?: string; lang?: string }) => {
+    .action((positionalId: string | undefined, opts: { id?: string; root?: string; lang?: string }) => {
       try {
         const lang = getLanguage(opts.lang);
+        const id = opts.id ?? positionalId;
+        if (!id) {
+          throw new Error(getMessage('autonomous.backlog.id_required', lang));
+        }
         const root = opts.root ?? resolveProjectRoot();
         backlogRemove({ root, id, lang });
         print(getMessage('autonomous.backlog.removed', lang, { id }));
