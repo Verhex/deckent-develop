@@ -14,7 +14,7 @@ export interface ExecuteDispatcherDeps {
   config: ResolvedConfig;
   /** Injected runTaskMode (kind=task). */
   runTask: (
-    ctx: { projectRoot: string; description: string; model?: string; scope?: { directories: string[] } },
+    ctx: { projectRoot: string; description: string; model?: string; provider?: string; scope?: { directories: string[] } },
     config: ResolvedConfig,
   ) => unknown;
   /** Injected runSprint (kind=sprint). */
@@ -31,11 +31,17 @@ export function makeExecuteDispatcher(deps: ExecuteDispatcherDeps): ActionHandle
       if (entry.kind === 'sprint') {
         await deps.runSprint(deps.projectRoot, deps.config);
       } else {
+        // The dispatcher forwards the entry's full provider/model intent. The real
+        // runTaskMode adapter (wired in the composition root, engine task 7) maps these
+        // to the worker spawn; per-task provider routing for single-task mode follows
+        // the same path sprint mode already uses via the worker backend. Forwarding here
+        // preserves intent rather than silently dropping it.
         deps.runTask(
           {
             projectRoot: deps.projectRoot,
             description: entry.spec.description ?? entry.title,
             model: entry.model,
+            provider: entry.provider,
             scope: { directories: [entry.spec.scopeDir ?? '.'] },
           },
           deps.config,

@@ -19,6 +19,7 @@ describe('execute-dispatcher', () => {
     expect(runSprint).not.toHaveBeenCalled();
     const ctx = runTask.mock.calls[0]![0];
     expect(ctx.model).toBe('qwen3.6:27b');
+    expect(ctx.provider).toBe('ollama');
   });
 
   it('kind=sprint → runSprint invoked', async () => {
@@ -48,5 +49,20 @@ describe('execute-dispatcher', () => {
   it('AUTONOMOUS_EXECUTE_ACTION constant is exported and stable', async () => {
     const mod = await import('../../../src/orchestra/autonomous/execute-dispatcher.js');
     expect(mod.AUTONOMOUS_EXECUTE_ACTION).toBe('autonomous.execute');
+  });
+
+  it('runSprint rejecting → failure with error', async () => {
+    const runSprint = vi.fn().mockRejectedValue(new Error('sprint-fail'));
+    const handler = makeExecuteDispatcher({ projectRoot: '/p', config: {} as never, runTask: vi.fn(), runSprint });
+    const res = await handler('autonomous.execute', { entry: { ...taskEntry, kind: 'sprint', spec: { directivesRef: 'D.md' } } });
+    expect(res.outcome).toBe('failure');
+    expect(res.error).toContain('sprint-fail');
+  });
+
+  it('falls back to entry.title when spec.description is absent', async () => {
+    const runTask = vi.fn().mockReturnValue({ ok: true });
+    const handler = makeExecuteDispatcher({ projectRoot: '/p', config: {} as never, runTask, runSprint: vi.fn() });
+    await handler('autonomous.execute', { entry: { ...taskEntry, title: 'My Title', spec: { scopeDir: '.' } } });
+    expect(runTask.mock.calls[0]![0].description).toBe('My Title');
   });
 });
