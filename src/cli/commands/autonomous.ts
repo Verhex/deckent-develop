@@ -202,7 +202,7 @@ export async function handleStart(opts: AutonomousStartOptions): Promise<void> {
 
   const intervalMs = opts.intervalMs !== undefined
     ? Math.max(0, parseInt(opts.intervalMs, 10) || 0)
-    : (resolvedConfig.autonomous.interval_ms ?? 1000);
+    : (resolvedConfig.autonomous.interval_ms ?? 5000);
   const maxIterations = opts.maxIterations !== undefined
     ? Math.max(0, parseInt(opts.maxIterations, 10) || 0)
     : undefined;

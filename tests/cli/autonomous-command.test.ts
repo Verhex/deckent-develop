@@ -21,6 +21,7 @@ import {
   handleStatus,
   handleStop,
 } from '../../src/cli/commands/autonomous.js';
+import { useSandboxHome } from '../helpers/sandbox-home.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────
 
@@ -63,6 +64,11 @@ function captureStdout(fn: () => void | Promise<void>): Promise<string> {
 
 describe('deckent autonomous CLI (226-007)', () => {
   let root: string;
+
+  // Isolate HOME so loadConfig cannot read the real ~/.deckent/config.json.
+  const { beforeEach: sandboxBefore, afterEach: sandboxAfter } = useSandboxHome();
+  beforeEach(sandboxBefore);
+  afterEach(sandboxAfter);
 
   beforeEach(() => {
     root = mkRoot();
