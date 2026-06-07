@@ -119,6 +119,14 @@ describe('deckent autonomous CLI (226-007)', () => {
   });
 
   it('start → loop kurar, maxIterations=1 ile temiz biter (idle, no flows)', async () => {
+    // Enable autonomous engine via config (flag-gate requires autonomous.enabled=true).
+    const configDir = join(root, '.deckent');
+    mkdirSync(configDir, { recursive: true });
+    writeFileSync(
+      join(configDir, 'config.json'),
+      JSON.stringify({ autonomous: { enabled: true } }, null, 2),
+      'utf-8',
+    );
     const out = await captureStdout(() =>
       handleStart({ root, lang: 'en', intervalMs: '1', maxIterations: '1' }),
     );
@@ -129,7 +137,27 @@ describe('deckent autonomous CLI (226-007)', () => {
     expect(existsSync(eventsFile)).toBe(false);
   });
 
+  it('start refuses when autonomous.enabled is false (flag-gate)', async () => {
+    // No config written → autonomous.enabled is undefined/falsy → engine must NOT run.
+    const out = await captureStdout(() =>
+      handleStart({ root, lang: 'en', intervalMs: '1', maxIterations: '1' }),
+    );
+    expect(out).toContain('Autonomous mode is disabled');
+    // Loop never ran — no banner, no "finished" line.
+    expect(out).not.toContain('Autonomous runtime started');
+    expect(out).not.toContain('Autonomous loop finished');
+  });
+
   it('default-deny korunur — bilinmeyen tenant flow → audit "denied", oto-exec yok', async () => {
+    // Enable autonomous engine via config (flag-gate requires autonomous.enabled=true).
+    const configDir = join(root, '.deckent');
+    mkdirSync(configDir, { recursive: true });
+    writeFileSync(
+      join(configDir, 'config.json'),
+      JSON.stringify({ autonomous: { enabled: true } }, null, 2),
+      'utf-8',
+    );
+
     // Plant a flow whose tenantId is not a known role → authority adapter denies.
     writeFlow(root, {
       id: 'flow-external',

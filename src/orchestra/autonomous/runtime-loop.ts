@@ -136,6 +136,8 @@ export interface BuildEngineRuntimeOptions {
   reactiveSource?: TriggerSource;
   clock?: () => Date;
   now?: () => string;
+  /** Optional persistence path for the approval-adapter pending queue (forwarded to inner buildAutonomousRuntime). */
+  pendingPath?: string;
 }
 
 /**
@@ -166,6 +168,7 @@ export function buildEngineRuntime(
     actionHandlers: handlers,
     clock: opts.clock,
     now: opts.now,
+    pendingPath: opts.pendingPath,
   });
 
   // Compose: backlog-due → existing scheduled-flow source → optional reactive.
