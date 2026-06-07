@@ -54,4 +54,42 @@ describe('backlog store', () => {
     const reloaded = loadBacklog(path);
     expect(reloaded.entries[0]!.status).toBe('running');
   });
+
+  // I3: loadBacklog throws when entries is not an array
+  it('throws when entries is not an array', () => {
+    writeFileSync(path, JSON.stringify({ _version: '1.0', entries: { bad: true } }));
+    expect(() => loadBacklog(path)).toThrow(/entries must be an array/);
+  });
+
+  // I4: loadBacklog throws on a stored entry with an invalid kind
+  it('throws on loadBacklog when a stored entry has an invalid kind', () => {
+    writeFileSync(path, JSON.stringify({ _version: '1.0', entries: [{ ...entry(), kind: 'bogus' }] }));
+    expect(() => loadBacklog(path)).toThrow(/Invalid backlog entry/);
+  });
+
+  // M1: updateStatus writes lastResult and lastRun when result provided
+  it('updateStatus writes lastResult and lastRun when result provided', () => {
+    writeFileSync(path, JSON.stringify({ _version: '1.0', entries: [entry({ id: 'a' })] }));
+    const bl = loadBacklog(path);
+    updateStatus(path, bl, 'a', 'done', { ok: true, reason: 'ok' });
+    const reloaded = loadBacklog(path);
+    expect(reloaded.entries[0]!.lastResult?.ok).toBe(true);
+    expect(reloaded.entries[0]!.lastRun).toBeTruthy();
+  });
+
+  // M2: updateStatus throws on unknown id
+  it('updateStatus throws on unknown id', () => {
+    writeFileSync(path, JSON.stringify({ _version: '1.0', entries: [entry({ id: 'a' })] }));
+    const bl = loadBacklog(path);
+    expect(() => updateStatus(path, bl, 'ghost', 'done', null)).toThrow(/not found/);
+  });
+
+  // I2 coverage: empty title and array-spec validation
+  it('rejects an entry with an empty title', () => {
+    expect(validateBacklogEntry({ ...entry(), title: '' })).toMatch(/title/);
+  });
+
+  it('rejects an entry with an array spec', () => {
+    expect(validateBacklogEntry({ ...entry(), spec: [] })).toMatch(/spec/);
+  });
 });
