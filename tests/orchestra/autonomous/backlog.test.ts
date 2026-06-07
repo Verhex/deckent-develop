@@ -92,4 +92,11 @@ describe('backlog store', () => {
   it('rejects an entry with an array spec', () => {
     expect(validateBacklogEntry({ ...entry(), spec: [] })).toMatch(/spec/);
   });
+
+  it('queryDue also surfaces pending reactive entries', () => {
+    const bl = { _version: '1.0', entries: [
+      { id: 'r', title: 't', kind: 'task' as const, spec: {}, policy: 'auto' as const, trigger: { type: 'reactive' as const, detector: 'x' }, status: 'pending' as const, lastRun: null, lastResult: null },
+    ]};
+    expect(queryDue(bl, new Date()).map(e => e.id)).toEqual(['r']);
+  });
 });
