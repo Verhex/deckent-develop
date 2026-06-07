@@ -28,7 +28,8 @@ path to proving AS-6 on real work. (The dogfood is a *separate* effort tracked i
 
 ### Goals
 1. A **declarative reactive-map** (`.deckent/autonomous/reactive-map.json`) that maps a
-   detection (by detector type + minimum severity) to a backlog-entry template.
+   detection (by the detector's `groupKey` and/or a minimum `risk`/`severity`) to a
+   backlog-entry template.
 2. A **reactive ingester** that, given a normalized reactive event, maps it to a
    `BacklogEntry`, **dedups** against existing pending/running reactive entries, and
    **appends it to the durable backlog** (atomic).
@@ -78,8 +79,8 @@ New modules under `src/orchestra/autonomous/reactive/`:
 
 | Module | Responsibility | Depends on |
 |--------|----------------|-----------|
-| `reactive-types.ts` | `ReactiveEvent {sourceType, detectorType, severity, signature, payload}`; `ReactiveRule {match:{detectorType, minSeverity?}, entryTemplate, dedupKey?}`; `ReactiveMapFile {_version, rules[]}` | — |
-| `reactive-map.ts` | `loadReactiveMap(path): ReactiveMapFile` (missing → empty); `validateReactiveRule`; `mapEventToEntry(event, map, idGen): BacklogEntry \| null` (first matching rule by type + severity; instantiates the template) | backlog-types, reactive-types |
+| `reactive-types.ts` | `ReactiveEvent {sourceType, risk, severity?, groupKey?, metadata?}` (mirrors the fields a `DetectorResult` actually carries — it has NO detector-type field); `ReactiveRule {match:{groupKey?, minRisk?, minSeverity?}, entryTemplate, dedupKey?}`; `ReactiveMapFile {_version, rules[]}` | — |
+| `reactive-map.ts` | `loadReactiveMap(path): ReactiveMapFile` (missing → empty); `validateReactiveRule`; `mapEventToEntry(event, map, idGen): BacklogEntry \| null` (first rule whose specified criteria all match — `groupKey` equality if given, `risk`/`severity` at-or-above threshold if given; instantiates the template) | backlog-types, reactive-types |
 | `reactive-ingester.ts` | `makeReactiveIngester({backlogPath, map, now}) → { ingest(event): 'written'\|'deduped'\|'unmatched' }` — map → dedup (skip if a `pending`/`running` entry with the same reactive dedup-key exists) → atomic append via `loadBacklog`/`atomicWriteFileSync` | backlog, reactive-map |
 | `nervous-reactive-source.ts` | `makeNervousReactiveSource({observer, ingester}) → { start(), stop() }` — subscribes to `observer.on('detection', (result, event) => ingester.ingest(normalize(result, event)))`; `stop()` removes the listener | reactive-ingester, nervous types |
 
@@ -107,7 +108,7 @@ nervous observer 'detection'(result,event)
   "_version": "1.0",
   "rules": [
     {
-      "match": { "detectorType": "debt_trend", "minSeverity": "warn" },
+      "match": { "groupKey": "debt_trend", "minRisk": "medium" },
       "entryTemplate": {
         "kind": "task",
         "policy": "approval-required",
@@ -120,12 +121,12 @@ nervous observer 'detection'(result,event)
 }
 ```
 `mapEventToEntry` instantiates the template into a `BacklogEntry`: generated `id`
-(prefix + dedup signature), `title` from `titlePrefix` + detector summary, `kind`/`policy`/
-`spec`/`provider?`/`model?` from the template, `trigger: {type:'reactive', detector:<detectorType>}`,
-`status: 'pending'`. The detection payload is folded into `spec.description` for context.
+(prefix + dedup key), `title` from `titlePrefix` + a short detection summary, `kind`/`policy`/
+`spec`/`provider?`/`model?` from the template, `trigger: {type:'reactive', detector:<groupKey ?? 'nervous'>}`,
+`status: 'pending'`. The detection `risk`/`severity`/`metadata` are folded into `spec.description` for context.
 
 ### Dedup
-The ingester computes a reactive dedup-key = `rule.dedupKey ?? event.detectorType`. Before
+The ingester computes a reactive dedup-key = `rule.dedupKey ?? event.groupKey ?? event.risk`. Before
 appending, it scans the backlog; if any entry with `trigger.type==='reactive'` and the same
 derived key is already `pending` or `running`, it returns `'deduped'` and writes nothing.
 This stops a continuously-firing detector from flooding the backlog.
@@ -149,7 +150,7 @@ This stops a continuously-firing detector from flooding the backlog.
 ## 6. Testing (hermetic)
 
 - `reactive-map.ts`: load (valid / missing→empty / malformed), `validateReactiveRule`,
-  `mapEventToEntry` (match, no-match, severity threshold, template instantiation fields).
+  `mapEventToEntry` (groupKey match, no-match, risk/severity threshold at-or-above, template instantiation fields).
 - `reactive-ingester.ts`: writes an entry on match; returns `'unmatched'` (no write) on no
   rule; returns `'deduped'` (no write) when a pending/running reactive entry with the same
   key exists; atomic append preserves existing entries. tmpdir backlog.
