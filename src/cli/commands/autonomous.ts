@@ -42,6 +42,10 @@ import { runTaskMode } from '../../orchestra/task-mode-runner.js';
 import { runSprint as runSprintLifecycle } from '../../orchestra/sprint-controller.js';
 import { loadConfig } from '../../core/config.js';
 import type { ModelType } from '../../core/types.js';
+import { loadReactiveMap } from '../../orchestra/autonomous/reactive/reactive-map.js';
+import { makeReactiveIngester } from '../../orchestra/autonomous/reactive/reactive-ingester.js';
+import { makeNervousReactiveSource } from '../../orchestra/autonomous/reactive/nervous-reactive-source.js';
+import { NervousObserver } from '../../nervous/observer.js';
 
 // ─── Filesystem layout helpers ────────────────────────────────────────
 
@@ -196,6 +200,23 @@ export async function handleStart(opts: AutonomousStartOptions): Promise<void> {
     runSprint: (projectRoot) => runSprintLifecycle(projectRoot, sprintConfig),
   });
 
+  // Reactive ingestion (sub-project 2) — flag-gated, additional to autonomous.enabled.
+  let reactiveSource: { start(): void; stop(): void } | null = null;
+  let reactiveObserver: NervousObserver | null = null;
+  if (resolvedConfig.autonomous.reactive?.enabled) {
+    const mapPath = join(root, resolvedConfig.autonomous.reactive.map_path ?? '.deckent/autonomous/reactive-map.json');
+    const reactiveMap = loadReactiveMap(mapPath);
+    let rxCounter = 0;
+    const ingester = makeReactiveIngester({
+      backlogPath,
+      map: reactiveMap,
+      idGen: () => `rx-${new Date().toISOString()}-${++rxCounter}`,
+    });
+    reactiveObserver = new NervousObserver(root);
+    reactiveSource = makeNervousReactiveSource({ observer: reactiveObserver, ingester });
+    reactiveSource.start();
+  }
+
   const controller = new AbortController();
   const sigintHandler = (): void => controller.abort();
   process.on('SIGINT', sigintHandler);
@@ -236,6 +257,10 @@ export async function handleStart(opts: AutonomousStartOptions): Promise<void> {
     }));
   } finally {
     process.off('SIGINT', sigintHandler);
+    reactiveSource?.stop();
+    // Ensure the observer releases any timers/watchers it started so the
+    // process (and tests) can exit cleanly.
+    reactiveObserver?.stop?.();
   }
 }
 
