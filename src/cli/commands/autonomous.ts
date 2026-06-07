@@ -18,7 +18,7 @@ import { resolveProjectRoot } from '../helpers/process.js';
 import { print, printError } from '../helpers/output.js';
 import { getLanguage, getMessage } from '../helpers/messages.js';
 import {
-  buildAutonomousRuntime,
+  buildEngineRuntime,
   runAutonomousLoop,
 } from '../../orchestra/autonomous/runtime-loop.js';
 import {
@@ -28,7 +28,6 @@ import {
 import { FlowRegistry } from '../../core/flow-registry.js';
 import { notifyAsync } from '../../core/notify.js';
 import { bootstrapNotifyDispatcher } from '../../core/notify-bootstrap.js';
-import type { ActionHandler } from '../../nervous/executor.js';
 import type { ScheduledFlow } from '../../core/scheduled-flow.js';
 import type { SelfDispatchPolicy } from '../../core/self-dispatch.js';
 import type {
@@ -36,8 +35,13 @@ import type {
   AutonomousRuntimeConfig,
 } from '../../orchestra/autonomous-runtime.js';
 import { loadBacklog, validateBacklogEntry } from '../../orchestra/autonomous/backlog.js';
+import { recoverBacklog } from '../../orchestra/autonomous/execution-pool.js';
 import { atomicWriteFileSync } from '../../agents/worker-lifecycle.js';
 import type { BacklogEntry } from '../../orchestra/autonomous/backlog-types.js';
+import { runTaskMode } from '../../orchestra/task-mode-runner.js';
+import { runSprint as runSprintLifecycle } from '../../orchestra/sprint-controller.js';
+import { loadConfig } from '../../core/config.js';
+import type { ModelType } from '../../core/types.js';
 
 // ─── Filesystem layout helpers ────────────────────────────────────────
 
@@ -151,29 +155,54 @@ export async function handleStart(opts: AutonomousStartOptions): Promise<void> {
   const root = opts.root ?? resolveProjectRoot();
   ensureAutonomousDir(root);
 
+  // Flag-gate (safety invariant): the engine never runs unless explicitly enabled.
+  const resolvedConfig = await loadConfig(root);
+  if (!resolvedConfig.autonomous?.enabled) {
+    print(getMessage('autonomous.disabled', lang));
+    return;
+  }
+
   // Clear any stale stop marker before starting.
   const stopFile = stopMarkerPath(root);
   if (existsSync(stopFile)) rmSync(stopFile);
 
+  const backlogPath = join(root, resolvedConfig.autonomous.backlog_path ?? '.deckent/autonomous/backlog.json');
+  // Crash recovery: any entry left 'running' by a prior crash → back to 'pending'.
+  recoverBacklog(backlogPath);
+
   const flows = loadFlows(root);
   const policy = defaultPolicy();
-  // Empty action-handlers: no auto-sprint-start. Cleared actions still go
-  // through the authority adapter → default-deny / approval-gate first.
-  const actionHandlers = new Map<string, ActionHandler>();
 
-  const { deps } = buildAutonomousRuntime({
+  // runTaskMode requires task-style config; runSprint requires sprint-style.
+  // Clone the resolved config per execution kind (shallow override is enough —
+  // nested config is read-only here).
+  const taskConfig = { ...resolvedConfig, deckent_style: 'task' as const };
+  const sprintConfig = { ...resolvedConfig, deckent_style: 'sprint' as const };
+
+  const { deps } = buildEngineRuntime({
     projectRoot: root,
+    config: resolvedConfig,
+    backlogPath,
     flows,
     policy,
-    actionHandlers,
     pendingPath: pendingPath(root),
+    runTask: (ctx) => runTaskMode({
+      description: ctx.description,
+      model: ctx.model as ModelType | undefined,
+      scope: ctx.scope,
+      projectRoot: ctx.projectRoot ?? root,
+      autoApprove: true,
+    }, taskConfig),
+    runSprint: (projectRoot) => runSprintLifecycle(projectRoot, sprintConfig),
   });
 
   const controller = new AbortController();
   const sigintHandler = (): void => controller.abort();
   process.on('SIGINT', sigintHandler);
 
-  const intervalMs = Math.max(0, parseInt(opts.intervalMs ?? '1000', 10) || 0);
+  const intervalMs = opts.intervalMs !== undefined
+    ? Math.max(0, parseInt(opts.intervalMs, 10) || 0)
+    : (resolvedConfig.autonomous.interval_ms ?? 5000);
   const maxIterations = opts.maxIterations !== undefined
     ? Math.max(0, parseInt(opts.maxIterations, 10) || 0)
     : undefined;
@@ -192,9 +221,9 @@ export async function handleStart(opts: AutonomousStartOptions): Promise<void> {
       resolve();
     }, ms));
 
-  const config: AutonomousRuntimeConfig = {};
+  const loopConfig: AutonomousRuntimeConfig = {};
   try {
-    const summary = await runAutonomousLoop(config, deps, {
+    const summary = await runAutonomousLoop(loopConfig, deps, {
       intervalMs,
       maxIterations,
       signal: controller.signal,

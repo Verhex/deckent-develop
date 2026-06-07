@@ -615,6 +615,10 @@ const MESSAGES: MessageMap = {
   },
 
   // ─── autonomous command (Sprint 228 — 228-001 i18n retrofit) ─────────
+  'autonomous.disabled': {
+    en: 'Autonomous mode is disabled. Set config.autonomous.enabled=true (.deckent/config.json) to run the engine.',
+    tr: 'Otonom mod kapalı. Motoru çalıştırmak için config.autonomous.enabled=true yapın (.deckent/config.json).',
+  },
   'autonomous.start_banner': {
     en: 'Autonomous runtime started — {flows} flow(s), default-deny + approval-gate active',
     tr: 'Otonom runtime başladı — {flows} flow, default-deny + onay-kapısı aktif',
