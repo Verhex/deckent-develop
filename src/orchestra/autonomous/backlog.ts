@@ -45,13 +45,17 @@ export function loadBacklog(path: string): BacklogFile {
 }
 
 /**
- * Pending one-off entries that are due now. Recurring-entry timing is owned by
- * the FlowScheduler in the trigger layer (Task 5), so queryDue surfaces only
- * one-off pending entries here — recurring/reactive return not-due by design
- * (NOT a stub: the scheduler/reactive source own those paths).
+ * Pending entries that are due now and should be dispatched by the engine.
+ * Surfaces `trigger.type === 'one-off'` (explicit one-shot) and
+ * `trigger.type === 'reactive'` (written by the reactive ingester — always
+ * due once pending). Recurring-entry timing is owned by the FlowScheduler
+ * in the trigger layer; `trigger.type === 'recurring'` entries are not
+ * surfaced here (the scheduler manages their cron cadence).
  */
 export function queryDue(bl: BacklogFile, _now: Date): BacklogEntry[] {
-  return bl.entries.filter((e) => e.status === 'pending' && e.trigger.type === 'one-off');
+  return bl.entries.filter(
+    (e) => e.status === 'pending' && (e.trigger.type === 'one-off' || e.trigger.type === 'reactive'),
+  );
 }
 
 /** Mutate one entry's status + lastResult and write the whole backlog atomically. */

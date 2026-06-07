@@ -360,6 +360,13 @@ export interface DeckentConfig {
     backlog_path?: string;
     /** Max concurrent autonomous executions (default: 1 — serial). */
     pool_size?: number;
+    /** Reactive trigger sub-block (flag-gated, default-off). Sprint autonomous-reactive. */
+    reactive?: {
+      /** Enable reactive trigger bridge (default: false). */
+      enabled: boolean;
+      /** Path to the reactive trigger map JSON, relative to project root. */
+      map_path?: string;
+    };
   };
 
   // ─── Runtime Style ─────────────────────────────────────────────────

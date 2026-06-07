@@ -194,4 +194,31 @@ describe('deckent autonomous CLI (226-007)', () => {
     expect(out).toContain('Autonomous runtime status');
     expect(out).toContain('Pending approvals: 0');
   });
+
+  it('start with reactive disabled runs the engine loop unchanged', async () => {
+    // Config: autonomous.enabled:true, reactive absent — reactive branch must be skipped.
+    const configDir = join(root, '.deckent');
+    mkdirSync(configDir, { recursive: true });
+    writeFileSync(
+      join(configDir, 'config.json'),
+      JSON.stringify({ autonomous: { enabled: true } }, null, 2),
+      'utf-8',
+    );
+    await expect(handleStart({ root, lang: 'en', intervalMs: '1', maxIterations: '1' })).resolves.toBeUndefined();
+  });
+
+  it('start with reactive enabled + empty reactive-map attaches + tears down cleanly', async () => {
+    // Config: autonomous.enabled:true + autonomous.reactive.enabled:true.
+    // No reactive-map file on disk → loadReactiveMap returns empty {rules:[]}.
+    // Key assertion: handleStart resolves cleanly (constructs observer+ingester+source,
+    // runs 1 iteration, tears down — no hang, no leaked handle).
+    const configDir = join(root, '.deckent');
+    mkdirSync(configDir, { recursive: true });
+    writeFileSync(
+      join(configDir, 'config.json'),
+      JSON.stringify({ autonomous: { enabled: true, reactive: { enabled: true } } }, null, 2),
+      'utf-8',
+    );
+    await expect(handleStart({ root, lang: 'en', intervalMs: '1', maxIterations: '1' })).resolves.toBeUndefined();
+  });
 });

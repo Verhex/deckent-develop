@@ -148,8 +148,15 @@ registers the execute-dispatcher under the backlog action, installs the hybrid t
 
 - **No MCP tool yet.** `deckent autonomous` (start/backlog/status) is CLI-only; there is
   no `deckent_autonomous*` MCP tool. CLI/MCP parity is a follow-up.
-- **Reactive triggers** (nervous detectors / webhooks / repo-watch) are accepted through
-  a typed adapter interface but their breadth is sub-project 2.
+- **Reactive triggers (sub-project 2 — first slice landed, attach-only).** A nervous-detector
+  bridge is built and unit-tested: a detection → declarative reactive-map
+  (`.deckent/autonomous/reactive-map.json`, match on `groupKey`/`risk`/`severity`) → a
+  durable backlog entry (via an ingester, deduped), flag-gated by
+  `config.autonomous.reactive.enabled` (default-off). It is **attach-only** in `start`: the
+  nervous observer is not driven and built-in detectors are EXECUTE-phase-gated, so **live
+  detections do not yet flow**. Making detections actually flow (driving the observer /
+  user-registered detectors) and the **webhook + repo-watch** sources are the sub-project 2
+  continuation.
 - **Concurrency** is serial in pass 1 (`ExecutionPool` size 1); the interface is built so
   a bounded concurrent pool swaps in without loop changes.
 - **`deckent solo/develop/enterprise` packaging** is a future modular-install direction;
