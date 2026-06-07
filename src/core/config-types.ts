@@ -349,6 +349,19 @@ export interface DeckentConfig {
   /** Proactive meta-orchestrator nervous system configuration (Sprint 147+) */
   nervous_system?: NervousSystemConfig;
 
+  // ─── Autonomous Engine ──────────────────────────────────────────────
+  /** Autonomous execution engine configuration (Sprint 226 — Task 7). Default-disabled. */
+  autonomous?: {
+    /** Enable autonomous engine (default: false — flag-gated, ADR-040). */
+    enabled: boolean;
+    /** Idle-tick interval in ms (default: 5000). */
+    interval_ms?: number;
+    /** Path to backlog.json relative to project root (default: '.deckent/autonomous/backlog.json'). */
+    backlog_path?: string;
+    /** Max concurrent autonomous executions (default: 1 — serial). */
+    pool_size?: number;
+  };
+
   // ─── Runtime Style ─────────────────────────────────────────────────
   /** Active runtime style — sprint (developer orchestration) or task (one-shot life assistant) */
   deckent_style?: 'sprint' | 'task';
@@ -580,6 +593,8 @@ export interface ResolvedConfig {
   timeout?: TimeoutConfig;
   /** Nervous system configuration (passed through from DeckentConfig) */
   nervous_system?: NervousSystemConfig;
+  /** Autonomous engine configuration (passed through from DeckentConfig). Default-disabled. */
+  autonomous?: DeckentConfig['autonomous'];
   /** Observability configuration (passed through from DeckentConfig) */
   observability?: DeckentConfig['observability'];
   /** Resolved runtime style — always 'sprint' or 'task' */

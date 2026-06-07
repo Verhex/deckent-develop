@@ -766,6 +766,20 @@ export function validateConfig(config: DeckentConfig): string[] {
     }
   }
 
+  // ─── Autonomous Engine validation ──────────────────────────────────
+  if (config.autonomous !== undefined) {
+    const au = config.autonomous;
+    if (typeof au.enabled !== 'boolean') {
+      errors.push('autonomous.enabled must be a boolean');
+    }
+    if (au.interval_ms !== undefined && (typeof au.interval_ms !== 'number' || au.interval_ms < 0)) {
+      errors.push('autonomous.interval_ms must be >= 0');
+    }
+    if (au.pool_size !== undefined && (typeof au.pool_size !== 'number' || !Number.isInteger(au.pool_size) || au.pool_size < 1)) {
+      errors.push('autonomous.pool_size must be an integer >= 1');
+    }
+  }
+
   // ─── deckent_style validation ───────────────────────────────────────
   if (config.deckent_style !== undefined && !['sprint', 'task'].includes(config.deckent_style)) {
     errors.push(`Invalid value '${config.deckent_style}' for field 'deckent_style'. Valid options: sprint, task`);
@@ -1007,6 +1021,13 @@ export function createDefaultConfig(): DeckentConfig {
     terminal: structuredClone(DEFAULT_TERMINAL_CONFIG),
     // Worker prompt tuning (Sprint 182 PQ-5 / F7 — ADR relevance threshold)
     prompt: structuredClone(DEFAULT_PROMPT_CONFIG),
+    // Autonomous Engine (disabled by default — flag-gated, ADR-040)
+    autonomous: {
+      enabled: false,
+      interval_ms: 5000,
+      backlog_path: '.deckent/autonomous/backlog.json',
+      pool_size: 1,
+    },
     // Nervous System (disabled by default — Sprint 148 will activate)
     nervous_system: {
       enabled: false,
@@ -1304,6 +1325,8 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
       : structuredClone(DEFAULT_TIMEOUT_CONFIG),
     // Nervous System — passed through from project config
     nervous_system: config.nervous_system,
+    // Autonomous Engine — passed through from project config
+    autonomous: config.autonomous,
     // Messaging connectors (BOT-001) — passed through; tokens .deck-interpolated below.
     notify_connectors: (config as DeckentConfig).notify_connectors,
     notify_on_complete: (config as DeckentConfig).notify_on_complete,

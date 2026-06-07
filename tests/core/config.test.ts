@@ -1138,6 +1138,44 @@ describe('routing_engine config — V2 default and propagation', () => {
   });
 });
 
+// ─── Autonomous Engine config validation ──────────────────────────
+
+describe('validateConfig — autonomous engine', () => {
+  it('accepts a valid autonomous block', () => {
+    const config = getDefaultConfig();
+    config.autonomous = { enabled: true, interval_ms: 1000, pool_size: 2 } as typeof config.autonomous;
+    expect(() => validateConfig(config)).not.toThrow();
+  });
+
+  it('rejects enabled=non-boolean', () => {
+    const config = getDefaultConfig();
+    (config.autonomous as Record<string, unknown>)['enabled'] = 'yes';
+    expect(() => validateConfig(config)).toThrow(ConfigValidationError);
+    expect(() => validateConfig(config)).toThrow('autonomous.enabled must be a boolean');
+  });
+
+  it('rejects interval_ms=-1', () => {
+    const config = getDefaultConfig();
+    config.autonomous = { ...config.autonomous, interval_ms: -1 };
+    expect(() => validateConfig(config)).toThrow(ConfigValidationError);
+    expect(() => validateConfig(config)).toThrow('autonomous.interval_ms');
+  });
+
+  it('rejects pool_size=0', () => {
+    const config = getDefaultConfig();
+    config.autonomous = { ...config.autonomous, pool_size: 0 };
+    expect(() => validateConfig(config)).toThrow(ConfigValidationError);
+    expect(() => validateConfig(config)).toThrow('autonomous.pool_size');
+  });
+
+  it('rejects pool_size=1.5 (non-integer)', () => {
+    const config = getDefaultConfig();
+    config.autonomous = { ...config.autonomous, pool_size: 1.5 };
+    expect(() => validateConfig(config)).toThrow(ConfigValidationError);
+    expect(() => validateConfig(config)).toThrow('autonomous.pool_size');
+  });
+});
+
 // ─── Sprint 072: Plan Tier Generalization ──────────────────────────
 
 describe('Plan tier generalization (sprint-072)', () => {

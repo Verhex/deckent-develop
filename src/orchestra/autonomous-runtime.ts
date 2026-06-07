@@ -111,12 +111,22 @@ export interface TriggerSource {
   next(): Promise<AutonomousTrigger | null> | AutonomousTrigger | null;
 }
 
+/** Per-task policy gate (G2 + G3). Optional; absent → legacy authority-only flow. */
+export type PolicyGateDecision = 'auto' | 'park';
+export interface PolicyDecisionResult { decision: PolicyGateDecision; reason: string; }
+
+export interface PolicyGate {
+  decide(trigger: AutonomousTrigger): PolicyDecisionResult;
+}
+
 export interface AutonomousRuntimeDeps {
   triggerSource: TriggerSource;
   authority: AuthorityChecker;
   approvalGate: ApprovalGate;
   executor: ActionExecutor;
   audit: AuditSink;
+  /** Optional per-task policy gate (G2/G3 — separate from RBAC authority, spec §3). */
+  policyGate?: PolicyGate;
   /** Optional clock for deterministic tests. */
   now?: () => string;
 }
@@ -170,6 +180,25 @@ export async function runAutonomousCycle(
     }
     if (approval.outcome === 'pending') {
       return finish(trigger, authority, approval, null, 'pending', approval.reason ?? 'awaiting approval', deps.audit, now);
+    }
+  }
+
+  // G2/G3 — per-task policy gate (separate from RBAC authority, spec §3). When it
+  // parks, route through the approval gate exactly like an authority needs_approval.
+  // Absent policyGate → legacy authority-only flow (backward compatible).
+  // `approval === null` guard: if the authority needs_approval path already
+  // obtained a human decision for this trigger, do NOT solicit a second approval.
+  if (deps.policyGate && approval === null) {
+    const policy = deps.policyGate.decide(trigger);
+    if (policy.decision === 'park') {
+      approval = await deps.approvalGate.request(trigger);
+      if (approval.outcome === 'rejected') {
+        return finish(trigger, authority, approval, null, 'rejected', approval.reason ?? policy.reason, deps.audit, now);
+      }
+      if (approval.outcome === 'pending') {
+        return finish(trigger, authority, approval, null, 'pending', approval.reason ?? policy.reason, deps.audit, now);
+      }
+      // approved → fall through to execute
     }
   }
 
