@@ -11,6 +11,7 @@ import { buildWorkerPrompt } from '../../orchestra/task-builder.js';
 import { resolveAgentPrompt, resolveSkillPrompts } from '../../orchestra/sprint-controller.js';
 import { SpawnBackendFactory } from '../../orchestra/spawn-backend.js';
 import { isAdapterProvider, getProviderAdapterForTask } from '../../orchestra/sprint-utils.js';
+import { ensureOllamaModelRegistered } from '../../core/model-registry.js';
 
 /**
  * Build a comma-separated allowedTools string from a task's scope.
@@ -44,8 +45,18 @@ export async function spawnWorkerMultiProvider(
   model: string,
   prompt: string,
   root: string,
-  opts: { autoApprove?: boolean; allowedTools?: string; spawnBackend?: string; dockerImage?: string; dockerTimeout?: number },
+  opts: { autoApprove?: boolean; allowedTools?: string; spawnBackend?: string; dockerImage?: string; dockerTimeout?: number; provider?: string },
 ): Promise<{ backend: string; provider: ProviderName }> {
+  // Resolve provider from registry. Dynamic ollama tags (e.g. qwen3.6:27b) are not in
+  // the static registry at process start — the sprint path calls ensureOllamaModelRegistered
+  // at plan-time, but the autonomous kind=task path and deckent run do not. When the caller
+  // passes opts.provider='ollama' (autonomous dispatcher forwards entry.provider), pre-register
+  // the tag before getProviderForModel so it resolves to 'ollama' instead of throwing
+  // UnknownModelError. Only ollama tags auto-register here; genuinely-unknown cloud models
+  // still throw (real-bug signal preserved).
+  if (opts.provider === 'ollama') {
+    ensureOllamaModelRegistered(model);
+  }
   const provider = getProviderForModel(model as ModelType);
 
   // Host-HTTP adapter providers (e.g. ollama) run via their host adapter

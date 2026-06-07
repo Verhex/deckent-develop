@@ -36,7 +36,12 @@ export function makeExecuteDispatcher(deps: ExecuteDispatcherDeps): ActionHandle
         // to the worker spawn; per-task provider routing for single-task mode follows
         // the same path sprint mode already uses via the worker backend. Forwarding here
         // preserves intent rather than silently dropping it.
-        deps.runTask(
+        //
+        // await is required: runTaskMode is async and failures from it (e.g. UnknownModelError,
+        // adapter errors) become unhandled rejections without await. The spawn itself is
+        // fire-and-forget inside spawnWorkerMultiProvider, so await here only waits for
+        // the launch handshake, not worker completion — no concurrency regression.
+        await deps.runTask(
           {
             projectRoot: deps.projectRoot,
             description: entry.spec.description ?? entry.title,

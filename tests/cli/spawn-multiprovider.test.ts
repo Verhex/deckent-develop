@@ -6,6 +6,10 @@
  * host adapter's spawn(), NOT to the docker/tmux/subprocess backend — even when
  * opts.spawnBackend='docker' is set. Mirrors sprint-spawner.ts's adapterRouted logic.
  *
+ * Also verifies the dynamic-tag pre-registration path: opts.provider='ollama' triggers
+ * ensureOllamaModelRegistered before getProviderForModel so tags like qwen3.6:27b
+ * (not in static catalog) resolve correctly in autonomous kind=task and deckent run.
+ *
  * Hermetic: all mocks prevent real subprocess/network calls.
  * Fix: 2026-06-08 — ADR-066/077/027
  */
@@ -20,6 +24,19 @@ vi.mock('../../src/orchestra/sprint-utils.js', async (importOriginal) => {
     ...actual,
     isAdapterProvider: vi.fn((p: string) => p === 'ollama'),
     getProviderAdapterForTask: vi.fn(),
+  };
+});
+
+// Spy on ensureOllamaModelRegistered without removing its real behavior.
+// This lets us assert it was called for dynamic tag pre-registration.
+vi.mock('../../src/core/model-registry.js', async (importOriginal) => {
+  const actual = await importOriginal() as Record<string, unknown>;
+  return {
+    ...actual,
+    ensureOllamaModelRegistered: vi.fn((tag: string, registry?: unknown) => {
+      // Call the real implementation to keep registry side-effects intact
+      (actual.ensureOllamaModelRegistered as (t: string, r?: unknown) => void)(tag, registry);
+    }),
   };
 });
 
@@ -55,6 +72,7 @@ vi.mock('../../src/orchestra/tmux.js', () => ({
 import { spawnWorkerMultiProvider } from '../../src/cli/commands/spawn.js';
 import { SpawnBackendFactory } from '../../src/orchestra/spawn-backend.js';
 import { getProviderAdapterForTask } from '../../src/orchestra/sprint-utils.js';
+import { ensureOllamaModelRegistered } from '../../src/core/model-registry.js';
 
 // ─── Tests ─────────────────────────────────────────────────────────────────────
 
@@ -179,6 +197,38 @@ describe('spawnWorkerMultiProvider — adapter-provider (ollama) routing', () =>
       'prompt',
       expect.objectContaining({ autoApprove: true }),
     );
+  });
+
+  // ── opts.provider='ollama' triggers ensureOllamaModelRegistered for dynamic tags ─
+  // Regression guard for the autonomous kind=task path: the dispatcher forwards
+  // entry.provider='ollama' so dynamic tags (qwen3.6:27b) are pre-registered before
+  // getProviderForModel is called — which would otherwise throw UnknownModelError for
+  // tags not in the static catalog.
+
+  it('calls ensureOllamaModelRegistered when opts.provider=ollama (dynamic tag pre-registration)', async () => {
+    await spawnWorkerMultiProvider(
+      't-ollama-006',
+      'qwen-coder-32b',
+      'prompt',
+      '/root',
+      { provider: 'ollama', spawnBackend: 'docker' },
+    );
+
+    expect(ensureOllamaModelRegistered).toHaveBeenCalledWith('qwen-coder-32b');
+    expect(adapterSpawnSpy).toHaveBeenCalledOnce();
+  });
+
+  it('does NOT call ensureOllamaModelRegistered when opts.provider is absent', async () => {
+    await spawnWorkerMultiProvider(
+      't-ollama-007',
+      'qwen-coder-32b',
+      'prompt',
+      '/root',
+      { spawnBackend: 'docker' },
+    );
+
+    expect(ensureOllamaModelRegistered).not.toHaveBeenCalled();
+    expect(adapterSpawnSpy).toHaveBeenCalledOnce();
   });
 });
 

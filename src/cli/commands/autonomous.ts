@@ -193,6 +193,7 @@ export async function handleStart(opts: AutonomousStartOptions): Promise<void> {
     runTask: (ctx) => runTaskMode({
       description: ctx.description,
       model: ctx.model as ModelType | undefined,
+      provider: ctx.provider,
       scope: ctx.scope,
       projectRoot: ctx.projectRoot ?? root,
       autoApprove: true,

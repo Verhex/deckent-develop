@@ -29,6 +29,12 @@ export interface TaskModeContext {
   };
   /** Model to use (default: 'sonnet') */
   model?: ModelType;
+  /**
+   * Provider hint forwarded from the autonomous dispatcher's backlog entry.
+   * When set to 'ollama', spawnWorkerMultiProvider calls ensureOllamaModelRegistered
+   * before getProviderForModel so dynamic tags (e.g. qwen3.6:27b) resolve correctly.
+   */
+  provider?: string;
   /** Timeout in milliseconds (default: 300_000 = 5 minutes) */
   timeoutMs?: number;
   /** Auto-approve tool calls */
@@ -104,7 +110,7 @@ export async function runTaskMode(
     // Never let event emission break task execution
   }
 
-  // Spawn worker
+  // Spawn worker — forward provider hint so dynamic ollama tags are pre-registered
   const { backend, provider } = await spawnWorkerMultiProvider(
     taskId,
     model,
@@ -115,6 +121,7 @@ export async function runTaskMode(
       spawnBackend: config.spawn_backend,
       dockerImage: config.docker_image,
       dockerTimeout: config.docker_timeout,
+      provider: ctx.provider,
     },
   );
 

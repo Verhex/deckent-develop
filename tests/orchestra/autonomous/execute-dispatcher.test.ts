@@ -65,4 +65,16 @@ describe('execute-dispatcher', () => {
     await handler('autonomous.execute', { entry: { ...taskEntry, title: 'My Title', spec: { scopeDir: '.' } } });
     expect(runTask.mock.calls[0]![0].description).toBe('My Title');
   });
+
+  // Regression guard: runTask is now awaited. A REJECTED Promise (async failure)
+  // must be caught by the surrounding try/catch and return outcome=failure — not
+  // escape as an unhandled rejection. This is distinct from the sync-throw test
+  // above (sync throws were always caught even without await).
+  it('runTask returning a rejected promise → outcome=failure (async rejection caught)', async () => {
+    const runTask = vi.fn().mockRejectedValue(new Error('async-boom'));
+    const handler = makeExecuteDispatcher({ projectRoot: '/p', config: {} as never, runTask, runSprint: vi.fn() });
+    const res = await handler('autonomous.execute', { entry: taskEntry });
+    expect(res.outcome).toBe('failure');
+    expect(res.error).toContain('async-boom');
+  });
 });
