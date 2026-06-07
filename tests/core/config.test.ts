@@ -1176,6 +1176,28 @@ describe('validateConfig — autonomous engine', () => {
   });
 });
 
+describe('validateConfig — autonomous.reactive', () => {
+  it('accepts a valid reactive block', () => {
+    const config = getDefaultConfig();
+    config.autonomous = { enabled: true, reactive: { enabled: true, map_path: '.deckent/autonomous/reactive-map.json' } };
+    expect(() => validateConfig(config)).not.toThrow();
+  });
+
+  it('rejects non-boolean reactive.enabled', () => {
+    const config = getDefaultConfig();
+    (config.autonomous as Record<string, unknown>)['reactive'] = { enabled: 'yes' };
+    expect(() => validateConfig(config)).toThrow(ConfigValidationError);
+    expect(() => validateConfig(config)).toThrow('autonomous.reactive.enabled');
+  });
+
+  it('rejects non-string reactive.map_path', () => {
+    const config = getDefaultConfig();
+    (config.autonomous as Record<string, unknown>)['reactive'] = { enabled: true, map_path: 5 };
+    expect(() => validateConfig(config)).toThrow(ConfigValidationError);
+    expect(() => validateConfig(config)).toThrow('autonomous.reactive.map_path');
+  });
+});
+
 // ─── Sprint 072: Plan Tier Generalization ──────────────────────────
 
 describe('Plan tier generalization (sprint-072)', () => {
