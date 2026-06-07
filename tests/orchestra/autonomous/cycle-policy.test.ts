@@ -73,4 +73,16 @@ describe('cycle policy gate (G2/G3 split from RBAC)', () => {
     expect(res.outcome).toBe('denied');
     expect(policyDecide).not.toHaveBeenCalled();
   });
+
+  it('authority needs_approval (approved) + policyGate=park → approvalGate.request called ONCE', async () => {
+    const requestSpy = vi.fn().mockResolvedValue({ outcome: 'approved', reason: 'yes' });
+    const d = deps({
+      authority: { check: () => ({ outcome: 'needs_approval', reason: 'risk' }) },
+      approvalGate: { request: requestSpy },
+      policyGate: { decide: () => ({ decision: 'park', reason: 'policy' }) },
+    });
+    const res = await runAutonomousCycle({}, d);
+    expect(res.outcome).toBe('executed');
+    expect(requestSpy).toHaveBeenCalledTimes(1);
+  });
 });

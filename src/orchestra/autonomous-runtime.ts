@@ -112,8 +112,11 @@ export interface TriggerSource {
 }
 
 /** Per-task policy gate (G2 + G3). Optional; absent → legacy authority-only flow. */
+export type PolicyGateDecision = 'auto' | 'park';
+export interface PolicyDecisionResult { decision: PolicyGateDecision; reason: string; }
+
 export interface PolicyGate {
-  decide(trigger: AutonomousTrigger): { decision: 'auto' | 'park'; reason: string };
+  decide(trigger: AutonomousTrigger): PolicyDecisionResult;
 }
 
 export interface AutonomousRuntimeDeps {
@@ -183,7 +186,9 @@ export async function runAutonomousCycle(
   // G2/G3 — per-task policy gate (separate from RBAC authority, spec §3). When it
   // parks, route through the approval gate exactly like an authority needs_approval.
   // Absent policyGate → legacy authority-only flow (backward compatible).
-  if (deps.policyGate) {
+  // `approval === null` guard: if the authority needs_approval path already
+  // obtained a human decision for this trigger, do NOT solicit a second approval.
+  if (deps.policyGate && approval === null) {
     const policy = deps.policyGate.decide(trigger);
     if (policy.decision === 'park') {
       approval = await deps.approvalGate.request(trigger);
