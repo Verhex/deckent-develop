@@ -807,4 +807,151 @@ Items surfaced during the Sprint 211 doc-consolidation audit that were intention
 
 ---
 
+## 14. Remaining Work — Complete Inventory (one line each, nothing skipped)
+
+> **Alperen 2026-06-08:** the full backlog of everything still to do, every item in one sentence, nothing omitted — **all of it is in scope (no P0-cut, no MVP); every item is built enterprise-grade, million-user by default.** This is the canonical checklist; codes cross-ref §4/§4A–§4H/§5/§7. Order here is grouping, not priority. (Build *sequence* is dependency-driven per §10A, starting from the canonical work-model foundation.)
+
+### A. Canonical Work-Model Foundation (everything rides on this — brainstorm in progress, hybrid two-axis + core-first)
+- [ ] **WM-1** Build a single canonical `ExecutionRequest` contract that unifies the 3 divergent execution paths (`deckent run` / `deckent start` / autonomous) across both CLI and MCP.
+- [ ] **WM-2** Reconcile the 5 incompatible `TaskType` enums (`decision-types`/`rubric-registry`/`task-router`/`adr-selector`/`routing-types`) into ONE source of truth and add a real persisted `type` field to `Task`.
+- [ ] **WM-3** Introduce `EnvironmentType` as a hybrid two-axis model (work-domain × execution-context) so code / email / ERP / web / data-pipeline work are all first-class.
+- [ ] **WM-4** Introduce `RequirementProfile` (capability + resource) so policy, routing, governance and the capability-broker derive from a task's declared needs.
+- [ ] **WM-5** Provider-free hard-enforcement: remove MCP-`run` `provider:'claude'` hardcode, fix autonomous-`runTaskMode` always-generic (inject agent/skill), guard the unconditional `CLAUDE_AUTH_REQUIRED=1`, and stop leaking Claude-only `claudeArgs`/`--dangerously-skip-permissions` to codex/gemini.
+- [ ] **WM-6** Wire `getEffectClass()` (exists at `rubric-registry.ts:375`) into the autonomous policy-gate so `risk-tagged` entries actually park instead of behaving identically to `auto`.
+
+### B. Provider Independence (F1)
+- [ ] **F1-004** Docker provider-aware CLI invocation (per-provider binary select + auth + build-arg).
+- [ ] **F1-005** `Dockerfile.worker` multi-CLI image (build-arg opt-in, depends F1-004).
+- [ ] **F1-009r** Per-provider models.dev model-catalog IDs + a live-keys end-to-end mixed-provider sprint test.
+- [ ] **F1-010** Dynamic subscription→API overflow load-balancing when a subscription hits its rate/quota limit.
+- [ ] **F1-012** Config-driven provider registry (`providers[]` any-key, zero-hardcode) that de-hardcodes all 3 registration sites in `provider.ts`.
+- [ ] **F1-014r** Runtime spawn-time per-worker auth-isolation non-leak (beyond the secret-map unit contract).
+- [ ] **F1-015** Amazon Bedrock native adapter via hand-rolled SigV4 (no AWS SDK, ADR-010) plus optional Vertex.
+- [ ] **F1-G** Gemini subscription/OAuth support (today `gemini.ts` throws without an API key).
+
+### C. Native Chat & REPL (F2 / F11 / §6)
+- [ ] **F2-008** Native SDK round-trip (Path C true standalone, zero-CLI-prerequisite).
+- [ ] **F11-014** Multi-provider native REPL parity so codex/gemini/ollama match claude quality (persistent + agentic).
+- [ ] **F11-016** Stabilize the Ink (React-for-CLI) REPL (cursor/queue/streaming cascade) and write the ADR for the ink+react runtime-dependency decision.
+- [ ] **CHAT-A** Path A dashboard-native chat tab fully hardened (embedded, host-CLI-free).
+- [ ] **CHAT-IDE** VS Code / JetBrains extension real implementation (currently a stub: sidebar, command palette, status bar, `deckent` command).
+
+### D. Process Mode & Autonomous (F3 / AS-6)
+- [ ] **F3-004** SessionBackend Kubernetes pod-exec.
+- [ ] **F3-008** Workflow Composer — declarative/visual multi-step DAG flow editor on top of scheduled-flow + flow-registry.
+- [ ] **AUT-1** Drive the nervous observer inside `autonomous start` so live detections actually flow (today attach-only).
+- [ ] **AUT-2** Webhook + repo-watch reactive trigger sources (sub-project 2 continuation).
+- [ ] **AUT-3** Fix the scheduled-flow→sprint bridge (authority double-block + only-`autonomous.execute`-handler) so user-configured flows actually run.
+- [ ] **AUT-4** Implement `nextRun()` full cron evaluation (today only the minute field is honored).
+- [ ] **AUT-5** Make recurring backlog entries executable (`queryDue()` currently excludes them; no cron-reset path).
+- [ ] **AUT-6** Backlog done/failed-entry purge + autonomous task-artifact cleanup (stray `task-run-*` files).
+- [ ] **AUT-7** Concurrent `ExecutionPool` activation (interface ready, serial-only today) with Brain backpressure to `OLLAMA_NUM_PARALLEL`.
+- [ ] **AUT-8** `deckent_autonomous*` MCP tool parity (no MCP control surface today).
+- [ ] **AUT-9** Sub-projects 3-5: work-generation/goal engine, autonomous dashboard control-plane, and the F3-008 workflow composer.
+- [ ] **AUT-10** Master-plan autonomous-dogfood culmination (feed this backlog to autonomous deckent under approval gates).
+
+### E. Enterprise Hardening (F4 / F10 / sub-#3)
+- [ ] **ENT-1** Hard-enforced RBAC — flip ADR-037 to V2 (today `checkWorkerAuthority` returns `true`, `enforceRbac` NO_OP by default).
+- [ ] **ENT-2** Hard multi-tenancy — replace the 6 hardcoded `tenantId:'local'` sites with real per-tenant isolation + SQLite row-level security.
+- [ ] **ENT-3** Audit immutability + causal lineage (causationId / correlationId / parent-trace) for SOC2/ISO-grade traceability.
+- [ ] **ENT-4** Secret vault for credentials.
+- [ ] **ENT-5** SSO/OIDC depth + SIEM forwarder + compliance report generator.
+- [ ] **F10-001** Unify RBAC + activation-rules + condition-evaluator under one declarative self-hosted policy engine.
+- [ ] **F10-002** Risk-tagged operation gating (`shell.exec` / `mail.send` / `erp.write` / `filesystem.delete` → mandatory approval).
+- [ ] **SEC-1** Sub-project #2 self-security (prompt/command guard + planner state-hygiene) — not started.
+- [ ] **SCALE-1** Sub-project #3 million-scale: `RemoteTokenAuthProvider` + mTLS, audit shard, TPM/HSM (PKCS#11), Redis-cluster rate-limit aggregation.
+- [ ] **SCALE-2** Sub-project #3-mesh distributed agent mesh (workers across nodes + cross-node scheduling + shared memory/lock coordination).
+
+### F. Capability Broker & ERP (F8 / #ERP)
+- [ ] **F8-001** Capability abstraction layer — `capability.invoke(name,args)` resolving to one of N backends (`mail.search`→IMAP/Graph/Exchange).
+- [ ] **F8-002** Capability registry + config/availability-driven per-capability backend selection.
+- [ ] **F8-003** Capability-scoped least-privilege permissions per agent.
+- [ ] **ERP-1** ERP runtime integration — process automation + scoped read-only DB access (`db.query`/`erp.read`) → controlled management, on Process Mode + F8 + RBAC + approval.
+
+### G. MCP Client (F9 / AS-5)
+- [ ] **F9-001/REPL-MCP** Wire the built `McpClientBroker` into the live REPL/chat path (`buildMcpBridge` has 0 production callers today) so external MCP servers are actually reachable.
+- [ ] **F9-002** Dynamic external-tool discovery + namespaced runtime registration into the routing/tool registry.
+- [ ] **F9-003** Trust/approval gate for external MCP tools (RBAC + risk-tagged nervous approval + audit, no auto-approve).
+- [ ] **AS5-P2** Worker-surface MCP tool-injection + IPC→broker + RBAC scope/non-leak test.
+- [ ] **AS5-P3** Remote MCP over HTTP + OAuth + per-tenant isolation + dashboard MCP page.
+
+### H. Provider-Native Capabilities & Multi-Provider Fleet (AS-2 / AS-4)
+- [ ] **AS2-P2** Mixed-fleet + REPL/terminal provider-switcher parity + non-leak fleet test (any-key OpenAI-compat, API flag-gated OFF).
+- [ ] **AS2-P3** Failover wire (`resolveWithOverflow` + `resolveProviderWithFallback` + 429/limit-detect→switch into spawn/FIX) + models.dev dynamic map (F1-011 follow-on).
+- [ ] **AS2-P4** Bedrock SigV4 (+Vertex) fleet completion.
+- [ ] **AS4-P1** Capability Realization Layer — `CapabilitySpec` + `realizeCapabilities` + Claude native passthrough (`--append-system-prompt`/`--agents`/`--mcp-config`) + graceful text fallback.
+- [ ] **AS4-P2** Native skills/plugins passthrough (`--setting-sources`/superpowers opt-in).
+- [ ] **AS4-P3** Nested ultracode/Workflow orchestration (flag-gated + cost-gate) with multi-provider parity preserved.
+- [ ] **T2** vLLM + LiteLLM enterprise multi-model gateway (8+ concurrent, routing, RBAC, audit) + llama-swap VRAM tiers.
+
+### I. Air-Gapped / Offline (AS-7)
+- [ ] **AS7-1** Global `offline` config + `deckent --offline` that skips all network (catalog/pricing/plugin/provider-probe) with assert-no-network.
+- [ ] **AS7-2** Offline ollama-only enforcement (cloud providers drop from routing) + host-backend default (no docker pull).
+- [ ] **AS7-3** Offline install bundle (deckent + deps + ollama + model pre-packed for firewall-behind deploy).
+- [ ] **AS7-4** Air-gap conformance test (zero-outbound-packet proof) + enterprise on-prem package (on-prem MCP + RBAC/tenant + deploy guide).
+
+### J. Zero-Hardcode & i18n (AS-3)
+- [ ] **AS3-1** Per-locale `locales/<xx>.json` catalog + dynamic `SUPPORTED_LANGS` + `lint-i18n-hardcode` guard + en/tr migration.
+- [ ] **AS3-2** Full user-facing surface sweep to `getMessage` (dashboard, MCP tool-descriptions, errors, wizards) + `.codex`/`.gemini` rule-file sync from `.claude` source.
+- [ ] **AS3-3** Add-a-language contribution path (local-Ollama translation seed) + Track-B zero-hardcode live-data audit/guard.
+
+### K. Evolution at Scale (F5)
+- [ ] **F5-008r** Active identity-mutation at scale — A/B variant scoring into routing, mutation-frequency rate-limiter (max 1/3 sprints), and 1000+-agent-variant scale validation.
+- [ ] **EVO-1** Brain-evolution retro "Next Sprint Behavior Changes" section (sub-#3-ext) with ≥3 visible-changes threshold.
+- [ ] **EVO-2** Prove the evolution moat's efficacy with an observable outcome-improvement signal (wired but unproven today).
+
+### L. Human-Interaction Wire — remaining (§4G)
+- [ ] **REPL-001/002** REPL `/autonomous` + `/mcp` + `/nervous` slash dispatch parity (with `buildMcpBridge` startup).
+- [ ] **DASH-001** `/api/kill/all` → `killAllSessions` (fix the broken 500) + SSE autonomous-events/pending watch.
+- [ ] **DASH-002** Sidebar bell pending-count badge from `/api/nervous/status`.
+- [ ] **APPROVE-007b** REPL `/nervous` IPC bridge + `handleEdit` (modified-payload transport) instead of direct file mutation.
+- [ ] **PLANOBS-001..005** plan/start observability: `PROGRESS` event channel + `progress`/`phase-change` notify type (tty+MCP+file) + `deckent_watch` event payload (AI-notification channel) + instant human-facing error notify + plan/start speed (`.tasks` cache, drop double-`planSprint`, async pre-vitest).
+- [ ] **BOT-2d** Bounded multi-turn bot chat-memory (currently stateless) + live phone re-verify; Discord real-delivery verify; WhatsApp connector.
+- [ ] **DEFER-001** Autonomous MCP control + API/dashboard approval surface (remote/OAuth).
+- [ ] **DEFER-002** Nervous MCP undo/edit + `askBrain` escalation + `output-stream` SSE registration.
+- [ ] **CKPT-1** Replace worker `askBrain` auto-`continue` with a real human-checkpoint path (`ipc-registry` documented-deferral).
+
+### M. Dashboard, Monitoring & Wire-Gaps (F7 / W-K)
+- [ ] **F7-004** Terminal hardening completion (multi-session, history, copy/paste — ~75% today).
+- [ ] **F7-ENT-verify** Verify/close the enterprise dashboard backend — competitive analysis found `/api/enterprise/*` routes absent though F7-006 marked wired; reconcile and ensure all four tabs serve real data.
+- [ ] **WK-5** Docker live-monitoring: mount `output-stream` SSE in `server.ts`, add PTY `worker-attach` kind (`docker logs -f`, read-only), `watch --follow` docker branch, WorkerCard grid fan-out.
+- [ ] **WK-6** Wire dormant team-collab primitives (`shared-memory.ts` + `handoff-protocol.ts` + `multi-agent.ts`) into worker prompt/spawn for real multi-agent/team collaboration.
+- [ ] **WK-7** Scale-async for 50–100 workers: async-batch liveness probes, parallelized docker spawn, IPC back-pressure (auditor currently O(n)-blocking `spawnSync` in the 30s scan).
+- [ ] **WK-8** Rewrite `docs/reference/multi-provider.md` + `docs/guide/multi-provider.md` against code reality (Gemini CLI requirement; ollama/deepseek/qwen/glm omitted).
+- [ ] **WK-9** Regenerate `.codex`/`.gemini` rule files from `.claude` source (Karpathy + Proof-of-Function missing → weaker non-Claude workers).
+- [ ] **WK-nervous** Wire `panic-gate` `awaitPanicGateApproval` (hard timeout, 0-caller) into the executor/spawn path so nervous approval can't block spawn forever.
+- [ ] **WK-cost** Bridge `auth_mode→billingMode` in the cost gate + add mid-sprint token-usage abort (today the cap estimates `$0` for subscription and TokenSpikeDetector only fires post-hoc in RETRO).
+- [ ] **WK-import** Resolve the `core→orchestra` import cycle (`audit-writer`/`audit-query`→`event-stream`, ADR-008 soft-violation).
+
+### N. Performance & Reliability (W-J)
+- [ ] **PERF-1** Cold-start <500ms (lazy-load commands + agent/skill-cache lazy-loader; ~2s eager today).
+- [ ] **PERF-2** Memory V2 query index + worker-spawn <3s SLA + `tests/load/` load suite.
+- [ ] **PERF-3** OpenTelemetry / Prometheus self-hosted observability export (no SaaS, never-calls-home).
+- [ ] **PERF-4** GPU/VRAM detection in `system-capacity.ts` (deferred since Sprint 151, never delivered) for local-model concurrency.
+- [ ] **PERF-5** Coverage upward-ratchet (thresholds currently calibrated 5% below baseline → silent-regression headroom).
+- [ ] **M1-M4** Monitoring baseline auto-blocker gate.
+
+### O. Documentation & CLI/MCP Parity (W-H / W-B)
+- [ ] **DOC-1** Documentation perfection: `docs/cookbook/`, full EN user guide, lifecycle/API-surface diagrams, `why-deckent-vs-X`, demo videos, `docs/benchmark/memory-v2.md` (verify the 96% claim), `docs/security/threat-model.md`, `docs/adr-index.md`, `npm run docs:test`.
+- [ ] **PARITY-1** CLI/MCP parity: add `deckent_agent_manage` / `deckent_skill_manage` / `deckent_memory_manage` / `deckent_cost` MCP tools + ~20 missing options across history/retro/review/run/explain + a `lint-cli-mcp-parity.mjs` guard.
+- [ ] **DOC-2** README badge/module-count re-sync + MCP tool-description i18n wrapper + add-a-language guide.
+
+### P. Launch / OSS / Marketplace (W-I / §8)
+- [ ] **GA-1** `npm publish` (gate of record — the product must actually be installable; manual by Alperen).
+- [ ] **GA-2** Public product-repo flip with sensitive-info scrub (git-filter-repo/BFG + gitleaks pre-commit) + monorepo-vs-split decision.
+- [ ] **GA-3** `.github/` essentials (ISSUE_TEMPLATE, PR template, FUNDING.yml) + landing page + demo video + final npm package name.
+- [ ] **HUB-1** DeckentHub backend live (`registry.deckent.dev` not serving today) + moderation queue + CI auto key-rotation + phased registry growth 20→50→100 with vector search.
+
+### Q. Brain Integrity close-out (§4F)
+- [ ] **INT-1** Close the memory-loss saga: one more post-build sprint that keeps memory/exports intact confirms the Sprint-232 5-layer fix (build-verification pending).
+
+### R. Post-beta milestone-gated (recorded, not near-term)
+- [ ] **PB-1** Voice (STT Whisper + wake-word + TTS + real-time streaming) — gated behind 10K GitHub stars.
+- [ ] **PB-2** Mobile (React Native iOS/Android MCP client + push + device skills) — gated behind 50K stars.
+- [ ] **PB-3** AEGIS methodology (ADR-061) Phase 1 foundation — post-beta if approved.
+
+> **Count:** ~95 distinct remaining work-items across 18 clusters. None is a throwaway/MVP cut — each is built to god-level, enterprise-grade, million-user quality. Build *sequence* (not scope) is dependency-ordered per §10A, beginning with the canonical work-model foundation (cluster A).
+
+---
+
 *Single source of truth. Update this document — not the superseded roadmaps — when status changes.*
