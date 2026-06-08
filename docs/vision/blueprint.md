@@ -7,6 +7,8 @@
 > **What deckent is (2026-06-02):** the **god-level orchestration + enterprise layer of an open agent**, made so easy a single user wields the same power — **one MIT product** from a solo dev's laptop to a 10,000-person enterprise. **"Open source for open world."** We compare with peers (Devin, Cursor, Claude Code, Cowork) on capability — never as opposition. The architecture is a **core + enterprise-layer** split: the core is the same multi-agent orchestration every user runs; the enterprise layer (RBAC, audit, multi-tenant, scheduled flows) bolts on without forking. ([[project_deckent_positioning]])
 
 > **Where it's heading — autonomous agentic runtime:** beyond on-demand sprints, deckent runs **continuously and autonomously within defined authority bounds** — install it into an enterprise and it tracks orders, analyzes, checks MRP, and acts on customer requests inside RBAC + approval limits. Built on Process Mode (F3) + scheduled-flows + nervous approval + Capability Broker (F8 ERP) + ADR-037 authority matrix. **"Deckent orchestered for everyone everywhere"** across 6 contexts (greenfield / in-dev / maintained / daily-tasks / ERP / enterprise). ([[project_deckent_everyone_everywhere]])
+>
+> **As-built (2026-06-08) — the autonomous engine now exists and runs.** Sub-project 1 (Autonomous Execution Engine: durable backlog + 3-gate governance RBAC→per-task-policy→EffectClass-risk + per-entry task|sprint execution + crash-recovery + flag-gated `config.autonomous.*` default-off + `deckent autonomous` CLI) and sub-project 2 (nervous reactive bridge, attach-only) are **merged to main**; `deckent autonomous start` drives the engine end-to-end. **Local-model autonomous is proven live:** after a deep RCA (`docs/analysis/2026-06-08-local-model-autonomous-rca.md` — verdict: the host-inference + host-tool-loop architecture is the industry standard; failures were wiring, not design), the Phase-1 fix made it work — a zero-cost **qwen3.6 (Ollama, host)** worker autonomously authored a real documentation improvement. Continuation (Phase-1c worker-assessment, Phase-2 hardening + concurrency backpressure, Tier-2 vLLM+LiteLLM enterprise gateway, sub-projects 3-5) is sequenced in [`docs/MASTER-PLAN.md`](../MASTER-PLAN.md) (2026-06-08 entry) + memory `project_autonomous_engine_direction` / `project_autonomous_ollama_execution_gap`.
 
 ---
 
@@ -2342,6 +2344,22 @@ Full directive: `docs/directives/sprint-034.md`
 - Managed environment templates (CMA model — structured container configs per project type)
 
 **Note:** Enterprise features like SSO, RBAC, and audit logging are partially addressed by ADR-037 (RBAC) and the event stream audit trail (ADR-035). ADR-039 Self-Modifying Task Detection provides architectural protection for dogfooding scenarios. Full enterprise platform features are deferred to Phase 7, consistent with ADR-033's Product-Not-Service vision.
+
+## Phase 8: Autonomous Agentic Runtime (F3-009 / AS-6) — IN PROGRESS (foundation as-built 2026-06-08)
+
+**Goal:** deckent runs continuously + autonomously within authority bounds — the AI-System-Worker north star (beyond on-demand sprints).
+
+**As-built (merged to main):**
+- **Autonomous Execution Engine** (sub-project 1): durable backlog (recurring + one-off + reactive entries) + **3-gate governance** (RBAC authority → per-task policy → EffectClass risk) + per-entry `task|sprint` execution via the worker fleet + crash recovery + flag-gated `config.autonomous.*` (default-off) + `deckent autonomous` CLI (backlog/start/status/approve, i18n en/tr). `deckent autonomous start` drives the engine end-to-end (smoke-proven).
+- **Reactive bridge** (sub-project 2, first slice): nervous detection → declarative `reactive-map` → durable backlog entry (ingester + dedup; flag-gated; **attach-only** today — observer-driving + webhook/repo-watch are the continuation).
+
+**Local-model autonomous — proven live (2026-06-08).** After a 4-investigator enterprise RCA (`docs/analysis/2026-06-08-local-model-autonomous-rca.md`; verdict: the host-inference-service + host-tool-loop-worker architecture is the **industry standard**, the failures were **wiring not design**), a Phase-1 fix made it work: a **zero-cost qwen3.6 (Ollama, host) worker autonomously authored a real documentation improvement**. This validates the data-sovereign / zero-cost / air-gapped-capable (AS-7) local-model path.
+
+**Continuation (sequenced in [`docs/MASTER-PLAN.md`](../MASTER-PLAN.md) 2026-06-08 entry):** Phase-1c (worker-assessment: `task_done`+files → GO_WITH_TECH_DEBT not NO_GO) → Phase-1 merge → Phase-2 hardening (Brain backpressure to `OLLAMA_NUM_PARALLEL`, per-worker timeout, `/api/tags` health-gate, `deckent run`/MCP ollama-routing parity) → **Tier-2 enterprise gateway** (vLLM + LiteLLM + llama-swap for 8+ concurrent / multi-model routing / RBAC / audit) → sub-projects 3-5 (work-generation/goal · dashboard control-plane · F3-008 workflow composer) → master-plan autonomous-dogfood culmination.
+
+**Safety invariant:** flag-gated default-off + default-deny + no-auto-approve. The product autonomous mode is independent of the human-approval gate on starting development sprints. Concurrency: Ollama `OLLAMA_NUM_PARALLEL` serializes same-model → low `max_workers` + backpressure for single-GPU; vLLM for scale.
+
+Refs: F3-009, AS-6, ADR-037/040/055/079; specs/plans in `docs/superpowers/`; memory `project_autonomous_engine_direction` · `project_autonomous_ollama_execution_gap`.
 
 ---
 

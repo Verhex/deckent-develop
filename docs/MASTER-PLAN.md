@@ -282,6 +282,22 @@ F1-009 (8-provider fleet, ~95% iç-wiring — **gerçek any-key worker fleet = b
 
 Sprint 233-237 (F1-013 harness + canlı mixed-fleet kanıtı: qwen3.6 host + claude docker eşzamanlı, ikisi de DONE) **sonrası** kalan hardening + bu oturumda bulunan bug'lar. Kaynak: [[project_next_batch_ollama_hardening]]. **Sıfır regresyon kanıtlı** (base-commit `2f3716d3` vs HEAD 6 fail-dosyası BİREBİR aynı: 31 fail/357 pass → tüm tam-suite fail'leri pre-existing non-hermetik: WSL2-load timeout + ollama-detection + tmux e2e). tsc temiz, her işin hedef-suite'i yeşil.
 
+### 🟢 2026-06-08 — Autonomous Execution Engine (sub-proj 1+2) + local-model autonomous CANLI KANIT + Phase-1 fix
+
+**Sub-project 1 (Autonomous Execution Engine) + live `start`-wire + sub-project 2 (reactive bridge) MERGED to main** (commits `5191b8a6`, `c6d8610c`, `999217e8`). Tam akış: brainstorm → spec → plan → subagent-driven TDD → smoke → merge (her biri review'lı, gerçek defect'ler yakalandı). Durable backlog + **3-gate governance** (RBAC authority → per-task policy → EffectClass risk) + execute-dispatcher (task|sprint) + hybrid trigger (backlog∪scheduled-flow∪reactive) + concurrency-ready ExecutionPool + crash-recovery + flag-gated `config.autonomous.*` (default-off) + `deckent autonomous` CLI (backlog/start/status/approve, i18n); nervous reactive bridge (detection→declarative reactive-map→durable entry, **attach-only**). Spec/plan: `docs/superpowers/specs|plans/2026-06-07-autonomous-execution-engine*` + `*-reactive-trigger-bridge*`. Operations/usage doc: `docs/guide/autonomous-operations.md` + `autonomous-engine.md`.
+
+**Local-model autonomous gap → enterprise RCA → Phase-1 fix → CANLI KANIT.** İlk dogfood autonomous-ollama'nın çalışmadığını gösterdi (wired≠working). **4-investigator enterprise RCA** (`docs/analysis/2026-06-08-local-model-autonomous-rca.md`) — **verdict: mimari DOĞRU** (host inference service + host tool-loop worker = endüstri standardı; donanım/GPU/RAM sorunu YOK), başarısızlık **wiring gap'leri**. **Phase-1 fix (6 gap)** branch `feat/autonomous-ollama-exec`: A bootstrap-providers, E task-JSON-write (runTaskMode), G prompt-arg, B backlog status-writeback, F worker-completion (waitForResult), C trusted-internal authority (policy=auto artık koşar). **Re-dogfood BAŞARI:** `deckent autonomous start` → qwen3.6 host'ta **zero-cost GERÇEK iş yaptı** (local-model-workers.md'ye Türkçe Quick-start ekledi, +15 satır; commit `ab8f25d8` = autonomous deckent'in ilk gerçek katkısı). 1 kalan **worker-harness wrinkle** (task_done+filesChanged>0 → NO_GO; iyi işi başarısız gösteriyor — Phase-1c).
+
+**DEVAM İŞLERİ (sıradaki, [[project_autonomous_ollama_execution_gap]]):**
+1. **Phase-1c** — `agentic-worker-runner`: task_done + filesChanged>0 → en az GO_WITH_TECH_DEBT (NO_GO değil) → re-confirm.
+2. **Phase-1+1c → main merge** (şu an branch'te bekliyor).
+3. **Phase-2 hardening** — Brain backpressure to `OLLAMA_NUM_PARALLEL`; per-worker timeout; `/api/tags` health-gate; `deckent run`/MCP `deckent_run` ollama-routing parity (run.ts bootstrap + provider forward; MCP spawnWorkerMultiProvider'a geçir).
+4. **T2 vLLM+LiteLLM** (USER erken istedi) — enterprise multi-model gateway (8+ concurrent, routing, RBAC, audit) + llama-swap VRAM tiers. (RCA §3 tier roadmap.)
+5. **Sub-project 2 cont.** (observer-driving / webhook / repo-watch) + **sub-projects 3-5** (work-generation/goal · dashboard control-plane · F3-008 workflow composer).
+6. **Master-plan autonomous-dogfood culmination** — master-plan işlerini backlog'a yaz, autonomous deckent'e bırak ([[project_autonomous_engine_direction]]).
+
+**Concurrency notu (RCA):** OLLAMA_NUM_PARALLEL default 1, same-model serialize → 27B için `max_workers` 1-2 + Brain backpressure; >8/32B+ → vLLM. **Deferred:** concurrent ExecutionPool (interface hazır), `deckent solo/develop/enterprise` paketleme (design-for-modularity only), AS-2 fleet.
+
 | İş | Commit | Ne |
 |----|--------|-----|
 | **İŞ1** | `4640fc30` | **Planner precedence** — DIRECTIVES `- Provider:`/`- Model:` override'ları HER modda (ai/auto/structured) onurla → AI-planning 1:1 directive→task garanti edemediğinden override varsa structured'a route. **Mixed-fleet artık `modes.performance.brain_planning='structured'` workaround'suz çalışır.** (`sprint-planner.ts`) |
