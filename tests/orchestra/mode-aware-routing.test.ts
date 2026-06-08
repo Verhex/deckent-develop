@@ -6,7 +6,10 @@
  * runTaskMode rejects sprint mode, and task mode bypasses sprint lifecycle.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { SprintPhase } from '../../src/core/types.js';
 import type { ResolvedConfig } from '../../src/core/config-types.js';
 
@@ -90,8 +93,17 @@ function makeConfig(overrides: Partial<ResolvedConfig> = {}): ResolvedConfig {
 // ─── Tests ──────────────────────────────────────────────────────────
 
 describe('Mode-Aware Routing', () => {
+  // Unique per-test tmpdir so runTaskMode's task JSON write (Gap E) is hermetic
+  // and does not leave stray files in /tmp under fixed names.
+  let testRoot: string;
+
   beforeEach(() => {
     vi.clearAllMocks();
+    testRoot = mkdtempSync(join(tmpdir(), 'mode-aware-routing-'));
+  });
+
+  afterEach(() => {
+    rmSync(testRoot, { recursive: true, force: true });
   });
 
   // Test 1: config.deckent_style='sprint' → runSprint OK (mode guard doesn't block)
@@ -125,7 +137,7 @@ describe('Mode-Aware Routing', () => {
       const config = makeConfig({ deckent_style: 'task' });
       const ctx: TaskModeContext = {
         description: 'Test task for mode routing',
-        projectRoot: '/tmp/test-project',
+        projectRoot: testRoot,
       };
 
       const result = await runTaskMode(ctx, config);
@@ -141,7 +153,7 @@ describe('Mode-Aware Routing', () => {
       const ctx: TaskModeContext = {
         description: 'Emit event test',
         model: 'haiku',
-        projectRoot: '/tmp/test-project',
+        projectRoot: testRoot,
       };
 
       await runTaskMode(ctx, config);
@@ -161,7 +173,7 @@ describe('Mode-Aware Routing', () => {
       const config = makeConfig({ deckent_style: 'sprint' });
       const ctx: TaskModeContext = {
         description: 'Should fail',
-        projectRoot: '/tmp/test-project',
+        projectRoot: testRoot,
       };
 
       await expect(runTaskMode(ctx, config)).rejects.toThrow(
@@ -174,7 +186,7 @@ describe('Mode-Aware Routing', () => {
       const config = makeConfig({ deckent_style: 'task' });
       const ctx: TaskModeContext = {
         description: 'Direct execution — no sprint lifecycle',
-        projectRoot: '/tmp/test-project',
+        projectRoot: testRoot,
       };
 
       await runTaskMode(ctx, config);
@@ -185,7 +197,7 @@ describe('Mode-Aware Routing', () => {
         expect.stringMatching(/^run-test-/),
         'sonnet', // default model
         'mock-prompt',
-        '/tmp/test-project',
+        testRoot,
         expect.objectContaining({ autoApprove: false }),
       );
 
@@ -204,7 +216,7 @@ describe('Mode-Aware Routing', () => {
       const ctx: TaskModeContext = {
         description: 'Event payload check',
         model: 'opus',
-        projectRoot: '/tmp/test-project',
+        projectRoot: testRoot,
       };
 
       await runTaskMode(ctx, config);
@@ -235,7 +247,7 @@ describe('Mode-Aware Routing', () => {
         scope: { directories: ['src/core/'], filesWrite: ['src/core/config.ts'] },
         model: 'opus',
         autoApprove: true,
-        projectRoot: '/tmp/scoped-project',
+        projectRoot: testRoot,
       };
 
       await runTaskMode(ctx, config);
@@ -244,7 +256,7 @@ describe('Mode-Aware Routing', () => {
         expect.any(String),
         'opus',
         'mock-prompt',
-        '/tmp/scoped-project',
+        testRoot,
         expect.objectContaining({
           autoApprove: true,
           spawnBackend: 'docker',
