@@ -2,6 +2,15 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint245] - 2026-06-08
+
+### Added
+
+- 245-001 — .codex + .gemini rules → .claude parity
+
+
+_Tasks: 1 total, 1 done, 0 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint244] - 2026-06-08
 
 ### Added

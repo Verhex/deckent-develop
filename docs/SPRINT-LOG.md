@@ -6646,3 +6646,25 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 244-001: 243-001 — multi-provider docs kod-gerçeğine hizala (DONE)
 
 ---
+## Sprint 245 — sprint-245
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-06-08
+**Duration:** 494s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 1 |
+| Completed | 1 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 494432ms |
+
+### Tasks
+
+- 245-001: 245-001 — .codex + .gemini rules → .claude parity (DONE)
+
+---
