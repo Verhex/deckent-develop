@@ -4,6 +4,21 @@ deckent, yerel bir Ollama modelini gerçek bir agentic worker olarak çalıştı
 
 ---
 
+## Quick Start
+
+1. **Ollama'yı kurun ve çalıştırın:** [`ollama.com`](https://ollama.com) adresinden indirip `ollama serve` ile başlatın (varsayılan: `http://localhost:11434`).
+2. **Bir model çekin:** örneğin `ollama pull qwen3.6:27b`.
+3. **Görevinizde provider ve model belirtin:**
+
+   ```yaml
+   - Provider: ollama
+   - Model: qwen3.6:27b
+   ```
+
+4. **Sprint çalıştırın:** `deckent sprint -f tasks.yaml` ile görevi başlatın; worker Ollama ile döngü kurar, araç çağrılarını scope-enforced uygular ve `.result` üretir.
+
+---
+
 ## 1. Ollama Kurulumu
 
 1. [ollama.com](https://ollama.com) adresinden kurulumu tamamlayın.

@@ -1,6 +1,9 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { runAutonomousCycle } from '../../../src/orchestra/autonomous-runtime.js';
 import type { AutonomousRuntimeDeps, AutonomousTrigger } from '../../../src/orchestra/autonomous-runtime.js';
+import { buildEngineRuntime } from '../../../src/orchestra/autonomous/runtime-loop.js';
+import { AUTONOMOUS_EXECUTE_ACTION } from '../../../src/orchestra/autonomous/execute-dispatcher.js';
+import type { TaskResult } from '../../../src/core/types.js';
 
 const trig: AutonomousTrigger = { id: 't1', source: 'backlog', action: 'autonomous.execute', requestedBy: 'system', payload: {} };
 
@@ -84,5 +87,71 @@ describe('cycle policy gate (G2/G3 split from RBAC)', () => {
     const res = await runAutonomousCycle({}, d);
     expect(res.outcome).toBe('executed');
     expect(requestSpy).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ─── Gap C: trusted-internal authority wrap (buildEngineRuntime) ─────
+
+import { mkdirSync, writeFileSync, rmSync, existsSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+
+describe('Gap C — trusted-internal authority wrap in buildEngineRuntime', () => {
+  let tmpDir: string;
+  beforeEach(() => {
+    tmpDir = join(tmpdir(), `gap-c-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    mkdirSync(tmpDir, { recursive: true });
+    // Seed an empty backlog so loadBacklog doesn't throw
+    writeFileSync(join(tmpDir, 'backlog.json'), JSON.stringify({ _version: '1.0', entries: [] }, null, 2));
+  });
+  afterEach(() => {
+    if (existsSync(tmpDir)) rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  function makeBundle() {
+    const doneResult: TaskResult = {
+      taskId: 't', selfAssessment: 'DONE', testsPassed: true,
+      filesChanged: [], notes: '', linesAdded: 0, linesRemoved: 0,
+    };
+    return buildEngineRuntime({
+      projectRoot: tmpDir,
+      config: { deckent_style: 'task' } as never,
+      backlogPath: join(tmpDir, 'backlog.json'),
+      flows: [],
+      policy: { id: 'p', trigger: 'scheduled', action: 'start', guard: { requiresApproval: false } },
+      runTask: vi.fn().mockResolvedValue({ taskId: 't' }),
+      runSprint: vi.fn().mockResolvedValue({}),
+      waitForResult: vi.fn().mockResolvedValue(doneResult),
+    });
+  }
+
+  it('system + AUTONOMOUS_EXECUTE_ACTION → allowed (reaches policy gate)', () => {
+    const { deps: d } = makeBundle();
+    const result = d.authority.check(AUTONOMOUS_EXECUTE_ACTION, 'system');
+    expect(result.outcome).toBe('allowed');
+    expect(result.reason).toMatch(/trusted internal/);
+  });
+
+  it('system:engine + AUTONOMOUS_EXECUTE_ACTION → allowed (prefix match)', () => {
+    const { deps: d } = makeBundle();
+    const result = d.authority.check(AUTONOMOUS_EXECUTE_ACTION, 'system:engine');
+    expect(result.outcome).toBe('allowed');
+  });
+
+  it('non-system requestedBy + AUTONOMOUS_EXECUTE_ACTION → delegates to base authority (not blindly allowed)', () => {
+    const { deps: d } = makeBundle();
+    // 'attacker' is not recognized by makeAuthorityChecker → default-deny
+    const result = d.authority.check(AUTONOMOUS_EXECUTE_ACTION, 'attacker');
+    expect(result.outcome).toBe('denied');
+  });
+
+  it('system + unrelated action → delegates to base authority (default-deny preserved)', () => {
+    const { deps: d } = makeBundle();
+    // 'some.other.action' is not in the trusted-internal path
+    // makeAuthorityChecker maps 'system' to role 'brain'; checkAuthority with a generic
+    // action (event_emit) should return needs_approval or denied (not allowed here via wrap)
+    const result = d.authority.check('some.other.action', 'system');
+    // Must NOT be the special trusted-internal allowed response
+    expect(result.reason).not.toMatch(/trusted internal/);
   });
 });

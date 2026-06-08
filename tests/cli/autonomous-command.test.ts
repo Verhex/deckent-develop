@@ -3,6 +3,16 @@
 // Hermetic CLI tests for `deckent autonomous` (Sprint 226 — Task 226-007).
 // Verify start kurar loop, status özet, stop temiz, default-deny korunur.
 
+// Gap A fix: mock bootstrapProviders so the 3-second ollama HTTP probe does not
+// run in CI (where localhost:11434 is absent) and tests remain hermetic + fast.
+vi.mock('../../src/core/provider.js', async (importOriginal) => {
+  const actual = await importOriginal() as Record<string, unknown>;
+  return {
+    ...actual,
+    bootstrapProviders: vi.fn().mockResolvedValue({ registered: [], skipped: [] }),
+  };
+});
+
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Command } from 'commander';
 import {

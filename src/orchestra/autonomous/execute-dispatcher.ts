@@ -2,9 +2,18 @@
 // The real ActionHandler that fills buildAutonomousRuntime's empty handler map.
 // kind=task → runTaskMode (single worker); kind=sprint → runSprint (full lifecycle).
 // runTask/runSprint injected for hermetic tests; composition root passes the real fns.
+//
+// Phase-1b gaps B+F:
+//   Gap B: status-writeback — updateStatus('running') before, ('done'/'failed') after.
+//          backlogPath + loadBacklog/updateStatus injected so tests don't need disk.
+//   Gap F: completion tracking — waitForResult() after launch (CLI's waitForRunResult
+//          primitive); result != null && selfAssessment DONE/GO_WITH_TECH_DEBT = success
+//          (mirrors run.ts:320). null = timeout = failure.
 import type { ResolvedConfig } from '../../core/config-types.js';
 import type { ActionHandler } from '../../nervous/executor.js';
-import type { BacklogEntry } from './backlog-types.js';
+import type { BacklogEntry, BacklogFile } from './backlog-types.js';
+import { loadBacklog, updateStatus } from './backlog.js';
+import type { TaskResult } from '../../core/types.js';
 
 /** Action id the backlog-trigger sets on every entry-driven trigger. */
 export const AUTONOMOUS_EXECUTE_ACTION = 'autonomous.execute';
@@ -12,31 +21,65 @@ export const AUTONOMOUS_EXECUTE_ACTION = 'autonomous.execute';
 export interface ExecuteDispatcherDeps {
   projectRoot: string;
   config: ResolvedConfig;
-  /** Injected runTaskMode (kind=task). */
+  /** Injected runTaskMode (kind=task). Returns TaskModeResult shape including taskId. */
   runTask: (
     ctx: { projectRoot: string; description: string; model?: string; provider?: string; scope?: { directories: string[] } },
     config: ResolvedConfig,
-  ) => unknown;
+  ) => Promise<unknown>;
   /** Injected runSprint (kind=sprint). */
   runSprint: (projectRoot: string, config: ResolvedConfig) => Promise<unknown>;
+  /** Durable backlog path — used for Gap B status writeback. */
+  backlogPath: string;
+  /**
+   * Wait for the task .result file to appear (Gap F completion tracking).
+   * Injected for hermetic tests; live wire uses waitForRunResult from run.ts.
+   * Returns the parsed TaskResult or null on timeout.
+   */
+  waitForResult: (projectRoot: string, taskId: string, timeoutMs: number) => Promise<TaskResult | null>;
+  /**
+   * Max ms to wait for a task result before declaring failure.
+   * Defaults to 600_000 (10 min) — ollama models can be slow to load.
+   */
+  resultTimeoutMs?: number;
+}
+
+/** Determine whether a TaskResult represents success (mirrors run.ts:320). */
+function isSuccess(result: TaskResult | null): boolean {
+  if (!result) return false;
+  const a = result.selfAssessment ?? 'NO_GO';
+  return a === 'DONE' || a === 'GO_WITH_TECH_DEBT';
 }
 
 export function makeExecuteDispatcher(deps: ExecuteDispatcherDeps): ActionHandler {
+  const timeoutMs = deps.resultTimeoutMs ?? 600_000;
+
   return async (_actionId, payload) => {
     const entry = payload?.entry as BacklogEntry | undefined;
     if (!entry || typeof entry !== 'object') {
       return { outcome: 'failure', error: 'execute-dispatcher: no backlog entry in payload' };
     }
+
+    // Gap B — mark running before any work begins (re-load so concurrent changes are seen)
+    const bl0: BacklogFile = loadBacklog(deps.backlogPath);
+    updateStatus(deps.backlogPath, bl0, entry.id, 'running', null);
+
     try {
+      let ok = false;
+      let reason = '';
+
       if (entry.kind === 'sprint') {
+        // Sprint: runSprint awaits the full lifecycle — success unless it throws.
         await deps.runSprint(deps.projectRoot, deps.config);
+        ok = true;
+        reason = 'sprint completed';
       } else {
+        // Task: launch worker, then wait for real completion (Gap F).
+        //
         // The dispatcher forwards the entry's full provider/model intent. The real
-        // runTaskMode adapter (wired in the composition root, engine task 7) maps these
-        // to the worker spawn; per-task provider routing for single-task mode follows
-        // the same path sprint mode already uses via the worker backend. Forwarding here
-        // preserves intent rather than silently dropping it.
-        deps.runTask(
+        // runTaskMode adapter maps these to the worker spawn; per-task provider routing
+        // for single-task mode follows the same path sprint mode already uses via the
+        // worker backend. Forwarding here preserves intent rather than silently dropping it.
+        const r = await deps.runTask(
           {
             projectRoot: deps.projectRoot,
             description: entry.spec.description ?? entry.title,
@@ -45,11 +88,39 @@ export function makeExecuteDispatcher(deps: ExecuteDispatcherDeps): ActionHandle
             scope: { directories: [entry.spec.scopeDir ?? '.'] },
           },
           deps.config,
-        );
+        ) as { taskId?: string } | null | undefined;
+
+        const taskId = r?.taskId;
+        if (taskId) {
+          // Gap F: wait for real done/failed (not just launched)
+          const result = await deps.waitForResult(deps.projectRoot, taskId, timeoutMs);
+          ok = isSuccess(result);
+          reason = result
+            ? `selfAssessment=${result.selfAssessment ?? 'NO_GO'}`
+            : 'timeout — no result within limit';
+        } else {
+          // runTask returned no taskId — cannot track completion; treat as failure
+          // to avoid false-done (the "wiring-% vs user-working" trap).
+          ok = false;
+          reason = 'runTask returned no taskId — completion not trackable';
+        }
       }
-      return { outcome: 'success' };
+
+      // Gap B — final writeback (re-load to avoid clobbering concurrent changes)
+      const blFinal: BacklogFile = loadBacklog(deps.backlogPath);
+      updateStatus(deps.backlogPath, blFinal, entry.id, ok ? 'done' : 'failed', { ok, reason });
+
+      return ok ? { outcome: 'success' } : { outcome: 'failure', error: reason };
     } catch (err: unknown) {
-      return { outcome: 'failure', error: err instanceof Error ? err.message : String(err) };
+      const reason = err instanceof Error ? err.message : String(err);
+      // Gap B — error path writeback
+      try {
+        const blErr: BacklogFile = loadBacklog(deps.backlogPath);
+        updateStatus(deps.backlogPath, blErr, entry.id, 'failed', { ok: false, reason });
+      } catch {
+        // Never let the writeback failure mask the original error
+      }
+      return { outcome: 'failure', error: reason };
     }
   };
 }

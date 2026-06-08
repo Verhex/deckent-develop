@@ -45,6 +45,17 @@ vi.mock('../../../src/orchestra/spawn-backend.js', () => ({
   },
 }));
 
+// sprint-utils: isAdapterProvider returns false for all models in this suite
+// (sonnet/opus/gpt-4.1/gemini) — adapter path exercised in spawn-multiprovider.test.ts.
+vi.mock('../../../src/orchestra/sprint-utils.js', async (importOriginal) => {
+  const actual = await importOriginal() as Record<string, unknown>;
+  return {
+    ...actual,
+    isAdapterProvider: vi.fn(() => false),
+    getProviderAdapterForTask: vi.fn(() => null),
+  };
+});
+
 // ─── Imports ────────────────────────────────────────────────────────
 import { ensureSession, spawnWorker } from '../../../src/orchestra/tmux.js';
 import { readTask } from '../../../src/agents/worker.js';
@@ -80,7 +91,7 @@ describe('spawn multi-provider', () => {
 
   it('spawnWorkerMultiProvider uses tmux for claude models', async () => {
     const { spawnWorkerMultiProvider } = await import('../../../src/cli/commands/spawn.js');
-    const result = spawnWorkerMultiProvider('t1', 'sonnet', 'prompt', '/root', {});
+    const result = await spawnWorkerMultiProvider('t1', 'sonnet', 'prompt', '/root', {});
     expect(result.backend).toBe('tmux');
     expect(ensureSession).toHaveBeenCalled();
     expect(spawnWorker).toHaveBeenCalled();
@@ -88,7 +99,7 @@ describe('spawn multi-provider', () => {
 
   it('spawnWorkerMultiProvider uses subprocess for codex models', async () => {
     const { spawnWorkerMultiProvider } = await import('../../../src/cli/commands/spawn.js');
-    const result = spawnWorkerMultiProvider('t1', 'gpt-4.1', 'prompt', '/root', {});
+    const result = await spawnWorkerMultiProvider('t1', 'gpt-4.1', 'prompt', '/root', {});
     expect(result.backend).toBe('subprocess');
     expect(mockSubprocessSpawn).toHaveBeenCalledWith('t1', 'gpt-4.1', 'prompt', expect.objectContaining({
       projectDir: '/root',
@@ -98,20 +109,20 @@ describe('spawn multi-provider', () => {
 
   it('spawnWorkerMultiProvider uses subprocess for gemini models', async () => {
     const { spawnWorkerMultiProvider } = await import('../../../src/cli/commands/spawn.js');
-    const result = spawnWorkerMultiProvider('t1', 'gemini-2.5-pro', 'prompt', '/root', {});
+    const result = await spawnWorkerMultiProvider('t1', 'gemini-2.5-pro', 'prompt', '/root', {});
     expect(result.backend).toBe('subprocess');
     expect(mockSubprocessSpawn).toHaveBeenCalled();
   });
 
   it('spawnWorkerMultiProvider passes autoApprove to tmux', async () => {
     const { spawnWorkerMultiProvider } = await import('../../../src/cli/commands/spawn.js');
-    spawnWorkerMultiProvider('t1', 'opus', 'prompt', '/root', { autoApprove: true });
+    await spawnWorkerMultiProvider('t1', 'opus', 'prompt', '/root', { autoApprove: true });
     expect(spawnWorker).toHaveBeenCalledWith('t1', 'opus', 'prompt', '/root', { autoApprove: true });
   });
 
   it('spawnWorkerMultiProvider passes autoApprove to subprocess', async () => {
     const { spawnWorkerMultiProvider } = await import('../../../src/cli/commands/spawn.js');
-    spawnWorkerMultiProvider('t1', 'o3', 'prompt', '/root', { autoApprove: true });
+    await spawnWorkerMultiProvider('t1', 'o3', 'prompt', '/root', { autoApprove: true });
     expect(mockSubprocessSpawn).toHaveBeenCalledWith('t1', 'o3', 'prompt', expect.objectContaining({
       autoApprove: true,
     }));
@@ -120,7 +131,7 @@ describe('spawn multi-provider', () => {
   it('registerSpawn prints backend info for codex task', async () => {
     vi.mocked(readTask).mockReturnValue(makeTask({ model: 'gpt-4.1', id: 'test-codex' }));
     const { spawnWorkerMultiProvider } = await import('../../../src/cli/commands/spawn.js');
-    const result = spawnWorkerMultiProvider('test-codex', 'gpt-4.1', 'prompt', '/test/project', {});
+    const result = await spawnWorkerMultiProvider('test-codex', 'gpt-4.1', 'prompt', '/test/project', {});
     expect(result.backend).toBe('subprocess');
   });
 });

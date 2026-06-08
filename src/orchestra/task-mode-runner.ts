@@ -10,12 +10,15 @@
 //   - `deckent_run` MCP tool (task mode)
 //   - Any future task-mode entrypoint
 
+import { join } from 'node:path';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import type { ModelType } from '../core/types.js';
 import type { ResolvedConfig } from '../core/config-types.js';
 import { buildRunTask, createRunTaskId } from '../cli/commands/run.js';
 import { spawnWorkerMultiProvider } from '../cli/commands/spawn.js';
 import { buildWorkerPrompt } from './task-builder.js';
 import { eventBus } from './event-bus.js';
+import { TASKS_DIR } from '../core/constants.js';
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -29,6 +32,12 @@ export interface TaskModeContext {
   };
   /** Model to use (default: 'sonnet') */
   model?: ModelType;
+  /**
+   * Provider hint forwarded from the autonomous dispatcher's backlog entry.
+   * When set to 'ollama', spawnWorkerMultiProvider calls ensureOllamaModelRegistered
+   * before getProviderForModel so dynamic tags (e.g. qwen3.6:27b) resolve correctly.
+   */
+  provider?: string;
   /** Timeout in milliseconds (default: 300_000 = 5 minutes) */
   timeoutMs?: number;
   /** Auto-approve tool calls */
@@ -73,10 +82,10 @@ function assertTaskMode(config: ResolvedConfig): void {
  * 4. Spawn worker via multi-provider backend
  * 5. Return task ID + backend info
  */
-export function runTaskMode(
+export async function runTaskMode(
   ctx: TaskModeContext,
   config: ResolvedConfig,
-): TaskModeResult {
+): Promise<TaskModeResult> {
   assertTaskMode(config);
 
   const projectRoot = ctx.projectRoot ?? process.cwd();
@@ -87,8 +96,14 @@ export function runTaskMode(
   const taskId = createRunTaskId();
   const task = buildRunTask(taskId, ctx.description, model, scopeDir);
 
-  // Build prompt
-  const prompt = buildWorkerPrompt(task, projectRoot);
+  // Gap E: write task JSON so agentic-worker-entry can read its spec (mirrors run.ts:261-263)
+  const tasksDir = join(projectRoot, TASKS_DIR);
+  mkdirSync(tasksDir, { recursive: true });
+  writeFileSync(join(tasksDir, `task-${taskId}.json`), JSON.stringify(task, null, 2), 'utf-8');
+
+  // Gap G fix: buildWorkerPrompt(task, agentPrompt?, skillPrompts?) — do NOT pass projectRoot
+  // as agentPrompt. No agent/skill prompt resolution here (task-mode fast path).
+  const prompt = buildWorkerPrompt(task);
 
   // Emit event for nervous system / observers
   try {
@@ -104,8 +119,8 @@ export function runTaskMode(
     // Never let event emission break task execution
   }
 
-  // Spawn worker
-  const { backend, provider } = spawnWorkerMultiProvider(
+  // Spawn worker — forward provider hint so dynamic ollama tags are pre-registered
+  const { backend, provider } = await spawnWorkerMultiProvider(
     taskId,
     model,
     prompt,
@@ -115,6 +130,7 @@ export function runTaskMode(
       spawnBackend: config.spawn_backend,
       dockerImage: config.docker_image,
       dockerTimeout: config.docker_timeout,
+      provider: ctx.provider,
     },
   );
 

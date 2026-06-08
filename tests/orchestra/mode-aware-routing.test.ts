@@ -6,18 +6,23 @@
  * runTaskMode rejects sprint mode, and task mode bypasses sprint lifecycle.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { SprintPhase } from '../../src/core/types.js';
 import type { ResolvedConfig } from '../../src/core/config-types.js';
 
 // ─── Mocks ──────────────────────────────────────────────────────────
 
-// Mock spawn backend to prevent actual process spawning
+// Mock spawn backend to prevent actual process spawning.
+// spawnWorkerMultiProvider is now async — return a resolved promise so
+// runTaskMode (also now async) can await it correctly.
 vi.mock('../../src/cli/commands/spawn.js', () => ({
-  spawnWorkerMultiProvider: vi.fn(() => ({
+  spawnWorkerMultiProvider: vi.fn().mockResolvedValue({
     backend: 'subprocess',
     provider: 'claude',
-  })),
+  }),
   buildAllowedToolsFromScope: vi.fn(() => undefined),
 }));
 
@@ -88,8 +93,17 @@ function makeConfig(overrides: Partial<ResolvedConfig> = {}): ResolvedConfig {
 // ─── Tests ──────────────────────────────────────────────────────────
 
 describe('Mode-Aware Routing', () => {
+  // Unique per-test tmpdir so runTaskMode's task JSON write (Gap E) is hermetic
+  // and does not leave stray files in /tmp under fixed names.
+  let testRoot: string;
+
   beforeEach(() => {
     vi.clearAllMocks();
+    testRoot = mkdtempSync(join(tmpdir(), 'mode-aware-routing-'));
+  });
+
+  afterEach(() => {
+    rmSync(testRoot, { recursive: true, force: true });
   });
 
   // Test 1: config.deckent_style='sprint' → runSprint OK (mode guard doesn't block)
@@ -119,14 +133,14 @@ describe('Mode-Aware Routing', () => {
 
   describe('runTaskMode', () => {
     // Test 3: runTaskMode → taskId + backend returned
-    it('should return taskId and backend info', () => {
+    it('should return taskId and backend info', async () => {
       const config = makeConfig({ deckent_style: 'task' });
       const ctx: TaskModeContext = {
         description: 'Test task for mode routing',
-        projectRoot: '/tmp/test-project',
+        projectRoot: testRoot,
       };
 
-      const result = runTaskMode(ctx, config);
+      const result = await runTaskMode(ctx, config);
 
       expect(result.taskId).toMatch(/^run-test-/);
       expect(result.backend).toBe('subprocess');
@@ -134,15 +148,15 @@ describe('Mode-Aware Routing', () => {
     });
 
     // Test 4: runTaskMode with task style → success + event emitted
-    it('should emit TASK_MODE_START event', () => {
+    it('should emit TASK_MODE_START event', async () => {
       const config = makeConfig({ deckent_style: 'task' });
       const ctx: TaskModeContext = {
         description: 'Emit event test',
         model: 'haiku',
-        projectRoot: '/tmp/test-project',
+        projectRoot: testRoot,
       };
 
-      runTaskMode(ctx, config);
+      await runTaskMode(ctx, config);
 
       expect(mockEmit).toHaveBeenCalledWith(
         'deckent-event',
@@ -154,28 +168,28 @@ describe('Mode-Aware Routing', () => {
       );
     });
 
-    // Test 5: runTaskMode with sprint style → throws (mismatch guard)
-    it('should throw when config is sprint mode', () => {
+    // Test 5: runTaskMode with sprint style → rejects (mismatch guard now async)
+    it('should throw when config is sprint mode', async () => {
       const config = makeConfig({ deckent_style: 'sprint' });
       const ctx: TaskModeContext = {
         description: 'Should fail',
-        projectRoot: '/tmp/test-project',
+        projectRoot: testRoot,
       };
 
-      expect(() => runTaskMode(ctx, config)).toThrow(
+      await expect(runTaskMode(ctx, config)).rejects.toThrow(
         /config\.deckent_style !== "task"/,
       );
     });
 
     // Test 6: Task mode bypasses PLAN/SPAWN/EXECUTE/EVALUATE phases
-    it('should bypass sprint lifecycle phases', () => {
+    it('should bypass sprint lifecycle phases', async () => {
       const config = makeConfig({ deckent_style: 'task' });
       const ctx: TaskModeContext = {
         description: 'Direct execution — no sprint lifecycle',
-        projectRoot: '/tmp/test-project',
+        projectRoot: testRoot,
       };
 
-      const result = runTaskMode(ctx, config);
+      await runTaskMode(ctx, config);
 
       // Verify spawnWorkerMultiProvider was called directly (no plan/spawn/evaluate phases)
       expect(spawnWorkerMultiProvider).toHaveBeenCalledTimes(1);
@@ -183,7 +197,7 @@ describe('Mode-Aware Routing', () => {
         expect.stringMatching(/^run-test-/),
         'sonnet', // default model
         'mock-prompt',
-        '/tmp/test-project',
+        testRoot,
         expect.objectContaining({ autoApprove: false }),
       );
 
@@ -197,15 +211,15 @@ describe('Mode-Aware Routing', () => {
     });
 
     // Test 7: Task mode event stream TASK_MODE_START visible with correct payload
-    it('should include description and timestamp in event', () => {
+    it('should include description and timestamp in event', async () => {
       const config = makeConfig({ deckent_style: 'task' });
       const ctx: TaskModeContext = {
         description: 'Event payload check',
         model: 'opus',
-        projectRoot: '/tmp/test-project',
+        projectRoot: testRoot,
       };
 
-      runTaskMode(ctx, config);
+      await runTaskMode(ctx, config);
 
       expect(mockEmit).toHaveBeenCalledWith(
         'deckent-event',
@@ -221,7 +235,7 @@ describe('Mode-Aware Routing', () => {
     });
 
     // Test 8: Custom scope and options forwarded correctly
-    it('should forward scope and options to spawn backend', () => {
+    it('should forward scope and options to spawn backend', async () => {
       const config = makeConfig({
         deckent_style: 'task',
         spawn_backend: 'docker',
@@ -233,16 +247,16 @@ describe('Mode-Aware Routing', () => {
         scope: { directories: ['src/core/'], filesWrite: ['src/core/config.ts'] },
         model: 'opus',
         autoApprove: true,
-        projectRoot: '/tmp/scoped-project',
+        projectRoot: testRoot,
       };
 
-      const result = runTaskMode(ctx, config);
+      await runTaskMode(ctx, config);
 
       expect(spawnWorkerMultiProvider).toHaveBeenCalledWith(
         expect.any(String),
         'opus',
         'mock-prompt',
-        '/tmp/scoped-project',
+        testRoot,
         expect.objectContaining({
           autoApprove: true,
           spawnBackend: 'docker',
