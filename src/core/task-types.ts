@@ -3,6 +3,7 @@
 // Model data is now delegated to ModelRegistry (single source of truth).
 
 import { modelRegistry } from './model-registry.js';
+import type { TaskKind } from './work-model.js';
 
 // ─── Models ──────────────────────────────────────────────────────────
 
@@ -240,6 +241,8 @@ export interface Task {
   dependencies: string[];
   goNogo: GoNoGoCriteria;
   status: TaskStatus;
+  /** Canonical work-model kind (WM-2a, optional/additive). Set at plan-time by future consumers. */
+  type?: TaskKind;
   sprintId?: string;
   assignedWorker?: string;
   isPriorityFix?: boolean;
