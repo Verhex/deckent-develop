@@ -1,38 +1,40 @@
-# DIRECTIVES — Sprint 242: Provider-Free Safe Fixes (WM-5-safe)
+# DIRECTIVES — Sprint 243: Multi-Provider Docs ↔ Code Reality (WK-8)
 
-## Goal: WM-5 provider-free hard-enforce'un **iki düşük-risk parçası** (docker-spawn-path'e DOKUNMAZ → gece-güvenli): (a) MCP `deckent_run` `provider:'claude'` **hardcode'unu kaldır** → task'ın gerçek provider'ını onurla; (b) autonomous `task-mode-runner` **always-generic** worker'ı düzelt → CLI `run`'ın yaptığı gibi agent/skill resolve+inject et. **YÜKSEK-risk parçalar (CLAUDE_AUTH_REQUIRED guard + claudeArgs non-claude, spawn-backend-docker) bu sprint'te YOK** — gündüz-reviewed (deckent'in kendi docker-spawn'ı = gece-loop'un can damarı).
+## Goal: `docs/reference/multi-provider.md` + `docs/guide/multi-provider.md`'yi **kod gerçeğine göre** düzelt (W-K item 8 drift). Mevcut docs yanıltıcı: Gemini'nin `gemini` CLI gerektirdiğini gizliyor, ollama/deepseek/qwen/glm'den hiç bahsetmiyor (hepsi implement+bootstrap-registered), şüpheli auth komutları içeriyor. **DOC-ONLY — sıfır kod/test riski.** Bu sprint **yerel qwen3.6 (ollama, zero-cost)** worker ile koşar — mixed-fleet/local-model combined-power canlı kanıtı; Brain/ben kod-gerçeğine karşı disk-verify ederim.
 
 ## Ortak kurallar
-- **Backward-safe:** agent/skill resolution additive (resolve başarısız→generic fallback korunur); MCP-run provider artık task'tan gelir (claude default kalabilir ama hardcode değil — task.provider öncelikli). **i18n** muaf. **ESM `.js`.** No tech debt. ADR-066 (provider independence) realize.
-- **.result kontratı** api-surface.md. Tier-0/internal → unit-test yeterli (MCP-run + autonomous flag-gated, ana sprint-path'e dokunmaz → orchestration-smoke gerekmez, ben tsc+test+build doğrularım).
+- Markdown doğruluğu (i18n muaf — doküman içeriği). No tech debt. Mevcut doğru kısımları koru, yanlışları düzelt, eksikleri ekle. Tier-0 doc-write → test yok; doğruluk = kod-gerçeğiyle uyum.
 
 ---
 
-## Task 1: 242-001 — MCP-run provider-free + autonomous agent/skill inject
-- Provider: claude
-- Model: sonnet
+## Task 1: 243-001 — multi-provider docs kod-gerçeğine hizala
+- Provider: ollama
+- Model: qwen3.6:27b
 - Effort: normal
-- Agent: api-builder
-- Skills: typescript-expert, api-builder, testing-expert
-- Files: src/mcp/tools/run.ts, src/orchestra/task-mode-runner.ts, tests/mcp/run-provider-free.test.ts, tests/orchestra/task-mode-agent-inject.test.ts
-- Scope: src/mcp/, src/orchestra/, tests/mcp/, tests/orchestra/
+- Agent: doc-writer
+- Skills: documentation-writer, docs
+- Files: docs/reference/multi-provider.md, docs/guide/multi-provider.md
+- Scope: docs/reference/, docs/guide/
 
 ### Description
-Önce oku: `src/mcp/tools/run.ts` (mevcut `provider:'claude'` hardcode, ~satır 63), `src/cli/commands/run.ts` (referans: `resolveAgentPrompt`/`resolveSkillPrompts`/`buildWorkerPrompt`/`spawnWorkerMultiProvider` deseni), `src/orchestra/task-mode-runner.ts` (mevcut generic `buildWorkerPrompt(task)`, ~satır 104-106).
+Önce şu kod dosyalarını OKU + doğrula: `src/core/provider.ts` (bootstrapProviders: hangi provider'lar register oluyor), `src/providers/gemini.ts` (özellikle ~satır 294 `spawnSync('gemini','--version')` ve ~212-216 apiKey-zorunlu throw), `src/providers/codex.ts` (CodexAuthMode subscription/api_key), `src/providers/ollama.ts` (host HTTP), `src/providers/openai-compatible.ts` (DeepSeek/Qwen/GLM presetleri). Sonra iki dokümanı kod-gerçeğine göre yeniden yaz.
 
-**Fix A — MCP run provider-free:** `src/mcp/tools/run.ts`'te `provider:'claude'` hardcode'unu kaldır → task'ın provider'ını input/task'tan al (verilmezse config-default; ASLA literal 'claude' zorla). Mümkünse CLI-run gibi `spawnWorkerMultiProvider`/provider-resolution yoluna hizala (isAdapterProvider routing korunur). Minimum-diff.
+**Düzeltilecek kod-gerçeği fact'leri (kod'dan doğrula, doğruysa yaz):**
+1. **Gemini `gemini` CLI gerektirir** (`gemini.ts` `spawnSync('gemini','--version')`); API-key da zorunlu (`gemini.ts:212-216` apiKey yoksa throw) → docs "API-only" izlenimini düzelt; Gemini için hem CLI hem key gerektiğini açıkça yaz.
+2. **Ollama** (yerel, host `localhost:11434`, zero-cost, never-calls-home) + **OpenAI-compatible** providers **DeepSeek / Qwen / GLM** (bootstrap'ta DEEPSEEK/DASHSCOPE/ZHIPU key varsa register) — **docs bunlardan HİÇ bahsetmiyor → EKLE** (kurulum + env-key + örnek).
+3. **Codex** subscription VEYA api_key (`codex auth status`) — auth komutlarını kod'a göre düzelt; şüpheli `codex auth login`/`gemini auth login` komutlarını kod-gerçeğiyle değiştir (yanlışsa kaldır).
+4. Provider matrisini güncel tut: claude (subscription/docker), codex (subs/api CLI), gemini (CLI+key), ollama (host/zero-cost), deepseek/qwen/glm (openai-compat/key).
 
-**Fix B — autonomous agent/skill inject:** `src/orchestra/task-mode-runner.ts`'te generic `buildWorkerPrompt(task)` yerine CLI-run deseni: `resolveAgentPrompt(root, task)` + `resolveSkillPrompts(root, task)` → `buildWorkerPrompt(task, agentPrompt, skillPrompts)`. Resolve başarısız/boş→generic fallback (backward-safe). Autonomous task'lar artık domain-expertise + skill taşır (sprint task'larıyla parity).
+Açık başlıklar, kısa kurulum örnekleri, env-var tablosu. Mevcut doğru bilgiyi koru.
 
-**Kanıt:** `grep -c "provider:\s*'claude'" src/mcp/tools/run.ts` → 0 (hardcode gitti) · `grep "resolveAgentPrompt\|resolveSkillPrompts" src/orchestra/task-mode-runner.ts` → eklendi · `npx tsc --noEmit` temiz.
+**Kanıt:** `grep -il "ollama\|deepseek\|qwen\|glm" docs/reference/multi-provider.md docs/guide/multi-provider.md` → eklendi · "gemini" CLI gereği geçer · şüpheli auth-login komutları düzeltildi/kaldırıldı. Bitince `task_done` ile DONE.
 
-**Test (≥6):** `tests/mcp/run-provider-free.test.ts` — MCP-run task.provider'ı onurlar, literal-claude zorlamaz (2+); `tests/orchestra/task-mode-agent-inject.test.ts` — task-mode worker prompt'una agent/skill enjekte edilir, resolve-fail→generic fallback (3+); hermetik. Yeni testler yeşil + **mevcut mcp-run / task-mode testleri BOZULMAZ**.
-
-**Smoke:** yok (MCP-run + autonomous flag-gated; ana CLI-start spawn-path etkilenmez). Ben tsc+test+build doğrularım.
+**Test:** yok (doc-write).
+**Smoke:** (doc) disk-verify — Brain/ben iki doc'u kod-gerçeğine karşı kontrol eder (özellikle gemini CLI gereği + ollama/deepseek/qwen/glm varlığı).
 
 ---
 
-**Beklenen:** 1/1 DONE. MCP-run artık provider-free; autonomous task'lar agent/skill taşır. Disk-verify: hardcode-0 + inject-var + fallback + tsc temiz + yeni test + mevcut testler yeşil + memory wipe-check. **docker-spawn-path (spawn-backend-docker) DOKUNULMADI** (gündüz-reviewed).
+**Beklenen:** 1/1 DONE. İki multi-provider doc kod-gerçeğiyle hizalı. **243-001 qwen3.6 (host, zero-cost) tarafından üretilir** — combined-power kanıtı. Disk-verify: ollama/deepseek/qwen/glm eklendi + gemini-CLI gereği + auth-komutları kod-uyumlu + markdown anlamlı.
 
-İlgili ADR: ADR-066 (provider independence) · ADR-027 (spawn backend) · ADR-041 (agent taxonomy). Memory: [[project_merged_product_flow_analysis]] (MCP-run hardcode + autonomous=generic bulguları) · [[sprint_241_effectclass_wire]] · [[feedback_trust_brain_eval_not_worker]].
+İlgili: [[project_merged_product_flow_analysis]] (W-K provider-docs drift) · [[sprint_242_provider_free_safe]] · [[project_4cli_subscription_vision]] · ADR-066/077.
 </content>
