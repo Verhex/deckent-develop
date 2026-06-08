@@ -2,6 +2,15 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint242] - 2026-06-08
+
+### Added
+
+- 242-001 — MCP-run provider-free + autonomous agent/skill inject
+
+
+_Tasks: 1 total, 1 done, 0 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint241] - 2026-06-08
 
 ### Added
