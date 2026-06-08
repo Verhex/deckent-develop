@@ -134,17 +134,10 @@ kendimenot.md
 # Core memory backup (local mirror of user-level memory — never publish)
 docs/core-memory/
 
-# Private brain / internal planning docs (local only, never publish)
-docs/alperen-analysis/
-docs/MASTER-PLAN.md
-docs/MASTER-PLAN-TR.md
-docs/vision/
-docs/superpowers/
-docs/audits/
-docs/adr/
-docs/sprints/
-docs/SPRINT-LOG.md
-docs/archive/
+# Internal planning/strategy docs are TRACKED here (this is the private DEVELOP repo,
+# VerhexIO/deckent-develop, ADR-065). They were LOST once (2026-06-08) when gitignored +
+# swept by git clean/stash — gitignoring removed git's protection. Track them, don't ignore.
+# The separate PUBLIC product repo excludes these via its own export tooling, not gitignore here.
 .brain/archive/
 # Test temp dir leaks + editor backups (not source)
 .test-archive-debt-*/
