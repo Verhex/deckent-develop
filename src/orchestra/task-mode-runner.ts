@@ -13,10 +13,12 @@
 import { join } from 'node:path';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import type { ModelType } from '../core/types.js';
+import type { Task } from '../core/types.js';
 import type { ResolvedConfig } from '../core/config-types.js';
 import { buildRunTask, createRunTaskId } from '../cli/commands/run.js';
 import { spawnWorkerMultiProvider } from '../cli/commands/spawn.js';
 import { buildWorkerPrompt } from './task-builder.js';
+import { resolveAgentPrompt, resolveSkillPrompts } from './result-collector.js';
 import { eventBus } from './event-bus.js';
 import { TASKS_DIR } from '../core/constants.js';
 
@@ -101,9 +103,11 @@ export async function runTaskMode(
   mkdirSync(tasksDir, { recursive: true });
   writeFileSync(join(tasksDir, `task-${taskId}.json`), JSON.stringify(task, null, 2), 'utf-8');
 
-  // Gap G fix: buildWorkerPrompt(task, agentPrompt?, skillPrompts?) — do NOT pass projectRoot
-  // as agentPrompt. No agent/skill prompt resolution here (task-mode fast path).
-  const prompt = buildWorkerPrompt(task);
+  // Resolve agent and skill prompts for domain-expertise parity with sprint tasks.
+  // Both resolve to undefined/[] for 'generic' agent or empty skills — backward-safe fallback.
+  const agentPrompt = await resolveAgentPrompt(projectRoot, task as unknown as Task);
+  const skillPrompts = await resolveSkillPrompts(projectRoot, task as unknown as Task);
+  const prompt = buildWorkerPrompt(task, agentPrompt, skillPrompts);
 
   // Emit event for nervous system / observers
   try {

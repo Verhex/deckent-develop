@@ -40,6 +40,9 @@ export function registerRunTool(server: McpServer): void {
         mkdirSync(tasksDir, { recursive: true });
 
         const directories = scope ? scope.split(',').map((s) => s.trim()) : ['src/'];
+
+        // Load config first so provider comes from config, not hardcoded 'claude'
+        const cfg = await loadConfig(root);
         const task = {
           id: taskId,
           title: description.slice(0, 80),
@@ -60,7 +63,7 @@ export function registerRunTool(server: McpServer): void {
           createdAt: new Date().toISOString(),
           assignedAgent: 'generic',
           assignedSkills: [],
-          provider: 'claude',
+          provider: cfg.worker_provider ?? cfg.brain_provider,
         };
 
         writeFileSync(join(tasksDir, `task-${taskId}.json`), JSON.stringify(task, null, 2) + '\n');
@@ -69,9 +72,6 @@ export function registerRunTool(server: McpServer): void {
         const agentPrompt = await resolveAgentPrompt(root, task as Task);
         const skillPrompts = await resolveSkillPrompts(root, task as Task);
         const prompt = buildWorkerPrompt(task as Task, agentPrompt, skillPrompts);
-
-        // Spawn worker via config-aware backend (docker/tmux/subprocess/auto)
-        const cfg = await loadConfig(root);
         const backend = SpawnBackendFactory.create({
           backend: cfg.spawn_backend ?? 'auto',
           projectDir: root,
