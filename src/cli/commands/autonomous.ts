@@ -41,6 +41,7 @@ import type { BacklogEntry } from '../../orchestra/autonomous/backlog-types.js';
 import { runTaskMode } from '../../orchestra/task-mode-runner.js';
 import { runSprint as runSprintLifecycle } from '../../orchestra/sprint-controller.js';
 import { loadConfig } from '../../core/config.js';
+import { bootstrapProviders } from '../../core/provider.js';
 import type { ModelType } from '../../core/types.js';
 import { loadReactiveMap } from '../../orchestra/autonomous/reactive/reactive-map.js';
 import { makeReactiveIngester } from '../../orchestra/autonomous/reactive/reactive-ingester.js';
@@ -165,6 +166,11 @@ export async function handleStart(opts: AutonomousStartOptions): Promise<void> {
     print(getMessage('autonomous.disabled', lang));
     return;
   }
+
+  // Gap A fix: register provider adapters (including OllamaAdapter) so that
+  // getProviderAdapterForTask('ollama') resolves correctly for autonomous tasks.
+  // bootstrapProviders is idempotent and safe-no-op when a provider is unreachable.
+  await bootstrapProviders(resolvedConfig);
 
   // Clear any stale stop marker before starting.
   const stopFile = stopMarkerPath(root);

@@ -10,12 +10,15 @@
 //   - `deckent_run` MCP tool (task mode)
 //   - Any future task-mode entrypoint
 
+import { join } from 'node:path';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import type { ModelType } from '../core/types.js';
 import type { ResolvedConfig } from '../core/config-types.js';
 import { buildRunTask, createRunTaskId } from '../cli/commands/run.js';
 import { spawnWorkerMultiProvider } from '../cli/commands/spawn.js';
 import { buildWorkerPrompt } from './task-builder.js';
 import { eventBus } from './event-bus.js';
+import { TASKS_DIR } from '../core/constants.js';
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -93,8 +96,14 @@ export async function runTaskMode(
   const taskId = createRunTaskId();
   const task = buildRunTask(taskId, ctx.description, model, scopeDir);
 
-  // Build prompt
-  const prompt = buildWorkerPrompt(task, projectRoot);
+  // Gap E: write task JSON so agentic-worker-entry can read its spec (mirrors run.ts:261-263)
+  const tasksDir = join(projectRoot, TASKS_DIR);
+  mkdirSync(tasksDir, { recursive: true });
+  writeFileSync(join(tasksDir, `task-${taskId}.json`), JSON.stringify(task, null, 2), 'utf-8');
+
+  // Gap G fix: buildWorkerPrompt(task, agentPrompt?, skillPrompts?) — do NOT pass projectRoot
+  // as agentPrompt. No agent/skill prompt resolution here (task-mode fast path).
+  const prompt = buildWorkerPrompt(task);
 
   // Emit event for nervous system / observers
   try {
