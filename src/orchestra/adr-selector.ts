@@ -9,6 +9,7 @@
 
 import type { Task } from '../core/task-types.js';
 import type { MemoryEntryV2 } from '../core/memory-types.js';
+import { taskKindToAdrDomain } from '../core/work-model.js';
 
 // ─── Public Types ────────────────────────────────────────────────────
 
@@ -268,14 +269,16 @@ function scoreAgePenalty(adr: MemoryEntryV2, currentSprintNum: number): { score:
  * @returns Ranked list of relevant ADRs with scores and match reasons
  */
 export function selectRelevantAdrs(
-  task: Pick<Task, 'scope' | 'title' | 'description'>,
+  task: Pick<Task, 'scope' | 'title' | 'description' | 'type'>,
   allAdrs: MemoryEntryV2[],
   topN: number = 3,
   currentSprintNum: number = 146,
 ): AdrRelevance[] {
   if (!allAdrs || allAdrs.length === 0) return [];
 
-  const intent = classifyTaskIntent(task);
+  // Canonical path (WM-2c): task.type (TaskKind) set → derive ADR domain from SSOT adapter.
+  // Legacy fallback: classifyTaskIntent, backward-compatible when task.type absent.
+  const intent = task.type != null ? taskKindToAdrDomain(task.type) : classifyTaskIntent(task);
   const taskText = `${task.title ?? ''} ${task.description ?? ''}`;
   const taskDirs = task.scope?.directories ?? [];
 

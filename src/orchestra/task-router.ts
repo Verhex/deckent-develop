@@ -12,6 +12,8 @@ import type { SprintHistory } from './timeout-estimator.js';
 import { writeEvent, CHANNELS } from './event-stream.js';
 import { getUserSurfaceBonus, USER_SURFACE_AGENTS } from '../core/routing-engine.js';
 import { classifyIntent } from '../core/intent-classifier.js';
+import { taskKindToIntent } from '../core/work-model.js';
+import type { IntentType } from '../core/routing-types.js';
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -62,6 +64,22 @@ const TASK_TYPE_TO_ROUTING_KEY: Record<TaskType, keyof SkillRoutingConfig | null
   test: 'testing',
   doc: 'docs',
   code: null,
+  unknown: null,
+};
+
+/** Canonical routing-key lookup for IntentType (WM-2c bridge — mirrors TASK_TYPE_TO_ROUTING_KEY semantics) */
+const INTENT_TO_ROUTING_KEY: Record<IntentType, keyof SkillRoutingConfig | null> = {
+  documentation: 'docs',
+  design: 'design',
+  implementation: null,
+  bugfix: null,
+  refactor: null,
+  security: null,
+  devops: null,
+  config: null,
+  performance: null,
+  migration: null,
+  architecture: null,
   unknown: null,
 };
 
@@ -259,7 +277,11 @@ export function routeTask(
   const routing = config.skill_routing;
 
   // ─── Priority 1: Config override via skill_routing ────────────────
-  const routingKey = TASK_TYPE_TO_ROUTING_KEY[taskType];
+  // Canonical path (WM-2c): task.type (TaskKind) set → derive routing key via SSOT adapter.
+  // Legacy fallback: scope-shape detectTaskType, backward-compatible when task.type absent.
+  const routingKey = task.type != null
+    ? INTENT_TO_ROUTING_KEY[taskKindToIntent(task.type)]
+    : TASK_TYPE_TO_ROUTING_KEY[taskType];
   if (routingKey && routing) {
     const configProvider = routing[routingKey];
     if (configProvider && isProviderName(configProvider)) {
