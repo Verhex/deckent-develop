@@ -1,5 +1,0 @@
-# Archive gitignore — Sprint 172 B2
-# Blanket !* removed. Root .gitignore patterns now apply:
-#   sprint-*-tasks/, sprint-*.md, retro-sprint-*.md, pre-v2/, sprint-*_*.pid, *.snapshot.json
-# Tracked files (not covered by root patterns, intentionally kept):
-#   DEBT-ARCHIVE.md, DIRECTIVES-sprint-*.md

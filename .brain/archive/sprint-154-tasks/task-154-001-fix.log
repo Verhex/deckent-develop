@@ -1,9 +1,0 @@
-Result yazıldı. Özet:
-
-**Task 154-001-fix sonucu: DONE (no-op fix)**
-
-- `src/orchestra/rubric-registry.ts` zaten 196 LoC ile DIRECTIVES Task 1 spec'ini %100 karşılıyor — kod değişikliği gerekmedi
-- Doğrulamalar: `tsc --noEmit` 0 hata; 26/26 rubric-registry testi + 9/9 result-evaluator-typed testi = 35/35 pass
-- 9 export tam (TaskType + 3 rubric + 5 fonksiyon), rubric ağırlıkları spec ile birebir, `result-evaluator.ts`'ye gerçek import yok (sadece JSDoc yorumunda referans), `Object.freeze`'li registry, 3 rubric için SECURITY JSDoc notu mevcut
-- Önceki NO_GO sebebi: `result-evaluator.ts`'deki kapsam dışı tsc hataları — şimdi temizlenmiş
-- Coverage:null bilinçli (verify-only task, kod üretimi yok); registry'nin kendi dogfood'u

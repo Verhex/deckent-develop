@@ -55,7 +55,7 @@ describe('getEffectClass — detectTaskType+getEffectClass composition', () => {
       scope: {
         directories: ['docs/security/'],
         filesRead: [],
-        filesWrite: ['docs/security/sprint-156-review.md'],
+        filesWrite: ['docs/security/threat-model.md'],
       },
     });
 

@@ -1,9 +1,0 @@
-Görev tamamlandı.
-
-**Özet:**
-- `tests/orchestra/brain-crash-injection.test.ts` — 6 senaryo (S1–S6), 6/6 PASS
-- `tests/e2e/sprint-160-smoke.test.ts` — 3 e2e (phase transitions, eventStreamOffset, monotonic sequence), 3/3 PASS
-- Toplam: **9/9 PASS**, kanıt `grep -nE "S[1-6]:" tests/orchestra/brain-crash-injection.test.ts` → 18 match (≥6 hedef karşılandı)
-- T-004'ün `restoreSprintFromCheckpoint` fonksiyonu kaynak ağacına inmiş — S1/S4/S5 doğrudan onu test ediyor
-- Regression check: ilgili 5 dosyada 45/45 PASS; geniş `tests/orchestra` run'ında 10 fail var ama hepsi `sprint-phases.ts` / `sprint-controller.ts`'i değiştiren Task 1+2 kaynaklı, benim dosyalarım sadece yeni `.test.ts` ekliyor
-- `selfAssessment: DONE`, `.result` yazıldı

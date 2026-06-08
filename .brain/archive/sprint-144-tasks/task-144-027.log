@@ -1,9 +1,0 @@
-`★ Insight ─────────────────────────────────────`
-MemoryStore'un `getById` metodu tags'ı ayrı `tags` tablosundan yüklemez — sadece `entries` tablosundaki satırı döner. Tags'a erişmek için ayrı `getTagsForEntry(id)` metodu çağrılmalı. Bu SQLite join yerine ayrı sorgu pattern'ı, Memory V2'nin tasarım tercihini yansıtıyor.
-`─────────────────────────────────────────────────`
-
-Görev tamamlandı. **27 test geçiyor** (orijinal 17 + 10 yeni DB-write coverage testi).
-
-Eklenen yeni test grupları:
-1. **`appendCiHealthToRetro — DB-write coverage`** (6 test): DB'ye upsert, içerik doğrulama, idempotency, store yok durumu, rapor yok durumu, tags kontrolü
-2. **`appendCiLearningsToMemory — DB-write coverage`** (3 test): ci-learnings-latest upsert, store yok no-op, idempotency

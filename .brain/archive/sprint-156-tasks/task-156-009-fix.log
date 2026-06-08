@@ -1,8 +1,0 @@
-Worker görevi tamamlandı.
-
-**Özet:**
-- **Baseline doğrulandı:** `src/core/spawn-safety.ts` (157→168 LoC) ve 26 test, fix öncesi ve sonrası 26/26 yeşil.
-- **In-scope düzenleme:** `spawn-safety.ts` header JSDoc'una "Threat model boundary" alt başlığı eklendi — sh/bash whitelist'ten neden çıkarıldığını ve gelecekteki `sh -c` ihtiyacının çift override pattern'ini açıklıyor. Davranış değişikliği yok, yeni export yok.
-- **Scope kararı:** `src/orchestra/spawn-backend-docker.ts` wire-up'ı bu fix prompt'unun `filesWrite` listesinde YOK (`src/core/` + `tests/core/` ile sınırlı). Worker rule + DIRECTIVES anchor "SCOPE İZOLE" gereği orchestra'ya dokunmadım.
-- **Sonuç:** `GO_WITH_TECH_DEBT` — in-scope iş %100, spec-level iş ~%75 (wire-up yapısal olarak ulaşılamaz). Brain'e açık not: Aynı scope ile yeniden spawn etmek bu işi ilerletmez; orchestra wire-up için scope'un genişletilmesi gerekir.
-- **Verify:** `npx vitest run tests/core/spawn-safety.test.ts` → 26/26 ve targeted `tsc --noEmit` temiz. BUILD YASAK + TEST İZOLE anchor kurallarına uyuldu.

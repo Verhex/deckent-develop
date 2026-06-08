@@ -1,8 +1,0 @@
-Görev tamamlandı. Doğrulama sonuçları:
-
-- `tests/orchestra/rubric-registry.test.ts` zaten orijinal 154-005 worker'ı tarafından doğru şekilde teslim edilmiş (367 satır, 26 test).
-- `npx vitest run tests/orchestra/rubric-registry.test.ts` → 26/26 PASS (3ms).
-- `npx tsc --noEmit` → exit 0, repo genelinde 0 hata. Önceki rapordaki unused-import uyarıları (154-002/154-003 paralelinden) temizlenmiş.
-- Test kapsamı tam: isAuditTask (7), isDocumentWriteTask (8), detectTaskType (5), getRubric (3), coverageOptional (3) — toplam 26 test, AAA pattern, doğru `describe` gruplaması.
-
-**Sonuç:** 154-005'in orijinal NO_GO'su zaten bu sprint'in hedeflediği **Bug B**'nin canlı tezahürüydü — tests/ task'ının `coverage:null` ile reddedilmesi. Kod değişikliği gerekmedi; deliverable test suite'in sağlamlığının ampirik yeniden doğrulamasıdır. selfAssessment: **DONE**, `.tasks/task-154-005-fix.result` yazıldı.

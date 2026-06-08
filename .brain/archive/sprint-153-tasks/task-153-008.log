@@ -1,6 +1,0 @@
-Task 153-008 tamamlandı. `docs/smoke-2026-05-12/T-SMOKE-08.md` dosyası 679 kelime ile oluşturuldu. Belgede şunlar yer alıyor:
-
-- **Sprint Kill kuralları** — kullanıcı onayı zorunluluğu, `KILL_LIVE_SPRINT` locked_action, onaysız kill'in maliyeti
-- **ADR-022-V2 CLI/MCP parity** — `deckent kill` ↔ `deckent_kill`, `deckent cleanup` ↔ `deckent_cleanup` tam simetri tablosu
-- **Cleanup disiplini** — 5 aşamalı sıralı akış: `.tasks/` arşivleme → `.deckent/jobs/` persist → lock release → metrics rotation → retention policy
-- **Retention politikası** — `keep_last_n: 10`, `size_cap_mb: 500`, gzip arşivleme

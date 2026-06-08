@@ -1,1 +1,0 @@
-{"taskId":"151-014","workerId":"docker-151-014","filesChanged":[],"linesAdded":0,"linesRemoved":0,"testsPassed":false,"coverage":0,"selfAssessment":"NO_GO","exitCode":0,"notes":"Worker exited without writing result (exitCode=0)","tokenUsage":{"inputTokens":0,"outputTokens":0,"cacheReadTokens":0,"provider":"claude","model":"opus"}}

@@ -1,9 +1,0 @@
-Task 169-001-fix tamamlandı. Özet:
-
-**Yapılan değişiklik:** `src/orchestra/sprint-spawner.ts`'e `normalizeScopeFiles()` fonksiyonu eklendi ve `spawnWorkers` içinde `detectScopeCollisions` çağrısından önce path normalizasyonu yapan bir pre-pass wired edildi.
-
-**RC:** `detectScopeCollisions` yalnızca `file.trim()` yapıyordu — `./src/foo.ts` ile `src/foo.ts` aynı dosya sayılmıyordu, dolayısıyla 2+ writer threshold'ı hiç tetiklenmiyordu.
-
-**Fix:** Üç normalizasyon adımı: `./` prefix kaldır → `//` tekrarlı slash'ları daralt → trailing `/` kaldır. Her path varyantı artık aynı canonical key'e dönüşür.
-
-**Test sonucu:** 11/11 test PASS (7 unit + 3 integration + 1 spawnWorkers live-wire SPAWN_BLOCKED event testi). Orchestra suite 4391 test — 0 regresyon.

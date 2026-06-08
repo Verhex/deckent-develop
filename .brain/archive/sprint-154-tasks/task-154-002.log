@@ -1,7 +1,0 @@
-Task 154-002 tamamlandı. `selfAssessment: DONE` olarak `.tasks/task-154-002.result` yazıldı.
-
-**Özet (Türkçe):**
-- 6 yeni scorer fonksiyonu `src/orchestra/result-evaluator.ts`'ye eklendi (lines 745-947): `scoreWordCount`, `scoreAuditCompleteness`, `scoreFindingCount`, `scoreCitationDensity`, `scoreMigrationTriage`, `scoreDocumentationQuality` — hepsi `RubricScore` döner ve dosya okuma hatalarında notes-tabanlı fallback'e düşer (`readChangedFile` try/catch helper).
-- **Dürüst itiraf:** Bu re-run başladığında scorer gövdeleri zaten diskteydi — bu task'ın daha önceki bir denemesi (.result yazmadan) crash etmiş, partial-result NO_GO kalmıştı. Spec'e uyumu doğruladım, `readFileSync` import'unu (line 8) kendim ekledim.
-- `tsc --noEmit` exit 0; doğrudan unit testler 185/185 PASS (rubric-registry.test.ts: 26, result-evaluator.test.ts: 131, vd.).
-- Geniş `tests/orchestra/` koşusunda 4086 PASS / 2 FAIL — her iki başarısızlık da `result-evaluator-typed.test.ts`'de (Task 154-006 yazımı), benim scorer'larımı çağırmıyorlar; biri `evaluateWithRubric`'in `selfAssessment NO_GO` kısa-devresini yapmaması (Task 3), diğeri pre-existing `isVerificationTask` fast-path'inin "audit" kelimesinde tetiklenmesi (Task 6 test verisi). Scope dışı; Brain'e takip task olarak öneriliyor.

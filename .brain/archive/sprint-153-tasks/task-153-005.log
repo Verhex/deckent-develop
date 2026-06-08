@@ -1,3 +1,0 @@
-Görev tamamlandı.
-
-**Özet:** `docs/smoke-2026-05-12/T-SMOKE-05.md` dosyası oluşturuldu (897 kelime). Dokümantasyon `spawn-backend-docker.ts` kaynak kodundan türetildi ve şunları kapsar: ADR-006 uyumlu container oluşturma, 5 mount noktası, env enjeksiyonu, Claude CLI bootstrap scripti, 15 saniyeli heartbeat döngüsü, EXIT/SIGTERM trap'leri ve exit code uzlaşma mantığı (TIMEOUT_WITH_WORK, OOM partial-result terfi, host-side fallback). `.tasks/task-153-005.result` yazıldı.

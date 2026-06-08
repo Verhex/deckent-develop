@@ -1,7 +1,0 @@
-**Fix özeti:**
-
-**Root cause:** `scripts/security/secret-baseline.mjs:70` satırında `scan()` fonksiyonu hem `check` hem `build-baseline` modunda aynı `allowed` set'ini mevcut baseline'dan yüklüyordu. Bu nedenle `--build-baseline` çalıştırıldığında mevcut 6 allowlist girdisi `allowed`'a ekleniyordu, tüm match'ler atlanıyordu ve boş bir baseline yazılıyordu. Sonraki `check` komutu ise allowlist boş olduğu için 6 hit tespit ederek exit 1 üretiyordu (CI kırılıyordu).
-
-**Fix:** `allowed` set'i mode'a göre koşullu — `build-baseline` modunda boş `Set()` kullanılır (tüm match'ler toplanır), `check` modunda mevcut allowlist kullanılır.
-
-**Doğrulama:** `--build-baseline` iki kez çalıştırıldığında her seferinde 6 entry üretiliyor (idempotent), `check` modu exit 0 ile geçiyor (5075 tracked file), `tsc --noEmit` temiz.

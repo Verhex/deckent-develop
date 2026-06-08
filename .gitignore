@@ -131,10 +131,21 @@ kendimenot.md
 .vitest-out*.txt
 .test-e2e*
 
-!.brain/archive/
-
 # Core memory backup (local mirror of user-level memory — never publish)
 docs/core-memory/
+
+# Private brain / internal planning docs (local only, never publish)
+docs/alperen-analysis/
+docs/MASTER-PLAN.md
+docs/MASTER-PLAN-TR.md
+docs/vision/
+docs/superpowers/
+docs/audits/
+docs/adr/
+docs/sprints/
+docs/SPRINT-LOG.md
+docs/archive/
+.brain/archive/
 # Test temp dir leaks + editor backups (not source)
 .test-archive-debt-*/
 *.md.bak

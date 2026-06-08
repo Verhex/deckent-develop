@@ -27,9 +27,6 @@ describe('docs/ directory structure', () => {
     expect(existsSync(join(DOCS_ROOT, 'release'))).toBe(true);
   });
 
-  it('docs/directives/ directory exists', () => {
-    expect(existsSync(join(DOCS_ROOT, 'directives'))).toBe(true);
-  });
 });
 
 // ─── Guide Files ──────────────────────────────────────────────────

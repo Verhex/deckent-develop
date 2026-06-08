@@ -55,8 +55,9 @@ Useful for CI or for placing the staging dir on a faster filesystem.
 
 The script keeps the exclude list as a single `EXCLUDE` array near the top of `scripts/sync-to-product.mjs`. It mirrors the Sprint 201 manual snapshot 1:1:
 
-- **Directories** (prefix match, trailing `/`): `.brain/`, `.deckent/archive/`, `docs/superpowers/`, `docs/directives/`, `docs/launch/`, `docs/release/`, `docs/development/`, `docs/archive/`, `docs/audits/`, `docs/alperen-analysis/`, `docs/core-memory/`
-- **Personal root markdowns**: `DIRECTIVES.md`, `RESUME-MONDAY.md`, `DECKENT-ANA-PLAN.md`, `DECKENT-ANA-PLAN-TR.md`, `NERVOUS-TODO.md`
+- **Directories** (prefix match, trailing `/`): `.brain/`, `.deckent/archive/`, `docs/superpowers/`, `docs/launch/`, `docs/release/`, `docs/development/`, `docs/archive/`, `docs/audits/`, `docs/alperen-analysis/`, `docs/core-memory/`
+- **Retired historical paths still excluded if present in old branches:** `docs/directives/`, `NERVOUS-TODO.md`
+- **Personal root markdowns**: `DIRECTIVES.md`, `RESUME-MONDAY.md`, `DECKENT-ANA-PLAN.md`, `DECKENT-ANA-PLAN-TR.md`
 - **Runtime state**: `.deckent/config.json`, `.deckent/config.json.bak`, `.deckent/provider-cache.json`, `.deckent/ci-baseline.json`
 
 To add or remove an entry, edit the `EXCLUDE` array and re-run the dry-run to confirm the new keep/drop counts make sense.

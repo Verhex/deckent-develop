@@ -1,9 +1,0 @@
-Görev 163-003 tamamlandı.
-
-**Özet:** `docs/adr/043-brain-crash-recovery-protocol.md` oluşturuldu (173 satır). ADR-043, Sprint 160–162'de üç ayrı commit'te gerçekleştirilen Brain crash recovery implementasyonunu MADR v3 hibrit formatında belgeler:
-
-1. **Katman 1** — `installCrashHandlers()` + `redactSensitive()` (commit `9c184a3`)
-2. **Katman 2** — Atomic checkpoint `.tmp` + `renameSync` (commit `8cefed0`)  
-3. **Katman 3** — `restoreSprintFromCheckpoint()` 3-action discrimination: `fresh` / `complete` / `resume-evaluate` (Sprint 162 T-004)
-
-Result dosyası `.tasks/task-163-003.result` olarak yazıldı, `selfAssessment: "DONE"`.

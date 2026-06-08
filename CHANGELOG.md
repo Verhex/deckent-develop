@@ -13,7 +13,7 @@ See [docs/CHANGELOG.md](docs/CHANGELOG.md) for the full changelog.
 - **`IDEMPOTENCY_KEY` env injection** — `spawn-backend-docker.ts` 16-hex promptId'yi container env'e inject eder; prompt template'a "## Idempotency Key" section eklendi.
 - **`CleanupPhaseKind` type** — `'sprint-end' | 'spawn-fail'` gating; tmpfiles spawn-fail'de in-place preserve.
 - **3 ADR drafts** (proposed): ADR-053 TaskType Taxonomy, ADR-055 Hybrid Scoring 5-Layer Pipeline, ADR-060 Self-Awareness Propagation Channels.
-- **Per-change security review** — `docs/security/sprint-156-review.md`.
+- **Per-change security review** — historical Sprint 156 review removed during docs cleanup; security decisions are retained in ADR/security docs and git history.
 - **11 yeni test dosyası**.
 
 ### Changed

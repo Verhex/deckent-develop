@@ -1,9 +1,0 @@
-Task 148-028 tamamlandı.
-
-**Özet:**
-
-- `ADR-041` ("Agent Taxonomy — Horizontal Skills vs Vertical Agents") `memory.db`'ye insert edildi: `status=proposed`, `sprint_id=sprint-148`, `tags=[governance, agent-pool, taxonomy, beta-ga]`, `decay_exempt=true`
-- ADR içeriği Sprint 146-147 canlı kanıtlarını, taxonomy reform kararını (agent=dikey, skill=yatay) ve Sprint 148 T-148-001..005 implementation durumunu belgeler
-- `.brain/exports/decisions.md` yeniden üretildi — artık toplam 42 ADR içeriyor (adr-001..adr-041)
-- 3/3 test geçti: insert ✅, getById→proposed ✅, decisions.md içeriyor ✅
-- Sprint Gate #9 karşılandı: **ADR-041 proposed** kayıtlı

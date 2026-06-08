@@ -1,3 +1,0 @@
-Task tamamlandı.
-
-**Özet:** `docs/smoke-2026-05-12/T-SMOKE-07.md` zaten eksiksiz mevcuttu — 722 kelime, 139 satır, tüm zorunlu konular kapsanmış (Ed25519 keygen, skill publish 4-aşamalı pipeline, hub-validate.mjs doğrulama, lazy verify + SHA-256 checksum, opt-out mekanizmaları). Fix task'ın nedeni önceki konteyner OOM-kill ile `.result` yazılamamasıydı — dosya içeriği sorunsuz. selfAssessment: `DONE`.

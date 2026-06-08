@@ -1,6 +1,0 @@
-Task tamamlandı. **Özet:**
-
-- `docs/smoke-2026-05-12/T-SMOKE-06.md` zaten orijinal task-153-006 tarafından eksiksiz oluşturulmuştu (982 kelime, 11 detector)
-- Önceki fix worker OOM-kill nedeniyle `.result` dosyasını yazamadan durmuştu
-- Kaynak kod (`src/nervous/detectors/*.ts`) ile çapraz doğrulama yapıldı — tüm 11 detector doğru belgelendi
-- `.tasks/task-153-006-fix.result` → `selfAssessment: DONE`
