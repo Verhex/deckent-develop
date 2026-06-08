@@ -46,6 +46,24 @@ vi.mock('../../../src/orchestra/sprint-controller.js', () => ({
   runSprintLifecycle: vi.fn().mockResolvedValue({}),
 }));
 
+// run.ts waitForRunResult: mock so the dispatcher doesn't hang waiting for a real
+// .result file that will never appear in this hermetic test.
+vi.mock('../../../src/cli/commands/run.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../src/cli/commands/run.js')>();
+  return {
+    ...actual,
+    waitForRunResult: vi.fn().mockResolvedValue({
+      taskId: 'mock-task-id',
+      selfAssessment: 'DONE',
+      testsPassed: true,
+      filesChanged: [],
+      notes: '',
+      linesAdded: 0,
+      linesRemoved: 0,
+    }),
+  };
+});
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function mkRoot(): string {

@@ -132,6 +132,13 @@ export interface BuildEngineRuntimeOptions {
   policy: SelfDispatchPolicy;
   runTask: ExecuteDispatcherDeps['runTask'];
   runSprint: ExecuteDispatcherDeps['runSprint'];
+  /**
+   * Gap F: wait for a task result file (injected for hermetic tests;
+   * live wire passes waitForRunResult from run.ts).
+   */
+  waitForResult: ExecuteDispatcherDeps['waitForResult'];
+  /** Gap F: max ms to wait for a task result. Defaults to 600_000 in dispatcher. */
+  resultTimeoutMs?: number;
   /** Optional extra trigger source (e.g. a reactive/webhook source) added last. */
   reactiveSource?: TriggerSource;
   clock?: () => Date;
@@ -145,6 +152,10 @@ export interface BuildEngineRuntimeOptions {
  * - Wires the execute-dispatcher into the action-handler registry.
  * - Wraps the base bundle's trigger source with a backlog + optional reactive source.
  * - Installs a policy gate that routes backlog triggers through decidePolicy(G2/G3).
+ * - Gap C: wraps deps.authority so internal engine triggers (requestedBy starts with
+ *   'system' + action === AUTONOMOUS_EXECUTE_ACTION) are trusted (allowed), letting
+ *   the per-task policy gate become the real governance layer. Default-deny is
+ *   preserved for all other actions.
  * Pure construction — no I/O, no ticking.
  */
 export function buildEngineRuntime(
@@ -158,6 +169,9 @@ export function buildEngineRuntime(
       config: opts.config,
       runTask: opts.runTask,
       runSprint: opts.runSprint,
+      backlogPath: opts.backlogPath,
+      waitForResult: opts.waitForResult,
+      resultTimeoutMs: opts.resultTimeoutMs,
     }),
   );
 
@@ -170,6 +184,21 @@ export function buildEngineRuntime(
     now: opts.now,
     pendingPath: opts.pendingPath,
   });
+
+  // Gap C — trusted-internal authority wrap.
+  // Internal engine triggers (requestedBy starts with 'system' AND action matches
+  // AUTONOMOUS_EXECUTE_ACTION) are allowed at the authority layer so policy:auto
+  // entries reach the policy gate (which is the real governance). All other actions
+  // still delegate to the base authority — default-deny (ADR-037) is preserved.
+  const baseAuthority = base.deps.authority;
+  base.deps.authority = {
+    check(action, requestedBy) {
+      if (action === AUTONOMOUS_EXECUTE_ACTION && requestedBy.startsWith('system')) {
+        return { outcome: 'allowed', reason: 'trusted internal engine trigger (policy gate governs)' };
+      }
+      return baseAuthority.check(action, requestedBy);
+    },
+  };
 
   // Compose: backlog-due → existing scheduled-flow source → optional reactive.
   const backlogSrc = makeBacklogTriggerSource(

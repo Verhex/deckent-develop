@@ -40,6 +40,7 @@ import { atomicWriteFileSync } from '../../agents/worker-lifecycle.js';
 import type { BacklogEntry } from '../../orchestra/autonomous/backlog-types.js';
 import { runTaskMode } from '../../orchestra/task-mode-runner.js';
 import { runSprint as runSprintLifecycle } from '../../orchestra/sprint-controller.js';
+import { waitForRunResult } from './run.js';
 import { loadConfig } from '../../core/config.js';
 import { bootstrapProviders } from '../../core/provider.js';
 import type { ModelType } from '../../core/types.js';
@@ -205,6 +206,10 @@ export async function handleStart(opts: AutonomousStartOptions): Promise<void> {
       autoApprove: true,
     }, taskConfig),
     runSprint: (projectRoot) => runSprintLifecycle(projectRoot, sprintConfig),
+    // Gap F: real completion tracking — wire in the CLI's waitForRunResult primitive.
+    // Gap B: resultTimeoutMs from config; fallback to 600s (enough for cold ollama load).
+    waitForResult: waitForRunResult,
+    resultTimeoutMs: (resolvedConfig.autonomous as Record<string, unknown> | undefined)?.result_timeout_ms as number | undefined,
   });
 
   // Reactive ingestion (sub-project 2) — flag-gated, additional to autonomous.enabled.
