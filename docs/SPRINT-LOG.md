@@ -6558,3 +6558,25 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 240-001: 240-001 — task-router + adr-selector canonical-consume (fallback korunur) (DONE)
 
 ---
+## Sprint 241 — sprint-241
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-06-08
+**Duration:** 502s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 1 |
+| Completed | 1 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 502070ms |
+
+### Tasks
+
+- 241-001: 241-001 — decidePolicy'ye computed EffectClass wire (DONE)
+
+---
