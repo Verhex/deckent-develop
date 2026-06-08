@@ -45,7 +45,7 @@ import {
   AUTONOMOUS_EXECUTE_ACTION,
   type ExecuteDispatcherDeps,
 } from './execute-dispatcher.js';
-import { decidePolicy } from './policy-gate.js';
+import { decidePolicy, computeEntryEffectClass } from './policy-gate.js';
 import { loadBacklog } from './backlog.js';
 import type { BacklogEntry } from './backlog-types.js';
 
@@ -217,7 +217,7 @@ export function buildEngineRuntime(
       if (!entry) {
         return { decision: 'auto', reason: 'no entry (non-backlog trigger) → authority-only' };
       }
-      return decidePolicy(entry);
+      return decidePolicy(entry, computeEntryEffectClass(entry));
     },
   };
   base.deps.policyGate = policyGate;
