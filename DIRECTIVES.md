@@ -1,44 +1,42 @@
-# DIRECTIVES — Sprint 238: Canonical Work-Model Foundation (WM-2a, additive)
+# DIRECTIVES — Sprint 239: Work-Model Consumer Migration #1 (WM-2b)
 
-## Goal: MASTER-PLAN §14 Küme A'nın temel taşı — tüm yüzey ve alt-sistemlerin paylaşacağı **tek kanonik work-model** tiplerini ADDITIVE (sıfır mevcut-callsite değişikliği) olarak kur. 5 uyumsuz `TaskType` enum'unu tek `TaskKind` SSOT'a indirgeyecek adaptör katmanı + hybrid two-axis `EnvironmentType` + `RequirementProfile` + `ExecutionRequest` input-kontratı + `Task`'a OPSİYONEL `type` alanı. Bu adım **bilinçle additive**: yeni modül kimse tüketene kadar "ölü"dür → "foundation laid" sayılır, "WM-2 done" DEĞİL (consumer-migration sonraki sprint'ler). Referans tasarım: `docs/superpowers/specs/2026-06-08-canonical-work-model-design.md` (OKU).
+## Goal: Canonical work-model SSOT'un (Sprint 238 `src/core/work-model.ts`) **İLK GERÇEK CONSUMER'ı** — `rubric-registry`'yi kanonik `TaskKind`'dan rubric seçecek şekilde migrate et + `task-builder` plan-time'da `Task.type` set etsin. Bu, SSOT'un değerini KANITLAR (artık "ölü" değil, tüketiliyor). **Behavior-sensitive (eval-rubric yolu) → mutlak backward-compatible + regression-eşitlik:** `Task.type` set ise `taskKindToRubric(task.type)` kullan; set değilse mevcut scope-shape `detectTaskType` fallback'ı AYNEN korunur. Yeni-yol ESKİ-yolla AYNI rubric'i üretmeli (sıfır eval-regresyonu).
 
 ## Ortak kurallar
-- **Backward-safe ZORUNLU:** mevcut hiçbir callsite değişmez; `Task`'a eklenen alan **OPSİYONEL** (`type?:`) — `Task` JSON'dan inşa edilir (planner yazar/worker okur, tsc-denetlenmez yol), required alan runtime'ı kırar. tsc yeşil ≠ deckent hâlâ orkestre eder.
-- **i18n:** muaf (internal type'lar, user-facing string yok). **ESM `.js` uzantısı zorunlu.**
-- **No tech debt:** tüm adaptörler pure-function, tam unit-test'li. ADR-053 (TaskType taxonomy) genişletilir (realize-edilmiş tek-kaynak hali); yeni ADR WM-2c'de yazılır, bu additive adımda değil.
-- **.result kontratı:** `docs/reference/api-surface.md`.
-- Tier-0 (internal/structural, `src/core/`) → unit-test yeterli, Smoke gerekmez.
+- **Backward-safe + regression-zero ZORUNLU:** mevcut `detectTaskType` (scope-shape) fallback olarak KALIR; `Task.type` yoksa davranış birebir aynı. Yeni kanonik-yol, eşdeğer task için ESKİ-yolla aynı rubric'i seçtiğini testle kanıtla.
+- **i18n:** muaf (internal eval logic). **ESM `.js` zorunlu.** No tech debt.
+- ADR-008 (core→orchestra import yok; work-model core'da, rubric-registry orchestra'da → orchestra core'u import edebilir, ters değil ✅). ADR-053 (taxonomy) realize ediliyor.
+- **.result kontratı:** `docs/reference/api-surface.md`. Tier-0 (internal eval) → unit-test yeterli.
 
 ---
 
-## Task 1: 238-001 — Canonical work-model SSOT modülü (additive)
+## Task 1: 239-001 — rubric-registry + task-builder canonical TaskKind migration
 - Provider: claude
-- Model: opus
-- Effort: high
-- Agent: architect
-- Skills: typescript-expert, system-architect, code-simplifier, testing-expert
-- Files: src/core/work-model.ts, src/core/task-types.ts, tests/core/work-model.test.ts
-- Scope: src/core/, tests/core/
+- Model: sonnet
+- Effort: normal
+- Agent: refactorer
+- Skills: typescript-expert, code-simplifier, testing-expert
+- Files: src/orchestra/rubric-registry.ts, src/orchestra/task-builder.ts, tests/orchestra/work-model-consumer.test.ts
+- Scope: src/orchestra/, tests/orchestra/
 
 ### Description
-Önce `docs/superpowers/specs/2026-06-08-canonical-work-model-design.md`'yi ve mevcut 5 enum'u oku (`src/core/decision-types.ts:8`, `src/orchestra/rubric-registry.ts:21`, `src/orchestra/task-router.ts:55`, `src/orchestra/adr-selector.ts:45`, `src/core/routing-types.ts`). Sonra **yeni `src/core/work-model.ts`** dosyasını oluştur:
+Önce oku: `src/core/work-model.ts` (canonical `TaskKind` + `taskKindToRubric`), `src/orchestra/rubric-registry.ts` (mevcut `detectTaskType` scope-shape + `getRubric`/`EFFECT_CLASS_REGISTRY`), `src/orchestra/task-builder.ts` (task oluşturma).
 
-1. **Kanonik tipler** (spec §2 birebir): `TaskKind` (11-değerli union), `WorkDomain`+`ExecutionContext`+`EnvironmentType` (two-axis interface), `Capability`+`ResourceNeed`+`RequirementProfile`, `ExecutionRequest` (input-kontratı; `scope: TaskScope`, `provider?: ProviderName`, `model?: ModelType` mevcut tiplerden import — sıfır hardcode 'claude').
-2. **Legacy→canonical adaptörleri** (pure): `decisionTypeToKind`, `rubricTypeToKind`, `routerTypeToKind`, `adrSelectorToKind`, `intentToKind` — her 5 enum'un HER değeri kanonik `TaskKind`'a eşlenir (spec §3). Bilinmeyen→`'generic'`.
-3. **Reverse helper'lar** (pure): `taskKindToRubric` (→ 'audit'|'document-write'|'code-development'), `taskKindToAdrDomain`, `taskKindToIntent` — alt-sistemlerin tek kanonik kind'dan kendi görüşünü türetmesi için.
-4. `src/core/task-types.ts`: `Task` interface'ine **opsiyonel** `type?: TaskKind` alanı ekle (work-model.ts'ten import; tek satır, mevcut hiçbir şey değişmez).
+1. **rubric-registry.ts — canonical-consume + fallback:** `getRubric(task)` (veya rubric-seçen fonksiyon) şöyle çalışsın: **(a)** `task.type` (canonical `TaskKind`) set ise → `taskKindToRubric(task.type)` ile rubric-tipini türet; **(b)** set değilse → mevcut `detectTaskType(task)` scope-shape fallback'ı AYNEN. Mevcut `detectTaskType` fonksiyonu SİLİNMEZ (fallback). `EFFECT_CLASS_REGISTRY` ve rubric-seçim mantığı korunur, sadece tip-kaynağı canonical'a köprülenir.
+2. **task-builder.ts — `Task.type` set:** task oluştururken kanonik `TaskKind` türet (mevcut scope/description sinyalinden — `detectTaskType` sonucunu `rubricTypeToKind` ile canonical'a çevir, VEYA doğrudan uygun adaptör) ve `task.type` alanına yaz. Böylece yeni task'lar canonical type taşır → rubric yeni-yoldan seçer.
+3. **Sıfır-regresyon kanıtı:** eşdeğer task için **yeni-yol (task.type set) rubric == eski-yol (fallback) rubric** olduğunu testle göster (3 task-türü: code/doc/audit).
 
-**Tasarım kuralı:** tüm fonksiyonlar pure (side-effect yok); `work-model.ts` yalnız tip + saf-fonksiyon (I/O yok). Mevcut `TaskScope`/`GoNoGoCriteria`/`TaskEffort`/`TaskPriority`/`ProviderName`/`ModelType` tiplerini import et, yeniden tanımlama.
+**Tasarım:** minimum-diff, mevcut imzaları koru; `detectTaskType` fallback kalsın; pure-bridge. Karpathy: scope-içi, mevcut-pattern.
 
-**Kanıt:** `grep -c "export" src/core/work-model.ts` ≥ 12 (tipler+adaptörler) · `grep "type?:" src/core/task-types.ts` → eklendi · `npx tsc --noEmit` temiz.
+**Kanıt:** `grep "taskKindToRubric\|task.type" src/orchestra/rubric-registry.ts` → köprü var · `grep "\.type\s*=" src/orchestra/task-builder.ts` → set ediliyor · `npx tsc --noEmit` temiz.
 
-**Test (≥12):** `tests/core/work-model.test.ts` — (a) 5 adaptörün HER değeri doğru `TaskKind`'a map'lenir (her enum için ≥1 test), (b) bilinmeyen→'generic', (c) 3 reverse-helper round-trip, (d) `ExecutionRequest`/`EnvironmentType`/`RequirementProfile` tip-construction derler, (e) hermetik (I/O yok, tmpdir gerekmez). `npx vitest run tests/core/work-model.test.ts` yeşil.
+**Test (≥8):** `tests/orchestra/work-model-consumer.test.ts` — (a) `task.type='code-development'`→CODE rubric, `'documentation'`→DOC, `'audit'`→AUDIT; (b) `task.type` YOK → `detectTaskType` fallback aynen çalışır (eski davranış); (c) **regression-eşitlik:** 3 örnek task'ta yeni-yol==eski-yol rubric; (d) task-builder ürettiği task'ta `type` set; hermetik. `npx vitest run tests/orchestra/work-model-consumer.test.ts` yeşil. **Ayrıca mevcut rubric-registry testleri BOZULMAMALI** (`npx vitest run tests/orchestra/rubric-registry.test.ts` yeşil — varsa).
 
-**Smoke:** yok (Tier-0 internal-type; unit-test yeterli).
+**Smoke:** yok (Tier-0 internal eval); ama Brain/ben post-sprint **orchestration-smoke** (trivial sprint plan→spawn→evaluate, rubric doğru seçilir).
 
 ---
 
-**Beklenen:** 1/1 DONE. Additive (sıfır callsite değişikliği → mevcut tüm testler + deckent orkestrasyon BOZULMAZ). Disk-verify: `work-model.ts` var + 12+ export + `task-types.ts` opsiyonel `type?` + tsc temiz + work-model test yeşil. **Post-sprint orchestration-smoke (Brain/ben):** core-touching olduğundan deckent'in hâlâ trivial 1-task plan→spawn→evaluate yapabildiğini doğrula (tsc-green ≠ orkestre-eder).
+**Beklenen:** 1/1 DONE. SSOT artık TÜKETİLİYOR (WM-2 ilerledi). Disk-verify: köprü kodu + task.type set + tsc temiz + yeni test yeşil + mevcut rubric testleri yeşil (sıfır regresyon). **Post-sprint orchestration-smoke (ben):** core-eval-touching → deckent trivial sprint'i hâlâ doğru plan→spawn→**evaluate** (rubric drift yok).
 
-İlgili ADR: ADR-053 (TaskType taxonomy — bu onun realize-edilmiş tek-kaynak hali) · ADR-008 (import yönü) · ADR-002 (ESM `.js`). Memory: [[project_merged_product_flow_analysis]] (5-enum bulgusu) · [[feedback_no_minimum_no_mvp_deckent]].
+İlgili ADR: ADR-053 (TaskType taxonomy realize) · ADR-070 (eval integrity) · ADR-008. Memory: [[sprint_238_work_model_foundation]] (WM-2a SSOT) · [[feedback_brain_rubric_bridge_broken]] (rubric-eval hassasiyeti) · [[feedback_trust_brain_eval_not_worker]].
 </content>
