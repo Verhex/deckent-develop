@@ -817,7 +817,7 @@ Items surfaced during the Sprint 211 doc-consolidation audit that were intention
 - [ ] **WM-3** Introduce `EnvironmentType` as a hybrid two-axis model (work-domain × execution-context) so code / email / ERP / web / data-pipeline work are all first-class.
 - [ ] **WM-4** Introduce `RequirementProfile` (capability + resource) so policy, routing, governance and the capability-broker derive from a task's declared needs.
 - [ ] **WM-5** Provider-free hard-enforcement: remove MCP-`run` `provider:'claude'` hardcode, fix autonomous-`runTaskMode` always-generic (inject agent/skill), guard the unconditional `CLAUDE_AUTH_REQUIRED=1`, and stop leaking Claude-only `claudeArgs`/`--dangerously-skip-permissions` to codex/gemini.
-- [ ] **WM-6** Wire `getEffectClass()` (exists at `rubric-registry.ts:375`) into the autonomous policy-gate so `risk-tagged` entries actually park instead of behaving identically to `auto`.
+- [x] **WM-6** Wire `getEffectClass()` into the autonomous policy-gate so `risk-tagged` entries actually park — ✅ **DONE** (Sprint 241, `02d0612a`, disk-verified): `runtime-loop.ts:220` calls `decidePolicy(entry, computeEntryEffectClass(entry))`, fail-safe (unknown→park), backward-compatible; risk-tagged/irreversible now park (approval-required). 18 new + 8 regression tests, tsc clean.
 
 ### B. Provider Independence (F1)
 - [ ] **F1-004** Docker provider-aware CLI invocation (per-provider binary select + auth + build-arg).
