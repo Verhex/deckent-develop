@@ -6602,3 +6602,47 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 242-001: 242-001 — MCP-run provider-free + autonomous agent/skill inject (DONE)
 
 ---
+## Sprint 243 — sprint-243
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-06-08
+**Duration:** 573s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 2 |
+| Completed | 0 |
+| Tech Debt | 0 |
+| No-Go | 2 |
+| Coverage | 0.0% |
+| Duration | 573150ms |
+
+### Tasks
+
+- 243-001: 243-001 — multi-provider docs kod-gerçeğine hizala (NO_GO)
+
+---
+## Sprint 244 — sprint-244
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-06-08
+**Duration:** 451s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 1 |
+| Completed | 1 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 450834ms |
+
+### Tasks
+
+- 244-001: 243-001 — multi-provider docs kod-gerçeğine hizala (DONE)
+
+---
