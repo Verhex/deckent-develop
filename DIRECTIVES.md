@@ -1,4 +1,4 @@
-# DIRECTIVES — Sprint 243: Multi-Provider Docs ↔ Code Reality (WK-8)
+# DIRECTIVES — Sprint 244 (re-route, claude): Multi-Provider Docs ↔ Code Reality (WK-8)
 
 ## Goal: `docs/reference/multi-provider.md` + `docs/guide/multi-provider.md`'yi **kod gerçeğine göre** düzelt (W-K item 8 drift). Mevcut docs yanıltıcı: Gemini'nin `gemini` CLI gerektirdiğini gizliyor, ollama/deepseek/qwen/glm'den hiç bahsetmiyor (hepsi implement+bootstrap-registered), şüpheli auth komutları içeriyor. **DOC-ONLY — sıfır kod/test riski.** Bu sprint **yerel qwen3.6 (ollama, zero-cost)** worker ile koşar — mixed-fleet/local-model combined-power canlı kanıtı; Brain/ben kod-gerçeğine karşı disk-verify ederim.
 
@@ -8,8 +8,8 @@
 ---
 
 ## Task 1: 243-001 — multi-provider docs kod-gerçeğine hizala
-- Provider: ollama
-- Model: qwen3.6:27b
+- Provider: claude
+- Model: sonnet
 - Effort: normal
 - Agent: doc-writer
 - Skills: documentation-writer, docs
