@@ -932,7 +932,7 @@ Items surfaced during the Sprint 211 doc-consolidation audit that were intention
 - [ ] **M1-M4** Monitoring baseline auto-blocker gate.
 
 ### O. Documentation & CLI/MCP Parity (W-H / W-B)
-- [ ] **DOC-1** Documentation perfection: `docs/cookbook/`, full EN user guide, lifecycle/API-surface diagrams, `why-deckent-vs-X`, demo videos, `docs/benchmark/memory-v2.md` (verify the 96% claim), `docs/security/threat-model.md`, `docs/adr-index.md`, `npm run docs:test`.
+- [~] **DOC-1** (🔄 threat-model.md DONE Sprint 246, c-grounded honest; remaining: cookbook/EN-guide/diagrams/adr-index/benchmark/docs:test) Documentation perfection: `docs/cookbook/`, full EN user guide, lifecycle/API-surface diagrams, `why-deckent-vs-X`, demo videos, `docs/benchmark/memory-v2.md` (verify the 96% claim), `docs/security/threat-model.md`, `docs/adr-index.md`, `npm run docs:test`.
 - [ ] **PARITY-1** CLI/MCP parity: add `deckent_agent_manage` / `deckent_skill_manage` / `deckent_memory_manage` / `deckent_cost` MCP tools + ~20 missing options across history/retro/review/run/explain + a `lint-cli-mcp-parity.mjs` guard.
 - [ ] **DOC-2** README badge/module-count re-sync + MCP tool-description i18n wrapper + add-a-language guide.
 
