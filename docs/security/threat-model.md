@@ -1,171 +1,312 @@
-# Deckent Threat Model
+# Deckent Security Threat Model
 
 > **Version:** 1.0.0-beta.1  
-> **Last updated:** 2026-05-22  
-> **Status:** V1.0 — advisory enforcement; V2 hard enforcement planned post-GA
-
-This document describes the threat model for deckent: who the adversary is, what they can do, and how deckent defends against each threat. It is intended for security-conscious users and contributors evaluating deckent for production or team environments.
-
----
-
-## Scope and Assumptions
-
-**In scope:**
-- Sprint workers executing AI-generated code in the local filesystem
-- Provider API key handling (Claude, Codex, Gemini)
-- MCP server communication between IDE and deckent
-- Multi-project isolation when deckent is used in multiple repos
-- Dashboard and web terminal access
-
-**Out of scope (V1.0):**
-- Network-level isolation between workers and the internet
-- Hardware security modules or TPM-backed secret storage
-- Multi-user (team) deployments (deckent is single-user by design in V1.0)
-
-**Trust assumptions:**
-- The OS user running deckent is trusted
-- The `DIRECTIVES.md` author is trusted (typically the developer themselves)
-- Provider APIs (Claude, Codex, Gemini) are trusted third-party services
+> **Last updated:** 2026-06-08  
+> **Status:** V1.0 — code-grounded, advisory enforcement; V2 hard enforcement roadmap
+>
+> **Honesty principle:** This document distinguishes three posture levels:
+> - **Implemented** — enforced in code, verified against source
+> - **Advisory** — detected and logged but not hard-blocked (ADR-037 V1.0)
+> - **Post-beta** — planned, not yet shipped
 
 ---
 
-## Attack Surface
+## 1. Assets and Trust Boundaries
 
-### 1. Worker Code Execution
+| Asset | Location | Sensitivity | Current Protection |
+|-------|----------|-------------|-------------------|
+| Provider API keys (Claude, Codex, Gemini) | `.deck` file (project root) | Critical | Plaintext at rest, gitignored, per-provider env injection |
+| `memory.db` (sprint knowledge, ADRs) | `.brain/memory.db` | Medium | Gitignored, local filesystem only |
+| API auth token | `config.api_auth_token` or `DECKENT_API_TOKEN` env | High | Timing-safe SHA-256 comparison |
+| Worker spawn processes (docker/tmux/subprocess) | OS process table | High | Scope declarations + advisory RBAC |
+| MCP server/client channel | stdio (local) | Medium | Stdio-only transport; no network |
+| Dashboard / REST API | `localhost:PORT` by default | Medium | Bearer token auth; localhost-auto opt-in |
+| Terminal PTY audit log | SQLite (`.deckent/`) | High | HMAC-SHA256 append-only chain |
+| Autonomous backlog (nervous system) | `.deckent/autonomous/` | Medium | Same filesystem ACLs as project root |
+| `.deck` secret file | project root | Critical | Gitignored; plaintext on disk; no encryption at rest |
 
-**Threat:** A malicious or buggy AI task directive causes a worker to execute arbitrary shell commands, delete files, or exfiltrate data.
+### Trust Boundaries
 
-**Attack vectors:**
-- Prompt injection via task `description` or `DIRECTIVES.md`
-- Adversarial skill injected into `.deckent/skills/` that escapes the sandbox
-- Worker operating outside its assigned `scope.filesWrite`
+```
+[ User / DIRECTIVES author ]
+        |  (trusted — single-user design V1.0)
+        v
+[ Brain (sprint-controller) ]
+   |                    |
+   v                    v
+[ Worker processes ]  [ Auditor (in-process scan) ]
+   |                    |
+   v                    v
+[ Provider APIs ]   [ Audit log / event stream ]
+(Claude/Codex/Gemini — trusted third-party)
+```
 
-**Mitigations:**
-- **AST Sandbox** — all skills undergo AST validation before execution. Static analysis rejects skills that import dangerous Node.js built-ins (`child_process`, `fs` with unescaped paths) or call `eval`/`Function`. See `src/core/skill-pool.ts`.
-- **`spawn-safety.ts` whitelist** — subprocess spawns go through a security filter that validates binary path, argument structure, and working directory. Unknown or suspicious patterns are rejected.
-- **Scope enforcement (advisory, V1.0)** — each task declares `scope.filesWrite`. The Auditor scans `git diff --stat` after each worker heartbeat and raises alerts on violations. Workers that self-report violations (`BOUNDARY_VIOLATION`) trigger automatic `NO_GO` + Brain FIX cascade.
-- **ADR-037 V1.0 limitation:** Scope enforcement is _advisory_. The filesystem does not block writes — the Auditor detects and logs violations but does not prevent them at runtime. Hard enforcement (Layer-2) ships in V2 post-GA.
-
-**Residual risk (V1.0):** A rogue worker can write outside its scope before the Auditor scan cycle (every 30 seconds). The write is logged in the audit trail but not rolled back automatically.
-
----
-
-### 2. Provider API Key Leakage
-
-**Threat:** API keys for Claude, Codex, or Gemini are exposed in logs, config files, git history, or error output.
-
-**Attack vectors:**
-- Keys set as environment variables and accidentally logged
-- Config files containing keys committed to git
-- Error messages printing full config objects including keys
-- `.deckent/credentials/` with overly permissive file mode
-
-**Mitigations:**
-- **`.deck` Secret Interpolation (ADR-014)** — secrets stored in `.deck` files are never written to `DIRECTIVES.md`, task JSON, or log files. Config references use `$DECK:KEY_NAME` placeholder; interpolation happens at runtime, in-memory only.
-- **0600 file permissions** — `~/.deckent/credentials/` is created with owner-only read/write (mode 0600). Other OS users cannot read credential files.
-- **`.gitignore` defaults** — `deckent init` adds `.deckent/credentials/` and `.deck` to `.gitignore` automatically.
-- **Environment variable guidance** — documentation and `deckent doctor` recommend `CLAUDE_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_API_KEY` env vars over file storage for CI/CD.
-
-**Residual risk:** Keys stored as environment variables may be captured by process-listing tools (`ps aux`, `/proc/PID/environ`) on multi-user systems. Deckent does not protect against this on shared servers — single-user use is the V1.0 design target.
+**Key boundary:** Workers are spawned as subprocesses or in Docker/tmux. Brain passes them tasks and secrets — workers are not trusted to enforce their own scope boundaries. The Auditor monitors boundary compliance after the fact (advisory, V1.0).
 
 ---
 
-### 3. Multi-Project Boundary Violation
+## 2. Threat Actors
 
-**Threat:** A worker in project A reads from or writes to project B's files.
-
-**Attack vectors:**
-- Relative path traversal in `scope.directories` (e.g., `../../project-b/`)
-- Symlinks that escape the project root
-- Worker receiving an injection directive targeting another project
-
-**Mitigations:**
-- **ADR-034 Multi-Project Isolation** — each deckent project has its own `.deckent/` directory. Worker tasks reference only paths within the project root. Brain validates `scope.directories` entries at plan time.
-- **`git diff --stat` boundary check** — Auditor monitors for uncommitted writes; cross-project writes would appear as changes outside the expected working tree and trigger alerts.
-- **Project-relative paths** — task JSON files use project-relative paths; absolute path resolution validates the path starts within the project root.
-
-**Residual risk:** Symlink attacks are not explicitly defended in V1.0. A task with a symlink in `scope.directories` could escape the project root. Mitigation: review DIRECTIVES.md before running sprints on untrusted task definitions.
+| Actor | Motivation | Capability |
+|-------|-----------|------------|
+| **Malicious DIRECTIVES** | Inject harmful task into sprint | Can control task description + scope declarations; cannot directly write files |
+| **Rogue worker / model hallucination** | Write outside scope, exfiltrate secrets | Can write any file the OS user owns; only advisory RBAC blocks it |
+| **Local attacker (same machine)** | Steal `.deck` credentials; read `memory.db` | Requires OS user compromise or running as same user |
+| **Supply-chain attacker** | Inject malicious skill/plugin | Constrained by AST sandbox validation; can still exfiltrate via API calls |
+| **MCP client attacker** | Trigger destructive operations | Limited to stdio pipe; same OS user access required |
 
 ---
 
-### 4. MCP Stdio Channel
+## 3. Threats and Mitigations
 
-**Threat:** A malicious MCP client or man-in-the-middle sends crafted tool calls to deckent's MCP server, triggering unintended operations.
+### 3a. API Authentication (HTTP/Dashboard)
 
-**Attack vectors:**
-- A compromised IDE extension sending `deckent_kill` or `deckent_cleanup` without user intent
-- Parameter injection in tool call arguments (e.g., injecting path traversal in `root`)
-- SSRF via the MCP HTTP transport (if enabled)
+**Threat:** Unauthorized access to the deckent REST API or dashboard.
 
-**Mitigations:**
-- **stdio-only transport** — the MCP server uses stdio (not network) by default. Attackers must have local OS user access to the stdio pipe, which is equivalent to shell access.
-- **`root` parameter validation** — destructive tools (`kill`, `cleanup`, `recover`) validate that `root` is a known deckent project directory and reject path traversal.
-- **Confirmation requirements** — ADR-047 and memory rule `feedback_sprint_kill_always_ask_user` require Alperen's explicit approval for destructive operations. MCP callers must supply `force: true` + `userExplicit: true` simultaneously to bypass guards.
-- **Input schema validation (Zod)** — all MCP tool inputs are validated against strict Zod schemas before handler execution.
+**Code:** `src/api/auth.ts`
 
-**Residual risk:** Malicious Claude Code extensions or plugins with MCP access could call destructive tools if the user grants permission. The confirmation requirements create a speed-bump but cannot prevent a user who approves every prompt.
+**Implemented mitigations:**
+- **Timing-safe token comparison** — uses `timingSafeEqual(SHA-256(actual), SHA-256(expected))` from `node:crypto`. Both tokens are SHA-256 hashed before comparison to prevent length-based timing side-channels.
+- **Default deny** — when no token is configured, all non-exempt requests return 401. No open-by-default mode.
+- **Localhost auto-inject (opt-in only)** — `allowLocalhostAutoInject` (config) or `DECKENT_API_LOCALHOST_AUTO=1` (env) allows loopback callers without an `Authorization` header to pass through. A localhost request that *does* present an Authorization header is still verified — a wrong token from localhost earns a 403. This is an opt-in convenience, not the default.
+- **Explicit auth bypass warning** — `DECKENT_API_AUTH_DISABLED=1` disables all auth with a stderr warning. Intended for development only; the code explicitly prints: `WARNING: API authentication is DISABLED ... do NOT use in production`.
 
----
-
-### 5. Dashboard and Web Terminal
-
-**Threat:** The web dashboard or embedded terminal exposes sprint data or allows arbitrary command execution to unauthorized local users or network attackers.
-
-**Attack vectors:**
-- Dashboard HTTP server listening on a network interface accessible to other hosts
-- Web terminal (ADR-062) accepting commands from unauthenticated browsers
-- Audit log manipulation to hide terminal activity
-
-**Mitigations:**
-- **localhost-default binding** — the dashboard server binds to `127.0.0.1` by default. Network exposure requires explicit `--host 0.0.0.0` flag.
-- **Terminal auth layer** — the web terminal (ADR-062) uses a separate auth mechanism, stricter than the global API bypass. Auth tokens are generated per-session.
-- **Three terminal security layers (ADR-062):**
-  1. `prompt-guard` — input pattern matching blocks injection attempts before PTY write
-  2. `command-guard` — deny-list of dangerous shell patterns; default-deny on non-localhost
-  3. `outbound-limiter` — per-tenant daily byte quota with warn/kill thresholds
-- **HMAC-SHA256 audit chain** — terminal activity is stored in an append-only audit chain with tamper detection via `deckent audit verify`.
-
-**Residual risk:** The web terminal provides a full shell to the running user. Any user who can reach the dashboard port (including via localhost if another process is compromised) can use the terminal. Use `--no-terminal` to disable it in sensitive environments.
+**Residual risk:** If `DECKENT_API_AUTH_DISABLED=1` is set in a shared environment, any local process can reach the API without a token.
 
 ---
 
-## Defense Summary
+### 3b. Provider Credentials (`.deck` secrets)
 
-| Defense | Implementation | ADR |
-|---------|---------------|-----|
-| AST Sandbox for skills | `src/core/skill-pool.ts` — static AST validation | — |
-| Subprocess spawn safety | `src/core/spawn-safety.ts` — binary + arg whitelist | ADR-006 |
-| `.deck` secret interpolation | Runtime-only, never serialized to disk | ADR-014 |
-| Multi-project isolation | Per-project `.deckent/` config boundary | ADR-034 |
-| RBAC role boundaries | Auditor `git diff --stat` + audit trail (advisory V1.0) | ADR-037 |
-| MCP input validation | Zod schemas on all 31 tools | ADR-022-v2 |
-| Terminal prompt/command guard | PTY pre-write pattern matching | ADR-062 |
-| HMAC audit chain | Append-only terminal audit log | ADR-062 |
-| 0600 credential files | `deckent init` sets permissions automatically | — |
+**Threat:** API keys for Claude, Codex, or Gemini are exposed via logs, git history, or error output.
 
----
+**Code:** `src/core/deck-file.ts`, `src/core/provider.ts:applyDeckSecretsToEnv()`
 
-## ADR-037 V1.0 Honest Disclosure
+**Implemented mitigations:**
+- **Per-provider isolation** — `applyDeckSecretsToEnv()` returns a map of `ProviderName → { ENV_VAR: value }`. Only the provider-specific key is passed to each worker's environment. A Claude worker does not receive the Codex or Gemini key.
+- **Gitignore enforcement** — `.deck` is added to `.gitignore` by `deckent init`. `isDeckFileCommitted()` detects accidental git tracking. `deckent doctor` flags `.deck` tracked by git as a security issue.
+- **No serialization to task files** — secrets are never written to task JSON, DIRECTIVES, or log files.
 
-ADR-037 (Brain-Auditor-Worker Authority Matrix — RBAC Protocol V1.0) defines role boundaries for Brain, Auditor, and Workers. The V1.0 implementation is **advisory/soft**:
-
-- **What V1.0 does:** Detects scope violations via `git diff --stat`, emits structured events to the audit trail, logs `BOUNDARY_VIOLATION` warnings.
-- **What V1.0 does NOT do:** Block workers from writing outside their `scope.filesWrite` at the filesystem level. The runtime enforcement layer (Layer-2) was intentionally deferred to post-GA V2.
-- **Honest self-flag:** Workers are expected to self-report boundary violations (`BOUNDARY_VIOLATION → NO_GO`). Brain then applies FIX cascade.
-- **V2 plan:** Hard filesystem-level enforcement (chroot, seccomp, or OS-level path restrictions) is planned for post-GA V2. Timeline TBD.
-
-**Security implication:** In deckent V1.0-beta, a determined or buggy AI worker can write outside its declared scope before the Auditor's next scan cycle (~30 seconds). All such violations are recorded in the audit trail, but rollback is not automatic.
-
-For users in high-sensitivity environments, the recommendation is to run deckent with `--sandbox-mode` (subprocess backend with OS-level restrictions) until V2 hard enforcement is available.
+**Known limitations:**
+- **Plaintext at rest** — `.deck` is stored as a plaintext `KEY=VALUE` file. No encryption at rest. OS file permissions are the only protection.
+- **`process.env` injection** — `applyDeckSecretsToEnv()` writes keys into `process.env`. On multi-user Linux, other processes running as the same OS user can read `/proc/PID/environ`. Deckent is single-user V1.0; this is acceptable in that context but not on shared servers.
+- **No secret vault** — no HashiCorp Vault, AWS Secrets Manager, or equivalent integration (post-beta roadmap).
 
 ---
 
-## Vulnerability Disclosure
+### 3c. Worker Scope Enforcement (RBAC)
 
-See [SECURITY.md](https://github.com/VerhexIO/deckent/blob/main/SECURITY.md) for the full disclosure policy.
+**Threat:** A worker writes outside its declared `scope.filesWrite`, modifying files it was not assigned.
+
+**Code:** `src/orchestra/authority-enforcer.ts`
+
+**Advisory posture (ADR-037 V1.0) — honest disclosure:**
+
+The authority matrix defines which roles (Brain, Auditor, Worker) may read/write which paths. However, enforcement is **deliberately soft in V1.0**:
+
+```typescript
+// All checkAuthority() calls return mode: 'soft'
+return {
+  allowed: false,
+  level: 'warn',
+  mode: 'soft',   // <-- hardcoded in every return path
+  reason: `...worker scope violation...`,
+};
+```
+
+The filesystem does **not** block writes. `checkAuthority()` returns a result; callers decide whether to proceed. The Auditor detects violations via `git diff --stat` and emits events to the audit trail, but does not roll back writes.
+
+**What V1.0 does:**
+- Detects scope violations after the fact (Auditor scan every 30 seconds)
+- Emits `AUDITOR→BRAIN:AUTHORITY_VIOLATION` events to the event stream
+- Workers are expected to self-flag boundary violations as `BOUNDARY_VIOLATION → NO_GO`
+- Brain applies FIX cascade on honest NO_GO results
+
+**What V1.0 does NOT do:**
+- Block workers from writing outside `scope.filesWrite` at the OS level
+- Roll back unauthorized writes automatically
+- Hard-deny at process creation time
+
+**V2 roadmap:** Hard filesystem-level enforcement (OS-level path restrictions) is planned for post-GA V2. Timeline is TBD.
+
+**Security implication:** In V1.0-beta, a rogue worker (or model hallucination) can write outside its assigned scope before the Auditor's next scan cycle (~30 seconds). All violations are recorded in the audit trail but are not prevented.
+
+---
+
+### 3d. Sandbox Mode
+
+**Threat:** A worker modifies production code or leaves persistent changes after a test sprint.
+
+**Code:** `src/providers/sandbox.ts`, `src/cli/commands/start.ts` (`--sandbox-mode`)
+
+**Implemented mitigations:**
+- **Git-stash rollback** — `--sandbox-mode` runs `git stash --include-untracked` before the sprint. After sprint completion (or on error), `git stash pop` restores the original state. Changes made during the sprint are discarded.
+- **Memory limit** — workers run with `NODE_OPTIONS=--max-old-space-size=<N>` (default 512 MB).
+- **Pre-spawn scope check** — `SandboxSpawnBackend.enforceScope()` validates the working directory against `allowedDirs` before spawning. Throws `ProviderError` on violation.
+
+**What sandbox mode is NOT:**
+- **Not OS-level process isolation** — no chroot, no seccomp, no Linux namespaces.
+- **Network blocking is best-effort only** — `blockNetwork: true` sets proxy env vars (`http_proxy`, `https_proxy`). This prevents well-behaved processes from making HTTP/HTTPS calls but does not block raw TCP connections, DNS, or processes that ignore proxy env vars.
+- **Not a security boundary** — sandbox mode is primarily a rollback mechanism, not a security isolation mechanism.
+
+**Residual risk:** A worker that uses raw socket APIs or ignores `http_proxy` can still make outbound network calls in sandbox mode. Use Docker backend for stronger fs/mem isolation (but Docker also lacks network isolation in V1.0 — see §3e).
+
+---
+
+### 3e. Docker Worker Isolation
+
+**Threat:** A worker process escapes the project filesystem or consumes unbounded resources.
+
+**Code:** `src/providers/docker-backend.ts` (not in scope for this task; described per ADR-062 and project docs)
+
+**Implemented mitigations:**
+- **Filesystem isolation** — Docker workers run in a container with the project directory bind-mounted. Host filesystem outside the mount point is not accessible.
+- **Memory isolation** — container memory limits enforced by Docker.
+
+**What Docker does NOT provide (V1.0):**
+- **No network isolation** — Docker containers run on the default bridge network and can make outbound network calls. There is no `--network=none` or firewall rule applied by deckent.
+- **No seccomp/AppArmor profile** — deckent does not apply a custom seccomp profile; the Docker default profile applies.
+
+**Residual risk:** A Docker worker can exfiltrate data via outbound HTTP/HTTPS calls to arbitrary hosts. This is the same network risk as subprocess mode.
+
+---
+
+### 3f. HMAC Audit Chain (Terminal PTY)
+
+**Threat:** Audit logs are tampered with to hide malicious terminal activity.
+
+**Code:** `src/api/terminal/audit-integrity.ts`
+
+**Implemented:**
+- **HMAC-SHA256 chain** — each terminal audit row carries `audit_hmac = HMAC-SHA256(secret, prevHmac ∥ timestamp ∥ tenantId ∥ action ∥ content)`. Any UPDATE or DELETE of an audit row breaks the chain.
+- **32-byte random audit key** — generated on first use, stored at `.deckent/audit-key` with `chmod 0600`. Machine-local and gitignored.
+- **`verifyAuditChain()`** — walks rows in id-order, recomputes expected HMAC, reports the first tampered row id.
+- **Genesis row** — `prevHmac = null` is normalized to `""` so the first row's digest is well-defined.
+
+**Limitations:**
+- The audit key is stored on the same machine as the audit log. An attacker with local filesystem access can regenerate the chain with a new key.
+- No remote audit log shipping or SIEM integration (post-beta).
+
+---
+
+### 3g. Data Sovereignty (Never-Calls-Home)
+
+**Threat:** Deckent sends sprint data, code, or telemetry to external servers without the user's knowledge.
+
+**Code:** `src/core/telemetry.ts`
+
+**Implemented:**
+- **Telemetry off by default** — `TelemetryCollector` is instantiated with `enabled: false`. No events are recorded or sent unless explicitly enabled by the user.
+- **Local-only storage** — `record()` appends to an in-memory `events[]` array. `flush()` returns the array to the caller — there are no HTTP calls, WebSocket sends, or file writes in `telemetry.ts`. No data leaves the process.
+- **PII sanitization** — `sanitize()` strips string values containing `@` (email patterns) or home directory paths (`/home/`, `/Users/`).
+- **Local Ollama option** — for fully air-gapped deployments, deckent supports local Ollama models. In this mode, no AI prompts leave the machine.
+
+**Note:** Provider API calls (Claude, Codex, Gemini) do send prompts to third-party APIs when those providers are used. This is expected behavior, not background telemetry. Users who require fully offline operation should use the local Ollama provider.
+
+---
+
+### 3h. Multi-Tenant Isolation
+
+**Threat:** In a hypothetical multi-tenant deployment, one tenant's data is accessible to another.
+
+**Code:** `src/core/tenant-context.ts`
+
+**Current posture — schema-only (honest disclosure):**
+
+The multi-tenant API exists and is used: `tenantId` is validated with regex `^[a-z0-9][a-z0-9-]{0,62}$`, path isolation is enforced via `<projectRoot>/.deckent/tenants/<tenantId>/`, and `AsyncLocalStorage` provides tenant-scoped async context.
+
+However, the system defaults to `tenantId: 'local'` everywhere:
+
+```typescript
+const tenantId =
+  opts?.tenantId ??
+  process.env['DECKENT_TENANT_ID'] ??
+  'local';  // <-- default, used in all single-user deployments
+```
+
+**What multi-tenant does NOT provide (V1.0):**
+- No cross-tenant access control enforcement at the OS level
+- No database-level row isolation (all tenants share the same `memory.db` in V1.0)
+- No authentication boundary between tenants
+- The schema is correct but the runtime does not enforce tenant isolation
+
+**V1.0 is single-user by design.** The multi-tenant schema exists to support future F3/F4 enterprise features (ADR-067/068). Using deckent in a genuine multi-tenant deployment in V1.0 is **not supported and provides no security isolation**.
+
+---
+
+### 3i. Supply Chain (Plugin / Skill Sandbox AST)
+
+**Threat:** A malicious skill or plugin in `.deckent/skills/` executes arbitrary code when loaded.
+
+**Code:** `src/core/skill-pool.ts` (AST validation)
+
+**Implemented:**
+- **AST static analysis** — skills undergo AST validation before activation. The sandbox rejects skills that import dangerous Node.js built-ins or call `eval` / `Function()`.
+- **Sandboxed execution scope** — skills run with a restricted set of allowed imports.
+
+**Known limitations:**
+- AST validation is a static analysis heuristic, not a complete sandbox. Obfuscated code or indirect call patterns may bypass it.
+- Skills that make outbound HTTP calls (e.g., `fetch()`, `axios`) are not blocked — a malicious skill could exfiltrate data via legitimate-looking API calls.
+- No cryptographic signature verification on skill manifests.
+
+---
+
+### 3j. MCP Server / Client Channel
+
+**Threat:** A malicious MCP client sends crafted tool calls to trigger unintended operations.
+
+**Implemented mitigations:**
+- **Stdio-only transport** — the MCP server uses stdio, not network. Attackers require local OS user access equivalent to shell access.
+- **Zod schema validation** — all MCP tool inputs are validated against strict Zod schemas before handler execution.
+- **Destructive-op guards** — `deckent_kill`, `deckent_cleanup`, `deckent_recover` require explicit confirmation. ADR-047 + feedback rule `feedback_deckent_kill_approval_required`.
+
+**Residual risk:** A compromised IDE extension with MCP access could call destructive tools if the user approves the permission prompt.
+
+---
+
+## 4. Implementation Status Summary
+
+| Control | Status | Code Reference |
+|---------|--------|----------------|
+| Timing-safe token auth (SHA-256 + `timingSafeEqual`) | **Implemented** | `src/api/auth.ts` |
+| Localhost auto-inject (opt-in) | **Implemented** | `src/api/auth.ts` |
+| `.deck` per-provider secret isolation | **Implemented** | `src/core/provider.ts:applyDeckSecretsToEnv()` |
+| `.deck` gitignore + doctor check | **Implemented** | `src/core/deck-file.ts`, `src/cli/commands/doctor.ts` |
+| Scope enforcement (RBAC) — violation detection | **Implemented (advisory)** | `src/orchestra/authority-enforcer.ts` |
+| Scope enforcement — hard FS-level blocking | **Not implemented (V2 roadmap)** | ADR-037 V2 |
+| Sandbox: git-stash rollback | **Implemented** | `src/cli/commands/start.ts` |
+| Sandbox: network blocking | **Best-effort only** (proxy env vars) | `src/providers/sandbox.ts` |
+| Docker: filesystem isolation | **Implemented** | `src/providers/docker-backend.ts` |
+| Docker: network isolation | **Not implemented** | Post-beta |
+| HMAC-SHA256 audit chain (terminal PTY) | **Implemented** | `src/api/terminal/audit-integrity.ts` |
+| Telemetry off by default / never-calls-home | **Implemented** | `src/core/telemetry.ts` |
+| Multi-tenant path isolation | **Schema only** | `src/core/tenant-context.ts` |
+| Multi-tenant cross-tenant access control | **Not implemented** | ADR-067/068, post-beta |
+| Encryption at rest for `.deck` secrets | **Not implemented** | Post-beta |
+| Secret vault integration | **Not implemented** | Post-beta |
+| SIEM / remote audit log | **Not implemented** | Post-beta |
+| AST skill sandbox | **Implemented (heuristic)** | `src/core/skill-pool.ts` |
+
+---
+
+## 5. Recommendations for Security-Conscious Users
+
+1. **Always set `DECKENT_API_TOKEN`** — do not rely on localhost-auto-inject in production.
+2. **Do not set `DECKENT_API_AUTH_DISABLED=1`** outside local development.
+3. **Run `deckent doctor`** after `deckent init` — it checks `.deck` git tracking and other security issues.
+4. **Use `--sandbox-mode`** for sprint runs involving untrusted DIRECTIVES. Understand it is a rollback mechanism, not a security isolation boundary.
+5. **Use Docker backend** for stronger filesystem isolation (but note: network isolation is not provided).
+6. **Review DIRECTIVES.md** before running sprints. The DIRECTIVES author is trusted; verify the source before running third-party directives.
+7. **For offline operation**, use the local Ollama provider — no prompts leave the machine.
+8. **Do not use deckent in multi-tenant deployments** until F3/F4 enterprise isolation ships (post-beta).
+
+---
+
+## 6. Vulnerability Disclosure
+
+See `SECURITY.md` for the full disclosure policy.
 
 **Summary:**
-1. Report via [GitHub Security Advisory](https://github.com/VerhexIO/deckent/security/advisories/new) (preferred — private by default)
+1. Report via [GitHub Security Advisory](https://github.com/VerhexIO/deckent/security/advisories/new) (private by default)
 2. Alternative: security@verhex.com
 3. Include: description, reproduction steps, impact, suggested fix
 4. Response: acknowledgement within 48h, fix within 7 days for critical issues
