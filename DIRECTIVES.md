@@ -1,47 +1,44 @@
-# DIRECTIVES — Sprint 236: Mixed-Fleet Finale — Ollama (qwen3.6) + Claude (sonnet) EŞZAMANLI
+# DIRECTIVES — Sprint 238: Canonical Work-Model Foundation (WM-2a, additive)
 
-## Goal: **AS-2 vizyonunun ilk tam turu — tek sprint'te iki provider AYNI ANDA.** 1 task yerel **ollama (qwen3.6:27b, host node entry → localhost:11434)** + 1 task **claude (sonnet, docker backend)** — paralel, tek wave. Sprint 234 routing (`isAdapterProvider`) bunu sağlıyor: ollama task'ı host `OllamaAdapter.spawn`'a, claude task'ı docker backend'e gider — **aynı sprint'te eş-zamanlı.** İkisi de **basit dokümantasyon** görevi (düşük risk, gerçek-fayda, agentic loop'u kanıtlar). Bu, F1-013→234→235 zincirinin **canlı uçtan-uca mixed-fleet kanıtı**: qwen3.6 (claude değil!) gerçek bir deckent task'ı yapar, Brain GO verir; aynı anda claude/sonnet ikinci task'ı yapar.
+## Goal: MASTER-PLAN §14 Küme A'nın temel taşı — tüm yüzey ve alt-sistemlerin paylaşacağı **tek kanonik work-model** tiplerini ADDITIVE (sıfır mevcut-callsite değişikliği) olarak kur. 5 uyumsuz `TaskType` enum'unu tek `TaskKind` SSOT'a indirgeyecek adaptör katmanı + hybrid two-axis `EnvironmentType` + `RequirementProfile` + `ExecutionRequest` input-kontratı + `Task`'a OPSİYONEL `type` alanı. Bu adım **bilinçle additive**: yeni modül kimse tüketene kadar "ölü"dür → "foundation laid" sayılır, "WM-2 done" DEĞİL (consumer-migration sonraki sprint'ler). Referans tasarım: `docs/superpowers/specs/2026-06-08-canonical-work-model-design.md` (OKU).
 
 ## Ortak kurallar
-- **i18n-FIRST** (user-facing string getMessage; doc içeriği muaf — markdown). **No tech debt.**
-- **🔴 distinct filesWrite** (parallel-safety): iki task farklı dosyaya yazar (collision yok) → tek wave eş-zamanlı.
-- ESM `.js`. Subscription. structured planning. `dependency_pipeline` açık ama bu sprint dependency yok (paralel).
+- **Backward-safe ZORUNLU:** mevcut hiçbir callsite değişmez; `Task`'a eklenen alan **OPSİYONEL** (`type?:`) — `Task` JSON'dan inşa edilir (planner yazar/worker okur, tsc-denetlenmez yol), required alan runtime'ı kırar. tsc yeşil ≠ deckent hâlâ orkestre eder.
+- **i18n:** muaf (internal type'lar, user-facing string yok). **ESM `.js` uzantısı zorunlu.**
+- **No tech debt:** tüm adaptörler pure-function, tam unit-test'li. ADR-053 (TaskType taxonomy) genişletilir (realize-edilmiş tek-kaynak hali); yeni ADR WM-2c'de yazılır, bu additive adımda değil.
 - **.result kontratı:** `docs/reference/api-surface.md`.
-- Not: doc-write task'ları (ADR-053 TaskType) → test/coverage beklenmez; goCriteria = doğru+eksiksiz markdown.
+- Tier-0 (internal/structural, `src/core/`) → unit-test yeterli, Smoke gerekmez.
 
 ---
 
-## Task 1: 236-001 — [Ollama/qwen3.6] Yerel-model worker kullanım kılavuzu
-- Provider: ollama
-- Model: qwen3.6:27b
-- Effort: normal
-- Files: docs/guide/local-model-workers.md
-- Scope: docs/guide/
-### Description
-`docs/guide/local-model-workers.md` adında özlü bir kullanıcı kılavuzu yaz. Önce `docs/superpowers/specs/2026-06-06-ollama-agentic-worker-harness-design.md` ve `src/agents/agentic-worker-runner.ts`'i oku, sonra şunları anlat: (1) Ollama kurulumu + `ollama pull <model>`, (2) per-task `- Provider: ollama` + `- Model: <tag>` ile yapılandırma, (3) agentic tool-loop nasıl çalışır (read_file/write_file/edit_file/run_bash/task_done), (4) worker'ın host'ta (localhost:11434) çalıştığı ve scope-enforced olduğu. Açık başlıklar, kısa örnekler. Bitince `task_done` ile DONE.
-**Kanıt:** `docs/guide/local-model-workers.md` var + "ollama pull" + "Provider: ollama" + "task_done" geçer (`grep -lE "ollama pull|Provider: ollama" docs/guide/local-model-workers.md`).
-**Test:** yok (doc-write task; markdown doğruluğu).
-**Smoke:** (doc) — gerçek qwen3.6 host'ta üretir (Brain post-sprint disk-verify: dosya var + içerik anlamlı).
-
-## Task 2: 236-002 — [Claude/sonnet] Çoklu-provider filo kılavuzu
+## Task 1: 238-001 — Canonical work-model SSOT modülü (additive)
 - Provider: claude
-- Model: sonnet
-- Effort: low
-- Files: docs/guide/multi-provider-fleet.md
-- Scope: docs/guide/
+- Model: opus
+- Effort: high
+- Agent: architect
+- Skills: typescript-expert, system-architect, code-simplifier, testing-expert
+- Files: src/core/work-model.ts, src/core/task-types.ts, tests/core/work-model.test.ts
+- Scope: src/core/, tests/core/
+
 ### Description
-`docs/guide/multi-provider-fleet.md` adında özlü bir kılavuz yaz. `docs/MASTER-PLAN.md` §4A (AS-2) ve `src/orchestra/sprint-spawner.ts` (`isAdapterProvider` routing) referansıyla şunları anlat: per-task `- Provider:` seçimi; claude/codex/gemini'nin configured backend (docker) üzerinden, ollama'nın host-adapter üzerinden koştuğu; **tek sprint'in birden çok provider'ı eş-zamanlı karıştırabildiği** (örn. bu sprint: ollama + claude paralel). Açık başlıklar, kısa örnek DIRECTIVES bloğu. Özetle bitir.
-**Kanıt:** `docs/guide/multi-provider-fleet.md` var + "Provider:" + "mixed" veya "eş-zamanlı/paralel" geçer.
-**Test:** yok (doc-write task).
-**Smoke:** (doc) unit/disk-verify yeterli.
+Önce `docs/superpowers/specs/2026-06-08-canonical-work-model-design.md`'yi ve mevcut 5 enum'u oku (`src/core/decision-types.ts:8`, `src/orchestra/rubric-registry.ts:21`, `src/orchestra/task-router.ts:55`, `src/orchestra/adr-selector.ts:45`, `src/core/routing-types.ts`). Sonra **yeni `src/core/work-model.ts`** dosyasını oluştur:
+
+1. **Kanonik tipler** (spec §2 birebir): `TaskKind` (11-değerli union), `WorkDomain`+`ExecutionContext`+`EnvironmentType` (two-axis interface), `Capability`+`ResourceNeed`+`RequirementProfile`, `ExecutionRequest` (input-kontratı; `scope: TaskScope`, `provider?: ProviderName`, `model?: ModelType` mevcut tiplerden import — sıfır hardcode 'claude').
+2. **Legacy→canonical adaptörleri** (pure): `decisionTypeToKind`, `rubricTypeToKind`, `routerTypeToKind`, `adrSelectorToKind`, `intentToKind` — her 5 enum'un HER değeri kanonik `TaskKind`'a eşlenir (spec §3). Bilinmeyen→`'generic'`.
+3. **Reverse helper'lar** (pure): `taskKindToRubric` (→ 'audit'|'document-write'|'code-development'), `taskKindToAdrDomain`, `taskKindToIntent` — alt-sistemlerin tek kanonik kind'dan kendi görüşünü türetmesi için.
+4. `src/core/task-types.ts`: `Task` interface'ine **opsiyonel** `type?: TaskKind` alanı ekle (work-model.ts'ten import; tek satır, mevcut hiçbir şey değişmez).
+
+**Tasarım kuralı:** tüm fonksiyonlar pure (side-effect yok); `work-model.ts` yalnız tip + saf-fonksiyon (I/O yok). Mevcut `TaskScope`/`GoNoGoCriteria`/`TaskEffort`/`TaskPriority`/`ProviderName`/`ModelType` tiplerini import et, yeniden tanımlama.
+
+**Kanıt:** `grep -c "export" src/core/work-model.ts` ≥ 12 (tipler+adaptörler) · `grep "type?:" src/core/task-types.ts` → eklendi · `npx tsc --noEmit` temiz.
+
+**Test (≥12):** `tests/core/work-model.test.ts` — (a) 5 adaptörün HER değeri doğru `TaskKind`'a map'lenir (her enum için ≥1 test), (b) bilinmeyen→'generic', (c) 3 reverse-helper round-trip, (d) `ExecutionRequest`/`EnvironmentType`/`RequirementProfile` tip-construction derler, (e) hermetik (I/O yok, tmpdir gerekmez). `npx vitest run tests/core/work-model.test.ts` yeşil.
+
+**Smoke:** yok (Tier-0 internal-type; unit-test yeterli).
 
 ---
 
-**Beklenen:** 2/2 DONE, 0 NO_GO. **Distinct filesWrite** (local-model-workers.md vs multi-provider-fleet.md, ikisi de docs/guide/ ama ayrı dosya → collision yok) → **paralel tek-wave, EŞ-ZAMANLI**. 236-001 host'ta qwen3.6, 236-002 docker'da claude/sonnet — aynı anda. Bu, mixed-fleet'in canlı kanıtı.
+**Beklenen:** 1/1 DONE. Additive (sıfır callsite değişikliği → mevcut tüm testler + deckent orkestrasyon BOZULMAZ). Disk-verify: `work-model.ts` var + 12+ export + `task-types.ts` opsiyonel `type?` + tsc temiz + work-model test yeşil. **Post-sprint orchestration-smoke (Brain/ben):** core-touching olduğundan deckent'in hâlâ trivial 1-task plan→spawn→evaluate yapabildiğini doğrula (tsc-green ≠ orkestre-eder).
 
-**Pre-flight (Brain — yapıldı):** main temiz+push'lu ✅ · WAL-safe DB backup (236 entry) ✅ · ollama servisi açık (qwen3.6:27b yüklü) · structured planning.
-
-**Proof-of-function (Brain post-sprint):** disk-verify — her iki doc var + anlamlı; özellikle **236-001'in qwen3.6 (host) tarafından, 236-002'nin claude (docker) tarafından** üretildiğini sprint event/worker-log'dan doğrula (mixed-fleet kanıtı). False-NO_GO olursa disk-verify ([[feedback_trust_brain_eval_not_worker]]).
-
-İlgili: [[project_4cli_subscription_vision]] (mixed-fleet vizyon) · [[project_ollama_worker_stub_gap]] · [[feedback_proof_of_function_dod]] · [[feedback_trust_brain_eval_not_worker]]
-İlgili ADR: ADR-027 (spawn) · ADR-037 · ADR-053 (TaskType doc-write) · ADR-079
+İlgili ADR: ADR-053 (TaskType taxonomy — bu onun realize-edilmiş tek-kaynak hali) · ADR-008 (import yönü) · ADR-002 (ESM `.js`). Memory: [[project_merged_product_flow_analysis]] (5-enum bulgusu) · [[feedback_no_minimum_no_mvp_deckent]].
+</content>
