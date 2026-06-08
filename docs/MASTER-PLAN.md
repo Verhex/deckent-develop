@@ -917,7 +917,7 @@ Items surfaced during the Sprint 211 doc-consolidation audit that were intention
 - [ ] **WK-5** Docker live-monitoring: mount `output-stream` SSE in `server.ts`, add PTY `worker-attach` kind (`docker logs -f`, read-only), `watch --follow` docker branch, WorkerCard grid fan-out.
 - [ ] **WK-6** Wire dormant team-collab primitives (`shared-memory.ts` + `handoff-protocol.ts` + `multi-agent.ts`) into worker prompt/spawn for real multi-agent/team collaboration.
 - [ ] **WK-7** Scale-async for 50–100 workers: async-batch liveness probes, parallelized docker spawn, IPC back-pressure (auditor currently O(n)-blocking `spawnSync` in the 30s scan).
-- [ ] **WK-8** Rewrite `docs/reference/multi-provider.md` + `docs/guide/multi-provider.md` against code reality (Gemini CLI requirement; ollama/deepseek/qwen/glm omitted).
+- [x] **WK-8** Rewrite multi-provider docs against code reality — ✅ **DONE** (Sprint 244, `7aac7028`, disk-verified vs code): both docs +255/-53 — ollama/deepseek/qwen/glm added (were absent), Gemini CLI+key requirement clarified, auth commands fixed. (Sprint 243 attempted via qwen3.6/ollama → NO_GO on this large multi-file task; re-routed to claude — finding: local-model = small-scope only, see `project_ollama_sprint_task_sizing`.)
 - [ ] **WK-9** Regenerate `.codex`/`.gemini` rule files from `.claude` source (Karpathy + Proof-of-Function missing → weaker non-Claude workers).
 - [ ] **WK-nervous** Wire `panic-gate` `awaitPanicGateApproval` (hard timeout, 0-caller) into the executor/spawn path so nervous approval can't block spawn forever.
 - [ ] **WK-cost** Bridge `auth_mode→billingMode` in the cost gate + add mid-sprint token-usage abort (today the cap estimates `$0` for subscription and TokenSpikeDetector only fires post-hoc in RETRO).
