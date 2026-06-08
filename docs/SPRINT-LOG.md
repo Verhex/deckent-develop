@@ -6690,3 +6690,25 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 246-001: 246-001 — docs/security/threat-model.md (DONE)
 
 ---
+## Sprint 247 — sprint-247
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-06-08
+**Duration:** 540s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 1 |
+| Completed | 1 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 539565ms |
+
+### Tasks
+
+- 247-001: 247-001 — docs/adr-index.md (DONE)
+
+---
