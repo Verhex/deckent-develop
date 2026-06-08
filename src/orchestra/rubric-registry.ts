@@ -9,6 +9,7 @@
 // description text. Worker prompt/title language never influences routing.
 
 import type { Task, EvaluationRubric } from '../core/types.js';
+import { taskKindToRubric } from '../core/work-model.js';
 
 /**
  * Task taxonomy for rubric selection.
@@ -188,7 +189,10 @@ export const PROOF_OF_FUNCTION_CRITERION = {
 } as const;
 
 export function getRubric(task: Task): EvaluationRubric {
-  const base = RUBRIC_REGISTRY[detectTaskType(task)];
+  // Canonical path: task.type (TaskKind) set by task-builder → derive RubricTaskType via SSOT adapter.
+  // Fallback: scope-shape detectTaskType for tasks without a canonical type (backward-compatible).
+  const rubricType = task.type != null ? taskKindToRubric(task.type) : detectTaskType(task);
+  const base = RUBRIC_REGISTRY[rubricType];
   // Tier-1 (user-surface) tasks get the proof-of-function criterion appended.
   // Return a fresh object so the frozen base rubric is never mutated; Tier-0
   // tasks get the base rubric by reference (identity preserved for consumers).

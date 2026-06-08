@@ -10,6 +10,8 @@ import type {
 import { TaskStatus, ALL_MODELS, PROVIDER_MODEL_MAP } from '../core/types.js';
 import { VALID_PROVIDERS_ALL } from '../core/config.js';
 import { isAdapterProvider } from './sprint-utils.js';
+import { detectTaskType } from './rubric-registry.js';
+import { rubricTypeToKind } from '../core/work-model.js';
 import { modelRegistry, ensureOllamaModelRegistered } from '../core/model-registry.js';
 import type { TaskDNA } from '../core/routing-types.js';
 import { calculateModelScore } from './model-selector.js';
@@ -433,6 +435,10 @@ export function createTask(params: CreateTaskParams, sequence: number): Task & {
     ? { extraFiles: scopeDerived.extraFiles, extraDirs: scopeDerived.extraDirs, reason: 'test-mirror' as const }
     : undefined;
 
+  // WM-2b: derive canonical TaskKind from scope-shape so new tasks carry task.type
+  // (canonical SSOT). detectTaskType uses scope only — a minimal scope-only object suffices.
+  const canonicalKind = rubricTypeToKind(detectTaskType({ scope: params.scope } as Task));
+
   return {
     id,
     title: params.title,
@@ -445,6 +451,7 @@ export function createTask(params: CreateTaskParams, sequence: number): Task & {
     dependencies: params.dependencies,
     goNogo: params.goNogo,
     status: params.initialStatus ?? TaskStatus.PENDING,
+    type: canonicalKind,
     sprintId: params.sprintId,
     isPriorityFix: params.isPriorityFix,
     fixForTaskId: params.fixForTaskId,
