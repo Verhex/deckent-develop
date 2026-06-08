@@ -6514,3 +6514,25 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 238-001: 238-001 — Canonical work-model SSOT modülü (additive) (DONE)
 
 ---
+## Sprint 239 — sprint-239
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-06-08
+**Duration:** 642s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 2 |
+| Completed | 2 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 641501ms |
+
+### Tasks
+
+- 239-001: 239-001 — rubric-registry + task-builder canonical TaskKind migration (DONE)
+
+---

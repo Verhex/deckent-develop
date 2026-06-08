@@ -2,6 +2,15 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint239] - 2026-06-08
+
+### Added
+
+- 239-001 — rubric-registry + task-builder canonical TaskKind migration
+
+
+_Tasks: 2 total, 2 done, 0 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint238] - 2026-06-08
 
 ### Added
