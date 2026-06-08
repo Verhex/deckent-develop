@@ -1,41 +1,41 @@
-# DIRECTIVES — Sprint 240: Work-Model Consumer Migration #2 (WM-2c-safe)
+# DIRECTIVES — Sprint 241: EffectClass → Autonomous Policy-Gate Wire (WM-6)
 
-## Goal: Canonical work-model SSOT'un consumer'larını genişlet — `task-router` (routing intent) ve `adr-selector` (ADR-domain) `Task.type` (canonical `TaskKind`) set ise reverse-helper'lardan (`taskKindToIntent`, `taskKindToAdrDomain`) türetsin; set değilse mevcut legacy mantık AYNEN fallback. **Additive-safe (enum-SİLME YOK):** duplike taksonomilerin fiilen kaldırılması ayrı, gündüz-reviewed cleanup adımı — gece-loop'ta yalnız consume-köprüsü (regresyon-sıfır). rubric (WM-2b) deseninin birebir tekrarı, iki consumer daha.
+## Goal: Autonomous policy-gate'in G3 risk-katmanını GERÇEKTEN çalıştır. Bugün `getEffectClass` (`rubric-registry.ts:375`) TANIMLI ama autonomous'ta kullanılmıyor: tek caller `runtime-loop.ts` `decidePolicy(entry)`'yi **computed effect geçmeden** çağırıyor → default `'reversible'` (AUTO_SAFE) → `risk-tagged`/irreversible entry'ler `auto` ile AYNI yolu izliyor (park ETMİYOR). Fix: decidePolicy'ye entry'nin doğasından **hesaplanmış EffectClass** geçir → non-auto-safe (critical-irreversible/compensable/idempotent) entry'ler approval-required'a park etsin. **Düşük-risk: yalnız autonomous (flag-gated default-off), ana sprint/spawn-path'e DOKUNMAZ.**
 
 ## Ortak kurallar
-- **Backward-safe + regression-zero ZORUNLU:** mevcut legacy detection/mantık fallback olarak KALIR (silinmez); `Task.type` yoksa davranış birebir. Yeni kanonik-yol eşdeğer task için eski-yolla AYNI sonucu üretir.
-- **i18n** muaf (internal routing/adr). **ESM `.js`.** No tech debt. ADR-008 (orchestra core'u import edebilir).
-- **.result kontratı** api-surface.md. Tier-0 → unit-test yeterli.
+- **Backward-safe:** default davranış korunur (effect verilmezse eski `'reversible'` default kalır — imza opsiyonel); yeni-yol yalnız computed-effect ekler. ADR-055 (EffectClass) realize. ADR-037/040 (authority/approval) korunur — **OTO-APPROVE YOK**.
+- **i18n** muaf (internal policy). **ESM `.js`.** No tech debt. **.result kontratı** api-surface.md. Tier-0 → unit-test.
 
 ---
 
-## Task 1: 240-001 — task-router + adr-selector canonical-consume (fallback korunur)
+## Task 1: 241-001 — decidePolicy'ye computed EffectClass wire
 - Provider: claude
 - Model: sonnet
 - Effort: normal
-- Agent: refactorer
-- Skills: typescript-expert, code-simplifier, testing-expert
-- Files: src/orchestra/task-router.ts, src/orchestra/adr-selector.ts, tests/orchestra/work-model-consumer-2.test.ts
-- Scope: src/orchestra/, tests/orchestra/
+- Agent: bug-fixer
+- Skills: typescript-expert, system-architect, testing-expert
+- Files: src/orchestra/autonomous/policy-gate.ts, src/orchestra/autonomous/runtime-loop.ts, tests/orchestra/autonomous/policy-gate-effectclass.test.ts
+- Scope: src/orchestra/autonomous/, tests/orchestra/autonomous/
+- Dependencies:
 
 ### Description
-Önce oku: `src/core/work-model.ts` (`taskKindToIntent`, `taskKindToAdrDomain`), `src/orchestra/task-router.ts` (mevcut `detectTaskType`/intent kullanımı), `src/orchestra/adr-selector.ts` (mevcut domain seçimi), ve referans desen `src/orchestra/rubric-registry.ts:194` (WM-2b köprüsü).
+Önce oku: `src/orchestra/autonomous/policy-gate.ts` (`decidePolicy`, `AUTO_SAFE` set, `EffectClass`), `src/orchestra/autonomous/runtime-loop.ts` (decidePolicy caller, ~satır 220), `src/orchestra/rubric-registry.ts:375` (`getEffectClass`), `src/orchestra/autonomous/backlog-types.ts` (`BacklogEntry`).
 
-1. **task-router.ts:** routing-intent/TaskType belirlenen noktada → `task.type != null ? taskKindToIntent(task.type) : <mevcut legacy detection>`. Mevcut legacy fonksiyon/mantık SİLİNMEZ (fallback). Routing kararı (agent/skill seçimi) AYNI kalır — sadece intent-kaynağı canonical'a köprülenir.
-2. **adr-selector.ts:** ADR-domain belirlenen noktada → `task.type != null ? taskKindToAdrDomain(task.type) : <mevcut legacy domain detection>`. Legacy fallback korunur.
-3. **Sıfır-regresyon kanıtı:** eşdeğer task için yeni-yol == eski-yol (router intent + adr domain), 3 task-türünde.
+1. **EffectClass hesaplama köprüsü:** autonomous backlog entry için EffectClass türet. Yol: entry'nin doğasından (`entry.kind`, `entry.spec.scopeDir`/`description`) bir `TaskKind`/minimal-task çıkar → `getEffectClass` (veya `EFFECT_CLASS_REGISTRY`) ile EffectClass hesapla. Saf, deterministik bir `computeEntryEffectClass(entry): EffectClass` fonksiyonu (policy-gate.ts veya yardımcı). Belirsiz/bilinmeyen → **güvenli taraf: en-kısıtlayıcı** (auto-safe-DEĞİL → park; fail-safe, ADR-040 default-deny ruhuyla).
+2. **runtime-loop.ts wire:** `decidePolicy(entry)` çağrısını `decidePolicy(entry, computeEntryEffectClass(entry))` yap. `decidePolicy` imzası opsiyonel-effect korunur (verilmezse eski default).
+3. **Sonuç:** `pure`/`reversible` → `auto`; `compensable`/`idempotent`/`critical-irreversible` → approval-required (park). risk-tagged artık gerçek anlam taşır.
 
-**Tasarım:** minimum-diff, mevcut imzaları koru, legacy fallback kalsın, pure-bridge (rubric-registry WM-2b deseni birebir). Karpathy scope-içi.
+**Tasarım:** minimum-diff, opsiyonel-imza (backward), pure-compute, fail-safe (belirsiz→park). OTO-APPROVE eklenmez (ADR-040). Karpathy scope-içi.
 
-**Kanıt:** `grep "taskKindToIntent" src/orchestra/task-router.ts` + `grep "taskKindToAdrDomain" src/orchestra/adr-selector.ts` → köprü var · legacy detection fonksiyonları HÂLÂ mevcut (fallback) · `npx tsc --noEmit` temiz.
+**Kanıt:** `grep "computeEntryEffectClass\|decidePolicy(entry," src/orchestra/autonomous/runtime-loop.ts` → wire var · `decidePolicy` artık computed-effect alıyor · `npx tsc --noEmit` temiz.
 
-**Test (≥8):** `tests/orchestra/work-model-consumer-2.test.ts` — (a) `task.type` set → router intent + adr domain canonical'dan; (b) `task.type` yok → legacy fallback aynen; (c) regression-eşitlik 3 task-türü (yeni==eski); hermetik. Yeni test yeşil + **mevcut task-router/adr-selector testleri BOZULMAZ** (`npx vitest run tests/orchestra/task-router.test.ts tests/orchestra/adr-selector.test.ts` — varsa, yeşil).
+**Test (≥6):** `tests/orchestra/autonomous/policy-gate-effectclass.test.ts` — (a) pure/reversible entry → decision `auto`; (b) critical-irreversible/compensable → approval-required (park); (c) bilinmeyen-doğa → fail-safe park; (d) `decidePolicy` effect-verilmeden çağrılırsa eski default (backward); hermetik. `npx vitest run tests/orchestra/autonomous/policy-gate-effectclass.test.ts` yeşil + **mevcut policy-gate testleri BOZULMAZ**.
 
-**Smoke:** yok (Tier-0); Brain/ben post-sprint orchestration-smoke (trivial sprint plan→spawn→evaluate, routing+adr doğru).
+**Smoke:** yok (Tier-0 autonomous-internal, flag-gated). Ana sprint-path etkilenmez → orchestration-smoke gerekmez (autonomous default-off); ben yine de tsc+test+build doğrularım.
 
 ---
 
-**Beklenen:** 1/1 DONE. SSOT artık 3 consumer'da (rubric+router+adr) tüketiliyor; WM-2c-safe tamam (duplike-silme ayrı cleanup). Disk-verify: 2 köprü + fallback korundu + tsc temiz + yeni test + mevcut testler yeşil (sıfır regresyon). **Post-sprint orchestration-smoke (ben):** routing/adr-eval doğru.
+**Beklenen:** 1/1 DONE. Autonomous G3 risk-gate canlı (risk-tagged park eder). Disk-verify: computeEntryEffectClass + wire + fail-safe + tsc temiz + yeni test + mevcut policy-gate testleri yeşil. memory wipe-check.
 
-İlgili ADR: ADR-053 · ADR-015 (TaskRouter) · ADR-036 (ADR governance) · ADR-008. Memory: [[sprint_239_workmodel_consumer]] (WM-2b deseni) · [[feedback_agent_routing_imbalance]] (routing hassasiyeti) · [[feedback_trust_brain_eval_not_worker]].
+İlgili ADR: ADR-055 (EffectClass realize) · ADR-040 (nervous approval, no-auto-approve) · ADR-037 (authority). Memory: [[project_merged_product_flow_analysis]] (EffectClass G3 defaulted-open bulgusu) · [[sprint_240_workmodel_consumer2]] · [[feedback_trust_brain_eval_not_worker]].
 </content>
