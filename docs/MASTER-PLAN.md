@@ -813,7 +813,7 @@ Items surfaced during the Sprint 211 doc-consolidation audit that were intention
 
 ### A. Canonical Work-Model Foundation (everything rides on this — brainstorm in progress, hybrid two-axis + core-first)
 - [ ] **WM-1** Build a single canonical `ExecutionRequest` contract that unifies the 3 divergent execution paths (`deckent run` / `deckent start` / autonomous) across both CLI and MCP.
-- [ ] **WM-2** Reconcile the 5 incompatible `TaskType` enums (`decision-types`/`rubric-registry`/`task-router`/`adr-selector`/`routing-types`) into ONE source of truth and add a real persisted `type` field to `Task`.
+- [~] **WM-2** Reconcile the 5 incompatible `TaskType` enums (`decision-types`/`rubric-registry`/`task-router`/`adr-selector`/`routing-types`) into ONE source of truth and add a real persisted `type` field to `Task`. — 🔄 **WM-2a foundation laid** (Sprint 238, `ff8bb5ea`, disk-verified): `src/core/work-model.ts` SSOT + 5 legacy→canonical adapters + 3 reverse helpers + OPTIONAL `Task.type`, additive/zero-callsite, 43/43 tests, tsc clean. **DEAD until consumers migrate** — WM-2b (rubric consume + task-builder set type) + WM-2c (router/adr-selector/decision-types derive-from-canonical, delete duplicates) pending.
 - [ ] **WM-3** Introduce `EnvironmentType` as a hybrid two-axis model (work-domain × execution-context) so code / email / ERP / web / data-pipeline work are all first-class.
 - [ ] **WM-4** Introduce `RequirementProfile` (capability + resource) so policy, routing, governance and the capability-broker derive from a task's declared needs.
 - [ ] **WM-5** Provider-free hard-enforcement: remove MCP-`run` `provider:'claude'` hardcode, fix autonomous-`runTaskMode` always-generic (inject agent/skill), guard the unconditional `CLAUDE_AUTH_REQUIRED=1`, and stop leaking Claude-only `claudeArgs`/`--dangerously-skip-permissions` to codex/gemini.
@@ -943,7 +943,7 @@ Items surfaced during the Sprint 211 doc-consolidation audit that were intention
 - [ ] **HUB-1** DeckentHub backend live (`registry.deckent.dev` not serving today) + moderation queue + CI auto key-rotation + phased registry growth 20→50→100 with vector search.
 
 ### Q. Brain Integrity close-out (§4F)
-- [ ] **INT-1** Close the memory-loss saga: one more post-build sprint that keeps memory/exports intact confirms the Sprint-232 5-layer fix (build-verification pending).
+- [x] **INT-1** Close the memory-loss saga — ✅ **CONFIRMED (Sprint 238, 2026-06-08):** a post-fix intact sprint kept memory/exports whole (memory.db 243→**246 grew**, no wipe; exports intact: decisions 108 adr-ref, memory.md 766 lines). Sprint-232 5-layer fix validated live; §4F saga closed.
 
 ### R. Post-beta milestone-gated (recorded, not near-term)
 - [ ] **PB-1** Voice (STT Whisper + wake-word + TTS + real-time streaming) — gated behind 10K GitHub stars.
