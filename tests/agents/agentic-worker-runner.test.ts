@@ -173,6 +173,30 @@ describe('runAgenticWorker — F1-013 agentic worker harness (T-233-001)', () =>
     expect(result.selfAssessment).toBe('DONE');
   });
 
+  // ── Phase-1c: task_done WITHOUT a valid selfAssessment but with files changed → GO_WITH_TECH_DEBT (not NO_GO) ──
+  it('task_done with missing/invalid selfAssessment but files changed → GO_WITH_TECH_DEBT (work not punished as NO_GO)', async () => {
+    const fetchImpl = scriptFetch(
+      [
+        chatResp([{ name: 'write_file', args: { path: 'allowed.ts', content: 'export const x = 1;\n' } }]),
+        chatResp([{ name: 'task_done', args: {} }]), // no selfAssessment, no notes (the dogfood case)
+      ],
+      [],
+    );
+    const result = await runAgenticWorker(buildOpts(projectRoot, { fetchImpl }));
+    expect(result.filesChanged).toEqual(['allowed.ts']);
+    expect(result.selfAssessment).toBe('GO_WITH_TECH_DEBT');
+    expect(result.terminationReason).toBe('task_done');
+    expect(result.notes).toMatch(/valid selfAssessment|defaulted/);
+  });
+
+  // ── Phase-1c: task_done without a valid selfAssessment AND no files changed → NO_GO ──
+  it('task_done with missing selfAssessment and no files changed → NO_GO', async () => {
+    const fetchImpl = scriptFetch([chatResp([{ name: 'task_done', args: {} }])], []);
+    const result = await runAgenticWorker(buildOpts(projectRoot, { fetchImpl }));
+    expect(result.filesChanged).toEqual([]);
+    expect(result.selfAssessment).toBe('NO_GO');
+  });
+
   // ── Test 2: scope-out-of-bounds write → hard-reject + error fed back to model ──
   it('out-of-scope write_file is HARD-REJECTED and the scope error is fed into the NEXT request', async () => {
     const captured: { url: string; body: unknown }[] = [];

@@ -404,11 +404,21 @@ export async function runAgenticWorker(
       // Termination #1: task_done.
       if (name === 'task_done') {
         const rawSa = String(args['selfAssessment'] ?? '').toUpperCase();
-        const validSa: SelfAssessment =
-          rawSa === 'DONE' || rawSa === 'GO_WITH_TECH_DEBT' || rawSa === 'NO_GO'
-            ? (rawSa as SelfAssessment)
-            : 'NO_GO';
-        const note = String(args['notes'] ?? 'task_done called without notes');
+        const saValid = rawSa === 'DONE' || rawSa === 'GO_WITH_TECH_DEBT' || rawSa === 'NO_GO';
+        // Phase-1c: when the model calls task_done WITHOUT a valid selfAssessment,
+        // don't punish demonstrably-done work as NO_GO. If files were changed, the
+        // honest default is GO_WITH_TECH_DEBT (work landed, self-assessment unclear);
+        // only an empty-handed task_done defaults to NO_GO. Mirrors the no_tool_calls
+        // (filesChanged>0 → done) + maxIterations (filesChanged>0 → GO_WITH_TECH_DEBT) paths.
+        const validSa: SelfAssessment = saValid
+          ? (rawSa as SelfAssessment)
+          : (filesChanged.size > 0 ? 'GO_WITH_TECH_DEBT' : 'NO_GO');
+        const rawNote = args['notes'];
+        const note = typeof rawNote === 'string' && rawNote.trim()
+          ? rawNote
+          : saValid
+            ? 'task_done called without notes'
+            : `task_done called without a valid selfAssessment; defaulted to ${validSa} (${filesChanged.size} file change(s))`;
         logger(`[agentic-runner] task_done: ${validSa}`);
         return {
           taskId,
