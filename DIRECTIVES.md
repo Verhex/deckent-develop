@@ -1,41 +1,38 @@
-# DIRECTIVES — Sprint 241: EffectClass → Autonomous Policy-Gate Wire (WM-6)
+# DIRECTIVES — Sprint 242: Provider-Free Safe Fixes (WM-5-safe)
 
-## Goal: Autonomous policy-gate'in G3 risk-katmanını GERÇEKTEN çalıştır. Bugün `getEffectClass` (`rubric-registry.ts:375`) TANIMLI ama autonomous'ta kullanılmıyor: tek caller `runtime-loop.ts` `decidePolicy(entry)`'yi **computed effect geçmeden** çağırıyor → default `'reversible'` (AUTO_SAFE) → `risk-tagged`/irreversible entry'ler `auto` ile AYNI yolu izliyor (park ETMİYOR). Fix: decidePolicy'ye entry'nin doğasından **hesaplanmış EffectClass** geçir → non-auto-safe (critical-irreversible/compensable/idempotent) entry'ler approval-required'a park etsin. **Düşük-risk: yalnız autonomous (flag-gated default-off), ana sprint/spawn-path'e DOKUNMAZ.**
+## Goal: WM-5 provider-free hard-enforce'un **iki düşük-risk parçası** (docker-spawn-path'e DOKUNMAZ → gece-güvenli): (a) MCP `deckent_run` `provider:'claude'` **hardcode'unu kaldır** → task'ın gerçek provider'ını onurla; (b) autonomous `task-mode-runner` **always-generic** worker'ı düzelt → CLI `run`'ın yaptığı gibi agent/skill resolve+inject et. **YÜKSEK-risk parçalar (CLAUDE_AUTH_REQUIRED guard + claudeArgs non-claude, spawn-backend-docker) bu sprint'te YOK** — gündüz-reviewed (deckent'in kendi docker-spawn'ı = gece-loop'un can damarı).
 
 ## Ortak kurallar
-- **Backward-safe:** default davranış korunur (effect verilmezse eski `'reversible'` default kalır — imza opsiyonel); yeni-yol yalnız computed-effect ekler. ADR-055 (EffectClass) realize. ADR-037/040 (authority/approval) korunur — **OTO-APPROVE YOK**.
-- **i18n** muaf (internal policy). **ESM `.js`.** No tech debt. **.result kontratı** api-surface.md. Tier-0 → unit-test.
+- **Backward-safe:** agent/skill resolution additive (resolve başarısız→generic fallback korunur); MCP-run provider artık task'tan gelir (claude default kalabilir ama hardcode değil — task.provider öncelikli). **i18n** muaf. **ESM `.js`.** No tech debt. ADR-066 (provider independence) realize.
+- **.result kontratı** api-surface.md. Tier-0/internal → unit-test yeterli (MCP-run + autonomous flag-gated, ana sprint-path'e dokunmaz → orchestration-smoke gerekmez, ben tsc+test+build doğrularım).
 
 ---
 
-## Task 1: 241-001 — decidePolicy'ye computed EffectClass wire
+## Task 1: 242-001 — MCP-run provider-free + autonomous agent/skill inject
 - Provider: claude
 - Model: sonnet
 - Effort: normal
-- Agent: bug-fixer
-- Skills: typescript-expert, system-architect, testing-expert
-- Files: src/orchestra/autonomous/policy-gate.ts, src/orchestra/autonomous/runtime-loop.ts, tests/orchestra/autonomous/policy-gate-effectclass.test.ts
-- Scope: src/orchestra/autonomous/, tests/orchestra/autonomous/
-- Dependencies:
+- Agent: api-builder
+- Skills: typescript-expert, api-builder, testing-expert
+- Files: src/mcp/tools/run.ts, src/orchestra/task-mode-runner.ts, tests/mcp/run-provider-free.test.ts, tests/orchestra/task-mode-agent-inject.test.ts
+- Scope: src/mcp/, src/orchestra/, tests/mcp/, tests/orchestra/
 
 ### Description
-Önce oku: `src/orchestra/autonomous/policy-gate.ts` (`decidePolicy`, `AUTO_SAFE` set, `EffectClass`), `src/orchestra/autonomous/runtime-loop.ts` (decidePolicy caller, ~satır 220), `src/orchestra/rubric-registry.ts:375` (`getEffectClass`), `src/orchestra/autonomous/backlog-types.ts` (`BacklogEntry`).
+Önce oku: `src/mcp/tools/run.ts` (mevcut `provider:'claude'` hardcode, ~satır 63), `src/cli/commands/run.ts` (referans: `resolveAgentPrompt`/`resolveSkillPrompts`/`buildWorkerPrompt`/`spawnWorkerMultiProvider` deseni), `src/orchestra/task-mode-runner.ts` (mevcut generic `buildWorkerPrompt(task)`, ~satır 104-106).
 
-1. **EffectClass hesaplama köprüsü:** autonomous backlog entry için EffectClass türet. Yol: entry'nin doğasından (`entry.kind`, `entry.spec.scopeDir`/`description`) bir `TaskKind`/minimal-task çıkar → `getEffectClass` (veya `EFFECT_CLASS_REGISTRY`) ile EffectClass hesapla. Saf, deterministik bir `computeEntryEffectClass(entry): EffectClass` fonksiyonu (policy-gate.ts veya yardımcı). Belirsiz/bilinmeyen → **güvenli taraf: en-kısıtlayıcı** (auto-safe-DEĞİL → park; fail-safe, ADR-040 default-deny ruhuyla).
-2. **runtime-loop.ts wire:** `decidePolicy(entry)` çağrısını `decidePolicy(entry, computeEntryEffectClass(entry))` yap. `decidePolicy` imzası opsiyonel-effect korunur (verilmezse eski default).
-3. **Sonuç:** `pure`/`reversible` → `auto`; `compensable`/`idempotent`/`critical-irreversible` → approval-required (park). risk-tagged artık gerçek anlam taşır.
+**Fix A — MCP run provider-free:** `src/mcp/tools/run.ts`'te `provider:'claude'` hardcode'unu kaldır → task'ın provider'ını input/task'tan al (verilmezse config-default; ASLA literal 'claude' zorla). Mümkünse CLI-run gibi `spawnWorkerMultiProvider`/provider-resolution yoluna hizala (isAdapterProvider routing korunur). Minimum-diff.
 
-**Tasarım:** minimum-diff, opsiyonel-imza (backward), pure-compute, fail-safe (belirsiz→park). OTO-APPROVE eklenmez (ADR-040). Karpathy scope-içi.
+**Fix B — autonomous agent/skill inject:** `src/orchestra/task-mode-runner.ts`'te generic `buildWorkerPrompt(task)` yerine CLI-run deseni: `resolveAgentPrompt(root, task)` + `resolveSkillPrompts(root, task)` → `buildWorkerPrompt(task, agentPrompt, skillPrompts)`. Resolve başarısız/boş→generic fallback (backward-safe). Autonomous task'lar artık domain-expertise + skill taşır (sprint task'larıyla parity).
 
-**Kanıt:** `grep "computeEntryEffectClass\|decidePolicy(entry," src/orchestra/autonomous/runtime-loop.ts` → wire var · `decidePolicy` artık computed-effect alıyor · `npx tsc --noEmit` temiz.
+**Kanıt:** `grep -c "provider:\s*'claude'" src/mcp/tools/run.ts` → 0 (hardcode gitti) · `grep "resolveAgentPrompt\|resolveSkillPrompts" src/orchestra/task-mode-runner.ts` → eklendi · `npx tsc --noEmit` temiz.
 
-**Test (≥6):** `tests/orchestra/autonomous/policy-gate-effectclass.test.ts` — (a) pure/reversible entry → decision `auto`; (b) critical-irreversible/compensable → approval-required (park); (c) bilinmeyen-doğa → fail-safe park; (d) `decidePolicy` effect-verilmeden çağrılırsa eski default (backward); hermetik. `npx vitest run tests/orchestra/autonomous/policy-gate-effectclass.test.ts` yeşil + **mevcut policy-gate testleri BOZULMAZ**.
+**Test (≥6):** `tests/mcp/run-provider-free.test.ts` — MCP-run task.provider'ı onurlar, literal-claude zorlamaz (2+); `tests/orchestra/task-mode-agent-inject.test.ts` — task-mode worker prompt'una agent/skill enjekte edilir, resolve-fail→generic fallback (3+); hermetik. Yeni testler yeşil + **mevcut mcp-run / task-mode testleri BOZULMAZ**.
 
-**Smoke:** yok (Tier-0 autonomous-internal, flag-gated). Ana sprint-path etkilenmez → orchestration-smoke gerekmez (autonomous default-off); ben yine de tsc+test+build doğrularım.
+**Smoke:** yok (MCP-run + autonomous flag-gated; ana CLI-start spawn-path etkilenmez). Ben tsc+test+build doğrularım.
 
 ---
 
-**Beklenen:** 1/1 DONE. Autonomous G3 risk-gate canlı (risk-tagged park eder). Disk-verify: computeEntryEffectClass + wire + fail-safe + tsc temiz + yeni test + mevcut policy-gate testleri yeşil. memory wipe-check.
+**Beklenen:** 1/1 DONE. MCP-run artık provider-free; autonomous task'lar agent/skill taşır. Disk-verify: hardcode-0 + inject-var + fallback + tsc temiz + yeni test + mevcut testler yeşil + memory wipe-check. **docker-spawn-path (spawn-backend-docker) DOKUNULMADI** (gündüz-reviewed).
 
-İlgili ADR: ADR-055 (EffectClass realize) · ADR-040 (nervous approval, no-auto-approve) · ADR-037 (authority). Memory: [[project_merged_product_flow_analysis]] (EffectClass G3 defaulted-open bulgusu) · [[sprint_240_workmodel_consumer2]] · [[feedback_trust_brain_eval_not_worker]].
+İlgili ADR: ADR-066 (provider independence) · ADR-027 (spawn backend) · ADR-041 (agent taxonomy). Memory: [[project_merged_product_flow_analysis]] (MCP-run hardcode + autonomous=generic bulguları) · [[sprint_241_effectclass_wire]] · [[feedback_trust_brain_eval_not_worker]].
 </content>
