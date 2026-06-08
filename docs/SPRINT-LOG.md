@@ -6492,3 +6492,25 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 237-002: 236-002 — [Claude/sonnet] Çoklu-provider filo kılavuzu (DONE)
 
 ---
+## Sprint 238 — sprint-238
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-06-08
+**Duration:** 454s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 1 |
+| Completed | 1 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 453588ms |
+
+### Tasks
+
+- 238-001: 238-001 — Canonical work-model SSOT modülü (additive) (DONE)
+
+---
