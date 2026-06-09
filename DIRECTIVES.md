@@ -1,45 +1,61 @@
-# DIRECTIVES — Sprint: Combined verify (MF-8 + F1-RE)
+# DIRECTIVES — Sprint: Multi-Provider Doc Dogfood (WM-1 / WM-7 user docs)
 
-## Goal: Verify (1) MF-8 — codex-in-docker now self-reports a clean DONE (no false-NO_GO from linesAdded=0); (2) F1-RE — model reasoning-effort reaches the CLI (codex `-c model_reasoning_effort=high`, claude `--effort xhigh`). 2 tiny doc tasks. **DOC-ONLY, zero-risk.**
+## Goal: Dogfood deckent's multi-provider fleet on 3 self-contained, god-level documentation tasks — one per provider (claude / codex / gemini) — that document the just-shipped WM-1 (ExecutionRequest unification) + WM-7 (stack-aware criteria/routing) + the agentic-OS + agentic-run-ecosystem positioning, for end users. **DOC-ONLY, Tier-0, zero-risk** (WM-7 doc-kind criteria → disk-verify only, NO test suite, NO tsc gate). i18n-clean prose (English docs).
 
 ## Ortak kurallar
-- Tier-0 doc → NO test suite. Küçük dosya. Her worker `.tasks/task-XXX.result` yazmalı.
+- Doc-only → NO test suite, NO build. Disk-verify: file exists + required sections. Her worker `.tasks/task-XXX.result` yazmalı (selfAssessment DONE).
+- Mevcut doc stiline uy (docs/reference, docs/vision). Hardcode örnek-değer yok; gerçek API yüzeyinden yaz.
 
 ---
 
-## Task 1: V-001 — codex docker + reasoning-effort (MF-8 + F1-RE)
+## Task 1: DOC-1 — ExecutionRequest contract reference (WM-1)
+- Provider: claude
+- Model: sonnet
+- Effort: normal
+- Agent: doc-writer
+- Skills: documentation-writer
+- Files: docs/reference/execution-request.md
+- Scope: docs/reference/
+
+### Description
+Create `docs/reference/execution-request.md` documenting the canonical `ExecutionRequest` contract (`src/core/work-model.ts`) and the WM-1 single-task unification. Cover: the contract fields (core: description/kind/environment/requirements/scope/provider/model/goNogo; envelope: capabilityTarget/modelEffort/mode/actor/origin/correlationId/causationId/budget — note each is optional + consumed incrementally per feature); how `buildExecutionRequest` + `resolveToTask` (`src/orchestra/execution-request-builder.ts`) unify the 3 paths (`deckent run` / `deckent_run` MCP / autonomous); that `task.type` (TaskKind) is now set on every single-task run; and `resolveRiskClass()` deriving governance risk. Keep it a precise reference (tables + short examples), enterprise-grade.
+
+**Kanıt:** `test -f docs/reference/execution-request.md && grep -c "ExecutionRequest" docs/reference/execution-request.md` → dosya var, contract belgelendi. **Test:** yok (doc-only).
+
+---
+
+## Task 2: DOC-2 — Stack-aware criteria & routing (WM-7)
+- Provider: gemini
+- Model: gemini-2.5-pro
+- Effort: normal
+- Agent: doc-writer
+- Skills: documentation-writer
+- Files: docs/reference/stack-aware-routing.md
+- Scope: docs/reference/
+
+### Description
+Create `docs/reference/stack-aware-routing.md` documenting WM-7: how deckent derives GO/NO-GO criteria + the coverage gate + skill/agent routing from the task kind × the detected project stack (`TechStackKind`). Cover: doc/audit tasks aren't judged by a build; code tasks get the detected stack's commands (Go→`go test ./...`, never `tsc`); the coverage gate exempts non-JS/TS code (measurement gap, not failure); the parametric `code-expert` skill (per-stack idioms + commands); stack-specialized prime agents (`temp-go-specialist` etc.); and the language-mismatch routing penalty (typescript-expert is never routed on a Go project) with `- Skills:`/`- Agent:` overrides bypassing it. User-facing, with a "works on any stack" framing.
+
+**Kanıt:** `test -f docs/reference/stack-aware-routing.md && grep -ci "stack" docs/reference/stack-aware-routing.md` → dosya var. **Test:** yok (doc-only).
+
+---
+
+## Task 3: DOC-3 — Positioning: agentic-OS + agentic-run ecosystem
 - Provider: codex
 - Model: gpt-5
 - Backend: docker
 - ModelEffort: high
-- Effort: low
+- Effort: normal
 - Agent: doc-writer
 - Skills: documentation-writer
-- Files: docs/_verify-combined/codex-effort.md
-- Scope: docs/_verify-combined/
+- Files: docs/vision/agentic-run-ecosystem.md
+- Scope: docs/vision/
 
 ### Description
-Create `docs/_verify-combined/codex-effort.md` with three short lines: line 1 `# Codex Docker + Effort`, line 2 `Provider: codex, reasoning-effort: high`, line 3 one short sentence starting `Deckent`. Doc-only — do not run the test suite.
+Create `docs/vision/agentic-run-ecosystem.md` capturing the positioning: deckent is an **agentic-OS + agentic-run ecosystem** — install it, run it, ready+orchestrated, integrates everywhere, takes/gives data, understands structure, learns, and uses the models correctly. Map this to the Trinity (AI Assistant / AI System Worker / Developer Platform) × audience (end-user / developer / enterprise) matrix and the 6 everyone-everywhere scenarios. Reference how WM-1 (ExecutionRequest), WM-7 (stack-aware), and the multi-provider fleet realize it. Vision-doc tone, no marketing fluff — concrete capability mapping.
 
-**Kanıt:** dosya var, 3 satır, selfAssessment DONE (MF-8: linesAdded=0 false-NO_GO YOK). **Test:** yok.
+**Kanıt:** `test -f docs/vision/agentic-run-ecosystem.md && grep -ci "ecosystem" docs/vision/agentic-run-ecosystem.md` → dosya var. **Test:** yok (doc-only).
 
 ---
 
-## Task 2: V-002 — claude docker + reasoning-effort (F1-RE)
-- Provider: claude
-- Model: sonnet
-- ModelEffort: xhigh
-- Effort: low
-- Agent: doc-writer
-- Skills: documentation-writer
-- Files: docs/_verify-combined/claude-effort.md
-- Scope: docs/_verify-combined/
-
-### Description
-Create `docs/_verify-combined/claude-effort.md` with three short lines: line 1 `# Claude Docker + Effort`, line 2 `Provider: claude, reasoning-effort: xhigh`, line 3 one short sentence starting `Deckent`. Doc-only — do not run the test suite.
-
-**Kanıt:** dosya var, 3 satır, DONE. **Test:** yok.
-
----
-
-**Beklenen:** 2/2 DONE. codex-docker DONE (MF-8) + container komutu `-c model_reasoning_effort=high` (F1-RE); claude-docker komutu `--effort xhigh` (F1-RE). Disk-verify: 2 dosya + .result DONE + worker-script'lerde effort-flag.
+**Beklenen:** 3/3 DONE, 3 dosya disk'te, 3 provider (claude/codex/gemini) gerçekten koştu. Disk-verify: dosya + section + .result DONE. Mixed-fleet doc-dogfood — multi-provider değer gösterimi (WM-7 doc-kind criteria → tsc/test ZORUNLU DEĞİL).
