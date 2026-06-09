@@ -268,6 +268,17 @@ export interface Task {
    * via `readAuthMode()`. 'subscription' = default behavior (session mount).
    */
   authMode?: 'subscription' | 'api';
+  /**
+   * Per-task spawn backend override from DIRECTIVES.md (`- Backend: docker|tmux|subprocess`).
+   * Uses the existing spawn-backend vocabulary (config `spawn_backend`); does NOT
+   * invent a `host` value (the host-adapter routing for codex/gemini/ollama is a
+   * separate axis — see `isAdapterProvider`). Sprint 252 (PSL-1 verify): setting
+   * this forces the task onto the named backend, overriding both the config
+   * `spawn_backend` AND host-adapter routing — so codex/gemini can be exercised IN
+   * a docker container via the ProviderCommandSpec + per-provider OAuth mount.
+   * When undefined, default routing applies (unchanged behavior).
+   */
+  backend?: 'docker' | 'tmux' | 'subprocess';
   /** Sprint 196 WP-2: Intent mode for FIX worker — how to approach the re-execution. */
   fixMode?: 'verify-only' | 'amend' | 're-implement';
   /** Assigned agent ID (from agent pool) or 'generic' */

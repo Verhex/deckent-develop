@@ -60,6 +60,7 @@ import {
 
 // ─── Spawn backend abstraction ───────────────────────────────────
 import type { SpawnBackend } from './spawn-backend.js';
+import { SpawnBackendFactory } from './spawn-backend.js';
 
 // ─── Tmux ────────────────────────────────────────────────────────
 import { ensureSession, spawnWorker } from './tmux.js';
@@ -481,7 +482,28 @@ export async function spawnWorkers(
     // registered, refresh dynamic model acceptance and use `adapter.spawn`.
     // `refreshSupportedModels` is optional (`?.`) so non-Ollama adapters that
     // do not implement it remain compatible.
-    const wantsHostAdapter = isAdapterProvider(taskProvider);
+    // Sprint 252 (PSL-1 verify): `- Backend: docker|tmux|subprocess` forces a
+    // host-adapter provider (codex/gemini/ollama) onto a real spawn backend
+    // instead of its host CLI — exercises the ProviderCommandSpec + per-provider
+    // OAuth mount in the container. Uses the existing backend vocabulary (no
+    // invented 'host' value; host-vs-cloud is a separate axis). Default
+    // (undefined) keeps host-adapter routing unchanged.
+    const wantsHostAdapter = isAdapterProvider(taskProvider) && !task.backend;
+    // Honest per-task backend resolution: when `- Backend:` is set and DIFFERS
+    // from the configured spawn_backend, resolve THAT backend (so the override is
+    // truthful, not silently the configured one). When it matches config (the
+    // common case, e.g. `- Backend: docker` under spawn_backend=docker), reuse the
+    // already-resolved/injected `backend` — preserves the spawnOpts injection
+    // path (tests, controller) and avoids re-creating an identical backend.
+    const effectiveBackend: SpawnBackend | undefined =
+      task.backend && task.backend !== config.spawn_backend
+        ? SpawnBackendFactory.create({
+            backend: task.backend,
+            projectDir: projectRoot,
+            dockerImage: config.docker_image,
+            dockerTimeoutSeconds: config.docker_timeout,
+          })
+        : backend;
     const adapterRouted = wantsHostAdapter
       ? getProviderAdapterForTask(taskProvider)
       : null;
@@ -514,8 +536,8 @@ export async function spawnWorkers(
         );
       } catch (e) { debugLog('spawnWorkers:honestFailWrite', e); }
       continue;
-    } else if (backend) {
-      backend.spawn(task.id, model, prompt, {
+    } else if (effectiveBackend) {
+      effectiveBackend.spawn(task.id, model, prompt, {
         allowedTools,
         autoApprove: spawnOpts?.autoApprove ?? false,
         projectDir: projectRoot,
@@ -663,7 +685,28 @@ export async function respawnEligibleTasks(
     // Sprint 234 AS-2 Faz 2: same host-HTTP adapter routing as `spawnWorkers`.
     // Wave-2+ respawns must honor the predicate so ollama tasks promoted from
     // PENDING during dependency unblock also reach the host adapter.
-    const wantsHostAdapter = isAdapterProvider(taskProvider);
+    // Sprint 252 (PSL-1 verify): `- Backend: docker|tmux|subprocess` forces a
+    // host-adapter provider (codex/gemini/ollama) onto a real spawn backend
+    // instead of its host CLI — exercises the ProviderCommandSpec + per-provider
+    // OAuth mount in the container. Uses the existing backend vocabulary (no
+    // invented 'host' value; host-vs-cloud is a separate axis). Default
+    // (undefined) keeps host-adapter routing unchanged.
+    const wantsHostAdapter = isAdapterProvider(taskProvider) && !task.backend;
+    // Honest per-task backend resolution: when `- Backend:` is set and DIFFERS
+    // from the configured spawn_backend, resolve THAT backend (so the override is
+    // truthful, not silently the configured one). When it matches config (the
+    // common case, e.g. `- Backend: docker` under spawn_backend=docker), reuse the
+    // already-resolved/injected `backend` — preserves the spawnOpts injection
+    // path (tests, controller) and avoids re-creating an identical backend.
+    const effectiveBackend: SpawnBackend | undefined =
+      task.backend && task.backend !== config.spawn_backend
+        ? SpawnBackendFactory.create({
+            backend: task.backend,
+            projectDir: projectRoot,
+            dockerImage: config.docker_image,
+            dockerTimeoutSeconds: config.docker_timeout,
+          })
+        : backend;
     const adapterRouted = wantsHostAdapter
       ? getProviderAdapterForTask(taskProvider)
       : null;
@@ -691,8 +734,8 @@ export async function respawnEligibleTasks(
         );
       } catch (e) { debugLog('respawnEligibleTasks:honestFailWrite', e); }
       continue;
-    } else if (backend) {
-      backend.spawn(task.id, task.model, prompt, {
+    } else if (effectiveBackend) {
+      effectiveBackend.spawn(task.id, task.model, prompt, {
         allowedTools,
         autoApprove: spawnOpts?.autoApprove ?? false,
         projectDir: projectRoot,

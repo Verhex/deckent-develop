@@ -159,6 +159,19 @@ describe('parseStructuredDirectives — structured parsing', () => {
     expect(tasks).toHaveLength(1);
   });
 
+  it('parses "- Backend: docker|tmux|subprocess" override (Sprint 252 PSL-1), ignores invalid', () => {
+    const docker = parseStructuredDirectives(['## Task 1: x', '- Files: src/a.ts', '- Backend: docker'].join('\n'));
+    expect(docker[0]?.backend).toBe('docker');
+    const sub = parseStructuredDirectives(['## Task 1: x', '- Files: src/a.ts', '- Backend: subprocess'].join('\n'));
+    expect(sub[0]?.backend).toBe('subprocess');
+    // invalid value (e.g. the non-backend 'host') → undefined, not a broken value
+    const bad = parseStructuredDirectives(['## Task 1: x', '- Files: src/a.ts', '- Backend: host'].join('\n'));
+    expect(bad[0]?.backend).toBeUndefined();
+    // absent → undefined (default routing)
+    const none = parseStructuredDirectives(['## Task 1: x', '- Files: src/a.ts'].join('\n'));
+    expect(none[0]?.backend).toBeUndefined();
+  });
+
   it('parses multiple ## Görev blocks', () => {
     const content = [
       '## Görev 1: Fix auth',

@@ -254,6 +254,27 @@ describe('spawnWorkers — host-HTTP adapter routing', () => {
     expect(result.tokenUsage.provider).toBe('ollama');
   });
 
+  it('PSL-1 verify hook: `- Backend: docker` forces a host-adapter provider onto the spawn backend (not host adapter)', async () => {
+    // The ollama adapter IS registered — normally the task would route to it.
+    // `- Backend: docker` (matching spawn_backend=docker) must bypass host-adapter
+    // routing and use the spawn backend instead, so codex/gemini/ollama can be
+    // exercised IN the container (PSL-1 ProviderCommandSpec + OAuth mount).
+    const ollamaAdapter = makeMockOllamaAdapter();
+    registeredOllamaAdapter = ollamaAdapter;
+    providerRegistry.registerProvider(ollamaAdapter);
+
+    const task: Task = { ...createTask('250-BK', 'ollama', 'qwen3.6' as ModelType, ['src/x.ts']), backend: 'docker' };
+    persistTasks([task]);
+    const sprint = makeSprint('sprint-bk', [task]);
+    const backend = makeMockBackend();
+
+    await spawnWorkers(testRoot, sprint, makeConfig({ spawn_backend: 'docker' }), { spawnBackend: backend });
+
+    // host-adapter bypassed even though it is registered; spawn backend used instead
+    expect(ollamaAdapter.spawnCalls.map(c => c.taskId)).not.toContain('250-BK');
+    expect(backend.calls.map(c => c.taskId)).toContain('250-BK');
+  });
+
   it('mixed sprint — ollama hits adapter, claude hits backend', async () => {
     const ollamaAdapter = makeMockOllamaAdapter();
     registeredOllamaAdapter = ollamaAdapter;

@@ -122,6 +122,8 @@ export interface CreateTaskParams {
   excludeAgent?: string[];
   excludeSkills?: string[];
   authMode?: 'subscription' | 'api';
+  /** Per-task spawn backend override (`- Backend: docker|host`), Sprint 252 PSL-1. */
+  backend?: 'docker' | 'tmux' | 'subprocess';
   fixMode?: 'verify-only' | 'amend' | 're-implement';
   /** Tier-1 Proof-of-Function smoke directive propagated from ParsedDirectiveTask (216-004). */
   smoke?: { command: string; expect: string };
@@ -145,6 +147,8 @@ export interface ParsedDirectiveTask {
   priority?: TaskPriority;
   /** Per-task auth mode parsed from "- Auth: subscription|api" */
   authMode?: 'subscription' | 'api';
+  /** Per-task spawn backend parsed from "- Backend: docker|host" (Sprint 252 PSL-1). */
+  backend?: 'docker' | 'tmux' | 'subprocess';
   /** Tier-1 Proof-of-Function smoke (216-004): real-binary command + expected output, split on `→`. */
   smoke?: { command: string; expect: string };
 }
@@ -463,6 +467,7 @@ export function createTask(params: CreateTaskParams, sequence: number): Task & {
     excludeAgent: params.excludeAgent,
     excludeSkills: params.excludeSkills,
     authMode: params.authMode,
+    backend: params.backend,
     fixMode: params.fixMode,
     assignedAgent: params.forceAgent ?? 'generic',
     assignedSkills: params.forceSkills ?? [],
@@ -885,6 +890,15 @@ export function parseStructuredDirectives(content: string): ParsedDirectiveTask[
     const authLine = lines.find(l => /^[\s-]*Auth:\s*/i.test(l.trim()));
     const parsedAuthMode = parseAuthModeDirective(authLine);
 
+    // Sprint 252 (PSL-1 verify): optional Backend: line (e.g., "- Backend: docker")
+    const backendLine = lines.find(l => /^[\s-]*Backend:\s*/i.test(l.trim()));
+    const backendVal = backendLine
+      ?.trim().replace(/^-\s+/, '').replace(/^Backend:\s*/i, '').trim().toLowerCase();
+    const parsedBackend: 'docker' | 'tmux' | 'subprocess' | undefined =
+      backendVal === 'docker' || backendVal === 'tmux' || backendVal === 'subprocess'
+        ? backendVal
+        : undefined;
+
     // Sprint 182 PQ-4 (F6): description = content after `### Description` heading
     // when present. Falls back to the full block when no heading is found, so
     // legacy DIRECTIVES.md files keep their old description=block behavior.
@@ -894,7 +908,7 @@ export function parseStructuredDirectives(content: string): ParsedDirectiveTask[
       : block.trim();
 
     const enrichedScope = enrichScopeWithTestFiles(scope, scope.filesWrite);
-    tasks.push({ title, description, scope: enrichedScope, testTarget, provider: parsedProvider, forceModel: parsedForceModel, forceEffort: parsedForceEffort, forceAgent, forceSkills, excludeSkills, dependencies, priority: parsedPriority, authMode: parsedAuthMode, smoke: extractSmoke(block) });
+    tasks.push({ title, description, scope: enrichedScope, testTarget, provider: parsedProvider, forceModel: parsedForceModel, forceEffort: parsedForceEffort, forceAgent, forceSkills, excludeSkills, dependencies, priority: parsedPriority, authMode: parsedAuthMode, backend: parsedBackend, smoke: extractSmoke(block) });
   }
   return tasks;
 }
