@@ -9,9 +9,15 @@
 FROM node:24-trixie-slim
 
 # Install essential tools
+# ca-certificates (Sprint 252 PSL-1 verify): REQUIRED for non-claude provider CLIs
+# in-container. The codex CLI is a Rust binary whose TLS/websocket client uses the
+# SYSTEM root CA store; without ca-certificates it fails with "no native root CA
+# certificates found" connecting to chatgpt.com (Sprint 252 codex-in-docker verify).
+# (Node-based CLIs like gemini bundle their own CAs, so this was previously latent.)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     curl \
+    ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Claude Code CLI globally (always present — default lean image)
