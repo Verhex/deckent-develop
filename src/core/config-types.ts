@@ -385,6 +385,16 @@ export interface DeckentConfig {
       /** Minimum ms between debt scans (default: 600000 — 10 min). */
       interval_ms?: number;
     };
+    /** RBAC policy enforcement on machine-initiated dispatch (flag-gated,
+     *  default-off). When enabled, every backlog/work-gen/reactive entry is
+     *  gated through evaluatePolicy's RBAC layer under `role` — a role
+     *  without 'execute' (viewer) hard-DENIES autonomous execution. */
+    rbac_policy?: {
+      /** Enable RBAC enforcement for autonomous dispatch (default: false). */
+      enabled: boolean;
+      /** Role the autonomous engine acts under (default: 'viewer' — deny-by-default). */
+      role?: 'admin' | 'operator' | 'viewer';
+    };
   };
 
   // ─── Runtime Style ─────────────────────────────────────────────────

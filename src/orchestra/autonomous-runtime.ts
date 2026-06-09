@@ -111,8 +111,10 @@ export interface TriggerSource {
   next(): Promise<AutonomousTrigger | null> | AutonomousTrigger | null;
 }
 
-/** Per-task policy gate (G2 + G3). Optional; absent → legacy authority-only flow. */
-export type PolicyGateDecision = 'auto' | 'park';
+/** Per-task policy gate (G2 + G3 + optional RBAC enforcement). Optional;
+ *  absent → legacy authority-only flow. 'deny' is a HARD refusal (no approval
+ *  detour — the cycle finishes 'denied'); 'park' defers to human approval. */
+export type PolicyGateDecision = 'auto' | 'park' | 'deny';
 export interface PolicyDecisionResult { decision: PolicyGateDecision; reason: string; }
 
 export interface PolicyGate {
@@ -223,6 +225,11 @@ export async function runAutonomousCycle(
   // obtained a human decision for this trigger, do NOT solicit a second approval.
   if (deps.policyGate && approval === null) {
     const policy = deps.policyGate.decide(trigger);
+    if (policy.decision === 'deny') {
+      // HARD policy refusal (e.g. RBAC enforcement on machine-initiated
+      // dispatch) — no approval detour, the cycle records a denial.
+      return finish(trigger, authority, null, null, 'denied', policy.reason, deps.audit, now);
+    }
     if (policy.decision === 'park') {
       approval = await deps.approvalGate.request(trigger);
       if (approval.outcome === 'rejected') {

@@ -59,6 +59,21 @@ describe('cycle policy gate (G2/G3 split from RBAC)', () => {
     expect(exec).toHaveBeenCalledOnce();
   });
 
+  it('policyGate=deny → cycle denied, executor and approval gate NOT called', async () => {
+    const exec = vi.fn().mockResolvedValue({ ok: true });
+    const request = vi.fn().mockResolvedValue({ outcome: 'approved' });
+    const d = deps({
+      executor: { execute: exec },
+      approvalGate: { request },
+      policyGate: { decide: () => ({ decision: 'deny', reason: "rbac: 'viewer' denied 'execute'" }) },
+    });
+    const res = await runAutonomousCycle({}, d);
+    expect(res.outcome).toBe('denied');
+    expect(res.reason).toMatch(/rbac/);
+    expect(exec).not.toHaveBeenCalled();
+    expect(request).not.toHaveBeenCalled();
+  });
+
   it('no policyGate → legacy behavior preserved (executes when authority allowed)', async () => {
     const exec = vi.fn().mockResolvedValue({ ok: true });
     const d = deps({ executor: { execute: exec } });

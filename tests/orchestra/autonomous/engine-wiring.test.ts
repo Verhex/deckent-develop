@@ -155,4 +155,48 @@ describe('engine wiring — recurring re-enqueue + work-generator', () => {
     expect(result.outcome).toBe('pending'); // parked for human approval (G3)
     expect(loadBacklog(backlogPath).entries[0]!.status).toBe('pending'); // never ran
   });
+
+  // ── Seam #4: evaluatePolicy RBAC enforcement on machine-initiated dispatch ──
+
+  it('denies machine-initiated dispatch when rbac_policy is enabled with a role lacking execute', async () => {
+    writeFileSync(backlogPath, JSON.stringify({ _version: '1.0', entries: [entry({ id: 'a' })] }));
+    const opts = baseOpts(() => new Date('2026-06-09T10:00:00Z'));
+    opts.config = { deckent_style: 'sprint', autonomous: { enabled: true, rbac_policy: { enabled: true, role: 'viewer' } } } as never;
+    const bundle = buildEngineRuntime(opts);
+
+    const result = await runAutonomousCycle({}, bundle.deps);
+
+    expect(result.outcome).toBe('denied');
+    expect(result.reason).toMatch(/rbac/);
+    expect(loadBacklog(backlogPath).entries[0]!.status).toBe('pending'); // never ran
+  });
+
+  it('permits machine-initiated dispatch when the enforced role has execute (operator)', async () => {
+    const cap = entry({
+      id: 'cap-echo-rbac', kind: 'capability', policy: 'auto',
+      spec: { capabilityTarget: { capability: 'echo', args: {} } },
+    });
+    writeFileSync(backlogPath, JSON.stringify({ _version: '1.0', entries: [cap] }));
+    const opts = baseOpts(() => new Date('2026-06-09T10:00:00Z'));
+    opts.config = { deckent_style: 'sprint', autonomous: { enabled: true, rbac_policy: { enabled: true, role: 'operator' } } } as never;
+    const bundle = buildEngineRuntime(opts);
+
+    const result = await runAutonomousCycle({}, bundle.deps);
+
+    expect(result.outcome).toBe('executed');
+    expect(loadBacklog(backlogPath).entries[0]!.status).toBe('done');
+  });
+
+  it('rbac_policy absent → dispatch ungated (backward-safe)', async () => {
+    const cap = entry({
+      id: 'cap-echo-plain', kind: 'capability', policy: 'auto',
+      spec: { capabilityTarget: { capability: 'echo', args: {} } },
+    });
+    writeFileSync(backlogPath, JSON.stringify({ _version: '1.0', entries: [cap] }));
+    const bundle = buildEngineRuntime(baseOpts(() => new Date('2026-06-09T10:00:00Z')));
+
+    const result = await runAutonomousCycle({}, bundle.deps);
+
+    expect(result.outcome).toBe('executed');
+  });
 });

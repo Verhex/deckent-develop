@@ -49,6 +49,8 @@ import {
   AUTONOMOUS_EXECUTE_ACTION,
   type ExecuteDispatcherDeps,
 } from './execute-dispatcher.js';
+import { evaluatePolicy } from '../../core/policy-engine.js';
+import { Permission } from '../../core/rbac.js';
 import { decidePolicy, computeEntryEffectClass } from './policy-gate.js';
 import { applyRecurringReenqueue, enqueueCandidates, loadBacklog } from './backlog.js';
 import { makeWorkGeneratorSource } from './work-generator-source.js';
@@ -270,11 +272,30 @@ export function buildEngineRuntime(
 
   // G2/G3 policy gate: backlog entries route through decidePolicy; non-backlog
   // triggers (scheduled-flow, reactive) return 'auto' (authority-only flow).
+  // RBAC enforcement (capability-maturity gap #4): when autonomous.rbac_policy
+  // is enabled, every entry-carrying trigger is FIRST gated through
+  // evaluatePolicy's RBAC layer — machine-initiated dispatch under a role
+  // without 'execute' (default 'viewer') is hard-DENIED. This converts RBAC
+  // from advisory (ADR-037 V1.0) to enforced on the autonomous path, where the
+  // trusted-internal authority wrap above would otherwise be the only gate.
+  const rbacPolicy = opts.config.autonomous?.rbac_policy;
   const policyGate: PolicyGate = {
     decide(trigger) {
       const entry = (trigger.payload as { entry?: BacklogEntry } | undefined)?.entry;
       if (!entry) {
         return { decision: 'auto', reason: 'no entry (non-backlog trigger) → authority-only' };
+      }
+      if (rbacPolicy?.enabled) {
+        const verdict = evaluatePolicy({
+          rbac: {
+            role: rbacPolicy.role ?? 'viewer',
+            action: Permission.EXECUTE,
+            tenantId: entry.tenant ?? 'local',
+          },
+        });
+        if (verdict.decision === 'deny') {
+          return { decision: 'deny', reason: verdict.reasons.join('; ') };
+        }
       }
       return decidePolicy(entry, computeEntryEffectClass(entry));
     },

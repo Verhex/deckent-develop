@@ -1225,6 +1225,32 @@ describe('validateConfig — autonomous.work_generator', () => {
   });
 });
 
+describe('validateConfig — autonomous.rbac_policy', () => {
+  it('accepts a valid rbac_policy block', () => {
+    const config = getDefaultConfig();
+    config.autonomous = { enabled: true, rbac_policy: { enabled: true, role: 'operator' } };
+    expect(() => validateConfig(config)).not.toThrow();
+  });
+
+  it('defaults rbac_policy to disabled with role viewer', () => {
+    const config = getDefaultConfig();
+    expect(config.autonomous?.rbac_policy?.enabled).toBe(false);
+    expect(config.autonomous?.rbac_policy?.role).toBe('viewer');
+  });
+
+  it('rejects non-boolean rbac_policy.enabled', () => {
+    const config = getDefaultConfig();
+    (config.autonomous as Record<string, unknown>)['rbac_policy'] = { enabled: 'yes' };
+    expect(() => validateConfig(config)).toThrow('autonomous.rbac_policy.enabled');
+  });
+
+  it('rejects an unknown rbac_policy.role', () => {
+    const config = getDefaultConfig();
+    (config.autonomous as Record<string, unknown>)['rbac_policy'] = { enabled: true, role: 'superuser' };
+    expect(() => validateConfig(config)).toThrow('autonomous.rbac_policy.role');
+  });
+});
+
 // ─── Sprint 072: Plan Tier Generalization ──────────────────────────
 
 describe('Plan tier generalization (sprint-072)', () => {
