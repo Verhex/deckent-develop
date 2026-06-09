@@ -210,6 +210,18 @@ describe('audit read-side — retention plan/apply (retention subcommand)', () =
     expect(existsSync(archivePath())).toBe(false);
   });
 
+  it("compliance over a retained stream is ARCHIVE-AWARE: chain verifies across archive + live (hmac'd head archived)", () => {
+    seedThree(); // a1..a3, all hmac-chained
+    runAuditRetention(root, SPRINT, { maxCount: 2 }, true); // a1 → archive
+
+    // The live stream alone is a truncated chain (kept head anchors to the
+    // archived record) — compliance must verify across archive + live.
+    const report = runComplianceReport(root, SPRINT, { rbacEnabled: false, tenantIsolation: false });
+
+    expect(report.auditChainIntegrity).toEqual({ intact: true });
+    expect(report.eventCount).toBe(3); // retained trail = 1 archived + 2 live
+  });
+
   it('apply with maxCount: atomic rewrite — readAuditEvents returns the keep-set, dropped event is archived, non-audit events survive', () => {
     // Non-audit event first — retention must NEVER touch other channels.
     writeEvent(root, SPRINT, 'brain', '*', 'BRAIN→*:SPRINT_PHASE_CHANGE', { phase: 'PLAN' });

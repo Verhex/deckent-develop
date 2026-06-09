@@ -3,11 +3,14 @@
 // F4 enterprise foundation — ADR-062 audit-trail + tenant-based filtering.
 // Sprint 205 (205-008) — skeleton only: read + filter, no new audit writes.
 
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { readEvents } from '../orchestra/event-stream.js';
 import type { DeckentEvent } from '../orchestra/event-stream.js';
 import { can, Permission } from './rbac.js';
 import { AUDIT_EVENT_CHANNEL } from './audit-writer.js';
 import type { AuditEvent, AuditEventPayload } from './audit-writer.js';
+import { DECKENT_DIR } from './constants.js';
 
 // ─── Types ────────────────────────────────────────────────────────
 
@@ -106,6 +109,38 @@ export function readAuditEvents(projectRoot: string, sprintId: string): AuditEve
   return readEvents(projectRoot, sprintId)
     .filter(e => e.channel === AUDIT_EVENT_CHANNEL)
     .map(e => e.payload as unknown as AuditEventPayload);
+}
+
+/**
+ * Read the audit payloads that `deckent audit retention --apply` moved into
+ * the sprint's archive file (`.deckent/<sprintId>-events-archive.jsonl`).
+ *
+ * The archive holds the chain's HEAD partition, so chain verification over a
+ * retained stream must run on `[...archived, ...live]` — the live stream alone
+ * is a truncated chain whose head anchors to the last archived record.
+ * Missing archive → `[]`; malformed lines are skipped (never throws).
+ */
+export function readArchivedAuditEvents(projectRoot: string, sprintId: string): AuditEventPayload[] {
+  const archivePath = join(projectRoot, DECKENT_DIR, `${sprintId}-events-archive.jsonl`);
+  if (!existsSync(archivePath)) return [];
+  let raw: string;
+  try {
+    raw = readFileSync(archivePath, 'utf-8');
+  } catch {
+    return [];
+  }
+  const payloads: AuditEventPayload[] = [];
+  for (const line of raw.split('\n')) {
+    if (!line.trim()) continue;
+    try {
+      const event = JSON.parse(line) as DeckentEvent;
+      if (event.channel !== AUDIT_EVENT_CHANNEL) continue;
+      payloads.push(event.payload as unknown as AuditEventPayload);
+    } catch {
+      // malformed archive line — skip, never throw
+    }
+  }
+  return payloads;
 }
 
 // ─── Filter Helpers ───────────────────────────────────────────────

@@ -2,7 +2,7 @@ import { writeFileSync, mkdirSync, existsSync, appendFileSync, renameSync } from
 import { join, dirname } from 'node:path';
 import type { Command } from 'commander';
 import { runSelfAuditGate } from '../../orchestra/sprint-finalizer.js';
-import { queryAudit, readAuditEvents } from '../../core/audit-query.js';
+import { queryAudit, readAuditEvents, readArchivedAuditEvents } from '../../core/audit-query.js';
 import { generateComplianceReport, type ComplianceReport } from '../../core/compliance-report.js';
 import { createSiemForwarder } from '../../core/siem-forwarder.js';
 import { createHttpSiemTransport, type SiemFetchLike } from '../../core/siem-transport-http.js';
@@ -39,8 +39,15 @@ const DEFAULT_SYSLOG_PORT = 514;
 // ─── Read-side helpers (gap #5 — compliance + SIEM over the live chain) ───────
 
 /**
- * Build a compliance report over the live ENT-3 audit chain of a sprint.
+ * Build a compliance report over the FULL retained ENT-3 audit trail of a
+ * sprint: the retention archive (chain HEAD partition, written by
+ * `audit retention --apply`) prepended to the live stream — the live stream
+ * alone is a truncated chain after an apply that dropped HMAC'd head records.
  * Control flags are injected by the caller (CLI derives them from config).
+ *
+ * Honest limit: `prune` (age-expired) records are truly deleted, not archived
+ * — if HMAC'd records were pruned, the surviving chain reports broken by
+ * design (true deletion is the GDPR-style tradeoff against tamper-evidence).
  */
 export function runComplianceReport(
   root: string,
@@ -50,7 +57,7 @@ export function runComplianceReport(
   return generateComplianceReport({
     rbacEnabled: flags.rbacEnabled,
     tenantIsolation: flags.tenantIsolation,
-    auditEvents: readAuditEvents(root, sprintId),
+    auditEvents: [...readArchivedAuditEvents(root, sprintId), ...readAuditEvents(root, sprintId)],
   });
 }
 
