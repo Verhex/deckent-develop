@@ -13,6 +13,27 @@
       "default_billing_mode": "subscription",
       "api_endpoint": "https://api.anthropic.com",
       "models": {
+        "claude-fable-5": {
+          "input_cost_per_token": 1e-05,
+          "output_cost_per_token": 5e-05,
+          "cache_creation_input_token_cost": 1.25e-05,
+          "cache_creation_input_token_cost_above_1hr": null,
+          "cache_read_input_token_cost": 1e-06,
+          "max_input_tokens": 1000000,
+          "max_output_tokens": 128000,
+          "supports_prompt_caching": true,
+          "supports_reasoning": true,
+          "supports_vision": true,
+          "supports_tool_choice": true,
+          "deckent_tier": "premium_plus",
+          "deckent_aliases": [
+            "fable",
+            "fable-5"
+          ],
+          "enabled": true,
+          "_source": "model-registry (Fable-5 integration 2026-06-09; $10/$50 per MTok, free on subscription until 2026-06-22)",
+          "_verified_at": "2026-06-10"
+        },
         "claude-opus-4-6": {
           "input_cost_per_token": 5e-06,
           "output_cost_per_token": 2.5e-05,
