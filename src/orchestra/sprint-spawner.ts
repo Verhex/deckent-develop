@@ -62,6 +62,7 @@ import {
 import type { SpawnBackend } from './spawn-backend.js';
 import { SpawnBackendFactory } from './spawn-backend.js';
 import { resolveReasoningEffort } from '../core/reasoning-effort.js';
+import { bootstrapProviders } from '../core/provider.js';
 
 // ─── Tmux ────────────────────────────────────────────────────────
 import { ensureSession, spawnWorker } from './tmux.js';
@@ -508,9 +509,22 @@ export async function spawnWorkers(
     // F1-RE (Sprint 252): resolve the model reasoning-effort (opt-in, provider-
     // validated) once; passed to every spawn path below. undefined → no flag.
     const reasoningEffort = resolveReasoningEffort(taskProvider, task.modelEffort);
-    const adapterRouted = wantsHostAdapter
+    let adapterRouted = wantsHostAdapter
       ? getProviderAdapterForTask(taskProvider)
       : null;
+    // MF-2 lazy re-check (Sprint 252): a host-only provider may not have been
+    // registered at bootstrap (e.g. the ollama daemon came up AFTER sprint start,
+    // or a transient detection miss). Re-run the idempotent bootstrap ONCE and
+    // re-resolve — this lets a now-available provider run instead of honest-failing
+    // it. Best-effort: on fault we keep null and fall through to the honest-fail.
+    if (wantsHostAdapter && !adapterRouted) {
+      try {
+        await bootstrapProviders(config, projectRoot);
+        adapterRouted = getProviderAdapterForTask(taskProvider);
+      } catch (e) {
+        debugLog('spawn:lazyAdapterRebootstrap', e);
+      }
+    }
     if (adapterRouted) {
       // `refreshSupportedModels` is optional on the ProviderAdapter contract
       // (OllamaAdapter implements it for `/api/tags` dynamic acceptance; others
@@ -716,9 +730,22 @@ export async function respawnEligibleTasks(
     // F1-RE (Sprint 252): resolve the model reasoning-effort (opt-in, provider-
     // validated) once; passed to every spawn path below. undefined → no flag.
     const reasoningEffort = resolveReasoningEffort(taskProvider, task.modelEffort);
-    const adapterRouted = wantsHostAdapter
+    let adapterRouted = wantsHostAdapter
       ? getProviderAdapterForTask(taskProvider)
       : null;
+    // MF-2 lazy re-check (Sprint 252): a host-only provider may not have been
+    // registered at bootstrap (e.g. the ollama daemon came up AFTER sprint start,
+    // or a transient detection miss). Re-run the idempotent bootstrap ONCE and
+    // re-resolve — this lets a now-available provider run instead of honest-failing
+    // it. Best-effort: on fault we keep null and fall through to the honest-fail.
+    if (wantsHostAdapter && !adapterRouted) {
+      try {
+        await bootstrapProviders(config, projectRoot);
+        adapterRouted = getProviderAdapterForTask(taskProvider);
+      } catch (e) {
+        debugLog('spawn:lazyAdapterRebootstrap', e);
+      }
+    }
     if (adapterRouted) {
       const refresh = (adapterRouted as { refreshSupportedModels?: () => Promise<void> }).refreshSupportedModels;
       if (typeof refresh === 'function') {

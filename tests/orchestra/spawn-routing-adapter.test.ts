@@ -24,7 +24,7 @@ import { tmpdir } from 'node:os';
 import { spawnWorkers, respawnEligibleTasks } from '../../src/orchestra/sprint-spawner.js';
 import { isAdapterProvider } from '../../src/orchestra/sprint-utils.js';
 import { getProviderBinaryForModel } from '../../src/orchestra/spawn-backend-docker.js';
-import { providerRegistry } from '../../src/core/provider.js';
+import { providerRegistry, bootstrapProviders } from '../../src/core/provider.js';
 // Side-effect import: registerOllamaModels(modelRegistry) — ensures the
 // registry knows ollama-served models so getProviderForModel resolves the
 // 'ollama' branch in getProviderBinaryForModel. The defensive honest-fail
@@ -37,6 +37,17 @@ import type {
 import { TaskStatus } from '../../src/core/types.js';
 import type { Sprint, Task, ResolvedConfig, ModelType } from '../../src/core/types.js';
 import type { SpawnBackend, SpawnBackendOptions } from '../../src/orchestra/spawn-backend.js';
+
+// MF-2 lazy re-check (Sprint 252): spawnWorkers/respawnEligibleTasks now call
+// bootstrapProviders() when a host-adapter is missing. Stub it to a no-op so the
+// tests stay hermetic — otherwise real provider detection (the dev machine's live
+// ollama/codex/gemini) would register adapters into the singleton registry and
+// pollute the "no adapter → honest-fail" + routing assertions. providerRegistry
+// and everything else stay REAL (partial mock).
+vi.mock('../../src/core/provider.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/core/provider.js')>();
+  return { ...actual, bootstrapProviders: vi.fn().mockResolvedValue({ registered: [], skipped: [], defaultProvider: null }) };
+});
 
 // ─── Mock SpawnBackend ────────────────────────────────────────────
 
@@ -252,6 +263,29 @@ describe('spawnWorkers — host-HTTP adapter routing', () => {
     expect(result.selfAssessment).toBe('NO_GO');
     expect(result.notes).toContain('host adapter');
     expect(result.tokenUsage.provider).toBe('ollama');
+  });
+
+  it('MF-2 lazy re-check: missing adapter → re-bootstrap registers it → runs it (not honest-fail)', async () => {
+    // No ollama adapter registered initially (bootstrap race). The lazy re-check
+    // re-runs bootstrap, which now registers it → the task runs on the adapter
+    // instead of honest-failing.
+    const ollamaAdapter = makeMockOllamaAdapter();
+    registeredOllamaAdapter = ollamaAdapter;
+    vi.mocked(bootstrapProviders).mockImplementationOnce(async () => {
+      providerRegistry.registerProvider(ollamaAdapter);
+      return { registered: ['ollama'], skipped: [], defaultProvider: null } as Awaited<ReturnType<typeof bootstrapProviders>>;
+    });
+
+    const task = createTask('250-LZ', 'ollama', 'qwen3.6' as ModelType, ['src/lz.ts']);
+    persistTasks([task]);
+    const sprint = makeSprint('sprint-lz', [task]);
+    const backend = makeMockBackend();
+
+    await spawnWorkers(testRoot, sprint, makeConfig(), { spawnBackend: backend });
+
+    expect(ollamaAdapter.spawnCalls.map(c => c.taskId)).toContain('250-LZ');
+    expect(backend.calls.map(c => c.taskId)).not.toContain('250-LZ');
+    expect(existsSync(join(testRoot, '.tasks', 'task-250-LZ.result'))).toBe(false); // no honest-fail
   });
 
   it('PSL-1 verify hook: `- Backend: docker` forces a host-adapter provider onto the spawn backend (not host adapter)', async () => {
