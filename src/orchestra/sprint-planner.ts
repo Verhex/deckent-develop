@@ -46,7 +46,7 @@ import type { ProviderAdapter } from '../core/provider.js';
 import { providerRegistry } from '../core/provider.js';
 
 // ─── Core — skill system ─────────────────────────────────────────
-import { detectProjectStack, detectFullStack } from '../core/stack-detector.js';
+import { detectProjectStack } from '../core/stack-detector.js';
 import { normalizeTechStack, rubricTypeToKind } from '../core/work-model.js';
 import { detectTaskType } from './rubric-registry.js';
 import { SkillPoolManager } from '../core/skill-pool.js';
@@ -388,11 +388,12 @@ export async function planSprint(
 
     // WM-7: resolve the project tech stack ONCE so each task's GO/NO-GO criteria
     // are kind × stack aware — a doc task isn't judged by a build, and a code
-    // task gets the DETECTED stack's commands (never `tsc` on a Go/Python/C++
-    // project). Best-effort; unknown stack → 'generic' (deriver stays neutral).
-    const wm7Stack = detectFullStack(projectRoot);
-    const wm7StackKind = normalizeTechStack(wm7Stack.language);
-    const wm7Commands = { build: wm7Stack.commands?.build, test: wm7Stack.commands?.test };
+    // task is judged against ITS stack (never `tsc` on a Go/Python/C++ project).
+    // Uses the already-detected ProjectStack.language; unknown → 'generic'
+    // (deriver stays neutral). Exact build/test command injection is a tracked
+    // enrichment follow-up (see MASTER-PLAN WM-7).
+    const wm7Stack = detectProjectStack(projectRoot);
+    const wm7StackKind = normalizeTechStack(wm7Stack?.language);
 
     for (const src of directiveSources) {
       // Sprint 236: register locally-pulled ollama tags BEFORE model resolution
@@ -419,7 +420,6 @@ export async function planSprint(
         goNogo: extractGoNogoCriteria(src.description, src.testTarget, {
           kind: rubricTypeToKind(detectTaskType({ scope: src.scope } as Task)),
           stack: wm7StackKind,
-          commands: wm7Commands,
         }),
         sprintId,
         initialStatus,
