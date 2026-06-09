@@ -358,3 +358,23 @@ BLOCKED: Shell metacharacter detected in heartbeat command: "npx vitest run --re
 BLOCKED: Shell metacharacter detected in heartbeat command: "npx vitest run --reporter=verbose 2>&1 | tail -5"
 ```
 
+
+## Heartbeat — 2026-06-09T08:51:17.360Z
+
+- ❌ `tsc --noEmit`
+```
+ts(183,7): error TS1005: ',' expected.
+src/api/output-stream.ts(183,17): error TS1005: ',' expected.
+src/api/output-stream.ts(222,9): error TS1005: ',' expected.
+src/api/output-stream.ts(222,19): error TS1005: ',' expected.
+src/orchestra/sprint-phases.ts(1264,13): error TS1005: ',' expected.
+src/orchestra/sprint-phases.ts(1264,23): error TS1005: ',' expected.
+src/orchestra/sprint-phases.ts(1457,13): error TS1005: ',' expected.
+src/orchestra/sprint-phases.ts(1457,23): error TS1005: ',' expected.
+```
+
+- ❌ `npx vitest run --reporter=verbose 2>&1 | tail -5`
+```
+BLOCKED: Shell metacharacter detected in heartbeat command: "npx vitest run --reporter=verbose 2>&1 | tail -5"
+```
+

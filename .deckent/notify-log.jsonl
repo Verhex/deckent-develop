@@ -92,3 +92,7 @@
 {"priority":"warning","event":"task-no-go","title":"Task 253-001 başarısız","summary":"[honest-gate] DISHONEST_DONE_STUB: selfAssessment=DONE claimed but linesAdded=0 testsPassed=not_run_","sprintId":"sprint-253","timestamp":"2026-06-09T08:17:37.502Z"}
 {"priority":"info","event":"task-done","title":"Task 253-002 tamamlandı","summary":"Created docs/_verify-docker/gemini-docker.md with the specified three lines.","sprintId":"sprint-253","timestamp":"2026-06-09T08:17:42.295Z"}
 {"priority":"info","event":"sprint-finalized","title":"Sprint sprint-253 kapandı","summary":"3/3 DONE, 0 TECH_DEBT, 0 NO_GO","sprintId":"sprint-253","timestamp":"2026-06-09T08:21:17.386Z"}
+{"priority":"info","event":"sprint-started","title":"Sprint sprint-254 başladı","summary":"3 task planlandı","sprintId":"sprint-254","timestamp":"2026-06-09T08:51:05.355Z"}
+{"priority":"info","event":"task-done","title":"Task 254-001 tamamlandı","summary":"DISPOSITION: debt-249-009-fix is a VERIFIED FALSE-POSITIVE (phantom) debt — resolved by verification","sprintId":"sprint-254","timestamp":"2026-06-09T09:00:12.887Z"}
+{"priority":"info","event":"task-done","title":"Task 254-003 tamamlandı","summary":"Created docs/_verify-combined/claude-effort.md with exactly 3 lines: (1) # Claude Docker + Effort, (","sprintId":"sprint-254","timestamp":"2026-06-09T09:00:19.820Z"}
+{"priority":"info","event":"sprint-finalized","title":"Sprint sprint-254 kapandı","summary":"3/3 DONE, 1 TECH_DEBT, 0 NO_GO","sprintId":"sprint-254","timestamp":"2026-06-09T09:02:22.399Z"}

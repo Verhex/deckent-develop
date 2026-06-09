@@ -6873,3 +6873,27 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 253-002: 253-002 — gemini IN docker (DONE)
 
 ---
+## Sprint 254 — sprint-254
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-06-09
+**Duration:** 802s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 3 |
+| Completed | 3 |
+| Tech Debt | 1 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 801575ms |
+
+### Tasks
+
+- 254-001: Fix debt: Tech debt from 249-009-fix: Created/updated docs/guide/architecture-overview.md  (DONE)
+- 254-002: V-001 — codex docker + reasoning-effort (MF-8 + F1-RE) (GO_WITH_TECH_DEBT)
+- 254-003: V-002 — claude docker + reasoning-effort (F1-RE) (DONE)
+
+---

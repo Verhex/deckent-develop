@@ -1,5 +1,13 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-254 Learnings
+- Sprint sprint-254 Learnings: ## Sprint sprint-254 Learnings
+- V-001 — codex docker + reasoning-effort (MF-8 + F1-RE): GO_WITH_TECH_DEBT — Created the required three-line documentation file. No test suite was run because this is a Tier-0 doc-only task.
+
+## Gains
+- 254-001 — Fix debt: Tech debt from 249-009-fix: Created/updated docs/guide/architecture-overview.md — DISPOSITION: debt-249-009-fix is a VERIFIED FALSE-POSITIVE (phantom) debt — resolved by verificat...
+- 254-003 — V-002 — claude docker + reasoning-effort (F1-RE) — Created docs/_verify-combined/claude-effort.md with exactly 3 lines: (1) # Claude Docker + Effort...
+
 ## Sprint sprint-253 Learnings
 - Sprint sprint-253 Learnings: ## Sprint sprint-253 Learnings
 

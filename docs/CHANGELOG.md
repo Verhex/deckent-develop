@@ -2,6 +2,23 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint254] - 2026-06-09
+
+### Added
+
+- V-002 — claude docker + reasoning-effort (F1-RE)
+
+### Changed
+
+- V-001 — codex docker + reasoning-effort (MF-8 + F1-RE) (completed with tech debt)
+
+### Fixed
+
+- Fix debt: Tech debt from 249-009-fix: Created/updated docs/guide/architecture-overview.md 
+
+
+_Tasks: 3 total, 3 done, 1 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint253] - 2026-06-09
 
 ### Added

@@ -72,13 +72,16 @@ deckent config set worker_provider codex
 
 ### Google Gemini
 
-Gemini requires **both** the `gemini` CLI binary **and** a Google API key. The CLI must be installed and a valid `GOOGLE_API_KEY` must be set; one without the other results in partial availability only.
+Gemini requires the `gemini` CLI binary, authenticated **either** via an OAuth/subscription login **or** a `GOOGLE_API_KEY` (Sprint 248 F1-G — the CLI's logged-in session is honored, like Claude/Codex).
 
 ```bash
 # 1. Install the Gemini CLI
 npm install -g @google/gemini-cli
 
-# 2. Set API key (mandatory — Gemini has no subscription-only mode)
+# 2. Authenticate — choose one:
+# Option A: interactive OAuth/subscription login
+gemini   # then follow the login prompt
+# Option B: API key
 export GOOGLE_API_KEY="AIza..."
 
 # 3. Verify
@@ -88,7 +91,7 @@ gemini --version
 deckent config set worker_provider gemini
 ```
 
-> **Note:** If `GOOGLE_API_KEY` is not set, Deckent will refuse to spawn Gemini workers even when the CLI is installed. Run `deckent doctor` to diagnose partial availability.
+> **Note:** Gemini is available once the CLI is installed; with no `GOOGLE_API_KEY` it uses the OAuth session. Run `deckent doctor` to check availability. (CLI present ≠ logged in — if neither OAuth nor key is set, the worker surfaces an auth error in its log.)
 
 ### Ollama (Local / Zero-Cost)
 
@@ -277,6 +280,22 @@ In DIRECTIVES.md, you can hint at a provider for specific tasks. Brain respects 
 ```
 
 Tasks with an explicit `provider` field bypass the global `worker_provider` setting.
+
+### Backend and reasoning-effort (per task)
+
+In a structured `DIRECTIVES.md` task block you can also set:
+
+```markdown
+## Task 1: Deep analysis
+- Provider: codex
+- Backend: docker          # docker | tmux | subprocess
+- ModelEffort: high        # model reasoning DEPTH (not work size)
+- Effort: normal           # task WORK SIZE (timeout/budget)
+- Files: docs/analysis.md
+```
+
+- **`- Backend:`** forces the spawn backend. By default `codex`/`gemini`/`ollama` run via their host CLI and `claude` runs in a docker container; `- Backend: docker` routes a host-CLI provider into the container (it authenticates via the mounted host session, e.g. `~/.codex`, `~/.gemini`). The worker image must contain that provider's CLI + `ca-certificates`.
+- **`- ModelEffort:`** sets the model's **reasoning depth** — claude `low|medium|high|xhigh|max` (→ `--effort`), codex `minimal|low|medium|high` (→ `model_reasoning_effort`). Opt-in; gemini/ollama have no reasoning-effort knob. **This is separate from `- Effort:`** (which is task *work size* and drives timeout/budget/token estimates). The two are independent: a small task can request deep reasoning, and vice versa.
 
 ---
 

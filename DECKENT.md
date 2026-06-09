@@ -132,7 +132,11 @@ hangi fonksiyonlar eklenecek/degistirilecek, neden gerekli oldugunu belirt.
 | Alan | Gecerli Degerler | Aciklama |
 |------|-----------------|----------|
 | Model | opus, sonnet, haiku | Kullanilacak AI modeli |
-| Effort | low, normal, high | Tahmini is yuku |
+| Provider | claude, codex, gemini, ollama | Bu task'i hangi provider kossun (per-task override) |
+| Effort | low, normal, high | Tahmini **is YUKU** (timeout/butce/token-tahmin). Reasoning-derinligi DEGIL — onun icin ModelEffort |
+| ModelEffort | claude: low/medium/high/xhigh/max · codex: minimal/low/medium/high | Modelin **reasoning DERINLIGI** (claude `--effort`, codex `model_reasoning_effort`). Opt-in; gemini/ollama desteklemez. Effort (is-yuku) ile karistirma. |
+| Backend | docker, tmux, subprocess | Task'i belirli spawn-backend'e zorlar — host-adapter provider'i (codex/gemini/ollama) docker container'da kosturmak icin (varsayilan: codex/gemini/ollama host CLI, claude docker) |
+| Auth | subscription, api | Per-task auth modu (api => ANTHROPIC_API_KEY zorunlu, ~/.claude mount atlanir) |
 | Skills | skill-id listesi | Uzmanlik alani (virgul ile ayir) |
 | Files | dosya yollari | Degistirilecek dosyalar |
 | Scope | dizin yollari | Izin verilen dizinler |

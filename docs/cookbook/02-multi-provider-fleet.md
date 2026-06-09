@@ -99,6 +99,29 @@ Supported task keys:
 | --- | --- | --- |
 | `Provider` | No | Selects the provider for this task. |
 | `Model` | No | Selects the provider-specific model for this task. |
+| `Backend` | No | Forces the spawn backend (`docker`/`tmux`/`subprocess`) — e.g. run a `codex`/`gemini` task inside a container instead of its host CLI. |
+| `ModelEffort` | No | The model's reasoning depth (claude `low`/`medium`/`high`/`xhigh`/`max`; codex `minimal`/`low`/`medium`/`high`). Distinct from `Effort` (task work size). |
+
+## Per-task backend and reasoning-effort
+
+- **`- Backend: docker | tmux | subprocess`** — by default `codex`/`gemini`/`ollama` run via their host CLI and `claude` runs in a docker container; `- Backend: docker` routes a host-CLI provider into the container (it authenticates via the mounted host session, e.g. `~/.codex` / `~/.gemini`).
+- **`- ModelEffort: <level>`** — the model's **reasoning depth**, distinct from `- Effort:` (which is task *work size* and drives timeout/budget). Opt-in; gemini/ollama have no reasoning-effort knob; when omitted the CLI keeps its own default.
+
+```markdown
+## Task 1: Deep codex analysis in a container
+- Provider: codex
+- Backend: docker
+- ModelEffort: high
+- Effort: normal
+- Files: docs/analysis.md
+
+## Task 2: Claude with maximum reasoning
+- Provider: claude
+- ModelEffort: xhigh
+- Files: src/core/tricky.ts
+```
+
+> `- Effort:` (work size) and `- ModelEffort:` (reasoning depth) are independent — a small task can still request deep reasoning, and vice versa.
 
 ## Contributing
 
