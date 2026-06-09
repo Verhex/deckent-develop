@@ -335,3 +335,47 @@ export function checkWorkerAuthority(
   console.warn(`[deckent] [ADR-037 soft] worker authority: ${reason}`);
   return { allowed: true, level: 'warn', role, deniedCapabilities, reason };
 }
+
+// ─── ENT-1 bridge: authorizeExecution (ADR-037 V2 consumable) ────────────────
+//
+// Bridges the ExecutionRequest contract to checkWorkerAuthority. Returns a
+// simpler structured result suitable for direct consumption in spawn-path
+// callers (Brain hand-wires post-verify per ADR-047). Delegates entirely to
+// checkWorkerAuthority — no logic duplication.
+
+/** Result of the ExecutionRequest-contract authorization bridge (ENT-1). */
+export interface AuthorizeExecutionResult {
+  /** Whether the operation proceeds. Soft mode always allows; only hard (enforceRbac=true) denies. */
+  allowed: boolean;
+  /** Capabilities the actor role is NOT permitted (empty when allowed with no violations). */
+  violations: string[];
+  /** Whether enforcement was in hard mode (mirrors the enforceRbac opt-in flag). */
+  enforced: boolean;
+}
+
+/**
+ * ENT-1 bridge — authorize an `ExecutionRequest` against the RBAC authority matrix.
+ *
+ * Extracts `req.actor?.role` and `req.requirements?.capabilities`, delegates to
+ * the existing `checkWorkerAuthority` logic, and returns a simplified result.
+ *
+ * Permissive default: absent actor or unknown role → `{ allowed:true, violations:[], enforced:false }`.
+ * Soft by default (warn+emit, allowed:true); only when `opts.enforceRbac === true` does a
+ * role-denied capability set `allowed:false` (mirrors the `enforce_rbac` config flag).
+ *
+ * Does NOT edit any spawn-path file — Brain hand-wires the spawn call post-verify (ADR-047).
+ *
+ * @param req  The contract slice carrying actor + required capabilities.
+ * @param opts `enforceRbac` opt-in flag (default false = soft).
+ */
+export function authorizeExecution(
+  req: Pick<ExecutionRequest, 'actor' | 'requirements'>,
+  opts?: { enforceRbac?: boolean },
+): AuthorizeExecutionResult {
+  const result = checkWorkerAuthority(req, { enforceRbac: opts?.enforceRbac });
+  return {
+    allowed: result.allowed,
+    violations: result.deniedCapabilities as string[],
+    enforced: opts?.enforceRbac === true,
+  };
+}

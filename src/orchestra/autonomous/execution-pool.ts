@@ -21,6 +21,41 @@ export function makeSerialPool(): ExecutionPool {
   };
 }
 
+/**
+ * Bounded pool: up to `maxConcurrency` jobs run in parallel; excess jobs queue and run
+ * as slots free up. Errors propagate to the individual submitter without blocking others.
+ */
+export function makeBoundedPool(maxConcurrency: number): ExecutionPool {
+  let inFlight = 0;
+  const queue: Array<() => void> = [];
+
+  function dequeue(): void {
+    if (queue.length > 0 && inFlight < maxConcurrency) {
+      inFlight++;
+      queue.shift()!();
+    }
+  }
+
+  return {
+    submit<T>(job: () => Promise<T>): Promise<T> {
+      return new Promise<T>((resolve, reject) => {
+        function run(): void {
+          job().then(
+            (v) => { inFlight--; dequeue(); resolve(v); },
+            (e: unknown) => { inFlight--; dequeue(); reject(e); },
+          );
+        }
+        if (inFlight < maxConcurrency) {
+          inFlight++;
+          run();
+        } else {
+          queue.push(run);
+        }
+      });
+    },
+  };
+}
+
 /** Reset any `running` entry (interrupted by a crash) back to `pending`. */
 export function recoverBacklog(path: string): void {
   const bl = loadBacklog(path);

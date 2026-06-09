@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { atomicWriteFileSync } from '../../agents/worker-lifecycle.js';
 import { TASKS_DIR } from '../../core/constants.js';
 import type { BacklogEntry, BacklogFile, BacklogStatus } from './backlog-types.js';
+import { nextRun } from './scheduled-flow.js';
 
 const KINDS = new Set(['task', 'sprint']);
 const POLICIES = new Set(['auto', 'approval-required', 'risk-tagged']);
@@ -127,4 +128,40 @@ export function cleanupAutonomousArtifacts(
       // per-file errors ignored — cleanup is best-effort
     }
   }
+}
+
+/**
+ * Re-enqueue completed recurring backlog entries whose next cron cadence has arrived.
+ *
+ * For each recurring entry in `done` status, computes the next scheduled run after
+ * `lastRun` (or epoch if never run). If that computed time is at or before `now`,
+ * the entry is reset to `pending` so the FlowScheduler can dispatch it again.
+ *
+ * Fail-safe: a malformed cron expression is caught — the entry is left `done` and a
+ * warning is logged; this function never throws.
+ *
+ * Pure function: returns a new BacklogFile without disk I/O. The caller persists if needed.
+ * Non-recurring and non-done entries are returned unchanged.
+ */
+export function reenqueueRecurring(bl: BacklogFile, now: Date): BacklogFile {
+  const entries = bl.entries.map((e) => {
+    if (e.trigger.type !== 'recurring' || e.status !== 'done') return e;
+    const cron = e.trigger.cron;
+    // Seed from last completion time; fall back to epoch when the entry has never run.
+    const from = e.lastRun ? new Date(e.lastRun) : new Date(0);
+    let due: Date;
+    try {
+      due = nextRun(cron, from);
+    } catch (err) {
+      // Malformed cron — leave entry done, log, never throw.
+      console.warn(
+        `[backlog] reenqueueRecurring: malformed cron "${cron}" for entry ${e.id}:`,
+        err instanceof Error ? err.message : String(err),
+      );
+      return e;
+    }
+    if (due > now) return e; // next run is still in the future
+    return { ...e, status: 'pending' as BacklogStatus };
+  });
+  return { ...bl, entries };
 }

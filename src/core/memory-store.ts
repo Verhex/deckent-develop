@@ -83,9 +83,11 @@ function rowToEntry(row: EntryRow): MemoryEntryV2 {
 
 export class MemoryStore {
   private db: DatabaseType;
+  private strictTenantIsolation: boolean;
 
-  constructor(dbPath: string) {
+  constructor(dbPath: string, opts?: { strictTenantIsolation?: boolean }) {
     this.db = new Database(dbPath);
+    this.strictTenantIsolation = opts?.strictTenantIsolation ?? false;
     this.db.pragma('journal_mode = WAL');
     this.db.pragma('foreign_keys = ON');
     this.initSchema();
@@ -673,7 +675,16 @@ export class MemoryStore {
 
     if (tenantId !== undefined) {
       const deletedClause = includeDeleted ? '' : ' AND deleted_at IS NULL';
-      sql = `SELECT * FROM entries WHERE id = ?${deletedClause} AND (tenant_id = ? OR tenant_id IS NULL)`;
+      // WARNING: When strictTenantIsolation is false (default), this query includes
+      // NULL-tenant rows alongside the requesting tenant's rows. This allows backward-
+      // compatible access to legacy/global entries but leaks NULL-tenant rows across
+      // tenant boundaries. Set strictTenantIsolation=true (via DeckentConfig
+      // strict_tenant_isolation) to close this leak and return only the requesting
+      // tenant's own rows.
+      const tenantClause = this.strictTenantIsolation
+        ? ' AND tenant_id = ?'
+        : ' AND (tenant_id = ? OR tenant_id IS NULL)';
+      sql = `SELECT * FROM entries WHERE id = ?${deletedClause}${tenantClause}`;
       params.push(tenantId);
     } else {
       sql = includeDeleted
@@ -688,8 +699,17 @@ export class MemoryStore {
   getByType(type: string, tenantId?: string): MemoryEntryV2[] {
     let rows: EntryRow[];
     if (tenantId !== undefined) {
+      // WARNING: When strictTenantIsolation is false (default), this query includes
+      // NULL-tenant rows alongside the requesting tenant's rows. This allows backward-
+      // compatible access to legacy/global entries but leaks NULL-tenant rows across
+      // tenant boundaries. Set strictTenantIsolation=true (via DeckentConfig
+      // strict_tenant_isolation) to close this leak and return only the requesting
+      // tenant's own rows.
+      const tenantClause = this.strictTenantIsolation
+        ? 'tenant_id = ?'
+        : '(tenant_id = ? OR tenant_id IS NULL)';
       rows = this.db.prepare(
-        `SELECT * FROM entries WHERE type = ? AND deleted_at IS NULL AND (tenant_id = ? OR tenant_id IS NULL) ORDER BY sprint_num DESC`,
+        `SELECT * FROM entries WHERE type = ? AND deleted_at IS NULL AND ${tenantClause} ORDER BY sprint_num DESC`,
       ).all(type, tenantId) as EntryRow[];
     } else {
       rows = this.db.prepare(
@@ -713,12 +733,21 @@ export class MemoryStore {
     const placeholders = tags.map(() => '?').join(', ');
     let rows: EntryRow[];
     if (tenantId !== undefined) {
+      // WARNING: When strictTenantIsolation is false (default), this query includes
+      // NULL-tenant rows alongside the requesting tenant's rows. This allows backward-
+      // compatible access to legacy/global entries but leaks NULL-tenant rows across
+      // tenant boundaries. Set strictTenantIsolation=true (via DeckentConfig
+      // strict_tenant_isolation) to close this leak and return only the requesting
+      // tenant's own rows.
+      const tenantClause = this.strictTenantIsolation
+        ? 'e.tenant_id = ?'
+        : '(e.tenant_id = ? OR e.tenant_id IS NULL)';
       rows = this.db.prepare(`
         SELECT DISTINCT e.* FROM entries e
         INNER JOIN tags t ON e.id = t.entry_id
         WHERE t.tag IN (${placeholders})
           AND e.deleted_at IS NULL
-          AND (e.tenant_id = ? OR e.tenant_id IS NULL)
+          AND ${tenantClause}
       `).all(...tags, tenantId) as EntryRow[];
     } else {
       rows = this.db.prepare(`

@@ -686,6 +686,89 @@ describe('Multi-tenant isolation', () => {
   });
 });
 
+// ── Strict tenant isolation (ENT-2, Sprint 261) ───────────────────
+
+describe('strict tenant isolation', () => {
+  let strictStore: MemoryStore;
+  let strictTmpDir: string;
+
+  beforeEach(() => {
+    strictTmpDir = mkdtempSync(join(tmpdir(), 'memstore-strict-'));
+    strictStore = new MemoryStore(join(strictTmpDir, 'strict.db'), { strictTenantIsolation: true });
+  });
+
+  afterEach(() => {
+    strictStore.close();
+    rmSync(strictTmpDir, { recursive: true, force: true });
+  });
+
+  it('default (non-strict) getByType includes NULL-tenant rows', () => {
+    store.insert(makeInput({ id: 'sti-null', type: 'adr' })); // null tenant
+    store.insert(makeInput({ id: 'sti-acme', type: 'adr', tenant_id: 'acme' }));
+    const acmeView = store.getByType('adr', 'acme');
+    // permissive default: NULL-tenant row is visible to acme tenant
+    expect(acmeView.map(e => e.id)).toContain('sti-null');
+    expect(acmeView.map(e => e.id)).toContain('sti-acme');
+  });
+
+  it('strict getByType excludes NULL-tenant rows', () => {
+    strictStore.insert(makeInput({ id: 'sti-null', type: 'adr' })); // null tenant
+    strictStore.insert(makeInput({ id: 'sti-acme', type: 'adr', tenant_id: 'acme' }));
+    strictStore.insert(makeInput({ id: 'sti-beta', type: 'adr', tenant_id: 'beta' }));
+    const acmeView = strictStore.getByType('adr', 'acme');
+    // strict: only acme's own rows; NULL-tenant is NOT leaked
+    expect(acmeView.map(e => e.id)).toContain('sti-acme');
+    expect(acmeView.map(e => e.id)).not.toContain('sti-null');
+    expect(acmeView.map(e => e.id)).not.toContain('sti-beta');
+  });
+
+  it('default (non-strict) getById with tenantId includes NULL-tenant rows', () => {
+    store.insert(makeInput({ id: 'gid-null-ns' })); // null tenant
+    const entry = store.getById('gid-null-ns', { tenantId: 'acme' });
+    expect(entry).not.toBeNull(); // permissive: NULL-tenant visible to acme
+  });
+
+  it('strict getById with tenantId excludes NULL-tenant rows', () => {
+    strictStore.insert(makeInput({ id: 'gid-null-s' })); // null tenant
+    const entry = strictStore.getById('gid-null-s', { tenantId: 'acme' });
+    expect(entry).toBeNull(); // strict: NULL-tenant NOT visible to acme
+  });
+
+  it('strict getById with tenantId returns own-tenant rows', () => {
+    strictStore.insert(makeInput({ id: 'gid-own', tenant_id: 'acme' }));
+    const entry = strictStore.getById('gid-own', { tenantId: 'acme' });
+    expect(entry).not.toBeNull();
+    expect(entry!.tenant_id).toBe('acme');
+  });
+
+  it('default (non-strict) getByTags with tenantId includes NULL-tenant rows', () => {
+    store.insert(makeInput({ id: 'gbt-null-ns', tags: ['multi'] })); // null tenant
+    store.insert(makeInput({ id: 'gbt-acme-ns', tags: ['multi'], tenant_id: 'acme' }));
+    const acmeView = store.getByTags(['multi'], 'acme');
+    expect(acmeView.map(e => e.id)).toContain('gbt-null-ns'); // permissive: NULL visible
+    expect(acmeView.map(e => e.id)).toContain('gbt-acme-ns');
+  });
+
+  it('strict getByTags excludes NULL-tenant rows', () => {
+    strictStore.insert(makeInput({ id: 'gbt-null-s', tags: ['strict-tag'] })); // null tenant
+    strictStore.insert(makeInput({ id: 'gbt-acme-s', tags: ['strict-tag'], tenant_id: 'acme' }));
+    strictStore.insert(makeInput({ id: 'gbt-beta-s', tags: ['strict-tag'], tenant_id: 'beta' }));
+    const acmeView = strictStore.getByTags(['strict-tag'], 'acme');
+    expect(acmeView.map(e => e.id)).toContain('gbt-acme-s');
+    expect(acmeView.map(e => e.id)).not.toContain('gbt-null-s'); // strict: NULL not leaked
+    expect(acmeView.map(e => e.id)).not.toContain('gbt-beta-s');
+  });
+
+  it('strict getByType without tenantId still returns all entries (no tenant filter)', () => {
+    strictStore.insert(makeInput({ id: 'all-null', type: 'memory' }));
+    strictStore.insert(makeInput({ id: 'all-acme', type: 'memory', tenant_id: 'acme' }));
+    const all = strictStore.getByType('memory');
+    // Without tenantId, strict mode has no effect — full cross-tenant access
+    expect(all.map(e => e.id)).toContain('all-null');
+    expect(all.map(e => e.id)).toContain('all-acme');
+  });
+});
+
 // ── ADR-010 Amendment (Sprint 143 — Task 18) ──────────────────────
 
 describe('ADR-010 Amendment', () => {

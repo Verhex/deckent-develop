@@ -262,3 +262,40 @@ function finish(
   audit.record(record);
   return { outcome, reason, trigger, authority, approval, action, audit: record };
 }
+
+// ─── Nervous observer composer — AUT-1 wire ──────────────────────────────────
+// NOTE: named `withNervousObserver` (NOT buildEngineRuntime) to avoid colliding
+// with runtime-loop.ts's `buildEngineRuntime`, which assembles the live runtime
+// bundle. This is a composable wrapper applied to an already-built deps bundle;
+// runtime-loop's buildEngineRuntime calls it when given an `opts.nervousTick`.
+
+export interface WithNervousObserverOpts {
+  /**
+   * Tick function that drives the nervous observation pipeline once per cycle.
+   * Typically wraps a DetectorRegistry.runAll() call or a NervousObserver cron
+   * handler. Wrapped fail-safe in runAutonomousCycle — errors never break the loop.
+   */
+  nervousTick?: () => void | Promise<void>;
+}
+
+/**
+ * Construct a thin NervousObserverDep adapter from `opts.nervousTick` and wire
+ * it into the assembled deps so `tick()` actually fires during autonomous execution.
+ *
+ * This is the bridge between a pre-assembled AutonomousRuntimeDeps bundle
+ * (from buildAutonomousRuntime in runtime-loop.ts) and the nervous observation
+ * layer. Call it after composing the base deps bundle to enable per-cycle detection.
+ *
+ * When `nervousTick` is absent the base deps are returned unchanged (backward-safe).
+ * Observer errors are swallowed inside runAutonomousCycle — fail-safe invariant.
+ */
+export function withNervousObserver(
+  deps: AutonomousRuntimeDeps,
+  opts: WithNervousObserverOpts = {},
+): AutonomousRuntimeDeps {
+  const { nervousTick } = opts;
+  if (!nervousTick) return deps;
+  // Construct the NervousObserverDep adapter and pass it into the composed deps.
+  const nervousObserver: NervousObserverDep = { tick: nervousTick };
+  return { ...deps, nervousObserver };
+}

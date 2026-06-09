@@ -6,6 +6,7 @@
 import { readEvents } from '../orchestra/event-stream.js';
 import type { DeckentEvent } from '../orchestra/event-stream.js';
 import { can, Permission } from './rbac.js';
+import type { AuditEvent } from './audit-writer.js';
 
 // ─── Types ────────────────────────────────────────────────────────
 
@@ -135,4 +136,114 @@ function toAuditEntry(e: DeckentEvent): AuditEntry {
     tenantId: extractTenantId(e.payload),
     payload: e.payload,
   };
+}
+
+// ═══ Lineage Query Surface (ENT-3, SOC2/ISO traceability) ═════════════════
+// Pure, read-only helpers over a provided AuditEvent list.
+// No I/O — callers supply the event list; these functions only filter/group.
+
+/**
+ * AuditEvent with optional lineage fields (correlationId + causationId).
+ * Extends the base write-side AuditEvent with the two lineage fields that
+ * DeckentEvent carries at the top level (ADR-035, ENT-3).
+ */
+export interface AuditEventWithLineage extends AuditEvent {
+  /** Groups all events belonging to the same logical request flow. */
+  correlationId?: string;
+  /** Identifies the upstream request that caused this event to be emitted. */
+  causationId?: string;
+}
+
+/**
+ * Filter events by correlationId (exact match).
+ * Returns a new array; does not mutate input. Empty input → [].
+ */
+export function filterByCorrelation(
+  events: AuditEventWithLineage[],
+  correlationId: string,
+): AuditEventWithLineage[] {
+  return events.filter(e => e.correlationId === correlationId);
+}
+
+/**
+ * Filter events by causationId (exact match).
+ * Returns a new array; does not mutate input. Empty input → [].
+ */
+export function filterByCausation(
+  events: AuditEventWithLineage[],
+  causationId: string,
+): AuditEventWithLineage[] {
+  return events.filter(e => e.causationId === causationId);
+}
+
+/**
+ * Build the ordered causal chain for a given correlationId.
+ *
+ * Returns all events that share `rootCorrelationId`, ordered so that
+ * causal ancestors appear before their dependents: events with no
+ * causationId (or a causationId not in the correlation group) come first,
+ * then events whose causationId was already placed, until all are placed.
+ * This is a topological sort over the causation graph within the group.
+ *
+ * Empty input → []. Events with no correlationId match are excluded.
+ * Cyclic or unresolvable causation chains: remaining events appended in order.
+ */
+export function buildCausalChain(
+  events: AuditEventWithLineage[],
+  rootCorrelationId: string,
+): AuditEventWithLineage[] {
+  const group = events.filter(e => e.correlationId === rootCorrelationId);
+  if (group.length === 0) return [];
+
+  // Topological sort: place events whose causal parent is already placed
+  // (or has no parent within the group). Use hmac as the stable event id.
+  const placedHmacs = new Set<string>();
+  const result: AuditEventWithLineage[] = [];
+  let remaining = [...group];
+  let progress = true;
+
+  while (progress && remaining.length > 0) {
+    progress = false;
+    const nextRemaining: AuditEventWithLineage[] = [];
+    for (const e of remaining) {
+      // parentHmacInGroup: true when this event's causationId matches a group member's hmac
+      const parentHmacInGroup =
+        e.causationId !== undefined && group.some(g => g.hmac === e.causationId);
+      // placeable if: no parent in group (root/external cause) OR parent already placed
+      const placeable =
+        !parentHmacInGroup ||
+        (e.causationId !== undefined && placedHmacs.has(e.causationId));
+      if (placeable) {
+        result.push(e);
+        if (e.hmac !== undefined) placedHmacs.add(e.hmac);
+        progress = true;
+      } else {
+        nextRemaining.push(e);
+      }
+    }
+    remaining = nextRemaining;
+  }
+
+  // Append any remaining events (cycle or unresolvable causation) in original order.
+  result.push(...remaining);
+  return result;
+}
+
+/**
+ * Group events by their `actor` field.
+ * Returns a Map<actor, AuditEvent[]>. Events with an empty/missing actor
+ * are grouped under the empty string key. Empty input → empty Map.
+ */
+export function groupByActor(events: AuditEvent[]): Map<string, AuditEvent[]> {
+  const map = new Map<string, AuditEvent[]>();
+  for (const e of events) {
+    const key = typeof e.actor === 'string' ? e.actor : '';
+    const bucket = map.get(key);
+    if (bucket !== undefined) {
+      bucket.push(e);
+    } else {
+      map.set(key, [e]);
+    }
+  }
+  return map;
 }

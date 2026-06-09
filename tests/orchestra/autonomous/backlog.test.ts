@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { loadBacklog, validateBacklogEntry, queryDue, updateStatus, purgeCompletedBacklog, cleanupAutonomousArtifacts } from '../../../src/orchestra/autonomous/backlog.js';
+import { loadBacklog, validateBacklogEntry, queryDue, updateStatus, purgeCompletedBacklog, cleanupAutonomousArtifacts, reenqueueRecurring } from '../../../src/orchestra/autonomous/backlog.js';
 import type { BacklogEntry } from '../../../src/orchestra/autonomous/backlog-types.js';
 
 function entry(over: Partial<BacklogEntry> = {}): BacklogEntry {
@@ -186,5 +186,44 @@ describe('backlog store', () => {
 
   it('cleanupAutonomousArtifacts is a no-op when tasks directory is absent', () => {
     expect(() => cleanupAutonomousArtifacts(dir, '.nonexistent')).not.toThrow();
+  });
+
+  // ── reenqueueRecurring ────────────────────────────────────────────────────
+
+  it('reenqueueRecurring resets a recurring done entry to pending when next-due has passed', () => {
+    // lastRun at 10:00, cron = every hour, now = 11:30 → nextRun(cron, 10:00) = 11:00 ≤ 11:30
+    const bl = { _version: '1.0', entries: [
+      entry({ id: 'rec', status: 'done', trigger: { type: 'recurring' as const, cron: '0 * * * *' }, lastRun: '2026-06-09T10:00:00Z' }),
+    ]};
+    const result = reenqueueRecurring(bl, new Date('2026-06-09T11:30:00Z'));
+    expect(result.entries[0]!.status).toBe('pending');
+    // lastRun is preserved — updateStatus sets it on completion, not reenqueue
+    expect(result.entries[0]!.lastRun).toBe('2026-06-09T10:00:00Z');
+  });
+
+  it('reenqueueRecurring leaves a recurring done entry done when next-due is still in the future', () => {
+    // lastRun at 10:00, cron = every hour, now = 10:30 → nextRun(cron, 10:00) = 11:00 > 10:30
+    const bl = { _version: '1.0', entries: [
+      entry({ id: 'rec', status: 'done', trigger: { type: 'recurring' as const, cron: '0 * * * *' }, lastRun: '2026-06-09T10:00:00Z' }),
+    ]};
+    const result = reenqueueRecurring(bl, new Date('2026-06-09T10:30:00Z'));
+    expect(result.entries[0]!.status).toBe('done');
+  });
+
+  it('reenqueueRecurring leaves a one-off done entry untouched', () => {
+    const bl = { _version: '1.0', entries: [
+      entry({ id: 'once', status: 'done', trigger: { type: 'one-off' as const }, lastRun: '2026-06-09T10:00:00Z' }),
+    ]};
+    const result = reenqueueRecurring(bl, new Date('2026-06-09T23:00:00Z'));
+    expect(result.entries[0]!.status).toBe('done');
+  });
+
+  it('reenqueueRecurring leaves a recurring done entry done when cron is malformed (fail-safe, no throw)', () => {
+    const bl = { _version: '1.0', entries: [
+      entry({ id: 'bad', status: 'done', trigger: { type: 'recurring' as const, cron: 'NOT_A_CRON' }, lastRun: '2026-06-09T10:00:00Z' }),
+    ]};
+    expect(() => reenqueueRecurring(bl, new Date('2026-06-09T23:00:00Z'))).not.toThrow();
+    const result = reenqueueRecurring(bl, new Date('2026-06-09T23:00:00Z'));
+    expect(result.entries[0]!.status).toBe('done');
   });
 });

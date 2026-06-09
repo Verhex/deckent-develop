@@ -2,6 +2,28 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint261] - 2026-06-09
+
+### Added
+
+- F10-001 — unified policy engine (compose RBAC + activation + condition)
+- ENT-1 / ADR-037 V2 — `authorizeExecution(req)` bridge in the authority matrix
+- ENT-3 — tamper-evident audit hash-chain (additive field)
+- ENT-2 — strict tenant isolation flag (omit NULL-tenant leak)
+- F8-002 — multi-backend capability selection (availability/priority)
+- AUT-5 — recurring backlog re-enqueue (true cron cadence)
+- AUT-7 — wire the ExecutionPool into the dispatcher (bounded concurrency)
+- AUT-1 — actually drive the nervous observer in the autonomous loop
+- AUT-9 — proactive work-generator (backlog candidate generation)
+- AUT cleanup — consolidate the duplicate scheduled-flow cron evaluator
+
+### Changed
+
+- Doc — Enterprise-Depth reference (enforcement + secret vault + capability handlers) (completed with tech debt)
+
+
+_Tasks: 17 total, 14 done, 1 tech debt, 3 no-go_
+
 ## [1.0.0-beta.1-sprint260] - 2026-06-09
 
 ### Added

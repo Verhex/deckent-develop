@@ -2,7 +2,14 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { writeAuditEvent, validateAuditEvent, AUDIT_EVENT_CHANNEL } from '../../src/core/audit-writer.js';
+import {
+  writeAuditEvent,
+  validateAuditEvent,
+  verifyAuditChain,
+  _resetChainHead,
+  AUDIT_EVENT_CHANNEL,
+  type AuditEventPayload,
+} from '../../src/core/audit-writer.js';
 import { queryAudit } from '../../src/core/audit-query.js';
 
 let tmpRoot: string;
@@ -139,5 +146,148 @@ describe('validateAuditEvent', () => {
 
   it('returns false for whitespace-only action', () => {
     expect(validateAuditEvent({ tenantId: 'org', actor: 'u', action: '  ' })).toBe(false);
+  });
+});
+
+// ─── Test 5 — hash-chain via write path ──────────────────────────
+
+describe('verifyAuditChain — chain links intact', () => {
+  beforeEach(() => {
+    _resetChainHead(); // deterministic start
+  });
+
+  it('single event forms a valid chain', () => {
+    writeAuditEvent(tmpRoot, SPRINT_ID, { tenantId: 'acme', actor: 'u1', action: 'login' });
+
+    const { matched } = queryAudit(tmpRoot, SPRINT_ID, { channel: AUDIT_EVENT_CHANNEL });
+    const payloads = matched.map(e => e.payload as AuditEventPayload);
+
+    const result = verifyAuditChain(payloads);
+    expect(result.intact).toBe(true);
+    expect(result.brokenAt).toBeUndefined();
+  });
+
+  it('three consecutive events form a valid chain', () => {
+    writeAuditEvent(tmpRoot, SPRINT_ID, { tenantId: 'acme', actor: 'u1', action: 'login' });
+    writeAuditEvent(tmpRoot, SPRINT_ID, { tenantId: 'acme', actor: 'u1', action: 'read' });
+    writeAuditEvent(tmpRoot, SPRINT_ID, { tenantId: 'acme', actor: 'u1', action: 'logout' });
+
+    const { matched } = queryAudit(tmpRoot, SPRINT_ID, { channel: AUDIT_EVENT_CHANNEL });
+    const payloads = matched.map(e => e.payload as AuditEventPayload);
+
+    expect(payloads).toHaveLength(3);
+    // Each event should carry chain fields
+    for (const p of payloads) {
+      expect(typeof p.prevHmac).toBe('string');
+      expect(typeof p.hmac).toBe('string');
+    }
+
+    const result = verifyAuditChain(payloads);
+    expect(result.intact).toBe(true);
+  });
+
+  it('each event links to the previous via prevHmac', () => {
+    writeAuditEvent(tmpRoot, SPRINT_ID, { tenantId: 'org', actor: 'a', action: 'x' });
+    writeAuditEvent(tmpRoot, SPRINT_ID, { tenantId: 'org', actor: 'b', action: 'y' });
+
+    const { matched } = queryAudit(tmpRoot, SPRINT_ID, { channel: AUDIT_EVENT_CHANNEL });
+    const payloads = matched.map(e => e.payload as AuditEventPayload);
+
+    expect(payloads[1]!.prevHmac).toBe(payloads[0]!.hmac);
+  });
+});
+
+// ─── Test 6 — tamper detection ────────────────────────────────────
+
+describe('verifyAuditChain — tamper detection', () => {
+  beforeEach(() => {
+    _resetChainHead();
+  });
+
+  it('modifying a payload field breaks the chain at that index', () => {
+    writeAuditEvent(tmpRoot, SPRINT_ID, { tenantId: 'acme', actor: 'u1', action: 'login' });
+    writeAuditEvent(tmpRoot, SPRINT_ID, { tenantId: 'acme', actor: 'u1', action: 'read' });
+    writeAuditEvent(tmpRoot, SPRINT_ID, { tenantId: 'acme', actor: 'u1', action: 'logout' });
+
+    const { matched } = queryAudit(tmpRoot, SPRINT_ID, { channel: AUDIT_EVENT_CHANNEL });
+    const payloads = matched.map(e => ({ ...(e.payload as AuditEventPayload) }));
+
+    // Tamper the second event's action field
+    payloads[1] = { ...payloads[1]!, action: 'TAMPERED' };
+
+    const result = verifyAuditChain(payloads);
+    expect(result.intact).toBe(false);
+    expect(result.brokenAt).toBe(1);
+  });
+
+  it('modifying the first event breaks the chain at index 0', () => {
+    writeAuditEvent(tmpRoot, SPRINT_ID, { tenantId: 'org', actor: 'x', action: 'do' });
+
+    const { matched } = queryAudit(tmpRoot, SPRINT_ID, { channel: AUDIT_EVENT_CHANNEL });
+    const payloads = matched.map(e => ({ ...(e.payload as AuditEventPayload) }));
+
+    payloads[0] = { ...payloads[0]!, actor: 'EVIL' };
+
+    const result = verifyAuditChain(payloads);
+    expect(result.intact).toBe(false);
+    expect(result.brokenAt).toBe(0);
+  });
+
+  it('injecting a foreign event with wrong prevHmac breaks the chain', () => {
+    writeAuditEvent(tmpRoot, SPRINT_ID, { tenantId: 'org', actor: 'u', action: 'a' });
+    writeAuditEvent(tmpRoot, SPRINT_ID, { tenantId: 'org', actor: 'u', action: 'b' });
+
+    const { matched } = queryAudit(tmpRoot, SPRINT_ID, { channel: AUDIT_EVENT_CHANNEL });
+    const payloads = matched.map(e => ({ ...(e.payload as AuditEventPayload) }));
+
+    // Inject a foreign event at index 1 with a wrong prevHmac
+    const foreign: AuditEventPayload = {
+      tenantId: 'org',
+      actor: 'attacker',
+      action: 'inject',
+      timestamp: new Date().toISOString(),
+      prevHmac: 'deadbeef0000000000000000000000000000000000000000000000000000000',
+      hmac: 'deadbeef1111111111111111111111111111111111111111111111111111111',
+    };
+    payloads.splice(1, 0, foreign);
+
+    const result = verifyAuditChain(payloads);
+    expect(result.intact).toBe(false);
+    expect(result.brokenAt).toBe(1);
+  });
+});
+
+// ─── Test 7 — missing-hmac backward-safe ─────────────────────────
+
+describe('verifyAuditChain — missing-hmac backward-safe', () => {
+  it('empty array returns intact: true', () => {
+    const result = verifyAuditChain([]);
+    expect(result.intact).toBe(true);
+    expect(result.brokenAt).toBeUndefined();
+  });
+
+  it('legacy events without hmac are skipped (intact)', () => {
+    const legacyEvents = [
+      { tenantId: 'org', actor: 'u1', action: 'read' },
+      { tenantId: 'org', actor: 'u2', action: 'write' },
+    ];
+
+    const result = verifyAuditChain(legacyEvents);
+    expect(result.intact).toBe(true);
+  });
+
+  it('mix of legacy and chained events: chain portion is verified', () => {
+    _resetChainHead();
+    writeAuditEvent(tmpRoot, SPRINT_ID, { tenantId: 'org', actor: 'u', action: 'x' });
+
+    const { matched } = queryAudit(tmpRoot, SPRINT_ID, { channel: AUDIT_EVENT_CHANNEL });
+    const chained = matched.map(e => e.payload as AuditEventPayload);
+
+    // Prepend a legacy event (no hmac field)
+    const legacy = { tenantId: 'org', actor: 'old', action: 'legacy' };
+    const mixed = [legacy, ...chained];
+
+    const result = verifyAuditChain(mixed);
+    expect(result.intact).toBe(true);
   });
 });

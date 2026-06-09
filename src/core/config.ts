@@ -1325,6 +1325,9 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
     // Pre-sprint full-vitest baseline (Sprint 255: default FALSE — the full suite
     // blocks sprint start; opt-in only). Speeds sprint start dramatically.
     pre_sprint_tests: config.pre_sprint_tests ?? false,
+    // Strict multi-tenant isolation (Sprint 261 ENT-2: default FALSE — backward-compat
+    // permissive mode includes NULL-tenant rows). Set true to close NULL-tenant leak.
+    strict_tenant_isolation: config.strict_tenant_isolation ?? false,
     // AI planner timeout
     ai_planner_timeout: config.ai_planner_timeout,
     // Sprint checkpoint interval

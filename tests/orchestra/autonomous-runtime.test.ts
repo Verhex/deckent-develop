@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
   runAutonomousCycle,
+  withNervousObserver,
   type AutonomousTrigger,
   type AutonomousRuntimeDeps,
   type AuthorityDecision,
@@ -218,5 +219,48 @@ describe('runAutonomousCycle — nervous observer (AUT-1)', () => {
     expect(audit).toHaveLength(1);
     expect(spies.execute).toHaveBeenCalledTimes(1);
     expect(spies.authorityCheck).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ─── withNervousObserver — nervous observer construction ─────────────────────
+
+describe('withNervousObserver — nervous observer construction (AUT-1 wire)', () => {
+  it('constructs a NervousObserverDep from nervousTick and passes it into deps', () => {
+    const { deps } = makeDeps();
+    const tick = vi.fn().mockResolvedValue(undefined);
+    const enhanced = withNervousObserver(deps, { nervousTick: tick });
+
+    expect(enhanced.nervousObserver).toBeDefined();
+    expect(enhanced.nervousObserver).toHaveProperty('tick');
+  });
+
+  it('constructed observer tick fires once per cycle when cycle runs', async () => {
+    const { deps } = makeDeps();
+    const tick = vi.fn().mockResolvedValue(undefined);
+    const enhanced = withNervousObserver(deps, { nervousTick: tick });
+
+    await runAutonomousCycle({}, enhanced);
+
+    expect(tick).toHaveBeenCalledTimes(1);
+  });
+
+  it('absent nervousTick returns deps unchanged (backward-safe)', () => {
+    const { deps } = makeDeps();
+    const result = withNervousObserver(deps);
+
+    expect(result.nervousObserver).toBeUndefined();
+    expect(result).toBe(deps);
+  });
+
+  it('throwing nervousTick does NOT break the cycle (fail-safe via runAutonomousCycle)', async () => {
+    const { deps, audit } = makeDeps();
+    const tick = vi.fn().mockRejectedValue(new Error('nervous crash'));
+    const enhanced = withNervousObserver(deps, { nervousTick: tick });
+
+    const result = await runAutonomousCycle({}, enhanced);
+
+    expect(result.outcome).toBe('executed');
+    expect(audit).toHaveLength(1);
+    expect(tick).toHaveBeenCalledTimes(1);
   });
 });

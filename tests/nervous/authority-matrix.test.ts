@@ -108,6 +108,7 @@ const {
   normalizeWorkerRole,
   ROLE_CAPABILITY_MAP,
   ENFORCE_RBAC_CONFIG_KEY,
+  authorizeExecution,
 } = await import('../../src/nervous/authority-matrix.js');
 
 // Build a minimal ExecutionRequest slice for checkWorkerAuthority (ENT-1).
@@ -378,6 +379,41 @@ describe('AuthorityMatrix', () => {
 
     it('ENFORCE_RBAC_CONFIG_KEY is the enforce_rbac config flag name', () => {
       expect(ENFORCE_RBAC_CONFIG_KEY).toBe('enforce_rbac');
+    });
+  });
+
+  // ─── authorizeExecution bridge (ENT-1 ADR-037 V2) ─────────────────────────
+  describe('authorizeExecution (ENT-1 bridge)', () => {
+    it('permissive default: no actor → allowed, no violations, not enforced', () => {
+      const result = authorizeExecution({
+        actor: undefined,
+        requirements: { capabilities: ['fs-write', 'shell'], resources: [] },
+      });
+      expect(result.allowed).toBe(true);
+      expect(result.violations).toEqual([]);
+      expect(result.enforced).toBe(false);
+    });
+
+    it('denied under enforceRbac: viewer + fs-write + enforceRbac:true → blocked', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const result = authorizeExecution(
+        reqSlice('viewer', ['fs-read', 'fs-write']),
+        { enforceRbac: true },
+      );
+      expect(result.allowed).toBe(false);
+      expect(result.violations).toEqual(['fs-write']);
+      expect(result.enforced).toBe(true);
+      expect(warnSpy).not.toHaveBeenCalled();
+      warnSpy.mockRestore();
+    });
+
+    it('unknown role → permissive allow: allowed, no violations, not enforced', () => {
+      const result = authorizeExecution(
+        reqSlice('unknownrole', ['db-write', 'shell']),
+      );
+      expect(result.allowed).toBe(true);
+      expect(result.violations).toEqual([]);
+      expect(result.enforced).toBe(false);
     });
   });
 });

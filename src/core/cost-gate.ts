@@ -63,11 +63,22 @@ export interface CostGatePass {
 export interface CostGateExceeded {
   ok: false;
   reason: 'COST_GATE_EXCEEDED';
+  /**
+   * Which budget ceiling was tripped.
+   * - 'sprint'  — config sprint_max_usd was the binding limit
+   * - 'usd'     — per-request budget.maxUsd was the binding limit
+   * - 'tokens'  — per-request budget.maxTokens was the binding limit
+   */
+  ceilingTripped: 'sprint' | 'usd' | 'tokens';
   estimate: SprintCostEstimate;
   /** Convenience: realistic USD cost. */
   estimatedUsd: number;
-  /** Convenience: sprint_max_usd from cost-config. */
+  /** Convenience: effective USD budget ceiling (sprint or per-request). */
   budgetUsd: number;
+  /** Total estimated tokens (present when ceilingTripped === 'tokens'). */
+  estimatedTokens?: number;
+  /** Per-request token ceiling (present when ceilingTripped === 'tokens'). */
+  budgetTokens?: number;
   /** Human-readable explanation suitable for error messages. */
   message: string;
 }
@@ -115,6 +126,34 @@ export function evaluateCostGate(input: CostGateInput): CostGateResult {
 
   const exceedsEffectiveBudget = estimatedUsd > effectiveBudgetUsd;
 
+  // Per-request token ceiling (budget.maxTokens). Mirrors the totalTokens
+  // calculation in cost-calculator.ts subscriptionImpact block.
+  const requestMaxTokens = budget?.maxTokens;
+  const estimatedTotalTokens =
+    estimate.totalUncachedInputTokens +
+    estimate.totalCacheCreationTokens +
+    estimate.totalCacheReadTokens +
+    estimate.totalOutputTokens;
+  const exceedsTokenBudget =
+    requestMaxTokens !== undefined && estimatedTotalTokens > requestMaxTokens;
+
+  // Token ceiling is checked before USD — provides the most specific reason.
+  if (exceedsTokenBudget && !acknowledgeCost) {
+    return {
+      ok: false,
+      reason: 'COST_GATE_EXCEEDED',
+      ceilingTripped: 'tokens',
+      estimate,
+      estimatedUsd,
+      budgetUsd: effectiveBudgetUsd,
+      estimatedTokens: estimatedTotalTokens,
+      budgetTokens: requestMaxTokens,
+      message:
+        `Sprint estimated ${estimatedTotalTokens.toLocaleString()} tokens exceeds per-request token limit ${requestMaxTokens.toLocaleString()}. ` +
+        `Raise the request budget.maxTokens or set acknowledgeCost=true (MCP) / --force (CLI).`,
+    };
+  }
+
   if (exceedsEffectiveBudget && !acknowledgeCost) {
     const isRequestBudgetBinding =
       requestMaxUsd !== undefined && requestMaxUsd < sprintBudgetUsd;
@@ -126,6 +165,7 @@ export function evaluateCostGate(input: CostGateInput): CostGateResult {
     return {
       ok: false,
       reason: 'COST_GATE_EXCEEDED',
+      ceilingTripped: isRequestBudgetBinding ? 'usd' : 'sprint',
       estimate,
       estimatedUsd,
       budgetUsd: effectiveBudgetUsd,
@@ -142,7 +182,7 @@ export function evaluateCostGate(input: CostGateInput): CostGateResult {
     estimate,
     autoConfirm,
     autoConfirmThresholdUsd,
-    overrideApplied: exceedsEffectiveBudget && acknowledgeCost === true,
+    overrideApplied: (exceedsEffectiveBudget || exceedsTokenBudget) && acknowledgeCost === true,
   };
 }
 

@@ -14,6 +14,7 @@ import type { ActionHandler } from '../../nervous/executor.js';
 import type { BacklogEntry, BacklogFile } from './backlog-types.js';
 import { loadBacklog, updateStatus } from './backlog.js';
 import type { TaskResult } from '../../core/types.js';
+import type { ExecutionPool } from './execution-pool.js';
 
 /** Action id the backlog-trigger sets on every entry-driven trigger. */
 export const AUTONOMOUS_EXECUTE_ACTION = 'autonomous.execute';
@@ -41,6 +42,12 @@ export interface ExecuteDispatcherDeps {
    * Defaults to 600_000 (10 min) — ollama models can be slow to load.
    */
   resultTimeoutMs?: number;
+  /**
+   * Optional concurrency pool. When provided, each action is routed through
+   * pool.submit() to enforce bounded parallel execution. Absent → direct/serial
+   * (backward-safe: all existing callers that pass no pool are unchanged).
+   */
+  pool?: ExecutionPool;
 }
 
 /** Determine whether a TaskResult represents success (mirrors run.ts:320). */
@@ -59,68 +66,75 @@ export function makeExecuteDispatcher(deps: ExecuteDispatcherDeps): ActionHandle
       return { outcome: 'failure', error: 'execute-dispatcher: no backlog entry in payload' };
     }
 
-    // Gap B — mark running before any work begins (re-load so concurrent changes are seen)
-    const bl0: BacklogFile = loadBacklog(deps.backlogPath);
-    updateStatus(deps.backlogPath, bl0, entry.id, 'running', null);
+    // The full execution body is extracted into a job function so it can be submitted
+    // to an optional bounded pool (deps.pool). When no pool is provided the job runs
+    // directly — identical to the prior serial behavior (backward-safe).
+    const job = async (): Promise<{ outcome: 'success' | 'failure'; error?: string }> => {
+      // Gap B — mark running before any work begins (re-load so concurrent changes are seen)
+      const bl0: BacklogFile = loadBacklog(deps.backlogPath);
+      updateStatus(deps.backlogPath, bl0, entry.id, 'running', null);
 
-    try {
-      let ok = false;
-      let reason = '';
-
-      if (entry.kind === 'sprint') {
-        // Sprint: runSprint awaits the full lifecycle — success unless it throws.
-        await deps.runSprint(deps.projectRoot, deps.config);
-        ok = true;
-        reason = 'sprint completed';
-      } else {
-        // Task: launch worker, then wait for real completion (Gap F).
-        //
-        // The dispatcher forwards the entry's full provider/model intent. The real
-        // runTaskMode adapter maps these to the worker spawn; per-task provider routing
-        // for single-task mode follows the same path sprint mode already uses via the
-        // worker backend. Forwarding here preserves intent rather than silently dropping it.
-        const r = await deps.runTask(
-          {
-            projectRoot: deps.projectRoot,
-            description: entry.spec.description ?? entry.title,
-            model: entry.model,
-            provider: entry.provider,
-            scope: { directories: [entry.spec.scopeDir ?? '.'] },
-          },
-          deps.config,
-        ) as { taskId?: string } | null | undefined;
-
-        const taskId = r?.taskId;
-        if (taskId) {
-          // Gap F: wait for real done/failed (not just launched)
-          const result = await deps.waitForResult(deps.projectRoot, taskId, timeoutMs);
-          ok = isSuccess(result);
-          reason = result
-            ? `selfAssessment=${result.selfAssessment ?? 'NO_GO'}`
-            : 'timeout — no result within limit';
-        } else {
-          // runTask returned no taskId — cannot track completion; treat as failure
-          // to avoid false-done (the "wiring-% vs user-working" trap).
-          ok = false;
-          reason = 'runTask returned no taskId — completion not trackable';
-        }
-      }
-
-      // Gap B — final writeback (re-load to avoid clobbering concurrent changes)
-      const blFinal: BacklogFile = loadBacklog(deps.backlogPath);
-      updateStatus(deps.backlogPath, blFinal, entry.id, ok ? 'done' : 'failed', { ok, reason });
-
-      return ok ? { outcome: 'success' } : { outcome: 'failure', error: reason };
-    } catch (err: unknown) {
-      const reason = err instanceof Error ? err.message : String(err);
-      // Gap B — error path writeback
       try {
-        const blErr: BacklogFile = loadBacklog(deps.backlogPath);
-        updateStatus(deps.backlogPath, blErr, entry.id, 'failed', { ok: false, reason });
-      } catch {
-        // Never let the writeback failure mask the original error
+        let ok = false;
+        let reason = '';
+
+        if (entry.kind === 'sprint') {
+          // Sprint: runSprint awaits the full lifecycle — success unless it throws.
+          await deps.runSprint(deps.projectRoot, deps.config);
+          ok = true;
+          reason = 'sprint completed';
+        } else {
+          // Task: launch worker, then wait for real completion (Gap F).
+          //
+          // The dispatcher forwards the entry's full provider/model intent. The real
+          // runTaskMode adapter maps these to the worker spawn; per-task provider routing
+          // for single-task mode follows the same path sprint mode already uses via the
+          // worker backend. Forwarding here preserves intent rather than silently dropping it.
+          const r = await deps.runTask(
+            {
+              projectRoot: deps.projectRoot,
+              description: entry.spec.description ?? entry.title,
+              model: entry.model,
+              provider: entry.provider,
+              scope: { directories: [entry.spec.scopeDir ?? '.'] },
+            },
+            deps.config,
+          ) as { taskId?: string } | null | undefined;
+
+          const taskId = r?.taskId;
+          if (taskId) {
+            // Gap F: wait for real done/failed (not just launched)
+            const result = await deps.waitForResult(deps.projectRoot, taskId, timeoutMs);
+            ok = isSuccess(result);
+            reason = result
+              ? `selfAssessment=${result.selfAssessment ?? 'NO_GO'}`
+              : 'timeout — no result within limit';
+          } else {
+            // runTask returned no taskId — cannot track completion; treat as failure
+            // to avoid false-done (the "wiring-% vs user-working" trap).
+            ok = false;
+            reason = 'runTask returned no taskId — completion not trackable';
+          }
+        }
+
+        // Gap B — final writeback (re-load to avoid clobbering concurrent changes)
+        const blFinal: BacklogFile = loadBacklog(deps.backlogPath);
+        updateStatus(deps.backlogPath, blFinal, entry.id, ok ? 'done' : 'failed', { ok, reason });
+
+        return ok ? { outcome: 'success' } : { outcome: 'failure', error: reason };
+      } catch (err: unknown) {
+        const reason = err instanceof Error ? err.message : String(err);
+        // Gap B — error path writeback
+        try {
+          const blErr: BacklogFile = loadBacklog(deps.backlogPath);
+          updateStatus(deps.backlogPath, blErr, entry.id, 'failed', { ok: false, reason });
+        } catch {
+          // Never let the writeback failure mask the original error
+        }
+        return { outcome: 'failure', error: reason };
       }
-      return { outcome: 'failure', error: reason };
-    }
+    };
+
+    return deps.pool ? deps.pool.submit(job) : job();
   };
 }

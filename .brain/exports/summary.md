@@ -127,4 +127,4 @@ _No active technical debt._
 - Violation pattern: stale_heartbeat
 - Violation pattern: file_outside_scope
 
-_Total entries: 341 | Generated: 2026-06-09_
+_Total entries: 343 | Generated: 2026-06-09_

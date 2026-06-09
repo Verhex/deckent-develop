@@ -279,6 +279,114 @@ describe('buildCostGateErrorPayload', () => {
         expect(resultNoBudget.budgetUsd).toBe(resultWithBudgetUndefined.budgetUsd);
       }
     });
+
+    it('ceilingTripped=sprint for pure sprint-budget block', () => {
+      const costConfig = makeCostConfig({ sprintMaxUsd: 0.01 });
+      const tasks = Array.from({ length: 20 }, (_, i) => task(`t${i}`, 'opus', 'high'));
+
+      const result = evaluateCostGate({ tasks, costConfig });
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.ceilingTripped).toBe('sprint');
+      }
+    });
+
+    it('ceilingTripped=usd for per-request maxUsd block', () => {
+      const costConfig = makeCostConfig({ sprintMaxUsd: 10 });
+      const tasks = Array.from({ length: 5 }, (_, i) => task(`t${i}`, 'haiku', 'normal'));
+
+      const result = evaluateCostGate({ tasks, costConfig, budget: { maxUsd: 0.000001 } });
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.ceilingTripped).toBe('usd');
+      }
+    });
+  });
+
+  // ─── Sprint 261 — per-request token ceiling (budget.maxTokens) ──────────────
+  describe('per-request token ceiling (budget.maxTokens)', () => {
+    it('blocks when estimated tokens exceed per-request maxTokens', () => {
+      const costConfig = makeCostConfig({ sprintMaxUsd: 100 });
+      // Each task has 2700 input + 1500 output = 4200 tokens. 3 tasks = 12600 tokens min.
+      // Set maxTokens to 1 to force a block.
+      const tasks = [task('t1', 'haiku', 'normal')];
+
+      const result = evaluateCostGate({ tasks, costConfig, budget: { maxTokens: 1 } });
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.reason).toBe('COST_GATE_EXCEEDED');
+        expect(result.ceilingTripped).toBe('tokens');
+        expect(result.estimatedTokens).toBeGreaterThan(0);
+        expect(result.budgetTokens).toBe(1);
+        expect(result.message).toMatch(/tokens/i);
+        expect(result.message).toMatch(/per-request token limit/i);
+      }
+    });
+
+    it('passes when estimated tokens are within per-request maxTokens', () => {
+      const costConfig = makeCostConfig({ sprintMaxUsd: 100 });
+      const tasks = [task('t1', 'haiku', 'low')];
+      // Very large maxTokens → should pass
+      const result = evaluateCostGate({ tasks, costConfig, budget: { maxTokens: 1_000_000_000 } });
+
+      expect(result.ok).toBe(true);
+    });
+
+    it('ceilingTripped=tokens even when USD is also over (tokens checked first)', () => {
+      const costConfig = makeCostConfig({ sprintMaxUsd: 0.000001 });
+      const tasks = [task('t1', 'haiku', 'normal')];
+
+      const result = evaluateCostGate({ tasks, costConfig, budget: { maxTokens: 1 } });
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        // Tokens was checked first — should win
+        expect(result.ceilingTripped).toBe('tokens');
+      }
+    });
+
+    it('acknowledgeCost=true bypasses token ceiling (overrideApplied)', () => {
+      const costConfig = makeCostConfig({ sprintMaxUsd: 100 });
+      const tasks = [task('t1', 'haiku', 'normal')];
+
+      const result = evaluateCostGate({
+        tasks,
+        costConfig,
+        budget: { maxTokens: 1 },
+        acknowledgeCost: true,
+      });
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.overrideApplied).toBe(true);
+      }
+    });
+
+    it('no maxTokens field → existing behavior unchanged (backward-safe)', () => {
+      const costConfig = makeCostConfig({ sprintMaxUsd: 100 });
+      const tasks = [task('t1', 'haiku', 'low')];
+
+      const resultNoBudget = evaluateCostGate({ tasks, costConfig });
+      const resultWithMaxUsdOnly = evaluateCostGate({ tasks, costConfig, budget: { maxUsd: 50 } });
+
+      expect(resultNoBudget.ok).toBe(true);
+      expect(resultWithMaxUsdOnly.ok).toBe(true);
+    });
+
+    it('estimatedTokens and budgetTokens are populated on token block', () => {
+      const costConfig = makeCostConfig({ sprintMaxUsd: 100 });
+      const tasks = [task('t1', 'haiku', 'normal')];
+
+      const result = evaluateCostGate({ tasks, costConfig, budget: { maxTokens: 100 } });
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.estimatedTokens).toBeDefined();
+        expect(result.budgetTokens).toBe(100);
+        expect(result.estimatedTokens).toBeGreaterThan(100);
+      }
+    });
   });
 
   // ─── Sprint 238 İŞ10 — estimate↔gate bridge for 'local' (ollama) ──────────

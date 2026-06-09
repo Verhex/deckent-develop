@@ -7049,3 +7049,40 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 260-016: Doc — Enterprise Foundation reference (consume-the-contract) (GO_WITH_TECH_DEBT)
 
 ---
+## Sprint 261 — sprint-261
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-06-09
+**Duration:** 740s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 17 |
+| Completed | 14 |
+| Tech Debt | 1 |
+| No-Go | 3 |
+| Coverage | NaN% |
+| Duration | 740430ms |
+
+### Tasks
+
+- 261-001: F10-001 — unified policy engine (compose RBAC + activation + condition) (DONE)
+- 261-002: ENT-1 / ADR-037 V2 — `authorizeExecution(req)` bridge in the authority matrix (DONE)
+- 261-003: ENT-3 — tamper-evident audit hash-chain (additive field) (DONE)
+- 261-004: ENT-2 — strict tenant isolation flag (omit NULL-tenant leak) (DONE)
+- 261-005: F8-002 — multi-backend capability selection (availability/priority) (DONE)
+- 261-006: F8 — real capability handlers (http / env / shell-gated) (NO_GO)
+- 261-007: AUT-5 — recurring backlog re-enqueue (true cron cadence) (DONE)
+- 261-008: AUT-7 — wire the ExecutionPool into the dispatcher (bounded concurrency) (DONE)
+- 261-009: AUT-1 — actually drive the nervous observer in the autonomous loop (DONE)
+- 261-010: AUT-9 — proactive work-generator (backlog candidate generation) (DONE)
+- 261-011: AUT cleanup — consolidate the duplicate scheduled-flow cron evaluator (DONE)
+- 261-012: budget — cost-gate honors `maxTokens` (deepen Sprint 260 maxUsd) (DONE)
+- 261-013: WM — `InteractionMode` consumer (interactive/batch/streaming policy) (DONE)
+- 261-014: Hygiene — green stale model-id test assertions (gpt-5 → gpt-5.5 drift) (NO_GO)
+- 261-015: Doc — Enterprise-Depth reference (enforcement + secret vault + capability handlers) (GO_WITH_TECH_DEBT)
+- 261-016: ENT-3 — audit query/lineage surface (read-only) (DONE)
+
+---

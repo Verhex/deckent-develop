@@ -100,6 +100,12 @@ export interface DeckentConfig {
    *  full suite is slow and blocks sprint start). Opt-in for the honesty
    *  verify-delta baseline. */
   pre_sprint_tests?: boolean;
+  /** Strict multi-tenant isolation (default: false).
+   *  When false (default), tenant-scoped queries include global NULL-tenant rows
+   *  (backward-compat). When true, OMIT the `OR tenant_id IS NULL` clause so a
+   *  tenant sees ONLY its own rows — closes the NULL-tenant leak for strict
+   *  multi-tenant deployments. */
+  strict_tenant_isolation?: boolean;
   /** Spawn backend: 'docker' | 'tmux' | 'subprocess' | 'auto' (default: 'auto') */
   spawn_backend?: 'docker' | 'tmux' | 'subprocess' | 'auto';
   /** Docker image for worker containers (default: 'deckent-worker:latest') */
@@ -524,6 +530,10 @@ export interface ResolvedConfig {
   auto_docs?: AutoDocsConfig;
   /** Run the full pre-sprint vitest baseline before SPAWN (default: false). */
   pre_sprint_tests?: boolean;
+  /** Strict multi-tenant isolation (default: false).
+   *  When true, tenant-scoped queries omit the `OR tenant_id IS NULL` clause.
+   *  @see DeckentConfig.strict_tenant_isolation */
+  strict_tenant_isolation?: boolean;
   /** Spawn backend: 'docker' | 'tmux' | 'subprocess' | 'auto' (default: 'auto') */
   spawn_backend?: 'docker' | 'tmux' | 'subprocess' | 'auto';
   /** Docker image for worker containers (default: 'deckent-worker:latest') */

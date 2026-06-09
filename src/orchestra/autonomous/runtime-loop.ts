@@ -36,6 +36,7 @@ import { makeTriggerSource } from './trigger-adapter.js';
 // ─── Engine composition root (Task 7) imports ────────────────────────
 import type { ResolvedConfig } from '../../core/config-types.js';
 import type { PolicyGate } from '../autonomous-runtime.js';
+import { withNervousObserver } from '../autonomous-runtime.js';
 import {
   makeBacklogTriggerSource,
   makeHybridTriggerSource,
@@ -145,6 +146,13 @@ export interface BuildEngineRuntimeOptions {
   now?: () => string;
   /** Optional persistence path for the approval-adapter pending queue (forwarded to inner buildAutonomousRuntime). */
   pendingPath?: string;
+  /**
+   * AUT-1: optional nervous-observation tick. When provided, a NervousObserverDep
+   * is composed onto the runtime deps (via withNervousObserver) so detectors fire
+   * once per autonomous cycle. Absent → no observer (backward-safe). The tick is
+   * called fail-safe inside runAutonomousCycle (errors never break the loop).
+   */
+  nervousTick?: () => void | Promise<void>;
 }
 
 /**
@@ -221,6 +229,13 @@ export function buildEngineRuntime(
     },
   };
   base.deps.policyGate = policyGate;
+
+  // AUT-1: compose the nervous observer onto the deps so detectors actually fire
+  // per cycle. No-op when nervousTick is absent (backward-safe). The CLI passes a
+  // real DetectorRegistry-backed tick to fully close the live-observation wire.
+  if (opts.nervousTick) {
+    base.deps = withNervousObserver(base.deps, { nervousTick: opts.nervousTick });
+  }
 
   return base;
 }

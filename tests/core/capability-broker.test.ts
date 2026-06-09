@@ -317,3 +317,129 @@ describe('invokeFromRequest', () => {
     expect(expectOk(res).value).toBe('rows');
   });
 });
+
+// ─── Multi-backend selection (F8-002) ────────────────────────────
+
+describe('CapabilityRegistry — multi-backend selection', () => {
+  let reg: CapabilityRegistry;
+  beforeEach(() => {
+    reg = new CapabilityRegistry();
+  });
+
+  it('single backend registered with no opts: default priority, always available', async () => {
+    reg.register('mail.send', makeHandler({ invoke: () => 'sent' }));
+    const res = await reg.invoke({ capability: 'mail.send' });
+    expect(expectOk(res).value).toBe('sent');
+  });
+
+  it('picks the highest-priority backend when several share a name', async () => {
+    reg.register('mail.send', makeHandler({ invoke: () => 'low' }), { priority: 1 });
+    reg.register('mail.send', makeHandler({ invoke: () => 'high' }), { priority: 5 });
+    const res = await reg.invoke({ capability: 'mail.send' });
+    expect(expectOk(res).value).toBe('high');
+  });
+
+  it('skips an unavailable higher-priority backend, falls back to an available lower one', async () => {
+    reg.register('mail.send', makeHandler({ invoke: () => 'low-available' }), { priority: 1 });
+    reg.register('mail.send', makeHandler({ invoke: () => 'high-down' }), {
+      priority: 9,
+      isAvailable: () => false,
+    });
+    const res = await reg.invoke({ capability: 'mail.send' });
+    expect(expectOk(res).value).toBe('low-available');
+  });
+
+  it('returns CAPABILITY_NOT_FOUND when a registered name has no available backend', async () => {
+    reg.register('mail.send', makeHandler({ invoke: () => 'x' }), { isAvailable: () => false });
+    const res = await reg.invoke({ capability: 'mail.send' });
+    expect(res.ok).toBe(false);
+    expect(!res.ok && res.code).toBe('CAPABILITY_NOT_FOUND');
+    expect(!res.ok && res.error).toContain('all backends unavailable');
+  });
+
+  it('equal priority → most-recently registered wins (last-writer-wins preserved)', async () => {
+    reg.register('x', makeHandler({ invoke: () => 'first' }));
+    reg.register('x', makeHandler({ invoke: () => 'second' }));
+    const res = await reg.invoke({ capability: 'x' });
+    expect(expectOk(res).value).toBe('second');
+  });
+
+  it('get() returns the top backend ignoring availability (has ⟺ get)', () => {
+    const down = makeHandler({ description: 'down' });
+    reg.register('x', down, { priority: 5, isAvailable: () => false });
+    expect(reg.has('x')).toBe(true);
+    expect(reg.get('x')).toBe(down);
+  });
+
+  it('a throwing isAvailable() predicate counts as unavailable (registry never throws)', async () => {
+    reg.register('x', makeHandler({ invoke: () => 'safe' }), { priority: 1 });
+    reg.register('x', makeHandler({ invoke: () => 'boom-probe' }), {
+      priority: 9,
+      isAvailable: () => {
+        throw new Error('probe failed');
+      },
+    });
+    const res = await reg.invoke({ capability: 'x' });
+    expect(expectOk(res).value).toBe('safe');
+  });
+
+  it('connector falls back to the verb when the connector backend is unavailable', async () => {
+    reg.register('mail.send', makeHandler({ invoke: () => 'via-verb' }));
+    reg.register('imap', makeHandler({ invoke: () => 'via-connector' }), {
+      isAvailable: () => false,
+    });
+    const res = await reg.invoke({ capability: 'mail.send', connector: 'imap' });
+    expect(expectOk(res).value).toBe('via-verb');
+    expect(res.ok && res.handler).toBe('mail.send');
+  });
+});
+
+// ─── listBackends introspection ──────────────────────────────────
+
+describe('CapabilityRegistry — listBackends', () => {
+  let reg: CapabilityRegistry;
+  beforeEach(() => {
+    reg = new CapabilityRegistry();
+  });
+
+  it('returns [] for an unregistered name', () => {
+    expect(reg.listBackends('absent')).toEqual([]);
+  });
+
+  it('lists labels in resolution order (priority desc, ties most-recent first)', () => {
+    reg.register('mail.send', makeHandler({ description: 'smtp-low' }), { priority: 1 });
+    reg.register('mail.send', makeHandler({ description: 'graph-high' }), { priority: 5 });
+    reg.register('mail.send', makeHandler({ description: 'imap-low2' }), { priority: 1 });
+    expect(reg.listBackends('mail.send')).toEqual(['graph-high', 'imap-low2', 'smtp-low']);
+  });
+
+  it('falls back to requiredCapability when a backend has no description', () => {
+    reg.register('x', makeHandler({ requiredCapability: 'db-write' }));
+    expect(reg.listBackends('x')).toEqual(['db-write']);
+  });
+});
+
+// ─── Module registerCapability opts forwarding ───────────────────
+
+describe('registerCapability opts forwarding (default registry)', () => {
+  afterEach(() => {
+    resetDefaultCapabilityRegistry();
+  });
+
+  it('forwards priority so the higher-priority backend is selected', async () => {
+    registerCapability('mail.send', makeHandler({ invoke: () => 'low' }), { priority: 1 });
+    registerCapability('mail.send', makeHandler({ invoke: () => 'high' }), { priority: 5 });
+    const res = await invokeCapability({ capability: 'mail.send' });
+    expect(expectOk(res).value).toBe('high');
+  });
+
+  it('forwards isAvailable so an unavailable backend is skipped', async () => {
+    registerCapability('svc', makeHandler({ invoke: () => 'up' }), { priority: 1 });
+    registerCapability('svc', makeHandler({ invoke: () => 'down' }), {
+      priority: 9,
+      isAvailable: () => false,
+    });
+    const res = await invokeCapability({ capability: 'svc' });
+    expect(expectOk(res).value).toBe('up');
+  });
+});

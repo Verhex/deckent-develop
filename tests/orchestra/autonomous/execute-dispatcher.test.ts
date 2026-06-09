@@ -3,9 +3,11 @@ import { mkdirSync, writeFileSync, rmSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { makeExecuteDispatcher } from '../../../src/orchestra/autonomous/execute-dispatcher.js';
+import { makeBoundedPool } from '../../../src/orchestra/autonomous/execution-pool.js';
 import { loadBacklog } from '../../../src/orchestra/autonomous/backlog.js';
 import type { BacklogEntry, BacklogFile } from '../../../src/orchestra/autonomous/backlog-types.js';
 import type { TaskResult } from '../../../src/core/types.js';
+import type { ExecutionPool } from '../../../src/orchestra/autonomous/execution-pool.js';
 
 // ─── Shared helpers ──────────────────────────────────────────────────
 
@@ -276,5 +278,127 @@ describe('execute-dispatcher', () => {
     });
     await handler('autonomous.execute', { entry: taskEntry });
     expect(waitForResult).toHaveBeenCalledWith(tmpDir, 't', 42_000);
+  });
+
+  // ── pool integration tests ────────────────────────────────────────────
+
+  it('pool.submit is called when pool is provided', async () => {
+    const backlogPath = seedBacklog(tmpDir, taskEntry);
+    const runTask = vi.fn().mockResolvedValue({ taskId: 't' });
+    const waitForResult = vi.fn().mockResolvedValue(doneResult);
+
+    const mockPool: ExecutionPool = { submit: vi.fn((job) => job()) };
+
+    const handler = makeExecuteDispatcher({
+      projectRoot: tmpDir, config: {} as never,
+      runTask, runSprint: vi.fn(),
+      backlogPath, waitForResult,
+      pool: mockPool,
+    });
+
+    const res = await handler('autonomous.execute', { entry: taskEntry });
+    expect(res.outcome).toBe('success');
+    expect((mockPool.submit as ReturnType<typeof vi.fn>)).toHaveBeenCalledOnce();
+    expect(runTask).toHaveBeenCalledOnce();
+  });
+
+  it('no pool → direct execution (serial fallback, backward-safe)', async () => {
+    const backlogPath = seedBacklog(tmpDir, taskEntry);
+    const runTask = vi.fn().mockResolvedValue({ taskId: 't' });
+    const waitForResult = vi.fn().mockResolvedValue(doneResult);
+
+    // No pool provided — must behave exactly like before
+    const handler = makeExecuteDispatcher({
+      projectRoot: tmpDir, config: {} as never,
+      runTask, runSprint: vi.fn(),
+      backlogPath, waitForResult,
+    });
+
+    const res = await handler('autonomous.execute', { entry: taskEntry });
+    expect(res.outcome).toBe('success');
+    expect(runTask).toHaveBeenCalledOnce();
+  });
+});
+
+// ── makeBoundedPool unit tests ────────────────────────────────────────
+
+describe('makeBoundedPool', () => {
+  it('maxConcurrency=1 runs jobs serially (one at a time)', async () => {
+    const pool = makeBoundedPool(1);
+    const order: number[] = [];
+    let resolve1!: () => void;
+    const blocker = new Promise<void>((res) => { resolve1 = res; });
+
+    const j1 = pool.submit(async () => { await blocker; order.push(1); });
+    const j2 = pool.submit(async () => { order.push(2); });
+
+    // j1 is in-flight, j2 is queued; order is empty so far
+    expect(order).toEqual([]);
+    resolve1();
+    await Promise.all([j1, j2]);
+    expect(order).toEqual([1, 2]);
+  });
+
+  it('maxConcurrency=2 allows two jobs to run in parallel', async () => {
+    const pool = makeBoundedPool(2);
+    const started: number[] = [];
+    let resolve1!: () => void;
+    let resolve2!: () => void;
+
+    const p1 = new Promise<void>((res) => { resolve1 = res; });
+    const p2 = new Promise<void>((res) => { resolve2 = res; });
+
+    const j1 = pool.submit(async () => { started.push(1); await p1; });
+    const j2 = pool.submit(async () => { started.push(2); await p2; });
+    // Both should have started immediately (both within the concurrency limit)
+    await Promise.resolve(); // flush microtasks
+    expect(started).toContain(1);
+    expect(started).toContain(2);
+
+    resolve1();
+    resolve2();
+    await Promise.all([j1, j2]);
+  });
+
+  it('caps in-flight at maxConcurrency — third job waits for a slot', async () => {
+    const pool = makeBoundedPool(2);
+    const started: number[] = [];
+    const resolvers: Array<() => void> = [];
+
+    const jobs = [1, 2, 3].map((n) =>
+      pool.submit(async () => {
+        started.push(n);
+        await new Promise<void>((res) => { resolvers[n - 1] = res; });
+      }),
+    );
+
+    // Allow microtasks to settle so jobs 1+2 can start
+    await Promise.resolve();
+    await Promise.resolve();
+
+    // Only jobs 1 and 2 should have started; job 3 is queued
+    expect(started).toContain(1);
+    expect(started).toContain(2);
+    expect(started).not.toContain(3);
+
+    // Free one slot — job 3 should now start
+    resolvers[0]!();
+    await jobs[0];
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(started).toContain(3);
+
+    resolvers[1]!();
+    resolvers[2]!();
+    await Promise.all(jobs);
+  });
+
+  it('error in one job propagates to its promise but does not block subsequent jobs', async () => {
+    const pool = makeBoundedPool(1);
+    const j1 = pool.submit(async () => { throw new Error('oops'); });
+    const j2 = pool.submit(async () => 42);
+
+    await expect(j1).rejects.toThrow('oops');
+    await expect(j2).resolves.toBe(42);
   });
 });

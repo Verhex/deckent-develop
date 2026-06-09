@@ -62,47 +62,127 @@ export interface CapabilityHandler {
   invoke(args: Record<string, unknown>, ctx: InvocationContext): unknown | Promise<unknown>;
 }
 
+/** Per-backend registration options (F8-002 — multi-backend selection). */
+export interface RegisterCapabilityOptions {
+  /** Higher wins when multiple backends share a name. Default `0`. */
+  priority?: number;
+  /** Gate — a backend whose `isAvailable()` returns false is skipped during
+   *  resolution. Default: always available. A predicate that THROWS is treated as
+   *  unavailable (fail-safe), so a faulty probe never propagates out of the registry. */
+  isAvailable?: () => boolean;
+}
+
 // ─── Registry ────────────────────────────────────────────────────────────────
 
+/** A single registered backend under a name — handler + selection metadata. */
+interface BackendEntry {
+  handler: CapabilityHandler;
+  priority: number;
+  isAvailable?: () => boolean;
+}
+
 /**
- * Holds named handlers and routes a {@link CapabilityTarget} to one of them.
- * Resolution prefers an explicit `target.connector` (the chosen backend) and
- * falls back to `target.capability` (the verb) when no such connector exists.
+ * Holds named backends and routes a {@link CapabilityTarget} to one of them.
+ * A name may hold MULTIPLE backends (F8-002): resolution picks the highest-
+ * `priority` AVAILABLE backend, ties broken to the most-recently registered.
+ * Across the connector/verb axis, an explicit `target.connector` is preferred
+ * (when it has an available backend) and falls back to `target.capability`.
  */
 export class CapabilityRegistry {
-  private readonly handlers = new Map<string, CapabilityHandler>();
+  private readonly backends = new Map<string, BackendEntry[]>();
 
-  /** Register `handler` under `name` (a verb like 'mail.send' or a connector id
-   *  like 'imap'). Re-registering the same name overwrites — last writer wins. */
-  register(name: string, handler: CapabilityHandler): void {
-    this.handlers.set(name, handler);
+  /**
+   * Register `handler` as a backend under `name` (a verb like 'mail.send' or a
+   * connector id like 'imap'). ADDITIVE: a name may hold MANY backends.
+   * Resolution picks the highest-`priority` AVAILABLE backend; ties break to the
+   * most-recently registered — so with a single backend, or several at equal
+   * priority, the newest wins (the historical "last writer wins" behavior is
+   * preserved). `opts.isAvailable` (default: always available; a throwing
+   * predicate counts as unavailable) lets a backend opt out at resolution time.
+   */
+  register(name: string, handler: CapabilityHandler, opts?: RegisterCapabilityOptions): void {
+    const entry: BackendEntry = {
+      handler,
+      priority: opts?.priority ?? 0,
+      isAvailable: opts?.isAvailable,
+    };
+    const list = this.backends.get(name);
+    if (list) list.push(entry);
+    else this.backends.set(name, [entry]);
   }
 
   has(name: string): boolean {
-    return this.handlers.has(name);
+    return this.backends.has(name);
   }
 
+  /** The selected handler for `name` (highest priority, ties most-recent),
+   *  IGNORING availability so `has(name) ⟺ get(name) !== undefined` holds. */
   get(name: string): CapabilityHandler | undefined {
-    return this.handlers.get(name);
+    return this.selectEntry(name, false)?.handler;
   }
 
   /** Registered names, sorted for stable, order-independent output. */
   list(): string[] {
-    return [...this.handlers.keys()].sort();
+    return [...this.backends.keys()].sort();
   }
 
+  /** Introspection — labels of every backend under `name`, in resolution-
+   *  preference order (priority desc, ties most-recent first). `[]` if absent. */
+  listBackends(name: string): string[] {
+    const list = this.backends.get(name);
+    if (list === undefined) return [];
+    return list
+      .map((entry, index) => ({ entry, index }))
+      .sort((a, b) => b.entry.priority - a.entry.priority || b.index - a.index)
+      .map(({ entry }) => entry.handler.description ?? entry.handler.requiredCapability);
+  }
+
+  /** Remove ALL backends registered under `name`. */
   unregister(name: string): boolean {
-    return this.handlers.delete(name);
+    return this.backends.delete(name);
   }
 
   clear(): void {
-    this.handlers.clear();
+    this.backends.clear();
   }
 
-  /** Resolve the handler name for a target: connector first, then verb. */
-  private resolveName(target: CapabilityTarget): string | undefined {
-    if (target.connector && this.handlers.has(target.connector)) return target.connector;
-    if (this.handlers.has(target.capability)) return target.capability;
+  /** Is this backend selectable right now? A missing predicate ⇒ always; a
+   *  throwing predicate ⇒ unavailable (fail-safe — never propagates a throw). */
+  private isEntryAvailable(entry: BackendEntry): boolean {
+    if (entry.isAvailable === undefined) return true;
+    try {
+      return entry.isAvailable() === true;
+    } catch {
+      return false;
+    }
+  }
+
+  /** Best backend under `name`: highest priority, ties most-recent. When
+   *  `availableOnly`, unavailable backends are skipped. `undefined` if none. */
+  private selectEntry(name: string, availableOnly: boolean): BackendEntry | undefined {
+    const list = this.backends.get(name);
+    if (list === undefined) return undefined;
+    let best: BackendEntry | undefined;
+    // Iterate in insertion order; `>=` lets a later equal-priority entry replace
+    // an earlier one, yielding "max priority, ties → most-recent" for free.
+    for (const entry of list) {
+      if (availableOnly && !this.isEntryAvailable(entry)) continue;
+      if (best === undefined || entry.priority >= best.priority) best = entry;
+    }
+    return best;
+  }
+
+  /** Resolve `target` to an available backend: connector first, then verb. */
+  private resolveEntry(
+    target: CapabilityTarget,
+  ): { name: string; handler: CapabilityHandler } | undefined {
+    const candidates = target.connector
+      ? [target.connector, target.capability]
+      : [target.capability];
+    for (const name of candidates) {
+      const entry = this.selectEntry(name, true);
+      if (entry) return { name, handler: entry.handler };
+    }
     return undefined;
   }
 
@@ -112,19 +192,24 @@ export class CapabilityRegistry {
    */
   async invoke(target: CapabilityTarget, ctx: InvocationContext = {}): Promise<CapabilityResult> {
     const verb = target.capability;
-    const name = this.resolveName(target);
-    if (name === undefined) {
+    const resolved = this.resolveEntry(target);
+    if (resolved === undefined) {
+      // Distinguish "nothing registered" from "registered but all unavailable".
+      const registered =
+        this.has(target.capability) ||
+        (target.connector !== undefined && this.has(target.connector));
+      const suffix = target.connector ? ` or connector '${target.connector}'` : '';
       return {
         ok: false,
         capability: verb,
         code: 'CAPABILITY_NOT_FOUND',
-        error: `no handler registered for capability '${verb}'${
-          target.connector ? ` or connector '${target.connector}'` : ''
-        }`,
+        error: registered
+          ? `no available handler for capability '${verb}'${suffix} (all backends unavailable)`
+          : `no handler registered for capability '${verb}'${suffix}`,
       };
     }
 
-    const handler = this.handlers.get(name)!;
+    const { name, handler } = resolved;
 
     if (
       ctx.grantedCapabilities !== undefined &&
@@ -218,9 +303,14 @@ export function getDefaultRegistry(): CapabilityRegistry {
   return defaultRegistry;
 }
 
-/** Register a handler on the default registry. */
-export function registerCapability(name: string, handler: CapabilityHandler): void {
-  defaultRegistry.register(name, handler);
+/** Register a handler on the default registry. Forwards multi-backend
+ *  selection {@link RegisterCapabilityOptions} (priority / isAvailable). */
+export function registerCapability(
+  name: string,
+  handler: CapabilityHandler,
+  opts?: RegisterCapabilityOptions,
+): void {
+  defaultRegistry.register(name, handler, opts);
 }
 
 /** Invoke a capability target against the default registry. Never throws. */
