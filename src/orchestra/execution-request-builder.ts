@@ -29,6 +29,11 @@ import type {
   ExecutionContext,
   Capability,
   RequirementProfile,
+  CapabilityTarget,
+  ActorContext,
+  RequestOrigin,
+  InteractionMode,
+  ExecutionBudget,
 } from '../core/work-model.js';
 import { rubricTypeToKind } from '../core/work-model.js';
 import { detectTaskType } from './rubric-registry.js';
@@ -50,7 +55,9 @@ const DEFAULT_GONOGO: GoNoGoCriteria = {
 export interface ExecutionRequestInput {
   description: string;
   scope?: { directories?: string[]; filesRead?: string[]; filesWrite?: string[] };
+  capabilityTarget?: CapabilityTarget;
   model?: ModelType;
+  modelEffort?: string;
   provider?: ProviderName;
   projectRoot: string;
   config?: ResolvedConfig;
@@ -62,6 +69,15 @@ export interface ExecutionRequestInput {
   skillIds?: string[];
   autoApprove?: boolean;
   timeoutMs?: number;
+  // Universal envelope (WM-1) — optional; forwarded verbatim, consumed by the
+  // feature that owns each (TEAM-1/ENT-3/chat/cost-gate). Single-task code paths
+  // typically set only `origin`.
+  mode?: InteractionMode;
+  actor?: ActorContext;
+  origin?: RequestOrigin;
+  correlationId?: string;
+  causationId?: string;
+  budget?: ExecutionBudget;
 }
 
 /** Infer the capability/resource profile from scope (minimal, extensible). */
@@ -98,17 +114,25 @@ export function buildExecutionRequest(input: ExecutionRequestInput): ExecutionRe
     environment: { domain: 'code-repo', context },
     requirements: inferRequirements(scope),
     scope,
+    capabilityTarget: input.capabilityTarget,
     projectRoot: input.projectRoot,
     goNogo: input.goNogo,
     effort: input.effort ?? 'normal',
     priority: input.priority ?? 'NORMAL',
     provider,
     model: input.model,
+    modelEffort: input.modelEffort,
     authMode: input.authMode,
     agentId: input.agentId,
     skillIds: input.skillIds,
     autoApprove: input.autoApprove ?? true,
     timeoutMs: input.timeoutMs,
+    mode: input.mode,
+    actor: input.actor,
+    origin: input.origin,
+    correlationId: input.correlationId,
+    causationId: input.causationId,
+    budget: input.budget,
   };
 }
 
@@ -135,6 +159,7 @@ export function resolveToTask(req: ExecutionRequest, taskId: string): Task {
     createdAt: new Date().toISOString(),
     type: req.kind,
     provider: req.provider,
+    modelEffort: req.modelEffort,
     authMode: req.authMode,
     assignedAgent: req.agentId ?? 'generic',
     assignedSkills: req.skillIds ?? [],

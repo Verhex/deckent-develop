@@ -75,28 +75,131 @@ export interface RequirementProfile {
   resources: ResourceNeed[];
 }
 
+// ─── ExecutionRequest envelope types (WM-1 universal contract) ───────────────
+// These extend the contract to cover ALL four personas (solo-assistant /
+// developer / team / enterprise) + the 6 everyone-everywhere scenarios. Every
+// envelope field is OPTIONAL and consumed incrementally by the feature that
+// owns it (TEAM-1→actor, ENT-3→correlation/causation, F8→capabilityTarget,
+// chat→mode, cost-gate→budget, F10→riskClass). Solo/dev paths leave them unset.
+// See docs/superpowers/specs/2026-06-09-execution-request-persona-coverage.md.
+
+/** Non-code work target — a capability/connector to invoke (F8 broker). For
+ *  work that isn't file-scoped (mail/calendar/ERP/DB), `capabilityTarget`
+ *  carries the verb + args + which backend, alongside (or instead of) `scope`. */
+export interface CapabilityTarget {
+  /** Dotted capability verb, e.g. 'mail.send' | 'erp.read' | 'db.query' | 'calendar.create'. */
+  capability: string;
+  args?: Record<string, unknown>;
+  /** Which backend fulfils it, e.g. 'imap' | 'graph' | 'odoo' | 'postgres'. */
+  connector?: string;
+}
+
+/** WHO requested the work — identity + RBAC role + tenant (team/enterprise). */
+export interface ActorContext {
+  id: string;
+  role?: string;
+  tenantId?: string;
+}
+
+/** How the work entered the system (provenance — audit + persona routing). */
+export type RequestOrigin =
+  | 'cli'
+  | 'mcp'
+  | 'chat'
+  | 'autonomous'
+  | 'webhook'
+  | 'scheduled'
+  | 'api'
+  | 'ide';
+
+/** Interaction shape — conversational assistant vs fire-and-forget vs streamed. */
+export type InteractionMode = 'batch' | 'interactive' | 'streaming';
+
+/** Cost/resource ceiling for a request (enterprise cost-control). */
+export interface ExecutionBudget {
+  maxUsd?: number;
+  maxTokens?: number;
+}
+
+/** Risk class — DERIVED from requirements + capabilityTarget (never stored). */
+export type RiskClass = 'low' | 'medium' | 'high';
+
 /**
- * The canonical INPUT contract — unifies run/start/autonomous across CLI+MCP.
- * No hardcoded 'claude': `provider`/`model` are explicit or resolved upstream,
- * never assumed.
+ * The canonical INPUT contract — unifies run/start/autonomous across CLI+MCP and
+ * serves all four personas. No hardcoded 'claude': `provider`/`model` are
+ * explicit or resolved upstream, never assumed. The envelope fields (below the
+ * core) are OPTIONAL + consumed incrementally per their owning feature.
  */
 export interface ExecutionRequest {
+  // ── WHAT ──
   description: string;
   kind: TaskKind;
+  // ── WHERE ──
   environment: EnvironmentType;
+  // ── NEEDS ──
   requirements: RequirementProfile;
+  // ── TARGET ──
   scope: TaskScope;
+  /** Non-code work target (F8 broker) — for mail/calendar/ERP/DB work. */
+  capabilityTarget?: CapabilityTarget;
   projectRoot: string;
+  // ── OUTCOME ──
   goNogo?: GoNoGoCriteria;
+  // ── HOW ──
   effort?: TaskEffort;
   priority?: TaskPriority;
   provider?: ProviderName;
   model?: ModelType;
+  /** Native model reasoning-depth (F1-RE), distinct from work-size `effort`. */
+  modelEffort?: string;
   authMode?: 'subscription' | 'api';
   agentId?: string;
   skillIds?: string[];
   autoApprove?: boolean;
   timeoutMs?: number;
+  // ── INTERACTION ──
+  mode?: InteractionMode;
+  // ── IDENTITY / GOVERNANCE envelope ──
+  actor?: ActorContext;
+  origin?: RequestOrigin;
+  /** Audit: groups related requests. */
+  correlationId?: string;
+  /** Audit: what caused this request (lineage, ENT-3). */
+  causationId?: string;
+  // ── CONSTRAINTS ──
+  budget?: ExecutionBudget;
+}
+
+const HIGH_RISK_CAPABILITIES: ReadonlySet<Capability> = new Set<Capability>([
+  'erp-write',
+  'db-write',
+  'shell',
+]);
+const MEDIUM_RISK_CAPABILITIES: ReadonlySet<Capability> = new Set<Capability>([
+  'network',
+  'fs-write',
+  'erp-read',
+  'db-query',
+  'approval',
+  'provider-pin',
+  'tenant-scope',
+  'mcp-tool',
+]);
+
+/**
+ * Derive the {@link RiskClass} of a request from its declared capabilities +
+ * capability-target verb (write/send/delete/exec → high). Pure; the single
+ * source for governance gating (F10) — risk is NOT stored on the request.
+ */
+export function resolveRiskClass(
+  req: Pick<ExecutionRequest, 'requirements' | 'capabilityTarget'>,
+): RiskClass {
+  const caps = req.requirements?.capabilities ?? [];
+  if (caps.some((c) => HIGH_RISK_CAPABILITIES.has(c))) return 'high';
+  const verb = req.capabilityTarget?.capability ?? '';
+  if (/\.(send|write|create|delete|update|exec|drop)\b/i.test(verb)) return 'high';
+  if (caps.some((c) => MEDIUM_RISK_CAPABILITIES.has(c))) return 'medium';
+  return 'low';
 }
 
 // ─── Mirrored legacy enums (orchestra-resident; mirrored per ADR-008) ────────

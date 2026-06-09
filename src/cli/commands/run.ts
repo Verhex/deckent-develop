@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, writeFileSync, unlinkSync, createReadStream, watch as fsWatch } from 'node:fs';
 import { join } from 'node:path';
 import type { Command } from 'commander';
-import type { ModelType, TaskResult, Task } from '../../core/types.js';
+import type { ModelType, TaskResult } from '../../core/types.js';
 import { TaskStatus, ALL_MODELS } from '../../core/types.js';
 import { TASKS_DIR } from '../../core/constants.js';
 import { buildWorkerPrompt } from '../../orchestra/brain.js';
@@ -10,6 +10,7 @@ import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { spawnWorkerMultiProvider } from './spawn.js';
 import { loadConfig } from '../../core/config.js';
+import { buildExecutionRequest, resolveToTask, createRunTaskId } from '../../orchestra/execution-request-builder.js';
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -42,10 +43,10 @@ function sleep(ms: number): Promise<void> {
 
 import { readJsonSafe } from '../../core/utils.js';
 
-let _runTaskCounter = 0;
-export function createRunTaskId(): string {
-  return `run-${Date.now()}-${_runTaskCounter++}`;
-}
+// createRunTaskId re-homed to orchestra/execution-request-builder (ADR-008 — the
+// orchestra layer owns task construction; cli imports from it, not vice versa).
+// Re-exported here for back-compat with existing importers.
+export { createRunTaskId };
 
 export function buildRunTask(
   taskId: string,
@@ -255,7 +256,20 @@ export function registerRun(program: Command): void {
       }
 
       const taskId = createRunTaskId();
-      const task = buildRunTask(taskId, description, model, scopeDir);
+      // WM-1: unify on the canonical ExecutionRequest contract — sets task.type
+      // (TaskKind) + resolves provider from config + tags origin='cli'.
+      const cfg = await loadConfig(root).catch(() => undefined);
+      const execReq = buildExecutionRequest({
+        description,
+        model: model as ModelType,
+        scope: { directories: [scopeDir] },
+        projectRoot: root,
+        config: cfg,
+        autoApprove,
+        origin: 'cli',
+        timeoutMs,
+      });
+      const task = resolveToTask(execReq, taskId);
 
       // Write task file
       const tasksDir = join(root, TASKS_DIR);
@@ -268,17 +282,17 @@ export function registerRun(program: Command): void {
 
       try {
         // Resolve agent and skill prompts if available (task may have assignedAgent/assignedSkills)
-        const agentPrompt = await resolveAgentPrompt(root, task as Task);
-        const skillPrompts = await resolveSkillPrompts(root, task as Task);
+        const agentPrompt = await resolveAgentPrompt(root, task);
+        const skillPrompts = await resolveSkillPrompts(root, task);
 
-        // Spawn worker via config-aware backend
+        // Spawn worker via config-aware backend (provider resolved in the request)
         const prompt = buildWorkerPrompt(task, agentPrompt, skillPrompts);
-        const cfg = await loadConfig(root).catch(() => ({} as { spawn_backend?: string; docker_image?: string; docker_timeout?: number }));
         const { backend } = await spawnWorkerMultiProvider(taskId, model, prompt, root, {
           autoApprove,
-          spawnBackend: cfg.spawn_backend,
-          dockerImage: cfg.docker_image,
-          dockerTimeout: cfg.docker_timeout,
+          spawnBackend: cfg?.spawn_backend,
+          dockerImage: cfg?.docker_image,
+          dockerTimeout: cfg?.docker_timeout,
+          provider: execReq.provider,
         });
         print(`Worker spawned via ${backend} (w-${taskId})`);
 
