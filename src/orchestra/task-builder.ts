@@ -808,7 +808,8 @@ export function parseStructuredDirectives(content: string): ParsedDirectiveTask[
     const title = titleLine.trim().replace(/^-\s+/, '');
     if (!title) continue;
 
-    // Collect all scope-related lines (Dosya:, Kapsam:, Files:, Scope:, file paths)
+    // Collect only explicit scope directive lines. Prose may mention paths for
+    // context, but write scope must come from Files:/Scope: directives.
     // Use maskedLines for filtering to avoid code block false positives
     // but use original lines for actual scope extraction (labels are outside code blocks)
     const scopeLines: string[] = [];
@@ -817,10 +818,8 @@ export function parseStructuredDirectives(content: string): ParsedDirectiveTask[
       const ml = maskedLines[li] ?? l;
       // Skip the title line — it may contain code snippets that look like paths
       if (l === titleLine) continue;
-      // Use masked line for path detection to skip code block content
-      if (/(?:Dosya|Files?|Kapsam|Scope)\s*:/i.test(ml)) { scopeLines.push(l); continue; }
-      if (/\bsrc\/|tests\/|docs\/|scripts\//.test(ml)) { scopeLines.push(l); continue; }
-      if (/\.brain\/|\.deckent\/|\.contracts\/|\.claude\//.test(ml)) { scopeLines.push(l); continue; }
+      // Use masked line for directive detection to skip code block content.
+      if (/^\s*-?\s*(?:Dosya|Files?|Kapsam|Scope)\s*:/i.test(ml)) { scopeLines.push(l); continue; }
     }
     const scope = scopeLines.reduce<TaskScope>((acc, scopeLine) => {
       const extracted = extractScopeFromDirective(scopeLine);
@@ -970,15 +969,14 @@ export function parseBulletOrNumberedTasks(content: string): ParsedDirectiveTask
         // Collect masked versions of sub-lines for code block filtering
         const allMaskedLines = [maskedLines[i]!, ...subLines.map((_sl, si) => maskedLines[i + 1 + si] ?? _sl)];
 
-        // Extract scope from all lines (match all patterns extractScopeFromDirective supports)
-        // Use masked lines for detection to skip code block content
+        // Extract scope only from explicit directive lines. Prose may mention paths
+        // for context, but write scope must come from Files:/Scope: directives.
+        // Use masked lines for detection to skip code block content.
         const scopeLines: string[] = [];
         for (let ali = 0; ali < allLines.length; ali++) {
           const al = allLines[ali]!;
           const aml = allMaskedLines[ali] ?? al;
-          if (/(?:Dosya|Files?|Kapsam|Scope)\s*:/i.test(aml)) { scopeLines.push(al); continue; }
-          if (/\bsrc\/|tests\/|docs\/|scripts\//.test(aml)) { scopeLines.push(al); continue; }
-          if (/\.brain\/|\.deckent\/|\.contracts\/|\.claude\//.test(aml)) { scopeLines.push(al); continue; }
+          if (/^\s*-?\s*(?:Dosya|Files?|Kapsam|Scope)\s*:/i.test(aml)) { scopeLines.push(al); continue; }
         }
         const scope = scopeLines.reduce<TaskScope>((acc, scopeLine) => {
           const extracted = extractScopeFromDirective(scopeLine);

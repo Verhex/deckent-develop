@@ -268,10 +268,10 @@ Do something useful`;
   it('merges scope from multiple scope lines in a block', () => {
     const content = `## Görev 1: Multi-scope Task
 - Dosya: src/core/utils.ts (güncelle)
-- src/orchestra/brain.ts de etkileniyor`;
+- Dosya: src/orchestra/brain.ts`;
     const result = parseStructuredDirectives(content);
-    // Should have file entries from both lines
-    expect(result[0].scope.filesWrite.length).toBeGreaterThanOrEqual(1);
+    expect(result[0].scope.filesWrite).toContain('src/core/utils.ts');
+    expect(result[0].scope.filesWrite).toContain('src/orchestra/brain.ts');
   });
 
   it('skips blocks without a title', () => {
@@ -1794,6 +1794,26 @@ Handle edge cases in parseConfig().`;
   });
 });
 
+describe('parseStructuredDirectives — description paths do not become scope', () => {
+  it('does not add source paths mentioned only in prose to filesWrite or directories', () => {
+    const content = `## Task 1: Document work model reference
+- Agent: doc-writer
+
+### Description
+Document how \`src/core/work-model.ts\` relates to task classification without changing source files.
+
+**Test:** docs-only review`;
+
+    const tasks = parseStructuredDirectives(content);
+
+    expect(tasks).toHaveLength(1);
+    expect(tasks[0]!.scope.filesWrite).not.toContain('src/core/work-model.ts');
+    expect(tasks[0]!.scope.directories).not.toContain('src/core/');
+    expect(tasks[0]!.scope.filesWrite).toEqual([]);
+    expect(tasks[0]!.scope.directories).toEqual([]);
+  });
+});
+
 describe('extractScopeFromDirective — .deckent/ prefix path', () => {
   it('recognizes .deckent/ as a directory scope', () => {
     const scope = extractScopeFromDirective('- Scope: .deckent/');
@@ -1982,6 +2002,20 @@ describe('parsePriorityDirective', () => {
 // ═══ parseStructuredDirectives — Priority parsing ═════════════════
 
 describe('parseStructuredDirectives — priority parsing', () => {
+  const sprint136DirectivesFixture = Array.from({ length: 10 }, (_, index) => {
+    const taskNumber = index + 1;
+    const priority = taskNumber <= 3 ? 'CRITICAL' : taskNumber <= 8 ? 'HIGH' : 'NORMAL';
+    return [
+      `## Task ${taskNumber}: Sprint 136 Task ${taskNumber}`,
+      `- Priority: ${priority}`,
+      `- Files: src/core/task-${taskNumber}.ts`,
+      '- Scope: src/core/',
+      '',
+      '### Description',
+      `Sprint 136 fixture task ${taskNumber}.`,
+    ].join('\n');
+  }).join('\n\n---\n\n');
+
   it('parses Priority: CRITICAL from structured task block', () => {
     const content = `## Task 1: Critical Fix
 - Priority: CRITICAL
@@ -2052,12 +2086,7 @@ Low priority cleanup.`;
   });
 
   it('Sprint 136 DIRECTIVES self-parse: correct priority distribution (3 CRITICAL + 5 HIGH + 2 NORMAL)', () => {
-    const { readFileSync } = require('node:fs');
-    const { resolve } = require('node:path');
-    // Use archived Sprint 136 DIRECTIVES — stable fixture not affected by current sprint
-    const directivesPath = resolve(__dirname, '../../.brain/archive/DIRECTIVES-sprint-136.md');
-    const content = readFileSync(directivesPath, 'utf-8');
-    const tasks = parseStructuredDirectives(content);
+    const tasks = parseStructuredDirectives(sprint136DirectivesFixture);
     expect(tasks.length).toBe(10);
 
     const criticalCount = tasks.filter(t => t.priority === 'CRITICAL').length;
@@ -2071,12 +2100,7 @@ Low priority cleanup.`;
   });
 
   it('Sprint 136 DIRECTIVES self-parse: no explicit dependencies (all tasks independent)', () => {
-    const { readFileSync } = require('node:fs');
-    const { resolve } = require('node:path');
-    // Use archived Sprint 136 DIRECTIVES — stable fixture not affected by current sprint
-    const directivesPath = resolve(__dirname, '../../.brain/archive/DIRECTIVES-sprint-136.md');
-    const content = readFileSync(directivesPath, 'utf-8');
-    const tasks = parseStructuredDirectives(content);
+    const tasks = parseStructuredDirectives(sprint136DirectivesFixture);
     expect(tasks.length).toBe(10);
 
     // Sprint 136 DIRECTIVES has no explicit "- Dependencies:" lines

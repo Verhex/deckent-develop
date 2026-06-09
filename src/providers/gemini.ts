@@ -59,6 +59,10 @@ export function buildGeminiSpawnEnv(apiKey?: string): NodeJS.ProcessEnv {
   if (apiKey) {
     env['GOOGLE_API_KEY'] = apiKey;
   }
+  // Non-interactive guard: prevents the CLI from dropping into an interactive
+  // `gemini login` OAuth flow when auth fails (e.g. 429 RESOURCE_EXHAUSTED).
+  // With this flag set, the CLI must fail fast (exit non-zero) instead of hanging.
+  env['GEMINI_NONINTERACTIVE'] = '1';
   return env;
 }
 
