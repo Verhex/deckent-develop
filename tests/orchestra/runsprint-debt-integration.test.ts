@@ -132,6 +132,7 @@ vi.mock('../../src/core/plugin-hooks.js', () => ({
 
 vi.mock('../../src/core/stack-detector.js', () => ({
   detectProjectStack: vi.fn().mockReturnValue({ languages: [], frameworks: [], tools: [] }),
+  detectFullStack: vi.fn().mockReturnValue({ language: '', framework: '', buildTool: '', testFramework: '', commands: { build: '', test: '', lint: '' } }),
 }));
 
 vi.mock('../../src/core/skill-pool.js', () => ({

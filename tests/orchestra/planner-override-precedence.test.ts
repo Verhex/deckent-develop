@@ -136,6 +136,7 @@ vi.mock('../../src/core/skill-selector.js', () => ({
 
 vi.mock('../../src/core/stack-detector.js', () => ({
   detectProjectStack: vi.fn().mockReturnValue(undefined),
+  detectFullStack: vi.fn().mockReturnValue({ language: '', framework: '', buildTool: '', testFramework: '', commands: { build: '', test: '', lint: '' } }),
 }));
 
 // resolveTaskModel: mirror the real adapter-provider behaviour (pass forceModel
