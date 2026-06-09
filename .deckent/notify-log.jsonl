@@ -73,3 +73,4 @@
 {"priority":"warning","event":"task-no-go","title":"Task 249-013 başarısız","summary":"Worker exited without writing result (exitCode=0) | disk-verify found evidence (linesAdded=0, untrac","sprintId":"sprint-249","timestamp":"2026-06-09T05:55:42.098Z"}
 {"priority":"warning","event":"task-no-go","title":"Task 249-003 başarısız","summary":"Created scripts/lint-cli-mcp-parity.mjs (ESM, Node built-ins only, ADR-010 compliant). Script scans ","sprintId":"sprint-249","timestamp":"2026-06-09T05:55:25.117Z"}
 {"priority":"info","event":"sprint-finalized","title":"Sprint sprint-249 kapandı","summary":"11/21 DONE, 7 TECH_DEBT, 10 NO_GO","sprintId":"sprint-249","timestamp":"2026-06-09T06:15:33.154Z"}
+{"priority":"info","event":"sprint-started","title":"Sprint sprint-250 başladı","summary":"4 task planlandı","sprintId":"sprint-250","timestamp":"2026-06-09T06:44:32.930Z"}
