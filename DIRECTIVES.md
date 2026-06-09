@@ -1,102 +1,102 @@
-# DIRECTIVES — Sprint 261: Contract-Enforced — turn the ExecutionRequest envelope into real enforcement + finish the autonomous engine (claude-weighted, 16 tasks)
+# DIRECTIVES — Sprint 262: Enterprise Integrations + autonomous close (claude-weighted, 13 tasks)
 
-## Goal: Sprint 260 made the WM-1 universal `ExecutionRequest` envelope fields LIVE-carried. This sprint moves from **contract-aware → contract-enforced**: the built-but-dormant enforcement surfaces (RBAC zero-caller, ExecutionPool uncalled, observer attach-only, recurring-backlog one-shot, capability registry flat-map, tenant filter non-strict) become real, consumable enforcement — PLUS a unified policy engine, real capability handlers, a work-generator, and the autonomous execution-chain completion. **NOT MVP — enterprise-level, god-level.** Fleet: **claude-weighted** (14 claude [2 opus + 12 sonnet] + 1 codex breadth + 1 gemini doc). Every code task: `npx tsc --noEmit` clean + run ONLY the TARGETED test file(s) for the touched module(s). Each code-task scope INCLUDES the matching `tests/` dir (so adding a test stays in-scope). **All new behavior is additive / opt-in / default-off / backward-safe — never break existing callers.** Live worker-spawn / eval wiring is deliberately OUT of scope (Brain/CC hand-wires the spawn-path call post-verify); workers create the consumable surface, not the live spawn edit.
+## Goal: Build the enterprise INTEGRATION layer the MASTER-PLAN still lacks (ENT-5 SSO/OIDC + session + SIEM + compliance, ERP-1 read-only DB/ERP) on top of Sprint 261's contract-enforcement surfaces, finish the autonomous loop (fix the live minute-only cron bug, work-generator trigger source), and lay the ONE clean seam (actor data-plumbing) the live spawn-path wire needs. **NOT MVP — enterprise-level, god-level.** Fleet: **claude-weighted** (11 claude [2 opus + 9 sonnet] + 1 codex breadth + 1 gemini doc). Every code task: `npx tsc --noEmit` clean + run ONLY the TARGETED test file(s) for the touched module(s). Each code-task scope INCLUDES the matching `tests/` dir. **All new behavior is additive / opt-in / default-off / backward-safe.** Live worker-spawn / eval ENFORCEMENT wiring stays OUT of scope — CC hand-connects the spawn-path edge + consumes the accumulated seams next iteration; workers build the additive surface only. ADR-010: no new runtime dependency — hand-roll with `node:crypto` etc. **SSOT discipline:** do NOT re-define logic that already exists (role→capability lives in `authority-matrix.ts`/`rbac.ts`; budget-ceiling min lives in `cost-gate.ts`; strict-tenant lives in `memory-store.ts`) — these tasks add NEW capability, they do not duplicate existing decision logic.
 
 ## Ortak kurallar
 - CODE task → `npx tsc --noEmit` clean + run ONLY the TARGETED test file(s) for the touched module(s) (NOT the full suite — it has unrelated pre-existing failures). Additive / surgical / minimum-diff (Karpathy). Stay in `scope.filesWrite` (which includes the matching `tests/` dir).
 - i18n-first: NO hardcoded user-facing strings (`getMessage(key, lang)`). Mechanism modules stay string-free. No tech debt left silent — flag in `.result` notes.
-- `.tasks/task-XXX.result` honest selfAssessment (tsc + TARGETED tests). Self-assessment based on TARGETED tests, not the full suite.
-- **One writer per file:** every task below owns a UNIQUE primary file. Do NOT edit files outside your `Files:` list.
-- ESM: `.js` import extensions mandatory (Node16). ADR-008: `core/` does not import from `orchestra/nervous`; consumers import from `core/`. ADR-010: no new runtime dependency — hand-roll (use `node:crypto` etc.).
+- `.tasks/task-XXX.result` honest selfAssessment (tsc + TARGETED tests). **WRITE the `.result` file — a real deliverable with no `.result` is graded NO_GO (Sprint 260/261 codex/gemini lesson).**
+- **One writer per file:** every task owns a UNIQUE primary file. Do NOT edit files outside your `Files:` list.
+- ESM: `.js` import extensions mandatory (Node16). ADR-008: `core/` does not import from `orchestra/nervous`. ADR-010: hand-roll, no new deps.
 
 ---
 
-## Task 1: F10-001 — unified policy engine (compose RBAC + activation + condition)
+## Task 1: ENT-5a — OIDC/JWT verification (SSO foundation)
 - Provider: claude
 - Model: opus
 - Backend: docker
 - Effort: high
+- Agent: security-auditor
+- Skills: security-specialist, typescript-expert
+- Files: src/core/auth-oidc.ts, tests/core/auth-oidc.test.ts
+- Scope: src/core/, tests/core/
+
+### Description
+Create a NEW additive module `src/core/auth-oidc.ts` for SSO/OIDC token verification — NO new dependency (hand-roll with `node:crypto`). Expose `verifyJwt(token, opts): { valid: boolean; claims?: OidcClaims; reason?: string }` supporting HS256 (shared secret) and RS256 (PEM public key via `crypto.verify`), validating signature + `exp`/`nbf`/`iss`/`aud` claims when the corresponding opts are provided. Add `parseOidcClaims(token)` (decode without verify, for introspection) and an `OidcConfig` type ({ issuer?, audience?, algorithms?, hs256Secret?, rs256PublicKey? }). Pure functions, no network (JWKS fetch is a documented follow-up — accept the key material directly). Backward-safe (new file, zero callers). Enterprise-grade: reject `alg:none`, constant-time secret compare where applicable.
+
+**Kanıt:** `test -f src/core/auth-oidc.ts && grep -n "verifyJwt\|RS256\|HS256\|alg.*none\|exp\|iss" src/core/auth-oidc.ts` → JWT verify + claim validation, alg:none rejected; targeted test PASS; tsc clean. **Test:** targeted (new file, in-scope) — valid HS256, valid RS256, expired, bad-sig, alg:none rejected, aud/iss mismatch.
+
+---
+
+## Task 2: ENT-5a2 — SSO session store
+- Provider: claude
+- Model: sonnet
+- Backend: docker
+- Effort: normal
+- Agent: security-auditor
+- Skills: security-specialist, typescript-expert
+- Files: src/core/auth-session.ts, tests/core/auth-session.test.ts
+- Scope: src/core/, tests/core/
+
+### Description
+Create a NEW additive module `src/core/auth-session.ts` — a session store for verified SSO identities. Expose a `SessionStore` class with `create(identity, ttlMs): SessionToken`, `resolve(token): Session | null` (null when expired/unknown), `revoke(token)`, and `prune(now)` (drop expired). Session carries `{ actorId, role, tenantId, issuedAt, expiresAt }` mapping to the `ActorContext` shape (import the type from `core/work-model.js`). In-memory Map by default with an injectable persistence hook (`{ load?, save? }`) for durability — do NOT couple to a specific store. Deterministic for tests (injectable `now`). Backward-safe (new file). Pure where possible; least surface.
+
+**Kanıt:** `test -f src/core/auth-session.ts && grep -n "SessionStore\|create\|resolve\|revoke\|expiresAt\|ActorContext" src/core/auth-session.ts` → session lifecycle + ActorContext mapping; targeted test PASS; tsc clean. **Test:** targeted (new file, in-scope) — create/resolve, expiry→null, revoke, prune.
+
+---
+
+## Task 3: ENT-5b — SIEM event forwarder
+- Provider: claude
+- Model: sonnet
+- Backend: docker
+- Effort: normal
+- Agent: security-auditor
+- Skills: security-specialist, typescript-expert
+- Files: src/core/siem-forwarder.ts, tests/core/siem-forwarder.test.ts
+- Scope: src/core/, tests/core/
+
+### Description
+Create a NEW additive module `src/core/siem-forwarder.ts` — forwards audit events to an external SIEM. Expose `createSiemForwarder(opts): SiemForwarder` with a pluggable transport (`transport: (batch) => Promise<void>` — injected; default off / no-op), buffered batching (`flushEvery`, `maxBatch`), and `forward(event)` + `flush()`. Map an `AuditEvent` (import type from `audit-writer.js`, existing fields only) to a normalized SIEM record ({ ts, actor, action, outcome, correlationId, causationId }). Fail-safe: a transport error MUST NOT throw into the caller (log + retry-bounded, drop after N). Default-off (no transport → events buffered/discarded per policy, never crash). Hermetic tests (injected transport, no real network).
+
+**Kanıt:** `test -f src/core/siem-forwarder.ts && grep -n "createSiemForwarder\|transport\|forward\|flush\|batch" src/core/siem-forwarder.ts` → pluggable transport + batching + fail-safe; targeted test PASS; tsc clean. **Test:** targeted (new file, in-scope), hermetic — batch flush, transport-error swallowed, default-off no-op.
+
+---
+
+## Task 4: ENT-5c — compliance report generator
+- Provider: claude
+- Model: sonnet
+- Backend: docker
+- Effort: normal
 - Agent: architect
-- Skills: typescript-expert, system-architect
-- Files: src/core/policy-engine.ts, tests/core/policy-engine.test.ts
-- Scope: src/core/, tests/core/
-
-### Description
-Today three decision surfaces are separate: `src/core/rbac.ts` (`can()` / PERMISSION_MATRIX), `src/core/activation-engine.ts` (task-DNA activation scoring), `src/core/condition-evaluator.ts` (`evaluateCondition`). Create a NEW additive module `src/core/policy-engine.ts` exposing `evaluatePolicy(input): PolicyDecision` that COMPOSES the three existing layers into one declarative decision surface returning `{ decision: 'permit' | 'deny' | 'park' | 'suggest'; reasons: string[]; layers: {...} }`. It must DELEGATE to the existing functions (import `can` from rbac.js, `evaluateCondition` from condition-evaluator.js, and the activation scorer) — do NOT reimplement their logic. Pure function, no side effects, no I/O. This is create-only: nothing wires it into the live path yet (a follow-up wires it). Backward-safe by construction (new file, zero existing callers). Enterprise-grade, extensible (the decision union + reasons array is the contract).
-
-**Kanıt:** `test -f src/core/policy-engine.ts && grep -n "evaluatePolicy\|PolicyDecision\|permit\|deny\|park" src/core/policy-engine.ts` → composed decision surface delegating to rbac/activation/condition; targeted test PASS; tsc clean. **Test:** targeted (new policy-engine.test.ts, in-scope) — permit/deny/park paths + delegation.
-
----
-
-## Task 2: ENT-1 / ADR-037 V2 — `authorizeExecution(req)` bridge in the authority matrix
-- Provider: claude
-- Model: sonnet
-- Backend: docker
-- Effort: normal
-- Agent: security-auditor
-- Skills: security-specialist, typescript-expert
-- Files: src/nervous/authority-matrix.ts, tests/nervous/authority-matrix.test.ts
-- Scope: src/nervous/, tests/nervous/
-
-### Description
-`checkWorkerAuthority` (already real: role→capability map + `enforce_rbac` soft/hard gate, Sprint 260) has ZERO callers because nothing bridges the `ExecutionRequest` contract to it. Add `authorizeExecution(req: Pick<ExecutionRequest, 'actor' | 'requirements'>, opts?: { enforceRbac?: boolean }): { allowed: boolean; violations: string[]; enforced: boolean }` to `src/nervous/authority-matrix.ts` — it extracts `req.actor?.role` (absent/unknown → permissive allow-all, backward-safe) and the requested capabilities (from `req.requirements?.capabilities`), runs them through the EXISTING `checkWorkerAuthority` logic, and returns a structured result. Soft by default (warn+emit, `allowed:true`); only when `enforceRbac === true` (mirror of the `enforce_rbac` config flag, read defensively as the existing code does) does a role-denied capability set `allowed:false`. Import `ExecutionRequest` type from `core/work-model.js` (nervous→core is ADR-008-legal). Do NOT edit any spawn-path file — this is the consumable bridge only; Brain hand-wires the spawn call post-verify.
-
-**Kanıt:** `grep -n "authorizeExecution\|actor\|enforce_rbac\|checkWorkerAuthority" src/nervous/authority-matrix.ts` → contract-bridge present, permissive default, enforce_rbac-gated hard path; targeted test PASS; tsc clean. **Test:** targeted, additive (permissive-default + denied-under-enforce + unknown-role-allow).
-
----
-
-## Task 3: ENT-3 — tamper-evident audit hash-chain (additive field)
-- Provider: claude
-- Model: sonnet
-- Backend: docker
-- Effort: normal
-- Agent: security-auditor
-- Skills: security-specialist, typescript-expert
-- Files: src/core/audit-writer.ts, tests/core/audit-writer.test.ts
-- Scope: src/core/, tests/core/
-
-### Description
-The audit event sink (`src/core/audit-writer.ts`, `writeAuditEvent`) is durable + append-only but NOT tamper-evident. Add an optional hash-chain: each written `AuditEvent` carries `prevHmac` + `hmac` where `hmac = sha256(prevHmac + canonicalJSON(payload))` (use `node:crypto`, ADR-010 — no new dep). Maintain the running `prevHmac` across writes (module-level chain head, seeded from a genesis constant). The chain fields are ADDITIVE/OPTIONAL on `AuditEvent` (absent on old records → backward-safe; never throw on a missing/!verifiable prior). Add a `verifyAuditChain(events: AuditEvent[]): { intact: boolean; brokenAt?: number }` helper. Keep it pure + deterministic for testing (allow the chain head to be reset/injected in tests). Do NOT change the write channel/contract shape destructively.
-
-**Kanıt:** `grep -n "hmac\|sha256\|verifyAuditChain\|createHash" src/core/audit-writer.ts` → hash-chain + verifier present, additive; targeted test PASS; tsc clean. **Test:** targeted, additive (chain links, tamper-detection breaks `intact`, missing-prev backward-safe).
-
----
-
-## Task 4: ENT-2 — strict tenant isolation flag (omit NULL-tenant leak)
-- Provider: claude
-- Model: sonnet
-- Backend: docker
-- Effort: normal
-- Agent: refactorer
 - Skills: typescript-expert
-- Files: src/core/memory-store.ts, src/core/config-types.ts, src/core/config.ts, tests/core/memory-store.test.ts
+- Files: src/core/compliance-report.ts, tests/core/compliance-report.test.ts
 - Scope: src/core/, tests/core/
 
 ### Description
-`memory-store.ts` tenant queries currently filter `WHERE (tenant_id = ? OR tenant_id IS NULL)` — they intentionally INCLUDE global NULL-tenant rows (backward-compat) which violates strict multi-tenant isolation. Add a NEW typed config flag `strict_tenant_isolation?: boolean` (default `false`) to BOTH config interfaces in `src/core/config-types.ts` (mirror the `pre_sprint_tests` pattern — it appears in two interfaces) and its default in `src/core/config.ts`. When the store is constructed/queried with strict isolation enabled, OMIT the `OR tenant_id IS NULL` clause so a tenant sees ONLY its own rows. Default (flag false / absent) preserves today's permissive behavior exactly. This is the ONLY task that edits `config-types.ts` / `config.ts`. Add a WARNING doc-comment at the query sites explaining the NULL-tenant-leak the flag closes.
+Create a NEW additive module `src/core/compliance-report.ts` — generate a structured compliance summary from INJECTED inputs (do NOT couple to live DB/config, for testability). Expose `generateComplianceReport(input): ComplianceReport` where input carries { rbacEnabled, tenantIsolation, auditEvents } and the report summarizes: RBAC enforcement status, tenant-isolation status, audit-chain integrity (call `verifyAuditChain` from `audit-writer.js` on the provided events), event count + actor breakdown, and a SOC2/ISO-style checklist of which controls are ON/OFF. Pure function, deterministic. Backward-safe (new file). Output is a typed object (a markdown/text renderer is a follow-up).
 
-**Kanıt:** `grep -n "strict_tenant_isolation\|tenant_id IS NULL\|tenant_id = ?" src/core/memory-store.ts && grep -n "strict_tenant_isolation" src/core/config-types.ts src/core/config.ts` → flag threaded, strict path omits NULL; targeted memory-store test PASS; tsc clean. **Test:** targeted, additive (default includes NULL rows; strict excludes them).
+**Kanıt:** `test -f src/core/compliance-report.ts && grep -n "generateComplianceReport\|ComplianceReport\|verifyAuditChain\|rbac\|tenant" src/core/compliance-report.ts` → compliance summary composing audit-chain verify; targeted test PASS; tsc clean. **Test:** targeted (new file, in-scope) — controls ON/OFF, intact-chain vs broken-chain, actor breakdown.
 
 ---
 
-## Task 5: F8-002 — multi-backend capability selection (availability/priority)
+## Task 5: ENT-3 — audit log retention & rotation policy
 - Provider: claude
-- Model: opus
+- Model: sonnet
 - Backend: docker
-- Effort: high
+- Effort: normal
 - Agent: architect
-- Skills: typescript-expert, system-architect
-- Files: src/core/capability-broker.ts, tests/core/capability-broker.test.ts
+- Skills: typescript-expert
+- Files: src/core/audit-retention.ts, tests/core/audit-retention.test.ts
 - Scope: src/core/, tests/core/
 
 ### Description
-`CapabilityRegistry` is a flat one-handler-per-name map. Extend it (additively, backward-safe) so a capability can have MULTIPLE registered backends and selection picks one by availability + priority: `registerCapability(name, handler, opts?: { priority?: number; isAvailable?: () => boolean })` keeps the single-handler call working (default priority 0, always-available), and when several handlers exist for a name, `resolve`/`invokeCapability` picks the highest-priority AVAILABLE one (skip handlers whose `isAvailable()` returns false). Add `listBackends(name): string[]` for introspection. Existing callers (`echoHandler`, `fsReadHandler`, `invokeFromRequest`, the per-agent `grantedCapabilities` gate) MUST keep working unchanged. This file is owned ONLY by this task — Task 6's new handlers self-register via their own installer, they do NOT edit this file.
+Create a NEW additive module `src/core/audit-retention.ts` — retention/rotation policy for the audit log. Expose `planRetention(entries, policy): { keep: AuditEvent[]; archive: AuditEvent[]; prune: AuditEvent[] }` where policy = { maxAgeMs?, maxCount? } — partition entries by age/count into keep/archive/prune WITHOUT breaking the hash-chain semantics (archived/pruned ranges must be contiguous from the chain head so `verifyAuditChain` stays meaningful on what remains). Pure function over injected entries (no fs I/O here — the caller applies the plan). Import `AuditEvent` from `audit-writer.js`. Backward-safe (new file). Document the chain-contiguity invariant in a comment.
 
-**Kanıt:** `grep -n "priority\|isAvailable\|listBackends\|registerCapability" src/core/capability-broker.ts` → multi-backend selection, backward-safe single-handler default; targeted test PASS; tsc clean. **Test:** targeted, additive (single-handler unchanged; multi-backend picks highest available; unavailable skipped).
+**Kanıt:** `test -f src/core/audit-retention.ts && grep -n "planRetention\|maxAge\|maxCount\|keep\|archive\|prune\|AuditEvent" src/core/audit-retention.ts` → retention partitioning, chain-contiguous; targeted test PASS; tsc clean. **Test:** targeted (new file, in-scope) — age-prune, count-prune, contiguity preserved, empty safe.
 
 ---
 
-## Task 6: F8 — real capability handlers (http / env / shell-gated)
+## Task 6: F8 — data capability handlers (read-only db.query / mail.search)
 - Provider: codex
 - Model: gpt-5
 - Backend: docker
@@ -104,183 +104,132 @@ The audit event sink (`src/core/audit-writer.ts`, `writeAuditEvent`) is durable 
 - Effort: normal
 - Agent: refactorer
 - Skills: typescript-expert
-- Files: src/core/capability-handlers.ts, tests/core/capability-handlers.test.ts
+- Files: src/core/capability-handlers-data.ts, tests/core/capability-handlers-data.test.ts
 - Scope: src/core/, tests/core/
 
 ### Description
-Only `echoHandler` + `fsReadHandler` exist. Create a NEW additive module `src/core/capability-handlers.ts` shipping real reference handlers implementing the EXISTING `CapabilityHandler` interface (import the type from `capability-broker.js` — do NOT edit capability-broker.ts): `httpGetHandler` (HTTP GET via `node:https`/fetch, returns status+body, declares `requiredCapability: 'net.read'`), `envReadHandler` (reads an allow-listed env var, `requiredCapability: 'env.read'`), and `shellExecHandler` (runs a command via async `spawn` — NEVER `spawnSync`, ADR/CI rule — gated behind `requiredCapability: 'shell.exec'`, least-privilege). Export `installExtendedHandlers(registry: CapabilityRegistry): void` so a caller registers them WITHOUT editing the broker. Each handler declares its `requiredCapability` so the existing least-privilege gate applies. Hermetic tests (no real network/shell — inject a fake fetch/spawn or test the registration + requiredCapability wiring + arg validation).
+Create a NEW additive module `src/core/capability-handlers-data.ts` shipping data-access reference handlers implementing the EXISTING `CapabilityHandler` interface (import from `capability-broker.js` — do NOT edit that file). `dbQueryHandler` (`requiredCapability: 'db.read'`) — executes a READ-ONLY query via an INJECTED query function (`queryImpl`), and REJECTS any statement that is not a single SELECT (block INSERT/UPDATE/DELETE/DROP/`;`-multi-statement — least-privilege, no writes). `mailSearchHandler` (`requiredCapability: 'mail.read'`) — searches via an injected `searchImpl`, returns normalized message headers. Export `installDataHandlers(registry)`. Each declares `requiredCapability` so the existing least-privilege gate applies. Hermetic tests (injected queryImpl/searchImpl — NO real DB/network; assert the read-only SQL gate rejects writes). **WRITE a `.result` file.**
 
-**Kanıt:** `test -f src/core/capability-handlers.ts && grep -n "httpGetHandler\|envReadHandler\|shellExecHandler\|installExtendedHandlers\|requiredCapability" src/core/capability-handlers.ts` → handlers + installer, least-privilege declared, async spawn; targeted test PASS; tsc clean. **Test:** targeted (new file, in-scope), hermetic.
+**Kanıt:** `test -f src/core/capability-handlers-data.ts && grep -n "dbQueryHandler\|mailSearchHandler\|installDataHandlers\|requiredCapability\|SELECT\|read-only" src/core/capability-handlers-data.ts` → read-only handlers + write-rejection gate; targeted test PASS; tsc clean. **Test:** targeted (new file, in-scope), hermetic — SELECT allowed, INSERT/UPDATE/DELETE/multi-stmt rejected, mail search maps headers.
 
 ---
 
-## Task 7: AUT-5 — recurring backlog re-enqueue (true cron cadence)
+## Task 7: ERP-1 — read-only ERP/DB connector capability
+- Provider: claude
+- Model: opus
+- Backend: docker
+- Effort: high
+- Agent: data-engineer
+- Skills: typescript-expert, database-migration
+- Files: src/core/erp-connector.ts, tests/core/erp-connector.test.ts
+- Scope: src/core/, tests/core/
+
+### Description
+Create a NEW additive module `src/core/erp-connector.ts` — the foundation for "Deckent runs inside an enterprise" (ERP-1, MASTER-PLAN #ERP), scoped READ-ONLY. Expose an `ErpConnector` abstraction with `query(spec): Promise<ErpResultSet>` where `spec` is a STRUCTURED read query ({ entity, filters, fields, limit }) — NOT raw SQL — compiled to a parameterized read-only request through an INJECTED driver (`driver: (compiled) => Promise<rows>`). Enforce least-privilege: no mutation verbs, mandatory `limit` cap, field allow-list per entity. Add `registerEntity(name, schema)` so only declared entities/fields are queryable. Pure compilation + injected execution (hermetic). Import `ActorContext` from `work-model.js` to tag the requesting actor on each query (for audit). Backward-safe (new file). Enterprise-grade, extensible to connectors (SAP/Odoo/Dynamics) later.
+
+**Kanıt:** `test -f src/core/erp-connector.ts && grep -n "ErpConnector\|registerEntity\|read-only\|limit\|filters\|ActorContext" src/core/erp-connector.ts` → structured read-only query compiler + entity allow-list; targeted test PASS; tsc clean. **Test:** targeted (new file, in-scope), hermetic — allowed entity/field query, undeclared entity rejected, mutation/limit enforcement.
+
+---
+
+## Task 8: AUT-4 fix — full 5-field cron in CORE (close the live latent bug)
 - Provider: claude
 - Model: sonnet
 - Backend: docker
 - Effort: normal
 - Agent: bug-fixer
 - Skills: typescript-expert
-- Files: src/orchestra/autonomous/backlog.ts, tests/orchestra/autonomous/backlog.test.ts
-- Scope: src/orchestra/autonomous/, tests/orchestra/autonomous/
-
-### Description
-Recurring backlog entries (`trigger.type === 'recurring'` with a cron field, see `backlog-types.ts`) are one-shot today: `queryDue()` excludes them and once a recurring entry reaches `done` it stays done forever — there is NO re-enqueue. Add `reenqueueRecurring(bl: BacklogFile, now: Date): BacklogFile` (and/or extend `updateStatus`) so that when a recurring entry completes, it is reset to `pending` with an updated `lastRun`/next-due bookkeeping, so it fires again on its next cron cadence. Reuse the existing cron evaluator (`nextRun`) — do NOT hand-roll cron again. Surgical in `backlog.ts` (owned only by this task). Non-recurring (one-off) entries are untouched. Fail-safe (malformed cron → leave entry done, log, never throw).
-
-**Kanıt:** `grep -n "reenqueueRecurring\|recurring\|lastRun\|nextRun\|pending" src/orchestra/autonomous/backlog.ts` → recurring re-enqueue present; targeted backlog test PASS; tsc clean. **Test:** targeted, additive (recurring resets to pending w/ updated lastRun; one-off stays done; malformed cron safe).
-
----
-
-## Task 8: AUT-7 — wire the ExecutionPool into the dispatcher (bounded concurrency)
-- Provider: claude
-- Model: sonnet
-- Backend: docker
-- Effort: normal
-- Agent: architect
-- Skills: typescript-expert
-- Files: src/orchestra/autonomous/execute-dispatcher.ts, src/orchestra/autonomous/execution-pool.ts, tests/orchestra/autonomous/execute-dispatcher.test.ts
-- Scope: src/orchestra/autonomous/, tests/orchestra/autonomous/
-
-### Description
-`execution-pool.ts` exports `makeSerialPool()` + an `ExecutionPool` interface but NOTHING calls it — autonomous execution is serial-only and the pool is dead code. (1) In `execution-pool.ts` add `makeBoundedPool(maxConcurrency: number): ExecutionPool` (a real bounded-concurrency pool — N in-flight, queue the rest; hand-rolled, no new dep) alongside the existing serial pool. (2) In `execute-dispatcher.ts` accept an OPTIONAL `pool?: ExecutionPool` in its deps and route launches through `pool.submit(...)` when provided, falling back to today's direct/serial behavior when absent (backward-safe — existing callers that pass no pool are unchanged). Default concurrency, when a pool is constructed, comes from existing config (`max_workers`) or a small constant — do NOT add a new config field. These two files are owned ONLY by this task.
-
-**Kanıt:** `grep -n "makeBoundedPool\|maxConcurrency\|pool.submit\|ExecutionPool" src/orchestra/autonomous/execution-pool.ts src/orchestra/autonomous/execute-dispatcher.ts` → bounded pool + dispatcher wire, optional/backward-safe; targeted test PASS; tsc clean. **Test:** targeted, additive (bounded pool caps in-flight; dispatcher uses pool when given, serial fallback when not).
-
----
-
-## Task 9: AUT-1 — actually drive the nervous observer in the autonomous loop
-- Provider: claude
-- Model: sonnet
-- Backend: docker
-- Effort: normal
-- Agent: architect
-- Skills: typescript-expert
-- Files: src/orchestra/autonomous-runtime.ts, tests/orchestra/autonomous-runtime.test.ts
-- Scope: src/orchestra/, tests/orchestra/
-
-### Description
-The autonomous loop defines a `NervousObserverDep` and CALLS `nervousObserver.tick()` in its cycle, but `buildEngineRuntime` / `buildAutonomousRuntime` NEVER set `nervousObserver` in the composed deps — so the wire from Sprint 260 (AUT-1) is attach-only and no observation flows during an autonomous run. Construct a real (or thin adapter) `NervousObserverDep` inside `buildEngineRuntime` and pass it into the composed deps so `tick()` actually fires during the loop. Reuse the existing observer/detector-registry APIs — do NOT reimplement detection. **Fail-safe is mandatory:** any observer error must be caught and MUST NOT break the autonomous loop (wrap `tick()` in try/catch, log, continue). Surgical in `autonomous-runtime.ts` (owned only by this task). Default behavior when no observer is available stays unchanged.
-
-**Kanıt:** `grep -n "nervousObserver\|tick\|buildEngineRuntime\|try" src/orchestra/autonomous-runtime.ts` → observer constructed + passed into deps, tick fail-safe; targeted test PASS; tsc clean. **Test:** targeted, additive (observer tick fires in cycle; throwing observer does NOT break the loop).
-
----
-
-## Task 10: AUT-9 — proactive work-generator (backlog candidate generation)
-- Provider: claude
-- Model: sonnet
-- Backend: docker
-- Effort: normal
-- Agent: architect
-- Skills: typescript-expert
-- Files: src/orchestra/autonomous/work-generator.ts, tests/orchestra/autonomous/work-generator.test.ts
-- Scope: src/orchestra/autonomous/, tests/orchestra/autonomous/
-
-### Description
-The only work-creation path is `reactive-ingester` (detector events → backlog). There is NO proactive generator. Create a NEW additive module `src/orchestra/autonomous/work-generator.ts` exposing `generateWorkCandidates(input): BacklogEntry[]` (use the EXISTING `BacklogEntry` shape from `backlog-types.js`) that produces candidate work items from simple, deterministic heuristics: (a) open tech-debt entries (accept a provided list of debt records — do NOT couple to a live DB here; take them as input for testability), and (b) `TODO`/`FIXME` markers (accept a provided list of `{file, line, text}` — caller scans; this module just maps to candidates). Pure function, returns candidates, does NOT auto-enqueue or touch the live loop (a follow-up wires it). Each candidate has a stable id, title, priority, and a `source` tag. Backward-safe by construction (new file, zero callers).
-
-**Kanıt:** `test -f src/orchestra/autonomous/work-generator.ts && grep -n "generateWorkCandidates\|BacklogEntry\|TODO\|debt\|source" src/orchestra/autonomous/work-generator.ts` → pure candidate generator from debt + TODO inputs; targeted test PASS; tsc clean. **Test:** targeted (new file, in-scope) — debt→candidate, TODO→candidate, empty input→[].
-
----
-
-## Task 11: AUT cleanup — consolidate the duplicate scheduled-flow cron evaluator
-- Provider: claude
-- Model: sonnet
-- Backend: docker
-- Effort: low
-- Agent: refactorer
-- Skills: typescript-expert, code-simplifier
-- Files: src/orchestra/autonomous/scheduled-flow.ts, tests/orchestra/autonomous/scheduled-flow.test.ts
-- Scope: src/orchestra/autonomous/, tests/orchestra/autonomous/
-
-### Description
-There are TWO cron `nextRun` evaluators: the live one in `src/core/scheduled-flow.ts` (used by `FlowScheduler` / `trigger-adapter`) and a parallel full-5-field copy in `src/orchestra/autonomous/scheduled-flow.ts` that is computed but UNUSED (orphaned duplicate). Resolve the divergence WITHOUT regressing behavior: make `src/orchestra/autonomous/scheduled-flow.ts` re-export / delegate to the canonical `core/scheduled-flow.js` `nextRun` (so there is one implementation), preserving the module's existing public export names so any importer still resolves. If the core version is missing a field the orphan supported, port that capability INTO core first (one source of truth) — but keep it surgical. Add/keep a targeted test asserting the autonomous module's `nextRun` matches core's behavior. DRY/YAGNI cleanup; no behavior regression.
-
-**Kanıt:** `grep -n "scheduled-flow\|nextRun\|export" src/orchestra/autonomous/scheduled-flow.ts` → single source (delegates/re-exports core), no duplicate logic; targeted test PASS; tsc clean. **Test:** targeted (autonomous nextRun == core nextRun for representative cron exprs).
-
----
-
-## Task 12: budget — cost-gate honors `maxTokens` (deepen Sprint 260 maxUsd)
-- Provider: claude
-- Model: sonnet
-- Backend: docker
-- Effort: normal
-- Agent: api-builder
-- Skills: typescript-expert
-- Files: src/core/cost-gate.ts, tests/core/cost-gate.test.ts
+- Files: src/core/scheduled-flow.ts, tests/core/scheduled-flow.test.ts
 - Scope: src/core/, tests/core/
 
 ### Description
-Sprint 260 made `evaluateCostGate` honor `ExecutionRequest.budget.maxUsd` as a per-request ceiling. Extend it (additively) to ALSO honor `budget.maxTokens`: when a request carries `budget.maxTokens`, the gate blocks/flags when the estimated token count exceeds it (in addition to maxUsd + the config sprint budget), and returns a STRUCTURED over-budget reason distinguishing which ceiling tripped (`usd` vs `tokens` vs `sprint`). Backward-safe: no budget → today's behavior exactly; maxUsd-only → unchanged. Reuse the existing estimate path — do NOT add a new estimator. Surgical in `cost-gate.ts` (owned only by this task).
+LATENT BUG (Sprint 261 T11 finding): the LIVE `FlowScheduler` uses `core/scheduled-flow.ts`'s `nextRun`, which only honors the **minute** field — so real cron schedules silently ignore hour/day-of-month/month/day-of-week. The full 5-field implementation exists only in the UNUSED `orchestra/autonomous/scheduled-flow.ts`. Fix the LIVE path: implement full 5-field cron evaluation (minute, hour, dom, month, dow with `*`, ranges `a-b`, lists `a,b`, steps `*/n`) directly in `src/core/scheduled-flow.ts`'s `nextRun` — hand-rolled, no new dep (ADR-010). Preserve the existing function signature + all current exports so `FlowScheduler` / `trigger-adapter` keep resolving unchanged. This is the canonical source; the autonomous duplicate can re-export it in a follow-up. **CC will verify this against the live path with extra scrutiny.**
 
-**Kanıt:** `grep -n "maxTokens\|maxUsd\|budget\|reason" src/core/cost-gate.ts` → per-request token ceiling honored + structured reason; targeted cost-gate test PASS; tsc clean. **Test:** targeted, additive (over-token blocks; under passes; reason names the tripped ceiling; no-budget unchanged).
+**Kanıt:** `grep -n "nextRun\|hour\|dayOfWeek\|dayOfMonth\|month\|step\|range" src/core/scheduled-flow.ts` → full 5-field cron in core; targeted test PASS; tsc clean. **Test:** targeted, additive — each field (hour/dom/month/dow), ranges, lists, steps, plus the existing minute behavior preserved.
 
 ---
 
-## Task 13: WM — `InteractionMode` consumer (interactive/batch/streaming policy)
+## Task 9: actor data-plumbing — carry ActorContext onto the Task (seam, not enforcement)
 - Provider: claude
 - Model: sonnet
 - Backend: docker
 - Effort: normal
 - Agent: refactorer
 - Skills: typescript-expert
-- Files: src/core/interaction-policy.ts, tests/core/interaction-policy.test.ts
-- Scope: src/core/, tests/core/
+- Files: src/core/types.ts, src/orchestra/execution-request-builder.ts, tests/orchestra/execution-request-builder.test.ts
+- Scope: src/core/, src/orchestra/, tests/orchestra/
 
 ### Description
-`ExecutionRequest.mode: InteractionMode ('batch' | 'interactive' | 'streaming')` is carried but has NO consumer. Create a NEW additive module `src/core/interaction-policy.ts` exposing `resolveInteractionPolicy(mode?: InteractionMode): InteractionPolicy` where `InteractionPolicy = { autoApproveDefault: boolean; promptUser: boolean; streamOutput: boolean }`: `batch` → non-interactive (autoApproveDefault true for safe ops, promptUser false, no stream), `interactive` → promptUser true / autoApproveDefault false, `streaming` → like interactive + streamOutput true. Absent/unknown mode → a safe conservative default (treat as interactive: promptUser true). Pure function, imports ONLY the `InteractionMode` type from `core/work-model.js`. This is the consumable policy mapping; wiring it into chat/REPL is a follow-up. Backward-safe (new file, zero callers).
+To let the live spawn-path eventually consult RBAC, the actor must reach the Task. This task ONLY plumbs DATA (no enforcement): add an additive OPTIONAL `actor?: ActorContext` field to the `Task` interface in `src/core/types.ts` (import `ActorContext` from `work-model.js`; touch NOTHING else in types.ts) and set `task.actor = req.actor` in `resolveToTask` (`execution-request-builder.ts`). Absent actor → field undefined (backward-safe; every existing caller/test unaffected). Do NOT add any authorization call — this is the data seam only; CC wires the spawn-path `authorizeExecution` consult separately next iteration. Surgical, additive-optional.
 
-**Kanıt:** `test -f src/core/interaction-policy.ts && grep -n "resolveInteractionPolicy\|InteractionMode\|autoApproveDefault\|streamOutput" src/core/interaction-policy.ts` → mode→policy mapping; targeted test PASS; tsc clean. **Test:** targeted (new file, in-scope) — each mode + absent-mode default.
+**Kanıt:** `grep -n "actor" src/core/types.ts && grep -n "actor" src/orchestra/execution-request-builder.ts` → optional actor on Task + set in resolveToTask; targeted execution-request-builder test PASS; tsc clean. **Test:** targeted, additive (actor threaded when present; undefined when absent — backward-safe).
 
 ---
 
-## Task 14: Hygiene — green stale model-id test assertions (gpt-5 → gpt-5.5 drift)
+## Task 10: AUT-9 — work-generator trigger source (composable, not auto-wired)
+- Provider: claude
+- Model: sonnet
+- Backend: docker
+- Effort: normal
+- Agent: architect
+- Skills: typescript-expert
+- Files: src/orchestra/autonomous/work-generator-source.ts, tests/orchestra/autonomous/work-generator-source.test.ts
+- Scope: src/orchestra/autonomous/, tests/orchestra/autonomous/
+
+### Description
+Sprint 261 built `work-generator.ts` (`generateWorkCandidates`, pure) but nothing emits its candidates. Create a NEW additive module `src/orchestra/autonomous/work-generator-source.ts` exposing `makeWorkGeneratorSource(opts): TriggerSource` — a composable trigger source (matching the existing TriggerSource shape used by the hybrid source in runtime-loop) that, when polled, calls an injected candidate-provider (`generate: () => BacklogEntry[]`, wrapping `generateWorkCandidates`) and yields them as triggers. Do NOT auto-wire it into the live loop (a follow-up + default-off flag adds it to the hybrid source) — this is the composable source only. Fail-safe (generator error → empty, never throw). Reuse `BacklogEntry`/`TriggerSource` types. Backward-safe (new file).
+
+**Kanıt:** `test -f src/orchestra/autonomous/work-generator-source.ts && grep -n "makeWorkGeneratorSource\|TriggerSource\|generate\|BacklogEntry" src/orchestra/autonomous/work-generator-source.ts` → composable work-gen trigger source; targeted test PASS; tsc clean. **Test:** targeted (new file, in-scope) — yields candidates as triggers, generator-error→empty fail-safe.
+
+---
+
+## Task 11: capability-audit bridge — emit an audit event per capability invocation
+- Provider: claude
+- Model: sonnet
+- Backend: docker
+- Effort: normal
+- Agent: architect
+- Skills: typescript-expert
+- Files: src/core/capability-audit-bridge.ts, tests/core/capability-audit-bridge.test.ts
+- Scope: src/core/, tests/core/
+
+### Description
+Capability invocations are not audited. Create a NEW additive module `src/core/capability-audit-bridge.ts` exposing `withAuditedInvocation(handler, emit): CapabilityHandler` — wraps an existing `CapabilityHandler` (import the type from `capability-broker.js`) so each `invoke` emits a structured audit record (capability name, requiredCapability, actor if present, outcome success/error, timestamp) via an INJECTED `emit: (record) => void` (default no-op). The wrapped handler's behavior is otherwise identical (pass-through result, re-throw errors AFTER emitting the error record). Pure wrapper, no direct I/O (emit is injected). Backward-safe (new file). This is the observability seam between the capability broker and the audit log (consumed by the wiring iteration).
+
+**Kanıt:** `test -f src/core/capability-audit-bridge.ts && grep -n "withAuditedInvocation\|CapabilityHandler\|emit\|outcome" src/core/capability-audit-bridge.ts` → audited-invocation wrapper; targeted test PASS; tsc clean. **Test:** targeted (new file, in-scope) — success emits record + returns result, error emits + re-throws, no-op emit safe.
+
+---
+
+## Task 12: Hygiene — green deterministic stale test assertions
 - Provider: claude
 - Model: sonnet
 - Backend: docker
 - Effort: normal
 - Agent: ci-guardian
 - Skills: ci-testing, typescript-expert
-- Files: tests/core/model-types.test.ts, tests/orchestra/model-selector-provider.test.ts
-- Scope: tests/core/, tests/orchestra/
+- Files: tests/core/error-registry-lint.test.ts, tests/core/provider-bootstrap.test.ts
+- Scope: tests/core/
 
 ### Description
-Some pre-existing test failures are STALE assertions (registry drift), not real bugs: residual `gpt-5` apiId/model expectations that should reflect the current registry (`gpt-5.5` apiId). Sprint 260-014 fixed part of `model-types.test.ts` / `model-selector-provider.test.ts`; correct the REMAINING stale expectations in these two files so the registry's current correct values pass (verify against `src/core/model-types.ts` / the model registry — read source, do NOT change source). Only correct stale assertions; do NOT touch any source file or any test outside these two. This greens part of the suite + shrinks the CODE-FULLSUITE-NOGO false-NO_GO surface.
+Reduce the pre-existing false-NO_GO surface by greening DETERMINISTIC stale assertions ONLY (NOT live-env / ollama / readline-timeout flakes). Inspect `tests/core/error-registry-lint.test.ts` (allow-listed violation count drift — update the expected count to match the current registry if it has legitimately changed, verifying against `scripts/check-error-handling.mjs` output) and `tests/core/provider-bootstrap.test.ts` (any stale provider/model expectation that is deterministic, NOT dependent on a live binary). If a test in these files is failing ONLY due to live-env (requires a real ollama/provider binary), leave it and note it — do NOT fake it. Correct ONLY stale deterministic assertions; do NOT touch any source file. If a file is already fully green, say so in `.result` (no change needed).
 
-**Kanıt:** `npx vitest run tests/core/model-types.test.ts tests/orchestra/model-selector-provider.test.ts` → PASS; tsc clean. **Test:** these two targeted suites green (assertions only; no source change).
+**Kanıt:** `npx vitest run tests/core/error-registry-lint.test.ts tests/core/provider-bootstrap.test.ts` → PASS (or remaining failures documented as live-env, not staleness); tsc clean. **Test:** these targeted suites green or live-env-documented (assertions only; no source change).
 
 ---
 
-## Task 15: Doc — Enterprise-Depth reference (enforcement + secret vault + capability handlers)
+## Task 13: Doc — Enterprise Integrations reference (SSO/SIEM/compliance/ERP)
 - Provider: gemini
 - Model: gemini-2.5-pro
 - Effort: normal
 - Agent: doc-writer
 - Skills: documentation-writer
-- Files: docs/reference/enterprise-depth.md
+- Files: docs/reference/enterprise-integrations.md
 - Scope: docs/reference/
 
 ### Description
-Create `docs/reference/enterprise-depth.md` — the enforcement-layer companion to `enterprise-foundation.md`. Document, with config flags and code anchors (read the source; no marketing fluff): (1) the **policy engine** (`policy-engine.ts`, unified permit/deny/park/suggest) and the three layers it composes (rbac / activation-engine / condition-evaluator); (2) **RBAC enforcement** — `authorizeExecution` + the `enforce_rbac` flag (soft warn vs hard block, ADR-037 V2); (3) **audit hash-chain** (`audit-writer.ts` HMAC chain + `verifyAuditChain`); (4) **strict tenant isolation** (`strict_tenant_isolation` flag, the NULL-tenant leak it closes); (5) **capability broker** — multi-backend selection + the real handlers (http/env/shell) + per-agent least-privilege grants; (6) the **secret vault** that ALREADY EXISTS and is currently undocumented: `$DECK:NAME` interpolation syntax (`deck-interpolation.ts`), AES-256-GCM master key in `~/.deckent/.keyring` (`credential-encryption.ts`), `.deck` gitignored storage (ADR-016) — make this discoverable. Note all enforcement is opt-in / default-off. DOC-ONLY (no test/tsc).
+Create `docs/reference/enterprise-integrations.md` — the integrations companion to `enterprise-foundation.md` + `enterprise-depth.md`. Document, with code anchors (read the source; no marketing fluff): (1) **SSO/OIDC** — `auth-oidc.ts` `verifyJwt` (HS256/RS256, claim validation, alg:none rejection) + `auth-session.ts` session lifecycle; (2) **SIEM forwarding** — `siem-forwarder.ts` pluggable transport + batching + fail-safe, default-off; (3) **Compliance reporting** — `compliance-report.ts` controls checklist + audit-chain integrity; (4) **Audit retention** — `audit-retention.ts` age/count rotation + chain-contiguity invariant; (5) **ERP/DB read-only** — `erp-connector.ts` structured read-only query + entity allow-list + `capability-handlers-data.ts` db.read/mail.read handlers; (6) **Capability audit** — `capability-audit-bridge.ts` per-invocation audit. Note every integration is opt-in / injected-transport / default-off. DOC-ONLY (no test/tsc).
 
-**Kanıt:** `test -f docs/reference/enterprise-depth.md && grep -ci "policy\|rbac\|tenant\|hmac\|DECK\|capability" docs/reference/enterprise-depth.md`. **Test:** yok (doc-only).
-
----
-
-## Task 16: ENT-3 — audit query/lineage surface (read-only)
-- Provider: claude
-- Model: sonnet
-- Backend: docker
-- Effort: normal
-- Agent: architect
-- Skills: typescript-expert
-- Files: src/core/audit-query.ts, tests/core/audit-query.test.ts
-- Scope: src/core/, tests/core/
-
-### Description
-Audit events carry `correlationId` + `causationId` but there is no way to QUERY lineage. Create a NEW additive module `src/core/audit-query.ts` exposing pure, read-only query helpers over a provided list of audit events (take `AuditEvent[]` as input — do NOT couple to the live sink/DB, for testability; import the EXISTING `AuditEvent` type from `audit-writer.js` using only fields present today): `filterByCorrelation(events, correlationId)`, `filterByCausation(events, causationId)`, `buildCausalChain(events, rootCorrelationId)` (returns the ordered lineage of events sharing a correlation group, linked by causation), and `groupByActor(events)`. Pure functions, no I/O. Backward-safe by construction (new file). This is the consume-side of ENT-3 lineage (SOC2/ISO traceability).
-
-**Kanıt:** `test -f src/core/audit-query.ts && grep -n "filterByCorrelation\|buildCausalChain\|causationId\|groupByActor" src/core/audit-query.ts` → lineage query surface; targeted test PASS; tsc clean. **Test:** targeted (new file, in-scope) — correlation filter, causal-chain order, actor grouping, empty input safe.
+**Kanıt:** `test -f docs/reference/enterprise-integrations.md && grep -ci "oidc\|siem\|compliance\|erp\|retention\|capability" docs/reference/enterprise-integrations.md`. **Test:** yok (doc-only).
 
 ---
 
-**Beklenen:** 16 task, enterprise-grade, claude-ağırlıklı (14 claude [2 opus: T1/T5 + 12 sonnet] + 1 codex [T6] + 1 gemini-doc [T15]). Contract-aware → contract-enforced: dormant enforcement yüzeyleri (RBAC bridge, ExecutionPool wire, observer drive, recurring re-enqueue, multi-backend caps, strict tenant, audit hash-chain + lineage) gerçek/tüketilebilir hale gelir + unified policy-engine + gerçek capability handler'lar + work-generator + scheduled-flow dedup. Her dosya TEK-yazıcı (çakışma yok). Tüm yeni davranış additive/opt-in/default-off (backward-safe). Live spawn/eval wire BİLİNÇLİ kapsam-dışı (CC verify sonrası elle bağlar). CC sprint-sonu her task'ı verify eder (disk + tsc + targeted + diff). Döngü: bu sprint'ten sonra → live spawn-path RBAC/policy wire (CC) + sonraki batch.
+**Beklenen:** 13 task, enterprise-grade, claude-ağırlıklı (11 claude [2 opus: T1/T7 + 9 sonnet] + 1 codex [T6] + 1 gemini-doc [T13]). Enterprise INTEGRATION katmanı (ENT-5 SSO/OIDC+session+SIEM+compliance, ERP-1 read-only, data-handlers) + autonomous-close (T8 LIVE cron-bug-fix, T10 work-gen source) + 2 additive seam (T9 actor-plumbing, T11 capability-audit). **SSOT korundu** — role→cap/budget-min/strict-tenant YENİDEN tanımlanmadı (duplicate task'lar elendi). Her dosya TEK-yazıcı, tümü additive/opt-in/default-off. Worker'lar `.result` YAZAR. CC her task'ı verify eder (T8 live-cron ekstra titizlikle). **Sonraki iterasyon = WIRING/consume oturumu (CC):** biriken seam'leri (actor→spawn RBAC consult, policy-engine→decision, capability-broker→spawn-context+audit, work-gen-source→loop) live path'e bağla — ERTELENMEYECEK.
