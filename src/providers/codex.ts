@@ -365,7 +365,12 @@ export class CodexAdapter implements ProviderAdapter {
     promptPath: string,
     _opts?: Pick<ProviderSpawnOptions, 'allowedTools' | 'autoApprove'>,
   ): string {
-    return `codex exec --full-auto "$(cat ${promptPath})" --model ${model}`;
+    // Sprint 252: send the registry apiId (wire model, e.g. gpt-5.5) not the
+    // deckent alias — same fix as buildArgs (a ChatGPT subscription rejects
+    // `gpt-5`). Host context keeps `--full-auto` (host-sandboxed); the docker
+    // container path uses the ProviderCommandSpec (--dangerously-bypass-…).
+    const apiId = modelRegistry.get(model)?.apiId ?? model;
+    return `codex exec --full-auto "$(cat ${promptPath})" --model ${apiId}`;
   }
 
   // ─── buildPlannerCommand() ──────────────────────────────────────────

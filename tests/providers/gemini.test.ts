@@ -436,7 +436,10 @@ describe('GeminiAdapter', () => {
     expect(cmd).toContain('-p');
     expect(cmd).toContain('--output-format json');
     expect(cmd).toContain('-m gemini-2.5-pro');
-    expect(cmd).toContain('--approval-mode plan');
+    // Sprint 252: worker buildCommand uses yolo + skip-trust (was read-only plan).
+    expect(cmd).toContain('--approval-mode yolo');
+    expect(cmd).toContain('--skip-trust');
+    expect(cmd).not.toContain('--approval-mode plan');
     expect(cmd).toContain('/tmp/prompt.json');
   });
 

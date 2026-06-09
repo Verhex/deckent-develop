@@ -433,7 +433,12 @@ export class GeminiAdapter implements ProviderAdapter {
     promptPath: string,
     _opts?: Pick<ProviderSpawnOptions, 'allowedTools' | 'autoApprove'>,
   ): string {
-    return `gemini -p "$(cat ${promptPath})" --output-format json -m ${model} --approval-mode plan`;
+    // Sprint 252: match the buildArgs worker fix — `--approval-mode yolo` (a
+    // worker must auto-approve edit/write; `plan` is read-only and can't write
+    // `.result`) + `--skip-trust` (headless) + apiId wire model. Eliminates the
+    // buildCommand↔buildArgs drift.
+    const apiId = modelRegistry.get(model)?.apiId ?? model;
+    return `gemini -p "$(cat ${promptPath})" --output-format json -m ${apiId} --approval-mode yolo --skip-trust`;
   }
 
   /**
