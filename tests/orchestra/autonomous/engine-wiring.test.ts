@@ -10,6 +10,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { buildEngineRuntime } from '../../../src/orchestra/autonomous/runtime-loop.js';
 import { loadBacklog } from '../../../src/orchestra/autonomous/backlog.js';
+import { runAutonomousCycle } from '../../../src/orchestra/autonomous-runtime.js';
 import type { BacklogEntry } from '../../../src/orchestra/autonomous/backlog-types.js';
 
 function entry(over: Partial<BacklogEntry> = {}): BacklogEntry {
@@ -121,5 +122,37 @@ describe('engine wiring — recurring re-enqueue + work-generator', () => {
     writeFileSync(backlogPath, JSON.stringify({ _version: '1.0', entries: [] }));
     const bundle = buildEngineRuntime(baseOpts(() => new Date('2026-06-09T10:00:00Z')));
     expect(await bundle.deps.triggerSource.next()).toBeNull();
+  });
+
+  // ── Seam #3: capability-broker cluster reachable through the live dispatch path ──
+
+  it('executes a capability backlog entry end-to-end through a full autonomous cycle', async () => {
+    const cap = entry({
+      id: 'cap-echo', kind: 'capability', policy: 'auto',
+      spec: { capabilityTarget: { capability: 'echo', args: { hello: 'world' } } },
+    });
+    writeFileSync(backlogPath, JSON.stringify({ _version: '1.0', entries: [cap] }));
+    const bundle = buildEngineRuntime(baseOpts(() => new Date('2026-06-09T10:00:00Z')));
+
+    const result = await runAutonomousCycle({}, bundle.deps);
+
+    expect(result.outcome).toBe('executed');
+    const e = loadBacklog(backlogPath).entries.find((x) => x.id === 'cap-echo');
+    expect(e?.status).toBe('done');
+    expect(e?.lastResult?.ok).toBe(true);
+  });
+
+  it('parks a risk-tagged side-effecting capability entry instead of executing it', async () => {
+    const cap = entry({
+      id: 'cap-shell', kind: 'capability', policy: 'risk-tagged',
+      spec: { capabilityTarget: { capability: 'shell.exec', args: { command: 'rm' } } },
+    });
+    writeFileSync(backlogPath, JSON.stringify({ _version: '1.0', entries: [cap] }));
+    const bundle = buildEngineRuntime(baseOpts(() => new Date('2026-06-09T10:00:00Z')));
+
+    const result = await runAutonomousCycle({}, bundle.deps);
+
+    expect(result.outcome).toBe('pending'); // parked for human approval (G3)
+    expect(loadBacklog(backlogPath).entries[0]!.status).toBe('pending'); // never ran
   });
 });

@@ -290,4 +290,27 @@ describe('backlog store', () => {
     expect(() => enqueueCandidates(path, bl, [bad])).not.toThrow();
     expect(readFileSync(path, 'utf-8')).toBe(raw);
   });
+
+  // ── capability kind (F8 broker dispatch) ──────────────────────────────────
+
+  it('accepts a capability entry with a capabilityTarget', () => {
+    const cap = entry({
+      id: 'cap', kind: 'capability' as const,
+      spec: { capabilityTarget: { capability: 'echo', args: { x: 1 } } },
+    });
+    expect(validateBacklogEntry(cap)).toBeNull();
+  });
+
+  it('rejects a capability entry without a capabilityTarget', () => {
+    const cap = entry({ id: 'cap', kind: 'capability' as const, spec: { description: 'x' } });
+    expect(validateBacklogEntry(cap)).toMatch(/capabilityTarget/);
+  });
+
+  it('rejects a capability entry whose capabilityTarget has no capability verb', () => {
+    const cap = entry({
+      id: 'cap', kind: 'capability' as const,
+      spec: { capabilityTarget: { capability: '' } },
+    });
+    expect(validateBacklogEntry(cap)).toMatch(/capability/);
+  });
 });

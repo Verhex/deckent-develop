@@ -8,7 +8,7 @@ import { TASKS_DIR } from '../../core/constants.js';
 import type { BacklogEntry, BacklogFile, BacklogStatus } from './backlog-types.js';
 import { nextRun } from './scheduled-flow.js';
 
-const KINDS = new Set(['task', 'sprint']);
+const KINDS = new Set(['task', 'sprint', 'capability']);
 const POLICIES = new Set(['auto', 'approval-required', 'risk-tagged']);
 const STATUSES = new Set(['pending', 'running', 'parked', 'done', 'failed']);
 const TRIGGER_TYPES = new Set(['recurring', 'one-off', 'reactive']);
@@ -27,6 +27,13 @@ export function validateBacklogEntry(e: unknown): string | null {
   if (t.type === 'recurring' && typeof t.cron !== 'string') return `entry.${r.id}.trigger.cron required`;
   if (t.type === 'reactive' && typeof t.detector !== 'string') return `entry.${r.id}.trigger.detector required`;
   if (!r.spec || typeof r.spec !== 'object' || Array.isArray(r.spec)) return `entry.${r.id}.spec must be a plain object`;
+  if (r.kind === 'capability') {
+    const target = (r.spec as Record<string, unknown>).capabilityTarget as Record<string, unknown> | undefined;
+    if (!target || typeof target !== 'object') return `entry.${r.id}.spec.capabilityTarget required for kind=capability`;
+    if (typeof target.capability !== 'string' || !target.capability.trim()) {
+      return `entry.${r.id}.spec.capabilityTarget.capability must be a non-empty string`;
+    }
+  }
   return null;
 }
 

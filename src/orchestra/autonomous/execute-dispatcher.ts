@@ -11,6 +11,7 @@
 //          (mirrors run.ts:320). null = timeout = failure.
 import type { ResolvedConfig } from '../../core/config-types.js';
 import type { ActionHandler } from '../../nervous/executor.js';
+import type { CapabilityRegistry } from '../../core/capability-broker.js';
 import type { BacklogEntry, BacklogFile } from './backlog-types.js';
 import { loadBacklog, updateStatus } from './backlog.js';
 import type { TaskResult } from '../../core/types.js';
@@ -48,6 +49,12 @@ export interface ExecuteDispatcherDeps {
    * (backward-safe: all existing callers that pass no pool are unchanged).
    */
   pool?: ExecutionPool;
+  /**
+   * F8 broker dispatch: registry that fulfils `kind=capability` entries
+   * (non-code work — mail/db/http/erp). Absent → capability entries fail with
+   * a clear reason (backward-safe; composition root wires the real registry).
+   */
+  capabilityRegistry?: CapabilityRegistry;
 }
 
 /** Determine whether a TaskResult represents success (mirrors run.ts:320). */
@@ -83,6 +90,26 @@ export function makeExecuteDispatcher(deps: ExecuteDispatcherDeps): ActionHandle
           await deps.runSprint(deps.projectRoot, deps.config);
           ok = true;
           reason = 'sprint completed';
+        } else if (entry.kind === 'capability') {
+          // F8 broker dispatch: non-code work resolved through the capability
+          // registry. The broker never throws — every path is a CapabilityResult.
+          const target = entry.spec.capabilityTarget;
+          if (!target) {
+            ok = false;
+            reason = 'capability entry has no spec.capabilityTarget';
+          } else if (!deps.capabilityRegistry) {
+            ok = false;
+            reason = 'no capability registry wired into the dispatcher';
+          } else {
+            const result = await deps.capabilityRegistry.invoke(target, {
+              projectRoot: deps.projectRoot,
+              actor: entry.tenant ? { id: 'system', tenantId: entry.tenant } : { id: 'system' },
+            });
+            ok = result.ok;
+            reason = result.ok
+              ? `capability ${result.capability} fulfilled by handler '${result.handler}'`
+              : `${result.code}: ${result.error}`;
+          }
         } else {
           // Task: launch worker, then wait for real completion (Gap F).
           //

@@ -722,6 +722,14 @@ const MESSAGES: MessageMap = {
     en: 'Invalid cron expression "{cron}": {error}',
     tr: 'Geçersiz cron ifadesi "{cron}": {error}',
   },
+  'autonomous.backlog.capability_required': {
+    en: 'kind=capability requires --capability <verb> (e.g. fs.read, db.query).',
+    tr: 'kind=capability için --capability <fiil> gerekli (örn. fs.read, db.query).',
+  },
+  'autonomous.backlog.invalid_args': {
+    en: 'Invalid --args JSON: {error}',
+    tr: 'Geçersiz --args JSON: {error}',
+  },
   'autonomous.backlog.summary': {
     en: 'Backlog: {total} entries — pending:{pending} running:{running} parked:{parked} done:{done} failed:{failed}',
     tr: 'Backlog: {total} kayıt — bekleyen:{pending} çalışan:{running} beklemede:{parked} tamam:{done} hata:{failed}',

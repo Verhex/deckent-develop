@@ -35,6 +35,9 @@ import { makeActionExecutor } from './action-adapter.js';
 import { makeTriggerSource } from './trigger-adapter.js';
 // ─── Engine composition root (Task 7) imports ────────────────────────
 import type { ResolvedConfig } from '../../core/config-types.js';
+import type { CapabilityRegistry } from '../../core/capability-broker.js';
+import { createAuditedCapabilityRegistry } from '../../core/capability-runtime.js';
+import { writeAuditEvent } from '../../core/audit-writer.js';
 import type { PolicyGate } from '../autonomous-runtime.js';
 import { withNervousObserver } from '../autonomous-runtime.js';
 import {
@@ -151,6 +154,14 @@ export interface BuildEngineRuntimeOptions {
    * work-generator source (backward-safe).
    */
   generateWork?: () => BacklogEntry[];
+  /**
+   * F8 broker dispatch: registry that fulfils `kind=capability` backlog
+   * entries. Absent → a default audited registry is composed (reference +
+   * extended + data handlers; allowlist-gated handlers DENY by default), with
+   * each invocation written to the ENT-3 audit hash-chain. Override for tests
+   * or to install custom connector handlers.
+   */
+  capabilityRegistry?: CapabilityRegistry;
   clock?: () => Date;
   now?: () => string;
   /** Optional persistence path for the approval-adapter pending queue (forwarded to inner buildAutonomousRuntime). */
@@ -178,6 +189,21 @@ export interface BuildEngineRuntimeOptions {
 export function buildEngineRuntime(
   opts: BuildEngineRuntimeOptions,
 ): AutonomousRuntimeBundle {
+  // F8 broker dispatch (capability-maturity gap #3): kind=capability entries
+  // resolve through this registry; every invocation lands on the ENT-3 audit
+  // hash-chain (writeAuditEvent is itself fail-safe on validation/IO).
+  const capabilityRegistry = opts.capabilityRegistry ?? createAuditedCapabilityRegistry(
+    (record) => {
+      writeAuditEvent(opts.projectRoot, 'autonomous', {
+        tenantId: record.actor?.tenantId ?? 'local',
+        actor: record.actor?.id ?? 'system',
+        action: `capability.${record.outcome}`,
+        target: record.capability,
+        metadata: { timestamp: record.timestamp, error: record.error },
+      });
+    },
+  );
+
   const handlers = new Map<string, ActionHandler>();
   handlers.set(
     AUTONOMOUS_EXECUTE_ACTION,
@@ -189,6 +215,7 @@ export function buildEngineRuntime(
       backlogPath: opts.backlogPath,
       waitForResult: opts.waitForResult,
       resultTimeoutMs: opts.resultTimeoutMs,
+      capabilityRegistry,
     }),
   );
 

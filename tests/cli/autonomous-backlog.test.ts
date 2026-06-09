@@ -114,4 +114,43 @@ describe('autonomous backlog CLI helpers', () => {
     ).toThrow(/cron/i);
     expect(backlogList({ root })).toHaveLength(0); // nothing persisted
   });
+
+  // ── capability entries (--kind capability) ────────────────────────────────
+
+  it('add with kind=capability creates an entry with a capabilityTarget', () => {
+    backlogAdd({
+      root, id: 'c', title: 'read config', kind: 'capability',
+      description: '', policy: 'auto', lang: 'en',
+      capability: 'fs.read', capabilityArgs: '{"path":"package.json"}', connector: undefined,
+    });
+    const e = backlogList({ root }).find((x) => x.id === 'c');
+    expect(e!.kind).toBe('capability');
+    expect(e!.spec.capabilityTarget).toEqual({ capability: 'fs.read', args: { path: 'package.json' } });
+  });
+
+  it('add with kind=capability records the connector when given', () => {
+    backlogAdd({
+      root, id: 'c2', title: 'erp pull', kind: 'capability',
+      description: '', policy: 'approval-required', lang: 'en',
+      capability: 'erp.read', connector: 'odoo',
+    });
+    const e = backlogList({ root }).find((x) => x.id === 'c2');
+    expect(e!.spec.capabilityTarget).toEqual({ capability: 'erp.read', connector: 'odoo' });
+  });
+
+  it('add with kind=capability but no --capability throws an i18n error', () => {
+    expect(() =>
+      backlogAdd({ root, id: 'c3', title: 'x', kind: 'capability', description: '', policy: 'auto', lang: 'en' }),
+    ).toThrow(/capability/i);
+  });
+
+  it('add with invalid --args JSON throws an i18n error and persists nothing', () => {
+    expect(() =>
+      backlogAdd({
+        root, id: 'c4', title: 'x', kind: 'capability', description: '', policy: 'auto', lang: 'tr',
+        capability: 'echo', capabilityArgs: '{not json',
+      }),
+    ).toThrow(/JSON|args/i);
+    expect(backlogList({ root })).toHaveLength(0);
+  });
 });

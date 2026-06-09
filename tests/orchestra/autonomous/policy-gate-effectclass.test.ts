@@ -133,3 +133,31 @@ describe('decidePolicy G3 — risk-tagged entries with computed EffectClass', ()
     expect(decidePolicy(irrev, computeEntryEffectClass(irrev)).reason.length).toBeGreaterThan(0);
   });
 });
+
+// ─── capability-kind EffectClass (F8 broker dispatch) ─────────────────────────
+
+describe('computeEntryEffectClass — capability entries', () => {
+  const cap = (verb: string): BacklogEntry => ({
+    ...base, kind: 'capability',
+    spec: { capabilityTarget: { capability: verb } },
+  });
+
+  it('read-only capability verbs classify as pure', () => {
+    for (const verb of ['echo', 'fs.read', 'http.get', 'env.read', 'db.query', 'mail.search', 'erp.read']) {
+      expect(computeEntryEffectClass(cap(verb)), verb).toBe('pure');
+    }
+  });
+
+  it('side-effecting / unknown capability verbs fail safe to critical-irreversible', () => {
+    for (const verb of ['shell.exec', 'mail.send', 'erp.write', 'totally.unknown']) {
+      expect(computeEntryEffectClass(cap(verb)), verb).toBe('critical-irreversible');
+    }
+  });
+
+  it('risk-tagged + read-only capability → auto; risk-tagged + side-effecting → park', () => {
+    const read = cap('fs.read');
+    const write = cap('shell.exec');
+    expect(decidePolicy(read, computeEntryEffectClass(read)).decision).toBe('auto');
+    expect(decidePolicy(write, computeEntryEffectClass(write)).decision).toBe('park');
+  });
+});

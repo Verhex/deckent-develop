@@ -103,12 +103,18 @@ export interface BacklogAddOptions {
   root: string;
   id: string;
   title: string;
-  kind: 'task' | 'sprint';
+  kind: 'task' | 'sprint' | 'capability';
   description: string;
   policy: BacklogEntry['policy'];
   lang: string;
   /** 5-field cron expression — when set, the entry recurs at this cadence. */
   cron?: string;
+  /** kind=capability: dotted verb to invoke (e.g. 'fs.read', 'db.query'). */
+  capability?: string;
+  /** kind=capability: JSON-encoded args object for the handler. */
+  capabilityArgs?: string;
+  /** kind=capability: preferred backend/connector id (e.g. 'odoo', 'imap'). */
+  connector?: string;
 }
 
 export function backlogAdd(o: BacklogAddOptions): void {
@@ -129,11 +135,38 @@ export function backlogAdd(o: BacklogAddOptions): void {
       }));
     }
   }
+  // kind=capability: require a verb at intake and parse args strictly — an
+  // entry that only fails at dispatch time would be a silent dead entry.
+  let capabilityTarget: BacklogEntry['spec']['capabilityTarget'];
+  if (o.kind === 'capability') {
+    if (!o.capability || !o.capability.trim()) {
+      throw new Error(getMessage('autonomous.backlog.capability_required', o.lang));
+    }
+    let args: Record<string, unknown> | undefined;
+    if (o.capabilityArgs !== undefined) {
+      try {
+        const parsed: unknown = JSON.parse(o.capabilityArgs);
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+          throw new Error('args must be a JSON object');
+        }
+        args = parsed as Record<string, unknown>;
+      } catch (err) {
+        throw new Error(getMessage('autonomous.backlog.invalid_args', o.lang, {
+          error: err instanceof Error ? err.message : String(err),
+        }));
+      }
+    }
+    capabilityTarget = {
+      capability: o.capability,
+      ...(args !== undefined ? { args } : {}),
+      ...(o.connector !== undefined ? { connector: o.connector } : {}),
+    };
+  }
   const entry: BacklogEntry = {
     id: o.id,
     title: o.title,
     kind: o.kind,
-    spec: { description: o.description },
+    spec: { description: o.description, ...(capabilityTarget ? { capabilityTarget } : {}) },
     policy: o.policy,
     trigger: o.cron !== undefined ? { type: 'recurring', cron: o.cron } : { type: 'one-off' },
     status: 'pending',
@@ -629,26 +662,33 @@ export function registerAutonomous(program: Command): void {
     .description('Add a new entry to the autonomous backlog')
     .requiredOption('--id <id>', 'Unique entry id')
     .requiredOption('--title <title>', 'Human-readable title')
-    .option('--kind <kind>', 'Entry kind: task (default) or sprint', 'task')
+    .option('--kind <kind>', 'Entry kind: task (default), sprint, or capability', 'task')
     .option('--description <text>', 'Task description or directives ref', '')
     .option('--policy <policy>', 'Policy: auto (default), approval-required, or risk-tagged', 'auto')
     .option('--cron <expr>', '5-field cron expression — entry recurs at this cadence (omit for one-off)')
+    .option('--capability <verb>', 'kind=capability: dotted verb to invoke (e.g. fs.read, db.query)')
+    .option('--args <json>', 'kind=capability: JSON object of handler args')
+    .option('--connector <id>', 'kind=capability: preferred backend/connector (e.g. odoo, imap)')
     .option('--root <path>', 'Project root override')
     .option('--lang <code>', 'Language override (en|tr)')
     .action((opts: {
       id: string; title: string; kind: string; description: string;
-      policy: string; cron?: string; root?: string; lang?: string;
+      policy: string; cron?: string; capability?: string; args?: string;
+      connector?: string; root?: string; lang?: string;
     }) => {
       try {
         const lang = getLanguage(opts.lang);
         const root = opts.root ?? resolveProjectRoot();
         backlogAdd({
           root, id: opts.id, title: opts.title,
-          kind: (opts.kind === 'sprint' ? 'sprint' : 'task'),
+          kind: (opts.kind === 'sprint' || opts.kind === 'capability') ? opts.kind : 'task',
           description: opts.description,
           policy: (opts.policy as BacklogEntry['policy']),
           lang,
           cron: opts.cron,
+          capability: opts.capability,
+          capabilityArgs: opts.args,
+          connector: opts.connector,
         });
         print(getMessage('autonomous.backlog.added', lang, { id: opts.id }));
       } catch (err) {

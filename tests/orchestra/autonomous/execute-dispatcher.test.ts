@@ -3,6 +3,7 @@ import { mkdirSync, writeFileSync, rmSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { makeExecuteDispatcher } from '../../../src/orchestra/autonomous/execute-dispatcher.js';
+import { createDefaultRegistry } from '../../../src/core/capability-broker.js';
 import { makeBoundedPool } from '../../../src/orchestra/autonomous/execution-pool.js';
 import { loadBacklog } from '../../../src/orchestra/autonomous/backlog.js';
 import type { BacklogEntry, BacklogFile } from '../../../src/orchestra/autonomous/backlog-types.js';
@@ -19,6 +20,11 @@ const taskEntry: BacklogEntry = {
 
 const sprintEntry: BacklogEntry = {
   ...taskEntry, id: 'e-sprint', kind: 'sprint', spec: { directivesRef: 'D.md' },
+};
+
+const capabilityEntry: BacklogEntry = {
+  ...taskEntry, id: 'e-cap', kind: 'capability', provider: undefined, model: undefined,
+  spec: { capabilityTarget: { capability: 'echo', args: { ping: 'pong' } } },
 };
 
 /** Write a minimal backlog file containing the given entry and return its path. */
@@ -51,6 +57,109 @@ afterEach(() => {
 });
 
 // ─── Tests ───────────────────────────────────────────────────────────
+
+describe('execute-dispatcher — capability branch (F8 broker dispatch)', () => {
+  it('kind=capability → registry invoked, backlog moves pending→running→done', async () => {
+    const backlogPath = seedBacklog(tmpDir, capabilityEntry);
+    const registry = createDefaultRegistry(); // echo + fs.read preinstalled
+    const runTask = vi.fn();
+    const runSprint = vi.fn();
+
+    const handler = makeExecuteDispatcher({
+      projectRoot: tmpDir, config: {} as never,
+      runTask, runSprint,
+      backlogPath, waitForResult: vi.fn(),
+      capabilityRegistry: registry,
+    });
+
+    const res = await handler('autonomous.execute', { entry: capabilityEntry });
+
+    expect(res.outcome).toBe('success');
+    expect(runTask).not.toHaveBeenCalled();
+    expect(runSprint).not.toHaveBeenCalled();
+    const e = loadBacklog(backlogPath).entries.find((x) => x.id === 'e-cap');
+    expect(e?.status).toBe('done');
+    expect(e?.lastResult?.ok).toBe(true);
+    expect(e?.lastResult?.reason).toMatch(/echo/);
+  });
+
+  it('kind=capability: unknown verb → CAPABILITY_NOT_FOUND, entry failed', async () => {
+    const entry: BacklogEntry = {
+      ...capabilityEntry, id: 'e-cap-miss',
+      spec: { capabilityTarget: { capability: 'erp.read' } },
+    };
+    const backlogPath = seedBacklog(tmpDir, entry);
+    const handler = makeExecuteDispatcher({
+      projectRoot: tmpDir, config: {} as never,
+      runTask: vi.fn(), runSprint: vi.fn(),
+      backlogPath, waitForResult: vi.fn(),
+      capabilityRegistry: createDefaultRegistry(),
+    });
+
+    const res = await handler('autonomous.execute', { entry });
+
+    expect(res.outcome).toBe('failure');
+    expect(res.error).toMatch(/CAPABILITY_NOT_FOUND/);
+    expect(loadBacklog(backlogPath).entries[0]!.status).toBe('failed');
+  });
+
+  it('kind=capability without a wired registry → failure with a clear reason', async () => {
+    const backlogPath = seedBacklog(tmpDir, capabilityEntry);
+    const handler = makeExecuteDispatcher({
+      projectRoot: tmpDir, config: {} as never,
+      runTask: vi.fn(), runSprint: vi.fn(),
+      backlogPath, waitForResult: vi.fn(),
+    });
+
+    const res = await handler('autonomous.execute', { entry: capabilityEntry });
+
+    expect(res.outcome).toBe('failure');
+    expect(res.error).toMatch(/registry/i);
+    expect(loadBacklog(backlogPath).entries[0]!.status).toBe('failed');
+  });
+
+  it('kind=capability with a missing capabilityTarget in the PAYLOAD → failure (defensive)', async () => {
+    // Intake validation forbids a target-less capability entry ON DISK; the
+    // defensive branch guards the payload-borne copy (trigger payload may
+    // drift from disk state). Seed a valid disk entry, send a broken payload.
+    const backlogPath = seedBacklog(tmpDir, capabilityEntry);
+    const broken = { ...capabilityEntry, spec: {} } as BacklogEntry;
+    const handler = makeExecuteDispatcher({
+      projectRoot: tmpDir, config: {} as never,
+      runTask: vi.fn(), runSprint: vi.fn(),
+      backlogPath, waitForResult: vi.fn(),
+      capabilityRegistry: createDefaultRegistry(),
+    });
+
+    const res = await handler('autonomous.execute', { entry: broken });
+
+    expect(res.outcome).toBe('failure');
+    expect(res.error).toMatch(/capabilityTarget/);
+    expect(loadBacklog(backlogPath).entries[0]!.status).toBe('failed');
+  });
+
+  it('kind=capability passes projectRoot + tenant-derived actor into the invocation context', async () => {
+    const entry: BacklogEntry = { ...capabilityEntry, id: 'e-cap-ctx', tenant: 'acme' };
+    const backlogPath = seedBacklog(tmpDir, entry);
+    const registry = createDefaultRegistry();
+    let seenCtx: unknown;
+    registry.register('ctx.probe', {
+      requiredCapability: 'mcp-tool',
+      invoke: (_args, ctx) => { seenCtx = ctx; return {}; },
+    });
+    entry.spec = { capabilityTarget: { capability: 'ctx.probe' } };
+
+    const handler = makeExecuteDispatcher({
+      projectRoot: tmpDir, config: {} as never,
+      runTask: vi.fn(), runSprint: vi.fn(),
+      backlogPath, waitForResult: vi.fn(),
+      capabilityRegistry: registry,
+    });
+    await handler('autonomous.execute', { entry });
+
+    expect(seenCtx).toMatchObject({ projectRoot: tmpDir, actor: { id: 'system', tenantId: 'acme' } });
+  });
+});
 
 describe('execute-dispatcher', () => {
   it('kind=task → runTask invoked with entry provider/model, backlog moves pending→running→done', async () => {

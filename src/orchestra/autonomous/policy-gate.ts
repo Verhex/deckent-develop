@@ -16,6 +16,13 @@ const RE_IRREVERSIBLE = /\bnpm publish\b|\bpublish\b|\bdeploy to production\b|\b
 const RE_COMPENSABLE  = /\boutbound api\b|\bqueue dispatch\b|\bwebhook\b/i;
 const RE_IDEMPOTENT   = /\bdb[- ]migration\b|\bschema migration\b|\bcreate table\b|\bdatabase migration\b/i;
 
+// Capability verbs that only READ (no external side effect) — classify 'pure'.
+// Anything else (shell.exec, mail.send, erp.write, unknown verbs) falls to the
+// fail-safe default (F10-002 risk classes; ADR-040 default-deny).
+const READ_ONLY_CAPABILITIES: ReadonlySet<string> = new Set([
+  'echo', 'fs.read', 'http.get', 'env.read', 'db.query', 'mail.search', 'erp.read',
+]);
+
 /**
  * Derive an EffectClass from a BacklogEntry's nature (pure computation, no I/O).
  *
@@ -37,6 +44,13 @@ export function computeEntryEffectClass(entry: BacklogEntry): EffectClass {
   if (RE_IRREVERSIBLE.test(desc)) return 'critical-irreversible';
   if (RE_COMPENSABLE.test(desc))  return 'compensable';
   if (RE_IDEMPOTENT.test(desc))   return 'idempotent';
+
+  // Capability entries: classify by the verb — read-only verbs are pure;
+  // side-effecting or unknown verbs fail safe to the most restrictive class.
+  if (entry.kind === 'capability') {
+    const verb = entry.spec.capabilityTarget?.capability ?? '';
+    return READ_ONLY_CAPABILITIES.has(verb) ? 'pure' : 'critical-irreversible';
+  }
 
   // Sprints orchestrate working-tree code changes — reversible via git.
   if (entry.kind === 'sprint') return 'reversible';

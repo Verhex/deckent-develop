@@ -77,8 +77,8 @@ export function registerAutonomousTool(server: McpServer): void {
         ),
         // backlog_add
         title: z.string().optional().describe('Entry title — required for backlog_add'),
-        kind: z.enum(['task', 'sprint']).optional().default('task').describe(
-          'Entry kind (task=inline description, sprint=directives ref). Default: task',
+        kind: z.enum(['task', 'sprint', 'capability']).optional().default('task').describe(
+          'Entry kind (task=inline description, sprint=directives ref, capability=F8 broker verb). Default: task',
         ),
         description: z.string().optional().default('').describe(
           'Task description or directives ref — used by backlog_add',
@@ -88,6 +88,15 @@ export function registerAutonomousTool(server: McpServer): void {
         ),
         cron: z.string().optional().describe(
           '5-field cron expression for backlog_add — entry recurs at this cadence (omit for one-off)',
+        ),
+        capability: z.string().optional().describe(
+          'kind=capability: dotted verb to invoke (e.g. fs.read, db.query) — backlog_add',
+        ),
+        capabilityArgs: z.string().optional().describe(
+          'kind=capability: JSON object of handler args — backlog_add',
+        ),
+        connector: z.string().optional().describe(
+          'kind=capability: preferred backend/connector id (e.g. odoo, imap) — backlog_add',
         ),
         // approve / reject (prefer `triggerId`, fall back to `id`)
         triggerId: z.string().optional().describe(
@@ -105,6 +114,9 @@ export function registerAutonomousTool(server: McpServer): void {
       description,
       policy,
       cron,
+      capability,
+      capabilityArgs,
+      connector,
       triggerId,
       reason,
     }) => {
@@ -190,6 +202,9 @@ export function registerAutonomousTool(server: McpServer): void {
             policy: (policy ?? 'auto') as BacklogEntry['policy'],
             lang,
             cron,
+            capability,
+            capabilityArgs,
+            connector,
           });
           const enriched = enrichResponse('autonomous', { action: 'backlog_add', id, added: true });
           return { content: [{ type: 'text' as const, text: JSON.stringify(enriched) }] };

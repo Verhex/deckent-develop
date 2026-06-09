@@ -2,7 +2,9 @@
 // Backlog data model for the autonomous engine. Durable, git-trackable.
 // Spec: docs/superpowers/specs/2026-06-07-autonomous-execution-engine-design.md §5
 
-export type BacklogKind = 'task' | 'sprint';
+import type { CapabilityTarget } from '../../core/work-model.js';
+
+export type BacklogKind = 'task' | 'sprint' | 'capability';
 export type BacklogPolicy = 'auto' | 'approval-required' | 'risk-tagged';
 export type BacklogStatus = 'pending' | 'running' | 'parked' | 'done' | 'failed';
 
@@ -16,8 +18,14 @@ export interface BacklogEntry {
   id: string;
   title: string;
   kind: BacklogKind;
-  /** kind=task → inline description for runTaskMode; kind=sprint → directives ref. */
-  spec: { description?: string; directivesRef?: string; scopeDir?: string };
+  /** kind=task → inline description for runTaskMode; kind=sprint → directives ref;
+   *  kind=capability → non-code work routed through the F8 capability broker. */
+  spec: {
+    description?: string;
+    directivesRef?: string;
+    scopeDir?: string;
+    capabilityTarget?: CapabilityTarget;
+  };
   policy: BacklogPolicy;
   provider?: string;
   model?: string;
