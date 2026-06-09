@@ -2,6 +2,19 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint248] - 2026-06-09
+
+### Added
+
+- 248-002 — gemini worker gate
+
+### Changed
+
+- 248-001 — codex worker gate (completed with tech debt)
+
+
+_Tasks: 2 total, 2 done, 1 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint247] - 2026-06-08
 
 ### Added

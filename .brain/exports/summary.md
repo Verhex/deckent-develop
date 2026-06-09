@@ -80,6 +80,8 @@
 | adr-086 | Native CLI Parity — F11 Feature Set (Sprint 224) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-248 Learnings** (sprint-248): ## Sprint sprint-248 Learnings
+- 248-001 — codex worker gate: GO_WITH_TECH_DEBT — Created docs/_provider-gate/codex-p...
 - **Sprint sprint-247 Learnings** (sprint-247): ## Sprint sprint-247 Learnings
 
 ## Gains
@@ -114,10 +116,6 @@
 
 ## Gains
 - 239-001 — rubric-registry + task-builder canonical TaskKind migration — Wo...
-- **Sprint sprint-238 Learnings** (sprint-238): ## Sprint sprint-238 Learnings
-
-## Gains
-- 238-001 — Canonical work-model SSOT modülü (additive) — WM-2a additive fou...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -129,5 +127,6 @@ _No active technical debt._
 - Violation pattern: file_outside_scope
 - Violation pattern: stale_heartbeat
 - Violation pattern: stale_heartbeat
+- Violation pattern: stale_heartbeat
 
-_Total entries: 278 | Generated: 2026-06-08_
+_Total entries: 283 | Generated: 2026-06-09_

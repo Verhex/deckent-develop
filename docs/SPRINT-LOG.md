@@ -6712,3 +6712,26 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 247-001: 247-001 — docs/adr-index.md (DONE)
 
 ---
+## Sprint 248 — sprint-248
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-06-09
+**Duration:** 304s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 2 |
+| Completed | 2 |
+| Tech Debt | 1 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 303601ms |
+
+### Tasks
+
+- 248-001: 248-001 — codex worker gate (GO_WITH_TECH_DEBT)
+- 248-002: 248-002 — gemini worker gate (DONE)
+
+---

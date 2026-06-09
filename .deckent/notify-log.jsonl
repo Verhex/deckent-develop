@@ -61,3 +61,6 @@
 {"priority":"info","event":"sprint-started","title":"Sprint sprint-247 başladı","summary":"1 task planlandı","sprintId":"sprint-247","timestamp":"2026-06-08T21:44:37.251Z"}
 {"priority":"info","event":"task-done","title":"Task 247-001 tamamlandı","summary":"Created docs/adr-index.md with all 57 ADRs present in decisions.md (ADR-001..086, with documented ga","sprintId":"sprint-247","timestamp":"2026-06-08T21:49:38.635Z"}
 {"priority":"info","event":"sprint-finalized","title":"Sprint sprint-247 kapandı","summary":"1/1 DONE, 0 TECH_DEBT, 0 NO_GO","sprintId":"sprint-247","timestamp":"2026-06-08T21:51:37.823Z"}
+{"priority":"info","event":"sprint-started","title":"Sprint sprint-248 başladı","summary":"2 task planlandı","sprintId":"sprint-248","timestamp":"2026-06-09T05:07:18.739Z"}
+{"priority":"info","event":"task-done","title":"Task 248-002 tamamlandı","summary":"Created docs/_provider-gate/gemini-parity.md with specified content.","sprintId":"sprint-248","timestamp":"2026-06-09T05:08:13.880Z"}
+{"priority":"info","event":"sprint-finalized","title":"Sprint sprint-248 kapandı","summary":"2/2 DONE, 1 TECH_DEBT, 0 NO_GO","sprintId":"sprint-248","timestamp":"2026-06-09T05:10:25.408Z"}

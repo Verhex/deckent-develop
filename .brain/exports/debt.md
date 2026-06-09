@@ -9,6 +9,7 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-248-001 | Tech debt from 248-001: Created docs/_provider-gate/codex-parity.md with exactly | normal | sprint-248 | resolved |
 | rollback-sprint-243 | Sprint sprint-243 rollback SUCCESS | normal | sprint-243 | resolved |
 | rollback-sprint-239 | Sprint sprint-239 rollback SUCCESS | normal | sprint-239 | resolved |
 | debt-237-001 | Tech debt from 237-001: docs/guide/local-model-workers.md yazıldı. İçerik: (1) O | normal | sprint-237 | resolved |

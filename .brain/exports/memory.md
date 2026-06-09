@@ -1,5 +1,12 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-248 Learnings
+- Sprint sprint-248 Learnings: ## Sprint sprint-248 Learnings
+- 248-001 — codex worker gate: GO_WITH_TECH_DEBT — Created docs/_provider-gate/codex-parity.md with exactly the requested three lines. Typecheck and test suite were not ru
+
+## Gains
+- 248-002 — gemini worker gate — Created docs/_provider-gate/gemini-parity.md with specified content.
+
 ## Sprint sprint-247 Learnings
 - Sprint sprint-247 Learnings: ## Sprint sprint-247 Learnings
 
