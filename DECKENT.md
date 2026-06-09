@@ -27,7 +27,7 @@
 - Task routing: task-router.ts assigns agent + skills + provider per task
 
 ## MCP Integration
-- 31 tools: init, set_directives, plan, start, status, doctor, retro, history, analyze_project, sync, config, review, run, kill, cleanup, help, agent_list, skill_list, checkpoint, docs, explain, **memory_query**, watch, feature_query, audit, recover, nervous_subscribe, nervous_accept, nervous_reject, nervous_status, nervous_config
+- 33 tools: init, set_directives, plan, start, status, doctor, retro, history, analyze_project, sync, config, review, run, kill, cleanup, help, agent_list, skill_list, checkpoint, docs, explain, **memory_query**, watch, feature_query, audit, recover, **autonomous**, **models**, nervous_subscribe, nervous_accept, nervous_reject, nervous_status, nervous_config
 - 8 resources: dashboard, directives, memory, debt, config, retro, tasks, agents
 - Canonical tool list is auto-generated — see `docs/reference/mcp-tools.md` (`npm run docs:ref`)
 - Registration: `claude mcp add deckent -- npx deckent-mcp`
@@ -201,6 +201,8 @@ PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → CLEANUP
 | `deckent_nervous_reject` | Bekleyen nervous bildirimini reddet | Hayir | Hayir |
 | `deckent_nervous_status` | Nervous System mevcut durumunu goster | Evet | Hayir |
 | `deckent_nervous_config` | Nervous System detector'larini yapilandir | Hayir | Hayir |
+| `deckent_autonomous` | Otonom motor: status/stop/backlog yonetimi (add destekler: cron, capability) | Hayir | Hayir |
+| `deckent_models` | Model registry'yi listele (provider/tier/apiId, canli veri) | Evet | Hayir |
 
 ### Parametre Ornekleri
 

@@ -943,20 +943,31 @@ deckent web --dev
 > Hand-curated sections above are produced by `scripts/generate-cli-docs.ts`; this block is maintained by `scripts/gen-reference-docs.mjs`.
 
 <!-- AUTOGEN:START id="cli" -->
-> 109 commands. Generated from `src/cli/commands/*.ts`.
+> 148 commands. Generated from `src/cli/commands/*.ts`.
 
 | Command | Description |
 |---------|-------------|
 | `deckent accept <id>` | Accept a pending nervous system suggestion |
+| `deckent accept-panic <task-id>` | Approve a PanicGuard-blocked worker kill (writes IPC marker) |
+| `deckent add` | Add a new entry to the autonomous backlog |
+| `deckent add <cron> <action>` | Add a new scheduled flow (cron: 5-field expression, e.g. "* * * * * |
+| `deckent add <name> <cmdOrUrl> [args...]` | Add an MCP server (stdio or http) — writes to .mcp.json by scope |
 | `deckent add <path>` | Add a document to managed docs |
 | `deckent agent` | Manage agent pool |
 | `deckent analyze` | Analyze project stack, size, and recommended methodology |
 | `deckent approve <sprintId> <phase>` | Approve a pending checkpoint |
-| `deckent archive-debt` | Archive resolved debt items from .brain/DEBT.md |
+| `deckent approve <triggerId>` | Approve a parked trigger — resolves the running loop\'s gate |
+| `deckent archive-debt` | Report tech-debt status (DB-first; resolved debt is auto-managed in memory.db) |
 | `deckent attach` | Attach to the tmux orchestra session |
-| `deckent audit <sprint-id>` | Run Brain Self-Audit Gate for a sprint (tsc + vitest + honesty + observability) |
+| `deckent audit [sprint-id]` | Run Brain Self-Audit Gate for a sprint, or query/export audit log events (query \| compliance \| forward) |
+| `deckent audit-verify` | Verify the audit HMAC chain (I4 invariant — tamper-evident audit log) |
 | `deckent auto` | Auto-detect mode from context |
+| `deckent autonomous` | Autonomous runtime — authority-bounded continuous loop (F3-009) |
+| `deckent backlog` | Manage the autonomous backlog (add / list / remove entries) |
+| `deckent baseline-refresh` | Refresh directives_protection baseline to current DIRECTIVES.md content |
 | `deckent budget` | View or set cost budgets |
+| `deckent chat` | Start a conversational session with Deckent. Uses your installed AI CLI. |
+| `deckent check <role> <action>` | Check whether a role has permission to perform an action |
 | `deckent checkpoint` | Manage human checkpoints — list, approve, or reject pending checkpoints |
 | `deckent cleanup` | Clean up after a sprint |
 | `deckent config` | Show or modify project configuration |
@@ -975,13 +986,17 @@ deckent web --dev
 | `deckent edit <name>` | Edit an agent configuration |
 | `deckent enable <name>` | Enable an agent |
 | `deckent enable <name>` | Enable a skill |
+| `deckent evolve` | Evolution analysis — cross-sprint trends and prompt suggestions |
 | `deckent explain` | Explain what the last sprint did in human-friendly language |
 | `deckent export` | Export memory.db to .brain/exports/*.md |
 | `deckent export [file]` | Export config to stdout or a file |
 | `deckent features` | List features from .deckent/features-manifest.json by category |
-| `deckent finalize` | Finalize a sprint: upsert retro/memory in `memory.db`, refresh `.deckent/workspace/IDENTITY.md` and `.brain/exports/*.md`, run decay |
+| `deckent finalize` | Finalize a sprint: update MEMORY.md, RETRO.md, PROJECT-IDENTITY.md, config, run decay |
+| `deckent flow` | Manage scheduled flows (F3 process mode) |
 | `deckent get <key>` | Get a configuration value by key (supports dot notation) |
+| `deckent get <name>` | Show details for an MCP server (from merged view) |
 | `deckent global <style>` | Set global default (sprint\|task) |
+| `deckent grant <user> <role>` | Assign a role to a user |
 | `deckent heartbeat` | Run proactive heartbeat tasks from .deckent/HEARTBEAT.md |
 | `deckent help-info` | Show quick-reference help (localized) |
 | `deckent history` | Show sprint history |
@@ -996,43 +1011,61 @@ deckent web --dev
 | `deckent keys` | List all config parameter keys |
 | `deckent kill [taskId]` | Kill a running worker |
 | `deckent list` | List all agents in the pool |
+| `deckent list` | List autonomous backlog entries |
 | `deckent list` | List all checkpoints |
 | `deckent list` | Show current authority matrix with all presets |
 | `deckent list` | List all config parameters grouped by category |
 | `deckent list` | List all managed documents |
+| `deckent list` | List all scheduled flows |
+| `deckent list` | List registered MCP servers (merged: local > project > user) |
 | `deckent list` | List all relations in memory.db |
+| `deckent list` | List available models from the catalog |
 | `deckent list` | List installed plugins |
 | `deckent list` | List all skills |
 | `deckent log` | View raw nervous system log |
+| `deckent mcp` | Manage MCP servers (Claude-parity) |
 | `deckent memory` | Memory V2 management |
 | `deckent migrate` | Migrate config.json to the latest full format (adds missing fields with defaults) |
 | `deckent mode` | Get/set deckent_style (sprint\|task\|auto) |
-| `deckent nervous` | Configure Nervous System authority mode and action overrides', ) .action(async () => { const root = resolveProjectRoot(); await handleInteractive(root); }); // deckent config nervous set mode &lt;preset&gt; nervousCmd .command('set |
+| `deckent models` | Manage and browse the model catalog |
+| `deckent nervous` | Configure Nervous System authority mode and action overrides', ) .option('--lang &lt;code&gt;', 'Language override (en\|tr) |
 | `deckent nervous` | Nervous System dashboard — monitor, accept, reject proactive suggestions |
 | `deckent onboard` | Run the onboarding wizard |
 | `deckent output <taskId>` | Show captured output for a specific worker task |
 | `deckent override <actionId> <policy>` | Set a per-action policy override |
+| `deckent pending` | List parked approvals awaiting human accept/reject |
 | `deckent plan` | Plan a sprint without executing it |
 | `deckent plugin` | Manage plugins |
 | `deckent publish <skillPath>` | Validate, sign (Ed25519) and publish a skill to the marketplace |
+| `deckent rbac` | Role-based access control — check permissions and list roles |
 | `deckent rebuild` | Rebuild memory.db from .brain/exports/*.md files |
 | `deckent recall <query>` | Search project memory — ADRs, sprint learnings, patterns, debt |
+| `deckent reclassify` | Reclassify a recorded task outcome (delta-applies agent/skill stats) |
 | `deckent recover <sprint-id>` | Recover from a crashed or stuck sprint (audit + cleanup + archive) |
+| `deckent refresh` | Force-refresh the model catalog (invalidates 24h cache) |
 | `deckent reject <id>` | Reject a pending nervous system suggestion |
 | `deckent reject <sprintId> <phase>` | Reject a pending checkpoint |
+| `deckent reject <triggerId>` | Reject a parked trigger — resolves the running loop\'s gate |
 | `deckent relations` | Manage memory relations |
 | `deckent remember <note>` | Store a note in project memory |
+| `deckent remove [id]` | Remove an entry from the autonomous backlog (positional id or --id) |
+| `deckent remove <name>` | Remove an MCP server (searches all scopes if --scope omitted) |
 | `deckent remove <name>` | Remove an installed plugin |
 | `deckent remove <pathOrId>` | Remove a document from managed docs |
+| `deckent report` | Show cross-sprint agent/skill trend report |
 | `deckent reset` | Reset all action overrides to preset defaults |
 | `deckent resume <sprintId>` | Resume a sprint from its latest checkpoint |
 | `deckent retro` | Show the latest sprint retrospective |
 | `deckent review` | Review pending relations from backfill preview |
 | `deckent review` | Review sprint tasks with evaluations |
+| `deckent revoke <user>` | Remove the role assignment for a user |
+| `deckent roles` | List all roles and their effective permissions |
 | `deckent run` | Run managed doc updates without a sprint |
+| `deckent run` | Run the flow-runtime tick once (--once) or start the daemon |
 | `deckent run <description>` | Run a single one-shot task without a sprint cycle |
 | `deckent search <query>` | Search skills in the marketplace registry |
 | `deckent serve` | Start HTTP API server with SSE support |
+| `deckent set` | Set a nervous system configuration value |
 | `deckent set <key> <value>` | Set a configuration value |
 | `deckent set-directives` | Write sprint goals to DIRECTIVES.md (content, file, or stdin) |
 | `deckent show` | Display model pricing (read-only) |
@@ -1040,14 +1073,20 @@ deckent web --dev
 | `deckent skill` | Manage skill pool |
 | `deckent spawn <taskId>` | Manually spawn a worker for a task |
 | `deckent sprint` | Switch to sprint mode |
+| `deckent start` | Start the autonomous loop (default-deny + human-approval gate) |
 | `deckent start [description]` | Start a new sprint (optionally with a one-line description for zero-config mode) |
 | `deckent stats` | Show memory.db statistics |
 | `deckent stats <name>` | Show sprint-by-sprint performance for an agent |
+| `deckent status` | Show autonomous runtime summary (pending + last audit events) |
+| `deckent status` | Show whether the bot daemon is running |
 | `deckent status` | Show the current sprint dashboard |
+| `deckent stop` | Signal the autonomous loop to stop cleanly |
+| `deckent stop` | Stop the bot daemon |
 | `deckent sync` | Sync adapter files and detect out-of-band changes since last sprint |
 | `deckent task` | Switch to task mode |
 | `deckent test` | Run a test sprint (no retro, no memory update, no decay) |
 | `deckent test <name>` | Test a plugin: validate manifest and entrypoint, run hooks if available |
+| `deckent tier <model>` | Look up the tier of a specific model by ID or API ID |
 | `deckent undo <action-id>` | Undo a recent reversible action |
 | `deckent update` | Fetch latest pricing from LiteLLM + OpenRouter |
 | `deckent update <name>` | Update an installed skill from its original source |

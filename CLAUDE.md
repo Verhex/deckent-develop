@@ -73,8 +73,8 @@ MVP ve temel seviye iş ve işçilik planlamıyorum. Her zaman milyonlarca kişi
 - **connectors/** — External messaging adapters: Discord, Telegram, WhatsApp, incoming-router
 - **providers/** — Claude, Codex, Gemini adapters (5 modules)
 - **api/** — HTTP API server, SSE, rate limiting (4 modules)
-- **mcp/** — MCP server: 31 tools + 8 resources, stdio transport
-- **cli/** — 46 commands, helpers, entry point
+- **mcp/** — MCP server: 33 tools + 8 resources, stdio transport
+- **cli/** — 55+ commands, helpers, entry point
 - **dashboard/** — React + Vite + Tailwind web dashboard
 - **extensions/vscode/** — VS Code extension host integration
 
