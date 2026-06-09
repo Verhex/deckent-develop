@@ -377,6 +377,14 @@ export interface DeckentConfig {
       /** Path to the reactive trigger map JSON, relative to project root. */
       map_path?: string;
     };
+    /** Work-generator sub-block (flag-gated, default-off): self-generated work
+     *  from active tech-debt records → backlog candidates. */
+    work_generator?: {
+      /** Enable debt→backlog work generation (default: false). */
+      enabled: boolean;
+      /** Minimum ms between debt scans (default: 600000 — 10 min). */
+      interval_ms?: number;
+    };
   };
 
   // ─── Runtime Style ─────────────────────────────────────────────────

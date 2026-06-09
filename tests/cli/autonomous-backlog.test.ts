@@ -86,4 +86,32 @@ describe('autonomous backlog CLI helpers', () => {
   it('turkish error messages work (lang=tr)', () => {
     expect(() => backlogRemove({ root, id: 'ghost', lang: 'tr' })).toThrow(/bulunamadı/);
   });
+
+  // ── recurring entries (--cron) ──────────────────────────────────────────
+
+  it('add with cron creates a recurring entry', () => {
+    backlogAdd({
+      root, id: 'r', title: 'nightly scan', kind: 'task',
+      description: 'scan debt', policy: 'auto', lang: 'en', cron: '0 3 * * *',
+    });
+    const e = backlogList({ root }).find((x) => x.id === 'r');
+    expect(e).toBeDefined();
+    expect(e!.trigger).toEqual({ type: 'recurring', cron: '0 3 * * *' });
+    expect(e!.status).toBe('pending');
+  });
+
+  it('add without cron keeps the one-off trigger (backward-safe)', () => {
+    backlogAdd({ root, id: 'o', title: 'once', kind: 'task', description: '', policy: 'auto', lang: 'en' });
+    expect(backlogList({ root })[0]!.trigger).toEqual({ type: 'one-off' });
+  });
+
+  it('add with a malformed cron throws a getMessage-based error (en + tr)', () => {
+    expect(() =>
+      backlogAdd({ root, id: 'r1', title: 'n', kind: 'task', description: '', policy: 'auto', lang: 'en', cron: 'NOT_A_CRON' }),
+    ).toThrow(/cron/i);
+    expect(() =>
+      backlogAdd({ root, id: 'r2', title: 'n', kind: 'task', description: '', policy: 'auto', lang: 'tr', cron: 'NOT_A_CRON' }),
+    ).toThrow(/cron/i);
+    expect(backlogList({ root })).toHaveLength(0); // nothing persisted
+  });
 });

@@ -1198,6 +1198,33 @@ describe('validateConfig — autonomous.reactive', () => {
   });
 });
 
+describe('validateConfig — autonomous.work_generator', () => {
+  it('accepts a valid work_generator block', () => {
+    const config = getDefaultConfig();
+    config.autonomous = { enabled: true, work_generator: { enabled: true, interval_ms: 60000 } };
+    expect(() => validateConfig(config)).not.toThrow();
+  });
+
+  it('defaults work_generator to disabled', () => {
+    const config = getDefaultConfig();
+    expect(config.autonomous?.work_generator?.enabled).toBe(false);
+  });
+
+  it('rejects non-boolean work_generator.enabled', () => {
+    const config = getDefaultConfig();
+    (config.autonomous as Record<string, unknown>)['work_generator'] = { enabled: 'yes' };
+    expect(() => validateConfig(config)).toThrow(ConfigValidationError);
+    expect(() => validateConfig(config)).toThrow('autonomous.work_generator.enabled');
+  });
+
+  it('rejects negative work_generator.interval_ms', () => {
+    const config = getDefaultConfig();
+    (config.autonomous as Record<string, unknown>)['work_generator'] = { enabled: true, interval_ms: -1 };
+    expect(() => validateConfig(config)).toThrow(ConfigValidationError);
+    expect(() => validateConfig(config)).toThrow('autonomous.work_generator.interval_ms');
+  });
+});
+
 // ─── Sprint 072: Plan Tier Generalization ──────────────────────────
 
 describe('Plan tier generalization (sprint-072)', () => {

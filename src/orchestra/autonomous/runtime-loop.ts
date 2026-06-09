@@ -47,7 +47,8 @@ import {
   type ExecuteDispatcherDeps,
 } from './execute-dispatcher.js';
 import { decidePolicy, computeEntryEffectClass } from './policy-gate.js';
-import { loadBacklog } from './backlog.js';
+import { applyRecurringReenqueue, enqueueCandidates, loadBacklog } from './backlog.js';
+import { makeWorkGeneratorSource } from './work-generator-source.js';
 import type { BacklogEntry } from './backlog-types.js';
 
 // Re-export TriggerSource so callers can type reactiveSource without importing autonomous-runtime.
@@ -142,6 +143,14 @@ export interface BuildEngineRuntimeOptions {
   resultTimeoutMs?: number;
   /** Optional extra trigger source (e.g. a reactive/webhook source) added last. */
   reactiveSource?: TriggerSource;
+  /**
+   * Optional self-generated-work producer (e.g. makeDebtWorkGenerator). When
+   * provided, candidates are deduped against the backlog (by id, any status),
+   * enqueued, and dispatched through a work-generator trigger source composed
+   * at the LOWEST priority (after backlog/scheduled/reactive). Absent → no
+   * work-generator source (backward-safe).
+   */
+  generateWork?: () => BacklogEntry[];
   clock?: () => Date;
   now?: () => string;
   /** Optional persistence path for the approval-adapter pending queue (forwarded to inner buildAutonomousRuntime). */
@@ -208,13 +217,28 @@ export function buildEngineRuntime(
     },
   };
 
-  // Compose: backlog-due → existing scheduled-flow source → optional reactive.
+  // Compose: backlog-due → existing scheduled-flow source → optional reactive
+  // → optional work-generator (self-generated work has the lowest priority).
+  const clock = opts.clock ?? ((): Date => new Date());
+  // Recurring cadence wire (capability-maturity gap #1): every backlog load
+  // first flips due recurring done-entries back to pending (persisted), so a
+  // `recurring` entry fires again at each cron cadence instead of dying after
+  // its first run.
   const backlogSrc = makeBacklogTriggerSource(
-    () => loadBacklog(opts.backlogPath),
-    opts.clock ?? (() => new Date()),
+    () => applyRecurringReenqueue(opts.backlogPath, loadBacklog(opts.backlogPath), clock()),
+    clock,
   );
   const sources: TriggerSource[] = [backlogSrc, base.deps.triggerSource];
   if (opts.reactiveSource) sources.push(opts.reactiveSource);
+  // Work-generator wire (capability-maturity gap #2): candidates are enqueued
+  // into the backlog FIRST (execute-dispatcher's status writeback requires the
+  // entry to exist there), then the first fresh one is yielded as a trigger.
+  if (opts.generateWork) {
+    const generateWork = opts.generateWork;
+    sources.push(makeWorkGeneratorSource({
+      generate: () => enqueueCandidates(opts.backlogPath, loadBacklog(opts.backlogPath), generateWork()),
+    }));
+  }
   base.deps.triggerSource = makeHybridTriggerSource(sources);
 
   // G2/G3 policy gate: backlog entries route through decidePolicy; non-backlog

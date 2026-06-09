@@ -718,6 +718,10 @@ const MESSAGES: MessageMap = {
     en: 'An entry id is required: pass it positionally (remove <id>) or via --id <id>.',
     tr: 'Kayıt id gerekli: ya konumsal (remove <id>) ya da --id <id> ile verin.',
   },
+  'autonomous.backlog.invalid_cron': {
+    en: 'Invalid cron expression "{cron}": {error}',
+    tr: 'Geçersiz cron ifadesi "{cron}": {error}',
+  },
   'autonomous.backlog.summary': {
     en: 'Backlog: {total} entries — pending:{pending} running:{running} parked:{parked} done:{done} failed:{failed}',
     tr: 'Backlog: {total} kayıt — bekleyen:{pending} çalışan:{running} beklemede:{parked} tamam:{done} hata:{failed}',

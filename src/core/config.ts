@@ -787,6 +787,15 @@ export function validateConfig(config: DeckentConfig): string[] {
         errors.push('autonomous.reactive.map_path must be a string');
       }
     }
+    const workGen = au.work_generator;
+    if (workGen !== undefined) {
+      if (typeof workGen.enabled !== 'boolean') {
+        errors.push('autonomous.work_generator.enabled must be a boolean');
+      }
+      if (workGen.interval_ms !== undefined && (typeof workGen.interval_ms !== 'number' || workGen.interval_ms < 0)) {
+        errors.push('autonomous.work_generator.interval_ms must be >= 0');
+      }
+    }
   }
 
   // ─── deckent_style validation ───────────────────────────────────────
@@ -1037,6 +1046,7 @@ export function createDefaultConfig(): DeckentConfig {
       backlog_path: '.deckent/autonomous/backlog.json',
       pool_size: 1,
       reactive: { enabled: false, map_path: '.deckent/autonomous/reactive-map.json' },
+      work_generator: { enabled: false, interval_ms: 600000 },
     },
     // Nervous System (disabled by default — Sprint 148 will activate)
     nervous_system: {

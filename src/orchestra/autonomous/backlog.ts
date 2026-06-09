@@ -49,16 +49,17 @@ export function loadBacklog(path: string): BacklogFile {
 
 /**
  * Pending entries that are due now and should be dispatched by the engine.
- * Surfaces `trigger.type === 'one-off'` (explicit one-shot) and
- * `trigger.type === 'reactive'` (written by the reactive ingester — always
- * due once pending). Recurring-entry timing is owned by the FlowScheduler
- * in the trigger layer; `trigger.type === 'recurring'` entries are not
- * surfaced here (the scheduler manages their cron cadence).
+ * Surfaces every `pending` entry regardless of trigger type:
+ *   - `one-off`   — explicit one-shot, due as soon as pending
+ *   - `reactive`  — written by the reactive ingester, due once pending
+ *   - `recurring` — cron cadence is gated at FLIP time by `reenqueueRecurring`
+ *     (done→pending only when the next run after `lastRun` has arrived), so a
+ *     pending recurring entry means "due now". A freshly added recurring entry
+ *     is pending = first run immediate, matching reenqueueRecurring's
+ *     epoch-seeded semantics for never-run entries.
  */
 export function queryDue(bl: BacklogFile, _now: Date): BacklogEntry[] {
-  return bl.entries.filter(
-    (e) => e.status === 'pending' && (e.trigger.type === 'one-off' || e.trigger.type === 'reactive'),
-  );
+  return bl.entries.filter((e) => e.status === 'pending');
 }
 
 /** Mutate one entry's status + lastResult and write the whole backlog atomically. */
@@ -164,4 +165,50 @@ export function reenqueueRecurring(bl: BacklogFile, now: Date): BacklogFile {
     return { ...e, status: 'pending' as BacklogStatus };
   });
   return { ...bl, entries };
+}
+
+/**
+ * Disk-persisting wrapper around `reenqueueRecurring`: applies the flip and
+ * writes the backlog atomically ONLY when at least one entry changed (so idle
+ * ticks never rewrite the file). Returns the (possibly new) BacklogFile.
+ *
+ * This is the production call-site contract for the engine's backlog loader —
+ * it closes the function-level dormant seam (capability-maturity gap #1).
+ */
+export function applyRecurringReenqueue(path: string, bl: BacklogFile, now: Date): BacklogFile {
+  const next = reenqueueRecurring(bl, now);
+  const changed = next.entries.some((e, i) => e !== bl.entries[i]);
+  if (changed) atomicWriteFileSync(path, JSON.stringify(next, null, 2));
+  return changed ? next : bl;
+}
+
+/**
+ * Enqueue work-generator candidates into the backlog. Dedupe is by id against
+ * entries of ANY status (a done/failed `wg-*` entry must not re-enqueue while
+ * its source marker still exists) and within the batch itself. Invalid
+ * candidates are skipped with a warning — this path is fed by generators and
+ * must never throw. Mutates `bl.entries`, persists atomically only when at
+ * least one candidate was accepted, and returns the newly enqueued entries.
+ */
+export function enqueueCandidates(
+  path: string,
+  bl: BacklogFile,
+  candidates: BacklogEntry[],
+): BacklogEntry[] {
+  const seen = new Set(bl.entries.map((e) => e.id));
+  const fresh: BacklogEntry[] = [];
+  for (const c of candidates) {
+    if (seen.has(c.id)) continue;
+    const err = validateBacklogEntry(c);
+    if (err) {
+      console.warn(`[backlog] enqueueCandidates: skipping invalid candidate: ${err}`);
+      continue;
+    }
+    seen.add(c.id);
+    fresh.push(c);
+  }
+  if (fresh.length === 0) return [];
+  bl.entries.push(...fresh);
+  atomicWriteFileSync(path, JSON.stringify(bl, null, 2));
+  return fresh;
 }

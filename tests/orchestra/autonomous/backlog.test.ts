@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync, existsSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync, existsSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { loadBacklog, validateBacklogEntry, queryDue, updateStatus, purgeCompletedBacklog, cleanupAutonomousArtifacts, reenqueueRecurring } from '../../../src/orchestra/autonomous/backlog.js';
+import { loadBacklog, validateBacklogEntry, queryDue, updateStatus, purgeCompletedBacklog, cleanupAutonomousArtifacts, reenqueueRecurring, applyRecurringReenqueue, enqueueCandidates } from '../../../src/orchestra/autonomous/backlog.js';
 import type { BacklogEntry } from '../../../src/orchestra/autonomous/backlog-types.js';
 
 function entry(over: Partial<BacklogEntry> = {}): BacklogEntry {
@@ -225,5 +225,69 @@ describe('backlog store', () => {
     expect(() => reenqueueRecurring(bl, new Date('2026-06-09T23:00:00Z'))).not.toThrow();
     const result = reenqueueRecurring(bl, new Date('2026-06-09T23:00:00Z'));
     expect(result.entries[0]!.status).toBe('done');
+  });
+
+  // ── queryDue + recurring (cadence gated at flip-time by reenqueueRecurring) ──
+
+  it('queryDue surfaces pending recurring entries (pending recurring = due now)', () => {
+    const bl = { _version: '1.0', entries: [
+      entry({ id: 'rec', trigger: { type: 'recurring' as const, cron: '0 * * * *' } }),
+      entry({ id: 'rec-done', status: 'done' as const, trigger: { type: 'recurring' as const, cron: '0 * * * *' } }),
+    ]};
+    expect(queryDue(bl, new Date('2026-06-09T10:30:00Z')).map(e => e.id)).toEqual(['rec']);
+  });
+
+  // ── applyRecurringReenqueue (disk-persisting wrapper) ─────────────────────
+
+  it('applyRecurringReenqueue persists the done→pending flip when the cadence is due', () => {
+    const rec = entry({ id: 'rec', status: 'done' as const, trigger: { type: 'recurring' as const, cron: '0 * * * *' }, lastRun: '2026-06-09T10:00:00Z' });
+    writeFileSync(path, JSON.stringify({ _version: '1.0', entries: [rec] }));
+    const result = applyRecurringReenqueue(path, loadBacklog(path), new Date('2026-06-09T11:30:00Z'));
+    expect(result.entries[0]!.status).toBe('pending');
+    expect(loadBacklog(path).entries[0]!.status).toBe('pending'); // persisted to disk
+  });
+
+  it('applyRecurringReenqueue leaves the file untouched when nothing flips', () => {
+    const rec = entry({ id: 'rec', status: 'done' as const, trigger: { type: 'recurring' as const, cron: '0 * * * *' }, lastRun: '2026-06-09T10:00:00Z' });
+    const raw = JSON.stringify({ _version: '1.0', entries: [rec] });
+    writeFileSync(path, raw);
+    const result = applyRecurringReenqueue(path, loadBacklog(path), new Date('2026-06-09T10:30:00Z'));
+    expect(result.entries[0]!.status).toBe('done');
+    expect(readFileSync(path, 'utf-8')).toBe(raw); // no rewrite
+  });
+
+  // ── enqueueCandidates (work-generator intake) ─────────────────────────────
+
+  it('enqueueCandidates appends new candidates, persists, and returns them', () => {
+    writeFileSync(path, JSON.stringify({ _version: '1.0', entries: [entry({ id: 'a' })] }));
+    const bl = loadBacklog(path);
+    const fresh = enqueueCandidates(path, bl, [entry({ id: 'wg-1' })]);
+    expect(fresh.map(e => e.id)).toEqual(['wg-1']);
+    expect(loadBacklog(path).entries.map(e => e.id)).toEqual(['a', 'wg-1']);
+  });
+
+  it('enqueueCandidates dedupes by id against entries of any status', () => {
+    writeFileSync(path, JSON.stringify({ _version: '1.0', entries: [entry({ id: 'wg-1', status: 'done' as const })] }));
+    const bl = loadBacklog(path);
+    const fresh = enqueueCandidates(path, bl, [entry({ id: 'wg-1' })]);
+    expect(fresh).toEqual([]);
+    expect(loadBacklog(path).entries).toHaveLength(1);
+  });
+
+  it('enqueueCandidates dedupes within a single candidate batch', () => {
+    writeFileSync(path, JSON.stringify({ _version: '1.0', entries: [] }));
+    const bl = loadBacklog(path);
+    const fresh = enqueueCandidates(path, bl, [entry({ id: 'wg-1' }), entry({ id: 'wg-1' })]);
+    expect(fresh.map(e => e.id)).toEqual(['wg-1']);
+    expect(loadBacklog(path).entries).toHaveLength(1);
+  });
+
+  it('enqueueCandidates skips invalid candidates without throwing and does not write when none are valid', () => {
+    const raw = JSON.stringify({ _version: '1.0', entries: [] });
+    writeFileSync(path, raw);
+    const bl = loadBacklog(path);
+    const bad = { ...entry({ id: 'bad' }), policy: 'bogus' } as unknown as BacklogEntry;
+    expect(() => enqueueCandidates(path, bl, [bad])).not.toThrow();
+    expect(readFileSync(path, 'utf-8')).toBe(raw);
   });
 });

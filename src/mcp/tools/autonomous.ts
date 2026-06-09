@@ -86,6 +86,9 @@ export function registerAutonomousTool(server: McpServer): void {
         policy: z.enum(['auto', 'approval-required', 'risk-tagged']).optional().default('auto').describe(
           'Execution policy for backlog_add. Default: auto',
         ),
+        cron: z.string().optional().describe(
+          '5-field cron expression for backlog_add — entry recurs at this cadence (omit for one-off)',
+        ),
         // approve / reject (prefer `triggerId`, fall back to `id`)
         triggerId: z.string().optional().describe(
           'Trigger ID to approve or reject (alternative to `id` for approve/reject)',
@@ -101,6 +104,7 @@ export function registerAutonomousTool(server: McpServer): void {
       kind,
       description,
       policy,
+      cron,
       triggerId,
       reason,
     }) => {
@@ -185,6 +189,7 @@ export function registerAutonomousTool(server: McpServer): void {
             description: description ?? '',
             policy: (policy ?? 'auto') as BacklogEntry['policy'],
             lang,
+            cron,
           });
           const enriched = enrichResponse('autonomous', { action: 'backlog_add', id, added: true });
           return { content: [{ type: 'text' as const, text: JSON.stringify(enriched) }] };

@@ -28,6 +28,7 @@ import {
 import { FlowRegistry } from '../../core/flow-registry.js';
 import { notifyAsync } from '../../core/notify.js';
 import { bootstrapNotifyDispatcher } from '../../core/notify-bootstrap.js';
+import { nextRun } from '../../core/scheduled-flow.js';
 import type { ScheduledFlow } from '../../core/scheduled-flow.js';
 import type { SelfDispatchPolicy } from '../../core/self-dispatch.js';
 import type {
@@ -35,6 +36,7 @@ import type {
   AutonomousRuntimeConfig,
 } from '../../orchestra/autonomous-runtime.js';
 import { loadBacklog, validateBacklogEntry } from '../../orchestra/autonomous/backlog.js';
+import { makeDebtWorkGenerator } from '../../orchestra/autonomous/work-generator-source.js';
 import { recoverBacklog } from '../../orchestra/autonomous/execution-pool.js';
 import { atomicWriteFileSync } from '../../agents/worker-lifecycle.js';
 import type { BacklogEntry } from '../../orchestra/autonomous/backlog-types.js';
@@ -105,6 +107,8 @@ export interface BacklogAddOptions {
   description: string;
   policy: BacklogEntry['policy'];
   lang: string;
+  /** 5-field cron expression — when set, the entry recurs at this cadence. */
+  cron?: string;
 }
 
 export function backlogAdd(o: BacklogAddOptions): void {
@@ -113,13 +117,25 @@ export function backlogAdd(o: BacklogAddOptions): void {
   if (bl.entries.some((e) => e.id === o.id)) {
     throw new Error(getMessage('autonomous.backlog.duplicate', o.lang, { id: o.id }));
   }
+  // Reject a malformed cron at intake — a recurring entry whose cron only
+  // fails later (at the reenqueue flip) would silently never fire again.
+  if (o.cron !== undefined) {
+    try {
+      nextRun(o.cron, new Date());
+    } catch (err) {
+      throw new Error(getMessage('autonomous.backlog.invalid_cron', o.lang, {
+        cron: o.cron,
+        error: err instanceof Error ? err.message : String(err),
+      }));
+    }
+  }
   const entry: BacklogEntry = {
     id: o.id,
     title: o.title,
     kind: o.kind,
     spec: { description: o.description },
     policy: o.policy,
-    trigger: { type: 'one-off' },
+    trigger: o.cron !== undefined ? { type: 'recurring', cron: o.cron } : { type: 'one-off' },
     status: 'pending',
     lastRun: null,
     lastResult: null,
@@ -190,12 +206,20 @@ export async function handleStart(opts: AutonomousStartOptions): Promise<void> {
   const taskConfig = { ...resolvedConfig, deckent_style: 'task' as const };
   const sprintConfig = { ...resolvedConfig, deckent_style: 'sprint' as const };
 
+  // Work-generator wire (flag-gated, default-off): active tech-debt records
+  // become backlog candidates, throttled to work_generator.interval_ms.
+  const workGenConfig = resolvedConfig.autonomous.work_generator;
+  const generateWork = workGenConfig?.enabled
+    ? makeDebtWorkGenerator({ projectRoot: root, intervalMs: workGenConfig.interval_ms })
+    : undefined;
+
   const { deps } = buildEngineRuntime({
     projectRoot: root,
     config: resolvedConfig,
     backlogPath,
     flows,
     policy,
+    generateWork,
     pendingPath: pendingPath(root),
     runTask: (ctx) => runTaskMode({
       description: ctx.description,
@@ -608,11 +632,12 @@ export function registerAutonomous(program: Command): void {
     .option('--kind <kind>', 'Entry kind: task (default) or sprint', 'task')
     .option('--description <text>', 'Task description or directives ref', '')
     .option('--policy <policy>', 'Policy: auto (default), approval-required, or risk-tagged', 'auto')
+    .option('--cron <expr>', '5-field cron expression — entry recurs at this cadence (omit for one-off)')
     .option('--root <path>', 'Project root override')
     .option('--lang <code>', 'Language override (en|tr)')
     .action((opts: {
       id: string; title: string; kind: string; description: string;
-      policy: string; root?: string; lang?: string;
+      policy: string; cron?: string; root?: string; lang?: string;
     }) => {
       try {
         const lang = getLanguage(opts.lang);
@@ -623,6 +648,7 @@ export function registerAutonomous(program: Command): void {
           description: opts.description,
           policy: (opts.policy as BacklogEntry['policy']),
           lang,
+          cron: opts.cron,
         });
         print(getMessage('autonomous.backlog.added', lang, { id: opts.id }));
       } catch (err) {
