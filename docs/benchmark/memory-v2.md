@@ -1,157 +1,146 @@
 # Memory V2 — Context Reduction Benchmark
 
-This document substantiates the "96% context reduction" claim made in README.md and launch
-materials. All measurements are derived from actual files in this repository.
+This document assesses the **"96% context reduction"** claim made for Memory V2. Every number
+below is measured from the actual repository state at **sprint-249 (2026-06-09)** and is
+reproducible with the commands in [How to Reproduce](#how-to-reproduce). Where a figure cannot
+be reproduced from this checkout, it is explicitly labelled as such rather than asserted.
 
 ---
 
-## What Is Being Measured
+## What Memory V2 Does
 
-**Memory V1 (flat-file):** All `.brain/*.md` files were loaded directly into Claude Code
-context via `@` references in CLAUDE.md. Every conversation loaded the full content of
-DECISIONS.md, MEMORY.md, PATTERNS.md, DEBT.md, PROJECT-IDENTITY.md, and RETRO.md.
+Memory V2 is **DB-first**: all brain knowledge (ADRs, learnings, sprint records, retros,
+patterns, debt, identity) lives in a single SQLite database, `.brain/memory.db`
+(`src/core/memory-store.ts` — "SQLite DB layer for Memory V2", FTS5 full-text search).
 
-**Memory V2 (DB-first):** All knowledge lives in `.brain/memory.db` (SQLite + FTS5). Only
-`.brain/exports/summary.md` is loaded into context via `@` reference. Full exports
-(decisions.md, memory.md, debt.md) are generated for git review but not loaded into context.
-Targeted queries via `deckent recall "<query>"` retrieve only relevant entries from the DB.
+Markdown files under `.brain/exports/` are **generated snapshots** of that DB
+(`src/core/memory-export.ts` — four export functions: `exportSummaryMd`, `exportDecisionsMd`,
+`exportMemoryMd`, `exportDebtMd`). They exist for git review, not for model context.
 
----
+The context-reduction lever is the split between **what is generated** and **what is loaded**:
 
-## Measurement A — Pre-V2 Snapshot vs V2 Context File
+- **Generated for git review:** `decisions.md`, `memory.md`, `debt.md`, `summary.md`.
+- **Loaded into model context** (`@`-referenced in `CLAUDE.md` and `DECKENT.md`): **only
+  `summary.md`** — a compact digest (ADR index + recent learnings + active debt + patterns).
+  The three large exports are never `@`-referenced.
 
-**Baseline:** `.brain/archive/pre-v2/` contains the exact flat-file state at migration time
-(Sprint 143, May 12 2025). These files were all loaded into context on every conversation.
-
-| File | Bytes | Lines |
-|------|------:|------:|
-| `DECISIONS.md` | 96,389 | 1,505 |
-| `MEMORY.md` | 4,361 | 34 |
-| `PROJECT-IDENTITY.md` | 7,766 | 117 |
-| `RETRO.md` | 5,491 | 119 |
-| `PATTERNS.md` | 177 | 8 |
-| `DEBT.md` | 544 | 3 |
-| **Total V1 context load** | **114,728** | **1,786** |
-
-**V2 context load** (only `summary.md` is `@`-referenced in CLAUDE.md):
-
-| File | Bytes | Lines |
-|------|------:|------:|
-| `exports/summary.md` | 8,595 | 140 |
-
-**Reduction (Measurement A):**
-
-```
-context_reduction = (114728 - 8595) / 114728 = 92.5%
-```
+Targeted retrieval (`deckent recall "<query>"`) reads relevant rows from the DB on demand
+instead of loading the whole corpus.
 
 ---
 
-## Measurement B — V2 Full Exports vs V2 Context File
+## Method
 
-By Sprint 212 the database holds 459 entries (66 ADRs, 78 memory entries, 74 sprint records,
-62 retros, 47 patterns, 131 debt items, 1 identity). Full exports at this sprint count:
+**Baseline (denominator):** the full set of generated markdown exports — i.e. the knowledge a
+flat-file ("load everything") setup would place into context.
 
-| File | Bytes | Lines | Loaded in context? |
-|------|------:|------:|:------------------:|
-| `exports/decisions.md` | 395,259 | 6,851 | No — git review only |
-| `exports/memory.md` | 52,878 | 640 | No — git review only |
-| `exports/debt.md` | 17,770 | 156 | No — git review only |
-| `exports/summary.md` | 8,595 | 140 | **Yes** |
-| **Total exports** | **474,502** | **7,787** | |
+**V2 context load (numerator):** the bytes Memory V2 actually loads into context — only
+`summary.md`.
 
-Only 8,595 of 474,502 bytes are loaded into context.
+`reduction = (baseline − loaded) / baseline`
 
-**Reduction (Measurement B):**
-
-```
-context_reduction = (474502 - 8595) / 474502 = 98.2%
-```
+All sizes are byte counts (`wc -c`); the corpus is ASCII/UTF-8 markdown, so bytes ≈ characters.
 
 ---
 
-## Measurement C — FTS5 Query Precision
+## Measured State (sprint-249, 2026-06-09)
 
-When `deckent recall "<query>"` is used, the FTS5 engine returns only the relevant entries
-instead of loading all knowledge into context.
+| Generated export | Bytes | Loaded into context? |
+|------------------|------:|:--------------------:|
+| `exports/decisions.md` | 506,301 | No — git review only |
+| `exports/memory.md` | 65,723 | No — git review only |
+| `exports/debt.md` | 818 | No — git review only |
+| `exports/summary.md` | 8,430 | **Yes** (`@`-referenced) |
+| **Total generated** | **581,272** | |
 
-| Metric | Value |
-|--------|------:|
-| Total entries in DB (Sprint 212) | 459 |
-| Typical query result set | 5–10 entries |
-| Avg context per entry (chars) | ~400 |
-| Full-corpus context | ~183,600 chars |
-| Typical query context | ~2,000–4,000 chars |
-
-**Reduction (Measurement C):**
-
-```
-at 5 results:  (459 - 5)  / 459 = 98.9%
-at 10 results: (459 - 10) / 459 = 97.8%
-at 20 results: (459 - 20) / 459 = 95.6%
-```
-
-FTS5 dual-layer search (original + `turkishNormalize()`) ensures high recall even as
-precision reduces the result set — relevant entries are not missed.
+Database (`.brain/memory.db`): **3.33 MB**, **284 live entries** — 107 memory, 75 ADR, 48 chat,
+20 sprint, 20 retro, 8 pattern, 5 debt, 1 identity.
 
 ---
 
-## Summary
+## Result
 
-| Methodology | Measured Reduction |
-|-------------|-------------------:|
-| A — Pre-V2 snapshot vs V2 context file | 92.5% |
-| B — V2 full exports vs V2 context file | 98.2% |
-| C — FTS5 query precision (10-result set) | 97.8% |
-| **Claim in README** | **96%** |
+**Primary measurement — full generated corpus vs loaded context file:**
 
-**Verdict:** The "96% context reduction" claim is directionally correct. Actual measured
-values range from **92.5% to 98.2%** depending on methodology and sprint count. The claim
-of 96% falls within this measured range and is a conservative midpoint when accounting for
-both per-conversation context reduction (Measurement A/B) and per-query precision
-(Measurement C).
+```
+reduction = (581,272 − 8,430) / 581,272 = 98.55%
+```
 
-The DECISIONS.md file alone grew from 96KB (pre-V2) to 395KB by Sprint 212 — the V2
-architecture kept the context-loaded portion flat at 8.4KB regardless of sprint count.
+**Conservative single-file framing — vs `decisions.md` alone** (the dominant export):
+
+```
+reduction = (506,301 − 8,430) / 506,301 = 98.33%
+```
+
+Both reproducible measurements land at **≈98.3–98.6%**.
+
+---
+
+## Honest Qualification of the 96% Claim
+
+- **The claim is conservative and supported.** The reproducible measurements (98.3–98.6%)
+  *exceed* 96%, so the headline number understates the actual reduction rather than inflating it.
+- **96% is not the exact output of any single measurement here.** It is a round, conservative
+  figure; the directly-derivable numbers from this checkout are ≈98.5%. Treat 96% as a safe
+  floor, not a precise reading.
+- **The legacy V1 ("flat-file, load everything") baseline cannot be reproduced in this
+  checkout.** There is no `.brain/archive/pre-v2/` directory here, so any historical
+  V1→V2 figure (the migration-era comparison) is **not verifiable from this repository** and is
+  deliberately excluded from the measured result above.
+- **The "vs raw DB" angle is excluded from the headline.** Comparing `summary.md` (8,430 B)
+  against the 3.33 MB `.brain/memory.db` yields 99.76%, but that is not apples-to-apples: the DB
+  is binary and includes the FTS5 index and history table, none of which a flat-file setup would
+  paste into context. It is noted only for completeness.
+- **`summary.md` exceeds its own design target.** `exportSummaryMd` targets `< 5000 chars`
+  (`src/core/memory-export.ts`), but the live file is 8,430 B because the ADR index now holds 75
+  one-line rows. The reduction still holds — and improves over time — because the denominator
+  (full exports) grows much faster than the digest as the project accumulates knowledge.
+
+**Verdict:** Under the stated assumptions (baseline = all generated exports; loaded = only the
+`@`-referenced `summary.md`), Memory V2 reduces loaded memory context by **≈98.5%** at
+sprint-249. The advertised **96%** is a conservative, defensible floor — directionally correct
+and below the actual reproducible figure, not above it.
 
 ---
 
 ## How to Reproduce
 
 ```bash
-# Pre-V2 baseline
-wc -c .brain/archive/pre-v2/*.md
-
-# V2 context file
+# Loaded context file (numerator)
 wc -c .brain/exports/summary.md
 
-# V2 full exports
+# Full generated corpus (denominator)
 wc -c .brain/exports/*.md
 
-# DB entry count
+# DB size + live entry count by type
+ls -la .brain/memory.db
 node -e "
-const Database = require('better-sqlite3');
-const db = new Database('.brain/memory.db');
-console.log(db.prepare('SELECT COUNT(*) as c FROM entries WHERE deleted_at IS NULL').get());
-db.close();
+  const Database = require('better-sqlite3');
+  const db = new Database('.brain/memory.db', { readonly: true });
+  console.log('total', db.prepare('SELECT COUNT(*) c FROM entries WHERE deleted_at IS NULL').get().c);
+  for (const r of db.prepare('SELECT type, COUNT(*) c FROM entries WHERE deleted_at IS NULL GROUP BY type ORDER BY c DESC').all())
+    console.log(' ', r.type, r.c);
+  db.close();
 "
 ```
 
----
-
-## Database
-
-- **Path:** `.brain/memory.db` (SQLite 3, WAL mode)
-- **Size:** 5.9 MB (Sprint 212)
-- **Schema:** 5 tables + FTS5 virtual table (`entries_fts`)
-- **FTS5 columns:** title, content, summary, tag\_text + 4 normalized variants
-- **Tokenizer:** `unicode61 remove_diacritics 2`
-- **Search:** Dual-layer (original + `turkishNormalize()`) for TR/EN/DE 100% recall
-
-See [`docs/architecture/memory-system.md`](https://github.com/VerhexIO/deckent/blob/main/docs/architecture/memory-system.md) for full
-architecture documentation.
+Numbers will drift as the DB grows; the reduction percentage increases with it, because the
+full exports expand while only the compact `summary.md` is loaded.
 
 ---
 
-*Last updated: Sprint 212 (2026-06-01). Measurements sourced from `.brain/archive/pre-v2/`
-(pre-migration baseline) and `.brain/exports/` (current V2 outputs).*
+## Database Details
+
+- **Path:** `.brain/memory.db` (SQLite 3, gitignored — rebuilt from exports)
+- **Schema:** 5 tables (`entries`, `tags`, `relations`, `entry_history`, `schema_version`) + an
+  `entries_fts` FTS5 virtual table
+- **Search:** dual-layer FTS5 (original + `turkishNormalize()`) for TR/EN/DE high-recall retrieval
+- **Lifecycle:** soft-delete + decay; `summary.md` regenerated each sprint end
+
+See [`../architecture/memory-system.md`](../architecture/memory-system.md) for the full
+architecture.
+
+---
+
+*Measured from `.brain/exports/` and `.brain/memory.db` at sprint-249 (2026-06-09). Figures
+recompute via the commands above; they are not hard-coded snapshots of a fixed sprint.*

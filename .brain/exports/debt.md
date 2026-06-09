@@ -4,11 +4,17 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-249-009-fix | Tech debt from 249-009-fix: Created/updated docs/guide/architecture-overview.md  | normal | sprint-249 | active |
 
 ## Resolved Technical Debt
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-249-006 | Tech debt from 249-006: Created docs/comparison/why-deckent.md as a factual, pos | normal | sprint-249 | resolved |
+| debt-249-010 | Tech debt from 249-010: Worker exited without writing result (exitCode=0) | disk | normal | sprint-249 | resolved |
+| debt-249-012 | Tech debt from 249-012: Worker exited without writing result (exitCode=0) | disk | normal | sprint-249 | resolved |
+| debt-249-014 | Tech debt from 249-014: Worker exited without writing result (exitCode=0) | disk | normal | sprint-249 | resolved |
+| debt-249-015 | Tech debt from 249-015: Worker exited without writing result (exitCode=0) | disk | normal | sprint-249 | resolved |
 | debt-248-001 | Tech debt from 248-001: Created docs/_provider-gate/codex-parity.md with exactly | normal | sprint-248 | resolved |
 | rollback-sprint-243 | Sprint sprint-243 rollback SUCCESS | normal | sprint-243 | resolved |
 | rollback-sprint-239 | Sprint sprint-239 rollback SUCCESS | normal | sprint-239 | resolved |

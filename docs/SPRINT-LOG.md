@@ -6735,3 +6735,39 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 248-002: 248-002 — gemini worker gate (DONE)
 
 ---
+## Sprint 249 — sprint-249
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-06-09
+**Duration:** 2477s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 21 |
+| Completed | 11 |
+| Tech Debt | 7 |
+| No-Go | 10 |
+| Coverage | NaN% |
+| Duration | 2477064ms |
+
+### Tasks
+
+- 249-001: 249-001 — benchmark/memory-v2 (verify the 96% claim) (DONE)
+- 249-002: 249-002 — lifecycle + API-surface diagrams (DONE)
+- 249-003: 249-003 — lint-cli-mcp-parity guard (report-only) (NO_GO)
+- 249-004: 249-004 — lint-i18n-hardcode guard (report-only) (NO_GO)
+- 249-005: 249-005 — provider-parity fleet regression test (DONE)
+- 249-006: 249-006 — why-deckent comparison (factual) (GO_WITH_TECH_DEBT)
+- 249-007: 249-007 — cookbook: first sprint (NO_GO)
+- 249-008: 249-008 — cookbook: multi-provider fleet (NO_GO)
+- 249-009: 249-009 — architecture overview (EN) (GO_WITH_TECH_DEBT)
+- 249-010: 249-010 — cookbook: memory recall (GO_WITH_TECH_DEBT)
+- 249-011: 249-011 — cookbook: autonomous mode (DONE)
+- 249-012: 249-012 — getting-started (EN) (GO_WITH_TECH_DEBT)
+- 249-013: 249-013 — feature matrix (NO_GO)
+- 249-014: 249-014 — glossary (ollama, small) (GO_WITH_TECH_DEBT)
+- 249-015: 249-015 — cookbook: status & watch (ollama, small) (GO_WITH_TECH_DEBT)
+
+---

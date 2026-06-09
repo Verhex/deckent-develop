@@ -2,6 +2,27 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint249] - 2026-06-09
+
+### Added
+
+- 249-001 — benchmark/memory-v2 (verify the 96% claim)
+- 249-002 — lifecycle + API-surface diagrams
+- 249-005 — provider-parity fleet regression test
+- 249-011 — cookbook: autonomous mode
+
+### Changed
+
+- 249-006 — why-deckent comparison (factual) (completed with tech debt)
+- 249-009 — architecture overview (EN) (completed with tech debt)
+- 249-010 — cookbook: memory recall (completed with tech debt)
+- 249-012 — getting-started (EN) (completed with tech debt)
+- 249-014 — glossary (ollama, small) (completed with tech debt)
+- 249-015 — cookbook: status & watch (ollama, small) (completed with tech debt)
+
+
+_Tasks: 21 total, 11 done, 7 tech debt, 10 no-go_
+
 ## [1.0.0-beta.1-sprint248] - 2026-06-09
 
 ### Added

@@ -1,5 +1,24 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-249 Learnings
+- Sprint sprint-249 Learnings: ## Sprint sprint-249 Learnings
+- 249-003 — lint-cli-mcp-parity guard (report-only): NO_GO — Created scripts/lint-cli-mcp-parity.mjs (ESM, Node built-ins only, ADR-010 compliant). Script scans src/cli/commands/*.t
+- 249-004 — lint-i18n-hardcode guard (report-only): NO_GO — Created scripts/lint-i18n-hardcode.mjs — ESM, Node built-ins only (ADR-010). Scans src/cli/commands/*.ts for console.log
+- 249-006 — why-deckent comparison (factual): GO_WITH_TECH_DEBT — Created docs/comparison/why-deckent.md as a factual, positive positioning doc. Smoke checks passed: file exists, no comp
+- 249-007 — cookbook: first sprint: NO_GO — Created docs/cookbook/01-first-sprint.md with a concise first-sprint recipe and verified the requested CLI command seque
+- 249-008 — cookbook: multi-provider fleet: NO_GO — Created the multi-provider fleet cookbook recipe. It includes per-task Provider/Model override syntax, a 3-task snippet 
+- 249-009 — architecture overview (EN): GO_WITH_TECH_DEBT — Worker exited without writing result (exitCode=0)
+- 249-010 — cookbook: memory recall: GO_WITH_TECH_DEBT — Worker exited without writing result (exitCode=0) | disk-verify found evidence (linesAdded=0, untrackedFiles=3). Status 
+- 249-012 — getting-started (EN): GO_WITH_TECH_DEBT — Worker exited without writing result (exitCode=0) | disk-verify found evidence (linesAdded=0, untrackedFiles=1). Status 
+- 249-013 — feature matrix: NO_GO — Worker exited without writing result (exitCode=0) | disk-verify found evidence (linesAdded=0, untrackedFiles=2). Status 
+- 249-014 — glossary (ollama, small): GO_WITH_TECH_DEBT — Worker exited without writing result (exitCode=0) | disk-verify found evidence (linesAdded=0, untrackedFiles=6). Status 
+
+## Gains
+- 249-001 — benchmark/memory-v2 (verify the 96% claim) — Rewrote docs/benchmark/memory-v2.md to HONESTLY assess the '96% context reduction' claim against ...
+- 249-002 — lifecycle + API-surface diagrams — Created docs/reference/lifecycle-diagram.md with two accurate mermaid diagrams.
+- 249-005 — provider-parity fleet regression test — Created tests/orchestra/provider-parity-fleet.test.ts with 5 hermetic unit tests.
+- 249-011 — cookbook: autonomous mode — Created docs/cookbook/04-autonomous-mode.md with a high-level recipe for autonomous mode, describ...
+
 ## Sprint sprint-248 Learnings
 - Sprint sprint-248 Learnings: ## Sprint sprint-248 Learnings
 - 248-001 — codex worker gate: GO_WITH_TECH_DEBT — Created docs/_provider-gate/codex-parity.md with exactly the requested three lines. Typecheck and test suite were not ru
