@@ -3,7 +3,7 @@
 // Model data is now delegated to ModelRegistry (single source of truth).
 
 import { modelRegistry } from './model-registry.js';
-import type { TaskKind } from './work-model.js';
+import type { TaskKind, ActorContext } from './work-model.js';
 
 // ─── Models ──────────────────────────────────────────────────────────
 
@@ -319,6 +319,8 @@ export interface Task {
       reason: string;
     };
   };
+  /** Requesting actor — threaded from ExecutionRequest for downstream RBAC seam (data only, no enforcement). */
+  actor?: ActorContext;
   createdAt?: string;
   updatedAt?: string;
 }

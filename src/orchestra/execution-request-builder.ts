@@ -155,5 +155,6 @@ export function resolveToTask(req: ExecutionRequest, taskId: string): Task {
     authMode: req.authMode,
     assignedAgent: req.agentId ?? 'generic',
     assignedSkills: req.skillIds ?? [],
+    actor: req.actor,
   } as Task;
 }

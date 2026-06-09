@@ -55,7 +55,7 @@ describe('nextRun', () => {
   it('advances to the correct target minute', () => {
     const from = new Date('2026-01-01T10:00:00.000Z');
     const result = nextRun('30 * * * *', from);
-    expect(result.getMinutes()).toBe(30);
+    expect(result.getUTCMinutes()).toBe(30);
   });
 
   it('uses current time when no from date is given', () => {
@@ -69,6 +69,89 @@ describe('nextRun', () => {
     const result = nextRun('* * * * *', from);
     expect(result.getSeconds()).toBe(0);
     expect(result.getMilliseconds()).toBe(0);
+  });
+
+  // --- Full 5-field tests ---
+
+  it('honors the hour field', () => {
+    const from = new Date('2026-01-01T10:30:00.000Z');
+    const result = nextRun('0 14 * * *', from);
+    expect(result.toISOString()).toBe('2026-01-01T14:00:00.000Z');
+  });
+
+  it('advances to the next day when hour has already passed', () => {
+    const from = new Date('2026-01-01T15:00:00.000Z');
+    const result = nextRun('0 9 * * *', from);
+    expect(result.toISOString()).toBe('2026-01-02T09:00:00.000Z');
+  });
+
+  it('honors the day-of-month field', () => {
+    const from = new Date('2026-01-01T00:00:00.000Z');
+    const result = nextRun('0 0 15 * *', from);
+    expect(result.getUTCDate()).toBe(15);
+    expect(result.getUTCMonth()).toBe(0); // January
+  });
+
+  it('advances month when day-of-month has already passed', () => {
+    const from = new Date('2026-01-20T00:00:00.000Z');
+    const result = nextRun('0 0 10 * *', from);
+    expect(result.getUTCMonth()).toBe(1); // February
+    expect(result.getUTCDate()).toBe(10);
+  });
+
+  it('honors the month field', () => {
+    const from = new Date('2026-01-01T00:00:00.000Z');
+    const result = nextRun('0 0 1 3 *', from);
+    expect(result.getUTCMonth()).toBe(2); // March (0-indexed)
+    expect(result.getUTCDate()).toBe(1);
+  });
+
+  it('honors the day-of-week field (Monday-Friday)', () => {
+    // 2026-01-03 is a Saturday
+    const from = new Date('2026-01-03T00:00:00.000Z');
+    const result = nextRun('0 9 * * 1-5', from);
+    const dow = result.getUTCDay();
+    expect(dow).toBeGreaterThanOrEqual(1);
+    expect(dow).toBeLessThanOrEqual(5);
+    expect(result.getUTCHours()).toBe(9);
+  });
+
+  it('treats dow=7 as Sunday alias', () => {
+    // 2026-01-02 is a Friday
+    const from = new Date('2026-01-02T00:00:00.000Z');
+    const result = nextRun('0 0 * * 7', from);
+    expect(result.getUTCDay()).toBe(0); // Sunday
+  });
+
+  it('honors step expression */5 for minutes', () => {
+    const from = new Date('2026-01-01T10:03:00.000Z');
+    const result = nextRun('*/5 * * * *', from);
+    expect(result.getUTCMinutes()).toBe(5);
+  });
+
+  it('honors step expression */2 for hours', () => {
+    const from = new Date('2026-01-01T01:00:00.000Z');
+    const result = nextRun('0 */2 * * *', from);
+    expect(result.getUTCHours()).toBe(2);
+    expect(result.getUTCMinutes()).toBe(0);
+  });
+
+  it('honors range in minute field', () => {
+    const from = new Date('2026-01-01T10:09:00.000Z');
+    const result = nextRun('10-15 * * * *', from);
+    expect(result.getUTCMinutes()).toBe(10);
+  });
+
+  it('honors comma list in minute field', () => {
+    const from = new Date('2026-01-01T10:06:00.000Z');
+    const result = nextRun('5,15,45 * * * *', from);
+    expect(result.getUTCMinutes()).toBe(15);
+  });
+
+  it('throws for impossible date expression', () => {
+    // Feb 31 does not exist
+    const from = new Date('2026-01-01T00:00:00.000Z');
+    expect(() => nextRun('0 0 31 2 *', from)).toThrow('no match found within 1 year');
   });
 });
 

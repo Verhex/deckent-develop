@@ -2,6 +2,32 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint262] - 2026-06-09
+
+### Added
+
+- ENT-5a — OIDC/JWT verification (SSO foundation)
+- ENT-5a2 — SSO session store
+- ENT-5b — SIEM event forwarder
+- ENT-5c — compliance report generator
+- ENT-3 — audit log retention & rotation policy
+- ERP-1 — read-only ERP/DB connector capability
+- actor data-plumbing — carry ActorContext onto the Task (seam, not enforcement)
+- AUT-9 — work-generator trigger source (composable, not auto-wired)
+- capability-audit bridge — emit an audit event per capability invocation
+- Hygiene — green deterministic stale test assertions
+
+### Changed
+
+- Doc — Enterprise Integrations reference (SSO/SIEM/compliance/ERP) (completed with tech debt)
+
+### Fixed
+
+- AUT-4 fix — full 5-field cron in CORE (close the live latent bug)
+
+
+_Tasks: 13 total, 12 done, 1 tech debt, 1 no-go_
+
 ## [1.0.0-beta.1-sprint261] - 2026-06-09
 
 ### Added

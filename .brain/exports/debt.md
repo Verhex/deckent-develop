@@ -9,6 +9,7 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-262-013 | Tech debt from 262-013: Worker exited without writing result (exitCode=0) | disk | normal | sprint-262 | resolved |
 | debt-261-015 | Tech debt from 261-015: Worker exited without writing result (exitCode=0) | disk | normal | sprint-261 | resolved |
 | debt-260-016 | Tech debt from 260-016: Worker exited without writing result (exitCode=0) | disk | normal | sprint-260 | resolved |
 | debt-256-002 | Tech debt from 256-002: Bug: structured directive parsing pulled path-looking pr | normal | sprint-256 | resolved |

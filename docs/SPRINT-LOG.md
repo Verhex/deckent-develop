@@ -7086,3 +7086,37 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 261-016: ENT-3 — audit query/lineage surface (read-only) (DONE)
 
 ---
+## Sprint 262 — sprint-262
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-06-09
+**Duration:** 484s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 13 |
+| Completed | 12 |
+| Tech Debt | 1 |
+| No-Go | 1 |
+| Coverage | NaN% |
+| Duration | 484316ms |
+
+### Tasks
+
+- 262-001: ENT-5a — OIDC/JWT verification (SSO foundation) (DONE)
+- 262-002: ENT-5a2 — SSO session store (DONE)
+- 262-003: ENT-5b — SIEM event forwarder (DONE)
+- 262-004: ENT-5c — compliance report generator (DONE)
+- 262-005: ENT-3 — audit log retention & rotation policy (DONE)
+- 262-006: F8 — data capability handlers (read-only db.query / mail.search) (NO_GO)
+- 262-007: ERP-1 — read-only ERP/DB connector capability (DONE)
+- 262-008: AUT-4 fix — full 5-field cron in CORE (close the live latent bug) (DONE)
+- 262-009: actor data-plumbing — carry ActorContext onto the Task (seam, not enforcement) (DONE)
+- 262-010: AUT-9 — work-generator trigger source (composable, not auto-wired) (DONE)
+- 262-011: capability-audit bridge — emit an audit event per capability invocation (DONE)
+- 262-012: Hygiene — green deterministic stale test assertions (DONE)
+- 262-013: Doc — Enterprise Integrations reference (SSO/SIEM/compliance/ERP) (GO_WITH_TECH_DEBT)
+
+---
