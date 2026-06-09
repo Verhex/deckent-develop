@@ -288,6 +288,13 @@ export function coverageOptional(task: Task, result?: { filesChanged?: string[];
     const stack = inferStackFromFiles(result.filesChanged);
     if (stack !== 'generic' && !isCoverageMeasurable(stack)) return true;
   }
+  // WM-7: same non-measurable-stack exemption when `result` is absent — the
+  // sprint-phases audit-trail callsite (`coverageOptional(task)`) and any future
+  // result-less caller infer the stack from the task's declared write-scope, so
+  // both callsites agree (no audit-trail mislabel + defensive against a future
+  // verdict callsite). TS/JS scope → measurable → unchanged.
+  const scopeStack = inferStackFromFiles(task.scope?.filesWrite);
+  if (scopeStack !== 'generic' && !isCoverageMeasurable(scopeStack)) return true;
   return false;
 }
 
