@@ -1,5 +1,13 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-263 Learnings
+- Sprint sprint-263 Learnings: ## Sprint sprint-263 Learnings
+
+## Gains
+- 263-001 — Architecture & Module Inventory Analysis — Authored docs/analysis/deckent-architecture-inventory.md (190 lines) — quantitative architecture ...
+- 263-002 — Enterprise & Autonomous Capability Maturity Analysis — Authored docs/analysis/deckent-capability-maturity.md (118 lines): quantitative BUILT/PARTIAL/MIS...
+- 263-003 — Test & Quality Posture Analysis — Authored docs/analysis/deckent-quality-posture.md (190 lines, number-dense).
+
 ## Sprint sprint-260 Learnings
 - Sprint sprint-260 Learnings: ## Sprint sprint-260 Learnings
 - Doc — Enterprise Foundation reference (consume-the-contract): GO_WITH_TECH_DEBT — Worker exited without writing result (exitCode=0) | disk-verify found evidence (linesAdded=0, untrackedFiles=1). Status 

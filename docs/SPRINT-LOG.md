@@ -7120,3 +7120,27 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 262-013: Doc — Enterprise Integrations reference (SSO/SIEM/compliance/ERP) (GO_WITH_TECH_DEBT)
 
 ---
+## Sprint 263 — sprint-263
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-06-09
+**Duration:** 435s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 3 |
+| Completed | 3 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 434553ms |
+
+### Tasks
+
+- 263-001: Architecture & Module Inventory Analysis (DONE)
+- 263-002: Enterprise & Autonomous Capability Maturity Analysis (DONE)
+- 263-003: Test & Quality Posture Analysis (DONE)
+
+---
