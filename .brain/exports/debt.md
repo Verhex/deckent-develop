@@ -9,6 +9,7 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-256-002 | Tech debt from 256-002: Bug: structured directive parsing pulled path-looking pr | normal | sprint-256 | resolved |
 | debt-254-002 | Tech debt from 254-002: Created the required three-line documentation file. No t | normal | sprint-254 | resolved |
 | debt-251-007 | Tech debt from 251-007: Created docs/cookbook/index.md with a navigation index l | normal | sprint-251 | resolved |
 | debt-251-010 | Tech debt from 251-010: Worker exited without writing result (exitCode=0) | disk | normal | sprint-251 | resolved |

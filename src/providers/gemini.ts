@@ -6,10 +6,9 @@ import {
 } from 'node:child_process';
 import {
   writeFileSync,
+  appendFileSync,
   mkdirSync,
   existsSync,
-  openSync,
-  closeSync,
 } from 'node:fs';
 import { join } from 'node:path';
 import type { ModelType, GeminiModel } from '../core/types.js';
@@ -82,6 +81,14 @@ const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models
 
 /** Auth header name per official Google AI docs (used by REST API fallback) */
 export const GEMINI_AUTH_HEADER = 'x-goog-api-key';
+
+// Fast-fail guards: kill the child immediately when these patterns appear in output.
+// Prevents the gemini CLI from hanging for the full worker timeout when it drops into
+// an interactive login flow (unrecoverable) or hits quota exhaustion (429 / RESOURCE_EXHAUSTED).
+/** Login/auth prompt pattern — kill immediately (interactive mode = unrecoverable headless) */
+export const LOGIN_FAST_FAIL = /gemini\s+login|please\s+(run\s+)?.*login|please\s+authenticate|authentication\s+required|login\s+required/i;
+/** Quota/rate-limit pattern — kill after 2 hits (allow CLI's own single retry) */
+export const QUOTA_FAST_FAIL = /429|RESOURCE_EXHAUSTED|No\s+capacity/i;
 
 // ─── Gemini CLI Output Parser ────────────────────────────────────────
 
@@ -252,19 +259,20 @@ export class GeminiAdapter implements ProviderAdapter {
     ensureDir(tasksDir);
 
     const logPath = join(tasksDir, `task-${taskId}.log`);
-    const logFd = openSync(logPath, 'a');
 
     // Build args for the Gemini CLI
     const args = this.buildArgs(model, prompt);
 
+    // Use pipe stdio so we can monitor stdout/stderr for fast-fail patterns
+    // (login prompts, 429, RESOURCE_EXHAUSTED). An fd-based approach would make
+    // child.stdout/stderr null, preventing real-time monitoring.
     const spawnOpts: NodeSpawnOptions = {
       cwd: dir,
-      stdio: ['pipe', logFd, logFd],
+      stdio: ['pipe', 'pipe', 'pipe'],
       env: buildGeminiSpawnEnv(apiKey),
     };
 
     const child = spawn('gemini', args, spawnOpts);
-    closeSync(logFd);
 
     // Write heartbeat
     this.writeHeartbeat(taskId, dir, 'EXECUTING');
@@ -281,11 +289,31 @@ export class GeminiAdapter implements ProviderAdapter {
     const timeout = this.defaultTimeoutMs;
     if (timeout > 0) {
       entry.timeoutHandle = setTimeout(() => {
-        this.killWithSignal(taskId, 'SIGKILL');
+        if (this.workers.has(taskId)) this.killWithSignal(taskId, 'SIGKILL');
       }, timeout);
     }
 
     this.workers.set(taskId, entry);
+
+    // Fast-fail guard: watch stdout/stderr for login prompts and quota exhaustion.
+    // Kills the child within seconds instead of waiting for the full worker timeout.
+    let quotaHits = 0;
+    const checkFastFail = (chunk: Buffer | string): void => {
+      const text = chunk.toString();
+      try { appendFileSync(logPath, text, 'utf-8'); } catch { /* non-fatal */ }
+      if (LOGIN_FAST_FAIL.test(text)) {
+        if (this.workers.has(taskId)) this.killWithSignal(taskId, 'SIGKILL');
+        return;
+      }
+      if (QUOTA_FAST_FAIL.test(text)) {
+        quotaHits++;
+        if (quotaHits >= 2 && this.workers.has(taskId)) {
+          this.killWithSignal(taskId, 'SIGKILL');
+        }
+      }
+    };
+    child.stdout?.on('data', checkFastFail);
+    child.stderr?.on('data', checkFastFail);
 
     // Cleanup on exit
     child.once('exit', () => {

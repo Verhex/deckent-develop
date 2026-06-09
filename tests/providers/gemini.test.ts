@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { MockInstance } from 'vitest';
-import { GeminiAdapter, createGeminiAdapter, GEMINI_AUTH_HEADER, parseGeminiOutput, buildGeminiSpawnEnv } from '../../src/providers/gemini.js';
+import { GeminiAdapter, createGeminiAdapter, GEMINI_AUTH_HEADER, parseGeminiOutput, buildGeminiSpawnEnv, LOGIN_FAST_FAIL, QUOTA_FAST_FAIL } from '../../src/providers/gemini.js';
 import type { ProviderSpawnOptions } from '../../src/core/provider.js';
 import { ProviderError } from '../../src/core/provider.js';
 
@@ -10,6 +10,12 @@ const mockChildProcess = {
   stdin: {
     write: vi.fn(),
     end: vi.fn(),
+  },
+  stdout: {
+    on: vi.fn(),
+  },
+  stderr: {
+    on: vi.fn(),
   },
   once: vi.fn(),
   kill: vi.fn(),
@@ -25,31 +31,66 @@ vi.mock('node:child_process', () => ({
 
 vi.mock('node:fs', () => ({
   writeFileSync: vi.fn(),
+  appendFileSync: vi.fn(),
   mkdirSync: vi.fn(),
   existsSync: vi.fn().mockReturnValue(true),
-  openSync: vi.fn().mockReturnValue(3),
-  closeSync: vi.fn(),
 }));
 
 import { spawn, spawnSync } from 'node:child_process';
-import { writeFileSync, mkdirSync, existsSync, openSync, closeSync } from 'node:fs';
+import { writeFileSync, appendFileSync, mkdirSync, existsSync } from 'node:fs';
 
 const mockSpawn = spawn as unknown as MockInstance;
 const mockSpawnSync = spawnSync as unknown as MockInstance;
 const mockWriteFileSync = writeFileSync as unknown as MockInstance;
+const mockAppendFileSync = appendFileSync as unknown as MockInstance;
 const mockMkdirSync = mkdirSync as unknown as MockInstance;
 const mockExistsSync = existsSync as unknown as MockInstance;
-const mockOpenSync = openSync as unknown as MockInstance;
-const mockCloseSync = closeSync as unknown as MockInstance;
 
 // ─── Helpers ─────────────────────────────────────────────────────────
 
 function setupMockChild(overrides?: Partial<typeof mockChildProcess>) {
-  const child = { ...mockChildProcess, ...overrides };
-  child.once = vi.fn().mockImplementation((event, cb) => {
+  const child = {
+    ...mockChildProcess,
+    stdout: { on: vi.fn() },
+    stderr: { on: vi.fn() },
+    kill: vi.fn(),
+    ...overrides,
+  };
+  child.once = vi.fn().mockImplementation((event: string, cb: () => void) => {
     if (event === 'exit') {
       (child as any)._exitCb = cb;
     }
+    return child;
+  });
+  mockSpawn.mockReturnValue(child);
+  return child;
+}
+
+/**
+ * Build a mock child that triggers fast-fail data on stdout or stderr.
+ * The on('data', cb) call immediately invokes cb with the given chunks.
+ */
+function setupMockChildWithOutput(stdoutChunks: string[], stderrChunks: string[] = []) {
+  const child = {
+    ...mockChildProcess,
+    stdout: {
+      on: vi.fn().mockImplementation((event: string, cb: (chunk: Buffer) => void) => {
+        if (event === 'data') {
+          for (const chunk of stdoutChunks) cb(Buffer.from(chunk));
+        }
+      }),
+    },
+    stderr: {
+      on: vi.fn().mockImplementation((event: string, cb: (chunk: Buffer) => void) => {
+        if (event === 'data') {
+          for (const chunk of stderrChunks) cb(Buffer.from(chunk));
+        }
+      }),
+    },
+    kill: vi.fn(),
+  };
+  child.once = vi.fn().mockImplementation((event: string, cb: () => void) => {
+    if (event === 'exit') (child as any)._exitCb = cb;
     return child;
   });
   mockSpawn.mockReturnValue(child);
@@ -68,7 +109,6 @@ describe('GeminiAdapter', () => {
     process.env = { ...originalEnv, GOOGLE_API_KEY: 'test-api-key-123' };
     adapter = new GeminiAdapter(projectDir);
     mockExistsSync.mockReturnValue(true);
-    mockOpenSync.mockReturnValue(3);
     mockSpawnSync.mockReturnValue({ status: 0, stdout: '0.1.0\n' });
   });
 
@@ -380,19 +420,21 @@ describe('GeminiAdapter', () => {
     expect(adapter.listWorkers()).not.toContain('task-009');
   });
 
-  it('spawn log file is created in tasks directory', () => {
-    setupMockChild();
+  it('spawn registers stdout and stderr data listeners for fast-fail monitoring', () => {
+    const child = setupMockChild();
     adapter.spawn('task-logtest', 'gemini-2.5-pro', 'Test');
-    expect(mockOpenSync).toHaveBeenCalledWith(
-      expect.stringContaining('task-logtest.log'),
-      'a',
-    );
+    expect(child.stdout.on).toHaveBeenCalledWith('data', expect.any(Function));
+    expect(child.stderr.on).toHaveBeenCalledWith('data', expect.any(Function));
   });
 
-  it('spawn closes log file descriptor after spawn', () => {
-    setupMockChild();
+  it('spawn appends stdout data to log file via appendFileSync', () => {
+    const child = setupMockChildWithOutput(['some output text']);
     adapter.spawn('task-fdtest', 'gemini-2.5-pro', 'Test');
-    expect(mockCloseSync).toHaveBeenCalledWith(3);
+    expect(mockAppendFileSync).toHaveBeenCalledWith(
+      expect.stringContaining('task-fdtest.log'),
+      'some output text',
+      'utf-8',
+    );
   });
 
   // ─── kill() ────────────────────────────────────────────────────────
@@ -576,6 +618,65 @@ describe('GeminiAdapter', () => {
     expect(child.kill).not.toHaveBeenCalled();
 
     vi.useRealTimers();
+  });
+
+  // ─── Fast-Fail Guard ───────────────────────────────────────────────
+
+  it('LOGIN_FAST_FAIL pattern matches gemini login prompt', () => {
+    expect(LOGIN_FAST_FAIL.test('Please run gemini login to authenticate')).toBe(true);
+    expect(LOGIN_FAST_FAIL.test('gemini login required')).toBe(true);
+    expect(LOGIN_FAST_FAIL.test('Authentication required')).toBe(true);
+    expect(LOGIN_FAST_FAIL.test('Login required')).toBe(true);
+    expect(LOGIN_FAST_FAIL.test('Please authenticate')).toBe(true);
+    expect(LOGIN_FAST_FAIL.test('Normal output line')).toBe(false);
+  });
+
+  it('QUOTA_FAST_FAIL pattern matches 429 and RESOURCE_EXHAUSTED', () => {
+    expect(QUOTA_FAST_FAIL.test('Error 429 Too Many Requests')).toBe(true);
+    expect(QUOTA_FAST_FAIL.test('RESOURCE_EXHAUSTED: quota exceeded')).toBe(true);
+    expect(QUOTA_FAST_FAIL.test('No capacity available right now')).toBe(true);
+    expect(QUOTA_FAST_FAIL.test('Normal response text')).toBe(false);
+  });
+
+  it('fast-fail kills child immediately on login prompt in stdout', () => {
+    const child = setupMockChildWithOutput(['Please run gemini login to authenticate']);
+    adapter.spawn('task-ff-login', 'gemini-2.5-pro', 'Test');
+    expect(child.kill).toHaveBeenCalledWith('SIGKILL');
+    expect(adapter.listWorkers()).not.toContain('task-ff-login');
+  });
+
+  it('fast-fail kills child immediately on login prompt in stderr', () => {
+    const child = setupMockChildWithOutput([], ['Authentication required, run gemini login']);
+    adapter.spawn('task-ff-login-err', 'gemini-2.5-pro', 'Test');
+    expect(child.kill).toHaveBeenCalledWith('SIGKILL');
+    expect(adapter.listWorkers()).not.toContain('task-ff-login-err');
+  });
+
+  it('fast-fail kills child after 2 quota/429 hits', () => {
+    const child = setupMockChildWithOutput([], [
+      'Error: RESOURCE_EXHAUSTED — quota exceeded',
+      'Error: RESOURCE_EXHAUSTED — quota exceeded',
+    ]);
+    adapter.spawn('task-ff-quota', 'gemini-2.5-pro', 'Test');
+    expect(child.kill).toHaveBeenCalledWith('SIGKILL');
+    expect(adapter.listWorkers()).not.toContain('task-ff-quota');
+  });
+
+  it('fast-fail does NOT kill child on a single quota/429 hit', () => {
+    const child = setupMockChildWithOutput([], ['Error 429 rate limit — retrying']);
+    adapter.spawn('task-ff-single429', 'gemini-2.5-pro', 'Test');
+    expect(child.kill).not.toHaveBeenCalled();
+    expect(adapter.listWorkers()).toContain('task-ff-single429');
+  });
+
+  it('fast-fail does not trigger on healthy output', () => {
+    const child = setupMockChildWithOutput(
+      ['Successfully generated response: Here is your code...'],
+      ['Warning: model is experimental'],
+    );
+    adapter.spawn('task-ff-healthy', 'gemini-2.5-pro', 'Test');
+    expect(child.kill).not.toHaveBeenCalled();
+    expect(adapter.listWorkers()).toContain('task-ff-healthy');
   });
 
   // ─── Edge Cases ────────────────────────────────────────────────────
@@ -817,6 +918,16 @@ describe('GeminiAdapter', () => {
     expect(withKey['GOOGLE_API_KEY']).toBe('AIza-the-key');
     const withoutKey = buildGeminiSpawnEnv();
     expect(withoutKey['GOOGLE_API_KEY']).toBeUndefined();
+  });
+
+  it('buildGeminiSpawnEnv sets GEMINI_NONINTERACTIVE=1 to prevent interactive login hang', () => {
+    // Non-interactive guard: when gemini CLI hits auth failure it must not drop
+    // into an interactive `gemini login` flow — it must exit non-zero (fail-fast).
+    const env = buildGeminiSpawnEnv();
+    expect(env['GEMINI_NONINTERACTIVE']).toBe('1');
+    // Also true when API key is provided
+    const envWithKey = buildGeminiSpawnEnv('AIza-key');
+    expect(envWithKey['GEMINI_NONINTERACTIVE']).toBe('1');
   });
 
   // ─── Factory ───────────────────────────────────────────────────────

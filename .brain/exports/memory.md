@@ -1,5 +1,27 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-257 Learnings
+- Sprint sprint-257 Learnings: ## Sprint sprint-257 Learnings
+
+## Gains
+- 257-001 — CODE-FULLSUITE-NOGO — worker self-verify must be TARGETED, not full-suite — Surgical edit to the else-branch (code task) verify section in renderTemplate.
+- 257-002 — GEMINI-LOGIN-HANG (real) — fail fast on interactive login / 429, don't hang — Implemented real fast-fail guard in src/providers/gemini.ts.
+
+## Sprint sprint-256 Learnings
+- Sprint sprint-256 Learnings: ## Sprint sprint-256 Learnings
+- PLAN-SCOPE-1 — planner must NOT pull description-mentioned file paths into scope.filesWrite: GO_WITH_TECH_DEBT — Bug: structured directive parsing pulled path-looking prose lines into scope.filesWrite/directories.,Root Cause: parseStructuredDirectives and bullet fallback collected any line containing src/, tests/, docs/, scripts/, .brain/, .deckent/, .contracts/, or .claude/ as a scope line, so prose mentions were passed to extractScopeFromDirective.,Category: Integration/Logic.,Fix: scope line collection now accepts only explicit Files/Dosya/Scope/Kapsam directive lines; explicit directive extraction behavior is preserved. Added a regression for a doc task mentioning `src/core/work-model.ts` only in description prose.,Also made two existing priority parser tests hermetic by replacing a missing .brain/archive/DIRECTIVES-sprint-136.md dependency with an inline fixture in the allowed test file.,Full suite check: npx vitest run was executed and FAILED with 67 failures across 19 files plus 1 unhandled error. Failures are outside this task scope, including docs/security-md-current.test.ts, tests/core/model-types.test.ts, tests/core/provider-ollama-bootstrap.test.ts, tests/orchestra/model-selector-provider.test.ts, tests/config/nervous-faz1-smoke.test.ts, tests/e2e/tmux-backend.test.ts, tests/cli/doctor-ux.test.ts, and ANSI/output/script/manifest/provider expectation drift. Because full suite did not pass, this result is NO_GO per worker bug-fixer verification rules.
+
+## Gains
+- 256-001 — GEMINI-LOGIN-HANG — gemini worker must fail-fast, never hang on interactive login — Added GEMINI_NONINTERACTIVE=1 to buildGeminiSpawnEnv — the single env var that signals to the gem...
+
+## Sprint sprint-255 Learnings
+- Sprint sprint-255 Learnings: ## Sprint sprint-255 Learnings
+
+## Gains
+- 255-001 — DOC-1 — ExecutionRequest contract reference (WM-1) — Created docs/reference/execution-request.md with full ExecutionRequest contract reference.
+- 255-002 — DOC-2 — Stack-aware criteria & routing (WM-7) — Code physically verified despite missing .result (Sprint 135 docker HB shutdown bug pattern).
+- 255-003 — DOC-3 — Positioning: agentic-OS + agentic-run ecosystem — Created docs/vision/agentic-run-ecosystem.md as a concrete positioning document for deckent as an...
+
 ## Sprint sprint-254 Learnings
 - Sprint sprint-254 Learnings: ## Sprint sprint-254 Learnings
 - V-001 — codex docker + reasoning-effort (MF-8 + F1-RE): GO_WITH_TECH_DEBT — Created the required three-line documentation file. No test suite was run because this is a Tier-0 doc-only task.

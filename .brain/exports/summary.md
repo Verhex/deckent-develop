@@ -80,6 +80,16 @@
 | adr-086 | Native CLI Parity — F11 Feature Set (Sprint 224) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-257 Learnings** (sprint-257): ## Sprint sprint-257 Learnings
+
+## Gains
+- 257-001 — CODE-FULLSUITE-NOGO — worker self-verify must be TARGETED, not f...
+- **Sprint sprint-256 Learnings** (sprint-256): ## Sprint sprint-256 Learnings
+- PLAN-SCOPE-1 — planner must NOT pull description-mentioned file paths into scope.fil...
+- **Sprint sprint-255 Learnings** (sprint-255): ## Sprint sprint-255 Learnings
+
+## Gains
+- 255-001 — DOC-1 — ExecutionRequest contract reference (WM-1) — Created doc...
 - **Sprint sprint-254 Learnings** (sprint-254): ## Sprint sprint-254 Learnings
 - V-001 — codex docker + reasoning-effort (MF-8 + F1-RE): GO_WITH_TECH_DEBT — Created ...
 - **Sprint sprint-253 Learnings** (sprint-253): ## Sprint sprint-253 Learnings
@@ -98,18 +108,6 @@
 - 249-003 — lint-cli-mcp-parity guard (report-only): NO_GO — Created scripts/lint-cli-...
 - **Sprint sprint-248 Learnings** (sprint-248): ## Sprint sprint-248 Learnings
 - 248-001 — codex worker gate: GO_WITH_TECH_DEBT — Created docs/_provider-gate/codex-p...
-- **Sprint sprint-247 Learnings** (sprint-247): ## Sprint sprint-247 Learnings
-
-## Gains
-- 247-001 — docs/adr-index.md — Created docs/adr-index.md with all 57 ADRs p...
-- **Sprint sprint-246 Learnings** (sprint-246): ## Sprint sprint-246 Learnings
-
-## Gains
-- 246-001 — docs/security/threat-model.md — Rewrote docs/security/threat-mod...
-- **Sprint sprint-245 Learnings** (sprint-245): ## Sprint sprint-245 Learnings
-
-## Gains
-- 245-001 — .codex + .gemini rules → .claude parity — All four goCriteria ve...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -128,5 +126,6 @@ _No active technical debt._
 - Violation pattern: file_outside_scope
 - Violation pattern: stale_heartbeat
 - Violation pattern: stale_heartbeat
+- Violation pattern: stale_heartbeat
 
-_Total entries: 317 | Generated: 2026-06-09_
+_Total entries: 330 | Generated: 2026-06-09_

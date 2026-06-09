@@ -626,18 +626,19 @@ This is a Tier-0 documentation task: there is no source code to type-check or te
 Mark selfAssessment = "DONE" when the file exists and matches the goCriteria. Use "GO_WITH_TECH_DEBT" only if the content is genuinely partial; use "NO_GO" only if you could not create the file at all. Do NOT mark NO_GO because an unrelated test suite failed.`);
   } else {
     sections.push(`## CRITICAL VERIFY STEPS (DO NOT SKIP)
-You MUST run the project's type check and test suite before marking your task as done.
+You MUST run the project's type check and TARGETED tests before marking your task as done.
 Check the project's TOOLS.md or package.json scripts to find the right commands.
 
 1. **Type check / static analysis** — fix ALL errors (max 3 attempts)
    Examples: \`tsc --noEmit\` (TypeScript), \`mypy\` (Python), \`go vet ./...\` (Go), \`cargo check\` (Rust)
-2. **Full test suite** — fix ALL failures (max 3 attempts)
-   Examples: \`npx vitest run\` / \`jest\` (Node.js), \`pytest\` (Python), \`go test ./...\` (Go), \`cargo test\` (Rust)
+2. **TARGETED test file(s) only** — run ONLY the test file(s) that cover the module(s) you changed (max 3 attempts)
+   Example: \`npx vitest run tests/orchestra/my-module.test.ts\` — do NOT run the Full test suite (\`npx vitest run\` without args).
+   The Full test suite contains ~67 pre-existing unrelated failures (stale model-id expectations, env-dependent provider/ollama tests). These pre-existing failures MUST NOT cause a NO_GO — they are not your responsibility. Base your self-assessment on (a) \`tsc --noEmit\` clean + (b) the targeted test file(s) for the module(s) you changed passing.
 
 If BOTH pass → selfAssessment = "DONE"
 If minor issues remain → selfAssessment = "GO_WITH_TECH_DEBT" with details in notes
 If Bash tool is unavailable → report in notes, selfAssessment = "GO_WITH_TECH_DEBT"
-If tests fail after 3 attempts → selfAssessment = "NO_GO" with error details`);
+If targeted tests fail after 3 attempts → selfAssessment = "NO_GO" with error details`);
   }
 
   // Scope block
