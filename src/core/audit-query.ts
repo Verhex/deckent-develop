@@ -6,7 +6,8 @@
 import { readEvents } from '../orchestra/event-stream.js';
 import type { DeckentEvent } from '../orchestra/event-stream.js';
 import { can, Permission } from './rbac.js';
-import type { AuditEvent } from './audit-writer.js';
+import { AUDIT_EVENT_CHANNEL } from './audit-writer.js';
+import type { AuditEvent, AuditEventPayload } from './audit-writer.js';
 
 // ─── Types ────────────────────────────────────────────────────────
 
@@ -91,6 +92,20 @@ export function queryAudit(
     totalScanned: rawEvents.length,
     matched: filtered.map(toAuditEntry),
   };
+}
+
+// ─── Raw audit-event reader (gap #5 read-side) ────────────────────
+
+/**
+ * Read the raw ENT-3 audit payloads (with prevHmac/hmac chain fields) for a
+ * sprint, in stream order — the input shape `verifyAuditChain`,
+ * `generateComplianceReport`, and the SIEM forwarder consume. Non-audit
+ * channels on the stream are excluded. Missing stream → `[]` (never throws).
+ */
+export function readAuditEvents(projectRoot: string, sprintId: string): AuditEventPayload[] {
+  return readEvents(projectRoot, sprintId)
+    .filter(e => e.channel === AUDIT_EVENT_CHANNEL)
+    .map(e => e.payload as unknown as AuditEventPayload);
 }
 
 // ─── Filter Helpers ───────────────────────────────────────────────

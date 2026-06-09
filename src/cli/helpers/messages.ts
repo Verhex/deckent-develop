@@ -730,6 +730,20 @@ const MESSAGES: MessageMap = {
     en: 'Invalid --args JSON: {error}',
     tr: 'Geçersiz --args JSON: {error}',
   },
+
+  // ─── audit read-side (compliance + SIEM forward) ──────────────────────
+  'audit.compliance.summary': {
+    en: 'Compliance ({sprint}): events={count} auditChainIntact={chain} rbacEnforcement={rbac} tenantIsolation={tenant}',
+    tr: 'Uyumluluk ({sprint}): olay={count} denetimZinciriSağlam={chain} rbacZorlama={rbac} kiracıİzolasyonu={tenant}',
+  },
+  'audit.compliance.actor_row': {
+    en: '  actor {actor}: {count} event(s)',
+    tr: '  aktör {actor}: {count} olay',
+  },
+  'audit.forward.done': {
+    en: 'Forwarded {count} audit record(s) → {out}',
+    tr: '{count} denetim kaydı iletildi → {out}',
+  },
   'autonomous.backlog.summary': {
     en: 'Backlog: {total} entries — pending:{pending} running:{running} parked:{parked} done:{done} failed:{failed}',
     tr: 'Backlog: {total} kayıt — bekleyen:{pending} çalışan:{running} beklemede:{parked} tamam:{done} hata:{failed}',

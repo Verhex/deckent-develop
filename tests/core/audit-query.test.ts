@@ -4,12 +4,14 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
   queryAudit,
+  readAuditEvents,
   filterByCorrelation,
   filterByCausation,
   buildCausalChain,
   groupByActor,
   type AuditEventWithLineage,
 } from '../../src/core/audit-query.js';
+import { writeAuditEvent, _resetChainHead, AUDIT_EVENT_CHANNEL } from '../../src/core/audit-writer.js';
 import type { DeckentEvent } from '../../src/orchestra/event-stream.js';
 
 let tmpRoot: string;
@@ -261,5 +263,50 @@ describe('groupByActor', () => {
     const result = groupByActor(events);
     expect(result.size).toBe(1);
     expect(result.get('system')).toHaveLength(3);
+  });
+});
+
+// ─── readAuditEvents — raw audit-channel payload reader (gap #5 read-side) ────
+
+describe('readAuditEvents', () => {
+  let root: string;
+  beforeEach(() => {
+    root = mkdtempSync(join(tmpdir(), 'audit-read-'));
+    _resetChainHead();
+  });
+  afterEach(() => { rmSync(root, { recursive: true, force: true }); });
+
+  it('returns only audit-channel payloads, in order, excluding other channels', () => {
+    // Seed a NON-audit event first (writeEvents creates the file), then append
+    // real audit events through writeAuditEvent (append-only event stream).
+    writeEvents(root, [makeEvent({ channel: 'BRAIN→*:METRIC_EMITTED' })]);
+    writeAuditEvent(root, SPRINT_ID, { tenantId: 'local', actor: 'system', action: 'a1' });
+    writeAuditEvent(root, SPRINT_ID, { tenantId: 'local', actor: 'cli', action: 'a2' });
+
+    const events = readAuditEvents(root, SPRINT_ID);
+
+    expect(events.map(e => e.action)).toEqual(['a1', 'a2']);
+  });
+
+  it('reads back exactly what writeAuditEvent appended (hermetic round-trip)', () => {
+    writeAuditEvent(root, SPRINT_ID, { tenantId: 'local', actor: 'system', action: 'one' });
+    writeAuditEvent(root, SPRINT_ID, { tenantId: 'acme', actor: 'cli', action: 'two', target: 'x' });
+
+    const events = readAuditEvents(root, SPRINT_ID);
+
+    expect(events).toHaveLength(2);
+    expect(events[0]!.action).toBe('one');
+    expect(events[1]!.tenantId).toBe('acme');
+    expect(events[1]!.target).toBe('x');
+    expect(events[0]!.hmac).toBeTruthy();
+    expect(events[1]!.prevHmac).toBe(events[0]!.hmac);
+  });
+
+  it('returns [] when the sprint stream is absent', () => {
+    expect(readAuditEvents(root, 'sprint-none')).toEqual([]);
+  });
+
+  it('uses the AUDIT_EVENT_CHANNEL constant for filtering', () => {
+    expect(AUDIT_EVENT_CHANNEL).toMatch(/AUDIT/);
   });
 });
