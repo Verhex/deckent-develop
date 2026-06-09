@@ -8,6 +8,41 @@ import type { ActivationConfig } from '../core/routing-types.js';
 import type { AgentDefinition } from '../core/agent-types.js';
 import { createAgentDefinition } from '../core/agent-types.js';
 import { persistTempAgentPrompts } from './temp-agent-generator.js';
+import { normalizeTechStack, type TechStackKind } from '../core/work-model.js';
+import { STACK_COMMANDS } from '../core/stack-detector.js';
+
+// ─── WM-7 E1: per-stack idioms — turns the parametric "project-conventions"
+// skill into a genuine, stack-correct code-expert base (a Go project gets Go
+// idioms, not TypeScript). Commands come from the single source STACK_COMMANDS
+// (no second command table); only the IDIOMS knowledge lives here.
+const STACK_IDIOMS: Partial<Record<TechStackKind, string[]>> = {
+  typescript: ['ESM imports require `.js` extensions (Node16 resolution)', 'Strict typing — avoid `any`; prefer discriminated unions + exhaustive switches', 'Tests: `describe/it/expect` + `vi.mock()`; mirror `src/` under `tests/`'],
+  javascript: ['Prefer ESM modules; avoid implicit globals', 'Tests: vitest/jest `describe/it/expect`'],
+  python: ['PEP 8 + type hints, keep `mypy` clean', 'pytest with fixtures; test files `test_*.py` / `*_test.py`', 'Isolate deps via venv/poetry; never commit secrets'],
+  go: ['Run `gofmt` + `go vet`; wrap errors with `fmt.Errorf("…: %w", err)`', 'Table-driven tests in `*_test.go`', 'Small interfaces; accept interfaces, return concrete structs'],
+  rust: ['Prefer `Result<T,E>` + `?` over panics; keep `clippy` clean', 'Unit tests in-module `#[cfg(test)]`, integration under `tests/`', 'Respect ownership/borrowing — avoid needless `.clone()`'],
+  cpp: ['RAII; avoid raw `new`/`delete` (smart pointers)', 'const-correctness; pass large objects by const-ref', 'Tests via GoogleTest/Catch2 (`*_test.cc`); build with CMake + ctest'],
+  c: ['Check every return code; free what you allocate', 'Header guards; minimise global state', 'Tests via Unity/CMocka + ctest'],
+  java: ['Favor immutability + dependency injection', 'JUnit5; avoid raw generic types', 'Build via Maven/Gradle'],
+  kotlin: ['Null-safety (`?`; use `!!` sparingly); data classes', 'JUnit5/Kotest; coroutines for async'],
+  csharp: ['Nullable reference types ON; `async`/`await` end-to-end', 'xUnit/NUnit; dispose via `using`/`IDisposable`'],
+  swift: ['Value types + optionals; avoid force-unwrap', 'XCTest; run with `swift test`'],
+  ruby: ['Keep RuboCop clean; prefer blocks/enumerables', 'RSpec specs in `*_spec.rb`'],
+  php: ['Follow PSR-12; typed properties + return types', 'PHPUnit `*Test.php`'],
+  dart: ['Keep `dart analyze` clean; null-safety', 'Flutter widget tests / `dart test`'],
+};
+
+/** Resolve a representative STACK_COMMANDS entry for a TechStackKind (handles the
+ *  build-tool-suffixed keys java_maven / c_cmake / kotlin_gradle). */
+function commandsForStack(stack: TechStackKind, language: string): { build: string; test: string; lint: string } | undefined {
+  const direct = STACK_COMMANDS[language.toLowerCase()];
+  if (direct) return direct;
+  const keyByStack: Partial<Record<TechStackKind, string>> = {
+    cpp: 'c_cmake', c: 'c_cmake', java: 'java_maven', kotlin: 'kotlin_gradle',
+  };
+  const key = keyByStack[stack];
+  return key ? STACK_COMMANDS[key] : STACK_COMMANDS[stack];
+}
 
 // ─── Internal helpers ───────────────────────────────────────────────────────
 
@@ -49,6 +84,23 @@ export function generateProjectConventionsSkill(
   sections.push(`- Build: ${analysis.buildTool || 'unknown'}`);
   sections.push(`- Test: ${analysis.testFramework || 'unknown'}`);
   sections.push('');
+
+  // WM-7 E1: stack-correct commands + idioms (parametric code-expert base).
+  const techStack = normalizeTechStack(analysis.language);
+  const cmds = commandsForStack(techStack, analysis.language);
+  if (cmds && (cmds.build || cmds.test || cmds.lint)) {
+    sections.push('## Commands');
+    if (cmds.build) sections.push(`- Build: \`${cmds.build}\``);
+    if (cmds.test) sections.push(`- Test: \`${cmds.test}\``);
+    if (cmds.lint) sections.push(`- Lint: \`${cmds.lint}\``);
+    sections.push('');
+  }
+  const idioms = STACK_IDIOMS[techStack];
+  if (idioms && idioms.length > 0) {
+    sections.push(`## ${analysis.language} Idioms`);
+    for (const idiom of idioms) sections.push(`- ${idiom}`);
+    sections.push('');
+  }
 
   // Key dependencies
   if (analysis.dependencies.length > 0) {
