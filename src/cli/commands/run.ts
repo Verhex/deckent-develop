@@ -41,7 +41,12 @@ function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-import { readJsonSafe } from '../../core/utils.js';
+import { readJsonSafe, debugLog } from '../../core/utils.js';
+import { AgentPoolManager } from '../../core/agent-pool.js';
+import { SkillPoolManager } from '../../core/skill-pool.js';
+import { detectProjectStack } from '../../core/stack-detector.js';
+import { routeTaskV2 } from '../../core/routing-engine.js';
+import type { UserOverride } from '../../core/routing-types.js';
 
 let _runTaskCounter = 0;
 export function createRunTaskId(): string {
@@ -276,6 +281,45 @@ export function registerRun(program: Command): void {
         timeoutMs,
       });
       const task = resolveToTask(execReq, taskId);
+
+      // WM-1b: V2 routing — assign the right agent + skills (fail-safe: any error keeps 'generic')
+      try {
+        const routingVersion = cfg?.routing_engine ?? 'v2';
+        if (routingVersion === 'v2') {
+          const agentPool = new AgentPoolManager(root);
+          const pool = agentPool.loadAgents();
+          const projectStack = detectProjectStack(root);
+          const skillPool = new SkillPoolManager(root);
+          const skills = skillPool.loadSkills();
+
+          const overrides: UserOverride[] = [];
+          if (task.forceAgent || task.forceSkills || task.excludeSkills || task.excludeAgent) {
+            overrides.push({
+              source: 'task-directive',
+              forceAgent: task.forceAgent,
+              forceSkills: task.forceSkills,
+              excludeSkills: task.excludeSkills,
+              excludeAgents: task.excludeAgent,
+              priority: 3,
+            });
+          }
+
+          const decision = routeTaskV2(task, pool, skills, {
+            projectStack,
+            overrides,
+            learningData: [],
+            config: cfg ? { ...cfg.routing_config, agentMinScore: cfg.agent_min_score } : undefined,
+            sprintId: '',
+            taskId: task.id,
+            projectRoot: root,
+          });
+
+          task.assignedAgent = decision.agentId ?? 'generic';
+          task.assignedSkills = decision.skillIds;
+        }
+      } catch (routingErr) {
+        debugLog('run:routing', `V2 routing failed, using generic fallback: ${routingErr}`);
+      }
 
       // Write task file
       const tasksDir = join(root, TASKS_DIR);
