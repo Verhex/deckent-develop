@@ -1,46 +1,31 @@
-# DIRECTIVES — Sprint: CODE Dogfood (loop-critical fixes, claude-weighted)
+# DIRECTIVES — Sprint: WM-1b single-task routing (claude)
 
-## Goal: Two claude-authored code fixes that make the dogfood LOOP clean: (1) CODE-FULLSUITE-NOGO — code-task workers should self-verify with TARGETED tests for the module they touched, not the full suite (whose ~67 pre-existing failures cause false self-NO_GO); (2) GEMINI-LOGIN-HANG (real) — the gemini worker must fail FAST when it drops into an interactive login / 429, not waste the full worker timeout. Fleet: **claude only** (Anthropic models carry code work; codex/gemini secondary this round). **Code tasks, Tier-0 (internal src/).**
+## Goal: WM-1b — wire real agent/skill routing into the single-task CLI path so `deckent run "fix the Go auth bug"` is routed to the right specialist (bug-fixer + the stack-prime / correct skills via WM-7), instead of the current hardcoded `generic` agent + empty skills. This completes WM-1 (the ExecutionRequest unification already sets task.type + provider; routing is the missing piece) and lets single-task runs benefit from WM-7 stack-aware routing + the language-mismatch penalty. Fleet: **claude only**. **Code task, Tier-0 (internal src/).**
 
 ## Ortak kurallar
-- CODE tasks → `npx tsc --noEmit` must stay clean. Run ONLY the TARGETED test file(s) for the module you change (NOT the full suite — it has unrelated pre-existing failures). Additive / surgical / minimum-diff (Karpathy). Stay in `scope.filesWrite`.
+- CODE task → `npx tsc --noEmit` clean. Run ONLY the TARGETED test file(s) for the touched module (e.g. `tests/cli/commands/run.test.ts`), NOT the full suite (it has unrelated pre-existing failures). Additive / surgical / minimum-diff (Karpathy). Stay in `scope.filesWrite`.
 - "Bir süre test yok": do NOT author NEW test suites; keep existing targeted tests green. Mark deferred tests as TECH DEBT in `.result` notes.
-- Her worker `.tasks/task-XXX.result` yazmalı (honest selfAssessment based on TARGETED tests + tsc).
+- `.tasks/task-XXX.result` honest selfAssessment (tsc + TARGETED tests).
 
 ---
 
-## Task 1: CODE-FULLSUITE-NOGO — worker self-verify must be TARGETED, not full-suite
+## Task 1: WM-1b — route agent + skills for the CLI `deckent run` single-task path
 - Provider: claude
 - Model: sonnet
 - Backend: docker
-- Effort: normal
+- Effort: high
 - Agent: bug-fixer
 - Skills: typescript-expert
-- Files: src/orchestra/prompt-god-template.ts
-- Scope: src/orchestra/
+- Files: src/cli/commands/run.ts
+- Scope: src/cli/commands/
 
 ### Description
-Code-task workers currently self-verify by running the FULL vitest suite (`npx vitest run`), so the project's pre-existing/unrelated failures (~67, e.g. stale model-id test expectations, env-dependent provider/ollama tests) trip a FALSE self-NO_GO even when the worker's own change is correct + its targeted tests pass. Update the worker VERIFY section in `src/orchestra/prompt-god-template.ts` (the non-doc / code verify-steps block) so the worker is instructed to run the TARGETED test file(s) for the module(s) it changed (e.g. the matching `tests/**/<module>.test.ts`), NOT the whole suite — and to base its self-assessment on (a) `tsc --noEmit` clean + (b) those targeted tests passing. Explicitly note that the full suite may contain unrelated pre-existing failures that must NOT cause a NO_GO. Keep the doc-only verify gate (MF-1) untouched. Surgical edit to the verify-section string only.
+Today the CLI `deckent run` path (`src/cli/commands/run.ts`) builds the task via `buildExecutionRequest` → `resolveToTask`, which sets `assignedAgent: 'generic'` + `assignedSkills: []` (no routing). Wire real routing so the task gets the right agent + skills. After `resolveToTask(...)` and BEFORE `resolveAgentPrompt`/`buildWorkerPrompt`, run the same V2 routing the planner uses: load the agent pool + skills, detect the project stack, classify the task, call `routeTaskV2(...)` (see how `src/orchestra/sprint-planner.ts` does its `routingVersion === 'v2'` block: `AgentPoolManager`, `SkillPoolManager`, `detectProjectStack`, `classifyIntent`, `routeTaskV2`), and set `task.assignedAgent` + `task.assignedSkills` from the routing decision. Respect explicit overrides: if the user passed an explicit agent/skill (or the task already carries forceAgent/forceSkills), DO NOT override them. Best-effort + fail-safe: if routing throws, fall back to the current `generic` behavior (never break `deckent run`). Keep the change inside `run.ts`. Because run.ts is a user-surface CLI file, include a `Smoke:` proof.
 
-**Kanıt:** `grep -n "targeted\|full suite\|pre-existing\|vitest run" src/orchestra/prompt-god-template.ts` → targeted-verify guidance eklendi; `npx tsc --noEmit` PASS; `npx vitest run tests/orchestra/prompt-god-template.test.ts` (varsa) PASS. **Test:** targeted, mevcut yeşil.
+**Smoke:** `node dist/cli/entry.js run "fix the auth bug" --scope src/ --help` is not meaningful; instead REPL-verify routing: a task whose description/scope implies bug-fixing routes to a non-generic agent (e.g. bug-fixer) — show via a small node snippet calling the routing path, OR assert in `tests/cli/commands/run.test.ts` that assignedAgent is no longer hardcoded 'generic' when routing succeeds.
+
+**Kanıt:** `grep -n "routeTaskV2\|AgentPoolManager\|assignedAgent" src/cli/commands/run.ts` → routing wired; `npx tsc --noEmit` PASS; `npx vitest run tests/cli/commands/run.test.ts` PASS (TARGETED only). **Test:** targeted, mevcut yeşil + (varsa) routing assertion.
 
 ---
 
-## Task 2: GEMINI-LOGIN-HANG (real) — fail fast on interactive login / 429, don't hang
-- Provider: claude
-- Model: sonnet
-- Backend: docker
-- Effort: normal
-- Agent: bug-fixer
-- Skills: typescript-expert
-- Files: src/providers/gemini.ts
-- Scope: src/providers/
-
-### Description
-The prior fix (`GEMINI_NONINTERACTIVE=1` env) is a no-op — the gemini CLI's non-interactive mode is `-p/--prompt` (already used), and on a 429 RESOURCE_EXHAUSTED the CLI can still drop into an interactive `gemini login` flow and hang until the worker timeout (~1200s). Implement a REAL fast-fail in `src/providers/gemini.ts`: in the gemini spawn path, watch the child process stdout/stderr; if it emits a login/auth prompt or repeated `429`/`RESOURCE_EXHAUSTED`/`No capacity` lines (indicating it cannot proceed non-interactively), kill the child and exit non-zero promptly (seconds, not 20 minutes) so the sprint NO_GOs / re-routes fast. Keep the harmless GEMINI_NONINTERACTIVE env (documents intent) but make the fast-fail the real guard. Preserve healthy-auth behavior. Run `npx tsc --noEmit` + `npx vitest run tests/providers/gemini.test.ts` — both pass.
-
-**Kanıt:** `grep -n "429\|RESOURCE_EXHAUSTED\|login\|kill\|fast" src/providers/gemini.ts` → fast-fail guard eklendi; `npx vitest run tests/providers/gemini.test.ts` PASS. **Test:** targeted, mevcut yeşil.
-
----
-
-**Beklenen:** 2/2 DONE, claude gerçek kod yazdı, tsc temiz + TARGETED testler yeşil (full-suite KOŞULMAZ → false-NO_GO yok). CC sprint-sonu disk-verify + tsc + targeted-test + diff-review yapar, gerekirse fix/genişletir. Döngü: bu bitince sonraki MASTER-PLAN item'ı.
+**Beklenen:** 1/1 DONE, claude `deckent run`'a routing wire etti (generic-hardcode kalktı, override'lar korundu, fail-safe), tsc temiz + TARGETED run testleri yeşil. CC sprint-sonu disk-verify + tsc + targeted-test + diff-review + REPL (run → doğru agent) yapar. Döngü: bu bitince sonraki MASTER-PLAN item.
