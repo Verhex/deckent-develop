@@ -88,3 +88,7 @@
 {"priority":"warning","event":"task-no-go","title":"Task 252-001 başarısız","summary":"Worker exited without writing result (exitCode=0)","sprintId":"sprint-252","timestamp":"2026-06-09T08:05:17.188Z"}
 {"priority":"info","event":"task-done","title":"Task 252-002 tamamlandı","summary":"Created docs/_verify-docker/gemini-docker.md with 3 lines as specified.","sprintId":"sprint-252","timestamp":"2026-06-09T08:05:22.580Z"}
 {"priority":"info","event":"sprint-finalized","title":"Sprint sprint-252 kapandı","summary":"3/3 DONE, 0 TECH_DEBT, 0 NO_GO","sprintId":"sprint-252","timestamp":"2026-06-09T08:08:11.846Z"}
+{"priority":"info","event":"sprint-started","title":"Sprint sprint-253 başladı","summary":"2 task planlandı","sprintId":"sprint-253","timestamp":"2026-06-09T08:16:42.907Z"}
+{"priority":"warning","event":"task-no-go","title":"Task 253-001 başarısız","summary":"[honest-gate] DISHONEST_DONE_STUB: selfAssessment=DONE claimed but linesAdded=0 testsPassed=not_run_","sprintId":"sprint-253","timestamp":"2026-06-09T08:17:37.502Z"}
+{"priority":"info","event":"task-done","title":"Task 253-002 tamamlandı","summary":"Created docs/_verify-docker/gemini-docker.md with the specified three lines.","sprintId":"sprint-253","timestamp":"2026-06-09T08:17:42.295Z"}
+{"priority":"info","event":"sprint-finalized","title":"Sprint sprint-253 kapandı","summary":"3/3 DONE, 0 TECH_DEBT, 0 NO_GO","sprintId":"sprint-253","timestamp":"2026-06-09T08:21:17.386Z"}

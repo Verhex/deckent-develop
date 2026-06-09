@@ -1,5 +1,12 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-253 Learnings
+- Sprint sprint-253 Learnings: ## Sprint sprint-253 Learnings
+
+## Gains
+- 253-001 — codex IN docker — Created the requested three-line Docker verification document.
+- 253-002 — gemini IN docker — Created docs/_verify-docker/gemini-docker.md with the specified three lines.
+
 ## Sprint sprint-252 Learnings
 - Sprint sprint-252 Learnings: ## Sprint sprint-252 Learnings
 

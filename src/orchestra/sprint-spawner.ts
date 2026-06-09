@@ -61,6 +61,7 @@ import {
 // ─── Spawn backend abstraction ───────────────────────────────────
 import type { SpawnBackend } from './spawn-backend.js';
 import { SpawnBackendFactory } from './spawn-backend.js';
+import { resolveReasoningEffort } from '../core/reasoning-effort.js';
 
 // ─── Tmux ────────────────────────────────────────────────────────
 import { ensureSession, spawnWorker } from './tmux.js';
@@ -504,6 +505,9 @@ export async function spawnWorkers(
             dockerTimeoutSeconds: config.docker_timeout,
           })
         : backend;
+    // F1-RE (Sprint 252): resolve the model reasoning-effort (opt-in, provider-
+    // validated) once; passed to every spawn path below. undefined → no flag.
+    const reasoningEffort = resolveReasoningEffort(taskProvider, task.modelEffort);
     const adapterRouted = wantsHostAdapter
       ? getProviderAdapterForTask(taskProvider)
       : null;
@@ -520,6 +524,7 @@ export async function spawnWorkers(
         allowedTools,
         autoApprove: spawnOpts?.autoApprove ?? false,
         projectDir: projectRoot,
+        reasoningEffort,
       });
     } else if (wantsHostAdapter) {
       // MF-2 (Sprint 250): host-only provider (codex/gemini/ollama) but its
@@ -541,6 +546,7 @@ export async function spawnWorkers(
         allowedTools,
         autoApprove: spawnOpts?.autoApprove ?? false,
         projectDir: projectRoot,
+        reasoningEffort,
       });
     } else if (!isTmuxProvider(taskProvider)) {
       const adapter = getProviderAdapterForTask(taskProvider);
@@ -707,6 +713,9 @@ export async function respawnEligibleTasks(
             dockerTimeoutSeconds: config.docker_timeout,
           })
         : backend;
+    // F1-RE (Sprint 252): resolve the model reasoning-effort (opt-in, provider-
+    // validated) once; passed to every spawn path below. undefined → no flag.
+    const reasoningEffort = resolveReasoningEffort(taskProvider, task.modelEffort);
     const adapterRouted = wantsHostAdapter
       ? getProviderAdapterForTask(taskProvider)
       : null;
@@ -719,6 +728,7 @@ export async function respawnEligibleTasks(
         allowedTools,
         autoApprove: spawnOpts?.autoApprove ?? false,
         projectDir: projectRoot,
+        reasoningEffort,
       });
     } else if (wantsHostAdapter) {
       // MF-2 (Sprint 250): FIX-phase re-spawn of a host-only provider whose
@@ -739,6 +749,7 @@ export async function respawnEligibleTasks(
         allowedTools,
         autoApprove: spawnOpts?.autoApprove ?? false,
         projectDir: projectRoot,
+        reasoningEffort,
       });
     } else if (!isTmuxProvider(taskProvider)) {
       const adapter = getProviderAdapterForTask(taskProvider);

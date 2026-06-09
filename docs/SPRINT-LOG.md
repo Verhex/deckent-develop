@@ -6850,3 +6850,26 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 252-002: 253-002 — gemini IN docker (DONE)
 
 ---
+## Sprint 253 — sprint-253
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-06-09
+**Duration:** 398s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 3 |
+| Completed | 3 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 397671ms |
+
+### Tasks
+
+- 253-001: 253-001 — codex IN docker (DONE)
+- 253-002: 253-002 — gemini IN docker (DONE)
+
+---

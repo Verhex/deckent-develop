@@ -279,6 +279,15 @@ export interface Task {
    * When undefined, default routing applies (unchanged behavior).
    */
   backend?: 'docker' | 'tmux' | 'subprocess';
+  /**
+   * Per-task MODEL reasoning-effort override from DIRECTIVES.md (`- ModelEffort: <level>`).
+   * Sprint 252 (F1-RE): reasoning DEPTH the model's CLI offers (claude --effort
+   * low|medium|high|xhigh|max; codex model_reasoning_effort minimal|low|medium|high).
+   * DISTINCT from `effort`/`forceEffort` (work SIZE → timeout/budget/token-estimate).
+   * Opt-in: when undefined, no reasoning-effort flag is sent (CLI default kept).
+   * Validated per-provider at spawn time via `resolveReasoningEffort`.
+   */
+  modelEffort?: string;
   /** Sprint 196 WP-2: Intent mode for FIX worker — how to approach the re-execution. */
   fixMode?: 'verify-only' | 'amend' | 're-implement';
   /** Assigned agent ID (from agent pool) or 'generic' */

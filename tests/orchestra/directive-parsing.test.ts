@@ -172,6 +172,16 @@ describe('parseStructuredDirectives — structured parsing', () => {
     expect(none[0]?.backend).toBeUndefined();
   });
 
+  it('parses "- ModelEffort: <level>" override (Sprint 252 F1-RE), distinct from Effort', () => {
+    const high = parseStructuredDirectives(['## Task 1: x', '- Files: src/a.ts', '- ModelEffort: high'].join('\n'));
+    expect(high[0]?.modelEffort).toBe('high');
+    const xhigh = parseStructuredDirectives(['## Task 1: x', '- Files: src/a.ts', '- ModelEffort: xhigh'].join('\n'));
+    expect(xhigh[0]?.modelEffort).toBe('xhigh');
+    // absent → undefined (no reasoning-effort flag sent; CLI default kept)
+    const none = parseStructuredDirectives(['## Task 1: x', '- Files: src/a.ts'].join('\n'));
+    expect(none[0]?.modelEffort).toBeUndefined();
+  });
+
   it('parses multiple ## Görev blocks', () => {
     const content = [
       '## Görev 1: Fix auth',

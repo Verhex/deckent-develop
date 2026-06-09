@@ -14,6 +14,13 @@ export interface ProviderSpawnOptions {
   logPath?: string;
   /** Environment variable overrides injected into the worker process (only provider-specific keys) */
   env?: Record<string, string>;
+  /**
+   * Resolved MODEL reasoning-effort level (F1-RE, Sprint 252) — already validated
+   * for this provider via `resolveReasoningEffort`. When set, the adapter/backend
+   * appends the provider's reasoning-effort flag (claude `--effort`, codex
+   * `-c model_reasoning_effort=`). Distinct from work-size effort.
+   */
+  reasoningEffort?: string;
 }
 
 // ─── Provider Worker Info ────────────────────────────────────────────

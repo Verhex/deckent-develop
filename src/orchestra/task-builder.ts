@@ -124,6 +124,8 @@ export interface CreateTaskParams {
   authMode?: 'subscription' | 'api';
   /** Per-task spawn backend override (`- Backend: docker|host`), Sprint 252 PSL-1. */
   backend?: 'docker' | 'tmux' | 'subprocess';
+  /** Per-task MODEL reasoning-effort (`- ModelEffort: <level>`), Sprint 252 F1-RE — distinct from work-size effort. */
+  modelEffort?: string;
   fixMode?: 'verify-only' | 'amend' | 're-implement';
   /** Tier-1 Proof-of-Function smoke directive propagated from ParsedDirectiveTask (216-004). */
   smoke?: { command: string; expect: string };
@@ -149,6 +151,8 @@ export interface ParsedDirectiveTask {
   authMode?: 'subscription' | 'api';
   /** Per-task spawn backend parsed from "- Backend: docker|host" (Sprint 252 PSL-1). */
   backend?: 'docker' | 'tmux' | 'subprocess';
+  /** Per-task MODEL reasoning-effort (`- ModelEffort: <level>`), Sprint 252 F1-RE — distinct from work-size effort. */
+  modelEffort?: string;
   /** Tier-1 Proof-of-Function smoke (216-004): real-binary command + expected output, split on `→`. */
   smoke?: { command: string; expect: string };
 }
@@ -468,6 +472,7 @@ export function createTask(params: CreateTaskParams, sequence: number): Task & {
     excludeSkills: params.excludeSkills,
     authMode: params.authMode,
     backend: params.backend,
+    modelEffort: params.modelEffort,
     fixMode: params.fixMode,
     assignedAgent: params.forceAgent ?? 'generic',
     assignedSkills: params.forceSkills ?? [],
@@ -899,6 +904,13 @@ export function parseStructuredDirectives(content: string): ParsedDirectiveTask[
         ? backendVal
         : undefined;
 
+    // Sprint 252 (F1-RE): optional ModelEffort: line (e.g., "- ModelEffort: high").
+    // Validated per-provider later (resolveReasoningEffort); parsed verbatim here.
+    const modelEffortLine = lines.find(l => /^[\s-]*ModelEffort:\s*/i.test(l.trim()));
+    const parsedModelEffort = modelEffortLine
+      ? modelEffortLine.trim().replace(/^-\s+/, '').replace(/^ModelEffort:\s*/i, '').trim().toLowerCase() || undefined
+      : undefined;
+
     // Sprint 182 PQ-4 (F6): description = content after `### Description` heading
     // when present. Falls back to the full block when no heading is found, so
     // legacy DIRECTIVES.md files keep their old description=block behavior.
@@ -908,7 +920,7 @@ export function parseStructuredDirectives(content: string): ParsedDirectiveTask[
       : block.trim();
 
     const enrichedScope = enrichScopeWithTestFiles(scope, scope.filesWrite);
-    tasks.push({ title, description, scope: enrichedScope, testTarget, provider: parsedProvider, forceModel: parsedForceModel, forceEffort: parsedForceEffort, forceAgent, forceSkills, excludeSkills, dependencies, priority: parsedPriority, authMode: parsedAuthMode, backend: parsedBackend, smoke: extractSmoke(block) });
+    tasks.push({ title, description, scope: enrichedScope, testTarget, provider: parsedProvider, forceModel: parsedForceModel, forceEffort: parsedForceEffort, forceAgent, forceSkills, excludeSkills, dependencies, priority: parsedPriority, authMode: parsedAuthMode, backend: parsedBackend, modelEffort: parsedModelEffort, smoke: extractSmoke(block) });
   }
   return tasks;
 }
@@ -1097,8 +1109,14 @@ export function plannerTaskToParams(
  * @returns Effort level string for the worker prompt
  */
 export function resolveWorkerEffort(task: Task): 'max' | 'high' | 'medium' | 'low' {
-  // safe: forceEffort is TaskEffort ('low'|'normal'|'high') — subset of the return union type
-  if (task.forceEffort) return task.forceEffort as 'max' | 'high' | 'medium' | 'low';
+  // Map work-size effort (TaskEffort 'low'|'normal'|'high') → the 4-level
+  // worker-prompt scale. Sprint 252 (F1-RE audit): `'normal'` has NO 1:1 member
+  // in {max,high,medium,low} — the old `as` cast leaked an invalid `'normal'`.
+  // Map it to `'medium'`. (This is the work-size→prompt scale, NOT the model
+  // reasoning-effort axis — see resolveReasoningEffort.)
+  if (task.forceEffort) {
+    return task.forceEffort === 'high' ? 'high' : task.forceEffort === 'low' ? 'low' : 'medium';
+  }
   const score = calculateModelScore(task.title, task.description, task.scope);
   if (score >= 6) return 'max';
   if (score >= 1) return 'high';

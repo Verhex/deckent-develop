@@ -53,6 +53,28 @@ describe('buildProviderCommand', () => {
     expect(PROVIDER_COMMAND_SPECS.codex.oauthHomeDir).toBe('.codex');
     expect(PROVIDER_COMMAND_SPECS.gemini.oauthHomeDir).toBe('.gemini');
   });
+
+  // F1-RE (Sprint 252): model reasoning-effort appended when resolved + supported.
+  it('claude: appends --effort <level> when reasoningEffort is set', () => {
+    const cmd = buildProviderCommand(PROVIDER_COMMAND_SPECS.claude, 'claude-opus-4-8', P, { autoApprove: true, reasoningEffort: 'xhigh' });
+    expect(cmd).toContain('--effort xhigh');
+  });
+
+  it('codex: appends -c model_reasoning_effort=<level> when reasoningEffort is set', () => {
+    const cmd = buildProviderCommand(PROVIDER_COMMAND_SPECS.codex, 'gpt-5.5', P, { autoApprove: true, reasoningEffort: 'high' });
+    expect(cmd).toContain('-c model_reasoning_effort=high');
+  });
+
+  it('gemini: reasoningEffortArgs=null → no effort flag even if a level is passed', () => {
+    const cmd = buildProviderCommand(PROVIDER_COMMAND_SPECS.gemini, 'gemini-2.5-flash', P, { autoApprove: true, reasoningEffort: 'high' });
+    expect(cmd).not.toContain('effort');
+    expect(cmd).not.toContain('model_reasoning_effort');
+  });
+
+  it('no reasoningEffort → no effort flag (opt-in)', () => {
+    const cmd = buildProviderCommand(PROVIDER_COMMAND_SPECS.claude, 'claude-opus-4-8', P, { autoApprove: true });
+    expect(cmd).not.toContain('--effort');
+  });
 });
 
 describe('getProviderCommandSpec', () => {

@@ -50,6 +50,13 @@ export interface ProviderCommandSpec {
    * or null for providers with no host session dir.
    */
   oauthHomeDir: string | null;
+  /**
+   * Builds the reasoning-effort args for a resolved level (F1-RE, Sprint 252), or
+   * null when the provider's CLI has no reasoning-effort knob (gemini/ollama).
+   * claude → `--effort <level>`; codex → `-c model_reasoning_effort=<level>`.
+   * Only invoked when a level was resolved (opt-in via `- ModelEffort:`).
+   */
+  reasoningEffortArgs: ((level: string) => readonly string[]) | null;
 }
 
 /**
@@ -72,6 +79,7 @@ export const PROVIDER_COMMAND_SPECS: Readonly<Record<string, ProviderCommandSpec
     allowedToolsFlag: '--allowedTools',
     promptFeed: 'stdin',
     oauthHomeDir: '.claude',
+    reasoningEffortArgs: (level) => ['--effort', level], // low|medium|high|xhigh|max
   },
   codex: {
     binary: 'codex',
@@ -82,6 +90,7 @@ export const PROVIDER_COMMAND_SPECS: Readonly<Record<string, ProviderCommandSpec
     allowedToolsFlag: null,
     promptFeed: 'stdin',
     oauthHomeDir: '.codex',
+    reasoningEffortArgs: (level) => ['-c', `model_reasoning_effort=${level}`], // minimal|low|medium|high
   },
   gemini: {
     binary: 'gemini',
@@ -93,6 +102,7 @@ export const PROVIDER_COMMAND_SPECS: Readonly<Record<string, ProviderCommandSpec
     allowedToolsFlag: null,
     promptFeed: 'inline',
     oauthHomeDir: '.gemini',
+    reasoningEffortArgs: null, // gemini CLI has no reasoning-effort knob
   },
 };
 
@@ -109,7 +119,7 @@ export function buildProviderCommand(
   spec: ProviderCommandSpec,
   apiId: string,
   promptPath: string,
-  opts: { allowedTools?: string; autoApprove?: boolean } = {},
+  opts: { allowedTools?: string; autoApprove?: boolean; reasoningEffort?: string } = {},
 ): string {
   const parts: string[] = [spec.binary];
   for (const arg of spec.baseArgs) {
@@ -121,6 +131,11 @@ export function buildProviderCommand(
   }
   if (opts.autoApprove) {
     parts.push(...spec.approvalArgs);
+  }
+  // F1-RE (Sprint 252): model reasoning-effort (depth) — opt-in, already
+  // resolved + provider-validated by the caller (resolveReasoningEffort).
+  if (opts.reasoningEffort && spec.reasoningEffortArgs) {
+    parts.push(...spec.reasoningEffortArgs(opts.reasoningEffort));
   }
   return parts.join(' ');
 }

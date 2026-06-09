@@ -80,6 +80,10 @@
 | adr-086 | Native CLI Parity — F11 Feature Set (Sprint 224) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-253 Learnings** (sprint-253): ## Sprint sprint-253 Learnings
+
+## Gains
+- 253-001 — codex IN docker — Created the requested three-line Docker verifi...
 - **Sprint sprint-252 Learnings** (sprint-252): ## Sprint sprint-252 Learnings
 
 ## Gains
@@ -108,11 +112,9 @@
 
 ## Gains
 - 244-001 — multi-provider docs kod-gerçeğine hizala — Updated both multi-pr...
-- **Sprint sprint-243 Learnings** (sprint-243): ## Sprint sprint-243 Learnings
-- 243-001 — multi-provider docs kod-gerçeğine hizala: NO_GO — Model returned no tool c...
 
 ## Active Technical Debt
-- [HIGH] Tech debt from 249-009-fix: Created/updated docs/guide/architecture-overview.md 
+- [CRITICAL] Tech debt from 249-009-fix: Created/updated docs/guide/architecture-overview.md 
 
 ## Active Patterns
 - Violation pattern: stale_heartbeat
@@ -126,5 +128,6 @@
 - Violation pattern: stale_heartbeat
 - Violation pattern: file_outside_scope
 - Violation pattern: file_outside_scope
+- Violation pattern: stale_heartbeat
 
-_Total entries: 308 | Generated: 2026-06-09_
+_Total entries: 312 | Generated: 2026-06-09_

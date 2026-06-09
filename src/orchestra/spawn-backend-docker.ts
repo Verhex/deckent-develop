@@ -377,6 +377,9 @@ export class DockerSpawnBackend implements SpawnBackend {
     const workerCmd = buildProviderCommand(spec, apiId, containerPromptPath, {
       allowedTools: opts?.allowedTools,
       autoApprove: true,
+      // F1-RE (Sprint 252): resolved model reasoning-effort (claude --effort,
+      // codex -c model_reasoning_effort); undefined → no flag (CLI default).
+      reasoningEffort: opts?.reasoningEffort,
     });
     const resultPath = `${CONTAINER_WORKSPACE}/${TASKS_DIR}/task-${taskId}.result`;
     const timeoutPath = `${CONTAINER_WORKSPACE}/${TASKS_DIR}/task-${taskId}.timeout`;
