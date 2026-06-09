@@ -20,6 +20,10 @@ export default defineConfig({
     teardownTimeout: 30000,
     coverage: {
       provider: 'v8',
+      // Default v8 reporters omit json-summary; `scripts/update-readme-stats.mjs`
+      // reads coverage/coverage-summary.json to render the README coverage badge,
+      // so emit it explicitly alongside the human-facing text/html reports.
+      reporter: ['text', 'html', 'clover', 'json', 'json-summary'],
       include: ['src/**/*.ts'],
       exclude: [
         'src/index.ts',

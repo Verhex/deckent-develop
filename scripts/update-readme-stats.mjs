@@ -236,6 +236,11 @@ export function renderBadges({ tests, coverage, sprint, version }) {
       `[![version](https://img.shields.io/badge/version-v${shieldsEscape(version)}-orange)](https://github.com/VerhexIO/deckent)`,
     );
   }
+  // CI status is a live shields.io endpoint (no local stat) — kept in the
+  // generated set so regenerating the badges block never drops it.
+  parts.push(
+    `[![CI](https://img.shields.io/github/actions/workflow/status/VerhexIO/deckent/ci.yml?label=ci)](https://github.com/VerhexIO/deckent/actions)`,
+  );
   return parts.join(' ');
 }
 

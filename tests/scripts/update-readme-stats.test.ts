@@ -170,6 +170,16 @@ describe('renderBadges', () => {
     const md = renderBadges({ tests: 1, coverage: null, sprint: 1, version: '1.0.0-beta.1' });
     expect(md).toContain('version-v1.0.0--beta.1');
   });
+
+  it('always emits the CI status badge (never dropped on regeneration)', () => {
+    // Regression guard: the CI badge has no local stat; it must stay in the
+    // generated set so `docs:stats --write` never strips it from the block.
+    const withCov = renderBadges({ tests: 1, coverage: 88.58, sprint: 255, version: '1.0.0-beta.1' });
+    const withoutCov = renderBadges({ tests: 1, coverage: null, sprint: 1, version: '0.0.1' });
+    expect(withCov).toContain('label=ci');
+    expect(withCov).toContain('/actions/workflow/status/VerhexIO/deckent/ci.yml');
+    expect(withoutCov).toContain('label=ci');
+  });
 });
 
 // ─── renderStatCounts ────────────────────────────────────────────────────────
