@@ -1,5 +1,12 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-252 Learnings
+- Sprint sprint-252 Learnings: ## Sprint sprint-252 Learnings
+
+## Gains
+- 252-001 — codex IN docker — Worker exited without writing result (exitCode=0)
+- 252-002 — gemini IN docker — Created docs/_verify-docker/gemini-docker.md with 3 lines as specified.
+
 ## Sprint sprint-251 Learnings
 - Sprint sprint-251 Learnings: ## Sprint sprint-251 Learnings
 - 251-006 — provider fleet notes (benchmark; codex): NO_GO — Created docs/benchmark/provider-fleet-notes.md with qualitative provider fleet routing notes. Verified by reading the fi

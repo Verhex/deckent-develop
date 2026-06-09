@@ -6827,3 +6827,26 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 251-010: 251-010 — nervous alerts (cookbook; ollama, small) (GO_WITH_TECH_DEBT)
 
 ---
+## Sprint 252 — sprint-252
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-06-09
+**Duration:** 327s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 3 |
+| Completed | 3 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 327155ms |
+
+### Tasks
+
+- 252-001: 253-001 — codex IN docker (DONE)
+- 252-002: 253-002 — gemini IN docker (DONE)
+
+---

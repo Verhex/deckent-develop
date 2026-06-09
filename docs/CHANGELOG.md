@@ -2,6 +2,16 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint252] - 2026-06-09
+
+### Added
+
+- 253-001 — codex IN docker
+- 253-002 — gemini IN docker
+
+
+_Tasks: 3 total, 3 done, 0 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint251] - 2026-06-09
 
 ### Added

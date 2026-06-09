@@ -1,11 +1,11 @@
 {
-  "sprintId": "sprint-251",
+  "sprintId": "sprint-252",
   "baseline": {
     "tscPassed": true,
-    "testCount": 69,
+    "testCount": 64,
     "testPassed": 0,
-    "testFailed": 69,
+    "testFailed": 64,
     "coverage": 0,
-    "timestamp": "2026-06-09T07:05:35.813Z"
+    "timestamp": "2026-06-09T08:04:20.089Z"
   }
 }

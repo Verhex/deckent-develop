@@ -4,7 +4,7 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
-| debt-249-009-fix | Tech debt from 249-009-fix: Created/updated docs/guide/architecture-overview.md  | normal | sprint-249 | active |
+| debt-249-009-fix | Tech debt from 249-009-fix: Created/updated docs/guide/architecture-overview.md  | high | sprint-249 | active |
 
 ## Resolved Technical Debt
 
