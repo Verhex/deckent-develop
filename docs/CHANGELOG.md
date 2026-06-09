@@ -2,6 +2,17 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint255] - 2026-06-09
+
+### Added
+
+- DOC-1 — ExecutionRequest contract reference (WM-1)
+- DOC-2 — Stack-aware criteria & routing (WM-7)
+- DOC-3 — Positioning: agentic-OS + agentic-run ecosystem
+
+
+_Tasks: 3 total, 3 done, 0 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint254] - 2026-06-09
 
 ### Added

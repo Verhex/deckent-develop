@@ -194,14 +194,14 @@ The Sprint 145-150 cutover table and Sprint 175 Embedded Web Terminal section co
 | Metric | Value |
 |--------|-------|
 | Version | 1.0.0-beta.1 |
-| Sprint | sprint-254 |
+| Sprint | sprint-255 |
 | MCP Tools | 32 |
 | MCP Resources | 8 |
 | CLI Commands | 55+ |
 | Dashboard Pages | 12 |
 | Agents | 15 built-in + 2 custom |
 | Skills | 21 built-in |
-| Providers | 4 (Claude, Codex, Gemini, Ollama) |
+| Providers | 3 (Claude, Codex, Gemini) |
 
 ## Overview
 
@@ -1051,13 +1051,13 @@ Every blocker was directly verified in the codebase. False claims have been corr
 ## Sprint Metrics
 | Metric | Value |
 |--------|-------|
-| Sprint | sprint-254 |
+| Sprint | sprint-255 |
 | Total Tasks | 3 |
 | Completed | 3 |
-| Tech Debt | 1 |
+| Tech Debt | 0 |
 | No-Go | 0 |
-| Duration | 13dk 21sn |
-| Coverage | N/A |
+| Duration | 0dk 0sn |
+| Coverage | 0.0% |
 
 ## Sprint History (Sprint 136-166)
 | Sprint | Tasks | Done | NO_GO | Duration | Avg Rubric | Theme |

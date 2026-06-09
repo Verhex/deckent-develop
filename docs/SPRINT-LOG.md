@@ -6897,3 +6897,27 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 254-003: V-002 — claude docker + reasoning-effort (F1-RE) (DONE)
 
 ---
+## Sprint 255 — sprint-255
+
+**Status:** COMPLETE
+**Date:** 2026-06-09
+**Duration:** 0s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 3 |
+| Completed | 3 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 0ms |
+
+### Tasks
+
+- 255-001: DOC-1 — ExecutionRequest contract reference (WM-1) (DONE)
+- 255-002: DOC-2 — Stack-aware criteria & routing (WM-7) (DONE)
+- 255-003: DOC-3 — Positioning: agentic-OS + agentic-run ecosystem (DONE)
+
+---
