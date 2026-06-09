@@ -2,6 +2,69 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint260] - 2026-06-09
+
+### Added
+
+- ENT-1 — actor.role → worker authority (ADR-037 V2 step)
+- ENT-2 — tenantId threading (replace hardcoded 'local')
+- ENT-3 — correlationId / causationId audit lineage
+- WM-6 / F10-002 — riskClass → risk-gated approval
+- budget → pre-spawn cost-gate enforcement
+- F8-001 — capability.invoke abstraction (capabilityTarget consumer)
+- AUT-4 — nextRun() full cron evaluation
+- AUT-6 — backlog done/failed purge + autonomous artifact cleanup
+- AUT-8 — deckent_autonomous* MCP tool parity
+- AUT-1 — drive the nervous observer inside `autonomous start`
+
+### Changed
+
+- Doc — Enterprise Foundation reference (consume-the-contract) (completed with tech debt)
+
+
+_Tasks: 17 total, 17 done, 1 tech debt, 0 no-go_
+
+## [1.0.0-beta.1-sprint259] - 2026-06-09
+
+### Added
+
+- No completed tasks
+
+
+_Tasks: 0 total, 0 done, 0 tech debt, 0 no-go_
+
+## [1.0.0-beta.1-sprint258] - 2026-06-09
+
+### Added
+
+- No completed tasks
+
+
+_Tasks: 0 total, 0 done, 0 tech debt, 0 no-go_
+
+## [1.0.0-beta.1-sprint257] - 2026-06-09
+
+### Added
+
+- CODE-FULLSUITE-NOGO — worker self-verify must be TARGETED, not full-suite
+- GEMINI-LOGIN-HANG (real) — fail fast on interactive login / 429, don't hang
+
+
+_Tasks: 3 total, 3 done, 0 tech debt, 0 no-go_
+
+## [1.0.0-beta.1-sprint256] - 2026-06-09
+
+### Added
+
+- GEMINI-LOGIN-HANG — gemini worker must fail-fast, never hang on interactive login
+
+### Changed
+
+- PLAN-SCOPE-1 — planner must NOT pull description-mentioned file paths into scope.filesWrite (completed with tech debt)
+
+
+_Tasks: 2 total, 2 done, 1 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint255] - 2026-06-09
 
 ### Added

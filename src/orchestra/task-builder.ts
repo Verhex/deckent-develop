@@ -447,6 +447,10 @@ export function createTask(params: CreateTaskParams, sequence: number): Task & {
   // (canonical SSOT). detectTaskType uses scope only — a minimal scope-only object suffices.
   const canonicalKind = rubricTypeToKind(detectTaskType({ scope: params.scope } as Task));
 
+  // Sprint 260 BOUNDARY-TEST-PATTERN: auto-add mirrored tests/ dirs for code-development tasks
+  // so workers adding a test alongside their fix stay in-scope without a BOUNDARY_VIOLATION.
+  const normalizedScope = mirrorTestScope(params.scope, canonicalKind);
+
   return {
     id,
     title: params.title,
@@ -455,7 +459,7 @@ export function createTask(params: CreateTaskParams, sequence: number): Task & {
     effort: params.effort,
     priority: params.priority,
     reason: params.reason,
-    scope: params.scope,
+    scope: normalizedScope,
     dependencies: params.dependencies,
     goNogo: params.goNogo,
     status: params.initialStatus ?? TaskStatus.PENDING,
@@ -734,6 +738,26 @@ export function extractScopeFromDirective(line: string): TaskScope {
   );
 
   return { directories, filesRead: [], filesWrite: sanitizedFilesWrite };
+}
+
+/**
+ * Auto-add mirrored tests/ directories for code-development tasks.
+ * Prevents false BOUNDARY_VIOLATION when workers naturally add a test alongside their fix.
+ * Only widens scope.directories — backward-safe for audit/doc tasks.
+ */
+export function mirrorTestScope(scope: TaskScope, kind: string): TaskScope {
+  if (kind !== 'code-development') return scope;
+  const extraDirs: string[] = [];
+  for (const dir of scope.directories) {
+    if (dir.startsWith('src/')) {
+      const mirrored = 'tests/' + dir.slice('src/'.length);
+      if (!scope.directories.includes(mirrored) && !extraDirs.includes(mirrored)) {
+        extraDirs.push(mirrored);
+      }
+    }
+  }
+  if (extraDirs.length === 0) return scope;
+  return { ...scope, directories: [...scope.directories, ...extraDirs] };
 }
 
 /**

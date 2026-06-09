@@ -15,6 +15,14 @@ import { debugLog } from '../core/utils.js';
 
 // ─── Types ───────────────────────────────────────────────────────
 
+/** Audit lineage fields carried from ExecutionRequest (ENT-3, SOC2/ISO traceability). */
+export interface AuditLineage {
+  /** Groups all events belonging to the same logical request flow. */
+  correlationId?: string;
+  /** Identifies the upstream request that caused this event to be emitted. */
+  causationId?: string;
+}
+
 /** Protocol Version 1.0 event structure (ADR-035). */
 export interface DeckentEvent {
   timestamp: string;
@@ -24,6 +32,10 @@ export interface DeckentEvent {
   target: 'brain' | 'worker' | 'auditor' | 'user' | '*' | string;
   channel: string;
   payload: unknown;
+  /** Optional — absent when the event was not initiated by a tracked ExecutionRequest. */
+  correlationId?: string;
+  /** Optional — absent when the event was not initiated by a tracked ExecutionRequest. */
+  causationId?: string;
 }
 
 /** Filter criteria for readEvents(). */
@@ -44,6 +56,22 @@ export interface ReconstructedState {
   taskResults: Map<string, { verdict: string; timestamp: string }>;
   collisions: Array<{ taskIds: string[]; files: string[]; timestamp: string }>;
   metrics: Array<{ name: string; value: number; timestamp: string }>;
+}
+
+// ─── Lineage Helper ──────────────────────────────────────────────
+
+/**
+ * Extract `correlationId` + `causationId` from any object that carries them
+ * (e.g. `ExecutionRequest`). Returns an `AuditLineage` ready to pass as the
+ * optional `lineage` argument of `writeEvent`.
+ *
+ * Absent fields propagate as `undefined` — backward-safe.
+ */
+export function extractLineage(src: AuditLineage | undefined): AuditLineage {
+  return {
+    correlationId: src?.correlationId,
+    causationId: src?.causationId,
+  };
 }
 
 // ─── Channel Constants ───────────────────────────────────────────
@@ -209,6 +237,7 @@ export function writeEvent(
   target: DeckentEvent['target'],
   channel: string,
   payload: unknown,
+  lineage?: AuditLineage,
 ): DeckentEvent | null {
   try {
     // Sprint 183 W1-2 — DEPENDENCY_BLOCKED spam debounce.
@@ -238,6 +267,8 @@ export function writeEvent(
       target,
       channel,
       payload,
+      ...(lineage?.correlationId !== undefined && { correlationId: lineage.correlationId }),
+      ...(lineage?.causationId !== undefined && { causationId: lineage.causationId }),
     };
 
     const line = JSON.stringify(event) + '\n';

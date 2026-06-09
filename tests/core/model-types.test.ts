@@ -341,7 +341,7 @@ describe('MODEL_API_IDS', () => {
   });
 
   it('maps OpenAI models to their API IDs', () => {
-    expect(MODEL_API_IDS['gpt-5']).toBe('gpt-5');
+    expect(MODEL_API_IDS['gpt-5']).toBe('gpt-5.5');
     expect(MODEL_API_IDS['gpt-4.1']).toBe('gpt-4.1');
     expect(MODEL_API_IDS['gpt-4.1-mini']).toBe('gpt-4.1-mini');
     expect(MODEL_API_IDS['gpt-5-mini']).toBe('gpt-5-mini');
@@ -373,7 +373,7 @@ describe('resolveApiModelId', () => {
   });
 
   it('resolves OpenAI models (alias = API ID)', () => {
-    expect(resolveApiModelId('gpt-5')).toBe('gpt-5');
+    expect(resolveApiModelId('gpt-5')).toBe('gpt-5.5');
     expect(resolveApiModelId('gpt-4.1')).toBe('gpt-4.1');
     expect(resolveApiModelId('o3')).toBe('o3');
   });

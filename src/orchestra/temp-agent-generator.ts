@@ -153,6 +153,86 @@ export const AGENT_PROMPT_TEMPLATES: Readonly<Record<string, AgentPromptTemplate
     ],
     testingHint: 'cargo test — keep unit tests in `#[cfg(test)] mod tests` next to code.',
   },
+  'cpp-specialist': {
+    stackHeading: 'C++ + CMake',
+    tagline: 'Write resource-safe, testable modern C++.',
+    bestPractices: [
+      'Use RAII for ownership; prefer smart pointers and values over raw `new`/`delete`.',
+      'Model builds with target-based CMake (`target_link_libraries`, `target_compile_features`).',
+      'Keep headers minimal and const-correct; pass large objects by `const&` where appropriate.',
+      'Treat warnings as design feedback; avoid undefined behavior and lifetime ambiguity.',
+    ],
+    antiPatterns: [
+      'Manual memory management when standard containers or smart pointers fit.',
+      'Global mutable state hidden behind singletons.',
+      'CMake directory-level flags that leak across unrelated targets.',
+    ],
+    testingHint: 'CMake + GoogleTest — run through ctest and cover ownership/error paths.',
+  },
+  'java-specialist': {
+    stackHeading: 'Java + Maven',
+    tagline: 'Build maintainable JVM services and libraries with JUnit 5 coverage.',
+    bestPractices: [
+      'Use Maven lifecycle conventions; keep production code under `src/main/java` and tests under `src/test/java`.',
+      'Prefer immutable value objects, records where suitable, and constructor injection.',
+      'Use generics precisely; avoid raw types and unchecked casts.',
+      'Keep domain logic decoupled from framework annotations when possible.',
+    ],
+    antiPatterns: [
+      'Static mutable singletons for shared application state.',
+      'Catching broad `Exception` without translating or preserving context.',
+      'Tests that require real network, filesystem, or database state for unit coverage.',
+    ],
+    testingHint: 'Maven + JUnit 5 — use focused unit tests and integration tests at boundaries.',
+  },
+  'csharp-specialist': {
+    stackHeading: 'C# + .NET',
+    tagline: 'Write nullable-safe, async-correct .NET code.',
+    bestPractices: [
+      'Keep nullable reference types enabled and handle null at boundaries.',
+      'Use `async`/`await` end-to-end; avoid blocking on tasks with `.Result` or `.Wait()`.',
+      'Dispose resources with `using` / `await using` and model ownership explicitly.',
+      'Prefer records for immutable data and small interfaces at consumer boundaries.',
+    ],
+    antiPatterns: [
+      'Fire-and-forget tasks without observed failure handling.',
+      'Service locators where constructor injection would make dependencies clear.',
+      'Suppressing nullable warnings instead of tightening the model.',
+    ],
+    testingHint: '.NET + xUnit — run `dotnet test` and assert observable behavior.',
+  },
+  'kotlin-specialist': {
+    stackHeading: 'Kotlin + Gradle',
+    tagline: 'Write null-safe JVM code with clear coroutine boundaries.',
+    bestPractices: [
+      'Use Gradle conventions and keep Kotlin DSL/build logic explicit.',
+      'Lean on null-safety, data classes, and sealed hierarchies for state modeling.',
+      'Make coroutine scopes explicit; keep structured concurrency boundaries visible.',
+      'Prefer immutable collections and expression-oriented functions where they improve clarity.',
+    ],
+    antiPatterns: [
+      'Using `!!` where a typed nullable flow or early return would be clearer.',
+      'Launching coroutines in global scope from application logic.',
+      'Overusing extension functions when ordinary functions communicate ownership better.',
+    ],
+    testingHint: 'Gradle + JUnit 5/Kotest — test suspend functions with coroutine test utilities.',
+  },
+  'swift-specialist': {
+    stackHeading: 'Swift + SPM',
+    tagline: 'Build value-oriented Swift packages with XCTest coverage.',
+    bestPractices: [
+      'Use Swift Package Manager layout: `Sources/` for modules and `Tests/` for XCTest targets.',
+      'Prefer structs, enums, protocols, and value semantics unless reference identity is required.',
+      'Handle optionals explicitly with `guard let`, `if let`, or typed defaults.',
+      'Keep async code actor-aware and avoid shared mutable state crossing concurrency domains.',
+    ],
+    antiPatterns: [
+      'Force-unwrapping optionals outside tightly proven invariants.',
+      'Reference types for plain data that should be value types.',
+      'Tests coupled to wall-clock timing or live services.',
+    ],
+    testingHint: 'SPM + XCTest — run `swift test` and cover optionals, errors, and async behavior.',
+  },
 };
 
 const GENERIC_TEMPLATE: AgentPromptTemplate = {

@@ -139,22 +139,22 @@ describe('resolveTaskModel — forceModel + provider', () => {
   const config = makeConfig();
   const patterns: never[] = [];
 
-  it('forceModel=opus on codex maps to gpt-5', () => {
+  it('forceModel=opus on codex returns opus (adapter provider — forceModel is authoritative)', () => {
     const scope = makeScope(['src/core/']);
     const result = resolveTaskModel(
       'Forced task', 'Forced model', scope, config, patterns,
       'opus', undefined, 'codex',
     );
-    expect(result).toBe('gpt-5');
+    expect(result).toBe('opus');
   });
 
-  it('forceModel=sonnet on gemini maps to gemini-2.5-flash', () => {
+  it('forceModel=sonnet on gemini returns sonnet (adapter provider — forceModel is authoritative)', () => {
     const scope = makeScope(['src/core/']);
     const result = resolveTaskModel(
       'Forced task', 'Forced model', scope, config, patterns,
       'sonnet', undefined, 'gemini',
     );
-    expect(result).toBe('gemini-2.5-flash');
+    expect(result).toBe('sonnet');
   });
 
   it('forceModel=gpt-4.1 on codex returns gpt-4.1 directly (same provider)', () => {
@@ -175,13 +175,13 @@ describe('resolveTaskModel — forceModel + provider', () => {
     expect(result).toBe('opus');
   });
 
-  it('forceModel=haiku on gemini maps to gemini-2.0-flash (economy tier)', () => {
+  it('forceModel=haiku on gemini returns haiku (adapter provider — forceModel is authoritative)', () => {
     const scope = makeScope(['src/core/']);
     const result = resolveTaskModel(
       'Forced task', 'Forced model', scope, config, patterns,
       'haiku', undefined, 'gemini',
     );
-    expect(result).toBe('gemini-2.0-flash');
+    expect(result).toBe('haiku');
   });
 });
 

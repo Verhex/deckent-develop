@@ -119,6 +119,21 @@ export interface PolicyGate {
   decide(trigger: AutonomousTrigger): PolicyDecisionResult;
 }
 
+/**
+ * Minimal nervous observer surface consumed by the autonomous runtime.
+ *
+ * Each cycle calls `tick()` so detectors actually fire during an autonomous
+ * run. The runtime never starts/stops the observer — lifetime management is
+ * the caller's responsibility. Errors from `tick()` are swallowed (fail-safe)
+ * so an observer failure never breaks the autonomous loop.
+ *
+ * Adapters (in runtime-loop.ts or the CLI) implement this by forwarding to
+ * `NervousObserver` / `DetectorRegistry` or emitting a synthetic observe event.
+ */
+export interface NervousObserverDep {
+  tick(): void | Promise<void>;
+}
+
 export interface AutonomousRuntimeDeps {
   triggerSource: TriggerSource;
   authority: AuthorityChecker;
@@ -127,6 +142,12 @@ export interface AutonomousRuntimeDeps {
   audit: AuditSink;
   /** Optional per-task policy gate (G2/G3 — separate from RBAC authority, spec §3). */
   policyGate?: PolicyGate;
+  /**
+   * Optional nervous observer adapter. When present, `tick()` is called once
+   * per cycle (before trigger pull) so detectors run during autonomous execution.
+   * Errors from `tick()` are swallowed — fail-safe invariant.
+   */
+  nervousObserver?: NervousObserverDep;
   /** Optional clock for deterministic tests. */
   now?: () => string;
 }
@@ -152,6 +173,18 @@ export async function runAutonomousCycle(
   deps: AutonomousRuntimeDeps,
 ): Promise<AutonomousCycleResult> {
   const now = deps.now ?? isoNow;
+
+  // Drive nervous observer scan once per cycle so detectors fire during
+  // autonomous execution. Wrapped in try/catch — observer errors must never
+  // break the autonomous loop (fail-safe).
+  if (deps.nervousObserver !== undefined) {
+    try {
+      await deps.nervousObserver.tick();
+    } catch {
+      // Fail-safe: observer tick failure is non-fatal to the autonomous loop
+    }
+  }
+
   const trigger = await deps.triggerSource.next();
 
   if (!trigger) {

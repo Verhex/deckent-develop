@@ -4,6 +4,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { ActionDefinition, ApprovalPolicy } from '../../src/core/nervous-types.js';
+import type { Capability, ExecutionRequest } from '../../src/core/work-model.js';
 
 // ─── Mock action-registry ────────────────────────────────────────────────────
 
@@ -103,7 +104,22 @@ const {
   MATRIX_BY_MODE,
   resolvePolicy,
   isSafetyFloorAction,
+  checkWorkerAuthority,
+  normalizeWorkerRole,
+  ROLE_CAPABILITY_MAP,
+  ENFORCE_RBAC_CONFIG_KEY,
 } = await import('../../src/nervous/authority-matrix.js');
+
+// Build a minimal ExecutionRequest slice for checkWorkerAuthority (ENT-1).
+function reqSlice(
+  role: string | undefined,
+  caps: Capability[],
+): Pick<ExecutionRequest, 'actor' | 'requirements'> {
+  return {
+    actor: role === undefined ? undefined : { id: 'u1', role },
+    requirements: { capabilities: caps, resources: [] },
+  };
+}
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
@@ -242,6 +258,126 @@ describe('AuthorityMatrix', () => {
     it('returns false for non-safety-floor actions', () => {
       expect(isSafetyFloorAction('ORPHAN_TASK_ARCHIVE')).toBe(false);
       expect(isSafetyFloorAction('COMMIT_PUSH')).toBe(false);
+    });
+  });
+
+  // ─── ENT-1: actor.role → worker authority (ADR-037 V2 step) ───────────────
+  describe('checkWorkerAuthority (ENT-1)', () => {
+    it('permissive default: no actor → permit, allow-all, role null', () => {
+      const result = checkWorkerAuthority(reqSlice(undefined, ['fs-write', 'shell']));
+      expect(result.allowed).toBe(true);
+      expect(result.level).toBe('permit');
+      expect(result.role).toBeNull();
+      expect(result.deniedCapabilities).toEqual([]);
+      expect(result.reason).toContain('No actor role');
+    });
+
+    it('permissive default: unknown role → permit (backward-safe)', () => {
+      const result = checkWorkerAuthority(reqSlice('wizard', ['db-write']));
+      expect(result.allowed).toBe(true);
+      expect(result.level).toBe('permit');
+      expect(result.role).toBeNull();
+      expect(result.reason).toContain("Unknown actor role 'wizard'");
+    });
+
+    it('viewer with read-only capabilities → permit', () => {
+      const result = checkWorkerAuthority(reqSlice('viewer', ['fs-read', 'db-query', 'erp-read']));
+      expect(result.allowed).toBe(true);
+      expect(result.level).toBe('permit');
+      expect(result.role).toBe('viewer');
+      expect(result.deniedCapabilities).toEqual([]);
+    });
+
+    it('viewer requesting fs-write → SOFT warn (allowed, emits, not blocked) by default', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const emit = vi.fn();
+      const result = checkWorkerAuthority(reqSlice('viewer', ['fs-read', 'fs-write']), { emit });
+
+      expect(result.allowed).toBe(true); // SOFT — not blocked
+      expect(result.level).toBe('warn');
+      expect(result.role).toBe('viewer');
+      expect(result.deniedCapabilities).toEqual(['fs-write']);
+      expect(emit).toHaveBeenCalledOnce();
+      expect(emit).toHaveBeenCalledWith(
+        expect.objectContaining({ role: 'viewer', enforced: false, actorId: 'u1' }),
+      );
+      expect(warnSpy).toHaveBeenCalledOnce();
+      warnSpy.mockRestore();
+    });
+
+    it('enforce_rbac flag ON: viewer requesting fs-write → HARD deny (blocked, no console.warn)', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const emit = vi.fn();
+      const result = checkWorkerAuthority(reqSlice('viewer', ['fs-write']), {
+        enforceRbac: true,
+        emit,
+      });
+
+      expect(result.allowed).toBe(false); // HARD block under flag
+      expect(result.level).toBe('deny');
+      expect(result.deniedCapabilities).toEqual(['fs-write']);
+      expect(emit).toHaveBeenCalledWith(expect.objectContaining({ enforced: true }));
+      expect(warnSpy).not.toHaveBeenCalled(); // deny path does not console.warn
+      warnSpy.mockRestore();
+    });
+
+    it('engineer with dev capabilities → permit', () => {
+      const result = checkWorkerAuthority(
+        reqSlice('engineer', ['fs-write', 'shell', 'db-write', 'network']),
+      );
+      expect(result.allowed).toBe(true);
+      expect(result.level).toBe('permit');
+      expect(result.role).toBe('engineer');
+    });
+
+    it('engineer requesting enterprise-admin capability (erp-write) → soft warn', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const result = checkWorkerAuthority(reqSlice('engineer', ['fs-write', 'erp-write']));
+      expect(result.allowed).toBe(true);
+      expect(result.level).toBe('warn');
+      expect(result.deniedCapabilities).toEqual(['erp-write']);
+      warnSpy.mockRestore();
+    });
+
+    it('admin permits every capability', () => {
+      const all: Capability[] = [
+        'fs-read', 'fs-write', 'network', 'db-query', 'db-write', 'erp-read',
+        'erp-write', 'shell', 'approval', 'provider-pin', 'gpu', 'tenant-scope', 'mcp-tool',
+      ];
+      const result = checkWorkerAuthority(reqSlice('admin', all));
+      expect(result.allowed).toBe(true);
+      expect(result.level).toBe('permit');
+      expect(result.deniedCapabilities).toEqual([]);
+    });
+
+    it('known role with empty required capabilities → permit', () => {
+      const result = checkWorkerAuthority(reqSlice('viewer', []));
+      expect(result.allowed).toBe(true);
+      expect(result.level).toBe('permit');
+      expect(result.role).toBe('viewer');
+    });
+
+    it('normalizeWorkerRole maps known roles (case-insensitive) and rejects others', () => {
+      expect(normalizeWorkerRole('admin')).toBe('admin');
+      expect(normalizeWorkerRole('Engineer')).toBe('engineer');
+      expect(normalizeWorkerRole('  viewer ')).toBe('viewer');
+      expect(normalizeWorkerRole('wizard')).toBeNull();
+      expect(normalizeWorkerRole(undefined)).toBeNull();
+      expect(normalizeWorkerRole('')).toBeNull();
+    });
+
+    it('ROLE_CAPABILITY_MAP is a nested hierarchy (admin ⊇ engineer ⊇ viewer)', () => {
+      const { admin, engineer, viewer } = ROLE_CAPABILITY_MAP;
+      for (const cap of viewer) expect(engineer.has(cap)).toBe(true);
+      for (const cap of engineer) expect(admin.has(cap)).toBe(true);
+      // admin strictly larger than engineer (erp-write, tenant-scope are admin-only)
+      expect(admin.has('erp-write')).toBe(true);
+      expect(engineer.has('erp-write')).toBe(false);
+      expect(engineer.has('tenant-scope')).toBe(false);
+    });
+
+    it('ENFORCE_RBAC_CONFIG_KEY is the enforce_rbac config flag name', () => {
+      expect(ENFORCE_RBAC_CONFIG_KEY).toBe('enforce_rbac');
     });
   });
 });

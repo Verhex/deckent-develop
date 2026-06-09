@@ -181,6 +181,52 @@ function resolveCommandKey(language: string, buildTool: string): string {
   return language;
 }
 
+// ─── IDENTITY.md language feed ──────────────────────────────────────────────
+
+const IDENTITY_LANG_MAP: Record<string, string> = {
+  typescript: 'typescript',
+  javascript: 'javascript',
+  go: 'go',
+  golang: 'go',
+  rust: 'rust',
+  python: 'python',
+  java: 'java',
+  kotlin: 'kotlin',
+  ruby: 'ruby',
+  php: 'php',
+  dart: 'dart',
+  flutter: 'flutter',
+  'c#': 'csharp',
+  csharp: 'csharp',
+  dotnet: 'csharp',
+  swift: 'swift',
+  'c++': 'cpp',
+  cpp: 'cpp',
+  c: 'c',
+};
+
+/**
+ * Read the `Language:` line from `.deckent/workspace/IDENTITY.md` and return
+ * the canonical stack language key. Returns undefined when the file is absent,
+ * has no Language: line, or names an unrecognized language (fall-through to
+ * the next detection layer).
+ */
+function readIdentityLanguage(projectRoot: string): string | undefined {
+  const identityPath = path.join(projectRoot, '.deckent', 'workspace', 'IDENTITY.md');
+  if (!fs.existsSync(identityPath)) return undefined;
+  try {
+    const content = fs.readFileSync(identityPath, 'utf-8');
+    const match = content.match(/^Language:\s*(.+)$/m);
+    if (!match || !match[1]) return undefined;
+    const raw = match[1].trim();
+    const first = raw.split(/[\s(]/)[0]?.toLowerCase() ?? '';
+    return IDENTITY_LANG_MAP[first];
+  } catch (e) {
+    debugLog('readIdentityLanguage:readFile', e);
+    return undefined;
+  }
+}
+
 // ─── Config language override ───────────────────────────────────────────────
 
 function readConfigLanguageOverride(projectRoot: string): string | undefined {
@@ -309,17 +355,23 @@ function detectFresh(projectRoot: string): ProjectStack {
 
   // ─── 4-Layer Language Detection ──────────────────────────────────────
   //
-  // Layer 1: User override (config.language) — always wins
+  // Layer 0: IDENTITY.md Language: line — SSOT when present (managed-docs)
+  // Layer 1: User override (config.language) — always wins over heuristics
   // Layer 2: Exclusive framework config (Cargo.toml, go.mod → single-lang)
   // Layer 3: File-count weighted (when multiple markers → count .py/.ts/.go)
   // Layer 4: Fallback (insufficient data → "unknown", skip build checks)
   //
   const hasTS = fs.existsSync(tsconfigPath) || depNames.includes('typescript');
   const hasJS = fs.existsSync(pkgPath) && depNames.length > 0;
+  const identityLanguage = readIdentityLanguage(projectRoot);
   const configLanguage = readConfigLanguageOverride(projectRoot);
 
+  // Layer 0: IDENTITY.md declares Language authoritatively
+  if (identityLanguage) {
+    language = identityLanguage;
+  }
   // Layer 1: User explicitly set language in config
-  if (configLanguage) {
+  else if (configLanguage) {
     language = configLanguage;
   }
   // Layer 2: Exclusive framework configs (these are unambiguous single-lang signals)

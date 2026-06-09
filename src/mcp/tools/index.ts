@@ -27,6 +27,7 @@ import { registerFeatureQueryTool } from './feature-query.js';
 import { registerAuditTool } from './audit.js';
 import { registerRecoverTool } from './recover.js';
 import { registerModelsTool } from './models.js';
+import { registerAutonomousTool } from './autonomous.js';
 
 export function registerTools(server: McpServer): void {
   registerInitTool(server);
@@ -57,4 +58,5 @@ export function registerTools(server: McpServer): void {
   registerAuditTool(server);
   registerRecoverTool(server);
   registerModelsTool(server);
+  registerAutonomousTool(server);
 }

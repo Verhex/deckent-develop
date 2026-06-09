@@ -3,6 +3,7 @@ import {
   createTask,
   extractScopeFromDirective,
   enrichScopeWithTestFiles,
+  mirrorTestScope,
   parseStructuredDirectives,
   parseBulletOrNumberedTasks,
   parsePriorityDirective,
@@ -107,7 +108,10 @@ describe('createTask', () => {
     expect(task.effort).toBe(params.effort);
     expect(task.priority).toBe(params.priority);
     expect(task.reason).toBe(params.reason);
-    expect(task.scope).toEqual(params.scope);
+    // scope.directories may be widened by mirrorTestScope for code-development tasks
+    expect(task.scope.directories).toEqual(expect.arrayContaining(params.scope.directories));
+    expect(task.scope.filesRead).toEqual(params.scope.filesRead);
+    expect(task.scope.filesWrite).toEqual(params.scope.filesWrite);
     expect(task.dependencies).toEqual(params.dependencies);
     expect(task.goNogo).toEqual(params.goNogo);
     expect(task.sprintId).toBe(params.sprintId);
@@ -2262,5 +2266,137 @@ No auth directive — fall back to config default.`;
     const tasks = parseStructuredDirectives(content);
     expect(tasks).toHaveLength(1);
     expect(tasks[0]!.authMode).toBeUndefined();
+  });
+});
+
+// ─── mirrorTestScope (Sprint 260 BOUNDARY-TEST-PATTERN) ───────────────────────
+
+describe('mirrorTestScope', () => {
+  it('adds tests/orchestra/ when kind=code-development and src/orchestra/ is in directories', () => {
+    const scope = {
+      directories: ['src/orchestra/'],
+      filesRead: [],
+      filesWrite: ['src/orchestra/task-builder.ts'],
+    };
+    const result = mirrorTestScope(scope, 'code-development');
+    expect(result.directories).toContain('src/orchestra/');
+    expect(result.directories).toContain('tests/orchestra/');
+  });
+
+  it('adds mirrored tests/ dirs for multiple src/ directories', () => {
+    const scope = {
+      directories: ['src/core/', 'src/cli/'],
+      filesRead: [],
+      filesWrite: ['src/core/config.ts'],
+    };
+    const result = mirrorTestScope(scope, 'code-development');
+    expect(result.directories).toContain('tests/core/');
+    expect(result.directories).toContain('tests/cli/');
+  });
+
+  it('does not add duplicate tests/ dir when already present', () => {
+    const scope = {
+      directories: ['src/orchestra/', 'tests/orchestra/'],
+      filesRead: [],
+      filesWrite: ['src/orchestra/brain.ts'],
+    };
+    const result = mirrorTestScope(scope, 'code-development');
+    const testsDirs = result.directories.filter(d => d === 'tests/orchestra/');
+    expect(testsDirs).toHaveLength(1);
+  });
+
+  it('leaves scope unchanged for non-code-development kinds', () => {
+    const scope = {
+      directories: ['src/core/'],
+      filesRead: [],
+      filesWrite: ['src/core/config.ts'],
+    };
+    const auditResult = mirrorTestScope(scope, 'audit');
+    const docResult = mirrorTestScope(scope, 'document-write');
+    expect(auditResult).toBe(scope);
+    expect(docResult).toBe(scope);
+  });
+
+  it('leaves scope unchanged when no src/ directories present', () => {
+    const scope = {
+      directories: ['docs/', 'tests/core/'],
+      filesRead: [],
+      filesWrite: ['docs/guide.md'],
+    };
+    const result = mirrorTestScope(scope, 'code-development');
+    expect(result).toBe(scope);
+  });
+
+  it('does not mutate the original scope', () => {
+    const original = ['src/orchestra/'];
+    const scope = { directories: original, filesRead: [], filesWrite: [] };
+    mirrorTestScope(scope, 'code-development');
+    expect(scope.directories).toEqual(['src/orchestra/']);
+  });
+
+  it('preserves filesRead and filesWrite unchanged', () => {
+    const scope = {
+      directories: ['src/core/'],
+      filesRead: ['src/core/config.ts'],
+      filesWrite: ['src/core/utils.ts'],
+    };
+    const result = mirrorTestScope(scope, 'code-development');
+    expect(result.filesRead).toEqual(['src/core/config.ts']);
+    expect(result.filesWrite).toEqual(['src/core/utils.ts']);
+  });
+});
+
+// ─── createTask — BOUNDARY-TEST-PATTERN auto-widen ────────────────────────────
+
+describe('createTask — auto-includes matching tests/ dir for code-development scope', () => {
+  it('adds tests/orchestra/ when scope is src/orchestra/ (code-development task)', () => {
+    const params = makeBaseParams({
+      scope: {
+        directories: ['src/orchestra/'],
+        filesRead: [],
+        filesWrite: ['src/orchestra/task-builder.ts'],
+      },
+    });
+    const task = createTask(params, 1);
+    expect(task.scope.directories).toContain('src/orchestra/');
+    expect(task.scope.directories).toContain('tests/orchestra/');
+  });
+
+  it('adds tests/core/ when scope is src/core/ (code-development task)', () => {
+    const params = makeBaseParams({
+      scope: {
+        directories: ['src/core/'],
+        filesRead: [],
+        filesWrite: ['src/core/config.ts'],
+      },
+    });
+    const task = createTask(params, 2);
+    expect(task.scope.directories).toContain('tests/core/');
+  });
+
+  it('does not duplicate tests/ dir when already explicitly in scope', () => {
+    const params = makeBaseParams({
+      scope: {
+        directories: ['src/orchestra/', 'tests/orchestra/'],
+        filesRead: [],
+        filesWrite: ['src/orchestra/brain.ts'],
+      },
+    });
+    const task = createTask(params, 3);
+    const count = task.scope.directories.filter(d => d === 'tests/orchestra/').length;
+    expect(count).toBe(1);
+  });
+
+  it('does not add tests/ dir for doc-only scope', () => {
+    const params = makeBaseParams({
+      scope: {
+        directories: ['docs/'],
+        filesRead: [],
+        filesWrite: ['docs/guide.md'],
+      },
+    });
+    const task = createTask(params, 4);
+    const testDirs = task.scope.directories.filter(d => d.startsWith('tests/'));
+    expect(testDirs).toHaveLength(0);
   });
 });

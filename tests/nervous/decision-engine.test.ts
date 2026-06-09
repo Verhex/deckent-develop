@@ -9,7 +9,12 @@ import type {
   NervousSystemConfig,
   Severity,
 } from '../../src/core/nervous-types.js';
-import { DecisionEngine, isInQuietHours } from '../../src/nervous/decision-engine.js';
+import type { Capability } from '../../src/core/work-model.js';
+import {
+  DecisionEngine,
+  isInQuietHours,
+  type RiskGateRequest,
+} from '../../src/nervous/decision-engine.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -29,6 +34,24 @@ function makeDetectorResult(
     shouldNotify: true,
     ...overrides,
   };
+}
+
+/** Config extended with the opt-in risk-gate flag (declared on NervousSystemConfig in a follow-up). */
+type RiskGateConfig = NervousSystemConfig & { risk_gate_enabled?: boolean };
+
+function makeRiskGateConfig(
+  riskGateEnabled: boolean,
+  overrides: Partial<NervousSystemConfig> = {},
+): RiskGateConfig {
+  return { ...makeConfig(overrides), risk_gate_enabled: riskGateEnabled };
+}
+
+/** Build the minimal request shape `resolveRiskClass` consumes (caps + capabilityTarget). */
+function makeRequest(
+  capabilities: Capability[],
+  capabilityTarget?: RiskGateRequest['capabilityTarget'],
+): RiskGateRequest {
+  return { requirements: { capabilities, resources: [] }, capabilityTarget };
 }
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
@@ -184,6 +207,106 @@ describe('DecisionEngine', () => {
       expect(outputs[0].reason).toBeTruthy();
       expect(outputs[0].reason.length).toBeGreaterThan(10);
       expect(outputs[0].reason).toContain('low');
+    });
+  });
+
+  describe('decide() risk-gate (F10-002 / WM-6)', () => {
+    it('risk-gate OFF (default) + HIGH-risk request -> no gating (backward-safe)', () => {
+      // Arrange — flag off; a normally-autonomous low action
+      const engine = new DecisionEngine(makeRiskGateConfig(false));
+      const result = makeDetectorResult({
+        suggestedActions: [{ id: 'ORPHAN_TASK_ARCHIVE', label: 'Archive', risk: 'low' }],
+      });
+
+      // Act — even a HIGH-risk request must not gate while the flag is off
+      const outputs = engine.decide(result, makeRequest(['shell']));
+
+      // Assert
+      expect(outputs).toHaveLength(1);
+      expect(outputs[0].policy).toBe('autonomous');
+    });
+
+    it('risk-gate ON + HIGH-risk request (shell) -> decision parked (approve)', () => {
+      // Arrange
+      const engine = new DecisionEngine(makeRiskGateConfig(true));
+      const result = makeDetectorResult({
+        suggestedActions: [{ id: 'ORPHAN_TASK_ARCHIVE', label: 'Archive', risk: 'low' }],
+      });
+
+      // Act
+      const outputs = engine.decide(result, makeRequest(['shell']));
+
+      // Assert — low action that would auto-execute is parked for approval
+      expect(outputs).toHaveLength(1);
+      expect(outputs[0].policy).toBe('approve');
+      expect(outputs[0].reason).toContain('Risk-gate');
+      expect(outputs[0].reason).toContain('approval');
+    });
+
+    it('risk-gate ON + HIGH-risk via capabilityTarget verb (mail.send) -> parked', () => {
+      // Arrange — no high-risk capability, but the verb is a write/send
+      const engine = new DecisionEngine(makeRiskGateConfig(true));
+      const result = makeDetectorResult({
+        suggestedActions: [{ id: 'ORPHAN_TASK_ARCHIVE', label: 'Archive', risk: 'low' }],
+      });
+
+      // Act
+      const outputs = engine.decide(result, makeRequest([], { capability: 'mail.send' }));
+
+      // Assert
+      expect(outputs[0].policy).toBe('approve');
+    });
+
+    it('risk-gate ON + LOW-risk request (fs-read) -> unchanged (autonomous)', () => {
+      // Arrange
+      const engine = new DecisionEngine(makeRiskGateConfig(true));
+      const result = makeDetectorResult({
+        suggestedActions: [{ id: 'ORPHAN_TASK_ARCHIVE', label: 'Archive', risk: 'low' }],
+      });
+
+      // Act — low-risk operation is not gated even with the flag on
+      const outputs = engine.decide(result, makeRequest(['fs-read']));
+
+      // Assert
+      expect(outputs[0].policy).toBe('autonomous');
+    });
+
+    it('risk-gate ON but no request passed -> no gating (backward-safe)', () => {
+      // Arrange
+      const engine = new DecisionEngine(makeRiskGateConfig(true));
+      const result = makeDetectorResult({
+        suggestedActions: [{ id: 'ORPHAN_TASK_ARCHIVE', label: 'Archive', risk: 'low' }],
+      });
+
+      // Act — single-arg call (existing callers) is unaffected
+      const outputs = engine.decide(result);
+
+      // Assert
+      expect(outputs[0].policy).toBe('autonomous');
+    });
+
+    it('risk-gate ON + HIGH-risk: parks normal decisions, preserves safety-floor', () => {
+      // Arrange — autopilot would auto-run everything; one normal + one safety-floor
+      const engine = new DecisionEngine(makeRiskGateConfig(true, { mode: 'autopilot' }));
+      const result = makeDetectorResult({
+        suggestedActions: [
+          { id: 'ORPHAN_TASK_ARCHIVE', label: 'Archive', risk: 'low' },
+          { id: 'KILL_LIVE_SPRINT', label: 'Kill', risk: 'high' },
+        ],
+      });
+
+      // Act
+      const outputs = engine.decide(result, makeRequest(['db-write']));
+
+      // Assert — normal decision parked; safety-floor untouched (already approve)
+      expect(outputs).toHaveLength(2);
+      const archive = outputs.find((o) => o.action.id === 'ORPHAN_TASK_ARCHIVE');
+      const kill = outputs.find((o) => o.action.id === 'KILL_LIVE_SPRINT');
+      expect(archive?.policy).toBe('approve');
+      expect(archive?.reason).toContain('Risk-gate');
+      expect(kill?.policy).toBe('approve');
+      expect(kill?.isSafetyFloor).toBe(true);
+      expect(kill?.reason).toContain('Safety floor');
     });
   });
 

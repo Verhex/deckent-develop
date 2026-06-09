@@ -12,6 +12,7 @@ import type {
   SafetyFloorAction,
   ActionDefinition,
 } from '../core/nervous-types.js';
+import type { ActorContext, Capability, ExecutionRequest } from '../core/work-model.js';
 import { ACTION_BY_ID } from './action-registry.js';
 
 // ─── Safety Floor ────────────────────────────────────────────────────────────
@@ -181,4 +182,156 @@ export function getMatrixByMode(mode: AuthorityMode): AuthorityMatrix | undefine
  */
 export function isSafetyFloorAction(actionId: string): boolean {
   return (SAFETY_FLOOR as readonly string[]).includes(actionId);
+}
+
+// ─── ENT-1: actor.role → worker authority (ADR-037 V2 step) ─────────────────
+//
+// ADR-037 RBAC V1.0 is advisory (allow-all, NO_OP). ENT-1 takes a real V2 step:
+// a worker's allowed capabilities derive from its `ExecutionRequest.actor.role`.
+// Enforcement stays SOFT (warn+emit) by default — backward-safe — and only HARD
+// blocks when the caller passes the opt-in `enforce_rbac` config flag (default
+// false). Permissive default: absent actor / unknown role → current allow-all.
+
+/** Config key (in `.deckent/config.json`) gating HARD RBAC enforcement. Default false. */
+export const ENFORCE_RBAC_CONFIG_KEY = 'enforce_rbac' as const;
+
+/** Minimal RBAC role taxonomy for worker authority (ENT-1). */
+export type WorkerRole = 'admin' | 'engineer' | 'viewer';
+
+/**
+ * Minimal role → allowed-{@link Capability} map. The required capabilities of a
+ * request (`ExecutionRequest.requirements.capabilities`) are checked against the
+ * actor role's allow-set:
+ *  - `admin`    — every capability (full trust).
+ *  - `engineer` — dev capabilities; excludes enterprise-admin caps (`erp-write`,
+ *                 `tenant-scope`).
+ *  - `viewer`   — read-only (`fs-read`, `db-query`, `erp-read`).
+ */
+export const ROLE_CAPABILITY_MAP: Readonly<Record<WorkerRole, ReadonlySet<Capability>>> =
+  Object.freeze({
+    admin: new Set<Capability>([
+      'fs-read', 'fs-write', 'network', 'db-query', 'db-write', 'erp-read',
+      'erp-write', 'shell', 'approval', 'provider-pin', 'gpu', 'tenant-scope', 'mcp-tool',
+    ]),
+    engineer: new Set<Capability>([
+      'fs-read', 'fs-write', 'network', 'db-query', 'db-write', 'erp-read',
+      'shell', 'approval', 'provider-pin', 'gpu', 'mcp-tool',
+    ]),
+    viewer: new Set<Capability>(['fs-read', 'db-query', 'erp-read']),
+  });
+
+/** Options for {@link checkWorkerAuthority}. */
+export interface AuthorityEnforcementOptions {
+  /**
+   * Mirror of the `enforce_rbac` config flag (default false). When `true`, a
+   * role-denied capability HARD-blocks (`allowed: false`); when false/absent,
+   * enforcement is SOFT — the violation is warned + emitted but still allowed.
+   */
+  enforceRbac?: boolean;
+  /** Optional structured emit hook (e.g. event-stream wire) — fired on a violation. */
+  emit?: (payload: WorkerAuthorityViolation) => void;
+}
+
+/** Structured payload describing a role-based authority violation (for emit). */
+export interface WorkerAuthorityViolation {
+  actorId?: string;
+  role: WorkerRole;
+  deniedCapabilities: Capability[];
+  enforced: boolean;
+  reason: string;
+}
+
+/** Result of a role-based worker authority check (ENT-1). */
+export interface WorkerAuthorityResult {
+  /** Whether the operation proceeds. SOFT mode always allows; only HARD denies. */
+  allowed: boolean;
+  /** Enforcement level — `permit` ok, `warn` soft-violation, `deny` hard-block. */
+  level: 'permit' | 'warn' | 'deny';
+  /** Resolved role, or null when no/unknown actor role (permissive path). */
+  role: WorkerRole | null;
+  /** Capabilities the role is NOT permitted (empty on permit/permissive). */
+  deniedCapabilities: Capability[];
+  /** Human-readable reason for the decision. */
+  reason: string;
+}
+
+/**
+ * Normalize a free-form actor role string into the {@link WorkerRole} taxonomy.
+ * Unknown or absent → `null` (caller treats as permissive / backward-safe).
+ */
+export function normalizeWorkerRole(role: string | undefined | null): WorkerRole | null {
+  switch ((role ?? '').toLowerCase().trim()) {
+    case 'admin':
+      return 'admin';
+    case 'engineer':
+      return 'engineer';
+    case 'viewer':
+      return 'viewer';
+    default:
+      return null;
+  }
+}
+
+/**
+ * ENT-1 — derive a worker's allowed operations from its `ExecutionRequest.actor.role`.
+ *
+ * Resolution:
+ * 1. No actor / no role / unknown role → `permit` (allow-all; backward-compatible).
+ * 2. Known role, every required capability in the role allow-map → `permit`.
+ * 3. Known role, at least one capability NOT permitted:
+ *    - `opts.enforceRbac === true` (the `enforce_rbac` flag) → `deny` (HARD block).
+ *    - otherwise → `warn` (SOFT: still `allowed`, but warned via console + `opts.emit`).
+ *
+ * @param req  The contract slice carrying actor + required capabilities.
+ * @param opts Enforcement flag + optional emit hook.
+ */
+export function checkWorkerAuthority(
+  req: Pick<ExecutionRequest, 'actor' | 'requirements'>,
+  opts: AuthorityEnforcementOptions = {},
+): WorkerAuthorityResult {
+  const actor: ActorContext | undefined = req.actor;
+  const role = normalizeWorkerRole(actor?.role);
+
+  // 1. Permissive default — absent actor or unknown role keeps V1.0 allow-all.
+  if (!role) {
+    return {
+      allowed: true,
+      level: 'permit',
+      role: null,
+      deniedCapabilities: [],
+      reason: actor?.role
+        ? `Unknown actor role '${actor.role}' — permissive default (allow-all, ADR-037 V1.0)`
+        : 'No actor role on request — permissive default (allow-all, ADR-037 V1.0)',
+    };
+  }
+
+  const allowed = ROLE_CAPABILITY_MAP[role];
+  const required: Capability[] = req.requirements?.capabilities ?? [];
+  const deniedCapabilities = required.filter((c) => !allowed.has(c));
+
+  // 2. Every required capability permitted.
+  if (deniedCapabilities.length === 0) {
+    return {
+      allowed: true,
+      level: 'permit',
+      role,
+      deniedCapabilities: [],
+      reason: `Role '${role}' permits all ${required.length} required capabilit${required.length === 1 ? 'y' : 'ies'}`,
+    };
+  }
+
+  // 3. Role-denied capabilities — HARD block only under the enforce_rbac flag.
+  const enforced = opts.enforceRbac === true;
+  const reason = `Role '${role}' is NOT permitted: ${deniedCapabilities.join(', ')} (${enforced ? 'enforce_rbac ON → blocked' : 'soft warn — ADR-037, not blocked'})`;
+
+  if (opts.emit) {
+    opts.emit({ actorId: actor?.id, role, deniedCapabilities, enforced, reason });
+  }
+
+  if (enforced) {
+    return { allowed: false, level: 'deny', role, deniedCapabilities, reason };
+  }
+
+  console.warn(`[deckent] [ADR-037 soft] worker authority: ${reason}`);
+  return { allowed: true, level: 'warn', role, deniedCapabilities, reason };
 }

@@ -12,8 +12,9 @@ import {
   readSequence,
   getCurrentSprintId,
   CHANNELS,
+  extractLineage,
 } from '../../src/orchestra/event-stream.js';
-import type { DeckentEvent, EventFilter } from '../../src/orchestra/event-stream.js';
+import type { DeckentEvent, EventFilter, AuditLineage } from '../../src/orchestra/event-stream.js';
 
 describe('event-stream', () => {
   let testRoot: string;
@@ -282,5 +283,82 @@ describe('event-stream', () => {
     for (let i = 1; i < events.length; i++) {
       expect(events[i]!.sequence).toBeGreaterThan(events[i - 1]!.sequence);
     }
+  });
+
+  // ─── ENT-3: correlationId / causationId audit lineage ─────────────
+
+  describe('ENT-3 audit lineage (correlationId / causationId)', () => {
+    it('writeEvent with lineage propagates both correlationId and causationId', () => {
+      const lineage: AuditLineage = {
+        correlationId: 'corr-abc-123',
+        causationId: 'caus-xyz-456',
+      };
+
+      const event = writeEvent(
+        testRoot, sprintId, 'brain', '*',
+        CHANNELS.SPRINT_PHASE_CHANGE,
+        { phase: 'EXECUTE' },
+        lineage,
+      );
+
+      expect(event).not.toBeNull();
+      expect(event!.correlationId).toBe('corr-abc-123');
+      expect(event!.causationId).toBe('caus-xyz-456');
+
+      // Round-trip: lineage fields survive JSONL serialize/deserialize
+      const events = readEvents(testRoot, sprintId);
+      expect(events[0]!.correlationId).toBe('corr-abc-123');
+      expect(events[0]!.causationId).toBe('caus-xyz-456');
+    });
+
+    it('writeEvent without lineage leaves correlationId/causationId undefined (backward-safe)', () => {
+      const event = writeEvent(
+        testRoot, sprintId, 'brain', '*',
+        CHANNELS.SPRINT_PHASE_CHANGE,
+        { phase: 'PLAN' },
+      );
+
+      expect(event).not.toBeNull();
+      expect(event!.correlationId).toBeUndefined();
+      expect(event!.causationId).toBeUndefined();
+    });
+
+    it('writeEvent with partial lineage (correlationId only) omits causationId', () => {
+      const lineage: AuditLineage = { correlationId: 'corr-only-789' };
+
+      const event = writeEvent(
+        testRoot, sprintId, 'brain', '*',
+        CHANNELS.HEARTBEAT,
+        { taskId: 'T1' },
+        lineage,
+      );
+
+      expect(event).not.toBeNull();
+      expect(event!.correlationId).toBe('corr-only-789');
+      expect(event!.causationId).toBeUndefined();
+    });
+
+    it('extractLineage returns both fields from a source object', () => {
+      const source: AuditLineage = {
+        correlationId: 'corr-111',
+        causationId: 'caus-222',
+      };
+
+      const result = extractLineage(source);
+      expect(result.correlationId).toBe('corr-111');
+      expect(result.causationId).toBe('caus-222');
+    });
+
+    it('extractLineage with undefined input returns empty lineage (no fields set)', () => {
+      const result = extractLineage(undefined);
+      expect(result.correlationId).toBeUndefined();
+      expect(result.causationId).toBeUndefined();
+    });
+
+    it('extractLineage with partial source propagates only the present field', () => {
+      const result = extractLineage({ causationId: 'caus-only-333' });
+      expect(result.correlationId).toBeUndefined();
+      expect(result.causationId).toBe('caus-only-333');
+    });
   });
 });

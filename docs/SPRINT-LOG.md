@@ -6921,3 +6921,131 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 255-003: DOC-3 — Positioning: agentic-OS + agentic-run ecosystem (DONE)
 
 ---
+## Sprint 256 — sprint-256
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-06-09
+**Duration:** 327s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 2 |
+| Completed | 2 |
+| Tech Debt | 1 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 327340ms |
+
+### Tasks
+
+- 256-001: GEMINI-LOGIN-HANG — gemini worker must fail-fast, never hang on interactive login (DONE)
+- 256-002: PLAN-SCOPE-1 — planner must NOT pull description-mentioned file paths into scope.filesWrite (GO_WITH_TECH_DEBT)
+
+---
+## Sprint 257 — sprint-257
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-06-09
+**Duration:** 422s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 3 |
+| Completed | 3 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 421830ms |
+
+### Tasks
+
+- 257-001: CODE-FULLSUITE-NOGO — worker self-verify must be TARGETED, not full-suite (DONE)
+- 257-002: GEMINI-LOGIN-HANG (real) — fail fast on interactive login / 429, don't hang (DONE)
+
+---
+## Sprint 258 — sprint-258
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-06-09
+**Duration:** 335s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 0 |
+| Completed | 0 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 335238ms |
+
+### Tasks
+
+- 258-001: WM-1b — route agent + skills for the CLI `deckent run` single-task path (DONE)
+
+---
+## Sprint 259 — sprint-259
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-06-09
+**Duration:** 217s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 0 |
+| Completed | 0 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 216648ms |
+
+### Tasks
+
+- 259-001: WM-1b/MCP — route agent+skills in MCP `deckent_run` (DONE)
+- 259-002: WM-1b/autonomous — route agent+skills in `runTaskMode` (DONE)
+
+---
+## Sprint 260 — sprint-260
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-06-09
+**Duration:** 1315s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 17 |
+| Completed | 17 |
+| Tech Debt | 1 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 1314863ms |
+
+### Tasks
+
+- 260-001: ENT-1 — actor.role → worker authority (ADR-037 V2 step) (DONE)
+- 260-002: ENT-2 — tenantId threading (replace hardcoded 'local') (DONE)
+- 260-003: ENT-3 — correlationId / causationId audit lineage (DONE)
+- 260-004: WM-6 / F10-002 — riskClass → risk-gated approval (DONE)
+- 260-005: budget → pre-spawn cost-gate enforcement (DONE)
+- 260-006: F8-001 — capability.invoke abstraction (capabilityTarget consumer) (DONE)
+- 260-007: AUT-4 — nextRun() full cron evaluation (DONE)
+- 260-008: AUT-6 — backlog done/failed purge + autonomous artifact cleanup (DONE)
+- 260-009: AUT-8 — deckent_autonomous* MCP tool parity (DONE)
+- 260-010: AUT-1 — drive the nervous observer inside `autonomous start` (DONE)
+- 260-011: WM-7 E3 — IDENTITY.md `Language:` feed as stack SSOT (DONE)
+- 260-012: WM-7 — extend AGENT_TEMPLATES to C++/Java/C#/Kotlin/Swift prime agents (DONE)
+- 260-013: BOUNDARY-TEST-PATTERN — code-task scope auto-includes matching tests/ dir (DONE)
+- 260-014: Pre-existing test staleness cleanup — gpt-5.5 apiId expectations (DONE)
+- 260-015: F9-001 — wire McpClientBroker into the REPL/chat path (DONE)
+- 260-016: Doc — Enterprise Foundation reference (consume-the-contract) (GO_WITH_TECH_DEBT)
+
+---

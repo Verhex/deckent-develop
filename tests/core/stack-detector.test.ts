@@ -1123,3 +1123,109 @@ describe('monorepo / sub-project language detection', () => {
     expect(tsCount).toBe(1);
   });
 });
+
+// ─── IDENTITY.md Language feed ────────────────────────────────────────────
+
+describe('IDENTITY.md Language feed', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(fs.readdirSync).mockReturnValue([]);
+    vi.mocked(fs.statSync).mockReturnValue({ isDirectory: () => false, mtimeMs: 1000 } as unknown as fs.Stats);
+  });
+
+  function mockWithIdentity(identityContent: string | null, existingFiles: string[] = [], pkgDeps: Record<string, string> = {}) {
+    const allFiles = identityContent !== null
+      ? [...existingFiles, '.deckent/workspace/IDENTITY.md']
+      : existingFiles;
+    vi.mocked(fs.existsSync).mockImplementation((p) => {
+      const s = String(p);
+      return allFiles.some((f) => s.endsWith(f));
+    });
+    vi.mocked(fs.readFileSync).mockImplementation((p) => {
+      const s = String(p);
+      if (s.endsWith('IDENTITY.md') && identityContent !== null) return identityContent;
+      if (s.endsWith('package.json') && Object.keys(pkgDeps).length > 0) {
+        return JSON.stringify({ dependencies: pkgDeps });
+      }
+      throw new Error('ENOENT');
+    });
+  }
+
+  it('uses Language: from IDENTITY.md when file is present', () => {
+    mockWithIdentity('# Identity\nLanguage: TypeScript (ESM)\nTest: vitest\n', ['package.json']);
+
+    const stack = detectProjectStack(ROOT);
+    expect(stack.language).toBe('typescript');
+  });
+
+  it('normalizes TypeScript (ESM) to typescript', () => {
+    mockWithIdentity('Language: TypeScript (ESM)\n');
+
+    const stack = detectProjectStack(ROOT);
+    expect(stack.language).toBe('typescript');
+  });
+
+  it('normalizes Python 3 to python', () => {
+    mockWithIdentity('Language: Python 3\n');
+
+    const stack = detectProjectStack(ROOT);
+    expect(stack.language).toBe('python');
+  });
+
+  it('normalizes Go to go', () => {
+    mockWithIdentity('Language: Go\n');
+
+    const stack = detectProjectStack(ROOT);
+    expect(stack.language).toBe('go');
+  });
+
+  it('normalizes Rust to rust', () => {
+    mockWithIdentity('Language: Rust\n');
+
+    const stack = detectProjectStack(ROOT);
+    expect(stack.language).toBe('rust');
+  });
+
+  it('IDENTITY.md takes precedence over heuristic (Cargo.toml present but IDENTITY says typescript)', () => {
+    mockWithIdentity('Language: TypeScript (ESM)\n', ['Cargo.toml']);
+
+    const stack = detectProjectStack(ROOT);
+    expect(stack.language).toBe('typescript');
+  });
+
+  it('falls back to heuristic when IDENTITY.md is absent', () => {
+    mockWithIdentity(null, ['Cargo.toml']);
+
+    const stack = detectProjectStack(ROOT);
+    expect(stack.language).toBe('rust');
+  });
+
+  it('falls back to heuristic when IDENTITY.md has no Language: line', () => {
+    mockWithIdentity('# Identity\nName: my-project\nVersion: 1.0.0\n', ['Cargo.toml']);
+
+    const stack = detectProjectStack(ROOT);
+    expect(stack.language).toBe('rust');
+  });
+
+  it('falls back to heuristic when IDENTITY.md has unrecognized language', () => {
+    mockWithIdentity('Language: COBOL\n', ['Cargo.toml']);
+
+    const stack = detectProjectStack(ROOT);
+    expect(stack.language).toBe('rust');
+  });
+
+  it('handles readFileSync error on IDENTITY.md gracefully', () => {
+    vi.mocked(fs.existsSync).mockImplementation((p) => {
+      const s = String(p);
+      return s.endsWith('IDENTITY.md') || s.endsWith('Cargo.toml');
+    });
+    vi.mocked(fs.readFileSync).mockImplementation((p) => {
+      const s = String(p);
+      if (s.endsWith('IDENTITY.md')) throw new Error('EPERM');
+      throw new Error('ENOENT');
+    });
+
+    const stack = detectProjectStack(ROOT);
+    expect(stack.language).toBe('rust');
+  });
+});

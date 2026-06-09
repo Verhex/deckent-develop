@@ -1,8 +1,10 @@
 // src/orchestra/autonomous/backlog.ts
 // Durable backlog store. Single source of truth for autonomous work items.
 // ADR-010 (no new dep): hand-written validation, mirrors validateCostConfig style.
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, unlinkSync } from 'node:fs';
+import { join } from 'node:path';
 import { atomicWriteFileSync } from '../../agents/worker-lifecycle.js';
+import { TASKS_DIR } from '../../core/constants.js';
 import type { BacklogEntry, BacklogFile, BacklogStatus } from './backlog-types.js';
 
 const KINDS = new Set(['task', 'sprint']);
@@ -74,4 +76,55 @@ export function updateStatus(
   // so the scheduler can re-trigger the entry correctly on the next cycle.
   if (lastResult !== null) { e.lastResult = lastResult; e.lastRun = new Date().toISOString(); }
   atomicWriteFileSync(path, JSON.stringify(bl, null, 2));
+}
+
+/**
+ * Purge done/failed backlog entries, keeping only the `keepRuns` most recently
+ * completed ones (by `lastRun` timestamp). Active entries (pending/running/parked)
+ * are never touched. Mutates `bl.entries` in place and writes atomically.
+ *
+ * Resolves AUT-6: completed entries accumulate forever without this cleanup pass.
+ */
+export function purgeCompletedBacklog(
+  path: string,
+  bl: BacklogFile,
+  keepRuns = 5,
+): void {
+  const TERMINAL: ReadonlySet<BacklogStatus> = new Set(['done', 'failed']);
+  const active = bl.entries.filter((e) => !TERMINAL.has(e.status));
+  const completed = bl.entries.filter((e) => TERMINAL.has(e.status));
+  // Sort most-recent first (null lastRun sorts to the end, i.e. treated as oldest)
+  completed.sort((a, b) => (b.lastRun ?? '').localeCompare(a.lastRun ?? ''));
+  bl.entries = [...active, ...completed.slice(0, keepRuns)];
+  atomicWriteFileSync(path, JSON.stringify(bl, null, 2));
+}
+
+/**
+ * Remove stale autonomous task artifacts from the tasks directory:
+ *   - `task-run-*`  — per-run task files created by the autonomous execute-dispatcher
+ *   - `_*.pid`      — launch PID bookkeeping files left by autonomous worker spawns
+ *
+ * Fail-safe: per-file errors are silently swallowed; a missing directory is a no-op.
+ * Resolves AUT-6 (PID-1 finding): autonomous artifacts never cleaned up otherwise.
+ */
+export function cleanupAutonomousArtifacts(
+  projectRoot: string,
+  tasksDir: string = TASKS_DIR,
+): void {
+  const dir = join(projectRoot, tasksDir);
+  if (!existsSync(dir)) return;
+  let files: string[];
+  try {
+    files = readdirSync(dir);
+  } catch {
+    return;
+  }
+  for (const file of files) {
+    if (!file.startsWith('task-run-') && !/^_.*\.pid$/.test(file)) continue;
+    try {
+      unlinkSync(join(dir, file));
+    } catch {
+      // per-file errors ignored — cleanup is best-effort
+    }
+  }
 }

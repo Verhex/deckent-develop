@@ -80,6 +80,8 @@
 | adr-086 | Native CLI Parity — F11 Feature Set (Sprint 224) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-260 Learnings** (sprint-260): ## Sprint sprint-260 Learnings
+- Doc — Enterprise Foundation reference (consume-the-contract): GO_WITH_TECH_DEBT — Wo...
 - **Sprint sprint-259 Learnings** (sprint-259): ## Sprint sprint-259 Learnings
 - **Sprint sprint-258 Learnings** (sprint-258): ## Sprint sprint-258 Learnings
 - **Sprint sprint-257 Learnings** (sprint-257): ## Sprint sprint-257 Learnings
@@ -104,8 +106,6 @@
 - 252-001 — codex IN docker — Worker exited without writing result (exitCode...
 - **Sprint sprint-251 Learnings** (sprint-251): ## Sprint sprint-251 Learnings
 - 251-006 — provider fleet notes (benchmark; codex): NO_GO — Created docs/benchmark/pr...
-- **Sprint sprint-250 Learnings** (sprint-250): ## Sprint sprint-250 Learnings
-- 250-V2 — codex verify (MF-1 KEY): NO_GO — Created docs/_verify/codex-v.md with exact...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -125,5 +125,6 @@ _No active technical debt._
 - Violation pattern: stale_heartbeat
 - Violation pattern: stale_heartbeat
 - Violation pattern: stale_heartbeat
+- Violation pattern: file_outside_scope
 
-_Total entries: 336 | Generated: 2026-06-09_
+_Total entries: 341 | Generated: 2026-06-09_

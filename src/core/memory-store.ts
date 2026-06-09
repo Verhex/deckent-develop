@@ -665,19 +665,37 @@ export class MemoryStore {
     })();
   }
 
-  getById(id: string, opts?: { includeDeleted?: boolean }): MemoryEntryV2 | null {
+  getById(id: string, opts?: { includeDeleted?: boolean; tenantId?: string }): MemoryEntryV2 | null {
     const includeDeleted = opts?.includeDeleted ?? false;
-    const sql = includeDeleted
-      ? `SELECT * FROM entries WHERE id = ?`
-      : `SELECT * FROM entries WHERE id = ? AND deleted_at IS NULL`;
-    const row = this.db.prepare(sql).get(id) as EntryRow | undefined;
+    const tenantId = opts?.tenantId;
+    let sql: string;
+    const params: unknown[] = [id];
+
+    if (tenantId !== undefined) {
+      const deletedClause = includeDeleted ? '' : ' AND deleted_at IS NULL';
+      sql = `SELECT * FROM entries WHERE id = ?${deletedClause} AND (tenant_id = ? OR tenant_id IS NULL)`;
+      params.push(tenantId);
+    } else {
+      sql = includeDeleted
+        ? `SELECT * FROM entries WHERE id = ?`
+        : `SELECT * FROM entries WHERE id = ? AND deleted_at IS NULL`;
+    }
+
+    const row = this.db.prepare(sql).get(...params) as EntryRow | undefined;
     return row ? rowToEntry(row) : null;
   }
 
-  getByType(type: string): MemoryEntryV2[] {
-    const rows = this.db.prepare(
-      `SELECT * FROM entries WHERE type = ? AND deleted_at IS NULL ORDER BY sprint_num DESC`,
-    ).all(type) as EntryRow[];
+  getByType(type: string, tenantId?: string): MemoryEntryV2[] {
+    let rows: EntryRow[];
+    if (tenantId !== undefined) {
+      rows = this.db.prepare(
+        `SELECT * FROM entries WHERE type = ? AND deleted_at IS NULL AND (tenant_id = ? OR tenant_id IS NULL) ORDER BY sprint_num DESC`,
+      ).all(type, tenantId) as EntryRow[];
+    } else {
+      rows = this.db.prepare(
+        `SELECT * FROM entries WHERE type = ? AND deleted_at IS NULL ORDER BY sprint_num DESC`,
+      ).all(type) as EntryRow[];
+    }
     return rows.map(rowToEntry);
   }
 
@@ -690,15 +708,26 @@ export class MemoryStore {
     return rows.map(r => r.tag);
   }
 
-  getByTags(tags: string[]): MemoryEntryV2[] {
+  getByTags(tags: string[], tenantId?: string): MemoryEntryV2[] {
     if (tags.length === 0) return [];
     const placeholders = tags.map(() => '?').join(', ');
-    const rows = this.db.prepare(`
-      SELECT DISTINCT e.* FROM entries e
-      INNER JOIN tags t ON e.id = t.entry_id
-      WHERE t.tag IN (${placeholders})
-        AND e.deleted_at IS NULL
-    `).all(...tags) as EntryRow[];
+    let rows: EntryRow[];
+    if (tenantId !== undefined) {
+      rows = this.db.prepare(`
+        SELECT DISTINCT e.* FROM entries e
+        INNER JOIN tags t ON e.id = t.entry_id
+        WHERE t.tag IN (${placeholders})
+          AND e.deleted_at IS NULL
+          AND (e.tenant_id = ? OR e.tenant_id IS NULL)
+      `).all(...tags, tenantId) as EntryRow[];
+    } else {
+      rows = this.db.prepare(`
+        SELECT DISTINCT e.* FROM entries e
+        INNER JOIN tags t ON e.id = t.entry_id
+        WHERE t.tag IN (${placeholders})
+          AND e.deleted_at IS NULL
+      `).all(...tags) as EntryRow[];
+    }
     return rows.map(rowToEntry);
   }
 

@@ -221,6 +221,52 @@ describe('temp-skill-generator', () => {
       expect(ids).toContain('temp-go-specialist');
     });
 
+    it('generates prime agents for C++, Java, C#, Kotlin, and Swift stacks', () => {
+      const cases = [
+        {
+          language: 'cpp',
+          framework: 'none',
+          dependencies: ['cmake', 'googletest'],
+          expectedId: 'temp-cpp-specialist',
+        },
+        {
+          language: 'java',
+          framework: 'none',
+          dependencies: ['maven', 'junit-jupiter'],
+          expectedId: 'temp-java-specialist',
+        },
+        {
+          language: 'csharp',
+          framework: 'none',
+          dependencies: ['dotnet', 'xunit'],
+          expectedId: 'temp-csharp-specialist',
+        },
+        {
+          language: 'kotlin',
+          framework: 'none',
+          dependencies: ['gradle', 'kotlinx-coroutines-core'],
+          expectedId: 'temp-kotlin-specialist',
+        },
+        {
+          language: 'swift',
+          framework: 'none',
+          dependencies: ['swift-package-manager', 'xctest'],
+          expectedId: 'temp-swift-specialist',
+        },
+      ];
+
+      for (const testCase of cases) {
+        const agents = generateTempAgents({
+          ...baseStack,
+          language: testCase.language,
+          framework: testCase.framework,
+          dependencies: testCase.dependencies,
+        });
+        const ids = agents.map((a) => a.id);
+        expect(ids).toContain(testCase.expectedId);
+      }
+    });
+
     it('returns empty array for unknown/unsupported stack', () => {
       const unknownStack = {
         ...baseStack,

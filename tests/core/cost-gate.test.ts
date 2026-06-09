@@ -206,6 +206,81 @@ describe('buildCostGateErrorPayload', () => {
     expect(payload.override).toBe('force');
   });
 
+  // ─── ENT-5 — per-request budget ceiling (budget.maxUsd) ─────────────────────
+  describe('per-request budget ceiling (budget.maxUsd)', () => {
+    it('blocks when estimate exceeds per-request budget even if within sprint budget', () => {
+      const costConfig = makeCostConfig({ sprintMaxUsd: 10 });
+      // Use a cheap task that costs >0 but stay well under sprint budget
+      const tasks = Array.from({ length: 5 }, (_, i) => task(`t${i}`, 'haiku', 'normal'));
+
+      const result = evaluateCostGate({ tasks, costConfig, budget: { maxUsd: 0.000001 } });
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.reason).toBe('COST_GATE_EXCEEDED');
+        // effectiveBudgetUsd should be the per-request budget (the binding one)
+        expect(result.budgetUsd).toBe(0.000001);
+        expect(result.message).toMatch(/per-request limit/i);
+      }
+    });
+
+    it('uses sprint budget when it is smaller than per-request budget', () => {
+      // sprint budget $0.01, request budget $100 → sprint wins
+      const costConfig = makeCostConfig({ sprintMaxUsd: 0.01 });
+      const tasks = Array.from({ length: 20 }, (_, i) => task(`t${i}`, 'opus', 'high'));
+
+      const result = evaluateCostGate({ tasks, costConfig, budget: { maxUsd: 100 } });
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.reason).toBe('COST_GATE_EXCEEDED');
+        expect(result.budgetUsd).toBe(0.01);
+        expect(result.message).toMatch(/exceeds budget/i);
+        expect(result.message).not.toMatch(/per-request limit/i);
+      }
+    });
+
+    it('passes when estimate is within both sprint and per-request budgets', () => {
+      const costConfig = makeCostConfig({ sprintMaxUsd: 10 });
+      const tasks = [task('t1', 'haiku', 'low')];
+
+      const result = evaluateCostGate({ tasks, costConfig, budget: { maxUsd: 5 } });
+
+      expect(result.ok).toBe(true);
+    });
+
+    it('acknowledgeCost=true bypasses per-request budget too (overrideApplied)', () => {
+      const costConfig = makeCostConfig({ sprintMaxUsd: 10 });
+      const tasks = Array.from({ length: 5 }, (_, i) => task(`t${i}`, 'haiku', 'normal'));
+
+      const result = evaluateCostGate({
+        tasks,
+        costConfig,
+        budget: { maxUsd: 0.000001 },
+        acknowledgeCost: true,
+      });
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.overrideApplied).toBe(true);
+      }
+    });
+
+    it('no budget field → existing sprint-budget behavior unchanged', () => {
+      const costConfig = makeCostConfig({ sprintMaxUsd: 0.01 });
+      const tasks = Array.from({ length: 20 }, (_, i) => task(`t${i}`, 'opus', 'high'));
+
+      const resultNoBudget = evaluateCostGate({ tasks, costConfig });
+      const resultWithBudgetUndefined = evaluateCostGate({ tasks, costConfig, budget: undefined });
+
+      expect(resultNoBudget.ok).toBe(false);
+      expect(resultWithBudgetUndefined.ok).toBe(false);
+      if (!resultNoBudget.ok && !resultWithBudgetUndefined.ok) {
+        expect(resultNoBudget.budgetUsd).toBe(resultWithBudgetUndefined.budgetUsd);
+      }
+    });
+  });
+
   // ─── Sprint 238 İŞ10 — estimate↔gate bridge for 'local' (ollama) ──────────
   // The cost gate keys on estimate.costRealistic / withinBudget. A local
   // on-device task must contribute $0, so an all-ollama sprint passes the gate

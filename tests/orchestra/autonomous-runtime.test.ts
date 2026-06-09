@@ -7,6 +7,7 @@ import {
   type ApprovalDecision,
   type ActionResult,
   type AuditRecord,
+  type NervousObserverDep,
 } from '../../src/orchestra/autonomous-runtime.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────
@@ -166,5 +167,56 @@ describe('runAutonomousCycle — execution failure', () => {
     expect(result.action?.ok).toBe(false);
     expect(audit[0]?.outcome).toBe('failed');
     expect(audit[0]?.reason).toBe('ERP write timeout');
+  });
+});
+
+// ─── AUT-1: nervous observer integration ────────────────────────────────────
+
+describe('runAutonomousCycle — nervous observer (AUT-1)', () => {
+  it('calls nervousObserver.tick() once per cycle (happy path)', async () => {
+    const { deps } = makeDeps();
+    const tick = vi.fn().mockResolvedValue(undefined);
+    const observer: NervousObserverDep = { tick };
+    deps.nervousObserver = observer;
+
+    await runAutonomousCycle({}, deps);
+
+    expect(tick).toHaveBeenCalledTimes(1);
+  });
+
+  it('tick() error is swallowed — cycle completes normally (fail-safe)', async () => {
+    const { deps, audit } = makeDeps();
+    const tick = vi.fn().mockRejectedValue(new Error('observer scan failure'));
+    deps.nervousObserver = { tick };
+
+    const result = await runAutonomousCycle({}, deps);
+
+    // Cycle must still complete despite observer error
+    expect(result.outcome).toBe('executed');
+    expect(audit).toHaveLength(1);
+    expect(tick).toHaveBeenCalledTimes(1);
+  });
+
+  it('tick() is called even when trigger source returns null (no_trigger cycle)', async () => {
+    const { deps } = makeDeps({ trigger: null });
+    const tick = vi.fn().mockResolvedValue(undefined);
+    deps.nervousObserver = { tick };
+
+    const result = await runAutonomousCycle({}, deps);
+
+    expect(result.outcome).toBe('no_trigger');
+    expect(tick).toHaveBeenCalledTimes(1);
+  });
+
+  it('absent nervousObserver leaves all existing cycle behavior unchanged', async () => {
+    const { deps, audit, spies } = makeDeps();
+    // No nervousObserver set — backward-compat check
+
+    const result = await runAutonomousCycle({ tenantId: 'acme' }, deps);
+
+    expect(result.outcome).toBe('executed');
+    expect(audit).toHaveLength(1);
+    expect(spies.execute).toHaveBeenCalledTimes(1);
+    expect(spies.authorityCheck).toHaveBeenCalledTimes(1);
   });
 });

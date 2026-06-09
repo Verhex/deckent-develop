@@ -24,6 +24,7 @@ function makeInput(overrides: Partial<CreateEntryInput> = {}): CreateEntryInput 
     lang: overrides.lang ?? 'en',
     decay_exempt: overrides.decay_exempt ?? false,
     metadata: overrides.metadata ?? { key: 'value' },
+    tenant_id: overrides.tenant_id,
     relations: overrides.relations ?? [],
   };
 }
@@ -608,6 +609,80 @@ describe('Auto-extract ADR references on insert', () => {
     // Should have both the explicit depends_on AND auto-extracted references
     expect(rels.some(r => r.rel_type === 'depends_on' && r.to_id === 'adr-006')).toBe(true);
     expect(rels.some(r => r.rel_type === 'references' && r.to_id === 'adr-006')).toBe(true);
+  });
+});
+
+// ── Multi-tenant isolation (ENT-2) ─────────────────────────────────
+
+describe('Multi-tenant isolation', () => {
+  it('getByType without tenantId returns all entries (backward compat)', () => {
+    store.insert(makeInput({ id: 'mt-all-1', type: 'adr', tenant_id: 'acme' }));
+    store.insert(makeInput({ id: 'mt-all-2', type: 'adr', tenant_id: 'beta' }));
+    store.insert(makeInput({ id: 'mt-all-3', type: 'adr' })); // null tenant
+    const all = store.getByType('adr');
+    expect(all.map(e => e.id)).toEqual(expect.arrayContaining(['mt-all-1', 'mt-all-2', 'mt-all-3']));
+    expect(all).toHaveLength(3);
+  });
+
+  it('getByType with tenantId isolates rows for that tenant', () => {
+    store.insert(makeInput({ id: 'ti-acme', type: 'memory', tenant_id: 'acme' }));
+    store.insert(makeInput({ id: 'ti-beta', type: 'memory', tenant_id: 'beta' }));
+    const acmeOnly = store.getByType('memory', 'acme');
+    expect(acmeOnly.map(e => e.id)).toContain('ti-acme');
+    expect(acmeOnly.map(e => e.id)).not.toContain('ti-beta');
+  });
+
+  it('getByType with tenantId also returns legacy NULL-tenant rows', () => {
+    store.insert(makeInput({ id: 'ti-leg', type: 'debt' })); // null tenant
+    store.insert(makeInput({ id: 'ti-acme2', type: 'debt', tenant_id: 'acme' }));
+    store.insert(makeInput({ id: 'ti-beta2', type: 'debt', tenant_id: 'beta' }));
+    const acmeView = store.getByType('debt', 'acme');
+    // acme rows + legacy NULL rows are visible
+    expect(acmeView.map(e => e.id)).toContain('ti-leg');
+    expect(acmeView.map(e => e.id)).toContain('ti-acme2');
+    expect(acmeView.map(e => e.id)).not.toContain('ti-beta2');
+  });
+
+  it('getById with tenantId returns entry when tenant matches', () => {
+    store.insert(makeInput({ id: 'gid-acme', tenant_id: 'acme' }));
+    const entry = store.getById('gid-acme', { tenantId: 'acme' });
+    expect(entry).not.toBeNull();
+    expect(entry!.id).toBe('gid-acme');
+  });
+
+  it('getById with tenantId returns null for wrong tenant', () => {
+    store.insert(makeInput({ id: 'gid-acme2', tenant_id: 'acme' }));
+    const entry = store.getById('gid-acme2', { tenantId: 'beta' });
+    expect(entry).toBeNull();
+  });
+
+  it('getById with tenantId returns legacy NULL-tenant entries', () => {
+    store.insert(makeInput({ id: 'gid-null' })); // null tenant
+    const entry = store.getById('gid-null', { tenantId: 'acme' });
+    expect(entry).not.toBeNull();
+  });
+
+  it('getByTags with tenantId isolates results', () => {
+    store.insert(makeInput({ id: 'gt-acme', tags: ['shared-tag'], tenant_id: 'acme' }));
+    store.insert(makeInput({ id: 'gt-beta', tags: ['shared-tag'], tenant_id: 'beta' }));
+    const acmeResults = store.getByTags(['shared-tag'], 'acme');
+    expect(acmeResults.map(e => e.id)).toContain('gt-acme');
+    expect(acmeResults.map(e => e.id)).not.toContain('gt-beta');
+  });
+
+  it('getByTags without tenantId returns all matching entries (backward compat)', () => {
+    store.insert(makeInput({ id: 'gt-all-a', tags: ['multi-tag'], tenant_id: 'acme' }));
+    store.insert(makeInput({ id: 'gt-all-b', tags: ['multi-tag'], tenant_id: 'beta' }));
+    const all = store.getByTags(['multi-tag']);
+    expect(all.map(e => e.id)).toEqual(expect.arrayContaining(['gt-all-a', 'gt-all-b']));
+    expect(all).toHaveLength(2);
+  });
+
+  it('tenant_id is persisted and retrievable on inserted entry', () => {
+    store.insert(makeInput({ id: 'tid-check', tenant_id: 'enterprise' }));
+    const entry = store.getById('tid-check');
+    expect(entry).not.toBeNull();
+    expect(entry!.tenant_id).toBe('enterprise');
   });
 });
 

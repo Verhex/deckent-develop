@@ -19,6 +19,7 @@ import {
   type EstimateOptions,
 } from './cost-calculator.js';
 import type { CostConfig } from './cost-config-loader.js';
+import type { ExecutionBudget } from './work-model.js';
 
 // ─── Input / Output Types ───────────────────────────────────────────────────
 
@@ -34,6 +35,13 @@ export interface CostGateInput {
   acknowledgeCost?: boolean;
   /** Optional estimate tuning (cache hit ratio, retry multiplier, …). */
   estimateOptions?: EstimateOptions;
+  /**
+   * Per-request budget from ExecutionRequest.budget (WM-1 contract, ENT-5).
+   * When present, `maxUsd` is treated as an additional per-request ceiling —
+   * the effective ceiling = min(config sprint_max_usd, budget.maxUsd).
+   * Backward-safe: absent → existing behavior using only config sprint budget.
+   */
+  budget?: ExecutionBudget;
 }
 
 export interface CostGatePass {
@@ -90,26 +98,40 @@ export const DEFAULT_AUTO_CONFIRM_THRESHOLD_USD = 2;
  * Pure function — performs no I/O, no prompting, no side effects.
  */
 export function evaluateCostGate(input: CostGateInput): CostGateResult {
-  const { tasks, costConfig, acknowledgeCost, estimateOptions } = input;
+  const { tasks, costConfig, acknowledgeCost, estimateOptions, budget } = input;
 
   const estimate = estimateSprintCost(tasks, costConfig, estimateOptions ?? {});
 
-  const budgetUsd = estimate.budgetUsd;
+  const sprintBudgetUsd = estimate.budgetUsd;
   const estimatedUsd = estimate.costRealistic;
   const autoConfirmThresholdUsd =
     costConfig.cost_limits.auto_confirm_below_usd ?? DEFAULT_AUTO_CONFIRM_THRESHOLD_USD;
 
-  if (!estimate.withinBudget && !acknowledgeCost) {
+  // Effective ceiling = min(config sprint budget, per-request budget.maxUsd).
+  // When budget is absent, effectiveBudgetUsd === sprintBudgetUsd → backward-safe.
+  const requestMaxUsd = budget?.maxUsd;
+  const effectiveBudgetUsd =
+    requestMaxUsd !== undefined ? Math.min(sprintBudgetUsd, requestMaxUsd) : sprintBudgetUsd;
+
+  const exceedsEffectiveBudget = estimatedUsd > effectiveBudgetUsd;
+
+  if (exceedsEffectiveBudget && !acknowledgeCost) {
+    const isRequestBudgetBinding =
+      requestMaxUsd !== undefined && requestMaxUsd < sprintBudgetUsd;
+    const overrideHint = isRequestBudgetBinding
+      ? `Raise the request budget.maxUsd or set acknowledgeCost=true (MCP) / --force (CLI).`
+      : `Override with acknowledgeCost=true (MCP) / --force (CLI) or raise cost_limits.sprint_max_usd in .deckent/cost-config.json.`;
+    const budgetSource = isRequestBudgetBinding ? ` (per-request limit)` : ``;
+
     return {
       ok: false,
       reason: 'COST_GATE_EXCEEDED',
       estimate,
       estimatedUsd,
-      budgetUsd,
+      budgetUsd: effectiveBudgetUsd,
       message:
-        `Sprint cost $${estimatedUsd.toFixed(2)} exceeds budget $${budgetUsd.toFixed(2)}. ` +
-        `Override with acknowledgeCost=true (MCP) / --force (CLI) or raise ` +
-        `cost_limits.sprint_max_usd in .deckent/cost-config.json.`,
+        `Sprint cost $${estimatedUsd.toFixed(2)} exceeds budget $${effectiveBudgetUsd.toFixed(2)}${budgetSource}. ` +
+        overrideHint,
     };
   }
 
@@ -120,7 +142,7 @@ export function evaluateCostGate(input: CostGateInput): CostGateResult {
     estimate,
     autoConfirm,
     autoConfirmThresholdUsd,
-    overrideApplied: !estimate.withinBudget && acknowledgeCost === true,
+    overrideApplied: exceedsEffectiveBudget && acknowledgeCost === true,
   };
 }
 

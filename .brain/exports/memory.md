@@ -1,5 +1,20 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-260 Learnings
+- Sprint sprint-260 Learnings: ## Sprint sprint-260 Learnings
+- Doc — Enterprise Foundation reference (consume-the-contract): GO_WITH_TECH_DEBT — Worker exited without writing result (exitCode=0) | disk-verify found evidence (linesAdded=0, untrackedFiles=1). Status 
+
+## Gains
+- 260-001 — ENT-1 — actor.role → worker authority (ADR-037 V2 step) — ENT-1 (ADR-037 V2 step): the nervous authority-matrix now consults ExecutionRequest.actor.role.
+- 260-002 — ENT-2 — tenantId threading (replace hardcoded 'local') — ENT-2 tenantId threading complete.
+- 260-003 — ENT-3 — correlationId / causationId audit lineage — ENT-3 audit lineage implemented surgically and backward-safely.
+- 260-004 — WM-6 / F10-002 — riskClass → risk-gated approval — WM-6 / F10-002 risk-gate wired INTO the nervous DecisionEngine.
+- 260-005 — budget → pre-spawn cost-gate enforcement — Added per-request budget ceiling enforcement to evaluateCostGate.
+- 260-006 — F8-001 — capability.invoke abstraction (capabilityTarget consumer) — Worker exited without writing result (exitCode=0)
+- 260-007 — AUT-4 — nextRun() full cron evaluation — Created src/orchestra/autonomous/scheduled-flow.ts with full 5-field cron evaluator.
+- 260-008 — AUT-6 — backlog done/failed purge + autonomous artifact cleanup — Added purgeCompletedBacklog() and cleanupAutonomousArtifacts() to backlog.ts.
+- …and 7 more delivered
+
 ## Sprint sprint-259 Learnings
 - Sprint sprint-259 Learnings: ## Sprint sprint-259 Learnings
 

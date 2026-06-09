@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { loadBacklog, validateBacklogEntry, queryDue, updateStatus } from '../../../src/orchestra/autonomous/backlog.js';
+import { loadBacklog, validateBacklogEntry, queryDue, updateStatus, purgeCompletedBacklog, cleanupAutonomousArtifacts } from '../../../src/orchestra/autonomous/backlog.js';
 import type { BacklogEntry } from '../../../src/orchestra/autonomous/backlog-types.js';
 
 function entry(over: Partial<BacklogEntry> = {}): BacklogEntry {
@@ -98,5 +98,93 @@ describe('backlog store', () => {
       { id: 'r', title: 't', kind: 'task' as const, spec: {}, policy: 'auto' as const, trigger: { type: 'reactive' as const, detector: 'x' }, status: 'pending' as const, lastRun: null, lastResult: null },
     ]};
     expect(queryDue(bl, new Date()).map(e => e.id)).toEqual(['r']);
+  });
+
+  // ── purgeCompletedBacklog ──────────────────────────────────────────────────
+
+  it('purgeCompletedBacklog removes done/failed entries beyond keepRuns', () => {
+    const entries = [
+      entry({ id: 'a', status: 'done', lastRun: '2026-01-01T00:00:00Z' }),
+      entry({ id: 'b', status: 'failed', lastRun: '2026-01-02T00:00:00Z' }),
+      entry({ id: 'c', status: 'done', lastRun: '2026-01-03T00:00:00Z' }),
+    ];
+    writeFileSync(path, JSON.stringify({ _version: '1.0', entries }));
+    const bl = loadBacklog(path);
+    purgeCompletedBacklog(path, bl, 2);
+    const reloaded = loadBacklog(path);
+    // Should keep the 2 most recent (c, b) and drop the oldest (a)
+    expect(reloaded.entries.map(e => e.id).sort()).toEqual(['b', 'c']);
+  });
+
+  it('purgeCompletedBacklog never removes active (pending/running/parked) entries', () => {
+    const entries = [
+      entry({ id: 'p', status: 'pending' }),
+      entry({ id: 'r', status: 'running' }),
+      entry({ id: 'd', status: 'done', lastRun: '2026-01-01T00:00:00Z' }),
+    ];
+    writeFileSync(path, JSON.stringify({ _version: '1.0', entries }));
+    const bl = loadBacklog(path);
+    purgeCompletedBacklog(path, bl, 0); // keep zero completed entries
+    const reloaded = loadBacklog(path);
+    expect(reloaded.entries.map(e => e.id).sort()).toEqual(['p', 'r']);
+  });
+
+  it('purgeCompletedBacklog keeps all completed entries when count <= keepRuns', () => {
+    const entries = [
+      entry({ id: 'a', status: 'done', lastRun: '2026-01-01T00:00:00Z' }),
+      entry({ id: 'b', status: 'failed', lastRun: '2026-01-02T00:00:00Z' }),
+    ];
+    writeFileSync(path, JSON.stringify({ _version: '1.0', entries }));
+    const bl = loadBacklog(path);
+    purgeCompletedBacklog(path, bl, 5);
+    const reloaded = loadBacklog(path);
+    expect(reloaded.entries).toHaveLength(2);
+  });
+
+  it('purgeCompletedBacklog persists atomically (re-load confirms)', () => {
+    const entries = [
+      entry({ id: 'x', status: 'done', lastRun: '2026-01-01T00:00:00Z' }),
+      entry({ id: 'y', status: 'pending' }),
+    ];
+    writeFileSync(path, JSON.stringify({ _version: '1.0', entries }));
+    const bl = loadBacklog(path);
+    purgeCompletedBacklog(path, bl, 0);
+    const reloaded = loadBacklog(path);
+    expect(reloaded.entries.map(e => e.id)).toEqual(['y']);
+    expect(reloaded._version).toBe('1.0');
+  });
+
+  // ── cleanupAutonomousArtifacts ─────────────────────────────────────────────
+
+  it('cleanupAutonomousArtifacts removes task-run-* files', () => {
+    const tasksDir = join(dir, '.tasks');
+    mkdirSync(tasksDir);
+    writeFileSync(join(tasksDir, 'task-run-1234567890-0.json'), '{}');
+    writeFileSync(join(tasksDir, 'task-run-1234567890-0.hb'), '{}');
+    cleanupAutonomousArtifacts(dir, '.tasks');
+    expect(existsSync(join(tasksDir, 'task-run-1234567890-0.json'))).toBe(false);
+    expect(existsSync(join(tasksDir, 'task-run-1234567890-0.hb'))).toBe(false);
+  });
+
+  it('cleanupAutonomousArtifacts removes _*.pid files', () => {
+    const tasksDir = join(dir, '.tasks');
+    mkdirSync(tasksDir);
+    writeFileSync(join(tasksDir, '_run-abc.pid'), '12345');
+    cleanupAutonomousArtifacts(dir, '.tasks');
+    expect(existsSync(join(tasksDir, '_run-abc.pid'))).toBe(false);
+  });
+
+  it('cleanupAutonomousArtifacts leaves unrelated task files intact', () => {
+    const tasksDir = join(dir, '.tasks');
+    mkdirSync(tasksDir);
+    writeFileSync(join(tasksDir, 'task-001-001.json'), '{}');
+    writeFileSync(join(tasksDir, 'task-run-1234567890-0.json'), '{}');
+    cleanupAutonomousArtifacts(dir, '.tasks');
+    expect(existsSync(join(tasksDir, 'task-001-001.json'))).toBe(true);
+    expect(existsSync(join(tasksDir, 'task-run-1234567890-0.json'))).toBe(false);
+  });
+
+  it('cleanupAutonomousArtifacts is a no-op when tasks directory is absent', () => {
+    expect(() => cleanupAutonomousArtifacts(dir, '.nonexistent')).not.toThrow();
   });
 });

@@ -26,4 +26,10 @@ When acting as Worker: @.codex/rules/worker-default.md
 ## Agent Performance
 | Agent | Tasks | Done | Success |
 |-------|-------|------|--------|
-| doc-writer | 3 | 3 | 100% |
+| security-auditor | 2 | 2 | 100% |
+| refactorer | 3 | 3 | 100% |
+| architect | 3 | 3 | 100% |
+| api-builder | 3 | 3 | 100% |
+| bug-fixer | 3 | 3 | 100% |
+| ci-guardian | 1 | 1 | 100% |
+| doc-writer | 1 | 1 | 100% |
