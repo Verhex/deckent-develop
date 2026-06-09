@@ -35,6 +35,7 @@ vi.mock('node:fs', async () => {
 
 vi.mock('../../src/core/config.js', () => ({
   loadConfig: vi.fn(),
+  readAuthMode: vi.fn().mockResolvedValue('subscription'),
 }));
 
 vi.mock('../../src/orchestra/brain.js', () => ({
