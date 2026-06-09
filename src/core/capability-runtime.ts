@@ -3,6 +3,7 @@
 //   capability-broker.ts        — registry + reference handlers (echo, fs.read)
 //   capability-handlers.ts      — http.get / env.read / shell.exec
 //   capability-handlers-data.ts — db.query / mail.search
+//   capability-handlers-erp.ts  — erp.read (opt-in, injected ErpConnector)
 //   capability-audit-bridge.ts  — per-invocation audit record emission
 // This is the call-site the cluster was missing (capability-maturity E11 —
 // "closed island"); buildEngineRuntime consumes it for kind=capability backlog
@@ -20,6 +21,8 @@ import {
   installDataHandlers,
   type DataHandlerOptions,
 } from './capability-handlers-data.js';
+import { installErpHandler } from './capability-handlers-erp.js';
+import type { ErpConnector } from './erp-connector.js';
 import {
   withAuditedInvocation,
   type CapabilityAuditRecord,
@@ -28,6 +31,9 @@ import {
 /** Handler options forwarded to the underlying install* functions. */
 export interface CapabilityRuntimeOptions extends ExtendedHandlerOptions {
   data?: DataHandlerOptions;
+  /** Opt-in ERP read access (Sprint 265) — absent ⇒ no 'erp.read' handler
+   *  is registered and the registry behaves exactly as before (backward-safe). */
+  erp?: { connector: ErpConnector };
 }
 
 /**
@@ -48,6 +54,9 @@ export function createAuditedCapabilityRegistry(
   const registry = createDefaultRegistry();
   installExtendedHandlers(registry, options);
   installDataHandlers(registry, { db: options.data?.db, mail: options.data?.mail });
+  // Opt-in ERP wake (E12) — installed before the audit wrap below so erp.read
+  // invocations emit audit records through the same loop as every other handler.
+  if (options.erp) installErpHandler(registry, { connector: options.erp.connector });
 
   if (emit) {
     const safeEmit = (record: CapabilityAuditRecord): void => {

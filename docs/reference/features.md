@@ -1,6 +1,6 @@
 # Deckent Feature Reference
 
-> Auto-generated from `.deckent/features-manifest.json`. Run `node scripts/sync-manifest.mjs` to regenerate.
+> Hand-maintained reference — no script generates this file; update it manually when feature status changes. The machine-readable counterpart is `.deckent/features-manifest.json`, which `node scripts/sync-manifest.mjs` regenerates (curated feature catalog in the script, bucketed by an import-count heuristic plus lifecycle annotations). That script writes only the JSON manifest, not this document.
 
 This document lists all Deckent features categorized by their activity level. It serves both AI orchestrators (Claude Code, Codex, Gemini) and human developers as the single reference for feature status.
 

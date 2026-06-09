@@ -1,5 +1,16 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-265 Learnings
+- Sprint sprint-265 Learnings: ## Sprint sprint-265 Learnings
+
+## Gains
+- 265-001 — ERP capability wake — erp.read handler + runtime wiring + referans driver — E12 wake complete.
+- 265-002 — SIEM HTTP transport + `audit forward --url` canlı wire — TDD (RED→GREEN).
+- 265-003 — SIEM syslog transport (RFC5424, injectable socket) — NEW src/core/siem-transport-syslog.ts: createSyslogSiemTransport(opts) -> (batch: SiemRecord[]) =...
+- 265-004 — JWKS fetch + RS256 key resolver — JWKS fetch + RS256 key resolver (ENT-5 follow-up).
+- 265-005 — Embedded-terminal OidcAuthProvider (spec §1d rezerve slot) — OidcAuthProvider added to src/api/terminal/auth-provider.ts (spec §1d reserved slot) as a surgica...
+- 265-006 — features.md sahte auto-gen başlığı düzelt (Sprint 264 worker bulgusu) — Replaced the false auto-gen header (line 3) in docs/reference/features.md with an accurate one.
+
 ## Sprint sprint-264 Learnings
 - Sprint sprint-264 Learnings: ## Sprint sprint-264 Learnings
 

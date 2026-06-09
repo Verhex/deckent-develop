@@ -7177,3 +7177,30 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 264-012: deckent-nedir (TR) — otonom yetenek özeti (DONE)
 
 ---
+## Sprint 265 — sprint-265
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-06-09
+**Duration:** 508s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 6 |
+| Completed | 6 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 507899ms |
+
+### Tasks
+
+- 265-001: ERP capability wake — erp.read handler + runtime wiring + referans driver (DONE)
+- 265-002: SIEM HTTP transport + `audit forward --url` canlı wire (DONE)
+- 265-003: SIEM syslog transport (RFC5424, injectable socket) (DONE)
+- 265-004: JWKS fetch + RS256 key resolver (DONE)
+- 265-005: Embedded-terminal OidcAuthProvider (spec §1d rezerve slot) (DONE)
+- 265-006: features.md sahte auto-gen başlığı düzelt (Sprint 264 worker bulgusu) (DONE)
+
+---

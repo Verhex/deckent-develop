@@ -2,6 +2,20 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint265] - 2026-06-09
+
+### Added
+
+- ERP capability wake — erp.read handler + runtime wiring + referans driver
+- SIEM HTTP transport + `audit forward --url` canlı wire
+- SIEM syslog transport (RFC5424, injectable socket)
+- JWKS fetch + RS256 key resolver
+- Embedded-terminal OidcAuthProvider (spec §1d rezerve slot)
+- features.md sahte auto-gen başlığı düzelt (Sprint 264 worker bulgusu)
+
+
+_Tasks: 6 total, 6 done, 0 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint264] - 2026-06-09
 
 ### Added

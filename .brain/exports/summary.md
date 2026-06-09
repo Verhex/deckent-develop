@@ -80,6 +80,10 @@
 | adr-086 | Native CLI Parity — F11 Feature Set (Sprint 224) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-265 Learnings** (sprint-265): ## Sprint sprint-265 Learnings
+
+## Gains
+- 265-001 — ERP capability wake — erp.read handler + runtime wiring + refera...
 - **Sprint sprint-264 Learnings** (sprint-264): ## Sprint sprint-264 Learnings
 
 ## Gains
@@ -104,10 +108,6 @@
 - 255-001 — DOC-1 — ExecutionRequest contract reference (WM-1) — Created doc...
 - **Sprint sprint-254 Learnings** (sprint-254): ## Sprint sprint-254 Learnings
 - V-001 — codex docker + reasoning-effort (MF-8 + F1-RE): GO_WITH_TECH_DEBT — Created ...
-- **Sprint sprint-253 Learnings** (sprint-253): ## Sprint sprint-253 Learnings
-
-## Gains
-- 253-001 — codex IN docker — Created the requested three-line Docker verifi...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -129,4 +129,4 @@ _No active technical debt._
 - Violation pattern: stale_heartbeat
 - Violation pattern: file_outside_scope
 
-_Total entries: 353 | Generated: 2026-06-09_
+_Total entries: 356 | Generated: 2026-06-09_

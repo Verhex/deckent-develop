@@ -5,6 +5,7 @@ import { runSelfAuditGate } from '../../orchestra/sprint-finalizer.js';
 import { queryAudit, readAuditEvents } from '../../core/audit-query.js';
 import { generateComplianceReport, type ComplianceReport } from '../../core/compliance-report.js';
 import { createSiemForwarder } from '../../core/siem-forwarder.js';
+import { createHttpSiemTransport, type SiemFetchLike } from '../../core/siem-transport-http.js';
 import { loadConfig } from '../../core/config.js';
 import { print, printError } from '../helpers/output.js';
 import { getLanguage, getMessage } from '../helpers/messages.js';
@@ -18,6 +19,7 @@ interface AuditOpts {
   since?: string;
   role?: string;
   out?: string;
+  url?: string;
   lang?: string;
 }
 
@@ -42,7 +44,8 @@ export function runComplianceReport(
 /**
  * Forward a sprint's audit chain through the SIEM forwarder into an NDJSON
  * file (the built-in file transport). Returns the record count + destination.
- * Real network transports (HTTP/syslog) remain an ENT-5 follow-up.
+ * For real network forwarding see {@link runSiemHttpForward} (syslog CLI wire
+ * remains an ENT-5 follow-up).
  */
 export async function runSiemExport(
   root: string,
@@ -63,6 +66,32 @@ export async function runSiemExport(
   return { count: events.length, out: outPath };
 }
 
+/**
+ * Forward a sprint's audit chain to an HTTP(S) SIEM endpoint via
+ * {@link createHttpSiemTransport}. Returns the record count + destination URL.
+ *
+ * Sync errors (malformed URL) throw before any forwarding; transport failures
+ * (non-2xx / network) are retried then dropped by the forwarder per its
+ * fail-safe contract — they never reject. `fetchImpl` is injectable for
+ * hermetic tests.
+ */
+export async function runSiemHttpForward(
+  root: string,
+  sprintId: string,
+  url: string,
+  fetchImpl?: SiemFetchLike,
+): Promise<{ count: number; url: string }> {
+  const events = readAuditEvents(root, sprintId);
+  const forwarder = createSiemForwarder({
+    flushEvery: 0, // manual flush — no dangling timer in a one-shot CLI run
+    transport: createHttpSiemTransport({ url, ...(fetchImpl ? { fetchImpl } : {}) }),
+  });
+  for (const event of events) forwarder.forward(event);
+  await forwarder.flush();
+  forwarder.dispose();
+  return { count: events.length, url };
+}
+
 export function registerAudit(program: Command): void {
   program
     .command('audit [sprint-id]')
@@ -74,6 +103,7 @@ export function registerAudit(program: Command): void {
     .option('--since <timestamp>', 'Filter audit events at or after ISO 8601 timestamp (used with query subcommand)')
     .option('--role <role>', 'Caller role for RBAC enforcement: admin|operator|viewer (used with query subcommand)')
     .option('--out <path>', 'Output file for the forward subcommand (default: .deckent/siem-export.jsonl)')
+    .option('--url <url>', 'POST audit records to an HTTP(S) SIEM endpoint (forward subcommand; takes precedence over --out)')
     .option('--lang <code>', 'Language override (en|tr)')
     .action(async (sprintId: string | undefined, opts: AuditOpts) => {
       const root = resolveProjectRoot();
@@ -110,8 +140,22 @@ export function registerAudit(program: Command): void {
       }
 
       if (sprintId === 'forward') {
-        // SIEM NDJSON export of the live audit chain (gap #5 read-side).
+        // SIEM forward of the live audit chain (gap #5 read-side):
+        // --url → HTTP transport (takes precedence over --out); default → NDJSON file.
         try {
+          if (opts.url) {
+            const result = await runSiemHttpForward(root, opts.sprint ?? 'sprint-001', opts.url);
+            if (opts.json) {
+              print(JSON.stringify(result, null, 2));
+            } else {
+              print(getMessage('audit.forward.sent', lang, {
+                count: String(result.count),
+                url: result.url,
+              }));
+            }
+            process.exitCode = 0;
+            return;
+          }
           const out = opts.out ?? join(root, '.deckent', 'siem-export.jsonl');
           const result = await runSiemExport(root, opts.sprint ?? 'sprint-001', out);
           if (opts.json) {

@@ -744,6 +744,10 @@ const MESSAGES: MessageMap = {
     en: 'Forwarded {count} audit record(s) → {out}',
     tr: '{count} denetim kaydı iletildi → {out}',
   },
+  'audit.forward.sent': {
+    en: 'Forwarded {count} audit record(s) → {url}',
+    tr: '{count} denetim kaydı iletildi → {url}',
+  },
   'autonomous.backlog.summary': {
     en: 'Backlog: {total} entries — pending:{pending} running:{running} parked:{parked} done:{done} failed:{failed}',
     tr: 'Backlog: {total} kayıt — bekleyen:{pending} çalışan:{running} beklemede:{parked} tamam:{done} hata:{failed}',
