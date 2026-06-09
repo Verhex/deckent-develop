@@ -59,32 +59,28 @@
 
 ## 2. IMMEDIATE next work — WM-7 / stack-aware enrichment (the approved hybrid, finish it)
 
-The CORE is done; these are the deferred enrichments (approved design, hand-code preferred):
+The CORE + most enrichments are now DONE (Sprint 254 auto-mode batch). Status:
 
-- **E1 — First-class parametric `code-expert`.** Enrich `orchestra/temp-skill-generator.ts`
-  `generateProjectConventionsSkill(stack)` into a richer universal base: inject the detected
-  stack's idioms + build/test/lint commands (from `STACK_COMMANDS`) + file conventions.
-  Goal: any-stack project gets a competent code-expert out of the box. Acceptance: a Go
-  project's generated skill names `go test ./...`/`go vet`, not TS idioms.
-- **E2 — Prime-agent instantiation per stack.** Wire `orchestra/temp-agent-generator.ts`
-  `AGENT_TEMPLATES` (already carry a `language` affinity) so the matching prime agent is
-  instantiated for the detected stack alongside the horizontal quality agents
-  (security-auditor/code-reviewer/doc-writer stay stack-agnostic — preserve ADR-041).
-- **E3 — IDENTITY.md `Language:` feed.** Use the managed-docs IDENTITY `Language:` line as
-  the stack SSOT (cache), fall back to live `detectProjectStack`. Single source for
-  criteria + routing + parametric skill.
-- **E4 — Exact build/test commands in criteria.** Re-wire `sprint-planner` to pass
-  `commands:{build,test}` to `extractGoNogoCriteria` (criteria-deriver already accepts it).
-  Requires `detectFullStack` — when you do, ALSO add `detectFullStack` to the 3 planner test
-  mocks (`planner-override-precedence`, `ai-planner-honest-fallback`, `runsprint-debt-
-  integration`) so they stay green. (This is the one place test-touch is mandatory.)
-- **E5 — prompt-god-template verify-command injection.** Inject the resolved stack commands
-  into the worker verify section (today: multi-lang examples; worker-verify.ts already runs
-  the right commands via ADR-019, so this is polish).
-- **E6 — Formal ADR.** Write ADR-087 (amends ADR-041): "Stack-Aware Evaluation & Routing +
-  Parametric Stack-Axis" — TechStackKind orthogonal to TaskKind; parametric base + curated
-  prime experts + mismatch-penalty; forceSkills bypass. Insert via `MemoryStore` (DB-first)
-  + export.
+- **E1 ✅ DONE** — parametric `code-expert`: `generateProjectConventionsSkill` injects
+  stack-correct Commands (STACK_COMMANDS) + per-language Idioms (STACK_IDIOMS). Go skill →
+  `go test ./...`+gofmt, TS → tsc/vitest+ESM-`.js`. REPL-proven.
+- **E2 ✅ DONE (was already wired)** — `generateTempAgents(stack)` is stack-GATED (filters
+  AGENT_TEMPLATES by `tpl.language`) + planner-called: Go→`temp-go-specialist`,
+  TS+React→`temp-react-ts/react-specialist`, Py+FastAPI→`temp-python-api/python-specialist`;
+  horizontal quality agents stay stack-agnostic (ADR-041), forceAgent bypasses. REPL-proven.
+  ⬜ Follow-up: extend AGENT_TEMPLATES to C++/Java/C#/Kotlin/Swift (content add, not wiring).
+- **E4 ✅ DONE** — criteria carry exact stack commands (detectFullStack→deriver); the 3
+  planner test mocks gained `detectFullStack`. TS task → "`npx tsc` succeeds; `npx vitest run`
+  passes".
+- **E3 ⬜ minor** — IDENTITY.md `Language:` feed. `detectFullStack` is already functionally
+  equivalent (live detection cached to `.deckent/project-stack.json`); only do this if a
+  user wants IDENTITY to OVERRIDE detection.
+- **E5 ⬜ minor** — prompt-god-template verify-command injection. `worker-verify.ts` already
+  runs the right commands (ADR-019) + the prompt has multi-lang examples; pure polish.
+- **E6 ⬜ governance** — Formal ADR-087 (amends ADR-041): "Stack-Aware Evaluation & Routing +
+  Parametric Stack-Axis". DB-first insert via `MemoryStore` + export — do this in a
+  memory-export cycle (don't hand-edit memory.db mid-run). Decision is already recorded in
+  this brief + MASTER-PLAN WM-7 + the commit messages.
 
 ---
 
