@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { MockInstance } from 'vitest';
-import { GeminiAdapter, createGeminiAdapter, GEMINI_AUTH_HEADER, parseGeminiOutput } from '../../src/providers/gemini.js';
+import { GeminiAdapter, createGeminiAdapter, GEMINI_AUTH_HEADER, parseGeminiOutput, buildGeminiSpawnEnv } from '../../src/providers/gemini.js';
 import type { ProviderSpawnOptions } from '../../src/core/provider.js';
 import { ProviderError } from '../../src/core/provider.js';
 
@@ -200,7 +200,7 @@ describe('GeminiAdapter', () => {
 
   it('buildArgs returns correct Gemini CLI arguments', () => {
     const args = adapter.buildArgs('gemini-2.5-pro', 'Hello Gemini');
-    expect(args).toEqual(['-p', 'Hello Gemini', '--output-format', 'json', '-m', 'gemini-2.5-pro', '--approval-mode', 'plan']);
+    expect(args).toEqual(['-p', 'Hello Gemini', '--output-format', 'json', '-m', 'gemini-2.5-pro', '--approval-mode', 'yolo', '--skip-trust']);
   });
 
   it('buildArgs includes -p flag for headless mode', () => {
@@ -221,10 +221,14 @@ describe('GeminiAdapter', () => {
     expect(args).toContain('gemini-2.5-pro');
   });
 
-  it('buildArgs includes --approval-mode plan for non-interactive mode', () => {
+  it('buildArgs includes --approval-mode yolo + --skip-trust for headless worker mode', () => {
+    // Sprint 248 (Provider Parity): a worker must auto-approve edit/write tools
+    // (`yolo`, not read-only `plan`) and trust the workspace headlessly.
     const args = adapter.buildArgs('gemini-2.5-pro', 'prompt');
     expect(args).toContain('--approval-mode');
-    expect(args).toContain('plan');
+    expect(args).toContain('yolo');
+    expect(args).toContain('--skip-trust');
+    expect(args).not.toContain('plan');
   });
 
   // ─── Streaming Support ─────────────────────────────────────────────
@@ -320,15 +324,16 @@ describe('GeminiAdapter', () => {
     ).toThrow(/Unsupported model/);
   });
 
-  it('spawn throws when API key is missing', () => {
+  it('spawn succeeds without API key via OAuth session (does not throw)', () => {
+    // Sprint 248 (Provider Parity): a missing key is no longer fatal — the CLI
+    // falls back to its OAuth/subscription session. Previously this threw.
     delete process.env.GOOGLE_API_KEY;
     delete process.env.DECKENT_GOOGLE_API_KEY;
+    setupMockChild();
     expect(() =>
       adapter.spawn('task-005', 'gemini-2.5-pro', 'Test'),
-    ).toThrow(ProviderError);
-    expect(() =>
-      adapter.spawn('task-005', 'gemini-2.5-pro', 'Test'),
-    ).toThrow(/GOOGLE_API_KEY/);
+    ).not.toThrow();
+    expect(mockSpawn).toHaveBeenCalledWith('gemini', expect.any(Array), expect.any(Object));
   });
 
   it('spawn throws for duplicate taskId', () => {
@@ -457,7 +462,9 @@ describe('GeminiAdapter', () => {
     expect(result.args).toContain('-m');
     expect(result.args).toContain('gemini-2.5-pro');
     expect(result.args).toContain('--approval-mode');
-    expect(result.args).toContain('plan');
+    // Sprint 248 (Provider Parity): shared buildArgs now uses yolo + skip-trust.
+    expect(result.args).toContain('yolo');
+    expect(result.args).toContain('--skip-trust');
   });
 
   it('buildPlannerCommand uses correct model in args', () => {
@@ -774,6 +781,32 @@ describe('GeminiAdapter', () => {
       expect(result.auth).toBe(true);
       expect(result.ready).toBe(true);
     });
+  });
+
+  // ─── buildGeminiSpawnEnv (Sprint 248 Provider Parity) ──────────────
+
+  it('buildGeminiSpawnEnv strips GEMINI_CLI_IDE_* vars (no IDE-session binding)', () => {
+    process.env['GEMINI_CLI_IDE_SERVER_PORT'] = '9999';
+    process.env['GEMINI_CLI_IDE_WORKSPACE_PATH'] = '/ide/workspace';
+    process.env['GEMINI_CLI_IDE_AUTH_TOKEN'] = 'ide-token';
+    try {
+      const env = buildGeminiSpawnEnv();
+      expect(env['GEMINI_CLI_IDE_SERVER_PORT']).toBeUndefined();
+      expect(env['GEMINI_CLI_IDE_WORKSPACE_PATH']).toBeUndefined();
+      expect(env['GEMINI_CLI_IDE_AUTH_TOKEN']).toBeUndefined();
+    } finally {
+      delete process.env['GEMINI_CLI_IDE_SERVER_PORT'];
+      delete process.env['GEMINI_CLI_IDE_WORKSPACE_PATH'];
+      delete process.env['GEMINI_CLI_IDE_AUTH_TOKEN'];
+    }
+  });
+
+  it('buildGeminiSpawnEnv injects GOOGLE_API_KEY only when key provided', () => {
+    delete process.env['GOOGLE_API_KEY'];
+    const withKey = buildGeminiSpawnEnv('AIza-the-key');
+    expect(withKey['GOOGLE_API_KEY']).toBe('AIza-the-key');
+    const withoutKey = buildGeminiSpawnEnv();
+    expect(withoutKey['GOOGLE_API_KEY']).toBeUndefined();
   });
 
   // ─── Factory ───────────────────────────────────────────────────────

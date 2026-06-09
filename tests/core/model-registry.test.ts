@@ -391,7 +391,9 @@ describe('ModelRegistry', () => {
     });
 
     it('returns correct API ID for OpenAI models', () => {
-      expect(registry.resolveApiId('gpt-5')).toBe('gpt-5');
+      // Sprint 248 (Provider Parity): premium codex id `gpt-5` wires to apiId
+      // `gpt-5.5` — the name a ChatGPT subscription accepts (`gpt-5` is rejected).
+      expect(registry.resolveApiId('gpt-5')).toBe('gpt-5.5');
       expect(registry.resolveApiId('gpt-4.1')).toBe('gpt-4.1');
       expect(registry.resolveApiId('o3')).toBe('o3');
       expect(registry.resolveApiId('o4-mini')).toBe('o4-mini');

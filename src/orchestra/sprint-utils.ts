@@ -103,34 +103,37 @@ export function isTmuxProvider(providerName: ProviderName): boolean {
 }
 
 /**
- * Check whether a provider is a **host-HTTP adapter provider** that MUST be
+ * Check whether a provider is a **host-spawned adapter provider** that MUST be
  * spawned via its host `ProviderAdapter.spawn(...)` rather than through a
  * container/tmux backend.
  *
- * Why this exists (Sprint 234 AS-2 Faz 2):
- * Host-HTTP providers reach a service listening on the host (e.g. Ollama's
- * `localhost:11434`) via the spawned worker's node entry script. They cannot
- * run inside the Docker worker image because the container's loopback
- * interface does not route to the host Ollama daemon, and they cannot run
- * inside a tmux pane because they do not invoke a `claude` CLI. The only
- * correct spawn path is the host `adapter.spawn()` registered in
- * `providerRegistry`.
+ * Why this exists (Sprint 234 AS-2 Faz 2; extended Sprint 248 for codex/gemini):
+ * These providers run on the host and cannot tolerate the Docker worker image:
+ *   - `ollama` is host-HTTP — it reaches a daemon on the host loopback
+ *     (`localhost:11434`) that the container's loopback does not route to.
+ *   - `codex` / `gemini` are host-process CLIs whose OAuth/subscription session
+ *     lives in the host home (`~/.codex`, `~/.gemini`). The Docker backend's
+ *     `getProviderForModel` would degrade a non-claude task to the `claude` CLI
+ *     inside the container — the wrong tool — and the container has no access to
+ *     the host OAuth session anyway. Their `CodexAdapter`/`GeminiAdapter.spawn`
+ *     invoke the real `codex`/`gemini` CLI as a host child process.
  *
  * Before this predicate existed, `sprint-spawner.ts` preferred any provided
  * spawn backend (typically `docker`) over the adapter, which silently routed
- * ollama tasks to `spawn-backend-docker.ts` where `getProviderForModel`
- * would degrade them to the `claude` CLI — the wrong tool entirely.
+ * these tasks to `spawn-backend-docker.ts` and degraded them to `claude`.
  *
  * Extension point: when an OpenAI-compatible HTTP adapter ("openai-compat")
- * is added under the same pattern (local server, host-HTTP only), append its
- * provider name to this predicate. Keep the list tight — only providers
- * that genuinely cannot tolerate a container/tmux backend belong here.
+ * is added under the same pattern (local server, host-only), append its
+ * provider name here. Keep the list tight — only providers that genuinely
+ * cannot tolerate a container/tmux backend belong here.
  *
- * @returns true for `'ollama'`; false for `'claude'`, `'codex'`, `'gemini'`
+ * @returns true for `'ollama'`, `'codex'`, `'gemini'`; false for `'claude'`
  * @internal
  */
 export function isAdapterProvider(providerName: ProviderName): boolean {
-  return providerName === 'ollama';
+  return providerName === 'ollama'
+    || providerName === 'codex'
+    || providerName === 'gemini';
 }
 
 

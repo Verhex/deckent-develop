@@ -121,16 +121,19 @@ describe('detectAvailableProviders', () => {
     expect(codex.authMethod).toBe('api_key');
   });
 
-  it('detects Codex as unavailable when CLI present but no API key', async () => {
+  it('detects Codex as available via OAuth session when CLI present but no API key', async () => {
+    // Sprint 248 (Provider Parity): CLI presence alone marks codex available;
+    // with no API key it authenticates via the OAuth/subscription session
+    // (`codex login`), mirroring Claude. Previously this required a key.
     vi.mocked(spawnSync).mockImplementation((cmd: string) => {
       if (cmd === 'codex') return makeSpawnResult(0, '0.1.0') as ReturnType<typeof spawnSync>;
       return makeSpawnResult(1, '') as ReturnType<typeof spawnSync>;
     });
     const providers = await detectAvailableProviders();
     const codex = providers.find(p => p.name === 'codex')!;
-    expect(codex.available).toBe(false);
+    expect(codex.available).toBe(true);
     expect(codex.version).toBe('0.1.0');
-    expect(codex.authMethod).toBe('none');
+    expect(codex.authMethod).toBe('session');
   });
 
   it('detects Codex as unavailable when API key present but no CLI', async () => {
@@ -183,7 +186,9 @@ describe('detectAvailableProviders', () => {
     expect(gemini.models).toEqual(['gemini-3.1-pro-preview', 'gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.0-flash']);
   });
 
-  it('empty OPENAI_API_KEY is treated as missing', async () => {
+  it('empty OPENAI_API_KEY is not treated as api_key auth (falls back to session)', async () => {
+    // Sprint 248 (Provider Parity): an empty key is not a usable api_key, but
+    // CLI presence still makes codex available via the OAuth/subscription session.
     vi.mocked(spawnSync).mockImplementation((cmd: string) => {
       if (cmd === 'codex') return makeSpawnResult(0, '0.1.0') as ReturnType<typeof spawnSync>;
       return makeSpawnResult(1, '') as ReturnType<typeof spawnSync>;
@@ -191,8 +196,8 @@ describe('detectAvailableProviders', () => {
     process.env['OPENAI_API_KEY'] = '';
     const providers = await detectAvailableProviders();
     const codex = providers.find(p => p.name === 'codex')!;
-    expect(codex.available).toBe(false);
-    expect(codex.authMethod).toBe('none');
+    expect(codex.available).toBe(true);
+    expect(codex.authMethod).toBe('session');
   });
 
   it('empty GOOGLE_API_KEY is treated as missing', async () => {

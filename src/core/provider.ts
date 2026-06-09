@@ -359,19 +359,27 @@ function detectClaude(): DetectedProvider {
 
 /**
  * Detect Codex (OpenAI) CLI availability.
- * Checks `codex --version` CLI and OPENAI_API_KEY env variable.
- * Both CLI and API key are needed for full availability.
+ *
+ * Sprint 248 (Provider Parity): the Codex CLI supports two auth modes, mirroring
+ * Claude — an OAuth/ChatGPT subscription session (`codex login`) OR an
+ * `OPENAI_API_KEY`. Previously this required the API key, so a subscription-only
+ * user (no key) was reported `available: false` and the adapter was never
+ * registered — making `worker_provider=codex` silently fall back to Claude.
+ * Now CLI presence alone marks the provider available; `authMethod` is `api_key`
+ * when a key is set, otherwise `session` (OAuth). A logged-out CLI still reports
+ * available — the spawn surfaces the auth error in the worker log, exactly as
+ * Claude does. Live login state is the auto-detect feature's concern (deferred).
  */
 function detectCodex(): DetectedProvider {
   const version = detectCliVersion('codex');
   const hasApiKey = typeof process.env['OPENAI_API_KEY'] === 'string' && process.env['OPENAI_API_KEY'].length > 0;
-  const available = version !== undefined && hasApiKey;
+  const available = version !== undefined;
   let authMethod: DetectedProvider['authMethod'] = 'none';
   if (hasApiKey) {
     authMethod = 'api_key';
   } else if (version !== undefined) {
-    // CLI found but no API key
-    authMethod = 'none';
+    // CLI found, no API key → assume OAuth/subscription session (codex login).
+    authMethod = 'session';
   }
   return {
     name: 'codex',
@@ -429,18 +437,27 @@ async function detectOllama(): Promise<DetectedProvider> {
 
 /**
  * Detect Gemini CLI availability.
- * Checks `gemini --version` CLI and GOOGLE_API_KEY / DECKENT_GOOGLE_API_KEY env variable.
- * Both CLI and API key are needed for full availability.
+ *
+ * Sprint 248 (Provider Parity): like Codex, the Gemini CLI supports an
+ * OAuth/subscription session (`gemini` interactive login) in addition to
+ * `GOOGLE_API_KEY` / `DECKENT_GOOGLE_API_KEY`. Previously a key was required, so
+ * an OAuth-only user was reported unavailable and the adapter never registered.
+ * Now CLI presence marks the provider available; `authMethod` is `api_key` when
+ * a key is set, otherwise `session` (OAuth). The GeminiAdapter spawn honors both
+ * (key in env when present, OAuth session otherwise).
  */
 function detectGemini(): DetectedProvider {
   const version = detectCliVersion('gemini');
   const hasApiKey =
     (typeof process.env['GOOGLE_API_KEY'] === 'string' && process.env['GOOGLE_API_KEY'].length > 0) ||
     (typeof process.env['DECKENT_GOOGLE_API_KEY'] === 'string' && process.env['DECKENT_GOOGLE_API_KEY'].length > 0);
-  const available = version !== undefined && hasApiKey;
+  const available = version !== undefined;
   let authMethod: DetectedProvider['authMethod'] = 'none';
   if (hasApiKey) {
     authMethod = 'api_key';
+  } else if (version !== undefined) {
+    // CLI found, no API key → assume OAuth/subscription session.
+    authMethod = 'session';
   }
   return {
     name: 'gemini',

@@ -406,7 +406,13 @@ export class CodexAdapter implements ProviderAdapter {
    * We keep `--full-auto` for backward compat with Node CLI — the Rust rewrite ignores it harmlessly.
    */
   private buildArgs(model: ModelType, prompt: string, _opts?: ProviderSpawnOptions): string[] {
-    const args = ['exec', '--full-auto', prompt, '--model', model];
+    // Sprint 248 (Provider Parity): send the registry `apiId` (wire model name)
+    // rather than the deckent-facing id. The premium codex id `gpt-5` maps to
+    // apiId `gpt-5.5` — the name a ChatGPT subscription accepts (`gpt-5` is
+    // rejected). Mirrors the OllamaAdapter's `resolveApiId` pattern. Falls back
+    // to the id when no registry entry exists.
+    const wireModel = modelRegistry.get(model)?.apiId ?? model;
+    const args = ['exec', '--full-auto', prompt, '--model', wireModel];
     return args;
   }
 

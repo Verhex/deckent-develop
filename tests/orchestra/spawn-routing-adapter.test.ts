@@ -154,12 +154,15 @@ describe('isAdapterProvider (Sprint 234 AS-2 Faz 2)', () => {
     expect(isAdapterProvider('claude')).toBe(false);
   });
 
-  it('returns false for codex (backend-routed)', () => {
-    expect(isAdapterProvider('codex')).toBe(false);
+  // Sprint 248 (Provider Parity): codex/gemini are host-process CLI adapters
+  // whose OAuth session lives on the host — they MUST bypass the Docker backend
+  // (which would degrade them to the claude CLI) and spawn via their adapter.
+  it('returns true for codex (host-process adapter)', () => {
+    expect(isAdapterProvider('codex')).toBe(true);
   });
 
-  it('returns false for gemini (backend-routed)', () => {
-    expect(isAdapterProvider('gemini')).toBe(false);
+  it('returns true for gemini (host-process adapter)', () => {
+    expect(isAdapterProvider('gemini')).toBe(true);
   });
 });
 

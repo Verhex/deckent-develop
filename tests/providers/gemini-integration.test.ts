@@ -29,7 +29,7 @@ describe.skipIf(!hasGemini)('Gemini CLI integration', () => {
   it('buildArgs produces valid argument array', () => {
     const adapter = createGeminiAdapter('/tmp/test-gemini-integration');
     const args = adapter.buildArgs('gemini-2.5-pro', 'Hello');
-    expect(args).toEqual(['-p', 'Hello', '--output-format', 'json', '-m', 'gemini-2.5-pro', '--approval-mode', 'plan']);
+    expect(args).toEqual(['-p', 'Hello', '--output-format', 'json', '-m', 'gemini-2.5-pro', '--approval-mode', 'yolo', '--skip-trust']);
   });
 
   it('buildCommand produces valid CLI command string', () => {

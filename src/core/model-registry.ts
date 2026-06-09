@@ -102,7 +102,14 @@ export const BUILTIN_MODELS: readonly ModelDefinition[] = [
   },
   {
     id: 'gpt-5',
-    apiId: 'gpt-5',
+    // Sprint 248 (Provider Parity): the deckent-facing id stays `gpt-5` (premium
+    // codex slot — preserves the 13-model invariant + tier maps), but the wire
+    // model is `gpt-5.5`, the current ChatGPT-subscription frontier. A bare
+    // `--model gpt-5` is rejected by codex with a ChatGPT account
+    // ("model is not supported"); `gpt-5.5` is accepted. The CodexAdapter sends
+    // `resolveApiId(model)` so this mapping reaches the CLI. Full first-class
+    // gpt-5.5/gpt-5.4-mini ids + per-auth-mode maps are the auto-detect feature.
+    apiId: 'gpt-5.5',
     provider: 'codex',
     tier: 'premium',
     contextWindow: 1_000_000,

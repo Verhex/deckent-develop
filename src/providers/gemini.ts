@@ -35,6 +35,34 @@ function getGeminiModels(): readonly GeminiModel[] {
 }
 
 /**
+ * Build the environment for a spawned Gemini worker process.
+ *
+ * Sprint 248 (Provider Parity):
+ *   - When `apiKey` is set, inject `GOOGLE_API_KEY`; otherwise leave it unset so
+ *     the CLI falls back to its OAuth/subscription session.
+ *   - Strip every `GEMINI_CLI_IDE_*` variable. When deckent runs inside an IDE
+ *     (Gemini CLI IDE integration sets `GEMINI_CLI_IDE_SERVER_PORT`,
+ *     `GEMINI_CLI_IDE_WORKSPACE_PATH`, `GEMINI_CLI_IDE_AUTH_TOKEN`), a spawned
+ *     worker inheriting them binds to the parent IDE session and aborts with a
+ *     "Directory mismatch / IDE workspace" error. A headless worker must not
+ *     attach to the IDE companion, so these are removed from its env.
+ *
+ * @internal exported for regression coverage
+ */
+export function buildGeminiSpawnEnv(apiKey?: string): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = { ...process.env };
+  for (const key of Object.keys(env)) {
+    if (key.startsWith('GEMINI_CLI_IDE_')) {
+      delete env[key];
+    }
+  }
+  if (apiKey) {
+    env['GOOGLE_API_KEY'] = apiKey;
+  }
+  return env;
+}
+
+/**
  * Tier-based model mapping for Gemini CLI.
  * @deprecated Derived from model-equivalence.ts — use adapter.getModelForTier() instead.
  * Kept for backward compatibility with existing imports.
@@ -209,13 +237,11 @@ export class GeminiAdapter implements ProviderAdapter {
       );
     }
 
+    // Sprint 248 (Provider Parity): an API key is no longer mandatory — the
+    // Gemini CLI also authenticates via an OAuth/subscription session. When a
+    // key is present we inject it; when absent the CLI uses its logged-in
+    // session. (Previously this threw, making OAuth-only users unusable.)
     const apiKey = this.getApiKey();
-    if (!apiKey) {
-      throw new ProviderError(
-        'GOOGLE_API_KEY environment variable is not set',
-        this.name,
-      );
-    }
 
     const dir = opts?.projectDir ?? this.projectDir;
     const tasksDir = join(dir, TASKS_DIR);
@@ -230,7 +256,7 @@ export class GeminiAdapter implements ProviderAdapter {
     const spawnOpts: NodeSpawnOptions = {
       cwd: dir,
       stdio: ['pipe', logFd, logFd],
-      env: { ...process.env, GOOGLE_API_KEY: apiKey },
+      env: buildGeminiSpawnEnv(apiKey),
     };
 
     const child = spawn('gemini', args, spawnOpts);
@@ -384,10 +410,20 @@ export class GeminiAdapter implements ProviderAdapter {
    * Build CLI arguments for `gemini` binary invocation.
    * Uses `-p` flag for headless/non-interactive mode.
    * Uses `-m` short flag (Gemini CLI docs: `-m gemini-2.5-flash`).
-   * Adds `--approval-mode plan` for non-interactive auto-approval.
+   *
+   * Sprint 248 (Provider Parity), two corrections that make a real worker:
+   *   - `--approval-mode yolo` (was `plan`): `plan` is **read-only** — the CLI
+   *     refuses every edit/write tool, so a worker could never modify files or
+   *     emit `.tasks/task-XXX.result`. `yolo` auto-approves all tools, which a
+   *     non-interactive worker requires (it is the Gemini equivalent of the
+   *     Codex `--full-auto` sandbox the codex adapter uses).
+   *   - `--skip-trust`: a headless run in a directory the CLI has not
+   *     interactively "trusted" otherwise aborts with a trust prompt
+   *     (`GEMINI_CLI_TRUST_WORKSPACE`). `--skip-trust` trusts the workspace for
+   *     this session so the worker can start unattended.
    */
   buildArgs(model: ModelType, prompt: string): string[] {
-    return ['-p', prompt, '--output-format', 'json', '-m', model, '--approval-mode', 'plan'];
+    return ['-p', prompt, '--output-format', 'json', '-m', model, '--approval-mode', 'yolo', '--skip-trust'];
   }
 
   // ─── buildCommand() ────────────────────────────────────────────────
