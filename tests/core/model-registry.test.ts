@@ -11,14 +11,14 @@ import {
 // ─── Builtin catalog tests ───────────────────────────────────────────
 
 describe('BUILTIN_MODELS catalog', () => {
-  it('contains exactly 15 models', () => {
-    expect(BUILTIN_MODELS).toHaveLength(13);
+  it('contains exactly 14 models', () => {
+    expect(BUILTIN_MODELS).toHaveLength(14);
   });
 
-  it('has 3 Claude models', () => {
+  it('has 4 Claude models', () => {
     const claude = BUILTIN_MODELS.filter(m => m.provider === 'claude');
-    expect(claude).toHaveLength(3);
-    expect(claude.map(m => m.id).sort()).toEqual(['haiku', 'opus', 'sonnet']);
+    expect(claude).toHaveLength(4);
+    expect(claude.map(m => m.id).sort()).toEqual(['fable', 'haiku', 'opus', 'sonnet']);
   });
 
   it('has 6 OpenAI/Codex models', () => {
@@ -119,8 +119,8 @@ describe('ModelRegistry', () => {
   // ── getByProvider ──
 
   describe('getByProvider()', () => {
-    it('returns 3 models for claude', () => {
-      expect(registry.getByProvider('claude')).toHaveLength(3);
+    it('returns 4 models for claude', () => {
+      expect(registry.getByProvider('claude')).toHaveLength(4);
     });
 
     it('returns 6 models for codex', () => {
@@ -192,8 +192,9 @@ describe('ModelRegistry', () => {
     });
 
     it('returns undefined for provider+tier with no GA model', () => {
-      // claude has no premium_plus GA model
-      expect(registry.getByProviderAndTier('claude', 'premium_plus')).toBeUndefined();
+      // gemini's only premium_plus model (gemini-3.1-pro-preview) is status 'preview', not GA.
+      // (claude+premium_plus is now GA — claude-fable-5.)
+      expect(registry.getByProviderAndTier('gemini', 'premium_plus')).toBeUndefined();
     });
   });
 
@@ -232,10 +233,10 @@ describe('ModelRegistry', () => {
       expect(registry.getEquivalent('opus', 'claude')).toBe('opus');
     });
 
-    it('falls back to lower tier when exact tier unavailable', () => {
-      // o3 is codex premium_plus — claude has no premium_plus GA
-      // Should fall back to premium → opus
-      expect(registry.getEquivalent('o3', 'claude')).toBe('opus');
+    it('maps premium_plus to claude premium_plus (fable)', () => {
+      // o3 is codex premium_plus; claude now has a premium_plus GA model (fable),
+      // so the equivalent is the exact-tier match, not a premium fallback.
+      expect(registry.getEquivalent('o3', 'claude')).toBe('fable');
     });
 
     it('throws when no equivalent exists', () => {
@@ -466,9 +467,10 @@ describe('ModelRegistry', () => {
   // ── getAllModelIds / getAllModels / getAllProviders ──
 
   describe('getAllModelIds()', () => {
-    it('returns all 13 builtin model ids', () => {
+    it('returns all 14 builtin model ids', () => {
       const ids = registry.getAllModelIds();
-      expect(ids).toHaveLength(13);
+      expect(ids).toHaveLength(14);
+      expect(ids).toContain('fable');
       expect(ids).toContain('opus');
       expect(ids).toContain('gpt-5');
       expect(ids).toContain('gemini-2.5-pro');
@@ -478,9 +480,9 @@ describe('ModelRegistry', () => {
   });
 
   describe('getAllModels()', () => {
-    it('returns all 13 builtin model definitions', () => {
+    it('returns all 14 builtin model definitions', () => {
       const models = registry.getAllModels();
-      expect(models).toHaveLength(13);
+      expect(models).toHaveLength(14);
       for (const m of models) {
         expect(m.id).toBeDefined();
         expect(m.apiId).toBeDefined();
@@ -505,7 +507,7 @@ describe('ModelRegistry', () => {
     it('accepts custom builtins array', () => {
       const custom = new ModelRegistry([BUILTIN_MODELS[0]!]);
       expect(custom.getAllModelIds()).toHaveLength(1);
-      expect(custom.has('opus')).toBe(true);
+      expect(custom.has('fable')).toBe(true); // BUILTIN_MODELS[0] is now claude-fable-5
       expect(custom.has('sonnet')).toBe(false);
     });
 
@@ -565,7 +567,7 @@ describe('modelRegistry singleton', () => {
     expect(modelRegistry).toBeInstanceOf(ModelRegistry);
   });
 
-  it('has all 13 builtin models', () => {
-    expect(modelRegistry.getAllModelIds()).toHaveLength(13);
+  it('has all 14 builtin models', () => {
+    expect(modelRegistry.getAllModelIds()).toHaveLength(14);
   });
 });

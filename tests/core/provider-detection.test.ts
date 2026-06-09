@@ -179,7 +179,7 @@ describe('detectAvailableProviders', () => {
     vi.mocked(spawnSync).mockReturnValue(makeSpawnResult(1, '') as ReturnType<typeof spawnSync>);
     const providers = await detectAvailableProviders();
     const claude = providers.find(p => p.name === 'claude')!;
-    expect(claude.models).toEqual(['opus', 'sonnet', 'haiku']);
+    expect(claude.models).toEqual(['fable', 'opus', 'sonnet', 'haiku']);
     const codex = providers.find(p => p.name === 'codex')!;
     expect(codex.models).toEqual(['o3', 'gpt-5', 'gpt-4.1', 'o4-mini', 'gpt-5-mini', 'gpt-4.1-mini']);
     const gemini = providers.find(p => p.name === 'gemini')!;

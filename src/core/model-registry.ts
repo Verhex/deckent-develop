@@ -58,7 +58,21 @@ export interface ModelDefinition {
 // live source of truth; apiId values here must be kept current at build time.
 
 export const BUILTIN_MODELS: readonly ModelDefinition[] = [
-  // Claude (3)
+  // Claude (4)
+  {
+    // Claude Fable 5 — Anthropic's most capable widely released model (GA 2026-06-09).
+    // Free on Pro/Max/Team subscriptions through 2026-06-22; reverts to $10/$50 paid after.
+    // 1M context (Opus 4.7 tokenizer), adaptive thinking always-on, no extended thinking.
+    id: 'fable',
+    apiId: 'claude-fable-5',
+    provider: 'claude',
+    tier: 'premium_plus',
+    contextWindow: 1_000_000,
+    costPerMillion: { input: 10, output: 50 },
+    capabilities: { streaming: true, toolUse: true, vision: true, codeExecution: true, reasoning: false },
+    status: 'ga',
+    maxOutputTokens: 128_000,
+  },
   {
     id: 'opus',
     apiId: 'claude-opus-4-8',

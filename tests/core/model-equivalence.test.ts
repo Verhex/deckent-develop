@@ -308,8 +308,8 @@ describe('model-equivalence', () => {
 
   // ─── getProviderModels ────────────────────────────────────────────
   describe('getProviderModels', () => {
-    it('claude has 3 models', () => {
-      expect(getProviderModels('claude')).toEqual(['opus', 'sonnet', 'haiku']);
+    it('claude has 4 models', () => {
+      expect(getProviderModels('claude')).toEqual(['fable', 'opus', 'sonnet', 'haiku']);
     });
 
     it('codex has 6 models', () => {
@@ -327,9 +327,9 @@ describe('model-equivalence', () => {
       expect(Object.keys(MODEL_TIERS)).toEqual(['premium', 'standard', 'economy', 'premium_plus']);
     });
 
-    it('total model count is 13', () => {
+    it('total model count is 14', () => {
       const total = Object.values(MODEL_TIERS).reduce((sum, models) => sum + models.length, 0);
-      expect(total).toBe(13);
+      expect(total).toBe(14);
     });
 
     it('every model in MODEL_TIERS has a provider', () => {

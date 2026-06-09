@@ -94,8 +94,8 @@ describe('ModelRegistry — Ollama tier resolution (opt-in)', () => {
     expect(secondCount).toBe(firstCount);
   });
 
-  it('preserves the 13-model BUILTIN invariant — Ollama models are NOT in BUILTIN_MODELS', () => {
-    expect(BUILTIN_MODELS).toHaveLength(13);
+  it('preserves the 14-model BUILTIN invariant — Ollama models are NOT in BUILTIN_MODELS', () => {
+    expect(BUILTIN_MODELS).toHaveLength(14);
     const builtinProviders = new Set(BUILTIN_MODELS.map(m => m.provider));
     expect(builtinProviders.has('ollama' as unknown as RegistryProviderName)).toBe(false);
   });

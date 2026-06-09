@@ -20,12 +20,12 @@ describe('model-registry apiId correctness (207-001)', () => {
     expect(registry.getTier('haiku')).toBe('economy');
   });
 
-  it('13-model invariant holds (3 Claude + 6 OpenAI + 4 Gemini)', () => {
-    expect(BUILTIN_MODELS.length).toBe(13);
+  it('14-model invariant holds (4 Claude + 6 OpenAI + 4 Gemini)', () => {
+    expect(BUILTIN_MODELS.length).toBe(14);
     const claude = BUILTIN_MODELS.filter(m => m.provider === 'claude');
     const codex = BUILTIN_MODELS.filter(m => m.provider === 'codex');
     const gemini = BUILTIN_MODELS.filter(m => m.provider === 'gemini');
-    expect(claude.length).toBe(3);
+    expect(claude.length).toBe(4);
     expect(codex.length).toBe(6);
     expect(gemini.length).toBe(4);
   });

@@ -24,8 +24,8 @@ import type {
 // ─── PROVIDER_MODEL_MAP ──────────────────────────────────────────────────────
 
 describe('PROVIDER_MODEL_MAP', () => {
-  it('maps claude to opus, sonnet, haiku', () => {
-    expect(PROVIDER_MODEL_MAP.claude).toEqual(['opus', 'sonnet', 'haiku']);
+  it('maps claude to fable, opus, sonnet, haiku', () => {
+    expect(PROVIDER_MODEL_MAP.claude).toEqual(['fable', 'opus', 'sonnet', 'haiku']);
   });
 
   it('maps codex to o3, gpt-5, gpt-4.1, o4-mini, gpt-5-mini, gpt-4.1-mini', () => {
@@ -46,8 +46,8 @@ describe('PROVIDER_MODEL_MAP', () => {
 // ─── CLAUDE_MODELS ───────────────────────────────────────────────────────────
 
 describe('CLAUDE_MODELS', () => {
-  it('contains opus, sonnet, haiku', () => {
-    expect(CLAUDE_MODELS).toEqual(['opus', 'sonnet', 'haiku']);
+  it('contains fable, opus, sonnet, haiku', () => {
+    expect(CLAUDE_MODELS).toEqual(['fable', 'opus', 'sonnet', 'haiku']);
   });
 
   it('is readonly (cannot mutate)', () => {
@@ -59,8 +59,8 @@ describe('CLAUDE_MODELS', () => {
 // ─── ALL_MODELS ──────────────────────────────────────────────────────────────
 
 describe('ALL_MODELS', () => {
-  it('contains all 13 model names', () => {
-    expect(ALL_MODELS).toHaveLength(13);
+  it('contains all 14 model names', () => {
+    expect(ALL_MODELS).toHaveLength(14);
   });
 
   it('includes all Claude models', () => {
@@ -404,7 +404,7 @@ describe('Tier equivalence consistency', () => {
     }
   });
 
-  it('all 13 models have corresponding API IDs', () => {
-    expect(Object.keys(MODEL_API_IDS)).toHaveLength(13);
+  it('all 14 models have corresponding API IDs', () => {
+    expect(Object.keys(MODEL_API_IDS)).toHaveLength(14);
   });
 });
