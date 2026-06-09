@@ -431,14 +431,23 @@ export class GeminiAdapter implements ProviderAdapter {
   buildCommand(
     model: ModelType,
     promptPath: string,
-    _opts?: Pick<ProviderSpawnOptions, 'allowedTools' | 'autoApprove'>,
+    opts?: Pick<ProviderSpawnOptions, 'allowedTools' | 'autoApprove'>,
   ): string {
-    // Sprint 252: match the buildArgs worker fix — `--approval-mode yolo` (a
-    // worker must auto-approve edit/write; `plan` is read-only and can't write
-    // `.result`) + `--skip-trust` (headless) + apiId wire model. Eliminates the
-    // buildCommand↔buildArgs drift.
+    // Sprint 252: use the apiId wire model, and gate the full-autonomy flags on
+    // `autoApprove` — mirrors the claude adapter (which gates
+    // `--dangerously-skip-permissions` the same way). A worker spawn passes
+    // autoApprove → `--approval-mode yolo` (auto-approve edit/write; `plan` is
+    // read-only and can't write `.result`) + `--skip-trust` (headless). A
+    // non-worker caller (e.g. planner, default opts) gets the SAFE default
+    // approval mode — yolo is NOT emitted unconditionally (security review,
+    // Agent/Subprocess Permission Bypass). Host workers share the same
+    // full-autonomy posture as codex `--full-auto`; the container sandbox
+    // (PSL-1 ProviderCommandSpec, P2) is the structural mitigation.
     const apiId = modelRegistry.get(model)?.apiId ?? model;
-    return `gemini -p "$(cat ${promptPath})" --output-format json -m ${apiId} --approval-mode yolo --skip-trust`;
+    const base = `gemini -p "$(cat ${promptPath})" --output-format json -m ${apiId}`;
+    return opts?.autoApprove
+      ? `${base} --approval-mode yolo --skip-trust`
+      : `${base} --approval-mode default`;
   }
 
   /**

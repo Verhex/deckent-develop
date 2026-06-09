@@ -430,8 +430,8 @@ describe('GeminiAdapter', () => {
 
   // ─── buildCommand() ────────────────────────────────────────────────
 
-  it('buildCommand returns gemini CLI command with correct flags', () => {
-    const cmd = adapter.buildCommand('gemini-2.5-pro', '/tmp/prompt.json');
+  it('buildCommand (worker, autoApprove) uses yolo + skip-trust', () => {
+    const cmd = adapter.buildCommand('gemini-2.5-pro', '/tmp/prompt.json', { autoApprove: true });
     expect(cmd).toContain('gemini');
     expect(cmd).toContain('-p');
     expect(cmd).toContain('--output-format json');
@@ -441,6 +441,13 @@ describe('GeminiAdapter', () => {
     expect(cmd).toContain('--skip-trust');
     expect(cmd).not.toContain('--approval-mode plan');
     expect(cmd).toContain('/tmp/prompt.json');
+  });
+
+  it('buildCommand WITHOUT autoApprove does NOT emit yolo/skip-trust (security: no unconditional bypass)', () => {
+    const cmd = adapter.buildCommand('gemini-2.5-pro', '/tmp/prompt.json');
+    expect(cmd).toContain('--approval-mode default');
+    expect(cmd).not.toContain('yolo');
+    expect(cmd).not.toContain('--skip-trust');
   });
 
   it('buildCommand uses cat to read prompt file', () => {

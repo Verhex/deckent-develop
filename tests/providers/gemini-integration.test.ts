@@ -34,7 +34,7 @@ describe.skipIf(!hasGemini)('Gemini CLI integration', () => {
 
   it('buildCommand produces valid CLI command string', () => {
     const adapter = createGeminiAdapter('/tmp/test-gemini-integration');
-    const cmd = adapter.buildCommand('gemini-2.5-flash', '/tmp/prompt.txt');
+    const cmd = adapter.buildCommand('gemini-2.5-flash', '/tmp/prompt.txt', { autoApprove: true });
     expect(cmd).toBe('gemini -p "$(cat /tmp/prompt.txt)" --output-format json -m gemini-2.5-flash --approval-mode yolo --skip-trust');
   });
 
