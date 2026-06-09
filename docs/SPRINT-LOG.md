@@ -6796,3 +6796,34 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 250-004: 250-V4 — ollama verify (GO_WITH_TECH_DEBT)
 
 ---
+## Sprint 251 — sprint-251
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-06-09
+**Duration:** 570s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 13 |
+| Completed | 11 |
+| Tech Debt | 2 |
+| No-Go | 2 |
+| Coverage | NaN% |
+| Duration | 570110ms |
+
+### Tasks
+
+- 251-001: 251-001 — event channels reference (code-derived) (DONE)
+- 251-002: 251-002 — recover a stuck sprint (cookbook) (DONE)
+- 251-003: 251-003 — evolution & learning (guide) (DONE)
+- 251-004: 251-004 — feature matrix (redo; codex) (DONE)
+- 251-005: 251-005 — cost & budget (cookbook; codex) (DONE)
+- 251-006: 251-006 — provider fleet notes (benchmark; codex) (NO_GO)
+- 251-007: 251-007 — cookbook index (gemini) (GO_WITH_TECH_DEBT)
+- 251-008: 251-008 — checkpoints & approval (cookbook; gemini) (DONE)
+- 251-009: 251-009 — tech debt tracking (cookbook; gemini) (NO_GO)
+- 251-010: 251-010 — nervous alerts (cookbook; ollama, small) (GO_WITH_TECH_DEBT)
+
+---

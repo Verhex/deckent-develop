@@ -1,0 +1,14 @@
+# Deckent Cookbook Index
+
+Here's an index of practical recipes to help you use Deckent effectively:
+
+- [01-first-sprint.md: Initialize a new project and run your first sprint.](./01-first-sprint.md)
+- [02-multi-provider-fleet.md: Configure and utilize Deckent with multiple AI providers.](./02-multi-provider-fleet.md)
+- [03-memory-recall.md: Query and manage Deckent's project memory using the CLI.](./03-memory-recall.md)
+- [04-autonomous-mode.md: Enable and manage autonomous agent operations.](./04-autonomous-mode.md)
+- [05-status-and-watch.md: Monitor sprint progress and events in real-time.](./05-status-and-watch.md)
+- [06-checkpoints-approval.md: Understand and manage human checkpoints in a sprint.](./06-checkpoints-approval.md)
+- [07-tech-debt-tracking.md: Track and manage technical debt using Deckent.](./07-tech-debt-tracking.md)
+- [08-cost-and-budget.md: Manage sprint cost estimates and budgeting.](./08-cost-and-budget.md)
+- [09-recover-stuck-sprint.md: Manually recover a stalled or stuck sprint.](./09-recover-stuck-sprint.md)
+- [10-nervous-alerts.md: Understand and respond to Nervous System alerts.](./10-nervous-alerts.md)

@@ -2,6 +2,25 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint251] - 2026-06-09
+
+### Added
+
+- 251-001 — event channels reference (code-derived)
+- 251-002 — recover a stuck sprint (cookbook)
+- 251-003 — evolution & learning (guide)
+- 251-004 — feature matrix (redo; codex)
+- 251-005 — cost & budget (cookbook; codex)
+- 251-008 — checkpoints & approval (cookbook; gemini)
+
+### Changed
+
+- 251-007 — cookbook index (gemini) (completed with tech debt)
+- 251-010 — nervous alerts (cookbook; ollama, small) (completed with tech debt)
+
+
+_Tasks: 13 total, 11 done, 2 tech debt, 2 no-go_
+
 ## [1.0.0-beta.1-sprint250] - 2026-06-09
 
 ### Added

@@ -80,6 +80,8 @@
 | adr-086 | Native CLI Parity — F11 Feature Set (Sprint 224) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-251 Learnings** (sprint-251): ## Sprint sprint-251 Learnings
+- 251-006 — provider fleet notes (benchmark; codex): NO_GO — Created docs/benchmark/pr...
 - **Sprint sprint-250 Learnings** (sprint-250): ## Sprint sprint-250 Learnings
 - 250-V2 — codex verify (MF-1 KEY): NO_GO — Created docs/_verify/codex-v.md with exact...
 - **Sprint sprint-249 Learnings** (sprint-249): ## Sprint sprint-249 Learnings
@@ -108,10 +110,6 @@
 
 ## Gains
 - 242-001 — MCP-run provider-free + autonomous agent/skill inject — Fix A: R...
-- **Sprint sprint-241 Learnings** (sprint-241): ## Sprint sprint-241 Learnings
-
-## Gains
-- 241-001 — decidePolicy'ye computed EffectClass wire — Implemented computeE...
 
 ## Active Technical Debt
 - [NORMAL] Tech debt from 249-009-fix: Created/updated docs/guide/architecture-overview.md 
@@ -125,5 +123,7 @@
 - Violation pattern: stale_heartbeat
 - Violation pattern: stale_heartbeat
 - Violation pattern: stale_heartbeat
+- Violation pattern: stale_heartbeat
+- Violation pattern: file_outside_scope
 
-_Total entries: 297 | Generated: 2026-06-09_
+_Total entries: 304 | Generated: 2026-06-09_

@@ -1,5 +1,20 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-251 Learnings
+- Sprint sprint-251 Learnings: ## Sprint sprint-251 Learnings
+- 251-006 — provider fleet notes (benchmark; codex): NO_GO — Created docs/benchmark/provider-fleet-notes.md with qualitative provider fleet routing notes. Verified by reading the fi
+- 251-007 — cookbook index (gemini): GO_WITH_TECH_DEBT — Created docs/cookbook/index.md with a navigation index linking all cookbook recipes and their one-line descriptions.
+- 251-009 — tech debt tracking (cookbook; gemini): NO_GO — Docker backend received a non-claude provider binary "gemini" (provider "gemini") for task 251-009. The docker worker pa
+- 251-010 — nervous alerts (cookbook; ollama, small): GO_WITH_TECH_DEBT — Worker exited without writing result (exitCode=0) | disk-verify found evidence (linesAdded=0, untrackedFiles=1). Status 
+
+## Gains
+- 251-001 — event channels reference (code-derived) — Created docs/reference/event-channels.md with all 27 CHANNELS from src/orchestra/event-stream.ts.
+- 251-002 — recover a stuck sprint (cookbook) — Worker exited without writing result (exitCode=0)
+- 251-003 — evolution & learning (guide) — Created docs/guide/evolution-and-learning.md (149 lines).
+- 251-004 — feature matrix (redo; codex) — Created docs/guide/feature-matrix.md with a CLI/MCP/Dashboard feature matrix.
+- 251-005 — cost & budget (cookbook; codex) — Created the cost and budget cookbook page.
+- 251-008 — checkpoints & approval (cookbook; gemini) — Created docs/cookbook/06-checkpoints-approval.md as per instructions.
+
 ## Sprint sprint-250 Learnings
 - Sprint sprint-250 Learnings: ## Sprint sprint-250 Learnings
 - 250-V2 — codex verify (MF-1 KEY): NO_GO — Created docs/_verify/codex-v.md with exactly three lines. Line 1 is '# Codex Verify', line 2 is 'Provider: codex', and l

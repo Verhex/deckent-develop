@@ -10,6 +10,8 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-251-007 | Tech debt from 251-007: Created docs/cookbook/index.md with a navigation index l | normal | sprint-251 | resolved |
+| debt-251-010 | Tech debt from 251-010: Worker exited without writing result (exitCode=0) | disk | normal | sprint-251 | resolved |
 | debt-250-004 | Tech debt from 250-004: Created docs/_verify/ollama-v.md with exactly 3 lines: l | normal | sprint-250 | resolved |
 | debt-249-006 | Tech debt from 249-006: Created docs/comparison/why-deckent.md as a factual, pos | normal | sprint-249 | resolved |
 | debt-249-010 | Tech debt from 249-010: Worker exited without writing result (exitCode=0) | disk | normal | sprint-249 | resolved |
