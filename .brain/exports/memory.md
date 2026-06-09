@@ -1,5 +1,63 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-247 Learnings
+- Sprint sprint-247 Learnings: ## Sprint sprint-247 Learnings
+
+## Gains
+- 247-001 — docs/adr-index.md — Created docs/adr-index.md with all 57 ADRs present in decisions.md (ADR-001..086, with documented...
+
+## Sprint sprint-246 Learnings
+- Sprint sprint-246 Learnings: ## Sprint sprint-246 Learnings
+
+## Gains
+- 246-001 — docs/security/threat-model.md — Rewrote docs/security/threat-model.md with honest, code-grounded content.
+
+## Sprint sprint-245 Learnings
+- Sprint sprint-245 Learnings: ## Sprint sprint-245 Learnings
+
+## Gains
+- 245-001 — .codex + .gemini rules → .claude parity — All four goCriteria verified:
+
+## Sprint sprint-244 Learnings
+- Sprint sprint-244 Learnings: ## Sprint sprint-244 Learnings
+
+## Gains
+- 244-001 — multi-provider docs kod-gerçeğine hizala — Updated both multi-provider docs to match code reality.
+
+## Sprint sprint-243 Learnings
+- Sprint sprint-243 Learnings: ## Sprint sprint-243 Learnings
+- 243-001 — multi-provider docs kod-gerçeğine hizala: NO_GO — Model returned no tool calls and no files were changed. Assistant: 
+
+## Sprint sprint-242 Learnings
+- Sprint sprint-242 Learnings: ## Sprint sprint-242 Learnings
+
+## Gains
+- 242-001 — MCP-run provider-free + autonomous agent/skill inject — Fix A: Removed provider:'claude' hardcode from src/mcp/tools/run.ts.
+
+## Sprint sprint-241 Learnings
+- Sprint sprint-241 Learnings: ## Sprint sprint-241 Learnings
+
+## Gains
+- 241-001 — decidePolicy'ye computed EffectClass wire — Implemented computeEntryEffectClass(entry): EffectClass in policy-gate.ts.
+
+## Sprint sprint-240 Learnings
+- Sprint sprint-240 Learnings: ## Sprint sprint-240 Learnings
+
+## Gains
+- 240-001 — task-router + adr-selector canonical-consume (fallback korunur) — WM-2c canonical-consume bridge implemented for task-router + adr-selector.
+
+## Sprint sprint-239 Learnings
+- Sprint sprint-239 Learnings: ## Sprint sprint-239 Learnings
+
+## Gains
+- 239-001 — rubric-registry + task-builder canonical TaskKind migration — Worker exited without writing result (exitCode=0)
+
+## Sprint sprint-238 Learnings
+- Sprint sprint-238 Learnings: ## Sprint sprint-238 Learnings
+
+## Gains
+- 238-001 — Canonical work-model SSOT modülü (additive) — WM-2a additive foundation complete.
+
 ## Sprint sprint-237 Learnings
 - Sprint sprint-237 Learnings: ## Sprint sprint-237 Learnings
 - 236-001 — [Ollama/qwen3.6] Yerel-model worker kullanım kılavuzu: GO_WITH_TECH_DEBT — docs/guide/local-model-workers.md yazıldı. İçerik: (1) Ollama kurulumu + `ollama pull`, (2) `Provider: ollama` / `Model:

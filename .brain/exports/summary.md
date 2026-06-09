@@ -80,42 +80,44 @@
 | adr-086 | Native CLI Parity — F11 Feature Set (Sprint 224) | accepted |
 
 ## Recent Learnings
-- **Sprint sprint-237 Learnings** (sprint-237): ## Sprint sprint-237 Learnings
-- 236-001 — [Ollama/qwen3.6] Yerel-model worker kullanım kılavuzu: GO_WITH_TECH_DEBT —...
-- **Sprint sprint-236 Learnings** (sprint-236): ## Sprint sprint-236 Learnings
+- **Sprint sprint-247 Learnings** (sprint-247): ## Sprint sprint-247 Learnings
 
 ## Gains
-- 236-001 — [Ollama/qwen3.6] Yerel-model worker kullanım kılavuzu — Created ...
-- **Sprint sprint-235 Learnings** (sprint-235): ## Sprint sprint-235 Learnings
+- 247-001 — docs/adr-index.md — Created docs/adr-index.md with all 57 ADRs p...
+- **Sprint sprint-246 Learnings** (sprint-246): ## Sprint sprint-246 Learnings
 
 ## Gains
-- 235-001 — [P0] Per-task ollama provider+model plan-time acceptance — Worke...
-- **Sprint sprint-233 Learnings** (sprint-233): ## Sprint sprint-233 Learnings
+- 246-001 — docs/security/threat-model.md — Rewrote docs/security/threat-mod...
+- **Sprint sprint-245 Learnings** (sprint-245): ## Sprint sprint-245 Learnings
 
 ## Gains
-- 233-001 — [Wave 1] Core agentic worker runner + tool şemaları + scope-guar...
-- **Sprint sprint-232 Learnings** (sprint-232): ## Sprint sprint-232 Learnings
+- 245-001 — .codex + .gemini rules → .claude parity — All four goCriteria ve...
+- **Sprint sprint-244 Learnings** (sprint-244): ## Sprint sprint-244 Learnings
 
 ## Gains
-- 232-001 — [P0] decay_after_sprints config wire (PRIMARY kök) — Sprint 232 ...
-- **Sprint sprint-229 Learnings** (sprint-229): ## Sprint sprint-229 Learnings
+- 244-001 — multi-provider docs kod-gerçeğine hizala — Updated both multi-pr...
+- **Sprint sprint-243 Learnings** (sprint-243): ## Sprint sprint-243 Learnings
+- 243-001 — multi-provider docs kod-gerçeğine hizala: NO_GO — Model returned no tool c...
+- **Sprint sprint-242 Learnings** (sprint-242): ## Sprint sprint-242 Learnings
 
 ## Gains
-- 229-001 — McpClientBroker çekirdek (SDK Client + stdio/HTTP transport) — M...
-- **Sprint sprint-228 Learnings** (sprint-228): ## Sprint sprint-228 Learnings
+- 242-001 — MCP-run provider-free + autonomous agent/skill inject — Fix A: R...
+- **Sprint sprint-241 Learnings** (sprint-241): ## Sprint sprint-241 Learnings
 
 ## Gains
-- 228-001 — [P0] autonomous CLI i18n retrofit (hardcode → getMessage) — Work...
-- **Sprint sprint-227 Learnings** (sprint-227): ## Sprint sprint-227 Learnings
+- 241-001 — decidePolicy'ye computed EffectClass wire — Implemented computeE...
+- **Sprint sprint-240 Learnings** (sprint-240): ## Sprint sprint-240 Learnings
 
 ## Gains
-- 227-001 — Rubric total diagnostic fix (coverage:null → renormalize) — Spri...
-- **Sprint sprint-226 Learnings** (sprint-226): ## Sprint sprint-226 Learnings
+- 240-001 — task-router + adr-selector canonical-consume (fallback korunur) ...
+- **Sprint sprint-239 Learnings** (sprint-239): ## Sprint sprint-239 Learnings
 
 ## Gains
-- 226-001 — Authority adapter (checkAuthority → AuthorityChecker) — Created ...
-- **Sprint 224 Learnings** (sprint-224): - Sprint sprint-224 Learnings: ## Sprint sprint-224 Learnings
-- 224-015 — [P0] AI plan-mode fix (dürüst hata + gerçek...
+- 239-001 — rubric-registry + task-builder canonical TaskKind migration — Wo...
+- **Sprint sprint-238 Learnings** (sprint-238): ## Sprint sprint-238 Learnings
+
+## Gains
+- 238-001 — Canonical work-model SSOT modülü (additive) — WM-2a additive fou...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -124,5 +126,8 @@ _No active technical debt._
 - Violation pattern: stale_heartbeat
 - Violation pattern: file_outside_scope
 - Violation pattern: file_outside_scope
+- Violation pattern: file_outside_scope
+- Violation pattern: stale_heartbeat
+- Violation pattern: stale_heartbeat
 
-_Total entries: 243 | Generated: 2026-06-06_
+_Total entries: 278 | Generated: 2026-06-08_

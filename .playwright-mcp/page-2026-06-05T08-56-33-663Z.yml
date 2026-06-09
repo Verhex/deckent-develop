@@ -1,0 +1,83 @@
+- generic [ref=e3]:
+  - complementary "Primary navigation" [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]:
+        - img "Deckent" [ref=e7]
+        - heading "deckent" [level=1] [ref=e8]
+      - paragraph [ref=e9]: agent orchestration
+    - generic [ref=e10]:
+      - generic [ref=e11]: "Auditor:"
+      - generic [ref=e12]: Inactive
+    - navigation [ref=e13]:
+      - generic [ref=e14]:
+        - paragraph [ref=e15]: Konuş
+        - link "Chat" [ref=e17] [cursor=pointer]:
+          - /url: /chat
+          - img [ref=e18]
+          - text: Chat
+      - generic [ref=e20]:
+        - paragraph [ref=e21]: İzle
+        - generic [ref=e22]:
+          - link "Dashboard" [ref=e23] [cursor=pointer]:
+            - /url: /
+            - img [ref=e24]
+            - text: Dashboard
+          - link "Status" [ref=e29] [cursor=pointer]:
+            - /url: /status
+            - img [ref=e30]
+            - text: Status
+          - link "History" [ref=e32] [cursor=pointer]:
+            - /url: /history
+            - img [ref=e33]
+            - text: History
+          - link "Evolution" [ref=e37] [cursor=pointer]:
+            - /url: /evolution
+            - img [ref=e38]
+            - text: Evolution
+          - link "Nervous" [ref=e42] [cursor=pointer]:
+            - /url: /nervous
+            - img [ref=e43]
+            - text: Nervous
+      - generic [ref=e46]:
+        - paragraph [ref=e47]: Yönet
+        - generic [ref=e48]:
+          - link "Memory" [ref=e49] [cursor=pointer]:
+            - /url: /memory
+            - img [ref=e50]
+            - text: Memory
+          - link "Memory Explorer" [ref=e60] [cursor=pointer]:
+            - /url: /memory-explorer
+            - img [ref=e61]
+            - text: Memory Explorer
+          - link "Config" [ref=e64] [cursor=pointer]:
+            - /url: /config
+            - img [ref=e65]
+            - text: Config
+          - link "Enterprise" [ref=e66] [cursor=pointer]:
+            - /url: /enterprise
+            - img [ref=e67]
+            - text: Enterprise
+    - generic [ref=e71]:
+      - generic [ref=e74]: ...
+      - button "TR" [ref=e75]:
+        - img [ref=e76]
+        - text: TR
+      - button "Toggle dark/light theme" [ref=e79]:
+        - img [ref=e80]
+        - text: Light
+  - generic [ref=e86]:
+    - banner [ref=e87]:
+      - generic [ref=e89]: deckent
+      - generic [ref=e92]: connecting
+    - main "Main content" [ref=e94]:
+      - status [ref=e95]:
+        - generic [ref=e96]:
+          - img [ref=e97]
+          - generic [ref=e98]: deckent
+        - paragraph [ref=e99]: ...…
+        - paragraph [ref=e100]: agent orchestration
+  - button "toggle terminal" [ref=e102]:
+    - generic [ref=e103]:
+      - generic [ref=e104]: ▸
+      - generic [ref=e105]: Terminal
+    - generic [ref=e106]: expand
