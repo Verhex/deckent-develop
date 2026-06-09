@@ -432,39 +432,47 @@ describe('DockerSpawnBackend: NODE_OPTIONS container env (Sprint 194 T-004)', ()
   });
 });
 
-describe('DockerSpawnBackend: MF-3 non-claude binary guard (Sprint 250)', () => {
-  beforeEach(() => { vi.clearAllMocks(); });
-
-  it('writes an honest NO_GO (not a broken docker command) for a non-claude provider model', async () => {
-    // gemini-2.5-flash → getProviderBinaryForModel returns 'gemini' (not 'claude').
-    // The docker path builds claude-CLI syntax (--dangerously-skip-permissions etc.)
-    // which gemini rejects (Sprint 249). MF-2 routes non-claude away from docker;
-    // this guard is defense-in-depth: honest NO_GO instead of a degraded/broken spawn.
-    const fs = await import('node:fs');
-    const wf = vi.mocked(fs.writeFileSync);
-    const backend = new DockerSpawnBackend('/test/project');
-
-    backend.spawn('mf3-gemini', 'gemini-2.5-flash', 'prompt-body');
-
-    const resultCall = wf.mock.calls.find(c => String(c[0]).endsWith('task-mf3-gemini.result'));
-    expect(resultCall).toBeDefined();
-    const written = JSON.parse(String(resultCall![1]));
-    expect(written.selfAssessment).toBe('NO_GO');
-    expect(written.notes).toContain('non-claude provider binary');
-    expect(written.tokenUsage.provider).toBe('gemini');
+describe('DockerSpawnBackend: PSL-1 provider-aware command + OAuth mount (Sprint 252)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    installSpawnRouter();
   });
 
-  it('claude model is NOT blocked by the MF-3 guard (regression)', async () => {
+  async function workerScriptFor(taskId: string): Promise<string> {
     const fs = await import('node:fs');
     const wf = vi.mocked(fs.writeFileSync);
-    const backend = new DockerSpawnBackend('/test/project');
+    const call = wf.mock.calls.find(c =>
+      String(c[0]).includes(`.worker-${taskId}`) && String(c[0]).endsWith('.sh'));
+    return call ? String(call[1]) : '';
+  }
 
-    backend.spawn('mf3-claude', 'sonnet', 'prompt-body');
+  it('claude: docker worker script uses claude command + mounts ~/.claude (regression)', async () => {
+    new DockerSpawnBackend('/test/project').spawn('psl-claude', 'sonnet', 'prompt-body');
+    const script = await workerScriptFor('psl-claude');
+    expect(script).toContain('claude -p -');
+    expect(script).toContain('--dangerously-skip-permissions');
+    expect(capturedDockerRunArgs[0]!.some(a => a.includes('/.claude:'))).toBe(true);
+  });
 
-    // No honest-fail NO_GO result for a claude task (it proceeds to the docker spawn path)
-    const noGo = wf.mock.calls.find(c =>
-      String(c[0]).endsWith('task-mf3-claude.result') &&
-      String(c[1]).includes('non-claude provider binary'));
-    expect(noGo).toBeUndefined();
+  it('gemini: docker worker script uses gemini command (yolo/skip-trust, NOT claude flags) + mounts ~/.gemini', async () => {
+    new DockerSpawnBackend('/test/project').spawn('psl-gemini', 'gemini-2.5-flash', 'prompt-body');
+    const script = await workerScriptFor('psl-gemini');
+    expect(script).toContain('gemini -p "$(cat');
+    expect(script).toContain('--approval-mode yolo');
+    expect(script).toContain('--skip-trust');
+    expect(script).toContain('-m gemini-2.5-flash');
+    expect(script).not.toContain('--dangerously-skip-permissions'); // claude-only flag must NOT leak
+    expect(capturedDockerRunArgs[0]!.some(a => a.includes('/.gemini:'))).toBe(true);
+  });
+
+  it('codex: docker worker script uses validated codex flags (--dangerously-bypass…, apiId, stdin) + mounts ~/.codex', async () => {
+    new DockerSpawnBackend('/test/project').spawn('psl-codex', 'gpt-5', 'prompt-body');
+    const script = await workerScriptFor('psl-codex');
+    expect(script).toContain('codex exec --skip-git-repo-check');
+    expect(script).toContain('--dangerously-bypass-approvals-and-sandbox');
+    expect(script).toContain('--model gpt-5.5'); // apiId, not the gpt-5 alias
+    expect(script).not.toContain('--full-auto');  // deprecated; not used
+    expect(script).toMatch(/codex exec .*< "/);   // stdin promptFeed → prompt file piped in
+    expect(capturedDockerRunArgs[0]!.some(a => a.includes('/.codex:'))).toBe(true);
   });
 });

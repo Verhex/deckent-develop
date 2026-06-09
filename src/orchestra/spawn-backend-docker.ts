@@ -11,6 +11,7 @@ import { homedir, totalmem } from 'node:os';
 import type { ModelType } from '../core/types.js';
 import { getProviderForModel, UnknownModelError } from '../core/task-types.js';
 import { modelRegistry } from '../core/model-registry.js';
+import { getProviderCommandSpec, buildProviderCommand } from '../core/provider-command-spec.js';
 import { TASKS_DIR } from '../core/constants.js';
 import { debugLog } from '../core/utils.js';
 import {
@@ -332,23 +333,24 @@ export class DockerSpawnBackend implements SpawnBackend {
     const promptHostPath = join(tasksDir, promptFileName);
     writeFileSync(promptHostPath, prompt, 'utf-8');
 
-    // Build provider CLI command inside container
-    const providerBinary = getProviderBinaryForModel(model);
-
-    // MF-3 (Sprint 250): the docker worker command below is CLAUDE CLI syntax
-    // (`-p -`, `--allowedTools`, `--dangerously-skip-permissions`). Those flags
-    // are claude-only — a codex/gemini binary rejects them ("Unknown arguments:
-    // dangerously-skip-permissions", Sprint 249 gemini degrade). MF-2 already
-    // routes non-claude providers to their host adapter (or honest-fails) before
-    // they reach this backend; this is a defense-in-depth guard. If a non-claude
-    // binary still arrives, write an honest NO_GO instead of emitting a broken
-    // command that silently degrades. (Per-provider docker invocation is F1-004.)
-    if (providerBinary !== 'claude') {
-      const provider = modelRegistry.get(model)?.provider ?? 'unknown';
+    // Build the in-container worker command from the provider's declarative
+    // ProviderCommandSpec (PSL-1, Sprint 252) — NO claude-hardcode. The spec is
+    // the single, centrally-maintained per-provider command definition; this
+    // replaces the old block that emitted claude-CLI syntax (`-p -`,
+    // `--dangerously-skip-permissions`) for EVERY provider (Sprint 249 root
+    // cause: codex/gemini binaries rejected the claude-only flags).
+    const containerPromptPath = `${CONTAINER_WORKSPACE}/${TASKS_DIR}/${promptFileName}`;
+    const provider = modelRegistry.get(model)?.provider ?? 'claude';
+    const spec = getProviderCommandSpec(provider);
+    if (!spec) {
+      // Host-only / unknown provider (e.g. ollama) reached the docker backend.
+      // MF-2 routes host-adapter providers away before here; if one slips
+      // through with no container command spec, honest-fail instead of degrading
+      // to the claude CLI (which produced misleading results in Sprint 249).
       const reason =
-        `Docker backend received a non-claude provider binary "${providerBinary}" (provider "${provider}") `
-        + `for task ${taskId}. The docker worker path builds claude-CLI syntax which non-claude CLIs reject. `
-        + `Non-claude providers must run via their host adapter (isAdapterProvider). Refusing to spawn a broken/degraded worker.`;
+        `Docker backend has no ProviderCommandSpec for provider "${provider}" (task ${taskId}). `
+        + `Host-only providers (e.g. ollama) must run via their host adapter (isAdapterProvider). `
+        + `Refusing to spawn a degraded worker.`;
       const honestFail = {
         taskId,
         workerId: `docker-honestfail-${taskId}`,
@@ -362,23 +364,20 @@ export class DockerSpawnBackend implements SpawnBackend {
       };
       try {
         writeFileSync(join(tasksDir, `task-${taskId}.result`), JSON.stringify(honestFail, null, 2), 'utf-8');
-      } catch (e) { debugLog('docker-backend:non-claude-honestfail', e); }
+      } catch (e) { debugLog('docker-backend:no-spec-honestfail', e); }
       console.warn(`[deckent:spawn-backend-docker] ${reason}`);
       return;
     }
-
-    // Sprint 237: pass real model name (apiId, e.g. claude-opus-4-8) not alias.
+    const providerBinary = spec.binary;
+    // Sprint 237/252: wire model name (apiId, e.g. claude-opus-4-8, gpt-5.5), not alias.
     const apiId = modelRegistry.get(model)?.apiId ?? model;
-    const claudeArgs: string[] = ['-p', '-', '--model', apiId];
-    if (opts?.allowedTools) {
-      // Double-quote the value — allowedTools contains parentheses like Write(.tasks/)
-      // which sh (dash) interprets as subshell syntax without quoting
-      claudeArgs.push('--allowedTools', `"${opts.allowedTools}"`);
-    }
-    // IMMUTABLE — Deckent standard: workers MUST have full write permissions
-    claudeArgs.push('--dangerously-skip-permissions');
-
-    const claudeCmd = `${providerBinary} ${claudeArgs.join(' ')}`;
+    // IMMUTABLE — deckent workers run with full autonomy (autoApprove). The spec
+    // maps that to the correct per-provider flag (claude --dangerously-skip-
+    // permissions, codex --dangerously-bypass-approvals-and-sandbox, gemini yolo).
+    const workerCmd = buildProviderCommand(spec, apiId, containerPromptPath, {
+      allowedTools: opts?.allowedTools,
+      autoApprove: true,
+    });
     const resultPath = `${CONTAINER_WORKSPACE}/${TASKS_DIR}/task-${taskId}.result`;
     const timeoutPath = `${CONTAINER_WORKSPACE}/${TASKS_DIR}/task-${taskId}.timeout`;
     // Build docker run args
@@ -480,7 +479,7 @@ export class DockerSpawnBackend implements SpawnBackend {
       // If container is SIGKILL'd (OOM), this file survives on the shared volume.
       // Host-side monitorContainer promotes it to .result with NO_GO_PARTIAL assessment.
       `cat > "$PRFILE" <<PARTIALEOF`,
-      `{"taskId":"${taskId}","selfAssessment":"NO_GO","notes":"Worker started but did not complete — partial-result written at startup. If you see this, the container was likely OOM-killed or force-stopped before Claude CLI could write a .result.","partialMarker":true,"tokenUsage":{"inputTokens":0,"outputTokens":0,"cacheReadTokens":0,"provider":"claude","model":"${model}"}}`,
+      `{"taskId":"${taskId}","selfAssessment":"NO_GO","notes":"Worker started but did not complete — partial-result written at startup. If you see this, the container was likely OOM-killed or force-stopped before the worker CLI could write a .result.","partialMarker":true,"tokenUsage":{"inputTokens":0,"outputTokens":0,"cacheReadTokens":0,"provider":"${provider}","model":"${model}"}}`,
       'PARTIALEOF',
       'fsync_file "$PRFILE"',
       // EXIT trap: Sprint 145 — calls on_exit() which detects partial work via git diff
@@ -491,7 +490,10 @@ export class DockerSpawnBackend implements SpawnBackend {
       `( SEQ=2; while true; do sleep 15; SEQ=$((SEQ+1)); echo "{\\"workerId\\":\\"docker-${taskId}\\",\\"taskId\\":\\"${taskId}\\",\\"status\\":\\"EXECUTING\\",\\"sequence\\":$SEQ,\\"timestamp\\":\\"$(date -u +%Y-%m-%dT%H:%M:%S.000Z)\\",\\"backend\\":\\"docker\\"}" > "$HBFILE"; done ) &`,
       'HB_PID=$!',
       `TIMEOUT=\${TASK_TIMEOUT:-${effectiveTimeout}}`,
-      `timeout $TIMEOUT ${claudeCmd} < "${CONTAINER_WORKSPACE}/${TASKS_DIR}/${promptFileName}" || echo "WORKER_TIMEOUT" > "${timeoutPath}"`,
+      // PSL-1 (Sprint 252): feed the prompt per the spec's promptFeed — 'stdin'
+      // providers (claude `-p -`, codex `exec`) read the prompt FILE via `< …`;
+      // 'inline' providers (gemini `-p "$(cat …)"`) already embed it in workerCmd.
+      `timeout $TIMEOUT ${workerCmd}${spec.promptFeed === 'stdin' ? ` < "${containerPromptPath}"` : ''} || echo "WORKER_TIMEOUT" > "${timeoutPath}"`,
       // Sprint 151: Clean up .partial-result on normal exit — on_exit/EXIT trap handles abnormal exit
       'rm -f "$PRFILE" 2>/dev/null',
     ].join('\n');
@@ -532,13 +534,18 @@ export class DockerSpawnBackend implements SpawnBackend {
       '-v', `${tasksDir}:${CONTAINER_WORKSPACE}/${TASKS_DIR}`,
       // .locks/ mounted read-write (file locking)
       '-v', `${join(dir, '.locks')}:${CONTAINER_WORKSPACE}/.locks`,
-      // provider-aware auth: claude→~/.claude mount, codex/gemini→API key env only.
-      // Skip mount when api auth mode or non-claude provider binary.
-      ...(useApiOnly || providerBinary !== 'claude'
+      // PSL-1/P2 (Sprint 252): provider-aware OAuth/session mount. Each provider's
+      // host session dir (claude `.claude`, codex `.codex`, gemini `.gemini` from
+      // spec.oauthHomeDir) mounts into the container so the CLI authenticates via
+      // its host OAuth/subscription session — this is what lets codex/gemini run
+      // LIVE in docker, not just claude. Skipped in api-only mode (env key instead)
+      // or when the host dir does not exist. (Was: claude-only mount.)
+      ...(useApiOnly || !spec.oauthHomeDir
         ? []
         : [
-            '-v', `${join(home, '.claude')}:${containerHome}/.claude`,
-            ...(existsSync(join(home, '.claude.json'))
+            '-v', `${join(home, spec.oauthHomeDir)}:${containerHome}/${spec.oauthHomeDir}`,
+            // claude additionally keeps a top-level ~/.claude.json config file
+            ...(spec.oauthHomeDir === '.claude' && existsSync(join(home, '.claude.json'))
               ? ['-v', `${join(home, '.claude.json')}:${containerHome}/.claude.json`]
               : []),
           ]),
