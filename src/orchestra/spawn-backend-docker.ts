@@ -334,6 +334,39 @@ export class DockerSpawnBackend implements SpawnBackend {
 
     // Build provider CLI command inside container
     const providerBinary = getProviderBinaryForModel(model);
+
+    // MF-3 (Sprint 250): the docker worker command below is CLAUDE CLI syntax
+    // (`-p -`, `--allowedTools`, `--dangerously-skip-permissions`). Those flags
+    // are claude-only — a codex/gemini binary rejects them ("Unknown arguments:
+    // dangerously-skip-permissions", Sprint 249 gemini degrade). MF-2 already
+    // routes non-claude providers to their host adapter (or honest-fails) before
+    // they reach this backend; this is a defense-in-depth guard. If a non-claude
+    // binary still arrives, write an honest NO_GO instead of emitting a broken
+    // command that silently degrades. (Per-provider docker invocation is F1-004.)
+    if (providerBinary !== 'claude') {
+      const provider = modelRegistry.get(model)?.provider ?? 'unknown';
+      const reason =
+        `Docker backend received a non-claude provider binary "${providerBinary}" (provider "${provider}") `
+        + `for task ${taskId}. The docker worker path builds claude-CLI syntax which non-claude CLIs reject. `
+        + `Non-claude providers must run via their host adapter (isAdapterProvider). Refusing to spawn a broken/degraded worker.`;
+      const honestFail = {
+        taskId,
+        workerId: `docker-honestfail-${taskId}`,
+        filesChanged: [] as string[],
+        linesAdded: 0,
+        linesRemoved: 0,
+        testsPassed: false,
+        selfAssessment: 'NO_GO',
+        notes: reason,
+        tokenUsage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, provider, model },
+      };
+      try {
+        writeFileSync(join(tasksDir, `task-${taskId}.result`), JSON.stringify(honestFail, null, 2), 'utf-8');
+      } catch (e) { debugLog('docker-backend:non-claude-honestfail', e); }
+      console.warn(`[deckent:spawn-backend-docker] ${reason}`);
+      return;
+    }
+
     // Sprint 237: pass real model name (apiId, e.g. claude-opus-4-8) not alias.
     const apiId = modelRegistry.get(model)?.apiId ?? model;
     const claudeArgs: string[] = ['-p', '-', '--model', apiId];

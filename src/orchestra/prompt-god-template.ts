@@ -11,7 +11,7 @@ import type { Task, TaskScope } from '../core/task-types.js';
 import type { MemoryEntryV2 } from '../core/memory-types.js';
 import { selectRelevantAdrs, buildAdrPromptSection } from './adr-selector.js';
 import { sanitizeScope } from './scope-sanitizer.js';
-import { truncateAtParagraph } from './task-builder.js';
+import { truncateAtParagraph, inferTaskDomains } from './task-builder.js';
 import { getDefaultProviderName } from './sprint-utils.js';
 
 // ─── Public Types ──────────────────────────────────────────────────────
@@ -605,8 +605,27 @@ Use this key for external API calls (Idempotency-Key header) to make retries saf
 4. Document: update relevant docs if your changes affect them
 5. Report: write your result file to .tasks/task-${task.id}.result`);
 
-  // Verify steps
-  sections.push(`## CRITICAL VERIFY STEPS (DO NOT SKIP)
+  // Verify steps — Sprint 250 MF-1: Tier-0 doc-only tasks must NOT run the full
+  // test suite. The prompt previously told EVERY worker to run the project test
+  // suite; shell-capable external CLIs (codex/gemini) obeyed and ran the full
+  // 17k-test deckent suite on a doc-only task, which collapsed under their
+  // sandbox (EROFS ~/.codex, EPERM, API-endpoint timeouts) → false NO_GO +
+  // timeout despite a correct doc. Brain already exempts doc tasks at evaluation
+  // (result-evaluator isDocTask→DONE); the prompt must match. Doc-only = every
+  // inferred scope domain is 'doc' (reuses inferTaskDomains; cycle-safe).
+  const taskDomains = inferTaskDomains(
+    task.scope?.filesWrite ?? [],
+    task.scope?.directories ?? [],
+  );
+  const isDocOnlyTask = taskDomains.length > 0 && taskDomains.every(d => d === 'doc');
+  if (isDocOnlyTask) {
+    sections.push(`## VERIFY STEPS (doc-only task — DO NOT run the test suite)
+This is a Tier-0 documentation task: there is no source code to type-check or test. DO NOT run \`npm test\` / \`vitest\` / the project test suite — it is large, unrelated to your file, slow, and produces spurious failures that do NOT reflect your work.
+1. Read your file back from disk (the path in your scope) and confirm its content satisfies the goCriteria above.
+2. You MAY run a fast doc/markdown lint if one exists, but a passing test suite is NOT required and NOT expected.
+Mark selfAssessment = "DONE" when the file exists and matches the goCriteria. Use "GO_WITH_TECH_DEBT" only if the content is genuinely partial; use "NO_GO" only if you could not create the file at all. Do NOT mark NO_GO because an unrelated test suite failed.`);
+  } else {
+    sections.push(`## CRITICAL VERIFY STEPS (DO NOT SKIP)
 You MUST run the project's type check and test suite before marking your task as done.
 Check the project's TOOLS.md or package.json scripts to find the right commands.
 
@@ -619,6 +638,7 @@ If BOTH pass → selfAssessment = "DONE"
 If minor issues remain → selfAssessment = "GO_WITH_TECH_DEBT" with details in notes
 If Bash tool is unavailable → report in notes, selfAssessment = "GO_WITH_TECH_DEBT"
 If tests fail after 3 attempts → selfAssessment = "NO_GO" with error details`);
+  }
 
   // Scope block
   sections.push(scopeBlock);

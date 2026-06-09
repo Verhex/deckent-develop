@@ -317,3 +317,47 @@ describe('buildTaskPrompt', () => {
     expect(result.prompt).toContain('"Code written" ≠ "DONE"');
   });
 });
+
+// ─── MF-1 (Sprint 250): doc-only tasks must NOT be told to run the test suite ──
+describe('buildTaskPrompt — MF-1 doc-task verify gate', () => {
+  it('doc-only task prompt suppresses the full test suite and gives a doc verify path', () => {
+    const task = makeTask({
+      title: 'Write cookbook recipe',
+      description: 'Create docs/cookbook/01-first-sprint.md',
+      scope: { directories: ['docs/'], filesRead: [], filesWrite: ['docs/cookbook/01-first-sprint.md'] },
+      assignedAgent: 'doc-writer',
+    });
+    const result = buildTaskPrompt(task, makeCtx({ agentId: 'doc-writer' }));
+
+    // Must NOT instruct running the project test suite (the Sprint-249 codex false-NO_GO root)
+    expect(result.prompt).toContain('doc-only task — DO NOT run the test suite');
+    expect(result.prompt).not.toContain('CRITICAL VERIFY STEPS (DO NOT SKIP)');
+    expect(result.prompt).not.toContain('Full test suite');
+    // Must still give a positive completion path
+    expect(result.prompt).toContain('Read your file back from disk');
+    expect(result.prompt).toContain('Do NOT mark NO_GO because an unrelated test suite failed');
+  });
+
+  it('code task prompt KEEPS the full test suite verify', () => {
+    const task = makeTask({
+      title: 'Add config validator',
+      description: 'Build src/core/config-validator.ts',
+      scope: { directories: ['src/core/'], filesRead: [], filesWrite: ['src/core/config-validator.ts'] },
+    });
+    const result = buildTaskPrompt(task, makeCtx());
+
+    expect(result.prompt).toContain('CRITICAL VERIFY STEPS (DO NOT SKIP)');
+    expect(result.prompt).toContain('Full test suite');
+    expect(result.prompt).not.toContain('doc-only task — DO NOT run the test suite');
+  });
+
+  it('mixed scope (docs + src) is NOT treated as doc-only → keeps full suite', () => {
+    const task = makeTask({
+      title: 'Code + docs',
+      description: 'Touch both src and docs',
+      scope: { directories: ['src/core/', 'docs/'], filesRead: [], filesWrite: ['src/core/x.ts', 'docs/x.md'] },
+    });
+    const result = buildTaskPrompt(task, makeCtx());
+    expect(result.prompt).toContain('CRITICAL VERIFY STEPS (DO NOT SKIP)');
+  });
+});

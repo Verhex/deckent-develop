@@ -236,6 +236,52 @@ export function normalizeScopeFiles(files: readonly string[]): string[] {
   return result;
 }
 
+/**
+ * MF-2 (Sprint 250): write an honest NO_GO `.result` when a host-only provider
+ * (codex/gemini/ollama, per `isAdapterProvider`) has no registered/available
+ * host adapter at spawn time.
+ *
+ * Without this, the spawn chain falls through to the docker backend, which
+ * silently degrades non-claude work to the `claude` CLI (Sprint 249 root cause:
+ * gemini/ollama FIX-respawns ran as claude and produced misleading claude-labeled
+ * results). An honest NO_GO is read by the result-collector like any worker
+ * result and surfaces the real problem (provider not available) instead of a
+ * fabricated success on the wrong provider.
+ */
+function writeProviderUnavailableNoGo(task: Task, projectRoot: string): void {
+  const reason =
+    `Provider "${task.provider}" requires a host adapter (isAdapterProvider) but none is `
+    + `registered/available at spawn time. Refusing to silently degrade to the claude CLI via the `
+    + `docker backend. Ensure the provider is available at bootstrap (CLI logged in / daemon reachable) `
+    + `so its host adapter is registered.`;
+  const result = {
+    taskId: task.id,
+    workerId: `honestfail-${task.id}`,
+    filesChanged: [] as string[],
+    linesAdded: 0,
+    linesRemoved: 0,
+    testsPassed: false,
+    selfAssessment: 'NO_GO',
+    notes: reason,
+    tokenUsage: {
+      inputTokens: 0,
+      outputTokens: 0,
+      cacheReadTokens: 0,
+      provider: task.provider,
+      model: task.model,
+    },
+  };
+  try {
+    writeFileSync(
+      join(projectRoot, TASKS_DIR, `task-${task.id}.result`),
+      JSON.stringify(result, null, 2),
+      'utf-8',
+    );
+  } catch (e) {
+    debugLog('writeProviderUnavailableNoGo', e);
+  }
+}
+
 // ═══ Exported Functions ════════════════════════════════════════════
 
 /**
@@ -435,7 +481,8 @@ export async function spawnWorkers(
     // registered, refresh dynamic model acceptance and use `adapter.spawn`.
     // `refreshSupportedModels` is optional (`?.`) so non-Ollama adapters that
     // do not implement it remain compatible.
-    const adapterRouted = isAdapterProvider(taskProvider)
+    const wantsHostAdapter = isAdapterProvider(taskProvider);
+    const adapterRouted = wantsHostAdapter
       ? getProviderAdapterForTask(taskProvider)
       : null;
     if (adapterRouted) {
@@ -452,6 +499,21 @@ export async function spawnWorkers(
         autoApprove: spawnOpts?.autoApprove ?? false,
         projectDir: projectRoot,
       });
+    } else if (wantsHostAdapter) {
+      // MF-2 (Sprint 250): host-only provider (codex/gemini/ollama) but its
+      // adapter is not registered/available right now. Do NOT fall through to
+      // the docker backend, which silently degrades non-claude work to the
+      // claude CLI. Write an honest NO_GO and skip this task's spawn.
+      writeProviderUnavailableNoGo(task, projectRoot);
+      task.status = TaskStatus.NO_GO;
+      try {
+        writeFileSync(
+          join(projectRoot, TASKS_DIR, `task-${task.id}.json`),
+          JSON.stringify(task, null, 2),
+          'utf-8',
+        );
+      } catch (e) { debugLog('spawnWorkers:honestFailWrite', e); }
+      continue;
     } else if (backend) {
       backend.spawn(task.id, model, prompt, {
         allowedTools,
@@ -601,7 +663,8 @@ export async function respawnEligibleTasks(
     // Sprint 234 AS-2 Faz 2: same host-HTTP adapter routing as `spawnWorkers`.
     // Wave-2+ respawns must honor the predicate so ollama tasks promoted from
     // PENDING during dependency unblock also reach the host adapter.
-    const adapterRouted = isAdapterProvider(taskProvider)
+    const wantsHostAdapter = isAdapterProvider(taskProvider);
+    const adapterRouted = wantsHostAdapter
       ? getProviderAdapterForTask(taskProvider)
       : null;
     if (adapterRouted) {
@@ -614,6 +677,20 @@ export async function respawnEligibleTasks(
         autoApprove: spawnOpts?.autoApprove ?? false,
         projectDir: projectRoot,
       });
+    } else if (wantsHostAdapter) {
+      // MF-2 (Sprint 250): FIX-phase re-spawn of a host-only provider whose
+      // adapter is missing — this is exactly how Sprint 249 gemini 010/013
+      // degraded to claude via docker. Honest NO_GO instead of silent degrade.
+      writeProviderUnavailableNoGo(task, projectRoot);
+      task.status = TaskStatus.NO_GO;
+      try {
+        writeFileSync(
+          join(projectRoot, TASKS_DIR, `task-${task.id}.json`),
+          JSON.stringify(task, null, 2),
+          'utf-8',
+        );
+      } catch (e) { debugLog('respawnEligibleTasks:honestFailWrite', e); }
+      continue;
     } else if (backend) {
       backend.spawn(task.id, task.model, prompt, {
         allowedTools,

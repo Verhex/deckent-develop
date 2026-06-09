@@ -431,3 +431,40 @@ describe('DockerSpawnBackend: NODE_OPTIONS container env (Sprint 194 T-004)', ()
     }
   });
 });
+
+describe('DockerSpawnBackend: MF-3 non-claude binary guard (Sprint 250)', () => {
+  beforeEach(() => { vi.clearAllMocks(); });
+
+  it('writes an honest NO_GO (not a broken docker command) for a non-claude provider model', async () => {
+    // gemini-2.5-flash → getProviderBinaryForModel returns 'gemini' (not 'claude').
+    // The docker path builds claude-CLI syntax (--dangerously-skip-permissions etc.)
+    // which gemini rejects (Sprint 249). MF-2 routes non-claude away from docker;
+    // this guard is defense-in-depth: honest NO_GO instead of a degraded/broken spawn.
+    const fs = await import('node:fs');
+    const wf = vi.mocked(fs.writeFileSync);
+    const backend = new DockerSpawnBackend('/test/project');
+
+    backend.spawn('mf3-gemini', 'gemini-2.5-flash', 'prompt-body');
+
+    const resultCall = wf.mock.calls.find(c => String(c[0]).endsWith('task-mf3-gemini.result'));
+    expect(resultCall).toBeDefined();
+    const written = JSON.parse(String(resultCall![1]));
+    expect(written.selfAssessment).toBe('NO_GO');
+    expect(written.notes).toContain('non-claude provider binary');
+    expect(written.tokenUsage.provider).toBe('gemini');
+  });
+
+  it('claude model is NOT blocked by the MF-3 guard (regression)', async () => {
+    const fs = await import('node:fs');
+    const wf = vi.mocked(fs.writeFileSync);
+    const backend = new DockerSpawnBackend('/test/project');
+
+    backend.spawn('mf3-claude', 'sonnet', 'prompt-body');
+
+    // No honest-fail NO_GO result for a claude task (it proceeds to the docker spawn path)
+    const noGo = wf.mock.calls.find(c =>
+      String(c[0]).endsWith('task-mf3-claude.result') &&
+      String(c[1]).includes('non-claude provider binary'));
+    expect(noGo).toBeUndefined();
+  });
+});

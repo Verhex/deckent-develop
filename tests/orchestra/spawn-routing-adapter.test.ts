@@ -17,7 +17,7 @@
 // providerRegistry. No real docker, no network, no spawnSync.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { writeFileSync, mkdirSync, rmSync, existsSync, mkdtempSync } from 'node:fs';
+import { writeFileSync, readFileSync, mkdirSync, rmSync, existsSync, mkdtempSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
@@ -230,6 +230,28 @@ describe('spawnWorkers — host-HTTP adapter routing', () => {
     await spawnWorkers(testRoot, sprint, makeConfig(), { spawnBackend: backend });
 
     expect(backend.calls.map(c => c.taskId)).toContain('234-ROUTE-B');
+  });
+
+  it('MF-2: host-adapter provider with NO registered adapter → honest NO_GO, not docker degrade', async () => {
+    // No ollama adapter registered (simulates the Sprint-249 bootstrap/FIX-respawn
+    // race where getProviderAdapterForTask returns null). Old behavior fell through
+    // to the docker backend and silently degraded to claude. MF-2 must honest-fail.
+    const ollamaTask = createTask('250-MF2', 'ollama', 'qwen3.6' as ModelType, ['docs/x.md']);
+    persistTasks([ollamaTask]);
+    const sprint = makeSprint('sprint-250', [ollamaTask]);
+    const backend = makeMockBackend();
+
+    await spawnWorkers(testRoot, sprint, makeConfig(), { spawnBackend: backend });
+
+    // Must NOT silently degrade to the docker backend
+    expect(backend.calls.map(c => c.taskId)).not.toContain('250-MF2');
+    // Must write an honest NO_GO result the collector can read
+    const resultPath = join(testRoot, '.tasks', 'task-250-MF2.result');
+    expect(existsSync(resultPath)).toBe(true);
+    const result = JSON.parse(readFileSync(resultPath, 'utf-8'));
+    expect(result.selfAssessment).toBe('NO_GO');
+    expect(result.notes).toContain('host adapter');
+    expect(result.tokenUsage.provider).toBe('ollama');
   });
 
   it('mixed sprint — ollama hits adapter, claude hits backend', async () => {
