@@ -1,3 +1,3 @@
 # Codex Verify
 Provider: codex
-Deckent is a sprint-aware developer workflow system that keeps verification evidence explicit.
+Deckent is a focused orchestration workspace for coordinating reliable agent-driven development.

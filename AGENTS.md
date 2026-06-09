@@ -26,6 +26,4 @@ When acting as Worker: @.codex/rules/worker-default.md
 ## Agent Performance
 | Agent | Tasks | Done | Success |
 |-------|-------|------|--------|
-| doc-writer | 11 | 8 | 73% |
-| ci-guardian | 3 | 1 | 33% |
-| architect | 1 | 1 | 100% |
+| doc-writer | 4 | 3 | 75% |

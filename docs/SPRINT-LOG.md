@@ -6771,3 +6771,28 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 249-015: 249-015 — cookbook: status & watch (ollama, small) (GO_WITH_TECH_DEBT)
 
 ---
+## Sprint 250 — sprint-250
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-06-09
+**Duration:** 618s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 4 |
+| Completed | 3 |
+| Tech Debt | 1 |
+| No-Go | 1 |
+| Coverage | NaN% |
+| Duration | 617809ms |
+
+### Tasks
+
+- 250-001: 250-V1 — claude verify (DONE)
+- 250-002: 250-V2 — codex verify (MF-1 KEY) (NO_GO)
+- 250-003: 250-V3 — gemini verify (DONE)
+- 250-004: 250-V4 — ollama verify (GO_WITH_TECH_DEBT)
+
+---

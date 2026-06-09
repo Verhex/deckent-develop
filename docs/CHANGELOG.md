@@ -2,6 +2,20 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint250] - 2026-06-09
+
+### Added
+
+- 250-V1 — claude verify
+- 250-V3 — gemini verify
+
+### Changed
+
+- 250-V4 — ollama verify (completed with tech debt)
+
+
+_Tasks: 4 total, 3 done, 1 tech debt, 1 no-go_
+
 ## [1.0.0-beta.1-sprint249] - 2026-06-09
 
 ### Added

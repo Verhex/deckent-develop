@@ -1,5 +1,14 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-250 Learnings
+- Sprint sprint-250 Learnings: ## Sprint sprint-250 Learnings
+- 250-V2 — codex verify (MF-1 KEY): NO_GO — Created docs/_verify/codex-v.md with exactly three lines. Line 1 is '# Codex Verify', line 2 is 'Provider: codex', and l
+- 250-V4 — ollama verify: GO_WITH_TECH_DEBT — Created docs/_verify/ollama-v.md with exactly 3 lines: line 1 "# Ollama Verify", line 2 "Provider: ollama", line 3 a sho
+
+## Gains
+- 250-001 — 250-V1 — claude verify — Created docs/_verify/claude-v.md with exactly 3 lines: line 1 '# Claude Verify', line 2 'Provider...
+- 250-003 — 250-V3 — gemini verify — Created docs/_verify/gemini-v.md with the specified 3 lines of content.
+
 ## Sprint sprint-249 Learnings
 - Sprint sprint-249 Learnings: ## Sprint sprint-249 Learnings
 - 249-003 — lint-cli-mcp-parity guard (report-only): NO_GO — Created scripts/lint-cli-mcp-parity.mjs (ESM, Node built-ins only, ADR-010 compliant). Script scans src/cli/commands/*.t
