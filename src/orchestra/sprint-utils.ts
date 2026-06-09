@@ -22,6 +22,8 @@ import {
 } from '../core/constants.js';
 
 import { readJsonSafe, debugLog } from '../core/utils.js';
+import { deriveBaseCriteria } from '../core/criteria-deriver.js';
+import type { TaskKind, TechStackKind } from '../core/work-model.js';
 import { modelRegistry } from '../core/model-registry.js';
 import type { RegistryProviderName } from '../core/model-registry.js';
 import { getSystemProfile } from '../core/system-profile.js';
@@ -393,6 +395,11 @@ export function buildSpawnRetryHint(error: unknown, sprint: Sprint): string {
 export function extractGoNogoCriteria(
   description: string,
   testTarget?: string,
+  // WM-7: optional kind×stack context. When supplied, the BASE criteria are
+  // derived from the task kind + detected project stack (doc→disk-verify,
+  // code→stack commands, never `tsc` on a non-TS project). When ABSENT, the
+  // legacy TypeScript-centric output is preserved verbatim (backward compatible).
+  opts?: { kind?: TaskKind; stack?: TechStackKind; commands?: { build?: string; test?: string } },
 ): { goCriteria: string; noGoCriteria: string; techDebtAcceptable: string } {
   const lines = description.split('\n');
   const proofLines: string[] = [];
@@ -409,14 +416,31 @@ export function extractGoNogoCriteria(
     }
   }
 
+  const specificCriteria = proofLines
+    .slice(0, 3)
+    .map(l => l.replace(/^\*\*.*?\*\*:\s*/, '').replace(/^[-*]\s*/, ''))
+    .join('; ');
+
+  // ── WM-7 path: kind × stack aware base ──────────────────────────────────
+  if (opts?.kind) {
+    const base = deriveBaseCriteria(opts.kind, opts.stack ?? 'generic', opts.commands);
+    if (proofLines.length > 0) {
+      // Compose the task-specific proof lines on top of the kind-aware base.
+      // For doc/audit/data the base already says "no build/test"; for code it
+      // carries the stack commands — neither path glues `tsc` onto a doc task.
+      return {
+        goCriteria: `${base.goCriteria}; ${specificCriteria}`,
+        noGoCriteria: base.noGoCriteria,
+        techDebtAcceptable: base.techDebtAcceptable,
+      };
+    }
+    return base;
+  }
+
+  // ── Legacy path (no kind context): preserved verbatim ───────────────────
   const baseCriteria = testTarget ? `${testTarget}; Tests pass` : 'Tests pass; tsc clean';
 
   if (proofLines.length > 0) {
-    // Use first 3 proof lines as specific criteria (avoid excessive length)
-    const specificCriteria = proofLines
-      .slice(0, 3)
-      .map(l => l.replace(/^\*\*.*?\*\*:\s*/, '').replace(/^[-*]\s*/, ''))
-      .join('; ');
     return {
       goCriteria: `${baseCriteria}; ${specificCriteria}`,
       noGoCriteria: 'Build fails or verification commands fail',

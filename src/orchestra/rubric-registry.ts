@@ -10,6 +10,7 @@
 
 import type { Task, EvaluationRubric } from '../core/types.js';
 import { taskKindToRubric } from '../core/work-model.js';
+import { inferStackFromFiles, isCoverageMeasurable } from '../core/coverage-adapters.js';
 
 /**
  * Task taxonomy for rubric selection.
@@ -279,6 +280,13 @@ export function coverageOptional(task: Task, result?: { filesChanged?: string[];
   if (result) {
     const wroteTests = result.filesChanged?.some(f => f.includes('.test.') || f.includes('.spec.')) ?? false;
     if (wroteTests) return true;
+    // WM-7: deckent's coverage scoring is vitest/v8-only. For a non-JS/TS code
+    // task (Go / Python / C++ / Rust / …), `coverage:null` is a MEASUREMENT GAP
+    // — deckent literally cannot measure it — NOT a quality failure. Signal: the
+    // changed source files belong to a stack deckent can't measure coverage for.
+    // Exempt → a C++ code task no longer false-NO_GOs on missing coverage.
+    const stack = inferStackFromFiles(result.filesChanged);
+    if (stack !== 'generic' && !isCoverageMeasurable(stack)) return true;
   }
   return false;
 }

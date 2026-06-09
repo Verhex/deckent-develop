@@ -120,6 +120,62 @@ export type AdrTaskType =
   | 'provider'
   | 'dashboard';
 
+/**
+ * WM-7 — Canonical technology-stack axis, ORTHOGONAL to TaskKind. TaskKind is
+ * WHAT the work is (code/doc/audit/…); TechStackKind is the language/runtime it
+ * targets. Drives: stack-aware GO/NO-GO criteria, coverage exemption (deckent
+ * can only measure JS/TS coverage), and parametric/prime skill+agent routing
+ * (so a Go project is never judged by `tsc` nor routed `typescript-expert`).
+ */
+export type TechStackKind =
+  | 'typescript'
+  | 'javascript'
+  | 'python'
+  | 'go'
+  | 'rust'
+  | 'java'
+  | 'kotlin'
+  | 'csharp'
+  | 'swift'
+  | 'cpp'
+  | 'c'
+  | 'ruby'
+  | 'php'
+  | 'dart'
+  | 'generic';
+
+/** Languages deckent can natively MEASURE test coverage for (vitest/v8 path). */
+export const COVERAGE_MEASURABLE_STACKS: ReadonlySet<TechStackKind> = new Set<TechStackKind>([
+  'typescript',
+  'javascript',
+]);
+
+/**
+ * Normalize a free-string project language (from stack-detector or IDENTITY.md
+ * `Language:`) into the canonical {@link TechStackKind}. Pure + total: unknown
+ * input → `'generic'` (callers degrade gracefully, never throw). Order matters —
+ * `javascript` is matched before `java` because `'javascript'.includes('java')`.
+ */
+export function normalizeTechStack(language: string | undefined | null): TechStackKind {
+  const l = (language ?? '').toLowerCase().trim();
+  if (!l) return 'generic';
+  if (l.includes('typescript') || l === 'ts' || l === 'tsx') return 'typescript';
+  if (l.includes('javascript') || l === 'js' || l === 'jsx' || l === 'node' || l === 'nodejs') return 'javascript';
+  if (l.includes('python') || l === 'py') return 'python';
+  if (l === 'go' || l.includes('golang')) return 'go';
+  if (l.includes('rust') || l === 'rs') return 'rust';
+  if (l.includes('kotlin') || l === 'kt') return 'kotlin';
+  if (l.includes('java')) return 'java';
+  if (l.includes('csharp') || l === 'c#' || l === 'cs' || l.includes('dotnet') || l.includes('.net')) return 'csharp';
+  if (l.includes('swift')) return 'swift';
+  if (l.includes('c++') || l === 'cpp' || l.includes('cplusplus')) return 'cpp';
+  if (l.includes('ruby') || l === 'rb') return 'ruby';
+  if (l.includes('php')) return 'php';
+  if (l === 'dart' || l.includes('flutter')) return 'dart';
+  if (l === 'c' || l === 'clang') return 'c';
+  return 'generic';
+}
+
 // ─── Legacy → canonical adapters (pure; spec §3) ─────────────────────────────
 
 /** decision-types `TaskType` → canonical `TaskKind`. */
