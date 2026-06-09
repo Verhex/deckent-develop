@@ -279,20 +279,23 @@ Builds a report over the sprint's audit events with three control flags:
 The summary also includes the event count and a per-actor breakdown.
 **Exit codes:** `0` chain intact, `1` **broken chain** (use this in CI gates), `2` error.
 
-### 12.2 SIEM export (NDJSON)
+### 12.2 SIEM forward (HTTP / NDJSON)
 
 ```bash
-deckent audit forward --sprint <id> --out <path>
+deckent audit forward --sprint <id> --url <https-endpoint>   # POST to an HTTP(S) SIEM endpoint
+deckent audit forward --sprint <id> --out <path>             # NDJSON file (one record per line)
 # default --out: .deckent/siem-export.jsonl
 ```
 
-Forwards the sprint's audit chain through the SIEM forwarder into an **NDJSON file**
-(one JSON record per line) and prints the record count + destination. Exit codes:
-`0` success, `2` error.
+Forwards the sprint's audit chain through the SIEM forwarder and prints the record
+count + destination. `--url` takes precedence over `--out`. Exit codes: `0` success,
+`2` error (e.g. a malformed URL). HTTP transport failures (non-2xx / network) are
+retried then dropped per the forwarder's fail-safe contract — they never abort the run.
 
-> **Honest limit:** the built-in transport is **file-only**. Real network transports
-> (HTTP/syslog) are an ENT-5 follow-up and do **not** exist yet — ship the NDJSON file
-> to your SIEM with your own collector/agent.
+> **Transport status:** the **HTTP transport is live** (`--url`, `src/core/siem-transport-http.ts`).
+> A **syslog transport module is ready** (`src/core/siem-transport-syslog.ts`, RFC 5424,
+> default facility 13 "log audit") but its CLI wire (`--syslog`) is a follow-up — until it
+> lands, ship the NDJSON file to your syslog-based SIEM with your own collector/agent.
 
 ---
 

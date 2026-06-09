@@ -2,6 +2,19 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint266] - 2026-06-09
+
+### Added
+
+- Odoo read-only ErpDriver (JSON-RPC search_read)
+- audit CLI tamamlama — syslog forward wire + retention subcommand
+- Enterprise integrations reference — sprint-265 çıktıları
+- Enterprise depth — JWKS/OIDC/transport ekleri
+- Autonomous operations — forward --url/--syslog ekleri
+
+
+_Tasks: 5 total, 5 done, 0 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint265] - 2026-06-09
 
 ### Added

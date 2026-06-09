@@ -1,5 +1,15 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-266 Learnings
+- Sprint sprint-266 Learnings: ## Sprint sprint-266 Learnings
+
+## Gains
+- 266-001 — Odoo read-only ErpDriver (JSON-RPC search_read) — First concrete ErpDriver: createOdooErpDriver(opts) translates CompiledQuery -> Odoo JSON-RPC 2.0...
+- 266-002 — audit CLI tamamlama — syslog forward wire + retention subcommand — Syslog wire + retention subcommand landed, both consuming SSOT modules (no re-implementation).
+- 266-003 — Enterprise integrations reference — sprint-265 çıktıları — Appended code-derived sections 7-10 to docs/reference/enterprise-integrations.md; existing sectio...
+- 266-004 — Enterprise depth — JWKS/OIDC/transport ekleri — Doc-only Tier-0 task (no test suite run, per task instructions).
+- 266-005 — Autonomous operations — forward --url/--syslog ekleri — Updated §12.2 of docs/guide/autonomous-operations.md to the CURRENT disk state of src/cli/command...
+
 ## Sprint sprint-265 Learnings
 - Sprint sprint-265 Learnings: ## Sprint sprint-265 Learnings
 

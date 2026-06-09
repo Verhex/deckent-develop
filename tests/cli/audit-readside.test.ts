@@ -1,14 +1,25 @@
 // tests/cli/audit-readside.test.ts
 // Gap #5 — audit read-side consumers: compliance report + SIEM export over the
-// live ENT-3 audit chain. Hermetic: tmpdir root, events seeded via writeAuditEvent,
-// HTTP forwarding via injected fetch (no real network).
+// live ENT-3 audit chain, syslog forward (Sprint 266) and retention plan/apply.
+// Hermetic: tmpdir root, events seeded via writeAuditEvent, HTTP forwarding via
+// injected fetch, syslog via injected sendImpl (no real network/sockets).
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtempSync, rmSync, readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { runComplianceReport, runSiemExport, runSiemHttpForward } from '../../src/cli/commands/audit.js';
-import { writeAuditEvent, _resetChainHead } from '../../src/core/audit-writer.js';
+import {
+  runComplianceReport,
+  runSiemExport,
+  runSiemHttpForward,
+  runSiemSyslogForward,
+  runAuditRetention,
+  parseSyslogTarget,
+} from '../../src/cli/commands/audit.js';
+import { readAuditEvents } from '../../src/core/audit-query.js';
+import { writeAuditEvent, verifyAuditChain, _resetChainHead, AUDIT_EVENT_CHANNEL } from '../../src/core/audit-writer.js';
+import { writeEvent, readEvents } from '../../src/orchestra/event-stream.js';
 import type { SiemFetchLike } from '../../src/core/siem-transport-http.js';
+import type { SyslogSendImpl } from '../../src/core/siem-transport-syslog.js';
 
 const SPRINT = 'sprint-rs';
 
@@ -117,5 +128,142 @@ describe('audit read-side — SIEM HTTP forward (--url path)', () => {
     expect(result).toEqual({ count: 2, url: URL });
     expect(fetchImpl).toHaveBeenCalledTimes(4);
     expect(errSpy).toHaveBeenCalled();
+  });
+});
+
+describe('audit read-side — SIEM syslog forward (--syslog path)', () => {
+  let root: string;
+
+  beforeEach(() => {
+    root = mkdtempSync(join(tmpdir(), 'audit-rs-syslog-'));
+    _resetChainHead();
+    writeAuditEvent(root, SPRINT, { tenantId: 'local', actor: 'system', action: 'capability.success', target: 'fs-read' });
+    writeAuditEvent(root, SPRINT, { tenantId: 'acme', actor: 'cli', action: 'rbac.denied' });
+  });
+  afterEach(() => { rmSync(root, { recursive: true, force: true }); });
+
+  it('runSiemSyslogForward ships one RFC 5424 message per record via the injected sendImpl', async () => {
+    const batches: string[][] = [];
+    const sendImpl: SyslogSendImpl = async (messages) => { batches.push(messages); };
+
+    const result = await runSiemSyslogForward(root, SPRINT, 'siem.internal', 6514, 'udp', sendImpl);
+
+    expect(result).toEqual({ count: 2, host: 'siem.internal', port: 6514, protocol: 'udp' });
+    expect(batches).toHaveLength(1);
+    expect(batches[0]).toHaveLength(2);
+    // PRI 110 = facility 13 ("log audit") × 8 + severity 6 (Informational), version 1.
+    for (const message of batches[0]!) expect(message).toMatch(/^<110>1 /);
+    expect(batches[0]![0]).toContain('"action":"capability.success"');
+    expect(batches[0]![1]).toContain('"action":"rbac.denied"');
+  });
+
+  it('runSiemSyslogForward on an empty sprint stream → count 0 and sendImpl is never called', async () => {
+    const sendImpl = vi.fn<SyslogSendImpl>(async () => {});
+
+    const result = await runSiemSyslogForward(root, 'sprint-empty', 'siem.internal', 514, 'tcp', sendImpl);
+
+    expect(result).toEqual({ count: 0, host: 'siem.internal', port: 514, protocol: 'tcp' });
+    expect(sendImpl).not.toHaveBeenCalled();
+  });
+
+  it('runSiemSyslogForward rejects on invalid transport options (empty host) before any send', async () => {
+    const sendImpl = vi.fn<SyslogSendImpl>(async () => {});
+
+    await expect(runSiemSyslogForward(root, SPRINT, '', 514, 'udp', sendImpl)).rejects.toThrow(/host/i);
+    expect(sendImpl).not.toHaveBeenCalled();
+  });
+
+  it('parseSyslogTarget parses host[:port] with the syslog default 514', () => {
+    expect(parseSyslogTarget('siem.internal:6514')).toEqual({ host: 'siem.internal', port: 6514 });
+    expect(parseSyslogTarget('siem.internal')).toEqual({ host: 'siem.internal', port: 514 });
+    // Non-numeric suffix is not a port — the whole value is the host.
+    expect(parseSyslogTarget('siem.internal:abc')).toEqual({ host: 'siem.internal:abc', port: 514 });
+  });
+});
+
+describe('audit read-side — retention plan/apply (retention subcommand)', () => {
+  let root: string;
+
+  beforeEach(() => {
+    root = mkdtempSync(join(tmpdir(), 'audit-rs-ret-'));
+    _resetChainHead();
+  });
+  afterEach(() => { rmSync(root, { recursive: true, force: true }); });
+
+  const streamPath = (): string => join(root, '.deckent', `${SPRINT}-events.jsonl`);
+  const archivePath = (): string => join(root, '.deckent', `${SPRINT}-events-archive.jsonl`);
+
+  function seedThree(): void {
+    writeAuditEvent(root, SPRINT, { tenantId: 'local', actor: 'system', action: 'a1' });
+    writeAuditEvent(root, SPRINT, { tenantId: 'local', actor: 'system', action: 'a2' });
+    writeAuditEvent(root, SPRINT, { tenantId: 'local', actor: 'system', action: 'a3' });
+  }
+
+  it('dry-run reports the plan and writes NOTHING (stream byte-identical, no archive file)', () => {
+    seedThree();
+    const before = readFileSync(streamPath(), 'utf-8');
+
+    const result = runAuditRetention(root, SPRINT, { maxCount: 2 }, false);
+
+    expect(result).toEqual({ sprintId: SPRINT, scanned: 3, keep: 2, archive: 1, prune: 0, applied: false });
+    expect(readFileSync(streamPath(), 'utf-8')).toBe(before);
+    expect(existsSync(archivePath())).toBe(false);
+  });
+
+  it('apply with maxCount: atomic rewrite — readAuditEvents returns the keep-set, dropped event is archived, non-audit events survive', () => {
+    // Non-audit event first — retention must NEVER touch other channels.
+    writeEvent(root, SPRINT, 'brain', '*', 'BRAIN→*:SPRINT_PHASE_CHANGE', { phase: 'PLAN' });
+    seedThree();
+
+    const result = runAuditRetention(root, SPRINT, { maxCount: 2 }, true);
+
+    expect(result).toEqual({ sprintId: SPRINT, scanned: 3, keep: 2, archive: 1, prune: 0, applied: true });
+    expect(existsSync(`${streamPath()}.tmp`)).toBe(false); // atomic rename — no tmp left behind
+    const kept = readAuditEvents(root, SPRINT);
+    expect(kept.map((e) => e.action)).toEqual(['a2', 'a3']);
+    const allAfter = readEvents(root, SPRINT);
+    expect(allAfter.some((e) => e.channel === 'BRAIN→*:SPRINT_PHASE_CHANGE')).toBe(true);
+    const archived = readFileSync(archivePath(), 'utf-8').trim().split('\n').map((l) => JSON.parse(l) as { channel: string; payload: { action: string } });
+    expect(archived).toHaveLength(1);
+    expect(archived[0]!.channel).toBe(AUDIT_EVENT_CHANNEL);
+    expect(archived[0]!.payload.action).toBe('a1');
+  });
+
+  it('apply pruning a legacy (hmac-less) head record keeps verifyAuditChain intact on the kept chain', () => {
+    // Legacy head: raw audit-channel event with an old timestamp and no chain
+    // fields — the backward-safe record shape verifyAuditChain skips. Pruning
+    // it from the head preserves the genesis anchor of the surviving hmac chain.
+    writeEvent(root, SPRINT, 'deckent', 'auditor', AUDIT_EVENT_CHANNEL, {
+      tenantId: 'local', actor: 'legacy', action: 'legacy.write', timestamp: '2020-01-01T00:00:00.000Z',
+    });
+    writeAuditEvent(root, SPRINT, { tenantId: 'local', actor: 'system', action: 'fresh.one' });
+    writeAuditEvent(root, SPRINT, { tenantId: 'local', actor: 'system', action: 'fresh.two' });
+
+    const result = runAuditRetention(root, SPRINT, { maxAgeMs: 30 * 86_400_000 }, true);
+
+    expect(result).toEqual({ sprintId: SPRINT, scanned: 3, keep: 2, archive: 0, prune: 1, applied: true });
+    const kept = readAuditEvents(root, SPRINT);
+    expect(kept.map((e) => e.action)).toEqual(['fresh.one', 'fresh.two']);
+    expect(verifyAuditChain(kept)).toEqual({ intact: true });
+    expect(existsSync(archivePath())).toBe(false); // pruned, not archived
+  });
+
+  it('apply with nothing to drop leaves the stream untouched (byte-identical)', () => {
+    seedThree();
+    const before = readFileSync(streamPath(), 'utf-8');
+
+    const result = runAuditRetention(root, SPRINT, {}, true); // empty policy → keep everything
+
+    expect(result).toEqual({ sprintId: SPRINT, scanned: 3, keep: 3, archive: 0, prune: 0, applied: true });
+    expect(readFileSync(streamPath(), 'utf-8')).toBe(before);
+    expect(existsSync(archivePath())).toBe(false);
+  });
+
+  it('empty stream → zero plan and apply creates no files', () => {
+    const result = runAuditRetention(root, 'sprint-empty', { maxCount: 1 }, true);
+
+    expect(result).toEqual({ sprintId: 'sprint-empty', scanned: 0, keep: 0, archive: 0, prune: 0, applied: true });
+    expect(existsSync(join(root, '.deckent', 'sprint-empty-events.jsonl'))).toBe(false);
+    expect(existsSync(join(root, '.deckent', 'sprint-empty-events-archive.jsonl'))).toBe(false);
   });
 });

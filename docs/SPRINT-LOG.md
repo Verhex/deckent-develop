@@ -7204,3 +7204,29 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 265-006: features.md sahte auto-gen başlığı düzelt (Sprint 264 worker bulgusu) (DONE)
 
 ---
+## Sprint 266 — sprint-266
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-06-09
+**Duration:** 575s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 5 |
+| Completed | 5 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 574510ms |
+
+### Tasks
+
+- 266-001: Odoo read-only ErpDriver (JSON-RPC search_read) (DONE)
+- 266-002: audit CLI tamamlama — syslog forward wire + retention subcommand (DONE)
+- 266-003: Enterprise integrations reference — sprint-265 çıktıları (DONE)
+- 266-004: Enterprise depth — JWKS/OIDC/transport ekleri (DONE)
+- 266-005: Autonomous operations — forward --url/--syslog ekleri (DONE)
+
+---

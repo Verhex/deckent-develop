@@ -110,3 +110,76 @@ To ensure full observability, every use of a capability can be audited. This mod
   - The record is sent to the `emit` function.
   - If the original handler succeeds, the `outcome` is `'success'`, and its result is passed through to the caller.
   - If the original handler throws an error, the `outcome` is `'error'`, the error record is emitted, and the original error is re-thrown, preserving the original behavior.
+
+## 7. JWKS Key Resolution (`src/core/auth-jwks.ts`)
+
+This module closes the "JWKS fetch is a documented follow-up" note in `auth-oidc.ts`. It fetches a JWKS document from an HTTPS endpoint, resolves a token's `kid` to a PEM (spki) RSA public key, and verifies the token by **delegating** to `verifyJwt` — `auth-oidc.ts` stays the single source of truth for JWT verification.
+
+- **`fetchJwks(url, fetchImpl?)`**: Fetches and validates a JWKS document.
+  - **HTTPS-only**: Any non-`https:` URL is rejected — public key material is never fetched over plaintext where a MITM could substitute keys.
+  - **Fail-loud**: Throws `JwksError` with a stable machine-readable `code` on failure: `JWKS_URL_INVALID`, `JWKS_URL_NOT_HTTPS`, `JWKS_FETCH_UNAVAILABLE`, `JWKS_FETCH_FAILED`, `JWKS_INVALID_DOCUMENT`, `JWKS_UNKNOWN_KID`.
+  - **Injectable I/O**: `fetchImpl` is injectable for hermetic tests; the default is the Node built-in `globalThis.fetch` (ADR-010 — no new runtime dependency).
+
+- **`createJwksKeyResolver(opts)`**: Creates a TTL-cached `kid` → PEM resolver over a JWKS endpoint.
+  - **TTL Cache**: Default `cacheTtlMs` is 300,000 ms (5 minutes); the clock is injectable for deterministic tests.
+  - **Eligibility (algorithm-confusion guard)**: A JWK is resolvable only when `kty === 'RSA'`, `alg` is absent or `'RS256'`, and `kid` is a non-empty string. A single malformed JWK is skipped and does not poison resolution of valid keys.
+  - **Kid-Rotation**: When a `kid` is missing from a cache that the call did not just populate, the JWKS is re-fetched **once** and the lookup retried — handling upstream key rotation without unbounded refetch loops. A `kid` still missing after a fresh fetch throws `JWKS_UNKNOWN_KID`.
+
+- **`verifyJwtWithJwks(token, opts)`**: Verifies a JWT against a JWKS endpoint with the algorithm **pinned to `RS256`** (not configurable) — a JWKS-resolved key is asymmetric by definition, so `alg: none` and HS256 tokens are rejected outright.
+  - **Fail-Closed Reason Codes**: Pre-resolution gates never throw; they return stable snake_case `reason` codes (same pattern as `auth-oidc.ts`):
+    - malformed token / header → `malformed_token`
+    - `alg: none` (case-insensitive) → `alg_none_rejected`
+    - any non-RS256 alg (HS256 included) → `algorithm_not_allowed`
+    - absent / empty `kid` → `missing_kid`
+    - resolver failure (unknown kid, fetch error) → `jwks_key_resolution_failed` — a key that cannot be resolved is a token that cannot be trusted.
+  - After resolution, the call delegates to `verifyJwt` with `algorithms: ['RS256']` and the resolved `rs256PublicKey` — no verification logic is duplicated in the JWKS layer.
+
+## 8. Terminal OIDC Auth Provider (`src/api/terminal/auth-provider.ts`)
+
+`OidcAuthProvider` is the OIDC / JWT bearer implementation of the embedded terminal's pluggable `AuthProvider` interface, alongside the existing `LocalTokenAuthProvider`.
+
+- **Sync-Contract Boundary**: The `AuthProvider.verify` contract is **synchronous**, so no network key fetch (JWKS) can happen on the verify path. The key material is **static** — passed once via the constructor (`key`). The async JWKS-resolver flow (section 7) is a documented follow-up behind a future async seam; it is deliberately **not** wired into this provider.
+- **Algorithm Pinning**: The constructor pins exactly one `algorithm` and routes the key material exclusively to the slot matching that algorithm (`hs256Secret` for HS256, `rs256PublicKey` for RS256), so the HS256/RS256 "algorithm confusion" attack cannot cross key material.
+- **Delegated Verification**: `verify` delegates to `verifyJwt` (`src/core/auth-oidc.ts` — single source of truth): signature check, `alg: none` rejection, `exp`/`nbf`, `iss`, and optional `aud`. The clock is injectable (seconds since epoch) for deterministic expiry tests.
+- **`AUTH_DISABLED` No-Bypass Invariant**: This provider **deliberately ignores `DECKENT_API_AUTH_DISABLED`** — the same invariant as `LocalTokenAuthProvider`. The global read-only-dashboard dev bypass must never silently open a remote shell; a terminal session always requires a verifiable token, even when the rest of the HTTP API has its bearer middleware disabled for local development.
+- **Fail-Fast Construction**: An empty `issuer` or empty `key` throws at construction time, not at first verify.
+
+## 9. SIEM Network Transports
+
+Both transports below are pluggable `transport` functions for `createSiemForwarder` (section 2). Both are deliberately "dumb pipes": **send failures throw, and the forwarder owns retry/drop semantics** — transports never retry internally, which avoids double-retry. The forwarder's contract is bounded retries (`maxRetries`, default 3), after which the batch is dropped; transport failures never propagate to the forwarder's caller.
+
+### HTTP Transport (`src/core/siem-transport-http.ts`)
+
+- **`createHttpSiemTransport({ url, headers?, fetchImpl? })`**: Returns a `(batch) => Promise<void>` that POSTs the batch of normalized SIEM records as a single JSON array.
+  - **Eager Validation**: The URL is validated at wiring time (fail-fast), not at first flush. Only `http:`/`https:` protocols are accepted.
+  - **Headers**: `content-type: application/json` by default; caller-supplied headers are merged after, so a caller content-type wins (e.g. for an authorization header).
+  - **Forwarder-Retry Contract**: A non-2xx response throws with the status code; network errors propagate. The forwarder's bounded retry/drop mechanism handles the failure — the transport performs no internal retries.
+  - **Empty Batch**: An empty batch is a no-op — no network round-trip.
+  - **Injectable I/O**: `fetchImpl` is injectable for hermetic tests; the default is `globalThis.fetch` (Node 18+ built-in).
+- **CLI Wire**: `deckent audit forward --url <https-endpoint>` ships a sprint's audit chain through this transport (`runSiemHttpForward`), taking precedence over the `--out` NDJSON file path.
+
+### Syslog Transport (`src/core/siem-transport-syslog.ts`)
+
+- **`createSyslogSiemTransport({ host, port?, protocol?, facility?, appName?, sendImpl? })`**: Returns a `(batch) => Promise<void>` that formats each `SiemRecord` as one RFC5424 message and ships the batch.
+  - **RFC5424 Format**: `<PRI>1 TIMESTAMP HOSTNAME APP-NAME PROCID MSGID SD MSG`, where `PRI = facility × 8 + severity`. Severity is fixed at 6 (Informational); MSGID and STRUCTURED-DATA are NILVALUE (`-`); MSG is the record JSON.
+  - **Facility 13**: The default facility is 13 — "log audit" (RFC 5424 §6.2.1 Table 1), the designated facility for audit-trail messages.
+  - **Defaults**: Port 514, protocol `udp`. UDP sends one datagram per message; TCP uses a single connection with non-transparent (newline) framing.
+  - **Hermetic by Injection**: When `sendImpl` is provided, **no socket is opened** — real sockets (node:dgram / node:net) live only inside the default sender. Tests always inject `sendImpl`.
+  - **Eager Validation**: Empty host, out-of-range port (1–65535) or facility (0–23), unknown protocol, and whitespace in `appName` all throw at wiring time. An empty batch never opens a socket.
+  - **Forwarder-Retry Contract**: Same as the HTTP transport — send errors propagate to the forwarder, which retries then drops.
+- **CLI Wire**: see the CLI commands reference (`docs/reference/cli-commands.md`) for the current `deckent audit forward` flag set.
+
+## 10. ERP Read Capability (`src/core/capability-handlers-erp.ts`)
+
+This module bridges the capability path to the read-only ERP connector (section 5): an `erp.read` capability invocation is shape-validated into an `ErpQuerySpec` and executed through an injected `ErpConnector`.
+
+- **`createErpReadHandler({ connector })`**: Builds a `CapabilityHandler` requiring the `erp.read` capability.
+  - **Shape Validation Only**: Raw capability args are validated for JSON shape — `entity` (non-empty string), optional `fields` (string array), optional `filters` (`{ field, op, value }` objects with `op` ∈ `eq|ne|gt|gte|lt|lte|in|like`), optional `limit` (number). Deep semantics — entity/field allow-listing, mutation-verb rejection, parameterization, limit clamping — remain in the `ErpConnector` (single source of truth; deliberately not re-implemented in the handler).
+  - **Error Surface**: Validation and connector throws surface as `CAPABILITY_FAILED` through the broker — the handler never returns an error shape.
+  - **Audit Trail**: The actor on the invocation context is forwarded so the connector tags the compiled query and result for downstream audit.
+- **`installErpHandler(registry, opts)`**: Registers the `erp.read` handler on a `CapabilityRegistry` without modifying the broker.
+- **`createInMemoryErpDriver(tables)`**: The reference/test implementation of the `ErpDriver` seam, operating over in-memory tables keyed by physical source name (`CompiledQuery.source`).
+  - Applies compiled predicates with AND semantics; placeholder indices are 1-based into the compiled `params`.
+  - SQL `LIKE` patterns (`%` any-run, `_` single char) are translated to anchored regular expressions; ordered comparisons (`gt`/`gte`/`lt`/`lte`) are defined only for number↔number and string↔string pairs — anything else is incomparable and the predicate evaluates false.
+  - Projects the compiled field list (only keys actually present are emitted) and slices to the mandatory limit.
+- **Driver Status**: Concrete ERP drivers plug in behind the same `ErpDriver` seam. As of this writing, the in-memory reference driver is the only driver implementation in the tree.

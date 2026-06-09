@@ -176,13 +176,15 @@ deckent audit compliance --sprint sprint-262 [--json] [--lang en|tr]
 ### SIEM Export: `deckent audit forward`
 
 ```bash
-deckent audit forward --sprint sprint-262 [--out .deckent/siem-export.jsonl] [--json]
+deckent audit forward --sprint sprint-262 [--url <https-endpoint>] [--out .deckent/siem-export.jsonl] [--json]
 ```
 
--   **Sources**: `src/core/siem-forwarder.ts` (`createSiemForwarder`), `src/cli/commands/audit.ts` (`runSiemExport`)
+-   **Sources**: `src/core/siem-forwarder.ts` (`createSiemForwarder`), `src/cli/commands/audit.ts` (`runSiemExport`, `runSiemHttpForward`)
 -   Normalizes each audit event into a `SiemRecord` (`ts`, `actor`, `action`, `outcome`, optional `correlationId`/`causationId`) and appends them as **NDJSON** to the output file (default: `.deckent/siem-export.jsonl`).
 -   The forwarder is fail-safe by design: buffered batching (`maxBatch` default 100), bounded retries (`maxRetries` default 3, then the batch is dropped), and **no transport configured means default-off** — records are buffered then discarded, never sent. The CLI runs a one-shot manual flush (`flushEvery: 0`) so no timer dangles.
--   **Honest limit**: the built-in transport is the NDJSON **file** transport only. Real network transports (HTTP, syslog) are an ENT-5 roadmap item — they are not implemented yet.
+-   **Network transports (Sprint 265)**: the NDJSON file transport is no longer the only option.
+    -   **HTTP — live**: `--url <endpoint>` routes the export through `src/core/siem-transport-http.ts` (`createHttpSiemTransport`), POSTing each batch as a JSON array. `--url` takes precedence over `--out`. The transport is fail-loud (non-2xx and network errors throw); retry/drop stays in the forwarder — no double-retry.
+    -   **Syslog — module ready**: `src/core/siem-transport-syslog.ts` (`createSyslogSiemTransport`) formats each record as one RFC 5424 message (facility 13 "log audit", UDP default / TCP newline-framed, injectable `sendImpl` for hermetic tests). The `audit forward` CLI flag wire for syslog is a follow-up.
 
 ## 8. Capability Invocation Audit
 
@@ -204,3 +206,20 @@ In `buildEngineRuntime`, the `emit` callback forwards each `CapabilityAuditRecor
 -   **`metadata`**: the invocation timestamp, plus the error message on the `capability.error` path.
 
 Because these records flow through `writeAuditEvent`, they participate in the `prevHmac`/`hmac` chain and are visible to `deckent audit query`, `deckent audit compliance`, and `deckent audit forward` like any other audit event.
+
+## 9. SSO / OIDC: JWKS Key Resolution & Terminal Auth
+
+Sprint 265 closed the long-standing "JWKS fetch is a documented follow-up" note from `auth-oidc.ts`: JWKS-backed RS256 key resolution is now implemented.
+
+### JWKS Resolver
+
+-   **Source**: `src/core/auth-jwks.ts`
+-   **`fetchJwks(url, fetchImpl?)`**: fetches a JWKS document — **HTTPS-only** (key material never transits plaintext); `fetchImpl` is injectable so tests stay hermetic.
+-   **`createJwksKeyResolver(opts)`**: a TTL-cached (default 5 minutes) `kid` → PEM resolver. Only `kty: "RSA"` keys whose `alg` is absent or `RS256` are eligible (algorithm-confusion guard). A `kid` missing from a warm cache triggers exactly **one** re-fetch (key-rotation support) before failing.
+-   **`verifyJwtWithJwks(token, opts)`**: pins `algorithms: ['RS256']`, rejects `alg: none` and HS256 outright, and **fails closed** with stable reason codes (`missing_kid`, `jwks_key_resolution_failed`). Verification delegates to `verifyJwt` in `auth-oidc.ts` — the single source of truth; nothing is re-implemented.
+
+### Embedded Terminal: `OidcAuthProvider`
+
+-   **Source**: `src/api/terminal/auth-provider.ts`
+-   `OidcAuthProvider` is the OIDC/JWT bearer implementation of the embedded terminal's pluggable `AuthProvider` interface (spec §1d reserved slot). The `verify` contract is **synchronous**, so key material is **static** — a pinned algorithm plus an HS256 shared secret or RS256 PEM public key; the async JWKS-resolver flow above is deliberately not wired into the sync verify path.
+-   **No-bypass invariant**: like `LocalTokenAuthProvider`, it deliberately ignores `DECKENT_API_AUTH_DISABLED` — the read-only-dashboard dev bypass can never silently open a remote shell.

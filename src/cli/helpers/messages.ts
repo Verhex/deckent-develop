@@ -748,6 +748,26 @@ const MESSAGES: MessageMap = {
     en: 'Forwarded {count} audit record(s) → {url}',
     tr: '{count} denetim kaydı iletildi → {url}',
   },
+  'audit.forward.syslog_sent': {
+    en: 'Forwarded {count} audit record(s) → syslog {protocol}://{host}:{port}',
+    tr: '{count} denetim kaydı iletildi → syslog {protocol}://{host}:{port}',
+  },
+  'audit.retention.plan': {
+    en: 'Retention plan ({sprint}): scanned={scanned} keep={keep} archive={archive} prune={prune} — dry-run, nothing written (use --apply)',
+    tr: 'Saklama planı ({sprint}): taranan={scanned} tutulan={keep} arşiv={archive} silinecek={prune} — deneme çalıştırması, hiçbir şey yazılmadı (--apply kullanın)',
+  },
+  'audit.retention.applied': {
+    en: 'Retention applied ({sprint}): kept={keep} archived={archive} pruned={prune}',
+    tr: 'Saklama uygulandı ({sprint}): tutulan={keep} arşivlenen={archive} silinen={prune}',
+  },
+  'audit.retention.invalid_keep_days': {
+    en: '--keep-days must be a non-negative number, got "{value}"',
+    tr: '--keep-days negatif olmayan bir sayı olmalı, girilen: "{value}"',
+  },
+  'audit.retention.invalid_keep_count': {
+    en: '--keep-count must be a non-negative integer, got "{value}"',
+    tr: '--keep-count negatif olmayan bir tamsayı olmalı, girilen: "{value}"',
+  },
   'autonomous.backlog.summary': {
     en: 'Backlog: {total} entries — pending:{pending} running:{running} parked:{parked} done:{done} failed:{failed}',
     tr: 'Backlog: {total} kayıt — bekleyen:{pending} çalışan:{running} beklemede:{parked} tamam:{done} hata:{failed}',
