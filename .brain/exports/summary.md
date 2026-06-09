@@ -80,6 +80,8 @@
 | adr-086 | Native CLI Parity — F11 Feature Set (Sprint 224) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-259 Learnings** (sprint-259): ## Sprint sprint-259 Learnings
+- **Sprint sprint-258 Learnings** (sprint-258): ## Sprint sprint-258 Learnings
 - **Sprint sprint-257 Learnings** (sprint-257): ## Sprint sprint-257 Learnings
 
 ## Gains
@@ -104,10 +106,6 @@
 - 251-006 — provider fleet notes (benchmark; codex): NO_GO — Created docs/benchmark/pr...
 - **Sprint sprint-250 Learnings** (sprint-250): ## Sprint sprint-250 Learnings
 - 250-V2 — codex verify (MF-1 KEY): NO_GO — Created docs/_verify/codex-v.md with exact...
-- **Sprint sprint-249 Learnings** (sprint-249): ## Sprint sprint-249 Learnings
-- 249-003 — lint-cli-mcp-parity guard (report-only): NO_GO — Created scripts/lint-cli-...
-- **Sprint sprint-248 Learnings** (sprint-248): ## Sprint sprint-248 Learnings
-- 248-001 — codex worker gate: GO_WITH_TECH_DEBT — Created docs/_provider-gate/codex-p...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -128,4 +126,4 @@ _No active technical debt._
 - Violation pattern: stale_heartbeat
 - Violation pattern: stale_heartbeat
 
-_Total entries: 330 | Generated: 2026-06-09_
+_Total entries: 336 | Generated: 2026-06-09_

@@ -21,6 +21,12 @@ import { buildWorkerPrompt } from './task-builder.js';
 import { resolveAgentPrompt, resolveSkillPrompts } from './result-collector.js';
 import { eventBus } from './event-bus.js';
 import { TASKS_DIR } from '../core/constants.js';
+import { AgentPoolManager } from '../core/agent-pool.js';
+import { SkillPoolManager } from '../core/skill-pool.js';
+import { detectProjectStack } from '../core/stack-detector.js';
+import { routeTaskV2 } from '../core/routing-engine.js';
+import type { UserOverride } from '../core/routing-types.js';
+import { debugLog } from '../core/utils.js';
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -108,6 +114,45 @@ export async function runTaskMode(
     origin: 'autonomous',
   });
   const task = resolveToTask(execReq, taskId);
+
+  // WM-1b: V2 routing — assign the right agent + skills (fail-safe: any error keeps 'generic')
+  try {
+    const routingVersion = config.routing_engine ?? 'v2';
+    if (routingVersion === 'v2') {
+      const agentPool = new AgentPoolManager(projectRoot);
+      const pool = agentPool.loadAgents();
+      const projectStack = detectProjectStack(projectRoot);
+      const skillPool = new SkillPoolManager(projectRoot);
+      const skills = skillPool.loadSkills();
+
+      const overrides: UserOverride[] = [];
+      if (task.forceAgent || task.forceSkills || task.excludeSkills || task.excludeAgent) {
+        overrides.push({
+          source: 'task-directive',
+          forceAgent: task.forceAgent,
+          forceSkills: task.forceSkills,
+          excludeSkills: task.excludeSkills,
+          excludeAgents: task.excludeAgent,
+          priority: 3,
+        });
+      }
+
+      const decision = routeTaskV2(task, pool, skills, {
+        projectStack,
+        overrides,
+        learningData: [],
+        config: { ...config.routing_config, agentMinScore: config.agent_min_score },
+        sprintId: '',
+        taskId: task.id,
+        projectRoot,
+      });
+
+      task.assignedAgent = decision.agentId ?? 'generic';
+      task.assignedSkills = decision.skillIds;
+    }
+  } catch (routingErr) {
+    debugLog('task-mode:routing', `V2 routing failed, using generic fallback: ${routingErr}`);
+  }
 
   // Gap E: write task JSON so agentic-worker-entry can read its spec (mirrors run.ts:261-263)
   const tasksDir = join(projectRoot, TASKS_DIR);
