@@ -10,7 +10,7 @@ import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { spawnWorkerMultiProvider } from './spawn.js';
 import { loadConfig } from '../../core/config.js';
-import { buildExecutionRequest, resolveToTask, createRunTaskId } from '../../orchestra/execution-request-builder.js';
+import { buildExecutionRequest, resolveToTask } from '../../orchestra/execution-request-builder.js';
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -43,11 +43,17 @@ function sleep(ms: number): Promise<void> {
 
 import { readJsonSafe } from '../../core/utils.js';
 
-// createRunTaskId re-homed to orchestra/execution-request-builder (ADR-008 — the
-// orchestra layer owns task construction; cli imports from it, not vice versa).
-// Re-exported here for back-compat with existing importers.
-export { createRunTaskId };
+let _runTaskCounter = 0;
+export function createRunTaskId(): string {
+  return `run-${Date.now()}-${_runTaskCounter++}`;
+}
 
+/**
+ * @deprecated WM-1: superseded by `buildExecutionRequest` + `resolveToTask`
+ * (orchestra/execution-request-builder.ts), which set `task.type` + the canonical
+ * fields. No production caller remains (all 3 paths migrated); retained only for
+ * existing test fixtures. Remove + migrate those fixtures when the test window reopens.
+ */
 export function buildRunTask(
   taskId: string,
   description: string,

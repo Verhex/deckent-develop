@@ -12,10 +12,10 @@
 
 import { join } from 'node:path';
 import { mkdirSync, writeFileSync } from 'node:fs';
-import type { ModelType } from '../core/types.js';
-import type { Task } from '../core/types.js';
+import type { ModelType, ProviderName } from '../core/types.js';
 import type { ResolvedConfig } from '../core/config-types.js';
-import { buildRunTask, createRunTaskId } from '../cli/commands/run.js';
+import { buildExecutionRequest, resolveToTask } from './execution-request-builder.js';
+import { createRunTaskId } from '../cli/commands/run.js';
 import { spawnWorkerMultiProvider } from '../cli/commands/spawn.js';
 import { buildWorkerPrompt } from './task-builder.js';
 import { resolveAgentPrompt, resolveSkillPrompts } from './result-collector.js';
@@ -94,9 +94,20 @@ export async function runTaskMode(
   const model: ModelType = ctx.model ?? 'sonnet';
   const scopeDir = ctx.scope?.directories?.[0] ?? '.';
 
-  // Build task
+  // Build task — WM-1: unify on the canonical ExecutionRequest contract (sets
+  // task.type, resolves provider via config, tags origin='autonomous').
   const taskId = createRunTaskId();
-  const task = buildRunTask(taskId, ctx.description, model, scopeDir);
+  const execReq = buildExecutionRequest({
+    description: ctx.description,
+    model,
+    provider: ctx.provider as ProviderName | undefined,
+    scope: { directories: [scopeDir] },
+    projectRoot,
+    config,
+    autoApprove: ctx.autoApprove ?? false,
+    origin: 'autonomous',
+  });
+  const task = resolveToTask(execReq, taskId);
 
   // Gap E: write task JSON so agentic-worker-entry can read its spec (mirrors run.ts:261-263)
   const tasksDir = join(projectRoot, TASKS_DIR);
@@ -105,8 +116,8 @@ export async function runTaskMode(
 
   // Resolve agent and skill prompts for domain-expertise parity with sprint tasks.
   // Both resolve to undefined/[] for 'generic' agent or empty skills — backward-safe fallback.
-  const agentPrompt = await resolveAgentPrompt(projectRoot, task as unknown as Task);
-  const skillPrompts = await resolveSkillPrompts(projectRoot, task as unknown as Task);
+  const agentPrompt = await resolveAgentPrompt(projectRoot, task);
+  const skillPrompts = await resolveSkillPrompts(projectRoot, task);
   const prompt = buildWorkerPrompt(task, agentPrompt, skillPrompts);
 
   // Emit event for nervous system / observers
@@ -134,7 +145,7 @@ export async function runTaskMode(
       spawnBackend: config.spawn_backend,
       dockerImage: config.docker_image,
       dockerTimeout: config.docker_timeout,
-      provider: ctx.provider,
+      provider: execReq.provider,
     },
   );
 

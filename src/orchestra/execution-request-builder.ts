@@ -38,14 +38,6 @@ import type {
 import { rubricTypeToKind } from '../core/work-model.js';
 import { detectTaskType } from './rubric-registry.js';
 
-let _runTaskCounter = 0;
-
-/** Canonical single-task id (`run-<ts>-<n>`). Re-homed from cli/commands/run.ts
- *  so orchestra/autonomous no longer import it from the CLI layer (ADR-008). */
-export function createRunTaskId(): string {
-  return `run-${Date.now()}-${_runTaskCounter++}`;
-}
-
 const DEFAULT_GONOGO: GoNoGoCriteria = {
   goCriteria: 'Task completed successfully',
   noGoCriteria: 'Task failed or errored',
@@ -151,7 +143,7 @@ export function resolveToTask(req: ExecutionRequest, taskId: string): Task {
     model: (req.model ?? 'sonnet') as ModelType,
     effort: req.effort ?? 'normal',
     priority: req.priority ?? 'NORMAL',
-    reason: 'One-shot run (unified ExecutionRequest)',
+    reason: 'One-shot run command',
     scope: req.scope,
     dependencies: [],
     goNogo: req.goNogo ?? DEFAULT_GONOGO,
