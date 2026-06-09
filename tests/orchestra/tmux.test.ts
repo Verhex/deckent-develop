@@ -536,12 +536,32 @@ describe.skipIf(isWindows)('buildWorkerCommand', () => {
     expect(cmd).toContain('< /tmp/p.txt');
   });
 
+  // ─── F1-RE: native reasoning-effort flag (no-adapter fallback) ──────
+  it('appends --effort for a valid reasoning-effort (no adapter)', () => {
+    const cmd = buildWorkerCommand('opus', '/tmp/p.txt', { reasoningEffort: 'high' });
+    expect(cmd).toContain('--effort high');
+  });
+
+  it('drops an invalid reasoning-effort (no adapter)', () => {
+    // 'minimal' is codex-only — not part of the claude vocabulary
+    const cmd = buildWorkerCommand('opus', '/tmp/p.txt', { reasoningEffort: 'minimal' });
+    expect(cmd).not.toContain('--effort');
+  });
+
+  it('forwards reasoningEffort to adapter.buildCommand when adapter present', () => {
+    const adapter = createMockAdapter();
+    buildWorkerCommand('opus', '/tmp/p.txt', { reasoningEffort: 'xhigh' }, adapter);
+    expect(adapter.buildCommand).toHaveBeenCalledWith('opus', '/tmp/p.txt',
+      expect.objectContaining({ reasoningEffort: 'xhigh' }));
+  });
+
   it('delegates to adapter.buildCommand when adapter is provided', () => {
     const adapter = createMockAdapter();
     const cmd = buildWorkerCommand('opus', '/tmp/p.txt', undefined, adapter);
     expect(adapter.buildCommand).toHaveBeenCalledWith('opus', '/tmp/p.txt', {
       allowedTools: undefined,
       autoApprove: undefined,
+      reasoningEffort: undefined,
     });
     expect(cmd).toBe('mock-cli --model opus < /tmp/p.txt');
   });

@@ -112,6 +112,7 @@ export class TmuxBackend implements SpawnBackend {
       allowedTools: opts?.allowedTools,
       autoApprove: opts?.autoApprove,
       taskTimeoutSeconds: opts?.taskTimeoutSeconds,
+      reasoningEffort: opts?.reasoningEffort, // F1-RE: native model reasoning depth
     });
   }
 

@@ -1,5 +1,5 @@
 import type { Command } from 'commander';
-import { loadConfig } from '../../core/config.js';
+import { loadConfig, readAuthMode } from '../../core/config.js';
 import { bootstrapProviders } from '../../core/provider.js';
 import type { BootstrapResult } from '../../core/provider.js';
 import {
@@ -17,7 +17,7 @@ import { promptConfirm } from '../helpers/prompt.js';
 import { bootstrapNotifyDispatcher } from '../../core/notify-bootstrap.js';
 import { buildConnectorNotificationAdapter } from '../../connectors/connector-bootstrap.js';
 import { loadCostConfig, initCostConfig } from '../../core/cost-config-loader.js';
-import { estimateSprintCost, formatEstimate, type TaskCostInput } from '../../core/cost-calculator.js';
+import { estimateSprintCost, formatEstimate, resolveBillingModeForAuth, type TaskCostInput } from '../../core/cost-calculator.js';
 import { evaluateCostGate } from '../../core/cost-gate.js';
 import { existsSync, unlinkSync, readFileSync, writeFileSync, mkdirSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -330,12 +330,15 @@ export function registerStart(program: Command): void {
           try {
             initCostConfig(root);
             const costConfig = loadCostConfig(root);
+            const cfgAuthMode = await readAuthMode(root);
             const costTasks: TaskCostInput[] = sprint.tasks.map((t) => ({
               id: t.id,
               model: t.model,
               estimatedInputTokens: t.estimatedTokens ?? 2700,
               estimatedOutputTokens: t.effort === 'high' ? 4000 : t.effort === 'low' ? 500 : 1500,
               effort: t.effort as 'low' | 'normal' | 'high' | undefined,
+              // F1-CB: billing follows effective auth — subscription/local tasks cost $0
+              billingMode: resolveBillingModeForAuth(t.provider, t.authMode ?? cfgAuthMode),
             }));
             const estimate = estimateSprintCost(costTasks, costConfig);
             print(formatEstimate(estimate));
@@ -363,12 +366,15 @@ export function registerStart(program: Command): void {
               reason: 'Cost gate pre-plan',
             };
             const planForCost = await planSprint(root, config, context, recommendation);
+            const cfgAuthMode = await readAuthMode(root);
             const costTasks: TaskCostInput[] = planForCost.tasks.map((t) => ({
               id: t.id,
               model: t.model,
               estimatedInputTokens: t.estimatedTokens ?? 2700,
               estimatedOutputTokens: t.effort === 'high' ? 4000 : t.effort === 'low' ? 500 : 1500,
               effort: t.effort as 'low' | 'normal' | 'high' | undefined,
+              // F1-CB: billing follows effective auth — subscription/local tasks cost $0
+              billingMode: resolveBillingModeForAuth(t.provider, t.authMode ?? cfgAuthMode),
             }));
             const gate = evaluateCostGate({ tasks: costTasks, costConfig });
             print(formatEstimate(gate.estimate));

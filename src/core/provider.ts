@@ -112,9 +112,9 @@ export interface ProviderAdapter {
    * Equivalent to tmux.ts buildClaudeCommand(). Used for debugging/dry-run display.
    * @param model         Model to use
    * @param promptPath    Path to the prompt file (stdin redirection)
-   * @param opts          Spawn options (allowedTools, autoApprove)
+   * @param opts          Spawn options (allowedTools, autoApprove, reasoningEffort)
    */
-  buildCommand(model: ModelType, promptPath: string, opts?: Pick<ProviderSpawnOptions, 'allowedTools' | 'autoApprove'>): string;
+  buildCommand(model: ModelType, promptPath: string, opts?: Pick<ProviderSpawnOptions, 'allowedTools' | 'autoApprove' | 'reasoningEffort'>): string;
 
   /**
    * Build CLI command + args for planner invocations.

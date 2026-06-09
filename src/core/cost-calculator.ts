@@ -166,6 +166,31 @@ interface TaskCostResult {
   displayLabel?: string;
 }
 
+/**
+ * Resolve a task's billing mode from its effective auth so the cost estimate
+ * FOLLOWS how the work is actually paid for (F1-CB). Without this, a
+ * subscription-auth'd codex/gemini task is billed at the provider's static
+ * `default_billing_mode` (`'api'` in the shipped cost-config) and shows phantom
+ * USD even though the user pays through their plan.
+ *
+ *  - ollama         → `'local'`        (on-device inference, always $0)
+ *  - subscription   → `'subscription'` (already paid via plan, $0 USD, quota-tracked)
+ *  - api            → `'api'`          (metered USD)
+ *  - hybrid/unknown → `undefined`      (defer to provider's `default_billing_mode`)
+ *
+ * Returning `undefined` is intentional: it preserves the prior provider-default
+ * behaviour for callers/tasks whose auth cannot be determined.
+ */
+export function resolveBillingModeForAuth(
+  provider: string | undefined,
+  effectiveAuthMode: 'subscription' | 'api' | 'hybrid' | undefined,
+): BillingMode | undefined {
+  if (provider === 'ollama') return 'local';
+  if (effectiveAuthMode === 'subscription') return 'subscription';
+  if (effectiveAuthMode === 'api') return 'api';
+  return undefined;
+}
+
 function calculateTaskCost(
   task: TaskCostInput,
   config: CostConfig,

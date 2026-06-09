@@ -368,6 +368,28 @@ describe('ClaudeAdapter', () => {
       expect(cmd).toContain("--allowedTools 'Read'");
       expect(cmd).toContain('--dangerously-skip-permissions');
     });
+
+    // ─── F1-RE: native reasoning-effort flag ───────────────────────
+    it('appends --effort when a valid reasoning-effort is given (tmux)', () => {
+      const cmd = adapter.buildCommand('opus', '/tmp/p.txt', { reasoningEffort: 'high' });
+      expect(cmd).toContain('--effort high');
+    });
+
+    it('omits --effort when no reasoning-effort is given', () => {
+      const cmd = adapter.buildCommand('opus', '/tmp/p.txt');
+      expect(cmd).not.toContain('--effort');
+    });
+
+    it('drops an invalid reasoning-effort (validated against claude vocabulary)', () => {
+      // 'minimal' is a codex level, not a claude level → must NOT leak through
+      const cmd = adapter.buildCommand('opus', '/tmp/p.txt', { reasoningEffort: 'minimal' });
+      expect(cmd).not.toContain('--effort');
+    });
+
+    it('accepts the full claude effort vocabulary (xhigh, max)', () => {
+      expect(adapter.buildCommand('opus', '/p', { reasoningEffort: 'xhigh' })).toContain('--effort xhigh');
+      expect(adapter.buildCommand('opus', '/p', { reasoningEffort: 'max' })).toContain('--effort max');
+    });
   });
 
   // ─── detect() — 3-state availability (Sprint 190 Task 190-002) ────

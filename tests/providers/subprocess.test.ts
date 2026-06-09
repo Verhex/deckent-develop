@@ -350,6 +350,37 @@ describe('SubprocessSpawnBackend', () => {
       const cmd = backend.buildCommand('opus', '/path/prompt.txt');
       expect(cmd).toContain('< /path/prompt.txt');
     });
+
+    // ─── F1-RE: native reasoning-effort flag ───────────────────────
+    it('appends --effort for a valid reasoning-effort', () => {
+      const cmd = backend.buildCommand('opus', '/p.txt', { reasoningEffort: 'high' });
+      expect(cmd).toContain('--effort high');
+    });
+
+    it('drops an invalid reasoning-effort', () => {
+      const cmd = backend.buildCommand('opus', '/p.txt', { reasoningEffort: 'minimal' });
+      expect(cmd).not.toContain('--effort');
+    });
+  });
+
+  // ─── F1-RE: buildArgs reasoning-effort (argv path) ─────────────────
+  describe('CLAUDE_SUBPROCESS_CONFIG.buildArgs reasoning-effort', () => {
+    it('adds --effort argv pair for a valid level', () => {
+      const args = CLAUDE_SUBPROCESS_CONFIG.buildArgs('opus', { reasoningEffort: 'max' });
+      const i = args.indexOf('--effort');
+      expect(i).toBeGreaterThan(-1);
+      expect(args[i + 1]).toBe('max');
+    });
+
+    it('omits --effort when no reasoning-effort given', () => {
+      const args = CLAUDE_SUBPROCESS_CONFIG.buildArgs('opus');
+      expect(args).not.toContain('--effort');
+    });
+
+    it('drops an invalid (codex-only) level', () => {
+      const args = CLAUDE_SUBPROCESS_CONFIG.buildArgs('opus', { reasoningEffort: 'minimal' });
+      expect(args).not.toContain('--effort');
+    });
   });
 
   // ─── Heartbeat ───────────────────────────────────────────────────

@@ -4,7 +4,7 @@ import { fork } from 'node:child_process';
 import { writeFileSync, mkdirSync, rmSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { loadConfig } from '../../core/config.js';
+import { loadConfig, readAuthMode } from '../../core/config.js';
 import { bootstrapProviders } from '../../core/provider.js';
 import { readContext, planSprint, BrainError } from '../../orchestra/brain.js';
 import { cleanOrphanIpcDirs } from '../../core/orphan-cleaner.js';
@@ -15,7 +15,7 @@ import { enrichResponse } from '../helpers/enrich.js';
 import { formatStartResponse, formatErrorResponse, wrapResponse } from '../helpers/format.js';
 import { isSprintLocked } from '../../core/multi-ide.js';
 import { initCostConfig, loadCostConfig } from '../../core/cost-config-loader.js';
-import type { TaskCostInput } from '../../core/cost-calculator.js';
+import { resolveBillingModeForAuth, type TaskCostInput } from '../../core/cost-calculator.js';
 import { evaluateCostGate, buildCostGateErrorPayload } from '../../core/cost-gate.js';
 import {
   getIpcDir,
@@ -159,12 +159,15 @@ export function registerStartTool(server: McpServer): void {
               reason: 'Cost gate pre-plan',
             };
             const planForCost = await planSprint(root, config, context, recommendation, { dryRun: true });
+            const cfgAuthMode = await readAuthMode(root);
             const costTasks: TaskCostInput[] = planForCost.tasks.map((t) => ({
               id: t.id,
               model: t.model,
               estimatedInputTokens: t.estimatedTokens ?? 2700,
               estimatedOutputTokens: t.effort === 'high' ? 4000 : t.effort === 'low' ? 500 : 1500,
               effort: t.effort as 'low' | 'normal' | 'high' | undefined,
+              // F1-CB: billing follows effective auth — subscription/local tasks cost $0
+              billingMode: resolveBillingModeForAuth(t.provider, t.authMode ?? cfgAuthMode),
             }));
 
             const gate = evaluateCostGate({

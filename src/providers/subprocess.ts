@@ -17,6 +17,7 @@ import type { ProviderAdapter, ProviderSpawnOptions } from '../core/provider.js'
 import { ProviderError } from '../core/provider.js';
 import { TASKS_DIR } from '../core/constants.js';
 import { modelRegistry } from '../core/model-registry.js';
+import { resolveReasoningEffort } from '../core/reasoning-effort.js';
 
 // ─── SubprocessProviderConfig ───────────────────────────────────────
 /**
@@ -44,7 +45,7 @@ export interface SubprocessProviderConfig {
    * @param opts        Spawn options
    * @returns Shell command string
    */
-  buildCommandString(model: ModelType, promptPath: string, opts?: Pick<ProviderSpawnOptions, 'allowedTools' | 'autoApprove'>): string;
+  buildCommandString(model: ModelType, promptPath: string, opts?: Pick<ProviderSpawnOptions, 'allowedTools' | 'autoApprove' | 'reasoningEffort'>): string;
 }
 
 /**
@@ -63,15 +64,24 @@ export const CLAUDE_SUBPROCESS_CONFIG: SubprocessProviderConfig = {
     if (opts?.autoApprove) {
       args.push('--dangerously-skip-permissions');
     }
+    // F1-RE: native reasoning-effort flag, opt-in + validated against claude vocabulary.
+    const effort = resolveReasoningEffort('claude', opts?.reasoningEffort);
+    if (effort) {
+      args.push('--effort', effort);
+    }
     return args;
   },
-  buildCommandString(model: ModelType, promptPath: string, opts?: Pick<ProviderSpawnOptions, 'allowedTools' | 'autoApprove'>): string {
+  buildCommandString(model: ModelType, promptPath: string, opts?: Pick<ProviderSpawnOptions, 'allowedTools' | 'autoApprove' | 'reasoningEffort'>): string {
     let cmd = `claude -p - --model ${modelRegistry.get(model)?.apiId ?? model}`;
     if (opts?.allowedTools) {
       cmd += ` --allowedTools '${opts.allowedTools}'`;
     }
     if (opts?.autoApprove) {
       cmd += ' --dangerously-skip-permissions';
+    }
+    const effort = resolveReasoningEffort('claude', opts?.reasoningEffort);
+    if (effort) {
+      cmd += ` --effort ${effort}`;
     }
     cmd += ` < ${promptPath}`;
     return cmd;

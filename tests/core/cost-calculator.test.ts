@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   estimateSprintCost,
   formatEstimate,
+  resolveBillingModeForAuth,
   type TaskCostInput,
   type SprintCostEstimate,
 } from '../../src/core/cost-calculator.js';
@@ -435,6 +436,56 @@ describe('cost-calculator', () => {
       expect(out).toContain('(local)'); // model distribution line too
       expect(out).not.toContain('(subscription)');
       expect(out).not.toContain('(free tier)');
+    });
+  });
+
+  describe('resolveBillingModeForAuth (F1-CB — billing follows auth)', () => {
+    it('maps ollama → local regardless of auth mode', () => {
+      expect(resolveBillingModeForAuth('ollama', 'api')).toBe('local');
+      expect(resolveBillingModeForAuth('ollama', 'subscription')).toBe('local');
+      expect(resolveBillingModeForAuth('ollama', undefined)).toBe('local');
+    });
+
+    it('maps subscription auth → subscription, api auth → api', () => {
+      expect(resolveBillingModeForAuth('openai', 'subscription')).toBe('subscription');
+      expect(resolveBillingModeForAuth('openai', 'api')).toBe('api');
+      expect(resolveBillingModeForAuth('anthropic', 'subscription')).toBe('subscription');
+    });
+
+    it('defers to provider default (undefined) for hybrid/unknown auth', () => {
+      expect(resolveBillingModeForAuth('openai', 'hybrid')).toBeUndefined();
+      expect(resolveBillingModeForAuth('openai', undefined)).toBeUndefined();
+    });
+
+    it('subscription-auth codex task costs $0 even though cost-config default is api', () => {
+      // openai default_billing_mode is 'api' in TEST_CONFIG → without the bridge
+      // a gpt-5 task would show phantom USD. With billingMode='subscription'
+      // (resolved from auth) the realistic USD cost is $0.
+      const tasks: TaskCostInput[] = [{
+        id: 'cb-1',
+        model: 'gpt-5',
+        estimatedInputTokens: 100_000,
+        estimatedOutputTokens: 4000,
+        effort: 'high',
+        billingMode: resolveBillingModeForAuth('openai', 'subscription'),
+      }];
+      const est = estimateSprintCost(tasks, TEST_CONFIG, {});
+      expect(est.costRealistic).toBe(0);
+      expect(est.perProvider.openai.billingMode).toBe('subscription');
+    });
+
+    it('api-auth codex task still bills USD (no false zeroing)', () => {
+      const tasks: TaskCostInput[] = [{
+        id: 'cb-2',
+        model: 'gpt-5',
+        estimatedInputTokens: 100_000,
+        estimatedOutputTokens: 4000,
+        effort: 'high',
+        billingMode: resolveBillingModeForAuth('openai', 'api'),
+      }];
+      const est = estimateSprintCost(tasks, TEST_CONFIG, {});
+      expect(est.costRealistic).toBeGreaterThan(0);
+      expect(est.perProvider.openai.billingMode).toBe('api');
     });
   });
 });

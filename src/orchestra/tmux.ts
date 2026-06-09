@@ -7,6 +7,7 @@ import type { ProviderAdapter } from '../core/provider.js';
 import { debugLog } from '../core/utils.js';
 import { validateTaskId } from '../core/validators.js';
 import { modelRegistry } from '../core/model-registry.js';
+import { resolveReasoningEffort } from '../core/reasoning-effort.js';
 import {
   TMUX_SESSION_NAME,
   TMUX_AUDITOR_WINDOW,
@@ -18,6 +19,8 @@ import {
 export interface SpawnOptions {
   allowedTools?: string;
   autoApprove?: boolean;
+  /** F1-RE: native model reasoning-effort (e.g. claude `--effort high`). Opt-in. */
+  reasoningEffort?: string;
 }
 
 // ─── TmuxError ──────────────────────────────────────────────────────
@@ -102,6 +105,7 @@ export function buildWorkerCommand(
     return adapter.buildCommand(model, promptFilePath, {
       allowedTools: opts?.allowedTools,
       autoApprove: opts?.autoApprove,
+      reasoningEffort: opts?.reasoningEffort,
     });
   }
 
@@ -119,6 +123,11 @@ export function buildWorkerCommand(
   }
   if (opts?.autoApprove) {
     cmd += ' --dangerously-skip-permissions';
+  }
+  // F1-RE: native reasoning-effort, opt-in + validated against claude's vocabulary.
+  const effort = resolveReasoningEffort('claude', opts?.reasoningEffort);
+  if (effort) {
+    cmd += ` --effort ${effort}`;
   }
   cmd += ` < ${promptFilePath}`;
 

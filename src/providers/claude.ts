@@ -15,6 +15,7 @@ import {
 } from '../orchestra/tmux.js';
 import { TASKS_DIR } from '../core/constants.js';
 import { getActiveWorkerIds } from '../core/active-workers.js';
+import { resolveReasoningEffort } from '../core/reasoning-effort.js';
 import {
   SubprocessSpawnBackend,
   CLAUDE_SUBPROCESS_CONFIG,
@@ -141,6 +142,7 @@ export class ClaudeAdapter implements ProviderAdapter {
     spawnWorker(taskId, model, prompt, dir, {
       allowedTools: opts?.allowedTools,
       autoApprove: opts?.autoApprove,
+      reasoningEffort: opts?.reasoningEffort,
     });
   }
 
@@ -344,17 +346,24 @@ export class ClaudeAdapter implements ProviderAdapter {
   buildCommand(
     model: ModelType,
     promptPath: string,
-    opts?: Pick<ProviderSpawnOptions, 'allowedTools' | 'autoApprove'>,
+    opts?: Pick<ProviderSpawnOptions, 'allowedTools' | 'autoApprove' | 'reasoningEffort'>,
   ): string {
     // Sprint 237: pass the real model name (apiId, e.g. claude-opus-4-8) to the
     // CLI, NOT the short alias ('opus') — so the worker runs the EXACT current
     // version (no 4-6/4-8 confusion) and logs show it. apiId is live from
     // models.dev via bootstrapFromCatalog (parametric, no hardcode).
     const apiId = modelRegistry.get(model)?.apiId ?? model;
+    // F1-RE: native reasoning-effort flag (`--effort low|medium|high|xhigh|max`),
+    // opt-in + validated against the claude effort vocabulary. Distinct from
+    // task-effort (work size). undefined → CLI keeps its own default (no flag).
+    const effort = resolveReasoningEffort('claude', opts?.reasoningEffort);
     if (this.backend === 'subprocess') {
       let cmd = `claude -p "${promptPath}" --dangerously-skip-permissions --model ${apiId}`;
       if (opts?.allowedTools) {
         cmd += ` --allowedTools '${opts.allowedTools}'`;
+      }
+      if (effort) {
+        cmd += ` --effort ${effort}`;
       }
       return cmd;
     }
@@ -366,6 +375,9 @@ export class ClaudeAdapter implements ProviderAdapter {
     }
     if (opts?.autoApprove) {
       cmd += ' --dangerously-skip-permissions';
+    }
+    if (effort) {
+      cmd += ` --effort ${effort}`;
     }
     cmd += ` < ${promptPath}`;
     return cmd;
