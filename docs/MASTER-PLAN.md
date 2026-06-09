@@ -868,33 +868,33 @@ Items surfaced during the Sprint 211 doc-consolidation audit that were intention
 ### D. Process Mode & Autonomous (F3 / AS-6)
 - [ ] **F3-004** SessionBackend Kubernetes pod-exec.
 - [ ] **F3-008** Workflow Composer — declarative/visual multi-step DAG flow editor on top of scheduled-flow + flow-registry.
-- [ ] **AUT-1** Drive the nervous observer inside `autonomous start` so live detections actually flow (today attach-only).
+- [~] **AUT-1** Drive the nervous observer inside `autonomous start`. 🔄 **Sprint 260+261:** per-cycle `tick()` + fail-safe in `runAutonomousCycle`; `withNervousObserver` composer wired into `runtime-loop.buildEngineRuntime` via optional `nervousTick` (CC dedup-fix Sprint 261). **Remaining:** CLI passes a real DetectorRegistry-backed tick (one-liner follow-up).
 - [ ] **AUT-2** Webhook + repo-watch reactive trigger sources (sub-project 2 continuation).
 - [ ] **AUT-3** Fix the scheduled-flow→sprint bridge (authority double-block + only-`autonomous.execute`-handler) so user-configured flows actually run.
-- [ ] **AUT-4** Implement `nextRun()` full cron evaluation (today only the minute field is honored).
-- [ ] **AUT-5** Make recurring backlog entries executable (`queryDue()` currently excludes them; no cron-reset path).
-- [ ] **AUT-6** Backlog done/failed-entry purge + autonomous task-artifact cleanup (stray `task-run-*` files).
-- [ ] **AUT-7** Concurrent `ExecutionPool` activation (interface ready, serial-only today) with Brain backpressure to `OLLAMA_NUM_PARALLEL`.
-- [ ] **AUT-8** `deckent_autonomous*` MCP tool parity (no MCP control surface today).
-- [ ] **AUT-9** Sub-projects 3-5: work-generation/goal engine, autonomous dashboard control-plane, and the F3-008 workflow composer.
+- [~] **AUT-4** `nextRun()` full cron evaluation. 🔄 **Sprint 260:** full 5-field cron landed — BUT in the *unused* `orchestra/autonomous/scheduled-flow.ts`; the LIVE `FlowScheduler` still uses core's skeletal minute-only `nextRun` (Sprint 261 T11 finding). **Remaining:** port full cron → `core/scheduled-flow.ts` + re-point FlowScheduler.
+- [x] **AUT-5** Recurring backlog entries executable. ✅ **Sprint 261:** `reenqueueRecurring` resets a done recurring entry to pending with updated lastRun via cron `nextRun` (fail-safe on malformed cron).
+- [x] **AUT-6** Backlog done/failed-entry purge + autonomous task-artifact cleanup. ✅ **Sprint 260:** `purgeCompletedBacklog` + `cleanupAutonomousArtifacts`.
+- [x] **AUT-7** Concurrent `ExecutionPool` activation. ✅ **Sprint 261:** `makeBoundedPool(maxConcurrency)` + wired into `execute-dispatcher` (optional `pool`, serial fallback). **Future:** Brain backpressure to `OLLAMA_NUM_PARALLEL`.
+- [x] **AUT-8** `deckent_autonomous*` MCP tool parity. ✅ **Sprint 260:** `deckent_autonomous` MCP tool (status/start/stop/backlog-add), live-confirmed after /mcp restart.
+- [~] **AUT-9** Sub-projects 3-5: work-generation/goal engine, autonomous dashboard, F3-008 composer. 🔄 **Sprint 261:** `work-generator.ts` `generateWorkCandidates` (debt/TODO → backlog candidates, pure). **Remaining:** wire into the live loop + dashboard + composer.
 - [ ] **AUT-10** Master-plan autonomous-dogfood culmination (feed this backlog to autonomous deckent under approval gates).
 
 ### E. Enterprise Hardening (F4 / F10 / sub-#3)
-- [ ] **ENT-1** Hard-enforced RBAC — flip ADR-037 to V2 (today `checkWorkerAuthority` returns `true`, `enforceRbac` NO_OP by default).
-- [ ] **ENT-2** Hard multi-tenancy — replace the 6 hardcoded `tenantId:'local'` sites with real per-tenant isolation + SQLite row-level security.
-- [ ] **ENT-3** Audit immutability + causal lineage (causationId / correlationId / parent-trace) for SOC2/ISO-grade traceability.
-- [ ] **ENT-4** Secret vault for credentials.
+- [~] **ENT-1** Hard-enforced RBAC — flip ADR-037 to V2. 🔄 **Sprint 260+261:** `checkWorkerAuthority` real role→capability map + `enforce_rbac` soft/hard gate; `authorizeExecution(req)` contract bridge (actor.role → check). **Remaining:** wire `authorizeExecution` into the live worker-spawn path (CC, self-modifying-risk follow-up).
+- [~] **ENT-2** Hard multi-tenancy. 🔄 **Sprint 260+261:** `tenantId` threaded write/query param (default 'local') + `strict_tenant_isolation` config flag closes the NULL-tenant leak at all 3 memory-store query sites. **Remaining:** thread real `actor.tenantId` from spawn context end-to-end.
+- [~] **ENT-3** Audit immutability + causal lineage. 🔄 **Sprint 261:** tamper-evident hash-chain (`audit-writer.ts` sha256 prev→hmac + `verifyAuditChain`) + lineage query surface (`audit-query.ts` correlation/causation/causal-chain/actor). correlationId/causationId on event-stream (260). **Remaining:** durable signed sink + retention.
+- [x] **ENT-4** Secret vault for credentials. ✅ **Already built** (discovered Sprint 261): `credentials.ts` + `credential-encryption.ts` (AES-256-GCM, `~/.deckent/.keyring`, `DECKENT_MASTER_KEY`), `$DECK:NAME` interpolation (`deck-interpolation.ts`), `.deck` gitignored (ADR-016). Now documented (`docs/reference/enterprise-depth.md`).
 - [ ] **ENT-5** SSO/OIDC depth + SIEM forwarder + compliance report generator.
-- [ ] **F10-001** Unify RBAC + activation-rules + condition-evaluator under one declarative self-hosted policy engine.
-- [ ] **F10-002** Risk-tagged operation gating (`shell.exec` / `mail.send` / `erp.write` / `filesystem.delete` → mandatory approval).
+- [~] **F10-001** Unify RBAC + activation-rules + condition-evaluator under one declarative policy engine. 🔄 **Sprint 261:** `policy-engine.ts` `evaluatePolicy()` composes rbac.can + evaluateActivation + evaluateCondition → permit/deny/park/suggest (create-only, pure). **Remaining:** wire into the live decision path.
+- [~] **F10-002** Risk-tagged operation gating. 🔄 **Sprint 260:** `resolveRiskClass` + `risk_gate_enabled` flag parks HIGH-risk (shell/erp-write/db-write/mail.send/fs.delete) in the nervous decision-engine.
 - [ ] **SEC-1** Sub-project #2 self-security (prompt/command guard + planner state-hygiene) — not started.
 - [ ] **SCALE-1** Sub-project #3 million-scale: `RemoteTokenAuthProvider` + mTLS, audit shard, TPM/HSM (PKCS#11), Redis-cluster rate-limit aggregation.
 - [ ] **SCALE-2** Sub-project #3-mesh distributed agent mesh (workers across nodes + cross-node scheduling + shared memory/lock coordination).
 
 ### F. Capability Broker & ERP (F8 / #ERP)
-- [ ] **F8-001** Capability abstraction layer — `capability.invoke(name,args)` resolving to one of N backends (`mail.search`→IMAP/Graph/Exchange).
-- [ ] **F8-002** Capability registry + config/availability-driven per-capability backend selection.
-- [ ] **F8-003** Capability-scoped least-privilege permissions per agent.
+- [x] **F8-001** Capability abstraction layer. ✅ **Sprint 260:** `capability-broker.ts` `invokeCapability`/`registerCapability`/`invokeFromRequest` + `CapabilityRegistry` + reference handlers (echo/fsRead).
+- [x] **F8-002** Capability registry + config/availability-driven per-capability backend selection. ✅ **Sprint 261:** multi-backend selection (`priority` + `isAvailable()`), `listBackends`, backward-safe single-handler default.
+- [~] **F8-003** Capability-scoped least-privilege permissions per agent. 🔄 **Sprint 260+261:** `requiredCapability` per handler + `grantedCapabilities` gate (opt-in); real handlers (http/env/shell) declare their capability. **Remaining:** auto-derive the grant set from `actor.role` and enforce in the spawn context.
 - [ ] **ERP-1** ERP runtime integration — process automation + scoped read-only DB access (`db.query`/`erp.read`) → controlled management, on Process Mode + F8 + RBAC + approval.
 
 ### G. MCP Client (F9 / AS-5)
