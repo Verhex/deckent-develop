@@ -42,6 +42,7 @@ import type { PolicyGate } from '../autonomous-runtime.js';
 import { withNervousObserver } from '../autonomous-runtime.js';
 import {
   makeBacklogTriggerSource,
+  makeFlowBacklogBridge,
   makeHybridTriggerSource,
 } from './backlog-trigger.js';
 import {
@@ -257,7 +258,15 @@ export function buildEngineRuntime(
     () => applyRecurringReenqueue(opts.backlogPath, loadBacklog(opts.backlogPath), clock()),
     clock,
   );
-  const sources: TriggerSource[] = [backlogSrc, base.deps.triggerSource];
+  // AUT-3: scheduled-flow triggers are normalized into the backlog dispatch
+  // path (handler + authority + policy + rbac_policy + audit in ONE lane) —
+  // without this bridge user-configured flows hit 'no handler' + default-deny.
+  const flowSrc = makeFlowBacklogBridge(
+    base.deps.triggerSource,
+    () => loadBacklog(opts.backlogPath),
+    opts.backlogPath,
+  );
+  const sources: TriggerSource[] = [backlogSrc, flowSrc];
   if (opts.reactiveSource) sources.push(opts.reactiveSource);
   // Work-generator wire (capability-maturity gap #2): candidates are enqueued
   // into the backlog FIRST (execute-dispatcher's status writeback requires the

@@ -199,4 +199,45 @@ describe('engine wiring — recurring re-enqueue + work-generator', () => {
 
     expect(result.outcome).toBe('executed');
   });
+
+  // ── AUT-3: scheduled-flow → backlog bridge (user-configured flows actually run) ──
+
+  function flowOpts(requiresApproval: boolean) {
+    const opts = baseOpts(() => new Date('2026-06-10T03:00:00Z'));
+    return {
+      ...opts,
+      flows: [{ id: 'nightly', cronExpr: '* * * * *', action: 'scan dependency tree', tenantId: 'local', enabled: true }] as never,
+      policy: { id: 'p', trigger: 'scheduled', action: 'start', guard: { requiresApproval } } as never,
+    };
+  }
+
+  it('a due user-configured flow EXECUTES end-to-end (no-approval guard): runTask runs, backlog records done', async () => {
+    writeFileSync(backlogPath, JSON.stringify({ _version: '1.0', entries: [] }));
+    const opts = flowOpts(false);
+    opts.runTask = vi.fn().mockResolvedValue({ taskId: 't-flow' });
+    opts.waitForResult = vi.fn().mockResolvedValue({ taskId: 't-flow', selfAssessment: 'DONE', testsPassed: true, filesChanged: [], notes: '', linesAdded: 0, linesRemoved: 0 });
+    const bundle = buildEngineRuntime(opts);
+
+    const result = await runAutonomousCycle({}, bundle.deps);
+
+    expect(result.outcome).toBe('executed');
+    expect(opts.runTask).toHaveBeenCalledOnce();
+    const entries = loadBacklog(backlogPath).entries;
+    expect(entries).toHaveLength(1);
+    expect(entries[0]!.status).toBe('done');
+    expect(entries[0]!.spec.description).toBe('scan dependency tree');
+  });
+
+  it('a due flow with the default approval guard PARKS for a human (ADR-040 preserved)', async () => {
+    writeFileSync(backlogPath, JSON.stringify({ _version: '1.0', entries: [] }));
+    const opts = flowOpts(true);
+    opts.runTask = vi.fn();
+    const bundle = buildEngineRuntime(opts);
+
+    const result = await runAutonomousCycle({}, bundle.deps);
+
+    expect(result.outcome).toBe('pending');
+    expect(opts.runTask).not.toHaveBeenCalled();
+    expect(loadBacklog(backlogPath).entries[0]!.status).toBe('pending'); // enqueued, never ran
+  });
 });
