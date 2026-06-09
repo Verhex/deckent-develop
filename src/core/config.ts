@@ -1322,6 +1322,9 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
     // Dependency pipeline (Sprint 156: default true; user/project config can override)
     dependency_pipeline_enabled:
       (config as DeckentConfigWithPipeline).dependency_pipeline_enabled ?? true,
+    // Pre-sprint full-vitest baseline (Sprint 255: default FALSE — the full suite
+    // blocks sprint start; opt-in only). Speeds sprint start dramatically.
+    pre_sprint_tests: config.pre_sprint_tests ?? false,
     // AI planner timeout
     ai_planner_timeout: config.ai_planner_timeout,
     // Sprint checkpoint interval

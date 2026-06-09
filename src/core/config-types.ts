@@ -96,6 +96,10 @@ export interface DeckentConfig {
   last_sprint_id?: string;
   version?: string;
   auto_docs?: AutoDocsConfig;
+  /** Run the full pre-sprint vitest baseline before SPAWN (default: false — the
+   *  full suite is slow and blocks sprint start). Opt-in for the honesty
+   *  verify-delta baseline. */
+  pre_sprint_tests?: boolean;
   /** Spawn backend: 'docker' | 'tmux' | 'subprocess' | 'auto' (default: 'auto') */
   spawn_backend?: 'docker' | 'tmux' | 'subprocess' | 'auto';
   /** Docker image for worker containers (default: 'deckent-worker:latest') */
@@ -518,6 +522,8 @@ export interface ResolvedConfig {
   /** Resolved tier-based model strategy (from mode preset + config overrides) */
   model_strategy?: ModelStrategy;
   auto_docs?: AutoDocsConfig;
+  /** Run the full pre-sprint vitest baseline before SPAWN (default: false). */
+  pre_sprint_tests?: boolean;
   /** Spawn backend: 'docker' | 'tmux' | 'subprocess' | 'auto' (default: 'auto') */
   spawn_backend?: 'docker' | 'tmux' | 'subprocess' | 'auto';
   /** Docker image for worker containers (default: 'deckent-worker:latest') */

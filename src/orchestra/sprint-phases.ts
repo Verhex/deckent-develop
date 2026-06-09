@@ -602,8 +602,14 @@ export async function runPlanPhase(
       } catch (e) { debugLog('runPlanPhase:showSplash', e); }
     }
 
-    // Run pre-sprint CI validation — may block sprint if tsc/tests fail
-    const ciResult: CiValidationResult = runPreSprintValidation(projectRoot, sprint.id);
+    // Run pre-sprint CI validation — keeps the fast tsc gate; the SLOW full
+    // pre-sprint vitest is skipped unless `pre_sprint_tests` is opted in (Sprint
+    // 255: the full suite blocking SPAWN was the main sprint-start latency).
+    const ciResult: CiValidationResult = runPreSprintValidation(
+      projectRoot,
+      sprint.id,
+      config.pre_sprint_tests ? undefined : { track_test_count: false },
+    );
     if (!ciResult.passed) {
       throw new BrainError(
         ciResult.blockedReason ?? 'CI validation failed — sprint blocked',

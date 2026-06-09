@@ -970,11 +970,15 @@ export async function runSprint(
     try { resetDashboard(projectRoot, sprint.id, sprint.tasks.length); } catch (e) { debugLog('runSprint:resetDashboard', e); }
     writeSprintState(projectRoot, sprint);
 
-    // Phase 1.9: Capture pre-sprint test baseline
-    try {
-      const captured = captureVitestBaseline(projectRoot);
-      if (captured) writeBaseline(projectRoot, sprint.id, captured);
-    } catch (e) { debugLog('runSprint:baseline', e); }
+    // Phase 1.9: Capture pre-sprint test baseline — OPT-IN (Sprint 255). The full
+    // vitest suite is slow and blocks sprint start; default-off so sprints start
+    // immediately. The honesty verify-delta degrades gracefully without a baseline.
+    if (config.pre_sprint_tests) {
+      try {
+        const captured = captureVitestBaseline(projectRoot);
+        if (captured) writeBaseline(projectRoot, sprint.id, captured);
+      } catch (e) { debugLog('runSprint:baseline', e); }
+    }
 
     // Phase-transition checkpoint: PLAN complete
     try { writePhaseCheckpoint(projectRoot, sprint, sprint.phase); } catch (e) { debugLog('runSprint:checkpoint:plan', e); }
