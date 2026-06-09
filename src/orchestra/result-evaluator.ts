@@ -14,6 +14,7 @@ import { debugLog } from '../core/utils.js';
 import { validateWorkerCoverage } from './coverage-validator.js';
 import { reconcileSpuriousNoGo, reconcileRubricNoGo } from './mid-sprint-adapter.js';
 import { getRubric, coverageOptional } from './rubric-registry.js';
+import type { DiskVerifyResult } from './disk-verify.js';
 import {
   detectDishonestResult,
   emitDishonestResultEvent,
@@ -1943,13 +1944,27 @@ function downgradeToNoGo(
 export function enforceHonestResultGate(
   result: TaskResult,
   task: Task,
+  diskVerify?: DiskVerifyResult,
 ): HonestGateResult {
   if (!result) {
     return { result, honest: true };
   }
 
+  // MF-8 (Sprint 252): the stub/empty-write checks below trigger on
+  // `linesAdded===0`, but `linesAdded` under-reports for docker / host-adapter
+  // workers — a new file is UNTRACKED, so `git diff --numstat HEAD` returns 0
+  // even though the deliverable exists (Sprint-253 codex-in-docker: created a
+  // correct 3-line file, self-assessed DONE, yet was flipped to NO_GO as a
+  // "stub ... worker likely crashed"). When disk-verify shows REAL evidence in
+  // scope (untrackedFiles or numstat>0), the worker genuinely produced output,
+  // so the linesAdded=0 stub/empty-write heuristics must NOT fire. A genuine
+  // crash/stub leaves NO disk evidence → hasDiskEvidence is false → the checks
+  // still flip exactly as before (the Sprint-165 Bug X protection is preserved).
+  // Boundary-violation (Check 2) is orthogonal and always runs.
+  const hasDiskEvidence = diskVerify?.hasDiskEvidence === true;
+
   // Check 1: stub literal (covers Sprint 156-011 CRITICAL debt + Sprint 164 replay)
-  if (isStubResult(result)) {
+  if (!hasDiskEvidence && isStubResult(result)) {
     const codeVerified = (result as TaskResult & { codeVerified?: string }).codeVerified;
     const violation: HonestyViolation =
       codeVerified === 'CODE_VERIFIED_DONE'
@@ -1985,6 +2000,7 @@ export function enforceHonestResultGate(
   // (sprint-finalizer's synthetic result shape — caught above by isStubResult,
   // but this is a backstop for any other producer that emits the same shape)
   if (
+    !hasDiskEvidence &&
     (result.filesChanged?.length ?? 0) > 0 &&
     (result.linesAdded ?? 0) === 0 &&
     result.selfAssessment === 'DONE'

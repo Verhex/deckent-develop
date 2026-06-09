@@ -303,3 +303,56 @@ describe('enforceHonestResultGate — Scenario (f): scope violation forced to NO
     expect(gated.violation).toBeUndefined();
   });
 });
+
+// ─── MF-8 (Sprint 252) — disk-evidence overrides linesAdded=0 false-stub ────
+// A docker/host-adapter worker that creates a NEW (untracked) file reports
+// linesAdded=0 (git numstat HEAD = 0 for untracked) — the stub/empty-write
+// heuristics would wrongly flip its DONE to NO_GO. When disk-verify shows real
+// evidence (untrackedFiles), the gate must treat it as honest. A genuine stub
+// (no disk evidence) must STILL flip — the integrity boundary is preserved.
+describe('enforceHonestResultGate — MF-8: disk evidence vs linesAdded=0 false-stub', () => {
+  it('codex-in-docker shape (DONE, linesAdded=0, testsPassed=false) + disk evidence → HONEST (not flipped)', () => {
+    const task = makeTask({ scope: { directories: ['docs/_verify-docker/'], filesRead: [], filesWrite: ['docs/_verify-docker/codex-docker.md'] } });
+    const result = makeResult({ filesChanged: ['docs/_verify-docker/codex-docker.md'], linesAdded: 0, testsPassed: false, selfAssessment: 'DONE' });
+    const diskVerify = { hasDiskEvidence: true, linesAdded: 0, untrackedFiles: ['docs/_verify-docker/codex-docker.md'] };
+
+    const gated = enforceHonestResultGate(result, task, diskVerify);
+
+    expect(gated.honest).toBe(true);
+    expect(gated.violation).toBeUndefined();
+    expect(gated.result.selfAssessment).toBe('DONE');
+  });
+
+  it('SAME shape but NO disk evidence → still DISHONEST_DONE_STUB (integrity preserved)', () => {
+    const task = makeTask();
+    const result = makeResult({ filesChanged: [], linesAdded: 0, testsPassed: false, selfAssessment: 'DONE' });
+    const noEvidence = { hasDiskEvidence: false, linesAdded: 0, untrackedFiles: [] as string[] };
+
+    const gated = enforceHonestResultGate(result, task, noEvidence);
+
+    expect(gated.honest).toBe(false);
+    expect(gated.violation).toBe('DISHONEST_DONE_STUB');
+    expect(gated.result.selfAssessment).toBe('NO_GO');
+  });
+
+  it('omitted diskVerify (e.g. retro-phase caller) → exact legacy behavior (still flips a stub)', () => {
+    const task = makeTask();
+    const result = makeResult({ filesChanged: [], linesAdded: 0, testsPassed: false, selfAssessment: 'DONE' });
+
+    const gated = enforceHonestResultGate(result, task);
+
+    expect(gated.honest).toBe(false);
+    expect(gated.violation).toBe('DISHONEST_DONE_STUB');
+  });
+
+  it('Check 3 (filesChanged>0, linesAdded=0, DONE) + disk evidence → HONEST (no SCOPE_VIOLATION_OR_EMPTY_WRITE)', () => {
+    // in-scope file (so Check 2 boundary does not fire — we isolate Check 3)
+    const task = makeTask({ scope: { directories: ['docs/'], filesRead: [], filesWrite: ['docs/x.md'] } });
+    const result = makeResult({ filesChanged: ['docs/x.md'], linesAdded: 0, testsPassed: true, selfAssessment: 'DONE' });
+    const diskVerify = { hasDiskEvidence: true, linesAdded: 0, untrackedFiles: ['docs/x.md'] };
+
+    const gated = enforceHonestResultGate(result, task, diskVerify);
+
+    expect(gated.honest).toBe(true);
+  });
+});

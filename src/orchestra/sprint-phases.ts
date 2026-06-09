@@ -1097,8 +1097,18 @@ export async function runEvaluatePhase(
         // the EVALUATE loop. Gate faults log + treat-as-honest fallback.
         let gated: { result: TaskResult; honest: boolean; violation?: string };
         try {
+          // MF-8 (Sprint 252): pass disk-evidence so the gate doesn't flip a
+          // real deliverable to NO_GO when `linesAdded` under-reports (untracked
+          // files from docker/host-adapter workers — git numstat returns 0).
+          // Best-effort; a fault falls through to the no-disk-evidence path.
+          let diskVerify: DiskVerifyResult | undefined;
+          try {
+            diskVerify = verifyDiskAgainstClaim(projectRoot, task.scope);
+          } catch (e) {
+            debugLog('runEvaluatePhase:honestGate:diskVerify:fault', e);
+          }
           gated = typeof enforceHonestResultGate === 'function'
-            ? enforceHonestResultGate(rawResult, task)
+            ? enforceHonestResultGate(rawResult, task, diskVerify)
             : { result: rawResult, honest: true };
         } catch (e) {
           debugLog('runEvaluatePhase:honestGate:fault', e);
