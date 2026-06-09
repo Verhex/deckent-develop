@@ -30,6 +30,7 @@ import { evaluateActivation, migrateV1AgentToActivation, migrateV1SkillToActivat
 import { analyzeSkillInMemory } from '../orchestra/ecosystem-intelligence.js';
 import { resolveComposition } from './skill-selector.js';
 import { modelRegistry } from './model-registry.js';
+import { normalizeTechStack } from './work-model.js';
 import { getAgentDomain, type AgentDomain } from './agent-pool.js';
 import { debugLog } from './utils.js';
 
@@ -94,6 +95,15 @@ export function selectAgentByFallback(
  *  `stackBonus` so a domain-specialist + activation rule beats a
  *  generic-impl candidate that has only `impl@7`. */
 export const DOMAIN_MATCH_BONUS = 3;
+
+/**
+ * WM-7 routing dual — soft penalty for a language-category skill whose language
+ * does NOT match the confidently-detected project stack (e.g. typescript-expert
+ * on a Go project). Sized to drop a typical mis-routed language skill below
+ * `skillMinScore` (3) while letting a very strongly task-signalled skill survive
+ * (polyglot-safe). Soft, score-based; `- Skills:` overrides bypass routing.
+ */
+export const LANGUAGE_MISMATCH_PENALTY = 6;
 
 /** Map task intent → the agent domain that should be boosted. Only
  *  intents that map cleanly to an existing built-in agent domain are
@@ -555,7 +565,24 @@ function selectBestSkills(
     if (projectStack) {
       if (skill.category === 'language') {
         const langMatch = skill.triggers.some(t => t.toLowerCase() === projectStack.language.toLowerCase());
-        if (langMatch) stackBonus += 3;
+        if (langMatch) {
+          stackBonus += 3;
+        } else {
+          // WM-7 routing dual: a language-category skill whose language does NOT
+          // match the confidently-detected project stack is the wrong specialist
+          // (e.g. typescript-expert on a Go project). Soft-penalize so it drops
+          // below the candidate threshold for typical mis-routes, while a very
+          // strong task signal can still override (polyglot-safe). `- Skills:`
+          // overrides bypass routing entirely, so explicit pins are unaffected.
+          const projStack = normalizeTechStack(projectStack.language);
+          if (projStack !== 'generic') {
+            const normMatch = skill.triggers.some(t => normalizeTechStack(t) === projStack);
+            if (!normMatch) {
+              stackBonus -= LANGUAGE_MISMATCH_PENALTY;
+              reasoning.push(`Skill '${id}' language-mismatch penalty: -${LANGUAGE_MISMATCH_PENALTY} (skill not for ${projStack} stack)`);
+            }
+          }
+        }
       }
       if (skill.category === 'framework') {
         const fwMatch = skill.triggers.some(t => t.toLowerCase() === projectStack.framework.toLowerCase());
