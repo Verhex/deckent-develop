@@ -42,6 +42,26 @@ Deckent's Role-Based Access Control (RBAC) system can be configured for soft or 
 
 The actor's role and required capabilities are extracted from the `ExecutionRequest` payload. If a role is unknown or absent, the system permissively allows the action.
 
+### Enforced Slice: Autonomous Dispatch (`rbac_policy`)
+
+The first advisory→enforced slice of ADR-037 is **machine-initiated dispatch** in the autonomous engine.
+
+-   **Source**: `src/orchestra/autonomous/runtime-loop.ts` (`buildEngineRuntime` policy gate)
+-   **Config**: `autonomous.rbac_policy` in `.deckent/config.json`
+
+```json
+{
+  "autonomous": {
+    "rbac_policy": { "enabled": false, "role": "viewer" }
+  }
+}
+```
+
+-   **Default**: `enabled: false`, `role: 'viewer'` (deny-by-default once enabled). Valid roles: `admin | operator | viewer` — any other value fails config validation.
+-   **Behavior when enabled**: every entry-carrying trigger (backlog, work-generator, reactive) is first gated through `evaluatePolicy`'s RBAC layer under the configured `role`. A role without the `execute` permission (the default `viewer`) **hard-denies** the dispatch — the cycle ends as `denied` and the denial lands on the audit chain. `operator` and `admin` are permitted.
+
+**Honest boundary**: this enforcement applies **only** to the autonomous dispatch path. Sprint worker-spawn remains **advisory** (ADR-037 V1.0) — `Task` carries no capability requirements yet, so role violations during sprint execution are warned and emitted but not blocked. The hard-flip for the sprint path is a post-GA V2 item.
+
 ## 3. Tamper-Evident Audit Chain
 
 To ensure the integrity of audit logs, Deckent implements a tamper-evident hash chain for all audit events.
@@ -127,3 +147,60 @@ Deckent includes a built-in secret management system for securely storing API ke
     -   When `loadConfig` runs, it automatically finds the corresponding `SECRET_NAME` in the `.deck` file and replaces the placeholder with the actual value.
 
 This system ensures that sensitive data never needs to be committed to version control, providing a secure foundation for enterprise integrations.
+
+## 7. Audit Read-Side: Compliance Reports & SIEM Forwarding
+
+The tamper-evident audit chain (Section 3) is write-side. The read-side consumes that live chain for compliance checks and SIEM export.
+
+### Raw Chain Reader: `readAuditEvents`
+
+-   **Source**: `src/core/audit-query.ts`
+-   **Function**: `readAuditEvents(projectRoot, sprintId): AuditEventPayload[]`
+
+Reads the raw ENT-3 audit payloads for a sprint from the append-only event stream, **in stream order**, with the `prevHmac`/`hmac` chain fields intact. Non-audit channels on the stream are excluded; a missing stream returns `[]` (never throws). This is the input shape consumed by `verifyAuditChain`, `generateComplianceReport`, and the SIEM forwarder.
+
+### Compliance Report: `deckent audit compliance`
+
+```bash
+deckent audit compliance --sprint sprint-262 [--json] [--lang en|tr]
+```
+
+-   **Sources**: `src/core/compliance-report.ts` (`generateComplianceReport`, pure function — no I/O), `src/cli/commands/audit.ts`
+-   **Controls** (SOC2/ISO-style checklist, each `ON | OFF`):
+    -   `rbacEnforcement` — sourced from config `autonomous.rbac_policy.enabled` (default `false`)
+    -   `tenantIsolation` — sourced from config `strict_tenant_isolation` (default `false`)
+    -   `auditChainIntact` — derived by running `verifyAuditChain` over the sprint's live audit events
+-   **Output**: control statuses, event count, and a per-actor event breakdown.
+-   **Exit codes**: `0` when the chain is intact, `1` when the chain is **broken**, `2` on error — suitable for CI gating.
+
+### SIEM Export: `deckent audit forward`
+
+```bash
+deckent audit forward --sprint sprint-262 [--out .deckent/siem-export.jsonl] [--json]
+```
+
+-   **Sources**: `src/core/siem-forwarder.ts` (`createSiemForwarder`), `src/cli/commands/audit.ts` (`runSiemExport`)
+-   Normalizes each audit event into a `SiemRecord` (`ts`, `actor`, `action`, `outcome`, optional `correlationId`/`causationId`) and appends them as **NDJSON** to the output file (default: `.deckent/siem-export.jsonl`).
+-   The forwarder is fail-safe by design: buffered batching (`maxBatch` default 100), bounded retries (`maxRetries` default 3, then the batch is dropped), and **no transport configured means default-off** — records are buffered then discarded, never sent. The CLI runs a one-shot manual flush (`flushEvery: 0`) so no timer dangles.
+-   **Honest limit**: the built-in transport is the NDJSON **file** transport only. Real network transports (HTTP, syslog) are an ENT-5 roadmap item — they are not implemented yet.
+
+## 8. Capability Invocation Audit
+
+Every capability invocation in the autonomous engine is recorded on the ENT-3 audit hash-chain.
+
+-   **Composition root**: `src/core/capability-runtime.ts` — `createAuditedCapabilityRegistry(emit?, options)`
+-   **Bridge**: `src/core/capability-audit-bridge.ts` — `withAuditedInvocation(handler, emit)`
+-   **Wire-up**: `src/orchestra/autonomous/runtime-loop.ts` (`buildEngineRuntime`)
+
+### How It Works
+
+`createAuditedCapabilityRegistry` assembles the full production registry (reference + extended + data handlers) and, when an `emit` callback is provided, wraps every handler with the audit bridge. Without `emit`, the registry is plain — audit is **default-off and backward-safe**. An `emit` that throws is contained: an audit-sink failure never fails the capability invocation itself.
+
+In `buildEngineRuntime`, the `emit` callback forwards each `CapabilityAuditRecord` to `writeAuditEvent`, so the record lands on the tamper-evident chain:
+
+-   **`action`**: `capability.success` on a clean invocation, `capability.error` when the handler throws (the error is re-thrown to the caller after emission).
+-   **`target`**: the capability verb (e.g. `fs.read`, `http.get`).
+-   **`actor` / `tenantId`**: taken from the invocation's actor context, falling back to `system` / `local`.
+-   **`metadata`**: the invocation timestamp, plus the error message on the `capability.error` path.
+
+Because these records flow through `writeAuditEvent`, they participate in the `prevHmac`/`hmac` chain and are visible to `deckent audit query`, `deckent audit compliance`, and `deckent audit forward` like any other audit event.

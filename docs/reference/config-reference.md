@@ -744,7 +744,35 @@ Proactive meta-orchestrator (ADR-040).
 
 ---
 
-## 22. Inert / Unverified Fields
+## 22. Autonomous Engine (`autonomous`)
+
+Autonomous execution engine (ADR-040). **Every flag below is default-off** — the engine and each sub-block are opt-in.
+
+> **Master switch:** when `enabled: false`, the engine refuses to start (autonomous.ts:215) and every sub-block below is inert. The `reactive`, `work_generator` and `rbac_policy` sub-blocks additionally carry their own `enabled` flag.
+
+| Key | Default (code) | Values | Description |
+|-----|----------------|--------|-------------|
+| `enabled` | `false` (1053) | boolean (validate 773) | Master on/off switch (flag-gated, ADR-040). |
+| `interval_ms` | `5000` (1054) | >= 0 ms (validate 776) | Idle-tick interval of the runtime loop. |
+| `backlog_path` | `".deckent/autonomous/backlog.json"` (1055) | path | Backlog file, relative to project root. |
+| `pool_size` | `1` (1056) | integer >= 1 (validate 779) | Max concurrent autonomous executions (1 = serial). |
+| `reactive.enabled` | `false` (1057) | boolean (validate 784) | Reactive trigger bridge. |
+| `reactive.map_path` | `".deckent/autonomous/reactive-map.json"` (1057) | string (validate 787) | Reactive trigger map JSON, relative to project root. |
+| `work_generator.enabled` | `false` (1058) | boolean (validate 793) | Self-generated work: active tech-debt records become backlog candidates (work-generator-source.ts). HIGH/CRITICAL debt is parked `risk-tagged` for approval; NORMAL dispatches `auto`. |
+| `work_generator.interval_ms` | `600000` (1058) | >= 0 ms (validate 796) | Throttle: minimum ms between debt scans (default 10 min). The trigger source polls every idle tick, but a scan runs at most once per interval — ticks inside the window return no candidates (already-enqueued candidates live in the backlog; nothing is lost). |
+| `rbac_policy.enabled` | `false` (1059) | boolean (validate 802) | RBAC gate on machine-initiated dispatch (runtime-loop.ts:288). When enabled, every entry-carrying trigger is first checked against `evaluatePolicy`'s RBAC layer before dispatch. |
+| `rbac_policy.role` | `"viewer"` (1059) | `admin \| operator \| viewer` (validate 805) | Role the autonomous engine acts under. `viewer` lacks the `execute` permission, so machine-initiated dispatch is hard-denied (deny-by-default); raise to `operator` or `admin` to allow execution. |
+
+Validation errors (config.ts:790-807, exact strings):
+
+- `autonomous.work_generator.enabled must be a boolean`
+- `autonomous.work_generator.interval_ms must be >= 0`
+- `autonomous.rbac_policy.enabled must be a boolean`
+- `autonomous.rbac_policy.role must be admin|operator|viewer`
+
+---
+
+## 23. Inert / Unverified Fields
 
 These appear in config but have no active effect in the current code paths:
 

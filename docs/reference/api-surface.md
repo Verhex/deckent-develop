@@ -151,6 +151,74 @@ Lock files in `.locks/`: `{filepath-with-__-separators}.lock`
 }
 ```
 
+## .deckent/autonomous/backlog.json File Format
+
+The autonomous engine's durable backlog — single source of truth for machine-initiated work items
+(`src/orchestra/autonomous/backlog-types.ts`, `backlog.ts`). Git-trackable. A missing file is treated
+as an empty backlog (`{ "_version": "1.0", "entries": [] }`).
+
+```json
+{
+  "_version": "1.0",
+  "entries": [
+    {
+      "id": "string (non-empty, unique — enqueue dedupes by id against entries of ANY status)",
+      "title": "string (non-empty)",
+      "kind": "task | sprint | capability",
+      "spec": {
+        "description": "string (optional — kind=task: inline description for runTaskMode)",
+        "directivesRef": "string (optional — kind=sprint: directives reference)",
+        "scopeDir": "string (optional — scope directory)",
+        "capabilityTarget": {
+          "capability": "string (dotted verb, e.g. 'mail.send' | 'erp.read' | 'db.query')",
+          "args": "object (optional — Record<string, unknown>)",
+          "connector": "string (optional — backend, e.g. 'imap' | 'graph' | 'odoo' | 'postgres')"
+        }
+      },
+      "policy": "auto | approval-required | risk-tagged",
+      "provider": "string (optional)",
+      "model": "string (optional)",
+      "trigger": "{ type: 'recurring', cron: string } | { type: 'one-off' } | { type: 'reactive', detector: string }",
+      "status": "pending | running | parked | done | failed",
+      "tenant": "string (optional)",
+      "lastRun": "ISO 8601 | null (run COMPLETION time — set only with a non-null lastResult, never on run start)",
+      "lastResult": "{ ok: boolean, reason: string } | null"
+    }
+  ]
+}
+```
+
+### Validation Rules (`validateBacklogEntry`)
+
+Hand-written validation (ADR-010, no schema dependency) — returns the first violation:
+- `id` and `title` must be non-empty strings
+- `kind` ∈ `task | sprint | capability`; `policy` ∈ `auto | approval-required | risk-tagged`; `status` ∈ valid set
+- `trigger.type` ∈ `recurring | one-off | reactive`
+- `trigger.type = recurring` → `trigger.cron` (string) is REQUIRED
+- `trigger.type = reactive` → `trigger.detector` (string) is REQUIRED
+- `spec` must be a plain object (not an array)
+- `kind = capability` → `spec.capabilityTarget` is REQUIRED, with a non-empty `capability` string
+
+Invalid entries fail `loadBacklog` hard; invalid work-generator candidates are skipped with a
+warning in `enqueueCandidates` (never throws).
+
+### Status Lifecycle
+
+```
+pending → running → done | failed
+        ↘ parked (policy gate — approval-required / risk-tagged hold)
+recurring: done → pending (re-enqueue when next cron cadence after lastRun arrives)
+```
+
+- `queryDue` surfaces every `pending` entry — "pending = due now". Recurring cadence is gated at
+  FLIP time by `reenqueueRecurring` (done→pending only when the next run after `lastRun` has
+  arrived); a never-run recurring entry is pending = first run immediate.
+- `applyRecurringReenqueue` persists the flip atomically ONLY when at least one entry changed
+  (idle ticks never rewrite the file). A malformed cron leaves the entry `done` with a warning —
+  never throws.
+- `purgeCompletedBacklog` keeps the 5 most recently completed `done`/`failed` entries (by
+  `lastRun`, default `keepRuns = 5`); `pending`/`running`/`parked` entries are never touched.
+
 ## Module Import Rules (ADR-008)
 
 - Brain (sprint-controller) is the ONLY module that imports from tmux, auditor, worker

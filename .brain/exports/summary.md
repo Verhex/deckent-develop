@@ -80,6 +80,10 @@
 | adr-086 | Native CLI Parity — F11 Feature Set (Sprint 224) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-264 Learnings** (sprint-264): ## Sprint sprint-264 Learnings
+
+## Gains
+- 264-001 — Autonomous engine internals doc — yeni dispatch yolları — Added ...
 - **Sprint sprint-263 Learnings** (sprint-263): ## Sprint sprint-263 Learnings
 
 ## Gains
@@ -104,10 +108,6 @@
 
 ## Gains
 - 253-001 — codex IN docker — Created the requested three-line Docker verifi...
-- **Sprint sprint-252 Learnings** (sprint-252): ## Sprint sprint-252 Learnings
-
-## Gains
-- 252-001 — codex IN docker — Worker exited without writing result (exitCode...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -129,4 +129,4 @@ _No active technical debt._
 - Violation pattern: stale_heartbeat
 - Violation pattern: file_outside_scope
 
-_Total entries: 350 | Generated: 2026-06-09_
+_Total entries: 353 | Generated: 2026-06-09_

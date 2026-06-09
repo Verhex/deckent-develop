@@ -51,6 +51,33 @@ generated from it.
 |---------|----------|------------|
 | `DECKENT→USER:NOTIFY` | `CHANNELS.NOTIFY` | Deckent surfaces a notification to the end user (dispatch, connector, alert) |
 
+### Audit Trail (Deckent → Auditor)
+
+| Channel | Constant | Fires when |
+|---------|----------|------------|
+| `DECKENT→AUDIT:EVENT_WRITTEN` | `AUDIT_EVENT_CHANNEL` (`src/core/audit-writer.ts`) | `writeAuditEvent()` appends a structured audit event to the tamper-evident hash chain (ENT-3) |
+
+Unlike the channels above, this constant lives in `src/core/audit-writer.ts`, not in the
+`CHANNELS` table of `event-stream.ts`. Events on this channel use `source: 'deckent'`,
+`target: 'auditor'`, and every payload carries `prevHmac` / `hmac` chain fields plus a
+`timestamp` added by `writeAuditEvent()`.
+
+#### Payload actions — `capability.success` / `capability.error`
+
+Every capability invocation dispatched by the autonomous engine (`kind=capability`
+backlog entries, F8 broker) is audited through `createAuditedCapabilityRegistry`. The
+emit callback in `src/orchestra/autonomous/runtime-loop.ts` writes one audit event per
+invocation with `sprintId: 'autonomous'` (events land in
+`.deckent/autonomous-events.jsonl`):
+
+| Field | Value |
+|-------|-------|
+| `action` | `capability.success` — handler returned without throwing; `capability.error` — handler threw |
+| `tenantId` | Invoking actor's tenant id; falls back to `'local'` when the invocation carries no actor |
+| `actor` | Invoking actor's id; falls back to `'system'` when the invocation carries no actor |
+| `target` | The invoked capability verb (`handler.requiredCapability`, e.g. `fs.read`) |
+| `metadata` | `{ timestamp, error }` — `timestamp` is the ISO 8601 UTC invocation time; `error` is the handler's error message, present only on `capability.error` |
+
 ### Auditor Housekeeping
 
 | Channel | Constant | Fires when |

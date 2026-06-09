@@ -19,6 +19,17 @@ Deckent, **Claude Code CLI üzerine kurulu bir AI ajan orkestrasyon sistemidir**
 **Multi-Provider Desteği (Sprint 038):**
 Deckent artık 3 farklı AI provider'ı destekliyor: Claude (Anthropic), Codex (OpenAI), Gemini (Google). Aynı sprint'te farklı provider'lar kullanılabilir. Her görev için en uygun model+provider çifti otomatik seçilir. Provider fallback zinciri sayesinde kota aşımı veya hata durumunda bir sonraki provider'a geçiş yapılır — maliyet optimizasyonu ve yüksek erişilebilirlik sağlanır.
 
+**Otonom Mod (tamamı opt-in — varsayılan kapalı):**
+Deckent, klasik kullanıcı-tetiklemeli sprint akışının yanında makine-başlatmalı iş de yürütebilir: tekrarlayan işleri cron kadansıyla yeniden kuyruklar, aktif teknik borçtan kendine iş üretir, kod-dışı işleri capability broker'la yürütür ve denetim zincirini uyumluluk raporu/SIEM export'uyla dışa verir. Otonom motor varsayılan olarak kapalıdır (`autonomous.enabled: false`) ve aşağıdaki yeteneklerin her biri kendi bayrağıyla ayrıca açılmadıkça devreye girmez:
+
+- **Tekrarlayan işler (cron):** Backlog girdileri 5-alanlı cron ifadesiyle tanımlanır (`deckent autonomous backlog add --cron "0 3 * * *"`); tamamlanan tekrarlı iş, kadansı geldiğinde otomatik yeniden kuyruklanır.
+- **Kendi kendine iş üretimi:** `autonomous.work_generator { enabled: false, interval_ms: 600000 }` — aktif teknik borç kayıtlarından backlog adayı üretir; yüksek riskli (HIGH/CRITICAL) borçlar doğrudan çalıştırılmaz, risk etiketiyle onaya park edilir.
+- **Kod-dışı işler (capability broker):** `--kind capability` girdileri dosya-okuma, HTTP, veritabanı ve mail gibi işleri capability broker üzerinden yürütür (`--capability fs.read --args '{"path":"package.json"}' [--connector odoo]`); salt-okur fiiller dışındaki her çağrı riskli sayılır ve onaya düşer.
+- **RBAC sınırı:** `autonomous.rbac_policy { enabled: false, role: 'viewer' }` — bayrak açıkken `execute` izni olmayan rol (viewer) makine-başlatmalı işi kesin reddeder; operator/admin rolleri izinlidir.
+- **Denetim ve uyumluluk:** Her otonom adım hash-zincirli denetim kaydına yazılır; `deckent audit compliance --sprint <id>` uyumluluk raporu üretir, `deckent audit forward` zinciri SIEM tüketimi için NDJSON dosyasına dışa verir (gerçek ağ aktarımı henüz yok — dosya export'u).
+
+Bu yeteneklerin hiçbiri kendiliğinden çalışmaz: ilgili bayraklar `.deckent/config.json` içinde açılmadıkça deckent yalnızca kullanıcı-tetiklemeli sprint akışını yürütür.
+
 **Ne DEĞİLDİR:**
 - Bir AI modeli değil — Claude'u araç olarak kullanır
 - Bir IDE eklentisi değil — terminal (CLI) tabanlıdır

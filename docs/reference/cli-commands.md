@@ -1,6 +1,6 @@
 # CLI Command Inventory
 
-> Complete inventory of all Deckent CLI commands. Last updated Sprint 186.
+> Complete inventory of all Deckent CLI commands. Last updated Sprint 264.
 > **Total:** 55+ top-level commands + subcommands
 
 ## Quick Reference
@@ -50,9 +50,10 @@
 | — | `config nervous` | Configure nervous mode settings (subcommand of config) | — |
 | 42 | `mode` | Get/set deckent_style | — |
 | 43 | `features` | List feature flags and capabilities | — |
-| 44 | `audit` | Run Brain Self-Audit Gate | — |
+| 44 | `audit` | Run Self-Audit Gate, audit-chain query/compliance/forward | `deckent_audit` |
 | 45 | `recover` | Recover from crashed/stuck sprint | — |
 | 46 | `models` | Browse and manage model catalog (list/refresh/tier) | `deckent_models` |
+| 47 | `autonomous` | Autonomous runtime loop, backlog, approvals | `deckent_autonomous` |
 | — | `help-info` | Show quick-reference help (alias: `info`) | `deckent_help` |
 
 ---
@@ -439,17 +440,34 @@ deckent doctor --pre-flight --json
 
 ### `deckent audit`
 
-Run Brain Self-Audit Gate for a sprint (tsc + vitest + honesty + observability).
+Run Brain Self-Audit Gate for a sprint (tsc + vitest + honesty + observability), or read/export the live ENT-3 audit chain via the `query`, `compliance`, and `forward` subcommands.
+
+**Usage forms:**
+
+| Form | Description |
+|------|-------------|
+| `deckent audit <sprint-id>` | Run the Self-Audit Gate; writes `.deckent/<sprint-id>-gate.json` |
+| `deckent audit compliance` | Compliance report over the live audit chain (chain integrity + RBAC/tenant control flags) |
+| `deckent audit forward` | Export the audit chain as SIEM NDJSON to a file |
+| `deckent audit query` | Filter raw audit events (`--tenant`, `--action`, `--since`, `--role`) |
 
 | Option | Description |
 |--------|-------------|
 | `--json` | Output raw JSON only |
+| `--sprint <id>` | Sprint ID for the `query`/`compliance`/`forward` subcommands (default: `sprint-001`) |
+| `--out <path>` | Output file for the `forward` subcommand (default: `.deckent/siem-export.jsonl`) |
+| `--lang <code>` | Language override (`en`\|`tr`) |
+
+**Exit codes:** gate form — `0` PASS, `1` gate failure; `audit compliance` — `0` chain intact, `1` broken audit chain; `2` on execution error (gate/compliance/forward).
 
 **Example:**
 ```bash
-deckent audit
-deckent audit --json
+deckent audit sprint-264 --json
+deckent audit compliance --sprint sprint-264
+deckent audit forward --sprint sprint-264 --out ./siem/export.jsonl
 ```
+
+**MCP:** `deckent_audit` (Self-Audit Gate form only)
 
 ---
 
@@ -954,6 +972,55 @@ deckent nervous log --follow
 
 ---
 
+## Autonomous Runtime
+
+### `deckent autonomous`
+
+Authority-bounded autonomous runtime loop — backlog-driven continuous execution with a default-deny approval gate (ADR-040). Flag-gated: the loop refuses to start unless `autonomous.enabled` is `true` in `.deckent/config.json`.
+
+**Subcommands:**
+
+| Subcommand | Description |
+|------------|-------------|
+| `autonomous start` | Start the loop (`--interval-ms`, `--max-iterations`) |
+| `autonomous status` | Runtime summary: backlog counts, pending approvals, recent audit events |
+| `autonomous stop` | Signal the running loop to stop cleanly (stop marker) |
+| `autonomous pending` | List parked approvals awaiting human accept/reject |
+| `autonomous approve <triggerId>` | Approve a parked trigger (`--reason`) |
+| `autonomous reject <triggerId>` | Reject a parked trigger (`--reason`) |
+| `autonomous backlog add` | Add a backlog entry (options below) |
+| `autonomous backlog list` | List backlog entries |
+| `autonomous backlog remove [id]` | Remove a backlog entry (positional id or `--id`) |
+
+**`backlog add` options:**
+
+| Option | Description |
+|--------|-------------|
+| `--id <id>` | Unique entry id (required) |
+| `--title <title>` | Human-readable title (required) |
+| `--kind <kind>` | Entry kind: `task` (default), `sprint`, or `capability` |
+| `--description <text>` | Task description or directives ref |
+| `--policy <policy>` | Execution policy: `auto` (default), `approval-required`, or `risk-tagged` |
+| `--cron <expr>` | 5-field cron expression — entry recurs at this cadence (omit for one-off; malformed cron is rejected at intake) |
+| `--capability <verb>` | `--kind capability`: dotted verb to invoke (e.g. `fs.read`, `db.query`) — required for capability entries |
+| `--args <json>` | `--kind capability`: JSON object of handler args (malformed JSON is rejected at intake) |
+| `--connector <id>` | `--kind capability`: preferred backend/connector id (e.g. `odoo`, `imap`) |
+| `--root <path>` | Project root override |
+| `--lang <code>` | Language override (`en`\|`tr`) |
+
+**Example:**
+```bash
+deckent autonomous start --max-iterations 10
+deckent autonomous backlog add --id nightly --title "Nightly debt sweep" --cron "0 3 * * *"
+deckent autonomous backlog add --id read-pkg --title "Read package.json" \
+  --kind capability --capability fs.read --args '{"path":"package.json"}'
+deckent autonomous approve trigger-001 --reason "reviewed"
+```
+
+**MCP:** `deckent_autonomous`
+
+---
+
 ## Server & Dashboard
 
 ### `deckent serve`
@@ -1056,6 +1123,8 @@ deckent info --lang tr
 | `explain` | `deckent_explain` | Full |
 | `recall` | `deckent_memory_query` | Full |
 | `set-directives` | `deckent_set_directives` | Full |
+| `audit` | `deckent_audit` | Partial (Self-Audit Gate only — query/compliance/forward are CLI-only) |
+| `autonomous` | `deckent_autonomous` | Partial (backlog/approvals full; loop process launches via CLI) |
 | `attach` | — | CLI only |
 | `spawn` | — | CLI only |
 | `dashboard` | — | CLI only |
@@ -1074,14 +1143,13 @@ deckent info --lang tr
 | `config nervous` | — | CLI only (subcommand) |
 | `mode` | — | CLI only |
 | `features` | — | CLI only |
-| `audit` | — | CLI only |
 | `recover` | — | CLI only |
 | `archive-debt` | — | CLI only |
 | `onboard` | — | CLI only |
 | `upgrade` | — | CLI only |
 | `plugin` | — | CLI only |
 
-**Coverage:** 22/45 commands have MCP tool counterparts (49% parity).
+**Coverage:** 24/46 commands have MCP tool counterparts (52% parity).
 
 ---
 

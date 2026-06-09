@@ -27,6 +27,20 @@ vi.mock('node:readline/promises', () => ({
   })),
 }));
 
+// wizard.ts (the provider-selection wizard init runs after its prompts) uses the
+// CALLBACK readline API (`node:readline`), NOT `node:readline/promises`. Without
+// this mock the wizard opens a REAL interface on process.stdin whenever 2+
+// providers are detected available (e.g. a live local Ollama server answering
+// detectOllama()'s HTTP probe), and its question() promise never resolves —
+// hanging every init test into the 10s timeout. Answering '' mirrors a user
+// pressing Enter: each wizard step resolves to its default value.
+vi.mock('node:readline', () => ({
+  createInterface: vi.fn(() => ({
+    question: vi.fn((_q: string, cb: (answer: string) => void) => { cb(''); }),
+    close: vi.fn(),
+  })),
+}));
+
 vi.mock('../../src/core/config.js', () => ({
   loadConfig: vi.fn().mockResolvedValue({ language: 'en' }),
   validatePartialConfig: vi.fn(),
@@ -1186,16 +1200,30 @@ describe('init command', () => {
     vi.clearAllMocks();
     captureOutput();
     process.exitCode = undefined;
+    // Hermeticity: detectOllama() (src/core/provider.ts) probes the LOCAL
+    // Ollama server (http://localhost:11434/api/tags) with a real fetch.
+    // On machines where Ollama runs this made a second provider "available",
+    // routing init into the interactive provider wizard (see the node:readline
+    // mock at the top of this file). Reject the probe so provider detection
+    // never leaves the test process.
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('ECONNREFUSED')));
+    // Determinism: vi.clearAllMocks() keeps implementations, so spawnSync
+    // would otherwise carry whatever earlier describe blocks installed
+    // (e.g. `claude --version` → '1.0.0' from the start-command suite).
+    // Pin it to "no CLI binaries found" so the provider auto-config path is
+    // taken regardless of test-execution order or filtering.
+    vi.mocked(spawnSync).mockReturnValue({ status: 1, stdout: '', stderr: '', pid: 0, output: [], signal: null } as ReturnType<typeof spawnSync>);
   });
   afterEach(() => {
+    vi.unstubAllGlobals();
     restoreOutput();
     process.exitCode = undefined;
   });
 
   it('creates directory structure and config', async () => {
     const mockQuestion = vi.fn()
-      .mockResolvedValueOnce('1')  // plan: max_plan
       .mockResolvedValueOnce('1')  // language: en
+      .mockResolvedValueOnce('1')  // plan: performance
       .mockResolvedValueOnce('test-project');  // project name
     vi.mocked(createInterface).mockReturnValue({
       question: mockQuestion,
@@ -1212,11 +1240,11 @@ describe('init command', () => {
     expect(stdout()).toContain('Setting up your AI development team');
   });
 
-  it.skip('creates config with selected mode — TODO: update mock for language-first init flow', async () => {
+  it('creates config with selected mode', async () => {
     const mockQuestion = vi.fn()
-      .mockResolvedValueOnce('3')  // plan: pro_plan
       .mockResolvedValueOnce('2')  // language: tr
-      .mockResolvedValueOnce('my-app');
+      .mockResolvedValueOnce('3')  // plan: economic
+      .mockResolvedValueOnce('my-app');  // project name
     vi.mocked(createInterface).mockReturnValue({
       question: mockQuestion,
       close: vi.fn(),

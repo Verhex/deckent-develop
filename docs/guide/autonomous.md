@@ -120,6 +120,104 @@ The stop marker is written to `.deckent/autonomous/stop`. The loop reads it afte
 
 ---
 
+### `autonomous backlog`
+
+Manage the autonomous work queue (`.deckent/autonomous/backlog.json`). The running loop picks up pending entries as `backlog` triggers — they pass through the same authority/approval/audit pipeline as every other trigger.
+
+```bash
+deckent autonomous backlog add [options]
+deckent autonomous backlog list [options]
+deckent autonomous backlog remove <id> [options]
+```
+
+#### `backlog add` options
+
+| Option | Default | Description |
+|---|---|---|
+| `--id <id>` | required | Unique entry id. Duplicate ids are rejected. |
+| `--title <title>` | required | Human-readable title. |
+| `--kind <kind>` | `task` | Entry kind: `task` (inline description), `sprint` (directives ref), or `capability` (F8 broker verb). |
+| `--description <text>` | empty | Task description or directives ref. |
+| `--policy <policy>` | `auto` | Execution policy: `auto`, `approval-required`, or `risk-tagged`. |
+| `--cron <expr>` | one-off | 5-field cron expression — the entry recurs at this cadence. Omit for a one-off entry. |
+| `--capability <verb>` | — | `kind=capability` only: dotted verb to invoke (e.g. `fs.read`, `db.query`). |
+| `--args <json>` | — | `kind=capability` only: JSON object of handler args. |
+| `--connector <id>` | — | `kind=capability` only: preferred backend/connector id (e.g. `odoo`, `imap`). |
+| `--root <path>` | auto-detected | Project root override. |
+| `--lang <code>` | `en` | Language override (`en` or `tr`). |
+
+#### Recurring entry (cron cadence)
+
+```bash
+# Re-enqueue every night at 03:00 — when a recurring entry completes,
+# the loop flips it back to pending at the next due time.
+deckent autonomous backlog add \
+  --id nightly-debt-sweep \
+  --title "Nightly debt sweep" \
+  --description "Scan and triage active tech debt" \
+  --cron "0 3 * * *"
+```
+
+**Expected output (EN):**
+```
+Backlog entry added: nightly-debt-sweep
+```
+
+The cron expression is validated **at intake**: a malformed expression is rejected immediately (i18n, EN/TR), so a recurring entry can never be saved in a state where it silently fails to fire later:
+
+```
+Invalid cron expression "0 3 * *": <parser error>
+```
+
+#### Capability entry (`--kind capability`)
+
+A `capability` entry runs no task or sprint — it invokes a registered capability-broker verb (file read, HTTP, DB query, mail, …) through the F8 broker:
+
+```bash
+deckent autonomous backlog add \
+  --id read-pkg \
+  --title "Read package manifest" \
+  --kind capability \
+  --capability fs.read \
+  --args '{"path":"package.json"}'
+
+# With a preferred backend/connector:
+deckent autonomous backlog add \
+  --id sync-orders \
+  --title "Pull open orders" \
+  --kind capability \
+  --capability db.query \
+  --args '{"table":"orders"}' \
+  --connector odoo
+```
+
+Capability entries are also validated at intake (i18n, EN/TR):
+
+- Missing verb → `kind=capability requires --capability <verb> (e.g. fs.read, db.query).`
+- `--args` that does not parse to a JSON **object** → `Invalid --args JSON: <error>`
+
+A `--cron` flag combines with any kind — a recurring capability entry re-runs its verb at the cron cadence.
+
+#### MCP parity
+
+The `deckent_autonomous` MCP tool's `backlog_add` action accepts the same parameters: `cron`, `capability`, `capabilityArgs`, `connector` — plus `id`, `title`, `kind`, `description`, `policy`:
+
+```json
+{
+  "action": "backlog_add",
+  "id": "read-pkg",
+  "title": "Read package manifest",
+  "kind": "capability",
+  "capability": "fs.read",
+  "capabilityArgs": "{\"path\":\"package.json\"}",
+  "cron": "0 3 * * *"
+}
+```
+
+`backlog_list` and `backlog_remove` mirror the CLI `list` / `remove` subcommands.
+
+---
+
 ## Loop Architecture
 
 Each iteration of the autonomous loop runs a single **cycle**:
@@ -182,12 +280,40 @@ The autonomous loop reads flows from `.deckent/flows/`. Each flow is a JSON file
   flows/
     nightly-check.json    ← ScheduledFlow definition
   autonomous/
+    backlog.json          ← Work queue (managed by `autonomous backlog`)
     pending.json          ← Approval queue (auto-created)
     stop                  ← Stop marker (written by `autonomous stop`)
   autonomous-events.jsonl ← Audit trail (auto-created)
 ```
 
 If `.deckent/flows/` does not exist or contains no flows, the loop runs with 0 flows — it still ticks at `--interval-ms` but every cycle produces `no_trigger`.
+
+---
+
+## Work Generator (Self-Generated Work)
+
+When enabled, the loop generates its own backlog candidates from **active tech-debt records** (Memory V2 debt store). The feature is **default-off** and flag-gated under `autonomous.work_generator` in `.deckent/config.json`:
+
+```json
+{
+  "autonomous": {
+    "enabled": true,
+    "work_generator": {
+      "enabled": true,
+      "interval_ms": 600000
+    }
+  }
+}
+```
+
+| Key | Default | Description |
+|---|---|---|
+| `work_generator.enabled` | `false` | Enable debt→backlog work generation. |
+| `work_generator.interval_ms` | `600000` (10 min) | Minimum ms between debt scans. Between scans the generator yields nothing — already-enqueued candidates live in the backlog, so nothing is lost. |
+
+Severity mapping: **HIGH/CRITICAL** debt becomes a `risk-tagged` candidate — it parks for human approval under the risk gate instead of executing automatically. NORMAL debt becomes `auto`. Candidates are deduplicated against the backlog by id, so a debt record is enqueued once.
+
+Work-generator triggers have the **lowest priority** among trigger sources (backlog → scheduled-flow → reactive → work-generator) and are fail-safe: an unavailable debt store yields no candidates and never breaks the loop.
 
 ---
 

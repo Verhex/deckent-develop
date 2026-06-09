@@ -1,5 +1,19 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-264 Learnings
+- Sprint sprint-264 Learnings: ## Sprint sprint-264 Learnings
+
+## Gains
+- 264-001 — Autonomous engine internals doc — yeni dispatch yolları — Added 'Dispatch paths — the 2026-06-10 wirings' section (5 subsections) to docs/guide/autonomous-...
+- 264-002 — Autonomous user guide — backlog add yeni yüzeyleri — Added user-facing docs for the new backlog-add surfaces to docs/guide/autonomous.md, all derived ...
+- 264-003 — Autonomous operations guide — governance + audit ops — Added two new operations sections to docs/guide/autonomous-operations.md, derived from code reali...
+- 264-004 — Enterprise depth reference — read-side + enforcement — Added three code-derived sections to docs/reference/enterprise-depth.md.
+- 264-005 — Config reference — yeni anahtarlar — Added new section '## 22.
+- 264-006 — CLI commands reference — audit + backlog yeni flag'ler — Kanıt PASSED: grep -ciE "audit (compliance|forward)|--cron|--capability|--connector" docs/referen...
+- 264-007 — Features reference — yeni yetenek satırları — Added '## Lightly Used Features' section to docs/reference/features.md between Active and Dormant...
+- 264-008 — Feature matrix guide — satır güncellemeleri — Updated docs/guide/feature-matrix.md surgically.
+- …and 4 more delivered
+
 ## Sprint sprint-263 Learnings
 - Sprint sprint-263 Learnings: ## Sprint sprint-263 Learnings
 

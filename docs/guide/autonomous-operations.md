@@ -224,7 +224,79 @@ detections**: a detection → a declarative `reactive-map.json` rule → a durab
 
 ---
 
-## 11. Troubleshooting
+## 11. RBAC enforcement (machine-initiated dispatch)
+
+By default ADR-037 RBAC is **advisory**. On the autonomous path it can be flipped to
+**enforced** with the (default-off) `rbac_policy` block in `.deckent/config.json`:
+
+```json
+{
+  "autonomous": {
+    "enabled": true,
+    "rbac_policy": { "enabled": false, "role": "viewer" }
+  }
+}
+```
+
+- `enabled: false` (default) → no RBAC gate; entries flow straight to the per-task
+  policy decision (§3 governance).
+- `enabled: true` → every entry-carrying trigger is RBAC-checked **first**, before the
+  per-task policy gate. The configured `role` is the identity of machine-initiated
+  dispatch; the required permission is `execute`.
+- **`viewer` (the default role) does NOT have the `execute` permission.** Turning the
+  flag on without raising the role means every machine-initiated entry is
+  **hard-denied**: the cycle ends `denied`, the decision is written to the audit
+  stream (§5.4), and the entry never reaches the approval gate.
+- `operator` / `admin` → `execute` is granted; the entry proceeds to the normal
+  per-task policy decision (`auto` / `approval-required` / `risk-tagged`).
+
+**`denied` is not `parked`.** A parked entry waits for a human `approve`/`reject`
+(§7); a denied entry was refused at the RBAC layer and will be denied again on every
+cycle until you either raise `rbac_policy.role` or disable the flag. The tenant used
+for the check is the entry's `tenant` field (`local` when unset).
+
+---
+
+## 12. Audit read-side: compliance report + SIEM export
+
+Two read-only consumers over the live ENT-3 audit chain of a sprint:
+
+### 12.1 Compliance report
+
+```bash
+deckent audit compliance --sprint <id>          # human-readable summary
+deckent audit compliance --sprint <id> --json   # raw JSON report
+```
+
+Builds a report over the sprint's audit events with three control flags:
+
+| Control | Source |
+|---------|--------|
+| `auditChainIntact` | HMAC chain verification over the sprint's audit events |
+| `rbacEnforcement` | `autonomous.rbac_policy.enabled` in config (§11) |
+| `tenantIsolation` | `strict_tenant_isolation` in config |
+
+The summary also includes the event count and a per-actor breakdown.
+**Exit codes:** `0` chain intact, `1` **broken chain** (use this in CI gates), `2` error.
+
+### 12.2 SIEM export (NDJSON)
+
+```bash
+deckent audit forward --sprint <id> --out <path>
+# default --out: .deckent/siem-export.jsonl
+```
+
+Forwards the sprint's audit chain through the SIEM forwarder into an **NDJSON file**
+(one JSON record per line) and prints the record count + destination. Exit codes:
+`0` success, `2` error.
+
+> **Honest limit:** the built-in transport is **file-only**. Real network transports
+> (HTTP/syslog) are an ENT-5 follow-up and do **not** exist yet — ship the NDJSON file
+> to your SIEM with your own collector/agent.
+
+---
+
+## 13. Troubleshooting
 
 | Symptom | Cause / fix |
 |--------|-------------|
@@ -234,10 +306,11 @@ detections**: a detection → a declarative `reactive-map.json` rule → a durab
 | Entry → `failed` | Read `.tasks/task-<id>.result` `notes` + the audit line in `autonomous-events.jsonl`. |
 | Reactive entries never appear | Reactive is attach-only (see §9) and/or `reactive.enabled` is false / map empty. |
 | Worker didn't spawn (provider error) | Provider not reachable (ollama down) or auth missing for claude. |
+| Every entry ends `denied` | `rbac_policy.enabled` is true with role `viewer` (no `execute`) — raise to `operator`/`admin` or disable the flag (§11). |
 
 ---
 
-## 12. References
+## 14. References
 
 - Concepts/architecture: [`autonomous-engine.md`](./autonomous-engine.md)
 - Spec/plan: `docs/superpowers/specs/2026-06-07-autonomous-execution-engine-design.md`,

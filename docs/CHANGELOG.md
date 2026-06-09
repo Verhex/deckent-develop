@@ -2,6 +2,28 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint264] - 2026-06-09
+
+### Added
+
+- Autonomous engine internals doc — yeni dispatch yolları
+- Autonomous user guide — backlog add yeni yüzeyleri
+- Autonomous operations guide — governance + audit ops
+- Enterprise depth reference — read-side + enforcement
+- Config reference — yeni anahtarlar
+- CLI commands reference — audit + backlog yeni flag'ler
+- Features reference — yeni yetenek satırları
+- Feature matrix guide — satır güncellemeleri
+- Event channels reference — capability audit aksiyonları
+- API surface contract — autonomous backlog formatı
+
+### Fixed
+
+- Init-test kümesi gerçek fix — readline-mock timeout
+
+
+_Tasks: 12 total, 12 done, 0 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint263] - 2026-06-09
 
 ### Added

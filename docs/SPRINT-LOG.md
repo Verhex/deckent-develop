@@ -7144,3 +7144,36 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 263-003: Test & Quality Posture Analysis (DONE)
 
 ---
+## Sprint 264 — sprint-264
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-06-09
+**Duration:** 854s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 12 |
+| Completed | 12 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 854327ms |
+
+### Tasks
+
+- 264-001: Autonomous engine internals doc — yeni dispatch yolları (DONE)
+- 264-002: Autonomous user guide — backlog add yeni yüzeyleri (DONE)
+- 264-003: Autonomous operations guide — governance + audit ops (DONE)
+- 264-004: Enterprise depth reference — read-side + enforcement (DONE)
+- 264-005: Config reference — yeni anahtarlar (DONE)
+- 264-006: CLI commands reference — audit + backlog yeni flag'ler (DONE)
+- 264-007: Features reference — yeni yetenek satırları (DONE)
+- 264-008: Feature matrix guide — satır güncellemeleri (DONE)
+- 264-009: Event channels reference — capability audit aksiyonları (DONE)
+- 264-010: API surface contract — autonomous backlog formatı (DONE)
+- 264-011: Init-test kümesi gerçek fix — readline-mock timeout (DONE)
+- 264-012: deckent-nedir (TR) — otonom yetenek özeti (DONE)
+
+---
