@@ -80,6 +80,10 @@
 | adr-086 | Native CLI Parity — F11 Feature Set (Sprint 224) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-274 Learnings** (sprint-274): ## Sprint sprint-274 Learnings
+
+## Gains
+- 274-001 — cache_warm config bloğu — Added CacheWarmConfig interface to con...
 - **Sprint sprint-273 Learnings** (sprint-273): ## Sprint sprint-273 Learnings
 
 ## Gains
@@ -114,10 +118,6 @@
 
 ## Gains
 - 265-001 — ERP capability wake — erp.read handler + runtime wiring + refera...
-- **Sprint sprint-264 Learnings** (sprint-264): ## Sprint sprint-264 Learnings
-
-## Gains
-- 264-001 — Autonomous engine internals doc — yeni dispatch yolları — Added ...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -144,5 +144,6 @@ _No active technical debt._
 - Violation pattern: file_outside_scope
 - Violation pattern: stale_heartbeat
 - Violation pattern: stale_heartbeat
+- Violation pattern: stale_heartbeat
 
-_Total entries: 397 | Generated: 2026-06-10_
+_Total entries: 401 | Generated: 2026-06-10_

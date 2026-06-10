@@ -1,21 +1,21 @@
 {
-  "taskId": "273-005",
-  "sprintId": "sprint-273",
+  "taskId": "274-001",
+  "sprintId": "sprint-274",
   "steps": [
     {
       "step": 2,
       "name": "routing-step-2",
       "input": {
-        "taskId": "273-005",
-        "title": "result-evaluator tokenUsage hizalaması — beyan artık zorunlu değil",
+        "taskId": "274-001",
+        "title": "cache_warm config bloğu",
         "scope": [
-          "src/orchestra/",
-          "tests/orchestra/"
+          "src/core/",
+          "tests/core/"
         ],
         "intent": "implementation"
       },
       "output": {
-        "agent": "bug-fixer",
+        "agent": "api-builder",
         "skills": [
           "typescript-expert",
           "testing-expert"
@@ -23,22 +23,22 @@
         "confidence": "high"
       },
       "durationMs": 0,
-      "reasoning": "Agent forced by override: bug-fixer"
+      "reasoning": "Agent forced by override: api-builder"
     },
     {
       "step": 4,
       "name": "routing-step-4",
       "input": {
-        "taskId": "273-005",
-        "title": "result-evaluator tokenUsage hizalaması — beyan artık zorunlu değil",
+        "taskId": "274-001",
+        "title": "cache_warm config bloğu",
         "scope": [
-          "src/orchestra/",
-          "tests/orchestra/"
+          "src/core/",
+          "tests/core/"
         ],
         "intent": "implementation"
       },
       "output": {
-        "agent": "bug-fixer",
+        "agent": "api-builder",
         "skills": [
           "typescript-expert",
           "testing-expert"
@@ -46,22 +46,22 @@
         "confidence": "high"
       },
       "durationMs": 0,
-      "reasoning": "Skill budget: max 1 (small task, 1 module(s), effort=normal)"
+      "reasoning": "Skill budget: max 2 (medium task, 1 module(s), effort=normal)"
     },
     {
       "step": 5,
       "name": "routing-step-5",
       "input": {
-        "taskId": "273-005",
-        "title": "result-evaluator tokenUsage hizalaması — beyan artık zorunlu değil",
+        "taskId": "274-001",
+        "title": "cache_warm config bloğu",
         "scope": [
-          "src/orchestra/",
-          "tests/orchestra/"
+          "src/core/",
+          "tests/core/"
         ],
         "intent": "implementation"
       },
       "output": {
-        "agent": "bug-fixer",
+        "agent": "api-builder",
         "skills": [
           "typescript-expert",
           "testing-expert"
@@ -72,5 +72,5 @@
       "reasoning": "Skills forced by override: [typescript-expert, testing-expert]"
     }
   ],
-  "decidedAt": "2026-06-10T18:14:07.269Z"
+  "decidedAt": "2026-06-10T18:58:28.404Z"
 }

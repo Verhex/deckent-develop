@@ -566,6 +566,35 @@ How workers are launched and their resource limits.
 
 ---
 
+## 12.1. Cache Warm Configuration
+
+Optional configuration block for F1-TOK Faz 2 (Sprint 274): warmup strategy to optimize shared prompt-prefix caching when spawning a fleet of workers.
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `cache_warm.enabled` | boolean | `false` | Master on/off switch. When `false`, no cache-warm behavior. |
+| `cache_warm.warm_delay_ms` | number | `45000` | Delay (milliseconds) before spawning non-warmer workers in the first wave. Range: 5000–180000 (5s–3m). Allows the first worker to write the shared prompt-prefix to cache before the fleet starts. |
+
+### Behavior
+
+- **Disabled (default):** `cache_warm.enabled: false` — zero behavioral change, all workers spawn immediately.
+- **Enabled:** First dispatch-eligible task in the sprint's first SPAWN wave launches immediately. Remaining tasks delay by `warm_delay_ms`, allowing the first worker's cache-write to finish before followers read.
+- **Single-task sprints:** No delay (only one task).
+- **Fail-safe:** If `warm_delay_ms` timer fails, normal spawn flow resumes without retrying.
+
+### Example Config
+
+```json
+{
+  "cache_warm": {
+    "enabled": true,
+    "warm_delay_ms": 45000
+  }
+}
+```
+
+---
+
 ## 13. Tier-Based Model Strategy (`model_strategy`)
 
 Replaces hard-coded model names with provider-agnostic tiers. Starts from the mode preset (`mode-presets.ts`), then `config.model_strategy` overlays on top (config.ts:1051-1066). A custom mode falls back to the `balanced` preset.
@@ -819,6 +848,7 @@ Proactive meta-orchestrator (ADR-040).
 | Key | Default | Values | Description |
 |-----|---------|--------|-------------|
 | `prompt.adr_min_relevance` | `0.3` | 0.0–1.0 (validate 658) | ADR relevance filter for worker prompts (Sprint 182); ADRs scoring below the threshold are dropped (prompt-god-template). |
+| `prompt.adr_render` | `"full"` | `"full"` \| `"operative"` (Sprint 273, Task 273-012) | ADR rendering mode for worker prompts. `"full"` = include complete ADR text. `"operative"` = include only marked operative sections (bounded by `<!-- worker-operative-start -->` / `<!-- worker-operative-end -->` HTML comments). Default `"full"` for backward compatibility. |
 
 ---
 

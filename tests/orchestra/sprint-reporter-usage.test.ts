@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { buildLimitBurnRow } from '../../src/orchestra/sprint-reporter.js';
 import type { LimitBurnOpts } from '../../src/orchestra/sprint-reporter.js';
 import type { UsageRecord } from '../../src/core/limit-ledger.js';
-import type { SprintUsageSummary } from '../../src/core/limit-ledger-report.js';
+import type { SprintUsageSummary, CacheGateReport } from '../../src/core/limit-ledger-report.js';
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -74,13 +74,14 @@ function makeOpts(
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
 describe('buildLimitBurnRow', () => {
-  it('formats the row with total cost, per-task cost, and boot-cw share', async () => {
+  it('formats the row with total cost, per-task cost, boot-cw share, and hit-rate', async () => {
     const records = [makeRecord()];
     const summary = makeSummary();
+    // totals: cacheRead=9000, in=1800 → hitRate=9000/10800≈83%
     const row = await buildLimitBurnRow('/root', 2, makeOpts(records, summary));
 
     expect(row).toBe(
-      '| Limit burn | $0.55 eşdeğer (task-başı $0.28, boot-cw %50%) |',
+      '| Limit burn | $0.55 eşdeğer (task-başı $0.28, boot-cw %50%, hit-rate %83%) |',
     );
   });
 
@@ -127,9 +128,10 @@ describe('buildLimitBurnRow', () => {
       parseUsage: async () => [makeRecord()],
       summarize: () => summary,
     };
+    // cacheRead=200, in=500 → hitRate=200/700≈29%
     const row = await buildLimitBurnRow('/root', 2, opts);
     expect(row).toBe(
-      '| Limit burn | $0.10 eşdeğer (task-başı $0.05, boot-cw %0%) |',
+      '| Limit burn | $0.10 eşdeğer (task-başı $0.05, boot-cw %0%, hit-rate %29%) |',
     );
   });
 
@@ -139,9 +141,91 @@ describe('buildLimitBurnRow', () => {
       parseUsage: async () => [makeRecord()],
       summarize: () => summary,
     };
+    // totals: cacheRead=9000, in=1800 → hitRate=83%
     const row = await buildLimitBurnRow('/root', 0, opts);
     expect(row).toBe(
-      '| Limit burn | $0.55 eşdeğer (task-başı $0.00, boot-cw %50%) |',
+      '| Limit burn | $0.55 eşdeğer (task-başı $0.00, boot-cw %50%, hit-rate %83%) |',
     );
+  });
+
+  it('appends cache-gate PASS when evaluateGate returns applicable+pass', async () => {
+    const records = [makeRecord()];
+    const summary = makeSummary();
+    const gate: CacheGateReport = {
+      applicable: true, pass: true,
+      warmTaskId: '001-001', sessions: [], warmShare: 1.0,
+    };
+    const opts: LimitBurnOpts = {
+      ...makeOpts(records, summary),
+      evaluateGate: () => gate,
+    };
+    const row = await buildLimitBurnRow('/root', 2, opts);
+    expect(row).toBe(
+      '| Limit burn | $0.55 eşdeğer (task-başı $0.28, boot-cw %50%, hit-rate %83%, cache-gate PASS) |',
+    );
+  });
+
+  it('appends cache-gate FAIL when evaluateGate returns applicable+not-pass', async () => {
+    const records = [makeRecord()];
+    const summary = makeSummary();
+    const gate: CacheGateReport = {
+      applicable: true, pass: false,
+      warmTaskId: '001-001', sessions: [], warmShare: 0.5,
+    };
+    const opts: LimitBurnOpts = {
+      ...makeOpts(records, summary),
+      evaluateGate: () => gate,
+    };
+    const row = await buildLimitBurnRow('/root', 2, opts);
+    expect(row).toBe(
+      '| Limit burn | $0.55 eşdeğer (task-başı $0.28, boot-cw %50%, hit-rate %83%, cache-gate FAIL) |',
+    );
+  });
+
+  it('omits cache-gate field when gate is not applicable (single session)', async () => {
+    const records = [makeRecord()];
+    const summary = makeSummary();
+    const gate: CacheGateReport = {
+      applicable: false, pass: false,
+      warmTaskId: null, sessions: [], warmShare: 0,
+    };
+    const opts: LimitBurnOpts = {
+      ...makeOpts(records, summary),
+      evaluateGate: () => gate,
+    };
+    const row = await buildLimitBurnRow('/root', 2, opts);
+    // gate not applicable → no cache-gate field
+    expect(row).toBe(
+      '| Limit burn | $0.55 eşdeğer (task-başı $0.28, boot-cw %50%, hit-rate %83%) |',
+    );
+  });
+
+  it('omits cache-gate and does not throw when evaluateGate throws', async () => {
+    const records = [makeRecord()];
+    const summary = makeSummary();
+    const opts: LimitBurnOpts = {
+      ...makeOpts(records, summary),
+      evaluateGate: () => { throw new Error('gate read failed'); },
+    };
+    const row = await buildLimitBurnRow('/root', 2, opts);
+    // error swallowed → no cache-gate field, row still produced
+    expect(row).toBe(
+      '| Limit burn | $0.55 eşdeğer (task-başı $0.28, boot-cw %50%, hit-rate %83%) |',
+    );
+  });
+
+  it('shows hit-rate %0 when cacheRead is zero', async () => {
+    const summary = makeSummary({
+      totals: {
+        calls: 2, in: 1000, out: 200, cacheRead: 0, cacheWrite: 800,
+        limitCost: 0.20, bootstrapShare: 0.5,
+      },
+    });
+    const opts: LimitBurnOpts = {
+      parseUsage: async () => [makeRecord()],
+      summarize: () => summary,
+    };
+    const row = await buildLimitBurnRow('/root', 2, opts);
+    expect(row).toContain('hit-rate %0%');
   });
 });

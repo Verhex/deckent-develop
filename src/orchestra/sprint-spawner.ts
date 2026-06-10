@@ -300,9 +300,44 @@ export async function spawnWorkers(
   projectRoot: string,
   sprint: Sprint,
   config: ResolvedConfig,
-  spawnOpts?: { autoApprove?: boolean; spawnBackend?: SpawnBackend },
+  spawnOpts?: {
+    autoApprove?: boolean;
+    spawnBackend?: SpawnBackend;
+    /**
+     * Sprint 274 F1-TOK Faz 2 — set ONLY at the sprint's first SPAWN-phase
+     * dispatch (sprint-phases.ts). Gates the cache-warm delay so FIX-phase
+     * respawns / TOPP continuous dispatch stay NORMAL. Default (undefined) =
+     * no warm delay regardless of config.
+     */
+    firstWave?: boolean;
+    /**
+     * Sprint 274 — injectable sleep for the cache-warm delay (defaults to the
+     * token-quota `sleep`). Tests inject a recording stub so the 45s default
+     * never blocks the suite (no real wait). Does NOT affect the Sprint-202
+     * token throttle, which keeps using the module-level `sleep`.
+     */
+    sleepFn?: (ms: number) => Promise<void>;
+  },
 ): Promise<Task[]> {
   const backend = spawnOpts?.spawnBackend;
+
+  // ─── Cache-Warm Spawn Gate (Sprint 274 F1-TOK Faz 2) ──────────────
+  // Opt-in prompt-cache economy. Evidence: when N workers start concurrently
+  // they EACH write the shared prompt-prefix to the provider cache (boot-cw
+  // fleet write %44-63). If one worker starts first, the rest READ the now-warm
+  // cache instead. So — and ONLY when `config.cache_warm.enabled === true` AND
+  // this is the sprint's first spawn wave (`firstWave`) — we dispatch the first
+  // task immediately (the "warmer", which WRITES the prefix) and delay the rest
+  // of the wave ONCE by `warm_delay_ms`. This is a one-time sprint-start delay;
+  // subsequent dispatches / FIX respawns / TOPP flow are NORMAL (gated out by
+  // `firstWave`). Chosen as the least-invasive point: it sits in the same loop
+  // and reuses the same `spawnedThisWave` counter as the Sprint-202 throttle.
+  const cacheWarmCfg = config.cache_warm;
+  const cacheWarmActive = spawnOpts?.firstWave === true && cacheWarmCfg?.enabled === true;
+  const warmDelayMs = cacheWarmCfg?.warm_delay_ms ?? 45_000;
+  const warmSleep = spawnOpts?.sleepFn ?? sleep;
+  let warmDelayApplied = false;
+  let warmTaskId: string | null = null;
 
   let needsTmuxSession = false;
 
@@ -410,6 +445,23 @@ export async function spawnWorkers(
     if (blockedTaskIds.has(task.id)) {
       debugLog('spawnWorkers:skipBlocked', `Task ${task.id} blocked by scope collision`);
       continue;
+    }
+
+    // Sprint 274 — cache-warm delay: after the warmer (first dispatched worker)
+    // has written the shared prompt-prefix, delay the remaining first-wave
+    // workers ONCE so they READ the warm cache. Fail-safe: a sleep/timer fault
+    // never blocks the wave — we log and fall through to the normal flow.
+    if (cacheWarmActive && spawnedThisWave === 1 && !warmDelayApplied) {
+      warmDelayApplied = true;
+      debugLog(
+        'spawnWorkers:cacheWarm',
+        `Warm worker = task ${warmTaskId ?? 'unknown'}; delaying remaining first-wave spawns by ${warmDelayMs}ms`,
+      );
+      try {
+        await warmSleep(warmDelayMs);
+      } catch (e) {
+        debugLog('spawnWorkers:cacheWarmDelay', e);
+      }
     }
 
     // Sprint 202 Task 202-004 — pace spawns by token_throttle_ms (skip first).
@@ -600,6 +652,11 @@ export async function spawnWorkers(
     } catch (e) { debugLog('spawnWorkers:writeTaskFile', e); }
 
     spawnedThisWave++;
+    // Sprint 274 — capture the warmer (the first task that actually spawned) so
+    // the cache-warm delay log can name which task wrote the shared prefix.
+    if (cacheWarmActive && spawnedThisWave === 1) {
+      warmTaskId = task.id;
+    }
   }
 
   const agents: AgentInfo[] = activeTasks.map(task => ({

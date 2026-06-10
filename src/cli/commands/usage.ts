@@ -24,8 +24,8 @@ import { resolveProjectRoot } from '../helpers/process.js';
 import { loadConfig } from '../../core/config.js';
 import { parseTranscriptUsage, limitCost } from '../../core/limit-ledger.js';
 import type { UsageRecord, LedgerOpts, LedgerPrices } from '../../core/limit-ledger.js';
-import { summarizeSprint, extractTaskIdFromStream } from '../../core/limit-ledger-report.js';
-import type { SprintUsageSummary } from '../../core/limit-ledger-report.js';
+import { summarizeSprint, extractTaskIdFromStream, evaluateCacheGate } from '../../core/limit-ledger-report.js';
+import type { SprintUsageSummary, CacheGateReport } from '../../core/limit-ledger-report.js';
 import { loadCostConfig, listEnabledModels } from '../../core/cost-config-loader.js';
 
 // ─── Injectable deps ────────────────────────────────────────────────────────
@@ -247,9 +247,10 @@ export async function runUsageCommand(
     }
 
     const summary: SprintUsageSummary = summarizeSprint(records, filteredMap, prices);
+    const cacheGate: CacheGateReport = evaluateCacheGate(records, filteredMap);
 
     if (options.json) {
-      print(JSON.stringify(summary, null, 2));
+      print(JSON.stringify({ ...summary, cacheGate }, null, 2));
       return;
     }
 
@@ -294,6 +295,17 @@ export async function runUsageCommand(
     ]);
 
     print(formatTable(headers, rows));
+
+    // Cache gate line
+    print('');
+    if (!cacheGate.applicable) {
+      print(getMessage('usage.cache_gate_na', lang));
+    } else {
+      const status = cacheGate.pass ? 'PASS' : 'FAIL';
+      const share = Math.round(cacheGate.warmShare * 100).toString();
+      const taskId = cacheGate.warmTaskId ?? '?';
+      print(getMessage('usage.cache_gate', lang, { status, share, taskId }));
+    }
     return;
   }
 

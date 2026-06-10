@@ -824,6 +824,19 @@ export function validateConfig(config: DeckentConfig): string[] {
     }
   }
 
+  // ─── Cache Warm validation ──────────────────────────────────────────
+  if (config.cache_warm !== undefined) {
+    const cw = config.cache_warm;
+    if (typeof cw.enabled !== 'boolean') {
+      errors.push('cache_warm.enabled must be a boolean');
+    }
+    if (cw.warm_delay_ms !== undefined) {
+      if (typeof cw.warm_delay_ms !== 'number' || cw.warm_delay_ms < 5000 || cw.warm_delay_ms > 180000) {
+        errors.push('cache_warm.warm_delay_ms must be a number between 5000 and 180000');
+      }
+    }
+  }
+
   // ─── deckent_style validation ───────────────────────────────────────
   if (config.deckent_style !== undefined && !['sprint', 'task'].includes(config.deckent_style)) {
     errors.push(`Invalid value '${config.deckent_style}' for field 'deckent_style'. Valid options: sprint, task`);
@@ -1419,6 +1432,8 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
     autonomous: config.autonomous,
     // Resource Monitor — passed through from project config (opt-in, absent = disabled)
     resource_monitor: config.resource_monitor,
+    // Cache Warm — passed through from project config (opt-in, absent = disabled)
+    cache_warm: config.cache_warm,
     // Messaging connectors (BOT-001) — passed through; tokens .deck-interpolated below.
     notify_connectors: (config as DeckentConfig).notify_connectors,
     notify_on_complete: (config as DeckentConfig).notify_on_complete,
@@ -2079,6 +2094,8 @@ export function mergeConfigs(
       : structuredClone(DEFAULT_TERMINAL_CONFIG),
     // Resource Monitor — passed through (opt-in, absent = disabled)
     resource_monitor: config.resource_monitor,
+    // Cache Warm — passed through (opt-in, absent = disabled)
+    cache_warm: config.cache_warm,
   };
   return merged;
 }

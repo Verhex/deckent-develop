@@ -1,5 +1,16 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-274 Learnings
+- Sprint sprint-274 Learnings: ## Sprint sprint-274 Learnings
+
+## Gains
+- 274-001 — cache_warm config bloğu — Added CacheWarmConfig interface to config-types.ts (after ResourceMonitorConfig, same pattern).
+- 274-002 — cache-warm spawn stratejisi — ilk worker yazar, fleet okur (OPUS) — F1-TOK Faz 2 cache-warm spawn implemented in spawnWorkers (sprint-spawner.ts) — the least-invasiv...
+- 274-003 — ledger cache-gate — sprint'in 2.+ worker'ları cache okuyor mu? — All goCriteria met:
+- 274-004 — retro limit-satırı genişletmesi — hit-rate + warm-share — All goCriteria met:
+- 274-005 — docs — cache_warm + adr_render + usage cache-gate — Added cache_warm configuration block (section 12.1) with enabled/warm_delay_ms fields; added prom...
+- 274-006 — MASTER-PLAN — F1-TOK Faz 2 işaretleri — F1-TOK Faz 2 completion marked in MASTER-PLAN.md.
+
 ## Sprint sprint-273 Learnings
 - Sprint sprint-273 Learnings: ## Sprint sprint-273 Learnings
 

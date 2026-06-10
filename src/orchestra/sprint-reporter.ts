@@ -466,6 +466,7 @@ import { debugLog } from '../core/utils.js';
 import { parseTranscriptUsage } from '../core/limit-ledger.js';
 import type { LedgerPrices, UsageRecord } from '../core/limit-ledger.js';
 import { summarizeSprint } from '../core/limit-ledger-report.js';
+import type { CacheGateReport } from '../core/limit-ledger-report.js';
 
 /** Injectable options for {@link buildLimitBurnRow} — used in tests. */
 export interface LimitBurnOpts {
@@ -474,6 +475,12 @@ export interface LimitBurnOpts {
   /** Override sprint summarizer (injectable for hermetic tests). */
   summarize?: typeof summarizeSprint;
   prices?: LedgerPrices;
+  /**
+   * Injectable cache-gate evaluator (pre-bound with taskMap) for hermetic tests.
+   * Called best-effort — errors are caught and the gate field is omitted silently.
+   * When not provided, the cache-gate field is omitted from the output row.
+   */
+  evaluateGate?: (records: UsageRecord[]) => CacheGateReport;
 }
 
 /**
@@ -512,8 +519,27 @@ export async function buildLimitBurnRow(
         ? Math.round((bootstrapSum / summary.totals.cacheWrite) * 100)
         : 0;
 
+    // Sprint-wide hit rate: cacheRead / (in + cacheRead)
+    const hitRateDenom = summary.totals.in + summary.totals.cacheRead;
+    const hitRatePct = hitRateDenom > 0
+      ? Math.round((summary.totals.cacheRead / hitRateDenom) * 100)
+      : 0;
+
+    // Best-effort cache-gate from injectable evaluator
+    let gateStr = '';
+    if (opts.evaluateGate) {
+      try {
+        const gate = opts.evaluateGate(records);
+        if (gate.applicable) {
+          gateStr = `, cache-gate ${gate.pass ? 'PASS' : 'FAIL'}`;
+        }
+      } catch (e) {
+        debugLog('buildLimitBurnRow gate', e);
+      }
+    }
+
     const fmt = (n: number) => `$${n.toFixed(2)}`;
-    return `| Limit burn | ${fmt(total)} eşdeğer (task-başı ${fmt(perTask)}, boot-cw %${bootShare}%) |`;
+    return `| Limit burn | ${fmt(total)} eşdeğer (task-başı ${fmt(perTask)}, boot-cw %${bootShare}%, hit-rate %${hitRatePct}%${gateStr}) |`;
   } catch (e) {
     debugLog('buildLimitBurnRow', e);
     return null;

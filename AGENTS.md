@@ -26,11 +26,7 @@ When acting as Worker: @.codex/rules/worker-default.md
 ## Agent Performance
 | Agent | Tasks | Done | Success |
 |-------|-------|------|--------|
-| performance-analyzer | 2 | 2 | 100% |
 | api-builder | 2 | 2 | 100% |
-| bug-fixer | 3 | 3 | 100% |
-| devops-engineer | 1 | 1 | 100% |
-| ci-guardian | 1 | 1 | 100% |
 | architect | 1 | 1 | 100% |
+| performance-analyzer | 1 | 1 | 100% |
 | doc-writer | 2 | 2 | 100% |
-| refactorer | 1 | 1 | 100% |

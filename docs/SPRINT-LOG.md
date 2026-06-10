@@ -7479,3 +7479,30 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 273-013: doc senkronu — features + MASTER-PLAN işaretleri (DONE)
 
 ---
+## Sprint 274 — sprint-274
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-06-10
+**Duration:** 707s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 6 |
+| Completed | 6 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 707204ms |
+
+### Tasks
+
+- 274-001: cache_warm config bloğu (DONE)
+- 274-002: cache-warm spawn stratejisi — ilk worker yazar, fleet okur (OPUS) (DONE)
+- 274-003: ledger cache-gate — sprint'in 2.+ worker'ları cache okuyor mu? (DONE)
+- 274-004: retro limit-satırı genişletmesi — hit-rate + warm-share (DONE)
+- 274-005: docs — cache_warm + adr_render + usage cache-gate (DONE)
+- 274-006: MASTER-PLAN — F1-TOK Faz 2 işaretleri (DONE)
+
+---

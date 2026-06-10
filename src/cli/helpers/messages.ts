@@ -1253,6 +1253,14 @@ const MESSAGES: MessageMap = {
     en: 'No sprint data found. Sessions could not be mapped to sprint {sprint} tasks.',
     tr: 'Sprint verisi bulunamadı. Oturumlar sprint {sprint} görevlerine eşlenemedi.',
   },
+  'usage.cache_gate': {
+    en: 'Cache gate: {status} (warm-share {share}%, warmer: {taskId})',
+    tr: 'Önbellek kapısı: {status} (ısıtma payı %{share}, ısıtıcı: {taskId})',
+  },
+  'usage.cache_gate_na': {
+    en: 'Cache gate: N/A (single-session sprint)',
+    tr: 'Önbellek kapısı: N/A (tek oturumlu sprint)',
+  },
 };
 
 /**

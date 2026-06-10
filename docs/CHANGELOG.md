@@ -2,6 +2,20 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint274] - 2026-06-10
+
+### Added
+
+- cache_warm config bloğu
+- cache-warm spawn stratejisi — ilk worker yazar, fleet okur (OPUS)
+- ledger cache-gate — sprint'in 2.+ worker'ları cache okuyor mu?
+- retro limit-satırı genişletmesi — hit-rate + warm-share
+- docs — cache_warm + adr_render + usage cache-gate
+- MASTER-PLAN — F1-TOK Faz 2 işaretleri
+
+
+_Tasks: 6 total, 6 done, 0 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint273] - 2026-06-10
 
 ### Added

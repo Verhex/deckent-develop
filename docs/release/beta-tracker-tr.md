@@ -47,7 +47,7 @@ Spec: `docs/superpowers/specs/2026-05-19-embedded-web-terminal-design.md`. Plan:
 | Metric | Value |
 |--------|-------|
 | Version | 1.0.0-beta.1 |
-| Sprint | sprint-273 |
+| Sprint | sprint-274 |
 | MCP Tools | 33 |
 | MCP Resources | 8 |
 | CLI Commands | 57+ |
@@ -1955,12 +1955,12 @@ Sprint 166 mimari forensic'inde 4 yeni follow-up bug tespit edildi (Sprint 167 Ã
 ## Sprint Metrics
 | Metric | Value |
 |--------|-------|
-| Sprint | sprint-273 |
-| Total Tasks | 13 |
-| Completed | 13 |
+| Sprint | sprint-274 |
+| Total Tasks | 6 |
+| Completed | 6 |
 | Tech Debt | 0 |
 | No-Go | 0 |
-| Duration | 19dk 50sn |
+| Duration | 11dk 47sn |
 | Coverage | N/A |
 
 ## Sprint History

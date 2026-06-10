@@ -1,16 +1,15 @@
 {
-  "taskId": "273-013",
-  "sprintId": "sprint-273",
+  "taskId": "274-005",
+  "sprintId": "sprint-274",
   "steps": [
     {
       "step": 2,
       "name": "routing-step-2",
       "input": {
-        "taskId": "273-013",
-        "title": "doc senkronu — features + MASTER-PLAN işaretleri",
+        "taskId": "274-005",
+        "title": "docs — cache_warm + adr_render + usage cache-gate",
         "scope": [
-          "docs/reference/",
-          "docs/"
+          "docs/reference/"
         ],
         "intent": "documentation"
       },
@@ -28,11 +27,10 @@
       "step": 3,
       "name": "routing-step-3",
       "input": {
-        "taskId": "273-013",
-        "title": "doc senkronu — features + MASTER-PLAN işaretleri",
+        "taskId": "274-005",
+        "title": "docs — cache_warm + adr_render + usage cache-gate",
         "scope": [
-          "docs/reference/",
-          "docs/"
+          "docs/reference/"
         ],
         "intent": "documentation"
       },
@@ -50,11 +48,10 @@
       "step": 4,
       "name": "routing-step-4",
       "input": {
-        "taskId": "273-013",
-        "title": "doc senkronu — features + MASTER-PLAN işaretleri",
+        "taskId": "274-005",
+        "title": "docs — cache_warm + adr_render + usage cache-gate",
         "scope": [
-          "docs/reference/",
-          "docs/"
+          "docs/reference/"
         ],
         "intent": "documentation"
       },
@@ -69,5 +66,5 @@
       "reasoning": "Skills forced by override: [documentation-writer]"
     }
   ],
-  "decidedAt": "2026-06-10T18:14:07.285Z"
+  "decidedAt": "2026-06-10T18:58:28.410Z"
 }

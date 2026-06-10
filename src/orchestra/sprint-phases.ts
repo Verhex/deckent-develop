@@ -753,7 +753,10 @@ export async function runSpawnPhase(
       // before workers are spawned. Status remains whatever planSprint
       // emitted (PLANNING) until ACTIVE flips after a successful spawn.
       persistPhaseTransition(projectRoot, sprint, SprintPhase.SPAWN, sprint.status);
-      taskQueue = await spawnWorkers(projectRoot, sprint, config, { autoApprove: opts?.autoApprove, spawnBackend });
+      // Sprint 274 F1-TOK Faz 2 — `firstWave: true` gates the opt-in cache-warm
+      // delay (config.cache_warm.enabled). The FIX-phase spawnWorkers call below
+      // intentionally omits it so FIX respawns stay NORMAL (no warm delay).
+      taskQueue = await spawnWorkers(projectRoot, sprint, config, { autoApprove: opts?.autoApprove, spawnBackend, firstWave: true });
       // Spawn succeeded — promote to ACTIVE and re-persist.
       persistPhaseTransition(projectRoot, sprint, SprintPhase.SPAWN, SprintStatus.ACTIVE);
       try {

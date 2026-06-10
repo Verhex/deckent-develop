@@ -141,7 +141,8 @@ Three immovable pillars (Alperen-approved 2026-05-31):
 | Faz 0 | Core ledger infrastructure (transcript parse, cost-equivalent unit, .gitignore stabilization, prompt-determinism guard) | ✅ Sprint 273: limit-ledger kernel + `parseTranscriptUsage` + `limitCost` unit math + gitignore cache-prefix artifacts + prompt-determinism test |
 | Faz 1 | Reporting & CLI (ledger→task mapping, sprint aggregation, `deckent usage` command, result-evaluator realignment, sprint-reporter limit row) | ✅ Sprint 273: limit-ledger-report + `deckent usage` (default/--sprint/--json) + result-evaluator token-optional + sprint-reporter burn metric |
 | Faz 1.5 | Prompt/persona cleanup (goCriteria language fix, persona "full suite" audit, ADR-seçici explicit refs) | ✅ Sprint 273: criteria-deriver targeted-verify language + persona full-suite → targeted + adr-selector explicit-ref force-include |
-| Remaining | Faz 2 CACHE-WARM (first-worker bootstrap cache strategy) + Faz 2 A/B verification sprint (target ≤$0.45/task, quality stable) | ⬜ deferred post-273 |
+| Faz 2 | First-worker bootstrap cache strategy + cache-gate measurement (cache-warm spawn 274-002 + cache-gate evaluator 274-003 + ADR-037 operative + kind-limitlers config) | ✅ Sprint 274: cache-warm spawn, cache-gate measurement, ADR-037 operative CC-written, kind-limitlers config-wired |
+| Remaining | Faz 2 A/B Verification sprint (target ≤$0.45/task, quality stable) | ⬜ Sprint 274 sprint-end: A/B measurement on transcript (code frozen, metrics post-build+tests+push) |
 
 ### F2 — Native Chat — **~95%**
 | ID | Item | Status |

@@ -546,6 +546,7 @@ Show transcript-based token and limit usage accounting (real ground-truth ledger
 2. **`--sprint <N>` mode:** Display per-task breakdown for a single sprint:
    - Task ID, model, calls, output tokens, cache write, bootstrap cache write (first call), $-cost, hit-rate.
    - Bottom row: sprint totals and bootstrap share %.
+   - **Cache gate row (F1-TOK):** "Cache gate: PASS/FAIL (warm-share %X, warmer: <taskId>)" — evaluates whether followers' first calls benefited from the warmer's cache-write (pass threshold ≥80%). Added by Sprint 274.
 
 **Accounting:**
 Uses the real transcript ledger (`.claude/projects/**/*.jsonl` message-usage fields) instead of worker self-estimates. Cost-equivalent unit: `in·$in + out·$out + cacheWrite·1.25·$in` (calibrated against observed token spend). Cache read has zero weight.

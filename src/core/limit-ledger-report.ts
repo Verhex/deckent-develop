@@ -54,6 +54,45 @@ export interface SprintUsageSummary {
   };
 }
 
+export interface CacheGateSession {
+  taskId: string;
+  /** First call's cache read tokens */
+  firstCallCr: number;
+  /** First call's cache write tokens */
+  firstCallCw: number;
+  /**
+   * True if this session's first call had cacheRead >= cacheWrite.
+   * Always false for the warmer (first session) — the warmer is the writer by definition.
+   */
+  readsWarm: boolean;
+}
+
+export interface CacheGateReport {
+  /**
+   * False for single-session sprints — gate requires ≥ 2 sessions to be meaningful.
+   * When false, pass is also false and sessions is empty.
+   */
+  applicable: boolean;
+  /** warmShare >= 0.8 → PASS. Always false when applicable is false. */
+  pass: boolean;
+  /** TaskId of the first (warmer) session. Null when applicable is false. */
+  warmTaskId: string | null;
+  /**
+   * All mapped sessions in chronological order (by first call ts).
+   * Index 0 = warmer; indices 1..N = followers evaluated for the gate.
+   */
+  sessions: CacheGateSession[];
+  /**
+   * Fraction of follower sessions (2.+) whose first call had cacheRead >= cacheWrite.
+   * Range [0, 1]. 0 when applicable is false.
+   *
+   * Gate threshold: warmShare >= 0.8 → PASS.
+   * A single outlier worker should not fail the gate — the 0.8 threshold allows one miss
+   * in a 5-worker fleet.
+   */
+  warmShare: number;
+}
+
 // ─── Task ID extraction ──────────────────────────────────────────────────────
 
 /**
@@ -252,5 +291,98 @@ export function summarizeSprint(
       limitCost: tCost,
       bootstrapShare: tCw > 0 ? tBoot / tCw : 0,
     },
+  };
+}
+
+// ─── Cache-gate evaluation ────────────────────────────────────────────────────
+
+/**
+ * Evaluate whether the sprint's follower workers read from cache (vs writing fresh).
+ *
+ * Algorithm:
+ * 1. Group records by sessionFile; resolve taskId from taskMap (skip unmapped sessions).
+ * 2. Sort sessions chronologically by their earliest record's ts.
+ * 3. First session = "warmer" (the worker that populated the shared prompt-prefix cache).
+ * 4. Each follower session's FIRST call is checked: cacheRead >= cacheWrite → readsWarm.
+ * 5. warmShare = readsWarm count / follower count. Gate: warmShare >= 0.8 → PASS.
+ *    The 0.8 threshold means a single outlier worker does not fail a 5+ worker fleet.
+ *
+ * @param records  UsageRecord[] — all records for the sprint (may include all models/sessions)
+ * @param taskMap  sessionFile basename → taskId (from extractTaskIdFromStream)
+ */
+export function evaluateCacheGate(
+  records: UsageRecord[],
+  taskMap: Record<string, string>,
+): CacheGateReport {
+  const NA: CacheGateReport = {
+    applicable: false,
+    pass: false,
+    warmTaskId: null,
+    sessions: [],
+    warmShare: 0,
+  };
+
+  // Group records by sessionFile
+  const sessionGroups = new Map<string, UsageRecord[]>();
+  for (const r of records) {
+    let arr = sessionGroups.get(r.sessionFile);
+    if (!arr) {
+      arr = [];
+      sessionGroups.set(r.sessionFile, arr);
+    }
+    arr.push(r);
+  }
+
+  // Build per-session entries (skip sessions without a taskId mapping)
+  interface SessionEntry {
+    taskId: string;
+    firstRecord: UsageRecord;
+  }
+
+  const entries: SessionEntry[] = [];
+  for (const [sessionFile, recs] of sessionGroups) {
+    const taskId = taskMap[sessionFile];
+    if (!taskId) continue;
+
+    // Sort by ts so index 0 is the earliest call
+    const sorted = [...recs].sort((a, b) => {
+      if (a.ts && b.ts) return a.ts < b.ts ? -1 : a.ts > b.ts ? 1 : 0;
+      return 0;
+    });
+
+    entries.push({ taskId, firstRecord: sorted[0]! });
+  }
+
+  // Need at least 2 sessions to evaluate the gate
+  if (entries.length < 2) return NA;
+
+  // Sort sessions chronologically by their first-call ts
+  entries.sort((a, b) => {
+    const ta = a.firstRecord.ts;
+    const tb = b.firstRecord.ts;
+    if (ta && tb) return ta < tb ? -1 : ta > tb ? 1 : 0;
+    return 0;
+  });
+
+  // Build CacheGateSession list
+  const sessions: CacheGateSession[] = entries.map((e, idx) => ({
+    taskId: e.taskId,
+    firstCallCr: e.firstRecord.cacheRead,
+    firstCallCw: e.firstRecord.cacheWrite,
+    // warmer (idx=0) is the writer by definition — readsWarm is always false for it
+    readsWarm: idx === 0 ? false : e.firstRecord.cacheRead >= e.firstRecord.cacheWrite,
+  }));
+
+  // warmShare: fraction of follower sessions that readsWarm
+  const followers = sessions.slice(1);
+  const warmCount = followers.filter((s) => s.readsWarm).length;
+  const warmShare = followers.length > 0 ? warmCount / followers.length : 0;
+
+  return {
+    applicable: true,
+    pass: warmShare >= 0.8,
+    warmTaskId: sessions[0]!.taskId,
+    sessions,
+    warmShare,
   };
 }
