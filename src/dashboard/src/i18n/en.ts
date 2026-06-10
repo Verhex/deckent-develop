@@ -5,6 +5,8 @@ export const en = {
   'nav.history': 'History',
   'nav.memory': 'Memory',
   'nav.config': 'Config',
+  'nav.workers': 'Workers',
+  'nav.directives': 'Directives',
 
   // Layout
   'layout.subtitle': 'agent orchestration',
@@ -35,7 +37,7 @@ export const en = {
   'dashboard.queued': 'queued',
   'dashboard.failed': 'failed',
   'dashboard.new_sprint': 'New Sprint',
-  'dashboard.subtitle': 'Live sprint orchestration · {n} workers',
+  'dashboard.subtitle': 'Live sprint orchestration · {{n}} workers',
   'dashboard.stat_active_sprint': 'Active sprint',
   'dashboard.stat_tasks_complete': 'Tasks complete',
   'dashboard.stat_executing': 'Executing now',
@@ -47,6 +49,17 @@ export const en = {
   'dashboard.confirm_cleanup': 'Archive sprint files?',
   'dashboard.confirm_kill': 'Stop all workers?',
   'dashboard.phase_timeline': 'Sprint Phases',
+
+  // Workers Page
+  'workers.subtitle': 'Live worker grid — status, heartbeat age, kill control',
+
+  // Directives Page
+  'directives.subtitle': 'View and edit DIRECTIVES.md — sprint goals and tasks',
+  'directives.load_warning': 'Could not load DIRECTIVES.md from the server (read endpoint unavailable). You can still compose and save.',
+  'directives.save': 'Save',
+  'directives.saving': 'Saving…',
+  'directives.saved': 'DIRECTIVES saved ({{n}} tasks).',
+  'directives.empty_warning': 'DIRECTIVES content is empty — add content before saving.',
 
   // Settings Page
   'settings.title': 'Settings & Health',

@@ -80,6 +80,10 @@
 | adr-086 | Native CLI Parity — F11 Feature Set (Sprint 224) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-269 Learnings** (sprint-269): ## Sprint sprint-269 Learnings
+
+## Gains
+- 269-001 — SPA token-inject P0 + enterprise endpoints + chat-stream adapter...
 - **Sprint sprint-268 Learnings** (sprint-268): ## Sprint sprint-268 Learnings
 
 ## Gains
@@ -108,10 +112,6 @@
 - Doc — Enterprise Foundation reference (consume-the-contract): GO_WITH_TECH_DEBT — Wo...
 - **Sprint sprint-259 Learnings** (sprint-259): ## Sprint sprint-259 Learnings
 - **Sprint sprint-258 Learnings** (sprint-258): ## Sprint sprint-258 Learnings
-- **Sprint sprint-257 Learnings** (sprint-257): ## Sprint sprint-257 Learnings
-
-## Gains
-- 257-001 — CODE-FULLSUITE-NOGO — worker self-verify must be TARGETED, not f...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -134,4 +134,4 @@ _No active technical debt._
 - Violation pattern: file_outside_scope
 - Violation pattern: file_outside_scope
 
-_Total entries: 366 | Generated: 2026-06-10_
+_Total entries: 374 | Generated: 2026-06-10_

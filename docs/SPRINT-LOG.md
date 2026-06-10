@@ -7289,3 +7289,34 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 268-006: Enterprise-depth reference — api_oidc + JWKS-seam + Dynamics ekleri (DONE)
 
 ---
+## Sprint 269 — sprint-269
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-06-10
+**Duration:** ~35dk efektif (ilk koşu Anthropic usage-limit kesintisi + CC retry respawn)
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 5 |
+| Completed | 5 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | ~35dk (limit kesintisi + retry dahil) |
+
+### Tasks
+
+- 269-001: API server yüzey fix'leri — SPA token-inject + Enterprise endpoints + chat-stream adapter (DONE — retry)
+- 269-002: Dashboard frontend — Workers/Directives rotaları + {n} fix + Nervous SSE + client birleştirme (DONE — retry)
+- 269-003: REPL slash tamamlama + i18n ihlalleri — /autonomous /audit /directives + hardcode temizliği (DONE — retry)
+- 269-004: MCP parite — deckent_run modelEffort/timeout/keep + deckent_audit action genişletmesi (DONE — retry)
+- 269-005: Doc-drift kapatma — mcp-tools regen + drift testi + features 268 satırları (DONE)
+
+> Limit notu: ilk koşuda 5 paralel fable worker'ı Anthropic usage limitini tüketti — 4 ağır task'ın
+> worker'ları hb seq-99/DONE'a kadar gelip .result yazamadan kesildi (sentetik NO_GO + FIX dalgası
+> aynı ölü limite koştu). Limit reset sonrası CC manuel respawn: 4/4 DONE disk-verify. Dersler
+> F1-LIM + model-katmanlama politikası olarak MASTER-PLAN'de; ilk sahte retro istatistikleri düzeltildi.
+
+---

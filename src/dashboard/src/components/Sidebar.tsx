@@ -7,7 +7,7 @@
  * canonical source and the inline copy in Layout.tsx is deleted.
  */
 import { NavLink } from "react-router-dom";
-import { LayoutDashboard, History, Brain, SlidersHorizontal, MessageCircle, Activity, GitBranch, Bell, Building2, Search } from "lucide-react";
+import { LayoutDashboard, History, Brain, SlidersHorizontal, MessageCircle, Activity, GitBranch, Bell, Building2, Search, Users, FileText } from "lucide-react";
 import { cn } from "../lib/utils";
 import { useTranslation } from "../i18n/LanguageProvider";
 import type { TranslationKey } from "../i18n/en";
@@ -27,6 +27,8 @@ export const navItems: ReadonlyArray<NavItem> = [
   { to: "/config", labelKey: "nav.config", icon: SlidersHorizontal },
   { to: "/chat", labelKey: "nav.chat", icon: MessageCircle },
   { to: "/status", labelKey: "dashboard.status", icon: Activity },
+  { to: "/workers", labelKey: "nav.workers", icon: Users },
+  { to: "/directives", labelKey: "nav.directives", icon: FileText },
   { to: "/evolution", labelKey: "nav.dashboard", label: "Evolution", icon: GitBranch },
   { to: "/nervous", labelKey: "nav.dashboard", label: "Nervous", icon: Bell },
   { to: "/enterprise", labelKey: "nav.dashboard", label: "Enterprise", icon: Building2 },

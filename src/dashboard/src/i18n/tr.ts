@@ -7,6 +7,8 @@ export const tr: Record<TranslationKey, string> = {
   'nav.history': 'Geçmiş',
   'nav.memory': 'Bellek',
   'nav.config': 'Yapılandırma',
+  'nav.workers': "Worker'lar",
+  'nav.directives': 'Direktifler',
 
   // Layout
   'layout.subtitle': 'ajan orkestrasyon',
@@ -37,7 +39,7 @@ export const tr: Record<TranslationKey, string> = {
   'dashboard.queued': 'kuyrukta',
   'dashboard.failed': 'başarısız',
   'dashboard.new_sprint': 'Yeni Sprint',
-  'dashboard.subtitle': 'Canlı sprint orkestrasyonu · {n} worker',
+  'dashboard.subtitle': 'Canlı sprint orkestrasyonu · {{n}} worker',
   'dashboard.stat_active_sprint': 'Aktif sprint',
   'dashboard.stat_tasks_complete': 'Tamamlanan',
   'dashboard.stat_executing': 'Şu an çalışan',
@@ -49,6 +51,17 @@ export const tr: Record<TranslationKey, string> = {
   'dashboard.confirm_cleanup': 'Sprint dosyalarını arşivle?',
   'dashboard.confirm_kill': "Tüm worker'ları durdur?",
   'dashboard.phase_timeline': 'Sprint Fazları',
+
+  // Workers Page
+  'workers.subtitle': 'Canlı worker tablosu — durum, heartbeat yaşı, durdurma kontrolü',
+
+  // Directives Page
+  'directives.subtitle': 'DIRECTIVES.md görüntüle ve düzenle — sprint hedefleri ve görevler',
+  'directives.load_warning': "DIRECTIVES.md sunucudan yüklenemedi (okuma endpoint'i mevcut değil). Yine de içerik yazıp kaydedebilirsiniz.",
+  'directives.save': 'Kaydet',
+  'directives.saving': 'Kaydediliyor…',
+  'directives.saved': 'DIRECTIVES kaydedildi ({{n}} görev).',
+  'directives.empty_warning': 'DIRECTIVES içeriği boş — kaydetmeden önce içerik ekleyin.',
 
   // Settings Page
   'settings.title': 'Ayarlar & Sağlık',

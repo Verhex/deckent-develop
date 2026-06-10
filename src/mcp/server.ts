@@ -28,7 +28,7 @@ init → set_directives → plan → start → status → review → retro → c
 ## Sprint Lifecycle
 PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → CLEANUP
 
-## Tools (32)
+## Tools (33)
 - deckent_init: Initialize Deckent in the current project directory
 - deckent_set_directives: Write sprint goals and task definitions to DIRECTIVES.md
 - deckent_plan: Generate task plan from DIRECTIVES (mode: ai/structured/auto)
@@ -61,6 +61,7 @@ PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → CLEANUP
 - deckent_audit: Run Brain Self-Audit Gate for a sprint (tsc, vitest, honesty checks) — read-only
 - deckent_recover: Recover a crashed or stuck sprint (clean orphan IPC dirs, stale locks, archive tasks) — destructive
 - deckent_models: List and refresh model catalog (live fetch from models.dev with 24h cache + bundled fallback)
+- deckent_autonomous: Autonomous engine control surface (status/start/stop/backlog list-add-approve-reject, cron support)
 
 ## Resources (8)
 - deckent://dashboard — Live sprint dashboard (agents, phases, alerts)

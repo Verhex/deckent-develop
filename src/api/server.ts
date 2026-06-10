@@ -44,6 +44,9 @@ import { streamChatMessage, streamToSseLines, type ChatProviderAdapter } from '.
 import { registerEvolutionRoutes } from './evolution-endpoint.js';
 import { registerMemorySearch } from './memory-search-endpoint.js';
 import { registerNervousRoutes } from './nervous-endpoint.js';
+import { registerEnterpriseRoutes } from './enterprise-endpoint.js';
+import { resolveChatProvider } from '../core/config.js';
+import { resolveChatAdapter } from '../cli/commands/chat-provider-parity.js';
 import { registerCoverageRoutes } from './coverage-endpoint.js';
 import { handleOutputStream, isOutputStreamRequest } from './output-stream.js';
 import { createOutputCollector, type OutputCollector } from '../core/output-collector.js';
@@ -91,6 +94,21 @@ export class RateLimiter {
   /** Exported for testing — resets all entries */
   reset(): void {
     this.store.clear();
+  }
+
+  /**
+   * Live state snapshot for /api/enterprise/rate (Sprint 269 B-Enterprise) —
+   * one row per tracked IP whose window is still open. Expired windows are
+   * skipped (they no longer constrain anything).
+   */
+  snapshot(): Array<{ key: string; count: number; resetAt: number; limit: number }> {
+    const now = Date.now();
+    const rows: Array<{ key: string; count: number; resetAt: number; limit: number }> = [];
+    for (const [key, entry] of this.store) {
+      if (now >= entry.resetAt) continue;
+      rows.push({ key, count: entry.count, resetAt: entry.resetAt, limit: this.maxRequests });
+    }
+    return rows;
   }
 }
 
@@ -333,6 +351,8 @@ async function handleRequest(
   rateLimiter?: RateLimiter,
   authMiddleware?: (req: IncomingMessage, res: ServerResponse) => boolean,
   outputCollector?: OutputCollector,
+  serveIndexHtml?: (req: IncomingMessage, res: ServerResponse) => boolean,
+  chatAdapter?: ChatProviderAdapter | null,
 ): Promise<void> {
   // Normalize /api/v1/... → /api/... for backward compat
   const rawUrl = req.url ?? '/';
@@ -573,8 +593,14 @@ async function handleRequest(
 
     // Worker output SSE (Sprint 230 T-230-008): live log fan-out for the
     // dashboard. Mounted via isOutputStreamRequest so the route matches the
-    // exact /api/output-stream path and ignores unrelated GETs.
-    if (outputCollector && isOutputStreamRequest(req)) {
+    // exact /api/output-stream path and ignores unrelated GETs. The collector
+    // is created eagerly at server setup (Sprint 269 B-OutputStream); a null
+    // collector (constructor failure) gets an honest 503 instead of a crash.
+    if (isOutputStreamRequest(req)) {
+      if (!outputCollector) {
+        sendError(res, 503, 'output-stream collector unavailable');
+        return;
+      }
       handleOutputStream(req, res, outputCollector);
       return;
     }
@@ -597,7 +623,11 @@ async function handleRequest(
       let closed = false;
       req.on('close', () => { closed = true; });
 
-      const adapter = chatStreamAdapter;
+      // Seam-injected adapter (setChatStreamAdapter) wins; otherwise fall back
+      // to the config-driven adapter resolved at server setup (Sprint 269
+      // B-ChatStream — REPL resolveChatAdapter SSOT). Neither configured →
+      // existing honest SSE-error below.
+      const adapter = chatStreamAdapter ?? chatAdapter ?? null;
       if (!adapter) {
         res.write(`data: ${JSON.stringify({ type: 'error', message: 'chat-stream: no adapter configured' })}\n\n`);
         res.end();
@@ -644,7 +674,11 @@ async function handleRequest(
         }
       }
 
-      // SPA fallback
+      // SPA fallback — every index.html served from here goes through the
+      // same loopback-only token-inject helper as the root path (A1, Sprint
+      // 269), so deep-link entry/refresh (/enterprise, /status, …) carries
+      // __DECKENT_API_TOKEN__ and the dashboard's API calls return 200.
+      if (serveIndexHtml?.(req, res)) return;
       const indexPath = join(staticDir, 'index.html');
       if (existsSync(indexPath)) {
         try {
@@ -666,6 +700,8 @@ async function handleRequest(
     // Memory FTS5 search: /api/memory/search?q= (216-012)
     if (registerMemorySearch(url, res, projectRoot)) return;
     if (registerNervousRoutes(url, method, res, projectRoot)) return;
+    // Enterprise dashboard data: /api/enterprise/{tenants,rbac,audit,rate} (269-001)
+    if (registerEnterpriseRoutes(url, method, res, projectRoot, rateLimiter ? { rateLimiter } : {})) return;
     // Coverage history + brain budget: /api/coverage
     if (registerCoverageRoutes(url, res, projectRoot)) return;
 
@@ -1008,11 +1044,26 @@ export function createHttpServer(
   // Auto-generate token if requested and none provided
   if (!resolvedToken && autoGenerateToken) {
     resolvedToken = randomUUID();
-    process.stderr.write(`[deckent:info] Auto-generated API token: ${resolvedToken}\n`);
+    process.stderr.write(`[deckent:info] Auto-generated API token (active for /api/* Bearer auth): ${resolvedToken}\n`);
   }
 
-  // Resolve final token: explicit param > env var fallback
+  // Resolve final token — single resolution order (A4, Sprint 269):
+  //   explicit param > env DECKENT_API_TOKEN > config api_auth_token > localhost auto-mint.
+  // resolveAuthToken keeps its existing contract (explicit > env); the config
+  // layer below only fills the previously-dead third slot — `deckent serve`
+  // never forwarded config.api_auth_token, so users who set it got 401s.
   let finalToken = resolveAuthToken(resolvedToken);
+  if (!finalToken) {
+    const projCfgForToken = join(projectRoot, PROJECT_CONFIG_PATH);
+    if (existsSync(projCfgForToken)) {
+      try {
+        const rawCfg = JSON.parse(readFileSync(projCfgForToken, 'utf-8')) as { api_auth_token?: unknown };
+        // Same deck-interpolation pass as the OIDC block — `$DECK:KEY` resolves.
+        const cfgToken = interpolateConfig(rawCfg.api_auth_token, projectRoot);
+        if (typeof cfgToken === 'string' && cfgToken.length > 0) finalToken = cfgToken;
+      } catch { /* unreadable config — fall through to auto-mint */ }
+    }
+  }
 
   // Sprint 216-006 (reconstructed Sprint 218 after a git reset --hard wiped the
   // original uncommitted change). On a loopback bind with no configured token,
@@ -1023,7 +1074,7 @@ export function createHttpServer(
   const isLoopbackHost = host === '127.0.0.1' || host === '::1' || host === 'localhost';
   if (!finalToken && isLoopbackHost && process.env['DECKENT_API_AUTH_DISABLED'] !== '1') {
     finalToken = randomBytes(32).toString('hex');
-    process.stderr.write(`[deckent:info] Auto-minted localhost API token: ${finalToken}\n`);
+    process.stderr.write(`[deckent:info] Auto-minted localhost API token (this is the ACTIVE token for /api/* Bearer auth; the dashboard on localhost receives it automatically): ${finalToken}\n`);
   }
 
   // Inform at startup about auth status (only reached on a remote bind with no token)
@@ -1081,12 +1132,34 @@ export function createHttpServer(
   const dashPath = join(projectRoot, DASHBOARD_FILE);
   const sseClients = new Set<ServerResponse>();
 
-  // Lazy OutputCollector for /api/output-stream SSE (Sprint 230 T-230-008).
-  // One per server — workers attach via the docker/tmux/subprocess backends.
+  // Eager OutputCollector for /api/output-stream SSE (Sprint 230 T-230-008,
+  // eager since Sprint 269 B-OutputStream). One per server — workers attach via
+  // the docker/tmux/subprocess backends. Created at setup so the first SSE
+  // request (before any worker attaches) streams an empty snapshot instead of
+  // racing a lazy init; a constructor failure leaves null → honest 503.
   let outputCollector: OutputCollector | null = null;
-  function getOutputCollector(): OutputCollector {
-    if (!outputCollector) outputCollector = createOutputCollector(projectRoot);
-    return outputCollector;
+  try {
+    outputCollector = createOutputCollector(projectRoot);
+  } catch {
+    outputCollector = null;
+  }
+
+  // Config-driven chat adapter for /api/chat/stream (Sprint 269 B-ChatStream).
+  // Rides the REPL's resolveChatAdapter SSOT (ADR-083 chat-provider-parity) so
+  // dashboard chat streams through the same provider the terminal REPL uses.
+  // Same raw sync config read as the OIDC/terminal blocks (createHttpServer is
+  // synchronous). The test seam (setChatStreamAdapter) still wins at request
+  // time; resolution failure leaves null → the endpoint's honest SSE-error.
+  let serveChatAdapter: ChatProviderAdapter | null = null;
+  try {
+    let rawChatCfg: Parameters<typeof resolveChatProvider>[0];
+    const projCfgForChat = join(projectRoot, PROJECT_CONFIG_PATH);
+    if (existsSync(projCfgForChat)) {
+      rawChatCfg = JSON.parse(readFileSync(projCfgForChat, 'utf-8')) as Parameters<typeof resolveChatProvider>[0];
+    }
+    serveChatAdapter = resolveChatAdapter(resolveChatProvider(rawChatCfg), {});
+  } catch {
+    serveChatAdapter = null;
   }
 
   // Watch dashboard file for SSE — lazy start
@@ -1167,7 +1240,9 @@ export function createHttpServer(
       // LocalTokenAuthProvider uses constant-time SHA-256 compare (timingSafeEqual)
       // and DELIBERATELY ignores DECKENT_API_AUTH_DISABLED.
       terminalToken = randomUUID();
-      process.stderr.write(`[deckent:info] Auto-generated API token: ${terminalToken}\n`);
+      // A4 (Sprint 269): label this clearly as the TERMINAL token — it was
+      // previously logged as "API token", sending users to /api/* 403s.
+      process.stderr.write(`[deckent:info] Terminal session token (embedded web terminal only — NOT the /api/* API token): ${terminalToken}\n`);
       terminalMgr = new PtySessionManager(terminalBackend, {
         scrollbackBytes: 262_144,
         idleTimeoutMs: 1_800_000,
@@ -1184,6 +1259,41 @@ export function createHttpServer(
       terminalAuth = terminalJwks
         ? new JwksAuthProvider(terminalJwks)
         : new LocalTokenAuthProvider(terminalToken);
+    }
+  }
+
+  // ─── Localhost-only token injection into index.html (A1, Sprint 269) ─
+  // Single inject path for EVERY served index.html — the root/index route in
+  // the request handler below AND handleRequest's SPA fallback (deep-link
+  // entry / browser refresh on /enterprise, /status, …) both call this.
+  // Injects:
+  //   - `window.__DECKENT_TERMINAL_TOKEN__` (existing terminal bootstrap)
+  //   - `window.__DECKENT_API_TOKEN__` (Sprint 191 — dashboard reads it and
+  //     attaches `Authorization: Bearer ...` on non-terminal fetches)
+  // Injects ONLY when at least one token is set AND the caller is loopback.
+  // Non-localhost callers fall through (return false) and receive the
+  // unmodified HTML so the tokens never leak across the network.
+  function serveIndexWithTokenInject(req: IncomingMessage, res: ServerResponse): boolean {
+    if (!resolvedStaticDir) return false;
+    if ((req.method ?? 'GET') !== 'GET') return false;
+    if (!terminalToken && !finalToken) return false;
+    if (!isLoopbackRemote(req.socket.remoteAddress ?? '')) return false;
+    const indexPath = join(resolvedStaticDir, 'index.html');
+    if (!existsSync(indexPath)) return false;
+    try {
+      let html = readFileSync(indexPath, 'utf-8');
+      if (terminalToken) {
+        const inject = `<script>window.__DECKENT_TERMINAL_TOKEN__ = ${JSON.stringify(terminalToken)};</script>`;
+        html = html.replace('</head>', inject + '</head>');
+      }
+      if (finalToken) {
+        html = injectApiTokenIntoHtml(html, finalToken);
+      }
+      res.writeHead(200, { 'Content-Type': 'text/html' });
+      res.end(html);
+      return true;
+    } catch {
+      return false; // unreadable index.html — caller falls through
     }
   }
 
@@ -1271,39 +1381,14 @@ export function createHttpServer(
         return;
       }
 
-      // ─── Localhost-only token injection into index.html ─
-      // Inject both:
-      //   - `window.__DECKENT_TERMINAL_TOKEN__` (existing terminal bootstrap)
-      //   - `window.__DECKENT_API_TOKEN__` (Sprint 191 — dashboard reads it and
-      //     attaches `Authorization: Bearer ...` on non-terminal fetches)
-      // Inject ONLY when at least one token is set AND the caller is loopback.
-      // Non-localhost callers receive the unmodified HTML so the tokens never
-      // leak across the network.
-      if (resolvedStaticDir && (terminalToken || finalToken) && method === 'GET' &&
-          (urlPath === '/' || urlPath === '/index.html')) {
-        const remoteAddr = req.socket.remoteAddress ?? '';
-        const isLocalhost = isLoopbackRemote(remoteAddr);
-        if (isLocalhost) {
-          const indexPath = join(resolvedStaticDir, 'index.html');
-          if (existsSync(indexPath)) {
-            try {
-              let html = readFileSync(indexPath, 'utf-8');
-              if (terminalToken) {
-                const inject = `<script>window.__DECKENT_TERMINAL_TOKEN__ = ${JSON.stringify(terminalToken)};</script>`;
-                html = html.replace('</head>', inject + '</head>');
-              }
-              if (finalToken) {
-                html = injectApiTokenIntoHtml(html, finalToken);
-              }
-              res.writeHead(200, { 'Content-Type': 'text/html' });
-              res.end(html);
-              return;
-            } catch { /* fall through to normal handling */ }
-          }
-        }
+      // ─── Localhost-only token injection into index.html (A1) ─
+      // Root/index path — same helper as handleRequest's SPA fallback, so a
+      // deep-link refresh and the root entry serve byte-identical HTML.
+      if (method === 'GET' && (urlPath === '/' || urlPath === '/index.html')) {
+        if (serveIndexWithTokenInject(req, res)) return;
       }
 
-      await handleRequest(req, res, projectRoot, dashPath, sseClients, resolvedStaticDir, initWatcher, finalToken, rateLimiter, authMiddleware, getOutputCollector());
+      await handleRequest(req, res, projectRoot, dashPath, sseClients, resolvedStaticDir, initWatcher, finalToken, rateLimiter, authMiddleware, outputCollector ?? undefined, serveIndexWithTokenInject, serveChatAdapter);
     })().catch((err: unknown) => {
       sendError(res, 500, err instanceof Error ? err.message : 'Internal server error');
     });

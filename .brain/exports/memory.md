@@ -1,5 +1,20 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-269 Learnings
+- Sprint sprint-269 Learnings: ## Sprint sprint-269 Learnings
+
+## Gains
+- 269-001 — SPA token-inject P0 + enterprise endpoints + chat-stream adapter — dashboard auth zinciri uçtan uca (24 test)
+- 269-002 — WorkersPage/DirectivesPage + Nervous SSE + kanonik API-client (19 test)
+- 269-003 — /autonomous /audit /directives REPL slash'leri + i18n (49 test)
+- 269-004 — MCP deckent_run modelEffort/timeoutMs/keep + deckent_audit action'ları (22 test)
+- 269-005 — doc-drift kapatma (kod-türevli drift testi)
+
+## Bugs/Dersler (limit olayı)
+- F1-LIM — usage-limit tükenmesi → 4 worker + 4 FIX worker toplu exit-without-result (hb DONE'a kadar gelmişlerdi); algıla→park gerekli
+- MODEL-KATMANLAMA — fable yalnız planlama+çok-zor task'lara (Alperen 2026-06-10)
+- BUILD +x — tsc build entry.js execute bitini düşürüyor → npm-link global deckent "Permission denied" (publish-readiness)
+
 ## Sprint sprint-268 Learnings
 - Sprint sprint-268 Learnings: ## Sprint sprint-268 Learnings
 

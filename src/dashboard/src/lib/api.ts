@@ -25,6 +25,10 @@ export class ApiError extends Error {
 /**
  * Read the bootstrap API token injected by the server. Returns undefined in
  * dev mode (vite without the server inject) or on non-localhost callers.
+ *
+ * This is the SINGLE token-read function for the dashboard (Sprint 269
+ * Task 269-002 client unification) — api-client.ts re-exports it and
+ * useApi.ts / use-live-data.ts consume it through this module.
  */
 export function getBootstrapApiToken(): string | undefined {
   if (typeof window === "undefined") return undefined;
@@ -39,9 +43,18 @@ function authHeaders(extra?: Record<string, string>): Record<string, string> {
   return base;
 }
 
+/** Dispatch 'deckent:unauthorized' so a top-level component can show a 401 banner
+ *  (absorbed from api-client.ts — Sprint 216-007 behavior, unified Sprint 269). */
+function signal401(): void {
+  if (typeof window !== "undefined" && typeof window.dispatchEvent === "function") {
+    window.dispatchEvent(new CustomEvent("deckent:unauthorized"));
+  }
+}
+
 export async function fetchJson<T>(url: string): Promise<T> {
   const res = await fetch(url, { headers: authHeaders() });
   if (!res.ok) {
+    if (res.status === 401) signal401();
     throw new ApiError(res.status, `GET ${url} failed: ${res.statusText}`);
   }
   return res.json() as Promise<T>;
@@ -54,6 +67,7 @@ export async function postJson<T>(url: string, body?: unknown): Promise<T> {
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
   if (!res.ok) {
+    if (res.status === 401) signal401();
     throw new ApiError(res.status, `POST ${url} failed: ${res.statusText}`);
   }
   return res.json() as Promise<T>;

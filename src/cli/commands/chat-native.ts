@@ -1,4 +1,7 @@
 import { spawn as nodeSpawn } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { DIRECTIVES_FILE } from '../../core/constants.js';
 import {
   providerRegistry as defaultProviderRegistry,
   type ProviderAdapter,
@@ -290,6 +293,12 @@ export interface ChatNativeOptions {
    * language so /resume output is localized (i18n-first).
    */
   lang?: string;
+  /**
+   * Sprint 269 T-269-003 — project root used by the `/directives` slash to
+   * read DIRECTIVES.md. Tests inject a tmpdir fixture (hermetic file I/O);
+   * production defaults to `process.cwd()` like the nervous bridge.
+   */
+  projectRoot?: string;
 }
 
 const DEFAULT_MAX_TURNS = 50;
@@ -499,30 +508,6 @@ export async function runChatNativeLoop(opts: ChatNativeOptions): Promise<ChatMe
       output(emitText);
       continue;
     }
-    // Sprint 222 T-222-007 — enterprise slash bridge wire. /cost /audit /rbac
-    // /flow shell out to the deckent enterprise CLI via dispatchEnterpriseSlash
-    // (def file chat-enterprise-bridge.ts excluded from kanıt grep). The check
-    // runs BEFORE the slash registry so enterprise slashes intercept cleanly
-    // and never round-trip to claude. Tests inject `opts.enterpriseSpawn` to
-    // stay hermetic; production uses the built-in child_process spawn.
-    if (line.startsWith('/')) {
-      const parts = line.split(/\s+/);
-      const slashName = (parts[0] ?? '').toLowerCase();
-      const extraArgs = parts.slice(1);
-      const enterpriseResult = await dispatchEnterpriseSlash(
-        slashName,
-        extraArgs,
-        opts.enterpriseSpawn ? { spawnFn: opts.enterpriseSpawn } : {},
-      );
-      if (enterpriseResult.handled) {
-        output(enterpriseResult.output);
-        transcript.push({ role: 'user', content: line });
-        transcript.push({ role: 'assistant', content: enterpriseResult.output });
-        memStore?.appendChatTurn(sessionId, 'user', line);
-        memStore?.appendChatTurn(sessionId, 'assistant', enterpriseResult.output);
-        continue;
-      }
-    }
     // Sprint 222 T-222-005 — slash registry wire. Extended slash commands
     // (/help, /status, /recall, /plan, /sprint) resolve via the live
     // catalog in chat-slash-registry.ts. `/help` renders the registry
@@ -531,9 +516,34 @@ export async function runChatNativeLoop(opts: ChatNativeOptions): Promise<ChatMe
     // gated by the risky-confirm function. Fires regardless of the
     // `agenticDispatch` flag — an explicit slash is unambiguous user
     // intent, while the flag only gates natural-language classification.
+    // Sprint 269 T-269-003 — the registry now resolves BEFORE the enterprise
+    // bridge so structured subactions (`/audit gate|query|compliance`) map to
+    // MCP dispatch; bare `/audit`, `-`-prefixed flags and the other enterprise
+    // slashes (/cost /rbac /flow) resolve to 'none' here and keep falling
+    // through to the enterprise CLI bridge below (behaviour preserved).
     const slashAction = resolveSlash(line, buildSlashRegistry());
     if (slashAction.action === 'help') {
       output(renderHelp(slashAction.registry));
+      continue;
+    }
+    // Sprint 269 T-269-003 — i18n informational/error reply from the registry
+    // (unknown subaction, `/mcp` honest not-wired notice, usage hints). The
+    // registry stays pure; the loop localizes the key here.
+    if (slashAction.action === 'message') {
+      output(getMessage(slashAction.messageKey, lang, slashAction.params));
+      continue;
+    }
+    // Sprint 269 T-269-003 — `/directives` (bare): show the project's current
+    // DIRECTIVES.md. Root is injectable for hermetic tests; defaults to cwd.
+    if (slashAction.action === 'show-directives') {
+      const directivesRoot = opts.projectRoot ?? process.cwd();
+      let directivesText: string;
+      try {
+        directivesText = readFileSync(join(directivesRoot, DIRECTIVES_FILE), 'utf-8');
+      } catch {
+        directivesText = getMessage('chat.directives_not_found', lang, { root: directivesRoot });
+      }
+      output(directivesText);
       continue;
     }
     if (slashAction.action === 'agentic') {
@@ -555,6 +565,31 @@ export async function runChatNativeLoop(opts: ChatNativeOptions): Promise<ChatMe
       memStore?.appendChatTurn(sessionId, 'user', line);
       memStore?.appendChatTurn(sessionId, 'assistant', slashResult);
       continue;
+    }
+    // Sprint 222 T-222-007 — enterprise slash bridge wire. /cost /audit /rbac
+    // /flow shell out to the deckent enterprise CLI via dispatchEnterpriseSlash
+    // (def file chat-enterprise-bridge.ts excluded from kanıt grep). Reached
+    // only when the registry above resolved 'none' (Sprint 269 reorder), so
+    // bare `/audit` and the other enterprise slashes intercept here and never
+    // round-trip to claude. Tests inject `opts.enterpriseSpawn` to stay
+    // hermetic; production uses the built-in child_process spawn.
+    if (line.startsWith('/')) {
+      const parts = line.split(/\s+/);
+      const slashName = (parts[0] ?? '').toLowerCase();
+      const extraArgs = parts.slice(1);
+      const enterpriseResult = await dispatchEnterpriseSlash(
+        slashName,
+        extraArgs,
+        opts.enterpriseSpawn ? { spawnFn: opts.enterpriseSpawn } : {},
+      );
+      if (enterpriseResult.handled) {
+        output(enterpriseResult.output);
+        transcript.push({ role: 'user', content: line });
+        transcript.push({ role: 'assistant', content: enterpriseResult.output });
+        memStore?.appendChatTurn(sessionId, 'user', line);
+        memStore?.appendChatTurn(sessionId, 'assistant', enterpriseResult.output);
+        continue;
+      }
     }
     // Sprint 221 T-221-002 — agentic dispatch wire. After the slash check,
     // classify the line as a deckent_* MCP tool intent (status/history/
@@ -579,7 +614,7 @@ export async function runChatNativeLoop(opts: ChatNativeOptions): Promise<ChatMe
           output(`[agentic] cancelled: ${intent.tool}`);
           continue;
         }
-        const agenticResult = await dispatchAgenticIntent(line, dispatcher);
+        const agenticResult = await dispatchAgenticIntent(line, dispatcher, lang);
         output(agenticResult.output);
         transcript.push({ role: 'user', content: line });
         transcript.push({ role: 'assistant', content: agenticResult.output });
@@ -590,7 +625,8 @@ export async function runChatNativeLoop(opts: ChatNativeOptions): Promise<ChatMe
     }
     if (EXIT_COMMANDS.includes(line.toLowerCase())) break;
     if (turnCount >= maxTurns) {
-      output(`[chat-native] maxTurns (${maxTurns}) reached — ending session.`);
+      // i18n (269-003): en template byte-identical to the prior hardcode.
+      output(getMessage('chat.max_turns_reached', lang, { max: String(maxTurns) }));
       break;
     }
     turnCount++;
@@ -651,7 +687,8 @@ export async function runChatNativeLoop(opts: ChatNativeOptions): Promise<ChatMe
       let toolHops = 0;
       while (response.stopReason === 'tool_use' && response.toolCalls?.length) {
         if (toolHops >= maxToolHops) {
-          trackedOutput(`[chat-native] maxToolHops (${maxToolHops}) reached — aborting tool chain.`);
+          // i18n (269-003): en template byte-identical to the prior hardcode.
+          trackedOutput(getMessage('chat.max_tool_hops_reached', lang, { max: String(maxToolHops) }));
           break;
         }
         toolHops++;
@@ -685,7 +722,8 @@ export async function runChatNativeLoop(opts: ChatNativeOptions): Promise<ChatMe
     } catch (err) {
       if (!opts.gracefulErrors || outputCount > 0) throw err;
       const msg = err instanceof Error ? err.message : String(err);
-      const errorTurn = `[chat-native] error: ${msg}`;
+      // i18n (269-003): en template byte-identical to the prior hardcode.
+      const errorTurn = getMessage('chat.provider_error', lang, { message: msg });
       output(errorTurn);
       transcript.push({ role: 'assistant', content: errorTurn });
       memStore?.appendChatTurn(sessionId, 'assistant', errorTurn);

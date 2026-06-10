@@ -1,0 +1,231 @@
+// ─── deckent_run MCP parity — modelEffort / timeoutMs / keep (269-004, ADR-022) ───
+// Hermetic: every I/O boundary (fs, spawn, config, routing) is mocked; the only
+// real modules under test are src/mcp/tools/run.ts + the pure ExecutionRequest
+// builder + the real resolveReasoningEffort contract (silent-drop pin).
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { writeFileSync } from 'node:fs';
+
+// ─── Mocks (mirror tests/mcp/tools/run.test.ts) ─────────────────────
+
+vi.mock('node:fs', () => ({
+  mkdirSync: vi.fn(),
+  writeFileSync: vi.fn(),
+}));
+
+vi.mock('../../src/core/constants.js', () => ({
+  TASKS_DIR: '.tasks',
+}));
+
+vi.mock('../../src/mcp/tools/job-runner.js', () => ({
+  writeJobState: vi.fn(),
+}));
+
+vi.mock('../../src/mcp/helpers/enrich.js', () => ({
+  enrichResponse: vi.fn((_t: string, data: unknown) => data),
+}));
+
+vi.mock('../../src/orchestra/brain.js', () => ({
+  buildWorkerPrompt: vi.fn().mockReturnValue('worker-prompt'),
+}));
+
+vi.mock('../../src/orchestra/sprint-controller.js', () => ({
+  resolveAgentPrompt: vi.fn().mockResolvedValue(undefined),
+  resolveSkillPrompts: vi.fn().mockResolvedValue([]),
+}));
+
+vi.mock('../../src/core/config.js', () => ({
+  loadConfig: vi.fn(),
+}));
+
+vi.mock('../../src/cli/commands/spawn.js', () => ({
+  spawnWorkerMultiProvider: vi.fn().mockResolvedValue({ backend: 'subprocess' }),
+}));
+
+// keep=false background cleanup path (lazy-imported by the tool)
+vi.mock('../../src/cli/commands/run.js', () => ({
+  waitForRunResult: vi.fn().mockResolvedValue(null),
+  cleanupRunTask: vi.fn(),
+}));
+
+vi.mock('../../src/core/agent-pool.js', () => ({
+  AgentPoolManager: vi.fn().mockImplementation(() => ({
+    loadAgents: vi.fn().mockReturnValue([]),
+  })),
+}));
+
+vi.mock('../../src/core/skill-pool.js', () => ({
+  SkillPoolManager: vi.fn().mockImplementation(() => ({
+    loadSkills: vi.fn().mockReturnValue([]),
+  })),
+}));
+
+vi.mock('../../src/core/stack-detector.js', () => ({
+  detectProjectStack: vi.fn().mockReturnValue({ primaryLanguage: 'typescript' }),
+}));
+
+vi.mock('../../src/core/routing-engine.js', () => ({
+  routeTaskV2: vi.fn().mockReturnValue({ agentId: 'generic', skillIds: [] }),
+}));
+
+vi.mock('../../src/core/utils.js', () => ({
+  debugLog: vi.fn(),
+}));
+
+import { loadConfig } from '../../src/core/config.js';
+import { spawnWorkerMultiProvider } from '../../src/cli/commands/spawn.js';
+import { waitForRunResult, cleanupRunTask } from '../../src/cli/commands/run.js';
+// REAL import (not mocked) — pins the silent-drop validation contract the spawn
+// path applies to modelEffort (resolveReasoningEffort SSOT, F1-RE 268-003).
+import { resolveReasoningEffort } from '../../src/core/reasoning-effort.js';
+
+// ─── Mock Server ────────────────────────────────────────────────────
+
+type ToolHandler = (args: Record<string, unknown>) => Promise<{ content: Array<{ type: string; text: string }>; isError?: boolean }>;
+
+interface MockServer {
+  tools: Map<string, { config: Record<string, unknown>; handler: ToolHandler }>;
+  registerTool(name: string, config: Record<string, unknown>, handler: ToolHandler): void;
+}
+
+function createMockServer(): MockServer {
+  const tools = new Map<string, { config: Record<string, unknown>; handler: ToolHandler }>();
+  return {
+    tools,
+    registerTool(name, config, handler) { tools.set(name, { config, handler }); },
+  };
+}
+
+async function getHandler(server: MockServer): Promise<ToolHandler> {
+  const { registerRunTool } = await import('../../src/mcp/tools/run.ts');
+  registerRunTool(server as never);
+  return server.tools.get('deckent_run')!.handler;
+}
+
+function writtenTaskJson(): Record<string, unknown> {
+  const call = vi.mocked(writeFileSync).mock.calls.find(
+    (c) => typeof c[0] === 'string' && (c[0] as string).endsWith('.json'),
+  );
+  expect(call).toBeDefined();
+  return JSON.parse(call![1] as string) as Record<string, unknown>;
+}
+
+function spawnOpts(): Record<string, unknown> {
+  expect(vi.mocked(spawnWorkerMultiProvider)).toHaveBeenCalledOnce();
+  return vi.mocked(spawnWorkerMultiProvider).mock.calls[0]![4] as Record<string, unknown>;
+}
+
+// ─── Tests ──────────────────────────────────────────────────────────
+
+describe('deckent_run MCP — modelEffort/timeoutMs/keep parity (269-004)', () => {
+  let server: MockServer;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(loadConfig).mockResolvedValue({ spawn_backend: 'subprocess' } as never);
+    vi.mocked(spawnWorkerMultiProvider).mockResolvedValue({ backend: 'subprocess' } as never);
+    vi.mocked(waitForRunResult).mockResolvedValue(null);
+    server = createMockServer();
+  });
+
+  it('exposes modelEffort, timeoutMs and keep in the inputSchema', async () => {
+    await getHandler(server);
+    const schema = server.tools.get('deckent_run')!.config['inputSchema'] as { shape: Record<string, unknown> };
+    expect(Object.keys(schema.shape)).toEqual(
+      expect.arrayContaining(['modelEffort', 'timeoutMs', 'keep']),
+    );
+  });
+
+  it('forwards modelEffort to the spawnWorkerMultiProvider opts (spawn wire)', async () => {
+    const handler = await getHandler(server);
+    await handler({ description: 'fix a bug', model: 'sonnet', modelEffort: 'xhigh', autoApprove: true });
+
+    expect(spawnOpts()['modelEffort']).toBe('xhigh');
+  });
+
+  it('sets task.modelEffort in the written task JSON (ExecutionRequest path)', async () => {
+    const handler = await getHandler(server);
+    await handler({ description: 'fix a bug', model: 'sonnet', modelEffort: 'high', autoApprove: true });
+
+    expect(writtenTaskJson()['modelEffort']).toBe('high');
+  });
+
+  it('omitted modelEffort → undefined at spawn and absent from the task JSON (no behavior change)', async () => {
+    const handler = await getHandler(server);
+    await handler({ description: 'fix a bug', model: 'sonnet', autoApprove: true });
+
+    expect(spawnOpts()['modelEffort']).toBeUndefined();
+    expect(writtenTaskJson()['modelEffort']).toBeUndefined();
+  });
+
+  it('forwards an invalid modelEffort raw to spawn without erroring (validation lives in spawn, CLI parity)', async () => {
+    const handler = await getHandler(server);
+    const result = await handler({ description: 'fix a bug', model: 'sonnet', modelEffort: 'bogus-level', autoApprove: true });
+
+    expect(result.isError).not.toBe(true);
+    // Raw forward — spawnWorkerMultiProvider resolves it via resolveReasoningEffort
+    // exactly like cli/commands/run.ts does.
+    expect(spawnOpts()['modelEffort']).toBe('bogus-level');
+  });
+
+  it('resolveReasoningEffort silently drops invalid/unsupported levels (spawn validation contract)', () => {
+    // The contract the spawn path applies to the forwarded value:
+    expect(resolveReasoningEffort('claude', 'bogus-level')).toBeUndefined(); // unknown level → dropped
+    expect(resolveReasoningEffort('gemini', 'high')).toBeUndefined();        // unsupported provider → dropped
+    expect(resolveReasoningEffort('claude', 'xhigh')).toBe('xhigh');         // valid → passes through
+    expect(resolveReasoningEffort('codex', 'minimal')).toBe('minimal');      // valid → passes through
+  });
+
+  it('echoes timeoutMs in the response and defaults to 300000 (CLI --timeout parity)', async () => {
+    const handler = await getHandler(server);
+    const res = await handler({ description: 'fix a bug', model: 'sonnet', timeoutMs: 60_000, autoApprove: true });
+    expect(JSON.parse(res.content[0]!.text).timeoutMs).toBe(60_000);
+
+    vi.clearAllMocks();
+    vi.mocked(loadConfig).mockResolvedValue({ spawn_backend: 'subprocess' } as never);
+    vi.mocked(spawnWorkerMultiProvider).mockResolvedValue({ backend: 'subprocess' } as never);
+    const resDefault = await handler({ description: 'fix a bug', model: 'sonnet', autoApprove: true });
+    expect(JSON.parse(resDefault.content[0]!.text).timeoutMs).toBe(300_000);
+  });
+
+  it('keep=false → background watcher waits with timeoutMs and cleans up once the result arrives', async () => {
+    vi.mocked(waitForRunResult).mockResolvedValue({ taskId: 'x', selfAssessment: 'DONE' } as never);
+
+    const handler = await getHandler(server);
+    const res = await handler({ description: 'fix a bug', model: 'sonnet', keep: false, timeoutMs: 45_000, autoApprove: true });
+    expect(JSON.parse(res.content[0]!.text).keep).toBe(false);
+
+    await vi.waitFor(() => {
+      expect(vi.mocked(cleanupRunTask)).toHaveBeenCalledOnce();
+    });
+    expect(vi.mocked(waitForRunResult)).toHaveBeenCalledOnce();
+    // wait window is the requested timeoutMs; cleanup targets the spawned taskId
+    const [, waitTaskId, waitTimeout] = vi.mocked(waitForRunResult).mock.calls[0]!;
+    expect(waitTimeout).toBe(45_000);
+    const [, cleanTaskId] = vi.mocked(cleanupRunTask).mock.calls[0]!;
+    expect(cleanTaskId).toBe(waitTaskId);
+  });
+
+  it('keep omitted (MCP default: preserve) → no watcher, no cleanup', async () => {
+    const handler = await getHandler(server);
+    const res = await handler({ description: 'fix a bug', model: 'sonnet', autoApprove: true });
+    expect(JSON.parse(res.content[0]!.text).keep).toBe(true);
+
+    // flush microtasks — a watcher (if wrongly started) would have fired by now
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(vi.mocked(waitForRunResult)).not.toHaveBeenCalled();
+    expect(vi.mocked(cleanupRunTask)).not.toHaveBeenCalled();
+  });
+
+  it('keep=false + timeout without a result → files preserved (no cleanup under a live worker)', async () => {
+    vi.mocked(waitForRunResult).mockResolvedValue(null); // timeout — no result
+
+    const handler = await getHandler(server);
+    await handler({ description: 'fix a bug', model: 'sonnet', keep: false, autoApprove: true });
+
+    await vi.waitFor(() => {
+      expect(vi.mocked(waitForRunResult)).toHaveBeenCalledOnce();
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(vi.mocked(cleanupRunTask)).not.toHaveBeenCalled();
+  });
+});

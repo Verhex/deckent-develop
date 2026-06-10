@@ -991,7 +991,7 @@ deckent web --dev
 | `deckent export` | Export memory.db to .brain/exports/*.md |
 | `deckent export [file]` | Export config to stdout or a file |
 | `deckent features` | List features from .deckent/features-manifest.json by category |
-| `deckent finalize` | Finalize a sprint: update MEMORY.md, RETRO.md, PROJECT-IDENTITY.md, config, run decay |
+| `deckent finalize` | Finalize a sprint: update memory exports, retro, identity (managed-docs), config, run decay |
 | `deckent flow` | Manage scheduled flows (F3 process mode) |
 | `deckent get <key>` | Get a configuration value by key (supports dot notation) |
 | `deckent get <name>` | Show details for an MCP server (from merged view) |

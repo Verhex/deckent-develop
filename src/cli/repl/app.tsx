@@ -53,12 +53,15 @@ export interface ReplLabels {
 /**
  * Error boundary — a render error in any child shows a one-line message instead
  * of crashing the whole REPL (enterprise robustness).
+ *
+ * i18n (269-003): the component is string-free — the caller injects the
+ * localized `label` (getMessage('tui.render_error', lang)); English default.
  */
-export class ReplErrorBoundary extends Component<{ children: ReactNode }, { err: Error | null }> {
+export class ReplErrorBoundary extends Component<{ children: ReactNode; label?: string }, { err: Error | null }> {
   state: { err: Error | null } = { err: null };
   static getDerivedStateFromError(err: Error): { err: Error } { return { err }; }
   override render(): ReactNode {
-    if (this.state.err) return <Text color="red">{`⚠ REPL render hatası: ${this.state.err.message}`}</Text>;
+    if (this.state.err) return <Text color="red">{`⚠ ${this.props.label ?? 'REPL render error'}: ${this.state.err.message}`}</Text>;
     return this.props.children;
   }
 }

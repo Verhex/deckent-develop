@@ -33,11 +33,14 @@ export function registerRunTool(server: McpServer): void {
       inputSchema: z.object({
         description: z.string().describe('Clear description of what the worker should do. Be specific: include file paths, expected outcome, and any constraints.'),
         model: z.enum(ALL_MODELS as unknown as readonly [string, ...string[]]).optional().default('sonnet').describe('AI model to use. Supports all providers (Claude, OpenAI, Gemini). Default: sonnet'),
+        modelEffort: z.string().optional().describe('Native model reasoning-effort level, mirrors CLI --model-effort (claude: low|medium|high|xhigh|max, codex: minimal|low|medium|high). Opt-in: validated per-provider at spawn time; invalid or unsupported levels are silently ignored and the provider CLI default applies.'),
         scope: z.string().optional().describe('Comma-separated directory paths the worker may modify (e.g. "src/,tests/"). Defaults to "src/" if omitted.'),
+        timeoutMs: z.number().optional().describe('Maximum wait window in milliseconds for the background result watcher, mirrors CLI --timeout. Default: 300000.'),
+        keep: z.boolean().optional().describe('Keep task files (.json/.hb/.result/.log) after the worker completes, mirrors CLI --keep. MCP default: true (files are preserved so deckent_status can read the result). Set false to opt in to CLI-style cleanup once the result file appears; on timeout without a result, files are always preserved.'),
         autoApprove: z.boolean().optional().default(true).describe('Auto-approve worker tool calls with --dangerously-skip-permissions. Deckent standard: workers MUST have full write permissions.'),
       }),
     },
-    async ({ description, model, scope, autoApprove }) => {
+    async ({ description, model, modelEffort, scope, timeoutMs, keep, autoApprove }) => {
       const root = process.cwd();
 
       try {
@@ -46,6 +49,14 @@ export function registerRunTool(server: McpServer): void {
         const tasksDir = join(root, TASKS_DIR);
         mkdirSync(tasksDir, { recursive: true });
 
+        // C-MCP-parite (269-004): CLI --timeout / --keep counterparts. MCP keep
+        // defaults to TRUE (preserve) — the fire-and-forget MCP path never cleaned
+        // up before, and deckent_status reads .result after completion.
+        const effectiveTimeoutMs = timeoutMs !== undefined && Number.isFinite(timeoutMs) && timeoutMs > 0
+          ? timeoutMs
+          : 300_000;
+        const keepFiles = keep !== false;
+
         // WM-1: unify on the canonical ExecutionRequest contract — sets task.type
         // (TaskKind), resolves provider from config (not hardcoded 'claude'), tags
         // origin='mcp', and spawns through the one provider-aware primitive.
@@ -53,11 +64,16 @@ export function registerRunTool(server: McpServer): void {
         const execReq = buildExecutionRequest({
           description,
           model: model as ModelType,
+          // C-MCP-parite (269-004): forward --model-effort equivalent into the
+          // canonical request so task.modelEffort is set (resolveToTask) and spawn
+          // emits the provider flag — same wire as CLI `deckent run` (268-003).
+          modelEffort,
           scope: { directories: scope ? scope.split(',').map((s) => s.trim()) : ['src/'] },
           projectRoot: root,
           config: cfg,
           autoApprove,
           origin: 'mcp',
+          timeoutMs: effectiveTimeoutMs,
         });
         const task = resolveToTask(execReq, taskId);
 
@@ -112,6 +128,11 @@ export function registerRunTool(server: McpServer): void {
           dockerImage: cfg.docker_image,
           dockerTimeout: cfg.docker_timeout,
           provider: execReq.provider,
+          // C-MCP-parite (269-004): task.modelEffort is validated per-provider
+          // inside spawnWorkerMultiProvider via resolveReasoningEffort — an invalid
+          // or unsupported level resolves to undefined (no flag emitted), exactly
+          // like the CLI path (cli/commands/run.ts).
+          modelEffort: task.modelEffort,
         });
 
         writeJobState(root, {
@@ -120,11 +141,31 @@ export function registerRunTool(server: McpServer): void {
           startedAt: new Date().toISOString(),
         });
 
+        // C-MCP-parite (269-004): keep=false opts in to CLI-style cleanup — watch
+        // for the result in the background (non-blocking; bounded by timeoutMs) and
+        // remove task files once a result actually arrived. Unlike the CLI, a
+        // timeout WITHOUT a result preserves the files: a fire-and-forget MCP path
+        // must never delete files under a possibly-still-running worker.
+        // Lazy import keeps the default path free of cli/commands/run.js deps.
+        if (!keepFiles) {
+          void import('../../cli/commands/run.js')
+            .then(async ({ waitForRunResult, cleanupRunTask }) => {
+              const result = await waitForRunResult(root, taskId, effectiveTimeoutMs);
+              if (result) cleanupRunTask(root, taskId);
+            })
+            .catch((cleanupErr) => {
+              debugLog('run:mcp:cleanup', `background cleanup watcher failed: ${cleanupErr}`);
+            });
+        }
+
         const enriched = enrichResponse('run', {
           jobId,
           taskId,
           status: 'RUNNING',
           model,
+          modelEffort: task.modelEffort,
+          timeoutMs: effectiveTimeoutMs,
+          keep: keepFiles,
           scope: execReq.scope.directories,
           backend,
         });

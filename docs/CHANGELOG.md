@@ -2,6 +2,23 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint269] - 2026-06-10
+
+### Added
+
+- Dashboard SPA-fallback token-inject — alt-sayfa refresh'i artık 401'e düşmüyor (P0)
+- Enterprise sayfası canlı: `/api/enterprise/{tenants,rbac,audit,rate}` endpoint'leri
+- WorkersPage + DirectivesPage rotaları; Nervous sayfası SSE; kanonik API-client birleştirmesi
+- Dashboard chat-stream adapter wiring (gerçek SSE streaming)
+- REPL: `/autonomous` `/audit` `/directives` slash'leri + i18n hardcode temizliği
+- MCP parite: `deckent_run` modelEffort/timeoutMs/keep; `deckent_audit` query/compliance/retention action'ları
+
+### Changed
+
+- Doc-drift kapatma — kod-türevli drift testi + features 268 satırları
+
+_Tasks: 5 total, 5 done, 0 tech debt, 0 no-go (ilk koşu Anthropic usage-limit kesintisi yedi; CC retry ile tamamlandı)_
+
 ## [1.0.0-beta.1-sprint268] - 2026-06-10
 
 ### Added

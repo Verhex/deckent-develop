@@ -199,3 +199,8 @@
 {"priority":"info","event":"task-done","title":"Task 268-005 tamamlandı","summary":"Dynamics 365 OData v4 read-only ErpDriver landed TDD-first (RED confirmed before impl). createDynami","sprintId":"sprint-268","timestamp":"2026-06-10T05:58:24.747Z"}
 {"priority":"info","event":"task-done","title":"Task 268-006 tamamlandı","summary":"Added Section 10 'HTTP API OIDC Bearer (api_oidc)' to docs/reference/enterprise-depth.md — fully cod","sprintId":"sprint-268","timestamp":"2026-06-10T05:58:27.940Z"}
 {"priority":"info","event":"sprint-finalized","title":"Sprint sprint-268 kapandı","summary":"7/7 DONE, 0 TECH_DEBT, 0 NO_GO","sprintId":"sprint-268","timestamp":"2026-06-10T06:02:49.574Z"}
+{"priority":"info","event":"sprint-started","title":"Sprint sprint-269 başladı","summary":"5 task planlandı","sprintId":"sprint-269","timestamp":"2026-06-10T07:11:02.446Z"}
+{"priority":"warning","event":"task-no-go","title":"Task 269-001 başarısız","summary":"Worker exited without writing result (exitCode=0)","sprintId":"sprint-269","timestamp":"2026-06-10T07:19:18.576Z"}
+{"priority":"warning","event":"task-no-go","title":"Task 269-003 başarısız","summary":"Worker exited without writing result (exitCode=0)","sprintId":"sprint-269","timestamp":"2026-06-10T07:19:21.617Z"}
+{"priority":"warning","event":"task-no-go","title":"Task 269-002 başarısız","summary":"Worker exited without writing result (exitCode=0) | disk-verify found evidence (linesAdded=58, untra","sprintId":"sprint-269","timestamp":"2026-06-10T07:19:21.609Z"}
+{"priority":"info","event":"sprint-finalized","title":"Sprint sprint-269 kapandı","summary":"1/9 DONE, 1 TECH_DEBT, 8 NO_GO","sprintId":"sprint-269","timestamp":"2026-06-10T07:21:05.703Z"}

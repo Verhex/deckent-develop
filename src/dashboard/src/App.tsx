@@ -13,6 +13,8 @@ import EvolutionPage from "./pages/EvolutionPage";
 import NervousPage from "./pages/NervousPage";
 import EnterprisePage from "./pages/EnterprisePage";
 import MemoryExplorerPage from "./pages/MemoryExplorerPage";
+import WorkersPage from "./pages/WorkersPage";
+import DirectivesPage from "./pages/DirectivesPage";
 
 function App() {
   return (
@@ -32,6 +34,8 @@ function App() {
               <Route path="/nervous" element={<NervousPage />} />
               <Route path="/enterprise" element={<EnterprisePage />} />
               <Route path="/memory-explorer" element={<MemoryExplorerPage />} />
+              <Route path="/workers" element={<WorkersPage />} />
+              <Route path="/directives" element={<DirectivesPage />} />
             </Route>
           </Routes>
         </BrowserRouter>

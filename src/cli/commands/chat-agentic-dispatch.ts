@@ -1,4 +1,5 @@
 import type { McpToolDispatcher } from './chat-native.js';
+import { getMessage } from '../helpers/messages.js';
 
 // ═══ chat-agentic-dispatch — natural language → MCP tool router ═════════
 //
@@ -119,16 +120,20 @@ export function classifyAgenticIntent(text: string): AgenticIntent {
  *
  * Multiple intents in a single string are NOT chained here — the
  * caller can invoke `dispatchAgenticIntent` per line / per concern.
+ *
+ * `lang` localizes the no-match notice (i18n, 269-003); defaults to 'en'
+ * so existing two-arg callers keep their exact output.
  */
 export async function dispatchAgenticIntent(
   text: string,
   dispatcher: McpToolDispatcher,
+  lang: string = 'en',
 ): Promise<AgenticDispatchResult> {
   const intent = classifyAgenticIntent(text);
   if (intent.tool === null) {
     return {
       matched: false,
-      output: '[agentic] no matching intent — falling back to chat.',
+      output: getMessage('chat.agentic_no_match', lang),
     };
   }
   const output = await dispatcher.dispatch(intent.tool, intent.args);

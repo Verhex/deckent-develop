@@ -15,12 +15,12 @@
 ## Live Metrics
 | Metric | Value |
 |--------|-------|
-| Sprint | sprint-268 |
-| Total Tasks | 7 |
-| Completed | 7 |
+| Sprint | sprint-269 |
+| Total Tasks | 5 |
+| Completed | 5 |
 | Tech Debt | 0 |
 | No-Go | 0 |
-| Duration | 25dk 5sn |
+| Duration | ~35dk (limit kesintisi + retry) |
 | Coverage | N/A |
 
 # TABLE OF CONTENTS

@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { getBootstrapApiToken } from "./api";
 
 /**
  * Live-data hook with stale-while-revalidate semantics.
@@ -29,11 +30,9 @@ export interface UseLiveDataResult<T> {
   isLoading: boolean;
   error: Error | null;
   status: LiveDataStatus;
-}
-
-function getApiToken(): string | undefined {
-  if (typeof window === "undefined") return undefined;
-  return (window as unknown as { __DECKENT_API_TOKEN__?: string }).__DECKENT_API_TOKEN__;
+  /** Trigger an immediate re-fetch (cancels the pending poll timer) — e.g.
+   *  right after a mutation so the UI reflects it without waiting a poll. */
+  refresh: () => void;
 }
 
 export function useLiveData<T>(
@@ -51,6 +50,9 @@ export function useLiveData<T>(
   const abortRef = useRef<AbortController | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mountedRef = useRef(true);
+  // Latest tick function — written by the effect below so the stable
+  // `refresh` callback can trigger an immediate re-fetch.
+  const tickRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     if (!enabled) return;
@@ -62,7 +64,7 @@ export function useLiveData<T>(
       setIsLoading(true);
 
       const headers: Record<string, string> = {};
-      const token = getApiToken();
+      const token = getBootstrapApiToken();
       if (token) headers["Authorization"] = `Bearer ${token}`;
 
       try {
@@ -97,10 +99,20 @@ export function useLiveData<T>(
       }
     }
 
+    tickRef.current = () => {
+      if (!mountedRef.current) return;
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+      void tick();
+    };
+
     void tick();
 
     return () => {
       mountedRef.current = false;
+      tickRef.current = () => {};
       abortRef.current?.abort();
       if (timerRef.current) {
         clearTimeout(timerRef.current);
@@ -109,5 +121,9 @@ export function useLiveData<T>(
     };
   }, [url, pollIntervalMs, retryDelayMs, enabled]);
 
-  return { data, isStale, isLoading, error, status };
+  const refresh = useCallback(() => {
+    tickRef.current();
+  }, []);
+
+  return { data, isStale, isLoading, error, status, refresh };
 }

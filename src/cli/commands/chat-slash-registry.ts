@@ -35,6 +35,14 @@ export type SlashAction =
   | { action: 'exit' }
   | { action: 'clear' }
   | { action: 'agentic'; tool: string; args: Record<string, unknown> }
+  /**
+   * Sprint 269 T-269-003 — i18n-safe informational/error reply. The registry
+   * stays pure (no lang, no disk I/O); the caller resolves `messageKey` via
+   * getMessage(key, lang, params) and echoes the localized text.
+   */
+  | { action: 'message'; messageKey: string; params?: Record<string, string> }
+  /** Sprint 269 T-269-003 — `/directives` (bare): caller shows DIRECTIVES.md. */
+  | { action: 'show-directives' }
   | { action: 'none' };
 
 // ─── Live Catalog ────────────────────────────────────────────────────────────
@@ -178,6 +186,31 @@ const SLASH_CATALOG: readonly SlashCommand[] = [
     agenticArgs: {},
   },
   {
+    name: '/autonomous',
+    desc: 'Otonom motor (örn: /autonomous status · backlog add <başlık> [--cron <expr>] · approve <id>)',
+    agenticTool: 'deckent_autonomous',
+    agenticArgs: {},
+  },
+  {
+    name: '/audit',
+    desc: 'Sprint audit (örn: /audit gate sprint-269 · query [kanal] · compliance)',
+    agenticTool: 'deckent_audit',
+    agenticArgs: {},
+  },
+  {
+    name: '/directives',
+    desc: "DIRECTIVES.md göster · '/directives set <metin>' ile yaz (onay ister)",
+    agenticTool: 'deckent_set_directives',
+    agenticArgs: {},
+  },
+  {
+    // Meta-command: external MCP-client is not wired into the REPL yet (F9
+    // Faz 2 roadmap). Intercepted here with an honest i18n message so the
+    // line never round-trips to the provider (audit finding A3).
+    name: '/mcp',
+    desc: 'Harici MCP istemci durumu',
+  },
+  {
     name: '/model',
     desc: 'Modeli değiştir (örn: /model sonnet)',
   },
@@ -253,6 +286,119 @@ export function slashCompleter(line: string): [string[], string] {
   return [hits.length > 0 ? hits : names, line];
 }
 
+// ─── Subaction parsers (Sprint 269 T-269-003) ───────────────────────────────
+//
+// /autonomous, /audit and /directives carry structured subactions that map to
+// MCP tool args (the generic `_rest` passthrough is not enough). Pure string →
+// SlashAction functions; unknown/incomplete input returns an i18n `message`
+// action (the caller localizes via getMessage).
+
+/** Derive a stable backlog id from a human title (deckent_autonomous backlog_add requires `id`). */
+function slugifyBacklogId(title: string): string {
+  return title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+/** `/autonomous status|start|stop|backlog list|backlog add <title> [--cron <expr>]|approve <id>|reject <id>` → deckent_autonomous. */
+function resolveAutonomousSlash(rest: readonly string[]): SlashAction {
+  // Bare `/autonomous` defaults to the read-only status action.
+  const sub = (rest[0] ?? 'status').toLowerCase();
+  if (sub === 'status' || sub === 'start' || sub === 'stop') {
+    return { action: 'agentic', tool: 'deckent_autonomous', args: { action: sub } };
+  }
+  if (sub === 'backlog') {
+    const verb = (rest[1] ?? '').toLowerCase();
+    if (verb === 'list') {
+      return { action: 'agentic', tool: 'deckent_autonomous', args: { action: 'backlog_list' } };
+    }
+    if (verb === 'add') {
+      const cronIdx = rest.indexOf('--cron');
+      const titleWords = cronIdx >= 0 ? rest.slice(2, cronIdx) : rest.slice(2);
+      const title = titleWords.join(' ').trim();
+      if (title.length === 0) {
+        return { action: 'message', messageKey: 'chat.autonomous_title_required' };
+      }
+      const args: Record<string, unknown> = {
+        action: 'backlog_add',
+        id: slugifyBacklogId(title),
+        title,
+      };
+      if (cronIdx >= 0) {
+        const cron = rest.slice(cronIdx + 1).join(' ').trim();
+        if (cron.length > 0) args['cron'] = cron;
+      }
+      return { action: 'agentic', tool: 'deckent_autonomous', args };
+    }
+    return {
+      action: 'message',
+      messageKey: 'chat.slash_unknown_subaction',
+      params: { command: '/autonomous backlog', sub: verb.length > 0 ? verb : '(boş)' },
+    };
+  }
+  if (sub === 'approve' || sub === 'reject') {
+    const triggerId = rest[1];
+    if (!triggerId) {
+      return { action: 'message', messageKey: 'chat.autonomous_id_required', params: { sub } };
+    }
+    return { action: 'agentic', tool: 'deckent_autonomous', args: { action: sub, triggerId } };
+  }
+  return {
+    action: 'message',
+    messageKey: 'chat.slash_unknown_subaction',
+    params: { command: '/autonomous', sub },
+  };
+}
+
+/**
+ * `/audit gate [sprint]|query [channel]|compliance` → deckent_audit dispatch.
+ *
+ * Bare `/audit` (and `-`-prefixed flags like `/audit --json`) deliberately
+ * return `none` so the legacy enterprise CLI bridge in chat-native keeps
+ * handling them (behaviour preserved). Subactions that exist in the CLI but
+ * NOT in the MCP tool (forward, retention, …) get an honest i18n message
+ * instead of a fabricated dispatch.
+ */
+function resolveAuditSlash(rest: readonly string[]): SlashAction {
+  const sub = (rest[0] ?? '').toLowerCase();
+  if (sub.length === 0 || sub.startsWith('-')) return { action: 'none' };
+  if (sub === 'gate') {
+    const args: Record<string, unknown> = { action: 'gate' };
+    const sprint = rest[1];
+    if (sprint) args['sprintId'] = sprint;
+    return { action: 'agentic', tool: 'deckent_audit', args };
+  }
+  if (sub === 'query') {
+    const args: Record<string, unknown> = { action: 'query' };
+    const channel = rest[1];
+    if (channel) args['channel'] = channel;
+    return { action: 'agentic', tool: 'deckent_audit', args };
+  }
+  if (sub === 'compliance') {
+    return { action: 'agentic', tool: 'deckent_audit', args: { action: 'compliance' } };
+  }
+  return { action: 'message', messageKey: 'chat.audit_not_in_mcp', params: { sub } };
+}
+
+/** `/directives` (show) · `/directives set <content>` → deckent_set_directives. */
+function resolveDirectivesSlash(rest: readonly string[]): SlashAction {
+  if (rest.length === 0) return { action: 'show-directives' };
+  const sub = (rest[0] ?? '').toLowerCase();
+  if (sub === 'set') {
+    const content = rest.slice(1).join(' ').trim();
+    if (content.length === 0) {
+      return { action: 'message', messageKey: 'chat.directives_set_usage' };
+    }
+    return { action: 'agentic', tool: 'deckent_set_directives', args: { content } };
+  }
+  return {
+    action: 'message',
+    messageKey: 'chat.slash_unknown_subaction',
+    params: { command: '/directives', sub },
+  };
+}
+
 /**
  * Resolve a raw REPL line against the slash registry.
  *
@@ -272,6 +418,14 @@ export function resolveSlash(line: string, registry: SlashRegistry): SlashAction
   if (name === '/help') return { action: 'help', registry };
   if (name === '/exit' || name === '/quit') return { action: 'exit' };
   if (name === '/clear') return { action: 'clear' };
+
+  // Sprint 269 T-269-003 — structured subaction slashes. Parsed BEFORE the
+  // generic entry lookup so their args map to the MCP tool schemas instead of
+  // the positional `_rest` passthrough.
+  if (name === '/mcp') return { action: 'message', messageKey: 'chat.mcp_not_wired' };
+  if (name === '/autonomous') return resolveAutonomousSlash(rest);
+  if (name === '/audit') return resolveAuditSlash(rest);
+  if (name === '/directives') return resolveDirectivesSlash(rest);
 
   const entry = registry.find((r) => r.name.toLowerCase() === name);
   if (entry?.agenticTool) {

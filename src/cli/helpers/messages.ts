@@ -613,6 +613,59 @@ const MESSAGES: MessageMap = {
     en: 'ran command',
     tr: 'komut çalıştırıldı',
   },
+  'tui.render_error': {
+    en: 'REPL render error',
+    tr: 'REPL render hatası',
+  },
+
+  // ─── chat REPL loop + slash subactions (Sprint 269 — 269-003) ────────
+  // NOTE: the en templates for max_turns/max_tool_hops/provider_error/
+  // agentic_no_match are byte-identical to the previous hardcoded strings —
+  // existing substring assertions stay green.
+  'chat.max_turns_reached': {
+    en: '[chat-native] maxTurns ({max}) reached — ending session.',
+    tr: '[chat-native] maxTurns ({max}) sınırına ulaşıldı — oturum kapatılıyor.',
+  },
+  'chat.max_tool_hops_reached': {
+    en: '[chat-native] maxToolHops ({max}) reached — aborting tool chain.',
+    tr: '[chat-native] maxToolHops ({max}) sınırına ulaşıldı — araç zinciri durduruluyor.',
+  },
+  'chat.provider_error': {
+    en: '[chat-native] error: {message}',
+    tr: '[chat-native] hata: {message}',
+  },
+  'chat.agentic_no_match': {
+    en: '[agentic] no matching intent — falling back to chat.',
+    tr: '[agentic] eşleşen niyet yok — sohbete dönülüyor.',
+  },
+  'chat.mcp_not_wired': {
+    en: 'The external MCP client is not wired into the REPL yet — it is on the roadmap (F9 phase 2). Use `claude mcp add deckent -- npx deckent-mcp` to reach deckent tools from a host CLI.',
+    tr: 'Harici MCP istemcisi REPL\'e henüz bağlı değil — yol haritasında (F9 faz 2). Deckent araçlarına host CLI üzerinden erişmek için: `claude mcp add deckent -- npx deckent-mcp`.',
+  },
+  'chat.slash_unknown_subaction': {
+    en: '{command}: unknown subaction "{sub}". See /help for usage.',
+    tr: '{command}: bilinmeyen alt-aksiyon "{sub}". Kullanım için /help.',
+  },
+  'chat.autonomous_id_required': {
+    en: 'Usage: /autonomous {sub} <id>',
+    tr: 'Kullanım: /autonomous {sub} <id>',
+  },
+  'chat.autonomous_title_required': {
+    en: 'Usage: /autonomous backlog add <title> [--cron <expr>]',
+    tr: 'Kullanım: /autonomous backlog add <başlık> [--cron <ifade>]',
+  },
+  'chat.audit_not_in_mcp': {
+    en: 'Audit action "{sub}" is not available over MCP yet — run it via the CLI: deckent audit {sub}',
+    tr: '"{sub}" audit aksiyonu henüz MCP\'de yok — CLI ile çalıştırın: deckent audit {sub}',
+  },
+  'chat.directives_set_usage': {
+    en: 'Usage: /directives set <content>',
+    tr: 'Kullanım: /directives set <içerik>',
+  },
+  'chat.directives_not_found': {
+    en: 'DIRECTIVES.md not found under {root}.',
+    tr: 'DIRECTIVES.md bulunamadı: {root}.',
+  },
 
   // ─── autonomous command (Sprint 228 — 228-001 i18n retrofit) ─────────
   'autonomous.disabled': {

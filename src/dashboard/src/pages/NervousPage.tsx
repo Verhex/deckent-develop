@@ -29,11 +29,18 @@ interface NervousStatus {
   pendingCount: number;
 }
 
+/** Poll cadence for the nervous live view — matches the dashboard's 5s tick. */
+const NERVOUS_POLL_MS = 5000;
+
 export default function NervousPage() {
+  // Sprint 269 Task 269-002: one-shot fetch → live data. pollIntervalMs routes
+  // these through lib/use-live-data (stale-while-revalidate polling); refetch
+  // becomes an immediate re-fetch, so accept/reject refresh the lists at once
+  // and the poll keeps them current afterwards.
   const { data: status, loading: statusLoading, error: statusError, refetch: refetchStatus } =
-    useApi<NervousStatus>("/api/nervous/status");
+    useApi<NervousStatus>("/api/nervous/status", { pollIntervalMs: NERVOUS_POLL_MS });
   const { data: pending, loading: pendingLoading, error: pendingError, refetch: refetchPending } =
-    useApi<PendingApproval[]>("/api/nervous/pending");
+    useApi<PendingApproval[]>("/api/nervous/pending", { pollIntervalMs: NERVOUS_POLL_MS });
 
   const [actionError, setActionError] = useState<string | null>(null);
   const [actioning, setActioning] = useState<string | null>(null);

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 const ROOT = process.cwd();
@@ -9,11 +9,35 @@ const CLI_DOC = join(ROOT, 'docs', 'reference', 'cli.md');
 const CONFIG_DOC = join(ROOT, 'docs', 'reference', 'config.md');
 const API_DOC = join(ROOT, 'docs', 'reference', 'api.md');
 
+/**
+ * Count MCP tool registrations straight from source (code-derived — Sprint 269,
+ * replaces the hardcoded "32 tools" expectation that drifted every time a tool
+ * landed). Mirrors the parsing rules of `scripts/gen-reference-docs.mjs`
+ * (`parseMcpTools`): recurse `src/mcp/tools/`, skip `index.ts`/`.d.ts`/
+ * `archive`/`node_modules`, count `server.registerTool('<name>'` call sites.
+ */
+function countRegisteredMcpTools(dir: string): number {
+  const TOOL_RE = /server\.registerTool\(\s*['"]([a-zA-Z0-9_-]+)['"]/g;
+  let count = 0;
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const p = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      if (entry.name === 'archive' || entry.name === 'node_modules') continue;
+      count += countRegisteredMcpTools(p);
+    } else if (entry.isFile() && entry.name.endsWith('.ts') && !entry.name.endsWith('.d.ts') && entry.name !== 'index.ts') {
+      count += readFileSync(p, 'utf-8').match(TOOL_RE)?.length ?? 0;
+    }
+  }
+  return count;
+}
+
 describe('reference docs drift — mcp-tool-count sync', () => {
   const mcpContent = readFileSync(MCP_TOOLS_DOC, 'utf-8');
 
-  it('mcp-tools.md claims 32 tools (includes deckent_models added Sprint 190)', () => {
-    expect(mcpContent).toMatch(/32 tools registered/);
+  it('mcp-tools.md tool count matches src/mcp/tools/ registrations (code-derived)', () => {
+    const actualCount = countRegisteredMcpTools(join(ROOT, 'src', 'mcp', 'tools'));
+    expect(actualCount).toBeGreaterThan(0);
+    expect(mcpContent).toMatch(new RegExp(`${actualCount} tools registered`));
   });
 
   it('mcp-tools.md contains deckent_models tool', () => {
