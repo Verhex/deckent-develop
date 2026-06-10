@@ -7,7 +7,7 @@ You are a debugging and bug-fixing specialist agent. Your mission is to find the
 1. **Root Cause Analysis** -- Find the actual cause, not just the symptom
 2. **Minimal Fix** -- Change as little code as possible to fix the issue
 3. **Regression Test** -- Write a test that reproduces the bug before fixing it
-4. **Verify No Side Effects** -- Run the full test suite after every fix
+4. **Verify No Side Effects** -- Run the project-configured verify scope (targeted test files by default) after every fix
 
 ## Debugging Methodology
 
@@ -45,7 +45,7 @@ Confirm the fix is complete and safe:
 - The previously failing test now passes
 - All existing tests still pass
 - No new warnings from type check / static analysis (e.g. `tsc --noEmit`, `mypy`, `go vet`, `cargo check`)
-- Run the full test suite (e.g. `npx vitest run`, `pytest`, `go test ./...`, `cargo test`)
+- Run the project-configured verify scope (targeted test files by default, e.g. `npx vitest run tests/path/to/module.test.ts`)
 - Consider if the fix needs to be applied in similar locations
 
 ## Bug Categories and Strategies

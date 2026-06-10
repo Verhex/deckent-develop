@@ -975,7 +975,7 @@ deckent web --dev
 > Hand-curated sections above are produced by `scripts/generate-cli-docs.ts`; this block is maintained by `scripts/gen-reference-docs.mjs`.
 
 <!-- AUTOGEN:START id="cli" -->
-> 148 commands. Generated from `src/cli/commands/*.ts`.
+> 149 commands. Generated from `src/cli/commands/*.ts`.
 
 | Command | Description |
 |---------|-------------|
@@ -991,7 +991,7 @@ deckent web --dev
 | `deckent approve <triggerId>` | Approve a parked trigger — resolves the running loop\'s gate |
 | `deckent archive-debt` | Report tech-debt status (DB-first; resolved debt is auto-managed in memory.db) |
 | `deckent attach` | Attach to the tmux orchestra session |
-| `deckent audit [sprint-id]` | Run Brain Self-Audit Gate for a sprint, or query/export audit log events (query \| compliance \| forward) |
+| `deckent audit [sprint-id]` | Run Brain Self-Audit Gate for a sprint, or query/export/retain audit log events (query \| compliance \| forward \| retention) |
 | `deckent audit-verify` | Verify the audit HMAC chain (I4 invariant — tamper-evident audit log) |
 | `deckent auto` | Auto-detect mode from context |
 | `deckent autonomous` | Autonomous runtime — authority-bounded continuous loop (F3-009) |
@@ -1023,7 +1023,7 @@ deckent web --dev
 | `deckent export` | Export memory.db to .brain/exports/*.md |
 | `deckent export [file]` | Export config to stdout or a file |
 | `deckent features` | List features from .deckent/features-manifest.json by category |
-| `deckent finalize` | Finalize a sprint: update memory exports, retro, identity (managed-docs), config, run decay |
+| `deckent finalize` | Finalize a sprint: update MEMORY.md, RETRO.md, PROJECT-IDENTITY.md, config, run decay |
 | `deckent flow` | Manage scheduled flows (F3 process mode) |
 | `deckent get <key>` | Get a configuration value by key (supports dot notation) |
 | `deckent get <name>` | Show details for an MCP server (from merged view) |
@@ -1086,6 +1086,7 @@ deckent web --dev
 | `deckent remove <pathOrId>` | Remove a document from managed docs |
 | `deckent report` | Show cross-sprint agent/skill trend report |
 | `deckent reset` | Reset all action overrides to preset defaults |
+| `deckent resources` | Show live docker worker resource usage or analyze resource log |
 | `deckent resume <sprintId>` | Resume a sprint from its latest checkpoint |
 | `deckent retro` | Show the latest sprint retrospective |
 | `deckent review` | Review pending relations from backfill preview |
@@ -1103,7 +1104,6 @@ deckent web --dev
 | `deckent show` | Display model pricing (read-only) |
 | `deckent show` | Show current mode |
 | `deckent skill` | Manage skill pool |
-| `deckent spawn <taskId>` | Manually spawn a worker for a task |
 | `deckent sprint` | Switch to sprint mode |
 | `deckent start` | Start the autonomous loop (default-deny + human-approval gate) |
 | `deckent start [description]` | Start a new sprint (optionally with a one-line description for zero-config mode) |
@@ -1125,6 +1125,7 @@ deckent web --dev
 | `deckent update <pathOrId>` | Update rules for an existing managed doc |
 | `deckent update <source>` | Update a plugin (remove existing and re-install from source) |
 | `deckent upgrade` | Self-update deckent |
+| `deckent usage` | Show token/limit consumption from Claude Code transcripts |
 | `deckent watch` | Live tmux split view: dashboard + worker panes |
 | `deckent web` | Start web dashboard with API server |
 <!-- AUTOGEN:END id="cli" -->

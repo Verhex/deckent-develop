@@ -198,6 +198,18 @@ const SLASH_CATALOG: readonly SlashCommand[] = [
     agenticArgs: {},
   },
   {
+    name: '/usage',
+    desc: 'Token/limit kullanımını göster (örn: /usage --sprint 275)',
+    agenticTool: 'deckent_usage',
+    agenticArgs: {},
+  },
+  {
+    name: '/resources',
+    desc: 'MCP kaynak anlık görüntüsü (örn: /resources --log)',
+    agenticTool: 'deckent_resources',
+    agenticArgs: {},
+  },
+  {
     name: '/directives',
     desc: "DIRECTIVES.md göster · '/directives set <metin>' ile yaz (onay ister)",
     agenticTool: 'deckent_set_directives',
@@ -381,6 +393,51 @@ function resolveAuditSlash(rest: readonly string[]): SlashAction {
   return { action: 'message', messageKey: 'chat.audit_not_in_mcp', params: { sub } };
 }
 
+/** `/resources [--log [path]]` → deckent_resources dispatch. */
+function resolveResourcesSlash(rest: readonly string[]): SlashAction {
+  if (rest.length === 0) {
+    return { action: 'agentic', tool: 'deckent_resources', args: {} };
+  }
+  const sub = rest[0] ?? '';
+  if (sub === '--log') {
+    const path = rest[1];
+    const args: Record<string, unknown> = path ? { log: path } : { log: true };
+    return { action: 'agentic', tool: 'deckent_resources', args };
+  }
+  return {
+    action: 'message',
+    messageKey: 'chat.slash_unknown_subaction',
+    params: { command: '/resources', sub },
+  };
+}
+
+/** `/usage [--sprint N] [since <ISO>]` → deckent_usage dispatch. */
+function resolveUsageSlash(rest: readonly string[]): SlashAction {
+  if (rest.length === 0) {
+    return { action: 'agentic', tool: 'deckent_usage', args: {} };
+  }
+  const sub = rest[0] ?? '';
+  if (sub === '--sprint') {
+    const sprint = rest[1];
+    if (!sprint) {
+      return { action: 'message', messageKey: 'chat.usage_sprint_required' };
+    }
+    return { action: 'agentic', tool: 'deckent_usage', args: { sprint } };
+  }
+  if (sub === 'since' || sub === '--since') {
+    const since = rest[1];
+    if (!since) {
+      return { action: 'message', messageKey: 'chat.usage_since_required' };
+    }
+    return { action: 'agentic', tool: 'deckent_usage', args: { since } };
+  }
+  return {
+    action: 'message',
+    messageKey: 'chat.slash_unknown_subaction',
+    params: { command: '/usage', sub },
+  };
+}
+
 /** `/directives` (show) · `/directives set <content>` → deckent_set_directives. */
 function resolveDirectivesSlash(rest: readonly string[]): SlashAction {
   if (rest.length === 0) return { action: 'show-directives' };
@@ -426,6 +483,8 @@ export function resolveSlash(line: string, registry: SlashRegistry): SlashAction
   if (name === '/autonomous') return resolveAutonomousSlash(rest);
   if (name === '/audit') return resolveAuditSlash(rest);
   if (name === '/directives') return resolveDirectivesSlash(rest);
+  if (name === '/usage') return resolveUsageSlash(rest);
+  if (name === '/resources') return resolveResourcesSlash(rest);
 
   const entry = registry.find((r) => r.name.toLowerCase() === name);
   if (entry?.agenticTool) {

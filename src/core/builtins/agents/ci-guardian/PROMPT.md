@@ -46,7 +46,7 @@ After each task completes:
 
 After all tasks are evaluated:
 
-- [ ] Run full test suite
+- [ ] Run full test suite <!-- ci-context -->
 - [ ] Compare against baseline: test count delta, coverage delta, regressions
 - [ ] Generate CI report JSON at `.brain/ci-report-sprint-{id}.json`
 - [ ] Add "## CI Health" section to RETRO.md

@@ -80,6 +80,10 @@
 | adr-086 | Native CLI Parity — F11 Feature Set (Sprint 224) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-275 Learnings** (sprint-275): ## Sprint sprint-275 Learnings
+
+## Gains
+- 275-001 — /usage REPL slash — üç katman birden — Implemented /usage REPL s...
 - **Sprint sprint-274 Learnings** (sprint-274): ## Sprint sprint-274 Learnings
 
 ## Gains
@@ -114,10 +118,6 @@
 
 ## Gains
 - 266-001 — Odoo read-only ErpDriver (JSON-RPC search_read) — First concrete...
-- **Sprint sprint-265 Learnings** (sprint-265): ## Sprint sprint-265 Learnings
-
-## Gains
-- 265-001 — ERP capability wake — erp.read handler + runtime wiring + refera...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -146,4 +146,4 @@ _No active technical debt._
 - Violation pattern: stale_heartbeat
 - Violation pattern: stale_heartbeat
 
-_Total entries: 401 | Generated: 2026-06-10_
+_Total entries: 404 | Generated: 2026-06-10_

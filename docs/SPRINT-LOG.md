@@ -7506,3 +7506,32 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 274-006: MASTER-PLAN — F1-TOK Faz 2 işaretleri (DONE)
 
 ---
+## Sprint 275 — sprint-275
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-06-10
+**Duration:** 587s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 8 |
+| Completed | 8 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 587158ms |
+
+### Tasks
+
+- 275-001: /usage REPL slash — üç katman birden (DONE)
+- 275-002: /resources REPL slash — üç katman birden (DONE)
+- 275-003: deckent_usage MCP tool — ADR-022 parite (DONE)
+- 275-004: 273-010 debt kapanışı — kalan "full test suite" eşleşmeleri denetimi (DONE)
+- 275-005: cli-commands + features — usage/resources slash + MCP satırları (DONE)
+- 275-006: mcp-tools.md regen — 34 tool (DONE)
+- 275-007: resource-profile — F1-TOK optimizasyon bölümü iskeleti (DONE)
+- 275-008: MASTER-PLAN — F1-TOK durum konsolidasyonu (DONE)
+
+---

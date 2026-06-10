@@ -1,5 +1,18 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-275 Learnings
+- Sprint sprint-275 Learnings: ## Sprint sprint-275 Learnings
+
+## Gains
+- 275-001 — /usage REPL slash — üç katman birden — Implemented /usage REPL slash across all three layers per the 3-KATMAN KURALI (269 lesson):
+- 275-002 — /resources REPL slash — üç katman birden — Implemented /resources REPL slash across all three layers per the 3-KATMAN KURALI (269 lesson):
+- 275-003 — deckent_usage MCP tool — ADR-022 parite — Implemented deckent_usage MCP tool (tools count: 33→34).
+- 275-004 — 273-010 debt kapanışı — kalan "full test suite" eşleşmeleri denetimi — 273-010 debt closure: all 10 'full test suite' occurrences in src/core/builtins/ classified and h...
+- 275-005 — cli-commands + features — usage/resources slash + MCP satırları — Documentation-only task (Tier-0).
+- 275-006 — mcp-tools.md regen — 34 tool — Successfully regenerated mcp-tools.md with 34 tools.
+- 275-007 — resource-profile — F1-TOK optimizasyon bölümü iskeleti — Added comprehensive 'Token/Cache Optimizasyonu (F1-TOK)' section to resource-profile.md.
+- 275-008 — MASTER-PLAN — F1-TOK durum konsolidasyonu — F1-TOK section (lines 137-146) updated with Sprint 275 kanıt-sprint status consolidation.
+
 ## Sprint sprint-274 Learnings
 - Sprint sprint-274 Learnings: ## Sprint sprint-274 Learnings
 

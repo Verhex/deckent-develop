@@ -134,7 +134,7 @@ Three immovable pillars (Alperen-approved 2026-05-31):
 | F1-014 | **Per-worker auth isolation contract (load-bearing)** — each worker env gets ONLY its provider's credential; subscription Claude worker gets NO `ANTHROPIC_API_KEY`; zero cross-leak; per-worker non-leak test | ⚠️ **partial — non-leak unit contract landed (2026-06-07 İŞ7, `b3b18121`)** `tests/core/auth-matrix.test.ts`: `applyDeckSecretsToEnv` per-provider isolation (cross-leak yok, subs→key yok, ollama-host→key yok) tested. **KALAN (AS-2 all phases §4A):** spawn-time per-worker env non-leak (runtime, not just the secret-map). Sprint 213 was KILLED by the inverse (unconditional `ANTHROPIC_API_KEY` → API-mode → mass synthetic NO_GO; ADR-076, `feedback_container_auth_precedence`). |
 | F1-015 | **Bedrock + non-OpenAI-wire native adapters** — Amazon Bedrock via hand-rolled SigV4 (Node `crypto`, no AWS SDK → ADR-010 preserved); optional Vertex | ⬜ **AS-2 Faz 4 (§4A)** — no Bedrock adapter today (only `pricing-updater.ts` data ref); Bedrock uses AWS SigV4, not OpenAI `/chat/completions`. |
 
-### F1-TOK — Token/Limit Accounting (Real Ledger over Estimates) — **✅ ~100% (Sprint 273)**
+### F1-TOK — Token/Limit Accounting (Real Ledger over Estimates) — **✅ 100% (Sprint 273+274, Sprint 275 kanıt-sprint)**
 
 | ID | Item | Status |
 |----|------|--------|
@@ -142,7 +142,8 @@ Three immovable pillars (Alperen-approved 2026-05-31):
 | Faz 1 | Reporting & CLI (ledger→task mapping, sprint aggregation, `deckent usage` command, result-evaluator realignment, sprint-reporter limit row) | ✅ Sprint 273: limit-ledger-report + `deckent usage` (default/--sprint/--json) + result-evaluator token-optional + sprint-reporter burn metric |
 | Faz 1.5 | Prompt/persona cleanup (goCriteria language fix, persona "full suite" audit, ADR-seçici explicit refs) | ✅ Sprint 273: criteria-deriver targeted-verify language + persona full-suite → targeted + adr-selector explicit-ref force-include |
 | Faz 2 | First-worker bootstrap cache strategy + cache-gate measurement (cache-warm spawn 274-002 + cache-gate evaluator 274-003 + ADR-037 operative + kind-limitlers config) | ✅ Sprint 274: cache-warm spawn, cache-gate measurement, ADR-037 operative CC-written, kind-limitlers config-wired |
-| Remaining | Faz 2 A/B Verification sprint (target ≤$0.45/task, quality stable) | ⬜ Sprint 274 sprint-end: A/B measurement on transcript (code frozen, metrics post-build+tests+push) |
+| Faz 2 A/B Verification | Sprint 275 kanıt-sprint — usage yüzey paritesi proof (/usage + /resources slash, deckent_usage MCP tool, 010-debt kapanışı; final A/B ölçümü CC raporunda) | ✅ Sprint 275: /usage + /resources REPL slash (3-KATMAN), deckent_usage MCP (33→34 tool), 010-debt closure, proof-of-function; final measurement (cache-gate PASS teyidi + task-başı cost ≤$0.45) CC sprint-sonu raporunda |
+| Kalan | Haftalık usage gözden geçirme (continuous-izleme) | ⬜ post-GA — ongoing monitoring, no sprint scope |
 
 ### F2 — Native Chat — **~95%**
 | ID | Item | Status |

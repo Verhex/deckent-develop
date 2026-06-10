@@ -28,6 +28,7 @@ import { registerAuditTool } from './audit.js';
 import { registerRecoverTool } from './recover.js';
 import { registerModelsTool } from './models.js';
 import { registerAutonomousTool } from './autonomous.js';
+import { registerUsageTool } from './usage.js';
 
 export function registerTools(server: McpServer): void {
   registerInitTool(server);
@@ -59,4 +60,5 @@ export function registerTools(server: McpServer): void {
   registerRecoverTool(server);
   registerModelsTool(server);
   registerAutonomousTool(server);
+  registerUsageTool(server);
 }

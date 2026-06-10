@@ -2,6 +2,22 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint275] - 2026-06-10
+
+### Added
+
+- /usage REPL slash — üç katman birden
+- /resources REPL slash — üç katman birden
+- deckent_usage MCP tool — ADR-022 parite
+- 273-010 debt kapanışı — kalan "full test suite" eşleşmeleri denetimi
+- cli-commands + features — usage/resources slash + MCP satırları
+- mcp-tools.md regen — 34 tool
+- resource-profile — F1-TOK optimizasyon bölümü iskeleti
+- MASTER-PLAN — F1-TOK durum konsolidasyonu
+
+
+_Tasks: 8 total, 8 done, 0 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint274] - 2026-06-10
 
 ### Added

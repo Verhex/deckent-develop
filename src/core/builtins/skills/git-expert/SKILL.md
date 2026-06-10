@@ -16,7 +16,7 @@
 - When conflicts arise, read both sides fully before choosing. Understand the intent of each change.
 - Use `git diff --merge` or `git log --merge -p` to see what each branch changed in the conflicting file.
 - For complex conflicts, use `git mergetool` with a 3-way merge tool (VS Code, vimdiff, meld).
-- After resolving, run the full test suite before committing. Conflicts in imports or types often cause silent breakage.
+- After resolving, run the project-configured verify scope (targeted test files by default) before committing. Conflicts in imports or types often cause silent breakage.
 
 ## Interactive Rebase
 - Use `git rebase -i HEAD~N` to clean up the last N commits before pushing.

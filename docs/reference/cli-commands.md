@@ -1199,6 +1199,56 @@ deckent info --lang tr
 
 ---
 
+## REPL Slash Commands
+
+The interactive REPL (`deckent`) provides shorthand slash commands for quick access to common operations without exiting the shell.
+
+### `/usage [--sprint N] [--since ISO] [--until ISO]`
+
+Show transcript-based token and limit usage accounting from the REPL.
+
+| Option | Description |
+|--------|-------------|
+| `--sprint <N>` | Show per-task breakdown for a specific sprint. Default: 7-day rolling window aggregated by model. |
+| `--since <ISO>` | Start date for usage window (ISO 8601 format). Default: 7 days ago. |
+| `--until <ISO>` | End date for usage window (ISO 8601 format). Default: today. |
+
+**Example:**
+```
+/usage
+/usage --sprint 275
+/usage --since 2026-06-01
+```
+
+**MCP Tool:** `deckent_usage`
+
+---
+
+### `/resources [--log [path]]`
+
+Show worker resource usage (CPU, memory, I/O) from the REPL.
+
+| Option | Description |
+|--------|-------------|
+| `--log [path]` | Analyze historical resource log (JSONL format). Optional path overrides `.deckent/resource-log.jsonl` default. Omit path for live snapshot. |
+
+**Modes:**
+
+1. **Default (no args):** Display current resource usage via `docker stats` snapshot.
+2. **`--log` (no path):** Summarize `.deckent/resource-log.jsonl`.
+3. **`--log <path>`:** Summarize a custom historical log.
+
+**Example:**
+```
+/resources
+/resources --log
+/resources --log /custom/resource-log.jsonl
+```
+
+**MCP Tool:** `deckent_resources`
+
+---
+
 ## MCP Tool Parity Summary (ADR-022-V2)
 
 | CLI Command | MCP Tool | Parity |

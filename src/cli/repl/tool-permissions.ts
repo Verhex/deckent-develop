@@ -59,5 +59,7 @@ export function classifyTool(tool: string, args: Record<string, unknown>): ToolP
     const action = typeof args['action'] === 'string' ? (args['action'] as string) : 'gate';
     return action === 'gate' ? 'confirm' : 'read';
   }
+  if (tool === 'deckent_usage') return 'read';
+  if (tool === 'deckent_resources') return 'read';
   return 'read';
 }

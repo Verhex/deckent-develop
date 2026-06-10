@@ -5,13 +5,13 @@
 Deckent ships an MCP server that exposes orchestration to MCP-compatible IDEs (Claude Code, Cursor, etc.). The tools below are registered in `src/mcp/tools/*.ts` and surfaced via `deckent-mcp` stdio transport.
 
 <!-- AUTOGEN:START id="mcp-tools" -->
-> 33 tools registered. Generated from `src/mcp/tools/*.ts`.
+> 34 tools registered. Generated from `src/mcp/tools/*.ts`.
 
 | Tool | Title | Description |
 |------|-------|-------------|
 | `deckent_agent_list` | Agent List | List all registered agents in the Deckent project — both built-in and dynamically generated temp agents. |
 | `deckent_analyze_project` | Analyze Project | Analyze the current project to detect: language (TypeScript/JavaScript/Python/Go/Rust/etc.), framework (React/Express/FastAPI/etc.), test framework (vitest/jest/pytest/etc.), build tool (tsc/webpack/vite/etc.), CI system (GitHub Actions/GitLab CI/etc.), project size (small/medium/large based on file count), and methodology recommendation. Returns config suggestions (e.g. recommended plan mode, worker count). Useful before init to pick the right configuration, or to verify stack detection. Does not modify any files. |
-| `deckent_audit` | Sprint Audit | Run Brain Self-Audit Gate for a sprint. Checks tsc, vitest, honesty violations, and observability. Returns gate result (PASS or GATE_FAILURE) and writes to .deckent/{sprintId}-gate.json. Read-only: does not modify source code or sprint state. |
+| `deckent_audit` | Sprint Audit | Sprint audit multitool, mirrors the |
 | `deckent_autonomous` | Autonomous Engine | Control the deckent autonomous execution engine: query status, start/stop |
 | `deckent_checkpoint` | Checkpoint Management | List, approve, or reject human checkpoints in sprint lifecycle. Checkpoints pause sprint execution at configured phases (plan/evaluate/fix) until a human approves or rejects. Use action=list to see pending checkpoints, action=approve/reject with sprintId and phase to respond. |
 | `deckent_cleanup` | Sprint Cleanup | Remove sprint artifacts and optionally trim memory budget. Deletes all task files (.json, .plan, .hb, .result, .paused, .log) from .tasks/ and all lock files from .locks/. With decay=true, also runs memory decay on .brain/ files if they exceed the line budget (trims MEMORY.md, RETRO.md, sprint logs). Use dryRun=true first to preview what would be deleted. Typically run after a sprint completes (deckent_review) or before starting a fresh sprint after kill. |
@@ -41,5 +41,6 @@ Deckent ships an MCP server that exposes orchestration to MCP-compatible IDEs (C
 | `deckent_start` | Start Sprint | Start a full sprint in the background. Runs the complete lifecycle: PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → CLEANUP. Pre-spawn cost gate (Sprint 189 T-008): if the estimated sprint cost exceeds cost_limits.sprint_max_usd (.deckent/cost-config.json), the tool returns COST_GATE_EXCEEDED — override with acknowledgeCost=true (or force=true to skip the gate entirely). Returns immediately with a jobId — the sprint continues asynchronously. Use deckent_status to monitor progress and deckent_review to evaluate results. Prerequisite: deckent_init + deckent_set_directives must have been run. |
 | `deckent_status` | Sprint Status | Get the current sprint dashboard status. Returns: agents (active worker list with task assignments), progress (done/total counts + progress bar + ETA), alerts (stale workers, boundary violations, lock issues), job (background job state: RUNNING/COMPLETE/FAILED + sprintId + metrics), agentAssignments (which agent handles which tasks), skillAssignments (which skills are active). Call repeatedly to poll progress. No prerequisite — safe to call anytime. |
 | `deckent_sync` | Sync Deckent | Sync AI adapter files (CLAUDE.md, AGENTS.md) to ensure they import DECKENT.md as the single source of truth. Additive only — prepends the @DECKENT.md reference if missing, never overwrites existing content. Use when CLAUDE.md or AGENTS.md loses its Deckent reference (e.g. after a manual edit or merge conflict). Requires DECKENT.md to exist (run deckent_init first). |
+| `deckent_usage` | Usage | Show token/limit consumption from Claude Code transcripts. |
 | `deckent_watch` | Watch Sprint Events | Subscribe to live sprint event stream via MCP logging notifications. |
 <!-- AUTOGEN:END id="mcp-tools" -->

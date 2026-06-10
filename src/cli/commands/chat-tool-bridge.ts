@@ -162,6 +162,28 @@ export function cliArgsFor(name: string, args: Record<string, unknown>): string[
     if (action === 'compliance') return ['audit', 'compliance'];
     return null; // forward/retention (network/destructive) stay CLI-only
   }
+  if (name === 'deckent_usage') {
+    const argv: string[] = ['usage'];
+    if (typeof args['sprint'] === 'string' && (args['sprint'] as string).length > 0) {
+      argv.push('--sprint', args['sprint'] as string);
+    }
+    if (typeof args['since'] === 'string' && (args['since'] as string).length > 0) {
+      argv.push('--since', args['since'] as string);
+    }
+    if (typeof args['until'] === 'string' && (args['until'] as string).length > 0) {
+      argv.push('--until', args['until'] as string);
+    }
+    return argv;
+  }
+  if (name === 'deckent_resources') {
+    const argv: string[] = ['resources'];
+    if (args['log'] === true) {
+      argv.push('--log');
+    } else if (typeof args['log'] === 'string' && (args['log'] as string).length > 0) {
+      argv.push('--log', args['log'] as string);
+    }
+    return argv;
+  }
   if (name === 'deckent_set_directives') {
     const content = typeof args['content'] === 'string' ? (args['content'] as string) : '';
     return content.length > 0 ? ['set-directives', '--content', content] : null;
