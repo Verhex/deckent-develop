@@ -16,6 +16,7 @@ Reference for Docker worker resource usage, memory configuration, and monitoring
 8. [deckent resources Command](#8-deckent-resources-command)
 9. [Resource Log Format](#9-resource-log-format)
 10. [Measured Profile](#10-measured-profile)
+11. [Kind-Based Memory Limits (Optional)](#11-kind-based-memory-limits-optional)
 
 ---
 
@@ -344,6 +345,86 @@ First real profile, collected by CC during the resource-observability sprint its
 `resource_monitor.enabled` is on, from `.deckent/resource-log.jsonl` via `deckent resources --log`).
 Baseline profiles accumulate across sprints to inform `worker_memory_limit` reductions and
 `max_workers` scaling.
+
+---
+
+## 11. Kind-Based Memory Limits (Optional)
+
+**Feature:** Per-task-kind memory limit override (Sprint 272, F1-LIM faz-2a)
+
+By default, all Docker workers use the same `worker_memory_limit` (4g). For projects with diverse task types, you can set different memory limits based on the task kind (e.g., code tasks, doc tasks).
+
+### Motivation
+
+Sprint 271 baseline measurements showed:
+- **Code tasks (vitest/tsc):** peak 432–929 MB (e.g., 929 MB for opus lifecycle-wire task)
+- **Doc tasks (haiku):** peak 200–247 MB
+
+The global 4g default is **4–20× oversized** for these workloads. Kind-based limits allow:
+- Tighter resource allocation for doc tasks (~768m) and code tasks (~1.5g)
+- 20+ concurrent workers on a 40 GB host (vs. 6 with global 4g)
+- 4–5 concurrent workers on an 8 GB machine (vs. 1)
+
+### Configuration
+
+Add to `.deckent/config.json`:
+
+```json
+{
+  "worker_memory_limit_by_kind": {
+    "code": "1536m",
+    "doc": "768m"
+  }
+}
+```
+
+**Fields:**
+- Keys are canonical `TaskKind` values (e.g., `code`, `doc`, `test`) — see `src/core/work-model.ts` for the authoritative list
+- Values are memory strings (e.g., `"1536m"`, `"1.5g"`, `"1610612736"` bytes)
+- Syntax validation via `parseMemoryString()` (same parser as `worker_memory_limit`)
+
+### Behavior
+
+1. When spawning a task with kind `K`:
+   - If `worker_memory_limit_by_kind[K]` is set → use that limit
+   - Otherwise → fall back to global `worker_memory_limit` (default 4g)
+
+2. Swap limit is derived as: `swap = memory × 1.5` (same ratio as global limits)
+
+3. If a kind value is invalid (e.g., `"xyz"`), the config fails validation at startup.
+
+### Recommended Profile (Sprint 271 Baseline)
+
+| Task Kind | Peak Observed | Recommended Limit | Headroom |
+|-----------|---------------|-------------------|----------|
+| `code` | 929 MB | 1536m (1.5g) | 64% |
+| `doc` | 247 MB | 768m | 67% |
+
+**Note:** Observed peaks are from real sprint runs. Limits with 64–67% headroom prevent OOM kills while reducing idle waste.
+
+### Example: Multi-Kind Config
+
+```json
+{
+  "max_workers": 20,
+  "worker_memory_limit": "2g",
+  "worker_memory_limit_by_kind": {
+    "code": "1536m",
+    "doc": "768m",
+    "test": "1024m"
+  }
+}
+```
+
+This config allows:
+- Code tasks → 1.5g each
+- Doc tasks → 768m each
+- Test tasks → 1g each
+- Any other kind → fallback to 2g
+
+### Validation
+
+If you use a kind value that has no meaning in your project, it will still be accepted (no validation against known kinds at config time). The memory string itself is validated: invalid formats (e.g., `"xyz"`, `""`) will cause a config error.
 
 ---
 

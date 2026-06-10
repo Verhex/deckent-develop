@@ -8,14 +8,14 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync, renameSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { DECKENT_DIR, TASKS_DIR } from '../core/constants.js';
+import { DECKENT_DIR, TASKS_DIR, BRAIN_DIR } from '../core/constants.js';
 import { debugLog, readJsonSafe } from '../core/utils.js';
 import type { Sprint } from '../core/types.js';
 import { SprintPhase, SprintStatus } from '../core/types.js';
 import type { Task } from '../core/types.js';
 import { TaskStatus } from '../core/types.js';
 import type { Heartbeat } from '../core/types.js';
-import { writeSprintState } from './sprint-utils.js';
+import { writeSprintState, readSprintState } from './sprint-utils.js';
 import type { SerializedDependencyGraph } from './dependency-scheduler.js';
 import {
   persistDependencyGraph,
@@ -273,6 +273,67 @@ export function getResumableTasks(
  */
 export function hasCheckpoint(projectRoot: string, sprintId: string): boolean {
   return existsSync(checkpointPath(projectRoot, sprintId));
+}
+
+// ─── Terminal Cleanup (Sprint 272 272-001 — GHOST-FINALIZE) ──────────
+
+/**
+ * Remove all on-disk checkpoint artifacts for a sprint:
+ *   - `.deckent/<sprintId>-checkpoint.json`
+ *   - `.deckent/<sprintId>-checkpoint.json.tmp` (orphaned atomic-write temp)
+ *   - `.deckent/<sprintId>-checkpoint-seq` (monotonic counter)
+ *
+ * GHOST-FINALIZE fix (Sprint 272 272-001): finalize/cleanup previously left
+ * these files behind, so the next `deckent start` read the stale checkpoint
+ * and ran a phantom 0/0 "complete" restore for the already-finished sprint —
+ * exiting before the new sprint started. Terminal-state code paths
+ * (persistFinalSprintState, the restore ghost-finalize guard) now purge them.
+ *
+ * Idempotent + fail-safe: a missing or locked file never throws.
+ */
+export function cleanupCheckpointFiles(projectRoot: string, sprintId: string): void {
+  const base = checkpointPath(projectRoot, sprintId);
+  const targets = [base, `${base}.tmp`, checkpointCounterPath(projectRoot, sprintId)];
+  for (const p of targets) {
+    try {
+      if (existsSync(p)) unlinkSync(p);
+    } catch (e) {
+      debugLog('sprint-checkpoint:cleanupCheckpointFiles', e);
+    }
+  }
+}
+
+/**
+ * Heuristic: has the given sprint already completed its finalize cycle?
+ *
+ * A finalized sprint that left a checkpoint behind must never re-trigger the
+ * "complete" restore path (the ghost-finalize bug). Signals — any one wins:
+ *   1. `.deckent/sprint-state.json` is stamped COMPLETE for this sprint —
+ *      written by persistFinalSprintState at the end of finalizeSprint.
+ *   2. The sprint-log `.brain/sprints/<sprintId>.md` exists — writeRetrospective
+ *      produces it alongside the memory.db `retro` entry, so its presence is
+ *      the on-disk mirror of "retro written / sprint finalized".
+ *
+ * Fail-safe: any read error is treated as "not finalized" (false) so a genuine
+ * crash-recovery (sprint-state still ACTIVE/EVALUATING, no sprint-log yet) is
+ * never mistaken for a finished sprint and keeps its existing recovery path.
+ */
+export function isSprintFinalized(projectRoot: string, sprintId: string): boolean {
+  // Signal 1: sprint-state.json COMPLETE for THIS sprint
+  try {
+    const state = readSprintState(projectRoot);
+    if (state && state.sprintId === sprintId && state.status === SprintStatus.COMPLETE) {
+      return true;
+    }
+  } catch (e) { debugLog('sprint-checkpoint:isSprintFinalized:state', e); }
+
+  // Signal 2: sprint-log markdown exists (on-disk mirror of memory.db retro)
+  try {
+    const sprintLogPath = join(projectRoot, BRAIN_DIR, 'sprints', `${sprintId}.md`);
+    if (existsSync(sprintLogPath)) return true;
+  } catch (e) { debugLog('sprint-checkpoint:isSprintFinalized:log', e); }
+
+  return false;
 }
 
 // ─── Dep Graph Resume (Task 030) ─────────────────────────────────────
@@ -560,6 +621,26 @@ export function restoreSprintFromCheckpoint(
 ): RestoreResult {
   const cp = readCheckpoint(projectRoot, sprintId);
   if (!cp) {
+    return {
+      restored: false,
+      action: 'fresh',
+      staleTasksWithResult: [],
+      staleTasksMarkedNoGo: [],
+    };
+  }
+
+  // ─── GHOST-FINALIZE guard (Sprint 272 272-001) ──────────────────────
+  // A checkpoint left behind by an ALREADY-finalized sprint must NOT drive a
+  // phantom "complete" restore (0/0 tasks — the sprint's task.json files were
+  // archived by CLEANUP) that exits before the next sprint even starts. When
+  // the sprint is finalized, silently purge the stale checkpoint artifacts and
+  // report 'fresh' so the caller plans a brand-new sprint. A genuine
+  // crash-before-finalize (sprint-state still ACTIVE, no sprint-log) is NOT
+  // finalized, so it falls through to the existing recovery logic below.
+  if (isSprintFinalized(projectRoot, sprintId)) {
+    cleanupCheckpointFiles(projectRoot, sprintId);
+    debugLog('restoreSprintFromCheckpoint:ghostFinalize',
+      `Stale checkpoint for already-finalized ${sprintId} purged — proceeding fresh`);
     return {
       restored: false,
       action: 'fresh',

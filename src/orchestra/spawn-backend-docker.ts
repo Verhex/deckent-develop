@@ -71,6 +71,208 @@ export function parseMemoryString(value: string | null | undefined): number | nu
   return Math.floor(num * mul);
 }
 
+/**
+ * F1-LIM faz-2a (Sprint 272): Derive the docker `--memory-swap` value from a
+ * limit byte count, matching the 4g/6g default ratio (× 1.5).
+ *
+ * The result is an integer MB string (e.g. '1152m') — docker accepts this
+ * format directly. Exported for unit tests.
+ */
+export function deriveSwapFromLimitBytes(limitBytes: number): string {
+  const swapBytes = Math.floor(limitBytes * 1.5);
+  const mb = Math.floor(swapBytes / (1024 * 1024));
+  return `${mb}m`;
+}
+
+// ─── Sprint 272 T-003: exit-without-result enriched marker ──────────────────
+// Live pattern (3 sprints running): a worker finishes its work (git diff on disk,
+// heartbeat seq high) but exits — often CLEANLY, exitCode 0, on a usage-limit /
+// stream interruption — WITHOUT writing `.result`. The old EXIT-trap else-branch
+// wrote a blind NO_GO ("Worker exited without writing result"), indistinguishable
+// from a worker that did nothing. These two helpers (a) add a last-chance flush
+// window and (b) enrich the partial with a discriminator so the FIX phase
+// (Task 272-004) can tell "work present, result missing" (→ verify-and-complete)
+// apart from "nothing done". The marker stays a NO_GO candidate: existing
+// evaluation is unchanged; the new fields are purely additive.
+
+/** Input for {@link buildExitWithoutResultMarker}. */
+export interface ExitWithoutResultMarkerInput {
+  taskId: string;
+  model: string;
+  /** Container exit code (`docker wait`). >128 ⇒ signal (137 = SIGKILL/OOM). */
+  exitCode: number;
+  /** true when a `git diff` shows ≥1 changed file on the shared volume. */
+  workPresent: boolean;
+  /** `git diff --shortstat` summary, e.g. `3 files changed, 45 insertions(+)`. */
+  diffStat?: string;
+  /** Last heartbeat status read from the `.hb` file (best-effort). */
+  lastHbStatus?: string;
+  /** Last heartbeat sequence read from the `.hb` file (best-effort). */
+  lastHbSequence?: number;
+  /** Where the marker was synthesized: container EXIT trap or host monitor. */
+  source?: 'wrapper' | 'host';
+}
+
+/** Canonical EXIT_WITHOUT_RESULT partial — a NO_GO candidate carrying FIX-routing hints. */
+export interface ExitWithoutResultMarker {
+  taskId: string;
+  workerId: string;
+  filesChanged: string[];
+  linesAdded: number;
+  linesRemoved: number;
+  testsPassed: boolean;
+  coverage: number;
+  selfAssessment: 'NO_GO';
+  markerType: 'EXIT_WITHOUT_RESULT';
+  workPresent: boolean;
+  diffStat: string;
+  lastHbStatus: string;
+  lastHbSequence: number;
+  exitCode: number;
+  notes: string;
+  tokenUsage: { inputTokens: number; outputTokens: number; cacheReadTokens: number; provider: string; model: string };
+}
+
+/**
+ * Build the canonical EXIT_WITHOUT_RESULT marker. `selfAssessment` stays `NO_GO`
+ * so the evaluator is unchanged; `markerType`/`workPresent` are additive
+ * discriminators the FIX phase consumes. The TS shape mirrors the JSON the
+ * container EXIT trap writes (see {@link buildOnExitTrap}) so both origins
+ * (wrapper + host monitor) are schema-compatible for the evaluator.
+ */
+export function buildExitWithoutResultMarker(input: ExitWithoutResultMarkerInput): ExitWithoutResultMarker {
+  const signalInfo = input.exitCode > 128 ? ` signal=${input.exitCode - 128}` : '';
+  const diffStat = (input.diffStat ?? '').trim();
+  const source = input.source ?? 'host';
+  const workNote = input.workPresent
+    ? `work present on disk (${diffStat || 'diff detected'}) — FIX should verify-and-complete the partial work rather than restart from scratch`
+    : 'no changed files detected — nothing to recover';
+  return {
+    taskId: input.taskId,
+    workerId: `docker-${input.taskId}`,
+    filesChanged: [],
+    linesAdded: 0,
+    linesRemoved: 0,
+    testsPassed: false,
+    coverage: 0,
+    selfAssessment: 'NO_GO',
+    markerType: 'EXIT_WITHOUT_RESULT',
+    workPresent: input.workPresent,
+    diffStat,
+    lastHbStatus: input.lastHbStatus ?? 'unknown',
+    lastHbSequence: input.lastHbSequence ?? 0,
+    exitCode: input.exitCode,
+    // Keeps the lowercase `code=<n>` form of the historical host-fallback note (the
+    // wrapper EXIT trap uses `exitCode=`). The canonical classifier phrase "Worker
+    // exited without writing result" is preserved either way (result-collector /
+    // result-evaluator NO_RESULT_CRASH_PATTERN).
+    notes:
+      `Worker exited without writing result (code=${input.exitCode}${signalInfo}, source=${source}). `
+      + `EXIT_WITHOUT_RESULT marker — workPresent=${input.workPresent}; ${workNote}.`,
+    tokenUsage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, provider: 'claude', model: input.model },
+  };
+}
+
+/**
+ * Build the container EXIT-trap shell function (`on_exit`). Extracted from the
+ * inline `spawn()` body so it is unit-testable. Behavior:
+ *  - `.result` already present → fsync + return (normal worker exit; unchanged).
+ *  - Sprint 272 T-003 last-chance window: if `.result` is missing, wait up to 5s
+ *    re-checking — catches a late flush from a clean exit-0 (limit/stream cut).
+ *  - non-zero exit + git diff ⇒ TIMEOUT_WITH_WORK (unchanged; Brain reconciles).
+ *  - else ⇒ enriched EXIT_WITHOUT_RESULT marker (workPresent + diffStat + last hb),
+ *    still a NO_GO candidate. The JSON mirrors {@link buildExitWithoutResultMarker}.
+ */
+export function buildOnExitTrap(taskId: string, model: string): string {
+  return [
+    'on_exit() {',
+    '  local exit_code=$?',
+    // If .result already exists (worker wrote it normally), just fsync and exit
+    '  if [ -f "$RFILE" ]; then',
+    '    fsync_file "$RFILE"',
+    '    fsync_file "$HBFILE"',
+    '    rm -f "$PRFILE" 2>/dev/null',
+    '    kill $HB_PID 2>/dev/null',
+    '    return',
+    '  fi',
+    // Sprint 272 T-003: last-chance window — a clean exit-0 (usage-limit / stream
+    // interruption) can land just before the worker's .result write flushes to the
+    // shared volume. Wait up to 5s, re-checking, before synthesizing a marker.
+    '  lc_wait=0',
+    '  while [ ! -f "$RFILE" ] && [ "$lc_wait" -lt 5 ]; do',
+    '    sleep 1',
+    '    lc_wait=$((lc_wait + 1))',
+    '  done',
+    '  if [ -f "$RFILE" ]; then',
+    '    fsync_file "$RFILE"',
+    '    fsync_file "$HBFILE"',
+    '    rm -f "$PRFILE" 2>/dev/null',
+    '    kill $HB_PID 2>/dev/null',
+    '    return',
+    '  fi',
+    // Non-zero exit: check git diff for partial work
+    `  cd "${CONTAINER_WORKSPACE}" 2>/dev/null || true`,
+    '  local changed_files=""',
+    '  changed_files=$(git diff --name-only 2>/dev/null || true)',
+    '  if [ -n "$changed_files" ] && [ "$exit_code" -ne 0 ]; then',
+    // Build JSON array from changed files using pure POSIX sh (no jq dependency)
+    '    local json_array="["',
+    '    local first=1',
+    '    local count=0',
+    '    while IFS= read -r f; do',
+    '      [ -z "$f" ] && continue',
+    '      count=$((count + 1))',
+    '      if [ "$first" -eq 1 ]; then',
+    '        first=0',
+    '      else',
+    '        json_array="$json_array,"',
+    '      fi',
+    '      local escaped=$(printf "%s" "$f" | sed \'s/\\\\/\\\\\\\\/g; s/"/\\\\"/g\')',
+    '      json_array="$json_array\\"$escaped\\""',
+    '    done <<GITEOF',
+    '$changed_files',
+    'GITEOF',
+    '    json_array="$json_array]"',
+    // Sprint 149: Add signal_info for signal-killed containers
+    '    local signal_info=""',
+    '    [ "$exit_code" -gt 128 ] && signal_info=" signal=$((exit_code - 128))"',
+    '    cat > "$RFILE" <<RESULTEOF',
+    `{"taskId":"${taskId}","selfAssessment":"TIMEOUT_WITH_WORK","filesChanged":$json_array,"exitCode":$exit_code,"notes":"Worker timeout/killed (exitCode=$exit_code$signal_info) but git diff shows $count files modified. Brain should reconcile via Spurious NO_GO helper.","tokenUsage":{"inputTokens":0,"outputTokens":0,"cacheReadTokens":0,"provider":"claude","model":"${model}"}}`,
+    'RESULTEOF',
+    '  else',
+    // Sprint 272 T-003: enriched EXIT_WITHOUT_RESULT marker (was a blind NO_GO).
+    // workPresent = git diff shows >=1 file; diffStat = shortstat summary; last
+    // heartbeat status/sequence pulled from $HBFILE. Stays a NO_GO candidate so the
+    // evaluator is unchanged, but the FIX phase can verify-and-complete disk work.
+    // The "exited without writing result (exitCode=" phrase is preserved — note
+    // classifiers match it (nogo-note-accuracy).
+    '    local work_present=false',
+    '    [ -n "$changed_files" ] && work_present=true',
+    '    local diff_stat=""',
+    '    diff_stat=$(git diff --shortstat 2>/dev/null | sed \'s/^[[:space:]]*//\' | tr -d \'"\' || true)',
+    '    local hb_status="unknown"',
+    '    local hb_seq=0',
+    '    if [ -f "$HBFILE" ]; then',
+    '      hb_status=$(sed -n \'s/.*"status":"\\([^"]*\\)".*/\\1/p\' "$HBFILE" 2>/dev/null | head -1)',
+    '      hb_seq=$(sed -n \'s/.*"sequence":\\([0-9][0-9]*\\).*/\\1/p\' "$HBFILE" 2>/dev/null | head -1)',
+    '      [ -z "$hb_status" ] && hb_status="unknown"',
+    '      [ -z "$hb_seq" ] && hb_seq=0',
+    '    fi',
+    '    local signal_info_nw=""',
+    '    [ "$exit_code" -gt 128 ] && signal_info_nw=" signal=$((exit_code - 128))"',
+    '    cat > "$RFILE" <<NORESULTEOF',
+    `{"taskId":"${taskId}","workerId":"docker-${taskId}","filesChanged":[],"linesAdded":0,"linesRemoved":0,"testsPassed":false,"coverage":0,"selfAssessment":"NO_GO","markerType":"EXIT_WITHOUT_RESULT","workPresent":$work_present,"diffStat":"$diff_stat","lastHbStatus":"$hb_status","lastHbSequence":$hb_seq,"exitCode":$exit_code,"notes":"Worker exited without writing result (exitCode=$exit_code$signal_info_nw, source=wrapper). EXIT_WITHOUT_RESULT marker workPresent=$work_present diff [$diff_stat]. Brain FIX: workPresent=true -> verify-and-complete disk work.","tokenUsage":{"inputTokens":0,"outputTokens":0,"cacheReadTokens":0,"provider":"claude","model":"${model}"}}`,
+    'NORESULTEOF',
+    '  fi',
+    '  fsync_file "$RFILE"',
+    '  fsync_file "$HBFILE"',
+    // Sprint 151: Clean up .partial-result — EXIT trap wrote a proper .result
+    '  rm -f "$PRFILE" 2>/dev/null',
+    '  kill $HB_PID 2>/dev/null',
+    '}',
+  ].join('\n');
+}
+
 // ─── Sprint 163 T-002: Health Check + Retry Policy ──────────────────────────
 // container_start_failed previously masked four distinct failure modes
 // (image-missing, port-collision, resource-limit, instant-exit-success).
@@ -234,15 +436,24 @@ export class DockerSpawnBackend implements SpawnBackend {
   private readonly gracefulTimeoutSeconds: number;
   private readonly memoryLimit: string;
   private readonly memorySwap: string;
+  private readonly kindMemoryLimits: Record<string, string>;
   private readonly containers = new Map<string, { containerId: string; model: string }>(); // taskId → container info
 
-  constructor(projectDir: string, opts?: { image?: string; timeoutSeconds?: number; gracefulTimeoutSeconds?: number; memoryLimit?: string; memorySwap?: string }) {
+  constructor(projectDir: string, opts?: { image?: string; timeoutSeconds?: number; gracefulTimeoutSeconds?: number; memoryLimit?: string; memorySwap?: string; kindMemoryLimits?: Record<string, string> }) {
     this.projectDir = resolve(projectDir);
     this.image = opts?.image ?? DEFAULT_IMAGE;
     this.timeoutSeconds = opts?.timeoutSeconds ?? DEFAULT_TIMEOUT_SECONDS;
     this.gracefulTimeoutSeconds = opts?.gracefulTimeoutSeconds ?? DEFAULT_GRACEFUL_TIMEOUT_SECONDS;
     this.memoryLimit = opts?.memoryLimit ?? DEFAULT_WORKER_MEMORY_LIMIT;
     this.memorySwap = opts?.memorySwap ?? DEFAULT_WORKER_MEMORY_SWAP;
+    const rawKindLimits = opts?.kindMemoryLimits ?? {};
+    // Validate kind limits at construction time — fail fast on invalid values
+    for (const [kind, limitStr] of Object.entries(rawKindLimits)) {
+      if (parseMemoryString(limitStr) === null) {
+        throw new Error(`Invalid memory limit for kind '${kind}': '${limitStr}'. Expected docker memory string (e.g. '768m', '1536m', '1.5g').`);
+      }
+    }
+    this.kindMemoryLimits = rawKindLimits;
   }
 
   /**
@@ -403,65 +614,11 @@ export class DockerSpawnBackend implements SpawnBackend {
     // Sprint 145: TIMEOUT_WITH_WORK EXIT trap function — detects partial work via git diff
     // When worker is killed (non-zero exit) but has modified files, writes TIMEOUT_WITH_WORK
     // result instead of blind NO_GO. Brain can then reconcile via Spurious NO_GO helper.
-    const onExitFn = [
-      'on_exit() {',
-      '  local exit_code=$?',
-      // If .result already exists (worker wrote it normally), just fsync and exit
-      '  if [ -f "$RFILE" ]; then',
-      '    fsync_file "$RFILE"',
-      '    fsync_file "$HBFILE"',
-      // Sprint 151: Clean up .partial-result — no longer needed when .result is present
-      '    rm -f "$PRFILE" 2>/dev/null',
-      '    kill $HB_PID 2>/dev/null',
-      '    return',
-      '  fi',
-      // Non-zero exit: check git diff for partial work
-      `  cd "${CONTAINER_WORKSPACE}" 2>/dev/null || true`,
-      '  local changed_files=""',
-      '  changed_files=$(git diff --name-only 2>/dev/null || true)',
-      '  if [ -n "$changed_files" ] && [ "$exit_code" -ne 0 ]; then',
-      // Build JSON array from changed files using pure POSIX sh (no jq dependency)
-      '    local json_array="["',
-      '    local first=1',
-      '    local count=0',
-      // Process each line — handles filenames with spaces via IFS
-      '    while IFS= read -r f; do',
-      '      [ -z "$f" ] && continue',
-      '      count=$((count + 1))',
-      '      if [ "$first" -eq 1 ]; then',
-      '        first=0',
-      '      else',
-      '        json_array="$json_array,"',
-      '      fi',
-      // Escape double quotes and backslashes in filenames for valid JSON
-      '      local escaped=$(printf "%s" "$f" | sed \'s/\\\\/\\\\\\\\/g; s/"/\\\\"/g\')',
-      '      json_array="$json_array\\"$escaped\\""',
-      '    done <<GITEOF',
-      '$changed_files',
-      'GITEOF',
-      '    json_array="$json_array]"',
-      // Sprint 149: Add signal_info for signal-killed containers
-      '    local signal_info=""',
-      '    [ "$exit_code" -gt 128 ] && signal_info=" signal=$((exit_code - 128))"',
-      `    cat > "$RFILE" <<RESULTEOF`,
-      `{"taskId":"${taskId}","selfAssessment":"TIMEOUT_WITH_WORK","filesChanged":$json_array,"exitCode":$exit_code,"notes":"Worker timeout/killed (exitCode=$exit_code$signal_info) but git diff shows $count files modified. Brain should reconcile via Spurious NO_GO helper.","tokenUsage":{"inputTokens":0,"outputTokens":0,"cacheReadTokens":0,"provider":"claude","model":"${model}"}}`,
-      'RESULTEOF',
-      '  else',
-      // No partial work AND no result written — fall back to NO_GO
-      // Sprint 150: use cat heredoc instead of echo to include signal_info + exit_code
-      '    local signal_info_nw=""',
-      '    [ "$exit_code" -gt 128 ] && signal_info_nw=" signal=$((exit_code - 128))"',
-      `    cat > "$RFILE" <<NORESULTEOF`,
-      `{"taskId":"${taskId}","workerId":"docker-${taskId}","filesChanged":[],"linesAdded":0,"linesRemoved":0,"testsPassed":false,"coverage":0,"selfAssessment":"NO_GO","exitCode":$exit_code,"notes":"Worker exited without writing result (exitCode=$exit_code$signal_info_nw)","tokenUsage":{"inputTokens":0,"outputTokens":0,"cacheReadTokens":0,"provider":"claude","model":"${model}"}}`,
-      'NORESULTEOF',
-      '  fi',
-      '  fsync_file "$RFILE"',
-      '  fsync_file "$HBFILE"',
-      // Sprint 151: Clean up .partial-result — EXIT trap wrote a proper .result
-      '  rm -f "$PRFILE" 2>/dev/null',
-      '  kill $HB_PID 2>/dev/null',
-      '}',
-    ].join('\n');
+    // Sprint 272 T-003: EXIT-trap extracted to buildOnExitTrap() — adds a
+    // last-chance flush window + enriched EXIT_WITHOUT_RESULT marker (workPresent +
+    // diffStat + last hb) for clean exit-0 without .result, while preserving the
+    // TIMEOUT_WITH_WORK path. See buildOnExitTrap above.
+    const onExitFn = buildOnExitTrap(taskId, model);
 
     // Sprint 151: .partial-result path — intermediate checkpoint for OOM kill recovery
     const partialResultPath = `${CONTAINER_WORKSPACE}/${TASKS_DIR}/task-${taskId}.partial-result`;
@@ -511,6 +668,12 @@ export class DockerSpawnBackend implements SpawnBackend {
     // Anything else (undefined/'subscription') → default subscription behavior.
     const taskAuthMode = this.readTaskAuthMode(dir, taskId);
     const useApiOnly = taskAuthMode === 'api';
+
+    // F1-LIM faz-2a (Sprint 272): kind-based memory limit — opt-in override.
+    // Falls back to constructor memoryLimit/memorySwap when kind not configured.
+    const kindLimits = this.resolveKindMemoryLimits(dir, taskId);
+    const effectiveMemory = kindLimits?.memory ?? this.memoryLimit;
+    const effectiveSwap = kindLimits?.swap ?? this.memorySwap;
     if (useApiOnly && !process.env.ANTHROPIC_API_KEY) {
       throw new SpawnBackendError(
         `Task ${taskId} declares "Auth: api" but ANTHROPIC_API_KEY is not set in env. ` +
@@ -527,8 +690,9 @@ export class DockerSpawnBackend implements SpawnBackend {
       // HOME must point to a directory that EXISTS in the container
       '-e', `HOME=${containerHome}`,
       // Memory limits — Claude CLI peak ~4-6GB (Sprint 166 Bug G OOM forensic), 8g + 12g headroom
-      '--memory', this.memoryLimit,
-      '--memory-swap', this.memorySwap,
+      // F1-LIM faz-2a: kind-based override when worker_memory_limit_by_kind configured
+      '--memory', effectiveMemory,
+      '--memory-swap', effectiveSwap,
       // Writable HOME via tmpfs — Claude CLI needs to write config/cache here
       '--tmpfs', `${containerHome}:size=100m,uid=${uid},gid=${gid}`,
       // Project mounted read-write — workers need to create/edit files in scope
@@ -930,6 +1094,43 @@ export class DockerSpawnBackend implements SpawnBackend {
    * the caller can surface the conflicting task id.
    */
   /**
+   * F1-LIM faz-2a (Sprint 272): Resolve kind-based memory limits for a task.
+   * Reads the task JSON to get the canonical TaskKind (`type` field), then
+   * looks it up in `this.kindMemoryLimits`. Returns undefined when no kind
+   * limit is configured for this task (caller falls back to constructor defaults).
+   */
+  private resolveKindMemoryLimits(projectDir: string, taskId: string): { memory: string; swap: string } | undefined {
+    if (Object.keys(this.kindMemoryLimits).length === 0) return undefined;
+    const taskKind = this.readTaskKind(projectDir, taskId);
+    if (!taskKind) return undefined;
+    const limitStr = this.kindMemoryLimits[taskKind];
+    if (!limitStr) return undefined;
+    const limitBytes = parseMemoryString(limitStr);
+    if (limitBytes === null) return undefined; // already validated in constructor; guard for safety
+    const swapStr = deriveSwapFromLimitBytes(limitBytes);
+    return { memory: limitStr, swap: swapStr };
+  }
+
+  /**
+   * Read the canonical TaskKind from `task-<taskId>.json` (`type` field).
+   * Returns undefined when the file is missing, malformed, or type is unset.
+   */
+  private readTaskKind(projectDir: string, taskId: string): string | undefined {
+    const taskJsonPath = join(projectDir, TASKS_DIR, `task-${taskId}.json`);
+    if (!existsSync(taskJsonPath)) return undefined;
+    try {
+      const raw = readFileSync(taskJsonPath, 'utf-8');
+      const parsed = JSON.parse(raw) as { type?: unknown };
+      if (typeof parsed.type === 'string' && parsed.type.length > 0) {
+        return parsed.type;
+      }
+    } catch (err) {
+      debugLog('docker-backend:kind-limit', `taskId=${taskId} failed to read task kind: ${(err as Error).message}`);
+    }
+    return undefined;
+  }
+
+  /**
    * Read the per-task auth mode override from `task-<taskId>.json`.
    * Returns 'api' or 'subscription' when explicitly set on the task, or
    * undefined when missing/malformed (caller treats undefined as subscription
@@ -1103,22 +1304,21 @@ export class DockerSpawnBackend implements SpawnBackend {
       }
 
       if (!existsSync(resultPath) && exitCode !== 0) {
-        // Sprint 149: Add signal_info for signal-killed containers (exit > 128)
-        const signalInfo = exitCode > 128 ? ` signal=${exitCode - 128}` : '';
-        // Host-side fallback result — ensures result-collector always finds a .result file
-        const hostFallbackResult = JSON.stringify({
-          taskId,
-          workerId: `docker-${taskId}`,
-          filesChanged: [],
-          linesAdded: 0,
-          linesRemoved: 0,
-          testsPassed: false,
-          coverage: 0,
-          selfAssessment: 'NO_GO',
-          notes: `Worker exited (code=${exitCode}${signalInfo}) without writing result. Host-side fallback.`,
-          exitCode,
-          tokenUsage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, provider: 'claude', model },
-        });
+        // Sprint 272 T-003: enriched EXIT_WITHOUT_RESULT marker. This host fallback
+        // fires when the container EXIT trap was bypassed (e.g. SIGKILL/OOM), so the
+        // wrapper never wrote a marker. workPresent is unknown host-side (the container
+        // is gone) → false; lastHb defaults to unknown (the .hb was already clobbered
+        // with the host verdict above). Keeps the same NO_GO + "exited without writing
+        // result (exitCode=" shape, now schema-compatible with the wrapper marker.
+        const hostFallbackResult = JSON.stringify(
+          buildExitWithoutResultMarker({
+            taskId,
+            model,
+            exitCode,
+            workPresent: false,
+            source: 'host',
+          }),
+        );
         try {
           writeFileSync(resultPath, hostFallbackResult, 'utf-8');
           // fsync from host side to ensure data hits disk

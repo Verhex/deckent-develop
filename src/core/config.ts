@@ -1334,6 +1334,7 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
     spawn_backend: config.spawn_backend,
     docker_image: config.docker_image,
     docker_timeout: config.docker_timeout,
+    worker_memory_limit_by_kind: config.worker_memory_limit_by_kind,
     skills: config.skills,
     brain_provider: config.brain_provider,
     worker_provider: config.worker_provider,
@@ -1649,6 +1650,12 @@ export const CONFIG_METADATA: Readonly<Record<string, ConfigMetadataEntry>> = {
     description: 'Docker container timeout in seconds. Workers killed after this duration.',
     type: 'number',
     default: 1200,
+    category: 'Sprint',
+  },
+  worker_memory_limit_by_kind: {
+    description: 'Opt-in per-kind Docker memory limits. Keys are canonical TaskKind values. Swap is auto-derived at limit × 1.5.',
+    type: 'Record<string, string>',
+    default: undefined,
     category: 'Sprint',
   },
   brain_provider: {

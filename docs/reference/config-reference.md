@@ -560,8 +560,9 @@ How workers are launched and their resource limits.
 | `deckent_style` | `"sprint"` (config.ts:868) | `sprint \| task` | Runtime style. `sprint` = multi-task orchestration; `task` = one-shot assistant mode (task-mode-runner.ts:25). |
 | `worker_memory_limit` | `"2g"` (raw — not on `DeckentConfig` type) | e.g. `"2g"`, `"512m"` | Docker `--memory` cgroup limit per worker (spawn-backend-docker.ts:490). |
 | `worker_memory_swap` | `"3g"` (raw) | e.g. `"3g"` | Docker `--memory-swap` limit per worker (spawn-backend-docker.ts:491). |
+| `worker_memory_limit_by_kind` | undefined (optional) | object with kind→memory mappings | Per-task-kind memory limit override (Sprint 272, F1-LIM). Keys are canonical `TaskKind` values (e.g., `"code"`, `"doc"`). Values are memory strings (e.g., `"1.5g"`, `"768m"`). When set, overrides global `worker_memory_limit` for matching kinds. Swap is derived as `memory × 1.5`. Falls back to global `worker_memory_limit` for unmatched kinds. Validation: memory strings must parse successfully (same as `worker_memory_limit`). |
 
-> `worker_memory_limit` / `worker_memory_swap` are Docker-backend-only extensions read directly from raw config (and surfaced by `deckent doctor`); they are not part of the typed `DeckentConfig`.
+> `worker_memory_limit` / `worker_memory_swap` / `worker_memory_limit_by_kind` are Docker-backend-only extensions read directly from raw config (and surfaced by `deckent doctor`); they are not part of the typed `DeckentConfig`.
 
 ---
 

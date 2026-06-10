@@ -40,25 +40,23 @@ function runScriptAsync(
   });
 }
 
-// Build the project via ASYNC spawn (event loop stays responsive). Returns true
-// when dist/ was produced. Build may fail in CI (no tsc output), so build-
-// dependent tests skip at runtime when this is false.
-function runBuildAsync(timeoutMs = 120000): Promise<boolean> {
-  return new Promise((resolve) => {
-    const child = spawn('npm', ['run', 'build'], { cwd: PROJECT_ROOT, stdio: 'ignore' });
-    const timer = setTimeout(() => { child.kill('SIGKILL'); resolve(false); }, timeoutMs);
-    child.on('error', () => { clearTimeout(timer); resolve(false); });
-    child.on('close', (code) => { clearTimeout(timer); resolve(code === 0); });
-  });
+// HERMETICITY (Sprint 272 live incident): this file used to spawn `npm run
+// build` against the REAL project root in beforeAll, with a 120s SIGKILL.
+// `build` inline-cleans dist/ first, so a kill mid-build (slow CI / loaded
+// host) left the repo with dist/ DELETED — it wiped the live CLI under a
+// running session (MF-8 test-hermeticity family). Tests must NEVER mutate the
+// repo: build-dependent tests now skip unless a dist/ already exists.
+function distAvailable(): boolean {
+  return fs.existsSync(path.join(PROJECT_ROOT, 'dist', 'cli', 'entry.js'));
 }
 
 describe.skipIf(isWindows)('OSS Scripts', () => {
-  // Built once for the whole file; skipIf can't await, so build-dependent tests
-  // check `canBuild` at runtime via ctx.skip() instead of it.skipIf.
+  // Checked once for the whole file; skipIf can't await, so build-dependent
+  // tests check `canBuild` at runtime via ctx.skip() instead of it.skipIf.
   let canBuild = false;
-  beforeAll(async () => {
-    canBuild = await runBuildAsync();
-  }, 130000);
+  beforeAll(() => {
+    canBuild = distAvailable();
+  });
 
   beforeEach(() => {
     // Ensure test directory exists

@@ -301,6 +301,48 @@ function popEligibleFromQueue(
   return undefined;
 }
 
+// ═══ Ready-but-Undispatched Detection (Sprint 272 — Task 272-002) ═══
+//
+// The Sprint 271-013 live race: a PENDING task whose final blocking dependency
+// lands in (or just before) the same poll cycle as the collection-done check
+// can slip past the dispatcher entirely — `maybeRespawn()` is a no-op when
+// `dependency_pipeline_enabled` is false, and `forceRescanIfIdle()` only fires
+// after a 5-minute idle window. The task then sits PENDING until the sprint
+// timeout, and EVALUATE writes a synthetic NO_GO for work that never ran.
+//
+// This pure helper names that set: PENDING tasks whose dependencies are ALL
+// satisfied (aggregate-aware, mirroring `planContinuous`'s `fixForTaskId`
+// roll-up) but which have neither been collected nor assigned a worker.
+// `waitForResults` dispatches these IMMEDIATELY each tick so the invariant
+// "every task is TERMINAL (result collected) OR dispatched-and-awaited" holds
+// before the main loop may exit toward EVALUATE.
+//
+// Scope is deliberately narrow — only dependency-bearing tasks count. A no-dep
+// PENDING overflow task keeps the existing force-rescan cadence (behavior
+// preserved); this targets exactly the "dependencies newly satisfied" race.
+export function findReadyUndispatchedTasks(
+  sprint: Sprint,
+  collectedIds: ReadonlySet<string>,
+  assignedTaskIds: ReadonlySet<string>,
+): Task[] {
+  const doneIds = new Set<string>();
+  for (const t of sprint.tasks) {
+    if (t.status !== TaskStatus.DONE) continue;
+    doneIds.add(t.id);
+    if (t.fixForTaskId) doneIds.add(t.fixForTaskId);
+  }
+  const ready: Task[] = [];
+  for (const task of sprint.tasks) {
+    if (task.status !== TaskStatus.PENDING) continue;
+    if (collectedIds.has(task.id)) continue;
+    if (assignedTaskIds.has(task.id)) continue;
+    if (!task.dependencies || task.dependencies.length === 0) continue;
+    if (!task.dependencies.every(dep => doneIds.has(dep))) continue;
+    ready.push(task);
+  }
+  return ready;
+}
+
 // ═══ Status Mutation (ADR-045 Decision 1) ═════════════════════════
 
 /**
@@ -826,6 +868,36 @@ export async function waitForResults(
     lastSpawnAttempt = Date.now();
   };
 
+  // ─── Sprint 272 Task 272-002 — immediate ready-task dispatch ─────────
+  // Dispatch any PENDING task whose dependencies were JUST satisfied right
+  // now — not on forceRescanIfIdle's 5-minute cadence and not via the
+  // dependency_pipeline-gated maybeRespawn (a no-op when the flag is off).
+  // This closes the Sprint 271-013 race where such a task sat PENDING until
+  // the sprint timeout and EVALUATE synthesised a NO_GO for work that never
+  // ran.
+  //
+  // Bounded by the main loop's timeout: a task that cannot be spawned (spawn
+  // error → spawnIfNotAssigned rolls back its assignedTaskIds entry and
+  // returns false) is simply retried on later ticks and ultimately falls
+  // through to the honest synthetic NO_GO at EVALUATE — no infinite wait.
+  // Legacy callers without `config` are a no-op (existing behavior preserved).
+  const dispatchReadyTasks = async (): Promise<void> => {
+    if (!config) return;
+    const ready = findReadyUndispatchedTasks(sprint, collected, assignedTaskIds);
+    if (ready.length === 0) return;
+    const { computeSlotsAvailable } = await loadProcessQueueHelpers();
+    const maxWorkers = resolveEffectiveWorkers(config, getSystemProfile());
+    let slots = computeSlotsAvailable(sprint, maxWorkers);
+    for (const task of ready) {
+      if (slots <= 0) break;
+      const ok = await spawnIfNotAssigned(task);
+      if (ok) {
+        slots--;
+        metric('queue.ready_dispatch', 1, { taskId: task.id });
+      }
+    }
+  };
+
   const initiallyCollected = await collectResults();
   // ADR-064 (TOPP B): unified dispatch tick — replaces the dual
   // `await processQueue(...); await maybeRespawn();` sequence so the
@@ -833,6 +905,10 @@ export async function waitForResults(
   // to a single function call. Initial pass — Wave 2 may be eligible
   // immediately if Wave 1 results were already on disk when entered.
   await dispatchTick(initiallyCollected);
+  // Sprint 272 T2 — dispatch tasks whose deps were already satisfied at entry
+  // before the early all-collected return, so the EVALUATE transition never
+  // skips a runnable task.
+  await dispatchReadyTasks();
   if (collected.size === taskIds.size) return results;
 
   // IPC dual-mode: register HEARTBEAT listeners for any channels in registry
@@ -899,6 +975,10 @@ export async function waitForResults(
       // Sprint 165 Bug Y — force re-scan idle slots for hayalet PENDING tasks
       // (legacy FIFO mode and dependency pipeline mode both benefit).
       await forceRescanIfIdle();
+      // Sprint 272 T2 — dispatch dependency-just-satisfied PENDING tasks NOW so
+      // the collection-done check below is only reached once every ready task
+      // is dispatched-and-awaited (never a synthetic NO_GO for unran work).
+      await dispatchReadyTasks();
       if (collected.size === taskIds.size) break;
       // Check for pending worker questions and auto-answer them
       checkWorkerQuestions(projectRoot, taskIds, collected);

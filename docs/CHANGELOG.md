@@ -2,6 +2,25 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint272] - 2026-06-10
+
+### Added
+
+- dispatch-kuyruğu/EVALUATE yarışı — koşmamış task varken değerlendirme başlamaz
+- exit-without-result kökü (a) — docker wrapper son-şans + zengin marker
+- F1-LIM faz-2a — task-tipine göre memory limiti (kod 1.5g / doc 768m önerisi)
+- docs — resource-profile kind-limit bölümü + config/features satırları
+- MASTER-PLAN işaretleri — 272 kapananlar
+
+### Fixed
+
+- GHOST-FINALIZE fix — checkpoint artığı temizliği + start'ın dürüst davranışı
+- exit-without-result kökü (b) — eval'de workPresent → verify-and-complete FIX yolu
+- F1-LIM faz-2b — provider-limit tespit modülü + FIX ölü-limit guard'ı
+
+
+_Tasks: 8 total, 8 done, 0 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint271] - 2026-06-10
 
 ### Added

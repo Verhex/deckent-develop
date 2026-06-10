@@ -40,6 +40,16 @@ import type { SpawnBackend } from './spawn-backend.js';
 // ─── Notify (DECKENT→USER:NOTIFY — Hot Fix H6) ──────────────────
 import { notify } from '../core/notify.js';
 
+// ─── Provider Failure Classifier (Sprint 272 — Task 006, F1-LIM faz-2b) ──
+// Pure SSOT discriminating provider-side failures (usage-limit/auth/oom)
+// from code failures so the FIX wave can PARK instead of re-running into
+// a dead provider limit (269 live lesson).
+import {
+  summarizeProviderFailures,
+  providerLimitFixSkipMessage,
+  type ProviderFailureInput,
+} from '../core/provider-failure-classifier.js';
+
 // ─── Rollback ─────────────────────────────────────────────────────
 import type { SafetyPoint } from './rollback.js';
 import {
@@ -93,6 +103,15 @@ import {
   enforceHonestResultGate,
   writeHonestSentinelResult,
   isStubResult,
+} from './result-evaluator.js';
+
+// ─── Verify-and-Complete FIX Signal (Sprint 272 — Task 272-004) ──────
+// Consumes the Task-272-003 EXIT_WITHOUT_RESULT marker: when work is present
+// on disk, the FIX prompt is reframed to audit-and-finish the partial work
+// rather than restart from scratch (ADR-073 FIX prompt enrichment).
+import {
+  classifyExitWithoutResult,
+  buildVerifyAndCompleteGuidance,
 } from './result-evaluator.js';
 
 // ─── Result Map Helper ──────────────────────────────────────────
@@ -325,6 +344,48 @@ export function findUndispatchedTaskIds(
     }
   }
   return undispatched;
+}
+
+/**
+ * IDs of tasks whose dependencies are ALL satisfied (DONE, aggregate-aware via
+ * `fixForTaskId`) yet which were never dispatched — not collected, no
+ * heartbeat, no assigned worker, still PENDING. These are the Sprint 271-013
+ * race victims: a task whose final blocking dependency landed too late for the
+ * dispatcher to pick it up before the collection-done check, about to take a
+ * synthetic NO_GO for work that never ran.
+ *
+ * Distinct from {@link findUndispatchedTaskIds}: this is dependency-aware (only
+ * READY tasks count) and deliberately IGNORES the deferred shortcut — a
+ * deferred task whose deps are now DONE is exactly the bug, not a legitimately
+ * skipped one. `result-collector.waitForResults` now dispatches these before
+ * returning; this helper is the EVALUATE-boundary diagnostic for the residual
+ * case (e.g. a spawn error left a ready task genuinely undispatchable). Control
+ * flow is unchanged. Pure (disk reads via {@link isTaskDispatched}, never
+ * mutates).
+ *
+ * @internal Exported for unit testing.
+ */
+export function findReadyUndispatchedTaskIds(
+  projectRoot: string,
+  sprint: Sprint,
+  results: readonly TaskResult[],
+): string[] {
+  const collectedIds = new Set(results.map(r => r.taskId));
+  const doneIds = new Set<string>();
+  for (const t of sprint.tasks) {
+    if (t.status !== TaskStatus.DONE) continue;
+    doneIds.add(t.id);
+    if (t.fixForTaskId) doneIds.add(t.fixForTaskId);
+  }
+  const noDeferred: ReadonlySet<string> = new Set();
+  const out: string[] = [];
+  for (const task of sprint.tasks) {
+    if (!task.dependencies || task.dependencies.length === 0) continue;
+    if (!task.dependencies.every(dep => doneIds.has(dep))) continue;
+    if (isTaskDispatched(projectRoot, task, collectedIds, noDeferred)) continue;
+    out.push(task.id);
+  }
+  return out;
 }
 
 /**
@@ -1049,6 +1110,31 @@ export async function runEvaluatePhase(
     // tetiklenirse phase EXECUTE'da kalır (persistPhaseTransition yapılmaz)
     // ve sonraki çağrı yine deneyebilir (finally lock release eder).
     if (options?.enforceDispatchGate === true) {
+      // Sprint 272 Task 272-002 — dispatch/EVALUATE race diagnostic. A task
+      // whose deps are all DONE but which reached EVALUATE undispatched is the
+      // Sprint 271-013 victim. result-collector.waitForResults now dispatches
+      // these before returning; this fail-soft event surfaces the residual
+      // case (e.g. a spawn error left it genuinely undispatchable) for the
+      // auditor/forensics. No control-flow change — evaluation proceeds via the
+      // existing undispatched path below.
+      const readyUndispatched = findReadyUndispatchedTaskIds(projectRoot, sprint, results);
+      if (readyUndispatched.length > 0) {
+        try {
+          const sidForReady = getCurrentSprintId(projectRoot) ?? sprint.id;
+          writeEvent(
+            projectRoot, sidForReady, 'brain', 'auditor',
+            'BRAIN→AUDITOR:READY_TASK_UNDISPATCHED',
+            {
+              sprintId: sprint.id,
+              taskIds: readyUndispatched,
+              totalTasks: sprint.tasks.length,
+              collectedResults: results.length,
+              timestamp: new Date().toISOString(),
+            },
+          );
+        } catch (e) { debugLog('runEvaluatePhase:readyUndispatched-event', e); }
+      }
+
       const undispatched = findUndispatchedTaskIds(
         projectRoot, sprint, results, deferredTaskIds,
       );
@@ -1612,6 +1698,42 @@ export function recordFixEvaluationAudit(
 }
 
 /**
+ * Sprint 272 T-004: enrich fix-task prompts with verify-and-complete guidance.
+ *
+ * For each fix task whose original task left a Task-272-003
+ * `EXIT_WITHOUT_RESULT` marker with work on disk (`workPresent:true`), append
+ * the audit-and-finish guidance to `fixTask.description` so the fix worker
+ * verifies-and-completes the partial work rather than restarting from scratch
+ * (ADR-073). Idempotent — a description already carrying the guidance is left
+ * untouched. workPresent:false / ordinary NO_GO originals get no enrichment, so
+ * today's crashed-NO_GO behavior is preserved.
+ *
+ * Pure mutation (no I/O) so it is unit-testable; `runFixPhase` persists the
+ * enriched task JSONs separately.
+ *
+ * @returns the ids of the fix tasks whose description was enriched.
+ */
+export function applyVerifyAndCompleteEnrichment(
+  fixTasks: Task[],
+  results: TaskResult[],
+): string[] {
+  const enriched: string[] = [];
+  const resultsMap = buildResultsMap(results);
+  for (const fixTask of fixTasks) {
+    if (!fixTask.fixForTaskId) continue;
+    const originalResult = resultsMap.get(fixTask.fixForTaskId);
+    if (!originalResult) continue;
+    const guidance = buildVerifyAndCompleteGuidance(classifyExitWithoutResult(originalResult));
+    if (guidance.length === 0) continue;
+    const current = fixTask.description ?? '';
+    if (current.includes('VERIFY_AND_COMPLETE')) continue; // already enriched — idempotent
+    fixTask.description = current.length > 0 ? `${current}\n\n${guidance}` : guidance;
+    enriched.push(fixTask.id);
+  }
+  return enriched;
+}
+
+/**
  * Run the FIX phase: handle cross-dependencies, reroute fix tasks (V2),
  * spawn fix workers, evaluate fix results.
  * Mutates `sprint` (status, phase) in place.
@@ -1630,6 +1752,56 @@ export async function runFixPhase(
     // Sprint 161 Task 2 (T-003): FIX entry — phase reaches disk so
     // observers see the EVALUATE→FIX transition.
     persistPhaseTransition(projectRoot, sprint, SprintPhase.FIX, SprintStatus.FIXING);
+
+    // ─── Provider-Limit FIX Guard (Sprint 272 — Task 006, F1-LIM faz-2b) ──
+    // 269 live lesson: when the provider usage-limit was exhausted EVERY
+    // worker exited-without-result, and the FIX wave re-ran into the SAME
+    // dead limit, burning a whole retry wave of tokens for nothing. Before
+    // spawning any fix worker, classify the NO_GO failures; if ≥50% look
+    // like a provider usage-limit, SKIP the FIX wave and emit an honest
+    // i18n notice (defer until the limit resets). A single/sparse limit
+    // stays below threshold → existing FIX behavior is preserved. Whole
+    // guard is fail-safe: any error falls through to the normal FIX path.
+    try {
+      const guardResultsMap = buildResultsMap(results);
+      const noGoInputs: ProviderFailureInput[] = [];
+      for (const [taskId, ev] of evaluations) {
+        if (ev !== TaskEvaluation.NO_GO) continue;
+        const r = guardResultsMap.get(taskId);
+        noGoInputs.push({ resultNotes: r?.notes });
+      }
+      // summarizeProviderFailures runs classifyProviderFailure() over each
+      // NO_GO input and aggregates the usage-limit ratio + skip verdict.
+      const failureSummary = summarizeProviderFailures(noGoInputs);
+      if (failureSummary.skipFix) {
+        debugLog(
+          'runFixPhase:provider-limit-skip',
+          `usageLimit=${failureSummary.usageLimit}/${failureSummary.total} ` +
+          `ratio=${failureSummary.usageLimitRatio.toFixed(2)} → FIX skipped`,
+        );
+        const lang = config.language ?? 'en';
+        const msg = providerLimitFixSkipMessage(lang);
+        try {
+          const sidForGuard = getCurrentSprintId(projectRoot) ?? sprint.id;
+          writeEvent(
+            projectRoot, sidForGuard, 'brain', 'user',
+            'BRAIN→USER:FIX_SKIPPED_PROVIDER_LIMIT',
+            {
+              usageLimit: failureSummary.usageLimit,
+              total: failureSummary.total,
+              ratio: failureSummary.usageLimitRatio,
+              timestamp: new Date().toISOString(),
+            },
+          );
+        } catch (e) { debugLog('runFixPhase:provider-limit-event', e); }
+        try {
+          void notify('human-checkpoint-required', sprint.id, msg.title, msg.summary);
+        } catch (e) { debugLog('runFixPhase:provider-limit-notify', e); }
+        console.warn(`[fix] ${msg.summary}`);
+        return;
+      }
+    } catch (e) { debugLog('runFixPhase:providerLimitGuard', e); }
+
     handleCrossDependencies(projectRoot, sprint, evaluations);
 
     const fixTasks: Task[] = [];
@@ -1642,6 +1814,26 @@ export async function runFixPhase(
     }
 
     if (fixTasks.length > 0) {
+      // ─── Verify-and-Complete FIX Enrichment (Sprint 272 — Task 272-004) ──
+      // Reframe the fix prompt for tasks whose original worker left an
+      // EXIT_WITHOUT_RESULT marker with work on disk: audit-and-finish the
+      // partial work + write the missing .result, NOT restart from scratch.
+      // Runs BEFORE the v2 reroute (which re-persists the same task object) so
+      // both routing versions carry the enriched description. Fail-safe: any
+      // I/O error falls through to the normal FIX path.
+      try {
+        const enrichedIds = applyVerifyAndCompleteEnrichment(fixTasks, results);
+        for (const enrichedId of enrichedIds) {
+          const ft = fixTasks.find(t => t.id === enrichedId);
+          if (ft) {
+            writeFileSync(join(tasksPath, `task-${ft.id}.json`), JSON.stringify(ft, null, 2), 'utf-8');
+          }
+        }
+        if (enrichedIds.length > 0) {
+          debugLog('runFixPhase:verifyAndComplete', `enriched ${enrichedIds.length} fix prompt(s): ${enrichedIds.join(', ')}`);
+        }
+      } catch (e) { debugLog('runFixPhase:verifyAndComplete', e); }
+
       // V2: Reroute fix tasks with MidSprintAdapter (exclude failed agent/skills)
       if (routingVersionForFix === 'v2') {
         try {

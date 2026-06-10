@@ -123,6 +123,14 @@ export interface DeckentConfig {
   docker_image?: string;
   /** Docker container timeout in seconds (default: 1200 = 20 minutes) */
   docker_timeout?: number;
+  /**
+   * Opt-in per-kind Docker memory limits. Keys are canonical TaskKind values
+   * (work-model.ts SSOT): 'code-development', 'documentation', 'test', etc.
+   * When a spawned task's kind matches, that limit overrides the global default 4g.
+   * Swap is auto-derived at limit × 1.5. Absent block = no change from current behavior.
+   * Example: { "code-development": "1536m", "documentation": "768m" }
+   */
+  worker_memory_limit_by_kind?: Record<string, string>;
   /** Skill system configuration */
   skills?: SkillConfig;
   /** Decision engine configuration */
@@ -594,6 +602,8 @@ export interface ResolvedConfig {
   docker_image?: string;
   /** Docker container timeout in seconds (default: 1200 = 20 minutes) */
   docker_timeout?: number;
+  /** Opt-in per-kind Docker memory limits. Keys are canonical TaskKind values. Swap derived at × 1.5. */
+  worker_memory_limit_by_kind?: Record<string, string>;
   /** Skill system configuration */
   skills?: SkillConfig;
   /** Provider for Brain planning (default: 'claude') */

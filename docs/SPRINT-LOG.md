@@ -7416,3 +7416,32 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 271-013: MASTER-PLAN işaretleri — 271 kapananlar (NO_GO)
 
 ---
+## Sprint 272 — sprint-272
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-06-10
+**Duration:** 1563s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 8 |
+| Completed | 8 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 1563480ms |
+
+### Tasks
+
+- 272-001: GHOST-FINALIZE fix — checkpoint artığı temizliği + start'ın dürüst davranışı (DONE)
+- 272-002: dispatch-kuyruğu/EVALUATE yarışı — koşmamış task varken değerlendirme başlamaz (DONE)
+- 272-003: exit-without-result kökü (a) — docker wrapper son-şans + zengin marker (DONE)
+- 272-004: exit-without-result kökü (b) — eval'de workPresent → verify-and-complete FIX yolu (DONE)
+- 272-005: F1-LIM faz-2a — task-tipine göre memory limiti (kod 1.5g / doc 768m önerisi) (DONE)
+- 272-006: F1-LIM faz-2b — provider-limit tespit modülü + FIX ölü-limit guard'ı (DONE)
+- 272-007: docs — resource-profile kind-limit bölümü + config/features satırları (DONE)
+- 272-008: MASTER-PLAN işaretleri — 272 kapananlar (DONE)
+
+---

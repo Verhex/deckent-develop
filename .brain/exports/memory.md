@@ -1,5 +1,18 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-272 Learnings
+- Sprint sprint-272 Learnings: ## Sprint sprint-272 Learnings
+
+## Gains
+- 272-001 — GHOST-FINALIZE fix — checkpoint artığı temizliği + start'ın dürüst davranışı — GHOST-FINALIZE fix — root cause closed at two layers + a runtime guard.
+- 272-002 — dispatch-kuyruğu/EVALUATE yarışı — koşmamış task varken değerlendirme başlamaz — Fixed the Sprint 271-013 dispatch-queue/EVALUATE race.
+- 272-003 — exit-without-result kökü (a) — docker wrapper son-şans + zengin marker — exit-without-result kökü (a) — docker wrapper son-şans + zengin marker.
+- 272-004 — exit-without-result kökü (b) — eval'de workPresent → verify-and-complete FIX yolu — exit-without-result kökü (b) — eval'de workPresent → verify-and-complete FIX yolu.
+- 272-005 — F1-LIM faz-2a — task-tipine göre memory limiti (kod 1.5g / doc 768m önerisi) — Implemented F1-LIM faz-2a opt-in kind-based Docker memory limits.
+- 272-006 — F1-LIM faz-2b — provider-limit tespit modülü + FIX ölü-limit guard'ı — F1-LIM faz-2b complete.
+- 272-007 — docs — resource-profile kind-limit bölümü + config/features satırları — Documentation task completed: (1) Added Section 11 to resource-profile.md with kind-based memory ...
+- 272-008 — MASTER-PLAN işaretleri — 272 kapananlar — Added Sprint 272 entry to MASTER-PLAN.md marking completion of 4 root-cause fixes: (1) GHOST-FINA...
+
 ## Sprint sprint-271 Learnings
 - Sprint sprint-271 Learnings: ## Sprint sprint-271 Learnings
 - sprint-yaşamdöngüsü wire — opt-in izleme SPAWN→CLEANUP: GO_WITH_TECH_DEBT — Wired Task-1 resource-monitor into the sprint lifecycle, opt-in via config.resource_monitor.enabled===true. Chose sprint

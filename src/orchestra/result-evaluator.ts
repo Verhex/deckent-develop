@@ -1400,6 +1400,100 @@ export function applyTechDebtDowngrade(
   return { decision: originalDecision, downgraded: false, reason: null, completionRatio: ratio };
 }
 
+// ─── EXIT_WITHOUT_RESULT → VERIFY_AND_COMPLETE FIX Signal (Sprint 272 T-004) ──
+//
+// Task 272-003 enriched the docker wrapper EXIT-trap so that a worker which
+// finished its work but exited without writing `.result` (a clean exit-0 on a
+// usage-limit / stream cut) leaves an `EXIT_WITHOUT_RESULT` marker carrying a
+// `workPresent` flag + diffStat + last heartbeat. The marker stays a NO_GO
+// candidate (selfAssessment:'NO_GO') so the rubric evaluator is unchanged.
+//
+// This module turns that marker into a FIX-routing signal: when work is present
+// on disk, the fix worker should AUDIT-AND-FINISH the partial work (and write
+// the missing `.result`) rather than restart from scratch — the productized
+// form of the "fresh worker over partial work" recovery we did by hand three
+// sprints running. workPresent:false → no signal → today's crashed-NO_GO path.
+
+/** FIX-routing signal for an EXIT_WITHOUT_RESULT partial that has work on disk. */
+export const VERIFY_AND_COMPLETE = 'VERIFY_AND_COMPLETE' as const;
+
+/** Classification of an exit-without-result marker for FIX routing. */
+export interface ExitWithoutResultSignal {
+  /** true when the result is a Task-272-003 `EXIT_WITHOUT_RESULT` marker. */
+  isExitWithoutResult: boolean;
+  /** Mirror of the marker's `workPresent` flag (false when not a marker). */
+  workPresent: boolean;
+  /** `VERIFY_AND_COMPLETE` when work is present on disk; `null` otherwise. */
+  signal: typeof VERIFY_AND_COMPLETE | null;
+  /** `git diff --shortstat` passthrough for the FIX prompt ('' when absent). */
+  diffStat: string;
+  /** Last heartbeat status passthrough ('unknown' when absent). */
+  lastHbStatus: string;
+  /** Last heartbeat sequence passthrough (0 when absent). */
+  lastHbSequence: number;
+}
+
+/** Additive marker fields the evaluator reads off a parsed `.result` JSON. */
+interface ExitMarkerFields {
+  markerType?: unknown;
+  workPresent?: unknown;
+  diffStat?: unknown;
+  lastHbStatus?: unknown;
+  lastHbSequence?: unknown;
+}
+
+/**
+ * Classify a task result against the Task-272-003 `EXIT_WITHOUT_RESULT` marker.
+ *
+ * The marker fields are additive (not on the `TaskResult` TS type) but land on
+ * the parsed `.result` JSON verbatim, so they are read via a narrow cast. A
+ * normal worker result (DONE / GO_WITH_TECH_DEBT / ordinary NO_GO) carries no
+ * `markerType` → `isExitWithoutResult:false`, `signal:null` — the caller leaves
+ * existing behavior untouched.
+ */
+export function classifyExitWithoutResult(result: TaskResult): ExitWithoutResultSignal {
+  const m = result as unknown as ExitMarkerFields;
+  const isExitWithoutResult = m.markerType === 'EXIT_WITHOUT_RESULT';
+  const workPresent = isExitWithoutResult && m.workPresent === true;
+  return {
+    isExitWithoutResult,
+    workPresent,
+    signal: workPresent ? VERIFY_AND_COMPLETE : null,
+    diffStat: typeof m.diffStat === 'string' ? m.diffStat : '',
+    lastHbStatus: typeof m.lastHbStatus === 'string' && m.lastHbStatus.length > 0
+      ? m.lastHbStatus
+      : 'unknown',
+    lastHbSequence: typeof m.lastHbSequence === 'number' ? m.lastHbSequence : 0,
+  };
+}
+
+/**
+ * Build the verify-and-complete FIX guidance block injected into the fix
+ * worker's prompt when the original task left an `EXIT_WITHOUT_RESULT` marker
+ * with work on disk. Reframes the fix from "redo from scratch" to "audit and
+ * finish the partial work + write the missing `.result`" (ADR-073 FIX prompt
+ * enrichment). Returns '' when there is no recoverable work (signal !==
+ * VERIFY_AND_COMPLETE) so the caller preserves today's crashed-NO_GO behavior.
+ *
+ * Internal worker-prompt text (English) — mirrors the existing hardcoded
+ * fix-prompt sections in debt-manager.ts; it is not a user-facing UI string,
+ * so it does not route through getMessage().
+ */
+export function buildVerifyAndCompleteGuidance(signal: ExitWithoutResultSignal): string {
+  if (signal.signal !== VERIFY_AND_COMPLETE) return '';
+  const diff = signal.diffStat.length > 0 ? signal.diffStat : 'changes detected on disk';
+  return [
+    '## VERIFY_AND_COMPLETE — partial work is already on disk',
+    `The previous worker finished work but exited before writing its \`.result\` `
+      + `(EXIT_WITHOUT_RESULT; last heartbeat ${signal.lastHbStatus}, seq ${signal.lastHbSequence}; ${diff}).`,
+    'Do NOT restart from scratch. Instead:',
+    '1. Inspect the existing changes (`git diff`) — most of the work is likely already done.',
+    "2. Verify they satisfy the task's goCriteria and fill ONLY the remaining gaps.",
+    '3. Run the verification commands (type check + targeted tests).',
+    '4. Write the missing `.tasks/task-*.result` so the task can complete.',
+  ].join('\n');
+}
+
 // ─── Token Usage Validation ─────────────────────────────────────────
 
 /**

@@ -115,6 +115,13 @@ import { notify } from '../core/notify.js';
 import { writeSprintState, readSprintState, SPRINT_STATE_FILE } from './sprint-utils.js';
 import { clearPid } from './sprint-pid-manager.js';
 
+// ─── Checkpoint cleanup (Sprint 272 272-001 — GHOST-FINALIZE) ─────
+// Terminal-state finalize must purge `.deckent/<id>-checkpoint.json` +
+// `-checkpoint-seq` so the next `deckent start` cannot read a stale
+// checkpoint and run a phantom 0/0 "complete" restore that exits before
+// the new sprint starts. Covers normal completion AND `finalize --force`.
+import { cleanupCheckpointFiles } from './sprint-checkpoint.js';
+
 
 // ═══ Types ════════════════════════════════════════════════════════
 
@@ -1499,4 +1506,12 @@ export function persistFinalSprintState(projectRoot: string, sprint: Sprint): vo
   try {
     clearPid(projectRoot, sprint.id);
   } catch (e) { debugLog('persistFinalSprintState:clearPid', e); }
+  // GHOST-FINALIZE fix (Sprint 272 272-001): purge this sprint's checkpoint
+  // artifacts so the next `deckent start` cannot read a stale checkpoint and
+  // run a phantom 0/0 "complete" restore. cleanupCheckpointFiles is itself
+  // idempotent + fail-safe; the wrapping try/catch is belt-and-suspenders so
+  // finalize never crashes on a locked/missing file.
+  try {
+    cleanupCheckpointFiles(projectRoot, sprint.id);
+  } catch (e) { debugLog('persistFinalSprintState:cleanupCheckpointFiles', e); }
 }
