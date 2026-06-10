@@ -219,6 +219,27 @@ export interface DeckentConfig {
   auth_mode?: 'subscription' | 'api' | 'hybrid';
   /** Bearer token for HTTP API authentication. Falls back to DECKENT_API_TOKEN env var. */
   api_auth_token?: string;
+  /**
+   * OIDC JWT verification for the HTTP API bearer middleware (Sprint 267).
+   * Optional block — when absent, behavior is unchanged (static token only).
+   * A Bearer value is checked against the static token FIRST (constant-time);
+   * on mismatch it is verified as a JWT via `verifyJwt` (src/core/auth-oidc.ts).
+   * When enabled WITHOUT a static token, auth becomes ACTIVE: a valid Bearer
+   * JWT is required for non-exempt requests. `key` supports `$DECK:KEY`
+   * references (the whole config passes through deck-interpolation on load).
+   */
+  api_oidc?: {
+    /** Master switch — the block is inert unless true. */
+    enabled: boolean;
+    /** Expected `iss` claim (required non-empty when enabled). */
+    issuer: string;
+    /** Expected `aud` claim (optional). */
+    audience?: string;
+    /** Pinned signature algorithm — key material is routed only to this slot. */
+    algorithm: 'HS256' | 'RS256';
+    /** HS256 shared secret or RS256 PEM public key (required non-empty when enabled). */
+    key: string;
+  };
 
   // ─── Memory (V1 — flat .md files) ───────────────────────────────────
   /** @deprecated Use memory.backend instead. Kept for V1 backward compat. */

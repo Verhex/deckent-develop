@@ -80,6 +80,10 @@
 | adr-086 | Native CLI Parity — F11 Feature Set (Sprint 224) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-267 Learnings** (sprint-267): ## Sprint sprint-267 Learnings
+
+## Gains
+- 267-001 — api_oidc OIDC JWT bearer uzantısı — verifyJwt SSOT tüketimi, def...
 - **Sprint sprint-266 Learnings** (sprint-266): ## Sprint sprint-266 Learnings
 
 ## Gains
@@ -106,10 +110,6 @@
 - 257-001 — CODE-FULLSUITE-NOGO — worker self-verify must be TARGETED, not f...
 - **Sprint sprint-256 Learnings** (sprint-256): ## Sprint sprint-256 Learnings
 - PLAN-SCOPE-1 — planner must NOT pull description-mentioned file paths into scope.fil...
-- **Sprint sprint-255 Learnings** (sprint-255): ## Sprint sprint-255 Learnings
-
-## Gains
-- 255-001 — DOC-1 — ExecutionRequest contract reference (WM-1) — Created doc...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -131,4 +131,4 @@ _No active technical debt._
 - Violation pattern: stale_heartbeat
 - Violation pattern: file_outside_scope
 
-_Total entries: 359 | Generated: 2026-06-09_
+_Total entries: 362 | Generated: 2026-06-10_

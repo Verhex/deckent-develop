@@ -440,31 +440,48 @@ deckent doctor --pre-flight --json
 
 ### `deckent audit`
 
-Run Brain Self-Audit Gate for a sprint (tsc + vitest + honesty + observability), or read/export the live ENT-3 audit chain via the `query`, `compliance`, and `forward` subcommands.
+Run Brain Self-Audit Gate for a sprint (tsc + vitest + honesty + observability), or read/export/retain the ENT-3 audit chain via the `query`, `compliance`, `forward`, and `retention` subcommands.
 
 **Usage forms:**
 
 | Form | Description |
 |------|-------------|
 | `deckent audit <sprint-id>` | Run the Self-Audit Gate; writes `.deckent/<sprint-id>-gate.json` |
-| `deckent audit compliance` | Compliance report over the live audit chain (chain integrity + RBAC/tenant control flags) |
-| `deckent audit forward` | Export the audit chain as SIEM NDJSON to a file |
+| `deckent audit compliance` | Compliance report over the full retained audit trail — retention archive + live chain (chain integrity + RBAC/tenant control flags) |
+| `deckent audit forward` | Forward the audit chain to a SIEM — HTTP(S) endpoint, syslog collector, or NDJSON file |
 | `deckent audit query` | Filter raw audit events (`--tenant`, `--action`, `--since`, `--role`) |
+| `deckent audit retention` | Plan (dry-run) or apply audit-log retention (`--keep-days`, `--keep-count`, `--apply`) |
 
 | Option | Description |
 |--------|-------------|
 | `--json` | Output raw JSON only |
-| `--sprint <id>` | Sprint ID for the `query`/`compliance`/`forward` subcommands (default: `sprint-001`) |
-| `--out <path>` | Output file for the `forward` subcommand (default: `.deckent/siem-export.jsonl`) |
+| `--sprint <id>` | Sprint ID for the `query`/`compliance`/`forward`/`retention` subcommands (default: `sprint-001`) |
+| `--url <url>` | `forward`: POST audit records to an HTTP(S) SIEM endpoint (takes precedence over `--syslog` and `--out`) |
+| `--syslog <host[:port]>` | `forward`: send audit records to a syslog collector, RFC 5424 (takes precedence over `--out`; default port `514`) |
+| `--syslog-protocol <protocol>` | `forward`: syslog wire protocol — `udp`\|`tcp` (default: `udp`) |
+| `--out <path>` | `forward`: output file for the NDJSON file transport (default: `.deckent/siem-export.jsonl`) |
+| `--keep-days <n>` | `retention`: prune audit events older than `n` days |
+| `--keep-count <n>` | `retention`: archive audit events beyond the most recent `n` |
+| `--apply` | `retention`: apply the plan — without it the run is a dry-run |
 | `--lang <code>` | Language override (`en`\|`tr`) |
 
-**Exit codes:** gate form — `0` PASS, `1` gate failure; `audit compliance` — `0` chain intact, `1` broken audit chain; `2` on execution error (gate/compliance/forward).
+**Forward precedence:** `--url` (HTTP) > `--syslog` (RFC 5424 syslog) > `--out` (NDJSON file) — the highest-precedence flag present wins; the others are ignored. Invalid syslog targets/protocols are rejected before any forwarding (exit `2`).
+
+**Retention semantics:** without `--apply` the run is a dry-run — it prints the plan (`scanned`/`keep`/`archive`/`prune`) and performs zero writes. With `--apply`, the `archive` partition is appended to `.deckent/<sprint-id>-events-archive.jsonl` **before** the stream is touched (no-data-loss ordering), `prune` events are dropped, and the event stream is rewritten atomically (tmp file + rename) preserving all non-audit events and the `keep` partition in original order. When the plan drops nothing, the stream file is not touched at all.
+
+**Archive-aware compliance:** after a `retention --apply`, `audit compliance` verifies the chain over the retention archive prepended to the live stream — the live stream alone is a truncated chain. Honest limit: `prune`d records are permanently deleted, not archived; if HMAC'd records were pruned, the surviving chain reports broken **by design** — true deletion is the GDPR-style tradeoff against tamper-evidence.
+
+**Exit codes:** gate form — `0` PASS, `1` gate failure; `audit compliance` — `0` chain intact, `1` broken audit chain; `audit forward` / `audit retention` — `0` success (dry-run or apply), `2` invalid target/policy or execution error; `2` on execution error (gate/compliance).
 
 **Example:**
 ```bash
 deckent audit sprint-264 --json
 deckent audit compliance --sprint sprint-264
+deckent audit forward --sprint sprint-264 --url https://siem.example.com/ingest
+deckent audit forward --sprint sprint-264 --syslog logs.example.com:6514 --syslog-protocol tcp
 deckent audit forward --sprint sprint-264 --out ./siem/export.jsonl
+deckent audit retention --sprint sprint-264 --keep-days 30 --keep-count 500   # dry-run — zero writes
+deckent audit retention --sprint sprint-264 --keep-days 30 --apply            # archive first, then atomic rewrite
 ```
 
 **MCP:** `deckent_audit` (Self-Audit Gate form only)

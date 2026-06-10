@@ -842,6 +842,34 @@ export function validateConfig(config: DeckentConfig): string[] {
     }
   }
 
+  // ─── API OIDC validation (Sprint 267 T-267-001) ─────────────────────
+  // Optional block — absent means today's static-token-only behavior. NEVER
+  // echo `key` material into an error message (secret-leak guard).
+  if (config.api_oidc !== undefined) {
+    const oidc = config.api_oidc as unknown as Record<string, unknown>;
+    if (typeof oidc['enabled'] !== 'boolean') {
+      errors.push('api_oidc.enabled must be a boolean');
+    }
+    const oidcAlgorithm = oidc['algorithm'];
+    if (oidcAlgorithm !== undefined && oidcAlgorithm !== 'HS256' && oidcAlgorithm !== 'RS256') {
+      errors.push(`Invalid value '${String(oidcAlgorithm)}' for field 'api_oidc.algorithm'. Valid: HS256, RS256`);
+    }
+    if (oidc['audience'] !== undefined && typeof oidc['audience'] !== 'string') {
+      errors.push('api_oidc.audience must be a string');
+    }
+    if (oidc['enabled'] === true) {
+      if (typeof oidc['issuer'] !== 'string' || oidc['issuer'].length === 0) {
+        errors.push('api_oidc.issuer must be a non-empty string when api_oidc.enabled is true');
+      }
+      if (typeof oidc['key'] !== 'string' || oidc['key'].length === 0) {
+        errors.push('api_oidc.key must be a non-empty string when api_oidc.enabled is true');
+      }
+      if (oidcAlgorithm === undefined) {
+        errors.push('api_oidc.algorithm is required when api_oidc.enabled is true. Valid: HS256, RS256');
+      }
+    }
+  }
+
   if (errors.length > 0) {
     throw new ConfigValidationError(errors);
   }

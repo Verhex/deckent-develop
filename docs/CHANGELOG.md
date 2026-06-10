@@ -2,6 +2,19 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint267] - 2026-06-10
+
+### Added
+
+- HTTP API bearer middleware — statik-key OIDC JWT uzantısı (`api_oidc`, default-off; statik token yolu bit-bit korunur)
+- SAP OData read-only ErpDriver (`createSapErpDriver` — ikinci somut ERP driver'ı, v2/v4 zarf desteği, secret-redaction)
+- CLI commands reference — retention + syslog + forward önceliği
+- Config reference — `api_oidc` bloğu (koddan birebir)
+- Enterprise integrations — Odoo/retention/archive-aware compliance ekleri
+- Features reference — 266/267 satırları (Odoo driver, audit-retention, syslog, FlowBacklogBridge)
+
+_Tasks: 6 total, 6 done, 0 tech debt, 0 no-go (gece crash sonrası CC manuel kurtarma ile tamamlandı)_
+
 ## [1.0.0-beta.1-sprint266] - 2026-06-09
 
 ### Added

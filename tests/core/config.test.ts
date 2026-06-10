@@ -1251,6 +1251,81 @@ describe('validateConfig — autonomous.rbac_policy', () => {
   });
 });
 
+describe('validateConfig — api_oidc (Sprint 267 T-267-001)', () => {
+  it('accepts a valid enabled block', () => {
+    const config = getDefaultConfig();
+    config.api_oidc = {
+      enabled: true,
+      issuer: 'https://idp.example.test',
+      algorithm: 'HS256',
+      key: 'shared-secret',
+    };
+    expect(() => validateConfig(config)).not.toThrow();
+  });
+
+  it('has no default — block absent means today\'s behavior (no throw)', () => {
+    const config = getDefaultConfig();
+    expect(config.api_oidc).toBeUndefined();
+    expect(() => validateConfig(config)).not.toThrow();
+  });
+
+  it('rejects non-boolean enabled', () => {
+    const config = getDefaultConfig();
+    (config as unknown as Record<string, unknown>)['api_oidc'] = {
+      enabled: 'yes', issuer: 'https://idp.example.test', algorithm: 'HS256', key: 'k',
+    };
+    expect(() => validateConfig(config)).toThrow(ConfigValidationError);
+    expect(() => validateConfig(config)).toThrow('api_oidc.enabled must be a boolean');
+  });
+
+  it('rejects enabled block with an empty issuer', () => {
+    const config = getDefaultConfig();
+    config.api_oidc = { enabled: true, issuer: '', algorithm: 'HS256', key: 'shared-secret' };
+    expect(() => validateConfig(config)).toThrow(ConfigValidationError);
+    expect(() => validateConfig(config)).toThrow('api_oidc.issuer');
+  });
+
+  it('rejects enabled block with an empty key', () => {
+    const config = getDefaultConfig();
+    config.api_oidc = { enabled: true, issuer: 'https://idp.example.test', algorithm: 'HS256', key: '' };
+    expect(() => validateConfig(config)).toThrow(ConfigValidationError);
+    expect(() => validateConfig(config)).toThrow('api_oidc.key');
+  });
+
+  it('rejects an unknown algorithm', () => {
+    const config = getDefaultConfig();
+    (config as unknown as Record<string, unknown>)['api_oidc'] = {
+      enabled: true, issuer: 'https://idp.example.test', algorithm: 'ES512', key: 'shared-secret',
+    };
+    expect(() => validateConfig(config)).toThrow(ConfigValidationError);
+    expect(() => validateConfig(config)).toThrow('api_oidc.algorithm');
+  });
+
+  it('rejects enabled block with algorithm missing', () => {
+    const config = getDefaultConfig();
+    (config as unknown as Record<string, unknown>)['api_oidc'] = {
+      enabled: true, issuer: 'https://idp.example.test', key: 'shared-secret',
+    };
+    expect(() => validateConfig(config)).toThrow(ConfigValidationError);
+    expect(() => validateConfig(config)).toThrow('api_oidc.algorithm is required');
+  });
+
+  it('rejects non-string audience', () => {
+    const config = getDefaultConfig();
+    (config as unknown as Record<string, unknown>)['api_oidc'] = {
+      enabled: true, issuer: 'https://idp.example.test', algorithm: 'HS256', key: 'k', audience: 42,
+    };
+    expect(() => validateConfig(config)).toThrow(ConfigValidationError);
+    expect(() => validateConfig(config)).toThrow('api_oidc.audience must be a string');
+  });
+
+  it('accepts a DISABLED block with empty issuer/key (gating applies only when enabled)', () => {
+    const config = getDefaultConfig();
+    config.api_oidc = { enabled: false, issuer: '', algorithm: 'HS256', key: '' };
+    expect(() => validateConfig(config)).not.toThrow();
+  });
+});
+
 // ─── Sprint 072: Plan Tier Generalization ──────────────────────────
 
 describe('Plan tier generalization (sprint-072)', () => {

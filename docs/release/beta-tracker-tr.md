@@ -47,14 +47,14 @@ Spec: `docs/superpowers/specs/2026-05-19-embedded-web-terminal-design.md`. Plan:
 | Metric | Value |
 |--------|-------|
 | Version | 1.0.0-beta.1 |
-| Sprint | sprint-266 |
+| Sprint | sprint-267 |
 | MCP Tools | 32 |
 | MCP Resources | 8 |
 | CLI Commands | 55+ |
 | Dashboard Pages | 12 |
 | Agents | 15 built-in + 2 custom |
 | Skills | 21 built-in |
-| Providers | 4 (Claude, Codex, Gemini, Ollama) |
+| Providers | 3 (Claude, Codex, Gemini) |
 
 ## Genel Bakış
 
@@ -1955,12 +1955,12 @@ Sprint 166 mimari forensic'inde 4 yeni follow-up bug tespit edildi (Sprint 167 �
 ## Sprint Metrics
 | Metric | Value |
 |--------|-------|
-| Sprint | sprint-266 |
-| Total Tasks | 5 |
-| Completed | 5 |
+| Sprint | sprint-267 |
+| Total Tasks | 6 |
+| Completed | 1 |
 | Tech Debt | 0 |
-| No-Go | 0 |
-| Duration | 9dk 34sn |
+| No-Go | 5 |
+| Duration | 257dk 53sn |
 | Coverage | N/A |
 
 ## Sprint History

@@ -588,6 +588,48 @@ Tier equivalence (DECKENT.md model registry): `premium` = opus / gpt-5 / gemini-
 |-----|---------|--------|-------------|
 | `auth_mode` | `"subscription"` (config.ts:770) | `subscription \| api \| hybrid` | `subscription` = Claude.ai session mount; `api` = uses `ANTHROPIC_API_KEY`; `hybrid` = both (`.deck` keys take precedence). Resolved by `readAuthMode()` (config.ts:1208), consumed in provider.ts:728. A per-task `- Auth:` directive overrides this. |
 
+### 14.1 HTTP API OIDC Bearer (`api_oidc`)
+
+Optional top-level block (config-types.ts:231) that extends the HTTP API bearer middleware with OIDC JWT verification (Sprint 267). **Default-off**: when the block is absent, behavior is unchanged — only the static token (`api_auth_token` or the `DECKENT_API_TOKEN` env var) is checked. There are no built-in defaults for this block.
+
+| Key | Type | Required | Description |
+|-----|------|----------|-------------|
+| `api_oidc.enabled` | boolean | yes | Master switch — the block is inert unless `true`. |
+| `api_oidc.issuer` | string | when enabled | Expected `iss` claim; tokens from any other issuer are rejected. Must be non-empty when `enabled: true`. |
+| `api_oidc.audience` | string | no | Expected `aud` claim. When set, tokens without a matching `aud` are rejected. |
+| `api_oidc.algorithm` | `HS256 \| RS256` | when enabled | Pinned signature algorithm. Tokens signed with any other `alg` are rejected; key material is routed only to the slot matching this value (HS256 secret vs RS256 public key), so algorithm-confusion attacks cannot cross key material. |
+| `api_oidc.key` | string | when enabled | HS256 shared secret or RS256 PEM public key. Must be non-empty when `enabled: true`. Supports `$DECK:KEY` references — the block passes through deck-interpolation on load (server.ts:1049). |
+
+```json
+{
+  "api_oidc": {
+    "enabled": true,
+    "issuer": "https://idp.example.com",
+    "audience": "deckent-api",
+    "algorithm": "RS256",
+    "key": "$DECK:OIDC_PUBLIC_KEY"
+  }
+}
+```
+
+**Validation** (config.ts:848-871, exact strings; the `key` value is never echoed into an error message — secret-leak guard):
+
+- `api_oidc.enabled must be a boolean`
+- `Invalid value '<value>' for field 'api_oidc.algorithm'. Valid: HS256, RS256`
+- `api_oidc.audience must be a string`
+- `api_oidc.issuer must be a non-empty string when api_oidc.enabled is true`
+- `api_oidc.key must be a non-empty string when api_oidc.enabled is true`
+- `api_oidc.algorithm is required when api_oidc.enabled is true. Valid: HS256, RS256`
+
+**Behavior with the static token** (src/api/auth.ts — JWT verification delegates to `verifyJwt` in src/core/auth-oidc.ts):
+
+- A Bearer value is checked against the static token **first** (constant-time SHA-256 compare, bit-identical to the pre-267 path); only on mismatch is it verified as a JWT. The static token keeps working in an OIDC-enabled config.
+- **OIDC-only mode**: configuring `api_oidc` with **no** static token *activates* auth — a valid Bearer JWT becomes mandatory for non-exempt requests (missing/malformed header → 401, failed verification → 403). The "auth disabled" path applies only when *neither* mechanism is configured.
+- If both checks fail → 403 Forbidden (unchanged). Responses stay generic — no claim or key material leaks into the body.
+- Exempt-path (`/health`, `/api/health`), query-token (`/api/events` SSE) and localhost-auto-inject semantics are unchanged; the query-token fallback applies to the static token only.
+
+**Server resolution** (server.ts:1035-1065): an explicit `oidc` option passed to `createHttpServer` wins; otherwise the project config's `api_oidc` block is consulted — and used only when `enabled: true` with a complete `issuer`/`algorithm`/`key`. A block that is missing, disabled, incomplete, or unparseable fails closed to the previous middleware behavior.
+
 ---
 
 ## 15. Sprint Lifecycle & Evaluation

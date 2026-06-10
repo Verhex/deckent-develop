@@ -1,5 +1,18 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-267 Learnings
+- Sprint sprint-267 Learnings: ## Sprint sprint-267 Learnings
+
+## Gains
+- 267-001 — api_oidc OIDC JWT bearer uzantısı — verifyJwt SSOT tüketimi, default-off, statik yol regresyonsuz (43 dosya/479 test)
+- 267-002 — SAP OData ErpDriver — Odoo'dan sonra ikinci driver; ErpDriver sözleşmesi iki somut driver'la doğrulandı
+- 267-003..006 — 4 referans doc kod-türevli, Kanıt grep'leri geçti
+
+## Bugs (kurtarmadan)
+- RESUME-RACE — deckent resume bayat .hb/.partial-result'ı resetlemeden runSprint'e giriyor; collector respawn'a şans vermeden sentetik NO_GO ile kapatıyor (fix: hb reset + grace period)
+- SPAWN-LIFECYCLE — deckent spawn: docker'da bloklayıcı, completion'da status finalize yok (duplicate riski), modelEffort düşürülüyor
+- OOM exit 137 (267-002 ilk deneme) — fresh-worker-over-partial-work deseni başarıyla tamamladı
+
 ## Sprint sprint-266 Learnings
 - Sprint sprint-266 Learnings: ## Sprint sprint-266 Learnings
 

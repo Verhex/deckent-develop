@@ -111,12 +111,12 @@ Komutlar: `deckent status`, `deckent history`, `deckent retro`, `deckent recall 
 ## Sprint Metrics
 | Metric | Value |
 |--------|-------|
-| Sprint | sprint-266 |
-| Total Tasks | 5 |
-| Completed | 5 |
+| Sprint | sprint-267 |
+| Total Tasks | 6 |
+| Completed | 6 |
 | Tech Debt | 0 |
 | No-Go | 0 |
-| Duration | 9dk 34sn |
+| Duration | 26dk (gece crash + CC kurtarma respawn) |
 | Coverage | N/A |
 
 ## Active Debt
@@ -125,5 +125,6 @@ _No tech debt record._
 ## Agent Performance
 | Agent | Tasks | Done | Success |
 |-------|-------|------|--------|
-| api-builder | 2 | 2 | 100% |
-| doc-writer | 3 | 3 | 100% |
+| security-auditor | 1 | 1 | 100% |
+| api-builder | 1 | 1 | 100% |
+| doc-writer | 4 | 4 | 100% |

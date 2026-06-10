@@ -37,6 +37,7 @@ import {
   validateWebhookKey,
 } from '../connectors/incoming-router.js';
 import { loadDeckSecrets } from '../core/deck-file.js';
+import { interpolateConfig } from '../core/deck-interpolation.js';
 import { buildChatReply } from './chat-handler.js';
 import { streamChatMessage, streamToSseLines, type ChatProviderAdapter } from './chat-stream.js';
 import { registerEvolutionRoutes } from './evolution-endpoint.js';
@@ -956,6 +957,17 @@ export interface HttpServerOptions {
   rateLimit?: number;
   /** PTY session backend for embedded terminal support (Sprint 175). */
   terminalBackend?: SessionBackend;
+  /**
+   * OIDC JWT bearer verification (Sprint 267). Explicit override — when
+   * omitted, the project config's `api_oidc` block is consulted (only when
+   * `enabled: true`). See `AuthConfig.oidc` for the verification semantics.
+   */
+  oidc?: {
+    issuer: string;
+    audience?: string;
+    algorithm: 'HS256' | 'RS256';
+    key: string;
+  };
 }
 
 export function createHttpServer(projectRoot: string, port?: number, staticDir?: string, apiToken?: string): HttpApi;
@@ -974,6 +986,7 @@ export function createHttpServer(
   let autoGenerateToken = false;
   let rateLimitMax = 100;
   let terminalBackend: SessionBackend | undefined;
+  let resolvedOidc: HttpServerOptions['oidc'];
 
   if (typeof portOrOpts === 'object' && portOrOpts !== null) {
     listenPort = portOrOpts.port ?? DEFAULT_PORT;
@@ -983,6 +996,7 @@ export function createHttpServer(
     autoGenerateToken = portOrOpts.autoGenerateToken ?? false;
     rateLimitMax = portOrOpts.rateLimit ?? 100;
     terminalBackend = portOrOpts.terminalBackend;
+    resolvedOidc = portOrOpts.oidc;
   } else {
     listenPort = portOrOpts ?? DEFAULT_PORT;
     resolvedStaticDir = staticDir;
@@ -1018,6 +1032,38 @@ export function createHttpServer(
     );
   }
 
+  // ─── OIDC bearer config (Sprint 267 T-267-001) ──────────────────
+  // Explicit `opts.oidc` wins; otherwise sync-read the project config's
+  // `api_oidc` block (same sync-read pattern as the terminal block below —
+  // createHttpServer is synchronous, loadConfig is async). The block passes
+  // through deck-interpolation so `$DECK:KEY` in `key` resolves exactly like
+  // the rest of the config. Fail-closed: a block that is missing, disabled,
+  // or incomplete leaves the middleware exactly as before (api_oidc default-off).
+  if (!resolvedOidc) {
+    const projCfgForOidc = join(projectRoot, PROJECT_CONFIG_PATH);
+    if (existsSync(projCfgForOidc)) {
+      try {
+        const rawCfg = JSON.parse(readFileSync(projCfgForOidc, 'utf-8')) as {
+          api_oidc?: { enabled?: boolean; issuer?: string; audience?: string; algorithm?: string; key?: string };
+        };
+        const block = interpolateConfig(rawCfg.api_oidc, projectRoot);
+        if (
+          block?.enabled === true &&
+          typeof block.issuer === 'string' && block.issuer.length > 0 &&
+          typeof block.key === 'string' && block.key.length > 0 &&
+          (block.algorithm === 'HS256' || block.algorithm === 'RS256')
+        ) {
+          resolvedOidc = {
+            issuer: block.issuer,
+            ...(typeof block.audience === 'string' ? { audience: block.audience } : {}),
+            algorithm: block.algorithm,
+            key: block.key,
+          };
+        }
+      } catch { /* ignore parse errors — fail-closed to no OIDC */ }
+    }
+  }
+
   // Build auth middleware with health endpoint exempt. SSE clients
   // (`EventSource`) cannot set Authorization headers, so `/api/events` opts
   // into a `?token=...` query-parameter fallback — the dashboard appends the
@@ -1026,6 +1072,7 @@ export function createHttpServer(
     configToken: finalToken,
     exemptPaths: ['/health', '/api/health'],
     queryTokenPaths: ['/api/events'],
+    ...(resolvedOidc ? { oidc: resolvedOidc } : {}),
   });
 
   const rateLimiter = rateLimitMax > 0 ? new RateLimiter(rateLimitMax) : undefined;

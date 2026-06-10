@@ -1,5 +1,6 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import { verifyJwt, type JwtAlgorithm, type VerifyOptions } from '../core/auth-oidc.js';
 import { extractTokenFromQuery } from './middleware/token.js';
 
 // ─── Types ──────────────────────────────────────────────────────────
@@ -29,6 +30,31 @@ export interface AuthConfig {
    * (a bad token still gets 403), so this only fills the missing-header gap.
    */
   allowLocalhostAutoInject?: boolean;
+  /**
+   * OIDC JWT verification (config.api_oidc, Sprint 267). When set, a Bearer
+   * value is checked against the static token FIRST (constant-time compare,
+   * unchanged); on mismatch it is verified as a JWT via `verifyJwt`
+   * (src/core/auth-oidc.ts — single source of truth). Key material is routed
+   * exclusively to the slot matching the pinned `algorithm`, so the
+   * HS256/RS256 algorithm-confusion attack cannot cross key material.
+   *
+   * Activation semantics: configuring `oidc` WITHOUT a static token ACTIVATES
+   * auth — a valid Bearer JWT becomes mandatory for non-exempt requests
+   * (missing header → 401, failed verification → 403). The "auth disabled"
+   * default-deny message path applies only when NEITHER mechanism is
+   * configured. Exempt-path / query-token / localhost-auto semantics are
+   * unchanged.
+   */
+  oidc?: {
+    /** Expected `iss` claim — tokens from any other issuer are rejected. */
+    issuer: string;
+    /** Expected `aud` claim. When set, tokens without a matching `aud` are rejected. */
+    audience?: string;
+    /** Pinned signature algorithm. Tokens signed with any other alg are rejected. */
+    algorithm: JwtAlgorithm;
+    /** Key material matching `algorithm`: HS256 shared secret or RS256 PEM public key. */
+    key: string;
+  };
 }
 
 // ─── Localhost Detection ────────────────────────────────────────────
@@ -77,6 +103,19 @@ function hashToken(token: string): Buffer {
 }
 
 /**
+ * Extract the raw Bearer value from the Authorization header, or null when
+ * absent/malformed. Same parsing rules as {@link verifyBearerToken}'s
+ * 'missing' classification.
+ */
+function extractBearerValue(req: IncomingMessage): string | null {
+  const authHeader = req.headers['authorization'];
+  if (!authHeader) return null;
+  const [scheme, value] = authHeader.split(' ', 2);
+  if (scheme !== 'Bearer' || value === undefined || value === '') return null;
+  return value;
+}
+
+/**
  * Extract and verify Bearer token from Authorization header.
  * Returns: 'ok' | 'missing' | 'invalid'
  */
@@ -84,11 +123,8 @@ export function verifyBearerToken(
   req: IncomingMessage,
   expectedToken: string,
 ): 'ok' | 'missing' | 'invalid' {
-  const authHeader = req.headers['authorization'];
-  if (!authHeader) return 'missing';
-
-  const [scheme, value] = authHeader.split(' ', 2);
-  if (scheme !== 'Bearer' || value === undefined || value === '') return 'missing';
+  const value = extractBearerValue(req);
+  if (value === null) return 'missing';
 
   const expected = hashToken(expectedToken);
   const actual = hashToken(value);
@@ -113,6 +149,18 @@ export function bearerAuthMiddleware(config: AuthConfig) {
   const activeToken = resolveAuthToken(config.configToken);
   const exempt = new Set(config.exemptPaths ?? []);
   const queryTokenPaths = new Set(config.queryTokenPaths ?? []);
+  // OIDC verify options built once — algorithm pinned, key material routed
+  // only to the matching slot (same discipline as terminal OidcAuthProvider).
+  const oidcVerifyOptions: VerifyOptions | null = config.oidc
+    ? {
+        issuer: config.oidc.issuer,
+        ...(config.oidc.audience !== undefined ? { audience: config.oidc.audience } : {}),
+        algorithms: [config.oidc.algorithm],
+        ...(config.oidc.algorithm === 'HS256'
+          ? { hs256Secret: config.oidc.key }
+          : { rs256PublicKey: config.oidc.key }),
+      }
+    : null;
   const allowLocalhostAuto =
     config.allowLocalhostAutoInject === true ||
     process.env['DECKENT_API_LOCALHOST_AUTO'] === '1';
@@ -149,8 +197,25 @@ export function bearerAuthMiddleware(config: AuthConfig) {
       return true;
     }
 
-    // No token configured → default deny (secure by default)
+    // No static token configured.
     if (!activeToken) {
+      // OIDC-only mode: configuring `oidc` alone ACTIVATES auth — a valid
+      // Bearer JWT is mandatory. Status shapes mirror the static-token path:
+      // missing/malformed header → 401, failed verification → 403. Responses
+      // stay generic — no claim/key material ever leaks into the body.
+      if (oidcVerifyOptions) {
+        const bearerValue = extractBearerValue(req);
+        if (bearerValue === null) {
+          res.writeHead(401, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'authentication required' }));
+          return false;
+        }
+        if (verifyJwt(bearerValue, oidcVerifyOptions).valid === true) return true;
+        res.writeHead(403, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'forbidden' }));
+        return false;
+      }
+      // Neither static token nor OIDC → default deny (secure by default)
       res.writeHead(401, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'authentication required — configure DECKENT_API_TOKEN or set DECKENT_API_AUTH_DISABLED=1 to bypass' }));
       return false;
@@ -182,7 +247,15 @@ export function bearerAuthMiddleware(config: AuthConfig) {
       return false;
     }
 
-    // headerResult === 'invalid'
+    // headerResult === 'invalid' — the static constant-time compare failed.
+    // When OIDC is configured the Bearer value gets a second chance as a JWT
+    // (static token FIRST, JWT second — the static path is bit-identical).
+    if (oidcVerifyOptions) {
+      const bearerValue = extractBearerValue(req);
+      if (bearerValue !== null && verifyJwt(bearerValue, oidcVerifyOptions).valid === true) {
+        return true;
+      }
+    }
     res.writeHead(403, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'forbidden' }));
     return false;

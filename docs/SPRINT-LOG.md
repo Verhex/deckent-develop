@@ -7230,3 +7230,35 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 266-005: Autonomous operations — forward --url/--syslog ekleri (DONE)
 
 ---
+## Sprint 267 — sprint-267
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-06-10
+**Duration:** ~26dk efektif (gece 02:57 makine-uykusu crash'i + CC kurtarma respawn 07:15-07:37)
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 6 |
+| Completed | 6 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | ~26dk (kurtarma dahil) |
+
+### Tasks
+
+- 267-001: API bearer middleware — statik-key OIDC JWT uzantısı (api_oidc) (DONE)
+- 267-002: SAP OData read-only ErpDriver (DONE — ilk deneme OOM exit 137, ikinci worker tamamladı)
+- 267-003: CLI commands reference — retention + syslog + forward önceliği (DONE)
+- 267-004: Config reference — api_oidc bloğu (DONE)
+- 267-005: Enterprise integrations — Odoo/retention/archive-aware ekleri (DONE)
+- 267-006: Features reference — 266/267 satırları (DONE)
+
+> Kurtarma notu: orchestrator gece 02:59'da öldü (makine uykusu); `deckent resume`
+> sentetik NO_GO yarışıyla (RESUME-RACE) sprint'i 1/6 kapattı. CC manuel respawn
+> (ADR-047) ile 5 task yeniden koşuldu, 6/6 DONE disk-verify edildi; ilk sahte
+> retro'nun istatistikleri düzeltildi.
+
+---

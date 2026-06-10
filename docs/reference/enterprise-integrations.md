@@ -58,6 +58,15 @@ This module generates a structured report summarizing the application's complian
     - **Event Breakdown**: A count of total events and a breakdown by actor.
     - **Controls Checklist**: A SOC2/ISO-style checklist indicating which security controls are verifiably ON or OFF.
 
+### Archive-Aware Compliance (CLI read-side)
+
+After `deckent audit retention --apply` has moved the chain's head into an archive file (section 4), the live event stream alone is a truncated chain. The compliance CLI therefore verifies the chain over **archive + live**, in that order.
+
+- **`runComplianceReport(root, sprintId, flags)`** (`src/cli/commands/audit.ts`): Builds the report over the full retained audit trail by concatenating `[...readArchivedAuditEvents(root, sprintId), ...readAuditEvents(root, sprintId)]` before calling `generateComplianceReport`. Control flags (`rbacEnabled`, `tenantIsolation`) are injected by the caller — the CLI derives them from config (`autonomous.rbac_policy.enabled`, `strict_tenant_isolation`).
+- **`readArchivedAuditEvents(root, sprintId)`** (`src/core/audit-query.ts`): Reads the audit payloads that a retention apply moved into `.deckent/<sprintId>-events-archive.jsonl`. The archive holds the chain's **HEAD partition**, so chain verification on a retained stream must run on `[...archived, ...live]` — the live stream's head anchors to the last archived record. A missing archive yields `[]`; malformed lines are skipped and non-audit channels are excluded (never throws).
+- **Honest limit — pruning vs. tamper-evidence**: `prune` (age-expired) records are **truly deleted**, not archived. If HMAC'd records were pruned, the surviving chain reports broken **by design**: permanent deletion is the GDPR-style tradeoff against tamper-evidence. A broken-chain report after pruning HMAC'd head records is the honest signal of that deletion, not a bug.
+- **CLI Wire**: `deckent audit compliance --sprint <id> [--json]`. Exit code 0 when the chain is intact, 1 when broken, 2 on error.
+
 ## 4. Audit Log Retention & Rotation (`src/core/audit-retention.ts`)
 
 This module provides logic for applying retention and rotation policies to audit logs while preserving the integrity of the audit trail.
@@ -67,7 +76,18 @@ This module provides logic for applying retention and rotation policies to audit
   - **Output**: The function returns `{ keep: AuditEvent[], archive: AuditEvent[], prune: AuditEvent[] }`.
   - **Chain Contiguity**: A critical feature is that the function preserves the hash-chain semantics of the audit log. It ensures that any entries marked for archival or pruning are a contiguous block from the *head* (oldest part) of the chain. This guarantees that `verifyAuditChain` remains meaningful on the `keep` set, as the chain is unbroken from its new starting point.
 
-The caller is responsible for applying the returned plan (e.g., writing the `archive` set to cold storage and deleting the `prune` set).
+The caller is responsible for applying the returned plan (e.g., writing the `archive` set to cold storage and deleting the `prune` set). The CLI below is the in-tree caller.
+
+### Retention CLI (`deckent audit retention`)
+
+`runAuditRetention(root, sprintId, policy, apply)` (`src/cli/commands/audit.ts`) applies the `planRetention` plan to a sprint's event stream (`.deckent/<sprintId>-events.jsonl`). The partitioning logic stays in `audit-retention.ts` — the CLI layer only maps flags to a policy and applies the resulting plan to the stream file.
+
+- **Policy from Flags**: `--keep-days <n>` sets `maxAgeMs = n × 86,400,000` (age-expired records become the `prune` partition); `--keep-count <n>` sets `maxCount` (records beyond the most recent *n* become the `archive` partition). A negative or non-numeric value throws (exit code 2).
+- **Dry-Run by Default**: Without `--apply`, the run performs **zero writes** and reports the plan counts `{ scanned, keep, archive, prune, applied: false }`. Only audit-channel events are scanned; non-audit channels are excluded from the counts.
+- **Archive-First Ordering (no data loss)**: On `--apply`, the `archive` partition is appended to `.deckent/<sprintId>-events-archive.jsonl` **before** the stream file is rewritten. A crash between the two steps can at worst duplicate events into the archive — it can never lose them.
+- **Atomic Rewrite**: The stream is rewritten via a temp file + `rename`. Every **non-audit event** and the audit `keep` partition are preserved in their original stream order; `prune` events are dropped (true deletion, never archived). When the plan drops nothing, the stream file is not touched at all.
+- **Chain Contiguity**: Per `planRetention`'s contract, `prune` and `archive` are contiguous head slices of the audit sub-stream (`[ prune | archive | keep ]` layout), so the kept entries' internal `prevHmac` linkage stays intact. Dropping HMAC-bearing head entries re-anchors the surviving sub-chain — see the archive-aware compliance notes in section 3 for the verification-side consequences.
+- **CLI Wire**: `deckent audit retention --sprint <id> [--keep-days <n>] [--keep-count <n>] [--apply] [--json]`. Exit code 0 for both a dry-run and a successful apply; 2 on error.
 
 ## 5. Read-Only Data Access
 
@@ -182,4 +202,29 @@ This module bridges the capability path to the read-only ERP connector (section 
   - Applies compiled predicates with AND semantics; placeholder indices are 1-based into the compiled `params`.
   - SQL `LIKE` patterns (`%` any-run, `_` single char) are translated to anchored regular expressions; ordered comparisons (`gt`/`gte`/`lt`/`lte`) are defined only for number↔number and string↔string pairs — anything else is incomparable and the predicate evaluates false.
   - Projects the compiled field list (only keys actually present are emitted) and slices to the mandatory limit.
-- **Driver Status**: Concrete ERP drivers plug in behind the same `ErpDriver` seam. As of this writing, the in-memory reference driver is the only driver implementation in the tree.
+- **Driver Status**: Concrete ERP drivers plug in behind the same `ErpDriver` seam. The tree currently contains the in-memory reference driver (above), the Odoo JSON-RPC driver, and the SAP OData driver (both below).
+
+### Odoo Driver (`src/core/erp-driver-odoo.ts`)
+
+The first concrete `ErpDriver`: it translates a `CompiledQuery` into an Odoo External API `search_read` call — a JSON-RPC 2.0 envelope POSTed to `/jsonrpc` with service `object`, method `execute_kw`. No compilation or validation logic is re-implemented here: the connector owns allow-listing, parameterization, and limits (single source of truth); the driver only translates the already-compiled request into the Odoo wire format.
+
+- **`createOdooErpDriver({ url, db, uid, apiKey, fetchImpl?, entityModelMap? })`**: Factory returning an `ErpDriver`. Wiring is validated **eagerly** — an invalid or non-http(s) URL, empty `db`, non-integer `uid`, empty `apiKey`, or missing fetch implementation throws at construction time, not on the first query.
+- **Strictly Read-Only**: The driver re-checks `compiled.readOnly === true && compiled.operation === 'read'` (defence in depth — the connector already guarantees it) and only ever emits the `search_read` model method. A non-read-only compiled query is refused with an error.
+- **Domain Translation**: Compiled predicates (AND semantics) become a flat Odoo domain of `[field, operator, value]` terms. Operator map: `eq→=`, `ne→!=`, `gt→>`, `gte→>=`, `lt→<`, `lte→<=`, `in→in`, `like→ilike` (case-insensitive matching — the Odoo idiom). Placeholder indices are resolved 1-based against the compiled `params`; an out-of-range index throws.
+- **`entityModelMap`**: Maps logical entity names to Odoo model names (e.g. `partner` → `res.partner`). Needed because Odoo model names contain dots, which the connector's identifier rule forbids; an unmapped entity falls back to the entity name itself.
+- **`apiKey` Redaction**: The API key travels only inside the JSON-RPC `args` (positional `[db, uid, apiKey, model, 'search_read', [domain], { fields, limit }]`). It is never interpolated into error messages, and any server-echoed occurrence is replaced with `[redacted]` before an error is thrown.
+- **Injectable Fetch**: `fetchImpl` is injectable for hermetic tests — tests never touch the network. The default is `globalThis.fetch` (Node 18+ built-in; no new runtime dependency per ADR-010).
+- **Error Surface**: A non-2xx HTTP response throws with the status code; a non-JSON or non-object body throws; a JSON-RPC `error` object throws with the extracted (and redacted) Odoo message; a response without an array `result` throws. When reached via the `erp.read` capability handler (above), these surface as `CAPABILITY_FAILED` through the broker.
+
+### SAP OData Driver (`src/core/erp-driver-sap.ts`)
+
+The second concrete `ErpDriver`: it translates a `CompiledQuery` into an SAP OData read request — `GET <baseUrl>/<EntitySet>?$filter=...&$select=...&$top=<limit>&$format=json`. Strictly read-only: the compiled query's read-only contract is re-checked (defence in depth) and only GET requests are ever issued. Like the Odoo driver, no compilation or validation logic is re-implemented — the driver only translates.
+
+- **`createSapErpDriver({ baseUrl, auth, fetchImpl?, entityModelMap? })`**: Factory returning an `ErpDriver`. Eager wiring validation: an invalid or non-http(s) `baseUrl`, a malformed `auth` object, or a missing fetch implementation throws at construction time.
+- **Authentication**: `auth` is a discriminated union — `{ kind: 'basic', username, password }` (sent as `Authorization: Basic base64(user:pass)`) or `{ kind: 'bearer', token }` (`Authorization: Bearer <token>`). The secret (password or token) is never interpolated into error messages, and any server-echoed occurrence is replaced with `[redacted]` before an error is thrown — the same redaction pattern as the Odoo driver.
+- **OData Dialect**: Predicates target the OData **v2** grammar (`substringof` for `like`, `$format=json`) because SAP Gateway services are predominantly v2. The comparison operators and the `in` or-chain are valid in both v2 and v4, and the response parser accepts both envelopes — so v4 services work for everything except `like`.
+- **Predicate Translation**: `eq`/`ne`/`gt`/`lt` map directly; `gte→ge`, `lte→le`. `in` expands to an or-chain `(f eq v1 or f eq v2 …)` — OData v2 has no `in` operator; `like` becomes `substringof('needle', field)`. Placeholder indices are resolved 1-based against the compiled `params`; an out-of-range index throws. Clauses join with `and`; a query with no predicates emits no `$filter` at all.
+- **Injection Safety**: String literals are single-quoted with embedded single quotes escaped as `''` (the OData escape), so a parameter value can never break out of its literal; numbers and booleans are emitted raw, `null` as the keyword. The assembled `$filter` and `$select` values are additionally URL-encoded.
+- **`entityModelMap`**: Maps logical entity names to OData entity sets (e.g. `partner` → `A_BusinessPartner`), since SAP entity sets often don't match the connector's logical names; unmapped entities fall back to the entity name.
+- **Envelope Handling**: Both response generations are accepted — OData v2 `{ d: { results: [...] } }` and v4 `{ value: [...] }` — and normalized to `ErpRow[]`. A response with neither shape throws.
+- **Error Surface**: A non-2xx response throws with the HTTP status plus up to 500 characters of the (redacted) error body; non-JSON or non-object bodies throw. `fetchImpl` is injectable (default `globalThis.fetch`) so tests stay hermetic (ADR-010).
