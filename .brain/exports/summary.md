@@ -80,6 +80,8 @@
 | adr-086 | Native CLI Parity — F11 Feature Set (Sprint 224) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-279 Learnings** (sprint-279): ## Sprint sprint-279 Learnings
+- WK-nervous — panic-gate timeout wire (0-caller → spawn yolu): GO_WITH_TECH_DEBT — Fi...
 - **Sprint sprint-278 Learnings** (sprint-278): ## Sprint sprint-278 Learnings
 - shared→worker okuma — spawn-time SharedMemory prompt enjeksiyonu (OPUS): GO_WITH_TEC...
 - **Sprint sprint-277 Learnings** (sprint-277): ## Sprint sprint-277 Learnings
@@ -112,10 +114,6 @@
 
 ## Gains
 - 270-001 — validate-publish güçlendirme — exec-bit + dashboard-bundle asser...
-- **Sprint sprint-269 Learnings** (sprint-269): ## Sprint sprint-269 Learnings
-
-## Gains
-- 269-001 — SPA token-inject P0 + enterprise endpoints + chat-stream adapter...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -146,5 +144,6 @@ _No active technical debt._
 - Violation pattern: stale_heartbeat
 - Violation pattern: stale_heartbeat
 - Violation pattern: stale_heartbeat
+- Violation pattern: stale_heartbeat
 
-_Total entries: 429 | Generated: 2026-06-10_
+_Total entries: 434 | Generated: 2026-06-10_

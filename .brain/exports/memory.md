@@ -1,5 +1,20 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-279 Learnings
+- Sprint sprint-279 Learnings: ## Sprint sprint-279 Learnings
+- WK-nervous — panic-gate timeout wire (0-caller → spawn yolu): GO_WITH_TECH_DEBT — Fixed executor.ts handleApprove: imported awaitPanicGateApproval+isLockedPanicAction from panic-gate.ts; added optional 
+
+## Gains
+- 279-001 — WK-import — core→orchestra import-cycle çöz (ADR-008) (OPUS) — WK-import / ADR-008 — core→orchestra ters bağımlılık çözüldü.
+- 279-003 — WK-cost — mid-sprint token-usage abort (limit-ledger besleme) — WK-cost mid-sprint token-usage abort implemented.
+- 279-004 — WK-7 — auditor async-batch liveness (O(n) spawnSync → parallel) — WK-7 async-batch liveness — CORE ENGINEERING GOAL DONE; literal Kanıt grep=0 NOT reachable in-sco...
+- 279-005 — DASH-001 — /api/kill/all + autonomous SSE watch — DASH-001 complete.
+- 279-006 — DASH-002 — sidebar bell pending-count badge (lucide, emoji-yasak) — Created useNervousStatus hook that polls /api/nervous/status every 30s via useLiveData.
+- 279-007 — WK-5-kalan — docker live-monitor: output-stream PTY worker-attach + watch --follow — WK-5-kalan completed.
+- 279-008 — F7-ENT-verify — enterprise dashboard backend doğrula + 4 tab gerçek-veri — Created tests/api/enterprise-routes-complete.test.ts with 10 tests covering all 4 enterprise endp...
+- 279-009 — WK-5/COMM-1 dashboard görünürlük — Worker Comms + Resources panel — DONE criteria met: (1) npx vitest run --config vitest.dashboard.config.ts tests/dashboard/workers...
+- …and 2 more delivered
+
 ## Sprint sprint-278 Learnings
 - Sprint sprint-278 Learnings: ## Sprint sprint-278 Learnings
 - shared→worker okuma — spawn-time SharedMemory prompt enjeksiyonu (OPUS): GO_WITH_TECH_DEBT — shared→worker SharedMemory prompt injection wired. prompt-god-template.ts: NEW exported buildSharedContextBlock(entries)

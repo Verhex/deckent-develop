@@ -9,6 +9,7 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-279-002 | Tech debt from 279-002: Fixed executor.ts handleApprove: imported awaitPanicGate | normal | sprint-279 | resolved |
 | debt-278-003 | Tech debt from 278-003: shared→worker SharedMemory prompt injection wired. promp | normal | sprint-278 | resolved |
 | debt-278-004 | Tech debt from 278-004: handoff→downstream worker prompt injection wired (Sprint | normal | sprint-278 | resolved |
 | debt-278-005 | Tech debt from 278-005: All goCriteria met:
