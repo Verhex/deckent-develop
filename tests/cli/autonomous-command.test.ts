@@ -164,7 +164,22 @@ describe('deckent autonomous CLI (226-007)', () => {
     expect(out).not.toContain('Autonomous loop finished');
   });
 
-  it('default-deny korunur — bilinmeyen tenant flow → audit "denied", oto-exec yok', async () => {
+  it('default-deny korunur — bilinmeyen tenant flow → park/pending (approval required), oto-exec yok', async () => {
+    // AUT-3 behavior (commit 464aaf5e, makeFlowBacklogBridge): unknown-tenant flows are no
+    // longer hard-denied at the authority layer. Instead they are normalised into the backlog
+    // as entries with policy:'approval-required' and parked for human approval.
+    //
+    // Pre-AUT-3: scheduled-flow → authority-denied → audit outcome:'denied'
+    // Post-AUT-3: scheduled-flow → bridge → backlog entry (policy:'approval-required') →
+    //   trusted-internal authority wrap allows it → policy gate: 'park' →
+    //   approvalGate.request → no prior decision → outcome:'pending' (halts cycle)
+    //   → execute is NEVER called (execute-dispatcher.updateStatus('running') never fires)
+    //
+    // Safety proof: 'pending' = parked, waiting for explicit human approval. The execute
+    // path (autonomous-runtime.ts:245) is only reached after approvalGate.request returns
+    // 'approved', which requires an explicit `deckent autonomous approve <id>` command.
+    // No internal code path auto-approves 'approval-required' entries (ADR-040).
+
     // Enable autonomous engine via config (flag-gate requires autonomous.enabled=true).
     const configDir = join(root, '.deckent');
     mkdirSync(configDir, { recursive: true });
@@ -174,7 +189,7 @@ describe('deckent autonomous CLI (226-007)', () => {
       'utf-8',
     );
 
-    // Plant a flow whose tenantId is not a known role → authority adapter denies.
+    // Plant a flow whose tenantId is not a known role → AUT-3 parks it for approval.
     writeFlow(root, {
       id: 'flow-external',
       cronExpr: '* * * * *',
@@ -187,13 +202,29 @@ describe('deckent autonomous CLI (226-007)', () => {
       handleStart({ root, lang: 'en', intervalMs: '1', maxIterations: '1' }),
     );
 
+    // Audit event: cycle outcome is 'pending' (parked, not denied).
     const eventsFile = join(root, '.deckent', 'autonomous-events.jsonl');
     expect(existsSync(eventsFile)).toBe(true);
     const lines = readFileSync(eventsFile, 'utf-8').split('\n').filter((l) => l.length > 0);
     expect(lines.length).toBeGreaterThanOrEqual(1);
     const ev = JSON.parse(lines[0]!) as { payload: { outcome: string; reason: string } };
-    expect(ev.payload.outcome).toBe('denied');
-    expect(ev.payload.reason.toLowerCase()).toContain('default-deny');
+    // AUT-3: outcome is 'pending' (park), not 'denied'. The security guarantee is the same:
+    // auto-execution is blocked. Human must explicitly approve before anything runs.
+    expect(ev.payload.outcome).toBe('pending');
+    expect(ev.payload.reason.toLowerCase()).toContain('approval');
+
+    // Oto-exec yok assertion (strengthened): check that the backlog entry is still
+    // 'pending', NOT 'running'. execute-dispatcher calls updateStatus('running') as its
+    // very first step — if status is still 'pending', the executor was never invoked.
+    const backlogFile = join(root, '.deckent', 'autonomous', 'backlog.json');
+    expect(existsSync(backlogFile)).toBe(true);
+    const backlog = JSON.parse(readFileSync(backlogFile, 'utf-8')) as {
+      entries: Array<{ id: string; status: string; policy: string }>;
+    };
+    const parkedEntry = backlog.entries.find((e) => e.id.startsWith('flow-flow-external'));
+    expect(parkedEntry).toBeDefined();
+    expect(parkedEntry!.status).toBe('pending');
+    expect(parkedEntry!.policy).toBe('approval-required');
   });
 
   it('CLI wiring — `autonomous status` parses + emits status header', async () => {

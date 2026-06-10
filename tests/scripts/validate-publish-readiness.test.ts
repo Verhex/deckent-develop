@@ -1,4 +1,7 @@
 import { describe, it, expect } from 'vitest';
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
 import {
   GATES,
   checkPackSizeAndCount,
@@ -10,6 +13,22 @@ import {
   parsePackOutput,
   runReadinessGates,
 } from '../../scripts/validate-publish.mjs';
+
+/** Hermetic projectRoot fixture satisfying bin_exec_bits + dashboard_bundle. */
+function buildHealthyDistRoot(): string {
+  const root = mkdtempSync(join(tmpdir(), 'readiness-gates-'));
+  for (const bin of ['dist/cli/entry.js', 'dist/mcp/server.js']) {
+    const p = join(root, bin);
+    mkdirSync(dirname(p), { recursive: true });
+    writeFileSync(p, '#!/usr/bin/env node\n');
+    chmodSync(p, 0o755);
+  }
+  const assets = join(root, 'dist/dashboard/assets');
+  mkdirSync(assets, { recursive: true });
+  writeFileSync(join(root, 'dist/dashboard/index.html'), '<html></html>');
+  writeFileSync(join(assets, 'index-test1234.js'), '// bundle');
+  return root;
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
 
@@ -39,7 +58,7 @@ function buildPackOutput(opts: {
 // ─── GATES catalog ────────────────────────────────────────────────────────
 
 describe('GATES catalog', () => {
-  it('declares exactly 6 readiness gate ids', () => {
+  it('declares exactly 8 readiness gate ids (Sprint 270: + bin_exec_bits, dashboard_bundle)', () => {
     expect(GATES).toEqual([
       'pack_size_and_count',
       'engines_node',
@@ -47,6 +66,8 @@ describe('GATES catalog', () => {
       'no_internal_state_leak',
       'adr_lint',
       'link_lint',
+      'bin_exec_bits',
+      'dashboard_bundle',
     ]);
   });
 });
@@ -209,23 +230,32 @@ describe('checkLinkLint (Gate 6)', () => {
 // ─── Aggregator: runReadinessGates ────────────────────────────────────────
 
 describe('runReadinessGates aggregator', () => {
-  it('runs all 6 gates and reports summary with mocked inputs', () => {
+  it('runs all 8 gates and reports summary with mocked inputs (Sprint 270: +2 fs gates, hermetic fixture)', () => {
     const packOutput = buildPackOutput({ packageSize: '450 kB', fileCount: 900 });
-    const result = runReadinessGates({
-      packOutput,
-      pkg: {
-        engines: { node: '>=24.0.0' },
-        main: './dist/index.js',
-        types: './dist/index.d.ts',
-      },
-      adrResult: { exitCode: 0, stdout: '' },
-      linkResult: { exitCode: 0, stdout: '' },
-    });
-    expect(result.checks).toHaveLength(6);
-    expect(result.checks.every(c => c.ok)).toBe(true);
-    expect(result.ok).toBe(true);
-    expect(result.summary.passed).toBe(6);
-    expect(result.summary.failed).toBe(0);
+    // bin_exec_bits + dashboard_bundle read the filesystem — feed a hermetic
+    // tmpdir projectRoot (CI has no built dist/; fail paths are covered in
+    // tests/scripts/validate-publish.test.ts).
+    const root = buildHealthyDistRoot();
+    try {
+      const result = runReadinessGates({
+        projectRoot: root,
+        packOutput,
+        pkg: {
+          engines: { node: '>=24.0.0' },
+          main: './dist/index.js',
+          types: './dist/index.d.ts',
+        },
+        adrResult: { exitCode: 0, stdout: '' },
+        linkResult: { exitCode: 0, stdout: '' },
+      });
+      expect(result.checks).toHaveLength(8);
+      expect(result.checks.every(c => c.ok)).toBe(true);
+      expect(result.ok).toBe(true);
+      expect(result.summary.passed).toBe(8);
+      expect(result.summary.failed).toBe(0);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 
   it('reports failed gates when any fail', () => {

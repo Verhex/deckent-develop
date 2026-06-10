@@ -49,26 +49,27 @@ These three faces are not separate modes — they work together. Chat to plan, s
 
 ## Quick Start
 
-Get your first sprint running in 5 minutes:
+Three commands to get running in under 2 minutes:
 
 ```bash
-# Install (or use npx — no global install required)
+# 1. Install globally
 npm install -g deckent
 
-# Initialize your project
-cd my-project
+# 2. Initialize your project
 deckent init
 
-# Option A: Chat interface (conversational)
-deckent chat
-
-# Option B: Sprint interface (structured)
-deckent set-directives   # describe your goals
-deckent start            # plan + spawn + execute
-deckent status           # watch progress live
+# 3. Start the REPL or dashboard
+deckent                  # Interactive REPL — ask Deckent anything
+# OR
+deckent serve           # Open dashboard at http://localhost:3100
 ```
 
-After `deckent init`, edit `DIRECTIVES.md` with your sprint goals. Deckent handles the rest.
+**What you'll see:**
+- After **step 1:** `deckent --version` prints `1.0.0-beta.1` (verify install)
+- After **step 2:** `.deckent/`, `.brain/`, `DIRECTIVES.md`, and `CLAUDE.md` created in your project
+- After **step 3:** Either a conversational prompt (`deckent>`) or your dashboard opens in the browser
+
+Next steps: Edit `DIRECTIVES.md` with your sprint goals, then `deckent start` to plan and execute.
 
 ---
 

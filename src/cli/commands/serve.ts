@@ -5,6 +5,7 @@ import { LocalPtyBackend } from '../../api/terminal/session-backend.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { print, printError } from '../helpers/output.js';
 import { getDashboardStaticDir } from '../helpers/dashboard-dir.js';
+import { getMessage, getLanguage } from '../helpers/messages.js';
 
 /** Extended MIME types for static file serving (superset of server.ts defaults) */
 export const EXTENDED_MIME_TYPES: Record<string, string> = {
@@ -119,12 +120,18 @@ export function registerServe(program: Command): void {
         terminalBackend,
       });
 
-      print(`Deckent API server listening on http://${host}:${port}`);
+      const lang = getLanguage();
+      print(getMessage('serve.listening', lang, { host, port: String(port) }));
+      print('');
+      print(getMessage('serve.token_injected', lang));
       if (terminalEnabled && api.terminalToken) {
-        print(`Embedded terminal enabled (token auto-injected for localhost callers)`);
-      } else if (!terminalEnabled) {
-        print('Embedded terminal disabled');
+        print(getMessage('serve.terminal_enabled', lang));
+      } else {
+        print(getMessage('serve.terminal_disabled', lang));
       }
+      print(getMessage('serve.stop_hint', lang));
+      print(getMessage('serve.port_tip', lang));
+      print('');
 
       const cleanup = (): void => {
         api.close().then(() => {

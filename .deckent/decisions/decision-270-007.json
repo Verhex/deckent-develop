@@ -1,0 +1,79 @@
+{
+  "taskId": "270-007",
+  "sprintId": "sprint-270",
+  "steps": [
+    {
+      "step": 2,
+      "name": "routing-step-2",
+      "input": {
+        "taskId": "270-007",
+        "title": "F1-IMG part 1 — worker-image readiness denetim modülü",
+        "scope": [
+          "src/core/",
+          "tests/core/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "devops-engineer",
+        "skills": [
+          "docker-expert",
+          "typescript-expert",
+          "testing-expert"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Agent forced by override: devops-engineer"
+    },
+    {
+      "step": 4,
+      "name": "routing-step-4",
+      "input": {
+        "taskId": "270-007",
+        "title": "F1-IMG part 1 — worker-image readiness denetim modülü",
+        "scope": [
+          "src/core/",
+          "tests/core/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "devops-engineer",
+        "skills": [
+          "docker-expert",
+          "typescript-expert",
+          "testing-expert"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Skill budget: max 1 (small task, 1 module(s), effort=normal)"
+    },
+    {
+      "step": 5,
+      "name": "routing-step-5",
+      "input": {
+        "taskId": "270-007",
+        "title": "F1-IMG part 1 — worker-image readiness denetim modülü",
+        "scope": [
+          "src/core/",
+          "tests/core/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "devops-engineer",
+        "skills": [
+          "docker-expert",
+          "typescript-expert",
+          "testing-expert"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Skills forced by override: [docker-expert, typescript-expert, testing-expert]"
+    }
+  ],
+  "decidedAt": "2026-06-10T09:54:24.476Z"
+}

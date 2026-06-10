@@ -630,6 +630,41 @@ Optional top-level block (config-types.ts:231) that extends the HTTP API bearer 
 
 **Server resolution** (server.ts:1035-1065): an explicit `oidc` option passed to `createHttpServer` wins; otherwise the project config's `api_oidc` block is consulted — and used only when `enabled: true` with a complete `issuer`/`algorithm`/`key`. A block that is missing, disabled, incomplete, or unparseable fails closed to the previous middleware behavior.
 
+### 14.2 Terminal OIDC JWT (`terminal_oidc_jwks`)
+
+Optional top-level block (config-types.ts) that enables async JWKS-backed RS256 JWT verification for the embedded terminal (Sprint 268). **Default-off**: when the block is absent, behavior is unchanged — the terminal uses a local random token. There are no built-in defaults for this block.
+
+| Key | Type | Required | Description |
+|-----|------|----------|-------------|
+| `terminal_oidc_jwks.issuer` | string | when present | Expected `iss` claim in the JWT. Must be non-empty when the block is present. |
+| `terminal_oidc_jwks.jwksUrl` | string | when present | HTTPS URL of the IdP's JWKS document (RFC 7517 §5). Must be non-empty and HTTPS-only. When set, terminal bearer tokens are resolved via this endpoint. |
+| `terminal_oidc_jwks.audience` | string | no | Expected `aud` claim. When set, tokens without a matching `aud` are rejected. |
+
+**Validation (server.ts:1237-1249):**
+- Both `issuer` and `jwksUrl` must be non-empty strings to activate OIDC verification
+- If the block is present but incomplete (either field missing or empty), a warning is logged and the terminal falls back to local-token auth
+- `jwksUrl` MUST use `https://` — key material is never fetched over plaintext (auth-jwks.ts enforces this)
+
+**Behavior:**
+- When OIDC is disabled (block absent or malformed): terminal mints a local random token and serves it to authenticated callers
+- When OIDC is enabled: terminal mints a local token (for fallback) but uses JwksAuthProvider to verify incoming Bearer tokens against the JWKS endpoint — only IdP-issued tokens are accepted
+- Verification fails closed: malformed tokens or JWKS resolution errors → 401 Unauthorized; no claim or key material leaks into the response
+
+**Example:**
+```json
+{
+  "terminal_oidc_jwks": {
+    "issuer": "https://idp.example.com",
+    "jwksUrl": "https://idp.example.com/.well-known/jwks.json",
+    "audience": "deckent-terminal"
+  }
+}
+```
+
+**Difference from `api_oidc`:**
+- `api_oidc` (section 14.1) guards the REST API (`/api/*`) and supports both HS256 (shared secret) and RS256 (public key)
+- `terminal_oidc_jwks` (this section) guards the embedded terminal (`/api/terminal/*`) and uses RS256-only (JWKS endpoint); HS256 is not supported for terminal auth
+
 ---
 
 ## 15. Sprint Lifecycle & Evaluation
@@ -831,6 +866,41 @@ grep -n "VALID_\|includes(\|z.enum" src/core/config.ts # validation enums
 grep -n "?:" src/core/config-types.ts                  # union types
 grep -n "memory" src/orchestra/spawn-backend-docker.ts # docker memory flags
 sed -n '94,157p' src/orchestra/timeout-estimator.ts    # timeout estimate chain
+```
+
+---
+
+## 24. HTTP Server Configuration (serve command)
+
+The `deckent serve` command runs an HTTP server with these rate-limiting defaults. These settings apply when running the dashboard server.
+
+| Key | Default | Values | Description |
+|-----|---------|--------|-------------|
+| `rateLimit` | `100` (server.ts:1043) | number >= 0 | Maximum requests per minute per IP address. `0` disables rate limiting. Applies to all remote callers. |
+| `rateLimitExemptLoopback` | `true` (server.ts:1043) | boolean | When `true` (default), loopback callers (127.0.0.1, ::1) entirely bypass the rate limiter. When `false`, loopback is rate-limited like any other IP. |
+
+### Rationale for Loopback Exemption
+
+The localhost dashboard legitimately exceeds the per-minute request budget due to:
+- Page fetch fan-out: dashboard loads multiple modules, each requiring separate HTTP requests
+- SSE reconnects: Server-Sent Events (for real-time updates) reconnect on network hiccup, which can cause rapid request sequences
+
+When a 429 Too Many Requests response is sent to an SSE client, the browser's automatic retry-loop can prevent the rate-limit window from draining, leaving the dashboard unusable.
+
+**Default behavior:** `rateLimitExemptLoopback: true` allows the owner's own dashboard to operate without 429 errors while still protecting against remote abuse.
+
+**For tests:** Set `rateLimitExemptLoopback: false` to exercise the rate-limit rejection path (e.g. testing 429 responses).
+
+### Example: Custom Rate Limit via Code
+
+When calling `createHttpServer()` programmatically:
+
+```typescript
+const server = createHttpServer(projectRoot, {
+  port: 3100,
+  rateLimit: 50,                    // 50 req/min per IP
+  rateLimitExemptLoopback: true,    // localhost bypasses
+});
 ```
 
 ---

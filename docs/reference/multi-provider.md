@@ -19,15 +19,17 @@ Deckent supports multiple AI providers: **Claude** (default), **OpenAI Codex**, 
 
 ## 1. Supported Providers
 
-| Provider | CLI / SDK | Auth | Models | Best For |
-|----------|-----------|------|--------|----------|
-| **Claude** | `claude` CLI | Subscription or `ANTHROPIC_API_KEY` | `opus`, `sonnet`, `haiku` | Default provider. Full feature support including tmux workers |
-| **Codex** | `codex` CLI | `OPENAI_API_KEY` or ChatGPT subscription | `gpt-5`, `gpt-5-mini`, `gpt-4.1`, `gpt-4.1-mini`, `o3`, `o4-mini` | Teams already using OpenAI infrastructure |
-| **Gemini** | `gemini` CLI + `GOOGLE_API_KEY` | Both CLI binary AND API key required | `gemini-2.5-pro`, `gemini-2.5-flash`, `gemini-2.0-flash` | Cost-effective alternative, large context windows |
-| **Ollama** | HTTP server (`localhost:11434`) | None — local, zero-cost | Any locally-pulled model | Privacy-first, zero API cost, offline use |
-| **DeepSeek** | HTTP (OpenAI-compat) | `DEEPSEEK_API_KEY` | `deepseek-chat`, `deepseek-reasoner` | Reasoning-focused tasks at low cost |
-| **Qwen** | HTTP (OpenAI-compat) | `DASHSCOPE_API_KEY` | `qwen-plus`, `qwen-turbo`, `qwen-max` | Alibaba Cloud / DashScope users |
-| **GLM / Zhipu** | HTTP (OpenAI-compat) | `ZHIPU_API_KEY` | `glm-4-plus`, `glm-4-flash`, `glm-4-air` | Zhipu AI users |
+| Provider | CLI / SDK | Auth | Worker Backend | Status |
+|----------|-----------|------|----------------|--------|
+| **Claude** | `claude` CLI (`@anthropic-ai/claude-code`) | OAuth session managed by CLI (subscription or `ANTHROPIC_API_KEY`) | tmux (default) or subprocess; Docker with `~/.claude` mount | Default, full feature support |
+| **Codex** | `codex` CLI (`@openai/codex`) | `OPENAI_API_KEY` **or** ChatGPT subscription (`codex auth status`) | subprocess (host-adapter); Docker with `~/.codex` mount | Full sprint + worker support |
+| **Gemini** | `gemini` CLI (`@google/gemini-cli`) | OAuth session (default) **or** `GOOGLE_API_KEY` | subprocess (host-adapter); Docker with `~/.gemini` mount | Full sprint + worker support (Sprint 248) |
+| **Ollama** | HTTP server (`localhost:11434`) | None — local, zero-cost | Node subprocess via agentic-worker-entry.js (HTTP API) | Local/private; any pulled model |
+| **DeepSeek** | HTTP (OpenAI-compat) | `DEEPSEEK_API_KEY` | HTTP-only (no spawn, no Docker) | Brain planner + HTTP tasks |
+| **Qwen** | HTTP (OpenAI-compat) | `DASHSCOPE_API_KEY` | HTTP-only (no spawn, no Docker) | Brain planner + HTTP tasks |
+| **GLM / Zhipu** | HTTP (OpenAI-compat) | `ZHIPU_API_KEY` | HTTP-only (no spawn, no Docker) | Brain planner + HTTP tasks |
+
+> **Worker backend note:** Claude runs in Docker by default (container isolates the worker). Codex, Gemini, and Ollama are **host-adapter** providers — workers spawn on the host and reach the local CLI or HTTP server. All three host-adapter CLIs can also run in Docker when `- Backend: docker` is set in a task directive, provided the worker image contains their binaries and the host OAuth directory is mounted.
 
 ---
 
@@ -38,10 +40,14 @@ Deckent supports multiple AI providers: **Claude** (default), **OpenAI Codex**, 
 Claude works out of the box if you have the Claude Code CLI installed.
 
 ```bash
+# Install
+npm install -g @anthropic-ai/claude-code
+
 # Verify
 claude --version
 
-# Requires an active subscription (Pro, Max 5x, Max 20x) or API key
+# Requires an active subscription (Pro, Max 5x, Max 20x) or ANTHROPIC_API_KEY
+# The CLI manages its own OAuth session — no separate login command needed
 ```
 
 No additional configuration is needed — Claude is the default provider.
@@ -62,25 +68,29 @@ export OPENAI_API_KEY="sk-..."
 # Option B: ChatGPT subscription login
 codex login
 
-# 3. Verify
+# 3. Verify CLI is installed
 codex --version
+
+# 4. Check auth status (shows "logged in" for subscription auth)
 codex auth status
 
-# 4. Configure Deckent
+# 5. Configure Deckent
 deckent config set worker_provider codex
 ```
 
 ### Google Gemini
 
-Gemini requires the `gemini` CLI binary, authenticated **either** via an OAuth/subscription login **or** a `GOOGLE_API_KEY` (Sprint 248 F1-G — the CLI's logged-in session is honored, like Claude/Codex).
+Gemini requires the `gemini` CLI binary. Authentication uses **either** an OAuth/subscription session **or** a `GOOGLE_API_KEY` — the API key is optional when the CLI already has an active OAuth session (Sprint 248 F1-G).
 
 ```bash
 # 1. Install the Gemini CLI
 npm install -g @google/gemini-cli
 
 # 2. Authenticate — choose one:
-# Option A: interactive OAuth/subscription login
-gemini   # then follow the login prompt
+
+# Option A: interactive OAuth/subscription login (no API key required)
+gemini   # follow the login prompt on first run
+
 # Option B: API key
 export GOOGLE_API_KEY="AIza..."
 
@@ -91,7 +101,9 @@ gemini --version
 deckent config set worker_provider gemini
 ```
 
-> **Note:** Gemini is available once the CLI is installed; with no `GOOGLE_API_KEY` it uses the OAuth session. Run `deckent doctor` to check availability. (CLI present ≠ logged in — if neither OAuth nor key is set, the worker surfaces an auth error in its log.)
+> **Doctor behavior:** `deckent doctor` uses `GOOGLE_API_KEY` / `DECKENT_GOOGLE_API_KEY` to determine Gemini availability. Without a key, doctor reports **partial** availability even when an OAuth session is active. Workers can still be spawned in partial state (the CLI uses its OAuth session), but `deckent doctor` will show a warning. Set `GOOGLE_API_KEY` to eliminate the warning.
+
+> **IDE session conflict:** When Deckent runs inside a Gemini CLI IDE integration, spawned workers strip `GEMINI_CLI_IDE_*` env vars to prevent attaching to the parent IDE session.
 
 ### Ollama (Local / Zero-Cost)
 
@@ -122,9 +134,13 @@ export OLLAMA_HOST="http://192.168.1.10:11434"
 
 Deckent resolves the endpoint in this priority order: `DECKENT_OLLAMA_HOST` → `OLLAMA_HOST` → `http://localhost:11434`.
 
+Any model installed via `ollama pull` is automatically accepted at spawn time (Deckent probes `/api/tags` at startup to discover locally available models).
+
 ### OpenAI-Compatible Providers (DeepSeek / Qwen / GLM)
 
 DeepSeek, Qwen, and GLM/Zhipu speak the OpenAI `/chat/completions` wire protocol. Deckent auto-registers each one when the corresponding API key environment variable is set at startup — no explicit config entry is required.
+
+These are **HTTP-only** adapters: they do not spawn a local CLI process and cannot run as Docker workers. They are available for Brain planner calls and agentic HTTP tasks via Deckent's `send()` path.
 
 #### DeepSeek
 
@@ -152,8 +168,6 @@ deckent config set worker_provider zhipu
 ```
 
 Endpoint: `https://open.bigmodel.cn/api/paas/v4` · Models: `glm-4-plus`, `glm-4-flash`, `glm-4-air`
-
-> **HTTP-only:** DeepSeek, Qwen, and GLM are HTTP adapters — they do not spawn a local CLI process. They are available as Brain and Worker providers through Deckent's agentic HTTP path.
 
 ### Verify Provider Availability
 
@@ -216,9 +230,12 @@ When a task requires a specific model tier but the target provider does not supp
 
 | Tier | Claude | Codex | Gemini |
 |------|--------|-------|--------|
+| **Premium+** | `fable` | `o3` | `gemini-3.1-pro-preview` |
 | **Premium** | `opus` | `gpt-5` | `gemini-2.5-pro` |
-| **Standard** | `sonnet` | `gpt-4.1` | `gemini-2.5-flash` |
-| **Economy** | `haiku` | `gpt-5-mini` | `gemini-2.0-flash` |
+| **Standard** | `sonnet` | `gpt-4.1` · `o4-mini` | `gemini-2.5-flash` |
+| **Economy** | `haiku` | `gpt-5-mini` · `gpt-4.1-mini` | `gemini-2.0-flash` |
+
+> **Wire model note:** The deckent-facing id `gpt-5` maps to wire model `gpt-5.5` (the current ChatGPT-subscription frontier). The CodexAdapter sends the registry `apiId` to avoid rejection. Similarly `opus` → `claude-opus-4-8`, `fable` → `claude-fable-5`.
 
 ### How It Works
 
@@ -231,7 +248,8 @@ opus (Claude, premium tier) --> gpt-5 (Codex, premium tier)
 Similarly:
 ```
 sonnet (Claude, standard) --> gemini-2.5-flash (Gemini, standard)
-haiku (Claude, economy) --> gpt-5-mini (Codex, economy)
+haiku (Claude, economy)   --> gpt-5-mini (Codex, economy)
+fable (Claude, premium+)  --> o3 (Codex, premium+)
 ```
 
 This mapping is handled by `getEquivalentModel()` in `src/core/model-equivalence.ts`.
@@ -294,8 +312,8 @@ In a structured `DIRECTIVES.md` task block you can also set:
 - Files: docs/analysis.md
 ```
 
-- **`- Backend:`** forces the spawn backend. By default `codex`/`gemini`/`ollama` run via their host CLI and `claude` runs in a docker container; `- Backend: docker` routes a host-CLI provider into the container (it authenticates via the mounted host session, e.g. `~/.codex`, `~/.gemini`). The worker image must contain that provider's CLI + `ca-certificates`.
-- **`- ModelEffort:`** sets the model's **reasoning depth** — claude `low|medium|high|xhigh|max` (→ `--effort`), codex `minimal|low|medium|high` (→ `model_reasoning_effort`). Opt-in; gemini/ollama have no reasoning-effort knob. **This is separate from `- Effort:`** (which is task *work size* and drives timeout/budget/token estimates). The two are independent: a small task can request deep reasoning, and vice versa.
+- **`- Backend:`** forces the spawn backend. By default `codex`/`gemini`/`ollama` run via their host CLI and `claude` runs in a Docker container. Setting `- Backend: docker` routes a host-CLI provider into the container — it authenticates via the mounted host session directory (`~/.codex`, `~/.gemini`, `~/.claude`). The worker image must contain that provider's CLI and `ca-certificates`.
+- **`- ModelEffort:`** sets the model's **reasoning depth** — claude `low|medium|high|xhigh|max` (→ `--effort`), codex `minimal|low|medium|high` (→ `-c model_reasoning_effort=<level>`). Opt-in; gemini/ollama have no reasoning-effort knob. **This is separate from `- Effort:`** (which is task *work size* and drives timeout/budget/token estimates). The two are independent: a small task can request deep reasoning, and vice versa.
 
 ---
 
@@ -309,15 +327,15 @@ Provider selection can be overridden via environment variables (useful for CI/CD
 | `DECKENT_WORKER_PROVIDER` | Override `worker_provider` |
 | `DECKENT_FALLBACK_PROVIDER` | Override `fallback_provider` |
 | `ANTHROPIC_API_KEY` | Required for API mode with Claude |
-| `OPENAI_API_KEY` | Required for Codex provider (API key mode) |
-| `GOOGLE_API_KEY` | Required for Gemini provider (mandatory alongside CLI) |
-| `DECKENT_GOOGLE_API_KEY` | Alternative to `GOOGLE_API_KEY` for Gemini (takes precedence) |
-| `DECKENT_OPENAI_API_KEY` | Alternative to `OPENAI_API_KEY` for Codex (takes precedence) |
+| `OPENAI_API_KEY` | API key auth for Codex |
+| `DECKENT_OPENAI_API_KEY` | Deckent-specific Codex key (takes precedence over `OPENAI_API_KEY`) |
+| `GOOGLE_API_KEY` | API key auth for Gemini (optional when OAuth session is active) |
+| `DECKENT_GOOGLE_API_KEY` | Deckent-specific Gemini key (takes precedence over `GOOGLE_API_KEY`) |
 | `DEEPSEEK_API_KEY` | Required for DeepSeek provider |
 | `DASHSCOPE_API_KEY` | Required for Qwen provider (DashScope) |
 | `ZHIPU_API_KEY` | Required for GLM / Zhipu provider |
 | `OLLAMA_HOST` | Ollama server URL (default: `http://localhost:11434`) |
-| `DECKENT_OLLAMA_HOST` | Deckent-specific Ollama host override (takes precedence over `OLLAMA_HOST`) |
+| `DECKENT_OLLAMA_HOST` | Deckent-specific Ollama host (takes precedence over `OLLAMA_HOST`) |
 
 Environment variables take precedence over config file values.
 
@@ -333,17 +351,19 @@ deckent doctor
 
 Check that the provider's prerequisites are met:
 
-- **Claude**: `claude --version` works
-- **Codex**: `codex --version` works AND (`OPENAI_API_KEY` is set OR `codex auth status` shows logged in)
-- **Gemini**: `gemini --version` works AND `GOOGLE_API_KEY` / `DECKENT_GOOGLE_API_KEY` is set
-- **Ollama**: `curl http://localhost:11434/api/tags` returns HTTP 200
+- **Claude**: `claude --version` works (session managed internally by CLI)
+- **Codex**: `codex --version` works AND (`OPENAI_API_KEY`/`DECKENT_OPENAI_API_KEY` is set OR `codex auth status` shows "logged in")
+- **Gemini**: `gemini --version` works AND (`GOOGLE_API_KEY`/`DECKENT_GOOGLE_API_KEY` is set OR OAuth session is active via `gemini` login)
+- **Ollama**: `curl http://localhost:11434/api/tags` returns HTTP 200 with at least one model installed
 - **DeepSeek**: `DEEPSEEK_API_KEY` is set
 - **Qwen**: `DASHSCOPE_API_KEY` is set
 - **GLM**: `ZHIPU_API_KEY` is set
 
-### Gemini: CLI installed but workers fail
+### Gemini: doctor reports partial availability
 
-Gemini requires **both** the CLI binary and an API key. Having only the CLI installed results in partial availability — Deckent will refuse to spawn workers. Set `GOOGLE_API_KEY` (or `DECKENT_GOOGLE_API_KEY`) and re-run `deckent doctor`.
+`deckent doctor` checks for `GOOGLE_API_KEY` / `DECKENT_GOOGLE_API_KEY` to determine Gemini availability. Without a key it reports **partial** even when an OAuth session is active. This is a doctor-probe limitation — workers can still be spawned using the OAuth session. To eliminate the warning, set `GOOGLE_API_KEY`.
+
+If workers fail despite an active session, look for `gemini login` / `please authenticate` messages in the task log — the session may have expired. Re-run `gemini` interactively to refresh the OAuth token.
 
 ### Model Not Supported by Provider
 
@@ -352,6 +372,18 @@ If you specify a model that does not belong to the configured provider, Deckent 
 ### Fallback Not Working
 
 Ensure `fallback_provider` is set and the fallback provider's prerequisites are met. Only one fallback attempt is made per failure.
+
+### Codex: workers fail with "model is not supported"
+
+Deckent sends the registry `apiId` (`gpt-5.5`) rather than the deckent-facing alias (`gpt-5`). If you see this error, your Codex CLI may be outdated. Update with `npm update -g @openai/codex`.
+
+### Ollama: no models available
+
+`deckent doctor` reports "partial" when the Ollama server is reachable but no models are pulled. Pull a model first:
+
+```bash
+ollama pull qwen3:latest
+```
 
 ---
 

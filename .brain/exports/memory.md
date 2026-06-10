@@ -1,5 +1,19 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-270 Learnings
+- Sprint sprint-270 Learnings: ## Sprint sprint-270 Learnings
+
+## Gains
+- 270-001 — validate-publish güçlendirme — exec-bit + dashboard-bundle assertion'ları — Added two new publish-readiness gates:
+- 270-002 — npm pack hermetik smoke — paketten kurulan deckent gerçekten açılıyor — Created hermetic e2e test with 4 passing tests:
+- 270-003 — README quickstart — 3-komut kurulum çıtası — Updated README Quick Start section to follow Odysseus 3-komut çıtası pattern.
+- 270-004 — dev/tsc exec-bit kaybı kökü — watch yolunda da +x garantisi — Approach (b) implemented:
+- 270-005 — PSL-6 doctor auth-probe — CLI var ≠ login; gerçek oturum durumu — PSL-6 core probe module: NEW src/core/provider-auth-probe.ts exporting probeProviderAuth(provider...
+- 270-006 — doctor wire — auth-probe satırları ("CLI var ama login DEĞİL" görünür) — Wired Task 270-005's probeProviderAuth into `deckent doctor`.
+- 270-007 — F1-IMG part 1 — worker-image readiness denetim modülü — F1-IMG part 1 — new src/core/worker-image-check.ts exporting checkWorkerImage({image?, requiredPr...
+- 270-008 — F1-IMG part 2 — doctor satırı + consent-based rebuild önerisi (ADR-063) — F1-IMG part 2 — wired Task 270-007's checkWorkerImage report into `deckent doctor` + added consen...
+- …and 12 more delivered
+
 ## Sprint sprint-269 Learnings
 - Sprint sprint-269 Learnings: ## Sprint sprint-269 Learnings
 

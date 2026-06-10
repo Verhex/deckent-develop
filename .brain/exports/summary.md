@@ -80,6 +80,10 @@
 | adr-086 | Native CLI Parity — F11 Feature Set (Sprint 224) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-270 Learnings** (sprint-270): ## Sprint sprint-270 Learnings
+
+## Gains
+- 270-001 — validate-publish güçlendirme — exec-bit + dashboard-bundle asser...
 - **Sprint sprint-269 Learnings** (sprint-269): ## Sprint sprint-269 Learnings
 
 ## Gains
@@ -111,7 +115,6 @@
 - **Sprint sprint-260 Learnings** (sprint-260): ## Sprint sprint-260 Learnings
 - Doc — Enterprise Foundation reference (consume-the-contract): GO_WITH_TECH_DEBT — Wo...
 - **Sprint sprint-259 Learnings** (sprint-259): ## Sprint sprint-259 Learnings
-- **Sprint sprint-258 Learnings** (sprint-258): ## Sprint sprint-258 Learnings
 
 ## Active Technical Debt
 _No active technical debt._
@@ -133,5 +136,6 @@ _No active technical debt._
 - Violation pattern: stale_heartbeat
 - Violation pattern: file_outside_scope
 - Violation pattern: file_outside_scope
+- Violation pattern: stale_heartbeat
 
-_Total entries: 374 | Generated: 2026-06-10_
+_Total entries: 382 | Generated: 2026-06-10_

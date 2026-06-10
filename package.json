@@ -34,6 +34,7 @@
     "lint:link": "node scripts/lint-links.mjs",
     "clean": "rm -rf dist",
     "ci:rebuild-native": "npm rebuild better-sqlite3 --ignore-scripts=false",
+    "fix:bin": "node scripts/copy-assets.mjs --fix-bin-only",
     "validate:publish": "node scripts/validate-publish.mjs",
     "release": "npm run docs:stats:check && npm run docs:ref:check && npm run build:all && npm run validate:publish",
     "docs:generate-cli": "npx tsx scripts/generate-cli-docs.ts",

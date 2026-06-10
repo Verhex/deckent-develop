@@ -263,6 +263,45 @@ const tenantId =
 
 ---
 
+### 3k. Worker Code Execution
+
+**Threat:** A worker — a provider-backed agent (Claude/Codex/Gemini) executing a task — runs arbitrary code inside the project working tree: it edits source files and runs the project's own build, lint, and test commands (e.g. `npm run build`, `vitest`). A malicious DIRECTIVES author, a compromised provider response, or a model hallucination can therefore cause unintended code execution on the host.
+
+**Code:** `src/agents/worker.ts`, `src/orchestra/spawn-backend.ts`, `src/providers/docker-backend.ts`
+
+**Trust assumption (honest):** The DIRECTIVES author is trusted — single-user design, V1.0 (see §1 trust boundaries). Worker code execution is the *intended* behavior of the system: deckent orchestrates agents that write and run code. The security question is not "can a worker run code" (yes, by design) but "how far can a worker's code reach."
+
+**Implemented mitigations:**
+- **Backend isolation choice** — workers run via subprocess, tmux, or Docker (`spawn-backend.ts`). The Docker backend bind-mounts only the project directory, so worker code cannot read host files outside the mount (§3e). subprocess/tmux backends run as the same OS user with no filesystem boundary.
+- **Symlink-aware scope resolution** — `worker.ts` resolves each written path with `realpathSync()` before scope matching, so a symlink that points outside the project root resolves to its real location instead of masking the target (ADR-034 Katman 3).
+- **Honest-gate self-assessment** — a worker that detects it wrote outside its declared `scope.filesWrite` is expected to self-flag `BOUNDARY_VIOLATION → NO_GO`; Brain then applies a FIX cascade (§3c).
+- **Per-provider API Key isolation** — each worker process receives only its own provider's API Key via per-provider environment injection; a Claude worker never receives the Codex or Gemini key (§3b).
+
+**Advisory posture (ADR-037 V1.0) — honest disclosure:**
+
+Worker scope is **not** enforced at the OS level. The runtime authority check is **soft** — `checkAuthority()` returns `mode: 'soft'` on every path and never blocks a write (§3c). The Auditor detects out-of-scope writes after the fact via `git diff --stat` (≈30 s scan cycle) and records them in the audit trail, but does not roll back the write or kill the worker. Hard, process-level execution confinement is deferred to **V2 (post-GA)**.
+
+**Residual risk:** On subprocess/tmux backends, a rogue worker can execute any command and write any file the OS user owns before the next Auditor scan. The provider API Key for that worker is present in its `process.env` and is readable by any process running as the same OS user (`/proc/PID/environ`). For untrusted DIRECTIVES, use the Docker backend (filesystem isolation) plus `--sandbox-mode` (git-stash rollback) — but note that neither provides network isolation in V1.0 (§3d, §3e).
+
+---
+
+### 3l. Multi-Project Isolation
+
+**Threat:** A worker in Project A reaches the source, secrets, or memory of a sibling Project B on the same machine. This is **Multi-Project** isolation — one user running several projects side by side — and is explicitly **not** SaaS multi-tenant isolation, which is out of scope per ADR-033 (see §3h for the separate multi-tenant posture).
+
+**Code:** `src/agents/worker.ts` (symlink-aware scope resolution), ADR-034.
+
+**Implemented mitigations:**
+- **Per-project directory isolation (structural)** — each project owns independent `.deckent/`, `.brain/`, `.tasks/`, and `.locks/` directories under its own project root. There is no cross-reference between them; a project's `.brain/` contains only that project's sprint history (ADR-034 Katman 1).
+- **Symlink-aware scope resolution** — a sibling-project access attempt via a crafted symlink (`../project-b/src/secret.ts`) resolves to its real path through `realpathSync()` before scope matching, closing the naive symlink-bypass vector (ADR-034 Katman 3; Sprint 132 MEDIUM #10).
+- **Environment-only API Keys** — provider API Keys live in environment variables and the project-local `.deck` file, never in the global `~/.deckent/config.json`, so the shared global config is not a cross-project credential-leakage vector (ADR-034 Katman 4).
+
+**Advisory posture (ADR-037 V1.0):** As with all scope enforcement (§3c), the cross-project check is **advisory** — the symlink is *resolved* correctly and an out-of-scope target is logged and surfaced, but it is not hard-blocked at the OS level. Hard cross-project enforcement is **V2 post-GA**.
+
+**Residual risk:** A worker running as the same OS user can still read a sibling project's files directly — there is no kernel-level boundary between projects on subprocess/tmux backends. Multi-Project isolation is a structural-plus-advisory boundary in V1.0-beta, not an OS-enforced one.
+
+---
+
 ## 4. Implementation Status Summary
 
 | Control | Status | Code Reference |
@@ -273,6 +312,11 @@ const tenantId =
 | `.deck` gitignore + doctor check | **Implemented** | `src/core/deck-file.ts`, `src/cli/commands/doctor.ts` |
 | Scope enforcement (RBAC) — violation detection | **Implemented (advisory)** | `src/orchestra/authority-enforcer.ts` |
 | Scope enforcement — hard FS-level blocking | **Not implemented (V2 roadmap)** | ADR-037 V2 |
+| Worker code execution — Docker backend isolation (bind-mount) | **Implemented** | `src/orchestra/spawn-backend.ts`, `src/providers/docker-backend.ts` |
+| Worker code execution — OS-level confinement | **Not implemented (advisory; V2 roadmap)** | ADR-037 V2 |
+| Multi-project: per-project directory isolation | **Implemented (structural)** | ADR-034 Katman 1 |
+| Multi-project: symlink-aware scope resolution | **Implemented** | `src/agents/worker.ts` (`realpathSync`) |
+| Multi-project: cross-project OS-level boundary | **Not implemented (advisory; V2 roadmap)** | ADR-037 V2 |
 | Sandbox: git-stash rollback | **Implemented** | `src/cli/commands/start.ts` |
 | Sandbox: network blocking | **Best-effort only** (proxy env vars) | `src/providers/sandbox.ts` |
 | Docker: filesystem isolation | **Implemented** | `src/providers/docker-backend.ts` |

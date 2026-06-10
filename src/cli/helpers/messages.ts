@@ -161,6 +161,52 @@ const MESSAGES: MessageMap = {
     tr: 'Sonuç: {passed}/{total} kontrol geçti',
   },
 
+  // ─── doctor: worker image readiness + --fix-image (F1-IMG, Sprint 270 — 270-008) ──
+  'doctor.image_ready': {
+    en: 'Worker image ready — provider CLIs + ca-certificates present',
+    tr: 'Worker imajı hazır — sağlayıcı CLI\'ları + ca-certificates mevcut',
+  },
+  'doctor.image_not_ready': {
+    en: 'Worker image {state} — rebuild needed before docker-backend workers can run',
+    tr: 'Worker imajı {state} — docker-backend worker\'lar çalışmadan önce yeniden derleme gerekli',
+  },
+  'doctor.image_missing_clis': {
+    en: 'Missing provider CLIs: {clis}',
+    tr: 'Eksik sağlayıcı CLI\'ları: {clis}',
+  },
+  'doctor.image_missing_cacerts': {
+    en: 'Missing ca-certificates (TLS will fail for codex/gemini)',
+    tr: 'ca-certificates eksik (codex/gemini için TLS başarısız olur)',
+  },
+  'doctor.image_build_hint': {
+    en: 'Build: {cmd}',
+    tr: 'Derleme: {cmd}',
+  },
+  'doctor.image_fix_hint': {
+    en: 'Run `deckent doctor --fix-image` to rebuild it (asks for confirmation first).',
+    tr: 'Yeniden derlemek için `deckent doctor --fix-image` çalıştırın (önce onay ister).',
+  },
+  'doctor.image_fix_confirm': {
+    en: 'Rebuild the worker image now? This runs: {cmd}',
+    tr: 'Worker imajı şimdi yeniden derlensin mi? Şu komut çalışır: {cmd}',
+  },
+  'doctor.image_fix_declined': {
+    en: 'Image rebuild cancelled — nothing was built.',
+    tr: 'İmaj yeniden derlemesi iptal edildi — hiçbir şey derlenmedi.',
+  },
+  'doctor.image_fix_running': {
+    en: 'Rebuilding worker image: {cmd}',
+    tr: 'Worker imajı yeniden derleniyor: {cmd}',
+  },
+  'doctor.image_fix_done': {
+    en: 'Worker image rebuilt successfully.',
+    tr: 'Worker imajı başarıyla yeniden derlendi.',
+  },
+  'doctor.image_fix_failed': {
+    en: 'Worker image build failed (exit {code}). See the build output above.',
+    tr: 'Worker imaj derlemesi başarısız (çıkış {code}). Yukarıdaki derleme çıktısına bakın.',
+  },
+
   // ─── attach command ─────────────────────────────────────────────────
   'attach.no_active_session': {
     en: 'No active session. Run `deckent start` first.',
@@ -972,6 +1018,32 @@ const MESSAGES: MessageMap = {
   'bot.kill_already_stopped': {
     en: 'ℹ️ Sprint {sprint} is already stopped — nothing to kill.',
     tr: 'ℹ️ {sprint} sprint\'i zaten durmuş — öldürülecek bir şey yok.',
+  },
+
+  // ─── serve command ──────────────────────────────────────────────────
+  'serve.listening': {
+    en: 'Deckent is ready — http://{host}:{port}',
+    tr: 'Deckent hazır — http://{host}:{port}',
+  },
+  'serve.token_injected': {
+    en: '  Token     API token auto-injected into dashboard HTML (localhost: no extra step)',
+    tr: '  Token     API token dashboard HTML\'ine otomatik enjekte edildi (localhost: ek adım yok)',
+  },
+  'serve.terminal_enabled': {
+    en: '  Terminal  embedded PTY enabled (token auto-injected for localhost callers)',
+    tr: '  Terminal  gömülü PTY aktif (localhost arayanlar için token otomatik enjekte)',
+  },
+  'serve.terminal_disabled': {
+    en: '  Terminal  disabled — pass --terminal on localhost to enable',
+    tr: '  Terminal  kapalı — etkinleştirmek için localhost\'ta --terminal geçin',
+  },
+  'serve.stop_hint': {
+    en: '  Stop      Ctrl+C',
+    tr: '  Durdurmak Ctrl+C',
+  },
+  'serve.port_tip': {
+    en: '  Tips      deckent serve --port <n>  --host <addr>',
+    tr: '  İpuçları  deckent serve --port <n>  --host <adres>',
   },
 
   // ─── bot daemon (start/stop/status) ────────────────────────────

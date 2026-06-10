@@ -27,7 +27,7 @@ Deckent supports multiple providers for worker execution:
 |----------|-----------|------|--------|
 | `claude` | `claude` CLI | Subscription or `ANTHROPIC_API_KEY` | **Default** |
 | `codex` | `codex` CLI | `OPENAI_API_KEY` or ChatGPT subscription | Opt-in |
-| `gemini` | `gemini` CLI | CLI binary **+** `GOOGLE_API_KEY` (both required) | Opt-in |
+| `gemini` | `gemini` CLI | OAuth session (default) **or** `GOOGLE_API_KEY` | Opt-in |
 | `ollama` | HTTP server | None — local, zero-cost | Opt-in |
 | `deepseek` | HTTP (OpenAI-compat) | `DEEPSEEK_API_KEY` | Opt-in |
 | `qwen` | HTTP (OpenAI-compat) | `DASHSCOPE_API_KEY` | Opt-in |
@@ -37,11 +37,17 @@ Deckent supports multiple providers for worker execution:
 
 ## 2. Default: Claude Provider
 
-The default provider is `claude`. No configuration is needed.
+Claude is the default provider. Install the CLI and it works immediately.
 
 ```bash
-# Verify Claude CLI is available and authenticated
+# 1. Install the Claude Code CLI
+npm install -g @anthropic-ai/claude-code
+
+# 2. Verify it is available
 claude --version
+
+# Requires an active subscription (Pro, Max 5x, Max 20x) or ANTHROPIC_API_KEY
+# The CLI manages its own OAuth session — no separate login command needed
 ```
 
 To explicitly set Claude as the worker provider:
@@ -95,7 +101,7 @@ Or in `.deckent/config.json`:
 
 ## 4. Opt-In: Gemini Provider (Google)
 
-Gemini requires **both** the `gemini` CLI binary **and** a Google API key. The CLI is not optional — Deckent spawns workers via `gemini -p ...`. An API key alone is not sufficient.
+Gemini requires the `gemini` CLI binary. Authentication uses **either** an OAuth/subscription session **or** a `GOOGLE_API_KEY` — the API key is optional when the CLI already has an active OAuth session (Sprint 248 F1-G). Deckent spawns workers via the `gemini` CLI.
 
 ### Install
 
@@ -106,10 +112,13 @@ npm i -g @google/gemini-cli
 gemini --version
 ```
 
-### Set API Key
+### Authenticate
 
 ```bash
-# Mandatory — no subscription-only mode for Gemini
+# Option A: interactive OAuth/subscription login (no API key required)
+gemini   # follow the login prompt on first run
+
+# Option B: API key
 export GOOGLE_API_KEY=AIza...
 ```
 
@@ -119,7 +128,9 @@ export GOOGLE_API_KEY=AIza...
 npx deckent config set worker_provider gemini
 ```
 
-> **Partial availability:** If only the CLI is installed without an API key (or vice versa), `deckent doctor` will report partial availability and Deckent will refuse to spawn Gemini workers. Both prerequisites must be met.
+> **Doctor behavior:** `deckent doctor` uses `GOOGLE_API_KEY` / `DECKENT_GOOGLE_API_KEY` to determine Gemini availability. Without a key, doctor reports **partial** availability even when an OAuth session is active. Workers can still be spawned using the OAuth session — to eliminate the warning, set `GOOGLE_API_KEY`.
+
+> **IDE session conflict:** When Deckent runs inside a Gemini CLI IDE integration, spawned workers strip `GEMINI_CLI_IDE_*` env vars to prevent attaching to the parent IDE session.
 
 ---
 
@@ -208,36 +219,68 @@ Available models: `glm-4-plus`, `glm-4-flash`, `glm-4-air`
 
 ## 7. Per-Task Provider Override in DIRECTIVES
 
-You can override the provider on a per-task basis in `DIRECTIVES.md`:
+You can override the provider on a per-task basis in `DIRECTIVES.md` using `- Provider:` and `- Model:` together. This enables mixed-fleet sprints where different tasks use different providers concurrently.
+
+### Mixed-fleet example
 
 ```markdown
-## Task 2: Heavy reasoning task
-- Model: opus
+## Task 1: Architecture planning (Claude opus — deep reasoning)
 - Provider: claude
+- Model: opus
 - Effort: high
+- Skills: system-architect
+- Files: docs/architecture.md
+- Scope: docs/
 
-## Task 3: Code generation with Codex
-- Model: gpt-4.1
+## Task 2: Code generation (Codex — OpenAI)
 - Provider: codex
+- Model: gpt-4.1
 - Effort: normal
+- Skills: typescript-expert
+- Files: src/api/routes.ts
+- Scope: src/api/
 
-## Task 4: Gemini Flash for fast tasks
-- Model: gemini-2.5-flash
+## Task 3: Fast documentation (Gemini Flash)
 - Provider: gemini
+- Model: gemini-2.5-flash
 - Effort: low
+- Skills: documentation-writer
+- Files: docs/guide/api.md
+- Scope: docs/guide/
 
-## Task 5: Local model task (zero-cost)
-- Model: qwen3:latest
+## Task 4: Local model (Ollama — zero-cost, private)
 - Provider: ollama
+- Model: qwen3:latest
 - Effort: normal
+- Skills: typescript-expert
+- Files: src/utils/helpers.ts
+- Scope: src/utils/
 
-## Task 6: DeepSeek reasoning
-- Model: deepseek-reasoner
+## Task 5: High-priority reasoning (DeepSeek)
 - Provider: deepseek
+- Model: deepseek-reasoner
 - Effort: high
+- Files: docs/analysis.md
+- Scope: docs/
 ```
 
-The `- Provider:` line in DIRECTIVES overrides `worker_provider` for that specific task.
+The `- Provider:` line overrides `worker_provider` for that specific task. The `- Model:` line sets the exact model within that provider. Both are independent — you can mix any combination of providers and models across tasks in the same sprint.
+
+### Backend and reasoning-effort (per task)
+
+In a DIRECTIVES task block you can also set:
+
+```markdown
+## Task 1: Deep analysis
+- Provider: codex
+- Backend: docker          # docker | tmux | subprocess
+- ModelEffort: high        # model reasoning DEPTH (not work size)
+- Effort: normal           # task WORK SIZE (timeout/budget)
+- Files: docs/analysis.md
+```
+
+- **`- Backend:`** forces the spawn backend. By default `codex`/`gemini`/`ollama` run via their host CLI and `claude` runs in a Docker container. Setting `- Backend: docker` routes a host-CLI provider into the container — it authenticates via the mounted host session directory (`~/.codex`, `~/.gemini`, `~/.claude`). The worker image must contain that provider's CLI and `ca-certificates`.
+- **`- ModelEffort:`** sets the model's **reasoning depth** — claude `low|medium|high|xhigh|max` (→ `--effort`), codex `minimal|low|medium|high` (→ `-c model_reasoning_effort=<level>`). Opt-in; gemini/ollama have no reasoning-effort knob. **This is separate from `- Effort:`** (task *work size* for timeout/budget). The two are independent: a small task can request deep reasoning, and vice versa.
 
 ---
 

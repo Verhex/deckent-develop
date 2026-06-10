@@ -7320,3 +7320,44 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 > F1-LIM + model-katmanlama politikası olarak MASTER-PLAN'de; ilk sahte retro istatistikleri düzeltildi.
 
 ---
+## Sprint 270 — sprint-270
+
+**Status:** COMPLETE
+**Date:** 2026-06-10
+**Duration:** 14282s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 20 |
+| Completed | 20 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 14282161ms |
+
+### Tasks
+
+- 270-001: validate-publish güçlendirme — exec-bit + dashboard-bundle assertion'ları (DONE)
+- 270-002: npm pack hermetik smoke — paketten kurulan deckent gerçekten açılıyor (DONE)
+- 270-003: README quickstart — 3-komut kurulum çıtası (DONE)
+- 270-004: dev/tsc exec-bit kaybı kökü — watch yolunda da +x garantisi (DONE)
+- 270-005: PSL-6 doctor auth-probe — CLI var ≠ login; gerçek oturum durumu (DONE)
+- 270-006: doctor wire — auth-probe satırları ("CLI var ama login DEĞİL" görünür) (DONE)
+- 270-007: F1-IMG part 1 — worker-image readiness denetim modülü (DONE)
+- 270-008: F1-IMG part 2 — doctor satırı + consent-based rebuild önerisi (ADR-063) (DONE)
+- 270-009: docs/reference/multi-provider.md — kod-gerçeği rewrite (W-K #8a) (DONE)
+- 270-010: docs/guide/multi-provider.md — rehber senkronu (W-K #8b) (DONE)
+- 270-011: .codex/.gemini rules sync — Karpathy + worker-default parite (W-K #9) (DONE)
+- 270-012: threat-model — Worker Code Execution + eksik saldırı yüzeyleri (DONE)
+- 270-013: AUT-3 bayat default-deny test beklentisi — davranış doğrula + güncelle (DONE)
+- 270-014: serve ilk-koşu çıktısı — tek-blok kullanım rehberi (i18n) (DONE)
+- 270-015: features.md — 269 satırları (DONE)
+- 270-016: config-reference — rateLimitExemptLoopback + terminal_oidc_jwks (DONE)
+- 270-017: enterprise-integrations — Dynamics bölümü (DONE)
+- 270-018: cli-commands.md — doctor/serve/audit 269-270 eklemeleri (DONE)
+- 270-019: REPL i18n sözlük denetimi — yeni key'lerin en/tr bütünlüğü (DONE)
+- 270-020: MASTER-PLAN işaretlemeleri — 270 kapanan maddeler (DONE)
+
+---

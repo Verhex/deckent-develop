@@ -1,7 +1,7 @@
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { platform } from 'node:os';
-import { spawnSync } from 'node:child_process';
+import { spawnSync, spawn as nodeSpawn } from 'node:child_process';
 import type { Command } from 'commander';
 import { planInstall } from '../../core/provisioner.js';
 import type { DoctorResult, SystemProfile } from '../../core/types.js';
@@ -29,6 +29,13 @@ import { resolveProjectRoot } from '../helpers/process.js';
 import { getMessage } from '../helpers/messages.js';
 import { ErrorRegistry } from '../../core/errors.js';
 import { detectAvailableProviders, formatDetectedProviders } from '../../core/provider.js';
+import { probeProviderAuth, type AuthProbeResult } from '../../core/provider-auth-probe.js';
+import {
+  checkWorkerImage,
+  type WorkerImageReport,
+  type SpawnImpl,
+} from '../../core/worker-image-check.js';
+import { promptConfirm } from '../helpers/prompt.js';
 import { runProviderDiagnostics } from './doctor-checks.js';
 import { detectEnvironment } from '../../core/environment.js';
 import { loadDeckSecrets, validateDeckFile, KNOWN_DECK_KEYS, isDeckFileCommitted } from '../../core/deck-file.js';
@@ -385,6 +392,12 @@ export interface HumanDoctorInput {
   ciBaseline?: CIBaseline;
   /** Optional: CI reports from .brain/ci-report-*.json (newest first) */
   ciReports?: CIReport[];
+  /** Optional (PSL-6, Task 270-006): provider-name → real auth-probe result. */
+  authProbes?: Record<string, AuthProbeResult>;
+  /** Optional (F1-IMG, Task 270-008): worker docker image readiness report. */
+  workerImage?: WorkerImageReport;
+  /** Optional UI language for probe diagnostics (en|tr). Defaults to 'en'. */
+  lang?: string;
 }
 
 /**
@@ -524,19 +537,193 @@ export function buildConnectorHealthResults(providers: DetectedProvider[]): Heal
   }));
 }
 
+// ─── PSL-6 Auth Probe Wiring (Sprint 270, Task 270-006) ──────────────────────
+//
+// "CLI installed ≠ logged in." The detect* functions report `authMethod:'session'`
+// for any provider whose `<cli> --version` works (GAP-4). probeProviderAuth (Task
+// 270-005) checks the REAL session state; this wiring surfaces it in the doctor
+// Provider Health section.
+
+/** Providers probeProviderAuth understands — anything else is left unprobed. */
+const AUTH_PROBE_PROVIDERS = new Set(['claude', 'codex', 'gemini']);
+/** Short per-probe timeout so `deckent doctor` never stalls on a hung CLI. */
+const DOCTOR_AUTH_PROBE_TIMEOUT_MS = 2_000;
+
+/**
+ * Run the auth probe for every AVAILABLE provider the probe understands, in
+ * PARALLEL with a short timeout. Never throws — a failing probe degrades to
+ * 'unknown' (which maps to existing behavior, no regression). `probeFn` is
+ * injectable so the wiring can be tested hermetically (no real fs/spawn).
+ *
+ * @returns provider-name → {@link AuthProbeResult} (only for probed providers).
+ */
+export async function runAuthProbes(
+  providers: DetectedProvider[],
+  probeFn: typeof probeProviderAuth = probeProviderAuth,
+  timeoutMs: number = DOCTOR_AUTH_PROBE_TIMEOUT_MS,
+): Promise<Record<string, AuthProbeResult>> {
+  const targets = providers.filter(p => p.available && AUTH_PROBE_PROVIDERS.has(p.name));
+  const entries = await Promise.all(
+    targets.map(async (p): Promise<readonly [string, AuthProbeResult]> => {
+      try {
+        return [p.name, await probeFn(p.name, { timeoutMs })] as const;
+      } catch {
+        return [p.name, { state: 'unknown', detail: 'auth probe failed' }] as const;
+      }
+    }),
+  );
+  return Object.fromEntries(entries);
+}
+
+/** The single command that starts an interactive login for a provider. */
+function getProviderLoginCmd(name: string): string {
+  switch (name) {
+    case 'claude': return 'claude login';
+    case 'codex': return 'codex login';
+    case 'gemini': return 'gemini';
+    default: return `${name} login`;
+  }
+}
+
+/**
+ * Localized "CLI present but NOT logged in" diagnostic (EN default, TR provided).
+ * Local i18n: messages.ts is outside this task's write-scope (Task 270-008/014);
+ * these two strings live here and can be centralized later.
+ */
+function authProbeLoggedOutLine(name: string, lang: string): string {
+  const cmd = getProviderLoginCmd(name);
+  return lang === 'tr'
+    ? `CLI mevcut ama oturum AÇILMAMIŞ — çalıştırın: ${cmd}`
+    : `CLI present but NOT logged in — run: ${cmd}`;
+}
+
+// ─── F1-IMG Worker Image Readiness Wiring (Sprint 270, Task 270-008) ──────────
+//
+// Surfaces Task 270-007's checkWorkerImage report in the doctor output and, ONLY
+// with the explicit `--fix-image` flag AND an interactive confirmation (ADR-063
+// consent-based provisioning + ADR-011 readline), runs the suggested rebuild.
+// Without the flag (or on decline) the build is NEVER run — default behavior is
+// unchanged.
+
+/**
+ * Render the worker-image readiness report as `[PASS]`/`[WARN]` doctor lines.
+ * `ready` → a single OK line; `missing`/`stale` → a WARN line plus the missing
+ * CLIs / ca-certs and the real `docker build` command (suggestedBuildCmd). Pure,
+ * i18n via getMessage (en+tr).
+ */
+export function formatWorkerImageLines(report: WorkerImageReport, lang: string = 'en'): string[] {
+  const lines: string[] = ['Worker Image:'];
+  if (report.state === 'ready') {
+    lines.push(`  [PASS] ${getMessage('doctor.image_ready', lang)}`);
+    return lines;
+  }
+  lines.push(`  [WARN] ${getMessage('doctor.image_not_ready', lang, { state: report.state })}`);
+  if (report.missingClis.length > 0) {
+    lines.push(`         ${getMessage('doctor.image_missing_clis', lang, { clis: report.missingClis.join(', ') })}`);
+  }
+  if (report.missingCaCerts) {
+    lines.push(`         ${getMessage('doctor.image_missing_cacerts', lang)}`);
+  }
+  lines.push(`         ${getMessage('doctor.image_build_hint', lang, { cmd: report.suggestedBuildCmd })}`);
+  lines.push(`         ${getMessage('doctor.image_fix_hint', lang)}`);
+  return lines;
+}
+
+/** Outcome of {@link maybeFixWorkerImage} — used by callers/tests, never thrown. */
+export type FixImageOutcome = 'disabled' | 'already-ready' | 'declined' | 'built' | 'build-failed';
+
+export interface FixWorkerImageOptions {
+  /** Was `--fix-image` passed? When false, NEVER prompts and NEVER builds. */
+  enabled: boolean;
+  /** Injectable confirm (defaults to interactive y/N via readline, default NO). */
+  confirmFn?: (question: string) => Promise<boolean>;
+  /** Injectable async spawn for the build (defaults to node:child_process spawn). */
+  spawnImpl?: SpawnImpl;
+  /** UI language for prompts/messages (en|tr). Defaults to 'en'. */
+  lang?: string;
+}
+
+/**
+ * Run the suggested `docker build` command, streaming its output to the terminal.
+ * Async spawn (never spawnSync). Resolves with the process exit code (-1 on a
+ * spawn error). The build string is built by us from known argv (no spaced args),
+ * so whitespace-splitting into command + args is safe.
+ */
+function runImageBuild(buildCmd: string, spawnImpl?: SpawnImpl): Promise<number> {
+  const parts = buildCmd.split(/\s+/).filter(Boolean);
+  const command = parts[0] ?? 'docker';
+  const args = parts.slice(1);
+  const spawn: SpawnImpl = spawnImpl ?? ((c, a, o) => nodeSpawn(c, a, o));
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (code: number): void => {
+      if (settled) return;
+      settled = true;
+      resolve(code);
+    };
+    const child = spawn(command, args, { shell: false });
+    child.stdout?.on('data', (chunk: string | Buffer) => process.stdout.write(chunk));
+    child.stderr?.on('data', (chunk: string | Buffer) => process.stderr.write(chunk));
+    child.on('error', () => finish(-1));
+    child.on('close', (code) => finish(code ?? -1));
+  });
+}
+
+/**
+ * Consent-based worker-image rebuild (ADR-063). Returns WITHOUT building unless
+ * (a) `--fix-image` was passed (`enabled`), (b) the image is actually not ready,
+ * AND (c) the user confirms interactively. On confirm, runs suggestedBuildCmd via
+ * async spawn and streams its output. Default behavior (no flag) is a no-op.
+ */
+export async function maybeFixWorkerImage(
+  report: WorkerImageReport,
+  opts: FixWorkerImageOptions,
+): Promise<FixImageOutcome> {
+  const lang = opts.lang ?? 'en';
+  if (!opts.enabled) return 'disabled';
+  if (report.state === 'ready') return 'already-ready';
+
+  const confirmFn = opts.confirmFn ?? ((q: string) => promptConfirm(q, false));
+  const approved = await confirmFn(getMessage('doctor.image_fix_confirm', lang, { cmd: report.suggestedBuildCmd }));
+  if (!approved) {
+    print(getMessage('doctor.image_fix_declined', lang));
+    return 'declined';
+  }
+
+  print(getMessage('doctor.image_fix_running', lang, { cmd: report.suggestedBuildCmd }));
+  const code = await runImageBuild(report.suggestedBuildCmd, opts.spawnImpl);
+  if (code === 0) {
+    print(getMessage('doctor.image_fix_done', lang));
+    return 'built';
+  }
+  print(getMessage('doctor.image_fix_failed', lang, { code: String(code) }));
+  return 'build-failed';
+}
+
 /**
  * Format Connector health check results in [PASS]/[WARN]/[FAIL] style.
  * Includes provider CLI status, .deck file summary, and detected environment.
+ *
+ * When `authProbes` is supplied (PSL-6, Task 270-006), a provider whose CLI is
+ * present but whose probe proves there is NO usable session is downgraded from
+ * the legacy "session auth active" PASS line to an actionable [WARN]. A
+ * 'logged-in'/'unknown'/absent probe leaves existing behavior unchanged.
  */
 export function formatConnectorHealthLines(
   results: HealthCheckResult[],
   root: string,
+  authProbes?: Record<string, AuthProbeResult>,
+  lang: string = 'en',
 ): string[] {
   const lines: string[] = ['Provider Health:'];
 
   for (const r of results) {
     const versionStr = r.cliVersion ? ` ${r.cliVersion}` : '';
-    if (r.available && r.authStatus === 'ok') {
+    const probe = authProbes?.[r.provider];
+    if (r.available && probe?.state === 'logged-out') {
+      // PSL-6: CLI installed but the probe proves no session — louder + actionable.
+      lines.push(`  [WARN] ${capitalize(r.provider)} CLI${versionStr} — ${authProbeLoggedOutLine(r.provider, lang)}`);
+    } else if (r.available && r.authStatus === 'ok') {
       const authLabel = r.provider === 'claude' ? 'session auth active' : 'API key configured';
       lines.push(`  [PASS] ${capitalize(r.provider)} CLI${versionStr} — ${authLabel}`);
     } else if (!r.available) {
@@ -675,13 +862,25 @@ export function formatHumanDoctor(input: HumanDoctorInput): string {
   if (input.projectRoot) {
     if (input.connectorHealthResults) {
       // Use Connector health format with [PASS]/[WARN]/[FAIL]
-      const healthLines = formatConnectorHealthLines(input.connectorHealthResults, input.projectRoot);
+      const healthLines = formatConnectorHealthLines(
+        input.connectorHealthResults,
+        input.projectRoot,
+        input.authProbes,
+        input.lang ?? 'en',
+      );
       lines.push(...healthLines);
     } else {
       // Fall back to legacy format
       const providerHealthLines = formatProviderHealthSection(providers, input.projectRoot);
       lines.push(...providerHealthLines);
     }
+    lines.push('');
+  }
+
+  // --- Worker Image (F1-IMG, Task 270-008) ---
+  // Only present when the docker backend is configured (the action gates it).
+  if (input.workerImage) {
+    lines.push(...formatWorkerImageLines(input.workerImage, input.lang ?? 'en'));
     lines.push('');
   }
 
@@ -1101,7 +1300,8 @@ export function registerDoctor(program: Command): void {
     .option('--providers', 'Show detailed provider diagnostics (binary, version, auth) for Claude/Codex/Gemini')
     .option('--memory', 'Show host RAM detection (/proc/meminfo first, os.totalmem fallback) and suggested max_workers')
     .option('--ram-experiment', 'Show 6-worker × 2g RAM scenario verdict (Safe/Risky) based on current config and host RAM')
-    .action(async (opts: { profile?: boolean; legacy?: boolean; json?: boolean; preFlight?: boolean; providers?: boolean; memory?: boolean; ramExperiment?: boolean }) => {
+    .option('--fix-image', 'Rebuild the worker docker image after an interactive confirmation (ADR-063 consent) when it is missing/stale')
+    .action(async (opts: { profile?: boolean; legacy?: boolean; json?: boolean; preFlight?: boolean; providers?: boolean; memory?: boolean; ramExperiment?: boolean; fixImage?: boolean }) => {
       let root: string;
       try {
         root = resolveProjectRoot();
@@ -1244,6 +1444,21 @@ export function registerDoctor(program: Command): void {
         const lastSprintId = getLastSprintId(root);
         const debtItems = countDebtItems(root);
         const connectorHealthResults = buildConnectorHealthResults(providers);
+        // PSL-6 (Task 270-006): probe real login state in parallel (short timeout)
+        // so "CLI present but NOT logged in" is surfaced, not assumed-OK.
+        const authProbes = await runAuthProbes(providers);
+
+        // F1-IMG (Task 270-008): for the docker backend, report worker-image
+        // readiness. Detection-only; wrapped so a docker hiccup never breaks doctor.
+        let workerImage: WorkerImageReport | undefined;
+        if (spawnBackend === 'docker') {
+          try {
+            const requiredProviders = activeProviderNames.length > 0 ? activeProviderNames : ['claude'];
+            workerImage = await checkWorkerImage({ requiredProviders });
+          } catch {
+            workerImage = undefined;
+          }
+        }
 
         const ciBaseline = readCIBaseline(root);
         const ciReports = readAllCIReports(root, 5);
@@ -1269,7 +1484,16 @@ export function registerDoctor(program: Command): void {
           connectorHealthResults,
           ciBaseline: ciBaseline ?? undefined,
           ciReports,
+          authProbes,
+          workerImage,
+          lang,
         }));
+
+        // F1-IMG consent (ADR-063): only the explicit --fix-image flag, plus an
+        // interactive y/N confirm inside maybeFixWorkerImage, can run the rebuild.
+        if (workerImage && opts.fixImage) {
+          await maybeFixWorkerImage(workerImage, { enabled: true, lang });
+        }
       }
 
       if (opts.profile) {

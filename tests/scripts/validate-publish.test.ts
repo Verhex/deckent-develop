@@ -11,9 +11,13 @@
  * Plus a smoke-pass for the main exports to confirm the wiring is correct.
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync, chmodSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import {
   GATES,
+  BIN_FILES,
   parseSizeToBytes,
   extractMinNodeMajor,
   parsePackOutput,
@@ -23,6 +27,8 @@ import {
   checkNoInternalStateLeak,
   checkAdrLint,
   checkLinkLint,
+  checkBinExecBits,
+  checkDashboardBundle,
   runReadinessGates,
 } from '../../scripts/validate-publish.mjs';
 
@@ -98,10 +104,15 @@ describe('extractMinNodeMajor', () => {
 // ─── Smoke: all exports accessible ───────────────────────────────────────
 
 describe('validate-publish.mjs exports smoke', () => {
-  it('GATES is a non-empty array of strings', () => {
+  it('GATES is a non-empty array of strings with 8 entries', () => {
     expect(Array.isArray(GATES)).toBe(true);
-    expect(GATES.length).toBeGreaterThan(0);
+    expect(GATES.length).toBe(8);
     expect(GATES.every((g: unknown) => typeof g === 'string')).toBe(true);
+  });
+
+  it('BIN_FILES is a non-empty array of strings', () => {
+    expect(Array.isArray(BIN_FILES)).toBe(true);
+    expect(BIN_FILES.length).toBeGreaterThan(0);
   });
 
   it('parsePackOutput is a function', () => {
@@ -134,6 +145,14 @@ describe('validate-publish.mjs exports smoke', () => {
 
   it('checkLinkLint is a function', () => {
     expect(typeof checkLinkLint).toBe('function');
+  });
+
+  it('checkBinExecBits is a function', () => {
+    expect(typeof checkBinExecBits).toBe('function');
+  });
+
+  it('checkDashboardBundle is a function', () => {
+    expect(typeof checkDashboardBundle).toBe('function');
   });
 
   it('runReadinessGates is a function', () => {
@@ -214,7 +233,7 @@ describe('runReadinessGates — edge cases', () => {
     expect(result.summary.passed).toBeGreaterThan(0);
   });
 
-  it('returns exactly 6 checks', () => {
+  it('returns exactly 8 checks (including bin_exec_bits and dashboard_bundle)', () => {
     const packOutput = [
       'npm notice === Tarball Contents ===',
       'npm notice 1kB dist/index.js',
@@ -230,6 +249,152 @@ describe('runReadinessGates — edge cases', () => {
       linkResult: { exitCode: 0, stdout: '' },
     });
 
-    expect(result.checks).toHaveLength(6);
+    expect(result.checks).toHaveLength(8);
+  });
+});
+
+// ─── checkBinExecBits ─────────────────────────────────────────────────────
+
+describe('checkBinExecBits', () => {
+  let tmpRoot = '';
+
+  afterEach(() => {
+    if (tmpRoot) {
+      rmSync(tmpRoot, { recursive: true, force: true });
+      tmpRoot = '';
+    }
+  });
+
+  function makeTmpRoot(): string {
+    tmpRoot = mkdtempSync(join(tmpdir(), 'deckent-test-bin-'));
+    return tmpRoot;
+  }
+
+  it('passes when all bin files exist and are executable', () => {
+    const root = makeTmpRoot();
+    for (const rel of BIN_FILES) {
+      const p = join(root, rel);
+      mkdirSync(join(root, rel.replace(/\/[^/]+$/, '')), { recursive: true });
+      writeFileSync(p, '#!/usr/bin/env node\n');
+      chmodSync(p, 0o755);
+    }
+    const result = checkBinExecBits(root);
+    expect(result.gate).toBe('bin_exec_bits');
+    expect(result.ok).toBe(true);
+  });
+
+  it('fails when bin files are missing', () => {
+    const root = makeTmpRoot();
+    const result = checkBinExecBits(root);
+    expect(result.ok).toBe(false);
+    expect(result.severity).toBe('error');
+    expect(result.message).toMatch(/npm run build:all/);
+    expect(result.message).toMatch(/missing/i);
+  });
+
+  it('fails when bin files exist but have no execute bit (mode 644)', () => {
+    const root = makeTmpRoot();
+    for (const rel of BIN_FILES) {
+      const p = join(root, rel);
+      mkdirSync(join(root, rel.replace(/\/[^/]+$/, '')), { recursive: true });
+      writeFileSync(p, '#!/usr/bin/env node\n');
+      chmodSync(p, 0o644); // rw-r--r-- — no exec bit
+    }
+    const result = checkBinExecBits(root);
+    expect(result.ok).toBe(false);
+    expect(result.severity).toBe('error');
+    expect(result.message).toMatch(/execute bit/i);
+    expect(result.message).toMatch(/npm run build:all/);
+  });
+
+  it('fails with actionable message listing missing file path', () => {
+    const root = makeTmpRoot();
+    // create only the first bin file
+    const rel = BIN_FILES[0]!;
+    mkdirSync(join(root, rel.replace(/\/[^/]+$/, '')), { recursive: true });
+    writeFileSync(join(root, rel), '');
+    chmodSync(join(root, rel), 0o755);
+    const result = checkBinExecBits(root);
+    expect(result.ok).toBe(false);
+    // the second bin file should be mentioned
+    expect(result.message).toContain(BIN_FILES[1]);
+  });
+});
+
+// ─── checkDashboardBundle ─────────────────────────────────────────────────
+
+describe('checkDashboardBundle', () => {
+  let tmpRoot = '';
+
+  afterEach(() => {
+    if (tmpRoot) {
+      rmSync(tmpRoot, { recursive: true, force: true });
+      tmpRoot = '';
+    }
+  });
+
+  function makeTmpRoot(): string {
+    tmpRoot = mkdtempSync(join(tmpdir(), 'deckent-test-dash-'));
+    return tmpRoot;
+  }
+
+  function makeFullDashboard(root: string): void {
+    const assetsDir = join(root, 'dist', 'dashboard', 'assets');
+    mkdirSync(assetsDir, { recursive: true });
+    writeFileSync(join(root, 'dist', 'dashboard', 'index.html'), '<html></html>');
+    writeFileSync(join(assetsDir, 'index-abc123.js'), 'console.log(1)');
+  }
+
+  it('passes when index.html and assets bundle are present', () => {
+    const root = makeTmpRoot();
+    makeFullDashboard(root);
+    const result = checkDashboardBundle(root);
+    expect(result.gate).toBe('dashboard_bundle');
+    expect(result.ok).toBe(true);
+    expect(result.message).toContain('index-abc123.js');
+  });
+
+  it('fails when index.html is missing', () => {
+    const root = makeTmpRoot();
+    const result = checkDashboardBundle(root);
+    expect(result.ok).toBe(false);
+    expect(result.severity).toBe('error');
+    expect(result.message).toContain('index.html');
+    expect(result.message).toMatch(/npm run build:all/);
+  });
+
+  it('fails when index.html exists but no js bundle in assets/', () => {
+    const root = makeTmpRoot();
+    const dashDir = join(root, 'dist', 'dashboard');
+    mkdirSync(join(dashDir, 'assets'), { recursive: true });
+    writeFileSync(join(dashDir, 'index.html'), '<html></html>');
+    // no js file in assets
+    const result = checkDashboardBundle(root);
+    expect(result.ok).toBe(false);
+    expect(result.severity).toBe('error');
+    expect(result.message).toMatch(/index-\*\.js/);
+    expect(result.message).toMatch(/npm run build:all/);
+  });
+
+  it('fails when assets/ directory is missing entirely', () => {
+    const root = makeTmpRoot();
+    const dashDir = join(root, 'dist', 'dashboard');
+    mkdirSync(dashDir, { recursive: true });
+    writeFileSync(join(dashDir, 'index.html'), '<html></html>');
+    // no assets dir
+    const result = checkDashboardBundle(root);
+    expect(result.ok).toBe(false);
+    expect(result.message).toMatch(/npm run build:all/);
+  });
+
+  it('ignores non-index js files (css, other bundles)', () => {
+    const root = makeTmpRoot();
+    const assetsDir = join(root, 'dist', 'dashboard', 'assets');
+    mkdirSync(assetsDir, { recursive: true });
+    writeFileSync(join(root, 'dist', 'dashboard', 'index.html'), '<html></html>');
+    // only a CSS file present — no matching index-*.js
+    writeFileSync(join(assetsDir, 'index-abc123.css'), '.app{}');
+    const result = checkDashboardBundle(root);
+    expect(result.ok).toBe(false);
   });
 });

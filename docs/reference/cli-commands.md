@@ -427,11 +427,16 @@ Check system dependencies and health.
 | `--legacy` | Use legacy output format |
 | `--json` | Output results as JSON |
 | `--pre-flight` | Run pre-flight health check before sprint spawn |
+| `--fix-image` | Enable interactive worker image rebuild (consent-based, ADR-063) |
+
+**Provider Auth Probing:**
+Doctor now probes configured provider auth status (logged in, logged out, or unknown) and displays warnings when a CLI is present but not logged in.
 
 **Example:**
 ```bash
 deckent doctor
 deckent doctor --pre-flight --json
+deckent doctor --fix-image
 ```
 
 **MCP:** `deckent_doctor`
@@ -1050,10 +1055,22 @@ Start HTTP API server with SSE support.
 | `--dev` | Enable dev proxy mode (expects Vite dev server) |
 | `--dev-port <number>` | Vite dev server port for --dev proxy mode |
 
+**First-Run Output:**
+On startup, `deckent serve` displays a user-friendly banner showing:
+- Dashboard URL and token status (API token auto-injected for localhost)
+- Terminal mode status
+- Stop hints (Ctrl+C)
+- Port and host configuration tips
+
+**Rate Limiting:**
+By default, loopback requests (localhost, 127.0.0.1, ::1) are exempt from rate limiting (configurable via `rateLimitExemptLoopback` in config).
+
 **Example:**
 ```bash
 deckent serve --port 3000
 deckent serve --dev --dev-port 5173
+deckent serve
+# Outputs dashboard URL + token + terminal mode + shutdown hints
 ```
 
 ---

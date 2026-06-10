@@ -24,8 +24,8 @@
  */
 
 import { execSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 
 // ─── Gate catalog ──────────────────────────────────────────────────────────
 
@@ -37,7 +37,16 @@ export const GATES = [
   'no_internal_state_leak',
   'adr_lint',
   'link_lint',
+  'bin_exec_bits',
+  'dashboard_bundle',
 ];
+
+/**
+ * Bin entry files that must exist and carry execute bit after build.
+ * Mirrors scripts/copy-assets.mjs:25 (BIN_FILES) — keep in sync.
+ * @type {readonly string[]}
+ */
+export const BIN_FILES = ['dist/cli/entry.js', 'dist/mcp/server.js'];
 
 // Sprint 180 fix-task calibration (180-012-fix): original 2 MB threshold was a
 // pre-implementation guess. Measured reality with full product (incl. bundled
@@ -334,6 +343,105 @@ export function checkLinkLint(cmdResult) {
   };
 }
 
+// ─── Gate 7: bin execute bits ─────────────────────────────────────────────
+
+/**
+ * Verify every BIN_FILES entry exists and has at least one execute bit set.
+ * Catches bare `tsc` / `npm run dev` builds that skip copy-assets chmod step.
+ * @param {string} projectRoot
+ * @returns {{ gate: string, ok: boolean, severity: 'info'|'warning'|'error', message: string }}
+ */
+export function checkBinExecBits(projectRoot) {
+  /** @type {string[]} */
+  const missing = [];
+  /** @type {string[]} */
+  const noExec = [];
+
+  for (const rel of BIN_FILES) {
+    const p = join(projectRoot, rel);
+    try {
+      const st = statSync(p);
+      if ((st.mode & 0o111) === 0) {
+        noExec.push(rel);
+      }
+    } catch {
+      missing.push(rel);
+    }
+  }
+
+  if (missing.length > 0) {
+    return {
+      gate: 'bin_exec_bits',
+      ok: false,
+      severity: 'error',
+      message: `Binary files missing — run npm run build:all: ${missing.join(', ')}`,
+    };
+  }
+
+  if (noExec.length > 0) {
+    return {
+      gate: 'bin_exec_bits',
+      ok: false,
+      severity: 'error',
+      message: `Binary files missing execute bit — run npm run build:all: ${noExec.join(', ')}`,
+    };
+  }
+
+  return {
+    gate: 'bin_exec_bits',
+    ok: true,
+    severity: 'info',
+    message: `All ${BIN_FILES.length} bin files present and executable`,
+  };
+}
+
+// ─── Gate 8: dashboard bundle ─────────────────────────────────────────────
+
+/**
+ * Verify that the dashboard bundle was built: index.html + assets/index-*.js.
+ * A publish without the dashboard build produces a hollow `deckent serve`.
+ * @param {string} projectRoot
+ * @returns {{ gate: string, ok: boolean, severity: 'info'|'warning'|'error', message: string }}
+ */
+export function checkDashboardBundle(projectRoot) {
+  const htmlPath = join(projectRoot, 'dist', 'dashboard', 'index.html');
+  try {
+    statSync(htmlPath);
+  } catch {
+    return {
+      gate: 'dashboard_bundle',
+      ok: false,
+      severity: 'error',
+      message: 'dist/dashboard/index.html missing — run npm run build:all',
+    };
+  }
+
+  const assetsDir = join(projectRoot, 'dist', 'dashboard', 'assets');
+  /** @type {string | undefined} */
+  let jsBundle;
+  try {
+    jsBundle = readdirSync(assetsDir).find((e) => /^index-.*\.js$/.test(e));
+  } catch {
+    // assetsDir unreadable → treat as missing
+  }
+
+  if (!jsBundle) {
+    return {
+      gate: 'dashboard_bundle',
+      ok: false,
+      severity: 'error',
+      message: 'dist/dashboard/assets/index-*.js bundle missing — run npm run build:all',
+    };
+  }
+
+  return {
+    gate: 'dashboard_bundle',
+    ok: true,
+    severity: 'info',
+    message: `Dashboard bundle present: assets/${jsBundle}`,
+  };
+}
+
 // ─── Aggregator ───────────────────────────────────────────────────────────
 
 /**
@@ -342,9 +450,11 @@ export function checkLinkLint(cmdResult) {
  *   pkg: { engines?: { node?: string }, main?: string, types?: string },
  *   adrResult: { exitCode: number, stdout?: string },
  *   linkResult: { exitCode: number, stdout?: string },
+ *   projectRoot?: string,
  * }} input
  */
 export function runReadinessGates(input) {
+  const root = input.projectRoot ?? process.cwd();
   const checks = [
     checkPackSizeAndCount(input.packOutput),
     checkEnginesNode(input.pkg),
@@ -352,6 +462,8 @@ export function runReadinessGates(input) {
     checkNoInternalStateLeak(input.packOutput),
     checkAdrLint(input.adrResult),
     checkLinkLint(input.linkResult),
+    checkBinExecBits(root),
+    checkDashboardBundle(root),
   ];
 
   const passed = checks.filter((c) => c.ok).length;
@@ -412,6 +524,7 @@ export function runCli(projectRoot) {
     pkg,
     adrResult,
     linkResult,
+    projectRoot: root,
   });
 
   return result;
@@ -420,7 +533,7 @@ export function runCli(projectRoot) {
 const entryArg = process.argv[1] ?? '';
 if (entryArg.endsWith('validate-publish.mjs')) {
   const projectRoot = resolve(process.argv[2] ?? '.');
-  console.log('\n  npm publish readiness — 6 gate validation\n');
+  console.log('\n  npm publish readiness — 8 gate validation\n');
 
   const result = runCli(projectRoot);
 

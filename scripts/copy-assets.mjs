@@ -11,6 +11,7 @@
 
 import { chmodSync, copyFileSync, existsSync, mkdirSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const ROOT = join(import.meta.dirname ?? dirname(new URL(import.meta.url).pathname), '..');
 const SRC = join(ROOT, 'src');
@@ -22,7 +23,26 @@ const DIST = join(ROOT, 'dist');
 const ASSET_EXTENSIONS = ['.json', '.md', '.template'];
 
 /** Bin entries from package.json — must have execute bit (Sprint 154 audit A2.F6/A3.F1). */
-const BIN_FILES = ['dist/cli/entry.js', 'dist/mcp/server.js'];
+export const BIN_FILES = ['dist/cli/entry.js', 'dist/mcp/server.js'];
+
+/**
+ * Ensure all BIN_FILES have execute bit (0o755).
+ * Safe to call after bare `tsc` / `tsc --watch` which strips mode bits.
+ * @param {string} [root] - project root directory (defaults to this file's parent)
+ * @returns {number} count of files chmodded
+ */
+export function ensureBinExecutable(root) {
+  const resolvedRoot = root ?? ROOT;
+  let count = 0;
+  for (const rel of BIN_FILES) {
+    const p = join(resolvedRoot, rel);
+    if (existsSync(p)) {
+      chmodSync(p, 0o755);
+      count++;
+    }
+  }
+  return count;
+}
 
 function walk(dir) {
   const results = [];
@@ -46,32 +66,33 @@ function walk(dir) {
   return results;
 }
 
-let copied = 0;
-const assets = walk(SRC);
-for (const src of assets) {
-  const rel = relative(SRC, src);
-  const dst = join(DIST, rel);
-  mkdirSync(dirname(dst), { recursive: true });
-  copyFileSync(src, dst);
-  copied++;
-}
+const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
-if (copied === 0) {
-  console.log('copy-assets: no assets to copy');
-} else {
-  console.log(`copy-assets: copied ${copied} file${copied === 1 ? '' : 's'} to dist/`);
-}
+if (isMain) {
+  const fixBinOnly = process.argv.includes('--fix-bin-only');
 
-// Sprint 154 A2.F6/A3.F1 fix: tsc does not propagate Unix mode bits, so dist/ bin
-// files end up -rw-r--r-- (644) and `npx deckent` fails with EACCES. Restore +x.
-let chmodCount = 0;
-for (const rel of BIN_FILES) {
-  const p = join(ROOT, rel);
-  if (existsSync(p)) {
-    chmodSync(p, 0o755);
-    chmodCount++;
+  if (!fixBinOnly) {
+    let copied = 0;
+    const assets = walk(SRC);
+    for (const src of assets) {
+      const rel = relative(SRC, src);
+      const dst = join(DIST, rel);
+      mkdirSync(dirname(dst), { recursive: true });
+      copyFileSync(src, dst);
+      copied++;
+    }
+
+    if (copied === 0) {
+      console.log('copy-assets: no assets to copy');
+    } else {
+      console.log(`copy-assets: copied ${copied} file${copied === 1 ? '' : 's'} to dist/`);
+    }
   }
-}
-if (chmodCount > 0) {
-  console.log(`copy-assets: chmod +x ${chmodCount} bin file${chmodCount === 1 ? '' : 's'}`);
+
+  // Sprint 154 A2.F6/A3.F1 fix: tsc does not propagate Unix mode bits, so dist/ bin
+  // files end up -rw-r--r-- (644) and `npx deckent` fails with EACCES. Restore +x.
+  const chmodCount = ensureBinExecutable(ROOT);
+  if (chmodCount > 0) {
+    console.log(`copy-assets: chmod +x ${chmodCount} bin file${chmodCount === 1 ? '' : 's'}`);
+  }
 }

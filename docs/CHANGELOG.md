@@ -2,6 +2,24 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint270] - 2026-06-10
+
+### Added
+
+- validate-publish güçlendirme — exec-bit + dashboard-bundle assertion'ları
+- npm pack hermetik smoke — paketten kurulan deckent gerçekten açılıyor
+- README quickstart — 3-komut kurulum çıtası
+- dev/tsc exec-bit kaybı kökü — watch yolunda da +x garantisi
+- PSL-6 doctor auth-probe — CLI var ≠ login; gerçek oturum durumu
+- doctor wire — auth-probe satırları ("CLI var ama login DEĞİL" görünür)
+- F1-IMG part 1 — worker-image readiness denetim modülü
+- F1-IMG part 2 — doctor satırı + consent-based rebuild önerisi (ADR-063)
+- docs/reference/multi-provider.md — kod-gerçeği rewrite (W-K #8a)
+- docs/guide/multi-provider.md — rehber senkronu (W-K #8b)
+
+
+_Tasks: 20 total, 20 done, 0 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint269] - 2026-06-10
 
 ### Added

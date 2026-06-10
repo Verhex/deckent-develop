@@ -13,11 +13,14 @@ async function importDetect() {
 }
 
 describe('ci-baseline-detect', () => {
-  it('README badge contains sprint 214 (not stale 190)', () => {
+  it('README sprint badge is current (>= 214, never the stale 190)', () => {
     expect(fs.existsSync(README_PATH)).toBe(true);
     const readme = fs.readFileSync(README_PATH, 'utf-8');
-    // Must have 21X or 214 (updated sprint)
-    expect(readme).toMatch(/21[0-9]|214/);
+    // Code-derived guard (Sprint 270): the literal "21X" expectation went stale
+    // the moment the badge advanced past 219 — parse the actual badge count.
+    const badge = readme.match(/sprints-(\d+)%2B/);
+    expect(badge).not.toBeNull();
+    expect(Number(badge![1])).toBeGreaterThanOrEqual(214);
     // Must NOT have old 190+ badge as the sprint count
     expect(readme).not.toMatch(/sprints-190%2B/);
   });
