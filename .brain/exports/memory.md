@@ -1,5 +1,19 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-276 Learnings
+- Sprint sprint-276 Learnings: ## Sprint sprint-276 Learnings
+
+## Gains
+- 276-001 — directive-interrogator çekirdeği — zorlayıcı soru üretimi + taslak öneri — PLAN-INT-1 core delivered.
+- 276-002 — interrogation config + i18n soru sözlüğü — Added PlanConfig interface + plan? field to DeckentConfig and ResolvedConfig in config-types.ts.
+- 276-003 — deckent plan --interrogate CLI wire — Implemented PLAN-INT-1 CLI wire: (1) Added runInterrogation() as an exported, injectable function...
+- 276-004 — cross-verify çekirdeği — high-stakes tespit + farklı-provider seçimi — XVER-1 pure decision layer.
+- 276-005 — cross_verify config bloğu (default-off) — Added CrossVerifyConfig interface to config-types.ts (near CacheWarmConfig/ResourceMonitorConfig ...
+- 276-006 — adversarial-refute prompt builder — XVER-1 adversarial prompt builder.
+- 276-007 — cross-verify dispatch + eval advisory-wire (OPUS) — XVER-1 dispatch + eval advisory-wire.
+- 276-008 — cross-verify outcome-tracker beslemesi — öğrenilen verifier eşleşmeleri — Added OutcomeTracker.recordCrossVerifyVerdict() method (~38 LoC including JSDoc) that feeds cross...
+- …and 4 more delivered
+
 ## Sprint sprint-275 Learnings
 - Sprint sprint-275 Learnings: ## Sprint sprint-275 Learnings
 

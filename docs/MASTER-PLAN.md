@@ -143,6 +143,8 @@ Three immovable pillars (Alperen-approved 2026-05-31):
 | Faz 1.5 | Prompt/persona cleanup (goCriteria language fix, persona "full suite" audit, ADR-seçici explicit refs) | ✅ Sprint 273: criteria-deriver targeted-verify language + persona full-suite → targeted + adr-selector explicit-ref force-include |
 | Faz 2 | First-worker bootstrap cache strategy + cache-gate measurement (cache-warm spawn 274-002 + cache-gate evaluator 274-003 + ADR-037 operative + kind-limitlers config) | ✅ Sprint 274: cache-warm spawn, cache-gate measurement, ADR-037 operative CC-written, kind-limitlers config-wired |
 | Faz 2 A/B Verification | Sprint 275 kanıt-sprint — usage yüzey paritesi proof (/usage + /resources slash, deckent_usage MCP tool, 010-debt kapanışı; final A/B ölçümü CC raporunda) | ✅ Sprint 275: /usage + /resources REPL slash (3-KATMAN), deckent_usage MCP (33→34 tool), 010-debt closure, proof-of-function; final measurement (cache-gate PASS teyidi + task-başı cost ≤$0.45) CC sprint-sonu raporunda |
+| PLAN-INT-1 | Pre-PLAN interrogation (Core + `deckent plan --interrogate` CLI + `/interrogate` REPL slash; LLM-zenrichment optional-kalan) | ✅ Sprint 276: core `directive-interrogator.ts` + config wire + CLI/REPL slash complete; orphan structure oluşturma/doğrulama tested |
+| XVER-1 | Cross-provider adversarial verify (Core + dispatch-wire + outcome-feed, default-off; canlı multi-provider kanıtı kalan) | ✅ Sprint 276: core `cross-verify.ts` + decision-layer + prompt-builder + dispatch-wire + advisory-insert complete; default-off + fail-safe |
 | Kalan | Haftalık usage gözden geçirme (continuous-izleme) | ⬜ post-GA — ongoing monitoring, no sprint scope |
 
 ### F2 — Native Chat — **~95%**

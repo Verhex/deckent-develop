@@ -158,12 +158,14 @@ Plan a sprint without executing it.
 
 | Option | Description |
 |--------|-------------|
+| `--interrogate` | Pre-plan interrogation: challenge DIRECTIVES with 5 structural questions (pain-vs-feature, narrowest wedge, hidden capabilities, premises, effort alternatives), suggest revisions before PLAN phase. Optional: skipped silently with `--no-confirm` or in non-interactive mode. |
 | `--no-confirm` | Skip confirmation, auto-approve plan |
 | `--structured` | Force structured parsing (skip AI) |
 | `--dry-run` | Show plan without writing task files to disk |
 
 **Example:**
 ```bash
+deckent plan --interrogate
 deckent plan --structured
 deckent plan --dry-run
 ```
@@ -1221,6 +1223,28 @@ Show transcript-based token and limit usage accounting from the REPL.
 ```
 
 **MCP Tool:** `deckent_usage`
+
+---
+
+### `/interrogate`
+
+Pre-plan interrogation from the REPL: inspect current DIRECTIVES.md and generate 5 structural questions challenging the sprint goals.
+
+Provides:
+- **Pain-vs-feature:** Is this solving a real pain or an aspirational request?
+- **Narrowest wedge:** What is the smallest shippable value?
+- **Hidden capabilities:** What existing features could solve this partially?
+- **Premise assumptions:** What could invalidate the sprint goal?
+- **Effort alternatives:** Are there faster approaches?
+
+Questions are displayed in the REPL with a header prompt. DIRECTIVES.md is never modified by the slash command — use `/interrogate` to explore, then manually update DIRECTIVES.md and run `deckent plan --interrogate` to apply the full flow (questions + answer collection + draft suggestions).
+
+**Example:**
+```
+/interrogate
+```
+
+This command displays the current DIRECTIVES.md's goal and tasks, then lists 5 structured interrogation questions. No arguments or flags.
 
 ---
 

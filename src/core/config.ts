@@ -837,6 +837,29 @@ export function validateConfig(config: DeckentConfig): string[] {
     }
   }
 
+  // ─── Cross Verify validation (Sprint 276 XVER-1) ─────────────────────
+  if (config.cross_verify !== undefined) {
+    const cv = config.cross_verify;
+    if (typeof cv.enabled !== 'boolean') {
+      errors.push('cross_verify.enabled must be a boolean');
+    }
+    if (cv.high_stakes_only !== undefined && typeof cv.high_stakes_only !== 'boolean') {
+      errors.push('cross_verify.high_stakes_only must be a boolean');
+    }
+    if (cv.verifier_priority !== undefined) {
+      if (!Array.isArray(cv.verifier_priority)) {
+        errors.push('cross_verify.verifier_priority must be an array of strings');
+      } else {
+        for (const item of cv.verifier_priority) {
+          if (typeof item !== 'string') {
+            errors.push('cross_verify.verifier_priority must be an array of strings');
+            break;
+          }
+        }
+      }
+    }
+  }
+
   // ─── deckent_style validation ───────────────────────────────────────
   if (config.deckent_style !== undefined && !['sprint', 'task'].includes(config.deckent_style)) {
     errors.push(`Invalid value '${config.deckent_style}' for field 'deckent_style'. Valid options: sprint, task`);
@@ -866,6 +889,11 @@ export function validateConfig(config: DeckentConfig): string[] {
         `Invalid value '${config.prompt.adr_render}' for field 'prompt.adr_render'. Valid: ${validAdrRender.join(', ')}.`,
       );
     }
+  }
+
+  // ─── Plan config validation (Sprint 276 PLAN-INT-1) ─────────────────
+  if (config.plan?.interrogate !== undefined && typeof config.plan.interrogate !== 'boolean') {
+    errors.push(`Invalid value '${String(config.plan.interrogate)}' for field 'plan.interrogate'. Must be a boolean.`);
   }
 
   // ─── Chat config validation (Sprint 221 Task 221-010) ───────────────
@@ -1434,6 +1462,8 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
     resource_monitor: config.resource_monitor,
     // Cache Warm — passed through from project config (opt-in, absent = disabled)
     cache_warm: config.cache_warm,
+    // Plan config (Sprint 276 PLAN-INT-1) — passed through (opt-in, absent = disabled)
+    plan: config.plan,
     // Messaging connectors (BOT-001) — passed through; tokens .deck-interpolated below.
     notify_connectors: (config as DeckentConfig).notify_connectors,
     notify_on_complete: (config as DeckentConfig).notify_on_complete,
@@ -2096,6 +2126,8 @@ export function mergeConfigs(
     resource_monitor: config.resource_monitor,
     // Cache Warm — passed through (opt-in, absent = disabled)
     cache_warm: config.cache_warm,
+    // Plan config (Sprint 276 PLAN-INT-1) — passed through (opt-in, absent = disabled)
+    plan: config.plan,
   };
   return merged;
 }

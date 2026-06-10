@@ -28,6 +28,7 @@ import {
   renderResumedHistory,
 } from './chat-resume.js';
 import { getMessage } from '../helpers/messages.js';
+import { buildInterrogationQuestions } from '../../core/directive-interrogator.js';
 
 // ═══ chat-native — Path C tool-use loop iskelet (Sprint 203 T-203-005) ═══
 //
@@ -506,6 +507,30 @@ export async function runChatNativeLoop(opts: ChatNativeOptions): Promise<ChatMe
         }
       }
       output(emitText);
+      continue;
+    }
+    // Sprint 276 T-276-009 — `/interrogate` slash wire (PLAN-INT-1).
+    // REPL-içi meta-komut: reads DIRECTIVES.md, builds structural interrogation
+    // questions via buildInterrogationQuestions, and renders them inline.
+    // No CLI-spawn, no tool-bridge — pure file read + pure fn call.
+    // Tests inject opts.projectRoot for hermetic file I/O (same pattern as /directives).
+    if (line === '/interrogate' || line.startsWith('/interrogate ')) {
+      const interrRoot = opts.projectRoot ?? process.cwd();
+      let interrText: string;
+      try {
+        const dirContent = readFileSync(join(interrRoot, DIRECTIVES_FILE), 'utf-8');
+        const questions = buildInterrogationQuestions(dirContent, { lang });
+        const intro = getMessage('interrogate.intro', lang);
+        const numbered = questions.map((q, i) => `${i + 1}. ${q.text}`).join('\n');
+        interrText = `${intro}\n\n${numbered}`;
+      } catch {
+        interrText = getMessage('chat.directives_not_found', lang, { root: interrRoot });
+      }
+      output(interrText);
+      transcript.push({ role: 'user', content: line });
+      transcript.push({ role: 'assistant', content: interrText });
+      memStore?.appendChatTurn(sessionId, 'user', line);
+      memStore?.appendChatTurn(sessionId, 'assistant', interrText);
       continue;
     }
     // Sprint 222 T-222-005 — slash registry wire. Extended slash commands

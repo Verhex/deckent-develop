@@ -1,0 +1,76 @@
+{
+  "taskId": "276-005",
+  "sprintId": "sprint-276",
+  "steps": [
+    {
+      "step": 2,
+      "name": "routing-step-2",
+      "input": {
+        "taskId": "276-005",
+        "title": "cross_verify config bloğu (default-off)",
+        "scope": [
+          "src/core/",
+          "tests/core/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "api-builder",
+        "skills": [
+          "typescript-expert",
+          "testing-expert"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Agent forced by override: api-builder"
+    },
+    {
+      "step": 4,
+      "name": "routing-step-4",
+      "input": {
+        "taskId": "276-005",
+        "title": "cross_verify config bloğu (default-off)",
+        "scope": [
+          "src/core/",
+          "tests/core/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "api-builder",
+        "skills": [
+          "typescript-expert",
+          "testing-expert"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Skill budget: max 2 (medium task, 1 module(s), effort=normal)"
+    },
+    {
+      "step": 5,
+      "name": "routing-step-5",
+      "input": {
+        "taskId": "276-005",
+        "title": "cross_verify config bloğu (default-off)",
+        "scope": [
+          "src/core/",
+          "tests/core/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "api-builder",
+        "skills": [
+          "typescript-expert",
+          "testing-expert"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Skills forced by override: [typescript-expert, testing-expert]"
+    }
+  ],
+  "decidedAt": "2026-06-10T19:49:53.977Z"
+}

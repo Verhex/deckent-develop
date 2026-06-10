@@ -7535,3 +7535,36 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 275-008: MASTER-PLAN — F1-TOK durum konsolidasyonu (DONE)
 
 ---
+## Sprint 276 — sprint-276
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-06-10
+**Duration:** 1524s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 12 |
+| Completed | 12 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 1524456ms |
+
+### Tasks
+
+- 276-001: directive-interrogator çekirdeği — zorlayıcı soru üretimi + taslak öneri (DONE)
+- 276-002: interrogation config + i18n soru sözlüğü (DONE)
+- 276-003: deckent plan --interrogate CLI wire (DONE)
+- 276-004: cross-verify çekirdeği — high-stakes tespit + farklı-provider seçimi (DONE)
+- 276-005: cross_verify config bloğu (default-off) (DONE)
+- 276-006: adversarial-refute prompt builder (DONE)
+- 276-007: cross-verify dispatch + eval advisory-wire (OPUS) (DONE)
+- 276-008: cross-verify outcome-tracker beslemesi — öğrenilen verifier eşleşmeleri (DONE)
+- 276-009: REPL /interrogate slash — pre-plan sorgulamaya REPL erişimi (DONE)
+- 276-010: api-surface + config-reference — yeni alanlar (DONE)
+- 276-011: features + cli-commands — PLAN-INT/XVER satırları (DONE)
+- 276-012: MASTER-PLAN — PLAN-INT-1 + XVER-1 kapanış işaretleri (DONE)
+
+---

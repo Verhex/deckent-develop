@@ -232,6 +232,45 @@ export class OutcomeTracker {
   }
 
   /**
+   * Feed a cross-verify verdict as a ROUTE-1 learning signal on agent + skill performance.
+   *
+   * Advisory: does NOT change the official evaluation, does NOT bump totalOutcomes (the task
+   * was already counted by recordOutcome), and does NOT write a sprint outcome file entry.
+   * REFUTED  → negative signal (isSuccess=false) to agent + skill performance + synergy.
+   * CONFIRMED → positive signal (isSuccess=true) to agent + skill performance + synergy.
+   * unclear  → no-op (honest non-result — no signal injected).
+   *
+   * ADR-070: purely advisory — no evaluation mutation; Brain/human decides what to do
+   * with repeated REFUTED signals (e.g. reroute the next sprint via reclassifyTaskOutcome).
+   */
+  recordCrossVerifyVerdict(
+    agentId: string | null,
+    skillIds: string[],
+    verdict: 'refuted' | 'confirmed' | 'unclear',
+    intent: IntentType = 'implementation',
+  ): void {
+    if (verdict === 'unclear') return;
+
+    const isSuccess = verdict === 'confirmed';
+
+    if (agentId && agentId !== 'generic') {
+      this.updateEntityPerformance(this.learnings.agentPerformance, agentId, intent, isSuccess);
+    }
+    for (const skillId of skillIds) {
+      this.updateEntityPerformance(this.learnings.skillPerformance, skillId, intent, isSuccess);
+    }
+    // Update synergy for agent+skill pairs (mirrors recordOutcome pattern).
+    if (agentId && agentId !== 'generic') {
+      for (const skillId of skillIds) {
+        this.updateSynergy(`${agentId}+${skillId}`, isSuccess);
+      }
+    }
+
+    this.learnings.updatedAt = new Date().toISOString();
+    this.saveLearnings();
+  }
+
+  /**
    * Reclassify the evaluation of a previously recorded outcome.
    *
    * Idempotent: if the new decision matches the current one, returns `changed: false`

@@ -151,6 +151,13 @@ const SLASH_CATALOG: readonly SlashCommand[] = [
     desc: 'Bekleyen nervous bildirimleri (örn: /nervous accept <id>)',
   },
   {
+    // Meta-command: handled directly in chat-native.ts BEFORE the registry
+    // (PLAN-INT-1 Sprint 276 Task 9). Lists structural interrogation questions
+    // from the current DIRECTIVES.md — no CLI-spawn, no tool-bridge required.
+    name: '/interrogate',
+    desc: 'DIRECTIVES sorgulama sorularını göster (pre-plan PLAN-INT-1)',
+  },
+  {
     // Meta-command: handled in the chat loop (chat-resume) BEFORE the registry.
     name: '/resume',
     desc: 'Önceki sohbet oturumunu sürdür (örn: /resume 1)',

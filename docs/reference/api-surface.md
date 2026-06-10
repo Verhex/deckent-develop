@@ -72,9 +72,24 @@ Each completed task writes `.tasks/task-{id}.result`:
     "scope_compliance": 100,
     "documentation": 70
   },
-  "evaluationDecision": "DONE | GO_WITH_TECH_DEBT | NO_GO"
+  "evaluationDecision": "DONE | GO_WITH_TECH_DEBT | NO_GO",
+  "crossVerify": {
+    "verifier": "string (provider name that performed the verification)",
+    "verdict": "refuted | confirmed | unclear (adversarial verification outcome)",
+    "reason": "string (explanation of the verdict)"
+  }
 }
 ```
+
+**Note on `crossVerify` field:**
+
+- **When present:** Only written to `.result` when `config.cross_verify.enabled: true` AND the task was high-stakes (or any task if `high_stakes_only: false`) AND a verifier provider was available.
+- **When absent:** Omitted from the result entirely if cross-verify is disabled or verification was skipped.
+- **Verdict meanings:**
+  - `refuted` — The verifier found issues with the task result; advisory warning that the task may need review.
+  - `confirmed` — The verifier independently validated the task result; advisory confirmation.
+  - `unclear` — The verifier output was inconclusive or uninterpretable; no strong signal either way.
+- **Impact on decision:** The `crossVerify` field is advisory only. Task `selfAssessment` and `evaluationDecision` are NOT downgraded based on this field. Human/Brain review decides next steps (FIX retry, approval, or acceptance as-is).
 
 ## Sprint Phases
 

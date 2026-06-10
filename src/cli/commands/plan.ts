@@ -1,3 +1,6 @@
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { createInterface } from 'node:readline/promises';
 import type { Command } from 'commander';
 import { loadConfig } from '../../core/config.js';
 import { bootstrapProviders } from '../../core/provider.js';
@@ -10,6 +13,70 @@ import { print, printError, formatTable } from '../helpers/output.js';
 import { promptConfirm } from '../helpers/prompt.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getMessage } from '../helpers/messages.js';
+import {
+  buildInterrogationQuestions,
+  applyInterrogationAnswers,
+} from '../../core/directive-interrogator.js';
+import type { InterrogationAnswer } from '../../core/directive-interrogator.js';
+
+export type RlFactory = () => {
+  question: (q: string) => Promise<string>;
+  close: () => void;
+};
+
+/**
+ * Run the pre-plan directive interrogation flow (PLAN-INT-1).
+ * Asks structural challenge questions, collects answers, generates a revised DIRECTIVES
+ * draft, and writes it to disk if the user approves.
+ *
+ * @param directivesPath - Absolute path to DIRECTIVES.md (for writing back)
+ * @param directivesContent - Current DIRECTIVES.md content
+ * @param lang - UI language ('en' | 'tr')
+ * @param rlFactory - Injectable readline factory (default: real createInterface)
+ * @param confirmFn - Injectable confirm prompt (default: promptConfirm)
+ * @returns The final directives content (revised if approved, original otherwise)
+ */
+export async function runInterrogation(
+  directivesPath: string,
+  directivesContent: string,
+  lang: string,
+  rlFactory: RlFactory = () => createInterface({ input: process.stdin, output: process.stdout }),
+  confirmFn: (question: string) => Promise<boolean> = promptConfirm,
+): Promise<string> {
+  const questions = buildInterrogationQuestions(directivesContent, { lang });
+
+  print(getMessage('interrogate.intro', lang));
+
+  const rl = rlFactory();
+  const answers: InterrogationAnswer[] = [];
+
+  try {
+    for (const q of questions) {
+      print(`\n[${q.category}] ${q.text}`);
+      const answer = await rl.question('> ');
+      answers.push({ id: q.id, answer: answer.trim() });
+    }
+  } finally {
+    rl.close();
+  }
+
+  const validAnswers = answers.filter((a) => a.answer.length > 0);
+  if (validAnswers.length === 0) return directivesContent;
+
+  const draft = applyInterrogationAnswers(directivesContent, validAnswers);
+
+  print(`\n${getMessage('interrogate.draft_header', lang)}\n`);
+  print(draft);
+
+  const confirmed = await confirmFn('Write revised DIRECTIVES.md and plan with this?');
+
+  if (confirmed) {
+    writeFileSync(directivesPath, draft, 'utf-8');
+    return draft;
+  }
+
+  return directivesContent;
+}
 
 export function registerPlan(program: Command): void {
   program
@@ -18,12 +85,33 @@ export function registerPlan(program: Command): void {
     .option('--no-confirm', 'Skip confirmation, auto-approve plan')
     .option('--structured', 'Force structured parsing (skip AI)')
     .option('--dry-run', 'Show plan without writing task files to disk')
-    .action(async (opts: { confirm?: boolean; structured?: boolean; dryRun?: boolean }) => {
+    .option('--interrogate', 'Challenge directives with structural questions before planning')
+    .action(async (opts: {
+      confirm?: boolean;
+      structured?: boolean;
+      dryRun?: boolean;
+      interrogate?: boolean;
+    }) => {
       const root = resolveProjectRoot();
 
       try {
         const config = await loadConfig(root);
-        const lang = config.language;
+        const lang = config.language ?? 'en';
+
+        // ─── Interrogation (PLAN-INT-1) ──────────────────────────────────
+        // Run BEFORE readContext so planSprint sees the revised DIRECTIVES.md.
+        // Skip silently if --no-confirm (non-interactive) or no DIRECTIVES content.
+        const shouldInterrogate = opts.interrogate === true || config.plan?.interrogate === true;
+        if (shouldInterrogate && opts.confirm !== false) {
+          const directivesPath = join(root, 'DIRECTIVES.md');
+          if (existsSync(directivesPath)) {
+            const content = readFileSync(directivesPath, 'utf-8');
+            if (content.trim()) {
+              await runInterrogation(directivesPath, content, lang);
+            }
+          }
+        }
+
         const context = readContext(root);
 
         // Provider bootstrap — follows start.ts pattern

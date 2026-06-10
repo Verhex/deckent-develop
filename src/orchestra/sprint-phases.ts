@@ -153,6 +153,12 @@ import {
   type VerifyDiskOptions,
 } from './disk-verify.js';
 
+// ─── Cross-Verify Advisory Wire (Sprint 276 — XVER-1 Task 276-007) ──
+// Best-effort cross-provider adversarial verification of high-stakes DONE/
+// GO_WITH_TECH_DEBT tasks. Config-gated default-OFF (config.cross_verify.enabled);
+// when disabled the wire below never calls runCrossVerify, so behavior is unchanged.
+import { runCrossVerify } from './cross-verify-runner.js';
+
 // ─── Sprint Controller (safe circular — all usages inside function bodies) ──
 import {
   BrainError,
@@ -1363,6 +1369,38 @@ export async function runEvaluatePhase(
             resolveDebt(projectRoot, `debt-${task.fixForTaskId}`, sprint.id);
           }
           resolveDebt(projectRoot, `debt-${task.id}`, sprint.id);
+        }
+
+        // ─── Cross-Verify Advisory Wire (Sprint 276 — XVER-1 Task 276-007) ──
+        // When config.cross_verify.enabled === true, a high-stakes DONE/
+        // GO_WITH_TECH_DEBT task can be re-verified by a DIFFERENT provider whose
+        // job is to REFUTE the result. The verdict is written to the task's
+        // .result as a `crossVerify` advisory and (when REFUTED) emitted as a
+        // warning event — it NEVER downgrades the evaluation (ADR-070). All
+        // best-effort: any fault is debugLog'd and cannot drop the EVALUATE loop.
+        if (
+          resolvedConfig?.cross_verify?.enabled === true &&
+          (evaluation === TaskEvaluation.DONE || evaluation === TaskEvaluation.GO_WITH_TECH_DEBT)
+        ) {
+          try {
+            const xvResult = await runCrossVerify(projectRoot, task, result, evaluation, resolvedConfig);
+            if (xvResult.ran && xvResult.refuted) {
+              try {
+                const sidXv = getCurrentSprintId(projectRoot) ?? sprint.id;
+                writeEvent(
+                  projectRoot, sidXv, 'brain', 'auditor',
+                  'BRAIN→AUDITOR:CROSS_VERIFY_REFUTED',
+                  {
+                    taskId: task.id,
+                    verifier: xvResult.advisory?.verifier,
+                    reason: xvResult.advisory?.reason,
+                    evaluation: toAuditDecision(evaluation),
+                    timestamp: new Date().toISOString(),
+                  },
+                );
+              } catch (e) { debugLog('runEvaluatePhase:crossVerify-event', e); }
+            }
+          } catch (e) { debugLog('runEvaluatePhase:crossVerify', e); }
         }
       } else {
         // ─── Explicit DEFERRED skip (Sprint 192 — Task 192-009 — W-INTEGRITY I-3) ──

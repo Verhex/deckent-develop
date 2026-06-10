@@ -80,6 +80,10 @@
 | adr-086 | Native CLI Parity — F11 Feature Set (Sprint 224) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-276 Learnings** (sprint-276): ## Sprint sprint-276 Learnings
+
+## Gains
+- 276-001 — directive-interrogator çekirdeği — zorlayıcı soru üretimi + tasl...
 - **Sprint sprint-275 Learnings** (sprint-275): ## Sprint sprint-275 Learnings
 
 ## Gains
@@ -114,10 +118,6 @@
 
 ## Gains
 - 267-001 — api_oidc OIDC JWT bearer uzantısı — verifyJwt SSOT tüketimi, def...
-- **Sprint sprint-266 Learnings** (sprint-266): ## Sprint sprint-266 Learnings
-
-## Gains
-- 266-001 — Odoo read-only ErpDriver (JSON-RPC search_read) — First concrete...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -145,5 +145,6 @@ _No active technical debt._
 - Violation pattern: stale_heartbeat
 - Violation pattern: stale_heartbeat
 - Violation pattern: stale_heartbeat
+- Violation pattern: stale_heartbeat
 
-_Total entries: 404 | Generated: 2026-06-10_
+_Total entries: 410 | Generated: 2026-06-10_

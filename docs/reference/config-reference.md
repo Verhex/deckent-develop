@@ -595,7 +595,65 @@ Optional configuration block for F1-TOK Faz 2 (Sprint 274): warmup strategy to o
 
 ---
 
-## 13. Tier-Based Model Strategy (`model_strategy`)
+## 12.2. Plan Phase Configuration
+
+Optional configuration block for Sprint 276 PLAN-INT-1: pre-plan directive interrogation. **Default-off** — absent block = disabled. When enabled, Brain asks clarifying questions about DIRECTIVES before planning.
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `plan.interrogate` | boolean | `false` | Enable directive interrogation before planning. When `true`, Brain generates structural questions (pain-vs-feature, minimal wedge, hidden capabilities, premises, effort alternatives) and displays them via `node:readline/promises`. User can approve a revised DIRECTIVES.md draft or proceed with the original. Non-interactive environments skip interrogation silently. |
+
+### Behavior
+
+- **Disabled (default):** `plan.interrogate: false` — zero behavioral change, PLAN phase works as usual.
+- **Enabled:** Before PLAN → interrogation phase runs (if interactive) → user approves/rejects draft → proceed with approved or original DIRECTIVES.
+- **Non-interactive:** Interrogation is skipped with no warning (honored in CI/background).
+- **Fail-safe:** If interrogation errors, PLAN continues with original DIRECTIVES (never blocks sprint).
+
+### Example Config
+
+```json
+{
+  "plan": {
+    "interrogate": true
+  }
+}
+```
+
+---
+
+## 12.3. Cross Verify Configuration
+
+Optional configuration block for Sprint 276 XVER-1: cross-provider adversarial verification. **Default-off** — absent block = disabled. When enabled, high-stakes tasks (security/auth/P0/risk-tagged) are verified by a different provider using adversarial refutation logic.
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `cross_verify.enabled` | boolean | `false` | Master on/off switch. Must be present (non-optional) when the block exists. |
+| `cross_verify.high_stakes_only` | boolean | `true` | Only verify high-stakes tasks (security/auth/P0/risk-tagged). When `false`, every completed task gets verified. Default keeps verification lean. |
+| `cross_verify.verifier_priority` | string[] | `["codex", "gemini", "claude"]` | Provider selection order for the verifier. Task provider is excluded; first available alternative is used. If no second provider exists, verification is skipped (honest fail-safe). |
+
+### Behavior
+
+- **Disabled (default):** `cross_verify.enabled: false` — zero behavioral change, EVALUATE phase is unchanged.
+- **Enabled + multi-provider:** After EVALUATE, high-stakes DONE/GO_WITH_TECH_DEBT tasks get a refutation worker (different provider) that checks the result independently. Verdict is recorded as an advisory signal; does NOT downgrade the task decision (Brain/user decides).
+- **Enabled + single provider:** Verification is skipped with a debug log message — never throws, never blocks sprint.
+- **Verdict outcomes:** `refuted` → advisory warning (result may be wrong); `confirmed` → advisory success (result verified); `unclear` → advisory inconclusive (verifier output uninterpretable).
+
+### Example Config
+
+```json
+{
+  "cross_verify": {
+    "enabled": true,
+    "high_stakes_only": true,
+    "verifier_priority": ["codex", "gemini", "claude"]
+  }
+}
+```
+
+---
+
+## 14. Tier-Based Model Strategy (`model_strategy`)
 
 Replaces hard-coded model names with provider-agnostic tiers. Starts from the mode preset (`mode-presets.ts`), then `config.model_strategy` overlays on top (config.ts:1051-1066). A custom mode falls back to the `balanced` preset.
 
@@ -612,13 +670,13 @@ Tier equivalence (DECKENT.md model registry): `premium` = opus / gpt-5 / gemini-
 
 ---
 
-## 14. Auth Mode
+## 15. Auth Mode
 
 | Key | Default | Values | Description |
 |-----|---------|--------|-------------|
 | `auth_mode` | `"subscription"` (config.ts:770) | `subscription \| api \| hybrid` | `subscription` = Claude.ai session mount; `api` = uses `ANTHROPIC_API_KEY`; `hybrid` = both (`.deck` keys take precedence). Resolved by `readAuthMode()` (config.ts:1208), consumed in provider.ts:728. A per-task `- Auth:` directive overrides this. |
 
-### 14.1 HTTP API OIDC Bearer (`api_oidc`)
+### 15.1 HTTP API OIDC Bearer (`api_oidc`)
 
 Optional top-level block (config-types.ts:231) that extends the HTTP API bearer middleware with OIDC JWT verification (Sprint 267). **Default-off**: when the block is absent, behavior is unchanged — only the static token (`api_auth_token` or the `DECKENT_API_TOKEN` env var) is checked. There are no built-in defaults for this block.
 
@@ -660,7 +718,7 @@ Optional top-level block (config-types.ts:231) that extends the HTTP API bearer 
 
 **Server resolution** (server.ts:1035-1065): an explicit `oidc` option passed to `createHttpServer` wins; otherwise the project config's `api_oidc` block is consulted — and used only when `enabled: true` with a complete `issuer`/`algorithm`/`key`. A block that is missing, disabled, incomplete, or unparseable fails closed to the previous middleware behavior.
 
-### 14.2 Terminal OIDC JWT (`terminal_oidc_jwks`)
+### 15.2 Terminal OIDC JWT (`terminal_oidc_jwks`)
 
 Optional top-level block (config-types.ts) that enables async JWKS-backed RS256 JWT verification for the embedded terminal (Sprint 268). **Default-off**: when the block is absent, behavior is unchanged — the terminal uses a local random token. There are no built-in defaults for this block.
 
@@ -697,7 +755,7 @@ Optional top-level block (config-types.ts) that enables async JWKS-backed RS256 
 
 ---
 
-## 15. Sprint Lifecycle & Evaluation
+## 16. Sprint Lifecycle & Evaluation
 
 | Key | Default (code) | Values | Description |
 |-----|----------------|--------|-------------|
@@ -724,7 +782,7 @@ Optional top-level block (config-types.ts) that enables async JWKS-backed RS256 
 
 ---
 
-## 16. Auditor, Locks & Memory
+## 17. Auditor, Locks & Memory
 
 | Key | Default | Values | Description |
 |-----|---------|--------|-------------|
@@ -739,7 +797,7 @@ Optional top-level block (config-types.ts) that enables async JWKS-backed RS256 
 
 ---
 
-## 17. Timeout Configuration (`timeout`)
+## 18. Timeout Configuration (`timeout`)
 
 Consumer: `timeout-estimator.ts:94-157`. Estimate chain:
 
@@ -765,7 +823,7 @@ The clamp always wins — scaling factors can never push the final value outside
 
 ---
 
-## 18. Search, Notifications, Telemetry & Output
+## 19. Search, Notifications, Telemetry & Output
 
 | Key | Default | Values | Description |
 |-----|---------|--------|-------------|
@@ -785,7 +843,7 @@ The clamp always wins — scaling factors can never push the final value outside
 
 ---
 
-## 19. Nervous System (`nervous_system`)
+## 20. Nervous System (`nervous_system`)
 
 Proactive meta-orchestrator (ADR-040).
 
@@ -824,7 +882,7 @@ Proactive meta-orchestrator (ADR-040).
 
 ---
 
-## 20. Observability, Retention & Terminal
+## 21. Observability, Retention & Terminal
 
 | Key | Default (code) | Values | Description |
 |-----|----------------|--------|-------------|
@@ -843,7 +901,7 @@ Proactive meta-orchestrator (ADR-040).
 
 ---
 
-## 21. Prompt Tuning
+## 22. Prompt Tuning
 
 | Key | Default | Values | Description |
 |-----|---------|--------|-------------|
@@ -852,7 +910,7 @@ Proactive meta-orchestrator (ADR-040).
 
 ---
 
-## 22. Autonomous Engine (`autonomous`)
+## 23. Autonomous Engine (`autonomous`)
 
 Autonomous execution engine (ADR-040). **Every flag below is default-off** — the engine and each sub-block are opt-in.
 
@@ -880,7 +938,7 @@ Validation errors (config.ts:790-807, exact strings):
 
 ---
 
-## 23. Inert / Unverified Fields
+## 24. Inert / Unverified Fields
 
 These appear in config but have no active effect in the current code paths:
 

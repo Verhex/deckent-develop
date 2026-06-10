@@ -72,6 +72,17 @@ export interface CacheWarmConfig {
   warm_delay_ms?: number;
 }
 
+// ─── Cross Verify Config ─────────────────────────────────────────────
+/** Cross-provider adversarial verification configuration (Sprint 276 XVER-1). Opt-in — absent block = disabled. */
+export interface CrossVerifyConfig {
+  /** Enable cross-provider adversarial verification (required). */
+  enabled: boolean;
+  /** Only verify high-stakes tasks (security/auth/P0/risk-tagged) — default true. */
+  high_stakes_only?: boolean;
+  /** Provider priority order for verifier selection (default: ['codex','gemini','claude']). */
+  verifier_priority?: string[];
+}
+
 // ─── Configuration (Blueprint 13) ───────────────────────────────────
 export interface PlanModeConfig {
   max_workers: number | 'auto';
@@ -416,6 +427,10 @@ export interface DeckentConfig {
   /** Prompt-cache warm spawn configuration (Sprint 274 F1-TOK Faz 2). Default-disabled (opt-in). */
   cache_warm?: CacheWarmConfig;
 
+  // ─── Cross Verify ────────────────────────────────────────────────────
+  /** Cross-provider adversarial verification configuration (Sprint 276 XVER-1). Default-disabled (opt-in). */
+  cross_verify?: CrossVerifyConfig;
+
   // ─── Autonomous Engine ──────────────────────────────────────────────
   /** Autonomous execution engine configuration (Sprint 226 — Task 7). Default-disabled. */
   autonomous?: {
@@ -465,6 +480,16 @@ export interface DeckentConfig {
   // ─── Prompt Generation (Sprint 182 PQ-5 / F7) ──────────────────────
   /** Worker prompt generation tuning. */
   prompt?: PromptConfig;
+
+  // ─── Plan Phase (Sprint 276 PLAN-INT-1) ─────────────────────────────
+  /** Plan phase behavior tuning. */
+  plan?: PlanConfig;
+}
+
+/** Plan phase configuration (Sprint 276 PLAN-INT-1). */
+export interface PlanConfig {
+  /** Enable directive interrogation before planning (default: false). */
+  interrogate?: boolean;
 }
 
 /** Worker prompt generation tuning (Sprint 182 PQ-5 / F7). */
@@ -708,6 +733,8 @@ export interface ResolvedConfig {
   resource_monitor?: ResourceMonitorConfig;
   /** Cache warm spawn configuration (passed through from DeckentConfig). Default-disabled. */
   cache_warm?: CacheWarmConfig;
+  /** Cross-provider adversarial verification configuration (passed through from DeckentConfig). Default-disabled. */
+  cross_verify?: CrossVerifyConfig;
   /** Observability configuration (passed through from DeckentConfig) */
   observability?: DeckentConfig['observability'];
   /** Resolved runtime style — always 'sprint' or 'task' */
@@ -722,6 +749,8 @@ export interface ResolvedConfig {
    *  Same optional-on-both-sides pattern as `terminal`; `loadConfig`/`mergeConfigs`
    *  always populate it with DEFAULT_PROMPT_CONFIG. Consumers may rely on it. */
   prompt?: PromptConfig;
+  /** Plan phase behavior tuning (Sprint 276 PLAN-INT-1). Passed through from DeckentConfig. */
+  plan?: PlanConfig;
 }
 
 // ─── Config Metadata ──────────────────────────────────────────────

@@ -1261,6 +1261,36 @@ const MESSAGES: MessageMap = {
     en: 'Cache gate: N/A (single-session sprint)',
     tr: 'Önbellek kapısı: N/A (tek oturumlu sprint)',
   },
+
+  // ─── interrogation (Sprint 276 PLAN-INT-1) ───────────────────────────
+  'interrogate.intro': {
+    en: 'Directive Interrogation — challenging your plan before coding:',
+    tr: 'Direktif Sorgulaması — kodlamadan önce planınızı zorluyoruz:',
+  },
+  'interrogate.draft_header': {
+    en: '## Interrogation Refinements',
+    tr: '## Sorgulama İyileştirmeleri',
+  },
+  'interrogate.q_pain': {
+    en: 'Is this a real pain point or a feature wish? What breaks today without it?',
+    tr: 'Bu gerçek bir acı noktası mı yoksa özellik isteği mi? Bugün bu olmadan ne bozuluyor?',
+  },
+  'interrogate.q_wedge': {
+    en: 'What is the narrowest shippable slice that delivers value immediately?',
+    tr: 'Değeri hemen sunan en dar gönderilebilir dilim nedir?',
+  },
+  'interrogate.q_hidden': {
+    en: 'Are there existing capabilities in the codebase that already solve part of this?',
+    tr: 'Kod tabanında bunu kısmen zaten çözen mevcut yetenekler var mı?',
+  },
+  'interrogate.q_premise': {
+    en: 'What assumption in this plan could be wrong? What would invalidate it?',
+    tr: 'Bu plandaki hangi varsayım yanlış olabilir? Onu geçersiz kılacak ne var?',
+  },
+  'interrogate.q_effort': {
+    en: 'Is there a 10x simpler alternative that gets 80% of the value at 10% of the effort?',
+    tr: 'Çabanın %10\'uyla değerin %80\'ini sağlayan 10 kat daha basit bir alternatif var mı?',
+  },
 };
 
 /**

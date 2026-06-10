@@ -2,6 +2,24 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint276] - 2026-06-10
+
+### Added
+
+- directive-interrogator çekirdeği — zorlayıcı soru üretimi + taslak öneri
+- interrogation config + i18n soru sözlüğü
+- deckent plan --interrogate CLI wire
+- cross-verify çekirdeği — high-stakes tespit + farklı-provider seçimi
+- cross_verify config bloğu (default-off)
+- adversarial-refute prompt builder
+- cross-verify dispatch + eval advisory-wire (OPUS)
+- cross-verify outcome-tracker beslemesi — öğrenilen verifier eşleşmeleri
+- REPL /interrogate slash — pre-plan sorgulamaya REPL erişimi
+- api-surface + config-reference — yeni alanlar
+
+
+_Tasks: 12 total, 12 done, 0 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint275] - 2026-06-10
 
 ### Added
