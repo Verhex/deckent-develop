@@ -637,6 +637,38 @@ deckent doctor --profile
 
 ---
 
+## `models`
+
+Browse and manage the model catalog. Lists all available models grouped by provider and tier.
+
+**Usage:** `deckent models`
+
+**Subcommands:**
+
+| Subcommand | Description |
+|------------|-------------|
+| `list` | List all models from the catalog (default) |
+| `refresh` | Refresh the model catalog from provider APIs |
+| `tier <name>` | Look up a model by tier name |
+
+**Options:**
+
+| Flag | Description |
+|------|-------------|
+| `--json` | Output as JSON |
+| `--provider <name>` | Filter by provider (claude, codex, gemini) |
+
+**Examples:**
+
+```bash
+deckent models
+deckent models list --provider claude
+deckent models tier standard
+deckent models --json
+```
+
+---
+
 # Skills & Agents
 
 ## `skill`

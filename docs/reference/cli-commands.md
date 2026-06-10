@@ -54,6 +54,7 @@
 | 45 | `recover` | Recover from crashed/stuck sprint | — |
 | 46 | `models` | Browse and manage model catalog (list/refresh/tier) | `deckent_models` |
 | 47 | `autonomous` | Autonomous runtime loop, backlog, approvals | `deckent_autonomous` |
+| 48 | `resources` | Show worker resource usage (CPU, memory, I/O) — live snapshot or historical analysis | — |
 | — | `help-info` | Show quick-reference help (alias: `info`) | `deckent_help` |
 
 ---
@@ -432,6 +433,9 @@ Check system dependencies and health.
 **Provider Auth Probing:**
 Doctor now probes configured provider auth status (logged in, logged out, or unknown) and displays warnings when a CLI is present but not logged in.
 
+**Worker Resources Section:**
+Doctor displays worker memory limits, max worker count, and calculated RAM ceiling — useful for capacity planning. Warns if worker RAM usage exceeds a configurable threshold (default 60% of host memory). Related: `deckent resources` for live monitoring and historical analysis.
+
 **Example:**
 ```bash
 deckent doctor
@@ -440,6 +444,35 @@ deckent doctor --fix-image
 ```
 
 **MCP:** `deckent_doctor`
+
+---
+
+### `deckent resources`
+
+Monitor worker resource usage — CPU, memory, I/O. Requires `resource_monitor.enabled: true` in config (default-off).
+
+| Option | Description |
+|--------|-------------|
+| `--log [path]` | Analyze historical resource log (JSONL format). Shows per-task peak/avg memory, peak CPU. Optional path overrides `.deckent/resource-log.jsonl` default. |
+| `--json` | Output raw JSON (both snapshot and log modes). Useful for integration with monitoring tools. |
+
+**Modes:**
+
+1. **Default (live snapshot):** Display current resource usage via `docker stats` — container name, assigned task ID, memory usage/limit/%, CPU%. Shows system totals and configured limits.
+2. **`--log` mode:** Parse and summarize a historical resource log. Shows per-task statistics and sprint-wide concurrent peak memory.
+
+**Example:**
+```bash
+deckent resources                          # Live docker stats snapshot
+deckent resources --log                    # Summarize .deckent/resource-log.jsonl
+deckent resources --log /custom/log.jsonl  # Custom log path
+deckent resources --json                   # JSON output for both modes
+```
+
+**Requirements:**
+
+- Docker daemon running and accessible (`docker stats` command must work)
+- `resource_monitor.enabled: true` in `.deckent/config.json` enables background sampling during sprints
 
 ---
 

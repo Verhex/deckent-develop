@@ -103,12 +103,14 @@ describe('checkPackSizeAndCount (Gate 1)', () => {
     expect(result.severity).toBe('info');
   });
 
-  it('fails when package size exceeds 3 MB', () => {
-    const out = buildPackOutput({ packageSize: '4.2 MB', fileCount: 900 });
+  it('fails when package size exceeds the 5 MB threshold (Sprint 271 calibration)', () => {
+    // 271-008 raised the ceiling 3 MB → 5 MB: a full build:all pack (dashboard
+    // bundle included) measures ~4.8 MB; 4.2 MB is now legitimately under it.
+    const out = buildPackOutput({ packageSize: '5.6 MB', fileCount: 900 });
     const result = checkPackSizeAndCount(out);
     expect(result.ok).toBe(false);
     expect(result.severity).toBe('error');
-    expect(result.message).toMatch(/exceeds|3\s*MB/i);
+    expect(result.message).toMatch(/exceeds|5\s*MB/i);
   });
 });
 

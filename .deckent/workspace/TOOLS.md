@@ -116,6 +116,7 @@ _Total: 29 MCP tools_
 | `recall` | deckent recall |
 | `recover` | deckent recover |
 | `remember` | deckent remember |
+| `resources` | deckent resources |
 | `resume` | deckent resume |
 | `retro` | deckent retro |
 | `retro-formatter` | deckent retro-formatter |
@@ -135,4 +136,4 @@ _Total: 29 MCP tools_
 | `watch` | deckent watch |
 | `web` | deckent web |
 
-_Total: 87 CLI command modules_
+_Total: 88 CLI command modules_

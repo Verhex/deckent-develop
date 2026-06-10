@@ -15,12 +15,12 @@
 ## Live Metrics
 | Metric | Value |
 |--------|-------|
-| Sprint | sprint-270 |
-| Total Tasks | 20 |
-| Completed | 20 |
-| Tech Debt | 0 |
-| No-Go | 0 |
-| Duration | 238dk 2sn |
+| Sprint | sprint-271 |
+| Total Tasks | 14 |
+| Completed | 13 |
+| Tech Debt | 2 |
+| No-Go | 1 |
+| Duration | 32dk 54sn |
 | Coverage | N/A |
 
 # TABLE OF CONTENTS

@@ -26,7 +26,7 @@ env -u ANTHROPIC_API_KEY deckent
 |---|------|-------------|----------|
 | 1 | **E1 markdown** | deckent'e "2x2 tablo + ts kod bloğu + [!WARNING] admonition ver" | Tablo **boxed+hizalı** (┌┬┐), kod **syntax-renkli + çerçeveli + dil-etiketi**, admonition **renkli ikon+sol-bar** |
 | 2 | E1 inline | "**kalın** _italik_ ~~üstü-çizili~~ `kod` ve src/cli/entry.ts ver" | bold/italic/strike/code + **dosya-yolu cyan** (VSCode'da tıklanır) |
-| 3 | E1 link | "[Docs](https://docs.anthropic.com) ve [yerel](./x.md)" | http **tıklanabilir OSC-8**; göreli **cyan+dim** (kırık-link değil) |
+| 3 | E1 link | `[Docs](https://docs.anthropic.com) ve [yerel](./x.md)` | http **tıklanabilir OSC-8**; göreli **cyan+dim** (kırık-link değil) |
 | 4 | **E2 /menü** | `/` yaz, sonra `do` yaz | Menü açılır, **canlı filtre** (→/doctor), ↑↓ ❯ gezer, **Enter çalıştırır**, Esc kapatır, Tab tamamlar |
 | 5 | E2 komut | `/status`, `/retro`, `/doctor`, `/models` | Her biri **gerçek deckent çıktısı** (mock değil) |
 | 6 | **E3 switch** | `/provider codex` sonra `/model sonnet` | "geçildi" + **status-bar** `deckent codex` / `claude · sonnet` canlı güncellenir |

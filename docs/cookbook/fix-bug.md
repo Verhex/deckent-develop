@@ -225,6 +225,6 @@ The retrospective records:
 ## Related
 
 - [Getting Started](/guide/getting-started)
-- [Agent Reference — bug-fixer](/reference/agents#bug-fixer)
+- [Agent Reference — bug-fixer](/reference/agents)
 - [Sprint Lifecycle — FIX Phase](https://github.com/VerhexIO/deckent/blob/main/docs/architecture/sprint-lifecycle.md#fix)
 - [Cookbook: Add a REST API Endpoint](add-rest-api)

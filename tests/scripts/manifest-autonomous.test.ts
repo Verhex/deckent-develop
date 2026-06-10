@@ -45,7 +45,7 @@ describe('FEATURE_DEFINITIONS — autonomous-runtime present in source', () => {
 
   it('sync-manifest.mjs source file contains the F3-009 label string', () => {
     const source = readFileSync(SYNC_MANIFEST_PATH, 'utf-8');
-    expect(source).toContain('Autonomous Runtime — F3-009 authority-bounded loop');
+    expect(source).toContain('Autonomous Execution Engine — F3-009 backlog-driven authority-bounded loop');
   });
 });
 
@@ -66,7 +66,7 @@ describe('regenerate — script outputs autonomous-runtime', () => {
     const manifest = JSON.parse(stdout);
     const entry = manifest.active.find((f: { id: string }) => f.id === 'autonomous-runtime');
     expect(entry).toBeDefined();
-    expect(entry.label).toBe('Autonomous Runtime — F3-009 authority-bounded loop');
+    expect(entry.label).toBe('Autonomous Execution Engine — F3-009 backlog-driven authority-bounded loop');
   }, 30_000);
 });
 

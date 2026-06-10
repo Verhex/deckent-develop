@@ -207,6 +207,32 @@ const MESSAGES: MessageMap = {
     tr: 'Worker imaj derlemesi başarısız (çıkış {code}). Yukarıdaki derleme çıktısına bakın.',
   },
 
+  // ─── doctor: worker resources (Sprint 271 — 271-006) ─────────────────
+  'doctor.resources_header': {
+    en: 'Worker Resources:',
+    tr: 'Worker Kaynakları:',
+  },
+  'doctor.resources_limits': {
+    en: 'Memory: {limit} / swap: {swap} — max workers: {workers}',
+    tr: 'Bellek: {limit} / swap: {swap} — maksimum worker: {workers}',
+  },
+  'doctor.resources_ceiling': {
+    en: 'RAM ceiling: {ceiling} ({workers} × {limit}) — host: {host} ({pct}%)',
+    tr: 'RAM tavanı: {ceiling} ({workers} × {limit}) — host: {host} ({pct}%)',
+  },
+  'doctor.resources_warn_ceiling': {
+    en: '[WARN] Worker RAM ceiling ({ceiling}) is {pct}% of host — consider lowering max_workers or worker_memory_limit',
+    tr: '[WARN] Worker RAM tavanı ({ceiling}) host\'un %{pct}\'i — max_workers veya worker_memory_limit düşürmeyi düşünün',
+  },
+  'doctor.resources_monitor_on': {
+    en: 'Resource monitor: enabled (interval: {interval}ms)',
+    tr: 'Kaynak izleme: etkin (aralık: {interval}ms)',
+  },
+  'doctor.resources_monitor_off': {
+    en: 'Resource monitor: disabled (set resource_monitor.enabled=true to enable)',
+    tr: 'Kaynak izleme: devre dışı (etkinleştirmek için resource_monitor.enabled=true ayarlayın)',
+  },
+
   // ─── attach command ─────────────────────────────────────────────────
   'attach.no_active_session': {
     en: 'No active session. Run `deckent start` first.',
@@ -1078,6 +1104,84 @@ const MESSAGES: MessageMap = {
   'bot.daemon_status_running': {
     en: '🟢 Bot daemon is running (pid {pid}).',
     tr: '🟢 Bot daemon çalışıyor (pid {pid}).',
+  },
+
+  // ─── resources command (Sprint 271 T-004) ────────────────────────────────
+  'resources.snapshot_title': {
+    en: 'Live Worker Resource Snapshot',
+    tr: 'Canlı Worker Kaynak Anlık Görüntüsü',
+  },
+  'resources.log_title': {
+    en: 'Resource Log Summary',
+    tr: 'Kaynak Log Özeti',
+  },
+  'resources.docker_unavailable': {
+    en: 'Docker is not available — cannot retrieve resource data.',
+    tr: 'Docker mevcut değil — kaynak verisi alınamıyor.',
+  },
+  'resources.no_containers': {
+    en: 'No deckent worker containers running.',
+    tr: 'Çalışan deckent worker container\'ı yok.',
+  },
+  'resources.log_not_found': {
+    en: 'Resource log not found: {path}',
+    tr: 'Kaynak log bulunamadı: {path}',
+  },
+  'resources.log_empty': {
+    en: 'Resource log is empty — no samples recorded.',
+    tr: 'Kaynak log boş — hiç örnek kaydedilmemiş.',
+  },
+  'resources.table_header_container': {
+    en: 'Container',
+    tr: 'Container',
+  },
+  'resources.table_header_task': {
+    en: 'Task',
+    tr: 'Görev',
+  },
+  'resources.table_header_mem_usage': {
+    en: 'Mem Usage',
+    tr: 'Bellek Kullanımı',
+  },
+  'resources.table_header_mem_limit': {
+    en: 'Mem Limit',
+    tr: 'Bellek Limiti',
+  },
+  'resources.table_header_mem_pct': {
+    en: 'Mem%',
+    tr: 'Bellek%',
+  },
+  'resources.table_header_cpu_pct': {
+    en: 'CPU%',
+    tr: 'CPU%',
+  },
+  'resources.config_line': {
+    en: 'Config: memory_limit={limit}/swap={swap}, max_workers={workers}, RAM ceiling={ceiling}',
+    tr: 'Yapılandırma: memory_limit={limit}/swap={swap}, max_workers={workers}, RAM tavanı={ceiling}',
+  },
+  'resources.log_header_task': {
+    en: 'Task',
+    tr: 'Görev',
+  },
+  'resources.log_header_peak_mem': {
+    en: 'Peak Mem',
+    tr: 'Tepe Bellek',
+  },
+  'resources.log_header_avg_mem': {
+    en: 'Avg Mem',
+    tr: 'Ort. Bellek',
+  },
+  'resources.log_header_peak_cpu': {
+    en: 'Peak CPU%',
+    tr: 'Tepe CPU%',
+  },
+  'resources.log_header_duration': {
+    en: 'Duration(s)',
+    tr: 'Süre(s)',
+  },
+  'resources.sprint_peak': {
+    en: 'Sprint concurrent peak: {peak} ({containers} containers)',
+    tr: 'Sprint eşzamanlı tepe: {peak} ({containers} container)',
   },
 };
 

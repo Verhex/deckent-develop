@@ -70,7 +70,7 @@ deckent autonomous backlog remove --id docs-refresh-1
 
 The `add` command writes a `one-off` `pending` entry with `policy: auto` (per `--policy`).
 To set `provider`/`model`/`kind: sprint`/recurring schedules, edit the entry in
-`backlog.json` directly (the entry schema is in [`autonomous-engine.md`](./autonomous-engine.md#concepts)).
+`backlog.json` directly (the entry schema is in [`autonomous-engine.md`](./autonomous-engine.md)).
 
 **Governance (when does an entry run vs wait):**
 - `auto` → runs (after passing RBAC authority).

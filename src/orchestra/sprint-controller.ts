@@ -97,6 +97,10 @@ import { DECKENT_DIR } from '../core/constants.js';
 import { HandoffProtocol } from './handoff-protocol.js';
 import { HeartbeatDaemon } from './heartbeat-daemon.js';
 
+// ─── Resource Monitor (Sprint 271 Task 271-005 — opt-in worker resource sampling) ──
+import { createResourceMonitor } from './resource-monitor.js';
+import type { ResourceMonitor, ResourceMonitorOpts } from './resource-monitor.js';
+
 // ─── Sprint Checkpoint (phase-transition auto-checkpoint) ────────
 import { writePhaseCheckpoint, restoreSprintFromCheckpoint } from './sprint-checkpoint.js';
 
@@ -611,6 +615,12 @@ export interface RunSprintOptions {
   connector?: Connector;
   /** Set to false to opt out of automatic HeartbeatDaemon start/stop during sprint (default: enabled) */
   enableHeartbeatDaemon?: boolean;
+  /**
+   * Optional ResourceMonitor factory override — DI seam for tests (Sprint 271
+   * Task 271-005). Defaults to {@link createResourceMonitor}. Only consulted
+   * when `config.resource_monitor.enabled === true`.
+   */
+  resourceMonitorFactory?: (opts: ResourceMonitorOpts) => ResourceMonitor;
 }
 
 // ═══ Coordination Wire Helpers ════════════════════════════════════
@@ -727,6 +737,54 @@ export function createAndStartHeartbeatDaemon(
   return daemon;
 }
 
+/**
+ * Create and start a {@link ResourceMonitor} for the sprint duration — only
+ * when `config.resource_monitor.enabled === true` (opt-in; an absent block
+ * means disabled → zero behavior change). Mirrors
+ * {@link createAndStartHeartbeatDaemon}: returns the live monitor, or null
+ * when disabled or when start fails.
+ *
+ * Fail-safe: a monitor construction/start fault is swallowed (debugLog) and
+ * returns null so a monitoring problem NEVER affects the sprint. `factory` is
+ * the DI seam — tests pass a mock; production defaults to
+ * {@link createResourceMonitor}. Exported for testability. Sprint 271 Task 271-005.
+ */
+export function createAndStartResourceMonitor(
+  projectRoot: string,
+  config: ResolvedConfig,
+  factory: (opts: ResourceMonitorOpts) => ResourceMonitor = createResourceMonitor,
+): ResourceMonitor | null {
+  if (config.resource_monitor?.enabled !== true) return null;
+  try {
+    const monitor = factory({
+      intervalMs: config.resource_monitor.interval_ms,
+      logPath: join(
+        projectRoot,
+        config.resource_monitor.log_path ?? join(DECKENT_DIR, 'resource-log.jsonl'),
+      ),
+    });
+    monitor.start();
+    return monitor;
+  } catch (e) {
+    debugLog('resourceMonitor:start', e);
+    return null;
+  }
+}
+
+/**
+ * Stop a {@link ResourceMonitor}, awaiting any in-flight sample tick. No-op on
+ * null. Fail-safe: a stop fault is swallowed (debugLog) so it never blocks
+ * sprint teardown. Sprint 271 Task 271-005.
+ */
+export async function stopResourceMonitor(monitor: ResourceMonitor | null): Promise<void> {
+  if (!monitor) return;
+  try {
+    await monitor.stop();
+  } catch (e) {
+    debugLog('resourceMonitor:stop', e);
+  }
+}
+
 // ═══ Core Functions (kept in this file) ═══════════════════════════
 
 /**
@@ -834,6 +892,10 @@ export async function runSprint(
   // Default-off respect: returns null when `nervous_system.enabled !== true`.
   const nervous = await initNervousSystemForSprint(config, projectRoot);
   let heartbeatDaemon: HeartbeatDaemon | null = null;
+  // Sprint 271 Task 271-005: opt-in worker resource monitor. Declared in
+  // sprint scope (before the try) so the finally block can stop it on every
+  // early-exit/throw path. Stays null unless config.resource_monitor.enabled.
+  let resourceMonitor: ResourceMonitor | null = null;
 
   try {
   // ═══ State Recovery on Brain Restart (Sprint 162 — Task T-004) ════
@@ -1009,6 +1071,19 @@ export async function runSprint(
 
     // Start heartbeat daemon for sprint duration (opt-out: opts.enableHeartbeatDaemon === false)
     heartbeatDaemon = createAndStartHeartbeatDaemon(projectRoot, opts?.enableHeartbeatDaemon !== false);
+
+    // ─── Resource Monitor (Sprint 271 Task 271-005) ────────────────────
+    // Wire point chosen here — right AFTER runSpawnPhase completes — rather
+    // than at the literal SPAWN entry: docker worker containers only exist
+    // once spawn finishes, so the first `docker stats` sample is meaningful,
+    // and this co-locates with the analogous sprint-lifetime HeartbeatDaemon
+    // above. Opt-in only (config.resource_monitor.enabled === true); fail-safe
+    // (a monitor fault returns null and never affects the sprint). The monitor
+    // is stopped in the CLEANUP region below AND the finally fail-safe, so all
+    // early-exit/throw paths tear it down.
+    resourceMonitor = createAndStartResourceMonitor(
+      projectRoot, config, opts?.resourceMonitorFactory,
+    );
 
     // ─── Sprint 192 Task 192-009 — Dispatch loop assignedWorker wire ───
     // W-INTEGRITY I-3: spawn-spawner sets task.status=EXECUTING + persists
@@ -1385,6 +1460,11 @@ export async function runSprint(
     heartbeatDaemon = null;
   }
 
+  // Stop resource monitor before cleanup (Sprint 271 Task 271-005). Set to
+  // null so the finally fail-safe below is a no-op on the happy path.
+  await stopResourceMonitor(resourceMonitor);
+  resourceMonitor = null;
+
   // Phase 8: CLEANUP
   scanInterval = runCleanupPhase(projectRoot, sprint, config, opts, scanInterval, spawnBackend);
 
@@ -1423,6 +1503,11 @@ export async function runSprint(
     // Fail-safe: stop heartbeat daemon if not yet stopped (e.g., early exception)
     if (heartbeatDaemon) {
       try { heartbeatDaemon.stop(); } catch { /* best effort */ }
+    }
+    // Fail-safe: stop resource monitor on any early-exit/throw path (Sprint
+    // 271 Task 271-005). No-op when the happy path already stopped it.
+    if (resourceMonitor) {
+      await stopResourceMonitor(resourceMonitor);
     }
   }
 }

@@ -2,6 +2,29 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint271] - 2026-06-10
+
+### Added
+
+- resource-monitor çekirdeği — docker stats örnekleyici → JSONL
+- resource_monitor config bloğu
+- resource-log analiz fonksiyonları — per-task peak/avg
+- `deckent resources` CLI — anlık snapshot + log özeti
+- resource-profile referansı — kod-türevli kaynak haritası
+- pack diyeti — 4.8MB → eşik altı
+- link lint — 17 kırık link
+- manifest F3-009 pre-existing test çifti
+- crash-hardening — .spawnlock bayat-kilit temizliği kurtarma araçlarında
+- features + cli-commands — resources/resource_monitor satırları
+
+### Changed
+
+- sprint-yaşamdöngüsü wire — opt-in izleme SPAWN→CLEANUP (completed with tech debt)
+- doctor "Worker Resources" satırı — limit görünürlüğü + tavan uyarısı (completed with tech debt)
+
+
+_Tasks: 14 total, 13 done, 2 tech debt, 1 no-go_
+
 ## [1.0.0-beta.1-sprint270] - 2026-06-10
 
 ### Added

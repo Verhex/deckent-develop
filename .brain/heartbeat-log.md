@@ -691,3 +691,43 @@ src/orchestra/sprint-phases.ts(1463,23): error TS1005: ',' expected.
 BLOCKED: Shell metacharacter detected in heartbeat command: "npx vitest run --reporter=verbose 2>&1 | tail -5"
 ```
 
+
+## Heartbeat — 2026-06-10T15:50:45.124Z
+
+- ❌ `tsc --noEmit`
+```
+ts(183,7): error TS1005: ',' expected.
+src/api/output-stream.ts(183,17): error TS1005: ',' expected.
+src/api/output-stream.ts(222,9): error TS1005: ',' expected.
+src/api/output-stream.ts(222,19): error TS1005: ',' expected.
+src/orchestra/sprint-phases.ts(1270,13): error TS1005: ',' expected.
+src/orchestra/sprint-phases.ts(1270,23): error TS1005: ',' expected.
+src/orchestra/sprint-phases.ts(1463,13): error TS1005: ',' expected.
+src/orchestra/sprint-phases.ts(1463,23): error TS1005: ',' expected.
+```
+
+- ❌ `npx vitest run --reporter=verbose 2>&1 | tail -5`
+```
+BLOCKED: Shell metacharacter detected in heartbeat command: "npx vitest run --reporter=verbose 2>&1 | tail -5"
+```
+
+
+## Heartbeat — 2026-06-10T16:25:30.718Z
+
+- ❌ `tsc --noEmit`
+```
+ts(183,7): error TS1005: ',' expected.
+src/api/output-stream.ts(183,17): error TS1005: ',' expected.
+src/api/output-stream.ts(222,9): error TS1005: ',' expected.
+src/api/output-stream.ts(222,19): error TS1005: ',' expected.
+src/orchestra/sprint-phases.ts(1270,13): error TS1005: ',' expected.
+src/orchestra/sprint-phases.ts(1270,23): error TS1005: ',' expected.
+src/orchestra/sprint-phases.ts(1463,13): error TS1005: ',' expected.
+src/orchestra/sprint-phases.ts(1463,23): error TS1005: ',' expected.
+```
+
+- ❌ `npx vitest run --reporter=verbose 2>&1 | tail -5`
+```
+BLOCKED: Shell metacharacter detected in heartbeat command: "npx vitest run --reporter=verbose 2>&1 | tail -5"
+```
+

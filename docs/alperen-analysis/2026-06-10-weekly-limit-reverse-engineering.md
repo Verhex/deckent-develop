@@ -172,3 +172,148 @@ AI fleet işleten herkes için ders: limit yönetimi = maliyet-eşdeğeri muhase
 
 ---
 *Metodoloji notu: davranışsal çıkarım, 2 kalibrasyon noktası, ±%10 hata payı; claude.ai web kullanımı kapsam dışı; Anthropic'in iç formülü farklı katsayılar içerebilir.*
+
+---
+
+## 8. Anthropic Resmi Doküman Kıyası (2026-06-10 — kaynak: platform.claude.com + support.claude.com)
+
+### ⚠️ Önce sistem ayrımı — İKİ FARKLI LİMİT, KARIŞTIRMA (Alperen düzeltmesi 2026-06-10)
+
+| | **API Rate Limits** | **Abonelik Usage Limiti (Pro/Max)** |
+|---|---|---|
+| Ne sınırlar | Anlık **debi**: istek/dk (RPM) + token/dk (ITPM/OTPM), token-bucket | Toplam **kullanım kotası**: 5-saat oturum penceresi + haftalık pencere |
+| Kimi bağlar | API-key org'ları (Tier 1-4, Console) | Abonelik hesabı — claude.ai + Claude Code + Desktop **tek havuz** |
+| Birim | Dakikalık, model-bazlı yayınlanmış tablolar | **Formül yayınlanmamış** ("Anthropic does not specify exactly how it calculates usage limits") |
+| Bizim %100/%41 olayı | ❌ bu DEĞİL | ✅ bu — analizin konusu |
+| Bizim çıkarımın dayanağı | — | **Kendi 2-nokta kalibrasyonumuz** (W1=%100, W2=%41), resmi doküman değil |
+
+Bu ayrım gereği: aşağıdaki tabloda **prompt-caching mekaniği** satırları (paralel yarış, TTL, min-prefix,
+model-scoped cache) **doğrudan geçerlidir** — bunlar limit sistemi değil, CC'nin kullandığı caching
+motorunun kendisidir. **"Cache-aware ITPM" satırı ise FARKLI sistemden** (API rate-limit) yalnız
+tasarım-felsefesi paralelidir — haftalık metrenin dokümanı değildir.
+
+| Konu | Anthropic resmi ifadesi | Bizim ölçüm | Hüküm |
+|---|---|---|---|
+| **Cache-read sayımı** (⚠️ FARKLI SİSTEM: API rate-limit) | API rate-limits: **"only uncached input tokens count towards your ITPM... `cache_read_input_tokens` ✗ Do NOT count"**; `input_tokens` + `cache_creation_input_tokens` ✓ sayılır ("cache-aware ITPM") | Haftalık **abonelik** metresi (ayrı sistem): in+out+cw sayıyor, cacheRead ~%0 ağırlık (%39,7-42,6 fit) — kendi kalibrasyonumuz | 🟡 **Yalnız tasarım-felsefesi paraleli, doğrudan kanıt DEĞİL.** Anthropic'in bir limit sisteminde cache-read'i saymadığının resmi örneği; abonelik-metre sonucu bizim veriye dayanır |
+| Cache fiyat çarpanları | Write **1.25×** (5dk TTL) / **2×** (1saat TTL); read **0.1×** | cost-config.json aynı; cw = limit yakımının %57-63'ü (bizim katkı: ölçekte baskın kalem olduğunun ölçümü) | ✅ doğrulandı |
+| **Paralel istek cache-yarışı** | **RESMİ:** "A cache entry becomes readable only after the first response begins streaming. **N parallel requests with identical prefixes all pay full price.** For fan-out: send 1 request, await the first streamed token, then fire the remaining N−1." | 56 fable worker × ~125K cw/session — cross-worker cache paylaşımı fiilen yok | ✅ **Kök neden resmen belgeli; önerdiğimiz stagger fix'i resmi desen** |
+| Pre-warm mekanizması | **RESMİ:** `max_tokens: 0` isteği cache'i yazar, anında döner, output faturası yok; "re-warm at least every 5 minutes" | Bizim "keep-alive ping" önerisi | ✅ resmi aracı var — planda max_tokens:0 kullanılacak (deckent-native yüzeyde) |
+| TTL | 5dk default, her kullanımda yenilenir; 1h TTL 2× write, break-even ≥3 read (5dk: 2 read) | İnteraktif/gece-loop >5dk boşluklar = tam rewrite gözlemi | ✅; 1h TTL kararı read-sayısı hesabıyla verilecek |
+| Min cacheable prefix | Opus 4.8 & Haiku 4.5: **4096 token**; Fable 5 & Sonnet 4.6: **2048 token** — altı sessizce cache'lenmez | Haiku micro-call'larının kötü şekli (hit %48) | 🆕 yeni bilgi — haiku şekil-fix'ine girdi (kısa prefix hiç cache'lenmiyor olabilir) |
+| Model-scoped cache | "Switching models mid-session invalidates the cache... caches are model-scoped" | Model-katmanlama → her tier kendi prefix'ini ısıtmalı | ✅ plan etkisi: per-model warm |
+| Silent invalidators | Resmi denetim listesi: timestamp, UUID, sıralanmamış JSON, koşullu system bölümleri | **Repo'da somut bulgu:** `heartbeat.pid`, `sprint.lock`, `memory.db.backup-*`, `.playwright-mcp/` gitignore'da DEĞİL → git-status snapshot'ı worker'dan worker'a değişiyor → CC system-prompt prefix'i bölünüyor | 🆕 ucuz, ölçülebilir fix adayı |
+| 20-block lookback | Breakpoint en fazla 20 content-block geriye bakar; çok-tool-call'lı uzun turn'ler sessiz miss | Worker'lar yoğun tool-call yapıyor (CC kendi yönetiyor) | ⚠️ bilinçli risk — bizim lever değil |
+| Tek havuz | **"Usage of all different Claude product surfaces (claude.ai, Claude Code, Claude Desktop) counts towards the same usage limit"** | Web'i kapsam dışı bırakmıştık | ✅ ±%10 hata payımızın resmi açıklaması |
+| Formül | "Anthropic does not specify exactly how it calculates usage limits" — etkenler: uzunluk, karmaşıklık, özellikler, **model**, **effort** | Bizim kalibrasyon somut katsayı verdi: fiyat-ağırlıklı in+out+1.25·cw, cr≈0 | ✅ resmi çerçeveyle uyumlu; katkımız ölçülmüş katsayılar |
+| API-mode bonus | Resmi örnek: %80 cache-hit ile 2M ITPM → **10M etkili token/dk** | F1-010 overflow (subscription→API kaçış) | 🆕 cache disiplini API modunda throughput'u 5×'e kadar artırır — F1-TOK yatırımı iki modda da geçerli |
+
+**Sonuç:** Tersine-mühendislik bulgularımız resmi dokümanlarla **çelişmiyor.** Caching-mekaniği bulguları (paralel istek yarışı, TTL, min-prefix, model-scoped cache) **doğrudan resmi belgeli** — bunlar abonelik limitinden bağımsız, CC'nin kullandığı caching motorunun davranışı. Abonelik haftalık metresinin formülünü Anthropic bilinçli yayınlamıyor ("does not specify exactly"); oradaki sonucumuz **yalnız kendi 2-nokta kalibrasyonumuza** dayanır, API rate-limit dokümanı ona sadece felsefe-düzeyinde paralel destek verir. İki sistemi karıştırmamak F1-LIM için de tasarım gereği: **rate-limit hatası (429, `retry-after`) ≠ abonelik kota tükenmesi** — algılama ve tepki ayrı kodlanmalı (429 → backoff/retry; kota → PARK + reset bekle).
+
+## 9. İş Planı — F1-TOK Fazlı Uygulama (deckent core özelliği)
+
+**Mimari ayrım (planın temeli):** İki ayrı optimizasyon yüzeyi var:
+- **Yüzey-1 — CC-worker fleet** (docker'da `claude` CLI): `cache_control`'e doğrudan erişim YOK. Kaldıraçlar dolaylı: prompt-girdi stabilitesi, git-status gürültüsü, spawn zamanlaması, `--resume`.
+- **Yüzey-2 — deckent-native LLM çağrıları** (REPL chat, AI-planner, autonomous, nervous): TAM kontrol — breakpoint yerleşimi, `max_tokens:0` prewarm, 1h TTL, mid-conversation system (beta).
+
+### Faz 0 — ÖLÇ (TOK-LEDGER) · 1 sprint · önkoşulsuz
+- `scripts/token-usage-report.mjs` → `src/core/limit-ledger.ts`: limit-ağırlıklı birim (`in·$in + out·$out + cw·1.25$in`, cr=0), per-task/per-sprint attribution (transcript session ↔ task eşlemesi), cache-hit-rate.
+- Sprint retro + `deckent status` + dashboard'a "limit-yakım" kolonu; F1-LIM park-eşiği bu birimden beslenir.
+- **Gate:** her sprint sonunda otomatik rapor; mevcut hafta baseline'ı kayıt altında.
+
+### Faz 1 — SUSTUR (PREFIX-STAB) · 1 sprint · Faz 0 ile paralel olabilir
+- `.gitignore`'a sprint-runtime artıkları: `heartbeat.pid`, `sprint.lock`, `memory.db.backup-*`, `.playwright-mcp/` (git-status snapshot stabilize → CC system-prompt prefix bölünmesi durur).
+- Worker prompt assembly determinizm denetimi: ADR/skill sıralaması sorted, timestamp/UUID yok (resmi silent-invalidator listesiyle).
+- Sprint İÇİNDE değişen @-include'ların (summary.md vb.) denetimi.
+- **Gate:** aynı wave'deki 2 worker'ın transcript'inde 2. worker'ın ilk çağrısında `cache_read > cache_creation`.
+
+### Faz 2 — ISIT (CACHE-WARM) · 1 sprint · Faz 1'e bağlı
+- **Fleet:** "first-worker-warm" spawn stratejisi — wave'de model başına İLK worker erken başlar; ilk stream-token'ı görülünce (transcript'te ilk assistant chunk) kalanlar salınır (resmi fan-out deseni). Config: `spawn_warm_strategy: 'first-worker' | 'stagger-ms' | 'off'`.
+- **Native:** `max_tokens:0` prewarm (resmi mekanizma) — REPL/autonomous oturum açılışında shared prefix'i ısıt.
+- **Gate:** fleet cw/session ortalaması ≥%50 düşüş (Faz 0 ledger ile ölçülür).
+- Beklenen: fleet cw toplam yakımın ~%40'ı → bunun %60-80'i kazanılır = **haftalık limitte ~%25-30 tasarruf**.
+
+### Faz 3 — SÜRDÜR (TTL-MGMT) · 1 sprint
+- FIX/retry'da yeni session yerine `claude --resume` (bootstrap cw sıfırlanır + bağlam korunur — kalite de artar).
+- deckent-native uzun oturumlarda 1h TTL değerlendirmesi (break-even ≥3 read hesabıyla, config-gated).
+- **Gate:** FIX dalgalarında attempt-2 session'larının cw'si attempt-1'in <%20'si.
+
+### Faz 4 — ŞEKİLLENDİR (OUT-DISC + HAIKU-SHAPE) · 1 sprint
+- Haiku micro-call'ları batch'le ya da ≥4096-token stable prefix garanti et (min-cacheable eşiği); gerekirse micro-utility işleri haiku yerine mevcut-session-sonnet'e kaydır (ölç, karar ver).
+- Output disiplini: FIX-dalga dedupe (F1-LIM ile), worker log/result budaması, doc-task'larda ModelEffort=low default.
+- **Gate:** haiku hit-rate ≥%85; $-eşdeğer/istek sonnet'in altına iner.
+
+### Faz 5 — KANITLA (A/B + yayın) · yarım sprint
+- Aynı şekilli 12-task doc-sprint'i optimize-öncesi baseline'a karşı koş: hedef **$-eşdeğer/task ≥%40 düşüş, kalite sabit (12/12 DONE)**.
+- Sonuçlar → docs + sosyal içerik v2 ("limit-aware orchestration" ürün hikâyesi) + README özellik satırı.
+
+**Toplam hedef:** cw −%70 (≈ toplam −%40) + output −%15 ⇒ **aynı haftalık limitle ~2× iş, sıfır içerik/kalite kaybı.** Üçleme: F1-TOK (optimize) → F1-LIM (dürüst dur/park) → F1-010 (overflow; cache-aware ITPM sayesinde API modunda da 5× etkili throughput).
+
+---
+
+## 10. Geçmiş-Sprint Transcript Analizi + Worker-Prompt Denetimi (2026-06-10 akşam)
+
+### 10.1 Altı sprint, 69 task — gerçek (transcript) yakım, üç dönem
+
+Session↔task eşlemesi: worker transcript'inin ilk user-mesajındaki `.tasks/task-NNN-NNN.` deseni.
+Birim: $-eşdeğer (in·$in + out·$out + cw·1.25$in, cacheRead=0). `.result` beyanları KULLANILMADI.
+
+| Sprint | Fleet | Task | Task-başı $ | boot-cw / cw | Not |
+|---|---|---|---|---|---|
+| 261 (fable-öncesi) | sonnet-ağırlıklı | 15 | **$0,58** | %63 | 259 çağrı, hit %91-97 |
+| 264 (all-fable) | fable ×12 | 12 | **$2,27** | %52 | doc sprint'i — fable'a gereksiz pahalı |
+| 266 (all-fable) | fable ×5 | 5 | **$2,47** | %54 | |
+| **269 (all-fable + limit kesintisi)** | fable ×5 | 5 | **$7,70** | %22 | 62-74 çağrı/task (normal 9-20) — **kesinti+FIX kaskadı maliyeti 3,3× şişirdi**; 5 task = $38,5 ≈ 270'in 20 task'ı + 271'in 12 task'ı TOPLAMI |
+| 270 (katmanlı) | opus5+sonnet9+haiku6 | 20 | **$0,88** | %44 | |
+| 271 (katmanlı, canlı) | sonnet9+opus1+haiku2 | 12 | **$0,58** | %59 | sonnet-dönemi maliyetine geri dönüldü |
+
+**Çıkarımlar:**
+1. **Model-katmanlama kanıtlandı:** task-başı yakım fable-fleet $2,3-2,5 → katmanlı $0,58-0,88 (~3-4× düşüş), kalite sabit (270: 20/20).
+2. **`.result` tokenUsage beyanları sistematik olarak 3-5× DÜŞÜK** (beyan/gerçek ortalama ~%30, aralık %8-68) — worker kendi usage'ını göremiyor, uyduruyor. Ledger transcript-bazlı OLMALI (Faz 0 tasarım kararı kanıtlandı); "tokenUsage eksik = NO_GO" sözleşmesi kurumsallaşmış kurgu — kaldırılmalı.
+3. **Bootstrap cw = fleet cw'sinin %44-63'ü** (~47-91K/worker; sonnet ~50K, opus ~65-91K, fable ~60-80K). Session-içi hit %89-98 — caching session içinde mükemmel çalışıyor; israf yalnız session-başı tam-yeniden-yazım. CACHE-WARM'un hedefi doğru.
+4. **En pahalı israf retry/kesinti:** 269'un fazladan ~$27'ı (5 task'ta) tüm prompt-optimizasyonlarının kazancından büyük → F1-LIM (park, FIX'i ölü-limitte tetikleme) ekonomik olarak 1 numaralı kalem.
+5. Kesintili task'larda süre alanı güvenilmez (negatif süreler = reset'i aşan session'lar) — ledger süreyi hb'den almalı, transcript'ten değil.
+
+### 10.2 Worker-prompt denetimi: 271-004 vs 271-010 (kalite·maliyet·tutarlılık, /100)
+
+Bölüm haritası (ölçülmüş):
+
+| Bölüm | 271-004 (44,6K char ≈ 11,1K tok) | 271-010 (24,6K char ≈ 6,1K tok) |
+|---|---|---|
+| Agent persona | 5,1K (api-builder) | 7,1K (bug-fixer) |
+| Skills | 9,2K — **iki dosyada md5 birebir aynı** | 9,2K (aynı) |
+| ADR bloğu | **22,4K (%50!) — ADR-037 tek başına 21,6K (%48)** | 3,0K (001/002/008 — uygun) |
+| Task+kurallar | 6,6K | 5,1K |
+
+**Puanlar:** 271-004 = **85/100** (Kalite 37/40 · Maliyet 23/30 · Tutarlılık 25/30) · 271-010 = **90/100** (39 · 28 · 23).
+
+**Kesintiler (kanıtlı):**
+- **[T1, her ikisi]** goCriteria şablonu "`npx vitest run` passes" (TAM suite) derken CRITICAL VERIFY "do NOT run the Full test suite (~67 pre-existing fail)" diyor — **doğrudan iç çelişki** (Definition-of-Done ↔ verify talimatı). False-NO_GO/karışıklık riski; 257'de fix'lenen CODE-FULLSUITE-NOGO'nun şablonda yaşayan artığı.
+- **[T2, 271-010 ağır]** bug-fixer personası 5 yerde "run the FULL test suite", "full suite passes yoksa NO_GO (GO_WITH_TECH_DEBT değil)" diyor — hem harness'ın targeted-verify kuralıyla hem self-assessment merdiveniyle çelişiyor. Persona-harness çatışmasını worker çözmek zorunda kalıyor.
+- **[K1, 271-004]** Task description açıkça "register pattern **ADR-012**" diyor; relevance-scorer (topN=3) ADR-012'yi SEÇMEMİŞ, yerine ~5,4K token'lık ADR-037'yi (görevle ilgisi: zaten Scope Rules + Karpathy bloklarında özetlenen "scope'ta kal + dürüst ol") koymuş. Açık-referans kaçırma + balast.
+- **[M1]** ADR render'ı her ADR'de başlık+status'u İKİ kez basıyor (export başlığı + içerik başlığı) — saf tekrar.
+- **[M2]** Blok sırası cache-düşmanı: Agent (task-başına değişir) EN BAŞTA, Skills (en-paylaşılan, md5-aynı) ikinci — aynı-skill'li iki worker'ın paylaşılabilir prefix'i 1. bayttan kırılıyor.
+- **[T3]** `*Kanıt:**` bozuk markdown artifact'ı (şablon interpolasyonu).
+- **[T4]** tokenUsage zorunluluğu (10.1 #2 — kurgu mecburiyeti).
+
+### 10.3 ≥97/100 için değişiklik listesi — SIFIR kalite/işlev kaybı
+
+Hiçbir bilgi silinmez; düzeltilir, teklenir, yeniden sıralanır:
+
+| # | Fix | Etki | Puan |
+|---|---|---|---|
+| 1 | goCriteria şablonu: "`npx vitest run` passes" → "targeted test file(s) pass" (tek satır, task-builder şablonu) | T1 ölür; false-NO_GO/full-suite koşma riski biter | +3-4 her ikisi |
+| 2 | Persona harness-uyumu: agent şablonlarındaki "full test suite" ifadeleri parametrik ("project-configured verify scope") YA DA persona sonuna otomatik harness-override notu | T2 ölür | +4 (010) |
+| 3 | ADR seçici: task description'daki açık `ADR-NNN` referansları topN'e ZORLA dahil | K1 ölür | +2 (004) |
+| 4 | ADR render dedupe (çift başlık tek başlığa) + dev-ADR'lerde "operative-extract" modu: ADR-037 için V1.0-reality notu + worker'a dokunan kurallar (tarihçe/alternatifler/matris worker için işlevsiz — işlevsel kural kaybı YOK) | ~5K token/task tasarruf (037 seçildiğinde), dikkat-kirliliği azalır | +3 (004) |
+| 5 | Blok sırası: **Skills (en-paylaşılan) → Agent → ADR → Task (en-özel)** — salt yeniden sıralama | Cross-worker paylaşılabilir prefix uzar (cache) | +1 |
+| 6 | tokenUsage: zorunlu-beyan → opsiyonel-tahmin; gerçek sayım transcript-ledger'dan (Faz 0) | T4 ölür; veri dürüstlüğü | +1-2 |
+| 7 | `*Kanıt:**` interpolasyon fix'i | T3 ölür | +0,5 |
+
+Sonuç projeksiyonu: 271-004 → **~97-98**, 271-010 → **~98**.
+
+### 10.4 F1-TOK plan genişletmesi (bu analizle eklenen)
+
+- **Faz 0 (TOK-LEDGER) genişledi:** ledger `.result` tokenUsage'ın YERİNE geçer (3-5× sapma kanıtı §10.1); süre hb'den; "tokenUsage eksik = NO_GO" kuralı kalkar (fix #6).
+- **Faz 1 (PREFIX-STAB) genişledi:** + blok yeniden-sıralama (fix #5), + ADR render dedupe & operative-extract (fix #4), + açık-ADR-referans önceliği (fix #3).
+- **🆕 Faz 1,5 (PROMPT-CONS — prompt tutarlılık):** goCriteria şablon fix'i (#1) + persona harness-uyum katmanı (#2) + interpolasyon artifact'ları (#7). Bunlar token tasarrufundan fazlası: **false-NO_GO/FIX-kaskadı önleme** — 269 kanıtıyla retry şişmesi ($7,70/task) tüm israf kalemlerinin en büyüğü.
+- **Faz 5 (A/B) ölçütü güncellendi:** baseline artık bu analizin 6-sprint tablosu; hedef katmanlı-fleet task-başı $0,58-0,88 → **≤$0,45** (boot-warm + prompt fix'leriyle) kalite sabit.

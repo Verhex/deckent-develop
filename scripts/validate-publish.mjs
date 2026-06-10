@@ -53,7 +53,21 @@ export const BIN_FILES = ['dist/cli/entry.js', 'dist/mcp/server.js'];
 // dashboard) is ~2.7 MB; 3 MB ceiling gives ~10% headroom while still catching
 // >50% regressions, and stays well below npm's own 50 MB warning threshold.
 // File count target re-anchored to measured 920 (from 899) for the same reason.
-const MAX_PACK_BYTES = 3 * 1024 * 1024; // 3 MB
+//
+// Sprint 271 re-calibration (271-008): threshold raised from 3 MB → 5 MB.
+// Root cause: `npm run build:all` now includes the Vite dashboard bundle under
+// dist/dashboard/, adding ~3 MB of compressed content:
+//   - JS + CSS bundle: ~400 KB
+//   - dist/dashboard/decko-mascot.png (761 KB) — functional, shown in Layout
+//   - dist/dashboard/favicon.png (761 KB) — browser tab icon
+//   - dist/dashboard/logo.png (1.4 MB) — present in public/ but not referenced
+//     in src/dashboard/src/ (identified as dead asset; removal is a follow-up
+//     task outside this script's scope)
+// Measured with full build: ~4.8 MB (Sprint 270 finding). 5 MB gives ~200 KB
+// headroom while remaining well under npm's own 50 MB warning threshold.
+// The dashboard bundle is a functional product feature (served by `deckent serve`)
+// and cannot be excluded without breaking the UI.
+const MAX_PACK_BYTES = 5 * 1024 * 1024; // 5 MB (see Sprint 271 calibration above)
 const TARGET_FILE_COUNT = 920;
 const FILE_COUNT_TOLERANCE = 800; // accept ~120..1720 (band — exact match is brittle)
 
@@ -180,7 +194,7 @@ export function checkPackSizeAndCount(packOutput) {
       gate: 'pack_size_and_count',
       ok: false,
       severity: 'error',
-      message: `Package size ${packageSize} exceeds 2 MB limit (${packageSizeBytes} > ${MAX_PACK_BYTES} bytes)`,
+      message: `Package size ${packageSize} exceeds 5 MB limit (${packageSizeBytes} > ${MAX_PACK_BYTES} bytes)`,
     };
   }
 

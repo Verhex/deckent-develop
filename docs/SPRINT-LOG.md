@@ -7361,3 +7361,58 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 270-020: MASTER-PLAN işaretlemeleri — 270 kapanan maddeler (DONE)
 
 ---
+## Sprint 270 — sprint-270
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-06-10
+**Duration:** 20939s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 0 |
+| Completed | 0 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 20939396ms |
+
+### Tasks
+
+
+---
+## Sprint 271 — sprint-271
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-06-10
+**Duration:** 1975s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 14 |
+| Completed | 13 |
+| Tech Debt | 2 |
+| No-Go | 1 |
+| Coverage | NaN% |
+| Duration | 1974907ms |
+
+### Tasks
+
+- 271-001: resource-monitor çekirdeği — docker stats örnekleyici → JSONL (DONE)
+- 271-002: resource_monitor config bloğu (DONE)
+- 271-003: resource-log analiz fonksiyonları — per-task peak/avg (DONE)
+- 271-004: `deckent resources` CLI — anlık snapshot + log özeti (DONE)
+- 271-005: sprint-yaşamdöngüsü wire — opt-in izleme SPAWN→CLEANUP (GO_WITH_TECH_DEBT)
+- 271-006: doctor "Worker Resources" satırı — limit görünürlüğü + tavan uyarısı (GO_WITH_TECH_DEBT)
+- 271-007: resource-profile referansı — kod-türevli kaynak haritası (DONE)
+- 271-008: pack diyeti — 4.8MB → eşik altı (DONE)
+- 271-009: link lint — 17 kırık link (DONE)
+- 271-010: manifest F3-009 pre-existing test çifti (DONE)
+- 271-011: crash-hardening — .spawnlock bayat-kilit temizliği kurtarma araçlarında (DONE)
+- 271-012: features + cli-commands — resources/resource_monitor satırları (DONE)
+- 271-013: MASTER-PLAN işaretleri — 271 kapananlar (NO_GO)
+
+---

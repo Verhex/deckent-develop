@@ -10,7 +10,7 @@ Most of these features are opt-in and can be enabled via flags in `.deckent/conf
 
 1.  [Actor & RBAC (`actor`)](#1-actor--rbac-role-based-access-control)
 2.  [Multi-Tenancy (`tenantId`)](#2-multi-tenancy-tenantid)
-3.  [Audit Lineage (`correlationId`, `causationId`)](#3-audit-lineage-correlationid--causationid)
+3.  [Audit Lineage (`correlationId`, `causationId`)](#3-audit-lineage-correlationid-causationid)
 4.  [Governance Gating (`riskClass`)](#4-governance-gating-riskclass)
 5.  [Capability Brokering (`capabilityTarget`)](#5-capability-brokering-capabilitytarget)
 6.  [Cost Control (`budget`)](#6-cost-control-budget)

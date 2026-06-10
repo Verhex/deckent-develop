@@ -1,5 +1,25 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-271 Learnings
+- Sprint sprint-271 Learnings: ## Sprint sprint-271 Learnings
+- sprint-yaşamdöngüsü wire — opt-in izleme SPAWN→CLEANUP: GO_WITH_TECH_DEBT — Wired Task-1 resource-monitor into the sprint lifecycle, opt-in via config.resource_monitor.enabled===true. Chose sprint
+- doctor "Worker Resources" satırı — limit görünürlüğü + tavan uyarısı: GO_WITH_TECH_DEBT — Added Worker Resources section to deckent doctor.
+
+Changes:
+- src/cli/commands/doctor.ts: Added `totalmem` to os import;
+- MASTER-PLAN işaretleri — 271 kapananlar: NO_GO
+
+## Gains
+- 271-001 — resource-monitor çekirdeği — docker stats örnekleyici → JSONL — Implemented createResourceMonitor with start/stop/sampleOnce.
+- 271-002 — resource_monitor config bloğu — Added ResourceMonitorConfig interface to config-types.ts with enabled (required boolean), interva...
+- 271-003 — resource-log analiz fonksiyonları — per-task peak/avg — Implemented pure analysis functions for resource log data:
+- 271-004 — `deckent resources` CLI — anlık snapshot + log özeti — Implemented deckent resources CLI command (ADR-012 register pattern).
+- 271-007 — resource-profile referansı — kod-türevli kaynak haritası — Created comprehensive resource-profile.md reference document with all code-derived content from s...
+- 271-008 — pack diyeti — 4.8MB → eşik altı — ## Pack Analysis (npm pack --dry-run, without dashboard build)
+- 271-009 — link lint — 17 kırık link
+- 271-010 — manifest F3-009 pre-existing test çifti — Root cause: the test was written in Sprint 228 with label 'Autonomous Runtime — F3-009 authority-...
+- …and 2 more delivered
+
 ## Sprint sprint-270 Learnings
 - Sprint sprint-270 Learnings: ## Sprint sprint-270 Learnings
 

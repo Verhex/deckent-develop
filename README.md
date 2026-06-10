@@ -127,10 +127,10 @@ Single-task execution for quick commands, reminders, and life-assistant use case
 
 Four core modules — each documented separately:
 
-- **[Brain](docs/architecture/brain.md)** — Plans tasks, assigns models, evaluates results, learns across sprints via SQLite memory
-- **[Workers](docs/architecture/workers.md)** — Execute tasks in parallel (tmux, subprocess, or Docker), each with plan-code-test-report cycle
-- **[Auditor](docs/architecture/auditor.md)** — Monitors heartbeats, detects boundary violations, enforces quality gates
-- **[Memory V2](docs/architecture/memory.md)** — SQLite + FTS5, dual-layer i18n normalize, 96% context reduction, `deckent recall "<query>"` instant search
+- **[Brain](docs/architecture/architecture.md)** — Plans tasks, assigns models, evaluates results, learns across sprints via SQLite memory
+- **[Workers](docs/worker-guide.md)** — Execute tasks in parallel (tmux, subprocess, or Docker), each with plan-code-test-report cycle
+- **[Auditor](docs/architecture/authority-matrix.md)** — Monitors heartbeats, detects boundary violations, enforces quality gates
+- **[Memory V2](docs/architecture/memory-system.md)** — SQLite + FTS5, dual-layer i18n normalize, 96% context reduction, `deckent recall "<query>"` instant search
 
 ---
 

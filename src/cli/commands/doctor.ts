@@ -1,6 +1,6 @@
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { platform } from 'node:os';
+import { platform, totalmem } from 'node:os';
 import { spawnSync, spawn as nodeSpawn } from 'node:child_process';
 import type { Command } from 'commander';
 import { planInstall } from '../../core/provisioner.js';
@@ -35,6 +35,11 @@ import {
   type WorkerImageReport,
   type SpawnImpl,
 } from '../../core/worker-image-check.js';
+import {
+  DEFAULT_WORKER_MEMORY_LIMIT,
+  DEFAULT_WORKER_MEMORY_SWAP,
+  parseMemoryString,
+} from '../../orchestra/spawn-backend-docker.js';
 import { promptConfirm } from '../helpers/prompt.js';
 import { runProviderDiagnostics } from './doctor-checks.js';
 import { detectEnvironment } from '../../core/environment.js';
@@ -396,6 +401,8 @@ export interface HumanDoctorInput {
   authProbes?: Record<string, AuthProbeResult>;
   /** Optional (F1-IMG, Task 270-008): worker docker image readiness report. */
   workerImage?: WorkerImageReport;
+  /** Optional (Sprint 271, Task 271-006): worker resource limits + ceiling info. */
+  workerResources?: WorkerResourcesInfo;
   /** Optional UI language for probe diagnostics (en|tr). Defaults to 'en'. */
   lang?: string;
 }
@@ -626,6 +633,74 @@ export function formatWorkerImageLines(report: WorkerImageReport, lang: string =
   }
   lines.push(`         ${getMessage('doctor.image_build_hint', lang, { cmd: report.suggestedBuildCmd })}`);
   lines.push(`         ${getMessage('doctor.image_fix_hint', lang)}`);
+  return lines;
+}
+
+// ─── Worker Resources Section (Sprint 271, Task 271-006) ─────────────────────
+
+/** Default max_workers when not set in config (matches --ram-experiment default). */
+const DEFAULT_MAX_WORKERS = 6;
+
+/** Structured info for the Worker Resources doctor section. */
+export interface WorkerResourcesInfo {
+  memoryLimit: string;
+  memorySwap: string;
+  maxWorkers: number;
+  /** Total host RAM in bytes (injectable for tests, defaults to os.totalmem()). */
+  hostTotalBytes: number;
+  /** Optional resource_monitor block from config. */
+  resourceMonitor?: { enabled: boolean; interval_ms?: number };
+}
+
+/** Format bytes as human-readable string (e.g. 8.0GB, 512MB). */
+function formatBytesHuman(bytes: number): string {
+  if (bytes >= 1024 ** 3) return `${(bytes / 1024 ** 3).toFixed(1)}GB`;
+  if (bytes >= 1024 ** 2) return `${(bytes / 1024 ** 2).toFixed(0)}MB`;
+  return `${bytes}B`;
+}
+
+/**
+ * Format the Worker Resources section for `deckent doctor` output.
+ * Pure function — injectable for tests (hostTotalBytes in WorkerResourcesInfo).
+ */
+export function formatWorkerResourcesLines(info: WorkerResourcesInfo, lang: string = 'en'): string[] {
+  const lines: string[] = [getMessage('doctor.resources_header', lang)];
+
+  const limitBytes = parseMemoryString(info.memoryLimit) ?? parseMemoryString(DEFAULT_WORKER_MEMORY_LIMIT) ?? 0;
+  const ramCeilingBytes = info.maxWorkers * limitBytes;
+  const hostBytes = info.hostTotalBytes;
+  const pct = hostBytes > 0 ? Math.round((ramCeilingBytes / hostBytes) * 100) : 0;
+
+  lines.push(`  ${getMessage('doctor.resources_limits', lang, {
+    limit: info.memoryLimit,
+    swap: info.memorySwap,
+    workers: String(info.maxWorkers),
+  })}`);
+
+  lines.push(`  ${getMessage('doctor.resources_ceiling', lang, {
+    ceiling: formatBytesHuman(ramCeilingBytes),
+    workers: String(info.maxWorkers),
+    limit: info.memoryLimit,
+    host: formatBytesHuman(hostBytes),
+    pct: String(pct),
+  })}`);
+
+  if (hostBytes > 0 && pct > 60) {
+    lines.push(`  ${getMessage('doctor.resources_warn_ceiling', lang, {
+      ceiling: formatBytesHuman(ramCeilingBytes),
+      pct: String(pct),
+    })}`);
+  }
+
+  if (info.resourceMonitor) {
+    if (info.resourceMonitor.enabled) {
+      const interval = info.resourceMonitor.interval_ms ?? 5000;
+      lines.push(`  ${getMessage('doctor.resources_monitor_on', lang, { interval: String(interval) })}`);
+    } else {
+      lines.push(`  ${getMessage('doctor.resources_monitor_off', lang)}`);
+    }
+  }
+
   return lines;
 }
 
@@ -881,6 +956,12 @@ export function formatHumanDoctor(input: HumanDoctorInput): string {
   // Only present when the docker backend is configured (the action gates it).
   if (input.workerImage) {
     lines.push(...formatWorkerImageLines(input.workerImage, input.lang ?? 'en'));
+    lines.push('');
+  }
+
+  // --- Worker Resources (Sprint 271, Task 271-006) ---
+  if (input.workerResources) {
+    lines.push(...formatWorkerResourcesLines(input.workerResources, input.lang ?? 'en'));
     lines.push('');
   }
 
@@ -1465,11 +1546,39 @@ export function registerDoctor(program: Command): void {
 
         // Read memory_budget from config (sync) — default 900
         let brainBudget = 900;
+        let workerResources: WorkerResourcesInfo | undefined;
         try {
           const configPath = join(root, PROJECT_CONFIG_PATH);
           if (existsSync(configPath)) {
-            const rawCfg = JSON.parse(readFileSync(configPath, 'utf-8')) as { memory_budget?: number };
+            const rawCfg = JSON.parse(readFileSync(configPath, 'utf-8')) as {
+              memory_budget?: number;
+              worker_memory_limit?: string;
+              worker_memory_swap?: string;
+              max_workers?: number | 'auto';
+              resource_monitor?: { enabled?: boolean; interval_ms?: number };
+            };
             if (typeof rawCfg.memory_budget === 'number') brainBudget = rawCfg.memory_budget;
+            // Worker Resources (Sprint 271 Task 271-006)
+            const memLimit = rawCfg.worker_memory_limit ?? DEFAULT_WORKER_MEMORY_LIMIT;
+            const memSwap = rawCfg.worker_memory_swap ?? DEFAULT_WORKER_MEMORY_SWAP;
+            const maxW = (typeof rawCfg.max_workers === 'number' ? rawCfg.max_workers : null) ?? DEFAULT_MAX_WORKERS;
+            workerResources = {
+              memoryLimit: memLimit,
+              memorySwap: memSwap,
+              maxWorkers: maxW,
+              hostTotalBytes: totalmem(),
+              resourceMonitor: rawCfg.resource_monitor && typeof rawCfg.resource_monitor.enabled === 'boolean'
+                ? { enabled: rawCfg.resource_monitor.enabled, interval_ms: rawCfg.resource_monitor.interval_ms }
+                : undefined,
+            };
+          } else {
+            // No config file: use all defaults
+            workerResources = {
+              memoryLimit: DEFAULT_WORKER_MEMORY_LIMIT,
+              memorySwap: DEFAULT_WORKER_MEMORY_SWAP,
+              maxWorkers: DEFAULT_MAX_WORKERS,
+              hostTotalBytes: totalmem(),
+            };
           }
         } catch { /* use default */ }
 
@@ -1486,6 +1595,7 @@ export function registerDoctor(program: Command): void {
           ciReports,
           authProbes,
           workerImage,
+          workerResources,
           lang,
         }));
 

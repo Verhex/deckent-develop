@@ -234,7 +234,7 @@ See [Managed Docs Reference](/reference/managed-docs) for the full configuration
 ## Related
 
 - [Getting Started](/guide/getting-started)
-- [Agent Reference — doc-writer](/reference/agents#doc-writer)
+- [Agent Reference — doc-writer](/reference/agents)
 - [Managed Docs Reference](/reference/managed-docs)
 - [Cookbook: Add a REST API Endpoint](add-rest-api)
 - [Cookbook: Fix a Bug](fix-bug)

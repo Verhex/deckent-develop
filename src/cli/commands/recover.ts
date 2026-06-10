@@ -2,7 +2,7 @@ import { existsSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Command } from 'commander';
 import { cleanOrphanIpcDirs } from '../../core/orphan-cleaner.js';
-import { clearStaleLocks } from '../../core/file-lock.js';
+import { clearStaleLocks, clearStaleSpawnLocks } from '../../core/file-lock.js';
 import { postFinalizeCleanup } from '../../core/orphan-cleaner.js';
 import { runSelfAuditGate } from '../../orchestra/sprint-finalizer.js';
 import { TASKS_DIR, LOCKS_DIR } from '../../core/constants.js';
@@ -16,6 +16,7 @@ export interface RecoveryReport {
   audit: { overallGate: 'PASS' | 'GATE_FAILURE' | 'SKIPPED' };
   orphanIpcDirs: string[];
   staleLocksCleaned: number;
+  staleSpawnLocksCleaned: number;
   taskFilesArchived: number;
   taskFilesPreserved: number;
 }
@@ -29,6 +30,7 @@ async function runRecovery(
     audit: { overallGate: 'SKIPPED' },
     orphanIpcDirs: [],
     staleLocksCleaned: 0,
+    staleSpawnLocksCleaned: 0,
     taskFilesArchived: 0,
     taskFilesPreserved: 0,
   };
@@ -61,6 +63,13 @@ async function runRecovery(
           if (now - st.mtimeMs > STALE_LOCK_AGE_MS) report.staleLocksCleaned++;
         } catch { /* skip */ }
       }
+      const spawnLockFiles = readdirSync(locksDir).filter(f => f.endsWith('.spawnlock'));
+      for (const f of spawnLockFiles) {
+        try {
+          const st = statSync(join(locksDir, f));
+          if (now - st.mtimeMs > STALE_LOCK_AGE_MS) report.staleSpawnLocksCleaned++;
+        } catch { /* skip */ }
+      }
     }
 
     const tasksDir = join(root, TASKS_DIR);
@@ -80,11 +89,16 @@ async function runRecovery(
     print(`  Warning: IPC cleanup failed: ${e}`);
   }
 
-  // Step 3: Clear stale locks
+  // Step 3: Clear stale locks (.lock and .spawnlock)
   try {
     report.staleLocksCleaned = clearStaleLocks(root, STALE_LOCK_AGE_MS);
   } catch (e) {
     print(`  Warning: Lock cleanup failed: ${e}`);
+  }
+  try {
+    report.staleSpawnLocksCleaned = clearStaleSpawnLocks(root, STALE_LOCK_AGE_MS);
+  } catch (e) {
+    print(`  Warning: Spawn lock cleanup failed: ${e}`);
   }
 
   // Step 4: Archive terminal task files
@@ -121,6 +135,7 @@ export function registerRecover(program: Command): void {
           }
           print(`  Orphan IPC dirs: ${report.orphanIpcDirs.length} would be removed`);
           print(`  Stale locks:     ${report.staleLocksCleaned} would be cleared`);
+          print(`  Stale spawnlocks:${report.staleSpawnLocksCleaned} would be cleared`);
           print(`  Task files:      ${report.taskFilesArchived} would be archived`);
           print(`  ─────────────────────────────────────────`);
           print(`\n  Run without --dry-run to execute.\n`);
@@ -156,6 +171,7 @@ export function registerRecover(program: Command): void {
         }
         print(`  Orphan IPC dirs: ${report.orphanIpcDirs.length} removed`);
         print(`  Stale locks:     ${report.staleLocksCleaned} cleared`);
+        print(`  Stale spawnlocks:${report.staleSpawnLocksCleaned} cleared`);
         print(`  Task files:      ${report.taskFilesArchived} archived, ${report.taskFilesPreserved} preserved`);
         print(`  ─────────────────────────────────────────`);
         print(`\n  ✓ Recovery complete. Sprint ${sprintId} is ready for restart.\n`);

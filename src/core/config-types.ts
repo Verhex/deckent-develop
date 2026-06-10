@@ -52,6 +52,17 @@ export interface TerminalConfig {
   outboundDailyQuotaBytes?: number;
 }
 
+// ─── Resource Monitor Config ────────────────────────────────────────
+/** Docker worker resource monitoring (Sprint 271). Opt-in — absent block = disabled. */
+export interface ResourceMonitorConfig {
+  /** Enable resource monitoring (required). */
+  enabled: boolean;
+  /** Sampling interval in ms (default: 5000, min: 1000). */
+  interval_ms?: number;
+  /** JSONL log path relative to project root (default: '.deckent/resource-log.jsonl'). */
+  log_path?: string;
+}
+
 // ─── Configuration (Blueprint 13) ───────────────────────────────────
 export interface PlanModeConfig {
   max_workers: number | 'auto';
@@ -380,6 +391,10 @@ export interface DeckentConfig {
   /** Proactive meta-orchestrator nervous system configuration (Sprint 147+) */
   nervous_system?: NervousSystemConfig;
 
+  // ─── Resource Monitor ───────────────────────────────────────────────
+  /** Docker worker resource monitoring configuration (Sprint 271). Default-disabled (opt-in). */
+  resource_monitor?: ResourceMonitorConfig;
+
   // ─── Autonomous Engine ──────────────────────────────────────────────
   /** Autonomous execution engine configuration (Sprint 226 — Task 7). Default-disabled. */
   autonomous?: {
@@ -657,6 +672,8 @@ export interface ResolvedConfig {
   nervous_system?: NervousSystemConfig;
   /** Autonomous engine configuration (passed through from DeckentConfig). Default-disabled. */
   autonomous?: DeckentConfig['autonomous'];
+  /** Resource monitor configuration (passed through from DeckentConfig). Default-disabled. */
+  resource_monitor?: ResourceMonitorConfig;
   /** Observability configuration (passed through from DeckentConfig) */
   observability?: DeckentConfig['observability'];
   /** Resolved runtime style — always 'sprint' or 'task' */

@@ -9,6 +9,10 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-271-005 | Tech debt from 271-005: Wired Task-1 resource-monitor into the sprint lifecycle, | normal | sprint-271 | resolved |
+| debt-271-006 | Tech debt from 271-006: Added Worker Resources section to deckent doctor.
+
+Chang | normal | sprint-271 | resolved |
 | debt-269-005 | Tech debt from 269-005: C-DocDrift closed. (1) mcp-tools.md regen NOT needed: `n | normal | sprint-269 | resolved |
 | debt-262-013 | Tech debt from 262-013: Worker exited without writing result (exitCode=0) | disk | normal | sprint-262 | resolved |
 | debt-261-015 | Tech debt from 261-015: Worker exited without writing result (exitCode=0) | disk | normal | sprint-261 | resolved |

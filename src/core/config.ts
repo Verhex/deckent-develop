@@ -807,6 +807,22 @@ export function validateConfig(config: DeckentConfig): string[] {
     }
   }
 
+  // ─── Resource Monitor validation ────────────────────────────────────
+  if (config.resource_monitor !== undefined) {
+    const rm = config.resource_monitor;
+    if (typeof rm.enabled !== 'boolean') {
+      errors.push('resource_monitor.enabled must be a boolean');
+    }
+    if (rm.interval_ms !== undefined) {
+      if (typeof rm.interval_ms !== 'number' || rm.interval_ms < 1000) {
+        errors.push('resource_monitor.interval_ms must be a number >= 1000');
+      }
+    }
+    if (rm.log_path !== undefined && typeof rm.log_path !== 'string') {
+      errors.push('resource_monitor.log_path must be a string');
+    }
+  }
+
   // ─── deckent_style validation ───────────────────────────────────────
   if (config.deckent_style !== undefined && !['sprint', 'task'].includes(config.deckent_style)) {
     errors.push(`Invalid value '${config.deckent_style}' for field 'deckent_style'. Valid options: sprint, task`);
@@ -1391,6 +1407,8 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
     nervous_system: config.nervous_system,
     // Autonomous Engine — passed through from project config
     autonomous: config.autonomous,
+    // Resource Monitor — passed through from project config (opt-in, absent = disabled)
+    resource_monitor: config.resource_monitor,
     // Messaging connectors (BOT-001) — passed through; tokens .deck-interpolated below.
     notify_connectors: (config as DeckentConfig).notify_connectors,
     notify_on_complete: (config as DeckentConfig).notify_on_complete,
@@ -2043,6 +2061,8 @@ export function mergeConfigs(
     terminal: config.terminal
       ? deepMerge(DEFAULT_TERMINAL_CONFIG, config.terminal as Partial<TerminalConfig>)
       : structuredClone(DEFAULT_TERMINAL_CONFIG),
+    // Resource Monitor — passed through (opt-in, absent = disabled)
+    resource_monitor: config.resource_monitor,
   };
   return merged;
 }
