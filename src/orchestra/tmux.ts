@@ -211,6 +211,24 @@ export function killWorker(taskId: string): void {
 }
 
 /**
+ * Kill all active worker windows. Returns the count of workers killed.
+ * Individual kill failures are swallowed so one bad window does not abort the rest.
+ */
+export function killAllWorkers(): number {
+  const workers = listWorkers();
+  let killed = 0;
+  for (const taskId of workers) {
+    try {
+      killWorker(taskId);
+      killed++;
+    } catch {
+      // best-effort: skip failed individual kills
+    }
+  }
+  return killed;
+}
+
+/**
  * @internal Lists active worker windows in tmux. Used only within orchestra/.
  * Not part of the public API surface.
  */

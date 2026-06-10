@@ -11,6 +11,7 @@ import { LayoutDashboard, History, Brain, SlidersHorizontal, MessageCircle, Acti
 import { cn } from "../lib/utils";
 import { useTranslation } from "../i18n/LanguageProvider";
 import type { TranslationKey } from "../i18n/en";
+import { useNervousStatus } from "../hooks/useNervousStatus";
 
 export type NavItem = {
   to: string;
@@ -41,6 +42,7 @@ interface SidebarNavLinksProps {
 
 export function SidebarNavLinks({ onNavigate }: SidebarNavLinksProps) {
   const { t } = useTranslation();
+  const { pendingCount } = useNervousStatus();
   return (
     <nav className="flex flex-col gap-1">
       {navItems.map(({ to, labelKey, label, icon: Icon }) => (
@@ -60,6 +62,15 @@ export function SidebarNavLinks({ onNavigate }: SidebarNavLinksProps) {
         >
           <Icon className="h-4 w-4" />
           {label ?? t(labelKey)}
+          {to === "/nervous" && pendingCount > 0 && (
+            <span
+              data-testid="nervous-bell-badge"
+              aria-label={t("dashboard.pending")}
+              className="ml-auto flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-yellow-500 px-1 text-xs font-bold text-zinc-900"
+            >
+              {pendingCount > 99 ? "99+" : pendingCount}
+            </span>
+          )}
         </NavLink>
       ))}
     </nav>

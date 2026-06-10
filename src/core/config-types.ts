@@ -96,6 +96,15 @@ export interface WorkerCommsConfig {
   inject_shared?: boolean;
 }
 
+// ─── Cost Guard Config ───────────────────────────────────────────────
+/** Mid-sprint token-usage abort guard (Sprint 279 WK-cost). Opt-in — absent block = disabled. */
+export interface CostGuardConfig {
+  /** Enable mid-sprint cost guard (required). */
+  enabled: boolean;
+  /** Dispatch stops when sprint limit-cost reaches this threshold in USD (default-off when absent). */
+  max_limit_cost_usd?: number;
+}
+
 // ─── Configuration (Blueprint 13) ───────────────────────────────────
 export interface PlanModeConfig {
   max_workers: number | 'auto';
@@ -473,6 +482,10 @@ export interface DeckentConfig {
   /** Worker-to-worker communication configuration (Sprint 278 COMM-1). Default-disabled (opt-in). */
   worker_comms?: WorkerCommsConfig;
 
+  // ─── Cost Guard ──────────────────────────────────────────────────────
+  /** Mid-sprint token-usage abort guard (Sprint 279 WK-cost). Default-disabled (opt-in). */
+  cost_guard?: CostGuardConfig;
+
   // ─── Autonomous Engine ──────────────────────────────────────────────
   /** Autonomous execution engine configuration (Sprint 226 — Task 7). Default-disabled. */
   autonomous?: {
@@ -779,6 +792,8 @@ export interface ResolvedConfig {
   cross_verify?: CrossVerifyConfig;
   /** Worker-to-worker communication configuration (passed through from DeckentConfig). Default-disabled. */
   worker_comms?: WorkerCommsConfig;
+  /** Mid-sprint cost guard configuration (passed through from DeckentConfig). Default-disabled. */
+  cost_guard?: CostGuardConfig;
   /** Observability configuration (passed through from DeckentConfig) */
   observability?: DeckentConfig['observability'];
   /** Resolved runtime style — always 'sprint' or 'task' */

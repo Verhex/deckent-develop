@@ -4,7 +4,7 @@
 // Sprint 208 (208-011).
 
 import { createHash } from 'node:crypto';
-import { writeEvent } from '../orchestra/event-stream.js';
+import { writeEvent } from './event-stream.js';
 
 // ─── Channel constant ─────────────────────────────────────────────
 

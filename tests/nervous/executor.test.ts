@@ -167,18 +167,21 @@ describe('Executor', () => {
     expect(handler).not.toHaveBeenCalled();
   });
 
-  // Test 6: approve → awaits indefinitely until resolveApproval
-  it('should await indefinitely for approve policy until user resolves', async () => {
+  // Test 6: SAFETY_FLOOR approve → awaits indefinitely until resolveApproval.
+  // Non-SAFETY_FLOOR approve actions now auto-proceed after a hard timeout
+  // (Sprint 279 WK-nervous, see panic-gate-wire.test.ts); SAFETY_FLOOR (locked)
+  // actions remain exempt and require explicit human resolution.
+  it('should await indefinitely for SAFETY_FLOOR approve policy until user resolves', async () => {
     const history = createMockHistory();
     const handler = createMockHandler('success');
     const executor = new Executor(history, handler);
 
-    const action = createAction({ policy: 'approve', id: 'COMMIT_PUSH' });
+    const action = createAction({ policy: 'approve', id: 'KILL_LIVE_SPRINT', isSafetyFloor: true });
     const notification = createNotification({ id: 'notif-approve', actions: [action] });
 
     const handlePromise = executor.handle(notification);
 
-    // Advance significant time — should not auto-resolve
+    // Advance significant time — SAFETY_FLOOR action must not auto-resolve
     await vi.advanceTimersByTimeAsync(60 * 60 * 1000); // 1 hour
     expect(executor.pendingCount).toBe(1);
 

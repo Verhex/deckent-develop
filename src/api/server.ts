@@ -23,7 +23,7 @@ import { bearerAuthMiddleware, isLocalhostRequest, resolveAuthToken } from './au
 import { injectApiTokenIntoHtml, isLoopbackRemote } from './middleware/token.js';
 import { parseSprintLog } from '../cli/commands/history.js';
 import { runDoctorChecks } from '../cli/commands/doctor.js';
-import { killWorker } from '../orchestra/tmux.js';
+import { killWorker, killAllWorkers } from '../orchestra/tmux.js';
 import { loadConfig, createDefaultConfig, validatePartialConfig, ConfigValidationError } from '../core/config.js';
 import { readWorkerLog } from '../agents/worker.js';
 import { AgentPoolManager } from '../core/agent-pool.js';
@@ -814,6 +814,18 @@ async function handleRequest(
         status: () => chatStatusLine(projectRoot, dashPath),
       });
       sendJson(res, { reply });
+      return;
+    }
+
+    // POST /api/kill/all — kill every active worker
+    if (url === '/api/kill/all') {
+      try {
+        const killed = killAllWorkers();
+        console.log(`[deckent] All workers killed via dashboard: ${killed}`);
+        sendJson(res, { success: true, killed });
+      } catch (err: unknown) {
+        sendError(res, 500, err instanceof Error ? err.message : 'Kill all failed');
+      }
       return;
     }
 

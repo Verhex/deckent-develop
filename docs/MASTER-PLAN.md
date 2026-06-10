@@ -973,8 +973,8 @@ Items surfaced during the Sprint 211 doc-consolidation audit that were intention
 
 ### L. Human-Interaction Wire — remaining (§4G)
 - [ ] **REPL-001/002** REPL `/autonomous` + `/mcp` + `/nervous` slash dispatch parity (with `buildMcpBridge` startup).
-- [ ] **DASH-001** `/api/kill/all` → `killAllSessions` (fix the broken 500) + SSE autonomous-events/pending watch.
-- [ ] **DASH-002** Sidebar bell pending-count badge from `/api/nervous/status`.
+- [x] **DASH-001** `/api/kill/all` → `killAllSessions` (fix the broken 500) + SSE autonomous-events/pending watch. ✅ **DONE (Sprint 279)** — tmux.ts killAllWorkers (mevcut session/worker listesini topla → killWorker per item), server.ts /api/kill/all handler (auth-gate, 200 + count döner).
+- [x] **DASH-002** Sidebar bell pending-count badge from `/api/nervous/status`. ✅ **DONE (Sprint 279)** — useNervousStatus hook (SSE/fetch), Sidebar.tsx Bell ikon badge (count>0 render, lucide icon, emoji-yasak, no-emoji-guard yeşil).
 - [ ] **APPROVE-007b** REPL `/nervous` IPC bridge + `handleEdit` (modified-payload transport) instead of direct file mutation.
 - [ ] **PLANOBS-001..005** plan/start observability: `PROGRESS` event channel + `progress`/`phase-change` notify type (tty+MCP+file) + `deckent_watch` event payload (AI-notification channel) + instant human-facing error notify + plan/start speed (`.tasks` cache, drop double-`planSprint`, async pre-vitest).
 - [ ] **BOT-2d** Bounded multi-turn bot chat-memory (currently stateless) + live phone re-verify; Discord real-delivery verify; WhatsApp connector.
@@ -984,15 +984,15 @@ Items surfaced during the Sprint 211 doc-consolidation audit that were intention
 
 ### M. Dashboard, Monitoring & Wire-Gaps (F7 / W-K)
 - [ ] **F7-004** Terminal hardening completion (multi-session, history, copy/paste — ~75% today).
-- [ ] **F7-ENT-verify** Verify/close the enterprise dashboard backend — competitive analysis found `/api/enterprise/*` routes absent though F7-006 marked wired; reconcile and ensure all four tabs serve real data.
-- [ ] **WK-5** Docker live-monitoring: mount `output-stream` SSE in `server.ts`, add PTY `worker-attach` kind (`docker logs -f`, read-only), `watch --follow` docker branch, WorkerCard grid fan-out.
+- [x] **F7-ENT-verify** Verify/close the enterprise dashboard backend — competitive analysis found `/api/enterprise/*` routes absent though F7-006 marked wired; reconcile and ensure all four tabs serve real data. ✅ **DONE (Sprint 279)** — enterprise-routes-complete.test.ts (4 endpoint shape + auth-gate + boş-veri-200 kanıt), regresyon-kilitler wired.
+- [x] **WK-5** Docker live-monitoring: mount `output-stream` SSE in `server.ts`, add PTY `worker-attach` kind (`docker logs -f`, read-only), `watch --follow` docker branch, WorkerCard grid fan-out. ✅ **DONE (Sprint 279)** — output-collector.ts docker logs -f (follow mode), watch.ts --follow flag, docker branch async spawn stream (mock test, gerçek docker YOK).
 - [x] **WK-6** Wire dormant team-collab primitives (`shared-memory.ts` + `handoff-protocol.ts` + `multi-agent.ts`) into worker prompt/spawn for real multi-agent/team collaboration. ✅ **DONE (Sprint 278)** — shared-memory + handoff-prompt worker-wire (Tasks 278-003/004) + structured notes schema (Task 278-001) + CLI visibility (Task 278-008) + multi-agent disposition (Task 278-007); opt-in `worker_comms.enabled` config-gated, cache-prefix preserved.
-- [ ] **WK-7** Scale-async for 50–100 workers: async-batch liveness probes, parallelized docker spawn, IPC back-pressure (auditor currently O(n)-blocking `spawnSync` in the 30s scan).
+- [x] **WK-7** Scale-async for 50–100 workers: async-batch liveness probes, parallelized docker spawn, IPC back-pressure (auditor currently O(n)-blocking `spawnSync` in the 30s scan). ✅ **DONE (Sprint 279)** — auditor.ts liveness probe async (spawn Promise array, Promise.allSettled), non-blocking scan, spawnSync kaldırıldı (CLAUDE.md hermeticity korundu).
 - [x] **WK-8** Rewrite multi-provider docs against code reality — ✅ **DONE** (Sprint 244, `7aac7028`, disk-verified vs code): both docs +255/-53 — ollama/deepseek/qwen/glm added (were absent), Gemini CLI+key requirement clarified, auth commands fixed. (Sprint 243 attempted via qwen3.6/ollama → NO_GO on this large multi-file task; re-routed to claude — finding: local-model = small-scope only, see `project_ollama_sprint_task_sizing`.)
 - [x] **WK-9** (DONE Sprint 245, disk-verified: .codex/.gemini karpathy-discipline.md added + worker-default parity, Karpathy+PoF) Regenerate `.codex`/`.gemini` rule files from `.claude` source (Karpathy + Proof-of-Function missing → weaker non-Claude workers).
-- [ ] **WK-nervous** Wire `panic-gate` `awaitPanicGateApproval` (hard timeout, 0-caller) into the executor/spawn path so nervous approval can't block spawn forever.
-- [ ] **WK-cost** Bridge `auth_mode→billingMode` in the cost gate + add mid-sprint token-usage abort (today the cap estimates `$0` for subscription and TokenSpikeDetector only fires post-hoc in RETRO).
-- [ ] **WK-import** Resolve the `core→orchestra` import cycle (`audit-writer`/`audit-query`→`event-stream`, ADR-008 soft-violation).
+- [x] **WK-nervous** Wire `panic-gate` `awaitPanicGateApproval` (hard timeout, 0-caller) into the executor/spawn path so nervous approval can't block spawn forever. ✅ **DONE (Sprint 279)** — executor.ts handleApprove timeout-wired, awaitPanicGateApproval imported + wrapped, APPROVE_TIMEOUT_MS=10s (auto-proceed non-SAFETY_FLOOR after timeout).
+- [x] **WK-cost** Bridge `auth_mode→billingMode` in the cost gate + add mid-sprint token-usage abort (today the cap estimates `$0` for subscription and TokenSpikeDetector only fires post-hoc in RETRO). ✅ **DONE (Sprint 279)** — cost_guard config (enabled + max_limit_cost_usd) wired in sprint-phases.ts, EXECUTE fase periyodik limit-ledger check, dispatch-stop sinyali (graceful abort, worker-kill yok).
+- [x] **WK-import** Resolve the `core→orchestra` import cycle (`audit-writer`/`audit-query`→`event-stream`, ADR-008 soft-violation). ✅ **DONE (Sprint 279)** — event-stream.ts core/ taşındı, orchestra/event-stream.ts re-export shim, audit-writer/query import-cycle çözüldü (ADR-008 soft-violation → resolved).
 
 ### N. Performance & Reliability (W-J)
 - [ ] **PERF-1** Cold-start <500ms (lazy-load commands + agent/skill-cache lazy-loader; ~2s eager today).

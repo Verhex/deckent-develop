@@ -7635,3 +7635,35 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 278-011: features + MASTER-PLAN — COMM-1 işaretleri (DONE)
 
 ---
+## Sprint 279 — sprint-279
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-06-10
+**Duration:** 1260s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 11 |
+| Completed | 11 |
+| Tech Debt | 1 |
+| No-Go | 0 |
+| Coverage | 9.1% |
+| Duration | 1260447ms |
+
+### Tasks
+
+- 279-001: WK-import — core→orchestra import-cycle çöz (ADR-008) (OPUS) (DONE)
+- 279-002: WK-nervous — panic-gate timeout wire (0-caller → spawn yolu) (GO_WITH_TECH_DEBT)
+- 279-003: WK-cost — mid-sprint token-usage abort (limit-ledger besleme) (DONE)
+- 279-004: WK-7 — auditor async-batch liveness (O(n) spawnSync → parallel) (DONE)
+- 279-005: DASH-001 — /api/kill/all + autonomous SSE watch (DONE)
+- 279-006: DASH-002 — sidebar bell pending-count badge (lucide, emoji-yasak) (DONE)
+- 279-007: WK-5-kalan — docker live-monitor: output-stream PTY worker-attach + watch --follow (DONE)
+- 279-008: F7-ENT-verify — enterprise dashboard backend doğrula + 4 tab gerçek-veri (DONE)
+- 279-009: WK-5/COMM-1 dashboard görünürlük — Worker Comms + Resources panel (DONE)
+- 279-010: features + cli-commands — M-küme satırları (DONE)
+- 279-011: MASTER-PLAN — M-küme işaretleri (DONE)
+
+---

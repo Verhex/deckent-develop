@@ -2,6 +2,28 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint279] - 2026-06-10
+
+### Added
+
+- WK-import — core→orchestra import-cycle çöz (ADR-008) (OPUS)
+- WK-cost — mid-sprint token-usage abort (limit-ledger besleme)
+- WK-7 — auditor async-batch liveness (O(n) spawnSync → parallel)
+- DASH-001 — /api/kill/all + autonomous SSE watch
+- DASH-002 — sidebar bell pending-count badge (lucide, emoji-yasak)
+- WK-5-kalan — docker live-monitor: output-stream PTY worker-attach + watch --follow
+- F7-ENT-verify — enterprise dashboard backend doğrula + 4 tab gerçek-veri
+- WK-5/COMM-1 dashboard görünürlük — Worker Comms + Resources panel
+- features + cli-commands — M-küme satırları
+- MASTER-PLAN — M-küme işaretleri
+
+### Changed
+
+- WK-nervous — panic-gate timeout wire (0-caller → spawn yolu) (completed with tech debt)
+
+
+_Tasks: 11 total, 11 done, 1 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint278] - 2026-06-10
 
 ### Added

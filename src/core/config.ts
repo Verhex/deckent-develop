@@ -877,6 +877,19 @@ export function validateConfig(config: DeckentConfig): string[] {
     }
   }
 
+  // ─── Cost Guard validation (Sprint 279 WK-cost) ─────────────────────
+  if (config.cost_guard !== undefined) {
+    const cg = config.cost_guard;
+    if (typeof cg.enabled !== 'boolean') {
+      errors.push('cost_guard.enabled must be a boolean');
+    }
+    if (cg.max_limit_cost_usd !== undefined) {
+      if (typeof cg.max_limit_cost_usd !== 'number' || cg.max_limit_cost_usd <= 0) {
+        errors.push('cost_guard.max_limit_cost_usd must be a positive number');
+      }
+    }
+  }
+
   // ─── deckent_style validation ───────────────────────────────────────
   if (config.deckent_style !== undefined && !['sprint', 'task'].includes(config.deckent_style)) {
     errors.push(`Invalid value '${config.deckent_style}' for field 'deckent_style'. Valid options: sprint, task`);
@@ -1481,6 +1494,8 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
     cache_warm: config.cache_warm,
     // Worker Comms — passed through (opt-in, absent = disabled)
     worker_comms: config.worker_comms,
+    // Cost Guard — passed through (opt-in, absent = disabled)
+    cost_guard: config.cost_guard,
     // Plan config (Sprint 276 PLAN-INT-1) — passed through (opt-in, absent = disabled)
     plan: config.plan,
     // Messaging connectors (BOT-001) — passed through; tokens .deck-interpolated below.
@@ -2147,6 +2162,8 @@ export function mergeConfigs(
     cache_warm: config.cache_warm,
     // Worker Comms — passed through (opt-in, absent = disabled)
     worker_comms: config.worker_comms,
+    // Cost Guard — passed through (opt-in, absent = disabled)
+    cost_guard: config.cost_guard,
     // Plan config (Sprint 276 PLAN-INT-1) — passed through (opt-in, absent = disabled)
     plan: config.plan,
   };

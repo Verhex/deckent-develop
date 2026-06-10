@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync, existsSync, writeFileSync, unlinkSync, statSync, mkdirSync, renameSync } from 'node:fs';
 import { readFile, stat, writeFile } from 'node:fs/promises';
 import { join, normalize } from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { AgentStatus, AlertLevel, SprintPhase, SprintStatus, TaskStatus } from '../core/types.js';
 import type {
   Heartbeat,
@@ -138,6 +138,205 @@ export function isWorkerProcessAlive(hb: Heartbeat): boolean {
   }
 }
 
+// ─── Async Batch Liveness Probe (Sprint 279 WK-7) ───────────────────
+//
+// The synchronous `isWorkerProcessAlive` above issues one blocking, synchronous
+// docker/tmux probe per worker. Inside the 30s auditor scan that
+// is O(n) event-loop blocking — with ≥20 workers it stalls the loop and causes
+// resource contention. This block adds a NON-BLOCKING, parallel alternative:
+// each worker is probed with async `spawn`, all probes run concurrently via
+// `Promise.allSettled`, and the verdicts are memoized in a liveness cache. The
+// scan loop pre-warms this cache (see `startScanLoop`), so the synchronous stale
+// detection reads cached results instead of blocking on per-worker probes. The
+// sync probe remains the cache-miss fallback (cold cache / direct call) so
+// standalone behavior is preserved bit-for-bit.
+
+/** Options for the async liveness probe — `spawn` is injectable for tests. */
+export interface LivenessProbeOptions {
+  /** Inject an async spawn implementation (defaults to node:child_process spawn). */
+  spawn?: typeof spawn;
+  /** Per-probe timeout in milliseconds (default 5_000 — matches the sync probe). */
+  timeoutMs?: number;
+}
+
+/**
+ * Module-level liveness cache keyed by workerId.
+ * Populated by `batchProbeLiveness`; read by `isWorkerStale` (Signal B).
+ */
+const livenessCache = new Map<string, boolean>();
+
+/** Clear the liveness cache (for testing or sprint cleanup). */
+export function clearLivenessCache(): void {
+  livenessCache.clear();
+}
+
+/** Get the liveness cache size (for testing). */
+export function getLivenessCacheSize(): number {
+  return livenessCache.size;
+}
+
+/** Read a cached liveness verdict (undefined when not yet probed). */
+export function getCachedLiveness(workerId: string): boolean | undefined {
+  return livenessCache.get(workerId);
+}
+
+/**
+ * Run a single async liveness probe and resolve a boolean verdict.
+ * Never throws — spawn errors, timeouts, and unexpected exits resolve `false`
+ * (fail-safe, matching the synchronous probe's catch semantics).
+ */
+function runAsyncProbe(
+  spawnFn: typeof spawn,
+  command: string,
+  args: string[],
+  timeoutMs: number,
+  decide: (code: number | null, stdout: string) => boolean,
+): Promise<boolean> {
+  return new Promise<boolean>((resolve) => {
+    let settled = false;
+    const finish = (verdict: boolean): void => {
+      if (settled) return;
+      settled = true;
+      resolve(verdict);
+    };
+
+    let child: ReturnType<typeof spawn>;
+    try {
+      child = spawnFn(command, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+    } catch {
+      finish(false); // spawn threw synchronously (ENOENT etc.) — fail-safe
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      try { child.kill(); } catch { /* already gone */ }
+      finish(false);
+    }, timeoutMs);
+    if (typeof timer.unref === 'function') timer.unref();
+
+    let stdout = '';
+    child.stdout?.on('data', (chunk: unknown) => { stdout += String(chunk); });
+    child.on('error', () => { clearTimeout(timer); finish(false); });
+    child.on('close', (code: number | null) => {
+      clearTimeout(timer);
+      finish(decide(code, stdout));
+    });
+  });
+}
+
+/**
+ * Async, non-blocking equivalent of `isWorkerProcessAlive`.
+ * Same backend semantics: docker → container `deckent-<id>` running;
+ * tmux → session exists (exit 0); subprocess/unknown → false (conservative).
+ */
+export async function probeWorkerAlive(
+  hb: Heartbeat,
+  opts: LivenessProbeOptions = {},
+): Promise<boolean> {
+  const spawnFn = opts.spawn ?? spawn;
+  const timeoutMs = opts.timeoutMs ?? 5_000;
+  const workerId = hb.workerId;
+
+  switch (hb.backend) {
+    case 'docker':
+      return runAsyncProbe(
+        spawnFn, 'docker',
+        ['ps', '--filter', `name=deckent-${workerId}`, '--format', '{{.Names}}'],
+        timeoutMs,
+        (_code, stdout) => stdout.trim().length > 0,
+      );
+    case 'tmux':
+      return runAsyncProbe(
+        spawnFn, 'tmux',
+        ['has-session', '-t', workerId],
+        timeoutMs,
+        (code) => code === 0,
+      );
+    case 'subprocess':
+    default:
+      return false; // conservative — PID not tracked in HB (matches sync probe)
+  }
+}
+
+/**
+ * Probe every worker's liveness IN PARALLEL and memoize the verdicts.
+ *
+ * All probes are started concurrently and collected with `Promise.allSettled`,
+ * so a single failed probe never affects the others (the rejected branch is
+ * skipped; that worker stays uncached and falls back to the sync probe). This
+ * replaces the O(n) serial `spawnSync` loop with non-blocking parallelism.
+ */
+export async function batchProbeLiveness(
+  heartbeats: Heartbeat[],
+  opts: LivenessProbeOptions = {},
+): Promise<Map<string, boolean>> {
+  const verdicts = new Map<string, boolean>();
+  if (heartbeats.length === 0) return verdicts;
+
+  const settled = await Promise.allSettled(
+    heartbeats.map(async (hb) => ({
+      workerId: hb.workerId,
+      alive: await probeWorkerAlive(hb, opts),
+    })),
+  );
+
+  for (const outcome of settled) {
+    if (outcome.status === 'fulfilled') {
+      verdicts.set(outcome.value.workerId, outcome.value.alive);
+      livenessCache.set(outcome.value.workerId, outcome.value.alive);
+    }
+    // rejected — defensive only (probeWorkerAlive is fail-safe); leave uncached
+  }
+  return verdicts;
+}
+
+/**
+ * Collect active (non-DONE) heartbeats from disk for liveness probing.
+ * Reuses the mtime-cached heartbeat reader; returns [] when no .tasks dir.
+ */
+export function collectActiveHeartbeats(projectRoot: string): Heartbeat[] {
+  const out: Heartbeat[] = [];
+  let tasksDir: string;
+  try {
+    tasksDir = join(projectRoot, TASKS_DIR);
+    if (!existsSync(tasksDir)) return out;
+  } catch {
+    return out;
+  }
+
+  let files: string[];
+  try {
+    files = readdirSync(tasksDir).filter((f) => f.endsWith('.hb'));
+  } catch {
+    return out;
+  }
+
+  for (const file of files) {
+    const hb = readHeartbeatCached(join(tasksDir, file));
+    if (!hb) continue;
+    if (hb.status === AgentStatus.DONE) continue; // finished — no probe needed
+    out.push(hb);
+  }
+  return out;
+}
+
+/**
+ * Read active heartbeats from disk and batch-probe their liveness in parallel,
+ * warming the liveness cache for the next synchronous scan. Fail-safe: any
+ * error resolves to an empty map (the scan falls back to sync probes).
+ */
+export async function refreshLivenessFromDisk(
+  projectRoot: string,
+  opts: LivenessProbeOptions = {},
+): Promise<Map<string, boolean>> {
+  try {
+    const heartbeats = collectActiveHeartbeats(projectRoot);
+    return await batchProbeLiveness(heartbeats, opts);
+  } catch {
+    return new Map<string, boolean>();
+  }
+}
+
 // ─── Multi-Signal Stale Detection (Sprint 139) ──────────────────────
 
 /**
@@ -180,8 +379,13 @@ export function isWorkerStale(
     }
   }
 
-  // Signal B: Process/container is still running
-  if (isWorkerProcessAlive(hb)) {
+  // Signal B: Process/container is still running.
+  // Sprint 279 (WK-7): prefer the async-batch-probed liveness cache (non-blocking,
+  // O(n)→parallel) that the scan loop pre-warms; fall back to the synchronous probe
+  // on a cache miss (cold cache / direct call) so standalone behavior is preserved.
+  const cachedAlive = livenessCache.get(hb.workerId);
+  const processAlive = cachedAlive !== undefined ? cachedAlive : isWorkerProcessAlive(hb);
+  if (processAlive) {
     return false; // Process alive — worker is running, just slow to update HB
   }
 
@@ -1140,7 +1344,8 @@ export function startScanLoop(
 ): ReturnType<typeof setInterval> {
   const interval = intervalMs ?? 30_000;
   const mergedOpts: ScanOptions = { autoCleanLocks, ...scanOpts };
-  return setInterval(() => {
+
+  const runScan = (): void => {
     try {
       const result = runScanCycle(projectRoot, currentSprintId, mergedOpts);
       if (onScanComplete) {
@@ -1149,6 +1354,23 @@ export function startScanLoop(
     } catch {
       // Scan loop must not die
     }
+  };
+
+  return setInterval(() => {
+    // Sprint 279 (WK-7): warm the liveness cache with parallel async probes BEFORE
+    // the synchronous scan, so per-worker stale detection reads cached verdicts
+    // instead of blocking on O(n) serial spawnSync probes. When there are no active
+    // workers the async path is skipped (no await), so the scan still runs
+    // synchronously within this tick — preserving the existing loop timing.
+    let active: Heartbeat[] = [];
+    try { active = collectActiveHeartbeats(projectRoot); } catch { active = []; }
+    if (active.length === 0) {
+      runScan();
+      return;
+    }
+    void batchProbeLiveness(active)
+      .catch(() => undefined) // probe refresh must never kill the loop
+      .then(runScan);
   }, interval);
 }
 

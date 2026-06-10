@@ -1,12 +1,12 @@
 // ═══ Audit Log Query API ════════════════════════════════════════════════
-// Read-only query layer over the event stream (src/orchestra/event-stream.ts).
+// Read-only query layer over the event stream (src/core/event-stream.ts).
 // F4 enterprise foundation — ADR-062 audit-trail + tenant-based filtering.
 // Sprint 205 (205-008) — skeleton only: read + filter, no new audit writes.
 
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { readEvents } from '../orchestra/event-stream.js';
-import type { DeckentEvent } from '../orchestra/event-stream.js';
+import { readEvents } from './event-stream.js';
+import type { DeckentEvent } from './event-stream.js';
 import { can, Permission } from './rbac.js';
 import { AUDIT_EVENT_CHANNEL } from './audit-writer.js';
 import type { AuditEvent, AuditEventPayload } from './audit-writer.js';

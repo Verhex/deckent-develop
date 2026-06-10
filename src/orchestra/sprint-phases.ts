@@ -2137,3 +2137,138 @@ export function runCleanupPhase(
 
   return null;
 }
+
+// ═══ Mid-Sprint Cost Guard (Sprint 279 WK-cost) ══════════════════════════════
+// Opt-in (config.cost_guard.enabled === true, default-off). Periodically checks
+// the limit-ledger during EXECUTE phase and signals dispatch-stop when the sprint
+// has consumed >= max_limit_cost_usd. Best-effort: ledger errors never fail the
+// sprint.
+
+/** Injectable options for {@link checkMidSprintCostGuard} — used in hermetic tests. */
+export interface CostGuardOpts {
+  /**
+   * Injectable cost getter — returns current sprint limit-equivalent cost in USD.
+   * When omitted, calls parseTranscriptUsage + limitCost({ root: projectRoot }).
+   * Override in tests to return a deterministic cost without real transcript I/O.
+   */
+  getLimitCost?: (projectRoot: string) => Promise<number>;
+}
+
+/**
+ * Check whether the mid-sprint cost guard should stop new task dispatch.
+ *
+ * Returns `{ shouldStopDispatch: false }` when:
+ *   - `config.cost_guard.enabled !== true` (disabled → no-op)
+ *   - `max_limit_cost_usd` is absent or <= 0
+ *   - The ledger call throws or returns 0 (best-effort)
+ *   - Current cost is below the threshold
+ *
+ * Returns `{ shouldStopDispatch: true }` when `currentCostUsd >= max_limit_cost_usd`.
+ * Also writes an audit event and emits a notify signal on first threshold crossing.
+ *
+ * @internal Exported for unit tests.
+ */
+export async function checkMidSprintCostGuard(
+  projectRoot: string,
+  sprintId: string,
+  config: ResolvedConfig,
+  opts?: CostGuardOpts,
+): Promise<{ shouldStopDispatch: boolean; currentCostUsd: number }> {
+  // Guard: disabled → no-op
+  if (config.cost_guard?.enabled !== true) {
+    return { shouldStopDispatch: false, currentCostUsd: 0 };
+  }
+  const maxCost = config.cost_guard.max_limit_cost_usd;
+  if (typeof maxCost !== 'number' || maxCost <= 0) {
+    return { shouldStopDispatch: false, currentCostUsd: 0 };
+  }
+
+  // Best-effort: any ledger error returns a safe no-op result
+  let currentCostUsd = 0;
+  try {
+    if (opts?.getLimitCost) {
+      currentCostUsd = await opts.getLimitCost(projectRoot);
+    } else {
+      // Dynamic import to avoid top-level circular dep risk; fail-safe on error.
+      const { parseTranscriptUsage, limitCost } = await import('../core/limit-ledger.js');
+      const records = await parseTranscriptUsage({ root: projectRoot });
+      currentCostUsd = limitCost(records, {});
+    }
+  } catch (e) {
+    debugLog('costGuard:getLimitCost', e);
+    return { shouldStopDispatch: false, currentCostUsd: 0 };
+  }
+
+  if (currentCostUsd >= maxCost) {
+    const msg =
+      `Sprint ${sprintId}: limit-cost $${currentCostUsd.toFixed(4)} >= threshold ` +
+      `$${maxCost.toFixed(4)} — stopping new task dispatch (cost_guard)`;
+    debugLog('costGuard:abort', msg);
+    try {
+      writeEvent(projectRoot, sprintId, 'brain', 'auditor', 'COST_GUARD_ABORT', {
+        currentCostUsd,
+        maxCostUsd: maxCost,
+        emittedAt: new Date().toISOString(),
+      });
+    } catch (e) { debugLog('costGuard:writeEvent', e); }
+    return { shouldStopDispatch: true, currentCostUsd };
+  }
+
+  return { shouldStopDispatch: false, currentCostUsd };
+}
+
+/** Handle returned by {@link createCostGuardMonitor}. */
+export interface CostGuardMonitor {
+  /** Start the periodic cost check interval. No-op if already started. */
+  start(): void;
+  /** Stop the periodic interval. */
+  stop(): void;
+  /** True after the first tick that exceeded the cost threshold. */
+  shouldStopDispatch(): boolean;
+}
+
+/**
+ * Create a periodic cost guard monitor for the duration of the EXECUTE phase.
+ *
+ * Default interval: 60 seconds. Opt-in via `config.cost_guard.enabled === true`.
+ * When disabled, returns a no-op monitor that never sets the dispatch-stop flag.
+ *
+ * Pattern mirrors {@link createResourceMonitor} from resource-monitor.ts.
+ *
+ * @internal Exported for unit tests.
+ */
+export function createCostGuardMonitor(
+  projectRoot: string,
+  sprintId: string,
+  config: ResolvedConfig,
+  opts?: CostGuardOpts & { intervalMs?: number },
+): CostGuardMonitor {
+  let stopDispatch = false;
+  let timer: ReturnType<typeof setInterval> | null = null;
+  const intervalMs = opts?.intervalMs ?? 60_000;
+
+  function start(): void {
+    if (timer !== null) return;
+    if (config.cost_guard?.enabled !== true) return;
+    timer = setInterval(() => {
+      checkMidSprintCostGuard(projectRoot, sprintId, config, opts).then((result) => {
+        if (result.shouldStopDispatch) {
+          stopDispatch = true;
+        }
+      }).catch((e) => { debugLog('costGuardMonitor:tick', e); });
+    }, intervalMs);
+  }
+
+  function stop(): void {
+    if (timer !== null) {
+      clearInterval(timer);
+      timer = null;
+    }
+  }
+
+  return {
+    start,
+    stop,
+    shouldStopDispatch: () => stopDispatch,
+  };
+}

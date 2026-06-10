@@ -10,6 +10,7 @@ import type {
   ExecutionRecord,
 } from '../core/nervous-types.js';
 import { ACTION_BY_ID } from './action-registry.js';
+import { awaitPanicGateApproval, isLockedPanicAction } from './panic-gate.js';
 import { randomUUID } from 'node:crypto';
 
 // ─── NervousHistory Interface ────────────────────────────────────────────────
@@ -50,6 +51,9 @@ const TIMEOUT_MAP: Readonly<Record<string, number>> = {
   'suggest-30m': 30 * 60 * 1000, // 1800000 ms
 };
 
+/** Hard timeout for approve-policy actions (non-SAFETY_FLOOR). Matches panic-gate default. */
+const APPROVE_TIMEOUT_MS = 10_000;
+
 // ─── Executor Class ──────────────────────────────────────────────────────────
 
 export class Executor {
@@ -64,6 +68,7 @@ export class Executor {
     private readonly history: NervousHistory,
     private readonly actionHandler: ActionHandler,
     private readonly pendingStore?: PendingApprovalStore,
+    private readonly projectRoot: string = process.cwd(),
   ) {}
 
   /**
@@ -258,42 +263,76 @@ export class Executor {
     action: NotificationAction,
     baseFields: ExecutionRecordBase,
   ): Promise<ExecutionRecord> {
-    return new Promise<ExecutionRecord>((resolve) => {
+    const locked = isLockedPanicAction(action.id);
+
+    return new Promise<ExecutionRecord>((outerResolve) => {
+      let settled = false;
+
+      const finish = async (
+        decision: 'accepted' | 'rejected' | 'timeout-auto-applied',
+        decidedBy: 'user' | 'timeout',
+      ): Promise<void> => {
+        if (settled) return;
+        settled = true;
+        this.pendingApprovals.delete(notification.id);
+        this.pendingStore?.remove(notification.id);
+
+        if (decision === 'accepted' || decision === 'timeout-auto-applied') {
+          try {
+            const result = await this.actionHandler(action.id, action.payload ?? {});
+            outerResolve({
+              ...baseFields,
+              decision,
+              decidedBy,
+              outcome: result.outcome,
+              error: result.error,
+            });
+          } catch (err: unknown) {
+            const errorMsg = err instanceof Error ? err.message : String(err);
+            outerResolve({
+              ...baseFields,
+              decision,
+              decidedBy,
+              outcome: 'failure',
+              error: errorMsg,
+            });
+          }
+        } else {
+          outerResolve({
+            ...baseFields,
+            decision: 'rejected',
+            decidedBy: 'user',
+            outcome: 'pending',
+          });
+        }
+      };
+
+      // In-memory approval path — `resolveApproval` calls this.
       this.pendingApprovals.set(notification.id, {
         notification,
         actionId: action.id,
-        resolve: async (decision: 'accepted' | 'rejected') => {
-          if (decision === 'accepted') {
-            try {
-              const result = await this.actionHandler(action.id, action.payload ?? {});
-              resolve({
-                ...baseFields,
-                decision: 'accepted',
-                decidedBy: 'user',
-                outcome: result.outcome,
-                error: result.error,
-              });
-            } catch (err: unknown) {
-              const errorMsg = err instanceof Error ? err.message : String(err);
-              resolve({
-                ...baseFields,
-                decision: 'accepted',
-                decidedBy: 'user',
-                outcome: 'failure',
-                error: errorMsg,
-              });
-            }
-          } else {
-            resolve({
-              ...baseFields,
-              decision: 'rejected',
-              decidedBy: 'user',
-              outcome: 'pending',
-            });
-          }
+        resolve: (decision: 'accepted' | 'rejected') => {
+          void finish(decision, 'user');
         },
       });
       this.pendingStore?.add(notification);
+
+      // Hard-timeout path for non-SAFETY_FLOOR actions via awaitPanicGateApproval.
+      // SAFETY_FLOOR actions are exempt — they require explicit human approval and
+      // keep the in-memory-only path (no auto-proceed on timeout).
+      if (!locked) {
+        void awaitPanicGateApproval({
+          actionId: action.id,
+          taskId: notification.id,
+          projectRoot: this.projectRoot,
+          timeoutMs: APPROVE_TIMEOUT_MS,
+        }).then((gateDecision) => {
+          if (gateDecision === 'TIMEOUT_AUTO_PROCEED') {
+            void finish('timeout-auto-applied', 'timeout');
+          }
+          // APPROVED/REJECTED from file marker: handled by resolveApproval in-memory path.
+        });
+      }
     });
   }
 

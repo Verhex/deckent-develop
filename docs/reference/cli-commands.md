@@ -697,11 +697,11 @@ deckent attach --list
 
 ### `deckent watch`
 
-Live tmux split view: dashboard + worker panes.
+Live tmux split view: dashboard + worker panes. For docker-backend workers, `--follow` streams live output via `docker logs -f` (async PTY, non-blocking event loop).
 
 | Option | Description |
 |--------|-------------|
-| `--follow <taskId>` | Attach to a specific worker pane |
+| `--follow <taskId>` | Attach to a specific worker pane; for docker backend, streams live output via `docker logs -f` |
 
 **Example:**
 ```bash

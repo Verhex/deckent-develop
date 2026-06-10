@@ -9,7 +9,8 @@
 //   - Fail-safe: backend errors → warn + continue
 //   - File write: .deckent/sprint-NNN-outputs/task-NNN.out per task
 
-import { spawnSync } from 'node:child_process';
+import { spawnSync, spawn as nodeSpawn } from 'node:child_process';
+import type { ChildProcess } from 'node:child_process';
 import { existsSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { DECKENT_DIR } from './constants.js';
@@ -456,4 +457,53 @@ export class OutputCollector {
  */
 export function createOutputCollector(projectRoot: string): OutputCollector {
   return new OutputCollector(projectRoot);
+}
+
+// ─── Follow Mode (async streaming) ──────────────────────────────────
+
+/** Handle returned by followDockerOutput — call stop() to end the stream. */
+export interface FollowHandle {
+  stop(): void;
+}
+
+/**
+ * Stream a docker container's logs in follow mode (`docker logs -f`).
+ *
+ * Uses async spawn so the event loop is never blocked. spawnFn is injectable
+ * for unit tests — defaults to node:child_process spawn.
+ *
+ * @param containerName - Docker container name or ID to follow.
+ * @param onLine - Called for each non-blank line received from stdout/stderr.
+ * @param spawnFn - Injectable spawn implementation (for testing).
+ * @returns A handle with stop() to terminate the follow stream.
+ */
+export function followDockerOutput(
+  containerName: string,
+  onLine: (line: string) => void,
+  spawnFn: (cmd: string, args: string[]) => ChildProcess = (cmd, args) => nodeSpawn(cmd, args)
+): FollowHandle {
+  const proc = spawnFn('docker', ['logs', '-f', containerName]);
+
+  let buf = '';
+  const onData = (chunk: Buffer): void => {
+    buf += chunk.toString();
+    const lines = buf.split('\n');
+    buf = lines.pop() ?? '';
+    for (const line of lines) {
+      if (line.trim()) onLine(line);
+    }
+  };
+
+  proc.stdout?.on('data', onData);
+  proc.stderr?.on('data', onData);
+
+  proc.on('error', (err: Error) => {
+    debugLog('output-collector:follow', `docker logs -f error for ${containerName}: ${err.message}`);
+  });
+
+  return {
+    stop(): void {
+      proc.kill();
+    },
+  };
 }
