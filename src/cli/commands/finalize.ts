@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import type { Command } from 'commander';
 import type { Task, TaskResult } from '../../core/types.js';
 import { TaskEvaluation, SprintStatus, SprintPhase } from '../../core/types.js';
-import { TASKS_DIR, BRAIN_DIR } from '../../core/constants.js';
+import { TASKS_DIR, BRAIN_DIR, DECKENT_DIR } from '../../core/constants.js';
 import { finalizeSprint } from '../../orchestra/brain.js';
 import { evaluateResult } from '../../orchestra/sprint-controller.js';
 import { loadConfig } from '../../core/config.js';
@@ -19,8 +19,18 @@ import { loadReviewState } from './review.js';
  * Reads task JSON files and .result files, evaluates each result.
  * Integrates review state: rejected tasks are evaluated as NO_GO.
  * If sprintFilter is provided, only tasks with that sprintId are included.
+ *
+ * FINALIZE-ARCHIVE-BLIND fix (Sprint 268): task/result collection is
+ * archive-aware — after CLEANUP archives files to
+ * `.brain/archive/<sprintId>-tasks/`, a re-finalize used to undercount
+ * (sprint-267 live bug: "5/5" instead of "6/6") and treat archived results
+ * as missing (→ synthetic NO_GO). Both locations are merged, id-deduped,
+ * with `.tasks/` taking priority. The archive dir is only resolvable when
+ * the sprint ID is known (via `--sprint` or derivable from `.tasks/`).
+ *
+ * Exported for tests (Sprint 268).
  */
-function buildSprintFromTasks(root: string, sprintFilter?: string): {
+export function buildSprintFromTasks(root: string, sprintFilter?: string): {
   sprintId: string;
   tasks: Task[];
   results: TaskResult[];
@@ -31,18 +41,25 @@ function buildSprintFromTasks(root: string, sprintFilter?: string): {
   const results: TaskResult[] = [];
   const evaluations = new Map<string, TaskEvaluation>();
 
-  if (!existsSync(tasksDir)) {
+  const tasksDirExists = existsSync(tasksDir);
+  // Without a .tasks/ dir AND without an explicit --sprint filter there is no
+  // way to locate the per-sprint archive dir either — nothing to finalize.
+  if (!tasksDirExists && !sprintFilter) {
     return { sprintId: 'sprint-unknown', tasks, results, evaluations };
   }
 
-  // Read all task JSON files
-  const taskFiles = readdirSync(tasksDir).filter(f => f.startsWith('task-') && f.endsWith('.json'));
-  for (const file of taskFiles) {
-    const task = readJsonSafe<Task>(join(tasksDir, file));
-    if (task) {
-      // If a sprint filter is provided, only include tasks matching that sprint
-      if (!sprintFilter || task.sprintId === sprintFilter) {
-        tasks.push(task);
+  // Read all task JSON files from .tasks/ (priority location)
+  const seenTaskIds = new Set<string>();
+  if (tasksDirExists) {
+    const taskFiles = readdirSync(tasksDir).filter(f => f.startsWith('task-') && f.endsWith('.json'));
+    for (const file of taskFiles) {
+      const task = readJsonSafe<Task>(join(tasksDir, file));
+      if (task) {
+        // If a sprint filter is provided, only include tasks matching that sprint
+        if (!sprintFilter || task.sprintId === sprintFilter) {
+          tasks.push(task);
+          seenTaskIds.add(task.id);
+        }
       }
     }
   }
@@ -50,11 +67,41 @@ function buildSprintFromTasks(root: string, sprintFilter?: string): {
   // Determine sprint ID: use filter if provided, else derive from tasks
   const sprintId = sprintFilter ?? tasks[0]?.sprintId ?? 'sprint-unknown';
 
-  // Read all result files
-  const resultFiles = readdirSync(tasksDir).filter(f => f.startsWith('task-') && f.endsWith('.result'));
-  for (const file of resultFiles) {
-    const result = readJsonSafe<TaskResult>(join(tasksDir, file));
-    if (result) results.push(result);
+  // Merge archived task JSONs (.tasks/ wins on id collision)
+  const archiveTasksDir = join(root, BRAIN_DIR, 'archive', `${sprintId}-tasks`);
+  const archiveDirExists = sprintId !== 'sprint-unknown' && existsSync(archiveTasksDir);
+  if (archiveDirExists) {
+    const archivedTaskFiles = readdirSync(archiveTasksDir).filter(f => f.startsWith('task-') && f.endsWith('.json'));
+    for (const file of archivedTaskFiles) {
+      const task = readJsonSafe<Task>(join(archiveTasksDir, file));
+      if (task && !seenTaskIds.has(task.id) && (!sprintFilter || task.sprintId === sprintFilter)) {
+        tasks.push(task);
+        seenTaskIds.add(task.id);
+      }
+    }
+  }
+
+  // Read all result files (.tasks/ first, then archive — deduped by taskId)
+  const seenResultIds = new Set<string>();
+  if (tasksDirExists) {
+    const resultFiles = readdirSync(tasksDir).filter(f => f.startsWith('task-') && f.endsWith('.result'));
+    for (const file of resultFiles) {
+      const result = readJsonSafe<TaskResult>(join(tasksDir, file));
+      if (result) {
+        results.push(result);
+        seenResultIds.add(result.taskId);
+      }
+    }
+  }
+  if (archiveDirExists) {
+    const archivedResultFiles = readdirSync(archiveTasksDir).filter(f => f.startsWith('task-') && f.endsWith('.result'));
+    for (const file of archivedResultFiles) {
+      const result = readJsonSafe<TaskResult>(join(archiveTasksDir, file));
+      if (result && !seenResultIds.has(result.taskId)) {
+        results.push(result);
+        seenResultIds.add(result.taskId);
+      }
+    }
   }
 
   // Load review state to integrate rejected tasks
@@ -77,8 +124,21 @@ function buildSprintFromTasks(root: string, sprintFilter?: string): {
     }
     const result = results.find(r => r.taskId === task.id);
     if (result) {
-      const evaluation = evaluateResult(result, task);
-      evaluations.set(task.id, evaluation);
+      // FINALIZE-RECOUNT fix (Sprint 268, 1a): a .result that went through
+      // Brain EVALUATE carries the authoritative decision in
+      // `evaluationDecision`; crash-recovered/manual results only carry the
+      // worker's `selfAssessment` (sprint-267 live bug: the recorded decision
+      // was ignored and every task was re-counted as a failed use). Success
+      // detection therefore uses `evaluationDecision ?? selfAssessment`
+      // (DONE / GO_WITH_TECH_DEBT = success). Re-grading via evaluateResult
+      // stays as the last resort for results carrying neither (or a
+      // non-terminal hint such as TIMEOUT_WITH_WORK).
+      const recorded = result.evaluationDecision ?? result.selfAssessment;
+      if (recorded === 'DONE' || recorded === 'GO_WITH_TECH_DEBT' || recorded === 'NO_GO') {
+        evaluations.set(task.id, recorded as TaskEvaluation);
+      } else {
+        evaluations.set(task.id, evaluateResult(result, task));
+      }
     } else {
       // No result file = NO_GO (timeout or incomplete)
       evaluations.set(task.id, TaskEvaluation.NO_GO);
@@ -151,6 +211,26 @@ export function registerFinalize(program: Command): void {
           return;
         }
 
+        // FINALIZE Duration fix (Sprint 268): the CLI-built sprint object had
+        // no startedAt, so calculateMetrics fell back to Date.now() for the
+        // start time and wrote Duration=0ms (sprint-267 live bug). Recover
+        // the real start from .deckent/sprint-state.json (only when it
+        // belongs to THIS sprint), falling back to the coordinator PID
+        // record. When neither exists, startedAt stays undefined and the
+        // job summary honestly reports the duration as 'unknown'.
+        let startedAt: string | undefined;
+        const sprintState = readJsonSafe<{ sprintId?: string; startedAt?: string }>(
+          join(root, DECKENT_DIR, 'sprint-state.json'),
+        );
+        if (sprintState?.startedAt && sprintState.sprintId === sprintId) {
+          startedAt = sprintState.startedAt;
+        } else {
+          const pidRecord = readJsonSafe<{ sprintId?: string; startedAt?: string }>(
+            join(root, DECKENT_DIR, 'pids', `${sprintId}.pid`),
+          );
+          if (pidRecord?.startedAt) startedAt = pidRecord.startedAt;
+        }
+
         const sprint = {
           id: sprintId,
           number: parseInt(sprintId.replace('sprint-', ''), 10) || 0,
@@ -158,6 +238,7 @@ export function registerFinalize(program: Command): void {
           phase: SprintPhase.COMPLETE,
           tasks,
           workers: tasks.map(t => `w-${t.id}`),
+          startedAt,
           completedAt: new Date().toISOString(),
         };
 

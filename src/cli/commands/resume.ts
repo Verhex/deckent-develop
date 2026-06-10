@@ -3,7 +3,7 @@
 // MVP: reads checkpoint, respawns pending tasks, skips completed ones.
 // Sprint 140+ will add mid-worker resume and heartbeat daemon integration.
 
-import { existsSync, readdirSync } from 'node:fs';
+import { existsSync, readdirSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Command } from 'commander';
 
@@ -112,6 +112,55 @@ export function registerResume(program: Command): void {
             // Worker may already be dead (SIGKILL scenario) — expected
           }
         }
+      }
+
+      // ─── RESUME-RACE fix (Sprint 268 — live bug from sprint-267 recovery) ──
+      // Before re-entering runSprint, reset stale worker artifacts for every
+      // task that will be respawned (every non-completed candidate). Without
+      // this, the previous run's leftovers poison the new run:
+      //   • a stale `.hb` makes isTaskDispatched (sprint-phases.ts) treat the
+      //     task as already dispatched, and checkWorkerLiveness (worker-
+      //     liveness.ts L3, 90s mtime window) sees no fresh signal → the
+      //     collector classifies the respawn as crashed (honest-gate
+      //     `worker-crashed-no-result`) before the new worker even starts;
+      //   • a stale `.partial-result` crash marker can be promoted to `.result`
+      //     by the docker backend (spawn-backend-docker.ts) and read as the
+      //     NEW run's outcome → sprint races to RETRO/CLEANUP with synthetic
+      //     NO_GOs instead of giving the respawn a chance.
+      //
+      // Strategy: DELETE the stale `.hb` rather than resetting its timestamp
+      // to now. A missing heartbeat is the honest "not yet spawned" state —
+      // the respawned worker writes its own fresh heartbeat at startup, while
+      // a timestamp-reset file would fake liveness for a worker that does not
+      // exist yet (worker-liveness L3 freshness + isTaskDispatched hb signal),
+      // masking real spawn failures. Tasks with a `.result` on disk are
+      // completed — their artifacts are left untouched. The --dry-run path
+      // returns earlier, so dry-run never deletes anything.
+      const respawnCandidateIds = new Set<string>([
+        ...checkpoint.pendingTasks,
+        ...checkpoint.activeWorkers.map(w => w.taskId),
+      ]);
+      let resetArtifacts = 0;
+      for (const taskId of respawnCandidateIds) {
+        const resultPath = join(projectRoot, TASKS_DIR, `task-${taskId}.result`);
+        if (existsSync(resultPath)) continue; // completed — do not touch
+        const stalePaths = [
+          join(projectRoot, TASKS_DIR, `task-${taskId}.hb`),
+          join(projectRoot, TASKS_DIR, `task-${taskId}.partial-result`),
+        ];
+        for (const stalePath of stalePaths) {
+          if (!existsSync(stalePath)) continue;
+          try {
+            unlinkSync(stalePath);
+            resetArtifacts++;
+          } catch {
+            // Fail-soft: an unremovable artifact must not abort resume —
+            // worst case the collector falls back to pre-fix behavior.
+          }
+        }
+      }
+      if (resetArtifacts > 0) {
+        print(`  Reset ${resetArtifacts} stale worker artifact(s) (.hb / .partial-result).`);
       }
 
       print(`\nSpawning ${resumableCount} pending tasks...\n`);

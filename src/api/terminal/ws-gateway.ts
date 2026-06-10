@@ -70,23 +70,48 @@ export function attachTerminalGateway(server: Server, deps: GatewayDeps): void {
     const token = tokenProto ? tokenProto.slice(PREFIX.length) : undefined;
 
     wss.handleUpgrade(req, socket, head, (ws) => {
-      if (!deps.auth.verify(token)) {
+      // Async-capable auth seam (Sprint 268): prefer `verifyAsync` when the
+      // provider defines it (e.g. JWKS network key resolution), else the sync
+      // `verify`. SECURITY: no data flows to or from the PTY while the async
+      // verification is pending — the socket is paused (frames buffered, never
+      // processed pre-auth) and `bridge()` (the only WS↔session pipe) is
+      // reached strictly after an accept. The sync-provider path runs without
+      // suspension, so its timing and deny flow are identical to before
+      // (audit `auth.deny` + close 4401).
+      void (async () => {
+        let authorized = false;
+        if (deps.auth.verifyAsync) {
+          ws.pause();
+          try {
+            authorized = await deps.auth.verifyAsync(token);
+          } catch {
+            // A rejecting provider is a deny, never a bypass (fail closed).
+            authorized = false;
+          }
+          // Resume on both outcomes: the deny path needs the read side live to
+          // complete the close handshake.
+          ws.resume();
+        } else {
+          authorized = deps.auth.verify(token);
+        }
+        if (!authorized) {
+          deps.audit.record({
+            action: 'auth.deny',
+            tenantId: 'local',
+            detail: 'ws upgrade rejected',
+            at: new Date().toISOString(),
+          });
+          ws.close(APP_CLOSE_UNAUTHORIZED, 'unauthorized');
+          return;
+        }
         deps.audit.record({
-          action: 'auth.deny',
+          action: 'auth.ok',
           tenantId: 'local',
-          detail: 'ws upgrade rejected',
+          detail: 'ws upgrade accepted',
           at: new Date().toISOString(),
         });
-        ws.close(APP_CLOSE_UNAUTHORIZED, 'unauthorized');
-        return;
-      }
-      deps.audit.record({
-        action: 'auth.ok',
-        tenantId: 'local',
-        detail: 'ws upgrade accepted',
-        at: new Date().toISOString(),
-      });
-      bridge(ws, deps);
+        bridge(ws, deps);
+      })();
     });
   });
 }

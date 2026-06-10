@@ -1,5 +1,7 @@
+import { existsSync, statSync, writeFileSync, watch as fsWatch } from 'node:fs';
+import { join } from 'node:path';
 import type { Command } from 'commander';
-import type { Task, ModelType, ProviderName } from '../../core/types.js';
+import type { Task, ModelType, ProviderName, TaskResult } from '../../core/types.js';
 import { readTask } from '../../agents/worker.js';
 import { ensureSession, spawnWorker } from '../../orchestra/tmux.js';
 import { print, printError } from '../helpers/output.js';
@@ -7,11 +9,14 @@ import { resolveProjectRoot } from '../helpers/process.js';
 import { loadConfig } from '../../core/config.js';
 import { getMessage } from '../helpers/messages.js';
 import { TaskStatus, getProviderForModel } from '../../core/task-types.js';
+import { TASKS_DIR } from '../../core/constants.js';
+import { readJsonSafe, debugLog } from '../../core/utils.js';
 import { buildWorkerPrompt } from '../../orchestra/task-builder.js';
 import { resolveAgentPrompt, resolveSkillPrompts } from '../../orchestra/sprint-controller.js';
 import { SpawnBackendFactory } from '../../orchestra/spawn-backend.js';
 import { isAdapterProvider, getProviderAdapterForTask } from '../../orchestra/sprint-utils.js';
 import { ensureOllamaModelRegistered } from '../../core/model-registry.js';
+import { resolveReasoningEffort } from '../../core/reasoning-effort.js';
 
 /**
  * Build a comma-separated allowedTools string from a task's scope.
@@ -45,7 +50,7 @@ export async function spawnWorkerMultiProvider(
   model: string,
   prompt: string,
   root: string,
-  opts: { autoApprove?: boolean; allowedTools?: string; spawnBackend?: string; dockerImage?: string; dockerTimeout?: number; provider?: string },
+  opts: { autoApprove?: boolean; allowedTools?: string; spawnBackend?: string; dockerImage?: string; dockerTimeout?: number; provider?: string; modelEffort?: string },
 ): Promise<{ backend: string; provider: ProviderName }> {
   // Resolve provider from registry. Dynamic ollama tags (e.g. qwen3.6:27b) are not in
   // the static registry at process start — the sprint path calls ensureOllamaModelRegistered
@@ -58,6 +63,13 @@ export async function spawnWorkerMultiProvider(
     ensureOllamaModelRegistered(model);
   }
   const provider = getProviderForModel(model as ModelType);
+
+  // F1-RE (268-003): resolve the model reasoning-effort ONCE for the resolved
+  // provider — same SSOT + opt-in semantics as the sprint path
+  // (sprint-spawner.ts:511). Invalid/unsupported level → undefined → no flag
+  // emitted (CLI default kept). Previously the manual paths (deckent spawn /
+  // deckent run) silently dropped task.modelEffort.
+  const reasoningEffort = resolveReasoningEffort(provider, opts.modelEffort);
 
   // Host-HTTP adapter providers (e.g. ollama) run via their host adapter
   // (agentic-worker-entry on localhost:11434), NOT a docker/tmux/subprocess backend —
@@ -81,6 +93,7 @@ export async function spawnWorkerMultiProvider(
         allowedTools: opts.allowedTools,
         autoApprove: opts.autoApprove ?? false,
         projectDir: root,
+        reasoningEffort,
       });
       return { backend: 'host-adapter', provider };
     }
@@ -99,6 +112,7 @@ export async function spawnWorkerMultiProvider(
       autoApprove: opts.autoApprove ?? false,
       projectDir: root,
       allowedTools: opts.allowedTools,
+      reasoningEffort,
     });
     return { backend: backend.name, provider };
   }
@@ -109,6 +123,7 @@ export async function spawnWorkerMultiProvider(
     spawnWorker(taskId, model as ModelType, prompt, root, {
       autoApprove: opts.autoApprove ?? false,
       allowedTools: opts.allowedTools,
+      reasoningEffort,
     });
     return { backend: 'tmux', provider };
   }
@@ -122,14 +137,56 @@ export async function spawnWorkerMultiProvider(
     autoApprove: opts.autoApprove ?? false,
     projectDir: root,
     allowedTools: opts.allowedTools,
+    reasoningEffort,
   });
   return { backend: 'subprocess', provider };
+}
+
+/**
+ * Finalize the task JSON `status` from the worker's `.result` file (268-003).
+ *
+ * Manual `deckent spawn` previously left the task JSON at EXECUTING/CLAIMED after
+ * the worker wrote its `.result` — a second spawn could then run a duplicate
+ * worker (267-004 live evidence). Derives status from `selfAssessment` with the
+ * same mapping as the sprint path's applyStatusMutation (ADR-045 §1,
+ * result-collector.ts): DONE / GO_WITH_TECH_DEBT → DONE, NO_GO → NO_GO.
+ *
+ * @returns the finalized TaskStatus, or null when the result file is missing,
+ *          malformed, or carries an unknown selfAssessment (task JSON untouched).
+ */
+export function finalizeTaskStatusFromResult(root: string, taskId: string): TaskStatus | null {
+  const resultPath = join(root, TASKS_DIR, `task-${taskId}.result`);
+  if (!existsSync(resultPath)) return null;
+  const result = readJsonSafe<TaskResult>(resultPath);
+  if (!result) return null;
+
+  const assessment = result.selfAssessment;
+  const status =
+    assessment === 'DONE' || assessment === 'GO_WITH_TECH_DEBT' ? TaskStatus.DONE
+    : assessment === 'NO_GO' ? TaskStatus.NO_GO
+    : null;
+  if (status === null) return null;
+
+  const taskPath = join(root, TASKS_DIR, `task-${taskId}.json`);
+  try {
+    const task = readTask(root, taskId);
+    task.status = status;
+    writeFileSync(taskPath, JSON.stringify(task, null, 2), 'utf-8');
+    return status;
+  } catch (e) {
+    debugLog('spawn:finalizeTaskStatus', e);
+    return null;
+  }
 }
 
 export function registerSpawn(program: Command): void {
   program
     .command('spawn <taskId>')
-    .description('Manually spawn a worker for a task')
+    // NOTE: with the docker backend this command BLOCKS until the worker
+    // container exits — DockerSpawnBackend.monitorContainer keeps a `docker wait`
+    // child alive, so the CLI process only returns once the worker is finished.
+    // tmux/subprocess spawns remain fire-and-forget.
+    .description('Manually spawn a worker for a task (BLOCKS until the worker exits on the docker backend; fire-and-forget on tmux/subprocess)')
     .option('--force', 'Force respawn even if task is DONE or NO_GO')
     .option('--auto-approve', 'Enable auto-approve mode for the worker')
     .action(async (taskId: string, opts: { force?: boolean; autoApprove?: boolean }) => {
@@ -161,7 +218,18 @@ export function registerSpawn(program: Command): void {
         // Derive scope-based allowedTools for boundary enforcement
         const allowedTools = buildAllowedToolsFromScope(task);
 
-        // Spawn via config-aware backend (respects spawn_backend setting)
+        // Stale-result guard for the post-spawn finalize below: a pre-existing
+        // .result (e.g. --force respawn of a DONE/NO_GO task) must not be read
+        // as the NEW run's outcome — only a result created/modified after this
+        // point finalizes the task status.
+        const resultPath = join(root, TASKS_DIR, `task-${taskId}.result`);
+        let preSpawnResultMtime: number | null = null;
+        try { preSpawnResultMtime = statSync(resultPath).mtimeMs; } catch { /* no prior result */ }
+
+        // Spawn via config-aware backend (respects spawn_backend setting).
+        // Docker backend: this call starts the container and the process then
+        // stays alive until the container exits (`docker wait` monitor) — i.e.
+        // `deckent spawn` is BLOCKING on docker. tmux/subprocess: fire-and-forget.
         const cfgAny = config as { spawn_backend?: string; docker_image?: string; docker_timeout?: number };
         const { backend, provider } = await spawnWorkerMultiProvider(taskId, task.model, prompt, root, {
           autoApprove: opts.autoApprove ?? false,
@@ -169,6 +237,9 @@ export function registerSpawn(program: Command): void {
           spawnBackend: cfgAny.spawn_backend,
           dockerImage: cfgAny.docker_image,
           dockerTimeout: cfgAny.docker_timeout,
+          // F1-RE (268-003): forward the task's reasoning-depth override so the
+          // manual spawn path emits the provider flag like the sprint path does.
+          modelEffort: task.modelEffort,
         });
 
         print(getMessage('spawn.worker_spawned', lang, { taskId, model: task.model }));
@@ -181,6 +252,47 @@ export function registerSpawn(program: Command): void {
         }
         if (task.scope.filesWrite.length > 0) {
           print(`  Write files: ${task.scope.filesWrite.join(', ')}`);
+        }
+
+        // 268-003 completion finalize: when the worker's .result appears, derive
+        // the task JSON status from selfAssessment so a later spawn cannot run a
+        // duplicate worker against a stale EXECUTING/CLAIMED status (267-004).
+        // A result is only honored when it is NEW relative to the pre-spawn
+        // snapshot (mtime guard above).
+        const isNewResult = (): boolean => {
+          try {
+            const mtime = statSync(resultPath).mtimeMs;
+            return preSpawnResultMtime === null || mtime !== preSpawnResultMtime;
+          } catch {
+            return false;
+          }
+        };
+        const tryFinalize = (): boolean => {
+          if (!isNewResult()) return false;
+          const finalized = finalizeTaskStatusFromResult(root, taskId);
+          if (finalized !== null) {
+            print(`  Task status finalized: ${finalized}`);
+            return true;
+          }
+          return false;
+        };
+
+        // Blocking backends (docker) may have completed already — finalize now.
+        if (!tryFinalize()) {
+          // Fire-and-forget backends: watch for the result WITHOUT keeping the
+          // process alive (persistent: false). If the process stays alive anyway
+          // (docker's `docker wait` monitor), the watcher fires on completion;
+          // if the CLI exits first (tmux/subprocess), behavior is unchanged.
+          try {
+            const watcher = fsWatch(join(root, TASKS_DIR), { persistent: false }, (_event, filename) => {
+              if (filename === `task-${taskId}.result` && tryFinalize()) {
+                watcher.close();
+              }
+            });
+            watcher.on('error', () => watcher.close());
+          } catch (e) {
+            debugLog('spawn:resultWatch', e);
+          }
         }
       } catch (error) {
         printError(error);

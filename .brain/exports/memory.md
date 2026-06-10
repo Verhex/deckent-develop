@@ -1,5 +1,16 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-268 Learnings
+- Sprint sprint-268 Learnings: ## Sprint sprint-268 Learnings
+
+## Gains
+- 268-001 — RESUME-RACE fix — resume respawn'dan önce bayat worker-artifact reset — RESUME-RACE fix landed.
+- 268-002 — FINALIZE fix üçlüsü — recount + archive-blind + orphan-state — Worker exited without writing result (exitCode=0)
+- 268-003 — SPAWN-LIFECYCLE — modelEffort pass-through + completion status finalize — SPAWN-LIFECYCLE both gaps closed.
+- 268-004 — JWKS async AuthProvider seam — terminal auth RS256/JWKS canlı — JWKS async AuthProvider seam opened (additive, backward-compatible).
+- 268-005 — Dynamics 365 OData read-only ErpDriver — Dynamics 365 OData v4 read-only ErpDriver landed TDD-first (RED confirmed before impl).
+- 268-006 — Enterprise-depth reference — api_oidc + JWKS-seam + Dynamics ekleri — Added Section 10 'HTTP API OIDC Bearer (api_oidc)' to docs/reference/enterprise-depth.md — fully ...
+
 ## Sprint sprint-267 Learnings
 - Sprint sprint-267 Learnings: ## Sprint sprint-267 Learnings
 

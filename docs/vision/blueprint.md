@@ -15,12 +15,12 @@
 ## Live Metrics
 | Metric | Value |
 |--------|-------|
-| Sprint | sprint-267 |
-| Total Tasks | 6 |
-| Completed | 6 |
+| Sprint | sprint-268 |
+| Total Tasks | 7 |
+| Completed | 7 |
 | Tech Debt | 0 |
 | No-Go | 0 |
-| Duration | 26dk (gece crash + CC kurtarma respawn) |
+| Duration | 25dk 5sn |
 | Coverage | N/A |
 
 # TABLE OF CONTENTS

@@ -2,6 +2,23 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint268] - 2026-06-10
+
+### Added
+
+- SPAWN-LIFECYCLE — modelEffort pass-through + completion status finalize
+- JWKS async AuthProvider seam — terminal auth RS256/JWKS canlı
+- Dynamics 365 OData read-only ErpDriver
+- Enterprise-depth reference — api_oidc + JWKS-seam + Dynamics ekleri
+
+### Fixed
+
+- RESUME-RACE fix — resume respawn'dan önce bayat worker-artifact reset
+- FINALIZE fix üçlüsü — recount + archive-blind + orphan-state
+
+
+_Tasks: 7 total, 7 done, 0 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint267] - 2026-06-10
 
 ### Added

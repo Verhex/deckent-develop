@@ -223,3 +223,65 @@ Sprint 265 closed the long-standing "JWKS fetch is a documented follow-up" note 
 -   **Source**: `src/api/terminal/auth-provider.ts`
 -   `OidcAuthProvider` is the OIDC/JWT bearer implementation of the embedded terminal's pluggable `AuthProvider` interface (spec §1d reserved slot). The `verify` contract is **synchronous**, so key material is **static** — a pinned algorithm plus an HS256 shared secret or RS256 PEM public key; the async JWKS-resolver flow above is deliberately not wired into the sync verify path.
 -   **No-bypass invariant**: like `LocalTokenAuthProvider`, it deliberately ignores `DECKENT_API_AUTH_DISABLED` — the read-only-dashboard dev bypass can never silently open a remote shell.
+
+## 10. HTTP API OIDC Bearer (`api_oidc`)
+
+Sprint 267 extended the HTTP API's bearer middleware with OIDC JWT verification. The static-token path stays bit-identical; JWT verification is an additive second chance behind it.
+
+-   **Middleware source**: `src/api/auth.ts` (`AuthConfig.oidc`, `bearerAuthMiddleware`)
+-   **Server wire-up**: `src/api/server.ts` (`createHttpServer` — `HttpServerOptions.oidc` + config consult)
+-   **Config schema & validation**: `src/core/config-types.ts` (`api_oidc` block), `src/core/config.ts` (`validateConfig`)
+-   **JWT engine**: `verifyJwt` in `src/core/auth-oidc.ts` — the single source of truth; nothing is re-implemented in the middleware.
+
+### Configuration
+
+```json
+{
+  "api_oidc": {
+    "enabled": true,
+    "issuer": "https://idp.example.com/",
+    "audience": "deckent-api",
+    "algorithm": "RS256",
+    "key": "$DECK:OIDC_PUBLIC_KEY"
+  }
+}
+```
+
+-   The block is **optional and inert unless `enabled: true`** — absent means today's static-token-only behavior.
+-   `issuer` is the expected `iss` claim; tokens from any other issuer are rejected. `audience` (optional) is matched against `aud` when set.
+-   `key` supports `$DECK:NAME` references — the block passes through deck-interpolation (Section 6), so the secret never sits in `config.json` plaintext.
+
+### Verification Order: Static First, JWT Second
+
+When a request presents a Bearer value and a static token is configured:
+
+1.  The value is checked against the **static token FIRST** — the same constant-time SHA-256 + `timingSafeEqual` compare as before. This path is unchanged.
+2.  Only on a static mismatch does the value get a **second chance as a JWT** via `verifyJwt`. A valid JWT authenticates the request; otherwise the response is the same generic `403` as a plain wrong token.
+
+### Algorithm Pinning & Key-Slot Separation
+
+The middleware builds its `VerifyOptions` once, with `algorithms` pinned to the single configured value. Key material is routed **exclusively to the slot matching the pinned algorithm** — `hs256Secret` for HS256, `rs256PublicKey` for RS256 — so the classic HS256/RS256 algorithm-confusion attack cannot cross key material (the same discipline as the terminal `OidcAuthProvider` in Section 9).
+
+### OIDC-Only Mode: Auth Activation
+
+Configuring `api_oidc` **without** a static token **activates** authentication — a valid Bearer JWT becomes mandatory for non-exempt requests:
+
+-   Missing/malformed `Authorization` header → **401**
+-   Failed JWT verification → **403**
+
+The "auth disabled" default-deny message path applies only when **neither** mechanism is configured. Responses stay generic — no claim or key material ever leaks into a response body. Exempt-path (`/health`), query-token (SSE `/api/events`), and localhost-auto-inject semantics are unchanged.
+
+**Honest boundary**: unlike the terminal auth providers (Section 9), the HTTP API middleware's `DECKENT_API_AUTH_DISABLED=1` development bypass still short-circuits **before** any token or JWT check — do not set it in production.
+
+### Server Config Consult: Fail-Closed
+
+`createHttpServer` resolves the OIDC block in two steps:
+
+1.  An explicit `opts.oidc` parameter **wins**.
+2.  Otherwise the project's `.deckent/config.json` `api_oidc` block is sync-read and passed through `interpolateConfig` so `$DECK:KEY` resolves exactly like the rest of the config.
+
+The consult is **fail-closed**: a block that is missing, `enabled: false`, incomplete (empty `issuer`/`key`, unknown `algorithm`), or unparseable JSON leaves the middleware exactly as before — `api_oidc` is default-off, and a broken config can never widen access.
+
+### Config Validation: Keys Are Never Echoed
+
+`validateConfig` in `src/core/config.ts` enforces the block's shape: `enabled` must be a boolean; `algorithm` must be `HS256` or `RS256`; when `enabled: true`, `issuer` and `key` must be non-empty and `algorithm` is required. Validation errors **never echo `key` material** — the secret-leak guard reports field names only.

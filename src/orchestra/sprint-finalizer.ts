@@ -112,7 +112,7 @@ import { notify } from '../core/notify.js';
 // `.deckent/pids/<id>.pid` + `.snapshot.json` so the next `deckent start`
 // no longer detects this sprint as an orphan and does not re-resume it
 // in the FIX phase.
-import { writeSprintState, SPRINT_STATE_FILE } from './sprint-utils.js';
+import { writeSprintState, readSprintState, SPRINT_STATE_FILE } from './sprint-utils.js';
 import { clearPid } from './sprint-pid-manager.js';
 
 
@@ -818,6 +818,36 @@ export async function finalizeSprint(
     try {
       const poolManager = new AgentPoolManager(projectRoot);
       const skillPoolManager = new SkillPoolManager(projectRoot);
+
+      // FINALIZE-RECOUNT guard (Sprint 268, 1b): updateAgentStats /
+      // updateSkillStats stamp stats.lastUsedInSprint = sprint.id on first
+      // record, so an entity already carrying this sprint's stamp was
+      // recorded by an EARLIER finalize of the SAME sprint (re-finalize via
+      // `finalize --force`) and must not be double-counted (sprint-267 live
+      // bug: uses+N, success+0). Snapshot the markers BEFORE the update loop:
+      // an agent/skill serving multiple tasks in THIS run stamps itself on
+      // its first task, and the pre-scan keeps its remaining tasks counting.
+      const agentsAlreadyRecorded = new Set<string>();
+      const skillsAlreadyRecorded = new Set<string>();
+      for (const task of sprint.tasks) {
+        const aId = task.assignedAgent;
+        if (aId && !agentsAlreadyRecorded.has(aId)
+            && poolManager.getAgent(aId)?.stats?.lastUsedInSprint === sprint.id) {
+          agentsAlreadyRecorded.add(aId);
+        }
+        for (const sId of task.assignedSkills ?? []) {
+          if (!skillsAlreadyRecorded.has(sId)
+              && skillPoolManager.getSkill(sId)?.stats?.lastUsedInSprint === sprint.id) {
+            skillsAlreadyRecorded.add(sId);
+          }
+        }
+      }
+      if (agentsAlreadyRecorded.size > 0 || skillsAlreadyRecorded.size > 0) {
+        debugLog('finalizeSprint:updateAgentSkillStats',
+          `Re-finalize of ${sprint.id} — skipping already-recorded stats for ` +
+          `${agentsAlreadyRecorded.size} agent(s), ${skillsAlreadyRecorded.size} skill(s)`);
+      }
+
       for (const task of sprint.tasks) {
         const evaluation = evaluations.get(task.id);
         if (!evaluation) continue;
@@ -829,13 +859,14 @@ export async function finalizeSprint(
 
         // Update agent stats
         const agentId = task.assignedAgent;
-        if (agentId) {
+        if (agentId && !agentsAlreadyRecorded.has(agentId)) {
           poolManager.updateAgentStats(agentId, evaluation, coverage, sprint.id);
         }
 
         // Update skill stats
         if (task.assignedSkills) {
           for (const skillId of task.assignedSkills) {
+            if (skillsAlreadyRecorded.has(skillId)) continue;
             skillPoolManager.updateSkillStats(skillId, evaluation, coverage, sprint.id);
           }
         }
@@ -849,33 +880,50 @@ export async function finalizeSprint(
       const { assessQuality } = await import('./quality-assessor.js');
       const tracker = new OutcomeTracker(projectRoot);
 
-      for (const task of sprint.tasks) {
-        const evaluation = evaluations.get(task.id);
-        if (!evaluation) continue;
-        const taskResult = resultsMap.get(task.id);
+      // FINALIZE-RECOUNT guard (Sprint 268, 1b): recordOutcome appends
+      // sprint.id to learnings.recentSprints on the first record and that
+      // list is append-only — its presence is a durable "stats already
+      // recorded for this sprint" marker. A re-finalize (`finalize --force`
+      // on an already-finalized sprint) must NOT re-record: the sprint-267
+      // live bug re-counted every task (uses+N) while archived results read
+      // as missing/NO_GO (success+0). Corrections to a recorded sprint go
+      // through tracker.reclassifyTaskOutcome instead of double-recording.
+      // The downstream steps (rule evolution, manifest sync, promotions)
+      // still run — they derive from accumulated learnings and are
+      // idempotent on unchanged data.
+      const statsAlreadyRecorded = tracker.getLearnings().recentSprints.includes(sprint.id);
+      if (statsAlreadyRecorded) {
+        debugLog('finalizeSprint:routing-outcomes',
+          `Stats already recorded for ${sprint.id} — skipping re-record (idempotent re-finalize)`);
+      } else {
+        for (const task of sprint.tasks) {
+          const evaluation = evaluations.get(task.id);
+          if (!evaluation) continue;
+          const taskResult = resultsMap.get(task.id);
 
-        // Quality assessment — multi-dimensional scoring beyond GO/NO_GO
-        let qualityScore: number | undefined;
-        if (taskResult) {
-          try {
-            const quality = assessQuality(task, taskResult, evaluation as unknown as string);
-            qualityScore = quality.overall;
-          } catch (e) { debugLog('finalizeSprint:assessQuality', e); }
+          // Quality assessment — multi-dimensional scoring beyond GO/NO_GO
+          let qualityScore: number | undefined;
+          if (taskResult) {
+            try {
+              const quality = assessQuality(task, taskResult, evaluation as unknown as string);
+              qualityScore = quality.overall;
+            } catch (e) { debugLog('finalizeSprint:assessQuality', e); }
+          }
+
+          tracker.recordOutcome({
+            taskId: task.id,
+            sprintId: sprint.id,
+            taskDNA: (task.routingMeta?.taskDNA ?? { intent: { primary: 'unknown', secondary: [], confidence: 0 }, domains: [], operations: [], complexity: { fileCount: 0, moduleCount: 0, crossCutting: false, estimatedSize: 'small' }, scope: { writeRatio: {}, primaryWriteTarget: '', testWriteRatio: 0 } }) as TaskDNA,
+            agentId: task.assignedAgent ?? null,
+            skillIds: task.assignedSkills ?? [],
+            evaluation: evaluation as unknown as 'DONE' | 'GO_WITH_TECH_DEBT' | 'NO_GO',
+            coverage: taskResult?.coverage ?? 0,
+            qualityScore,
+            routingVersion: 'v2',
+          });
         }
-
-        tracker.recordOutcome({
-          taskId: task.id,
-          sprintId: sprint.id,
-          taskDNA: (task.routingMeta?.taskDNA ?? { intent: { primary: 'unknown', secondary: [], confidence: 0 }, domains: [], operations: [], complexity: { fileCount: 0, moduleCount: 0, crossCutting: false, estimatedSize: 'small' }, scope: { writeRatio: {}, primaryWriteTarget: '', testWriteRatio: 0 } }) as TaskDNA,
-          agentId: task.assignedAgent ?? null,
-          skillIds: task.assignedSkills ?? [],
-          evaluation: evaluation as unknown as 'DONE' | 'GO_WITH_TECH_DEBT' | 'NO_GO',
-          coverage: taskResult?.coverage ?? 0,
-          qualityScore,
-          routingVersion: 'v2',
-        });
+        debugLog('finalizeSprint:routing-outcomes', `Recorded ${sprint.tasks.length} routing outcomes to learnings.json`);
       }
-      debugLog('finalizeSprint:routing-outcomes', `Recorded ${sprint.tasks.length} routing outcomes to learnings.json`);
 
       // 8d. Evolve routing rules from accumulated data
       try {
@@ -1217,11 +1265,16 @@ export async function finalizeSprint(
     }
     const agentParts = Object.entries(agentBreakdown).map(([a, c]) => `${a}(${c})`).join(', ');
 
-    // Format duration
+    // Format duration — Sprint 268 FINALIZE fix: without a recoverable
+    // startedAt the computed durationMs is a meaningless ~0 (calculateMetrics
+    // falls back to Date.now() for the start). Report 'unknown' honestly
+    // instead of a fake "0sn" (sprint-267 live finding: Duration=0ms).
     const durationMs = metrics.durationMs;
     const mins = Math.floor(durationMs / 60000);
     const secs = Math.floor((durationMs % 60000) / 1000);
-    const durationStr = mins > 0 ? `${mins}dk ${secs}sn` : `${secs}sn`;
+    const durationStr = !sprint.startedAt
+      ? 'unknown'
+      : mins > 0 ? `${mins}dk ${secs}sn` : `${secs}sn`;
 
     // completedTasks already includes TECH_DEBT (see calculateMetrics), so use it directly
     const donePure = metrics.completedTasks - metrics.techDebtTasks;
@@ -1429,7 +1482,18 @@ export function persistFinalSprintState(projectRoot: string, sprint: Sprint): vo
     sprint.completedAt = sprint.completedAt ?? new Date().toISOString();
     const statePath = join(projectRoot, SPRINT_STATE_FILE);
     if (existsSync(statePath)) {
-      writeSprintState(projectRoot, sprint);
+      // Sprint 268 guard: only stamp the state file when it belongs to THIS
+      // sprint — `finalize --force` for an older sprint must not overwrite a
+      // different (possibly live) sprint's state as COMPLETE. A state file
+      // without a sprintId (legacy/corrupt) is still stamped, preserving the
+      // Sprint 223 cleanup behavior.
+      const existing = readSprintState(projectRoot);
+      if (!existing?.sprintId || existing.sprintId === sprint.id) {
+        writeSprintState(projectRoot, sprint);
+      } else {
+        debugLog('persistFinalSprintState:skip',
+          `sprint-state.json belongs to ${existing.sprintId}, not ${sprint.id} — leaving untouched`);
+      }
     }
   } catch (e) { debugLog('persistFinalSprintState:writeSprintState', e); }
   try {

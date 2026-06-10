@@ -7262,3 +7262,30 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 > retro'nun istatistikleri düzeltildi.
 
 ---
+## Sprint 268 — sprint-268
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-06-10
+**Duration:** 1506s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 7 |
+| Completed | 7 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 1505743ms |
+
+### Tasks
+
+- 268-001: RESUME-RACE fix — resume respawn'dan önce bayat worker-artifact reset (DONE)
+- 268-002: FINALIZE fix üçlüsü — recount + archive-blind + orphan-state (DONE)
+- 268-003: SPAWN-LIFECYCLE — modelEffort pass-through + completion status finalize (DONE)
+- 268-004: JWKS async AuthProvider seam — terminal auth RS256/JWKS canlı (DONE)
+- 268-005: Dynamics 365 OData read-only ErpDriver (DONE)
+- 268-006: Enterprise-depth reference — api_oidc + JWKS-seam + Dynamics ekleri (DONE)
+
+---

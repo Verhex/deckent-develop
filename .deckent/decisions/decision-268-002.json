@@ -1,0 +1,88 @@
+{
+  "taskId": "268-002",
+  "sprintId": "sprint-268",
+  "steps": [
+    {
+      "step": 2,
+      "name": "routing-step-2",
+      "input": {
+        "taskId": "268-002",
+        "title": "FINALIZE fix üçlüsü — recount + archive-blind + orphan-state",
+        "scope": [
+          "src/cli/commands/",
+          "src/orchestra/",
+          "tests/cli/",
+          "src/cli/",
+          "tests/orchestra/",
+          "tests/cli/commands/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "bug-fixer",
+        "skills": [
+          "typescript-expert",
+          "testing-expert"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Agent forced by override: bug-fixer"
+    },
+    {
+      "step": 4,
+      "name": "routing-step-4",
+      "input": {
+        "taskId": "268-002",
+        "title": "FINALIZE fix üçlüsü — recount + archive-blind + orphan-state",
+        "scope": [
+          "src/cli/commands/",
+          "src/orchestra/",
+          "tests/cli/",
+          "src/cli/",
+          "tests/orchestra/",
+          "tests/cli/commands/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "bug-fixer",
+        "skills": [
+          "typescript-expert",
+          "testing-expert"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Skill budget: max 2 (medium task, 2 module(s), effort=normal)"
+    },
+    {
+      "step": 5,
+      "name": "routing-step-5",
+      "input": {
+        "taskId": "268-002",
+        "title": "FINALIZE fix üçlüsü — recount + archive-blind + orphan-state",
+        "scope": [
+          "src/cli/commands/",
+          "src/orchestra/",
+          "tests/cli/",
+          "src/cli/",
+          "tests/orchestra/",
+          "tests/cli/commands/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "bug-fixer",
+        "skills": [
+          "typescript-expert",
+          "testing-expert"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Skills forced by override: [typescript-expert, testing-expert]"
+    }
+  ],
+  "decidedAt": "2026-06-10T05:35:50.262Z"
+}

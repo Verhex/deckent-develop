@@ -4,7 +4,8 @@ import { join, extname, resolve } from 'node:path';
 import { randomBytes, randomUUID } from 'node:crypto';
 import type { SessionBackend } from './terminal/session-backend.js';
 import { PtySessionManager } from './terminal/session-manager.js';
-import { LocalTokenAuthProvider } from './terminal/auth-provider.js';
+import { LocalTokenAuthProvider, JwksAuthProvider } from './terminal/auth-provider.js';
+import type { AuthProvider } from './terminal/auth-provider.js';
 import { TerminalAudit, type AuditSink } from './terminal/audit.js';
 import { attachTerminalGateway } from './terminal/ws-gateway.js';
 import type { CreateSessionInput, SessionKind, TenantId } from './terminal/types.js';
@@ -1116,19 +1117,47 @@ export function createHttpServer(
   let terminalToken: string | undefined;
   let terminalMgr: PtySessionManager | undefined;
   let terminalAudit: TerminalAudit | undefined;
-  let terminalAuth: LocalTokenAuthProvider | undefined;
+  let terminalAuth: AuthProvider | undefined;
   let terminalReaper: NodeJS.Timeout | undefined;
 
   if (terminalBackend) {
     // Check if terminal is enabled via project config (sync read — createHttpServer is synchronous)
     let terminalEnabled = true;
+    // Opt-in JWKS terminal auth (Sprint 268 — ENT-5 async seam). Consulted via
+    // the same raw project-config read as `terminal.enabled`; absent block =
+    // EXACTLY today's local-token behavior (default-off).
+    let terminalJwks: { issuer: string; audience?: string; jwksUrl: string } | undefined;
     const projCfgPath = join(projectRoot, PROJECT_CONFIG_PATH);
     if (existsSync(projCfgPath)) {
       try {
         const raw = readFileSync(projCfgPath, 'utf-8');
-        const projCfg = JSON.parse(raw) as { terminal?: { enabled?: boolean } };
+        const projCfg = JSON.parse(raw) as {
+          terminal?: { enabled?: boolean };
+          terminal_oidc_jwks?: { issuer?: unknown; audience?: unknown; jwksUrl?: unknown };
+        };
         if (projCfg?.terminal?.enabled === false) {
           terminalEnabled = false;
+        }
+        const jwks = projCfg?.terminal_oidc_jwks;
+        if (jwks !== undefined && jwks !== null && typeof jwks === 'object') {
+          if (
+            typeof jwks.issuer === 'string' && jwks.issuer.length > 0 &&
+            typeof jwks.jwksUrl === 'string' && jwks.jwksUrl.length > 0
+          ) {
+            terminalJwks = {
+              issuer: jwks.issuer,
+              jwksUrl: jwks.jwksUrl,
+              ...(typeof jwks.audience === 'string' && jwks.audience.length > 0
+                ? { audience: jwks.audience }
+                : {}),
+            };
+          } else {
+            // Malformed block: fall back to the (still-secure, random) local
+            // token rather than silently running a misconfigured IdP setup.
+            process.stderr.write(
+              '[deckent:warn] terminal_oidc_jwks requires non-empty issuer + jwksUrl — falling back to local-token terminal auth\n',
+            );
+          }
         }
       } catch { /* ignore parse errors */ }
     }
@@ -1148,7 +1177,13 @@ export function createHttpServer(
       // MemoryStore. Raw PTY output is NEVER routed here (security invariant).
       const auditSink: AuditSink = { insert: () => { /* no-op default */ } };
       terminalAudit = new TerminalAudit(auditSink);
-      terminalAuth = new LocalTokenAuthProvider(terminalToken);
+      // JWKS auth (opt-in): bearer = IdP-issued RS256 JWT verified via the
+      // verifyAsync seam. The auto-generated local token above is still minted
+      // and HTML-injected (return contract preserved) but is NOT honored by
+      // JwksAuthProvider — its sync verify is always-deny by design.
+      terminalAuth = terminalJwks
+        ? new JwksAuthProvider(terminalJwks)
+        : new LocalTokenAuthProvider(terminalToken);
     }
   }
 
@@ -1162,7 +1197,13 @@ export function createHttpServer(
       if (terminalMgr && terminalAuth && terminalAudit && rawUrl.startsWith('/api/terminal/')) {
         const authHeader = req.headers['authorization'] ?? '';
         const tok = authHeader.replace(/^Bearer\s+/i, '');
-        if (!terminalAuth.verify(tok || undefined)) {
+        // Async seam (Sprint 268): prefer verifyAsync when the provider defines
+        // it (JWKS key resolution) — the handler is already async. Sync-only
+        // providers (LocalToken) keep the exact previous code path.
+        const terminalAuthorized = terminalAuth.verifyAsync
+          ? await terminalAuth.verifyAsync(tok || undefined)
+          : terminalAuth.verify(tok || undefined);
+        if (!terminalAuthorized) {
           terminalAudit.record({
             action: 'auth.deny',
             tenantId: 'local',

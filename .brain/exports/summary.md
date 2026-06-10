@@ -80,6 +80,10 @@
 | adr-086 | Native CLI Parity — F11 Feature Set (Sprint 224) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-268 Learnings** (sprint-268): ## Sprint sprint-268 Learnings
+
+## Gains
+- 268-001 — RESUME-RACE fix — resume respawn'dan önce bayat worker-artifact ...
 - **Sprint sprint-267 Learnings** (sprint-267): ## Sprint sprint-267 Learnings
 
 ## Gains
@@ -108,8 +112,6 @@
 
 ## Gains
 - 257-001 — CODE-FULLSUITE-NOGO — worker self-verify must be TARGETED, not f...
-- **Sprint sprint-256 Learnings** (sprint-256): ## Sprint sprint-256 Learnings
-- PLAN-SCOPE-1 — planner must NOT pull description-mentioned file paths into scope.fil...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -130,5 +132,6 @@ _No active technical debt._
 - Violation pattern: stale_heartbeat
 - Violation pattern: stale_heartbeat
 - Violation pattern: file_outside_scope
+- Violation pattern: file_outside_scope
 
-_Total entries: 362 | Generated: 2026-06-10_
+_Total entries: 366 | Generated: 2026-06-10_

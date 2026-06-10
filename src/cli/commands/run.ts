@@ -16,6 +16,8 @@ import { buildExecutionRequest, resolveToTask } from '../../orchestra/execution-
 
 export interface RunCommandOpts {
   model?: string;
+  /** F1-RE (268-003): native model reasoning-effort level (`--model-effort`). */
+  modelEffort?: string;
   scope?: string;
   timeout?: string;
   keep?: boolean;
@@ -240,6 +242,7 @@ export function registerRun(program: Command): void {
     .command('run <description>')
     .description('Run a single one-shot task without a sprint cycle')
     .option('--model <model>', `Model to use (default: sonnet). Options: ${ALL_MODELS.join(', ')}`, 'sonnet')
+    .option('--model-effort <level>', 'Native model reasoning-effort (claude: low|medium|high|xhigh|max, codex: minimal|low|medium|high). Opt-in; unsupported/invalid levels are ignored')
     .option('--scope <dir>', 'Worker scope directory (default: ./)', './')
     .option('--timeout <ms>', 'Maximum wait time in milliseconds (default: 300000)', '300000')
     .option('--keep', 'Keep task files after completion (skip cleanup)')
@@ -273,6 +276,9 @@ export function registerRun(program: Command): void {
       const execReq = buildExecutionRequest({
         description,
         model: model as ModelType,
+        // F1-RE (268-003): forward --model-effort into the canonical request so
+        // task.modelEffort is set (resolveToTask) and spawn emits the flag.
+        modelEffort: opts.modelEffort,
         scope: { directories: [scopeDir] },
         projectRoot: root,
         config: cfg,
@@ -343,6 +349,9 @@ export function registerRun(program: Command): void {
           dockerImage: cfg?.docker_image,
           dockerTimeout: cfg?.docker_timeout,
           provider: execReq.provider,
+          // F1-RE (268-003): task.modelEffort (from --model-effort) is validated
+          // per-provider inside spawnWorkerMultiProvider via resolveReasoningEffort.
+          modelEffort: task.modelEffort,
         });
         print(`Worker spawned via ${backend} (w-${taskId})`);
 
