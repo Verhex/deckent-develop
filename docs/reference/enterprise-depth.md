@@ -285,3 +285,63 @@ The consult is **fail-closed**: a block that is missing, `enabled: false`, incom
 ### Config Validation: Keys Are Never Echoed
 
 `validateConfig` in `src/core/config.ts` enforces the block's shape: `enabled` must be a boolean; `algorithm` must be `HS256` or `RS256`; when `enabled: true`, `issuer` and `key` must be non-empty and `algorithm` is required. Validation errors **never echo `key` material** — the secret-leak guard reports field names only.
+
+## 11. Dashboard SSO
+
+Sprint 277 closes the backend OIDC foundation and wires the dashboard authentication layer: `useAuth` context hook, session state management, identity display, and OIDC-redirect skeleton with JWT claim extraction.
+
+### Dashboard Auth-State Layer
+
+-   **Source**: `src/dashboard/src/hooks/useAuth.tsx`, `src/dashboard/src/lib/session.ts`
+-   **`useAuth()` hook**: React context provider exporting `{ token, isAuthenticated, identity, mode, login(token), logout(), refresh() }`. Bootstraps from `window.__DECKENT_API_TOKEN__` (localhost auto-inject, mevcut) or sessionStorage fallback. On mount, calls `/api/auth/me` to fetch identity claims (sub, email, name, role). Mode: `'static'` (opaque token) or `'oidc'` (JWT with claims). Logout clears sessionStorage + resets state.
+-   **`session.ts` module**: `DECKENT_SESSION_TOKEN` sessionStorage key, `getToken()`, `setToken(token)`, `clearToken()` helpers. XSS-narrow surface via sessionStorage (not localStorage).
+
+### Identity & Role Display
+
+-   **AuthStatus component** (`src/dashboard/src/components/AuthStatus.tsx`): Renders logged-in user display ("Logged in as: <name>") or static mode ("Local session"), optional role badge, logout button. Uses `useAuth().identity` and `useAuth().logout()`. Placed in AppShell header for visibility.
+
+### Manual Token Input (Testing)
+
+-   **ManualTokenInput component** (`src/dashboard/src/components/ManualTokenInput.tsx`): Modal allowing developer/tester to paste a JWT manually when `dashboard_oidc` is disabled or to test alternative tokens. Calls `useAuth().login(token)`, triggers `/api/auth/me` refresh. Displays validation error on 401. Type-safe input (`type=password`).
+
+### OIDC Redirect Flow Skeleton
+
+-   **`oidc-flow.ts` library** (`src/dashboard/src/lib/oidc-flow.ts`): Pure, no network I/O. `generatePkce()` produces S256 challenge/verifier pair. `buildAuthorizeUrl()` assembles the authorization endpoint URL with openid scope, PKCE challenge, state (CSRF), nonce. `parseCallbackParams()` extracts code/state from redirect URL. `validateState()` checks CSRF token integrity. All hermetically testable.
+
+### Login & Callback Routes
+
+-   **LoginPage** (`src/dashboard/src/pages/LoginPage.tsx`): When `dashboard_oidc.enabled: true`, displays "Sign in with SSO" button (calls `generatePkce()`, saves verifier to sessionStorage, redirects to authorization endpoint via `buildAuthorizeUrl()`). Always shows ManualTokenInput. Redirects to home if already authenticated.
+-   **CallbackPage** (`src/dashboard/src/pages/CallbackPage.tsx`): Receives IdP redirect with `code` + optional `state`. Validates state (CSRF), calls `POST /api/auth/oidc/exchange` with code + verifier. On success, stores token in sessionStorage via `useAuth().login()`, redirects to home. On failure, shows error and redirects back to LoginPage.
+
+### Backend Integration: JWT-Derived Audit Actor
+
+-   **`/api/auth/me` endpoint** (`src/api/auth-me-endpoint.ts`): Auth-gated, returns `{ authenticated, mode, sub, email, name, role }` (OIDC JWT claims when mode='oidc'; static when mode='static'). Token itself never in response body.
+-   **`/api/auth/oidc/exchange` endpoint** (`src/api/oidc-callback-endpoint.ts`): EXEMPT (login phase, no bearer yet). Body `{ code, code_verifier }`, returns `{ ok, token, claims }` or `{ ok: false, code, reason }`. Server exchanges code with IdP's token endpoint, verifies id_token via JWKS/RS256, and returns verified claims.
+-   **Audit actor derivation** (`src/api/enterprise-endpoint.ts`): When audit-logging, extracts JWT `sub` or `preferred_username` claim from bearer, sets `audit.actor` to that value (falls back to 'local' for static tokens). Enables audit trails to reflect real user identity.
+
+### Configuration
+
+```json
+{
+  "dashboard_oidc": {
+    "enabled": false,
+    "issuer": "https://idp.example.com/",
+    "client_id": "deckent-dashboard",
+    "client_secret": "$DECK:OIDC_CLIENT_SECRET",
+    "redirect_uri": "http://localhost:3000/auth/callback",
+    "scope": "openid profile email"
+  }
+}
+```
+
+-   **Default:** `enabled: false` (SSO opt-in). When disabled, dashboard requires manual token input or localhost auto-inject.
+-   **Issuer + Client ID:** Required when `enabled: true`. Client secret supports `$DECK:NAME` vault references.
+-   **Redirect URI:** Must match IdP whitelist. For development, typically `http://localhost:3000/auth/callback`.
+
+### Fail-Safe Guarantees
+
+-   When `dashboard_oidc.enabled: false`, the OIDC routes are wired but SSO button hidden; manual token input always available.
+-   Localhost auto-inject token path (mevcut) remains unaffected — authentication is **additive**, not replacing.
+-   JWT verification is **fail-closed**: invalid tokens, signature mismatches, or expired claims → dürüst error message (token never echoed).
+-   If IdP is unreachable, the exchange endpoint returns a structured error; user can retry or fall back to manual token.
+-   Verifier state (PKCE, nonce) stored in sessionStorage (per-tab isolation); no server-side state — stateless CSRF protection.

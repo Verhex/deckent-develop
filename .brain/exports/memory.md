@@ -1,5 +1,19 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-277 Learnings
+- Sprint sprint-277 Learnings: ## Sprint sprint-277 Learnings
+
+## Gains
+- 277-001 — /api/auth/me whoami endpoint — bearer'dan kimlik + rol — Implemented GET /api/auth/me whoami endpoint following the enterprise/nervous endpoint register p...
+- 277-002 — audit-actor JWT sub'dan türetme — hardcoded 'local' fix — Added dynamic audit actor derivation to enterprise-endpoint.ts:
+- 277-003 — useAuth hook/context — dashboard auth-state SSOT — Implemented session.ts (getSessionToken/setSessionToken/clearSessionToken with DECKENT_SESSION_TO...
+- 277-004 — AuthStatus komponenti — "kim giriş yaptı" + logout — AuthStatus component created.
+- 277-005 — ManualTokenInput — api_oidc modunda JWT test girişi — ManualTokenInput modal implemented.
+- 277-006 — OIDC redirect-flow çekirdeği — PKCE + authorize-URL + state (OPUS) — NEW src/dashboard/src/lib/oidc-flow.ts — pure, security-critical OIDC Authorization-Code + PKCE p...
+- 277-007 — OIDC token-exchange backend endpoint — code→token (OPUS) — OIDC token-exchange backend endpoint (code→token).
+- 277-008 — dashboard wire — Provider + AuthStatus + Login/Callback rotaları — All 5 files wired.
+- …and 6 more delivered
+
 ## Sprint sprint-276 Learnings
 - Sprint sprint-276 Learnings: ## Sprint sprint-276 Learnings
 

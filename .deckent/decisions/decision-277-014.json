@@ -1,0 +1,91 @@
+{
+  "taskId": "277-014",
+  "sprintId": "sprint-277",
+  "steps": [
+    {
+      "step": 2,
+      "name": "routing-step-2",
+      "input": {
+        "taskId": "277-014",
+        "title": "dashboard emoji→lucide-react temizliği — tasarım kararı ihlali geri-al (ACİL, Alperen)",
+        "scope": [
+          "src/dashboard/src/components/",
+          "src/dashboard/src/pages/",
+          "tests/dashboard/",
+          "src/dashboard/",
+          "tests/dashboard/src/components/",
+          "tests/dashboard/src/pages/"
+        ],
+        "intent": "design"
+      },
+      "output": {
+        "agent": "frontend-designer",
+        "skills": [
+          "react-specialist",
+          "frontend-design",
+          "testing-expert"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Agent forced by override: frontend-designer"
+    },
+    {
+      "step": 3,
+      "name": "routing-step-3",
+      "input": {
+        "taskId": "277-014",
+        "title": "dashboard emoji→lucide-react temizliği — tasarım kararı ihlali geri-al (ACİL, Alperen)",
+        "scope": [
+          "src/dashboard/src/components/",
+          "src/dashboard/src/pages/",
+          "tests/dashboard/",
+          "src/dashboard/",
+          "tests/dashboard/src/components/",
+          "tests/dashboard/src/pages/"
+        ],
+        "intent": "design"
+      },
+      "output": {
+        "agent": "frontend-designer",
+        "skills": [
+          "react-specialist",
+          "frontend-design",
+          "testing-expert"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Skill budget: max 2 (medium task, 1 module(s), effort=normal)"
+    },
+    {
+      "step": 4,
+      "name": "routing-step-4",
+      "input": {
+        "taskId": "277-014",
+        "title": "dashboard emoji→lucide-react temizliği — tasarım kararı ihlali geri-al (ACİL, Alperen)",
+        "scope": [
+          "src/dashboard/src/components/",
+          "src/dashboard/src/pages/",
+          "tests/dashboard/",
+          "src/dashboard/",
+          "tests/dashboard/src/components/",
+          "tests/dashboard/src/pages/"
+        ],
+        "intent": "design"
+      },
+      "output": {
+        "agent": "frontend-designer",
+        "skills": [
+          "react-specialist",
+          "frontend-design",
+          "testing-expert"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Skills forced by override: [react-specialist, frontend-design, testing-expert]"
+    }
+  ],
+  "decidedAt": "2026-06-10T20:34:00.126Z"
+}

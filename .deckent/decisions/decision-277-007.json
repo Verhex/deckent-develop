@@ -1,76 +1,85 @@
 {
-  "taskId": "276-004",
-  "sprintId": "sprint-276",
+  "taskId": "277-007",
+  "sprintId": "sprint-277",
   "steps": [
     {
       "step": 2,
       "name": "routing-step-2",
       "input": {
-        "taskId": "276-004",
-        "title": "cross-verify çekirdeği — high-stakes tespit + farklı-provider seçimi",
+        "taskId": "277-007",
+        "title": "OIDC token-exchange backend endpoint — code→token (OPUS)",
         "scope": [
+          "src/api/",
           "src/core/",
+          "tests/api/",
           "tests/core/"
         ],
         "intent": "implementation"
       },
       "output": {
-        "agent": "architect",
+        "agent": "security-auditor",
         "skills": [
+          "security-specialist",
           "typescript-expert",
           "testing-expert"
         ],
         "confidence": "high"
       },
       "durationMs": 0,
-      "reasoning": "Agent forced by override: architect"
+      "reasoning": "Agent forced by override: security-auditor"
     },
     {
       "step": 3,
       "name": "routing-step-3",
       "input": {
-        "taskId": "276-004",
-        "title": "cross-verify çekirdeği — high-stakes tespit + farklı-provider seçimi",
+        "taskId": "277-007",
+        "title": "OIDC token-exchange backend endpoint — code→token (OPUS)",
         "scope": [
+          "src/api/",
           "src/core/",
+          "tests/api/",
           "tests/core/"
         ],
         "intent": "implementation"
       },
       "output": {
-        "agent": "architect",
+        "agent": "security-auditor",
         "skills": [
+          "security-specialist",
           "typescript-expert",
           "testing-expert"
         ],
         "confidence": "high"
       },
       "durationMs": 0,
-      "reasoning": "Skill budget: max 1 (small task, 1 module(s), effort=normal)"
+      "reasoning": "Skill budget: max 2 (medium task, 2 module(s), effort=normal)"
     },
     {
       "step": 4,
       "name": "routing-step-4",
       "input": {
-        "taskId": "276-004",
-        "title": "cross-verify çekirdeği — high-stakes tespit + farklı-provider seçimi",
+        "taskId": "277-007",
+        "title": "OIDC token-exchange backend endpoint — code→token (OPUS)",
         "scope": [
+          "src/api/",
           "src/core/",
+          "tests/api/",
           "tests/core/"
         ],
         "intent": "implementation"
       },
       "output": {
-        "agent": "architect",
+        "agent": "security-auditor",
         "skills": [
+          "security-specialist",
           "typescript-expert",
           "testing-expert"
         ],
         "confidence": "high"
       },
       "durationMs": 0,
-      "reasoning": "Skills forced by override: [typescript-expert, testing-expert]"
+      "reasoning": "Skills forced by override: [security-specialist, typescript-expert, testing-expert]"
     }
   ],
-  "decidedAt": "2026-06-10T19:49:53.975Z"
+  "decidedAt": "2026-06-10T20:34:00.118Z"
 }

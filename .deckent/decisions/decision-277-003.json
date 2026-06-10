@@ -1,0 +1,91 @@
+{
+  "taskId": "277-003",
+  "sprintId": "sprint-277",
+  "steps": [
+    {
+      "step": 2,
+      "name": "routing-step-2",
+      "input": {
+        "taskId": "277-003",
+        "title": "useAuth hook/context — dashboard auth-state SSOT",
+        "scope": [
+          "src/dashboard/src/hooks/",
+          "src/dashboard/src/lib/",
+          "tests/dashboard/",
+          "src/dashboard/",
+          "tests/dashboard/src/hooks/",
+          "tests/dashboard/src/lib/"
+        ],
+        "intent": "design"
+      },
+      "output": {
+        "agent": "frontend-designer",
+        "skills": [
+          "react-specialist",
+          "typescript-expert",
+          "testing-expert"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Agent forced by override: frontend-designer"
+    },
+    {
+      "step": 3,
+      "name": "routing-step-3",
+      "input": {
+        "taskId": "277-003",
+        "title": "useAuth hook/context — dashboard auth-state SSOT",
+        "scope": [
+          "src/dashboard/src/hooks/",
+          "src/dashboard/src/lib/",
+          "tests/dashboard/",
+          "src/dashboard/",
+          "tests/dashboard/src/hooks/",
+          "tests/dashboard/src/lib/"
+        ],
+        "intent": "design"
+      },
+      "output": {
+        "agent": "frontend-designer",
+        "skills": [
+          "react-specialist",
+          "typescript-expert",
+          "testing-expert"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Skill budget: max 2 (medium task, 1 module(s), effort=normal)"
+    },
+    {
+      "step": 4,
+      "name": "routing-step-4",
+      "input": {
+        "taskId": "277-003",
+        "title": "useAuth hook/context — dashboard auth-state SSOT",
+        "scope": [
+          "src/dashboard/src/hooks/",
+          "src/dashboard/src/lib/",
+          "tests/dashboard/",
+          "src/dashboard/",
+          "tests/dashboard/src/hooks/",
+          "tests/dashboard/src/lib/"
+        ],
+        "intent": "design"
+      },
+      "output": {
+        "agent": "frontend-designer",
+        "skills": [
+          "react-specialist",
+          "typescript-expert",
+          "testing-expert"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Skills forced by override: [react-specialist, typescript-expert, testing-expert]"
+    }
+  ],
+  "decidedAt": "2026-06-10T20:34:00.114Z"
+}

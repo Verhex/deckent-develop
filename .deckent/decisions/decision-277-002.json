@@ -1,45 +1,47 @@
 {
-  "taskId": "276-001",
-  "sprintId": "sprint-276",
+  "taskId": "277-002",
+  "sprintId": "sprint-277",
   "steps": [
     {
       "step": 2,
       "name": "routing-step-2",
       "input": {
-        "taskId": "276-001",
-        "title": "directive-interrogator çekirdeği — zorlayıcı soru üretimi + taslak öneri",
+        "taskId": "277-002",
+        "title": "audit-actor JWT sub'dan türetme — hardcoded 'local' fix",
         "scope": [
-          "src/core/",
-          "tests/core/"
+          "src/api/",
+          "tests/api/"
         ],
         "intent": "implementation"
       },
       "output": {
-        "agent": "architect",
+        "agent": "security-auditor",
         "skills": [
+          "security-specialist",
           "typescript-expert",
           "testing-expert"
         ],
         "confidence": "high"
       },
       "durationMs": 0,
-      "reasoning": "Agent forced by override: architect"
+      "reasoning": "Agent forced by override: security-auditor"
     },
     {
       "step": 3,
       "name": "routing-step-3",
       "input": {
-        "taskId": "276-001",
-        "title": "directive-interrogator çekirdeği — zorlayıcı soru üretimi + taslak öneri",
+        "taskId": "277-002",
+        "title": "audit-actor JWT sub'dan türetme — hardcoded 'local' fix",
         "scope": [
-          "src/core/",
-          "tests/core/"
+          "src/api/",
+          "tests/api/"
         ],
         "intent": "implementation"
       },
       "output": {
-        "agent": "architect",
+        "agent": "security-auditor",
         "skills": [
+          "security-specialist",
           "typescript-expert",
           "testing-expert"
         ],
@@ -52,25 +54,26 @@
       "step": 4,
       "name": "routing-step-4",
       "input": {
-        "taskId": "276-001",
-        "title": "directive-interrogator çekirdeği — zorlayıcı soru üretimi + taslak öneri",
+        "taskId": "277-002",
+        "title": "audit-actor JWT sub'dan türetme — hardcoded 'local' fix",
         "scope": [
-          "src/core/",
-          "tests/core/"
+          "src/api/",
+          "tests/api/"
         ],
         "intent": "implementation"
       },
       "output": {
-        "agent": "architect",
+        "agent": "security-auditor",
         "skills": [
+          "security-specialist",
           "typescript-expert",
           "testing-expert"
         ],
         "confidence": "high"
       },
       "durationMs": 0,
-      "reasoning": "Skills forced by override: [typescript-expert, testing-expert]"
+      "reasoning": "Skills forced by override: [security-specialist, typescript-expert, testing-expert]"
     }
   ],
-  "decidedAt": "2026-06-10T19:49:53.970Z"
+  "decidedAt": "2026-06-10T20:34:00.113Z"
 }

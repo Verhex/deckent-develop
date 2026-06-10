@@ -442,4 +442,11 @@ export const tr: Record<TranslationKey, string> = {
   'common.confirm': 'Onayla',
   'common.yes': 'Evet',
   'common.no': 'Hayır',
+
+  // Auth Status
+  'auth.logged_in_as': 'Giriş yapan: {{name}}',
+  'auth.local_session': 'Yerel oturum',
+  'auth.logout': 'Çıkış yap',
+  'auth.role': 'Rol: {{role}}',
+  'auth.session_cleared': 'Oturum temizlendi',
 };

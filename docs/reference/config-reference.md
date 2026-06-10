@@ -755,6 +755,73 @@ Optional top-level block (config-types.ts) that enables async JWKS-backed RS256 
 
 ---
 
+### 15.3 Dashboard OIDC (`dashboard_oidc`)
+
+Optional top-level block (config-types.ts:293) that enables OIDC authorization-code flow for the web dashboard (Sprint 277, ENT-5). **Default-off**: when the block is absent or `enabled: false`, behavior is unchanged — the dashboard uses manual JWT token input or localhost auto-inject. There are no built-in defaults for this block.
+
+| Key | Type | Required | Description |
+|-----|------|----------|-------------|
+| `dashboard_oidc.enabled` | boolean | yes | Master switch — the block is inert unless `true`. |
+| `dashboard_oidc.issuer` | string | when enabled | OIDC issuer base URL. Discovery hits `<issuer>/.well-known/openid-configuration`. Must be non-empty when `enabled: true`. |
+| `dashboard_oidc.client_id` | string | when enabled | Public client ID registered with the IdP. Also used as the expected `aud` claim in the returned id_token. Must be non-empty when `enabled: true`. |
+| `dashboard_oidc.redirect_uri` | string | when enabled | Redirect URI registered with the IdP. Must match the URI in the authorization request. Must be non-empty when `enabled: true`. |
+| `dashboard_oidc.client_secret` | string | no | Confidential-client secret (optional — omit for public PKCE clients). Supports `$DECK:KEY` references — the config passes through deck-interpolation on load. |
+| `dashboard_oidc.scope` | string | no | OAuth scopes sent in the authorize request (optional; default "openid profile email"). |
+
+**Behavior:**
+- **Disabled (default):** `enabled: false` or block absent — zero behavioral change. Dashboard uses manual token input or localhost auto-inject. OIDC authorization flow is unavailable.
+- **Enabled:** Dashboard presents "Sign in with SSO" button. Frontend generates PKCE verifier/challenge → builds authorize URL → redirects to IdP. IdP login returns `code` → dashboard calls `POST /api/auth/oidc/exchange` (backend code→token exchange) → token stored in sessionStorage → authenticated.
+- **Discovery:** Backend discovers IdP's token_endpoint and jwks_uri from the issuer's `.well-known/openid-configuration` endpoint. Fails closed: malformed discovery → exchange endpoint returns error.
+- **Validation:** The returned id_token is verified via JWKS (RS256-pinned, signature validated, alg:none rejected, iss/aud claims matched against config issuer and client_id). Fails closed: invalid token → 403.
+- **Config resolution:** `resolveDashboardOidcConfig()` (oidc-callback-endpoint.ts) reads the project config and returns only when enabled + structurally complete.
+
+**Example Config (Public PKCE Client):**
+
+```json
+{
+  "dashboard_oidc": {
+    "enabled": true,
+    "issuer": "https://idp.example.com",
+    "client_id": "my-app-web",
+    "redirect_uri": "http://localhost:3200/auth/callback",
+    "scope": "openid profile email"
+  }
+}
+```
+
+**Example Config (Confidential Client with Secret):**
+
+```json
+{
+  "dashboard_oidc": {
+    "enabled": true,
+    "issuer": "https://idp.example.com",
+    "client_id": "my-app-backend",
+    "client_secret": "$DECK:OIDC_CLIENT_SECRET",
+    "redirect_uri": "http://api.example.com/auth/callback"
+  }
+}
+```
+
+**Validation (config.ts):**
+- `dashboard_oidc.enabled must be a boolean`
+- `dashboard_oidc.issuer must be a non-empty string when dashboard_oidc.enabled is true`
+- `dashboard_oidc.client_id must be a non-empty string when dashboard_oidc.enabled is true`
+- `dashboard_oidc.redirect_uri must be a non-empty string when dashboard_oidc.enabled is true`
+- `dashboard_oidc.scope must be a string` (if present)
+
+**Security Notes:**
+- The client_secret (if present) is never included in HTTP responses and is never logged — it remains in the server-side config only.
+- PKCE protection (code_challenge + code_verifier) is mandatory for all authorization flows (both public and confidential clients).
+- The authorization code and id_token never appear in the response body to the dashboard frontend — only the parsed claims and a sanitized id_token are stored in sessionStorage.
+- Issuer and audience are pinned during id_token verification — token-swapping attacks are prevented.
+
+**Related Endpoints:**
+- `GET /api/auth/me` — Returns the authenticated user's identity (section "HTTP API Endpoints").
+- `POST /api/auth/oidc/exchange` — Exchanges authorization code for id_token (section "HTTP API Endpoints").
+
+---
+
 ## 16. Sprint Lifecycle & Evaluation
 
 | Key | Default (code) | Values | Description |

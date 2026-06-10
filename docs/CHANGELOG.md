@@ -2,6 +2,28 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint277] - 2026-06-10
+
+### Added
+
+- /api/auth/me whoami endpoint — bearer'dan kimlik + rol
+- useAuth hook/context — dashboard auth-state SSOT
+- AuthStatus komponenti — "kim giriş yaptı" + logout
+- ManualTokenInput — api_oidc modunda JWT test girişi
+- OIDC redirect-flow çekirdeği — PKCE + authorize-URL + state (OPUS)
+- OIDC token-exchange backend endpoint — code→token (OPUS)
+- dashboard wire — Provider + AuthStatus + Login/Callback rotaları
+- EnterprisePage "BENİM rolüm" bağlamı
+- api_oidc test smoke — gerçek-binary serve + JWT-bearer dashboard yolu
+- config-reference + api-surface — dashboard_oidc + auth/me + crossVerify-komşu
+
+### Fixed
+
+- audit-actor JWT sub'dan türetme — hardcoded 'local' fix
+
+
+_Tasks: 14 total, 14 done, 0 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint276] - 2026-06-10
 
 ### Added

@@ -81,7 +81,7 @@ export function SprintControlPanel() {
     return (
       <Card data-testid="sprint-control-panel-empty" className="border-zinc-800 bg-zinc-900 shadow-lg shadow-zinc-950/50">
         <CardContent className="flex flex-col items-center justify-center py-12 gap-3">
-          <p className="text-3xl select-none">🐙</p>
+          <img src="/decko-mascot.png" alt="Decko" className="h-10 w-10 object-contain" />
           <p className="text-zinc-500 text-sm">No active sprint</p>
         </CardContent>
       </Card>

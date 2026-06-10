@@ -1,16 +1,16 @@
 {
-  "taskId": "276-005",
-  "sprintId": "sprint-276",
+  "taskId": "277-001",
+  "sprintId": "sprint-277",
   "steps": [
     {
       "step": 2,
       "name": "routing-step-2",
       "input": {
-        "taskId": "276-005",
-        "title": "cross_verify config bloğu (default-off)",
+        "taskId": "277-001",
+        "title": "/api/auth/me whoami endpoint — bearer'dan kimlik + rol",
         "scope": [
-          "src/core/",
-          "tests/core/"
+          "src/api/",
+          "tests/api/"
         ],
         "intent": "implementation"
       },
@@ -18,7 +18,8 @@
         "agent": "api-builder",
         "skills": [
           "typescript-expert",
-          "testing-expert"
+          "testing-expert",
+          "security-specialist"
         ],
         "confidence": "high"
       },
@@ -26,14 +27,14 @@
       "reasoning": "Agent forced by override: api-builder"
     },
     {
-      "step": 4,
-      "name": "routing-step-4",
+      "step": 3,
+      "name": "routing-step-3",
       "input": {
-        "taskId": "276-005",
-        "title": "cross_verify config bloğu (default-off)",
+        "taskId": "277-001",
+        "title": "/api/auth/me whoami endpoint — bearer'dan kimlik + rol",
         "scope": [
-          "src/core/",
-          "tests/core/"
+          "src/api/",
+          "tests/api/"
         ],
         "intent": "implementation"
       },
@@ -41,7 +42,8 @@
         "agent": "api-builder",
         "skills": [
           "typescript-expert",
-          "testing-expert"
+          "testing-expert",
+          "security-specialist"
         ],
         "confidence": "high"
       },
@@ -49,14 +51,14 @@
       "reasoning": "Skill budget: max 2 (medium task, 1 module(s), effort=normal)"
     },
     {
-      "step": 5,
-      "name": "routing-step-5",
+      "step": 4,
+      "name": "routing-step-4",
       "input": {
-        "taskId": "276-005",
-        "title": "cross_verify config bloğu (default-off)",
+        "taskId": "277-001",
+        "title": "/api/auth/me whoami endpoint — bearer'dan kimlik + rol",
         "scope": [
-          "src/core/",
-          "tests/core/"
+          "src/api/",
+          "tests/api/"
         ],
         "intent": "implementation"
       },
@@ -64,13 +66,14 @@
         "agent": "api-builder",
         "skills": [
           "typescript-expert",
-          "testing-expert"
+          "testing-expert",
+          "security-specialist"
         ],
         "confidence": "high"
       },
       "durationMs": 0,
-      "reasoning": "Skills forced by override: [typescript-expert, testing-expert]"
+      "reasoning": "Skills forced by override: [typescript-expert, testing-expert, security-specialist]"
     }
   ],
-  "decidedAt": "2026-06-10T19:49:53.977Z"
+  "decidedAt": "2026-06-10T20:34:00.112Z"
 }

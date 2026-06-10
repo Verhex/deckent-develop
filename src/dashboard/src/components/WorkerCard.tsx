@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
-import { Skull } from "lucide-react";
+import { Skull, Gem, Zap, Leaf, Bot, Cpu, FileCode2, Activity, Clock, type LucideIcon } from "lucide-react";
 import type { AgentInfo } from "../types";
 import { useTranslation } from "../i18n/LanguageProvider";
 import type { TranslatorProp } from "../i18n/types";
@@ -26,19 +26,19 @@ const STATUS_BADGE: Record<string, "info" | "success" | "critical" | "secondary"
   IDLE: "secondary",
 };
 
-const STATUS_ICON: Record<string, string> = {
-  EXECUTING: "▶",
-  DONE: "✓",
-  NO_GO: "✗",
-  ERROR: "✗",
-  PAUSED: "⏸",
-  IDLE: "○",
+const STATUS_DOT_COLOR: Record<string, string> = {
+  EXECUTING: "bg-brand-400 animate-pulse",
+  DONE: "bg-green-500",
+  NO_GO: "bg-red-500",
+  ERROR: "bg-red-500",
+  PAUSED: "bg-yellow-500",
+  IDLE: "bg-zinc-600",
 };
 
-const MODEL_ICON: Record<string, string> = {
-  opus: "💎",
-  sonnet: "⚡",
-  haiku: "🍃",
+const MODEL_ICON: Record<string, LucideIcon> = {
+  opus: Gem,
+  sonnet: Zap,
+  haiku: Leaf,
 };
 
 const BACKEND_BADGE: Record<string, { label: string; className: string }> = {
@@ -47,12 +47,12 @@ const BACKEND_BADGE: Record<string, { label: string; className: string }> = {
   subprocess: { label: "subprocess", className: "bg-orange-900/50 text-orange-300 border border-orange-700" },
 };
 
-function getModelIcon(model: string): string {
+function getModelIcon(model: string): LucideIcon {
   const lower = model.toLowerCase();
-  for (const [key, icon] of Object.entries(MODEL_ICON)) {
-    if (lower.includes(key)) return icon;
+  for (const [key, Icon] of Object.entries(MODEL_ICON)) {
+    if (lower.includes(key)) return Icon;
   }
-  return "🤖";
+  return Bot;
 }
 
 /** Derive the model tier (gold label) from the model id — client-side, no API
@@ -160,8 +160,8 @@ export function WorkerCard({ agent, onClick, onKill }: WorkerCardProps) {
   const { t } = useTranslation();
   const statusBar = STATUS_BAR[agent.status] ?? "bg-zinc-600";
   const badgeVariant = STATUS_BADGE[agent.status] ?? "secondary";
-  const statusIcon = STATUS_ICON[agent.status] ?? "○";
-  const modelIcon = getModelIcon(agent.model);
+  const statusDot = STATUS_DOT_COLOR[agent.status] ?? "bg-zinc-600";
+  const ModelIcon = getModelIcon(agent.model);
   const tier = getModelTier(agent.model);
   const provider = getProvider(agent.model);
   const liveLog = useLiveLogTail(
@@ -179,8 +179,8 @@ export function WorkerCard({ agent, onClick, onKill }: WorkerCardProps) {
 
       {/* Header: Worker ID + provider bar + tier + Model/Backend badges */}
       <div className="flex items-center justify-between mb-3">
-        <span className="font-mono text-sm text-zinc-100">
-          🤖 {agent.id}
+        <span className="font-mono text-sm text-zinc-100 flex items-center gap-1">
+          <Cpu className="h-3.5 w-3.5 text-zinc-400" /> {agent.id}
         </span>
         <div className="flex items-center gap-1.5">
           {/* Provider color bar (3px) — Claude clay / Codex green / Gemini blue */}
@@ -195,8 +195,8 @@ export function WorkerCard({ agent, onClick, onKill }: WorkerCardProps) {
               {BACKEND_BADGE[agent.backend].label}
             </span>
           )}
-          <Badge variant="outline" className="text-xs">
-            {modelIcon} {agent.model}
+          <Badge variant="outline" className="text-xs flex items-center gap-1">
+            <ModelIcon className="h-3.5 w-3.5" /> {agent.model}
           </Badge>
           {/* Tier label — gold (handoff signature) */}
           <span className="font-mono text-[10px] uppercase tracking-wide text-gold" data-testid="worker-tier">
@@ -209,8 +209,8 @@ export function WorkerCard({ agent, onClick, onKill }: WorkerCardProps) {
 
       {/* Task title */}
       <div className="mb-2">
-        <p className="text-sm text-zinc-200 truncate">
-          📝 {agent.taskId ?? "—"}
+        <p className="text-sm text-zinc-200 truncate flex items-center gap-1">
+          <FileCode2 className="h-3.5 w-3.5 text-zinc-400 shrink-0" /> {agent.taskId ?? "—"}
         </p>
         <p className="text-xs text-zinc-400 mt-1">
           {t("worker.agent")}: <span className="text-zinc-300">{agent.role}</span>
@@ -221,8 +221,8 @@ export function WorkerCard({ agent, onClick, onKill }: WorkerCardProps) {
 
       {/* Elapsed + Heartbeat */}
       <div className="flex items-center justify-between text-xs text-zinc-400 mb-3">
-        <span>⏱ {elapsed(agent.spawnedAt)}</span>
-        <span>❤️ {relativeTime(agent.lastHeartbeat, t)}</span>
+        <span className="flex items-center gap-1"><Clock className="h-3.5 w-3.5" /> {elapsed(agent.spawnedAt)}</span>
+        <span className="flex items-center gap-1"><Activity className="h-3.5 w-3.5 text-red-400" /> {relativeTime(agent.lastHeartbeat, t)}</span>
       </div>
 
       {/* Current action (SSE live data) */}
@@ -247,7 +247,7 @@ export function WorkerCard({ agent, onClick, onKill }: WorkerCardProps) {
       {/* Status bar + badge */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="text-sm">{statusIcon}</span>
+          <span className={`inline-block h-2 w-2 rounded-full ${statusDot}`} data-testid="worker-status-dot" />
           <Badge variant={badgeVariant}>{agent.status}</Badge>
         </div>
         <div className="flex items-center gap-2">

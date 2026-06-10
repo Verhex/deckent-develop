@@ -1,13 +1,13 @@
 {
-  "taskId": "276-010",
-  "sprintId": "sprint-276",
+  "taskId": "277-011",
+  "sprintId": "sprint-277",
   "steps": [
     {
       "step": 2,
       "name": "routing-step-2",
       "input": {
-        "taskId": "276-010",
-        "title": "api-surface + config-reference — yeni alanlar",
+        "taskId": "277-011",
+        "title": "config-reference + api-surface — dashboard_oidc + auth/me + crossVerify-komşu",
         "scope": [
           "docs/reference/"
         ],
@@ -27,8 +27,8 @@
       "step": 3,
       "name": "routing-step-3",
       "input": {
-        "taskId": "276-010",
-        "title": "api-surface + config-reference — yeni alanlar",
+        "taskId": "277-011",
+        "title": "config-reference + api-surface — dashboard_oidc + auth/me + crossVerify-komşu",
         "scope": [
           "docs/reference/"
         ],
@@ -48,8 +48,8 @@
       "step": 4,
       "name": "routing-step-4",
       "input": {
-        "taskId": "276-010",
-        "title": "api-surface + config-reference — yeni alanlar",
+        "taskId": "277-011",
+        "title": "config-reference + api-surface — dashboard_oidc + auth/me + crossVerify-komşu",
         "scope": [
           "docs/reference/"
         ],
@@ -66,5 +66,5 @@
       "reasoning": "Skills forced by override: [documentation-writer]"
     }
   ],
-  "decidedAt": "2026-06-10T19:49:53.985Z"
+  "decidedAt": "2026-06-10T20:34:00.122Z"
 }

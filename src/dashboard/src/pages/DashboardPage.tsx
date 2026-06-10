@@ -30,7 +30,7 @@ function WelcomeScreen({ lastSprintId, lastSprintMetrics, onNewSprint }: Welcome
   return (
     <Card className="border-zinc-800 bg-zinc-900 shadow-lg shadow-zinc-950/50">
       <CardContent className="flex flex-col items-center justify-center py-16 gap-4">
-        <p className="text-5xl select-none">🐙</p>
+        <img src="/decko-mascot.png" alt="Decko" className="h-12 w-12 object-contain" />
         <h2 className="text-2xl font-bold text-zinc-100">deckent</h2>
         <p className="text-zinc-400 text-center">{t("welcome.no_sprint")}</p>
         <p className="text-zinc-500 text-sm text-center">{t("welcome.start_hint")}</p>

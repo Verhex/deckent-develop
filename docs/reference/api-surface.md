@@ -2,6 +2,163 @@
 
 *This file defines inter-agent contracts. Brain creates, all agents read.*
 
+---
+
+## HTTP API Endpoints
+
+The Deckent HTTP server (`deckent serve`) exposes these endpoints.
+
+### Authentication & Authorization
+
+All endpoints except those marked **EXEMPT** require bearer authentication via the `Authorization: Bearer <token>` header. The bearer can be:
+- A static API token (configured via `api_auth_token` or `DECKENT_API_TOKEN` env var)
+- A JWT issued by the dashboard OIDC flow (when `dashboard_oidc.enabled: true`)
+
+The auth-gate middleware verifies the token before the endpoint is invoked. Unauthenticated requests to protected endpoints receive `401 Unauthorized`.
+
+### GET /api/auth/me
+
+**Authentication:** Required (auth-gate). The bearer has already been validated by the middleware.
+
+**Purpose:** Return the authenticated caller's identity and role claims.
+
+**Request:**
+```
+GET /api/auth/me
+Authorization: Bearer <token>
+```
+
+**Response (200 OK):**
+
+OIDC JWT bearer:
+```json
+{
+  "authenticated": true,
+  "mode": "oidc",
+  "sub": "user-uuid-or-identifier",
+  "email": "user@example.com",
+  "name": "Full Name",
+  "preferredUsername": "username",
+  "role": "admin"
+}
+```
+
+Static token bearer:
+```json
+{
+  "authenticated": true,
+  "mode": "static"
+}
+```
+
+**Response Fields:**
+- `authenticated` — Always `true` (auth middleware blocks unauthenticated requests)
+- `mode` — Token type: `"oidc"` (JWT with claims) or `"static"` (opaque token, no claims)
+- `sub` — OIDC: unique user identifier from JWT claim (present when available)
+- `email` — OIDC: email address from JWT claim (present when available)
+- `name` — OIDC: user's display name from JWT claim (present when available)
+- `preferredUsername` — OIDC: preferred username from JWT claim (present when available)
+- `role` — OIDC: user's role from JWT claim or config RBAC (present when available); values: `"admin"`, `"operator"`, `"viewer"`
+
+**Security Notes:**
+- The bearer token itself is never included in the response.
+- Claims are extracted from the JWT without re-verifying the signature (auth middleware already verified).
+- Role is derived from JWT claims only — never from unauthenticated sources.
+- For static tokens, `mode: "static"` signals that no claims are available (this is intentional).
+
+**Errors:**
+- `401 Unauthorized` — No bearer or invalid token (caught by auth-gate middleware before reaching this endpoint)
+
+---
+
+### POST /api/auth/oidc/exchange
+
+**Authentication:** **EXEMPT** — This endpoint is called during the login flow before a bearer token exists.
+
+**Purpose:** Exchange an authorization code from the OIDC authorize redirect for an id_token. Called by the dashboard after the IdP redirect.
+
+**Activation:** Only available when `dashboard_oidc.enabled: true` in config. When disabled, the endpoint returns `404 Not Found`.
+
+**Request:**
+```
+POST /api/auth/oidc/exchange
+Content-Type: application/json
+
+{
+  "code": "<authorization-code>",
+  "code_verifier": "<pkce-code-verifier>"
+}
+```
+
+**Request Fields:**
+- `code` — Authorization code returned by the IdP's authorization endpoint
+- `code_verifier` — PKCE code verifier (must match the code_challenge sent during authorization)
+
+**Response (200 OK):**
+
+Success:
+```json
+{
+  "ok": true,
+  "token": "<id_token>",
+  "claims": {
+    "iss": "https://idp.example.com",
+    "sub": "user-id",
+    "aud": "client-id",
+    "iat": 1234567890,
+    "exp": 1234571490,
+    "email": "user@example.com",
+    "name": "User Name"
+  }
+}
+```
+
+Failure:
+```json
+{
+  "ok": false,
+  "code": "invalid_request",
+  "reason": "code_verifier mismatch"
+}
+```
+
+**Response Fields:**
+- `ok` — Boolean: `true` for success, `false` for error
+- `token` — (Success only) The verified id_token as a JWT string (stored by dashboard in sessionStorage)
+- `claims` — (Success only) Parsed JWT claims for display (user identity, role, etc.)
+- `code` — (Error only) Stable machine-readable error code (see Error Codes table below)
+- `reason` — (Error only, optional) Brief human-readable explanation (never includes sensitive values)
+
+**Error Codes:**
+
+| Code | Meaning |
+|------|---------|
+| `invalid_request` | Missing or malformed request (code or code_verifier missing, invalid JSON, etc.) |
+| `discovery_failed` | Could not fetch or parse IdP's `.well-known/openid-configuration` document |
+| `token_exchange_failed` | Token endpoint returned an error or invalid response |
+| `id_token_missing` | Token endpoint response did not include an id_token |
+| `id_token_invalid` | id_token verification failed (signature invalid, exp expired, iss/aud mismatch, alg:none rejected, etc.) |
+| `fetch_unavailable` | (Internal) fetch is unavailable; network I/O cannot proceed |
+
+**Security Notes:**
+- **Config-gated:** When `dashboard_oidc` is disabled or missing, this endpoint returns `404 Not Found`.
+- **Fail-closed:** All errors return structured failure responses with machine-readable codes. No sensitive values (client_secret, authorization code, id_token) appear in any response body or log.
+- **PKCE protection:** The code_verifier is validated against the authorization code's code_challenge. Mismatched or missing verifier → `invalid_request`.
+- **Signature verification:** The id_token is verified via JWKS (RS256-pinned). Algorithm-confusion attacks are blocked (alg:none rejected). Issuer and audience claims are validated against the config.
+- **Expiration:** id_token expiration (`exp` claim) is checked at exchange time. Expired tokens → `id_token_invalid`.
+
+**Flow (from Dashboard Perspective):**
+1. User clicks "Sign in with SSO"
+2. Dashboard generates PKCE verifier + challenge (crypto.subtle.digest SHA-256, base64url)
+3. Dashboard builds authorize URL and redirects to the IdP
+4. IdP prompts user for login and redirect back to `dashboard_oidc.redirect_uri` with `code` query param
+5. Dashboard extracts `code` and calls `POST /api/auth/oidc/exchange` with code + code_verifier
+6. Backend verifies the code with the IdP's token endpoint and validates the returned id_token
+7. If successful, dashboard stores the token in sessionStorage and calls `GET /api/auth/me` to fetch user identity
+8. Dashboard sets authenticated state and redirects to home page
+
+---
+
 ## .tasks/ File Format (JSON)
 
 Each task is stored as `.tasks/task-{id}.json`:

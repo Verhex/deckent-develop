@@ -1,4 +1,5 @@
 import { useApi } from "../hooks/useApi";
+import { useAuth } from "../hooks/useAuth.js";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../components/ui/tabs";
 import { Badge } from "../components/ui/badge";
@@ -62,6 +63,7 @@ export default function EnterprisePage() {
   const { data: audit, loading: auditLoading, error: auditError } = useApi<AuditEntry[]>("/api/enterprise/audit");
   const { data: rate, loading: rateLoading, error: rateError } = useApi<RateLimitInfo[]>("/api/enterprise/rate");
   const { data: statusData } = useApi<{ alerts: Alert[] }>("/api/status");
+  const { identity } = useAuth();
 
   const sortedRbac = rbac
     ? [...rbac].sort((a, b) => (ROLE_ORDER[a.role] ?? 99) - (ROLE_ORDER[b.role] ?? 99))
@@ -79,6 +81,16 @@ export default function EnterprisePage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-zinc-100">Enterprise</h1>
         <div className="flex items-center gap-2" data-testid="enterprise-auth-status">
+          {identity?.role && (
+            <Badge className="bg-brand-900 text-brand-300" data-testid="my-role-badge">
+              You are: {identity.role}
+            </Badge>
+          )}
+          {identity && !identity.role && identity.mode === 'static' && (
+            <Badge className="bg-zinc-700 text-zinc-400" data-testid="my-role-badge">
+              local (full access)
+            </Badge>
+          )}
           <Badge className={token ? "bg-green-900 text-green-300" : "bg-zinc-700 text-zinc-400"}>
             {token ? "Authenticated" : "No auth token"}
           </Badge>
@@ -171,8 +183,14 @@ export default function EnterprisePage() {
               {rbacError && <p className="text-red-400">Error: {rbacError}</p>}
               {sortedRbac && sortedRbac.length > 0 && (
                 <div className="space-y-4" data-testid="rbac-matrix">
-                  {sortedRbac.map((entry) => (
-                    <div key={entry.role} className="rounded-md border border-zinc-800 p-4">
+                  {sortedRbac.map((entry) => {
+                    const isMyRole = identity?.role === entry.role;
+                    return (
+                    <div
+                      key={entry.role}
+                      className={`rounded-md border p-4 ${isMyRole ? "border-brand-500 bg-brand-950/40" : "border-zinc-800"}`}
+                      data-testid={isMyRole ? "my-role-row" : undefined}
+                    >
                       <div className="flex items-center gap-2 mb-3">
                         <Shield className="w-4 h-4 text-brand-300" />
                         <span className="font-semibold text-zinc-100 capitalize">{entry.role}</span>
@@ -183,6 +201,11 @@ export default function EnterprisePage() {
                         }>
                           {entry.role}
                         </Badge>
+                        {isMyRole && (
+                          <Badge className="bg-brand-900 text-brand-300 text-xs" data-testid="my-role-indicator">
+                            You
+                          </Badge>
+                        )}
                       </div>
                       <div className="flex flex-wrap gap-2">
                         {entry.permissions.map((perm) => (
@@ -190,7 +213,8 @@ export default function EnterprisePage() {
                         ))}
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
               {!rbacLoading && !rbacError && (!sortedRbac || sortedRbac.length === 0) && (

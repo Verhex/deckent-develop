@@ -7568,3 +7568,38 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 276-012: MASTER-PLAN — PLAN-INT-1 + XVER-1 kapanış işaretleri (DONE)
 
 ---
+## Sprint 277 — sprint-277
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-06-10
+**Duration:** 1668s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 14 |
+| Completed | 14 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 1668443ms |
+
+### Tasks
+
+- 277-001: /api/auth/me whoami endpoint — bearer'dan kimlik + rol (DONE)
+- 277-002: audit-actor JWT sub'dan türetme — hardcoded 'local' fix (DONE)
+- 277-003: useAuth hook/context — dashboard auth-state SSOT (DONE)
+- 277-004: AuthStatus komponenti — "kim giriş yaptı" + logout (DONE)
+- 277-005: ManualTokenInput — api_oidc modunda JWT test girişi (DONE)
+- 277-006: OIDC redirect-flow çekirdeği — PKCE + authorize-URL + state (OPUS) (DONE)
+- 277-007: OIDC token-exchange backend endpoint — code→token (OPUS) (DONE)
+- 277-008: dashboard wire — Provider + AuthStatus + Login/Callback rotaları (DONE)
+- 277-009: EnterprisePage "BENİM rolüm" bağlamı (DONE)
+- 277-010: api_oidc test smoke — gerçek-binary serve + JWT-bearer dashboard yolu (DONE)
+- 277-011: config-reference + api-surface — dashboard_oidc + auth/me + crossVerify-komşu (DONE)
+- 277-012: features + enterprise-depth — dashboard SSO satırları (DONE)
+- 277-013: MASTER-PLAN — ENT-5 dashboard SSO işaretleri (DONE)
+- 277-014: dashboard emoji→lucide-react temizliği — tasarım kararı ihlali geri-al (ACİL, Alperen) (DONE)
+
+---

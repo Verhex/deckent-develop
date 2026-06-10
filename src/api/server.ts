@@ -48,6 +48,8 @@ import { registerEnterpriseRoutes } from './enterprise-endpoint.js';
 import { resolveChatProvider } from '../core/config.js';
 import { resolveChatAdapter } from '../cli/commands/chat-provider-parity.js';
 import { registerCoverageRoutes } from './coverage-endpoint.js';
+import { registerAuthMeRoute } from './auth-me-endpoint.js';
+import { registerOidcCallbackRoute } from './oidc-callback-endpoint.js';
 import { handleOutputStream, isOutputStreamRequest } from './output-stream.js';
 import { createOutputCollector, type OutputCollector } from '../core/output-collector.js';
 
@@ -715,6 +717,8 @@ async function handleRequest(
     if (registerEnterpriseRoutes(url, method, res, projectRoot, rateLimiter ? { rateLimiter } : {})) return;
     // Coverage history + brain budget: /api/coverage
     if (registerCoverageRoutes(url, res, projectRoot)) return;
+    // Auth identity: /api/auth/me (277-001)
+    if (registerAuthMeRoute(url, method, res, req)) return;
 
     // GET with no matching route
     sendError(res, 404, 'Not found');
@@ -737,6 +741,10 @@ async function handleRequest(
     }
 
     if (registerNervousRoutes(url, method, res, projectRoot)) return;
+
+    // OIDC SSO token exchange: POST /api/auth/oidc/exchange (277-007). Auth-exempt
+    // (login flow has no bearer yet); config-gated (404 when dashboard_oidc off).
+    if (await registerOidcCallbackRoute(url, method, res, body, projectRoot)) return;
 
     if (url === '/api/start') {
       const parsed = StartSchema.safeParse(body);
@@ -1142,7 +1150,11 @@ export function createHttpServer(
   // bootstrap token there. Same constant-time compare as the Bearer header.
   const authMiddleware = bearerAuthMiddleware({
     configToken: finalToken,
-    exemptPaths: ['/health', '/api/health'],
+    // /api/auth/oidc/exchange is the SSO login flow (Sprint 277) — the caller
+    // has no bearer yet, so it bypasses the bearer gate. The endpoint itself is
+    // config-gated (404 when dashboard_oidc is disabled), so exempting the path
+    // leaks nothing.
+    exemptPaths: ['/health', '/api/health', '/api/auth/oidc/exchange'],
     queryTokenPaths: ['/api/events'],
     ...(resolvedOidc ? { oidc: resolvedOidc } : {}),
   });

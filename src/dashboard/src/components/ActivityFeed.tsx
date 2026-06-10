@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { RefreshCw, Activity, CheckCheck, XCircle, FileCode2, AlertTriangle, Bell, type LucideIcon } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { useTranslation } from "../i18n/LanguageProvider";
 import type { DashboardState } from "../types";
@@ -8,7 +9,7 @@ const MAX_ENTRIES = 50;
 interface ActivityEntry {
   id: string;
   timestamp: string;
-  icon: string;
+  icon: LucideIcon;
   message: string;
   detail?: string;
 }
@@ -50,7 +51,7 @@ export function ActivityFeed({ state, hasSprint }: ActivityFeedProps) {
         newEntries.push({
           id: makeId(),
           timestamp: now,
-          icon: "🔄",
+          icon: RefreshCw,
           message: t("activity.phase_changed"),
           detail: currentPhase,
         });
@@ -67,7 +68,7 @@ export function ActivityFeed({ state, hasSprint }: ActivityFeedProps) {
         newEntries.push({
           id: makeId(),
           timestamp: now,
-          icon: "🟢",
+          icon: Activity,
           message: `${agent.id} ${t("activity.spawned")}`,
           detail: agent.model ? `[${agent.model}]` : undefined,
         });
@@ -76,7 +77,7 @@ export function ActivityFeed({ state, hasSprint }: ActivityFeedProps) {
           newEntries.push({
             id: makeId(),
             timestamp: now,
-            icon: "✅",
+            icon: CheckCheck,
             message: `${agent.id} ${t("activity.done")}`,
             detail: agent.taskId ?? undefined,
           });
@@ -84,7 +85,7 @@ export function ActivityFeed({ state, hasSprint }: ActivityFeedProps) {
           newEntries.push({
             id: makeId(),
             timestamp: now,
-            icon: "❌",
+            icon: XCircle,
             message: `${agent.id} ${t("activity.nogo")}`,
             detail: agent.taskId ?? undefined,
           });
@@ -92,7 +93,7 @@ export function ActivityFeed({ state, hasSprint }: ActivityFeedProps) {
           newEntries.push({
             id: makeId(),
             timestamp: now,
-            icon: "📝",
+            icon: FileCode2,
             message: `${agent.id} ${t("activity.writing")}`,
             detail: agent.currentAction ?? undefined,
           });
@@ -105,7 +106,7 @@ export function ActivityFeed({ state, hasSprint }: ActivityFeedProps) {
         newEntries.push({
           id: makeId(),
           timestamp: now,
-          icon: "📝",
+          icon: FileCode2,
           message: `${agent.id} ${t("activity.writing")}`,
           detail: agent.currentAction,
         });
@@ -127,7 +128,7 @@ export function ActivityFeed({ state, hasSprint }: ActivityFeedProps) {
         newEntries.push({
           id: makeId(),
           timestamp: now,
-          icon: isStale ? "⚠️" : "🔔",
+          icon: isStale ? AlertTriangle : Bell,
           message: isStale ? t("activity.stale") : alert.message,
           detail: alert.source ?? undefined,
         });
@@ -178,7 +179,7 @@ export function ActivityFeed({ state, hasSprint }: ActivityFeedProps) {
                 <span className="text-zinc-500 font-mono shrink-0 mt-0.5">
                   {formatTime(entry.timestamp)}
                 </span>
-                <span className="shrink-0">{entry.icon}</span>
+                <entry.icon className="h-3.5 w-3.5 shrink-0 mt-0.5 text-zinc-400" />
                 <div className="flex-1 min-w-0">
                   <span className="text-zinc-300">{entry.message}</span>
                   {entry.detail && (

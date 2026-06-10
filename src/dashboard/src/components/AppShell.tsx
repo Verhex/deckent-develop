@@ -17,6 +17,7 @@ import { cn } from "../lib/utils.js";
 import { useTheme } from "./ThemeProvider.js";
 import { navItems } from "./Sidebar.js";
 import { useTranslation } from "../i18n/LanguageProvider.js";
+import { AuthStatus } from "./AuthStatus.js";
 
 export interface AppShellProps {
   children?: ReactNode;
@@ -163,6 +164,9 @@ export function AppShell({ children, headerContent, className }: AppShellProps) 
           {headerContent && (
             <div className="flex items-center gap-2 flex-1 px-4">{headerContent}</div>
           )}
+
+          {/* Auth identity chip — shows when authenticated (OIDC or static) */}
+          <AuthStatus className="hidden md:flex" />
 
           {/* Mobile theme toggle in header (desktop toggle lives in sidebar) */}
           <ThemeToggleButton

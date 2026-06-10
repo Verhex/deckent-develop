@@ -279,6 +279,31 @@ export interface DeckentConfig {
     /** HS256 shared secret or RS256 PEM public key (required non-empty when enabled). */
     key: string;
   };
+  /**
+   * Dashboard SSO via the OIDC authorization-code + PKCE flow (Sprint 277, ENT-5).
+   * Optional block — default-off; when absent or `enabled: false` the dashboard
+   * SSO surface is inert and `POST /api/auth/oidc/exchange` responds 404
+   * (disabled). When enabled, the backend token-exchange endpoint discovers the
+   * IdP (`<issuer>/.well-known/openid-configuration`), exchanges the
+   * authorization `code` (+ PKCE `code_verifier`) at the IdP token endpoint, and
+   * verifies the returned `id_token` against the issuer's JWKS (auth-jwks.ts SSOT,
+   * RS256-pinned) before handing it to the dashboard. `client_secret` supports
+   * `$DECK:KEY` references (the whole config passes through deck-interpolation).
+   */
+  dashboard_oidc?: {
+    /** Master switch — the block is inert unless true. */
+    enabled: boolean;
+    /** OIDC issuer base URL — discovery hits `<issuer>/.well-known/openid-configuration`. */
+    issuer: string;
+    /** Public client id registered with the IdP (also the expected id_token `aud`). */
+    client_id: string;
+    /** Confidential-client secret (optional — omit for public PKCE clients). */
+    client_secret?: string;
+    /** Redirect URI registered with the IdP (must match the authorize request). */
+    redirect_uri: string;
+    /** OAuth scopes sent in the authorize request (optional; default "openid profile email"). */
+    scope?: string;
+  };
 
   // ─── Memory (V1 — flat .md files) ───────────────────────────────────
   /** @deprecated Use memory.backend instead. Kept for V1 backward compat. */

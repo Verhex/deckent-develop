@@ -8,10 +8,12 @@
 // Missing data returns an empty array with 200 (never 404/500) — the page
 // renders its EmptyState. Register pattern follows nervous-endpoint.ts.
 
-import type { ServerResponse } from 'node:http';
+import type { IncomingMessage, ServerResponse } from 'node:http';
 import { existsSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { readJsonSafe } from '../core/utils.js';
+import { parseOidcClaims } from '../core/auth-oidc.js';
+import { writeAuditEvent } from '../core/audit-writer.js';
 import { PROJECT_CONFIG_PATH } from '../core/constants.js';
 import { PERMISSION_MATRIX, type Role } from '../core/rbac.js';
 import { isValidTenantId } from '../core/tenant-context.js';
@@ -59,6 +61,27 @@ export interface EnterpriseRouteDeps {
 function sendJson(res: ServerResponse, data: unknown, status = 200): void {
   res.writeHead(status, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify(data));
+}
+
+/**
+ * Resolve the audit actor from the request bearer token.
+ * JWT bearer → claims.sub ?? claims.preferred_username.
+ * Static/opaque token or no bearer → 'local' (fallback for backward compat).
+ */
+function resolveAuditActor(req?: IncomingMessage): string {
+  if (!req) return 'local';
+  const authHeader = req.headers['authorization'];
+  if (typeof authHeader !== 'string') return 'local';
+  const spaceIdx = authHeader.indexOf(' ');
+  if (spaceIdx < 0 || authHeader.slice(0, spaceIdx) !== 'Bearer') return 'local';
+  const token = authHeader.slice(spaceIdx + 1).trim();
+  if (!token) return 'local';
+  const claims = parseOidcClaims(token);
+  if (claims === null) return 'local';
+  if (typeof claims.sub === 'string' && claims.sub) return claims.sub;
+  const pref = claims['preferred_username'];
+  if (typeof pref === 'string' && pref) return pref;
+  return 'local';
 }
 
 // ─── Tenants ─────────────────────────────────────────────────────────
@@ -201,29 +224,42 @@ export function registerEnterpriseRoutes(
   res: ServerResponse,
   projectRoot: string,
   deps: EnterpriseRouteDeps = {},
+  req?: IncomingMessage,
 ): boolean {
   const parsed = new URL(url, 'http://localhost');
   const path = parsed.pathname;
   if (!path.startsWith('/api/enterprise/')) return false;
   if (method !== 'GET') return false;
 
+  const actor = resolveAuditActor(req);
+  const sprintId = latestEventSprintId(projectRoot);
+
   if (path === '/api/enterprise/tenants') {
-    sendJson(res, listTenants(projectRoot));
+    const data = listTenants(projectRoot);
+    if (sprintId) writeAuditEvent(projectRoot, sprintId, { tenantId: 'local', actor, action: 'enterprise:tenants:read' });
+    sendJson(res, data);
     return true;
   }
 
   if (path === '/api/enterprise/rbac') {
-    sendJson(res, listRbacRoles());
+    const roles = listRbacRoles();
+    if (sprintId) writeAuditEvent(projectRoot, sprintId, { tenantId: 'local', actor, action: 'enterprise:rbac:read' });
+    sendJson(res, roles);
     return true;
   }
 
   if (path === '/api/enterprise/audit') {
-    sendJson(res, listAuditEntries(projectRoot, parsed.searchParams));
+    // Read before write so the access-record event does not appear in this response.
+    const entries = listAuditEntries(projectRoot, parsed.searchParams);
+    if (sprintId) writeAuditEvent(projectRoot, sprintId, { tenantId: 'local', actor, action: 'enterprise:audit:read' });
+    sendJson(res, entries);
     return true;
   }
 
   if (path === '/api/enterprise/rate') {
-    sendJson(res, listRateLimits(deps));
+    const rateData = listRateLimits(deps);
+    if (sprintId) writeAuditEvent(projectRoot, sprintId, { tenantId: 'local', actor, action: 'enterprise:rate:read' });
+    sendJson(res, rateData);
     return true;
   }
 

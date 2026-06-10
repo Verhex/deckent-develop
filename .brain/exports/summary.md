@@ -80,6 +80,10 @@
 | adr-086 | Native CLI Parity — F11 Feature Set (Sprint 224) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-277 Learnings** (sprint-277): ## Sprint sprint-277 Learnings
+
+## Gains
+- 277-001 — /api/auth/me whoami endpoint — bearer'dan kimlik + rol — Impleme...
 - **Sprint sprint-276 Learnings** (sprint-276): ## Sprint sprint-276 Learnings
 
 ## Gains
@@ -114,10 +118,6 @@
 
 ## Gains
 - 268-001 — RESUME-RACE fix — resume respawn'dan önce bayat worker-artifact ...
-- **Sprint sprint-267 Learnings** (sprint-267): ## Sprint sprint-267 Learnings
-
-## Gains
-- 267-001 — api_oidc OIDC JWT bearer uzantısı — verifyJwt SSOT tüketimi, def...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -146,5 +146,6 @@ _No active technical debt._
 - Violation pattern: stale_heartbeat
 - Violation pattern: stale_heartbeat
 - Violation pattern: stale_heartbeat
+- Violation pattern: stale_heartbeat
 
-_Total entries: 410 | Generated: 2026-06-10_
+_Total entries: 416 | Generated: 2026-06-10_

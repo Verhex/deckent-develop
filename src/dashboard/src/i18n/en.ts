@@ -440,6 +440,13 @@ export const en = {
   'common.confirm': 'Confirm',
   'common.yes': 'Yes',
   'common.no': 'No',
+
+  // Auth Status
+  'auth.logged_in_as': 'Logged in as: {{name}}',
+  'auth.local_session': 'Local session',
+  'auth.logout': 'Log out',
+  'auth.role': 'Role: {{role}}',
+  'auth.session_cleared': 'Session cleared',
 } as const;
 
 export type TranslationKey = keyof typeof en;
