@@ -1,228 +1,138 @@
-# DIRECTIVES — Sprint 271: Kaynak Gözlemlenebilirliği + Optimizasyon Temeli + Publish Engelleri
+# DIRECTIVES — Sprint 272: Orkestrasyon Güvenilirliği — Ghost-Finalize + Dispatch-Yarışı + Exit-Without-Result Kökü + Kind-Bazlı Limitler
 
-## Goal: deckent'in docker worker kaynak ayak izi ÖLÇÜLEBİLİR ve YÖNETİLEBİLİR olsun (Alperen 2026-06-10: "anlık RAM datasına erişmek istiyorum; RAM/VRAM/SSD limitlerini netleyip optimize edeceğiz — daha az kaynakla aynı performans; kurumsal + yüksek-bütçesiz kullanıcılar için kritik"): docker-stats örnekleyici + sprint-yaşamdöngüsü wire'ı + `deckent resources` CLI + doctor kaynak satırı. Yanında: 270'in bıraktığı publish engelleri (pack 4.8MB>3MB, 17 kırık link, manifest F3-009) + crash-hardening (.spawnlock). MİKRO-TASK + DEPENDENCY + MODEL-KATMANLAMA. Mevcut gerçekler: per-container limit 4g/6g default (spawn-backend-docker.ts:41-42, Sprint 191), max_workers artık 6, image 1.72GB, VRAM container'da kullanılmıyor.
+## Goal: Son üç sprintin canlı bulgularını kökten kapat: (1) GHOST-FINALIZE — finalize/cleanup checkpoint artığı bırakıyor, sonraki `deckent start` hayalet 0/0-finalize koşup sprint başlatmadan çıkıyor; (2) dispatch-kuyruğu/EVALUATE yarışı — kuyrukta hiç koşmamış task varken değerlendirme başlıyor (271-013 vakası); (3) exit-without-result ailesi — worker işi yapıp .result yazamadan çıkınca sentetik NO_GO (3 sprint üst üste; iş diskte TAM olduğu hâlde); (4) F1-LIM faz-2 — 271 baseline'ına göre task-tipine göre memory limiti (kod 1.5g / doc 768m önerisi) + provider-limit tespit temeli. Bu sprint ürünün KENDİ resource-monitor'üyle koşuyor (resource_monitor.enabled=true — canlı dogfood testi).
 
 ## Ortak kurallar
-- **TDD + hermetik:** önce RED; tmpdir + injectable spawn/fs; gerçek docker/ağ YASAK testlerde; spawnSync YASAK.
+- **TDD + hermetik:** önce RED; tmpdir + injectable I/O; gerçek docker/ağ YASAK testlerde; spawnSync YASAK.
 - **Self-verify TARGETED:** yalnız kendi test dosyaların; başkasının yarım dosyası NO_GO sebebi değil (notes'a).
-- **Fail-safe:** kaynak-izleme hatası sprint'i ASLA düşürmez/yavaşlatmaz (best-effort, log-and-continue).
-- **Davranış korunumu:** her şey opt-in/additive; default'lar değişmez.
+- **Davranış korunumu:** mevcut yeşil testler yeşil kalır; tüm yeni davranışlar additive/opt-in; canlı-yol değişikliklerinde fail-safe öncelikli.
 - **i18n-FIRST:** user-facing string `getMessage(key, lang)` (en+tr).
-- **`.tasks/task-XXX.result` YAZ**; Kanıt komutlarını koş. Gerçek-binary smoke CC sprint-sonu (ADR-079).
+- **`.tasks/task-XXX.result` YAZ** — bu sprint'in konusu tam da bu: result yazımını ATLAMA.
 
 ---
 
-## Task 1: resource-monitor çekirdeği — docker stats örnekleyici → JSONL
+## Task 1: GHOST-FINALIZE fix — checkpoint artığı temizliği + start'ın dürüst davranışı
 - Provider: claude
-- Model: sonnet
+- Model: opus
+- Backend: docker
+- Effort: high
+- Agent: bug-fixer
+- Skills: typescript-expert, testing-expert
+- Files: src/orchestra/sprint-finalizer.ts, src/orchestra/sprint-checkpoint.ts, src/cli/commands/start.ts, tests/orchestra/ghost-finalize.test.ts
+- Scope: src/orchestra/, src/cli/, tests/orchestra/, tests/cli/
+
+### Description
+CANLI BUG (2026-06-10, iki kez): sprint finalize/cleanup `.deckent/sprint-NNN-checkpoint.json` + `-checkpoint-seq` dosyalarını SİLMİYOR; sonraki `deckent start` bu artığı görüp önceki sprint için **hayalet finalize** koşuyor ("Sprint NNN Complete! 0/0 tasks", taskIds boş) ve YENİ SPRINT'İ BAŞLATMADAN çıkıyor — kullanıcı start'ın çalıştığını sanıyor. Kaynaklar: `src/orchestra/sprint-checkpoint.ts` (checkpoint yazımı/okuması), finalize/cleanup zinciri (`sprint-finalizer.ts` + CLEANUP fazı), `src/cli/commands/start.ts` (leftover-checkpoint yolu — davranışı İZLE ve .result'a belgele). Fix: (1) sprint terminal'e ulaştığında (finalize VE cleanup yolları, `finalize --force` dahil) kendi checkpoint dosyalarını temizle; (2) start leftover-checkpoint bulursa: checkpoint'in sprint'i ZATEN finalize edilmişse (memory.db retro var / sprint-state COMPLETE-arşivli) sessizce temizleyip YENİ sprint'e DEVAM ET; finalize edilmemişse mevcut kurtarma davranışı + kullanıcıya açık i18n mesajı ("önceki sprint artığı bulundu → X yapılıyor") — hayalet 0/0-finalize loglayıp çıkmak YASAK. Testler: finalize sonrası checkpoint yok; --force yolu; leftover+finalize-edilmiş → temizle-ve-başlat; leftover+yarım → kurtarma yolu korunur.
+
+**Kanıt:** `npx vitest run tests/orchestra/ghost-finalize.test.ts` yeşil; `grep -n "checkpoint" src/orchestra/sprint-finalizer.ts | head -2` ≥ 1. **Test:** 8+.
+
+---
+
+## Task 2: dispatch-kuyruğu/EVALUATE yarışı — koşmamış task varken değerlendirme başlamaz
+- Provider: claude
+- Model: opus
+- Backend: docker
+- Effort: high
+- Agent: bug-fixer
+- Skills: typescript-expert, testing-expert
+- Files: src/orchestra/result-collector.ts, src/orchestra/sprint-phases.ts, tests/orchestra/dispatch-evaluate-race.test.ts
+- Scope: src/orchestra/, tests/orchestra/
+
+### Description
+CANLI BUG (271-013): TOPP continuous-dispatch'te bağımlılıkları YENİ açılmış ve henüz hiç dispatch edilmemiş task kuyrukta beklerken collector "toplama bitti" deyip EVALUATE başlattı → 013 hiç koşmadan honest-gate sentetik NO_GO yedi; FIX dalgası da onu almadı. Kaynaklar: `result-collector.ts` (waitForResults/processQueue — toplamanın bitme koşulu), `sprint-phases.ts` dispatch döngüsü (respawnEligibleTasks/TOPP, ADR-064), `isTaskDispatched` sinyali (`sprint-phases.ts:262` civarı). Fix: toplama-bitti koşulu "tüm task'lar TERMINAL (result'lı) VEYA dispatch-edilmiş-ve-bekleniyor" olmalı; dependencies'i yeni karşılanmış PENDING task varsa EVALUATE'e GEÇME — önce dispatch et (timeout güvenliği: dispatch-edilemeyen task makul üst-sınırda dürüst NO_GO'ya düşer, sonsuz bekleme YOK — mevcut sprint-timeout mekanizmasına bağla). Yarışın birim-testi: sentetik kuyrukla "dep'i son anda açılan task evaluate öncesi dispatch edilir" + "dispatch imkânsızsa (spawn hatası) timeout'la dürüşt kapanır" + mevcut akış regresyonsuz.
+
+**Kanıt:** `npx vitest run tests/orchestra/dispatch-evaluate-race.test.ts` yeşil. **Test:** 7+.
+
+---
+
+## Task 3: exit-without-result kökü (a) — docker wrapper son-şans + zengin marker
+- Provider: claude
+- Model: opus
 - Backend: docker
 - Effort: high
 - Agent: devops-engineer
+- Skills: docker-expert, typescript-expert, testing-expert
+- Files: src/orchestra/spawn-backend-docker.ts, tests/orchestra/docker-exit-marker.test.ts
+- Scope: src/orchestra/, tests/orchestra/
+
+### Description
+3 sprint üst üste canlı desen: worker İŞİ BİTİRİYOR (hb seq yüksek/DONE, diff diskte) ama `.result` yazamadan exitCode=0 çıkıyor (limit/akış kesintisi) → host monitor "Worker exited without writing result" sentetik NO_GO. Kaynak: `spawn-backend-docker.ts` EXIT-trap / host-monitor promotion yolu (`:1083` civarı partial-promotion). Fix (wrapper tarafı): container çıkışında .result YOKSA (1) kısa son-şans penceresi (3-5s — geç flush'ı yakala); (2) hâlâ yoksa promotion marker'ını ZENGİNLEŞTİR: `git diff --stat` özeti (kaç dosya/satır — EXIT-trap zaten diff hesaplıyorsa onu kullan), son hb status/seq, `workPresent: boolean` (diff>0) alanlarıyla `EXIT_WITHOUT_RESULT` tipli partial yaz. Davranış korunur (yine NO_GO-aday partial) — ama Task 4'ün eval'i artık ayırt edebilir. Testler: mock exit akışında marker alanları; son-şans penceresi; iş-yok vakasında workPresent=false.
+
+**Kanıt:** `npx vitest run tests/orchestra/docker-exit-marker.test.ts` yeşil; `grep -n "workPresent\|EXIT_WITHOUT_RESULT" src/orchestra/spawn-backend-docker.ts | head -2` ≥ 1. **Test:** 6+.
+
+---
+
+## Task 4: exit-without-result kökü (b) — eval'de workPresent → verify-and-complete FIX yolu
+- Provider: claude
+- Model: opus
+- Backend: docker
+- Effort: high
+- Agent: bug-fixer
+- Skills: typescript-expert, testing-expert
+- Files: src/orchestra/result-evaluator.ts, src/orchestra/sprint-phases.ts, tests/orchestra/work-present-eval.test.ts
+- Dependencies: 272-003
+- Scope: src/orchestra/, tests/orchestra/
+
+### Description
+Task 3'ün zengin marker'ını değerlendirme tüketsin: `EXIT_WITHOUT_RESULT` + `workPresent:true` partial'ı düz "crashed NO_GO" yerine **VERIFY_AND_COMPLETE** sinyalli NO_GO olur → FIX dalgasının bu task için prompt'u "sıfırdan yap" değil "diskteki işi denetle-tamamla-result yaz" çerçevesi alır (FIX prompt zenginleştirme deseni ADR-073; mevcut FIX akışına minimal ek — yeni faz İCAT ETME). workPresent:false → bugünkü davranış aynen. CC kurtarmalarında elle yaptığımız "fresh worker over partial work" deseninin üçüncü kez kanıtlanmış hâlinin ürünleşmesi. Testler: workPresent partial → eval sinyali + FIX prompt içeriğinde verify-and-complete ibaresi (mock); workPresent yok → regresyonsuz; gerçek DONE result'lar etkilenmez.
+
+**Kanıt:** `npx vitest run tests/orchestra/work-present-eval.test.ts` yeşil; `grep -n "VERIFY_AND_COMPLETE\|workPresent" src/orchestra/result-evaluator.ts | head -2` ≥ 1. **Test:** 6+.
+
+---
+
+## Task 5: F1-LIM faz-2a — task-tipine göre memory limiti (kod 1.5g / doc 768m önerisi)
+- Provider: claude
+- Model: sonnet
+- Backend: docker
+- Effort: normal
+- Agent: devops-engineer
 - Skills: typescript-expert, testing-expert, docker-expert
-- Files: src/orchestra/resource-monitor.ts, tests/orchestra/resource-monitor.test.ts
-- Scope: src/orchestra/, tests/orchestra/
+- Files: src/core/config-types.ts, src/core/config.ts, src/orchestra/spawn-backend-docker.ts, tests/orchestra/memory-limit-by-kind.test.ts
+- Scope: src/core/, src/orchestra/, tests/
 
 ### Description
-**YENİ `src/orchestra/resource-monitor.ts`** (orchestra'da — `parseMemoryString`'i `spawn-backend-docker.ts:52`'den import eder, ADR-008 uyumlu): `createResourceMonitor(opts: { intervalMs?: number; logPath: string; spawnImpl?; filterPrefix?: string }): { start(): void; stop(): Promise<void>; sampleOnce(): Promise<ResourceSample[]> }`. Her tick'te `docker stats --no-stream --format "{{json .}}"` (async spawn, injectable) → satır-satır parse → `filterPrefix` ('deckent-w-' default) ile süz → `ResourceSample { ts, container, taskId (addan türet: deckent-w-<id>), memUsageBytes, memLimitBytes, memPerc, cpuPerc, netIO, blockIO }` → `logPath`'e JSONL append (append-only, atomic gerekmez — tek yazar). Hatalar (docker yok, parse kırığı): log-and-continue, ASLA throw etmez; stop() bekleyen tick'i temiz kapatır. Testler: mock spawn ile örnekleme/parse/filtre/append; docker-yok senaryosu sessiz; stop temizliği; taskId türetimi.
+271 baseline'ı (resource-profile.md §10: kod-task peak ≤929MB, doc-task ≤247MB — 4g limit 4-20 kat fazla) → opt-in kind-bazlı limit: config `worker_memory_limit_by_kind?: { [kind: string]: string }` (örn `{ "doc": "768m", "code": "1536m" }`; anahtarlar canonical TaskKind — `core/work-model.ts` SSOT). Spawn'da: task.type için kind-limit varsa onu, yoksa mevcut `worker_memory_limit ?? 4g` (sıfır davranış değişikliği). Swap aynı oranda türetilir (limit×1.5, mevcut 4g/6g oranı). `parseMemoryString` ile validasyon; geçersiz değer → config hatası. Testler: kind eşleşmesi, fallback, swap türetimi, validasyon.
 
-**Kanıt:** `npx vitest run tests/orchestra/resource-monitor.test.ts` yeşil; `grep -n "parseMemoryString" src/orchestra/resource-monitor.ts` ≥ 1. **Test:** 8+.
+**Kanıt:** `npx vitest run tests/orchestra/memory-limit-by-kind.test.ts` yeşil; `grep -n "worker_memory_limit_by_kind" src/orchestra/spawn-backend-docker.ts` ≥ 1. **Test:** 7+.
 
 ---
 
-## Task 2: resource_monitor config bloğu
-- Provider: claude
-- Model: sonnet
-- Backend: docker
-- Effort: low
-- Agent: api-builder
-- Skills: typescript-expert, testing-expert
-- Files: src/core/config-types.ts, src/core/config.ts, tests/core/config-resource-monitor.test.ts
-- Scope: src/core/, tests/core/
-
-### Description
-Config'e opt-in blok (autonomous bloğu desenini izle — config-types.ts + validateConfig): `resource_monitor?: { enabled: boolean (zorunlu, default davranış=blok yok=kapalı); interval_ms?: number (default 5000, min 1000 validasyonu); log_path?: string (default '.deckent/resource-log.jsonl') }`. Validation hataları mevcut stil; alan yokken sıfır davranış değişikliği. Testler: geçerli/geçersiz bloklar, min-interval, default'lar.
-
-**Kanıt:** `npx vitest run tests/core/config-resource-monitor.test.ts` yeşil; `grep -n "resource_monitor" src/core/config-types.ts` ≥ 1. **Test:** 5+.
-
----
-
-## Task 3: resource-log analiz fonksiyonları — per-task peak/avg
-- Provider: claude
-- Model: sonnet
-- Backend: docker
-- Effort: normal
-- Agent: performance-analyzer
-- Skills: typescript-expert, testing-expert
-- Files: src/orchestra/resource-report.ts, tests/orchestra/resource-report.test.ts
-- Dependencies: 271-001
-- Scope: src/orchestra/, tests/orchestra/
-
-### Description
-**YENİ `src/orchestra/resource-report.ts`** (Task 1'in ResourceSample tipini import eder — Dependencies bu yüzden): pure fonksiyonlar — `parseResourceLog(content: string): ResourceSample[]` (bozuk satırları atla) + `summarizeByTask(samples): TaskResourceSummary[]` (`{ taskId, container, samples, peakMemBytes, avgMemBytes, peakMemPerc, peakCpuPerc, firstTs, lastTs, durationMs }`) + `summarizeSprint(samples)` (toplam eşzamanlı peak: aynı ts-penceresindeki container'ların mem toplamının maksimumu — sistem tavanı analizi için kritik) + `formatBytes(n)` (insan-okur). I/O YOK (pure — CLI Task 4'te okur). Testler: sentetik örneklerle peak/avg/eşzamanlı-toplam doğruluğu, bozuk satır toleransı, boş log.
-
-**Kanıt:** `npx vitest run tests/orchestra/resource-report.test.ts` yeşil; `grep -n "summarizeByTask\|summarizeSprint" src/orchestra/resource-report.ts` ≥ 2. **Test:** 8+.
-
----
-
-## Task 4: `deckent resources` CLI — anlık snapshot + log özeti
-- Provider: claude
-- Model: sonnet
-- Backend: docker
-- Effort: normal
-- Agent: api-builder
-- Skills: typescript-expert, testing-expert
-- Files: src/cli/commands/resources.ts, src/cli/index.ts, src/cli/helpers/messages.ts, tests/cli/resources-command.test.ts
-- Dependencies: 271-001, 271-003
-- Scope: src/cli/, tests/cli/
-
-### Description
-**YENİ `deckent resources` komutu** (register pattern ADR-012; `src/cli/index.ts`'e kayıt): (a) default: anlık snapshot — Task 1 `sampleOnce()` ile canlı `docker stats` tablosu (container, task, RAM kullanım/limit/%, CPU%) + altta etkin konfig satırı (memory limit 4g/6g default ?? config, max_workers, hesaplanan tavan = workers×limit); (b) `--log [path]`: Task 3 ile log özeti — task başına peak/avg tablo + sprint eşzamanlı-peak; (c) `--json` ham çıktı. i18n en+tr (tablo başlıkları dahil). Docker yoksa dürüst i18n mesajı, exit 0 (bilgi komutu). Testler: mock monitor/log ile tablo render, --json shape, docker-yok yolu.
-
-**Kanıt:** `npx vitest run tests/cli/resources-command.test.ts` yeşil; `grep -n "registerResources" src/cli/index.ts` ≥ 1. **Test:** 7+.
-
----
-
-## Task 5: sprint-yaşamdöngüsü wire — opt-in izleme SPAWN→CLEANUP
+## Task 6: F1-LIM faz-2b — provider-limit tespit modülü + FIX ölü-limit guard'ı
 - Provider: claude
 - Model: opus
 - Backend: docker
 - Effort: high
 - Agent: devops-engineer
 - Skills: typescript-expert, testing-expert
-- Files: src/orchestra/sprint-controller.ts, src/orchestra/sprint-phases.ts, tests/orchestra/resource-monitor-wire.test.ts
-- Dependencies: 271-001, 271-002
-- Scope: src/orchestra/, tests/orchestra/
+- Files: src/core/provider-failure-classifier.ts, src/orchestra/sprint-phases.ts, tests/core/provider-failure-classifier.test.ts
+- Scope: src/core/, src/orchestra/, tests/
 
 ### Description
-Task 1 monitor'ünü sprint yaşam döngüsüne bağla — YALNIZ `config.resource_monitor?.enabled === true` iken: SPAWN fazı başında `createResourceMonitor(...).start()`, CLEANUP'ta (ve TÜM erken-çıkış/hata yollarında — finally disiplini) `stop()`. Monitor başlatma/örnekleme hatası sprint'i ASLA etkilemez (try/catch + debugLog). Wire noktasını koda yorumla belgele (sprint-controller mı sprint-phases mı — mevcut faz-hook desenine en uygun yeri SEÇ, iki dosyaya da yazma yetkin var ama minimal-diff). Disabled iken sıfır davranış farkı (mevcut testler yeşil). Testler: enabled=true → start/stop çağrıları (mock monitor inject — DI seam'i ekle), disabled → hiç çağrı yok, monitor-throw → sprint akışı etkilenmez.
+269 canlı dersi: usage-limit tükenince TÜM worker'lar exit-without-result yedi ve FIX dalgası AYNI ölü limite koşup israf etti. **YENİ `src/core/provider-failure-classifier.ts`:** `classifyProviderFailure(input: { workerLog?: string; resultNotes?: string; exitCode?: number }): 'usage-limit' | 'auth' | 'oom' | 'unknown'` — pure; imzalar GERÇEK gözlemlerden: claude CLI usage-limit mesaj desenleri (workerLog'da geçen kalıpları `.tasks/*.log` arşiv örneklerinden ÇIKAR — uydurma regex yazma; bulamadığın imza için 'unknown'), exit 137 → 'oom', auth hata kalıpları. **FIX guard'ı (sprint-phases):** FIX dalgası başlamadan, NO_GO'ların ≥%50'si 'usage-limit' sınıflıysa FIX'i ATLAYIP dürüst i18n uyarısı logla ("provider limiti tükenmiş görünüyor — FIX ertelendi; limit reset sonrası deckent spawn/resume") — toplu israfı kes. Tek-tük limit → mevcut davranış. Testler: sınıflandırma imzaları, FIX-skip eşiği, normal NO_GO'larda FIX aynen.
 
-**Kanıt:** `npx vitest run tests/orchestra/resource-monitor-wire.test.ts` yeşil; `grep -n "resource_monitor" src/orchestra/sprint-controller.ts src/orchestra/sprint-phases.ts | head -2` ≥ 1. **Test:** 6+.
+**Kanıt:** `npx vitest run tests/core/provider-failure-classifier.test.ts` yeşil; `grep -n "classifyProviderFailure" src/orchestra/sprint-phases.ts` ≥ 1. **Test:** 9+.
 
 ---
 
-## Task 6: doctor "Worker Resources" satırı — limit görünürlüğü + tavan uyarısı
-- Provider: claude
-- Model: sonnet
-- Backend: docker
-- Effort: normal
-- Agent: devops-engineer
-- Skills: typescript-expert, testing-expert
-- Files: src/cli/commands/doctor.ts, src/cli/helpers/messages.ts, tests/cli/doctor-resources.test.ts
-- Dependencies: 271-002
-- Scope: src/cli/, tests/cli/
-
-### Description
-Doctor'a kaynak bölümü (270'in doctor desenini izle — auth-probe/image-check satırlarının yanına): etkin `worker_memory_limit/swap` (config ?? 4g/6g default — `spawn-backend-docker.ts` DEFAULT sabitlerini import et, hardcode ETME), `max_workers` (config ?? default), **hesaplanan RAM tavanı** = max_workers × limit, host toplam RAM (`os.totalmem()`) ve oran. Oran > %60 → `[WARN] worker RAM tavanı (XGB) host'un %N'i — max_workers/worker_memory_limit düşürmeyi düşünün` (i18n; bugünkü WSL-crash dersi). resource_monitor bloğu varsa enabled/interval bilgi satırı. Testler: hesap doğruluğu (mock os.totalmem), eşik uyarısı var/yok, default'lar.
-
-**Kanıt:** `npx vitest run tests/cli/doctor-resources.test.ts` yeşil; `grep -n "totalmem\|RAM tavan\|ram_ceiling" src/cli/commands/doctor.ts | head -2` ≥ 1. **Test:** 6+.
-
----
-
-## Task 7: resource-profile referansı — kod-türevli kaynak haritası
+## Task 7: docs — resource-profile kind-limit bölümü + config/features satırları
 - Provider: claude
 - Model: haiku
 - Backend: docker
 - Effort: low
 - Agent: doc-writer
 - Skills: documentation-writer
-- Files: docs/reference/resource-profile.md
-- Dependencies: 271-002, 271-004
+- Files: docs/reference/resource-profile.md, docs/reference/config-reference.md, docs/reference/features.md
+- Dependencies: 272-005, 272-006
 - Scope: docs/reference/
 
 ### Description
-**YENİ `docs/reference/resource-profile.md`** — kod-türevli (uydurma YOK): per-container default'lar 4g/6g (`spawn-backend-docker.ts:41-42`) + config anahtarları (`worker_memory_limit/swap`, `max_workers`, `resource_monitor` bloğu — Task 2 diskte olduğunda; Dependencies), Node heap'in cgroup'a oranlanması (`:98` civarı yorum), RAM tavan formülü (workers×limit), worker image boyutu (~1.7GB) ve `docker system df` ile katman temizliği, VRAM gerçeği (worker container'ları GPU KULLANMAZ — yalnız host-side ollama), `deckent resources` kullanımı (Task 4), `.deckent/resource-log.jsonl` formatı. "Ölçülmüş profil" bölümü için yer aç ve şunu yaz: gerçek ölçümler sprint-içi toplanır ve CC tarafından eklenir (boş tablo başlığı bırak — uydurma sayı YAZMA).
+DİSKTEKİ koddan (inmemişleri yazma + .result'a not): resource-profile.md'ye `worker_memory_limit_by_kind` bölümü (271 baseline tablosuna referansla önerilen değerler) + config-reference'a alan tanımı + features.md'ye kind-limit & provider-failure-classifier & FIX ölü-limit guard satırları.
 
-**Kanıt:** `grep -ciE "worker_memory_limit|resource_monitor|4g" docs/reference/resource-profile.md` ≥ 3. **Test:** yok — .result YAZ.
-
----
-
-## Task 8: pack diyeti — 4.8MB → eşik altı
-- Provider: claude
-- Model: sonnet
-- Backend: docker
-- Effort: normal
-- Agent: ci-guardian
-- Skills: ci-testing, typescript-expert
-- Files: package.json, scripts/validate-publish.mjs, tests/scripts/validate-publish.test.ts
-- Scope: ./package.json, scripts/, tests/scripts/
-
-### Description
-270 bulgusu: `pack_size_and_count` gate'i kırmızı — tarball 4.8MB > 3MB eşiği. ÖNCE analiz (`npm pack --dry-run --json` içerik dökümü — .result'a en büyük 10 girdiyi yaz): bilinen şüpheliler `dist/dashboard/decko-mascot.png` (779KB), source-map'ler, gereksiz asset'ler. SONRA diyet: `package.json files` allowlist'i / `.npmignore` ile gereksizleri at (mascot'u küçült/webp'e çevirme YOK — sadece dahil-etme kararları; dashboard'ın ÇALIŞIR kalması şart: index.html + assets bundle'ları pakette KALIR — Task 270-001 gate'i bunu doğruluyor). Hedef: eşik altı; mimari olarak inmiyorsa (dashboard bundle meşru büyüklükse) eşiği gerekçeli güncelle (örn. 5MB) + yorumla belgele — DÜRÜST karar, .result'a gerekçe. Test: gate yeşil senaryosu güncel.
-
-**Kanıt:** `node scripts/validate-publish.mjs` çıktısında pack_size_and_count=PASS (`npm pack` gerektiriyorsa --dry-run yolunu kullan); `npx vitest run tests/scripts/validate-publish.test.ts` yeşil. **Test:** mevcut + güncellenen.
+**Kanıt:** `grep -ciE "worker_memory_limit_by_kind" docs/reference/resource-profile.md docs/reference/config-reference.md | paste -sd+ | bc` ≥ 2. **Test:** yok — .result YAZ.
 
 ---
 
-## Task 9: link lint — 17 kırık link
-- Provider: claude
-- Model: sonnet
-- Backend: docker
-- Effort: normal
-- Agent: doc-writer
-- Skills: documentation-writer, ci-testing
-- Files: docs/
-- Scope: docs/, README.md, scripts/lint-links.mjs
-
-### Description
-270 bulgusu: `link_lint` gate'i 17 kırık link raporluyor. `node scripts/lint-links.mjs` (veya `npm run lint:link`) koş, TÜM kırıkları listele (.result'a), her birini düzelt: taşınan/yeniden adlanan dosyalara güncel yol, silinmişlere en yakın güncel hedef, gerçekten ölü dış linklere kaldırma/değiştirme. Link hedefi belirsizse içerikten en mantıklı güncel dokümanı seç + .result'a not. lint-links.mjs'in KENDİSİNE dokunma (false-positive iddiası varsa düzeltme yerine .result'a yaz).
-
-**Kanıt:** `node scripts/lint-links.mjs` exit 0. **Test:** lint yeşil — .result YAZ.
-
----
-
-## Task 10: manifest F3-009 pre-existing test çifti
-- Provider: claude
-- Model: sonnet
-- Backend: docker
-- Effort: normal
-- Agent: bug-fixer
-- Skills: typescript-expert, testing-expert
-- Files: scripts/sync-manifest.mjs, tests/scripts/manifest-autonomous.test.ts
-- Scope: scripts/, tests/scripts/
-
-### Description
-Pre-existing kırmızı çift: `tests/scripts/manifest-autonomous.test.ts` — "(a) sync-manifest.mjs source contains the F3-009 label string" + "(b) --dry-run --json active entry has the correct F3-009 label". ÖNCE kökü teşhis et: `scripts/sync-manifest.mjs` FEATURE_DEFINITIONS'taki autonomous-runtime girdisinin label'ı testin beklediğinden farklılaşmış (hangisi doğru? — feature GERÇEKTEN F3-009 etiketiyle mi anılmalı: MASTER-PLAN/manifest gerçeğine bak). Senkronla: ya script label'ını testin sözleşmesine döndür ya testi güncel gerçeğe güncelle — hangisini seçtiğini gerekçesiyle .result'a yaz. `--dry-run --json` çıktısı doğrulanır.
-
-**Kanıt:** `npx vitest run tests/scripts/manifest-autonomous.test.ts` yeşil. **Test:** mevcut suite yeşil.
-
----
-
-## Task 11: crash-hardening — .spawnlock bayat-kilit temizliği kurtarma araçlarında
-- Provider: claude
-- Model: sonnet
-- Backend: docker
-- Effort: normal
-- Agent: bug-fixer
-- Skills: typescript-expert, testing-expert
-- Files: src/core/file-lock.ts, src/cli/commands/recover.ts, tests/core/file-lock-spawnlock.test.ts
-- Scope: src/core/, src/cli/, tests/core/, tests/cli/
-
-### Description
-Bugünkü canlı bulgu (WSL-crash kurtarması): crash sonrası `.locks/*.spawnlock` dosyaları kaldı ve sonraki `deckent spawn`'ı "Spawn lock conflict" ile blokladı; `clearStaleLocks` (`src/core/file-lock.ts`) yalnız `.lock` uzantısını süpürüyor. Fix: (1) `clearStaleLocks`'a (ya da yeni `clearStaleSpawnLocks` + recover'da ikisini çağır — mevcut sözleşmeyi bozmayan yolu seç) `.spawnlock` desteği — aynı yaş eşiği (acquiredAt/mtime > eşik) + ölü-koşu güvenliği; (2) `deckent recover` çıktısında temizlenen spawnlock sayısı raporlanır. Spawnlock'u YÖNETEN modülü bul (spawn-lock yazan kod) ve format sözleşmesini oradan türet (acquiredAt alanı var — gördük). Testler: tmpdir'de bayat/taze spawnlock ayrımı, recover entegrasyonu (dry-run sayımı).
-
-**Kanıt:** `npx vitest run tests/core/file-lock-spawnlock.test.ts` yeşil; `grep -n "spawnlock" src/core/file-lock.ts src/cli/commands/recover.ts | head -2` ≥ 1. **Test:** 6+.
-
----
-
-## Task 12: features + cli-commands — resources/resource_monitor satırları
-- Provider: claude
-- Model: haiku
-- Backend: docker
-- Effort: low
-- Agent: doc-writer
-- Skills: documentation-writer
-- Files: docs/reference/features.md, docs/reference/cli-commands.md
-- Dependencies: 271-002, 271-004, 271-006
-- Scope: docs/reference/
-
-### Description
-DİSKTEKİ koddan (Dependencies — inmemişleri yazma + .result'a not): `docs/reference/features.md`'e resource-monitor/`deckent resources`/doctor-resources satırları (tetikleyen config/komutla); `docs/reference/cli-commands.md`'e `deckent resources` bölümü (snapshot/--log/--json) + doctor kaynak satırı notu. Mevcut format korunur.
-
-**Kanıt:** `grep -ciE "resources|resource_monitor" docs/reference/features.md docs/reference/cli-commands.md | paste -sd+ | bc` ≥ 4 (iki dosya toplamı). **Test:** yok — .result YAZ.
-
----
-
-## Task 13: MASTER-PLAN işaretleri — 271 kapananlar
+## Task 8: MASTER-PLAN işaretleri — 272 kapananlar
 - Provider: claude
 - Model: haiku
 - Backend: docker
@@ -230,14 +140,14 @@ DİSKTEKİ koddan (Dependencies — inmemişleri yazma + .result'a not): `docs/r
 - Agent: doc-writer
 - Skills: documentation-writer
 - Files: docs/MASTER-PLAN.md
-- Dependencies: 271-005, 271-008, 271-009, 271-011
+- Dependencies: 272-001, 272-002, 272-004, 272-006
 - Scope: docs/
 
 ### Description
-Diskte doğruladıklarını işaretle (inmemişleri İŞARETLEME): F1-LIM → "resource-aware spawn temel ölçüm katmanı ✅ Sprint 271 (monitor+CLI+doctor; algıla→park kalan)", publish engelleri pack/link satırları, crash-hardening spawnlock. Tek-satır ekler, mevcut metni silme.
+Diskte doğruladıklarını işaretle (inmemişleri İŞARETLEME + .result'a not): GHOST-FINALIZE fix ✅, dispatch/EVALUATE yarışı ✅, exit-without-result wrapper+eval zinciri ✅ (MF-9/B-MF ailesiyle ilişkilendir), F1-LIM faz-2 (kind-limit + limit-tespit + FIX guard'ı — "algıla→park"ın ilk yarısı ✅, tam park/resume-planı kalan). Tek-satır ekler.
 
-**Kanıt:** `grep -c "Sprint 271" docs/MASTER-PLAN.md` ≥ 2. **Test:** yok — .result YAZ.
+**Kanıt:** `grep -c "Sprint 272" docs/MASTER-PLAN.md` ≥ 2. **Test:** yok — .result YAZ.
 
 ---
 
-**Beklenen:** 13 mikro task (opus 1 · sonnet 9 · haiku 3), zincirler: 003→001 · 004→001,003 · 005→001,002 · 006→002 · 007→002,004 · 012→002,004,006 · 013→005,008,009,011. max_workers=6 (yeni config) — CC sprint boyunca kendi docker-stats örnekleyicisini koşturup CANLI RAM verisi toplar (Alperen'in anlık-data isteği bu sprint'te elle karşılanır; kalıcı mekanizma Task 1-5). CC sprint sonu: ölçüm raporu + tsc + testler + gerçek-binary `deckent resources` + commit/push + 🔨 BUILD. Sonraki: ölçüm-verisiyle optimizasyon kararları (limit düşürme denemeleri) + F1-LIM algıla→park + PLAN-INT-1/XVER-1.
+**Beklenen:** 8 mikro task (opus 5 — hepsi zor orkestrasyon kökü · sonnet 1 · haiku 2), zincirler: 004→003 · 007→005,006 · 008→001,002,004,006. Bu sprint ürünün KENDİ resource-monitor'üyle koşar (`resource_monitor.enabled=true` — Sprint 271 wire'ının canlı testi; CC ayrıca hafif yedek örnekleyici tutar). CC sprint sonu: `.deckent/resource-log.jsonl` ürün-logunu `deckent resources --log` ile analiz + tsc + testler + commit/push + 🔨 BUILD. Sonraki: PLAN-INT-1 + XVER-1 + dashboard UI SSO.
