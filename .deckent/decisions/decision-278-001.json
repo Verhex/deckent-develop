@@ -1,16 +1,16 @@
 {
-  "taskId": "277-001",
-  "sprintId": "sprint-277",
+  "taskId": "278-001",
+  "sprintId": "sprint-278",
   "steps": [
     {
       "step": 2,
       "name": "routing-step-2",
       "input": {
-        "taskId": "277-001",
-        "title": "/api/auth/me whoami endpoint — bearer'dan kimlik + rol",
+        "taskId": "278-001",
+        "title": "worker_comms config + .result sharedNotes/messages şeması",
         "scope": [
-          "src/api/",
-          "tests/api/"
+          "src/core/",
+          "tests/core/"
         ],
         "intent": "implementation"
       },
@@ -18,8 +18,7 @@
         "agent": "api-builder",
         "skills": [
           "typescript-expert",
-          "testing-expert",
-          "security-specialist"
+          "testing-expert"
         ],
         "confidence": "high"
       },
@@ -27,14 +26,14 @@
       "reasoning": "Agent forced by override: api-builder"
     },
     {
-      "step": 3,
-      "name": "routing-step-3",
+      "step": 4,
+      "name": "routing-step-4",
       "input": {
-        "taskId": "277-001",
-        "title": "/api/auth/me whoami endpoint — bearer'dan kimlik + rol",
+        "taskId": "278-001",
+        "title": "worker_comms config + .result sharedNotes/messages şeması",
         "scope": [
-          "src/api/",
-          "tests/api/"
+          "src/core/",
+          "tests/core/"
         ],
         "intent": "implementation"
       },
@@ -42,8 +41,7 @@
         "agent": "api-builder",
         "skills": [
           "typescript-expert",
-          "testing-expert",
-          "security-specialist"
+          "testing-expert"
         ],
         "confidence": "high"
       },
@@ -51,14 +49,14 @@
       "reasoning": "Skill budget: max 2 (medium task, 1 module(s), effort=normal)"
     },
     {
-      "step": 4,
-      "name": "routing-step-4",
+      "step": 5,
+      "name": "routing-step-5",
       "input": {
-        "taskId": "277-001",
-        "title": "/api/auth/me whoami endpoint — bearer'dan kimlik + rol",
+        "taskId": "278-001",
+        "title": "worker_comms config + .result sharedNotes/messages şeması",
         "scope": [
-          "src/api/",
-          "tests/api/"
+          "src/core/",
+          "tests/core/"
         ],
         "intent": "implementation"
       },
@@ -66,14 +64,13 @@
         "agent": "api-builder",
         "skills": [
           "typescript-expert",
-          "testing-expert",
-          "security-specialist"
+          "testing-expert"
         ],
         "confidence": "high"
       },
       "durationMs": 0,
-      "reasoning": "Skills forced by override: [typescript-expert, testing-expert, security-specialist]"
+      "reasoning": "Skills forced by override: [typescript-expert, testing-expert]"
     }
   ],
-  "decidedAt": "2026-06-10T20:34:00.112Z"
+  "decidedAt": "2026-06-10T21:22:52.127Z"
 }

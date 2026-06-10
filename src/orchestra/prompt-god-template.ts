@@ -55,6 +55,71 @@ export interface SprintContext {
    * when unset. Resolved from `config.prompt.adr_min_relevance` at the call site.
    */
   adrMinRelevance?: number;
+  /**
+   * Notes other workers shared via SharedMemory (Sprint 278 COMM-1 / 278-003).
+   *
+   * Populated by the caller ONLY when `worker_comms.enabled && inject_shared`;
+   * the gating lives at the call site (task-builder), so when this is undefined
+   * or empty the rendered prompt is byte-for-byte identical to the pre-COMM-1
+   * output. Rendered by {@link buildSharedContextBlock} into a block appended at
+   * the very END of the prompt (most task-specific region) so the shared
+   * Skills→Agent→ADR cache prefix is never split (F1-TOK lesson).
+   */
+  sharedContext?: SharedContextEntry[];
+  /**
+   * Executed upstream handoffs targeting this task (Sprint 278 COMM-1 / 278-004).
+   *
+   * Populated by the caller ONLY when `worker_comms.enabled && inject_handoffs`;
+   * the gating lives at the call site (task-builder), so when this is undefined
+   * or empty the rendered prompt is byte-for-byte identical to the pre-COMM-1
+   * output. Rendered by {@link buildHandoffBlock} into a block appended at the
+   * very END of the prompt (next to the Shared Context block, most task-specific
+   * region) so the shared Skills→Agent→ADR cache prefix is never split.
+   */
+  upstreamHandoffs?: UpstreamHandoffEntry[];
+  /**
+   * Whether `worker_comms.enabled` is true for this sprint (Sprint 278 COMM-1 / 278-006).
+   *
+   * When true, the worker prompt receives a short instruction block explaining
+   * how to populate `sharedNotes` and `handoffNotes` in the `.result` file.
+   * Set by the caller (task-builder) from `config.worker_comms?.enabled`.
+   * When absent or false the instruction block is omitted entirely — the
+   * rendered prompt is byte-for-byte identical to the pre-COMM-1 output.
+   * Rendered by {@link buildWorkerCommsInstructionBlock} and appended at the
+   * very END of the prompt (after sharedBlock and handoffBlock) so the shared
+   * Skills→Agent→ADR cache prefix is never split (F1-TOK lesson).
+   */
+  workerCommsEnabled?: boolean;
+}
+
+/**
+ * A single inter-worker shared-context entry (Sprint 278 COMM-1 / 278-003).
+ * Sourced from a {@link SharedMemory} write performed by another worker:
+ * `key`/`writerId` come from the store, `value` is the stringified payload.
+ */
+export interface SharedContextEntry {
+  /** SharedMemory key the upstream worker wrote under. */
+  key: string;
+  /** Task id of the worker that wrote the entry. */
+  writerId: string;
+  /** Stringified shared value. */
+  value: string;
+}
+
+/**
+ * A single executed upstream handoff targeting this task (Sprint 278 COMM-1 / 278-004).
+ * Sourced from a {@link HandoffProtocol} `ready` handoff whose `toTaskId` is the
+ * current task. Decoupled from the `Handoff` shape on purpose (same precedent as
+ * {@link SharedContextEntry} vs SharedMemory) so this module stays free of
+ * orchestra cross-imports.
+ */
+export interface UpstreamHandoffEntry {
+  /** Task id of the upstream worker that produced the handoff. */
+  fromTaskId: string;
+  /** Artifact paths carried by the handoff (relative to project root). */
+  artifacts: string[];
+  /** Free-text message from the upstream worker (Task 5 `handoffNotes`), if any. */
+  notes?: string;
 }
 
 // ─── Constants ─────────────────────────────────────────────────────────
@@ -154,6 +219,22 @@ export function buildTaskPrompt(task: Task, ctx: SprintContext): PromptArtifact 
   // ── 5. Dependencies Block ───────────────────────────────────────────
   const depsBlock = buildDependenciesBlock(task.dependencies, ctx.dependencies, ctx.tasksDir);
 
+  // ── 5b. Shared Context Block (Sprint 278 COMM-1 / 278-003) ──────────
+  // Caller (task-builder) populates ctx.sharedContext ONLY when
+  // worker_comms.enabled && inject_shared; empty/undefined → '' (no block).
+  const sharedBlock = buildSharedContextBlock(ctx.sharedContext);
+
+  // ── 5c. Upstream Handoff Block (Sprint 278 COMM-1 / 278-004) ────────
+  // Caller (task-builder) populates ctx.upstreamHandoffs ONLY when
+  // worker_comms.enabled && inject_handoffs; empty/undefined → '' (no block).
+  const handoffBlock = buildHandoffBlock(ctx.upstreamHandoffs);
+
+  // ── 5d. Worker Comms Instruction Block (Sprint 278 COMM-1 / 278-006) ─
+  // Emitted ONLY when worker_comms.enabled — tells workers how to write
+  // sharedNotes/handoffNotes to their .result. Without this instruction
+  // workers never know these fields exist (Tasks 1-5 path stays empty).
+  const commsInstructionBlock = buildWorkerCommsInstructionBlock(ctx.workerCommsEnabled);
+
   // ── 6. Render final prompt ──────────────────────────────────────────
   // Sprint 182 PQ-1 (F1): compute deterministic idempotency key once per render
   // so the template can interpolate the resolved value instead of leaking the
@@ -165,6 +246,9 @@ export function buildTaskPrompt(task: Task, ctx: SprintContext): PromptArtifact 
     adrBlock,
     scopeBlock,
     depsBlock,
+    sharedBlock,
+    handoffBlock,
+    commsInstructionBlock,
     task,
     effort,
     idempotencyKey,
@@ -547,6 +631,96 @@ function formatAggregateEntry(
   return lines.join('\n');
 }
 
+// ─── Shared Context Block Builder (Sprint 278 COMM-1 / 278-003) ────────
+
+/**
+ * Render the "Shared Context (other workers)" block from SharedMemory entries.
+ *
+ * Bridges the dormant {@link SharedMemory} primitive into the worker prompt:
+ * notes another worker wrote during the sprint become visible context for the
+ * current worker. Returns '' when there is nothing to inject so the caller can
+ * skip the section entirely (no stranded empty header).
+ *
+ * Determinism: entries are sorted by `key` with a stable lexicographic
+ * comparator (matching `SharedMemory.listKeys()`'s default sort), so the same
+ * set of entries renders byte-for-byte identically regardless of input order —
+ * keeping the prompt-determinism guard (Sprint 273) green.
+ *
+ * KRİTİK (F1-TOK / cache-prefix): the caller appends this block at the very END
+ * of the prompt (the most task-specific region), so the shared Skills→Agent→ADR
+ * cache prefix is never split.
+ *
+ * @param entries Shared-context entries, or undefined/empty when comms is off.
+ * @returns The rendered block, or '' when there is nothing to render.
+ */
+export function buildSharedContextBlock(entries: SharedContextEntry[] | undefined): string {
+  if (!entries || entries.length === 0) return '';
+  const sorted = [...entries].sort((a, b) =>
+    a.key < b.key ? -1 : a.key > b.key ? 1 : 0,
+  );
+  const lines = sorted.map(e => `- ${e.key} (by ${e.writerId}): ${e.value}`);
+  return `=== Shared Context (other workers) ===\n${lines.join('\n')}`;
+}
+
+// ─── Upstream Handoff Block Builder (Sprint 278 COMM-1 / 278-004) ───────
+
+/**
+ * Render the "Upstream Handoffs" block from executed handoffs targeting this task.
+ *
+ * Bridges the already-created sprint-controller handoffs (`createHandoff` /
+ * `executeHandoff`) into the downstream worker prompt: artifact paths the
+ * upstream task produced plus its free-text {@link UpstreamHandoffEntry.notes}
+ * message (Task 5 `handoffNotes`) become visible context. Returns '' when there
+ * is nothing to inject so the caller can skip the section entirely (no stranded
+ * empty header).
+ *
+ * Determinism: the caller passes entries pre-sorted by handoff id
+ * (`HandoffProtocol.listHandoffs()` sorts via `localeCompare`), so the rendered
+ * block is order-stable and the prompt-determinism guard (Sprint 273) stays green.
+ *
+ * KRİTİK (F1-TOK / cache-prefix): the caller appends this block at the very END
+ * of the prompt (next to the Shared Context block), so the shared
+ * Skills→Agent→ADR cache prefix is never split.
+ *
+ * @param handoffs Executed upstream handoffs, or undefined/empty when comms is off.
+ * @returns The rendered block, or '' when there is nothing to render.
+ */
+export function buildHandoffBlock(handoffs: UpstreamHandoffEntry[] | undefined): string {
+  if (!handoffs || handoffs.length === 0) return '';
+  const lines = handoffs.map(h => {
+    const artifacts = `artifacts [${h.artifacts.join(', ')}]`;
+    const note = h.notes ? `, note: ${h.notes}` : '';
+    return `- from ${h.fromTaskId}: ${artifacts}${note}`;
+  });
+  return `=== Upstream Handoffs ===\n${lines.join('\n')}`;
+}
+
+// ─── Worker Comms Instruction Block Builder (Sprint 278 COMM-1 / 278-006) ──
+
+/**
+ * Render the worker communications instruction block.
+ *
+ * Emitted ONLY when `worker_comms.enabled` so workers learn how to populate
+ * `sharedNotes` and `handoffNotes` in their `.result` file. Without this block
+ * the worker has no indication these fields exist and the Tasks 1-5 sharing
+ * pipeline stays empty.
+ *
+ * Content is English (worker prompt standard). Appended at the very END of the
+ * prompt (after sharedBlock and handoffBlock) so it never splits the shared
+ * Skills→Agent→ADR cache prefix (F1-TOK lesson).
+ *
+ * @param enabled Whether `config.worker_comms?.enabled` is true.
+ * @returns The rendered instruction block, or '' when disabled/absent.
+ */
+export function buildWorkerCommsInstructionBlock(enabled?: boolean): string {
+  if (!enabled) return '';
+  return `=== Worker Communications ===
+You may share structured notes with other workers in this sprint:
+- Add \`sharedNotes: [{ key: string, value: string }]\` to your \`.result\` for structured notes other workers can read.
+- Add \`handoffNotes: string\` to your \`.result\` to send a free-text message to dependent tasks.
+Both fields are optional. Only populate them when you have meaningful cross-worker context to share.`;
+}
+
 // ─── Template Renderer ─────────────────────────────────────────────────
 
 interface RenderInput {
@@ -555,6 +729,12 @@ interface RenderInput {
   adrBlock: string;
   scopeBlock: string;
   depsBlock: string;
+  /** Shared-context block (Sprint 278 COMM-1 / 278-003) — appended LAST when non-empty. */
+  sharedBlock: string;
+  /** Upstream-handoff block (Sprint 278 COMM-1 / 278-004) — appended LAST when non-empty. */
+  handoffBlock: string;
+  /** Worker comms instruction block (Sprint 278 COMM-1 / 278-006) — appended LAST when non-empty. */
+  commsInstructionBlock: string;
   task: Task;
   effort: string;
   /**
@@ -567,7 +747,7 @@ interface RenderInput {
 }
 
 function renderTemplate(input: RenderInput): string {
-  const { agentBlock, skillBlock, adrBlock, scopeBlock, depsBlock, task, effort, idempotencyKey } = input;
+  const { agentBlock, skillBlock, adrBlock, scopeBlock, depsBlock, sharedBlock, handoffBlock, commsInstructionBlock, task, effort, idempotencyKey } = input;
 
   // Conditionally emit non-empty sections only (skip filler empty headers).
   // Sprint 273 (F1-TOK fix #5): Skills FIRST, then Agent — skill blocks are
@@ -671,6 +851,23 @@ CRITICAL: never exit without writing the .result file — even on failure, write
 
   // Karpathy 4-discipline cognitive anchor (concise, provider-agnostic).
   sections.push(KARPATHY_ESSENCE);
+
+  // Shared Context (Sprint 278 COMM-1 / 278-003) — appended LAST, after every
+  // shared/structural section, so this per-spawn-variable block sits in the most
+  // task-specific region and never splits the Skills→Agent→ADR cache prefix
+  // (F1-TOK lesson). Empty when worker_comms is off → byte-for-byte legacy prompt.
+  if (sharedBlock) sections.push(sharedBlock);
+
+  // Upstream Handoffs (Sprint 278 COMM-1 / 278-004) — appended next to the Shared
+  // Context block in the same prompt-END region (same cache-prefix rationale).
+  // Empty when worker_comms is off / inject_handoffs disabled → unchanged prompt.
+  if (handoffBlock) sections.push(handoffBlock);
+
+  // Worker Comms Instruction (Sprint 278 COMM-1 / 278-006) — appended LAST so
+  // workers know how to populate sharedNotes/handoffNotes. Without this block
+  // workers never discover these optional fields exist (Tasks 1-5 path stays
+  // empty). Empty when worker_comms is off → byte-for-byte legacy prompt.
+  if (commsInstructionBlock) sections.push(commsInstructionBlock);
 
   return sections.join('\n\n');
 }

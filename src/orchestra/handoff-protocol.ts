@@ -13,6 +13,8 @@ export interface Handoff {
   status: 'pending' | 'ready' | 'failed';
   createdAt: string;
   failReason?: string;
+  /** Free-text message from upstream worker to downstream worker (Sprint 278 COMM-1). */
+  notes?: string;
 }
 
 export class HandoffProtocol {
@@ -24,8 +26,9 @@ export class HandoffProtocol {
 
   /**
    * Create a new handoff from one task to another.
+   * @param notes Optional free-text message from upstream worker to downstream worker (Sprint 278 COMM-1).
    */
-  createHandoff(fromTaskId: string, toTaskId: string, artifacts: string[]): Handoff {
+  createHandoff(fromTaskId: string, toTaskId: string, artifacts: string[], notes?: string): Handoff {
     if (!fromTaskId || !toTaskId) {
       throw ErrorRegistry.createError('DECKENT_E046', { message: 'HandoffProtocol.createHandoff: fromTaskId and toTaskId are required' });
     }
@@ -43,6 +46,7 @@ export class HandoffProtocol {
       artifacts,
       status: 'pending',
       createdAt: new Date().toISOString(),
+      ...(notes !== undefined && { notes }),
     };
 
     writeFileSync(

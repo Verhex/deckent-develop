@@ -9,6 +9,11 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-278-003 | Tech debt from 278-003: shared→worker SharedMemory prompt injection wired. promp | normal | sprint-278 | resolved |
+| debt-278-004 | Tech debt from 278-004: handoff→downstream worker prompt injection wired (Sprint | normal | sprint-278 | resolved |
+| debt-278-005 | Tech debt from 278-005: All goCriteria met:
+
+1. handoff-protocol.ts: Added `note | normal | sprint-278 | resolved |
 | debt-271-005 | Tech debt from 271-005: Wired Task-1 resource-monitor into the sprint lifecycle, | normal | sprint-271 | resolved |
 | debt-271-006 | Tech debt from 271-006: Added Worker Resources section to deckent doctor.
 

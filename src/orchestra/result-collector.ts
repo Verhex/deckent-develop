@@ -37,6 +37,17 @@ import type { BrainAnswer, WorkerQuestion, TokenUsage } from '../core/task-types
 // ─── Spawn backend abstraction ───────────────────────────────────
 import type { SpawnBackend } from './spawn-backend.js';
 
+// ─── Shared Memory (Sprint 278 COMM-1 — worker-to-worker comms) ──
+import { SharedMemory } from './shared-memory.js';
+
+/**
+ * Factory for SharedMemory with optional TTL.
+ * TTL defaults to 1 hour when not provided.
+ */
+export function getSharedMemory(projectRoot: string, ttlMs?: number): SharedMemory {
+  return new SharedMemory(projectRoot, ttlMs);
+}
+
 // ─── Task builder ─────────────────────────────────────────────────
 import { buildWorkerPrompt } from './task-builder.js';
 
@@ -608,6 +619,23 @@ export async function waitForResults(
           collected.add(taskId);
           newlyCollected.push(taskId);
           syncTaskStatusFromResult(taskId, result);
+          // Sprint 278 COMM-1 — write sharedNotes to SharedMemory (best-effort, opt-in)
+          if (
+            config?.worker_comms?.enabled
+            && (result.selfAssessment === 'DONE' || result.selfAssessment === 'GO_WITH_TECH_DEBT')
+            && Array.isArray(result.sharedNotes)
+            && result.sharedNotes.length > 0
+          ) {
+            const sm = getSharedMemory(projectRoot, config.worker_comms.shared_memory_ttl_ms);
+            for (const note of result.sharedNotes) {
+              if (!note || typeof note.key !== 'string' || !note.key) continue;
+              try {
+                sm.write(note.key, note.value, taskId);
+              } catch (e) {
+                debugLog('collectResults:sharedNotes:write', e);
+              }
+            }
+          }
           if (reclassifyToManualReview) {
             const taskRef = taskMap.get(taskId);
             if (taskRef) taskRef.status = TaskStatus.MANUAL_REVIEW_REQUIRED;

@@ -1,14 +1,15 @@
 {
-  "taskId": "277-013",
-  "sprintId": "sprint-277",
+  "taskId": "278-011",
+  "sprintId": "sprint-278",
   "steps": [
     {
       "step": 2,
       "name": "routing-step-2",
       "input": {
-        "taskId": "277-013",
-        "title": "MASTER-PLAN — ENT-5 dashboard SSO işaretleri",
+        "taskId": "278-011",
+        "title": "features + MASTER-PLAN — COMM-1 işaretleri",
         "scope": [
+          "docs/reference/",
           "docs/"
         ],
         "intent": "documentation"
@@ -27,9 +28,10 @@
       "step": 3,
       "name": "routing-step-3",
       "input": {
-        "taskId": "277-013",
-        "title": "MASTER-PLAN — ENT-5 dashboard SSO işaretleri",
+        "taskId": "278-011",
+        "title": "features + MASTER-PLAN — COMM-1 işaretleri",
         "scope": [
+          "docs/reference/",
           "docs/"
         ],
         "intent": "documentation"
@@ -42,15 +44,16 @@
         "confidence": "high"
       },
       "durationMs": 0,
-      "reasoning": "Skill budget: max 0 (trivial task, 1 module(s), effort=normal)"
+      "reasoning": "Skill budget: max 1 (small task, 1 module(s), effort=normal)"
     },
     {
       "step": 4,
       "name": "routing-step-4",
       "input": {
-        "taskId": "277-013",
-        "title": "MASTER-PLAN — ENT-5 dashboard SSO işaretleri",
+        "taskId": "278-011",
+        "title": "features + MASTER-PLAN — COMM-1 işaretleri",
         "scope": [
+          "docs/reference/",
           "docs/"
         ],
         "intent": "documentation"
@@ -66,5 +69,5 @@
       "reasoning": "Skills forced by override: [documentation-writer]"
     }
   ],
-  "decidedAt": "2026-06-10T20:34:00.124Z"
+  "decidedAt": "2026-06-10T21:22:52.143Z"
 }

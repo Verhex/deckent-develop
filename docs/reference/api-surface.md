@@ -229,7 +229,13 @@ Each completed task writes `.tasks/task-{id}.result`:
     "scope_compliance": 100,
     "documentation": 70
   },
-  "evaluationDecision": "DONE | GO_WITH_TECH_DEBT | NO_GO",
+  "sharedNotes": [
+    {
+      "key": "string",
+      "value": "string"
+    }
+  ],
+  "handoffNotes": "string (optional message for downstream tasks)",
   "crossVerify": {
     "verifier": "string (provider name that performed the verification)",
     "verdict": "refuted | confirmed | unclear (adversarial verification outcome)",
@@ -237,6 +243,19 @@ Each completed task writes `.tasks/task-{id}.result`:
   }
 }
 ```
+
+**Note on `sharedNotes` field:**
+
+- **When present:** Only written to `.result` when `config.worker_comms?.enabled: true`. Workers can populate this array with structured notes to share with other workers in the same sprint.
+- **When absent:** Omitted from the result entirely if worker communications is disabled or no notes were generated.
+- **Format:** Array of objects with `key` (string identifier) and `value` (content string). Keys should be descriptive and unique within the task.
+- **Usage:** Other workers read these notes from `SharedMemory` when executing dependent tasks, providing cross-worker context without explicit handoff channels.
+
+**Note on `handoffNotes` field:**
+
+- **When present:** Only written to `.result` when `config.worker_comms?.enabled: true` and the task has dependents. Workers can populate this with a free-text message for downstream tasks.
+- **When absent:** Omitted from the result entirely if worker communications is disabled or no handoff message was generated.
+- **Usage:** When the sprint controller creates a handoff from this task to dependent tasks, the `handoffNotes` are included in the handoff record and injected into dependent workers' prompts under the "Upstream Handoffs" section.
 
 **Note on `crossVerify` field:**
 

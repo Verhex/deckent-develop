@@ -227,6 +227,82 @@ function output(message: string): void {
   print(isNoColor() ? stripAnsi(message) : message);
 }
 
+/**
+ * Read and format the Worker Comms section for `deckent status`.
+ * Returns null when worker_comms is disabled or config is unreadable (section hidden, no regression).
+ * File-system based to avoid ADR-008 import cycle (matches loadDepGraphForSprint pattern).
+ */
+export function buildWorkerCommsSection(root: string, lang: string): string | null {
+  // Check config — only render when worker_comms.enabled = true
+  try {
+    const configPath = join(root, '.deckent', 'config.json');
+    if (!existsSync(configPath)) return null;
+    const cfg = JSON.parse(readFileSync(configPath, 'utf-8')) as { worker_comms?: { enabled?: boolean } };
+    if (!cfg.worker_comms?.enabled) return null;
+  } catch {
+    return null;
+  }
+
+  // Read shared memory entries from .tasks/shared/*.json
+  const sharedDir = join(root, '.tasks', 'shared');
+  const sharedEntries: Array<{ key: string; writerId: string }> = [];
+  if (existsSync(sharedDir)) {
+    try {
+      const files = readdirSync(sharedDir).filter(f => typeof f === 'string' && (f as string).endsWith('.json'));
+      for (const file of files) {
+        try {
+          const raw = JSON.parse(readFileSync(join(sharedDir, file as string), 'utf-8')) as {
+            writerId?: unknown; writtenAt?: string; ttlMs?: number;
+          };
+          if (!raw?.writerId || typeof raw.writerId !== 'string') continue;
+          if (raw.ttlMs !== undefined && raw.writtenAt) {
+            const age = Date.now() - new Date(raw.writtenAt).getTime();
+            if (age > raw.ttlMs) continue;
+          }
+          sharedEntries.push({ key: (file as string).replace(/\.json$/, ''), writerId: raw.writerId });
+        } catch { /* skip malformed */ }
+      }
+    } catch { /* ignore dir read error */ }
+  }
+
+  // Read handoff counts from .tasks/handoffs/*.json
+  const handoffsDir = join(root, '.tasks', 'handoffs');
+  let pending = 0, executed = 0;
+  if (existsSync(handoffsDir)) {
+    try {
+      const files = readdirSync(handoffsDir).filter(f => typeof f === 'string' && (f as string).endsWith('.json'));
+      for (const file of files) {
+        try {
+          const h = JSON.parse(readFileSync(join(handoffsDir, file as string), 'utf-8')) as { status?: string };
+          if (h?.status === 'pending') pending++;
+          else executed++;
+        } catch { /* skip malformed */ }
+      }
+    } catch { /* ignore dir read error */ }
+  }
+
+  // Format section
+  const lines: string[] = [];
+  lines.push(getMessage('status.worker_comms.header', lang));
+  if (sharedEntries.length === 0) {
+    lines.push('  ' + getMessage('status.worker_comms.no_shared', lang));
+  } else {
+    lines.push('  ' + getMessage('status.worker_comms.shared_keys', lang).replace('{count}', String(sharedEntries.length)));
+    for (const e of sharedEntries.slice(-5)) {
+      lines.push(`    - ${e.key} (by ${e.writerId})`);
+    }
+  }
+  const totalHandoffs = pending + executed;
+  if (totalHandoffs > 0) {
+    lines.push(
+      '  ' + getMessage('status.worker_comms.handoffs', lang)
+        .replace('{pending}', String(pending))
+        .replace('{executed}', String(executed)),
+    );
+  }
+  return lines.join('\n');
+}
+
 export function registerStatus(program: Command): void {
   program
     .command('status')
@@ -324,6 +400,8 @@ export function registerStatus(program: Command): void {
             output(JSON.stringify(standaloneData, null, 2));
           } else {
             output(formatStandaloneStatus(tasks, sprintId));
+            const commsStandalone = buildWorkerCommsSection(root, lang);
+            if (commsStandalone) output(commsStandalone);
           }
           return;
         }
@@ -357,6 +435,8 @@ export function registerStatus(program: Command): void {
                 ciBaseline: ci.baseline,
                 ciReport: ci.report,
               }));
+              const commsWatch = buildWorkerCommsSection(root, lang);
+              if (commsWatch) output(commsWatch);
             }
           }
         };
@@ -426,6 +506,8 @@ export function registerStatus(program: Command): void {
               output(formatAgentAssignments(tasks, true));
               output(formatSkillAssignments(tasks, true));
             }
+            const commsMode = buildWorkerCommsSection(root, lang);
+            if (commsMode) output(commsMode);
           } else {
             output(formatHumanStatus({
               dashboard: state,
@@ -441,6 +523,8 @@ export function registerStatus(program: Command): void {
               output(formatAgentAssignments(tasks, true));
               output(formatSkillAssignments(tasks, true));
             }
+            const commsDefault = buildWorkerCommsSection(root, lang);
+            if (commsDefault) output(commsDefault);
           }
         }
       } catch (error) {

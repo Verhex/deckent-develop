@@ -1,13 +1,13 @@
 {
-  "taskId": "277-010",
-  "sprintId": "sprint-277",
+  "taskId": "278-009",
+  "sprintId": "sprint-278",
   "steps": [
     {
       "step": 2,
       "name": "routing-step-2",
       "input": {
-        "taskId": "277-010",
-        "title": "api_oidc test smoke — gerçek-binary serve + JWT-bearer dashboard yolu",
+        "taskId": "278-009",
+        "title": "e2e comms akışı — iki-worker shared+handoff round-trip smoke",
         "scope": [
           "tests/e2e/"
         ],
@@ -28,8 +28,8 @@
       "step": 4,
       "name": "routing-step-4",
       "input": {
-        "taskId": "277-010",
-        "title": "api_oidc test smoke — gerçek-binary serve + JWT-bearer dashboard yolu",
+        "taskId": "278-009",
+        "title": "e2e comms akışı — iki-worker shared+handoff round-trip smoke",
         "scope": [
           "tests/e2e/"
         ],
@@ -50,8 +50,8 @@
       "step": 5,
       "name": "routing-step-5",
       "input": {
-        "taskId": "277-010",
-        "title": "api_oidc test smoke — gerçek-binary serve + JWT-bearer dashboard yolu",
+        "taskId": "278-009",
+        "title": "e2e comms akışı — iki-worker shared+handoff round-trip smoke",
         "scope": [
           "tests/e2e/"
         ],
@@ -69,5 +69,5 @@
       "reasoning": "Skills forced by override: [ci-testing, typescript-expert]"
     }
   ],
-  "decidedAt": "2026-06-10T20:34:00.122Z"
+  "decidedAt": "2026-06-10T21:22:52.141Z"
 }

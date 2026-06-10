@@ -1,0 +1,88 @@
+{
+  "taskId": "278-008",
+  "sprintId": "sprint-278",
+  "steps": [
+    {
+      "step": 2,
+      "name": "routing-step-2",
+      "input": {
+        "taskId": "278-008",
+        "title": "worker-comms görünürlük — CLI durum + shared/handoff listesi",
+        "scope": [
+          "src/cli/commands/",
+          "src/cli/helpers/",
+          "tests/cli/",
+          "src/cli/",
+          "tests/cli/commands/",
+          "tests/cli/helpers/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "api-builder",
+        "skills": [
+          "typescript-expert",
+          "testing-expert"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Agent forced by override: api-builder"
+    },
+    {
+      "step": 4,
+      "name": "routing-step-4",
+      "input": {
+        "taskId": "278-008",
+        "title": "worker-comms görünürlük — CLI durum + shared/handoff listesi",
+        "scope": [
+          "src/cli/commands/",
+          "src/cli/helpers/",
+          "tests/cli/",
+          "src/cli/",
+          "tests/cli/commands/",
+          "tests/cli/helpers/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "api-builder",
+        "skills": [
+          "typescript-expert",
+          "testing-expert"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Skill budget: max 2 (medium task, 1 module(s), effort=normal)"
+    },
+    {
+      "step": 5,
+      "name": "routing-step-5",
+      "input": {
+        "taskId": "278-008",
+        "title": "worker-comms görünürlük — CLI durum + shared/handoff listesi",
+        "scope": [
+          "src/cli/commands/",
+          "src/cli/helpers/",
+          "tests/cli/",
+          "src/cli/",
+          "tests/cli/commands/",
+          "tests/cli/helpers/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "api-builder",
+        "skills": [
+          "typescript-expert",
+          "testing-expert"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Skills forced by override: [typescript-expert, testing-expert]"
+    }
+  ],
+  "decidedAt": "2026-06-10T21:22:52.139Z"
+}

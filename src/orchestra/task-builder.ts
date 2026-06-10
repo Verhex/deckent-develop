@@ -20,10 +20,13 @@ import { filterSkillPromptsByDNA } from './prompt-token-optimizer.js';
 import { MemoryStore } from '../core/memory-store.js';
 import type { MemoryEntryV2 } from '../core/memory-types.js';
 import { searchMemory } from '../core/memory-query.js';
-import { BRAIN_DIR, MEMORY_DB_FILE } from '../core/constants.js';
+import { BRAIN_DIR, MEMORY_DB_FILE, PROJECT_CONFIG_PATH } from '../core/constants.js';
 import { selectRelevantAdrs, buildAdrPromptSection } from './adr-selector.js';
 import { buildTaskPrompt } from './prompt-god-template.js';
-import type { SprintContext } from './prompt-god-template.js';
+import type { SprintContext, SharedContextEntry, UpstreamHandoffEntry } from './prompt-god-template.js';
+import { SharedMemory } from './shared-memory.js';
+import { HandoffProtocol } from './handoff-protocol.js';
+import type { WorkerCommsConfig } from '../core/config-types.js';
 import { deriveTestScope } from './scope-deriver.js';
 import type { AgentDefinition } from '../core/agent-types.js';
 import { type AgentDomain, getAgentDomain } from '../core/agent-pool.js';
@@ -1239,6 +1242,96 @@ export function queryRelevantADRs(taskDescription: string, taskScope: string[], 
   }
 }
 
+// ─── Sprint 278 COMM-1 (278-003): Worker Comms — shared-context read ───────
+
+/**
+ * Read the project-level `worker_comms` config block (Sprint 278 COMM-1).
+ *
+ * Synchronous + best-effort: `buildWorkerPrompt` is sync and all its spawn-path
+ * callers invoke it synchronously, so the async 3-layer `loadConfig` can't be
+ * used here. `worker_comms` is an opt-in project-level block (absent ⇒ disabled),
+ * so reading the project `.deckent/config.json` directly is sufficient. Any
+ * read/parse failure yields `undefined` (comms stays off) — never throws.
+ */
+function readWorkerCommsConfig(projectRoot: string): WorkerCommsConfig | undefined {
+  try {
+    const p = join(projectRoot, PROJECT_CONFIG_PATH);
+    if (!existsSync(p)) return undefined;
+    const parsed = JSON.parse(readFileSync(p, 'utf-8')) as { worker_comms?: WorkerCommsConfig };
+    return parsed?.worker_comms;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Stringify a SharedMemory value for prompt rendering (strings pass through). */
+function stringifySharedValue(value: unknown): string {
+  if (typeof value === 'string') return value;
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+}
+
+/**
+ * Read other workers' SharedMemory notes for injection into this task's prompt
+ * (Sprint 278 COMM-1 / 278-003).
+ *
+ * Returns undefined unless `worker_comms.enabled && (inject_shared ?? true)`.
+ * Entries written by the current task itself are skipped — the prompt block is
+ * "other workers" context. Best-effort: any failure returns undefined so the
+ * worker prompt build is never disrupted.
+ */
+function readSharedContext(task: Task, projectRoot: string): SharedContextEntry[] | undefined {
+  try {
+    const wc = readWorkerCommsConfig(projectRoot);
+    if (!wc?.enabled || (wc.inject_shared ?? true) === false) return undefined;
+    const sm = new SharedMemory(projectRoot, wc.shared_memory_ttl_ms);
+    const entries: SharedContextEntry[] = [];
+    for (const key of sm.listKeys()) {
+      const entry = sm.read(key);
+      if (!entry) continue;
+      if (entry.writerId === task.id) continue; // skip own notes — "other workers"
+      entries.push({ key, writerId: entry.writerId, value: stringifySharedValue(entry.value) });
+    }
+    return entries.length > 0 ? entries : undefined;
+  } catch (e) {
+    debugLog('buildWorkerPrompt:readSharedContext', e);
+    return undefined;
+  }
+}
+
+/**
+ * Read executed upstream handoffs targeting this task for prompt injection
+ * (Sprint 278 COMM-1 / 278-004).
+ *
+ * Sprint-controller already creates handoffs (`createHandoff`/`executeHandoff`)
+ * when a dependency completes — this bridges them into the downstream worker's
+ * prompt. Returns undefined unless `worker_comms.enabled && (inject_handoffs ?? true)`.
+ * Only `ready` handoffs (executeHandoff verified all artifacts present) addressed
+ * to this task (`toTaskId === task.id`) are surfaced; pending/failed handoffs are
+ * skipped. `listHandoffs()` already sorts by id, so the order is deterministic.
+ * Best-effort: any failure returns undefined so the prompt build is never disrupted.
+ */
+function readUpstreamHandoffs(task: Task, projectRoot: string): UpstreamHandoffEntry[] | undefined {
+  try {
+    const wc = readWorkerCommsConfig(projectRoot);
+    if (!wc?.enabled || (wc.inject_handoffs ?? true) === false) return undefined;
+    const protocol = new HandoffProtocol(projectRoot);
+    const entries: UpstreamHandoffEntry[] = [];
+    for (const h of protocol.listHandoffs()) {
+      if (h.toTaskId !== task.id) continue;
+      if (h.status !== 'ready') continue; // only executed handoffs
+      entries.push({ fromTaskId: h.fromTaskId, artifacts: h.artifacts, notes: h.notes });
+    }
+    return entries.length > 0 ? entries : undefined;
+  } catch (e) {
+    debugLog('buildWorkerPrompt:readUpstreamHandoffs', e);
+    return undefined;
+  }
+}
+
 /**
  * Build the full prompt string sent to a worker agent.
  *
@@ -1252,12 +1345,16 @@ export function queryRelevantADRs(taskDescription: string, taskScope: string[], 
  * @param task The task the worker will execute.
  * @param agentPrompt Optional agent PROMPT.md content.
  * @param skillPrompts Optional skill prompt blocks.
+ * @param projectRoot Project root used to read `worker_comms` config + SharedMemory
+ *   (Sprint 278 COMM-1 / 278-003). Defaults to `process.cwd()` — the established
+ *   spawn-path root (same assumption as the in-function memory.db load).
  * @returns The assembled worker prompt (also sets `task.estimatedTokens`).
  */
 export function buildWorkerPrompt(
   task: Task,
   agentPrompt?: string,
   skillPrompts?: Array<{ name: string; content: string }>,
+  projectRoot: string = process.cwd(),
 ): string {
   const effort = resolveWorkerEffort(task);
 
@@ -1286,6 +1383,14 @@ export function buildWorkerPrompt(
     // ADR loading is best-effort
   }
 
+  // Sprint 278 COMM-1 (278-003): inject other workers' shared-context notes
+  // when worker_comms.enabled && inject_shared. Best-effort; undefined when off.
+  const sharedContext = readSharedContext(task, projectRoot);
+
+  // Sprint 278 COMM-1 (278-004): inject executed upstream handoffs targeting this
+  // task when worker_comms.enabled && inject_handoffs. Best-effort; undefined when off.
+  const upstreamHandoffs = readUpstreamHandoffs(task, projectRoot);
+
   const ctx: SprintContext = {
     agentPrompt,
     agentId: task.assignedAgent ?? 'generic',
@@ -1293,6 +1398,8 @@ export function buildWorkerPrompt(
     allAdrs,
     effort,
     dependencies: task.dependencies,
+    sharedContext,
+    upstreamHandoffs,
   };
   const artifact = buildTaskPrompt(task, ctx);
 

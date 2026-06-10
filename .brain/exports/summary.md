@@ -80,6 +80,8 @@
 | adr-086 | Native CLI Parity — F11 Feature Set (Sprint 224) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-278 Learnings** (sprint-278): ## Sprint sprint-278 Learnings
+- shared→worker okuma — spawn-time SharedMemory prompt enjeksiyonu (OPUS): GO_WITH_TEC...
 - **Sprint sprint-277 Learnings** (sprint-277): ## Sprint sprint-277 Learnings
 
 ## Gains
@@ -114,10 +116,6 @@
 
 ## Gains
 - 269-001 — SPA token-inject P0 + enterprise endpoints + chat-stream adapter...
-- **Sprint sprint-268 Learnings** (sprint-268): ## Sprint sprint-268 Learnings
-
-## Gains
-- 268-001 — RESUME-RACE fix — resume respawn'dan önce bayat worker-artifact ...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -147,5 +145,6 @@ _No active technical debt._
 - Violation pattern: stale_heartbeat
 - Violation pattern: stale_heartbeat
 - Violation pattern: stale_heartbeat
+- Violation pattern: stale_heartbeat
 
-_Total entries: 416 | Generated: 2026-06-10_
+_Total entries: 429 | Generated: 2026-06-10_

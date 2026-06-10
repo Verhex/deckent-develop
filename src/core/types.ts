@@ -31,3 +31,17 @@ export const ALL_PROVIDER_NAMES: readonly ProviderNameExt[] = [
   'gemini',
   'ollama',
 ] as const;
+
+// ─── Worker Comms — TaskResult augmentation (Sprint 278 COMM-1) ──────────────
+// Extends TaskResult (defined in task-types.ts) with optional worker-to-worker
+// communication fields: sharedNotes (for SharedMemory writes) and handoffNotes
+// (free-text message to downstream workers via HandoffProtocol). Both fields are
+// opt-in and additive — existing .result files without them remain valid.
+declare module './task-types.js' {
+  interface TaskResult {
+    /** Structural notes written to SharedMemory when worker_comms.enabled (Sprint 278 COMM-1). */
+    sharedNotes?: Array<{ key: string; value: string }>;
+    /** Free-text message to downstream dependent workers via HandoffProtocol (Sprint 278 COMM-1). */
+    handoffNotes?: string;
+  }
+}

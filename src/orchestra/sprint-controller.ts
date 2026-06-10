@@ -655,7 +655,7 @@ export function wireHandoffsForCompletedTasks(
     const dependents = dependentsOf.get(result.taskId) ?? [];
     for (const depId of dependents) {
       try {
-        const handoff = handoffProtocol.createHandoff(result.taskId, depId, artifacts);
+        const handoff = handoffProtocol.createHandoff(result.taskId, depId, artifacts, result.handoffNotes);
         handoffProtocol.executeHandoff(handoff.id);
       } catch (e) {
         debugLog('wireHandoffsForCompletedTasks', e);

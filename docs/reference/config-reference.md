@@ -653,6 +653,39 @@ Optional configuration block for Sprint 276 XVER-1: cross-provider adversarial v
 
 ---
 
+## 12.4. Worker Communications Configuration
+
+Optional configuration block for Sprint 278 COMM-1: worker-to-worker communication via shared memory and handoff protocol. **Default-off** — absent block = disabled. When enabled, workers can share structured notes and messages with other workers in the same sprint.
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `worker_comms.enabled` | boolean | `false` | Master on/off switch. When `false`, no shared memory or handoff messaging. |
+| `worker_comms.shared_memory_ttl_ms` | number | `3600000` (1 hour) | Time-to-live (milliseconds) for entries in shared memory. Expired entries are purged automatically. Range: 300000–86400000 (5 minutes–24 hours). |
+| `worker_comms.inject_handoffs` | boolean | `true` (when enabled) | When `true`, downstream workers receive upstream task handoff notes in their prompt under "Upstream Handoffs" section. |
+| `worker_comms.inject_shared` | boolean | `true` (when enabled) | When `true`, workers receive a "Shared Context" block in their prompt containing notes shared by other workers via `sharedNotes` in their result. |
+
+### Behavior
+
+- **Disabled (default):** `worker_comms.enabled: false` — zero behavioral change. No shared memory, no handoff injection.
+- **Enabled:** Workers can write `sharedNotes` (array of `{ key, value }`) and `handoffNotes` (string message) to their `.result` file. Result-collector writes `sharedNotes` to `SharedMemory`. Sprint-controller includes `handoffNotes` in handoff records. Task-builder injects both into downstream worker prompts (when `inject_shared` / `inject_handoffs` are true).
+- **Opt-in fields:** Workers are not required to use `sharedNotes` or `handoffNotes` — both fields are optional in the result.
+- **Fail-safe:** Errors in shared memory I/O do not block task processing or sprint execution (best-effort).
+
+### Example Config
+
+```json
+{
+  "worker_comms": {
+    "enabled": true,
+    "shared_memory_ttl_ms": 3600000,
+    "inject_handoffs": true,
+    "inject_shared": true
+  }
+}
+```
+
+---
+
 ## 14. Tier-Based Model Strategy (`model_strategy`)
 
 Replaces hard-coded model names with provider-agnostic tiers. Starts from the mode preset (`mode-presets.ts`), then `config.model_strategy` overlays on top (config.ts:1051-1066). A custom mode falls back to the `balanced` preset.

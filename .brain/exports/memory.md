@@ -1,5 +1,23 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-278 Learnings
+- Sprint sprint-278 Learnings: ## Sprint sprint-278 Learnings
+- shared→worker okuma — spawn-time SharedMemory prompt enjeksiyonu (OPUS): GO_WITH_TECH_DEBT — shared→worker SharedMemory prompt injection wired. prompt-god-template.ts: NEW exported buildSharedContextBlock(entries)
+- handoff→downstream worker prompt enjeksiyonu (OPUS): GO_WITH_TECH_DEBT — handoff→downstream worker prompt injection wired (Sprint 278 COMM-1 / 278-004). Mirrors the 278-003 SharedMemory pattern
+- structured handoff-notes — upstream worker'dan downstream'e mesaj: GO_WITH_TECH_DEBT — All goCriteria met:
+
+1. handoff-protocol.ts: Added `notes?: string` to Handoff interface and 4th optional param to creat
+
+## Gains
+- 278-001 — worker_comms config + .result sharedNotes/messages şeması — All goCriteria met:
+- 278-002 — worker→shared yazım köprüsü — .result sharedNotes → SharedMemory — Implemented worker→SharedMemory write bridge in result-collector.ts.
+- 278-006 — worker prompt talimatı — sharedNotes/handoffNotes nasıl yazılır — Added buildWorkerCommsInstructionBlock() export to prompt-god-template.ts.
+- 278-007 — multi-agent.ts disposition — runPipeline 0-caller (ADR-038) — INVESTIGATION: Production 0-caller confirmed — src/mcp/server.ts and src/cli/helpers/cursor-confi...
+- 278-008 — worker-comms görünürlük — CLI durum + shared/handoff listesi — Added `buildWorkerCommsSection(root, lang): string | null` export to status.ts.
+- 278-009 — e2e comms akışı — iki-worker shared+handoff round-trip smoke — Created hermetic e2e test file tests/e2e/worker-comms-flow.test.ts with 4 tests covering the full...
+- 278-010 — api-surface + config-reference — worker_comms + sharedNotes — Successfully documented worker_comms configuration and result fields.
+- 278-011 — features + MASTER-PLAN — COMM-1 işaretleri — Task 278-011 — features + MASTER-PLAN COMM-1 işaretleri.
+
 ## Sprint sprint-277 Learnings
 - Sprint sprint-277 Learnings: ## Sprint sprint-277 Learnings
 

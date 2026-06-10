@@ -83,6 +83,19 @@ export interface CrossVerifyConfig {
   verifier_priority?: string[];
 }
 
+// ─── Worker Comms Config ─────────────────────────────────────────────
+/** Worker-to-worker communication configuration (Sprint 278 COMM-1). Opt-in — absent block = disabled. */
+export interface WorkerCommsConfig {
+  /** Enable worker comms (required). */
+  enabled: boolean;
+  /** Shared memory entry TTL in ms (default: 3600000 = 1 hour). */
+  shared_memory_ttl_ms?: number;
+  /** Inject upstream handoffs into downstream worker prompts (default: true when enabled). */
+  inject_handoffs?: boolean;
+  /** Inject shared memory context into worker prompts (default: true when enabled). */
+  inject_shared?: boolean;
+}
+
 // ─── Configuration (Blueprint 13) ───────────────────────────────────
 export interface PlanModeConfig {
   max_workers: number | 'auto';
@@ -456,6 +469,10 @@ export interface DeckentConfig {
   /** Cross-provider adversarial verification configuration (Sprint 276 XVER-1). Default-disabled (opt-in). */
   cross_verify?: CrossVerifyConfig;
 
+  // ─── Worker Comms ────────────────────────────────────────────────────
+  /** Worker-to-worker communication configuration (Sprint 278 COMM-1). Default-disabled (opt-in). */
+  worker_comms?: WorkerCommsConfig;
+
   // ─── Autonomous Engine ──────────────────────────────────────────────
   /** Autonomous execution engine configuration (Sprint 226 — Task 7). Default-disabled. */
   autonomous?: {
@@ -760,6 +777,8 @@ export interface ResolvedConfig {
   cache_warm?: CacheWarmConfig;
   /** Cross-provider adversarial verification configuration (passed through from DeckentConfig). Default-disabled. */
   cross_verify?: CrossVerifyConfig;
+  /** Worker-to-worker communication configuration (passed through from DeckentConfig). Default-disabled. */
+  worker_comms?: WorkerCommsConfig;
   /** Observability configuration (passed through from DeckentConfig) */
   observability?: DeckentConfig['observability'];
   /** Resolved runtime style — always 'sprint' or 'task' */

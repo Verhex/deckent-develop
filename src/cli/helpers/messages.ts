@@ -126,6 +126,22 @@ const MESSAGES: MessageMap = {
     en: 'Failed to read dashboard file.',
     tr: 'Dashboard dosyası okunamadı.',
   },
+  'status.worker_comms.header': {
+    en: '--- Worker Comms ---',
+    tr: '--- Worker İletişim ---',
+  },
+  'status.worker_comms.no_shared': {
+    en: 'No shared context.',
+    tr: 'Paylaşılan bağlam yok.',
+  },
+  'status.worker_comms.shared_keys': {
+    en: 'Shared context: {count} key(s)',
+    tr: 'Paylaşılan bağlam: {count} anahtar',
+  },
+  'status.worker_comms.handoffs': {
+    en: 'Handoffs: {pending} pending / {executed} executed',
+    tr: 'Handoff\'lar: {pending} bekliyor / {executed} tamamlandı',
+  },
 
   // ─── cleanup command ─────────────────────────────────────────────────
   'cleanup.decay_complete': {

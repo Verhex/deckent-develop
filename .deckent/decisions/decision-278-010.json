@@ -1,13 +1,13 @@
 {
-  "taskId": "277-012",
-  "sprintId": "sprint-277",
+  "taskId": "278-010",
+  "sprintId": "sprint-278",
   "steps": [
     {
       "step": 2,
       "name": "routing-step-2",
       "input": {
-        "taskId": "277-012",
-        "title": "features + enterprise-depth — dashboard SSO satırları",
+        "taskId": "278-010",
+        "title": "api-surface + config-reference — worker_comms + sharedNotes",
         "scope": [
           "docs/reference/"
         ],
@@ -27,8 +27,8 @@
       "step": 3,
       "name": "routing-step-3",
       "input": {
-        "taskId": "277-012",
-        "title": "features + enterprise-depth — dashboard SSO satırları",
+        "taskId": "278-010",
+        "title": "api-surface + config-reference — worker_comms + sharedNotes",
         "scope": [
           "docs/reference/"
         ],
@@ -48,8 +48,8 @@
       "step": 4,
       "name": "routing-step-4",
       "input": {
-        "taskId": "277-012",
-        "title": "features + enterprise-depth — dashboard SSO satırları",
+        "taskId": "278-010",
+        "title": "api-surface + config-reference — worker_comms + sharedNotes",
         "scope": [
           "docs/reference/"
         ],
@@ -66,5 +66,5 @@
       "reasoning": "Skills forced by override: [documentation-writer]"
     }
   ],
-  "decidedAt": "2026-06-10T20:34:00.123Z"
+  "decidedAt": "2026-06-10T21:22:52.142Z"
 }

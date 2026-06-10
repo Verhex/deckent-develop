@@ -2,6 +2,28 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint278] - 2026-06-10
+
+### Added
+
+- worker_comms config + .result sharedNotes/messages şeması
+- worker→shared yazım köprüsü — .result sharedNotes → SharedMemory
+- worker prompt talimatı — sharedNotes/handoffNotes nasıl yazılır
+- multi-agent.ts disposition — runPipeline 0-caller (ADR-038)
+- worker-comms görünürlük — CLI durum + shared/handoff listesi
+- e2e comms akışı — iki-worker shared+handoff round-trip smoke
+- api-surface + config-reference — worker_comms + sharedNotes
+- features + MASTER-PLAN — COMM-1 işaretleri
+
+### Changed
+
+- shared→worker okuma — spawn-time SharedMemory prompt enjeksiyonu (OPUS) (completed with tech debt)
+- handoff→downstream worker prompt enjeksiyonu (OPUS) (completed with tech debt)
+- structured handoff-notes — upstream worker'dan downstream'e mesaj (completed with tech debt)
+
+
+_Tasks: 11 total, 11 done, 3 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint277] - 2026-06-10
 
 ### Added

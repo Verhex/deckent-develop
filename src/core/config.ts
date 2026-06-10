@@ -860,6 +860,23 @@ export function validateConfig(config: DeckentConfig): string[] {
     }
   }
 
+  // ─── Worker Comms validation (Sprint 278 COMM-1) ─────────────────────
+  if (config.worker_comms !== undefined) {
+    const wc = config.worker_comms;
+    if (typeof wc.enabled !== 'boolean') {
+      errors.push('worker_comms.enabled must be a boolean');
+    }
+    if (wc.shared_memory_ttl_ms !== undefined && typeof wc.shared_memory_ttl_ms !== 'number') {
+      errors.push('worker_comms.shared_memory_ttl_ms must be a number');
+    }
+    if (wc.inject_handoffs !== undefined && typeof wc.inject_handoffs !== 'boolean') {
+      errors.push('worker_comms.inject_handoffs must be a boolean');
+    }
+    if (wc.inject_shared !== undefined && typeof wc.inject_shared !== 'boolean') {
+      errors.push('worker_comms.inject_shared must be a boolean');
+    }
+  }
+
   // ─── deckent_style validation ───────────────────────────────────────
   if (config.deckent_style !== undefined && !['sprint', 'task'].includes(config.deckent_style)) {
     errors.push(`Invalid value '${config.deckent_style}' for field 'deckent_style'. Valid options: sprint, task`);
@@ -1462,6 +1479,8 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
     resource_monitor: config.resource_monitor,
     // Cache Warm — passed through from project config (opt-in, absent = disabled)
     cache_warm: config.cache_warm,
+    // Worker Comms — passed through (opt-in, absent = disabled)
+    worker_comms: config.worker_comms,
     // Plan config (Sprint 276 PLAN-INT-1) — passed through (opt-in, absent = disabled)
     plan: config.plan,
     // Messaging connectors (BOT-001) — passed through; tokens .deck-interpolated below.
@@ -2126,6 +2145,8 @@ export function mergeConfigs(
     resource_monitor: config.resource_monitor,
     // Cache Warm — passed through (opt-in, absent = disabled)
     cache_warm: config.cache_warm,
+    // Worker Comms — passed through (opt-in, absent = disabled)
+    worker_comms: config.worker_comms,
     // Plan config (Sprint 276 PLAN-INT-1) — passed through (opt-in, absent = disabled)
     plan: config.plan,
   };
