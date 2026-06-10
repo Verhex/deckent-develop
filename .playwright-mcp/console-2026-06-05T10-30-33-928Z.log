@@ -1,2 +1,0 @@
-[      53ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3100/api/config:0
-[ 2746528ms] [ERROR] Failed to load resource: net::ERR_INCOMPLETE_CHUNKED_ENCODING @ http://localhost:3100/api/events?token=5131a55339dcb28cc4f86d08a8f875c7d4be41ec7a5f68afc36fe4447860b9bc:0

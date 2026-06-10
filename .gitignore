@@ -22,6 +22,7 @@ coverage/
 .brain/memory.db-wal
 .brain/memory.db-shm
 .brain/memory.db.bak-*
+.brain/memory.db.backup-*
 .brain/sprints/
 
 # Sprint runtime artifacts (Memory V2 DB-first — content in memory.db)
@@ -41,6 +42,7 @@ coverage/
 .test/
 .test-e2e-sprint-*/
 .test-e2e-sprint-*
+.playwright-mcp/
 
 # Deckent runtime config & state
 .deckent/agents/temp-*/
@@ -83,6 +85,11 @@ coverage/
 .claude/settings.local.json
 
 # Deckent runtime artifacts (per-sprint, ephemeral)
+# Cache-prefix stability: these files change frequently and alter git-status snapshot,
+# breaking system-prompt cache coherence. Gitignored to preserve prompt-cache prefix
+# identity across sprint runs (analysis: docs/alperen-analysis/2026-06-10-weekly-limit-reverse-engineering.md §8)
+.deckent/heartbeat.pid
+.deckent/sprint.lock
 .deckent/mcp-server.pid
 .deckent/*-gate.json
 
