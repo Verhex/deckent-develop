@@ -20,6 +20,10 @@ export interface DerivedBaseCriteria {
 export interface StackCommands {
   build?: string;
   test?: string;
+  /** Specific test file paths to target (e.g. extracted from task Files/Kanıt). When absent
+   *  the test criterion uses the "targeted test file(s)" generic phrase rather than the bare
+   *  run-all command, avoiding a "run the full suite" implication in goCriteria. */
+  testFiles?: string[];
 }
 
 /** TaskKinds whose definition-of-done is artifacts-on-disk, NOT a build/test. */
@@ -73,9 +77,19 @@ export function deriveBaseCriteria(
 function deriveCodeCriteria(stack: TechStackKind, commands?: StackCommands): DerivedBaseCriteria {
   const build = commands?.build?.trim();
   const test = commands?.test?.trim();
+  const testFiles = commands?.testFiles;
   const parts: string[] = [];
   if (build) parts.push(`\`${build}\` succeeds`);
-  if (test) parts.push(`\`${test}\` passes`);
+  if (test) {
+    // Use a targeted-file command when file paths are known; otherwise use the
+    // generic "targeted" phrase so goCriteria never implies running the full suite
+    // (bare `npx vitest run` would trigger that implication — Sprint 273 T-009).
+    if (testFiles && testFiles.length > 0) {
+      parts.push(`\`${test} ${testFiles.join(' ')}\` passes`);
+    } else {
+      parts.push('the targeted test file(s) for the modules you changed pass');
+    }
+  }
   // No detected commands → neutral phrasing naming the stack (never hardcode tsc).
   const goCriteria = parts.length > 0
     ? parts.join('; ')
@@ -87,4 +101,27 @@ function deriveCodeCriteria(stack: TechStackKind, commands?: StackCommands): Der
     noGoCriteria: 'Build fails or tests fail',
     techDebtAcceptable: 'Minor style issues if build and tests pass',
   };
+}
+
+/**
+ * Strip leading markdown bold/label prefixes from a proof-line.
+ *
+ * Handles both well-formed and asymmetric bold markers that appear in DIRECTIVES:
+ *   `**Kanıt:** content`  → `content`
+ *   `*Kanıt:** content`   → `content`  (single-star prefix, asymmetric)
+ *   `- **Proof:** content` → `content`
+ *   `- \`grep ...\``       → `` \`grep ...\` ``
+ *
+ * Exported so callers (e.g. sprint-utils.ts extractGoNogoCriteria) can reuse this
+ * normalizer to prevent `*Kanıt:**` leaking into goCriteria strings.
+ */
+export function cleanProofLine(line: string): string {
+  let s = line.trimStart();
+  // Strip leading list marker (- or *) followed by at least one space
+  s = s.replace(/^[-*]\s+/, '');
+  // Strip bold label prefix in form: **Label:** or *Label:**
+  // The colon comes AFTER the label text and BEFORE any closing stars.
+  // Handles both symmetric `**Label:**` and asymmetric `*Label:**` (single leading star).
+  s = s.replace(/^\*{1,2}[^*:\n]+:\*{0,2}\s*/, '');
+  return s;
 }

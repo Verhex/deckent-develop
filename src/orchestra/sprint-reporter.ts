@@ -451,3 +451,71 @@ export function buildSpecializationDriftSection(reports: DriftReport[]): string 
 
   return lines.join('\n') + '\n';
 }
+
+// ═══ Sprint 273 Task 273-004 — Limit Burn Retro Row ══════════════
+//
+// Best-effort: ledger is called with try/catch so a transcript-read failure
+// never blocks retro generation. When the limit burn cannot be computed
+// (no transcript dir, ledger error, zero records), the function returns null
+// and the caller omits the row silently.
+//
+// ADR-008: sprint-reporter (orchestra) imports from core — direction is compat.
+// ADR-010: no new runtime deps (limit-ledger.ts uses only Node built-ins).
+
+import { debugLog } from '../core/utils.js';
+import { parseTranscriptUsage } from '../core/limit-ledger.js';
+import type { LedgerPrices, UsageRecord } from '../core/limit-ledger.js';
+import { summarizeSprint } from '../core/limit-ledger-report.js';
+
+/** Injectable options for {@link buildLimitBurnRow} — used in tests. */
+export interface LimitBurnOpts {
+  /** Override transcript parser (injectable for hermetic tests). */
+  parseUsage?: (opts?: { root?: string }) => Promise<UsageRecord[]>;
+  /** Override sprint summarizer (injectable for hermetic tests). */
+  summarize?: typeof summarizeSprint;
+  prices?: LedgerPrices;
+}
+
+/**
+ * Build an optional Metrics-table row for the "Limit burn" line.
+ *
+ * Calls the transcript ledger best-effort (try/catch) and formats:
+ *   `| Limit burn | $X.XX eşdeğer (task-başı $Y.YY, boot-cw %Z%) |`
+ *
+ * Returns `null` when ledger is unavailable or returns no records —
+ * callers should omit the row silently in that case.
+ *
+ * @param root      Project root (passed to parseTranscriptUsage)
+ * @param taskCount Number of tasks in the sprint (for per-task average)
+ * @param opts      Injectable overrides for hermetic testing
+ */
+export async function buildLimitBurnRow(
+  root: string,
+  taskCount: number,
+  opts: LimitBurnOpts = {},
+): Promise<string | null> {
+  try {
+    const parseFn = opts.parseUsage ?? ((o) => parseTranscriptUsage(o ?? {}));
+    const summarizeFn = opts.summarize ?? summarizeSprint;
+
+    const records = await parseFn({ root });
+    if (records.length === 0) return null;
+
+    const summary = summarizeFn(records, {}, opts.prices ?? {});
+    const total = summary.totals.limitCost;
+    if (total <= 0) return null;
+
+    const perTask = taskCount > 0 ? total / taskCount : 0;
+    const bootstrapSum = summary.tasks.reduce((s, t) => s + t.bootstrapCw, 0);
+    const bootShare =
+      summary.totals.cacheWrite > 0
+        ? Math.round((bootstrapSum / summary.totals.cacheWrite) * 100)
+        : 0;
+
+    const fmt = (n: number) => `$${n.toFixed(2)}`;
+    return `| Limit burn | ${fmt(total)} eşdeğer (task-başı ${fmt(perTask)}, boot-cw %${bootShare}%) |`;
+  } catch (e) {
+    debugLog('buildLimitBurnRow', e);
+    return null;
+  }
+}

@@ -1529,7 +1529,10 @@ export function validateTokenUsage(result: TaskResult): TokenUsageValidationResu
   if (!result.tokenUsage) {
     return {
       isComplete: false,
-      warnings: ['tokenUsage field is missing — Sprint 140 will reject as NO_GO'],
+      // Sprint 273: tokenUsage is an optional self-estimate — ground-truth
+      // accounting comes from the transcript limit-ledger; absence is never a
+      // rejection reason (worker declarations measured at ~30% of reality).
+      warnings: ['tokenUsage field is missing — optional self-estimate; ground truth = limit-ledger'],
       tokenUsageMissing: true,
     };
   }

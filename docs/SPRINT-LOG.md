@@ -7445,3 +7445,37 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 272-008: MASTER-PLAN işaretleri — 272 kapananlar (DONE)
 
 ---
+## Sprint 273 — sprint-273
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-06-10
+**Duration:** 1190s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 13 |
+| Completed | 13 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 1190114ms |
+
+### Tasks
+
+- 273-001: limit-ledger çekirdeği — transcript parse + maliyet-eşdeğeri birim (DONE)
+- 273-002: ledger session→task eşleme + sprint agregasyonu (DONE)
+- 273-003: `deckent usage` CLI — pencere + sprint görünümü (DONE)
+- 273-004: sprint-reporter "limit-yakım" satırı — retro entegrasyonu (DONE)
+- 273-005: result-evaluator tokenUsage hizalaması — beyan artık zorunlu değil (DONE)
+- 273-006: .gitignore sprint-runtime artıkları — git-status prefix stabilizasyonu (DONE)
+- 273-007: prompt-determinizm guard testi (DONE)
+- 273-008: prompt-template revizyonu — Skills-first blok sırası + tokenUsage metni (OPUS) (DONE)
+- 273-009: goCriteria şablonu — full-suite çelişkisi + Kanıt-interpolasyon fix'i (DONE)
+- 273-010: persona/skill "full test suite" envanteri + targeted-verify hizalaması (DONE)
+- 273-011: ADR seçici — açık `ADR-NNN` referansı topN'e zorla dahil (DONE)
+- 273-012: ADR render dedupe + operative-extract (opt-in, default-off) (DONE)
+- 273-013: doc senkronu — features + MASTER-PLAN işaretleri (DONE)
+
+---

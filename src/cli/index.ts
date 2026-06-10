@@ -57,6 +57,7 @@ import { registerAutonomous } from './commands/autonomous.js';
 import { registerBot } from './commands/bot.js';
 import { registerMcp } from './commands/mcp.js';
 import { registerResources } from './commands/resources.js';
+import { registerUsage } from './commands/usage.js';
 import { showSplash } from './helpers/splash.js';
 import { installFatalHandlers } from './helpers/error-handler.js';
 
@@ -141,6 +142,7 @@ export function buildProgram(): Command {
   registerBot(program);
   registerMcp(program);
   registerResources(program);
+  registerUsage(program);
   registerHelp(program);
 
   return program;

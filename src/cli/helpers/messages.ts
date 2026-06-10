@@ -1183,6 +1183,76 @@ const MESSAGES: MessageMap = {
     en: 'Sprint concurrent peak: {peak} ({containers} containers)',
     tr: 'Sprint eşzamanlı tepe: {peak} ({containers} container)',
   },
+
+  // ─── usage command ─────────────────────────────────────────────────
+  'usage.no_transcript_dir': {
+    en: 'Transcript directory not found — no usage data available.',
+    tr: 'Transkript dizini bulunamadı — kullanım verisi mevcut değil.',
+  },
+  'usage.no_data': {
+    en: 'No usage data found for the selected period.',
+    tr: 'Seçilen dönem için kullanım verisi bulunamadı.',
+  },
+  'usage.header_window': {
+    en: 'Usage — last {days} days',
+    tr: 'Kullanım — son {days} gün',
+  },
+  'usage.header_since_until': {
+    en: 'Usage — {since} to {until}',
+    tr: 'Kullanım — {since} → {until}',
+  },
+  'usage.header_sprint': {
+    en: 'Usage — Sprint {sprint}',
+    tr: 'Kullanım — Sprint {sprint}',
+  },
+  'usage.col_model': {
+    en: 'Model',
+    tr: 'Model',
+  },
+  'usage.col_calls': {
+    en: 'Calls',
+    tr: 'Çağrı',
+  },
+  'usage.col_input': {
+    en: 'Input',
+    tr: 'Girdi',
+  },
+  'usage.col_output': {
+    en: 'Output',
+    tr: 'Çıktı',
+  },
+  'usage.col_cw': {
+    en: 'CW',
+    tr: 'ÖB',
+  },
+  'usage.col_cost': {
+    en: 'Limit $',
+    tr: 'Limit $',
+  },
+  'usage.col_hit_rate': {
+    en: 'Hit%',
+    tr: 'İsabet%',
+  },
+  'usage.col_task': {
+    en: 'Task',
+    tr: 'Görev',
+  },
+  'usage.col_boot_cw': {
+    en: 'Boot-CW',
+    tr: 'Başl-ÖB',
+  },
+  'usage.totals': {
+    en: 'TOTAL',
+    tr: 'TOPLAM',
+  },
+  'usage.budget_ref': {
+    en: 'Weekly budget reference: ~${budget} equiv',
+    tr: 'Haftalık bütçe referansı: ~${budget} eşdeğer',
+  },
+  'usage.no_sprint_data': {
+    en: 'No sprint data found. Sessions could not be mapped to sprint {sprint} tasks.',
+    tr: 'Sprint verisi bulunamadı. Oturumlar sprint {sprint} görevlerine eşlenemedi.',
+  },
 };
 
 /**

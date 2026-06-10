@@ -80,6 +80,10 @@
 | adr-086 | Native CLI Parity — F11 Feature Set (Sprint 224) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-273 Learnings** (sprint-273): ## Sprint sprint-273 Learnings
+
+## Gains
+- 273-001 — limit-ledger çekirdeği — transcript parse + maliyet-eşdeğeri bir...
 - **Sprint sprint-272 Learnings** (sprint-272): ## Sprint sprint-272 Learnings
 
 ## Gains
@@ -114,10 +118,6 @@
 
 ## Gains
 - 264-001 — Autonomous engine internals doc — yeni dispatch yolları — Added ...
-- **Sprint sprint-263 Learnings** (sprint-263): ## Sprint sprint-263 Learnings
-
-## Gains
-- 263-001 — Architecture & Module Inventory Analysis — Authored docs/analysi...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -143,5 +143,6 @@ _No active technical debt._
 - Violation pattern: stale_heartbeat
 - Violation pattern: file_outside_scope
 - Violation pattern: stale_heartbeat
+- Violation pattern: stale_heartbeat
 
-_Total entries: 393 | Generated: 2026-06-10_
+_Total entries: 397 | Generated: 2026-06-10_

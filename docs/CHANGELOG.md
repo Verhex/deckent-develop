@@ -2,6 +2,29 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint273] - 2026-06-10
+
+### Added
+
+- limit-ledger çekirdeği — transcript parse + maliyet-eşdeğeri birim
+- ledger session→task eşleme + sprint agregasyonu
+- `deckent usage` CLI — pencere + sprint görünümü
+- sprint-reporter "limit-yakım" satırı — retro entegrasyonu
+- result-evaluator tokenUsage hizalaması — beyan artık zorunlu değil
+- prompt-determinizm guard testi
+- prompt-template revizyonu — Skills-first blok sırası + tokenUsage metni (OPUS)
+- persona/skill "full test suite" envanteri + targeted-verify hizalaması
+- ADR seçici — açık `ADR-NNN` referansı topN'e zorla dahil
+- ADR render dedupe + operative-extract (opt-in, default-off)
+
+### Fixed
+
+- .gitignore sprint-runtime artıkları — git-status prefix stabilizasyonu
+- goCriteria şablonu — full-suite çelişkisi + Kanıt-interpolasyon fix'i
+
+
+_Tasks: 13 total, 13 done, 0 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint272] - 2026-06-10
 
 ### Added

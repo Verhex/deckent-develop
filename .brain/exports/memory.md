@@ -1,5 +1,19 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-273 Learnings
+- Sprint sprint-273 Learnings: ## Sprint sprint-273 Learnings
+
+## Gains
+- 273-001 — limit-ledger çekirdeği — transcript parse + maliyet-eşdeğeri birim — Created src/core/limit-ledger.ts with full API: parseTranscriptUsage (injectable readDir/openStre...
+- 273-002 — ledger session→task eşleme + sprint agregasyonu — Created src/core/limit-ledger-report.ts with full API:
+- 273-003 — `deckent usage` CLI — pencere + sprint görünümü — Created `deckent usage` command (registerUsage + runUsageCommand with injectable deps):
+- 273-004 — sprint-reporter "limit-yakım" satırı — retro entegrasyonu — Added buildLimitBurnRow() to src/orchestra/sprint-reporter.ts:
+- 273-005 — result-evaluator tokenUsage hizalaması — beyan artık zorunlu değil — Three surgical text changes in validateTokenUsage area of result-evaluator.ts: (1) TokenUsageVali...
+- 273-006 — .gitignore sprint-runtime artıkları — git-status prefix stabilizasyonu — Successfully added sprint-runtime artifacts to .gitignore for cache-prefix stability.
+- 273-007 — prompt-determinizm guard testi — Created tests/orchestra/prompt-determinism.test.ts with 5 determinism guard tests:
+- 273-008 — prompt-template revizyonu — Skills-first blok sırası + tokenUsage metni (OPUS) — TWO surgical changes, content-preservation absolute (Karpathy minimum-diff).
+- …and 5 more delivered
+
 ## Sprint sprint-272 Learnings
 - Sprint sprint-272 Learnings: ## Sprint sprint-272 Learnings
 

@@ -1,0 +1,112 @@
+{
+  "taskId": "273-010",
+  "sprintId": "sprint-273",
+  "steps": [
+    {
+      "step": 2,
+      "name": "routing-step-2",
+      "input": {
+        "taskId": "273-010",
+        "title": "persona/skill \"full test suite\" envanteri + targeted-verify hizalaması",
+        "scope": [
+          "src/core/builtins/agents/bug-fixer/",
+          "src/core/builtins/agents/ci-guardian/",
+          "src/core/builtins/agents/migration-specialist/",
+          "src/core/builtins/skills/testing-expert/",
+          "src/core/builtins/skills/git-expert/",
+          "src/core/builtins/skills/migration-expert/",
+          "src/core/builtins/",
+          "tests/core/builtins/agents/bug-fixer/",
+          "tests/core/builtins/agents/ci-guardian/",
+          "tests/core/builtins/agents/migration-specialist/",
+          "tests/core/builtins/skills/testing-expert/",
+          "tests/core/builtins/skills/git-expert/",
+          "tests/core/builtins/skills/migration-expert/",
+          "tests/core/builtins/"
+        ],
+        "intent": "documentation"
+      },
+      "output": {
+        "agent": "doc-writer",
+        "skills": [
+          "documentation-writer",
+          "testing-expert"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Agent forced by override: doc-writer"
+    },
+    {
+      "step": 3,
+      "name": "routing-step-3",
+      "input": {
+        "taskId": "273-010",
+        "title": "persona/skill \"full test suite\" envanteri + targeted-verify hizalaması",
+        "scope": [
+          "src/core/builtins/agents/bug-fixer/",
+          "src/core/builtins/agents/ci-guardian/",
+          "src/core/builtins/agents/migration-specialist/",
+          "src/core/builtins/skills/testing-expert/",
+          "src/core/builtins/skills/git-expert/",
+          "src/core/builtins/skills/migration-expert/",
+          "src/core/builtins/",
+          "tests/core/builtins/agents/bug-fixer/",
+          "tests/core/builtins/agents/ci-guardian/",
+          "tests/core/builtins/agents/migration-specialist/",
+          "tests/core/builtins/skills/testing-expert/",
+          "tests/core/builtins/skills/git-expert/",
+          "tests/core/builtins/skills/migration-expert/",
+          "tests/core/builtins/"
+        ],
+        "intent": "documentation"
+      },
+      "output": {
+        "agent": "doc-writer",
+        "skills": [
+          "documentation-writer",
+          "testing-expert"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Skill budget: max 3 (large task, 1 module(s), effort=normal)"
+    },
+    {
+      "step": 4,
+      "name": "routing-step-4",
+      "input": {
+        "taskId": "273-010",
+        "title": "persona/skill \"full test suite\" envanteri + targeted-verify hizalaması",
+        "scope": [
+          "src/core/builtins/agents/bug-fixer/",
+          "src/core/builtins/agents/ci-guardian/",
+          "src/core/builtins/agents/migration-specialist/",
+          "src/core/builtins/skills/testing-expert/",
+          "src/core/builtins/skills/git-expert/",
+          "src/core/builtins/skills/migration-expert/",
+          "src/core/builtins/",
+          "tests/core/builtins/agents/bug-fixer/",
+          "tests/core/builtins/agents/ci-guardian/",
+          "tests/core/builtins/agents/migration-specialist/",
+          "tests/core/builtins/skills/testing-expert/",
+          "tests/core/builtins/skills/git-expert/",
+          "tests/core/builtins/skills/migration-expert/",
+          "tests/core/builtins/"
+        ],
+        "intent": "documentation"
+      },
+      "output": {
+        "agent": "doc-writer",
+        "skills": [
+          "documentation-writer",
+          "testing-expert"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Skills forced by override: [documentation-writer, testing-expert]"
+    }
+  ],
+  "decidedAt": "2026-06-10T18:14:07.280Z"
+}

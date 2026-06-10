@@ -569,11 +569,16 @@ interface RenderInput {
 function renderTemplate(input: RenderInput): string {
   const { agentBlock, skillBlock, adrBlock, scopeBlock, depsBlock, task, effort, idempotencyKey } = input;
 
-  // Conditionally emit non-empty sections only (skip filler empty headers)
+  // Conditionally emit non-empty sections only (skip filler empty headers).
+  // Sprint 273 (F1-TOK fix #5): Skills FIRST, then Agent — skill blocks are
+  // byte-identical across tasks while the agent block varies per task, so the
+  // most-shared content must lead for a shareable provider cache prefix.
+  // (273-008 changed the template docs; this is the actual assembly order —
+  // locked by tests/orchestra/prompt-determinism.test.ts block-order test.)
   const sections: string[] = [];
 
-  if (agentBlock) sections.push(agentBlock);
   if (skillBlock) sections.push(skillBlock);
+  if (agentBlock) sections.push(agentBlock);
   if (adrBlock) sections.push(adrBlock);
 
   // Main worker preamble

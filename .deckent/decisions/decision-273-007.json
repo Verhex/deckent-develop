@@ -1,0 +1,73 @@
+{
+  "taskId": "273-007",
+  "sprintId": "sprint-273",
+  "steps": [
+    {
+      "step": 2,
+      "name": "routing-step-2",
+      "input": {
+        "taskId": "273-007",
+        "title": "prompt-determinizm guard testi",
+        "scope": [
+          "tests/orchestra/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "ci-guardian",
+        "skills": [
+          "ci-testing",
+          "typescript-expert"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Agent forced by override: ci-guardian"
+    },
+    {
+      "step": 4,
+      "name": "routing-step-4",
+      "input": {
+        "taskId": "273-007",
+        "title": "prompt-determinizm guard testi",
+        "scope": [
+          "tests/orchestra/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "ci-guardian",
+        "skills": [
+          "ci-testing",
+          "typescript-expert"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Skill budget: max 0 (trivial task, 1 module(s), effort=normal)"
+    },
+    {
+      "step": 5,
+      "name": "routing-step-5",
+      "input": {
+        "taskId": "273-007",
+        "title": "prompt-determinizm guard testi",
+        "scope": [
+          "tests/orchestra/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "ci-guardian",
+        "skills": [
+          "ci-testing",
+          "typescript-expert"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Skills forced by override: [ci-testing, typescript-expert]"
+    }
+  ],
+  "decidedAt": "2026-06-10T18:14:07.273Z"
+}

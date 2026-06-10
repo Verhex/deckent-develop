@@ -134,6 +134,15 @@ Three immovable pillars (Alperen-approved 2026-05-31):
 | F1-014 | **Per-worker auth isolation contract (load-bearing)** — each worker env gets ONLY its provider's credential; subscription Claude worker gets NO `ANTHROPIC_API_KEY`; zero cross-leak; per-worker non-leak test | ⚠️ **partial — non-leak unit contract landed (2026-06-07 İŞ7, `b3b18121`)** `tests/core/auth-matrix.test.ts`: `applyDeckSecretsToEnv` per-provider isolation (cross-leak yok, subs→key yok, ollama-host→key yok) tested. **KALAN (AS-2 all phases §4A):** spawn-time per-worker env non-leak (runtime, not just the secret-map). Sprint 213 was KILLED by the inverse (unconditional `ANTHROPIC_API_KEY` → API-mode → mass synthetic NO_GO; ADR-076, `feedback_container_auth_precedence`). |
 | F1-015 | **Bedrock + non-OpenAI-wire native adapters** — Amazon Bedrock via hand-rolled SigV4 (Node `crypto`, no AWS SDK → ADR-010 preserved); optional Vertex | ⬜ **AS-2 Faz 4 (§4A)** — no Bedrock adapter today (only `pricing-updater.ts` data ref); Bedrock uses AWS SigV4, not OpenAI `/chat/completions`. |
 
+### F1-TOK — Token/Limit Accounting (Real Ledger over Estimates) — **✅ ~100% (Sprint 273)**
+
+| ID | Item | Status |
+|----|------|--------|
+| Faz 0 | Core ledger infrastructure (transcript parse, cost-equivalent unit, .gitignore stabilization, prompt-determinism guard) | ✅ Sprint 273: limit-ledger kernel + `parseTranscriptUsage` + `limitCost` unit math + gitignore cache-prefix artifacts + prompt-determinism test |
+| Faz 1 | Reporting & CLI (ledger→task mapping, sprint aggregation, `deckent usage` command, result-evaluator realignment, sprint-reporter limit row) | ✅ Sprint 273: limit-ledger-report + `deckent usage` (default/--sprint/--json) + result-evaluator token-optional + sprint-reporter burn metric |
+| Faz 1.5 | Prompt/persona cleanup (goCriteria language fix, persona "full suite" audit, ADR-seçici explicit refs) | ✅ Sprint 273: criteria-deriver targeted-verify language + persona full-suite → targeted + adr-selector explicit-ref force-include |
+| Remaining | Faz 2 CACHE-WARM (first-worker bootstrap cache strategy) + Faz 2 A/B verification sprint (target ≤$0.45/task, quality stable) | ⬜ deferred post-273 |
+
 ### F2 — Native Chat — **~95%**
 | ID | Item | Status |
 |----|------|--------|

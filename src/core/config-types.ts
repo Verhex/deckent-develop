@@ -464,6 +464,15 @@ export interface PromptConfig {
    * (no empty header). Default: 0.3 (lenient).
    */
   adr_min_relevance?: number;
+  /**
+   * ADR render mode for worker prompt injection (Sprint 273 F1-TOK).
+   * 'full' (default): full ADR content emitted as-is.
+   * 'operative': if content contains <!-- worker-operative-start --> /
+   * <!-- worker-operative-end --> markers, only that section is emitted
+   * with footnote "[full text: .brain/memory.db adr-NNN]"; ADRs without
+   * markers fall back to full content. No content is auto-summarized.
+   */
+  adr_render?: 'full' | 'operative';
 }
 
 // ─── Nervous System Config Types ────────────────────────────────────

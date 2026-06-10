@@ -255,10 +255,42 @@ function scoreAgePenalty(adr: MemoryEntryV2, currentSprintNum: number): { score:
   return { score: penalty, reason: 'age-penalty' };
 }
 
+// ─── Explicit ADR Reference Extraction ─────────────────────────────
+
+/**
+ * Normalize an ADR id to canonical form: lowercase "adr-NNN" with 3-digit zero-padding.
+ * Handles "ADR-12", "adr-012", "ADR012" → "adr-012".
+ */
+function normalizeAdrId(raw: string): string {
+  const m = /adr-?0*(\d+)/i.exec(raw);
+  if (!m) return raw.toLowerCase();
+  return `adr-${m[1]!.padStart(3, '0')}`;
+}
+
+/**
+ * Extract explicit ADR references from task text.
+ * Pattern: /ADR-?(\d{1,3})/gi — matches "ADR-012", "ADR012", "adr-12" etc.
+ * Returns deduplicated canonical ids like ["adr-012", "adr-037"].
+ */
+export function extractExplicitAdrRefs(text: string): string[] {
+  const pattern = /ADR-?(\d{1,3})/gi;
+  const seen = new Set<string>();
+  let m: RegExpExecArray | null;
+  while ((m = pattern.exec(text)) !== null) {
+    seen.add(normalizeAdrId(`adr-${m[1]!}`));
+  }
+  return [...seen];
+}
+
 // ─── Main API ───────────────────────────────────────────────────────
 
 /**
  * Select the most relevant ADRs for a task.
+ *
+ * Pre-phase: any ADR explicitly referenced in task title/description (e.g. "ADR-012")
+ * is forced into the result at the front, regardless of relevance score.
+ * Remaining slots are filled by the scoring engine.
+ * Design choice: total output = max(topN, explicitRefCount) — explicit refs never truncated.
  *
  * Scoring: scope path match (+0.4), keyword match (+0.3), intent preference (+0.2), age penalty (max -0.1).
  *
@@ -282,8 +314,58 @@ export function selectRelevantAdrs(
   const taskText = `${task.title ?? ''} ${task.description ?? ''}`;
   const taskDirs = task.scope?.directories ?? [];
 
-  const scored: AdrRelevance[] = allAdrs
-    .filter(adr => adr.type === 'adr' && adr.status === 'accepted')
+  // Build a normalized-id lookup map for the pool
+  const adrPool = allAdrs.filter(adr => adr.type === 'adr' && adr.status === 'accepted');
+  const poolByNormId = new Map<string, MemoryEntryV2>();
+  for (const adr of adrPool) {
+    poolByNormId.set(normalizeAdrId(adr.id), adr);
+  }
+
+  // Pre-phase: extract explicit ADR-NNN references from task text and force-include them
+  const explicitRefs = extractExplicitAdrRefs(taskText);
+  const forcedIds = new Set<string>();
+  const forcedEntries: AdrRelevance[] = [];
+
+  for (const ref of explicitRefs) {
+    const entry = poolByNormId.get(ref);
+    if (!entry) continue; // ADR-999 or any non-existent ref → silently skip
+
+    const normId = normalizeAdrId(entry.id);
+    if (forcedIds.has(normId)) continue; // deduplicate
+    forcedIds.add(normId);
+
+    // Score normally so matchReasons are informative, but always include regardless
+    const reasons: string[] = ['explicit-ref'];
+    let totalScore = 1.0; // base score ensures explicit refs sort to the front if needed
+
+    const scope = scoreScopeMatch(entry, taskDirs);
+    if (scope.reason) { totalScore += scope.score; reasons.push(scope.reason); }
+
+    const keyword = scoreKeywordMatch(entry, taskText);
+    if (keyword.reason) { totalScore += keyword.score; reasons.push(keyword.reason); }
+
+    const intentPref = scoreIntentPreference(entry, intent);
+    if (intentPref.reason) { totalScore += intentPref.score; reasons.push(intentPref.reason); }
+
+    const preset = scorePresetBonus(entry, intent);
+    if (preset.reason) { totalScore += preset.score; reasons.push(preset.reason); }
+
+    const age = scoreAgePenalty(entry, currentSprintNum);
+    if (age.reason) { totalScore += age.score; reasons.push(age.reason); }
+
+    forcedEntries.push({
+      adrId: entry.id,
+      title: entry.title,
+      score: Math.round(totalScore * 1000) / 1000,
+      matchReasons: reasons,
+    });
+  }
+
+  // Remaining slots for scored selection (exclude already-forced ADRs)
+  const remainingSlots = Math.max(0, topN - forcedEntries.length);
+
+  const scored: AdrRelevance[] = adrPool
+    .filter(adr => !forcedIds.has(normalizeAdrId(adr.id)))
     .map(adr => {
       const reasons: string[] = [];
       let totalScore = 0;
@@ -313,8 +395,27 @@ export function selectRelevantAdrs(
     .filter(r => r.score > 0)
     .sort((a, b) => b.score - a.score);
 
-  return scored.slice(0, topN);
+  // Explicit refs at front, then scored results fill remaining slots
+  return [...forcedEntries, ...scored.slice(0, remainingSlots)];
 }
+
+// ─── Operative Extract ───────────────────────────────────────────────
+
+const OPERATIVE_START = '<!-- worker-operative-start -->';
+const OPERATIVE_END = '<!-- worker-operative-end -->';
+
+/**
+ * Extract the operative section from ADR content when markers are present.
+ * Returns null if no valid marker pair found (caller falls back to full content).
+ */
+function extractOperativeSection(content: string): string | null {
+  const startIdx = content.indexOf(OPERATIVE_START);
+  const endIdx = content.indexOf(OPERATIVE_END);
+  if (startIdx === -1 || endIdx === -1 || endIdx <= startIdx) return null;
+  return content.slice(startIdx + OPERATIVE_START.length, endIdx).trim();
+}
+
+// ─── Prompt Section Builder ──────────────────────────────────────────
 
 /**
  * Build a markdown prompt section from ranked ADRs.
@@ -322,12 +423,16 @@ export function selectRelevantAdrs(
  * @param adrs - Ranked ADR relevance results (from selectRelevantAdrs)
  * @param mode - 'full' embeds full ADR content, 'summary' embeds 3-5 line summaries
  * @param allAdrs - Original ADR entries (needed to get content/summary)
+ * @param adrRender - 'full' (default): full content; 'operative': emit only the
+ *   `<!-- worker-operative-start --> / <!-- worker-operative-end -->` section when
+ *   present, with a footnote. ADRs without markers fall back to full content.
  * @returns Formatted markdown string for prompt injection
  */
 export function buildAdrPromptSection(
   adrs: AdrRelevance[],
   mode: 'full' | 'summary',
   allAdrs?: MemoryEntryV2[],
+  adrRender: 'full' | 'operative' = 'full',
 ): string {
   if (adrs.length === 0) return '';
 
@@ -342,8 +447,16 @@ export function buildAdrPromptSection(
     const entry = adrMap.get(adr.adrId);
 
     if (mode === 'full') {
-      const content = entry?.content ?? `(content not available for ${adr.adrId})`;
-      sections.push(`## ${adr.adrId}: ${adr.title}\n\n**Status:** accepted\n\n${content}`);
+      const rawContent = entry?.content ?? `(content not available for ${adr.adrId})`;
+      let content = rawContent;
+      if (adrRender === 'operative') {
+        const operative = extractOperativeSection(rawContent);
+        if (operative !== null) {
+          content = `${operative}\n\n[full text: .brain/memory.db ${adr.adrId}]`;
+        }
+      }
+      // Dedupe: outer header carries adrId+title only; content body already has status/date.
+      sections.push(`## ${adr.adrId}: ${adr.title}\n\n${content}`);
     } else {
       // Summary mode: use entry.summary if available, otherwise extract first 3-5 meaningful lines
       let summaryText: string;

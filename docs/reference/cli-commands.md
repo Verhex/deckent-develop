@@ -526,6 +526,40 @@ deckent audit retention --sprint sprint-264 --keep-days 30 --apply            # 
 
 ---
 
+### `deckent usage`
+
+Show transcript-based token and limit usage accounting (real ground-truth ledger, not worker self-estimates).
+
+| Option | Description |
+|--------|-------------|
+| `--sprint <N>` | Show per-task breakdown for a specific sprint (task name, model, calls, output tokens, cache write, bootstrap cache write, $-cost). Default: 7-day rolling window aggregated by model. |
+| `--since <ISO>` | Start date for usage window (ISO 8601 format, e.g. `2026-06-01`). Default: 7 days ago. |
+| `--until <ISO>` | End date for usage window (ISO 8601 format). Default: today. |
+| `--json` | Output raw JSON (array of usage records) for integration with monitoring tools. |
+
+**Modes:**
+
+1. **Default (7-day window):** Display model-level table with aggregate usage:
+   - Model name, number of calls, input/output tokens, cache read/write, **limit-cost** (cost-equivalent using token prices), cache hit-rate (%).
+   - Optional footer: "Weekly budget reference ~$650-eqv" (from config `usage.weekly_budget_equiv`, or hidden if not set).
+
+2. **`--sprint <N>` mode:** Display per-task breakdown for a single sprint:
+   - Task ID, model, calls, output tokens, cache write, bootstrap cache write (first call), $-cost, hit-rate.
+   - Bottom row: sprint totals and bootstrap share %.
+
+**Accounting:**
+Uses the real transcript ledger (`.claude/projects/**/*.jsonl` message-usage fields) instead of worker self-estimates. Cost-equivalent unit: `in·$in + out·$out + cacheWrite·1.25·$in` (calibrated against observed token spend). Cache read has zero weight.
+
+**Example:**
+```bash
+deckent usage                          # 7-day model-level table
+deckent usage --sprint 273             # Sprint 273 per-task breakdown
+deckent usage --since 2026-06-01       # Specific date range
+deckent usage --json                   # Raw JSON for monitoring
+```
+
+---
+
 ### `deckent features`
 
 List feature flags and capabilities from `.deckent/features-manifest.json`.

@@ -219,6 +219,7 @@ export const DEFAULT_TERMINAL_CONFIG: TerminalConfig = {
 // that previously inflated worker prompts.
 export const DEFAULT_PROMPT_CONFIG: Required<PromptConfig> = {
   adr_min_relevance: 0.3,
+  adr_render: 'full',
 };
 
 /**
@@ -842,6 +843,14 @@ export function validateConfig(config: DeckentConfig): string[] {
     if (typeof v !== 'number' || Number.isNaN(v) || v < 0 || v > 1) {
       errors.push(
         `Invalid value '${v}' for field 'prompt.adr_min_relevance'. Must be a number in [0, 1].`,
+      );
+    }
+  }
+  if (config.prompt?.adr_render !== undefined) {
+    const validAdrRender = ['full', 'operative'];
+    if (!validAdrRender.includes(config.prompt.adr_render)) {
+      errors.push(
+        `Invalid value '${config.prompt.adr_render}' for field 'prompt.adr_render'. Valid: ${validAdrRender.join(', ')}.`,
       );
     }
   }
