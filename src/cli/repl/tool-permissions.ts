@@ -48,5 +48,16 @@ export function classifyTool(tool: string, args: Record<string, unknown>): ToolP
     const sub = Array.isArray(rest) && typeof rest[0] === 'string' ? rest[0] : '';
     return CONFIG_WRITE_SUBS.has(sub) ? 'confirm' : 'read';
   }
+  if (tool === 'deckent_autonomous') {
+    // status/pending/backlog_list are read-only; approve/reject/backlog_add/stop
+    // mutate the backlog or dispatch machine work (Sprint 269 /autonomous slash).
+    const action = typeof args['action'] === 'string' ? (args['action'] as string) : '';
+    return action === 'status' || action === 'pending' || action === 'backlog_list' ? 'read' : 'confirm';
+  }
+  if (tool === 'deckent_audit') {
+    // gate writes <sprint>-gate.json and runs the slow self-audit; query/compliance read.
+    const action = typeof args['action'] === 'string' ? (args['action'] as string) : 'gate';
+    return action === 'gate' ? 'confirm' : 'read';
+  }
   return 'read';
 }

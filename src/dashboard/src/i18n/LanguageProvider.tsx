@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { fetchJson, postJson } from '../lib/api';
 import { en } from './en';
 import { tr } from './tr';
 import type { TranslationKey } from './en';
@@ -23,9 +24,9 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const [lang, setLangState] = useState<Language>('en');
 
   useEffect(() => {
-    // Load language from config API
-    fetch('/api/config')
-      .then((res) => res.ok ? res.json() : null)
+    // Load language from config API (canonical token-aware client — a raw
+    // fetch here was the last un-migrated caller and 401'd on served builds)
+    fetchJson<{ language?: string }>('/api/config')
       .then((config) => {
         if (config?.language === 'tr') setLangState('tr');
       })
@@ -35,11 +36,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const setLang = useCallback((newLang: Language) => {
     setLangState(newLang);
     // Persist to config
-    fetch('/api/config', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ language: newLang }),
-    }).catch(() => {});
+    postJson('/api/config', { language: newLang }).catch(() => {});
   }, []);
 
   const t = useCallback(

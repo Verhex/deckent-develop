@@ -91,4 +91,18 @@ describe('E2E rate-limit gate', () => {
     expect(limited.headers.get('x-content-type-options')).toBe('nosniff');
     expect(limited.headers.get('x-frame-options')).toBe('DENY');
   });
+
+  it('rateLimitExemptLoopback: true never 429s loopback callers (Sprint 269 dashboard fix)', async () => {
+    // Production serve default: the owner's own localhost dashboard must not
+    // be throttled (page fetch fan-out + SSE reconnects exceed 100 req/min).
+    handle = await startTestServer({
+      disableAuth: true,
+      rateLimit: 1,
+      rateLimitExemptLoopback: true,
+    });
+    const responses = await fireMany(handle, '/api/status', 5);
+    for (const [i, res] of responses.entries()) {
+      expect(res.status, `request ${i + 1}`).toBe(200);
+    }
+  });
 });

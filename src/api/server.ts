@@ -19,7 +19,7 @@ import type { Task, Sprint } from '../core/types.js';
 import { readJsonSafe } from '../core/utils.js';
 import { deepMerge } from '../core/config.js';
 import { watchDashboard } from './watcher.js';
-import { bearerAuthMiddleware, resolveAuthToken } from './auth.js';
+import { bearerAuthMiddleware, isLocalhostRequest, resolveAuthToken } from './auth.js';
 import { injectApiTokenIntoHtml, isLoopbackRemote } from './middleware/token.js';
 import { parseSprintLog } from '../cli/commands/history.js';
 import { runDoctorChecks } from '../cli/commands/doctor.js';
@@ -75,9 +75,19 @@ export class RateLimiter {
   private readonly maxRequests: number;
   private readonly store = new Map<string, RateLimitEntry>();
 
-  constructor(maxRequests = 100, windowMs = 60_000) {
+  /**
+   * When true (default), loopback callers bypass the limiter entirely —
+   * it exists to throttle remote abuse, and the owner's own dashboard on
+   * localhost legitimately exceeds 100 req/min (per-page fetch fan-out +
+   * SSE reconnects; a 429'd SSE retry-loop never lets the window drain).
+   * Tests that exercise the 429 wire-up set this to false.
+   */
+  readonly exemptLoopback: boolean;
+
+  constructor(maxRequests = 100, windowMs = 60_000, opts?: { exemptLoopback?: boolean }) {
     this.maxRequests = maxRequests;
     this.windowMs = windowMs;
+    this.exemptLoopback = opts?.exemptLoopback ?? true;
   }
 
   check(ip: string): boolean {
@@ -359,8 +369,9 @@ async function handleRequest(
   const url = rawUrl.startsWith('/api/v1/') ? '/api/' + rawUrl.slice('/api/v1/'.length) : rawUrl;
   const method = req.method ?? 'GET';
 
-  // Rate limiting
-  if (rateLimiter && url.startsWith('/api/')) {
+  // Rate limiting. Loopback callers are exempt by default (Sprint 269 live
+  // finding — see RateLimiter.exemptLoopback); remote binds keep the limit.
+  if (rateLimiter && url.startsWith('/api/') && !(rateLimiter.exemptLoopback && isLocalhostRequest(req))) {
     const ip = req.socket.remoteAddress ?? '127.0.0.1';
     if (!rateLimiter.check(ip)) {
       sendError(res, 429, 'Too Many Requests');
@@ -992,6 +1003,13 @@ export interface HttpServerOptions {
   autoGenerateToken?: boolean;
   /** Max requests per minute per IP. Defaults to 100. 0 disables rate limiting. */
   rateLimit?: number;
+  /**
+   * Exempt loopback callers from the rate limiter (default true — the owner's
+   * own localhost dashboard legitimately exceeds the per-minute budget via
+   * page fetch fan-out + SSE reconnects). Set false to rate-limit loopback
+   * too (tests exercising the 429 wire-up rely on this).
+   */
+  rateLimitExemptLoopback?: boolean;
   /** PTY session backend for embedded terminal support (Sprint 175). */
   terminalBackend?: SessionBackend;
   /**
@@ -1022,6 +1040,7 @@ export function createHttpServer(
 
   let autoGenerateToken = false;
   let rateLimitMax = 100;
+  let rateLimitExemptLoopback = true;
   let terminalBackend: SessionBackend | undefined;
   let resolvedOidc: HttpServerOptions['oidc'];
 
@@ -1032,6 +1051,7 @@ export function createHttpServer(
     host = portOrOpts.host ?? LOCALHOST_ONLY;
     autoGenerateToken = portOrOpts.autoGenerateToken ?? false;
     rateLimitMax = portOrOpts.rateLimit ?? 100;
+    rateLimitExemptLoopback = portOrOpts.rateLimitExemptLoopback ?? true;
     terminalBackend = portOrOpts.terminalBackend;
     resolvedOidc = portOrOpts.oidc;
   } else {
@@ -1127,7 +1147,9 @@ export function createHttpServer(
     ...(resolvedOidc ? { oidc: resolvedOidc } : {}),
   });
 
-  const rateLimiter = rateLimitMax > 0 ? new RateLimiter(rateLimitMax) : undefined;
+  const rateLimiter = rateLimitMax > 0
+    ? new RateLimiter(rateLimitMax, undefined, { exemptLoopback: rateLimitExemptLoopback })
+    : undefined;
 
   const dashPath = join(projectRoot, DASHBOARD_FILE);
   const sseClients = new Set<ServerResponse>();

@@ -121,6 +121,52 @@ function defaultSpawnFn(args: string[]): Promise<string> {
  * in dispatch because its `query` arg maps to a `recall <query>` positional.
  */
 export function cliArgsFor(name: string, args: Record<string, unknown>): string[] | null {
+  // ── Arg-aware builders (Sprint 269 follow-up — the /autonomous, /audit and
+  // /directives slashes dispatch these tools with structured args; the static
+  // map below cannot express them). Long-running actions stay excluded:
+  // `autonomous start` runs the engine loop and would block the REPL turn
+  // (and be killed by SPAWN_TIMEOUT_MS) — run it standalone via the CLI.
+  if (name === 'deckent_autonomous') {
+    const action = typeof args['action'] === 'string' ? (args['action'] as string) : '';
+    if (action === 'status' || action === 'stop' || action === 'pending') return ['autonomous', action];
+    if (action === 'approve' || action === 'reject') {
+      const id = typeof args['triggerId'] === 'string' ? (args['triggerId'] as string) : '';
+      return id ? ['autonomous', action, id] : null;
+    }
+    if (action === 'backlog_list') return ['autonomous', 'backlog', 'list'];
+    if (action === 'backlog_add') {
+      const id = typeof args['id'] === 'string' ? (args['id'] as string) : '';
+      const title = typeof args['title'] === 'string' ? (args['title'] as string) : '';
+      if (!id || !title) return null;
+      const argv = ['autonomous', 'backlog', 'add', '--id', id, '--title', title];
+      if (typeof args['cron'] === 'string' && (args['cron'] as string).length > 0) {
+        argv.push('--cron', args['cron'] as string);
+      }
+      return argv;
+    }
+    return null; // start (long-running) and unknown actions stay excluded
+  }
+  if (name === 'deckent_audit') {
+    const action = typeof args['action'] === 'string' ? (args['action'] as string) : 'gate';
+    if (action === 'gate') {
+      const sprint = typeof args['sprintId'] === 'string' ? (args['sprintId'] as string) : '';
+      return sprint ? ['audit', sprint] : ['audit'];
+    }
+    if (action === 'query') {
+      const argv = ['audit', 'query'];
+      if (typeof args['channel'] === 'string' && (args['channel'] as string).length > 0) {
+        argv.push('--action', args['channel'] as string);
+      }
+      return argv;
+    }
+    if (action === 'compliance') return ['audit', 'compliance'];
+    return null; // forward/retention (network/destructive) stay CLI-only
+  }
+  if (name === 'deckent_set_directives') {
+    const content = typeof args['content'] === 'string' ? (args['content'] as string) : '';
+    return content.length > 0 ? ['set-directives', '--content', content] : null;
+  }
+
   const base = TOOL_COMMANDS[name];
   if (!base) return null;
   const cliArgs = [...base];

@@ -194,7 +194,8 @@ describe('Server Security Hardening', () => {
 
   describe('rate limiting integration', () => {
     it('returns 429 when rate limit exceeded', async () => {
-      api = createHttpServer(PROJECT_ROOT, { port: 0, rateLimit: 2 });
+      // strict limiter over loopback (production default exempts loopback — Sprint 269)
+      api = createHttpServer(PROJECT_ROOT, { port: 0, rateLimit: 2, rateLimitExemptLoopback: false });
       await new Promise<void>((r) => api.server.once('listening', r));
 
       await request(api, '/api/status');

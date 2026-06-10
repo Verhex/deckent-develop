@@ -81,6 +81,10 @@ export async function startTestServer(
     port: 0,
     apiToken: opts.apiToken,
     rateLimit: opts.rateLimit,
+    // Tests run over real loopback sockets; default to the strict (no loopback
+    // exemption) limiter so rate-limit wire-up stays E2E-testable. Production
+    // serve keeps the exemption (HttpServerOptions default true).
+    rateLimitExemptLoopback: opts.rateLimitExemptLoopback ?? false,
     staticDir: opts.staticDir,
     host: opts.host ?? '127.0.0.1',
   });

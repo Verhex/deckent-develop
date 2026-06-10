@@ -133,12 +133,52 @@ describe('createCliToolDispatcher — chat-tool-bridge.ts', () => {
     expect(spawnFn).toHaveBeenCalledWith(['kill', '--all']);
   });
 
-  it('deckent_audit → tool not allowed (slow/auth-blocked, gated)', async () => {
+  // Sprint 269 follow-up: deckent_audit is now bridged (the /audit slash needs
+  // it). gate/query/compliance map to CLI argv; forward/retention (network /
+  // destructive) stay excluded and return the not-allowed error.
+  it('deckent_audit gate/query/compliance → bridged to audit CLI argv', async () => {
+    const spawnFn = vi.fn().mockResolvedValue('ok') as unknown as CliToolSpawnFn;
+    const d = createCliToolDispatcher({ spawnFn });
+    await d.dispatch('deckent_audit', { action: 'gate', sprintId: 'sprint-224' });
+    expect(spawnFn).toHaveBeenCalledWith(['audit', 'sprint-224']);
+    await d.dispatch('deckent_audit', { action: 'query', channel: 'rbac.check' });
+    expect(spawnFn).toHaveBeenCalledWith(['audit', 'query', '--action', 'rbac.check']);
+    await d.dispatch('deckent_audit', { action: 'compliance' });
+    expect(spawnFn).toHaveBeenCalledWith(['audit', 'compliance']);
+  });
+
+  it('deckent_audit forward/retention stay excluded (network/destructive)', async () => {
     const spawnFn = vi.fn() as unknown as CliToolSpawnFn;
     const d = createCliToolDispatcher({ spawnFn });
-    const out = await d.dispatch('deckent_audit', { _rest: ['sprint-224'] });
+    const out = await d.dispatch('deckent_audit', { action: 'retention' });
     expect(out).toBe('[mcp-error] tool not allowed: deckent_audit');
     expect(spawnFn).not.toHaveBeenCalled();
+  });
+
+  it('deckent_autonomous read/write actions bridge; start stays excluded (long-running)', async () => {
+    const spawnFn = vi.fn().mockResolvedValue('ok') as unknown as CliToolSpawnFn;
+    const d = createCliToolDispatcher({ spawnFn });
+    await d.dispatch('deckent_autonomous', { action: 'status' });
+    expect(spawnFn).toHaveBeenCalledWith(['autonomous', 'status']);
+    await d.dispatch('deckent_autonomous', { action: 'approve', triggerId: 't-1' });
+    expect(spawnFn).toHaveBeenCalledWith(['autonomous', 'approve', 't-1']);
+    await d.dispatch('deckent_autonomous', {
+      action: 'backlog_add', id: 'nightly-doc', title: 'Nightly doc', cron: '0 6 * * *',
+    });
+    expect(spawnFn).toHaveBeenCalledWith([
+      'autonomous', 'backlog', 'add', '--id', 'nightly-doc', '--title', 'Nightly doc', '--cron', '0 6 * * *',
+    ]);
+    const out = await d.dispatch('deckent_autonomous', { action: 'start' });
+    expect(out).toBe('[mcp-error] tool not allowed: deckent_autonomous');
+  });
+
+  it('deckent_set_directives bridges with --content; empty content rejected', async () => {
+    const spawnFn = vi.fn().mockResolvedValue('ok') as unknown as CliToolSpawnFn;
+    const d = createCliToolDispatcher({ spawnFn });
+    await d.dispatch('deckent_set_directives', { content: '# DIRECTIVES — Sprint X' });
+    expect(spawnFn).toHaveBeenCalledWith(['set-directives', '--content', '# DIRECTIVES — Sprint X']);
+    const out = await d.dispatch('deckent_set_directives', { content: '' });
+    expect(out).toBe('[mcp-error] tool not allowed: deckent_set_directives');
   });
 
   it('ignores a non-array _rest (defensive)', async () => {

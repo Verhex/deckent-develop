@@ -61,6 +61,8 @@ async function bootServer(
     port: 0,
     apiToken: TOKEN,
     host: '127.0.0.1',
+    // strict limiter over loopback so the rate snapshot test stays meaningful
+    rateLimitExemptLoopback: false,
     ...(opts.rateLimit !== undefined ? { rateLimit: opts.rateLimit } : {}),
   });
   await new Promise<void>((resolve) =>

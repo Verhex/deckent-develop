@@ -34,4 +34,21 @@ describe('classifyTool — REPL confirm hierarchy', () => {
     expect(classifyTool('deckent_cleanup', {})).toBe('always');
     expect(classifyTool('deckent_recover', {})).toBe('always');
   });
+
+  it('deckent_autonomous: read actions silent, mutating actions confirm (Sprint 269)', () => {
+    expect(classifyTool('deckent_autonomous', { action: 'status' })).toBe('read');
+    expect(classifyTool('deckent_autonomous', { action: 'pending' })).toBe('read');
+    expect(classifyTool('deckent_autonomous', { action: 'backlog_list' })).toBe('read');
+    expect(classifyTool('deckent_autonomous', { action: 'approve', triggerId: 't-1' })).toBe('confirm');
+    expect(classifyTool('deckent_autonomous', { action: 'reject', triggerId: 't-1' })).toBe('confirm');
+    expect(classifyTool('deckent_autonomous', { action: 'backlog_add', id: 'x', title: 'X' })).toBe('confirm');
+    expect(classifyTool('deckent_autonomous', { action: 'stop' })).toBe('confirm');
+  });
+
+  it('deckent_audit: gate confirms (writes gate file), query/compliance read (Sprint 269)', () => {
+    expect(classifyTool('deckent_audit', { action: 'gate', sprintId: 'sprint-269' })).toBe('confirm');
+    expect(classifyTool('deckent_audit', {})).toBe('confirm');
+    expect(classifyTool('deckent_audit', { action: 'query' })).toBe('read');
+    expect(classifyTool('deckent_audit', { action: 'compliance' })).toBe('read');
+  });
 });
