@@ -1,139 +1,214 @@
-# DIRECTIVES — Sprint 275: F1-TOK Kapanış-Ölçüm — Usage Yüzey Paritesi + Kanıt Fleet'i
+# DIRECTIVES — Sprint 276: PLAN-INT-1 (Pre-PLAN Sorgulama) + XVER-1 (Cross-Provider Adversarial Verify)
 
-## Goal: F1-TOK'un kanıt sprint'i — bu sprint'in KENDİSİ deneydir: warm-spawn + Skills-first + adr-operative + kind-limitler hep birlikte İLK kez aktif koşar; CC sprint-sonu gerçek cache-gate + final A/B raporunu çıkarır (hedefler: 2.+ worker'larda cache_read>cache_write, boot-cw payı %56→düşüş, task-başı ≤$0.45 teyidi). İş yükü gerçek-değerli usage-yüzey paritesi: `/usage` + `/resources` REPL slash'leri (ÜÇ KATMAN: registry + tool-bridge + permissions — 269 dersi), `deckent_usage` MCP tool'u, 273-010 debt kapanışı, doc senkronları. MİKRO-TASK + DEPENDENCY + MODEL-KATMANLAMA (sonnet 5 · haiku 3; opus yok — çok-zor iş yok).
+## Goal: gstack-dersi iki kalite kaldıracı (Alperen 2026-06-10, §14-S). (1) PLAN-INT-1: PLAN'dan ÖNCE opt-in "directive-interrogation" — Brain hedefi zorlayıcı sorularla sınar (yanlış-problem'i koddan önce yakalar), revize DIRECTIVES taslağı önerir; doğrudan-DIRECTIVES yolu ASLA bloke olmaz (power-user atlar). (2) XVER-1: yüksek-riskli task'larda (security/auth/P0/risk-tagged) sonucu FARKLI bir provider'a "bunu ÇÜRÜTMEYE çalış" adversarial doğrulamasıyla denetlet — eval'e advisory sinyal, **config-gated default-OFF**, OAuth-fleet'te $0 (F1-CB), ikinci provider yoksa honest-fail. MİKRO-TASK + DEPENDENCY + MODEL-KATMANLAMA (opus 3 · sonnet 6 · haiku 3).
 
 ## Ortak kurallar
-- **TDD + hermetik:** önce RED; tmpdir + injectable I/O; gerçek ağ/`~/.claude` YASAK testlerde; spawnSync YASAK.
-- **3-KATMAN KURALI (269 canlı dersi):** REPL'e slash eklemek = chat-slash-registry + chat-tool-bridge `cliArgsFor` + tool-permissions `classifyTool` ÜÇÜNÜN birden güncellenmesi. Birini atlamak = mock-geçer/canlı-düşer.
-- **Davranış korunumu:** additive/opt-in; mevcut yeşil testler yeşil.
-- **i18n-FIRST:** user-facing string `getMessage(key, lang)` (en+tr).
-- **`.tasks/task-XXX.result` YAZ**; Kanıt komutlarını gerçekten koş.
+- **TDD + hermetik:** önce RED; tmpdir + injectable spawn/fs/readline; gerçek ağ/provider YASAK testlerde; spawnSync YASAK.
+- **Opt-in + fail-safe:** her iki özellik de default-OFF; hata/sağlayıcı-yokluğu mevcut akışı ASLA bozmaz (interrogation atlanır → düz plan; xverify atlanır → mevcut eval). Davranış korunumu: bayrak/config kapalıyken bayt-bayt aynı.
+- **i18n-FIRST:** user-facing TÜM string `getMessage(key, lang)` (en+tr) — interrogation soruları + xverify mesajları dahil.
+- **SSOT:** provider seçimi `sprint-utils`/`task-router` mevcut helper'ları; eval `result-evaluator`; YENİDEN İCAT YOK.
+- **`.tasks/task-XXX.result` YAZ**; Kanıt komutlarını gerçekten koş. Tier-1 smoke CC sprint-sonu (ADR-079).
 
 ---
 
-## Task 1: /usage REPL slash — üç katman birden
+## Task 1: directive-interrogator çekirdeği — zorlayıcı soru üretimi + taslak öneri
+- Provider: claude
+- Model: opus
+- Backend: docker
+- Effort: high
+- Agent: architect
+- Skills: typescript-expert, testing-expert
+- Files: src/core/directive-interrogator.ts, tests/core/directive-interrogator.test.ts
+- Scope: src/core/, tests/core/
+
+### Description
+**YENİ `src/core/directive-interrogator.ts`** (PLAN-INT-1 çekirdeği, LLM-opsiyonel-pure tasarım): `buildInterrogationQuestions(directives: string, opts?): InterrogationQuestion[]` — DIRECTIVES metnini ayrıştırıp (Goal + Task başlıkları) **yapısal zorlayıcı sorular** üretir (gstack /office-hours deseni): (a) pain-vs-feature ("bu gerçek bir acı mı yoksa feature-isteği mi?"), (b) en-dar-shippable-wedge, (c) gizli/varsayılan capability'ler, (d) sorgulanacak premise'ler, (e) effort-alternatifleri. Sorular i18n key-tabanlı (getMessage; soru-şablonları en+tr) + DIRECTIVES içeriğinden parametrik (Goal'daki anahtar isimleri enjekte). + `applyInterrogationAnswers(directives, answers): string` — pure: kullanıcı cevaplarını alıp revize DIRECTIVES TASLAĞI üretir (orijinali SİLMEZ — Goal'a "## Interrogation Refinements" bölümü ekler/günceller; içerik-korunumlu). LLM çağrısı YOK bu task'ta (yapısal sorular yeter; LLM-zenginleştirme opsiyonel-sonraki). Hermetik testler: soru üretimi (boş/çok-task'lı DIRECTIVES), i18n key varlığı, taslak-üretim içerik-korunumu, cevapsız-soru toleransı.
+
+**Kanıt:** `npx vitest run tests/core/directive-interrogator.test.ts` yeşil; `grep -n "buildInterrogationQuestions\|applyInterrogationAnswers" src/core/directive-interrogator.ts | head -2` ≥ 2. **Test:** 8+.
+
+---
+
+## Task 2: interrogation config + i18n soru sözlüğü
 - Provider: claude
 - Model: sonnet
 - Backend: docker
-- Effort: normal
-- Agent: bug-fixer
+- Effort: low
+- Agent: api-builder
 - Skills: typescript-expert, testing-expert
-- Files: src/cli/commands/chat-slash-registry.ts, src/cli/commands/chat-tool-bridge.ts, src/cli/repl/tool-permissions.ts, tests/cli/chat-slash-usage.test.ts
-- Scope: src/cli/, tests/cli/
+- Files: src/core/config-types.ts, src/core/config.ts, src/cli/helpers/messages.ts, tests/core/config-interrogate.test.ts
+- Scope: src/core/, src/cli/helpers/, tests/core/
 
 ### Description
-`/usage [--sprint N]` slash'i (269-273 desenleri): (1) registry — `/usage` → `deckent_usage` dispatch, `--sprint N`/`since` arg-map (resolveAuditSlash deseni); (2) tool-bridge `cliArgsFor` — `deckent_usage` → `['usage', ...]` argv (sprint paramı `--sprint N`; read-only); (3) tool-permissions — `deckent_usage` → 'read'. NOT: MCP tool'u Task 3'te iniyor — bridge CLI'ı spawn'ladığı için MCP tool'una bağımlı DEĞİL (dispatch adı sözleşmesi yeter); yine de bilinmeyen-arg dürüst i18n mesajı. Testler: registry kaydı + arg-map; bridge argv (sprint'li/siz); permission read; bilinmeyen alt-arg yolu.
+(1) Config: `plan?: { interrogate?: boolean }` opsiyonel (default false=kapalı; mevcut `prompt` bloğuyla aynı düzeyde — `prompt.adr_render` deseni). Validation: boolean kontrolü. (2) i18n: Task 1'in kullandığı interrogation soru/başlık key'lerini `messages.ts`'e en+tr ekle (`interrogate.q_pain`, `interrogate.q_wedge`, `interrogate.q_hidden`, `interrogate.q_premise`, `interrogate.q_effort`, `interrogate.intro`, `interrogate.draft_header` vb. — Task 1 hangi key'leri çağırıyorsa). messages-completeness guard'ı (Sprint 270-019) yeşil kalmalı (key-parite). Testler: config geçerli/geçersiz/default; messages key varlığı en+tr.
 
-**Kanıt:** `npx vitest run tests/cli/chat-slash-usage.test.ts` yeşil; `grep -c "deckent_usage" src/cli/commands/chat-tool-bridge.ts src/cli/repl/tool-permissions.ts | paste -sd+ | bc` ≥ 2 (iki dosyada da). **Test:** 6+.
+**Kanıt:** `npx vitest run tests/core/config-interrogate.test.ts tests/cli/messages-completeness.test.ts` yeşil; `grep -c "interrogate" src/cli/helpers/messages.ts` ≥ 5. **Test:** 5+.
 
 ---
 
-## Task 2: /resources REPL slash — üç katman birden
-- Provider: claude
-- Model: sonnet
-- Backend: docker
-- Effort: normal
-- Agent: bug-fixer
-- Skills: typescript-expert, testing-expert
-- Files: src/cli/commands/chat-slash-registry.ts, src/cli/commands/chat-tool-bridge.ts, src/cli/repl/tool-permissions.ts, tests/cli/chat-slash-resources.test.ts
-- Dependencies: 275-001
-- Scope: src/cli/, tests/cli/
-
-### Description
-`/resources [--log]` slash'i — Task 1 ile AYNI ÜÇ DOSYAYI değiştirdiği için Dependencies ile serileştirildi (onun düzeninin üstüne otur): registry `/resources` → `deckent_resources` dispatch (`--log [path]` arg-map; path verilmezse default log); bridge → `['resources', ...]`; permissions → 'read'. Anlık snapshot REPL'den tek slash'le (Alperen'in günlük kullanımı). Testler: Task 1 deseninde 5+.
-
-**Kanıt:** `npx vitest run tests/cli/chat-slash-resources.test.ts` yeşil; `grep -n "/resources" src/cli/commands/chat-slash-registry.ts | head -1` ≥ 1. **Test:** 5+.
-
----
-
-## Task 3: deckent_usage MCP tool — ADR-022 parite
+## Task 3: deckent plan --interrogate CLI wire
 - Provider: claude
 - Model: sonnet
 - Backend: docker
 - Effort: normal
 - Agent: api-builder
 - Skills: typescript-expert, testing-expert
-- Files: src/mcp/tools/usage.ts, src/mcp/tools/index.ts, src/mcp/server.ts, tests/mcp/usage-tool.test.ts
-- Scope: src/mcp/, tests/mcp/
+- Files: src/cli/commands/plan.ts, tests/cli/plan-interrogate.test.ts
+- Dependencies: 276-001, 276-002
+- Scope: src/cli/, tests/cli/
 
 ### Description
-YENİ `deckent_usage` MCP tool'u (`mcp/tools/` register deseni — 33→34 tool): inputSchema `{ sprint?: string; since?: string; until?: string }` → `core/limit-ledger`+`limit-ledger-report` çağrısı (CLI ile aynı SSOT; usage.ts CLI'ının çekirdek fonksiyonunu re-use et — export gerekiyorsa surgical export, notes'a). Çıktı: JSON özet (model tablosu ya da sprint task-tablosu + cache-gate alanları). `src/mcp/server.ts` instructions bloğuna satır ekle + "## Tools (34)" sayacı güncelle (lint-mcp-instructions yeşil kalmalı — `node scripts/lint-mcp-instructions.mjs` koş!). Read-only/idempotent annotations. Testler: tool kaydı, schema, mock-ledger çıktı shape, instructions-lint.
+`deckent plan`'e `--interrogate` opsiyonu (kaynak: `plan.ts:14` registerPlan; config `plan.interrogate` true ise bayraksız da aktif). Akış: PLAN'dan ÖNCE → `buildInterrogationQuestions(DIRECTIVES)` → soruları `node:readline/promises` ile sun (ADR-011), cevapları topla → `applyInterrogationAnswers` ile revize taslak üret → kullanıcıya GÖSTER + onay iste ("bu taslağı DIRECTIVES.md'ye yaz ve planla? Y/n"). Onay→yaz+devam; ret→orijinalle devam. `--no-confirm`/non-interactive ortamda interrogation ATLANIR (sessiz, düz plan — bloke etme). Hermetik test: injectable readline ile soru-akışı + onay-evet (taslak yazıldı) + onay-hayır (orijinal korundu) + non-interactive atlama.
 
-**Kanıt:** `npx vitest run tests/mcp/usage-tool.test.ts` yeşil; `node scripts/lint-mcp-instructions.mjs` exit 0. **Test:** 6+.
+**Kanıt:** `npx vitest run tests/cli/plan-interrogate.test.ts` yeşil; `grep -n "interrogate" src/cli/commands/plan.ts | head -2` ≥ 1. **Test:** 6+.
 
 ---
 
-## Task 4: 273-010 debt kapanışı — kalan "full test suite" eşleşmeleri denetimi
+## Task 4: cross-verify çekirdeği — high-stakes tespit + farklı-provider seçimi
+- Provider: claude
+- Model: opus
+- Backend: docker
+- Effort: high
+- Agent: architect
+- Skills: typescript-expert, testing-expert
+- Files: src/core/cross-verify.ts, tests/core/cross-verify.test.ts
+- Scope: src/core/, tests/core/
+
+### Description
+**YENİ `src/core/cross-verify.ts`** (XVER-1 çekirdeği, pure-karar katmanı): (1) `isHighStakesTask(task): boolean` — security/auth anahtar kelimeleri (scope/desc/agent=security-auditor), priority=CRITICAL/P0, policy=risk-tagged (mevcut task alanlarından; kanıt-temelli, uydurma sinyal yok). (2) `selectVerifierProvider(taskProvider, availableProviders): ProviderName | null` — task'ı koşandan FARKLI bir provider seç (claude→codex/gemini öncelik sırası; tek-provider ortamında `null` → honest-skip). availableProviders caller'dan (bootstrap'tan; bu modül pure). (3) `CrossVerifyDecision { shouldVerify: boolean; verifierProvider?; reason }`. LLM/spawn YOK (karar katmanı; dispatch Task 7). Hermetik testler: high-stakes tespiti (pozitif/negatif), provider-seçim (claude→alt, tek-provider→null), karar birleşimi.
+
+**Kanıt:** `npx vitest run tests/core/cross-verify.test.ts` yeşil; `grep -n "isHighStakesTask\|selectVerifierProvider" src/core/cross-verify.ts | head -2` ≥ 2. **Test:** 8+.
+
+---
+
+## Task 5: cross_verify config bloğu (default-off)
 - Provider: claude
 - Model: sonnet
 - Backend: docker
 - Effort: low
-- Agent: doc-writer
-- Skills: documentation-writer, testing-expert
-- Files: src/core/builtins/
-- Scope: src/core/builtins/
+- Agent: api-builder
+- Skills: typescript-expert, testing-expert
+- Files: src/core/config-types.ts, src/core/config.ts, tests/core/config-cross-verify.test.ts
+- Scope: src/core/, tests/core/
 
 ### Description
-273-010'un dürüst borcu: `grep -rn "full test suite" src/core/builtins/` hâlâ ~6 eşleşme (agents/'ta da kalanlar var — 010'un Kanıt'ı agents=0 bekliyordu, tutmadı). HER eşleşmeyi tek tek sınıflandır (.result'a tablo): (a) CI/PR-bağlamı (testing-expert "on every pull request" gibi) → DOĞRU, KALIR + satıra `<!-- ci-context -->` yorumu eklenebilirse ekle (md yorumu güvenli); (b) worker-verify bağlamı → 273-010'un düzeltme diliyle değiştir ("project-configured verify scope (targeted test files by default...)"). İçerik KORUNUMU: silme yok, ifade düzeltme.
+Config: `cross_verify?: { enabled: boolean; high_stakes_only?: boolean (default true); verifier_priority?: string[] (default ['codex','gemini','claude']) }` — default blok-yok=kapalı. Validation (resource_monitor deseni): enabled boolean; high_stakes_only boolean; verifier_priority string[]. Blok yokken sıfır davranış değişikliği. NOT: config-types.ts'i Task 2 de değiştiriyor — bu task FARKLI alan ekler (plan vs cross_verify), çakışırsa Brain FIX; ama ayrı bloklar olduğu için merge-safe. Testler: geçerli/geçersiz/default + iç içe alan validasyonu.
 
-**Kanıt:** `grep -rn "full test suite" src/core/builtins/agents/ | grep -v "ci-context\|pull request\|CI" | wc -l` = 0; .result'ta sınıflandırma tablosu. **Test:** yok — .result YAZ.
+**Kanıt:** `npx vitest run tests/core/config-cross-verify.test.ts` yeşil; `grep -n "cross_verify" src/core/config-types.ts` ≥ 1. **Test:** 5+.
 
 ---
 
-## Task 5: cli-commands + features — usage/resources slash + MCP satırları
+## Task 6: adversarial-refute prompt builder
+- Provider: claude
+- Model: sonnet
+- Backend: docker
+- Effort: normal
+- Agent: bug-fixer
+- Skills: typescript-expert, testing-expert
+- Files: src/core/cross-verify-prompt.ts, tests/core/cross-verify-prompt.test.ts
+- Dependencies: 276-004
+- Scope: src/core/, tests/core/
+
+### Description
+**YENİ `src/core/cross-verify-prompt.ts`** (Task 4 tiplerini import eder): `buildRefutePrompt(task, result, opts): string` — verifier-worker'a verilecek adversarial prompt: "Bu task'ın sonucunu BAĞIMSIZ doğrula; amacın ONAYLAMAK değil ÇÜRÜTMEK. Diskteki gerçek değişikliği incele (git diff/dosyalar), goCriteria karşıla, gizli hata/eksik/güvenlik-açığı ara. Sonunda VERDICT: REFUTED <neden> | CONFIRMED <kanıt>." Disk-verify temelli (worker gerçek dosyalara bakar), self-onay yanlılığını kıran dil. + `parseRefuteVerdict(output): { verdict: 'refuted'|'confirmed'|'unclear'; reason: string }` — verifier çıktısından sonuç çıkarımı (regex/anahtar, belirsiz→'unclear'). i18n: prompt İngilizce (worker-prompt standardı; mekanizma-string değil içerik). Testler: prompt içeriği (refute-dili + goCriteria enjekte), verdict parse (3 durum + bozuk çıktı).
+
+**Kanıt:** `npx vitest run tests/core/cross-verify-prompt.test.ts` yeşil; `grep -n "parseRefuteVerdict\|REFUTED" src/core/cross-verify-prompt.ts | head -2` ≥ 2. **Test:** 7+.
+
+---
+
+## Task 7: cross-verify dispatch + eval advisory-wire (OPUS)
+- Provider: claude
+- Model: opus
+- Backend: docker
+- Effort: high
+- Agent: architect
+- Skills: typescript-expert, testing-expert
+- Files: src/orchestra/cross-verify-runner.ts, src/orchestra/sprint-phases.ts, tests/orchestra/cross-verify-wire.test.ts
+- Dependencies: 276-004, 276-005, 276-006
+- Scope: src/orchestra/, tests/orchestra/
+
+### Description
+**YENİ `src/orchestra/cross-verify-runner.ts`** + sprint-phases EVALUATE-sonrası wire. YALNIZ `config.cross_verify?.enabled === true` iken: EVALUATE'te bir task DONE/GO_WITH_TECH_DEBT aldıysa VE `isHighStakesTask` (high_stakes_only ise) → `selectVerifierProvider` (bootstrap'tan available list) → verifier yoksa **honest-skip** (debugLog "cross-verify skipped: no second provider", asla sessiz-başarı değil) → varsa `buildRefutePrompt` ile farklı-provider worker spawn (kısa timeout; `spawnWorkerMultiProvider` SSOT, provider override) → `parseRefuteVerdict` → sonucu task .result'ına `crossVerify: { verifier, verdict, reason }` advisory alanı olarak yaz + REFUTED ise brainEvaluation'a uyarı sinyali (downgrade DEĞİL — advisory; Brain/insan karar verir, ADR-070 evaluation-integrity). HER ŞEY best-effort try/catch — xverify hatası sprint'i/eval'i ASLA düşürmez. Hermetik test: enabled+high-stakes+2-provider → refute-worker spawn (mock) + advisory yazım; tek-provider → honest-skip; disabled → hiç çağrı; spawn-throw → eval etkilenmez; REFUTED → advisory sinyal (downgrade yok).
+
+**Kanıt:** `npx vitest run tests/orchestra/cross-verify-wire.test.ts` yeşil; `grep -n "cross_verify\|crossVerify" src/orchestra/sprint-phases.ts | head -2` ≥ 1. **Test:** 8+.
+
+---
+
+## Task 8: cross-verify outcome-tracker beslemesi — öğrenilen verifier eşleşmeleri
+- Provider: claude
+- Model: sonnet
+- Backend: docker
+- Effort: normal
+- Agent: bug-fixer
+- Skills: typescript-expert, testing-expert
+- Files: src/orchestra/outcome-tracker.ts, tests/orchestra/cross-verify-outcome.test.ts
+- Dependencies: 276-007
+- Scope: src/orchestra/, tests/orchestra/
+
+### Description
+Task 7'nin crossVerify verdict'ini outcome-tracker'a besle (ROUTE-1 öğrenme yolu): REFUTED verdict → ilgili agent/provider eşleşmesine negatif sinyal (gelecekte o tür task'a farklı routing); CONFIRMED → pozitif (best-effort, mevcut recordOutcome deseni — yeni alan/çağrı minimal). xverify kapalıyken outcome-tracker davranışı bayt-bayt aynı. ADR-008: outcome-tracker orchestra'da, cross-verify tipleri core'da — import yönü uyumlu. Testler: REFUTED→negatif sinyal kaydı (mock store), CONFIRMED→pozitif, crossVerify-yok→mevcut davranış.
+
+**Kanıt:** `npx vitest run tests/orchestra/cross-verify-outcome.test.ts` yeşil; `grep -n "crossVerify\|refute" src/orchestra/outcome-tracker.ts | head -2` ≥ 1. **Test:** 5+.
+
+---
+
+## Task 9: REPL /interrogate slash — pre-plan sorgulamaya REPL erişimi
+- Provider: claude
+- Model: sonnet
+- Backend: docker
+- Effort: normal
+- Agent: bug-fixer
+- Skills: typescript-expert, testing-expert
+- Files: src/cli/commands/chat-slash-registry.ts, src/cli/commands/chat-native.ts, tests/cli/chat-slash-interrogate.test.ts
+- Dependencies: 276-001, 276-002
+- Scope: src/cli/, tests/cli/
+- ModelEffort: low
+
+### Description
+REPL'den pre-plan sorgulamaya erişim: `/interrogate` slash — mevcut DIRECTIVES.md'yi okuyup `buildInterrogationQuestions` ile soruları REPL'de gösterir (cevap-toplama REPL'in mevcut chat-input döngüsünden geçer; basit tutar — soruları LİSTELER, kullanıcı /directives set ile revize edebilir VEYA cevap akışı mümkünse uygula). 3-katman kuralı: bu slash CLI-spawn DEĞİL, REPL-içi meta-komut (chat-native'de doğrudan handle — /nervous deseni gibi), o yüzden tool-bridge/permissions GEREKMEZ; yalnız registry + chat-native handler. i18n. Testler: registry kaydı, handler soru-render (mock DIRECTIVES), DIRECTIVES-yok dürüst mesaj.
+
+**Kanıt:** `npx vitest run tests/cli/chat-slash-interrogate.test.ts` yeşil; `grep -n "interrogate" src/cli/commands/chat-slash-registry.ts | head -1` ≥ 1. **Test:** 5+.
+
+---
+
+## Task 10: api-surface + config-reference — yeni alanlar
 - Provider: claude
 - Model: haiku
 - Backend: docker
 - Effort: low
 - Agent: doc-writer
 - Skills: documentation-writer
-- Files: docs/reference/cli-commands.md, docs/reference/features.md
-- Dependencies: 275-001, 275-002, 275-003
+- Files: docs/reference/config-reference.md, docs/reference/api-surface.md
+- Dependencies: 276-002, 276-005, 276-007
 - Scope: docs/reference/
+- ModelEffort: low
 
 ### Description
-DİSKTEKİ koddan (inmemişleri yazma + .result'a not): cli-commands REPL-slash bölümüne `/usage` + `/resources`; features.md'ye deckent_usage MCP + slash satırları (tetikleyenleriyle). Mevcut format.
+DİSKTEKİ koddan (inmemişleri yazma + .result'a not): config-reference'a `plan.interrogate` + `cross_verify` bloğu (alanlar/default'lar birebir); api-surface.md'ye `.result` formatına `crossVerify` advisory alanı (verifier/verdict/reason — Task 7 yazdıysa). Uydurma YOK.
 
-**Kanıt:** `grep -ciE "/usage|/resources|deckent_usage" docs/reference/cli-commands.md docs/reference/features.md | paste -sd+ | bc` ≥ 3. **Test:** yok — .result YAZ.
+**Kanıt:** `grep -ciE "interrogate|cross_verify" docs/reference/config-reference.md` ≥ 2. **Test:** yok — .result YAZ.
 
 ---
 
-## Task 6: mcp-tools.md regen — 34 tool
+## Task 11: features + cli-commands — PLAN-INT/XVER satırları
 - Provider: claude
 - Model: haiku
 - Backend: docker
 - Effort: low
 - Agent: doc-writer
 - Skills: documentation-writer
-- Files: docs/reference/mcp-tools.md, tests/docs/reference-drift.test.ts
-- Dependencies: 275-003
-- Scope: docs/reference/, tests/docs/
-
-### Description
-Task 3 sonrası `node scripts/gen-reference-docs.mjs` (ya da `npm run docs:ref`) ile mcp-tools.md'yi 34-tool gerçeğiyle yeniden üret; reference-drift testi kod-türevliyse otomatik geçer (DOĞRULA — sabitse güncelle + yorum).
-
-**Kanıt:** `npx vitest run tests/docs/reference-drift.test.ts` yeşil. **Test:** drift yeşil — .result YAZ.
-
----
-
-## Task 7: resource-profile — F1-TOK optimizasyon bölümü iskeleti
-- Provider: claude
-- Model: haiku
-- Backend: docker
-- Effort: low
-- Agent: doc-writer
-- Skills: documentation-writer
-- Files: docs/reference/resource-profile.md
+- Files: docs/reference/features.md, docs/reference/cli-commands.md
+- Dependencies: 276-003, 276-007, 276-009
 - Scope: docs/reference/
+- ModelEffort: low
 
 ### Description
-resource-profile.md'ye "Token/Cache Optimizasyonu (F1-TOK)" bölümü — DİSKTEKİ koddan: cache_warm config + warm-spawn davranışı (sprint-spawner yorumlarından), prompt.adr_render operative modu, Skills-first sıra gerekçesi (prompt-god-template yorumu), `deckent usage` cache-gate okuma rehberi. "Ölçülmüş A/B" alt-bölümüne yer aç (CC sprint-sonu gerçek sayıları ekler — uydurma sayı YAZMA; 274 ledger'ından bilinen $0.52→$0.22 satırını yazabilirsin, kaynağıyla).
+DİSKTEKİ koddan: features.md'ye PLAN-INT-1 (plan --interrogate + /interrogate slash) + XVER-1 (cross_verify, default-off, high-stakes adversarial) satırları; cli-commands'a `plan --interrogate` + `/interrogate` notu. Tetikleyen bayrak/config ile. Mevcut format.
 
-**Kanıt:** `grep -ciE "cache_warm|adr_render|F1-TOK" docs/reference/resource-profile.md` ≥ 3. **Test:** yok — .result YAZ.
+**Kanıt:** `grep -ciE "interrogate|cross.?verify|adversarial" docs/reference/features.md` ≥ 2. **Test:** yok — .result YAZ.
 
 ---
 
-## Task 8: MASTER-PLAN — F1-TOK durum konsolidasyonu
+## Task 12: MASTER-PLAN — PLAN-INT-1 + XVER-1 kapanış işaretleri
 - Provider: claude
 - Model: haiku
 - Backend: docker
@@ -141,14 +216,15 @@ resource-profile.md'ye "Token/Cache Optimizasyonu (F1-TOK)" bölümü — DİSKT
 - Agent: doc-writer
 - Skills: documentation-writer
 - Files: docs/MASTER-PLAN.md
-- Dependencies: 275-001, 275-003, 275-004
+- Dependencies: 276-003, 276-007
 - Scope: docs/
+- ModelEffort: low
 
 ### Description
-F1-TOK maddesinde durum konsolidasyonu (tek-satır ekler, silme yok): Faz 0+1+1,5 ✅ (273), Faz 2 ✅ (274 + CC el-işleri), kanıt-sprint ✅ Sprint 275 (usage yüzey paritesi: /usage + /resources slash + deckent_usage MCP + 010-debt kapanışı; final ölçüm CC raporunda). Kalan: yalnız sürekli-izleme (haftalık usage gözden geçirme).
+Diskte doğruladıklarını işaretle (inmemişleri İŞARETLEME): PLAN-INT-1 ✅ Sprint 276 (pre-plan interrogation: core + plan --interrogate + /interrogate slash; LLM-zenginleştirme opsiyonel-kalan), XVER-1 ✅ Sprint 276 (cross-provider adversarial verify: core + dispatch-wire + outcome-feed, default-off; canlı çok-provider kanıtı kalan). Tek-satır ekler, mevcut metni SİLME.
 
-**Kanıt:** `grep -c "Sprint 275" docs/MASTER-PLAN.md` ≥ 2. **Test:** yok — .result YAZ.
+**Kanıt:** `grep -c "Sprint 276" docs/MASTER-PLAN.md` ≥ 2. **Test:** yok — .result YAZ.
 
 ---
 
-**Beklenen:** 8 mikro task (sonnet 4 · haiku 4 — wait: 001,002,003,004 sonnet; 005,006,007,008 haiku), zincirler: 002→001 (aynı 3 dosya — serileştirme!) · 005→001,002,003 · 006→003 · 008→001,003,004. **BU SPRINT DENEYDİR:** warm-spawn İLK CANLI koşu — CC monitor'de ilk worker'ın TEK başladığını + ~45s sonra fleet'in geldiğini gözler; sprint-sonu `usage --sprint 275` ile gerçek cache-gate (PASS hedefi) + boot-cw payı + final A/B (273/274/275) → **F1-TOK KAPANIŞ RAPORU** + commit/push + 🔨 BUILD.
+**Beklenen:** 12 mikro task (opus 3 — interrogator/cross-verify-core/dispatch-wire · sonnet 6 · haiku 3), zincirler: 003→001,002 · 006→004 · 007→004,005,006 · 008→007 · 009→001,002 · 010→002,005,007 · 011→003,007,009 · 012→003,007. Dosya çakışması: config-types.ts (002 plan-alanı + 005 cross_verify-alanı — ayrı bloklar, merge-safe ama çakışırsa Brain FIX); chat-slash-registry.ts (009 tek sahip); sprint-phases.ts (007 tek sahip). Her şey default-OFF + fail-safe. CC sprint sonu: tsc + testler + `deckent plan --interrogate` smoke + commit/push + 🔨 BUILD. Sonraki: dashboard UI SSO · F9 MCP-client Faz 2 · (en-son) MOD-SPLIT.
