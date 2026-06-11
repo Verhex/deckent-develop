@@ -166,3 +166,13 @@ Each step is independently completable; a "skip" button dismisses the wizard and
 - ROADMAP F7-008: Onboarding → Sprint 210-012 DONE
 - feedback_fix_prompt_quality: FIX prompt empty description + wrong agent
 - feedback_agent_routing_imbalance: routing diversity live validation
+
+---
+
+## Amendment — Sprint 281 (2026-06-11, ADR-review, full code-verification)
+
+**Classification: BOTH** (FIX-kalitesi + dashboard kontrol-paneli user-facing).
+
+**Re-verified (üç part da canlı):** Part-A live-diversity + imbalance-guard testleri + `--ci` modu (:89) ✓ · Part-B `selectFixAgent` (`debt-manager.ts:145`) + "## Original Task" inject (:328) ✓ · Part-C 3 dashboard bileşeni + `/api/routing/distribution` (`server.ts:544`) ✓.
+
+**Evrim notları:** (1) FIX-prompt formatı zenginleşti — ADR'nin `===`-blokları `##`-başlıklara + **Fix Guidance** bölümüne evrildi (Kanıt-komutlarını-koş, selfAssessment-şişirme-yasak, scope-kal; `debt-manager.ts:340`) — aynı niyet, daha güçlü sözleşme. (2) Part-B **S272 verify-and-complete enrichment** ile genişledi: exit-without-result+disk-kanıtlı FIX'ler "sıfırdan-yap" değil "audit-and-finish" reframe'iyle gider (`applyVerifyAndCompleteEnrichment`). (3) Nüks-bağlamı: fixture-testler geçerken canlı-dağılım S211'de yine skew'ladı — katmanlı mitigasyonlar ADR-072 Sprint-281 amendment'inde haritalı. md+db senkron (Alperen ADR-review).

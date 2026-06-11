@@ -130,3 +130,15 @@ Reads last N sprint outcome entries from `memory.db`. Computes per-agent success
 - ADR-037: Brain-Auditor-Worker Authority Matrix RBAC V1.0
 - `src/cli/commands/chat-native.ts`, `src/core/rbac.ts`, `src/core/audit-export.ts`, `src/core/rate-limiter.ts`
 - `src/orchestra/prompt-evolution.ts`, `src/agents/adaptive-agent.ts`, `src/orchestra/cross-sprint-analyzer.ts`
+
+---
+
+## Amendment — Sprint 281 (2026-06-11, ADR-review, full code-verification)
+
+**Classification: BOTH** (chat + enterprise + evolution üçü de ürün yüzeyi).
+
+**Re-verified:** Part-B tam — `enforceRbac` (`rbac.ts:120`, disabled→NO_OP) + `exportAuditLog` (`audit-export.ts:40`) + `rate-limiter.ts` ✓ · Part-C tam — `cross-sprint-analyzer.ts` + `evolve.ts` + `prompt-evolution.ts` (runtime-wiring ADR-075/S212 teyitli) ✓.
+
+**Part-A evrim-zinciri:** chat-native'in gerçek-LLM round-trip'i sonraki ADR'lerle olgunlaştı — **ADR-081** (çıplak `deckent` = native agentic Ink-REPL) → **ADR-082** (Native-LLM-Wire canlı) → **ADR-083** (provider-parity) → Sprint 280 `/mcp` broker-wire (G1). CLI-native-chat bugün gerçek, agentic ve multi-provider'dır.
+
+**⚠️ Ayrım-notu (yüzey karışmasın):** 2026-06-11 UX-denetiminin **"dashboard Chat HOLLOW"** bulgusu (NL→"Anlamadım", `project_dashboard_chat_audit_20260611` #1) bu ADR'nin CLI-chat'i DEĞİLDİR — ayrı yüzey olan **dashboard ChatPage**, mevcut `/api/chat/stream` backend'ine NL yönlendirmiyor (S219 endpoint canlı, sayfa command-router'da takılı). Fix Chat/Dashboard product-sprint'inde. md+db senkron (Alperen ADR-review).

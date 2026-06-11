@@ -6976,15 +6976,15 @@ roles receive an empty/error response. This moves F4-001 from pure skeleton to e
 
 ## adr-071: F3 Autonomous Mode (Self-Dispatch Guard) + F4 Enterprise RBAC/Tenant/Audit
 
-**Status:** proposed
+**Status:** accepted
 
 # ADR-071: F3 Autonomous Mode (Self-Dispatch Guard) + F4 Enterprise RBAC/Tenant/Audit
 
-**Status:** proposed
+**Status:** accepted
 
 **Date:** 2026-05-31
 
-**Proposed:** Sprint 208
+**Proposed:** Sprint 208 · promoted 2026-06-11 (Sprint 281 ADR-review — kapsam-ayrımıyla: dayanıklı-çekirdek + F4 canlı; F3-A/B mekanizmaları superseded)
 
 ---
 
@@ -7134,6 +7134,18 @@ All enterprise features are **opt-in false** — existing single-tenant deployme
 - ROADMAP F4-001: RBAC hierarchy → Sprint 208 extension DONE
 - ROADMAP F4-002: audit-writer → Sprint 208 DONE
 
+---
+
+## Amendment — Sprint 281 (2026-06-11, ADR-review): proposed → accepted + kapsam-ayrımı (ADR-027 deseni)
+
+**Classification: BOTH** (approval-sözleşmesi governance-kanunu; F4 enterprise-katman ürün).
+
+**✅ Dayanıklı çekirdek CANLI (terfi gerekçesi):**
+- **"requiresApproval default TRUE non-negotiable" sözleşmesi mirasçısında yaşar:** otonom motorun `policy-gate.ts` (`'auto' | 'park'` — "park for human approval", G2 per-task-policy + G3 EffectClass-risk) aynı "AI önerir, insan onaylar" kontratının üretim-gerçekleşmesidir. Sprint-start insan-onayı kuralı da yürürlükte.
+- **F4 bileşenlerinin TAMAMI canlı:** RBAC hiyerarşi + `PERMISSION_MATRIX` (`rbac.ts:44`, 4 canlı tüketici — ADR-069 amendment) ✓ · `writeAuditEvent` (`audit-writer.ts:73`; sonradan S261 HMAC-zincirle güçlendi) ✓ · `enterprise-config.ts` ✓ · `withTenant`/`tenantPath` → `flow-registry` tüketiyor ✓.
+
+**🔄 F3-A/B mekanizmaları SUPERSEDED (F3-009 otonom motor):** `flow-runtime.ts` (tick-daemon) + `self-dispatch.ts` (SelfDispatchPolicy/evaluateDispatch) diskte durur ama MASTER-PLAN F3-009 kaydıyla "pre-226 ~%40 foundation — engine tarafından superseded": `buildEngineRuntime` + durable-backlog + hybrid-trigger-source + execute-dispatcher onların yerini aldı. Bu iki iskelet **ertelenmiş dormant-sweep adayıdır** (ADR-038/039 amendment'leriyle aynı havuz). Sözleşme öldü değil — mekanizma değişti, governance-kontratı taşındı. md+db senkron (Alperen ADR-review).
+
 
 ---
 
@@ -7253,6 +7265,18 @@ This matches the security posture of other local-dev tools: localhost is implici
 - ADR-070: Brain Evaluation Integrity — Zero-Hard-Code Principle
 - ROADMAP F7-001: API auth fix → Sprint 209-006 DONE
 - ROADMAP F7-002: Dashboard live data parity → Sprint 209-007 IN PROGRESS
+
+---
+
+## Amendment — Sprint 281 (2026-06-11, ADR-review, full code-verification)
+
+**Classification: BOTH** (routing-dağılımı + local-dev-auth ürün davranışı).
+
+**Re-verified:** Part-A domain-enrichment canlı (intent-classifier keyword+path patterns) ✓ · Part-B `DOMAIN_MATCH_BONUS = 3` (routing-engine:97) + `routing-distribution.mjs` ✓ · Part-C loopback-auto-trust (auth.ts:23/28, prod-safe) ✓ — **canlı-kanıt 2026-06-11 UX-denetimi:** `deckent serve` token auto-mint + dashboard'a otomatik enjeksiyon bizzat gözlendi.
+
+**Gerçeklik-notu (ADR-041 Sprint-281 amendment'iyle aynı aile):** Part-A/B dengesizliği tek başına çözmedi — **Sprint 211'de nüks** (12/16 refactorer; memory `feedback_agent_routing_imbalance`). Çözüm katmanlı evrildi: **ADR-073** (routing live-validation + FIX-prompt enrichment) + **ADR-075** (skill→agent affinity) + **WM-7** `LANGUAGE_MISMATCH_PENALTY` (S254, polyglot-safe) + `routing-imbalance-guard` script. Bu ADR'nin +3-bonus'u zincirin ilk halkasıdır; dağılım-dengesi sürekli-izlenen hedef olarak kalır.
+
+**Part-C evrimi:** localhost-auto-trust, **ADR-076** (auth-precedence + serve token-inject) ile olgunlaştı — bugünkü canlı davranış 076'nın token-inject akışıdır; bu ADR'nin prod-safe-default ilkesi korunur. md+db senkron (Alperen ADR-review).
 
 
 ---
@@ -7430,6 +7454,16 @@ Each step is independently completable; a "skip" button dismisses the wizard and
 - feedback_fix_prompt_quality: FIX prompt empty description + wrong agent
 - feedback_agent_routing_imbalance: routing diversity live validation
 
+---
+
+## Amendment — Sprint 281 (2026-06-11, ADR-review, full code-verification)
+
+**Classification: BOTH** (FIX-kalitesi + dashboard kontrol-paneli user-facing).
+
+**Re-verified (üç part da canlı):** Part-A live-diversity + imbalance-guard testleri + `--ci` modu (:89) ✓ · Part-B `selectFixAgent` (`debt-manager.ts:145`) + "## Original Task" inject (:328) ✓ · Part-C 3 dashboard bileşeni + `/api/routing/distribution` (`server.ts:544`) ✓.
+
+**Evrim notları:** (1) FIX-prompt formatı zenginleşti — ADR'nin `===`-blokları `##`-başlıklara + **Fix Guidance** bölümüne evrildi (Kanıt-komutlarını-koş, selfAssessment-şişirme-yasak, scope-kal; `debt-manager.ts:340`) — aynı niyet, daha güçlü sözleşme. (2) Part-B **S272 verify-and-complete enrichment** ile genişledi: exit-without-result+disk-kanıtlı FIX'ler "sıfırdan-yap" değil "audit-and-finish" reframe'iyle gider (`applyVerifyAndCompleteEnrichment`). (3) Nüks-bağlamı: fixture-testler geçerken canlı-dağılım S211'de yine skew'ladı — katmanlı mitigasyonlar ADR-072 Sprint-281 amendment'inde haritalı. md+db senkron (Alperen ADR-review).
+
 
 ---
 
@@ -7569,6 +7603,18 @@ Reads last N sprint outcome entries from `memory.db`. Computes per-agent success
 - ADR-037: Brain-Auditor-Worker Authority Matrix RBAC V1.0
 - `src/cli/commands/chat-native.ts`, `src/core/rbac.ts`, `src/core/audit-export.ts`, `src/core/rate-limiter.ts`
 - `src/orchestra/prompt-evolution.ts`, `src/agents/adaptive-agent.ts`, `src/orchestra/cross-sprint-analyzer.ts`
+
+---
+
+## Amendment — Sprint 281 (2026-06-11, ADR-review, full code-verification)
+
+**Classification: BOTH** (chat + enterprise + evolution üçü de ürün yüzeyi).
+
+**Re-verified:** Part-B tam — `enforceRbac` (`rbac.ts:120`, disabled→NO_OP) + `exportAuditLog` (`audit-export.ts:40`) + `rate-limiter.ts` ✓ · Part-C tam — `cross-sprint-analyzer.ts` + `evolve.ts` + `prompt-evolution.ts` (runtime-wiring ADR-075/S212 teyitli) ✓.
+
+**Part-A evrim-zinciri:** chat-native'in gerçek-LLM round-trip'i sonraki ADR'lerle olgunlaştı — **ADR-081** (çıplak `deckent` = native agentic Ink-REPL) → **ADR-082** (Native-LLM-Wire canlı) → **ADR-083** (provider-parity) → Sprint 280 `/mcp` broker-wire (G1). CLI-native-chat bugün gerçek, agentic ve multi-provider'dır.
+
+**⚠️ Ayrım-notu (yüzey karışmasın):** 2026-06-11 UX-denetiminin **"dashboard Chat HOLLOW"** bulgusu (NL→"Anlamadım", `project_dashboard_chat_audit_20260611` #1) bu ADR'nin CLI-chat'i DEĞİLDİR — ayrı yüzey olan **dashboard ChatPage**, mevcut `/api/chat/stream` backend'ine NL yönlendirmiyor (S219 endpoint canlı, sayfa command-router'da takılı). Fix Chat/Dashboard product-sprint'inde. md+db senkron (Alperen ADR-review).
 
 
 ---

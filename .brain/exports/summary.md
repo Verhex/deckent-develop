@@ -64,7 +64,7 @@
 | adr-068 | Enterprise Foundation — Audit Query + Multi-Tenant + Scheduled Flows | accepted |
 | adr-069 | Event-Driven Triggers + RBAC — F3 Webhook & F4 Role-Based Access Control | accepted |
 | adr-070 | Brain Evaluation Integrity — Signal-Based Coverage Exemption + Zero-Hard-Code Principle | accepted |
-| adr-071 | F3 Autonomous Mode (Self-Dispatch Guard) + F4 Enterprise RBAC/Tenant/Audit | proposed |
+| adr-071 | F3 Autonomous Mode (Self-Dispatch Guard) + F4 Enterprise RBAC/Tenant/Audit | accepted |
 | adr-072 | Agent Routing Balance (Multi-Signal Scoring) + Dashboard API Auth Hardening | accepted |
 | adr-073 | Routing Live Validation + FIX Prompt Enrichment + Dashboard Control Plane | accepted |
 | adr-074 | Native Chat Real Round-Trip + Enterprise RBAC/Audit/Rate + F5 Evolution Wire | accepted |

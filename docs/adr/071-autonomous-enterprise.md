@@ -1,10 +1,10 @@
 # ADR-071: F3 Autonomous Mode (Self-Dispatch Guard) + F4 Enterprise RBAC/Tenant/Audit
 
-**Status:** proposed
+**Status:** accepted
 
 **Date:** 2026-05-31
 
-**Proposed:** Sprint 208
+**Proposed:** Sprint 208 · promoted 2026-06-11 (Sprint 281 ADR-review — kapsam-ayrımıyla: dayanıklı-çekirdek + F4 canlı; F3-A/B mekanizmaları superseded)
 
 ---
 
@@ -153,3 +153,15 @@ All enterprise features are **opt-in false** — existing single-tenant deployme
 - ROADMAP F3-004/F3-005: flow runtime daemon + self-dispatch → Sprint 208 DONE
 - ROADMAP F4-001: RBAC hierarchy → Sprint 208 extension DONE
 - ROADMAP F4-002: audit-writer → Sprint 208 DONE
+
+---
+
+## Amendment — Sprint 281 (2026-06-11, ADR-review): proposed → accepted + kapsam-ayrımı (ADR-027 deseni)
+
+**Classification: BOTH** (approval-sözleşmesi governance-kanunu; F4 enterprise-katman ürün).
+
+**✅ Dayanıklı çekirdek CANLI (terfi gerekçesi):**
+- **"requiresApproval default TRUE non-negotiable" sözleşmesi mirasçısında yaşar:** otonom motorun `policy-gate.ts` (`'auto' | 'park'` — "park for human approval", G2 per-task-policy + G3 EffectClass-risk) aynı "AI önerir, insan onaylar" kontratının üretim-gerçekleşmesidir. Sprint-start insan-onayı kuralı da yürürlükte.
+- **F4 bileşenlerinin TAMAMI canlı:** RBAC hiyerarşi + `PERMISSION_MATRIX` (`rbac.ts:44`, 4 canlı tüketici — ADR-069 amendment) ✓ · `writeAuditEvent` (`audit-writer.ts:73`; sonradan S261 HMAC-zincirle güçlendi) ✓ · `enterprise-config.ts` ✓ · `withTenant`/`tenantPath` → `flow-registry` tüketiyor ✓.
+
+**🔄 F3-A/B mekanizmaları SUPERSEDED (F3-009 otonom motor):** `flow-runtime.ts` (tick-daemon) + `self-dispatch.ts` (SelfDispatchPolicy/evaluateDispatch) diskte durur ama MASTER-PLAN F3-009 kaydıyla "pre-226 ~%40 foundation — engine tarafından superseded": `buildEngineRuntime` + durable-backlog + hybrid-trigger-source + execute-dispatcher onların yerini aldı. Bu iki iskelet **ertelenmiş dormant-sweep adayıdır** (ADR-038/039 amendment'leriyle aynı havuz). Sözleşme öldü değil — mekanizma değişti, governance-kontratı taşındı. md+db senkron (Alperen ADR-review).

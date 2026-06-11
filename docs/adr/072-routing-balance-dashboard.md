@@ -110,3 +110,15 @@ This matches the security posture of other local-dev tools: localhost is implici
 - ADR-070: Brain Evaluation Integrity — Zero-Hard-Code Principle
 - ROADMAP F7-001: API auth fix → Sprint 209-006 DONE
 - ROADMAP F7-002: Dashboard live data parity → Sprint 209-007 IN PROGRESS
+
+---
+
+## Amendment — Sprint 281 (2026-06-11, ADR-review, full code-verification)
+
+**Classification: BOTH** (routing-dağılımı + local-dev-auth ürün davranışı).
+
+**Re-verified:** Part-A domain-enrichment canlı (intent-classifier keyword+path patterns) ✓ · Part-B `DOMAIN_MATCH_BONUS = 3` (routing-engine:97) + `routing-distribution.mjs` ✓ · Part-C loopback-auto-trust (auth.ts:23/28, prod-safe) ✓ — **canlı-kanıt 2026-06-11 UX-denetimi:** `deckent serve` token auto-mint + dashboard'a otomatik enjeksiyon bizzat gözlendi.
+
+**Gerçeklik-notu (ADR-041 Sprint-281 amendment'iyle aynı aile):** Part-A/B dengesizliği tek başına çözmedi — **Sprint 211'de nüks** (12/16 refactorer; memory `feedback_agent_routing_imbalance`). Çözüm katmanlı evrildi: **ADR-073** (routing live-validation + FIX-prompt enrichment) + **ADR-075** (skill→agent affinity) + **WM-7** `LANGUAGE_MISMATCH_PENALTY` (S254, polyglot-safe) + `routing-imbalance-guard` script. Bu ADR'nin +3-bonus'u zincirin ilk halkasıdır; dağılım-dengesi sürekli-izlenen hedef olarak kalır.
+
+**Part-C evrimi:** localhost-auto-trust, **ADR-076** (auth-precedence + serve token-inject) ile olgunlaştı — bugünkü canlı davranış 076'nın token-inject akışıdır; bu ADR'nin prod-safe-default ilkesi korunur. md+db senkron (Alperen ADR-review).
