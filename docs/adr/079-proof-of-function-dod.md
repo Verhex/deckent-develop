@@ -150,3 +150,13 @@ Tears down the server in a `try/finally` block. Complements `test:ci-sim` (herme
 - ADR-070 (Brain Evaluation Integrity) — zero-hard-code principle and signal-based coverage
 - ADR-078 (CI-Hermeticity Standard) — parallel discipline: `test:ci-sim` guards hermeticity, `test:e2e-surfaces` guards user-working
 - Sprint 216 evidence: `serve` localhost auto-mint landed (`src/api/server.ts:921-935`); `/api/status` confirmed 200 run-proven.
+
+---
+
+## Amendment — Sprint 281 (2026-06-11, ADR-review, full code-verification)
+
+**Classification: BOTH** (hollow-DONE engeli = ürün-güvenilirliği; "wired ≠ working" felsefesinin kanunu).
+
+**Re-verified:** `isUserSurfaceTask` (`rubric-registry.ts:220`) + `verifyProofOfFunction` (`proof-of-function.ts:259`) + evaluator-wire (`result-evaluator.ts:49`) + `Smoke:` parser (`task-builder.ts:164`) + `test-e2e-surfaces.mjs` + npm-script ✓.
+
+**Sürekli savaş-kullanımda:** Disiplin her sprint'te fiilen uygulanıyor — Sprint 280 DIRECTIVES'i Tier-1 task'lara `Smoke:`-satırlarıyla yazıldı; `worker-default.md` + `karpathy-discipline.md` anchor'ları canlı; CC close-out zinciri her sprint-sonunda gerçek-binary Tier-1 smoke koşar. 2026-06-11 dashboard/chat UX-denetimi de aynı "wired ≠ working" ilkesinin ürün-ölçeği uygulamasıdır (mocked-yeşilken hollow yüzeyleri canlı-koşu yakaladı — bu ADR'nin doğuş-senaryosunun tekrarı ve teyidi). md+db senkron (Alperen ADR-review).

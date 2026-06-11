@@ -1,5 +1,13 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-281 Learnings
+- Sprint sprint-281 Learnings: ## Sprint sprint-281 Learnings
+
+## Gains
+- 281-001 — Mimari & Eşzamanlılık Doğruluğu Denetimi — Mimari & eşzamanlılık doğruluğu denetimi tamamlandı.
+- 281-002 — Adversarial Kırmızı-Takım — Tasarımı Kır — Adversarial kırmızı-takım denetimi tamamlandı.
+- 281-003 — Ürün & User/Enterprise Perspektifi Denetimi — Ürün & User/Enterprise perspektifi denetimi tamamlandı.
+
 ## Sprint sprint-280 Learnings
 - Sprint sprint-280 Learnings: ## Sprint sprint-280 Learnings
 - REPL /mcp broker wire — G1 (mcp-bridge → chat-native) (OPUS, Tier-1): GO_WITH_TECH_DEBT — G1 CLOSED — the external-MCP client (buildMcpBridge + McpClientBroker, 0-caller since Sprint 229) is now LIVE-WIRED into

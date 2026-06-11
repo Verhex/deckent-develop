@@ -123,3 +123,15 @@ Three foundational modules establish the native-speed, god-level UI baseline:
 - ADR-076 — Auth-Precedence Fix + User-Facing Surfaces (serve token-inject, Path A chat)
 - ADR-078 — CI-Hermeticity + Dashboard God-Level (Sprint 215 AppShell + page scaffolding)
 - `project_dashboard_realrun_findings` — 2026-06-01 real browser audit that identified the freeze, wire-gap, and chat defects
+
+---
+
+## Amendment — Sprint 281 (2026-06-11, ADR-review, full code-verification + canlı UX-denetimi)
+
+**Classification: BOTH** (dashboard tamamen user-facing).
+
+**Re-verified:** §1 `startSprintDetached` (`sprint-job-runner.ts:18`, `detached:true`+unref :29) ✓ · §4 `DirectivesEditor.tsx` ✓ · §5 `use-live-data.ts` + `theme.ts` ✓.
+
+**§3 düzeltilmiş gerçeklik (2026-06-11 canlı UX-denetimi + kod-izi; v3-teşhis ADR-083 review'unda düzeltildi):** Frontend-wire bu ADR'nin dediği gibi VAR — `ChatPage.tsx:312/351/391` NL'i `POST /api/chat` + stream'e düşürür. Serve-tarafı adapter-wire de VAR — Sprint 269 B-ChatStream `resolveChatAdapter` SSOT'unu bağladı (`server.ts:1206` resolve + `:643` stream-endpoint tüketimi); bu amendment'ın ilk sürümündeki "serve'de resolveChatAdapter wire eksik" teşhisi YANLIŞTI. **Gerçek zincir:** (1) `POST /api/chat` (`server.ts:813`) **classifier-only** — `buildChatReply`'a adapter hiç girmiyor, "Anlamadım" buradan; (2) ChatPage stream-hatasını yutuyor (`:382-384` onError boş) ve POST-fallback'i her durumda atıyor → canlıda stream boş kaldığında classifier-cevap görünür kalıyor; (3) canlı stream'in neden boş kaldığı ayrıştırılacak — baş şüpheli EventSource GET'inde Bearer-header imkânsızlığı (auth-gate) veya serve-içi claude CLI spawn hatası. Fix Chat/Dashboard product-sprint'inde (memory `project_dashboard_chat_audit_20260611` #1, v3-teşhis).
+
+**§2 sonrası drift:** 4-route+4-link wire'ı indi; ancak S219'da `Layout.tsx` kendi `navGroups`'unu render eder hale geldi ve `Sidebar.tsx` navItems'ı **stale-duplicate** kaldı → bugün Workers/Directives nav'dan erişilemez (UX-denetim #3, duplicate-sidebar) — tek-kaynağa indirme product-sprint'te. md+db senkron (Alperen ADR-review).

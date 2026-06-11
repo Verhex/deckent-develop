@@ -133,3 +133,16 @@ Alerts tamamen kaldırmak yerine dedup seçildi: provider-neutral tek uyarı dah
 - `src/nervous/bootstrap.ts` — `createNervousSystemIfEnabled`
 - `src/dashboard/src/components/WorkerGrid.tsx` — SSE real-time worker list
 - Memory: `project_dashboard_realrun_findings` — 11-madde dashboard run-verify bulguları
+
+---
+
+## Amendment — Sprint 281 (2026-06-11, ADR-review, full code-verification)
+
+**Classification: BOTH** (REPL-LLM + dashboard-canlılık ürün-yüzü; nervous dogfood+ürün bakım-otomasyonu).
+
+**Re-verified:** Dalga-A `chat_provider` config (`config.ts:67-76`) + `entry.ts` fallback-zinciri `chat_provider → brain_provider → 'claude'` (:86/:103/:435) ✓ · Dalga-D `createNervousSystemIfEnabled` (`bootstrap.ts:114`) ✓ · Dalga-B/C WorkerGrid + RefreshButton + `coverage-endpoint.ts` + DebtPage severity ✓. Action-handler seti 8→**9 aksiyona büyüdü** (WORKER_RESPAWN vd. sonradan eklendi — CACHE_INVALIDATE, DEAD_EVENT_STREAM_CLEANUP, DEBT_TRENDING_REPORT, IPC_DIR_CLEANUP, LOG_ROTATION, METRIC_EMIT, ORPHAN_TASK_ARCHIVE, STALE_LOCK_RELEASE, WORKER_RESPAWN).
+
+**3 bilinen-durum (2026-06-11):**
+1. **220-013 config-flip bugün geçerli DEĞİL** — canlı `.deckent/config.json` → `nervous_system.enabled: false`. Mekanizma sağlam ve evrildi (Sprint 279 panic-gate timeout wire dahil) ancak deckent-dev'de sonradan kapatılmış — opt-out drift'i; yeniden-açma kararı ayrı değerlendirilecek.
+2. **220-007 chat round-trip canlı-gap (v3-teşhis):** frontend-wire VAR (ChatPage POST `/api/chat` + stream) ve serve-tarafı adapter-wire de VAR (Sprint 269, `server.ts:1206` `resolveChatAdapter` SSOT) — ilk teşhisteki "serve'de wire eksik" iddiası yanlıştı. Gerçek kök: `POST /api/chat` classifier-only (`server.ts:813`) + ChatPage stream-hata-yutması (`:382-384`) → stream canlıda boş kalınca "Anlamadım" görünür kalıyor (ayrıntı ADR-080 §3 düzeltmesi; UX-denetim #1; fix Chat/Dashboard product-sprint'inde).
+3. **220-010 alert-dedup nüks:** 2026-06-11 denetiminde "CLAUDE.md güncellenmedi" ×59 spam (UX-denetim #4) — dedup ya geriledi ya bu auditor-alert yolunu kapsamıyor. md+db senkron (Alperen ADR-review).

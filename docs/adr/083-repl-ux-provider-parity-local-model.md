@@ -178,3 +178,17 @@ Layout'u sprint içinde sıfırdan yazmak. Reddedildi: Karpathy Discipline 3 (Su
 - `src/core/config.ts` — `resolveChatProvider`, `CHAT_CONFIG_SCHEMA`
 - Memory: `project_terminal_dashboard_ux_evolution` — Sprint 221 yönü (claude-code-UX evrim)
 - Memory: `feedback_directive_kanit_letter_vs_goal` — wire-gap (def-dosya dışla, çağıran-modül ölç)
+
+---
+
+## Amendment — Sprint 281 (2026-06-11, ADR-review, full code-verification)
+
+**Classification: BOTH** (REPL ürün-yüzü; ollama-local = air-gapped/maliyet user-değeri; enterprise-slash köprüsü "kullanılmasa da kullanılabilir" ilkesinin taşıyıcısı).
+
+**Re-verified (çağıran-taraf wire'lar gerçek):** Dalga-A `handleReplCommand` + `classifyAgenticIntent/dispatchAgenticIntent` + `buildSlashRegistry/resolveSlash` — `chat-native.ts:10/:13/:15` import + loop-tüketimi ✓ · 5 modül diskte (slash-registry / status-line / mode / enterprise-bridge / provider-parity) ✓ · `resolveChatProvider` (`config.ts:87`) + `resolveChatProviderWithFallback` (:124) + `CHAT_CONFIG_SCHEMA` (:318) ✓ · `buildOllamaReplAdapter` (`entry.ts:205`) + `DECKENT_CHAT_PROVIDER` env-override ✓.
+
+**Evrim:**
+- **Ink-default'a sorunsuz taşındı (ADR-086):** `src/cli/repl/run.tsx` slash-registry'yi tüketiyor — Dalga-A çekirdeği view-değişiminde korundu.
+- **`resolveChatAdapter` SSOT'u serve'e uzadı:** Sprint 269 B-ChatStream `server.ts:1206`'da bu ADR'nin parity-modülünü dashboard chat-stream adapter'ı olarak bağladı (`:643` endpoint-tüketimi) — "tek giriş noktası" hedefi terminal-ötesine geçti.
+
+**Hafif drift:** `entry.ts` REPL-tarafı kendi inline provider-dallarını koruyor (ollama/openai-compat) — `resolveChatAdapter` SSOT'una indirgenmedi; iki resolve-yolu yaşıyor (konsolidasyon adayı, Chat/Dashboard product-sprint'i). Canlı dashboard-chat'in "Anlamadım" davranışının kökü bu ADR'nin parity-modülü DEĞİL — `POST /api/chat` classifier-only + ChatPage stream-hata-yutması (ayrıntı ADR-080 amendment düzeltmesi + UX-denetim #1 v3). md+db senkron (Alperen ADR-review).

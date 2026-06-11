@@ -187,3 +187,17 @@ project-wide knowledge) belong outside the git-tracked memory; `.deckent/setting
 - `scripts/agentic-do-verify.mjs` — run-proven agentic-write E2E smoke
 - `scripts/repl-smoke-verify.mjs` — REPL smoke harness (terminal/streaming/perms/menu)
 - `.deckent/config.json` — `nervous_system.enabled: true` (re-enabled Sprint 224-010)
+
+---
+
+## Amendment — Sprint 281 (2026-06-11, ADR-review, full code-verification)
+
+**Classification: BOTH** (REPL-parity = ürünün claude-code-kalite çıtası; F11 doğrudan user-deneyimi).
+
+**Re-verified:** `/nervous` slash-wire (`chat-native.ts:21-24` import + `:292` wire-root) ✓ · banner-wire (`entry.ts:29` + `:511`) ✓ · planner discriminant-union (`planner.ts:375-386`: spawn_failed/timeout/parse_failed/validation_failed/no_providers) ✓ · permission-memory (`chat-permissions.ts` → `.deckent/settings.local.json`) ✓ · `agentic-do-verify.mjs` + `repl-smoke-verify.mjs` ✓.
+
+**Yeniden-yapılanma (dosya-referansı stale, kavram canlı ve büyümüş):** `chat-agentic-do.ts` artık diskte YOK — `<deckent_tool>` agentic-DO katmanı şu aileye bölündü: `chat-session.ts` (`:83 DECKENT_TOOL_TAG_RE` parser + `--append-system-prompt` enjeksiyonu) + `chat-tool-exec.ts` (`createToolExecDispatcher`, async-spawn bash) + `chat-tool-bridge.ts` + `tool-permissions.ts` (hem `commands/` hem `repl/` katmanında). Bu ADR'nin Referanslar bölümündeki `chat-agentic-do.ts` satırı tarihsel kayıt olarak korunur.
+
+**Negatives-listesi Ink'le kapandı:** F11-007 pinned input-bar (`src/cli/repl/input-bar.tsx`), F11-008 `/` menü, F11-009 markdown-stream vd. Sprint 224+ Ink enterprise-epic'i (E1-E7: markdown/menü/switcher/footer/agentic-diff/paste/default) ile gerçekleşti — ADR'nin "kapsam-dışı" bıraktıkları sonraki el-kodlama oturumlarında tamamlandı (ADR-083 amendment Ink-evrim notu).
+
+**224-010 nervous re-enable bugün geçerli DEĞİL:** canlı `.deckent/config.json` → `nervous_system.enabled: false` — Sprint 223 disable → 224 re-enable → sonradan İKİNCİ kez kapatılmış (ADR-082 amendment'indeki opt-out drift'le aynı kayıt; yeniden-açma kararı ayrı değerlendirilecek). md+db senkron (Alperen ADR-review).

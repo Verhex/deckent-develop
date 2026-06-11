@@ -143,3 +143,17 @@ Sprint 219 yedi dalgada bu boşlukları kapattı:
 - `feedback_wiring_pct_vs_user_working` — wired ≠ çalışıyor
 - `feedback_proof_of_function_dod` — Smoke gate (gerçek-koşu)
 - `project_deckent_runtime_ecosystem` — agentic os + native
+
+---
+
+## Amendment — Sprint 281 (2026-06-11, ADR-review, full code-verification)
+
+**Classification: BOTH** (çıplak-`deckent` REPL = ürünün ana bireysel yüzü; agentic dispatch + onay-kapısı doğrudan user-deneyimi).
+
+**Re-verified:** Dalga-A `shouldLaunchDefaultRepl` (`entry.ts:62`) + `buildEntryArgv` (:88) ✓ · Dalga-B 3 agentic-modül (chat-agentic-dispatch / agentic-confirm / agentic-session) diskte ✓ · Dalga-C `chat-stream.ts` + `chat-stream-client.ts` ✓ · Dalga-G smoke-propagation (ADR-079 amendment'inde teyitli) ✓.
+
+**Evrim (sonraki sprint'ler bu temeli taşıdı):**
+- Dalga-A/B'nin readline-REPL'i **ADR-083 ile Ink'e** (React-for-CLI) evrildi ve DEFAULT view oldu — engine=loop korunup view-katmanı değişti (`src/cli/repl/` app.tsx, input-bar.tsx vd.); `chat-repl-ux.ts` readline-yardımcıları artık fallback/iç-katman.
+- "Tam MCP client post-beta" reddi gerçekleşti: **Sprint 280 `/mcp` broker-wire** (mcp-bridge → chat-native) Dalga-B dispatch'ini harici-MCP tüketimine genişletti.
+- Dalga-F `autonomous-runtime.ts` iskeleti diskte ancak **superseded-aile** — gerçek otonom motor `src/orchestra/autonomous/` engine'i oldu (ADR-071 amendment'indeki flow-runtime/self-dispatch havuzu; dormant-sweep adayı).
+- 219-009 nav-tek-kaynak fix'i sonradan ters yönde yeniden drift'ledi (Layout navGroups ↔ Sidebar navItems duplicate, 2026-06-11 UX-denetim #3) — kayıt ADR-080 amendment'inde; fix Chat/Dashboard product-sprint'inde. md+db senkron (Alperen ADR-review).

@@ -8377,6 +8377,16 @@ Tears down the server in a `try/finally` block. Complements `test:ci-sim` (herme
 - ADR-078 (CI-Hermeticity Standard) — parallel discipline: `test:ci-sim` guards hermeticity, `test:e2e-surfaces` guards user-working
 - Sprint 216 evidence: `serve` localhost auto-mint landed (`src/api/server.ts:921-935`); `/api/status` confirmed 200 run-proven.
 
+---
+
+## Amendment — Sprint 281 (2026-06-11, ADR-review, full code-verification)
+
+**Classification: BOTH** (hollow-DONE engeli = ürün-güvenilirliği; "wired ≠ working" felsefesinin kanunu).
+
+**Re-verified:** `isUserSurfaceTask` (`rubric-registry.ts:220`) + `verifyProofOfFunction` (`proof-of-function.ts:259`) + evaluator-wire (`result-evaluator.ts:49`) + `Smoke:` parser (`task-builder.ts:164`) + `test-e2e-surfaces.mjs` + npm-script ✓.
+
+**Sürekli savaş-kullanımda:** Disiplin her sprint'te fiilen uygulanıyor — Sprint 280 DIRECTIVES'i Tier-1 task'lara `Smoke:`-satırlarıyla yazıldı; `worker-default.md` + `karpathy-discipline.md` anchor'ları canlı; CC close-out zinciri her sprint-sonunda gerçek-binary Tier-1 smoke koşar. 2026-06-11 dashboard/chat UX-denetimi de aynı "wired ≠ working" ilkesinin ürün-ölçeği uygulamasıdır (mocked-yeşilken hollow yüzeyleri canlı-koşu yakaladı — bu ADR'nin doğuş-senaryosunun tekrarı ve teyidi). md+db senkron (Alperen ADR-review).
+
 
 ---
 
@@ -8509,6 +8519,18 @@ Three foundational modules establish the native-speed, god-level UI baseline:
 - ADR-076 — Auth-Precedence Fix + User-Facing Surfaces (serve token-inject, Path A chat)
 - ADR-078 — CI-Hermeticity + Dashboard God-Level (Sprint 215 AppShell + page scaffolding)
 - `project_dashboard_realrun_findings` — 2026-06-01 real browser audit that identified the freeze, wire-gap, and chat defects
+
+---
+
+## Amendment — Sprint 281 (2026-06-11, ADR-review, full code-verification + canlı UX-denetimi)
+
+**Classification: BOTH** (dashboard tamamen user-facing).
+
+**Re-verified:** §1 `startSprintDetached` (`sprint-job-runner.ts:18`, `detached:true`+unref :29) ✓ · §4 `DirectivesEditor.tsx` ✓ · §5 `use-live-data.ts` + `theme.ts` ✓.
+
+**§3 düzeltilmiş gerçeklik (2026-06-11 canlı UX-denetimi + kod-izi; v3-teşhis ADR-083 review'unda düzeltildi):** Frontend-wire bu ADR'nin dediği gibi VAR — `ChatPage.tsx:312/351/391` NL'i `POST /api/chat` + stream'e düşürür. Serve-tarafı adapter-wire de VAR — Sprint 269 B-ChatStream `resolveChatAdapter` SSOT'unu bağladı (`server.ts:1206` resolve + `:643` stream-endpoint tüketimi); bu amendment'ın ilk sürümündeki "serve'de resolveChatAdapter wire eksik" teşhisi YANLIŞTI. **Gerçek zincir:** (1) `POST /api/chat` (`server.ts:813`) **classifier-only** — `buildChatReply`'a adapter hiç girmiyor, "Anlamadım" buradan; (2) ChatPage stream-hatasını yutuyor (`:382-384` onError boş) ve POST-fallback'i her durumda atıyor → canlıda stream boş kaldığında classifier-cevap görünür kalıyor; (3) canlı stream'in neden boş kaldığı ayrıştırılacak — baş şüpheli EventSource GET'inde Bearer-header imkânsızlığı (auth-gate) veya serve-içi claude CLI spawn hatası. Fix Chat/Dashboard product-sprint'inde (memory `project_dashboard_chat_audit_20260611` #1, v3-teşhis).
+
+**§2 sonrası drift:** 4-route+4-link wire'ı indi; ancak S219'da `Layout.tsx` kendi `navGroups`'unu render eder hale geldi ve `Sidebar.tsx` navItems'ı **stale-duplicate** kaldı → bugün Workers/Directives nav'dan erişilemez (UX-denetim #3, duplicate-sidebar) — tek-kaynağa indirme product-sprint'te. md+db senkron (Alperen ADR-review).
 
 
 ---
@@ -8663,6 +8685,20 @@ Sprint 219 yedi dalgada bu boşlukları kapattı:
 - `feedback_proof_of_function_dod` — Smoke gate (gerçek-koşu)
 - `project_deckent_runtime_ecosystem` — agentic os + native
 
+---
+
+## Amendment — Sprint 281 (2026-06-11, ADR-review, full code-verification)
+
+**Classification: BOTH** (çıplak-`deckent` REPL = ürünün ana bireysel yüzü; agentic dispatch + onay-kapısı doğrudan user-deneyimi).
+
+**Re-verified:** Dalga-A `shouldLaunchDefaultRepl` (`entry.ts:62`) + `buildEntryArgv` (:88) ✓ · Dalga-B 3 agentic-modül (chat-agentic-dispatch / agentic-confirm / agentic-session) diskte ✓ · Dalga-C `chat-stream.ts` + `chat-stream-client.ts` ✓ · Dalga-G smoke-propagation (ADR-079 amendment'inde teyitli) ✓.
+
+**Evrim (sonraki sprint'ler bu temeli taşıdı):**
+- Dalga-A/B'nin readline-REPL'i **ADR-083 ile Ink'e** (React-for-CLI) evrildi ve DEFAULT view oldu — engine=loop korunup view-katmanı değişti (`src/cli/repl/` app.tsx, input-bar.tsx vd.); `chat-repl-ux.ts` readline-yardımcıları artık fallback/iç-katman.
+- "Tam MCP client post-beta" reddi gerçekleşti: **Sprint 280 `/mcp` broker-wire** (mcp-bridge → chat-native) Dalga-B dispatch'ini harici-MCP tüketimine genişletti.
+- Dalga-F `autonomous-runtime.ts` iskeleti diskte ancak **superseded-aile** — gerçek otonom motor `src/orchestra/autonomous/` engine'i oldu (ADR-071 amendment'indeki flow-runtime/self-dispatch havuzu; dormant-sweep adayı).
+- 219-009 nav-tek-kaynak fix'i sonradan ters yönde yeniden drift'ledi (Layout navGroups ↔ Sidebar navItems duplicate, 2026-06-11 UX-denetim #3) — kayıt ADR-080 amendment'inde; fix Chat/Dashboard product-sprint'inde. md+db senkron (Alperen ADR-review).
+
 
 ---
 
@@ -8805,6 +8841,19 @@ Alerts tamamen kaldırmak yerine dedup seçildi: provider-neutral tek uyarı dah
 - `src/nervous/bootstrap.ts` — `createNervousSystemIfEnabled`
 - `src/dashboard/src/components/WorkerGrid.tsx` — SSE real-time worker list
 - Memory: `project_dashboard_realrun_findings` — 11-madde dashboard run-verify bulguları
+
+---
+
+## Amendment — Sprint 281 (2026-06-11, ADR-review, full code-verification)
+
+**Classification: BOTH** (REPL-LLM + dashboard-canlılık ürün-yüzü; nervous dogfood+ürün bakım-otomasyonu).
+
+**Re-verified:** Dalga-A `chat_provider` config (`config.ts:67-76`) + `entry.ts` fallback-zinciri `chat_provider → brain_provider → 'claude'` (:86/:103/:435) ✓ · Dalga-D `createNervousSystemIfEnabled` (`bootstrap.ts:114`) ✓ · Dalga-B/C WorkerGrid + RefreshButton + `coverage-endpoint.ts` + DebtPage severity ✓. Action-handler seti 8→**9 aksiyona büyüdü** (WORKER_RESPAWN vd. sonradan eklendi — CACHE_INVALIDATE, DEAD_EVENT_STREAM_CLEANUP, DEBT_TRENDING_REPORT, IPC_DIR_CLEANUP, LOG_ROTATION, METRIC_EMIT, ORPHAN_TASK_ARCHIVE, STALE_LOCK_RELEASE, WORKER_RESPAWN).
+
+**3 bilinen-durum (2026-06-11):**
+1. **220-013 config-flip bugün geçerli DEĞİL** — canlı `.deckent/config.json` → `nervous_system.enabled: false`. Mekanizma sağlam ve evrildi (Sprint 279 panic-gate timeout wire dahil) ancak deckent-dev'de sonradan kapatılmış — opt-out drift'i; yeniden-açma kararı ayrı değerlendirilecek.
+2. **220-007 chat round-trip canlı-gap (v3-teşhis):** frontend-wire VAR (ChatPage POST `/api/chat` + stream) ve serve-tarafı adapter-wire de VAR (Sprint 269, `server.ts:1206` `resolveChatAdapter` SSOT) — ilk teşhisteki "serve'de wire eksik" iddiası yanlıştı. Gerçek kök: `POST /api/chat` classifier-only (`server.ts:813`) + ChatPage stream-hata-yutması (`:382-384`) → stream canlıda boş kalınca "Anlamadım" görünür kalıyor (ayrıntı ADR-080 §3 düzeltmesi; UX-denetim #1; fix Chat/Dashboard product-sprint'inde).
+3. **220-010 alert-dedup nüks:** 2026-06-11 denetiminde "CLAUDE.md güncellenmedi" ×59 spam (UX-denetim #4) — dedup ya geriledi ya bu auditor-alert yolunu kapsamıyor. md+db senkron (Alperen ADR-review).
 
 
 ---
@@ -8993,6 +9042,20 @@ Layout'u sprint içinde sıfırdan yazmak. Reddedildi: Karpathy Discipline 3 (Su
 - `src/core/config.ts` — `resolveChatProvider`, `CHAT_CONFIG_SCHEMA`
 - Memory: `project_terminal_dashboard_ux_evolution` — Sprint 221 yönü (claude-code-UX evrim)
 - Memory: `feedback_directive_kanit_letter_vs_goal` — wire-gap (def-dosya dışla, çağıran-modül ölç)
+
+---
+
+## Amendment — Sprint 281 (2026-06-11, ADR-review, full code-verification)
+
+**Classification: BOTH** (REPL ürün-yüzü; ollama-local = air-gapped/maliyet user-değeri; enterprise-slash köprüsü "kullanılmasa da kullanılabilir" ilkesinin taşıyıcısı).
+
+**Re-verified (çağıran-taraf wire'lar gerçek):** Dalga-A `handleReplCommand` + `classifyAgenticIntent/dispatchAgenticIntent` + `buildSlashRegistry/resolveSlash` — `chat-native.ts:10/:13/:15` import + loop-tüketimi ✓ · 5 modül diskte (slash-registry / status-line / mode / enterprise-bridge / provider-parity) ✓ · `resolveChatProvider` (`config.ts:87`) + `resolveChatProviderWithFallback` (:124) + `CHAT_CONFIG_SCHEMA` (:318) ✓ · `buildOllamaReplAdapter` (`entry.ts:205`) + `DECKENT_CHAT_PROVIDER` env-override ✓.
+
+**Evrim:**
+- **Ink-default'a sorunsuz taşındı (ADR-086):** `src/cli/repl/run.tsx` slash-registry'yi tüketiyor — Dalga-A çekirdeği view-değişiminde korundu.
+- **`resolveChatAdapter` SSOT'u serve'e uzadı:** Sprint 269 B-ChatStream `server.ts:1206`'da bu ADR'nin parity-modülünü dashboard chat-stream adapter'ı olarak bağladı (`:643` endpoint-tüketimi) — "tek giriş noktası" hedefi terminal-ötesine geçti.
+
+**Hafif drift:** `entry.ts` REPL-tarafı kendi inline provider-dallarını koruyor (ollama/openai-compat) — `resolveChatAdapter` SSOT'una indirgenmedi; iki resolve-yolu yaşıyor (konsolidasyon adayı, Chat/Dashboard product-sprint'i). Canlı dashboard-chat'in "Anlamadım" davranışının kökü bu ADR'nin parity-modülü DEĞİL — `POST /api/chat` classifier-only + ChatPage stream-hata-yutması (ayrıntı ADR-080 amendment düzeltmesi + UX-denetim #1 v3). md+db senkron (Alperen ADR-review).
 
 
 ---
@@ -9190,6 +9253,20 @@ project-wide knowledge) belong outside the git-tracked memory; `.deckent/setting
 - `scripts/agentic-do-verify.mjs` — run-proven agentic-write E2E smoke
 - `scripts/repl-smoke-verify.mjs` — REPL smoke harness (terminal/streaming/perms/menu)
 - `.deckent/config.json` — `nervous_system.enabled: true` (re-enabled Sprint 224-010)
+
+---
+
+## Amendment — Sprint 281 (2026-06-11, ADR-review, full code-verification)
+
+**Classification: BOTH** (REPL-parity = ürünün claude-code-kalite çıtası; F11 doğrudan user-deneyimi).
+
+**Re-verified:** `/nervous` slash-wire (`chat-native.ts:21-24` import + `:292` wire-root) ✓ · banner-wire (`entry.ts:29` + `:511`) ✓ · planner discriminant-union (`planner.ts:375-386`: spawn_failed/timeout/parse_failed/validation_failed/no_providers) ✓ · permission-memory (`chat-permissions.ts` → `.deckent/settings.local.json`) ✓ · `agentic-do-verify.mjs` + `repl-smoke-verify.mjs` ✓.
+
+**Yeniden-yapılanma (dosya-referansı stale, kavram canlı ve büyümüş):** `chat-agentic-do.ts` artık diskte YOK — `<deckent_tool>` agentic-DO katmanı şu aileye bölündü: `chat-session.ts` (`:83 DECKENT_TOOL_TAG_RE` parser + `--append-system-prompt` enjeksiyonu) + `chat-tool-exec.ts` (`createToolExecDispatcher`, async-spawn bash) + `chat-tool-bridge.ts` + `tool-permissions.ts` (hem `commands/` hem `repl/` katmanında). Bu ADR'nin Referanslar bölümündeki `chat-agentic-do.ts` satırı tarihsel kayıt olarak korunur.
+
+**Negatives-listesi Ink'le kapandı:** F11-007 pinned input-bar (`src/cli/repl/input-bar.tsx`), F11-008 `/` menü, F11-009 markdown-stream vd. Sprint 224+ Ink enterprise-epic'i (E1-E7: markdown/menü/switcher/footer/agentic-diff/paste/default) ile gerçekleşti — ADR'nin "kapsam-dışı" bıraktıkları sonraki el-kodlama oturumlarında tamamlandı (ADR-083 amendment Ink-evrim notu).
+
+**224-010 nervous re-enable bugün geçerli DEĞİL:** canlı `.deckent/config.json` → `nervous_system.enabled: false` — Sprint 223 disable → 224 re-enable → sonradan İKİNCİ kez kapatılmış (ADR-082 amendment'indeki opt-out drift'le aynı kayıt; yeniden-açma kararı ayrı değerlendirilecek). md+db senkron (Alperen ADR-review).
 
 
 ---

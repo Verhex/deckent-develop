@@ -83,6 +83,10 @@
 | adr-089 | Backend-Agnostic Worker Observation + Per-Worker Independent Backends | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-281 Learnings** (sprint-281): ## Sprint sprint-281 Learnings
+
+## Gains
+- 281-001 — Mimari & Eşzamanlılık Doğruluğu Denetimi — Mimari & eşzamanlılık...
 - **Sprint sprint-280 Learnings** (sprint-280): ## Sprint sprint-280 Learnings
 - REPL /mcp broker wire — G1 (mcp-bridge → chat-native) (OPUS, Tier-1): GO_WITH_TECH_D...
 - **Sprint sprint-279 Learnings** (sprint-279): ## Sprint sprint-279 Learnings
@@ -113,8 +117,6 @@
 
 ## Gains
 - 272-001 — GHOST-FINALIZE fix — checkpoint artığı temizliği + start'ın dürü...
-- **Sprint sprint-271 Learnings** (sprint-271): ## Sprint sprint-271 Learnings
-- sprint-yaşamdöngüsü wire — opt-in izleme SPAWN→CLEANUP: GO_WITH_TECH_DEBT — Wired Ta...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -148,4 +150,4 @@ _No active technical debt._
 - Violation pattern: stale_heartbeat
 - Violation pattern: stale_heartbeat
 
-_Total entries: 441 | Generated: 2026-06-11_
+_Total entries: 444 | Generated: 2026-06-11_
