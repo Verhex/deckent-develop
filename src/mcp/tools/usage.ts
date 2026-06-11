@@ -10,15 +10,12 @@
  * Sprint 275 Task 275-003
  */
 
-import { join } from 'node:path';
-import { homedir } from 'node:os';
-import { createReadStream, readdirSync } from 'node:fs';
-import { createInterface } from 'node:readline';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod/v4';
 import { parseTranscriptUsage, limitCost } from '../../core/limit-ledger.js';
 import type { UsageRecord, LedgerOpts, LedgerPrices } from '../../core/limit-ledger.js';
-import { summarizeSprint, evaluateCacheGate, extractTaskIdFromStream } from '../../core/limit-ledger-report.js';
+import { summarizeSprint, evaluateCacheGate, buildTranscriptTaskMap } from '../../core/limit-ledger-report.js';
+import { buildLedgerPrices } from '../../core/cost-config-loader.js';
 
 // ─── Injectable deps ────────────────────────────────────────────────────────
 
@@ -28,45 +25,9 @@ export interface UsageToolDeps {
   pricesFn?: () => LedgerPrices;
 }
 
-// ─── Default helpers (same logic as cli/commands/usage.ts) ──────────────────
-
-function safeReadDir(p: string): string[] {
-  try { return readdirSync(p); } catch { return []; }
-}
-
-function makeLineReader(filePath: string): AsyncIterable<string> {
-  return createInterface({ input: createReadStream(filePath), crlfDelay: Infinity });
-}
-
-async function defaultBuildTaskMap(opts: LedgerOpts): Promise<Record<string, string>> {
-  const root = opts.root ?? join(homedir(), '.claude', 'projects');
-  const readDir = opts.readDir ?? safeReadDir;
-  const openStream = opts.openStream ?? makeLineReader;
-  const map: Record<string, string> = {};
-  const projectDirs = readDir(root);
-
-  for (const dirName of projectDirs) {
-    if (opts.projectFilter && !opts.projectFilter(dirName)) continue;
-    const dirPath = join(root, dirName);
-    const files = readDir(dirPath).filter((f) => f.endsWith('.jsonl'));
-
-    for (const fileName of files) {
-      const filePath = join(dirPath, fileName);
-      try {
-        const lines: string[] = [];
-        for await (const line of openStream(filePath)) {
-          lines.push(line);
-          if (lines.length >= 6) break;
-        }
-        const taskId = extractTaskIdFromStream(lines);
-        if (taskId) map[fileName] = taskId;
-      } catch {
-        // skip unreadable files
-      }
-    }
-  }
-  return map;
-}
+// Task-map builder shared with the CLI/retro/cost-guard consumers
+// (core/limit-ledger-report.ts) — was a third local copy of the same scan.
+const defaultBuildTaskMap = buildTranscriptTaskMap;
 
 interface ModelSummary {
   model: string;
@@ -122,7 +83,10 @@ export async function getUsageData(
 ): Promise<UsageResult> {
   const parseFn = deps.parseFn ?? parseTranscriptUsage;
   const buildTaskMapFn = deps.buildTaskMapFn ?? defaultBuildTaskMap;
-  const prices = deps.pricesFn?.() ?? {};
+  // Empty prices would zero every cost column (the MCP surface shipped this
+  // way in Sprint 275 — every model reported $0; found 2026-06-11). The MCP
+  // server runs with cwd = project root, so cost-config resolves from there.
+  const prices = deps.pricesFn?.() ?? buildLedgerPrices(process.cwd());
 
   const ledgerOpts: LedgerOpts = { since: opts.since, until: opts.until };
   const records = await parseFn(ledgerOpts);

@@ -13,8 +13,12 @@
  * F1-TOK Faz 1 — Sprint 273 Task 273-002
  */
 
+import { createReadStream, readdirSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
+import { createInterface } from 'node:readline';
 import { limitCost } from './limit-ledger.js';
-import type { UsageRecord, LedgerPrices } from './limit-ledger.js';
+import type { UsageRecord, LedgerPrices, LedgerOpts } from './limit-ledger.js';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -179,6 +183,72 @@ export function extractTaskIdFromStream(lines: string[]): string | null {
   }
 
   return null;
+}
+
+// ─── Transcript task map ─────────────────────────────────────────────────────
+
+function safeReadDir(p: string): string[] {
+  try { return readdirSync(p); } catch { return []; }
+}
+
+function defaultOpenStream(filePath: string): AsyncIterable<string> {
+  return createInterface({ input: createReadStream(filePath), crlfDelay: Infinity });
+}
+
+/**
+ * Scan the Claude Code transcripts root and map each session file basename to
+ * the task ID referenced in its opening lines (extractTaskIdFromStream).
+ *
+ * Shared by `deckent usage --sprint`, the retro Limit-burn row, and the
+ * mid-sprint cost guard. Honors the same injectable LedgerOpts seams as
+ * parseTranscriptUsage (root/readDir/openStream/projectFilter) for hermetic
+ * tests. Unreadable files are skipped — never throws.
+ */
+export async function buildTranscriptTaskMap(opts: LedgerOpts = {}): Promise<Record<string, string>> {
+  const root = opts.root ?? join(homedir(), '.claude', 'projects');
+  const rawReadDir = opts.readDir ?? safeReadDir;
+  const readDir = (p: string): string[] => {
+    try { return rawReadDir(p); } catch { return []; }
+  };
+  const openStream = opts.openStream ?? defaultOpenStream;
+
+  const map: Record<string, string> = {};
+  for (const dirName of readDir(root)) {
+    if (opts.projectFilter && !opts.projectFilter(dirName)) continue;
+    const dirPath = join(root, dirName);
+    const files = readDir(dirPath).filter((f) => f.endsWith('.jsonl'));
+
+    for (const fileName of files) {
+      try {
+        const lines: string[] = [];
+        for await (const line of openStream(join(dirPath, fileName))) {
+          lines.push(line);
+          if (lines.length >= 6) break;
+        }
+        const taskId = extractTaskIdFromStream(lines);
+        if (taskId) map[fileName] = taskId;
+      } catch {
+        // Skip unreadable files
+      }
+    }
+  }
+  return map;
+}
+
+/**
+ * Restrict a session→task map to a single sprint's tasks
+ * (taskId prefix "NNN-"; accepts both "281" and "sprint-281").
+ */
+export function filterTaskMapToSprint(
+  taskMap: Record<string, string>,
+  sprintId: string,
+): Record<string, string> {
+  const prefix = `${sprintId.replace(/^sprint-/, '')}-`;
+  const filtered: Record<string, string> = {};
+  for (const [sessionFile, taskId] of Object.entries(taskMap)) {
+    if (taskId.startsWith(prefix)) filtered[sessionFile] = taskId;
+  }
+  return filtered;
 }
 
 // ─── Sprint aggregation ──────────────────────────────────────────────────────

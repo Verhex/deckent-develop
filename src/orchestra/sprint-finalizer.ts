@@ -39,6 +39,7 @@ import {
   writeRetrospective, appendRetroSection, writeSprintLog, calculateMetrics,
   updateProjectDocs,
   buildAgentPerformance, archiveDirectives, archiveOrphanTasks,
+  buildSprintLimitBurnRow,
 } from './sprint-reporter.js';
 
 // ─── Sprint Docs Updater (direct — cleanTasksArchive not re-exported via sprint-reporter) ──
@@ -714,6 +715,19 @@ export async function finalizeSprint(
       appendRetroSection(projectRoot, sprint.id, '### Code-Verified DONE', section);
     }
   } catch (e) { debugLog('finalizeSprint:writeRetrospective', e); }
+
+  // ─── F1-TOK 273-004 retro wire — "Limit burn" row ────────────────
+  // buildLimitBurnRow shipped + tested in Sprint 273 but was never called
+  // from the retro path (0-caller dormant; found in the 2026-06-11
+  // calibration analysis). Best-effort: ledger/transcript errors must
+  // never block finalize.
+  try {
+    const limitBurnRow = await buildSprintLimitBurnRow(projectRoot, sprint.id, sprint.tasks.length);
+    if (limitBurnRow) {
+      const section = ['', '### Limit Burn', '', limitBurnRow, ''].join('\n');
+      appendRetroSection(projectRoot, sprint.id, '### Limit Burn', section);
+    }
+  } catch (e) { debugLog('finalizeSprint:limitBurnRow', e); }
 
   // Sprint 198 198-002 defensive fallback — guarantees a sprint-log DB
   // row even when writeRetrospective threw or its own try/catch returned

@@ -13,20 +13,18 @@
  */
 
 import { join } from 'node:path';
-import { homedir } from 'node:os';
-import { readdirSync, createReadStream, existsSync } from 'node:fs';
-import { createInterface } from 'node:readline';
+import { existsSync } from 'node:fs';
 import type { Command } from 'commander';
 import { print } from '../helpers/output.js';
 import { getMessage, getLanguage } from '../helpers/messages.js';
 import { formatTable } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { loadConfig } from '../../core/config.js';
-import { parseTranscriptUsage, limitCost } from '../../core/limit-ledger.js';
+import { parseTranscriptUsage, limitCost, resolveModelPrice } from '../../core/limit-ledger.js';
 import type { UsageRecord, LedgerOpts, LedgerPrices } from '../../core/limit-ledger.js';
-import { summarizeSprint, extractTaskIdFromStream, evaluateCacheGate } from '../../core/limit-ledger-report.js';
+import { summarizeSprint, buildTranscriptTaskMap, evaluateCacheGate } from '../../core/limit-ledger-report.js';
 import type { SprintUsageSummary, CacheGateReport } from '../../core/limit-ledger-report.js';
-import { loadCostConfig, listEnabledModels } from '../../core/cost-config-loader.js';
+import { buildLedgerPrices } from '../../core/cost-config-loader.js';
 
 // ─── Injectable deps ────────────────────────────────────────────────────────
 
@@ -37,69 +35,16 @@ export interface UsageDeps {
   configFn?: (root: string) => Promise<{ language?: string; usage?: { weekly_budget_equiv?: number } }>;
 }
 
-// ─── Default I/O helpers ────────────────────────────────────────────────────
-
-function safeReadDir(p: string): string[] {
-  try { return readdirSync(p); } catch { return []; }
-}
-
-function makeLineReader(filePath: string): AsyncIterable<string> {
-  return createInterface({ input: createReadStream(filePath), crlfDelay: Infinity });
-}
-
 // ─── Build task map (session file → task ID) ─────────────────────────────────
+// Shared implementation lives in core/limit-ledger-report.ts so the retro
+// Limit-burn row and the mid-sprint cost guard use the same mapping.
 
-async function defaultBuildTaskMap(opts: LedgerOpts): Promise<Record<string, string>> {
-  const root = opts.root ?? join(homedir(), '.claude', 'projects');
-  const readDir = opts.readDir ?? safeReadDir;
-  const openStream = opts.openStream ?? makeLineReader;
-
-  const map: Record<string, string> = {};
-  const projectDirs = readDir(root);
-
-  for (const dirName of projectDirs) {
-    if (opts.projectFilter && !opts.projectFilter(dirName)) continue;
-    const dirPath = join(root, dirName);
-    const files = readDir(dirPath).filter((f) => f.endsWith('.jsonl'));
-
-    for (const fileName of files) {
-      const filePath = join(dirPath, fileName);
-      try {
-        const lines: string[] = [];
-        for await (const line of openStream(filePath)) {
-          lines.push(line);
-          if (lines.length >= 6) break;
-        }
-        const taskId = extractTaskIdFromStream(lines);
-        if (taskId) map[fileName] = taskId;
-      } catch {
-        // Skip unreadable files
-      }
-    }
-  }
-
-  return map;
-}
+const defaultBuildTaskMap = buildTranscriptTaskMap;
 
 // ─── Default cost prices builder ─────────────────────────────────────────────
+// Shared implementation lives in core/cost-config-loader.ts (buildLedgerPrices).
 
-function defaultCostPrices(root: string): LedgerPrices {
-  try {
-    const config = loadCostConfig(root);
-    const models = listEnabledModels(config);
-    const prices: LedgerPrices = {};
-    for (const { modelId, pricing } of models) {
-      const entry = { in: pricing.input_cost_per_token, out: pricing.output_cost_per_token };
-      prices[modelId] = entry;
-      for (const alias of pricing.deckent_aliases ?? []) {
-        prices[alias] = entry;
-      }
-    }
-    return prices;
-  } catch {
-    return {};
-  }
-}
+const defaultCostPrices = buildLedgerPrices;
 
 // ─── Default config reader ────────────────────────────────────────────────────
 
@@ -233,6 +178,20 @@ export async function runUsageCommand(
   }
 
   const prices = costPricesFn(root);
+
+  // ─── Unknown-model guard ──────────────────────────────────────────
+  // A model that resolves to no price contributes $0 to every cost column.
+  // That silence hid a 2.4× under-report for 8 sprints (stale cost-config
+  // keys vs drifting transcript model IDs, 2026-06-11 analysis) — surface
+  // it loudly instead.
+  if (!options.json) {
+    const unresolved = [...new Set(records.map((r) => r.model))]
+      .filter((m) => resolveModelPrice(prices, m) === null)
+      .sort();
+    if (unresolved.length > 0) {
+      print(getMessage('usage.unknown_models', lang, { models: unresolved.join(', ') }));
+    }
+  }
 
   // ─── Sprint mode ──────────────────────────────────────────────────
   if (options.sprint) {

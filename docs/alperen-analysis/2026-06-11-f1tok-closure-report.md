@@ -1,5 +1,11 @@
 # F1-TOK Kapanış Raporu — Token/Limit Optimizasyonu (Sprint 273-275)
 
+> ⚠️ **ERRATA (2026-06-11 akşam):** Bu rapordaki $-eşdeğer A/B sayıları `deckent usage`'ın
+> stale model-key fiyat bug'ıyla hesaplandı (opus+haiku=$0 sayılıyordu). Gerçek kazanç
+> **−%33** (sonnet-only $0.67→$0.45), −%58 değil; ayrıca kazanç sprint 276-280'de geri eridi
+> ve retro "Limit burn" satırı hiç wire edilmemiş (0-caller). Düzeltilmiş analiz:
+> [2026-06-11-sprint273-now-usage-calibration.md](2026-06-11-sprint273-now-usage-calibration.md) §4-5.
+
 > Kaynak hipotez: `docs/alperen-analysis/2026-06-10-weekly-limit-reverse-engineering.md`
 > (boot-cw fleet yazımının %44-63'ü haftalık limiti yiyor; prompt skorları 85/90 → ≥97).
 > Bu rapor 3 sprint'in (273 Faz 0+1+1,5, 274 Faz 2, 275 kanıt) GERÇEK ledger verisiyle sonucu.

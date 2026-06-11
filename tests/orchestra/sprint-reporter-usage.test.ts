@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
-import { buildLimitBurnRow } from '../../src/orchestra/sprint-reporter.js';
-import type { LimitBurnOpts } from '../../src/orchestra/sprint-reporter.js';
-import type { UsageRecord } from '../../src/core/limit-ledger.js';
+import { buildLimitBurnRow, buildSprintLimitBurnRow } from '../../src/orchestra/sprint-reporter.js';
+import type { LimitBurnOpts, SprintLimitBurnOpts } from '../../src/orchestra/sprint-reporter.js';
+import type { UsageRecord, LedgerPrices } from '../../src/core/limit-ledger.js';
 import type { SprintUsageSummary, CacheGateReport } from '../../src/core/limit-ledger-report.js';
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
@@ -227,5 +227,81 @@ describe('buildLimitBurnRow', () => {
     };
     const row = await buildLimitBurnRow('/root', 2, opts);
     expect(row).toContain('hit-rate %0%');
+  });
+});
+
+// ─── buildSprintLimitBurnRow — sprint-scoped production wire ─────────────────
+
+const SONNET_PRICES: LedgerPrices = {
+  'claude-sonnet-4-6': { in: 0.000003, out: 0.000015 },
+};
+
+describe('buildSprintLimitBurnRow', () => {
+  // Two sessions: one mapped to sprint 281, one to sprint 280.
+  const sprintRecord = makeRecord({
+    sessionFile: 's281.jsonl',
+    in: 100_000, out: 20_000, cacheRead: 900_000, cacheWrite: 80_000,
+  });
+  const otherSprintRecord = makeRecord({
+    sessionFile: 's280.jsonl',
+    in: 500_000, out: 500_000, cacheRead: 0, cacheWrite: 500_000,
+  });
+  const taskMap = { 's281.jsonl': '281-001', 's280.jsonl': '280-001' };
+
+  function makeSprintOpts(): SprintLimitBurnOpts {
+    return {
+      parseUsage: async () => [sprintRecord, otherSprintRecord],
+      buildTaskMap: async () => taskMap,
+      prices: SONNET_PRICES,
+    };
+  }
+
+  it('scopes the row to the sprint — other sprints\' burn is excluded', async () => {
+    // 281 only: in 100000×3e-6 + out 20000×15e-6 + cw 80000×1.25×3e-6 = $0.90
+    // (the 280 session would add $9.50 — must NOT appear)
+    // boot-cw: single record → bootstrapCw = cw → %100; hit: 900K/(100K+900K) = %90
+    const row = await buildSprintLimitBurnRow('/root', 'sprint-281', 2, makeSprintOpts());
+    expect(row).toBe(
+      '| Limit burn | $0.90 eşdeğer (task-başı $0.45, boot-cw %100%, hit-rate %90%) |',
+    );
+  });
+
+  it('accepts the bare sprint number form ("281")', async () => {
+    const row = await buildSprintLimitBurnRow('/root', '281', 2, makeSprintOpts());
+    expect(row).toContain('$0.90 eşdeğer');
+  });
+
+  it('returns null when no transcript session maps to the sprint', async () => {
+    const row = await buildSprintLimitBurnRow('/root', 'sprint-999', 2, makeSprintOpts());
+    expect(row).toBeNull();
+  });
+
+  it('returns null when the task-map builder throws — retro must not be blocked', async () => {
+    const opts: SprintLimitBurnOpts = {
+      parseUsage: async () => [sprintRecord],
+      buildTaskMap: async () => { throw new Error('transcript scan failed'); },
+      prices: SONNET_PRICES,
+    };
+    const row = await buildSprintLimitBurnRow('/root', 'sprint-281', 2, opts);
+    expect(row).toBeNull();
+  });
+
+  it('evaluates the cache-gate against the sprint-scoped sessions by default', async () => {
+    // Two sessions in sprint 281: warmer writes (cw>cr), follower reads warm (cr>=cw).
+    const warmer = makeRecord({
+      ts: '2026-06-11T10:00:00.000Z', sessionFile: 'w.jsonl',
+      in: 1_000, out: 100, cacheRead: 0, cacheWrite: 50_000,
+    });
+    const follower = makeRecord({
+      ts: '2026-06-11T10:05:00.000Z', sessionFile: 'f.jsonl',
+      in: 1_000, out: 100, cacheRead: 50_000, cacheWrite: 100,
+    });
+    const opts: SprintLimitBurnOpts = {
+      parseUsage: async () => [warmer, follower],
+      buildTaskMap: async () => ({ 'w.jsonl': '281-001', 'f.jsonl': '281-002' }),
+      prices: SONNET_PRICES,
+    };
+    const row = await buildSprintLimitBurnRow('/root', 'sprint-281', 2, opts);
+    expect(row).toContain('cache-gate PASS');
   });
 });

@@ -49,7 +49,9 @@
           "deckent_tier": "premium",
           "deckent_aliases": [
             "opus",
-            "opus-4-6"
+            "opus-4-6",
+            "opus-4-8",
+            "claude-opus-4-8"
           ],
           "enabled": true,
           "_source": "litellm",
@@ -92,7 +94,8 @@
           "deckent_tier": "economy",
           "deckent_aliases": [
             "haiku",
-            "haiku-4-5"
+            "haiku-4-5",
+            "claude-haiku-4-5-20251001"
           ],
           "enabled": true,
           "_source": "litellm",

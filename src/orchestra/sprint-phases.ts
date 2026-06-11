@@ -2190,9 +2190,18 @@ export async function checkMidSprintCostGuard(
       currentCostUsd = await opts.getLimitCost(projectRoot);
     } else {
       // Dynamic import to avoid top-level circular dep risk; fail-safe on error.
+      // Fixed 2026-06-11: the original default read the PROJECT root as the
+      // transcripts root (always zero records) and passed an empty price map
+      // (always $0) — the guard could never trip. Now: parse the global CC
+      // transcripts dir, scope records to this sprint's tasks via the
+      // session→task map, and price with the project's cost-config.
       const { parseTranscriptUsage, limitCost } = await import('../core/limit-ledger.js');
-      const records = await parseTranscriptUsage({ root: projectRoot });
-      currentCostUsd = limitCost(records, {});
+      const { buildTranscriptTaskMap, filterTaskMapToSprint } = await import('../core/limit-ledger-report.js');
+      const { buildLedgerPrices } = await import('../core/cost-config-loader.js');
+      const records = await parseTranscriptUsage({});
+      const sprintMap = filterTaskMapToSprint(await buildTranscriptTaskMap({}), sprintId);
+      const sprintRecords = records.filter((r) => sprintMap[r.sessionFile] !== undefined);
+      currentCostUsd = limitCost(sprintRecords, buildLedgerPrices(projectRoot));
     }
   } catch (e) {
     debugLog('costGuard:getLimitCost', e);

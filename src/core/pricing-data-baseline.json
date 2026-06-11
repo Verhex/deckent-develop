@@ -23,7 +23,7 @@
           "supports_vision": true,
           "supports_tool_choice": true,
           "deckent_tier": "premium",
-          "deckent_aliases": ["opus", "opus-4-6"],
+          "deckent_aliases": ["opus", "opus-4-6", "opus-4-8", "claude-opus-4-8"],
           "enabled": true,
           "_source": "litellm",
           "_verified_at": "2026-04-15"
@@ -60,7 +60,7 @@
           "supports_vision": true,
           "supports_tool_choice": true,
           "deckent_tier": "economy",
-          "deckent_aliases": ["haiku", "haiku-4-5"],
+          "deckent_aliases": ["haiku", "haiku-4-5", "claude-haiku-4-5-20251001"],
           "enabled": true,
           "_source": "litellm",
           "_verified_at": "2026-04-15"

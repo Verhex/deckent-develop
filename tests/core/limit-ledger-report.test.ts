@@ -3,6 +3,8 @@ import {
   mapSessionToTask,
   extractTaskIdFromStream,
   summarizeSprint,
+  buildTranscriptTaskMap,
+  filterTaskMapToSprint,
   type TaskUsageSummary,
   type SprintUsageSummary,
 } from '../../src/core/limit-ledger-report.js';
@@ -294,5 +296,62 @@ describe('summarizeSprint', () => {
     expect(summary.tasks).toHaveLength(0);
     expect(summary.totals.calls).toBe(0);
     expect(summary.totals.bootstrapShare).toBe(0);
+  });
+});
+
+describe('filterTaskMapToSprint', () => {
+  const map = {
+    'a.jsonl': '281-001',
+    'b.jsonl': '281-002-fix',
+    'c.jsonl': '280-001',
+  };
+
+  it('keeps only the sprint\'s tasks (prefix match, fix-suffixes included)', () => {
+    expect(filterTaskMapToSprint(map, '281')).toEqual({
+      'a.jsonl': '281-001',
+      'b.jsonl': '281-002-fix',
+    });
+  });
+
+  it('accepts the "sprint-NNN" form', () => {
+    expect(filterTaskMapToSprint(map, 'sprint-280')).toEqual({ 'c.jsonl': '280-001' });
+  });
+
+  it('returns an empty map when nothing matches', () => {
+    expect(filterTaskMapToSprint(map, 'sprint-999')).toEqual({});
+  });
+});
+
+describe('buildTranscriptTaskMap', () => {
+  it('maps session files to task IDs via injected seams (hermetic)', async () => {
+    const files: Record<string, string[]> = {
+      '/transcripts': ['proj-a'],
+      '/transcripts/proj-a': ['s1.jsonl', 's2.jsonl', 'notes.txt'],
+    };
+    const streams: Record<string, string[]> = {
+      '/transcripts/proj-a/s1.jsonl': [
+        JSON.stringify({ message: { content: 'Read .tasks/task-281-001.json first' } }),
+      ],
+      '/transcripts/proj-a/s2.jsonl': [
+        JSON.stringify({ message: { content: 'no task reference here' } }),
+      ],
+    };
+    async function* lines(path: string): AsyncIterable<string> {
+      for (const l of streams[path] ?? []) yield l;
+    }
+    const map = await buildTranscriptTaskMap({
+      root: '/transcripts',
+      readDir: (p) => files[p] ?? [],
+      openStream: (p) => lines(p),
+    });
+    expect(map).toEqual({ 's1.jsonl': '281-001' });
+  });
+
+  it('skips unreadable files and returns {} for an unreadable root', async () => {
+    const map = await buildTranscriptTaskMap({
+      root: '/nonexistent',
+      readDir: () => { throw new Error('EACCES'); },
+    });
+    expect(map).toEqual({});
   });
 });

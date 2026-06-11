@@ -191,6 +191,36 @@ export async function parseTranscriptUsage(opts: LedgerOpts = {}): Promise<Usage
 // ─── Cost calculation ────────────────────────────────────────────────────────
 
 /**
+ * Resolve a transcript model ID against a price map.
+ *
+ * Exact key match first; otherwise falls back to the LONGEST price-map key
+ * contained in the model ID (family match). Transcript model IDs drift across
+ * releases — e.g. `claude-opus-4-8` or date-suffixed `claude-haiku-4-5-20251001`
+ * while the price table still keys `claude-opus-4-6` / `claude-haiku-4-5`.
+ * An exact-match miss silently priced those models at $0 for 8 sprints
+ * (2026-06-11 calibration analysis) — the family fallback closes that gap for
+ * future ID drift. Keys shorter than 4 chars are excluded from the fallback to
+ * avoid accidental substring hits (e.g. "o3").
+ *
+ * Returns null when neither an exact nor a family match exists — callers
+ * should surface unknown models instead of silently counting them as $0.
+ */
+export function resolveModelPrice(
+  prices: LedgerPrices,
+  model: string,
+): { in: number; out: number } | null {
+  const exact = prices[model];
+  if (exact) return exact;
+  let best: string | null = null;
+  for (const key of Object.keys(prices)) {
+    if (key.length >= 4 && model.includes(key) && (best === null || key.length > best.length)) {
+      best = key;
+    }
+  }
+  return best !== null ? prices[best]! : null;
+}
+
+/**
  * Compute limit-equivalent cost from usage records.
  *
  * Formula (reverse-engineered from subscription limit behavior, §3):
@@ -199,13 +229,14 @@ export async function parseTranscriptUsage(opts: LedgerOpts = {}): Promise<Usage
  * cacheRead contributes 0 — subscription accounts do not burn quota for cache hits.
  *
  * @param records  UsageRecord[] from parseTranscriptUsage
- * @param prices   Per-model per-token prices. Models not present in prices contribute 0.
- *                 Caller maps model IDs to prices via findModel() from cost-config-loader.
+ * @param prices   Per-model per-token prices. Model IDs are resolved via
+ *                 resolveModelPrice (exact, then longest-contained-key family
+ *                 fallback); models that resolve to nothing contribute 0.
  */
 export function limitCost(records: UsageRecord[], prices: LedgerPrices): number {
   let total = 0;
   for (const r of records) {
-    const p = prices[r.model];
+    const p = resolveModelPrice(prices, r.model);
     if (!p) continue;
     total +=
       r.in * p.in +

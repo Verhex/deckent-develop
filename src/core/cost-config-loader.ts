@@ -369,6 +369,33 @@ export function listEnabledModels(
 }
 
 /**
+ * Build a limit-ledger price map (model ID + aliases → in/out per-token cost)
+ * from the project's cost config.
+ *
+ * Single shared builder for every ledger consumer (`deckent usage` CLI/MCP/REPL,
+ * retro Limit-burn row, mid-sprint cost guard) — three call sites previously
+ * built this map independently or passed `{}` (which silently priced everything
+ * at $0; 2026-06-11 calibration analysis). Best-effort: returns {} on any
+ * config error so ledger consumers degrade to token-only reporting.
+ */
+export function buildLedgerPrices(projectRoot: string): Record<string, { in: number; out: number }> {
+  try {
+    const config = loadCostConfig(projectRoot);
+    const prices: Record<string, { in: number; out: number }> = {};
+    for (const { modelId, pricing } of listEnabledModels(config)) {
+      const entry = { in: pricing.input_cost_per_token, out: pricing.output_cost_per_token };
+      prices[modelId] = entry;
+      for (const alias of pricing.deckent_aliases ?? []) {
+        prices[alias] = entry;
+      }
+    }
+    return prices;
+  } catch {
+    return {};
+  }
+}
+
+/**
  * Convert per-token cost to per-MTok for display (multiply by 1M).
  * Never used in calculations — always per-token for math.
  */

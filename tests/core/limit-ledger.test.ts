@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { parseTranscriptUsage, limitCost, type UsageRecord, type LedgerPrices } from '../../src/core/limit-ledger.js';
+import { parseTranscriptUsage, limitCost, resolveModelPrice, type UsageRecord, type LedgerPrices } from '../../src/core/limit-ledger.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -445,5 +445,72 @@ describe('limitCost', () => {
       },
     ];
     expect(limitCost(records, {})).toBe(0);
+  });
+
+  it('prices drifted model IDs via family fallback (stale-key regression, 2026-06-11)', () => {
+    // Regression: transcripts emit claude-opus-4-8 / claude-haiku-4-5-20251001
+    // while cost-config keys claude-opus-4-6 / claude-haiku-4-5 — the exact-match
+    // miss silently priced both at $0 for 8 sprints.
+    const prices: LedgerPrices = {
+      'claude-opus-4-6': { in: 0.000005, out: 0.000025 },
+      opus: { in: 0.000005, out: 0.000025 },
+      'claude-haiku-4-5': { in: 0.000001, out: 0.000005 },
+      'haiku-4-5': { in: 0.000001, out: 0.000005 },
+    };
+    const records: UsageRecord[] = [
+      {
+        ts: null,
+        model: 'claude-opus-4-8',
+        sessionFile: 's.jsonl',
+        projectDir: 'p',
+        in: 1_000,
+        out: 500,
+        cacheRead: 0,
+        cacheWrite: 0,
+      },
+      {
+        ts: null,
+        model: 'claude-haiku-4-5-20251001',
+        sessionFile: 's.jsonl',
+        projectDir: 'p',
+        in: 0,
+        out: 1_000,
+        cacheRead: 0,
+        cacheWrite: 0,
+      },
+    ];
+    // opus-4-8 → family "opus": 1000×0.000005 + 500×0.000025 = 0.0175
+    // dated haiku → family "haiku-4-5": 1000×0.000005 = 0.005
+    expect(limitCost(records, prices)).toBeCloseTo(0.0225, 8);
+  });
+});
+
+describe('resolveModelPrice', () => {
+  const prices: LedgerPrices = {
+    'claude-opus-4-6': { in: 0.000005, out: 0.000025 },
+    opus: { in: 0.000005, out: 0.000025 },
+    'claude-haiku-4-5': { in: 0.000001, out: 0.000005 },
+    'haiku-4-5': { in: 0.000001, out: 0.000005 },
+    o3: { in: 0.00001, out: 0.00004 },
+  };
+
+  it('returns exact match when the model ID is a key', () => {
+    expect(resolveModelPrice(prices, 'claude-opus-4-6')).toEqual({ in: 0.000005, out: 0.000025 });
+  });
+
+  it('falls back to the longest contained key for drifted IDs', () => {
+    // claude-haiku-4-5-20251001 contains both "haiku-4-5" (9) and... the longest wins.
+    expect(resolveModelPrice(prices, 'claude-haiku-4-5-20251001')).toEqual({ in: 0.000001, out: 0.000005 });
+    expect(resolveModelPrice(prices, 'claude-opus-4-8')).toEqual({ in: 0.000005, out: 0.000025 });
+  });
+
+  it('ignores keys shorter than 4 chars in the fallback (no accidental "o3" hits)', () => {
+    // "model-o3x-zzz" contains "o3" but short keys are excluded from family matching
+    expect(resolveModelPrice(prices, 'model-o3x-zzz')).toBeNull();
+  });
+
+  it('returns null when neither exact nor family match exists', () => {
+    expect(resolveModelPrice(prices, 'gemini-2.5-pro')).toBeNull();
+    expect(resolveModelPrice({}, 'claude-opus-4-8')).toBeNull();
   });
 });

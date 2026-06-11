@@ -1289,6 +1289,10 @@ const MESSAGES: MessageMap = {
     en: 'Cache gate: N/A (single-session sprint)',
     tr: 'Önbellek kapısı: N/A (tek oturumlu sprint)',
   },
+  'usage.unknown_models': {
+    en: '⚠ No price found for model(s): {models} — their burn is counted as $0. Run `deckent config update-pricing` or add the model to .deckent/cost-config.json.',
+    tr: '⚠ Şu model(ler) için fiyat bulunamadı: {models} — yakımları $0 sayılıyor. `deckent config update-pricing` çalıştırın veya modeli .deckent/cost-config.json dosyasına ekleyin.',
+  },
 
   // ─── interrogation (Sprint 276 PLAN-INT-1) ───────────────────────────
   'interrogate.intro': {

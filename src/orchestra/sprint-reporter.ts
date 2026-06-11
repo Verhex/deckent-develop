@@ -464,9 +464,12 @@ export function buildSpecializationDriftSection(reports: DriftReport[]): string 
 
 import { debugLog } from '../core/utils.js';
 import { parseTranscriptUsage } from '../core/limit-ledger.js';
-import type { LedgerPrices, UsageRecord } from '../core/limit-ledger.js';
-import { summarizeSprint } from '../core/limit-ledger-report.js';
+import type { LedgerPrices, LedgerOpts, UsageRecord } from '../core/limit-ledger.js';
+import {
+  summarizeSprint, buildTranscriptTaskMap, filterTaskMapToSprint, evaluateCacheGate,
+} from '../core/limit-ledger-report.js';
 import type { CacheGateReport } from '../core/limit-ledger-report.js';
+import { buildLedgerPrices } from '../core/cost-config-loader.js';
 
 /** Injectable options for {@link buildLimitBurnRow} — used in tests. */
 export interface LimitBurnOpts {
@@ -492,7 +495,7 @@ export interface LimitBurnOpts {
  * Returns `null` when ledger is unavailable or returns no records —
  * callers should omit the row silently in that case.
  *
- * @param root      Project root (passed to parseTranscriptUsage)
+ * @param root      Project root (used to load cost-config prices)
  * @param taskCount Number of tasks in the sprint (for per-task average)
  * @param opts      Injectable overrides for hermetic testing
  */
@@ -502,13 +505,19 @@ export async function buildLimitBurnRow(
   opts: LimitBurnOpts = {},
 ): Promise<string | null> {
   try {
-    const parseFn = opts.parseUsage ?? ((o) => parseTranscriptUsage(o ?? {}));
+    // Default parses the global CC transcripts dir (~/.claude/projects) —
+    // LedgerOpts.root is the TRANSCRIPTS root, not the project root, so the
+    // project root must never be forwarded here (it would read the wrong dir
+    // and always yield zero records).
+    const parseFn = opts.parseUsage ?? (() => parseTranscriptUsage({}));
     const summarizeFn = opts.summarize ?? summarizeSprint;
 
-    const records = await parseFn({ root });
+    const records = await parseFn({});
     if (records.length === 0) return null;
 
-    const summary = summarizeFn(records, {}, opts.prices ?? {});
+    // Empty prices would zero every cost and silently drop the row —
+    // default to the project's cost-config price map.
+    const summary = summarizeFn(records, {}, opts.prices ?? buildLedgerPrices(root));
     const total = summary.totals.limitCost;
     if (total <= 0) return null;
 
@@ -542,6 +551,60 @@ export async function buildLimitBurnRow(
     return `| Limit burn | ${fmt(total)} eşdeğer (task-başı ${fmt(perTask)}, boot-cw %${bootShare}%, hit-rate %${hitRatePct}%${gateStr}) |`;
   } catch (e) {
     debugLog('buildLimitBurnRow', e);
+    return null;
+  }
+}
+
+/** Injectable options for {@link buildSprintLimitBurnRow} — used in tests. */
+export interface SprintLimitBurnOpts extends LimitBurnOpts {
+  /** Override transcript task-map builder (injectable for hermetic tests). */
+  buildTaskMap?: (opts: LedgerOpts) => Promise<Record<string, string>>;
+}
+
+/**
+ * Build the retro "Limit burn" row scoped to a single sprint.
+ *
+ * Production entry point for the retro pipeline (finalizeSprint). Assembles
+ * the pieces buildLimitBurnRow leaves to its caller:
+ *   1. Parses the global CC transcripts dir (NOT the project root).
+ *   2. Maps sessions → tasks and filters to this sprint's task IDs — so the
+ *      row reports the sprint's burn, not all-history burn.
+ *   3. Loads prices from cost-config (empty prices would zero the row out).
+ *   4. Evaluates the cache-gate against the sprint-scoped task map.
+ *
+ * Returns null when the sprint has no mapped transcript sessions or on any
+ * ledger error — callers omit the row silently (retro must never be blocked).
+ *
+ * @param projectRoot Project root (cost-config prices)
+ * @param sprintId    Sprint ID — accepts both "sprint-281" and "281"
+ * @param taskCount   Number of tasks in the sprint (for per-task average)
+ * @param opts        Injectable overrides for hermetic testing
+ */
+export async function buildSprintLimitBurnRow(
+  projectRoot: string,
+  sprintId: string,
+  taskCount: number,
+  opts: SprintLimitBurnOpts = {},
+): Promise<string | null> {
+  try {
+    const parseFn = opts.parseUsage ?? (() => parseTranscriptUsage({}));
+    const records = await parseFn({});
+    if (records.length === 0) return null;
+
+    const mapFn = opts.buildTaskMap ?? buildTranscriptTaskMap;
+    const sprintMap = filterTaskMapToSprint(await mapFn({}), sprintId);
+    if (Object.keys(sprintMap).length === 0) return null;
+
+    const prices = opts.prices ?? buildLedgerPrices(projectRoot);
+
+    return buildLimitBurnRow(projectRoot, taskCount, {
+      parseUsage: async () => records,
+      summarize: opts.summarize ?? ((recs, _taskMap, p) => summarizeSprint(recs, sprintMap, p)),
+      prices,
+      evaluateGate: opts.evaluateGate ?? ((recs) => evaluateCacheGate(recs, sprintMap)),
+    });
+  } catch (e) {
+    debugLog('buildSprintLimitBurnRow', e);
     return null;
   }
 }
