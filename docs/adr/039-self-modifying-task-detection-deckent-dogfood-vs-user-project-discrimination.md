@@ -112,3 +112,15 @@ Self-modifying task tamamlandıktan sonra otomatik checkpoint yazılır (sprint-
 - `src/orchestra/sprint-spawner.ts` — Sprint 140+ sequential wave wiring
 
 > **Note (verified vs code, Sprint 172):** The **detection API is real** — `src/orchestra/self-modifying-detector.ts` exports `detectDeckentRepo`, `isSelfModifying`, `isSelfModifyingSprint`, consumed by `src/orchestra/authority-enforcer.ts` and `src/agents/worker.ts`. **However, the "Sprint 140+ Integration Points" did not land:** there is no sequential-wave wiring in `sprint-spawner.ts`, no MCP-restart hook in `sprint-finalizer.ts`, no `SELF_MODIFY_DETECTED` channel in `event-stream.ts`, and the P2 Wave-0 gate is unwired. In practice deckent-dev self-modifying sprints are handled via **ADR-047 (Manuel Subagent Dispatch)** — manual, isolated dispatch — rather than the projected automated sequential-wave / rebuild-restart orchestration. Behavior unchanged; documentation alignment only (records actual state vs the original roadmap).
+
+---
+
+## Amendment — Sprint 281 (2026-06-11, ADR-review, full caller-trace)
+
+**Classification: BOTH** (P4 "user-projede sıfır-overhead no-op" = ürün davranışı; self-mod koruması = dogfood).
+
+**Consumer-claim düzeltmesi (Sprint-172 Note'undaki imprecision):** `authority-enforcer.ts` ve `worker.ts` detector'ı **import etmez** — yalnız `isSelfModifyingSprint` **bayrak-parametresini** kabul ederler (enforcer `AuthorityCheck.isSelfModifyingSprint?:48`, worker `checkWorkerAuthority(..., isSelfModifyingSprint=false)`). Caller-trace (2026-06-11): **bu bayrağı hesaplayıp geçen production caller YOK** — worker-side `checkWorkerAuthority` zaten 0-prod-caller (ADR-037 V1.0 by-design), auditor-side `checkAuthority`'ye de hiçbir yerde `isSelfModifyingSprint:true` geçilmiyor. → **enforcer:302'deki self-mod relaxation dalı fiilen DORMANT** (bayrak asla true olmaz).
+
+**Detector'ın gerçek canlı tüketicisi:** `src/orchestra/rollback.ts:107/178` — `detectDeckentRepo` ile deckent-repo'da rollback-guard (kendi git-ağacını koruma; self-git-mutation bug ailesine karşı gerçek, çalışan koruma). Bugün ADR-039'un canlı değeri budur; sprint-seviye self-mod akışı (P1 sequential, P2 Wave-0 gate, P3 auto-checkpoint) tamamen inmemiş/dormant durumda ve pratik ADR-047 manuel-dispatch ile yürüyor.
+
+**Disposition:** dormant bayrak-zinciri + inmemiş P1-P3 entegrasyonları, **ertelenmiş dormant-audit sweep'ine** katlanır (ADR-038 amendment'i ile aynı karar — yeni acil iş açılmaz). md+db senkron (Alperen ADR-review).

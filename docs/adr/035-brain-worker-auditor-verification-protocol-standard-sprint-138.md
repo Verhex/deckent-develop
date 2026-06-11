@@ -128,3 +128,14 @@ Event stream write başarısız olursa (disk tam, permission hata) → `console.
 > **Note (verified vs code, Sprint 172):** `src/orchestra/event-stream.ts` exists and implements the versioned protocol + channel codes ✓. **However, the "Backward Compatibility Roadmap" did not materialize:** the table projects file-based state soft-deprecated by Sprint 140 and **removed by Sprint 142** — but at Sprint 172 the file-based `.hb`/`.result` mechanism is still the **live primary** path (`src/orchestra/result-collector.ts`, `src/agents/worker.ts`; the ADR-047 manual-dispatch flow reads `.tasks/task-*.result`). The event stream is an **additive layer**, not the sole canonical truth in practice. "Event stream = canonical truth / file-based removed by 142" is design intent, not the current runtime state (consistent with the ADR-037 V1.0 advisory framing in `docs/architecture/authority-matrix.md`). Behavior unchanged; documentation alignment only.
 
 ---
+
+**Amendment — 2026-06-11 (ADR-review, full code-verification):**
+
+1. **Module location:** the canonical implementation moved `src/orchestra/event-stream.ts` → **`src/core/event-stream.ts`** (Sprint 279 WK-import, ADR-008 core→orchestra cycle fix); `src/orchestra/event-stream.ts` is now a ~1KB re-export shim. References/Note paths above predate the move.
+2. **Channel codes 15 → 28 (additive, protocol still 1.0):** all original 15 V1.0 channels remain **verbatim**; 13 were added since (ORPHAN_HB_DETECTED, AUTHORITY_VIOLATION, TIMEOUT_ASSIGN/WARNING/CAP_EXCEEDED/EXTEND, NEVER_DISPATCHED, SPAWN_BLOCKED, DEPENDENCY_BLOCKED, DEPENDENCY_RESOLVED_BY_FIX, AUTH_FAILED, CONTAINER_PATH_SANITIZED, PROGRESS — Sprint 280). Additive channels are forward-compatible per this ADR's own design, so `protocol_version` stays `'1.0'`. ⚠️ Naming-convention deviation: `PROGRESS` is a bare code (not `SOURCE→TARGET:NAME` like every other channel) — future channels should follow the convention.
+3. **Message envelope gained optional lineage fields** `correlationId`/`causationId` (additive — consumers ignoring them stay compatible).
+4. **Re-verified (body-read):** fail-safe (`writeEvent` try/catch → `console.warn` + `null`, never crashes the sprint) ✓; `nextSequence()` monotonic counter ✓; Sprint-172 Note's "file-based still live primary" finding **still true today** (Sprint 280 confirmed: result-collector reads `.tasks/*.result`).
+
+md+db senkron (Alperen ADR-review).
+
+---

@@ -343,3 +343,21 @@ Bu RBAC matrix Protocol Version 1.0 ile birlikte tanımlanmıştır. Değişikli
 - `src/monitor/auditor.ts:verifyWorkerResult()` — 3-pipeline verification implementasyonu
 
 ---
+
+## Amendment — Sprint 281 (2026-06-11, Alperen ADR-review + tartışma)
+
+**Classification: BOTH (dogfood + user-product).** Bu ADR yalnız deckent-iç değil — kullanıcılar kendi projelerinde multi-agent sprint koşturur; RBAC/audit, user + enterprise için **ürün ADR'sidir**.
+
+**1. Re-verification (2026-06-11, gövde-okuma):** Header-note'un V1.0 iddiaları bugün de birebir doğru — `checkWorkerAuthority` (worker.ts:584+) violation'da `console.warn('[ADR-037 soft]')` + `emitAuthorityViolation` (event-trail, Layer-3 canlı) ama **`return true`** (advisory); `enforceVerifyLoop`/`runTestVerifyLoop` 0 runtime-caller (yalnız re-export + doc-comment; worker-default template dürüstçe belgeler); Layer-1 aktif (`lint:adr` ADR-036 review'inde canlı kanıtlandı).
+
+**2. Kural 2 rafinmanı — transport-invariant + tipli mesaj-vocabulary (tartışma sonucu):**
+
+Kural 2'nin doğru okunuşu: **doğrudan peer-kanal YASAK** (socket, başka worker'ın task-dosyasına yazma/okuma, gate'siz context-enjeksiyonu); **TÜM worker-to-worker semantiği Brain-aracılı, event-stream'li mesaj-bus'tan geçer (worker→Brain→worker)**. Gerekçe: rol-gaspı (worker'ın Brain'leşmesi), lateral kontaminasyon (gate'siz talimat enjeksiyonu), denetlenemezlik (event-stream bypass → replay kırılır), scope-koalisyonu, loop'ta görünmez-deadlock + sonsuz-gevezelik (auto-mode token-yangını).
+
+- **Sprint 278 COMM-1 (worker_comms: sharedNotes/handoffNotes/SharedMemory) bu kurala UYUMLUDUR** — Brain-aracılıdır (worker `.result`'a yazar → Brain spawn-time enjekte eder), doğrudan peer-kanal değildir. COMM-1 = mediated-bus'ın v0'ı.
+- **Mesaj-TİPİ vocabulary genişleyebilir (COMM-2, MASTER-PLAN); transport-invariant DEĞİŞMEZ.** Planlanan tipler: `DEPENDENCY_REQUEST` (worker talep eder, **Brain karar verir** — spawn/route/ret), `PAUSED_WAITING_DEPENDENCY` (birinci-sınıf park-durumu: auditor stale-kill yapmaz, timeout/bütçeli — sonsuz park imkansız), `CONTRACT_PUBLISH` (tipli interface/şema ilanı), `INFO_REQUEST/RESPONSE` (üretici-worker'a Brain-yönlendirmeli soru), bounded loop-bütçeleri (review-loop'lar max-iterasyon/mesaj sınırlı).
+- **Worker ASLA Brain rolü üstlenmez — tip-tasarımıyla yapısal garanti:** worker mesajları yalnız **TALEP / YAYIN / SORU** olabilir; **ATAMA / SPAWN / DEĞERLENDİRME / scope-değişikliği** tipleri worker'a kapalıdır. Spawn-kararı, scope, GO/NO-GO Brain-münhasır kalır (matrix değişmedi). Her mesaj event-streamed + Brain-politika-filtreli + bütçeli.
+
+Kullanım ufku: keşfedilen-bağımlılık (worker iş ortasında "X lazım" der → Brain spawn eder → worker parka girer → kontrat döner), paralel interface-tutarlılığı, reviewer↔implementer loop'ları, auto-mode uzun akışlar — hepsi mediated-bus üzerinde, sonsuz senaryo tek invariant'la güvenli.
+
+md+db senkron (Alperen ADR-review).

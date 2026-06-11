@@ -153,3 +153,18 @@ broader scope. ADR-028 amendment required before disposal; scheduled for reasses
 Sprint 142+ (original plan), now overdue — escalate in next architecture review.
 
 **Rollback:** N/A — no changes to source file.
+
+---
+
+## Amendment — Sprint 281 (2026-06-11, ADR-review, full disk re-verification)
+
+**Classification: dogfood-only** (deckent'in kendi modül-disposition kararları).
+
+Tüm disposition iddiaları bugünkü diske + production-caller'lara karşı yeniden doğrulandı:
+
+1. **🟢 `handoff-protocol.ts` REVIVED — DORMANT → LIVE (Sprint 278 COMM-1).** Kademe-2 defer'ının öngördüğü "ya revive (dogfood+test) ya sil" yolunun **revive** çıkışı gerçekleşti: artık `task-builder.ts` + `sprint-controller.ts` tarafından production-import ediliyor (worker_comms handoff enjeksiyonu). Kademe-2'den çıkar — ACTIVE.
+2. **`batch-stats.ts` silinmesi HÂLÂ yapılmadı** (Kademe-1 planı, Sprint 140 hedefliydi) — dosya duruyor, 0-caller. ~141 LoC.
+3. **Gecikmiş reassessment'lar:** `brain-context.ts` (hâlâ 0-production-caller; reassess S142 planı → 139 sprint gecikmiş), `decision-replay.ts` (S230 teyitli 0-caller), `multi-agent.ts` (S278 "disposition" task'ı durumu teyit etti ama dispose etmedi — hâlâ 0-caller, deprecation-marker yok). **Karar:** bunlar + batch-stats silmesi, **ertelenmiş dormant-audit sweep'ine katlanır** ([[project_product_repo_migration_push]] — Alperen: "dormant taramasını işler bitince yeniden yapacağız"); ayrı acil iş açılmaz.
+4. **Yan-bulgu (manifest-mislabel ailesi, ADR-028-W ile aynı):** features.md dead-features `parallel-pipeline-manager`'ı "superseded" listeler ama `parallel-pipeline.ts` mevcut + production-import'lu (Kademe-4 false-positive düzeltmesi hâlâ geçerli).
+
+md+db senkron (Alperen ADR-review).

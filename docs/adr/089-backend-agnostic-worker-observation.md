@@ -1,6 +1,8 @@
 # ADR-089: Backend-Agnostic Worker Observation + Per-Worker Independent Backends
 
-**Status:** accepted (principle + CLI/MCP parity) · firecracker/cloud backends = roadmap (proposed)
+**Status:** accepted
+
+> Scope of acceptance: the backend-agnostic-watch principle + CLI/MCP parity are **accepted**; the firecracker/cloud backends are **roadmap** (forward-looking, see "Roadmap (proposed)" below — not yet built).
 
 **Date:** 2026-06-11
 

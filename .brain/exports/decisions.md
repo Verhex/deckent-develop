@@ -1647,6 +1647,17 @@ Event stream write başarısız olursa (disk tam, permission hata) → `console.
 
 ---
 
+**Amendment — 2026-06-11 (ADR-review, full code-verification):**
+
+1. **Module location:** the canonical implementation moved `src/orchestra/event-stream.ts` → **`src/core/event-stream.ts`** (Sprint 279 WK-import, ADR-008 core→orchestra cycle fix); `src/orchestra/event-stream.ts` is now a ~1KB re-export shim. References/Note paths above predate the move.
+2. **Channel codes 15 → 28 (additive, protocol still 1.0):** all original 15 V1.0 channels remain **verbatim**; 13 were added since (ORPHAN_HB_DETECTED, AUTHORITY_VIOLATION, TIMEOUT_ASSIGN/WARNING/CAP_EXCEEDED/EXTEND, NEVER_DISPATCHED, SPAWN_BLOCKED, DEPENDENCY_BLOCKED, DEPENDENCY_RESOLVED_BY_FIX, AUTH_FAILED, CONTAINER_PATH_SANITIZED, PROGRESS — Sprint 280). Additive channels are forward-compatible per this ADR's own design, so `protocol_version` stays `'1.0'`. ⚠️ Naming-convention deviation: `PROGRESS` is a bare code (not `SOURCE→TARGET:NAME` like every other channel) — future channels should follow the convention.
+3. **Message envelope gained optional lineage fields** `correlationId`/`causationId` (additive — consumers ignoring them stay compatible).
+4. **Re-verified (body-read):** fail-safe (`writeEvent` try/catch → `console.warn` + `null`, never crashes the sprint) ✓; `nextSequence()` monotonic counter ✓; Sprint-172 Note's "file-based still live primary" finding **still true today** (Sprint 280 confirmed: result-collector reads `.tasks/*.result`).
+
+md+db senkron (Alperen ADR-review).
+
+---
+
 
 ---
 
@@ -1706,7 +1717,18 @@ ADR governance'ı kullanıcı-facing ürün özelliğine dönüştürmek. 5 bile
 - ADR-013: DECKENT.md Adapter Pattern — mandatory read wiring pattern
 - MADR v3: https://adr.github.io/madr/
 
-> **Note (verified / Memory V2 reconciliation):** Confirmed in code — `scripts/adr-validator.mjs` + `npm run lint:adr` (format/status-enum/duplicate-ID) and the MADR v3 mandatory `**Status:**` enum are real; the "enforcement is compile-time, not runtime" caveat is accurate (consistent with ADR-037 V1.0). **However, the ADR store evolved (Memory V2, DB-first):** `.brain/DECISIONS.md` is **no longer a live hand-maintained file**. ADRs live in `.brain/memory.db` (`type='adr'`), synced from `docs/adr/*.md` via ADR-046 (`syncAdrFilesToDb`) and exported to `.brain/exports/decisions.md`. Worker-prompt ADR injection is DB-based (`src/orchestra/adr-selector.ts`), not a raw `.brain/DECISIONS.md` read; the brain/worker/auditor rules now state "Query ADRs via MemoryStore — never parse .md files". Read every `.brain/DECISIONS.md` mention above as **shorthand for the ADR governance store** (DB + `docs/adr/` + `exports/decisions.md`) — consistent with ADR-009, `docs/architecture/memory-system.md`, and `CLAUDE.md`. Behavior unchanged; documentation alignment only.
+> **Note (verified / Memory V2 reconciliation):** Confirmed in code — `scripts/adr-validator.mjs` + `npm run lint:adr` (format/status-enum/duplicate-ID) and the MADR v3 mandatory `**Status:**` enum are real; the "enforcement is compile-time, not runtime" caveat is accurate (consistent with ADR-037 V1.0). **However, the ADR store evolved (Memory V2, DB-first):** `.brain/DECISIONS.md` is **no longer a live hand-maintained file**. ADRs live in `.brain/memory.db` (`type='adr'`), synced from `docs/adr/*.md` via ADR-046 (`syncAdrFilesToDb`) and exported to `.brain/exports/decisions.md`. Worker-prompt ADR injection is DB-based (`src/orchestra/adr-selector.ts`), not a raw `.brain/DECISIONS.md` read; the brain/worker/auditor rules now state "Query ADRs via MemoryStore — never parse .md files". Read every `.brain/DECISIONS.md` mention above as **shorthand for the ADR governance store** (DB + `docs/adr/` + `exports/decisions.md`) — consistent with ADR-009 (superseded by ADR-088), `docs/architecture/memory-system.md`, and `CLAUDE.md`. Behavior unchanged; documentation alignment only.
+
+---
+
+**Amendment — 2026-06-11 (ADR-review, full code-verification):**
+
+1. **References correction:** `src/orchestra/task-builder.ts:loadADRContent()` **no longer exists** — the live injection path is the DB query in `task-builder.ts` (`store.getByType('adr').filter(a => a.status === 'accepted')`, ~lines 1200/1377) ranked by `src/orchestra/adr-selector.ts` (relevance + mandatory-ADR floor). The Note's "DB-based, not raw file read" framing was already correct; the References line was stale.
+2. **Validator target:** `scripts/adr-validator.mjs` validates the **generated export** `.brain/exports/decisions.md` (`adr-validator.mjs:166`) — i.e. it effectively validates the DB content (ADR-088 DB-first). Authoring flow: edit `docs/adr/*.md` → sync to DB → `deckent memory export` → `lint:adr`.
+3. **File→DB sync is live:** `syncAdrFilesToDb` (`src/core/adr-file-sync.ts:158`, the ADR-046 hook) runs at post-finalize (`identity-generator.ts:588`) + via the memory CLI — `docs/adr/*.md` is the authoring surface, DB the runtime source.
+4. **Live-proven during this very review:** `lint:adr` caught a real status-enum violation in the newly-authored ADR-089 (`accepted (…) · … (proposed)` mixed status) → fixed to a clean `accepted` + body note → `✓ 78 ADRs validated`. The governance loop works end-to-end. ⚠️ Outstanding warnings (non-fatal): adr-080/081/082/083/086 missing `**Decision:**`/`**Context:**` fields — to be addressed when the file-by-file review reaches them.
+
+md+db senkron (Alperen ADR-review).
 
 ---
 
@@ -2063,6 +2085,24 @@ Bu RBAC matrix Protocol Version 1.0 ile birlikte tanımlanmıştır. Değişikli
 
 ---
 
+## Amendment — Sprint 281 (2026-06-11, Alperen ADR-review + tartışma)
+
+**Classification: BOTH (dogfood + user-product).** Bu ADR yalnız deckent-iç değil — kullanıcılar kendi projelerinde multi-agent sprint koşturur; RBAC/audit, user + enterprise için **ürün ADR'sidir**.
+
+**1. Re-verification (2026-06-11, gövde-okuma):** Header-note'un V1.0 iddiaları bugün de birebir doğru — `checkWorkerAuthority` (worker.ts:584+) violation'da `console.warn('[ADR-037 soft]')` + `emitAuthorityViolation` (event-trail, Layer-3 canlı) ama **`return true`** (advisory); `enforceVerifyLoop`/`runTestVerifyLoop` 0 runtime-caller (yalnız re-export + doc-comment; worker-default template dürüstçe belgeler); Layer-1 aktif (`lint:adr` ADR-036 review'inde canlı kanıtlandı).
+
+**2. Kural 2 rafinmanı — transport-invariant + tipli mesaj-vocabulary (tartışma sonucu):**
+
+Kural 2'nin doğru okunuşu: **doğrudan peer-kanal YASAK** (socket, başka worker'ın task-dosyasına yazma/okuma, gate'siz context-enjeksiyonu); **TÜM worker-to-worker semantiği Brain-aracılı, event-stream'li mesaj-bus'tan geçer (worker→Brain→worker)**. Gerekçe: rol-gaspı (worker'ın Brain'leşmesi), lateral kontaminasyon (gate'siz talimat enjeksiyonu), denetlenemezlik (event-stream bypass → replay kırılır), scope-koalisyonu, loop'ta görünmez-deadlock + sonsuz-gevezelik (auto-mode token-yangını).
+
+- **Sprint 278 COMM-1 (worker_comms: sharedNotes/handoffNotes/SharedMemory) bu kurala UYUMLUDUR** — Brain-aracılıdır (worker `.result`'a yazar → Brain spawn-time enjekte eder), doğrudan peer-kanal değildir. COMM-1 = mediated-bus'ın v0'ı.
+- **Mesaj-TİPİ vocabulary genişleyebilir (COMM-2, MASTER-PLAN); transport-invariant DEĞİŞMEZ.** Planlanan tipler: `DEPENDENCY_REQUEST` (worker talep eder, **Brain karar verir** — spawn/route/ret), `PAUSED_WAITING_DEPENDENCY` (birinci-sınıf park-durumu: auditor stale-kill yapmaz, timeout/bütçeli — sonsuz park imkansız), `CONTRACT_PUBLISH` (tipli interface/şema ilanı), `INFO_REQUEST/RESPONSE` (üretici-worker'a Brain-yönlendirmeli soru), bounded loop-bütçeleri (review-loop'lar max-iterasyon/mesaj sınırlı).
+- **Worker ASLA Brain rolü üstlenmez — tip-tasarımıyla yapısal garanti:** worker mesajları yalnız **TALEP / YAYIN / SORU** olabilir; **ATAMA / SPAWN / DEĞERLENDİRME / scope-değişikliği** tipleri worker'a kapalıdır. Spawn-kararı, scope, GO/NO-GO Brain-münhasır kalır (matrix değişmedi). Her mesaj event-streamed + Brain-politika-filtreli + bütçeli.
+
+Kullanım ufku: keşfedilen-bağımlılık (worker iş ortasında "X lazım" der → Brain spawn eder → worker parka girer → kontrat döner), paralel interface-tutarlılığı, reviewer↔implementer loop'ları, auto-mode uzun akışlar — hepsi mediated-bus üzerinde, sonsuz senaryo tek invariant'la güvenli.
+
+md+db senkron (Alperen ADR-review).
+
 
 ---
 
@@ -2226,6 +2266,21 @@ Sprint 142+ (original plan), now overdue — escalate in next architecture revie
 
 **Rollback:** N/A — no changes to source file.
 
+---
+
+## Amendment — Sprint 281 (2026-06-11, ADR-review, full disk re-verification)
+
+**Classification: dogfood-only** (deckent'in kendi modül-disposition kararları).
+
+Tüm disposition iddiaları bugünkü diske + production-caller'lara karşı yeniden doğrulandı:
+
+1. **🟢 `handoff-protocol.ts` REVIVED — DORMANT → LIVE (Sprint 278 COMM-1).** Kademe-2 defer'ının öngördüğü "ya revive (dogfood+test) ya sil" yolunun **revive** çıkışı gerçekleşti: artık `task-builder.ts` + `sprint-controller.ts` tarafından production-import ediliyor (worker_comms handoff enjeksiyonu). Kademe-2'den çıkar — ACTIVE.
+2. **`batch-stats.ts` silinmesi HÂLÂ yapılmadı** (Kademe-1 planı, Sprint 140 hedefliydi) — dosya duruyor, 0-caller. ~141 LoC.
+3. **Gecikmiş reassessment'lar:** `brain-context.ts` (hâlâ 0-production-caller; reassess S142 planı → 139 sprint gecikmiş), `decision-replay.ts` (S230 teyitli 0-caller), `multi-agent.ts` (S278 "disposition" task'ı durumu teyit etti ama dispose etmedi — hâlâ 0-caller, deprecation-marker yok). **Karar:** bunlar + batch-stats silmesi, **ertelenmiş dormant-audit sweep'ine katlanır** ([[project_product_repo_migration_push]] — Alperen: "dormant taramasını işler bitince yeniden yapacağız"); ayrı acil iş açılmaz.
+4. **Yan-bulgu (manifest-mislabel ailesi, ADR-028-W ile aynı):** features.md dead-features `parallel-pipeline-manager`'ı "superseded" listeler ama `parallel-pipeline.ts` mevcut + production-import'lu (Kademe-4 false-positive düzeltmesi hâlâ geçerli).
+
+md+db senkron (Alperen ADR-review).
+
 
 ---
 
@@ -2347,6 +2402,18 @@ Self-modifying task tamamlandıktan sonra otomatik checkpoint yazılır (sprint-
 - `src/orchestra/sprint-spawner.ts` — Sprint 140+ sequential wave wiring
 
 > **Note (verified vs code, Sprint 172):** The **detection API is real** — `src/orchestra/self-modifying-detector.ts` exports `detectDeckentRepo`, `isSelfModifying`, `isSelfModifyingSprint`, consumed by `src/orchestra/authority-enforcer.ts` and `src/agents/worker.ts`. **However, the "Sprint 140+ Integration Points" did not land:** there is no sequential-wave wiring in `sprint-spawner.ts`, no MCP-restart hook in `sprint-finalizer.ts`, no `SELF_MODIFY_DETECTED` channel in `event-stream.ts`, and the P2 Wave-0 gate is unwired. In practice deckent-dev self-modifying sprints are handled via **ADR-047 (Manuel Subagent Dispatch)** — manual, isolated dispatch — rather than the projected automated sequential-wave / rebuild-restart orchestration. Behavior unchanged; documentation alignment only (records actual state vs the original roadmap).
+
+---
+
+## Amendment — Sprint 281 (2026-06-11, ADR-review, full caller-trace)
+
+**Classification: BOTH** (P4 "user-projede sıfır-overhead no-op" = ürün davranışı; self-mod koruması = dogfood).
+
+**Consumer-claim düzeltmesi (Sprint-172 Note'undaki imprecision):** `authority-enforcer.ts` ve `worker.ts` detector'ı **import etmez** — yalnız `isSelfModifyingSprint` **bayrak-parametresini** kabul ederler (enforcer `AuthorityCheck.isSelfModifyingSprint?:48`, worker `checkWorkerAuthority(..., isSelfModifyingSprint=false)`). Caller-trace (2026-06-11): **bu bayrağı hesaplayıp geçen production caller YOK** — worker-side `checkWorkerAuthority` zaten 0-prod-caller (ADR-037 V1.0 by-design), auditor-side `checkAuthority`'ye de hiçbir yerde `isSelfModifyingSprint:true` geçilmiyor. → **enforcer:302'deki self-mod relaxation dalı fiilen DORMANT** (bayrak asla true olmaz).
+
+**Detector'ın gerçek canlı tüketicisi:** `src/orchestra/rollback.ts:107/178` — `detectDeckentRepo` ile deckent-repo'da rollback-guard (kendi git-ağacını koruma; self-git-mutation bug ailesine karşı gerçek, çalışan koruma). Bugün ADR-039'un canlı değeri budur; sprint-seviye self-mod akışı (P1 sequential, P2 Wave-0 gate, P3 auto-checkpoint) tamamen inmemiş/dormant durumda ve pratik ADR-047 manuel-dispatch ile yürüyor.
+
+**Disposition:** dormant bayrak-zinciri + inmemiş P1-P3 entegrasyonları, **ertelenmiş dormant-audit sweep'ine** katlanır (ADR-038 amendment'i ile aynı karar — yeni acil iş açılmaz). md+db senkron (Alperen ADR-review).
 
 
 ---
@@ -8819,7 +8886,9 @@ Cross-ref: ADR-009 (superseded), ADR-036 (ADR Governance Integration — ADRs in
 
 # ADR-089: Backend-Agnostic Worker Observation + Per-Worker Independent Backends
 
-**Status:** accepted (principle + CLI/MCP parity) · firecracker/cloud backends = roadmap (proposed)
+**Status:** accepted
+
+> Scope of acceptance: the backend-agnostic-watch principle + CLI/MCP parity are **accepted**; the firecracker/cloud backends are **roadmap** (forward-looking, see "Roadmap (proposed)" below — not yet built).
 
 **Date:** 2026-06-11
 
