@@ -21,6 +21,14 @@ export interface ProviderSpawnOptions {
    * `-c model_reasoning_effort=`). Distinct from work-size effort.
    */
   reasoningEffort?: string;
+  /**
+   * Adaptive per-task timeout in seconds (Sprint 280 root-cause fix), computed by
+   * `brainEstimateTimeout` via `emitTimeoutEvents` and passed at every spawn site.
+   * SpawnBackend implementations (docker/tmux/subprocess) use it as the worker
+   * kill-timeout, making the static `docker_timeout` a FALLBACK rather than the
+   * de-facto cap. Host-CLI adapters that lack a timeout wrapper may ignore it.
+   */
+  taskTimeoutSeconds?: number;
 }
 
 // ─── Provider Worker Info ────────────────────────────────────────────

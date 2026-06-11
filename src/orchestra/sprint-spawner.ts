@@ -80,7 +80,16 @@ import { buildWorkerPrompt } from './task-builder.js';
 import { ParallelPipelineManager } from './parallel-pipeline.js';
 
 // ─── Task Router ────────────────────────────────────────────────
-import { routeTask } from './task-router.js';
+import { routeTask, emitTimeoutEvents } from './task-router.js';
+import type { SprintHistory } from './timeout-estimator.js';
+
+// Sprint 280 root-cause fix: adaptive per-task timeout is wired into every spawn
+// path (emitTimeoutEvents was a 0-caller dormant function, so docker_timeout
+// silently capped every worker at ~20min). History-scaling is optional in
+// brainEstimateTimeout (only applies when avgTaskDurationMs > 0), so the
+// spawn-time estimate uses the deterministic effort×loc×scope×backend factors —
+// the effort-based estimate is what matters at dispatch.
+const NO_SPRINT_HISTORY: SprintHistory = { avgTaskDurationMs: 0, sprintCount: 0 };
 
 // ─── Observability ──────────────────────────────────────────────
 import { metric } from '../core/observability.js';
@@ -561,6 +570,12 @@ export async function spawnWorkers(
     // F1-RE (Sprint 252): resolve the model reasoning-effort (opt-in, provider-
     // validated) once; passed to every spawn path below. undefined → no flag.
     const reasoningEffort = resolveReasoningEffort(taskProvider, task.modelEffort);
+    // Sprint 280 root-cause fix: compute + emit the adaptive per-task timeout and
+    // pass it to the spawn backend below as `taskTimeoutSeconds`, so docker_timeout
+    // is the FALLBACK (not the de-facto ~20min cap). emitTimeoutEvents was dormant.
+    const taskTimeoutSeconds = emitTimeoutEvents(
+      task, config, NO_SPRINT_HISTORY, projectRoot, getCurrentSprintId(projectRoot) ?? sprint.id,
+    );
     let adapterRouted = wantsHostAdapter
       ? getProviderAdapterForTask(taskProvider)
       : null;
@@ -591,6 +606,7 @@ export async function spawnWorkers(
         autoApprove: spawnOpts?.autoApprove ?? false,
         projectDir: projectRoot,
         reasoningEffort,
+        taskTimeoutSeconds,
       });
     } else if (wantsHostAdapter) {
       // MF-2 (Sprint 250): host-only provider (codex/gemini/ollama) but its
@@ -613,6 +629,7 @@ export async function spawnWorkers(
         autoApprove: spawnOpts?.autoApprove ?? false,
         projectDir: projectRoot,
         reasoningEffort,
+        taskTimeoutSeconds,
       });
     } else if (!isTmuxProvider(taskProvider)) {
       const adapter = getProviderAdapterForTask(taskProvider);
@@ -698,8 +715,19 @@ export async function respawnEligibleTasks(
 
   const waveStart = Date.now();
 
+  // Sprint 280 FIX-deadlock fix: a MANUAL_REVIEW_REQUIRED upstream must NOT
+  // deadlock its dependents. MRR is only set when a worker timed out / exited
+  // WITH disk-evidence (its deliverable IS on disk) — it is queued for human
+  // review / a FIX-phase retry, never for silent auto-completion to DONE. So a
+  // dependent waiting for that DONE would wait forever and the wave loop would
+  // idle until the sprint timeout (the observed 280-007 → 280-009/010 knot).
+  // Treating MRR as dependency-satisfying lets the wave progress; the MRR task
+  // itself still surfaces for review and is re-evaluated (→ NO_GO → FIX) in the
+  // EVALUATE phase the unblocked wave now allows the sprint to reach.
   const doneTasks = new Set(
-    sprint.tasks.filter(t => t.status === TaskStatus.DONE).map(t => t.id),
+    sprint.tasks
+      .filter(t => t.status === TaskStatus.DONE || t.status === TaskStatus.MANUAL_REVIEW_REQUIRED)
+      .map(t => t.id),
   );
 
   // Build dependency graph for enforcement (Sprint 139 Task 028)
@@ -787,6 +815,12 @@ export async function respawnEligibleTasks(
     // F1-RE (Sprint 252): resolve the model reasoning-effort (opt-in, provider-
     // validated) once; passed to every spawn path below. undefined → no flag.
     const reasoningEffort = resolveReasoningEffort(taskProvider, task.modelEffort);
+    // Sprint 280 root-cause fix: compute + emit the adaptive per-task timeout and
+    // pass it to the spawn backend below as `taskTimeoutSeconds`, so docker_timeout
+    // is the FALLBACK (not the de-facto ~20min cap). emitTimeoutEvents was dormant.
+    const taskTimeoutSeconds = emitTimeoutEvents(
+      task, config, NO_SPRINT_HISTORY, projectRoot, getCurrentSprintId(projectRoot) ?? sprint.id,
+    );
     let adapterRouted = wantsHostAdapter
       ? getProviderAdapterForTask(taskProvider)
       : null;
@@ -813,6 +847,7 @@ export async function respawnEligibleTasks(
         autoApprove: spawnOpts?.autoApprove ?? false,
         projectDir: projectRoot,
         reasoningEffort,
+        taskTimeoutSeconds,
       });
     } else if (wantsHostAdapter) {
       // MF-2 (Sprint 250): FIX-phase re-spawn of a host-only provider whose
@@ -834,6 +869,7 @@ export async function respawnEligibleTasks(
         autoApprove: spawnOpts?.autoApprove ?? false,
         projectDir: projectRoot,
         reasoningEffort,
+        taskTimeoutSeconds,
       });
     } else if (!isTmuxProvider(taskProvider)) {
       const adapter = getProviderAdapterForTask(taskProvider);

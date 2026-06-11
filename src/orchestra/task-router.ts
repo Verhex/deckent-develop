@@ -406,7 +406,7 @@ export function emitTimeoutEvents(
   history: SprintHistory,
   projectRoot: string,
   sprintId: string,
-): void {
+): number {
   const { timeoutSeconds, breakdown } = brainEstimateTimeout(task, config, history);
 
   writeEvent(
@@ -428,4 +428,12 @@ export function emitTimeoutEvents(
       { taskId: task.id, requested: breakdown.estimated, capped: timeoutSeconds },
     );
   }
+
+  // Sprint 280 root-cause fix: return the per-task adaptive timeout so the
+  // spawn sites can pass it as `taskTimeoutSeconds`. Previously this function
+  // was a 0-caller (dormant) telemetry-only emit, so every worker silently
+  // fell back to the static `docker_timeout` (default 1200s = 20min) in
+  // spawn-backend-docker.ts:`effectiveTimeout = taskTimeoutSeconds ?? this.timeoutSeconds`.
+  // Wiring the return value makes `docker_timeout` the FALLBACK, not the de-facto cap.
+  return timeoutSeconds;
 }
