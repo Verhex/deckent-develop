@@ -157,3 +157,15 @@ Sprint 168 ADR-048 = **tmpfile lifecycle** (write → persist → archive). Bu a
 **Related amendments:** —
 **Supersedes:** —
 **Superseded by:** —
+
+---
+
+### Sprint 281 Amendment — Re-verification + Live Proof (2026-06-11, ADR-review)
+
+**Classification: BOTH** (prompt lifecycle kullanıcı projelerindeki worker'ları doğrudan etkiler — tmpfile + content katmanlarının ikisi de ürün davranışı).
+
+**Re-verified (her iki katman, gövde-okuma):**
+- **Tmpfile (S168):** selective filter (`claude.ts:160/168`) + `getActiveWorkerIds` — `PENDING_SPAWNS` union dahil (`active-workers.ts:17-26`, S172-Note'un "süperset" nüansı geçerli) + `cleanupPreviousSprintOrphans` (`sprint-lifecycle.ts:236`) + `archivePromptFiles` (`spawn-backend-docker.ts:1410` — satır-drift, fonksiyon mevcut) + 4 test dosyası ✓.
+- **Content (S182):** truncation-grep'in kalan 6 hit'i incelendi — **ihlal değil**: `prompt-god-template.ts:290-291/320-321` kaldırmayı belgeleyen yorumlar; `:522 truncateAtParagraph` yalnız **dependency-NOTES özeti** için (`DEPENDENCY_NOTES_MAX_CHARS` — skill/ADR içeriği değil, Amendment-§1 kapsamı dışı, meşru). `minScore`/`adr_min_relevance` canlı (`prompt-god-template.ts:324/333` + `config.prompt`), `overrideWarnings` (`task-types.ts:311`), `getAgentPrompt` PROMPT.md-kanonik (`agent-pool.ts:603-610`) ✓.
+
+**Canlı kanıt (Sprint 279/280):** Sprint 280 worker-prompt'u (`.tasks/.prompt-280-007-*.txt`) **full SKILL.md** içerikli gözlendi (truncation-yok kuralı canlı); Sprint 279 prompt'ları `.tasks/archive/sprint-279/` altında arşivli (persist→archive lifecycle canlı). İki katman da üretimde çalışıyor. md+db senkron (Alperen ADR-review).

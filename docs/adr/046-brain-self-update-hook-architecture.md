@@ -421,3 +421,15 @@ flip proceeds.
 > - **Duplicate dosya:** `046-brain-self-update-hook.md` artık `# ADR-NNN:` H1 + `**Status:**` taşımayan bir insan/link redirect'idir; `adr-file-sync` onu `skipped` sayar, bu canonical `adr-046` entry'sini ezemez.
 >
 > Behavior unchanged; documentation alignment only.
+
+---
+
+## Amendment — Sprint 281 (2026-06-11, ADR-review, full code-verification)
+
+**Classification: BOTH** (post-finalize hook'lar kullanıcı projelerinde de çalışır — CLAUDE.md güncellemesi, rule-regen, ADR-sync ürün davranışıdır).
+
+1. **Duplicate-dosya teyidi (yapısal bulgu kapandı):** `046-brain-self-update-hook.md` bilinçli bir **redirect tasarımıdır** — kasıtlı olarak `# ADR-NNN:` H1 ve `**Status:**` taşımaz, böylece `parseAdrFile()` null döner ve `syncAdrFilesToDb()` onu `skipped` sayar; canonical `adr-046` entry'sini asla ezemez (rationale dosya-içi HTML-yorumda). **Her iki dosya da korunur** — redirect, eski linklerin insan-okur sürekliliği içindir. ADR-review'in başlangıç taraması bunu "duplicate hata" sanmıştı; kasıtlı-tasarım olarak doğrulandı.
+2. **Re-verified:** invariant testler (`tests/core/identity-generator-step-order.test.ts` + `adr-046-step-ordering-invariant.test.ts`) ✓ · forward `syncAdrFilesToDb` post-finalize'da canlı (`identity-generator.ts:588`) ✓ · reverse `exportAdrsToFs` (`memory-export.ts:317`) ✓. **Bu bi-directional FS↔DB kontratı, 2026-06-11 ADR-review'inin md+db eş-zamanlı güncelleme metodolojisini güvenli kılan mekanizmadır** (md edit → db update → post-finalize re-sync idempotent).
+3. **Staleness düzeltmesi:** Sprint-172 Note'undaki "deckent-dev'de `dependency_pipeline_enabled` bilinçle `false` kalır" cümlesi **superseded** — flag 2026-06-10'da `true`'ya çevrildi ve multi-wave canlı-kanıtlı (bkz. ADR-045 Sprint-281 amendment).
+
+md+db senkron (Alperen ADR-review).

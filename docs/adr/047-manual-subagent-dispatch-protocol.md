@@ -470,3 +470,16 @@ Bu ADR Sprint 168 GO kararinin mimari anchor'idir.
 > - **Numaralandırma:** "Step 2/4/5 partial" (§Context) ve §"Related ADRs"daki "Step 4/5/12" — ADR-046'da netleştirildiği gibi `finalizeSprint` 13-adım CLEANUP zinciri numaralandırmasıdır, ADR-046 §5.1'in 4-hook `runPostFinalizeHooks` kontratı değil.
 >
 > Behavior unchanged; documentation alignment only.
+
+---
+
+## Amendment — Sprint 281 (2026-06-11, ADR-review): Rol değişimi — birincil işletim modu → survival-fallback
+
+**Classification: dogfood-only** (deckent'in kendi onarımı/orkestrasyonu için Alperen-güdümlü protokol; parity-tablosu ürün özelliklerine köprü kurar).
+
+**İşletim-gerçekliği güncellemesi (Sprint-172 Note'u superseded):** Note'un "ADR-047 hâlâ fiilî kanonik işletim modu" tespiti artık geçerli DEĞİL. Sprint ~270'ten itibaren deckent-dev **Brain-otonom** çalışır: otonom dogfood-loop'un kendisi `deckent plan --structured && deckent start` akışıdır (Sprint 277/278/279/280 bu yolla koştu — manuel subagent dispatch değil). ADR'nin §"Sprint 169+ Brain Otonom Hedefi" parity tablosu **büyük ölçüde gerçekleşti:**
+
+- **Wave structure:** `dependency_pipeline_enabled=true` — canlı multi-wave (Sprint 279/280 kademeli wave yürütme; ADR-045 Sprint-281 amendment). Note'un "pipeline false / flip gerçekleşmedi" cümlesi superseded.
+- **File authority:** scope.filesWrite + auditor advisory (ADR-037 V1.0 tasarımı gereği) ✓ · **TDD/eval gate:** Brain GO/NO_GO + CC disk-verify close-out zinciri ✓ · **Checkpoint:** `deckent_checkpoint` + insan-onaylı sprint-start ✓ · **Lock pattern:** `.locks/` + spawn-time lock ✓ · **Survival fallback:** `deckent recover`/`run` + CC manuel müdahale ✓.
+
+**Rol kararı (Alperen):** ADR'nin kendi öngörüsü "parity sağlanınca deprecated olacak" idi — ancak **deprecated YAPILMAZ**: Prensip-7 (Manual Survival Fallback) kalıcı değer taşır ve **Sprint 280'de fiilen kullanıldı** (worker-timeout deadlock'unda TaskStop + manuel sprint-state finalize + CC el-düzeltmeleri — protokolün fallback-yüzü). ADR **accepted kalır**; rolü **"birincil işletim modu" → "survival-fallback"** olarak güncellenir: Brain-otonom birincil yoldur, Brain güvenilmez/kırık olduğunda ya da otonom akış düğümlendiğinde bu protokol devreye girer. md+db senkron (Alperen ADR-review).

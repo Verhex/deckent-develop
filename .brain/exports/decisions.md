@@ -3897,6 +3897,18 @@ flip proceeds.
 >
 > Behavior unchanged; documentation alignment only.
 
+---
+
+## Amendment — Sprint 281 (2026-06-11, ADR-review, full code-verification)
+
+**Classification: BOTH** (post-finalize hook'lar kullanıcı projelerinde de çalışır — CLAUDE.md güncellemesi, rule-regen, ADR-sync ürün davranışıdır).
+
+1. **Duplicate-dosya teyidi (yapısal bulgu kapandı):** `046-brain-self-update-hook.md` bilinçli bir **redirect tasarımıdır** — kasıtlı olarak `# ADR-NNN:` H1 ve `**Status:**` taşımaz, böylece `parseAdrFile()` null döner ve `syncAdrFilesToDb()` onu `skipped` sayar; canonical `adr-046` entry'sini asla ezemez (rationale dosya-içi HTML-yorumda). **Her iki dosya da korunur** — redirect, eski linklerin insan-okur sürekliliği içindir. ADR-review'in başlangıç taraması bunu "duplicate hata" sanmıştı; kasıtlı-tasarım olarak doğrulandı.
+2. **Re-verified:** invariant testler (`tests/core/identity-generator-step-order.test.ts` + `adr-046-step-ordering-invariant.test.ts`) ✓ · forward `syncAdrFilesToDb` post-finalize'da canlı (`identity-generator.ts:588`) ✓ · reverse `exportAdrsToFs` (`memory-export.ts:317`) ✓. **Bu bi-directional FS↔DB kontratı, 2026-06-11 ADR-review'inin md+db eş-zamanlı güncelleme metodolojisini güvenli kılan mekanizmadır** (md edit → db update → post-finalize re-sync idempotent).
+3. **Staleness düzeltmesi:** Sprint-172 Note'undaki "deckent-dev'de `dependency_pipeline_enabled` bilinçle `false` kalır" cümlesi **superseded** — flag 2026-06-10'da `true`'ya çevrildi ve multi-wave canlı-kanıtlı (bkz. ADR-045 Sprint-281 amendment).
+
+md+db senkron (Alperen ADR-review).
+
 
 ---
 
@@ -4377,6 +4389,19 @@ Bu ADR Sprint 168 GO kararinin mimari anchor'idir.
 >
 > Behavior unchanged; documentation alignment only.
 
+---
+
+## Amendment — Sprint 281 (2026-06-11, ADR-review): Rol değişimi — birincil işletim modu → survival-fallback
+
+**Classification: dogfood-only** (deckent'in kendi onarımı/orkestrasyonu için Alperen-güdümlü protokol; parity-tablosu ürün özelliklerine köprü kurar).
+
+**İşletim-gerçekliği güncellemesi (Sprint-172 Note'u superseded):** Note'un "ADR-047 hâlâ fiilî kanonik işletim modu" tespiti artık geçerli DEĞİL. Sprint ~270'ten itibaren deckent-dev **Brain-otonom** çalışır: otonom dogfood-loop'un kendisi `deckent plan --structured && deckent start` akışıdır (Sprint 277/278/279/280 bu yolla koştu — manuel subagent dispatch değil). ADR'nin §"Sprint 169+ Brain Otonom Hedefi" parity tablosu **büyük ölçüde gerçekleşti:**
+
+- **Wave structure:** `dependency_pipeline_enabled=true` — canlı multi-wave (Sprint 279/280 kademeli wave yürütme; ADR-045 Sprint-281 amendment). Note'un "pipeline false / flip gerçekleşmedi" cümlesi superseded.
+- **File authority:** scope.filesWrite + auditor advisory (ADR-037 V1.0 tasarımı gereği) ✓ · **TDD/eval gate:** Brain GO/NO_GO + CC disk-verify close-out zinciri ✓ · **Checkpoint:** `deckent_checkpoint` + insan-onaylı sprint-start ✓ · **Lock pattern:** `.locks/` + spawn-time lock ✓ · **Survival fallback:** `deckent recover`/`run` + CC manuel müdahale ✓.
+
+**Rol kararı (Alperen):** ADR'nin kendi öngörüsü "parity sağlanınca deprecated olacak" idi — ancak **deprecated YAPILMAZ**: Prensip-7 (Manual Survival Fallback) kalıcı değer taşır ve **Sprint 280'de fiilen kullanıldı** (worker-timeout deadlock'unda TaskStop + manuel sprint-state finalize + CC el-düzeltmeleri — protokolün fallback-yüzü). ADR **accepted kalır**; rolü **"birincil işletim modu" → "survival-fallback"** olarak güncellenir: Brain-otonom birincil yoldur, Brain güvenilmez/kırık olduğunda ya da otonom akış düğümlendiğinde bu protokol devreye girer. md+db senkron (Alperen ADR-review).
+
 
 ---
 
@@ -4543,6 +4568,18 @@ Sprint 168 ADR-048 = **tmpfile lifecycle** (write → persist → archive). Bu a
 **Related amendments:** —
 **Supersedes:** —
 **Superseded by:** —
+
+---
+
+### Sprint 281 Amendment — Re-verification + Live Proof (2026-06-11, ADR-review)
+
+**Classification: BOTH** (prompt lifecycle kullanıcı projelerindeki worker'ları doğrudan etkiler — tmpfile + content katmanlarının ikisi de ürün davranışı).
+
+**Re-verified (her iki katman, gövde-okuma):**
+- **Tmpfile (S168):** selective filter (`claude.ts:160/168`) + `getActiveWorkerIds` — `PENDING_SPAWNS` union dahil (`active-workers.ts:17-26`, S172-Note'un "süperset" nüansı geçerli) + `cleanupPreviousSprintOrphans` (`sprint-lifecycle.ts:236`) + `archivePromptFiles` (`spawn-backend-docker.ts:1410` — satır-drift, fonksiyon mevcut) + 4 test dosyası ✓.
+- **Content (S182):** truncation-grep'in kalan 6 hit'i incelendi — **ihlal değil**: `prompt-god-template.ts:290-291/320-321` kaldırmayı belgeleyen yorumlar; `:522 truncateAtParagraph` yalnız **dependency-NOTES özeti** için (`DEPENDENCY_NOTES_MAX_CHARS` — skill/ADR içeriği değil, Amendment-§1 kapsamı dışı, meşru). `minScore`/`adr_min_relevance` canlı (`prompt-god-template.ts:324/333` + `config.prompt`), `overrideWarnings` (`task-types.ts:311`), `getAgentPrompt` PROMPT.md-kanonik (`agent-pool.ts:603-610`) ✓.
+
+**Canlı kanıt (Sprint 279/280):** Sprint 280 worker-prompt'u (`.tasks/.prompt-280-007-*.txt`) **full SKILL.md** içerikli gözlendi (truncation-yok kuralı canlı); Sprint 279 prompt'ları `.tasks/archive/sprint-279/` altında arşivli (persist→archive lifecycle canlı). İki katman da üretimde çalışıyor. md+db senkron (Alperen ADR-review).
 
 
 ---
