@@ -7667,3 +7667,34 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 279-011: MASTER-PLAN — M-küme işaretleri (DONE)
 
 ---
+## Sprint 280 — sprint-280
+
+**Status:** COMPLETE
+**Date:** 2026-06-11
+**Duration:** 6705s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 10 |
+| Completed | 7 |
+| Tech Debt | 2 |
+| No-Go | 3 |
+| Coverage | NaN% |
+| Duration | 6705462ms |
+
+### Tasks
+
+- 280-001: PLANOBS-001 — event-stream PROGRESS channel + emitProgress helper (DONE)
+- 280-002: PLANOBS-002 — notify 'progress' + 'phase-change' event-tipleri (3 surface) (DONE)
+- 280-003: APPROVE-007b — modifiedPayload IPC transport + executor consume (OPUS) (DONE)
+- 280-004: REPL /mcp broker wire — G1 (mcp-bridge → chat-native) (OPUS, Tier-1) (GO_WITH_TECH_DEBT)
+- 280-005: PLANOBS-001 emit-site'ları — EXECUTE-% + spawn + pre-vitest (GO_WITH_TECH_DEBT)
+- 280-006: PLANOBS-004 — planner-fail notify + plan spinner (DONE)
+- 280-007: PLANOBS-005 — start çift-planSprint kaldır + .tasks cache + start-fail notify (OPUS) (NO_GO)
+- 280-008: APPROVE-007b — REPL /nervous edit (chat-nervous-bridge handleEdit) (DONE)
+- 280-009: features + cli-commands — L-küme satırları (NO_GO)
+- 280-010: MASTER-PLAN — §4G L-küme işaretleri (NO_GO)
+
+---
