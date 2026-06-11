@@ -7737,6 +7737,18 @@ The hardcoded counts are removed. Every sprint finalization regenerates the arch
 - `src/core/activation-engine.ts` (SKILL_AGENT_MAP, getSkillAgentAffinityBonus)
 - `src/orchestra/managed-docs/content-generators.ts` (countModules, architecture-map generator)
 
+---
+
+## Amendment — Sprint 281 (2026-06-11, ADR-review, full code-verification)
+
+**Classification: BOTH** (evolution = çekirdek farklılaştırıcı/moat — ürün hikâyesinin kendisi).
+
+**Re-verified — 6 wire da CANLI, ancak API-nüansı kayda geçer (gelecek denetimler yanılmasın):** Part-A'daki fonksiyon-isimleri (`recordLineage`/`retireAgent`/`detectDrift`/`revertPrompt`) **kavramsaldır** — canlı API **sınıf-temellidir** ve modüller **`src/agents/`**'tadır: `promotion-pipeline.ts:12-13` `AgentGenealogy` + `AgentRetirement` import edip instance-alan olarak tutar (:73-74); `sprint-reporter.ts:377-382` `SpecializationDriftDetector`'ı wire eder (Task 212-005 kod-içi belgeli); `prompt-evolution.ts:10` `PromptRollback`'a delege eder (:164). Yüzeysel fonksiyon-adı-grep'i 0-caller gösterir — **doğru proof-pattern sınıf-adı seviyesindedir** (`grep -rl "AgentGenealogy" src/ | grep -v test | grep -v def-file` ≥1). `wirePromptEvolutionFromOutcomes` (1 dış-caller) + `adaptAgentRuntime` (3) fonksiyon-seviyesinde de doğrulanır.
+
+**Part-B/C re-verified:** `SKILL_AGENT_MAP` + `SKILL_AGENT_AFFINITY_BONUS` (`activation-engine.ts:328-330`) + `routing-diversity-guard.test.ts` ✓ · `countModules` (`content-generators.ts:112`) ✓.
+
+**Evrim:** F5 zinciri sonradan **ADR-078** "Active Identity-Mutation Loop" ile genişledi; ölçek-validasyonu (F5-008r, 1000+-variant) MASTER-PLAN §K'da açık iş. md+db senkron (Alperen ADR-review).
+
 
 ---
 
@@ -7849,6 +7861,18 @@ All extension tests mock the `vscode` module — no `vscode` runtime dependency 
 - ADR-034: Multi-Project Isolation (per-project security boundaries)
 - ADR-074: Native Chat Real Round-Trip (Path B baseline; this ADR adds Path A)
 - `[[feedback_wiring_pct_vs_user_working]]` — user-working proof requirement
+
+---
+
+## Amendment — Sprint 281 (2026-06-11, ADR-review, full code-verification)
+
+**Classification: BOTH** (auth-akışı + serve/chat/IDE tamamen user-facing).
+
+**Re-verified (dört part da):** Part-A auth-aware forwarding (`spawn-backend-docker.ts:667/677/747` — subscription'da key container'a sızmaz; per-task `Auth:` override zinciri `task-router.ts:51`) ✓ · Part-B `__DECKENT_API_TOKEN__` inject (`server.ts:693/1111/1317`) — **2026-06-11 UX-denetiminde CANLI gözlendi** (serve auto-mint + dashboard 200'leri) ✓ · Part-C `chat-backend.ts` (Path-A, `runChatNativeLoop` köprüsü) mevcut ✓ · Part-D vscode extension gerçek dosyaları ✓.
+
+**🟢 Product-sprint için kritik tespit:** Dashboard-Chat-HOLLOW bulgusunun (UX-denetim #1, `project_dashboard_chat_audit_20260611`) eksiği **yalnız frontend-wiring'dir** — Path-A backend (`chat-backend.ts` + `/api/chat/stream`) bu ADR'yle hazır; `ChatPage.tsx` NL-girdisini ona yönlendirmiyor (command-router'da takılı). Fix-kapsamı = ChatPage→Path-A frontend-wire.
+
+**Uzantı:** Part-A'nın auth-mode temeli üzerine **F1-CB billing-follows-auth** (S254) maliyet-doğruluğunu ekledi (subscription/local=$0). md+db senkron (Alperen ADR-review).
 
 
 ---
@@ -7986,6 +8010,16 @@ No new runtime dependencies — Node.js built-in `fetch` (available Node.js ≥1
 - DeepSeek API: https://api.deepseek.com/v1 (OpenAI-compatible)
 - Qwen DashScope: https://dashscope.aliyuncs.com/compatible-mode/v1 (OpenAI-compatible)
 - GLM/Zhipu: https://open.bigmodel.cn/api/paas/v4 (OpenAI-compatible)
+
+---
+
+## Amendment — Sprint 281 (2026-06-11, ADR-review, full code-verification)
+
+**Classification: BOTH** (provider-free çekirdek ürün vaadi; 3rd-party maliyet-avantajı doğrudan user-değeri).
+
+**Re-verified (dört part da canlı):** Part-A adapter + 3 preset (`openai-compatible.ts:52/228`) ✓ · Part-B `PROVIDER_MAP` deepseek/qwen/zhipu (`model-catalog.ts:122-124`) ✓ · Part-C bootstrap auto-register + `.deck`-köprüsü (`provider.ts:718-721`, `DECKENT_DEEPSEEK_API_KEY` → env) ✓ · Part-D `multi-provider-smoke.mjs` ✓.
+
+**Canlı evrim:** Sprint 248-254 bu temeli **gerçek mixed-fleet dogfood'una** taşıdı — Sprint 249'da 15 task / 4 gerçek provider eşzamanlı koştu (forensics: `docs/alperen-analysis/2026-06-09-mixed-fleet-sprint249-forensics.md`); **ADR-078** "8-Provider Runtime" bunu runtime'da resmîleştirdi; **F1-CB billing-follows-auth** (S254) 3rd-party maliyet-etiketlerini de doğru-temelledi; ollama/deepseek/qwen/glm kullanıcı-dokümanları S244'te eklendi. md+db senkron (Alperen ADR-review).
 
 
 ---
@@ -8170,6 +8204,18 @@ All endpoints return empty arrays when no data is present (graceful empty state)
 - `[[project_test_home_leak]]` — HOME sandbox motivation
 - `[[project_deckent_runtime_ecosystem]]` — 8-provider + evolving agent + god-level dashboard vision
 - `[[project_dashboard_control_plane]]` — F7 god-level scope
+
+---
+
+## Amendment — Sprint 281 (2026-06-11, ADR-review, full code-verification)
+
+**Classification: BOTH.**
+
+1. **Part-A ✓ savaş-testli:** 3 hermeticity-artifact'ı mevcut (`test-ci-sim.mjs` + `lint-test-hermeticity.mjs` + `sandbox-home.ts`); S214-215 CI-yeşertmesinin kalıcı disiplini; karpathy-rules "Test Hermeticity" anchor'ı canlı. (Async/hermeticity kanunu artık **ADR-087**'de agent-inject — bu Part'ın governance-mirasçısı.)
+2. **🔴 Part-B yarım — overflow DORMANT:** bootstrap-register ✓ (`provider.ts:718+`) + per-worker auth-resolution ✓ (`task-router.ts` authMode-zinciri) AMA **`provider-overflow.resolveWithOverflow` 0-caller** — subs→API tier-preserving overflow inşa edildi, spawn-error/FIX yoluna hiç bağlanmadı (MASTER-PLAN W-K(detail) #4'ün tespiti; F1-010 ailesi). **Ertelenmiş dormant-sweep'e katlanır** (zaten W-K maddesi; yeni iş açılmadı).
+3. **Part-C ✓ canlı — API-adı nüansı (ADR-075 deseniyle aynı):** `applyAdaptation(agent, proposal, registry)` ismi kavramsaldır; canlı implementasyon `promotion-pipeline.ts:273+` "F5-008 Active identity-mutation loop" — `IdentityMutationOpts` (:46, `requiresApproval`-gated + variant-fingerprint-idempotent), genealogy'ye `identity-mutation` kaydı (:344). Yüzeysel fonksiyon-adı-grep'i yanıltır.
+4. **Part-D ✓ + tasarım-notu:** evolution-endpoint + 4 sayfa canlı. **EnterprisePage "read-first (no write actions in V1)" bu ADR'nin bilinçli kararıydı** — 2026-06-11 UX-denetiminin "enterprise salt-okunur" bulgusu (#6) V1-by-design'dır; gerçek ürün-boşluğu **V2 yönetim-düzlemi CRUD'udur** (ADR-068 god-level boşluk-haritası #1).
+5. **lint:adr format-notu (kozmetik):** Bu ADR (ve 079-083/086) `## Context`/`## Decision` başlık-stilini kullanır; validator bold-inline `**Decision:**` alanını "recommended" sayar — uyarı substans-dışıdır, içerik tamdır. md+db senkron (Alperen ADR-review).
 
 
 ---

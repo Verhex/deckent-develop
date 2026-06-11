@@ -127,3 +127,13 @@ No new runtime dependencies — Node.js built-in `fetch` (available Node.js ≥1
 - DeepSeek API: https://api.deepseek.com/v1 (OpenAI-compatible)
 - Qwen DashScope: https://dashscope.aliyuncs.com/compatible-mode/v1 (OpenAI-compatible)
 - GLM/Zhipu: https://open.bigmodel.cn/api/paas/v4 (OpenAI-compatible)
+
+---
+
+## Amendment — Sprint 281 (2026-06-11, ADR-review, full code-verification)
+
+**Classification: BOTH** (provider-free çekirdek ürün vaadi; 3rd-party maliyet-avantajı doğrudan user-değeri).
+
+**Re-verified (dört part da canlı):** Part-A adapter + 3 preset (`openai-compatible.ts:52/228`) ✓ · Part-B `PROVIDER_MAP` deepseek/qwen/zhipu (`model-catalog.ts:122-124`) ✓ · Part-C bootstrap auto-register + `.deck`-köprüsü (`provider.ts:718-721`, `DECKENT_DEEPSEEK_API_KEY` → env) ✓ · Part-D `multi-provider-smoke.mjs` ✓.
+
+**Canlı evrim:** Sprint 248-254 bu temeli **gerçek mixed-fleet dogfood'una** taşıdı — Sprint 249'da 15 task / 4 gerçek provider eşzamanlı koştu (forensics: `docs/alperen-analysis/2026-06-09-mixed-fleet-sprint249-forensics.md`); **ADR-078** "8-Provider Runtime" bunu runtime'da resmîleştirdi; **F1-CB billing-follows-auth** (S254) 3rd-party maliyet-etiketlerini de doğru-temelledi; ollama/deepseek/qwen/glm kullanıcı-dokümanları S244'te eklendi. md+db senkron (Alperen ADR-review).

@@ -174,3 +174,15 @@ All endpoints return empty arrays when no data is present (graceful empty state)
 - `[[project_test_home_leak]]` — HOME sandbox motivation
 - `[[project_deckent_runtime_ecosystem]]` — 8-provider + evolving agent + god-level dashboard vision
 - `[[project_dashboard_control_plane]]` — F7 god-level scope
+
+---
+
+## Amendment — Sprint 281 (2026-06-11, ADR-review, full code-verification)
+
+**Classification: BOTH.**
+
+1. **Part-A ✓ savaş-testli:** 3 hermeticity-artifact'ı mevcut (`test-ci-sim.mjs` + `lint-test-hermeticity.mjs` + `sandbox-home.ts`); S214-215 CI-yeşertmesinin kalıcı disiplini; karpathy-rules "Test Hermeticity" anchor'ı canlı. (Async/hermeticity kanunu artık **ADR-087**'de agent-inject — bu Part'ın governance-mirasçısı.)
+2. **🔴 Part-B yarım — overflow DORMANT:** bootstrap-register ✓ (`provider.ts:718+`) + per-worker auth-resolution ✓ (`task-router.ts` authMode-zinciri) AMA **`provider-overflow.resolveWithOverflow` 0-caller** — subs→API tier-preserving overflow inşa edildi, spawn-error/FIX yoluna hiç bağlanmadı (MASTER-PLAN W-K(detail) #4'ün tespiti; F1-010 ailesi). **Ertelenmiş dormant-sweep'e katlanır** (zaten W-K maddesi; yeni iş açılmadı).
+3. **Part-C ✓ canlı — API-adı nüansı (ADR-075 deseniyle aynı):** `applyAdaptation(agent, proposal, registry)` ismi kavramsaldır; canlı implementasyon `promotion-pipeline.ts:273+` "F5-008 Active identity-mutation loop" — `IdentityMutationOpts` (:46, `requiresApproval`-gated + variant-fingerprint-idempotent), genealogy'ye `identity-mutation` kaydı (:344). Yüzeysel fonksiyon-adı-grep'i yanıltır.
+4. **Part-D ✓ + tasarım-notu:** evolution-endpoint + 4 sayfa canlı. **EnterprisePage "read-first (no write actions in V1)" bu ADR'nin bilinçli kararıydı** — 2026-06-11 UX-denetiminin "enterprise salt-okunur" bulgusu (#6) V1-by-design'dır; gerçek ürün-boşluğu **V2 yönetim-düzlemi CRUD'udur** (ADR-068 god-level boşluk-haritası #1).
+5. **lint:adr format-notu (kozmetik):** Bu ADR (ve 079-083/086) `## Context`/`## Decision` başlık-stilini kullanır; validator bold-inline `**Decision:**` alanını "recommended" sayar — uyarı substans-dışıdır, içerik tamdır. md+db senkron (Alperen ADR-review).

@@ -103,3 +103,15 @@ All extension tests mock the `vscode` module — no `vscode` runtime dependency 
 - ADR-034: Multi-Project Isolation (per-project security boundaries)
 - ADR-074: Native Chat Real Round-Trip (Path B baseline; this ADR adds Path A)
 - `[[feedback_wiring_pct_vs_user_working]]` — user-working proof requirement
+
+---
+
+## Amendment — Sprint 281 (2026-06-11, ADR-review, full code-verification)
+
+**Classification: BOTH** (auth-akışı + serve/chat/IDE tamamen user-facing).
+
+**Re-verified (dört part da):** Part-A auth-aware forwarding (`spawn-backend-docker.ts:667/677/747` — subscription'da key container'a sızmaz; per-task `Auth:` override zinciri `task-router.ts:51`) ✓ · Part-B `__DECKENT_API_TOKEN__` inject (`server.ts:693/1111/1317`) — **2026-06-11 UX-denetiminde CANLI gözlendi** (serve auto-mint + dashboard 200'leri) ✓ · Part-C `chat-backend.ts` (Path-A, `runChatNativeLoop` köprüsü) mevcut ✓ · Part-D vscode extension gerçek dosyaları ✓.
+
+**🟢 Product-sprint için kritik tespit:** Dashboard-Chat-HOLLOW bulgusunun (UX-denetim #1, `project_dashboard_chat_audit_20260611`) eksiği **yalnız frontend-wiring'dir** — Path-A backend (`chat-backend.ts` + `/api/chat/stream`) bu ADR'yle hazır; `ChatPage.tsx` NL-girdisini ona yönlendirmiyor (command-router'da takılı). Fix-kapsamı = ChatPage→Path-A frontend-wire.
+
+**Uzantı:** Part-A'nın auth-mode temeli üzerine **F1-CB billing-follows-auth** (S254) maliyet-doğruluğunu ekledi (subscription/local=$0). md+db senkron (Alperen ADR-review).

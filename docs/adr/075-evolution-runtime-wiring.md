@@ -111,3 +111,15 @@ The hardcoded counts are removed. Every sprint finalization regenerates the arch
 - `src/orchestra/prompt-evolution.ts`, `src/agents/adaptive-agent.ts`
 - `src/core/activation-engine.ts` (SKILL_AGENT_MAP, getSkillAgentAffinityBonus)
 - `src/orchestra/managed-docs/content-generators.ts` (countModules, architecture-map generator)
+
+---
+
+## Amendment — Sprint 281 (2026-06-11, ADR-review, full code-verification)
+
+**Classification: BOTH** (evolution = çekirdek farklılaştırıcı/moat — ürün hikâyesinin kendisi).
+
+**Re-verified — 6 wire da CANLI, ancak API-nüansı kayda geçer (gelecek denetimler yanılmasın):** Part-A'daki fonksiyon-isimleri (`recordLineage`/`retireAgent`/`detectDrift`/`revertPrompt`) **kavramsaldır** — canlı API **sınıf-temellidir** ve modüller **`src/agents/`**'tadır: `promotion-pipeline.ts:12-13` `AgentGenealogy` + `AgentRetirement` import edip instance-alan olarak tutar (:73-74); `sprint-reporter.ts:377-382` `SpecializationDriftDetector`'ı wire eder (Task 212-005 kod-içi belgeli); `prompt-evolution.ts:10` `PromptRollback`'a delege eder (:164). Yüzeysel fonksiyon-adı-grep'i 0-caller gösterir — **doğru proof-pattern sınıf-adı seviyesindedir** (`grep -rl "AgentGenealogy" src/ | grep -v test | grep -v def-file` ≥1). `wirePromptEvolutionFromOutcomes` (1 dış-caller) + `adaptAgentRuntime` (3) fonksiyon-seviyesinde de doğrulanır.
+
+**Part-B/C re-verified:** `SKILL_AGENT_MAP` + `SKILL_AGENT_AFFINITY_BONUS` (`activation-engine.ts:328-330`) + `routing-diversity-guard.test.ts` ✓ · `countModules` (`content-generators.ts:112`) ✓.
+
+**Evrim:** F5 zinciri sonradan **ADR-078** "Active Identity-Mutation Loop" ile genişledi; ölçek-validasyonu (F5-008r, 1000+-variant) MASTER-PLAN §K'da açık iş. md+db senkron (Alperen ADR-review).
