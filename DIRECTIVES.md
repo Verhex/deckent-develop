@@ -1,174 +1,158 @@
-# DIRECTIVES — Sprint 279: M-küme — Dashboard/Monitoring/Wire-Gaps
+# DIRECTIVES — Sprint 280: L-küme — Human-Interaction Wire (REPL /mcp + PLANOBS observability + nervous edit)
 
-## Goal: M-küme (Alperen sırası: M ilk) — dashboard + monitoring + wire-gap kapanışı. Açık maddeler (kod-doğrulandı): WK-import (core→orchestra import-cycle, ADR-008 soft-ihlal), WK-nervous (panic-gate awaitPanicGateApproval 0-caller → spawn timeout), WK-cost (mid-sprint token-usage abort — billingMode zaten var F1-CB), WK-7 (auditor O(n) spawnSync → async-batch), DASH-001 (`/api/kill/all` + autonomous SSE watch), DASH-002 (sidebar bell pending-badge), WK-5-kalan (docker live-monitor PTY worker-attach + watch --follow), F7-004 (terminal hardening). Hepsi opt-in/additive/fail-safe; dashboard görsel = `docs/design/web-console` spec + lucide (EMOJI YASAK). MİKRO-TASK + DEPENDENCY + MODEL-KATMANLAMA (opus 2 · sonnet 7 · haiku 2).
+## Goal: L-küme (Alperen sırası: M sonrası L) — human-interaction-wire kalan maddeleri (MASTER-PLAN §4G). Kod-doğrulandı (Explore file:line, 2026-06-11): REPL `/mcp` **0-caller stub** (mcp-bridge.ts+broker.ts var ama chat-native'e wire YOK = G1/[[project_mcp_client_not_wired_s229]]), PLANOBS-001/002 (event-stream `PROGRESS` channel + notify `progress`/`phase-change` tipi YOK → plan/start sessiz-boşluk), PLANOBS-004 (planner-fail `console.error` notify değil + spinner yok), PLANOBS-005 (çift `planSprint` start.ts:308+368 + `.tasks` cache yok), APPROVE-007b (nervous `handleEdit` + modifiedPayload IPC transport YOK). Hepsi opt-in/additive/fail-safe; davranış-korunumlu. MİKRO-TASK + DEPENDENCY + MODEL-KATMANLAMA (opus 3 · sonnet 5 · haiku 2).
 
 ## Ortak kurallar
-- **TDD + hermetik:** önce RED; tmpdir + injectable fs/spawn; gerçek ağ/docker YASAK testlerde; spawnSync YASAK (kod-içinde de async spawn — WK-7 zaten bunu düzeltiyor).
-- **Dashboard görsel:** `docs/design/web-console/README.md` spec'ine sadık; **lucide-react ikon, EMOJI YASAK** (no-emoji-guard testi var); status renk-semantiği korunur.
-- **Davranış korunumu:** additive/opt-in; mevcut yeşil testler yeşil; default'lar değişmez.
-- **i18n:** dashboard/CLI user-facing → getMessage (en+tr).
-- **SSOT:** event-stream/audit/cost/nervous mevcut modüller — BAĞLA, yeniden yazma.
-- **`.tasks/task-XXX.result` YAZ**; Kanıt komutlarını gerçekten koş.
+- **TDD + hermetik:** önce RED; tmpdir + injectable fs/spawn; testte gerçek ağ/MCP-subprocess YASAK (mock broker/spawn); spawnSync YASAK (async spawn).
+- **Davranış korunumu:** additive/opt-in; mevcut yeşil testler yeşil; default çıktı/akış değişmez (örn. edit-yokken approval byte-bayt aynı; MCP-server yapılandırılmamışsa REPL aynı). Default çıktı bilinçli değişiyorsa (PLANOBS spinner/progress) snapshot bilinçli güncellenir + .result notes'a yazılır.
+- **i18n-FIRST:** TÜM user-facing string `getMessage(key, lang)` (en+tr). Hardcode TR/EN YASAK. Mekanizma modülleri string-free.
+- **Fail-safe:** yeni surface (broker, progress-emit, notify) hata verirse ana akışı (REPL / sprint / approval) ASLA düşürmez — log+skip.
+- **SSOT:** event-stream (core/), notification-dispatcher, ipc-queue, mcp-bridge/broker MEVCUT modüller — BAĞLA, yeniden yazma. event-stream Sprint 279'da `src/orchestra/`→`src/core/event-stream.ts`'e taşındı (orchestra shim).
+- **`.tasks/task-XXX.result` YAZ**; Kanıt komutlarını gerçekten koş. Tier-1 user-surface → gerçek-binary smoke CC sprint-sonu (ADR-079).
 
 ---
 
-## Task 1: WK-import — core→orchestra import-cycle çöz (ADR-008) (OPUS)
+## Task 1: PLANOBS-001 — event-stream PROGRESS channel + emitProgress helper
+- Provider: claude
+- Model: sonnet
+- Backend: docker
+- Effort: normal
+- Agent: api-builder
+- Skills: typescript-expert, testing-expert
+- Files: src/core/event-stream.ts, tests/core/event-stream-progress.test.ts
+- Scope: src/core/, tests/core/
+
+### Description
+Kanıt: `src/core/event-stream.ts` CHANNELS enum'unda (24 channel) `PROGRESS` YOK. Fix (Faz primitive — emit-site'ları Task 5 bağlar): (1) CHANNELS'e `PROGRESS: 'PROGRESS'` ekle (mevcut sabit-deseni izle); (2) `emitProgress(opts: { root?: string; phase: string; pct?: number; detail?: string; source?: string })` yardımcısı — mevcut `writeEvent` üzerine ince sarmalayıcı, `channel: CHANNELS.PROGRESS`, payload `{ phase, pct, detail }`. Hata-toleranslı (writeEvent hatası yutulur, asla throw). SAF additive: hiçbir mevcut channel/emit değişmez. ÖNCE writeEvent imzasını + bir mevcut emit-helper'ı (örn. DEPENDENCY_BLOCKED emit) oku, aynı deseni kullan.
+
+**Kanıt:** `npx vitest run tests/core/event-stream-progress.test.ts` yeşil; `grep -n "PROGRESS" src/core/event-stream.ts | head -2` ≥ 1. **Test:** 5+ (channel mevcut, emitProgress yazıyor, pct opsiyonel, hata-toleransı, payload shape).
+
+---
+
+## Task 2: PLANOBS-002 — notify 'progress' + 'phase-change' event-tipleri (3 surface)
+- Provider: claude
+- Model: sonnet
+- Backend: docker
+- Effort: normal
+- Agent: api-builder
+- Skills: typescript-expert, testing-expert
+- Files: src/core/notification-dispatcher.ts, src/core/notify.ts, tests/core/notify-progress-type.test.ts
+- Scope: src/core/, tests/core/
+
+### Description
+Kanıt: `notification-dispatcher.ts` NotificationEventName enum'u yalnız 5 lifecycle-tipi içeriyor ('sprint-started','task-done','task-no-go','sprint-finalized','human-checkpoint-required') — `progress`/`phase-change` YOK. Fix: enum'a `'progress'` + `'phase-change'` ekle; dispatcher bu tipleri TÜM kayıtlı adapter'lara (tty + MCP + file) yönlendirir (mevcut routing yolunu kullan — özel-case değil, generic dispatch). `notify.ts` yardımcı varsa (örn. notifyProgress) ekle, yoksa generic notify ile çağrılabilir bırak. Additive: mevcut 5 tip + adapter davranışı aynen. ÖNCE dispatcher'ın mevcut bir tipi nasıl route ettiğini oku.
+
+**Kanıt:** `npx vitest run tests/core/notify-progress-type.test.ts` yeşil; `grep -niE "progress|phase-change" src/core/notification-dispatcher.ts | head -2` ≥ 1. **Test:** 5+ (progress tip route, phase-change route, 3-adapter fan-out, mevcut tip regresyonsuz).
+
+---
+
+## Task 3: APPROVE-007b — modifiedPayload IPC transport + executor consume (OPUS)
+- Provider: claude
+- Model: opus
+- Backend: docker
+- Effort: normal
+- Agent: bug-fixer
+- Skills: typescript-expert, testing-expert
+- Files: src/nervous/ipc-queue.ts, src/nervous/executor.ts, tests/nervous/approval-edit-transport.test.ts
+- Scope: src/nervous/, tests/nervous/
+
+### Description
+Kanıt: `ipc-queue.ts` ApprovalRequest shape `{ notificationId, decision, reason, requestedAt }` — modifiedPayload YOK; executor `resolveApproval` orijinal payload'la çalışıyor → "edit" (onayı değiştirilmiş payload'la geçirme) imkansız. Fix: (1) ApprovalRequest'e **opsiyonel** `modifiedPayload?: Record<string, unknown>` ekle; writeApproval/readApproval taşır (geri-uyum: alan yoksa undefined). (2) poller→`executor.resolveApproval(notifId, decision, opts?)` opsiyonel `{ modifiedPayload }` geçirir. (3) Executor 'accepted' + modifiedPayload varsa handler'ı **birleştirilmiş** payload'la (`{ ...orijinal, ...modifiedPayload }`) çalıştırır; YOKSA byte-bayt mevcut davranış. SAFETY_FLOOR semantiği korunur (Sprint 279). ÖNCE resolveApproval + handler-invoke yolunu izle. Bu Task 8'in (REPL /nervous edit) transport-temeli.
+
+**Kanıt:** `npx vitest run tests/nervous/approval-edit-transport.test.ts` yeşil; `grep -n "modifiedPayload" src/nervous/ipc-queue.ts src/nervous/executor.ts | head -2` ≥ 2. **Test:** 7+ (transport round-trip, executor merge, edit-yok byte-aynı, reject+edit yok-sayılır, SAFETY_FLOOR korunur).
+
+---
+
+## Task 4: REPL /mcp broker wire — G1 (mcp-bridge → chat-native) (OPUS, Tier-1)
 - Provider: claude
 - Model: opus
 - Backend: docker
 - Effort: high
-- Agent: refactorer
-- Skills: typescript-expert, testing-expert, system-architect
-- Files: src/core/event-stream.ts, src/core/audit-writer.ts, src/core/audit-query.ts, src/orchestra/event-stream.ts, tests/core/event-stream-location.test.ts
-- Scope: src/core/, src/orchestra/, tests/
+- Agent: api-builder
+- Skills: typescript-expert, anthropic-sdk, testing-expert
+- Files: src/cli/commands/chat-native.ts, src/cli/commands/chat-slash-registry.ts, src/cli/repl/mcp-bridge.ts, tests/cli/repl-mcp-wire.test.ts
+- Scope: src/cli/, tests/cli/
 
 ### Description
-ADR-008 soft-ihlal: `core/audit-writer.ts` + `core/audit-query.ts` `orchestra/event-stream.js`'ten import ediyor (core→orchestra ters bağımlılık). Kök çözüm: **event-stream'i `core/`'a taşı** (audit'in tükettiği `writeEvent`/`readEvents`/`DeckentEvent` core-seviye primitive — orchestra'ya ait değil). Adımlar: (1) `src/orchestra/event-stream.ts` içeriğini `src/core/event-stream.ts`'e taşı; (2) `orchestra/event-stream.ts`'i core'dan re-export shim yap (mevcut orchestra-tarafı importerları kırma — geri-uyum); (3) audit-writer/audit-query importlarını `../core/event-stream.js`'e çevir → cycle kalkar. ÖNCE event-stream'in başka core-importer'ı var mı + orchestra-importerları grep'le (hepsi shim'le çalışmalı). Davranış bayt-bayt aynı (saf taşıma). Testler: event-stream core'dan import edilebilir; audit core-only import; orchestra shim re-export çalışır; mevcut event-stream/audit testleri yeşil.
+Kanıt ([[project_mcp_client_not_wired_s229]]): `/mcp` REPL'de `resolveSlash` (chat-slash-registry.ts:489) → `{ action:'message', messageKey:'chat.mcp_not_wired' }` döndürüyor (honest stub); `src/cli/repl/mcp-bridge.ts` (`buildMcpBridge`/McpClientBroker) + `src/mcp-client/broker.ts` MEVCUT ama chat-native'de **0-caller**. Fix: (1) chat-native başlangıcında `buildMcpBridge` wire et — **config-gated**: yalnız MCP-server yapılandırılmışsa (broker'ın mevcut server-discovery'sini OKU: `.mcp.json` / `config.mcp_servers` — neyse onu kullan, yeniden icat etme) bridge kurulur; (2) `/mcp` dispatch'i broker'a yönlendir: `list` (server+tool kataloğu), `call <tool> [args]` (tool çağrısı); (3) **server yapılandırılmamışsa** → honest i18n mesaj "MCP sunucusu yapılandırılmadı" (eski "not wired" DEĞİL — artık wire'lı, sadece yapılandırma yok); (4) broker hata/timeout → log+skip, **REPL ASLA çökmez** (fail-safe). i18n en+tr (yeni key'ler chat-slash-registry/chat-native içindeki getMessage çağrılarıyla; mevcut MessageKey union string kabul ediyor). ÖNCE buildMcpBridge imzası + broker.list/call API'sini oku.
 
-**Kanıt:** `npx vitest run tests/core/event-stream-location.test.ts` yeşil; `grep -c "orchestra/event-stream" src/core/audit-writer.ts src/core/audit-query.ts | awk -F: '{s+=$2} END{print s}'` = 0 (core artık orchestra'dan import etmiyor). **Test:** 6+.
+**Kanıt:** `npx vitest run tests/cli/repl-mcp-wire.test.ts` yeşil; `grep -n "buildMcpBridge" src/cli/commands/chat-native.ts | head -1` ≥ 1. **Smoke (Tier-1, CC sprint-sonu):** `echo "/mcp" | node dist/cli/entry.js` REPL → "yapılandırılmadı" honest mesajı (çökme yok), EXIT temiz. **Test:** 7+ (server-var→list, server-yok→honest mesaj, call→broker, broker-hata→REPL ayakta, i18n tr/en).
 
 ---
 
-## Task 2: WK-nervous — panic-gate timeout wire (0-caller → spawn yolu)
+## Task 5: PLANOBS-001 emit-site'ları — EXECUTE-% + spawn + pre-vitest
+- Provider: claude
+- Model: sonnet
+- Backend: docker
+- Effort: normal
+- Agent: api-builder
+- Skills: typescript-expert, testing-expert
+- Files: src/orchestra/result-collector.ts, src/orchestra/plugin-hooks.ts, tests/orchestra/progress-emit.test.ts
+- Scope: src/orchestra/, tests/orchestra/
+- Dependencies: 280-001
+
+### Description
+Task 1'in `emitProgress`'ini gerçek noktalara bağla (dormant değil canlı): (1) `result-collector.ts waitForResults` periyodik tick'inde (mevcut `debugLog('waitForResults:progress', …)` noktası, ~line 1016) → `emitProgress({ phase:'EXECUTE', pct: done/total, detail })`; (2) worker-spawn noktasında (spawn loop) → `emitProgress({ phase:'SPAWN', … })`; (3) `plugin-hooks.ts` pre-sprint vitest (track_test_count, ~line 577) öncesi/sonrası → `emitProgress({ phase:'PRE_VITEST', … })`. Mevcut log'ları KORU (emit ek). Fail-safe (emit hatası sprint'i düşürmez). `deckent_watch` artık PROGRESS event'lerini backfill+push eder (PLANOBS-003 zaten payload dönüyor). ÖNCE Task 1'in emitProgress imzasını + waitForResults döngüsünü oku.
+
+**Kanıt:** `npx vitest run tests/orchestra/progress-emit.test.ts` yeşil; `grep -n "emitProgress" src/orchestra/result-collector.ts | head -1` ≥ 1. **Test:** 6+ (EXECUTE-% emit, spawn emit, pre-vitest emit, emit-hata sprint-düşürmez, pct hesabı).
+
+---
+
+## Task 6: PLANOBS-004 — planner-fail notify + plan spinner
+- Provider: claude
+- Model: sonnet
+- Backend: docker
+- Effort: normal
+- Agent: api-builder
+- Skills: typescript-expert, testing-expert
+- Files: src/orchestra/sprint-planner.ts, src/cli/commands/plan.ts, tests/orchestra/planner-notify.test.ts
+- Scope: src/orchestra/, src/cli/, tests/orchestra/
+- Dependencies: 280-001, 280-002
+
+### Description
+Kanıt: `sprint-planner.ts` AI-fail'leri (parse_failed/timeout, line 250/329/336/363/452) `console.error` ile (notify'a GİTMEZ → operatör/MCP/AI görmez). Fix: (1) bu noktaları `notify({ type:'phase-change' veya 'progress', severity, message })` ile **insan-dönük** yüzeyle (3-surface: tty+MCP+file — Task 2 tipleri); planner-start'ta `emitProgress({ phase:'PLAN' })` (Task 1). `console.error` planner-fail noktalarında kaldır (notify SSOT). (2) `plan.ts` komutuna mevcut `chat-spinner.ts` ile sessiz-boşluk spinner'ı (uzun planlama sırasında); plan biter/hata → spinner durur + sonuç/hata mesajı. i18n en+tr. ÖNCE chat-spinner API'si + notify imzasını oku. Davranış: hata artık sessiz değil, ama exit-code/akış aynı.
+
+**Kanıt:** `npx vitest run tests/orchestra/planner-notify.test.ts` yeşil; `grep -n "notify" src/orchestra/sprint-planner.ts | head -1` ≥ 1. **Test:** 6+ (parse_failed→notify, timeout→notify, planner-start→emitProgress, spinner start/stop, i18n).
+
+---
+
+## Task 7: PLANOBS-005 — start çift-planSprint kaldır + .tasks cache + start-fail notify (OPUS)
+- Provider: claude
+- Model: opus
+- Backend: docker
+- Effort: high
+- Agent: performance-analyzer
+- Skills: typescript-expert, performance-optimizer, testing-expert
+- Files: src/cli/commands/start.ts, src/orchestra/sprint-controller.ts, tests/cli/start-plan-cache.test.ts
+- Scope: src/cli/, src/orchestra/, tests/cli/
+- Dependencies: 280-002
+
+### Description
+Kanıt: `start.ts` `planSprint`'i İKİ kez çağırıyor (line 308 display + line 368 cost-gate) — gereksiz çift-plan; ayrıca `start` HER ZAMAN re-plan (`.tasks` cache yok). Fix: (1) **tek planSprint**: bir kez planla, sonucu cost-gate + display + spawn'a yeniden-kullandır (davranış aynı, yalnız tek-hesap). (2) **`.tasks` cache**: DIRECTIVES içerik-hash'i değişmemişse + taze task-*.json varsa re-plan ATLA (mevcut task dosyalarını kullan); hash değişmiş/dosya yok → normal plan. Güvenli default (stale-task riski hash-guard'la kapalı). (3) start-fail (`console.error` yerine) **insan-dönük notify** (Task 2 'phase-change'). Pre-sprint vitest: bloke-eden çağrıyı async'e çevirme riski varsa DOKUNMA (KARPATHY: surgical), yalnız notify+emit ekle. ÖNCE start.ts plan-akışını + planSprint imzasını + sprint-controller plan-giriş noktasını oku.
+
+**Kanıt:** `npx vitest run tests/cli/start-plan-cache.test.ts` yeşil; cache-hit yolunda planSprint 0-çağrı (test mock-sayar kanıtlar). **Smoke (Tier-1, CC sprint-sonu):** `node dist/cli/entry.js start --dry-run` EXIT temiz (çift-plan yok). **Test:** 7+ (tek-plan reuse, cache-hit→re-plan-yok, hash-değişti→re-plan, start-fail→notify, dry-run regresyonsuz).
+
+---
+
+## Task 8: APPROVE-007b — REPL /nervous edit (chat-nervous-bridge handleEdit)
 - Provider: claude
 - Model: sonnet
 - Backend: docker
 - Effort: normal
 - Agent: bug-fixer
 - Skills: typescript-expert, testing-expert
-- Files: src/nervous/executor.ts, tests/nervous/panic-gate-wire.test.ts
-- Scope: src/nervous/, tests/nervous/
+- Files: src/cli/commands/chat-nervous-bridge.ts, tests/cli/nervous-edit-bridge.test.ts
+- Scope: src/cli/, tests/cli/
+- Dependencies: 280-003
 
 ### Description
-Kanıt: `src/nervous/panic-gate.ts` `awaitPanicGateApproval` (hard 10s timeout → auto-proceed, SAFETY_FLOOR excepted) MEVCUT ama 0-caller; `executor.ts handleApprove` timeout'suz Promise (sonsuza dek `deckent nervous accept` bekler → spawn'ı sonsuz blokeleyebilir). Fix: `executor.ts`'in approval-bekleme yolunu `awaitPanicGateApproval` ile sar — hard-timeout sonrası auto-proceed (SAFETY_FLOOR effect-class'ı muaf, o gerçekten bekler). ÖNCE executor'ın mevcut handleApprove/pendingApprovals yolunu izle (timeout'suz noktayı bul). Davranış: timeout'lu approval (bloke-sonsuz değil); SAFETY_FLOOR aksiyonları hâlâ insan-onayı bekler. Testler (fake timer): timeout→auto-proceed; SAFETY_FLOOR→bekler; erken-accept→hemen geçer.
+Kanıt: `chat-nervous-bridge.ts handleNervousSlash` yalnız accept/reject (handleEdit YOK). Fix: `/nervous edit <id> <key=val ...>` (veya json) parse → Task 3'ün transport'uyla `writeApproval({ notificationId, decision:'accepted', modifiedPayload })` (IPC → poller → executor merge-payload). REPL'de görünür onay listesinden id seç + payload düzelt + onayla. i18n en+tr (parse-hata mesajı dahil). Fail-safe (geçersiz id/payload → honest mesaj, REPL ayakta). ÖNCE handleNervousSlash accept/reject deseni + Task 3 writeApproval imzasını oku. Bu APPROVE-007b'yi kapatır (transport=Task3, surface=bu).
 
-**Kanıt:** `npx vitest run tests/nervous/panic-gate-wire.test.ts` yeşil; `grep -n "awaitPanicGateApproval" src/nervous/executor.ts` ≥ 1. **Test:** 6+.
+**Kanıt:** `npx vitest run tests/cli/nervous-edit-bridge.test.ts` yeşil; `grep -niE "handleEdit|edit" src/cli/commands/chat-nervous-bridge.ts | head -2` ≥ 1. **Test:** 5+ (edit→writeApproval+modifiedPayload, kv-parse, json-parse, geçersiz-id→honest, i18n).
 
 ---
 
-## Task 3: WK-cost — mid-sprint token-usage abort (limit-ledger besleme)
-- Provider: claude
-- Model: sonnet
-- Backend: docker
-- Effort: normal
-- Agent: api-builder
-- Skills: typescript-expert, testing-expert
-- Files: src/orchestra/sprint-phases.ts, src/core/config-types.ts, src/core/config.ts, tests/orchestra/mid-sprint-cost-abort.test.ts
-- Scope: src/orchestra/, src/core/, tests/orchestra/
-
-### Description
-Bugün cost-gate yalnız pre-spawn (start.ts billingMode var, F1-CB); mid-sprint kontrol YOK (TokenSpikeDetector sadece RETRO'da post-hoc). Fix: config `cost_guard?: { enabled: boolean; max_limit_cost_usd?: number }` (default-off). EXECUTE fazında periyodik (mevcut izleme tick'ine bağla — resource-monitor/collector döngüsü) `limit-ledger` (F1-TOK SSOT, `limitCost`) ile sprint'in o ana dek yaktığı limit-maliyetini ölç; `max_limit_cost_usd` aşılırsa dürüst uyarı + yeni-task-dispatch'i DURDUR (mevcut worker'ları öldürme — graceful; sprint-kill YASAK kuralına uy) + audit/notlar. Best-effort (ledger hatası sprint'i düşürmez). Testler: eşik-aşımı→dispatch-stop sinyali (mock ledger); altında→normal; kapalı→hiç kontrol.
-
-**Kanıt:** `npx vitest run tests/orchestra/mid-sprint-cost-abort.test.ts` yeşil; `grep -n "cost_guard\|max_limit_cost" src/orchestra/sprint-phases.ts src/core/config-types.ts | head -2` ≥ 1. **Test:** 6+.
-
----
-
-## Task 4: WK-7 — auditor async-batch liveness (O(n) spawnSync → parallel)
-- Provider: claude
-- Model: opus
-- Backend: docker
-- Effort: high
-- Agent: performance-analyzer
-- Skills: typescript-expert, testing-expert, performance-optimizer
-- Files: src/monitor/auditor.ts, tests/monitor/auditor-async-liveness.test.ts
-- Scope: src/monitor/, tests/monitor/
-
-### Description
-Kanıt: `auditor.ts` 30s scan'de worker-başına `spawnSync('docker', ...)` (O(n) blocking — ≥20 worker'da "resource contention"). Fix: liveness probe'larını **async + batch** yap — tüm worker'lar için `spawn` (async) promise'lerini paralel başlat, `Promise.allSettled` ile topla (event-loop bloke etmez); spawnSync'i KALDIR (CLAUDE.md hermeticity kuralı + ölçek). Mevcut scan-mantığı (stale tespit, heartbeat oku) aynen — yalnız docker-probe paralelleşir. Davranış korunumu: tespit sonuçları aynı, sadece non-blocking. Testler (mock spawn): N-worker paralel probe; bir-probe-hata diğerlerini etkilemez; stale tespiti doğru; spawnSync-yok (grep guard).
-
-**Kanıt:** `npx vitest run tests/monitor/auditor-async-liveness.test.ts` yeşil; `grep -c "spawnSync" src/monitor/auditor.ts` = 0. **Test:** 7+.
-
----
-
-## Task 5: DASH-001 — /api/kill/all + autonomous SSE watch
-- Provider: claude
-- Model: sonnet
-- Backend: docker
-- Effort: normal
-- Agent: api-builder
-- Skills: typescript-expert, testing-expert
-- Files: src/api/server.ts, src/orchestra/tmux.ts, tests/api/kill-all-endpoint.test.ts
-- Scope: src/api/, src/orchestra/, tests/api/
-- Dependencies: 279-001
-
-### Description
-Kanıt: `/api/kill/:id` killWorker(workerId) var ama `kill/all` özel-durumu eksik/kırık (DASH-001). Fix: (1) `tmux.ts`'e `killAllWorkers()` (mevcut session/worker listesini topla → her birini killWorker; subprocess/docker backend'leri de kapsa — mevcut kill mantığını SSOT al); (2) server.ts `/api/kill/all` → killAllWorkers + sayı dön (kill = destructive ama API zaten auth-gate'li; sprint-state'i COMPLETED yapma — yalnız worker'lar). Dependencies 279-001 (server.ts dokunan import-cycle fix'inin üstüne). i18n. Testler (mock killWorker): kill/all → tüm worker'lar; boş→0; tekil kill/:id regresyonsuz.
-
-**Kanıt:** `npx vitest run tests/api/kill-all-endpoint.test.ts` yeşil; `grep -n "kill/all\|killAllWorkers" src/api/server.ts src/orchestra/tmux.ts | head -2` ≥ 1. **Test:** 5+.
-
----
-
-## Task 6: DASH-002 — sidebar bell pending-count badge (lucide, emoji-yasak)
-- Provider: claude
-- Model: sonnet
-- Backend: docker
-- Effort: normal
-- Agent: frontend-designer
-- Skills: react-specialist, frontend-design, testing-expert
-- Files: src/dashboard/src/components/Sidebar.tsx, src/dashboard/src/hooks/useNervousStatus.ts, tests/dashboard/sidebar-bell-badge.test.tsx
-- Scope: src/dashboard/, tests/dashboard/
-
-### Description
-Sidebar'daki Nervous/Bell ikonuna pending-onay sayısı rozeti (`/api/nervous/status` pending count). YENİ `useNervousStatus` hook (use-live-data/SSE deseni — periyodik ya da SSE). Sidebar.tsx mevcut `Bell` lucide ikonuna (zaten import) sayı-badge ekle (count>0 ise; renk tema-token'larıyla, EMOJI YASAK — docs/design/web-console spec). 0→badge gizli. i18n (LanguageProvider). no-emoji-guard yeşil kalır. Testler (jsdom, mock fetch): pending>0→badge sayı; 0→gizli; hook fetch.
-
-**Kanıt:** `npx vitest run --config vitest.dashboard.config.ts tests/dashboard/sidebar-bell-badge.test.tsx` yeşil + `npx tsc --noEmit -p src/dashboard` temiz; `grep -n "useNervousStatus\|badge" src/dashboard/src/components/Sidebar.tsx | head -2` ≥ 1. **Test:** 5+.
-
----
-
-## Task 7: WK-5-kalan — docker live-monitor: output-stream PTY worker-attach + watch --follow
-- Provider: claude
-- Model: sonnet
-- Backend: docker
-- Effort: high
-- Agent: devops-engineer
-- Skills: docker-expert, typescript-expert, testing-expert
-- Files: src/cli/commands/watch.ts, src/core/output-collector.ts, tests/cli/watch-follow.test.ts
-- Scope: src/cli/, src/core/, tests/cli/
-
-### Description
-WK-5 SSE-mount zaten yapıldı (server.ts:608 isOutputStreamRequest); kalan: (1) `output-collector.ts` `docker logs --tail` (snapshot) → opsiyonel `docker logs -f` (follow) modu (injectable spawn, async stream); (2) `deckent watch` komutuna `--follow` docker branch — aktif docker worker'ların canlı log'unu akıt (mevcut watch tmux-split mantığını koru, docker-backend'de `logs -f` kullan). Gerçek docker YOK testlerde (mock spawn stream). Davranış: --follow'suz mevcut watch aynen. Testler: follow-mode log-stream (mock); tail-mode snapshot; docker-yok dürüst mesaj.
-
-**Kanıt:** `npx vitest run tests/cli/watch-follow.test.ts` yeşil; `grep -n "follow\|logs -f\|logs.*-f" src/cli/commands/watch.ts src/core/output-collector.ts | head -2` ≥ 1. **Test:** 6+.
-
----
-
-## Task 8: F7-ENT-verify — enterprise dashboard backend doğrula + 4 tab gerçek-veri
-- Provider: claude
-- Model: sonnet
-- Backend: docker
-- Effort: normal
-- Agent: ci-guardian
-- Skills: ci-testing, typescript-expert
-- Files: tests/api/enterprise-routes-complete.test.ts
-- Scope: tests/api/
-- Dependencies: 279-001
-
-### Description
-F7-ENT-verify: 277'de `registerEnterpriseRoutes` (tenants/rbac/audit/rate) mount edildi; bu task DOĞRULAR + regresyon-kilitler. YENİ test: 4 enterprise endpoint'in hepsi (auth'lu) 200 + beklenen shape döner (boş-veri 200, 404 değil); EnterprisePage'in çağırdığı tüm path'ler kapsanır. Eksik/yanlış-shape bulursan NO_GO + notes (server.ts ya da enterprise-endpoint düzeltmesi gerekiyorsa scope'a ekle — ama önce doğrula). Dependencies 279-001 (server.ts dokunuldu). Testler: 4 endpoint shape + auth-gate + boş-veri-200.
-
-**Kanıt:** `npx vitest run tests/api/enterprise-routes-complete.test.ts` yeşil (4 endpoint kanıtlı). **Test:** 6+.
-
----
-
-## Task 9: WK-5/COMM-1 dashboard görünürlük — Worker Comms + Resources panel
-- Provider: claude
-- Model: sonnet
-- Backend: docker
-- Effort: normal
-- Agent: frontend-designer
-- Skills: react-specialist, frontend-design, testing-expert
-- Files: src/dashboard/src/pages/WorkersPage.tsx, src/dashboard/src/lib/api.ts, tests/dashboard/workers-comms-panel.test.tsx
-- Scope: src/dashboard/, tests/dashboard/
-- Dependencies: 279-006
-
-### Description
-COMM-1 (278) + resource-monitor (271) dashboard görünürlüğü: WorkersPage'e (a) "Worker Comms" paneli — shared-context key sayısı + son handoff'lar (mevcut `/api/status` ya da yeni hafif endpoint — server'a dokunmadan status verisinden türetilebiliyorsa onu kullan; gerekirse salt-okunur); (b) resource özeti satırı (worker RAM, varsa). lucide ikon, EMOJI YASAK, tema-token. Veri yoksa EmptyState. Dependencies 279-006 (Sidebar/dashboard-hook deseni). Testler (jsdom): comms-panel render (mock data), boş-state, no-emoji.
-
-**Kanıt:** `npx vitest run --config vitest.dashboard.config.ts tests/dashboard/workers-comms-panel.test.tsx` yeşil; `grep -niE "comms|shared|handoff" src/dashboard/src/pages/WorkersPage.tsx | head -2` ≥ 1. **Test:** 5+.
-
----
-
-## Task 10: features + cli-commands — M-küme satırları
+## Task 9: features + cli-commands — L-küme satırları
 - Provider: claude
 - Model: haiku
 - Backend: docker
@@ -176,18 +160,18 @@ COMM-1 (278) + resource-monitor (271) dashboard görünürlüğü: WorkersPage'e
 - Agent: doc-writer
 - Skills: documentation-writer
 - Files: docs/reference/features.md, docs/reference/cli-commands.md
-- Dependencies: 279-005, 279-007
 - Scope: docs/reference/
+- Dependencies: 280-004, 280-005, 280-006, 280-007, 280-008
 - ModelEffort: low
 
 ### Description
-DİSKTEKİ koddan (inmemişleri yazma): features.md'ye M-küme satırları (`/api/kill/all`, watch --follow docker, sidebar bell-badge, cost_guard mid-sprint abort, panic-gate timeout); cli-commands'a `watch --follow` notu + kill/all. Mevcut format.
+DİSKTEKİ koddan (inmemişleri yazma): features.md'ye L-küme satırları (REPL `/mcp` broker wire, plan/start PROGRESS observability + planner-fail notify, `/nervous edit` modifiedPayload, start çift-plan kaldırma + .tasks cache); cli-commands'a `/mcp list|call` + `/nervous edit` + plan/start spinner notu. Mevcut format.
 
-**Kanıt:** `grep -ciE "kill/all|--follow|cost_guard|bell" docs/reference/features.md docs/reference/cli-commands.md | awk -F: '{s+=$1} END{print s}'` ≥ 2 (toplam — per-file say). **Test:** yok — .result YAZ.
+**Kanıt:** `grep -ciE "/mcp|nervous edit|PROGRESS|plan.*cache|planner.*notify" docs/reference/features.md docs/reference/cli-commands.md | awk -F: '{s+=$1} END{print s}'` ≥ 2 (toplam — per-file say). **Test:** yok — .result YAZ.
 
 ---
 
-## Task 11: MASTER-PLAN — M-küme işaretleri
+## Task 10: MASTER-PLAN — §4G L-küme işaretleri
 - Provider: claude
 - Model: haiku
 - Backend: docker
@@ -195,15 +179,15 @@ DİSKTEKİ koddan (inmemişleri yazma): features.md'ye M-küme satırları (`/ap
 - Agent: doc-writer
 - Skills: documentation-writer
 - Files: docs/MASTER-PLAN.md
-- Dependencies: 279-001, 279-002, 279-004, 279-005
 - Scope: docs/
+- Dependencies: 280-001, 280-002, 280-003, 280-004, 280-007
 - ModelEffort: low
 
 ### Description
-Diskte doğruladığın M-küme maddelerini işaretle (inmemişleri İŞARETLEME): WK-import ✅, WK-nervous ✅, WK-cost ✅ (mid-sprint abort), WK-7 ✅ (async-batch auditor), DASH-001 ✅, DASH-002 ✅, WK-5 ✅ (follow), F7-ENT-verify ✅. Tek-satır "✅ Sprint 279: ..." ekler, mevcut metni SİLME.
+Diskte doğruladığın L-küme maddelerini §4G'de işaretle (inmemişleri İŞARETLEME): REPL `/mcp` wire ✅ (G1 kapandı), PLANOBS-001 ✅ (PROGRESS channel+emit), PLANOBS-002 ✅ (notify progress/phase-change), PLANOBS-004 ✅ (planner notify+spinner), PLANOBS-005 ✅ (tek-plan+cache), APPROVE-007b ✅ (edit transport+REPL). §4G "Kalan: REPL·DASH·PLANOBS·DEFER" satırını güncelle (REPL+PLANOBS düştü → kalan DASH·DEFER). Tek-satır "✅ Sprint 280: ..." ekler, mevcut metni SİLME.
 
-**Kanıt:** `grep -c "Sprint 279" docs/MASTER-PLAN.md` ≥ 3. **Test:** yok — .result YAZ.
+**Kanıt:** `grep -c "Sprint 280" docs/MASTER-PLAN.md` ≥ 3. **Test:** yok — .result YAZ.
 
 ---
 
-**Beklenen:** 11 mikro task (opus 2 — WK-import refactor + WK-7 scale · sonnet 7 · haiku 2), zincirler: 005→001 · 008→001 · 009→006 · 010→005,007 · 011→001,002,004,005. Dosya çakışması: server.ts (001 import-fix + 005 kill/all — 005 Dependencies ile 001 sonrası); config-types.ts (003 cost_guard tek). Dashboard görsel (006/009) EMOJI YASAK + lucide + no-emoji-guard. CC sprint sonu: tsc + testler + dashboard-tsc + commit/push + build:all (CC) + notlar. Sonraki: L-küme (human-interaction kalan: REPL slash parity, PLANOBS, DEFER, CKPT).
+**Beklenen:** 10 mikro task (opus 3 — APPROVE-007b transport + /mcp broker wire + start-perf · sonnet 5 · haiku 2). Zincirler/wave: **Wave-1** 001·002·003·004 (deps-yok); **Wave-2** 005←001 · 006←001,002 · 007←002 · 008←003; **Wave-3** 009←004,005,006,007,008 · 010←001,002,003,004,007. Dosya çakışması YOK (her task ayrı filesWrite). Hepsi opt-in/additive/fail-safe + i18n (en+tr) + davranış-korunumlu. CC sprint sonu: tsc + testler + dashboard-tsc + Tier-1 smoke (/mcp, start --dry-run) + commit/push + build:all (CC) + notlar. Sonraki: K-küme.
