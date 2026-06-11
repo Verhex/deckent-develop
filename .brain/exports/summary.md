@@ -18,11 +18,11 @@
 | adr-013 | DECKENT.md Adapter Pattern (Sprint 15) | accepted |
 | adr-014 | .deck Secret File System (Sprint 044) | accepted |
 | adr-015 | TaskRouter Module — 6-level routing (Sprint 044) | accepted |
-| adr-016 | Connector Module — provider lifecycle (Sprint 044) | accepted |
+| adr-016 | External Messaging Connectors (Discord / Telegram / WhatsApp + Bot) | accepted |
 | adr-017 | MCP-Native Provider Adapters (Sprint 045) | accepted |
 | adr-018 | Multi-Environment Config Generation (Sprint 046) | accepted |
 | adr-019 | Language-Agnostic Worker Verify (Sprint 046) | accepted |
-| adr-020 | Rich Sprint Output — 7-section summary (Sprint 044) | accepted |
+| adr-020 | Rich Sprint Output — multi-section summary (Sprint 044) | accepted |
 | adr-021 | Kraken ASCII Brand Identity (Sprint 044) | accepted |
 | adr-022 | CLI/MCP Feature Parity — Parametre Eşitleme + Eksik Komutlar | accepted |
 | adr-023 | Plan Tier Generalizasyonu — Provider-Agnostic Tier İsimleri (Sprint 072) | accepted |

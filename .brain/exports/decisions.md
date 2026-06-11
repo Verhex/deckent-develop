@@ -367,6 +367,14 @@ The Sprint-172 inventory (9 deps) drifted. Current `package.json` has **13 runti
 
 **Note (realized):** The "extensible to future providers" consequence is now realized. Thin `@DECKENT.md` adapters exist for Gemini (`GEMINI.md`) and Codex (root `AGENTS.md`, optional `.codex/AGENTS.md`) alongside `CLAUDE.md` (Claude Code) and `.cursor/rules` (Cursor), all maintained via `ensureDeckentImport` (`src/core/utils.ts`) and `deckent sync` (`src/cli/commands/sync.ts`). `DECKENT.md` remains the single source of truth; adapters are never overwritten. Consistent with `DECKENT.md` and `CONTRIBUTING.md`. Behavior unchanged; documentation alignment only.
 
+---
+
+**🔴 Amendment — Sprint 281 (2026-06-11, Alperen ADR-review): ADR-013 ↔ ADR-029 çelişkisi + locale-leak kök-çözümü (seçenek A).**
+
+Çelişki: ADR-013 "CLAUDE.md/AGENTS.md asla üzerine yazılmaz" derken `.deckent/docs.json` bunları **managed-docs** olarak listeliyordu (`claude-md`→CLAUDE.md, `agents-md`→AGENTS.md) → ADR-029 render'ı her sprint (RETRO) bu EN-adapter'lara TR-başlık (`Metric→Metrik`) basıyordu = tekrarlayan **locale-leak** (her sprint manuel revert).
+
+**Karar (seçenek A):** CLAUDE.md/AGENTS.md (ve GEMINI.md/.cursor) **SAF adapter**'dır — managed-docs DEĞİL. Sadece `@DECKENT.md` referansı (`ensureDeckentImport`) + kullanıcı içeriği; bu ADR'nin "asla overwrite edilmez" garantisi mutlaktır. → docs.json'dan `claude-md`/`agents-md` çıkarılacak (deckent-dev + product init default'u) → render yok → locale-leak kökten biter. İş-maddesi: MASTER-PLAN "ADR-Analizi Türetilen İşler → ADR-013-W". Çift-bakış: dogfood (yerel leak biter) + product (user projelerinde CLAUDE.md bozulmaz).
+
 
 ---
 
@@ -416,25 +424,38 @@ The Sprint-172 inventory (9 deps) drifted. Current `package.json` has **13 runti
 
 ---
 
-## adr-016: Connector Module — provider lifecycle (Sprint 044)
+## adr-016: External Messaging Connectors (Discord / Telegram / WhatsApp + Bot)
 
 **Status:** accepted
 
-# ADR-016: Connector Module — provider lifecycle (Sprint 044)
+# ADR-016: External Messaging Connectors (Discord / Telegram / WhatsApp + Bot)
 
 **Status:** accepted
 
-**Date:** 2026-04-16
+**Date:** 2026-04-16 (original) · repurposed 2026-06-11
 
 ---
 
-**Context:** Provider'ların sağlık durumu sadece bootstrap'ta kontrol ediliyordu. Sprint sırasında provider düşerse tespit edilemiyordu.
+**Decision (current):** External messaging connectors live in `src/connectors/` as a lifecycle-managed subsystem:
+- **Contract + pool:** `base-connector.ts` (`BaseConnector` interface) + `connector-pool.ts` (`ConnectorPool` — register / broadcast / lifecycle).
+- **Per-platform adapters:** Telegram (`telegram.ts`, `telegraf` runtime dep), Discord (`discord.ts`, `discord.js` **optional** dep, lazy-imported), WhatsApp (`whatsapp.ts`).
+- **Outbound notify:** `connector-notify-adapter.ts` (`ConnectorNotificationAdapter` — implements the WIRE-001 `NotificationAdapter` contract; each `DECKENT→USER:NOTIFY` goes to each connector's own `chat_id`, per-target timeout-guarded + fail-isolated).
+- **Inbound pipeline:** `incoming-router.ts` → `incoming-command-router.ts` / `incoming-command-resolver.ts` (route inbound messages to actions, e.g. approve/reject).
+- **Agentic bot:** `bot-agentic.ts` / `bot-daemon.ts` / `bot-commands.ts` / `bot-action-store.ts` (`deckent bot listen`; humanized replies — see BOT-1).
+- **Multi-turn:** `chat-bridge.ts` (`ChatMemoryAdapter`, bounded history — BOT-2d).
+- **Bootstrap:** `connector-bootstrap.ts` reads `notify_connectors` config, lazy-imports enabled connectors (missing optional dep → log+skip), starts OUTBOUND.
 
-**Decision:** `Connector` class ile runtime health check, lazy init ve auditor entegrasyonu sağlandı. Her provider bağlantısı Connector üzerinden yönetilir.
+**Context:** Operators need deckent to reach them on their phone (sprint approvals, checkpoints, alerts) and to reply back (inbound approve/reject). The subsystem must be **config-gated** (`notify_connectors: { telegram|discord: { enabled, token: "$DECK:…", chat_id } }`), **lazy** (optional deps never break load), and **fail-safe** (a slow/hung platform never blocks the sprint lifecycle — every send is timeout-guarded + per-target error-isolated).
 
-**Consequence:** Sprint sırasında provider düşerse auditor tespit eder ve alert üretir. Lazy init sayesinde kullanılmayan provider'lar başlatılmaz. Connector, provider sağlık metriklerini `.dashboard`'a yazar.
+**Consequence:** Adding a platform = a new adapter implementing `BaseConnector` + a `notify_connectors` entry. Discord stays an `optionalDependency` (ADR-010). Telegram is a runtime dep (`telegraf`). Connectors are a first-class **product** surface for non-coder/enterprise reach (cross-ref BOT-1 humanized bot-agent, §4G human-interaction-wire). Cross-ref: ADR-010 (deps), WIRE-001 (notify dispatcher), `$DECK:` interpolation (ADR-014).
 
-**Note (terminology drift / evolution):** This recorded a Sprint 044 decision about **AI-provider health/lifecycle** via a `Connector` abstraction. That responsibility has since moved into `src/core/provider.ts` (`ProviderAdapter` interface with `isAvailable()`, the multi-provider registry) — see **ADR-017 (MCP-Native Provider Adapters)**. In the current codebase the term **"connector"** and the `src/connectors/` namespace mean **external messaging connectors** (`base-connector.ts`, `connector-pool.ts`): Discord (`discord.js`, an `optionalDependency`), Telegram (`telegraf`, a runtime dependency — mapped to this ADR by the ADR-010 Amendment), and WhatsApp. Behavior unchanged; documentation alignment only.
+---
+
+**Original decision (Sprint 044 — SUPERSEDED):** ADR-016 originally recorded an **AI-provider** health/lifecycle `Connector` abstraction (runtime health-check, lazy init, auditor integration, `.dashboard` health metrics). That AI-provider responsibility moved to `src/core/provider.ts` `ProviderAdapter` (`isAvailable()`, multi-provider registry) per **ADR-017 (MCP-Native Provider Adapters)**; the `Connector` class itself moved to `src/core/session-interface.ts` (evolved role). The term **"connector"** + the `src/connectors/` namespace now mean **external messaging connectors** (this ADR's current subject).
+
+---
+
+**Amendment log:** 2026-06-11 — ADR **repurposed** from "AI-provider lifecycle Connector" → **"External Messaging Connectors"** to match the codebase's current meaning of `connector` (closes a governance gap: the 16-file messaging/bot subsystem had no ADR). AI-provider lifecycle part marked superseded-by-ADR-017 (Alperen ADR-review). md+db synced.
 
 
 ---
@@ -457,7 +478,17 @@ The Sprint-172 inventory (9 deps) drifted. Current `package.json` has **13 runti
 
 **Consequence:** Gerçek provider'larla uçtan uca test mümkün. CI ortamında binary yoksa `describe.skipIf` ile testler atlanır. Mock adapter'lar yalnızca unit test scope'unda kalır.
 
-**Note (current scope):** Verified accurate — `src/providers/codex.ts` emits `codex exec --full-auto … --model …`; `src/providers/gemini.ts` uses `gemini -p … --output-format json` and now also supports `--output-format stream-json` (NDJSON); integration tests use `describe.skipIf` (`tests/providers/{codex,gemini}-integration.test.ts`). Adapters live in `src/providers/{claude,codex,gemini,sandbox,subprocess}.ts` behind the `ProviderAdapter` interface + `ProviderRegistry` (`src/core/provider.ts`). Per the ADR-010 Amendment, this ADR is also the governing record for the `@modelcontextprotocol/sdk` runtime dependency (MCP server/client transport, `src/mcp/server.ts`). Behavior unchanged; documentation alignment only.
+**Note (current scope, refreshed 2026-06-11):** The real-CLI ProviderAdapter decision holds and has **expanded to a multi-provider fleet** (ADR-066 Provider Independence, ADR-077 Multi-Provider 8-Fleet + OpenAI-Compatible HTTP Adapter). Adapters now live in `src/providers/` (**7**): `claude.ts`, `codex.ts`, `gemini.ts`, **`ollama.ts`**, **`openai-compatible.ts`**, `sandbox.ts`, `subprocess.ts` — behind the `ProviderAdapter` interface + `ProviderRegistry` (`src/core/provider.ts`). Integration tests use `describe.skipIf` (`tests/providers/*`).
+
+**Per-provider flags (host vs docker — ProviderCommandSpec, Sprint 252 PSL-1):**
+- **codex:** host path keeps `codex exec --full-auto` (backward-compat; Rust CLI ignores it harmlessly, `--approval-mode full-auto` also accepted); the **docker** container path uses `--dangerously-bypass-approvals-and-sandbox` via `ProviderCommandSpec` + per-provider OAuth mount.
+- **gemini:** `gemini -p … --output-format json` (also `stream-json`/NDJSON); docker path adds yolo / skip-trust (autoApprove-gated for security) + OAuth mount.
+
+Per the ADR-010 Amendment this ADR is also the governing record for the `@modelcontextprotocol/sdk` runtime dependency (MCP server/client transport, `src/mcp/server.ts`).
+
+---
+
+**Amendment log:** 2026-06-11 — Note refreshed: adapter list 5→**7** (ollama + openai-compatible eklendi); codex host `--full-auto` vs docker `--dangerously-bypass` (ProviderCommandSpec PSL-1) + gemini yolo/skip-trust ayrımı; cross-ref ADR-066/077 (Alperen ADR-review). Davranış değişmedi; md+db senkron.
 
 
 ---
@@ -476,9 +507,9 @@ The Sprint-172 inventory (9 deps) drifted. Current `package.json` has **13 runti
 
 **Context:** Her IDE/ortam farklı config dosyası bekliyor. Codex, Gemini, Cursor, VS Code farklı format ve yol tercihlerine sahip.
 
-**Decision:** Ortam başına config generator: Codex → `config.toml`, Gemini → `settings.json`, Cursor → `mcp.json`. `deckent init --all-envs` tüm ortamları tek seferde hazırlar.
+**Decision:** Ortam başına **`@DECKENT.md` adapter generator** (ADR-013 deseni): Codex → `AGENTS.md`, Gemini → `GEMINI.md`, Cursor → `.cursor/rules/deckent.mdc`, Claude → `CLAUDE.md`. Generator'lar `src/cli/helpers/agent-templates.ts` (`generateAgentsMd`/`generateGeminiMd`/`generateCursorRules`). `deckent init --all-envs` tüm ortamları tek seferde hazırlar. *(Orijinal Sprint-046 önerisi IDE-özel dosyalardı — config.toml/settings.json/mcp.json — ama @DECKENT.md adapter desenine yakınsadı; aşağıdaki Note + ADR-013.)*
 
-**Consequence:** Kullanıcı tek komutla tüm IDE entegrasyonlarını kurar. Her generator bağımsız modül, yeni ortam eklemek kolaylaşır. Mevcut config'ler üzerine yazılmaz, `writeIfNotExists` prensibi korunur.
+**Consequence:** Kullanıcı tek komutla tüm IDE entegrasyonlarını kurar. Her generator bağımsız modül, yeni ortam eklemek kolaylaşır. Adapter'lar üzerine yazılmaz — `ensureDeckentImport` / `deckent sync` ile sadece `@DECKENT.md` referansı korunur (ADR-013; orijinal `writeIfNotExists` ifadesinin yerini alır).
 
 **Note (evolved targets):** The per-environment generation decision still stands, but the concrete file targets converged on the **ADR-013 thin `@DECKENT.md` adapter** pattern (not the IDE-specific files originally proposed):
 - Codex → `AGENTS.md` (not `config.toml`)
@@ -487,6 +518,10 @@ The Sprint-172 inventory (9 deps) drifted. Current `package.json` has **13 runti
 - Claude → `CLAUDE.md`
 
 Generators live in `src/cli/helpers/agent-templates.ts` (`generateAgentsMd`, `generateGeminiMd`, …); the never-overwrite guarantee is provided by `ensureDeckentImport` / `deckent sync` (ADR-013), superseding the original `writeIfNotExists` phrasing. Behavior unchanged; documentation alignment only.
+
+---
+
+**Amendment log:** 2026-06-11 — Decision-body gerçek hedeflere güncellendi (config.toml/settings.json/mcp.json → AGENTS.md/GEMINI.md/.cursor/rules @DECKENT.md adapter, ADR-013); Consequence `writeIfNotExists` → `ensureDeckentImport`. Decision artık tek başına yanıltmıyor (Alperen ADR-review). md+db senkron.
 
 
 ---
@@ -542,14 +577,20 @@ Generators live in `src/cli/helpers/agent-templates.ts` (`generateAgentsMd`, `ge
 
 **Consequence:** Deckent TypeScript dışı projelerde de çalışır. Verify döngüsü stack-aware hale geldi. Yeni dil eklemek `STACK_COMMANDS` map'ine bir entry eklemekle yapılır.
 
+---
+
+**Cross-ref — eval-side companion (WM-7, Sprint 254):** This ADR governs the **verify-command** side (stack-aware `build`/`test` dispatch). The **evaluation-criteria** side is its companion: `src/core/criteria-deriver.ts` (`deriveBaseCriteria(kind, stack, commands)` — never hardcodes `tsc`; doc→files-on-disk, audit→findings, code→detected stack commands) + `src/core/coverage-adapters.ts` (per-stack `testFilePattern`/`coverageCommand`, `isCoverageMeasurable`) + `src/core/work-model.ts` (`COVERAGE_MEASURABLE_STACKS`). Together they ensure a C++/Go task is NOT false-NO_GO'd for "tsc not clean" / "no vitest coverage". The WM-7 evaluation-integrity work has no standalone ADR yet (MASTER-PLAN work-item, DONE Sprint 254) — cross-ref ADR-070 (Brain Evaluation Integrity); a dedicated eval-criteria ADR is a candidate (assessed during ADR-070 review).
+
+**Amendment log:** 2026-06-11 — eval-side companion (WM-7: criteria-deriver / coverage-adapters / work-model) cross-ref'i eklendi (Alperen ADR-review). md+db senkron.
+
 
 ---
 
-## adr-020: Rich Sprint Output — 7-section summary (Sprint 044)
+## adr-020: Rich Sprint Output — multi-section summary (Sprint 044)
 
 **Status:** accepted
 
-# ADR-020: Rich Sprint Output — 7-section summary (Sprint 044)
+# ADR-020: Rich Sprint Output — multi-section summary (Sprint 044)
 
 **Status:** accepted
 
@@ -569,6 +610,10 @@ Generators live in `src/cli/helpers/agent-templates.ts` (`generateAgentsMd`, `ge
 - **`NO_COLOR`** is honored — verified in `src/cli/helpers/splash.ts` (plain text when `NO_COLOR` set).
 
 The rich-multi-section decision stands; the concrete section set evolved (canonical = the modules above + `deckent retro` / `deckent history` output). Behavior unchanged; documentation alignment only.
+
+---
+
+**Amendment log:** 2026-06-11 — Başlık "7-section" → "multi-section" (gerçek = 5-section RETRO + task-log; "7" yanıltıcıydı, Note zaten doğru yapıyı veriyor). Dosya-adı eski kalır (numara-stabilite). Alperen ADR-review. md+db senkron.
 
 
 ---

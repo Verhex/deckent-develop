@@ -1,4 +1,4 @@
-# ADR-020: Rich Sprint Output — 7-section summary (Sprint 044)
+# ADR-020: Rich Sprint Output — multi-section summary (Sprint 044)
 
 **Status:** accepted
 
@@ -18,3 +18,7 @@
 - **`NO_COLOR`** is honored — verified in `src/cli/helpers/splash.ts` (plain text when `NO_COLOR` set).
 
 The rich-multi-section decision stands; the concrete section set evolved (canonical = the modules above + `deckent retro` / `deckent history` output). Behavior unchanged; documentation alignment only.
+
+---
+
+**Amendment log:** 2026-06-11 — Başlık "7-section" → "multi-section" (gerçek = 5-section RETRO + task-log; "7" yanıltıcıydı, Note zaten doğru yapıyı veriyor). Dosya-adı eski kalır (numara-stabilite). Alperen ADR-review. md+db senkron.

@@ -44,3 +44,9 @@
 **Decision:** `STACK_COMMANDS` ile dil bazlı build/test komutu belirlendi: Python → `pytest`, Go → `go test ./...`, Rust → `cargo test`. `.deckent/project-stack.json` dosyasından stack okunur.
 
 **Consequence:** Deckent TypeScript dışı projelerde de çalışır. Verify döngüsü stack-aware hale geldi. Yeni dil eklemek `STACK_COMMANDS` map'ine bir entry eklemekle yapılır.
+
+---
+
+**Cross-ref — eval-side companion (WM-7, Sprint 254):** This ADR governs the **verify-command** side (stack-aware `build`/`test` dispatch). The **evaluation-criteria** side is its companion: `src/core/criteria-deriver.ts` (`deriveBaseCriteria(kind, stack, commands)` — never hardcodes `tsc`; doc→files-on-disk, audit→findings, code→detected stack commands) + `src/core/coverage-adapters.ts` (per-stack `testFilePattern`/`coverageCommand`, `isCoverageMeasurable`) + `src/core/work-model.ts` (`COVERAGE_MEASURABLE_STACKS`). Together they ensure a C++/Go task is NOT false-NO_GO'd for "tsc not clean" / "no vitest coverage". The WM-7 evaluation-integrity work has no standalone ADR yet (MASTER-PLAN work-item, DONE Sprint 254) — cross-ref ADR-070 (Brain Evaluation Integrity); a dedicated eval-criteria ADR is a candidate (assessed during ADR-070 review).
+
+**Amendment log:** 2026-06-11 — eval-side companion (WM-7: criteria-deriver / coverage-adapters / work-model) cross-ref'i eklendi (Alperen ADR-review). md+db senkron.
