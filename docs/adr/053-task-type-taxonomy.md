@@ -144,3 +144,19 @@ Bu ADR, `rubric-registry.ts` içinde `Sprint 154 Bug B fix` olarak hayata geçir
 > Memory'deki taxonomy-vision (ADR-053/055/060 taslak seti) bağlamı korunur; yalnız ADR-053'ün **doğrulanmış çekirdeği** accepted'a alındı, geniş vizyon kapsamı değil. Behavior unchanged; documentation alignment only.
 
 > **Amendment — Sprint 191 (Karpathy cross-reference):** Sprint 191 Worker Discipline Anchor projesi `.claude/rules/karpathy-discipline.md` dosyasını ve `worker-default.md` Karpathy 4-Discipline Anchor bölümünü ekledi. Bu ADR, execute-time disiplin kurallarının **plan-time** tamamlayıcısıdır: ADR-053 *hangi* rubrikle değerlendirileceğini belirler (Brain sorumluluğu, plan-time), Karpathy 4-discipline *nasıl* yürütüleceğini belirler (Worker sorumluluğu, execute-time). §Related ADRs'e Karpathy Anchor referansı eklendi. Behavior unchanged; no code change.
+
+---
+
+## Amendment — Sprint 281 (2026-06-11, ADR-review): Deferred maddeler GERÇEKLEŞTİ
+
+**Classification: BOTH** (değerlendirme adaleti kullanıcı-ürün kanunudur — kullanıcının doc/audit task'ları uygulanamaz kriterlerle false-NO_GO yememeli).
+
+Sprint-172 Note'unun "deferred/unrealized" işaretlediği iki madde o zamandan gerçekleşti (kod-doğrulandı 2026-06-11):
+
+1. **🟢 Tek Kaynak Prensibi UYGULANDI — WM-2 canonical work-model (Sprint 238-240).** `src/core/work-model.ts` artık taxonominin canonical SSOT'u; üç tüketici de bağlı: `rubric-registry.ts:12` (`taskKindToRubric`), `task-router.ts:15` (`taskKindToIntent`), `adr-selector.ts:12` (`taskKindToAdrDomain`). Çakışan bağımsız `TaskType` tanımları sorunu kapandı; çekirdek 3-tip + `Object.freeze` + tespit-önceliği `rubric-registry.ts:23/169`'da birebir korunur.
+
+2. **🟢 EffectClass → otonom 3-gate ENFORCE — WM-6 (Sprint 241).** `src/orchestra/autonomous/policy-gate.ts` (G3 risk-gate) `EffectClass`'ı `rubric-registry`'den tüketir: pure/reversible → auto-run, riskli sınıflar → **park (insan onayı)**. ADR'nin "critical-irreversible → onay-gating" enforcement vizyonu otonom motorda canlıdır.
+
+3. **🟢 İkinci eksen: TechStackKind — WM-7 (Sprint 254).** Taxonomy `TaskKind × TechStack` iki-eksenli değerlendirmeye genişledi: `work-model.ts` `TechStackKind` + `normalizeTechStack` + `COVERAGE_MEASURABLE_STACKS`; `criteria-deriver.ts` tip+stack-duyarlı GO/NO-GO türetir (doc→files-on-disk, audit→findings, code→tespit-edilen stack komutları — C++ projeye tsc-clean dayatılmaz; ADR-019 cross-ref).
+
+**Hâlâ niyet-beyanı:** Extensibility-Roadmap'in gelecek tipleri (db-migration / package-publish / infrastructure-provision / security-patch) eklenmedi — 3 temel tip + iki-eksen güncel durumdur. md+db senkron (Alperen ADR-review).

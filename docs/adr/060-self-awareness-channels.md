@@ -176,3 +176,17 @@ Sprint 156 T-007'nin tamamlanması Kanal 5'in canlıya alındığını kanıtlar
 > **Çekirdek karar GERÇEKLEŞMEDİ (gövde gelecek-zamanlı kalmıştır):** Koordineli 5-kanal çatı mimarisi `buildWorkerContext()` ve `WorkerContextBundle` interface'i `src/` genelinde **yoktur** — builder'lar bağımsız çalışır, ADR'nin önerdiği koordinatör altında birleşmez. Kanal 1-4 "Yeni eklenti"leri (`sprint_sequence_number`, `manifest_checksum`, `skill_anti_patterns`) kodda **hiç yoktur**. "Sprint 157+ / Sprint 157 ADR consolidation" roadmap hedefi **geçti ve gerçekleşmedi** (Sprint 172).
 >
 > **Statü gerekçesi (ADR-055 ile tutarlı, ADR-053 kontrastı):** Bu ADR'nin çekirdeği = koordineli `buildWorkerContext()` mimarisi ve o inşa edilmedi — yalnız Kanal 5 seed + çevresel builder'lar mevcut. Bu nedenle status doğru biçimde **`proposed` kalır** (terfi dürüst olmazdı; ADR-053 ise çekirdeği shipped olduğu için terfi etmişti). Behavior unchanged; documentation alignment only.
+
+---
+
+## Amendment — Sprint 281 (2026-06-11, ADR-review): Kanal-5 genişlemesi + statü teyidi
+
+**Classification: BOTH** (worker-bağlam kalitesi kullanıcı projelerindeki çıktı kalitesini doğrudan etkiler).
+
+**Re-verified:** `buildWorkerContext`/`WorkerContextBundle` koordinatörü hâlâ yok (0-sembol); Kanal 1-4 "Yeni eklenti"leri (`sprint_sequence_number`/`manifest_checksum`/`skill_anti_patterns`) hâlâ yok → **`proposed` kalır**.
+
+**🟢 Kanal-5 organik GENİŞLEDİ (Sprint-172 sonrası):**
+1. **COMM-1 (Sprint 278):** Enrichment artık dependency-`.result`'ların ötesinde — **SharedMemory cross-worker notları + Upstream Handoff'lar** worker-prompt'una enjekte edilir (`task-builder.ts:1267-1290`, config-gated `worker_comms: { inject_shared, inject_handoffs }`). Kanal-5'in "bağımlılık-sonuç yayılımı" vizyonu, çapraz-worker bağlam paylaşımına büyüdü (ADR-037 Sprint-281 amendment'inin Brain-aracılı mesaj-bus invariant'ı içinde).
+2. **ADR-048 S182 amendment:** full-content injection (skill/ADR truncation-yasak) Kanal-2/4'ün içerik-teslimini koordinatörsüz güçlendirdi.
+
+ADR-055 ile aynı kalıp: hedefler kısmen organik gerçekleşiyor; koordineli 5-kanal çatısı **açık mimari opsiyon** olarak `proposed` kalır (worker-prompt yeniden-yapılandırma gündeme geldiğinde — WP-stream — karar verilir). md+db senkron (Alperen ADR-review).

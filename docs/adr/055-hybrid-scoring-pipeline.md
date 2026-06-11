@@ -194,3 +194,22 @@ Bu ADR Sprint 156 T-011 (EffectClass Annotation) çalışması sırasında ortay
 > **Çekirdek karar GERÇEKLEŞMEDİ (gövde gelecek-zamanlı kalmıştır):** `src/orchestra/scoring-pipeline.ts` **yoktur**; `runScoringPipeline` / `ScoringPipelineResult` / `PipelineLayerResult` sembolleri `src/` genelinde **hiç yoktur**. Layer 2 (Gate Conditions G-001..G-005), Layer 5 (Auditor Verification), Final Decision Matrix ve orkestrasyon katmanı uygulanmadı. "Sprint 157+ roadmap" hedefi **geçti ve gerçekleşmedi** (Sprint 172).
 >
 > **Statü gerekçesi (ADR-053 kontrastı):** ADR-053 terfi etti çünkü çekirdeği (3-tip taxonomy) shipped'di. ADR-055'in çekirdeği = 5-katman pipeline'ın **kendisi** ve o inşa edilmedi — yalnız çevresel seed'ler mevcut. Bu nedenle status doğru biçimde **`proposed` kalır** (terfi dürüst olmazdı). Satır drift'i: ADR `:197` → gerçek `:220`. Behavior unchanged; documentation alignment only.
+
+---
+
+## Amendment — Sprint 281 (2026-06-11, ADR-review): Hedef-gerçekleşme haritası — organik birikme vs formal pipeline
+
+**Classification: BOTH** (değerlendirme derinliği/güvenilirliği ürün-kanunu; şekil-kararı hâlâ açık).
+
+**Statü `proposed` KALIR** — formal pipeline hâlâ yok (`scoring-pipeline.ts` mevcut değil, `runScoringPipeline`/`ScoringPipelineResult` 0-sembol, 2026-06-11 doğrulandı). Ancak ADR'nin **hedefleri** o tarihten bu yana pipeline-şekli OLMADAN, organik olarak büyük ölçüde gerçekleşti:
+
+| ADR-055 katmanı | Organik gerçekleşme (kod-doğrulandı) |
+|---|---|
+| Layer 1 Schema | `validateResultSchema` canlı (zaten seed) ✓ |
+| Layer 2 Gates | **honest-gate** (`result-evaluator.ts` ~16 ref) + `reconcileSpuriousNoGo` + disk-verify gate + `applyTechDebtDowngrade` — gate'ler evaluator'a organik birikti (formal G-001..G-005 registry'si değil) |
+| Layer 3 Quality | tip-rubrik (ADR-053) + **WM-7 `criteria-deriver`** (TaskKind × TechStack iki-eksen) ✓ |
+| Layer 4 EffectClass/Outcome | EffectClass → **otonom policy-gate G3** (WM-6, Sprint 241): riskli sınıflar park = G-005 ruhu ENFORCE (otonom motorda) |
+| Layer 5 Bağımsız doğrulama | **XVER-1 cross-verify** (Sprint 276): farklı-provider adversarial verify, advisory-sinyal olarak evaluation'a akar (`src/core/cross-verify.ts` + `.result.crossVerify` field) |
+| "Az yanlış NO_GO" hedefi | **ADR-070** Brain Evaluation Integrity — signal-based coverage exemption (`coverageOptional`), NaN-guard, verdict-persist |
+
+**Açık mimari opsiyon (bu ADR'nin kalan değeri):** evaluator'daki organik gate-birikimi tam da bu ADR'nin öngördüğü yapısal soruna dönüşüyor (tek-modülde katman-karışımı). 5-katman pipeline-şekli, bu organik mekanizmaları **konsolide eden gelecek-refactor hedefi** olarak `proposed` kalır (MASTER-PLAN §A canonical work-model temeli + ADR-026 god-object-split deseniyle uyumlu). Karar o refactor gündeme geldiğinde verilir: pipeline-şekline taşı (bu ADR accept edilir) ya da organik mimariyi resmîleştir (bu ADR reject + yeni ADR). md+db senkron (Alperen ADR-review).

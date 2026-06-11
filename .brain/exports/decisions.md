@@ -4735,6 +4735,22 @@ Bu ADR, `rubric-registry.ts` içinde `Sprint 154 Bug B fix` olarak hayata geçir
 
 > **Amendment — Sprint 191 (Karpathy cross-reference):** Sprint 191 Worker Discipline Anchor projesi `.claude/rules/karpathy-discipline.md` dosyasını ve `worker-default.md` Karpathy 4-Discipline Anchor bölümünü ekledi. Bu ADR, execute-time disiplin kurallarının **plan-time** tamamlayıcısıdır: ADR-053 *hangi* rubrikle değerlendirileceğini belirler (Brain sorumluluğu, plan-time), Karpathy 4-discipline *nasıl* yürütüleceğini belirler (Worker sorumluluğu, execute-time). §Related ADRs'e Karpathy Anchor referansı eklendi. Behavior unchanged; no code change.
 
+---
+
+## Amendment — Sprint 281 (2026-06-11, ADR-review): Deferred maddeler GERÇEKLEŞTİ
+
+**Classification: BOTH** (değerlendirme adaleti kullanıcı-ürün kanunudur — kullanıcının doc/audit task'ları uygulanamaz kriterlerle false-NO_GO yememeli).
+
+Sprint-172 Note'unun "deferred/unrealized" işaretlediği iki madde o zamandan gerçekleşti (kod-doğrulandı 2026-06-11):
+
+1. **🟢 Tek Kaynak Prensibi UYGULANDI — WM-2 canonical work-model (Sprint 238-240).** `src/core/work-model.ts` artık taxonominin canonical SSOT'u; üç tüketici de bağlı: `rubric-registry.ts:12` (`taskKindToRubric`), `task-router.ts:15` (`taskKindToIntent`), `adr-selector.ts:12` (`taskKindToAdrDomain`). Çakışan bağımsız `TaskType` tanımları sorunu kapandı; çekirdek 3-tip + `Object.freeze` + tespit-önceliği `rubric-registry.ts:23/169`'da birebir korunur.
+
+2. **🟢 EffectClass → otonom 3-gate ENFORCE — WM-6 (Sprint 241).** `src/orchestra/autonomous/policy-gate.ts` (G3 risk-gate) `EffectClass`'ı `rubric-registry`'den tüketir: pure/reversible → auto-run, riskli sınıflar → **park (insan onayı)**. ADR'nin "critical-irreversible → onay-gating" enforcement vizyonu otonom motorda canlıdır.
+
+3. **🟢 İkinci eksen: TechStackKind — WM-7 (Sprint 254).** Taxonomy `TaskKind × TechStack` iki-eksenli değerlendirmeye genişledi: `work-model.ts` `TechStackKind` + `normalizeTechStack` + `COVERAGE_MEASURABLE_STACKS`; `criteria-deriver.ts` tip+stack-duyarlı GO/NO-GO türetir (doc→files-on-disk, audit→findings, code→tespit-edilen stack komutları — C++ projeye tsc-clean dayatılmaz; ADR-019 cross-ref).
+
+**Hâlâ niyet-beyanı:** Extensibility-Roadmap'in gelecek tipleri (db-migration / package-publish / infrastructure-provision / security-patch) eklenmedi — 3 temel tip + iki-eksen güncel durumdur. md+db senkron (Alperen ADR-review).
+
 
 ---
 
@@ -4939,6 +4955,25 @@ Bu ADR Sprint 156 T-011 (EffectClass Annotation) çalışması sırasında ortay
 >
 > **Statü gerekçesi (ADR-053 kontrastı):** ADR-053 terfi etti çünkü çekirdeği (3-tip taxonomy) shipped'di. ADR-055'in çekirdeği = 5-katman pipeline'ın **kendisi** ve o inşa edilmedi — yalnız çevresel seed'ler mevcut. Bu nedenle status doğru biçimde **`proposed` kalır** (terfi dürüst olmazdı). Satır drift'i: ADR `:197` → gerçek `:220`. Behavior unchanged; documentation alignment only.
 
+---
+
+## Amendment — Sprint 281 (2026-06-11, ADR-review): Hedef-gerçekleşme haritası — organik birikme vs formal pipeline
+
+**Classification: BOTH** (değerlendirme derinliği/güvenilirliği ürün-kanunu; şekil-kararı hâlâ açık).
+
+**Statü `proposed` KALIR** — formal pipeline hâlâ yok (`scoring-pipeline.ts` mevcut değil, `runScoringPipeline`/`ScoringPipelineResult` 0-sembol, 2026-06-11 doğrulandı). Ancak ADR'nin **hedefleri** o tarihten bu yana pipeline-şekli OLMADAN, organik olarak büyük ölçüde gerçekleşti:
+
+| ADR-055 katmanı | Organik gerçekleşme (kod-doğrulandı) |
+|---|---|
+| Layer 1 Schema | `validateResultSchema` canlı (zaten seed) ✓ |
+| Layer 2 Gates | **honest-gate** (`result-evaluator.ts` ~16 ref) + `reconcileSpuriousNoGo` + disk-verify gate + `applyTechDebtDowngrade` — gate'ler evaluator'a organik birikti (formal G-001..G-005 registry'si değil) |
+| Layer 3 Quality | tip-rubrik (ADR-053) + **WM-7 `criteria-deriver`** (TaskKind × TechStack iki-eksen) ✓ |
+| Layer 4 EffectClass/Outcome | EffectClass → **otonom policy-gate G3** (WM-6, Sprint 241): riskli sınıflar park = G-005 ruhu ENFORCE (otonom motorda) |
+| Layer 5 Bağımsız doğrulama | **XVER-1 cross-verify** (Sprint 276): farklı-provider adversarial verify, advisory-sinyal olarak evaluation'a akar (`src/core/cross-verify.ts` + `.result.crossVerify` field) |
+| "Az yanlış NO_GO" hedefi | **ADR-070** Brain Evaluation Integrity — signal-based coverage exemption (`coverageOptional`), NaN-guard, verdict-persist |
+
+**Açık mimari opsiyon (bu ADR'nin kalan değeri):** evaluator'daki organik gate-birikimi tam da bu ADR'nin öngördüğü yapısal soruna dönüşüyor (tek-modülde katman-karışımı). 5-katman pipeline-şekli, bu organik mekanizmaları **konsolide eden gelecek-refactor hedefi** olarak `proposed` kalır (MASTER-PLAN §A canonical work-model temeli + ADR-026 god-object-split deseniyle uyumlu). Karar o refactor gündeme geldiğinde verilir: pipeline-şekline taşı (bu ADR accept edilir) ya da organik mimariyi resmîleştir (bu ADR reject + yeni ADR). md+db senkron (Alperen ADR-review).
+
 
 ---
 
@@ -5124,6 +5159,20 @@ Sprint 156 T-007'nin tamamlanması Kanal 5'in canlıya alındığını kanıtlar
 > **Çekirdek karar GERÇEKLEŞMEDİ (gövde gelecek-zamanlı kalmıştır):** Koordineli 5-kanal çatı mimarisi `buildWorkerContext()` ve `WorkerContextBundle` interface'i `src/` genelinde **yoktur** — builder'lar bağımsız çalışır, ADR'nin önerdiği koordinatör altında birleşmez. Kanal 1-4 "Yeni eklenti"leri (`sprint_sequence_number`, `manifest_checksum`, `skill_anti_patterns`) kodda **hiç yoktur**. "Sprint 157+ / Sprint 157 ADR consolidation" roadmap hedefi **geçti ve gerçekleşmedi** (Sprint 172).
 >
 > **Statü gerekçesi (ADR-055 ile tutarlı, ADR-053 kontrastı):** Bu ADR'nin çekirdeği = koordineli `buildWorkerContext()` mimarisi ve o inşa edilmedi — yalnız Kanal 5 seed + çevresel builder'lar mevcut. Bu nedenle status doğru biçimde **`proposed` kalır** (terfi dürüst olmazdı; ADR-053 ise çekirdeği shipped olduğu için terfi etmişti). Behavior unchanged; documentation alignment only.
+
+---
+
+## Amendment — Sprint 281 (2026-06-11, ADR-review): Kanal-5 genişlemesi + statü teyidi
+
+**Classification: BOTH** (worker-bağlam kalitesi kullanıcı projelerindeki çıktı kalitesini doğrudan etkiler).
+
+**Re-verified:** `buildWorkerContext`/`WorkerContextBundle` koordinatörü hâlâ yok (0-sembol); Kanal 1-4 "Yeni eklenti"leri (`sprint_sequence_number`/`manifest_checksum`/`skill_anti_patterns`) hâlâ yok → **`proposed` kalır**.
+
+**🟢 Kanal-5 organik GENİŞLEDİ (Sprint-172 sonrası):**
+1. **COMM-1 (Sprint 278):** Enrichment artık dependency-`.result`'ların ötesinde — **SharedMemory cross-worker notları + Upstream Handoff'lar** worker-prompt'una enjekte edilir (`task-builder.ts:1267-1290`, config-gated `worker_comms: { inject_shared, inject_handoffs }`). Kanal-5'in "bağımlılık-sonuç yayılımı" vizyonu, çapraz-worker bağlam paylaşımına büyüdü (ADR-037 Sprint-281 amendment'inin Brain-aracılı mesaj-bus invariant'ı içinde).
+2. **ADR-048 S182 amendment:** full-content injection (skill/ADR truncation-yasak) Kanal-2/4'ün içerik-teslimini koordinatörsüz güçlendirdi.
+
+ADR-055 ile aynı kalıp: hedefler kısmen organik gerçekleşiyor; koordineli 5-kanal çatısı **açık mimari opsiyon** olarak `proposed` kalır (worker-prompt yeniden-yapılandırma gündeme geldiğinde — WP-stream — karar verilir). md+db senkron (Alperen ADR-review).
 
 
 ---
@@ -5520,6 +5569,20 @@ AEGIS VSDD'nin **superset'idir** — VSDD prensiplerinin çoğunu (adversarial v
 > Behavior unchanged; documentation alignment only.
 
 > **Amendment — Sprint 191 (Karpathy cross-reference):** Sprint 191 Worker Discipline Anchor projesi `.claude/rules/karpathy-discipline.md` dosyasını ekledi (4 disiplin: Think-Before-Coding, Simplicity-First, Surgical-Changes, Goal-Driven-Execution). Bu amendment AEGIS Phase 4 EXECUTE lifecycle adımına Karpathy 4-Discipline Anchor referansını ve §Related ADRs'e Karpathy Anchor cross-reference'ını ekler. Karpathy discipline AEGIS prensipleri #3 (Adversarial Verification — Discipline 4 honest self-assessment) ve #1 (Separation of Duties — Discipline 3 scope.filesWrite enforcement) ile örtüşür. No behavior change; documentation cross-reference only.
+
+---
+
+## Amendment — Sprint 281 (2026-06-11, ADR-review)
+
+**Classification: BOTH** (metodoloji ürünün kamusal kimlik iddiasıdır; manifesto-aşamasında).
+
+**Re-verified — `proposed` doğru kalır:** Roadmap Phase 0-5 inmedi (`.deckent/provenance/` yok, fast-check/Stryker dependency'leri yok, andon-authority yok, `src/aegis/` yok); MASTER-PLAN ile tutarlı ("PB-3: AEGIS Phase 1 foundation — post-beta if approved"; public-standard track Phase 1-4 ship'e dek deferred).
+
+1. **ADVERSE-ruhu organik parça indi:** **XVER-1 cross-verify** (Sprint 276, `src/core/cross-verify.ts` + `.result.crossVerify` advisory) = Phase-5 ADVERSE'in "differential / adversarial farklı-provider doğrulama" ruhunun canlı ilk parçası — ADR-055/060 ile aynı organik-gerçekleşme kalıbı (formal faz inşa edilmeden hedefin bir dilimi üretimde).
+2. **Mode-üçlüsü hizası:** AEGIS'in `sprint|task|process` mode-applicability tablosu, ADR-042 Sprint-281 amendment'inin üçlü-yön kararıyla (process modu = ADR-067 proposed; gerekçe: "sprint evrensel kavram değil + task-mode agentic değil") birebir örtüşür — AEGIS bu yönün metodoloji-katmanı olarak konumlanır.
+3. **İsim/trademark Architect-kararı açık kalır** (AEGIS vs MAVEN/PRISM/OAGD/HELIX + trademark araştırması) — post-beta Phase-0 kapısında çözülür; şimdilik baskı yok.
+
+md+db senkron (Alperen ADR-review).
 
 
 ---

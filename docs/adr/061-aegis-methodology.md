@@ -386,3 +386,17 @@ AEGIS VSDD'nin **superset'idir** — VSDD prensiplerinin çoğunu (adversarial v
 > Behavior unchanged; documentation alignment only.
 
 > **Amendment — Sprint 191 (Karpathy cross-reference):** Sprint 191 Worker Discipline Anchor projesi `.claude/rules/karpathy-discipline.md` dosyasını ekledi (4 disiplin: Think-Before-Coding, Simplicity-First, Surgical-Changes, Goal-Driven-Execution). Bu amendment AEGIS Phase 4 EXECUTE lifecycle adımına Karpathy 4-Discipline Anchor referansını ve §Related ADRs'e Karpathy Anchor cross-reference'ını ekler. Karpathy discipline AEGIS prensipleri #3 (Adversarial Verification — Discipline 4 honest self-assessment) ve #1 (Separation of Duties — Discipline 3 scope.filesWrite enforcement) ile örtüşür. No behavior change; documentation cross-reference only.
+
+---
+
+## Amendment — Sprint 281 (2026-06-11, ADR-review)
+
+**Classification: BOTH** (metodoloji ürünün kamusal kimlik iddiasıdır; manifesto-aşamasında).
+
+**Re-verified — `proposed` doğru kalır:** Roadmap Phase 0-5 inmedi (`.deckent/provenance/` yok, fast-check/Stryker dependency'leri yok, andon-authority yok, `src/aegis/` yok); MASTER-PLAN ile tutarlı ("PB-3: AEGIS Phase 1 foundation — post-beta if approved"; public-standard track Phase 1-4 ship'e dek deferred).
+
+1. **ADVERSE-ruhu organik parça indi:** **XVER-1 cross-verify** (Sprint 276, `src/core/cross-verify.ts` + `.result.crossVerify` advisory) = Phase-5 ADVERSE'in "differential / adversarial farklı-provider doğrulama" ruhunun canlı ilk parçası — ADR-055/060 ile aynı organik-gerçekleşme kalıbı (formal faz inşa edilmeden hedefin bir dilimi üretimde).
+2. **Mode-üçlüsü hizası:** AEGIS'in `sprint|task|process` mode-applicability tablosu, ADR-042 Sprint-281 amendment'inin üçlü-yön kararıyla (process modu = ADR-067 proposed; gerekçe: "sprint evrensel kavram değil + task-mode agentic değil") birebir örtüşür — AEGIS bu yönün metodoloji-katmanı olarak konumlanır.
+3. **İsim/trademark Architect-kararı açık kalır** (AEGIS vs MAVEN/PRISM/OAGD/HELIX + trademark araştırması) — post-beta Phase-0 kapısında çözülür; şimdilik baskı yok.
+
+md+db senkron (Alperen ADR-review).
