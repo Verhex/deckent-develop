@@ -25,6 +25,7 @@ import {
   writeNervousHeartbeat,
   clearNervousHeartbeat,
 } from './ipc-queue.js';
+import { createActionHandler } from './action-handlers.js';
 import type { ActionHandler, PendingApprovalStore } from './executor.js';
 import type {
   DetectorResult,
@@ -34,21 +35,7 @@ import type {
   SprintStateSnapshot,
 } from '../core/nervous-types.js';
 
-type ActionHandlerResult = Awaited<ReturnType<ActionHandler>>;
 import type { DeckentConfig } from '../core/types.js';
-
-// ─── Default Stub ActionHandler ────────────────────────────────────────────
-//
-// W2-1'de gerçek 4 MVP handler bu stub'ı değiştirecek (caller `actionHandler`
-// parametresiyle inject eder).
-
-const stubActionHandler: ActionHandler = async (
-  actionId: string,
-  _payload: unknown,
-): Promise<ActionHandlerResult> => ({
-  outcome: 'failure',
-  error: `Action handler not yet wired: ${actionId} (W2-1)`,
-});
 
 export interface NervousSystemHandle {
   observer: NervousObserver;
@@ -108,14 +95,17 @@ export function makeFilePendingStore(projectRoot: string): PendingApprovalStore 
  * @param config       Resolved config wrapper (DeckentConfig)
  * @param projectRoot  Proje kök dizini — observer FS watch + history dosyası
  * @param sprintStateProvider  Detector'lara aktif sprint snapshot sağlayan callback
- * @param actionHandler  Opsiyonel — W2-1'de inject edilecek gerçek handler
+ * @param actionHandler  Opsiyonel — default GERÇEK handler (`createActionHandler`,
+ *                       projectRoot-bağlı; NERV-W1 Sprint 281: önceki stub-default
+ *                       her aksiyonu "not yet wired" failure'a düşürüyordu).
+ *                       Testler kendi stub'larını inject edebilir.
  * @returns enabled ise handle, değilse null
  */
 export function createNervousSystemIfEnabled(
   config: DeckentConfig,
   projectRoot: string,
   sprintStateProvider: () => SprintStateSnapshot,
-  actionHandler: ActionHandler = stubActionHandler,
+  actionHandler: ActionHandler = createActionHandler({ projectRoot }),
   deps: NervousBootstrapDeps = {},
 ): NervousSystemHandle | null {
   const nervousConfig = config.nervous_system as NervousSystemConfig | undefined;

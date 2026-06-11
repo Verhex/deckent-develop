@@ -32,6 +32,20 @@ vi.mock('../../src/orchestra/event-bus.js', () => ({
   eventBus: mockEventBus,
 }));
 
+// ─── Mock action-handlers (NERV-W1 default-wire pin) ───────────────────────
+// Sprint 281 NERV-W1: bootstrap's default `actionHandler` param must be the
+// REAL `createActionHandler({ projectRoot })` — the previous stub default
+// failed every approved action with "not yet wired". This spy pins the
+// default-parameter call without dispatching real actions.
+const { mockCreateActionHandler } = vi.hoisted(() => ({
+  mockCreateActionHandler: vi.fn(() =>
+    async (): Promise<{ outcome: 'success' }> => ({ outcome: 'success' })),
+}));
+
+vi.mock('../../src/nervous/action-handlers.js', () => ({
+  createActionHandler: mockCreateActionHandler,
+}));
+
 // ─── Mock node:fs watch (Observer FS watchers) ─────────────────────────────
 vi.mock('node:fs', async (importOriginal) => {
   const orig = await importOriginal<typeof import('node:fs')>();
@@ -138,6 +152,31 @@ describe('createNervousSystemIfEnabled', () => {
     expect(result.observer.isStarted).toBe(false);
     // dispose() is idempotent — second call should not throw
     expect(() => result.dispose()).not.toThrow();
+  });
+});
+
+// ─── NERV-W1 (Sprint 281) — default actionHandler = REAL handler ────────────
+
+describe('createNervousSystemIfEnabled — default actionHandler is the real one (NERV-W1)', () => {
+  it('omitting actionHandler binds createActionHandler({ projectRoot }) — not a stub', () => {
+    mockCreateActionHandler.mockClear();
+    const wrapper = { nervous_system: makeNervousConfig({ enabled: true }) };
+
+    const handle = createNervousSystemIfEnabled(wrapper, '/tmp/nerv-w1-project', idleProvider);
+
+    expect(mockCreateActionHandler).toHaveBeenCalledWith({ projectRoot: '/tmp/nerv-w1-project' });
+    handle?.dispose();
+  });
+
+  it('an explicitly injected handler wins over the default (test seam preserved)', () => {
+    mockCreateActionHandler.mockClear();
+    const wrapper = { nervous_system: makeNervousConfig({ enabled: true }) };
+    const injected = async (): Promise<{ outcome: 'success' }> => ({ outcome: 'success' });
+
+    const handle = createNervousSystemIfEnabled(wrapper, '/tmp/nerv-w1-project', idleProvider, injected);
+
+    expect(mockCreateActionHandler).not.toHaveBeenCalled();
+    handle?.dispose();
   });
 });
 
