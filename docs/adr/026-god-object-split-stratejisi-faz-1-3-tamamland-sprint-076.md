@@ -21,6 +21,16 @@ Her fazda backward compatibility sprint-controller re-export layer üzerinden ko
 
 ---
 
-**Forward link — modularization groundwork for MOD-SPLIT (Alperen 2026-06-11):** The kademeli god-object split (this ADR + ADR-024) is the **modular foundation** the future **Community/Pro split (MOD-SPLIT, MASTER-PLAN §8)** will build on. When deckent is modularized into `community` (MIT) + a separately-licensed `enterprise` module (possibly 2 repos, on top of ADR-065 develop/product split), the clean module boundaries established here (independent `sprint-*` / `core/` modules, thin re-export coordinators) are exactly what enables drawing the community↔enterprise line + a license-loadable enterprise layer. The MOD-SPLIT prereq "modül sınırı envanteri (enterprise-layer dosya haritası)" leverages this split work. Cross-ref: §8 MOD-SPLIT, ADR-065, ADR-033 (single-product — pending MOD-SPLIT amendment).
+**Forward link — modularization groundwork for MOD-SPLIT (Alperen 2026-06-11):** The kademeli god-object split (this ADR + ADR-024) is the **modular foundation** the future **Community/Pro split (MOD-SPLIT, MASTER-PLAN §8)** will build on. Final shape (ADR-033 amendment, Sprint 281): **SAME codebase + modular enterprise-layer** — community = MIT, enterprise module separately licensed; NOT a fork / separate product / 2-repo split. The clean module boundaries established here (independent `sprint-*` / `core/` modules, thin re-export coordinators) are exactly what enables drawing the community↔enterprise line + a license-loadable enterprise layer. The MOD-SPLIT prereq "modül sınırı envanteri (enterprise-layer dosya haritası)" leverages this split work. Cross-ref: §8 MOD-SPLIT, ADR-065, ADR-033 (amendment DONE — Sprint 281).
 
-**Amendment log:** 2026-06-11 — MOD-SPLIT modülerleştirme-temeli forward-link'i eklendi (Alperen ADR-review); MASTER-PLAN §8 MOD-SPLIT'e ADR-026 ref edildi. md+db senkron.
+**Amendment log:** 2026-06-11 — MOD-SPLIT modülerleştirme-temeli forward-link'i eklendi (Alperen ADR-review); MASTER-PLAN §8 MOD-SPLIT'e ADR-026 ref edildi. Aynı gün re-audit'te forward-link nihai MOD-SPLIT kararıyla düzeltildi (2-repo→aynı-kod-tabanı-modüler; pending→DONE). md+db senkron.
+
+---
+
+## Amendment — Sprint 281 (2026-06-11, ADR-review re-audit, full code-verification)
+
+**Classification: dogfood** (mimari strateji; MOD-SPLIT temeli üzerinden ürün-yapısına dolaylı etki).
+
+**Re-verified (Faz 1-3'ün üçü de gövde-okuma):** Faz 1 `sprint-phases.ts` — 7 faz-fonksiyonu orijinal adlarıyla canlı (ADR-024 amendment kanıtları) ✓ · Faz 2 `sprint-utils.ts` — 22 export, 456 LoC ✓ · Faz 3 `result-collector.ts` — `waitForResults` (:505, fs.watch + fallback-polling) + IPC `ipc-registry` köprüsü (:29-34) ✓ · backward-compat re-export'lar `sprint-controller.ts:173/:176` ✓.
+
+**Bakım-bayrağı (ADR-024 re-audit'inden devir):** `sprint-controller.ts` bugün **1513 LoC** — Sprint 136 slim'i (209 LoC) sonrası kademeli geri-büyüme. Split-stratejisi geçerli; boyut-disiplini sürdürülemedi. MOD-SPLIT modül-sınırı envanteri çıkarılırken controller yeniden ele alınır (ayrı iş-maddesi yok, bu kayıt yeterli). md+db senkron (Alperen ADR-review).

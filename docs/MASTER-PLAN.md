@@ -625,6 +625,24 @@ AS-2 §4A (ollama worker = ön-koşul, host-adapter routing) · AS-5 §4C (on-pr
 
 ---
 
+## 4I. Resource Arbiter — İzin-Önce-Eylem Kaynak Hakemi (admission control) (🆕 2026-06-11)
+
+> **Tasarım onaylı — 2026-06-11 (Alperen + CC brainstorm).** 8 worker aynı anda tam vitest koşarsa makine kilitlenir (resource-log kanıtlı; RAM'den önce CPU/IO aşırı-aboneliği kilitler — `tierBasedMaxWorkers` worker SAYISINI sınırlıyor, spawn edilmişlerin aynı anda NE çalıştırdığı serbest). Tespit-sonra-müdahale bu hata sınıfında matematiksel geç → **izin-önce-eylem**: korumalı komut sınıfları (heavy-test, package-install, native-build, db-migration…) lease almadan exec olamaz; FIFO + sıra numarası. Spec: `docs/superpowers/specs/2026-06-11-resource-arbiter-design.md` · ADR-090 önerisi impl sprint'inde yazılacak.
+
+### Kararlar (brainstorm)
+K1 **hard gate V1** (PATH-shim, 3 backend — ADR-037 advisory dersi) · K2 **bekleme saati dondurur** (hb `WAITING_LEASE`, sentetik-NO_GO ailesine üye eklenmez) · K3 **dosya-tabanlı + `LeaseBackend` arayüzü** (`.locks` deseni, daemon'suz, AS-7 offline-uyumlu; enterprise API backend V2'de aynı arayüze) · K4 **hakem deterministik kod, LLM değil** (Brain politika koyar, çekirdek uygular).
+
+### Bileşenler (V1)
+`src/core/resource-arbiter.ts` (FileLeaseBackend, `.deckent/leases/`, atomik rename promotion, TTL+stale-temizlik) · `src/core/resource-classes.ts` (parametrik sınıflar, `capacity:"auto"` host-detector formülü — zero-hard-code, stack profilleri JSON-veri: TS built-in, python/c++/ERP veri-eklenir) · `src/orchestra/lease-shim.ts` (spawn-time shim üretici) · watchdog/Auditor saat-donması kontratı · PROGRESS/notify görünürlük (280-001/002 üstüne) · `deckent lease ls|release|clear` CLI · **fail-open ilkesi** (arbiter hatası ana akışı asla düşürmez).
+
+### Genelleme & V2
+ERP/iş kaynakları aynı primitive (`erp.material.<lot>` capacity-1 → "2 agent aynı malzemeyle mamul" çözülür; `tenant` alanı şemada rezerve) · **öğrenme döngüsü:** nervous detector (resource-log + exit-137/timeout forensiği) → kural önerisi → accept/**edit**/reject (APPROVE-007b) → `resource_classes` · V2: REPL/autonomous wire, max-wait→Brain devri, tenant/API backend, çoklu-lease, öncelik, dashboard kuyruk paneli, #3-mesh cross-machine.
+
+### Çapraz ref
+§4G (PLANOBS PROGRESS/notify altyapısı = görünürlük taşıyıcısı) · §4H AS-7 (offline-uyum) · ADR-008/010/037/045/064/079/087 · #ERP · Memory: `project_human_interaction_wire_gap` · `feedback_docker_oom_false_no_go` (sentetik-NO_GO ailesi).
+
+---
+
 ## 5. Sub-Projects — Agentic-OS Pipeline (#1–#5)
 
 | # | Sub-project | Status | Remaining |
@@ -1053,6 +1071,7 @@ Items surfaced during the Sprint 211 doc-consolidation audit that were intention
 - [ ] **ADR-008-W — kalan core→orchestra import ihlalini çöz (ADR-008).** Sprint 279 audit-writer/audit-query→event-stream cycle'ı düzeltti (event-stream→core/). KALAN: `src/core/routing-engine.ts:30` → `../orchestra/ecosystem-intelligence.js` (`analyzeSkillInMemory`). Fix: tüketilen fonksiyonu/modülü `core/`'a taşı **ya da** bağımlılığı tersine çevir (orchestra inject etsin). **Kanıt:** `grep -rnE "from ['\"]\.\.?/orchestra/" src/core/ | grep -v "\.test\."` = 0. authority-enforcer ADR-008 check zaten var (advisory). md+db senkron (adr-008).
 - [ ] **ADR-087-W — residual `spawnSync` → async-batch migrasyonu (ADR-005 deprecated → ADR-087 accepted).** Yeni ADR-087 (Async I/O & Test Hermeticity Standard, accepted, agent-inject) yazıldı; ADR-005 superseded. Kalan iş: ~15 `spawnSync` (`src/monitor/auditor.ts` — ADR-006 enforcement string + `gatherCiBaseline` git/vitest probe'ları) async `spawn`'a çevir (ADR-006 sanctioned-security istisnası HARİÇ). **Kanıt:** `grep -c "spawnSync" src/monitor/auditor.ts` = ADR-006 istisnası dışında 0 (sayım belgelenir). Çift-bakış: dogfood (ölçek/CI) + product (büyük-sprint kararlılık). md+db senkron tamam (adr-005/087).
 - [ ] **ADR-002-W — moduleResolution `Node16` → `nodenext` (ileriye-dönük, Alperen 2026-06-11).** Node 24+ taban olduğuna göre `tsconfig.json` `module`/`moduleResolution`'ı `Node16`→`nodenext`. Mevcut `.js`-ESM codebase için fonksiyonel eşdeğer (sıfır davranış-değişikliği beklenir) ama ileri-doğru. **Dikkat:** `src/dashboard/tsconfig` ayrı (Vite/bundler resolution — ona dokunma); yalnız ana tsconfig(ler). **Kanıt:** `grep -E "moduleResolution|\"module\"" tsconfig.json` → `nodenext`; `npx tsc --noEmit` temiz + full-suite regresyonsuz (davranış-korunumu). ADR-002 amendment-log'a işlendi.
+- [ ] **ADR-021-W — `output_splash` config-düğmesini gerçek gate yap (dormant-knob fix, re-audit 2026-06-11).** Bulgu: `showSplash` yalnız ilk sprint'te gate'siz çağrılıyor (`sprint-phases.ts:665-669`); config-gate'li `showSplashIfEnabled` **zero-caller** → `output_splash` key'i (default `true` `config.ts:1117`, şema `:1890`, dashboard ConfigPage + i18n en/tr) **no-op** — kullanıcı değiştirse davranış değişmez ("settings özellikler kayıp" deseni). Fix: sprint-phases çağrısını `showSplashIfEnabled`'a bağla (gerçek gate) **ya da** knob'u şema+ConfigPage+i18n'den kaldır — yarım-yol yok. **Kanıt:** `grep -n "showSplashIfEnabled" src/orchestra/sprint-phases.ts` ≥1 VEYA `grep -c "output_splash" src/core/config.ts src/dashboard/` = 0; `output_splash:false` ile sprint-start splash basmaz (davranış-testi). Çift-bakış: product (ayar dürüstlüğü) + dogfood (dormant-sweep örneği). md+db senkron (adr-021).
 
 ---
 

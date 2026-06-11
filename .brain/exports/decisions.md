@@ -66,6 +66,14 @@
 **Context:** Native ESM support, faster startup, v8 coverage provider, compatible API.
 **Consequence:** Tests in `tests/` directory, `vitest.config.ts` at root.
 
+---
+
+## Amendment — Sprint 281 (2026-06-11, ADR-review re-audit, full code-verification)
+
+**Classification: BOTH** (test-altyapı kanunu; user-projeleri de deckent'in test-discipline'ına güvenir).
+
+**Re-verified:** vitest `^3.0.0` + `@vitest/coverage-v8` package.json'da; jest bağımlılığı/configi SIFIR (tek "jest" izi dashboard'ın `@testing-library/jest-dom` matcher-lib'i — vitest'le kullanılan DOM-matcher, ihlal değil) · v8 coverage-provider (`vitest.config.ts:22`) · `tests/` altında 1435 test-dosyası ✓. **Evrim:** tek-config → çift-config (`vitest.dashboard.config.ts` ayrı dashboard-suite); fork-bounding/CI-hermeticity ayarları config'e işlendi (ADR-087 Async I/O & Test Hermeticity Standard bu ADR'nin disiplin-tamamlayıcısıdır). md+db senkron (Alperen ADR-review).
+
 
 ---
 
@@ -167,6 +175,16 @@ These exceptions never interpolate untrusted input into a command string (args r
 **Consequence:** Brain, worker scope'una göre allowedTools string'i hesaplar. SpawnOptions her spawn fonksiyonuna opsiyonel parametre olarak geçer.
 
 **Note (evolution):** This is the original/foundational decision and remains accurate — `SpawnOptions` is still defined in the tmux module (`src/orchestra/tmux.ts`, re-exported via `src/orchestra/index.ts`). With multi-provider support the concept was **extended** (not replaced): `ProviderSpawnOptions` in `src/core/provider.ts` and `SpawnBackendOptions extends ProviderSpawnOptions` in `src/orchestra/spawn-backend.ts` (see ADR-017 MCP-Native Provider Adapters, ADR-027 Hybrid Spawn Backend). `allowedTools`/`autoApprove` semantics are unchanged. Documentation alignment only.
+
+---
+
+## Amendment — Sprint 281 (2026-06-11, ADR-review re-audit, full code-verification)
+
+**Classification: dogfood-ağırlıklı** (iç spawn-sözleşmesi; `--allowedTools` güvenlik etkisi kullanıcıya dolaylı yansır).
+
+**Re-verified (gövde-okuma; mevcut Note da doğru çıktı):** `SpawnOptions { allowedTools?, autoApprove? }` (`tmux.ts:19-21`), tüketim `:106-107/:120`, `autoApprove → --dangerously-skip-permissions` (`:125`) ✓ · re-export (`orchestra/index.ts:55`) ✓ · genişleme-zinciri `ProviderSpawnOptions` (`provider.ts:10`) → `SpawnBackendOptions` (`spawn-backend.ts:51`) ✓ · "Brain scope'tan allowedTools hesaplar" canlı: `sprint-spawner.ts:198/504/611` (writeTargets→allowedTools) ✓.
+
+**Evrim:** autoApprove semantiği Docker-backend'e **per-provider** taşındı (`spawn-backend-docker.ts:551`, Sprint 249 kökü — her provider'ın kendi bypass-flag'i: claude `--dangerously-skip-permissions`, codex `--dangerously-bypass-approvals-and-sandbox`, gemini yolo); Claude CLI root'ta bypass'ı reddettiğinden container host-user olarak koşar (`:598/:688`). md+db senkron (Alperen ADR-review).
 
 
 ---
@@ -398,6 +416,16 @@ The Sprint-172 inventory (9 deps) drifted. Current `package.json` has **13 runti
 
 **Note (evolution):** This records the original Sprint 044 decision. The `.deck` system has since grown (decision intent unchanged): (1) **`$DECK:KEY` config interpolation** — config values like `"token": "$DECK:DISCORD_TOKEN"` are resolved at runtime from `.deck` (`src/core/deck-interpolation.ts`, `src/core/deck-file.ts`); (2) **Ed25519 signing** — `src/core/signature.ts` uses `@noble/ed25519` + `@noble/hashes` for secret/skill-publish signatures. Per the ADR-010 Amendment, those two crypto dependencies are governed by this ADR. Behavior unchanged; documentation alignment only.
 
+---
+
+## Amendment — Sprint 281 (2026-06-11, ADR-review re-audit, full code-verification)
+
+**Classification: BOTH** (secret-hijyeni doğrudan user-product güvenliği).
+
+**Re-verified (gövde-okuma):** `.deck` çekirdeği tam — `parseDeckFile/loadDeckSecrets/validateDeckFile/createDeckTemplate/ensureDeckGitignore/isDeckFileCommitted` (`deck-file.ts:45-185`), gitignore-auto init'e wire'lı ✓ · `DECKENT_` prefix key-registry (:10-13) ✓ · `$DECK:KEY` interpolation (`deck-interpolation.ts:3/:10`, missing-secret warn) ✓ · Ed25519 (`signature.ts:5-6`, `@noble/ed25519@^2.3.0` + `@noble/hashes` — ADR-010 governance-köprüsü tutuyor) ✓.
+
+**Consequence-düzeltmesi (izolasyon iddiadan GÜÇLÜ):** "Brain sadece gerekli key'leri task scope'una göre inject eder" cümlesi günün gerçeğinde **seçici-inject değil, sıfır-maruziyet**tir — `.deck` worker-spawn yoluna hiç girmez (docker-backend'de deck-transport yok); tüketiciler tamamen host-side (`provider.ts` bootstrap auto-register ADR-077 Part-C, `server.ts`, `doctor.ts`, interpolation). Worker'lar `.deck` içeriğini görmez iddiası bu haliyle daha katı biçimde doğrudur. md+db senkron (Alperen ADR-review).
+
 
 ---
 
@@ -420,6 +448,16 @@ The Sprint-172 inventory (9 deps) drifted. Current `package.json` has **13 runti
 **Consequence:** Yeni routing kuralları sprint-controller'a dokunmadan eklenebilir. Her seviye bağımsız test edilebilir. Router, task metadata'sını (model, effort, scope) okuyarak otomatik provider seçimi yapar.
 
 **Note (evolution):** The `TaskRouter` module is still current — `src/orchestra/task-router.ts` (`routeTask`, `TaskRouterConfig`) performs per-task provider + agent + skill routing. The **agent/skill selection it delegates to evolved to v2**: `src/core/routing-engine.ts` (`routeTaskV2`) "replaces `selectAgent()` + `selectSkills()` with a unified, intent-based decision" (3-layer: intent-classifier → activation-engine → routing-engine) per **ADR-028 (Decision-Engine V1→V2)**, default since Sprint 067. The original 6-level priority (config → force → agent → skill → worker → fallback) remains the foundational design. Behavior unchanged; documentation alignment only.
+
+---
+
+## Amendment — Sprint 281 (2026-06-11, ADR-review re-audit, full code-verification)
+
+**Classification: BOTH** (routing = mixed-fleet ürün-vaadi; `- Provider:` per-task override doğrudan user-yüzü).
+
+**Re-verified (gövde-okuma):** Modül-ayrıklığı gerçek — `routeTask` (`task-router.ts:248`) + `TaskRouterConfig` (:29), **sprint-controller'da 0 referans**; tüketiciler decision-engine / task-mode-runner / mid-sprint-adapter / sprint-planner / sprint-spawner ✓ · 6-seviyeli öncelik canlı (docblock :235-241 + body :279+), günün bileşimi: 1 config-override (`skill_routing`) → 2 `forceModel` → 3 **`task.provider`** (per-task `- Provider:` override — sonradan eklenen seviye) → 4 agent-tercihi → 5 availability-guard → 6 registry-default ✓ · Note'un `routeTaskV2` delegasyonu (`routing-engine.ts:267`) ✓.
+
+**Evrim (Note-sonrası 4 kazanım):** WM-2c **SSOT routing-key** (:280-284 — kanonik `task.type → taskKindToIntent → INTENT_TO_ROUTING_KEY`, legacy `detectTaskType` geri-uyum) · Sprint 219-015 surface-agent bonus (:254-257, `applyUserSurfaceBonus` — refactorer-collapse önleyici, ADR-079) · Sprint 202 registry-default fallback (:262-266 — pure-Ollama config sessizce claude'a düşmez) · `resolveWorkerAuth` per-task auth-precedence (:170-182, `task.authMode > config.auth_mode > 'subscription'`). md+db senkron (Alperen ADR-review).
 
 
 ---
@@ -645,6 +683,16 @@ The rich-multi-section decision stands; the concrete section set evolved (canoni
 
 Behavior unchanged; documentation alignment only.
 
+---
+
+## Amendment — Sprint 281 (2026-06-11, ADR-review re-audit, full code-verification)
+
+**Classification: user-product** (marka = ürün ilk-izlenimi).
+
+**Re-verified (Note'un tüm iddiaları gövdeden doğru):** `KRAKEN_ASCII` sabit const (`splash.ts:4`, runtime-üretim yok) · TEAL `38;2;77;184;164` = #4DB8A4 (:12) · BOLD_GOLD `1;38;2;196;168;85` = #C4A855 (:13) · NO_COLOR → plain-text döner, atlanmaz (:23-30) · CI env-handling yok ✓.
+
+**Yeni bulgu — `output_splash` config-düğmesi no-op (dormant çift):** `showSplash` canlı ama yalnız **ilk sprint'te** tüketiliyor (`sprint-phases.ts:665-669`, `sprint.number===1`, gate'siz doğrudan çağrı). Config-gate'li wrapper **`showSplashIfEnabled` = zero-caller**; `output_splash` key'i her katmanda mevcut (default `true` `config.ts:1117`, şema `:1890`, dashboard ConfigPage + i18n en/tr) ama onu okuyan kod hiç çağrılmıyor → kullanıcı ayarı değiştirse davranış değişmez. "Settings özellikler kayıp" deseninin birebir örneği. **İş kaydı: ADR-021-W** (MASTER-PLAN) — sprint-phases çağrısını `showSplashIfEnabled`'a bağla (gerçek gate) veya knob'u şemadan kaldır; dashboard ConfigPage yüzeyi de hizalanır. md+db senkron (Alperen ADR-review).
+
 
 ---
 
@@ -757,6 +805,16 @@ Init wizard da güncellendi: "Select your Claude plan" → "Select your plan". E
 
 **Note (evolution):** This records the Sprint 072 **first step** — `sprint-phases.ts` exists and `sprint-controller.ts` shrank from 1300+ to ~780 LoC. The god-object split **continued well beyond this**: see **ADR-026 (God Object Split Stratejisi — Faz 1-3, Sprint 076)** plus `brain.ts` becoming a thin re-export layer. `orchestra/` now contains many dedicated `sprint-*` modules (`sprint-planner`, `sprint-spawner`, `sprint-finalizer`, `sprint-retro-writer`, `sprint-utils`, `sprint-checkpoint`, `sprint-metrics`, `sprint-lifecycle`, `sprint-docs-updater`, …); the original `runPlanPhase`/`runSpawnPhase`/… naming evolved into those modules' functions (`planSprint`, `spawnWorkers`, …). The "orchestra 36→37" figure is a Sprint-072 snapshot and is now far higher (drift-prone — canonical module counts are not pinned in ADRs). Behavior unchanged; documentation alignment only.
 
+---
+
+## Amendment — Sprint 281 (2026-06-11, ADR-review re-audit, full code-verification)
+
+**Classification: dogfood** (iç mimari hijyen; user'a dolaylı yansır).
+
+**Re-verified + Note'ta 2 düzeltme:**
+1. **7 faz fonksiyonunun 7'si de orijinal adlarıyla CANLI** — `sprint-phases.ts`: `runPlanPhase:631`, `runSpawnPhase:744`, `runEvaluatePhase:1078`, `runFixPhase:1782`, `runRetroPhase:1997`, `runDecayPhase:2094`, `runCleanupPhase:2108`. Note'un "isimler `planSprint`/`spawnWorkers`'a evrildi" cümlesi yanlış/abartılıydı — `run*Phase` API'si duruyor; `sprint-*` modül-ailesi (bugün 12+ modül, orchestra toplam 94 .ts) onun YANINA büyüdü.
+2. **God-object yeniden-büyüme bulgusu:** Note "~780 LoC'a indi" der; Sprint 136 kaydı "1890→209 slim"; bugün `sprint-controller.ts` = **1513 LoC** — slim-sonrası ~145 sprint'te kademeli geri-büyüme. Split kararının kendisi geçerli (controller hâlâ fazları import eder, `:70`; `brain.ts` 53-satır ince re-export ✓) ancak boyut-disiplini sürdürülemedi. **Bağlantı:** ADR-026 amendment'indeki MOD-SPLIT modülerlik çalışması (community/enterprise modüler ayrım) controller'ı yeniden ele alırken bu regrowth kapsama dahil edilir — ayrı iş-maddesi açılmadı, ADR-026 kaydına not düşüldü. md+db senkron (Alperen ADR-review).
+
 
 ---
 
@@ -817,9 +875,19 @@ Her fazda backward compatibility sprint-controller re-export layer üzerinden ko
 
 ---
 
-**Forward link — modularization groundwork for MOD-SPLIT (Alperen 2026-06-11):** The kademeli god-object split (this ADR + ADR-024) is the **modular foundation** the future **Community/Pro split (MOD-SPLIT, MASTER-PLAN §8)** will build on. When deckent is modularized into `community` (MIT) + a separately-licensed `enterprise` module (possibly 2 repos, on top of ADR-065 develop/product split), the clean module boundaries established here (independent `sprint-*` / `core/` modules, thin re-export coordinators) are exactly what enables drawing the community↔enterprise line + a license-loadable enterprise layer. The MOD-SPLIT prereq "modül sınırı envanteri (enterprise-layer dosya haritası)" leverages this split work. Cross-ref: §8 MOD-SPLIT, ADR-065, ADR-033 (single-product — pending MOD-SPLIT amendment).
+**Forward link — modularization groundwork for MOD-SPLIT (Alperen 2026-06-11):** The kademeli god-object split (this ADR + ADR-024) is the **modular foundation** the future **Community/Pro split (MOD-SPLIT, MASTER-PLAN §8)** will build on. Final shape (ADR-033 amendment, Sprint 281): **SAME codebase + modular enterprise-layer** — community = MIT, enterprise module separately licensed; NOT a fork / separate product / 2-repo split. The clean module boundaries established here (independent `sprint-*` / `core/` modules, thin re-export coordinators) are exactly what enables drawing the community↔enterprise line + a license-loadable enterprise layer. The MOD-SPLIT prereq "modül sınırı envanteri (enterprise-layer dosya haritası)" leverages this split work. Cross-ref: §8 MOD-SPLIT, ADR-065, ADR-033 (amendment DONE — Sprint 281).
 
-**Amendment log:** 2026-06-11 — MOD-SPLIT modülerleştirme-temeli forward-link'i eklendi (Alperen ADR-review); MASTER-PLAN §8 MOD-SPLIT'e ADR-026 ref edildi. md+db senkron.
+**Amendment log:** 2026-06-11 — MOD-SPLIT modülerleştirme-temeli forward-link'i eklendi (Alperen ADR-review); MASTER-PLAN §8 MOD-SPLIT'e ADR-026 ref edildi. Aynı gün re-audit'te forward-link nihai MOD-SPLIT kararıyla düzeltildi (2-repo→aynı-kod-tabanı-modüler; pending→DONE). md+db senkron.
+
+---
+
+## Amendment — Sprint 281 (2026-06-11, ADR-review re-audit, full code-verification)
+
+**Classification: dogfood** (mimari strateji; MOD-SPLIT temeli üzerinden ürün-yapısına dolaylı etki).
+
+**Re-verified (Faz 1-3'ün üçü de gövde-okuma):** Faz 1 `sprint-phases.ts` — 7 faz-fonksiyonu orijinal adlarıyla canlı (ADR-024 amendment kanıtları) ✓ · Faz 2 `sprint-utils.ts` — 22 export, 456 LoC ✓ · Faz 3 `result-collector.ts` — `waitForResults` (:505, fs.watch + fallback-polling) + IPC `ipc-registry` köprüsü (:29-34) ✓ · backward-compat re-export'lar `sprint-controller.ts:173/:176` ✓.
+
+**Bakım-bayrağı (ADR-024 re-audit'inden devir):** `sprint-controller.ts` bugün **1513 LoC** — Sprint 136 slim'i (209 LoC) sonrası kademeli geri-büyüme. Split-stratejisi geçerli; boyut-disiplini sürdürülemedi. MOD-SPLIT modül-sınırı envanteri çıkarılırken controller yeniden ele alınır (ayrı iş-maddesi yok, bu kayıt yeterli). md+db senkron (Alperen ADR-review).
 
 
 ---
