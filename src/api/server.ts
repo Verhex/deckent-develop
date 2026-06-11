@@ -39,12 +39,12 @@ import {
 } from '../connectors/incoming-router.js';
 import { loadDeckSecrets } from '../core/deck-file.js';
 import { interpolateConfig } from '../core/deck-interpolation.js';
-import { buildChatReply } from './chat-handler.js';
+import { resolveChatReply } from './chat-handler.js';
 import { streamChatMessage, streamToSseLines, type ChatProviderAdapter } from './chat-stream.js';
 import { registerEvolutionRoutes } from './evolution-endpoint.js';
 import { registerMemorySearch } from './memory-search-endpoint.js';
 import { registerNervousRoutes } from './nervous-endpoint.js';
-import { registerEnterpriseRoutes } from './enterprise-endpoint.js';
+import { registerEnterpriseRoutes, handleEnterpriseTenantWrite } from './enterprise-endpoint.js';
 import { resolveChatProvider } from '../core/config.js';
 import { resolveChatAdapter } from '../cli/commands/chat-provider-parity.js';
 import { registerCoverageRoutes } from './coverage-endpoint.js';
@@ -52,6 +52,7 @@ import { registerAuthMeRoute } from './auth-me-endpoint.js';
 import { registerOidcCallbackRoute } from './oidc-callback-endpoint.js';
 import { handleOutputStream, isOutputStreamRequest } from './output-stream.js';
 import { createOutputCollector, type OutputCollector } from '../core/output-collector.js';
+import { reconcileStatusResponse } from './status-reconcile.js';
 
 const MIME_TYPES: Record<string, string> = {
   '.html': 'text/html',
@@ -415,31 +416,54 @@ async function handleRequest(
     return;
   }
 
+  // ─── Enterprise tenant mutations (282-010, DASH-UX-6) ──────
+  // POST/PUT/DELETE /api/enterprise/tenants[/:id] — admin-RBAC, audit-logged.
+  // Dispatched here (ahead of the GET/POST blocks) so all three verbs reach the
+  // single handler in enterprise-endpoint.ts. Already auth-gated above.
+  if (
+    (method === 'POST' || method === 'PUT' || method === 'DELETE') &&
+    url.split('?')[0]!.startsWith('/api/enterprise/tenants')
+  ) {
+    let entBody: unknown = {};
+    if (method !== 'DELETE') {
+      try {
+        entBody = await parseBody(req);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Invalid JSON body';
+        sendError(res, msg === 'Payload too large' ? 413 : 400, msg === 'Payload too large' ? 'Payload too large' : 'Invalid JSON body');
+        return;
+      }
+    }
+    if (await handleEnterpriseTenantWrite(url, method, res, projectRoot, entBody, req)) return;
+  }
+
   // ─── GET routes ────────────────────────────────────────────
   if (method === 'GET') {
     if (url === '/api/status') {
-      const data = readDashboardJson(dashPath);
-      if (data) { sendJson(res, data); return; }
-
-      // No active sprint — return idle state with last sprint summary
-      const lastSprint = getLatestSprintLog(projectRoot);
-      sendJson(res, {
-        sprint: {
-          id: lastSprint?.id ?? null,
-          phase: 'IDLE',
-          status: 'IDLE',
-        },
-        agents: [],
-        progress: { done: 0, active: 0, blocked: 0, total: 0 },
-        alerts: [],
-        updatedAt: new Date().toISOString(),
-        idle: true,
-        lastSprint: lastSprint ? {
-          id: lastSprint.id,
-          metrics: lastSprint.metrics,
-          tasks: lastSprint.tasks,
-        } : null,
-      });
+      const rawData = readDashboardJson(dashPath);
+      const data = reconcileStatusResponse(projectRoot, rawData);
+      // If reconcile returns an idle response (no dashboard or completed sprint)
+      // and there was no original data, augment with lastSprint for UI context.
+      const reconciled = data as Record<string, unknown>;
+      if (reconciled['idle'] || !rawData) {
+        const lastSprint = getLatestSprintLog(projectRoot);
+        sendJson(res, {
+          ...reconciled,
+          sprint: {
+            id: lastSprint?.id ?? (reconciled['sprint'] as Record<string, unknown> | undefined)?.['id'] ?? null,
+            phase: 'IDLE',
+            status: 'IDLE',
+          },
+          idle: true,
+          lastSprint: lastSprint ? {
+            id: lastSprint.id,
+            metrics: lastSprint.metrics,
+            tasks: lastSprint.tasks,
+          } : null,
+        });
+        return;
+      }
+      sendJson(res, data);
       return;
     }
 
@@ -810,9 +834,18 @@ async function handleRequest(
         sendError(res, 400, parsed.error.message);
         return;
       }
-      const reply = buildChatReply(parsed.data.message, {
-        status: () => chatStatusLine(projectRoot, dashPath),
-      });
+      // NL messages ride the same provider adapter the stream block uses (seam
+      // wins, then the config-resolved serveChatAdapter); explicit slash/commands
+      // (status/help) stay on the classifier front-path. A missing/failing
+      // adapter yields an honest i18n error — never a silent "Anlamadım".
+      const acceptLang = String(req.headers['accept-language'] ?? '').toLowerCase();
+      const lang = acceptLang.startsWith('tr') ? 'tr' : 'en';
+      const chatReplyAdapter = chatStreamAdapter ?? chatAdapter ?? null;
+      const reply = await resolveChatReply(
+        parsed.data.message,
+        { status: () => chatStatusLine(projectRoot, dashPath) },
+        { adapter: chatReplyAdapter, lang },
+      );
       sendJson(res, { reply });
       return;
     }
@@ -1157,9 +1190,14 @@ export function createHttpServer(
   }
 
   // Build auth middleware with health endpoint exempt. SSE clients
-  // (`EventSource`) cannot set Authorization headers, so `/api/events` opts
-  // into a `?token=...` query-parameter fallback — the dashboard appends the
-  // bootstrap token there. Same constant-time compare as the Bearer header.
+  // (`EventSource`) cannot set Authorization headers, so the SSE GET endpoints
+  // opt into a `?token=...` query-parameter fallback — the dashboard appends
+  // the bootstrap token there. Same constant-time compare as the Bearer header.
+  // Both EventSource channels are whitelisted: `/api/events` (dashboard event
+  // stream) and `/api/chat/stream` (chat SSE — Sprint 282 282-004 root-fix; the
+  // dashboard chat EventSource carries its token on `?token=` exactly like
+  // `/api/events`, so omitting it 401'd every chat stream and forced the
+  // "Anlamadım" classifier fallback — DASH-UX-1).
   const authMiddleware = bearerAuthMiddleware({
     configToken: finalToken,
     // /api/auth/oidc/exchange is the SSO login flow (Sprint 277) — the caller
@@ -1167,7 +1205,7 @@ export function createHttpServer(
     // config-gated (404 when dashboard_oidc is disabled), so exempting the path
     // leaks nothing.
     exemptPaths: ['/health', '/api/health', '/api/auth/oidc/exchange'],
-    queryTokenPaths: ['/api/events'],
+    queryTokenPaths: ['/api/events', '/api/chat/stream'],
     ...(resolvedOidc ? { oidc: resolvedOidc } : {}),
   });
 

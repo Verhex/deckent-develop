@@ -213,8 +213,8 @@ export interface ChatNativeOptions {
    * failures (spawn ENOENT, network down, adapter throws BEFORE emitting any
    * output) are caught, surfaced as a tagged error turn, and the session
    * continues. Mid-stream errors (output already emitted) still propagate.
-   * Default false preserves the prior `runChatNativeLoop` contract used by
-   * `src/api/chat-backend.ts` callers that need errors to bubble.
+   * Default false preserves the prior `runChatNativeLoop` contract for
+   * existing callers that need errors to bubble.
    */
   gracefulErrors?: boolean;
   /**
@@ -224,9 +224,8 @@ export interface ChatNativeOptions {
    * gated through {@link requireConfirmIfRisky} and then dispatched through
    * the supplied `dispatcher`, skipping the provider turn entirely. Default
    * false preserves the pre-T-221-002 behaviour for existing callers
-   * (chat-backend.ts, the chat-native-* test suite) whose canned inputs
-   * include phrases like "check status" or "how are we doing?" that would
-   * otherwise be intercepted by the STATUS_RE.
+   * (test suite) whose canned inputs include phrases like "check status" or
+   * "how are we doing?" that would otherwise be intercepted by the STATUS_RE.
    */
   agenticDispatch?: boolean;
   /**
@@ -711,9 +710,9 @@ export async function runChatNativeLoop(opts: ChatNativeOptions): Promise<ChatMe
     // then dispatch through the same `dispatcher` used for provider-driven
     // tool_use. The result is echoed to output and recorded in the
     // transcript+memory so context survives across turns. Opt-in via
-    // `agenticDispatch` to preserve backward compatibility with existing
-    // callers (chat-backend.ts) and tests whose canned inputs may collide
-    // with the natural-language regexes in chat-agentic-dispatch.ts.
+    // `agenticDispatch` to preserve backward compatibility with tests whose
+    // canned inputs may collide with the natural-language regexes in
+    // chat-agentic-dispatch.ts.
     if (opts.agenticDispatch) {
       const intent = classifyAgenticIntent(line);
       if (intent.tool !== null) {
@@ -779,7 +778,7 @@ export async function runChatNativeLoop(opts: ChatNativeOptions): Promise<ChatMe
     // any output) is surfaced as a tagged error turn instead of crashing
     // the REPL session. Mid-stream errors (output already emitted) still
     // propagate so the chat-native-stream "mid-stream error" contract and
-    // the chat-backend HTTP propagation contract are preserved.
+    // the HTTP error propagation contract are preserved.
     let outputCount = 0;
     let indicatorStopped = false;
     const stopIndicator = (): void => {

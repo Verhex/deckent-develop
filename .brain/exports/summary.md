@@ -83,6 +83,8 @@
 | adr-089 | Backend-Agnostic Worker Observation + Per-Worker Independent Backends | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-282 Learnings** (sprint-282): ## Sprint sprint-282 Learnings
+- POST /api/chat adapter-backed — classifier yalnız açık-komutlara: GO_WITH_TECH_DEBT ...
 - **Sprint sprint-281 Learnings** (sprint-281): ## Sprint sprint-281 Learnings
 
 ## Gains
@@ -113,10 +115,6 @@
 
 ## Gains
 - 273-001 — limit-ledger çekirdeği — transcript parse + maliyet-eşdeğeri bir...
-- **Sprint sprint-272 Learnings** (sprint-272): ## Sprint sprint-272 Learnings
-
-## Gains
-- 272-001 — GHOST-FINALIZE fix — checkpoint artığı temizliği + start'ın dürü...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -150,4 +148,4 @@ _No active technical debt._
 - Violation pattern: stale_heartbeat
 - Violation pattern: stale_heartbeat
 
-_Total entries: 444 | Generated: 2026-06-11_
+_Total entries: 453 | Generated: 2026-06-11_

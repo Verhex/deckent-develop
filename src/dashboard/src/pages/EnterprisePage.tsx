@@ -1,12 +1,25 @@
+import { useState } from "react";
 import { useApi } from "../hooks/useApi";
 import { useAuth } from "../hooks/useAuth.js";
+import { useTranslation } from "../i18n/LanguageProvider";
+import type { TranslationKey } from "../i18n/en";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../components/ui/tabs";
 import { Badge } from "../components/ui/badge";
 import { SkeletonTable } from "../components/Skeleton";
 import EmptyState from "../components/EmptyState";
-import { Building2, Shield, FileText, Gauge, AlertTriangle } from "lucide-react";
+import { Building2, Shield, FileText, Gauge, AlertTriangle, Plus, Pencil, Trash2, X, Save, Loader2 } from "lucide-react";
 import type { Alert } from "../types";
+
+type TenantStatus = "active" | "suspended" | "inactive";
+const TENANT_STATUSES: TenantStatus[] = ["active", "suspended", "inactive"];
+
+interface TenantFormState {
+  mode: "create" | "edit";
+  id: string;
+  name: string;
+  status: TenantStatus;
+}
 
 interface TenantInfo {
   id: string;
@@ -58,7 +71,7 @@ function dedupDocSyncAlerts(alerts: Alert[]): Alert[] {
 }
 
 export default function EnterprisePage() {
-  const { data: tenants, loading: tenantsLoading, error: tenantsError } = useApi<TenantInfo[]>("/api/enterprise/tenants");
+  const { data: tenants, loading: tenantsLoading, error: tenantsError, refetch: refetchTenants } = useApi<TenantInfo[]>("/api/enterprise/tenants");
   const { data: rbac, loading: rbacLoading, error: rbacError } = useApi<RbacRole[]>("/api/enterprise/rbac");
   const { data: audit, loading: auditLoading, error: auditError } = useApi<AuditEntry[]>("/api/enterprise/audit");
   const { data: rate, loading: rateLoading, error: rateError } = useApi<RateLimitInfo[]>("/api/enterprise/rate");
@@ -75,6 +88,101 @@ export default function EnterprisePage() {
     : undefined;
   const rawAlerts: Alert[] = statusData?.alerts ?? [];
   const dedupedAlerts = dedupDocSyncAlerts(rawAlerts);
+
+  // ─── Tenant CRUD (282-010, DASH-UX-6) ──────────────────────────────
+  const { t } = useTranslation();
+  const [form, setForm] = useState<TenantFormState | null>(null);
+  const [mutating, setMutating] = useState(false);
+  const [mutationError, setMutationError] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
+  // Admin-only management: OIDC admins or the local static-token owner (full
+  // access). Non-admin OIDC roles see the read-only view (buttons hidden); the
+  // server enforces the same rule with a 403 regardless of the UI.
+  const canManage = identity?.role === "admin" || identity?.mode === "static";
+
+  async function mutateTenant(method: string, path: string, payload?: unknown): Promise<void> {
+    const headers: Record<string, string> = {};
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+    if (payload !== undefined) headers["Content-Type"] = "application/json";
+    const res = await fetch(path, {
+      method,
+      headers,
+      body: payload !== undefined ? JSON.stringify(payload) : undefined,
+    });
+    if (!res.ok) {
+      let message = `HTTP ${res.status}`;
+      try {
+        const j = (await res.json()) as { error?: { message?: string } };
+        if (j?.error?.message) message = j.error.message;
+      } catch { /* non-JSON error body — keep status message */ }
+      throw new Error(message);
+    }
+  }
+
+  function openCreate(): void {
+    setMutationError(null);
+    setConfirmDeleteId(null);
+    setForm({ mode: "create", id: "", name: "", status: "active" });
+  }
+
+  function openEdit(tenant: TenantInfo): void {
+    setMutationError(null);
+    setConfirmDeleteId(null);
+    const status = (TENANT_STATUSES as string[]).includes(tenant.status)
+      ? (tenant.status as TenantStatus)
+      : "active";
+    setForm({ mode: "edit", id: tenant.id, name: tenant.name, status });
+  }
+
+  function closeForm(): void {
+    setForm(null);
+    setMutationError(null);
+  }
+
+  async function submitForm(): Promise<void> {
+    if (!form) return;
+    if (!form.id.trim() || !form.name.trim()) {
+      setMutationError(t("enterprise.required_fields"));
+      return;
+    }
+    setMutating(true);
+    setMutationError(null);
+    try {
+      if (form.mode === "create") {
+        await mutateTenant("POST", "/api/enterprise/tenants", {
+          id: form.id.trim(),
+          name: form.name.trim(),
+          status: form.status,
+        });
+      } else {
+        await mutateTenant("PUT", `/api/enterprise/tenants/${encodeURIComponent(form.id)}`, {
+          name: form.name.trim(),
+          status: form.status,
+        });
+      }
+      setForm(null);
+      refetchTenants();
+    } catch (err: unknown) {
+      setMutationError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setMutating(false);
+    }
+  }
+
+  async function deleteTenant(id: string): Promise<void> {
+    setMutating(true);
+    setMutationError(null);
+    try {
+      await mutateTenant("DELETE", `/api/enterprise/tenants/${encodeURIComponent(id)}`);
+      setConfirmDeleteId(null);
+      refetchTenants();
+    } catch (err: unknown) {
+      setMutationError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setMutating(false);
+    }
+  }
 
   return (
     <div className="space-y-6" data-testid="enterprise-page">
@@ -132,10 +240,94 @@ export default function EnterprisePage() {
 
         <TabsContent value="tenants">
           <Card className="bg-zinc-900 border-zinc-800">
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-zinc-100">Tenant List</CardTitle>
+              {canManage && !form && (
+                <button
+                  type="button"
+                  onClick={openCreate}
+                  data-testid="tenant-create-btn"
+                  className="inline-flex items-center gap-1.5 rounded-md bg-brand-700 hover:bg-brand-600 px-3 py-1.5 text-sm text-white"
+                >
+                  <Plus className="h-4 w-4" />
+                  {t("enterprise.new_tenant")}
+                </button>
+              )}
             </CardHeader>
             <CardContent>
+              {mutationError && (
+                <div
+                  data-testid="tenant-mutation-error"
+                  className="mb-3 flex items-center gap-2 rounded-md border border-red-800 bg-red-950/50 px-3 py-2 text-sm text-red-300"
+                >
+                  <AlertTriangle className="h-4 w-4 shrink-0" />
+                  <span>{t("enterprise.mutation_error", { msg: mutationError })}</span>
+                </div>
+              )}
+
+              {form && (
+                <div data-testid="tenant-form" className="mb-4 rounded-md border border-zinc-700 bg-zinc-950/60 p-4 space-y-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <label className="flex flex-col gap-1 text-xs text-zinc-400">
+                      {t("enterprise.tenant_id")}
+                      <input
+                        data-testid="tenant-form-id"
+                        value={form.id}
+                        disabled={form.mode === "edit" || mutating}
+                        onChange={(e) => setForm({ ...form, id: e.target.value })}
+                        placeholder="acme-corp"
+                        className="rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-100 disabled:opacity-50"
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1 text-xs text-zinc-400">
+                      {t("enterprise.tenant_name")}
+                      <input
+                        data-testid="tenant-form-name"
+                        value={form.name}
+                        disabled={mutating}
+                        onChange={(e) => setForm({ ...form, name: e.target.value })}
+                        className="rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-100 disabled:opacity-50"
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1 text-xs text-zinc-400">
+                      {t("enterprise.tenant_status")}
+                      <select
+                        data-testid="tenant-form-status"
+                        value={form.status}
+                        disabled={mutating}
+                        onChange={(e) => setForm({ ...form, status: e.target.value as TenantStatus })}
+                        className="rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-100 disabled:opacity-50"
+                      >
+                        {TENANT_STATUSES.map((s) => (
+                          <option key={s} value={s}>{t(`enterprise.status_${s}` as TranslationKey)}</option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => void submitForm()}
+                      disabled={mutating}
+                      data-testid="tenant-form-submit"
+                      className="inline-flex items-center gap-1.5 rounded-md bg-brand-700 hover:bg-brand-600 px-3 py-1.5 text-sm text-white disabled:opacity-50"
+                    >
+                      {mutating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                      {mutating ? t("enterprise.saving") : form.mode === "create" ? t("enterprise.create") : t("enterprise.save")}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={closeForm}
+                      disabled={mutating}
+                      className="inline-flex items-center gap-1.5 rounded-md border border-zinc-700 px-3 py-1.5 text-sm text-zinc-300 hover:bg-zinc-800 disabled:opacity-50"
+                    >
+                      <X className="h-4 w-4" />
+                      {t("enterprise.cancel")}
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {tenantsLoading && <div aria-label="loading"><SkeletonTable rows={3} cols={4} /></div>}
               {tenantsError && <p className="text-red-400">Error: {tenantsError}</p>}
               {tenants && tenants.length > 0 && (
@@ -146,7 +338,8 @@ export default function EnterprisePage() {
                         <th className="text-left py-2 pr-4 text-zinc-400">Name</th>
                         <th className="text-left py-2 pr-4 text-zinc-400">Status</th>
                         <th className="text-left py-2 pr-4 text-zinc-400">Users</th>
-                        <th className="text-left py-2 text-zinc-400">Created</th>
+                        <th className="text-left py-2 pr-4 text-zinc-400">Created</th>
+                        {canManage && <th className="text-right py-2 text-zinc-400">{t("enterprise.actions")}</th>}
                       </tr>
                     </thead>
                     <tbody>
@@ -159,7 +352,56 @@ export default function EnterprisePage() {
                             </Badge>
                           </td>
                           <td className="py-2 pr-4">{tenant.users}</td>
-                          <td className="py-2 text-zinc-500">{tenant.createdAt}</td>
+                          <td className="py-2 pr-4 text-zinc-500">{tenant.createdAt}</td>
+                          {canManage && (
+                            <td className="py-2 text-right whitespace-nowrap">
+                              {confirmDeleteId === tenant.id ? (
+                                <span className="inline-flex items-center gap-2" data-testid="tenant-confirm-delete">
+                                  <span className="text-xs text-zinc-400">{t("enterprise.confirm_delete")}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => void deleteTenant(tenant.id)}
+                                    disabled={mutating}
+                                    data-testid={`tenant-delete-confirm-${tenant.id}`}
+                                    className="rounded-md bg-red-800 hover:bg-red-700 px-2 py-1 text-xs text-white disabled:opacity-50"
+                                  >
+                                    {t("enterprise.delete")}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setConfirmDeleteId(null)}
+                                    disabled={mutating}
+                                    className="rounded-md border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-800 disabled:opacity-50"
+                                  >
+                                    {t("enterprise.cancel")}
+                                  </button>
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => openEdit(tenant)}
+                                    aria-label={t("enterprise.edit")}
+                                    title={t("enterprise.edit")}
+                                    data-testid={`tenant-edit-${tenant.id}`}
+                                    className="rounded-md border border-zinc-700 p-1.5 text-zinc-300 hover:bg-zinc-800"
+                                  >
+                                    <Pencil className="h-3.5 w-3.5" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => { setConfirmDeleteId(tenant.id); setMutationError(null); }}
+                                    aria-label={t("enterprise.delete")}
+                                    title={t("enterprise.delete")}
+                                    data-testid={`tenant-delete-${tenant.id}`}
+                                    className="rounded-md border border-zinc-700 p-1.5 text-red-300 hover:bg-red-950/60"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </button>
+                                </span>
+                              )}
+                            </td>
+                          )}
                         </tr>
                       ))}
                     </tbody>

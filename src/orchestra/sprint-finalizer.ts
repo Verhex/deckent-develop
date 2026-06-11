@@ -25,7 +25,7 @@ import type {
 import type { TaskDNA } from '../core/routing-types.js';
 
 import {
-  BRAIN_DIR, JOBS_DIR,
+  BRAIN_DIR, JOBS_DIR, DASHBOARD_FILE,
 } from '../core/constants.js';
 
 import { runRetention } from '../core/sprint-file-retention.js';
@@ -1476,6 +1476,13 @@ export async function finalizeSprint(
   persistFinalSprintState(projectRoot, sprint);
   debugLog('finalizeSprint:breadcrumb', 'Step 15 (terminalStateCleanup) — done');
 
+  // 16. Write terminal .dashboard snapshot so /api/status is never stale (DASH-UX-2)
+  debugLog('finalizeSprint:breadcrumb', 'Step 16 (terminalDashboardSnapshot) — entering');
+  try {
+    writeTerminalDashboardSnapshot(projectRoot, sprint, metrics);
+  } catch (e) { debugLog('finalizeSprint:terminalDashboard', e); }
+  debugLog('finalizeSprint:breadcrumb', 'Step 16 (terminalDashboardSnapshot) — done');
+
   return metrics;
 }
 
@@ -1528,4 +1535,45 @@ export function persistFinalSprintState(projectRoot: string, sprint: Sprint): vo
   try {
     cleanupCheckpointFiles(projectRoot, sprint.id);
   } catch (e) { debugLog('persistFinalSprintState:cleanupCheckpointFiles', e); }
+}
+
+/**
+ * Sprint 282 Task 005 — TERMINAL dashboard snapshot (DASH-UX-2).
+ *
+ * After sprint finalize, the `.dashboard` file is left at the last auditor
+ * scan state (e.g. "EXECUTE 80% 8/10").  The next `/api/status` call returns
+ * this stale snapshot as if the sprint is still running.
+ *
+ * Fix: overwrite `.dashboard` with a TERMINAL snapshot containing
+ *   sprint.phase = COMPLETE, sprint.status = COMPLETE,
+ *   agents = [], progress = final values, alerts = [].
+ * The file is always overwritten (idempotent — same data on re-finalize).
+ * Non-fatal: wrapped in the caller's try/catch (Step 16 in finalizeSprint).
+ */
+export function writeTerminalDashboardSnapshot(
+  projectRoot: string,
+  sprint: Sprint,
+  metrics: SprintMetrics,
+): void {
+  const dashPath = join(projectRoot, DASHBOARD_FILE);
+  const snapshot = {
+    sprint: {
+      id: sprint.id,
+      number: sprint.number,
+      phase: SprintPhase.COMPLETE,
+      status: SprintStatus.COMPLETE,
+    },
+    agents: [],
+    progress: {
+      done: metrics.completedTasks,
+      active: 0,
+      blocked: 0,
+      total: metrics.totalTasks,
+    },
+    alerts: [],
+    updatedAt: new Date().toISOString(),
+    completedAt: sprint.completedAt ?? new Date().toISOString(),
+  };
+  writeFileSync(dashPath, JSON.stringify(snapshot, null, 2), 'utf-8');
+  debugLog('writeTerminalDashboardSnapshot', `terminal snapshot written for ${sprint.id}`);
 }

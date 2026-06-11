@@ -7722,3 +7722,36 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 281-003: Ürün & User/Enterprise Perspektifi Denetimi (DONE)
 
 ---
+## Sprint 282 — sprint-282
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-06-11
+**Duration:** 2903s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 13 |
+| Completed | 10 |
+| Tech Debt | 5 |
+| No-Go | 3 |
+| Coverage | 12.5% |
+| Duration | 2903032ms |
+
+### Tasks
+
+- 282-001: Chat stream-boşluğu kök-teşhis — EventSource-auth mu, serve-içi CLI-spawn mı? (DONE)
+- 282-002: POST /api/chat adapter-backed — classifier yalnız açık-komutlara (GO_WITH_TECH_DEBT)
+- 282-003: ChatPage stream-hata dürüstlüğü — onError yutma + POST-yarışı fix (DONE)
+- 282-004: Stream-yolu kök-fix — teşhise göre auth/spawn onarımı (GO_WITH_TECH_DEBT)
+- 282-005: Stale sprint-state — finalize terminal-snapshot + /api/status reconcile (GO_WITH_TECH_DEBT)
+- 282-006: Nav tek-kaynak — Layout↔Sidebar birleştir, Workers/Directives erişilir (GO_WITH_TECH_DEBT)
+- 282-007: Terminal-bar overlap — z-index/layout fix (NO_GO)
+- 282-008: Alert-dedup — auditor staleness-uyarısı tek-satır (GO_WITH_TECH_DEBT)
+- 282-009: DebtPage route + /settings yüzeyi (NO_GO)
+- 282-010: Enterprise tenant-CRUD — UI + API (EXECUTING)
+- 282-011: chat-backend.ts disposition — API-W2 (DONE)
+- 282-012: Dashboard sayfa-içi i18n-temizliği — literal-label'lar i18n-key'e (NO_GO)
+
+---

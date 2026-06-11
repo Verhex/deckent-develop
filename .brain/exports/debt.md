@@ -9,6 +9,16 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-282-001 | Tech debt from 282-001: ROOT-CAUSE DECOMPOSED + PROVEN. Hypothesis (a) EventSour | normal | sprint-282 | resolved |
+| debt-282-002 | Tech debt from 282-002: POST /api/chat is now adapter-backed (DASH-UX-1 part-1). | normal | sprint-282 | resolved |
+| debt-282-004 | Tech debt from 282-004: Stream-path ROOT-FIX (DASH-UX-1, the auth root from 282- | normal | sprint-282 | resolved |
+| debt-282-005 | Tech debt from 282-005: DASH-UX-2 fix implemented in two layers:
+
+1. sprint-fina | normal | sprint-282 | resolved |
+| debt-282-006 | Tech debt from 282-006: nav-items.ts created as single source of truth for all 1 | normal | sprint-282 | resolved |
+| debt-282-008 | Tech debt from 282-008: Implemented identity-based alert dedup (DASH-UX-4).
+
+1.  | normal | sprint-282 | resolved |
 | debt-279-002 | Tech debt from 279-002: Fixed executor.ts handleApprove: imported awaitPanicGate | normal | sprint-279 | resolved |
 | debt-278-003 | Tech debt from 278-003: shared→worker SharedMemory prompt injection wired. promp | normal | sprint-278 | resolved |
 | debt-278-004 | Tech debt from 278-004: handoff→downstream worker prompt injection wired (Sprint | normal | sprint-278 | resolved |

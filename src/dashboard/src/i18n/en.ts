@@ -447,6 +447,25 @@ export const en = {
   'auth.logout': 'Log out',
   'auth.role': 'Role: {{role}}',
   'auth.session_cleared': 'Session cleared',
+
+  // Enterprise — Tenant management (282-010)
+  'enterprise.new_tenant': 'New tenant',
+  'enterprise.tenant_id': 'Tenant ID',
+  'enterprise.tenant_name': 'Name',
+  'enterprise.tenant_status': 'Status',
+  'enterprise.status_active': 'Active',
+  'enterprise.status_suspended': 'Suspended',
+  'enterprise.status_inactive': 'Inactive',
+  'enterprise.create': 'Create',
+  'enterprise.save': 'Save',
+  'enterprise.saving': 'Saving...',
+  'enterprise.cancel': 'Cancel',
+  'enterprise.edit': 'Edit',
+  'enterprise.delete': 'Delete',
+  'enterprise.actions': 'Actions',
+  'enterprise.confirm_delete': 'Delete this tenant?',
+  'enterprise.required_fields': 'Tenant ID and name are required.',
+  'enterprise.mutation_error': 'Operation failed: {{msg}}',
 } as const;
 
 export type TranslationKey = keyof typeof en;

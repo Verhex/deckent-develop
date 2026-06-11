@@ -7954,6 +7954,14 @@ All extension tests mock the `vscode` module — no `vscode` runtime dependency 
 
 **Uzantı:** Part-A'nın auth-mode temeli üzerine **F1-CB billing-follows-auth** (S254) maliyet-doğruluğunu ekledi (subscription/local=$0). md+db senkron (Alperen ADR-review).
 
+---
+
+## Amendment — Sprint 282 (2026-06-11, Part C supersession)
+
+**Part C — `chat-backend.ts` Superseded & Deleted**
+
+The standalone `src/api/chat-backend.ts` module (171 LoC, Sprint 214 T-214-007) was superseded by the integrated chat-handler + chat-stream + resolveChatAdapter family. Sprint 282 T-011 deleted the file and updated Part C references in the ADR. The embedded Path A chat contract (browser message → server-side loop → reply) is now owned by the server.ts HTTP endpoint wiring and the adapter resolution logic, with no separate backend module required.
+
 
 ---
 

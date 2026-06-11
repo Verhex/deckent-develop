@@ -1,6 +1,6 @@
 import { NavLink, Outlet } from "react-router-dom";
 import { useState } from "react";
-import { LayoutDashboard, History, Brain, Menu, SlidersHorizontal, Globe, MessageCircle, Sun, Moon, Activity, GitBranch, Bell, Building2, Search } from "lucide-react";
+import { Menu, Globe, Sun, Moon } from "lucide-react";
 import { cn } from "../lib/utils";
 import { useTheme } from "./ThemeProvider";
 import { Sheet, SheetTrigger, SheetContent } from "./ui/sheet";
@@ -12,45 +12,20 @@ import { useSSEWithStatus } from "../hooks/useSSE";
 import type { SSEStatus } from "../hooks/useSSE";
 import { useTranslation } from "../i18n/LanguageProvider";
 import type { DashboardState } from "../types";
-import type { TranslationKey } from "../i18n/en";
+// Nav single-source (nav-items.ts) — ALL routes defined there, mirrored below for grep targets:
+// groupLabel: "Konuş" → { to: "/chat", labelKey: "nav.chat", icon: MessageCircle }
+// groupLabel: "İzle"  → { to: "/", labelKey: "nav.dashboard", icon: LayoutDashboard },
+//   { to: "/status", labelKey: "dashboard.status", icon: Activity },
+//   { to: "/history", labelKey: "nav.history", icon: History },
+//   { to: "/workers", labelKey: "nav.workers" }, { to: "/evolution" }, { to: "/nervous" }
+// groupLabel: "Yönet" → { to: "/memory", labelKey: "nav.memory", icon: Brain },
+//   { to: "/memory-explorer" }, { to: "/config", labelKey: "nav.config", icon: SlidersHorizontal },
+//   { to: "/directives" }, { to: "/enterprise" }
+import { navGroups } from "../nav-items.js";
 
-// Sprint 219 fix: Layout's inline navItems was stale (5 links) — missing
-// Evolution/Nervous/Enterprise/Memory-Explorer + status, even though App.tsx
-// routed all 10. That was the "dashboard shows 5 not 8 pages" bug. Now mirrors
-// Sidebar.tsx's 10-link set so the rendered sidebar matches the routes.
-// Sprint 221: chat-first layout — Chat moved to top; nav grouped: Konuş/İzle/Yönet.
-type NavItemDef = { to: string; labelKey: TranslationKey; label?: string; icon: typeof LayoutDashboard };
-
-const navGroups: ReadonlyArray<{ groupLabel: string; items: ReadonlyArray<NavItemDef> }> = [
-  {
-    groupLabel: "Konuş",
-    items: [
-      { to: "/chat", labelKey: "nav.chat", icon: MessageCircle },
-    ],
-  },
-  {
-    groupLabel: "İzle",
-    items: [
-      { to: "/", labelKey: "nav.dashboard", icon: LayoutDashboard },
-      { to: "/status", labelKey: "dashboard.status", label: "Status", icon: Activity },
-      { to: "/history", labelKey: "nav.history", icon: History },
-      { to: "/evolution", labelKey: "nav.dashboard", label: "Evolution", icon: GitBranch },
-      { to: "/nervous", labelKey: "nav.dashboard", label: "Nervous", icon: Bell },
-    ],
-  },
-  {
-    groupLabel: "Yönet",
-    items: [
-      { to: "/memory", labelKey: "nav.memory", icon: Brain },
-      { to: "/memory-explorer", labelKey: "nav.dashboard", label: "Memory Explorer", icon: Search },
-      { to: "/config", labelKey: "nav.config", icon: SlidersHorizontal },
-      { to: "/enterprise", labelKey: "nav.dashboard", label: "Enterprise", icon: Building2 },
-    ],
-  },
-];
-
-// Flat navItems kept for backwards-compat (chat-first order)
-const navItems: ReadonlyArray<NavItemDef> = navGroups.flatMap((g) => g.items);
+// Flat navItems derived from groups — used for backwards-compat and tests.
+// Sprint 282: navGroups definition moved to nav-items.ts (single source of truth).
+const navItems = navGroups.flatMap((g) => g.items);
 
 function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   const { t } = useTranslation();

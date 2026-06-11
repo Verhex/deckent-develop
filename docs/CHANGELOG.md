@@ -2,6 +2,28 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint282] - 2026-06-11
+
+### Added
+
+- Chat stream-boşluğu kök-teşhis — EventSource-auth mu, serve-içi CLI-spawn mı?
+- chat-backend.ts disposition — API-W2
+
+### Changed
+
+- POST /api/chat adapter-backed — classifier yalnız açık-komutlara (completed with tech debt)
+- Stream-yolu kök-fix — teşhise göre auth/spawn onarımı (completed with tech debt)
+- Stale sprint-state — finalize terminal-snapshot + /api/status reconcile (completed with tech debt)
+- Nav tek-kaynak — Layout↔Sidebar birleştir, Workers/Directives erişilir (completed with tech debt)
+- Alert-dedup — auditor staleness-uyarısı tek-satır (completed with tech debt)
+
+### Fixed
+
+- ChatPage stream-hata dürüstlüğü — onError yutma + POST-yarışı fix
+
+
+_Tasks: 13 total, 10 done, 5 tech debt, 3 no-go_
+
 ## [1.0.0-beta.1-sprint281] - 2026-06-11
 
 ### Added

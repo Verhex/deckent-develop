@@ -12,7 +12,7 @@ import { useTranslation } from "../i18n/LanguageProvider";
 import { Badge } from "../components/ui/badge";
 import { Textarea } from "../components/ui/textarea";
 import { ScrollArea } from "../components/ui/scroll-area";
-import { Send, Bot, User, Bell, Activity } from "lucide-react";
+import { Send, Bot, User, Bell, Activity, AlertCircle, RefreshCw } from "lucide-react";
 import type { DashboardState } from "../types";
 
 // ── Types ────────────────────────────────────────
@@ -23,6 +23,8 @@ interface ChatMessage {
   content: string;
   timestamp: string;
   isSlash?: boolean;
+  isError?: boolean;
+  retryMessage?: string;
 }
 
 // ── Slash registry (terminal-parity with task 221-003) ──────────
@@ -122,7 +124,15 @@ function ChatInput({ onSend, disabled }: { onSend: (msg: string) => void; disabl
 
 // ── ChatHistory ──────────────────────────────────
 
-function ChatHistory({ messages }: { messages: ChatMessage[] }) {
+function ChatHistory({
+  messages,
+  onRetry,
+  sending,
+}: {
+  messages: ChatMessage[];
+  onRetry: (msg: string) => void;
+  sending: boolean;
+}) {
   const { t } = useTranslation();
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -157,11 +167,34 @@ function ChatHistory({ messages }: { messages: ChatMessage[] }) {
                   ? msg.isSlash
                     ? "bg-brand-bg text-brand-fg font-mono"
                     : "bg-brand-600 text-white"
-                  : "bg-zinc-800 text-zinc-100"
+                  : msg.isError
+                    ? "bg-red-950/40 border border-red-800/50 text-red-300"
+                    : "bg-zinc-800 text-zinc-100"
               }`}
               data-slash={msg.isSlash ? "true" : undefined}
+              data-testid={msg.isError ? "chat-error-bubble" : undefined}
             >
-              <p className="whitespace-pre-wrap">{msg.content}</p>
+              {msg.isError ? (
+                <div>
+                  <div className="flex items-start gap-1.5">
+                    <AlertCircle className="h-4 w-4 text-red-400 mt-0.5 shrink-0" />
+                    <p className="whitespace-pre-wrap">{msg.content}</p>
+                  </div>
+                  {msg.retryMessage && (
+                    <button
+                      onClick={() => onRetry(msg.retryMessage!)}
+                      disabled={sending}
+                      className="mt-2 flex items-center gap-1 text-xs text-zinc-400 hover:text-zinc-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      data-testid="chat-retry"
+                    >
+                      <RefreshCw className="h-3 w-3" />
+                      <span>{t("common.retry")}</span>
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <p className="whitespace-pre-wrap">{msg.content}</p>
+              )}
               <span className="mt-1 block text-[10px] opacity-60">
                 {new Date(msg.timestamp).toLocaleTimeString()}
               </span>
@@ -359,6 +392,7 @@ export default function ChatPage() {
 
     let streamedContent = "";
     let streamFinished = false;
+    let streamStarted = false;
     let ctrl: { close: () => void } | null = null;
 
     // Open SSE stream for incremental token rendering (219-008 wire).
@@ -367,6 +401,7 @@ export default function ChatPage() {
         message: content,
         handlers: {
           onChunk: (text) => {
+            streamStarted = true;
             streamedContent += text;
             setMessages((prev) => prev.map((m) =>
               m.id === assistantId ? { ...m, content: streamedContent } : m
@@ -380,7 +415,15 @@ export default function ChatPage() {
             setSending(false);
           },
           onError: () => {
-            // Stream errors are swallowed — POST round-trip is the fallback path.
+            // Show visible error when stream fails before delivering content.
+            // POST fallback (below) may still overwrite this with a real response.
+            if (!streamStarted) {
+              setMessages((prev) => prev.map((m) =>
+                m.id === assistantId
+                  ? { ...m, content: t("chat.error_response"), isError: true, retryMessage: content }
+                  : m
+              ));
+            }
           },
         },
       });
@@ -389,19 +432,24 @@ export default function ChatPage() {
     }
 
     // POST round-trip (Bearer via useApi) — fallback when stream emits nothing.
+    // Guard: !streamStarted prevents overwriting stream chunks (race fix, DASH-UX-1).
     try {
       const response = await post<{ reply: string }>("/api/chat", { message: content });
-      if (!streamFinished && streamedContent === "") {
+      if (!streamStarted && !streamFinished) {
         setMessages((prev) => prev.map((m) =>
-          m.id === assistantId ? { ...m, content: response.reply } : m
+          m.id === assistantId
+            ? { ...m, content: response.reply, isError: false, retryMessage: undefined }
+            : m
         ));
         ctrl?.close();
         setSending(false);
       }
     } catch {
-      if (!streamFinished && streamedContent === "") {
+      if (!streamStarted && !streamFinished) {
         setMessages((prev) => prev.map((m) =>
-          m.id === assistantId ? { ...m, content: t("chat.error_response") } : m
+          m.id === assistantId
+            ? { ...m, content: t("chat.error_response"), isError: true, retryMessage: content }
+            : m
         ));
         ctrl?.close();
         setSending(false);
@@ -423,7 +471,7 @@ export default function ChatPage() {
         <NotificationPanel notifications={notifications} />
 
         {/* Chat history */}
-        <ChatHistory messages={messages} />
+        <ChatHistory messages={messages} onRetry={handleSend} sending={sending} />
 
         {/* Chat input */}
         <ChatInput onSend={handleSend} disabled={sending} />

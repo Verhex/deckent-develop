@@ -13,7 +13,7 @@ import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { DASHBOARD_FILE } from '../core/constants.js';
 import { debugLog } from '../core/utils.js';
-import type { DashboardState } from '../core/monitoring-types.js';
+import type { Alert, DashboardState } from '../core/monitoring-types.js';
 import { SprintPhase, SprintStatus } from '../core/sprint-types.js';
 
 /** Canonical empty dashboard state — used when creating or repairing. */
@@ -255,4 +255,45 @@ export function readDashboardSafe(projectRoot: string): DashboardReadResult {
   // since auditor will overwrite with full state on next scan cycle.
   const state = mergeDashboardDefaults(data as Record<string, unknown>);
   return { state, valid: true, repaired: false };
+}
+
+/** Maximum number of alerts stored in the dashboard. */
+export const DASHBOARD_MAX_ALERTS = 50;
+
+/**
+ * Deduplicate an alert array by source identity.
+ *
+ * Alerts with the same `source` value are merged: the most recently seen entry is kept
+ * with `count` reflecting the total occurrence tally and `lastSeenAt` updated to the
+ * latest timestamp. Useful for batch-dedup when rewriting the full alerts list.
+ * The result is sorted by `lastSeenAt` descending (most recent first) and capped at
+ * DASHBOARD_MAX_ALERTS.
+ */
+export function dedupAlerts(alerts: Alert[]): Alert[] {
+  const map = new Map<string, Alert & { lastSeenAt?: string; count?: number }>();
+  for (const alert of alerts) {
+    const key = alert.source ?? alert.message;
+    const existing = map.get(key);
+    if (existing) {
+      existing.count = (existing.count ?? 1) + 1;
+      const incomingTime = (alert as Alert & { lastSeenAt?: string }).lastSeenAt ?? alert.timestamp;
+      if (!existing.lastSeenAt || incomingTime > existing.lastSeenAt) {
+        existing.lastSeenAt = incomingTime;
+        existing.message = alert.message;
+      }
+    } else {
+      map.set(key, {
+        ...alert,
+        count: (alert as Alert & { count?: number }).count ?? 1,
+        lastSeenAt: (alert as Alert & { lastSeenAt?: string }).lastSeenAt ?? alert.timestamp,
+      });
+    }
+  }
+  return [...map.values()]
+    .sort((a, b) => {
+      const ta = a.lastSeenAt ?? a.timestamp;
+      const tb = b.lastSeenAt ?? b.timestamp;
+      return tb.localeCompare(ta);
+    })
+    .slice(0, DASHBOARD_MAX_ALERTS) as Alert[];
 }

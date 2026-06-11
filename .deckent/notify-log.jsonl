@@ -318,3 +318,7 @@
 {"priority":"info","event":"task-done","title":"Task 281-002 tamamlandı","summary":"Adversarial kırmızı-takım denetimi tamamlandı. docs/reviews/resource-arbiter-spec/02-adversarial-red","sprintId":"sprint-281","timestamp":"2026-06-11T14:10:29.414Z"}
 {"priority":"info","event":"task-done","title":"Task 281-003 tamamlandı","summary":"Ürün & User/Enterprise perspektifi denetimi tamamlandı. Kanıt: grep -cE '^## Verdict|\\[P[0-3]\\]' → 3","sprintId":"sprint-281","timestamp":"2026-06-11T14:10:33.168Z"}
 {"priority":"info","event":"sprint-finalized","title":"Sprint sprint-281 kapandı","summary":"3/3 DONE, 0 TECH_DEBT, 0 NO_GO","sprintId":"sprint-281","timestamp":"2026-06-11T14:12:34.755Z"}
+{"priority":"info","event":"sprint-started","title":"Sprint sprint-282 başladı","summary":"12 task planlandı","sprintId":"sprint-282","timestamp":"2026-06-11T18:35:57.581Z"}
+{"priority":"warning","event":"task-no-go","title":"Task 282-003 başarısız","summary":"[honest-gate] BOUNDARY_VIOLATION: boundary: files outside scope.filesWrite: tests/dashboard/chat-str","sprintId":"sprint-282","timestamp":"2026-06-11T19:11:04.018Z"}
+{"priority":"info","event":"task-done","title":"Task 282-011 tamamlandı","summary":"Successfully removed the dormant chat-backend.ts module and all references. Updated 4 comment refere","sprintId":"sprint-282","timestamp":"2026-06-11T19:16:23.862Z"}
+{"priority":"info","event":"sprint-finalized","title":"Sprint sprint-282 kapandı","summary":"10/13 DONE, 5 TECH_DEBT, 3 NO_GO","sprintId":"sprint-282","timestamp":"2026-06-11T19:26:19.600Z"}

@@ -31,6 +31,8 @@
 
 ## Active ADR Constraints
 
+- **ADR-003**: vitest over Jest — **Status:** accepted
+- **ADR-007**: SpawnOptions Interface — **Status:** accepted
 - **ADR-068**: Enterprise Foundation — Audit Query + Multi-Tenant + Scheduled Flows — **Status:** accepted
 - **ADR-069**: Event-Driven Triggers + RBAC — F3 Webhook & F4 Role-Based Access Control — **Status:** accepted
 - **ADR-008**: Brain Merkezi Import — Tek Yönlü Bağımlılık — **Status:** accepted
@@ -96,10 +98,8 @@
 - **ADR-013**: DECKENT.md Adapter Pattern (Sprint 15) — **Status:** accepted
 - **ADR-001**: TypeScript + ESM — **Status:** accepted
 - **ADR-002**: Node16 Module Resolution — **Status:** accepted
-- **ADR-003**: vitest over Jest — **Status:** accepted
 - **ADR-004**: Layered Config Merge (defaults → global → project → env) — **Status:** accepted
 - **ADR-006**: spawnSync Security Pattern — **Status:** accepted
-- **ADR-007**: SpawnOptions Interface — **Status:** accepted
 - **ADR-011**: node:readline/promises — Built-in Prompt — **Status:** accepted
 - **ADR-012**: register\<Name\>(program) Pattern — **Status:** accepted
 - **ADR-088**: Memory V2 — DB-First Architecture — **Status:** accepted

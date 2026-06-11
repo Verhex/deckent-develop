@@ -449,4 +449,23 @@ export const tr: Record<TranslationKey, string> = {
   'auth.logout': 'Çıkış yap',
   'auth.role': 'Rol: {{role}}',
   'auth.session_cleared': 'Oturum temizlendi',
+
+  // Enterprise — Kiracı yönetimi (282-010)
+  'enterprise.new_tenant': 'Yeni kiracı',
+  'enterprise.tenant_id': 'Kiracı kimliği',
+  'enterprise.tenant_name': 'Ad',
+  'enterprise.tenant_status': 'Durum',
+  'enterprise.status_active': 'Aktif',
+  'enterprise.status_suspended': 'Askıya alındı',
+  'enterprise.status_inactive': 'Pasif',
+  'enterprise.create': 'Oluştur',
+  'enterprise.save': 'Kaydet',
+  'enterprise.saving': 'Kaydediliyor...',
+  'enterprise.cancel': 'İptal',
+  'enterprise.edit': 'Düzenle',
+  'enterprise.delete': 'Sil',
+  'enterprise.actions': 'İşlemler',
+  'enterprise.confirm_delete': 'Bu kiracı silinsin mi?',
+  'enterprise.required_fields': 'Kiracı kimliği ve ad zorunludur.',
+  'enterprise.mutation_error': 'İşlem başarısız: {{msg}}',
 };

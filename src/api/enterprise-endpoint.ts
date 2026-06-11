@@ -9,13 +9,14 @@
 // renders its EmptyState. Register pattern follows nervous-endpoint.ts.
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { existsSync, readdirSync, statSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, mkdirSync, readdirSync, statSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { z } from 'zod';
 import { readJsonSafe } from '../core/utils.js';
 import { parseOidcClaims } from '../core/auth-oidc.js';
 import { writeAuditEvent } from '../core/audit-writer.js';
 import { PROJECT_CONFIG_PATH } from '../core/constants.js';
-import { PERMISSION_MATRIX, type Role } from '../core/rbac.js';
+import { PERMISSION_MATRIX, isValidRole, type Role } from '../core/rbac.js';
 import { isValidTenantId } from '../core/tenant-context.js';
 import { readAuditEvents, queryAudit } from '../core/audit-query.js';
 import type { AuditEventPayload } from '../core/audit-writer.js';
@@ -264,4 +265,326 @@ export function registerEnterpriseRoutes(
   }
 
   return false;
+}
+
+// ─── Tenant mutations — POST / PUT / DELETE (282-010, DASH-UX-6) ───────
+//
+// Admin-only writes for the dashboard Tenants tab. Tenants are persisted in the
+// declarative `tenants` array of .deckent/config.json (the same list listTenants
+// reads first). Filesystem isolation roots (.deckent/tenants/<id>/) are NOT
+// mutated here — they are read-only isolation boundaries (tenant-context.ts);
+// a DELETE for an id that exists only as an FS dir returns 404.
+
+interface TenantRecord {
+  id: string;
+  name: string;
+  status: string;
+  users: number;
+  createdAt: string;
+}
+
+const TENANT_STATUSES = ['active', 'suspended', 'inactive'] as const;
+
+// Zod input validation (mevcut Zod-pattern — server.ts StartSchema). `.strict()`
+// rejects unknown fields so the write surface stays exactly { id,name,status,users }.
+const TenantCreateSchema = z
+  .object({
+    id: z.string().min(1).max(63).refine(isValidTenantId, {
+      message: 'id must match ^[a-z0-9][a-z0-9-]{0,62}$',
+    }),
+    name: z.string().min(1).max(120),
+    status: z.enum(TENANT_STATUSES).optional(),
+    users: z.number().int().nonnegative().optional(),
+  })
+  .strict();
+
+const TenantUpdateSchema = z
+  .object({
+    name: z.string().min(1).max(120).optional(),
+    status: z.enum(TENANT_STATUSES).optional(),
+    users: z.number().int().nonnegative().optional(),
+  })
+  .strict();
+
+/** Extract the raw Bearer value from the Authorization header (null if absent/malformed). */
+function extractBearer(req?: IncomingMessage): string | null {
+  const header = req?.headers['authorization'];
+  if (typeof header !== 'string') return null;
+  const [scheme, value] = header.split(' ', 2);
+  if (scheme !== 'Bearer' || value === undefined || value === '') return null;
+  return value;
+}
+
+/** Derive a Role from raw JWT claim values (mirrors auth-me-endpoint.ts). */
+function roleFromClaims(claims: Record<string, unknown>): Role | null {
+  const candidates = [claims['role'], claims['roles'], claims['https://deckent.io/role']];
+  for (const c of candidates) {
+    if (typeof c === 'string' && isValidRole(c)) return c;
+    if (Array.isArray(c)) {
+      for (const item of c) {
+        if (typeof item === 'string' && isValidRole(item)) return item;
+      }
+    }
+  }
+  return null;
+}
+
+interface AdminDecision {
+  authorized: boolean;
+  actor: string;
+}
+
+/**
+ * Authorize a tenant mutation — admin only (ADR-069/071 role-claim).
+ * - Static / opaque bearer (non-JWT) → authorized as the local owner ('local'),
+ *   matching the existing convention (auth-me mode:'static' = "local full access").
+ * - OIDC JWT with role 'admin' → authorized (actor = sub / preferred_username).
+ * - OIDC JWT without the admin role → denied; an access:denied audit event is
+ *   written for the enterprise audit-trail (fail-secure).
+ * - No bearer (should be unreachable — auth-gate blocks it) → denied.
+ */
+function authorizeTenantAdmin(
+  req: IncomingMessage | undefined,
+  projectRoot: string,
+  sprintId: string | null,
+  target: string,
+): AdminDecision {
+  const actor = resolveAuditActor(req);
+  const bearer = extractBearer(req);
+  if (!bearer) return { authorized: false, actor };
+
+  const claims = parseOidcClaims(bearer);
+  if (claims === null) {
+    // Static / opaque token — owner's root token, full access (existing convention).
+    return { authorized: true, actor };
+  }
+
+  const role = roleFromClaims(claims as Record<string, unknown>);
+  if (role === 'admin') return { authorized: true, actor };
+
+  if (sprintId) {
+    writeAuditEvent(projectRoot, sprintId, {
+      tenantId: 'local',
+      actor,
+      action: 'access:denied',
+      target,
+    });
+  }
+  return { authorized: false, actor };
+}
+
+function configPath(projectRoot: string): string {
+  return join(projectRoot, PROJECT_CONFIG_PATH);
+}
+
+/** Read the raw project config object (empty object when absent/unreadable). */
+function readRawConfig(projectRoot: string): Record<string, unknown> {
+  return readJsonSafe<Record<string, unknown>>(configPath(projectRoot)) ?? {};
+}
+
+/** Persist the raw project config object (creates .deckent/ if needed). */
+function writeRawConfig(projectRoot: string, cfg: Record<string, unknown>): void {
+  const path = configPath(projectRoot);
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, JSON.stringify(cfg, null, 2) + '\n', 'utf-8');
+}
+
+/** The config `tenants` array as a mutable list (preserves existing string/object entries). */
+function tenantArray(cfg: Record<string, unknown>): unknown[] {
+  const raw = cfg['tenants'];
+  return Array.isArray(raw) ? [...raw] : [];
+}
+
+/** The id of a config tenant entry (string entry → itself; object entry → .id). */
+function tenantEntryId(entry: unknown): string | null {
+  if (typeof entry === 'string') return entry || null;
+  if (entry !== null && typeof entry === 'object') {
+    const id = (entry as Record<string, unknown>)['id'];
+    return typeof id === 'string' && id ? id : null;
+  }
+  return null;
+}
+
+/** Normalize any config tenant entry into a full TenantRecord. */
+function normalizeTenant(entry: unknown, id: string): TenantRecord {
+  if (entry === null || typeof entry !== 'object') {
+    return { id, name: id, status: 'active', users: 0, createdAt: '' };
+  }
+  const o = entry as Record<string, unknown>;
+  return {
+    id,
+    name: typeof o['name'] === 'string' ? o['name'] : id,
+    status: typeof o['status'] === 'string' ? o['status'] : 'active',
+    users: typeof o['users'] === 'number' ? o['users'] : 0,
+    createdAt: typeof o['createdAt'] === 'string' ? o['createdAt'] : '',
+  };
+}
+
+function sendValidationError(res: ServerResponse, err: z.ZodError): void {
+  sendJson(
+    res,
+    {
+      error: {
+        code: 'VALIDATION_ERROR',
+        message: 'Invalid tenant payload',
+        details: err.issues.map((i) => ({ field: i.path.join('.') || '(root)', message: i.message })),
+      },
+    },
+    400,
+  );
+}
+
+function sendApiError(res: ServerResponse, status: number, code: string, message: string): void {
+  sendJson(res, { error: { code, message } }, status);
+}
+
+/** Parse `/api/enterprise/tenants/:id` → decoded id, or null for the collection path. */
+function tenantIdFromPath(path: string): string | null {
+  const prefix = '/api/enterprise/tenants/';
+  if (!path.startsWith(prefix)) return null;
+  const rest = path.slice(prefix.length);
+  if (!rest || rest.includes('/')) return null;
+  try {
+    return decodeURIComponent(rest);
+  } catch {
+    return rest;
+  }
+}
+
+/**
+ * Handle tenant write routes: POST (create), PUT (update), DELETE.
+ * Returns true when the route matched (and a response was sent), false to fall
+ * through. Admin-RBAC gated; every mutation is audit-logged. The caller must
+ * have already parsed the JSON `body` (POST/PUT) and passed the request for
+ * auth-context derivation.
+ */
+export async function handleEnterpriseTenantWrite(
+  url: string,
+  method: string,
+  res: ServerResponse,
+  projectRoot: string,
+  body: unknown,
+  req?: IncomingMessage,
+): Promise<boolean> {
+  const parsed = new URL(url, 'http://localhost');
+  const path = parsed.pathname;
+  if (path !== '/api/enterprise/tenants' && !path.startsWith('/api/enterprise/tenants/')) return false;
+  if (method !== 'POST' && method !== 'PUT' && method !== 'DELETE') return false;
+
+  const sprintId = latestEventSprintId(projectRoot);
+  const decision = authorizeTenantAdmin(req, projectRoot, sprintId, `tenant:${method.toLowerCase()}`);
+  if (!decision.authorized) {
+    sendApiError(res, 403, 'FORBIDDEN', 'admin role required for tenant management');
+    return true;
+  }
+  const actor = decision.actor;
+
+  // ── CREATE ──────────────────────────────────────────────────────────
+  if (method === 'POST') {
+    if (path !== '/api/enterprise/tenants') {
+      sendApiError(res, 404, 'NOT_FOUND', 'unknown tenant route');
+      return true;
+    }
+    const result = TenantCreateSchema.safeParse(body);
+    if (!result.success) {
+      sendValidationError(res, result.error);
+      return true;
+    }
+    const input = result.data;
+    const cfg = readRawConfig(projectRoot);
+    const tenants = tenantArray(cfg);
+    if (tenants.some((e) => tenantEntryId(e) === input.id)) {
+      sendApiError(res, 409, 'CONFLICT', `tenant '${input.id}' already exists`);
+      return true;
+    }
+    const record: TenantRecord = {
+      id: input.id,
+      name: input.name,
+      status: input.status ?? 'active',
+      users: input.users ?? 0,
+      createdAt: new Date().toISOString(),
+    };
+    tenants.push(record);
+    cfg['tenants'] = tenants;
+    writeRawConfig(projectRoot, cfg);
+    if (sprintId) {
+      writeAuditEvent(projectRoot, sprintId, {
+        tenantId: input.id,
+        actor,
+        action: 'enterprise:tenants:create',
+        target: input.id,
+      });
+    }
+    sendJson(res, record, 201);
+    return true;
+  }
+
+  // ── UPDATE / DELETE need an :id ──────────────────────────────────────
+  const id = tenantIdFromPath(path);
+  if (!id) {
+    sendApiError(res, 400, 'BAD_REQUEST', 'tenant id required in path');
+    return true;
+  }
+  if (!isValidTenantId(id)) {
+    sendApiError(res, 400, 'BAD_REQUEST', 'invalid tenant id');
+    return true;
+  }
+
+  const cfg = readRawConfig(projectRoot);
+  const tenants = tenantArray(cfg);
+  const idx = tenants.findIndex((e) => tenantEntryId(e) === id);
+
+  // ── UPDATE ──────────────────────────────────────────────────────────
+  if (method === 'PUT') {
+    const result = TenantUpdateSchema.safeParse(body);
+    if (!result.success) {
+      sendValidationError(res, result.error);
+      return true;
+    }
+    if (idx < 0) {
+      sendApiError(res, 404, 'NOT_FOUND', `tenant '${id}' not found`);
+      return true;
+    }
+    const current = normalizeTenant(tenants[idx], id);
+    const patch = result.data;
+    const updated: TenantRecord = {
+      ...current,
+      ...(patch.name !== undefined ? { name: patch.name } : {}),
+      ...(patch.status !== undefined ? { status: patch.status } : {}),
+      ...(patch.users !== undefined ? { users: patch.users } : {}),
+      id,
+    };
+    tenants[idx] = updated;
+    cfg['tenants'] = tenants;
+    writeRawConfig(projectRoot, cfg);
+    if (sprintId) {
+      writeAuditEvent(projectRoot, sprintId, {
+        tenantId: id,
+        actor,
+        action: 'enterprise:tenants:update',
+        target: id,
+      });
+    }
+    sendJson(res, updated, 200);
+    return true;
+  }
+
+  // ── DELETE ──────────────────────────────────────────────────────────
+  if (idx < 0) {
+    sendApiError(res, 404, 'NOT_FOUND', `tenant '${id}' not found`);
+    return true;
+  }
+  tenants.splice(idx, 1);
+  cfg['tenants'] = tenants;
+  writeRawConfig(projectRoot, cfg);
+  if (sprintId) {
+    writeAuditEvent(projectRoot, sprintId, {
+      tenantId: id,
+      actor,
+      action: 'enterprise:tenants:delete',
+      target: id,
+    });
+  }
+  sendJson(res, { ok: true, id }, 200);
+  return true;
 }

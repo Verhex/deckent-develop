@@ -1,5 +1,25 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-282 Learnings
+- Sprint sprint-282 Learnings: ## Sprint sprint-282 Learnings
+- POST /api/chat adapter-backed — classifier yalnız açık-komutlara: GO_WITH_TECH_DEBT — POST /api/chat is now adapter-backed (DASH-UX-1 part-1). resolveChatReply() in chat-handler.ts routes NL messages to the
+- Stream-yolu kök-fix — teşhise göre auth/spawn onarımı: GO_WITH_TECH_DEBT — Stream-path ROOT-FIX (DASH-UX-1, the auth root from 282-001). Root = src/api/server.ts:1179 auth-gate built queryTokenPa
+- Stale sprint-state — finalize terminal-snapshot + /api/status reconcile: GO_WITH_TECH_DEBT — DASH-UX-2 fix implemented in two layers:
+
+1. sprint-finalizer.ts — Step 16 added: writeTerminalDashboardSnapshot() write
+- Nav tek-kaynak — Layout↔Sidebar birleştir, Workers/Directives erişilir: GO_WITH_TECH_DEBT — nav-items.ts created as single source of truth for all 13 routes across 3 groups (Konuş/İzle/Yönet). Layout.tsx imports 
+- Terminal-bar overlap — z-index/layout fix: NO_GO
+- Alert-dedup — auditor staleness-uyarısı tek-satır: GO_WITH_TECH_DEBT — Implemented identity-based alert dedup (DASH-UX-4).
+
+1. alert-emitter.ts: Added `DedupAlert` type alias (Alert & { lastS
+- DebtPage route + /settings yüzeyi: NO_GO
+- Dashboard sayfa-içi i18n-temizliği — literal-label'lar i18n-key'e: NO_GO
+
+## Gains
+- 282-001 — Chat stream-boşluğu kök-teşhis — EventSource-auth mu, serve-içi CLI-spawn mı? — ROOT-CAUSE DECOMPOSED + PROVEN.
+- 282-003 — ChatPage stream-hata dürüstlüğü — onError yutma + POST-yarışı fix — All 3 goCriteria satisfied:
+- 282-011 — chat-backend.ts disposition — API-W2 — Successfully removed the dormant chat-backend.ts module and all references.
+
 ## Sprint sprint-281 Learnings
 - Sprint sprint-281 Learnings: ## Sprint sprint-281 Learnings
 
