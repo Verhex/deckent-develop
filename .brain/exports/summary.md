@@ -61,8 +61,8 @@
 | adr-065 | Develop / Product Two-Repo Split | accepted |
 | adr-066 | Provider Independence — Multi-Provider Backend Parity | accepted |
 | adr-067 | Process Mode + Tenant Isolation — F3 Foundation | proposed |
-| adr-068 | Enterprise Foundation — Audit Query + Multi-Tenant + Scheduled Flows | proposed |
-| adr-069 | Event-Driven Triggers + RBAC — F3 Webhook & F4 Role-Based Access Control | proposed |
+| adr-068 | Enterprise Foundation — Audit Query + Multi-Tenant + Scheduled Flows | accepted |
+| adr-069 | Event-Driven Triggers + RBAC — F3 Webhook & F4 Role-Based Access Control | accepted |
 | adr-070 | Brain Evaluation Integrity — Signal-Based Coverage Exemption + Zero-Hard-Code Principle | accepted |
 | adr-071 | F3 Autonomous Mode (Self-Dispatch Guard) + F4 Enterprise RBAC/Tenant/Audit | proposed |
 | adr-072 | Agent Routing Balance (Multi-Signal Scoring) + Dashboard API Auth Hardening | accepted |

@@ -1,8 +1,8 @@
 # ADR-069: Event-Driven Triggers + RBAC — F3 Webhook & F4 Role-Based Access Control
 
-**Status:** proposed
+**Status:** accepted
 
-**Date:** 2026-05-31
+**Date:** 2026-05-31 · promoted 2026-06-11 (Sprint 281 ADR-review — decided-scope shipped + canlı-tüketimli)
 
 ---
 
@@ -98,3 +98,15 @@ Bilinmeyen rol → tüm izinler reddedilir (fail-secure).
 - ADR-068: Enterprise Foundation — Audit Query + Multi-Tenant + Scheduled Flows
 - ROADMAP F3-003: event-driven webhook triggers → `✅ DONE Sprint 206-005`
 - ROADMAP F4-001: RBAC iskelet → `🟡 Sprint 206-008 (Role+Permission+can())`
+
+---
+
+## Amendment — Sprint 281 (2026-06-11, ADR-review): proposed → accepted + canlı-tüketici haritası
+
+**Classification: BOTH** (RBAC/triggers enterprise-ürün çekirdeği).
+
+**Terfi gerekçesi:** Her iki bileşen de decided-scope'unda shipped VE **canlı-tüketimli** (ADR-068 emsali):
+- `matchTrigger` → **`src/core/flow-scheduler.ts`** üretimde tüketiyor (event→flow eşleşmesi canlı).
+- `can()` → **4 canlı production tüketici:** `orchestra/autonomous/runtime-loop.ts` (S261 RBAC-bridge — otonom motor RBAC-gate'li), `api/auth-me-endpoint.ts` (OIDC JWT rol-claim'leri → `can()`), `api/enterprise-endpoint.ts`, `cli/commands/rbac.ts`. **"`can()` gerçek auth-session'a bağlı değil" negatifi ÇÖZÜLDÜ** (ADR-074 Enterprise RBAC/Audit/Rate + ADR-076 auth-precedence + 277-007 OIDC). Fail-secure (bilinmeyen-rol→tüm-izinler-red) korunur.
+
+**Hâlâ geçerli negatifler (yeni iş açılmadı, haritalı):** HTTP webhook-listener inşa edilmedi (AUT-2 — matcher'ın decided-scope'u zaten listener'ı hariç tutuyordu; reactive-trigger'lar şimdilik nervous-reactive bridge üzerinden) · custom-rol/izin-matrisi genişletmesi yok (F4-003; ADR-068 god-level boşluk-haritası #2 ile aynı madde). md+db senkron (Alperen ADR-review).

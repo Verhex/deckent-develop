@@ -6559,18 +6559,34 @@ Bu kararlar `src/core/tenant-context.ts` skeleton ile hayata geçirilmiştir (Sp
 - ADR-062: Embedded Web Terminal (tenant-scoped session hook interface mevcut)
 - ROADMAP F3: Process Mode sub-project tracker
 
+---
+
+## Amendment — Sprint 281 (2026-06-11, ADR-review, full code-verification)
+
+**Classification: BOTH** (Process Mode = üçüncü ürün-yüzü; multi-tenancy = enterprise-ürün).
+
+**Re-verified:** `TenantContext` + `resolveTenant` birebir (env `DECKENT_TENANT_ID` → config → `'local'`; `tenant-context.ts:37/43`) ✓ · **F3-002 çekirdeği İNDİ:** scheduled-flow full-cron `nextRun` (`core/scheduled-flow.ts:140`, AUT-4) + flow→backlog bridge (AUT-3 `makeFlowBacklogBridge`) + durable backlog/3-gate/ExecutionPool/capability-dispatch — **otonom motor (F3-009) fiilen Process-Mode'un agentic runtime'ıdır** ve büyük ölçüde inşa edilmiştir (flag-gated, default-off).
+
+**🔴 Threading-kararı GERÇEKLEŞMEDİ — tenant farklı şekle dağıldı:** `resolveTenant` **0-caller (dormant)**; "tüm Process-Mode bileşenleri `TenantContext` parametre alır" kararı yerine tenant-gerçekliği şöyle indi: `strict_tenant` config-flag (Sprint 261) + memory-store `tenant_id` kolonu (tenant-scoped entries/audit) + audit-MCP tenant-scope + backlog entry'de düz `tenant?: string`. **Accept-günü karar:** ya `TenantContext`-threading'i gerçekten wire et, ya bu Decision'ı gerçekleşen-şekle (config-flag + kolon + alan) amend et — ikisi birden değil.
+
+**Terminoloji hizalamaları (ADR-042 Sprint-281 amendment ile):**
+1. Context'teki "Chat Mode" ifadesi → Chat/REPL bir **etkileşim-yüzeyidir**; yürütme-style üçlüsü **`sprint | task | process`**'tir (Alperen gerekçesi: "sprint evrensel kavram değil" + "task-mode agentic değil" → process = uzun-ömürlü + agentic üçüncü style).
+2. **"auto" adlandırma-çakışması (accept-günü çözülmeli):** `deckent mode auto` = bağlamdan sprint|task **auto-DETECT** komutu; "**autonomous engine**" = sürekli-çalışan motor (F3-009, Process-Mode runtime'ı). İki "auto" farklı kavram — kullanıcı-karışıklığı riski; Process-Mode style-entegrasyonunda adlandırma netleştirilir.
+
+md+db senkron (Alperen ADR-review).
+
 
 ---
 
 ## adr-068: Enterprise Foundation — Audit Query + Multi-Tenant + Scheduled Flows
 
-**Status:** proposed
+**Status:** accepted
 
 # ADR-068: Enterprise Foundation — Audit Query + Multi-Tenant + Scheduled Flows
 
-**Status:** proposed
+**Status:** accepted
 
-**Date:** 2026-05-31
+**Date:** 2026-05-31 · promoted 2026-06-11 (Sprint 281 ADR-review — üç katman da shipped)
 
 ---
 
@@ -6647,18 +6663,39 @@ Enterprise Foundation üç katmandan oluşur:
 - ADR-067: Process Mode + Tenant Isolation — F3 Foundation
 - ROADMAP F3/F4: Process Mode + Enterprise sub-project tracker
 
+---
+
+## Amendment — Sprint 281 (2026-06-11, ADR-review): proposed → accepted + god-level boşluk-haritası
+
+**Classification: BOTH** (enterprise-temel ürünün kendisi).
+
+**Terfi gerekçesi (ADR-042/053 emsali — üç katman da shipped, kod-doğrulandı):**
+- **Katman-1 ✅:** `flow-registry.ts` + `flow.ts` CLI + `parseCronExpr` (:46) + **full-cron `nextRun`** (AUT-4; "iskelet" aşıldı) + flow→backlog bridge (AUT-3 — flow'lar gerçekten koşar).
+- **Katman-2 ✅:** `queryAudit` (:65, read-only) + üstüne **audit-HMAC chain** (S261; memory-store `audit_prev_hmac`/`audit_hmac`) + `audit-integrity.ts` + SIEM HTTP transport (`siem-transport-http.ts`).
+- **Katman-3 ✅ ("ileride" değil, İNDİ):** OIDC exchange endpoint canlı (`server.ts:745`, 277-007, config-gated, RS256-pinned/PKCE/fail-closed) + `/api/auth/me` RBAC-rolleri + enterprise rate-limits (**ADR-074**) + `strict_tenant` (S261) + auth-precedence (**ADR-076**). Teslim-eden ADR'ler: 074 (RBAC/Audit/Rate), 076 (auth-precedence), 277-007 (OIDC).
+
+**⚖️ Dürüst derinlik-değerlendirmesi (Alperen sorusu: "yüzeysel mi, god-level mi?"):** Bu temel **gerçek ve ciddi mühendisliktir, yüzeysel değildir** (OIDC güvenlik detayları, HMAC-zincir, guard'lı terminal). Ancak **god-level-enterprise'a YARI YOLDUR** — kalan boşluklar (hepsi zaten haritalı, yeni iş açılmadı):
+1. **Yönetim-düzlemi yok** — Enterprise UI salt-okunur; admin UI'dan tenant/rol/rate CRUD yapamaz (UX-denetim 2026-06-11 bulgu #6 → F7/DESK-1 control-plane).
+2. **RBAC statik** — 3 sabit rol; custom-rol/izin-matrisi/per-resource ACL yok.
+3. **Enforcement advisory** — ADR-037 V1.0 soft; enterprise hard-enforcement V2 hard-flip'te (post-GA).
+4. **Tenant izolasyonu config-seviyesi** — path-scoping + flag; runtime izolasyon (k8s pod-exec F3-003) inşa edilmedi.
+5. **Provisioning yok** — OIDC login-only; SCIM/directory-sync yok.
+6. **Audit-export/compliance-paketi yok** (F4-002) — SIEM-transport var, paketleme yok; SOC2 bilinçli-kapsam-dışı (ADR-033) ama MOD-SPLIT enterprise-layer'ı compliance-evidence tooling taşıyabilir.
+
+md+db senkron (Alperen ADR-review).
+
 
 ---
 
 ## adr-069: Event-Driven Triggers + RBAC — F3 Webhook & F4 Role-Based Access Control
 
-**Status:** proposed
+**Status:** accepted
 
 # ADR-069: Event-Driven Triggers + RBAC — F3 Webhook & F4 Role-Based Access Control
 
-**Status:** proposed
+**Status:** accepted
 
-**Date:** 2026-05-31
+**Date:** 2026-05-31 · promoted 2026-06-11 (Sprint 281 ADR-review — decided-scope shipped + canlı-tüketimli)
 
 ---
 
@@ -6754,6 +6791,18 @@ Bilinmeyen rol → tüm izinler reddedilir (fail-secure).
 - ADR-068: Enterprise Foundation — Audit Query + Multi-Tenant + Scheduled Flows
 - ROADMAP F3-003: event-driven webhook triggers → `✅ DONE Sprint 206-005`
 - ROADMAP F4-001: RBAC iskelet → `🟡 Sprint 206-008 (Role+Permission+can())`
+
+---
+
+## Amendment — Sprint 281 (2026-06-11, ADR-review): proposed → accepted + canlı-tüketici haritası
+
+**Classification: BOTH** (RBAC/triggers enterprise-ürün çekirdeği).
+
+**Terfi gerekçesi:** Her iki bileşen de decided-scope'unda shipped VE **canlı-tüketimli** (ADR-068 emsali):
+- `matchTrigger` → **`src/core/flow-scheduler.ts`** üretimde tüketiyor (event→flow eşleşmesi canlı).
+- `can()` → **4 canlı production tüketici:** `orchestra/autonomous/runtime-loop.ts` (S261 RBAC-bridge — otonom motor RBAC-gate'li), `api/auth-me-endpoint.ts` (OIDC JWT rol-claim'leri → `can()`), `api/enterprise-endpoint.ts`, `cli/commands/rbac.ts`. **"`can()` gerçek auth-session'a bağlı değil" negatifi ÇÖZÜLDÜ** (ADR-074 Enterprise RBAC/Audit/Rate + ADR-076 auth-precedence + 277-007 OIDC). Fail-secure (bilinmeyen-rol→tüm-izinler-red) korunur.
+
+**Hâlâ geçerli negatifler (yeni iş açılmadı, haritalı):** HTTP webhook-listener inşa edilmedi (AUT-2 — matcher'ın decided-scope'u zaten listener'ı hariç tutuyordu; reactive-trigger'lar şimdilik nervous-reactive bridge üzerinden) · custom-rol/izin-matrisi genişletmesi yok (F4-003; ADR-068 god-level boşluk-haritası #2 ile aynı madde). md+db senkron (Alperen ADR-review).
 
 
 ---
@@ -6911,6 +6960,16 @@ roles receive an empty/error response. This moves F4-001 from pure skeleton to e
 - ADR-037: Brain-Auditor-Worker Authority Matrix — RBAC Protocol V1.0
 - ADR-069: Event-Driven Triggers + RBAC — F3 Webhook & F4 RBAC
 - ROADMAP F4-001: OIDC/SSO AuthProvider impl + RBAC → Sprint 207-007 gate wire
+
+---
+
+## Amendment — Sprint 281 (2026-06-11, ADR-review, full code-verification)
+
+**Classification: BOTH** (değerlendirme adaleti + doğru model/maliyet gösterimi ürün-kanunu).
+
+**Re-verified (üç karar da birebir canlı):** Decision-A signal-based `wroteTests` (`rubric-registry.ts:281-282`) + bridge-allowlist (:246) ✓ · Decision-B bundled apiId'ler **güncel-tutulmuş** — `claude-opus-4-8` (:78) ve `claude-fable-5` (:67, en yeni model dahil; zero-hard-code ilkesi yaşıyor) ✓ · RBAC-gate `queryAudit` → `can(role, Permission.READ, tenantId)` (`audit-query.ts:73`) ✓ (ADR'deki `'audit:read'` ifadesi implementasyonda `Permission.READ` — semantik aynı, imza-nüansı).
+
+**Evrim — sinyal-ilkesi STACK boyutu kazandı (WM-7, Sprint 254):** coverage-muafiyet artık yalnız wroteTests-sinyali değil, **tech-stack-duyarlı** da: `COVERAGE_MEASURABLE_STACKS` (`core/work-model.ts`) vitest-ölçülemez stack'leri (C++/Go/…) coverage-zorunluluğundan muaf tutar — "ölçüm-boşluğu ≠ kalite-hatası" ilkesinin (bu ADR'nin özü) taksonomi-eksenine genişlemesi (ADR-053 Sprint-281 amendment cross-ref). md+db senkron (Alperen ADR-review).
 
 
 ---

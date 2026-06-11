@@ -1,8 +1,8 @@
 # ADR-068: Enterprise Foundation — Audit Query + Multi-Tenant + Scheduled Flows
 
-**Status:** proposed
+**Status:** accepted
 
-**Date:** 2026-05-31
+**Date:** 2026-05-31 · promoted 2026-06-11 (Sprint 281 ADR-review — üç katman da shipped)
 
 ---
 
@@ -78,3 +78,24 @@ Enterprise Foundation üç katmandan oluşur:
 - ADR-034: Multi-Project Isolation — Per-Project Security Boundaries
 - ADR-067: Process Mode + Tenant Isolation — F3 Foundation
 - ROADMAP F3/F4: Process Mode + Enterprise sub-project tracker
+
+---
+
+## Amendment — Sprint 281 (2026-06-11, ADR-review): proposed → accepted + god-level boşluk-haritası
+
+**Classification: BOTH** (enterprise-temel ürünün kendisi).
+
+**Terfi gerekçesi (ADR-042/053 emsali — üç katman da shipped, kod-doğrulandı):**
+- **Katman-1 ✅:** `flow-registry.ts` + `flow.ts` CLI + `parseCronExpr` (:46) + **full-cron `nextRun`** (AUT-4; "iskelet" aşıldı) + flow→backlog bridge (AUT-3 — flow'lar gerçekten koşar).
+- **Katman-2 ✅:** `queryAudit` (:65, read-only) + üstüne **audit-HMAC chain** (S261; memory-store `audit_prev_hmac`/`audit_hmac`) + `audit-integrity.ts` + SIEM HTTP transport (`siem-transport-http.ts`).
+- **Katman-3 ✅ ("ileride" değil, İNDİ):** OIDC exchange endpoint canlı (`server.ts:745`, 277-007, config-gated, RS256-pinned/PKCE/fail-closed) + `/api/auth/me` RBAC-rolleri + enterprise rate-limits (**ADR-074**) + `strict_tenant` (S261) + auth-precedence (**ADR-076**). Teslim-eden ADR'ler: 074 (RBAC/Audit/Rate), 076 (auth-precedence), 277-007 (OIDC).
+
+**⚖️ Dürüst derinlik-değerlendirmesi (Alperen sorusu: "yüzeysel mi, god-level mi?"):** Bu temel **gerçek ve ciddi mühendisliktir, yüzeysel değildir** (OIDC güvenlik detayları, HMAC-zincir, guard'lı terminal). Ancak **god-level-enterprise'a YARI YOLDUR** — kalan boşluklar (hepsi zaten haritalı, yeni iş açılmadı):
+1. **Yönetim-düzlemi yok** — Enterprise UI salt-okunur; admin UI'dan tenant/rol/rate CRUD yapamaz (UX-denetim 2026-06-11 bulgu #6 → F7/DESK-1 control-plane).
+2. **RBAC statik** — 3 sabit rol; custom-rol/izin-matrisi/per-resource ACL yok.
+3. **Enforcement advisory** — ADR-037 V1.0 soft; enterprise hard-enforcement V2 hard-flip'te (post-GA).
+4. **Tenant izolasyonu config-seviyesi** — path-scoping + flag; runtime izolasyon (k8s pod-exec F3-003) inşa edilmedi.
+5. **Provisioning yok** — OIDC login-only; SCIM/directory-sync yok.
+6. **Audit-export/compliance-paketi yok** (F4-002) — SIEM-transport var, paketleme yok; SOC2 bilinçli-kapsam-dışı (ADR-033) ama MOD-SPLIT enterprise-layer'ı compliance-evidence tooling taşıyabilir.
+
+md+db senkron (Alperen ADR-review).

@@ -147,3 +147,13 @@ roles receive an empty/error response. This moves F4-001 from pure skeleton to e
 - ADR-037: Brain-Auditor-Worker Authority Matrix — RBAC Protocol V1.0
 - ADR-069: Event-Driven Triggers + RBAC — F3 Webhook & F4 RBAC
 - ROADMAP F4-001: OIDC/SSO AuthProvider impl + RBAC → Sprint 207-007 gate wire
+
+---
+
+## Amendment — Sprint 281 (2026-06-11, ADR-review, full code-verification)
+
+**Classification: BOTH** (değerlendirme adaleti + doğru model/maliyet gösterimi ürün-kanunu).
+
+**Re-verified (üç karar da birebir canlı):** Decision-A signal-based `wroteTests` (`rubric-registry.ts:281-282`) + bridge-allowlist (:246) ✓ · Decision-B bundled apiId'ler **güncel-tutulmuş** — `claude-opus-4-8` (:78) ve `claude-fable-5` (:67, en yeni model dahil; zero-hard-code ilkesi yaşıyor) ✓ · RBAC-gate `queryAudit` → `can(role, Permission.READ, tenantId)` (`audit-query.ts:73`) ✓ (ADR'deki `'audit:read'` ifadesi implementasyonda `Permission.READ` — semantik aynı, imza-nüansı).
+
+**Evrim — sinyal-ilkesi STACK boyutu kazandı (WM-7, Sprint 254):** coverage-muafiyet artık yalnız wroteTests-sinyali değil, **tech-stack-duyarlı** da: `COVERAGE_MEASURABLE_STACKS` (`core/work-model.ts`) vitest-ölçülemez stack'leri (C++/Go/…) coverage-zorunluluğundan muaf tutar — "ölçüm-boşluğu ≠ kalite-hatası" ilkesinin (bu ADR'nin özü) taksonomi-eksenine genişlemesi (ADR-053 Sprint-281 amendment cross-ref). md+db senkron (Alperen ADR-review).

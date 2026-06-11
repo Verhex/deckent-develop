@@ -56,3 +56,19 @@ Bu kararlar `src/core/tenant-context.ts` skeleton ile hayata geçirilmiştir (Sp
 - ADR-034: Multi-Project Isolation — Per-Project Security Boundaries
 - ADR-062: Embedded Web Terminal (tenant-scoped session hook interface mevcut)
 - ROADMAP F3: Process Mode sub-project tracker
+
+---
+
+## Amendment — Sprint 281 (2026-06-11, ADR-review, full code-verification)
+
+**Classification: BOTH** (Process Mode = üçüncü ürün-yüzü; multi-tenancy = enterprise-ürün).
+
+**Re-verified:** `TenantContext` + `resolveTenant` birebir (env `DECKENT_TENANT_ID` → config → `'local'`; `tenant-context.ts:37/43`) ✓ · **F3-002 çekirdeği İNDİ:** scheduled-flow full-cron `nextRun` (`core/scheduled-flow.ts:140`, AUT-4) + flow→backlog bridge (AUT-3 `makeFlowBacklogBridge`) + durable backlog/3-gate/ExecutionPool/capability-dispatch — **otonom motor (F3-009) fiilen Process-Mode'un agentic runtime'ıdır** ve büyük ölçüde inşa edilmiştir (flag-gated, default-off).
+
+**🔴 Threading-kararı GERÇEKLEŞMEDİ — tenant farklı şekle dağıldı:** `resolveTenant` **0-caller (dormant)**; "tüm Process-Mode bileşenleri `TenantContext` parametre alır" kararı yerine tenant-gerçekliği şöyle indi: `strict_tenant` config-flag (Sprint 261) + memory-store `tenant_id` kolonu (tenant-scoped entries/audit) + audit-MCP tenant-scope + backlog entry'de düz `tenant?: string`. **Accept-günü karar:** ya `TenantContext`-threading'i gerçekten wire et, ya bu Decision'ı gerçekleşen-şekle (config-flag + kolon + alan) amend et — ikisi birden değil.
+
+**Terminoloji hizalamaları (ADR-042 Sprint-281 amendment ile):**
+1. Context'teki "Chat Mode" ifadesi → Chat/REPL bir **etkileşim-yüzeyidir**; yürütme-style üçlüsü **`sprint | task | process`**'tir (Alperen gerekçesi: "sprint evrensel kavram değil" + "task-mode agentic değil" → process = uzun-ömürlü + agentic üçüncü style).
+2. **"auto" adlandırma-çakışması (accept-günü çözülmeli):** `deckent mode auto` = bağlamdan sprint|task **auto-DETECT** komutu; "**autonomous engine**" = sürekli-çalışan motor (F3-009, Process-Mode runtime'ı). İki "auto" farklı kavram — kullanıcı-karışıklığı riski; Process-Mode style-entegrasyonunda adlandırma netleştirilir.
+
+md+db senkron (Alperen ADR-review).
