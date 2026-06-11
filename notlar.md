@@ -30,5 +30,23 @@
 
 - **DURDU — Alperen "bu sprintten sonra dur, yarın sabah devam" dedi (2026-06-11).** Otonom loop duraklatıldı. Sıradaki: **L-küme** (human-interaction kalan: REPL-001/002 slash parity, APPROVE-007b, PLANOBS, BOT-2d, DEFER, CKPT).
 
+### Sprint 280 — L-küme: Human-Interaction Wire + KÖK-SEBEP timeout fix ⚠️ (7/10 + 2 kök-fix, supervised)
+- **Bağlam:** Sabah Alperen aktifken koştu (supervised). 10-task L-küme planlandı (REPL /mcp · PLANOBS-001/002/004/005 · APPROVE-007b · 2 doc), 3-wave dependency. Wave makinesi + dependency-parse + TOPP continuous-dispatch **doğru çalıştı** (001-004 paralel, 005-008 deps-clear-oldukça, kademeli spawn).
+- **🔴 007 (PLANOBS-005, opus high) ~20dk'da TIMEOUT-öldü** → Alperen "neden?" sordu → **KÖK-SEBEP avı:**
+  - `emitTimeoutEvents` (brainEstimateTimeout'u çağıran TEK fonksiyon) **0-caller DORMANT** idi → adaptive per-task timeout hiç hesaplanmıyordu → her worker `spawn-backend-docker.ts: effectiveTimeout = taskTimeoutSeconds ?? this.timeoutSeconds` ile statik **docker_timeout (default 1200s=20dk)**'a düşüyordu. docker_timeout adaptive'i "eziyordu" çünkü **adaptive hiç wire değildi** (Alperen'in sezgisi birebir doğru).
+- **🔧 Kök-sebep fix (a) — adaptive timeout wire (`9f966eeb`):** emitTimeoutEvents artık `timeoutSeconds` döndürür; `spawnWorkers`+`respawnEligibleTasks` her task için hesaplayıp `taskTimeoutSeconds`'ı spawn opts'a geçirir (ProviderSpawnOptions + SpawnBackendOptions); docker_timeout artık FALLBACK. **fail-safe** (`bd29abd4`): partial-config mock'lu testler newly-live path'e girip patladı (cascade 33→25 file) → try/catch ile estimate best-effort yapıldı. 4 test (spawn-timeout-wiring).
+- **🔧 Kök-sebep fix (b) — MRR FIX-deadlock (`9f966eeb`):** `respawnEligibleTasks` `doneTasks = status===DONE` only → MANUAL_REVIEW_REQUIRED (timeout-disk-kanıtlı) upstream dependent'ı sonsuz blokeliyordu → 009/010 dispatch olmadı, EXECUTE wave sprint-timeout'a kadar idle, FIX hiç başlamadı (Alperen'in gördüğü "düğüm"). Fix: MRR'yi dependency-satisfying say. 4 test (respawn-mrr-unblock).
+- **⚙️ Timeout no-limit config (Alperen "timeout 0"):** `.deckent/config.json` → `sprint_timeout_minutes:0` (unlimited) + `docker_timeout:86400` + `timeout.docker_min/max 86100/86400` (24h tavan = fiilen sınırsız; gerçek-hang yine 24h backstop). Backup: `config.json.bak-pre-timeout0`.
+- **Teslimat (disk-verified, tsc temiz, build:all ✅ 2282 modül):** 001 PLANOBS-001 PROGRESS channel (9t), 002 PLANOBS-002 notify progress/phase-change (10t), 003 APPROVE-007b transport (10t), **004 REPL /mcp broker wire — G1 KAPANDI** (13t, GO_WITH_TECH_DEBT-ama-güçlü), 005 PROGRESS emit 2/3-site (14t, PRE_VITEST plugin-hooks core/'da scope-dışı), 006 PLANOBS-004 planner notify+spinner (9t), 008 nervous /edit (11t). **007 (PLANOBS-005) REVERT** — timeout+test-collection-hang, doğrulanamaz, kritik start-path → `.deckent/planobs-005-wip.patch` saklandı, carry-forward.
+- **Sprint deadlock manuel finalize:** 007-MRR deadlock'ta (Alperen onayıyla) TaskStop + sprint-state→COMPLETED + stale heartbeat.pid/sprint.lock temizlendi (orphan-state gotcha'sına karşı).
+- **Regresyon: NET-ZERO yeni.** Full-suite 33→25 file (fail-safe sonrası); kalan 25 **pre-280 src'de (3e5b7618) BİREBİR fail** = pre-existing baseline (zero-hardcode limit-ledger.ts yorumu/S273, error-handling capability-broker.ts throw, builtin-skills .deckent-mirror drift, + bilinen mcp-help/serve/doctor/sprint-controller/nervous-faz1/tmux-cli-bin flaky). Kendi 8 testim + dokunduğum modüllerin mevcut testleri yeşil.
+
+**⚠️ Sabah için bulgular (Alperen oku):**
+1. **DORMANT-CODE ZİNCİRİ tehlikeli:** emitTimeoutEvents Sprint 145'ten beri 0-caller'dı → adaptive timeout sistemi (timeout-estimator + clamp + effort_base) hep ölü, herkes 20dk docker_timeout'la koşuyordu. "Kanıt-letter vs goal" + 0-caller dormant deseninin canlı bedeli. **Genel risk:** kaç sistem daha "var ama 0-caller"? (event-stream PROGRESS de bu sprintte wire edildi.)
+2. **PLANOBS-005 carry-forward:** start dual-plan kaldırma + .tasks cache değerli ama opus-high + kritik-path; sonraki sprint'te tek-başına + bol-timeout (artık no-limit) ile yeniden. Patch hazır.
+3. **DEFER kümesi (L kalan):** DEFER-001 (autonomous API endpoint), DEFER-002 (nervous MCP undo/edit) + DASH (§4G) hâlâ açık.
+
+- **`deckent finalize --force` çalıştırıldı (Alperen isteği).** Sonraki: K-küme.
+
 ---
 _(Yeni girişler en alta eklenir. Başarısızlıkta: ne oldu, kök-neden, alınan aksiyon, kalan risk.)_
