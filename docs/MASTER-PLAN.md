@@ -1119,8 +1119,68 @@ Items surfaced during the Sprint 211 doc-consolidation audit that were intention
 
 ---
 
-> **Count:** ~103 distinct remaining work-items across 19 clusters. None is a throwaway/MVP cut — each is built to god-level, enterprise-grade, million-user quality. Build *sequence* (not scope) is dependency-ordered per §10A, beginning with the canonical work-model foundation (cluster A).
+## 15. FAZ-3 KONSOLİDASYON — Tek Öncelik Haritası (2026-06-11, %100 kayıpsız)
+
+> **Kayıpsızlık garantisi (Alperen kesin-emri):** Bu bölüm yıkıcı yeniden-yazım DEĞİL — yukarıdaki tüm detay-bölümler (kanıt-komutları, fazlamalar, bağlam) yerinde durur; burası her açık iş-maddesini bir arc'a bağlayan **organize-eden üst-katman**dır. Yazım anında dokümanda **115 açık madde** vardı; 115/115 aşağıda haritalandı (mekanik doğrulama: `grep -cE "^\s*- \[ \]" docs/MASTER-PLAN.md` ile açık-madde sayısı ↔ arc-üye-toplamı + DASH-UX blokları eşleşmeli). Yeni madde eklenirken bu haritaya da arc-ataması yazılır.
+
+### Öncelik sırası (Alperen onaylı: C→A→B→D→F→E → stratejik hatlar)
+
+**1️⃣ ARC-C — Chat/Dashboard/Surface Product** *(stratejik kalp: "user+enterprise kusursuz deneyim")* — 18 madde + 8 yeni:
+`F2-008` · `F11-014` · `F11-016` · `CHAT-A` · `CHAT-IDE` · `F7-004` · `M1-M4` · `API-W2` · `REPL-001/002` · `APPROVE-007b` · `PLANOBS-001..005` · `BOT-2d` · `DEFER-001` · `DEFER-002` · `CKPT-1` · `DESK-1` · `FB-1` · `BOT-1`
+**+ DASH-UX (2026-06-11 canlı UX-denetimi → resmî maddeler; kaynak: memory `project_dashboard_chat_audit_20260611` + ADR-080/082 amendment'ları):**
+- [ ] **DASH-UX-1 (P0)** — Chat-hollow v3-fix: `POST /api/chat` classifier-only (`server.ts:813`) → adapter-backed yap VEYA ChatPage stream-hata-yutmasını (`:382-384`) dürüst yüzeye çıkar + canlı stream-boşluğunun kökünü ayrıştır (EventSource Bearer-imkânsızlığı vs serve-içi CLI-spawn).
+- [ ] **DASH-UX-2 (P0)** — Stale sprint-state: finalize sonrası `.dashboard` donmuş snapshot; terminal `.dashboard` yaz / `/api/status` reconcile.
+- [ ] **DASH-UX-3 (P1)** — Duplicate sidebar-nav: Layout navGroups ↔ Sidebar navItems tek-kaynağa; Workers/Directives nav'dan erişilir olsun.
+- [ ] **DASH-UX-4 (P1)** — Alert-gürültüsü: "CLAUDE.md güncellenmedi" ×59 dedup/filtre (220-010 dedup'unun nüksü).
+- [ ] **DASH-UX-5 (P1)** — Terminal-bar overlap: collapsed çubuk sidebar YÖNET'i örtüyor (z-index/layout).
+- [ ] **DASH-UX-6 (P2)** — Enterprise CRUD: 4 tab salt-okunur; tenant/rol/rate UI'dan yönetilebilir olsun.
+- [ ] **DASH-UX-7 (P2)** — DebtPage route-suz orphan + `/settings` sidebar'da yok — yüzeye bağla.
+- [ ] **DASH-UX-8 (P2)** — i18n nav-karışıklığı (TR/EN literal-label) — ARC-L sweep'iyle koordineli.
+
+**2️⃣ ARC-A — Katman-Yönü Temizliği** *(product-repo geçişi ön-koşulu: "logic core/orchestra'da, yüzeyler thin")* — 5 madde:
+`CORE-W1` · `ORCH-W1` · `ORCH-W2` · `API-W1` · `ADR-008-W`
+
+**3️⃣ ARC-B — Dürüst-Ayarlar + Dormant-Disposition + Kablosuz-Güvenlik** — 12 madde:
+`CORE-W2` · `CORE-W3` · `CORE-W4` · `ADR-021-W` · `CORE-W6` · `CORE-W7` · `ORCH-W3` · `AGNT-W1` · `PROV-W1` · `CLI-W1` · `CONN-W1` · `SEC-1`
+
+**4️⃣ ARC-D — Doküman/Governance Dürüstlüğü** — 9 madde:
+`ADR-001-W` · `ADR-002-W` · `ADR-010-W` · `ADR-028-W` · `ADR-013-W` · `ADR-029-W` · `CORE-W8` · `DOC-2` · `PARITY-1`
+
+**5️⃣ ARC-F — God-Object Dizginleme + Performans/Ölçek** *(MOD-SPLIT ön-hazırlığı)* — 10 madde:
+`ORCH-W4` · `MON-W1` · `ADR-087-W` · `API-W3` · `CLI-W2` · `PERF-1` · `PERF-2` · `PERF-3` · `PERF-4` · `PERF-5`
+
+**6️⃣ ARC-E — Orkestrasyon-Zekâsı + Gözlemlenebilirlik** — 8 madde:
+`ADR-064-W` · `ADR-066-W` · `WATCH-W` · `COMM-2` · `ROUTE-1` · `EVO-1` · `EVO-2` · `F5-008r`
+
+### Stratejik hatlar (mevcut fazlamaları korunur — §4A-4I/§14 detayları geçerli)
+
+**7️⃣ ARC-G — Provider/Fleet Bağımsızlığı** — 26 madde:
+`F1-IMG` · `F1-009r` · `F1-010` · `F1-012` · `F1-014r` · `F1-015` · `F1-PD` · `F1-AD` · `MF-4` · `MF-5` · `MF-6` · `MF-7` · `MF-9` · `PSL-2` · `PSL-3` · `PSL-4` · `PSL-5` · `PSL-6` · `PSL-7` · `AS2-P2` · `AS2-P3` · `AS2-P4` · `AS4-P1` · `AS4-P2` · `AS4-P3` · `T2`
+
+**8️⃣ ARC-H — Autonomous & Process Mode** — 4 madde:
+`F3-004` · `F3-008` · `AUT-2` · `AUT-10`
+
+**9️⃣ ARC-J — MCP-Client (AS-5)** — 5 madde:
+`F9-001/REPL-MCP` · `F9-002` · `F9-003` · `AS5-P2` · `AS5-P3`
+
+**🔟 ARC-I — Enterprise + IFS-ERP** *(IFS = ilk gerçek ERP connector; beta-sonrası IFS test-ortamı enterprise testleri — memory `project_ifs_erp_first_connector`)* — 4 madde:
+`SCALE-1` · `SCALE-2` · `TEAM-1` · `CORE-W5`
+
+**1️⃣1️⃣ ARC-K — Air-Gap/Offline (AS-7)** — 4 madde:
+`AS7-1` · `AS7-2` · `AS7-3` · `AS7-4`
+
+**1️⃣2️⃣ ARC-L — i18n + Zero-Hardcode Sweep (AS-3)** *(Alperen-ertelemesi kayıtlı: mevcut işler bitince)* — 3 madde:
+`AS3-1` · `AS3-2` · `AS3-3`
+
+**1️⃣3️⃣ ARC-M — Launch/OSS/Post-Beta** — 7 madde:
+`GA-1` · `GA-2` · `GA-3` · `HUB-1` · `PB-1` · `PB-2` · `PB-3`
+
+**Kapsama-sağlaması:** 18+5+12+9+10+8+26+4+5+4+4+3+7 = **115/115** ✓ (+8 yeni DASH-UX maddesi bu bölümde doğdu). MOD-SPLIT (§8) arc'lar bittikçe modül-sınırı envanteriyle devreye girer; ARC-F onun ön-hazırlığıdır.
 
 ---
 
-*Single source of truth. Update this document — not the superseded roadmaps — when status changes.*
+> **Count:** 115 açık madde + 8 yeni DASH-UX = **123 açık iş-maddesi**, 13 arc'ta %100 haritalı (§15). None is a throwaway/MVP cut — each is built to god-level, enterprise-grade, million-user quality. Build *sequence* per §15 priority map (C→A→B→D→F→E → strategic threads); §10A AS-sequencing remains the dependency-order reference within strategic threads.
+
+---
+
+*Single source of truth. Update this document — not the superseded roadmaps — when status changes. New work-items MUST also be assigned to a §15 arc (lossless-map invariant).*
