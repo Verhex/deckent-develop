@@ -1,5 +1,21 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-280 Learnings
+- Sprint sprint-280 Learnings: ## Sprint sprint-280 Learnings
+- REPL /mcp broker wire — G1 (mcp-bridge → chat-native) (OPUS, Tier-1): GO_WITH_TECH_DEBT — G1 CLOSED — the external-MCP client (buildMcpBridge + McpClientBroker, 0-caller since Sprint 229) is now LIVE-WIRED into
+- PLANOBS-001 emit-site'ları — EXECUTE-% + spawn + pre-vitest: GO_WITH_TECH_DEBT — Wired emitProgress at 2/3 required call sites in result-collector.ts:
+1. SPAWN emit (line 828): after successful spawnIf
+- PLANOBS-005 — start çift-planSprint kaldır + .tasks cache + start-fail notify (OPUS): NO_GO — Worker timeout — process exceeded time limit and was killed; disk-verify found evidence (linesAdded=176, untrackedFiles=
+- features + cli-commands — L-küme satırları: NO_GO
+- MASTER-PLAN — §4G L-küme işaretleri: NO_GO
+
+## Gains
+- 280-001 — PLANOBS-001 — event-stream PROGRESS channel + emitProgress helper — Added CHANNELS.PROGRESS = 'PROGRESS' to the CHANNELS const in src/core/event-stream.ts (line 163).
+- 280-002 — PLANOBS-002 — notify 'progress' + 'phase-change' event-tipleri (3 surface) — Added 'progress' and 'phase-change' to NotificationEventName union and EVENT_PRIORITY record in n...
+- 280-003 — APPROVE-007b — modifiedPayload IPC transport + executor consume (OPUS) — APPROVE-007b modifiedPayload IPC transport + executor consume.
+- 280-006 — PLANOBS-004 — planner-fail notify + plan spinner — PLANOBS-004 implemented:
+- 280-008 — APPROVE-007b — REPL /nervous edit (chat-nervous-bridge handleEdit) — APPROVE-007b complete.
+
 ## Sprint sprint-279 Learnings
 - Sprint sprint-279 Learnings: ## Sprint sprint-279 Learnings
 - WK-nervous — panic-gate timeout wire (0-caller → spawn yolu): GO_WITH_TECH_DEBT — Fixed executor.ts handleApprove: imported awaitPanicGateApproval+isLockedPanicAction from panic-gate.ts; added optional 

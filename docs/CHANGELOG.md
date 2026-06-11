@@ -2,6 +2,24 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint280] - 2026-06-11
+
+### Added
+
+- PLANOBS-001 — event-stream PROGRESS channel + emitProgress helper
+- PLANOBS-002 — notify 'progress' + 'phase-change' event-tipleri (3 surface)
+- APPROVE-007b — modifiedPayload IPC transport + executor consume (OPUS)
+- PLANOBS-004 — planner-fail notify + plan spinner
+- APPROVE-007b — REPL /nervous edit (chat-nervous-bridge handleEdit)
+
+### Changed
+
+- REPL /mcp broker wire — G1 (mcp-bridge → chat-native) (OPUS, Tier-1) (completed with tech debt)
+- PLANOBS-001 emit-site'ları — EXECUTE-% + spawn + pre-vitest (completed with tech debt)
+
+
+_Tasks: 10 total, 7 done, 2 tech debt, 3 no-go_
+
 ## [1.0.0-beta.1-sprint279] - 2026-06-10
 
 ### Added
