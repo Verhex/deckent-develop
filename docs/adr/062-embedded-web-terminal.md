@@ -239,3 +239,17 @@ Sub-project roadmap:
 - **#4:** Enterprise external integration: remote PTY backends, audit export, SIEM hooks
 
 **İmza:** Brain (orchestrator) — Sprint 175 Wave 0.
+
+---
+
+## Amendment — Sprint 281 (2026-06-11, ADR-review, full code-verification)
+
+**Classification: BOTH** (dashboard-terminal tamamen user-facing ürün yüzeyi; enterprise audit-zinciri dahil).
+
+1. **🟢 Sub-project #2 DELIVERED.** Notes'taki roadmap'in "#2: Security — prompt/command guard" maddesi teslim edildi: `src/api/terminal/` ADR'nin 6 modülüne ek **4 güvenlik modülü** içerir — `command-guard.ts`, `prompt-guard.ts`, `outbound-limiter.ts`, `audit-integrity.ts` (+ `tests/security/` suite'leri). Sub-#3 (multi-tenant/k8s) + #4 (enterprise external) hâlâ deferred.
+2. **Re-verified (güvenlik-invariant'lar birebir):** `LocalTokenAuthProvider` "DELIBERATELY ignores `DECKENT_API_AUTH_DISABLED`" + `timingSafeEqual` SHA-256 (`auth-provider.ts:45/50/66`) ✓ · token yalnız `Sec-WebSocket-Protocol: deckent.<token>` (`ws-gateway.ts:27/34`) ✓. **Canlı kanıt (2026-06-11 UX-denetimi):** `deckent serve` terminal-token auto-mint + "embedded PTY enabled (token auto-injected for localhost)" gözlendi; dock dashboard'da çalışır.
+3. **Dependency rename:** `node-pty` → **`@lydell/node-pty`** (`session-backend.ts:1`; ADR-010 Amendment-2'de kayıtlı) — bu ADR'deki `node-pty` bahisleri eski-isim olarak okunmalı; karar değişmedi.
+4. **Stale ref düzeltmesi:** Related-ADR-047 satırındaki "dependency_pipeline_enabled: false for deckent-dev" superseded — flag artık `true`, multi-wave canlı (ADR-045 Sprint-281 amendment).
+5. **🟡 Bilinen UI-bug (product-sprint'e):** collapsed Terminal dock-bar'ı sidebar YÖNET bölümünü örtüyor (layout/z-index; UX-denetim 2026-06-11 bulgu #5, `project_dashboard_chat_audit_20260611`). Fonksiyonel değil görsel; Chat/Dashboard product-sprint'inde düzeltilir.
+
+md+db senkron (Alperen ADR-review).

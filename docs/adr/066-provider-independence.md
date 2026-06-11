@@ -127,3 +127,15 @@ When `INSTALL_CODEX=true`, `@openai/codex` is installed during build. When `INST
 - `src/core/model-registry.ts` — `getProviderForModel()` canonical resolver
 - `Dockerfile.worker` — ARG INSTALL_CODEX / ARG INSTALL_GEMINI build args
 - `docs/reference/provider-free.md` — user-facing provider-free guide
+
+---
+
+## Amendment — Sprint 281 (2026-06-11, ADR-review, full code-verification)
+
+**Classification: BOTH** (multi-provider ürünün çekirdek vaadi).
+
+1. **Konum-düzeltmesi:** canonical resolver `getProviderForModel` **`src/core/task-types.ts`'te** yaşar (docker backend `:12`'den import eder, `:322`'de kullanır) — model-registry.ts'te yalnız yorum-referansı vardır. Karar değişmedi; konum-bilgisi düzeltildi.
+2. **🔴 Invariant-drift — `?? 'claude'` 3 → 9:** "≤3 kalmalı, artmamalı, her yenisi justification ister" sözleşmesi bozuldu — bugün **9 gerçek-kod occurrence** (provider.ts:889, config.ts:92, cross-verify-runner.ts:215, sprint-utils.ts:214, +5). `sprint-utils.ts:203`'ün kendi yorumu bile "tekrar `?? 'claude'` yazma, `getDefaultProviderName()` kullan" der. Fix: MASTER-PLAN "ADR-Analizi Türetilen İşler → **ADR-066-W**" (9'unu re-audit: azalt / justify-comment'le / `getDefaultProviderName()`'e konsolide; WM-5 provider-free hard-enforcement kalanıyla aynı aile).
+3. **🟢 Mimari evrim (S248-254 + ADR-077 — auth-tablosunu süpersede eder):** Codex/Gemini artık yalnız "API-key-env" değil — **gerçek host-adapter worker'lar** (`isAdapterProvider` host-route, S248) + **per-provider OAuth/subscription mount'ları docker'da** (`~/.codex`, `~/.gemini`, S252 PSL-1 `ProviderCommandSpec`) + MF-2 lazy adapter re-bootstrap + **F1-CB billing-follows-auth** (subscription/local=$0). Ollama'nın docker-curl özel-vakası → **host-adapter default-route**'a evrildi (`wantsHostAdapter`). 8-fleet + OpenAI-compatible HTTP adapter = ADR-077. Bu ADR'nin "parity" kararı geçerli; auth/binary tabloları S203-dönemi snapshot'tır.
+
+md+db senkron (Alperen ADR-review).

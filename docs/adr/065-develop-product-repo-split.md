@@ -147,3 +147,16 @@ Enforcement:
 - Sprint 201 Task 201-003 — `scripts/sync-to-product.mjs` implementation
 - Sprint 200 incident: automated counter modified `docs/audits/sprint-139/dead-code-report.md`
   (historical `864` → `870`); change reverted in commit cf1ab8e2
+
+---
+
+## Amendment — Sprint 281 (2026-06-11, ADR-review, full code-verification)
+
+**Classification: BOTH** (mekanizma dogfood-iç; çıktısı ürünün kamusal vitrini).
+
+1. **Re-verified:** `scripts/sync-to-product.mjs` (dry-run/`--apply` + `EXCLUDE` :26 + `isExcluded` :65 + security-gate) ✓ · `docs/audits` docs.json'da YOK (immutable-policy fiilen korunur) ✓ · remotes ADR modeliyle uyumlu (origin=deckent-develop; product'a push manuel/staging) ✓.
+2. **Claim-hassasiyeti (immutable-enforcement):** "generator artık `docs/audits/**`'i explicitly skips" ifadesinin **literal path-guard'ı managed-docs kodunda yok** — koruma **registry-yokluğu** ile sağlanır (kayıtlı-olmayan doc'a runner dokunmaz). Geçerli savunma; ancak kural netleştirilir: **`docs/audits/**` HİÇBİR ZAMAN `.deckent/docs.json`'a register edilemez** (tek koruma hattı budur; ileride bir literal path-guard eklenirse defense-in-depth olur).
+3. **Eksen-netleştirmesi (MOD-SPLIT karışıklığını önle):** Bu ADR'nin "two-repo"su = **private-develop ↔ public-product vitrin** ekseni. ADR-033 Sprint-281 amendment'indeki MOD-SPLIT kararı ("ayrı repo/fork YOK — tek kod tabanı + modüler enterprise-layer") **community/enterprise lisans eksenidir** — farklı eksen, çelişki yok: tek kod tabanı (community+enterprise modüler) private-develop'ta yaşar, public-product'a sync'lenir.
+4. **Aktif güncellik:** Bu ADR, yürürlükteki **develop→product geçiş** hedefinin (Alperen 2026-06-11: "işlevsellikleri bitir + kodu düzelt + süreci tamamla") resmi mekanizmasıdır; geçiş günü `sync-to-product.mjs --dry-run` review → `--apply` → manuel push akışı uygulanır.
+
+md+db senkron (Alperen ADR-review).

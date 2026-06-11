@@ -102,3 +102,13 @@ DB sync: this `.md` is upserted into `memory.db` via the ADR-046 `adrInsert` pos
 hook (`adr-file-sync.ts`) — never via destructive rebuild (cf. `feedback_db_silmek_yasak`).
 
 **İmza:** Brain (orchestrator) — Sprint 175 Workstream A, behavior implemented + 23 tests PASS.
+
+---
+
+## Amendment — Sprint 281 (2026-06-11, ADR-review)
+
+**Classification: BOTH** (kurulum-deneyimi ürünün ilk-temas yüzeyi; consent güven-DNA'sıdır).
+
+**Re-verified:** `planInstall` (:80) / `installTool` (:122) / `PROVISIONER_BIN_WHITELIST` frozen `['npm']` (:58, runtime-check :129) / 23 test birebir ✓.
+
+**🟢 Consent-deseni yeniden-kullanılabilir anchor'a dönüştü:** Sprint 270 F1-IMG, docker-image hazırlama akışına aynı deseni uyguladı — `deckent doctor --fix-image` **açık flag + interaktif onay** olmadan ASLA build etmez (`doctor.ts:610` bu ADR'yi açıkça cite eder). Gelecekteki her "eksik-önkoşulu kur" yüzeyi (PSL-6 auth-probe ailesi dahil) bu ADR'nin consent-gated + whitelist + no-silent-sudo invariant'ına tabidir. md+db senkron (Alperen ADR-review).

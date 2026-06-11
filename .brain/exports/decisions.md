@@ -5833,6 +5833,20 @@ Sub-project roadmap:
 
 **İmza:** Brain (orchestrator) — Sprint 175 Wave 0.
 
+---
+
+## Amendment — Sprint 281 (2026-06-11, ADR-review, full code-verification)
+
+**Classification: BOTH** (dashboard-terminal tamamen user-facing ürün yüzeyi; enterprise audit-zinciri dahil).
+
+1. **🟢 Sub-project #2 DELIVERED.** Notes'taki roadmap'in "#2: Security — prompt/command guard" maddesi teslim edildi: `src/api/terminal/` ADR'nin 6 modülüne ek **4 güvenlik modülü** içerir — `command-guard.ts`, `prompt-guard.ts`, `outbound-limiter.ts`, `audit-integrity.ts` (+ `tests/security/` suite'leri). Sub-#3 (multi-tenant/k8s) + #4 (enterprise external) hâlâ deferred.
+2. **Re-verified (güvenlik-invariant'lar birebir):** `LocalTokenAuthProvider` "DELIBERATELY ignores `DECKENT_API_AUTH_DISABLED`" + `timingSafeEqual` SHA-256 (`auth-provider.ts:45/50/66`) ✓ · token yalnız `Sec-WebSocket-Protocol: deckent.<token>` (`ws-gateway.ts:27/34`) ✓. **Canlı kanıt (2026-06-11 UX-denetimi):** `deckent serve` terminal-token auto-mint + "embedded PTY enabled (token auto-injected for localhost)" gözlendi; dock dashboard'da çalışır.
+3. **Dependency rename:** `node-pty` → **`@lydell/node-pty`** (`session-backend.ts:1`; ADR-010 Amendment-2'de kayıtlı) — bu ADR'deki `node-pty` bahisleri eski-isim olarak okunmalı; karar değişmedi.
+4. **Stale ref düzeltmesi:** Related-ADR-047 satırındaki "dependency_pipeline_enabled: false for deckent-dev" superseded — flag artık `true`, multi-wave canlı (ADR-045 Sprint-281 amendment).
+5. **🟡 Bilinen UI-bug (product-sprint'e):** collapsed Terminal dock-bar'ı sidebar YÖNET bölümünü örtüyor (layout/z-index; UX-denetim 2026-06-11 bulgu #5, `project_dashboard_chat_audit_20260611`). Fonksiyonel değil görsel; Chat/Dashboard product-sprint'inde düzeltilir.
+
+md+db senkron (Alperen ADR-review).
+
 
 ---
 
@@ -5944,6 +5958,16 @@ DB sync: this `.md` is upserted into `memory.db` via the ADR-046 `adrInsert` pos
 hook (`adr-file-sync.ts`) — never via destructive rebuild (cf. `feedback_db_silmek_yasak`).
 
 **İmza:** Brain (orchestrator) — Sprint 175 Workstream A, behavior implemented + 23 tests PASS.
+
+---
+
+## Amendment — Sprint 281 (2026-06-11, ADR-review)
+
+**Classification: BOTH** (kurulum-deneyimi ürünün ilk-temas yüzeyi; consent güven-DNA'sıdır).
+
+**Re-verified:** `planInstall` (:80) / `installTool` (:122) / `PROVISIONER_BIN_WHITELIST` frozen `['npm']` (:58, runtime-check :129) / 23 test birebir ✓.
+
+**🟢 Consent-deseni yeniden-kullanılabilir anchor'a dönüştü:** Sprint 270 F1-IMG, docker-image hazırlama akışına aynı deseni uyguladı — `deckent doctor --fix-image` **açık flag + interaktif onay** olmadan ASLA build etmez (`doctor.ts:610` bu ADR'yi açıkça cite eder). Gelecekteki her "eksik-önkoşulu kur" yüzeyi (PSL-6 auth-probe ailesi dahil) bu ADR'nin consent-gated + whitelist + no-silent-sudo invariant'ına tabidir. md+db senkron (Alperen ADR-review).
 
 
 ---
@@ -6140,6 +6164,16 @@ ADR-064 adopts this format as the official TOPP C contract and the
 - Sprint 178 plan: `docs/superpowers/plans/2026-05-22-sprint-178-modernization-topp.md`
 - Tests: `tests/orchestra/topp-continuous-dispatch.test.ts` (G1-G10 matrix)
 
+---
+
+## Amendment — Sprint 281 (2026-06-11, ADR-review, full code-verification)
+
+**Classification: BOTH** (continuous throughput user-projelerinde aynı; `DECKENT_LEGACY_FIFO` operatör-escape'i ürün özelliği).
+
+**✅ Davranışsal sözleşme CANLI (re-verified + canlı-kanıt):** `dispatchTick` ana-loop'un tek dispatch-girişi (`result-collector.ts:938` initial-pass + `:1005` per-tick); continuous=default; `DECKENT_LEGACY_FIFO=1` escape gerçek (`:757` maybeRespawn short-circuit → legacy-FIFO korunur). Sprint 279/280 canlı-kanıt: bağımlılıklar temizlendikçe anında spawn, wave-barrier yok (ADR-045 Sprint-281 amendment'le tutarlı).
+
+**🔴 Mimari sapma — planner-bypass (tested-but-unwired):** ADR'nin "dispatchTick, `planDispatch`'e (pure) delege eder" iddiası ve `result-collector.ts:180` yorumu **koda uymuyor**: `dispatchTick` gövdesi yalnız `await processQueue(...); await maybeRespawn();` — `planDispatch(...)` (:227, `DispatchPlan`/`mode` döndüren saf planlayıcı) **runtime'da 0-caller**. G1-G10 testleri saf-modeli pinler; canlı yol kararları `processQueue`/`maybeRespawn` içinde imperatif verir → **test-vs-runtime sapma riski** (testler yeşilken canlı semantik sessizce farklılaşabilir). Bu, W-K AS-1'in "planDispatch wire" maddesinin hâlâ inmediği anlamına gelir. Fix: MASTER-PLAN "ADR-Analizi Türetilen İşler → **ADR-064-W**" — dispatchTick'i `planDispatch` üzerinden geçir (pinlenen model = canlı yol), `:180` yorumunu o zamana dek düzelt-veya-işaretle. md+db senkron (Alperen ADR-review).
+
 
 ---
 
@@ -6297,6 +6331,19 @@ Enforcement:
 - Sprint 200 incident: automated counter modified `docs/audits/sprint-139/dead-code-report.md`
   (historical `864` → `870`); change reverted in commit cf1ab8e2
 
+---
+
+## Amendment — Sprint 281 (2026-06-11, ADR-review, full code-verification)
+
+**Classification: BOTH** (mekanizma dogfood-iç; çıktısı ürünün kamusal vitrini).
+
+1. **Re-verified:** `scripts/sync-to-product.mjs` (dry-run/`--apply` + `EXCLUDE` :26 + `isExcluded` :65 + security-gate) ✓ · `docs/audits` docs.json'da YOK (immutable-policy fiilen korunur) ✓ · remotes ADR modeliyle uyumlu (origin=deckent-develop; product'a push manuel/staging) ✓.
+2. **Claim-hassasiyeti (immutable-enforcement):** "generator artık `docs/audits/**`'i explicitly skips" ifadesinin **literal path-guard'ı managed-docs kodunda yok** — koruma **registry-yokluğu** ile sağlanır (kayıtlı-olmayan doc'a runner dokunmaz). Geçerli savunma; ancak kural netleştirilir: **`docs/audits/**` HİÇBİR ZAMAN `.deckent/docs.json`'a register edilemez** (tek koruma hattı budur; ileride bir literal path-guard eklenirse defense-in-depth olur).
+3. **Eksen-netleştirmesi (MOD-SPLIT karışıklığını önle):** Bu ADR'nin "two-repo"su = **private-develop ↔ public-product vitrin** ekseni. ADR-033 Sprint-281 amendment'indeki MOD-SPLIT kararı ("ayrı repo/fork YOK — tek kod tabanı + modüler enterprise-layer") **community/enterprise lisans eksenidir** — farklı eksen, çelişki yok: tek kod tabanı (community+enterprise modüler) private-develop'ta yaşar, public-product'a sync'lenir.
+4. **Aktif güncellik:** Bu ADR, yürürlükteki **develop→product geçiş** hedefinin (Alperen 2026-06-11: "işlevsellikleri bitir + kodu düzelt + süreci tamamla") resmi mekanizmasıdır; geçiş günü `sync-to-product.mjs --dry-run` review → `--apply` → manuel push akışı uygulanır.
+
+md+db senkron (Alperen ADR-review).
+
 
 ---
 
@@ -6433,6 +6480,18 @@ When `INSTALL_CODEX=true`, `@openai/codex` is installed during build. When `INST
 - `src/core/model-registry.ts` — `getProviderForModel()` canonical resolver
 - `Dockerfile.worker` — ARG INSTALL_CODEX / ARG INSTALL_GEMINI build args
 - `docs/reference/provider-free.md` — user-facing provider-free guide
+
+---
+
+## Amendment — Sprint 281 (2026-06-11, ADR-review, full code-verification)
+
+**Classification: BOTH** (multi-provider ürünün çekirdek vaadi).
+
+1. **Konum-düzeltmesi:** canonical resolver `getProviderForModel` **`src/core/task-types.ts`'te** yaşar (docker backend `:12`'den import eder, `:322`'de kullanır) — model-registry.ts'te yalnız yorum-referansı vardır. Karar değişmedi; konum-bilgisi düzeltildi.
+2. **🔴 Invariant-drift — `?? 'claude'` 3 → 9:** "≤3 kalmalı, artmamalı, her yenisi justification ister" sözleşmesi bozuldu — bugün **9 gerçek-kod occurrence** (provider.ts:889, config.ts:92, cross-verify-runner.ts:215, sprint-utils.ts:214, +5). `sprint-utils.ts:203`'ün kendi yorumu bile "tekrar `?? 'claude'` yazma, `getDefaultProviderName()` kullan" der. Fix: MASTER-PLAN "ADR-Analizi Türetilen İşler → **ADR-066-W**" (9'unu re-audit: azalt / justify-comment'le / `getDefaultProviderName()`'e konsolide; WM-5 provider-free hard-enforcement kalanıyla aynı aile).
+3. **🟢 Mimari evrim (S248-254 + ADR-077 — auth-tablosunu süpersede eder):** Codex/Gemini artık yalnız "API-key-env" değil — **gerçek host-adapter worker'lar** (`isAdapterProvider` host-route, S248) + **per-provider OAuth/subscription mount'ları docker'da** (`~/.codex`, `~/.gemini`, S252 PSL-1 `ProviderCommandSpec`) + MF-2 lazy adapter re-bootstrap + **F1-CB billing-follows-auth** (subscription/local=$0). Ollama'nın docker-curl özel-vakası → **host-adapter default-route**'a evrildi (`wantsHostAdapter`). 8-fleet + OpenAI-compatible HTTP adapter = ADR-077. Bu ADR'nin "parity" kararı geçerli; auth/binary tabloları S203-dönemi snapshot'tır.
+
+md+db senkron (Alperen ADR-review).
 
 
 ---

@@ -185,3 +185,13 @@ ADR-064 adopts this format as the official TOPP C contract and the
 - ADR-036 (ADR Governance)
 - Sprint 178 plan: `docs/superpowers/plans/2026-05-22-sprint-178-modernization-topp.md`
 - Tests: `tests/orchestra/topp-continuous-dispatch.test.ts` (G1-G10 matrix)
+
+---
+
+## Amendment — Sprint 281 (2026-06-11, ADR-review, full code-verification)
+
+**Classification: BOTH** (continuous throughput user-projelerinde aynı; `DECKENT_LEGACY_FIFO` operatör-escape'i ürün özelliği).
+
+**✅ Davranışsal sözleşme CANLI (re-verified + canlı-kanıt):** `dispatchTick` ana-loop'un tek dispatch-girişi (`result-collector.ts:938` initial-pass + `:1005` per-tick); continuous=default; `DECKENT_LEGACY_FIFO=1` escape gerçek (`:757` maybeRespawn short-circuit → legacy-FIFO korunur). Sprint 279/280 canlı-kanıt: bağımlılıklar temizlendikçe anında spawn, wave-barrier yok (ADR-045 Sprint-281 amendment'le tutarlı).
+
+**🔴 Mimari sapma — planner-bypass (tested-but-unwired):** ADR'nin "dispatchTick, `planDispatch`'e (pure) delege eder" iddiası ve `result-collector.ts:180` yorumu **koda uymuyor**: `dispatchTick` gövdesi yalnız `await processQueue(...); await maybeRespawn();` — `planDispatch(...)` (:227, `DispatchPlan`/`mode` döndüren saf planlayıcı) **runtime'da 0-caller**. G1-G10 testleri saf-modeli pinler; canlı yol kararları `processQueue`/`maybeRespawn` içinde imperatif verir → **test-vs-runtime sapma riski** (testler yeşilken canlı semantik sessizce farklılaşabilir). Bu, W-K AS-1'in "planDispatch wire" maddesinin hâlâ inmediği anlamına gelir. Fix: MASTER-PLAN "ADR-Analizi Türetilen İşler → **ADR-064-W**" — dispatchTick'i `planDispatch` üzerinden geçir (pinlenen model = canlı yol), `:180` yorumunu o zamana dek düzelt-veya-işaretle. md+db senkron (Alperen ADR-review).
