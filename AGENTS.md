@@ -24,11 +24,8 @@ When acting as Worker: @.codex/rules/worker-default.md
 @.deckent/workspace/IDENTITY.md
 
 ## Agent Performance
-| Agent | Tasks | Done | Success |
+| Agent | Tasks | Done | Başarı |
 |-------|-------|------|--------|
-| api-builder | 2 | 2 | 100% |
-| bug-fixer | 2 | 2 | 100% |
-| architect | 2 | 2 | 100% |
-| doc-writer | 3 | 3 | 100% |
-| refactorer | 1 | 1 | 100% |
-| ci-guardian | 1 | 1 | 100% |
+| architect | 1 | 1 | 100% |
+| security-auditor | 1 | 1 | 100% |
+| architecture-planner | 1 | 1 | 100% |

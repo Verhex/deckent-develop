@@ -1,0 +1,259 @@
+{
+  "last_sprint_id": "sprint-280",
+  "mode": "performance",
+  "modes": {
+    "performance": {
+      "max_workers": 8,
+      "brain_model": "fable",
+      "default_model": "fable",
+      "haiku_allowed": true,
+      "brain_planning": "structured"
+    },
+    "balanced": {
+      "max_workers": 5,
+      "brain_model": "sonnet",
+      "default_model": "opus",
+      "haiku_allowed": true,
+      "brain_planning": "auto"
+    },
+    "economic": {
+      "max_workers": 3,
+      "brain_model": "sonnet",
+      "default_model": "sonnet",
+      "haiku_allowed": false,
+      "brain_planning": "auto"
+    },
+    "api": {
+      "max_workers": 4,
+      "brain_model": "opus",
+      "default_model": "sonnet",
+      "haiku_allowed": true,
+      "budget_per_sprint": 5,
+      "requires": "ANTHROPIC_API_KEY",
+      "brain_planning": "auto"
+    }
+  },
+  "providers": {
+    "brain": "claude",
+    "worker": "claude"
+  },
+  "cost_optimization": false,
+  "spawn_backend": "docker",
+  "auth_mode": "subscription",
+  "human_checkpoints": [],
+  "fix_phase_enabled": true,
+  "max_fix_retries": 2,
+  "coverage_threshold": 90,
+  "coverage_hard_floor": 50,
+  "coverage_aspirational": 90,
+  "max_reroutes": 3,
+  "reroute_on_tech_debt": false,
+  "sprint_timeout_minutes": 45,
+  "memory_budget": 5000,
+  "decay_after_sprints": 20,
+  "patterns_enabled": true,
+  "project_identity_enabled": true,
+  "scan_interval": 30,
+  "heartbeat_timeout": 120,
+  "boundary_enforcement": true,
+  "lock_stale_threshold": 300,
+  "search_enabled": true,
+  "search_provider": "context7",
+  "search_cache_ttl": 3600,
+  "notify_on_complete": true,
+  "notify_channel": null,
+  "notify_url": null,
+  "telemetry_enabled": false,
+  "telemetry_anonymous": true,
+  "detected_env": null,
+  "multi_ide_mode": false,
+  "output_splash": true,
+  "output_mode": "normal",
+  "output_theme": "default",
+  "rollback_policy": "never",
+  "rubric_max_retries": 0,
+  "adaptive_thresholds": false,
+  "agent_min_score": 5,
+  "adaptive_config": {
+    "min_samples": 3,
+    "no_go_threshold": 0.3,
+    "coverage_lookback": 3
+  },
+  "routing_engine": "v2",
+  "cleanup_delay_ms": 180000,
+  "dependency_pipeline_enabled": true,
+  "sprint_checkpoint_interval": 5,
+  "token_throttle_ms": 500,
+  "timeout": {
+    "docker_min_timeout": 1200,
+    "docker_max_timeout": 7200,
+    "tmux_min_timeout": 900,
+    "tmux_max_timeout": 5400,
+    "subprocess_min_timeout": 600,
+    "subprocess_max_timeout": 3600,
+    "effort_base": {
+      "low": 600,
+      "normal": 1200,
+      "high": 2400
+    },
+    "loc_scaling_enabled": true,
+    "history_scaling_enabled": true,
+    "runtime_extension_enabled": true,
+    "adaptive_multiplier": 1.5,
+    "runtime_extension_max": 5
+  },
+  "observability": {
+    "rotation": {
+      "maxSizeMB": 1,
+      "archiveFormat": "gzip",
+      "keepLastN": 10
+    }
+  },
+  "sprint_file_retention": {
+    "keep_last_n": 10,
+    "size_cap_mb": 500,
+    "archive_path": ".deckent/archive/sprints/"
+  },
+  "deckent_style": "sprint",
+  "terminal": {
+    "enabled": true,
+    "bind": "127.0.0.1",
+    "maxSessions": 10,
+    "idleTimeoutMs": 1800000,
+    "scrollbackBytes": 262144,
+    "allowShellKind": true
+  },
+  "prompt": {
+    "adr_min_relevance": 0.3,
+    "adr_render": "operative"
+  },
+  "nervous_system": {
+    "enabled": false,
+    "mode": "balanced",
+    "actionOverrides": {},
+    "safety_floor": {
+      "locked_actions": [
+        "KILL_LIVE_SPRINT",
+        "MANUAL_FILE_DELETE",
+        "COST_OVER_THRESHOLD",
+        "DESTRUCTIVE_GIT",
+        "ADR_DEPRECATE_ACCEPTED"
+      ],
+      "cost_threshold_usd": 110,
+      "bypass_allowed": false
+    },
+    "notifications": {
+      "channels": {
+        "mcp": true,
+        "cli": true,
+        "file": true,
+        "desktop": false
+      },
+      "throttle_ms": 300000,
+      "group_info_window_ms": 600000,
+      "severity_min": "info",
+      "quiet_hours": {
+        "start": "22:00",
+        "end": "08:00",
+        "timezone": "TRT"
+      },
+      "cross_channel_dedup": true
+    },
+    "detectors": {
+      "stale_worker": {
+        "enabled": true,
+        "threshold_ms": 180000
+      },
+      "scope_collision": {
+        "enabled": true
+      },
+      "debt_trend": {
+        "enabled": true,
+        "threshold_rate": 0.15
+      },
+      "agent_routing": {
+        "enabled": true,
+        "anomaly_threshold": 0.4
+      },
+      "directives_protection": {
+        "enabled": true,
+        "auto_restore": true
+      },
+      "dead_event_stream": {
+        "enabled": false
+      },
+      "cost_threshold": {
+        "enabled": false,
+        "reserve_for": "sprint-148"
+      },
+      "prompt_quality": {
+        "enabled": false,
+        "reserve_for": "sprint-148"
+      },
+      "worker_output_variance": {
+        "enabled": false,
+        "reserve_for": "sprint-148"
+      },
+      "self_modifying_warner": {
+        "enabled": false,
+        "reserve_for": "sprint-148"
+      },
+      "task_mode_idle": {
+        "enabled": false
+      },
+      "build_failure_recurrence": {
+        "enabled": false
+      },
+      "token_spike": {
+        "enabled": false
+      },
+      "agent_routing_anomaly": {
+        "enabled": false
+      },
+      "scope_collision_rate": {
+        "enabled": false
+      },
+      "notification_delivery_health": {
+        "enabled": false
+      }
+    },
+    "history_retention_days": 30
+  },
+  "brain_planning": "structured",
+  "notify_connectors": {
+    "telegram": {
+      "enabled": true,
+      "token": "$DECK:TELEGRAM_TOKEN",
+      "chat_id": "7374744018"
+    }
+  },
+  "autonomous": {
+    "enabled": false,
+    "interval_ms": 5000,
+    "backlog_path": ".deckent/autonomous/backlog.json",
+    "pool_size": 1,
+    "reactive": {
+      "enabled": false,
+      "map_path": ".deckent/autonomous/reactive-map.json"
+    }
+  },
+  "max_workers": 6,
+  "resource_monitor": {
+    "enabled": true,
+    "interval_ms": 5000
+  },
+  "worker_memory_limit_by_kind": {
+    "documentation": "768m",
+    "code-development": "2g",
+    "test": "2g",
+    "refactor": "2g",
+    "security": "2g",
+    "devops": "2g",
+    "audit": "2g",
+    "config": "2g"
+  },
+  "cache_warm": {
+    "enabled": false
+  },
+  "language": "tr"
+}

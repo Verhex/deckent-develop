@@ -1,193 +1,83 @@
-# DIRECTIVES — Sprint 280: L-küme — Human-Interaction Wire (REPL /mcp + PLANOBS observability + nervous edit)
+# DIRECTIVES — Sprint 281: Resource-Arbiter Spec Review — 3-Perspektif Audit
 
-## Goal: L-küme (Alperen sırası: M sonrası L) — human-interaction-wire kalan maddeleri (MASTER-PLAN §4G). Kod-doğrulandı (Explore file:line, 2026-06-11): REPL `/mcp` **0-caller stub** (mcp-bridge.ts+broker.ts var ama chat-native'e wire YOK = G1/[[project_mcp_client_not_wired_s229]]), PLANOBS-001/002 (event-stream `PROGRESS` channel + notify `progress`/`phase-change` tipi YOK → plan/start sessiz-boşluk), PLANOBS-004 (planner-fail `console.error` notify değil + spinner yok), PLANOBS-005 (çift `planSprint` start.ts:308+368 + `.tasks` cache yok), APPROVE-007b (nervous `handleEdit` + modifiedPayload IPC transport YOK). Hepsi opt-in/additive/fail-safe; davranış-korunumlu. MİKRO-TASK + DEPENDENCY + MODEL-KATMANLAMA (opus 3 · sonnet 5 · haiku 2).
+## Goal: `docs/superpowers/specs/2026-06-11-resource-arbiter-design.md` (izin-önce-eylem kaynak hakemi, commit fbaed64b) implementasyona girmeden ÖNCE 3 bağımsız perspektifle denetlensin: (1) mimari & eşzamanlılık doğruluğu, (2) adversarial kırmızı-takım, (3) ürün/user-enterprise. Bu bir SPEC-REVIEW sprint'idir — KOD YAZILMAZ.
 
 ## Ortak kurallar
-- **TDD + hermetik:** önce RED; tmpdir + injectable fs/spawn; testte gerçek ağ/MCP-subprocess YASAK (mock broker/spawn); spawnSync YASAK (async spawn).
-- **Davranış korunumu:** additive/opt-in; mevcut yeşil testler yeşil; default çıktı/akış değişmez (örn. edit-yokken approval byte-bayt aynı; MCP-server yapılandırılmamışsa REPL aynı). Default çıktı bilinçli değişiyorsa (PLANOBS spinner/progress) snapshot bilinçli güncellenir + .result notes'a yazılır.
-- **i18n-FIRST:** TÜM user-facing string `getMessage(key, lang)` (en+tr). Hardcode TR/EN YASAK. Mekanizma modülleri string-free.
-- **Fail-safe:** yeni surface (broker, progress-emit, notify) hata verirse ana akışı (REPL / sprint / approval) ASLA düşürmez — log+skip.
-- **SSOT:** event-stream (core/), notification-dispatcher, ipc-queue, mcp-bridge/broker MEVCUT modüller — BAĞLA, yeniden yazma. event-stream Sprint 279'da `src/orchestra/`→`src/core/event-stream.ts`'e taşındı (orchestra shim).
-- **`.tasks/task-XXX.result` YAZ**; Kanıt komutlarını gerçekten koş. Tier-1 user-surface → gerçek-binary smoke CC sprint-sonu (ADR-079).
+- **AUDIT task (ADR-053):** `src/`, spec dosyası veya başka HİÇBİR mevcut dosyaya DOKUNMA. Tek yazımın: kendi rapor dosyan (`docs/reviews/resource-arbiter-spec/`) + `.tasks/task-XXX.result`.
+- **Koda-karşı doğrulama ZORUNLU:** Spec, mevcut modüllere entegrasyon iddiaları içeriyor (file-lock.ts deseni, spawn PATH enjeksiyonu, hb/watchdog, PROGRESS/notify Sprint-280 altyapısı, host-detector, nervous approve/edit). Yüzeysel okuma YASAK — iddiayı GERÇEK koddan `file:line` ile teyit et veya çürüt.
+- **Rapor formatı:** Markdown; her bulgu: `[P0]`/`[P1]`/`[P2]`/`[P3]` severity (P0=blocker, P1=major, P2=minor, P3=nit) + somut gerekçe (spec bölüm referansı + varsa kod `file:line`) + öneri. Sonda zorunlu blok: `## Verdict: APPROVE | APPROVE_WITH_CHANGES | REWORK` + en kritik 3 madde özeti. Teyit ettiğin güçlü yönleri de yaz (yalnız kusur avı değil, dengeli denetim).
+- **Dil:** Rapor Türkçe (teknik terim İngilizce serbest). Rapor user-facing değil, i18n gerekmez.
+- Test koşma, build koşma — bu read-only denetim. `.tasks/task-XXX.result` YAZ (selfAssessment + notes'a verdict).
 
 ---
 
-## Task 1: PLANOBS-001 — event-stream PROGRESS channel + emitProgress helper
-- Provider: claude
-- Model: sonnet
-- Backend: docker
-- Effort: normal
-- Agent: api-builder
-- Skills: typescript-expert, testing-expert
-- Files: src/core/event-stream.ts, tests/core/event-stream-progress.test.ts
-- Scope: src/core/, tests/core/
-
-### Description
-Kanıt: `src/core/event-stream.ts` CHANNELS enum'unda (24 channel) `PROGRESS` YOK. Fix (Faz primitive — emit-site'ları Task 5 bağlar): (1) CHANNELS'e `PROGRESS: 'PROGRESS'` ekle (mevcut sabit-deseni izle); (2) `emitProgress(opts: { root?: string; phase: string; pct?: number; detail?: string; source?: string })` yardımcısı — mevcut `writeEvent` üzerine ince sarmalayıcı, `channel: CHANNELS.PROGRESS`, payload `{ phase, pct, detail }`. Hata-toleranslı (writeEvent hatası yutulur, asla throw). SAF additive: hiçbir mevcut channel/emit değişmez. ÖNCE writeEvent imzasını + bir mevcut emit-helper'ı (örn. DEPENDENCY_BLOCKED emit) oku, aynı deseni kullan.
-
-**Kanıt:** `npx vitest run tests/core/event-stream-progress.test.ts` yeşil; `grep -n "PROGRESS" src/core/event-stream.ts | head -2` ≥ 1. **Test:** 5+ (channel mevcut, emitProgress yazıyor, pct opsiyonel, hata-toleransı, payload shape).
-
----
-
-## Task 2: PLANOBS-002 — notify 'progress' + 'phase-change' event-tipleri (3 surface)
-- Provider: claude
-- Model: sonnet
-- Backend: docker
-- Effort: normal
-- Agent: api-builder
-- Skills: typescript-expert, testing-expert
-- Files: src/core/notification-dispatcher.ts, src/core/notify.ts, tests/core/notify-progress-type.test.ts
-- Scope: src/core/, tests/core/
-
-### Description
-Kanıt: `notification-dispatcher.ts` NotificationEventName enum'u yalnız 5 lifecycle-tipi içeriyor ('sprint-started','task-done','task-no-go','sprint-finalized','human-checkpoint-required') — `progress`/`phase-change` YOK. Fix: enum'a `'progress'` + `'phase-change'` ekle; dispatcher bu tipleri TÜM kayıtlı adapter'lara (tty + MCP + file) yönlendirir (mevcut routing yolunu kullan — özel-case değil, generic dispatch). `notify.ts` yardımcı varsa (örn. notifyProgress) ekle, yoksa generic notify ile çağrılabilir bırak. Additive: mevcut 5 tip + adapter davranışı aynen. ÖNCE dispatcher'ın mevcut bir tipi nasıl route ettiğini oku.
-
-**Kanıt:** `npx vitest run tests/core/notify-progress-type.test.ts` yeşil; `grep -niE "progress|phase-change" src/core/notification-dispatcher.ts | head -2` ≥ 1. **Test:** 5+ (progress tip route, phase-change route, 3-adapter fan-out, mevcut tip regresyonsuz).
-
----
-
-## Task 3: APPROVE-007b — modifiedPayload IPC transport + executor consume (OPUS)
+## Task 1: Mimari & Eşzamanlılık Doğruluğu Denetimi
 - Provider: claude
 - Model: opus
 - Backend: docker
 - Effort: normal
-- Agent: bug-fixer
-- Skills: typescript-expert, testing-expert
-- Files: src/nervous/ipc-queue.ts, src/nervous/executor.ts, tests/nervous/approval-edit-transport.test.ts
-- Scope: src/nervous/, tests/nervous/
+- Agent: architect
+- Skills: system-architect, typescript-expert
+- Files: docs/reviews/resource-arbiter-spec/01-architecture-correctness.md
+- Scope: docs/reviews/
 
 ### Description
-Kanıt: `ipc-queue.ts` ApprovalRequest shape `{ notificationId, decision, reason, requestedAt }` — modifiedPayload YOK; executor `resolveApproval` orijinal payload'la çalışıyor → "edit" (onayı değiştirilmiş payload'la geçirme) imkansız. Fix: (1) ApprovalRequest'e **opsiyonel** `modifiedPayload?: Record<string, unknown>` ekle; writeApproval/readApproval taşır (geri-uyum: alan yoksa undefined). (2) poller→`executor.resolveApproval(notifId, decision, opts?)` opsiyonel `{ modifiedPayload }` geçirir. (3) Executor 'accepted' + modifiedPayload varsa handler'ı **birleştirilmiş** payload'la (`{ ...orijinal, ...modifiedPayload }`) çalıştırır; YOKSA byte-bayt mevcut davranış. SAFETY_FLOOR semantiği korunur (Sprint 279). ÖNCE resolveApproval + handler-invoke yolunu izle. Bu Task 8'in (REPL /nervous edit) transport-temeli.
+Spec'i (`docs/superpowers/specs/2026-06-11-resource-arbiter-design.md`) mimari doğruluk gözüyle denetle:
+(a) **FileLeaseBackend algoritması (§5.2):** atomik rename promotion gerçekten tek-kazanan mı (iki worker aynı anda head-of-line olduğunu düşünürse?); monoton `seq` sayacının atomik artırımı pratikte nasıl — `src/core/file-lock.ts`'teki mevcut desenler (acquireLock O_EXCL, claimTaskLock, acquireSpawnLock) yetiyor mu, OKU ve karşılaştır; head-of-line promotion FIFO'yu her durumda garanti eder mi; stale-temizlik ile promotion aynı anda koşarsa yarış var mı; mtime-tabanlı TTL Docker bind-mount'ta güvenilir mi (container içi/dışı mtime semantiği).
+(b) **ADR uyumu:** ADR-008 (resource-arbiter core/'da, lease-shim orchestra/'da — core'un orchestra'dan import etmediği iddiası tutarlı mı), ADR-010 (yeni dependency yok), ADR-037 (RBAC ile çelişki/örtüşme), ADR-045/064 (L1 "TOPP dispatch erteleme" iddiası gerçekçi mi — dispatch kodunu `src/orchestra/` altında bul-oku), ADR-087 (hermetiklik).
+(c) **Saat-donması kontratı (§5.5):** timeout-watchdog gerçekte nerede yaşıyor — `src/orchestra/spawn-backend-docker.ts` timeout mantığı + `src/orchestra/result-collector.ts` deadline yolu; spec'in "hb'de taze WAITING_LEASE varsa deadline uzar" kontratı bu kodlara cerrahi şekilde uygulanabilir mi, yoksa derin refactor mu gerekir? Auditor stale-heartbeat tarafı (`src/monitor/`) için aynı soru.
+(d) **L1 plan-time packing (§4):** TaskKind→resource-class çıkarımı spec'te belirsiz mi; structured/AI planner çıktısından bu sinyal üretilebilir mi.
+(e) Katman sorumlulukları, V1/V2 kesimi, eksik bileşen var mı (örn. `renew()` kim çağırıyor — shim mi arka-plan mı, spec netliği).
 
-**Kanıt:** `npx vitest run tests/nervous/approval-edit-transport.test.ts` yeşil; `grep -n "modifiedPayload" src/nervous/ipc-queue.ts src/nervous/executor.ts | head -2` ≥ 2. **Test:** 7+ (transport round-trip, executor merge, edit-yok byte-aynı, reject+edit yok-sayılır, SAFETY_FLOOR korunur).
+**Kanıt:** `test -s docs/reviews/resource-arbiter-spec/01-architecture-correctness.md && grep -cE "^## Verdict|\[P[0-3]\]" docs/reviews/resource-arbiter-spec/01-architecture-correctness.md` ≥ 9 (≥8 bulgu/teyit + verdict). **Test:** yok — .result YAZ.
 
 ---
 
-## Task 4: REPL /mcp broker wire — G1 (mcp-bridge → chat-native) (OPUS, Tier-1)
+## Task 2: Adversarial Kırmızı-Takım — Tasarımı Kır
 - Provider: claude
 - Model: opus
 - Backend: docker
 - Effort: high
-- Agent: api-builder
-- Skills: typescript-expert, anthropic-sdk, testing-expert
-- Files: src/cli/commands/chat-native.ts, src/cli/commands/chat-slash-registry.ts, src/cli/repl/mcp-bridge.ts, tests/cli/repl-mcp-wire.test.ts
-- Scope: src/cli/, tests/cli/
+- Agent: security-auditor
+- Skills: security-specialist, testing-expert
+- Files: docs/reviews/resource-arbiter-spec/02-adversarial-redteam.md
+- Scope: docs/reviews/
 
 ### Description
-Kanıt ([[project_mcp_client_not_wired_s229]]): `/mcp` REPL'de `resolveSlash` (chat-slash-registry.ts:489) → `{ action:'message', messageKey:'chat.mcp_not_wired' }` döndürüyor (honest stub); `src/cli/repl/mcp-bridge.ts` (`buildMcpBridge`/McpClientBroker) + `src/mcp-client/broker.ts` MEVCUT ama chat-native'de **0-caller**. Fix: (1) chat-native başlangıcında `buildMcpBridge` wire et — **config-gated**: yalnız MCP-server yapılandırılmışsa (broker'ın mevcut server-discovery'sini OKU: `.mcp.json` / `config.mcp_servers` — neyse onu kullan, yeniden icat etme) bridge kurulur; (2) `/mcp` dispatch'i broker'a yönlendir: `list` (server+tool kataloğu), `call <tool> [args]` (tool çağrısı); (3) **server yapılandırılmamışsa** → honest i18n mesaj "MCP sunucusu yapılandırılmadı" (eski "not wired" DEĞİL — artık wire'lı, sadece yapılandırma yok); (4) broker hata/timeout → log+skip, **REPL ASLA çökmez** (fail-safe). i18n en+tr (yeni key'ler chat-slash-registry/chat-native içindeki getMessage çağrılarıyla; mevcut MessageKey union string kabul ediyor). ÖNCE buildMcpBridge imzası + broker.list/call API'sini oku.
+Hedefin spec'teki tasarımı KIRMAK. Her açı için: çalışır bir kötüye-kullanım/kaçış senaryosu kur, severity ver, savunma öner. Asgari açılar (kendi bulduklarını EKLE):
+(1) **Shim bypass:** `npx vitest` `node_modules/.bin`'i PATH-shim'den önce mi çözer? `node node_modules/vitest/vitest.mjs` doğrudan çağrı? `package.json` içindeki `npm test` script'i (npm, çocuk-process PATH'ini nasıl kurar — npm kendisi `node_modules/.bin`'i BAŞA ekler!)? `bash -c 'PATH=/usr/bin vitest run'`? Worker'ın (LLM) shim'i fark edip bilinçli/bilinçsiz devre-dışı bırakması.
+(2) **Saat-donması suistimali:** buggy/kötü worker sahte `WAITING_LEASE` hb yazarak timeout'u SONSUZ uzatabilir mi — spec'te sentinel'in arbiter-tarafı doğrulaması var mı (hb iddiası ile leases/waiting/ kaydının çapraz kontrolü)?
+(3) **Fail-open suistimali:** `leases/` dizinini bozmak (silmek/izin kırmak/çöp dosya) gate'i topyekûn kapatır mı — fail-open'ın "bypass'a dönüşen DoS" yüzü; hangi minimum bütünlük kontrolü şart?
+(4) **Starvation/livelock:** 1-2 sn polling + head-of-line altında 6 bekleyenli kuyrukta adalet; capacity>1'de tek-tek promotion'ın gecikme maliyeti; `reject` policy'de eşzamanlı iki migration'ın ikisinin de reddedilme olasılığı.
+(5) **Çoklu-bağlam çakışması:** aynı `.deckent/leases/` üstünde 2 eşzamanlı sprint, sprint+REPL, veya host'ta elle koşan `vitest` (shim'siz — gate'i hiç görmez!) — "korumasız katılımcı" problemi; spec bunu adresliyor mu?
+(6) **Crash pencereleri:** holder crash → TTL dolana dek kapasite kayıp (1800 sn!) — etki + erken-tespit (pid liveness?) önerisi; shim'in `trap release EXIT`'i SIGKILL'de çalışmaz — bu yol spec'te var mı?
+(7) **Injection/spoofing:** `match` regex'lerinden shim dosya adı üretimi (binary adı `;rm -rf` benzeri olabilir mi); lease JSON'una sahte holder yazımı; `.deckent/shims/` worker filesWrite dışında ama Docker mount'ta yazılabilir — bütünlük?
 
-**Kanıt:** `npx vitest run tests/cli/repl-mcp-wire.test.ts` yeşil; `grep -n "buildMcpBridge" src/cli/commands/chat-native.ts | head -1` ≥ 1. **Smoke (Tier-1, CC sprint-sonu):** `echo "/mcp" | node dist/cli/entry.js` REPL → "yapılandırılmadı" honest mesajı (çökme yok), EXIT temiz. **Test:** 7+ (server-var→list, server-yok→honest mesaj, call→broker, broker-hata→REPL ayakta, i18n tr/en).
+**Kanıt:** `test -s docs/reviews/resource-arbiter-spec/02-adversarial-redteam.md && grep -cE "^## Verdict|\[P[0-3]\]" docs/reviews/resource-arbiter-spec/02-adversarial-redteam.md` ≥ 9 (≥8 bulgu + verdict). **Test:** yok — .result YAZ.
 
 ---
 
-## Task 5: PLANOBS-001 emit-site'ları — EXECUTE-% + spawn + pre-vitest
+## Task 3: Ürün & User/Enterprise Perspektifi Denetimi
 - Provider: claude
 - Model: sonnet
 - Backend: docker
 - Effort: normal
-- Agent: api-builder
-- Skills: typescript-expert, testing-expert
-- Files: src/orchestra/result-collector.ts, src/orchestra/plugin-hooks.ts, tests/orchestra/progress-emit.test.ts
-- Scope: src/orchestra/, tests/orchestra/
-- Dependencies: 280-001
+- Agent: architecture-planner
+- Skills: system-architect, documentation-writer
+- Files: docs/reviews/resource-arbiter-spec/03-product-perspective.md
+- Scope: docs/reviews/
 
 ### Description
-Task 1'in `emitProgress`'ini gerçek noktalara bağla (dormant değil canlı): (1) `result-collector.ts waitForResults` periyodik tick'inde (mevcut `debugLog('waitForResults:progress', …)` noktası, ~line 1016) → `emitProgress({ phase:'EXECUTE', pct: done/total, detail })`; (2) worker-spawn noktasında (spawn loop) → `emitProgress({ phase:'SPAWN', … })`; (3) `plugin-hooks.ts` pre-sprint vitest (track_test_count, ~line 577) öncesi/sonrası → `emitProgress({ phase:'PRE_VITEST', … })`. Mevcut log'ları KORU (emit ek). Fail-safe (emit hatası sprint'i düşürmez). `deckent_watch` artık PROGRESS event'lerini backfill+push eder (PLANOBS-003 zaten payload dönüyor). ÖNCE Task 1'in emitProgress imzasını + waitForResults döngüsünü oku.
+Spec'i deckent-iç dogfood gözüyle DEĞİL, ürün gözüyle denetle (solo user + enterprise):
+(a) **Solo user:** 8-16 GB makinede `capacity:"auto"` formülü ne üretir (hesapla); sürpriz-bekleme UX'i — worker kuyruktayken kullanıcı bunu NEREDE görür (PROGRESS/notify yüzeyleri `src/core/notification-dispatcher.ts` + Sprint-280 sonrası gerçekte hangi yüzeylere gidiyor, OKU); REPL'de görünürlük; "neden yavaş?" sorusunun cevaplanabilirliği (`deckent lease ls` yeterli mi).
+(b) **Enterprise/ERP:** `erp.material.<lot>` genellemesi gerçekçi mi — iş-kaynağı lease'ini KİM acquire eder (worker mı, autonomous capability-dispatch mi, insan onayı mı); lease süresi iş süreci ölçeğinde (saatler/günler) TTL modeliyle uyumlu mu; `tenant` alanı rezervasyonu F3/F4 planlarıyla (`docs/MASTER-PLAN.md` §4 + ADR-067/068/071) hizalı mı.
+(c) **Prior-art kıyası:** GNU make jobserver, GitHub Actions `concurrency` groups, k8s ResourceQuota/PriorityClass — bu tasarım hangi kanıtlanmış desenleri alıyor, hangilerini kaçırıyor (örn. jobserver'ın token-tabanlı modeli vs bizim sınıf-tabanlı)?
+(d) **Konfigürasyon UX:** `resource_classes` JSON'unu gerçek kullanıcı tanımlayabilir mi — şema doğrulama, hata mesajları, `deckent config` yüzeyi; stack-profil "JSON-veri ile dağıtım" mekanizması ürünleşmiş mi yoksa el-sallama mı?
+(e) **Görünürlük/i18n kapsamı** (en+tr mesaj listesi eksiksiz mi) + docs/onboarding ihtiyacı (hangi doküman güncellenmeli).
+(f) **V1/V2 kesimi ürün değeri:** REPL/autonomous wire'ın V2'ye kalması solo-user'ı korumasız bırakıyor mu (REPL tek-agent — gerçek risk?); dashboard kuyruk panelinin V2'ye kalması enterprise demoda eksik mi?
 
-**Kanıt:** `npx vitest run tests/orchestra/progress-emit.test.ts` yeşil; `grep -n "emitProgress" src/orchestra/result-collector.ts | head -1` ≥ 1. **Test:** 6+ (EXECUTE-% emit, spawn emit, pre-vitest emit, emit-hata sprint-düşürmez, pct hesabı).
+**Kanıt:** `test -s docs/reviews/resource-arbiter-spec/03-product-perspective.md && grep -cE "^## Verdict|\[P[0-3]\]" docs/reviews/resource-arbiter-spec/03-product-perspective.md` ≥ 9 (≥8 madde + verdict). **Test:** yok — .result YAZ.
 
 ---
 
-## Task 6: PLANOBS-004 — planner-fail notify + plan spinner
-- Provider: claude
-- Model: sonnet
-- Backend: docker
-- Effort: normal
-- Agent: api-builder
-- Skills: typescript-expert, testing-expert
-- Files: src/orchestra/sprint-planner.ts, src/cli/commands/plan.ts, tests/orchestra/planner-notify.test.ts
-- Scope: src/orchestra/, src/cli/, tests/orchestra/
-- Dependencies: 280-001, 280-002
-
-### Description
-Kanıt: `sprint-planner.ts` AI-fail'leri (parse_failed/timeout, line 250/329/336/363/452) `console.error` ile (notify'a GİTMEZ → operatör/MCP/AI görmez). Fix: (1) bu noktaları `notify({ type:'phase-change' veya 'progress', severity, message })` ile **insan-dönük** yüzeyle (3-surface: tty+MCP+file — Task 2 tipleri); planner-start'ta `emitProgress({ phase:'PLAN' })` (Task 1). `console.error` planner-fail noktalarında kaldır (notify SSOT). (2) `plan.ts` komutuna mevcut `chat-spinner.ts` ile sessiz-boşluk spinner'ı (uzun planlama sırasında); plan biter/hata → spinner durur + sonuç/hata mesajı. i18n en+tr. ÖNCE chat-spinner API'si + notify imzasını oku. Davranış: hata artık sessiz değil, ama exit-code/akış aynı.
-
-**Kanıt:** `npx vitest run tests/orchestra/planner-notify.test.ts` yeşil; `grep -n "notify" src/orchestra/sprint-planner.ts | head -1` ≥ 1. **Test:** 6+ (parse_failed→notify, timeout→notify, planner-start→emitProgress, spinner start/stop, i18n).
-
----
-
-## Task 7: PLANOBS-005 — start çift-planSprint kaldır + .tasks cache + start-fail notify (OPUS)
-- Provider: claude
-- Model: opus
-- Backend: docker
-- Effort: high
-- Agent: performance-analyzer
-- Skills: typescript-expert, performance-optimizer, testing-expert
-- Files: src/cli/commands/start.ts, src/orchestra/sprint-controller.ts, tests/cli/start-plan-cache.test.ts
-- Scope: src/cli/, src/orchestra/, tests/cli/
-- Dependencies: 280-002
-
-### Description
-Kanıt: `start.ts` `planSprint`'i İKİ kez çağırıyor (line 308 display + line 368 cost-gate) — gereksiz çift-plan; ayrıca `start` HER ZAMAN re-plan (`.tasks` cache yok). Fix: (1) **tek planSprint**: bir kez planla, sonucu cost-gate + display + spawn'a yeniden-kullandır (davranış aynı, yalnız tek-hesap). (2) **`.tasks` cache**: DIRECTIVES içerik-hash'i değişmemişse + taze task-*.json varsa re-plan ATLA (mevcut task dosyalarını kullan); hash değişmiş/dosya yok → normal plan. Güvenli default (stale-task riski hash-guard'la kapalı). (3) start-fail (`console.error` yerine) **insan-dönük notify** (Task 2 'phase-change'). Pre-sprint vitest: bloke-eden çağrıyı async'e çevirme riski varsa DOKUNMA (KARPATHY: surgical), yalnız notify+emit ekle. ÖNCE start.ts plan-akışını + planSprint imzasını + sprint-controller plan-giriş noktasını oku.
-
-**Kanıt:** `npx vitest run tests/cli/start-plan-cache.test.ts` yeşil; cache-hit yolunda planSprint 0-çağrı (test mock-sayar kanıtlar). **Smoke (Tier-1, CC sprint-sonu):** `node dist/cli/entry.js start --dry-run` EXIT temiz (çift-plan yok). **Test:** 7+ (tek-plan reuse, cache-hit→re-plan-yok, hash-değişti→re-plan, start-fail→notify, dry-run regresyonsuz).
-
----
-
-## Task 8: APPROVE-007b — REPL /nervous edit (chat-nervous-bridge handleEdit)
-- Provider: claude
-- Model: sonnet
-- Backend: docker
-- Effort: normal
-- Agent: bug-fixer
-- Skills: typescript-expert, testing-expert
-- Files: src/cli/commands/chat-nervous-bridge.ts, tests/cli/nervous-edit-bridge.test.ts
-- Scope: src/cli/, tests/cli/
-- Dependencies: 280-003
-
-### Description
-Kanıt: `chat-nervous-bridge.ts handleNervousSlash` yalnız accept/reject (handleEdit YOK). Fix: `/nervous edit <id> <key=val ...>` (veya json) parse → Task 3'ün transport'uyla `writeApproval({ notificationId, decision:'accepted', modifiedPayload })` (IPC → poller → executor merge-payload). REPL'de görünür onay listesinden id seç + payload düzelt + onayla. i18n en+tr (parse-hata mesajı dahil). Fail-safe (geçersiz id/payload → honest mesaj, REPL ayakta). ÖNCE handleNervousSlash accept/reject deseni + Task 3 writeApproval imzasını oku. Bu APPROVE-007b'yi kapatır (transport=Task3, surface=bu).
-
-**Kanıt:** `npx vitest run tests/cli/nervous-edit-bridge.test.ts` yeşil; `grep -niE "handleEdit|edit" src/cli/commands/chat-nervous-bridge.ts | head -2` ≥ 1. **Test:** 5+ (edit→writeApproval+modifiedPayload, kv-parse, json-parse, geçersiz-id→honest, i18n).
-
----
-
-## Task 9: features + cli-commands — L-küme satırları
-- Provider: claude
-- Model: haiku
-- Backend: docker
-- Effort: low
-- Agent: doc-writer
-- Skills: documentation-writer
-- Files: docs/reference/features.md, docs/reference/cli-commands.md
-- Scope: docs/reference/
-- Dependencies: 280-004, 280-005, 280-006, 280-007, 280-008
-- ModelEffort: low
-
-### Description
-DİSKTEKİ koddan (inmemişleri yazma): features.md'ye L-küme satırları (REPL `/mcp` broker wire, plan/start PROGRESS observability + planner-fail notify, `/nervous edit` modifiedPayload, start çift-plan kaldırma + .tasks cache); cli-commands'a `/mcp list|call` + `/nervous edit` + plan/start spinner notu. Mevcut format.
-
-**Kanıt:** `grep -ciE "/mcp|nervous edit|PROGRESS|plan.*cache|planner.*notify" docs/reference/features.md docs/reference/cli-commands.md | awk -F: '{s+=$1} END{print s}'` ≥ 2 (toplam — per-file say). **Test:** yok — .result YAZ.
-
----
-
-## Task 10: MASTER-PLAN — §4G L-küme işaretleri
-- Provider: claude
-- Model: haiku
-- Backend: docker
-- Effort: low
-- Agent: doc-writer
-- Skills: documentation-writer
-- Files: docs/MASTER-PLAN.md
-- Scope: docs/
-- Dependencies: 280-001, 280-002, 280-003, 280-004, 280-007
-- ModelEffort: low
-
-### Description
-Diskte doğruladığın L-küme maddelerini §4G'de işaretle (inmemişleri İŞARETLEME): REPL `/mcp` wire ✅ (G1 kapandı), PLANOBS-001 ✅ (PROGRESS channel+emit), PLANOBS-002 ✅ (notify progress/phase-change), PLANOBS-004 ✅ (planner notify+spinner), PLANOBS-005 ✅ (tek-plan+cache), APPROVE-007b ✅ (edit transport+REPL). §4G "Kalan: REPL·DASH·PLANOBS·DEFER" satırını güncelle (REPL+PLANOBS düştü → kalan DASH·DEFER). Tek-satır "✅ Sprint 280: ..." ekler, mevcut metni SİLME.
-
-**Kanıt:** `grep -c "Sprint 280" docs/MASTER-PLAN.md` ≥ 3. **Test:** yok — .result YAZ.
-
----
-
-**Beklenen:** 10 mikro task (opus 3 — APPROVE-007b transport + /mcp broker wire + start-perf · sonnet 5 · haiku 2). Zincirler/wave: **Wave-1** 001·002·003·004 (deps-yok); **Wave-2** 005←001 · 006←001,002 · 007←002 · 008←003; **Wave-3** 009←004,005,006,007,008 · 010←001,002,003,004,007. Dosya çakışması YOK (her task ayrı filesWrite). Hepsi opt-in/additive/fail-safe + i18n (en+tr) + davranış-korunumlu. CC sprint sonu: tsc + testler + dashboard-tsc + Tier-1 smoke (/mcp, start --dry-run) + commit/push + build:all (CC) + notlar. Sonraki: K-küme.
+**Beklenen:** 3 audit task (opus 2 · sonnet 1), hepsi Wave-1 paralel (deps yok), dosya çakışması yok (her task kendi raporu), KOD DEĞİŞİKLİĞİ YOK. CC sprint-sonu: 3 raporu sentezleyip Alperen'le analiz.

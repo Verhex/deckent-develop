@@ -7698,3 +7698,27 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 280-010: MASTER-PLAN — §4G L-küme işaretleri (NO_GO)
 
 ---
+## Sprint 281 — sprint-281
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-06-11
+**Duration:** 608s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 3 |
+| Completed | 3 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 608420ms |
+
+### Tasks
+
+- 281-001: Mimari & Eşzamanlılık Doğruluğu Denetimi (DONE)
+- 281-002: Adversarial Kırmızı-Takım — Tasarımı Kır (DONE)
+- 281-003: Ürün & User/Enterprise Perspektifi Denetimi (DONE)
+
+---

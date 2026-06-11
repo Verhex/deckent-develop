@@ -39,6 +39,11 @@
 
 ## Active ADR Constraints
 
+- **ADR-068**: Enterprise Foundation — Audit Query + Multi-Tenant + Scheduled Flows — **Status:** accepted
+- **ADR-069**: Event-Driven Triggers + RBAC — F3 Webhook & F4 Role-Based Access Control — **Status:** accepted
+- **ADR-008**: Brain Merkezi Import — Tek Yönlü Bağımlılık — **Status:** accepted
+- **ADR-087**: Async I/O & Test Hermeticity Standard — **Status:** accepted
+- **ADR-089**: Backend-Agnostic Worker Observation + Per-Worker Independent Backends — **Status:** accepted
 - **ADR-086**: Native CLI Parity — F11 Feature Set (Sprint 224) — **Status:** accepted
 - **ADR-083**: REPL-UX-Evolution + Provider-Parity + Local-Model-Foundation — **Status:** accepted
 - **ADR-082**: Native-LLM-Wire + Nervous-Activation + Dashboard-v2 Canlı — **Status:** accepted
@@ -52,6 +57,7 @@
 - **ADR-074**: Native Chat Real Round-Trip + Enterprise RBAC/Audit/Rate + F5 Evolution Wire — **Status:** accepted
 - **ADR-073**: Routing Live Validation + FIX Prompt Enrichment + Dashboard Control Plane — **Status:** accepted
 - **ADR-072**: Agent Routing Balance (Multi-Signal Scoring) + Dashboard API Auth Hardening — **Status:** accepted
+- **ADR-071**: F3 Autonomous Mode (Self-Dispatch Guard) + F4 Enterprise RBAC/Tenant/Audit — **Status:** accepted
 - **ADR-070**: Brain Evaluation Integrity — Signal-Based Coverage Exemption + Zero-Hard-Code Principle — **Status:** accepted
 - **ADR-066**: Provider Independence — Multi-Provider Backend Parity — **Status:** accepted
 - **ADR-065**: Develop / Product Two-Repo Split — **Status:** accepted
@@ -92,20 +98,19 @@
 - **ADR-017**: MCP-Native Provider Adapters (Sprint 045) — **Status:** accepted
 - **ADR-014**: .deck Secret File System (Sprint 044) — **Status:** accepted
 - **ADR-015**: TaskRouter Module — 6-level routing (Sprint 044) — **Status:** accepted
-- **ADR-016**: Connector Module — provider lifecycle (Sprint 044) — **Status:** accepted
-- **ADR-020**: Rich Sprint Output — 7-section summary (Sprint 044) — **Status:** accepted
+- **ADR-016**: External Messaging Connectors (Discord / Telegram / WhatsApp + Bot) — **Status:** accepted
+- **ADR-020**: Rich Sprint Output — multi-section summary (Sprint 044) — **Status:** accepted
 - **ADR-021**: Kraken ASCII Brand Identity (Sprint 044) — **Status:** accepted
 - **ADR-013**: DECKENT.md Adapter Pattern (Sprint 15) — **Status:** accepted
 - **ADR-001**: TypeScript + ESM — **Status:** accepted
 - **ADR-002**: Node16 Module Resolution — **Status:** accepted
 - **ADR-003**: vitest over Jest — **Status:** accepted
-- **ADR-004**: 3-Layer Config Merge — **Status:** accepted
+- **ADR-004**: Layered Config Merge (defaults → global → project → env) — **Status:** accepted
 - **ADR-006**: spawnSync Security Pattern — **Status:** accepted
 - **ADR-007**: SpawnOptions Interface — **Status:** accepted
-- **ADR-008**: Brain Merkezi Import — Tek Yönlü Bağımlılık — **Status:** accepted
-- **ADR-009**: DEBT.md Markdown Tablo Formatı — **Status:** accepted
 - **ADR-011**: node:readline/promises — Built-in Prompt — **Status:** accepted
 - **ADR-012**: register\<Name\>(program) Pattern — **Status:** accepted
+- **ADR-088**: Memory V2 — DB-First Architecture — **Status:** accepted
 <!-- AUTO-END -->
 
 <!-- CUSTOM-START -->

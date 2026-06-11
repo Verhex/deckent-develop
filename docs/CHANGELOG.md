@@ -2,6 +2,17 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint281] - 2026-06-11
+
+### Added
+
+- Mimari & Eşzamanlılık Doğruluğu Denetimi
+- Adversarial Kırmızı-Takım — Tasarımı Kır
+- Ürün & User/Enterprise Perspektifi Denetimi
+
+
+_Tasks: 3 total, 3 done, 0 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint280] - 2026-06-11
 
 ### Added
