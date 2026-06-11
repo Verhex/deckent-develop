@@ -573,9 +573,15 @@ export async function spawnWorkers(
     // Sprint 280 root-cause fix: compute + emit the adaptive per-task timeout and
     // pass it to the spawn backend below as `taskTimeoutSeconds`, so docker_timeout
     // is the FALLBACK (not the de-facto ~20min cap). emitTimeoutEvents was dormant.
-    const taskTimeoutSeconds = emitTimeoutEvents(
-      task, config, NO_SPRINT_HISTORY, projectRoot, getCurrentSprintId(projectRoot) ?? sprint.id,
-    );
+    // Fail-safe: the estimate is best-effort — any fault (e.g. a partial config
+    // with no `timeout` block) must NOT abort the spawn; leave taskTimeoutSeconds
+    // undefined so the backend uses its static docker_timeout fallback.
+    let taskTimeoutSeconds: number | undefined;
+    try {
+      taskTimeoutSeconds = emitTimeoutEvents(
+        task, config, NO_SPRINT_HISTORY, projectRoot, getCurrentSprintId(projectRoot) ?? sprint.id,
+      );
+    } catch (e) { debugLog('spawn:timeoutEstimate', e); }
     let adapterRouted = wantsHostAdapter
       ? getProviderAdapterForTask(taskProvider)
       : null;
@@ -818,9 +824,15 @@ export async function respawnEligibleTasks(
     // Sprint 280 root-cause fix: compute + emit the adaptive per-task timeout and
     // pass it to the spawn backend below as `taskTimeoutSeconds`, so docker_timeout
     // is the FALLBACK (not the de-facto ~20min cap). emitTimeoutEvents was dormant.
-    const taskTimeoutSeconds = emitTimeoutEvents(
-      task, config, NO_SPRINT_HISTORY, projectRoot, getCurrentSprintId(projectRoot) ?? sprint.id,
-    );
+    // Fail-safe: the estimate is best-effort — any fault (e.g. a partial config
+    // with no `timeout` block) must NOT abort the spawn; leave taskTimeoutSeconds
+    // undefined so the backend uses its static docker_timeout fallback.
+    let taskTimeoutSeconds: number | undefined;
+    try {
+      taskTimeoutSeconds = emitTimeoutEvents(
+        task, config, NO_SPRINT_HISTORY, projectRoot, getCurrentSprintId(projectRoot) ?? sprint.id,
+      );
+    } catch (e) { debugLog('spawn:timeoutEstimate', e); }
     let adapterRouted = wantsHostAdapter
       ? getProviderAdapterForTask(taskProvider)
       : null;
