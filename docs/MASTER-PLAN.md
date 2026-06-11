@@ -627,19 +627,25 @@ AS-2 §4A (ollama worker = ön-koşul, host-adapter routing) · AS-5 §4C (on-pr
 
 ## 4I. Resource Arbiter — İzin-Önce-Eylem Kaynak Hakemi (admission control) (🆕 2026-06-11)
 
-> **Tasarım onaylı — 2026-06-11 (Alperen + CC brainstorm).** 8 worker aynı anda tam vitest koşarsa makine kilitlenir (resource-log kanıtlı; RAM'den önce CPU/IO aşırı-aboneliği kilitler — `tierBasedMaxWorkers` worker SAYISINI sınırlıyor, spawn edilmişlerin aynı anda NE çalıştırdığı serbest). Tespit-sonra-müdahale bu hata sınıfında matematiksel geç → **izin-önce-eylem**: korumalı komut sınıfları (heavy-test, package-install, native-build, db-migration…) lease almadan exec olamaz; FIFO + sıra numarası. Spec: `docs/superpowers/specs/2026-06-11-resource-arbiter-design.md` · ADR-090 önerisi impl sprint'inde yazılacak.
+> **Tasarım v2 onaylı — 2026-06-11 (Alperen + CC brainstorm + 6-rapor denetimi).** 8 worker aynı anda tam vitest koşarsa makine kilitlenir (resource-log kanıtlı; RAM'den önce CPU/IO aşırı-aboneliği — `tierBasedMaxWorkers` worker SAYISINI sınırlıyor, aynı anda NE çalıştırdıkları serbest; tehlike sınıf-içi + **sınıf-çaprazı**). Tespit-sonra-müdahale matematiksel geç → **izin-önce-eylem**: korumalı komut sınıfları lease almadan exec olamaz. Spec v2: `docs/superpowers/specs/2026-06-11-resource-arbiter-design.md` (6 denetim sonrası mekanizma yeniden kuruldu) · ADR-090 impl sprint'inde.
 
-### Kararlar (brainstorm)
-K1 **hard gate V1** (PATH-shim, 3 backend — ADR-037 advisory dersi) · K2 **bekleme saati dondurur** (hb `WAITING_LEASE`, sentetik-NO_GO ailesine üye eklenmez) · K3 **dosya-tabanlı + `LeaseBackend` arayüzü** (`.locks` deseni, daemon'suz, AS-7 offline-uyumlu; enterprise API backend V2'de aynı arayüze) · K4 **hakem deterministik kod, LLM değil** (Brain politika koyar, çekirdek uygular).
+### Denetim (6 bağımsız, körleme): `docs/reviews/resource-arbiter-spec/`
+sprint-281 (opus architect/security-auditor + sonnet architecture-planner) + 3 Fable sub-agent. Verdict: **3 REWORK + 3 APPROVE_WITH_CHANGES**. Çapraz-yakınsayan P0'lar v1'i devirdi: npm/npx PATH-shim bypass · seq atomikliği yok · exec+trap release çalışmaz · K2 container-timeout'ta uygulanamaz · ürün-modunda shim→arbiter köprüsü (Dockerfile.worker'da deckent yok).
+
+### Kararlar v2 (K5-K8 yeni)
+K1 hard-gate (kapsama matrisi, "fiziken imkânsız" overclaim'i geri çekildi) · K2 saat-donması (host-ledger muhasebesi, hb'ye yazım YOK) · K3 dosya-tabanlı+arayüz · K4 deterministik hakem · **K5 Host-Hakem + İnce-İstemci** (tüm karar host'ta tek süreçte → seq/TOCTOU/çift-grant yarışları kökten yok; import'suz `arbiter-client.mjs` → üründe deckent'siz container'da çalışır) · **K6 iki-seviyeli kapasite** (sınıf + global `heavy` havuzu — sınıf-çaprazı) · **K7 tek doğruluk=host ledger** (hb dual-writer/sahte-WAITING sınıfı yok) · **K8 fail-open katmanlı** (bozuk→fail-degraded havuz=1+alarm; reject→fail-closed).
+
+### Enforcement kapsama matrisi (§8)
+PM-shim (npm/npx/yarn script-gövdesi eşleme) + NODE_OPTIONS preload (node_modules/.bin doğrudan + login-shell PATH-reset'e dayanıklı, re-entrancy `DECKENT_LEASE_HELD`) + binary PATH-shim (make/cargo, `binaries:[]` allow-list — regex'ten ad türetme yok) + belgelenmiş bilinen-delikler. Tehdit modeli: A1 dürüst-worker birincil hedef; **A3 kötü-niyetli + A4 korumasız-katılımcı açık Non-Goal V1** (ADR-037 güven modeliyle tutarlı).
 
 ### Bileşenler (V1)
-`src/core/resource-arbiter.ts` (FileLeaseBackend, `.deckent/leases/`, atomik rename promotion, TTL+stale-temizlik) · `src/core/resource-classes.ts` (parametrik sınıflar, `capacity:"auto"` host-detector formülü — zero-hard-code, stack profilleri JSON-veri: TS built-in, python/c++/ERP veri-eklenir) · `src/orchestra/lease-shim.ts` (spawn-time shim üretici) · watchdog/Auditor saat-donması kontratı · PROGRESS/notify görünürlük (280-001/002 üstüne) · `deckent lease ls|release|clear` CLI · **fail-open ilkesi** (arbiter hatası ana akışı asla düşürmez).
+`resource-arbiter.ts` (host-hakem: ledger/grant/probe-reap/queue.json, async) · `resource-classes.ts` (şema+doğrulama, `capacity:"auto"` host'ta bir-kez snapshot, `pool`, `enabled:false`, ttl:null rezerve) · `lease-shim.ts` (PM-shim/preload/binary-shim/arbiter-client üretimi + 3-backend env enjeksiyonu) · ArbiterLoop (result-collector tick + startArbiterLoop; PROGRESS/notify emit host'ta) · K2-v2 (host aktif-süre muhasebesi + container backstop timeout) · `deckent lease ls|release|clear|test` · status+.dashboard kuyruk satırı · config yazım-anı doğrulama · L1 dispatch-deferral + reject-sınıfı eş-dispatch yasağı.
 
 ### Genelleme & V2
-ERP/iş kaynakları aynı primitive (`erp.material.<lot>` capacity-1 → "2 agent aynı malzemeyle mamul" çözülür; `tenant` alanı şemada rezerve) · **öğrenme döngüsü:** nervous detector (resource-log + exit-137/timeout forensiği) → kural önerisi → accept/**edit**/reject (APPROVE-007b) → `resource_classes` · V2: REPL/autonomous wire, max-wait→Brain devri, tenant/API backend, çoklu-lease, öncelik, dashboard kuyruk paneli, #3-mesh cross-machine.
+Otonom task/sprint V1'de spawn-yolu mirasıyla **kapsamda** (capability-dispatch iş-kaynağı lease'i V2) · ERP `erp.material.<lot>` explicit-release semantiği V2 (TTL iş-süreci ölçeğiyle uyumsuz) · öğrenme döngüsü: nervous detector→kural önerisi→**şema-gate (ReDoS/denylist)**→accept/edit/reject→`resource_classes` · V2: A3/A4 sertleştirme (RO-mount/HMAC/host-scoped store/shell-init), coalesce, öncelik, Brain-devri, dashboard panel, cross-machine (#3-mesh), REPL (tetik: ADR-081 bash tool).
 
 ### Çapraz ref
-§4G (PLANOBS PROGRESS/notify altyapısı = görünürlük taşıyıcısı) · §4H AS-7 (offline-uyum) · ADR-008/010/037/045/064/079/087 · #ERP · Memory: `project_human_interaction_wire_gap` · `feedback_docker_oom_false_no_go` (sentetik-NO_GO ailesi).
+§4G (PROGRESS/notify altyapısı) · §4H AS-7 (offline+profil-dağıtımı paket-içi, uzak yok) · ADR-008/010/037/045/064/070/079/087 · #ERP · Memory: `project_human_interaction_wire_gap` · `feedback_docker_oom_false_no_go` · `feedback_dual_perspective_dogfood_product` (kullanıcı-projesi smoke = dogfood-körlüğü gate'i).
 
 ---
 
