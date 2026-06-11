@@ -143,7 +143,12 @@ export function createNervousSystemIfEnabled(
   // silently discarded.
   const ipcQueue = deps.ipcQueue ?? new NervousIpcQueue(projectRoot);
   const pollHandle = ipcQueue.startPolling((req) => {
-    executor.resolveApproval(req.notificationId, req.decision);
+    // Sprint 280 APPROVE-007b live-path glue: forward the optional modifiedPayload
+    // so a `/nervous edit <id> ...` (chat-nervous-bridge → writeApproval) actually
+    // reaches the executor's payload-merge on accept. Without this the edited
+    // payload was carried through the IPC file but dropped here at the poller —
+    // the transport (003) + REPL surface (008) were built but not end-to-end live.
+    executor.resolveApproval(req.notificationId, req.decision, { modifiedPayload: req.modifiedPayload });
   });
 
   // APPROVE-007 (§4G): heartbeat so a separate `deckent nervous accept` process
