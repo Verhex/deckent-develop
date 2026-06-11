@@ -996,6 +996,20 @@ Mevcut projeler `.deckent/docs.json` oluşturmadan bu sistemi kullanmaz — back
 
 ---
 
+**🔴 Amendment — 2026-06-11 (ADR-review): i18n LOCALE-LEAK root cause + fix (recurring K/O bug).**
+
+**Symptom:** every sprint's RETRO render writes **Turkish** section headers/content into **English** managed docs (`CLAUDE.md`, `AGENTS.md`, `VISION.md`, `beta-tracker.md`, `blueprint.md`) — e.g. `Metric|Value`→`Metrik|Değer`, `Total Tasks`→`Toplam Task`. Manually reverted every sprint (Sprint 279/280).
+
+**Root cause (code-confirmed):** `src/orchestra/managed-docs/content-generators.ts:67` → `return ctx.config?.language === 'tr' ? TR : EN;` — generators pick content language from the **project-default locale** (`ctx.config.language`, =`tr` for deckent-dev), **NOT the target language of the doc being written**. `ManagedDocEntry` has `patternsByLang` (for matching section titles in multiple languages) but **no `lang` field** for the doc's target language. In `.deckent/docs.json`, `vision-en` (VISION.md) and `vision-tr` (VISION-TR.md) are separate entries but both have `lang=None` → both render TR → the EN one leaks.
+
+**Fix (two parts):**
+1. **Per-doc locale (this ADR — ADR-029-W):** add a `lang` field to `ManagedDocEntry`; generators use `entry.lang ?? ctx.config.language` so each doc renders in ITS target language. Set `vision-en.lang='en'`, `vision-tr.lang='tr'`, `beta-tracker.lang='en'`, `blueprint.lang='en'`, etc. → EN docs render EN, TR docs render TR.
+2. **Pure-adapter exclusion (ADR-013-W):** `CLAUDE.md`/`AGENTS.md` are adapters, not managed docs — remove from `docs.json` entirely (ADR-013 option A). 
+
+Together these end the recurring leak at the root. Tracked: MASTER-PLAN "ADR-Analizi Türetilen İşler → ADR-029-W" (+ ADR-013-W). md+db senkron.
+
+---
+
 
 ---
 
@@ -1061,6 +1075,10 @@ Güvenlik kararı: JSON generator'lar `loadUserGeneratorsSync()` ile sync olarak
 - Güvenlik notu: MJS loader gelecekte `src/core/plugin-loader.ts` SkillSandbox entegrasyonuyla güçlendirilebilir (Sprint 133 Task 1)
 
 > **Note (verified):** Confirmed in code — `src/orchestra/managed-docs/template-renderer.ts` and `plugin-loader.ts` exist (two-layer render pipeline as described). Behavior unchanged; documentation alignment + repo-migration cleanup only (dead old-repo commit SHA removed).
+
+---
+
+**Amendment log — 2026-06-11 (ADR-review, security status):** The flagged MJS arbitrary-code risk (Consequences −) is currently **latent, not active**: `loadUserGeneratorsAsync()` (the MJS/executable loader) is **NOT wired into the sprint pipeline** (`plugin-loader.ts:70` — "not currently wired … reserved for CLI `docs run --with-plugins`"). Only the safe **JSON declarative** loader (`loadUserGeneratorsSync`) runs in-sprint. **Guard for the future:** if MJS executable generators are ever wired (the reserved `--with-plugins` path), the SkillSandbox integration (Sprint 133 ref) MUST land first — no unsandboxed MJS in the sprint pipeline. md+db senkron (Alperen ADR-review).
 
 ---
 
@@ -1215,6 +1233,16 @@ Dil konfigürasyonu: `.deckent/config.json`'da `"language": "tr"` veya `"en"`. `
 
 ---
 
+**🔴 Amendment — 2026-06-11 (ADR-review): Layer-2 = locale-leak root + definitive per-language separation principle (Alperen).**
+
+**Finding:** Layer 2's `i18n(ctx)` = `ctx.config?.language === 'tr' ? TR : EN` chooses content language from the **project-default locale**, NOT the **target language of the doc being rendered**. In a TR-default project this writes Turkish headers/content into **English** docs (CLAUDE.md/AGENTS.md/VISION.md/beta-tracker.md/blueprint.md) — the recurring locale-leak (same root identified in ADR-029). Layer 1 (`patternsByLang`, language-agnostic matching) is fine; Layer 2 (content generation) is the leak.
+
+**Principle (Alperen 2026-06-11):** **Kesin dil-ayrımı.** Multi-language projects are allowed (some docs EN, some TR — `vision-en` + `vision-tr`), but **in the selected language the entire flow must be flawless** — never mixed TR/EN within one doc. Each doc/flow renders cleanly in ITS OWN declared language.
+
+**Fix:** `i18n()` (and all generators) must honor **per-doc language**: `entry.lang ?? ctx.config.language`. Each `ManagedDocEntry` declares its `lang`; the render is flawless in that language. Tracked: ADR-029-W + ADR-013-W (CLAUDE/AGENTS → pure adapters). This is the i18n-quality bar ([[feedback_god_level_i18n_quality_bar]]) applied to managed-docs. md+db senkron.
+
+---
+
 
 ---
 
@@ -1327,6 +1355,22 @@ Bu karar aşağıdaki yönlerin öncelikli geliştirme alanları olduğunu teyit
 
 ---
 
+## Amendment — Sprint 281 (2026-06-11, Alperen): Modüler-lisans rafinmanı (MOD-SPLIT) — İHLAL DEĞİL
+
+ADR-033'ün 4 dokunulamaz çekirdek ilkesi (product-not-service, kur-çalıştır-kolay, herkese-her-yerde, local-first/privacy) **AYNEN GEÇERLİDİR.** Tek rafine edilen boyut **lisanslama yapısı**:
+
+**Karar (rafine):** deckent **TEK ürün, TEK kod tabanı** olarak devam eder ("böyle başladık böyle devam edeceğiz"). Enterprise yetenekleri **ayrı ürün/fork DEĞİL** — **aynı kod tabanında modüler, eklenebilir bir katman** (`core` + `enterprise-layer`). Lisans yapısı:
+- **Community çekirdek: MIT, ücretsiz** (değişmedi — tüm bireysel/temel kullanım).
+- **Enterprise modül: FARKLI lisanslı** (MIT değil) — ama **aynı kod tabanında modüler katman**, lisansla eklenir/etkinleşir. 
+
+**Bu bir ADR-033 ihlali DEĞİLDİR:** "Enterprise edition yasak" satırının asıl gerekçesi **"iki kod tabanı + topluluk bölünmesi"** idi — bu rafinman **tam tersine tek-kod-tabanını korur** (ayrı repo/fork yok, modüler katman). "Paywall" community çekirdeği değil yalnız enterprise-modülü kapsar; bireysel kullanıcı için hiçbir şey ödeme-duvarı arkasına geçmez.
+
+**Güncellenen YASAK/İZİN:** "Enterprise edition (ayrı kod tabanı)" → hâlâ YASAK (ayrı kod tabanı/fork yok). "Enterprise modül (aynı kod tabanı, farklı lisans)" → İZİNLİ (yeni). SaaS/cloud-hosted/vendor-lock-in → hâlâ YASAK (değişmedi).
+
+İş planı: MASTER-PLAN §8 MOD-SPLIT bu yapıya göre güncellendi (aynı kod tabanı + modüler enterprise-layer + farklı lisans). Cross-ref: [[project_community_pro_split_strategy]], [[project_product_repo_migration_push]], ADR-034 (multi-project ≠ multi-tenant). md+db senkron.
+
+---
+
 
 ---
 
@@ -1406,7 +1450,7 @@ Sprint 133'te implementasyonu tamamlanan sistem:
 | `brain_planning` | Global OR Project | Proje override'ı tercih edilir |
 | `min_tier`, `mode_preset` | Global OR Project | Proje override'ı tercih edilir |
 | `OPENAI_API_KEY`, `GOOGLE_API_KEY` | Environment | İşletim sistemi env var, config'de saklanmaz |
-| `telemetry_enabled` | Hard-coded FALSE | ADR-033 gereği her zaman false |
+| `telemetry_enabled` | Global OR Project (default **false**) | **Opt-in, default-OFF** — settable boolean (`config.ts:1862`, `options:['true','false']`), DASHBOARD'da `PLANNED_CATEGORY`. ⚠️ "hard-coded/always-false" DEĞİL (2026-06-11 düzeltme). Phone-home garantisi **sender-yokluğundan** gelir — bkz. amendment. |
 | `verify_loop` | Project | Proje-özgü, global default true |
 | `auto_archive_directives` | Project | Proje-özgü |
 | Agent/skill pool | Project | Per-project `.deckent/agents/`, `.deckent/skills/` |
@@ -1453,6 +1497,17 @@ API anahtarları config dosyalarında saklanmaz — environment variable olarak 
 > - **Katman 3 (symlink-aware scope) — accuracy correction:** The symlink resolution **is** implemented — `isWithinScope()` (`src/agents/worker.ts`) calls `realpathSync()` and returns a **boolean**. However, it does **not** itself throw `ScopeViolationError`, and per **ADR-037 V1.0** runtime scope enforcement is **advisory/soft** (a violation is warned + event-emitted but does **not** hard-block; hard-flip is post-GA V2 — see `docs/architecture/authority-matrix.md`). Therefore "vulnerability is closed / `ScopeViolationError` thrown / blocks" describes the **design intent**, not the current runtime guarantee.
 >
 > Behavior unchanged; documentation alignment only. (An unrelated, stale "Büyük Dosya Split Analizi (Sprint 130)" appendix — long since completed via ADR-024/026 — was removed from this ADR.)
+
+---
+
+**🔴 Amendment — 2026-06-11 (ADR-review, Katman-4 accuracy correction): telemetry "hard-coded false" → settable opt-in (default-off), no sender wired.**
+
+The Layer-4 config-boundary table previously said `telemetry_enabled: Hard-coded FALSE | ADR-033 gereği her zaman false`. **This was inaccurate** (caught during a too-shallow first-pass review). Verified vs code:
+- `telemetry_enabled` is a **settable boolean config field** — `config.ts:1862` `{ type:'boolean', default:false, options:['true','false'], category:'Telemetry' }` (+ a `telemetry_anonymous` sibling). It is **default-OFF opt-in**, NOT hard-coded/always-false. The dashboard ConfigPage lists it under **`PLANNED_CATEGORY`** (`ConfigPage.tsx:135`).
+- **No telemetry SENDER is wired** — `grep` finds zero `sendTelemetry`/phone-home/network call gated on `telemetry_enabled`; the only consumers are the config schema + dashboard UI + i18n. So **deckent does not phone home today regardless of the flag** — the privacy guarantee currently holds via *absence of a sender*, NOT via a hard-coded-false flag.
+- **Forward:** the actual opt-in telemetry is **FB-1** (MASTER-PLAN §S — "deckent self-operation feedback loop, opt-in, ships OFF, explicit consent, operation-metrics-only, never project content"). When FB-1 is built, it MUST respect default-off + consent (ADR-063 consent-based) + the air-gapped/never-phone-home pillar ([[project_air_gapped_offline_pillar]]). API keys remain env-only (config references the var NAME, never stores the value — `config.ts:425/1798`).
+
+**Correct statement:** privacy/no-phone-home is preserved (no sender), but the mechanism is "no telemetry transport implemented + default-off opt-in flag", not "hard-coded false". ADR-033's never-phone-home intent holds via this. md+db senkron (Alperen ADR-review — first pass was shallow, re-verified all 4 layers).
 
 
 ---

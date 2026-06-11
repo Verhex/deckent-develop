@@ -57,3 +57,17 @@ Mevcut projeler `.deckent/docs.json` oluşturmadan bu sistemi kullanmaz — back
 > **Note (verified):** Managed-docs system confirmed in code — `src/orchestra/managed-docs/` (incl. `docs-config.ts`) exists and `.deckent/docs.json` is present. Behavior unchanged; documentation alignment + repo-migration cleanup only (dead old-repo commit SHA removed).
 
 ---
+
+**🔴 Amendment — 2026-06-11 (ADR-review): i18n LOCALE-LEAK root cause + fix (recurring K/O bug).**
+
+**Symptom:** every sprint's RETRO render writes **Turkish** section headers/content into **English** managed docs (`CLAUDE.md`, `AGENTS.md`, `VISION.md`, `beta-tracker.md`, `blueprint.md`) — e.g. `Metric|Value`→`Metrik|Değer`, `Total Tasks`→`Toplam Task`. Manually reverted every sprint (Sprint 279/280).
+
+**Root cause (code-confirmed):** `src/orchestra/managed-docs/content-generators.ts:67` → `return ctx.config?.language === 'tr' ? TR : EN;` — generators pick content language from the **project-default locale** (`ctx.config.language`, =`tr` for deckent-dev), **NOT the target language of the doc being written**. `ManagedDocEntry` has `patternsByLang` (for matching section titles in multiple languages) but **no `lang` field** for the doc's target language. In `.deckent/docs.json`, `vision-en` (VISION.md) and `vision-tr` (VISION-TR.md) are separate entries but both have `lang=None` → both render TR → the EN one leaks.
+
+**Fix (two parts):**
+1. **Per-doc locale (this ADR — ADR-029-W):** add a `lang` field to `ManagedDocEntry`; generators use `entry.lang ?? ctx.config.language` so each doc renders in ITS target language. Set `vision-en.lang='en'`, `vision-tr.lang='tr'`, `beta-tracker.lang='en'`, `blueprint.lang='en'`, etc. → EN docs render EN, TR docs render TR.
+2. **Pure-adapter exclusion (ADR-013-W):** `CLAUDE.md`/`AGENTS.md` are adapters, not managed docs — remove from `docs.json` entirely (ADR-013 option A). 
+
+Together these end the recurring leak at the root. Tracked: MASTER-PLAN "ADR-Analizi Türetilen İşler → ADR-029-W" (+ ADR-013-W). md+db senkron.
+
+---

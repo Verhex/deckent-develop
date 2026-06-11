@@ -70,7 +70,7 @@ Sprint 133'te implementasyonu tamamlanan sistem:
 | `brain_planning` | Global OR Project | Proje override'ı tercih edilir |
 | `min_tier`, `mode_preset` | Global OR Project | Proje override'ı tercih edilir |
 | `OPENAI_API_KEY`, `GOOGLE_API_KEY` | Environment | İşletim sistemi env var, config'de saklanmaz |
-| `telemetry_enabled` | Hard-coded FALSE | ADR-033 gereği her zaman false |
+| `telemetry_enabled` | Global OR Project (default **false**) | **Opt-in, default-OFF** — settable boolean (`config.ts:1862`, `options:['true','false']`), DASHBOARD'da `PLANNED_CATEGORY`. ⚠️ "hard-coded/always-false" DEĞİL (2026-06-11 düzeltme). Phone-home garantisi **sender-yokluğundan** gelir — bkz. amendment. |
 | `verify_loop` | Project | Proje-özgü, global default true |
 | `auto_archive_directives` | Project | Proje-özgü |
 | Agent/skill pool | Project | Per-project `.deckent/agents/`, `.deckent/skills/` |
@@ -117,3 +117,14 @@ API anahtarları config dosyalarında saklanmaz — environment variable olarak 
 > - **Katman 3 (symlink-aware scope) — accuracy correction:** The symlink resolution **is** implemented — `isWithinScope()` (`src/agents/worker.ts`) calls `realpathSync()` and returns a **boolean**. However, it does **not** itself throw `ScopeViolationError`, and per **ADR-037 V1.0** runtime scope enforcement is **advisory/soft** (a violation is warned + event-emitted but does **not** hard-block; hard-flip is post-GA V2 — see `docs/architecture/authority-matrix.md`). Therefore "vulnerability is closed / `ScopeViolationError` thrown / blocks" describes the **design intent**, not the current runtime guarantee.
 >
 > Behavior unchanged; documentation alignment only. (An unrelated, stale "Büyük Dosya Split Analizi (Sprint 130)" appendix — long since completed via ADR-024/026 — was removed from this ADR.)
+
+---
+
+**🔴 Amendment — 2026-06-11 (ADR-review, Katman-4 accuracy correction): telemetry "hard-coded false" → settable opt-in (default-off), no sender wired.**
+
+The Layer-4 config-boundary table previously said `telemetry_enabled: Hard-coded FALSE | ADR-033 gereği her zaman false`. **This was inaccurate** (caught during a too-shallow first-pass review). Verified vs code:
+- `telemetry_enabled` is a **settable boolean config field** — `config.ts:1862` `{ type:'boolean', default:false, options:['true','false'], category:'Telemetry' }` (+ a `telemetry_anonymous` sibling). It is **default-OFF opt-in**, NOT hard-coded/always-false. The dashboard ConfigPage lists it under **`PLANNED_CATEGORY`** (`ConfigPage.tsx:135`).
+- **No telemetry SENDER is wired** — `grep` finds zero `sendTelemetry`/phone-home/network call gated on `telemetry_enabled`; the only consumers are the config schema + dashboard UI + i18n. So **deckent does not phone home today regardless of the flag** — the privacy guarantee currently holds via *absence of a sender*, NOT via a hard-coded-false flag.
+- **Forward:** the actual opt-in telemetry is **FB-1** (MASTER-PLAN §S — "deckent self-operation feedback loop, opt-in, ships OFF, explicit consent, operation-metrics-only, never project content"). When FB-1 is built, it MUST respect default-off + consent (ADR-063 consent-based) + the air-gapped/never-phone-home pillar ([[project_air_gapped_offline_pillar]]). API keys remain env-only (config references the var NAME, never stores the value — `config.ts:425/1798`).
+
+**Correct statement:** privacy/no-phone-home is preserved (no sender), but the mechanism is "no telemetry transport implemented + default-off opt-in flag", not "hard-coded false". ADR-033's never-phone-home intent holds via this. md+db senkron (Alperen ADR-review — first pass was shallow, re-verified all 4 layers).

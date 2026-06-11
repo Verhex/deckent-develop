@@ -58,3 +58,7 @@ Güvenlik kararı: JSON generator'lar `loadUserGeneratorsSync()` ile sync olarak
 > **Note (verified):** Confirmed in code — `src/orchestra/managed-docs/template-renderer.ts` and `plugin-loader.ts` exist (two-layer render pipeline as described). Behavior unchanged; documentation alignment + repo-migration cleanup only (dead old-repo commit SHA removed).
 
 ---
+
+**Amendment log — 2026-06-11 (ADR-review, security status):** The flagged MJS arbitrary-code risk (Consequences −) is currently **latent, not active**: `loadUserGeneratorsAsync()` (the MJS/executable loader) is **NOT wired into the sprint pipeline** (`plugin-loader.ts:70` — "not currently wired … reserved for CLI `docs run --with-plugins`"). Only the safe **JSON declarative** loader (`loadUserGeneratorsSync`) runs in-sprint. **Guard for the future:** if MJS executable generators are ever wired (the reserved `--with-plugins` path), the SkillSandbox integration (Sprint 133 ref) MUST land first — no unsandboxed MJS in the sprint pipeline. md+db senkron (Alperen ADR-review).
+
+---

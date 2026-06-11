@@ -102,3 +102,19 @@ Bu karar aşağıdaki yönlerin öncelikli geliştirme alanları olduğunu teyit
 - ADR-008: Module Import Rules — brain/worker sınır disiplini tek-kod-tabanı product kimliğini güçlendirir (SaaS servis katmanına ihtiyaç bırakmaz, community fork'lar aynı sınırları korur)
 
 ---
+
+## Amendment — Sprint 281 (2026-06-11, Alperen): Modüler-lisans rafinmanı (MOD-SPLIT) — İHLAL DEĞİL
+
+ADR-033'ün 4 dokunulamaz çekirdek ilkesi (product-not-service, kur-çalıştır-kolay, herkese-her-yerde, local-first/privacy) **AYNEN GEÇERLİDİR.** Tek rafine edilen boyut **lisanslama yapısı**:
+
+**Karar (rafine):** deckent **TEK ürün, TEK kod tabanı** olarak devam eder ("böyle başladık böyle devam edeceğiz"). Enterprise yetenekleri **ayrı ürün/fork DEĞİL** — **aynı kod tabanında modüler, eklenebilir bir katman** (`core` + `enterprise-layer`). Lisans yapısı:
+- **Community çekirdek: MIT, ücretsiz** (değişmedi — tüm bireysel/temel kullanım).
+- **Enterprise modül: FARKLI lisanslı** (MIT değil) — ama **aynı kod tabanında modüler katman**, lisansla eklenir/etkinleşir. 
+
+**Bu bir ADR-033 ihlali DEĞİLDİR:** "Enterprise edition yasak" satırının asıl gerekçesi **"iki kod tabanı + topluluk bölünmesi"** idi — bu rafinman **tam tersine tek-kod-tabanını korur** (ayrı repo/fork yok, modüler katman). "Paywall" community çekirdeği değil yalnız enterprise-modülü kapsar; bireysel kullanıcı için hiçbir şey ödeme-duvarı arkasına geçmez.
+
+**Güncellenen YASAK/İZİN:** "Enterprise edition (ayrı kod tabanı)" → hâlâ YASAK (ayrı kod tabanı/fork yok). "Enterprise modül (aynı kod tabanı, farklı lisans)" → İZİNLİ (yeni). SaaS/cloud-hosted/vendor-lock-in → hâlâ YASAK (değişmedi).
+
+İş planı: MASTER-PLAN §8 MOD-SPLIT bu yapıya göre güncellendi (aynı kod tabanı + modüler enterprise-layer + farklı lisans). Cross-ref: [[project_community_pro_split_strategy]], [[project_product_repo_migration_push]], ADR-034 (multi-project ≠ multi-tenant). md+db senkron.
+
+---

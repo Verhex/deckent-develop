@@ -69,3 +69,13 @@ Dil konfigürasyonu: `.deckent/config.json`'da `"language": "tr"` veya `"en"`. `
 > **Note (verified):** `patternsByLang` is present in `src/orchestra/managed-docs/types.ts` and the `I18nStrings`/`EN`/`TR`/`i18n()` localization layer in `content-generators.ts` — the two-layer i18n design described above is confirmed in code. (Line numbers dropped — drift-prone.) Behavior unchanged; documentation alignment + repo-migration cleanup only (dead old-repo commit SHA removed).
 
 ---
+
+**🔴 Amendment — 2026-06-11 (ADR-review): Layer-2 = locale-leak root + definitive per-language separation principle (Alperen).**
+
+**Finding:** Layer 2's `i18n(ctx)` = `ctx.config?.language === 'tr' ? TR : EN` chooses content language from the **project-default locale**, NOT the **target language of the doc being rendered**. In a TR-default project this writes Turkish headers/content into **English** docs (CLAUDE.md/AGENTS.md/VISION.md/beta-tracker.md/blueprint.md) — the recurring locale-leak (same root identified in ADR-029). Layer 1 (`patternsByLang`, language-agnostic matching) is fine; Layer 2 (content generation) is the leak.
+
+**Principle (Alperen 2026-06-11):** **Kesin dil-ayrımı.** Multi-language projects are allowed (some docs EN, some TR — `vision-en` + `vision-tr`), but **in the selected language the entire flow must be flawless** — never mixed TR/EN within one doc. Each doc/flow renders cleanly in ITS OWN declared language.
+
+**Fix:** `i18n()` (and all generators) must honor **per-doc language**: `entry.lang ?? ctx.config.language`. Each `ManagedDocEntry` declares its `lang`; the render is flawless in that language. Tracked: ADR-029-W + ADR-013-W (CLAUDE/AGENTS → pure adapters). This is the i18n-quality bar ([[feedback_god_level_i18n_quality_bar]]) applied to managed-docs. md+db senkron.
+
+---
