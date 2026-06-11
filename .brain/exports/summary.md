@@ -6,12 +6,12 @@
 | adr-001 | TypeScript + ESM | accepted |
 | adr-002 | Node16 Module Resolution | accepted |
 | adr-003 | vitest over Jest | accepted |
-| adr-004 | 3-Layer Config Merge | accepted |
+| adr-004 | Layered Config Merge (defaults → global → project → env) | accepted |
 | adr-005 | Synchronous I/O | deprecated |
 | adr-006 | spawnSync Security Pattern | accepted |
 | adr-007 | SpawnOptions Interface | accepted |
 | adr-008 | Brain Merkezi Import — Tek Yönlü Bağımlılık | accepted |
-| adr-009 | DEBT.md Markdown Tablo Formatı | accepted |
+| adr-009 | DEBT.md Markdown Tablo Formatı | deprecated |
 | adr-010 | Tek Runtime Dependency — commander.js | accepted |
 | adr-011 | node:readline/promises — Built-in Prompt | accepted |
 | adr-012 | register\<Name\>(program) Pattern | accepted |
@@ -78,6 +78,8 @@
 | adr-082 | Native-LLM-Wire + Nervous-Activation + Dashboard-v2 Canlı | accepted |
 | adr-083 | REPL-UX-Evolution + Provider-Parity + Local-Model-Foundation | accepted |
 | adr-086 | Native CLI Parity — F11 Feature Set (Sprint 224) | accepted |
+| adr-087 | Async I/O & Test Hermeticity Standard | accepted |
+| adr-088 | Memory V2 — DB-First Architecture | accepted |
 
 ## Recent Learnings
 - **Sprint sprint-280 Learnings** (sprint-280): ## Sprint sprint-280 Learnings
@@ -145,4 +147,4 @@ _No active technical debt._
 - Violation pattern: stale_heartbeat
 - Violation pattern: stale_heartbeat
 
-_Total entries: 438 | Generated: 2026-06-11_
+_Total entries: 440 | Generated: 2026-06-11_

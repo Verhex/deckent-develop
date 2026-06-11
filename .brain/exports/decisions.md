@@ -12,9 +12,13 @@
 
 ---
 
-**Decision:** Use TypeScript with `"type": "module"` (ESM) as the project foundation.
-**Context:** Deckent is a Node.js CLI tool. ESM is the modern standard, supported by Node 18+.
-**Consequence:** All imports must use `.js` extensions. CommonJS interop via `esModuleInterop`.
+**Decision:** Use TypeScript with `"type": "module"` (ESM) as the project foundation. **Node 24+ is the validated runtime floor** (decided 2026-06-11).
+**Context:** Deckent is a Node.js CLI tool requiring **Node >=24** (`package.json` `engines: { node: ">=24.0.0" }`). ESM is the modern standard. Node 24+ ships `globalThis.fetch`, native test runner primitives, and the language features the codebase relies on.
+**Consequence:** All imports must use `.js` extensions. CommonJS interop via `esModuleInterop`. **Node 24+ is the single supported baseline — no `Node 18` references anywhere** (code comments, error messages, CI matrices, docs, agent/skill prompts). Version checks, fetch-availability notes, and CI must target Node 24+. See MASTER-PLAN "ADR-Analizi Türetilen İşler → ADR-001: Node 24+ tam-sweep".
+
+---
+
+**Amendment log:** 2026-06-11 — Node baseline 18+ → **24+** (Alperen kararı). `engines` zaten `>=24.0.0`; kalan `Node 18` referansları (≈8 src dosyası + CI) sweep ile temizlenecek (MASTER-PLAN iş-maddesi).
 
 
 ---
@@ -35,7 +39,13 @@
 **Context:** TypeScript 5.2+ requires these to match. Node16 resolution enforces `.js` extensions and `package.json` exports.
 **Consequence:** Explicit `.js` in all relative imports. No index file auto-resolution.
 
-**Note:** `Node16` here is the **TypeScript module-resolution mode name, not a Node.js runtime pin**. It selects Node's native ESM/CJS resolution algorithm — stable since Node 16 and identical in Node 18/20/22+. The project requires Node `>=18` (`package.json` `engines`) and runs on current Node. With TypeScript 5.x, `Node16` is functionally equivalent to `NodeNext` for this codebase (which uses only `.js`-extension ESM imports); `NodeNext` would simply track future Node resolution changes automatically.
+**Note:** `Node16` here is the **TypeScript module-resolution mode name, not a Node.js runtime pin**. It selects Node's native ESM/CJS resolution algorithm — stable since Node 16 and identical in Node 18/20/22/24+. The project requires Node `>=24` (`package.json` `engines`) and runs on current Node. With TypeScript 5.x, `Node16` is functionally equivalent to `NodeNext` for this codebase (which uses only `.js`-extension ESM imports); `NodeNext` simply tracks future Node resolution changes automatically.
+
+**Forward-looking decision (2026-06-11, Alperen):** Now that **Node 24+ is the validated floor** (ADR-001), migrate `module`/`moduleResolution` from `Node16` → **`nodenext`** so the resolver tracks the actual runtime instead of pinning a legacy mode name. Functionally equivalent for the current `.js`-ESM codebase (zero behavior change expected) but forward-correct. Tracked as MASTER-PLAN "ADR-Analizi Türetilen İşler → ADR-002-W".
+
+---
+
+**Amendment log:** 2026-06-11 — (1) Note baseline 18→24 (ADR-001 ile hizalı). (2) İleriye-dönük karar: `Node16` → `nodenext` migrasyonu (iş-maddesi ADR-002-W).
 
 
 ---
@@ -59,11 +69,11 @@
 
 ---
 
-## adr-004: 3-Layer Config Merge
+## adr-004: Layered Config Merge (defaults → global → project → env)
 
 **Status:** accepted
 
-# ADR-004: 3-Layer Config Merge
+# ADR-004: Layered Config Merge (defaults → global → project → env)
 
 **Status:** accepted
 
@@ -71,11 +81,15 @@
 
 ---
 
-**Decision:** Config loads in 3 layers: hardcoded defaults → `~/.deckent/config.json` → `.deckent/config.json`.
-**Context:** Users need global defaults (plan type, language) and per-project overrides.
-**Consequence:** `deepMerge` function handles nested object merge. Arrays are replaced, not merged. `undefined` values are skipped.
+**Decision:** Config loads in **layered precedence (4 effective layers, last wins):** hardcoded defaults → `~/.deckent/config.json` (global) → `.deckent/config.json` (project) → **environment-variable overrides** (env wins). Originally specified as 3 *file* layers; the runtime env-override layer makes 4 effective layers.
+**Context:** Users need global defaults (plan type, language), per-project overrides, and per-invocation env overrides (CI / one-off runs).
+**Consequence:** `deepMerge` function handles nested object merge. Arrays are replaced, not merged. `undefined` values are skipped. Env overrides apply last (`DECKENT_*` vars).
 
 **Note:** This ADR records the original **3-layer** decision. At runtime an additional **environment-variable override layer** sits on top (e.g. `DECKENT_BRAIN_PROVIDER`, `DECKENT_MAX_WORKERS`), so the effective precedence is: defaults → `~/.deckent/config.json` → `.deckent/config.json` → **env overrides** (env wins). See `src/core/config.ts` and the "Config Layers" section of `docs/architecture/architecture.md` (Layer 4 — Environment Variables). Behavior unchanged; documentation alignment only.
+
+---
+
+**Amendment log:** 2026-06-11 — Başlık + Decision "3-Layer" → **"Layered (4 effective: defaults → global → project → env)"** netleştirildi (Alperen onayı). Davranış değişmedi; env-override katmanı (config.ts:1342) zaten canlı. md+db senkron.
 
 
 ---
@@ -90,13 +104,19 @@
 
 **Date:** 2026-04-16
 
+**Superseded by:** ADR-087 (Async I/O & Test Hermeticity Standard) — the active, agent-injected async/hermeticity law. A deprecated ADR does not carry active guidance to workers; ADR-087 does.
+
 ---
 
-> **Note:** Sprint 132 CRITICAL #1 — Senkron I/O hot path performans sorunlarına yol açtı. Yeni modüller async I/O kullanmalıdır.
+> **Note:** Sprint 132 CRITICAL #1 — Senkron I/O hot path performans sorunlarına yol açtı. Yeni modüller async I/O kullanmalıdır. **→ Aktif kural artık [ADR-087](087-async-io-hermeticity-standard.md).**
 
 **Decision:** Wave 2 modülleri (tmux, auditor, worker) senkron I/O kullanır.
 **Context:** tmux komutları <100ms, lock dosyaları <1KB, auditor 30s cycle'da birkaç küçük JSON okur. Async overhead gereksiz.
 **Consequence:** Tüm fonksiyonlar senkron. Gelecekte performans sorunları çıkarsa async'e geçilebilir.
+
+---
+
+**Amendment log:** 2026-06-11 — ADR-087 (Async I/O & Test Hermeticity Standard, accepted) ile **superseded**. Aktif async/hermeticity kuralı artık ADR-087'de (agent-inject) — bu deprecated kayıt yalnız tarihsel (Alperen ADR-review).
 
 
 ---
@@ -113,15 +133,19 @@
 
 ---
 
-**Decision:** Tüm shell komutları `spawnSync(binary, [...args])` ile çalıştırılır, shell interpretation yok.
-**Context:** Command injection riski sıfıra indirilmeli. Prompt ve diğer kullanıcı girdileri argument array olarak geçer.
-**Consequence:** Template literal veya string concat ile komut oluşturmak yasak. Varsayılan kural: `{ shell: true }` kullanılmaz.
+**Decision:** Tüm subprocess çağrıları **array-args** ile çalıştırılır — `spawn(binary, [...args])` / `spawnSync(binary, [...args])` — **`shell: true` YOK**, shell-interpretation yok. Bu bir **GÜVENLİK invariant'ıdır** (command-injection sıfır) ve **`spawn` ile `spawnSync` ikisi için de** geçerlidir. **Sync-vs-async AYRI bir eksendir** ve [ADR-087](087-async-io-hermeticity-standard.md) tarafından yönetilir (async `spawn` default; `spawnSync` yalnız ADR-087'nin dar istisnaları için).
+**Context:** Command injection riski sıfıra indirilmeli. Prompt ve diğer kullanıcı girdileri argument array olarak geçer. Bu güvenlik kuralı, sync-vs-async tercihinden bağımsızdır.
+**Consequence:** Template literal veya string concat ile komut oluşturmak yasak. Varsayılan kural: `{ shell: true }` kullanılmaz. Array-args invariant'ı async `spawn`'a da uygulanır (ADR-087 async'i mandatory kılar; güvenlik deseni değişmez).
 
 **Note (documented exceptions):** The `spawnSync(binary, [...args])` array-args rule is the default and is the security baseline. There are **deliberate, narrowly-scoped exceptions** where `shell: true` is used:
 - `src/core/plugin-hooks.ts` — sandboxed plugin hook execution.
 - `src/core/provider.ts` — Windows only, to resolve `.cmd`/`.ps1` wrapper binaries on `PATH`.
 
 These exceptions never interpolate untrusted input into a command string (args remain arrays / fixed). Compliance is tracked by the ADR-006 check in `src/orchestra/authority-enforcer.ts` (compile-time scan; per ADR-037 V1.0 this is **advisory/soft** — it warns + emits, does not hard-block). Behavior unchanged; documentation alignment only.
+
+---
+
+**Amendment log:** 2026-06-11 — Lafız ADR-087 ile uzlaştırıldı (Alperen ADR-review). ADR-006 artık **güvenlik invariant'ı** (array-args + `shell:true`-yok, `spawn`+`spawnSync` ikisi için); **sync-vs-async** ekseni ADR-087'ye devredildi (async `spawn` default, spawnSync = ADR-087 istisnası). Davranış değişmedi; çelişki giderildi.
 
 
 ---
@@ -165,18 +189,28 @@ These exceptions never interpolate untrusted input into a command string (args r
 
 **Note (current enforcement & refinement):** The enforced lint (`src/orchestra/authority-enforcer.ts`, ADR-008 check) specifically scans the **import direction `core/ → orchestra/`**: `core/` must not depend on `orchestra/`; the orchestra Brain layer is the only place that imports `orchestra/` internals — a broader rule than the original `from.*brain` grep. Per ADR-037 V1.0 this check is **advisory/soft** (warns + emits, does not hard-block). After the god-object split, `src/orchestra/brain.ts` is a thin re-export layer; the actual importer is `sprint-controller`, and `planner` imports only from `core/`. The canonical refined statement of these import rules lives in `CLAUDE.md` and `docs/reference/api-surface.md` (Module Import Rules). Behavior unchanged; documentation alignment only.
 
+**Sprint 279 (WK-import):** the `core/audit-writer.ts` + `core/audit-query.ts` → `orchestra/event-stream.js` cycle was resolved by **moving `event-stream` into `core/`** (`src/core/event-stream.ts`; `orchestra/event-stream.ts` is now a re-export shim). 
+
+**🔴 Residual violation (2026-06-11 ADR-review, tracked):** ONE `core/ → orchestra/` import remains — `src/core/routing-engine.ts:30` imports `analyzeSkillInMemory` from `../orchestra/ecosystem-intelligence.js`. The advisory/soft enforcement (ADR-037 V1.0) let it persist. Fix tracked as MASTER-PLAN "ADR-Analizi Türetilen İşler → ADR-008-W" (move the consumed function/module to `core/`, or invert the dependency).
+
+---
+
+**Amendment log:** 2026-06-11 — Note'a Sprint-279 cycle-fix (event-stream→core/) + **kalan 1 ihlal** (routing-engine→ecosystem-intelligence) kaydedildi; ADR-008-W iş-maddesi açıldı (Alperen ADR-review).
+
 
 ---
 
 ## adr-009: DEBT.md Markdown Tablo Formatı
 
-**Status:** accepted
+**Status:** deprecated
 
 # ADR-009: DEBT.md Markdown Tablo Formatı
 
-**Status:** accepted
+**Status:** deprecated
 
 **Date:** 2026-04-16
+
+**Superseded by:** ADR-088 (Memory V2 — DB-First Architecture). Debt — like all brain knowledge — now lives in `.brain/memory.db` (`type='debt'`); `.brain/exports/debt.md` is a generated export, not the source.
 
 ---
 
@@ -185,6 +219,10 @@ These exceptions never interpolate untrusted input into a command string (args r
 **Consequence:** Tablo parse'ı `|` split + `slice(1,-1)` ile yapılır. Boş kolon değerleri korunur. Yeni kolon eklemek parse/generate'i güncellemeyi gerektirir.
 
 **Note (superseded by Memory V2 — DB-first):** This ADR records the **V1 design** where `DEBT.md` was the hand-maintained source of truth. Under **Memory V2**, technical debt lives in `.brain/memory.db` (SQLite, entries with `type='debt'` — see `src/orchestra/debt-manager.ts`, `store.getByType('debt')`); `.brain/exports/debt.md` is now a **generated export**, not the source. The original `parseDebtTable`/`generateDebtTable` markdown model is superseded by `MemoryStore` (consistent with the Memory V2 model in `docs/architecture/memory-system.md` and `docs/reference/api-surface.md`). Behavior unchanged; documentation alignment only.
+
+---
+
+**Amendment log:** 2026-06-11 — Status `accepted` → **`deprecated`** (Note zaten "superseded" diyordu, status çelişiyordu). **Superseded by ADR-088** (Memory V2 — DB-First Architecture, yeni accepted, agent-inject) — Memory V2'nin ilk resmî ADR'si; bu eski V1 DEBT.md kararını genelleştirir (Alperen ADR-review).
 
 
 ---
@@ -233,6 +271,33 @@ These exceptions never interpolate untrusted input into a command string (args r
 
 **Consequence:** The principle shifts from "1 dependency" to "minimum necessary, every dependency ADR-backed". Any new runtime dependency proposal must include an ADR reference or a new ADR. The dependency count (9) reflects the full product scope — CLI + MCP + Memory + Connectors + Crypto + Embedded Web Terminal (Sprint 175).
 
+---
+
+## Amendment 2 — Sprint 281 (2026-06-11 ADR-review, Alperen)
+
+The Sprint-172 inventory (9 deps) drifted. Current `package.json` has **13 runtime dependencies + 1 optional**. Refreshed inventory with governing ADRs:
+
+| Package | Version | Purpose | Governing ADR |
+|---------|---------|---------|---------------|
+| `commander` | `^13.0.0` | CLI command framework | ADR-010 |
+| `@modelcontextprotocol/sdk` | `^1.27.1` | MCP server/client transport | ADR-017 |
+| `better-sqlite3` | `^12.10.0` | Memory V2 DB — SQLite + FTS5 | **ADR-088** (Memory V2 — DB-First) |
+| `telegraf` | `^4.16.0` | Telegram connector | ADR-016 |
+| `zod` | `^3.25.0` | Plan/config schema validation | Task planner validation (Sprint 044+) |
+| `@noble/ed25519` | `^2.3.0` | Ed25519 `.deck` signing | ADR-014 |
+| `@noble/hashes` | `^1.8.0` | SHA-512 `.deck` key derivation | ADR-014 |
+| `@lydell/node-pty` | `^1.2.0-beta.12` | PTY for embedded web terminal (renamed from `node-pty`) | ADR-062 |
+| `ws` | `^8.18.0` | WebSocket terminal transport | ADR-062 |
+| `ink` | `^7.0.5` | Native REPL (React-for-CLI) | ADR-081 / ADR-083 (Native Agentic REPL) |
+| `react` | `^19.2.7` | Ink REPL + web dashboard | ADR-081 (REPL) / ADR-080 (Dashboard) |
+| `react-dom` | `^19.2.7` | Web dashboard render | ADR-080 (Dashboard) |
+| `cli-highlight` | `^2.1.11` | REPL syntax highlighting | ⚠️ **no ADR yet** → ADR-010-W |
+| `discord.js` *(optional)* | `^14.26.3` | Discord connector (lazy/optional) | ADR-016 |
+
+**🟡 ADR-backing gaps (tracked as ADR-010-W):** `cli-highlight` has no governing ADR; `zod` is justified by "planner validation" but no formal ADR. Per this ADR's own principle, each must get an ADR reference (or be removed). `ink`/`react` lean on the Native REPL ADRs (081/083) + Dashboard (080) — adequate but worth an explicit dependency note.
+
+**Amendment log:** 2026-06-11 — inventory 9→13(+1) güncellendi; `node-pty`→`@lydell/node-pty` rename, `ink`/`react`/`react-dom`/`cli-highlight`/`discord.js` eklendi, `better-sqlite3`→ADR-088 atfı; ADR-backing-eksik dep'ler (cli-highlight, zod) ADR-010-W'ye (Alperen ADR-review). md+db senkron.
+
 
 ---
 
@@ -248,9 +313,13 @@ These exceptions never interpolate untrusted input into a command string (args r
 
 ---
 
-**Decision:** İnteraktif prompt'lar (text, select, confirm) için `node:readline/promises` modülü kullanılır.
-**Context:** `inquirer` (1.2MB) veya `prompts` (200KB) eklemek yerine Node 18+ built-in API yeterli. Basit wrapper'lar (`promptText`, `promptSelect`, `promptConfirm`) tüm init wizard ihtiyacını karşılıyor.
-**Consequence:** Rich UI (autocomplete, fuzzy search) yok. Gerekirse Phase 3 TUI'da `ink` veya `blessed` eklenebilir.
+**Decision:** **Basit, non-interaktif CLI prompt'ları** (text, select, confirm) için `node:readline/promises` modülü kullanılır. Rich/interaktif kullanıcı yüzeyi bu ADR'nin kapsamı DEĞİL (aşağıya bakın).
+**Context:** `inquirer` (1.2MB) veya `prompts` (200KB) eklemek yerine Node 24+ built-in API basit prompt'lar için yeterli. Basit wrapper'lar (`promptText`, `promptSelect`, `promptConfirm`, `src/cli/helpers/prompt.ts`) init wizard + confirm ihtiyacını karşılar.
+**Consequence:** `readline/promises` **basit-prompt** için minimal built-in olarak kalır (init wizard, confirm, headless/script bağlamı). **Rich UI artık deckent'in TEMEL-CORE özelliğidir** (Alperen 2026-06-11): `ink` (Native REPL/TUI — ADR-081/083) + React web dashboard (ADR-080) birinci-sınıf kullanıcı/enterprise yüzeyleri. Bu ADR'nin orijinal "Phase 3'te ink eklenebilir" tahmini gerçekleşti ve core'a yükseldi. İki katman **çelişmez** — iş-bölümü: `readline`=basit prompt, `ink`/`react`=rich UI.
+
+---
+
+**Amendment log:** 2026-06-11 — Node 18→24; kapsam "basit prompt" olarak netleştirildi; **rich UI (ink/react) temel-core özellik** olarak kaydedildi (önceki "Phase 3 maybe" → realized + elevated). Çelişki yok, iş-bölümü açıklandı. Line-11 typo ("adrGerekirse") temizlendi (Alperen ADR-review). md+db senkron.
 
 
 ---
@@ -8537,3 +8606,66 @@ project-wide knowledge) belong outside the git-tracked memory; `.deckent/setting
 - `scripts/agentic-do-verify.mjs` — run-proven agentic-write E2E smoke
 - `scripts/repl-smoke-verify.mjs` — REPL smoke harness (terminal/streaming/perms/menu)
 - `.deckent/config.json` — `nervous_system.enabled: true` (re-enabled Sprint 224-010)
+
+
+---
+
+## adr-087: Async I/O & Test Hermeticity Standard
+
+**Status:** accepted
+
+# ADR-087: Async I/O & Test Hermeticity Standard
+
+**Status:** accepted
+
+**Date:** 2026-06-11
+
+**Supersedes:** ADR-005 (Synchronous I/O — deprecated)
+
+---
+
+**Decision:** Hot-path I/O and ALL subprocess spawning MUST be asynchronous; ALL tests MUST be hermetic. This is the active, agent-injected successor to the deprecated ADR-005, elevating the rule from a buried deprecated-Note + the CLAUDE.md hermeticity section into an enforced architecture decision that **every worker model (Claude / Codex / Gemini) reads** via ADR prompt-injection.
+
+**Rules (binding for all workers):**
+1. **No `spawnSync` for subprocesses** — use async `spawn` (`node:child_process`). `spawnSync` blocks the event loop → CI timeouts + O(n) scan contention (Sprint 279 WK-7: the auditor's 30s scan ran a per-worker `spawnSync('docker', …)`). Use async `spawn` + `Promise.allSettled` batching. **Sole sanctioned exception:** the ADR-006 spawnSync security pattern (argument-array, no shell) for short, trusted, non-hot-path one-shots.
+2. **Hot-path file/network I/O async** — loops, scan cycles, worker dispatch, large reads. A one-shot small config read at startup (`readFileSync` of a <1KB JSON) MAY stay sync — the Sprint 132 perf failure was hot-path, not startup.
+3. **Tests hermetic** — all I/O under `os.tmpdir()`; never read gitignored local state (`.deckent/config.json`, `.brain/memory.db`, `~/.deckent`, `.deck/`); no real network/docker; assume a fresh checkout. Verify with `npm run test:ci-sim`.
+
+**Context:** ADR-005 deprecated the synchronous-I/O decision after Sprint 132 hot-path performance problems, but its replacement guidance lived ONLY in a *deprecated* ADR's Note plus the CLAUDE.md worker rules — never as an accepted, prompt-injected ADR. Deprecated ADRs do not carry active law to the agents (Alperen 2026-06-11 ADR review: "deprecated ADR işe yaramaz; async + hermeticity diğer modeller de görmeli"). This ADR closes that governance gap.
+
+**Consequence:** New code uses async `spawn` + hermetic tests; reviewers/auditor flag new `spawnSync` (outside the ADR-006 exception). Residual `spawnSync` (Sprint 279 WK-7: ~15 in `auditor.ts` incl. the ADR-006 enforcement string + `gatherCiBaseline`) is tracked for migration in MASTER-PLAN "ADR-Analizi Türetilen İşler → ADR-087-W". Auditor liveness probes are already async-batched (Sprint 279). Cross-ref: ADR-006 (sanctioned spawnSync security pattern), CLAUDE.md "Test Hermeticity", `.claude/rules/karpathy-discipline.md` (CUSTOM — Test Hermeticity).
+
+
+---
+
+## adr-088: Memory V2 — DB-First Architecture
+
+**Status:** accepted
+
+# ADR-088: Memory V2 — DB-First Architecture
+
+**Status:** accepted
+
+**Date:** 2026-06-11
+
+**Supersedes:** ADR-009 (DEBT.md Markdown Tablo Formatı — deprecated). Generalizes the same principle to ALL brain knowledge.
+
+---
+
+**Decision:** All brain knowledge — ADRs, sprint learnings, retros, technical debt, patterns, identity — is stored **DB-first** in SQLite (`.brain/memory.db`, `better-sqlite3`). The `.brain/exports/*.md` files (`summary.md`, `decisions.md`, `memory.md`, `debt.md`) are **generated exports, not sources of truth**. Code reads knowledge via `MemoryStore` (`store.getByType('adr')`, `searchMemory(...)`) — never by parsing `.md`.
+
+**Schema:** 5 tables — `entries` (id, type, source, title, content, summary, *_norm, status, priority, sprint_id, sprint_num, lang, decay_exempt, metadata, tenant_id, timestamps, audit_prev_hmac, audit_hmac), `tags`, `relations` (references/supersedes/caused_by/resolves/blocks/depends_on), `entry_history` (field-level change tracking), `schema_version` — plus the `entries_fts` **FTS5 virtual table** (8 columns: title/content/summary/tag_text + their `turkishNormalize` variants).
+
+**Search:** FTS5 full-text, **dual-layer** — original text + `turkishNormalize()` (`memory-normalize.ts`) → TR/EN/DE ~100% recall. `searchMemory()` (`memory-query.ts`) runs both layers + `buildAutoQuery()` for Brain auto-query. Correct FTS5 query shape: `SELECT e.* FROM entries_fts f JOIN entries e ON e.rowid = f.rowid WHERE entries_fts MATCH ?`.
+
+**Context:** ADR-009 made `DEBT.md` a hand-maintained markdown table — the same file-as-source model used by the original `MEMORY.md`/`DECISIONS.md`/`RETRO.md`. It did not scale (96K ADR file, no search, merge conflicts, no decay/history). Memory V2 (DB-first) replaced it: SQLite is the single source, `.md` are exports for git review/diff. This decision had **no ADR** until now — a governance gap surfaced in the 2026-06-11 ADR review (Alperen).
+
+**Consequence:**
+- **Modules:** `memory-store.ts` (CRUD, FTS5 sync, tags, relations, decay, history, audit-hmac), `memory-query.ts` (dual-layer search), `memory-export.ts` (DB→.md), `memory-import.ts` (.md→DB), `memory-types.ts`.
+- **Sync invariant:** any write through `MemoryStore.insert/upsert/update` keeps `content_norm` + FTS5 + `entry_history` + `audit_hmac` consistent. Direct SQL `UPDATE` is forbidden (misses norm/FTS5/audit). **Editing an ADR/entry means updating BOTH the `.md` AND the DB** so doc==DB (regenerate exports with `deckent memory export`).
+- **Git:** `.brain/memory.db` is gitignored (rebuildable from exports via `memory-import`); `.brain/exports/*.md` are git-tracked.
+- **decay:** `store.decay(currentSprintNum, decayAfterSprints)`; `decay_exempt=1` for permanent governance (ADRs, identity).
+- **Brain auto-query:** Task DNA → relevant ADR/pattern/memory injected at PLAN/SPAWN/EVALUATE.
+- **CLI:** `deckent recall "q"`, `deckent remember "note"`, `deckent memory rebuild|export|stats`. **MCP:** `deckent_memory_query`. **Config:** `.deckent/config.json` → `memory.backend`, `memory.search`, `memory.decay_after_sprints`.
+
+Cross-ref: ADR-009 (superseded), ADR-036 (ADR Governance Integration — ADRs injected from DB), `docs/reference/api-surface.md` (Memory V2 DB Schema + Query API), DECKENT.md "Memory V2 — DB-First Architecture".
