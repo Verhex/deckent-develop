@@ -665,7 +665,7 @@ Behavior unchanged; documentation alignment only.
 **Context:** Sprint 085'te MCP tool parametreleştirilmesi tamamlandı. `deckent_init`, `deckent_start`, `deckent_status`, `deckent_doctor`, `deckent_retro`, `deckent_history` araçlarına CLI karşılıkları olanlarla eşit parametreler eklendi. Ayrıca `deckent_agent_list` ve `deckent_skill_list` araçları CLI-only olan `deckent agent list` ve `deckent skill list` komutlarını MCP'ye getirdi.
 
 **Decision:** CLI-only komutlar altyapı/terminal işlemleridir ve MCP'de yer almaz:
-- **Altyapı:** `attach`, `spawn`, `watch` — tmux oturum yönetimi
+- **Altyapı:** `attach`, `spawn` — tmux oturum yönetimi *(`watch` bu listeden ÇIKARILDI — 2026-06-11: `deckent_watch` MCP zaten var; watch parity + backend-agnostic olmalı, bkz. ADR-089 + amendment)*
 - **Sunucu/UI:** `dashboard`, `web`, `serve` — arabirim başlatma
 - **Kurulum:** `upgrade`, `onboard` — setup sihirbazları
 - **Eklenti:** `plugin install`, `plugin list`, `plugin create` — eklenti yönetimi
@@ -692,6 +692,12 @@ MCP-only komut yoktur — her MCP aracının bir CLI karşılığı vardır. Ort
 **Context (v1):** CLI'da 33+ komut, MCP'de 16 tool + 9 resource vardı. CLI'da olan bazı özellikler (spawn, attach, watch, agent, skill, plugin, onboard, upgrade, explain, finalize, dashboard, web, serve, archive-debt, quick-start, test-run, skill-marketplace) MCP tarafında yoktu. Kullanıcılar CLI'dan MCP'ye geçtiğinde özellik kaybı yaşıyordu. Ayrıca MCP tool'ları ile CLI komutları farklı kod yolları kullanıyordu — CLI doğrudan fonksiyon çağırırken MCP HTTP/stdio üzerinden wrapper çalıştırıyordu.
 
 **Decision (v1):** CLI ve MCP tam özellik eşliği sağlanmalı; her yeni CLI komutu aynı zamanda MCP tool olarak da kaydedilmeli; ortak iş mantığı `src/core/`/`src/orchestra/` altında paylaşılan fonksiyonlarda, CLI ve MCP yalnız thin wrapper.
+
+---
+
+**Amendment — 2026-06-11 (Alperen ADR-review): `watch` parity + backend-agnostic.**
+
+`watch`, "intentionally CLI-only altyapı" listesinden ÇIKARILDI. Gerçek: `deckent_watch` MCP tool zaten var (`src/mcp/tools/watch.ts`) AMA CLI `watch` (tmux-split) ile MCP `deckent_watch` (event-stream subscribe) **semantik olarak ayrışmış** = parity ihlali. Bu ADR'nin "bir komut CLI'da neyse MCP'de de aynı işi görmeli" ilkesine göre **birleştirilmeli**. Ayrıca `watch` tmux'a sabitlenmemeli — worker hangi backend'de (docker/subprocess/tmux/ileride firecracker/cloud) ise orada izlemeli. Tam karar + gelecek vizyonu (per-worker bağımsız backend): **ADR-089 (Backend-Agnostic Worker Observation)**. İş-maddesi: MASTER-PLAN "ADR-Analizi Türetilen İşler → WATCH-W". md+db senkron.
 
 **Consequence (v1):** Kullanıcı CLI'daki her şeyi MCP üzerinden de yapabilir; test coverage iki kat artabilir; yeni özellik maliyeti artar (2 wrapper) ama tutarlılık garantilenir. (v2'de bu, "altyapı komutları intentional CLI-only" ile rafine edildi.)
 
@@ -777,6 +783,10 @@ Init wizard da güncellendi: "Select your Claude plan" → "Select your plan". E
 
 **Note (verified — module locations):** Mechanism confirmed against code: `interruptActiveSprint()` is defined in `src/orchestra/sprint-lifecycle.ts` (marks task INTERRUPTED, aborts heartbeat, releases locks, kills workers); `killAllSessions()` lives in `src/orchestra/tmux.ts` ("Called on SIGINT for graceful shutdown"); the SIGINT handler is wired in `src/cli/entry.ts` (which exists alongside `src/cli/index.ts`). Behavior unchanged; documentation alignment only.
 
+---
+
+**Amendment log:** 2026-06-11 — Companion notu: Sprint 279 (DASH-001) `killAllWorkers()` (`tmux.ts:217`) eklendi — `killAllSessions()`'ın per-worker varyantı (tek worker ya da `/api/kill/all` için, subprocess/docker backend'lerini de kapsar). Graceful-shutdown mekanizması değişmedi (Alperen ADR-review). md+db senkron.
+
 
 ---
 
@@ -804,6 +814,12 @@ Her fazda backward compatibility sprint-controller re-export layer üzerinden ko
 **Consequence:** `sprint-controller.ts` orchestration koordinatörü rolüne döndü — iş mantığı bağımsız modüllerde. orchestra/ modül sayısı 37'den 47'ye çıktı. Her yeni modül bağımsız unit test kapsamı kazandı. Kademeli split stratejisi büyük refactor riskini minimize etti.
 
 **Note (verified / evolution):** Faz 1-3 confirmed against code — `sprint-phases.ts`, `sprint-utils.ts`, `result-collector.ts` (`waitForResults` + IPC) all exist; `src/orchestra/brain.ts` is a ~53-line *"Slim Re-export Layer"* re-exporting from `sprint-controller.js` ✓. The split **continued past Faz 3** (many more dedicated `sprint-*` modules now — see the ADR-024 note). The "orchestra 37→47" figure is a Sprint-076 snapshot and is now far higher (drift-prone — canonical module counts are not pinned in ADRs; see `docs/architecture/architecture.md`). Behavior unchanged; documentation alignment only.
+
+---
+
+**Forward link — modularization groundwork for MOD-SPLIT (Alperen 2026-06-11):** The kademeli god-object split (this ADR + ADR-024) is the **modular foundation** the future **Community/Pro split (MOD-SPLIT, MASTER-PLAN §8)** will build on. When deckent is modularized into `community` (MIT) + a separately-licensed `enterprise` module (possibly 2 repos, on top of ADR-065 develop/product split), the clean module boundaries established here (independent `sprint-*` / `core/` modules, thin re-export coordinators) are exactly what enables drawing the community↔enterprise line + a license-loadable enterprise layer. The MOD-SPLIT prereq "modül sınırı envanteri (enterprise-layer dosya haritası)" leverages this split work. Cross-ref: §8 MOD-SPLIT, ADR-065, ADR-033 (single-product — pending MOD-SPLIT amendment).
+
+**Amendment log:** 2026-06-11 — MOD-SPLIT modülerleştirme-temeli forward-link'i eklendi (Alperen ADR-review); MASTER-PLAN §8 MOD-SPLIT'e ADR-026 ref edildi. md+db senkron.
 
 
 ---
@@ -864,6 +880,22 @@ Sprint 139'da 3 backend'in (Docker, subprocess, tmux) E2E test coverage'ı tamam
 - Sprint 139 Task 19: Subprocess E2E tests (DONE — 33 test, 1.2s)
 - ADR-033: Product Vision — complexity minimization principle
 
+---
+
+## Amendment — Sprint 281 (2026-06-11, Alperen ADR-review): kapsam ayrımı + ADR-089 supersession
+
+ADR-027'nin orijinal "hibrit backend KALICI reddedildi" kararı **dar yorumda hâlâ geçerli, geniş yorumda superseded** — ayırmak gerekiyor:
+
+**✅ Hâlâ geçerli (rol-split reddi):** "Worker Docker'da + auditor AYRI subprocess olarak" senaryosu reddedilmeye devam eder. Auditor in-process kalır; cross-backend gözlemlenebilirlik event-stream (ADR-035) ile çözülür. Rol-bazlı backend-mixing'e gerek yok.
+
+**🔄 Superseded ("sprint başına tek backend" iddiası → ADR-089):** ADR-027 yazıldığında SpawnBackendFactory sprint için TEK backend seçiyordu. Bugün:
+- **Per-task backend override CANLI:** `sprint-spawner.ts` `effectiveBackend = task.backend && task.backend !== config.spawn_backend ? SpawnBackendFactory.create({ backend: task.backend, … }) : backend` (`- Backend: docker|tmux|subprocess` DIRECTIVES, Sprint 252 PSL-1 + mixed-fleet 248-254). Farklı task'lar farklı backend'de koşabiliyor.
+- **ADR-089 (Backend-Agnostic Worker Observation + Per-Worker Independent Backends):** açık vizyon = her worker/akış bağımsız backend (tmux/docker/firecracker/cloud/ollama-host). ADR-027'nin öngördüğü "distributed execution gerekirse revisit (Sprint 145+)" noktası geldi.
+
+**Net:** Bu ADR artık yalnız **rol-split-hibrit reddini** temsil eder; **heterojen per-worker backend** ADR-089 tarafından yönetilir (kabul edildi). "Hibrit kalıcı red" çerçevesi geniş anlamda ADR-089'a devredildi.
+
+**Amendment log:** 2026-06-11 — kapsam ayrıldı (rol-split-reddi geçerli ↔ tek-backend-per-sprint ADR-089'a superseded); per-task override + ADR-089 cross-ref'lendi (Alperen ADR-review). md+db senkron.
+
 
 ---
 
@@ -888,6 +920,14 @@ Sprint 139'da 3 backend'in (Docker, subprocess, tmux) E2E test coverage'ı tamam
 **Consequences:** 4 kaynak dosya + 38 test maintained but unused in production. decision-logger.ts hâlâ V2 tarafından kullanılıyor.
 
 **Note (verified vs code):** V2 confirmed — `routeTaskV2` in `src/core/routing-engine.ts`; `src/core/config.ts` defaults `routing_engine: 'v2'` and accepts `['v1','v2']` (V1 retained, selectable, `@deprecated`). Provenance: per `CLAUDE.md`/`IDENTITY.md` routing v2 has been the default since Sprint 067 (V2 introduced Sprint 066). The "4 source files / 38 tests" figures are a point-in-time snapshot (legacy V1 surface, not pinned). Behavior unchanged; documentation alignment only.
+
+---
+
+**Amendment — 2026-06-11 (ADR-review, code-alignment): V1 confirmed live + 2 minor inconsistencies.** `DecisionOrchestrator` (V1) is real (`src/orchestra/decision-engine.ts:101`), selectable via `routing_engine: 'v1'`, V2 default — ADR accurate. Two minor drifts found:
+1. **features-manifest mislabel:** the Dead Features list (`docs/reference/features.md`, auto-generated) marks `decision-orchestrator-v1` as **dead/superseded**, but per this ADR V1 is **deprecated-but-retained-selectable** (reference impl), not dead. Manifest classification should read "deprecated/retained", not "dead".
+2. **planner fallback:** `src/orchestra/sprint-planner.ts:468` uses `config.routing_engine ?? 'v1'` while `config.ts:1130` defaults to `'v2'` — with a fully-loaded config the `?? 'v1'` never fires, but it is an inconsistent default (should be `?? 'v2'`). 
+
+Both tracked as MASTER-PLAN "ADR-Analizi Türetilen İşler → ADR-028-W" (low priority). md+db senkron.
 
 
 ---
@@ -8714,3 +8754,42 @@ project-wide knowledge) belong outside the git-tracked memory; `.deckent/setting
 - **CLI:** `deckent recall "q"`, `deckent remember "note"`, `deckent memory rebuild|export|stats`. **MCP:** `deckent_memory_query`. **Config:** `.deckent/config.json` → `memory.backend`, `memory.search`, `memory.decay_after_sprints`.
 
 Cross-ref: ADR-009 (superseded), ADR-036 (ADR Governance Integration — ADRs injected from DB), `docs/reference/api-surface.md` (Memory V2 DB Schema + Query API), DECKENT.md "Memory V2 — DB-First Architecture".
+
+
+---
+
+## adr-089: Backend-Agnostic Worker Observation + Per-Worker Independent Backends
+
+**Status:** accepted
+
+# ADR-089: Backend-Agnostic Worker Observation + Per-Worker Independent Backends
+
+**Status:** accepted (principle + CLI/MCP parity) · firecracker/cloud backends = roadmap (proposed)
+
+**Date:** 2026-06-11
+
+**Related:** ADR-022 (CLI/MCP Feature Parity), ADR-027 (Hybrid Spawn Backend), ADR-066 (Provider Independence), WK-5 (docker live-monitor)
+
+---
+
+**Decision:**
+
+1. **`watch` is backend-agnostic.** `deckent watch [worker]` observes a worker on **whatever backend it actually runs** — docker (`docker logs -f`), subprocess (stdout/stderr stream), tmux (attach), and (roadmap) firecracker microVM / cloud / ollama-host — resolved **per-worker from sprint/worker state**, NOT hardwired to tmux. "`deckent watch` dediğin worker neredeyse orada çalışır." Backend-forcing flags (`deckent watch --docker`, `--tmux`, …) select an explicit view.
+
+2. **CLI/MCP parity — NO semantic split (ADR-022).** `deckent watch` (CLI) and `deckent_watch` (MCP) are the **same capability over the same core**. The current divergence (CLI `watch` = tmux-split vs MCP `deckent_watch` = event-stream subscribe) is a **parity violation to be removed**: one core resolves worker→backend→stream; CLI + MCP are thin wrappers calling it. A command does the same job in CLI and MCP.
+
+3. **Per-worker independent backends (vision).** Each worker / each flow can declare its **own execution backend** — tmux, docker, firecracker microVM, cloud, ollama-host — chosen independently. Both the orchestrator (spawn) AND the observation layer (watch) are **backend-pluggable**; observation follows the worker wherever it runs.
+
+**Context:** Today `watch` is tmux-centric and CLI/MCP semantics diverged (ADR-022 review, 2026-06-11). Workers already run on docker/tmux/subprocess (ADR-027). Product vision (Alperen 2026-06-11): make EVERY worker + EVERY flow **independently backed** — including future firecracker microVMs + cloud — so deckent scales from a laptop to a heterogeneous fleet and a user can observe ANY worker on ANY backend uniformly. Example: some workers on tmux, some docker, some firecracker, some cloud, some ollama-host — one `watch` UX across all.
+
+**Consequence:**
+- A **backend-observation abstraction** — per-backend attach/stream adapter (`docker logs -f`, subprocess pipe, tmux attach, cloud log API). `watch` resolves the worker's backend from sprint/worker state → dispatches the right stream.
+- CLI + MCP share one observation core (parity); the CLI=tmux / MCP=event-stream divergence is unified.
+- New backends (firecracker, cloud) plug in by implementing a **spawn adapter + observe adapter** — no `watch`/orchestrator rewrite.
+- Builds on ADR-027 (hybrid spawn backend), WK-5 (docker live-monitor `logs -f` + `deckent watch --follow`, Sprint 279).
+
+**Current state (2026-06-11):** docker/tmux/subprocess spawn exist (ADR-027); `watch --follow` docker `logs -f` added (Sprint 279 WK-5); CLI `watch` still tmux-centric; `deckent_watch` MCP = event-stream subscribe (diverged). Backend-agnostic resolution + CLI/MCP unification + firecracker/cloud are **work items** → MASTER-PLAN "ADR-Analizi Türetilen İşler → WATCH-W" + roadmap.
+
+**Roadmap (proposed):** firecracker microVM backend; cloud backend; per-worker backend declaration in the task spec; uniform fleet-wide observation. These are forward-looking (not built); the backend-agnostic-watch + CLI/MCP-parity principle is decided/accepted now.
+
+Cross-ref: ADR-022 (parity), ADR-027 (hybrid spawn), ADR-066 (provider independence), ADR-062 (embedded web terminal — PTY worker-attach), §S DESK-1 (god-level observation surface).

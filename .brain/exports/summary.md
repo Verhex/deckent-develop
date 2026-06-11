@@ -80,6 +80,7 @@
 | adr-086 | Native CLI Parity — F11 Feature Set (Sprint 224) | accepted |
 | adr-087 | Async I/O & Test Hermeticity Standard | accepted |
 | adr-088 | Memory V2 — DB-First Architecture | accepted |
+| adr-089 | Backend-Agnostic Worker Observation + Per-Worker Independent Backends | accepted |
 
 ## Recent Learnings
 - **Sprint sprint-280 Learnings** (sprint-280): ## Sprint sprint-280 Learnings
@@ -147,4 +148,4 @@ _No active technical debt._
 - Violation pattern: stale_heartbeat
 - Violation pattern: stale_heartbeat
 
-_Total entries: 440 | Generated: 2026-06-11_
+_Total entries: 441 | Generated: 2026-06-11_

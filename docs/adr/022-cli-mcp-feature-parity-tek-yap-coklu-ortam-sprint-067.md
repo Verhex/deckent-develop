@@ -11,7 +11,7 @@
 **Context:** Sprint 085'te MCP tool parametreleştirilmesi tamamlandı. `deckent_init`, `deckent_start`, `deckent_status`, `deckent_doctor`, `deckent_retro`, `deckent_history` araçlarına CLI karşılıkları olanlarla eşit parametreler eklendi. Ayrıca `deckent_agent_list` ve `deckent_skill_list` araçları CLI-only olan `deckent agent list` ve `deckent skill list` komutlarını MCP'ye getirdi.
 
 **Decision:** CLI-only komutlar altyapı/terminal işlemleridir ve MCP'de yer almaz:
-- **Altyapı:** `attach`, `spawn`, `watch` — tmux oturum yönetimi
+- **Altyapı:** `attach`, `spawn` — tmux oturum yönetimi *(`watch` bu listeden ÇIKARILDI — 2026-06-11: `deckent_watch` MCP zaten var; watch parity + backend-agnostic olmalı, bkz. ADR-089 + amendment)*
 - **Sunucu/UI:** `dashboard`, `web`, `serve` — arabirim başlatma
 - **Kurulum:** `upgrade`, `onboard` — setup sihirbazları
 - **Eklenti:** `plugin install`, `plugin list`, `plugin create` — eklenti yönetimi
@@ -38,5 +38,11 @@ MCP-only komut yoktur — her MCP aracının bir CLI karşılığı vardır. Ort
 **Context (v1):** CLI'da 33+ komut, MCP'de 16 tool + 9 resource vardı. CLI'da olan bazı özellikler (spawn, attach, watch, agent, skill, plugin, onboard, upgrade, explain, finalize, dashboard, web, serve, archive-debt, quick-start, test-run, skill-marketplace) MCP tarafında yoktu. Kullanıcılar CLI'dan MCP'ye geçtiğinde özellik kaybı yaşıyordu. Ayrıca MCP tool'ları ile CLI komutları farklı kod yolları kullanıyordu — CLI doğrudan fonksiyon çağırırken MCP HTTP/stdio üzerinden wrapper çalıştırıyordu.
 
 **Decision (v1):** CLI ve MCP tam özellik eşliği sağlanmalı; her yeni CLI komutu aynı zamanda MCP tool olarak da kaydedilmeli; ortak iş mantığı `src/core/`/`src/orchestra/` altında paylaşılan fonksiyonlarda, CLI ve MCP yalnız thin wrapper.
+
+---
+
+**Amendment — 2026-06-11 (Alperen ADR-review): `watch` parity + backend-agnostic.**
+
+`watch`, "intentionally CLI-only altyapı" listesinden ÇIKARILDI. Gerçek: `deckent_watch` MCP tool zaten var (`src/mcp/tools/watch.ts`) AMA CLI `watch` (tmux-split) ile MCP `deckent_watch` (event-stream subscribe) **semantik olarak ayrışmış** = parity ihlali. Bu ADR'nin "bir komut CLI'da neyse MCP'de de aynı işi görmeli" ilkesine göre **birleştirilmeli**. Ayrıca `watch` tmux'a sabitlenmemeli — worker hangi backend'de (docker/subprocess/tmux/ileride firecracker/cloud) ise orada izlemeli. Tam karar + gelecek vizyonu (per-worker bağımsız backend): **ADR-089 (Backend-Agnostic Worker Observation)**. İş-maddesi: MASTER-PLAN "ADR-Analizi Türetilen İşler → WATCH-W". md+db senkron.
 
 **Consequence (v1):** Kullanıcı CLI'daki her şeyi MCP üzerinden de yapabilir; test coverage iki kat artabilir; yeni özellik maliyeti artar (2 wrapper) ama tutarlılık garantilenir. (v2'de bu, "altyapı komutları intentional CLI-only" ile rafine edildi.)
