@@ -134,3 +134,20 @@ KILL_LIVE_SPRINT, MANUAL_FILE_DELETE, COST_OVER_THRESHOLD, DESTRUCTIVE_GIT, ADR_
 ---
 
 > **Note (verified vs code, Sprint 172):** `src/nervous/` exists with the full pipeline modules (observer, detector-registry, decision-engine, proposer, dispatcher, executor, authority-matrix, history, runtime-scope-check, detectors/) and the **sprint-controller EventBus hook is wired** (`src/orchestra/sprint-controller.ts` — `emitSprintEvent('SPRINT_PHASE_CHANGE', …)`, "always fires, subscribers optional"). The MCP `deckent_nervous_*` tools exist. Consistent with this ADR's own caveats, the Nervous System is **config-gated / opt-in**: the proactive Observer pipeline is not the default active path, and in practice deckent-dev operates self-modifying sprints via ADR-047 (Manuel Subagent Dispatch) rather than autonomous nervous execution. The "Toplam 27 MCP tool" figure (under "MCP Tools") is a Sprint-147 snapshot — the current count is higher (~31, drift-prone; canonical: `docs/reference/mcp-tools.md`). Behavior unchanged; documentation alignment only.
+
+---
+
+## Amendment — Sprint 281 (2026-06-11, ADR-review, full code-verification)
+
+**Classification: BOTH** (kullanıcı preset konfigüre eder, bildirim alır, onaylar/reddeder/düzenler — ürün özelliği; + dogfood meta-koruması).
+
+**Re-verified verbatim:** 5 Locked Safety Floor (`authority-matrix.ts:24`, `Object.freeze`) ✓ · 4 preset + per-action override ✓ · action-registry **tam 30** ✓ · pipeline modülleri ✓ · "config-gated opt-in" tespiti hâlâ doğru ✓.
+
+**Davranış-evrimi (Sprint 279-280 — bu ADR'nin Executor/CLI semantiğini günceller):**
+
+1. **Executor "approve" modu nüanslandı (Sprint 279 WK-nervous, panic-gate wire):** non-SAFETY_FLOOR `approve` action'ları artık **10s hard-timeout → auto-proceed** (`awaitPanicGateApproval` → `handleApprove`; `isLockedPanicAction` muafiyet-kontrolü). **SAFETY_FLOOR action'ları muaf — koşulsuz sonsuz-bekler** (kullanıcı çözene dek). Orijinal "approve = user decision bekler" ifadesi artık yalnız SAFETY_FLOOR için koşulsuz geçerli.
+2. **`edit` subcommand uçtan-uca CANLI (Sprint 280 APPROVE-007b):** `ApprovalRequest.modifiedPayload` IPC transport + executor merge (`{...orijinal, ...modifiedPayload}` yalnız 'accepted'ta; yokken byte-aynı) + bootstrap poller forward + REPL `/nervous edit <id> <k=v|json>`. ADR'nin başta listelediği edit artık gerçekten çalışır.
+3. **Cross-process approval round-trip (§4G APPROVE-004/005/007, ~Sprint 233):** Executor'a DI `PendingApprovalStore` (CLI-okunur `.deckent/nervous-pending.json`) + `ipcQueue.startPolling → executor.resolveApproval` wire + CLI accept/reject→IPC route (heartbeat-liveness'lı) — onaylar CLI/MCP/REPL'den canlı executor'a ulaşır (eskiden sessizce düşüyordu).
+4. **Detector 5 → 12 (additive):** + build-failure-recurrence, dead-event-stream, token-spike, task-mode-idle, notification-delivery-health, scope-collision-rate, agent-routing-anomaly. 5-MVP listesi Sprint-147 snapshot'ı.
+
+md+db senkron (Alperen ADR-review).

@@ -175,3 +175,11 @@ ADR-053'te olduğu gibi: uygulama önce yazıldı, ADR tasarım kararlarını ge
 kayıt altına almaktadır. Sprint 163 ile kabul edilmiştir.
 
 > **Note (deep-verified vs code, Sprint 172):** Decision §1'deki **4 call-site tablosu kod ile birebir doğrulandı** (`src/orchestra/sprint-phases.ts`): `runPlanPhase`→`PLAN/PLANNING` (`:447`), `runSpawnPhase`→`SPAWN/sprint.status`→`SPAWN/ACTIVE` (`:550`/`:553`), `runEvaluatePhase`→`EVALUATE/EVALUATING` (`:736`), `runFixPhase`→`FIX/FIXING` (`:1100`). `runRetroPhase` için call-site yoktur ve ADR de listelemez (tutarlı). Tek nüans: `runSpawnPhase` ilk çağrıda status argümanı literal `RUNNING` değil dinamik `sprint.status`'tur (ADR'nin "RUNNING → ACTIVE" ifadesi yaklaşık). `persistPhaseTransition`/`writeEvaluationAudit`/`reconcileSpuriousNoGo` fonksiyonları kodda mevcut; referans commit `6c337b0` (Sprint 157 T-001 survivor) repo git geçmişinde gerçek. Yukarıda audit yol düzeltmesi uygulandı: `.tasks/audit/...` → `.deckent/evaluations/<sprintId>/<taskId>-attempt-<N>.json` (`EVALUATIONS_DIR`, `constants.ts:27`). Behavior unchanged; documentation alignment only.
+
+---
+
+**Amendment — 2026-06-11 (ADR-review, re-verification + bilinen boşluk).** **Classification: BOTH** (`deckent status`/dashboard gözlemlenebilirliği user-facing ürün yüzeyi).
+
+**Re-verified (güncel satırlar):** 4 call-site canlı — PLAN:652, SPAWN:761/767, EVALUATE:1177, FIX:1795 ✓ · `writeEvaluationAudit` 3 call-site ✓ · `EVALUATIONS_DIR` (constants.ts:27) ✓.
+
+**🟡 Bilinen gözlemlenebilirlik-boşluğu (UX-denetimi 2026-06-11, canlı serve+playwright):** Contract `sprint-state.json` + evaluations audit-trail için ÇALIŞIYOR; ancak hedefin ("external observer gerçek durumu görür") **dashboard yüzeyinde deliği var** — sprint finalize sonrası auditor scan'i durduğu için **`.dashboard` snapshot'ı donuk kalır** ve `/api/status` (`server.ts readDashboardJson`) sprint-state'in `COMPLETED`'ı ile **reconcile etmez**: Sprint 280'de dashboard, sprint COMPLETE iken "EXECUTE %80, ~21dk kaldı" gösterdi; Chat sayfası ("Aktif sprint yok") doğruydu → yüzeyler-arası tutarsız kaynak. Fix: finalize'da terminal `.dashboard` yaz **veya** `/api/status` sprint-state-öncelikli reconcile — Chat/Dashboard product-sprint'inde ele alınır (bkz. memory `project_dashboard_chat_audit_20260611` bulgu #2). md+db senkron (Alperen ADR-review).

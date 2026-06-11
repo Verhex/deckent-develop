@@ -49,7 +49,7 @@
 ## Architecture Decision Records
 - `.brain/exports/decisions.md` = **ADR** (Architecture Decision Record) — generated export from memory.db, MADR v3 hibrit format, mandatory read for all agents
 - `.deckent/decisions/*.json` = **SDL** (Sprint Decision Log) — tactical decisions, audit trail, optional
-- **`dependency_pipeline_enabled`:** kod default `true` (`config.ts:600`, Sprint 156 eklendi). deckent-dev bu projede bilinçli `false` (`.deckent/config.json:198`) — Wave geçişleri Brain manuel (ADR-047). Kullanıcı projelerinde default `true` = otomatik wave (ADR-045).
+- **`dependency_pipeline_enabled`:** kod default `true` (Sprint 156 eklendi). **deckent-dev'de de artık `true`** (`.deckent/config.json`, flip 2026-06-10) — otomatik multi-wave canlı-kanıtlı (Sprint 279/280 kademeli wave yürütme; ADR-045 amendment). Kullanıcı projelerinde de default `true`. ADR-047 Brain-manuel wave artık fallback. Dependency-tatmin seti: `DONE ∪ MANUAL_REVIEW_REQUIRED` (Sprint 280, MRR-deadlock fix).
 
 ## Context
 @DIRECTIVES.md

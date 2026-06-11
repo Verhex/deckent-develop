@@ -102,3 +102,13 @@ Agent taxonomy şu şekilde reorganize edildi:
 - ADR-040: Nervous System Architecture — AgentRoutingHealth detector integration
 
 > **Note (verified vs code, Sprint 172):** Confirmed accurate — `.deckent/agents/` holds **15 built-in agents** (excluding temp/archive); `test-writer` is removed and archived under `.deckent/agents/archive/test-writer-removed-sprint-148/`. The Agent=vertical / Skill=horizontal taxonomy is consistent with `docs/architecture/agents.md` and `docs/architecture/agent-skill-architecture.md`. This decision was further **re-reconfirmed in Sprint 166** (per `DECKENT.md`) — still in force. Behavior unchanged; documentation alignment only.
+
+---
+
+## Amendment — Sprint 281 (2026-06-11, ADR-review, full code-verification)
+
+**Classification: BOTH** (taksonomi ürün-kanunudur — kullanıcı agent/skill yüzeylerini görür; custom-agent breaking-change etkisi de user-facing).
+
+**Re-verified:** 15 built-in agent + test-writer yok + arşiv duruyor ✓ · testing-expert auto-activation (`'test-coverage'` tag → +2, `routing-engine.ts:887`) ✓ · `ANOMALY_THRESHOLD_RATE = 0.40` (`detectors/agent-routing.ts:23`) ✓ · routing'de test-writer izi yok ✓.
+
+**Dağılım-hedefi gerçekliği:** Taksonomi kararı (vertical/horizontal, test=yatay-beceri) sağlam ve kalıcı-enforce'lu. Ancak Consequences'taki "routing dağılımı dengelendi" hedefi pratikte **kronik nüksetti** — test-writer monopolünün yerini dönem dönem **refactorer-ağırlığı** aldı (örn. Sprint 211: 12/16 task; bkz. memory `feedback_agent_routing_imbalance`). Mitigasyonlar: **ADR-072** (Agent Routing Balance — multi-signal scoring) + **ADR-075** (skill→agent affinity). %40 threshold'u **detector-izlemeli advisory'dir** (AgentRoutingHealth uyarır), hard-enforce değildir — dağılım dengesi sürekli-izlenen bir hedef olarak kalır. md+db senkron (Alperen ADR-review).

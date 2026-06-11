@@ -2559,6 +2559,23 @@ KILL_LIVE_SPRINT, MANUAL_FILE_DELETE, COST_OVER_THRESHOLD, DESTRUCTIVE_GIT, ADR_
 
 > **Note (verified vs code, Sprint 172):** `src/nervous/` exists with the full pipeline modules (observer, detector-registry, decision-engine, proposer, dispatcher, executor, authority-matrix, history, runtime-scope-check, detectors/) and the **sprint-controller EventBus hook is wired** (`src/orchestra/sprint-controller.ts` — `emitSprintEvent('SPRINT_PHASE_CHANGE', …)`, "always fires, subscribers optional"). The MCP `deckent_nervous_*` tools exist. Consistent with this ADR's own caveats, the Nervous System is **config-gated / opt-in**: the proactive Observer pipeline is not the default active path, and in practice deckent-dev operates self-modifying sprints via ADR-047 (Manuel Subagent Dispatch) rather than autonomous nervous execution. The "Toplam 27 MCP tool" figure (under "MCP Tools") is a Sprint-147 snapshot — the current count is higher (~31, drift-prone; canonical: `docs/reference/mcp-tools.md`). Behavior unchanged; documentation alignment only.
 
+---
+
+## Amendment — Sprint 281 (2026-06-11, ADR-review, full code-verification)
+
+**Classification: BOTH** (kullanıcı preset konfigüre eder, bildirim alır, onaylar/reddeder/düzenler — ürün özelliği; + dogfood meta-koruması).
+
+**Re-verified verbatim:** 5 Locked Safety Floor (`authority-matrix.ts:24`, `Object.freeze`) ✓ · 4 preset + per-action override ✓ · action-registry **tam 30** ✓ · pipeline modülleri ✓ · "config-gated opt-in" tespiti hâlâ doğru ✓.
+
+**Davranış-evrimi (Sprint 279-280 — bu ADR'nin Executor/CLI semantiğini günceller):**
+
+1. **Executor "approve" modu nüanslandı (Sprint 279 WK-nervous, panic-gate wire):** non-SAFETY_FLOOR `approve` action'ları artık **10s hard-timeout → auto-proceed** (`awaitPanicGateApproval` → `handleApprove`; `isLockedPanicAction` muafiyet-kontrolü). **SAFETY_FLOOR action'ları muaf — koşulsuz sonsuz-bekler** (kullanıcı çözene dek). Orijinal "approve = user decision bekler" ifadesi artık yalnız SAFETY_FLOOR için koşulsuz geçerli.
+2. **`edit` subcommand uçtan-uca CANLI (Sprint 280 APPROVE-007b):** `ApprovalRequest.modifiedPayload` IPC transport + executor merge (`{...orijinal, ...modifiedPayload}` yalnız 'accepted'ta; yokken byte-aynı) + bootstrap poller forward + REPL `/nervous edit <id> <k=v|json>`. ADR'nin başta listelediği edit artık gerçekten çalışır.
+3. **Cross-process approval round-trip (§4G APPROVE-004/005/007, ~Sprint 233):** Executor'a DI `PendingApprovalStore` (CLI-okunur `.deckent/nervous-pending.json`) + `ipcQueue.startPolling → executor.resolveApproval` wire + CLI accept/reject→IPC route (heartbeat-liveness'lı) — onaylar CLI/MCP/REPL'den canlı executor'a ulaşır (eskiden sessizce düşüyordu).
+4. **Detector 5 → 12 (additive):** + build-failure-recurrence, dead-event-stream, token-spike, task-mode-idle, notification-delivery-health, scope-collision-rate, agent-routing-anomaly. 5-MVP listesi Sprint-147 snapshot'ı.
+
+md+db senkron (Alperen ADR-review).
+
 
 ---
 
@@ -2670,6 +2687,16 @@ Agent taxonomy şu şekilde reorganize edildi:
 - ADR-040: Nervous System Architecture — AgentRoutingHealth detector integration
 
 > **Note (verified vs code, Sprint 172):** Confirmed accurate — `.deckent/agents/` holds **15 built-in agents** (excluding temp/archive); `test-writer` is removed and archived under `.deckent/agents/archive/test-writer-removed-sprint-148/`. The Agent=vertical / Skill=horizontal taxonomy is consistent with `docs/architecture/agents.md` and `docs/architecture/agent-skill-architecture.md`. This decision was further **re-reconfirmed in Sprint 166** (per `DECKENT.md`) — still in force. Behavior unchanged; documentation alignment only.
+
+---
+
+## Amendment — Sprint 281 (2026-06-11, ADR-review, full code-verification)
+
+**Classification: BOTH** (taksonomi ürün-kanunudur — kullanıcı agent/skill yüzeylerini görür; custom-agent breaking-change etkisi de user-facing).
+
+**Re-verified:** 15 built-in agent + test-writer yok + arşiv duruyor ✓ · testing-expert auto-activation (`'test-coverage'` tag → +2, `routing-engine.ts:887`) ✓ · `ANOMALY_THRESHOLD_RATE = 0.40` (`detectors/agent-routing.ts:23`) ✓ · routing'de test-writer izi yok ✓.
+
+**Dağılım-hedefi gerçekliği:** Taksonomi kararı (vertical/horizontal, test=yatay-beceri) sağlam ve kalıcı-enforce'lu. Ancak Consequences'taki "routing dağılımı dengelendi" hedefi pratikte **kronik nüksetti** — test-writer monopolünün yerini dönem dönem **refactorer-ağırlığı** aldı (örn. Sprint 211: 12/16 task; bkz. memory `feedback_agent_routing_imbalance`). Mitigasyonlar: **ADR-072** (Agent Routing Balance — multi-signal scoring) + **ADR-075** (skill→agent affinity). %40 threshold'u **detector-izlemeli advisory'dir** (AgentRoutingHealth uyarır), hard-enforce değildir — dağılım dengesi sürekli-izlenen bir hedef olarak kalır. md+db senkron (Alperen ADR-review).
 
 
 ---
@@ -2785,6 +2812,22 @@ env DECKENT_STYLE=task (highest)
 - Sprint 148 competitive analysis: OpenClaw life assistant mode comparison
 
 > **Note (verified vs code → status promoted, Sprint 172):** This ADR was marked `proposed` but the dual-mode is **shipped and verified**: `src/orchestra/task-mode-runner.ts` (`runTaskMode()`), `src/cli/commands/mode.ts` (`VALID_STYLES = ['sprint','task']`, `deckent mode sprint|task|auto`), the `deckent_style` config key (3-layer merge, ADR-004), and `README.md` presents Dual Mode as a core feature. Status therefore promoted **proposed → accepted** (governance-approved). The `🔄` items above (T-150-003/004 full task-mode UX, idle detector) reflect Sprint-150-era progress markers; the core toggle + runner are in place. `.brain/exports/summary.md`/`memory.db` will reflect `accepted` after the next `syncAdrFilesToDb` (docs/adr → DB). Behavior unchanged; documentation alignment only.
+
+---
+
+## Amendment — Sprint 281 (2026-06-11, ADR-review, full code-verification)
+
+**Classification: BOTH** (dual-audience ürünün özü; mode-toggle user-facing).
+
+**Re-verified:** `runTaskMode` (task-mode-runner.ts:93) ✓ · `VALID_STYLES=['sprint','task']` (mode.ts:10) ✓ · `deckent_style` config (config-types.ts:529/800) ✓ · task-mode-idle detector ✓.
+
+**1. Task-mode → otonom motorun yürütme-primitifi oldu.** `runTaskMode` artık **5 canlı production tüketicili** — en önemlisi `autonomous/execute-dispatcher.ts` (durable backlog `kind=task` → runTaskMode; F3-009). Sprint-172'de "core toggle + runner yerinde" idi; bugün task-mode otonom yürütmenin omurgası.
+
+**2. Üçüncü mod PLANLI: `process` (ADR-067, proposed — Alperen).** Bu ADR'nin dual'i (sprint|task) mevcut-gemideki kanundur; yön **üçlü**: gerekçe (Alperen 2026-06-11 review) — (a) **"sprint" evrensel bir kavram değil** (geliştirici-dışı kullanıcı için adlandırma/UX sorunu), (b) **task-mode agentic DEĞİL** (tek-atışlık worker, agentic loop yok) → uzun-ömürlü + agentic üçüncü mod = **process**. Kod-durumu: `'process'` henüz `deckent_style` değeri değil; temeller inmiş (`scheduled-flow.ts`, `flow.ts` CLI, `tenant-context.ts`, `event-trigger.ts`) ve **otonom motor (F3-009) fiilen onun agentic runtime'ı**. Tam karar + style-entegrasyonu ADR-067'nin kendi review/kabulünde ele alınır.
+
+**3. Style ≠ Surface netleştirmesi:** ADR-081'in native agentic REPL'i (çıplak `deckent`) bir **etkileşim-yüzeyidir**, üçüncü bir `deckent_style` DEĞİL — style yürütme-paradigmasını (sprint|task|gelecekte-process), yüzeyler (CLI/REPL/dashboard/MCP/bot) onun üstündeki erişimi tanımlar.
+
+md+db senkron (Alperen ADR-review).
 
 
 ---
@@ -2968,6 +3011,10 @@ store.insert({
 Bu ADR, Sprint 160–162 boyunca üç ayrı commit'te gerçekleştirilen implementasyonun geriye dönük belgelenmesidir. ADR-043 olmadan Sprint 163 governance borcu kapanmış sayılmıyordu. ADR-036 (ADR Governance Integration) gereği tüm kabul edilen mimari kararlar kayıt altına alınmak zorundadır.
 
 > **Note (verified vs code, Sprint 172):** Confirmed accurate against the codebase — referenced commits `9c184a3` (Sprint 160 T-001) and `8cefed0` (Sprint 161 T-002) **exist in this repo's git history** (real provenance, not migration-dead refs). The protocol's three layers are wired: `installCrashHandlers()` (`src/orchestra/sprint-runner-entry.ts`), `redactSensitive()` (`src/core/redact-sensitive.ts` + `src/orchestra/sensitive-redactor.ts`), and `restoreSprintFromCheckpoint()` + `computeEventStreamOffset()` (`src/orchestra/sprint-checkpoint.ts`). One naming correction applied above: the checkpoint interval is the `sprint_checkpoint_interval` config key (`config.ts:602`, default `5`), not a `CHECKPOINT_INTERVAL` constant. Behavior unchanged; documentation alignment only.
+
+---
+
+**Amendment — 2026-06-11 (ADR-review, re-verification + battle-tested kaydı).** **Classification: BOTH** (crash-recovery kullanıcı projelerinde de aynı şekilde çalışır — ürün dayanıklılığı). Re-verified: `installCrashHandlers({ipcDir, jobId})` boot'ta çağrılı (sprint-runner-entry.ts:194) ✓ · atomic `.tmp`+`renameSync` (sprint-checkpoint.ts:220) ✓ · `restoreSprintFromCheckpoint` (:618, canlı caller sprint-controller) ✓ · `sprint_checkpoint_interval` default 5 (config.ts:1148) ✓. **Battle-tested:** protokol gerçek crash'lerde kanıtlandı — Sprint 267 makine-uykusu crash (6/6 task kurtarıldı) + Sprint 270 WSL-VM crash (sıralı tek-container kurtarma); Sprint 272 GHOST-FINALIZE fix'i checkpoint-artığı temizliğini ekledi (start'ın checkpoint-kalıntısında dürüst davranması). md+db senkron (Alperen ADR-review).
 
 
 ---
@@ -3153,6 +3200,14 @@ ADR-053'te olduğu gibi: uygulama önce yazıldı, ADR tasarım kararlarını ge
 kayıt altına almaktadır. Sprint 163 ile kabul edilmiştir.
 
 > **Note (deep-verified vs code, Sprint 172):** Decision §1'deki **4 call-site tablosu kod ile birebir doğrulandı** (`src/orchestra/sprint-phases.ts`): `runPlanPhase`→`PLAN/PLANNING` (`:447`), `runSpawnPhase`→`SPAWN/sprint.status`→`SPAWN/ACTIVE` (`:550`/`:553`), `runEvaluatePhase`→`EVALUATE/EVALUATING` (`:736`), `runFixPhase`→`FIX/FIXING` (`:1100`). `runRetroPhase` için call-site yoktur ve ADR de listelemez (tutarlı). Tek nüans: `runSpawnPhase` ilk çağrıda status argümanı literal `RUNNING` değil dinamik `sprint.status`'tur (ADR'nin "RUNNING → ACTIVE" ifadesi yaklaşık). `persistPhaseTransition`/`writeEvaluationAudit`/`reconcileSpuriousNoGo` fonksiyonları kodda mevcut; referans commit `6c337b0` (Sprint 157 T-001 survivor) repo git geçmişinde gerçek. Yukarıda audit yol düzeltmesi uygulandı: `.tasks/audit/...` → `.deckent/evaluations/<sprintId>/<taskId>-attempt-<N>.json` (`EVALUATIONS_DIR`, `constants.ts:27`). Behavior unchanged; documentation alignment only.
+
+---
+
+**Amendment — 2026-06-11 (ADR-review, re-verification + bilinen boşluk).** **Classification: BOTH** (`deckent status`/dashboard gözlemlenebilirliği user-facing ürün yüzeyi).
+
+**Re-verified (güncel satırlar):** 4 call-site canlı — PLAN:652, SPAWN:761/767, EVALUATE:1177, FIX:1795 ✓ · `writeEvaluationAudit` 3 call-site ✓ · `EVALUATIONS_DIR` (constants.ts:27) ✓.
+
+**🟡 Bilinen gözlemlenebilirlik-boşluğu (UX-denetimi 2026-06-11, canlı serve+playwright):** Contract `sprint-state.json` + evaluations audit-trail için ÇALIŞIYOR; ancak hedefin ("external observer gerçek durumu görür") **dashboard yüzeyinde deliği var** — sprint finalize sonrası auditor scan'i durduğu için **`.dashboard` snapshot'ı donuk kalır** ve `/api/status` (`server.ts readDashboardJson`) sprint-state'in `COMPLETED`'ı ile **reconcile etmez**: Sprint 280'de dashboard, sprint COMPLETE iken "EXECUTE %80, ~21dk kaldı" gösterdi; Chat sayfası ("Aktif sprint yok") doğruydu → yüzeyler-arası tutarsız kaynak. Fix: finalize'da terminal `.dashboard` yaz **veya** `/api/status` sprint-state-öncelikli reconcile — Chat/Dashboard product-sprint'inde ele alınır (bkz. memory `project_dashboard_chat_audit_20260611` bulgu #2). md+db senkron (Alperen ADR-review).
 
 
 ---
@@ -3397,7 +3452,19 @@ test yapıldıktan sonra bu ADR production-validated olarak işaretlenir.
 > - **§2** → `result-collector.ts:379-387` `maybeRespawn` — `if (!config?.dependency_pipeline_enabled) return` legacy-FIFO no-op + fail-soft try/catch + `respawnEligibleTasks(projectRoot, sprint, config, spawnOpts)`. Tek nüans: respawn statik değil **lazy dynamic-import** (`loadRespawn()`) ile yüklenir — sözleşme sapması değil, ADR-008 tek-yönlü bağımlılık dostu.
 > - **§3** → `src/orchestra/sprint-spawner.ts` — slot kontrolü korundu (`:507` `slotsAvailable = max(0, maxWorkers - currentlyExecuting)`), `enforceWaveDependency` korundu (`:486`), `BRAIN→WORKER:DEPENDENCY_BLOCKED` (`:493`) ve `wave.respawn` metric (`:576`) gerçekten tetikleniyor; eligible filtresi `t.status === TaskStatus.DONE` (`:477`).
 >
-> **deckent-dev gerçeği:** Bu projede `.deckent/config.json` `dependency_pipeline_enabled: false` — Wave geçişleri bilinçle Brain-manuel (ADR-047, Sprint 164-171 kanıtlı). ADR'deki "Sprint 165 flip → production-validated" **kullanıcı-projesi default yolunu** tanımlar (`config.ts` kod default `true`, ADR-045 Sprint 169 H5'te `docs/reference/api-surface.md`'de teyitli); dogfood'da flag `false` kalır, rollback non-destructive (`if` branch atlanır). Behavior unchanged; documentation alignment only.
+> **deckent-dev gerçeği:** Bu projede `.deckent/config.json` `dependency_pipeline_enabled: false` — Wave geçişleri bilinçle Brain-manuel (ADR-047, Sprint 164-171 kanıtlı). ADR'deki "Sprint 165 flip → production-validated" **kullanıcı-projesi default yolunu** tanımlar (`config.ts` kod default `true`, ADR-045 Sprint 169 H5'te `docs/reference/api-surface.md`'de teyitli); dogfood'da flag `false` kalır, rollback non-destructive (`if` branch atlanır). Behavior unchanged; documentation alignment only. **(⚠️ Bu paragraf Sprint-172 anlık görüntüsüdür — aşağıdaki amendment'le superseded: dogfood da artık `true`.)**
+
+---
+
+## Amendment — Sprint 281 (2026-06-11, ADR-review, full code-verification)
+
+**Classification: BOTH** (kullanıcı-projelerinde default `true` — çekirdek ürün yürütme-semantiği; dogfood'da da artık canlı).
+
+**1. 🟢 deckent-dev DOGFOOD FLIP: `false` → `true` — CANLI-KANITLI.** `.deckent/config.json:84` artık `dependency_pipeline_enabled: true` (flip ~2026-06-10, [[feedback_scale_up_autonomous]] — "wave makinesini yük altında test etme" amacıyla). Canlı kanıt: **Sprint 279** kademeli worker-spawn timestamp'leri (wave-geçişleri otomatik) + **Sprint 280** 3-wave yürütme gözlendi (Wave-1 001-004 paralel · Wave-2 005-008 "Waiting for deps" · Wave-3 009/010 queued) ve dependency-parse zinciri doğrulandı (DIRECTIVES `- Dependencies:` → task-JSON `dependencies[]` %100; eski parse-gap kapalı). ADR'nin "production-validated" hedefi kullanıcı-yolu + dogfood'da gerçekleşti. ADR-047 Brain-manuel wave yönetimi artık zorunlu-yol değil (fallback olarak durur).
+
+**2. Semantik genişlemesi — dependency-tatmin seti `DONE ∪ MANUAL_REVIEW_REQUIRED` (Sprint 280, commit `9f966eeb`).** `respawnEligibleTasks`'in `doneTasks` seti artık `MANUAL_REVIEW_REQUIRED` statüsünü de bağımlılık-tatmin sayar (`sprint-spawner.ts:735`): MRR yalnız worker timeout'unda **disk-kanıtı varken** atanır (deliverable diskte; review/FIX kuyruğunda) — bağımlısını sonsuza bloke etmesi Sprint 280'de canlı deadlock yarattı (007-MRR → 009/010 hayalet → EXECUTE idle). Hâlâ-koşan (EXECUTING) upstream bloke etmeye devam eder. Kanıt: `tests/orchestra/respawn-mrr-unblock.test.ts` (4 test: MRR-unblock, DONE-korunum, EXECUTING-bloke, multi-dependent).
+
+**3. Doc-fix:** DECKENT.md'deki stale "deckent-dev bilinçle false" satırı bu amendment'le birlikte güncellendi. md+db senkron (Alperen ADR-review).
 
 
 ---

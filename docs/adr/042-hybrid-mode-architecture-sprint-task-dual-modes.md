@@ -105,3 +105,19 @@ env DECKENT_STYLE=task (highest)
 - Sprint 148 competitive analysis: OpenClaw life assistant mode comparison
 
 > **Note (verified vs code → status promoted, Sprint 172):** This ADR was marked `proposed` but the dual-mode is **shipped and verified**: `src/orchestra/task-mode-runner.ts` (`runTaskMode()`), `src/cli/commands/mode.ts` (`VALID_STYLES = ['sprint','task']`, `deckent mode sprint|task|auto`), the `deckent_style` config key (3-layer merge, ADR-004), and `README.md` presents Dual Mode as a core feature. Status therefore promoted **proposed → accepted** (governance-approved). The `🔄` items above (T-150-003/004 full task-mode UX, idle detector) reflect Sprint-150-era progress markers; the core toggle + runner are in place. `.brain/exports/summary.md`/`memory.db` will reflect `accepted` after the next `syncAdrFilesToDb` (docs/adr → DB). Behavior unchanged; documentation alignment only.
+
+---
+
+## Amendment — Sprint 281 (2026-06-11, ADR-review, full code-verification)
+
+**Classification: BOTH** (dual-audience ürünün özü; mode-toggle user-facing).
+
+**Re-verified:** `runTaskMode` (task-mode-runner.ts:93) ✓ · `VALID_STYLES=['sprint','task']` (mode.ts:10) ✓ · `deckent_style` config (config-types.ts:529/800) ✓ · task-mode-idle detector ✓.
+
+**1. Task-mode → otonom motorun yürütme-primitifi oldu.** `runTaskMode` artık **5 canlı production tüketicili** — en önemlisi `autonomous/execute-dispatcher.ts` (durable backlog `kind=task` → runTaskMode; F3-009). Sprint-172'de "core toggle + runner yerinde" idi; bugün task-mode otonom yürütmenin omurgası.
+
+**2. Üçüncü mod PLANLI: `process` (ADR-067, proposed — Alperen).** Bu ADR'nin dual'i (sprint|task) mevcut-gemideki kanundur; yön **üçlü**: gerekçe (Alperen 2026-06-11 review) — (a) **"sprint" evrensel bir kavram değil** (geliştirici-dışı kullanıcı için adlandırma/UX sorunu), (b) **task-mode agentic DEĞİL** (tek-atışlık worker, agentic loop yok) → uzun-ömürlü + agentic üçüncü mod = **process**. Kod-durumu: `'process'` henüz `deckent_style` değeri değil; temeller inmiş (`scheduled-flow.ts`, `flow.ts` CLI, `tenant-context.ts`, `event-trigger.ts`) ve **otonom motor (F3-009) fiilen onun agentic runtime'ı**. Tam karar + style-entegrasyonu ADR-067'nin kendi review/kabulünde ele alınır.
+
+**3. Style ≠ Surface netleştirmesi:** ADR-081'in native agentic REPL'i (çıplak `deckent`) bir **etkileşim-yüzeyidir**, üçüncü bir `deckent_style` DEĞİL — style yürütme-paradigmasını (sprint|task|gelecekte-process), yüzeyler (CLI/REPL/dashboard/MCP/bot) onun üstündeki erişimi tanımlar.
+
+md+db senkron (Alperen ADR-review).
