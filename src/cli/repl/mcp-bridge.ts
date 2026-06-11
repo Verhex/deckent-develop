@@ -34,7 +34,9 @@ import { McpToolRegistry } from '../../mcp-client/registry.js';
 import {
   buildMcpBridge,
   type BridgeBrokerLike,
+  type McpConfirmFn,
 } from '../commands/chat-mcp-bridge.js';
+import { getMessage } from '../helpers/messages.js';
 
 /** The live REPL-shaped MCP surface returned by `buildMcpBridge`. */
 export type ReplMcpBridge = ReturnType<typeof buildMcpBridge>;
@@ -100,4 +102,99 @@ export function initReplMcpBridge(opts: InitReplMcpBridgeOptions): ReplMcpBridge
     projectRoot,
     ...(sprintId !== undefined ? { sprintId } : {}),
   });
+}
+
+// ─── `/mcp` slash dispatch (Sprint 280 Task 280-004 — G1 live wire) ──────────
+//
+// The REPL `/mcp [list|call <tool> [args]]` handler. Given a LIVE bridge
+// (composed via `buildMcpBridge`), `list` connects the configured servers and
+// renders the namespaced tool catalogue; `call` dispatches one tool through the
+// bridge's confirm-gate + audit path. This is the pure dispatch core — the
+// chat-native loop owns server-discovery + bridge construction and only calls
+// in once it has a bridge. NEVER throws: every broker/connect failure is caught
+// and surfaced as a `[mcp-error] …` string so the REPL stays alive (fail-safe).
+
+/**
+ * Parse the trailing words of `/mcp call <tool> [args…]` into a tool-arg
+ * object. Accepts either one JSON object (`{"x":1}`) or a sequence of
+ * `key=value` tokens. Anything unparseable degrades to `{}` (never throws).
+ */
+export function parseMcpCallArgs(parts: readonly string[]): Record<string, unknown> {
+  if (parts.length === 0) return {};
+  const joined = parts.join(' ').trim();
+  if (joined.startsWith('{')) {
+    try {
+      const parsed = JSON.parse(joined) as unknown;
+      if (parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return parsed as Record<string, unknown>;
+      }
+    } catch {
+      // Not valid JSON — fall through to key=value parsing.
+    }
+  }
+  const out: Record<string, unknown> = {};
+  for (const p of parts) {
+    const eq = p.indexOf('=');
+    if (eq > 0) out[p.slice(0, eq)] = p.slice(eq + 1);
+  }
+  return out;
+}
+
+export interface DispatchMcpSlashOptions {
+  /** Words AFTER `/mcp` — e.g. `['list']` or `['call','srv__tool','{...}']`. */
+  args: readonly string[];
+  /** A live bridge (`buildMcpBridge` return) — list/connect/dispatch surface. */
+  bridge: ReplMcpBridge;
+  /** UI language for the localized usage/unknown-subaction notices. */
+  lang: string;
+  /**
+   * Confirm gate for `call` (external MCP tool = arbitrary side-effect). The
+   * bridge invokes it before `callTool`. Defaults to auto-approve — an explicit
+   * `/mcp call` is itself the user's consent; the REPL entry point may inject a
+   * stricter prompt. Tests inject a rejecting stub to exercise the cancel path.
+   */
+  confirm?: McpConfirmFn;
+}
+
+/**
+ * Handle a `/mcp [list|call <tool> [args]]` REPL line against a live bridge.
+ *
+ * Localized notices route through `getMessage` with EXISTING message keys
+ * (`chat.slash_unknown_subaction`) so no hardcoded user-facing strings are
+ * introduced (i18n-first). Dynamic output (tool catalogue, call results) comes
+ * straight from the broker and is server-derived data, not localizable text.
+ *
+ * Fail-safe contract: this function NEVER throws. `loadAndConnectAll` already
+ * skips misbehaving servers internally and `bridge.dispatch` encodes errors in
+ * its result shape; the outer try/catch is a final backstop for an unexpected
+ * throw so the REPL session is never torn down by a `/mcp` line.
+ */
+export async function dispatchMcpSlash(opts: DispatchMcpSlashOptions): Promise<string> {
+  const { bridge, lang } = opts;
+  const sub = (opts.args[0] ?? 'list').toLowerCase();
+  try {
+    if (sub === 'list') {
+      await bridge.loadAndConnectAll();
+      return bridge.listSlashLines().join('\n');
+    }
+    if (sub === 'call') {
+      const tool = opts.args[1];
+      if (!tool) {
+        return getMessage('chat.slash_unknown_subaction', lang, {
+          command: '/mcp call',
+          sub: '',
+        });
+      }
+      // Connect + register first so the namespaced name resolves before dispatch.
+      await bridge.loadAndConnectAll();
+      const callArgs = parseMcpCallArgs(opts.args.slice(2));
+      const confirmFn: McpConfirmFn = opts.confirm ?? (async (): Promise<boolean> => true);
+      const result = await bridge.dispatch(tool, callArgs, confirmFn);
+      return result.output;
+    }
+    return getMessage('chat.slash_unknown_subaction', lang, { command: '/mcp', sub });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return `[mcp-error] ${msg}`;
+  }
 }

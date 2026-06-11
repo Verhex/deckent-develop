@@ -18,6 +18,7 @@ import {
   applyInterrogationAnswers,
 } from '../../core/directive-interrogator.js';
 import type { InterrogationAnswer } from '../../core/directive-interrogator.js';
+import { createSpinner } from './chat-spinner.js';
 
 export type RlFactory = () => {
   question: (q: string) => Promise<string>;
@@ -160,11 +161,19 @@ export function registerPlan(program: Command): void {
 
         const asDraft = opts.confirm !== false;
 
-        const sprint = await planSprint(root, config, context, recommendation, {
-          mode: planMode,
-          asDraft,
-          dryRun,
-        });
+        const spinnerLabel = lang === 'tr' ? 'Planlanıyor…' : 'Planning…';
+        const spinner = createSpinner(spinnerLabel);
+        spinner.start();
+        let sprint;
+        try {
+          sprint = await planSprint(root, config, context, recommendation, {
+            mode: planMode,
+            asDraft,
+            dryRun,
+          });
+        } finally {
+          spinner.stop();
+        }
 
         print(getMessage('plan.sprint_planned', lang, {
           number: String(sprint.number),

@@ -92,6 +92,18 @@ export async function notify(
 }
 
 /**
+ * Convenience helper: emit a 'progress' notification.
+ * Equivalent to notify('progress', sprintId, phase, detail ?? phase, details).
+ */
+export async function notifyProgress(
+  sprintId: string,
+  phase: string,
+  detail?: string,
+): Promise<void> {
+  return notify('progress', sprintId, phase, detail ?? phase);
+}
+
+/**
  * Fire-and-forget variant — schedules notify() via microtask queue without awaiting.
  * Use this when the caller cannot afford even a microtask delay
  * (e.g. hot path in event loop). Otherwise prefer `await notify(...)` for ordering.

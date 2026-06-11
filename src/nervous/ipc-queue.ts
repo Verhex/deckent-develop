@@ -79,6 +79,13 @@ export interface ApprovalRequest {
   readonly decision: ApprovalDecision;
   readonly reason?: string;
   readonly requestedAt: string;
+  /**
+   * APPROVE-007b (Sprint 280): optional payload edits a human applied before
+   * accepting. The executor shallow-merges these over the action's original
+   * payload (`{ ...original, ...modifiedPayload }`) on an `accepted` decision.
+   * Absent (legacy / reject) → byte-identical to the pre-edit behavior.
+   */
+  readonly modifiedPayload?: Record<string, unknown>;
 }
 
 export interface ApprovalRequestInput {
@@ -86,6 +93,8 @@ export interface ApprovalRequestInput {
   readonly decision: ApprovalDecision;
   readonly reason?: string;
   readonly requestedAt?: string;
+  /** Optional payload edits to transport with an accept — see ApprovalRequest. */
+  readonly modifiedPayload?: Record<string, unknown>;
 }
 
 export interface PendingItem {
@@ -152,6 +161,9 @@ export class NervousIpcQueue {
       decision: input.decision,
       reason: input.reason,
       requestedAt,
+      // Carried only when present — JSON.stringify omits an undefined value, so
+      // legacy (no-edit) writes stay byte-identical to the pre-280-003 format.
+      modifiedPayload: input.modifiedPayload,
     };
     const safeId = sanitizeId(input.notificationId);
     const suffix = `${Date.now().toString(36)}-${randomBytes(4).toString('hex')}`;

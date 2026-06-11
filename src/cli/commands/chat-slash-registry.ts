@@ -223,11 +223,15 @@ const SLASH_CATALOG: readonly SlashCommand[] = [
     agenticArgs: {},
   },
   {
-    // Meta-command: external MCP-client is not wired into the REPL yet (F9
-    // Faz 2 roadmap). Intercepted here with an honest i18n message so the
-    // line never round-trips to the provider (audit finding A3).
+    // Meta-command: handled in chat-native.ts BEFORE the registry (Sprint 280
+    // Task 280-004 — G1 live wire). When ≥1 MCP server is configured
+    // (.mcp.json), `/mcp list` shows the namespaced tool catalogue and
+    // `/mcp call <tool> [args]` dispatches through the broker confirm-gate.
+    // With no server configured it falls through here to the honest notice
+    // (resolveSlash → chat.mcp_not_wired) so the line never round-trips to the
+    // provider (audit finding A3).
     name: '/mcp',
-    desc: 'Harici MCP istemci durumu',
+    desc: 'Harici MCP araçları — list · call <tool> [args] (proje .mcp.json)',
   },
   {
     name: '/model',

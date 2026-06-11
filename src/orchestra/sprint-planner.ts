@@ -115,6 +115,10 @@ import { createTask, extractScopeFromDirective, parseStructuredDirectives, plann
 // ─── BrainError ──────────────────────────────────────────────────
 import { BrainError } from './sprint-lifecycle.js';
 
+// ─── Notify + Progress ───────────────────────────────────────────
+import { notify } from '../core/notify.js';
+import { emitProgress } from '../core/event-stream.js';
+
 // ═══ Exported Functions ════════════════════════════════════════════
 
 /**
@@ -235,6 +239,7 @@ export async function planSprint(
   options?: { mode?: BrainPlanningMode; asDraft?: boolean; dryRun?: boolean },
 ): Promise<Sprint> {
   const sprintId = getNextSprintId(projectRoot);
+  emitProgress({ phase: 'PLAN', root: projectRoot });
   const defaultModel = recommendation.modelConstraint ?? config.activeModeConfig.default_model;
   let planMode = options?.mode ?? config.activeModeConfig.brain_planning ?? 'auto';
   const initialStatus = options?.asDraft ? TaskStatus.DRAFT : TaskStatus.PENDING;
@@ -247,9 +252,10 @@ export async function planSprint(
   const parsedDirectives = parseStructuredDirectives(context.directives);
   if (planMode !== 'structured' && parsedDirectives.some(t => t.provider || t.forceModel)) {
     if (planMode === 'ai') {
-      console.error(
-        '[Brain] Per-task provider/model overrides present in DIRECTIVES — using ' +
-        'structured planning to honor them exactly (AI planning cannot guarantee exact routing).',
+      void notify(
+        'phase-change', sprintId,
+        '[Brain] plan:structured-override',
+        'Per-task provider/model overrides present in DIRECTIVES — using structured planning to honor them exactly (AI planning cannot guarantee exact routing).',
       );
     }
     planMode = 'structured';
@@ -326,16 +332,18 @@ export async function planSprint(
       plannerResult = callResult.data;
       const directiveTaskCount = parsedDirectives.length;
       if (planMode === 'auto' && directiveTaskCount > 0 && plannerResult.tasks.length < directiveTaskCount) {
-        console.error(
-          `[Brain] AI planner returned ${plannerResult.tasks.length} tasks, ` +
-          `but directives contain ${directiveTaskCount}. Falling back to structured mode.`,
+        void notify(
+          'progress', sprintId,
+          '[Brain] plan:task-count-low',
+          `AI planner returned ${plannerResult.tasks.length} tasks, but directives contain ${directiveTaskCount}. Falling back to structured mode.`,
         );
         plannerResult = null;
         usedMode = 'fallback';
       } else if (planMode === 'auto' && directiveTaskCount > 0 && plannerResult.tasks.length > directiveTaskCount * 2) {
-        console.error(
-          `[Brain] AI planner returned ${plannerResult.tasks.length} tasks (>2x of ${directiveTaskCount}). ` +
-          `Falling back to structured mode.`,
+        void notify(
+          'progress', sprintId,
+          '[Brain] plan:task-count-high',
+          `AI planner returned ${plannerResult.tasks.length} tasks (>2x of ${directiveTaskCount}). Falling back to structured mode.`,
         );
         plannerResult = null;
         usedMode = 'fallback';
@@ -358,11 +366,11 @@ export async function planSprint(
         SprintPhase.PLAN,
       );
     } else {
-      // auto mode + AI failure: emit an explicit warning with the actual reason
-      // + message so the user can debug (no silent drop).
-      console.error(
-        `[Brain] AI planner failed (provider=${brainProviderName ?? 'unknown'}, reason=${callResult.reason}): ` +
-        `${callResult.message} — structured moda düşülüyor (falling back to structured mode).`,
+      // auto mode + AI failure: surface via notify so operator/MCP/AI can see it.
+      void notify(
+        'phase-change', sprintId,
+        '[Brain] plan:ai-failed',
+        `AI planner failed (provider=${brainProviderName ?? 'unknown'}, reason=${callResult.reason}): ${callResult.message} — falling back to structured mode.`,
       );
       usedMode = 'fallback';
     }
@@ -449,9 +457,10 @@ export async function planSprint(
   // D) Safeguard: warn if AI planner produced >2x the directive task count
   const directiveTaskCountForGuard = parsedDirectives.length;
   if (directiveTaskCountForGuard > 0 && tasks.length > directiveTaskCountForGuard * 2) {
-    console.error(
-      `[Brain] Warning: ${tasks.length} tasks planned but directives only contain ${directiveTaskCountForGuard} tasks (>2x). ` +
-      `Review the plan for excessive task generation.`,
+    void notify(
+      'progress', sprintId,
+      '[Brain] plan:task-overflow',
+      `Warning: ${tasks.length} tasks planned but directives only contain ${directiveTaskCountForGuard} tasks (>2x). Review the plan for excessive task generation.`,
     );
   }
 

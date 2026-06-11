@@ -61,7 +61,10 @@ export class Executor {
   private readonly pendingApprovals: Map<string, {
     notification: NervousNotification;
     actionId: string;
-    resolve: (decision: 'accepted' | 'rejected') => void;
+    resolve: (
+      decision: 'accepted' | 'rejected',
+      modifiedPayload?: Record<string, unknown>,
+    ) => void;
   }> = new Map();
 
   constructor(
@@ -88,11 +91,22 @@ export class Executor {
   /**
    * User-driven resolution: `deckent nervous accept <id>` / `reject <id>` calls this.
    * Works for both suggest-timeout and approve policies.
+   *
+   * APPROVE-007b (Sprint 280): `opts.modifiedPayload` lets a human edit the action
+   * payload before accepting. When present on an `accepted` decision, the handler
+   * runs with the shallow-merged payload (`{ ...original, ...modifiedPayload }`).
+   * Absent → byte-identical to the pre-edit behavior. Ignored on `rejected`
+   * (the handler is never invoked on reject). SAFETY_FLOOR (locked) actions keep
+   * their explicit-approval gating — editing only changes the accepted payload.
    */
-  resolveApproval(notificationId: string, decision: 'accepted' | 'rejected'): void {
+  resolveApproval(
+    notificationId: string,
+    decision: 'accepted' | 'rejected',
+    opts?: { modifiedPayload?: Record<string, unknown> },
+  ): void {
     const pending = this.pendingApprovals.get(notificationId);
     if (pending) {
-      pending.resolve(decision);
+      pending.resolve(decision, opts?.modifiedPayload);
       this.pendingApprovals.delete(notificationId);
       this.pendingStore?.remove(notificationId);
     }
@@ -220,13 +234,19 @@ export class Executor {
       this.pendingApprovals.set(notification.id, {
         notification,
         actionId: action.id,
-        resolve: async (decision: 'accepted' | 'rejected') => {
+        resolve: async (
+          decision: 'accepted' | 'rejected',
+          modifiedPayload?: Record<string, unknown>,
+        ) => {
           clearTimeout(timer);
           this.pendingTimers.delete(notification.id);
 
           if (decision === 'accepted') {
             try {
-              const result = await this.actionHandler(action.id, action.payload ?? {});
+              const effectivePayload = modifiedPayload
+                ? { ...(action.payload ?? {}), ...modifiedPayload }
+                : action.payload ?? {};
+              const result = await this.actionHandler(action.id, effectivePayload);
               resolve({
                 ...baseFields,
                 decision: 'accepted',
@@ -271,6 +291,7 @@ export class Executor {
       const finish = async (
         decision: 'accepted' | 'rejected' | 'timeout-auto-applied',
         decidedBy: 'user' | 'timeout',
+        modifiedPayload?: Record<string, unknown>,
       ): Promise<void> => {
         if (settled) return;
         settled = true;
@@ -279,7 +300,10 @@ export class Executor {
 
         if (decision === 'accepted' || decision === 'timeout-auto-applied') {
           try {
-            const result = await this.actionHandler(action.id, action.payload ?? {});
+            const effectivePayload = modifiedPayload
+              ? { ...(action.payload ?? {}), ...modifiedPayload }
+              : action.payload ?? {};
+            const result = await this.actionHandler(action.id, effectivePayload);
             outerResolve({
               ...baseFields,
               decision,
@@ -311,8 +335,11 @@ export class Executor {
       this.pendingApprovals.set(notification.id, {
         notification,
         actionId: action.id,
-        resolve: (decision: 'accepted' | 'rejected') => {
-          void finish(decision, 'user');
+        resolve: (
+          decision: 'accepted' | 'rejected',
+          modifiedPayload?: Record<string, unknown>,
+        ) => {
+          void finish(decision, 'user', modifiedPayload);
         },
       });
       this.pendingStore?.add(notification);

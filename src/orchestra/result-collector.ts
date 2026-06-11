@@ -125,7 +125,8 @@ import { getSystemProfile } from '../core/system-profile.js';
 import { resolveEffectiveWorkers } from '../core/config.js';
 
 // Sprint 183 W1-2 — DEPENDENCY_BLOCKED debounce cleanup helper
-import { clearDependencyBlockedState, writeEvent } from './event-stream.js';
+// Sprint 280 PLANOBS-001 — emitProgress emit-sites
+import { clearDependencyBlockedState, writeEvent, emitProgress } from './event-stream.js';
 
 // Sprint 195 195-001 (W-INTEGRITY) — disk-verify gate before synthetic NO_GO.
 import { verifyDiskAgainstClaim, DISK_VS_CLAIM_MISMATCH_CHANNEL } from './disk-verify.js';
@@ -823,6 +824,8 @@ export async function waitForResults(
       // respawnEligibleTasks paths; legacy FIFO queue does not persist.
       nextTask.status = TaskStatus.EXECUTING;
       lastSpawnAttempt = Date.now();
+      // PLANOBS-001 emit-site: SPAWN — fail-safe, never throws
+      emitProgress({ root: projectRoot, phase: 'SPAWN', detail: nextTask.id });
       return true;
     } catch (err) {
       debugLog('waitForResults:queue-spawn', `Failed to spawn queued task ${nextTask.id}: ${err instanceof Error ? err.message : String(err)}`);
@@ -1014,6 +1017,13 @@ export async function waitForResults(
       const now = Date.now();
       if (now - lastProgressLog >= PROGRESS_LOG_INTERVAL_MS) {
         debugLog('waitForResults:progress', `Sprint devam ediyor — ${collected.size}/${taskIds.size} task tamamlandı (${Math.round((now - startTime) / 60000)}dk)`);
+        // PLANOBS-001 emit-site: EXECUTE progress — fail-safe, never throws
+        emitProgress({
+          root: projectRoot,
+          phase: 'EXECUTE',
+          pct: taskIds.size > 0 ? Math.round((collected.size / taskIds.size) * 100) : 0,
+          detail: `${collected.size}/${taskIds.size}`,
+        });
         lastProgressLog = now;
       }
     }

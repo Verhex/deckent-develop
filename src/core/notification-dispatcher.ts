@@ -15,7 +15,9 @@ export type NotificationEventName =
   | 'task-done'
   | 'task-no-go'
   | 'sprint-finalized'
-  | 'human-checkpoint-required';
+  | 'human-checkpoint-required'
+  | 'progress'
+  | 'phase-change';
 
 export interface Notification {
   priority: NotificationPriority;
@@ -162,6 +164,8 @@ const EVENT_PRIORITY: Record<NotificationEventName, NotificationPriority> = {
   'task-no-go': 'warning',
   'sprint-finalized': 'info',
   'human-checkpoint-required': 'critical',
+  'progress': 'info',
+  'phase-change': 'info',
 };
 
 export function createNotification(

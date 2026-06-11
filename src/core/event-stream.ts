@@ -157,6 +157,10 @@ export const CHANNELS = {
   // string is also exported as CONTAINER_PATH_SANITIZED_CHANNEL from
   // container-path-sanitizer.ts (mirroring disk-verify's own channel const).
   CONTAINER_PATH_SANITIZED: 'BRAIN→AUDITOR:CONTAINER_PATH_SANITIZED',
+
+  // Sprint 280 — PLANOBS-001: plan/execute progress observability.
+  // Emitted by emitProgress() helper; emit-sites wired by Task 5.
+  PROGRESS: 'PROGRESS',
 } as const;
 
 export type ChannelCode = typeof CHANNELS[keyof typeof CHANNELS];
@@ -586,4 +590,44 @@ export function clearDependencyBlockedState(sprintId?: string, taskId?: string):
  */
 export function _getDependencyBlockedStateForTest(): Map<string, Map<string, string>> {
   return previousBlockedState;
+}
+
+// ─── Sprint 280 PLANOBS-001: emitProgress helper ─────────────────────
+
+/**
+ * Emit a PROGRESS event to the active sprint's event stream.
+ *
+ * Thin wrapper over writeEvent — fail-safe (never throws).
+ * Emit-sites (result-collector, plugin-hooks) are wired by Task 5.
+ *
+ * @param opts.root    - Project root; defaults to process.cwd()
+ * @param opts.phase   - Sprint/task phase label (e.g. 'EXECUTE', 'SPAWN', 'PLAN')
+ * @param opts.pct     - Completion percentage 0–100 (optional)
+ * @param opts.detail  - Human-readable detail string (optional)
+ * @param opts.source  - Event source component; defaults to 'brain'
+ * @returns The written DeckentEvent, or null if sprint not found / write failed
+ */
+export function emitProgress(opts: {
+  root?: string;
+  phase: string;
+  pct?: number;
+  detail?: string;
+  source?: string;
+}): DeckentEvent | null {
+  try {
+    const projectRoot = opts.root ?? process.cwd();
+    const sprintId = getCurrentSprintId(projectRoot);
+    if (!sprintId) return null;
+    const source = (opts.source ?? 'brain') as DeckentEvent['source'];
+    return writeEvent(
+      projectRoot,
+      sprintId,
+      source,
+      '*',
+      CHANNELS.PROGRESS,
+      { phase: opts.phase, pct: opts.pct, detail: opts.detail },
+    );
+  } catch {
+    return null;
+  }
 }

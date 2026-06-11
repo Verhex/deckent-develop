@@ -383,6 +383,18 @@ const MESSAGES: MessageMap = {
     en: '⚠ {action} — no live nervous process, dismissed without executing',
     tr: '⚠ {action} — canlı nervous süreci yok, çalıştırılmadan kapatıldı',
   },
+  'nervous.slash_edit_payload_required': {
+    en: '[nervous edit] payload required: /nervous edit <id> key=val ... or {json}',
+    tr: '[nervous edit] payload gerekli: /nervous edit <id> key=val ... veya {json}',
+  },
+  'nervous.slash_edit_invalid_json': {
+    en: '[nervous edit] invalid JSON payload: {detail}',
+    tr: '[nervous edit] geçersiz JSON payload: {detail}',
+  },
+  'nervous.slash_edit_invalid_kv': {
+    en: '[nervous edit] invalid key=value argument: {arg}',
+    tr: '[nervous edit] geçersiz key=value argümanı: {arg}',
+  },
   // ─── config nervous command (MSG-004, §4G) ───────────────────────────
   'config_nervous.mode_set': { en: '✓ Mode set to: {preset}', tr: '✓ Mod ayarlandı: {preset}' },
   'config_nervous.invalid_preset': {

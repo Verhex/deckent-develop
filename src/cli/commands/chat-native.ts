@@ -29,6 +29,14 @@ import {
 } from './chat-resume.js';
 import { getMessage } from '../helpers/messages.js';
 import { buildInterrogationQuestions } from '../../core/directive-interrogator.js';
+import { buildMcpBridge, type McpConfirmFn } from './chat-mcp-bridge.js';
+import { McpClientBroker } from '../../mcp-client/broker.js';
+// Aliased: this file already exports a local duck-typed `McpToolRegistry`
+// interface (the in-process deckent_* tool registry); the external-MCP client
+// registry class is a distinct type used only to compose the `/mcp` bridge.
+import { McpToolRegistry as McpClientToolRegistry } from '../../mcp-client/registry.js';
+import { loadMcpServers } from '../../mcp-client/config.js';
+import { dispatchMcpSlash, type ReplMcpBridge } from '../repl/mcp-bridge.js';
 
 // ═══ chat-native — Path C tool-use loop iskelet (Sprint 203 T-203-005) ═══
 //
@@ -300,6 +308,23 @@ export interface ChatNativeOptions {
    * production defaults to `process.cwd()` like the nervous bridge.
    */
   projectRoot?: string;
+  /**
+   * Sprint 280 T-280-004 — external-MCP `/mcp` wire. A pre-built bridge
+   * (`buildMcpBridge` return). When provided (non-null) the `/mcp` slash routes
+   * to it directly; when `null` it forces the honest no-server fall-through.
+   * When OMITTED (the production/default), the loop builds a bridge lazily from
+   * server-discovery (`loadMcpServers(projectRoot)`) and only when ≥1 MCP server
+   * is configured — otherwise `/mcp` keeps its existing honest notice. Tests
+   * inject a fake bridge to stay hermetic (no real MCP subprocess/connect).
+   */
+  mcpBridge?: ReplMcpBridge | null;
+  /**
+   * Sprint 280 T-280-004 — confirm gate for `/mcp call <tool>` (external MCP
+   * tool = arbitrary side-effect). Defaults to auto-approve (an explicit
+   * `/mcp call` is the user's consent); the REPL entry point may inject a
+   * stricter prompt. Tests inject a stub to drive the cancel path.
+   */
+  mcpConfirm?: McpConfirmFn;
 }
 
 const DEFAULT_MAX_TURNS = 50;
@@ -414,6 +439,12 @@ export async function runChatNativeLoop(opts: ChatNativeOptions): Promise<ChatMe
   const lang = opts.lang ?? 'en';
   // Most recently shown /resume list — lets `/resume <n>` pick by number.
   let lastResumeList: ReadonlyArray<{ sessionId: string; turnCount: number; lastAt: string; preview: string }> = [];
+  // Sprint 280 T-280-004 — lazily-built external-MCP bridge for `/mcp`, cached
+  // for the REPL session (one broker/connection pool per session). Built once
+  // on first `/mcp` use when MCP servers are configured; `built` guards the
+  // (cheap) discovery so a no-server session never re-probes every `/mcp`.
+  let liveMcpBridge: ReplMcpBridge | null = null;
+  let liveMcpBridgeBuilt = false;
   // Sprint 223 T-223-004 — chat-layout wire. emitLayout suppresses empty
   // strings (messageSeparator returns '' on non-TTY) so callers see only
   // meaningful chrome. Default-off so existing HTTP/test callers keep their
@@ -532,6 +563,64 @@ export async function runChatNativeLoop(opts: ChatNativeOptions): Promise<ChatMe
       memStore?.appendChatTurn(sessionId, 'user', line);
       memStore?.appendChatTurn(sessionId, 'assistant', interrText);
       continue;
+    }
+    // Sprint 280 T-280-004 — `/mcp` external-MCP-client wire (G1). The bridge
+    // (buildMcpBridge + McpClientBroker) shipped in Sprint 229 but had zero REPL
+    // callers; this is the live wire. Config-gated on server-discovery: `/mcp`
+    // routes to the broker ONLY when ≥1 MCP server is configured
+    // (loadMcpServers: .mcp.json / .mcp.local.json / ~/.deckent/mcp.json) OR a
+    // bridge was injected (tests/entry). With NO server configured the block
+    // does NOT intercept — `/mcp` falls through to the slash registry's existing
+    // honest notice (behaviour preserved, `chat.mcp_not_wired`). Fail-safe:
+    // discovery + bridge construction are wrapped so a `/mcp` line never crashes
+    // the REPL; dispatchMcpSlash itself never throws.
+    if (line === '/mcp' || line.startsWith('/mcp ')) {
+      const mcpRoot = opts.projectRoot ?? process.cwd();
+      let bridge: ReplMcpBridge | null;
+      if (opts.mcpBridge !== undefined) {
+        // Explicit injection (tests / future entry wire). `null` forces the
+        // honest no-server fall-through below.
+        bridge = opts.mcpBridge;
+      } else {
+        if (!liveMcpBridgeBuilt) {
+          liveMcpBridgeBuilt = true;
+          let configured = false;
+          try {
+            configured = Object.keys(loadMcpServers(mcpRoot)).length > 0;
+          } catch {
+            configured = false;
+          }
+          if (configured) {
+            try {
+              liveMcpBridge = buildMcpBridge({
+                broker: new McpClientBroker(),
+                registry: new McpClientToolRegistry(),
+                projectRoot: mcpRoot,
+              });
+            } catch {
+              liveMcpBridge = null;
+            }
+          }
+        }
+        bridge = liveMcpBridge;
+      }
+      if (bridge !== null) {
+        const mcpArgs = line.split(/\s+/).slice(1);
+        const mcpText = await dispatchMcpSlash({
+          args: mcpArgs,
+          bridge,
+          lang,
+          ...(opts.mcpConfirm !== undefined ? { confirm: opts.mcpConfirm } : {}),
+        });
+        output(mcpText);
+        transcript.push({ role: 'user', content: line });
+        transcript.push({ role: 'assistant', content: mcpText });
+        memStore?.appendChatTurn(sessionId, 'user', line);
+        memStore?.appendChatTurn(sessionId, 'assistant', mcpText);
+        continue;
+      }
+      // bridge === null → no MCP server configured. Fall through to the slash
+      // registry below, which returns the existing honest `/mcp` notice.
     }
     // Sprint 222 T-222-005 — slash registry wire. Extended slash commands
     // (/help, /status, /recall, /plan, /sprint) resolve via the live
