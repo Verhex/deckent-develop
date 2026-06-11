@@ -225,6 +225,8 @@ These exceptions never interpolate untrusted input into a command string (args r
 
 **Faz-2 tespitleri (MASTER-PLAN ORCH-W):** (1) `debt-manager → agents/worker.js` importu aile-içi ama amaç-incelemesi bekliyor (ORCH-W2). (2) **Ters-yön sızıntı:** `task-mode-runner.ts:18-19 → cli/commands/run+spawn` — 302-LoC `spawnWorkerMultiProvider` spawn-mantığı CLI'da yaşıyor ve orchestra ona bağımlı; fix = spawn-mantığını orchestra'ya taşı, cli thin-wrapper (ORCH-W1). (3) `sprint-finalizer:85`/`sprint-phases:88` → cli/helpers (presentation/splash) — orchestra→cli importları temizlenecek (ORCH-W1). (4) İkinci core→cli ihlali `directive-interrogator.ts:18` (CORE-W1). md+db senkron (Alperen ADR-review).
 
+**Sanctioned-exception — provider CLI-spawn adapter'ları (faz-2 providers-analizi, Alperen onaylı):** `src/providers/claude.ts` → `orchestra/tmux.js` (killWorker/listWorkers/ensureSession/isSessionActive/cleanupPromptFile) importu **ihlal DEĞİL** — ADR-017 (MCP-Native Provider Adapters) + ADR-027 (Hybrid Spawn Backend) gereği CLI-spawn adapter'ı tmux-backend'ini sarmalar; bu, ailenin spawn-soyutlama koluna (`spawn-backend` ailesi) paralel meşru bağdır. Kural-netleştirme: **provider-adapter'lar tmux/spawn-backend'i sarmalayabilir; auditor/worker'ı ASLA import edemez; tmux/auditor/worker yine brain'i/provider'ı import etmez** (tek-yön korunur). Geniş ilke aynı kalır: iş-mantığı core/orchestra'da yaşar; cli/api/mcp thin yüzeydir (API-W1 sistemik api→cli inversiyonu bu ilkeyle temizlenecek).
+
 
 ---
 
