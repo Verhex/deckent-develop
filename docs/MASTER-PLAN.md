@@ -1209,6 +1209,7 @@ Items surfaced during the Sprint 211 doc-consolidation audit that were intention
 3. **Hosted Deckent Core + SDK** (vLLM OpenAI-uyumlu + API-key gateway → deckent kendi provider'ı; OpenRouter-mantığı Hermes-playbook). 3-tier: BYO / yerel / hosted.
 4. **Opt-in telemetri-feedback** (🔴 GİZLİLİK-KRİTİK: default-off + açık-rıza + anonimleştirme + şeffaflık + air-gapped'de kapalı; sessiz-toplama ASLA).
 5. **MCP-W1** (writer-lease split, çoklu-pencere -32000 fix) — bağımsız ama bu programla uyumlu.
+6. **Temiz repo geçişi + docs-from-scratch** (ADR-065 yürütmesi): kodu `/docs/` hariç + doc-bağımlı testsiz temiz `deckent` repo'suna taşı → doc'ları koddan sıfırdan yaz; deckent-dev public→private. 🔴 Geçiş ÖNCESİ SP-2 eğitim-verisi (`.claude/projects`, `.brain/archive`, `.deckent`, `.tasks/archive`) ARŞİVLENMELİ (geri-dönülmez). [[project_clean_repo_migration_and_training_data]]
 
 **Durum (2026-06-12, mola):** Brainstorm sürüyor (skill aktif); kapsam+transport+mimari-yaklaşım+model-stratejisi KİLİTLİ; kalan brainstorm-bölümleri = izin-modeli, deckent-agent kimliği/kuralları, test/migrasyon → sonra spec-yazımı → writing-plans.
 

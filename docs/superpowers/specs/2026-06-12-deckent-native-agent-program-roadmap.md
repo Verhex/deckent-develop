@@ -38,9 +38,10 @@ deckent terminali (`deckent` komutu REPL) bugün claude CLI'ını spawn edip onu
 
 ### SP-2 — Deckent Core fine-tune
 **Amaç:** deckent'in kendi LLM'i — kullanım-profilleri + kod-tecrübesi + (ilerledikçe) ERP-enterprise süreçleriyle eğitilir; süreç+deckent+agent-os+tool-yönlendirmesi öğretir.
-**Yol:** base Qwen3-14B/32B veya Hermes-4-14B (tool-trained) → QLoRA (unsloth/LLaMA-Factory, RTX 5090) → GGUF + Ollama Modelfile → `deckent-qwen`. Hermes dersi: agent-trace-ağırlıklı dataset = sağlam tool-use.
-**Yutar:** [[project_ollama_worker_stub_gap]], deckent-qwen base-agent, air-gapped pillar güçlenir.
-**Bağımlılık:** SP-1 (tool-şeması + trace-üretimi). **Transport:** Ollama (Tier-2 deluxe).
+**Yol:** base Qwen3-14B/32B gibi açık kaynak modellerin eğitimi → QLoRA (unsloth/LLaMA-Factory, RTX 5090) → GGUF + Ollama Modelfile → `deckent-core`. Hermes dersi: agent-trace-ağırlıklı dataset = sağlam tool-use.
+**Eğitim-verisi kaynağı (hazır maden — toplanıp süreç-trace'e dönüştürülecek):** `.claude/projects/` (memory+transcript+karar-akışı), `.brain/archive/`+`memory.db` (ADR/sprint/retro/pattern/debt), `.deckent/` (config/manifest/decisions/backlog), `.tasks/archive/` (task-JSON + **result** + **plan** + handoff + worker-script). JSON/result/plan/transcript HEPSİ → eğitim-datası. 🔴 **KRİTİK: SP-6 temiz-repo-geçişi bu madeni GERİDE bırakır → geçiş ÖNCESİ güvenle export/arşivle (geri-dönülmez kayıp riski).**
+**Yutar:** [[project_ollama_worker_stub_gap]], deckent-core base-agent, air-gapped pillar güçlenir.
+**Bağımlılık:** SP-1 (tool-şeması + trace-üretimi) + SP-6-öncesi-veri-arşivi. **Transport:** Ollama (Tier-2 deluxe).
 **Başarı:** deckent-tuned model native tool_use'u model-katmanında sağlam üretir; terminal varsayılan base-agent'ı olur (opsiyonel).
 
 ### SP-3 — Hosted Deckent Core + SDK (PROVIDER)
@@ -60,14 +61,26 @@ deckent terminali (`deckent` komutu REPL) bugün claude CLI'ını spawn edip onu
 **Bağımlılık:** bağımsız (programa paralel). §4I resource-arbiter mekanizmasıyla yakınsar.
 **Başarı:** 2 pencere eşzamanlı read; 2. pencere write → lease-hatası; pid-ölünce devir.
 
+### SP-6 — Temiz repo geçişi + docs-from-scratch (ADR-065 yürütmesi)
+**Amaç:** doküman-borcunu sıfırlamak için kodu **temiz `deckent` repo'suna** taşı; doc'ları koddan sıfırdan yaz.
+**Yol:** (a) kodu taşı **`/docs/` hariç + doc-bağımlı testler olmadan** (önce envanterle+decouple); (b) rehber/mimari/design dokümanlarını mevcut kod+özelliklerden **SIFIRDAN** yaz; (c) deckent-dev **public→private**; (d) diğer repo issue/talep akışı buraya alınır.
+**🔴 Geçiş-öncesi zorunlu (geri-dönülmez):**
+1. **Veri-arşivle** — SP-2 eğitim-madeni (`.claude/projects`, `.brain/archive`, `.deckent`, `.tasks/archive`) private/clean ÖNCESİ güvenle dışa-aktarılmalı; aksi halde Deckent Core'un tek kaynağı kaybolur.
+2. **Git-history kararı:** clean-slate (sıfır history) vs history-koru (285 sprint geçmişi büyük).
+3. **Doc-bağımlı test envanteri:** `docs/`/managed-doc okuyan testler → decouple/kaldır (taşıma öncesi).
+4. **Managed-docs kararı:** yeni repo'da otomatik-doc-üretim (ADR-029) devam mı, statik-el-yazımı mı (doc-debt'in kökü; ADR-013-W/029-W locale-leak).
+**Bağımlılık:** bağımsız ama SP-2-veri-arşivi geçişten ÖNCE. ADR-065 ile zaten kabul-edilmiş yön.
+**Başarı:** temiz repo, doc-borcu sıfır, koddan-türetilmiş doküman, eğitim-verisi güvende.
+
 ## 5. Sıra & bağımlılık
 
 ```
 SP-1 (native core) ──► SP-2 (fine-tune) ──► SP-3 (hosted provider + SDK)
    └──► SP-4 (telemetri, SP-1 sonrası herhangi an, izinli)
 SP-5 (MCP-lease) — bağımsız, herhangi an
+SP-6 (temiz-repo + docs-from-scratch) — bağımsız; AMA SP-2 veri-arşivi geçişten ÖNCE (🔴 sıralama-kısıtı)
 ```
-**İlk iş: SP-1.** Diğerleri sıralı/paralel türer; her biri kendi brainstorm→ADR→plan döngüsü.
+**İlk iş: SP-1.** Diğerleri sıralı/paralel türer; her biri kendi brainstorm→ADR→plan döngüsü. **Tek sert-sıralama:** SP-6 temiz-geçiş'ten ÖNCE SP-2 eğitim-verisi arşivlenmeli (geri-dönülmez).
 
 ## 6. Bu program neyi AZALTIR (yük-düşürme)
 
