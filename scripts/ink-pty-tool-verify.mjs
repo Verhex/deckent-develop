@@ -2,8 +2,9 @@
 // 4 scenarios: write+approval, bash-tek, deny, multi-tag (2 confirm cards).
 // Pattern: scripts/ink-pty-test.mjs (existing harness — same PTY mechanics).
 // Skip-safe: exits 0 with SKIP when dist/ or node-pty are missing.
-import { existsSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 
 const ENTRY = resolve('dist/cli/entry.js');
 if (!existsSync(ENTRY)) {
@@ -21,19 +22,36 @@ const stripAnsi = (s) =>
   s.replace(/\x1b\][^\x07]*\x07/g, '').replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, '').replace(/\r/g, '\n');
 
 /** Run one PTY scenario and return { passed, name, out }. */
-function runScenario({ name, mock, steps, verify }) {
-  return new Promise((resolve) => {
+function runScenario({ name, mock, steps, verify, multiWriteTarget }) {
+  return new Promise((resolvePromise) => {
+    // HERMETIC cwd (ADR-087): a fresh tmpdir per scenario. Running in the repo
+    // root leaked `.deckent/settings.local.json` permission-memory ('a'-always
+    // grants from real dogfood sessions) into the harness — pre-allowed tools
+    // never show a confirm card, making deny/multi-tag structurally untestable.
+    const scenarioCwd = mkdtempSync(join(tmpdir(), 'pty-tool-verify-'));
+
+    // multi-tag: the write target lives inside the per-run tmpdir so its
+    // existence is the on-disk proof that the FIRST queued tool executed.
+    const writeTarget = join(scenarioCwd, 'multi-write.txt');
+    const effectiveMock = multiWriteTarget
+      ? [
+          `<deckent_tool>{"name":"deckent_write_file","args":{"path":"${writeTarget}","content":"first"}}</deckent_tool>` +
+          '<deckent_tool>{"name":"deckent_bash","args":{"cmd":"echo pty-multi-ok"}}</deckent_tool>',
+          'Both done.',
+        ]
+      : mock;
+
     const env = {
       ...process.env,
       DECKENT_INK: '1',
       DECKENT_CHAT_PROVIDER: 'claude',
-      DECKENT_PTY_MOCK: JSON.stringify(mock),
+      DECKENT_PTY_MOCK: JSON.stringify(effectiveMock),
     };
     delete env.ANTHROPIC_API_KEY;
 
     const p = ptySpawn('node', [ENTRY], {
       name: 'xterm-256color', cols: 100, rows: 30,
-      cwd: process.cwd(), env,
+      cwd: scenarioCwd, env,
     });
     let out = ''; let exited = false;
     p.onData((d) => { out += d; });
@@ -46,8 +64,11 @@ function runScenario({ name, mock, steps, verify }) {
     setTimeout(() => {
       if (!exited) { try { p.kill(); } catch { /* already dead */ } }
       const stripped = stripAnsi(out);
-      const passed = verify(stripped);
-      resolve({ passed, name, out: stripped });
+      // multi-tag: BOTH the bash block (out) AND the write-on-disk must hold.
+      const diskOk = multiWriteTarget ? existsSync(writeTarget) : true;
+      const passed = verify(stripped) && diskOk;
+      try { rmSync(scenarioCwd, { recursive: true, force: true }); } catch { /* best-effort */ }
+      resolvePromise({ passed, name, out: stripped });
     }, deadline);
   });
 }
@@ -66,8 +87,9 @@ const SCENARIOS = [
       { send: 'y', afterMs: 2800 },       // confirm write
       { send: '<C-c>', afterMs: 4500 },   // exit
     ],
-    // Confirm dialog always shows the hint text; tool name visible in summary.
-    verify: (out) => out.includes('y = allow') || out.includes('y = izin') || out.includes('pty-verify-write'),
+    // STRICT: the confirm card's hint must appear (no weak fallbacks — a raw
+    // tag echoed into the transcript previously produced a spurious PASS).
+    verify: (out) => out.includes('y = allow') || out.includes('y = izin'),
   },
   {
     name: 'bash-tek',
@@ -80,7 +102,9 @@ const SCENARIOS = [
       { send: 'y', afterMs: 2800 },
       { send: '<C-c>', afterMs: 4500 },
     ],
-    verify: (out) => out.includes('y = allow') || out.includes('y = izin') || out.includes('bash') || out.includes('echo'),
+    // STRICT: card-hint required ('echo'/'bash' also appear in the typed input
+    // itself, which previously made this a trivially-green check).
+    verify: (out) => out.includes('y = allow') || out.includes('y = izin'),
   },
   {
     name: 'deny',
@@ -93,24 +117,33 @@ const SCENARIOS = [
       { send: 'n', afterMs: 2800 },       // deny
       { send: '<C-c>', afterMs: 4500 },
     ],
-    // After deny: [cancelled] or [iptal edildi] appears in the output.
-    verify: (out) => out.includes('cancel') || out.includes('iptal') || out.includes('denied') || out.includes('reddet') || out.includes('y = allow') || out.includes('y = izin'),
+    // STRICT: the card must have shown AND the deny-signal must appear AND no
+    // fake success block. Deny returns "[deckent] iptal edildi: <tool>".
+    verify: (out) =>
+      (out.includes('y = allow') || out.includes('y = izin')) &&
+      (out.includes('iptal edildi') || out.includes('cancelled')) &&
+      !out.includes('wrote file') && !out.includes('dosya yazıldı'),
   },
   {
-    name: 'multi-tag (2 confirm cards)',
-    mock: [
-      '<deckent_tool>{"name":"deckent_write_file","args":{"path":"/tmp/pty-verify-multi-1.txt","content":"first"}}</deckent_tool>' +
-      '<deckent_tool>{"name":"deckent_bash","args":{"cmd":"echo pty-multi-ok"}}</deckent_tool>',
-      'Both done.',
-    ],
+    // Two tags in ONE assistant turn. The engine dispatches tool calls
+    // sequentially (await each), so the confirm queue shows them as two
+    // back-to-back [1/1] cards (NOT a single [1/2]/[2/2] burst — that only
+    // happens if multiple confirms enqueue before any resolves). The real
+    // contract: BOTH tools get a confirm AND BOTH execute. Proven on disk
+    // (write target) + the bash change-block, which persist in scrollback —
+    // unlike the transient [i/N] modal which never flushes to Static.
+    name: 'multi-tag (both tools execute)',
+    multiWriteTarget: true, // harness fills the write path with a per-run tmp file
+    mock: null,             // built in runScenario once the target path is known
     steps: [
       { send: 'do two things<CR>', afterMs: 1500 },
-      { send: 'y', afterMs: 2800 },       // confirm first tool [1/2]
-      { send: 'y', afterMs: 3800 },       // confirm second tool [2/2]
-      { send: '<C-c>', afterMs: 5500 },
+      { send: 'y', afterMs: 3000 },       // confirm first tool (write)
+      { send: 'y', afterMs: 4200 },       // confirm second tool (bash)
+      { send: '<C-c>', afterMs: 6000 },
     ],
-    // [1/2] and [2/2] progress indicators must both appear (confirmProgress key).
-    verify: (out) => out.includes('[1/2]') && out.includes('[2/2]'),
+    // PERSISTENT proof: the bash change-block appears AND the write landed on
+    // disk (checked in runScenario via fileMustExist).
+    verify: (out) => out.includes('ran command') || out.includes('komut çalıştırıldı'),
   },
 ];
 

@@ -135,9 +135,22 @@ export async function runInkRepl(
       // mode after every dispatch so input keeps working post-command.
       if (process.stdin.isTTY) { try { process.stdin.setRawMode(true); } catch { /* not a tty */ } }
       const info = toolInfoFor(toolName, args);
-      // Only surface a change block for a real action (not a denied/no-op).
-      if (toolSink && info && !result.startsWith('[mcp-error]') && !/reddedildi|denied/i.test(result)) {
-        toolSink(info);
+      // Only surface a change block for a REAL action. Both failure paths carry
+      // a stable bracket-prefix marker — `[mcp-error] …` (error) and
+      // `[deckent] …` (denied/cancelled, e.g. "[deckent] iptal edildi: <tool>").
+      // The old `/reddedildi|denied/i` text-match missed the actual i18n cancel
+      // string ("iptal edildi" / "cancelled") → a DENIED write rendered a fake
+      // "⎿ +1" success block. Prefix-marker check is language-independent.
+      const isFailureResult = result.startsWith('[mcp-error]') || result.startsWith('[deckent]');
+      if (toolSink) {
+        if (isFailureResult) {
+          // Honest denied/errored line: show the already-localized result text
+          // ("[deckent] iptal edildi: <tool>" / "[mcp-error] …") dim with ✗ —
+          // never a fake success block, never silent (REPL-TOOL-DEBT-1).
+          toolSink({ verb: result, target: '', failed: true });
+        } else if (info) {
+          toolSink(info);
+        }
       }
       return result;
     },

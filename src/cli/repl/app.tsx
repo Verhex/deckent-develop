@@ -106,6 +106,7 @@ export function createConfirmQueue(onChange: () => void): ConfirmQueue {
  * caller (run.tsx) localizes `verb`/`note`; the App owns the colored layout. */
 export interface ToolInfo {
   verb: string;       // localized, e.g. "dosya yazıldı"
+  failed?: boolean;   // denied/cancelled/errored → render dim with ✗ (honest, no fake success)
   target: string;     // path / command
   added?: number;     // lines added → green
   removed?: number;   // lines removed → red
@@ -209,8 +210,17 @@ function TurnView({ turn }: { turn: Turn }): ReactElement {
     );
   }
   if (turn.role === 'tool' && turn.tool) {
-    const { verb, target, added, removed, note } = turn.tool;
+    const { verb, target, added, removed, note, failed } = turn.tool;
     const hasDelta = added !== undefined || removed !== undefined || note !== undefined;
+    // Denied/errored action: honest dim "✗ verb target" with NO success delta —
+    // never let a blocked write look like it landed (REPL-TOOL-DEBT-1).
+    if (failed) {
+      return (
+        <Box marginTop={1}>
+          <Text dimColor><Text color="red">✗ </Text>{verb}<Text dimColor> {target}</Text></Text>
+        </Box>
+      );
+    }
     return (
       <Box flexDirection="column" marginTop={1}>
         <Text><Text color={TEAL}>● </Text><Text bold>{verb}</Text><Text dimColor> {target}</Text></Text>
