@@ -448,6 +448,16 @@ export const en = {
   'auth.role': 'Role: {{role}}',
   'auth.session_cleared': 'Session cleared',
 
+  // Settings Page — Appearance preferences (283-002)
+  'nav.debt': 'Debt',
+  'settings.appearance': 'Appearance',
+  'settings.language_label': 'Interface Language',
+  'settings.language_en': 'English',
+  'settings.language_tr': 'Turkish',
+  'settings.theme_label': 'Color Theme',
+  'settings.theme_dark': 'Dark',
+  'settings.theme_light': 'Light',
+
   // Enterprise — Tenant management (282-010)
   'enterprise.new_tenant': 'New tenant',
   'enterprise.tenant_id': 'Tenant ID',
@@ -466,6 +476,53 @@ export const en = {
   'enterprise.confirm_delete': 'Delete this tenant?',
   'enterprise.required_fields': 'Tenant ID and name are required.',
   'enterprise.mutation_error': 'Operation failed: {{msg}}',
+
+  // Evolution Page (283-003)
+  'evolution.title': 'Evolution',
+  'evolution.tab_genealogy': 'Genealogy',
+  'evolution.tab_retirement': 'Retirement',
+  'evolution.tab_prompt_diff': 'Prompt Diff',
+  'evolution.genealogy_title': 'Agent Genealogy Tree',
+  'evolution.genealogy_empty_title': 'No genealogy data',
+  'evolution.genealogy_empty_desc': 'Agent lineage will appear here once agents evolve through sprints.',
+  'evolution.retirement_title': 'Retirement Timeline',
+  'evolution.retirement_empty_title': 'No retired agents',
+  'evolution.retirement_empty_desc': 'Agents that are retired due to low performance will appear here.',
+  'evolution.metrics_title': 'Prompt Evolution Metrics',
+  'evolution.metrics_empty_title': 'No prompt metrics',
+  'evolution.metrics_empty_desc': 'Prompt evolution metrics will appear here once agents have versioned prompts.',
+  'evolution.col_agent': 'Agent',
+  'evolution.col_version': 'Version',
+  'evolution.col_success_rate': 'Success Rate',
+  'evolution.col_trend': 'Trend',
+  'evolution.col_experiment': 'Experiment',
+
+  // Nervous System Page (283-003)
+  'nervous.title': 'Nervous System',
+  'nervous.panic_guard_active': 'Panic Guard ACTIVE',
+  'nervous.panic_guard_off': 'Panic Guard off',
+  'nervous.error': 'Error',
+  'nervous.detector_status_title': 'Detector Status',
+  'nervous.detectors_empty_title': 'No detectors',
+  'nervous.detectors_empty_desc': 'No Nervous System detectors are configured.',
+  'nervous.pending_approvals_title': 'Pending Approvals',
+  'nervous.approvals_empty_title': 'No pending approvals',
+  'nervous.approvals_empty_desc': 'All Nervous System proposals have been reviewed.',
+  'nervous.accept_button': 'Accept',
+  'nervous.reject_button': 'Reject',
+
+  // Memory Explorer Page (283-003)
+  'memory_explorer.title': 'Memory & ADR Explorer',
+  'memory_explorer.adr_empty_title': 'No ADR Entries',
+  'memory_explorer.adr_empty_desc': 'Architecture Decision Records will appear in the timeline once memory is populated.',
+  'memory_explorer.adr_filtered_empty': 'No ADRs match the selected filter.',
+  'memory_explorer.adr_timeline_title': 'ADR Timeline',
+  'memory_explorer.filter_all': 'All',
+  'memory_explorer.filter_accepted': 'Accepted',
+  'memory_explorer.filter_proposed': 'Proposed',
+  'memory_explorer.filter_deprecated': 'Deprecated',
+  'memory_explorer.filter_rejected': 'Rejected',
+  'memory_explorer.debt_note': 'Use the Debt tab above for the full debt table. Memory search uses FTS5 (full-text search) from memory.db.',
 } as const;
 
 export type TranslationKey = keyof typeof en;

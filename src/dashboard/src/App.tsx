@@ -4,7 +4,8 @@ import { LanguageProvider } from "./i18n/LanguageProvider";
 import { AuthProvider } from "./hooks/useAuth";
 import { Layout } from "./components/Layout";
 import DashboardPage from "./pages/DashboardPage";
-import SettingsPage from "./pages/SettingsPage"; // redirects to /config
+import SettingsPage from "./pages/SettingsPage";
+import DebtPage from "./pages/DebtPage";
 import HistoryPage from "./pages/HistoryPage";
 import MemoryPage from "./pages/MemoryPage";
 import ConfigPage from "./pages/ConfigPage";
@@ -29,6 +30,7 @@ function App() {
               <Route element={<Layout />}>
                 <Route path="/" element={<DashboardPage />} />
                 <Route path="/settings" element={<SettingsPage />} />
+                <Route path="/debt" element={<DebtPage />} />
                 <Route path="/history" element={<HistoryPage />} />
                 <Route path="/memory" element={<MemoryPage />} />
                 <Route path="/config" element={<ConfigPage />} />

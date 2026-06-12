@@ -1,5 +1,13 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-283 Learnings
+- Sprint sprint-283 Learnings: ## Sprint sprint-283 Learnings
+
+## Gains
+- 283-001 — Terminal-bar overlap — z-index/layout fix (eski 282-007) — Fix: added `pb-10 relative z-50` to Layout.tsx aside element.
+- 283-002 — DebtPage route + /settings yüzeyi (eski 282-009) — All goCriteria met: (1) /debt route added to App.tsx with DebtPage import — route-render #1.
+- 283-003 — Dashboard sayfa-içi i18n-temizliği (eski 282-012) — Completed i18n cleanup for Dashboard pages (EvolutionPage, NervousPage, MemoryExplorerPage).
+
 ## Sprint sprint-282 Learnings
 - Sprint sprint-282 Learnings: ## Sprint sprint-282 Learnings
 - POST /api/chat adapter-backed — classifier yalnız açık-komutlara: GO_WITH_TECH_DEBT — POST /api/chat is now adapter-backed (DASH-UX-1 part-1). resolveChatReply() in chat-handler.ts routes NL messages to the

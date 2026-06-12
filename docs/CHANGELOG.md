@@ -2,6 +2,20 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint283] - 2026-06-12
+
+### Added
+
+- DebtPage route + /settings yüzeyi (eski 282-009)
+- Dashboard sayfa-içi i18n-temizliği (eski 282-012)
+
+### Fixed
+
+- Terminal-bar overlap — z-index/layout fix (eski 282-007)
+
+
+_Tasks: 5 total, 5 done, 0 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint282] - 2026-06-11
 
 ### Added

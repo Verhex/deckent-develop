@@ -450,6 +450,16 @@ export const tr: Record<TranslationKey, string> = {
   'auth.role': 'Rol: {{role}}',
   'auth.session_cleared': 'Oturum temizlendi',
 
+  // Settings Page — Görünüm tercihleri (283-002)
+  'nav.debt': 'Borç',
+  'settings.appearance': 'Görünüm',
+  'settings.language_label': 'Arayüz Dili',
+  'settings.language_en': 'İngilizce',
+  'settings.language_tr': 'Türkçe',
+  'settings.theme_label': 'Renk Teması',
+  'settings.theme_dark': 'Koyu',
+  'settings.theme_light': 'Açık',
+
   // Enterprise — Kiracı yönetimi (282-010)
   'enterprise.new_tenant': 'Yeni kiracı',
   'enterprise.tenant_id': 'Kiracı kimliği',
@@ -468,4 +478,51 @@ export const tr: Record<TranslationKey, string> = {
   'enterprise.confirm_delete': 'Bu kiracı silinsin mi?',
   'enterprise.required_fields': 'Kiracı kimliği ve ad zorunludur.',
   'enterprise.mutation_error': 'İşlem başarısız: {{msg}}',
+
+  // Evolution Page (283-003)
+  'evolution.title': 'Evrim',
+  'evolution.tab_genealogy': 'Soyağacı',
+  'evolution.tab_retirement': 'Emeklilik',
+  'evolution.tab_prompt_diff': 'Prompt Karşılaştırması',
+  'evolution.genealogy_title': 'Ajan Soyağacı Ağacı',
+  'evolution.genealogy_empty_title': 'Soyağacı verisi yok',
+  'evolution.genealogy_empty_desc': 'Ajanlar sprintler aracılığıyla geliştiğinde soyağacı burada görünecek.',
+  'evolution.retirement_title': 'Emeklilik Zaman Çizelgesi',
+  'evolution.retirement_empty_title': 'Emekli ajan yok',
+  'evolution.retirement_empty_desc': 'Düşük performans nedeniyle emekli olan ajanlar burada görünecek.',
+  'evolution.metrics_title': 'Prompt Evrim Metrikleri',
+  'evolution.metrics_empty_title': 'Prompt metriği yok',
+  'evolution.metrics_empty_desc': 'Ajanlar sürümlenmiş promptlara sahip olduğunda prompt evrim metrikleri burada görünecek.',
+  'evolution.col_agent': 'Ajan',
+  'evolution.col_version': 'Sürüm',
+  'evolution.col_success_rate': 'Başarı Oranı',
+  'evolution.col_trend': 'Trend',
+  'evolution.col_experiment': 'Deney',
+
+  // Nervous System Page (283-003)
+  'nervous.title': 'Sinir Sistemi',
+  'nervous.panic_guard_active': 'Panik Koruması AKTİF',
+  'nervous.panic_guard_off': 'Panik Koruması kapalı',
+  'nervous.error': 'Hata',
+  'nervous.detector_status_title': 'Dedektör Durumu',
+  'nervous.detectors_empty_title': 'Dedektör yok',
+  'nervous.detectors_empty_desc': 'Sinir Sistemi dedektörleri yapılandırılmış değil.',
+  'nervous.pending_approvals_title': 'Bekleyen Onaylar',
+  'nervous.approvals_empty_title': 'Bekleyen onay yok',
+  'nervous.approvals_empty_desc': 'Tüm Sinir Sistemi teklifleri incelenmiştir.',
+  'nervous.accept_button': 'Kabul Et',
+  'nervous.reject_button': 'Reddet',
+
+  // Memory Explorer Page (283-003)
+  'memory_explorer.title': 'Bellek & ADR Keşfedici',
+  'memory_explorer.adr_empty_title': 'ADR Girdisi Yok',
+  'memory_explorer.adr_empty_desc': 'Bellek doldurulduktan sonra Mimari Karar Kayıtları zaman çizelgesinde görünecek.',
+  'memory_explorer.adr_filtered_empty': 'Seçili filtreyle eşleşen ADR yok.',
+  'memory_explorer.adr_timeline_title': 'ADR Zaman Çizelgesi',
+  'memory_explorer.filter_all': 'Tümü',
+  'memory_explorer.filter_accepted': 'Kabul Edilen',
+  'memory_explorer.filter_proposed': 'Önerilen',
+  'memory_explorer.filter_deprecated': 'Kullanımdan Kaldırılan',
+  'memory_explorer.filter_rejected': 'Reddedilen',
+  'memory_explorer.debt_note': 'Tam borç tablosu için yukarıdaki Borç sekmesini kullanın. Bellek araması FTS5 (tam metin arama) kullanır.',
 };

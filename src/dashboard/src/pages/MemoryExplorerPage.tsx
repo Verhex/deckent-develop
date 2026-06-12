@@ -5,13 +5,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card"
 import MemoryExplorer, { parseAdrEntries, type AdrEntry } from "../components/MemoryExplorer";
 import { SkeletonText } from "../components/Skeleton";
 import EmptyState from "../components/EmptyState";
+import { useTranslation } from "../i18n/LanguageProvider";
 
 type StatusFilter = "all" | "accepted" | "proposed" | "deprecated" | "rejected";
 
 function timelineDotClass(status: string): string {
   const s = status.toLowerCase();
   if (s === "accepted") return "bg-green-500";
-  if (s === "proposed") return "bg-brand-500";
+  if (s === "proposed") return "bg-blue-500";
   if (s === "deprecated") return "bg-zinc-500";
   if (s === "rejected") return "bg-red-500";
   return "bg-zinc-400";
@@ -20,7 +21,7 @@ function timelineDotClass(status: string): string {
 function statusBadgeClass(status: string): string {
   const s = status.toLowerCase();
   if (s === "accepted") return "bg-green-900 text-green-200";
-  if (s === "proposed") return "bg-brand-bg text-brand-fg";
+  if (s === "proposed") return "bg-blue-900 text-blue-200";
   if (s === "deprecated") return "bg-zinc-700 text-zinc-400";
   if (s === "rejected") return "bg-red-900 text-red-200";
   return "bg-zinc-700 text-zinc-300";
@@ -30,9 +31,10 @@ interface AdrTimelineProps {
   entries: AdrEntry[];
   loading: boolean;
   statusFilter: StatusFilter;
+  t: ReturnType<typeof useTranslation>['t'];
 }
 
-function AdrTimeline({ entries, loading, statusFilter }: AdrTimelineProps) {
+function AdrTimeline({ entries, loading, statusFilter, t }: AdrTimelineProps) {
   const filtered = statusFilter === "all"
     ? entries
     : entries.filter((e) => e.status.toLowerCase() === statusFilter);
@@ -46,8 +48,8 @@ function AdrTimeline({ entries, loading, statusFilter }: AdrTimelineProps) {
       <div data-testid="adr-timeline-empty">
         <EmptyState
           icon={BookOpen}
-          title="No ADR Entries"
-          description="Architecture Decision Records will appear in the timeline once memory is populated."
+          title={t('memory_explorer.adr_empty_title')}
+          description={t('memory_explorer.adr_empty_desc')}
         />
       </div>
     );
@@ -56,7 +58,7 @@ function AdrTimeline({ entries, loading, statusFilter }: AdrTimelineProps) {
   if (filtered.length === 0) {
     return (
       <p data-testid="adr-timeline-filtered-empty" className="text-zinc-500 text-sm py-4">
-        No ADRs match the selected filter.
+        {t('memory_explorer.adr_filtered_empty')}
       </p>
     );
   }
@@ -92,6 +94,7 @@ function AdrTimeline({ entries, loading, statusFilter }: AdrTimelineProps) {
 }
 
 export default function MemoryExplorerPage() {
+  const { t } = useTranslation();
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
 
   const { data: memoryData, loading: memLoading } = useApi<{ content: string }>("/api/memory");
@@ -101,8 +104,8 @@ export default function MemoryExplorerPage() {
   return (
     <div data-testid="memory-explorer-page" className="space-y-6">
       <div className="flex items-center gap-2">
-        <Brain className="w-6 h-6 text-brand-300" />
-        <h1 className="text-2xl font-bold text-zinc-100">Memory &amp; ADR Explorer</h1>
+        <Brain className="w-6 h-6 text-blue-400" />
+        <h1 className="text-2xl font-bold text-zinc-100">{t('memory_explorer.title')}</h1>
       </div>
 
       {/* Main explorer: search/fts + adr table + debt */}
@@ -114,7 +117,7 @@ export default function MemoryExplorerPage() {
           <div className="flex items-center justify-between flex-wrap gap-2">
             <CardTitle className="text-zinc-100 flex items-center gap-2">
               <GitBranch className="w-5 h-5" />
-              ADR Timeline
+              {t('memory_explorer.adr_timeline_title')}
             </CardTitle>
             <div className="flex items-center gap-2">
               <Filter className="w-4 h-4 text-zinc-500" />
@@ -122,14 +125,14 @@ export default function MemoryExplorerPage() {
                 data-testid="timeline-status-filter"
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
-                className="bg-zinc-800 border border-zinc-700 text-zinc-200 text-sm rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-ring"
+                className="bg-zinc-800 border border-zinc-700 text-zinc-200 text-sm rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
                 aria-label="Filter ADRs by status"
               >
-                <option value="all">All</option>
-                <option value="accepted">Accepted</option>
-                <option value="proposed">Proposed</option>
-                <option value="deprecated">Deprecated</option>
-                <option value="rejected">Rejected</option>
+                <option value="all">{t('memory_explorer.filter_all')}</option>
+                <option value="accepted">{t('memory_explorer.filter_accepted')}</option>
+                <option value="proposed">{t('memory_explorer.filter_proposed')}</option>
+                <option value="deprecated">{t('memory_explorer.filter_deprecated')}</option>
+                <option value="rejected">{t('memory_explorer.filter_rejected')}</option>
               </select>
             </div>
           </div>
@@ -139,6 +142,7 @@ export default function MemoryExplorerPage() {
             entries={adrEntries}
             loading={memLoading}
             statusFilter={statusFilter}
+            t={t}
           />
         </CardContent>
       </Card>
@@ -146,10 +150,7 @@ export default function MemoryExplorerPage() {
       {/* Debt summary badge */}
       <div className="flex items-center gap-2 text-xs text-zinc-500" data-testid="debt-fts-note">
         <AlertTriangle className="w-3 h-3" />
-        <span>
-          Use the <strong className="text-zinc-400">Debt</strong> tab above for the full debt table.
-          Memory search uses FTS5 (full-text search) from memory.db.
-        </span>
+        <span>{t('memory_explorer.debt_note')}</span>
       </div>
     </div>
   );

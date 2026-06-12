@@ -173,7 +173,7 @@ export function Layout() {
       <aside
         data-testid="layout-sidebar"
         aria-label="Primary navigation"
-        className="hidden md:flex w-[240px] lg:w-[260px] flex-col border-r border-zinc-800 dark:border-zinc-800 bg-zinc-900 dark:bg-zinc-900 p-4"
+        className="hidden md:flex w-[240px] lg:w-[260px] flex-col border-r border-zinc-800 dark:border-zinc-800 bg-zinc-900 dark:bg-zinc-900 p-4 pb-10 relative z-50"
       >
         <SidebarContent sseState={sseState} sseStatus={sseStatus} />
       </aside>

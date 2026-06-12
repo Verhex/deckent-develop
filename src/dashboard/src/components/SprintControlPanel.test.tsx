@@ -90,9 +90,11 @@ describe("SprintControlPanel", () => {
 
     renderWithProviders(<SprintControlPanel />);
 
-    expect(screen.getByText("PLAN")).toBeTruthy();
-    expect(screen.getByText("EXECUTE")).toBeTruthy();
-    expect(screen.getByText("RETRO")).toBeTruthy();
+    // "PLAN" appears in both the phase badge and the timeline item — assert
+    // presence without requiring uniqueness.
+    expect(screen.getAllByText("PLAN").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("EXECUTE").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("RETRO").length).toBeGreaterThanOrEqual(1);
   });
 
   it("renders worker grid with active workers", () => {

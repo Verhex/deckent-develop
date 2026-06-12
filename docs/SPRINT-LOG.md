@@ -7755,3 +7755,27 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 282-012: Dashboard sayfa-içi i18n-temizliği — literal-label'lar i18n-key'e (NO_GO)
 
 ---
+## Sprint 283 — sprint-283
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-06-12
+**Duration:** 1292s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 5 |
+| Completed | 5 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 1291618ms |
+
+### Tasks
+
+- 283-001: Terminal-bar overlap — z-index/layout fix (eski 282-007) (DONE)
+- 283-002: DebtPage route + /settings yüzeyi (eski 282-009) (DONE)
+- 283-003: Dashboard sayfa-içi i18n-temizliği (eski 282-012) (DONE)
+
+---

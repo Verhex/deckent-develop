@@ -322,3 +322,7 @@
 {"priority":"warning","event":"task-no-go","title":"Task 282-003 başarısız","summary":"[honest-gate] BOUNDARY_VIOLATION: boundary: files outside scope.filesWrite: tests/dashboard/chat-str","sprintId":"sprint-282","timestamp":"2026-06-11T19:11:04.018Z"}
 {"priority":"info","event":"task-done","title":"Task 282-011 tamamlandı","summary":"Successfully removed the dormant chat-backend.ts module and all references. Updated 4 comment refere","sprintId":"sprint-282","timestamp":"2026-06-11T19:16:23.862Z"}
 {"priority":"info","event":"sprint-finalized","title":"Sprint sprint-282 kapandı","summary":"10/13 DONE, 5 TECH_DEBT, 3 NO_GO","sprintId":"sprint-282","timestamp":"2026-06-11T19:26:19.600Z"}
+{"priority":"info","event":"sprint-started","title":"Sprint sprint-283 başladı","summary":"3 task planlandı","sprintId":"sprint-283","timestamp":"2026-06-12T04:22:20.752Z"}
+{"priority":"warning","event":"task-no-go","title":"Task 283-003 başarısız","summary":"[honest-gate] BOUNDARY_VIOLATION: boundary: files outside scope.filesWrite: tests/dashboard/i18n-no-","sprintId":"sprint-283","timestamp":"2026-06-12T04:34:07.039Z"}
+{"priority":"info","event":"task-done","title":"Task 283-001 tamamlandı","summary":"Fix: added `pb-10 relative z-50` to Layout.tsx aside element. `relative z-50` makes sidebar stacking","sprintId":"sprint-283","timestamp":"2026-06-12T04:34:03.173Z"}
+{"priority":"info","event":"sprint-finalized","title":"Sprint sprint-283 kapandı","summary":"5/5 DONE, 0 TECH_DEBT, 0 NO_GO","sprintId":"sprint-283","timestamp":"2026-06-12T04:45:58.198Z"}

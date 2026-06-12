@@ -9,6 +9,7 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-283-002 | Tech debt from 283-002: All goCriteria met: (1) /debt route added to App.tsx wit | normal | sprint-283 | resolved |
 | debt-282-001 | Tech debt from 282-001: ROOT-CAUSE DECOMPOSED + PROVEN. Hypothesis (a) EventSour | normal | sprint-282 | resolved |
 | debt-282-002 | Tech debt from 282-002: POST /api/chat is now adapter-backed (DASH-UX-1 part-1). | normal | sprint-282 | resolved |
 | debt-282-004 | Tech debt from 282-004: Stream-path ROOT-FIX (DASH-UX-1, the auth root from 282- | normal | sprint-282 | resolved |

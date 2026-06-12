@@ -11,6 +11,8 @@ import {
   Search,
   Users,
   FileText,
+  AlertTriangle,
+  Settings,
 } from "lucide-react";
 import type { TranslationKey } from "./i18n/en.js";
 
@@ -41,6 +43,7 @@ export const navGroups: ReadonlyArray<NavGroup> = [
       { to: "/status", labelKey: "dashboard.status", icon: Activity },
       { to: "/history", labelKey: "nav.history", icon: History },
       { to: "/workers", labelKey: "nav.workers", icon: Users },
+      { to: "/debt", labelKey: "nav.debt", icon: AlertTriangle },
       { to: "/evolution", labelKey: "nav.dashboard", label: "Evolution", icon: GitBranch },
       { to: "/nervous", labelKey: "nav.dashboard", label: "Nervous", icon: Bell },
     ],
@@ -51,6 +54,7 @@ export const navGroups: ReadonlyArray<NavGroup> = [
       { to: "/memory", labelKey: "nav.memory", icon: Brain },
       { to: "/memory-explorer", labelKey: "nav.dashboard", label: "Memory Explorer", icon: Search },
       { to: "/config", labelKey: "nav.config", icon: SlidersHorizontal },
+      { to: "/settings", labelKey: "nav.settings", icon: Settings },
       { to: "/directives", labelKey: "nav.directives", icon: FileText },
       { to: "/enterprise", labelKey: "nav.dashboard", label: "Enterprise", icon: Building2 },
     ],

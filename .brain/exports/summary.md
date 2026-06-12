@@ -83,6 +83,10 @@
 | adr-089 | Backend-Agnostic Worker Observation + Per-Worker Independent Backends | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-283 Learnings** (sprint-283): ## Sprint sprint-283 Learnings
+
+## Gains
+- 283-001 — Terminal-bar overlap — z-index/layout fix (eski 282-007) — Fix: ...
 - **Sprint sprint-282 Learnings** (sprint-282): ## Sprint sprint-282 Learnings
 - POST /api/chat adapter-backed — classifier yalnız açık-komutlara: GO_WITH_TECH_DEBT ...
 - **Sprint sprint-281 Learnings** (sprint-281): ## Sprint sprint-281 Learnings
@@ -111,10 +115,6 @@
 
 ## Gains
 - 274-001 — cache_warm config bloğu — Added CacheWarmConfig interface to con...
-- **Sprint sprint-273 Learnings** (sprint-273): ## Sprint sprint-273 Learnings
-
-## Gains
-- 273-001 — limit-ledger çekirdeği — transcript parse + maliyet-eşdeğeri bir...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -147,5 +147,6 @@ _No active technical debt._
 - Violation pattern: stale_heartbeat
 - Violation pattern: stale_heartbeat
 - Violation pattern: stale_heartbeat
+- Violation pattern: stale_heartbeat
 
-_Total entries: 453 | Generated: 2026-06-11_
+_Total entries: 466 | Generated: 2026-06-12_

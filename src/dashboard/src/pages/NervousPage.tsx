@@ -6,6 +6,7 @@ import { Badge } from "../components/ui/badge";
 import { SkeletonCard } from "../components/Skeleton";
 import EmptyState from "../components/EmptyState";
 import { Brain, ShieldAlert, Check, X, Activity } from "lucide-react";
+import { useTranslation } from "../i18n/LanguageProvider";
 
 interface PendingApproval {
   id: string;
@@ -33,6 +34,7 @@ interface NervousStatus {
 const NERVOUS_POLL_MS = 5000;
 
 export default function NervousPage() {
+  const { t } = useTranslation();
   // Sprint 269 Task 269-002: one-shot fetch → live data. pollIntervalMs routes
   // these through lib/use-live-data (stale-while-revalidate polling); refetch
   // becomes an immediate re-fetch, so accept/reject refresh the lists at once
@@ -76,19 +78,19 @@ export default function NervousPage() {
   return (
     <div className="space-y-6" data-testid="nervous-page">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-zinc-100">Nervous System</h1>
+        <h1 className="text-2xl font-bold text-zinc-100">{t('nervous.title')}</h1>
         {status && (
           <Badge
             data-testid="panic-guard-badge"
             className={status.panicGuard ? "bg-red-900 text-red-300" : "bg-green-900 text-green-300"}
           >
-            {status.panicGuard ? "Panic Guard ACTIVE" : "Panic Guard off"}
+            {status.panicGuard ? t('nervous.panic_guard_active') : t('nervous.panic_guard_off')}
           </Badge>
         )}
       </div>
 
       {actionError && (
-        <p className="text-red-400 text-sm" data-testid="action-error">Error: {actionError}</p>
+        <p className="text-red-400 text-sm" data-testid="action-error">{t('nervous.error')}: {actionError}</p>
       )}
 
       {/* Detector Status */}
@@ -96,12 +98,12 @@ export default function NervousPage() {
         <CardHeader>
           <CardTitle className="text-zinc-100 flex items-center gap-2">
             <Activity className="w-4 h-4 text-brand-300" />
-            Detector Status
+            {t('nervous.detector_status_title')}
           </CardTitle>
         </CardHeader>
         <CardContent>
           {statusLoading && <SkeletonCard />}
-          {statusError && <p className="text-red-400">Error: {statusError}</p>}
+          {statusError && <p className="text-red-400">{t('nervous.error')}: {statusError}</p>}
           {status && status.detectors.length > 0 && (
             <div className="flex flex-wrap gap-2" data-testid="detector-list">
               {status.detectors.map((detector) => (
@@ -119,8 +121,8 @@ export default function NervousPage() {
           {!statusLoading && !statusError && (!status || status.detectors.length === 0) && (
             <EmptyState
               icon={Activity}
-              title="No detectors"
-              description="No Nervous System detectors are configured."
+              title={t('nervous.detectors_empty_title')}
+              description={t('nervous.detectors_empty_desc')}
             />
           )}
         </CardContent>
@@ -131,7 +133,7 @@ export default function NervousPage() {
         <CardHeader>
           <CardTitle className="text-zinc-100 flex items-center gap-2">
             <Brain className="w-4 h-4 text-purple-400" />
-            Pending Approvals
+            {t('nervous.pending_approvals_title')}
             {pending && pending.length > 0 && (
               <Badge className="ml-2 bg-yellow-900 text-yellow-300">{pending.length}</Badge>
             )}
@@ -139,7 +141,7 @@ export default function NervousPage() {
         </CardHeader>
         <CardContent>
           {pendingLoading && <SkeletonCard />}
-          {pendingError && <p className="text-red-400">Error: {pendingError}</p>}
+          {pendingError && <p className="text-red-400">{t('nervous.error')}: {pendingError}</p>}
           {pending && pending.length > 0 && (
             <div className="space-y-3" data-testid="pending-list">
               {pending.map((approval) => (
@@ -171,7 +173,7 @@ export default function NervousPage() {
                       className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-md bg-green-900/60 text-green-300 hover:bg-green-900 disabled:opacity-50 transition-colors"
                     >
                       <Check className="w-3 h-3" />
-                      Accept
+                      {t('nervous.accept_button')}
                     </button>
                     <button
                       data-testid={`reject-${approval.id}`}
@@ -180,7 +182,7 @@ export default function NervousPage() {
                       className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-md bg-red-900/60 text-red-300 hover:bg-red-900 disabled:opacity-50 transition-colors"
                     >
                       <X className="w-3 h-3" />
-                      Reject
+                      {t('nervous.reject_button')}
                     </button>
                   </div>
                 </div>
@@ -190,8 +192,8 @@ export default function NervousPage() {
           {!pendingLoading && !pendingError && (!pending || pending.length === 0) && (
             <EmptyState
               icon={Brain}
-              title="No pending approvals"
-              description="All Nervous System proposals have been reviewed."
+              title={t('nervous.approvals_empty_title')}
+              description={t('nervous.approvals_empty_desc')}
             />
           )}
         </CardContent>

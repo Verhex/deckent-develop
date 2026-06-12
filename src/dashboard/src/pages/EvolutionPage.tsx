@@ -5,6 +5,7 @@ import { Badge } from "../components/ui/badge";
 import { SkeletonCard } from "../components/Skeleton";
 import EmptyState from "../components/EmptyState";
 import { GitBranch, Archive, TrendingUp } from "lucide-react";
+import { useTranslation } from "../i18n/LanguageProvider";
 
 interface GenealogyNode {
   agentId: string;
@@ -50,14 +51,14 @@ function trendBadgeClass(trend: string): string {
   return "bg-zinc-700 text-zinc-400";
 }
 
-function GenealogyTree({ data, loading }: { data: FamilyTree | null; loading: boolean }) {
+function GenealogyTree({ data, loading, t }: { data: FamilyTree | null; loading: boolean; t: ReturnType<typeof useTranslation>['t'] }) {
   if (loading) return <SkeletonCard />;
   if (!data || data.roots.length === 0) {
     return (
       <EmptyState
         icon={GitBranch}
-        title="No genealogy data"
-        description="Agent lineage will appear here once agents evolve through sprints."
+        title={t('evolution.genealogy_empty_title')}
+        description={t('evolution.genealogy_empty_desc')}
       />
     );
   }
@@ -75,7 +76,7 @@ function GenealogyTree({ data, loading }: { data: FamilyTree | null; loading: bo
         className="py-1"
       >
         <div className="flex items-center gap-2">
-          <GitBranch className="w-3 h-3 text-brand-300 shrink-0" />
+          <GitBranch className="w-3 h-3 text-blue-400 shrink-0" />
           <span className="font-mono text-sm text-zinc-200">{agentId}</span>
           {node?.reason && (
             <span className="text-xs text-zinc-500 truncate">{node.reason}</span>
@@ -93,14 +94,14 @@ function GenealogyTree({ data, loading }: { data: FamilyTree | null; loading: bo
   );
 }
 
-function RetirementTimeline({ data, loading }: { data: RetiredAgentRecord[] | null; loading: boolean }) {
+function RetirementTimeline({ data, loading, t }: { data: RetiredAgentRecord[] | null; loading: boolean; t: ReturnType<typeof useTranslation>['t'] }) {
   if (loading) return <SkeletonCard />;
   if (!data || data.length === 0) {
     return (
       <EmptyState
         icon={Archive}
-        title="No retired agents"
-        description="Agents that are retired due to low performance will appear here."
+        title={t('evolution.retirement_empty_title')}
+        description={t('evolution.retirement_empty_desc')}
       />
     );
   }
@@ -135,14 +136,14 @@ function RetirementTimeline({ data, loading }: { data: RetiredAgentRecord[] | nu
   );
 }
 
-function PromptDiffTable({ data, loading }: { data: PromptMetricsReport[] | null; loading: boolean }) {
+function PromptDiffTable({ data, loading, t }: { data: PromptMetricsReport[] | null; loading: boolean; t: ReturnType<typeof useTranslation>['t'] }) {
   if (loading) return <SkeletonCard />;
   if (!data || data.length === 0) {
     return (
       <EmptyState
         icon={TrendingUp}
-        title="No prompt metrics"
-        description="Prompt evolution metrics will appear here once agents have versioned prompts."
+        title={t('evolution.metrics_empty_title')}
+        description={t('evolution.metrics_empty_desc')}
       />
     );
   }
@@ -178,7 +179,7 @@ function PromptDiffTable({ data, loading }: { data: PromptMetricsReport[] | null
               </td>
               <td className="py-2">
                 <Badge className={
-                  report.experimentStatus === "active" ? "bg-brand-bg text-brand-300" :
+                  report.experimentStatus === "active" ? "bg-blue-900 text-blue-300" :
                   report.experimentStatus === "completed" ? "bg-green-900 text-green-300" :
                   "bg-zinc-700 text-zinc-500"
                 }>
@@ -194,6 +195,7 @@ function PromptDiffTable({ data, loading }: { data: PromptMetricsReport[] | null
 }
 
 export default function EvolutionPage() {
+  const { t } = useTranslation();
   const { data: genealogy, loading: genealogyLoading, error: genealogyError } = useApi<FamilyTree>("/api/evolution/genealogy");
   const { data: retirement, loading: retirementLoading, error: retirementError } = useApi<RetiredAgentRecord[]>("/api/evolution/retirement");
   const { data: promptMetrics, loading: promptLoading, error: promptError } = useApi<PromptMetricsReport[]>("/api/evolution/prompt-metrics");
@@ -208,14 +210,14 @@ export default function EvolutionPage() {
     <div className="space-y-6" data-testid="evolution-page">
       <div className="flex items-center gap-2">
         <TrendingUp className="w-6 h-6 text-green-400" />
-        <h1 className="text-2xl font-bold text-zinc-100">Evolution</h1>
+        <h1 className="text-2xl font-bold text-zinc-100">{t('evolution.title')}</h1>
       </div>
 
       <Tabs defaultValue="genealogy">
         <TabsList>
-          <TabsTrigger value="genealogy" data-testid="tab-genealogy">Genealogy</TabsTrigger>
-          <TabsTrigger value="retirement" data-testid="tab-retirement">Retirement</TabsTrigger>
-          <TabsTrigger value="prompt-diff" data-testid="tab-prompt-diff">Prompt Diff</TabsTrigger>
+          <TabsTrigger value="genealogy" data-testid="tab-genealogy">{t('evolution.tab_genealogy')}</TabsTrigger>
+          <TabsTrigger value="retirement" data-testid="tab-retirement">{t('evolution.tab_retirement')}</TabsTrigger>
+          <TabsTrigger value="prompt-diff" data-testid="tab-prompt-diff">{t('evolution.tab_prompt_diff')}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="genealogy">
@@ -223,11 +225,11 @@ export default function EvolutionPage() {
             <CardHeader>
               <CardTitle className="text-zinc-100 flex items-center gap-2">
                 <GitBranch className="w-4 h-4" />
-                Agent Genealogy Tree
+                {t('evolution.genealogy_title')}
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {genealogyError ? errBanner(genealogyError) : <GenealogyTree data={genealogy} loading={genealogyLoading} />}
+              {genealogyError ? errBanner(genealogyError) : <GenealogyTree data={genealogy} loading={genealogyLoading} t={t} />}
             </CardContent>
           </Card>
         </TabsContent>
@@ -237,11 +239,11 @@ export default function EvolutionPage() {
             <CardHeader>
               <CardTitle className="text-zinc-100 flex items-center gap-2">
                 <Archive className="w-4 h-4" />
-                Retirement Timeline
+                {t('evolution.retirement_title')}
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {retirementError ? errBanner(retirementError) : <RetirementTimeline data={retirement} loading={retirementLoading} />}
+              {retirementError ? errBanner(retirementError) : <RetirementTimeline data={retirement} loading={retirementLoading} t={t} />}
             </CardContent>
           </Card>
         </TabsContent>
@@ -251,11 +253,11 @@ export default function EvolutionPage() {
             <CardHeader>
               <CardTitle className="text-zinc-100 flex items-center gap-2">
                 <TrendingUp className="w-4 h-4" />
-                Prompt Evolution Metrics
+                {t('evolution.metrics_title')}
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {promptError ? errBanner(promptError) : <PromptDiffTable data={promptMetrics} loading={promptLoading} />}
+              {promptError ? errBanner(promptError) : <PromptDiffTable data={promptMetrics} loading={promptLoading} t={t} />}
             </CardContent>
           </Card>
         </TabsContent>
