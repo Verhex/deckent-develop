@@ -2,6 +2,21 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint285] - 2026-06-12
+
+### Added
+
+- Enstrümante kök-teşhis — 3 hipotezi ayrıştır + failing-repro
+- Stream-toplama sağlamlığı — prose-konum bağımsızlığı
+- Çoklu tool-sonucu geri-beslemesi — model HEPSİNİ görür
+
+### Changed
+
+- Tur-içi tool-KUYRUĞU + per-tool sıralı onay (Ink) (completed with tech debt)
+
+
+_Tasks: 8 total, 7 done, 1 tech debt, 1 no-go_
+
 ## [1.0.0-beta.1-sprint284] - 2026-06-12
 
 ### Added

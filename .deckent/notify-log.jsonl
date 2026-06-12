@@ -334,3 +334,7 @@
 {"priority":"info","event":"task-done","title":"Task 284-005 tamamlandı","summary":"DASH-FIX-1 complete.\n\nFix 1 — terminal-sessions 401: Added `if (!getBootstrapToken()) return;` guard","sprintId":"sprint-284","timestamp":"2026-06-12T05:47:04.566Z"}
 {"priority":"warning","event":"task-no-go","title":"Task 284-006 başarısız","summary":"Created scripts/rt-latency-verify.mjs following test-e2e-surfaces.mjs pattern. Boots the real serve ","sprintId":"sprint-284","timestamp":"2026-06-12T05:47:04.578Z"}
 {"priority":"info","event":"sprint-finalized","title":"Sprint sprint-284 kapandı","summary":"6/8 DONE, 0 TECH_DEBT, 2 NO_GO","sprintId":"sprint-284","timestamp":"2026-06-12T05:50:44.951Z"}
+{"priority":"info","event":"sprint-started","title":"Sprint sprint-285 başladı","summary":"5 task planlandı","sprintId":"sprint-285","timestamp":"2026-06-12T06:26:50.780Z"}
+{"priority":"warning","event":"task-no-go","title":"Task 285-004 başarısız","summary":"Fixed `turnInput` in chat-session.ts to collect ALL consecutive trailing tool messages instead of on","sprintId":"sprint-285","timestamp":"2026-06-12T07:02:17.716Z"}
+{"priority":"warning","event":"task-no-go","title":"Task 285-003 başarısız","summary":"Fixed stream-collection robustness (H2 verdict from T-285-001):\n\n1. parseStreamJsonLine: Added `assi","sprintId":"sprint-285","timestamp":"2026-06-12T07:02:14.087Z"}
+{"priority":"info","event":"sprint-finalized","title":"Sprint sprint-285 kapandı","summary":"7/8 DONE, 1 TECH_DEBT, 1 NO_GO","sprintId":"sprint-285","timestamp":"2026-06-12T07:18:47.534Z"}

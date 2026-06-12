@@ -24,3 +24,15 @@ Yakalanmayan/atlanan etiketler için kullanıcıya hiçbir uyarı yok — 'wired
 
 ## Öneri
 `matchAll` + tur-içi tool kuyruğu + per-tool onay + atlanan-tag uyarısı. Önceliği: P1 multi-tag/prose-konumu birlikte düzeltilmeli (aynı parser yolu).
+
+---
+
+## KAPANIŞ — Sprint 285 (2026-06-12, CC kapanış-notu)
+
+Üç bulgu da kapatıldı (5-task sprint; teşhis-önce deseni):
+- **#1 multi-tag:** Kök parser DEĞİLDİ (tüm-tag exec-loop sağlamdı) — motor da sıralıydı; gerçek kırılganlık Ink confirm **tek-slot**'uydu (eşzamanlı/re-entrant ezilme) → **FIFO confirm-kuyruğu** (`createConfirmQueue`, [i/N] gösterge, deny-birini-geç-devam). 7/7 test.
+- **#2 prose-konumu:** Kök stream-toplamaydı — `assistant` complete-message blokları `collected`'a girmiyordu → blok-birleştirme + max-length reconciliation; 22-case konum-matrisi yeşil. "AÇIKLAMA YAPMA" sistem-prompt kısıtı kaldırıldı (semptom-kural bitti).
+- **#3 sessiz-düşürme:** parsed-vs-executed telemetri + malformed-tag görünür i18n-uyarı.
+- **Bonus (CC-ek-bulgu):** `turnInput` modele yalnız SON tool-sonucunu veriyordu → TÜM ardışık sonuçlar beslenir.
+
+Vakalar: 285-003 sentetik-NO_GO (eval-misfire; kod sağlamdı) · 285-005 OOM-137 (artifact'ler kurtarıldı). Açık-debt: PTY-harness deny/multi-tag senaryo-ayarı + exit-kodu (REPL-TOOL-DEBT-1, MASTER-PLAN).

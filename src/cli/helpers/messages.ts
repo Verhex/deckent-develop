@@ -605,6 +605,13 @@ const MESSAGES: MessageMap = {
     en: '(y = allow · a = always allow · N = deny)',
     tr: '(y = izin · a = hep izin · N = reddet)',
   },
+  // Per-card position when several tool calls are queued for approval in one turn
+  // ([1/3], [2/3], …). Numeric notation — identical across locales by design, but
+  // routed through getMessage so it stays i18n-owned (template, not hardcoded).
+  'tui.confirm_progress': {
+    en: '[{index}/{total}]',
+    tr: '[{index}/{total}]',
+  },
   'tui.confirm_granted': {
     en: 'allowed',
     tr: 'izin verildi',
@@ -716,6 +723,10 @@ const MESSAGES: MessageMap = {
   'tui.render_error': {
     en: 'REPL render error',
     tr: 'REPL render hatası',
+  },
+  'tui.tool_telemetry_mismatch': {
+    en: '[deckent] warning: {found} action tag(s) found, {executed} executed — {malformed} malformed/skipped',
+    tr: '[deckent] uyarı: {found} aksiyon-etiketi bulundu, {executed} yürütüldü — {malformed} hatalı/atlandı',
   },
 
   // ─── chat REPL loop + slash subactions (Sprint 269 — 269-003) ────────

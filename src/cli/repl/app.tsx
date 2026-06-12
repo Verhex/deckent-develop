@@ -20,7 +20,87 @@ import type { ActiveSelection } from './provider-switch.js';
 import { createStreamSegmenter, type StreamSegmenter } from './stream-segmenter.js';
 
 export type ConfirmAnswer = 'y' | 'a' | 'n';
-export type ConfirmTrigger = (summary: string) => Promise<ConfirmAnswer>;
+// toolName is optional: the dispatcher passes it so an 'a' (always) decision can
+// be applied to the SAME-tool remainder still waiting in the confirm queue. The
+// ALWAYS-confirm tier (kill/cleanup) omits it on purpose (never auto-applies 'a').
+export type ConfirmTrigger = (summary: string, toolName?: string) => Promise<ConfirmAnswer>;
+
+/** One queued confirm request — its prompt, the tool it gates, and its resolver. */
+export interface ConfirmRequest {
+  summary: string;
+  toolName?: string;
+  resolve: (answer: ConfirmAnswer) => void;
+}
+
+/** The confirm card to render now (queue head) + its position within the burst. */
+export interface ConfirmHead {
+  summary: string;
+  index: number;   // 1-based position of this card within the active burst
+  total: number;   // total cards in the active burst (grows if more arrive mid-burst)
+}
+
+/** FIFO confirm queue (view-layer authority). */
+export interface ConfirmQueue {
+  /** Enqueue a request. A pending head is NEVER overwritten — the new one waits. */
+  enqueue(req: ConfirmRequest): void;
+  /** Answer the current head; advance to the next. Deny does NOT cancel the rest. */
+  answer(answer: ConfirmAnswer): void;
+  /** The card to show now, or null when the queue is empty. */
+  head(): ConfirmHead | null;
+  /** Pending count (including the shown head). */
+  size(): number;
+}
+
+/**
+ * Pure FIFO confirm queue — the fix for the H1 single-slot fragility
+ * (docs/reviews/sprint-285/repl-tool-root-cause.md). The engine dispatches tool
+ * calls sequentially (chat-native.ts for…of await), so in practice one confirm
+ * is pending at a time; but a re-entrant/concurrent trigger used to OVERWRITE the
+ * single resolver slot and orphan the first request. A queue makes both the
+ * sequential and the concurrent path safe: every request is shown in arrival
+ * order, none is dropped.
+ *
+ * String-free (i18n-first): holds no user-facing text of its own; the caller
+ * passes the localized `summary`. `onChange` re-renders the head (React setState).
+ */
+export function createConfirmQueue(onChange: () => void): ConfirmQueue {
+  const pending: ConfirmRequest[] = [];
+  let answered = 0; // answered so far in the current burst (drives the [i/N] index)
+
+  const head = (): ConfirmHead | null => {
+    const h = pending[0];
+    if (!h) return null;
+    return { summary: h.summary, index: answered + 1, total: answered + pending.length };
+  };
+
+  const enqueue = (req: ConfirmRequest): void => {
+    pending.push(req); // never overwrite a pending head — append and wait its turn
+    onChange();
+  };
+
+  const answer = (a: ConfirmAnswer): void => {
+    const current = pending.shift();
+    if (!current) return;
+    answered += 1;
+    current.resolve(a);
+    // "always" applies to the same-tool remainder: queued requests for the SAME
+    // tool already cleared run.tsx's perms gate and won't re-check it, so resolve
+    // them here with the same allow decision (claude-code "always allow" feel).
+    if (a === 'a' && current.toolName) {
+      for (let i = pending.length - 1; i >= 0; i--) {
+        if (pending[i]!.toolName === current.toolName) {
+          const [same] = pending.splice(i, 1);
+          answered += 1;
+          same!.resolve('a');
+        }
+      }
+    }
+    if (pending.length === 0) answered = 0; // burst drained → reset the counter
+    onChange();
+  };
+
+  return { enqueue, answer, head, size: () => pending.length };
+}
 
 /** A completed tool action, rendered as a claude-code-style change block. The
  * caller (run.tsx) localizes `verb`/`note`; the App owns the colored layout. */
@@ -40,6 +120,7 @@ export interface ReplLabels {
   ready: string;        // "hazır · sıra sende"
   queued: string;       // "kuyrukta"
   confirmHint: string;  // "(y = izin · a = hep izin · N = reddet)"
+  confirmProgress: string; // "[{index}/{total}]" — per-card position (i18n template)
   menuHint: string;     // "↑↓ gez · Enter seç · Tab tamamla · Esc kapat"
   switched: string;     // "geçildi"
   switchUsage: string;  // "kullanım: /model <ad> · /provider <ad>"
@@ -166,7 +247,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
   const [busy, setBusy] = useState(false);
   const [working, setWorking] = useState(false); // a turn is in progress (streaming)
   const [queued, setQueued] = useState<string[]>([]);
-  const [confirm, setConfirm] = useState<{ summary: string } | null>(null);
+  const [confirm, setConfirm] = useState<ConfirmHead | null>(null);
 
   const [sessionTok, setSessionTok] = useState(0);
   const idRef = useRef(1);
@@ -175,7 +256,12 @@ export function ReplApp(props: ReplAppProps): ReactElement {
   const segmenter = useRef<StreamSegmenter | null>(null);
   const queue = useRef<string[]>([]);
   const wake = useRef<(() => void) | null>(null);
-  const confirmResolve = useRef<((a: ConfirmAnswer) => void) | null>(null);
+  // FIFO confirm queue (replaces the single-slot resolver — H1 fix). Lazy-init
+  // once; onChange mirrors the head into `confirm` state so React re-renders it.
+  const confirmQueue = useRef<ConfirmQueue | null>(null);
+  if (confirmQueue.current === null) {
+    confirmQueue.current = createConfirmQueue(() => setConfirm(confirmQueue.current!.head()));
+  }
   const started = useRef(false);
 
   const pushTurn = (role: Turn['role'], text: string): void =>
@@ -193,9 +279,10 @@ export function ReplApp(props: ReplAppProps): ReactElement {
   };
 
   useEffect(() => {
-    registerConfirm((summary: string) => new Promise<ConfirmAnswer>((resolve) => {
-      confirmResolve.current = resolve;
-      setConfirm({ summary });
+    // Enqueue instead of overwriting a single slot: N tool calls = N cards, asked
+    // in arrival order. The promise resolves when the queue answers this request.
+    registerConfirm((summary: string, toolName?: string) => new Promise<ConfirmAnswer>((resolve) => {
+      confirmQueue.current!.enqueue({ summary, resolve, ...(toolName ? { toolName } : {}) });
     }));
   }, [registerConfirm]);
 
@@ -337,12 +424,12 @@ export function ReplApp(props: ReplAppProps): ReactElement {
     if (wake.current) { const w = wake.current; wake.current = null; w(); }
   };
 
-  // Confirm modal owns input only while it is open (single-key y / a / N).
+  // Confirm modal owns input only while it is open (single-key y / a / N). The
+  // queue resolves the current head and advances to the next card (deny does not
+  // cancel the rest); onChange updates `confirm` (null when the queue drains).
   useInput((input) => {
     const answer: ConfirmAnswer = input === 'y' ? 'y' : input === 'a' ? 'a' : 'n';
-    setConfirm(null);
-    const r = confirmResolve.current; confirmResolve.current = null;
-    r?.(answer);
+    confirmQueue.current!.answer(answer);
   }, { isActive: confirm !== null });
 
   // Persistent phase anchor — the orientation signal ("am I working / done?").
@@ -358,11 +445,11 @@ export function ReplApp(props: ReplAppProps): ReactElement {
           above (readable in real time, native scrollback, no tall re-render). */}
       {partial.length > 0 && <Text>{partial}</Text>}
 
-      {/* Confirm modal. */}
+      {/* Confirm modal — one card per queued tool call, with an [i/N] position. */}
       {confirm && (
         <Box flexDirection="column" marginTop={1}>
           <Text color={TEAL}>{confirm.summary}</Text>
-          <Text dimColor>{labels.confirmHint}</Text>
+          <Text dimColor>{`${labels.confirmProgress.replace('{index}', String(confirm.index)).replace('{total}', String(confirm.total))} ${labels.confirmHint}`}</Text>
         </Box>
       )}
 

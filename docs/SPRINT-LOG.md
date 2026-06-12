@@ -7806,3 +7806,29 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 284-006: Gecikme-ölçüm smoke'u — "anlık" iddiasının kanıt-zinciri (NO_GO)
 
 ---
+## Sprint 285 — sprint-285
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-06-12
+**Duration:** 2990s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 8 |
+| Completed | 7 |
+| Tech Debt | 1 |
+| No-Go | 1 |
+| Coverage | 0.0% |
+| Duration | 2990305ms |
+
+### Tasks
+
+- 285-001: Enstrümante kök-teşhis — 3 hipotezi ayrıştır + failing-repro (DONE)
+- 285-002: Tur-içi tool-KUYRUĞU + per-tool sıralı onay (Ink) (GO_WITH_TECH_DEBT)
+- 285-003: Stream-toplama sağlamlığı — prose-konum bağımsızlığı (DONE)
+- 285-004: Çoklu tool-sonucu geri-beslemesi — model HEPSİNİ görür (DONE)
+- 285-005: Dürüst-telemetri + PTY regresyon-guard (NO_GO)
+
+---

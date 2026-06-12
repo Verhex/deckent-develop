@@ -9,6 +9,8 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-285-001 | Tech debt from 285-001: Kök-teşhis raporu + 9 repro testi (5 normal + 4 it.fails | normal | sprint-285 | resolved |
+| debt-285-002 | Tech debt from 285-002: H1-fix: replaced the single confirmResolve slot (app.tsx | normal | sprint-285 | resolved |
 | debt-283-002 | Tech debt from 283-002: All goCriteria met: (1) /debt route added to App.tsx wit | normal | sprint-283 | resolved |
 | debt-282-001 | Tech debt from 282-001: ROOT-CAUSE DECOMPOSED + PROVEN. Hypothesis (a) EventSour | normal | sprint-282 | resolved |
 | debt-282-002 | Tech debt from 282-002: POST /api/chat is now adapter-backed (DASH-UX-1 part-1). | normal | sprint-282 | resolved |

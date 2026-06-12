@@ -66,7 +66,9 @@ export async function runInkRepl(
     if (approvalMode === 'full-auto') return true;
     if (approvalMode === 'auto-edit' && toolName !== 'deckent_bash') return true;
     if (!confirmTrigger) return false;
-    const answer = await confirmTrigger(summary);
+    // Pass toolName so an 'a' (always) decision auto-applies to the same-tool
+    // remainder still queued for this turn (queue-aware "always allow").
+    const answer = await confirmTrigger(summary, toolName);
     if (answer === 'a') perms.allow(toolName);
     return answer !== 'n';
   };
@@ -169,6 +171,7 @@ export async function runInkRepl(
         ready: t('tui.ready'),
         queued: t('tui.queued'),
         confirmHint: t('tui.confirm_hint'),
+        confirmProgress: t('tui.confirm_progress'),
         menuHint: t('tui.menu_hint'),
         switched: t('tui.switched'),
         switchUsage: t('tui.switch_usage'),

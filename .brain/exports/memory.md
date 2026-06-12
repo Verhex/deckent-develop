@@ -1,5 +1,15 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-285 Learnings
+- Sprint sprint-285 Learnings: ## Sprint sprint-285 Learnings
+- Tur-içi tool-KUYRUĞU + per-tool sıralı onay (Ink): GO_WITH_TECH_DEBT — H1-fix: replaced the single confirmResolve slot (app.tsx:178) with a FIFO confirm QUEUE in the Ink view layer ONLY — the
+- Dürüst-telemetri + PTY regresyon-guard: NO_GO
+
+## Gains
+- 285-001 — Enstrümante kök-teşhis — 3 hipotezi ayrıştır + failing-repro — Kök-teşhis raporu + 9 repro testi (5 normal + 4 it.fails-pin), src'ye DOKUNULMADI.
+- 285-003 — Stream-toplama sağlamlığı — prose-konum bağımsızlığı — Fixed stream-collection robustness (H2 verdict from T-285-001):
+- 285-004 — Çoklu tool-sonucu geri-beslemesi — model HEPSİNİ görür — Fixed `turnInput` in chat-session.ts to collect ALL consecutive trailing tool messages instead of...
+
 ## Sprint sprint-284 Learnings
 - Sprint sprint-284 Learnings: ## Sprint sprint-284 Learnings
 - Gecikme-ölçüm smoke'u — "anlık" iddiasının kanıt-zinciri: NO_GO — Created scripts/rt-latency-verify.mjs following test-e2e-surfaces.mjs pattern. Boots the real serve binary with DECKENT_
