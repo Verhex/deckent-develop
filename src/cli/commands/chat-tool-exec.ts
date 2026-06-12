@@ -96,7 +96,11 @@ export function createToolExecDispatcher(opts: ToolExecOptions = {}): McpToolDis
       try {
         if (SIDE_EFFECTING.has(name)) {
           const approved = await confirm(summarize(name, args), name);
-          if (!approved) return `[deckent] iptal edildi: ${name}`;
+          // Distinct machine-marker for denial — MUST differ from the success
+          // returns ("[deckent] yazıldı/düzenlendi"), otherwise the REPL cannot
+          // tell a blocked write from a completed one (REPL-TOOL-DEBT-2). The UI
+          // localizes the user-facing "cancelled" text; this prefix is internal.
+          if (!approved) return `[deckent-denied] ${name}`;
         }
 
         switch (name) {

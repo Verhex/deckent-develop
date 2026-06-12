@@ -141,12 +141,17 @@ export async function runInkRepl(
       // The old `/reddedildi|denied/i` text-match missed the actual i18n cancel
       // string ("iptal edildi" / "cancelled") → a DENIED write rendered a fake
       // "⎿ +1" success block. Prefix-marker check is language-independent.
-      const isFailureResult = result.startsWith('[mcp-error]') || result.startsWith('[deckent]');
+      // Three honest outcomes (REPL-TOOL-DEBT-1/2): success → ● change block;
+      // DENIED ([deckent-denied] <tool>) → dim ✗ with localized "cancelled";
+      // ERROR ([mcp-error] …) → dim ✗ with the error detail. Success returns
+      // ([deckent] yazıldı/düzenlendi, bash output) must NOT match either marker
+      // — the old broad `[deckent]` prefix flagged a completed write as failed.
+      const isDenied = result.startsWith('[deckent-denied]');
+      const isError = result.startsWith('[mcp-error]');
       if (toolSink) {
-        if (isFailureResult) {
-          // Honest denied/errored line: show the already-localized result text
-          // ("[deckent] iptal edildi: <tool>" / "[mcp-error] …") dim with ✗ —
-          // never a fake success block, never silent (REPL-TOOL-DEBT-1).
+        if (isDenied) {
+          toolSink({ verb: `${t('tui.cmd_cancelled')}: ${toolName}`, target: '', failed: true });
+        } else if (isError) {
           toolSink({ verb: result, target: '', failed: true });
         } else if (info) {
           toolSink(info);
