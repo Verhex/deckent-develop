@@ -511,6 +511,15 @@ export const en = {
   'nervous.accept_button': 'Accept',
   'nervous.reject_button': 'Reject',
 
+  // Worker Log Panel (284-004)
+  'worker_log.panel_title': 'Worker Logs',
+  'worker_log.empty_unavailable': 'Log output is not available for this worker.',
+  'worker_log.no_logs': 'No log output yet.',
+  'worker_log.scroll_lock': 'Lock scroll',
+  'worker_log.scroll_unlock': 'Unlock scroll',
+  'worker_log.reconnecting': 'Reconnecting...',
+  'worker_log.close': 'Close log panel',
+
   // Memory Explorer Page (283-003)
   'memory_explorer.title': 'Memory & ADR Explorer',
   'memory_explorer.adr_empty_title': 'No ADR Entries',

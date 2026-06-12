@@ -11,7 +11,8 @@ import { ActivityFeed } from "../components/ActivityFeed";
 import { SprintPhaseTimeline } from "../components/SprintPhaseTimeline";
 import { SkeletonCard } from "../components/Skeleton";
 import { Sheet, SheetContent } from "../components/ui/sheet";
-import { useSSE } from "../hooks/useSSE";
+import { useSSEWithLiveEvents } from "../hooks/useSSE";
+import type { LiveActivityEntry } from "../lib/use-live-data";
 import { useTranslation } from "../i18n/LanguageProvider";
 import type { TranslatorProp } from "../i18n/types";
 import { fetchJson, postJson, ApiError } from "../lib/api";
@@ -126,9 +127,66 @@ function StatRow({ sprintId, done, total, exec, phase }: { sprintId?: string; do
   );
 }
 
+/** Inline live activity feed rendered in the activity column. */
+function LiveActivityFeed({
+  liveEvents,
+  hasSprint,
+  t,
+}: {
+  liveEvents: LiveActivityEntry[];
+  hasSprint: boolean;
+  t: TranslatorProp;
+}) {
+  if (!hasSprint && liveEvents.length === 0) {
+    return (
+      <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4 text-center">
+        <p className="text-sm text-zinc-500 pt-2">{t("activity.no_activity")}</p>
+      </div>
+    );
+  }
+  if (liveEvents.length === 0) {
+    return (
+      <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4 text-center">
+        <p className="text-sm text-zinc-500 pt-2">{t("activity.waiting")}</p>
+      </div>
+    );
+  }
+  return (
+    <div className="rounded-lg border border-zinc-800 bg-zinc-900 flex flex-col h-full">
+      <div className="p-3 pb-1">
+        <p className="text-sm font-semibold text-zinc-100 flex items-center gap-2">
+          <span className="inline-block w-2 h-2 rounded-full bg-brand-400 animate-pulse" />
+          {t("activity.title")}
+        </p>
+      </div>
+      <div className="flex-1 overflow-y-auto p-3 min-h-0 max-h-80">
+        <ul className="space-y-1">
+          {liveEvents.map((entry) => (
+            <li key={entry.id} className="flex items-start gap-2 text-xs">
+              <span className="text-zinc-500 font-mono shrink-0 mt-0.5">
+                {new Date(entry.ts).toLocaleTimeString("en-GB", { hour12: false })}
+              </span>
+              <div className="flex-1 min-w-0">
+                <span className="text-zinc-300 capitalize">{entry.type.replace(/_/g, " ")}</span>
+                {entry.payload !== undefined && (
+                  <span className="block text-zinc-500 truncate text-[11px]">
+                    {typeof entry.payload === "object" && entry.payload !== null
+                      ? JSON.stringify(entry.payload).slice(0, 80)
+                      : String(entry.payload)}
+                  </span>
+                )}
+              </div>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   const { t } = useTranslation();
-  const sseState = useSSE("/api/events");
+  const { data: sseState, liveEvents } = useSSEWithLiveEvents("/api/events");
   const { data: polledState } = useLiveData<DashboardState>("/api/status", {
     enabled: !sseState,
     pollIntervalMs: 5000,
@@ -396,9 +454,11 @@ export default function DashboardPage() {
           />
         </div>
 
-        {/* Activity Feed — 1/3 */}
+        {/* Activity Feed — 1/3: live events when available, snapshot-based fallback */}
         <div className="lg:col-span-1">
-          <ActivityFeed state={state} hasSprint={!!state} />
+          {liveEvents.length > 0
+            ? <LiveActivityFeed liveEvents={liveEvents} hasSprint={!!state} t={t} />
+            : <ActivityFeed state={state} hasSprint={!!state} />}
         </div>
       </div>
 

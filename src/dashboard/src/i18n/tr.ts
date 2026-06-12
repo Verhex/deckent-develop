@@ -513,6 +513,15 @@ export const tr: Record<TranslationKey, string> = {
   'nervous.accept_button': 'Kabul Et',
   'nervous.reject_button': 'Reddet',
 
+  // Worker Log Panel (284-004)
+  'worker_log.panel_title': 'Worker Logları',
+  'worker_log.empty_unavailable': 'Bu worker için log çıktısı mevcut değil.',
+  'worker_log.no_logs': 'Henüz log çıktısı yok.',
+  'worker_log.scroll_lock': 'Kaydırmayı kilitle',
+  'worker_log.scroll_unlock': 'Kaydırmayı serbest bırak',
+  'worker_log.reconnecting': 'Yeniden bağlanıyor...',
+  'worker_log.close': 'Log panelini kapat',
+
   // Memory Explorer Page (283-003)
   'memory_explorer.title': 'Bellek & ADR Keşfedici',
   'memory_explorer.adr_empty_title': 'ADR Girdisi Yok',

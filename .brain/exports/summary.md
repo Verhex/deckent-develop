@@ -83,6 +83,8 @@
 | adr-089 | Backend-Agnostic Worker Observation + Per-Worker Independent Backends | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-284 Learnings** (sprint-284): ## Sprint sprint-284 Learnings
+- Gecikme-ölçüm smoke'u — "anlık" iddiasının kanıt-zinciri: NO_GO — Created scripts/rt...
 - **Sprint sprint-283 Learnings** (sprint-283): ## Sprint sprint-283 Learnings
 
 ## Gains
@@ -111,10 +113,6 @@
 
 ## Gains
 - 275-001 — /usage REPL slash — üç katman birden — Implemented /usage REPL s...
-- **Sprint sprint-274 Learnings** (sprint-274): ## Sprint sprint-274 Learnings
-
-## Gains
-- 274-001 — cache_warm config bloğu — Added CacheWarmConfig interface to con...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -148,5 +146,6 @@ _No active technical debt._
 - Violation pattern: stale_heartbeat
 - Violation pattern: stale_heartbeat
 - Violation pattern: stale_heartbeat
+- Violation pattern: stale_heartbeat
 
-_Total entries: 466 | Generated: 2026-06-12_
+_Total entries: 490 | Generated: 2026-06-12_

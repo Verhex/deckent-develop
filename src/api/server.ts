@@ -41,6 +41,8 @@ import { loadDeckSecrets } from '../core/deck-file.js';
 import { interpolateConfig } from '../core/deck-interpolation.js';
 import { resolveChatReply } from './chat-handler.js';
 import { streamChatMessage, streamToSseLines, type ChatProviderAdapter } from './chat-stream.js';
+import { startLiveEventBridge, formatLiveEventFrame, type LiveEventBridge } from './live-events.js';
+import { matchWorkerLogStream, isValidTaskId, handleWorkerLogStream } from './worker-logs.js';
 import { registerEvolutionRoutes } from './evolution-endpoint.js';
 import { registerMemorySearch } from './memory-search-endpoint.js';
 import { registerNervousRoutes } from './nervous-endpoint.js';
@@ -690,6 +692,29 @@ async function handleRequest(
       return;
     }
 
+    // Worker-log SSE (DASH-RT-2, Sprint 284): live tail of `.tasks/task-<id>.log`
+    // backend-agnostically. The taskId is validated against `^[A-Za-z0-9_-]+$`
+    // BEFORE any fs access — a decoded segment with `.`/`/`/`%` (path traversal)
+    // is rejected 403. Query-token auth is granted via the `/api/workers/` prefix
+    // in the auth-gate (header-less EventSource transport).
+    {
+      const rawTaskId = matchWorkerLogStream(url);
+      if (rawTaskId !== null) {
+        let taskId: string;
+        try {
+          taskId = decodeURIComponent(rawTaskId);
+        } catch {
+          taskId = rawTaskId; // malformed %-escape → fails the regex below
+        }
+        if (!isValidTaskId(taskId)) {
+          sendError(res, 403, 'Invalid task id');
+          return;
+        }
+        handleWorkerLogStream(req, res, projectRoot, taskId, allowedOrigin);
+        return;
+      }
+    }
+
     // Static file serving for dashboard
     if (staticDir && !url.startsWith('/api/')) {
       const urlPath = url.split('?')[0] ?? '/';
@@ -743,6 +768,14 @@ async function handleRequest(
     if (registerCoverageRoutes(url, res, projectRoot)) return;
     // Auth identity: /api/auth/me (277-001)
     if (registerAuthMeRoute(url, method, res, req)) return;
+
+    // GET /api/directives — DIRECTIVES.md content (symmetric with POST, DASH-FIX-1)
+    if (url === '/api/directives') {
+      const directivesPath = join(projectRoot, DIRECTIVES_FILE);
+      const content = existsSync(directivesPath) ? readFileSync(directivesPath, 'utf-8') : '';
+      sendJson(res, { content });
+      return;
+    }
 
     // GET with no matching route
     sendError(res, 404, 'Not found');
@@ -877,7 +910,7 @@ async function handleRequest(
       return;
     }
 
-    if (url === '/api/set-directives') {
+    if (url === '/api/set-directives' || url === '/api/directives') {
       const parsed = SetDirectivesSchema.safeParse(body);
       if (!parsed.success) {
         sendError(res, 400, 'Missing content field');
@@ -1206,6 +1239,11 @@ export function createHttpServer(
     // leaks nothing.
     exemptPaths: ['/health', '/api/health', '/api/auth/oidc/exchange'],
     queryTokenPaths: ['/api/events', '/api/chat/stream'],
+    // Worker-log SSE (DASH-RT-2): `/api/workers/:taskId/logs/stream` has a
+    // dynamic segment, so it cannot be an exact entry. The PREFIX form (trailing
+    // slash) grants the same query-token fallback to the sub-resource while the
+    // `/api/workers` LIST endpoint stays exact-match-only (behavior unchanged).
+    queryTokenPrefixes: ['/api/workers/'],
     ...(resolvedOidc ? { oidc: resolvedOidc } : {}),
   });
 
@@ -1249,7 +1287,36 @@ export function createHttpServer(
   // Watch dashboard file for SSE — lazy start
   let watcher: ReturnType<typeof watchDashboard> | null = null;
 
+  // Live event bridge (DASH-RT-1, Sprint 284): real-time hb/result/event-stream
+  // push to the SAME `/api/events` SSE channel. Started lazily on the first SSE
+  // connect, independent of `.dashboard` existence, and fans out through the
+  // existing `sseClients` set (no second registry). Typed frames carry a named
+  // SSE `event:` field so they never collide with the snapshot's `data:`
+  // message. Fail-safe — a watcher fault never crashes serve.
+  let liveBridge: LiveEventBridge | null = null;
+  function ensureLiveBridge(): void {
+    if (liveBridge !== null) return;
+    try {
+      liveBridge = startLiveEventBridge({
+        projectRoot,
+        onEvent: (ev) => {
+          const frame = formatLiveEventFrame(ev);
+          for (const client of sseClients) {
+            try {
+              client.write(frame);
+            } catch {
+              // client gone — close() / req.on('close') cleans the set up
+            }
+          }
+        },
+      });
+    } catch {
+      liveBridge = null;
+    }
+  }
+
   function initWatcher(): void {
+    ensureLiveBridge();
     if (watcher !== null) return;
     if (!existsSync(dashPath)) return;
     watcher = watchDashboard(dashPath, () => {
@@ -1501,6 +1568,7 @@ export function createHttpServer(
     terminalToken,
     close(): Promise<void> {
       watcher?.close();
+      liveBridge?.close();
       if (terminalReaper) {
         clearInterval(terminalReaper);
         terminalReaper = undefined;

@@ -7779,3 +7779,30 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 283-003: Dashboard sayfa-içi i18n-temizliği (eski 282-012) (DONE)
 
 ---
+## Sprint 284 — sprint-284
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-06-12
+**Duration:** 2224s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 8 |
+| Completed | 6 |
+| Tech Debt | 0 |
+| No-Go | 2 |
+| Coverage | NaN% |
+| Duration | 2223973ms |
+
+### Tasks
+
+- 284-001: Canlı-olay köprüsü — hb + event-stream → /api/events typed-push (DONE)
+- 284-002: Dashboard client anlık-merge — snapshot üstüne event-akışı (DONE)
+- 284-003: Worker-log SSE endpoint — backend-agnostik file-tail (DONE)
+- 284-004: WorkersPage canlı log-paneli UI (DONE)
+- 284-005: DASH-FIX-1 — terminal-sessions 401 + directives 404 (DONE)
+- 284-006: Gecikme-ölçüm smoke'u — "anlık" iddiasının kanıt-zinciri (NO_GO)
+
+---

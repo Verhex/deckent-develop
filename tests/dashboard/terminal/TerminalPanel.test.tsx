@@ -11,6 +11,8 @@ const apiMocks = vi.hoisted(() => ({
   createSession: vi.fn(async () => ({ id: 's-new', kind: 'shell', status: 'running' })),
   listSessions: vi.fn(async () => [] as Array<{ id: string; kind: string; status: string }>),
   killSession: vi.fn(async () => {}),
+  // Sprint 284-005: TerminalPanel resolves its Bearer via getBootstrapToken.
+  getBootstrapToken: vi.fn(() => 'test-token'),
 }));
 
 vi.mock('../../../src/dashboard/src/lib/terminal-api', () => apiMocks);

@@ -1,6 +1,20 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getBootstrapApiToken } from "./api";
 
+// ─── Live Activity (DASH-RT-1) ──────────────────────────────────────────────
+
+/** A single entry in the live activity ring buffer fed by typed SSE events. */
+export interface LiveActivityEntry {
+  id: string;
+  ts: string;
+  /** 'deckent_event' from the sprint JSONL stream; 'worker_heartbeat'/'worker_done' from .tasks/ */
+  type: 'deckent_event' | 'worker_heartbeat' | 'worker_done';
+  payload?: unknown;
+}
+
+/** Maximum entries kept in the live activity ring buffer. */
+export const MAX_LIVE_ACTIVITY = 20;
+
 /**
  * Live-data hook with stale-while-revalidate semantics.
  *

@@ -5,6 +5,7 @@ import {
   createSession,
   killSession,
   listSessions,
+  getBootstrapToken,
   type SessionMeta,
 } from '../../lib/terminal-api.js';
 
@@ -13,6 +14,7 @@ export function TerminalPanel() {
   const [activeId, setActiveId] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!getBootstrapToken()) return; // terminal not configured — avoid Bearer-less 401
     let mounted = true;
     listSessions().then((s) => {
       if (!mounted) return;

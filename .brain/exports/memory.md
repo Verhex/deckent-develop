@@ -1,5 +1,16 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-284 Learnings
+- Sprint sprint-284 Learnings: ## Sprint sprint-284 Learnings
+- Gecikme-ölçüm smoke'u — "anlık" iddiasının kanıt-zinciri: NO_GO — Created scripts/rt-latency-verify.mjs following test-e2e-surfaces.mjs pattern. Boots the real serve binary with DECKENT_
+
+## Gains
+- 284-001 — Canlı-olay köprüsü — hb + event-stream → /api/events typed-push — DASH-RT-1 backbone delivered.
+- 284-002 — Dashboard client anlık-merge — snapshot üstüne event-akışı — DASH-RT-1 client-side delivered.
+- 284-003 — Worker-log SSE endpoint — backend-agnostik file-tail — DASH-RT-2 backend delivered + run-proven.
+- 284-004 — WorkersPage canlı log-paneli UI — DASH-RT-2 UI delivered.
+- 284-005 — DASH-FIX-1 — terminal-sessions 401 + directives 404 — DASH-FIX-1 complete.
+
 ## Sprint sprint-283 Learnings
 - Sprint sprint-283 Learnings: ## Sprint sprint-283 Learnings
 

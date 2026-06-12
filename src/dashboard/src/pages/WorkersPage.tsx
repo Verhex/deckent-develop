@@ -3,6 +3,7 @@ import { Users, MessageSquare, ArrowRightLeft, Cpu } from "lucide-react";
 import { Badge } from "../components/ui/badge";
 import { WorkerCardGrid } from "../components/WorkerCard";
 import { AgentDetail } from "../components/AgentDetail";
+import { WorkerLogPanel } from "../components/WorkerLogPanel";
 import { Sheet, SheetContent } from "../components/ui/sheet";
 import { useSSE } from "../hooks/useSSE";
 import { useLiveData } from "../lib/use-live-data";
@@ -132,6 +133,7 @@ export default function WorkersPage() {
     pollIntervalMs: 5000,
   });
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
+  const [selectedLogTaskId, setSelectedLogTaskId] = useState<string | null>(null);
 
   const state = sseState ?? polledState;
   const agents = state?.agents ?? [];
@@ -175,9 +177,20 @@ export default function WorkersPage() {
           provider bar + model badge, and the kill button for EXECUTING workers. */}
       <WorkerCardGrid
         agents={agents}
-        onSelect={(taskId) => setSelectedAgent(taskId)}
+        onSelect={(taskId) => {
+          setSelectedAgent(taskId);
+          setSelectedLogTaskId(taskId);
+        }}
         onKill={handleKill}
       />
+
+      {/* Worker Log Panel — live SSE log stream for the selected worker */}
+      {selectedLogTaskId !== null && (
+        <WorkerLogPanel
+          taskId={selectedLogTaskId}
+          onClose={() => setSelectedLogTaskId(null)}
+        />
+      )}
 
       {/* Worker Comms panel — shared-context key count + recent handoffs */}
       <WorkerCommsPanel agents={agents} />

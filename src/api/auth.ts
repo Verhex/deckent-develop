@@ -19,6 +19,15 @@ export interface AuthConfig {
    */
   queryTokenPaths?: string[];
   /**
+   * Like {@link queryTokenPaths}, but matched by PREFIX (`startsWith`) instead
+   * of exact equality. For SSE endpoints with a dynamic path segment — e.g.
+   * `/api/workers/:taskId/logs/stream` (DASH-RT-2) — whose full path cannot be
+   * enumerated. The query-token still goes through the same constant-time
+   * SHA-256 compare. Exact-match entries in `queryTokenPaths` are unaffected, so
+   * existing whitelisted paths keep their behavior unchanged.
+   */
+  queryTokenPrefixes?: string[];
+  /**
    * When true (or env var `DECKENT_API_LOCALHOST_AUTO=1` is set), requests
    * arriving from a loopback address (127.0.0.1 / ::1 / ::ffff:127.0.0.1)
    * with NO `Authorization` header are treated as authenticated. Lets the
@@ -149,6 +158,9 @@ export function bearerAuthMiddleware(config: AuthConfig) {
   const activeToken = resolveAuthToken(config.configToken);
   const exempt = new Set(config.exemptPaths ?? []);
   const queryTokenPaths = new Set(config.queryTokenPaths ?? []);
+  const queryTokenPrefixes = config.queryTokenPrefixes ?? [];
+  const queryTokenEligible = (path: string): boolean =>
+    queryTokenPaths.has(path) || queryTokenPrefixes.some((prefix) => path.startsWith(prefix));
   // OIDC verify options built once — algorithm pinned, key material routed
   // only to the matching slot (same discipline as terminal OidcAuthProvider).
   const oidcVerifyOptions: VerifyOptions | null = config.oidc
@@ -228,7 +240,7 @@ export function bearerAuthMiddleware(config: AuthConfig) {
     // Query-token fallback for transports that cannot set headers (SSE).
     // Only the paths the server explicitly opted in (e.g. /api/events) are
     // eligible, and the same constant-time compare is reused.
-    if (headerResult === 'missing' && queryTokenPaths.has(path)) {
+    if (headerResult === 'missing' && queryTokenEligible(path)) {
       const queryToken = extractTokenFromQuery(url);
       if (queryToken !== null) {
         const expected = hashToken(activeToken);

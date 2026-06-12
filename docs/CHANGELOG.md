@@ -2,6 +2,22 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint284] - 2026-06-12
+
+### Added
+
+- Canlı-olay köprüsü — hb + event-stream → /api/events typed-push
+- Dashboard client anlık-merge — snapshot üstüne event-akışı
+- Worker-log SSE endpoint — backend-agnostik file-tail
+- WorkersPage canlı log-paneli UI
+
+### Fixed
+
+- DASH-FIX-1 — terminal-sessions 401 + directives 404
+
+
+_Tasks: 8 total, 6 done, 0 tech debt, 2 no-go_
+
 ## [1.0.0-beta.1-sprint283] - 2026-06-12
 
 ### Added
