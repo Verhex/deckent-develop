@@ -1192,8 +1192,30 @@ Items surfaced during the Sprint 211 doc-consolidation audit that were intention
 
 ---
 
-> **Count:** 115 açık madde + 8 yeni DASH-UX = **123 açık iş-maddesi**, 13 arc'ta %100 haritalı (§15). None is a throwaway/MVP cut — each is built to god-level, enterprise-grade, million-user quality. Build *sequence* per §15 priority map (C→A→B→D→F→E → strategic threads); §10A AS-sequencing remains the dependency-order reference within strategic threads.
+## 16. NATIVE-AGENT PROGRAM — Strateji Pivotu (2026-06-12, Alperen yön)
+
+> **Bu EKLENEN iş değil, YUTAN iş.** deckent terminali claude-CLI-wrap'ten ([[project_repl_architectural_root_cause]]) deckent'in KENDİ native-agent'ına geçiyor (mevcut REPL/Ink engine KABUL EDİLMEDİ). Bu yön, §15'teki ARC-C'nin chat/REPL/tool kümesini + F2/F11 kalanını + REPL-TOOL-DEBT ailesini **tek tutarlı yöne katlar** — net madde-yükü azalır, dağılır değil. İki katman ayrı: **orkestratör (Brain+worker) subs+API hibrit DEĞİŞMEZ**; yalnız **terminal** native olur.
+
+**Bağlayıcı kararlar (bu oturum, memory'de tam):**
+- Native-agent = deckent kendi agent-loop'u + provider'ın GERÇEK native tool_use'u (Anthropic `tool_use` / OpenAI fn-call / Ollama / vLLM-tool-parser), tag-parse hack DEĞİL. Transport: **API veya Ollama** (subscription raw-API vermiyor; o orkestratörde kalır). [[project_deckent_native_terminal_agent]]
+- Provider-adapter **OpenAI-uyumlu-öncelikli** → BYO-key / Ollama / hosted-Deckent-Core hepsi tek arayüze takılır.
+- Fable-determinizmi: API-pinned model-ID (auto-downgrade YOK); güvenlik-önlemi atlatma YOK.
+- **Cross-check kuralı (bir süre bağlayıcı):** Anthropic↔OpenAI karşılıklı denetim, task-modunda. [[feedback_cross_check_anthropic_openai]]
+- **Mimari yaklaşım: A** — temiz greenfield agent-core (`src/agent/`) + mevcut Ink view korunur.
+
+**Sub-proje sırası (her biri kendi brainstorm→ADR→plan; biri diğerini bloke etmez):**
+1. 🔜 **Native-terminal-agent core** [İLK SPEC — brainstorm yarıda: izin-modeli + kimlik + test bölümleri kaldı]. Yutar: ARC-C chat/REPL kalanı, F2-008, F11-014/016, REPL-TOOL-DEBT ailesi, izin-modeli (settings.local always-allow sızıntısı).
+2. **Deckent Core fine-tune** (qwen3-14B/32B veya Hermes-4-14B base → QLoRA, deckent tool-trace + kod-tecrübe + ERP-enterprise). Yutar: [[project_ollama_worker_stub_gap]], deckent-qwen base-agent. [[project_deckent_core_model_and_provider]]
+3. **Hosted Deckent Core + SDK** (vLLM OpenAI-uyumlu + API-key gateway → deckent kendi provider'ı; OpenRouter-mantığı Hermes-playbook). 3-tier: BYO / yerel / hosted.
+4. **Opt-in telemetri-feedback** (🔴 GİZLİLİK-KRİTİK: default-off + açık-rıza + anonimleştirme + şeffaflık + air-gapped'de kapalı; sessiz-toplama ASLA).
+5. **MCP-W1** (writer-lease split, çoklu-pencere -32000 fix) — bağımsız ama bu programla uyumlu.
+
+**Durum (2026-06-12, mola):** Brainstorm sürüyor (skill aktif); kapsam+transport+mimari-yaklaşım+model-stratejisi KİLİTLİ; kalan brainstorm-bölümleri = izin-modeli, deckent-agent kimliği/kuralları, test/migrasyon → sonra spec-yazımı → writing-plans.
 
 ---
 
-*Single source of truth. Update this document — not the superseded roadmaps — when status changes. New work-items MUST also be assigned to a §15 arc (lossless-map invariant).*
+> **Count:** §15'te 123 açık madde (13 arc). §16 native-agent pivotu bunların chat/REPL/tool alt-kümesini SUBSUME eder (eklemez) + 4 sub-proje (kendi spec-döngüleri). None is a throwaway/MVP cut — god-level. Build *sequence*: §15 öncelik-haritası + §16 program-sırası paralel.
+
+---
+
+*Single source of truth. Update this document — not the superseded roadmaps — when status changes. New work-items MUST also be assigned to a §15 arc OR §16 sub-project (lossless-map invariant).*
