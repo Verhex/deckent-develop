@@ -1074,3 +1074,8 @@ git commit --allow-empty -m "chore(agent): SP-1 M2 Part 2 Phase B — headless a
 - **Ink view-adapter:** map `AgentEvent`→Ink render + the SP-285 approval-queue + dispatch the 4 commands; flag-gated `DECKENT_NATIVE_AGENT=1` (spec §10 Faz 1-4), default OFF → PTY smoke → default ON → delete legacy claude-CLI spawn + `parseDeckentToolCalls` + `DECKENT_TOOL_TAG_RE`.
 - **MCP/user/package tool sources** registered into the `ToolRegistry` at session bootstrap (spec §8 multi-source discovery) + the `chat-tool-bridge`/`chat-mcp-bridge` reuse.
 - **i18n** of `AgentEvent` reason strings + identity `lang` seam at the view boundary (getMessage).
+
+### Phase B final-review carry-overs (opus, MUST be folded into the M3 plan — do not let them rot)
+
+- **Wire the cost guard** (`guards/cost.ts` is module-complete + tested but has ZERO callers — unwired today). M3: `createAgentSession` holds a `CostGuardState`, calls `accrue(state, usage)` on each `usage` event (the `else if (ev.type === 'usage')` seam in `loop.ts`), and surfaces an advisory when `costExceeded` trips a configured ceiling. Needs a per-model price table (arrives with the M3 provider wiring). A guard merged with no callers is latent rot if M3 forgets it.
+- **Empty-assistant-message guard:** `loop.ts` always appends an assistant message even when a stream yields only `done` (no text, no tool calls) → `{role:'assistant', content:''}`. On the next `send()` an empty-content assistant turn replays to the provider (OpenAI may 400 on `content:""` with no `tool_calls`). Not reachable in the tested scripts, but a flaky-provider empty turn could wedge the next request. Fix (cheap): skip the append when `content===''` && `calls.length===0`, or coalesce.

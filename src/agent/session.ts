@@ -90,10 +90,9 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
     },
     cancel(): void {
       cancelled = true;
-      // Resolve all pending with deny.
+      // Deny everything already parked; ids not yet requested are covered by the
+      // `if (cancelled)` guard in requestPermission + the loop's isCancelled() checks.
       for (const [id, resolve] of pending) { pending.delete(id); resolve({ decision: 'deny' }); }
-      // Also stash deny for any ids not yet requested.
-      // (We don't know future ids, so we just drain pending above.)
     },
     setApprovalMode(next: ApprovalMode): void {
       mode = next;
