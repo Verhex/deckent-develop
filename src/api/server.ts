@@ -1161,13 +1161,11 @@ export function createHttpServer(
   let finalToken = resolveAuthToken(resolvedToken);
   if (!finalToken) {
     const projCfgForToken = join(projectRoot, PROJECT_CONFIG_PATH);
-    if (existsSync(projCfgForToken)) {
-      try {
-        const rawCfg = JSON.parse(readFileSync(projCfgForToken, 'utf-8')) as { api_auth_token?: unknown };
-        // Same deck-interpolation pass as the OIDC block — `$DECK:KEY` resolves.
-        const cfgToken = interpolateConfig(rawCfg.api_auth_token, projectRoot);
-        if (typeof cfgToken === 'string' && cfgToken.length > 0) finalToken = cfgToken;
-      } catch { /* unreadable config — fall through to auto-mint */ }
+    const rawCfgForToken = readJsonSafe<{ api_auth_token?: unknown }>(projCfgForToken);
+    if (rawCfgForToken) {
+      // Same deck-interpolation pass as the OIDC block — `$DECK:KEY` resolves.
+      const cfgToken = interpolateConfig(rawCfgForToken.api_auth_token, projectRoot);
+      if (typeof cfgToken === 'string' && cfgToken.length > 0) finalToken = cfgToken;
     }
   }
 
@@ -1199,26 +1197,22 @@ export function createHttpServer(
   // or incomplete leaves the middleware exactly as before (api_oidc default-off).
   if (!resolvedOidc) {
     const projCfgForOidc = join(projectRoot, PROJECT_CONFIG_PATH);
-    if (existsSync(projCfgForOidc)) {
-      try {
-        const rawCfg = JSON.parse(readFileSync(projCfgForOidc, 'utf-8')) as {
-          api_oidc?: { enabled?: boolean; issuer?: string; audience?: string; algorithm?: string; key?: string };
+    const rawCfgForOidc = readJsonSafe<{ api_oidc?: { enabled?: boolean; issuer?: string; audience?: string; algorithm?: string; key?: string } }>(projCfgForOidc);
+    if (rawCfgForOidc) {
+      const block = interpolateConfig(rawCfgForOidc.api_oidc, projectRoot);
+      if (
+        block?.enabled === true &&
+        typeof block.issuer === 'string' && block.issuer.length > 0 &&
+        typeof block.key === 'string' && block.key.length > 0 &&
+        (block.algorithm === 'HS256' || block.algorithm === 'RS256')
+      ) {
+        resolvedOidc = {
+          issuer: block.issuer,
+          ...(typeof block.audience === 'string' ? { audience: block.audience } : {}),
+          algorithm: block.algorithm,
+          key: block.key,
         };
-        const block = interpolateConfig(rawCfg.api_oidc, projectRoot);
-        if (
-          block?.enabled === true &&
-          typeof block.issuer === 'string' && block.issuer.length > 0 &&
-          typeof block.key === 'string' && block.key.length > 0 &&
-          (block.algorithm === 'HS256' || block.algorithm === 'RS256')
-        ) {
-          resolvedOidc = {
-            issuer: block.issuer,
-            ...(typeof block.audience === 'string' ? { audience: block.audience } : {}),
-            algorithm: block.algorithm,
-            key: block.key,
-          };
-        }
-      } catch { /* ignore parse errors — fail-closed to no OIDC */ }
+      }
     }
   }
 
@@ -1274,11 +1268,8 @@ export function createHttpServer(
   // time; resolution failure leaves null → the endpoint's honest SSE-error.
   let serveChatAdapter: ChatProviderAdapter | null = null;
   try {
-    let rawChatCfg: Parameters<typeof resolveChatProvider>[0];
     const projCfgForChat = join(projectRoot, PROJECT_CONFIG_PATH);
-    if (existsSync(projCfgForChat)) {
-      rawChatCfg = JSON.parse(readFileSync(projCfgForChat, 'utf-8')) as Parameters<typeof resolveChatProvider>[0];
-    }
+    const rawChatCfg = readJsonSafe<Parameters<typeof resolveChatProvider>[0]>(projCfgForChat);
     serveChatAdapter = resolveChatAdapter(resolveChatProvider(rawChatCfg), {});
   } catch {
     serveChatAdapter = null;

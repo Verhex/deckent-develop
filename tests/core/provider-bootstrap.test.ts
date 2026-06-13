@@ -104,6 +104,7 @@ function mockNoneAvailable() {
 
 describe('bootstrapProviders', () => {
   let registry: ProviderRegistry;
+  let originalFetch: typeof globalThis.fetch;
 
   beforeEach(() => {
     registry = new ProviderRegistry();
@@ -114,9 +115,15 @@ describe('bootstrapProviders', () => {
     // Clear env vars that affect detection
     delete process.env['OPENAI_API_KEY'];
     delete process.env['GOOGLE_API_KEY'];
+    // Make ollama unreachable so it never sneaks into registered providers.
+    // These tests focus on claude/codex/gemini bootstrap shape — ollama registration
+    // is covered by provider-ollama-bootstrap.test.ts.
+    originalFetch = globalThis.fetch;
+    globalThis.fetch = (() => Promise.reject(new Error('ECONNREFUSED'))) as typeof fetch;
   });
 
   afterEach(() => {
+    globalThis.fetch = originalFetch;
     vi.restoreAllMocks();
   });
 
@@ -138,7 +145,7 @@ describe('bootstrapProviders', () => {
       const result = await bootstrapProviders(config, '/tmp/test', registry);
 
       for (const name of result.registered) {
-        expect(['claude', 'codex', 'gemini']).toContain(name);
+        expect(['claude', 'codex', 'gemini', 'ollama']).toContain(name);
       }
     });
 

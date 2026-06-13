@@ -11,6 +11,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 // regardless of whether claude/codex/gemini binaries exist in the test env.
 vi.mock('node:child_process', () => ({
   spawnSync: vi.fn(),
+  spawn: vi.fn(),
+  execSync: vi.fn().mockReturnValue(''),
 }));
 
 import { spawnSync } from 'node:child_process';

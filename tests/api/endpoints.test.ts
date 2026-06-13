@@ -72,7 +72,12 @@ describe('E2E /api endpoint surface', () => {
     it('GET /api/status reflects seeded .dashboard JSON', async () => {
       handle = await startTestServer({
         disableAuth: true,
-        seed: { dashboard: buildDashboardSeed({ progress: { done: 3, active: 1, blocked: 0, total: 4 } }) },
+        seed: {
+          dashboard: buildDashboardSeed({ progress: { done: 3, active: 1, blocked: 0, total: 4 } }),
+          // Sprint 282: reconcileStatusResponse requires a non-terminal sprint-state
+          // to pass dashboard data through; without it the idle fallback zeros all counts.
+          sprintState: { status: 'ACTIVE', phase: 'EXECUTE', sprintId: 'sprint-001' },
+        },
       });
       const res = await call(handle, '/api/status');
       expect(res.status).toBe(200);

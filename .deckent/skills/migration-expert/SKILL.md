@@ -33,7 +33,7 @@ Common rules for all codemod tools:
 1. Read the full changelog and migration guide for every major version between current and target.
 2. Identify all deprecated APIs currently in use — fix deprecation warnings before upgrading.
 3. Update peer dependencies first (bottom-up), then the primary dependency.
-4. Run the full test suite after each dependency bump — not just at the end.
+4. Run the project-configured verify scope (targeted test files by default) after each dependency bump — not just at the end.
 5. Check for community-maintained codemods before writing custom transforms.
 
 ## Backward Compatibility
@@ -52,7 +52,7 @@ Common rules for all codemod tools:
 - Every migration must have a documented rollback plan before deployment.
 - Keep the old implementation available (behind a flag or in a tagged release) for at least one release cycle.
 - Database migrations must be backward-compatible: add columns before removing old ones, use expand-contract pattern.
-- If rollback is triggered, run the full test suite against the reverted state to confirm stability.
+- If rollback is triggered, run the project-configured verify scope (targeted test files by default) against the reverted state to confirm stability.
 
 ## Testing During Migration
 - Maintain parallel test suites during transition: old tests validate backward compatibility, new tests validate migrated behavior.

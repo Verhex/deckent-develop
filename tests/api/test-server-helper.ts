@@ -35,6 +35,10 @@ export interface TestServerOptions extends Omit<HttpServerOptions, 'port'> {
 
 export interface SeedData {
   dashboard?: unknown;
+  /** Sprint-state JSON — written to `.deckent/sprint-state.json` so that
+   *  reconcileStatusResponse treats the sprint as active and passes through
+   *  the dashboard data unchanged. */
+  sprintState?: unknown;
   config?: unknown;
   sprintLogs?: Array<{ id: string; markdown: string }>;
   memoryMd?: string;
@@ -138,6 +142,13 @@ function applySeed(projectRoot: string, seed: SeedData): void {
     writeFileSync(
       join(projectRoot, '.dashboard'),
       JSON.stringify(seed.dashboard),
+      'utf-8',
+    );
+  }
+  if (seed.sprintState !== undefined) {
+    writeFileSync(
+      join(projectRoot, '.deckent', 'sprint-state.json'),
+      JSON.stringify(seed.sprintState),
       'utf-8',
     );
   }

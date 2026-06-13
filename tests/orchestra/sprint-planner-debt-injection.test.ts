@@ -52,7 +52,10 @@ describe('Sprint 179 W1-1 — injectCriticalDebtTasks', () => {
 
     expect(result.tasks).toHaveLength(1);
     const fix = result.tasks[0]!;
-    expect(fix.scope.directories).toEqual(['src/orchestra/']);
+    // Sprint 260 BOUNDARY-TEST-PATTERN: mirrorTestScope auto-adds tests/orchestra/
+    // alongside src/orchestra/ for code-development tasks so workers can add tests
+    // without a BOUNDARY_VIOLATION.
+    expect(fix.scope.directories).toEqual(['src/orchestra/', 'tests/orchestra/']);
     expect(fix.scope.filesWrite).toEqual(['src/orchestra/event-stream.ts']);
     // filesRead defaults to the same directories so the worker can read what
     // it must write to (otherwise scope check would block legitimate edits).
@@ -97,7 +100,9 @@ describe('Sprint 179 W1-1 — injectCriticalDebtTasks', () => {
 
     expect(result.tasks).toHaveLength(1);
     const fix = result.tasks[0]!;
-    expect(fix.scope.directories).toEqual(['src/']);
+    // Sprint 260 BOUNDARY-TEST-PATTERN: mirrorTestScope auto-adds tests/ alongside src/
+    // for code-development tasks.
+    expect(fix.scope.directories).toEqual(['src/', 'tests/']);
     expect(fix.scope.filesWrite).toEqual(['src/']);
     expect(fix.priority).toBe('CRITICAL');
     expect(fix.isPriorityFix).toBe(true);

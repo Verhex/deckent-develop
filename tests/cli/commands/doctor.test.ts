@@ -17,6 +17,8 @@ vi.mock('node:os', () => ({
 
 vi.mock('node:child_process', () => ({
   spawnSync: vi.fn(),
+  spawn: vi.fn(),
+  execSync: vi.fn().mockReturnValue(''),
 }));
 
 vi.mock('../../../src/cli/helpers/output.js', () => ({

@@ -753,15 +753,15 @@ describe('planSprint', () => {
     expect(sprint.tasks.length).toBe(5);
   });
 
-  it('logs error message on fallback', async () => {
-    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+  it('falls back to structured when AI returns fewer tasks than directives (task-count-low)', async () => {
+    // 8 AI tasks < 12 directive tasks → task-count-low path → notify() + fallback
+    // Sprint-planner uses notify() (fire-and-forget) instead of console.error(),
+    // so we assert on the observable outcome (planningMode=fallback) not the channel.
     mockedCallBrainPlanner.mockReturnValue(makeAiResult(8));
     const ctx = makeContext(structuredDirective12);
-    await planSprint(ROOT, config, ctx, recommendation, { mode: 'auto' });
-    expect(errorSpy).toHaveBeenCalledWith(
-      expect.stringContaining('AI planner returned 8 tasks'),
-    );
-    errorSpy.mockRestore();
+    const sprint = await planSprint(ROOT, config, ctx, recommendation, { mode: 'auto' });
+    expect(sprint.planningMode).toBe('fallback');
+    expect(sprint.tasks.length).toBe(12);
   });
 
   it('AI null + auto still falls back to structured (existing behavior)', async () => {
