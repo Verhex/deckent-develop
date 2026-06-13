@@ -20,6 +20,12 @@ function toAnthropicMessage(m: ProviderMessage): Record<string, unknown> {
   if (m.role === 'tool') {
     return { role: 'user', content: [{ type: 'tool_result', tool_use_id: m.toolCallId ?? '', content: m.content }] };
   }
+  if (m.role === 'assistant' && m.toolCalls?.length) {
+    const blocks: Array<Record<string, unknown>> = [];
+    if (m.content) blocks.push({ type: 'text', text: m.content });
+    for (const tc of m.toolCalls) blocks.push({ type: 'tool_use', id: tc.id, name: tc.name, input: tc.args });
+    return { role: 'assistant', content: blocks };
+  }
   return { role: m.role, content: m.content };
 }
 

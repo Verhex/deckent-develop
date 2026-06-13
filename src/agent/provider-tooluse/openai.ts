@@ -18,6 +18,13 @@ export interface OpenAIAdapterOptions {
 
 function toOpenAIMessage(m: ProviderMessage): Record<string, unknown> {
   if (m.role === 'tool') return { role: 'tool', tool_call_id: m.toolCallId ?? '', content: m.content };
+  if (m.role === 'assistant' && m.toolCalls?.length) {
+    return {
+      role: 'assistant',
+      content: m.content,
+      tool_calls: m.toolCalls.map((tc) => ({ id: tc.id, type: 'function', function: { name: tc.name, arguments: JSON.stringify(tc.args) } })),
+    };
+  }
   return { role: m.role, content: m.content };
 }
 

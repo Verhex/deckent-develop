@@ -5,11 +5,20 @@
 
 import type { NativeToolSchema } from '../tools/registry.js';
 
+export interface ToolCallRef {
+  id: string;
+  name: string;
+  args: Record<string, unknown>;
+}
+
 export interface ProviderMessage {
   role: 'user' | 'assistant' | 'tool';
   content: string;
   /** present on role:'tool' — correlates the result to a prior tool-call id. */
   toolCallId?: string;
+  /** present on role:'assistant' — the tool calls this turn made (native
+   *  round-trip). content stays a string; this is a sibling, not a block-array. */
+  toolCalls?: ToolCallRef[];
 }
 
 export interface ProviderRequest {
