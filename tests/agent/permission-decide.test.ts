@@ -41,4 +41,7 @@ describe('decide — precedence (deny > floor > allow-rule > tier > mode)', () =
     expect(decide('write_file', 'x', 'confirm', ctx({ mode: 'auto-edit' }))).toBe('allow');
     expect(decide('bash', 'ls', 'confirm', ctx({ mode: 'auto-edit' }))).toBe('ask');
   });
+  it('always-floor tool asks even when tier is silent', () => {
+    expect(decide('deckent_kill', '', 'silent', ctx())).toBe('ask');
+  });
 });

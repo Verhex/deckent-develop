@@ -1,10 +1,10 @@
 // ═══ Permission engine — decide() (SP-1 §6) ═════════════════════════════════
-// Precedence (high → low):
+// Precedence (high → low), implemented as ordered early-returns:
 //   1. explicit deny rule
-//   2. always-floor (policy.alwaysFloor)  — never auto, even in full-auto
-//   3. explicit allow rule (once/session/always grants)
-//   4. tier default (silent → allow, confirm → ask)
-//   5. approvalMode (suggest/auto-edit/full-auto)
+//   2. always-floor (tier 'always' or policy.alwaysFloor) — never auto, even full-auto
+//   3. silent tier → allow
+//   4. explicit allow rule (once/session/always grants)
+//   5. approvalMode (full-auto / auto-edit non-bash → allow; else ask)
 // The floor (step 2) sits ABOVE every grant/mode — the safety invariant.
 
 import { matchRule, type ApprovalMode, type PermissionDecision, type PermissionRule } from './permission-types.js';
