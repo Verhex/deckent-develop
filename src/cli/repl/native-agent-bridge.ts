@@ -9,6 +9,7 @@
 import { createAgentSession } from '../../agent/session.js';
 import { loadPolicy } from '../../agent/permission-policy.js';
 import { createRuleStore } from '../../agent/permission-store.js';
+import { createCostGuard, accrue, costExceeded } from '../../agent/guards/cost.js';
 import type { ProviderAdapter } from '../../agent/provider-tooluse/types.js';
 import type { ToolRegistry } from '../../agent/tools/registry.js';
 import type { AgentEvent } from '../../agent/events.js';
@@ -32,6 +33,10 @@ export interface NativeEngineDeps {
   /** The existing tool/change-block sink (run.tsx toolSink). */
   toolSink: (info: ToolInfo) => void;
   maxIterations?: number;
+  /** Optional hard cost ceiling (USD) for the session; undefined → advisory only. */
+  costCeilingUsd?: number;
+  /** Blended price per 1M tokens (default 3). */
+  usdPerMillionTokens?: number;
 }
 
 /** Map a confirm-queue answer to a session permission decision. */
@@ -53,6 +58,12 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
     ...(deps.maxIterations !== undefined ? { maxIterations: deps.maxIterations } : {}),
   });
 
+  const cost = createCostGuard({
+    usdPerMillionTokens: deps.usdPerMillionTokens ?? 3,
+    ...(deps.costCeilingUsd !== undefined ? { ceilingUsd: deps.costCeilingUsd } : {}),
+  });
+  let costWarned = false;
+
   return async (input, cbs) => {
     let inputTokens = 0;
     let outputTokens = 0;
@@ -72,6 +83,14 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
         case 'usage':
           inputTokens = ev.inputTokens;
           outputTokens = ev.outputTokens;
+          accrue(cost, { inputTokens: ev.inputTokens, outputTokens: ev.outputTokens });
+          if (!costWarned) {
+            const c = costExceeded(cost);
+            if (c.exceeded) {
+              costWarned = true;
+              cbs.output(`\n[${c.reason}] ~$${c.spentUsd.toFixed(2)}`);
+            }
+          }
           break;
         case 'error':
           cbs.output(`\n[${ev.message}]`);

@@ -66,4 +66,31 @@ describe('createNativeEngine', () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  it('accrues usage and emits a cost advisory once a configured ceiling trips', async () => {
+    const adapter = scripted([[
+      { type: 'text-delta', text: 'x' },
+      { type: 'usage', inputTokens: 600_000, outputTokens: 0 }, // $6 at $10/M
+      { type: 'done' },
+    ]]);
+    const out: string[] = [];
+    const engine = createNativeEngine({
+      adapter, registry: buildNativeToolRegistry({ cwd: () => tmpdir() }), cwd: tmpdir(), model: 'm', lang: 'en',
+      confirm: async () => 'y', toolSink: () => {},
+      costCeilingUsd: 5, usdPerMillionTokens: 10,
+    });
+    await engine('go', { output: (t) => out.push(t), onTurnEnd: () => {} });
+    expect(out.join('')).toMatch(/COST_GATE_EXCEEDED|maliyet|cost/i);
+  });
+
+  it('does not emit a cost advisory when no ceiling is set', async () => {
+    const adapter = scripted([[{ type: 'usage', inputTokens: 10_000_000, outputTokens: 0 }, { type: 'done' }]]);
+    const out: string[] = [];
+    const engine = createNativeEngine({
+      adapter, registry: buildNativeToolRegistry({ cwd: () => tmpdir() }), cwd: tmpdir(), model: 'm', lang: 'en',
+      confirm: async () => 'y', toolSink: () => {},
+    });
+    await engine('go', { output: (t) => out.push(t), onTurnEnd: () => {} });
+    expect(out.join('')).not.toMatch(/COST_GATE_EXCEEDED/);
+  });
 });
