@@ -36,6 +36,9 @@ describe('Dashboard data-parity — live endpoint suite', () => {
           sprint: { id: 'sprint-209', number: 209, phase: 'EXECUTE', status: 'ACTIVE' },
           progress: { done: 5, active: 3, blocked: 0, total: 14 },
         }),
+        // Sprint 282: reconcileStatusResponse requires a non-terminal sprint-state
+        // to pass dashboard data through; without it the idle fallback zeros all counts.
+        sprintState: { status: 'ACTIVE', phase: 'EXECUTE', sprintId: 'sprint-209' },
       },
     });
 
