@@ -720,6 +720,14 @@ const MESSAGES: MessageMap = {
     en: 'ran command',
     tr: 'komut çalıştırıldı',
   },
+  'native.run_tool': {
+    en: 'Run tool',
+    tr: 'Aracı çalıştır',
+  },
+  'native.tool_ran': {
+    en: 'tool ran',
+    tr: 'araç çalıştı',
+  },
   'tui.render_error': {
     en: 'REPL render error',
     tr: 'REPL render hatası',

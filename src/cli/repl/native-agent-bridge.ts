@@ -37,6 +37,8 @@ export interface NativeEngineDeps {
   costCeilingUsd?: number;
   /** Blended price per 1M tokens (default 3). */
   usdPerMillionTokens?: number;
+  /** Localizer (run.tsx: (key) => getMessage(key, lang)). Defaults to identity. */
+  t?: (key: string) => string;
 }
 
 /** Map a confirm-queue answer to a session permission decision. */
@@ -47,6 +49,7 @@ function toDecision(answer: 'y' | 'a' | 'n'): PermissionResponse {
 }
 
 export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
+  const t = deps.t ?? ((k: string): string => k);
   const session = createAgentSession({
     adapter: deps.adapter,
     registry: deps.registry,
@@ -73,12 +76,12 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
           cbs.output(ev.text);
           break;
         case 'permission-request': {
-          const answer = await deps.confirm(`${ev.tool}${ev.resource ? ` (${ev.resource})` : ''}`, ev.tool);
+          const answer = await deps.confirm(`${t('native.run_tool')}: ${ev.tool}${ev.resource ? ` (${ev.resource})` : ''}`, ev.tool);
           session.respondPermission(ev.id, toDecision(answer));
           break;
         }
         case 'tool-result':
-          deps.toolSink({ verb: ev.tool, target: '', ...(ev.ok ? {} : { failed: true }) });
+          deps.toolSink({ verb: `${ev.tool} — ${t('native.tool_ran')}`, target: '', ...(ev.ok ? {} : { failed: true }) });
           break;
         case 'usage':
           inputTokens = ev.inputTokens;

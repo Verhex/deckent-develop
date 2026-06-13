@@ -197,6 +197,7 @@ export async function runInkRepl(
         lang: lang as 'en' | 'tr',
         confirm: (summary, toolName) => (confirmTrigger ? confirmTrigger(summary, toolName) : Promise.resolve('n')),
         toolSink: (info) => { if (toolSink) toolSink(info); },
+        t: (key: string) => getMessage(key, lang),
       });
     }
   }

@@ -93,4 +93,25 @@ describe('createNativeEngine', () => {
     await engine('go', { output: (t) => out.push(t), onTurnEnd: () => {} });
     expect(out.join('')).not.toMatch(/COST_GATE_EXCEEDED/);
   });
+
+  it('uses the injected localizer for the permission summary', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'nb-i18n-'));
+    try {
+      const adapter = scripted([
+        [{ type: 'tool-call', id: 'w', name: 'deckent_write_file', args: { path: 'a.txt', content: 'X' } }, { type: 'done' }],
+        [{ type: 'done' }],
+      ]);
+      const summaries: string[] = [];
+      const engine = createNativeEngine({
+        adapter, registry: buildNativeToolRegistry({ cwd: () => dir }), cwd: dir, model: 'm', lang: 'en',
+        confirm: async (summary) => { summaries.push(summary); return 'y'; },
+        toolSink: () => {},
+        t: (key) => (key === 'native.run_tool' ? 'RUN' : `LBL:${key}`),
+      });
+      await engine('go', { output: () => {}, onTurnEnd: () => {} });
+      expect(summaries[0]).toContain('RUN');      // localized prefix, not a raw English literal
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });
