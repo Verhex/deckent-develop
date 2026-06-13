@@ -68,7 +68,11 @@ function persist(cwd: string, rules: PermissionRule[]): void {
     ? (doc['permissions'] as Record<string, unknown>)
     : {};
   permissions['rules'] = rules;
-  delete permissions['allow']; // migrated into rules
+  // SP-1 M3 coexistence: while the native path (rules) runs behind a flag
+  // alongside the legacy default path (allow), do NOT delete permissions.allow —
+  // a native "always" grant must not wipe the legacy allow-list. The allow→rules
+  // migration still happens in-memory on load; only the on-disk delete is gated.
+  // M4 (legacy delete) removes this guard and resumes the cleanup.
   doc['permissions'] = permissions;
   mkdirSync(dirname(p), { recursive: true });
   writeFileSync(p, JSON.stringify(doc, null, 2) + '\n', 'utf-8');
