@@ -11,6 +11,7 @@
 // ADR-008: imports only from core/.
 
 import type { SiemRecord } from './siem-forwarder.js';
+import { DeckentError } from './errors.js';
 
 /**
  * Minimal structural fetch type the transport needs. `globalThis.fetch` is
@@ -50,17 +51,17 @@ export function createHttpSiemTransport(
   try {
     parsed = new URL(opts.url);
   } catch {
-    throw new Error(`siem-transport-http: invalid URL '${opts.url}'`);
+    throw new DeckentError('DECKENT_E004', `siem-transport-http: invalid URL '${opts.url}'`);
   }
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-    throw new Error(
+    throw new DeckentError('DECKENT_E004', 
       `siem-transport-http: unsupported protocol '${parsed.protocol}' — only http/https URLs are accepted`,
     );
   }
 
   const fetchImpl = opts.fetchImpl ?? (globalThis.fetch as SiemFetchLike | undefined);
   if (typeof fetchImpl !== 'function') {
-    throw new Error(
+    throw new DeckentError('DECKENT_E004', 
       'siem-transport-http: no fetch available — pass fetchImpl or run on Node 18+ where globalThis.fetch is built in',
     );
   }
@@ -78,7 +79,7 @@ export function createHttpSiemTransport(
       body: JSON.stringify(batch),
     });
     if (!res.ok) {
-      throw new Error(
+      throw new DeckentError('DECKENT_E004', 
         `siem-transport-http: endpoint responded ${res.status} for ${batch.length} record(s)`,
       );
     }

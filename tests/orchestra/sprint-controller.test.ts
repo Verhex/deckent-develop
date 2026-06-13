@@ -234,6 +234,10 @@ vi.mock('../../src/cli/helpers/splash.js', () => ({
 
 vi.mock('../../src/core/stack-detector.js', () => ({
   detectProjectStack: vi.fn().mockReturnValue({ languages: [], frameworks: [], tools: [] }),
+  STACK_COMMANDS: {
+    typescript: { build: 'tsc --noEmit', test: 'npx vitest run', lint: 'tsc --noEmit' },
+    javascript: { build: '', test: 'npx vitest run', lint: '' },
+  },
 }));
 
 vi.mock('../../src/core/skill-pool.js', () => ({

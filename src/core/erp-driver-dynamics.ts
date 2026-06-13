@@ -36,6 +36,7 @@
 // ADR-008 (core/ imports core/ only) · ADR-010 (no new dependency — built-in fetch).
 
 import type { CompiledQuery, ErpDriver, ErpFilterOp, ErpRow, ErpScalar } from './erp-connector.js';
+import { DeckentError } from './errors.js';
 
 // ─── Injectable fetch seam ────────────────────────────────────────────────────
 
@@ -96,7 +97,7 @@ function resolvePlaceholders(
 ): ErpScalar[] {
   return placeholders.map((index) => {
     if (!Number.isInteger(index) || index < 1 || index > params.length) {
-      throw new Error(
+      throw new DeckentError('DECKENT_E004', 
         `dynamics ERP driver: predicate '${field}' references placeholder ${index}, out of range for ${params.length} param(s)`,
       );
     }
@@ -141,10 +142,10 @@ export function createDynamicsErpDriver(opts: DynamicsErpDriverOptions): ErpDriv
   try {
     parsed = new URL(opts.baseUrl);
   } catch {
-    throw new Error(`dynamics ERP driver: invalid baseUrl: ${JSON.stringify(opts.baseUrl)}`);
+    throw new DeckentError('DECKENT_E004', `dynamics ERP driver: invalid baseUrl: ${JSON.stringify(opts.baseUrl)}`);
   }
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-    throw new Error(
+    throw new DeckentError('DECKENT_E004', 
       `dynamics ERP driver: unsupported protocol '${parsed.protocol}' — only http/https URLs are accepted`,
     );
   }
@@ -153,22 +154,22 @@ export function createDynamicsErpDriver(opts: DynamicsErpDriverOptions): ErpDriv
   // on the Web API. Anything else is a misconfiguration, refused eagerly.
   const auth = opts.auth;
   if (auth?.kind !== 'bearer') {
-    throw new Error("dynamics ERP driver: auth.kind must be 'bearer' (the Web API only accepts OAuth bearer tokens)");
+    throw new DeckentError('DECKENT_E004', "dynamics ERP driver: auth.kind must be 'bearer' (the Web API only accepts OAuth bearer tokens)");
   }
   if (typeof auth.token !== 'string' || auth.token.length === 0) {
-    throw new Error('dynamics ERP driver: bearer auth requires a non-empty token');
+    throw new DeckentError('DECKENT_E004', 'dynamics ERP driver: bearer auth requires a non-empty token');
   }
 
   const apiVersion = opts.apiVersion ?? '9.2';
   if (!API_VERSION_SHAPE.test(apiVersion)) {
-    throw new Error(
+    throw new DeckentError('DECKENT_E004', 
       `dynamics ERP driver: apiVersion must be a dotted numeric version like '9.2', got: ${JSON.stringify(apiVersion)}`,
     );
   }
 
   const fetchImpl = opts.fetchImpl ?? (globalThis.fetch as DynamicsFetchLike | undefined);
   if (typeof fetchImpl !== 'function') {
-    throw new Error(
+    throw new DeckentError('DECKENT_E004', 
       'dynamics ERP driver: no fetch available — pass fetchImpl or run on Node 18+ where globalThis.fetch is built in',
     );
   }
@@ -185,7 +186,7 @@ export function createDynamicsErpDriver(opts: DynamicsErpDriverOptions): ErpDriv
     // Defence in depth: the connector only ever emits read-only queries, but a
     // driver must not trust its caller blindly — re-check the contract.
     if (compiled.readOnly !== true || compiled.operation !== 'read') {
-      throw new Error('dynamics ERP driver: refusing non-read-only compiled query (read-only driver)');
+      throw new DeckentError('DECKENT_E004', 'dynamics ERP driver: refusing non-read-only compiled query (read-only driver)');
     }
 
     const entitySet = opts.entityModelMap?.[compiled.entity] ?? compiled.entity;
@@ -214,7 +215,7 @@ export function createDynamicsErpDriver(opts: DynamicsErpDriverOptions): ErpDriv
       } catch {
         // body unreadable — the status alone still explains the failure
       }
-      throw new Error(
+      throw new DeckentError('DECKENT_E004', 
         `dynamics ERP driver: Web API returned HTTP ${res.status}${detail ? ` — ${redact(detail)}` : ''}`,
       );
     }
@@ -223,10 +224,10 @@ export function createDynamicsErpDriver(opts: DynamicsErpDriverOptions): ErpDriv
     try {
       payload = await res.json();
     } catch {
-      throw new Error('dynamics ERP driver: Web API response body is not valid JSON');
+      throw new DeckentError('DECKENT_E004', 'dynamics ERP driver: Web API response body is not valid JSON');
     }
     if (typeof payload !== 'object' || payload === null) {
-      throw new Error('dynamics ERP driver: Web API response is not an object');
+      throw new DeckentError('DECKENT_E004', 'dynamics ERP driver: Web API response is not an object');
     }
 
     // v4 envelope ONLY: { value: [...] }. The Web API never speaks v2, so a
@@ -235,6 +236,6 @@ export function createDynamicsErpDriver(opts: DynamicsErpDriverOptions): ErpDriv
     if (Array.isArray(body.value)) {
       return body.value as ErpRow[];
     }
-    throw new Error('dynamics ERP driver: Web API response has no OData v4 `value` rows');
+    throw new DeckentError('DECKENT_E004', 'dynamics ERP driver: Web API response has no OData v4 `value` rows');
   };
 }

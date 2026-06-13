@@ -17,6 +17,7 @@
 // ADR-008 (core/ imports core/ only) · ADR-010 (no new dependency — built-in fetch).
 
 import type { CompiledQuery, ErpDriver, ErpFilterOp, ErpRow, ErpScalar } from './erp-connector.js';
+import { DeckentError } from './errors.js';
 
 // ─── Injectable fetch seam ────────────────────────────────────────────────────
 
@@ -72,7 +73,7 @@ function resolvePlaceholders(
 ): ErpScalar[] {
   return placeholders.map((index) => {
     if (!Number.isInteger(index) || index < 1 || index > params.length) {
-      throw new Error(
+      throw new DeckentError('DECKENT_E004', 
         `odoo ERP driver: predicate '${field}' references placeholder ${index}, out of range for ${params.length} param(s)`,
       );
     }
@@ -118,26 +119,26 @@ export function createOdooErpDriver(opts: OdooErpDriverOptions): ErpDriver {
   try {
     parsed = new URL(opts.url);
   } catch {
-    throw new Error(`odoo ERP driver: invalid endpoint URL: ${JSON.stringify(opts.url)}`);
+    throw new DeckentError('DECKENT_E004', `odoo ERP driver: invalid endpoint URL: ${JSON.stringify(opts.url)}`);
   }
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-    throw new Error(
+    throw new DeckentError('DECKENT_E004', 
       `odoo ERP driver: unsupported protocol '${parsed.protocol}' — only http/https URLs are accepted`,
     );
   }
   if (typeof opts.db !== 'string' || opts.db.length === 0) {
-    throw new Error('odoo ERP driver: db must be a non-empty string');
+    throw new DeckentError('DECKENT_E004', 'odoo ERP driver: db must be a non-empty string');
   }
   if (!Number.isInteger(opts.uid)) {
-    throw new Error('odoo ERP driver: uid must be an integer Odoo user id');
+    throw new DeckentError('DECKENT_E004', 'odoo ERP driver: uid must be an integer Odoo user id');
   }
   if (typeof opts.apiKey !== 'string' || opts.apiKey.length === 0) {
-    throw new Error('odoo ERP driver: apiKey must be a non-empty string');
+    throw new DeckentError('DECKENT_E004', 'odoo ERP driver: apiKey must be a non-empty string');
   }
 
   const fetchImpl = opts.fetchImpl ?? (globalThis.fetch as OdooFetchLike | undefined);
   if (typeof fetchImpl !== 'function') {
-    throw new Error(
+    throw new DeckentError('DECKENT_E004', 
       'odoo ERP driver: no fetch available — pass fetchImpl or run on Node 18+ where globalThis.fetch is built in',
     );
   }
@@ -151,7 +152,7 @@ export function createOdooErpDriver(opts: OdooErpDriverOptions): ErpDriver {
     // Defence in depth: the connector only ever emits read-only queries, but a
     // driver must not trust its caller blindly — re-check the contract.
     if (compiled.readOnly !== true || compiled.operation !== 'read') {
-      throw new Error('odoo ERP driver: refusing non-read-only compiled query (read-only driver)');
+      throw new DeckentError('DECKENT_E004', 'odoo ERP driver: refusing non-read-only compiled query (read-only driver)');
     }
 
     const model = opts.entityModelMap?.[compiled.entity] ?? compiled.entity;
@@ -182,25 +183,25 @@ export function createOdooErpDriver(opts: OdooErpDriverOptions): ErpDriver {
       body: JSON.stringify(envelope),
     });
     if (!res.ok) {
-      throw new Error(`odoo ERP driver: JSON-RPC endpoint returned HTTP ${res.status}`);
+      throw new DeckentError('DECKENT_E004', `odoo ERP driver: JSON-RPC endpoint returned HTTP ${res.status}`);
     }
 
     let payload: unknown;
     try {
       payload = await res.json();
     } catch {
-      throw new Error('odoo ERP driver: JSON-RPC response body is not valid JSON');
+      throw new DeckentError('DECKENT_E004', 'odoo ERP driver: JSON-RPC response body is not valid JSON');
     }
     if (typeof payload !== 'object' || payload === null) {
-      throw new Error('odoo ERP driver: JSON-RPC response is not an object');
+      throw new DeckentError('DECKENT_E004', 'odoo ERP driver: JSON-RPC response is not an object');
     }
 
     const body = payload as Record<string, unknown>;
     if (body.error !== undefined) {
-      throw new Error(`odoo ERP driver: Odoo error — ${redact(extractOdooErrorMessage(body.error))}`);
+      throw new DeckentError('DECKENT_E004', `odoo ERP driver: Odoo error — ${redact(extractOdooErrorMessage(body.error))}`);
     }
     if (!Array.isArray(body.result)) {
-      throw new Error('odoo ERP driver: JSON-RPC response has no array `result`');
+      throw new DeckentError('DECKENT_E004', 'odoo ERP driver: JSON-RPC response has no array `result`');
     }
     return body.result as ErpRow[];
   };

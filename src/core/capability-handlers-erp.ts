@@ -27,6 +27,7 @@ import type {
   ErpScalar,
 } from './erp-connector.js';
 import type { Capability } from './work-model.js';
+import { DeckentError } from './errors.js';
 
 // ─── erp.read handler ─────────────────────────────────────────────────────────
 
@@ -45,19 +46,20 @@ const ERP_FILTER_OPS: ReadonlySet<string> = new Set<ErpFilterOp>([
  *  runtime-check) is validated here. */
 function parseFilter(raw: unknown, index: number): ErpFilter {
   if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
-    throw new Error(`erp.read filter #${index} must be an object { field, op, value }`);
+    throw new DeckentError('DECKENT_E004', `erp.read filter #${index} must be an object { field, op, value }`);
   }
   const { field, op, value } = raw as Record<string, unknown>;
   if (typeof field !== 'string' || field.length === 0) {
-    throw new Error(`erp.read filter #${index} requires a non-empty string field`);
+    throw new DeckentError('DECKENT_E039', `erp.read filter #${index} requires a non-empty string field`);
   }
   if (typeof op !== 'string' || !ERP_FILTER_OPS.has(op)) {
-    throw new Error(
+    throw new DeckentError(
+      'DECKENT_E004',
       `erp.read filter #${index} has an unknown op ${JSON.stringify(op)} (expected eq|ne|gt|gte|lt|lte|in|like)`,
     );
   }
   if (value === undefined) {
-    throw new Error(`erp.read filter #${index} requires a value`);
+    throw new DeckentError('DECKENT_E039', `erp.read filter #${index} requires a value`);
   }
   return { field, op: op as ErpFilterOp, value: value as ErpScalar | readonly ErpScalar[] };
 }
@@ -67,7 +69,7 @@ function parseFilter(raw: unknown, index: number): ErpFilter {
 function parseQuerySpec(args: Record<string, unknown>): ErpQuerySpec {
   const entity = args.entity;
   if (typeof entity !== 'string' || entity.trim().length === 0) {
-    throw new Error('erp.read requires a non-empty string args.entity');
+    throw new DeckentError('DECKENT_E039', 'erp.read requires a non-empty string args.entity');
   }
   const spec: { entity: string; fields?: string[]; filters?: ErpFilter[]; limit?: number } = {
     entity,
@@ -76,11 +78,11 @@ function parseQuerySpec(args: Record<string, unknown>): ErpQuerySpec {
   const fields = args.fields;
   if (fields !== undefined) {
     if (!Array.isArray(fields)) {
-      throw new Error('erp.read requires args.fields to be an array of strings when provided');
+      throw new DeckentError('DECKENT_E004', 'erp.read requires args.fields to be an array of strings when provided');
     }
     spec.fields = fields.map((item, index) => {
       if (typeof item !== 'string') {
-        throw new Error(`erp.read field #${index} must be a string, got: ${JSON.stringify(item)}`);
+        throw new DeckentError('DECKENT_E004', `erp.read field #${index} must be a string, got: ${JSON.stringify(item)}`);
       }
       return item;
     });
@@ -89,7 +91,7 @@ function parseQuerySpec(args: Record<string, unknown>): ErpQuerySpec {
   const filters = args.filters;
   if (filters !== undefined) {
     if (!Array.isArray(filters)) {
-      throw new Error('erp.read requires args.filters to be an array when provided');
+      throw new DeckentError('DECKENT_E004', 'erp.read requires args.filters to be an array when provided');
     }
     spec.filters = filters.map((raw, index) => parseFilter(raw, index));
   }
@@ -97,7 +99,7 @@ function parseQuerySpec(args: Record<string, unknown>): ErpQuerySpec {
   const limit = args.limit;
   if (limit !== undefined) {
     if (typeof limit !== 'number') {
-      throw new Error('erp.read requires args.limit to be a number when provided');
+      throw new DeckentError('DECKENT_E004', 'erp.read requires args.limit to be a number when provided');
     }
     spec.limit = limit; // positivity / clamping is the connector's job (INVALID_LIMIT)
   }
@@ -161,7 +163,7 @@ function matchesPredicate(
   const resolved = predicate.placeholders.map((index) => {
     const param = params[index - 1];
     if (param === undefined) {
-      throw new Error(`in-memory ERP driver: placeholder ${index} is out of range for params`);
+      throw new DeckentError('DECKENT_E004', `in-memory ERP driver: placeholder ${index} is out of range for params`);
     }
     return param;
   });
@@ -218,7 +220,7 @@ export function createInMemoryErpDriver(tables: Record<string, ErpRow[]>): ErpDr
   return async (compiled: CompiledQuery): Promise<readonly ErpRow[]> => {
     const rows = tables[compiled.source];
     if (rows === undefined) {
-      throw new Error(`in-memory ERP driver has no table for source '${compiled.source}'`);
+      throw new DeckentError('DECKENT_E004', `in-memory ERP driver has no table for source '${compiled.source}'`);
     }
     return rows
       .filter((row) => compiled.predicates.every((p) => matchesPredicate(row, p, compiled.params)))

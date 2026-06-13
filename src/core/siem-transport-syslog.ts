@@ -17,6 +17,7 @@ import { createConnection } from 'node:net';
 import { hostname } from 'node:os';
 
 import type { SiemRecord } from './siem-forwarder.js';
+import { DeckentError } from './errors.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -144,19 +145,19 @@ export function createSyslogSiemTransport(
   const appName = opts.appName ?? DEFAULT_APP_NAME;
 
   if (typeof host !== 'string' || host.length === 0) {
-    throw new Error('syslog transport: host must be a non-empty string');
+    throw new DeckentError('DECKENT_E004', 'syslog transport: host must be a non-empty string');
   }
   if (!Number.isInteger(port) || port < 1 || port > 65535) {
-    throw new Error(`syslog transport: port must be an integer in 1-65535, got ${port}`);
+    throw new DeckentError('DECKENT_E004', `syslog transport: port must be an integer in 1-65535, got ${port}`);
   }
   if (protocol !== 'udp' && protocol !== 'tcp') {
-    throw new Error(`syslog transport: protocol must be 'udp' or 'tcp', got '${String(protocol)}'`);
+    throw new DeckentError('DECKENT_E004', `syslog transport: protocol must be 'udp' or 'tcp', got '${String(protocol)}'`);
   }
   if (!Number.isInteger(facility) || facility < 0 || facility > 23) {
-    throw new Error(`syslog transport: facility must be an integer in 0-23, got ${facility}`);
+    throw new DeckentError('DECKENT_E004', `syslog transport: facility must be an integer in 0-23, got ${facility}`);
   }
   if (/\s/.test(appName)) {
-    throw new Error('syslog transport: appName must not contain whitespace (RFC 5424 APP-NAME)');
+    throw new DeckentError('DECKENT_E004', 'syslog transport: appName must not contain whitespace (RFC 5424 APP-NAME)');
   }
 
   const send: SyslogSendImpl =

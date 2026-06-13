@@ -15,6 +15,7 @@ import { loadConfig } from '../../core/config.js';
 import { print, printError } from '../helpers/output.js';
 import { getLanguage, getMessage } from '../helpers/messages.js';
 import { resolveProjectRoot } from '../helpers/process.js';
+import { DeckentError } from '../../core/errors.js';
 
 interface AuditOpts {
   json?: boolean;
@@ -359,14 +360,14 @@ export function registerAudit(program: Command): void {
           if (opts.keepDays !== undefined) {
             const days = Number(opts.keepDays);
             if (!Number.isFinite(days) || days < 0) {
-              throw new Error(getMessage('audit.retention.invalid_keep_days', lang, { value: String(opts.keepDays) }));
+              throw new DeckentError('DECKENT_E004', getMessage('audit.retention.invalid_keep_days', lang, { value: String(opts.keepDays) }));
             }
             policy.maxAgeMs = days * MS_PER_DAY;
           }
           if (opts.keepCount !== undefined) {
             const count = Number(opts.keepCount);
             if (!Number.isInteger(count) || count < 0) {
-              throw new Error(getMessage('audit.retention.invalid_keep_count', lang, { value: String(opts.keepCount) }));
+              throw new DeckentError('DECKENT_E004', getMessage('audit.retention.invalid_keep_count', lang, { value: String(opts.keepCount) }));
             }
             policy.maxCount = count;
           }

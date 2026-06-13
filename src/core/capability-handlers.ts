@@ -12,6 +12,7 @@ import {
   type InvocationContext,
 } from './capability-broker.js';
 import type { Capability } from './work-model.js';
+import { DeckentError } from './errors.js';
 
 type ExtendedRequiredCapability = 'net.read' | 'env.read' | 'shell.exec';
 
@@ -69,7 +70,7 @@ function requiredCapability(capability: ExtendedRequiredCapability): Capability 
 function requireString(args: Record<string, unknown>, key: string, handlerName: string): string {
   const value = args[key];
   if (typeof value !== 'string' || value.trim().length === 0) {
-    throw new Error(`${handlerName} requires a non-empty string args.${key}`);
+    throw new DeckentError('DECKENT_E039', `${handlerName} requires a non-empty string args.${key}`);
   }
   return value;
 }
@@ -77,7 +78,7 @@ function requireString(args: Record<string, unknown>, key: string, handlerName: 
 function readStringArray(value: unknown, key: string, handlerName: string): string[] {
   if (value === undefined) return [];
   if (!Array.isArray(value) || !value.every((item): item is string => typeof item === 'string')) {
-    throw new Error(`${handlerName} requires args.${key} to be an array of strings`);
+    throw new DeckentError('DECKENT_E004', `${handlerName} requires args.${key} to be an array of strings`);
   }
   return [...value];
 }
@@ -87,17 +88,17 @@ function parseHttpUrl(rawUrl: string): URL {
   try {
     url = new URL(rawUrl);
   } catch {
-    throw new Error('http.get requires args.url to be a valid URL');
+    throw new DeckentError('DECKENT_E004', 'http.get requires args.url to be a valid URL');
   }
   if (url.protocol !== 'https:' && url.protocol !== 'http:') {
-    throw new Error('http.get only supports http: and https: URLs');
+    throw new DeckentError('DECKENT_E004', 'http.get only supports http: and https: URLs');
   }
   return url;
 }
 
 async function defaultFetch(input: string | URL, init?: { method: 'GET'; headers?: Record<string, string> }): Promise<FetchResponseLike> {
   if (typeof globalThis.fetch !== 'function') {
-    throw new Error('http.get requires a fetch implementation');
+    throw new DeckentError('DECKENT_E004', 'http.get requires a fetch implementation');
   }
   return globalThis.fetch(input, init);
 }
@@ -148,7 +149,7 @@ export function createEnvReadHandler(options: EnvReadHandlerOptions = {}): Capab
     invoke: (args: Record<string, unknown>) => {
       const name = requireString(args, 'name', 'env.read');
       if (!allowlist.includes(name)) {
-        throw new Error(`env.read variable is not allow-listed: ${name}`);
+        throw new DeckentError('DECKENT_E005', `env.read variable is not allow-listed: ${name}`);
       }
       return { name, value: env[name] ?? null };
     },
@@ -167,7 +168,7 @@ export function createShellExecHandler(options: ShellExecHandlerOptions = {}): C
     invoke: async (args: Record<string, unknown>, ctx: InvocationContext) => {
       const command = requireString(args, 'command', 'shell.exec');
       if (!isAllowed(command, options.allowedCommands)) {
-        throw new Error(`shell.exec command is not allow-listed: ${command}`);
+        throw new DeckentError('DECKENT_E005', `shell.exec command is not allow-listed: ${command}`);
       }
 
       const commandArgs = readStringArray(args.args, 'args', 'shell.exec');

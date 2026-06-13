@@ -59,6 +59,10 @@ describe('isCommentLine', () => {
     expect(isCommentLine('   * @param foo bar')).toBe(true);
   });
 
+  it('identifies JSDoc /** opener lines', () => {
+    expect(isCommentLine('  /** Raw model string from API response (e.g. "claude-sonnet-4-6") */')).toBe(true);
+  });
+
   it('returns false for regular code lines', () => {
     expect(isCommentLine('  const model = "claude-opus-4-8";')).toBe(false);
   });

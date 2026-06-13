@@ -50,6 +50,7 @@ import { loadReactiveMap } from '../../orchestra/autonomous/reactive/reactive-ma
 import { makeReactiveIngester } from '../../orchestra/autonomous/reactive/reactive-ingester.js';
 import { makeNervousReactiveSource } from '../../orchestra/autonomous/reactive/nervous-reactive-source.js';
 import { NervousObserver } from '../../nervous/observer.js';
+import { DeckentError } from '../../core/errors.js';
 
 // ─── Filesystem layout helpers ────────────────────────────────────────
 
@@ -121,7 +122,7 @@ export function backlogAdd(o: BacklogAddOptions): void {
   const path = defaultBacklogPath(o.root);
   const bl = loadBacklog(path);
   if (bl.entries.some((e) => e.id === o.id)) {
-    throw new Error(getMessage('autonomous.backlog.duplicate', o.lang, { id: o.id }));
+    throw new DeckentError('DECKENT_E039', getMessage('autonomous.backlog.duplicate', o.lang, { id: o.id }));
   }
   // Reject a malformed cron at intake — a recurring entry whose cron only
   // fails later (at the reenqueue flip) would silently never fire again.
@@ -129,7 +130,7 @@ export function backlogAdd(o: BacklogAddOptions): void {
     try {
       nextRun(o.cron, new Date());
     } catch (err) {
-      throw new Error(getMessage('autonomous.backlog.invalid_cron', o.lang, {
+      throw new DeckentError('DECKENT_E004', getMessage('autonomous.backlog.invalid_cron', o.lang, {
         cron: o.cron,
         error: err instanceof Error ? err.message : String(err),
       }));
@@ -140,18 +141,18 @@ export function backlogAdd(o: BacklogAddOptions): void {
   let capabilityTarget: BacklogEntry['spec']['capabilityTarget'];
   if (o.kind === 'capability') {
     if (!o.capability || !o.capability.trim()) {
-      throw new Error(getMessage('autonomous.backlog.capability_required', o.lang));
+      throw new DeckentError('DECKENT_E039', getMessage('autonomous.backlog.capability_required', o.lang));
     }
     let args: Record<string, unknown> | undefined;
     if (o.capabilityArgs !== undefined) {
       try {
         const parsed: unknown = JSON.parse(o.capabilityArgs);
         if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-          throw new Error('args must be a JSON object');
+          throw new DeckentError('DECKENT_E004', 'args must be a JSON object');
         }
         args = parsed as Record<string, unknown>;
       } catch (err) {
-        throw new Error(getMessage('autonomous.backlog.invalid_args', o.lang, {
+        throw new DeckentError('DECKENT_E004', getMessage('autonomous.backlog.invalid_args', o.lang, {
           error: err instanceof Error ? err.message : String(err),
         }));
       }
@@ -174,7 +175,7 @@ export function backlogAdd(o: BacklogAddOptions): void {
     lastResult: null,
   };
   const err = validateBacklogEntry(entry);
-  if (err) throw new Error(err);
+  if (err) throw new DeckentError('DECKENT_E004', err);
   bl.entries.push(entry);
   mkdirSync(dirname(path), { recursive: true });
   atomicWriteFileSync(path, JSON.stringify(bl, null, 2));
@@ -190,7 +191,7 @@ export function backlogRemove(o: { root: string; id: string; lang: string }): vo
   const before = bl.entries.length;
   bl.entries = bl.entries.filter((e) => e.id !== o.id);
   if (bl.entries.length === before) {
-    throw new Error(getMessage('autonomous.backlog.not_found', o.lang, { id: o.id }));
+    throw new DeckentError('DECKENT_E039', getMessage('autonomous.backlog.not_found', o.lang, { id: o.id }));
   }
   mkdirSync(dirname(path), { recursive: true });
   atomicWriteFileSync(path, JSON.stringify(bl, null, 2));
@@ -734,7 +735,7 @@ export function registerAutonomous(program: Command): void {
         const lang = getLanguage(opts.lang);
         const id = opts.id ?? positionalId;
         if (!id) {
-          throw new Error(getMessage('autonomous.backlog.id_required', lang));
+          throw new DeckentError('DECKENT_E039', getMessage('autonomous.backlog.id_required', lang));
         }
         const root = opts.root ?? resolveProjectRoot();
         backlogRemove({ root, id, lang });

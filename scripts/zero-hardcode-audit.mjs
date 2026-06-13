@@ -47,7 +47,7 @@ export function isAllowlisted(filePath, projectRoot) {
 /** Returns true if the line is a comment (should be skipped). */
 export function isCommentLine(line) {
   const trimmed = line.trimStart();
-  return trimmed.startsWith('//') || trimmed.startsWith('*');
+  return trimmed.startsWith('//') || trimmed.startsWith('*') || trimmed.startsWith('/**');
 }
 
 /** Returns true if the file should be skipped (test file or script). */

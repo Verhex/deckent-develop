@@ -24,6 +24,7 @@ import type {
   ActorContext,
   ExecutionRequest,
 } from './work-model.js';
+import { DeckentError } from './errors.js';
 
 // ─── Result + context types ──────────────────────────────────────────────────
 
@@ -264,14 +265,14 @@ export const fsReadHandler: CapabilityHandler = {
   invoke: async (args, ctx) => {
     const rawPath = args.path;
     if (typeof rawPath !== 'string' || rawPath.length === 0) {
-      throw new Error('fs-read requires a non-empty string args.path');
+      throw new DeckentError('DECKENT_E039', 'fs-read requires a non-empty string args.path');
     }
     let target = rawPath;
     if (ctx.projectRoot) {
       target = resolve(ctx.projectRoot, rawPath);
       const rel = relative(ctx.projectRoot, target);
       if (rel.startsWith('..') || isAbsolute(rel)) {
-        throw new Error(`fs-read path escapes projectRoot: ${rawPath}`);
+        throw new DeckentError('DECKENT_E005', `fs-read path escapes projectRoot: ${rawPath}`);
       }
     }
     const content = await readFile(target, 'utf8');

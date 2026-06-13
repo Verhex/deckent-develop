@@ -10,6 +10,7 @@ import {
   type InvocationContext,
 } from './capability-broker.js';
 import type { Capability } from './work-model.js';
+import { DeckentError } from './errors.js';
 
 type DataRequiredCapability = 'db.read' | 'mail.read';
 
@@ -71,7 +72,7 @@ function requiredCapability(capability: DataRequiredCapability): Capability {
 function requireString(args: Record<string, unknown>, key: string, handlerName: string): string {
   const value = args[key];
   if (typeof value !== 'string' || value.trim().length === 0) {
-    throw new Error(`${handlerName} requires a non-empty string args.${key}`);
+    throw new DeckentError('DECKENT_E039', `${handlerName} requires a non-empty string args.${key}`);
   }
   return value;
 }
@@ -80,7 +81,7 @@ function readParams(args: Record<string, unknown>): readonly unknown[] {
   const value = args.params;
   if (value === undefined) return [];
   if (!Array.isArray(value)) {
-    throw new Error('db.query requires args.params to be an array when provided');
+    throw new DeckentError('DECKENT_E004', 'db.query requires args.params to be an array when provided');
   }
   return [...value];
 }
@@ -89,7 +90,7 @@ function readLimit(args: Record<string, unknown>): number | undefined {
   const value = args.limit;
   if (value === undefined) return undefined;
   if (typeof value !== 'number' || !Number.isInteger(value) || value <= 0) {
-    throw new Error('mail.search requires args.limit to be a positive integer when provided');
+    throw new DeckentError('DECKENT_E004', 'mail.search requires args.limit to be a positive integer when provided');
   }
   return value;
 }
@@ -97,29 +98,29 @@ function readLimit(args: Record<string, unknown>): number | undefined {
 function assertReadOnlySelect(sql: string): string {
   const statement = sql.trim();
   if (statement.length === 0) {
-    throw new Error('db.query requires a non-empty SELECT statement');
+    throw new DeckentError('DECKENT_E039', 'db.query requires a non-empty SELECT statement');
   }
   if (statement.includes(';')) {
-    throw new Error('db.query is read-only and rejects semicolon multi-statement SQL');
+    throw new DeckentError('DECKENT_E004', 'db.query is read-only and rejects semicolon multi-statement SQL');
   }
   if (statement.includes('--') || statement.includes('/*') || statement.includes('*/')) {
-    throw new Error('db.query is read-only and rejects SQL comments');
+    throw new DeckentError('DECKENT_E004', 'db.query is read-only and rejects SQL comments');
   }
   if (!/^select\b/i.test(statement)) {
-    throw new Error('db.query is read-only and only accepts SELECT statements');
+    throw new DeckentError('DECKENT_E004', 'db.query is read-only and only accepts SELECT statements');
   }
   if (BLOCKED_SQL_TOKEN.test(statement)) {
-    throw new Error('db.query is read-only and rejects write or administrative SQL tokens');
+    throw new DeckentError('DECKENT_E004', 'db.query is read-only and rejects write or administrative SQL tokens');
   }
   return statement;
 }
 
 async function missingQueryImpl(): Promise<never> {
-  throw new Error('db.query requires an injected queryImpl');
+  throw new DeckentError('DECKENT_E004', 'db.query requires an injected queryImpl');
 }
 
 async function missingSearchImpl(): Promise<never> {
-  throw new Error('mail.search requires an injected searchImpl');
+  throw new DeckentError('DECKENT_E004', 'mail.search requires an injected searchImpl');
 }
 
 function headerValue(headers: Record<string, unknown> | undefined, key: string): unknown {

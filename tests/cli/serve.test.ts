@@ -73,7 +73,7 @@ describe('registerServe', () => {
       }),
     );
     expect(vi.mocked(print)).toHaveBeenCalledWith(
-      expect.stringContaining('listening on http://127.0.0.1:3100'),
+      expect.stringContaining('Deckent is ready — http://127.0.0.1:3100'),
     );
   });
 

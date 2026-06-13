@@ -14,6 +14,7 @@ import { modelRegistry } from '../core/model-registry.js';
 import { getProviderCommandSpec, buildProviderCommand } from '../core/provider-command-spec.js';
 import { TASKS_DIR } from '../core/constants.js';
 import { debugLog } from '../core/utils.js';
+import { DeckentError } from '../core/errors.js';
 import {
   acquireSpawnLocks,
   releaseAllSpawnLocks,
@@ -450,7 +451,7 @@ export class DockerSpawnBackend implements SpawnBackend {
     // Validate kind limits at construction time — fail fast on invalid values
     for (const [kind, limitStr] of Object.entries(rawKindLimits)) {
       if (parseMemoryString(limitStr) === null) {
-        throw new Error(`Invalid memory limit for kind '${kind}': '${limitStr}'. Expected docker memory string (e.g. '768m', '1536m', '1.5g').`);
+        throw new DeckentError('DECKENT_E004', `Invalid memory limit for kind '${kind}': '${limitStr}'. Expected docker memory string (e.g. '768m', '1536m', '1.5g').`);
       }
     }
     this.kindMemoryLimits = rawKindLimits;
