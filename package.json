@@ -25,6 +25,7 @@
     "test:e2e-surfaces": "node scripts/test-e2e-surfaces.mjs",
     "verify:rt-latency": "node scripts/rt-latency-verify.mjs",
     "verify:repl-tools": "node scripts/ink-pty-tool-verify.mjs",
+    "verify:native-repl": "node scripts/ink-pty-native-verify.mjs",
     "test:dashboard": "vitest run --config vitest.dashboard.config.ts",
     "build:dashboard": "node scripts/build-dashboard.mjs",
     "build:all": "npm run clean && tsc && node scripts/copy-assets.mjs && npm run build:dashboard",

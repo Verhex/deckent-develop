@@ -28,6 +28,17 @@ export function resolveNativeProvider(
   env: Record<string, string | undefined>,
   config: TransportConfig & { native_model?: string },
 ): ResolvedProvider | ProviderError {
+  const mock = env['DECKENT_NATIVE_MOCK'];
+  if (mock) {
+    let scripts: import('../../agent/provider-tooluse/types.js').ProviderEvent[][] = [];
+    try { scripts = JSON.parse(mock); } catch { scripts = []; }
+    let turn = 0;
+    return {
+      adapter: { name: 'mock', async *send() { for (const e of (scripts[turn++] ?? [{ type: 'done' }])) yield e; } },
+      model: env['DECKENT_NATIVE_MODEL'] ?? 'mock-model',
+    };
+  }
+
   const detected = detectTransport(env, config);
   if (detected.kind === 'none') return { error: detected.reason };
 
