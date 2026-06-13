@@ -150,3 +150,10 @@ view-adapter (mevcut Ink, refactor):
 - provider-tooluse: ollama'yı openai-compat'a delege mi, ayrı adapter mı (tool-parser farkları).
 - Faz-1'de view-adapter'ın ne kadarı yeniden-yazılır vs mevcut app.tsx/run.tsx korunur (approval-queue taşıma sınırı).
 - MCP tool-source'unun registry'ye dinamik kayıt zamanlaması (oturum-başı vs lazy).
+
+## 13. M2 önkoşulları (M1 final-review'dan, bağlayıcı)
+
+- **🔴 Dual-writer tehlikesi — legacy izin-store emekliye ayrılmalı:** M1'in `src/agent/permission-store.ts`'i `.deckent/settings.local.json`'da `permissions.rules[]` yazıp `permissions.allow`'u SİLER; legacy `src/cli/commands/chat-permissions.ts` (`createPermissionStore`) hâlâ `permissions.allow[]`'u sahipleniyor. İkisi aynı dosyada birlikte koşarsa legacy grant'ler sessizce düşer. M1'de zararsız (yeni modüller 0-caller). **M2: yeni store'u wire eden DEĞİŞİKLİK, legacy `chat-permissions.ts`'i aynı anda retire/redirect etmeli.**
+- **tierMap resolver M2'de:** `decide()` tier'ı çözmez — `tierMap` (name/category → effective tier) lookup'ını caller'a bırakır (`permission.ts` "tier-map already applied by caller"). M2 bu resolver'ı yazıp `decide()`'a beslemeli.
+- **tier-sözlük adaptasyonu:** yeni tier `'silent'|'confirm'|'always'` vs legacy `classifyTool` `'read'|'confirm'|'always'` — M2 reuse'da `read→silent` küçük adaptasyon gerekir.
+- **(Minor) `toNativeSchemas()` paylaşılan `inputSchema` ref'i** — bir consumer mutate ederse kayıtlı tool alias'lanır; opsiyonel shallow-spread hardening.
