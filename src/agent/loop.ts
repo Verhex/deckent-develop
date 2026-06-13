@@ -86,6 +86,9 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
     if (calls.length === 0) { yield { type: 'turn-end' }; return; }
 
     for (const call of calls) {
+      // cancel() stops the rest of the in-flight batch (incl. auto-tier calls),
+      // not just subsequent ask-tier ones (review follow-up #1).
+      if (deps.isCancelled?.()) break;
       const def = deps.registry.get(call.name);
       if (!def) {
         const output = `[unknown tool: ${call.name}]`;
@@ -94,8 +97,9 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
         continue;
       }
       const resource = primaryResource(call.args);
+      const elevated = checkSelfModifying(deps.cwd, writeTargets(call.args)).elevated;
       let tier = resolveTier(def, deps.policy);
-      if (checkSelfModifying(deps.cwd, writeTargets(call.args)).elevated) tier = 'always';
+      if (elevated) tier = 'always';
 
       const decision = decide(call.name, resource, tier, { rules: deps.ruleStore.activeRules(), denies: [], policy: deps.policy, mode: deps.getMode() });
       if (decision === 'deny') {
@@ -114,7 +118,10 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
           transcript.appendToolResult(call.id, output);
           continue;
         }
-        if (resp.decision !== 'once') deps.ruleStore.grant({ tool: call.name, pattern: resource || '**' }, resp.decision as GrantLifetime);
+        // A self-modifying-elevated call never persists a grant — each deckent-source
+        // write must be re-confirmed, or a single "always" would silently auto-approve
+        // later source writes by this tool and defeat the guard (review follow-up #2).
+        if (resp.decision !== 'once' && !elevated) deps.ruleStore.grant({ tool: call.name, pattern: resource || '**' }, resp.decision as GrantLifetime);
       }
 
       yield { type: 'tool-executing', id: call.id, tool: call.name };

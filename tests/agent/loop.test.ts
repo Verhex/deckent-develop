@@ -1,7 +1,10 @@
 // tests/agent/loop.test.ts
 import { describe, it, expect } from 'vitest';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { runAgentTurn, type LoopDeps } from '../../src/agent/loop.js';
+import { clearDetectionCache } from '../../src/orchestra/self-modifying-detector.js';
 import { Transcript } from '../../src/agent/transcript.js';
 import { ToolRegistry } from '../../src/agent/tools/registry.js';
 import { SAFE_DEFAULT_POLICY } from '../../src/agent/permission-policy.js';
@@ -95,5 +98,28 @@ describe('runAgentTurn', () => {
     expect(evs.filter((e) => e.type === 'tool-result').length).toBe(3);
     expect(evs[evs.length - 2]).toEqual({ type: 'error', message: 'recursion limit exceeded' });
     expect(evs[evs.length - 1]).toEqual({ type: 'turn-end' });
+  });
+
+  it('never persists a grant for a self-modifying-elevated call (re-asks every time)', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'loop-deckent-'));
+    mkdirSync(join(root, '.deckent'), { recursive: true });
+    writeFileSync(join(root, 'package.json'), JSON.stringify({ name: 'deckent' }));
+    clearDetectionCache();
+    try {
+      const grants: { tool: string; pattern: string }[] = [];
+      const ruleStore: RuleStore = { grant: (r) => grants.push(r), revoke: () => {}, activeRules: () => [...grants] };
+      const reg = new ToolRegistry();
+      reg.register({ name: 'srcwriter', description: 'w', inputSchema: { type: 'object' }, category: 'coding', tier: 'silent', source: 'builtin', handler: async () => ({ ok: true, output: 'wrote' }) });
+      const { adapter } = scriptedAdapter([[{ type: 'tool-call', id: 's1', name: 'srcwriter', args: { path: 'src/core/x.ts' } }, { type: 'done' }], [{ type: 'done' }]]);
+      const evs = await drain(runAgentTurn(baseDeps({ adapter, registry: reg, ruleStore, cwd: root, requestPermission: async () => ({ decision: 'always' }) }), new Transcript(), 'go'));
+      // a silent-tier tool is elevated to a permission prompt because it writes deckent source...
+      expect(evs).toContainEqual({ type: 'permission-request', id: 's1', tool: 'srcwriter', resource: 'src/core/x.ts', tier: 'always' });
+      // ...and the "always" grant is NOT persisted (each self-modifying write re-confirms).
+      expect(grants).toEqual([]);
+      expect(evs).toContainEqual({ type: 'tool-result', id: 's1', tool: 'srcwriter', ok: true, output: 'wrote' });
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+      clearDetectionCache();
+    }
   });
 });
