@@ -58,7 +58,7 @@ describe('Claude Adapter Smoke Tests', () => {
     const cmd = adapter.buildCommand('opus', '/tmp/prompt.txt');
     expect(cmd).toContain('claude');
     expect(cmd).toContain('-p -');
-    expect(cmd).toContain('--model opus');
+    expect(cmd).toContain('--model claude-opus-4-8');
     expect(cmd).toContain('< /tmp/prompt.txt');
   });
 
@@ -78,7 +78,7 @@ describe('Claude Adapter Smoke Tests', () => {
 
   it('buildCommand without opts produces clean command', () => {
     const cmd = adapter.buildCommand('sonnet', '/tmp/task.txt');
-    expect(cmd).toBe('claude -p - --model sonnet < /tmp/task.txt');
+    expect(cmd).toBe('claude -p - --model claude-sonnet-4-6 < /tmp/task.txt');
   });
 
   it('isAvailable returns boolean (checks claude --version)', async () => {

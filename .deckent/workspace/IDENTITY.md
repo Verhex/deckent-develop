@@ -15,7 +15,7 @@ Dashboard Tests: 413
 <!-- AUTOGEN:START id="identity-summary" -->
 Sprints: 255+ (active)
 CLI Commands: 55+
-MCP: 32 tools, 8 resources
+MCP: 34 tools, 8 resources
 Agents: 15 built-in + 2 custom
 Skills: 21 built-in
 Providers: Claude, Codex, Gemini
@@ -28,7 +28,7 @@ Features: **Memory V2 DB-First (SQLite FTS5, dual-layer i18n normalize, 96% cont
 |--------|-------|
 | Version | 1.0.0-beta.1 |
 | Sprint | sprint-255 |
-| MCP Tools | 32 |
+| MCP Tools | 34 |
 | MCP Resources | 8 |
 | CLI Commands | 55+ |
 | Dashboard Pages | 12 |

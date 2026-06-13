@@ -96,7 +96,7 @@ describe('TmuxBackend Unit Tests (mock-based)', () => {
     it('produces default Claude CLI command without adapter', async () => {
       const { buildWorkerCommand } = await import('../../src/orchestra/tmux.js');
       const cmd = buildWorkerCommand('sonnet', '/tmp/prompt.txt');
-      expect(cmd).toContain('claude -p - --model sonnet');
+      expect(cmd).toContain('claude -p - --model claude-sonnet-4-6');
       expect(cmd).toContain('< /tmp/prompt.txt');
     });
 
