@@ -53,4 +53,15 @@ describe('createOpenAIAdapter', () => {
     const a = createOpenAIAdapter({ baseUrl: 'http://x/v1', fetchImpl: fakeFetch('', false, 500) });
     await expect(drain(a, req)).rejects.toThrow(/500/);
   });
+  it('synthesizes unique ids for same-named parallel tool calls with omitted ids', async () => {
+    const sse =
+      'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"name":"read_file","arguments":"{}"}}]}}]}\n\n' +
+      'data: {"choices":[{"delta":{"tool_calls":[{"index":1,"function":{"name":"read_file","arguments":"{}"}}]}}]}\n\n' +
+      'data: {"choices":[{"delta":{},"finish_reason":"tool_calls"}]}\n\n' +
+      'data: [DONE]\n\n';
+    const a = createOpenAIAdapter({ baseUrl: 'http://x/v1', fetchImpl: fakeFetch(sse) });
+    const evs = await drain(a, req);
+    const ids = evs.filter((e): e is Extract<ProviderEvent, { type: 'tool-call' }> => e.type === 'tool-call').map((e) => e.id);
+    expect(ids).toEqual(['call-read_file-0', 'call-read_file-1']);
+  });
 });

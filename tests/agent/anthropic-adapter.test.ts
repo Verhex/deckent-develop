@@ -45,4 +45,21 @@ describe('createAnthropicAdapter', () => {
     const a = createAnthropicAdapter({ apiKey: 'sk-ant', fetchImpl: fakeFetch('', false, 429) });
     await expect(drain(a, req)).rejects.toThrow(/429/);
   });
+  it('synthesizes an index-scoped id when the tool_use block omits an id', async () => {
+    const sse =
+      'event: content_block_start\ndata: {"index":0,"content_block":{"type":"tool_use","name":"read_file"}}\n\n' +
+      'event: content_block_delta\ndata: {"index":0,"delta":{"type":"input_json_delta","partial_json":"{}"}}\n\n' +
+      'event: content_block_stop\ndata: {"index":0}\n\n' +
+      'event: message_stop\ndata: {}\n\n';
+    const a = createAnthropicAdapter({ apiKey: 'sk-ant', fetchImpl: fakeFetch(sse) });
+    const evs = await drain(a, req);
+    expect(evs).toContainEqual({ type: 'tool-call', id: 'toolu-read_file-0', name: 'read_file', args: {} });
+  });
+  it('throws when the stream carries a protocol error event', async () => {
+    const sse =
+      'event: message_start\ndata: {"message":{"usage":{"input_tokens":5}}}\n\n' +
+      'event: error\ndata: {"type":"error","error":{"type":"overloaded_error","message":"overloaded"}}\n\n';
+    const a = createAnthropicAdapter({ apiKey: 'sk-ant', fetchImpl: fakeFetch(sse) });
+    await expect(drain(a, req)).rejects.toThrow(/overloaded_error/);
+  });
 });

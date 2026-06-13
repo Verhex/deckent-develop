@@ -66,10 +66,12 @@ export function createOpenAIAdapter(opts: OpenAIAdapterOptions): ProviderAdapter
           }
         }
         if (choice?.finish_reason === 'tool_calls') {
-          for (const [, tc] of [...toolAcc.entries()].sort((a, b) => a[0] - b[0])) {
+          for (const [idx, tc] of [...toolAcc.entries()].sort((a, b) => a[0] - b[0])) {
             let args: Record<string, unknown> = {};
             try { args = tc.args ? (JSON.parse(tc.args) as Record<string, unknown>) : {}; } catch { args = {}; }
-            yield { type: 'tool-call', id: tc.id || `call-${tc.name}`, name: tc.name, args };
+            // Synthesized id is index-scoped so same-named parallel calls stay
+            // distinct for the Phase B transcript round-trip (toolCallId keying).
+            yield { type: 'tool-call', id: tc.id || `call-${tc.name}-${idx}`, name: tc.name, args };
           }
           toolAcc.clear();
         }

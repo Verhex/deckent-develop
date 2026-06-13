@@ -82,7 +82,9 @@ export function createAnthropicAdapter(opts: AnthropicAdapterOptions): ProviderA
             const cur = toolAcc.get(d.index)!;
             let args: Record<string, unknown> = {};
             try { args = cur.json ? (JSON.parse(cur.json) as Record<string, unknown>) : {}; } catch { args = {}; }
-            yield { type: 'tool-call', id: cur.id || `toolu-${cur.name}`, name: cur.name, args };
+            // Synthesized id is index-scoped so same-named parallel calls stay
+            // distinct for the Phase B transcript round-trip (toolCallId keying).
+            yield { type: 'tool-call', id: cur.id || `toolu-${cur.name}-${d.index}`, name: cur.name, args };
             toolAcc.delete(d.index);
           }
         } else if (ev.event === 'message_delta') {
@@ -90,6 +92,11 @@ export function createAnthropicAdapter(opts: AnthropicAdapterOptions): ProviderA
         } else if (ev.event === 'message_stop') {
           yield { type: 'usage', inputTokens, outputTokens };
           break;
+        } else if (ev.event === 'error') {
+          // Anthropic emits a mid-stream `error` frame (e.g. overloaded_error) on
+          // a failed turn; throw so it joins the transport-failure error path
+          // rather than silently completing as a successful turn.
+          throw new Error(`anthropic stream error: ${d.error?.type ?? 'unknown'}`);
         }
       }
       yield { type: 'done' };
@@ -103,4 +110,5 @@ interface AnthropicEvent {
   content_block?: { type?: string; id?: string; name?: string };
   delta?: { type?: string; text?: string; partial_json?: string };
   usage?: { output_tokens?: number };
+  error?: { type?: string; message?: string };
 }
