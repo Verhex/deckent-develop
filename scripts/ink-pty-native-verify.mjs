@@ -9,8 +9,10 @@ import { join, resolve } from 'node:path';
 
 const ENTRY = resolve('dist/cli/entry.js');
 if (!existsSync(ENTRY)) {
-  console.log('FAIL: dist not built — run npm run build:all first');
-  process.exit(1);
+  // Skip-safe (matches the header + the sibling harness): a pre-build invocation
+  // must not false-red. The human's Tier-1 gate runs `npm run build:all` first.
+  console.log('SKIP: dist/cli/entry.js not found — run npm run build:all first');
+  process.exit(0);
 }
 
 let ptySpawn;
@@ -84,12 +86,11 @@ const result = await new Promise((resolve) => {
 // ─── Assertions ──────────────────────────────────────────────────────────────
 const failures = [];
 
-// (a) A confirm card appeared (approval-prompt hint)
+// (a) A confirm card appeared (the approval-prompt hint — strict, matches the
+// sibling harness; the hint renders ONLY inside the confirm modal).
 const hasConfirmCard =
   result.includes('y = allow') ||
-  result.includes('y = izin') ||
-  result.includes('allow') ||
-  result.includes('confirm');
+  result.includes('y = izin');
 if (!hasConfirmCard) failures.push('(a) no confirm card hint in scrollback');
 
 // (b) native-proof.txt written with content OK
