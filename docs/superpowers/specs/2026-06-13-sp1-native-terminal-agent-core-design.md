@@ -154,6 +154,12 @@ view-adapter (mevcut Ink, refactor):
 ## 13. M2 önkoşulları (M1 final-review'dan, bağlayıcı)
 
 - **🔴 Dual-writer tehlikesi — legacy izin-store emekliye ayrılmalı:** M1'in `src/agent/permission-store.ts`'i `.deckent/settings.local.json`'da `permissions.rules[]` yazıp `permissions.allow`'u SİLER; legacy `src/cli/commands/chat-permissions.ts` (`createPermissionStore`) hâlâ `permissions.allow[]`'u sahipleniyor. İkisi aynı dosyada birlikte koşarsa legacy grant'ler sessizce düşer. M1'de zararsız (yeni modüller 0-caller). **M2: yeni store'u wire eden DEĞİŞİKLİK, legacy `chat-permissions.ts`'i aynı anda retire/redirect etmeli.**
-- **tierMap resolver M2'de:** `decide()` tier'ı çözmez — `tierMap` (name/category → effective tier) lookup'ını caller'a bırakır (`permission.ts` "tier-map already applied by caller"). M2 bu resolver'ı yazıp `decide()`'a beslemeli.
+- **✅ tierMap resolver — M2 Part 1'de KAPANDI:** `resolveTier(tool, policy)` `permission.ts`'e eklendi (name→category→default); `decide(tool.name, resource, resolveTier(tool, policy), ctx)` olarak tüketilir.
 - **tier-sözlük adaptasyonu:** yeni tier `'silent'|'confirm'|'always'` vs legacy `classifyTool` `'read'|'confirm'|'always'` — M2 reuse'da `read→silent` küçük adaptasyon gerekir.
 - **(Minor) `toNativeSchemas()` paylaşılan `inputSchema` ref'i** — bir consumer mutate ederse kayıtlı tool alias'lanır; opsiyonel shallow-spread hardening.
+
+### M2 Part 2 notları (M2 Part 1 final-review'dan)
+
+- **🔴 Transcript = mesaj-DİZİSİ, blok-array DEĞİL:** `ProviderMessage.content` string-only (OpenAI-compat-first normalleştirme kararı). Tek bir assistant turu metin + birden çok tool-call'ı iç içe geçirdiğinde, loop bunu **sıralı mesajlar** olarak modellemeli: assistant-metin mesajı, ardından her tool-sonucu `toolCallId`-keyed ayrı `role:'tool'` mesajı. Yapısal content-block array DEĞİL. Round-trip korelasyonu `ProviderToolCall.id` ↔ `ProviderMessage.toolCallId` üzerinden.
+- **ProviderEvent → AgentEvent eşleme (loop):** `text-delta`→`text-delta` (1:1); `tool-call`→ loop-güdümlü dörtlü (`tool-proposed`/`permission-request`/`tool-executing`/`tool-result`); `usage`→`usage`; `done`→`turn-end`. Provider ham `tool-call` emit eder; izin/exec yaşamdöngüsünü loop sentezler.
+- **M2 Part 1 ✅ KAPANDI** (`feat/sp1-m2p1`): events.ts, provider-tooluse/types.ts, resolveTier, identity.ts+soul.default.md, provider-detect.ts. 60 agent-test yeşil. Kalan M2: 3 provider-adapter + agent-loop + session.ts + 3 guard (Part 2).
