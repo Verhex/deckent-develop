@@ -27,4 +27,12 @@ describe('detectTransport', () => {
     const t = detectTransport({ ANTHROPIC_API_KEY: 'sk-ant-x' }, { ollama_host: 'http://127.0.0.1:11434' });
     expect(t.kind).toBe('anthropic-api');
   });
+  it('prefers anthropic-api over openai-compatible when both keys present', () => {
+    const t = detectTransport({ ANTHROPIC_API_KEY: 'x', OPENAI_API_KEY: 'y' }, {});
+    expect(t.kind).toBe('anthropic-api');
+  });
+  it('prefers openai-compatible over ollama when both are configured', () => {
+    const t = detectTransport({ OPENAI_API_KEY: 'y' }, { ollama_host: 'http://127.0.0.1:11434' });
+    expect(t.kind).toBe('openai-compatible');
+  });
 });
