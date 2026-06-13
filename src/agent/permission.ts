@@ -45,3 +45,15 @@ export function decide(
   if (ctx.mode === 'auto-edit' && tool !== 'bash') return 'allow';
   return 'ask';
 }
+
+/**
+ * Resolve a tool's effective tier: a policy tierMap override (by tool name,
+ * then by category) wins over the ToolDefinition's own default tier. This is
+ * the M2 precondition that decide() relies on (it consumes the resolved tier).
+ */
+export function resolveTier(
+  tool: { name: string; category: string; tier: ToolPermissionTier },
+  policy: PermissionPolicy,
+): ToolPermissionTier {
+  return policy.tierMap[tool.name] ?? policy.tierMap[tool.category] ?? tool.tier;
+}
