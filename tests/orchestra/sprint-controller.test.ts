@@ -1364,7 +1364,8 @@ describe('Task Router wiring in sprint-controller', () => {
       new URL('../../src/orchestra/sprint-spawner.ts', import.meta.url),
       'utf-8',
     );
-    expect(source).toContain("import { routeTask } from './task-router.js'");
+    // robust to other named imports in the same statement (e.g. emitTimeoutEvents, Sprint 280)
+    expect(source).toMatch(/import \{[^}]*\brouteTask\b[^}]*\} from '\.\/task-router\.js'/);
   });
 
   it('routeTask is called in runSprint between plan and spawn phases', async () => {
