@@ -50,4 +50,23 @@ describe('createRuleStore', () => {
     s.revoke({ tool: 'write_file', pattern: 'src/**' });
     expect(s.activeRules()).toHaveLength(0);
   });
+  it('revoke of an "always" rule updates the persisted file', () => {
+    const d = sandbox();
+    const s = createRuleStore(d);
+    s.grant({ tool: 'bash', pattern: 'npm test*' }, 'always');
+    s.revoke({ tool: 'bash', pattern: 'npm test*' });
+    expect(s.activeRules()).toHaveLength(0);
+    const doc = JSON.parse(readFileSync(settingsPath(d), 'utf-8'));
+    expect(doc.permissions.rules).toHaveLength(0);
+  });
+  it('persist preserves unrelated top-level keys and drops the legacy allow key', () => {
+    const d = sandbox();
+    writeFileSync(settingsPath(d), JSON.stringify({ otherKey: 1, permissions: { allow: ['deckent_write_file'] } }));
+    const s = createRuleStore(d);
+    s.grant({ tool: 'write_file', pattern: 'src/**' }, 'always');
+    const doc = JSON.parse(readFileSync(settingsPath(d), 'utf-8'));
+    expect(doc.otherKey).toBe(1);
+    expect(doc.permissions.allow).toBeUndefined();
+    expect(doc.permissions.rules).toEqual(expect.arrayContaining([{ tool: 'write_file', pattern: 'src/**' }]));
+  });
 });

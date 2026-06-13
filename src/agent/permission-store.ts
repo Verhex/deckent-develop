@@ -64,7 +64,7 @@ function persist(cwd: string, rules: PermissionRule[]): void {
   } catch {
     doc = {};
   }
-  const permissions = (doc['permissions'] && typeof doc['permissions'] === 'object')
+  const permissions = (doc['permissions'] && typeof doc['permissions'] === 'object' && !Array.isArray(doc['permissions']))
     ? (doc['permissions'] as Record<string, unknown>)
     : {};
   permissions['rules'] = rules;

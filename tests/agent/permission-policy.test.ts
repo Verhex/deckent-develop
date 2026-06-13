@@ -17,7 +17,7 @@ describe('loadPolicy', () => {
   it('returns the safe default when no policy file exists', () => {
     const p = loadPolicy(sandbox());
     expect(p.defaultMode).toBe(SAFE_DEFAULT_POLICY.defaultMode);
-    expect(p.alwaysFloor).toContain('deckent_kill');
+    expect(p.alwaysFloor).toEqual(expect.arrayContaining(['deckent_kill', 'deckent_cleanup', 'deckent_recover']));
   });
   it('merges an enterprise-locked override (mode + extra floor)', () => {
     const d = sandbox();
@@ -40,5 +40,11 @@ describe('loadPolicy', () => {
     const d = sandbox();
     writeFileSync(join(d, '.deckent', 'permission-policy.json'), '{ not json');
     expect(loadPolicy(d).defaultMode).toBe(SAFE_DEFAULT_POLICY.defaultMode);
+  });
+  it('cannot shrink the floor below baseline when alwaysFloor:[] is supplied', () => {
+    const d = sandbox();
+    writeFileSync(join(d, '.deckent', 'permission-policy.json'), JSON.stringify({ alwaysFloor: [] }));
+    const p = loadPolicy(d);
+    expect(p.alwaysFloor).toEqual(expect.arrayContaining(['deckent_kill', 'deckent_cleanup', 'deckent_recover']));
   });
 });
