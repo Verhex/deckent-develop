@@ -45,4 +45,22 @@ describe('buildNativeToolRegistry', () => {
     expect(reg.get('deckent_status')).toBeDefined();
     expect(reg.get('deckent_status')!.tier).toBe('silent');
   });
+
+  it('registers MCP bridge tools as confirm-tier ToolDefinitions (single-gate dispatch)', async () => {
+    const calls: Array<{ name: string; args: Record<string, unknown> }> = [];
+    const mcpBridge = {
+      listTools: () => [
+        { namespacedName: 'srv__echo', descriptor: { name: 'echo', description: 'echo it', inputSchema: { type: 'object', properties: { v: { type: 'string' } } } }, server: 'srv', tool: 'echo' },
+      ],
+      dispatch: async (name: string, args: Record<string, unknown>) => { calls.push({ name, args }); return { ok: true, output: `mcp:${args['v']}` }; },
+    };
+    const reg = buildNativeToolRegistry({ cwd: () => tmpdir(), mcpBridge });
+    const def = reg.get('srv__echo');
+    expect(def).toBeDefined();
+    expect(def!.tier).toBe('confirm');       // external MCP is never silent
+    expect(def!.source).toBe('mcp');
+    const r = await def!.handler({ v: 'hi' });
+    expect(r).toEqual({ ok: true, output: 'mcp:hi' });
+    expect(calls).toHaveLength(1);           // dispatched through the bridge (no-op confirm)
+  });
 });

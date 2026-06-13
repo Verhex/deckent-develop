@@ -178,9 +178,20 @@ export async function runInkRepl(
     if ('error' in resolved) {
       process.stdout.write(`\n${resolved.error}\n`);
     } else {
+      let mcpBridge: import('./native-tool-registry.js').NativeMcpBridge | undefined;
+      try {
+        const { McpClientBroker } = await import('../../mcp-client/broker.js');
+        const { McpToolRegistry } = await import('../../mcp-client/registry.js');
+        const { buildMcpBridge } = await import('../commands/chat-mcp-bridge.js');
+        const broker = new McpClientBroker({});
+        const bridge = buildMcpBridge({ broker, registry: new McpToolRegistry(), projectRoot: process.cwd() });
+        const connected = await bridge.loadAndConnectAll();
+        if (connected.length > 0) mcpBridge = bridge as unknown as import('./native-tool-registry.js').NativeMcpBridge;
+      } catch { /* MCP optional — REPL stays usable */ }
+
       nativeEngine = createNativeEngine({
         adapter: resolved.adapter,
-        registry: buildNativeToolRegistry({ cwd: () => process.cwd() }),
+        registry: buildNativeToolRegistry({ cwd: () => process.cwd(), ...(mcpBridge ? { mcpBridge } : {}) }),
         cwd: process.cwd(),
         model: resolved.model,
         lang: lang as 'en' | 'tr',

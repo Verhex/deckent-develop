@@ -14,9 +14,17 @@ import { createCliToolDispatcher } from '../commands/chat-tool-bridge.js';
 import { classifyTool } from './tool-permissions.js';
 import type { McpToolDispatcher } from '../commands/chat-native.js';
 
+/** Minimal structural shape of the buildMcpBridge return (chat-mcp-bridge.ts). */
+export interface NativeMcpBridge {
+  listTools(): Array<{ namespacedName: string; descriptor: { description?: string; inputSchema?: Record<string, unknown> } }>;
+  dispatch(namespacedName: string, args: Record<string, unknown>, confirmFn: (a: unknown) => Promise<boolean>): Promise<{ ok: boolean; output: string }>;
+}
+
 export interface NativeToolRegistryOptions {
   /** Resolved per-call so the REPL's /cd is followed live. */
   cwd: () => string;
+  /** Optional connected MCP bridge — its tools register as confirm-tier defs. */
+  mcpBridge?: NativeMcpBridge;
 }
 
 const LEGACY_TIER: Record<'read' | 'confirm' | 'always', ToolPermissionTier> = {
@@ -90,6 +98,26 @@ export function buildNativeToolRegistry(opts: NativeToolRegistryOptions): ToolRe
   for (const name of ['deckent_status', 'deckent_history', 'deckent_retro', 'deckent_doctor', 'deckent_models', 'deckent_review'] as const) {
     const tier = LEGACY_TIER[classifyTool(name, {})];
     registry.register(defineFromDispatcher(name, `Run the ${name} deckent command.`, genericSchema, tier, cli));
+  }
+
+  // MCP tools (external) — always 'confirm' (never silent); single gate via no-op confirm.
+  if (opts.mcpBridge) {
+    const alwaysApprove = async (): Promise<boolean> => true;
+    const bridge = opts.mcpBridge;
+    for (const t of bridge.listTools()) {
+      registry.register({
+        name: t.namespacedName,
+        description: t.descriptor.description ?? `MCP tool ${t.namespacedName}`,
+        inputSchema: t.descriptor.inputSchema ?? { type: 'object', additionalProperties: true },
+        category: 'mcp',
+        tier: 'confirm',
+        source: 'mcp',
+        handler: async (args) => {
+          const r = await bridge.dispatch(t.namespacedName, args, alwaysApprove);
+          return { ok: r.ok, output: r.output };
+        },
+      });
+    }
   }
 
   return registry;
