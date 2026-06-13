@@ -82,7 +82,12 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
       return;
     }
 
-    transcript.appendAssistant(assistantText, calls.map((c) => ({ id: c.id, name: c.name, args: c.args })));
+    // Skip a truly-empty assistant turn (no text, no tool calls) — appending
+    // `{role:'assistant', content:''}` would replay to the provider next send
+    // (OpenAI may 400 on empty content with no tool_calls). Review carry-over.
+    if (assistantText !== '' || calls.length > 0) {
+      transcript.appendAssistant(assistantText, calls.map((c) => ({ id: c.id, name: c.name, args: c.args })));
+    }
     if (calls.length === 0) { yield { type: 'turn-end' }; return; }
 
     for (const call of calls) {

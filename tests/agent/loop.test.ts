@@ -122,4 +122,17 @@ describe('runAgentTurn', () => {
       clearDetectionCache();
     }
   });
+
+  it('does not append an empty assistant turn when the stream yields no text and no tool calls', async () => {
+    const { adapter, requests } = scriptedAdapter([
+      [{ type: 'done' }],                                   // turn 1: empty (no text, no calls)
+      [{ type: 'text-delta', text: 'next' }, { type: 'done' }],
+    ]);
+    const t = new Transcript();
+    // Two sends on the same transcript: the 2nd request must NOT carry an empty assistant msg.
+    await drain(runAgentTurn(baseDeps({ adapter }), t, 'first'));
+    await drain(runAgentTurn(baseDeps({ adapter }), t, 'second'));
+    const assistantMsgs = requests[1]!.messages.filter((m) => m.role === 'assistant');
+    expect(assistantMsgs.every((m) => m.content !== '' || (m.toolCalls?.length ?? 0) > 0)).toBe(true);
+  });
 });
