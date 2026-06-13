@@ -77,14 +77,15 @@ describe('ClaudeAdapter', () => {
       expect(adapter.name).toBe('claude-tmux');
     });
 
-    it('should support opus, sonnet, haiku models', () => {
+    it('should support fable, opus, sonnet, haiku models', () => {
+      expect(adapter.supportedModels).toContain('fable');
       expect(adapter.supportedModels).toContain('opus');
       expect(adapter.supportedModels).toContain('sonnet');
       expect(adapter.supportedModels).toContain('haiku');
     });
 
-    it('should support exactly 3 models', () => {
-      expect(adapter.supportedModels).toHaveLength(3);
+    it('should support exactly 4 models', () => {
+      expect(adapter.supportedModels).toHaveLength(4);
     });
 
     it('should implement ProviderAdapter interface (name, supportedModels, spawn, kill, listWorkers, isAvailable, buildCommand)', () => {

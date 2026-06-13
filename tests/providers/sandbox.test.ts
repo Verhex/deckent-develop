@@ -107,16 +107,17 @@ describe('SandboxSpawnBackend', () => {
       expect(backend).toBeInstanceOf(SubprocessSpawnBackend);
     });
 
-    it('should support opus, sonnet, haiku models', () => {
+    it('should support fable, opus, sonnet, haiku models', () => {
       const backend = new SandboxSpawnBackend(projectDir);
+      expect(backend.supportedModels).toContain('fable');
       expect(backend.supportedModels).toContain('opus');
       expect(backend.supportedModels).toContain('sonnet');
       expect(backend.supportedModels).toContain('haiku');
     });
 
-    it('should support exactly 3 models', () => {
+    it('should support exactly 4 models', () => {
       const backend = new SandboxSpawnBackend(projectDir);
-      expect(backend.supportedModels).toHaveLength(3);
+      expect(backend.supportedModels).toHaveLength(4);
     });
   });
 

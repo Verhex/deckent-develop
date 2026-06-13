@@ -104,15 +104,15 @@ describe('buildWorkerPrompt — skillPrompts parameter', () => {
     expect(skillIdx).toBeLessThan(workerIdx);
   });
 
-  it('skill section appears after agent section when both present', () => {
+  it('skill section appears before agent section when both present', () => {
     const task = makeTask({ assignedAgent: 'my-agent' });
     const skillPrompts = [{ name: 'test-skill', content: 'Skill content' }];
     const prompt = buildWorkerPrompt(task, 'Agent instructions', skillPrompts);
-    const agentIdx = prompt.indexOf('=== Agent:');
     const skillIdx = prompt.indexOf('=== Skills ===');
+    const agentIdx = prompt.indexOf('=== Agent:');
     const workerIdx = prompt.indexOf('You are a Deckent worker agent');
-    expect(agentIdx).toBeLessThan(skillIdx);
-    expect(skillIdx).toBeLessThan(workerIdx);
+    expect(skillIdx).toBeLessThan(agentIdx);
+    expect(agentIdx).toBeLessThan(workerIdx);
   });
 
   it('standard prompt unchanged when no agent and no skills', () => {

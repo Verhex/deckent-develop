@@ -16,7 +16,7 @@ describe('ADR-068: enterprise foundation', () => {
     expect(content).toContain('## Decision');
     expect(content).toContain('## Consequences');
     expect(content).toContain('## Alternatives Considered');
-    expect(content).toContain('**Status:** proposed');
+    expect(content).toContain('**Status:** accepted');
   });
 
   it('contains enterprise/audit query/scheduled keywords (≥2)', () => {

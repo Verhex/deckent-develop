@@ -50,7 +50,7 @@ describe('createToolExecDispatcher (T-224-005)', () => {
   it('confirm reject → side-effecting tool is cancelled, no file written', async () => {
     const d = createToolExecDispatcher({ cwd: dir, confirm: async () => false });
     const res = await d.dispatch('deckent_write_file', { path: 'no.md', content: 'x' });
-    expect(res).toContain('iptal');
+    expect(res).toContain('[deckent-denied]');
     expect(existsSync(join(dir, 'no.md'))).toBe(false);
   });
 

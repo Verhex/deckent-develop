@@ -6,14 +6,14 @@ const ADR_PATH = join(process.cwd(), 'docs/adr/071-autonomous-enterprise.md');
 const ROADMAP_PATH = join(process.cwd(), 'docs/archive/ROADMAP-GOD-LEVEL.md');
 
 describe('ADR-071: F3 Autonomous Mode + F4 Enterprise', () => {
-  it('ADR file exists with MADR structure (Context, Decision, Consequences, Alternatives, Status proposed)', () => {
+  it('ADR file exists with MADR structure (Context, Decision, Consequences, Alternatives, Status accepted)', () => {
     expect(existsSync(ADR_PATH)).toBe(true);
     const content = readFileSync(ADR_PATH, 'utf-8');
     expect(content).toContain('## Context');
     expect(content).toContain('## Decision');
     expect(content).toContain('## Consequences');
     expect(content).toContain('## Alternatives Considered');
-    expect(content).toContain('**Status:** proposed');
+    expect(content).toContain('**Status:** accepted');
   });
 
   it('contains autonomous+enterprise keywords (≥3 matches)', () => {
