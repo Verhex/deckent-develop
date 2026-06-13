@@ -18,6 +18,7 @@ import { InputBar } from './input-bar.js';
 import type { SlashRegistry } from '../commands/chat-slash-registry.js';
 import type { ActiveSelection } from './provider-switch.js';
 import { createStreamSegmenter, type StreamSegmenter } from './stream-segmenter.js';
+import { measuredOnTurnEnd } from './native-elapsed.js';
 
 export type ConfirmAnswer = 'y' | 'a' | 'n';
 // toolName is optional: the dispatcher passes it so an 'a' (always) decision can
@@ -357,13 +358,14 @@ export function ReplApp(props: ReplAppProps): ReactElement {
     if (nativeEngine) {
       void (async () => {
         for await (const line of inputIter()) {
+          const startMs = Date.now();
           await nativeEngine(line, {
             output,
-            onTurnEnd: (s) => {
-              const tokens = s.outputTokens;
-              lastStats.current = { elapsedMs: 0, ...(tokens !== undefined ? { tokens } : {}) };
-              if (tokens) setSessionTok((n) => n + tokens);
-            },
+            onTurnEnd: measuredOnTurnEnd(startMs, () => Date.now(), (st) => {
+              lastStats.current = { elapsedMs: st.elapsedMs, ...(st.tokens !== undefined ? { tokens: st.tokens } : {}) };
+              const tok = st.tokens;
+              if (tok) setSessionTok((n) => n + tok);
+            }),
           });
         }
       })().then(() => exit()).catch(() => exit());
