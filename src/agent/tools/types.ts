@@ -36,10 +36,10 @@ const SOURCES: ReadonlySet<string> = new Set(['builtin', 'mcp', 'user', 'package
 export function validateToolDefinition(def: unknown): string | null {
   if (!def || typeof def !== 'object') return 'definition must be an object';
   const d = def as Partial<ToolDefinition>;
-  if (typeof d.name !== 'string' || d.name.length === 0) return 'name must be a non-empty string';
-  if (typeof d.description !== 'string' || d.description.length === 0) return 'description must be a non-empty string';
+  if (typeof d.name !== 'string' || d.name.trim().length === 0) return 'name must be a non-empty string';
+  if (typeof d.description !== 'string' || d.description.trim().length === 0) return 'description must be a non-empty string';
   if (!d.inputSchema || typeof d.inputSchema !== 'object' || Array.isArray(d.inputSchema)) return 'inputSchema must be a plain object';
-  if (typeof d.category !== 'string' || d.category.length === 0) return 'category must be a non-empty string';
+  if (typeof d.category !== 'string' || d.category.trim().length === 0) return 'category must be a non-empty string';
   if (typeof d.tier !== 'string' || !TIERS.has(d.tier)) return `tier must be one of ${[...TIERS].join('|')}`;
   if (typeof d.source !== 'string' || !SOURCES.has(d.source)) return `source must be one of ${[...SOURCES].join('|')}`;
   if (typeof d.handler !== 'function') return 'handler must be a function';

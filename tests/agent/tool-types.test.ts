@@ -27,4 +27,10 @@ describe('validateToolDefinition', () => {
   it('rejects missing handler', () => {
     expect(validateToolDefinition({ ...valid, handler: undefined as never })).toMatch(/handler/);
   });
+  it('rejects whitespace-only name', () => {
+    expect(validateToolDefinition({ ...valid, name: '   ' })).toMatch(/name/);
+  });
+  it('rejects array inputSchema', () => {
+    expect(validateToolDefinition({ ...valid, inputSchema: [] as never })).toMatch(/inputSchema/);
+  });
 });
