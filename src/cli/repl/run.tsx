@@ -6,6 +6,10 @@
 
 import { render } from 'ink';
 import { ReplApp, ReplErrorBoundary, type ConfirmTrigger, type ToolSink, type ToolInfo } from './app.js';
+import { isNativeAgentEnabled } from './native-flag.js';
+import { resolveNativeProvider } from './native-transport.js';
+import { buildNativeToolRegistry } from './native-tool-registry.js';
+import { createNativeEngine } from './native-agent-bridge.js';
 import type { ChatProviderAdapter } from '../commands/chat-native.js';
 import { createCliToolDispatcher, cliArgsFor } from '../commands/chat-tool-bridge.js';
 import { createToolExecDispatcher } from '../commands/chat-tool-exec.js';
@@ -161,6 +165,31 @@ export async function runInkRepl(
     },
   };
 
+  // Native-agent engine (SP-1 M3, flag-gated: DECKENT_NATIVE_AGENT=1 or --native).
+  // Default OFF — the legacy runChatNativeLoop path is unchanged when the flag is unset.
+  type NativeEngineType = ((input: string, cbs: { output: (t: string) => void; onTurnEnd: (s: { inputTokens: number; outputTokens: number }) => void }) => Promise<void>) | undefined;
+  let nativeEngine: NativeEngineType;
+  if (isNativeAgentEnabled(process.env, process.argv.slice(2))) {
+    const cfg = await loadConfig().catch(() => ({} as Record<string, unknown>));
+    const resolved = resolveNativeProvider(process.env, {
+      openai_base_url: (cfg as { openai_base_url?: string }).openai_base_url,
+      ollama_host: (cfg as { ollama_host?: string }).ollama_host,
+    });
+    if ('error' in resolved) {
+      process.stdout.write(`\n${resolved.error}\n`);
+    } else {
+      nativeEngine = createNativeEngine({
+        adapter: resolved.adapter,
+        registry: buildNativeToolRegistry({ cwd: () => process.cwd() }),
+        cwd: process.cwd(),
+        model: resolved.model,
+        lang: lang as 'en' | 'tr',
+        confirm: (summary, toolName) => (confirmTrigger ? confirmTrigger(summary, toolName) : Promise.resolve('n')),
+        toolSink: (info) => { if (toolSink) toolSink(info); },
+      });
+    }
+  }
+
   // Alternate-screen mode (OPT-IN: DECKENT_ALTSCREEN=1). It fixed the WSL
   // drift/blank but REMOVES native scrollback — long replies couldn't be scrolled
   // ("akış kayıp"). Default OFF so the main screen keeps native scrollback; the
@@ -201,6 +230,7 @@ export async function runInkRepl(
       }}
       registerConfirm={(trigger) => { confirmTrigger = trigger; }}
       registerToolSink={(sink) => { toolSink = sink; }}
+      {...(nativeEngine ? { nativeEngine } : {})}
     />
     </ReplErrorBoundary>,
   );

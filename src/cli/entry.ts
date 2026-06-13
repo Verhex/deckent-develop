@@ -52,6 +52,9 @@ const HELP_AND_VERSION_FLAGS: ReadonlySet<string> = new Set([
   '--version', '-V', '--version-json',
 ]);
 
+/** Top-level flags that are REPL-only and must NOT be passed to Commander. */
+const REPL_ONLY_FLAGS: ReadonlySet<string> = new Set(['--native']);
+
 /**
  * Decide whether the given argv should be redirected to `chat --native`.
  *
@@ -66,6 +69,10 @@ export function shouldLaunchDefaultRepl(argv: readonly string[]): boolean {
   for (const a of args) {
     if (HELP_AND_VERSION_FLAGS.has(a)) return false;
   }
+
+  // REPL-only flags (e.g. --native) must not be handed to Commander.
+  // If every arg is a REPL-only flag, launch the REPL.
+  if (args.every((a) => REPL_ONLY_FLAGS.has(a))) return true;
 
   // Any non-flag token is treated as a subcommand candidate — pass through to
   // Commander so it can handle the dispatch (or surface a "did-you-mean"

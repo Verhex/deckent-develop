@@ -171,6 +171,8 @@ export interface ReplAppProps {
   sessionId?: string;
   /** UI language for loop-emitted strings (/resume picker). */
   lang?: string;
+  /** When set (native flag on), drives the turn INSTEAD of runChatNativeLoop. */
+  nativeEngine?: (input: string, cbs: { output: (text: string) => void; onTurnEnd: (stats: { inputTokens: number; outputTokens: number }) => void }) => Promise<void>;
 }
 
 type ApprovalMode = 'suggest' | 'auto-edit' | 'full-auto';
@@ -246,7 +248,7 @@ function TurnView({ turn }: { turn: Turn }): ReactElement {
 }
 
 export function ReplApp(props: ReplAppProps): ReactElement {
-  const { provider, dispatcher, labels, registerConfirm, registerToolSink, slashRegistry, initialSelection, onSwitch, onApprovalMode, memory, sessionId, lang } = props;
+  const { provider, dispatcher, labels, registerConfirm, registerToolSink, slashRegistry, initialSelection, onSwitch, onApprovalMode, memory, sessionId, lang, nativeEngine } = props;
   const { exit } = useApp();
   const [selection, setSelection] = useState<ActiveSelection>(initialSelection);
   const [approval, setApproval] = useState<ApprovalMode>('suggest');
@@ -342,39 +344,57 @@ export function ReplApp(props: ReplAppProps): ReactElement {
       }
     }
 
-    void runChatNativeLoop({
-      provider,
-      dispatcher,
-      // The loop's built-in risky-confirm (requireConfirmIfRisky) uses readline,
-      // which fights Ink's raw-mode stdin and hangs the REPL. In the Ink path,
-      // confirmation is owned by the dispatcher gate (run.tsx classifyTool →
-      // Ink confirm modal), so auto-approve here and let that single authority
-      // ask. Read-only tools pass through; write/destructive ones still prompt.
-      agenticConfirm: async () => true,
-      // Chat persistence + /resume: when a memory adapter is wired, every turn
-      // is saved under sessionId and /resume can list/load prior sessions.
-      ...(memory ? { memory } : {}),
-      ...(sessionId ? { sessionId } : {}),
-      ...(lang ? { lang } : {}),
-      input: inputIter(),
-      // Stream tokens straight through the segmenter: completed lines/blocks flow
-      // into the scrollback immediately (real-time readable — Alperen: "yukarıya
-      // yazdır, beklemeyelim"); the in-progress partial line shows live + small.
-      output: (text: string) => {
-        segmenter.current?.feed(text);
-        setPartial(segmenter.current?.partial() ?? '');
-      },
-      thinkingIndicator: { start: () => setBusy(true), stop: () => setBusy(false) },
-      interactiveTty: true,
-      layoutEnabled: false,
-      gracefulErrors: true,
-      onTurnEnd: (s) => {
-        const tokens = s.usage?.outputTokens;
-        lastStats.current = { elapsedMs: s.elapsedMs, ...(tokens !== undefined ? { tokens } : {}) };
-        if (tokens) setSessionTok((n) => n + tokens);
-      },
-    }).then(() => exit()).catch(() => exit());
-  }, [provider, dispatcher, exit]);
+    const output = (text: string) => {
+      segmenter.current?.feed(text);
+      setPartial(segmenter.current?.partial() ?? '');
+    };
+    const onTurnEnd = (s: { elapsedMs: number; usage?: { outputTokens?: number } }) => {
+      const tokens = s.usage?.outputTokens;
+      lastStats.current = { elapsedMs: s.elapsedMs, ...(tokens !== undefined ? { tokens } : {}) };
+      if (tokens) setSessionTok((n) => n + tokens);
+    };
+
+    if (nativeEngine) {
+      void (async () => {
+        for await (const line of inputIter()) {
+          await nativeEngine(line, {
+            output,
+            onTurnEnd: (s) => {
+              const tokens = s.outputTokens;
+              lastStats.current = { elapsedMs: 0, ...(tokens !== undefined ? { tokens } : {}) };
+              if (tokens) setSessionTok((n) => n + tokens);
+            },
+          });
+        }
+      })().then(() => exit()).catch(() => exit());
+    } else {
+      void runChatNativeLoop({
+        provider,
+        dispatcher,
+        // The loop's built-in risky-confirm (requireConfirmIfRisky) uses readline,
+        // which fights Ink's raw-mode stdin and hangs the REPL. In the Ink path,
+        // confirmation is owned by the dispatcher gate (run.tsx classifyTool →
+        // Ink confirm modal), so auto-approve here and let that single authority
+        // ask. Read-only tools pass through; write/destructive ones still prompt.
+        agenticConfirm: async () => true,
+        // Chat persistence + /resume: when a memory adapter is wired, every turn
+        // is saved under sessionId and /resume can list/load prior sessions.
+        ...(memory ? { memory } : {}),
+        ...(sessionId ? { sessionId } : {}),
+        ...(lang ? { lang } : {}),
+        input: inputIter(),
+        // Stream tokens straight through the segmenter: completed lines/blocks flow
+        // into the scrollback immediately (real-time readable — Alperen: "yukarıya
+        // yazdır, beklemeyelim"); the in-progress partial line shows live + small.
+        output,
+        thinkingIndicator: { start: () => setBusy(true), stop: () => setBusy(false) },
+        interactiveTty: true,
+        layoutEnabled: false,
+        gracefulErrors: true,
+        onTurnEnd,
+      }).then(() => exit()).catch(() => exit());
+    }
+  }, [provider, dispatcher, exit, nativeEngine]);
 
   const handleSubmit = (line: string): void => {
     const trimmed = line.trim();
