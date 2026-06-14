@@ -47,21 +47,21 @@ graph TD
         API_S["**api/**\nHTTP API · SSE · rate limiting"]
     end
 
-    subgraph orch["orchestra/  ·  Sprint Lifecycle & Routing  (76 modules)"]
+    subgraph orch["orchestra/  ·  Sprint Lifecycle & Routing  (94 modules)"]
         BRAIN["Brain · Sprint Controller"]
         PLANNER["Planner · Task Builder · Task Router · Evaluator"]
     end
 
-    subgraph found["core/  ·  Foundation  (90 modules)"]
+    subgraph found["core/  ·  Foundation  (148 modules)"]
         TYPES["Types · Config (3-layer merge) · Model Registry"]
         POOLS["Agent Pool · Skill Registry · Routing Engine"]
         MEMORY["Memory V2 — SQLite FTS5 · dual-layer i18n normalize"]
     end
 
-    AGENTS["**agents/**\nWorker execution\nPrompt engineering  (20 modules)"]
+    AGENTS["**agents/**\nWorker execution\nPrompt engineering  (25 modules)"]
     NERVOUS["**nervous/**\nProactive meta-orchestrator\nObserver · Detector · Proposer"]
     MONITOR["**monitor/**\nAuditor scan loop\nDashboard state manager"]
-    PROVIDERS["**providers/**\nClaude · Codex · Gemini adapters  (5 modules)"]
+    PROVIDERS["**providers/**\nClaude · Codex · Gemini · Ollama · OpenAI-compatible adapters  (7 modules)"]
     DASH["**dashboard/**\nReact + Vite + Tailwind\n16 pages"]
 
     CLI --> orch

@@ -231,7 +231,7 @@ With this config, Brain updates `README.md`'s `## Sprint Metrics` and `## Agent 
 | `path` | Path to the doc file (relative to project root) |
 | `autoSections` | Section headings that Brain will rewrite after each sprint |
 | `protectedSections` | Section headings that are never auto-updated |
-| `lang` | Optional — `"en"` or `"tr"`. Ensures content renders in the doc's target language |
+| `skills` | Optional — skill IDs whose expertise guides the section rewrites |
 
 To add a new managed doc, run:
 
@@ -250,7 +250,7 @@ npm run docs:ref        # write updated reference files
 npm run docs:ref:check  # check-only (no write) — used in CI
 ```
 
-The `docs:ref` step runs automatically as part of `npm run release`. If you edit `src/mcp/` or `src/cli/commands/`, run `npm run docs:ref` to keep the reference docs in sync.
+The `docs:ref:check` step (check-only) runs automatically as part of `npm run release` to verify sync. If you edit `src/mcp/` or `src/cli/commands/`, run `npm run docs:ref` to keep the reference docs in sync.
 
 ---
 

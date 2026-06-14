@@ -86,7 +86,7 @@ The `deckent_checkpoint` MCP tool provides the same operations for IDE integrati
 ```
 # List checkpoints
 deckent_checkpoint({ action: "list" })
-deckent_checkpoint({ action: "list", filter: "pending" })
+deckent_checkpoint({ action: "list", sprintId: "sprint-042" })
 
 # Approve
 deckent_checkpoint({ action: "approve", sprintId: "sprint-286", phase: "SPAWN" })

@@ -14,11 +14,13 @@ deckent
 
 That is the full command. deckent detects an available AI provider (Claude by default, or `config.chat_provider`) and opens the TUI. The provider is shown in the status bar at the bottom.
 
-You can also launch it explicitly:
+The full agentic Ink REPL is the bare `deckent` command:
 
 ```bash
-deckent chat --native
+deckent
 ```
+
+> `deckent chat --native` is an experimental stub (the native LLM/tool path is not yet fully wired) — use bare `deckent` for the real REPL.
 
 ---
 

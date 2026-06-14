@@ -326,8 +326,7 @@ The `.deckent/config.json` file controls system behavior (model limits, plan mod
 {
   "brain_planning": "ai",
   "haiku_allowed": true,
-  "last_sprint_id": 17,
-  "workspace": "."
+  "last_sprint_id": "sprint-091"
 }
 ```
 

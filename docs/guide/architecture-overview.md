@@ -4,7 +4,7 @@ Deckent is organized as a multi-agent sprint orchestrator. The main runtime flow
 
 ## `orchestra/`
 
-`orchestra/` owns the sprint lifecycle and the Brain-facing control plane. It plans tasks, builds worker prompts, routes tasks to providers, agents, and skills, spawns workers through tmux or subprocess backends, evaluates results, runs FIX retries, writes retrospectives, applies memory decay, and completes cleanup across the PLAN -> SPAWN -> EXECUTE -> EVALUATE -> FIX -> RETRO -> DECAY -> CLEANUP lifecycle.
+`orchestra/` owns the sprint lifecycle and the Brain-facing control plane. It plans tasks, builds worker prompts, routes tasks to providers, agents, and skills, spawns workers through the Docker (default), tmux, or subprocess backends, evaluates results, runs FIX retries, writes retrospectives, applies memory decay, and completes cleanup across the PLAN -> SPAWN -> EXECUTE -> EVALUATE -> FIX -> RETRO -> DECAY -> CLEANUP lifecycle.
 
 ## `core/`
 

@@ -136,7 +136,7 @@ Every audit event (`src/core/audit-writer.ts`) carries a `hmac` (SHA-256) and a 
 
 ## 4. Governance Gating (`riskClass`)
 
--   **Contract Field:** `riskClass: 'low' | 'medium' | 'high'`
+-   **Derived value (not stored):** `riskClass: 'low' | 'medium' | 'high'` — computed by `resolveRiskClass()`, never a stored ExecutionRequest field
 -   **Enables:** `WM-6 / F10-002` - Risk-Based Approval Workflows
 
 The `riskClass` of a request is resolved by `resolveRiskClass()` based on the capabilities it requires (e.g., `shell`, `filesystem.delete`). This risk assessment is consumed by the **Nervous System's Decision Engine** (`src/nervous/decision-engine.ts`).
@@ -148,7 +148,9 @@ This feature is opt-in. To enable it, set the following in `.deckent/config.json
 
 ```json
 {
-  "risk_gate_enabled": true
+  "nervous_system": {
+    "risk_gate_enabled": true
+  }
 }
 ```
 

@@ -244,7 +244,7 @@ const tenantId =
 
 **Threat:** A malicious skill or plugin in `.deckent/skills/` executes arbitrary code when loaded.
 
-**Code:** `src/core/skill-pool.ts` (AST validation)
+**Code:** `src/core/skill-pool.ts` (structural validation) + `src/core/marketplace/skill-sandbox.ts` (AST sandbox: eval/Function/require denylist)
 
 **Implemented:**
 - **AST static analysis** — skills undergo AST validation before activation. The sandbox rejects skills that import dangerous Node.js built-ins or call `eval` / `Function()`.

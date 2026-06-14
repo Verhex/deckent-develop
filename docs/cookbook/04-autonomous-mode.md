@@ -26,7 +26,7 @@ The loop runs until you press `Ctrl+C` or create a stop marker (see below). With
 Optional flags:
 
 ```bash
-deckent autonomous start --interval-ms 10000   # idle-tick sleep (default: 5000ms)
+deckent autonomous start --interval-ms 10000   # idle-tick sleep (CLI flag default: 1000ms)
 deckent autonomous start --max-iterations 50   # stop after N cycles (testing/CI)
 ```
 

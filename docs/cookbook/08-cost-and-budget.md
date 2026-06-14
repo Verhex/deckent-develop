@@ -130,7 +130,7 @@ The `--sprint N` flag shows per-task cost and cache-write breakdown, which helps
 ## Workflow: Before Starting a Sprint
 
 1. Check current budgets: `deckent cost budget`
-2. View estimated cost in the plan output (shown by `deckent plan`)
+2. View the estimated cost at the pre-spawn cost gate (shown when you run `deckent start`)
 3. If the estimate exceeds your sprint budget, either reduce scope or raise the limit with `deckent cost budget --set N`
 4. After the sprint, review actual consumption: `deckent usage --sprint <N>`
 

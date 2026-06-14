@@ -70,7 +70,7 @@ deckent retro
 | 09 | [09-dependency-waves.md](./09-dependency-waves.md) | Kahn topological wave scheduler |
 | 10 | [10-result-evaluation.md](./10-result-evaluation.md) | GO / NO_GO / GO_WITH_TECH_DEBT rubric |
 | 11 | [11-auditor-rbac.md](./11-auditor-rbac.md) | Auditor 30s loop + ADR-037 RBAC |
-| 12 | [12-event-stream-observability.md](./12-event-stream-observability.md) | Event stream + 15-kanal protokol |
+| 12 | [12-event-stream-observability.md](./12-event-stream-observability.md) | Event stream + 28-kanal protokol |
 | 13 | [13-native-repl-agentic.md](./13-native-repl-agentic.md) | Native agentic REPL (`deckent` argümansız) |
 | 14 | [14-dashboard-control-plane.md](./14-dashboard-control-plane.md) | Web dashboard React+Vite+Tailwind |
 | 15 | [15-mcp-integration.md](./15-mcp-integration.md) | MCP 34 araç + 8 resource |

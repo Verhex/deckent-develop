@@ -137,7 +137,7 @@ Runs `claude --version`. Optionally checks authentication (`--check-auth`).
 | Result | Meaning |
 |--------|---------|
 | `v1.x.y` | Pass |
-| `not found` | Install Claude CLI: `npm install -g @anthropic-ai/claude-cli` |
+| `not found` | Install Claude Code CLI: `npm install -g @anthropic-ai/claude-code` |
 | `v1.x.y — not authenticated` | Run: `claude login` |
 
 **Required:** Yes. Claude CLI is the primary execution backend.

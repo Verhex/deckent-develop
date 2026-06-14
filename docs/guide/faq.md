@@ -440,7 +440,7 @@ Yes. Deckent (v1.0.0-beta.1) is fully multi-provider. You configure which provid
 
 | Provider | Key / Setup | Models |
 |----------|-------------|--------|
-| `claude` | Claude subscription or `ANTHROPIC_API_KEY` | opus, sonnet, haiku |
+| `claude` | Claude subscription or `ANTHROPIC_API_KEY` | fable, opus, sonnet, haiku |
 | `codex` | `OPENAI_API_KEY` | gpt-5, gpt-4.1, o4-mini, gpt-5-mini, gpt-4.1-mini |
 | `gemini` | `GOOGLE_API_KEY` | gemini-2.5-pro, gemini-2.5-flash, gemini-2.0-flash |
 | `ollama` | Local Ollama server at `http://localhost:11434` | Any locally-pulled model tag |

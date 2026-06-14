@@ -12,7 +12,7 @@
 
 Tam kullanıcı rehberi Sprint 181 sonrasında yayımlanacak. Bu doküman kısa bir tanıtım + ilk dakika kurulum rehberidir.
 
-> **ADR-040 durumu:** `accepted → realized` (Sprint 180 W3-1 ile sprint-controller wire canlı). Mimari karar artık fiilen çalışan sistemle eşleşiyor.
+> **ADR-040 durumu:** `accepted` (Sprint 180 W3-1 ile sprint-controller wire canlı — mimari karar artık fiilen çalışan sistemle eşleşiyor).
 
 ---
 

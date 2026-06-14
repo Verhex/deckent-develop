@@ -146,7 +146,7 @@ Deckent includes a built-in secret management system for securely storing API ke
 ### Core Components
 
 1.  **Storage (`.deck` file)**
-    -   **Source ADR**: ADR-016
+    -   **Source ADR**: ADR-014
     -   Secrets are stored in a `.deck` file at the project root, which is **git-ignored by default**.
     -   The format is a simple `KEY=VALUE` structure, similar to `.env` files.
 

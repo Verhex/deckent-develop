@@ -407,7 +407,7 @@ The `Dockerfile.worker` has Codex and Gemini install lines commented out by defa
 
 To enable them:
 
-1. Open `Dockerfile.worker` and uncomment lines 21–22:
+1. Open `Dockerfile.worker` and uncomment the commented `RUN npm i -g @openai/codex` and `@google/gemini-cli` lines:
 
    ```dockerfile
    # Before (default — Claude only):

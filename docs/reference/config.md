@@ -96,7 +96,7 @@
 | `memory_budget` | `number` | `5000` | `.brain/` dizini bellek butcesi (satir). |
 | `decay_after_sprints` | `number` | `20` | N sprint sonra eski kayitlari soft-delete. |
 | `patterns_enabled` | `boolean` | `true` | Desen algilama aktif. |
-| `project_identity_enabled` | `boolean` | `true` | PROJECT-IDENTITY.md guncellemesi aktif. |
+| `project_identity_enabled` | `boolean` | `true` | Proje kimligi guncellemesi aktif (kimlik `.deckent/workspace/IDENTITY.md` + memory.db; eski PROJECT-IDENTITY.md ADR-046 ile kaldirildi). |
 | `memory.backend` | `'sqlite' \| 'json'` | `'sqlite'` | Hafiza backend'i. Memory V2 = SQLite. |
 | `memory.search` | `'fts5' \| 'semantic' \| 'hybrid'` | `'fts5'` | Arama motoru. FTS5 = dual-layer Turkish normalize. |
 | `memory.decay_after_sprints` | `number` | `20` | V2 decay suresi. |

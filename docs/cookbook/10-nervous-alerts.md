@@ -259,11 +259,13 @@ All Nervous System config lives under `nervous_system` in `.deckent/config.json`
       "kill-and-respawn": "approve",
       "expand-scope": "reject"
     },
-    "quiet_hours": {
-      "start": "22:00",
-      "end": "08:00"
-    },
-    "throttle_ms": 300000
+    "notifications": {
+      "throttle_ms": 300000,
+      "quiet_hours": {
+        "start": "22:00",
+        "end": "08:00"
+      }
+    }
   }
 }
 ```

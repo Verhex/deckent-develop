@@ -23,7 +23,7 @@ A "provider-free" sprint means:
 - The routing engine resolves tier → provider → model automatically based on your `worker_provider` config.
 - Switching from Claude to Codex requires only a config change — no DIRECTIVES rewrite.
 
-The canonical tier-to-provider mapping lives in `src/core/model-registry.ts`. `getProviderForModel(model)` is the single resolver used across all backends.
+The canonical model registry lives in `src/core/model-registry.ts`; `getProviderForModel(model)` (defined in `src/core/task-types.ts`) is the single provider resolver used across all backends.
 
 ---
 

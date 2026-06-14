@@ -148,7 +148,7 @@ new DockerSpawnBackend(projectDir, {
 ```
 
 `spawn-backend-docker.ts` default sabitleri: `DEFAULT_WORKER_MEMORY_LIMIT = '4g'`,
-`DEFAULT_WORKER_MEMORY_SWAP = '6g'`. Override yapmıyorsanız bu değerler geçerlidir.
+`DEFAULT_WORKER_MEMORY_SWAP = '6g'`. **Not:** Bu flat anahtarlar doctor/resources tarafından RAM-raporlama/uyarı için okunur; standart spawn-factory yolunda container `--memory` bayrağına henüz bağlanmamıştır (container'lar yerleşik 4g/6g kullanır). Per-task-kind ince ayar için `worker_memory_limit_by_kind` kullanın.
 
 ## Sprint 189+190 Vakası (Tarihsel Kayıt)
 

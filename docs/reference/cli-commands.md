@@ -1528,7 +1528,7 @@ Show worker resource usage (CPU, memory, I/O) from the REPL.
 | `upgrade` | — | CLI only |
 | `plugin` | — | CLI only |
 | `chat` | — | CLI only |
-| `usage` | — | CLI only |
+| `usage` | `deckent_usage` | Both |
 | `audit-verify` | — | CLI only |
 | `flow` | — | CLI only |
 | `rbac` | — | CLI only |

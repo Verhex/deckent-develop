@@ -345,9 +345,7 @@ src/
 |------|-------|---------------|
 | `src/orchestra/pattern-recorder.ts` | ~80 | Record LearningEntry per sprint |
 | `src/orchestra/pattern-reader.ts` | ~100 | Query patterns, success/fail combinations |
-| `src/orchestra/combination-scorer.ts` | ~80 | Score historical combos |
-| `src/orchestra/learning-decay.ts` | ~70 | Prune old data, compact summary |
-| `src/orchestra/learning-migration.ts` | ~80 | PATTERNS.md -> learning format |
+| `src/orchestra/outcome-tracker.ts` | ~200 | Record outcomes, learning bonuses, synergy matrix |
 
 ### orchestra/ — Collaboration (Sprint 31)
 | File | Lines | Responsibility |

@@ -32,7 +32,7 @@
 - `deckent resources`: anlık snapshot + log özeti CLI komutu
 - `docs/reference/resource-profile.md`: kod-türevli kaynak haritası oluşturuldu
 
-**Kod:** `src/core/resource-monitor.ts` · `src/cli/commands/resources.ts` · `src/core/worker-image-check.ts`
+**Kod:** `src/orchestra/resource-monitor.ts` · `src/cli/commands/resources.ts` · `src/core/worker-image-check.ts`
 
 ---
 
@@ -175,7 +175,7 @@
 - Stream-toplama sağlamlığı: prose-konum bağımsızlığı (H2 verdict)
 - Enstrümante kök-teşhis: 3 hipotezi ayrıştır + 9 repro testi
 
-**Kod:** `src/api/events.ts` · `src/dashboard/src/pages/WorkersPage.tsx` · `src/cli/chat-session.ts`
+**Kod:** `src/api/live-events.ts` · `src/dashboard/src/pages/WorkersPage.tsx` · `src/cli/commands/chat-session.ts`
 
 ---
 
