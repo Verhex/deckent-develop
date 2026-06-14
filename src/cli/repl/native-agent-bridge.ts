@@ -39,6 +39,8 @@ export interface NativeEngineDeps {
   usdPerMillionTokens?: number;
   /** Localizer (run.tsx: (key) => getMessage(key, lang)). Defaults to identity. */
   t?: (key: string) => string;
+  /** Optional: called with the full transcript after each completed turn (trace recording). */
+  recordTurn?: (messages: import('../../agent/provider-tooluse/types.js').ProviderMessage[]) => void;
 }
 
 /** Map a confirm-queue answer to a session permission decision. */
@@ -102,5 +104,6 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
       }
     }
     cbs.onTurnEnd({ inputTokens, outputTokens });
+    if (deps.recordTurn) deps.recordTurn(session.transcript());
   };
 }

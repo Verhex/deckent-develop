@@ -114,4 +114,20 @@ describe('createNativeEngine', () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  it('records the transcript after a completed turn when a recorder is provided', async () => {
+    const adapter = scripted([[{ type: 'text-delta', text: 'hi' }, { type: 'done' }]]);
+    const recorded: Array<{ role: string; content: string }[]> = [];
+    const engine = createNativeEngine({
+      adapter, registry: buildNativeToolRegistry({ cwd: () => tmpdir() }), cwd: tmpdir(), model: 'm', lang: 'en',
+      confirm: async () => 'y', toolSink: () => {},
+      recordTurn: (messages) => recorded.push(messages.map((m) => ({ role: m.role, content: m.content }))),
+    });
+    await engine('hello', { output: () => {}, onTurnEnd: () => {} });
+    expect(recorded).toHaveLength(1);
+    expect(recorded[0]).toEqual([
+      { role: 'user', content: 'hello' },
+      { role: 'assistant', content: 'hi' },
+    ]);
+  });
 });
