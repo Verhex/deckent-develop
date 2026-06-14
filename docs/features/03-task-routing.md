@@ -45,8 +45,8 @@ routeTaskV2()
 deckent plan --structured
 # Çıktıda her görev için: "Agent: api-builder (confidence: high)" satırı görünür.
 
-# Belirli bir görevi manuel tetiklemek:
-deckent run <task-id>
+# Belirli bir görevi manuel tetiklemek (planlı task'ı spawn et):
+deckent spawn <taskId>
 # Sonuç dosyasında assignedAgent + assignedSkills alanlarını doğrula.
 ```
 

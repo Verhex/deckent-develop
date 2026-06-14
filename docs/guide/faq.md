@@ -596,7 +596,7 @@ The Nervous System includes detectors for events like:
 By default, Nervous proposals require your approval:
 
 ```bash
-deckent nervous status               # See pending proposals
+deckent nervous                      # Dashboard: see pending proposals
 ```
 
 Or via MCP:

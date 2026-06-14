@@ -139,8 +139,8 @@ git diff --stat
 ### Recovery
 
 ```bash
-# Re-run the specific task
-deckent run <task-id>
+# Re-spawn the specific task (add --force if it is DONE/NO_GO)
+deckent spawn <taskId>
 
 # Or recover the sprint (re-evaluates any partial results)
 deckent recover <sprint-id>
@@ -259,8 +259,8 @@ The Nervous System (ADR-040) runs detectors before each sprint. If a panic-gate 
 and the sprint hangs at SPAWN:
 
 ```bash
-# Check nervous system status
-deckent nervous status
+# Open the nervous system dashboard
+deckent nervous
 
 # Accept or reject pending proposals
 deckent nervous accept <proposal-id>
@@ -281,7 +281,7 @@ If a worker completes but Brain marks the task NO_GO with "no result file":
 1. Check if the worker is still running: `deckent status`
 2. Check the tmux session (if `spawn_backend: tmux`): `tmux ls`, `tmux attach -t deckent-NNN`
 3. Check Docker container logs: `docker logs <container-id>`
-4. Re-run the task: `deckent run <task-id>`
+4. Re-run the task: `deckent spawn <taskId>`
 
 ---
 
