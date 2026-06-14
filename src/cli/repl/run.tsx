@@ -174,6 +174,7 @@ export async function runInkRepl(
     const resolved = resolveNativeProvider(process.env, {
       openai_base_url: (cfg as { openai_base_url?: string }).openai_base_url,
       ollama_host: (cfg as { ollama_host?: string }).ollama_host,
+      native_model: (cfg as { native_model?: string }).native_model,
     });
     if ('error' in resolved) {
       process.stdout.write(`\n${resolved.error}\n`);
