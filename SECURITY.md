@@ -1,93 +1,97 @@
 # Security Policy
 
-## Supported Versions
+deckent spawns AI workers that read, write, and execute code on your machine, with your credentials, against your projects. That is a lot of power, and this document is deliberately precise about what deckent enforces, what it only *detects*, and where the gaps are. We would rather you trust deckent because it tells you the truth than because it makes promises it can't keep.
 
-| Version        | Supported                        |
-| -------------- | -------------------------------- |
-| 1.0.0-beta.x   | Yes (active)                     |
-| < 1.0          | No — legacy, no security updates |
+---
 
-## Reporting Vulnerabilities
+## Reporting a vulnerability
 
-If you discover a security vulnerability in deckent, please report it responsibly.
+**Report security issues privately — never in a public issue.** A public report exposes users before a fix exists.
 
-**Preferred:** [GitHub Security Advisory](https://github.com/VerhexIO/deckent/security/advisories/new) — keeps the report private until a fix is ready.
+- **Preferred:** open a [GitHub Security Advisory](https://github.com/VerhexIO/deckent/security/advisories/new) — it stays private until a fix ships.
+- **Email:** `security@deckent.ai`
 
-**Alternative Email:** security@verhex.com
+Please include a description and impact, steps to reproduce, and a suggested fix if you have one. We aim to acknowledge within **48 hours** and to ship a fix for critical issues within **7 days**.
 
-Please include:
-- Description of the vulnerability
-- Steps to reproduce
-- Potential impact
-- Suggested fix (if any)
+## Supported versions
 
-We will acknowledge receipt within 48 hours and aim to provide a fix within 7 days for critical issues.
+| Version | Supported |
+|---------|-----------|
+| `1.0.0-beta.x` | Yes — actively maintained |
+| `< 1.0` | No — legacy, no security updates |
 
-**Do not** open a public GitHub issue for security vulnerabilities — this exposes users before a fix is available.
+Run `npm install -g deckent@latest` to stay current.
 
-## Threat Model (Summary)
+---
 
-> Full threat model: [`docs/security/threat-model.md`](docs/security/threat-model.md)
+## Security posture (read this first)
 
-### Attack Surface
+deckent is a **single-user, local-first** orchestrator. It assumes the machine and OS user running it are trusted, and that workers operate on **your** code with **your** credentials. It is **not** a sandbox that isolates an adversarial worker or an untrusted third party at the OS level.
 
-| Surface | Risk | Mitigation |
-|---------|------|------------|
-| Worker code execution | AI worker runs arbitrary shell/code | AST-sandbox for skills; `spawn-safety.ts` whitelist |
-| Provider API key leakage | Keys in config, logs, or env | `.deck` secret interpolation (ADR-014); 0600 file permissions |
-| Multi-project boundary | Workers from project A writing to project B | Per-project isolation (ADR-034); auditor `git diff --stat` |
-| MCP stdio channel | Tool call injection via malicious input | Input validation; stdio-only transport (no network) |
-| tmux session access | Same OS user sees all sessions | Document clearly — deckent is single-user by design |
+The most important thing to understand is **which boundaries are hard and which are advisory.** deckent is honest about this rather than implying a uniform guarantee:
 
-### Role Boundary Disclosure (ADR-037 V1.0 → V2)
+| Control | Reality | Detail |
+|---------|---------|--------|
+| **Cost gate** | 🟢 **Hard** | An over-budget sprint does not spawn a single worker until you acknowledge it. |
+| **Safety floor** | 🟢 **Hard** | Five irreversible actions (kill a live sprint, delete files, destructive git, over-threshold cost, deprecate an accepted ADR) *always* require explicit approval — no automation mode can bypass them. |
+| **Dashboard / API auth** | 🟢 **Hard** | Bearer tokens use constant-time comparison; OIDC JWTs are RS256-pinned, `alg:none` and algorithm-confusion are rejected, JWKS is HTTPS-only and fails closed. |
+| **Spawn safety** | 🟢 **Hard** | Workers spawn with array args against a binary allow-list; shell-string execution is rejected. |
+| **Docker isolation** | 🟢 **Hard** | The default backend runs each worker in its own container with memory limits and graceful shutdown. |
+| **Local/agentic worker scope** | 🟢 **Hard** | Local-model and native-agent workers reject a write/edit outside their scope *before* it executes. |
+| **CLI/tmux worker scope** | 🟡 **Advisory (V1.0)** | The Auditor detects out-of-scope writes via `git diff --stat` and logs/emits an event, but does **not** block them at the OS level. Hard runtime enforcement is planned for V2 (post-GA). |
+| **RBAC roles (ADR-037)** | 🟡 **Advisory by default** | Role/authority violations are warned and written to the audit trail; they hard-block only when `enforce_rbac` is enabled in config. |
 
-**ADR-037 V1.0 implements advisory/soft role boundaries.** The scope enforcement layer:
-- Detects violations via `git diff --stat` in the Auditor scan loop
-- Emits structured events and logs (audit trail) for every violation
-- **Does NOT block** workers from writing outside scope at runtime (V1.0 intentional — Layer-2 hard enforcement planned for V2 post-GA)
+The advisory layers are robust for the cooperative, single-user case deckent is built for — a worker self-reports a boundary violation (`BOUNDARY_VIOLATION → NO_GO`), the Auditor records it, and the Brain applies a FIX. They are **not** a hard wall against a deliberately malicious worker. For untrusted or high-risk work, use the Docker backend.
 
-Workers self-flag boundary violations (`BOUNDARY_VIOLATION → NO_GO`). Brain applies FIX/cascade on self-reported violations.
+---
 
-**V2 hard-runtime enforcement Timeline:** V2 hard-runtime enforcement is planned for post-GA (target: Sprint 200+, post-2026-06-15). Until then, scope violations are detected via `git diff --stat` audit-trail and emit BRAIN→AUDITOR warning events but do NOT block worker execution. Hard-runtime enforcement will transition to OS/filesystem-level restrictions in V2 post-GA.
+## How the controls work
 
-See [`docs/security/threat-model.md`](docs/security/threat-model.md) for full details.
+### Scope enforcement
+Every task carries a scope (`scope.directories`, `scope.filesRead`, `scope.filesWrite`). The Auditor's scan loop diffs the working tree (`git diff --stat`) and raises an alert when a worker touches a file outside its assignment. For **local-model and native-agent workers**, a scope guard checks the path *before* the write tool runs and returns an error so the model self-corrects — a hard reject. For **CLI/tmux workers** the check is advisory in V1.0 (detect + log + event), with OS-level enforcement planned for V2.
 
-## Security Model Overview
+### RBAC authority matrix (ADR-037)
+Brain, Auditor, and Worker have distinct roles — the Brain is the only planner, the Auditor never writes source, workers never plan. Authority checks cover filesystem paths and event-stream channels, and every denial is written to a tamper-evident, HMAC-chained audit trail. Enforcement is advisory by default (warn + record) and becomes a hard block when `enforce_rbac` is turned on. Role capabilities are tenant-aware (`admin` / `engineer` / `viewer`).
 
-### Scope Isolation
-Each worker operates within a defined scope (`scope.directories`, `scope.filesRead`, `scope.filesWrite`). The Auditor continuously monitors for boundary violations using `git diff --stat` and raises alerts when workers access files outside their assigned scope.
+### Skill validation & spawn safety
+Skills are validated against a strict schema before registration (id, name, category, model allow-list, prompt-injection position). Worker subprocesses are constrained by a **binary allow-list** (`node`, `npx`, `vitest`, `tsc`, `python`, `go`, `cargo`, …) with shells deliberately excluded, and every argument is checked against a metacharacter-rejecting regex. The result: no `sh -c "<model output>"` path exists. *(Note: this is schema + spawn-allowlist validation, not full AST sandboxing of arbitrary skill JavaScript — see Limitations.)*
 
-> **V1.0 advisory note:** Scope enforcement in V1.0 is advisory — violations are detected and logged but not blocked at the OS/filesystem level. Hard enforcement ships in V2 post-GA.
+### Secret handling (`.deck`)
+Reference secrets as `$DECK:MY_TOKEN` anywhere in config or directives; they are resolved at runtime from a local `.deck` file that deckent keeps out of git (it ensures the `.gitignore` entry and can detect an accidentally-tracked file). Secrets are **never** written into git-tracked files. They are, however, stored in plaintext at rest and protected only by filesystem permissions (see Limitations).
 
-### Lock Files
-File-level locking prevents concurrent writes. Lock files are stored in `.locks/` with owner information and timestamps. Stale locks (older than 5 minutes) are automatically detected and reported.
+### Cost & action gates
+A pre-sprint **cost gate** estimates spend (with cache and retry buffers) and refuses to spawn workers if the estimate exceeds your budget, unless you acknowledge it (`--force` / `acknowledgeCost`). Small sprints under an auto-confirm threshold run without prompting. The **Nervous System** adds a safety floor of locked, irreversible actions and a configurable authority mode (from `STRICT` to `FULL_AUTO`) — but the safety floor is honored in every mode.
 
-### Auditor Monitoring
-The Auditor agent runs as an independent scan loop that:
-- Detects stale heartbeats (workers unresponsive for >2 minutes)
-- Identifies boundary violations
-- Checks for circular dependencies and deadlocks
-- Monitors usage thresholds to prevent runaway costs
+### Dashboard & API authentication
+Every protected endpoint requires a bearer token, compared in constant time (SHA-256, `timingSafeEqual`) to prevent timing leaks. Optional OIDC/SSO login verifies JWTs with **RS256 pinning** — `alg:none` and algorithm-confusion attempts are rejected, the JWKS endpoint must be HTTPS, and an unresolvable key fails closed (never bypasses). Loopback auto-inject (for local dev) is opt-in and never applies to remote callers.
 
-### Process Isolation
-Workers run in separate tmux sessions or subprocess instances, providing process-level isolation. The subprocess backend supports additional sandboxing with memory limits and directory restrictions.
+### Process isolation
+Workers run in Docker containers (default — the strongest boundary, with memory limits), tmux sessions, or subprocesses. The `.tasks/` result directory is shared; everything else in a Docker worker is container-isolated.
 
-## Known Limitations
+---
 
-- **No network isolation by default:** Workers can make network requests unless sandbox mode is enabled.
-- **File permissions are advisory (V1.0):** Scope enforcement relies on Auditor detection, not OS-level restrictions. Hard enforcement planned for V2.
-- **Credentials storage:** API keys stored in `~/.deckent/credentials/` use file permissions (0600) but are not encrypted at rest.
-- **tmux session visibility:** All tmux windows within the deckent session are accessible to the same OS user.
-- **ADR-037 V1.0 soft boundaries:** Role boundary violations are detected and logged but not blocked. Self-reporting by workers + Auditor audit trail is the enforcement mechanism in this release.
-- **Symlink resolution incomplete:** Symlink handling within scope enforcement is incomplete (ADR-034 Sprint 132 MEDIUM #10 open). Symbolic links to files outside scope may bypass scope checks. Targeted for V2 alongside ADR-037 hardening.
+## Known limitations
 
-## Best Practices
+Stated plainly, because pretending otherwise would be the real security risk:
 
-1. **Use sandbox mode** (`--sandbox-mode`) for untrusted or experimental tasks.
-2. **Review DIRECTIVES.md** before starting sprints to ensure task scopes are appropriate.
-3. **Monitor the dashboard** (`.dashboard` file or `deckent dashboard`) during sprints.
-4. **Keep deckent updated** to receive security fixes.
-5. **Set appropriate file permissions** on `~/.deckent/credentials/` directory.
-6. **Do not commit** `.deckent/credentials/` or API keys to version control.
-7. **Use environment variables** for API keys in CI/CD pipelines instead of credential files.
-8. **Prefer GitHub Security Advisories** over email for vulnerability reports — faster triage.
+- **Advisory scope for CLI/tmux workers (V1.0).** Detected and logged, not OS-blocked. Use Docker or local-agent workers for a hard boundary; full runtime enforcement is a V2 goal.
+- **No network isolation by default.** Workers can make outbound requests unless you run them in a network-restricted Docker configuration.
+- **Credentials are plaintext at rest.** `.deck` and credential files rely on filesystem permissions, not encryption. Keep them off shared machines and out of backups.
+- **tmux session visibility.** Any process running as the same OS user can attach to a worker's tmux session. The Docker backend avoids this.
+- **Symlink resolution is incomplete.** A symlink pointing outside a worker's scope can bypass the `git diff`-based scope check. Targeted for V2 with the ADR-037 hardening.
+- **Multi-tenant isolation is partial.** Audit and RBAC are tenant-aware, but there is no enforced filesystem boundary between tenants sharing a workspace. Treat multi-tenant as an audited convenience, not a hard isolation guarantee, in this release.
+- **Resource caps only under Docker.** Memory/CPU limits apply to Docker workers; tmux and subprocess workers are uncapped.
+- **The native agentic REPL is experimental.** The flag-gated `deckent --native` mode (off by default) has its own permission model — an immutable safety core plus an always-ask floor for destructive tools — but is not yet GA-hardened.
+
+---
+
+## Best practices
+
+1. **Use the Docker backend** (`spawn_backend: "docker"`, the default) for untrusted or high-risk work — it gives you the hard isolation tmux/subprocess can't.
+2. **Review `DIRECTIVES.md`** before `deckent start` — confirm each task's scope grants only the reach it needs.
+3. **Keep secrets in `.deck`**, never inline. Never commit `.deck`, `.deckent/credentials/`, or `.deckent/config.json`.
+4. **Use environment variables** for API keys in CI/CD rather than credential files.
+5. **Set a cost ceiling** and keep the Nervous-System safety floor enabled for unattended or autonomous runs.
+6. **Watch `deckent status` / the dashboard** during sprints to catch boundary or cost alerts early.
+7. **Enable `enforce_rbac`** for shared/team deployments where you want role violations to hard-block, not just log.
+8. **Keep deckent updated**, and prefer a GitHub Security Advisory over email for faster private triage.

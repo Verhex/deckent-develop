@@ -72,6 +72,6 @@ Both tasks are designed to complete quickly and demonstrate the core Deckent wor
 
 ## Resources
 
-- [Deckent Documentation](https://deckent.agency)
+- [deckent Documentation](https://deckent.ai)
 - [Architecture Guide](../../docs/architecture/architecture.md)
 - [Contributing Guide](../../CONTRIBUTING.md)
