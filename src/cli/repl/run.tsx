@@ -10,6 +10,8 @@ import { isNativeAgentEnabled } from './native-flag.js';
 import { resolveNativeProvider } from './native-transport.js';
 import { buildNativeToolRegistry } from './native-tool-registry.js';
 import { createNativeEngine } from './native-agent-bridge.js';
+import { buildTurnRecorder } from './trace-wire.js';
+import { composeSystemPrompt } from '../../agent/identity.js';
 import type { ChatProviderAdapter } from '../commands/chat-native.js';
 import { createCliToolDispatcher, cliArgsFor } from '../commands/chat-tool-bridge.js';
 import { createToolExecDispatcher } from '../commands/chat-tool-exec.js';
@@ -190,6 +192,15 @@ export async function runInkRepl(
         if (connected.length > 0) mcpBridge = bridge as unknown as import('./native-tool-registry.js').NativeMcpBridge;
       } catch { /* MCP optional — REPL stays usable */ }
 
+      // Local-only training-trace recorder (SP-2) — opt-out via DECKENT_TRACE=0.
+      const recordTurn = buildTurnRecorder({
+        enabled: process.env['DECKENT_TRACE'] !== '0',
+        dir: join(process.cwd(), '.deckent', 'traces'),
+        sessionId: sessionId ?? `native-${Date.now()}`,
+        system: composeSystemPrompt({ cwd: process.cwd(), lang: lang as 'en' | 'tr' }),
+        model: resolved.model,
+        now: () => new Date().toISOString(),
+      });
       nativeEngine = createNativeEngine({
         adapter: resolved.adapter,
         registry: buildNativeToolRegistry({ cwd: () => process.cwd(), ...(mcpBridge ? { mcpBridge } : {}) }),
@@ -199,6 +210,7 @@ export async function runInkRepl(
         confirm: (summary, toolName) => (confirmTrigger ? confirmTrigger(summary, toolName) : Promise.resolve('n')),
         toolSink: (info) => { if (toolSink) toolSink(info); },
         t: (key: string) => getMessage(key, lang),
+        ...(recordTurn ? { recordTurn } : {}),
       });
     }
   }

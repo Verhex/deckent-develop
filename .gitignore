@@ -59,6 +59,7 @@ coverage/
 .deckent/jobs/
 .deckent/usage/
 .deckent/cache/
+.deckent/traces/
 .deckent/sprint-*-baseline.json
 .deckent/metrics.jsonl
 
