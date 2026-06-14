@@ -9,7 +9,7 @@
 import { createAgentSession } from '../../agent/session.js';
 import { loadPolicy } from '../../agent/permission-policy.js';
 import { createRuleStore } from '../../agent/permission-store.js';
-import { createCostGuard, accrue, costExceeded } from '../../agent/guards/cost.js';
+import { createCostGuard } from '../../agent/guards/cost.js';
 import type { ProviderAdapter } from '../../agent/provider-tooluse/types.js';
 import type { ToolRegistry } from '../../agent/tools/registry.js';
 import type { AgentEvent } from '../../agent/events.js';
@@ -43,6 +43,25 @@ export interface NativeEngineDeps {
   recordTurn?: (messages: import('../../agent/provider-tooluse/types.js').ProviderMessage[]) => void;
 }
 
+/** Resolve an optional hard cost ceiling (USD) for the native session, so the
+ *  loop-level guard (SP1-A1) is reachable on the real REPL path — not just in
+ *  tests. Precedence: env override (DECKENT_NATIVE_COST_CEILING) → config
+ *  (native_cost_ceiling_usd). A missing/invalid/non-positive value → undefined
+ *  (advisory-only, no hard stop). */
+export function resolveCostCeilingUsd(
+  env: NodeJS.ProcessEnv,
+  cfg: { native_cost_ceiling_usd?: unknown },
+): number | undefined {
+  const raw = env['DECKENT_NATIVE_COST_CEILING'];
+  if (raw !== undefined && raw !== '') {
+    const n = Number(raw);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  const c = cfg.native_cost_ceiling_usd;
+  if (typeof c === 'number' && Number.isFinite(c) && c > 0) return c;
+  return undefined;
+}
+
 /** Map a confirm-queue answer to a session permission decision. */
 function toDecision(answer: 'y' | 'a' | 'n'): PermissionResponse {
   if (answer === 'n') return { decision: 'deny' };
@@ -52,6 +71,13 @@ function toDecision(answer: 'y' | 'a' | 'n'): PermissionResponse {
 
 export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
   const t = deps.t ?? ((k: string): string => k);
+  // The loop owns cost accrual + the hard-ceiling abort (SP1-A1) — the session
+  // threads this guard into LoopDeps so the default-ON path enforces the ceiling,
+  // not just the view layer. A crossed ceiling surfaces as an 'error' event below.
+  const cost = createCostGuard({
+    usdPerMillionTokens: deps.usdPerMillionTokens ?? 3,
+    ...(deps.costCeilingUsd !== undefined ? { ceilingUsd: deps.costCeilingUsd } : {}),
+  });
   const session = createAgentSession({
     adapter: deps.adapter,
     registry: deps.registry,
@@ -60,14 +86,9 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
     cwd: deps.cwd,
     model: deps.model,
     lang: deps.lang,
+    costGuard: cost,
     ...(deps.maxIterations !== undefined ? { maxIterations: deps.maxIterations } : {}),
   });
-
-  const cost = createCostGuard({
-    usdPerMillionTokens: deps.usdPerMillionTokens ?? 3,
-    ...(deps.costCeilingUsd !== undefined ? { ceilingUsd: deps.costCeilingUsd } : {}),
-  });
-  let costWarned = false;
 
   return async (input, cbs) => {
     let inputTokens = 0;
@@ -88,14 +109,8 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
         case 'usage':
           inputTokens = ev.inputTokens;
           outputTokens = ev.outputTokens;
-          accrue(cost, { inputTokens: ev.inputTokens, outputTokens: ev.outputTokens });
-          if (!costWarned) {
-            const c = costExceeded(cost);
-            if (c.exceeded) {
-              costWarned = true;
-              cbs.output(`\n[${c.reason}] ~$${c.spentUsd.toFixed(2)}`);
-            }
-          }
+          // accrual + ceiling check happen in the loop (via the threaded costGuard);
+          // a crossed hard ceiling arrives here as an 'error' event, printed below.
           break;
         case 'error':
           cbs.output(`\n[${ev.message}]`);

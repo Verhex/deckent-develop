@@ -18,6 +18,7 @@ import { runAgentTurn, type LoopDeps, type PermissionResponse } from './loop.js'
 import type { PermissionPolicy } from './permission-policy.js';
 import type { RuleStore } from './permission-store.js';
 import type { ApprovalMode } from './permission-types.js';
+import type { CostGuardState } from './guards/cost.js';
 import { ToolRegistry } from './tools/registry.js';
 import { Transcript } from './transcript.js';
 import type { ProviderAdapter, ProviderMessage } from './provider-tooluse/types.js';
@@ -31,6 +32,8 @@ export interface AgentSessionDeps {
   model: string;
   lang?: 'en' | 'tr';
   maxIterations?: number;
+  /** Optional per-session cost accumulator; a configured hard ceiling aborts the turn. */
+  costGuard?: CostGuardState;
 }
 
 export interface AgentSession {
@@ -60,6 +63,7 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
     model: deps.model,
     lang: deps.lang,
     maxIterations: deps.maxIterations,
+    costGuard: deps.costGuard,
     getMode: () => mode,
     isCancelled: () => cancelled,
     requestPermission: (req) =>

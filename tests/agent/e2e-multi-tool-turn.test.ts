@@ -10,7 +10,7 @@ import type { AgentEvent } from '../../src/agent/events.js';
 import type { ProviderAdapter, ProviderEvent, ProviderRequest } from '../../src/agent/provider-tooluse/types.js';
 import type { RuleStore } from '../../src/agent/permission-store.js';
 
-function memRuleStore(): RuleStore { const r: { tool: string; pattern: string }[] = []; return { grant: (x) => r.push(x), revoke: () => {}, activeRules: () => [...r] }; }
+function memRuleStore(): RuleStore { const r: { tool: string; pattern: string }[] = []; return { grant: (x) => r.push(x), revoke: () => {}, activeRules: () => [...r], activeDenies: () => [] }; }
 
 describe('e2e: native multi-tool turn', () => {
   it('runs two tool calls from one turn in order, then concludes', async () => {

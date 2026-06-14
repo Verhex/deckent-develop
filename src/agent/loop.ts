@@ -18,6 +18,7 @@ import { Transcript } from './transcript.js';
 import type { ProviderAdapter, ProviderRequest, ProviderToolCall } from './provider-tooluse/types.js';
 import { recursionExceeded } from './guards/recursion.js';
 import { checkSelfModifying } from './guards/self-modifying.js';
+import { accrue, costExceeded, type CostGuardState } from './guards/cost.js';
 
 export type PermissionResponse = { decision: 'once' | 'session' | 'always' | 'deny' };
 
@@ -36,6 +37,10 @@ export interface LoopDeps {
   requestPermission: (req: PermissionRequestEvent) => Promise<PermissionResponse>;
   /** cooperative cancellation between iterations. */
   isCancelled?: () => boolean;
+  /** Optional per-session cost accumulator. When a hard ceilingUsd is configured
+   *  and crossed, the turn aborts mid-stream (not advisory-only). Undefined → no
+   *  cost gating at the loop level. */
+  costGuard?: CostGuardState;
 }
 
 /** Best-effort primary resource for permission glob matching. */
@@ -73,7 +78,18 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
       for await (const ev of deps.adapter.send(req)) {
         if (ev.type === 'text-delta') { assistantText += ev.text; yield { type: 'text-delta', text: ev.text }; }
         else if (ev.type === 'tool-call') { calls.push(ev); yield { type: 'tool-proposed', id: ev.id, tool: ev.name, args: ev.args }; }
-        else if (ev.type === 'usage') { yield { type: 'usage', inputTokens: ev.inputTokens, outputTokens: ev.outputTokens }; }
+        else if (ev.type === 'usage') {
+          yield { type: 'usage', inputTokens: ev.inputTokens, outputTokens: ev.outputTokens };
+          if (deps.costGuard) {
+            accrue(deps.costGuard, { inputTokens: ev.inputTokens, outputTokens: ev.outputTokens });
+            const c = costExceeded(deps.costGuard);
+            if (c.exceeded) {
+              yield { type: 'error', message: `${c.reason}: ~$${c.spentUsd.toFixed(4)}` };
+              yield { type: 'turn-end' };
+              return;
+            }
+          }
+        }
         // 'done' ends the inner provider stream.
       }
     } catch (e) {
@@ -106,7 +122,7 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
       let tier = resolveTier(def, deps.policy);
       if (elevated) tier = 'always';
 
-      const decision = decide(call.name, resource, tier, { rules: deps.ruleStore.activeRules(), denies: [], policy: deps.policy, mode: deps.getMode() });
+      const decision = decide(call.name, resource, tier, { rules: deps.ruleStore.activeRules(), denies: deps.ruleStore.activeDenies(), policy: deps.policy, mode: deps.getMode() });
       if (decision === 'deny') {
         const output = '[denied by policy]';
         yield { type: 'tool-result', id: call.id, tool: call.name, ok: false, output };

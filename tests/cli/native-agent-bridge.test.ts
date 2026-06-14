@@ -3,7 +3,7 @@ import { describe, it, expect } from 'vitest';
 import { tmpdir } from 'node:os';
 import { mkdtempSync, existsSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { createNativeEngine } from '../../src/cli/repl/native-agent-bridge.js';
+import { createNativeEngine, resolveCostCeilingUsd } from '../../src/cli/repl/native-agent-bridge.js';
 import { buildNativeToolRegistry } from '../../src/cli/repl/native-tool-registry.js';
 import type { ProviderAdapter, ProviderEvent } from '../../src/agent/provider-tooluse/types.js';
 
@@ -113,6 +113,19 @@ describe('createNativeEngine', () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+
+  it('resolveCostCeilingUsd: env override wins, config is the fallback, invalid → undefined', () => {
+    // env override (valid positive number) wins over config
+    expect(resolveCostCeilingUsd({ DECKENT_NATIVE_COST_CEILING: '2.5' }, { native_cost_ceiling_usd: 9 })).toBe(2.5);
+    // config fallback when env unset
+    expect(resolveCostCeilingUsd({}, { native_cost_ceiling_usd: 9 })).toBe(9);
+    // neither set → undefined (advisory-only, no hard ceiling)
+    expect(resolveCostCeilingUsd({}, {})).toBeUndefined();
+    // invalid / non-positive values are rejected (not applied as a ceiling)
+    expect(resolveCostCeilingUsd({ DECKENT_NATIVE_COST_CEILING: 'abc' }, {})).toBeUndefined();
+    expect(resolveCostCeilingUsd({ DECKENT_NATIVE_COST_CEILING: '0' }, {})).toBeUndefined();
+    expect(resolveCostCeilingUsd({}, { native_cost_ceiling_usd: -1 })).toBeUndefined();
   });
 
   it('records the transcript after a completed turn when a recorder is provided', async () => {

@@ -59,6 +59,16 @@ describe('createRuleStore', () => {
     const doc = JSON.parse(readFileSync(settingsPath(d), 'utf-8'));
     expect(doc.permissions.rules).toHaveLength(0);
   });
+  it('activeDenies returns persisted permissions.deny rules (kept separate from allow rules)', () => {
+    const d = sandbox();
+    writeFileSync(settingsPath(d), JSON.stringify({ permissions: { deny: [{ tool: 'bash', pattern: 'rm -rf*' }] } }));
+    const s = createRuleStore(d);
+    expect(s.activeDenies()).toContainEqual({ tool: 'bash', pattern: 'rm -rf*' });
+    expect(s.activeRules()).toHaveLength(0);
+  });
+  it('activeDenies is empty when no deny rules are configured', () => {
+    expect(createRuleStore(sandbox()).activeDenies()).toEqual([]);
+  });
   it('persist preserves unrelated top-level keys AND the legacy allow key (native-flag coexistence)', () => {
     const d = sandbox();
     writeFileSync(settingsPath(d), JSON.stringify({ otherKey: 1, permissions: { allow: ['deckent_write_file'] } }));

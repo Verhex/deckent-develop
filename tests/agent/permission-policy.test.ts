@@ -41,6 +41,16 @@ describe('loadPolicy', () => {
     writeFileSync(join(d, '.deckent', 'permission-policy.json'), '{ not json');
     expect(loadPolicy(d).defaultMode).toBe(SAFE_DEFAULT_POLICY.defaultMode);
   });
+  it('drops tierMap entries whose tier value is not silent/confirm/always (rejects bad tiers)', () => {
+    const d = sandbox();
+    writeFileSync(join(d, '.deckent', 'permission-policy.json'), JSON.stringify({
+      tierMap: { bash: 'auto', deckent_read: 'silent', deckent_write: 'always' },
+    }));
+    const p = loadPolicy(d);
+    expect(p.tierMap['bash']).toBeUndefined();         // invalid 'auto' is rejected, not silently applied
+    expect(p.tierMap['deckent_read']).toBe('silent');  // valid tier kept
+    expect(p.tierMap['deckent_write']).toBe('always'); // valid tier kept
+  });
   it('cannot shrink the floor below baseline when alwaysFloor:[] is supplied', () => {
     const d = sandbox();
     writeFileSync(join(d, '.deckent', 'permission-policy.json'), JSON.stringify({ alwaysFloor: [] }));

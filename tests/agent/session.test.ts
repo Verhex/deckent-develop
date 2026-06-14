@@ -12,7 +12,7 @@ function scripted(scripts: ProviderEvent[][]): { adapter: ProviderAdapter; reque
   const requests: ProviderRequest[] = []; let turn = 0;
   return { requests, adapter: { name: 's', async *send(req) { requests.push(req); for (const e of (scripts[turn++] ?? [{ type: 'done' }])) yield e; } } };
 }
-function memRuleStore(): RuleStore { const r: { tool: string; pattern: string }[] = []; return { grant: (x) => r.push(x), revoke: () => {}, activeRules: () => [...r] }; }
+function memRuleStore(): RuleStore { const r: { tool: string; pattern: string }[] = []; return { grant: (x) => r.push(x), revoke: () => {}, activeRules: () => [...r], activeDenies: () => [] }; }
 function deps(over: Partial<AgentSessionDeps>): AgentSessionDeps {
   const reg = new ToolRegistry();
   reg.register({ name: 'writer', description: 'w', inputSchema: { type: 'object' }, category: 'coding', tier: 'confirm', source: 'builtin', handler: async () => ({ ok: true, output: 'wrote' }) });

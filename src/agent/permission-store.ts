@@ -15,8 +15,10 @@ export interface RuleStore {
   grant(rule: PermissionRule, lifetime: GrantLifetime): void;
   /** Remove a matching rule from memory + persisted store. */
   revoke(rule: PermissionRule): void;
-  /** All currently-active rules (session + persisted). */
+  /** All currently-active allow rules (session + persisted). */
   activeRules(): PermissionRule[];
+  /** Persisted explicit DENY rules (permissions.deny) — highest precedence in decide(). */
+  activeDenies(): PermissionRule[];
 }
 
 function settingsPath(cwd: string): string {
@@ -56,6 +58,27 @@ function loadPersisted(cwd: string): PermissionRule[] {
   }
 }
 
+/** Load explicit deny rules from permissions.deny. Fail-safe: malformed → []. */
+function loadDenies(cwd: string): PermissionRule[] {
+  const p = settingsPath(cwd);
+  if (!existsSync(p)) return [];
+  try {
+    const doc = JSON.parse(readFileSync(p, 'utf-8')) as { permissions?: { deny?: unknown } };
+    const raw = doc.permissions?.deny;
+    const rules: PermissionRule[] = [];
+    if (Array.isArray(raw)) {
+      for (const x of raw) {
+        if (x && typeof x === 'object' && typeof (x as PermissionRule).tool === 'string' && typeof (x as PermissionRule).pattern === 'string') {
+          rules.push({ tool: (x as PermissionRule).tool, pattern: (x as PermissionRule).pattern });
+        }
+      }
+    }
+    return rules;
+  } catch {
+    return [];
+  }
+}
+
 function persist(cwd: string, rules: PermissionRule[]): void {
   const p = settingsPath(cwd);
   let doc: Record<string, unknown> = {};
@@ -80,6 +103,7 @@ function persist(cwd: string, rules: PermissionRule[]): void {
 
 export function createRuleStore(cwd: string): RuleStore {
   const persisted = loadPersisted(cwd);
+  const denies = loadDenies(cwd);
   const session: PermissionRule[] = [];
   const active = (): PermissionRule[] => {
     const all = [...persisted];
@@ -103,5 +127,6 @@ export function createRuleStore(cwd: string): RuleStore {
       if (persisted.length !== before) persist(cwd, persisted);
     },
     activeRules: active,
+    activeDenies: () => [...denies],
   };
 }

@@ -34,7 +34,7 @@ export function loadPolicy(cwd: string): PermissionPolicy {
   try {
     const raw = JSON.parse(readFileSync(p, 'utf-8')) as Partial<PermissionPolicy>;
     return {
-      tierMap: { ...SAFE_DEFAULT_POLICY.tierMap, ...(isObj(raw.tierMap) ? raw.tierMap : {}) },
+      tierMap: { ...SAFE_DEFAULT_POLICY.tierMap, ...sanitizeTierMap(raw.tierMap) },
       alwaysFloor: [...new Set([...SAFE_FLOOR, ...(Array.isArray(raw.alwaysFloor) ? raw.alwaysFloor.filter((x) => typeof x === 'string') : [])])],
       defaultMode: isMode(raw.defaultMode) ? raw.defaultMode : SAFE_DEFAULT_POLICY.defaultMode,
     };
@@ -48,6 +48,18 @@ function clone(p: PermissionPolicy): PermissionPolicy {
 }
 function isObj(x: unknown): x is Record<string, ToolPermissionTier> {
   return !!x && typeof x === 'object' && !Array.isArray(x);
+}
+/** Valid tool permission tiers (mirrors ToolPermissionTier in tools/types.ts). */
+const VALID_TIERS: ReadonlySet<string> = new Set(['silent', 'confirm', 'always']);
+/** Keep only tierMap entries whose value is a real tier — an invalid value
+ *  (e.g. 'auto') is rejected, not silently applied as a mis-typed tier. */
+function sanitizeTierMap(raw: unknown): Record<string, ToolPermissionTier> {
+  if (!isObj(raw)) return {};
+  const out: Record<string, ToolPermissionTier> = {};
+  for (const [k, v] of Object.entries(raw)) {
+    if (typeof v === 'string' && VALID_TIERS.has(v)) out[k] = v as ToolPermissionTier;
+  }
+  return out;
 }
 function isMode(x: unknown): x is ApprovalMode {
   return x === 'suggest' || x === 'auto-edit' || x === 'full-auto';

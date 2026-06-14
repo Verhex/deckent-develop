@@ -9,7 +9,7 @@ import { ReplApp, ReplErrorBoundary, type ConfirmTrigger, type ToolSink, type To
 import { isNativeAgentEnabled } from './native-flag.js';
 import { resolveNativeProvider } from './native-transport.js';
 import { buildNativeToolRegistry } from './native-tool-registry.js';
-import { createNativeEngine } from './native-agent-bridge.js';
+import { createNativeEngine, resolveCostCeilingUsd } from './native-agent-bridge.js';
 import { buildTurnRecorder } from './trace-wire.js';
 import { composeSystemPrompt } from '../../agent/identity.js';
 import type { ChatProviderAdapter } from '../commands/chat-native.js';
@@ -201,6 +201,7 @@ export async function runInkRepl(
         model: resolved.model,
         now: () => new Date().toISOString(),
       });
+      const costCeilingUsd = resolveCostCeilingUsd(process.env, cfg as { native_cost_ceiling_usd?: unknown });
       nativeEngine = createNativeEngine({
         adapter: resolved.adapter,
         registry: buildNativeToolRegistry({ cwd: () => process.cwd(), ...(mcpBridge ? { mcpBridge } : {}) }),
@@ -210,6 +211,7 @@ export async function runInkRepl(
         confirm: (summary, toolName) => (confirmTrigger ? confirmTrigger(summary, toolName) : Promise.resolve('n')),
         toolSink: (info) => { if (toolSink) toolSink(info); },
         t: (key: string) => getMessage(key, lang),
+        ...(costCeilingUsd !== undefined ? { costCeilingUsd } : {}),
         ...(recordTurn ? { recordTurn } : {}),
       });
     }

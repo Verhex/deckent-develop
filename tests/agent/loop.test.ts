@@ -8,6 +8,7 @@ import { clearDetectionCache } from '../../src/orchestra/self-modifying-detector
 import { Transcript } from '../../src/agent/transcript.js';
 import { ToolRegistry } from '../../src/agent/tools/registry.js';
 import { SAFE_DEFAULT_POLICY } from '../../src/agent/permission-policy.js';
+import { createCostGuard } from '../../src/agent/guards/cost.js';
 import type { AgentEvent } from '../../src/agent/events.js';
 import type { ProviderAdapter, ProviderEvent, ProviderRequest } from '../../src/agent/provider-tooluse/types.js';
 import type { RuleStore } from '../../src/agent/permission-store.js';
@@ -28,7 +29,7 @@ function scriptedAdapter(scripts: ProviderEvent[][]): { adapter: ProviderAdapter
 }
 function memRuleStore(): RuleStore {
   const rules: { tool: string; pattern: string }[] = [];
-  return { grant: (r) => rules.push(r), revoke: () => {}, activeRules: () => [...rules] };
+  return { grant: (r) => rules.push(r), revoke: () => {}, activeRules: () => [...rules], activeDenies: () => [] };
 }
 async function drain(stream: AsyncIterable<AgentEvent>): Promise<AgentEvent[]> {
   const out: AgentEvent[] = []; for await (const e of stream) out.push(e); return out;
@@ -107,7 +108,7 @@ describe('runAgentTurn', () => {
     clearDetectionCache();
     try {
       const grants: { tool: string; pattern: string }[] = [];
-      const ruleStore: RuleStore = { grant: (r) => grants.push(r), revoke: () => {}, activeRules: () => [...grants] };
+      const ruleStore: RuleStore = { grant: (r) => grants.push(r), revoke: () => {}, activeRules: () => [...grants], activeDenies: () => [] };
       const reg = new ToolRegistry();
       reg.register({ name: 'srcwriter', description: 'w', inputSchema: { type: 'object' }, category: 'coding', tier: 'silent', source: 'builtin', handler: async () => ({ ok: true, output: 'wrote' }) });
       const { adapter } = scriptedAdapter([[{ type: 'tool-call', id: 's1', name: 'srcwriter', args: { path: 'src/core/x.ts' } }, { type: 'done' }], [{ type: 'done' }]]);
@@ -121,6 +122,40 @@ describe('runAgentTurn', () => {
       rmSync(root, { recursive: true, force: true });
       clearDetectionCache();
     }
+  });
+
+  it('passes active deny rules to decide() so a matching deny blocks an otherwise-silent tool', async () => {
+    const reg = new ToolRegistry();
+    reg.register({ name: 'bash', description: 'b', inputSchema: { type: 'object' }, category: 'coding', tier: 'silent', source: 'builtin', handler: async () => ({ ok: true, output: 'ran' }) });
+    const ruleStore: RuleStore = { grant: () => {}, revoke: () => {}, activeRules: () => [], activeDenies: () => [{ tool: 'bash', pattern: '**' }] };
+    const { adapter } = scriptedAdapter([[{ type: 'tool-call', id: 'b1', name: 'bash', args: { command: 'rm -rf x' } }, { type: 'done' }], [{ type: 'done' }]]);
+    const evs = await drain(runAgentTurn(baseDeps({ adapter, registry: reg, ruleStore }), new Transcript(), 'go'));
+    expect(evs).toContainEqual({ type: 'tool-result', id: 'b1', tool: 'bash', ok: false, output: '[denied by policy]' });
+    expect(evs.some((e) => e.type === 'tool-executing')).toBe(false);
+  });
+
+  it('aborts the turn with a COST_GATE_EXCEEDED error when the hard cost ceiling is crossed mid-turn', async () => {
+    const costGuard = createCostGuard({ usdPerMillionTokens: 3, ceilingUsd: 0.0001 });
+    const { adapter } = scriptedAdapter([[
+      { type: 'text-delta', text: 'hi' },
+      { type: 'usage', inputTokens: 999_999, outputTokens: 0 },
+      { type: 'tool-call', id: 'c1', name: 'echo', args: {} },
+      { type: 'done' },
+    ]]);
+    const evs = await drain(runAgentTurn(baseDeps({ adapter, costGuard }), new Transcript(), 'go'));
+    expect(evs).toContainEqual({ type: 'usage', inputTokens: 999_999, outputTokens: 0 });
+    expect(evs.some((e) => e.type === 'error' && (e as Extract<AgentEvent, { type: 'error' }>).message.includes('COST_GATE_EXCEEDED'))).toBe(true);
+    expect(evs[evs.length - 1]).toEqual({ type: 'turn-end' });
+    // the tool call that arrived after the ceiling-crossing usage is never executed
+    expect(evs.some((e) => e.type === 'tool-executing')).toBe(false);
+  });
+
+  it('does not abort on usage when the cost guard is advisory-only (no ceiling configured)', async () => {
+    const costGuard = createCostGuard({ usdPerMillionTokens: 3 });
+    const { adapter } = scriptedAdapter([[{ type: 'usage', inputTokens: 10_000_000, outputTokens: 0 }, { type: 'done' }]]);
+    const evs = await drain(runAgentTurn(baseDeps({ adapter, costGuard }), new Transcript(), 'go'));
+    expect(evs.some((e) => e.type === 'error')).toBe(false);
+    expect(evs[evs.length - 1]).toEqual({ type: 'turn-end' });
   });
 
   it('does not append an empty assistant turn when the stream yields no text and no tool calls', async () => {
