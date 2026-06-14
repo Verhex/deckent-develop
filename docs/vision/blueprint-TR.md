@@ -6,7 +6,7 @@
 
 > **Doküman rolü (Alperen 2026-06-02 — SSOT bölünmesi):** `blueprint-TR.md` = **deckent NE ve NEREDE** (kimlik, kabiliyet, mimari-as-built, konumlanma) — Türkçe SSOT-of-identity. `docs/MASTER-PLAN-TR.md` = **NASIL geliştiriyoruz** (yol haritası, sıralama, kalan iş — geliştirme SSOT). `docs/vision/VISION-TR.md` ve bu doküman birbirini tamamlar; bu doküman daha geniş kimlik anlatısı taşır, VISION-TR.md daha kısa stratejik özet sunar. İngilizce ana sürüm: [`blueprint.md`](./blueprint.md). MASTER-PLAN TR: [`docs/MASTER-PLAN-TR.md`](../MASTER-PLAN-TR.md).
 
-> **Deckent nedir (2026-06-02):** **açık bir ajanın god-level orkestrasyon + enterprise katmanı**, tek bir kullanıcının aynı gücü zahmetsiz kullanabileceği kadar kolaylaştırılmış — **tek MIT ürün**, solo geliştiricinin laptopundan 10.000 kişilik kuruma kadar. **"Open source for open world."** Devin / Cursor / Claude Code / Cowork ile kabiliyet düzeyinde **kıyaslarız** — asla "karşıt-X" olarak konumlanmayız. Mimari **core + enterprise-layer** ayrımı üzerinedir: core katman her kullanıcının çalıştırdığı çok-ajanlı orkestrasyondur; enterprise katman (RBAC, audit, multi-tenant, scheduled flows) çatallanmadan bunun üstüne oturur. ([[project_deckent_positioning]])
+> **Deckent nedir:** **açık bir ajanın god-level orkestrasyon + enterprise katmanı**, tek bir kullanıcının aynı gücü zahmetsizce kullanabileceği kadar kolaylaştırılmış — **tek MIT ürün**, solo geliştiricinin laptopundan 10.000 kişilik kuruma kadar. **"Open source for open world."** Mimari **core + enterprise-layer** ayrımı üzerinedir: core katman her kullanıcının çalıştırdığı çok-ajanlı orkestrasyondur; enterprise katman (RBAC, audit, multi-tenant, scheduled flows) çatallanmadan bunun üstüne oturur. ([[project_deckent_positioning]])
 
 > **Nereye gidiyor — otonom agentic runtime:** on-demand sprintlerin ötesinde, deckent **tanımlı yetki sınırları içinde sürekli ve otonom** çalışır — kuruma kurarsın, siparişleri izler, analiz eder, MRP kontrol eder ve müşteri taleplerine RBAC + onay sınırları içinde aksiyon alır. Temeli: Process Mode (F3) + scheduled-flows + nervous approval + Capability Broker (F8 ERP) + ADR-037 authority matrix. **"Deckent orchestered for everyone everywhere"** — 6 bağlamda (yeşil-alan / aktif-geliştirme / bakım / günlük-iş / ERP / enterprise). ([[project_deckent_everyone_everywhere]])
 
@@ -192,17 +192,17 @@ PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → CLEANUP
 
 ## 6. KONUMLANMA — "OPEN SOURCE FOR OPEN WORLD"
 
-**Anlatı:** Deckent **karşı-X değildir** — yanında durduğu açık dünyaya katkıdır. Devin, Cursor, Claude Code, Cowork, OpenClaw ile **kabiliyet düzeyinde** kıyaslarız; konumumuzu zayıf-noktalarına saldırarak değil, sağlam-noktamızı netleştirerek koruruz.
+**Anlatı:** Deckent **karşı-X değildir** — açık dünyaya katkı, kendi konumunu kendi değer önerisiyle netleştiren bir ürün.
 
-| Rakip | Güçlü | Deckent'in farkı (asla "karşıt" değil — tamamlayıcı / alternatif) |
-|-------|-------|--------------------------------------------------------------|
-| **OpenClaw** | Always-on daemon, 13K+ skill, 50+ kanal, 343K+ yıldız | Multi-agent orkestrasyon + sprint disiplini + öğrenme döngüsü + scope enforcement |
-| **Copilot Cowork** | Multi-model critique, M365 entegrasyonu, enterprise hazır | Açık kaynak, self-hosted, provider-agnostik, lisanssız tek MIT ürün |
-| **Devin** | End-to-end otonom, interaktif planlama, "AI software engineer" anlatısı | Multi-agent paralel, açık kaynak, ücretsiz, kullanıcı kontrolü |
-| **Perplexity Computer** | 19 model, gün-uzunluğunda task'lar, 400+ uygulama | Self-hosted, 13 model registry, sprint disiplini, on-prem |
-| **Claude Code (solo)** | Güçlü tek-task performansı | Claude Code'u worker olarak kullanır, üstüne orkestrasyon ekler |
-| **Cursor / Windsurf** | Editör entegrasyonu, üretkenlik | Sprint + auditor + memory; editor-agnostik (VSCode ext + dashboard + MCP) |
-| **Aider** | Hafif, hızlı, küçük | Sprint orkestrasyonu + multi-agent + dashboard + enterprise katman |
+**Deckent'in özgün değer önerisi:**
+- **Evrimsel mimari** — core + enterprise-layer ayrımı: aynı kod tabanı, çatallanmadan ölçeklenir
+- **Dependency-pipeline waves** — Kahn topological sıralama ile paralel ve sıralı görev yürütme
+- **Memory V2 FTS5** — SQLite + dual-layer Türkçe normalizasyon, %96 context azaltma
+- **Multi-provider** — Claude, Codex, Gemini, Ollama, OpenAI-compatible; provider-agnostik mimari
+- **Nervous System** — 12 dedektörle proaktif meta-orkestratör; onay-kapısı ile otonom güvenliği
+- **Otonom motor** — dayanıklı backlog, 3-kapı yönetişim (RBAC → policy → EffectClass-risk)
+- **ADR-governance** — 89 kabul edilmiş ADR; mimari kararlar zorunlu kısıt olarak uygulanır
+- **MIT açık kaynak** — self-hosted, on-prem, topluluk odaklı
 
 **Deckent'in özgün şekli:** **core + enterprise-layer** ayrımı + **6-senaryo kapsama** + **üç-yüz tek-motor**. Bu şekli korumak demek: tek kullanıcılı bireyselden 10.000 kişilik kurumsala kadar **aynı ürün** çatallanmadan ölçeklenir.
 

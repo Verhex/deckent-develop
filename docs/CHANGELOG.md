@@ -2,6 +2,17 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint287] - 2026-06-14
+
+### Added
+
+- roadmap.md — user-facing yol-haritasına dönüştür
+- blueprint.md + blueprint-TR.md — de-competitor + de-stale
+- enterprise referansları — derinleştir (286-020 yüzeysel kaldı)
+
+
+_Tasks: 3 total, 3 done, 0 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint286] - 2026-06-14
 
 ### Added

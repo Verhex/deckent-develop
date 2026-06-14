@@ -7901,3 +7901,27 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 286-048: release — roadmap + notes + checklist + beta-tracker (DONE)
 
 ---
+## Sprint 287 — sprint-287
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-06-14
+**Duration:** 879s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 3 |
+| Completed | 3 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 879411ms |
+
+### Tasks
+
+- 287-001: roadmap.md — user-facing yol-haritasına dönüştür (DONE)
+- 287-002: blueprint.md + blueprint-TR.md — de-competitor + de-stale (DONE)
+- 287-003: enterprise referansları — derinleştir (286-020 yüzeysel kaldı) (DONE)
+
+---

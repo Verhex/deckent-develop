@@ -6,6 +6,22 @@ Governing ADRs: **ADR-068** (Enterprise Foundation — scheduled flows, audit qu
 
 All integrations are disabled by default and must be explicitly configured and wired into the runtime.
 
+**Contents**
+
+1. [SSO/OIDC Integration](#1-ssoidc-integration)
+2. [SIEM Event Forwarding](#2-siem-event-forwarding-srccoresiemforwarderts)
+3. [Compliance Reporting](#3-compliance-reporting-srcccorecompliance-reportts)
+4. [Audit Log Retention & Rotation](#4-audit-log-retention--rotation-srccoreaudit-retentionts)
+5. [Read-Only Data Access](#5-read-only-data-access)
+6. [Capability Invocation Auditing](#6-capability-invocation-auditing-srcccorecapability-audit-bridgets)
+7. [JWKS Key Resolution](#7-jwks-key-resolution-srccoreauth-jwksts)
+8. [Terminal OIDC Auth Provider](#8-terminal-oidc-auth-provider-srcapiterminalauth-providerts)
+9. [SIEM Network Transports](#9-siem-network-transports)
+10. [ERP Read Capability](#10-erp-read-capability-srccorecapability-handlers-erpts)
+11. [Scheduled Flows](#11-scheduled-flows)
+12. [Event-Driven Triggers](#12-event-driven-triggers)
+13. [Enterprise Dashboard API](#13-enterprise-dashboard-api-srcapienterprise-endpoitts)
+
 ## 1. SSO/OIDC Integration
 
 Deckent provides modules for verifying OIDC-compliant JSON Web Tokens (JWTs) and managing user sessions, forming the basis for Single Sign-On (SSO).
@@ -248,3 +264,165 @@ The third concrete `ErpDriver`: it translates a `CompiledQuery` into a Dynamics 
 - **Bearer Token Redaction**: The token travels only inside the `Authorization: Bearer <token>` header — it is never interpolated into error messages, and any server-echoed occurrence is replaced with `[redacted]` before an error is thrown (same pattern as Odoo and SAP drivers).
 - **Injectable Fetch**: `fetchImpl` is injectable for hermetic tests — tests never touch the network. The default is `globalThis.fetch` (Node 18+ built-in; no new runtime dependency per ADR-010).
 - **Error Surface**: A non-2xx response throws with the HTTP status plus up to 500 characters of the (redacted) error body; non-JSON, non-object, or missing-`value` responses throw. When reached via the `erp.read` capability handler (section 10), these surface as `CAPABILITY_FAILED` through the broker.
+
+---
+
+## 11. Scheduled Flows
+
+Governing ADR: **ADR-068** (Enterprise Foundation — scheduled flows layer). Implemented across three modules: `src/core/scheduled-flow.ts`, `src/core/flow-registry.ts`, `src/core/flow-scheduler.ts`.
+
+### Flow Definition (`src/core/scheduled-flow.ts`)
+
+**`ScheduledFlow`** interface (the persisted definition):
+
+```typescript
+interface ScheduledFlow {
+  id: string;        // unique identifier
+  cronExpr: string;  // 5-field standard cron expression
+  action: string;    // action name routed to the autonomous backlog bridge
+  tenantId: string;  // required — every flow is tenant-scoped
+  enabled: boolean;  // disabled flows are never ticked
+  createdAt?: string;
+}
+```
+
+**`parseCronExpr(expr)`** — validates a 5-field cron expression (`minute hour day-of-month month day-of-week`). Supports:
+- Wildcards (`*`)
+- Exact values (`5`)
+- Ranges (`1-5`)
+- Comma lists (`1,3,5`)
+- Step expressions (`*/5`, `1-30/2`)
+- Throws on any invalid field with a stable error message.
+
+**`nextRun(cronExpr, from?)`** — computes the next scheduled run strictly after `from` (defaults to `new Date()`). This is a **full implementation** (not a skeleton): it performs minute-level iteration in UTC, applying standard cron union semantics when both day-of-month and day-of-week are non-wildcard (either matching satisfies the day constraint). Day-of-week 0 and 7 are both treated as Sunday. Throws if no match is found within one calendar year (pathological guard).
+
+### Flow Registry (`src/core/flow-registry.ts`)
+
+**`FlowRegistry`** — CRUD + JSON persistence for scheduled flows. Flows are persisted under `.deckent/flows/<tenantId>/<id>.json` (or flat under the base dir when the registry is tenant-bound).
+
+All mutating operations are **RBAC-gated** using `can()` from `src/core/rbac.ts`:
+
+| Operation | Required Permission | Notes |
+|-----------|--------------------|-|
+| `addFlow(flow, role?)` | `FLOW_MANAGE` | Throws `E_RBAC_DENIED` when denied |
+| `removeFlow(id, role?)` | `FLOW_MANAGE` | Deletes the `.json` file; returns `false` if not found |
+| `enableFlow(id, enabled, role?)` | `FLOW_MANAGE` | Persists the updated `enabled` flag |
+| `listFlows(tenantId?, role?)` | `READ` (when role provided) | No role = unguarded list |
+
+**`FlowRegistry.forCurrentTenant(projectRoot)`** — factory that creates a registry scoped to the `TenantContext` active in the current async scope (see `withTenant()` in `src/core/tenant-context.ts`). Flows are stored under the tenant's isolation root.
+
+### Flow Scheduler (`src/core/flow-scheduler.ts`)
+
+**`FlowScheduler`** — a pure, stateful tick-based scheduler. It holds internal `lastRunAt` state per flow and requires no `setInterval` or I/O — callers drive the tick.
+
+- **`tick(flows, now)`** — scans all enabled flows, computes `nextRun(flow.cronExpr, lastRunAt)` for each, and returns those whose `nextRun ≤ now` sorted ascending by `nextRun`. Updates `lastRunAt` for each due flow.
+- **`collectDue(flows, triggers, events, now)`** — unified dispatch: combines due scheduled flows from `tick()` with event-triggered flows from `matchTrigger()` (section 12) into a `DueDispatch[]` array discriminated by `kind: 'scheduled' | 'event'`.
+- **`reset(flowId)`** — clears the internal `lastRunAt` for a flow (manual-trigger support).
+
+**Honest note on execution:** The scheduler computes _when_ a flow is due. Actual execution routes through the autonomous backlog bridge (`deckent_autonomous` / `src/orchestra/autonomous/`) — the `FlowScheduler` does not spawn workers directly. A production deployment would call `collectDue()` on a timer and enqueue due dispatches into the autonomous backlog.
+
+---
+
+## 12. Event-Driven Triggers
+
+Governing ADR: **ADR-069** (Event-Driven Triggers + F4 RBAC). Implemented in `src/core/event-trigger.ts`; unified dispatch lives in `src/core/flow-scheduler.ts`.
+
+### Trigger Definition (`src/core/event-trigger.ts`)
+
+**`EventTrigger`** interface:
+
+```typescript
+interface EventTrigger {
+  id: string;
+  eventType: string;  // exact match (e.g. 'sprint:complete', 'pr:merged')
+  source: string;     // exact match (e.g. 'github', 'deckent')
+  action: string;     // action to invoke when matched
+  tenantId: string;   // required — tenant-scoped
+  enabled: boolean;
+}
+```
+
+**`IncomingEvent`** interface:
+
+```typescript
+interface IncomingEvent {
+  eventType: string;
+  source: string;
+  tenantId: string;
+  payload?: unknown;
+}
+```
+
+**`matchTrigger(event, triggers)`** — filters `triggers` to those that are all of:
+1. `enabled: true`
+2. `tenantId === event.tenantId`
+3. `eventType === event.eventType`
+4. `source === event.source`
+
+All four conditions use exact-match AND semantics. Returns an empty array (never throws) when no triggers match.
+
+### Unified Dispatch (`src/core/flow-scheduler.ts`)
+
+`FlowScheduler.collectDue(flows, triggers, events, now)` merges two dispatch sources into a single `DueDispatch[]`:
+
+```typescript
+type DueDispatch =
+  | { kind: 'scheduled'; flow: ScheduledFlow; nextRun: Date }
+  | { kind: 'event';     trigger: EventTrigger; event: IncomingEvent };
+```
+
+Scheduled flows that are due at `now` come first (sorted by `nextRun`), followed by event-matched triggers (in event-list order). The unified shape means the autonomous backlog bridge can handle both kinds with the same code path.
+
+### Webhook Notification Provider (`src/core/notification-providers/webhook.ts`)
+
+While distinct from event _triggers_, the webhook _provider_ is the outbound counterpart — it sends Deckent events to external HTTP endpoints when configured in `notification_config`:
+
+- **`WebhookNotificationProvider`**: Implements `NotificationProvider.send(url, event)`.
+- Posts `{ event, summary, details, timestamp, project }` as JSON with a 5-second timeout and 1 retry (2 total attempts).
+- Failures are logged to `.deckent/notification-log.json` (last 100 entries) and re-thrown — the caller decides whether to swallow.
+- Injectable `HttpClient` for hermetic tests.
+
+---
+
+## 13. Enterprise Dashboard API (`src/api/enterprise-endpoint.ts`)
+
+The enterprise dashboard pages (Tenants, RBAC, Audit, Rate Limits) are backed by four read endpoints and three write endpoints. All are auth-gate protected by the server's bearer middleware. Governing ADRs: **ADR-068**, **ADR-069**, **ADR-071**.
+
+### Read Endpoints (GET, bearer required)
+
+| Endpoint | Source | Response |
+|----------|--------|---------|
+| `GET /api/enterprise/tenants` | `config.tenants` list + `.deckent/tenants/` dirs | `TenantInfo[]` |
+| `GET /api/enterprise/rbac` | `PERMISSION_MATRIX` from `src/core/rbac.ts` | `RbacRole[]` |
+| `GET /api/enterprise/audit` | `readAuditEvents` / `queryAudit` from `src/core/audit-query.ts` | `AuditEntry[]` |
+| `GET /api/enterprise/rate` | Live `RateLimiter.snapshot()` | `RateLimitInfo[]` |
+
+Query parameters for `/api/enterprise/audit`:
+- `?sprint=<sprintId>` — defaults to the latest sprint with an event stream file
+- `?channel=<channel>` — routes through `queryAudit` with channel filter
+- `?limit=<n>` — max 500, default 50; returns the last N events
+
+Every read endpoint writes an `enterprise:<resource>:read` audit event so all access is traceable (ADR-068 audit-trail).
+
+### Write Endpoints (POST/PUT/DELETE, admin role required)
+
+Tenant CRUD is gated by **admin-only RBAC** enforced at the endpoint layer:
+
+- Static (opaque) bearer → treated as the local owner with full access (existing convention).
+- OIDC JWT with role `admin` → authorized; `actor` resolved from `sub` / `preferred_username`.
+- OIDC JWT with any other role → denied; `access:denied` audit event written; `403` returned.
+
+| Endpoint | Action | Notes |
+|----------|--------|-------|
+| `POST /api/enterprise/tenants` | Create tenant | Validates `id`, `name`, optional `status`/`users`; 409 on duplicate |
+| `PUT /api/enterprise/tenants/:id` | Update tenant | Partial update: `name`, `status`, `users` fields only |
+| `DELETE /api/enterprise/tenants/:id` | Delete tenant | Removes from config `tenants` array; 404 if FS-only dir |
+
+All mutations:
+- Persist in the declarative `tenants` array of `.deckent/config.json` (the same list `GET /tenants` reads first).
+- Write a structured `enterprise:tenants:<create|update|delete>` audit event tagging the mutation's `actor` and target `tenantId`.
+- Validate input via Zod (`.strict()` rejects unknown fields).
+
+**Role Claim Derivation** — the endpoint resolves a `Role` from JWT claims in this priority order: `claims.role` → `claims.roles[]` → `claims['https://deckent.io/role']`. Invalid or absent role → no admin access (fail-closed).
+
+**Honest scope:** `GET /api/enterprise/rbac` exposes the static `PERMISSION_MATRIX` — it does not expose a live per-user role assignment system. Dynamic role assignment per user is not yet implemented; roles flow from OIDC JWT claims established at login.

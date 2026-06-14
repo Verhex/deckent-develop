@@ -61,7 +61,7 @@ Brain dürüstlüğünü yeniden çıpalayan üç sprint:
 | Metrik | Değer |
 |--------|-------|
 | Version | 1.0.0-beta.1 |
-| Sprint | sprint-286 |
+| Sprint | sprint-287 |
 | MCP Tools | 34 |
 | MCP Resources | 8 |
 | CLI Commands | 57+ |
@@ -1980,12 +1980,12 @@ Sprint 166 mimari forensic'inde 4 yeni follow-up bug tespit edildi (Sprint 167 �
 ## Sprint Metrics
 | Metrik | Değer |
 |--------|-------|
-| Sprint | sprint-286 |
-| Toplam Task | 57 |
-| Tamamlanan | 53 |
+| Sprint | sprint-287 |
+| Toplam Task | 3 |
+| Tamamlanan | 3 |
 | Tech Debt | 0 |
-| No-Go | 4 |
-| Süre | 47dk 34sn |
+| No-Go | 0 |
+| Süre | 14dk 39sn |
 | Coverage | N/A |
 
 ## Sprint History

@@ -1,6 +1,6 @@
 # Enterprise Foundation: The ExecutionRequest Contract
 
-This document outlines how Deckent's universal `ExecutionRequest` contract serves as the backbone for its enterprise-grade features. By embedding critical metadata into every request, Deckent enables advanced governance, security, and operational controls. The `ExecutionRequest` schema is governed by **ADR-068** (Enterprise Foundation); the RBAC and event-trigger layers that consume it are governed by **ADR-069** (Event-Driven Triggers + F4 RBAC).
+This document outlines how Deckent's universal `ExecutionRequest` contract serves as the backbone for its enterprise-grade features. By embedding critical metadata into every request, Deckent enables advanced governance, security, and operational controls. The `ExecutionRequest` schema is governed by **ADR-068** (Enterprise Foundation — scheduled flows, audit query, multi-tenant); the RBAC and event-trigger layers that consume it are governed by **ADR-069** (Event-Driven Triggers + F4 RBAC) and **ADR-071** (Autonomous Mode Self-Dispatch Guard + F4 Enterprise RBAC/Tenant/Audit).
 
 Most of these features are opt-in and can be enabled via flags in `.deckent/config.json`.
 
@@ -22,21 +22,38 @@ Most of these features are opt-in and can be enabled via flags in `.deckent/conf
 -   **Contract Field:** `actor: { id: string, role: string }`
 -   **Enables:** `ENT-1` - Role-Based Access Control (RBAC)
 
-The `actor` object identifies who initiated a request. The `actor.role` field is consumed by the **Authority Matrix** (`src/nervous/authority-matrix.ts`) to determine a worker's permissions.
+Deckent has two complementary RBAC systems: the **Enterprise RBAC** (`src/core/rbac.ts`) for API/flow/audit gates, and the **Worker Authority** (`src/nervous/authority-matrix.ts`) for nervous-system capability checks on spawned tasks. Both are gated by the same `enforce_rbac` configuration flag.
 
-This allows for granular control using the **Worker Authority** taxonomy (`WorkerRole`):
-- `admin` — every capability (full trust).
-- `engineer` — dev capabilities; excludes enterprise-admin capabilities (`erp-write`, filesystem-delete, etc.).
-- `viewer` — read-only (`fs-read`, `db-query`, `erp-read`).
+### Enterprise RBAC (`src/core/rbac.ts`, ADR-069/071)
 
-For example, a `viewer` role is prohibited from executing shell commands or writing to the filesystem.
+The enterprise role system uses three roles with strict inheritance:
 
-**Note:** This is the *worker authority* role system (ENT-1). Deckent also has a separate *enterprise RBAC* system (`src/core/rbac.ts`, governed by **ADR-069**) used for the autonomous dispatch policy gate and compliance API — that system uses roles `admin | operator | viewer`. See `enterprise-depth.md` Section 2 for details on both systems.
+| Role | Level | Permissions (own + inherited) |
+|------|-------|-------------------------------|
+| `viewer` | 1 | `read`, `sprint:read` |
+| `operator` | 2 | + `write`, `execute`, `sprint:write`, `audit:read`, `flow:manage` |
+| `admin` | 3 | + `admin`, `audit`, `tenant:admin` |
 
-This system implements **ADR-037** (Brain-Auditor-Worker Authority Matrix) with hard enforcement enabled via the `enforce_rbac` flag.
+Roles are hierarchical (`viewer ⊆ operator ⊆ admin`) — every operator has all viewer permissions, and every admin has all operator permissions. The `PERMISSION_MATRIX` in `src/core/rbac.ts` is precomputed at module load time and is the single source of truth.
 
-**Configuration:**
-RBAC enforcement is disabled by default. To enable it, set the following in your `.deckent/config.json`:
+**`can(role, action, tenantId, auditCtx?)`** — the core permission check:
+- Returns `false` when `tenantId` fails path-safety validation or the role lacks the requested permission.
+- When `auditCtx` is provided and the check is **denied**, an `access:denied` audit event is written to the event stream via `writeAuditEvent()` — mandatory enterprise audit-trail (ADR-037).
+- Never throws; the fail-closed result is always `false` on invalid input.
+
+**`enforceRbac(role, action, tenantId, rbacConfig?)`** — the runtime gate:
+- When `rbacConfig.enabled` is `false` (or `rbacConfig` is absent), this is a **NO_OP that always returns `true`** — backward compatible with non-enterprise deployments.
+- When `enabled: true`, delegates to `can()` with full enforcement.
+- Intended for wiring into sprint/flow/API entry points without breaking non-enterprise setups.
+
+```typescript
+// Example wiring:
+if (!enforceRbac(actor.role, Permission.SPRINT_WRITE, tenantId, config.enterprise?.rbac)) {
+  throw new Error('RBAC_DENIED');
+}
+```
+
+**Enforcement is advisory/soft by default** (ADR-037 V1.0). Hard-block requires explicitly opting in via `enforce_rbac: true` in `.deckent/config.json`. Until the hard-flip to V2 (post-GA), a role violation that is not explicitly blocked emits a warning and is recorded in the audit trail but does not stop execution.
 
 ```json
 {
@@ -44,7 +61,11 @@ RBAC enforcement is disabled by default. To enable it, set the following in your
 }
 ```
 
-When `false`, Deckent operates in a permissive mode where all actors have full capabilities. When `true`, the `authority-matrix` will enforce the defined role-to-capability mappings, emitting warnings or blocking actions based on the configuration.
+### Worker Authority (`src/nervous/authority-matrix.ts`, ADR-037)
+
+The worker authority system operates at a different layer — it controls which **capabilities** a spawned task may use (e.g. `shell`, `filesystem.write`, `erp-write`). Its roles are `admin | engineer | viewer` (different taxonomy from the enterprise RBAC above). This system also respects the `enforce_rbac` flag: when `false` (default), violations emit a soft warning; when `true`, capability violations hard-block the task.
+
+The `actor` object on the `ExecutionRequest` carries both a role identifier and the `tenantId` for RBAC scoping. Role resolution for API callers flows from the JWT claims (`role` | `roles` | `https://deckent.io/role`) established at OIDC login.
 
 ---
 
@@ -53,11 +74,34 @@ When `false`, Deckent operates in a permissive mode where all actors have full c
 -   **Contract Field:** `tenantId: string`
 -   **Enables:** `ENT-2` - Data Isolation for Multi-Tenancy
 
-The `tenantId` field allows Deckent to partition data on a per-tenant basis. The primary consumer is the **Memory Store** (`src/core/memory-store.ts`), which uses the `tenantId` to isolate database rows.
+The `tenantId` field allows Deckent to partition data on a per-tenant basis. Tenants must pass path-safety validation (`^[a-z0-9][a-z0-9-]{0,62}$`) — IDs that fail this check are rejected, preventing path-traversal attacks on isolation roots.
 
-This ensures that one tenant's memory, decisions, and history are not visible to another. For backward compatibility, if `tenantId` is not provided, it defaults to `'local'`.
+### Isolation Boundaries (what is implemented)
 
-This feature is foundational for using a single Deckent instance to serve multiple distinct projects or clients securely.
+**Filesystem isolation** — each tenant gets a scoped directory root under `.deckent/tenants/<tenantId>/`. Tenant-aware components resolve paths through this root:
+
+- `FlowRegistry.forCurrentTenant()` persists flows under `.deckent/tenants/<tenantId>/flows/`
+- `tenantPath('flows/my-flow.json')` resolves relative paths within the tenant's isolation root
+- Tenant directories discovered under `.deckent/tenants/` are surfaced in the enterprise dashboard
+
+**Memory store isolation** — the `MemoryStore` (`src/core/memory-store.ts`) uses `tenantId` to scope SQLite rows, ensuring one tenant's ADRs, memory, and retro entries are not visible to another's queries.
+
+**Audit isolation** — `queryAudit()` accepts a `tenantId` filter that restricts results to events carrying that tenant identifier in their payload. RBAC checks on `queryAudit()` use the tenant ID for the `can()` call.
+
+**`TenantContext` runtime resolution** (`src/core/tenant-context.ts`):
+1. `DECKENT_TENANT_ID` environment variable (highest priority)
+2. Explicit `opts.tenantId` passed to `resolveTenant()`
+3. `'local'` default (backward compatible — single-tenant and Sprint Mode are unaffected)
+
+`withTenant(tenantId, projectRoot, fn)` runs `fn` in an `AsyncLocalStorage`-scoped tenant context. Any call to `currentTenant()` or `tenantPath()` inside `fn` returns context for that `tenantId` without needing to thread the parameter explicitly.
+
+### Honest Scope (what is NOT yet implemented)
+
+- **Runtime process isolation** (F3-003 — k8s pod-exec, container sandboxing): not implemented. Isolation is path-level (filesystem roots + DB row scoping) only.
+- **SCIM / directory sync**: tenants are provisioned manually via config or the dashboard API; no automated directory sync.
+- **Cross-tenant RBAC**: RBAC is per-operation, not a per-tenant role assignment matrix. A `tenantId` is required on every `can()` call but tenant membership is not enforced beyond the config-declared list.
+
+For backward compatibility, `tenantId` defaults to `'local'` everywhere. A Deckent instance running in single-project Sprint Mode is unaffected.
 
 ---
 
@@ -71,7 +115,22 @@ For enterprise-grade traceability, the `ExecutionRequest` carries two lineage id
 -   `correlationId`: Groups a sequence of related events together into a single logical "session" or "transaction."
 -   `causationId`: Links an event directly to its parent event, forming a causal chain (`event A` caused `event B`).
 
-These IDs are propagated through the **Structured Event Stream** (`src/orchestra/event-stream.ts`). Every event emitted during a task's lifecycle is stamped with these IDs, creating an unbroken audit trail that is essential for security analysis, debugging, and compliance.
+These IDs are propagated through the **Structured Event Stream** (`src/core/event-stream.ts`). Every event emitted during a task's lifecycle is stamped with these IDs, creating an unbroken HMAC-chained audit trail.
+
+### Causal Chain Query API (`src/core/audit-query.ts`)
+
+Four read-only helpers operate over `AuditEventWithLineage[]` lists (no I/O — callers supply events from `readAuditEvents()` or `readArchivedAuditEvents()`):
+
+- **`filterByCorrelation(events, correlationId)`** — returns all events sharing a `correlationId`, scoping a full request flow.
+- **`filterByCausation(events, causationId)`** — returns all events whose `causationId` matches the given value (direct children of a parent event).
+- **`buildCausalChain(events, rootCorrelationId)`** — topological sort of the causation graph within a correlation group. Ancestors appear before descendants. Cyclic or unresolvable chains have their remaining events appended in stream order (never throws).
+- **`groupByActor(events)`** — returns a `Map<actor, AuditEvent[]>` grouped by the `actor` field. Events with a missing actor are grouped under the empty-string key.
+
+These helpers are composable: `buildCausalChain(filterByCorrelation(events, id), id)` gives the full ordered causal tree for one request flow.
+
+### HMAC Chain Integrity
+
+Every audit event (`src/core/audit-writer.ts`) carries a `hmac` (SHA-256) and a `prevHmac` that anchors to the preceding event's `hmac`, forming a tamper-evident chain. `verifyAuditChain()` validates this chain; a broken chain (including after deliberate GDPR-style pruning) reports `integrity: false` by design rather than silently hiding the deletion.
 
 ---
 

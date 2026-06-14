@@ -4,7 +4,7 @@
 
 > **Doc role (Alperen 2026-06-02 — SSOT split):** `blueprint.md` = **WHAT deckent is and WHERE it stands** (identity, capabilities, architecture-as-built, positioning). `docs/MASTER-PLAN.md` = **HOW we build it** (roadmap, sequencing, remaining work — development SSOT). `docs/vision/*` track the evolving story and are updated as we progress. Live Metrics + structural counts are auto-current; the deep §-bodies below are being brought fully current in Sprint 220 (doc-refresh task).
 
-> **What deckent is (2026-06-02):** the **god-level orchestration + enterprise layer of an open agent**, made so easy a single user wields the same power — **one MIT product** from a solo dev's laptop to a 10,000-person enterprise. **"Open source for open world."** We compare with peers (Devin, Cursor, Claude Code, Cowork) on capability — never as opposition. The architecture is a **core + enterprise-layer** split: the core is the same multi-agent orchestration every user runs; the enterprise layer (RBAC, audit, multi-tenant, scheduled flows) bolts on without forking. ([[project_deckent_positioning]])
+> **What deckent is:** the **god-level orchestration + enterprise layer of an open agent**, made so easy a single user wields the same power — **one MIT product** from a solo dev's laptop to a 10,000-person enterprise. **"Open source for open world."** The architecture is a **core + enterprise-layer** split: the core is the same multi-agent orchestration every user runs; the enterprise layer (RBAC, audit, multi-tenant, scheduled flows) bolts on without forking. ([[project_deckent_positioning]])
 
 > **Where it's heading — autonomous agentic runtime:** beyond on-demand sprints, deckent runs **continuously and autonomously within defined authority bounds** — install it into an enterprise and it tracks orders, analyzes, checks MRP, and acts on customer requests inside RBAC + approval limits. Built on Process Mode (F3) + scheduled-flows + nervous approval + Capability Broker (F8 ERP) + ADR-037 authority matrix. **"Deckent orchestered for everyone everywhere"** across 6 contexts (greenfield / in-dev / maintained / daily-tasks / ERP / enterprise). ([[project_deckent_everyone_everywhere]])
 >
@@ -15,12 +15,12 @@
 ## Live Metrics
 | Metrik | Değer |
 |--------|-------|
-| Sprint | sprint-286 |
-| Toplam Task | 57 |
-| Tamamlanan | 53 |
+| Sprint | sprint-287 |
+| Toplam Task | 3 |
+| Tamamlanan | 3 |
 | Tech Debt | 0 |
-| No-Go | 4 |
-| Süre | 47dk 34sn |
+| No-Go | 0 |
+| Süre | 14dk 39sn |
 | Coverage | N/A |
 
 # TABLE OF CONTENTS
@@ -98,9 +98,9 @@ Sprint + learning loop. Deckent doesn't just execute tasks — it plans sprints,
 | 3 | Multi-provider (OpenAI, Gemini) | Small teams | Sprint 13+ |
 | 4 | Platform (Web UI, VSCode, API) | Enterprise | Sprint 20+ |
 
-**Inspiration Sources:**
-- OpenClaw: workspace structure, memory tiers, skill system, AGENTS.md pattern
-- Claude Cowork: agentic loop, plan→execute→verify, plugin architecture
+**Design Influences:**
+- Agentic workspace patterns: workspace structure, memory tiers, skill system, AGENTS.md pattern
+- Agentic loop design: plan→execute→verify, plugin architecture
 - Claude Code: CLAUDE.md, .claude/rules/, headless mode, MCP, Agent Teams
 - Claude Managed Agents (CMA): rubric-based grading, versioned memory stores, agent versioning, managed environments, multi-SDK
 
@@ -1148,7 +1148,7 @@ Brain becomes team lead, workers become teammates with native messaging.
 
 # 11. PLUGIN & SKILL SYSTEM
 
-Inspired by OpenClaw skills + Cowork plugins.
+Deckent's plugin and skill system is a first-class extensibility layer — native to the sprint orchestration engine.
 
 ## Skill Structure
 
