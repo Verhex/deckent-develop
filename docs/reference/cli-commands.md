@@ -1212,7 +1212,7 @@ On startup, `deckent serve` displays a user-friendly banner showing:
 - Port and host configuration tips
 
 **Rate Limiting:**
-By default, loopback requests (localhost, 127.0.0.1, ::1) are exempt from rate limiting (configurable via `rateLimitExemptLoopback` in config).
+By default, loopback requests (localhost, 127.0.0.1, ::1) are exempt from rate limiting (configurable via the `rateLimitExemptLoopback` serve option).
 
 **Example:**
 ```bash

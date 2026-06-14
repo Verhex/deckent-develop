@@ -460,6 +460,6 @@ Bozuk JSON config dosyasi tespit edildiginde:
 
 ---
 
-_Son guncelleme: Sprint 150 (2026-04-21)_
-_Toplam key sayisi: ~65_
+_Son guncelleme: Sprint 286 (2026-06-14)_
+_Toplam key sayisi: 100+_
 _ADR referanslari: ADR-004 (3-layer merge), ADR-023 (tier generalization)_

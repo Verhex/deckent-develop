@@ -132,7 +132,7 @@ Web ve terminal gösterge panelinin veri modeli; PLAN fazında sıfırlanır, sp
 **ADR-088** — Memory V2 DB-First Architecture
 
 ### decay
-`.brain/` dizininin 600 satır sınırını aşması durumunda eski bellek girdilerini arşivleyen mekanizma. Her sprint sonunda tetiklenir.
+`.brain/` dizininin 900 satır sınırını aşması durumunda eski bellek girdilerini arşivleyen mekanizma. Her sprint sonunda tetiklenir.
 **Blueprint §6** — "Decay Mechanism"
 
 ### deckent init
@@ -356,7 +356,7 @@ Sprint retrospektifi Memory V2 DB'de `type='retro'` entry olarak saklanır; `.br
 **ADR-088** — Memory V2 DB-First Architecture
 
 ### runDecay
-Brain'in `.brain/` dizinini 600 satır sınırı altında tutmak için çalıştırdığı sıkıştırma/arşivleme fonksiyonu.
+Brain'in `.brain/` dizinini 900 satır sınırı altında tutmak için çalıştırdığı sıkıştırma/arşivleme fonksiyonu.
 **Blueprint §6** — "Decay Mechanism"
 
 ### runSprint

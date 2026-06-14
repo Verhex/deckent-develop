@@ -97,7 +97,7 @@ routeTaskV2(task, agentPool, skillPool, options)
   → RoutingDecision { agent, skills, confidence, routingVersion: 'v2' }
 ```
 
-**Fallback chain:** v2 routing → v1 `selectAgent()` → generic worker
+**Fallback chain:** v2 routing → `selectAgentByFallback()` → generic worker
 
 ### Override Support
 
