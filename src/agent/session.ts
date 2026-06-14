@@ -20,7 +20,7 @@ import type { RuleStore } from './permission-store.js';
 import type { ApprovalMode } from './permission-types.js';
 import { ToolRegistry } from './tools/registry.js';
 import { Transcript } from './transcript.js';
-import type { ProviderAdapter } from './provider-tooluse/types.js';
+import type { ProviderAdapter, ProviderMessage } from './provider-tooluse/types.js';
 
 export interface AgentSessionDeps {
   adapter: ProviderAdapter;
@@ -38,6 +38,8 @@ export interface AgentSession {
   respondPermission(id: string, response: PermissionResponse): void;
   cancel(): void;
   setApprovalMode(mode: ApprovalMode): void;
+  /** The cross-turn transcript (a copy) — for trace recording. */
+  transcript(): ProviderMessage[];
 }
 
 export function createAgentSession(deps: AgentSessionDeps): AgentSession {
@@ -96,6 +98,9 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
     },
     setApprovalMode(next: ApprovalMode): void {
       mode = next;
+    },
+    transcript(): ProviderMessage[] {
+      return transcript.toProviderMessages();
     },
   };
 }

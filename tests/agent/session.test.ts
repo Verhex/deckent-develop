@@ -88,4 +88,17 @@ describe('createAgentSession', () => {
     await drainP;
     expect(events).toContainEqual({ type: 'tool-result', id: 'w1', tool: 'writer', ok: true, output: 'wrote' });
   });
+
+  it('exposes the cross-turn transcript as a copy for trace recording', async () => {
+    const { adapter } = scripted([[{ type: 'text-delta', text: 'a' }, { type: 'done' }]]);
+    const s = createAgentSession(deps({ adapter }));
+    for await (const _ of s.send('hi')) { /* drain */ }
+    const t = s.transcript();
+    expect(t.map((m) => ({ role: m.role, content: m.content }))).toEqual([
+      { role: 'user', content: 'hi' },
+      { role: 'assistant', content: 'a' },
+    ]);
+    t[0]!.content = 'MUT'; // mutating the copy must not affect the session
+    expect(s.transcript()[0]!.content).toBe('hi');
+  });
 });
