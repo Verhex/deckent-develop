@@ -4,7 +4,7 @@
 
 **Tarih:** 5 Haziran 2026 · **Belge Tipi:** Dahili Mühendislik Yol Haritası
 **Yöntem:** Her boşluk 6 paralel Explore agent'ı ile **kod tabanında dosya:satır kanıtıyla doğrulandı** — spekülasyon değil.
-**İlgili:** [`competitive-analysis-2026-06.md`](competitive-analysis-2026-06.md)
+**İlgili:** [`competitive-analysis-2026-06.md`](../archive/competitive-analysis-2026-06.md)
 
 > **Bu belgenin amacı:** Piyasadaki alternatiflerde (Hermes-Agent, OpenHands, goose, LangGraph, git-native araçlar, IDE AI araçları) olup deckent'te
 > **olmayan veya eksik** güçlü yanları çıkarmak, her birini kodda doğrulamak ve **somut kapatma planına** dönüştürmek.

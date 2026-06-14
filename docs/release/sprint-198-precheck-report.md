@@ -11,7 +11,7 @@
 ## What this report is
 
 `scripts/beta-launch-precheck.mjs` is a single-shot pre-flight check that audits every gate in
-[`beta-tracker.md`](./beta-tracker.md) and prints a PASS / FAIL / WARN table. It is intended to
+[`beta-tracker.md`](../archive/beta-tracker.md) and prints a PASS / FAIL / WARN table. It is intended to
 run on each of the four packaging days (28-31 May 2026) immediately before `npm pack` so any
 late regression in the 20-gate matrix is caught before the GA tag.
 
