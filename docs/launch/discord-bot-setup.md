@@ -9,7 +9,7 @@
 
 | Gereksinim | Kontrol |
 |------------|---------|
-| Node.js >= 18 | `node --version` |
+| Node.js >= 24 | `node --version` |
 | Deckent CLI | `deckent --version` |
 | `tsc` build | `ls dist/` (mevcut olmalı) |
 | Discord hesabı | https://discord.com |
@@ -113,7 +113,7 @@ bash scripts/deploy-discord.sh --check
 Beklenen çıktı:
 ```
 ▶ Önkoşul Kontrolü
-[OK]    Node.js v20.x.x (>= 18 gerekli)
+[OK]    Node.js v24.x.x (>= 24 gerekli)
 [OK]    .deck dosyası mevcut
 [OK]    DISCORD_TOKEN .deck dosyasında mevcut
 [OK]    .deckent/config.json mevcut
@@ -133,60 +133,67 @@ bash scripts/deploy-discord.sh --smoke
 ### Bot'u Başlat
 
 ```bash
+# Ön koşul kontrolü yapılmış deploy script ile başlat:
 bash scripts/deploy-discord.sh
+
+# Ya da doğrudan CLI ile foreground'da başlat:
+deckent bot listen
+
+# Arka planda daemon olarak başlatmak için:
+deckent bot start
+deckent bot status   # daemon çalışıyor mu kontrol et
+deckent bot stop     # durdur
 ```
 
-Beklenen çıktı:
+Beklenen çıktı (`deploy-discord.sh`):
 ```
 ╔══════════════════════════════════════════════════╗
 ║     Deckent Discord Bot — Deploy Script          ║
-║     Sprint 151 — Beta GA Cutover                 ║
 ╚══════════════════════════════════════════════════╝
 
 ▶ Önkoşul Kontrolü
-[OK]    Node.js v20.x.x
+[OK]    Node.js v24.x.x
 ...
 
 ▶ Discord Bot Başlatılıyor
 [discord-bot] ✅ Discord bot başarıyla başlatıldı!
 [discord-bot] Komutları test etmek için Discord'da şunu yaz:
-[discord-bot]   !deckent help
-[discord-bot]   !deckent status
-[discord-bot]   !deckent ping
-[discord-bot] Durdurmak için: Ctrl+C
+[discord-bot]   /help
+[discord-bot]   /status
+[discord-bot]   /pending
+[discord-bot] Durdurmak için: Ctrl+C veya `deckent bot stop`
 ```
 
 ---
 
 ## Adım 6: Smoke Test
 
-Bot çalışırken Discord server'da şu komutları dene:
+Bot çalışırken Discord server'da `#deckent-bot` kanalında şu slash komutlarını dene:
 
-### `!deckent ping`
+> **Not:** Bot, slash komutları (`/help`, `/status` vb.) kullanır. `!deckent` prefix desteklenmez.
 
-```
-Deckent Bot → 🏓 Pong! Deckent bot aktif.
-```
-
-### `!deckent help`
+### `/help`
 
 ```
-Deckent Bot → **Deckent Bot Komutları:**
-`!deckent help` — Bu yardım mesajı
-`!deckent status` — Sprint durumunu göster
-`!deckent ping` — Bağlantı testi
-
-Tam CLI dokümantasyonu: `deckent --help`
+Deckent Bot → 🤖 deckent bot — commands:
+/help    — Bu yardım mesajı
+/status  — Sprint durumunu göster
+/history — Sprint geçmişi
+/pending — Onay bekleyen aksiyonlar
+approve <id> — Bir aksiyonu onayla
+reject <id>  — Bir aksiyonu reddet
 ```
 
-### `!deckent status`
+### `/status`
 
 ```
-Deckent Bot → **Deckent Bot Durumu:**
-✅ Bot online
-✅ Nervous system bağlı
-✅ Event bus aktif
-⏰ 2026-04-22T10:00:00.000Z
+Deckent Bot → [mevcut sprint durumu veya "sprint yok" mesajı]
+```
+
+### `/history`
+
+```
+Deckent Bot → [son sprint'lerin listesi]
 ```
 
 ### Herhangi Bir Mesaj (incoming-router testi)
@@ -206,9 +213,9 @@ payload: { type: 'INCOMING_MESSAGE', connectorId: 'discord', ... }
 Smoke test tamamlandıktan sonra aşağıdaki kanıtları kaydet:
 
 - [ ] Bot Discord server'da "Online" görünüyor
-- [ ] `!deckent ping` → Pong yanıtı alındı
-- [ ] `!deckent help` → Komut listesi gösterildi
-- [ ] `!deckent status` → Durum mesajı alındı
+- [ ] `/help` → Komut listesi gösterildi
+- [ ] `/status` → Durum mesajı alındı
+- [ ] `/history` → Sprint geçmişi alındı
 - [ ] Terminal loglarında `IncomingMessageRouter` mesajları görünüyor
 
 ---
@@ -306,7 +313,7 @@ bash scripts/deploy-discord.sh
 ### Bot Mesajlara Yanıt Vermiyor
 
 1. Bot'un sunucuda doğru yetkilere sahip olduğunu kontrol et (Adım 2)
-2. Mesajın `!deckent` ile başladığından emin ol (case-insensitive)
+2. Mesajın `/help`, `/status` gibi slash formatıyla başladığından emin ol
 3. Terminal loglarında hata mesajı var mı kontrol et
 
 ---
@@ -325,7 +332,7 @@ EventBus (src/orchestra/event-bus.ts)
 Nervous System Detectors
 ```
 
-Bot gelen mesajları `IncomingMessageRouter` üzerinden Deckent'in event bus'ına yönlendirir. Bu sayede nervous system detectors Discord mesajlarına tepki verebilir (ör. `!deckent status` komutu sprint durumunu sorgulayabilir).
+Bot gelen mesajları `IncomingMessageRouter` üzerinden Deckent'in event bus'ına yönlendirir. Bu sayede nervous system detectors Discord mesajlarına tepki verebilir (ör. `/status` komutu sprint durumunu sorgular, `/pending` onay bekleyenleri listeler).
 
 ---
 

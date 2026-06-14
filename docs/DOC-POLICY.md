@@ -1,7 +1,7 @@
 # Documentation Policy — Core Docs & Update Rules
 
 > **Status:** CANONICAL (hand-maintained). Defines which documents are the source of truth, which are auto-generated, which are frozen — and **what to update vs skip during development.**
-> **Last reviewed:** 2026-06-01 (Sprint 211).
+> **Last reviewed:** 2026-06-14 (Sprint 286).
 
 The #1 rule: **never hand-edit an auto-generated document.** It will be overwritten on the next `deckent` finalize/regen. Fix the *generator/template/data source* instead, then regenerate. The managed-docs registry is `.deckent/docs.json` (ADR-029/030/031).
 
@@ -37,7 +37,7 @@ Registered in `.deckent/docs.json`. Each has `autoSections` (regenerated, overwr
 | `AGENTS.md` | provider-parity frontmatter, agent/skill tables | — |
 | `.deckent/workspace/TOOLS.md` | tool/command tables | — |
 | `.deckent/workspace/BOOT.md` | boot sequence | — |
-| `.deckent/workspace/WORKER-GUIDE.md` | worker rules | — |
+| `.deckent/workspace/WORKER-GUIDE.md` | Anti-Patterns (auto) | .plan File, Heartbeat File, Result File, Error Handling, Scope Rules, Verify Loop, Skill & Agent Context |
 | `docs/reference/mcp-tools.md` | full tool list (`npm run docs:ref`) | — |
 
 **Regen triggers:** sprint finalize (managed-doc-runner), `npm run docs:ref` (mcp-tools), `deckent memory export` (`.brain/exports/*`). Auto sections use content-hash caching (ADR-031) — they only re-render when source data changes.
@@ -84,10 +84,8 @@ When a sprint changes the codebase:
 
 ---
 
-## Known doc-code drift (Sprint 211 audit — to fix via regen or hand)
+## Known doc-code drift (Sprint 286 audit)
 
-- **VISION.md "by the Numbers" (auto):** shows 28 MCP tools / 62+ CLI; real = **32 MCP / 49+ CLI** (IDENTITY canonical). → fix by regenerating managed-docs (generator data was stale).
-- **CLAUDE.md / DECKENT.md module counts (auto):** `core/` says 90, real = **111**; `orchestra/` says 76, real = **88**. → regen.
-- **README badge:** "sprints-190+" → should be 211+; "96% context reduction" claim has no `docs/benchmark/memory-v2.md` proof. → hand-fix / add benchmark.
-- **VISION.md Mission (protected):** "31 MCP tools, 55+ ADRs" → **32 MCP tools, 65+ ADRs (latest ADR-074)**. → hand-fixed Sprint 211.
-- **VISION.md Roadmap (protected):** "Phase 3 Public Beta — Next (Sprint 167-168)" was stale (we are at Sprint 211, beta GA'd). → hand-fixed Sprint 211, points to MASTER-PLAN.
+Auto-section counts regenerate via managed-docs on every sprint finalize — stale numbers in Tier 2 `autoSections` are expected to self-correct on the next finalize run. Hand-edited `protectedSections` must be updated manually when the underlying feature changes.
+
+If you discover new drift, add it here with the sprint number and fix path (regen vs hand-edit).

@@ -1,41 +1,39 @@
-# Deckent vs Rakipler: Stratejik Karsilastirma Analizi
+# Deckent — Stratejik Güçlü Yanlar (Mart 2026 Arşiv)
 
-> ⚠️ **GÜNCELLİK NOTU:** Bu belge 27 Mart 2026 tarihlidir. Güncellenmiş, doğrulanmış ve genişletilmiş
-> sürüm (Hermes-Agent, OpenHands, goose, LangGraph dahil + canlı primary-kaynak verisi) için bkz:
-> [`competitive-analysis-2026-06.md`](competitive-analysis-2026-06.md) (5 Haziran 2026).
+> ⚠️ **ARŞİV:** Bu belge 27 Mart 2026 tarihlidir ve aktif olarak güncellenmemektedir.
+> Güncellenmiş sürüm için bkz: [`competitive-analysis-2026-06.md`](competitive-analysis-2026-06.md) (Haziran 2026).
 
 **Tarih:** 27 Mart 2026 | **Belge Tipi:** Dahili Strateji Raporu
 
 ---
 
-## Kategori Bazli Karsilastirma Matrisi (1-5)
+## Deckent Yetenek Değerlendirmesi (1-5)
 
-| Boyut | Deckent | OpenClaw | Devin | Claude Code | Cursor | Windsurf | Aider |
-|---|---|---|---|---|---|---|---|
-| Kurulum kolayligi | 3 | 4 | 5 | 5 | 5 | 5 | 4 |
-| Sprint/task orkestrasyon | **5** | 2 | 4 | 2 | 1 | 2 | 1 |
-| Multi-agent yonetimi | 4 | 3 | 3 | 4 | 1 | 3 | 1 |
-| Ogrenme/memory sistemi | **4** | 3 | 3 | 3 | 2 | 2 | 1 |
-| Plugin/skill ekosistemi | 2 | **5** | 1 | 3 | 4 | 2 | 2 |
-| Community/adoption | **1** | **5** | 3 | 4 | **5** | 3 | 4 |
-| Enterprise readiness | **1** | 3 | 4 | 3 | 4 | 2 | 2 |
-| Fiyat/deger orani | 4 | 4 | 2 | 4 | 3 | 3 | **5** |
-| Genisletilebilirlik | 4 | 4 | 1 | 3 | 3 | 2 | 3 |
-| Dokumantasyon | 2 | 4 | 3 | 4 | 4 | 3 | 4 |
-| **TOPLAM** | **30** | **37** | **29** | **35** | **32** | **27** | **27** |
+| Boyut | Deckent | Notlar |
+|---|---|---|
+| Kurulum kolaylığı | 3 | Tek-komut kurulum hedefleniyor; wizard mevcut |
+| Sprint/task orkestrasyon | **5** | 8-faz motor, 76+ orkestra modülü, sektörde eşsiz |
+| Multi-agent yönetimi | 4 | Brain/Worker/Auditor hiyerarşisi, paralel dependency waves |
+| Öğrenme/memory sistemi | **4** | SQLite FTS5, 9 tip entry, dual-layer i18n, otomatik decay |
+| Plugin/skill ekosistemi | 2 | 21 built-in skill, temp→permanent evolution pipeline |
+| Community/adoption | 1 | Pre-beta; public release hedefleniyor |
+| Enterprise readiness | 1 | RBAC V1 advisory; enterprise tier yol haritasında |
+| Fiyat/değer oranı | 4 | MIT lisansı, açık kaynak, sıfır platform lock-in |
+| Genişletilebilirlik | 4 | MCP server+client, plugin loader, custom generator |
+| Dokümantasyon | 2 | Geliştirilme sürecinde; kullanıcı-yönelik içerik artıyor |
 
 ---
 
 ## Deckent Nerede Guclu?
 
 ### 1. Sprint Orkestrasyon Motoru (Sektorde Essiz)
-PLAN-SPAWN-EXECUTE-EVALUATE-FIX-RETRO-DECAY-CLEANUP dongusu hicbir rakipte yok. Devin otonom ama kullaniciya sprint kontrolu vermiyor. Cursor/Claude Code "tek task" mentalitesinde. 78+ orchestra modulu bu alanin en derin implementasyonu.
+PLAN-SPAWN-EXECUTE-EVALUATE-FIX-RETRO-DECAY-CLEANUP döngüsü — kullanıma hazır, opinionated bir sprint yöneticisi sunan sistem sayısı çok azdır. Çoğu araç tek-task düşünür; deckent tüm geliştirme ekibini 8-faz boyunca yönetir. 78+ orkestra modülü bu alanın endüstrideki en derin implementasyonu.
 
 ### 2. V2 Intent-Based Routing (3-Katman)
 intent-classifier → activation-engine → routing-engine. Task'i anlamlandirip dogru agent+skill+provider kombinasyonuna yonlendiren yapisal sistem. Rakiplerin cogu sabit kural tabanli.
 
 ### 3. Yapisal Hafiza + Otomatik Decay
-.brain/memory.db (SQLite FTS5) + learning-decay. 9 entry type (ADR, memory, sprint, debt, pattern, retro, error, identity, audit), dual-layer i18n normalize, `deckent recall` CLI. Claude Code basit key-value, OpenClaw manuel MEMORY.md. Deckent zamanla curuyen yapisal bilgi tabani.
+.brain/memory.db (SQLite FTS5) + learning-decay. 9 entry type (ADR, memory, sprint, debt, pattern, retro, error, identity, audit), dual-layer i18n normalize, `deckent recall` CLI. Deckent zamanla çürüyen yapısal bilgi tabanı — her sprint sonrası güncel kalır, decay mekanizması alakasız bilgiyi otomatik kaldırır.
 
 ### 4. Muhendislik Disiplini
 16,697+ test descriptor, 186+ sprint. Bu seviyede test disiplinine sahip acik kaynak AI araci cok az.
@@ -48,13 +46,13 @@ Claude + Codex + Gemini + fallback chain + model equivalence. Cogu rakip tek pro
 ## Deckent Nerede Geri?
 
 ### 1. SIFIR KULLANICI (En Kritik)
-Henuz public bile degil. OpenClaw 250K star / 2M kullanici. Cursor 1M+ kullanici. Aider 42K star. Teknik ustunluk kullanicisiz anlamsiz.
+Henüz public bile değil. Teknik üstünlük kullanıcısız anlamsız; piyasadaki olgun araçlar büyük topluluklara sahip. Bu boşluk en kritik risk olmaya devam ediyor.
 
 ### 2. Windows Native Destek Yok
 Dunyada gelistiricilerin ~%50'si Windows. WSL2 gerekliligi ciddi bariyer. Tum rakipler Windows destekliyor.
 
 ### 3. Enterprise Katmani Yok
-SSO, RBAC, audit log, SOC2, SLA, on-premise — hicbiri yok. Devin Goldman Sachs ile calisiyor cunku bu katmanlara sahip.
+SSO, RBAC, audit log, SOC2, SLA, on-premise — hiçbiri yok. Ticari otonom platformlar kurumsal müşterilere bu katmanlar sayesinde ulaşıyor.
 
 ### 4. Dokumantasyon Kullaniciya Yonelik Degil
 222 markdown dosyasi var ama hepsi dahili. Hello world ornegi, tutorial serisi, video walkthrough eksik.

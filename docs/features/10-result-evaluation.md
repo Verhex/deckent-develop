@@ -26,9 +26,11 @@ Worker → .result dosyası → evaluateWithRubric()
    2. testsPassed false?      → NO_GO  (Bash yoksa → GO_WITH_TECH_DEBT)
    3. Doc task?               → DONE   (coverage atlanır)
    4. Rubric skorla:
-        correctness ≥60  + test_coverage ≥50  + scope_compliance ≥80
-   5. Tüm eşikler aşıldı?    → DONE
-      Bir eşik kaçırıldı?     → GO_WITH_TECH_DEBT
+        correctness ≥60  + test_coverage ≥50  + scope_compliance ≥80  + documentation ≥30
+        toplam ağırlıklı skor: correctness×0.4 + test_coverage×0.25 + scope_compliance×0.2 + documentation×0.15
+   5. totalScore ≥ 70?        → DONE
+      totalScore ≥ 49?        → GO_WITH_TECH_DEBT
+      totalScore < 49?        → NO_GO
    6. CODE_VERIFIED_DONE disk doğrulaması (NO_GO ise):
         dosyalar diskte var + kanıt uyuştu → GO_WITH_TECH_DEBT kurtarması
 ```

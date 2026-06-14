@@ -11,6 +11,11 @@
 3. [Building the Worker Image](#3-building-the-worker-image)
 4. [Configuration](#4-configuration)
 5. [Architecture](#5-architecture)
+   - [5.1 Volume Mount Strategy](#51-volume-mount-strategy)
+   - [5.2 Authentication](#52-authentication)
+   - [5.3 Non-Root Execution](#53-non-root-execution)
+   - [5.4 Container Lifecycle](#54-container-lifecycle)
+   - [5.5 Graceful Shutdown (SIGTERM + fsync)](#55-graceful-shutdown-sigterm--fsync)
 6. [Running a Sprint](#6-running-a-sprint)
 7. [Troubleshooting](#7-troubleshooting)
 
@@ -209,6 +214,42 @@ The container timeout is 20 minutes by default. You can override it via `config.
 ```
 
 This sets the timeout to 1800 seconds (30 minutes). If a worker exceeds the timeout, the `timeout` wrapper inside the container kills the process and writes a `.timeout` marker file to `.tasks/`.
+
+### 5.5 Graceful Shutdown (SIGTERM + fsync)
+
+When Brain calls `kill(taskId)`, the Docker backend performs a **graceful stop** rather than an immediate `SIGKILL`:
+
+```
+kill(taskId)
+  │
+  ├─ docker stop --time=15 deckent-w-<taskId>
+  │    └─ SIGTERM sent to container PID 1
+  │         └─ Container EXIT trap fires:
+  │               ├─ fsync_file "$RFILE"   ← flush .result to disk
+  │               └─ fsync_file "$HBFILE"  ← flush .hb to disk
+  ├─ Wait up to 15s for container to exit (then SIGKILL if still running)
+  ├─ Poll for .result file (up to 5s, 500 ms intervals)
+  ├─ Host-side fsync of .result (belt-and-suspenders)
+  └─ docker rm -f <containerName>
+```
+
+The EXIT trap is installed inside every worker container by the spawn script. It runs on both normal exit and SIGTERM:
+
+- **Normal exit:** If `.result` already exists, `fsync_file` flushes it to disk and the trap returns.
+- **Last-chance window:** If `.result` is missing, the trap waits up to 5 seconds re-checking (catches late flush from clean exit-0 on usage-limit / stream cut).
+- **TIMEOUT_WITH_WORK:** If exit is non-zero and git diff shows changed files, a `TIMEOUT_WITH_WORK` marker is written so Brain can reconcile the partial work.
+- **EXIT_WITHOUT_RESULT:** If no files changed and no `.result`, an enriched `EXIT_WITHOUT_RESULT` marker is written with `workPresent=false` to distinguish "nothing done" from "partial work lost."
+
+**Grace period:** 15 seconds by default. After 15 seconds the container receives `SIGKILL`. The fsync in the EXIT trap ensures `.result` and `.hb` survive even if SIGKILL fires immediately after SIGTERM.
+
+**Configuring the grace period** (programmatic API only — no config.json key):
+```typescript
+SpawnBackendFactory.create({
+  backend: 'docker',
+  projectDir: '/path/to/project',
+  dockerGracefulTimeoutSeconds: 30, // default: 15
+});
+```
 
 ---
 

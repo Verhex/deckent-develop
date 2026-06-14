@@ -55,6 +55,6 @@ deckent status --json | jq '.auditorAlerts'
 
 ## Durum
 
-- Olgunluk: ✅ canlı (ADR-008 accepted — Sprint 1'den beri aktif; 190+ sprint dogfood)
+- Olgunluk: ✅ canlı (ADR-008 accepted — Sprint 1'den beri aktif; 285+ sprint dogfood)
 - Auditor RBAC V1.0: ✅ advisory (ADR-037 — runtime soft-enforce; hard-flip V2 post-GA planında)
 - İlgili: ADR-008 · ADR-037 · `src/orchestra/sprint-controller.ts` · `src/monitor/auditor.ts`

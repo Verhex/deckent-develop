@@ -56,9 +56,16 @@ Varsayılan olarak Nervous System **kapalıdır**. Açmak için `.deckent/config
         "enabled": true,
         "threshold_ms": 180000
       },
-      "dead_event_stream": {
+      "scope_collision": {
+        "enabled": true
+      },
+      "debt_trend": {
         "enabled": true,
-        "threshold_ms": 600000
+        "threshold_rate": 0.15
+      },
+      "agent_routing": {
+        "enabled": true,
+        "anomaly_threshold": 0.40
       },
       "directives_protection": {
         "enabled": true,
@@ -69,13 +76,13 @@ Varsayılan olarak Nervous System **kapalıdır**. Açmak için `.deckent/config
 }
 ```
 
-Bu, Sprint 180 W3-2'de tanımlanan **Faz 1 smoke** konfigürasyonudur: 3 detector açık, mode `strict`, severity_min `critical`.
+Bu yapılandırmada **5 detector varsayılan olarak açıktır**: `stale_worker`, `scope_collision`, `debt_trend`, `agent_routing`, `directives_protection`. Mode `strict` — `severity_min` değerini ihtiyaca göre `critical` veya `warning` olarak ayarla.
 
-Diğer 9 detector default `enabled: false`. Bunlar Faz 2 ve Faz 3'te kademeli aktive edilecek.
+Diğer 7 detector (`dead_event_stream`, `task_mode_idle`, `build_failure_recurrence`, `token_spike`, `agent_routing_anomaly`, `scope_collision_rate`, `notification_delivery_health`) varsayılan `enabled: false`'tır. Projeye göre ihtiyaç duyulduğunda etkinleştirilebilir.
 
 ---
 
-## Faz 1 — 3 Detector
+## Varsayılan Detector'lar (5 Aktif)
 
 ### 1. stale_worker
 
@@ -96,26 +103,49 @@ Aktif worker'ların heartbeat dosyalarını (`.tasks/task-<id>.hb`) izler. Thres
 
 `threshold_ms` projeye göre ayarlanabilir. Docker backend için 180s yeterli; uzak provider'lar (gemini, slow tier) için 300s daha güvenli olabilir.
 
-### 2. dead_event_stream
+### 2. scope_collision
 
-`.deckent/sprint-events.jsonl` dosyasının son güncelleme zamanını izler. Threshold (default 600000ms = 10dk) boyunca yeni event yok + aktif worker var → **critical** alarm.
+Aynı dosyaya yazmak için birden fazla task'ın `filesWrite` kapsamının çakıştığını tespit eder. PLAN ve EXECUTE fazlarında çakışan görevler varsa **medium risk** alarmı + `SCOPE_COLLISION_REORDER` önerisi.
 
-**Tetikleyici:** Sprint 145 08:14 TRT incident: tüm worker'lar tmux session'da yaşıyordu ama hiçbiri heartbeat veya .result yazmıyordu. Event stream öldü, Brain ne olduğunu anlayamadı.
-
-**Önerilen eylem:** Sprint stall sinyali olarak kullanıcıya bildirim — manuel inceleme + `deckent recover` veya `deckent kill --all` kararı kullanıcıya bırakılır.
+**Önerilen eylem:** Bağımlılık grafiği yeniden sıralanır ya da çakışan task'lar seri yürütülmesi için reorder edilir.
 
 **Konfigürasyon:**
 
 ```json
-"dead_event_stream": {
-  "enabled": true,
-  "threshold_ms": 600000
+"scope_collision": {
+  "enabled": true
 }
 ```
 
-Pasif fazlar (`IDLE`, `CLEANUP`, `RETRO`, `DECAY`) ve aktif worker yokken alarm üretmez — false positive üretmemek için tasarlanmıştır.
+### 3. debt_trend
 
-### 3. directives_protection
+Son 3 sprint'teki tech-debt oranını izler. Oran `threshold_rate` (default %15) üzerindeyse **medium risk** alarmı + `DEBT_REPRIORITIZE` önerisi.
+
+**Konfigürasyon:**
+
+```json
+"debt_trend": {
+  "enabled": true,
+  "threshold_rate": 0.15
+}
+```
+
+### 4. agent_routing
+
+Agent atama anomalilerini tespit eder: geçersiz agent ID (`string;` gibi TypeScript kalıntısı), tek agent'a %40 üzeri aşırı yükleme (anomaly_threshold). **Medium risk** alarmı + `AGENT_PERFORMANCE_FLAG` önerisi.
+
+**Tetikleyici:** Sprint 146 T-146-005 `string;` corruption — assignedAgent alanına geçersiz değer yazıldı.
+
+**Konfigürasyon:**
+
+```json
+"agent_routing": {
+  "enabled": true,
+  "anomaly_threshold": 0.40
+}
+```
+
+### 5. directives_protection
 
 `DIRECTIVES.md` dosyasının mid-sprint bütünlüğünü korur. Sprint başında baseline hash kaydedilir. EXECUTE veya FIX fazında dosya:
 
@@ -308,11 +338,35 @@ deckent nervous history --json
 
 ---
 
+## Opsiyonel Detector'lar
+
+Aşağıdaki 7 detector `enabled: false` ile gelir. Projenize göre açabilirsiniz:
+
+| Detector ID | Açıklama |
+|-------------|---------|
+| `dead_event_stream` | Sprint event stream'inin uzun süre sessizleşmesini tespit eder (default threshold: 10dk) |
+| `task_mode_idle` | Task-mode (tek görev) sprint'lerinde uzun boşluk kalmasını tespit eder |
+| `build_failure_recurrence` | Tekrarlayan build hatası pattern'ini izler |
+| `token_spike` | Ani token-maliyeti artışlarını tespit eder (cost_threshold ile birlikte kullanılır) |
+| `agent_routing_anomaly` | Gelişmiş agent routing anomaly analizi |
+| `scope_collision_rate` | Kümülatif scope çakışma oranını izler |
+| `notification_delivery_health` | Bildirim iletim başarısını izler |
+
+**dead_event_stream** aktifleştirmek için:
+
+```json
+"dead_event_stream": {
+  "enabled": true,
+  "threshold_ms": 600000
+}
+```
+
+---
+
 ## Sonraki Adımlar
 
-- **Faz 2 (Sprint 181+):** 4 detector daha aktive olur (scope_collision, debt_trend, cost_threshold, prompt_quality)
-- **Faz 3 (Sprint 182+):** Tüm 12 detector + custom detector plugin loader
-- **Full user guide:** Sprint 181 post-beta tamamlanır, detector-by-detector tuning rehberi, runbook senaryoları, telemetri grafikleri
+- Tüm 12 detector şu an kodda mevcuttur; opsiyonel olanlar config üzerinden açılabilir
+- **Full tuning rehberi:** Detector-by-detector eşik ayarı, runbook senaryoları ve telemetri grafikleri için `docs/development/troubleshooting.md` ve `deckent nervous history` komutunu kullanın
 
 ---
 

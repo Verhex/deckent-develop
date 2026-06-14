@@ -43,8 +43,10 @@ Or use tier-based config for full provider-agnostic operation:
 
 ```json
 {
-  "brain_tier": "premium",
-  "worker_tier": "standard"
+  "model_strategy": {
+    "brain_tier": "premium",
+    "worker_tier": "standard"
+  }
 }
 ```
 
@@ -139,10 +141,11 @@ ollama serve
 # 2. Pull a model
 ollama pull llama3
 
-# 3. Configure Deckent
+# 3. Configure Deckent to use Ollama as the worker provider
 deckent config set worker_provider ollama
-deckent config set ollama_model llama3
 ```
+
+Specify the Ollama model per-task in `DIRECTIVES.md` using the model field (e.g. `- Model: llama3`), or rely on the model registry's tier defaults for the `ollama` provider.
 
 Ollama tasks bypass subscription auth and API key requirements entirely. No `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` is needed.
 

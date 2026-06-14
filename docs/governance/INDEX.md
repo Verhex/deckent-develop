@@ -10,7 +10,6 @@
 - [God Analysis FINAL-REPORT.md](../../.deckent/archive/sprints/misc/sprint-god-analysis/FINAL-REPORT.md) — Sprint 142 self-analysis + closure tracking (Sprint 172 doc-reorg ile arşive taşındı)
 
 ## Yapısal Plan (Static Plans)
-- [DECKENT-ANA-PLAN-TR.md](../../DECKENT-ANA-PLAN-TR.md) — TR ana plan, her major sprint sonu güncellenir ⚠️ Sprint 164 sonrası güncellenmedi
 - [blueprint.md](../vision/blueprint.md) — EN technical blueprint (Sprint 172 doc-reorg: `DECKENT-MASTER-BLUEPRINT.md` → `docs/vision/blueprint.md`)
 
 ## Beta Tracking

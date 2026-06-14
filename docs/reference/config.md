@@ -72,16 +72,20 @@
 
 | Key | Type | Default | Env Var | Description |
 |-----|------|---------|---------|-------------|
-| `spawn_backend` | `'docker' \| 'tmux' \| 'subprocess' \| 'auto'` | (auto-detect) | — | Worker calistirma backend'i. `deckent init` sirasinda sistem kapasitesine gore otomatik belirlenir. |
+| `spawn_backend` | `'docker' \| 'tmux' \| 'subprocess'` | `'docker'` | — | Worker calistirma backend'i. Docker izolasyon varsayilan (ADR-027, Sprint 177). |
 | `docker_image` | `string` | `'deckent-worker:latest'` | — | Docker worker container imaji. |
 | `docker_timeout` | `number` | `1200` | — | Docker container timeout (saniye). |
-| `worker_memory_limit` | `string` | `'2g'` | — | Docker worker container bellek limiti (orn. `'2g'`, `'512m'`). |
-| `worker_memory_swap` | `string` | `'3g'` | — | Docker worker container swap limiti. `worker_memory_limit`'ten buyuk olmali. |
+| `worker_memory_limit` | `string` | `'2g'` | — | Docker-only: worker container bellek limiti (orn. `'2g'`, `'512m'`). Typed `DeckentConfig`'ta yok, raw config. |
+| `worker_memory_swap` | `string` | `'3g'` | — | Docker-only: worker container swap limiti. `worker_memory_limit`'ten buyuk olmali. Typed `DeckentConfig`'ta yok, raw config. |
+| `worker_memory_limit_by_kind` | `object` | `undefined` | — | Per-task-kind Docker bellek limiti override. Anahtar: TaskKind (`'code'`, `'doc'`), deger: bellek string (`'1.5g'`). |
 | `multi_ide_mode` | `boolean` | `false` | — | Birden fazla IDE ortamini destekle. |
-| `max_workers` | `number` | (auto-detect) | — | User-level override. Tum modlardan bagimsiz, top-level limit. Preset degerleri override eder. |
+| `chat_provider` | `'claude' \| 'codex' \| 'gemini' \| 'ollama'` | — | — | REPL/chat icin isteğe bagli provider override. Yok ise `brain_provider` -> `'claude'` zinciri izlenir. Sprint 220. |
+| `pre_sprint_tests` | `boolean` | `false` | — | Sprint baslangicinda tam test suite calistir. Varsayilan `false` — bloke eder, opt-in. Sprint 255. |
+| `strict_tenant_isolation` | `boolean` | `false` | — | NULL-tenant satirlari filtrele (Enterprise multi-tenant). Sprint 261. |
+| `token_throttle_ms` | `number` | `500` | — | Worker spawn oncesi throttle (ms). 0 = devre disi. Sprint 202. |
 
 > **Sprint 150 Degisiklik:** `claude_backend` kaldirildi — `spawn_backend` kullanin.
-> **System Capacity MVP:** `deckent init` sirasinda RAM ve CPU'ya gore `max_workers` ve `spawn_backend` otomatik onerilir.
+> **System Capacity:** `deckent init` sirasinda RAM ve CPU'ya gore `max_workers` ve `spawn_backend` onerilir.
 
 ---
 
@@ -107,13 +111,15 @@
 |-----|------|---------|-------------|
 | `fix_phase_enabled` | `boolean` | `true` | Basarisiz task'lari fix phase'de tekrar dene. |
 | `max_fix_retries` | `number` | `2` | Fix phase'de max deneme sayisi (0-10). |
-| `coverage_threshold` | `number` | `90` | Tech debt olmadan gecmek icin min. coverage %. |
+| `coverage_threshold` | `number` | `90` | **Deprecated.** `coverage_aspirational` tohumu olarak kullanilir. |
+| `coverage_hard_floor` | `number` | `50` | Degismez EVALUATE alt esigi. Finalizer bunu asagi cekemez. Sprint 179. |
+| `coverage_aspirational` | `number` | `90` | Hedef coverage. `adaptive_thresholds: true` ise finalizer otomatik ayarlar, ama `coverage_hard_floor`'un altina dusemez. Sprint 179. |
 | `max_reroutes` | `number` | `3` | Mid-sprint adapter'da task basi max reroute. |
 | `reroute_on_tech_debt` | `boolean` | `false` | GO_WITH_TECH_DEBT task'lari da reroute et. |
 | `sprint_timeout_minutes` | `number` | `0` | Sprint timeout (dakika). 0 = limitsiz. |
 | `sprint_checkpoint_interval` | `number` | `5` | Her N terminal task'ta checkpoint yaz. |
 | `cleanup_delay_ms` | `number` | `180000` | Cleanup'tan once bekleme (ms). 0 = hemen. |
-| `ai_planner_timeout` | `number` | `60000` | AI planner subprocess timeout (ms). |
+| `ai_planner_timeout` | `number` | — | AI planner subprocess timeout (ms). |
 | `human_checkpoints` | `string[]` | `[]` | Insan onayi gereken fazlar: `'plan'`, `'evaluate'`, `'fix'`. Bos = tam otonom. |
 | `dependency_pipeline_enabled` | `boolean` | `true` | ADR-045 wave-based execution. `true` = Kahn algoritmasiyla topological wave spawning, cascade-on-NO_GO, unblock-on-DONE. `false` = Brain manuel wave yonetimi. **deckent-dev projesi kasitli `false`** (ADR-047). |
 
@@ -125,7 +131,7 @@
 |-----|------|---------|-------------|
 | `scan_interval` | `number` | `30` | Auditor tarama araligi (saniye, 5-600). |
 | `heartbeat_timeout` | `number` | `120` | Heartbeat stale esigi (saniye, 30-600). |
-| `boundary_enforcement` | `boolean` | `true` | Worker scope sinir kontrolu. |
+| `boundary_enforcement` | `boolean` | `true` | Worker scope sinir kontrolu (ADR-037 advisory/soft — uyari+emit, bloke ETMEZ). |
 | `lock_stale_threshold` | `number` | `300` | Kilit stale esigi (saniye, 30-3600). |
 | `auto_clean_locks` | `boolean` | `false` | Stale kilitleri otomatik temizle. |
 
@@ -224,7 +230,97 @@
 | `timeout.effort_base.high` | `number` | `2400` | Yuksek efor baz suresi. |
 | `timeout.loc_scaling_enabled` | `boolean` | `true` | Kod satiri tahminine gore timeout olcekleme. |
 | `timeout.history_scaling_enabled` | `boolean` | `true` | Gecmis sprint verisine gore timeout olcekleme. |
-| `timeout.runtime_extension_enabled` | `boolean` | `false` | Calisma sirasinda timeout uzatma. |
+| `timeout.runtime_extension_enabled` | `boolean` | `true` | Calisma sirasinda heartbeat-aware timeout uzatma. Sprint 191'de `false` -> `true` alindi. |
+| `timeout.adaptive_multiplier` | `number` | `1.5` | Tahmini timeout'a uygulanan carpan (>= 1.0). Sprint 192. |
+| `timeout.runtime_extension_max` | `number` | `5` | Task basi max uzatma sayisi. Sprint 192. |
+
+---
+
+## Resource Monitor
+
+Docker worker kaynak izleme (Sprint 271). Varsayilan devre disi — `opt-in`.
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `resource_monitor.enabled` | `boolean` | `false` | Master switch. |
+| `resource_monitor.interval_ms` | `number` | `5000` | Ornekleme araligi (ms, min 1000). |
+| `resource_monitor.log_path` | `string` | `'.deckent/resource-log.jsonl'` | JSONL log dosyasi yolu. |
+
+---
+
+## Cache Warm
+
+Prompt-cache isi tutma (Sprint 274 F1-TOK Faz 2). Varsayilan devre disi — `opt-in`.
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `cache_warm.enabled` | `boolean` | `false` | Master switch. |
+| `cache_warm.warm_delay_ms` | `number` | `45000` | Ilk dalgada 2. ve sonraki worker'lara uygulanan gecikme (ms, 5000-180000). |
+
+---
+
+## Plan Phase
+
+Sprint 276 PLAN-INT-1. Varsayilan devre disi — `opt-in`.
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `plan.interrogate` | `boolean` | `false` | Plan oncesi directive sorgulama. `true` ise Brain DIRECTIVES.md hakkinda aciklayici sorular sorar. |
+
+---
+
+## Cross Verify
+
+Capraz-provider tersleyici dogrulama (Sprint 276 XVER-1). Varsayilan devre disi — `opt-in`.
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `cross_verify.enabled` | `boolean` | `false` | Master switch. |
+| `cross_verify.high_stakes_only` | `boolean` | `true` | Yalniz yuksek-riskli task'lari dogrula (security/auth/P0/risk-tagged). |
+| `cross_verify.verifier_priority` | `string[]` | `['codex','gemini','claude']` | Dogrulayici provider secim sirasi. |
+
+---
+
+## Worker Communications
+
+Worker-to-worker iletisim (Sprint 278 COMM-1). Varsayilan devre disi — `opt-in`.
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `worker_comms.enabled` | `boolean` | `false` | Master switch. |
+| `worker_comms.shared_memory_ttl_ms` | `number` | `3600000` | Paylasilan bellek girislerinin yasam suresi (ms). |
+| `worker_comms.inject_handoffs` | `boolean` | `true` | Upstream handoff notlarini downstream worker prompt'una ekle. |
+| `worker_comms.inject_shared` | `boolean` | `true` | Paylasilan bellek icerigini worker prompt'una ekle. |
+
+---
+
+## Cost Guard
+
+Sprint-ici token maliyet kesici (Sprint 279 WK-cost). Varsayilan devre disi — `opt-in`.
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `cost_guard.enabled` | `boolean` | `false` | Master switch. |
+| `cost_guard.max_limit_cost_usd` | `number` | — | Bu USD esigine ulasildiginda dispatch durur. |
+
+---
+
+## Autonomous Engine
+
+Otonom yurutme motoru (Sprint 226, ADR-040). Her alt-blok varsayilan devre disi — `opt-in`.
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `autonomous.enabled` | `boolean` | `false` | Master switch (flag-gated, ADR-040). |
+| `autonomous.interval_ms` | `number` | `5000` | Bos-tiklamalarda bekleme araligi (ms). |
+| `autonomous.backlog_path` | `string` | `'.deckent/autonomous/backlog.json'` | Backlog dosya yolu. |
+| `autonomous.pool_size` | `number` | `1` | Esanli otonom yurutme sayisi (1 = seri). |
+| `autonomous.reactive.enabled` | `boolean` | `false` | Reaktif tetikleyici koprusu. |
+| `autonomous.reactive.map_path` | `string` | `'.deckent/autonomous/reactive-map.json'` | Reaktif trigger haritasi. |
+| `autonomous.work_generator.enabled` | `boolean` | `false` | Borctan backlog adayi uretimi. |
+| `autonomous.work_generator.interval_ms` | `number` | `600000` | Bor tarama esigi (ms, 10 dk). |
+| `autonomous.rbac_policy.enabled` | `boolean` | `false` | Makine-baslangicli dispatch RBAC kapisi. |
+| `autonomous.rbac_policy.role` | `'admin' \| 'operator' \| 'viewer'` | `'viewer'` | Motor'un altinda calistigi rol. `viewer` yetki reddeder. |
 
 ---
 

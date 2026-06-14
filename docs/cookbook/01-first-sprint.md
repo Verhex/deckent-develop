@@ -49,7 +49,13 @@ Generate task files from `DIRECTIVES.md`:
 deckent plan
 ```
 
-Review the planned tasks before starting.
+By default, `deckent plan` uses AI planning, which requires an authenticated provider (Claude subscription or API key). To plan without a provider, pass `--structured`:
+
+```bash
+deckent plan --structured
+```
+
+Review the planned tasks in `.tasks/` before starting. Pass `--dry-run` to preview the plan without writing task files.
 
 ## 4. Start
 
@@ -59,7 +65,7 @@ Launch the workers:
 deckent start
 ```
 
-Deckent runs the sprint lifecycle in the background.
+Pass `--dry-run` to preview which workers would be spawned without actually running them. Deckent runs the full sprint lifecycle (PLAN → SPAWN → EXECUTE → EVALUATE → RETRO) in the background.
 
 ## 5. Check Status
 

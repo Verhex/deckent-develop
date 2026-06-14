@@ -256,11 +256,11 @@ ones park for human approval (risk-tagged park). Description-keyword signals
 
 ## Current limitations (honest status)
 
-- **MCP parity (mostly closed).** The `deckent_autonomous` MCP tool exists
-  (status / start / stop / backlog_add / backlog_list / backlog_remove / approve /
-  reject; `backlog_add` supports cron + capability params). `start` only clears the
-  stop marker — the long-running loop process itself is still launched via the CLI
-  (`deckent autonomous start`).
+- **MCP parity (mostly closed).** The `deckent_autonomous` MCP tool exists with actions:
+  `status` / `start` / `stop` / `backlog_add` / `backlog_list` / `backlog_remove` /
+  `pending` / `approve` / `reject` (`backlog_add` supports `cron` + `capability` + `capabilityArgs` +
+  `connector` params). `start` only clears the stop marker — the long-running loop process itself
+  is launched via the CLI (`deckent autonomous start`).
 - **Reactive triggers (sub-project 2 — first slice landed, attach-only).** A nervous-detector
   bridge is built and unit-tested: a detection → declarative reactive-map
   (`.deckent/autonomous/reactive-map.json`, match on `groupKey`/`risk`/`severity`) → a

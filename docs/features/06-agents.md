@@ -57,20 +57,20 @@ deckent_agent_list → { root: "/projem" }
 
 ### Yerleşik Agent Kataloğu (15 built-in)
 
-| Agent | Uzmanlık | Aktivasyon |
-|-------|----------|------------|
-| `security-auditor` | OWASP, auth, vuln analizi | security / auth / jwt |
-| `doc-writer` | README, JSDoc, API docs | docs / readme / comment |
-| `bug-fixer` | Hata ayıklama, regression | fix / bug / error / crash |
-| `code-reviewer` | Kalite, best practices | review / quality / refactor |
-| `refactorer` | Yeniden yapılandırma, temizlik | refactor / cleanup / migrate |
-| `api-builder` | REST, OpenAPI, endpoint | api / endpoint / route |
-| `performance-analyzer` | Profiling, optimizasyon | perf / slow / optimize |
-| `ci-guardian` | CI/CD, test regresyon | ci / pipeline / test |
-| `architect` | Sistem tasarımı, bağımlılık | architecture / design / module |
-| `architecture-planner` | ADR yazımı, yol haritası | plan / roadmap / adr |
-| `accessibility-auditor` | WCAG, a11y | accessibility / a11y / wcag |
-| `data-engineer` | Pipeline, ETL, veri modeli | data / pipeline / etl |
-| `devops-engineer` | CI/CD, Docker, deployment | devops / deploy / docker |
-| `frontend-designer` | UI/UX, component | frontend / ui / design |
-| `migration-specialist` | Framework migration | migration / upgrade / deprecation |
+| Agent | Uzmanlık | Aktivasyon (trigger keywords) |
+|-------|----------|-------------------------------|
+| `security-auditor` | OWASP, auth, vuln analizi | security / auth / jwt / csrf / xss |
+| `doc-writer` | README, JSDoc, API docs | docs / readme / jsdoc / documentation |
+| `bug-fixer` | Hata ayıklama, regression | fix / bug / error / crash / regression |
+| `code-reviewer` | Kalite, best practices | review / refactor / quality / lint |
+| `refactorer` | Yeniden yapılandırma, temizlik | refactor / rename / extract / split |
+| `api-builder` | REST, OpenAPI, endpoint | api / endpoint / route / controller |
+| `performance-analyzer` | Profiling, optimizasyon | performance / optimize / speed / memory |
+| `ci-guardian` | CI/CD, test regresyon | ci / test / build / lint / regression |
+| `architect` | Sistem tasarımı, bağımlılık | architecture / design / module / dependency |
+| `architecture-planner` | ADR yazımı, yol haritası | architecture / design / blueprint / refactor |
+| `accessibility-auditor` | WCAG, a11y | accessibility / a11y / wcag / aria |
+| `data-engineer` | Pipeline, ETL, veri modeli | database / schema / query / sql / migration |
+| `devops-engineer` | CI/CD, Docker, deployment | docker / ci / cd / pipeline / deploy |
+| `frontend-designer` | UI/UX, component | component / layout / responsive / css / tailwind |
+| `migration-specialist` | Framework migration | migrate / migration / upgrade / breaking-change |

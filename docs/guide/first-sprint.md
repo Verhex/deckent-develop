@@ -90,10 +90,13 @@ deckent start
 What happens under the hood:
 
 1. **PLAN phase** -- Brain reads directives, creates `.tasks/task-001-001.json` and `.tasks/task-001-002.json`
-2. **SPAWN phase** -- Brain opens tmux windows, one per task, each running a Claude worker agent
-3. **EXECUTE phase** -- Workers read their task files, write code, run tests, produce `.result` files
+2. **SPAWN phase** -- Brain opens tmux windows (or subprocess/Docker containers), one per task; when `dependency_pipeline_enabled: true` (the default), tasks are sorted into dependency waves via Kahn's topological algorithm so independent tasks run in parallel and dependent tasks unblock only when their dependencies are done
+3. **EXECUTE phase** -- Workers read their task files, write code, run tests, produce `.result` files; heartbeat files (`.hb`) are written periodically so the Auditor can detect stale workers
 4. **EVALUATE phase** -- Brain reads each `.result`, assigns GO / NO-GO / GO_WITH_TECH_DEBT
-5. **RETRO phase** -- Brain writes a retrospective, updates memory, runs decay if needed
+5. **FIX phase** -- Failed tasks are retried with enriched prompts (optional, configurable timeout)
+6. **RETRO phase** -- Brain writes a retrospective to the memory DB, updates sprint learnings
+7. **DECAY phase** -- Old memory entries are pruned to stay within the budget
+8. **CLEANUP phase** -- Task files are archived, file locks released, the sprint is marked complete
 
 ### Watching Workers Live
 
@@ -178,18 +181,12 @@ Brain writes what it learned:
 deckent retro
 ```
 
-Or read directly:
-
-```bash
-cat .brain/RETRO.md
-```
-
 ### Review Technical Debt
 
-If any task was marked `GO_WITH_TECH_DEBT`, Brain logs it:
+If any task was marked `GO_WITH_TECH_DEBT`, Brain logs it in the memory DB. View the exported file:
 
 ```bash
-cat .brain/DEBT.md
+cat .brain/exports/debt.md
 ```
 
 ---

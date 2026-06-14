@@ -97,6 +97,8 @@ Read,Write(src/{scope}/*),Write(tests/{scope}/*),Write(.tasks/{id}.*),Bash(npm *
 
 ## 2. Scope Rules
 
+> **Hard vs advisory:** Scope enforcement varies by backend. Docker workers and local-model/native-agent workers enforce scope **before** a write executes (hard block). CLI/tmux workers detect violations **after** the fact via Auditor `git diff --stat` scans — detected, logged, and emitted as events, but not OS-blocked in V1.0 (ADR-037; full runtime enforcement is a V2 goal). Use the Docker backend for a hard boundary.
+
 Every task JSON file declares a `scope` object that defines the worker's write boundary:
 
 ```json
@@ -265,7 +267,7 @@ Deckent supports three operating modes with different risk/convenience trade-off
 
 | Threat | Vector | Mitigation |
 |---|---|---|
-| **Worker scope creep** | Worker writes outside assigned directory | Auditor `git diff` scan + BoundaryViolation alert |
+| **Worker scope creep** | Worker writes outside assigned directory | Auditor `git diff` scan + BoundaryViolation alert (advisory for CLI/tmux V1.0; hard block for Docker/local-model workers) |
 | **Stale/zombie worker** | Worker crashes, holds locks forever | Stale heartbeat + stale lock detection |
 | **Deadlocked tasks** | Task A depends on B depends on A | Kahn's algorithm circular dependency detection |
 | **Brain overreach** | Brain modifies DIRECTIVES or config | `--allowedTools` excludes those file paths |
@@ -280,7 +282,7 @@ Deckent supports three operating modes with different risk/convenience trade-off
 | **Network-level attacks** | Deckent is a local CLI tool; no network surface in core |
 | **Supply chain attacks** | Standard npm dependency hygiene applies; not Deckent-specific |
 | **Claude API key theft** | Handled by Anthropic SDK / OS credential store |
-| **Multi-user isolation** | Deckent is single-user, single-workspace; no multi-tenancy |
+| **Multi-user isolation** | Multi-tenant audit trail and RBAC are tenant-aware (ADR-037, ADR-068/069), but there is no hard filesystem boundary between tenants sharing a workspace. Treat as audited convenience, not strong isolation, in V1.0. |
 
 ### Trust Boundaries
 

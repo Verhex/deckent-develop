@@ -22,9 +22,17 @@ Deckent is organized as a multi-agent sprint orchestrator. The main runtime flow
 
 `monitor/` contains the Auditor and observability support. It runs scan loops, tracks sprint state, manages dashboard-facing status, and detects boundary or protocol violations from durable artifacts such as task files, result files, heartbeats, and git diffs.
 
+## `connectors/`
+
+`connectors/` contains external messaging adapters for Discord, Telegram, and WhatsApp. It includes an incoming command router that maps bot messages to sprint commands, a connector pool for lifecycle management, and a chat-bridge that connects the native REPL to bot sessions. The bot daemon handles command processing and agentic dispatch.
+
 ## `providers/`
 
-`providers/` contains concrete provider adapters for Claude, Codex, Gemini, and related execution backends. The rest of the system talks through provider abstractions and model tiers from `core/`, so provider-specific model names do not leak into task routing logic.
+`providers/` contains concrete provider adapters for Claude, Codex, Gemini, Ollama, and an OpenAI-compatible HTTP adapter. The rest of the system talks through provider abstractions and model tiers from `core/`, so provider-specific model names do not leak into task routing logic.
+
+## `api/`
+
+`api/` is the HTTP API layer. It runs the `deckent serve` server on localhost, exposes REST and SSE endpoints for sprint lifecycle, status, memory, auth (static token and OIDC), enterprise controls, evolution, nervous-system, and chat flows. It also streams live sprint events to dashboard clients through Server-Sent Events.
 
 ## `cli/`
 

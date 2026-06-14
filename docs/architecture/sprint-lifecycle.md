@@ -26,7 +26,10 @@ Phase 0: DIRECTIVE   — You write DIRECTIVES.md (pre-sprint, manual)
 Phase 1: PLAN        — Brain reads context, plans tasks, writes .tasks/*.json
                        Plugin hook: beforeSprint (after plan, before spawn)
 Phase 2: SPAWN       — Brain routes tasks to providers, launches workers
-Phase 3: EXECUTE     — Workers run in parallel; auditor scans every 30s
+Phase 2a: WAVE_BUILD — (when dependency_pipeline_enabled: true, default)
+                       Kahn's topological sort → dependency waves (ADR-045)
+                       Wave N tasks run in parallel; Wave N+1 waits for Wave N DONE
+Phase 3: EXECUTE     — Workers run in parallel within each wave; auditor scans every 30s
 Phase 4: EVALUATE    — Brain reads .result files, applies GO/NO-GO logic
                        Plugin hook: afterTask (after each task evaluation)
 Phase 5: FIX         — Brain spawns fix workers for NO-GO tasks
@@ -130,6 +133,33 @@ SprintPhase.PLAN
 
 ---
 
+## Phase 2a: WAVE_BUILD — Dependency Wave Sorting
+
+**Active when:** `dependency_pipeline_enabled: true` (default `true` in `src/core/config.ts`; override in `.deckent/config.json` for manual wave management per ADR-047)
+
+**ADR reference:** [ADR-045](../adr/045-wave-based-execution-semantics.md) — Wave-Based Execution Semantics
+
+**What happens:**
+
+When the dependency pipeline is enabled, tasks are sorted into **dependency waves** using **Kahn's topological sort algorithm** (`src/orchestra/sprint-spawner.ts`) before workers are spawned:
+
+1. **Build dependency graph** — each task's `dependencies[]` array is used to construct a DAG
+2. **Kahn's topological sort** — tasks with no unresolved dependencies form Wave 1; tasks that only depend on Wave 1 tasks form Wave 2; etc.
+3. **Scope collision detection** — `detectScopeCollisions()` (`src/orchestra/conflict-resolver.ts`) identifies tasks that write the same files and separates them into different waves even if they have no explicit dependency
+4. **Wave assignment** — each task gets a wave number; tasks in the same wave may run in parallel
+
+**Wave execution semantics:**
+- Tasks within the same wave run **in parallel**
+- Wave N+1 tasks are only spawned when all Wave N tasks reach `DONE ∪ MANUAL_REVIEW_REQUIRED` (ADR-045 amendment, Sprint 280 MRR-deadlock fix)
+- `respawnEligibleTasks()` (`src/orchestra/sprint-spawner.ts`) is called from `waitForResults()` after each result is collected; it filters for tasks whose all dependencies are satisfied
+- `BRAIN→WORKER:DEPENDENCY_BLOCKED` event is emitted for tasks waiting on an upstream dependency
+
+**If `dependency_pipeline_enabled: false`** (manual wave management mode per ADR-047): all tasks spawn concurrently in a single wave (legacy FIFO mode); Brain manages wave ordering manually.
+
+**Blueprint reference:** §7 Phase 2.5, ADR-045
+
+---
+
 ## Phase 3: EXECUTE
 
 **`SprintPhase.EXECUTE` | `SprintStatus.ACTIVE`**
@@ -139,9 +169,10 @@ SprintPhase.PLAN
 **What happens (Brain side):**
 
 1. Brain polls `.tasks/task-{id}.result` every 15 seconds
-2. When a result file appears and parses as valid JSON, it is collected
-3. Loop exits when all task IDs have results, or when the timeout (default: 30 minutes) expires
-4. Tasks that don't produce a result within the timeout get a synthetic `NO_GO` result in Phase 4
+2. When a result file appears and parses as valid JSON, it is collected and the task's in-memory status is updated (`DONE` / `NO_GO`)
+3. **Wave progression (ADR-045):** After each result is collected, `respawnEligibleTasks()` is called. It finds tasks whose all dependencies are now in `DONE ∪ MANUAL_REVIEW_REQUIRED` and spawns them. This drives Wave 2, Wave 3, etc. automatically without a barrier.
+4. Loop exits when all task IDs have results, or when the timeout (default: 30 minutes) expires
+5. Tasks that don't produce a result within the timeout get a synthetic `NO_GO` result in Phase 4
 
 **What happens (Worker side — parallel):**
 
@@ -458,6 +489,14 @@ User writes DIRECTIVES.md
   │             │    gemini → GeminiAdapter.spawn()
   │             │  startScanLoop() → setInterval(30s)
   │             │  [1 retry on failure]
+  └──────┬──────┘
+         │
+         ▼
+  ┌─────────────┐  (when dependency_pipeline_enabled: true — default)
+  │ Phase 2a    │  Kahn's topological sort → dependency waves
+  │  WAVE_BUILD │  detectScopeCollisions() → same-file writes → separate waves
+  │  (ADR-045)  │  Wave N tasks spawn in parallel; Wave N+1 waits on Wave N DONE
+  │             │  respawnEligibleTasks() fires after each result collected
   └──────┬──────┘
          │
          ▼

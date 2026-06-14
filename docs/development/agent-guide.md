@@ -1,73 +1,113 @@
 # Agent Guide
 
-Comprehensive guide to deckent's agent system -- from built-in agents to custom creation, selection algorithm, adaptive behavior, retirement, and performance tracking.
+Comprehensive guide to deckent's agent system — from built-in agents to custom creation, selection algorithm, adaptive behavior, and performance tracking.
 
 ## 1. What Are Agents?
 
 Agents are specialized worker personas in deckent's orchestration system. Each agent carries domain-specific instructions, trigger keywords, and model preferences that enable more effective task execution.
 
-Unlike generic workers that use a one-size-fits-all prompt, agents bring focused expertise to specific task types. When Brain plans a sprint and assigns tasks, it matches each task to the most suitable agent based on keyword analysis of the task title and description.
+Unlike generic workers that use a one-size-fits-all prompt, agents bring focused expertise to specific task types. When Brain plans a sprint and assigns tasks, it routes each task to the most suitable agent using the v2 routing engine (`src/core/routing-engine.ts`).
 
 Key concepts:
-- **Agent = Persona + Prompt + Triggers + Stats**
-- Agents are NOT separate processes -- they are prompt configurations applied to worker processes
-- Each agent has a `agent.json` configuration and a `PROMPT.md` with specialized instructions
+- **Agent = Persona + Prompt + Triggers + Activation Rules + Stats**
+- Agents are NOT separate processes — they are prompt configurations applied to worker processes
+- Each agent has an `agent.json` configuration and a `PROMPT.md` with specialized instructions
 - The default `generic` worker is used when no agent matches a task
 
-## 2. Built-in Agents (8 Agents)
+## 2. Built-in Agents (15 Agents)
+
+All 15 built-in agents are defined in `src/core/agent-pool.ts`:
 
 ### security-auditor
-Specializes in security-related tasks: vulnerability scanning, authentication fixes, injection prevention, CSRF/XSS mitigation. Uses opus model by default for thorough analysis.
-Triggers: `security`, `vulnerability`, `jwt`, `authentication`, `xss`, `csrf`, `injection`, `auth`
-
-### test-writer
-Focused on creating and improving tests: unit tests, integration tests, test coverage improvements, spec files. Ensures tests follow project conventions and achieve target coverage.
-Triggers: `test`, `unit test`, `integration test`, `coverage`, `spec`, `vitest`, `jest`
+Specializes in security-related tasks: vulnerability scanning, authentication fixes, injection prevention, CSRF/XSS mitigation, OWASP compliance.
+Triggers: `security`, `auth`, `vulnerability`, `jwt`, `xss`, `csrf`, `injection`
 
 ### doc-writer
-Handles documentation tasks: README updates, API docs, changelogs, guides, and inline documentation. Produces clear, consistent documentation following project style.
-Triggers: `readme`, `documentation`, `docs`, `changelog`, `api docs`, `guide`
+Handles documentation tasks: README updates, API docs, changelogs, guides, inline documentation. Follows the documentation-writer skill conventions.
+Triggers: `docs`, `readme`, `documentation`, `changelog`, `guide`, `api docs`
+
+### bug-fixer
+Focused on debugging, regression fixes, and hotfixes. Diagnoses root causes and applies minimal-diff repairs.
+Triggers: `fix`, `bug`, `error`, `crash`, `regression`, `hotfix`
 
 ### code-reviewer
-Performs code review and refactoring: code quality improvements, linting fixes, dead code removal, pattern enforcement. Focuses on maintainability and readability.
-Triggers: `review`, `refactor`, `lint`, `cleanup`, `dead code`, `code quality`
+Performs code review and refactoring: code quality improvements, pattern enforcement, maintainability.
+Triggers: `review`, `refactor`, `cleanup`, `quality`, `lint`
 
-### performance-optimizer
-Targets performance improvements: bundle size optimization, runtime profiling, memory leak fixes, caching strategies, lazy loading implementation.
-Triggers: `performance`, `optimize`, `bundle`, `cache`, `lazy`, `memory`, `profiling`
+### refactorer
+Specializes in structural refactoring, code modernization, and technical debt cleanup.
+Triggers: `refactor`, `cleanup`, `migrate`, `modernize`, `tech debt`
+
+### api-builder
+Designs and implements API endpoints: REST routes, request validation, response formatting, error handling, OpenAPI specs.
+Triggers: `api`, `endpoint`, `route`, `rest`, `schema`, `request`, `response`
+
+### performance-analyzer
+Targets performance improvements: profiling, memory leak detection, caching strategies, bundle optimization, async tuning.
+Triggers: `performance`, `optimize`, `slow`, `memory`, `profiling`, `benchmark`
+
+### ci-guardian
+Manages CI/CD health: test regression detection, pipeline fixes, build stability, hermetic test enforcement (ADR-087).
+Triggers: `ci`, `pipeline`, `test`, `build`, `coverage`, `hermetic`
+
+### architect
+System design and module management: cross-cutting concerns, dependency analysis, architectural patterns.
+Triggers: `architecture`, `design`, `module`, `dependency`, `cross-cutting`
+
+### architecture-planner
+Architecture planning, ADR authoring, roadmap planning. Writes Architecture Decision Records.
+Triggers: `plan`, `roadmap`, `adr`, `architectural decision`
+
+### accessibility-auditor
+WCAG compliance, a11y testing, accessibility reviews for UI components.
+Triggers: `accessibility`, `a11y`, `wcag`, `aria`
+
+### data-engineer
+Data pipeline design, ETL, data modeling, query optimization.
+Triggers: `data`, `pipeline`, `etl`, `query`, `database`
+
+### devops-engineer
+CI/CD pipelines, Docker configurations, deployment scripts, infrastructure setup.
+Triggers: `devops`, `deploy`, `docker`, `infrastructure`, `github actions`
+
+### frontend-designer
+UI/UX components, React, Vite, Tailwind, responsive design, dashboard control plane.
+Triggers: `frontend`, `ui`, `design`, `react`, `component`, `dashboard`
 
 ### migration-specialist
-Handles framework and library migrations: version upgrades, API changes, dependency updates, breaking change resolution.
-Triggers: `migration`, `upgrade`, `migrate`, `breaking change`, `deprecation`, `version`
+Framework and library migrations: version upgrades, API changes, dependency updates, breaking change resolution.
+Triggers: `migration`, `upgrade`, `migrate`, `deprecation`, `breaking change`
 
-### api-designer
-Designs and implements API endpoints: REST routes, GraphQL schemas, request validation, response formatting, error handling.
-Triggers: `api`, `endpoint`, `route`, `rest`, `graphql`, `schema`, `request`, `response`
+## 3. Agent Selection Algorithm (v2 Routing)
 
-### devops-agent
-Manages CI/CD pipelines, Docker configurations, deployment scripts, environment setup, and infrastructure tasks.
-Triggers: `ci`, `cd`, `docker`, `deploy`, `pipeline`, `github actions`, `infrastructure`
+Agent selection uses the three-layer v2 routing engine (`src/core/routing-engine.ts:routeTaskV2`). This runs during `planSprint()` in `src/orchestra/sprint-planner.ts`.
 
-## 3. Agent Selection Algorithm
+### Layer 1 — Intent Classification (`src/core/intent-classifier.ts`)
+Classifies the task's primary intent from scope and description:
+- `implementation`, `documentation`, `security`, `testing`, `refactoring`, `architecture`, `devops`, `frontend`, `data`, `performance`, `accessibility`, `api`
 
-When Brain assigns tasks to workers, the agent selection algorithm runs:
+### Layer 2 — Activation Engine (`src/core/activation-engine.ts`)
+Evaluates structured activation rules per agent. Each agent has an `activation` config with rules, `minScore` threshold, and optional `excludes`.
 
-1. **Trigger Matching**: Each agent's trigger keywords are compared against the task title and description. A match score is computed based on the number and relevance of keyword hits.
+### Layer 3 — Routing Engine (`src/core/routing-engine.ts`)
+Combines intent signal, activation score, agent-task affinity, and history bonus into a final routing decision with confidence score.
 
-2. **Scoring Formula**:
-   ```
-   score = (triggerHits * triggerWeight) + (stackBonus) + (historyBonus)
-   ```
-   - `triggerHits`: Number of matching keywords
-   - `triggerWeight`: Agent-specific weight (default 1.0)
-   - `stackBonus`: +2 if the agent's preferred stack matches the project
-   - `historyBonus`: +1 if the agent has successfully completed similar tasks before
+```
+routeTaskV2(task, agentPool, skillPool, options)
+  → RoutingDecision { agent, skills, confidence, routingVersion: 'v2' }
+```
 
-3. **Threshold Check**: An agent must score above the minimum threshold (default: 2) to be considered.
+**Fallback chain:** v2 routing → v1 `selectAgent()` → generic worker
 
-4. **Fallback**: If no agent scores above threshold, the `generic` worker is used.
+### Override Support
 
-5. **Conflict Resolution**: When multiple agents score equally, the agent with higher historical success rate is preferred.
+The task spec can override routing:
+```markdown
+- Agent: bug-fixer          # Force a specific agent
+- Skills: typescript-expert # Force specific skills
+```
+
+Override fields in task JSON: `forceAgent`, `forceSkills`, `excludeAgent`, `excludeSkills`.
 
 ## 4. Custom Agents
 
@@ -75,28 +115,34 @@ Create custom agents for project-specific needs:
 
 ```bash
 deckent agent create my-agent
+deckent agent create my-agent --model sonnet --description "My custom agent"
 ```
 
 This creates `.deckent/agents/my-agent/` with:
-- `agent.json` -- configuration (triggers, model, weight)
-- `PROMPT.md` -- specialized prompt instructions
+- `agent.json` — configuration (triggers, model, activation rules, stats)
+- `PROMPT.md` — specialized prompt instructions
 
 ### agent.json Structure
 
 ```json
 {
+  "id": "my-agent",
   "name": "my-agent",
   "description": "Custom agent for specific tasks",
+  "systemPrompt": "You are a specialist in...",
   "triggers": ["keyword1", "keyword2"],
   "model": "sonnet",
-  "weight": 1.0,
-  "enabled": true,
+  "activation": {
+    "rules": [],
+    "minScore": 0
+  },
   "stats": {
-    "tasksCompleted": 0,
-    "tasksFailed": 0,
-    "avgDuration": 0,
+    "totalUses": 0,
+    "successCount": 0,
+    "failureCount": 0,
     "successRate": 0
-  }
+  },
+  "enabled": true
 }
 ```
 
@@ -107,26 +153,39 @@ This creates `.deckent/agents/my-agent/` with:
 - Reference project conventions
 - Keep under 500 lines for optimal context usage
 
-## 5. Adaptive Agent Behavior
+## 5. Agent Pool Management
 
-Agents improve over time through the learning system:
+Agents are stored in two pools:
 
-- **Success Tracking**: Each task result updates the agent's stats (tasksCompleted, tasksFailed, avgDuration, successRate).
-- **Pattern Detection**: The Auditor identifies recurring patterns -- if an agent consistently fails at certain task types, Brain adjusts future assignments.
-- **Model Adjustment**: If an agent's tasks frequently result in NO_GO with a lower model, Brain may upgrade the model for that agent's future tasks.
-- **Trigger Refinement**: Over multiple sprints, the system identifies which trigger keywords lead to the best agent-task matches and can suggest trigger updates.
+| Pool | Path | Max | Eviction |
+|------|------|-----|----------|
+| Persistent (custom) | `.deckent/agents/` | — | Manual disable |
+| Temporary (auto-generated) | `.deckent/agents-temp/` | 50 | LRU eviction (5 sprint age) |
 
-## 6. Agent Retirement
+Temporary agents are created by `planSprint()` for project-specific conventions (e.g., a Python expert for a Python project). They are promoted to permanent via the Evolution Pipeline.
 
-Agents can be retired when they are no longer effective:
+### Agent Commands
 
-- **Automatic Retirement**: If an agent's success rate drops below 30% over 5+ sprints, Brain flags it for review.
-- **Manual Retirement**: Disable an agent via configuration:
-  ```json
-  { "enabled": false }
-  ```
-- **Archive**: Retired agents remain in `.deckent/agents/` but are excluded from selection.
-- **Reinstatement**: Retired agents can be re-enabled by setting `enabled: true` and resetting stats.
+```bash
+deckent agent list                   # All agents in the pool
+deckent agent create <name>          # Create a custom agent
+deckent agent stats <name>           # Sprint-by-sprint performance
+deckent agent info <name>            # Detailed agent configuration
+deckent agent enable <name>          # Re-enable a disabled agent
+deckent agent disable <name>         # Disable an agent (excluded from routing)
+deckent agent delete <name>          # Remove from pool
+deckent agent edit <name>            # Edit agent configuration
+```
+
+## 6. Evolution Pipeline
+
+Agents improve over time through the Evolution Pipeline (`src/orchestra/promotion-pipeline.ts`):
+
+- **Outcome Tracking**: `src/orchestra/outcome-tracker.ts` records routing decisions and their outcomes (DONE/GO_WITH_TECH_DEBT/NO_GO).
+- **Adaptive Thresholds**: Activation rules are adjusted based on outcome data.
+- **Promotion**: High-performing temp agents are promoted to persistent agents.
+- **Demotion**: Underperforming agents have their activation rules weakened or are disabled.
+- **Rule Evolution**: `src/orchestra/rule-evolver.ts` auto-generates activation rules from outcome patterns.
 
 ## 7. Performance Tracking
 
@@ -135,8 +194,7 @@ Agent performance is tracked at multiple levels:
 ### Per-Task Metrics
 - Task completion status (DONE, GO_WITH_TECH_DEBT, NO_GO)
 - Duration in milliseconds
-- Test pass rate
-- Coverage percentage
+- Test pass rate and coverage percentage
 
 ### Per-Sprint Metrics
 - Tasks assigned vs completed
@@ -146,14 +204,16 @@ Agent performance is tracked at multiple levels:
 ### Historical Metrics
 - Cumulative success rate
 - Task type distribution
-- Model usage distribution
 - Trend direction (improving, stable, declining)
 
 ### Viewing Performance
 ```bash
-deckent agent stats                    # All agents summary
-deckent agent stats security-auditor   # Specific agent
-deckent agent stats --json             # JSON output
+deckent agent stats <name>     # Sprint-by-sprint breakdown for one agent
+deckent agent list             # Summary table for all agents
 ```
 
 Brain uses these metrics during planning to make informed agent-task assignments, creating a feedback loop that improves sprint outcomes over time.
+
+---
+
+*Source: `src/core/agent-pool.ts`, `src/core/routing-engine.ts`, `src/cli/commands/agent.ts`*

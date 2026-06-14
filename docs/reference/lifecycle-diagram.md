@@ -42,8 +42,8 @@ flowchart TD
 ```mermaid
 graph TD
     subgraph entry["User Entry Points"]
-        CLI["**cli/**\n49+ commands · helpers · entry point"]
-        MCP_S["**mcp/**\n32 tools · 8 resources · stdio transport"]
+        CLI["**cli/**\n55+ commands · helpers · entry point"]
+        MCP_S["**mcp/**\n34 tools · 8 resources · stdio transport"]
         API_S["**api/**\nHTTP API · SSE · rate limiting"]
     end
 
@@ -62,7 +62,7 @@ graph TD
     NERVOUS["**nervous/**\nProactive meta-orchestrator\nObserver · Detector · Proposer"]
     MONITOR["**monitor/**\nAuditor scan loop\nDashboard state manager"]
     PROVIDERS["**providers/**\nClaude · Codex · Gemini adapters  (5 modules)"]
-    DASH["**dashboard/**\nReact + Vite + Tailwind\n7 pages"]
+    DASH["**dashboard/**\nReact + Vite + Tailwind\n16 pages"]
 
     CLI --> orch
     MCP_S --> orch

@@ -1,7 +1,9 @@
 <!-- Dil: TR | Teknik terimler EN -->
+> ⚠️ **SUPERSEDED (2026-06-01, Sprint 211).** Beta-gate durumu [`docs/MASTER-PLAN.md`](../MASTER-PLAN.md) §9'da konsolide edildi — tek kaynak. Provenance için korunmuştur.
+
 # Deckent Beta Tracker
 
-**Son güncelleme:** 2026-05-20 (Sprint 175 — Gömülü Web Terminali teslim edildi) | **Son sprint:** 175 (Alperen tarafından smoke ile doğrulandı) | **Versiyon:** v1.0.0-beta.1 → v1.0.0-beta.2 hedef | **Branch:** `docs/embedded-web-terminal-spec` (origin push'lı)
+**Son güncelleme:** 2026-06-14 (Sprint 286 — dokümantasyon audit geçişi) | **Son sprint:** 285+ (memory.db'de canonical) | **Versiyon:** v1.0.0-beta.1 | **Branch:** `main`
 
 ---
 
@@ -43,11 +45,23 @@ Spec: `docs/superpowers/specs/2026-05-19-embedded-web-terminal-design.md`. Plan:
 
 ---
 
+## Sprint 195-197 — Worker Prompt God-Level Stream + Disk-Verify Gate (2026-05-23 → 2026-05-26) — TESLİM
+
+Brain dürüstlüğünü yeniden çıpalayan üç sprint:
+
+**Teslim edilenler:**
+- Worker Prompt God-Level Stream WP-1..WP-12 Tier-1 wire — Karpathy 4-disiplin anchor, agent PROMPT.md tam-doğruluk, ADR cosine-similarity eşik ayarı, task başına idempotency-key
+- Disk-verify gate (KAYNAK 1-7 tümü) — `verifyDiskAgainstClaim` runtime; worker `.result` olmadan çıksa ama git diff varsa → `MANUAL_REVIEW_REQUIRED` (sentetik NO_GO değil)
+- 7 sentetik NO_GO kaynak haritası — sprint-phases.ts + sprint-controller.ts graceKill yolları da dahil
+- ADR-053 (TaskType Taxonomy) kabul edildi; ADR-061 (AEGIS) önerildi
+
+---
+
 ## Mevcut Durum
 | Metrik | Değer |
 |--------|-------|
 | Version | 1.0.0-beta.1 |
-| Sprint | sprint-285 |
+| Sprint | sprint-286 |
 | MCP Tools | 34 |
 | MCP Resources | 8 |
 | CLI Commands | 57+ |
@@ -58,7 +72,7 @@ Spec: `docs/superpowers/specs/2026-05-19-embedded-web-terminal-design.md`. Plan:
 
 ## Genel Bakış
 
-145+ sprint, 12,485+ test, 250+ TypeScript modülü. Üç spawn backend doğrulandı: tmux (en hızlı, 2dk55sn), subprocess (çalışıyor, 6dk53sn), Docker (canlı doğrulandı — Sprint 119-129). Self-dogfooding aktif — Deckent kendi test regresyonlarını ve dokümantasyonunu sprint'lerle düzeltiyor. Dokümantasyon konsolide edildi: BETA-TRACKER (EN+TR), docs.json 7 dokümanı otomatik güncelliyor.
+285+ sprint, 20,668+ test, 882 TypeScript modülü. Üç spawn backend doğrulandı: tmux (en hızlı), subprocess (çalışıyor), Docker (canlı doğrulandı, varsayılan). Self-dogfooding aktif — Deckent kendi test regresyonlarını ve dokümantasyonunu sprint'lerle düzeltiyor. Memory V2 DB-first mimari devrede (SQLite FTS5, çift katman i18n normalize).
 
 **Strateji:** npm paketle → kendi projelerinde dogfood → feedback → düzelt → public repo (VerhexIO/deckent)
 
@@ -377,7 +391,22 @@ Sprint 166 final durumu: **19/20 PASS, 1 PENDING (#11 docker e2e canlı yeniden 
 
 ---
 
-## Rakip Analizi
+## Deckent'in Benzersiz Değeri
+
+Deckent, yazılım ekipleri için geliştirilmiş tek açık kaynaklı, self-hosted, çok-sağlayıcılı AI agent orkestratörüdür. Temel farklılıklar:
+
+1. **Çok-agent paralel yürütme** — sprint başına 16'ya kadar eş zamanlı worker; her birinde bağımsız scope enforcement ve provider ataması
+2. **Retrospektifli sprint yaşam döngüsü** — 8-faz (PLAN→SPAWN→EXECUTE→EVALUATE→FIX→RETRO→DECAY→CLEANUP) + kalıcı öğrenme döngüsü
+3. **Bağımlılık-pipeline wave'leri** — Kahn topolojik sıralaması ile gerçek bağımlılık-bilinçli paralel yürütme
+4. **Memory V2 DB-first** — SQLite FTS5 + çift katman i18n normalize; proje bilgisi her sprint'te büyür
+5. **ADR yönetişimi** — 89+ kabul edilmiş mimari karar; her agent prompt'una zorunlu kısıt olarak enjekte edilir
+6. **Nervous System** — 12 dedektörlü proaktif meta-orkestratör; authority matrix güvensiz otonom eylemleri engeller
+7. **Autonomous engine** — cron/one-off/reactive backlog; 3 kapılı yönetişim (RBAC → policy → risk)
+8. **Çok-sağlayıcılı fleet** — Claude, Codex, Gemini, Ollama; 4 katmanda 13 model; task başına provider override; OpenAI-uyumlu HTTP adapter
+9. **Evolution pipeline** — agent/skill performansı sprint'ler boyunca izlenir; adaptif routing; promote/demote döngüsü
+10. **MIT açık kaynak, self-hosted** — tüm veri kendi altyapınızda kalır; kullanıcı başına ücret yok
+
+## Rakip Analizi (Tarihsel Bağlam — Arşivlenmiş)
 
 ### A. OpenClaw (Acik Kaynak Kisisel AI Asistan)
 
@@ -662,11 +691,7 @@ Sprint 166 final durumu: **19/20 PASS, 1 PENDING (#11 docker e2e canlı yeniden 
 **Hicbir rakipte BIRLIKTE bulunmayan ozellikler:**
 1. Multi-agent paralel calisma + scope enforcement + sprint planlama + retrospektif ogrenme + multi-provider + MCP native + acik kaynak + ucretsiz + self-hosted
 
-**Stratejik pozisyon:** Deckent, "gelistirici takim orkestratoru" nisinde tek acik kaynak cozum. Rakipler ya tek-agent (Devin, OpenClaw), kapali/pahali (Cowork, Perplexity) ya da sadece-bulut API servisleri (CMA).
-
-**Buyume karsilastirmasi:**
-- OpenClaw: 0 → 343K stars, 4 ayda. Yildiz/gun: ~2,860
-- Deckent: Henuz acik kaynak olarak yayinlanmadi. Lansman stratejisi belirleyici olacak.
+**Stratejik pozisyon:** Deckent, çok-agent paralel yürütme + scope enforcement + sprint planlaması + retrospektif öğrenme + çok-sağlayıcılı fleet + MCP native + açık kaynak + ücretsiz + self-hosted + rubrik puanlama + event stream + RBAC + Memory V2 DB-first özelliklerini bir arada sunan tek araçtır.
 
 ---
 
@@ -1955,13 +1980,13 @@ Sprint 166 mimari forensic'inde 4 yeni follow-up bug tespit edildi (Sprint 167 �
 ## Sprint Metrics
 | Metrik | Değer |
 |--------|-------|
-| Sprint | sprint-285 |
-| Toplam Task | 8 |
-| Tamamlanan | 7 |
-| Tech Debt | 1 |
-| No-Go | 1 |
-| Süre | 49dk 50sn |
-| Coverage | 0.0% |
+| Sprint | sprint-286 |
+| Toplam Task | 57 |
+| Tamamlanan | 53 |
+| Tech Debt | 0 |
+| No-Go | 4 |
+| Süre | 47dk 34sn |
+| Coverage | N/A |
 
 ## Sprint History
 _Sprint geçmişi yok._

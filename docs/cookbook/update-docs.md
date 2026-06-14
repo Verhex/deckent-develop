@@ -201,13 +201,18 @@ Brain records this as a `GO_WITH_TECH_DEBT` — work is done, stale entry is log
 
 ## Step 6: Automated Doc Updates (Advanced)
 
-For projects where documentation needs updating every sprint, you can configure Deckent's **Managed Docs** system to automate recurring sections:
+For projects where documentation needs updating every sprint, you can configure Deckent's **Managed Docs** system to automate recurring sections.
+
+### Managed Docs — `.deckent/docs.json`
+
+Create or edit `.deckent/docs.json` at the project root:
 
 ```json
-// .deckent/docs.json
 {
-  "managed": [
+  "version": 1,
+  "docs": [
     {
+      "id": "readme",
       "path": "README.md",
       "autoSections": ["Sprint Metrics", "Agent Performance"],
       "protectedSections": ["Architecture", "Contributing"]
@@ -216,9 +221,36 @@ For projects where documentation needs updating every sprint, you can configure 
 }
 ```
 
-With this config, Brain updates `README.md`'s `## Sprint Metrics` and `## Agent Performance` sections automatically after every sprint — no DIRECTIVES task needed.
+With this config, Brain updates `README.md`'s `## Sprint Metrics` and `## Agent Performance` sections automatically after every sprint — no DIRECTIVES task needed. Sections listed in `protectedSections` are never touched by the auto-updater.
 
-See [Managed Docs Reference](/reference/managed-docs) for the full configuration schema.
+**Key fields:**
+
+| Field | Description |
+|-------|-------------|
+| `id` | Unique identifier for the entry |
+| `path` | Path to the doc file (relative to project root) |
+| `autoSections` | Section headings that Brain will rewrite after each sprint |
+| `protectedSections` | Section headings that are never auto-updated |
+| `lang` | Optional — `"en"` or `"tr"`. Ensures content renders in the doc's target language |
+
+To add a new managed doc, run:
+
+```bash
+deckent docs add README.md --auto "Sprint Metrics,Agent Performance" --protect "Architecture"
+```
+
+### Auto-Generated Reference Docs — `npm run docs:ref`
+
+Some Deckent reference files (MCP tool list, CLI command reference) are generated directly from source code. These are marked with an `AUTOGEN` comment at the top and should never be edited by hand.
+
+To regenerate them:
+
+```bash
+npm run docs:ref        # write updated reference files
+npm run docs:ref:check  # check-only (no write) — used in CI
+```
+
+The `docs:ref` step runs automatically as part of `npm run release`. If you edit `src/mcp/` or `src/cli/commands/`, run `npm run docs:ref` to keep the reference docs in sync.
 
 ---
 

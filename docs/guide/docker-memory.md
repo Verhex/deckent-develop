@@ -185,5 +185,55 @@ Worker bütçesinden ayrı tutun.
 
 ---
 
+## Heartbeat Core Fix — `atomicWriteFileSync`
+
+Docker containers running workers kan be killed with SIGKILL (OOM, timeout). A plain
+`writeFileSync` call may leave data in the OS buffer cache — if SIGKILL arrives before
+the kernel flushes the buffer, the heartbeat file is **silently lost**.
+
+`atomicWriteFileSync` (Sprint 139 HB Core Fix, `src/agents/worker-lifecycle.ts`) closes
+this gap with a three-step pattern:
+
+```
+1. writeFileSync("<path>.tmp", data)   ← write to temp file (original untouched if crash here)
+2. fsyncSync(fd)                        ← force OS buffer → disk (survives SIGKILL after this)
+3. renameSync("<path>.tmp", "<path>")   ← POSIX atomic rename (readers see complete file or none)
+```
+
+This means `.tasks/task-{id}.hb` is **durable on disk** before `atomicWriteFileSync`
+returns. Even if SIGKILL fires immediately after, the last-written heartbeat is readable by
+the Auditor and Brain.
+
+### SIGTERM Handler
+
+The `registerSigtermHandler()` function (`src/agents/worker-lifecycle.ts`) is called once
+per worker process and registers a `process.on('SIGTERM', ...)` handler. When Docker sends
+SIGTERM (via `docker stop`), the handler:
+
+1. Fsyncs the `.result` file if it already exists on disk.
+2. Writes a finalized `.hb` with `note: 'Finalized on SIGTERM'` using `atomicWriteFileSync`.
+3. Exits the process so the container exits within the 15s grace window.
+
+This complements the shell-level `fsync_file` in the container's EXIT trap
+(see `docs/guide/docker-backend.md` §5.5 Graceful Shutdown).
+
+### Why This Matters on OOM-Kill
+
+When the kernel OOM-killer fires (`exit 137`), SIGTERM is NOT sent — the process is
+terminated immediately with SIGKILL. In this case:
+
+- The shell EXIT trap in the container **does not run** (SIGKILL cannot be caught).
+- The host-side `monitorContainer()` detects exit code 137 and writes a fallback
+  `EXIT_WITHOUT_RESULT` marker with `workPresent` set from `git diff`.
+- Any `.hb` written with `atomicWriteFileSync` **before** the OOM event is safe on disk
+  because `fsync` was called. Plain `writeFileSync` data may have been lost.
+
+**Practical implication:** If a sprint logs OOM-kill events, increase
+`worker_memory_limit` (see Hızlı Formül above) or reduce `max_workers`. The HB core
+fix ensures clean diagnosis (Auditor can read the last heartbeat) but does not prevent
+the OOM itself.
+
+---
+
 > İlgili ADR: ADR-027 (Hybrid Spawn Backend). Sprint 191 master plan:
 > `docs/alperen-analysis/2026-05-23-comprehensive-work-plan.md` P191-2.

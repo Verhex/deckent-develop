@@ -372,14 +372,17 @@ Creates:
 After creating, verify it loads correctly:
 
 ```bash
+# List all installed plugins
 deckent plugin list
+
+# Validate manifest + entrypoint
+deckent plugin test <name>
 ```
 
 If your plugin does not appear, check:
 - `manifest.json` is valid JSON
 - All required fields are present and non-empty
 - `name` field matches the directory name
-- `enabled` is not `false`
 
 ---
 
@@ -405,21 +408,48 @@ Clones the repository into `.deckent/plugins/<name>` where `<name>` comes from t
 
 ```bash
 deckent plugin list
+
+# JSON output (pipe-friendly)
+deckent plugin list --json
 ```
 
-Shows all enabled plugins with their version and description.
+Shows all installed plugins with their version and description. Warns if a plugin's entrypoint file is missing.
 
 ### Enable / Disable
 
-Disabling a plugin keeps it installed but prevents it from running:
+There is no CLI command for enable/disable. Set the `"enabled"` field directly in the plugin's `manifest.json`:
+
+```json
+{
+  "enabled": false
+}
+```
+
+Save the file — the next sprint load picks up the change. The `scanPlugins()` loader reads all plugins from disk; whether one is "active" depends on the `enabled` field.
+
+### Update a Plugin
 
 ```bash
-# Disable (sets enabled=false in manifest.json)
-deckent plugin disable my-plugin
-
-# Enable (sets enabled=true in manifest.json)
-deckent plugin enable my-plugin
+deckent plugin update <source>
 ```
+
+Accepts the same `<source>` formats as `install` (npm package, git URL, local path). Replaces the installed version in place.
+
+### Inspect a Plugin
+
+```bash
+deckent plugin info <dir>
+```
+
+Shows manifest fields and validates that the entrypoint file exists. Accepts an absolute or project-relative path to a plugin directory.
+
+### Test a Plugin
+
+```bash
+deckent plugin test <name>
+```
+
+Validates the manifest and entrypoint for an already-installed plugin. Runs hooks if available. Reports PASSED or FAILED.
 
 ### Remove a Plugin
 
@@ -729,3 +759,17 @@ Once satisfied with the plugin:
 | `haiku` | Simple checks, formatting, low-complexity |
 | `sonnet` | Standard implementation, analysis, docs |
 | `opus` | Security, complex logic, architecture |
+
+### Plugin CLI Commands
+
+| Command | Description |
+|---------|-------------|
+| `deckent plugin create <name>` | Scaffold a new plugin (manifest + SKILL.md + README.md) |
+| `deckent plugin install <source>` | Install from npm, git URL, or local path |
+| `deckent plugin update <source>` | Update an installed plugin in place |
+| `deckent plugin list [--json]` | List installed plugins |
+| `deckent plugin info <dir>` | Show manifest info + validate entrypoint |
+| `deckent plugin test <name>` | Validate manifest + entrypoint, run hooks |
+| `deckent plugin remove <name>` | Delete an installed plugin |
+
+Enable/disable is done by setting `"enabled": true/false` in `manifest.json` — no dedicated CLI subcommand.

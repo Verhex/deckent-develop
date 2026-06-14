@@ -1,10 +1,12 @@
-# Deckent — Rakip Güçlü Yanları & Kapanış Analizi (Kod-Doğrulamalı)
+# Deckent — Kapatılması Gereken Boşluklar (Kod-Doğrulamalı)
 
-**Tarih:** 5 Haziran 2026 · **Belge Tipi:** Dahili Strateji + Mühendislik Yol Haritası
+> ⚠️ **ARŞİV NOTU:** Bu belge Sprint 229 / 5 Haziran 2026 dönemine aittir. Sprint 286 itibarıyla bazı boşluklar (G1, G3, G4, G7) kısmen veya tamamen kapatılmış olabilir. Güncelleme öncesi mevcut kod tabanını doğrulayın.
+
+**Tarih:** 5 Haziran 2026 · **Belge Tipi:** Dahili Mühendislik Yol Haritası
 **Yöntem:** Her boşluk 6 paralel Explore agent'ı ile **kod tabanında dosya:satır kanıtıyla doğrulandı** — spekülasyon değil.
 **İlgili:** [`competitive-analysis-2026-06.md`](competitive-analysis-2026-06.md)
 
-> **Bu belgenin amacı:** Rakiplerde (Hermes-Agent, OpenHands, goose, LangGraph, Aider, Cursor/Cline) olup deckent'te
+> **Bu belgenin amacı:** Piyasadaki alternatiflerde (Hermes-Agent, OpenHands, goose, LangGraph, git-native araçlar, IDE AI araçları) olup deckent'te
 > **olmayan veya eksik** güçlü yanları çıkarmak, her birini kodda doğrulamak ve **somut kapatma planına** dönüştürmek.
 >
 > **Güven notu:** deckent tarafı bulguları **kod tabanında dosya:satır + koşu ile doğrulandı** (yüksek güven). Rakip
@@ -24,7 +26,7 @@ Kod tabanını gerçekten taradığımızda, hem eski (Mart) hem yeni (Haziran) 
 | "Dokümantasyon kullanıcıya yönelik değil, hep dahili" | ⚠️ **Kullanıcı-yönelik docs VAR** — `docs/guide/` (quickstart, installation, first-sprint…) + `docs/reference/` ~50 doc | ⚠️ Kısmen yanlış — oran dahili-ağır ama temel var |
 | "MCP server + client çift yönlü = güçlü yan" | 🔴 **Harici MCP-client REPL'e wire EDİLMEMİŞ** (koşu-doğrulanmış): `chat-mcp-bridge.ts` **0 importer**, `new McpClientBroker` sadece testte, `/mcp` slash **kayıtlı değil**. CLI (`deckent mcp …`) wire ama yalnızca `.mcp.json` config yönetir, server'a bağlanmaz. | 🔴 "Güçlü yan" sandığımız: server tarafı gerçek, **client tarafı testte kalmış** |
 | "Provider: 3 (+lokal foundation)" | ✅ **7 provider** (claude/codex/gemini + deepseek/qwen/zhipu OpenAI-compat + Ollama local) | ✅ Kredilediğimizden fazla |
-| "Onboarding 3/5" | ✅ **Olgun** — 15-adım init wizard, stack-detect (23+ dil), CLAUDE.md adapter, Cursor/VSCode MCP config | ✅ Aslında güçlü yan |
+| "Onboarding 3/5" | ✅ **Olgun** — 15-adım init wizard, stack-detect (23+ dil), CLAUDE.md adapter, VSCode/IDE MCP config | ✅ Aslında güçlü yan |
 
 **Ders:** Wiring %'si ≠ user-working (memory: `feedback_wiring_pct_vs_user_working`). "Sprint DONE" ≠ "production'da çalışıyor". MCP-client bunun canlı örneği.
 
@@ -36,12 +38,12 @@ Kod tabanını gerçekten taradığımızda, hem eski (Mart) hem yeni (Haziran) 
 |---|---|---|---|---|---|
 | **G1** | Harici MCP-client REPL wiring | goose (70+ ext) | 🔴 Broker/registry/config + CLI-config wire; **harici tool çağrısı REPL'e bağlı değil, `/mcp` kayıtsız** | P0 | **Düşük** (kod hazır) |
 | **G2** | Benchmark görünürlüğü (SWE-Bench) | OpenHands %66.4 | 🔴 Harness **yok** (Sprint 053 planlandı, yazılmadı) | P0 | Orta (~3-4 hafta) |
-| **G3** | Docker sandbox hardening | OpenHands/Devin | ⚠️ Real container ama net/seccomp/cap **yok** | P1 | Düşük-orta |
+| **G3** | Docker sandbox hardening | OpenHands ve tam sandbox platformları | ⚠️ Real container ama net/seccomp/cap **yok** | P1 | Düşük-orta |
 | **G4** | Provider aggregator (200+ model) | Hermes 200+, goose 15+ | ⚠️ 7 provider, **OpenRouter/aggregator yok** | P1 | Orta |
 | **G5** | HITL checkpoint wiring | LangGraph | ⚠️ Type+CLI var, **orchestrator durmuyor** | P2 | Orta |
-| **G6** | Git-native commit | Aider | 🔴 Worker **commit yapmıyor**, rollback `reset --hard` | P2 | Orta |
+| **G6** | Git-native commit | Git-native AI araçları | 🔴 Worker **commit yapmıyor**, rollback `reset --hard` | P2 | Orta |
 | **G7** | Local model genişliği | goose (Ollama+) | ⚠️ Ollama var, llama.cpp/generic **yok** | P2 | Düşük |
-| **G8** | IDE native entegrasyon | Cursor/Cline | 🔴 VS Code ext **hollow MVP** (v0.0.1, 2 komut) | P3 | Yüksek |
+| **G8** | IDE native entegrasyon | IDE-native AI araçları | 🔴 VS Code ext **hollow MVP** (v0.0.1, 2 komut) | P3 | Yüksek |
 | **G9** | Time-travel / replay | LangGraph | 🔴 **Yok** (sadece git pre/post rollback) | P3 | Yüksek |
 
 ---
@@ -98,7 +100,7 @@ Kod tabanını gerçekten taradığımızda, hem eski (Mart) hem yeni (Haziran) 
 
 ### ⚠️ G3 — Docker Sandbox Hardening (P1)
 
-**Rakip güçlü yanı:** OpenHands/Devin tam sandbox — network izolasyonu, seccomp, cap-drop, read-only root.
+**Piyasa güçlü yanı:** OpenHands ve tam sandbox platformları — network izolasyonu, seccomp, cap-drop, read-only root.
 
 **Kod-doğrulanmış durum (`spawn-backend-docker.ts:206-542`, `Dockerfile.worker`):**
 - ✅ VAR: container namespace, project read-only mount, non-root `--user uid:gid`, memory cgroup `--memory 4g`, PID/IPC namespace, graceful SIGTERM+15s.
@@ -152,7 +154,7 @@ Kod tabanını gerçekten taradığımızda, hem eski (Mart) hem yeni (Haziran) 
 
 ### 🔴 G6 — Git-Native Commit (P2)
 
-**Rakip güçlü yanı:** Aider git-native — her değişikliği otomatik commit, descriptive mesaj, kolay geri-al.
+**Piyasa güçlü yanı:** Git-native AI araçları — her değişikliği otomatik commit, descriptive mesaj, kolay geri-al.
 
 **Kod-doğrulanmış durum:**
 - 🔴 Worker `git commit` **yapmıyor** (`worker.ts`'de `git add/commit` yok) — değişiklik working tree'de kalır.
@@ -164,7 +166,7 @@ Kod tabanını gerçekten taradığımızda, hem eski (Mart) hem yeni (Haziran) 
 2. Rollback'i `reset --hard` yerine **revert-commit** veya checkpoint-branch'e güvenli geçişle değiştir (veri kaybı riski yok).
 3. Kullanıcı projesinde rollback öncesi **uncommitted-iş guard** (deckent-dev'deki ADR-039 korumasını genelleştir — memory: `project_deckent_self_git_mutation_bug`).
 
-**Effort:** Orta. **Getiri:** Aider-style güven + veri-kaybı riskini kapatır (bilinen P0 bug).
+**Effort:** Orta. **Getiri:** Git-native araç güveni + veri-kaybı riskini kapatır (bilinen P0 bug).
 
 ---
 
@@ -178,7 +180,7 @@ Kod tabanını gerçekten taradığımızda, hem eski (Mart) hem yeni (Haziran) 
 ### 🔴 G8 — IDE Native Entegrasyon (P3, yüksek effort)
 
 **Durum:** VS Code ext **hollow MVP** (`extensions/vscode/package.json:5` v0.0.1, 2 komut: startSprint=terminal-wrapper, showDashboard=localhost). Native edit/codelens/diagnostics yok. JetBrains yok.
-**Kapatma:** Ya derin VS Code plugin (yüksek effort) **ya da** "MCP-üzerinden herhangi IDE" anlatısına net konumlan (Cursor/Cline/Claude Code zaten MCP ile çalışıyor) — IDE UX'te rekabet etme, orkestrasyon motoru ol. **Öneri:** Stratejik olarak G8'i düşür, MCP-IDE anlatısını güçlendir.
+**Kapatma:** Ya derin VS Code plugin (yüksek effort) **ya da** "MCP-üzerinden herhangi IDE" anlatısına net konumlan (IDE ve terminal AI araçları zaten MCP ile çalışıyor) — IDE UX'te rekabet etme, orkestrasyon motoru ol. **Öneri:** Stratejik olarak G8'i düşür, MCP-IDE anlatısını güçlendir.
 
 ---
 

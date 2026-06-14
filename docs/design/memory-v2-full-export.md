@@ -1,8 +1,8 @@
 # Memory V2 — Full DB-to-Markdown Export Design Document
 
-**ADR Reference:** (none yet — to be created by the implementing sprint)
-**Status:** Proposed
-**Date:** 2026-05-22
+**ADR Reference:** ADR-088 (Memory V2 — DB-First Architecture)
+**Status:** Partially Implemented
+**Date:** 2026-05-22 (last updated: 2026-06-14)
 **Author:** Memory V2 migration (B6–B14 closing spec)
 
 ---
@@ -59,12 +59,26 @@ patterns and identity history.
 | `sprint` (sprint-log entries) | ✅ | ❌ | **missing** |
 | `pattern` | ✅ | ❌ | **missing** |
 | `identity` | ✅ | ❌ | **missing** |
+| `error` | ✅ | ❌ | **missing** |
+| `audit` | ✅ | ❌ | **missing** |
+| `chat` | ✅ | ❌ | **missing** |
+| `custom` | ✅ | ❌ | **missing** |
 | relations (cross-refs) | ✅ | ❌ | **missing** |
 | entry history | ✅ | ❌ | out of scope (audit-only) |
 
 `runMemoryExport()` (`core/identity-generator.ts`) currently hard-codes the
-four exporters. `core/memory-export.ts` holds `exportSummaryMd`,
-`exportDecisionsMd`, `exportMemoryMd`, `exportDebtMd`.
+four exporters. `core/memory-export.ts` holds the four main export functions:
+`exportSummaryMd`, `exportDecisionsMd`, `exportMemoryMd`, `exportDebtMd`.
+
+**Post-spec additions (not in original design):**
+- `exportAdrsToFs()` — DB→FS ADR sync (Sprint 169, ADR-046 Amendment); writes
+  individual per-ADR `.md` files to `docs/adr/` directory, not to `exports/`.
+- `writeGuardedExports()` — sanity-checked writer (Sprint 227) that refuses to
+  overwrite an export file with an empty render when the DB still has entries of
+  that type. `sprint-finalizer.ts` calls `writeGuardedExports` instead of
+  `runMemoryExport` directly for the wipe-prevention guard.
+- Schema additive migrations (idempotent `ALTER TABLE`): `tenant_id` (multi-tenant
+  enterprise support), `audit_prev_hmac` + `audit_hmac` (Sprint 179 audit chain).
 
 ---
 

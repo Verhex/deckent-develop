@@ -2,6 +2,28 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint286] - 2026-06-14
+
+### Added
+
+- README.md — proje vitrini (flagship)
+- README-TR.md — TR ayna
+- SECURITY.md + CONTRIBUTING.md
+- CODE_OF_CONDUCT.md + CHANGELOG.md
+- examples/ — çalıştırılabilir örnekler
+- docs/ giriş + sözlük + indeks
+- docs/ politika + worker rehberi
+- guide — başlangıç + kurulum
+- guide — quickstart + ilk sprint + kavramlar
+- guide — deckent-nedir + mimari-bakış + özellik-matrisi
+
+### Fixed
+
+- cookbook — alarmlar + uygulama tarifleri (10 + add-rest-api + fix-bug)
+
+
+_Tasks: 57 total, 53 done, 0 tech debt, 4 no-go_
+
 ## [1.0.0-beta.1-sprint285] - 2026-06-12
 
 ### Added

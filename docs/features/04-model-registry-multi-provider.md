@@ -5,10 +5,10 @@
 ## Ne işe yarar?
 
 - **Tek kaynak gerçeği:** `src/core/model-registry.ts` tüm model tanımlarını tutar; başka modül buradan okur.
-- **13 hazır model** — 3 provider (Claude / OpenAI-Codex / Gemini) × 4 tier (economy / standard / premium / premium_plus).
+- **14 hazır model** — 3 provider (Claude / OpenAI-Codex / Gemini) × 4 tier (economy / standard / premium / premium_plus). Claude'da 4 model, OpenAI'de 6, Gemini'de 4.
 - **Tier eşdeğerliği:** `getEquivalent()` ile `opus → gpt-5 → gemini-2.5-pro` otomatik cross-map.
-- **Canlı katalog:** `bootstrapFromCatalog()` 24s cache ile models.dev'den çeker; başarısız olursa yerleşik katalog devreye girer.
-- **Ollama opt-in:** yerel LLM'ler ayrı `ollama-models.ts`'te — 13 model / 3 provider değişmezi korunur.
+- **Canlı katalog:** `bootstrapFromCatalog()` 24s cache ile models.dev'den çeker; başarısız olursa yerleşik `BUILTIN_MODELS` devreye girer.
+- **Ollama opt-in:** yerel LLM'ler ayrı `ollama-models.ts`'te tutulur — 3-provider değişmezi korunur. Dinamik Ollama tag'leri (`ensureOllamaModelRegistered`) runtime'da kaydedilir.
 
 ## Neden önemli?
 
@@ -34,10 +34,18 @@ Tier tablosu (kaynak: `model-registry.ts` `BUILTIN_MODELS`):
 
 | Tier | Claude | OpenAI-Codex | Gemini |
 |------|--------|--------------|--------|
-| premium_plus | — | o3 | gemini-3.1-pro-preview |
+| premium_plus | fable | o3 | gemini-3.1-pro-preview |
 | premium | opus | gpt-5 | gemini-2.5-pro |
 | standard | sonnet | gpt-4.1 / o4-mini | gemini-2.5-flash |
 | economy | haiku | gpt-5-mini / gpt-4.1-mini | gemini-2.0-flash |
+
+**Claude model API ID'leri** (kaynak: `BUILTIN_MODELS`):
+| ID | API ID | Tier |
+|----|--------|------|
+| `fable` | `claude-fable-5` | premium_plus |
+| `opus` | `claude-opus-4-8` | premium |
+| `sonnet` | `claude-sonnet-4-6` | standard |
+| `haiku` | `claude-haiku-4-5-20251001` | economy |
 
 ## Komut / Örnek
 
@@ -67,6 +75,6 @@ Provider-agnostic config örneği (`.deckent/config.json`):
 ## Durum
 
 - Olgunluk: ✅ canlı
-- İlgili: ADR-023 · ADR-066 · ADR-077 (8-fleet 🔜 roadmap)
-- Modül: `src/core/model-registry.ts` · `src/core/mode-presets.ts`
-- Kaynak: `BUILTIN_MODELS` — 13 model, 3 provider (Ollama opt-in ayrı)
+- İlgili: ADR-023 · ADR-066 · ADR-077 · ADR-089
+- Modül: `src/core/model-registry.ts` · `src/core/mode-presets.ts` · `src/core/ollama-models.ts`
+- Kaynak: `BUILTIN_MODELS` — 14 model, 3 provider (Ollama opt-in ayrı, `OLLAMA_BUILTIN_MODELS`)

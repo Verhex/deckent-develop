@@ -82,12 +82,18 @@ When the brain assigns tasks to workers, it runs the agent selection algorithm
    - **+2** for each `triggerKeywords` entry that matches a task keyword
    - **+3** for each `triggerScopes` directory that overlaps with the task's `scope.directories`
    - **+1** for each `triggerFilePatterns` glob that matches a file in `scope.filesWrite`
-4. Agents scoring below the minimum threshold (default 3) are discarded
+4. Agents scoring below the threshold are discarded. The v1 selector's built-in
+   `SCORE_THRESHOLD` is **3** (`src/core/agent-selector.ts`); projects can raise the
+   bar with the `agent_min_score` config key (default **5**, range 2–8, see below)
 5. The highest-scoring agent wins; ties are broken by `stats.successRate` (higher wins)
 6. If no agent meets the threshold, the task falls through an intent-based fallback chain
    (`src/core/routing-engine.ts` — `selectAgentByFallback()`), then defaults to `generic`
 
 Override: set `forceAgent` in the task JSON or DIRECTIVES `Agent:` field to bypass scoring.
+
+> **Note:** This describes the **v1** keyword selector. With `routing_engine: "v2"`
+> (the default since ADR-028), agent + skill selection runs through the intent-based
+> activation engine — see [agent-skill-architecture.md](agent-skill-architecture.md) §3.
 
 ## Agent Stats and Learning
 

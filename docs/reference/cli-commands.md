@@ -1,7 +1,7 @@
 # CLI Command Inventory
 
-> Complete inventory of all Deckent CLI commands. Last updated Sprint 264.
-> **Total:** 55+ top-level commands + subcommands
+> Complete inventory of all Deckent CLI commands. Last updated Sprint 286.
+> **Total:** 57+ top-level commands + subcommands
 
 ## Quick Reference
 
@@ -55,6 +55,14 @@
 | 46 | `models` | Browse and manage model catalog (list/refresh/tier) | `deckent_models` |
 | 47 | `autonomous` | Autonomous runtime loop, backlog, approvals | `deckent_autonomous` |
 | 48 | `resources` | Show worker resource usage (CPU, memory, I/O) — live snapshot or historical analysis | — |
+| 49 | `usage` | Show transcript-based token and limit usage accounting | — |
+| 50 | `chat` | Start a conversational session with Deckent (native REPL or host CLI) | — |
+| 51 | `audit-verify` | Verify the audit HMAC chain (tamper-evident audit log) | — |
+| 52 | `flow` | Manage scheduled flows (F3 process mode) | — |
+| 53 | `rbac` | Role-based access control — check permissions and manage roles | — |
+| 54 | `evolve` | Evolution analysis — cross-sprint trends and prompt suggestions | — |
+| 55 | `bot` | Manage external bot connectors (Discord, Telegram) | — |
+| 56 | `mcp` | Manage MCP servers (Claude-parity add/list/remove/get) | — |
 | — | `help-info` | Show quick-reference help (alias: `info`) | `deckent_help` |
 
 ---
@@ -528,6 +536,26 @@ deckent audit retention --sprint sprint-264 --keep-days 30 --apply            # 
 
 ---
 
+### `deckent audit-verify`
+
+Verify the audit HMAC chain integrity (I4 invariant — tamper-evident audit log). Reads the audit event stream for the current project and validates that each event's HMAC chain is unbroken.
+
+| Option | Description |
+|--------|-------------|
+| `--json` | Output raw JSON only |
+
+**Exit codes:**
+- `0` — Chain intact (all HMACs valid)
+- `1` — Chain broken (tampered or truncated records detected)
+
+**Example:**
+```bash
+deckent audit-verify
+deckent audit-verify --json
+```
+
+---
+
 ### `deckent usage`
 
 Show transcript-based token and limit usage accounting (real ground-truth ledger, not worker self-estimates).
@@ -578,6 +606,38 @@ List feature flags and capabilities from `.deckent/features-manifest.json`.
 deckent features --category active
 deckent features --id memory-v2
 ```
+
+---
+
+### `deckent models`
+
+Browse and manage the model catalog — list available models by provider and tier, refresh cached catalog, or look up a model's tier.
+
+**Subcommands:**
+
+| Subcommand | Description |
+|------------|-------------|
+| `models list` | List available models (`--provider`, `--offline`, `--json`) |
+| `models refresh` | Force-refresh the model catalog (invalidates 24h cache) |
+| `models tier <model>` | Look up the tier of a model by ID or API ID (`--offline`, `--json`) |
+
+**`models list` options:**
+
+| Option | Description |
+|--------|-------------|
+| `--provider <name>` | Filter by provider: `claude`, `codex`, `gemini`, `ollama` |
+| `--offline` | Use cached or bundled catalog without network |
+| `--json` | Output as JSON |
+
+**Example:**
+```bash
+deckent models list
+deckent models list --provider claude
+deckent models tier claude-sonnet-4-6
+deckent models refresh
+```
+
+**MCP:** `deckent_models`
 
 ---
 
@@ -959,6 +1019,25 @@ deckent skill search "react" --limit 20
 
 ---
 
+### `deckent evolve`
+
+Evolution analysis — inspect cross-sprint agent/skill performance trends and surface prompt improvement suggestions from outcome data.
+
+**Subcommands:**
+
+| Subcommand | Description |
+|------------|-------------|
+| `evolve report` | Show cross-sprint agent/skill trend report (`-n/--sprints <n>`, `--json`) |
+
+**Example:**
+```bash
+deckent evolve report
+deckent evolve report --sprints 20
+deckent evolve report --json
+```
+
+---
+
 ## Plugins
 
 ### `deckent plugin`
@@ -1183,6 +1262,129 @@ deckent archive-debt --before sprint-140
 
 ---
 
+### `deckent chat`
+
+Start a conversational session with Deckent. Without `--native`, launches the configured host AI CLI (claude, codex, gemini). With `--native`, uses the built-in Ink REPL with tool-use support (same as running `deckent` with no subcommand).
+
+| Option | Description |
+|--------|-------------|
+| `--tool <name>` | AI CLI to launch: `claude` \| `codex` \| `gemini` |
+| `--native` | Use native Ink REPL with tool-use loop (default when `deckent` run without args) |
+| `--local` | Use a local LLM via Ollama |
+| `--check-mcp` | Verify Deckent MCP server is attached before starting |
+| `--resume <sessionId>` | Resume a previous chat session — prints recent turns |
+| `--resume-limit <n>` | Number of prior turns to show with `--resume` |
+| `--once` | Single-turn mode: send one message and exit (with `--native`) |
+| `--message <text>` | Message text for single-turn mode (implies `--native --once`) |
+
+**Example:**
+```bash
+deckent chat
+deckent chat --native
+deckent chat --tool claude --check-mcp
+deckent chat --message "List recent sprints" --once
+```
+
+---
+
+### `deckent flow`
+
+Manage scheduled flows (F3 process mode — enterprise scheduled automation). Flows run on a cron cadence and trigger deckent tasks automatically.
+
+**Subcommands:**
+
+| Subcommand | Description |
+|------------|-------------|
+| `flow list` | List all scheduled flows (`--tenant`, `--json`) |
+| `flow add <cron> <action>` | Add a scheduled flow (`--tenant`) |
+| `flow run` | Run the flow-runtime tick once (`--once`) or start the daemon (`--tenant`) |
+
+**Example:**
+```bash
+deckent flow list
+deckent flow add "0 3 * * *" "nightly-debt-sweep" --tenant default
+deckent flow run --once
+```
+
+---
+
+### `deckent rbac`
+
+Role-based access control — check permissions and manage role assignments (enterprise, ADR-069).
+
+**Subcommands:**
+
+| Subcommand | Description |
+|------------|-------------|
+| `rbac check <role> <action>` | Check whether a role has permission (`--tenant`) |
+| `rbac roles` | List all roles and effective permissions |
+| `rbac grant <user> <role>` | Assign a role to a user |
+| `rbac revoke <user>` | Remove the role assignment for a user |
+
+**Example:**
+```bash
+deckent rbac check admin sprint.start
+deckent rbac roles
+deckent rbac grant alice operator
+deckent rbac revoke bob
+```
+
+---
+
+### `deckent bot`
+
+Manage external bot connectors (Discord, Telegram). Connects deckent to messaging platforms so users can trigger sprints and check status from chat.
+
+**Subcommands:**
+
+| Subcommand | Description |
+|------------|-------------|
+| `bot listen` | Start listening for bot messages (foreground) |
+| `bot start` | Start the bot as a daemon |
+| `bot stop` | Stop the running bot daemon |
+| `bot status` | Show whether the bot daemon is running |
+
+**Options (all subcommands):**
+
+| Option | Description |
+|--------|-------------|
+| `--root <path>` | Project root override |
+| `--lang <code>` | Language override: `en` \| `tr` |
+
+**Example:**
+```bash
+deckent bot start
+deckent bot status
+deckent bot listen
+deckent bot stop
+```
+
+---
+
+### `deckent mcp`
+
+Manage MCP (Model Context Protocol) servers — add, list, remove, and inspect server registrations. Matches Claude Code's `claude mcp` parity.
+
+**Subcommands:**
+
+| Subcommand | Description |
+|------------|-------------|
+| `mcp add <name> <cmd\|url> [args...]` | Add an MCP server (stdio or http; `--scope`, `--transport`, `--header`, `--env`) |
+| `mcp list` | List registered MCP servers — merged local > project > user (`--json`) |
+| `mcp remove <name>` | Remove an MCP server (`--scope`) |
+| `mcp get <name>` | Show details for a registered server (`--json`) |
+
+**Example:**
+```bash
+deckent mcp list
+deckent mcp add deckent -- npx deckent-mcp
+deckent mcp add my-http-server https://mcp.example.com --transport http
+deckent mcp remove my-old-server
+deckent mcp get deckent --json
+```
+
+---
+
 ### `deckent help-info`
 
 Show quick-reference help (localized). Alias: `info`.
@@ -1301,6 +1503,7 @@ Show worker resource usage (CPU, memory, I/O) from the REPL.
 | `set-directives` | `deckent_set_directives` | Full |
 | `audit` | `deckent_audit` | Partial (Self-Audit Gate only — query/compliance/forward are CLI-only) |
 | `autonomous` | `deckent_autonomous` | Partial (backlog/approvals full; loop process launches via CLI) |
+| `models` | `deckent_models` | Full |
 | `attach` | — | CLI only |
 | `spawn` | — | CLI only |
 | `dashboard` | — | CLI only |
@@ -1324,9 +1527,17 @@ Show worker resource usage (CPU, memory, I/O) from the REPL.
 | `onboard` | — | CLI only |
 | `upgrade` | — | CLI only |
 | `plugin` | — | CLI only |
+| `chat` | — | CLI only |
+| `usage` | — | CLI only |
+| `audit-verify` | — | CLI only |
+| `flow` | — | CLI only |
+| `rbac` | — | CLI only |
+| `evolve` | — | CLI only |
+| `bot` | — | CLI only |
+| `mcp` | — | CLI only |
 
-**Coverage:** 24/46 commands have MCP tool counterparts (52% parity).
+**Coverage:** 25/57 commands have MCP tool counterparts (44% parity).
 
 ---
 
-_Generated: 2026-04-22 | Sprint 151 | Deckent v1.0.0-beta.1_
+_Updated: 2026-06-14 | Sprint 286 | Deckent v1.0.0-beta.1_

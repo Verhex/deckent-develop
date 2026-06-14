@@ -11,6 +11,8 @@ Each skill contains:
 
 ## Built-in Skills
 
+Deckent ships 21 built-in skills. Each skill lives in `.deckent/skills/<id>/` with a `manifest.json` and a `SKILL.md` knowledge file. The list below reflects the current skill pool (`src/core/skill-pool.ts`, activation-engine v2).
+
 ### typescript-expert
 Category: language | Priority: 10
 Triggers: typescript, type, interface, generic, enum, decorator, module, tsconfig
@@ -65,11 +67,77 @@ Triggers: docs, readme, changelog, api-docs, jsdoc, comment
 Stack detection: N/A (workflow-universal)
 Expertise: Technical writing, API documentation, code comments.
 
-### accessibility-specialist
+### accessibility-expert
 Category: domain | Priority: 5
 Triggers: accessibility, a11y, aria, screen-reader, wcag, semantic
 Stack detection: react, vue, angular dependencies
 Expertise: WCAG compliance, ARIA attributes, semantic HTML, keyboard navigation.
+
+### anthropic-sdk
+Category: tool | Priority: 8
+Triggers: anthropic, claude, llm, tool-use, streaming, agent-sdk, batch-api
+Stack detection: @anthropic-ai/sdk, @anthropic-ai/claude-code dependencies
+Expertise: Claude API, tool use, streaming, Agent SDK, batch API patterns.
+
+### ci-testing
+Category: workflow | Priority: 7
+Triggers: ci, pipeline, regression, coverage, test-strategy, hermetic
+Stack detection: .github/workflows, CI environment
+Expertise: CI/CD testing — regression detection, coverage analysis, hermetic test strategy.
+
+### code-simplifier
+Category: domain | Priority: 6
+Triggers: refactor, simplify, dead-code, dry, kiss, complexity, cleanup
+Stack detection: N/A (domain-universal)
+Expertise: Code simplification, dead code removal, DRY/KISS enforcement, complexity reduction.
+
+### docker-expert
+Category: tool | Priority: 6
+Triggers: docker, dockerfile, container, compose, multi-stage, networking, volumes
+Stack detection: Dockerfile, docker-compose.yml
+Expertise: Dockerfile optimization, multi-stage builds, Docker Compose, networking, volumes, security.
+
+### frontend-design
+Category: framework | Priority: 7
+Triggers: frontend, ui, ux, tailwind, responsive, layout, animation, design-system
+Stack detection: react, vue, tailwindcss dependencies
+Expertise: UI/UX design patterns, Tailwind CSS, responsive layouts, animations, design systems.
+
+### git-expert
+Category: tool | Priority: 5
+Triggers: git, branch, merge, rebase, conflict, hooks, bisect
+Stack detection: .git directory
+Expertise: Git workflow, branch strategy, merge conflict resolution, rebase, hooks, bisect.
+
+### graphql-expert
+Category: domain | Priority: 6
+Triggers: graphql, schema, resolver, subscription, federation, codegen
+Stack detection: graphql, @apollo/server, relay dependencies
+Expertise: GraphQL schema design, resolvers, subscriptions, federation, caching, code generation.
+
+### migration-expert
+Category: domain | Priority: 7
+Triggers: migration, upgrade, breaking-change, codemod, legacy, deprecation
+Stack detection: N/A (domain-universal)
+Expertise: Framework migration, version upgrades, breaking change resolution, codemods, incremental migration.
+
+### monorepo-expert
+Category: workflow | Priority: 5
+Triggers: monorepo, turborepo, nx, workspace, dependency-graph, build-cache
+Stack detection: turbo.json, nx.json, pnpm-workspace.yaml
+Expertise: Monorepo management, Turborepo, Nx, workspace configuration, dependency graph, build caching.
+
+### python-expert
+Category: language | Priority: 8
+Triggers: python, py, fastapi, django, pytest, type-hints, async
+Stack detection: requirements.txt, pyproject.toml, setup.py
+Expertise: Python best practices, type hints, async patterns, testing, modern tooling.
+
+### system-architect
+Category: domain | Priority: 8
+Triggers: architecture, registry, config-schema, provider-abstraction, tier-routing, backward-compatibility
+Stack detection: N/A (domain-universal)
+Expertise: Enterprise system architecture patterns — registry design, config schema evolution, provider abstraction, tier-based routing, migration planning, backward compatibility strategies.
 
 ## Creating Custom Skills
 

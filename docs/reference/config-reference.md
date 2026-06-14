@@ -911,10 +911,10 @@ The clamp always wins — scaling factors can never push the final value outside
 
 | Key | Default | Constraint (validate) | Description |
 |-----|---------|------------------------|-------------|
-| `docker_min_timeout` / `docker_max_timeout` | `3600` / `14400` | min >= 300, max <= 86400, max > min (config.ts:567-591) | Docker task timeout band (seconds). |
+| `docker_min_timeout` / `docker_max_timeout` | `1200` / `7200` | min >= 300, max <= 86400, max > min (config.ts:567-591) | Docker task timeout band (seconds). |
 | `tmux_min_timeout` / `tmux_max_timeout` | `900` / `5400` | same | Tmux band. |
-| `subprocess_min_timeout` / `subprocess_max_timeout` | `1800` / `10800` | same | Subprocess band. |
-| `effort_base.{low,normal,high}` | `1800` / `3600` / `7200` | high > normal > low (config.ts:562) | Base seconds per effort level. |
+| `subprocess_min_timeout` / `subprocess_max_timeout` | `600` / `3600` | same | Subprocess band. |
+| `effort_base.{low,normal,high}` | `600` / `1200` / `2400` | high > normal > low (config.ts:562) | Base seconds per effort level. |
 | `loc_scaling_enabled` | `true` | boolean | Scale by lines-of-code estimate. |
 | `history_scaling_enabled` | `true` | boolean | Scale by historical sprint timing. |
 | `runtime_extension_enabled` | `true` | boolean | Allow heartbeat-aware runtime extensions. |

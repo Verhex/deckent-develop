@@ -2,6 +2,8 @@
 
 This document provides a technical reference for Deckent's enterprise integration capabilities. These features are designed to be additive, opt-in, and configurable, allowing Deckent to operate securely within a corporate environment. They are companions to the foundational concepts in `enterprise-foundation.md` and `enterprise-depth.md`.
 
+Governing ADRs: **ADR-068** (Enterprise Foundation — scheduled flows, audit query, multi-tenant), **ADR-069** (Event-Driven Triggers + F4 RBAC), **ADR-071** (Autonomous Mode Self-Dispatch Guard + F4 Enterprise RBAC/Tenant/Audit).
+
 All integrations are disabled by default and must be explicitly configured and wired into the runtime.
 
 ## 1. SSO/OIDC Integration

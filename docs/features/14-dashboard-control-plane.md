@@ -6,7 +6,7 @@
 
 - **Canlı sprint izleme** — `/api/events` SSE akışı üzerinden worker durumunu, faz geçişlerini ve uyarıları anlık yansıtır.
 - **Sprint kontrolü** — start / kill / cleanup komutlarını arayüzden gönderir; terminal embed ile ham çıktıyı gösterir.
-- **Çok sayfalı navigasyon** — 11 aktif rota: Dashboard, Status, History, Memory, MemoryExplorer, Chat, Config, Evolution, Nervous, Enterprise, Settings.
+- **Çok sayfalı navigasyon** — 16 sayfa / 16 rota: Dashboard, Status, History, Memory, MemoryExplorer, Chat, Config, Debt, Evolution, Nervous, Enterprise, Workers, Directives, Settings, Login, Callback.
 - **Agentic Chat** — `/chat` sayfası; yerleşik konuşma arayüzüyle doğal dil üzerinden deckent komutları çalıştırır.
 - **Evolution & Nervous sayfaları** — agent promosyon/demosyon görselleştirme ve nervous-system bildirim yönetimi.
 - **Enterprise sayfası** — multi-tenant, audit ve RBAC konfigürasyonu için ayrılmış sayfa.
@@ -24,7 +24,7 @@
 3. **Sprint verisi** — `.dashboard` dosyası her Auditor scan döngüsünde (30 sn) güncellenir; SSE bu dosyanın değişimini izleyerek tüm istemcilere push eder.
 4. **Sayfa yönlendirmesi** — `react-router-dom` SPA; `BrowserRouter > Routes` yapısı `src/dashboard/src/App.tsx`'te tanımlıdır.
 
-> **Not:** `DebtPage.tsx` dosyası `src/dashboard/src/pages/` altında bulunur ancak mevcut router'a **eklenmemiştir** (unrouted, 12. dosya). Bu bir eksik rota değil, bilinçli bir erteleme olabilir — docs katkısı için öneri olarak not düşülüyor.
+> **Not:** `DebtPage.tsx` `/debt` rotasına bağlıdır (`App.tsx` L33) ve aktif olarak yönlendirilmektedir. Tüm 16 sayfa dosyası (`src/dashboard/src/pages/`) App.tsx'te kayıtlıdır.
 
 ## Komut / Örnek
 
@@ -48,7 +48,7 @@ deckent web --port 3100
 
 ## Durum
 
-- Olgunluk: ✅ canlı — React + Vite + Tailwind SPA, SSE canlı veri, 11 aktif rota
+- Olgunluk: ✅ canlı — React + Vite + Tailwind SPA, SSE canlı veri, 16 aktif rota
 - İlgili: ADR-080 (Dashboard God-Level), ADR-062 (Embedded Web Terminal), ADR-074 (Chat Round-Trip)
-- Modül: `src/dashboard/src/` · `src/api/server.ts` · `src/dashboard/src/pages/` (12 dosya, 11 rota)
+- Modül: `src/dashboard/src/` · `src/api/server.ts` · `src/dashboard/src/pages/` (16 dosya, 16 rota)
 - Kaynak: `src/dashboard/src/App.tsx` (rota tanımları), `src/dashboard/src/components/Layout.tsx` (SSE hook)

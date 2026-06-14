@@ -9,6 +9,70 @@ yeniden oluşturulabilir — bu durumda tüm kullanıcı ayarları kaybolur (Spr
 `regenerateConfigSafe()` bu sorunu çözer: mevcut config'i template defaults ile **MERGE**
 eder, overwite etmez. Kullanıcı değerleri her zaman kazanır.
 
+## 3-Katman Config Merge
+
+Deckent konfigürasyonunu üç katmandan oluşturur (ADR-004 — Layered Config Merge):
+
+```
+defaults (src/core/config.ts)
+    ↓ merge
+~/.deckent/config.json  (global — tüm projeler)
+    ↓ merge
+.deckent/config.json    (proje — bu dizin)
+```
+
+Her katman bir alttakini override eder; proje-level config en yüksek önceliğe sahiptir.
+Ortam değişkenleri (`DECKENT_SPAWN_BACKEND` vb.) proje config'ini de override edebilir.
+
+```bash
+# Aktif (merged) config'i görüntüle
+deckent config read
+
+# Belirli bir değeri güncelle (proje-level config'e yazar)
+deckent config set spawn_backend docker
+deckent config set brain_tier standard
+```
+
+## Sprint Recovery Chain (Takilmış Sprint)
+
+Sprint'iniz donup kaldıysa veya worker'lar yanıt vermiyorsa, aşağıdaki zinciri sırayla çalıştırın:
+
+```bash
+# Adım 1: Aktif worker'ları durdur
+deckent kill --all
+
+# Adım 2: Task dosyalarını arşivle, kilitleri temizle
+deckent cleanup
+
+# Adım 3: Orphan durumunu kurtar (kısmi sonuçları yeniden değerlendir)
+deckent recover <sprint-id>
+
+# Adım 4: Belirli bir task'ı manuel çalıştır
+deckent run <task-id>
+
+# Adım 5: Kalan task'ları spawn et (otomatik onay)
+deckent spawn --auto-approve
+```
+
+### MCP Eşdeğeri
+
+```
+deckent_kill    → { target: "all" }
+deckent_cleanup → { root: "." }
+deckent_recover → { root: "." }
+deckent_run     → { taskId: "<task-id>" }
+```
+
+### Ne Zaman Hangi Adım
+
+| Senaryo | Önce çalıştır |
+|---------|---------------|
+| Worker'lar heartbeat yazmıyor | `deckent kill --all` |
+| Task dosyaları bozuk veya kilit sıkışmış | `deckent cleanup` |
+| Kısmi sonuçlar var, sprint tamamlanmadı | `deckent recover <sprint-id>` |
+| Tek bir task yeniden çalıştırılacak | `deckent run <task-id>` |
+| Tüm kalan PENDING task'lar spawn edilecek | `deckent spawn --auto-approve` |
+
 ## Sprint 176 Örüntüsü
 
 Sprint 176'da şu senaryo gerçekleşti:

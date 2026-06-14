@@ -7832,3 +7832,72 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 285-005: Dürüst-telemetri + PTY regresyon-guard (NO_GO)
 
 ---
+## Sprint 286 — sprint-286
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-06-14
+**Duration:** 2855s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 57 |
+| Completed | 53 |
+| Tech Debt | 0 |
+| No-Go | 4 |
+| Coverage | NaN% |
+| Duration | 2854737ms |
+
+### Tasks
+
+- 286-001: README.md — proje vitrini (flagship) (DONE)
+- 286-002: README-TR.md — TR ayna (DONE)
+- 286-003: SECURITY.md + CONTRIBUTING.md (DONE)
+- 286-004: CODE_OF_CONDUCT.md + CHANGELOG.md (DONE)
+- 286-005: examples/ — çalıştırılabilir örnekler (DONE)
+- 286-006: docs/ giriş + sözlük + indeks (DONE)
+- 286-007: docs/ politika + worker rehberi (DONE)
+- 286-008: guide — başlangıç + kurulum (DONE)
+- 286-009: guide — quickstart + ilk sprint + kavramlar (DONE)
+- 286-010: guide — deckent-nedir + mimari-bakış + özellik-matrisi (DONE)
+- 286-011: guide — autonomous (3 doküman) (DONE)
+- 286-012: guide — multi-provider + yerel-model (DONE)
+- 286-013: guide — docker backend + workers (DONE)
+- 286-014: guide — nervous + evolution + ram-experiment (DONE)
+- 286-015: guide — chat + terminal (REPL) (DONE)
+- 286-016: guide — dashboard + config-recovery + troubleshooting (NO_GO)
+- 286-017: guide — faq (DONE)
+- 286-018: reference — CLI komutları (DONE)
+- 286-019: reference — config (DONE)
+- 286-020: reference — enterprise (3 doküman) (NO_GO)
+- 286-021: reference — execution + lifecycle + health (DONE)
+- 286-022: reference — marketplace + migration + provider-free + resource-profile (DONE)
+- 286-023: reference — multi-provider + security + skills + stack-routing + glossary (DONE)
+- 286-024: architecture — çekirdek mimari (flagship) (DONE)
+- 286-025: architecture — authority + memory + lifecycle (DONE)
+- 286-026: cookbook — sprint temelleri (01-03) (DONE)
+- 286-027: cookbook — operasyon (04-06) (DONE)
+- 286-028: cookbook — bakım (07-09) (DONE)
+- 286-029: cookbook — alarmlar + uygulama tarifleri (10 + add-rest-api + fix-bug) (DONE)
+- 286-030: cookbook — doküman tarifi + indeks (DONE)
+- 286-031: features — genel-bakış + mimari + lifecycle (00-02) (DONE)
+- 286-032: features — routing + model-registry + memory (03-05) (DONE)
+- 286-033: features — agents + skills + spawn (06-08) (DONE)
+- 286-034: features — waves + evaluation + rbac (09-11) (DONE)
+- 286-035: features — observability + native-repl + dashboard (12-14) (DONE)
+- 286-036: features — mcp + cli + evolution (15-17) (DONE)
+- 286-037: features — nervous + vizyon (18-19) (DONE)
+- 286-038: features — son-kazanımlar + dashboard-retheme (20-21) (DONE)
+- 286-039: development — agent + brain + worker rehberleri (DONE)
+- 286-040: development — dashboard + plugin + smoke (DONE)
+- 286-041: development — repo-sync + troubleshooting (DONE)
+- 286-042: security — threat-model + sprint-review (DONE)
+- 286-043: vision — VISION + agentic-ecosystem (DONE)
+- 286-044: vision — blueprint + roadmap (DONE)
+- 286-045: vision/comparison — DE-COMPETITOR-IFY (DONE)
+- 286-046: design + benchmark (DONE)
+- 286-047: governance + launch (bot-setup) (DONE)
+- 286-048: release — roadmap + notes + checklist + beta-tracker (DONE)
+
+---

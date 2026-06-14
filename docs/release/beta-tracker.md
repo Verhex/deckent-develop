@@ -3,7 +3,7 @@
 
 # Deckent Beta Tracker
 
-**Last updated:** 2026-05-31 (Sprint 197 — Worker Prompt God-Level Stream + Disk-Verify Gate + 7 synthetic NO_GO source map landed) | **Latest sprint:** 197 (canonical complete per memory.db; Sprint 198 KAYNAK 6+7 closure in flight) | **Version:** v1.0.0-beta.1 → v1.0.0 GA target (1 Haziran 2026 OSS beta launch) | **Branch:** `main` (Sprint 175 `docs/embedded-web-terminal-spec` long-merged)
+**Last updated:** 2026-06-14 (Sprint 286 — documentation audit pass) | **Latest sprint:** 285+ (canonical in memory.db) | **Version:** v1.0.0-beta.1 | **Branch:** `main`
 
 **Related:** [roadmap.md](../vision/roadmap.md) — Sprint 149-200 master plan
 
@@ -159,7 +159,7 @@ Spec: `docs/superpowers/specs/2026-05-19-embedded-web-terminal-design.md`. Plan:
 | M6 | Cross-Platform | 🔄 In Progress | Sprint 148 | macOS + Linux ✅, WSL2 ✅, Windows native — Sprint 148 validation |
 | M7 | Plugin Sandbox | 🔄 In Progress | Sprint 148 | SHA-256 signing ✅, AST scan ✅, e2e plugin test pending |
 | M8 | Documentation | 🔄 In Progress | Sprint 145+149 | README ✅, Memory V2 docs 🔄, API ref 🔄, config ref ✅ |
-| M9 | Beta Cutover | ✅ Complete | Sprint 150 + Sprint 165-166 | v1.0.0-beta.1 published, Sprint 168 Open Source GA (v1.0.0-beta.2) on track |
+| M9 | Beta Cutover | ✅ Complete | Sprint 150 + Sprint 165-166 | v1.0.0-beta.1 published; Sprint 285+ continuing stabilization |
 
 ---
 
@@ -194,7 +194,7 @@ The Sprint 145-150 cutover table and Sprint 175 Embedded Web Terminal section co
 | Metrik | Değer |
 |--------|-------|
 | Version | 1.0.0-beta.1 |
-| Sprint | sprint-285 |
+| Sprint | sprint-286 |
 | MCP Tools | 34 |
 | MCP Resources | 8 |
 | CLI Commands | 57+ |
@@ -205,7 +205,7 @@ The Sprint 145-150 cutover table and Sprint 175 Embedded Web Terminal section co
 
 ## Overview
 
-145+ sprints, 12,485+ tests, 882 TypeScript modules. Three spawn backends verified: tmux (fastest, 2m55s), subprocess (working, 6m53s), Docker (live verified — Sprint 119-129). Self-dogfooding active — Deckent fixes its own test regressions and documentation via sprints. Documentation consolidated: BETA-TRACKER (EN+TR), docs.json auto-updates 7 documents. Memory V2 DB-first architecture (SQLite FTS5) deployed and stable.
+285+ sprints, 20,668+ tests, 882 TypeScript modules. Three spawn backends verified: tmux (fastest), subprocess (working), Docker (live verified, default). Self-dogfooding active — Deckent fixes its own test regressions and documentation via sprints. Memory V2 DB-first architecture (SQLite FTS5, dual-layer i18n normalize) deployed and stable.
 
 **Strategy:** npm package → dogfood on own projects → feedback → fix → public repo (VerhexIO/deckent)
 
@@ -553,9 +553,22 @@ TR+EN dual language, VISION, link audit, config dashboard
 
 ---
 
-## Competitive Analysis
+## Deckent's Unique Value
 
-### A. OpenClaw (Open-Source Personal AI Assistant)
+Deckent is the only open-source, self-hosted, multi-provider AI agent orchestrator built for software teams. Key differentiators:
+
+1. **Multi-agent parallel execution** — up to 16 concurrent workers per sprint, each with independent scope enforcement and provider assignment
+2. **Sprint lifecycle with retrospectives** — 8-phase lifecycle (PLAN→SPAWN→EXECUTE→EVALUATE→FIX→RETRO→DECAY→CLEANUP) with persistent learning loop
+3. **Dependency-pipeline waves** — Kahn's topological sort enables true dependency-aware parallel execution within a sprint
+4. **Memory V2 DB-first** — SQLite FTS5 with dual-layer i18n normalize; project knowledge persists and grows across every sprint
+5. **ADR governance** — 89+ accepted architecture decisions enforced as mandatory constraints in every agent prompt
+6. **Nervous System** — 12-detector proactive meta-orchestrator proposes interventions; authority matrix prevents unsafe autonomous actions
+7. **Autonomous engine** — cron/one-off/reactive backlog with 3-gate governance (RBAC → policy → risk)
+8. **Multi-provider fleet** — Claude, Codex, Gemini, Ollama; 13 models across 4 tiers; per-task provider override; OpenAI-compatible HTTP adapter
+9. **Evolution pipeline** — agent/skill performance tracked across sprints; adaptive routing; promote/demote cycle
+10. **MIT open-source, self-hosted** — all data stays on your infrastructure; no per-seat pricing
+
+### A. OpenClaw (Historical Reference — Archived)
 
 **Overview:** Open-source (MIT) personal AI assistant created by Peter Steinberger. **343,000+ GitHub stars** (April 2026 — surpassed React in 60 days, most-starred software project on GitHub), **1,000+ contributors**, **2 million monthly active users**, **27 million monthly web visits** (925% growth). Previous names: Clawdbot → Moltbot → OpenClaw.
 
@@ -841,11 +854,7 @@ TR+EN dual language, VISION, link audit, config dashboard
 **Features found together in no other competitor (as of Sprint 145):**
 1. Multi-agent parallel execution + scope enforcement + sprint planning + retrospective learning + multi-provider + MCP native + open source + free + self-hosted + rubric grading + event stream + RBAC + Memory V2 DB-first
 
-**Strategic position:** Deckent is the only open-source solution in the "developer team orchestrator" niche. Competitors are either single-agent (Devin, OpenClaw), closed/expensive (Cowork, Perplexity), or cloud-only API services (CMA).
-
-**Growth comparison:**
-- OpenClaw: 0 → 343K stars in 4 months. Stars/day: ~2,860
-- Deckent: Not yet published as open source. Launch strategy will be decisive.
+**Strategic position:** Deckent is the only open-source, self-hosted solution in the "developer team orchestrator" niche that combines multi-agent parallel execution, sprint lifecycle with persistent learning, dependency-pipeline waves, and multi-provider fleet in a single MIT-licensed tool.
 
 ---
 
@@ -1051,13 +1060,13 @@ Every blocker was directly verified in the codebase. False claims have been corr
 ## Sprint Metrics
 | Metrik | Değer |
 |--------|-------|
-| Sprint | sprint-285 |
-| Toplam Task | 8 |
-| Tamamlanan | 7 |
-| Tech Debt | 1 |
-| No-Go | 1 |
-| Süre | 49dk 50sn |
-| Coverage | 0.0% |
+| Sprint | sprint-286 |
+| Toplam Task | 57 |
+| Tamamlanan | 53 |
+| Tech Debt | 0 |
+| No-Go | 4 |
+| Süre | 47dk 34sn |
+| Coverage | N/A |
 
 ## Sprint History (Sprint 136-166)
 | Sprint | Tasks | Done | NO_GO | Duration | Avg Rubric | Theme |

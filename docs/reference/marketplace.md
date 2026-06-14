@@ -21,27 +21,23 @@ Key features:
 - **Versioned Packages**: Every marketplace item follows semver for safe upgrades
 - **Quality Ratings**: Community-driven quality scores help identify the best extensions
 
-The marketplace is accessible via the CLI (`deckent marketplace`) and will eventually have a web interface at marketplace.deckent.ai.
+Marketplace skill features are accessible via the `deckent skill` subcommand (`skill search`, `skill publish`, `skill install`). A dedicated `deckent marketplace` command and web interface at marketplace.deckent.ai are planned for a future release.
 
 ## 2. Searching the Marketplace
 
 ### CLI Search
 
 ```bash
-deckent marketplace search "react testing"
-deckent marketplace search --category framework
-deckent marketplace search --type skill
-deckent marketplace search --type agent
-deckent marketplace search --sort downloads
-deckent marketplace search --sort rating
+deckent skill search "react testing"
+deckent skill search --category framework
+deckent skill search --limit 10
+deckent skill search --json
 ```
 
 ### Search Filters
 - `--category <name>`: Filter by category (language, framework, tool, domain)
-- `--type <skill|agent>`: Filter by package type
-- `--sort <downloads|rating|updated>`: Sort results
-- `--min-rating <number>`: Minimum quality rating (0-5)
-- `--verified`: Show only verified packages
+- `--limit <n>`: Max results per page (default: 20)
+- `--json`: Output results as JSON
 
 ### Search Results Format
 
@@ -59,14 +55,12 @@ vue-testing       skill   4.2       567      Vue.js component testing strategies
 ```bash
 deckent skill install typescript-expert
 deckent skill install @community/react-hooks-pro
-deckent skill install @community/react-hooks-pro@2.1.0
+deckent skill install https://github.com/org/my-skill
 ```
 
 ### Install an Agent
 
-```bash
-deckent agent install @community/nest-api-expert
-```
+Agents are added by placing an `agent.json` in `.deckent/agents/<name>/`. There is no `deckent agent install` CLI command; agent discovery and promotion happens through the [Evolution Pipeline](../guide/evolution-and-learning.md).
 
 ### Installation Process
 1. Package metadata is fetched from the registry
@@ -77,8 +71,6 @@ deckent agent install @community/nest-api-expert
 
 ### Install Options
 - `--force`: Overwrite existing installation
-- `--no-deps`: Skip dependency installation
-- `--dry-run`: Show what would be installed without installing
 
 ## 4. Publishing Packages
 
@@ -90,16 +82,14 @@ deckent agent install @community/nest-api-expert
 ### Publishing a Skill
 
 ```bash
-cd .deckent/skills/my-skill
-deckent marketplace publish
+deckent skill publish .deckent/skills/my-skill
 ```
+
+The publish command validates the manifest, performs an AST sandbox scan, signs the package with Ed25519, and uploads it to the registry.
 
 ### Publishing an Agent
 
-```bash
-cd .deckent/agents/my-agent
-deckent marketplace publish
-```
+Agent publishing to the marketplace is not yet implemented. To share an agent, publish its `agent.json` and `PROMPT.md` separately.
 
 ### Package Requirements
 - **name**: Unique identifier (lowercase, hyphens allowed)
@@ -186,11 +176,10 @@ When running with `--sandbox-mode`, marketplace packages receive additional rest
 - Network access references are stripped from prompts
 
 ### Reporting Issues
-```bash
-deckent marketplace report <package-name> --reason "security concern"
-```
 
-Reported packages are reviewed and may be:
+To report a security issue with a marketplace package, open an issue on the package's GitHub repository or contact the maintainer directly. A dedicated `deckent marketplace report` command is planned for a future release.
+
+Reported packages may be:
 - Flagged with a warning
 - Temporarily delisted
 - Permanently removed
@@ -198,6 +187,5 @@ Reported packages are reviewed and may be:
 ### Best Practices
 - Only install packages from verified authors for production use
 - Review `SKILL.md` / `PROMPT.md` content before installing
-- Use `--dry-run` to preview installation effects
 - Keep packages updated to receive security patches
 - Run `deckent doctor` after installing new packages to verify system health

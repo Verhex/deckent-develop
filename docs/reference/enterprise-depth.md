@@ -28,26 +28,41 @@ The policy engine, located in `src/core/policy-engine.ts`, provides a single, de
 
 This unified engine allows for rich, multi-faceted policies that go beyond simple role checks, enabling intent-aware and context-aware authorization.
 
-## 2. RBAC Enforcement (ADR-037 V2)
+## 2. RBAC Enforcement (ADR-037 + ADR-069)
 
-Deckent's Role-Based Access Control (RBAC) system can be configured for soft or hard enforcement, controlled by a single flag.
+Deckent has **two distinct RBAC role systems** — each governing a different execution path. Both are opt-in and disabled by default.
+
+### 2a. Worker Authority RBAC (`enforce_rbac` flag)
+
+Controls capability enforcement for worker-spawned tasks (sprint workers).
 
 -   **Source**: `src/nervous/authority-matrix.ts`
 -   **Bridge Function**: `authorizeExecution(req, opts)`
+-   **ADR**: ADR-037 (Brain-Auditor-Worker Authority Matrix)
+-   **Role taxonomy** (`WorkerRole`): `admin | engineer | viewer`
+    -   `admin` — every capability (full trust).
+    -   `engineer` — dev capabilities; excludes enterprise-admin caps.
+    -   `viewer` — read-only (`fs-read`, `db-query`, `erp-read`).
+    -   Unknown or absent role → permissive allow-all (backward-compatible default).
 
-### Enforcement Modes
+#### Enforcement Modes
 
--   **Soft Enforcement (Default)**: When `enforce_rbac` is `false` (the default), any role-based capability violation results in a warning (`console.warn`) and an emitted event. The operation is **allowed** to proceed. This ensures backward compatibility.
+-   **Soft Enforcement (Default)**: When `enforce_rbac` is `false`, any role-based capability violation results in a warning (`console.warn`) and an emitted event. The operation is **allowed** to proceed. This ensures backward compatibility.
 -   **Hard Enforcement**: When `enforce_rbac` is set to `true` in `.deckent/config.json`, a capability violation results in a hard block. The `authorizeExecution` function returns `{ allowed: false, ... }`, and the operation is prevented.
 
-The actor's role and required capabilities are extracted from the `ExecutionRequest` payload. If a role is unknown or absent, the system permissively allows the action.
+The actor's role and required capabilities are extracted from the `ExecutionRequest` payload.
 
-### Enforced Slice: Autonomous Dispatch (`rbac_policy`)
+### 2b. Enterprise RBAC: Autonomous Dispatch (`rbac_policy`)
 
-The first advisory→enforced slice of ADR-037 is **machine-initiated dispatch** in the autonomous engine.
+Controls role-based gating for the autonomous engine's machine-initiated dispatch. Governed by **ADR-069** (Event-Driven Triggers + F4 RBAC) and **ADR-071** (Autonomous Mode Self-Dispatch Guard).
 
 -   **Source**: `src/orchestra/autonomous/runtime-loop.ts` (`buildEngineRuntime` policy gate)
+-   **RBAC module**: `src/core/rbac.ts` (`can()`, `evaluatePolicy()`)
 -   **Config**: `autonomous.rbac_policy` in `.deckent/config.json`
+-   **Role taxonomy** (`Role`): `admin | operator | viewer`
+    -   `admin` — full permissions (inherits all).
+    -   `operator` — write, execute, sprint, audit-read, flow-manage.
+    -   `viewer` — read-only; cannot execute.
 
 ```json
 {
@@ -57,10 +72,10 @@ The first advisory→enforced slice of ADR-037 is **machine-initiated dispatch**
 }
 ```
 
--   **Default**: `enabled: false`, `role: 'viewer'` (deny-by-default once enabled). Valid roles: `admin | operator | viewer` — any other value fails config validation.
+-   **Default**: `enabled: false`, `role: 'viewer'` (deny-by-default once enabled). Any value other than `admin | operator | viewer` fails config validation.
 -   **Behavior when enabled**: every entry-carrying trigger (backlog, work-generator, reactive) is first gated through `evaluatePolicy`'s RBAC layer under the configured `role`. A role without the `execute` permission (the default `viewer`) **hard-denies** the dispatch — the cycle ends as `denied` and the denial lands on the audit chain. `operator` and `admin` are permitted.
 
-**Honest boundary**: this enforcement applies **only** to the autonomous dispatch path. Sprint worker-spawn remains **advisory** (ADR-037 V1.0) — `Task` carries no capability requirements yet, so role violations during sprint execution are warned and emitted but not blocked. The hard-flip for the sprint path is a post-GA V2 item.
+**Honest boundary**: enforcement via `rbac_policy` applies **only** to the autonomous dispatch path. Sprint worker-spawn uses the `enforce_rbac` path (Section 2a), which remains **advisory** (ADR-037 V1.0) — role violations are warned and emitted but not blocked. The sprint-path hard-flip is a post-GA V2 item.
 
 ## 3. Tamper-Evident Audit Chain
 

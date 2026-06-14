@@ -1,10 +1,10 @@
 # MCP Entegrasyonu — Model Context Protocol Araç Seti
 
-> Claude Code ve MCP uyumlu tüm istemcilere deckent'i 32 araç + 8 kaynak olarak sunan, sıfır-setup stdio tünel.
+> Claude Code ve MCP uyumlu tüm istemcilere deckent'i 34 araç + 8 kaynak olarak sunan, sıfır-setup stdio tünel.
 
 ## Ne işe yarar?
 
-- **32 MCP aracı** — `deckent_init`'ten `deckent_nervous_config`'e kadar tam sprint yaşam döngüsü MCP üzerinden erişilebilir.
+- **34 MCP aracı** — `deckent_init`'ten `deckent_usage`'a kadar tam sprint yaşam döngüsü MCP üzerinden erişilebilir.
 - **8 MCP kaynağı** — `dashboard`, `directives`, `memory`, `debt`, `config`, `retro`, `tasks`, `agents` kaynakları `deckent://` URI şemasıyla okunabilir.
 - **Stdio transport** — Claude Code (Claude Desktop, claude.ai/code, VS Code, JetBrains) ile tek satır kayıt yeterli; ek sunucu veya port açılmaz.
 - **Agentic loop** — Claude, MCP araçlarını zincirleme çağırarak tam bir sprint planlayıp başlatabilir; sonucu `deckent_status` ile izler.
@@ -13,17 +13,15 @@
 ## Neden önemli?
 
 - **IDE'ye gömülü orkestrasyon** — kullanıcı terminale geçmeden Claude Code sohbeti üzerinden sprint başlatır, izler, sonuçlandırır.
-- **Tool sayısı avantajı** — 32 araç, deckent'i en geniş MCP araç setiyle donatılmış açık-kaynak CLI'lardan biri yapar.
+- **Tool sayısı avantajı** — 34 araç, deckent'i en geniş MCP araç setiyle donatılmış açık-kaynak CLI'lardan biri yapar.
 - **Kaynak-araç ikilisi** — araçlar durumu değiştirirken kaynaklar anlık Markdown/JSON snapshot sunar; LLM bağlamı temiz kalır.
 
 ## Nasıl çalışır?
 
 1. **Kayıt** — `claude mcp add deckent -- npx deckent-mcp` komutu `~/.claude/mcp.json`'a stdio entry ekler.
 2. **Process başlatma** — Claude Code her oturumda `npx deckent-mcp` sürecini stdio üzerinden başlatır; `src/mcp/server.ts` MCP SDK sunucusunu ayağa kaldırır.
-3. **Tool dispatch** — `src/mcp/tools/index.ts`'teki `registerTools(server)` fonksiyonu 27 tekil araç + 5 nervous aracını (subscribe/accept/reject/status/config) kaydeder; toplam **32 araç**.
+3. **Tool dispatch** — `src/mcp/tools/index.ts`'teki `registerTools(server)` fonksiyonu 29 tekil araç + 5 nervous aracını (subscribe/accept/reject/status/config) kaydeder; toplam **34 araç**.
 4. **Resource erişimi** — `src/mcp/resources/index.ts` 8 kaynağı `deckent://` URI şemasıyla kaydeder; istemci `resources/read` çağrısıyla anlık snapshot alır.
-
-> **Tool sayısı notu:** `DECKENT.md` "31 tools" yazar, `IDENTITY.md` "32 tools" yazar. Kaynak kodu (`src/mcp/tools/index.ts`) **32 araç** kaydeder — `deckent_models` aracı son sprintlerde eklendi, `DECKENT.md` henüz güncellenmedi. **32 kaynak kodu doğruludur.**
 
 ## Komut / Örnek
 
@@ -47,7 +45,7 @@ claude mcp list
 deckent --help | grep -E "^\s+(init|plan|start|status|memory)"
 ```
 
-### MCP Araçları (32 adet — kaynak: src/mcp/tools/index.ts)
+### MCP Araçları (34 adet — kaynak: src/mcp/tools/index.ts)
 
 | Kategori | Araçlar |
 |----------|---------|
@@ -56,7 +54,8 @@ deckent --help | grep -E "^\s+(init|plan|start|status|memory)"
 | Konfigürasyon | config, sync, checkpoint, docs |
 | Agent/Skill/Model | agent_list, skill_list, models |
 | Hafıza & özellik | memory_query, feature_query |
-| Yardım | help, run |
+| Yardım & çalıştırma | help, run, usage |
+| Otonom motor | autonomous |
 | Nervous System | nervous_subscribe, nervous_accept, nervous_reject, nervous_status, nervous_config |
 
 ### MCP Kaynakları (8 adet — kaynak: src/mcp/resources/)
@@ -67,5 +66,5 @@ deckent --help | grep -E "^\s+(init|plan|start|status|memory)"
 
 - Olgunluk: ✅ canlı — stdio transport, Claude Code / VS Code / JetBrains ile doğrulanmış
 - İlgili: ADR-017 (MCP-Native Provider Adapters), ADR-022-V2 (CLI/MCP Feature Parity)
-- Modül: `src/mcp/server.ts` · `src/mcp/tools/` (30 dosya, 32 araç) · `src/mcp/resources/` (8 kaynak)
+- Modül: `src/mcp/server.ts` · `src/mcp/tools/` (32 dosya, 34 araç) · `src/mcp/resources/` (8 kaynak)
 - Kaynak: `src/mcp/tools/index.ts` (registerTools — araç sayısının canonical kaynağı)

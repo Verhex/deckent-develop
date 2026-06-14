@@ -1,71 +1,143 @@
-# Cost and Budget
+# Recipe 08: Cost and Budget
 
-This cookbook explains how Deckent's pre-spawn cost gate helps you review sprint cost before agents start work.
+Deckent tracks provider costs through two mechanisms: a pre-sprint cost gate that guards against runaway spending, and a usage command that reads Claude Code transcript ledgers for accurate post-sprint accounting. This recipe covers both.
 
-The cost gate is a planning checkpoint. It estimates the cost of a sprint from the requested work, selected execution mode, and configured limits. It does not promise an exact final bill. Actual cost can vary because model usage, retries, context size, and provider billing rules can change the final total.
+## Pre-Sprint Cost Gate
 
-## When the Cost Gate Runs
+Before spawning workers, Deckent checks the estimated sprint cost against configured limits. The gate runs automatically — you do not call it directly.
 
-Deckent checks cost before spawning sprint workers. At that point, you should see a sprint cost estimate and the budget policy that applies to the run.
+The estimate is a forecast, not an invoice. Actual cost varies with model usage, retry count, context size, and provider billing rules.
 
-Read the estimate before you approve the sprint. It is the last place to catch an unexpectedly large run before work begins.
+### Budget configuration
 
-## Sprint Cost Estimate
+Cost limits live in `.deckent/cost-config.json`. Set them via CLI or by editing the file directly:
 
-The sprint cost estimate is a forecast for the planned sprint. Use it to answer three questions:
+```bash
+# View current budgets
+deckent cost budget
 
-- Is this sprint expected to cost money?
-- Is the estimate within the configured sprint budget?
-- Do you need to approve the run explicitly?
+# Set per-sprint max
+deckent cost budget --set 5
 
-Treat the estimate as a guardrail, not an invoice. Do not compare it to exact model prices unless you also verify the active provider billing terms.
+# Set daily max
+deckent cost budget --daily 20
 
-## `cost_limits.sprint_max_usd`
+# Set monthly max
+deckent cost budget --monthly 100
+```
 
-Use `cost_limits.sprint_max_usd` to cap the allowed estimated cost for one sprint.
+Example output of `deckent cost budget`:
 
-If the estimate is greater than `cost_limits.sprint_max_usd`, Deckent should stop before spawning workers and ask for a decision instead of silently continuing.
+```
+💰 Cost Budgets
+  Sprint:  $5.00
+  Daily:   $20.00
+  Monthly: $100.00
+```
 
-Example policy:
+The config file path is `.deckent/cost-config.json`. You can edit it directly for multi-key changes:
 
 ```json
 {
   "cost_limits": {
-    "sprint_max_usd": 5
+    "sprint_max_usd": 5,
+    "daily_max_usd": 20,
+    "monthly_max_usd": 100,
+    "auto_confirm_below_usd": 1.00
   }
 }
 ```
 
-This means the sprint estimate must stay at or below `5` USD unless you explicitly choose a different approval path.
+`auto_confirm_below_usd` lets estimates below that threshold proceed without a confirmation prompt.
 
-## Subscription Mode Versus API Billing
+### Subscription vs. API billing
 
-Deckent can run in environments where usage is covered by a subscription or charged through API billing.
+Deckent runs in two auth modes:
 
-In subscription mode, the sprint estimate may be shown as `$0` because the local run is not billed through metered API usage. This does not mean compute is free in every environment. It means the current execution path is treated as subscription-covered for the purpose of the gate.
+- **Subscription mode** (`auth_mode: "subscription"`, the default): usage is covered by a Claude subscription. The sprint estimate may show `$0` because the local session is not metered. This does not mean compute is free everywhere — it means the current execution path is subscription-covered for the gate.
+- **API mode** (`auth_mode: "api"`, requires `ANTHROPIC_API_KEY`): usage is metered. The estimate represents expected provider charges. Compare it with `sprint_max_usd` before approving.
 
-In API billing mode, the estimate represents expected metered provider usage. Review it against `cost_limits.sprint_max_usd` before approving the sprint.
+### What happens when the gate triggers
 
-## `acknowledgeCost`
+When the estimate exceeds `sprint_max_usd`, Deckent stops before spawning workers and prompts for explicit approval. Approve the run only after deciding the cost is acceptable. Do not use permanent bypass — if you repeatedly approve the same expensive sprint, reduce task scope or raise the limit instead.
 
-`acknowledgeCost` records that you reviewed the estimate and intentionally approved the run.
+## View Model Pricing
 
-Use it when Deckent requires explicit confirmation before worker spawn. This is common when:
+```bash
+# Show all enabled models with input/output/cache pricing
+deckent cost show
 
-- The sprint has a non-zero estimate.
-- The estimate is close to the configured budget.
-- The estimate exceeds the default comfort level for the workspace.
+# Filter to one provider
+deckent cost show --provider anthropic
 
-Do not use `acknowledgeCost` as a permanent bypass. If you approve the same expensive sprint repeatedly, update the task scope or the workspace budget policy instead.
+# Single model detail
+deckent cost show --model claude-sonnet-4-6
+```
 
-## Before You Start a Sprint
+Example output:
 
-Before starting a sprint:
+```
+── anthropic (billing: subscription/api) ──
+  claude-sonnet-4-6              in=$3.00/MTok  out=$15.00/MTok  cache=$0.30/MTok  ctx=200K
+  claude-opus-4-8                in=$15.00/MTok out=$75.00/MTok  cache=$1.50/MTok  ctx=200K
+```
 
-1. Read the sprint cost estimate.
-2. Check whether the run is subscription-covered (`$0`) or API-billed.
-3. Compare the estimate with `cost_limits.sprint_max_usd`.
-4. If prompted, use `acknowledgeCost` only after you decide the run is acceptable.
-5. Reduce scope, split the sprint, or raise the limit if the estimate is too high.
+## Update Pricing
 
-This keeps cost review separate from task execution. Workers should start only after the budget decision is clear.
+Pricing data is bundled with Deckent and can be refreshed from LiteLLM + OpenRouter:
+
+```bash
+deckent cost update
+
+# Preview without writing
+deckent cost update --dry-run
+
+# Update one provider only
+deckent cost update --provider anthropic
+```
+
+## View Actual Consumption (Post-Sprint)
+
+`deckent usage` reads Claude Code transcript files and reports real token usage — more accurate than worker self-estimates, which typically under-report by 3–5×.
+
+```bash
+# Last 7 days, grouped by model
+deckent usage
+
+# Per-task breakdown for sprint 285
+deckent usage --sprint 285
+
+# Custom window
+deckent usage --since 2026-06-01 --until 2026-06-14
+
+# Machine-readable JSON
+deckent usage --json
+```
+
+Example output:
+
+```
+Usage — last 7 days
+
+Model                           Calls  Input    Output   CW       Cost    Hit%
+claude-sonnet-4-6               47     12.4M    1.2M     8.3M     $14.20  40%
+claude-opus-4-8                 12     3.1M     0.4M     2.1M     $18.50  41%
+TOTAL                           59     15.5M    1.6M     10.4M    $32.70  40%
+```
+
+The `--sprint N` flag shows per-task cost and cache-write breakdown, which helps identify which tasks consumed the most tokens.
+
+## Workflow: Before Starting a Sprint
+
+1. Check current budgets: `deckent cost budget`
+2. View estimated cost in the plan output (shown by `deckent plan`)
+3. If the estimate exceeds your sprint budget, either reduce scope or raise the limit with `deckent cost budget --set N`
+4. After the sprint, review actual consumption: `deckent usage --sprint <N>`
+
+## See Also
+
+- `deckent cost show` — model pricing table
+- `deckent cost budget` — view/set budgets
+- `deckent cost update` — refresh pricing data
+- `deckent usage` — real token consumption from transcripts
+- `.deckent/cost-config.json` — cost limits and provider billing config

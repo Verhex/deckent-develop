@@ -1,243 +1,233 @@
-# Dashboard Guide — Status Monitoring & HTTP API
+# Dashboard Development Guide
 
-> Reference: [ARCHITECTURE.md](ARCHITECTURE.md) | [API.md](API.md) | [DECKENT-MASTER-BLUEPRINT.md](../DECKENT-MASTER-BLUEPRINT.md)
+> Source: `src/dashboard/` | Build: `npm run build:all` | Dev: `cd src/dashboard && npm run dev`
 
 ---
 
 ## Overview
 
-Deckent provides two dashboard interfaces:
+The Deckent web dashboard is a React 19 + Vite 6 + Tailwind 4 SPA served by `deckent serve`.
+Source lives in `src/dashboard/`. Built assets are output to `src/dashboard/dist/` and served as static files by the HTTP API process.
 
-1. **Terminal TUI** — `deckent status` / `deckent status --watch`
-2. **Web Dashboard** — `deckent web` → React SPA at `localhost:3100`
-
-Both read from the `.dashboard` file, which the Auditor overwrites every 30 seconds during a sprint.
+Stack:
+- **React 19** with React Router 7
+- **Vite 6** — bundler and dev server
+- **Tailwind 4** — utility CSS
+- **lucide-react** — icon library (emoji strictly prohibited by design policy)
+- **recharts** — charts and data visualization
+- TypeScript (`tsconfig.json` + `tsconfig.node.json`)
 
 ---
 
-## Terminal TUI Dashboard
+## Building the Dashboard
 
-### Commands
+### Full build (CLI + dashboard)
 
 ```bash
-# One-time status snapshot
-deckent status
-
-# Watch mode — refreshes every 2 seconds
-deckent status --watch
-
-# Raw JSON output (pipe-friendly)
-deckent status --json
+npm run build:all
 ```
 
-### Display Sections
+Runs: `npm run clean && tsc && node scripts/copy-assets.mjs && npm run build:dashboard`
 
-The terminal dashboard (`src/cli/commands/status.ts`) renders:
+This is the canonical build for publishing or deployment — TypeScript compilation followed by Vite dashboard build.
 
-- **Sprint info**: ID, phase, status
-- **Progress bar**: `done / active / blocked / total`
-- **Agent table**: worker ID, model, status, current action, task ID
-- **Alerts**: CRITICAL / WARNING / INFO with timestamps
-- **Usage**: 5-hour % and weekly % consumption
+### Dashboard only
 
-Watch mode uses `setInterval(2000)` — clears the screen and re-renders on each tick.
+```bash
+npm run build:dashboard
+```
 
-### Exit Watch Mode
+Runs `node scripts/build-dashboard.mjs` (Vite build in `src/dashboard/`). Use when you've changed only dashboard source and want a faster cycle.
 
-Press `Ctrl+C` to exit watch mode.
+### Manual Vite build (from dashboard directory)
+
+```bash
+cd src/dashboard
+npm run build   # tsc -b && vite build
+```
+
+Output goes to `src/dashboard/dist/`.
+
+### Install dashboard dependencies separately
+
+```bash
+npm run install:all   # npm ci && npm ci --prefix src/dashboard
+```
+
+Or manually:
+
+```bash
+cd src/dashboard && npm ci
+```
 
 ---
 
-## Web Dashboard
+## Development Mode
 
-### Setup & Launch
+### Option A — Vite dev server + serve proxy (recommended)
+
+Start the Vite dev server in one terminal:
 
 ```bash
-# Start the HTTP server + serve the React SPA
-deckent web
+cd src/dashboard
+npm run dev        # vite, defaults to port 5173
+```
+
+Then start the API server in proxy mode in another terminal:
+
+```bash
+deckent serve --dev --dev-port 5173 --port 3100
+```
+
+`--dev` tells `serve` to proxy all non-API requests to the Vite dev server instead of serving `dist/`. HMR and Vite features work normally; the real API + auth layer is live.
+
+### Option B — Build and serve statically
+
+```bash
+npm run build:all
+deckent serve --port 3100
+```
+
+No HMR — requires a rebuild on every change. Useful for final verification.
+
+---
+
+## Type Checking
+
+```bash
+# Full project (src/ + dashboard)
+npm run lint           # tsc --noEmit && tsc --noEmit -p src/dashboard
+
+# Dashboard only
+npm run tsc:dashboard  # tsc --noEmit -p src/dashboard
+```
+
+---
+
+## Running Dashboard Tests
+
+```bash
+npm run test:dashboard   # vitest run --config vitest.dashboard.config.ts
+```
+
+Test files live in `src/dashboard/src/__tests__/` and `src/dashboard/src/components/*.test.tsx`.
+
+---
+
+## `deckent serve` — Launch Command
+
+The `deckent serve` command starts the HTTP API server and serves the dashboard SPA.
+
+```bash
+# Start on default port 3100
+deckent serve
 
 # Custom port
-deckent web --port 8080
+deckent serve --port 8080
 
-# API only (no static files)
-deckent web --api-only
+# Bind to all interfaces
+deckent serve --host 0.0.0.0 --port 3100
+
+# Dev proxy mode (proxy static to Vite dev server on port 5173)
+deckent serve --dev --dev-port 5173
+
+# Custom proxy target
+deckent serve --dev --dev-port 3001
 ```
 
-Default URL: `http://localhost:3100`
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--port <n>` | `3100` | Port for the HTTP server |
+| `--host <addr>` | `127.0.0.1` | Bind address |
+| `--dev` | off | Proxy static to Vite dev server |
+| `--dev-port <n>` | `5173` | Vite dev server port (used with `--dev`) |
 
-The React frontend is built with Vite + Tailwind CSS. Source: `src/dashboard/`.
-
-### Pages
-
-| Page | Path | Description |
-|------|------|-------------|
-| Dashboard | `/` | Live agent status, progress, alerts |
-| History | `/history` | Sprint history with metrics |
-| Settings | `/settings` | Edit config and directives |
-| Memory | `/memory` | View `.brain/MEMORY.md` content |
-
-### Real-Time Updates (SSE)
-
-The web dashboard connects to `GET /api/events` (Server-Sent Events). The server watches `.dashboard` for file changes and pushes new data to all connected clients:
-
-```
-client → GET /api/events
-server → watches .dashboard file
-auditor writes .dashboard → server sends `data: {...}\n\n` to all clients
-```
-
-The SSE watcher is initialized lazily on first client connection (`watchDashboard()` in `src/api/watcher.ts`).
+The legacy `deckent web` command also starts the dashboard but lacks dev-proxy and embedded terminal support. Prefer `deckent serve` for all development.
 
 ---
 
-## HTTP API Reference
+## Dashboard Pages (16)
 
-Base URL: `http://localhost:3100`
+Pages are defined in `src/dashboard/src/App.tsx` and `src/dashboard/src/pages/`.
 
-All endpoints return `application/json`. POST endpoints accept `application/json` bodies.
-
-### GET Endpoints
-
-| Endpoint | Description | Returns |
-|----------|-------------|---------|
-| `GET /api/status` | Current dashboard state | `DashboardState` JSON |
-| `GET /api/sprint` | Latest sprint log | Sprint metrics + task list |
-| `GET /api/history` | All sprint logs | Array of sprint records |
-| `GET /api/config` | Project config | `.deckent/config.json` contents |
-| `GET /api/doctor` | Health checks | Array of `DoctorCheck` results |
-| `GET /api/memory` | Brain memory | `{ content: string }` |
-| `GET /api/debt` | Tech debt table | `{ content: string }` (markdown) |
-| `GET /api/job/:jobId` | Background job status | `{ id, status, result?, error? }` |
-| `GET /api/worker/:taskId/log` | Worker tmux log | `{ taskId, log, task }` |
-| `GET /api/events` | SSE stream | `text/event-stream` (real-time dashboard updates) |
-
-### POST Endpoints
-
-| Endpoint | Body | Description |
-|----------|------|-------------|
-| `POST /api/start` | `{ autoApprove?: boolean }` | Start a sprint (background job) |
-| `POST /api/plan` | `{ mode?: 'ai'\|'structured'\|'auto' }` | Plan sprint, return task list |
-| `POST /api/kill/:workerId` | (none) | Kill a worker tmux window |
-| `POST /api/set-directives` | `{ content: string }` | Overwrite `DIRECTIVES.md` |
-| `POST /api/config` | `Record<string, unknown>` | Merge-update project config |
-
-### CORS
-
-All endpoints include `Access-Control-Allow-Origin: *`. OPTIONS preflight is handled.
+| Page | Route | Description |
+|------|-------|-------------|
+| Dashboard | `/` | Live sprint status, progress, agent table |
+| Chat | `/chat` | Native chat / REPL interface |
+| Config | `/config` | Project config editor |
+| Debt | `/debt` | Tech debt table |
+| Directives | `/directives` | DIRECTIVES.md editor |
+| Enterprise | `/enterprise` | RBAC, audit, tenant management |
+| Evolution | `/evolution` | Agent/skill evolution pipeline |
+| History | `/history` | Sprint history and metrics |
+| Memory | `/memory` | Memory V2 browser |
+| Memory Explorer | `/memory-explorer` | Advanced memory search and graph |
+| Nervous | `/nervous` | Nervous system detector status |
+| Settings | `/settings` | App settings |
+| Status | `/status` | Detailed sprint phase status |
+| Workers | `/workers` | Active worker details |
+| Login | `/login` | OIDC login page |
+| Auth Callback | `/auth/callback` | OIDC callback handler |
 
 ---
 
-## DashboardState Schema
+## Project Structure
 
-The `.dashboard` file and `/api/status` response follow this structure:
-
-```json
-{
-  "sprint": {
-    "id": "sprint-019",
-    "number": 19,
-    "phase": "EXECUTE",
-    "status": "RUNNING"
-  },
-  "agents": [
-    {
-      "id": "w-019-001",
-      "role": "worker",
-      "status": "EXECUTING",
-      "model": "sonnet",
-      "tmuxWindow": "w-019-001",
-      "taskId": "019-001",
-      "currentAction": "Writing tests",
-      "spawnedAt": "2026-03-18T10:00:00.000Z"
-    }
-  ],
-  "progress": {
-    "done": 2,
-    "active": 5,
-    "blocked": 0,
-    "total": 8
-  },
-  "alerts": [
-    {
-      "level": "WARNING",
-      "message": "Stale lock: src/core/types.ts by w-019-002",
-      "source": "w-019-002",
-      "timestamp": "2026-03-18T10:01:00.000Z"
-    }
-  ],
-  "updatedAt": "2026-03-18T10:02:00.000Z"
-}
+```
+src/dashboard/
+  package.json            # React app dependencies (separate npm workspace)
+  tsconfig.json           # Dashboard TypeScript config
+  vite.config.ts          # Vite + Tailwind plugin config
+  vitest.config.ts        # Dashboard test config
+  src/
+    App.tsx               # Router + layout
+    routes.tsx            # Route path constants
+    main.tsx              # React entry
+    pages/                # One file per page (16 pages)
+    components/           # Shared UI components
+    hooks/                # Custom React hooks
+    i18n/                 # EN/TR translation strings
+    lib/                  # Utilities and API client
+    types/                # TypeScript types
 ```
 
-### Sprint Phases
-
-| Phase | Description |
-|-------|-------------|
-| `DIRECTIVE` | Waiting for directives |
-| `PLAN` | Brain is planning tasks |
-| `SPAWN` | Spawning worker tmux windows |
-| `EXECUTE` | Workers running, auditor scanning |
-| `EVALUATE` | Brain grading results |
-| `FIX` | Handling NO-GO tasks |
-| `RETRO` | Writing retrospective |
-| `DECAY` | Compressing memory |
-| `TRANSITION` | Sprint complete, awaiting next |
-
-### Alert Levels
-
-| Level | Meaning |
-|-------|---------|
-| `CRITICAL` | Stale agent (>2 min heartbeat), deadlock |
-| `WARNING` | Stale lock (>5 min), boundary violation |
-| `INFO` | Informational events |
-
 ---
 
-## Auditor — Data Source
+## Icon Policy
 
-The dashboard data is written by the Auditor (`src/monitor/auditor.ts`) every 30 seconds during a sprint. The scan cycle:
+All icons use **lucide-react** (`lucide-react` package, imported per icon). Emoji are prohibited in dashboard UI per the design system policy. If you need an icon, search the lucide library first.
 
-1. `scanHeartbeats()` — reads `.tasks/*.hb` files, detects stale agents (>2 min)
-2. `checkBoundaryViolations()` — runs `git diff --stat`, flags out-of-scope changes
-3. `checkStaleLocks()` — reads `.locks/*.lock`, detects locks held >5 min
-4. `detectDeadlocks()` — Kahn's algorithm on task dependency graph
-5. `detectPatterns()` — logs recurring violations to `PATTERNS.md`
-6. `writeScanToDashboard()` — merges all results, overwrites `.dashboard`
+```tsx
+import { Play, Square, AlertTriangle } from 'lucide-react';
 
-The auditor runs **in-process** within `runSprint()` — not as a separate tmux window. It starts with `startScanLoop()` between SPAWN and EXECUTE phases, and stops with `clearInterval()` after EXECUTE.
-
----
-
-## Background Jobs
-
-`POST /api/start` returns immediately with a `jobId`. Poll for status:
-
-```bash
-# Start sprint
-curl -X POST http://localhost:3100/api/start \
-  -H 'Content-Type: application/json' \
-  -d '{"autoApprove": true}'
-# → { "jobId": "job-1710756000000", "status": "started" }
-
-# Poll job status
-curl http://localhost:3100/api/job/job-1710756000000
-# → { "id": "job-...", "status": "running" | "completed" | "failed" }
+<Play size={16} />
+<AlertTriangle className="text-amber-500" size={14} />
 ```
 
-Only one sprint job can run at a time. Starting a second returns HTTP 409.
+---
+
+## Tailwind 4
+
+The dashboard uses Tailwind 4 (CSS-first config). The `@tailwindcss/vite` plugin handles compilation in Vite. No `tailwind.config.js` is needed — configuration is done in CSS via `@theme` directives.
 
 ---
 
-## Programmatic Usage
+## HTTP API
 
-```ts
-import { createHttpServer } from 'deckent/api';
+The dashboard communicates with the deckent HTTP API at the same origin as `deckent serve`. Key endpoints:
 
-const api = createHttpServer('/path/to/project', 3100, '/path/to/dist');
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/status` | Current sprint dashboard state |
+| `GET /api/events` | Server-Sent Events stream (real-time updates) |
+| `GET /api/history` | Sprint history |
+| `GET /api/memory` | Memory V2 content |
+| `GET /api/config` | Project config |
+| `GET /api/auth/me` | Authenticated user identity |
+| `POST /api/start` | Start a sprint (returns jobId) |
+| `POST /api/plan` | Plan sprint tasks |
 
-// Close server
-await api.close();
-```
+See `docs/reference/api-surface.md` for full endpoint reference and schema definitions.
 
 ---
 
@@ -245,14 +235,13 @@ await api.close();
 
 | Problem | Solution |
 |---------|----------|
-| `/api/status` returns 404 | No sprint running — no `.dashboard` file exists |
-| Dashboard shows 0 progress | Sprint just started; auditor updates every 30s |
-| SSE events not arriving | Check that `.dashboard` file is being written; verify `deckent web` is running |
-| Port 3100 already in use | Use `--port <other>` flag |
-| `deckent web` shows no UI | Run `npm run build` in `src/dashboard/` to build React assets |
-
-See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for more.
+| Dashboard blank / no content | Run `npm run build:all` — built assets may be missing |
+| HMR not working | Use `deckent serve --dev --dev-port 5173` with Vite running in another terminal |
+| Type errors in dashboard | Run `npm run tsc:dashboard` for dashboard-specific errors |
+| Dashboard tests failing | Run `npm run test:dashboard`; check `src/dashboard/src/__tests__/` |
+| Icon missing | Import from `lucide-react`, not emoji |
+| Tailwind styles not applying | Ensure `@tailwindcss/vite` plugin is in `vite.config.ts` |
 
 ---
 
-*Source: `src/api/server.ts`, `src/monitor/auditor.ts`, `src/cli/commands/status.ts`, `src/dashboard/` | Blueprint Sections 6, 7, 12*
+*Source: `src/dashboard/`, `src/cli/commands/serve.ts`, `src/dashboard/package.json`*

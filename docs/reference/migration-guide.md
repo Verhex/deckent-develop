@@ -52,7 +52,7 @@ The `status` field in heartbeat files (`.tasks/*.hb`) now uses `AgentStatus` enu
 { "status": "EXECUTING" }
 ```
 
-Valid values: `IDLE | PLANNING | EXECUTING | EVALUATING | SCANNING | CODING | TESTING | DOCUMENTING | DONE | ERROR | PAUSED`
+Valid values: `IDLE | PLANNING | EXECUTING | EVALUATING | SCANNING | CODING | VERIFYING | TESTING | DOCUMENTING | DONE | ERROR | PAUSED`
 
 ### Task Result Format
 
@@ -297,51 +297,38 @@ Or via CLI:
 
 ### Current Status
 
-`deckent upgrade` is partially implemented. The command currently prints:
+`deckent upgrade` is implemented and supports the following options:
 
+```bash
+deckent upgrade               # Check for and install the latest release
+deckent upgrade --check       # Check for updates only, do not install
+deckent upgrade --changelog   # Show changelog for the latest version and exit
+deckent upgrade --beta        # Upgrade to the latest beta pre-release
+deckent upgrade --canary      # Upgrade to the latest canary pre-release
+deckent upgrade --rollback    # Revert to the previous installed version
+deckent upgrade --local <tgz> # Install from a local .tgz file (development)
 ```
-Self-update not yet implemented. Use: npm update -g deckent
-```
 
-Full automatic migration support is planned for v1.0.
+After upgrading, run `deckent sync` and `deckent doctor` to verify your project configuration is up to date.
 
-### Manual Upgrade Steps (current)
+### Upgrade Steps
 
-1. **Update the package**:
+1. **Upgrade the binary**:
    ```bash
-   npm update -g deckent
-   # or in a project:
-   npm install --save-dev deckent@latest
+   deckent upgrade
    ```
 
-2. **Re-initialize** (safe — additive, does not overwrite):
-   ```bash
-   deckent init
-   ```
-
-3. **Sync adapter files**:
+2. **Sync adapter files**:
    ```bash
    deckent sync
    ```
 
-4. **Validate**:
+3. **Validate**:
    ```bash
    deckent doctor
    ```
 
-5. **Check config** — if you have a flat v0.x config, migrate it to mode-based format (see [Config Format Changes](#config-format-changes)).
-
-### Planned Automatic Migration (v1.0)
-
-When implemented, `deckent upgrade` will:
-
-1. Detect installed version vs. latest.
-2. Download and install the latest version.
-3. Run config schema migration:
-   - Detect flat v0.x config → convert to mode-based.
-   - Detect v1 plugin manifests → add `enabled: true`.
-4. Run `deckent sync` to update adapter files.
-5. Run `deckent doctor` and report results.
+4. **Check config** — if you have a flat v0.x config, migrate it to mode-based format (see [Config Format Changes](#config-format-changes)).
 
 ---
 
@@ -497,4 +484,4 @@ deckent start --dry-run   # shows planned tasks without spawning
 
 ---
 
-*Last updated: Sprint 25 — deckent v0.1.0*
+*Last updated: Sprint 286 — deckent v1.0.0-beta.1*

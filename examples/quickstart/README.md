@@ -5,7 +5,7 @@ This is a minimal example project demonstrating Deckent's orchestration capabili
 ## Getting Started
 
 ### Prerequisites
-- Node.js >=18.0.0
+- Node.js >=24.0.0
 - Deckent CLI installed globally or available locally
 
 ### Installation

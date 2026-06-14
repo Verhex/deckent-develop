@@ -12,12 +12,14 @@ A **sprint** is one cycle of planning, executing, and evaluating work. Each spri
 PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → CLEANUP
 ```
 
-1. **PLAN** -- Brain reads your `DIRECTIVES.md` and creates task files
-2. **SPAWN** -- Brain launches worker agents (one per task, in parallel)
-3. **EXECUTE** -- Workers write code, run tests, produce results
+1. **PLAN** -- Brain reads your `DIRECTIVES.md` and creates task JSON files in `.tasks/`
+2. **SPAWN** -- Brain launches worker agents (one per task, in parallel); when `dependency_pipeline_enabled` is true (the default), tasks are sorted into dependency waves via Kahn's topological algorithm and each wave runs in parallel before the next is unblocked
+3. **EXECUTE** -- Workers write code, run tests, produce `.result` files
 4. **EVALUATE** -- Brain reviews each result: DONE, GO_WITH_TECH_DEBT, or NO_GO
-5. **RETRO** -- Brain writes a retrospective and updates project memory
-6. **DECAY** -- Old memories are pruned to stay within budget
+5. **FIX** -- Failed tasks are retried (configurable timeout); Brain enriches the retry prompt with failure context
+6. **RETRO** -- Brain writes a retrospective to the memory DB and updates project learnings
+7. **DECAY** -- Old memory entries are pruned to stay within the sprint budget
+8. **CLEANUP** -- Task files are archived, file locks are released, the sprint is marked complete
 
 Sprints are never left incomplete. If a worker stalls, the auditor detects it and Brain handles the failure.
 
@@ -54,7 +56,7 @@ Key properties:
 Every completed task produces a `.result` file:
 
 - **DONE** -- All GO criteria met, tests pass
-- **GO_WITH_TECH_DEBT** -- Functional but with known shortcuts (logged in `.brain/DEBT.md`)
+- **GO_WITH_TECH_DEBT** -- Functional but with known shortcuts (logged in the memory DB, exported to `.brain/exports/debt.md`)
 - **NO_GO** -- Failed to meet criteria; Brain logs the reason for the next sprint
 
 ---
@@ -103,27 +105,22 @@ The auditor never writes source code. It only observes and reports.
 
 ## Skill
 
-A **skill** is a specialized capability that workers can use. Skills provide domain-specific knowledge and tools:
+A **skill** is a specialized capability injected into a worker agent's prompt, providing domain-specific knowledge and best practices. Deckent ships 21 built-in skills:
 
-- **design** -- UI/UX patterns and component architecture
-- **testing** -- Test strategies and coverage optimization
-- **docs** -- Documentation generation and formatting
-- **default** -- General-purpose coding
+| Skill | Domain |
+|-------|--------|
+| `typescript-expert` | TypeScript type system, ESM, generics |
+| `testing-expert` | Vitest/Jest, mocks, coverage strategy |
+| `documentation-writer` | Markdown, JSDoc, API docs |
+| `security-specialist` | OWASP, input validation, cryptography |
+| `performance-optimizer` | Async optimization, profiling |
+| `react-specialist` | React, Vite, Tailwind, components |
+| `system-architect` | System design, ADRs, scalability |
+| `docker-expert` | Dockerfile, compose, container ops |
+| `git-expert` | Branching, merge strategy |
+| `api-builder` | REST design, OpenAPI spec |
 
-Skills are configured via `skill_routing` in `config.json`:
-
-```json
-{
-  "skill_routing": {
-    "design": "opus",
-    "testing": "sonnet",
-    "docs": "haiku",
-    "default": "sonnet"
-  }
-}
-```
-
-Each skill maps to a model, so the right level of AI capability is used for each type of work.
+Skills are assigned per task in `DIRECTIVES.md` via the `- Skills:` field, and Deckent's routing engine automatically selects the best match based on task scope and project stack. Workers without an explicit skill assignment receive the most relevant built-in skills for their task type.
 
 ---
 
@@ -151,20 +148,29 @@ The auditor enforces scope boundaries. If a worker modifies a file outside its s
 
 ## Memory
 
-Deckent has a persistent **memory system** in `.brain/`:
+Deckent has a persistent **Memory V2** system backed by SQLite (`.brain/memory.db`). This is the single source of truth for all project knowledge: ADRs, sprint learnings, debt records, patterns, and retrospectives.
 
-| File | Purpose | Limit |
-|------|---------|-------|
-| `MEMORY.md` | Sprint learnings and patterns | 600 lines |
-| `DEBT.md` | Technical debt log | No hard limit |
-| `RETRO.md` | Latest retrospective | 100 lines |
-| `DECISIONS.md` | Architecture decision records | No hard limit |
-| `PATTERNS.md` | Recognized code patterns | No hard limit |
-| `sprints/` | Per-sprint logs | 80 lines each |
+**Key facts:**
 
-Memory **decays** automatically. After a configurable number of sprints (default: 5), old entries are pruned to stay within budget. This keeps Brain focused on recent, relevant context.
+- **Storage:** `.brain/memory.db` — SQLite with FTS5 full-text search (dual-layer Turkish/English normalization for 100% recall across both languages)
+- **Exports:** `.brain/exports/summary.md`, `decisions.md`, `memory.md`, `debt.md` — auto-generated after each sprint for git tracking and agent context
+- **Schema:** 5 tables (`entries`, `tags`, `relations`, `entry_history`, `schema_version`) plus an FTS5 virtual table
+- **Decay:** Old entries are pruned automatically after a configurable number of sprints (default: 5), keeping Brain focused on recent context
+- **CLI:** `deckent recall "<query>"` searches memory; `deckent remember "<note>"` saves a note; `deckent memory stats` shows DB health
 
-The `PROJECT-IDENTITY.md` file is the exception -- it is permanent and never decayed.
+Search memory from the command line:
+
+```bash
+deckent recall "docker heartbeat"
+```
+
+View exports:
+
+```bash
+cat .brain/exports/memory.md    # sprint learnings
+cat .brain/exports/debt.md      # technical debt log
+cat .brain/exports/decisions.md # architecture decision records
+```
 
 ---
 

@@ -54,13 +54,14 @@ Deckent supports temporary agents and skills created during sprints (e.g., from 
 
 ### Promotion Criteria
 
-A temp agent or skill is eligible for permanent status when it meets all three thresholds:
+A temp agent or skill is eligible for permanent status when it meets both thresholds:
 
 | Criterion | Threshold |
 |-----------|-----------|
 | Minimum tasks assigned | 8 |
 | Minimum success rate | 85% |
-| Minimum sprints active | 3 |
+
+The `PromotionCriteria` type also carries a `minSprints: 3` field (approximated by task count — if an entity has completed 8 tasks it has typically been active across 3+ sprints), but the evaluation checks only `totalTasks` and `successRate` directly.
 
 `evaluatePromotions(tracker)` scans all learned entities and returns `PromotionResult[]` with action `'promote'` or `'wait'`. Calling `promote(entityId, entityType)` copies the agent from `.deckent/agents/temp-{id}/` to `.deckent/agents/{id}/` (or the equivalent skill path) and sets its source to `'user'`.
 
@@ -72,9 +73,11 @@ Underperforming permanent entities are evaluated by `evaluateDemotions()`:
 
 | Criterion | Threshold |
 |-----------|-----------|
-| Fail rate | > 50% |
 | Minimum tasks before demotion eligible | 5 |
-| Unused for N sprints | 5 |
+| Fail rate trigger | ≥ 50% |
+| Underperformer trigger | success rate < 65% over ≥ 20 tasks |
+
+The `DemotionCriteria` type includes an `unusedSprints: 5` field, but the evaluation currently checks task-based thresholds (fail rate and the underperformer floor). An entity with fewer than 5 total tasks is not eligible for demotion regardless of outcome.
 
 `demote()` sets `enabled: false` on the manifest and passes the entity to `AgentRetirement`, which performs a final evaluation — high-success agents may be preserved even if recently underused.
 

@@ -66,7 +66,7 @@ npm test              # full suite (vitest run)
 npm run test:watch    # watch mode
 npm run test:coverage # coverage report (gated — see Testing)
 npm run test:ci-sim   # CI hermeticity reproducer (hides local state)
-npm run test:dashboard# dashboard tests (separate vitest config)
+npm run test:dashboard  # dashboard tests (separate vitest config)
 
 # Lint / validation gates
 npm run lint          # type-check, no emit (tsc --noEmit)

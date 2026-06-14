@@ -7,15 +7,16 @@
 ## Table of Contents
 
 1. [Overview](#1-overview)
-2. [Default: Claude Provider](#2-default-claude-provider)
-3. [Opt-In: Codex Provider (OpenAI)](#3-opt-in-codex-provider-openai)
-4. [Opt-In: Gemini Provider (Google)](#4-opt-in-gemini-provider-google)
-5. [Opt-In: Ollama Provider (Local / Zero-Cost)](#5-opt-in-ollama-provider-local--zero-cost)
-6. [Opt-In: OpenAI-Compatible Providers (DeepSeek / Qwen / GLM)](#6-opt-in-openai-compatible-providers-deepseek--qwen--glm)
-7. [Per-Task Provider Override in DIRECTIVES](#7-per-task-provider-override-in-directives)
-8. [Auth Credentials Passthrough](#8-auth-credentials-passthrough)
-9. [Container vs Host CLI Presence](#9-container-vs-host-cli-presence)
-10. [Enabling Codex/Gemini in the Docker Worker Image](#10-enabling-codexgemini-in-the-docker-worker-image)
+2. [Model Registry & Tier Equivalence](#2-model-registry--tier-equivalence)
+3. [Default: Claude Provider](#3-default-claude-provider)
+4. [Opt-In: Codex Provider (OpenAI)](#4-opt-in-codex-provider-openai)
+5. [Opt-In: Gemini Provider (Google)](#5-opt-in-gemini-provider-google)
+6. [Opt-In: Ollama Provider (Local / Zero-Cost)](#6-opt-in-ollama-provider-local--zero-cost)
+7. [Opt-In: OpenAI-Compatible Providers (DeepSeek / Qwen / GLM)](#7-opt-in-openai-compatible-providers-deepseek--qwen--glm)
+8. [Per-Task Provider Override in DIRECTIVES](#8-per-task-provider-override-in-directives)
+9. [Auth Credentials Passthrough](#9-auth-credentials-passthrough)
+10. [Container vs Host CLI Presence](#10-container-vs-host-cli-presence)
+11. [Enabling Codex/Gemini in the Docker Worker Image](#11-enabling-codexgemini-in-the-docker-worker-image)
 
 ---
 
@@ -35,7 +36,72 @@ Deckent supports multiple providers for worker execution:
 
 ---
 
-## 2. Default: Claude Provider
+## 2. Model Registry & Tier Equivalence
+
+Deckent's built-in model catalog (`src/core/model-registry.ts`) defines 14 cloud models across 3 providers and 4 tiers, plus Ollama as an opt-in local provider. Ollama models are registered at runtime and are NOT part of the 14-model cloud catalog.
+
+### Tiers
+
+| Tier | Description | Typical Use |
+|------|-------------|-------------|
+| `premium_plus` | Highest capability, advanced reasoning | Complex architecture, frontier tasks |
+| `premium` | High capability, balanced cost | Deep reasoning, multi-file refactors |
+| `standard` | General-purpose, cost-efficient | Most development, bug fixes, tests |
+| `economy` | Lowest cost, fastest | Docs, simple edits, formatting |
+
+### Built-in Cloud Models
+
+The deckent id (used in DIRECTIVES `- Model:`) maps to an `apiId` (the wire value sent to the provider).
+
+**Claude (Anthropic)**
+
+| Deckent Id | API Id | Tier |
+|------------|--------|------|
+| `fable` | `claude-fable-5` | `premium_plus` |
+| `opus` | `claude-opus-4-8` | `premium` |
+| `sonnet` | `claude-sonnet-4-6` | `standard` |
+| `haiku` | `claude-haiku-4-5-20251001` | `economy` |
+
+**Codex (OpenAI)**
+
+| Deckent Id | API Id | Tier |
+|------------|--------|------|
+| `o3` | `o3` | `premium_plus` |
+| `gpt-5` | `gpt-5.5` | `premium` |
+| `gpt-4.1` | `gpt-4.1` | `standard` |
+| `o4-mini` | `o4-mini` | `standard` |
+| `gpt-5-mini` | `gpt-5-mini` | `economy` |
+| `gpt-4.1-mini` | `gpt-4.1-mini` | `economy` |
+
+> **Note:** `gpt-5` uses wire id `gpt-5.5` — the current ChatGPT-subscription frontier. `gpt-5` (bare) is rejected by Codex with a subscription account; `gpt-5.5` is accepted. The registry resolves this automatically via `resolveApiId()`.
+
+**Gemini (Google)**
+
+| Deckent Id | API Id | Tier | Status |
+|------------|--------|------|--------|
+| `gemini-3.1-pro-preview` | `gemini-3.1-pro-preview` | `premium_plus` | preview |
+| `gemini-2.5-pro` | `gemini-2.5-pro` | `premium` | ga |
+| `gemini-2.5-flash` | `gemini-2.5-flash` | `standard` | ga |
+| `gemini-2.0-flash` | `gemini-2.0-flash` | `economy` | ga |
+
+> **Note:** `gemini-3.1-pro-preview` is in preview status — behavior may change without notice.
+
+### Tier Equivalence Across Providers
+
+When you switch a task from one provider to another, Deckent maps models by tier:
+
+| Tier | Claude | Codex | Gemini |
+|------|--------|-------|--------|
+| `premium_plus` | `fable` | `o3` | `gemini-3.1-pro-preview` |
+| `premium` | `opus` | `gpt-5` | `gemini-2.5-pro` |
+| `standard` | `sonnet` | `gpt-4.1` / `o4-mini` | `gemini-2.5-flash` |
+| `economy` | `haiku` | `gpt-5-mini` / `gpt-4.1-mini` | `gemini-2.0-flash` |
+
+Use `deckent models` (CLI) or `deckent_models` (MCP) to see the live registry.
+
+---
+
+## 3. Default: Claude Provider
 
 Claude is the default provider. Install the CLI and it works immediately.
 
@@ -58,7 +124,7 @@ npx deckent config set worker_provider claude
 
 ---
 
-## 3. Opt-In: Codex Provider (OpenAI)
+## 4. Opt-In: Codex Provider (OpenAI)
 
 To use OpenAI Codex as a worker provider, you need the Codex CLI installed and authenticated.
 
@@ -99,7 +165,7 @@ Or in `.deckent/config.json`:
 
 ---
 
-## 4. Opt-In: Gemini Provider (Google)
+## 5. Opt-In: Gemini Provider (Google)
 
 Gemini requires the `gemini` CLI binary. Authentication uses **either** an OAuth/subscription session **or** a `GOOGLE_API_KEY` — the API key is optional when the CLI already has an active OAuth session (Sprint 248 F1-G). Deckent spawns workers via the `gemini` CLI.
 
@@ -134,7 +200,7 @@ npx deckent config set worker_provider gemini
 
 ---
 
-## 5. Opt-In: Ollama Provider (Local / Zero-Cost)
+## 6. Opt-In: Ollama Provider (Local / Zero-Cost)
 
 Ollama runs entirely on your machine — no API key, no third-party calls, zero cost. It is the ideal choice for privacy-sensitive workloads or offline development.
 
@@ -182,7 +248,7 @@ Deckent resolves the endpoint in priority order: `DECKENT_OLLAMA_HOST` → `OLLA
 
 ---
 
-## 6. Opt-In: OpenAI-Compatible Providers (DeepSeek / Qwen / GLM)
+## 7. Opt-In: OpenAI-Compatible Providers (DeepSeek / Qwen / GLM)
 
 DeepSeek, Qwen, and GLM/Zhipu speak the OpenAI `/chat/completions` wire protocol. Deckent auto-registers each one when its API key environment variable is present at startup — no explicit `registerProvider` call is required.
 
@@ -217,7 +283,7 @@ Available models: `glm-4-plus`, `glm-4-flash`, `glm-4-air`
 
 ---
 
-## 7. Per-Task Provider Override in DIRECTIVES
+## 8. Per-Task Provider Override in DIRECTIVES
 
 You can override the provider on a per-task basis in `DIRECTIVES.md` using `- Provider:` and `- Model:` together. This enables mixed-fleet sprints where different tasks use different providers concurrently.
 
@@ -284,7 +350,7 @@ In a DIRECTIVES task block you can also set:
 
 ---
 
-## 8. Auth Credentials Passthrough
+## 9. Auth Credentials Passthrough
 
 ### Subprocess / tmux backends
 
@@ -317,7 +383,7 @@ npx deckent start
 
 ---
 
-## 9. Container vs Host CLI Presence
+## 10. Container vs Host CLI Presence
 
 When using the **Docker backend**, CLIs must be installed **inside the worker image** (`Dockerfile.worker`), not just on the host.
 
@@ -336,7 +402,7 @@ Workers run inside containers that have no access to the host filesystem outside
 
 ---
 
-## 10. Enabling Codex/Gemini in the Docker Worker Image
+## 11. Enabling Codex/Gemini in the Docker Worker Image
 
 The `Dockerfile.worker` has Codex and Gemini install lines commented out by default to keep the base image smaller (~200 MB without them).
 
@@ -379,4 +445,4 @@ To enable them:
 - [Docker Backend Guide](docker-backend.md) — Docker setup and configuration
 - [Configuration Reference](../reference/config-reference.md) — All config options
 - [Multi-Provider Reference](../reference/multi-provider.md) — Full provider reference with env vars
-- [DIRECTIVES Format Guide](https://github.com/VerhexIO/deckent/blob/main/DECKENT.md) — Full task directive syntax
+- [DIRECTIVES Format Guide](../../DECKENT.md) — Full task directive syntax

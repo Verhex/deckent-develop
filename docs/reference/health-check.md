@@ -1,179 +1,313 @@
-# Deckent Health Check — Sprint 065
+# Deckent Health Check Reference
 
-*Last audit: 2026-03-26 (Sprint 065 complete)*
-*Project: 100+ sprints, 12,051+ tests, 96%+ coverage*
+`deckent doctor` runs a set of checks against the local environment and project
+workspace. This page documents every check, its required/optional status, and what
+it means when it fails.
 
----
-
-## Blueprint Compliance (24 Sections)
-
-### Section 1: Core Principles (7)
-
-| Principle | Status | Evidence |
-|-----------|--------|----------|
-| Native-first (CLI+MCP) | WORKING | 35+ CLI commands, 20 MCP tools (enriched), npm installable |
-| Self-evolving | WORKING | MEMORY.md learnings, decay, brain self-learning config suggestions (Sprint 054), sprint-to-sprint CI learning (Sprint 062) |
-| Observable | WORKING | .dashboard, deckent status/watch, web dashboard, agent/skill visibility |
-| Plan-compatible | WORKING | 4 modes (performance/balanced/economic/api), auto-setup wizard, subscription detection |
-| Zero-friction | WORKING | MCP auto-registration, natural language → DIRECTIVES → sprint, zero-config mode |
-| Open source | WORKING | MIT LICENSE, CONTRIBUTING.md, CODE_OF_CONDUCT.md |
-
-### Section 3: CLI Commands (35+)
-
-| Status | Count | Commands |
-|--------|-------|----------|
-| WORKING | 35+ | init, start, plan, status, doctor, retro, history, config, attach, spawn, kill, cleanup, sync, watch, analyze, archive-debt, dashboard, serve, web, mcp, config set, start --watch, test, run, onboard, upgrade, explain, review, finalize, agent, skill, plugin, checkpoint, docs |
-
-### Section 5: Agent System
-
-| Component | Status | Detail |
-|-----------|--------|--------|
-| Brain planSprint | WORKING | AI + structured + auto mode, Zod validation, post-validation fallback, ai_planner_timeout configurable (Sprint 065) |
-| Brain runSprint | WORKING | 8-phase lifecycle, validated through 65 sprints |
-| Auditor scanLoop | WORKING | In-process 30s cycle, heartbeat check, alert dedup, provider health |
-| Worker spawn | WORKING | SpawnBackendFactory — tmux or subprocess backend, multi-provider |
-| Worker verify loop | WORKING | tsc + vitest internal loop before reporting completion (Sprint 040) |
-| Task queue | WORKING | Wave mechanism: concurrent workers + queued tasks |
-| Task router | WORKING | Routing v2: intent-based 3-layer engine with learning (Sprint 063) |
-| End-to-end chain | WORKING | Continuous operation through 65 sprints |
-
-### Section 6: Memory 3-Tier
-
-| Tier | Status | Detail |
-|------|--------|--------|
-| Tier 1: MEMORY.md | WORKING | Sprint 1-65 learnings, 127 lines, decay active. Budget: 200 lines max |
-| Tier 2: sprints/*.md | WORKING | sprint-059.md through sprint-065.md (7 active sprint logs) |
-| Tier 3: archive/ | WORKING | 40+ archived sprints + 8 retro archives. Auto-archived on decay |
-
-### Section 7: Sprint Lifecycle (8 phases)
-
-| Phase | Code | Tested | Last Verified |
-|-------|------|--------|---------------|
-| PLAN | WORKING | Yes | Sprint 065 (7 tasks planned) |
-| SPAWN | WORKING | Yes | Sprint 065 (multi-provider spawn) |
-| EXECUTE | WORKING | Yes | Sprint 065 (7 parallel workers) |
-| EVALUATE | WORKING | Yes | Sprint 065 (7 GO_WITH_TECH_DEBT) |
-| FIX | WORKING | Yes | Available, triggered on NO_GO |
-| RETRO | WORKING | Yes | Sprint 065 (RETRO.md + archive) |
-| DECAY | WORKING | Yes | Sprint 065 (budget maintained) |
-| CLEANUP | WORKING | Yes | Sprint 065 (.tasks/ cleaned) |
-
-Last sprint execution: **Sprint 065** (2026-03-26, 27m 10s). All 65 sprints ran real orchestration.
-
-### Section 8: GO/NO-GO Protocol — WORKING
-
-### Section 10: tmux Management — WORKING (also subprocess backend available)
-
-### Section 11: Plugin System — WORKING
-- Plugin install/create/remove + runtime hooks (beforeSprint/afterTask/afterSprint)
-- 3 built-in plugins: test-runner, doc-writer, code-reviewer
-- ci-guardian agent hooks for CI integration (Sprint 062)
-
-### Section 13: Multi-plan — WORKING
-
-### Section 14: i18n — WORKING
-- en.json + tr.json with localized messages
-- CLI hints, MCP enrichment, error messages all localized
-
-### Section 16: Self-Test 3 Layer — WORKING
-- 12,051+ tests, 96%+ coverage
-
-### Section 21: MCP — WORKING
-- 21 tools (all enriched with _enriched meta), 8 resources, background job pattern
-
-### Section 22: User Flows — PARTIAL
-- No dedicated end-to-end flow test suite (covered by sprint execution)
-
-### Section 23: Roadmap — Phase 1-3.5 MET, Phase 4 IN PROGRESS
+**Source files:**
+- `src/cli/commands/doctor.ts` — `runDoctorChecks()`, all check functions
+- `src/cli/commands/doctor-checks.ts` — pure check implementations (extracted for testability)
 
 ---
 
-## Current Metrics
+## Running the Health Check
 
-| Metric | Value | Source |
-|--------|-------|--------|
-| Tests | 12,051+ | `npx vitest run` |
-| Test files | 469 | `npx vitest run` |
-| Coverage | 96%+ | `npx vitest run --coverage` |
-| Source files | 247 .ts | src/ directory |
-| Source lines | 75,105 | All .ts files |
-| CLI commands | 35+ | src/cli/commands/ |
-| MCP tools | 20 (enriched) | src/mcp/tools/ |
-| MCP resources | 8 | src/mcp/resources/ |
-| HTTP endpoints | 17 | src/api/server.ts |
-| Built-in agents | 16 | .deckent/agents/ |
-| Built-in skills | 21 | .deckent/skills/ |
-| Providers | 3 (Claude, Codex, Gemini) | src/providers/ |
-| Sprints completed | 100+ | .brain/sprints/ + archive/ |
-| ADRs | 21 | .brain/DECISIONS.md |
-| .brain/ budget | ~357 / 600 lines | countBrainLines() |
+```bash
+# Standard output (human-readable)
+deckent doctor
 
----
+# JSON output (machine-readable, CI-friendly)
+deckent doctor --json
 
-## Agent & Skill System Status
+# Force verbose mode
+deckent doctor --verbose
 
-### Built-in Agents (16)
+# MCP equivalent
+deckent_doctor { "root": "/path/to/project" }
+```
 
-| Agent | Status | Specialization |
-|-------|--------|---------------|
-| security-auditor | WORKING | Security analysis, vulnerability detection |
-| test-writer | WORKING | Test creation, coverage improvement |
-| doc-writer | WORKING | Documentation generation |
-| code-reviewer | WORKING | Code quality, best practices |
-| refactorer | WORKING | Code restructuring, cleanup |
-| bug-fixer | WORKING | Bug diagnosis, fix implementation |
-| api-builder | WORKING | API design, endpoint implementation |
-| performance-analyzer | WORKING | Performance profiling, optimization |
-| ci-guardian | WORKING | CI/CD integration, regression detection (Sprint 062) |
-
-### Built-in Skills (21)
-
-| Skill | Status |
-|-------|--------|
-| typescript-expert | WORKING |
-| react-specialist | WORKING |
-| python-expert | WORKING |
-| api-builder | WORKING |
-| database-migration | WORKING |
-| testing-expert | WORKING |
-| documentation-writer | WORKING |
-| security-specialist | WORKING |
-| performance-optimizer | WORKING |
-| devops-engineer | WORKING |
-| ci-testing | WORKING (Sprint 062) |
+The command exits with code `0` when all **required** checks pass; non-zero when any
+required check fails. Optional checks that fail are reported as warnings but do not affect
+the exit code.
 
 ---
 
-## Provider Health
+## Check Catalog
 
-| Provider | Status | Detail |
-|----------|--------|--------|
-| Claude | WORKING | tmux + subprocess backends, session auth |
-| Codex | WORKING | `codex exec --full-auto`, OPENAI_API_KEY |
-| Gemini | WORKING | `gemini -p`, GOOGLE_API_KEY |
-| Fallback chain | WORKING | primary → secondary → tertiary on failure |
-| Mixed sprint | WORKING | Multiple providers in same sprint |
+`runDoctorChecks()` executes exactly **15 checks** in this order:
 
----
-
-## Known Patterns
-
-| Pattern | Occurrences | Status |
-|---------|-------------|--------|
-| stale_heartbeat | 2,089 | UNRESOLVED (Sprint 056-065) |
-
----
-
-## Recent Sprint Performance
-
-| Sprint | Tasks | Done | Tech Debt | NO_GO | Duration |
-|--------|-------|------|-----------|-------|----------|
-| S065 | 7 | 7 | 6 | 0 | 27m 10s |
-| S064 | 14 | 0 | 0 | 14 | 42m 32s |
-| S063 | 14 | 7 | 4 | 7 | ~30m |
-| S062 | 8 | 8 | 3 | 0 | ~25m |
-| S061 | 8 | 8 | 5 | 0 | ~28m |
+| # | Check | Required | What it verifies |
+|---|-------|----------|-----------------|
+| 1 | Platform | optional | macOS/Linux/WSL2 fully supported; Windows advisory (subprocess-only) |
+| 2 | Node.js | **required** | Node is in PATH; version ≥ 24 |
+| 3 | git | **required** | git is in PATH; needed for rollback, safety points, branch management |
+| 4 | tmux | conditional | Not required when `spawn_backend` is `docker` or `subprocess` |
+| 5 | Docker | conditional | Required when `spawn_backend = docker`; image `deckent-worker:latest` must exist |
+| 6 | Claude CLI | **required** | `claude` is in PATH; auth check optional (via `--check-auth` flag) |
+| 7 | Workspace | optional | `.deckent/` directory exists (project initialised) |
+| 8 | Brain Dir | optional | `.brain/` directory exists with required export files |
+| 9 | Directives | optional | `DIRECTIVES.md` exists and is non-empty |
+| 10 | Brain Budget | optional | `.brain/` line count is within configured budget (default 900 lines) |
+| 11 | Debt | optional | No CRITICAL-priority tech debt items open |
+| 12 | Locks | optional | No stale lock files in `.locks/` (stale = older than 5 minutes) |
+| 13 | .deck Security | optional | `.deck` secrets file is NOT tracked by git |
+| 14 | Write Permissions | **required** | Write access to `.tasks/` and `.brain/` directories |
+| 15 | Gitignore | optional | `memory.db` and related files are in `.gitignore` and not git-tracked |
 
 ---
 
-*Updated at Sprint 065 completion. Next audit: Sprint 070.*
+## Check Details
+
+### 1 · Platform
+
+Detects the host OS and reports whether the platform is fully supported.
+
+| Result | Meaning |
+|--------|---------|
+| `macOS (fully supported)` | All backends (docker, tmux, subprocess) available |
+| `Linux (fully supported)` | All backends available |
+| `WSL2/Linux (fully supported)` | Detected via `WSL_DISTRO_NAME` or `/proc/version` |
+| `Windows UNSUPPORTED for tmux backend` | Only subprocess mode available; advisory warning |
+
+**Required:** No. Fails do not block sprint start.
+
+---
+
+### 2 · Node.js
+
+Runs `node --version` and parses the major version.
+
+| Result | Meaning |
+|--------|---------|
+| `v24.x.x (>=24 required)` | Pass |
+| `not found` | Node is not in PATH — install Node.js ≥ 24 |
+| `v18.x.x found but >=24 required` | Upgrade Node.js |
+
+**Required:** Yes. Sprint will not start if Node.js is missing or too old.
+
+---
+
+### 3 · git
+
+Runs `git --version`.
+
+| Result | Meaning |
+|--------|---------|
+| `v2.x.y` | Pass |
+| `not found` | git is not in PATH — install git |
+
+**Required:** Yes. Git is needed for rollback, safety points, and branch management.
+
+---
+
+### 4 · tmux
+
+Runs `tmux -V`. Behaviour depends on the configured `spawn_backend`.
+
+| Condition | Result |
+|-----------|--------|
+| `spawn_backend = docker` | `not required (docker backend)` — always passes |
+| `spawn_backend = subprocess` | `not required (subprocess backend)` — always passes |
+| `spawn_backend = tmux` or Claude provider active | required; fails if `tmux` not found |
+| Codex/Gemini-only providers | advisory warning only |
+
+**Required:** Conditional (only when tmux backend is active).
+
+---
+
+### 5 · Docker
+
+Runs `docker info` and checks for the `deckent-worker:latest` image.
+
+| Result | Meaning |
+|--------|---------|
+| `Docker available, deckent-worker:latest found` | Pass |
+| `Docker available but deckent-worker image missing` | Build it: `docker build -f Dockerfile.worker -t deckent-worker:latest .` |
+| `Docker not available` | Install Docker or switch to tmux/subprocess backend |
+| `not required (tmux backend)` | Always passes when docker backend is not selected |
+
+**Required:** Only when `spawn_backend = docker`.
+
+---
+
+### 6 · Claude CLI
+
+Runs `claude --version`. Optionally checks authentication (`--check-auth`).
+
+| Result | Meaning |
+|--------|---------|
+| `v1.x.y` | Pass |
+| `not found` | Install Claude CLI: `npm install -g @anthropic-ai/claude-cli` |
+| `v1.x.y — not authenticated` | Run: `claude login` |
+
+**Required:** Yes. Claude CLI is the primary execution backend.
+
+---
+
+### 7 · Workspace
+
+Checks that `.deckent/` directory exists in the project root.
+
+| Result | Meaning |
+|--------|---------|
+| `.deckent/ found` | Pass — project is initialised |
+| `.deckent/ missing` | Run `deckent init` to initialise the project |
+
+**Required:** No. Warning only.
+
+---
+
+### 8 · Brain Dir
+
+Checks `.brain/` directory and required export files
+(`exports/summary.md`, `exports/decisions.md`, `exports/memory.md`).
+
+| Result | Meaning |
+|--------|---------|
+| `All brain files present` | Pass |
+| `.brain/ missing` | Run `deckent init` or `deckent memory export` |
+| `Missing: exports/summary.md` | Run `deckent memory export` to regenerate |
+
+**Note:** The primary store is the SQLite database (`.brain/memory.db`). Export files are
+generated snapshots for git tracking and context injection; they are regenerated automatically
+at the end of each sprint.
+
+**Required:** No. Warning only.
+
+---
+
+### 9 · Directives
+
+Checks that `DIRECTIVES.md` exists and contains content.
+
+| Result | Meaning |
+|--------|---------|
+| `DIRECTIVES.md found` | Pass |
+| `DIRECTIVES.md missing` | Create it or run `deckent init` |
+| `DIRECTIVES.md is empty` | Add sprint goals using `## Task N: …` sections |
+| `Cannot read DIRECTIVES.md` | Check file permissions |
+
+**Required:** No. Warning only — `deckent start` will fail if absent.
+
+---
+
+### 10 · Brain Budget
+
+Counts lines in `.brain/exports/*.md` files and compares to the configured budget
+(default: 900 lines, set via `memory.budget` in `.deckent/config.json`).
+
+| Result | Meaning |
+|--------|---------|
+| `Brain within budget (350 / 900 lines)` | Pass |
+| `Brain over budget (950 / 900 lines) — run \`deckent memory export\`` | Warning; decay will trim on next sprint end |
+
+**Required:** No. Warning only.
+
+---
+
+### 11 · Debt
+
+Reads the active debt items from memory.db and flags any CRITICAL-priority items.
+
+| Result | Meaning |
+|--------|---------|
+| `3 open debt items, no critical` | Pass |
+| `1 CRITICAL debt item(s)` | Action required; resolve or downgrade before shipping |
+
+**Required:** No. Warning only.
+
+---
+
+### 12 · Locks
+
+Scans `.locks/` for stale lock files (last-modified > 5 minutes ago).
+
+| Result | Meaning |
+|--------|---------|
+| `No lock files` | Pass — no active workers |
+| `3 active lock(s)` | Pass — workers are running |
+| `2 stale lock(s)` | Run `deckent cleanup` to remove stale locks |
+
+**Required:** No. Warning only.
+
+---
+
+### 13 · .deck Security
+
+Checks whether the `.deck` secrets file (if present) is tracked by git.
+
+| Result | Meaning |
+|--------|---------|
+| `.deck file not found` | Pass — no secrets file |
+| `.deck file exists and is NOT tracked by git (safe)` | Pass |
+| `.deck file is tracked by git — secrets may be exposed!` | Add `.deck` to `.gitignore` immediately and run `git rm --cached .deck` |
+
+**Required:** No. Warning only.
+
+---
+
+### 14 · Write Permissions
+
+Uses `fs.accessSync` to verify write access to `.tasks/` and `.brain/`.
+
+| Result | Meaning |
+|--------|---------|
+| `Write access OK (.tasks/, .brain/)` | Pass |
+| `No write access to: .tasks/` | Fix directory permissions |
+
+**Required:** Yes. Deckent cannot run sprints without write access to these directories.
+
+---
+
+### 15 · Gitignore
+
+Reads `.gitignore` and checks that `memory.db`-related paths are excluded from git
+tracking. Also runs `git check-ignore` to confirm the files are actually gitignored.
+
+| Result | Meaning |
+|--------|---------|
+| `memory.db files properly gitignored` | Pass |
+| `.gitignore not found` | Create `.gitignore` with the required entries |
+| `Missing from .gitignore: .brain/memory.db` | Add the entry to `.gitignore` |
+| `Tracked by git: .brain/memory.db` | Run: `git rm --cached .brain/memory.db` |
+
+**Required:** No. Warning only — but ignoring this allows secrets stored in memory.db
+(API keys, tokens from `.deck` imports) to be committed to git.
+
+---
+
+## Exit Code Reference
+
+| Exit code | Meaning |
+|-----------|---------|
+| `0` | All required checks passed |
+| `1` | One or more required checks failed |
+
+Required checks are: **Node.js**, **git**, **Claude CLI**, **Write Permissions**.
+Conditional required: **tmux** (when tmux backend active), **Docker** (when docker backend active).
+
+---
+
+## Pre-flight Health Check
+
+`deckent start` automatically runs a lightweight pre-flight health check before spawning
+workers. This is a subset of the full `deckent doctor` checks and is designed to catch
+blocking issues without the full diagnostic output.
+
+The pre-flight check runs `scripts/pre-flight-health-check.mjs` as a child process and
+falls back to `runDoctorChecks()` if the script is not found.
+
+To disable pre-flight (not recommended): set `preflight_health_check: false` in
+`.deckent/config.json`.
+
+---
+
+## CI Usage
+
+```bash
+# In a CI step — exits non-zero if required checks fail
+deckent doctor --json | tee doctor-report.json
+```
+
+For hermetic CI environments, the Docker backend is strongly recommended — it eliminates
+the tmux check and provides consistent container isolation. See `docs/guide/docker-backend.md`.

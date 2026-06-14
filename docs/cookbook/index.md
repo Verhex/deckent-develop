@@ -12,3 +12,6 @@ Here's an index of practical recipes to help you use Deckent effectively:
 - [08-cost-and-budget.md: Manage sprint cost estimates and budgeting.](./08-cost-and-budget.md)
 - [09-recover-stuck-sprint.md: Manually recover a stalled or stuck sprint.](./09-recover-stuck-sprint.md)
 - [10-nervous-alerts.md: Understand and respond to Nervous System alerts.](./10-nervous-alerts.md)
+- [add-rest-api.md: Add a new REST API endpoint to an Express or FastAPI project.](./add-rest-api.md)
+- [fix-bug.md: Diagnose and fix a failing test with the bug-fixer agent.](./fix-bug.md)
+- [update-docs.md: Update stale documentation and automate recurring doc sections with Managed Docs.](./update-docs.md)

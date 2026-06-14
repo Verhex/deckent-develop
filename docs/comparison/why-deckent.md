@@ -69,16 +69,50 @@ accepted ADR requires an explicit NO_GO result or an ADR amendment path.
 This keeps implementation work connected to the project's recorded architecture
 instead of relying on ad hoc memory.
 
+### Dependency Wave Execution
+
+Deckent builds a dependency graph from task declarations and executes work in
+topological waves. Tasks with no unmet dependencies run in parallel; tasks that
+depend on earlier results wait for those results before starting. The algorithm
+is based on Kahn's topological sort and is applied automatically when the
+dependency pipeline is enabled.
+
+This means related tasks that can proceed in parallel do so without manual
+scheduling, while dependent tasks are blocked until their inputs are ready.
+
+### Evolutionary Agent And Skill Pipeline
+
+Agents and skills in deckent can be promoted, demoted, and replaced over time
+based on observed outcomes. A temporary agent that consistently performs well
+on a class of tasks can be promoted to a permanent built-in. One that
+underperforms on its assigned role can be demoted and replaced.
+
+The outcome tracker records task results, sprint evaluations, and quality scores
+per agent and per skill. This data feeds the promotion pipeline so the project's
+agent roster improves across sprints rather than staying fixed.
+
+### Nervous System
+
+Deckent includes a proactive meta-orchestrator layer called the Nervous System.
+It runs independently of active sprints and monitors the project state for
+conditions that warrant attention: potential conflicts, risky patterns, resource
+signals, or emerging anomalies.
+
+When the Nervous System detects something that may need a decision, it proposes
+an action. The authority matrix governs what it can do autonomously and what
+requires human approval. This keeps the orchestration layer active between
+sprints without requiring constant user attention.
+
 ### Autonomous And Reactive Operation
 
-Deckent includes an autonomous direction built around backlog-driven execution,
+Deckent includes an autonomous engine built around backlog-driven execution,
 reactive signals, approval gates, and risk-aware policies. Low-risk work can be
 handled under policy, while risk-tagged operations can wait for approval.
 
 The same Brain, Worker, Auditor, memory, and ADR model applies: autonomous work
 still needs scoped execution, recorded results, and reviewable governance.
 
-### Open Source For Open World
+### Open Source, MIT Licensed
 
 Deckent is MIT licensed and designed as an open system. Its agent, skill,
 provider, memory, CLI, MCP, and documentation surfaces are project-visible and

@@ -1,6 +1,13 @@
 # Sprint 156 — Per-Change Security Review
 
-**Status:** proposed  
+> **ARCHIVE NOTE (2026-06-14):** This review was written during Sprint 156 (2026-05-12)
+> and covers point-in-time security analysis of 13 changes introduced in that sprint.
+> All Sprint 156 changes are long-merged and the residual risks catalogued here have been
+> tracked and partially addressed in subsequent sprints (e.g., ADR-037 V1.0 authority matrix,
+> spawn-safety allowlist hardening). This document is **read-only historical reference**.
+> For current security posture see `SECURITY.md` and `docs/security/threat-model.md`.
+
+**Status:** archived  
 **Sprint:** 156 (Pipeline Hardening, T4 god-level)  
 **Reviewer role:** security-specialist  
 **Date:** 2026-05-12  

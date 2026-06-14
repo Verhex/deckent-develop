@@ -37,6 +37,43 @@
 
 ---
 
+## Memory V2 DB Schema
+
+The single source of truth for all Brain knowledge is `.brain/memory.db` (SQLite). The schema contains **5 tables + 1 FTS5 virtual table** (`src/core/memory-store.ts:99-237`):
+
+| Table | Type | Description |
+|---|---|---|
+| `schema_version` | real table | Migration tracking; single row with `version` + `applied_at` |
+| `entries` | real table | Main knowledge store — every ADR, memory entry, retro, debt, pattern |
+| `tags` | real table | Normalized many-to-many tag association (`entry_id`, `tag COLLATE NOCASE`) |
+| `relations` | real table | Cross-entry links: `from_id → to_id` with `rel_type` (references, supersedes, caused_by, resolves, blocks, depends_on) |
+| `entry_history` | real table | Field-level change tracking: `entry_id`, `field`, `old_value`, `new_value`, `changed_by`, `change_type` |
+| `entries_fts` | **FTS5 virtual table** | Full-text search over 8 columns — 4 original + 4 `turkishNormalize`d |
+
+### FTS5 Dual-Layer Search
+
+`entries_fts` indexes **8 columns** for dual-layer TR/EN recall:
+
+```sql
+CREATE VIRTUAL TABLE entries_fts USING fts5(
+  title, content, summary, tag_text,          -- 4 original columns
+  title_norm, content_norm, summary_norm, tag_norm,  -- 4 turkishNormalize columns
+  content='entries',
+  content_rowid='rowid',
+  tokenize='unicode61 remove_diacritics 2'
+);
+```
+
+The `_norm` columns store the output of `turkishNormalize()` (`src/core/memory-normalize.ts`), which maps Turkish-specific characters (ı→i, ğ→g, ş→s, ç→c, ö→o, ü→u) and normalizes casing. A query for "dogrulama" matches entries containing "doğrulama" — 100% recall across TR/EN/DE text.
+
+Sync is maintained via 3 triggers: `entries_ai` (after insert), `entries_ad` (after delete), `entries_au` (after update).
+
+### Additive Migrations
+
+The schema supports additive (non-destructive) column migrations via `applyAdditiveMigrations()`. New columns are PRAGMA-guarded so re-opening an existing DB is idempotent. Historical rows are never dropped or rebuilt. Current additive columns: `tenant_id`, `audit_prev_hmac`, `audit_hmac`.
+
+---
+
 ## Overview
 
 Deckent's memory system was originally designed as a **three-tiered, file-based knowledge store** in the `.brain/` directory (the V1 model documented below). Under Memory V2 it is realised DB-first — see the note above. Every sprint reads from and writes to this system, making the orchestrator progressively smarter with each execution cycle.
@@ -191,10 +228,9 @@ Each ADR follows MADR v3 hybrid format (ADR-036):
 | Max entries | No hard limit — grows indefinitely |
 | Decay | **Never decayed** (`decay_exempt = true`) |
 | Ownership | Brain writes via `MemoryStore.upsert()`; agents read |
-| Current count | 54+ ADRs (ADR-001 through ADR-061; see `docs/adr/` for full list) |
+| Current count | 89 ADRs (ADR-001 through ADR-089; see `docs/adr/` for full list) |
 
-> The V1 table showing "Sprint 065 — 21 ADRs total" (ADR-001 through ADR-013) is
-> **outdated**. ADR governance was formalized in Sprint 138 (ADR-036). For the
+> ADR governance was formalized in Sprint 138 (ADR-036). For the
 > authoritative list query `store.getByType('adr')` or see `docs/adr/`.
 
 ---

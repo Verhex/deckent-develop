@@ -1,6 +1,8 @@
 # Repo Sync — develop → product
 
-> Status: accepted (Sprint 201). See also: `docs/adr/065-develop-product-repo-split.md`.
+> Status: accepted (Sprint 201, amended Sprint 281). See also: `docs/adr/065-develop-product-repo-split.md`.
+>
+> **Note:** `docs/development/` is itself in the EXCLUDE list — this guide and all files in it are internal and do not appear in the public product repo.
 
 ## Two-repo model
 

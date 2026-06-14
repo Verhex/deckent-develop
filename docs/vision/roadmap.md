@@ -1,8 +1,8 @@
-> ⚠️ **SUPERSEDED (2026-06-01, Sprint 211).** Consolidated into [`docs/MASTER-PLAN.md`](../MASTER-PLAN.md) — the single source of truth. Preserved for provenance; sprint numbers here are pre-211 historical.
+> ⚠️ **SUPERSEDED (2026-06-01, Sprint 211).** Consolidated into [`docs/MASTER-PLAN.md`](../MASTER-PLAN.md) — the single source of truth for active development sequencing. This file is preserved for provenance; historical sprint planning through Sprint 210 is captured here. Sprint 211+ history lives in MASTER-PLAN.md. Current sprint: 285+.
 
 # Deckent — Product Roadmap
 
-**Last updated:** 2026-05-31 — Sprint 202-205 kuzey-yıldızı stream landed: provider-free %100 (Ollama + Docker provider-aware), native chat %60 (Path C tool-use loop + streaming + multi-turn + resume), F3 process mode başladı (tenant + scheduled flows), F4 enterprise iskelet (audit query), agent routing fix CANLI (built-in agent seçiliyor). 1 Haziran 2026 OSS beta launch window.
+**Last updated:** 2026-05-31 (historical anchor). **Current state:** Sprint 285+, v1.0.0-beta.1. Autonomous engine live (Sprint 220+), native REPL production (Sprint 219+, Sprint 285 tur-içi tool queue+approval), dashboard 16 pages, Memory V2 DB-first, 34 MCP tools, 4 providers. See [`docs/MASTER-PLAN.md`](../MASTER-PLAN.md) for the active how-we-build-it sequencing.
 
 > **⚠ AKTİF PLAN:** Sprint-bazlı yürütme planı artık **[docs/MASTER-PLAN.md](../MASTER-PLAN.md) §10 Sequencing**'tedir (geliştirme SSOT, kod-doğrulanmış, canlı). Eski `ROADMAP-GOD-LEVEL.md` MASTER-PLAN'e konsolide edildi → `docs/archive/`. Bu dosya ürün vizyonu çerçevesi için korunur. Güncel durum (Sprint 220): provider-free %100 · konuşulabilir (native REPL gerçek round-trip) · 3-yüz (Developer ~%90, System Worker ~%85, Asistan ~%85).
 
@@ -121,13 +121,14 @@ Each sprint is approximately 30-60 minutes of Deckent orchestrating its own deve
 | **195** | Worker Prompt God-Level Stream Tier-1 wire + 90 new tests + models.dev bootstrap | WP-1..WP-12 stream Tier-1 land: agent PROMPT.md canonical source, skill content full-fidelity, idempotency-key per `${sprintId}-${taskId}-${retryCount}`, scope.filesWrite auto-include of test paths (WP-3 `deriveTestScope`); 195-005 host-RAM detect (24 GB WSL2 / `meminfo`) live; 195-004 catalog bootstrap NO_GO → carry-over Sprint 196 | **Done** |
 | **196** | Disk-verify gate KAYNAK 1-5 live + WP-3 deriveTestScope + test-fail categorize (52→41) | `verifyDiskAgainstClaim` runtime gating on 5 of 7 synthetic NO_GO callsites (`result-collector.ts:518-583` + 4 siblings); 196-005 token-counter.ts NO_GO exposed KAYNAK 6+7 ungated paths (Sprint 198-001 seed); 196-007 test-fail audit `docs/audits/sprint-196/test-fail-categorize.md` (41-fail baseline kategorize, Sprint 198-006 attacks Tier-1) | **Done** |
 | **197** | Synthetic NO_GO source map (7/7) + persona-task matcher live + Sprint 195-196 retroactive reclassify | 6/8 DONE + 2 rescued (197-004 WSL2 OOM mitigation 6×2g config, 197-005 persona threshold tuning live); 197-001 worker mapped the 2 remaining ungated callsites (`sprint-phases.ts:1318-1330` + `sprint-controller.ts:963-1003`) for Sprint 198-001; 197-002 reclassify 2/12 applied + 10 skipped (sprint-entry-missing — Sprint 198-002 backfill); 197-003 CHANGELOG 40-entry catch-up Sprint 157→197; chore commit `cd4df0ed` regenerated `.claude/rules/auditor.md` from legacy PATTERNS.md template (Sprint 198-003 closes template) | **Done** |
-| **198** | Brain dürüst raporlama %100 closure + memory.db finalize fix + plan refresh + RAM verify + 15-fail attack | 4 dalga, 6 task + 3 opsiyonel — 198-001 KAYNAK 6+7 gate wire (`runEvaluatePhase` + `graceKill`), 198-002 memory.db sprint-log finalize bug fix + Sprint 194/196 row backfill, 198-003 managed-docs auditor.md template regression fix, 198-004 plan refresh (this entry + beta-tracker.md + comprehensive-work-plan.md), 198-005 6-worker × 2g RAM deney readiness, 198-006 baseline 41 → ≤26 attack | **In flight** |
-| **199** | Beta packaging Wave 1 — npm v1.0.0-beta.1 dry-run + Dockerfile.worker image build/push automation + announcement materials | Pre-launch verification: `npm pack --dry-run` parity, GA gate verification, beta announcement copy, release-notes draft, Dockerfile image pipeline | **Planned** |
-| **200** | 🚀 **v1.0.0-beta.1 NPM PUBLISH (1 Haziran 2026 OSS beta launch)** | Alperen manuel `npm publish` per project policy (`feedback_npm_publish_user_approval`); GitHub release tag; Show HN + Reddit + Twitter announce. **GA Canonical Launch milestone** (Trinity Developer face fully shipped; Assistant + System Worker progress per Sprint 201+) | **Planned (T-1 day)** |
-| **201-205** | Sub-project #3 + #4 implementation cycle | Hardware-attested HMAC + outbound cluster aggregation (was 187 plan), SSO/OIDC, SIEM forwarder, compliance reports, enterprise dashboard — re-sequenced post-beta per Sprint 188 master plan W-stream | Planned |
-| **206-209** | Nervous Phase 2/3 + Local LLM (CUDA) provider | 5 MVP detectors balanced mode, full 12-detector rollout, autopilot mode testing; `src/providers/ollama.ts` or `src/providers/cuda.ts` adapter — RTX 5090 + CUDA 13.2 + WSL2 passthrough verified 2026-05-21; 32GB VRAM, 70B model residence | Planned |
-| **210-213** | AEGIS Phase 1-3 — Foundation + Verification Stack + Provenance + Governance | Explicit ADVERSE phase, REVIEW MCP tool, COOL-DOWN consolidation (ADR-061), fast-check PBT, branded types, Stryker mutation-diff CI, artifact manifest schema, Ed25519 signing, formalized worker andon authority | Planned |
-| **214+** | **God-Level GA Canonical** — `v1.0.0` stable | `agentaegis.io` standard draft, academic paper prep (ICSE/FSE 2027 target), AEGIS-compliant orchestrator certification | Planned |
+| **198** | Brain dürüst raporlama %100 closure + memory.db finalize fix + plan refresh + RAM verify + 15-fail attack | 4 dalga, 6 task + 3 opsiyonel — 198-001 KAYNAK 6+7 gate wire (`runEvaluatePhase` + `graceKill`), 198-002 memory.db sprint-log finalize bug fix + Sprint 194/196 row backfill, 198-003 managed-docs auditor.md template regression fix, 198-004 plan refresh (this entry + beta-tracker.md + comprehensive-work-plan.md), 198-005 6-worker × 2g RAM deney readiness, 198-006 baseline 41 → ≤26 attack | **Done** |
+| **199** | Beta packaging Wave 1 — npm v1.0.0-beta.1 dry-run + Dockerfile.worker image build/push automation + announcement materials | Pre-launch verification: `npm pack --dry-run` parity, GA gate verification, beta announcement copy, release-notes draft, Dockerfile image pipeline | **Done** |
+| **200** | 🚀 **v1.0.0-beta.1 NPM PUBLISH (OSS beta launch)** | Alperen manuel `npm publish` per project policy (`feedback_npm_publish_user_approval`); GitHub release tag; Show HN + Reddit + Twitter announce. **GA Canonical Launch milestone** (Trinity Developer face fully shipped; Assistant + System Worker progress per Sprint 201+) | **Done** |
+| **201-211** | Sub-project #3 + #4 + enterprise foundation + native REPL arc | Enterprise RBAC/audit/multi-tenant (ADR-068/069/071), Nervous System Phase 2 (12 detectors, Sprint 220 active), native REPL full-scope (Sprint 219–222, ADR-081/083/084), Ollama first-class provider, autonomous engine foundation | **Done** |
+| **212-250** | Dashboard god-level + Autonomous engine + Memory V2 + Evolution pipeline | Dashboard 16 pages (Sprint 219–285), Memory V2 DB-First SQLite FTS5 (ADR-088), Autonomous engine merged to main (Sprint 220+, ADR-064/071), Evolution pipeline (promote/demote), TOPP continuous-dispatch (ADR-064), Sprint 285 tur-içi REPL tool queue+approval | **Done** |
+| **251-285** | Stability, doc audit, REPL polish, sprint lifecycle hardening | Dependency-pipeline waves (ADR-045/064 live), nervous system stable, sprint-286 full documentation audit in progress | **Done** |
+| **286+** | Documentation reality audit (full-coverage) + continued enterprise/autonomous hardening | 48-task doc audit (sprint-286), native-agent REPL polish, autonomous engine Phase-1c + Phase-2 concurrency backpressure | **In progress** |
+| **v1.0.0 stable** | **God-Level GA Canonical** | v1.0.0 stable release when all GA gates pass; `agentaegis.io` standard draft, academic paper prep (ICSE/FSE 2027 target) | Planned |
 
 > **Why Sub-project #3 and #4 are open source, not "Enterprise Edition":** Every capability — multi-tenancy, mTLS, k8s, SSO, SIEM, compliance reports — ships under the same MIT license as the rest of Deckent. There is no paid tier and no feature gate. The same code that ran the dogfood loop runs in a 10,000-employee corporation. Enterprise-grade does not mean closed source; it means default-deny security, scoped tenants, and operator-grade audit, available to anyone who installs.
 
@@ -171,11 +172,11 @@ Three-sprint band (2026-05-25 → 2026-05-26) that re-anchored Brain honesty aft
 
 ---
 
-## Competitive Landscape
+## Ecosystem Positioning
 
-Deckent occupies a unique position: **open-source CLI sprint orchestration with local-first AI**. Here is how we view the ecosystem.
+Deckent's unique position: **open-source CLI sprint orchestration with local-first AI**. Here is how Deckent fits in the ecosystem — complementary positioning, not opposition.
 
-### Devin — KARŞI (Against)
+### Devin
 
 **Position:** SaaS-based autonomous coding agent with cloud execution.
 
@@ -191,7 +192,7 @@ Deckent occupies a unique position: **open-source CLI sprint orchestration with 
 | Self-hostable | No | Yes (it's just your terminal) |
 | Offline capable | No | Yes (with local AI) |
 
-### OpenHands — MÜTTEFİK (Ally)
+### OpenHands
 
 **Position:** Open-source AI software development agent, self-hostable.
 
@@ -201,7 +202,7 @@ Deckent occupies a unique position: **open-source CLI sprint orchestration with 
 
 **Potential collaboration:** OpenHands agents could be Deckent workers; Deckent's sprint structure could wrap OpenHands sessions.
 
-### OpenClaw — REFERANS (Reference Model)
+### OpenClaw
 
 **Position:** Open-source Claude Code wrapper with Docker sandboxing.
 
@@ -209,7 +210,7 @@ Deckent occupies a unique position: **open-source CLI sprint orchestration with 
 
 **What Deckent adds:** Sprint lifecycle, multi-agent parallelism, structured evaluation (GO/NO-GO/TECH_DEBT), memory system, agent pool, skill registry, MCP integration. OpenClaw shows us the floor for install experience; Deckent builds the orchestration layer above it.
 
-### Cursor — KARŞI (Against)
+### Cursor
 
 **Position:** AI-powered IDE with cloud-synced features and subscription model.
 
@@ -217,7 +218,7 @@ Deckent occupies a unique position: **open-source CLI sprint orchestration with 
 
 **What we learn from Cursor:** Context-aware AI (knowing the full codebase, git history, open files) dramatically improves task quality. Deckent's scope system and file-locking are our equivalent — workers get exactly the context they need, no more.
 
-### GitHub Copilot — KARŞI (Against)
+### GitHub Copilot
 
 **Position:** Microsoft-backed AI code completion, tight IDE integration, enterprise-grade subscription.
 
@@ -225,7 +226,7 @@ Deckent occupies a unique position: **open-source CLI sprint orchestration with 
 
 **What we learn from Copilot:** Deep integration with developer workflow drives adoption. Deckent's MCP server and IDE extension strategy takes notes from Copilot's distribution, not its business model.
 
-### Aider — MÜTTEFİK (Ally)
+### Aider
 
 **Position:** Open-source CLI AI coding assistant, git-integrated, multi-provider.
 

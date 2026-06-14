@@ -36,13 +36,13 @@ Sprint biter
   Sonuçlar: ilgili ADR, retro, pattern
 ```
 
-5-tablo şeması (`memory-store.ts`):
-- `entries` — tüm bilgi türleri (adr/memory/retro/debt/pattern/sprint/identity)
-- `tags` — çoktan-çoğa etiket ilişkisi
-- `relations` — çapraz referans (references / supersedes / caused_by / resolves / blocks)
-- `entry_history` — alan-düzeyinde değişiklik kaydı
-- `schema_version` — migrasyon güvenliği
-- `entries_fts` — FTS5 sanal tablo (8 sütun: 4 orijinal + 4 norm)
+5-tablo şeması + 1 FTS5 sanal tablo (`memory-store.ts`):
+- `entries` — tüm bilgi türleri (adr/memory/retro/debt/pattern/sprint/identity/chat) + additive-migration sütunları: `tenant_id`, `audit_prev_hmac`, `audit_hmac`
+- `tags` — çoktan-çoğa etiket ilişkisi (NOCASE collation)
+- `relations` — çapraz referans (references / supersedes / caused_by / resolves / blocks / depends_on)
+- `entry_history` — alan-düzeyinde değişiklik kaydı (changed_by, change_type, old/new_value)
+- `schema_version` — migrasyon güvenliği (sürüm: 1)
+- `entries_fts` — FTS5 sanal tablo (8 sütun: title/content/summary/tag_text + title_norm/content_norm/summary_norm/tag_norm; tokenize='unicode61 remove_diacritics 2')
 
 ## Komut / Örnek
 
@@ -72,6 +72,6 @@ deckent_memory_query { "text": "routing engine", "type": ["adr"] }
 ## Durum
 
 - Olgunluk: ✅ canlı
-- İlgili: ADR-034 · ADR-036 · MASTER-PLAN §1 (data architecture)
-- Modül: `src/core/memory-store.ts` · `src/core/memory-query.ts` · `src/core/memory-normalize.ts` · `src/core/memory-export.ts`
-- Not: `~%96 bağlam azalması` iddiası — benchmark dosyası (`docs/benchmark/memory-v2.md`) henüz yok (MASTER-PLAN W-H). Ölçüm sonrası kesin değer eklenecek.
+- İlgili: ADR-034 (per-project isolation) · ADR-088 (Memory V2 DB-First Architecture)
+- Modül: `src/core/memory-store.ts` · `src/core/memory-query.ts` · `src/core/memory-normalize.ts` · `src/core/memory-export.ts` · `src/core/memory-import.ts`
+- Not: `~%96 bağlam azalması` iddiası — benchmark dosyası (`docs/benchmark/memory-v2.md`) henüz yok. Ölçüm sonrası kesin değer eklenecek.

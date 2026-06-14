@@ -3,7 +3,7 @@
 Deckent Telegram botunu nasıl oluşturacağınızı, yapılandıracağınızı ve canlıya alacağınızı açıklar.
 
 **Süre:** ~10 dakika  
-**Gereksinimler:** Telegram hesabı, Node.js >=18, curl
+**Gereksinimler:** Telegram hesabı, Node.js >=24, curl
 
 ---
 
@@ -54,7 +54,9 @@ DISCORD_TOKEN=...
 
 ---
 
-## Adım 3: Deploy Script Çalıştırın
+## Adım 3: Bot'u Başlatın
+
+### Seçenek A: Deploy Script
 
 ```bash
 bash scripts/deploy-telegram.sh
@@ -67,8 +69,6 @@ Script şu adımları otomatik gerçekleştirir:
 4. Smoke test çalıştırır
 5. Bot komutlarını Telegram'a kaydeder
 
-### Script Seçenekleri
-
 ```bash
 # Yalnızca token doğrulaması
 bash scripts/deploy-telegram.sh --check-only
@@ -80,6 +80,24 @@ bash scripts/deploy-telegram.sh --skip-smoke
 bash scripts/deploy-telegram.sh --help
 ```
 
+### Seçenek B: Deckent CLI
+
+```bash
+# Foreground'da başlat (terminal kapatıldığında durur):
+deckent bot listen
+
+# Arka planda daemon olarak başlat:
+deckent bot start
+
+# Daemon durumunu kontrol et:
+deckent bot status
+
+# Daemon'ı durdur:
+deckent bot stop
+```
+
+> `deckent bot start` ile başlatılan daemon, makine yeniden başlatılana kadar çalışır. Reboot sonrası kalıcı servis için pm2 veya systemd kullanın.
+
 ---
 
 ## Adım 4: Smoke Test Doğrulama
@@ -88,9 +106,10 @@ Deploy script başarıyla tamamlandıktan sonra Telegram'da bot'a mesaj göndere
 
 | Komut | Beklenen Yanıt |
 |-------|----------------|
-| `/start` | Deckent karşılama mesajı + komut listesi |
+| `/help` | Bot komut listesi (`/status`, `/history`, `/pending`, `approve <id>`, `reject <id>`) |
 | `/status` | Aktif sprint durumu (yoksa "sprint yok" mesajı) |
-| `/help` | Kullanılabilir komutlar |
+| `/history` | Son sprint'lerin listesi |
+| `/pending` | Onay bekleyen aksiyonlar (yoksa "onay yok" mesajı) |
 
 ---
 
@@ -181,8 +200,8 @@ BotFather'dan yeni token alın: `@BotFather → /token → <bot adınız>`
 ### Bot mesajlara yanıt vermiyor
 
 1. Bot'un `@BotFather`'dan aktif olduğunu doğrulayın: `/mybots`
-2. Webhook ayarlı değilse polling modunda çalışır
-3. `deckent connector status telegram` ile bağlantı durumunu kontrol edin
+2. Webhook ayarlı değilse polling modunda çalışır (`deckent bot listen` long-polling başlatır)
+3. `deckent bot status` ile daemon çalışıyor mu kontrol edin
 
 ---
 

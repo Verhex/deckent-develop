@@ -26,7 +26,7 @@
 
 ## 1. System Overview
 
-Deckent is an **AI agent orchestration CLI** that coordinates multiple AI agents (Claude, Codex, Gemini) working in parallel on a single codebase. A human operator writes `DIRECTIVES.md`, and Deckent translates those directives into coordinated agent work via a Brain-Worker-Auditor model. The system uses an intent-based routing v2 engine (Sprint 063+) for agent/skill selection with learning feedback, heartbeat daemon, human checkpoints, and adaptive thresholds.
+Deckent is an **AI agent orchestration CLI** that coordinates multiple AI agents (Claude, Codex, Gemini, and Ollama — plus any OpenAI-compatible HTTP endpoint) working in parallel on a single codebase. A human operator writes `DIRECTIVES.md`, and Deckent translates those directives into coordinated agent work via a Brain-Worker-Auditor model. The system uses an intent-based routing v2 engine (Sprint 063+) for agent/skill selection with learning feedback, heartbeat daemon, human checkpoints, and adaptive thresholds.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
@@ -80,7 +80,7 @@ Deckent is an **AI agent orchestration CLI** that coordinates multiple AI agents
 
 ```
 src/
-├── core/                    ← Shared types, config, utilities
+├── core/                    ← Shared types, config, utilities (148 modules)
 │   ├── types.ts             ← All shared TypeScript interfaces and enums
 │   ├── constants.ts         ← App-wide constants (timeouts, budgets, limits)
 │   ├── config.ts            ← 3-layer config loader (global → project → env)
@@ -91,7 +91,7 @@ src/
 │   ├── plugin.ts            ← Plugin manifest validation, load, install, remove
 │   └── plugin-hooks.ts      ← Plugin hook execution (beforeSprint/afterSprint/etc.)
 │
-├── orchestra/               ← Sprint orchestration (78 modules)
+├── orchestra/               ← Sprint orchestration (94 modules)
 │   ├── brain.ts             ← Re-export layer — sole orchestration entry point
 │   ├── sprint-controller.ts ← Sprint lifecycle (PLAN→SPAWN→EXECUTE→EVALUATE→FIX→RETRO→DECAY→CLEANUP)
 │   ├── sprint-phases.ts     ← Phase-specific execution logic
@@ -120,7 +120,7 @@ src/
 │   ├── model-selector.ts    ← Task model resolution
 │   └── ...                  ← decision-engine, learning, collaboration modules
 │
-├── agents/                  ← Worker agent runtime (20 modules)
+├── agents/                  ← Worker agent runtime (25 modules)
 │   ├── worker.ts            ← Worker lifecycle, heartbeat, result writing
 │   ├── adaptive-agent.ts    ← Runtime agent adaptation
 │   ├── worker-ipc.ts        ← WorkerChannel, ChannelRegistry — process.send IPC
@@ -174,8 +174,8 @@ src/
 │       ├── hints.ts         ← Phase-based contextual hints (tr/en)
 │       └── messages.ts      ← Localized message system (getMessage)
 │
-├── mcp/                     ← Model Context Protocol integration (31 tools + 8 resources)
-│   ├── tools/               ← 31 MCP tool handlers (one file per tool; nervous.ts registers 5)
+├── mcp/                     ← Model Context Protocol integration (34 tools + 8 resources)
+│   ├── tools/               ← 34 MCP tools (one handler file per tool; nervous.ts registers 5)
 │   │   ├── index.ts         ← Tool registration
 │   │   ├── init.ts          ← deckent_init
 │   │   ├── directives.ts    ← deckent_set_directives
@@ -197,7 +197,7 @@ src/
 │   │   ├── skill-list.ts    ← deckent_skill_list
 │   │   ├── checkpoint.ts    ← deckent_checkpoint
 │   │   ├── job-runner.ts    ← background job execution (internal)
-│   │   └── ...              ← memory-query, docs, explain, watch, audit, recover, feature-query, nervous_* (5) — full list: docs/reference/mcp-tools.md
+│   │   └── ...              ← memory-query, docs, explain, watch, audit, recover, feature-query, autonomous, models, usage, nervous_* (5) — full list: docs/reference/mcp-tools.md
 │   ├── resources/           ← 8 MCP resource handlers
 │   │   ├── index.ts         ← Resource registration
 │   │   ├── dashboard.ts     ← deckent://dashboard
@@ -211,11 +211,12 @@ src/
 │   └── helpers/
 │       └── enrich.ts        ← enrichResponse() — _enriched meta injection
 │
-├── api/                     ← HTTP REST API (4 modules)
+├── api/                     ← HTTP REST API (18 modules)
 │   ├── server.ts            ← HTTP server, REST endpoints + SSE stream
-│   ├── auth.ts              ← API auth / token handling
+│   ├── auth.ts              ← API auth: static token + OIDC/JWKS (RS256, ADR-076)
 │   ├── rate-limiter.ts      ← API rate limiting
-│   └── watcher.ts           ← File watcher for SSE
+│   ├── watcher.ts           ← File watcher for SSE
+│   └── ...                  ← enterprise endpoints: audit query, webhook triggers, RBAC, tenant isolation (ADR-068/069)
 │
 ├── monitor/                 ← Auditor scan loop, dashboard manager, sprint-state (5 modules)
 │   ├── auditor.ts           ← 30s scan: heartbeat, boundary (git diff --stat), alerts
@@ -231,7 +232,7 @@ src/
 │   └── ...
 │
 └── dashboard/               ← Web Dashboard
-    └── ...                  ← React + Vite + Tailwind (7 pages)
+    └── ...                  ← React + Vite + Tailwind (16 pages)
 ```
 
 ### providers/ — Multi-Provider Architecture (Sprint 038)
@@ -242,7 +243,7 @@ src/
 |-----------------|-------------|
 | `ProviderAdapter` | Unified interface: `spawn()`, `kill()`, `listWorkers()`, `isAvailable()`, `buildCommand()` |
 | `ProviderRegistry` | Singleton — `register()`, `get()`, `getDefault()`, `bootstrapProviders()` at startup |
-| `ProviderName` | `'claude' \| 'codex' \| 'gemini'` |
+| `ProviderName` | `'claude' \| 'codex' \| 'gemini' \| 'ollama'` (`src/core/task-types.ts`) |
 | `ModelType` | `ClaudeModel \| OpenAIModel \| GeminiModel` — union across all providers |
 | `ProviderCapabilities` | `streaming`, `toolUse`, `vision`, `codeExecution`, `maxContextTokens`, `cost` |
 | `Task.provider` | Per-task provider assignment field |
@@ -251,18 +252,21 @@ src/
 
 | File | Lines | Responsibility |
 |------|-------|---------------|
-| `src/core/provider.ts` | ~200 | ProviderAdapter interface, ProviderRegistry singleton, error types |
-| `src/providers/claude.ts` | ~180 | ClaudeAdapter — tmux + subprocess backend, Claude Code models |
-| `src/providers/codex.ts` | ~180 | CodexAdapter — CLI subprocess, OpenAI Codex/GPT models |
-| `src/providers/gemini.ts` | ~180 | GeminiAdapter — API subprocess, Gemini models |
-| `src/providers/subprocess.ts` | ~250 | SubprocessSpawnBackend — child_process based worker spawning |
-| `src/providers/sandbox.ts` | ~170 | SandboxSpawnBackend — isolated subprocess with memory/fs limits |
+| `src/core/provider.ts` | ~930 | ProviderAdapter interface, ProviderRegistry singleton, error types |
+| `src/providers/claude.ts` | ~575 | ClaudeAdapter — tmux + subprocess + Docker backend, Claude Code models |
+| `src/providers/codex.ts` | ~495 | CodexAdapter — CLI subprocess, OpenAI Codex/GPT models |
+| `src/providers/gemini.ts` | ~765 | GeminiAdapter — API subprocess, Gemini models |
+| `src/providers/ollama.ts` | ~715 | OllamaAdapter — local-model workers (REPL/chat live; sprint-worker support is intentionally limited) |
+| `src/providers/openai-compatible.ts` | ~260 | OpenAICompatibleAdapter — any OpenAI-compatible HTTP endpoint (8-fleet, ADR-077) |
+| `src/providers/subprocess.ts` | ~340 | SubprocessSpawnBackend — child_process based worker spawning |
+| `src/providers/sandbox.ts` | ~160 | SandboxSpawnBackend — isolated subprocess with memory/fs limits |
 
-**Model Equivalence (tier-based cross-provider mapping):**
+**Model Equivalence (4 tiers, tier-based cross-provider mapping — `src/core/model-registry.ts`, `ModelTier`):**
 
 | Tier | Claude | OpenAI | Gemini |
 |------|--------|--------|--------|
-| Premium | opus | o3 / gpt-5 | gemini-3.1-pro-preview / gemini-2.5-pro |
+| Premium+ | — | o3 | gemini-3.1-pro-preview |
+| Premium | opus | gpt-5 | gemini-2.5-pro |
 | Standard | sonnet | gpt-4.1 / o4-mini | gemini-2.5-flash |
 | Economy | haiku | gpt-5-mini / gpt-4.1-mini | gemini-2.0-flash |
 
@@ -582,7 +586,7 @@ All routes are served under the `/api/` prefix (see `src/api/server.ts`).
 
 The MCP layer exposes Deckent capabilities as Claude Code tools and resources, enabling operators to control Deckent directly from within Claude Code conversations.
 
-**Tools (31 total — core handlers shown; full list: [docs/reference/mcp-tools.md](../reference/mcp-tools.md)):**
+**Tools (34 total — core handlers shown; full list: [docs/reference/mcp-tools.md](../reference/mcp-tools.md)):**
 
 | Tool | MCP Name | Description |
 |------|----------|-------------|
@@ -672,11 +676,23 @@ api/           ← imports core/, orchestra/brain.ts
 ### Enforcement Mechanism
 
 ```
-tsc --noEmit → detects import errors at compile time
+tsc --noEmit → forbids circular dependencies at compile time
+authority-enforcer.ts → advisory lint of the core/ → orchestra/ import direction
 Code review  → enforces architectural intent
 ADR-008      → recorded permanently in memory.db (type='adr'),
                exported to .brain/exports/decisions.md + docs/adr/
 ```
+
+> **Enforcement is advisory in V1.0 (ADR-037).** The dedicated lint in
+> `src/orchestra/authority-enforcer.ts` scans the `core/ → orchestra/` direction
+> (core must not depend on orchestra) and **warns + emits** rather than
+> hard-blocking; the hard-flip is planned post-GA (V2). After the god-object
+> split (ADR-024/026), the "Brain" permitted to import `tmux` / `auditor` /
+> `worker` is the **Brain family** — `sprint-controller` plus its extracted
+> organs (`sprint-phases`, `sprint-spawner`, `sprint-lifecycle`,
+> `result-collector`, `result-evaluator`, `debt-manager`, …) and the spawn
+> abstraction (`spawn-backend`) — not a single `brain.ts` file. `tsc --noEmit`
+> still rejects circular imports unconditionally.
 
 ---
 
@@ -1420,17 +1436,27 @@ Browser ──GET /api/events──► API Server
 
 ### Web Dashboard
 
-The React dashboard (`src/dashboard/`) provides 7 pages:
+The React dashboard (`src/dashboard/`) ships **16 pages** (page components under
+`src/dashboard/src/pages/`):
 
-| Page | URL | Description |
-|------|-----|-------------|
-| Dashboard | `/` | Live agent status, progress, alerts, sprint info |
-| Status | `/status` | Detailed sprint/worker status |
-| History | `/history` | Sprint history, GO/NO-GO rates, test trends |
-| Memory | `/memory` | Browse brain memory (learnings, patterns, ADR exports) |
-| Chat | `/chat` | Conversational interface |
-| Config | `/config` | Configuration browser |
-| Settings | `/settings` | Config editor, plan mode selector |
+| Page | Description |
+|------|-------------|
+| Dashboard | Live agent status, progress, alerts, sprint info |
+| Status | Detailed sprint/worker status |
+| Workers | Per-worker view (heartbeat, scope, current task) |
+| History | Sprint history, GO/NO-GO rates, test trends |
+| Memory | Browse brain memory (learnings, patterns, ADR exports) |
+| MemoryExplorer | Deep Memory V2 explorer (FTS5 search, tags, relations) |
+| Debt | Tech debt ledger |
+| Directives | View/edit `DIRECTIVES.md` |
+| Nervous | Nervous System proposals and detector status (ADR-040) |
+| Evolution | Agent/skill promotion & demotion pipeline |
+| Enterprise | RBAC, tenant, audit query (ADR-068/069) |
+| Chat | Conversational / native-agent interface |
+| Config | Configuration browser |
+| Settings | Config editor, plan mode selector |
+| Login | OIDC / token sign-in |
+| Callback | OIDC redirect callback handler |
 
 ---
 
@@ -1439,21 +1465,29 @@ The React dashboard (`src/dashboard/`) provides 7 pages:
 The routing v2 engine replaced simple keyword matching with an intent-based 3-layer selection system:
 
 ```
-Layer 1: Intent Classification
-  Task title + description → intent type (feature, bugfix, refactor, test, docs, security, perf, ci)
+Layer 1: Intent Classification  (src/core/intent-classifier.ts)
+  Task scope + title + description → TaskDNA { intent, subIntent, operation, size, tags }
+  Intents: security | bugfix | refactor | documentation | performance | design |
+           devops | config | migration | architecture | implementation | unknown
+  (ADR-041: no 'testing' intent — test work is a 'test-coverage' tag on TaskDNA, not an agent)
 
-Layer 2: Agent Selection
-  Intent → agent mapping with learning feedback from prior sprint evaluations
+Layer 2: Activation Engine      (src/core/activation-engine.ts)
+  Each agent/skill's structured ActivationConfig is evaluated against TaskDNA;
+  learning feedback from prior sprint evaluations adjusts the scores
 
-Layer 3: Skill Selection
-  Agent expertise + project stack → skill combination (max 3 per task)
+Layer 3: Routing Decision       (src/core/routing-engine.ts → routeTaskV2)
+  Activation scores + learning bonuses + user/DIRECTIVES overrides →
+  RoutingDecision { agent, skills[], confidence, intent }
+  The skill set is bounded by a dynamic skill/token budget (not a fixed cap)
 ```
 
 Key features:
 - **forceSkills**: DIRECTIVES can specify `Skills: typescript-expert, testing-expert` per task
 - **forceModel**: DIRECTIVES can specify `Model: opus` per task
 - **Learning loop**: Agent/skill selection improves based on GO/NO_GO/TECH_DEBT evaluation history
-- **Implementation**: `src/orchestra/task-router.ts`
+- **Implementation**: `routeTaskV2()` in `src/core/routing-engine.ts`, orchestrated per task by `src/orchestra/task-router.ts`
+
+For the full agent/skill routing reference see [agent-skill-architecture.md](agent-skill-architecture.md).
 
 ## CI Guardian Agent (Sprint 062)
 

@@ -27,7 +27,7 @@ Architecture Decision Records (ADRs) capture the significant architectural decis
 | ID | Title | Status | Summary |
 |----|-------|--------|---------|
 | ADR-008 | Brain Merkezi Import — Tek Yönlü Bağımlılık | accepted | Brain is the ONLY module that imports tmux/auditor/worker; no reverse imports |
-| ADR-009 | DEBT.md Markdown Tablo Formatı | accepted | DEBT.md stored as 9-column markdown table; `parseDebtTable`/`generateDebtTable` for programmatic I/O |
+| ADR-009 | DEBT.md Markdown Tablo Formatı | deprecated | DEBT.md stored as 9-column markdown table; `parseDebtTable`/`generateDebtTable` for programmatic I/O |
 | ADR-010 | Tek Runtime Dependency — commander.js | accepted | CLI uses only `commander@^13` as runtime dependency; any addition requires an ADR |
 | ADR-011 | node:readline/promises — Built-in Prompt | accepted | Interactive prompts (text, select, confirm) use Node.js built-in `readline/promises` |
 | ADR-012 | register\<Name\>(program) Pattern | accepted | Each CLI command module exports `register<Name>(program: Command): void` |
@@ -44,11 +44,11 @@ Architecture Decision Records (ADRs) capture the significant architectural decis
 | ID | Title | Status | Summary |
 |----|-------|--------|---------|
 | ADR-015 | TaskRouter Module — 6-level routing | accepted | Standalone `TaskRouter` with 6-level priority: config → force → agent → skill → worker → fallback |
-| ADR-016 | Connector Module — provider lifecycle | accepted | `Connector` class manages provider runtime health check, lazy init, and auditor integration |
+| ADR-016 | External Messaging Connectors (Discord / Telegram / WhatsApp + Bot) | accepted | External messaging adapters for Discord, Telegram, and WhatsApp with unified incoming-router |
 | ADR-017 | MCP-Native Provider Adapters | accepted | Real CLI adapters: `codex exec --full-auto` and `gemini -p --output-format json` |
 | ADR-018 | Multi-Environment Config Generation | accepted | Per-environment config generators: Codex → `config.toml`, Gemini → `settings.json`, Cursor → `mcp.json` |
 | ADR-019 | Language-Agnostic Worker Verify | accepted | `STACK_COMMANDS` map enables correct build/test commands for Python/Go/Rust/Node.js projects |
-| ADR-020 | Rich Sprint Output — 7-section summary | accepted | Sprint finalization produces a 7-section structured summary including agent/skill performance |
+| ADR-020 | Rich Sprint Output — multi-section summary | accepted | Sprint finalization produces a multi-section structured summary including agent/skill performance |
 
 ## Brand & CLI/MCP Parity
 
@@ -157,10 +157,10 @@ Architecture Decision Records (ADRs) capture the significant architectural decis
 | ADR-065 | Develop / Product Two-Repo Split | accepted | `deckent` (develop repo) and `deckent-product` (release repo) split for clean release boundary |
 | ADR-066 | Provider Independence — Multi-Provider Backend Parity | accepted | Claude, Codex, and Gemini are all first-class providers with full feature parity |
 | ADR-067 | Process Mode + Tenant Isolation — F3 Foundation | proposed | F3: process isolation modes and per-tenant boundary enforcement |
-| ADR-068 | Enterprise Foundation — Audit Query + Multi-Tenant + Scheduled Flows | proposed | Audit query API, multi-tenant support, and scheduled sprint flows for enterprise use cases |
-| ADR-069 | Event-Driven Triggers + RBAC — F3 Webhook & F4 RBAC | proposed | F3 webhooks for event-driven task triggers; F4 role-based access control |
+| ADR-068 | Enterprise Foundation — Audit Query + Multi-Tenant + Scheduled Flows | accepted | Audit query API, multi-tenant support, and scheduled sprint flows for enterprise use cases |
+| ADR-069 | Event-Driven Triggers + RBAC — F3 Webhook & F4 Role-Based Access Control | accepted | F3 webhooks for event-driven task triggers; F4 role-based access control |
 | ADR-070 | Brain Evaluation Integrity | accepted | Signal-based coverage exemption; zero hard-code principle for evaluation thresholds |
-| ADR-071 | F3 Autonomous Mode + F4 Enterprise RBAC/Tenant/Audit | proposed | Self-dispatch guard for autonomous mode; enterprise RBAC/tenant/audit foundation |
+| ADR-071 | F3 Autonomous Mode (Self-Dispatch Guard) + F4 Enterprise RBAC/Tenant/Audit | accepted | Self-dispatch guard for autonomous mode; enterprise RBAC/tenant/audit foundation |
 
 ## Routing & Dashboard Evolution
 
@@ -194,7 +194,10 @@ Architecture Decision Records (ADRs) capture the significant architectural decis
 | ADR-082 | Native-LLM-Wire + Nervous-Activation + Dashboard-v2 Canlı | accepted | Native LLM provider wire; Nervous System activation in production; Dashboard v2 live |
 | ADR-083 | REPL-UX-Evolution + Provider-Parity + Local-Model-Foundation | accepted | REPL UX polish; full provider parity across Claude/Codex/Gemini; local model (Ollama) foundation |
 | ADR-086 | Native CLI Parity — F11 Feature Set (Sprint 224) | accepted | Complete CLI feature parity for the F11 feature set delivered in Sprint 224 |
+| ADR-087 | Async I/O & Test Hermeticity Standard | accepted | All I/O must be async; tests must be hermetic (no gitignored state); `test:ci-sim` reproduces clean-checkout CI |
+| ADR-088 | Memory V2 — DB-First Architecture | accepted | SQLite DB is the single source of truth for all brain knowledge; `.brain/exports/*.md` are generated snapshots; FTS5 + dual-layer i18n normalization |
+| ADR-089 | Backend-Agnostic Worker Observation + Per-Worker Independent Backends | accepted | Worker observation is backend-agnostic; each worker can use an independently configured backend (docker/tmux/subprocess) |
 
 ---
 
-*Source: `.brain/memory.db` (`type='adr'`) — export: `.brain/exports/decisions.md` — generated: 2026-06-08*
+*Source: `.brain/memory.db` (`type='adr'`) — export: `.brain/exports/decisions.md` — generated: 2026-06-14*

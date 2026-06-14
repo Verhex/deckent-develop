@@ -18,19 +18,19 @@
 
 ## Nasıl çalışır?
 
-1. **Sprint sonu tetikleyici** — `sprint-controller.ts` RETRO fazında `PromotionPipeline.evaluate()` çağırır.
+1. **Sprint sonu tetikleyici** — `sprint-finalizer.ts` RETRO fazında `PromotionPipeline.evaluatePromotions()` çağırır.
 2. **Promotion değerlendirmesi** — temp agent/skill için `minTasks=8`, `minSuccessRate=0.85`, `minSprints=3` kriterlerine bakılır; tümü sağlanırsa `.deckent/agents/<id>/agent.json` kalıcıya kopyalanır.
 3. **Demotion** — `maxFailRate=0.50`, `minTasks=5` veya `unusedSprints=5` aşılırsa agent pasife alınır.
-4. **Adaptive prompt** — `adaptAgentRuntime()` son 3 sprint sonucunu inceler; `IMPROVEMENT_THRESHOLD=%70` altındaysa `PromptDiff` üretir.
+4. **Adaptive prompt** — `adaptAgentRuntime()` son sprint sonuçlarını inceler; `successThreshold=0.70` altındaysa `PromptDiff` üretir.
 5. **Rule learning** — `RuleEvolver` outcome tracker'dan varlık bazlı başarı oranları çeker; yüksek-başarı varlıklar için aktivasyon kuralı, düşük-başarı varlıklar için exclusion kuralı önerir.
 
 ```
 Sprint Sonu
    ↓
-PromotionPipeline.evaluate()
-   ├── temp agent listele
+PromotionPipeline.evaluatePromotions()
+   ├── temp agent/skill listele
    ├── criteria kontrol → PROMOTE / DEMOTE / WAIT
-   └── identityMutationLoop() → requiresApproval → öneri veya otomatik uygula
+   └── runIdentityMutation() → requiresApproval → öneri veya otomatik uygula
          ↓
       RuleEvolver.generate()
          ├── conf ≥ 0.85 → auto-applied

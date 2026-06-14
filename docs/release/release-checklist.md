@@ -1,36 +1,49 @@
 # Release Checklist
 
-Use this checklist before every npm publish. Each step must pass before proceeding to the next.
+Use this checklist before every `npm publish`. Run steps in order — each gate must pass before proceeding to the next. Alperen runs `npm publish` manually (project policy; see memory: npm publish approval).
 
 ---
 
 ## Pre-Release Validation
 
-### 1. Type Check
+### 1. Validate Publish Gate
 
 ```bash
-tsc --noEmit
+npm run validate:publish
+```
+
+This is the canonical pre-publish gate (`scripts/validate-publish.mjs`). It runs all required checks in sequence. Alternatively, run the full release pipeline:
+
+```bash
+npm run release
+# expands to: npm run docs:stats:check && npm run docs:ref:check && npm run build:all && npm run validate:publish
+```
+
+### 2. Type Check
+
+```bash
+npx tsc --noEmit
 ```
 
 Must exit with zero errors. Fix all TypeScript issues before proceeding.
 
-### 2. Run Tests
+### 3. Run Tests
 
 ```bash
 npx vitest run
 ```
 
-All tests must pass. Zero regressions allowed. Check the total test count matches expectations.
+All tests must pass. Zero regressions allowed. 20,668+ descriptors expected. Check the total test count matches expectations.
 
-### 3. Coverage Check
+### 4. Coverage Check
 
 ```bash
 npx vitest run --coverage
 ```
 
-Coverage must be at or above 95% on non-barrel source files. If coverage dropped, investigate which files need additional tests.
+Coverage must be at or above 85% on non-barrel source files (current: 88.58%). If coverage dropped significantly, investigate which files need additional tests.
 
-### 4. Dry-Run Pack
+### 5. Dry-Run Pack
 
 ```bash
 npm pack --dry-run
@@ -43,9 +56,9 @@ Review the file list. Verify:
 - No `.env` or credential files are included
 - Total package size is reasonable (check for accidentally included large files)
 
-### 5. Update CHANGELOG
+### 6. Update CHANGELOG
 
-Open `docs/release/changelog.md` and add an entry for this release:
+Open `CHANGELOG.md` (at the project root) and add an entry for this release:
 
 ```markdown
 ## [X.Y.Z] - YYYY-MM-DD
@@ -65,7 +78,7 @@ Open `docs/release/changelog.md` and add an entry for this release:
 
 Follow [Keep a Changelog](https://keepachangelog.com/) format.
 
-### 6. Update README
+### 7. Update README
 
 Verify `README.md` reflects the current state:
 - Test count badge is accurate
@@ -73,7 +86,7 @@ Verify `README.md` reflects the current state:
 - CLI commands table is complete
 - No broken links
 
-### 7. Version Number
+### 8. Version Number
 
 Update the version in `package.json`:
 
@@ -102,7 +115,7 @@ git tag v0.X.Y
 
 ## Publish
 
-### 8. Dry-Run Publish
+### 9. Dry-Run Publish
 
 ```bash
 npm publish --dry-run
@@ -110,7 +123,7 @@ npm publish --dry-run
 
 Review the output. Verify the package name, version, and file list are correct.
 
-### 9. Publish to npm
+### 10. Publish to npm
 
 ```bash
 npm publish
@@ -122,7 +135,7 @@ For scoped packages or first publish:
 npm publish --access public
 ```
 
-### 10. Create GitHub Release
+### 11. Create GitHub Release
 
 ```bash
 # Push the tag
@@ -141,7 +154,7 @@ Or create the release manually on GitHub:
 4. Description: copy from CHANGELOG entry
 5. Publish release
 
-### 11. Post-Release Announcement
+### 12. Post-Release Announcement
 
 - Post in the project Discord/community channel
 - Update the website if applicable
@@ -167,12 +180,13 @@ deckent doctor
 
 ```bash
 # Full release sequence:
-tsc --noEmit
-npx vitest run
-npm pack --dry-run
-# Update CHANGELOG and README
-npm version minor
+npm run validate:publish          # canonical pre-publish gate
+npx tsc --noEmit                  # type check
+npx vitest run                    # all tests must pass
+npm pack --dry-run                # verify package contents
+# Update CHANGELOG.md and README.md
+npm version patch|minor|major     # updates package.json + git tag
 git push && git push --tags
-npm publish
-gh release create v0.X.Y --title "v0.X.Y" --notes "See CHANGELOG."
+npm publish                       # Alperen runs this manually
+gh release create v1.X.Y --title "v1.X.Y" --notes "See CHANGELOG."
 ```

@@ -120,5 +120,5 @@ Sprint 051-065 ile planlanan ve ilerleme durumu:
 
 ---
 
-*Current status: Sprint 100+ completed — 12,051+ tests passing, 96%+ coverage, 35+ CLI commands*
-*Source of truth: ADR records ([`docs/adr/`](../adr/)) and the [CHANGELOG](../../CHANGELOG.md).*
+*Current status: Sprint 285+ completed — 20,668+ tests passing, 88.58% coverage, 55+ CLI commands, v1.0.0-beta.1*
+*Source of truth: ADR records (`.brain/exports/decisions.md`) and the [CHANGELOG](../../CHANGELOG.md).*

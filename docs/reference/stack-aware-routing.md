@@ -1,20 +1,72 @@
-# Stack-Aware Routing (WM-7)
+# Stack-Aware Routing
 
-Deckent is designed to work on any project stack, not just TypeScript. It achieves this through a "stack-aware" routing and verification system. At the beginning of a sprint, Deckent analyzes your project to determine its `TechStackKind` (e.g., `typescript`, `go`, `python`, `rust`, `unknown`). This detection fundamentally changes how Deckent verifies tasks, routes work to agents, and applies skills.
+Deckent works on any project stack, not just TypeScript. Stack detection changes how Deckent verifies tasks, routes work to agents, and applies skills. At the start of a sprint, Deckent detects your project's `TechStackKind` (e.g., `typescript`, `go`, `python`, `rust`, `unknown`) — ensuring a Go project is verified with `go test` and a Python expert is never assigned to a Rust task.
 
-This powerful feature ensures that a Go project is tested with `go test` and that a Python expert agent isn't assigned to a Rust task.
+Routing itself is handled by the **v2 Routing Engine** (`src/core/routing-engine.ts`), a 3-layer intent-based system that operates on top of stack detection.
 
 ## Table of Contents
-1.  [Task-Kind Aware Verification](#1-task-kind-aware-verification)
-2.  [Stack-Specific Commands for Code](#2-stack-specific-commands-for-code)
-3.  [Intelligent Coverage Gate](#3-intelligent-coverage-gate)
-4.  [Parametric Skills and Specialized Agents](#4-parametric-skills-and-specialized-agents)
+1.  [Routing Engine v2 — 3-Layer Architecture](#1-routing-engine-v2--3-layer-architecture)
+2.  [Task-Kind Aware Verification](#2-task-kind-aware-verification)
+3.  [Stack-Specific Commands for Code](#3-stack-specific-commands-for-code)
+4.  [Intelligent Coverage Gate](#4-intelligent-coverage-gate)
 5.  [Language Mismatch Penalty](#5-language-mismatch-penalty)
 6.  [User Overrides](#6-user-overrides)
 
 ---
 
-### 1. Task-Kind Aware Verification
+### 1. Routing Engine v2 — 3-Layer Architecture
+
+`routeTaskV2` (`src/core/routing-engine.ts`) replaces the original `selectAgent()` + `selectSkills()` functions with a unified, intent-based decision pipeline. Every task passes through three layers in order:
+
+**Layer 1 — Intent Classifier** (`src/core/intent-classifier.ts`)
+
+Analyzes the task's title, description, and scope to produce a **TaskDNA** object:
+
+```typescript
+interface TaskDNA {
+  intent: {
+    primary: IntentType;       // e.g. 'implementation' | 'security' | 'documentation' | ...
+    secondary: IntentType[];
+    confidence: number;        // 0.0–1.0
+  };
+  tags: string[];              // cross-cutting concerns (e.g. 'test-coverage')
+  domains: Array<{ name: string; weight: number }>;  // e.g. [{name:'api', weight:0.8}]
+  operations: Array<{ type: OperationType; weight: number }>;
+  complexity: { fileCount: number; moduleCount: number; crossCutting: boolean; estimatedSize: TaskSize };
+  scope: { writeRatio: Record<string, number>; primaryWriteTarget: string; testWriteRatio: number };
+}
+```
+
+Supported intent types: `implementation`, `bugfix`, `refactor`, `documentation`, `security`, `devops`, `config`, `performance`, `design`, `migration`, `architecture`, `unknown`.
+
+**Layer 2 — Activation Engine** (`src/core/activation-engine.ts`)
+
+Evaluates each agent and skill against **ActivationConfig** rules (structured JSON rule-sets in each manifest's `activation.rules[]`). Rules fire when conditions on TaskDNA fields match — e.g. `{ "when": { "intent.primary": "security" }, "score": 10 }`. Agents and skills are ranked by cumulative activation score.
+
+Domain-match bonuses (`DOMAIN_MATCH_BONUS = 3`) are added when an agent's domain aligns with the task's extracted domains (e.g. `src/api/` → `api-builder` bonus). User-surface tasks (`cli`, `dashboard`, `api`) receive an additional `USER_SURFACE_BONUS = 8` for their owning agents (`api-builder`, `frontend-designer`, `ci-guardian`).
+
+**Layer 3 — Routing Engine** (`src/core/routing-engine.ts`)
+
+Resolves user overrides, applies the activation scores, selects the top agent and skills, and returns a `RoutingDecision`:
+
+```typescript
+interface RoutingDecision {
+  agentId: string | null;
+  skillIds: string[];
+  confidence: ConfidenceLevel;   // 'high' | 'medium' | 'low' | 'uncertain'
+  reasoning: string[];
+  taskDNA: TaskDNA;
+  overrideSource: OverrideSource;
+  overrideWarnings: string[];
+  skillBudget: SkillBudget;
+}
+```
+
+If no agent meets the activation threshold, the **fallback chain** for the primary intent provides a deterministic selection (e.g. `security` → `['security-auditor']`, `documentation` → `['doc-writer']`).
+
+---
+
+### 2. Task-Kind Aware Verification
 
 Not all tasks are created equal. Deckent understands the difference between writing documentation and refactoring critical code. The `task.kind` (`doc-write`, `audit`, `code-development`, etc.) is the first factor in the verification process.
 
@@ -24,11 +76,10 @@ Not all tasks are created equal. Deckent understands the difference between writ
 
 ---
 
-### 2. Stack-Specific Commands for Code
+### 3. Stack-Specific Commands for Code
 
 When a task involves writing or modifying code, Deckent uses the detected `TechStackKind` to run the correct, idiomatic verification commands.
 
-This means:
 -   A **Go** project will be tested with `go test ./...`. Deckent will never incorrectly try to run `tsc`.
 -   A **Rust** project will be checked with `cargo check` and `cargo test`.
 -   A **TypeScript** project will use `tsc --noEmit` and `vitest run`.
@@ -37,7 +88,7 @@ This prevents spurious failures and ensures that every project is validated usin
 
 ---
 
-### 3. Intelligent Coverage Gate
+### 4. Intelligent Coverage Gate
 
 Deckent's test coverage gate is currently implemented for JavaScript/TypeScript projects using `vitest --coverage`. For other stacks where coverage measurement isn't standardized in the same way, the coverage check is automatically exempted.
 
@@ -45,21 +96,9 @@ This is treated as a **measurement gap, not a failure**. A Go or Rust project wi
 
 ---
 
-### 4. Parametric Skills and Specialized Agents
-
-Deckent's routing intelligence extends to how it assigns agents and skills.
-
--   **Parametric `code-expert` Skill:** The generic `code-expert` skill is parametric. When applied to a task, it resolves to a stack-specific implementation, providing the agent with the correct idioms, commands, and best practices for the project's language.
-
--   **Stack-Specialized Prime Agents:** For certain well-known stacks, Deckent may spin up temporary, specialized agents (e.g., `temp-go-specialist`, `temp-rust-expert`) to handle tasks requiring deep, language-specific knowledge.
-
----
-
 ### 5. Language Mismatch Penalty
 
-To ensure high-quality results, the task router applies a heavy penalty when a skill or agent's specialization does not match the project's `TechStackKind`.
-
-For example, the `typescript-expert` skill will almost never be routed to a task in a Go project. This prevents agents from applying incorrect patterns or attempting to use the wrong tools, which would lead to failed tasks and wasted effort.
+The routing engine applies a penalty (`LANGUAGE_MISMATCH_PENALTY = 6`) when a skill's language category does not match the confidently-detected project stack. For example, `typescript-expert` will almost never be routed to a task in a Go project. This penalty is score-based and soft — a `- Skills:` override in DIRECTIVES bypasses it entirely.
 
 ---
 
@@ -70,7 +109,7 @@ While the automatic stack-aware routing is powerful, you always have the final s
 ```markdown
 ## Task 1: Refactor database logic in Go
 - Agent: migration-specialist
-- Skills: database-migration, go-expert
+- Skills: database-migration, git-expert
 - Files: pkg/db/connect.go
 - Scope: pkg/db/
 

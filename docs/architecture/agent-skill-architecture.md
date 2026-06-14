@@ -1,6 +1,6 @@
 # Agent / Skill Architecture & Routing
 
-> **Status:** Current architecture companion. **Last verified:** Sprint 186 (2026-05-22).
+> **Status:** Current architecture companion. **Last verified:** Sprint 286 (2026-06-14).
 >
 > **Background:** The agent pool, composable skill system, and intent-based Brain
 > routing described here were introduced across Sprints 029–033 and have evolved

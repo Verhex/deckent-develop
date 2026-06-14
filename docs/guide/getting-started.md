@@ -60,9 +60,9 @@ npx deckent init
 
 The wizard asks for:
 
-- **Project name** -- e.g. `my-project`
-- **Plan mode** -- matches your Claude subscription tier
 - **Language** -- `en` or `tr`
+- **Plan mode** -- `Performance`, `Balanced`, `Economic`, or `API`
+- **Project name** -- e.g. `my-project`
 
 After init, your project looks like this:
 
@@ -74,8 +74,12 @@ my-project/
   .deckent/
     config.json          # Runtime config
   .brain/
-    MEMORY.md            # Learned patterns
-    DEBT.md              # Technical debt log
+    memory.db            # SQLite knowledge base (Memory V2 — single source of truth)
+    exports/
+      summary.md         # Auto-generated context summary
+      memory.md          # Auto-generated sprint learnings
+      debt.md            # Auto-generated technical debt log
+      decisions.md       # Auto-generated ADR list
   .tasks/                # Task files (managed by Brain)
   .locks/                # File locks (managed by workers)
 ```
@@ -94,7 +98,7 @@ Start a conversational session. Ask questions, brainstorm goals, or trigger task
 deckent chat
 ```
 
-Deckent will connect to your installed AI CLI (Claude, Codex, or Gemini) and attach the Deckent MCP server, giving the assistant access to all 31 Deckent tools.
+Deckent will connect to your installed AI CLI (Claude, Codex, or Gemini) and attach the Deckent MCP server, giving the assistant access to all 34 Deckent tools.
 
 Example session:
 
@@ -215,7 +219,7 @@ cat .tasks/task-001-001.result
 Evaluation values:
 
 - **DONE** -- All criteria met
-- **GO_WITH_TECH_DEBT** -- Complete with known debt (logged in `.brain/DEBT.md`)
+- **GO_WITH_TECH_DEBT** -- Complete with known debt (logged in `.brain/exports/debt.md`)
 - **NO_GO** -- Failed; Brain logs it for retry in the next sprint
 
 ---
@@ -255,6 +259,6 @@ The dashboard shows live worker status, task results, memory, and sprint history
 - [Core Concepts](/guide/concepts) — Understand Sprint, Task, Agent, Brain, Auditor
 - [Your First Sprint](/guide/first-sprint) — Detailed walkthrough with examples
 - [Installation Guide](installation.md) — Platform-specific setup and Node 24+ requirements
-- [CLI Reference](/reference/cli) — All 46+ commands documented
+- [CLI Reference](/reference/cli) — All 55+ commands documented
 - [Config Reference](/reference/config) — Every configuration option explained
 - [API Reference](/reference/api) — Programmatic API and HTTP endpoints

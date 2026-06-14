@@ -373,14 +373,14 @@ Add to `.deckent/config.json`:
 ```json
 {
   "worker_memory_limit_by_kind": {
-    "code": "1536m",
-    "doc": "768m"
+    "code-development": "1536m",
+    "documentation": "768m"
   }
 }
 ```
 
 **Fields:**
-- Keys are canonical `TaskKind` values (e.g., `code`, `doc`, `test`) — see `src/core/work-model.ts` for the authoritative list
+- Keys are canonical `TaskKind` values (e.g., `code-development`, `documentation`, `test`) — see `src/core/work-model.ts` for the authoritative list
 - Values are memory strings (e.g., `"1536m"`, `"1.5g"`, `"1610612736"` bytes)
 - Syntax validation via `parseMemoryString()` (same parser as `worker_memory_limit`)
 
@@ -398,8 +398,8 @@ Add to `.deckent/config.json`:
 
 | Task Kind | Peak Observed | Recommended Limit | Headroom |
 |-----------|---------------|-------------------|----------|
-| `code` | 929 MB | 1536m (1.5g) | 64% |
-| `doc` | 247 MB | 768m | 67% |
+| `code-development` | 929 MB | 1536m (1.5g) | 64% |
+| `documentation` | 247 MB | 768m | 67% |
 
 **Note:** Observed peaks are from real sprint runs. Limits with 64–67% headroom prevent OOM kills while reducing idle waste.
 
@@ -410,16 +410,16 @@ Add to `.deckent/config.json`:
   "max_workers": 20,
   "worker_memory_limit": "2g",
   "worker_memory_limit_by_kind": {
-    "code": "1536m",
-    "doc": "768m",
+    "code-development": "1536m",
+    "documentation": "768m",
     "test": "1024m"
   }
 }
 ```
 
 This config allows:
-- Code tasks → 1.5g each
-- Doc tasks → 768m each
+- Code-development tasks → 1.5g each
+- Documentation tasks → 768m each
 - Test tasks → 1g each
 - Any other kind → fallback to 2g
 

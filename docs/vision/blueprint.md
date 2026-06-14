@@ -15,13 +15,13 @@
 ## Live Metrics
 | Metrik | Değer |
 |--------|-------|
-| Sprint | sprint-285 |
-| Toplam Task | 8 |
-| Tamamlanan | 7 |
-| Tech Debt | 1 |
-| No-Go | 1 |
-| Süre | 49dk 50sn |
-| Coverage | 0.0% |
+| Sprint | sprint-286 |
+| Toplam Task | 57 |
+| Tamamlanan | 53 |
+| Tech Debt | 0 |
+| No-Go | 4 |
+| Süre | 47dk 34sn |
+| Coverage | N/A |
 
 # TABLE OF CONTENTS
 
@@ -80,13 +80,15 @@ An agent-agnostic AI orchestration system. You describe goals in natural languag
 **USP (Unique Selling Point):**
 Sprint + learning loop. Deckent doesn't just execute tasks — it plans sprints, evaluates results with GO/NO-GO protocol, tracks tech debt, runs retrospectives, and feeds learnings into the next sprint. Every sprint makes the system smarter.
 
-**Where it stands today (Sprint 221 → 222):**
-- Sprint 219 closed (16/17 DONE, 0 tech-debt, 1 NO-GO — 219-010 dashboard e2e cache-bust carried to Sprint 220). Sprint 219 delivered: `deckent` argümansız native agentic REPL opens (ADR-081), agentic dispatch + approval gate live, F2 chat streaming wire (`/api/chat/stream`) SSE end-to-end, dashboard 8-page nav render-tested.
-- Sprint 220 ("Native-LLM-Wire + Dashboard-v2 Canlı + Nervous Activation") completes the remaining wires: **native REPL genuinely connected to a real LLM** (config-driven `chat_provider→brain_provider→claude`, real round-trip responses — not a skeleton), **nervous system active Faz-1** (config `nervous_system.enabled:true` + bootstrap pipeline + 8 action handlers), and **dashboard-v2 live** (worker grid real-time SSE, status correct, refresh+cooldown, chat-wire, tech-debt filter, coverage, enterprise-auth).
-- Sprint 221 ("deckent = claude-code-quality terminal REPL") delivers **native REPL full-scope**: live slash-commands (`/help` `/status` `/recall` `/plan` — config-driven registry, not hard-coded), **agentic dispatch** (natural language → real `deckent_status`/`deckent_recall` action, no provider pass-through), **5-provider parity** (claude / codex / gemini / ollama-local / openai-compatible — equal round-trip), **ollama-local as first-class** (zero-API, `localhost:11434`, foundation for future deckent-AI), **user/enterprise mode** (`chat.mode: 'user'|'enterprise'` config-driven — enterprise adds /audit /rbac /flow /cost slash group), and **customizable status-line** (`chat.status_line` toggle). ADR-083 accepted. Provider-neutral architecture preserved.
-- Sprint 222 ("Native REPL HIZ + GÖRSEL + Nervous CANLI") resolves the three UX gaps exposed by Sprint 221 run-verify: **(1) REPL hızlı** — `createPersistentClaudeSession` spawns the claude process **once** (`--input-format stream-json`), reusing it for every subsequent turn; cold-start pays once (first message), every next message is **<1s** (vs 4.5s per-turn before). **(2) GÖRSEL zenginlik** — `renderMarkdown` (ANSI, no dep), `createSpinner` (braille, stderr, TTY-only), and real token-streaming land; REPL no longer looks frozen. **(3) Nervous CANLI/etkileşimli** — panic-gate rewritten **non-blocking** (advisory mode, timeout-auto-proceed); `chat-nervous-bridge` surfaces pending nervous notifications in the REPL terminal; nervous re-enabled safely. ADR-084 accepted. Sprint 221 hollow wires (`/help`, status-line, agentic dispatch) closed with run-verify.
-- The doc you are reading was last sweep-refreshed in Sprint 222 — header timestamp + Live Metrics + "where it stands" block. Dated history sections from earlier sprints are preserved as-written; "as-built" sections (Architecture Overview, Memory V2, MCP/CLI counts) are kept code-derived via managed-docs (ADR-029/030).
-- The everyone-everywhere arc (6 contexts — greenfield / in-dev / maintained / daily-tasks / ERP / enterprise) and the autonomous agentic runtime continue to be built out; see §23 Strategic Roadmap and [`docs/MASTER-PLAN.md`](../MASTER-PLAN.md) (or [`docs/MASTER-PLAN-TR.md`](../MASTER-PLAN-TR.md)) for the how-we-build-it sequencing.
+**Where it stands today (Sprint 285+):**
+- **Native REPL** (Sprint 219–222, ADR-081/083/084) is production: `deckent` with no arguments opens a full-scope terminal REPL — real LLM round-trips, Ink-based rendering, 5-provider parity (claude / codex / gemini / ollama / openai-compatible), slash-commands, agentic dispatch (natural language → `deckent_status`/`deckent_recall`/etc.), persistent Claude session (`createPersistentClaudeSession`, <1s per turn after cold-start).
+- **REPL tur-içi kuyruk + per-tool onay** (Sprint 285): in-REPL tool calls are queued and surfaced for per-tool approval before execution — god-level tool-use UX.
+- **Autonomous engine** (Sprint 220+, ADR-064/068/071) is **merged to main and running**: durable backlog (`backlog.json`), 3-gate governance (RBAC → per-task-policy → EffectClass-risk), recurring/one-off/reactive triggers, `deckent autonomous` CLI + `deckent_autonomous` MCP tool. Local-model autonomous (Ollama qwen3.6) proven live.
+- **Nervous System** (ADR-040, Sprint 138+) is active: 12 detectors, proactive meta-orchestrator pipeline (observer → detector → decision → proposer → dispatcher → executor), authority-matrix, `deckent nervous_*` MCP tools + REPL bridge.
+- **Dashboard** (Sprint 219–285): 16 pages (Dashboard, Chat, Config, Debt, Directives, Enterprise, Evolution, History, Memory, MemoryExplorer, Nervous, Settings, Status, Workers, Login, Callback). `deckent serve` → auth-gated HTTP API + SSE.
+- **Memory V2 DB-first** (Sprint 140+, ADR-088): SQLite + FTS5 dual-layer Turkish normalize, `deckent recall/remember`, `deckent_memory_query` MCP tool. 96% context-window reduction.
+- **MCP**: 34 tools + 8 resources. **CLI**: 55+ commands. **Agents**: 15 built-in + 2 custom. **Skills**: 21 built-in. **Providers**: 4 (claude/codex/gemini/ollama) + OpenAI-compatible HTTP adapter. **Models**: 13 / 4 tiers. **Version**: v1.0.0-beta.1.
+- Dated history sections from earlier sprints are preserved as-written; "as-built" sections are kept code-derived via managed-docs (ADR-029/030). See [`docs/MASTER-PLAN.md`](../MASTER-PLAN.md) for active development sequencing.
 
 **Phased Roadmap:**
 | Phase | Focus | Target Audience | Sprint Range |
@@ -119,7 +121,7 @@ Sprint + learning loop. Deckent doesn't just execute tasks — it plans sprints,
            │                          │
 ┌──────────▼──────────────────────────▼──────────────┐
 │              DECKENT MCP SERVER (stdio)              │
-│  31 Tools + 8 Resources                             │
+│  34 Tools + 8 Resources                             │
 │  init | set_directives | plan | start | analyze ... │
 │  audit | recover | feature_query | watch | nervous_*│
 └──────────────────────┬──────────────────────────────┘
@@ -156,7 +158,7 @@ Sprint + learning loop. Deckent doesn't just execute tasks — it plans sprints,
 ┌──────────▼──────────────────────────────────────────┐
 │          HTTP API + WEB DASHBOARD                    │
 │  src/api/server.ts — 16 endpoints + SSE             │
-│  src/dashboard/ — React+Vite+Tailwind (7 pages)     │
+│  src/dashboard/ — React+Vite+Tailwind (16 pages)    │
 │  `deckent web` → localhost:3100                     │
 └─────────────────────────────────────────────────────┘
 ```
@@ -310,16 +312,17 @@ Supported OS:
   Windows (WSL2 — full tmux support)
 ```
 
-## 3.5 Native REPL — Full-Scope Terminal Chat (Sprint 222, ADR-081/083/084)
+## 3.5 Native REPL — Full-Scope Terminal Chat (Sprint 219–285, ADR-081/083/084)
 
 Running `deckent` with no arguments opens a **full-scope terminal REPL** — claude-code-quality conversation directly in your terminal.
 
-### Capabilities (as-built Sprint 222)
+### Capabilities (as-built Sprint 285)
 
 | Feature | Description |
 |---------|-------------|
 | **Live slash-commands** | `/help` `/status` `/recall` `/plan` `/sprint` `/exit` `/clear` — config-driven registry (`chat-slash-registry.ts`), not hard-coded |
 | **Agentic dispatch** | Natural language → real deckent action: "sprint durumu ne" → `deckent_status` (not provider pass-through) |
+| **Tur-içi kuyruk + per-tool onay** | In-REPL tool calls are queued; each tool shown for per-tool approval before execution (Sprint 285) |
 | **5-Provider parity** | claude / codex / gemini / ollama-local / openai-compatible — equal round-trip, same contract |
 | **ollama-local (zero-API)** | `chat_provider: 'ollama'` → `localhost:11434`, no API key required — first-class local model support |
 | **User/Enterprise mode** | `chat.mode: 'user'` (default, simple) / `'enterprise'` (adds /audit /rbac /flow /cost group) |
@@ -511,7 +514,7 @@ my-project/
 │   │   ├── server.ts               # 16 endpoints + SSE stream
 │   │   └── watcher.ts              # Dashboard file watcher
 │   ├── cli/                          # CLI commands (57 files, 55+ commands)
-│   ├── mcp/                          # MCP server (32 tools + 8 resources)
+│   ├── mcp/                          # MCP server (34 tools + 8 resources)
 │   │   ├── server.ts                # Entry point (McpServer + stdio)
 │   │   ├── tools/                   # 29 files (28 handlers; nervous.ts registers 5 nervous_* tools)
 │   │   │   ├── init.ts             # deckent_init
@@ -539,7 +542,7 @@ my-project/
 │   │   └── resources/               # 8 resource handlers
 │   └── dashboard/                    # Web Dashboard (React+Vite+Tailwind)
 │       └── src/
-│           ├── pages/               # 7 pages: Dashboard, Settings, History, Memory, Config, Status, Chat
+│           ├── pages/               # 16 pages: Dashboard, Chat, Config, Debt, Directives, Enterprise, Evolution, History, Memory, MemoryExplorer, Nervous, Settings, Status, Workers, Login, Callback
 │           ├── components/          # Layout, DebtTable, SprintChart, 14 UI components
 │           ├── hooks/               # useSSE, custom hooks
 │           ├── lib/                 # Utilities

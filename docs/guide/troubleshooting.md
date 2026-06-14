@@ -1,85 +1,300 @@
 # Troubleshooting Guide
 
-## Tmux Backend Deprecation
+## Sprint Stuck / Workers Not Responding
 
-**Status:** DEPRECATED — tmux backend will be removed in Sprint 178.
+Workers stop writing heartbeats (`.tasks/task-NNN.hb`) when they crash, are OOM-killed,
+or their backend container exits unexpectedly.
 
-### Background
-
-Sprint 176 uncovered a critical issue: the `auto` backend resolution chain was selecting `tmux` as a fallback when Docker was unavailable, causing unexpected behavior including incorrect process isolation and stale metadata after `deckent kill`.
-
-Starting from Sprint 177, the `auto` mode resolves directly to `docker`. Explicit `spawn_backend: "tmux"` still works but emits a deprecation warning.
-
-### Migration Steps
-
-**From tmux → docker (recommended):**
+### Diagnosis
 
 ```bash
-# Update your project config
+# Check active sprint and worker status
+deckent status
+
+# List heartbeat files and their timestamps
+ls -lt .tasks/*.hb
+
+# Check Docker containers (if spawn_backend = docker)
+docker ps -a | grep deckent
+```
+
+### Recovery Chain
+
+Run these steps in order — stop when the sprint resumes:
+
+```bash
+# Step 1: Kill all active workers
+deckent kill --all
+
+# Step 2: Archive task files, release locks
+deckent cleanup
+
+# Step 3: Recover orphan state (re-evaluate partial results)
+deckent recover <sprint-id>
+
+# Step 4: Re-run a specific task manually
+deckent run <task-id>
+
+# Step 5: Spawn remaining pending tasks
+deckent spawn --auto-approve
+```
+
+See [Config Recovery Guide](./config-recovery.md) for a detailed breakdown of each step.
+
+---
+
+## Docker Issues
+
+### Workers exit immediately (exit code 137)
+
+Exit code 137 = SIGKILL (OOM). The Docker container ran out of memory.
+
+**Fix:**
+
+```bash
+# Increase Docker memory limit in config
+deckent config set docker_memory_limit 4g
+
+# Or reduce parallel workers
+deckent config set max_workers 2
+```
+
+### Docker daemon not running
+
+```bash
+# Verify Docker is running
+docker info
+
+# Start Docker (macOS)
+open -a Docker
+
+# Start Docker (Linux)
+sudo systemctl start docker
+```
+
+### Container cannot access project files
+
+The Docker backend mounts the project root into the container. If you see file-not-found
+errors inside workers:
+
+```bash
+# Check the project root is correctly set
+deckent config read | grep root
+
+# Verify the mount path resolves
+docker run --rm -v "$(pwd):/workspace" alpine ls /workspace
+```
+
+---
+
+## Workers Not Starting
+
+### Check config
+
+```bash
+deckent config read
+# Verify spawn_backend is set correctly: docker, tmux, or subprocess
+```
+
+### Check backend health
+
+```bash
+# Docker backend
+docker info
+
+# Subprocess backend — no daemon required, always available
+# tmux backend
+tmux -V
+```
+
+### Run doctor
+
+```bash
+deckent doctor
+```
+
+`deckent doctor` checks: Node version (≥24), Docker availability, project structure
+(`.deckent/`, `.tasks/`, `.brain/`), config validity, and MCP server registration.
+
+---
+
+## Stale Heartbeat / False NO_GO
+
+A worker may have finished its work but failed to write the `.result` file before being
+killed (e.g. OOM). Brain detects a stale heartbeat and marks the task NO_GO.
+
+### Diagnosis
+
+```bash
+# Check the last heartbeat timestamp
+cat .tasks/task-NNN.hb
+
+# Check if a partial result exists
+ls .tasks/task-NNN.partial-result
+
+# Check git diff for any file changes the worker made
+git diff --stat
+```
+
+### Recovery
+
+```bash
+# Re-run the specific task
+deckent run <task-id>
+
+# Or recover the sprint (re-evaluates any partial results)
+deckent recover <sprint-id>
+```
+
+---
+
+## Config Lost / Corrupted
+
+When `.deckent/config.json` is missing or corrupted, deckent falls back to defaults.
+All values are still accessible:
+
+```bash
+# Show current (merged) config
+deckent config read
+
+# Restore a specific key to default
 deckent config set spawn_backend docker
-
-# Verify the change
-deckent config read | grep spawn_backend
+deckent config set brain_tier standard
 ```
 
-Or edit `.deckent/config.json` directly:
+For full config recovery (merge with template defaults), see
+[Config Recovery Guide](./config-recovery.md).
 
-```json
-{
-  "spawn_backend": "docker"
-}
+---
+
+## Build Failures (TypeScript)
+
+```bash
+# Check for type errors
+npx tsc --noEmit
+
+# Common causes:
+# - .js extension missing on ESM imports (ADR-002: Node16 resolution)
+# - New type not exported from core/types.ts
+# - Circular import (ADR-008: Brain-central import rule)
 ```
 
-**From tmux → subprocess (Windows / no Docker):**
+Fix the error, then re-run `npx tsc --noEmit` until clean.
+
+---
+
+## Test Failures
+
+```bash
+# Run a single test file (targeted — do NOT run full suite)
+npx vitest run tests/path/to/failing.test.ts
+
+# Check if the test needs hermetic isolation (ADR-087)
+# Tests must NOT read .deckent/config.json, .brain/memory.db, or ~/.deckent
+# All file I/O must use os.tmpdir() fixtures
+
+# Reproduce CI conditions
+npm run test:ci-sim
+```
+
+Known pre-existing failures: ~67 tests in the full suite depend on stale model-id
+expectations or live provider connections. Run only targeted tests for your changed files.
+
+---
+
+## MCP Server Caching Stale Code
+
+After a `tsc` rebuild, the long-lived MCP process still runs the old compiled code
+from its cache.
+
+```bash
+# Rebuild the TypeScript output
+npm run build
+
+# Then restart the MCP server in Claude Code
+# /mcp restart
+# Or restart Claude Code entirely
+```
+
+---
+
+## Dashboard Not Loading
+
+```bash
+# Rebuild the dashboard bundle
+npm run build:all
+
+# Restart the serve process
+deckent serve --port 3000
+```
+
+If individual pages (Evolution, Nervous, Workers, etc.) are missing or show wrong content,
+the bundle is stale. Always run `npm run build:all` after pulling changes that affect
+`src/dashboard/`.
+
+---
+
+## Spawn Lock Deadlock
+
+If `deckent start` hangs indefinitely with no output:
+
+```bash
+# Check for stale spawn locks
+ls .locks/*.spawnlock
+
+# Clear them manually
+rm .locks/*.spawnlock
+
+# Then retry
+deckent start
+```
+
+Stale spawn locks are also cleared by `deckent cleanup`.
+
+---
+
+## Nervous System Blocking Sprint Start
+
+The Nervous System (ADR-040) runs detectors before each sprint. If a panic-gate fires
+and the sprint hangs at SPAWN:
+
+```bash
+# Check nervous system status
+deckent nervous status
+
+# Accept or reject pending proposals
+deckent nervous accept <proposal-id>
+deckent nervous reject <proposal-id>
+
+# Or disable nervous for this sprint (temporary)
+deckent config set nervous_system.enabled false
+deckent start
+deckent config set nervous_system.enabled true
+```
+
+---
+
+## Worker `.result` File Not Written
+
+If a worker completes but Brain marks the task NO_GO with "no result file":
+
+1. Check if the worker is still running: `deckent status`
+2. Check the tmux session (if `spawn_backend: tmux`): `tmux ls`, `tmux attach -t deckent-NNN`
+3. Check Docker container logs: `docker logs <container-id>`
+4. Re-run the task: `deckent run <task-id>`
+
+---
+
+## Spawn Backend Options
+
+| Backend | When to use | Requirements |
+|---------|-------------|--------------|
+| `docker` | Default — isolated containers, consistent env | Docker daemon running |
+| `subprocess` | Windows / no Docker / lightweight | Node ≥24, no daemon |
+| `tmux` | Interactive debugging, view worker output live | tmux installed |
+
+Change backend:
 
 ```bash
 deckent config set spawn_backend subprocess
 ```
-
-### Docker Setup
-
-If Docker is not installed, follow the [Docker Backend Guide](./docker-backend.md).
-
-Quick check:
-
-```bash
-docker info
-# Should show Docker daemon info without errors
-```
-
-### Deprecation Warning
-
-When `spawn_backend: "tmux"` is set, deckent emits this warning once per sprint:
-
-```
-[deckent] DEPRECATION: spawn_backend="tmux" is deprecated and will be removed in Sprint 178.
-Migrate to spawn_backend="docker" (recommended) or spawn_backend="subprocess" (Windows fallback).
-See docs/guide/troubleshooting.md for migration instructions.
-```
-
-The warning is emitted only once per sprint lifecycle to avoid noise.
-
-### Timeline
-
-| Sprint | Change |
-|--------|--------|
-| 177 | `auto` resolves to `docker`; `tmux` emits deprecation warning |
-| 178 | tmux backend code removed; `spawn_backend: "tmux"` causes error |
-
----
-
-## Common Issues
-
-### Workers not starting
-
-1. Check Docker is running: `docker info`
-2. Check deckent config: `deckent config read`
-3. Check spawn_backend: should be `"docker"` or `"subprocess"`
-
-### Sprint stuck after kill
-
-See [Sprint Recovery Guide](./config-recovery.md).
-
-### Config lost after regen
-
-See [Config Recovery Guide](./config-recovery.md).

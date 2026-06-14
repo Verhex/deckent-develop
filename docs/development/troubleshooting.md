@@ -1,7 +1,7 @@
 # Deckent Troubleshooting Guide
 
-*Reference: DECKENT-MASTER-BLUEPRINT.md §3.4, §5, §10, §16, §21*
-*Last updated: Sprint 065 (2026-03-26)*
+*Reference: `docs/reference/api-surface.md`, ADR-087 (Async I/O & Test Hermeticity)*
+*Last updated: Sprint 286 (2026-06-14)*
 
 ---
 
@@ -13,6 +13,7 @@
 4. [tmux Issues](#4-tmux-issues)
 5. [Dashboard Issues](#5-dashboard-issues)
 6. [Quick Reference: `deckent doctor` Checks](#6-quick-reference-deckent-doctor-checks)
+7. [Developer Build & CI Issues](#7-developer-build--ci-issues)
 
 ---
 
@@ -38,27 +39,27 @@ source ~/.bashrc
 
 ---
 
-### 1.2 Node.js version too old — `deckent doctor` fails with "Node.js: v16.x (>=18 required)"
+### 1.2 Node.js version too old — `deckent doctor` fails with a version check error
 
 **Symptom:**
 ```
-✗ Node.js  v16.x.x (>=18 required)
+✗ Node.js  v20.x.x (>=18 required)
 ```
 
-**Cause:** Deckent requires Node.js ≥ 18 for `structuredClone`, `node:readline/promises`, and ESM support.
+**Cause:** Deckent requires Node.js ≥ 24.0.0 (`package.json` `engines` field). The `deckent doctor` message may show `>=18 required` — the official minimum is **≥24**.
 
 **Solution:**
 ```bash
-# Using nvm
-nvm install 22
-nvm use 22
+# Using nvm (recommended)
+nvm install 24
+nvm use 24
 
 # Using system package manager (Ubuntu/Debian)
-curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -
 sudo apt-get install -y nodejs
 
 # Verify
-node --version  # should be v22.x or >=v18.x
+node --version  # must be v24.x or higher
 ```
 
 ---
@@ -156,7 +157,7 @@ nvm install 22 && brew install tmux
 deckent start --force
 ```
 
-Doctor required checks: Node.js ≥ 18, git, tmux, Claude CLI.
+Doctor required checks: Node.js ≥ 24, git, tmux (or docker), Claude CLI.
 
 ---
 
@@ -211,22 +212,19 @@ deckent plan --mode structured
 
 ---
 
-### 2.4 Brain Budget over 600 lines — `deckent doctor` warning
+### 2.4 Brain Budget over 900 lines — `deckent doctor` warning
 
 **Symptom:**
 ```
-○ Brain Budget  612/600 lines — OVER BUDGET, run cleanup --decay
+○ Brain Budget  920/900 lines — OVER BUDGET, run cleanup --decay
 ```
 
-**Cause:** `.brain/` files have accumulated beyond the 600-line memory budget.
+**Cause:** `.brain/` export files have accumulated beyond the 900-line memory budget (Memory V2: the DB is SQLite; `.brain/exports/` markdown files are auto-generated exports, not the source of truth).
 
 **Solution:**
 ```bash
 # Run decay/compression
 deckent cleanup --decay
-
-# Or force decay even if under budget
-deckent cleanup --force
 
 # Check new line count
 deckent doctor
@@ -241,12 +239,12 @@ deckent doctor
 ○ Debt  2 CRITICAL debt item(s)
 ```
 
-**Cause:** `DEBT.md` has `CRITICAL` items. These must be resolved before or during the sprint.
+**Cause:** Memory V2 DB has `CRITICAL` debt entries (viewable via `.brain/exports/debt.md`).
 
 **Solution:**
 ```bash
-# View current debt
-cat .brain/DEBT.md
+# View current debt (auto-generated export)
+cat .brain/exports/debt.md
 
 # Archive resolved debt
 deckent archive-debt
@@ -374,17 +372,23 @@ deckent doctor
 
 **Symptom:** The `deckent://memory` MCP resource returns empty content.
 
-**Cause:** `.brain/MEMORY.md` is missing or empty.
+**Cause:** Memory V2 is DB-first (SQLite at `.brain/memory.db`). The resource is populated from the DB; if the DB is missing or the exports haven't been generated yet, the resource will be empty.
 
 **Solution:**
 ```bash
-# Check if MEMORY.md exists
-ls .brain/MEMORY.md
+# Check if memory DB exists
+ls .brain/memory.db
 
 # If missing, initialize workspace
 deckent init
 
-# If empty, run a sprint — Brain populates MEMORY.md after retro
+# Rebuild DB from markdown exports (if DB was lost)
+deckent memory rebuild
+
+# Export DB to markdown (regenerates .brain/exports/)
+deckent memory export
+
+# Run a sprint — Brain writes to DB after retro
 ```
 
 ---
@@ -635,14 +639,14 @@ Run `deckent doctor` to get a system health report. All required checks must pas
 
 | Check | Required | Pass Condition | Fix Command |
 |-------|----------|----------------|-------------|
-| Node.js | ✅ Yes | version ≥ 18 | `nvm install 22` |
+| Node.js | ✅ Yes | version ≥ 24 | `nvm install 24` |
 | git | ✅ Yes | git installed | `apt install git` / `brew install git` |
-| tmux | ✅ Yes | tmux installed | `apt install tmux` / `brew install tmux` |
+| tmux / docker | ✅ Yes | tmux or docker installed | `apt install tmux` / `brew install tmux` |
 | Claude CLI | ✅ Yes | `claude` in PATH | `npm install -g @anthropic-ai/claude-code` |
 | Workspace | ○ No | `.deckent/` exists | `deckent init` |
-| Brain Dir | ○ No | `.brain/` with all files | `deckent init` |
+| Brain Dir | ○ No | `.brain/memory.db` exists | `deckent init` / `deckent memory rebuild` |
 | Directives | ○ No | `DIRECTIVES.md` non-empty | Create `DIRECTIVES.md` |
-| Brain Budget | ○ No | ≤ 600 lines | `deckent cleanup --decay` |
+| Brain Budget | ○ No | ≤ 900 lines (exports) | `deckent cleanup --decay` |
 | Debt | ○ No | No CRITICAL items | `deckent archive-debt` |
 | Locks | ○ No | No stale locks (>5min) | `rm .locks/*.lock` |
 
@@ -655,10 +659,209 @@ deckent start --force  # skip pre-flight checks
 
 ## Additional Resources
 
-- **Architecture:** See `DECKENT-MASTER-BLUEPRINT.md` for complete system design
-- **Config Reference:** `.deckent/config.json` and `deckent config`
-- **Memory System:** `.brain/MEMORY.md`, `.brain/DECISIONS.md`, `.brain/DEBT.md`
+- **Architecture:** `docs/architecture/architecture.md` and `docs/guide/architecture-overview.md`
+- **Config Reference:** `.deckent/config.json` and `deckent config` — see also `docs/reference/config.md`
+- **Memory System:** `.brain/memory.db` (SQLite, single source of truth) — exports at `.brain/exports/`; see `docs/architecture/memory-system.md`
 - **Agent Rules:** `.claude/rules/brain.md`, `.claude/rules/worker-default.md`, `.claude/rules/auditor.md`
-- **API Contract:** `.contracts/api-surface.md`
+- **API Contract:** `docs/reference/api-surface.md`
+- **ADR Index:** `docs/adr-index.md` — accepted architecture decisions (89 ADRs)
 
-For bug reports, open an issue in the project repository.
+For bug reports, open an issue at [deckent.ai](https://deckent.ai).
+
+---
+
+## 7. Developer Build & CI Issues
+
+> This section covers issues when **working on the deckent codebase itself** — TypeScript build errors, test failures, and CI hermeticity problems (ADR-087).
+
+### 7.1 TypeScript build errors — `npm run build` fails
+
+**Symptom:**
+```
+src/core/config.ts(42,5): error TS2345: Argument of type ...
+```
+
+**Cause:** Type mismatch, missing import, or wrong `.js` extension in ESM import path (ADR-002: Node16 module resolution requires `.js` suffixes on all local imports).
+
+**Solution:**
+```bash
+# Run type check only (fast, no emit)
+npm run lint        # runs: tsc --noEmit && tsc --noEmit -p src/dashboard
+
+# Full build (clean + compile + copy assets)
+npm run build
+
+# Dashboard only (Vite)
+npm run build:all   # includes dashboard build
+
+# Watch mode for development
+npm run dev         # tsc --watch
+```
+
+**Common ESM import error:**
+```typescript
+// Wrong — will fail at runtime with Node16 resolution
+import { foo } from './bar';
+
+// Correct — .js extension required even for .ts source files
+import { foo } from './bar.js';
+```
+
+---
+
+### 7.2 Test failures — `npm test` fails
+
+**Symptom:**
+```
+FAIL  tests/core/config.test.ts
+  × Config loads default values ...
+```
+
+**Cause:** May be a real regression, or a pre-existing failure in an unrelated test (there are ~67 pre-existing failures in the full suite from stale model-id expectations and env-dependent provider tests).
+
+**Solution:**
+```bash
+# Run only targeted test file(s) for the module you changed
+npx vitest run tests/core/config.test.ts
+
+# Full suite (shows pre-existing failures too)
+npm test
+
+# Coverage report
+npm run test:coverage
+
+# Dashboard tests (separate Vite config)
+npm run test:dashboard
+```
+
+**Note:** When assessing a PR, run only the test file(s) covering changed modules. Pre-existing failures in unrelated tests are not your responsibility and must not cause a NO_GO.
+
+---
+
+### 7.3 Tests pass locally but fail in CI — hermetic violations (ADR-087)
+
+**Symptom:** Tests are green locally but fail on the CI machine with "cannot read file" or "config not found" errors.
+
+**Cause:** Tests read gitignored local state (`.deckent/config.json`, `.brain/memory.db`, `~/.deckent`) that does not exist on a fresh CI checkout. ADR-087 mandates all tests must be hermetic.
+
+**Solution:**
+```bash
+# Reproduce CI environment locally
+npm run test:ci-sim
+
+# The script temporarily hides .deckent/config.json + .brain/memory.db,
+# runs CI=1 vitest run, then ALWAYS restores state (try/finally).
+# Exit 0 = hermetic pass, 1 = hermetic failure, 2 = stash/restore error.
+
+# Dry-run (stash + restore without running vitest)
+node scripts/test-ci-sim.mjs --dry-run
+
+# Pass through extra vitest args
+node scripts/test-ci-sim.mjs -- --reporter=verbose
+```
+
+**Hermetic test pattern (ADR-087):**
+```typescript
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+describe('MyModule', () => {
+  let sandboxDir: string;
+
+  beforeEach(() => {
+    sandboxDir = mkdtempSync(join(tmpdir(), 'deckent-test-'));
+  });
+
+  afterEach(() => {
+    rmSync(sandboxDir, { recursive: true, force: true });
+  });
+
+  it('writes config', () => {
+    // All I/O goes to sandboxDir — never the project root or HOME
+    writeFileSync(join(sandboxDir, 'config.json'), '{}');
+    // ...
+  });
+});
+```
+
+**Common violations to fix:**
+
+| Violation | Fix |
+|-----------|-----|
+| `readFileSync('.deckent/config.json')` without guard | Use `sandboxDir` fixture; guard with `existsSync` check |
+| `spawnSync(...)` for subprocess | Replace with async `spawn` (ADR-087, ADR-006 exception: trusted, short, non-hot-path only) |
+| Writing test files to project root | Write to `os.tmpdir()` and clean up in `afterEach` |
+| Reading `~/.deckent` or `~/.claude` | Use a sandbox `HOME` via `withSandboxHome()` helper |
+
+---
+
+### 7.4 `tsc --noEmit` passes but runtime fails — ESM cache issue
+
+**Symptom:** TypeScript compiles cleanly but the running binary uses stale code (especially the MCP server).
+
+**Cause:** Long-lived processes (MCP server, daemon) cache the `dist/` build. Rebuilding `dist/` does not restart running processes.
+
+**Solution:**
+```bash
+# Rebuild dist/
+npm run build
+
+# Restart the MCP server
+# In Claude Code: run /mcp restart, or restart Claude Code entirely
+
+# Verify the binary uses the new build
+node dist/cli/entry.js --version
+```
+
+---
+
+### 7.5 ADR lint fails — `npm run lint:adr`
+
+**Symptom:**
+```
+ADR-065 is referenced in code but not found in .brain/memory.db
+```
+
+**Cause:** A new ADR was added to `docs/adr/` but not registered in the memory DB, or an ADR ID in code does not match the DB.
+
+**Solution:**
+```bash
+# Run ADR validator
+npm run lint:adr
+
+# Rebuild memory DB from exports (if DB is out of sync)
+deckent memory rebuild
+
+# Check ADR index
+cat docs/adr-index.md
+```
+
+---
+
+### 7.6 Publish gate fails — `npm run validate:publish`
+
+**Symptom:**
+```
+✗ dist/ missing — run npm run build first
+```
+or
+```
+✗ docs:ref out of date — run npm run docs:ref
+```
+
+**Cause:** The publish gate (`scripts/validate-publish.mjs`) checks that `dist/` is built, reference docs are up to date, and README stats are current.
+
+**Solution:**
+```bash
+# Full release gate (stats check + ref check + build)
+npm run release
+
+# Individual steps:
+npm run build              # compile TypeScript + copy assets
+npm run docs:ref           # regenerate reference docs (AUTOGEN files)
+npm run docs:stats         # update README stats from live counts
+npm run validate:publish   # final check (does NOT publish)
+
+# Alperen runs npm publish manually after this gate passes.
+```

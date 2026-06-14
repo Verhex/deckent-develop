@@ -43,6 +43,8 @@ isAdapterProvider(task.provider)?
 
 Add a `- Provider:` line to any task in `DIRECTIVES.md` to override the default `worker_provider` for that specific task. Pair it with a `- Model:` line that names a model supported by that provider.
 
+For the full list of deckent model ids, apiIds, and tier equivalences across providers, see [Multi-Provider Guide — Model Registry & Tier Equivalence](multi-provider.md#2-model-registry--tier-equivalence).
+
 ```markdown
 ## Task 1: Local model task
 - Provider: ollama

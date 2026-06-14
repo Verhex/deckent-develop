@@ -48,6 +48,6 @@ deckent cleanup                  # arşivle ve temizle
 ```
 
 ## Durum
-- Olgunluk: ✅ canlı — sprint-190+ aktif kullanım, yüksek import sayısı
+- Olgunluk: ✅ canlı — sprint-285+ aktif kullanım, yüksek import sayısı
 - İlgili: ADR-025 · ADR-043 · ADR-044 · ADR-046
 - Modüller: `src/orchestra/sprint-controller.ts` · `src/orchestra/sprint-phases.ts`

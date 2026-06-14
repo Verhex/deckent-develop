@@ -1,6 +1,19 @@
 # Local Model Workers — Ollama Agentic Worker Kılavuzu
 
-deckent, yerel bir Ollama modelini gerçek bir agentic worker olarak çalıştırır: dosya okur/yazár/duzeltir, testleri çalarır, yapılandırılmış `.result` üretir. Brain (Claude Opus) görevi planlar; Ollama modeli scope-enforced harness içinde işi gerçekleştirir.
+deckent, yerel bir Ollama modelini gerçek bir agentic worker olarak çalıştırır: dosya okur/yazar/düzeltir, testleri çalıştırır, yapılandırılmış `.result` üretir. Brain (Claude Opus) görevi planlar; Ollama modeli scope-enforced harness içinde işi gerçekleştirir.
+
+---
+
+## Ollama Kullanım Yolları
+
+Deckent'te Ollama iki farklı bağlamda çalışır:
+
+| Bağlam | Durum | Açıklama |
+|--------|-------|----------|
+| **REPL / Chat modu** | Tam destekli | `deckent` (argümansız) REPL'de `--provider ollama` ile başlatın. `native-transport.ts` aracılığıyla `OllamaAdapter` devreye girer; gerçek zamanlı streaming yanıtlar üretilir. |
+| **Sprint worker** | Tam destekli (derleme gerekli) | Task JSON'daki `- Provider: ollama` ile sprint worker olarak kullanılır. `dist/agents/agentic-worker-entry.js` üzerinden tool-calling döngüsü çalışır. **Gereksinim:** `npm run build` komutuyla proje derlenmiş olmalıdır. |
+
+> **Derleme uyarısı (sprint worker):** Sprint worker, ön-derlenmiş `dist/agents/agentic-worker-entry.js` dosyasına bağımlıdır. Bu dosya kaynak koddan üretilir; `dist/` dizini yoksa worker başlatılamaz. `npm run build` çalıştırın.
 
 ---
 
@@ -145,7 +158,24 @@ Bu sonuç Brain tarafından değerlendirilir: `GO` / `NO_GO` / `GO_WITH_TECH_DEB
 
 ---
 
-## 6. Hızlı Başlangıç Özet
+## 6. REPL / Chat Modunda Ollama
+
+REPL modunda Ollama modeli sohbet aracı olarak kullanılır — sprint başlatmadan direkt konuşabilirsiniz.
+
+```bash
+# Ollama servisini başlat ve model çek
+ollama serve &
+ollama pull qwen3:latest
+
+# deckent REPL'i Ollama ile başlat
+deckent --provider ollama --model qwen3:latest
+```
+
+REPL, `src/cli/repl/native-transport.ts` üzerinden `OllamaAdapter`'ı devreye alır ve `localhost:11434/api/chat` üzerinden gerçek zamanlı streaming yanıt üretir. Sprint başlatılmaz; `deckent run` gibi agentic araçlar da bu modda çalışır.
+
+---
+
+## 7. Hızlı Başlangıç Özet
 
 ```bash
 # 1. Ollama kurulu + çalışıyor
@@ -154,8 +184,12 @@ ollama serve &
 # 2. Model çek
 ollama pull qwen3.6:27b
 
-# 3. deckent görevi tanımla (Provider: ollama)
-deckent sprint -f tasks.yaml
+# 3. Proje derlendi mi kontrol et (sprint worker gerektirir)
+npm run build
 
-# 4. Worker localhost:11434'te çalışır, scope-enforced, .result üretir
+# 4. deckent görevi tanımla (Provider: ollama)
+# DIRECTIVES.md'de: - Provider: ollama, - Model: qwen3.6:27b
+deckent start
+
+# 5. Worker localhost:11434'te çalışır, scope-enforced, .result üretir
 ```

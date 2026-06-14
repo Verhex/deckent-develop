@@ -247,7 +247,7 @@ deckent is built to be watched, not to be a black box.
 ### Surfaces
 - **Interactive REPL** — `deckent` with markdown streaming, slash commands, and mid-session model/provider switching
 - **Web dashboard** — 16 pages (React + Vite + Tailwind): live status, workers, directives, memory explorer, debt, history, config, chat, nervous system, evolution, enterprise — plus an embedded web terminal (PTY over WebSocket, token-auth + audited)
-- **MCP server** — 34 tools + 8 resources over stdio, so any MCP client (Claude Code, Cursor, …) can drive deckent
+- **MCP server** — 34 tools + 8 resources over stdio, so any MCP client (Claude Code, Claude Desktop, …) can drive deckent
 - **Autonomous engine** — a durable backlog with recurring (cron), one-off, and reactive triggers; deckent works a queue on its own
 - **Connectors** — Discord, Telegram, and WhatsApp for notifications and remote triggering
 - **Enterprise foundation** — multi-tenant isolation, audit query, OIDC/SSO dashboard login (RS256-pinned JWT, PKCE), role-based access, scheduled flows, and webhooks — all in the same MIT codebase, no gated edition
@@ -289,7 +289,7 @@ deckent is provider-agnostic to the core. Configure providers in `.deckent/confi
 - Model: opus
 ```
 
-Or skip model names entirely and let the **model registry** (13 models across 4 tiers — `premium_plus` / `premium` / `standard` / `economy`) pick the equivalent model for whatever provider you chose, via `model_strategy.brain_tier` / `worker_tier`. Pricing is fetched live (with a bundled fallback), so cost estimates stay honest.
+Or skip model names entirely and let the **model registry** (14 models across 4 tiers — `premium_plus` / `premium` / `standard` / `economy`) pick the equivalent model for whatever provider you chose, via `model_strategy.brain_tier` / `worker_tier`. Pricing is fetched live (with a bundled fallback), so cost estimates stay honest.
 
 → Full guide: [docs/reference/multi-provider.md](docs/reference/multi-provider.md)
 

@@ -120,9 +120,64 @@ The stop marker is written to `.deckent/autonomous/stop`. The loop reads it afte
 
 ---
 
+### `autonomous pending`
+
+List parked triggers awaiting a human `approve` or `reject` decision.
+
+```bash
+deckent autonomous pending [options]
+```
+
+| Option | Default | Description |
+|---|---|---|
+| `--root <path>` | auto-detected | Project root override. |
+| `--lang <code>` | `en` | Language override (`en` or `tr`). |
+
+---
+
+### `autonomous approve <triggerId>`
+
+Approve a parked trigger — it runs on the next cycle.
+
+```bash
+deckent autonomous approve <triggerId> [options]
+```
+
+| Option | Default | Description |
+|---|---|---|
+| `--reason <text>` | — | Optional reason recorded with the decision. |
+| `--root <path>` | auto-detected | Project root override. |
+| `--lang <code>` | `en` | Language override (`en` or `tr`). |
+
+---
+
+### `autonomous reject <triggerId>`
+
+Reject a parked trigger — the decision is recorded and the trigger is not run.
+
+```bash
+deckent autonomous reject <triggerId> [options]
+```
+
+| Option | Default | Description |
+|---|---|---|
+| `--reason <text>` | — | Optional reason recorded with the decision. |
+| `--root <path>` | auto-detected | Project root override. |
+| `--lang <code>` | `en` | Language override (`en` or `tr`). |
+
+---
+
 ### `autonomous backlog`
 
 Manage the autonomous work queue (`.deckent/autonomous/backlog.json`). The running loop picks up pending entries as `backlog` triggers — they pass through the same authority/approval/audit pipeline as every other trigger.
+
+**Trigger types** (from `backlog-types.ts`):
+
+| `trigger.type` | Set by | Description |
+|---|---|---|
+| `recurring` | `--cron <expr>` | Fires on the cron cadence; re-enqueued to `pending` after each `done` |
+| `one-off` | no `--cron` (default) | Fires once; stays `done` after completion |
+| `reactive` | nervous-detector bridge | Written by the reactive ingester; fires once a detection matches |
 
 ```bash
 deckent autonomous backlog add [options]
@@ -139,18 +194,19 @@ deckent autonomous backlog remove <id> [options]
 | `--kind <kind>` | `task` | Entry kind: `task` (inline description), `sprint` (directives ref), or `capability` (F8 broker verb). |
 | `--description <text>` | empty | Task description or directives ref. |
 | `--policy <policy>` | `auto` | Execution policy: `auto`, `approval-required`, or `risk-tagged`. |
-| `--cron <expr>` | one-off | 5-field cron expression — the entry recurs at this cadence. Omit for a one-off entry. |
+| `--cron <expr>` | one-off | 5-field cron expression — sets trigger `type` to `recurring`. Omit for a `one-off` trigger. |
 | `--capability <verb>` | — | `kind=capability` only: dotted verb to invoke (e.g. `fs.read`, `db.query`). |
 | `--args <json>` | — | `kind=capability` only: JSON object of handler args. |
 | `--connector <id>` | — | `kind=capability` only: preferred backend/connector id (e.g. `odoo`, `imap`). |
 | `--root <path>` | auto-detected | Project root override. |
 | `--lang <code>` | `en` | Language override (`en` or `tr`). |
 
-#### Recurring entry (cron cadence)
+#### Recurring entry (`trigger.type = 'recurring'`)
+
+Passing `--cron` sets `trigger.type` to `'recurring'` and stores the cron expression in `trigger.cron`. When a recurring entry completes, the engine flips it back to `pending` at the next due cadence (via `applyRecurringReenqueue`):
 
 ```bash
-# Re-enqueue every night at 03:00 — when a recurring entry completes,
-# the loop flips it back to pending at the next due time.
+# Re-enqueue every night at 03:00
 deckent autonomous backlog add \
   --id nightly-debt-sweep \
   --title "Nightly debt sweep" \
@@ -230,8 +286,8 @@ Trigger → Authority → Approval → Action → Audit
 |---|---|---|
 | **Trigger** | Polls scheduled flows and nervous-system events. Returns the next pending trigger or `no_trigger`. | `trigger-adapter` |
 | **Authority** | RBAC check via `authority-enforcer.checkAuthority`. Known roles: `brain`, `auditor`, `worker`, `system`. Unknown requesters → immediate `denied`. | `authority-adapter` |
-| **Approval** | When authority returns `needs_approval`, the trigger is parked in `.deckent/autonomous/pending.json` and the cycle outcome is `pending`. Human must approve via `deckent_nervous_accept` (MCP) or CLI. | `approval-adapter` |
-| **Action** | Executes the registered action handler if approved. By default no handlers are registered — actions resolve but perform no side effects. | `action-adapter` |
+| **Approval** | When authority returns `needs_approval` or the policy gate parks an entry, the trigger is stored in `.deckent/autonomous/pending.json` and the cycle outcome is `pending`. Human must approve via `deckent autonomous approve` (CLI) or `deckent_autonomous` MCP (`action: 'approve'`). | `approval-adapter` |
+| **Action** | Executes the registered action handler. The engine registers the **execute-dispatcher** handler, which runs `task` → worker, `sprint` → sprint lifecycle, `capability` → F8 broker invocation. | `action-adapter` |
 | **Audit** | Records every cycle outcome (executed/failed/denied/rejected/pending/no\_trigger) to `.deckent/autonomous-events.jsonl`. | `audit-adapter` |
 
 **Idle vs active ticking:**
@@ -257,17 +313,25 @@ denied: Unknown requestedBy "unknown" — default-deny (ADR-037)
 When the authority enforcer returns `needs_approval`, the trigger is parked in the pending queue. The loop **never approves its own triggers**. A human operator must resolve pending items:
 
 ```bash
-# Via MCP tool
-deckent_nervous_accept   # approve a pending trigger
-deckent_nervous_reject   # reject a pending trigger
+# Via CLI
+deckent autonomous pending               # list parked triggers awaiting a decision
+deckent autonomous approve <triggerId>   # approve → runs on the next cycle
+deckent autonomous reject  <triggerId>   # reject → recorded, not run
 
-# Via CLI status check first
-deckent autonomous status   # see what is pending
+# Via MCP tool (deckent_autonomous)
+# action: 'pending'  — list parked triggers
+# action: 'approve', triggerId: '<id>'  — approve
+# action: 'reject',  triggerId: '<id>'  — reject
 ```
 
-### 3. No auto-sprint-start
+### 3. Governed task/sprint execution
 
-The default action-handler registry is **empty**. Even if a trigger is allowed and approved, calling an unregistered action name results in a no-op (no sprint is started, no file is written outside the audit log). Custom action handlers can be registered programmatically by embedding the runtime in your own code — the CLI surface intentionally keeps this empty.
+When a trigger passes both the RBAC gate and the approval gate, the engine's **execute-dispatcher** runs the entry:
+- `kind: task` → spawns a single worker task via the configured provider
+- `kind: sprint` → runs a full sprint lifecycle (`runSprintLifecycle`)
+- `kind: capability` → invokes the F8 capability-broker verb (`CapabilityRegistry.invoke`)
+
+The real safety invariants are **the flag-gate** (`autonomous.enabled: false` default), **default-deny RBAC**, and **the policy gate** — `approval-required`/`risk-tagged` entries park for human approval before any execution. An `auto`-policy entry with a passing RBAC check WILL spawn real work that edits the repository. Use `approval-required` policy for risky entries, and supervise early runs with `--max-iterations`.
 
 ---
 
@@ -331,6 +395,8 @@ Work-generator triggers have the **lowest priority** among trigger sources (back
 
 ## Related Commands
 
+- `deckent autonomous pending` — list parked approvals awaiting a decision
+- `deckent autonomous approve <triggerId>` / `deckent autonomous reject <triggerId>` — resolve a parked trigger (CLI)
+- `deckent_autonomous` (MCP, `action: 'approve'/'reject'`) — resolve parked triggers via MCP
 - [`deckent nervous-subscribe`](../reference/mcp-tools.md) — subscribe to nervous-system notifications
 - [`deckent nervous-status`](../reference/mcp-tools.md) — show nervous system status
-- `deckent_nervous_accept` / `deckent_nervous_reject` — MCP tools for resolving pending approvals

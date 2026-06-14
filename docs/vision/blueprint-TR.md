@@ -54,13 +54,13 @@
 **USP (Benzersiz Değer Önerisi):**
 Sprint + öğrenme döngüsü. Deckent yalnızca task yürütmez — sprint planlar, sonuçları GO/NO-GO protokolüyle değerlendirir, tech debt izler, retro çalıştırır ve öğrenimleri bir sonraki sprint'e besler. Her sprint sistemi daha akıllı yapar.
 
-**Bugün nerededir (Sprint 218 → 219):**
-- Sprint 218 kapandı (13/13 DONE, 0 NO_GO, 0 tech-debt).
-- Sprint 219 ("Native Agentic Deckent") devam ediyor: argümansız `deckent` → native agentic REPL (`claude` gibi), doğal dil → MCP/CLI aksiyon onay-kapısıyla, dashboard 8-sayfa render-test + cache-bust kalıcı-fix, F2 chat streaming wire (`/api/chat/stream`) SSE token-token akış.
-- Sürüm: `1.0.0-beta.1` (npm publish gate Alperen manuel).
-- Dashboard: 8 sayfa (Sidebar+Layout tek-kaynak nav).
-- MCP: 32 tool + 8 resource. CLI: 49+ komut. Agent: 15 built-in + 2 custom. Skill: 21 built-in.
-- Yakın hedef: Sprint 220 publish-readiness (secret-scrub + .github + threat-model). Orta hedef: 6-senaryo paket fişeği.
+**Bugün nerededir (Sprint 285+):**
+- **Native REPL** (Sprint 219–285, ADR-081/083/084) üretimde: argümansız `deckent` → full-scope terminal REPL — gerçek LLM round-trip, Ink tabanlı görsel, 5-provider paritesi (claude / codex / gemini / ollama / openai-compatible), slash-komutlar, agentic dispatch. **Sprint 285:** tur-içi tool kuyruğu + per-tool onay kapısı (god-level tool-use UX).
+- **Otonom motor** (Sprint 220+, ADR-064/068/071) **main'e merge edildi ve çalışıyor**: dayanıklı backlog (`backlog.json`), 3-kapı yönetişim (RBAC → per-task-policy → EffectClass-risk), recurring/one-off/reactive tetikleyiciler, `deckent autonomous` CLI + `deckent_autonomous` MCP tool. Yerel-model otonom (Ollama qwen3.6) canlı kanıtlı.
+- **Nervous System** (ADR-040, Sprint 138+) aktif: 12 dedektör, proaktif meta-orkestratör (observer → detector → decision → proposer → dispatcher → executor), authority-matrix, `deckent nervous_*` MCP tools + REPL bridge.
+- **Dashboard** (Sprint 219–285): 16 sayfa (Dashboard, Chat, Config, Debt, Directives, Enterprise, Evolution, History, Memory, MemoryExplorer, Nervous, Settings, Status, Workers, Login, Callback). `deckent serve` → auth-kapılı HTTP API + SSE.
+- **Memory V2 DB-first** (Sprint 140+, ADR-088): SQLite + FTS5 dual-layer Türkçe normalize, `deckent recall/remember`, `deckent_memory_query` MCP tool. %96 context-window azaltması.
+- Sürüm: `1.0.0-beta.1` (npm publish gate Alperen manuel). **MCP**: 34 tool + 8 resource. **CLI**: 55+ komut. **Agent**: 15 built-in + 2 custom. **Skill**: 21 built-in. **Provider**: 4 (claude/codex/gemini/ollama) + OpenAI-compatible. **Model**: 13 / 4 tier.
 
 ---
 
@@ -95,7 +95,7 @@ Bunlar **üç ürün değil — aynı ürünün üç modudur.** Aynı MCP tool'l
            │                      │
 ┌──────────▼──────────────────────▼──────────────────┐
 │         DECKENT MCP SERVER (stdio)                  │
-│  32 Tool + 8 Resource                              │
+│  34 Tool + 8 Resource                              │
 │  init · plan · start · status · memory_query ...    │
 │  audit · recover · feature_query · watch · nervous_*│
 └──────────────────────┬──────────────────────────────┘
@@ -132,7 +132,7 @@ Bunlar **üç ürün değil — aynı ürünün üç modudur.** Aynı MCP tool'l
 ┌──────────▼──────────────────────────────────────────┐
 │        HTTP API + WEB DASHBOARD                      │
 │  src/api/server.ts — 16 endpoint + SSE              │
-│  src/dashboard/ — React+Vite+Tailwind (8 sayfa)     │
+│  src/dashboard/ — React+Vite+Tailwind (16 sayfa)    │
 │  `deckent web` → localhost:3100                     │
 └─────────────────────────────────────────────────────┘
 ```
@@ -255,7 +255,7 @@ Her senaryo aynı **core**'u paylaşır; üst senaryolar **enterprise-layer**'ı
 - ADR-068 Enterprise Foundation (audit query + multi-tenant + scheduled).
 - ADR-069/071 F3 Autonomous Mode + F4 RBAC/Tenant/Audit (proposed).
 
-**Sprint 219 iskeleti:** `src/orchestra/autonomous-runtime.ts` — `runAutonomousCycle(config)`: trigger → analiz → RBAC + onay → aksiyon → audit. Gerçek runtime wire Sprint 220'de planlanır.
+**As-built (Sprint 220+):** Otonom motor **main'e merge edildi ve çalışıyor** — `deckent autonomous start` komutu motoru uçtan uca yürütür. Durable backlog (`backlog.json`), 3-kapı yönetişim, recurring/one-off/reactive tetikleyiciler, crash-recovery, `config.autonomous.*` (varsayılan kapalı). Yerel-model otonom: sıfır-maliyet **qwen3.6 (Ollama, host)** worker otonom biçimde gerçek bir doküman iyileştirmesi üretti — Phase-1 kanıtlı canlı.
 
 **Sınır:** Otonom mod **yetki sınırları içinde** çalışır — RBAC dışı aksiyon, onay-kapısı reddi, hassas adım için kesin onay gerektirir. "Bu otonom" demek "bu kontrolsüz" demek değildir.
 
@@ -302,6 +302,6 @@ Her senaryo aynı **core**'u paylaşır; üst senaryolar **enterprise-layer**'ı
 
 ## NOT — Doküman Bakımı
 
-Bu doküman managed-docs (ADR-029/030) **dışında** durur; içerik elle bakım gerektirir. Live Metrics ve sayım blokları yoktur — code-derived sayımlar `blueprint.md` (EN) tarafında otomatik tutulur, bu doküman daha çok anlatı/positioning. Stale-detection için: bu dokümanı her büyük yön değişikliğinden sonra (özellikle Sprint 220+ otonom runtime, F4 enterprise, sub-projects #3/#4 milestones) yeniden okuyup gerekiyorsa güncelle. Sprint sayım rakamları için `blueprint.md` Live Metrics ya da `deckent status` referans alınmalı.
+Bu doküman managed-docs (ADR-029/030) **dışında** durur; içerik elle bakım gerektirir. Live Metrics ve sayım blokları yoktur — code-derived sayımlar `blueprint.md` (EN) tarafında otomatik tutulur, bu doküman daha çok anlatı/positioning. Stale-detection için: bu dokümanı her büyük yön değişikliğinden sonra (native-agent sprint 285+ güncellemeleri, F4 enterprise, autonomous milestones) yeniden okuyup gerekiyorsa güncelle. Sprint sayım rakamları için `blueprint.md` Live Metrics ya da `deckent status` referans alınmalı. Son güncelleme: Sprint 286.
 
 > **"Open source for open world."** — Deckent felsefesi.

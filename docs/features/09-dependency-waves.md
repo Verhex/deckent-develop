@@ -57,7 +57,17 @@ deckent status --json | node -e "
 - Dependencies: task-001, task-002
 ```
 
+## Bağımlılık-tatmin kümesi
+
+Sprint 280 FIX-deadlock düzeltmesiyle dependency-satisfied kümesi genişletildi:
+
+```
+DONE ∪ MANUAL_REVIEW_REQUIRED
+```
+
+`MANUAL_REVIEW_REQUIRED` durumundaki bir upstream task (zaman aşımı / beklenmeyen çıkış), bağımlı task'ları sonsuza dek bloke etmez. Downstream task'lar serbest bırakılır; MRR task'ı daha sonra incelenmek üzere log'lanır.
+
 ## Durum
 - Olgunluk: ✅ canlı — `dependency_pipeline_enabled: true` (varsayılan); manifest: `dependency-scheduler` aktif
-- **Not (deckent-dev projesi):** Deckent'in kendi dogfood sprint'lerinde `dependency_pipeline_enabled: false` — Brain wave geçişlerini manuel yönetir (ADR-047). Kullanıcı projelerinde default `true`.
-- İlgili: ADR-045 · `src/orchestra/dependency-scheduler.ts` · `src/orchestra/conflict-resolver.ts`
+- Hem deckent'in kendi dogfood sprint'lerinde hem kullanıcı projelerinde `true` (dogfood flip: 2026-06-10). ADR-047 Brain-manuel wave artık yalnızca fallback.
+- İlgili: ADR-045 · ADR-064 · `src/orchestra/dependency-scheduler.ts` · `src/orchestra/conflict-resolver.ts`

@@ -2,7 +2,30 @@
 
 See [docs/CHANGELOG.md](docs/CHANGELOG.md) for the full changelog.
 
-## Unreleased — Sprint 156 Pipeline Hardening (2026-05-12, commit `4d15196`)
+## [1.0.0-beta.1] — 2026-04-22 (current)
+
+v1.0.0-beta.1 is the current release. All sprint work since Beta GA (Sprint 150) is part of the ongoing beta.1 cycle. Major capabilities added since the initial launch:
+
+### Major Capabilities Added Since Beta GA (Sprints 151–285+)
+
+- **Memory V2 DB-First Architecture** — SQLite single source of truth (5 tables + FTS5 full-text search, dual-layer Turkish/English i18n normalize, 96% context reduction). `deckent recall`, `deckent remember`, `deckent memory rebuild|export|stats` CLI. `deckent_memory_query` MCP tool.
+- **Native REPL + Agentic Tool-Use** — Argümansız `deckent` launches Ink-based interactive REPL with agentic `<deckent_tool>` protocol, per-turn queue + approval (suggest/auto-edit/full-auto), slash commands. Native-agent mode is opt-in via `DECKENT_NATIVE_AGENT`/`--native` flag (experimental).
+- **Autonomous Engine** — Machine-initiated backlog (`kind: task|sprint|capability`), trigger types (`recurring-cron`, `one-off`, `reactive`), 3-gate governance (RBAC → policy → risk). `deckent autonomous status|stop|backlog add` CLI. `deckent_autonomous` MCP tool.
+- **ADR Governance Integration** — 89 Architecture Decision Records (MADR v3 hybrid format), mandatory enforcement via ADR-036. `npm run lint:adr` gate. Brain/Worker/Auditor prompts auto-injected with relevant ADRs from `memory.db`.
+- **RBAC Authority Matrix** — ADR-037: Brain/Auditor/Worker role-based access; advisory/soft enforcement V1.0 (compile-time lint + audit trail); 5 safety-floor locked actions.
+- **Agent/Skill Evolution Pipeline** — temp→permanent promote/demote pipeline, outcome-tracker, adaptive thresholds, synergy matrix, rule-evolver, performance stats per sprint.
+- **Nervous System** — ADR-040 proactive meta-orchestrator: observer → detector-registry → decision-engine → proposer → dispatcher → executor. 12 detectors. Subscribe/accept/reject API via `deckent_nervous_*` MCP tools.
+- **ModelRegistry** — 13 models / 3 providers / 4 tiers (premium_plus / premium / standard / economy). Provider-agnostic `brain_tier`/`worker_tier` config. `deckent_models` MCP tool (live data).
+- **Docker Backend (default)** — Container isolation, configurable timeout, atomic heartbeat write (SIGTERM + fsync grace period), 10 e2e tests. `spawn_backend: docker` is now the default.
+- **Wave-Based Dependency Pipeline** — Kahn's topological algorithm, `dependency_pipeline_enabled: true` default (ADR-045/064). MRR-deadlock fix: `DONE ∪ MANUAL_REVIEW_REQUIRED` satisfies dependency gate.
+- **Enterprise Foundation** — RBAC, multi-tenant isolation, audit-query, scheduled flows, OIDC exchange (`POST /api/auth/oidc/exchange`), embedded web terminal (PTY/WS, ADR-062, ADR-068/069/071).
+- **OpenAI-Compatible HTTP Adapter** — Ollama + HTTP provider support (ADR-077). 4 providers: claude / codex / gemini / ollama.
+- **Training Data Pipeline** — Live per-turn trace recorder (JSONL), CC-transcript extractor (aligned + general OpenAI-messages corpora, SP-2).
+- **Self-Modifying Task Detection** — ADR-038: deckent dogfood vs user-project discrimination, `self-modifying-detector.ts` (+789 LoC).
+
+---
+
+### Sprint 156 (2026-05-12, commit `4d15196`) — Pipeline Hardening
 
 ### Added
 
@@ -69,7 +92,7 @@ Plus heartbeat write race, sprint-state.json freeze, retro naming off-by-one —
 
 ---
 
-## Unreleased — Hot Fix Day (Sprint 152.5, 2026-04-24)
+## Sprint 152.5 — Hot Fix Day (2026-04-24)
 
 ### Fixed (4 Beta GA launch blockers)
 - **Docker worker GLIBC mismatch (HF1)** — `Dockerfile.worker` base image `node:22-slim` → `node:24-trixie-slim` (Debian 13, glibc 2.41). better-sqlite3 NODE_MODULE_VERSION 137 native binding now loads in container. Memory V2 DB accessible to workers; `deckent://memory`, `deckent://debt`, `deckent://retro` MCP resources populated.
@@ -85,7 +108,7 @@ See `docs/KNOWN_ISSUES.md` for the full list. Highlights: MCP tool count doc dri
 
 ---
 
-## Latest: v1.0.0-beta.1 (2026-04-22) — Beta GA Launch
+## Beta GA Launch (Sprint 150 + 150A, 2026-04-22) — Initial v1.0.0-beta.1 Release
 
 ### Sprint 150 + 150A Hot Fix — Beta GA Cutover
 

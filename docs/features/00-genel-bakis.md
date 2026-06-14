@@ -6,9 +6,12 @@
 
 - **Otonom sprint yönetimi** — DIRECTIVES.md yaz, `deckent start` koş; Brain planlar, Worker'lar yazar, Auditor denetler.
 - **Multi-agent paralel çalışma** — 15 built-in agent + 21 skill, bağımsız görevler aynı anda çalışır.
+- **Autonomous Engine** — tekrarlayan (cron), tek seferlik (one-off) ve reaktif görevler için üç kapılı yönetişimli (RBAC → politika → risk) arka plan motoru.
+- **Memory V2 DB-First** — SQLite FTS5 + Türkçe normalize; `deckent recall/remember` ile geçmiş kararlar ve örüntüler anında sorgulanır.
+- **Nervous System** — proaktif meta-orkestratör: 12 dedektör seti anomali algılar, kabul/red onayıyla Brain'e iletir.
 - **Üç yüz, tek motor** — geliştirici sprint modu, şirket süreç modu, bireysel sohbet modu.
 - **Provider-özgür** — Claude, Codex, Gemini veya yerel Ollama; API anahtarı zorunlu değil.
-- **Sürekli öğrenen** — her sprint sonunda Brain kendi retrosunu okur, routing kararları gelecek sprintleri besler.
+- **Sürekli öğrenen** — her sprint sonunda Brain kendi retrosunu okur, routing kararları ve agent/skill evolution pipeline gelecek sprintleri besler.
 - **MIT, tamamen ücretsiz** — pro/team/enterprise yok; aynı kod bir kişide de 10.000 kişilik şirkette de çalışır.
 
 ## Neden önemli?
@@ -47,7 +50,7 @@ deckent retro
 
 ## Durum
 
-- Olgunluk: ✅ canlı (v1.0.0-beta.1, Sprint 224+, 190+ dogfood sprint geçmişi)
+- Olgunluk: ✅ canlı (v1.0.0-beta.1, Sprint 285+, 285+ dogfood sprint geçmişi)
 - İlgili: ADR-033 · ADR-081 · `src/orchestra/sprint-controller.ts`
 
 ---
@@ -70,8 +73,8 @@ deckent retro
 | 12 | [12-event-stream-observability.md](./12-event-stream-observability.md) | Event stream + 15-kanal protokol |
 | 13 | [13-native-repl-agentic.md](./13-native-repl-agentic.md) | Native agentic REPL (`deckent` argümansız) |
 | 14 | [14-dashboard-control-plane.md](./14-dashboard-control-plane.md) | Web dashboard React+Vite+Tailwind |
-| 15 | [15-mcp-integration.md](./15-mcp-integration.md) | MCP 31+ araç + 8 resource |
-| 16 | [16-cli-commands.md](./16-cli-commands.md) | 49+ CLI komut, CLI/MCP parity |
+| 15 | [15-mcp-integration.md](./15-mcp-integration.md) | MCP 34 araç + 8 resource |
+| 16 | [16-cli-commands.md](./16-cli-commands.md) | 55+ CLI komut, CLI/MCP parity |
 | 17 | [17-evolution-pipeline.md](./17-evolution-pipeline.md) | Agent/Skill evolution + promotion pipeline |
 | 18 | [18-nervous-system.md](./18-nervous-system.md) | Nervous System proaktif meta-orkestratör |
 | 19 | [19-vizyon-yol-haritasi.md](./19-vizyon-yol-haritasi.md) | Trinity vizyon + yol haritası |

@@ -28,11 +28,67 @@ features:
     details: Real-time boundary scanning, heartbeat monitoring, and drift detection. Never let an agent go off-script.
   - icon: 🔌
     title: Multi-Provider
-    details: Claude, OpenAI Codex, and Google Gemini support. Mix providers per task — premium models for complex work, economy for simple tasks.
+    details: Claude, OpenAI Codex, Google Gemini, and Ollama support. Mix providers per task — premium models for complex work, economy for simple tasks.
   - icon: 🛠
     title: Skills System
     details: Extend agents with specialized skills for design, testing, docs, and more. Skills are sandboxed and versioned.
   - icon: 📦
     title: MCP Server
-    details: Full Model Context Protocol server for IDE integration. Works with Claude Desktop, Cursor, and any MCP-compatible editor.
+    details: Full Model Context Protocol server for IDE integration. Works with Claude Desktop and any MCP-compatible editor.
 ---
+
+## Documentation
+
+### Guides
+
+- [Getting Started](guide/getting-started.md)
+- [Installation](guide/installation.md)
+- [Quickstart](guide/quickstart.md)
+- [First Sprint](guide/first-sprint.md)
+- [Concepts](guide/concepts.md)
+- [Autonomous Engine](guide/autonomous-engine.md)
+- [Multi-Provider Fleet](guide/multi-provider-fleet.md)
+- [Docker Backend](guide/docker-backend.md)
+- [Nervous System](guide/nervous-system.md)
+- [Dashboard](guide/dashboard.md)
+- [Chat Mode / REPL](guide/chat-mode.md)
+- [FAQ](guide/faq.md)
+- [Troubleshooting](guide/troubleshooting.md)
+
+### Reference
+
+- [CLI Commands](reference/cli-commands.md)
+- [Configuration](reference/config.md)
+- [MCP Tools](reference/mcp-tools.md)
+- [MCP Resources](reference/mcp-resources.md)
+- [API Endpoints](reference/api-endpoints.md)
+- [Skills](reference/skills.md)
+- [Agents](reference/agents.md)
+- [Multi-Provider](reference/multi-provider.md)
+- [Security](reference/security.md)
+- [Glossary](glossary.md)
+
+### Architecture
+
+- [Architecture Overview](guide/architecture-overview.md)
+- [Agent & Skill Architecture](architecture/agent-skill-architecture.md)
+- [Authority Matrix](architecture/authority-matrix.md)
+- [Memory System](architecture/memory-system.md)
+- [Sprint Lifecycle](architecture/sprint-lifecycle.md)
+- [ADR Index](adr-index.md)
+
+### Cookbook
+
+- [Cookbook Index](cookbook/index.md)
+- [First Sprint](cookbook/01-first-sprint.md)
+- [Multi-Provider Fleet](cookbook/02-multi-provider-fleet.md)
+- [Memory Recall](cookbook/03-memory-recall.md)
+- [Autonomous Mode](cookbook/04-autonomous-mode.md)
+- [Recover a Stuck Sprint](cookbook/09-recover-stuck-sprint.md)
+
+### Features
+
+- [Feature Overview](features/00-genel-bakis.md)
+- [Memory V2](features/05-memory-v2.md)
+- [Dependency Waves](features/09-dependency-waves.md)
+- [Nervous System](features/18-nervous-system.md)

@@ -1,34 +1,106 @@
-# Recover a Stuck Sprint
+# Cookbook: Checkpoints and Approval
 
-Human checkpoints are a crucial mechanism in Deckent for introducing human oversight and approval into the sprint execution flow. This allows you to pause the agentic workflow, review progress, and make critical decisions before the sprint proceeds.
+Human checkpoints are predefined pause points in the sprint workflow where deckent stops and waits for your explicit go-ahead before continuing. They let you review work-in-progress at critical phases without giving up full automation.
 
-## `deckent checkpoint`
+## What Triggers a Checkpoint?
 
-The `deckent checkpoint` command is used to interact with these human checkpoints directly from the CLI.
+Checkpoints are written to `.deckent/checkpoints/checkpoint-{sprintId}-{phase}.json` by Brain during sprint execution when a checkpoint gate is reached. The gate pauses execution until the checkpoint file's `status` field is updated to `approved` or `rejected`.
 
--   **Approve:** When a checkpoint is hit, the sprint pauses, awaiting human input. You can approve the checkpoint, allowing the sprint to continue its execution.
-    ```bash
-    deckent checkpoint approve
-    ```
--   **Reject:** If the state at the checkpoint is not satisfactory, you can reject it. This typically marks the current task or sprint as `NO_GO`, requiring re-evaluation or manual intervention.
-    ```bash
-    deckent checkpoint reject
-    ```
+## Listing Checkpoints
 
-## What is a Checkpoint Gate?
+```bash
+deckent checkpoint list
+```
 
-A checkpoint gate is a predefined point in the sprint workflow where the system automatically pauses and waits for explicit human approval. These are often configured in `DIRECTIVES.md` or within the task definition to ensure critical steps are human-verified.
+Output:
+
+```
+Sprint           Phase     Status   Summary                                    Created
+sprint-286       SPAWN     pending  6 workers spawned, 0 errors                2026-06-14T09:12:44Z
+sprint-285       EVALUATE  approved All tasks GO or GO_WITH_TECH_DEBT          2026-06-13T17:30:01Z
+```
+
+Filter to only pending checkpoints:
+
+```bash
+deckent checkpoint list --pending
+```
+
+Output as JSON (useful for scripting):
+
+```bash
+deckent checkpoint list --json
+```
+
+## Approving a Checkpoint
+
+```bash
+deckent checkpoint approve <sprintId> <phase>
+```
+
+Example:
+
+```bash
+deckent checkpoint approve sprint-286 SPAWN
+# Checkpoint sprint-286/SPAWN approved.
+```
+
+Once approved, Brain resumes execution from the paused phase.
+
+## Rejecting a Checkpoint
+
+```bash
+deckent checkpoint reject <sprintId> <phase>
+```
+
+Example:
+
+```bash
+deckent checkpoint reject sprint-286 SPAWN
+# Checkpoint sprint-286/SPAWN rejected.
+```
+
+Rejection marks the checkpoint as rejected. Brain's FIX/recovery logic then decides whether to retry, escalate, or stop the sprint — depending on the phase and sprint configuration.
+
+## Checkpoint File Format
+
+Stored in `.deckent/checkpoints/`:
+
+```json
+{
+  "phase": "SPAWN",
+  "summary": "6 workers spawned, 0 errors",
+  "status": "pending",
+  "createdAt": "2026-06-14T09:12:44.000Z"
+}
+```
+
+Filename pattern: `checkpoint-{sprintId}-{phase}.json`
+
+Status values: `pending` | `approved` | `rejected`
 
 ## MCP `deckent_checkpoint`
 
-For programmatic interaction, the MCP (Multi-Control Plane) provides the `deckent_checkpoint` tool. This allows external systems or integrated development environments to approve or reject checkpoints, facilitating automation within a broader human-in-the-loop workflow.
+The `deckent_checkpoint` MCP tool provides the same operations for IDE integrations and external automation:
 
-```typescript
-// Example MCP call to approve a checkpoint
-deckent_checkpoint({ action: 'approve' });
+```
+# List checkpoints
+deckent_checkpoint({ action: "list" })
+deckent_checkpoint({ action: "list", filter: "pending" })
 
-// Example MCP call to reject a checkpoint
-deckent_checkpoint({ action: 'reject', reason: 'Review failed' });
+# Approve
+deckent_checkpoint({ action: "approve", sprintId: "sprint-286", phase: "SPAWN" })
+
+# Reject
+deckent_checkpoint({ action: "reject", sprintId: "sprint-286", phase: "SPAWN" })
 ```
 
-For more details on specific flags and advanced usage, refer to `deckent help checkpoint`.
+## Workflow Example
+
+1. A sprint starts and hits a checkpoint gate at the `SPAWN` phase.
+2. Execution pauses. Brain logs the checkpoint and waits.
+3. You review the spawned workers: `deckent status --json | jq '.workers'`.
+4. Everything looks good — approve: `deckent checkpoint approve sprint-286 SPAWN`.
+5. Brain resumes the `EXECUTE` phase automatically.
+
+If something is wrong, reject instead. Brain interprets the rejection and either retries, requests a FIX, or surfaces a `NO_GO` result for the sprint.

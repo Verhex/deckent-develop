@@ -33,10 +33,10 @@ yüksek rakamlar doğrulanamadı — büyük olasılıkla başka bir ürünle ka
 | Kategori | Sistemler | deckent ilişkisi |
 |---|---|---|
 | **Multi-agent orkestrasyon ÜRÜNÜ** (kullanıma hazır, sprint/ekip yöneten) | **🟢 deckent** | Bizim kategori |
-| Otonom kodlama agent platformu | 🟢 OpenHands, Devin, SWE-agent | En yakın fonksiyonel rakipler |
+| Otonom kodlama agent platformu | 🟢 OpenHands, SWE-agent ve benzeri otonom platformlar | En yakın fonksiyonel rakipler |
 | Genel-amaçlı otonom agent | 🟢 Hermes-Agent, AutoGPT | Mimari benzer, alan farklı |
 | Multi-agent **framework** (kütüphane, ürün değil) | 🟢 LangGraph, CrewAI, AutoGen/AG2, MetaGPT | Bizim altımızdaki katman |
-| Tek-agent kodlama asistanı | 🟢 Aider, goose, Cline, Claude Code, Cursor | deckent'in spawn ettiği worker'lar bunlar olabilir |
+| Tek-agent kodlama asistanı | 🟢 goose, Cline ve benzeri tek-agent araçlar | deckent'in spawn ettiği worker'lar bunlar olabilir |
 | Kişisel AI asistanı (kod değil) | 🟢 OpenClaw | Komşu kategori, rakip değil |
 
 **Ana içgörü:** deckent bir "AI kodlama asistanı" değil, **"AI geliştirme-ekibi yöneticisi / orkestratör ÜRÜNÜ"**.
@@ -47,41 +47,41 @@ framework (kendin kur) ya da tek-agent asistan.
 
 ## 2. Tam Karşılaştırma Matrisi (özellik bazlı)
 
-| Boyut | **deckent** ⚪ | Hermes-Agent 🟢 | OpenHands 🟢 | goose 🟢 | Aider 🟢 | LangGraph 🟡 | CrewAI/AutoGen 🟡 | Devin 🟡 |
-|---|---|---|---|---|---|---|---|---|
-| **Kategori** | Multi-agent orkestrasyon ürünü | Genel otonom agent | Otonom kod platformu | Tek-agent asistan | Tek-agent pair-prog | Framework | Framework | Kapalı otonom SWE |
-| **Mimari** | Brain–Auditor–Worker (planner/worker ayrık, hiyerarşik) | Tek ana agent + izole subagent'lar | Multi-trajectory + neural critic | Tek-agent (desktop+CLI) | Tek-agent | Directed-graph state machine | Rol-bazlı / konuşma-bazlı | Tek otonom agent |
-| **Sprint/yaşam-döngüsü** | ✅ 8-faz (PLAN→…→CLEANUP) **eşsiz** | ❌ | ❌ (görev-bazlı) | ❌ | ❌ | ⚠️ graph akışı (sprint değil) | ❌ | ❌ |
-| **Provider bağımsızlığı** | ✅ Claude/Codex/Gemini + fallback + tier denkliği | ✅✅ 200+ model (OpenRouter, NIM, OpenAI…) | ✅ model-agnostik | ✅✅ 15+ provider + Ollama | ✅ Claude/OpenAI/DeepSeek/local | ✅ (framework) | ✅ | ❌ kapalı |
-| **Lokal model** | ⚠️ kısmi (foundation aşaması) | ✅ | ✅ (Ollama) | ✅ (Ollama) | ✅ | ✅ | ✅ | ❌ |
-| **Lisans** | MIT (no-gate) | **MIT** | **MIT** (enterprise/ ayrı) | **Apache 2.0** | Apache 2.0 | MIT + paid platform | MIT/açık | Kapalı/ticari |
-| **Olgunluk** | ⚪ pre-beta, ~0 dış kullanıcı, 229 sprint | 🟢 aktif | 🟢🟢 çok yüksek (~50k★ sınıfı) | 🟢🟢 **46.5k★**, 137 release, Linux Foundation | 🟢🟢 yüksek (~30k★+) | 🟢🟢 çok yüksek | 🟢🟢 çok yüksek | 🟢 ticari, finanse |
-| **Kalıcı hafıza** | ✅✅ SQLite **FTS5** + 9 tip + decay + i18n normalize | ✅ **FTS5** oturum arama + LLM özet + agent-curated | ⚠️ session/event | ⚠️ session | ⚠️ git geçmişi + repo map | ✅ Checkpointer (DB) | ⚠️ değişken | ⚠️ kapalı |
-| **Human-in-the-loop** | ✅ checkpoint CLI/MCP + confirm-gate | ⚠️ | ✅ | ✅ | ✅✅ (her commit onayı) | ✅✅ breakpoints + time-travel | ⚠️ | ⚠️ |
-| **Scope/sandbox/RBAC** | ✅ scope.filesWrite + Auditor + ADR-037 RBAC (V1 advisory) | ⚠️ subagent izolasyonu | ✅ Docker sandbox | ⚠️ | ⚠️ git-diff | ❌ (framework sorumlu) | ❌ | ✅ bulut sandbox |
-| **MCP desteği** | ✅✅ **server (32 tool/8 resource) + client** (S229) | ⚠️ | ✅ consumer | ✅ consumer (70+ ext) | ⚠️ | ✅ | ⚠️ | ⚠️ |
-| **SWE-Bench görünürlüğü** | ❌ yok | ⚠️ | ✅✅ **66.4% Verified** (SOTA iddiası) | ⚠️ | 🟡 tarihsel skorlar | n/a | n/a | 🟡 tanıtım skorları |
-| **Benzersiz farklılaştırıcı** | Sprint orkestrasyon + evrimleşen agent/skill + yapısal hafıza | 200+ model + agent-curated memory | SOTA benchmark + critic model | Linux Foundation + dev deneyimi | Git-native, basitlik | Production state-machine | Çoklu-agent desenleri | "İlk AI yazılım mühendisi" markası |
+| Boyut | **deckent** ⚪ | Hermes-Agent 🟢 | OpenHands 🟢 | goose 🟢 | LangGraph 🟡 | CrewAI/AutoGen 🟡 |
+|---|---|---|---|---|---|---|
+| **Kategori** | Multi-agent orkestrasyon ürünü | Genel otonom agent | Otonom kod platformu | Tek-agent asistan | Framework | Framework |
+| **Mimari** | Brain–Auditor–Worker (planner/worker ayrık, hiyerarşik) | Tek ana agent + izole subagent'lar | Multi-trajectory + neural critic | Tek-agent (desktop+CLI) | Directed-graph state machine | Rol-bazlı / konuşma-bazlı |
+| **Sprint/yaşam-döngüsü** | ✅ 8-faz (PLAN→…→CLEANUP) **eşsiz** | ❌ | ❌ (görev-bazlı) | ❌ | ⚠️ graph akışı (sprint değil) | ❌ |
+| **Provider bağımsızlığı** | ✅ Claude/Codex/Gemini + fallback + tier denkliği | ✅✅ 200+ model (OpenRouter, NIM, OpenAI…) | ✅ model-agnostik | ✅✅ 15+ provider + Ollama | ✅ (framework) | ✅ |
+| **Lokal model** | ⚠️ kısmi (foundation aşaması) | ✅ | ✅ (Ollama) | ✅ (Ollama) | ✅ | ✅ |
+| **Lisans** | MIT (no-gate) | **MIT** | **MIT** (enterprise/ ayrı) | **Apache 2.0** | MIT + paid platform | MIT/açık |
+| **Olgunluk** | ⚪ pre-beta, ~0 dış kullanıcı, 285+ sprint | 🟢 aktif | 🟢🟢 çok yüksek (~50k★ sınıfı) | 🟢🟢 **46.5k★**, 137 release, Linux Foundation | 🟢🟢 çok yüksek | 🟢🟢 çok yüksek |
+| **Kalıcı hafıza** | ✅✅ SQLite **FTS5** + 9 tip + decay + i18n normalize | ✅ **FTS5** oturum arama + LLM özet + agent-curated | ⚠️ session/event | ⚠️ session | ✅ Checkpointer (DB) | ⚠️ değişken |
+| **Human-in-the-loop** | ✅ checkpoint CLI/MCP + confirm-gate | ⚠️ | ✅ | ✅ | ✅✅ breakpoints + time-travel | ⚠️ |
+| **Scope/sandbox/RBAC** | ✅ scope.filesWrite + Auditor + ADR-037 RBAC (V1 advisory) | ⚠️ subagent izolasyonu | ✅ Docker sandbox | ⚠️ | ❌ (framework sorumlu) | ❌ |
+| **MCP desteği** | ✅✅ **server (34 tool/8 resource) + client** | ⚠️ | ✅ consumer | ✅ consumer (70+ ext) | ✅ | ⚠️ |
+| **SWE-Bench görünürlüğü** | ❌ yok | ⚠️ | ✅✅ **66.4% Verified** (SOTA iddiası) | ⚠️ | n/a | n/a |
+| **Benzersiz farklılaştırıcı** | Sprint orkestrasyon + evrimleşen agent/skill + yapısal hafıza | 200+ model + agent-curated memory | SOTA benchmark + critic model | Linux Foundation + dev deneyimi | Production state-machine | Çoklu-agent desenleri |
 
 ---
 
 ## 3. Puan Matrisi + Eski Rapora Göre DELTA
 
-Eski (27 Mart) raporun 1–5 skala matrisi yeni rakiplerle genişletildi. **🆕 = yeni eksen/rakip.**
+Eski (27 Mart) raporun 1–5 skala matrisi yeni sistemlerle genişletildi. **🆕 = yeni eksen/sistem.**
 
-| Boyut | deckent | Hermes 🆕 | OpenHands 🆕 | goose 🆕 | Aider | LangGraph 🆕 | OpenClaw* |
-|---|---|---|---|---|---|---|---|
-| Kurulum kolaylığı | 3 | 4 | 4 | 5 | 4 | 3 | 4 |
-| **Sprint/orkestrasyon** | **5** | 2 | 3 | 1 | 1 | 3 | 1 |
-| Multi-agent yönetimi | 4 | 3 | **5** | 1 | 1 | 4 | 2 |
-| Öğrenme/memory | **4** | **4** ⚠️ *yakın tehdit* | 2 | 2 | 1 | 4 | 2 |
-| Provider bağımsızlığı 🆕 | 4 | **5** | 4 | **5** | 4 | 4 | 3 |
-| MCP entegrasyonu 🆕 | **5** | 2 | 4 | 4 | 1 | 3 | 1 |
-| Plugin/skill ekosistemi | 2 | 3 | 4 | **5** | 2 | 4 | 3 |
-| Community/adoption | **1** | 3 | **5** | **5** | 4 | **5** | 3 |
-| Benchmark görünürlüğü 🆕 | **1** | 2 | **5** | 3 | 3 | n/a | 1 |
-| Enterprise readiness | **1** | 2 | 4 | 4 | 2 | 4 | 2 |
-| Dokümantasyon | 2 | 3 | 4 | **5** | 4 | **5** | 4 |
+| Boyut | deckent | Hermes 🆕 | OpenHands 🆕 | goose 🆕 | LangGraph 🆕 | OpenClaw* |
+|---|---|---|---|---|---|---|
+| Kurulum kolaylığı | 3 | 4 | 4 | 5 | 3 | 4 |
+| **Sprint/orkestrasyon** | **5** | 2 | 3 | 1 | 3 | 1 |
+| Multi-agent yönetimi | 4 | 3 | **5** | 1 | 4 | 2 |
+| Öğrenme/memory | **4** | **4** ⚠️ *yakın tehdit* | 2 | 2 | 4 | 2 |
+| Provider bağımsızlığı 🆕 | 4 | **5** | 4 | **5** | 4 | 3 |
+| MCP entegrasyonu 🆕 | **5** | 2 | 4 | 4 | 3 | 1 |
+| Plugin/skill ekosistemi | 2 | 3 | 4 | **5** | 4 | 3 |
+| Community/adoption | **1** | 3 | **5** | **5** | **5** | 3 |
+| Benchmark görünürlüğü 🆕 | **1** | 2 | **5** | 3 | n/a | 1 |
+| Enterprise readiness | **1** | 2 | 4 | 4 | 4 | 2 |
+| Dokümantasyon | 2 | 3 | 4 | **5** | **5** | 4 |
 
 \* OpenClaw farklı kategori — referans için bırakıldı.
 
@@ -100,7 +100,7 @@ Eski (27 Mart) raporun 1–5 skala matrisi yeni rakiplerle genişletildi. **🆕
 - **deckent'in üstünlüğü:** Hermes "tek agent subagent spawn eder"; deckent **kalıcı rol ayrımı** (Brain planlar, Worker uygular, Auditor denetler) + **sprint yaşam döngüsü** + **ADR yönetişimi**. Hermes'te sprint/evaluate/retro/decay döngüsü yok.
 - **deckent'in zayıfı:** Hermes'in model genişliği (200+) ve hafıza paritesi "eşsiz" anlatımızı zayıflatıyor.
 
-### 🥈 OpenHands (eski OpenDevin) — en güçlü kod-otonomi rakibi 🟢
+### 🥈 OpenHands — en güçlü kod-otonomi rakibi 🟢
 - **Neden tehlikeli:** **%66.4 SWE-Bench Verified** (ölçülebilir kanıt), multi-trajectory + neural critic, MIT, SDK/API/micro-agent ile orkestrasyon, devasa topluluk. **Bizim ölçemediğimizi ölçüyor.**
 - **deckent'in üstünlüğü:** OpenHands görev-bazlı; deckent **sprint-bazlı çok-task ekip yönetimi** + yapısal hafıza + ADR yönetişimi. Onlar "bir görevi en iyi çözen agent", biz "bir projeyi yöneten ekip".
 - **deckent'in zayıfı:** **Benchmark görünürlüğü sıfır.** "Ölçemediğin şeyi satamazsın" — en kritik açık.
@@ -138,7 +138,7 @@ sprint-orkestrasyon motoruna** sahip, ama bir **laboratuvar projesi** — risk t
 **Mart'tan beri değişen üç gerçek:**
 1. **Hendekler daraldı** — Hermes hafıza paritesi getirdi, goose/OpenHands toplulukla ezici geldi. "Eşsiz memory" artık savunma değil.
 2. **Yeni hendek açıldı** — MCP server+client çift yönlülüğü gerçek bir farklılaştırıcı oldu.
-3. **Konumlandırma netleşmeli** — deckent'i tek-agent asistanlarla (Aider/goose) DEĞİL, **orkestrasyon ürünü** olarak konumla. "AI agent" değil **"AI development team manager"**.
+3. **Konumlandırma netleşmeli** — deckent'i tek-agent asistanlarla DEĞİL, **orkestrasyon ürünü** olarak konumla. "AI agent" değil **"AI development team manager"**.
 
 **En kritik 3 aksiyon (öncelik):**
 1. **Public + ilk 100 kullanıcı** (Mart'tan beri #1, değişmedi).
@@ -151,7 +151,6 @@ sprint-orkestrasyon motoruna** sahip, ama bir **laboratuvar projesi** — risk t
 
 | Sistem | Kaynak |
 |---|---|
-| Aider | https://aider.chat/ · https://github.com/Aider-AI/aider |
 | Hermes-Agent | https://github.com/nousresearch/hermes-agent |
 | OpenClaw | https://github.com/openclaw/openclaw |
 | OpenHands | https://github.com/OpenHands/OpenHands · https://www.openhands.dev/ · .../blog/sota-on-swe-bench-verified-with-inference-time-scaling-and-critic-model |

@@ -83,6 +83,33 @@ Every permission exercise is recorded in the event stream (`.deckent/sprint-NNN-
 ### Fail-Closed
 **Design goal:** if a permission check fails or is ambiguous → access denied; explicit allow lists, implicit deny. **Current implementation (V1.0):** soft-mode — a failed check is logged + event-emitted but the action still proceeds (see the enforcement-reality note at the top). Fail-closed blocking is the post-GA V2 target.
 
+### Safety Floor — 5 Locked Actions
+
+The following 5 actions are **permanently locked** — they require explicit user approval (`'approve'` policy) in **every mode**, including `full-auto`. They cannot be bypassed by any config override or user override. Defined in `src/nervous/authority-matrix.ts:24-30`.
+
+| Action ID | Description |
+|---|---|
+| `KILL_LIVE_SPRINT` | Kill an active sprint and its workers |
+| `MANUAL_FILE_DELETE` | Manually delete files outside task scope |
+| `COST_OVER_THRESHOLD` | Execute actions that exceed the configured cost gate |
+| `DESTRUCTIVE_GIT` | Destructive git operations (force-push, reset --hard, branch -D) |
+| `ADR_DEPRECATE_ACCEPTED` | Deprecate or remove an already-accepted ADR |
+
+These 5 actions form the `SAFETY_FLOOR` constant (`ReadonlyArray<SafetyFloorAction>`) and are checked before any policy resolution in `resolvePolicy()`. When `isSafetyFloor: true`, the policy is always `'approve'` regardless of the active matrix preset.
+
+### Advisory Default / Hard Opt-In (ENT-1)
+
+The base enforcement model for role-based worker authority is **advisory** (soft mode, backward-safe). To opt into **hard enforcement** (actual blocking on capability violations), set the `enforce_rbac` key to `true` in `.deckent/config.json`:
+
+```json
+{ "enforce_rbac": true }
+```
+
+- **Advisory mode (default, `enforce_rbac: false`):** A role-denied capability emits a `WorkerAuthorityViolation` event and logs a warning, but the action proceeds (`allowed: true`).
+- **Hard mode (`enforce_rbac: true`):** A role-denied capability returns `allowed: false` — the action is hard-blocked.
+
+Config key constant: `ENFORCE_RBAC_CONFIG_KEY = 'enforce_rbac'` (`src/nervous/authority-matrix.ts:196`).
+
 ---
 
 ## 3. Full Authority Matrix Table
@@ -279,6 +306,30 @@ Every Worker's allowed paths come from its task JSON:
 ```
 
 The `isWithinScope()` function in `src/agents/worker.ts` *computes* whether a path is in scope (symlink-aware, see ADR-034). It is a pure boolean predicate: it does **not** throw or block. The wrapper `checkWorkerAuthority()` warns + emits an `AUTHORITY_VIOLATION` event on an out-of-scope write but then `return true` (the write proceeds — V1.0 soft mode). Boundary observance therefore relies on worker discipline (honest BOUNDARY_VIOLATION → NO_GO self-flag) plus Auditor advisory monitoring, not a runtime block.
+
+### Worker Role Taxonomy (ENT-1)
+
+Beyond the Brain/Auditor/Worker separation, workers themselves have a **role taxonomy** that controls which capabilities their task may exercise. This is the ENT-1 layer (`src/nervous/authority-matrix.ts:187-320`).
+
+#### Roles
+
+| Role | Capabilities | Typical Use |
+|---|---|---|
+| `admin` | All capabilities (full trust) | CI/CD pipelines, privileged ops |
+| `engineer` | All except `erp-write` and `tenant-scope` | Standard development tasks |
+| `viewer` | `fs-read`, `db-query`, `erp-read` only | Read-only analysis, audits |
+
+Role → capability mapping is defined in `ROLE_CAPABILITY_MAP` (`src/nervous/authority-matrix.ts:210-221`). The `admin` role has all 13 capabilities; `engineer` has 11 (excludes enterprise-admin caps); `viewer` has 3 (read-only).
+
+#### Authority Check
+
+`checkWorkerAuthority(request, matrix, opts)` validates that the worker's `actor.role` allows the requested capabilities:
+- Returns `{ allowed: boolean, level: 'permit' | 'warn' | 'deny', ... }`
+- `level: 'permit'` — all capabilities allowed
+- `level: 'warn'` — violation detected, advisory (soft mode)
+- `level: 'deny'` — violation detected, hard-blocked (when `enforce_rbac: true`)
+
+Missing/unknown actor role defaults to `allow-all` (backward-compatible permissive default).
 
 ---
 
@@ -552,9 +603,9 @@ Mitigations below state the design intent; in V1.0 the scope/path mitigations ar
 | Add new role (e.g., Notifier, Scheduler) | New ADR superseding ADR-037 |
 | Change event channel rights | ADR-035 + ADR-037 updated together |
 
-### Evolution History (current sprint: 186)
+### Evolution History (current sprint: 286)
 
-> These milestones were written as future plans at Sprint 138. Sprint 186 is now
+> These milestones were written as future plans at Sprint 138. Sprint 286 is now
 > active; the items below are historical.
 
 | Sprint | Scope | Status |

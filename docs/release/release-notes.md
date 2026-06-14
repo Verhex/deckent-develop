@@ -1,56 +1,96 @@
-# Deckent v0.2.0-beta.1 — Release Notes
+# Deckent v1.0.0-beta.1 — Release Notes
 
-**Release Date:** 2026-03-24
-**Status:** Beta — ready for tester evaluation
+**Release Date:** 2026-05-01
+**Status:** Public Beta
+**Node.js Requirement:** >= 24.0.0
 
 ---
 
 ## What's New
 
-Deckent is an AI agent orchestration CLI that coordinates multiple AI agents (Claude, Codex, Gemini) to execute software engineering tasks in parallel. This beta release marks the first externally testable version after 65 development sprints.
+Deckent is an AI agent orchestration CLI that coordinates multiple AI agents (Claude, Codex, Gemini, Ollama) to execute software engineering tasks in parallel. v1.0.0-beta.1 marks the first public beta after 200+ development sprints, bringing enterprise-grade orchestration, Memory V2 DB-first architecture, the Nervous System meta-orchestrator, and the Autonomous engine to the wider community.
 
-### Multi-Provider Support
-- **3 AI Providers**: Claude (via tmux/subprocess), OpenAI Codex, and Google Gemini
-- **Automatic Fallback**: If a provider fails, tasks route to the next available provider
-- **Model Equivalence**: Tier-based mapping ensures tasks use the right model class regardless of provider
-- **Per-Provider Config**: Separate API keys, endpoints, and model preferences per provider
-- **Subprocess Mode**: Claude adapter supports `claude_backend: 'subprocess'` for tmux-free operation
+---
+
+## Core Capabilities
 
 ### Orchestration Engine
-- **Brain Orchestrator**: 8-phase sprint lifecycle (PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → CLEANUP)
-- **AI Task Planning**: Zod-validated AI planner with structured fallback (3 modes: ai/structured/auto)
-- **Parallel Execution**: Dependency-aware task waves with topological sort
-- **GO/NO-GO Evaluation**: Every task result evaluated with tech debt tracking and cross-dependency resolution
-- **Language-Agnostic Verify Loop**: Worker verification runs tsc + vitest across any stack (TypeScript/Python/Go/Rust)
-- **Rich Sprint Output**: 7-section formatted summary with agent performance table, git diff stats, and learnings
+- **Brain Orchestrator:** 8-phase sprint lifecycle (PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → CLEANUP)
+- **Dependency-Pipeline Waves:** Kahn's topological sort — tasks run in dependency-aware parallel waves
+- **GO/NO-GO Evaluation:** Every result scored across correctness, coverage, scope compliance, and documentation
+- **Quality Assessor:** Multi-dimensional rubric scoring per task
+- **FIX Phase:** Failed tasks automatically retried with enriched context
 
-### Secret & Environment Management
-- **.deck Secret System**: Encrypted local secrets file for API keys (`DECKENT_OPENAI_API_KEY`, `DECKENT_GOOGLE_API_KEY`, `DECKENT_CLAUDE_API_KEY`)
-- **Multi-Environment Init**: `deckent init` detects your environment (VSCode, Cursor, Codex, Gemini CLI) and creates the appropriate context file (CLAUDE.md / AGENTS.md / GEMINI.md / .cursor/rules/)
-- **Environment Auto-Detection**: Detects vscode, cursor, codex, gemini, shell, and CI environments automatically
-- **Worker Env Injection**: Secrets passed to subprocess workers only for the required key — not full .deck contents
+### Multi-Provider Fleet
+- **4 Providers:** Claude (Docker/tmux/subprocess), OpenAI Codex, Google Gemini, Ollama (local)
+- **13 Models / 4 Tiers:** premium_plus → premium → standard → economy — single `ModelRegistry` source of truth
+- **Provider-Agnostic Config:** `brain_tier` / `worker_tier` instead of model names
+- **Mixed-Fleet Sprints:** Per-task provider override — some tasks on Claude, others on Gemini in the same sprint
+- **OpenAI-Compatible HTTP Adapter:** Any OpenAI-compatible endpoint as a provider
+
+### Memory V2 — DB-First Architecture
+- **SQLite FTS5:** Single source of truth for all brain knowledge (ADRs, patterns, learnings, debt)
+- **Dual-Layer i18n Search:** Turkish normalize (TR/EN/DE — 100% recall) via `deckent recall "query"`
+- **96% Context Reduction:** From flat Markdown files to compact DB-driven exports
+- **Auto-Query:** Task DNA → relevant ADRs and past learnings automatically injected at PLAN/SPAWN/EVALUATE
+
+### Nervous System (ADR-040)
+- **Proactive Meta-Orchestrator:** 12 detectors observe sprint state and surface proposals
+- **Authority Matrix:** Safety floor — 5 locked actions require explicit human consent
+- **Decision Engine:** Proposals ranked by risk, confidence, and authority level
+- **MCP Integration:** `deckent_nervous_subscribe/accept/reject/status/config` tools
+
+### Autonomous Engine
+- **Backlog Types:** `task | sprint | capability` entries with `pending/running/parked/done/failed` lifecycle
+- **Trigger Modes:** `recurring` (cron), `one-off`, `reactive` (detector-driven)
+- **3-Gate Governance:** RBAC → policy → risk assessment before dispatch
+- **CLI:** `deckent autonomous status/stop/backlog add`
 
 ### Agent & Skill System
-- **8 Built-in Agents**: security-auditor, test-writer, doc-writer, code-reviewer, refactorer, bug-fixer, api-builder, performance-analyzer
-- **10 Built-in Skills**: typescript-expert, react-specialist, python-expert, api-builder, database-migration, testing-expert, documentation-writer, security-specialist, performance-optimizer, devops-engineer
-- **Skill Marketplace**: Registry client with search, publish, and rating system
-- **Auto-Detection**: Project stack detection (TypeScript/React/Python/Rust/Go/Docker) with agent+skill auto-selection
+- **15 Built-in Agents:** security-auditor, doc-writer, bug-fixer, code-reviewer, refactorer, api-builder, performance-analyzer, ci-guardian, architect, architecture-planner, accessibility-auditor, data-engineer, devops-engineer, frontend-designer, migration-specialist
+- **21 Built-in Skills:** typescript-expert, testing-expert, documentation-writer, security-specialist, performance-optimizer, api-builder, devops-engineer, database-migration, react-specialist, python-expert, ci-testing, accessibility-expert, anthropic-sdk, code-simplifier, docker-expert, frontend-design, git-expert, graphql-expert, migration-expert, monorepo-expert, system-architect
+- **Evolution Pipeline:** Agent/skill promote/demote based on outcome tracking and synergy matrix
 
-### Developer Experience
-- **Human-Friendly Output**: Colored CLI status, doctor health check, error messages with suggestions, worker progress logs
-- **Web Dashboard**: React+Vite+Tailwind dashboard with real-time SSE updates at localhost:3100
-- **MCP Integration**: 16 MCP tools + 9 resources for IDE integration (Cursor, Claude Code)
-- **Interactive Review**: `deckent review` for per-task approve/reject/retry
-- **Notification System**: Terminal bell, webhook, Discord, and Slack notifications
-- **Provider Health Doctor**: `deckent doctor` now shows per-provider CLI version, auth status, and install hints
+### Docker Backend (Default)
+- **Container Isolation:** Each worker runs in its own Docker container
+- **Graceful Shutdown:** SIGTERM + fsync handler, 15s grace period
+- **Atomic Heartbeat Writes:** `atomicWriteFileSync` prevents partial HB corruption
+- **Configurable:** `spawn_backend: docker | tmux | subprocess` per worker or globally
 
-### Security & Reliability
-- **Timing-Safe Auth**: Constant-time token comparison (prevents timing attacks)
-- **Credential Redaction**: Automatic masking of API keys and secrets in logs
-- **Skill Sandbox**: AST-based static analysis to detect unsafe code (eval, Function, child_process)
-- **Plugin System**: Install lifecycle with rollback and runtime hooks
-- **Subprocess Fallback**: tmux-free operation via child_process backend
-- **Connector Health Tracking**: Provider health status tracked via Connector module; unhealthy providers still registered with warning
+### MCP Integration — 34 Tools / 8 Resources
+Full Claude Code / Cursor integration via MCP server (`npx deckent-mcp`):
+- Sprint lifecycle: `deckent_init`, `deckent_plan`, `deckent_start`, `deckent_status`, `deckent_review`, `deckent_retro`, `deckent_cleanup`
+- Memory: `deckent_memory_query` — cross-source FTS5 search
+- Nervous System: `deckent_nervous_subscribe/accept/reject/status/config`
+- Autonomous: `deckent_autonomous` (status/stop/backlog)
+- Utilities: `deckent_doctor`, `deckent_history`, `deckent_checkpoint`, `deckent_recover`, `deckent_models`, `deckent_watch`
+
+### Web Dashboard — 16 Pages
+React + Vite + Tailwind dashboard at `deckent serve`:
+Dashboard, Chat, Config, Debt, Directives, Enterprise, Evolution, History, Memory, MemoryExplorer, Nervous, Settings, Status, Workers, Login, Callback
+
+### Native REPL (Experimental)
+- Argless `deckent` launches an Ink-based interactive REPL
+- Agentic tool-use via `<deckent_tool>` protocol
+- Approval modes: suggest / auto-edit / full-auto
+- Native-agent mode is flag-gated (`DECKENT_NATIVE_AGENT=1` or `--native`), default OFF
+
+### CLI — 55+ Commands
+```bash
+deckent init          # Initialize project
+deckent plan          # Plan sprint (ai|structured|auto)
+deckent start         # Execute sprint
+deckent status        # Live status (--watch)
+deckent review        # GO/NO-GO evaluation
+deckent retro         # Retrospective
+deckent recall "q"    # Memory FTS5 search
+deckent remember "n"  # Save a memory entry
+deckent autonomous    # Autonomous engine management
+deckent serve         # Web dashboard + API server
+deckent doctor        # System health check
+deckent checkpoint    # Approve/reject a checkpoint
+deckent recover       # Recover a stuck sprint
+```
 
 ---
 
@@ -58,51 +98,33 @@ Deckent is an AI agent orchestration CLI that coordinates multiple AI agents (Cl
 
 | Metric | Value |
 |--------|-------|
-| Total Sprints | 65 |
-| Test Count | 11,862 |
-| Test Files | 469 |
-| Code Coverage | 96%+ |
-| CLI Commands | 34+ |
-| MCP Tools | 16 |
-| MCP Resources | 9 |
-| Built-in Agents | 8 + ci-guardian |
-| Built-in Skills | 10 + ci-testing |
-| Supported Providers | 3 (Claude, Codex, Gemini) |
-| Supported Platforms | macOS, Linux, WSL2 |
-| Runtime Dependencies | 1 (commander) |
-
-### New Since Sprint 048
-
-- **CI Guardian Agent** (Sprint 062): ci-guardian agent + ci-testing skill with beforeSprint/afterTask/afterSprint hooks
-- **Routing v2 Engine** (Sprint 063): Intent-based 3-layer agent/skill selection with learning feedback
-- **forceSkills/forceModel** (Sprint 063): DIRECTIVES can specify skills and model per task
-- **CLI Deep Analysis** (Sprint 055-065): 158 improvement opportunities identified and systematically resolved
-- **Config AutoMigrate** (Sprint 065): loadConfig() auto-runs needsMigration + migrateConfig
-- **AI Planner Timeout** (Sprint 065): Configurable ai_planner_timeout in config
-- **History Trend** (Sprint 065): Last 5 sprint success rate/coverage trend analysis
-- **Retro Archiving** (Sprint 065): RETRO.md auto-archived before overwrite
-
-### Sprint NO_GO Trend (Last 5 Sprints)
-
-| Sprint | NO_GO Rate | Notes |
-|--------|-----------|-------|
-| Sprint 061 | 0% | 8/8 tasks done, agent assignment fix |
-| Sprint 062 | 0% | 8/8 tasks done, ci-guardian system |
-| Sprint 063 | 50% | 7/14 done, routing v2 + complex scope |
-| Sprint 064 | 100% | Duplicate work validation (all already done) |
-| Sprint 065 | 0% | 7/7 tasks done, final CLI improvements |
+| Version | 1.0.0-beta.1 |
+| Sprints (dogfood) | 285+ |
+| Tests | 20,668+ |
+| Coverage | 88.58% |
+| CLI Commands | 55+ |
+| MCP Tools | 34 |
+| MCP Resources | 8 |
+| Built-in Agents | 15 |
+| Built-in Skills | 21 |
+| Dashboard Pages | 16 |
+| Providers | 4 (Claude, Codex, Gemini, Ollama) |
+| Models | 13 across 4 tiers |
+| Spawn Backends | 3 (Docker default, tmux, subprocess) |
+| Platforms | macOS, Linux, WSL2 |
 
 ---
 
 ## Getting Started
 
 ### Prerequisites
-- Node.js >= 18
+- Node.js >= 24.0.0
 - git
-- At least one AI provider configured:
-  - **Claude**: `claude` CLI installed and authenticated
-  - **Codex** (optional): `codex` CLI installed with `OPENAI_API_KEY`
-  - **Gemini** (optional): `GOOGLE_API_KEY` set
+- At least one AI provider:
+  - **Claude:** `claude` CLI installed and authenticated (Docker backend recommended)
+  - **Codex:** `OPENAI_API_KEY` environment variable
+  - **Gemini:** `GOOGLE_API_KEY` environment variable
+  - **Ollama:** Ollama running locally (REPL/chat; sprint-worker support is partial)
 
 ### Install
 ```bash
@@ -117,14 +139,11 @@ deckent init
 # Check system health
 deckent doctor
 
-# Set sprint directives
-deckent set-directives "Add user authentication with JWT tokens"
+# Set sprint goals
+deckent set-directives
 
-# Plan the sprint (preview tasks before execution)
+# Plan the sprint
 deckent plan --mode auto
-
-# Review the plan
-deckent status
 
 # Execute the sprint
 deckent start
@@ -132,74 +151,64 @@ deckent start
 # Watch progress in real-time
 deckent status --watch
 
-# View retrospective after completion
+# Review results
+deckent review
+
+# Read the retrospective
 deckent retro
 ```
 
 ### MCP Integration
-Deckent auto-registers as an MCP server. After `deckent init`, your IDE (Cursor, Claude Code) can use:
-- `deckent_status` — Sprint status
-- `deckent_plan` — Plan a sprint
-- `deckent_start` — Start execution (background job)
-- `deckent_doctor` — Health check
-- `deckent_history` — Sprint history
+Register as an MCP server and use Deckent from Claude Code or Cursor:
+```bash
+claude mcp add deckent -- npx deckent-mcp
+```
+
+---
+
+## Notable Improvements Since Beta Start
+
+- **Memory V2:** SQLite FTS5 replaces flat Markdown — 96% context reduction, instant semantic search
+- **Dependency-Pipeline Waves:** Kahn's topological sort enables true parallel wave execution
+- **Nervous System:** 12-detector proactive meta-orchestrator with authority matrix
+- **Autonomous Engine:** Cron/one-off/reactive backlog with 3-gate governance
+- **ADR Governance:** 89 accepted ADRs, mandatory constraint enforcement in all agents
+- **Evolution Pipeline:** Agent/skill performance tracking → promote/demote → adaptive routing
+- **Docker Backend:** Default spawn backend with full isolation and graceful shutdown
+- **RBAC V1.0 (ADR-037):** Brain-Auditor-Worker authority matrix, advisory enforcement
+- **Brain Self-Update (ADR-046):** Brain updates its own rules from sprint outcomes
+- **Worker Prompt God-Level:** Full ADR injection, Karpathy 4-discipline anchor, idempotency keys
+- **Disk-Verify Gate:** 7 synthetic NO_GO source paths now verify disk evidence before flagging
+- **Embedded Web Terminal (ADR-062):** VSCode-style PTY terminal panel in dashboard
 
 ---
 
 ## Known Limitations
 
 ### Provider Support
-- **Gemini adapter**: Full API verification deferred — integration tests skip if `gemini` CLI not installed. Real API calls may need adjustment.
-- **Codex adapter**: CLI integration implemented but tested with limited real Codex CLI instances. API mode is partial.
-- **Claude MCP backend**: Stub only — full MCP server mode deferred to a future sprint.
-- **Provider fallback**: Single retry only — no exponential backoff or circuit breaker.
-- **Connector integration**: Health check runs during bootstrap; connector reference in sprint-controller has partial wiring.
+- **Ollama:** Works for REPL/chat; sprint-worker path is partial (stub-level).
+- **Docker backend:** Claude-only by design. Codex/Gemini use tmux/subprocess backends.
+- **Provider fallback:** Single retry — no exponential backoff.
+
+### RBAC
+- **ADR-037 V1.0 Layer-2:** Runtime scope enforcement is **advisory/soft** — violations are warned and emitted but do not hard-block. Hard enforcement planned post-GA V2.
+
+### Native REPL
+- **Experimental:** Native-agent mode (`DECKENT_NATIVE_AGENT=1`) is opt-in and not yet default. Standard REPL is stable.
 
 ### Platform
-- **Windows**: Not supported natively. Use WSL2 for Windows development.
-- **tmux**: Required for parallel worker execution. Subprocess backend available as fallback but lacks real-time log capture.
-
-### Orchestration
-- **Worker .result files**: tmux workers occasionally exit without writing .result, causing false NO_GO evaluations. Subprocess backend is more reliable.
-- **NO_GO rate**: Complex sprints with many tasks can have high NO_GO rates (>50%). This is expected — failed tasks are retried in subsequent sprints. Sprint 047 saw 100% NO_GO in automation mode; all items were resolved via manual fix.
-- **AI planner**: May under-plan (fewer tasks than directives specify). Structured fallback compensates but lacks AI context awareness.
-- **Skill sandbox**: AST-based analysis deferred for full production hardening; basic detection is in place.
-
-### Scale
-- **Sprint size**: Tested up to 20 parallel tasks. Larger sprints may hit memory or token limits.
-- **Memory budget**: 900 lines in .brain/ — very active projects may need manual decay via `deckent archive-debt`.
-
-### Beta Limitations
-- **No Windows support** — Linux/macOS/WSL2 only
-- **No interactive mode** — all operations are non-interactive by design
-- **Plugin marketplace** — local-only for now, no remote registry
-- **Telemetry** — infrastructure exists but collection is disabled in beta
-- **API mode** — partial implementation; subscription auth is the recommended path
+- **Windows:** Not supported natively. Use WSL2.
 
 ---
 
-## Roadmap
+## Upgrade
 
-### v0.2.x (Post-Beta)
-- Provider fallback improvements (circuit breaker, exponential backoff)
-- Gemini adapter full verification with real API
-- Claude MCP backend full implementation
-- Windows native support investigation
-- Plugin marketplace remote registry
-- Performance benchmarks and optimization
-
-### v0.3.0 (Planned)
-- Multi-project orchestration (monorepo awareness)
-- Team collaboration features (shared agent pools, skill libraries)
-- Cost tracking dashboard per provider
-- CI/CD integration (GitHub Actions, GitLab CI)
-
-### v1.0.0 (Stable)
-- Production-grade stability
-- Telemetry opt-in with anonymous usage analytics
-- Official plugin marketplace
-- Enterprise features (SSO, audit log, compliance)
+```bash
+npm install -g deckent@latest
+deckent doctor
+```
 
 ---
 
-*Updated through Sprint 047 — stabilization sprint with manual fix applied. All known debt resolved.*
+*See [CHANGELOG.md](../../CHANGELOG.md) for the full change history.*
+*See [deckent.ai](https://deckent.ai) for documentation.*

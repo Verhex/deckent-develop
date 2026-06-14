@@ -107,8 +107,8 @@ Aşağıdaki kanalları sırayla oluştur:
 
 ### #deckent-bot
 - **İzinler:** @everyone okuyabilir ve yazabilir
-- **Bot komutları:** T-151-004 bot deploy sonrası aktif olur
-- **Kullanılabilir komutlar:** `!deckent help`, `!deckent status`, `!deckent version`
+- **Bot komutları:** `deckent bot listen` / `deckent bot start` ile daemon başlatıldıktan sonra aktif
+- **Kullanılabilir komutlar:** `/help`, `/status`, `/history`, `/pending`; `approve <id>` / `reject <id>` ile onay akışı
 
 ---
 
@@ -146,7 +146,7 @@ T-151-004 tamamlandıktan ve bot token `.deck` dosyasına yazıldıktan sonra:
    - Bot Permissions: `Send Messages`, `Read Message History`, `Manage Messages`, `Embed Links`
 2. Bot invite URL'ini Discord'a yapıştır, `Deckent Community` sunucusunu seç
 3. `#deckent-bot` kanalını bot için default kanal yap
-4. Bot'u test et: `!deckent help` komutu çalışmalı
+4. Bot'u test et: `/help` komutu çalışmalı
 
 ---
 
@@ -192,8 +192,8 @@ Sprint 151 sonunda şu adımları kontrol et:
 - [ ] `#announcements` kanal @everyone için read-only
 - [ ] Alperen admin rolüne sahip
 - [ ] Server invite link oluşturuldu
-- [ ] Bot `#deckent-bot` kanalında aktif (T-151-004 sonrası)
-- [ ] `!deckent help` komutu çalışıyor (T-151-004 sonrası)
+- [ ] Bot `#deckent-bot` kanalında aktif (`deckent bot start` sonrası)
+- [ ] `/help` komutu çalışıyor
 - [ ] `#rules` kanalında CONDUCT.md bağlantısı pinned
 - [ ] AutoMod temel kuralları aktif
 

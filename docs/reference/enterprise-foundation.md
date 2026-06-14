@@ -1,6 +1,6 @@
 # Enterprise Foundation: The ExecutionRequest Contract
 
-This document outlines how Deckent's universal `ExecutionRequest` contract serves as the backbone for its enterprise-grade features. By embedding critical metadata into every request, Deckent enables advanced governance, security, and operational controls.
+This document outlines how Deckent's universal `ExecutionRequest` contract serves as the backbone for its enterprise-grade features. By embedding critical metadata into every request, Deckent enables advanced governance, security, and operational controls. The `ExecutionRequest` schema is governed by **ADR-068** (Enterprise Foundation); the RBAC and event-trigger layers that consume it are governed by **ADR-069** (Event-Driven Triggers + F4 RBAC).
 
 Most of these features are opt-in and can be enabled via flags in `.deckent/config.json`.
 
@@ -24,9 +24,16 @@ Most of these features are opt-in and can be enabled via flags in `.deckent/conf
 
 The `actor` object identifies who initiated a request. The `actor.role` field is consumed by the **Authority Matrix** (`src/nervous/authority-matrix.ts`) to determine a worker's permissions.
 
-This allows for granular control, where roles like `admin`, `engineer`, or `viewer` can be assigned different capabilities. For example, a `viewer` role might be prohibited from executing shell commands or writing to the filesystem.
+This allows for granular control using the **Worker Authority** taxonomy (`WorkerRole`):
+- `admin` — every capability (full trust).
+- `engineer` — dev capabilities; excludes enterprise-admin capabilities (`erp-write`, filesystem-delete, etc.).
+- `viewer` — read-only (`fs-read`, `db-query`, `erp-read`).
 
-This system is a step towards full ADR-037 V2 implementation.
+For example, a `viewer` role is prohibited from executing shell commands or writing to the filesystem.
+
+**Note:** This is the *worker authority* role system (ENT-1). Deckent also has a separate *enterprise RBAC* system (`src/core/rbac.ts`, governed by **ADR-069**) used for the autonomous dispatch policy gate and compliance API — that system uses roles `admin | operator | viewer`. See `enterprise-depth.md` Section 2 for details on both systems.
+
+This system implements **ADR-037** (Brain-Auditor-Worker Authority Matrix) with hard enforcement enabled via the `enforce_rbac` flag.
 
 **Configuration:**
 RBAC enforcement is disabled by default. To enable it, set the following in your `.deckent/config.json`:

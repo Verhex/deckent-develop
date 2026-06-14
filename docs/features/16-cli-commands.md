@@ -1,10 +1,10 @@
-# CLI Komutları — 52 Komutla Tam Orkestrasyon Kontrolü
+# CLI Komutları — 57 Komutla Tam Orkestrasyon Kontrolü
 
 > Terminalde tek bir `deckent` ikili ile sprint planla, başlat, izle, retrospektif yaz ve hafızana sor — hiçbir şeye gerek yok.
 
 ## Ne işe yarar?
 
-- **52 kayıtlı CLI komutu** — `deckent init`'ten `deckent rbac`'e kadar tam sprint yaşam döngüsü ve yardımcı araçlar (kaynak: `src/cli/index.ts`).
+- **57 kayıtlı CLI komutu** — `deckent init`'ten `deckent help`'e kadar tam sprint yaşam döngüsü ve yardımcı araçlar (kaynak: `src/cli/index.ts`).
 - **REPL varsayılanı** — argümansız `deckent` → agentic sohbet REPL açılır (ADR-081); `deckent chat --native` ile aynı.
 - **Hafıza CLI** — `deckent recall "sorgu"`, `deckent remember "not"`, `deckent memory stats|export|rebuild`.
 - **Model ve maliyet kontrolü** — `deckent models list`, `deckent cost` ile token/maliyet özeti.
@@ -27,7 +27,7 @@
 ```bash
 # Sprint yaşam döngüsü (temel akış)
 deckent init                        # Projeyi başlat (.deckent/, .brain/, .tasks/)
-deckent plan --structured      # DIRECTIVES.md'yi oku, task JSON'larını oluştur
+deckent plan --structured           # DIRECTIVES.md'yi oku, task JSON'larını oluştur
 deckent start                       # Worker'ları spawn et, sprint başlat
 deckent status                      # Aktif sprint durumunu göster
 deckent review                      # GO / NO_GO / GO_WITH_TECH_DEBT değerlendirmesi
@@ -53,7 +53,7 @@ deckent --help                      # Tüm komutların listesi
 deckent start --help                # Belirli komut yardımı
 ```
 
-### Tam Komut Listesi (52 adet — kaynak: `src/cli/index.ts`)
+### Tam Komut Listesi (57 adet — kaynak: `src/cli/index.ts`)
 
 | Kategori | Komutlar |
 |----------|----------|
@@ -63,12 +63,12 @@ deckent start --help                # Belirli komut yardımı
 | Agent / Skill / Model | `agent`, `skill`, `models`, `evolve` |
 | Hafıza | `recall`, `remember`, `memory` |
 | Agentic REPL & sohbet | `chat`, `heartbeat` |
-| Raporlama & maliyet | `cost`, `features` |
-| Sistem | `help`, `serve`, `web`, `dashboard`, `rbac`, `nervous`, `config-nervous` |
-| Kurulum & geliştirme | `onboard`, `upgrade`, `plugin`, `run`, `test-run` |
+| Raporlama & maliyet | `cost`, `features`, `usage` |
+| Sistem & entegrasyon | `help`, `serve`, `web`, `dashboard`, `rbac`, `nervous`, `config-nervous`, `mcp`, `resources`, `bot` |
+| Kurulum & geliştirme | `onboard`, `upgrade`, `plugin`, `run`, `test-run`, `archive-debt` |
 
 ## Durum
 
-- Olgunluk: ✅ canlı — tüm 52 komut `buildProgram()` ile kayıtlı, `deckent --help` ile erişilebilir
+- Olgunluk: ✅ canlı — tüm 57 komut `buildProgram()` ile kayıtlı, `deckent --help` ile erişilebilir
 - İlgili: ADR-012 (register\<Name\> Pattern) · ADR-010 (Tek Runtime Dependency) · ADR-022-V2 (CLI/MCP Parity)
-- Modül: `src/cli/index.ts` (kayıt hub'ı) · `src/cli/entry.ts` (giriş noktası) · `src/cli/commands/` (52 komut)
+- Modül: `src/cli/index.ts` (kayıt hub'ı) · `src/cli/entry.ts` (giriş noktası) · `src/cli/commands/` (57 komut)

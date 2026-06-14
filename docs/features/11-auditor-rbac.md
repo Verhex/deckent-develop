@@ -67,8 +67,23 @@ cat .dashboard | jq '{phase, activeWorkers, alerts}'
 deckent status --json | jq '.alerts[] | select(.source == "auditor")'
 ```
 
+## Nervous System Authority Matrix (ayrı sistem)
+
+`src/nervous/authority-matrix.ts` burada anlatılan sprint RBAC'ından **farklı** bir sistemdir.
+Nervous System'ın otonom eylem yönetişimini yönetir: 4 preset mod (strict / balanced / autopilot / full-auto) ve 5 kilitli **safety floor** aksiyonu:
+
+| Safety Floor Aksiyonu | Açıklama |
+|----------------------|----------|
+| `KILL_LIVE_SPRINT` | Canlı sprint'i durdurma |
+| `MANUAL_FILE_DELETE` | Manuel dosya silme |
+| `COST_OVER_THRESHOLD` | Bütçe eşiği aşımı |
+| `DESTRUCTIVE_GIT` | Zararlı git operasyonu |
+| `ADR_DEPRECATE_ACCEPTED` | Kabul edilmiş ADR'yi iptal etme |
+
+Bu 5 aksiyon full-auto dahil hiçbir modda autonomous çalıştırılamaz.
+
 ## Durum
 
 - Olgunluk: ✅ canlı — `startScanLoop()` tüm sprint'lerde aktif; `authority-enforcer.ts` her taramada çağrılır
 - ADR-037 V1.0 `soft` mod aktif; `hard` mod 🔜 post-GA V2 hedefi
-- İlgili: ADR-037 · ADR-035 · `src/monitor/auditor.ts` · `src/orchestra/authority-enforcer.ts`
+- İlgili: ADR-037 · ADR-035 · `src/monitor/auditor.ts` · `src/orchestra/authority-enforcer.ts` · `src/nervous/authority-matrix.ts`

@@ -117,8 +117,8 @@ my-project/
     config.json          # Runtime config (mode, language, sprint ID)
     workspace/
   .brain/
-    MEMORY.md            # Learned patterns (auto-updated)
-    DEBT.md              # Technical debt log
+    memory.db            # SQLite memory store (single source of truth)
+    exports/             # Auto-generated Markdown exports (summary, memory, debt, decisions)
     sprints/             # Per-sprint logs
   .tasks/                # Task JSON files (written by Brain)
   .locks/                # File locks (managed by workers)
@@ -145,7 +145,10 @@ Open `DIRECTIVES.md` and describe what you want to build. Use the `## Task N:` f
 # DIRECTIVES -- Sprint 1
 
 ## Task 1: User Authentication
-- Files: src/auth/index.ts (new), tests/auth/auth.test.ts (new)
+- Model: sonnet
+- Effort: normal
+- Skills: typescript-expert, security-specialist
+- Files: src/auth/index.ts, tests/auth/auth.test.ts
 - Scope: src/auth/, tests/auth/
 
 ### Description
@@ -155,12 +158,14 @@ Implement JWT-based login and registration endpoints.
 - Add bcrypt password hashing
 - Write tests for both endpoints
 
-### Tests
-- All auth tests pass
-- 90%+ coverage on src/auth/
+**Kanıt:** `grep -c "login\|register" src/auth/index.ts` ≥ 2
+**Test:** 3+ tests (happy path, invalid credentials, token validation)
 
 ## Task 2: User Profile Page
-- Files: src/pages/profile.tsx (new)
+- Model: sonnet
+- Effort: low
+- Skills: react-specialist
+- Files: src/pages/profile.tsx
 - Scope: src/pages/, src/components/
 
 ### Description
@@ -169,9 +174,8 @@ Create a user profile page showing name, email, and avatar.
 - Display in a responsive card layout
 - Add loading and error states
 
-### Tests
-- Component renders correctly
-- API integration test passes
+**Kanıt:** `grep -c "useEffect\|profile" src/pages/profile.tsx` ≥ 1
+**Test:** 3+ tests (renders correctly, loading state, error state)
 ```
 
 **Tips for effective directives:**
@@ -213,15 +217,16 @@ Planning mode: ai
 deckent start
 ```
 
-Brain will:
+Brain runs the full 8-phase sprint lifecycle:
 
-1. Read `DIRECTIVES.md`
-2. Plan tasks (AI mode by default) and write `.tasks/task-NNN.json` files
-3. Spawn one Claude worker per task in separate tmux windows
-4. Start the auditor scan loop (health checks every 30 seconds)
-5. Wait for all workers to complete
-6. Evaluate each result (GO / NO-GO / GO_WITH_TECH_DEBT)
-7. Write a retrospective and update memory
+1. **PLAN** — Read `DIRECTIVES.md`, write `.tasks/task-NNN.json` files
+2. **SPAWN** — Launch one worker per task in separate tmux windows (or subprocess/Docker); sort into dependency waves when `dependency_pipeline_enabled: true`
+3. **EXECUTE** — Workers write code, run tests, update heartbeat files, produce `.result` files
+4. **EVALUATE** — Review each result: GO / NO-GO / GO_WITH_TECH_DEBT
+5. **FIX** — Retry failed tasks with enriched prompts (configurable timeout)
+6. **RETRO** — Write retrospective and update project memory (SQLite DB)
+7. **DECAY** — Prune old memory entries to stay within budget
+8. **CLEANUP** — Archive task files, release locks, mark sprint complete
 
 Workers run in tmux windows. Attach to watch a worker live:
 
@@ -332,23 +337,23 @@ cat .tasks/task-001-001.result
 Evaluation values:
 
 - **DONE** -- Task complete, all criteria met
-- **GO_WITH_TECH_DEBT** -- Task complete with known debt (logged in `.brain/DEBT.md`)
+- **GO_WITH_TECH_DEBT** -- Task complete with known debt (logged in the memory DB, exported to `.brain/exports/debt.md`)
 - **NO_GO** -- Task failed; Brain logs the failure and it can be retried next sprint
 
 ### Technical Debt
 
-Brain tracks technical debt automatically:
+Brain tracks technical debt in the memory DB. View the export:
 
 ```bash
-cat .brain/DEBT.md
+cat .brain/exports/debt.md
 ```
 
-### What Brain Learned
+### Search Project Memory
 
-Brain stores learnings that persist across sprints:
+Brain stores learnings that persist across sprints. Search them:
 
 ```bash
-cat .brain/MEMORY.md
+deckent recall "authentication"
 ```
 
 ---

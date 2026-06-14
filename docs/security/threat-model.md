@@ -1,7 +1,7 @@
 # Deckent Security Threat Model
 
 > **Version:** 1.0.0-beta.1  
-> **Last updated:** 2026-06-08  
+> **Last updated:** 2026-06-14  
 > **Status:** V1.0 — code-grounded, advisory enforcement; V2 hard enforcement roadmap
 >
 > **Honesty principle:** This document distinguishes three posture levels:
@@ -99,36 +99,43 @@
 
 **Code:** `src/orchestra/authority-enforcer.ts`
 
-**Advisory posture (ADR-037 V1.0) — honest disclosure:**
+**Two posture levels — enforcement differs by worker backend:**
 
-The authority matrix defines which roles (Brain, Auditor, Worker) may read/write which paths. However, enforcement is **deliberately soft in V1.0**:
+| Worker type | Scope enforcement | Detail |
+|-------------|------------------|--------|
+| **Local-model / native-agent workers** | 🟢 **Hard** | The scope guard checks each write path *before* the tool executes and returns an error, forcing the model to self-correct. Writes outside scope never reach disk. |
+| **CLI / tmux workers** | 🟡 **Advisory (V1.0)** | The Auditor detects out-of-scope writes via `git diff --stat` and emits events to the audit trail, but does **not** block them at the OS level. Hard enforcement is planned for V2 (post-GA). |
+
+**Authority matrix (ADR-037 V1.0) — RBAC check behavior:**
+
+The authority matrix defines which roles (Brain, Auditor, Worker) may read/write which paths. For CLI/tmux workers, the check is **deliberately soft**:
 
 ```typescript
-// All checkAuthority() calls return mode: 'soft'
+// checkAuthority() for CLI/tmux workers returns mode: 'soft'
 return {
   allowed: false,
   level: 'warn',
-  mode: 'soft',   // <-- hardcoded in every return path
+  mode: 'soft',   // <-- advisory; never hard-blocks CLI/tmux writes
   reason: `...worker scope violation...`,
 };
 ```
 
-The filesystem does **not** block writes. `checkAuthority()` returns a result; callers decide whether to proceed. The Auditor detects violations via `git diff --stat` and emits events to the audit trail, but does not roll back writes.
+`checkAuthority()` returns a result; callers decide whether to proceed. The filesystem does **not** block CLI/tmux writes. For local-model/native-agent workers the scope guard is enforced before the write tool executes (not via `checkAuthority`).
 
-**What V1.0 does:**
-- Detects scope violations after the fact (Auditor scan every 30 seconds)
+**What V1.0 does (all workers):**
+- Detects scope violations via Auditor scan every 30 seconds (`git diff --stat`)
 - Emits `AUDITOR→BRAIN:AUTHORITY_VIOLATION` events to the event stream
 - Workers are expected to self-flag boundary violations as `BOUNDARY_VIOLATION → NO_GO`
 - Brain applies FIX cascade on honest NO_GO results
 
-**What V1.0 does NOT do:**
-- Block workers from writing outside `scope.filesWrite` at the OS level
+**What V1.0 does NOT do (CLI/tmux workers only):**
+- Block writes outside `scope.filesWrite` at the OS level (hard enforcement is V2 roadmap)
 - Roll back unauthorized writes automatically
 - Hard-deny at process creation time
 
-**V2 roadmap:** Hard filesystem-level enforcement (OS-level path restrictions) is planned for post-GA V2. Timeline is TBD.
+**V2 roadmap:** Hard OS-level path restriction for CLI/tmux workers is planned for post-GA V2. Timeline is TBD.
 
-**Security implication:** In V1.0-beta, a rogue worker (or model hallucination) can write outside its assigned scope before the Auditor's next scan cycle (~30 seconds). All violations are recorded in the audit trail but are not prevented.
+**Security implication:** For CLI/tmux workers in V1.0-beta, a rogue worker (or model hallucination) can write outside its assigned scope before the Auditor's next scan cycle (~30 seconds). All violations are recorded in the audit trail but are not blocked. Use Docker or local-model workers for hard scope enforcement.
 
 ---
 
@@ -156,7 +163,7 @@ The filesystem does **not** block writes. `checkAuthority()` returns a result; c
 
 **Threat:** A worker process escapes the project filesystem or consumes unbounded resources.
 
-**Code:** `src/providers/docker-backend.ts` (not in scope for this task; described per ADR-062 and project docs)
+**Code:** `src/orchestra/spawn-backend.ts`, `src/providers/docker-backend.ts` (see ADR-062 and project docs)
 
 **Implemented mitigations:**
 - **Filesystem isolation** — Docker workers run in a container with the project directory bind-mounted. Host filesystem outside the mount point is not accessible.
@@ -277,11 +284,14 @@ const tenantId =
 - **Honest-gate self-assessment** — a worker that detects it wrote outside its declared `scope.filesWrite` is expected to self-flag `BOUNDARY_VIOLATION → NO_GO`; Brain then applies a FIX cascade (§3c).
 - **Per-provider API Key isolation** — each worker process receives only its own provider's API Key via per-provider environment injection; a Claude worker never receives the Codex or Gemini key (§3b).
 
-**Advisory posture (ADR-037 V1.0) — honest disclosure:**
+**Scope enforcement posture by backend — honest disclosure:**
 
-Worker scope is **not** enforced at the OS level. The runtime authority check is **soft** — `checkAuthority()` returns `mode: 'soft'` on every path and never blocks a write (§3c). The Auditor detects out-of-scope writes after the fact via `git diff --stat` (≈30 s scan cycle) and records them in the audit trail, but does not roll back the write or kill the worker. Hard, process-level execution confinement is deferred to **V2 (post-GA)**.
+Scope enforcement is **not uniform** across backends (see §3c for the full breakdown):
 
-**Residual risk:** On subprocess/tmux backends, a rogue worker can execute any command and write any file the OS user owns before the next Auditor scan. The provider API Key for that worker is present in its `process.env` and is readable by any process running as the same OS user (`/proc/PID/environ`). For untrusted DIRECTIVES, use the Docker backend (filesystem isolation) plus `--sandbox-mode` (git-stash rollback) — but note that neither provides network isolation in V1.0 (§3d, §3e).
+- **Local-model / native-agent workers:** scope is enforced **hard** — the write tool checks the path before executing and blocks out-of-scope writes before they reach disk.
+- **CLI/tmux workers (subprocess/tmux backends):** scope is **advisory in V1.0** — `checkAuthority()` returns `mode: 'soft'`, the Auditor detects violations via `git diff --stat` after the fact, but does not block or roll back the write.
+
+**Residual risk:** For **CLI/tmux workers** specifically, a rogue worker can execute any command and write any file the OS user owns before the next Auditor scan (~30 s). The provider API Key for that worker is present in its `process.env` and is readable by any process running as the same OS user (`/proc/PID/environ`). For untrusted DIRECTIVES, use the Docker backend (filesystem isolation) plus `--sandbox-mode` (git-stash rollback) — but note that neither provides network isolation in V1.0 (§3d, §3e).
 
 ---
 
@@ -310,8 +320,9 @@ Worker scope is **not** enforced at the OS level. The runtime authority check is
 | Localhost auto-inject (opt-in) | **Implemented** | `src/api/auth.ts` |
 | `.deck` per-provider secret isolation | **Implemented** | `src/core/provider.ts:applyDeckSecretsToEnv()` |
 | `.deck` gitignore + doctor check | **Implemented** | `src/core/deck-file.ts`, `src/cli/commands/doctor.ts` |
-| Scope enforcement (RBAC) — violation detection | **Implemented (advisory)** | `src/orchestra/authority-enforcer.ts` |
-| Scope enforcement — hard FS-level blocking | **Not implemented (V2 roadmap)** | ADR-037 V2 |
+| Scope enforcement — local/agentic workers (hard, pre-write) | **Implemented (hard)** | Worker scope guard in local-model / native-agent path |
+| Scope enforcement — CLI/tmux workers (advisory, post-write detection) | **Implemented (advisory)** | `src/orchestra/authority-enforcer.ts`, Auditor `git diff --stat` |
+| Scope enforcement — CLI/tmux hard FS-level blocking | **Not implemented (V2 roadmap)** | ADR-037 V2 |
 | Worker code execution — Docker backend isolation (bind-mount) | **Implemented** | `src/orchestra/spawn-backend.ts`, `src/providers/docker-backend.ts` |
 | Worker code execution — OS-level confinement | **Not implemented (advisory; V2 roadmap)** | ADR-037 V2 |
 | Multi-project: per-project directory isolation | **Implemented (structural)** | ADR-034 Katman 1 |
@@ -351,7 +362,7 @@ See `SECURITY.md` for the full disclosure policy.
 
 **Summary:**
 1. Report via [GitHub Security Advisory](https://github.com/VerhexIO/deckent/security/advisories/new) (private by default)
-2. Alternative: security@verhex.com
+2. Alternative: security@deckent.ai
 3. Include: description, reproduction steps, impact, suggested fix
 4. Response: acknowledgement within 48h, fix within 7 days for critical issues
 5. Do NOT open a public GitHub issue for unpatched vulnerabilities

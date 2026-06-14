@@ -29,9 +29,9 @@ deckent skill list
 # Örnek çıktı:
 # Name                 Category   Status   Triggers              Priority
 # TypeScript Expert    language   enabled  typescript, type...   10
-# React Specialist     frontend   enabled  react, hook, jsx...   8
-# Testing Expert       testing    enabled  test, vitest, mock... 7
-# Security Specialist  security   enabled  security, auth...     9
+# React Specialist     framework  enabled  react, hook, jsx...   8
+# Testing Expert       workflow   enabled  test, vitest, mock... 7
+# Security Specialist  domain     enabled  security, auth...     9
 # ...
 
 # Kategoriye göre filtrele
@@ -48,32 +48,34 @@ deckent_skill_list → { root: "/projem" }
 
 ## Durum
 - Olgunluk: ✅ canlı (21 built-in, kaynak: `.deckent/skills/` dizini)
-- İlgili: ADR-041 · `src/core/skill-registry.ts` · `src/core/marketplace/skill-sandbox.ts`
+- İlgili: ADR-041 · `src/core/skill-pool.ts` · `src/core/skill-registry.ts` · `src/core/marketplace/skill-sandbox.ts`
 
 ---
 
 ### Yerleşik Skill Kataloğu (21 built-in)
 
+Manifest `category` değerleri: `language`, `framework`, `tool`, `domain`, `workflow`.
+
 | Skill | Kategori | Açıklama |
 |-------|----------|----------|
 | `typescript-expert` | language | TypeScript tip sistemi, ESM, generics |
-| `testing-expert` | testing | Vitest/Jest, mock, coverage stratejisi |
-| `documentation-writer` | docs | Markdown, JSDoc, API docs |
-| `security-specialist` | security | Güvenlik pattern, input validasyon |
-| `performance-optimizer` | perf | Async optimizasyon, memory, profiling |
-| `api-builder` | api | REST tasarımı, OpenAPI spec |
-| `devops-engineer` | devops | GitHub Actions, Docker, pipeline |
-| `database-migration` | data | Query optimizasyon, migration, ORM |
-| `react-specialist` | frontend | React, Vite, Tailwind, component |
+| `testing-expert` | workflow | Vitest/Jest, mock, coverage stratejisi |
+| `documentation-writer` | workflow | Markdown, JSDoc, API docs |
+| `security-specialist` | domain | Güvenlik pattern, input validasyon |
+| `performance-optimizer` | domain | Async optimizasyon, memory, profiling |
+| `api-builder` | domain | REST tasarımı, OpenAPI spec |
+| `devops-engineer` | tool | GitHub Actions, Docker, pipeline |
+| `database-migration` | domain | Query optimizasyon, migration, ORM |
+| `react-specialist` | framework | React, Vite, Tailwind, component |
 | `python-expert` | language | Python ekosistemi, FastAPI |
-| `ci-testing` | testing | CI ortamında test yürütme |
-| `accessibility-expert` | a11y | WCAG standartları, a11y test |
-| `anthropic-sdk` | sdk | Claude API, tool use, agent SDK |
-| `code-simplifier` | refactor | Kod sadeleştirme, karmaşıklık azaltma |
-| `docker-expert` | devops | Dockerfile, compose, container |
-| `frontend-design` | frontend | UI component, CSS, responsive |
-| `git-expert` | vcs | Git iş akışı, branch stratejisi |
-| `graphql-expert` | api | GraphQL schema, resolver |
-| `migration-expert` | migration | Framework geçişi, versiyon yükseltme |
-| `monorepo-expert` | infra | Monorepo yönetimi, workspace |
-| `system-architect` | architecture | Sistem mimarisi, tasarım desenleri |
+| `ci-testing` | workflow | CI ortamında test yürütme |
+| `accessibility-expert` | domain | WCAG standartları, a11y test |
+| `anthropic-sdk` | framework | Claude API, tool use, agent SDK |
+| `code-simplifier` | workflow | Kod sadeleştirme, karmaşıklık azaltma |
+| `docker-expert` | tool | Dockerfile, compose, container |
+| `frontend-design` | domain | UI component, CSS, responsive |
+| `git-expert` | tool | Git iş akışı, branch stratejisi |
+| `graphql-expert` | framework | GraphQL schema, resolver |
+| `migration-expert` | workflow | Framework geçişi, versiyon yükseltme |
+| `monorepo-expert` | tool | Monorepo yönetimi, workspace |
+| `system-architect` | domain | Sistem mimarisi, tasarım desenleri |

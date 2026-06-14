@@ -8,8 +8,8 @@
 ## A
 
 ### ADR (Architecture Decision Record)
-Yazılım mimarisindeki önemli kararların gerekçesiyle birlikte belgelendiği kayıt formatı. Deckent'te `.brain/DECISIONS.md` dosyasında tutulur.
-**Blueprint §5.1** — "Update DECISIONS.md for new architecture decisions"
+Yazılım mimarisindeki önemli kararların gerekçesiyle birlikte belgelendiği kayıt formatı. Deckent'te **Memory V2** SQLite DB'de (`memory.db`, type='adr') tutulur; git-takipli export: `.brain/exports/decisions.md`. Toplam 89 ADR (ADR-001–089).
+**ADR-036** — ADR Governance Integration
 
 ### Agent Teams
 Claude Code'un deneysel özelliği; Brain'in takım lideri, Worker'ların takım üyesi olarak yerel mesajlaşmayla çalışması. Gelecekte `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` ile etkinleştirilecek.
@@ -128,8 +128,8 @@ Web ve terminal gösterge panelinin veri modeli; PLAN fazında sıfırlanır, sp
 **Blueprint §19** — "Sprint 17: Dashboard reset"
 
 ### DEBT.md
-`.brain/DEBT.md` — Teknik borç kayıtlarının tablo formatında tutulduğu dosya; Brain tarafından yazılır, çözüme kavuşturulduğunda güncellenir.
-**Blueprint §6** — "Memory Files"
+`.brain/exports/debt.md` — Teknik borç kayıtlarının tablo formatında tutulduğu git-takipli export; birincil depolama SQLite DB'dir (`memory.db`, type='debt'). Brain tarafından yazılır, çözüme kavuşturulduğunda güncellenir.
+**ADR-088** — Memory V2 DB-First Architecture
 
 ### decay
 `.brain/` dizininin 600 satır sınırını aşması durumunda eski bellek girdilerini arşivleyen mekanizma. Her sprint sonunda tetiklenir.
@@ -155,9 +155,9 @@ Canlı tmux bölünmüş görünüm oluşturan CLI komutu; gösterge paneli ve W
 Tüm agent yapılandırmasının tek gerçek kaynağı. `CLAUDE.md` ve `AGENTS.md` bu dosyaya `@import` ile başvurur.
 **Blueprint §4.3** — "DECKENT.md + Adapter Pattern"
 
-### DECISIONS.md
-`.brain/DECISIONS.md` — Kalıcı mimari karar kayıtları (ADR); Brain tarafından yazılır, hiç arşivlenmez.
-**Blueprint §6** — "Memory Files"
+### decisions.md (exports)
+`.brain/exports/decisions.md` — Memory V2 SQLite DB'den auto-generated ADR listesi; git-takipli, elle düzenlenmez. Birincil kaynak `memory.db`'dir (type='adr'). `deckent memory export` ile yeniden üretilir.
+**ADR-088** — Memory V2 DB-First Architecture
 
 ### DIRECTIVES.md
 Operatörün (kullanıcının) sprint hedeflerini yazdığı dosya. Brain planlama sırasında bu dosyayı ilk okur.
@@ -275,9 +275,9 @@ Bir sprintte eş zamanlı çalışabilecek maksimum Worker sayısı; plan moduna
 Claude Code'un araç ve kaynak entegrasyonu için kullandığı protokol. Deckent, stdio transportuyla MCP sunucusu olarak çalışır.
 **Blueprint §21** — "MCP Server Architecture"
 
-### MEMORY.md
-`.brain/MEMORY.md` — Tier 1 bellek dosyası; maks. 100 satır, her sprintin sonunda Brain tarafından güncellenir, tüm agent'ların bağlamına `@import` ile eklenir.
-**Blueprint §6** — "Tier 1: Always Loaded"
+### memory.db
+`.brain/memory.db` — **Memory V2** SQLite single source of truth; 5 tablo (entries, tags, relations, entry_history, schema_version) + FTS5 full-text search. Tüm ADR, sprint, borç, pattern ve kimlik kayıtlarını saklar. `.brain/exports/` altındaki `.md` dosyaları bu DB'den auto-generate edilir. CLI: `deckent recall "<sorgu>"`, `deckent remember "<not>"`, `deckent memory rebuild|export|stats`.
+**ADR-088** — Memory V2 DB-First Architecture
 
 ---
 
@@ -303,9 +303,9 @@ Deckent sisteminin en üst izin seviyesindeki kullanıcısı; `DIRECTIVES.md` ya
 `DIRECTIVES.md` içindeki `## Task N:` / `## Görev N:` bloklarını ayrıştırarak görev listesi oluşturan fonksiyon. `'structured'` planlama modunda kullanılır.
 **Blueprint §9** — "BrainPlanningMode"
 
-### PATTERNS.md
-`.brain/PATTERNS.md` — Auditor'ın tespit ettiği kalıpları sakladığı dosya; maks. 80 satır, 5 sprint kullanılmayanlara decay uygulanır.
-**Blueprint §6** — "Memory Files"
+### pattern (memory entry)
+Auditor'ın tespit ettiği ihlal kalıpları (stale_heartbeat, file_outside_scope vb.) `memory.db`'de `type='pattern'` entry olarak saklanır. Eski `.brain/PATTERNS.md` dosya sistemi Memory V2 ile kaldırıldı. Decay: `store.decay(currentSprintNum, decayAfterSprints)`.
+**ADR-088** — Memory V2 DB-First Architecture
 
 ### pipe-pane
 Worker'ların terminal çıktısını `.tasks/task-{id}.log` dosyasına yönlendiren tmux mekanizması (`tmux pipe-pane -t ... "cat >> logPath"`).
@@ -336,8 +336,8 @@ Provider soyutlama arayüzü. `spawn()`, `kill()`, `listWorkers()`, `isAvailable
 **Sprint 037** — `src/core/provider.ts`
 
 ### ProviderName
-Desteklenen AI provider'ları: `'claude' | 'codex' | 'gemini'`.
-**Sprint 037** — `src/core/task-types.ts`
+Desteklenen AI provider'ları: `'claude' | 'codex' | 'gemini' | 'ollama' | 'deepseek' | 'qwen' | 'zhipu'`. Claude varsayılan; Codex/Gemini tam sprint + worker desteği; Ollama yerel/sıfır-maliyet; DeepSeek/Qwen/Zhipu OpenAI-uyumlu HTTP adapter.
+**ADR-066** — Provider Independence; `src/core/task-types.ts`
 
 ### ProviderRegistry
 Singleton provider kayıt sistemi. `register()`, `get()`, `getDefault()` metotları. `bootstrapProviders()` ile startup'ta doldurulur.
@@ -351,9 +351,9 @@ Singleton provider kayıt sistemi. `register()`, `get()`, `getDefault()` metotla
 
 ## R
 
-### RETRO.md
-`.brain/RETRO.md` — Son sprintin retrospektif özeti; Brain tarafından her sprint sonunda üzerine yazılır, maks. 100 satır.
-**Blueprint §6** — "Memory Files"
+### RETRO.md / retro (memory entry)
+Sprint retrospektifi Memory V2 DB'de `type='retro'` entry olarak saklanır; `.brain/exports/summary.md` içinde özetlenir. Eski `.brain/RETRO.md` dosya sistemi Memory V2 ile kaldırıldı. CLI: `deckent retro`.
+**ADR-088** — Memory V2 DB-First Architecture
 
 ### runDecay
 Brain'in `.brain/` dizinini 600 satır sınırı altında tutmak için çalıştırdığı sıkıştırma/arşivleme fonksiyonu.
@@ -461,4 +461,4 @@ Brain planlayıcısının (`planner.ts`) AI yanıtlarını doğrulamak için kul
 
 ---
 
-*Toplam terim sayısı: 68+. Sözlük son olarak Sprint 037-038'de güncellenmiştir.*
+*Toplam terim sayısı: 68+. Sözlük son olarak Sprint 286'da güncellendi (Memory V2 DB-First, ProviderName genişletme, ADR export yolları).*
