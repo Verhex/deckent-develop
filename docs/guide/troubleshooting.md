@@ -32,11 +32,11 @@ deckent cleanup
 # Step 3: Recover orphan state (re-evaluate partial results)
 deckent recover <sprint-id>
 
-# Step 4: Re-run a specific task manually
-deckent run <task-id>
+# Step 4: Re-spawn a specific task (add --force if it is DONE/NO_GO)
+deckent spawn <taskId> --force
 
-# Step 5: Spawn remaining pending tasks
-deckent spawn --auto-approve
+# Step 5: Spawn remaining pending tasks one by one (spawn takes a single taskId)
+deckent spawn <taskId>
 ```
 
 See [Config Recovery Guide](./config-recovery.md) for a detailed breakdown of each step.
@@ -52,11 +52,11 @@ Exit code 137 = SIGKILL (OOM). The Docker container ran out of memory.
 **Fix:**
 
 ```bash
-# Increase Docker memory limit in config
-deckent config set docker_memory_limit 4g
-
-# Or reduce parallel workers
+# Reduce parallel workers (lowers total memory pressure — the reliable fix)
 deckent config set max_workers 2
+
+# Per-worker container memory is 4g by default; tune per task-kind via
+# worker_memory_limit_by_kind in .deckent/config.json if needed.
 ```
 
 ### Docker daemon not running

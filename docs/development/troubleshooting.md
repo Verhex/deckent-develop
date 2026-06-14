@@ -27,11 +27,11 @@
 
 **Solution:**
 ```bash
-# Find the npm global bin directory
-npm bin -g
+# Find the npm global bin directory (`npm bin -g` was removed in npm v9 / Node ≥24)
+echo "$(npm prefix -g)/bin"
 
 # Add to your shell profile (~/.bashrc, ~/.zshrc, ~/.profile)
-export PATH="$(npm bin -g):$PATH"
+export PATH="$(npm prefix -g)/bin:$PATH"
 
 # Reload shell
 source ~/.bashrc

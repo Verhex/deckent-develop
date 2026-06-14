@@ -78,7 +78,7 @@ Write `.tasks/task-{id}.result` atomically — write to `.tmp` first, then `rena
 }
 ```
 
-**`tokenUsage` is required** — a missing `tokenUsage` is treated as NO_GO by Brain.
+**`tokenUsage` is an optional self-estimate** — a missing `tokenUsage` produces a warning, not a NO_GO (ground truth comes from the limit-ledger). Include it when you can.
 
 See `docs/reference/api-surface.md` for the full result schema including optional fields (`rubricScores`, `sharedNotes`, `handoffNotes`, `crossVerify`).
 

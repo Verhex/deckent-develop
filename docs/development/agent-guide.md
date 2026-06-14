@@ -16,7 +16,7 @@ Key concepts:
 
 ## 2. Built-in Agents (15 Agents)
 
-All 15 built-in agents are defined in `src/core/agent-pool.ts`:
+All 15 built-in agents are defined as JSON manifests in `src/core/builtins/agents/<name>/agent.json` (loaded by the `AgentPoolManager` in `src/core/agent-pool.ts`):
 
 ### security-auditor
 Specializes in security-related tasks: vulnerability scanning, authentication fixes, injection prevention, CSRF/XSS mitigation, OWASP compliance.
@@ -126,23 +126,16 @@ This creates `.deckent/agents/my-agent/` with:
 
 ```json
 {
-  "id": "my-agent",
   "name": "my-agent",
-  "description": "Custom agent for specific tasks",
-  "systemPrompt": "You are a specialist in...",
-  "triggers": ["keyword1", "keyword2"],
+  "type": "custom",
+  "enabled": true,
   "model": "sonnet",
-  "activation": {
-    "rules": [],
-    "minScore": 0
-  },
-  "stats": {
-    "totalUses": 0,
-    "successCount": 0,
-    "failureCount": 0,
-    "successRate": 0
-  },
-  "enabled": true
+  "triggers": ["keyword1", "keyword2"],
+  "description": "Custom agent for specific tasks",
+  "uses": 0,
+  "successRate": 0,
+  "createdAt": "2026-06-14T00:00:00.000Z",
+  "updatedAt": "2026-06-14T00:00:00.000Z"
 }
 ```
 
@@ -160,7 +153,7 @@ Agents are stored in two pools:
 | Pool | Path | Max | Eviction |
 |------|------|-----|----------|
 | Persistent (custom) | `.deckent/agents/` | — | Manual disable |
-| Temporary (auto-generated) | `.deckent/agents-temp/` | 50 | LRU eviction (5 sprint age) |
+| Temporary (auto-generated) | `.deckent/agents/temp-<id>/` | 50 | LRU eviction (5 sprint age) |
 
 Temporary agents are created by `planSprint()` for project-specific conventions (e.g., a Python expert for a Python project). They are promoted to permanent via the Evolution Pipeline.
 

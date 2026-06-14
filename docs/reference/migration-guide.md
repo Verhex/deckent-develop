@@ -128,13 +128,13 @@ The `selfAssessment` field is now required in result files:
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `mode` | `PlanMode` | `"economic"` | Active plan mode (legacy: `pro_plan`) |
+| `mode` | `PlanMode` | `"performance"` | Active plan mode (legacy: `pro_plan`) |
 | `modes` | `Record<PlanMode, PlanModeConfig>` | — | Per-mode configuration |
 | `language` | `"en" \| "tr"` | `"en"` | UI language |
 | `projectName` | `string` | directory name | Project display name |
 | `version` | `string` | `"1.0.0"` | Config schema version |
 | `auto_docs` | `AutoDocsConfig` | — | Automatic doc update tiers |
-| `brain_planning` | `"ai" \| "structured" \| "auto"` | `"structured"` | Planning strategy (per mode) |
+| `brain_planning` | `"ai" \| "structured" \| "auto"` | `"auto"` | Planning strategy (per mode) |
 | `max_workers` | `number \| "auto"` | `4` | Worker count (`"auto"` = CPU-based) |
 
 ### Migrating Flat Config Manually

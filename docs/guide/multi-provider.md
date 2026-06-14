@@ -223,15 +223,14 @@ curl http://localhost:11434/api/tags
 
 ```bash
 npx deckent config set worker_provider ollama
-npx deckent config set worker_model qwen3:latest
+export DECKENT_OLLAMA_MODEL=qwen3:latest   # Ollama model via env (there is no worker_model config key)
 ```
 
 Or in `.deckent/config.json`:
 
 ```json
 {
-  "worker_provider": "ollama",
-  "worker_model": "qwen3:latest"
+  "worker_provider": "ollama"
 }
 ```
 

@@ -21,7 +21,7 @@ Key features:
 - **Versioned Packages**: Every marketplace item follows semver for safe upgrades
 - **Quality Ratings**: Community-driven quality scores help identify the best extensions
 
-Marketplace skill features are accessible via the `deckent skill` subcommand (`skill search`, `skill publish`, `skill install`). A dedicated `deckent marketplace` command and web interface at marketplace.deckent.ai are planned for a future release.
+Marketplace skill features available today are `deckent skill search` and `deckent skill publish`. Skill **install**, a dedicated `deckent marketplace` command, and a web interface at marketplace.deckent.ai are planned for a future release.
 
 ## 2. Searching the Marketplace
 
@@ -49,6 +49,8 @@ vue-testing       skill   4.2       567      Vue.js component testing strategies
 ```
 
 ## 3. Installing Packages
+
+> **Status: planned** — `deckent skill install` is not yet implemented. Only `skill search` and `skill publish` are available today; the commands below describe the intended future interface.
 
 ### Install a Skill
 

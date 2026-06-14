@@ -1,11 +1,11 @@
 # Event Channels Reference
 
 Deckent uses a structured, append-only JSONL event stream for Brain ↔ Worker ↔ Auditor
-communication. Each event is written by `writeEvent()` from `src/orchestra/event-stream.ts`
+communication. Each event is written by `writeEvent()` from `src/core/event-stream.ts`
 and stored in `.deckent/<sprint-id>-events.jsonl` (one JSON object per line, Protocol
 Version 1.0, per ADR-035).
 
-You can tail this stream in real time via the `deckent_watch` MCP tool or `deckent watch`.
+You can tail this stream in real time via the `deckent_watch` MCP tool. (The CLI `deckent watch` is a tmux split-view and does not read this JSONL stream.)
 Events can be queried by channel using `readEvents(projectRoot, sprintId, { channel })`.
 
 ---
@@ -13,7 +13,7 @@ Events can be queried by channel using `readEvents(projectRoot, sprintId, { chan
 ## Channel Codes
 
 Every channel code follows the convention `SOURCE→TARGET:SIGNAL`. The `CHANNELS` constant
-in `src/orchestra/event-stream.ts` is the canonical definition; the table below is
+in `src/core/event-stream.ts` is the canonical definition; the table below is
 generated from it.
 
 ### Brain ↔ Worker
@@ -147,5 +147,5 @@ they are appended by `writeEvent()`.
 - **DEPENDENCY_BLOCKED deduplication:** The event stream suppresses duplicate
   `BRAIN→WORKER:DEPENDENCY_BLOCKED` events for the same `(taskId, unresolvedDeps)` pair
   within a sprint to prevent log spam on every wave tick.
-- **Source file:** `src/orchestra/event-stream.ts` — `CHANNELS` constant, `writeEvent`,
+- **Source file:** `src/core/event-stream.ts` — `CHANNELS` constant, `writeEvent`,
   `readEvents`, `reconstructState`.

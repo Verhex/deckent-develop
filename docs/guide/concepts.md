@@ -155,7 +155,7 @@ Deckent has a persistent **Memory V2** system backed by SQLite (`.brain/memory.d
 - **Storage:** `.brain/memory.db` — SQLite with FTS5 full-text search (dual-layer Turkish/English normalization for 100% recall across both languages)
 - **Exports:** `.brain/exports/summary.md`, `decisions.md`, `memory.md`, `debt.md` — auto-generated after each sprint for git tracking and agent context
 - **Schema:** 5 tables (`entries`, `tags`, `relations`, `entry_history`, `schema_version`) plus an FTS5 virtual table
-- **Decay:** Old entries are pruned automatically after a configurable number of sprints (default: 5), keeping Brain focused on recent context
+- **Decay:** Old entries are pruned automatically after a configurable number of sprints (`decay_after_sprints`, default: 20), keeping Brain focused on recent context
 - **CLI:** `deckent recall "<query>"` searches memory; `deckent remember "<note>"` saves a note; `deckent memory stats` shows DB health
 
 Search memory from the command line:

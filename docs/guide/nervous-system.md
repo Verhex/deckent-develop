@@ -241,7 +241,7 @@ Detector bir risk yakaladığında, `notifications.channels` üzerinde aktif ola
 **Kanallar:**
 
 - `mcp` — MCP `deckent_nervous_subscribe` tool ile event stream
-- `cli` — `deckent nervous status` komutuyla yakın bildirim
+- `cli` — `deckent nervous` komutuyla yakın bildirim
 - `file` — `.deckent/nervous-events/*.json` dosya channel (Dispatcher yazar)
 - `desktop` — Sistem bildirimi (opsiyonel; Sprint 181 sonrası)
 
@@ -259,7 +259,7 @@ Authority mode `approve` veya `suggest-Nm` ise, Nervous System eylem önermeden 
 
 ```bash
 # Bekleyen onayları listele
-deckent nervous status
+deckent nervous
 
 # Onayla
 deckent nervous accept <action-id>
@@ -314,7 +314,7 @@ deckent nervous history --json
 
 ### Nervous aktif olmasına rağmen hiç event üretmiyor
 
-1. `deckent nervous status` — observer running mu?
+1. `deckent nervous` — observer running mu?
 2. `.deckent/nervous-history.jsonl` mevcut mu? Boşsa hiç detector tetiklenmemiş demektir.
 3. Detector threshold'ları konservatif olabilir. `stale_worker.threshold_ms` 60000'e çek, kasıtlı stale worker yarat, gözle.
 

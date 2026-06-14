@@ -1471,7 +1471,7 @@ Show worker resource usage (CPU, memory, I/O) from the REPL.
 /resources --log /custom/resource-log.jsonl
 ```
 
-**MCP Tool:** `deckent_resources`
+**MCP Tool:** _none_ (no `deckent_resources` tool — `/resources` is a REPL/CLI surface only)
 
 ---
 

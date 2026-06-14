@@ -23,7 +23,7 @@ Deckent is an AI agent orchestration CLI that coordinates multiple AI agents (Cl
 
 ### Multi-Provider Fleet
 - **4 Providers:** Claude (Docker/tmux/subprocess), OpenAI Codex, Google Gemini, Ollama (local)
-- **13 Models / 4 Tiers:** premium_plus → premium → standard → economy — single `ModelRegistry` source of truth
+- **14 Models / 4 Tiers:** premium_plus → premium → standard → economy — single `ModelRegistry` source of truth
 - **Provider-Agnostic Config:** `brain_tier` / `worker_tier` instead of model names
 - **Mixed-Fleet Sprints:** Per-task provider override — some tasks on Claude, others on Gemini in the same sprint
 - **OpenAI-Compatible HTTP Adapter:** Any OpenAI-compatible endpoint as a provider

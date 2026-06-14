@@ -27,7 +27,7 @@ is running because sprint execution is detached from the serve event loop.
 
 The sprint control panel. Shows:
 
-- **Sprint phase timeline** — PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → CLEANUP
+- **Sprint phase timeline** — PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → CLEANUP
 - **Worker grid** — each active worker card with task title, status, and a kill button
 - **Progress bar** — done / active / queued tasks
 - **Alerts** — auditor warnings and critical flags

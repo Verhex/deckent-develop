@@ -336,7 +336,7 @@ Provider soyutlama arayüzü. `spawn()`, `kill()`, `listWorkers()`, `isAvailable
 **Sprint 037** — `src/core/provider.ts`
 
 ### ProviderName
-Desteklenen AI provider'ları: `'claude' | 'codex' | 'gemini' | 'ollama' | 'deepseek' | 'qwen' | 'zhipu'`. Claude varsayılan; Codex/Gemini tam sprint + worker desteği; Ollama yerel/sıfır-maliyet; DeepSeek/Qwen/Zhipu OpenAI-uyumlu HTTP adapter.
+Desteklenen AI provider'ları (ProviderName union): `'claude' | 'codex' | 'gemini' | 'ollama'`. Claude varsayılan; Codex/Gemini tam sprint + worker desteği; Ollama yerel/sıfır-maliyet. DeepSeek/Qwen/Zhipu gibi modeller OpenAI-uyumlu HTTP adapter üzerinden çalışır (ProviderName union üyesi değil).
 **ADR-066** — Provider Independence; `src/core/task-types.ts`
 
 ### ProviderRegistry

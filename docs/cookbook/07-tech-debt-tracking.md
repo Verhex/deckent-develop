@@ -60,9 +60,9 @@ Debt that is not resolved escalates automatically each sprint:
 
 | Sprints Open | Priority |
 |-------------|----------|
-| 0–2         | normal   |
-| ≥ 3         | high     |
-| ≥ 5         | critical |
+| 0–1         | normal   |
+| ≥ 2         | high     |
+| ≥ 3         | critical |
 
 The `escalateDebt()` function in `src/orchestra/debt-manager.ts` increments `sprintsOpen` in the DB entry's metadata on every sprint pass. Critical items appear prominently in `deckent status` output.
 

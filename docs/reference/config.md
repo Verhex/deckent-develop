@@ -27,7 +27,7 @@
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| `mode` | `PlanMode` | `'balanced'` | Aktif plan modu. Gecerli: `'performance'`, `'balanced'`, `'economic'`, `'api'`. |
+| `mode` | `PlanMode` | `'performance'` | Aktif plan modu. Gecerli: `'performance'`, `'balanced'`, `'economic'`, `'api'`. |
 | `modes` | `Record<PlanMode, PlanModeConfig>` | (preset) | Her mod icin konfigürasyon: `max_workers`, `brain_model`, `default_model`, `haiku_allowed`, `brain_planning`. |
 | `model_strategy` | `Partial<ModelStrategy>` | (mode preset) | Tier-tabanli model secim stratejisi. Mode preset ile merge edilir, user override oncelikli. |
 | `providers` | `{ brain?, worker?, fallback?, overrides? }` | — | Gruplanmis provider konfig. **Flat `brain_provider`/`worker_provider` kaldirildI** (Sprint 150 Karar 3+4). |
@@ -121,7 +121,7 @@
 | `cleanup_delay_ms` | `number` | `180000` | Cleanup'tan once bekleme (ms). 0 = hemen. |
 | `ai_planner_timeout` | `number` | — | AI planner subprocess timeout (ms). |
 | `human_checkpoints` | `string[]` | `[]` | Insan onayi gereken fazlar: `'plan'`, `'evaluate'`, `'fix'`. Bos = tam otonom. |
-| `dependency_pipeline_enabled` | `boolean` | `true` | ADR-045 wave-based execution. `true` = Kahn algoritmasiyla topological wave spawning, cascade-on-NO_GO, unblock-on-DONE. `false` = Brain manuel wave yonetimi. **deckent-dev projesi kasitli `false`** (ADR-047). |
+| `dependency_pipeline_enabled` | `boolean` | `true` | ADR-045 wave-based execution. `true` = Kahn algoritmasiyla topological wave spawning, cascade-on-NO_GO, unblock-on-DONE. `false` = Brain manuel wave yonetimi (ADR-047 fallback). Varsayilan `true`; deckent-dev dahil tum projeler `true` (Sprint 156; deckent-dev flip 2026-06-10). |
 
 ---
 

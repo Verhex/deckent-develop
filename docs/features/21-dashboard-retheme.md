@@ -94,8 +94,8 @@ Re-theme sonrası aktif dashboard rotaları (`src/dashboard/src/pages/`):
 | `EvolutionPage` | `/evolution` | Agent/skill evolution pipeline |
 | `HistoryPage` | `/history` | Sprint geçmişi |
 | `LoginPage` | `/login` | OIDC / token giriş |
-| `CallbackPage` | `/callback` | OIDC redirect callback |
-| `MemoryExplorerPage` | `/memory/explorer` | FTS5 memory arama |
+| `CallbackPage` | `/auth/callback` | OIDC redirect callback |
+| `MemoryExplorerPage` | `/memory-explorer` | FTS5 memory arama |
 | `MemoryPage` | `/memory` | Brain memory özeti |
 | `NervousPage` | `/nervous` | Nervous System alert'leri |
 | `SettingsPage` | `/settings` | Kullanıcı ayarları |
@@ -106,7 +106,7 @@ Re-theme sonrası aktif dashboard rotaları (`src/dashboard/src/pages/`):
 
 ## Kaynak & doğrulama
 
-- **Tasarım kaynağı:** `docs/design/web-console/` — README (266-satır spec, token hex+HSL, ekran-ekran, kabul listesi) + `screens/01-04.png` (hi-fi mockup) + `reference/*.jsx` (standalone çalışan prototip = en kesin layout direktifi) + `colors_and_type.css` (temel token) + `assets/` (Decko mascot PNG'leri).
+- **Tasarım kaynağı:** `docs/design/web-console/` — README (285-satır spec, token hex+HSL, ekran-ekran, kabul listesi) + `screens/01-04.png` (hi-fi mockup) + `reference/*.jsx` (standalone çalışan prototip = en kesin layout direktifi) + `colors_and_type.css` (temel token) + `assets/` (Decko mascot PNG'leri).
 - **Doğrulama:** her FAZ → `build:dashboard` + `tsc --noEmit` + `test:dashboard` (796 yeşil). Görsel: kullanıcı `:3100`'de eyeball-onayladı.
 - **Lucide doğrulama:** `grep -rn "lucide-react" src/dashboard/src/components/` — 13+ bileşen, emoji kullanımı = 0.
 - **CSS token doğrulama:** `--color-brand-500: #54a89c`, `--color-gold: #c0b46c` — `src/dashboard/src/index.css` `@theme` bloğu.

@@ -194,7 +194,7 @@ Checks that `DIRECTIVES.md` exists and contains content.
 ### 10 · Brain Budget
 
 Counts lines in `.brain/exports/*.md` files and compares to the configured budget
-(default: 900 lines, set via `memory.budget` in `.deckent/config.json`).
+(set via the top-level `memory_budget` key in `.deckent/config.json`).
 
 | Result | Meaning |
 |--------|---------|
@@ -297,8 +297,7 @@ blocking issues without the full diagnostic output.
 The pre-flight check runs `scripts/pre-flight-health-check.mjs` as a child process and
 falls back to `runDoctorChecks()` if the script is not found.
 
-To disable pre-flight (not recommended): set `preflight_health_check: false` in
-`.deckent/config.json`.
+To skip the pre-flight check (not recommended): run `deckent start --force`.
 
 ---
 

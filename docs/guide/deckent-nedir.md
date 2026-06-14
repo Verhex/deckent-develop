@@ -204,7 +204,7 @@ MCP kaynakları: `deckent://dashboard`, `deckent://directives`, `deckent://memor
 | Yerleşik agent | 15 |
 | Yerleşik skill | 21 |
 | Provider | 4 (Claude/Codex/Gemini/Ollama) + OpenAI-uyumlu |
-| Model | 13 (4 tier) |
+| Model | 14 (4 tier) |
 | ADR | 89 |
 
 ### Kurulum

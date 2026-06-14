@@ -98,11 +98,11 @@ deckent init
 The wizard will prompt you for:
 
 - **Project name** -- for example, `my-project`
-- **Plan mode** -- your Claude subscription tier:
-  - `Max 20x ($200/mo)` -- up to 8 parallel workers, Opus for Brain
-  - `Max 5x ($100/mo)` -- up to 5 workers, Sonnet for Brain
-  - `Pro ($20/mo)` -- up to 3 workers, Sonnet only
-  - `API (pay-as-you-go)` -- up to 10 workers, any model
+- **Plan mode** -- a resource/cost preset (it does NOT ask for a subscription tier or price):
+  - `Performance` -- up to 8 parallel workers, premium Brain (Opus)
+  - `Balanced` -- up to 5 parallel workers, standard Brain (Sonnet)
+  - `Economic` -- up to 3 parallel workers, economy models
+  - `API` -- API-key billing mode (set `ANTHROPIC_API_KEY`)
 - **Language** -- `en` (English) or `tr` (Turkish)
 
 After initialization, your project will contain:

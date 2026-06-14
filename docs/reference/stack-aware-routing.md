@@ -1,6 +1,6 @@
 # Stack-Aware Routing
 
-Deckent works on any project stack, not just TypeScript. Stack detection changes how Deckent verifies tasks, routes work to agents, and applies skills. At the start of a sprint, Deckent detects your project's `TechStackKind` (e.g., `typescript`, `go`, `python`, `rust`, `unknown`) — ensuring a Go project is verified with `go test` and a Python expert is never assigned to a Rust task.
+Deckent works on any project stack, not just TypeScript. Stack detection changes how Deckent verifies tasks, routes work to agents, and applies skills. At the start of a sprint, Deckent detects your project's `TechStackKind` (e.g., `typescript`, `go`, `python`, `rust`, `generic`) — ensuring a Go project is verified with `go test` and a Python expert is never assigned to a Rust task.
 
 Routing itself is handled by the **v2 Routing Engine** (`src/core/routing-engine.ts`), a 3-layer intent-based system that operates on top of stack detection.
 

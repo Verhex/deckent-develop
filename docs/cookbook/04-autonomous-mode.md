@@ -168,7 +168,7 @@ A recurring entry that has never run fires immediately on first dispatch. A malf
 All backlog and approval operations are also available via the `deckent_autonomous` MCP tool:
 
 ```
-deckent_autonomous({ action: "backlog", op: "add", id: "fix-lint-errors", title: "Fix lint", kind: "task", policy: "auto" })
+deckent_autonomous({ action: "backlog_add", id: "fix-lint-errors", title: "Fix lint", kind: "task", policy: "auto" })
 deckent_autonomous({ action: "status" })
 deckent_autonomous({ action: "stop" })
 ```

@@ -47,11 +47,11 @@ deckent cleanup
 # Adım 3: Orphan durumunu kurtar (kısmi sonuçları yeniden değerlendir)
 deckent recover <sprint-id>
 
-# Adım 4: Belirli bir task'ı manuel çalıştır
-deckent run <task-id>
+# Adım 4: Belirli bir task'ı yeniden spawn et (DONE/NO_GO ise --force)
+deckent spawn <taskId> --force
 
-# Adım 5: Kalan task'ları spawn et (otomatik onay)
-deckent spawn --auto-approve
+# Adım 5: Kalan PENDING task'ları tek tek spawn et (spawn tek taskId alır)
+deckent spawn <taskId>
 ```
 
 ### MCP Eşdeğeri
@@ -60,7 +60,7 @@ deckent spawn --auto-approve
 deckent_kill    → { target: "all" }
 deckent_cleanup → { root: "." }
 deckent_recover → { root: "." }
-deckent_run     → { taskId: "<task-id>" }
+deckent_run     → { description: "<task açıklaması>" }
 ```
 
 ### Ne Zaman Hangi Adım
@@ -70,8 +70,8 @@ deckent_run     → { taskId: "<task-id>" }
 | Worker'lar heartbeat yazmıyor | `deckent kill --all` |
 | Task dosyaları bozuk veya kilit sıkışmış | `deckent cleanup` |
 | Kısmi sonuçlar var, sprint tamamlanmadı | `deckent recover <sprint-id>` |
-| Tek bir task yeniden çalıştırılacak | `deckent run <task-id>` |
-| Tüm kalan PENDING task'lar spawn edilecek | `deckent spawn --auto-approve` |
+| Tek bir task yeniden çalıştırılacak | `deckent spawn <taskId>` |
+| Kalan PENDING task'lar (tek tek) | `deckent spawn <taskId>` |
 
 ## Sprint 176 Örüntüsü
 
@@ -86,7 +86,7 @@ Sprint 176'da şu senaryo gerçekleşti:
 ```typescript
 import { regenerateConfigSafe } from 'deckent/core/config';
 
-const result = await regenerateConfigSafe('/path/to/project');
+const result = regenerateConfigSafe('/path/to/project'); // senkron — Promise döndürmez
 console.log('Backup:', result.backupPath);
 console.log('Eklenen alanlar:', result.added);
 ```
@@ -142,9 +142,6 @@ deckent config read
 
 # Belirli bir değeri sıfırla (template default'u tekrar uygula)
 deckent config set spawn_backend docker
-
-# Tam regen (merge ile)
-deckent recover
 ```
 
 ## Sorun Giderme

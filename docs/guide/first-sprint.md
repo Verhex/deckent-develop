@@ -209,7 +209,7 @@ Brain remembers what it learned. Each sprint builds on the last -- memory persis
 | `deckent history` | Past sprint summaries |
 | `deckent retro` | Latest retrospective |
 | `deckent doctor` | Health check |
-| `deckent config --show` | Current configuration |
+| `deckent config` | Current configuration (add `--raw` for unmerged project config) |
 
 ---
 

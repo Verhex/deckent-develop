@@ -117,7 +117,7 @@ See [Chat Mode](chat-mode.md) for a complete walkthrough of naïve and task-driv
 Write your goals in `DIRECTIVES.md` and run the sprint directly:
 
 ```bash
-deckent set-directives   # opens an editor or prompts for goals
+deckent set-directives --file goals.md   # writes DIRECTIVES.md (--content "<text>" or stdin also work)
 ```
 
 Or edit `DIRECTIVES.md` manually:

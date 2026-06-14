@@ -502,15 +502,7 @@ F1-TOK prioritizes **Skills** over broad **Agent** assignment. Skills are narrow
 - Task-specific skill injection is more targeted than agent-wide system prompts
 - In Sprint 275 testing, Skills-first routing produced equivalent quality while reducing prompt context by 20–25%
 
-**Configuration:** Default behavior — no explicit config required. The routing engine (Sprint 075+) already prioritizes Skills when available. To disable Skills injection:
-
-```json
-{
-  "routing": {
-    "skills_enabled": true
-  }
-}
-```
+**Configuration:** Default behavior — no explicit config required; the routing engine (Sprint 075+) prioritizes Skills when available. Skill→agent routing affinities are tuned via the `skill_routing` object (`design` / `testing` / `docs` / `default`) in `.deckent/config.json`; there is no global skills enable/disable toggle.
 
 ### Reading Cache Metrics with `deckent usage`
 

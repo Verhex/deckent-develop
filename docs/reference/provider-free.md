@@ -126,7 +126,7 @@ On Linux, Docker may not resolve `host.docker.internal` by default. Add the host
 docker run --add-host=host.docker.internal:host-gateway ...
 ```
 
-Or configure Deckent with `ollama_host` pointing to the Docker bridge IP directly.
+Or set the `DECKENT_OLLAMA_HOST` (or `OLLAMA_HOST`) environment variable to the Docker bridge IP directly (there is no `ollama_host` config key).
 
 ---
 

@@ -45,7 +45,7 @@ deckent skill list                  # Kayıtlı skill'leri listele
 deckent evolve report               # Cross-sprint agent/skill trend raporu
 
 # Model ve maliyet
-deckent models list                 # Kayıtlı 13 modeli provider/tier ile listele
+deckent models list                 # Kayıtlı 14 modeli provider/tier ile listele
 deckent cost                        # Sprint token kullanım özeti
 
 # Yardım

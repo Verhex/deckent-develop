@@ -67,7 +67,7 @@ Prints the current sprint's task dependency graph as a Mermaid diagram (read fro
 | `--raw` | Legacy box-format dashboard |
 | `--no-color` | Disable ANSI color codes (useful for log files) |
 | `--graph` | Print dependency graph as Mermaid diagram |
-| `--mode <mode>` | Output render mode: `standard` \| `explainatory` \| `verbose` \| `json` |
+| `--mode <mode>` | Output render mode: `standart` \| `explainatory` \| `verbose` \| `json` |
 
 ## Live Tmux Split with `deckent watch`
 

@@ -22,10 +22,10 @@ süreci için ayrılan tampondur.
 
 | Mode        | max_workers | worker_memory_limit | Toplam talep |
 |-------------|-------------|---------------------|--------------|
-| performance | 3           | 4 GB                | 14 GB        |
-| balanced    | 3           | 4 GB                | 14 GB        |
+| performance | 8           | 4 GB                | 34 GB        |
+| balanced    | 5           | 4 GB                | 22 GB        |
 | economic    | 3           | 4 GB                | 14 GB        |
-| api         | 4           | 4 GB                | 18 GB        |
+| api         | 10          | 4 GB                | 42 GB        |
 
 > Sprint 191 öncesi (8 GB hardcoded + 6 worker): **50 GB** istenirdi. Tipik bir
 > 16 GB WSL2 host'ta bu doğrudan OOM-kill demek.

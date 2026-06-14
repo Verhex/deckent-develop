@@ -163,7 +163,7 @@ return {
 
 **Threat:** A worker process escapes the project filesystem or consumes unbounded resources.
 
-**Code:** `src/orchestra/spawn-backend.ts`, `src/providers/docker-backend.ts` (see ADR-062 and project docs)
+**Code:** `src/orchestra/spawn-backend.ts`, `src/orchestra/spawn-backend-docker.ts` (see ADR-062 and project docs)
 
 **Implemented mitigations:**
 - **Filesystem isolation** — Docker workers run in a container with the project directory bind-mounted. Host filesystem outside the mount point is not accessible.
@@ -274,7 +274,7 @@ const tenantId =
 
 **Threat:** A worker — a provider-backed agent (Claude/Codex/Gemini) executing a task — runs arbitrary code inside the project working tree: it edits source files and runs the project's own build, lint, and test commands (e.g. `npm run build`, `vitest`). A malicious DIRECTIVES author, a compromised provider response, or a model hallucination can therefore cause unintended code execution on the host.
 
-**Code:** `src/agents/worker.ts`, `src/orchestra/spawn-backend.ts`, `src/providers/docker-backend.ts`
+**Code:** `src/agents/worker.ts`, `src/orchestra/spawn-backend.ts`, `src/orchestra/spawn-backend-docker.ts`
 
 **Trust assumption (honest):** The DIRECTIVES author is trusted — single-user design, V1.0 (see §1 trust boundaries). Worker code execution is the *intended* behavior of the system: deckent orchestrates agents that write and run code. The security question is not "can a worker run code" (yes, by design) but "how far can a worker's code reach."
 
@@ -323,14 +323,14 @@ Scope enforcement is **not uniform** across backends (see §3c for the full brea
 | Scope enforcement — local/agentic workers (hard, pre-write) | **Implemented (hard)** | Worker scope guard in local-model / native-agent path |
 | Scope enforcement — CLI/tmux workers (advisory, post-write detection) | **Implemented (advisory)** | `src/orchestra/authority-enforcer.ts`, Auditor `git diff --stat` |
 | Scope enforcement — CLI/tmux hard FS-level blocking | **Not implemented (V2 roadmap)** | ADR-037 V2 |
-| Worker code execution — Docker backend isolation (bind-mount) | **Implemented** | `src/orchestra/spawn-backend.ts`, `src/providers/docker-backend.ts` |
+| Worker code execution — Docker backend isolation (bind-mount) | **Implemented** | `src/orchestra/spawn-backend.ts`, `src/orchestra/spawn-backend-docker.ts` |
 | Worker code execution — OS-level confinement | **Not implemented (advisory; V2 roadmap)** | ADR-037 V2 |
 | Multi-project: per-project directory isolation | **Implemented (structural)** | ADR-034 Katman 1 |
 | Multi-project: symlink-aware scope resolution | **Implemented** | `src/agents/worker.ts` (`realpathSync`) |
 | Multi-project: cross-project OS-level boundary | **Not implemented (advisory; V2 roadmap)** | ADR-037 V2 |
 | Sandbox: git-stash rollback | **Implemented** | `src/cli/commands/start.ts` |
 | Sandbox: network blocking | **Best-effort only** (proxy env vars) | `src/providers/sandbox.ts` |
-| Docker: filesystem isolation | **Implemented** | `src/providers/docker-backend.ts` |
+| Docker: filesystem isolation | **Implemented** | `src/orchestra/spawn-backend-docker.ts` |
 | Docker: network isolation | **Not implemented** | Post-beta |
 | HMAC-SHA256 audit chain (terminal PTY) | **Implemented** | `src/api/terminal/audit-integrity.ts` |
 | Telemetry off by default / never-calls-home | **Implemented** | `src/core/telemetry.ts` |

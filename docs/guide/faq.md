@@ -131,9 +131,9 @@ Per-task override in DIRECTIVES.md:
 ### Docker Backend Details
 
 - **Container isolation** — each worker gets its own container with the project mounted read-write only to its declared scope
-- **Memory limit** — configurable via `docker_memory_limit` in config (default: `512m`)
+- **Memory limit** — `4g` per worker container by default; tune per task-kind via `worker_memory_limit_by_kind` in `.deckent/config.json`
 - **Graceful shutdown** — SIGTERM sent first, then SIGKILL after grace period; heartbeat data is fsynced before exit
-- **Timeout** — configurable via `docker_worker_timeout`
+- **Timeout** — configurable via `docker_timeout` (seconds, default `1200`)
 
 ### Using tmux
 
@@ -248,7 +248,7 @@ Each sprint progresses through **8 phases** (monitor via `deckent status`):
 ```bash
 deckent kill --all         # Stop all active workers
 deckent cleanup            # Archive task files, end sprint
-deckent recover            # Re-evaluate partial results from a stalled sprint
+deckent recover <sprint-id>  # Re-evaluate partial results from a stalled sprint
 deckent resume <sprintId>  # Resume from the latest checkpoint
 ```
 
