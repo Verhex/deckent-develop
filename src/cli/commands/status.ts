@@ -11,6 +11,7 @@ import { getCurrentSprintId } from '../../monitor/sprint-state.js';
 import { formatStatus, resolveOutputMode } from '../../core/output-formatter.js';
 import { eventBus } from '../../orchestra/event-bus.js';
 import { StatusRenderer } from '../helpers/status-renderer.js';
+import { readPendingApprovals } from '../../core/pending-approvals.js';
 import { hideCursor, showCursor, clearScreen } from '../helpers/ansi.js';
 
 interface StatusOpts {
@@ -303,6 +304,25 @@ export function buildWorkerCommsSection(root: string, lang: string): string | nu
   return lines.join('\n');
 }
 
+/**
+ * W4 — render the cross-surface "Pending approvals" section from the durable hub
+ * (readPendingApprovals). Independent of sprint state: a parked nervous approval
+ * surfaces in `deckent status` with the EXACT accept command, so the operator
+ * never has to guess what to run. Returns null when nothing is parked.
+ */
+export function buildPendingApprovalsSection(root: string, lang: string): string | null {
+  const pending = readPendingApprovals(root);
+  if (pending.length === 0) return null;
+  const lines: string[] = [getMessage('status.pending_approvals.header', lang, { count: String(pending.length) })];
+  for (const p of pending.slice(0, 5)) {
+    lines.push(`  ⏳ ${p.title}  →  ${p.acceptCommand}`);
+  }
+  if (pending.length > 5) {
+    lines.push('  ' + getMessage('status.pending_approvals.more', lang, { count: String(pending.length - 5) }));
+  }
+  return lines.join('\n');
+}
+
 export function registerStatus(program: Command): void {
   program
     .command('status')
@@ -406,6 +426,8 @@ export function registerStatus(program: Command): void {
           return;
         }
         print(getMessage('status.no_active_sprint', lang));
+        const pendingNoSprint = buildPendingApprovalsSection(root, lang);
+        if (pendingNoSprint) print(pendingNoSprint);
         return;
       }
 
@@ -525,6 +547,8 @@ export function registerStatus(program: Command): void {
             }
             const commsDefault = buildWorkerCommsSection(root, lang);
             if (commsDefault) output(commsDefault);
+            const pendingDefault = buildPendingApprovalsSection(root, lang);
+            if (pendingDefault) output(pendingDefault);
           }
         }
       } catch (error) {

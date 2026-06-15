@@ -122,6 +122,14 @@ const MESSAGES: MessageMap = {
     en: 'No active sprint. Run `deckent start` first.',
     tr: 'Aktif sprint yok. Önce `deckent start` çalıştırın.',
   },
+  'status.pending_approvals.header': {
+    en: '⏳ Pending approvals: {count} — act in the sprint terminal or the dashboard:',
+    tr: '⏳ Bekleyen onaylar: {count} — sprint terminalinde veya dashboard\'tan onayla:',
+  },
+  'status.pending_approvals.more': {
+    en: '… and {count} more (run `deckent nervous` to see all)',
+    tr: '… ve {count} tane daha (hepsi için: `deckent nervous`)',
+  },
   'status.dashboard_read_failed': {
     en: 'Failed to read dashboard file.',
     tr: 'Dashboard dosyası okunamadı.',
