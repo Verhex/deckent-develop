@@ -1016,6 +1016,14 @@ const MESSAGES: MessageMap = {
     en: '❌ Rejected: {id}',
     tr: '❌ Reddedildi: {id}',
   },
+  'bot.approve_ack_ctx': {
+    en: '✅ Approved: {id} — {what}',
+    tr: '✅ Onaylandı: {id} — {what}',
+  },
+  'bot.reject_ack_ctx': {
+    en: '❌ Rejected: {id} — {what}',
+    tr: '❌ Reddedildi: {id} — {what}',
+  },
   'bot.not_found': {
     en: '⚠️ No pending approval found (unknown or expired): {id}',
     tr: '⚠️ Bekleyen onay bulunamadı (bilinmiyor veya süresi doldu): {id}',

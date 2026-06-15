@@ -45,34 +45,50 @@ function ipcPendingFiles(): string[] {
 }
 
 describe('makeCommandResolver — autonomous ownership (durable decisions.json)', () => {
-  it('approve an owned trigger → resolved + decisions.json records approved', async () => {
+  it('approve an owned trigger → resolved ack carries WHAT was approved + decisions.json records approved', async () => {
     seedAutonomousPending('trig-1');
     const resolve = makeCommandResolver(root);
-    expect(await resolve('trig-1', 'approve')).toBe('resolved');
+    const outcome = await resolve('trig-1', 'approve');
+    // Context-rich ack (BOT-002 UX): id + action + requester, not a bare id.
+    expect(outcome).toMatchObject({ status: 'resolved' });
+    if (typeof outcome === 'object') {
+      expect(outcome.reply).toContain('trig-1');
+      expect(outcome.reply).toContain('do-x');     // the action
+      expect(outcome.reply).toContain('nervous');  // requestedBy
+    }
     expect(readDecisions()['trig-1']?.outcome).toBe('approved');
   });
 
   it('reject an owned trigger → resolved + decisions.json records rejected', async () => {
     seedAutonomousPending('trig-2');
     const resolve = makeCommandResolver(root);
-    expect(await resolve('trig-2', 'reject')).toBe('resolved');
+    expect(await resolve('trig-2', 'reject')).toMatchObject({ status: 'resolved' });
     expect(readDecisions()['trig-2']?.outcome).toBe('rejected');
   });
 
   it('is idempotent — resolving twice stays resolved (platform re-sends)', async () => {
     seedAutonomousPending('trig-3');
     const resolve = makeCommandResolver(root);
-    expect(await resolve('trig-3', 'approve')).toBe('resolved');
-    expect(await resolve('trig-3', 'approve')).toBe('resolved');
+    expect(await resolve('trig-3', 'approve')).toMatchObject({ status: 'resolved' });
+    expect(await resolve('trig-3', 'approve')).toMatchObject({ status: 'resolved' });
     expect(readDecisions()['trig-3']?.outcome).toBe('approved');
+  });
+
+  it('localizes the ack (TR)', async () => {
+    seedAutonomousPending('trig-tr');
+    const resolve = makeCommandResolver(root, {}, 'tr');
+    const outcome = await resolve('trig-tr', 'approve');
+    if (typeof outcome === 'object') expect(outcome.reply).toContain('Onaylandı');
   });
 });
 
 describe('makeCommandResolver — nervous ownership (durable IPC)', () => {
-  it('real disk: nervous-pending id → resolved + an IPC pending file is written', async () => {
+  it('real disk: nervous id → resolved ack shows the title + an IPC pending file is written', async () => {
     seedNervousPending('n-1');
     const resolve = makeCommandResolver(root);
-    expect(await resolve('n-1', 'approve')).toBe('resolved');
+    const outcome = await resolve('n-1', 'approve');
+    expect(outcome).toMatchObject({ status: 'resolved' });
+    if (typeof outcome === 'object') expect(outcome.reply).toContain('t'); // the nervous title
     expect(ipcPendingFiles().length).toBe(1);
   });
 
@@ -82,7 +98,7 @@ describe('makeCommandResolver — nervous ownership (durable IPC)', () => {
       readNervousPending: () => [{ id: 'n-full-42' }],
       writeNervousApproval,
     });
-    expect(await resolve('n-full-42', 'reject')).toBe('resolved');
+    expect(await resolve('n-full-42', 'reject')).toMatchObject({ status: 'resolved' });
     expect(writeNervousApproval).toHaveBeenCalledWith(root, 'n-full-42', 'reject');
   });
 });
@@ -93,7 +109,7 @@ describe('makeCommandResolver — routing precedence + not-found', () => {
     const readNervousPending = vi.fn(() => [{ id: 'shared-id' }]);
     const writeNervousApproval = vi.fn(async () => {});
     const resolve = makeCommandResolver(root, { readNervousPending, writeNervousApproval });
-    expect(await resolve('shared-id', 'approve')).toBe('resolved');
+    expect(await resolve('shared-id', 'approve')).toMatchObject({ status: 'resolved' });
     expect(writeNervousApproval).not.toHaveBeenCalled();
   });
 

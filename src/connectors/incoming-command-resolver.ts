@@ -20,11 +20,14 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { makeApprovalGate } from '../orchestra/autonomous/approval-adapter.js';
 import { NervousIpcQueue } from '../nervous/ipc-queue.js';
+import { getMessage } from '../cli/helpers/messages.js';
 import type { ApprovalAction, CommandResolver, ResolveOutcome } from './incoming-command-router.js';
 
 /** Minimal shape the resolver needs from a nervous pending entry. */
 export interface NervousPendingLike {
   readonly id: string;
+  /** Human-readable title — surfaced in the ack so the user sees WHAT they decided. */
+  readonly title?: string;
 }
 
 export interface CommandResolverDeps {
@@ -47,6 +50,13 @@ function readNervousPendingFile(root: string): NervousPendingLike[] {
   }
 }
 
+/** Build a context-rich resolved outcome so the ack says WHAT was decided, not
+ *  just the id (e.g. "✅ Onaylandı: dz-9 — autonomous.execute (system:verify)"). */
+function resolvedWith(action: ApprovalAction, id: string, what: string, lang: string): ResolveOutcome {
+  const key = action === 'approve' ? 'bot.approve_ack_ctx' : 'bot.reject_ack_ctx';
+  return { status: 'resolved', reply: getMessage(key, lang, { id, what }) };
+}
+
 async function writeNervousApprovalReal(root: string, id: string, action: ApprovalAction): Promise<void> {
   await new NervousIpcQueue(root).writeApproval({
     notificationId: id,
@@ -58,7 +68,11 @@ async function writeNervousApprovalReal(root: string, id: string, action: Approv
  * Build a CommandResolver bound to a project root. Disk-backed by default; the
  * nervous seams are injectable for hermetic routing tests.
  */
-export function makeCommandResolver(root: string, deps: CommandResolverDeps = {}): CommandResolver {
+export function makeCommandResolver(
+  root: string,
+  deps: CommandResolverDeps = {},
+  lang = 'en',
+): CommandResolver {
   const readNervous = deps.readNervousPending ?? readNervousPendingFile;
   const writeNervous = deps.writeNervousApproval ?? writeNervousApprovalReal;
 
@@ -71,14 +85,17 @@ export function makeCommandResolver(root: string, deps: CommandResolverDeps = {}
     if (owned) {
       if (action === 'approve') gate.accept(owned.triggerId);
       else gate.reject(owned.triggerId);
-      return 'resolved';
+      // The ack carries the action + who requested it, so the user knows what
+      // they just decided (not a bare "Approved dz-9").
+      const what = owned.requestedBy ? `${owned.action} (${owned.requestedBy})` : owned.action;
+      return resolvedWith(action, owned.triggerId, what, lang);
     }
 
     // 2. Nervous gate — durable IPC, consumed by the executor poller.
     const match = readNervous(root).find((n) => n.id === id || n.id.startsWith(id));
     if (match) {
       await writeNervous(root, match.id, action);
-      return 'resolved';
+      return resolvedWith(action, match.id, match.title ?? match.id, lang);
     }
 
     return 'not-found';

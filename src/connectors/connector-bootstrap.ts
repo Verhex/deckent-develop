@@ -165,7 +165,7 @@ export async function bootstrapConnectorCommands(
   deps: ConnectorCommandsDeps = {},
 ): Promise<ConnectorCommandsHandle> {
   const lang = deps.lang ?? 'en';
-  const gateResolve = deps.resolve ?? makeCommandResolver(root);
+  const gateResolve = deps.resolve ?? makeCommandResolver(root, {}, lang);
   const actionDispatcher = deps.actionDispatcher ?? createCliToolDispatcher();
   // Composite resolver: a parked bot-action (slice 2b) is the THIRD gate type —
   // unlike autonomous/nervous (consumed by their own loops), approving here
