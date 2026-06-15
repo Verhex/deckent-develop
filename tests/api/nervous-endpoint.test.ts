@@ -4,6 +4,8 @@
  * root via startTestServer, no gitignored state.
  */
 import { describe, it, expect, afterEach } from 'vitest';
+import { writeFileSync, existsSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
 import { startTestServer, call, type TestServerHandle } from './test-server-helper.js';
 
 describe('/api/nervous/* routes', () => {
@@ -51,5 +53,51 @@ describe('/api/nervous/* routes', () => {
     handle = await startTestServer({ disableAuth: true });
     const res = await call(handle, '/api/nervous/bogus');
     expect(res.status).toBe(404);
+  });
+});
+
+// W8 — the dashboard nervous surface is unified with the cross-surface hub: it
+// surfaces the SAME nervous-pending.json approvals shown by `deckent status` /
+// Telegram, and resolves them via the nervous-ipc queue (the executor poller),
+// not only the legacy panic-guard channel.
+describe('/api/nervous/* — unified hub integration (W8)', () => {
+  let handle: TestServerHandle;
+  afterEach(async () => {
+    if (handle) { await handle.close(); handle = undefined as unknown as TestServerHandle; }
+  });
+
+  function seedNervousPending(root: string): void {
+    writeFileSync(join(root, '.deckent', 'nervous-pending.json'), JSON.stringify([
+      { id: 'nrv-1', type: 'directives-protection', title: 'Directives changed mid-sprint', message: 'baseline drift', severity: 'critical', detectorId: 'directives-protection', createdAt: '2026-06-15T00:00:00.000Z' },
+    ]));
+  }
+
+  it('GET /api/nervous/pending surfaces nervous-pending.json approvals (unified hub)', async () => {
+    handle = await startTestServer({ disableAuth: true });
+    seedNervousPending(handle.projectRoot);
+    const res = await call(handle, '/api/nervous/pending');
+    expect(res.status).toBe(200);
+    const body = res.json<Array<{ id: string; description: string; risk: string }>>();
+    const nrv = body.find((p) => p.id === 'nrv-1');
+    expect(nrv).toBeTruthy();
+    expect(nrv!.description).toContain('Directives changed');
+    expect(nrv!.risk).toBe('high'); // critical → high
+  });
+
+  it('GET /api/nervous/status counts nervous-pending approvals in pendingCount', async () => {
+    handle = await startTestServer({ disableAuth: true });
+    seedNervousPending(handle.projectRoot);
+    const res = await call(handle, '/api/nervous/status');
+    expect(res.json<{ pendingCount: number }>().pendingCount).toBeGreaterThanOrEqual(1);
+  });
+
+  it('POST /api/nervous/accept/<id> writes a nervous-ipc approval (executor round-trip)', async () => {
+    handle = await startTestServer({ disableAuth: true });
+    seedNervousPending(handle.projectRoot);
+    const res = await call(handle, '/api/nervous/accept/nrv-1', { method: 'POST' });
+    expect(res.status).toBe(200);
+    const ipcPending = join(handle.projectRoot, '.deckent', 'nervous-ipc', 'pending');
+    expect(existsSync(ipcPending)).toBe(true);
+    expect(readdirSync(ipcPending).length).toBeGreaterThanOrEqual(1);
   });
 });
