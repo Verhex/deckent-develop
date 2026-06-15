@@ -59,4 +59,28 @@ describe('createStreamSegmenter', () => {
     s.flush();
     expect(seg).toEqual([{ kind: 'block', markdown: '```js\ncode without close' }]);
   });
+
+  it('caps a runaway unclosed code block — emits mid-stream instead of swallowing the rest of the reply', () => {
+    // A stray/unclosed ``` would otherwise buffer EVERY following line silently
+    // until turn-end (the "akış kayıp" freeze). The cap bounds that window.
+    const { seg, emit } = collect();
+    const s = createStreamSegmenter(emit);
+    s.feed('```js\n');
+    for (let i = 0; i < 250; i++) s.feed(`line ${i}\n`);
+    // Without the cap, nothing is emitted before flush(); with it, the runaway
+    // block is flushed mid-stream so subsequent output is not swallowed.
+    expect(seg.length).toBeGreaterThan(0);
+    expect(seg.some((x) => x.kind === 'block')).toBe(true);
+  });
+
+  it('a normal-sized closed code block is unaffected by the cap (still emits whole on close)', () => {
+    const { seg, emit } = collect();
+    const s = createStreamSegmenter(emit);
+    s.feed('```ts\n');
+    for (let i = 0; i < 20; i++) s.feed(`const n${i} = ${i};\n`);
+    expect(seg).toEqual([]);          // under the cap → still buffered until close
+    s.feed('```\n');
+    expect(seg).toHaveLength(1);
+    expect(seg[0]!.kind).toBe('block');
+  });
 });

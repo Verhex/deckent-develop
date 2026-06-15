@@ -28,6 +28,13 @@ export interface StreamSegmenter {
 const isTableRow = (l: string): boolean => /\|/.test(l) && l.trim().length > 0;
 const isFenceLine = (l: string): boolean => /^\s*```/.test(l);
 
+/** Cap a code block that never closes. A stray/unclosed ``` would otherwise
+ *  buffer EVERY following line silently until turn-end (the "akış kayıp" freeze
+ *  where a long reply appears frozen). Past this many lines without a closing
+ *  fence we flush the buffered block and resume prose, bounding the freeze. Real
+ *  fenced blocks are well under this — they still emit whole on their close. */
+const MAX_CODE_BLOCK_LINES = 200;
+
 /**
  * Create a segmenter. `emit(seg)` is called once per completed unit, in order.
  * Prose lines emit immediately; a fenced code block buffers from its opening
@@ -50,7 +57,10 @@ export function createStreamSegmenter(emit: (seg: Segment) => void): StreamSegme
   const handleLine = (line: string): void => {
     if (mode === 'code') {
       block.push(line);
-      if (isFenceLine(line)) { emit({ kind: 'block', markdown: block.join('\n') }); block = []; mode = 'prose'; }
+      if (isFenceLine(line)) { emit({ kind: 'block', markdown: block.join('\n') }); block = []; mode = 'prose'; return; }
+      // Runaway/unclosed fence: bound the silent buffer so the rest of the reply
+      // is not swallowed until turn-end. Flush what we have and resume prose.
+      if (block.length >= MAX_CODE_BLOCK_LINES) { emit({ kind: 'block', markdown: block.join('\n') }); block = []; mode = 'prose'; }
       return;
     }
     if (mode === 'table') {
