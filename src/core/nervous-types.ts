@@ -100,6 +100,9 @@ export interface NotificationAction {
 export interface NervousNotification {
   /** UUID v4 — cross-channel dedup için */
   readonly id: string;
+  /** Kısa, insan-yazılabilir onay kodu (id'den deterministik türetilir). Operatör
+   *  Telegram'da UUID yerine `approve <shortCode>` yazabilsin diye (proposer mint eder). */
+  readonly shortCode?: string;
   /** Notification tipi — Detector tarafından belirlenir */
   readonly type: string;
   /** İnsan-okunabilir başlık */

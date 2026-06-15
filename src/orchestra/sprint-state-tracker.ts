@@ -73,6 +73,12 @@ function readActiveWorkers(tasksDir: string): ActiveWorker[] {
   const out: ActiveWorker[] = [];
   for (const file of files) {
     if (!file.endsWith('.hb')) continue;
+    // A worker that has already written its .result is FINISHED, not active —
+    // its heartbeat simply stopped on normal exit, so its .hb ages out and
+    // (without this guard) reads as "stale". Skipping it here keeps
+    // activeWorkers genuinely-active, so StaleWorkerDetector never proposes a
+    // spurious WORKER_RESPAWN for a DONE worker (the false-positive root).
+    if (existsSync(join(tasksDir, file.replace(/\.hb$/, '.result')))) continue;
     try {
       const raw = readFileSync(join(tasksDir, file), 'utf-8');
       const hb = JSON.parse(raw) as { workerId?: unknown; taskId?: unknown; timestamp?: unknown };

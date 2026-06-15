@@ -60,6 +60,13 @@ const FS_WATCH_TARGETS: readonly string[] = [
  * self-written files are pure noise to the detectors (which care about task
  * files, DIRECTIVES, source, memory.db, locks).
  */
+// Drop ONLY files deckent writes DURING an observe/detector/executor cycle — the
+// self-cascade sources (a write → watcher re-fire → cycle → write → …). The
+// confirmed ~200-sprint loop was the ERRORS.md branch; the rest (nervous-*,
+// metrics/events.jsonl) close the same class. Deliberately NOT filtered: `.hb` and
+// `sprint-state.json` — those are written by the WORKER / sprint-controller, never
+// by the observe handler, so they can't self-cascade, and reacting to them
+// (debounced) is a USEFUL trigger for prompt staleness / phase-transition checks.
 function isObserverNoiseFile(filename: string | null | undefined): boolean {
   if (!filename) return false;
   const name = String(filename).replace(/\\/g, '/');
@@ -67,12 +74,10 @@ function isObserverNoiseFile(filename: string | null | undefined): boolean {
     name.includes('nervous-') ||        // nervous-history/recommendations/pending/heartbeat/respawn-requests
     name.includes('nervous-ipc') ||
     name.includes('panic-ipc') ||
-    name.endsWith('ERRORS.md') ||        // debugLog target — the loop trigger
-    name.endsWith('.dashboard') ||       // auditor snapshot (every scan)
-    name.endsWith('sprint-state.json') ||
-    name.endsWith('metrics.jsonl') ||
-    name.endsWith('-events.jsonl') ||    // event-stream (per-event churn)
-    name.endsWith('.hb')                 // worker heartbeats (sub-second churn during EXECUTE)
+    name.endsWith('ERRORS.md') ||        // debugLog target — the confirmed loop trigger
+    name.endsWith('.dashboard') ||       // auditor snapshot (every scan — useless to react to)
+    name.endsWith('metrics.jsonl') ||    // observability emitMetric (detector-cycle self-write)
+    name.endsWith('-events.jsonl')       // event-stream writeEvent (detector-cycle self-write)
   );
 }
 

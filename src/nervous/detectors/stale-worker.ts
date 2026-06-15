@@ -1,18 +1,23 @@
 // src/nervous/detectors/stale-worker.ts
 //
 // StaleWorkerDetector — Sprint 145 T-011 Docker worker exit pattern'i + genel HB staleness.
-// 3dk+ heartbeat güncellemesi olmayan worker'ları tespit eder → WORKER_RESPAWN öneri.
+// 10dk+ heartbeat güncellemesi olmayan worker'ları tespit eder → WORKER_RESPAWN öneri.
 //
 // Design spec: docs/superpowers/specs/2026-04-20-deckent-nervous-system-design.md Section 5.1
 // Sprint 147 Task 9
 
 import type { DetectorContext, DetectorResult } from '../../core/nervous-types.js';
 
-const DEFAULT_STALE_MS = 180000; // 3 dakika
+// 10 dakika. Bitmiş worker'lar (.result yazmış) snapshot'ın activeWorkers'ından
+// zaten elenir (sprint-state-tracker), dolayısıyla bu eşik YALNIZ gerçekten
+// asılı kalmış AKTİF bir worker içindir — uzun-soluklu bir tool-call'u erkenden
+// "stale" damgalamamak için 3dk→10dk yükseltildi (uyarı gürültüsü azaltma).
+// Override: config.nervous_system.detectors.stale_worker.threshold_ms.
+const DEFAULT_STALE_MS = 600000;
 
 /**
  * Aktif worker'ların heartbeat'lerini izler.
- * 3dk+ güncelleme yok → WORKER_RESPAWN önerisi (medium risk).
+ * 10dk+ güncelleme yok → WORKER_RESPAWN önerisi (medium risk).
  *
  * Tetikleyiciler: cron tick veya filesystem değişikliği.
  * event-bus kaynağı bu detector tarafından işlenmez.

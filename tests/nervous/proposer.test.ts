@@ -5,6 +5,7 @@
 // critical bypass, multiple actions, timeout computation, payload propagation
 
 import { describe, it, expect, beforeEach } from 'vitest';
+import { createHash } from 'node:crypto';
 import { Proposer, computeTimeoutMs } from '../../src/nervous/proposer.js';
 import type {
   DetectorResult,
@@ -162,6 +163,20 @@ describe('Proposer', () => {
     expect(notification!.actions).toHaveLength(2);
     expect(notification!.actions[0].id).toBe('WORKER_RESPAWN');
     expect(notification!.actions[1].id).toBe('SCOPE_COLLISION_REORDER');
+  });
+
+  it('mints a short, deterministic approval code (phone-typeable, derived from id)', () => {
+    const result = makeDetectorResult({ groupKey: 'stale-worker:w-9' });
+    const decisions = [makeDecision('WORKER_RESPAWN')];
+    const n = proposer.propose(result, decisions, makeContext());
+    expect(n).not.toBeNull();
+    // 5-char base36 — short enough to type on a phone, not a UUID.
+    expect(n!.shortCode).toMatch(/^[0-9a-z]{5}$/);
+    // Deterministic: the code is a pure function of the notification id (pins the
+    // documented derivation so the resolver/CLI/Telegram all agree on the code).
+    const h = createHash('sha256').update(n!.id).digest('hex');
+    const expected = parseInt(h.slice(0, 12), 16).toString(36).slice(0, 5).padStart(5, '0');
+    expect(n!.shortCode).toBe(expected);
   });
 
   it('should compute timeoutMs as smallest suggest-* timeout', () => {

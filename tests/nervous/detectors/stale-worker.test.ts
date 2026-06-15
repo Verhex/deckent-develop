@@ -53,8 +53,8 @@ function makeFreshWorker(id: string, taskId: string): SprintStateSnapshot['activ
   return { id, taskId, lastHeartbeat: freshTime };
 }
 
-function makeStaleWorker(id: string, taskId: string, staleMs = 200_000): SprintStateSnapshot['activeWorkers'][number] {
-  // Son heartbeat: staleMs önce (varsayılan 200s = stale > 180s threshold)
+function makeStaleWorker(id: string, taskId: string, staleMs = 700_000): SprintStateSnapshot['activeWorkers'][number] {
+  // Son heartbeat: staleMs önce (varsayılan 700s = stale > 600s/10dk threshold)
   const staleTime = new Date(BASE_NOW.getTime() - staleMs).toISOString();
   return { id, taskId, lastHeartbeat: staleTime };
 }
@@ -65,7 +65,7 @@ describe('StaleWorkerDetector', () => {
   let detector: StaleWorkerDetector;
 
   beforeEach(() => {
-    detector = new StaleWorkerDetector(); // default 180s threshold
+    detector = new StaleWorkerDetector(); // default 600s/10dk threshold
   });
 
   it('Test 1: aktif worker yoksa null döndürür', () => {

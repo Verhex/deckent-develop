@@ -40,7 +40,14 @@ const PRIORITY_EMOJI: Record<string, string> = {
 
 function formatNotification(n: Notification): string {
   const emoji = PRIORITY_EMOJI[n.priority] ?? 'ℹ️';
-  return `${emoji} [deckent] ${n.title}: ${n.summary}`;
+  const head = `${emoji} [deckent] ${n.title}: ${n.summary}`;
+  // Surface the actionable approve/reject commands (each carries its own short
+  // code) so the operator can resolve the ask straight from the chat reply —
+  // previously actions never reached the connector at all (only the CLI/event
+  // surfaces showed "what to run"). The humanizer preserves commands verbatim.
+  if (!n.actions || n.actions.length === 0) return head;
+  const cmds = n.actions.map((a) => `${a.label}: ${a.cliCommand}`).join('  ·  ');
+  return `${head}\n${cmds}`;
 }
 
 /** Resolve `undefined` after `ms` so a hanging send never blocks the caller. */

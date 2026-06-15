@@ -17,6 +17,7 @@ import {
   makeGatedDispatcher,
   hasRealPendingCheckpoint,
   DECKENT_BOT_SYSTEM_PROMPT,
+  buildBotSystemPrompt,
 } from '../../src/connectors/bot-agentic.js';
 import type { McpToolDispatcher } from '../../src/cli/commands/chat-native.js';
 
@@ -166,5 +167,42 @@ describe('hasRealPendingCheckpoint', () => {
     mkdirSync(dir, { recursive: true });
     writeFileSync(join(dir, 'checkpoint-x-PLAN.json'), '{not json', 'utf-8');
     expect(hasRealPendingCheckpoint(root)).toBe(false);
+  });
+});
+
+describe('buildBotSystemPrompt — conversational grounding (bot chat quality fix)', () => {
+  let root: string;
+  beforeEach(() => { root = mkdtempSync(join(tmpdir(), 'botprompt-')); });
+  afterEach(() => rmSync(root, { recursive: true, force: true }));
+
+  it('no root → returns the bare tool prompt (back-compat)', () => {
+    expect(buildBotSystemPrompt()).toBe(DECKENT_BOT_SYSTEM_PROMPT);
+  });
+
+  it('injects the live project context (summary.md) so answers are grounded, not hollow', () => {
+    mkdirSync(join(root, '.brain', 'exports'), { recursive: true });
+    writeFileSync(
+      join(root, '.brain', 'exports', 'summary.md'),
+      '# Brain Summary\nadr-088 Memory V2 DB-First — accepted\nSPRINT_MARKER_42',
+      'utf-8',
+    );
+    const prompt = buildBotSystemPrompt(root);
+    expect(prompt).toContain(DECKENT_BOT_SYSTEM_PROMPT); // keeps the tool directives
+    expect(prompt).toContain('SPRINT_MARKER_42');        // grounds in real project context
+    expect(prompt).toContain('Proje Bağlamı');           // the grounding section header
+  });
+
+  it('summary absent → still returns a non-empty grounded prompt (fail-safe, never throws)', () => {
+    const prompt = buildBotSystemPrompt(root);
+    expect(prompt).toContain(DECKENT_BOT_SYSTEM_PROMPT);
+    expect(prompt.length).toBeGreaterThan(DECKENT_BOT_SYSTEM_PROMPT.length);
+  });
+
+  it('bounds a huge summary so the system prompt never blows up', () => {
+    mkdirSync(join(root, '.brain', 'exports'), { recursive: true });
+    writeFileSync(join(root, '.brain', 'exports', 'summary.md'), 'x'.repeat(20000), 'utf-8');
+    const prompt = buildBotSystemPrompt(root);
+    expect(prompt).toContain('kısaltıldı');
+    expect(prompt.length).toBeLessThan(8000);
   });
 });

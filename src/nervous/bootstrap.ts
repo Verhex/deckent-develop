@@ -112,12 +112,17 @@ export function emitNervousApprovalPending(
   try {
     const sprintId = getCurrentSprintId(projectRoot);
     if (!sprintId) return;
+    // Surface the short code (proposer-minted) so every operator surface
+    // (deckent status --follow / deckent_watch) shows a copy-pasteable command
+    // instead of a UUID; the CLI resolver matches shortCode just like the id.
+    const code = notification.shortCode ?? notification.id;
     writeEvent(projectRoot, sprintId, 'deckent', 'user', CHANNELS.NERVOUS_NOTIFICATION, {
       kind: 'nervous',
       id: notification.id,
+      shortCode: notification.shortCode,
       title: notification.title,
-      acceptCommand: `deckent nervous accept ${notification.id}`,
-      rejectCommand: `deckent nervous reject ${notification.id}`,
+      acceptCommand: `deckent nervous accept ${code}`,
+      rejectCommand: `deckent nervous reject ${code}`,
     });
   } catch {
     // Never break the nervous pipeline on a live-tail emit failure.

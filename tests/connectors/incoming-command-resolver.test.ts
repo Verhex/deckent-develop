@@ -101,6 +101,28 @@ describe('makeCommandResolver — nervous ownership (durable IPC)', () => {
     expect(await resolve('n-full-42', 'reject')).toMatchObject({ status: 'resolved' });
     expect(writeNervousApproval).toHaveBeenCalledWith(root, 'n-full-42', 'reject');
   });
+
+  it('short code: `approve <shortCode>` resolves the notification and writes the FULL id', async () => {
+    const writeNervousApproval = vi.fn(async () => {});
+    const resolve = makeCommandResolver(root, {
+      // UUID id + a phone-typeable short code (what the Telegram message shows).
+      readNervousPending: () => [{ id: 'c1c64af8-7c73-4117-ac07-f2bb5bf73910', shortCode: 'a3f9c' }],
+      writeNervousApproval,
+    });
+    expect(await resolve('a3f9c', 'approve')).toMatchObject({ status: 'resolved' });
+    // The executor is keyed by the full id — the short code resolves to it.
+    expect(writeNervousApproval).toHaveBeenCalledWith(root, 'c1c64af8-7c73-4117-ac07-f2bb5bf73910', 'approve');
+  });
+
+  it('short code is case-insensitive (operator may type it any case)', async () => {
+    const writeNervousApproval = vi.fn(async () => {});
+    const resolve = makeCommandResolver(root, {
+      readNervousPending: () => [{ id: 'n-xyz', shortCode: 'a3f9c' }],
+      writeNervousApproval,
+    });
+    expect(await resolve('A3F9C', 'approve')).toMatchObject({ status: 'resolved' });
+    expect(writeNervousApproval).toHaveBeenCalledWith(root, 'n-xyz', 'approve');
+  });
 });
 
 describe('makeCommandResolver — routing precedence + not-found', () => {

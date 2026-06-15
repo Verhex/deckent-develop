@@ -178,7 +178,7 @@ export function handleNervousSlash(
       return getMessage('nervous.slash_id_required', lng, { sub });
     }
     const pending = getPendingNervous(root);
-    const idx = pending.findIndex(n => n.id === id || n.id.startsWith(id));
+    const idx = pending.findIndex(n => n.id === id || n.id.startsWith(id) || n.shortCode === id.toLowerCase());
     if (idx === -1) {
       return getMessage('nervous.slash_not_found', lng, { id });
     }
@@ -201,7 +201,7 @@ export function handleNervousSlash(
       return getMessage('nervous.slash_id_required', lng, { sub });
     }
     const pending = getPendingNervous(root);
-    const idx = pending.findIndex(n => n.id === id || n.id.startsWith(id));
+    const idx = pending.findIndex(n => n.id === id || n.id.startsWith(id) || n.shortCode === id.toLowerCase());
     if (idx === -1) {
       return getMessage('nervous.slash_not_found', lng, { id });
     }

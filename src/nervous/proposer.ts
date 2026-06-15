@@ -17,7 +17,17 @@ import type {
   NervousSystemConfig,
   ApprovalPolicy,
 } from '../core/nervous-types.js';
-import { randomUUID } from 'node:crypto';
+import { randomUUID, createHash } from 'node:crypto';
+
+/**
+ * Kısa, insan-yazılabilir onay kodu — notification id'sinden DETERMINISTIK türetilir
+ * (aynı id → aynı kod), bekleyen birkaç bildirim arasında çakışması ihmal edilebilir.
+ * Operatör Telegram'da uzun UUID yerine `approve <code>` yazabilsin diye (5 base36 hane).
+ */
+function shortApprovalCode(id: string): string {
+  const h = createHash('sha256').update(id).digest('hex');
+  return parseInt(h.slice(0, 12), 16).toString(36).slice(0, 5).padStart(5, '0');
+}
 
 // ─── Severity Rank ───────────────────────────────────────────────────────────
 
@@ -89,8 +99,10 @@ export class Proposer {
 
     // Build notification
     const now = context.now ?? new Date();
+    const id = randomUUID();
     const notification: NervousNotification = {
-      id: randomUUID(),
+      id,
+      shortCode: shortApprovalCode(id),
       type: (detectorResult.metadata?.type as string) ?? 'generic',
       title: context.title,
       message: context.message,

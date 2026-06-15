@@ -331,12 +331,25 @@ function bridgeToUserNotify(notification: NervousNotification): void {
   try {
     const hasActions = notification.actions.length > 0;
     const eventName = mapSeverityToEventName(notification.severity, hasActions);
+    // Surface a SHORT, copy-pasteable approve/reject command so the operator can
+    // resolve the ask over Telegram without typing the UUID. The code is the
+    // notification's shortCode (proposer-minted); the Telegram regex accepts both
+    // `approve`/`reject` and the resolver matches shortCode. Labels are the
+    // mechanism's English default (NotificationAction.label is caller-localized).
+    const code = notification.shortCode ?? notification.id;
+    const actions = hasActions
+      ? [
+          { label: 'Approve', cliCommand: `approve ${code}` },
+          { label: 'Reject', cliCommand: `reject ${code}` },
+        ]
+      : undefined;
     void notify(
       eventName,
       notification.sprintId ?? 'unknown',
       `[Nervous] ${notification.title}`,
       notification.message,
       notification.detectorId,
+      actions ? { actions } : undefined,
     ).catch(() => { /* Fail-safe */ });
   } catch {
     // Fail-safe: never let bridge errors propagate

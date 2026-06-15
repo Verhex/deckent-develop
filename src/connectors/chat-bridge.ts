@@ -27,7 +27,7 @@ import {
 import { createCliToolDispatcher } from '../cli/commands/chat-tool-bridge.js';
 import { createPersistentClaudeSession } from '../cli/commands/chat-session.js';
 import { classifyActionRisk, type AgenticAction } from '../cli/commands/agentic-confirm.js';
-import { makeGatedDispatcher, hasRealPendingCheckpoint, DECKENT_BOT_SYSTEM_PROMPT } from './bot-agentic.js';
+import { makeGatedDispatcher, hasRealPendingCheckpoint, buildBotSystemPrompt } from './bot-agentic.js';
 import { parkBotAction, isSprintScopedDestructive } from './bot-action-store.js';
 import { getCurrentSprintId } from '../monitor/sprint-state.js';
 
@@ -101,7 +101,9 @@ export function makeChatResponder(deps: ChatResponderDeps = {}): ChatResponder {
   function agenticProvider(): ChatProviderAdapter {
     if (deps.provider) return deps.provider;
     if (!persistent) {
-      persistent = createPersistentClaudeSession({ systemPrompt: DECKENT_BOT_SYSTEM_PROMPT });
+      // Ground the persistent session in the live project context (summary.md) so
+      // conversational answers are deckent-specific and accurate, not hollow.
+      persistent = createPersistentClaudeSession({ systemPrompt: buildBotSystemPrompt(deps.root) });
     }
     return persistent;
   }

@@ -201,3 +201,46 @@ export const DECKENT_BOT_SYSTEM_PROMPT = [
   '',
   'Aksiyon gerekmeyen sorulara normal metinle, kullanıcının dilinde cevap ver.',
 ].join('\n');
+
+/**
+ * Read a compact project-context snapshot to GROUND the bot's conversational
+ * answers. Source: `.brain/exports/summary.md` — the curated, auto-generated
+ * context (active ADRs, recent sprint learnings, active debt). Bounded so a large
+ * summary never blows the system prompt. Absent/unreadable → a short static line.
+ */
+function readProjectContextSnapshot(root: string): string {
+  const summaryPath = join(root, '.brain', 'exports', 'summary.md');
+  try {
+    if (existsSync(summaryPath)) {
+      const raw = readFileSync(summaryPath, 'utf-8').trim();
+      const MAX = 6000; // keep the system prompt bounded (~1.5K tokens of context)
+      return raw.length > MAX ? raw.slice(0, MAX) + '\n…(kısaltıldı — tamamı için deckent_memory_query)' : raw;
+    }
+  } catch {
+    // unreadable summary → fall through to the static line (never break the bot)
+  }
+  return "deckent: AI agent orchestration CLI (Brain/Worker/Auditor, sprint-tabanlı). Canlı durum için deckent_status tool'unu çağır.";
+}
+
+/**
+ * Build the bot's conversational system prompt: the tool directives + LIVE project
+ * grounding (summary.md) + a "be a genuinely helpful, accurate deckent-expert"
+ * instruction. Grounding the persistent session in the project context is the fix
+ * for hollow/generic answers — the model otherwise sees only the raw question with
+ * ZERO project knowledge (the root cause of poor bot chat quality). Volatile state
+ * (sprint progress) stays tool-driven (deckent_status), never baked into the prompt.
+ */
+export function buildBotSystemPrompt(root?: string): string {
+  if (!root) return DECKENT_BOT_SYSTEM_PROMPT;
+  return [
+    DECKENT_BOT_SYSTEM_PROMPT,
+    '',
+    "Sen deckent'i DERİNLEMESINE bilen, yardımsever ve DOĞRU bir asistansın.",
+    'Aşağıdaki canlı proje bağlamını kullanarak somut, doğru ve kısa-öz cevap ver;',
+    'bilmediğini UYDURMA — gerekirse bir salt-okunur tool çağırıp canlı veriye bak.',
+    "Kullanıcının dilinde (Türkçe/İngilizce) yanıtla. Vague/genel laf etme; deckent'e özgü konuş.",
+    '',
+    '## Proje Bağlamı (deckent — canlı özet; cevaplarını BUNA dayandır)',
+    readProjectContextSnapshot(root),
+  ].join('\n');
+}

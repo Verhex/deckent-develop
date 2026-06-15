@@ -67,6 +67,31 @@ describe('ConnectorNotificationAdapter (BOT-001)', () => {
     expect(dc.sent[0]?.channelId).toBe('DC-999');
   });
 
+  it('renders actionable commands (approve/reject short codes) into the sent text', async () => {
+    const tg = fakeConnector('telegram');
+    const adapter = makeConnectorNotificationAdapter([{ connector: tg, chatId: 'TG-1' }]);
+    await adapter.send({
+      ...notif('warning'),
+      title: '[Nervous] stale worker',
+      actions: [
+        { label: 'Approve', cliCommand: 'approve a3f9c' },
+        { label: 'Reject', cliCommand: 'reject a3f9c' },
+      ],
+    });
+    expect(tg.sent).toHaveLength(1);
+    // The operator can resolve the ask straight from the chat reply (short code).
+    expect(tg.sent[0]?.text).toContain('approve a3f9c');
+    expect(tg.sent[0]?.text).toContain('reject a3f9c');
+  });
+
+  it('no actions → no command footer (plain notification, back-compat)', async () => {
+    const tg = fakeConnector('telegram');
+    const adapter = makeConnectorNotificationAdapter([{ connector: tg, chatId: 'TG-1' }]);
+    await adapter.send(notif());
+    expect(tg.sent[0]?.text).not.toContain('approve');
+    expect(tg.sent[0]?.text).toBe('ℹ️ [deckent] Sprint done: 5 tasks complete');
+  });
+
   it('isAvailable reflects whether any target is configured', () => {
     expect(makeConnectorNotificationAdapter([{ connector: fakeConnector('telegram'), chatId: 'x' }]).isAvailable()).toBe(true);
     expect(makeConnectorNotificationAdapter([]).isAvailable()).toBe(false);

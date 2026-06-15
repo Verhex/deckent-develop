@@ -304,7 +304,7 @@ function showDashboard(root: string, lang: string): void {
 
 async function handleAccept(root: string, id: string, lang: string): Promise<void> {
   const pending = readPendingNotifications(root);
-  const idx = pending.findIndex(n => n.id === id || n.id.startsWith(id));
+  const idx = pending.findIndex(n => n.id === id || n.id.startsWith(id) || n.shortCode === id.toLowerCase());
 
   if (idx === -1) {
     printError(getMessage('nervous.not_found_pending', lang, { id }));
@@ -337,7 +337,7 @@ async function handleAccept(root: string, id: string, lang: string): Promise<voi
 
 async function handleReject(root: string, id: string, lang: string, reason?: string): Promise<void> {
   const pending = readPendingNotifications(root);
-  const idx = pending.findIndex(n => n.id === id || n.id.startsWith(id));
+  const idx = pending.findIndex(n => n.id === id || n.id.startsWith(id) || n.shortCode === id.toLowerCase());
 
   if (idx === -1) {
     printError(getMessage('nervous.not_found_pending', lang, { id }));
@@ -374,7 +374,7 @@ async function handleReject(root: string, id: string, lang: string, reason?: str
 
 function handleEdit(root: string, id: string, lang: string): void {
   const pending = readPendingNotifications(root);
-  const idx = pending.findIndex(n => n.id === id || n.id.startsWith(id));
+  const idx = pending.findIndex(n => n.id === id || n.id.startsWith(id) || n.shortCode === id.toLowerCase());
 
   if (idx === -1) {
     printError(getMessage('nervous.not_found_pending', lang, { id }));

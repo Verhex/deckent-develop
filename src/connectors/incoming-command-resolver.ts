@@ -26,6 +26,9 @@ import type { ApprovalAction, CommandResolver, ResolveOutcome } from './incoming
 /** Minimal shape the resolver needs from a nervous pending entry. */
 export interface NervousPendingLike {
   readonly id: string;
+  /** Short, human-typeable approval code — lets the operator approve over Telegram
+   *  with `approve <code>` instead of the UUID (proposer-minted, persisted in pending). */
+  readonly shortCode?: string;
   /** Human-readable title — surfaced in the ack so the user sees WHAT they decided. */
   readonly title?: string;
 }
@@ -91,8 +94,11 @@ export function makeCommandResolver(
       return resolvedWith(action, owned.triggerId, what, lang);
     }
 
-    // 2. Nervous gate — durable IPC, consumed by the executor poller.
-    const match = readNervous(root).find((n) => n.id === id || n.id.startsWith(id));
+    // 2. Nervous gate — durable IPC, consumed by the executor poller. Match the
+    //    full id, an id-prefix, OR the short approval code (phone-friendly).
+    const match = readNervous(root).find(
+      (n) => n.id === id || n.id.startsWith(id) || n.shortCode === id.toLowerCase(),
+    );
     if (match) {
       await writeNervous(root, match.id, action);
       return resolvedWith(action, match.id, match.title ?? match.id, lang);
