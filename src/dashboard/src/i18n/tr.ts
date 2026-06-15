@@ -513,6 +513,26 @@ export const tr: Record<TranslationKey, string> = {
   'nervous.accept_button': 'Kabul Et',
   'nervous.reject_button': 'Reddet',
 
+  // Autonomous Engine (W6-W7 AutonomousPage)
+  'autonomous.title': 'Otonom Motor',
+  'autonomous.error': 'Hata',
+  'autonomous.pending_word': 'bekleyen',
+  'autonomous.backlog_summary_title': 'Backlog Özeti',
+  'autonomous.summary_total': 'toplam',
+  'autonomous.summary_pending': 'bekleyen',
+  'autonomous.summary_running': 'çalışan',
+  'autonomous.summary_parked': 'park edilmiş',
+  'autonomous.summary_done': 'biten',
+  'autonomous.summary_failed': 'başarısız',
+  'autonomous.pending_approvals_title': 'Bekleyen Onaylar',
+  'autonomous.approvals_empty_title': 'Bekleyen onay yok',
+  'autonomous.approvals_empty_desc': 'Karar bekleyen otonom tetikleyici yok.',
+  'autonomous.approve_button': 'Onayla',
+  'autonomous.reject_button': 'Reddet',
+  'autonomous.backlog_title': 'Backlog Kayıtları',
+  'autonomous.backlog_empty_title': 'Backlog kaydı yok',
+  'autonomous.backlog_empty_desc': 'Otonom backlog boş — `deckent autonomous backlog add` ile iş ekleyin.',
+
   // Worker Log Panel (284-004)
   'worker_log.panel_title': 'Worker Logları',
   'worker_log.empty_unavailable': 'Bu worker için log çıktısı mevcut değil.',

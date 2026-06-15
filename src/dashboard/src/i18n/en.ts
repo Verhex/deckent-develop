@@ -511,6 +511,26 @@ export const en = {
   'nervous.accept_button': 'Accept',
   'nervous.reject_button': 'Reject',
 
+  // Autonomous Engine (W6-W7 AutonomousPage)
+  'autonomous.title': 'Autonomous Engine',
+  'autonomous.error': 'Error',
+  'autonomous.pending_word': 'pending',
+  'autonomous.backlog_summary_title': 'Backlog Summary',
+  'autonomous.summary_total': 'total',
+  'autonomous.summary_pending': 'pending',
+  'autonomous.summary_running': 'running',
+  'autonomous.summary_parked': 'parked',
+  'autonomous.summary_done': 'done',
+  'autonomous.summary_failed': 'failed',
+  'autonomous.pending_approvals_title': 'Pending Approvals',
+  'autonomous.approvals_empty_title': 'No pending approvals',
+  'autonomous.approvals_empty_desc': 'No autonomous triggers are awaiting a decision.',
+  'autonomous.approve_button': 'Approve',
+  'autonomous.reject_button': 'Reject',
+  'autonomous.backlog_title': 'Backlog Entries',
+  'autonomous.backlog_empty_title': 'No backlog entries',
+  'autonomous.backlog_empty_desc': 'The autonomous backlog is empty — add work with `deckent autonomous backlog add`.',
+
   // Worker Log Panel (284-004)
   'worker_log.panel_title': 'Worker Logs',
   'worker_log.empty_unavailable': 'Log output is not available for this worker.',

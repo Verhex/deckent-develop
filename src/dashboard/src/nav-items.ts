@@ -13,6 +13,7 @@ import {
   FileText,
   AlertTriangle,
   Settings,
+  Zap,
 } from "lucide-react";
 import type { TranslationKey } from "./i18n/en.js";
 
@@ -46,6 +47,7 @@ export const navGroups: ReadonlyArray<NavGroup> = [
       { to: "/debt", labelKey: "nav.debt", icon: AlertTriangle },
       { to: "/evolution", labelKey: "nav.dashboard", label: "Evolution", icon: GitBranch },
       { to: "/nervous", labelKey: "nav.dashboard", label: "Nervous", icon: Bell },
+      { to: "/autonomous", labelKey: "nav.dashboard", label: "Autonomous", icon: Zap },
     ],
   },
   {

@@ -13,6 +13,7 @@ import ChatPage from "./pages/ChatPage";
 import StatusPage from "./pages/StatusPage";
 import EvolutionPage from "./pages/EvolutionPage";
 import NervousPage from "./pages/NervousPage";
+import AutonomousPage from "./pages/AutonomousPage";
 import EnterprisePage from "./pages/EnterprisePage";
 import MemoryExplorerPage from "./pages/MemoryExplorerPage";
 import WorkersPage from "./pages/WorkersPage";
@@ -38,6 +39,7 @@ function App() {
                 <Route path="/status" element={<StatusPage />} />
                 <Route path="/evolution" element={<EvolutionPage />} />
                 <Route path="/nervous" element={<NervousPage />} />
+                <Route path="/autonomous" element={<AutonomousPage />} />
                 <Route path="/enterprise" element={<EnterprisePage />} />
                 <Route path="/memory-explorer" element={<MemoryExplorerPage />} />
                 <Route path="/workers" element={<WorkersPage />} />
