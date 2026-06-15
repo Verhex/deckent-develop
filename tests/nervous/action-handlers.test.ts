@@ -15,6 +15,7 @@ import {
   type ActionHandlerResult,
 } from '../../src/nervous/action-handlers.js';
 import { readRecommendations } from '../../src/nervous/recommendation-log.js';
+import { ACTION_REGISTRY } from '../../src/nervous/action-registry.js';
 import { Executor, type NervousHistory } from '../../src/nervous/executor.js';
 import type {
   NervousNotification,
@@ -155,22 +156,31 @@ describe('action-handlers — MVP handlers', () => {
     );
   });
 
-  // Test 5: Stub default — still-unimplemented (destructive/orchestration) IDs
-  it('returns `unimplemented` for still-unimplemented action IDs', async () => {
-    const otherIds = [
+  // Test 5: Completeness — EVERY registry action is now handled (none unimplemented).
+  // Non-maintenance (destructive/orchestration) actions land a Brain proposal.
+  it('handles every registry action (none returns `unimplemented`)', async () => {
+    const proposalIds = [
       'PROMPT_BUILDER_TWEAK',
+      'ADR_DRAFT',
+      'RETRO_AUGMENT',
+      'SPRINT_GATE_ADJUST',
+      'TASK_DEPENDENCY_REWIRE',
       'SPRINT_START',
       'SPRINT_STOP',
       'SRC_MODIFICATION',
+      'COMMIT_CREATE',
       'COMMIT_PUSH',
       'AGENT_DISABLE',
       'KILL_LIVE_SPRINT',
+      'MANUAL_FILE_DELETE',
+      'DESTRUCTIVE_GIT',
+      'ADR_DEPRECATE_ACCEPTED',
     ];
 
-    for (const actionId of otherIds) {
-      const result = await dispatchAction(actionId, {}, deps);
-      expect(result.outcome).toBe('unimplemented');
-      expect(result.actionId).toBe(actionId);
+    for (const actionId of proposalIds) {
+      const result = await dispatchAction(actionId, { ctx: 1 }, deps);
+      expect(result.outcome).toBe('success');
+      expect(deps.recommend).toHaveBeenCalledWith('/tmp/test-project', actionId, { ctx: 1 });
     }
   });
 
@@ -340,6 +350,13 @@ describe('action-handlers — recommendation handlers (nervous proposes)', () =>
     expect(result.outcome).toBe('failure');
     expect(result.error).toContain('feed unwritable');
   });
+
+  it('COMPLETENESS: no registry action returns `unimplemented`', async () => {
+    for (const action of ACTION_REGISTRY) {
+      const result = await dispatchAction(action.id, {}, deps);
+      expect(result.outcome).not.toBe('unimplemented');
+    }
+  });
 });
 
 // ─── Integration Test — createActionHandler + Executor chain ────────────────
@@ -381,13 +398,13 @@ describe('action-handlers — Executor integration', () => {
     const deps = createMockDeps();
     const handler = createActionHandler(deps);
 
-    // Call directly via executor-shaped signature (a still-unimplemented action)
-    const result = await handler('PROMPT_BUILDER_TWEAK', {});
+    // Call directly via executor-shaped signature (an id absent from the registry)
+    const result = await handler('TOTALLY_UNKNOWN_ACTION', {});
 
     // Bridged to ActionHandler interface (success | failure)
     expect(result.outcome).toBe('failure');
     expect(result.error).toMatch(/unimplemented/i);
-    expect(result.error).toContain('PROMPT_BUILDER_TWEAK');
+    expect(result.error).toContain('TOTALLY_UNKNOWN_ACTION');
   });
 
   it('createActionHandler executes new low-risk LOG_ROTATION via Executor', async () => {

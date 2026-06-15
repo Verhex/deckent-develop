@@ -11,14 +11,13 @@
 //   - LOG_ROTATION / CACHE_INVALIDATE / IPC_DIR_CLEANUP / DEBT_TRENDING_REPORT (Faz 2 deps)
 //   - METRIC_EMIT(metricName,value)     → append .deckent/metrics.jsonl (observability)
 //
-// Resource-recommendation handlers (ADR-037: nervous PROPOSES, Brain DISPOSES —
-// never self-mutates the repo, guarding the self-modification hazard). Each lands
-// a Brain-actionable proposal in .deckent/nervous-recommendations.jsonl:
-//   - DIRECTIVES_WRITE · DEBT_REPRIORITIZE · AGENT_PERFORMANCE_FLAG
-//   - SKILL_ROUTING_ADJUST · SCOPE_COLLISION_REORDER · COST_OVER_THRESHOLD
-//
-// Remaining destructive / orchestration actions (sprint/git/src/worker control)
-// stay `{ outcome: 'unimplemented', actionId }` pending the autonomous-refuse guard.
+// Resource-recommendation handlers — EVERY non-maintenance registry action
+// (ADR-037: nervous PROPOSES, Brain/operator DISPOSES — never self-mutates the
+// repo, guarding the self-modification P0). The whole medium / high / safety-floor
+// surface (debt · routing · agents · directives · sprint · git · src control)
+// lands an inert proposal in .deckent/nervous-recommendations.jsonl; the operator
+// executes through the normal guarded CLI. Only an action id absent from the
+// registry returns `{ outcome: 'unimplemented', actionId }`.
 
 import { appendFileSync, existsSync, mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -52,10 +51,10 @@ export interface ActionHandlerDeps {
   projectRoot: string;
 }
 
-/** Actions with a real handler. The rest return `unimplemented` (pending the
- *  autonomous-refuse guard for destructive/orchestration actions). */
-const IMPLEMENTED_ACTION_IDS = new Set([
-  // maintenance / observability — autonomous-safe direct effect
+/** Maintenance / observability actions the nervous system OWNS — autonomous-safe,
+ *  direct effect (clean state, rotate, prune, emit a metric). WORKER_RESPAWN is
+ *  here because it acts through a coordinator-injected kill/spawn, not the repo. */
+const MAINTENANCE_ACTION_IDS = new Set([
   'WORKER_RESPAWN',
   'ORPHAN_TASK_ARCHIVE',
   'STALE_LOCK_RELEASE',
@@ -65,24 +64,22 @@ const IMPLEMENTED_ACTION_IDS = new Set([
   'IPC_DIR_CLEANUP',
   'DEBT_TRENDING_REPORT',
   'METRIC_EMIT',
-  // resource-recommendation — nervous proposes, Brain disposes (ADR-037)
-  'DIRECTIVES_WRITE',
-  'DEBT_REPRIORITIZE',
-  'AGENT_PERFORMANCE_FLAG',
-  'SKILL_ROUTING_ADJUST',
-  'SCOPE_COLLISION_REORDER',
-  'COST_OVER_THRESHOLD',
 ]);
 
-/** Actions routed to the recommendation inbox (no direct repo mutation). */
-const RECOMMENDATION_ACTION_IDS = new Set([
-  'DIRECTIVES_WRITE',
-  'DEBT_REPRIORITIZE',
-  'AGENT_PERFORMANCE_FLAG',
-  'SKILL_ROUTING_ADJUST',
-  'SCOPE_COLLISION_REORDER',
-  'COST_OVER_THRESHOLD',
-]);
+/** Every registry action that is NOT direct maintenance is a Brain proposal
+ *  (ADR-037: nervous proposes, Brain/operator disposes). This is the whole
+ *  medium/high/safety-floor surface — debt/routing/agents/directives/sprint/git/
+ *  src control — which the nervous system NEVER self-executes (self-modification
+ *  P0). It lands an inert proposal in .deckent/nervous-recommendations.jsonl;
+ *  the operator acts through the normal guarded CLI. Deriving from the registry
+ *  means a newly-registered action defaults to "propose" — fail-safe, not silent. */
+const RECOMMENDATION_ACTION_IDS = new Set(
+  ACTION_REGISTRY.map((a) => a.id).filter((id) => !MAINTENANCE_ACTION_IDS.has(id)),
+);
+
+/** Implemented = the full registry (maintenance ∪ recommendation). Only an action
+ *  id absent from the registry falls through to `unimplemented`. */
+const IMPLEMENTED_ACTION_IDS = new Set(ACTION_REGISTRY.map((a) => a.id));
 
 function success(): ActionDispatchResult {
   return { outcome: 'success' };
@@ -326,12 +323,14 @@ export function createActionHandler(deps?: Partial<ActionHandlerDeps>): ActionHa
 }
 
 // ─── Sanity Check ───────────────────────────────────────────────────────────
-// Build-time guard: every implemented id must exist in ACTION_REGISTRY.
+// Build-time guard: every maintenance id must exist in ACTION_REGISTRY (a typo
+// in MAINTENANCE_ACTION_IDS would otherwise silently route the action to the
+// recommendation inbox instead of its direct handler).
 const REGISTRY_IDS = new Set(
   (ACTION_REGISTRY as readonly { id: string }[]).map((a) => a.id),
 );
-for (const id of IMPLEMENTED_ACTION_IDS) {
+for (const id of MAINTENANCE_ACTION_IDS) {
   if (!REGISTRY_IDS.has(id)) {
-    throw new Error(`Implemented action id ${id} missing from ACTION_REGISTRY`);
+    throw new Error(`Maintenance action id ${id} missing from ACTION_REGISTRY`);
   }
 }
