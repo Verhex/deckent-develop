@@ -975,7 +975,7 @@ deckent web --dev
 > Hand-curated sections above are produced by `scripts/generate-cli-docs.ts`; this block is maintained by `scripts/gen-reference-docs.mjs`.
 
 <!-- AUTOGEN:START id="cli" -->
-> 149 commands. Generated from `src/cli/commands/*.ts`.
+> 153 commands. Generated from `src/cli/commands/*.ts`.
 
 | Command | Description |
 |---------|-------------|
@@ -1016,6 +1016,8 @@ deckent web --dev
 | `deckent doctor` | Check system dependencies and health |
 | `deckent edit <id>` | Modify and accept a pending suggestion |
 | `deckent edit <name>` | Edit an agent configuration |
+| `deckent enable` | Enable autonomous mode (one command instead of editing config; default stays OFF) |
+| `deckent enable` | Enable the Nervous System (one command; default stays OFF, human-approval preserved) |
 | `deckent enable <name>` | Enable an agent |
 | `deckent enable <name>` | Enable a skill |
 | `deckent evolve` | Evolution analysis — cross-sprint trends and prompt suggestions |
@@ -1058,7 +1060,7 @@ deckent web --dev
 | `deckent mcp` | Manage MCP servers (Claude-parity) |
 | `deckent memory` | Memory V2 management |
 | `deckent migrate` | Migrate config.json to the latest full format (adds missing fields with defaults) |
-| `deckent mode` | Get/set deckent_style (sprint\|task\|auto) |
+| `deckent mode` | Get/set deckent_style (sprint\|task\|process\|auto) |
 | `deckent models` | Manage and browse the model catalog |
 | `deckent nervous` | Configure Nervous System authority mode and action overrides', ) .option('--lang &lt;code&gt;', 'Language override (en\|tr) |
 | `deckent nervous` | Nervous System dashboard — monitor, accept, reject proactive suggestions |
@@ -1068,11 +1070,13 @@ deckent web --dev
 | `deckent pending` | List parked approvals awaiting human accept/reject |
 | `deckent plan` | Plan a sprint without executing it |
 | `deckent plugin` | Manage plugins |
+| `deckent process` | Switch to process mode (continuous request-handling \u2014 ERP / automation via MCP + REST) |
 | `deckent publish <skillPath>` | Validate, sign (Ed25519) and publish a skill to the marketplace |
 | `deckent rbac` | Role-based access control — check permissions and list roles |
 | `deckent rebuild` | Rebuild memory.db from .brain/exports/*.md files |
 | `deckent recall <query>` | Search project memory — ADRs, sprint learnings, patterns, debt |
 | `deckent reclassify` | Reclassify a recorded task outcome (delta-applies agent/skill stats) |
+| `deckent recommendations` | View the Brain inbox — nervous proposals awaiting disposition (ADR-037) |
 | `deckent recover <sprint-id>` | Recover from a crashed or stuck sprint (audit + cleanup + archive) |
 | `deckent refresh` | Force-refresh the model catalog (invalidates 24h cache) |
 | `deckent reject <id>` | Reject a pending nervous system suggestion |

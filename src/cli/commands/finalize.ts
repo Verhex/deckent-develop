@@ -172,7 +172,7 @@ export function detectMixedSprints(tasks: Task[]): string[] {
 export function registerFinalize(program: Command): void {
   program
     .command('finalize')
-    .description('Finalize a sprint: update MEMORY.md, RETRO.md, PROJECT-IDENTITY.md, config, run decay')
+    .description('Finalize a sprint: update MEMORY.md, RETRO.md, IDENTITY.md, config, run decay')
     .option('--sprint <id>', 'Specific sprint ID to finalize (e.g. sprint-063). Defaults to auto-detect from tasks.')
     .option('--skip-decay', 'Skip memory/debt decay phase')
     .option('--skip-hooks', 'Skip plugin afterSprint hooks')
