@@ -159,7 +159,9 @@ Three immovable pillars (Alperen-approved 2026-05-31):
 | F2-008 | **Native SDK round-trip** (true standalone, Path C) | ⬜ Q3 2026 |
 | F2-009 | **Path A embedded dashboard chat** (host-CLI-free, Sprint-214) | ✅ DONE (Sprint 214) — `chat-backend.ts` bridges browser messages to server-side ProviderAdapter; dashboard ChatPage wired; ADR-076 Part C |
 
-### F3 — Process Mode — **~85%**
+### F3 — Process Mode — **~90% (first-class landed 2026-06-15)**
+> **✅ PROCESS MODE FIRST-CLASS (`56cf97f0`·`99ae5078`·`e470aa61`, CC el-kodu, TDD, gerçek-serve run-proven; Alperen ERP-test isteği):** `deckent_style += 'process'` (enum+validation+`deckent mode process`). **`process-controller.ts`** client-facing execution API — `submit(ctx)→BacklogEntry→decidePolicy(EffectClass)→ auto:execute-dispatcher / park:approval-required`; **güvenli-varsayılan** `policy='risk-tagged'` (erp.read pure→auto, erp.write critical-irreversible→park — gerçek `deckent serve` POST kanıtlandı). **REST** `/api/process/submit·status·result` + **MCP** `deckent_process` (35. tool). `buildProcessController` (cli/helpers/process-runtime) heavy-deps'i REST+MCP paylaşır: style-scoped runTaskMode/runSprint + audited capabilityRegistry (ERP odoo/sap/sage handler'ları → ENT-3 hash-chain = **eğitim-data izi**). DRY (autonomous backlog+policy+dispatcher reuse, sıfır-duplicate orkestrasyon). Tenant: actor.tenantId→entry.tenant. **Kalan:** full TenantContext threading (ADR-067), prod ERP-connector binding, durable scheduler, trace-recorder worker-lifecycle wire. Bkz [[project_automation_usability_state]].
+
 | ID | Item | Status |
 |----|------|--------|
 | F3-001/002/003/005/006/007 | Tenant context, scheduled flows, event triggers, flow runtime, self-dispatch guard | ✅ DONE |
