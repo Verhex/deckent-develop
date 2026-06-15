@@ -10,11 +10,16 @@ import {
 } from '../../lib/terminal-api.js';
 
 export function TerminalPanel() {
+  // D7: the embedded terminal is available only when the server injected a
+  // terminal bootstrap token (terminalEnabled — localhost / --terminal). When
+  // absent (disabled / non-localhost), render NOTHING instead of a dead bar, so
+  // the surface stays consistent with the backend.
+  const terminalAvailable = typeof window !== 'undefined' && !!getBootstrapToken();
   const [tabs, setTabs] = useState<SessionMeta[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!getBootstrapToken()) return; // terminal not configured — avoid Bearer-less 401
+    if (!terminalAvailable) return; // terminal not configured — avoid Bearer-less 401
     let mounted = true;
     listSessions().then((s) => {
       if (!mounted) return;
@@ -24,7 +29,7 @@ export function TerminalPanel() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [terminalAvailable]);
 
   const launch = async (kind: string, tool?: string) => {
     const s = await createSession({ kind, tool });
@@ -43,6 +48,9 @@ export function TerminalPanel() {
       return next;
     });
   };
+
+  // D7: no terminal token → terminal disabled → render nothing (no dead bar).
+  if (!terminalAvailable) return null;
 
   return (
     <div className="flex flex-col h-full">
