@@ -4,9 +4,12 @@
 import type { RiskLevel, Severity } from '../../../core/nervous-types.js';
 import type { BacklogKind, BacklogPolicy } from '../backlog-types.js';
 
-/** A reactive signal normalized from a source (nervous detection today). */
+/** A reactive signal normalized from a source. `nervous` = an internal detector
+ *  detection; `repo` = a working-tree change (repo-watch source); `webhook` = an
+ *  external system event POSTed to the reactive ingress. All three feed the same
+ *  ingester + declarative reactive-map (groupKey routing). */
 export interface ReactiveEvent {
-  sourceType: 'nervous';
+  sourceType: 'nervous' | 'repo' | 'webhook';
   risk: RiskLevel;
   severity?: Severity;
   groupKey?: string;

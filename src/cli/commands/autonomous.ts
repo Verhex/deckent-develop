@@ -52,6 +52,8 @@ import type { ModelType } from '../../core/types.js';
 import { loadReactiveMap } from '../../orchestra/autonomous/reactive/reactive-map.js';
 import { makeReactiveIngester } from '../../orchestra/autonomous/reactive/reactive-ingester.js';
 import { makeNervousReactiveSource } from '../../orchestra/autonomous/reactive/nervous-reactive-source.js';
+import { makeRepoWatchReactiveSource } from '../../orchestra/autonomous/reactive/repo-watch-reactive-source.js';
+import { makeWebhookReactiveSource } from '../../orchestra/autonomous/reactive/webhook-reactive-source.js';
 import { NervousObserver } from '../../nervous/observer.js';
 import { createNervousSystemIfEnabled, type NervousSystemHandle } from '../../nervous/bootstrap.js';
 import { getSprintStateSnapshot } from '../../orchestra/sprint-state-tracker.js';
@@ -319,10 +321,13 @@ export async function handleStart(opts: AutonomousStartOptions): Promise<void> {
   });
 
   // Reactive ingestion (sub-project 2) — flag-gated, additional to autonomous.enabled.
-  let reactiveSource: { start(): void; stop(): void } | null = null;
+  // N2: three sources share one ingester + reactive-map — nervous detections, repo
+  // working-tree changes, and external webhook events all normalize to ReactiveEvent.
+  const reactiveSources: Array<{ start(): void; stop(): void }> = [];
   let reactiveObserver: NervousObserver | null = null;
   if (resolvedConfig.autonomous.reactive?.enabled) {
-    const mapPath = join(root, resolvedConfig.autonomous.reactive.map_path ?? '.deckent/autonomous/reactive-map.json');
+    const reactive = resolvedConfig.autonomous.reactive;
+    const mapPath = join(root, reactive.map_path ?? '.deckent/autonomous/reactive-map.json');
     const reactiveMap = loadReactiveMap(mapPath);
     let rxCounter = 0;
     const ingester = makeReactiveIngester({
@@ -331,8 +336,17 @@ export async function handleStart(opts: AutonomousStartOptions): Promise<void> {
       idGen: () => `rx-${new Date().toISOString()}-${++rxCounter}`,
     });
     reactiveObserver = new NervousObserver(root);
-    reactiveSource = makeNervousReactiveSource({ observer: reactiveObserver, ingester });
-    reactiveSource.start();
+    reactiveSources.push(makeNervousReactiveSource({ observer: reactiveObserver, ingester }));
+    // N2: repo-watch — working-tree changes → backlog (ignores deckent-internal dirs).
+    if (reactive.repo_watch?.enabled) {
+      reactiveSources.push(makeRepoWatchReactiveSource({ projectRoot: root, ingester }));
+    }
+    // N2: webhook — drains the durable inbox the POST /api/reactive/webhook ingress writes.
+    if (reactive.webhook?.enabled) {
+      const inboxPath = join(root, '.deckent', 'autonomous', 'reactive-inbox.jsonl');
+      reactiveSources.push(makeWebhookReactiveSource({ inboxPath, ingester }));
+    }
+    for (const source of reactiveSources) source.start();
   }
 
   // N1 (F3-009 attach-only fix): drive the built-in nervous detectors LIVE in
@@ -398,7 +412,7 @@ export async function handleStart(opts: AutonomousStartOptions): Promise<void> {
     }));
   } finally {
     process.off('SIGINT', sigintHandler);
-    reactiveSource?.stop();
+    for (const source of reactiveSources) source.stop();
     // Ensure the observer releases any timers/watchers it started so the
     // process (and tests) can exit cleanly.
     reactiveObserver?.stop?.();

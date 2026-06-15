@@ -541,6 +541,11 @@ export interface DeckentConfig {
       enabled: boolean;
       /** Path to the reactive trigger map JSON, relative to project root. */
       map_path?: string;
+      /** N2: repo-watch reactive source — working-tree changes → backlog (default-off). */
+      repo_watch?: { enabled: boolean };
+      /** N2: webhook reactive source — drains .deckent/autonomous/reactive-inbox.jsonl
+       *  (POST /api/reactive/webhook ingress) → backlog (default-off). */
+      webhook?: { enabled: boolean };
     };
     /** Work-generator sub-block (flag-gated, default-off): self-generated work
      *  from active tech-debt records → backlog candidates. */

@@ -48,6 +48,7 @@ import { registerMemorySearch } from './memory-search-endpoint.js';
 import { registerNervousRoutes } from './nervous-endpoint.js';
 import { registerAutonomousRoutes } from './autonomous-endpoint.js';
 import { registerProcessRoutes } from './process-endpoint.js';
+import { registerReactiveRoutes } from './reactive-endpoint.js';
 import { registerEnterpriseRoutes, handleEnterpriseTenantWrite } from './enterprise-endpoint.js';
 import { resolveChatProvider } from '../core/config.js';
 import { resolveChatAdapter } from '../cli/commands/chat-provider-parity.js';
@@ -804,6 +805,7 @@ async function handleRequest(
     if (registerNervousRoutes(url, method, res, projectRoot)) return;
     if (registerAutonomousRoutes(url, method, res, projectRoot)) return;
     if (await registerProcessRoutes(url, method, res, body, projectRoot, req)) return;
+    if (registerReactiveRoutes(url, method, res, body, projectRoot)) return;
 
     // OIDC SSO token exchange: POST /api/auth/oidc/exchange (277-007). Auth-exempt
     // (login flow has no bearer yet); config-gated (404 when dashboard_oidc off).
