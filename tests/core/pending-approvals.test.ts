@@ -45,3 +45,45 @@ describe('readPendingApprovals', () => {
     expect(readPendingApprovals(d)).toEqual([]);
   });
 });
+
+// ─── W5 — autonomous parked triggers join the unified hub ──────────────────
+const autonomousPath = (d: string) => {
+  mkdirSync(join(d, '.deckent', 'autonomous'), { recursive: true });
+  return join(d, '.deckent', 'autonomous', 'pending.json');
+};
+
+describe('readPendingApprovals — autonomous (W5 cross-surface unification)', () => {
+  it('reads parked autonomous triggers and emits the exact approve/reject commands', () => {
+    const d = sandbox();
+    writeFileSync(autonomousPath(d), JSON.stringify([
+      { triggerId: 't-42', action: 'autonomous.execute', requestedBy: 'system:backlog', enqueuedAt: '2026-06-15T00:00:00.000Z' },
+    ]));
+    const pending = readPendingApprovals(d);
+    expect(pending).toHaveLength(1);
+    expect(pending[0]).toMatchObject({
+      kind: 'autonomous',
+      id: 't-42',
+      acceptCommand: 'deckent autonomous approve t-42',
+      rejectCommand: 'deckent autonomous reject t-42',
+    });
+    // The action is the human-readable title operators see in `deckent status`.
+    expect(pending[0]!.title).toContain('autonomous.execute');
+  });
+
+  it('merges nervous + autonomous parked approvals across surfaces', () => {
+    const d = sandbox();
+    writeFileSync(nervousPath(d), JSON.stringify([{ id: 'n1', title: 'T' }]));
+    writeFileSync(autonomousPath(d), JSON.stringify([
+      { triggerId: 'a1', action: 'autonomous.execute', requestedBy: 'system', enqueuedAt: '2026-06-15T00:00:00.000Z' },
+    ]));
+    const kinds = readPendingApprovals(d).map((p) => p.kind).sort();
+    expect(kinds).toEqual(['autonomous', 'nervous']);
+  });
+
+  it('is fail-safe on malformed autonomous JSON (nervous still surfaces)', () => {
+    const d = sandbox();
+    writeFileSync(nervousPath(d), JSON.stringify([{ id: 'n1', title: 'T' }]));
+    writeFileSync(autonomousPath(d), '{ not json');
+    expect(readPendingApprovals(d).map((p) => p.kind)).toEqual(['nervous']);
+  });
+});

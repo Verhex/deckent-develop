@@ -50,11 +50,44 @@ function readNervous(projectRoot: string): PendingApproval[] {
   }
 }
 
+/** Read parked autonomous triggers from `.deckent/autonomous/pending.json`
+ *  (approval-adapter PendingApproval shape — triggerId/action/requestedBy). The
+ *  operator resolves these with `deckent autonomous approve/reject <triggerId>`
+ *  (note: `approve`, not `accept` — the autonomous CLI verb differs from nervous). */
+function readAutonomous(projectRoot: string): PendingApproval[] {
+  const path = join(projectRoot, '.deckent', 'autonomous', 'pending.json');
+  if (!existsSync(path)) return [];
+  try {
+    const data: unknown = JSON.parse(readFileSync(path, 'utf-8'));
+    if (!Array.isArray(data)) return [];
+    const out: PendingApproval[] = [];
+    for (const t of data) {
+      if (t && typeof t === 'object' && typeof (t as { triggerId?: unknown }).triggerId === 'string') {
+        const id = (t as { triggerId: string }).triggerId;
+        const action = typeof (t as { action?: unknown }).action === 'string' ? (t as { action: string }).action : '';
+        const requestedBy = typeof (t as { requestedBy?: unknown }).requestedBy === 'string' ? (t as { requestedBy: string }).requestedBy : '';
+        const title = action ? (requestedBy ? `${action} — ${requestedBy}` : action) : id;
+        out.push({
+          kind: 'autonomous',
+          id,
+          title,
+          acceptCommand: `deckent autonomous approve ${id}`,
+          rejectCommand: `deckent autonomous reject ${id}`,
+        });
+      }
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+
 /**
- * All currently-parked approvals across surfaces. Nervous today; autonomous
- * joins once its accept/reject CLI lands (W5) — extend here so every surface
- * picks it up for free.
+ * All currently-parked approvals across surfaces — nervous (`deckent nervous
+ * accept/reject`) AND autonomous (`deckent autonomous approve/reject`) — merged
+ * from one reader so every surface (`deckent status`, `status --follow`, the
+ * dashboard, MCP) shows the SAME unified list with the correct per-kind command.
  */
 export function readPendingApprovals(projectRoot: string): PendingApproval[] {
-  return [...readNervous(projectRoot)];
+  return [...readNervous(projectRoot), ...readAutonomous(projectRoot)];
 }
