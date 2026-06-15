@@ -18,6 +18,7 @@ import {
   createNotification,
   toEventPayload,
   type NotificationEventName,
+  type CreateNotificationOpts,
 } from './notification-dispatcher.js';
 import {
   getGlobalNotifyDispatcher,
@@ -50,11 +51,12 @@ export async function notify(
   title: string,
   summary: string,
   details?: string,
+  opts?: CreateNotificationOpts,
 ): Promise<void> {
   // Build the notification object first (reused for both channels)
   let notification;
   try {
-    notification = createNotification(event, sprintId, title, summary, details);
+    notification = createNotification(event, sprintId, title, summary, details, opts);
   } catch (err) {
     debugLog('notify:createNotification', err);
     return;
@@ -114,8 +116,9 @@ export function notifyAsync(
   title: string,
   summary: string,
   details?: string,
+  opts?: CreateNotificationOpts,
 ): void {
-  void notify(event, sprintId, title, summary, details).catch((err) => {
+  void notify(event, sprintId, title, summary, details, opts).catch((err) => {
     debugLog('notifyAsync', err);
   });
 }

@@ -19,6 +19,17 @@ export type NotificationEventName =
   | 'progress'
   | 'phase-change';
 
+/** An actionable command an operator can run to resolve/act on a notification
+ *  (e.g. approving a parked nervous/autonomous decision). Carried on the
+ *  notification + event payload so EVERY surface (terminal print, status/watch
+ *  tail, dashboard) shows the operator exactly what to run. */
+export interface NotificationAction {
+  /** Short, already-localized label (e.g. "Approve", "Reject"). */
+  label: string;
+  /** The exact CLI command to run (e.g. "deckent nervous accept <id>"). */
+  cliCommand: string;
+}
+
 export interface Notification {
   priority: NotificationPriority;
   event: NotificationEventName;
@@ -27,6 +38,20 @@ export interface Notification {
   details?: string;
   sprintId: string;
   timestamp: string;
+  /** PID of the process that OWNS the in-memory gate this notification refers to
+   *  (the running sprint/executor whose terminal the operator must act in and
+   *  whose IPC poller consumes the accept). Defaults to the emitting process.pid. */
+  owningPid?: number;
+  /** Actionable commands (approve/reject) — self-describing so any surface can act. */
+  actions?: NotificationAction[];
+}
+
+/** Optional self-describing context for {@link createNotification}. */
+export interface CreateNotificationOpts {
+  /** Override the owning PID (defaults to process.pid). */
+  owningPid?: number;
+  /** Actionable commands surfaced on every channel. */
+  actions?: NotificationAction[];
 }
 
 export interface NotificationAdapter {
@@ -174,6 +199,7 @@ export function createNotification(
   title: string,
   summary: string,
   details?: string,
+  opts?: CreateNotificationOpts,
 ): Notification {
   return {
     priority: EVENT_PRIORITY[event],
@@ -183,6 +209,8 @@ export function createNotification(
     details,
     sprintId,
     timestamp: new Date().toISOString(),
+    owningPid: opts?.owningPid ?? process.pid,
+    ...(opts?.actions && opts.actions.length > 0 ? { actions: opts.actions } : {}),
   };
 }
 
@@ -199,5 +227,7 @@ export function toEventPayload(notification: Notification): Record<string, unkno
     summary: notification.summary,
     details: notification.details,
     sprintId: notification.sprintId,
+    owningPid: notification.owningPid,
+    ...(notification.actions ? { actions: notification.actions } : {}),
   };
 }

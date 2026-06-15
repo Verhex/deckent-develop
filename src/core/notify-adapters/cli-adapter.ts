@@ -49,7 +49,17 @@ export class CliNotificationAdapter implements NotificationAdapter {
    */
   async send(notification: Notification): Promise<void> {
     const emoji = PRIORITY_EMOJI[notification.priority] ?? 'ℹ️';
-    const line = `\n${emoji} [deckent] ${notification.title}: ${notification.summary}\n`;
+    // Line 1 keeps the backward-compatible `[deckent]` prefix; the self-describing
+    // context (sprint + owning PID) and actionable commands follow on their own
+    // lines so the operator sees exactly which terminal + command to act with.
+    let line = `\n${emoji} [deckent] ${notification.title}: ${notification.summary}\n`;
+    const ctx: string[] = [];
+    if (notification.sprintId) ctx.push(`sprint ${notification.sprintId}`);
+    if (notification.owningPid) ctx.push(`PID ${notification.owningPid}`);
+    if (ctx.length > 0) line += `   ↳ ${ctx.join('  ·  ')}\n`;
+    if (notification.actions && notification.actions.length > 0) {
+      for (const a of notification.actions) line += `   ↳ ${a.label}: ${a.cliCommand}\n`;
+    }
 
     // Try parent process fd first
     const parentPid = process.env['DECKENT_PARENT_PID'];
