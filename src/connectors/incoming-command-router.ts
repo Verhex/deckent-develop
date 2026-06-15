@@ -70,16 +70,22 @@ export interface IncomingCommandRouterOptions {
   readonly acceptFrom?: number;
 }
 
-const COMMAND_RE = /^\/?(approve|reject)\s+(\S+)$/i;
+// `accept` is an alias for `approve` (BOT-VERB) so a user copying the nervous
+// CLI verb (`deckent nervous accept <id>`) commands successfully over Telegram —
+// autonomous uses `approve`, nervous uses `accept`, both resolve the same way.
+const COMMAND_RE = /^\/?(approve|accept|reject)\s+(\S+)$/i;
 
 /**
  * Parse an inbound message into a command, or null if it is not exactly
  * `verb <id>` (default-deny — chatter and malformed input are ignored).
+ * `accept` normalizes to the `approve` action.
  */
 export function parseCommand(text: string): ParsedCommand | null {
   const match = COMMAND_RE.exec(text.trim());
   if (!match) return null;
-  return { action: match[1]!.toLowerCase() as ApprovalAction, id: match[2]! };
+  const verb = match[1]!.toLowerCase();
+  const action: ApprovalAction = verb === 'reject' ? 'reject' : 'approve';
+  return { action, id: match[2]! };
 }
 
 /**

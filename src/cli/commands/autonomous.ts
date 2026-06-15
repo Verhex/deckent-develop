@@ -28,6 +28,7 @@ import {
 import { FlowRegistry } from '../../core/flow-registry.js';
 import { notifyAsync } from '../../core/notify.js';
 import { bootstrapNotifyDispatcher } from '../../core/notify-bootstrap.js';
+import { buildConnectorNotificationAdapter } from '../../connectors/connector-bootstrap.js';
 import { nextRun } from '../../core/scheduled-flow.js';
 import type { ScheduledFlow } from '../../core/scheduled-flow.js';
 import type { SelfDispatchPolicy } from '../../core/self-dispatch.js';
@@ -342,8 +343,16 @@ export async function handleStart(opts: AutonomousStartOptions): Promise<void> {
     : undefined;
 
   // Wire DECKENT→USER:NOTIFY so parked approvals + cycle outcomes reach this
-  // terminal — without it notify() is a silent no-op in pure-CLI runs (§4G).
-  bootstrapNotifyDispatcher({ projectRoot: root });
+  // terminal AND the configured messaging connectors — W9-A: a standalone
+  // `deckent autonomous` run now pushes parks to Telegram the same way a sprint
+  // does (mirrors start.ts). Without the connector adapter, autonomous notify()
+  // only reached the local TTY; with `deckent bot listen` up, the pushed park is
+  // approvable straight from Telegram. Silent no-op otherwise (§4G).
+  const connectorAdapter = await buildConnectorNotificationAdapter(resolvedConfig.notify_connectors);
+  bootstrapNotifyDispatcher({
+    projectRoot: root,
+    extraAdapters: connectorAdapter ? [connectorAdapter] : [],
+  });
   const onTick = makeTickReporter(lang);
 
   print(getMessage('autonomous.start_banner', lang, { flows: String(flows.length) }));

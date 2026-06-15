@@ -38,6 +38,13 @@ describe('parseCommand', () => {
     expect(parseCommand('/reject  abc')).toEqual({ action: 'reject', id: 'abc' });
   });
 
+  // BOT-VERB — "accept" is an alias for "approve" so the verb a user copies from
+  // the nervous CLI (`deckent nervous accept <id>`) also works over Telegram.
+  it('accepts "accept <id>" as an alias for approve', () => {
+    expect(parseCommand('accept k9')).toEqual({ action: 'approve', id: 'k9' });
+    expect(parseCommand('/ACCEPT  Trig-9 ')).toEqual({ action: 'approve', id: 'Trig-9' });
+  });
+
   it('default-denies anything that is not exactly verb + one id', () => {
     expect(parseCommand('hello there')).toBeNull();
     expect(parseCommand('approve')).toBeNull();            // no id
