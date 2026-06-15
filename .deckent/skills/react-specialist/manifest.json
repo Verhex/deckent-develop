@@ -52,10 +52,10 @@
   },
   "enabled": true,
   "stats": {
-    "totalUses": 95,
-    "successCount": 81,
-    "successRate": 0.8526315789473684,
+    "totalUses": 96,
+    "successCount": 82,
+    "successRate": 0.8541666666666666,
     "avgCoverage": 0,
-    "lastUsedInSprint": "sprint-285"
+    "lastUsedInSprint": "sprint-287"
   }
 }

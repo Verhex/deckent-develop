@@ -83,6 +83,10 @@
 | adr-089 | Backend-Agnostic Worker Observation + Per-Worker Independent Backends | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-287 Learnings** (sprint-287): ## Sprint sprint-287 Learnings
+
+## Gains
+- 287-001 — roadmap.md — user-facing yol-haritasına dönüştür — Transformed d...
 - **Sprint sprint-285 Learnings** (sprint-285): ## Sprint sprint-285 Learnings
 - Tur-içi tool-KUYRUĞU + per-tool sıralı onay (Ink): GO_WITH_TECH_DEBT — H1-fix: repla...
 - **Sprint sprint-284 Learnings** (sprint-284): ## Sprint sprint-284 Learnings
@@ -107,10 +111,6 @@
 
 ## Gains
 - 277-001 — /api/auth/me whoami endpoint — bearer'dan kimlik + rol — Impleme...
-- **Sprint sprint-276 Learnings** (sprint-276): ## Sprint sprint-276 Learnings
-
-## Gains
-- 276-001 — directive-interrogator çekirdeği — zorlayıcı soru üretimi + tasl...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -146,5 +146,7 @@ _No active technical debt._
 - Violation pattern: stale_heartbeat
 - Violation pattern: stale_heartbeat
 - Violation pattern: stale_heartbeat
+- Violation pattern: stale_heartbeat
+- Violation pattern: stale_heartbeat
 
-_Total entries: 507 | Generated: 2026-06-12_
+_Total entries: 591 | Generated: 2026-06-14_

@@ -1,5 +1,13 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-287 Learnings
+- Sprint sprint-287 Learnings: ## Sprint sprint-287 Learnings
+
+## Gains
+- 287-001 — roadmap.md — user-facing yol-haritasına dönüştür — Transformed docs/vision/roadmap.md (1118 -> 222 lines) from a deprecated internal-strategy/launch...
+- 287-002 — blueprint.md + blueprint-TR.md — de-competitor + de-stale — PRIMARY GOAL ACHIEVED: All competitor-comparison references removed from both files.
+- 287-003 — enterprise referansları — derinleştir (286-020 yüzeysel kaldı) — Full code-verified audit of enterprise docs completed.
+
 ## Sprint sprint-285 Learnings
 - Sprint sprint-285 Learnings: ## Sprint sprint-285 Learnings
 - Tur-içi tool-KUYRUĞU + per-tool sıralı onay (Ink): GO_WITH_TECH_DEBT — H1-fix: replaced the single confirmResolve slot (app.tsx:178) with a FIFO confirm QUEUE in the Ink view layer ONLY — the
