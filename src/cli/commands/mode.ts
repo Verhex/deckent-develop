@@ -7,7 +7,7 @@ import { loadConfig, saveGlobalConfig, loadGlobalConfig } from '../../core/confi
 import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 
-const VALID_STYLES = ['sprint', 'task'] as const;
+const VALID_STYLES = ['sprint', 'task', 'process'] as const;
 type DeckentStyle = (typeof VALID_STYLES)[number];
 
 function isValidStyle(value: string): value is DeckentStyle {
@@ -38,7 +38,7 @@ function setProjectConfigValue(configPath: string, key: string, value: unknown):
 export function registerMode(program: Command): void {
   const mode = program
     .command('mode')
-    .description('Get/set deckent_style (sprint|task|auto)');
+    .description('Get/set deckent_style (sprint|task|process|auto)');
 
   mode
     .command('show')
@@ -79,6 +79,21 @@ export function registerMode(program: Command): void {
         const configPath = join(root, PROJECT_CONFIG_PATH);
         setProjectConfigValue(configPath, 'deckent_style', 'task');
         print('\u2713 Switched to task mode (project override)');
+      } catch (error) {
+        printError(error);
+        process.exitCode = 1;
+      }
+    });
+
+  mode
+    .command('process')
+    .description('Switch to process mode (continuous request-handling \u2014 ERP / automation via MCP + REST)')
+    .action(async () => {
+      try {
+        const root = resolveProjectRoot();
+        const configPath = join(root, PROJECT_CONFIG_PATH);
+        setProjectConfigValue(configPath, 'deckent_style', 'process');
+        print('\u2713 Switched to process mode (project override)');
       } catch (error) {
         printError(error);
         process.exitCode = 1;

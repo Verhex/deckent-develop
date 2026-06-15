@@ -891,8 +891,8 @@ export function validateConfig(config: DeckentConfig): string[] {
   }
 
   // ─── deckent_style validation ───────────────────────────────────────
-  if (config.deckent_style !== undefined && !['sprint', 'task'].includes(config.deckent_style)) {
-    errors.push(`Invalid value '${config.deckent_style}' for field 'deckent_style'. Valid options: sprint, task`);
+  if (config.deckent_style !== undefined && !['sprint', 'task', 'process'].includes(config.deckent_style)) {
+    errors.push(`Invalid value '${config.deckent_style}' for field 'deckent_style'. Valid options: sprint, task, process`);
   }
 
   // ─── Routing Engine validation ──────────────────────────────────────
@@ -1357,7 +1357,7 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
   }
   const envDeckentStyle = process.env['DECKENT_STYLE'];
   if (envDeckentStyle) {
-    config.deckent_style = envDeckentStyle as 'sprint' | 'task';
+    config.deckent_style = envDeckentStyle as 'sprint' | 'task' | 'process';
   }
 
   // ─── Mode preset → model_strategy merge ────────────────────────────
@@ -2015,10 +2015,10 @@ export const CONFIG_METADATA: Readonly<Record<string, ConfigMetadataEntry>> = {
     category: 'Sprint',
   },
   deckent_style: {
-    description: 'Active runtime style: "sprint" for developer orchestration, "task" for one-shot life assistant.',
-    type: "'sprint' | 'task'",
+    description: 'Active runtime style: "sprint" for developer orchestration, "task" for one-shot life assistant, "process" for continuous request-handling (ERP / business automation via MCP + REST).',
+    type: "'sprint' | 'task' | 'process'",
     default: 'sprint',
-    options: ['sprint', 'task'],
+    options: ['sprint', 'task', 'process'],
     category: 'Sprint',
   },
 } as const;

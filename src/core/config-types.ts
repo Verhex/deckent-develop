@@ -557,7 +557,7 @@ export interface DeckentConfig {
 
   // ─── Runtime Style ─────────────────────────────────────────────────
   /** Active runtime style — sprint (developer orchestration) or task (one-shot life assistant) */
-  deckent_style?: 'sprint' | 'task';
+  deckent_style?: 'sprint' | 'task' | 'process';
 
   // ─── Terminal ──────────────────────────────────────────────────────
   /** Embedded web terminal configuration (Sprint 175). */
@@ -838,7 +838,7 @@ export interface ResolvedConfig {
   /** Observability configuration (passed through from DeckentConfig) */
   observability?: DeckentConfig['observability'];
   /** Resolved runtime style — always 'sprint' or 'task' */
-  deckent_style: 'sprint' | 'task';
+  deckent_style: 'sprint' | 'task' | 'process';
   /** Resolved embedded web terminal configuration. Mirrors the `model_strategy`
    * optional-on-both-sides pattern: optional on the type, runtime-populated by
    * `loadConfig`/`mergeConfigs` (DEFAULT_TERMINAL_CONFIG) so consumers can rely
