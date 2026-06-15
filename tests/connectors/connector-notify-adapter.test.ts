@@ -123,4 +123,20 @@ describe('ConnectorNotificationAdapter (BOT-001)', () => {
     expect(tg.sent[0]?.text).toContain('Heads up');     // humanized phrasing
     expect(tg.sent[0]?.text).toContain('approve t-42');  // actionable command preserved
   });
+
+  // BOT-1 — Discord parity: the humanizer is platform-agnostic; a multi-target
+  // adapter humanizes for EVERY connector (telegram AND discord), not just one.
+  it('BOT-1: humanizes for ALL connectors (telegram + discord parity)', async () => {
+    const tg = fakeConnector('telegram');
+    const dc = fakeConnector('discord');
+    const humanizer = makeBotHumanizer({ complete: async () => 'Doğal mesaj — approve t-42' });
+    const adapter = makeConnectorNotificationAdapter(
+      [{ connector: tg, chatId: 'TG' }, { connector: dc, chatId: 'DC' }],
+      { humanizer },
+    );
+    await adapter.send({ priority: 'info', event: 'task-done', title: 'P', summary: 'approve t-42', sprintId: 's', timestamp: '2026-06-15T00:00:00.000Z' });
+    expect(tg.sent[0]?.text).toContain('Doğal mesaj');
+    expect(dc.sent[0]?.text).toContain('Doğal mesaj'); // Discord gets the SAME humanized text
+    expect(dc.sent[0]?.text).toContain('approve t-42');
+  });
 });
