@@ -13,7 +13,7 @@
 
 import type { Notification, NotificationAdapter } from '../core/notification-dispatcher.js';
 import type { IMessageConnector } from './types.js';
-import { chunkMessage } from './message-format.js';
+import { makeBotHumanizer, type BotHumanizer } from './bot-humanizer.js';
 
 /** A started (outbound) connector plus the chat id notifications are sent to. */
 export interface ConnectorTarget {
@@ -24,6 +24,12 @@ export interface ConnectorTarget {
 export interface ConnectorNotifyOptions {
   /** Per-send timeout in ms (default 5000) — caps a slow/unreachable platform. */
   timeoutMs?: number;
+  /**
+   * BOT-1 bot-agent: rephrases + summarizes-to-fit each notification before send.
+   * Absent → a passthrough humanizer (raw text, lossless chunk) — identical to the
+   * pre-BOT-1 behavior, so this is zero-risk when the bot-agent is off.
+   */
+  humanizer?: BotHumanizer;
 }
 
 const PRIORITY_EMOJI: Record<string, string> = {
@@ -57,6 +63,7 @@ export function makeConnectorNotificationAdapter(
   opts: ConnectorNotifyOptions = {},
 ): NotificationAdapter {
   const timeoutMs = opts.timeoutMs ?? 5000;
+  const humanizer = opts.humanizer ?? makeBotHumanizer();
   return {
     name: 'connector-broadcast',
 
@@ -65,9 +72,9 @@ export function makeConnectorNotificationAdapter(
     },
 
     async send(notification: Notification): Promise<void> {
-      // BOT-LEN: split over-limit notifications into Telegram-safe parts instead
-      // of letting the platform reject/cut them. Non-lossy — every part is sent.
-      const parts = chunkMessage(formatNotification(notification));
+      // BOT-1 + BOT-LEN: humanize (when enabled) then split into Telegram-safe
+      // parts — never reject/cut. Passthrough humanizer = lossless chunk only.
+      const parts = await humanizer.toParts(formatNotification(notification));
       await Promise.all(
         targets.map((t) =>
           withTimeout(

@@ -20,6 +20,7 @@ import {
   type ConnectorCommandsHandle,
 } from '../../connectors/connector-bootstrap.js';
 import { makeChatResponder } from '../../connectors/chat-bridge.js';
+import { buildBotHumanizer } from '../../connectors/bot-completion.js';
 import {
   writeBotPid, clearBotPid, readBotPid, stopBot, startBotDaemon,
 } from '../../connectors/bot-daemon.js';
@@ -52,7 +53,10 @@ export async function handleBotListen(opts: BotListenOptions = {}): Promise<void
       // provider can call tools; the gated dispatcher auto-runs read-only ones and
       // PARKS risky ones for phone approval (approve <id>) — no destructive
       // action ever executes without explicit human approval.
-      bootstrapConnectorCommands(r, n, { chat: makeChatResponder({ agentic: true, root: r, lang }) }));
+      bootstrapConnectorCommands(r, n, {
+        chat: makeChatResponder({ agentic: true, root: r, lang }),
+        humanizer: buildBotHumanizer(config as unknown as Record<string, unknown>),
+      }));
   const handle = await bootstrap(root, config.notify_connectors);
 
   if (handle.active.length === 0) {

@@ -16,6 +16,7 @@ import { getMessage } from '../helpers/messages.js';
 import { promptConfirm } from '../helpers/prompt.js';
 import { bootstrapNotifyDispatcher } from '../../core/notify-bootstrap.js';
 import { buildConnectorNotificationAdapter } from '../../connectors/connector-bootstrap.js';
+import { buildBotHumanizer } from '../../connectors/bot-completion.js';
 import { loadCostConfig, initCostConfig } from '../../core/cost-config-loader.js';
 import { estimateSprintCost, formatEstimate, resolveBillingModeForAuth, type TaskCostInput } from '../../core/cost-calculator.js';
 import { evaluateCostGate } from '../../core/cost-gate.js';
@@ -287,7 +288,9 @@ export function registerStart(program: Command): void {
         // BOT-001: also fan notifications out to configured messaging connectors
         // (Telegram/Discord) so they reach the operator's phone. Fail-safe — a
         // misconfigured connector logs + skips, never blocks the sprint.
-        const connectorAdapter = await buildConnectorNotificationAdapter(config.notify_connectors);
+        const connectorAdapter = await buildConnectorNotificationAdapter(
+          config.notify_connectors, {}, buildBotHumanizer(config as unknown as Record<string, unknown>),
+        );
         bootstrapNotifyDispatcher({
           projectRoot: root,
           extraAdapters: connectorAdapter ? [connectorAdapter] : [],
