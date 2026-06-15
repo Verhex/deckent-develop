@@ -3,15 +3,27 @@
 // Nervous Action Handlers — Step C — Sprint 180 W2-1, Sprint 181 recovery.
 // NERVOUS-TODO §11.2 Step C.
 //
-// İlk 4 MVP action handler:
-//   - WORKER_RESPAWN(taskId)            → spawn-backend kill + spawn
+// Maintenance / observability handlers (autonomous-safe, direct effect):
+//   - WORKER_RESPAWN(taskId)            → spawn-backend kill + spawn (coordinator-injected)
 //   - ORPHAN_TASK_ARCHIVE(sprintId)     → sprint-docs-updater.archiveOrphanTasks
 //   - STALE_LOCK_RELEASE(filePath)      → file-lock.releaseLock
 //   - DEAD_EVENT_STREAM_CLEANUP(sprintId) → event-stream cleanup (Faz 2 wire)
+//   - LOG_ROTATION / CACHE_INVALIDATE / IPC_DIR_CLEANUP / DEBT_TRENDING_REPORT (Faz 2 deps)
+//   - METRIC_EMIT(metricName,value)     → append .deckent/metrics.jsonl (observability)
 //
-// Diğer 26 action stub: `{ outcome: 'unimplemented', actionId }` döndürür.
+// Resource-recommendation handlers (ADR-037: nervous PROPOSES, Brain DISPOSES —
+// never self-mutates the repo, guarding the self-modification hazard). Each lands
+// a Brain-actionable proposal in .deckent/nervous-recommendations.jsonl:
+//   - DIRECTIVES_WRITE · DEBT_REPRIORITIZE · AGENT_PERFORMANCE_FLAG
+//   - SKILL_ROUTING_ADJUST · SCOPE_COLLISION_REORDER · COST_OVER_THRESHOLD
+//
+// Remaining destructive / orchestration actions (sprint/git/src/worker control)
+// stay `{ outcome: 'unimplemented', actionId }` pending the autonomous-refuse guard.
 
+import { appendFileSync, existsSync, mkdirSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { ACTION_REGISTRY } from './action-registry.js';
+import { recordRecommendation } from './recommendation-log.js';
 import type { ActionHandler } from './executor.js';
 
 type ExecutorBridgeResult = Awaited<ReturnType<ActionHandler>>;
@@ -34,10 +46,16 @@ export interface ActionHandlerDeps {
   cleanIpcDir: (projectRoot: string) => number;
   generateDebtReport: (projectRoot: string) => void;
   emitMetric: (projectRoot: string, metricName: string, value: number) => void;
+  /** Land a Brain-actionable proposal for a resource the nervous system does not
+   *  own (ADR-037). Defaults to recommendation-log.recordRecommendation. */
+  recommend: (projectRoot: string, actionId: string, payload: Record<string, unknown>) => void;
   projectRoot: string;
 }
 
-const MVP_ACTION_IDS = new Set([
+/** Actions with a real handler. The rest return `unimplemented` (pending the
+ *  autonomous-refuse guard for destructive/orchestration actions). */
+const IMPLEMENTED_ACTION_IDS = new Set([
+  // maintenance / observability — autonomous-safe direct effect
   'WORKER_RESPAWN',
   'ORPHAN_TASK_ARCHIVE',
   'STALE_LOCK_RELEASE',
@@ -47,6 +65,23 @@ const MVP_ACTION_IDS = new Set([
   'IPC_DIR_CLEANUP',
   'DEBT_TRENDING_REPORT',
   'METRIC_EMIT',
+  // resource-recommendation — nervous proposes, Brain disposes (ADR-037)
+  'DIRECTIVES_WRITE',
+  'DEBT_REPRIORITIZE',
+  'AGENT_PERFORMANCE_FLAG',
+  'SKILL_ROUTING_ADJUST',
+  'SCOPE_COLLISION_REORDER',
+  'COST_OVER_THRESHOLD',
+]);
+
+/** Actions routed to the recommendation inbox (no direct repo mutation). */
+const RECOMMENDATION_ACTION_IDS = new Set([
+  'DIRECTIVES_WRITE',
+  'DEBT_REPRIORITIZE',
+  'AGENT_PERFORMANCE_FLAG',
+  'SKILL_ROUTING_ADJUST',
+  'SCOPE_COLLISION_REORDER',
+  'COST_OVER_THRESHOLD',
 ]);
 
 function success(): ActionDispatchResult {
@@ -150,6 +185,21 @@ async function handleMetricEmit(
   return success();
 }
 
+/**
+ * Resource-recommendation handler (ADR-037). The action touches a resource the
+ * nervous system does not own (debt priority, routing, agent flags, wave order,
+ * directives, over-budget proceed) → it lands a Brain-actionable proposal rather
+ * than self-mutating the repo. The full detector payload is preserved as context.
+ */
+async function handleRecommend(
+  actionId: string,
+  payload: Record<string, unknown>,
+  deps: ActionHandlerDeps,
+): Promise<ActionDispatchResult> {
+  deps.recommend(deps.projectRoot, actionId, payload);
+  return success();
+}
+
 let defaultDeps: ActionHandlerDeps | null = null;
 
 async function loadDefaultDeps(): Promise<ActionHandlerDeps> {
@@ -191,9 +241,15 @@ async function loadDefaultDeps(): Promise<ActionHandlerDeps> {
     generateDebtReport: (_projectRoot: string) => {
       // Debt trending report generation — Faz 2 wire.
     },
-    emitMetric: (_projectRoot: string, _metricName: string, _value: number) => {
-      // Metric emit — Faz 2 wire.
+    emitMetric: (projectRoot: string, metricName: string, value: number): void => {
+      // Observability metric point — append-only JSONL, dependency-free.
+      const path = join(projectRoot, '.deckent', 'metrics.jsonl');
+      const dir = dirname(path);
+      if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+      const line = JSON.stringify({ ts: new Date().toISOString(), metricName, value }) + '\n';
+      appendFileSync(path, line, 'utf-8');
     },
+    recommend: recordRecommendation,
     projectRoot: process.cwd(),
   };
   return defaultDeps;
@@ -212,11 +268,15 @@ export async function dispatchAction(
     ? { ...(await loadDefaultDeps()), ...deps }
     : await loadDefaultDeps();
 
-  if (!MVP_ACTION_IDS.has(actionId)) {
+  if (!IMPLEMENTED_ACTION_IDS.has(actionId)) {
     return unimplemented(actionId);
   }
 
   try {
+    // Resource-recommendation actions all share one effect (ADR-037 propose).
+    if (RECOMMENDATION_ACTION_IDS.has(actionId)) {
+      return await handleRecommend(actionId, payload, resolved);
+    }
     switch (actionId) {
       case 'WORKER_RESPAWN':
         return await handleWorkerRespawn(payload, resolved);
@@ -266,12 +326,12 @@ export function createActionHandler(deps?: Partial<ActionHandlerDeps>): ActionHa
 }
 
 // ─── Sanity Check ───────────────────────────────────────────────────────────
-// Build-time guard: every MVP id must exist in ACTION_REGISTRY.
+// Build-time guard: every implemented id must exist in ACTION_REGISTRY.
 const REGISTRY_IDS = new Set(
   (ACTION_REGISTRY as readonly { id: string }[]).map((a) => a.id),
 );
-for (const mvp of MVP_ACTION_IDS) {
-  if (!REGISTRY_IDS.has(mvp)) {
-    throw new Error(`MVP action id ${mvp} missing from ACTION_REGISTRY`);
+for (const id of IMPLEMENTED_ACTION_IDS) {
+  if (!REGISTRY_IDS.has(id)) {
+    throw new Error(`Implemented action id ${id} missing from ACTION_REGISTRY`);
   }
 }

@@ -4,13 +4,17 @@
 //
 // 4 original MVP handlers + 5 new low-risk handlers + integration + type + idempotency.
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { mkdtempSync, rmSync, existsSync, readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import {
   dispatchAction,
   createActionHandler,
   type ActionHandlerDeps,
   type ActionHandlerResult,
 } from '../../src/nervous/action-handlers.js';
+import { readRecommendations } from '../../src/nervous/recommendation-log.js';
 import { Executor, type NervousHistory } from '../../src/nervous/executor.js';
 import type {
   NervousNotification,
@@ -24,7 +28,7 @@ function createMockDeps(): Required<Pick<
   ActionHandlerDeps,
   | 'killWorker' | 'spawnWorker' | 'archiveOrphanTasks' | 'releaseLock' | 'cleanDeadEventStream'
   | 'rotateLogs' | 'invalidateCache' | 'cleanIpcDir' | 'generateDebtReport' | 'emitMetric'
-  | 'projectRoot'
+  | 'recommend' | 'projectRoot'
 >> {
   return {
     killWorker: vi.fn(),
@@ -37,6 +41,7 @@ function createMockDeps(): Required<Pick<
     cleanIpcDir: vi.fn(() => 2),
     generateDebtReport: vi.fn(),
     emitMetric: vi.fn(),
+    recommend: vi.fn(),
     projectRoot: '/tmp/test-project',
   };
 }
@@ -150,13 +155,15 @@ describe('action-handlers — MVP handlers', () => {
     );
   });
 
-  // Test 5: Stub default — non-MVP action IDs return `unimplemented`
-  it('returns `unimplemented` for non-MVP action IDs', async () => {
+  // Test 5: Stub default — still-unimplemented (destructive/orchestration) IDs
+  it('returns `unimplemented` for still-unimplemented action IDs', async () => {
     const otherIds = [
-      'DIRECTIVES_WRITE',
       'PROMPT_BUILDER_TWEAK',
       'SPRINT_START',
+      'SPRINT_STOP',
+      'SRC_MODIFICATION',
       'COMMIT_PUSH',
+      'AGENT_DISABLE',
       'KILL_LIVE_SPRINT',
     ];
 
@@ -290,6 +297,51 @@ describe('action-handlers — new low-risk handlers', () => {
   });
 });
 
+// ─── Unit Tests — resource-recommendation handlers (ADR-037) ────────────────
+
+describe('action-handlers — recommendation handlers (nervous proposes)', () => {
+  let deps: ReturnType<typeof createMockDeps>;
+
+  beforeEach(() => {
+    deps = createMockDeps();
+  });
+
+  const recommendationIds = [
+    'DIRECTIVES_WRITE',
+    'DEBT_REPRIORITIZE',
+    'AGENT_PERFORMANCE_FLAG',
+    'SKILL_ROUTING_ADJUST',
+    'SCOPE_COLLISION_REORDER',
+    'COST_OVER_THRESHOLD',
+  ];
+
+  it.each(recommendationIds)(
+    '%s lands a Brain proposal via recommend() (no repo mutation)',
+    async (actionId) => {
+      const payload = { context: 'x', n: 1 };
+      const result = await dispatchAction(actionId, payload, deps);
+
+      expect(result.outcome).toBe('success');
+      expect(deps.recommend).toHaveBeenCalledWith('/tmp/test-project', actionId, payload);
+    },
+  );
+
+  it('recommendation handlers never touch destructive deps', async () => {
+    await dispatchAction('DIRECTIVES_WRITE', { content: 'x' }, deps);
+    expect(deps.killWorker).not.toHaveBeenCalled();
+    expect(deps.spawnWorker).not.toHaveBeenCalled();
+  });
+
+  it('surfaces failure when recommend() throws', async () => {
+    deps.recommend = vi.fn(() => {
+      throw new Error('feed unwritable');
+    });
+    const result = await dispatchAction('DEBT_REPRIORITIZE', {}, deps);
+    expect(result.outcome).toBe('failure');
+    expect(result.error).toContain('feed unwritable');
+  });
+});
+
 // ─── Integration Test — createActionHandler + Executor chain ────────────────
 
 describe('action-handlers — Executor integration', () => {
@@ -329,13 +381,13 @@ describe('action-handlers — Executor integration', () => {
     const deps = createMockDeps();
     const handler = createActionHandler(deps);
 
-    // Call directly via executor-shaped signature
-    const result = await handler('DIRECTIVES_WRITE', {});
+    // Call directly via executor-shaped signature (a still-unimplemented action)
+    const result = await handler('PROMPT_BUILDER_TWEAK', {});
 
     // Bridged to ActionHandler interface (success | failure)
     expect(result.outcome).toBe('failure');
     expect(result.error).toMatch(/unimplemented/i);
-    expect(result.error).toContain('DIRECTIVES_WRITE');
+    expect(result.error).toContain('PROMPT_BUILDER_TWEAK');
   });
 
   it('createActionHandler executes new low-risk LOG_ROTATION via Executor', async () => {
@@ -352,6 +404,48 @@ describe('action-handlers — Executor integration', () => {
 
     expect(records[0].outcome).toBe('success');
     expect(deps.rotateLogs).toHaveBeenCalledWith('/tmp/test-project');
+  });
+});
+
+// ─── Proof-of-function — real default deps write to disk ────────────────────
+
+describe('action-handlers — real default deps (no mock)', () => {
+  let root: string;
+
+  afterEach(() => {
+    if (root && existsSync(root)) rmSync(root, { recursive: true, force: true });
+    root = undefined as unknown as string;
+  });
+
+  it('METRIC_EMIT default dep appends a real .deckent/metrics.jsonl line', async () => {
+    root = mkdtempSync(join(tmpdir(), 'deckent-ah-'));
+    const result = await dispatchAction(
+      'METRIC_EMIT',
+      { metricName: 'nervous.test', value: 7 },
+      { projectRoot: root },
+    );
+    expect(result.outcome).toBe('success');
+    const path = join(root, '.deckent', 'metrics.jsonl');
+    expect(existsSync(path)).toBe(true);
+    const rec = JSON.parse(readFileSync(path, 'utf-8').trim());
+    expect(rec.metricName).toBe('nervous.test');
+    expect(rec.value).toBe(7);
+    expect(typeof rec.ts).toBe('string');
+  });
+
+  it('a recommendation action default dep appends a real proposal', async () => {
+    root = mkdtempSync(join(tmpdir(), 'deckent-ah-'));
+    const result = await dispatchAction(
+      'AGENT_PERFORMANCE_FLAG',
+      { agent: 'doc-writer', successRate: 0.4 },
+      { projectRoot: root },
+    );
+    expect(result.outcome).toBe('success');
+    const recs = readRecommendations(root);
+    expect(recs).toHaveLength(1);
+    expect(recs[0].actionId).toBe('AGENT_PERFORMANCE_FLAG');
+    expect(recs[0].payload).toEqual({ agent: 'doc-writer', successRate: 0.4 });
+    expect(recs[0].status).toBe('open');
   });
 });
 
