@@ -273,11 +273,15 @@ async function loadDefaultDeps(): Promise<ActionHandlerDeps> {
       generateDebtTrendReport(projectRoot);
     },
     emitMetric: (projectRoot: string, metricName: string, value: number): void => {
-      // Observability metric point — append-only JSONL, dependency-free.
+      // Observability metric point — append the CANONICAL observability MetricEntry
+      // schema ({type:'metric', name, value, timestamp}) to the SAME .deckent/
+      // metrics.jsonl observability.ts reads. (Prior {metricName} shape was silently
+      // skipped by the load-report consumer, which keys off `name` — a dangling
+      // write.) Dependency-free so the nervous hot path stays light.
       const path = join(projectRoot, '.deckent', 'metrics.jsonl');
       const dir = dirname(path);
       if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-      const line = JSON.stringify({ ts: new Date().toISOString(), metricName, value }) + '\n';
+      const line = JSON.stringify({ type: 'metric', name: metricName, value, timestamp: new Date().toISOString() }) + '\n';
       appendFileSync(path, line, 'utf-8');
     },
     recommend: recordRecommendation,

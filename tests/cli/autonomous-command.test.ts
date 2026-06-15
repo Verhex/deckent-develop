@@ -299,11 +299,15 @@ describe('deckent autonomous CLI (226-007)', () => {
 
     await expect(handleStart({ root, lang: 'en', intervalMs: '1', maxIterations: '1' })).resolves.toBeUndefined();
 
-    // wire: created with (config, root, sprintStateProvider fn)
+    // wire: created with (config, root, sprintStateProvider fn, _, deps)
     expect(nervousCreateSpy).toHaveBeenCalled();
     const lastCall = nervousCreateSpy.mock.calls.at(-1)!;
     expect(lastCall[1]).toBe(root);
     expect(typeof lastCall[2]).toBe('function');
+    // N1 fix: autonomous MUST request detectors-in-any-phase (no hosted sprint →
+    // IDLE → the EXECUTE-only guard would otherwise keep detectors inert). The
+    // observer-level effect of this flag is proven in observer-phase-guard.test.ts.
+    expect((lastCall[4] as { observerActiveInAnyPhase?: boolean })?.observerActiveInAnyPhase).toBe(true);
     // lifecycle: enabled → handle created → disposed on teardown (no leak)
     expect(nervousDisposeSpy).toHaveBeenCalled();
   });

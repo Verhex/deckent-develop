@@ -190,6 +190,49 @@ describe('NervousObserver — Sprint 183 W1-1 phase guard + debounce', () => {
     expect(mockRunAll).toHaveBeenCalledTimes(1);
   });
 
+  // ─── N1 fix (2026-06-15): autonomous (no-sprint, IDLE) detector firing ──────
+  // Standalone `deckent autonomous start` has no hosted sprint → phase is
+  // permanently IDLE. With activeInAnyPhase=true the detector pipeline must run
+  // anyway (so live detections actually flow); the default (false) preserves the
+  // EXECUTE-only sprint guard.
+  it('N1 — IDLE phase + activeInAnyPhase=true: detector cycle RUNS (autonomous)', () => {
+    currentPhase = 'IDLE';
+    observer = new NervousObserver(
+      '/test/project',
+      60_000,
+      { stale_worker: { enabled: true } },
+      () => buildSnapshot(currentPhase),
+      1,
+      true, // activeInAnyPhase — the autonomous bootstrap sets this
+    );
+    observer.start();
+
+    const tasksWatcher = mockWatcherInstances[0];
+    tasksWatcher.callback!('change', 'task-001.hb');
+    expect(mockRunAll).toHaveBeenCalledTimes(0);
+    vi.advanceTimersByTime(DETECTOR_DEBOUNCE_WINDOW_MS + 50);
+    // CRITICAL: detections flow in IDLE (this is the N1 behavior the old
+    // mock-only test never proved).
+    expect(mockRunAll).toHaveBeenCalledTimes(1);
+  });
+
+  it('N1 — IDLE phase + activeInAnyPhase=false (default): detector cycle does NOT run (sprint guard preserved)', () => {
+    currentPhase = 'IDLE';
+    observer = new NervousObserver(
+      '/test/project',
+      60_000,
+      { stale_worker: { enabled: true } },
+      () => buildSnapshot(currentPhase),
+      // 5th/6th omitted → idleThrottle=1, activeInAnyPhase=false
+    );
+    observer.start();
+
+    const tasksWatcher = mockWatcherInstances[0];
+    tasksWatcher.callback!('change', 'task-001.hb');
+    vi.advanceTimersByTime(DETECTOR_DEBOUNCE_WINDOW_MS * 3);
+    expect(mockRunAll).toHaveBeenCalledTimes(0);
+  });
+
   // ─── Case 3: Debounce batch — 17 quick events collapse to 1 cycle ─────────
   it('Case 3 — Debounce batch: 17 FS events within 500ms window → 1 detector cycle', () => {
     currentPhase = 'EXECUTE';

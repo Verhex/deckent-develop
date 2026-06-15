@@ -50,6 +50,10 @@ export interface NervousBootstrapDeps {
   ipcQueue?: Pick<NervousIpcQueue, 'startPolling'>;
   /** Pending approval persistence (APPROVE-004). */
   pendingStore?: PendingApprovalStore;
+  /** N1 fix: run detectors in ANY sprint phase (not only EXECUTE). Set true by
+   *  the autonomous bootstrap — there is no hosted sprint there, so the
+   *  EXECUTE-only guard would otherwise keep every built-in detector inert. */
+  observerActiveInAnyPhase?: boolean;
 }
 
 const PENDING_FILE = 'nervous-pending.json';
@@ -179,6 +183,8 @@ export function createNervousSystemIfEnabled(
     15_000,
     detectorConfig as never,
     sprintStateProvider,
+    1, // idleThrottleMultiplier (unwired here — preserves current default)
+    deps.observerActiveInAnyPhase ?? false, // N1: detectors fire in any phase (autonomous)
   );
   const decisionEngine = new DecisionEngine(nervousConfig);
   const proposer = new Proposer(nervousConfig);

@@ -476,9 +476,12 @@ describe('action-handlers — real default deps (no mock)', () => {
     const path = join(root, '.deckent', 'metrics.jsonl');
     expect(existsSync(path)).toBe(true);
     const rec = JSON.parse(readFileSync(path, 'utf-8').trim());
-    expect(rec.metricName).toBe('nervous.test');
+    // Canonical observability MetricEntry schema (name/value/type) — consumable
+    // by observability.ts's load-report (was {metricName} → silently skipped).
+    expect(rec.type).toBe('metric');
+    expect(rec.name).toBe('nervous.test');
     expect(rec.value).toBe(7);
-    expect(typeof rec.ts).toBe('string');
+    expect(typeof rec.timestamp).toBe('string');
   });
 
   it('a recommendation action default dep appends a real proposal', async () => {

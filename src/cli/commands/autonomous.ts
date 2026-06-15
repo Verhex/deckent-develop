@@ -360,6 +360,10 @@ export async function handleStart(opts: AutonomousStartOptions): Promise<void> {
     resolvedConfig as unknown as DeckentConfig,
     root,
     () => getSprintStateSnapshot(root),
+    undefined, // default actionHandler (createActionHandler with the 30 real handlers)
+    // N1 fix: autonomous has no hosted sprint (phase permanently IDLE) — let the
+    // built-in detectors fire in any phase so live detections actually flow.
+    { observerActiveInAnyPhase: true },
   );
 
   const controller = new AbortController();

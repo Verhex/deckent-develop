@@ -112,6 +112,13 @@ export class NervousObserver extends EventEmitter {
     // pre-Sprint-223 behavior; values >1 throttle the IDLE-phase cadence.
     // Wired from config `nervous_system.idle_throttle` (multiplier; 1=off).
     private readonly idleThrottleMultiplier: number = 1,
+    // N1 fix (2026-06-15): when true, the detector pipeline runs in ANY sprint
+    // phase (not only EXECUTE). The EXECUTE-only guard (Sprint 183 P0-1) exists to
+    // stop detectors firing mid-sprint PLAN/SPAWN; but in AUTONOMOUS there is no
+    // hosted sprint — the phase is permanently IDLE — so the guard would keep the
+    // observer inert. The autonomous nervous bootstrap sets this true so built-in
+    // detections actually flow without a sprint. Default false = sprint behavior.
+    private readonly activeInAnyPhase: boolean = false,
   ) {
     super();
     assertBrainScope('NervousObserver');
@@ -203,7 +210,7 @@ export class NervousObserver extends EventEmitter {
     // sprintStateProvider runtime'da phase değişimini yansıttığı için
     // her çağrıda taze okunur.
     const sprintState = this.sprintStateProvider();
-    if (sprintState.currentPhase !== DETECTOR_ACTIVE_PHASE) return;
+    if (!this.activeInAnyPhase && sprintState.currentPhase !== DETECTOR_ACTIVE_PHASE) return;
 
     // Debounce: pending event'i güncel olanla değiştir, timer'ı reset et.
     this.detectorPendingEvent = event;
@@ -233,7 +240,7 @@ export class NervousObserver extends EventEmitter {
     if (this.detectorRegistry === null) return;
 
     const sprintState = this.sprintStateProvider();
-    if (sprintState.currentPhase !== DETECTOR_ACTIVE_PHASE) return;
+    if (!this.activeInAnyPhase && sprintState.currentPhase !== DETECTOR_ACTIVE_PHASE) return;
 
     const ctx: DetectorContext = {
       event,
