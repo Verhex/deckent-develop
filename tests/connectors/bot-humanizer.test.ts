@@ -7,7 +7,7 @@
 // without a real provider.
 
 import { describe, it, expect, vi } from 'vitest';
-import { makeBotHumanizer } from '../../src/connectors/bot-humanizer.js';
+import { makeBotHumanizer, criticalTokens } from '../../src/connectors/bot-humanizer.js';
 
 describe('makeBotHumanizer', () => {
   it('passthrough when no completer: lossless chunk of the raw text', async () => {
@@ -53,5 +53,27 @@ describe('makeBotHumanizer', () => {
     }).toParts('x');
     expect(seen).toContain('warm pirate tone');
     expect(seen).toContain('tr');
+  });
+
+  // Correctness gate — a model that ALTERS the approve/reject id must not reach
+  // the user (the reply would not resolve); fall back to the raw message.
+  it('discards humanized output that altered the action id (re-cased) → raw', async () => {
+    // model re-cased t-42 → T-42 (like a weak small model) — must fall back to raw.
+    const h = makeBotHumanizer({ complete: async () => 'Onayla: Approve T-42 / Reject T-42' });
+    const parts = await h.toParts('approve t-42 / reject t-42');
+    expect(parts).toEqual(['approve t-42 / reject t-42']);
+  });
+
+  it('keeps humanized output that preserved the action id verbatim', async () => {
+    const h = makeBotHumanizer({ complete: async () => 'Hey! Onaylamak için approve t-42 yaz 👍' });
+    const parts = await h.toParts('approve t-42 / reject t-42');
+    expect(parts.join('')).toContain('Hey!');
+    expect(parts.join('')).toContain('approve t-42');
+  });
+
+  it('criticalTokens extracts approve/reject/accept ids (de-duped, punctuation-stripped)', () => {
+    expect(criticalTokens('approve t-42 / reject t-42')).toEqual(['t-42']);
+    expect(criticalTokens('reply accept k9.').sort()).toEqual(['k9']);
+    expect(criticalTokens('no commands here')).toEqual([]);
   });
 });
