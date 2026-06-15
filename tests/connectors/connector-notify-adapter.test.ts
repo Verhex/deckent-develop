@@ -89,4 +89,22 @@ describe('ConnectorNotificationAdapter (BOT-001)', () => {
     // Resolves via the timeout rather than hanging the sprint's awaited notify().
     await expect(adapter.send(notif('critical'))).resolves.toBeUndefined();
   });
+
+  // BOT-LEN — a notification longer than Telegram's 4096-char cap is SPLIT into
+  // multiple messages (lossless), never hard-cut. The bot is meaningless if it
+  // truncates: the operator must see the whole content.
+  it('lossless: a notification over the Telegram limit is split, never cut', async () => {
+    const tg = fakeConnector('telegram');
+    const adapter = makeConnectorNotificationAdapter([{ connector: tg, chatId: 'TG' }]);
+    const longSummary = 'L'.repeat(9000);
+    await adapter.send({
+      priority: 'info', event: 'task-done', title: 'Big', summary: longSummary,
+      sprintId: 's', timestamp: '2026-06-15T00:00:00.000Z',
+    });
+    expect(tg.sent.length).toBeGreaterThan(1);                       // split, not one giant msg
+    for (const m of tg.sent) expect(m.text.length).toBeLessThanOrEqual(4096); // each fits Telegram
+    const joined = tg.sent.map((m) => m.text).join('');
+    expect(joined).toContain(longSummary);                           // nothing lost
+    expect(joined).not.toContain('truncated');                       // not cut
+  });
 });

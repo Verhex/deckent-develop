@@ -19,7 +19,8 @@ import {
 } from './connector-notify-adapter.js';
 import { makeIncomingCommandRouter, type CommandResolver, type ResolveOutcome } from './incoming-command-router.js';
 import { makeCommandResolver } from './incoming-command-resolver.js';
-import { chunkMessage, type ChatResponder } from './chat-bridge.js';
+import { type ChatResponder } from './chat-bridge.js';
+import { chunkMessage } from './message-format.js';
 import { isBotSlash, handleBotSlash } from './bot-commands.js';
 import { takeBotAction, checkExecutable } from './bot-action-store.js';
 import { createCliToolDispatcher } from '../cli/commands/chat-tool-bridge.js';
@@ -29,11 +30,6 @@ import { getCurrentSprintId } from '../monitor/sprint-state.js';
 import { getMessage } from '../cli/helpers/messages.js';
 
 type NotifyConnectorsConfig = NonNullable<DeckentConfig['notify_connectors']>;
-
-/** Keep an executed-action reply within one Telegram message. */
-function truncate(text: string, limit = 3500): string {
-  return text.length > limit ? text.slice(0, limit) + '\n…(truncated)' : text;
-}
 
 export interface ConnectorBootstrapDeps {
   /** Test/override hook: construct a connector instead of lazy-loading the real module. */
@@ -202,7 +198,9 @@ export async function bootstrapConnectorCommands(
           };
         }
         const result = await actionDispatcher.dispatch(parked.tool, parked.args);
-        const body = getMessage('bot.action_done', lang, { tool: parked.tool }) + '\n' + truncate(result);
+        // BOT-LEN: carry the FULL result — the lossless `send` below chunks it
+        // into Telegram-safe parts instead of hard-cutting (the old truncate()).
+        const body = getMessage('bot.action_done', lang, { tool: parked.tool }) + '\n' + result;
         return { status: 'resolved', reply: body };
       } catch (err) {
         return {
@@ -239,8 +237,15 @@ export async function bootstrapConnectorCommands(
         const connector = deps.makeConnector ? deps.makeConnector(id) : await loadConnector(id);
         if (!connector) continue;
         const chatId = String(cfg.chat_id);
-        const send = (channelId: string, text: string): Promise<void> =>
-          connector.sendMessage({ connector: connector.id, channelId, text });
+        // BOT-LEN: lossless send — split any over-limit text into Telegram-safe
+        // parts (never cut). Single chokepoint for every outbound bot message
+        // (command acks, bot-action results, chat replies). The onChat path's own
+        // chunkMessage stays a harmless no-op (parts are already ≤ limit).
+        const send = async (channelId: string, text: string): Promise<void> => {
+          for (const part of chunkMessage(text)) {
+            await connector.sendMessage({ connector: connector.id, channelId, text: part });
+          }
+        };
         const chat = deps.chat;
         connector.onMessage(
           makeIncomingCommandRouter({

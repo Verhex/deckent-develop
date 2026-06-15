@@ -13,6 +13,7 @@
 
 import type { Notification, NotificationAdapter } from '../core/notification-dispatcher.js';
 import type { IMessageConnector } from './types.js';
+import { chunkMessage } from './message-format.js';
 
 /** A started (outbound) connector plus the chat id notifications are sent to. */
 export interface ConnectorTarget {
@@ -64,15 +65,21 @@ export function makeConnectorNotificationAdapter(
     },
 
     async send(notification: Notification): Promise<void> {
-      const text = formatNotification(notification);
+      // BOT-LEN: split over-limit notifications into Telegram-safe parts instead
+      // of letting the platform reject/cut them. Non-lossy — every part is sent.
+      const parts = chunkMessage(formatNotification(notification));
       await Promise.all(
         targets.map((t) =>
           withTimeout(
-            t.connector.sendMessage({
-              connector: t.connector.id,
-              channelId: t.chatId,
-              text,
-            }),
+            (async (): Promise<void> => {
+              for (const text of parts) {
+                await t.connector.sendMessage({
+                  connector: t.connector.id,
+                  channelId: t.chatId,
+                  text,
+                });
+              }
+            })(),
             timeoutMs,
           ).catch(() => undefined), // per-target isolation: a failure never propagates
         ),

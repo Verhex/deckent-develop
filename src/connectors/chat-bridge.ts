@@ -202,21 +202,7 @@ function lastAssistantText(transcript: ReadonlyArray<{ role: string; content: st
   return '';
 }
 
-/**
- * Split a reply into Telegram-safe chunks (≤ limit chars), preferring newline
- * boundaries; hard-splits a single oversized line. Telegram rejects messages
- * over ~4096 chars, so tool output / logs must be chunked before send.
- */
-export function chunkMessage(text: string, limit = 4000): string[] {
-  if (text.length <= limit) return [text];
-  const chunks: string[] = [];
-  let rest = text;
-  while (rest.length > limit) {
-    let cut = rest.lastIndexOf('\n', limit);
-    if (cut <= 0) cut = limit; // no newline in window → hard split
-    chunks.push(rest.slice(0, cut));
-    rest = rest.slice(cut).replace(/^\n/, '');
-  }
-  if (rest.length > 0) chunks.push(rest);
-  return chunks;
-}
+// chunkMessage now lives in the dependency-free message-format.ts so the notify
+// hot-path can use it without loading this chat/LLM engine. Re-exported here for
+// backward compatibility with existing importers.
+export { chunkMessage } from './message-format.js';
