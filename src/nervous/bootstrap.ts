@@ -18,7 +18,7 @@ import { NervousObserver } from './observer.js';
 import { DecisionEngine } from './decision-engine.js';
 import { Proposer } from './proposer.js';
 import { NervousDispatcher } from './dispatcher.js';
-import { Executor } from './executor.js';
+import { Executor, APPROVE_TIMEOUT_MS } from './executor.js';
 import { NervousHistory } from './history.js';
 import {
   NervousIpcQueue,
@@ -125,7 +125,10 @@ export function createNervousSystemIfEnabled(
   const dispatcher = new NervousDispatcher(nervousConfig, projectRoot);
   const history = new NervousHistory(projectRoot);
   const pendingStore = deps.pendingStore ?? makeFilePendingStore(projectRoot);
-  const executor = new Executor(history, actionHandler, pendingStore);
+  // make-usable #3: thread the configurable approve auto-proceed timeout (0 or
+  // negative → never auto-proceed; the cautious-user trust setting).
+  const approveTimeoutMs = nervousConfig.approve_timeout_ms ?? APPROVE_TIMEOUT_MS;
+  const executor = new Executor(history, actionHandler, pendingStore, projectRoot, approveTimeoutMs);
 
   // APPROVE-005 (§4G): poll the MCP IPC queue so `deckent_nervous_accept/reject`
   // (which write approval files) resolve the running executor's pending map —

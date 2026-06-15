@@ -609,6 +609,11 @@ export interface NervousSystemConfig {
   enabled: boolean;
   /** Authority mode preset (default: 'balanced') */
   mode: NervousAuthorityMode;
+  /** Hard timeout (ms) before a non-safety-floor 'approve' action AUTO-PROCEEDS
+   *  if not approved (default 10000). Set to 0 (or negative) to DISABLE
+   *  auto-proceed: such actions then stay pending until you explicitly accept or
+   *  reject (safety-floor actions never auto-proceed regardless). */
+  approve_timeout_ms?: number;
   /** Per-action policy overrides — override preset for specific actions */
   actionOverrides: Record<string, NervousApprovalPolicy>;
   /** Safety floor configuration */

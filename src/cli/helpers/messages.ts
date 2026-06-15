@@ -405,6 +405,14 @@ const MESSAGES: MessageMap = {
     en: 'Nervous System is already enabled (authority: {mode}). Open it with: deckent nervous',
     tr: 'Nervous System zaten açık (yetki: {mode}). Açmak için: deckent nervous',
   },
+  'nervous.approve_timeout.auto': {
+    en: 'Auto-proceed: non-safety-floor approvals auto-apply after {secs}s if not approved (safety-floor always waits for you). Disable with config.nervous_system.approve_timeout_ms=0.',
+    tr: 'Auto-proceed: safety-floor olmayan onaylar {secs}s içinde onaylanmazsa otomatik uygulanır (safety-floor her zaman seni bekler). Kapatmak: config.nervous_system.approve_timeout_ms=0.',
+  },
+  'nervous.approve_timeout.never': {
+    en: 'Auto-proceed: DISABLED — every approval waits for your explicit accept/reject.',
+    tr: 'Auto-proceed: KAPALI — her onay senin açık accept/reject kararını bekler.',
+  },
   'config_nervous.invalid_preset': {
     en: 'Invalid preset: "{preset}". Valid values: {values}',
     tr: 'Geçersiz preset: "{preset}". Geçerli değerler: {values}',

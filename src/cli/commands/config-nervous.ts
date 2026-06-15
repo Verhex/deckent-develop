@@ -142,6 +142,16 @@ export function handleSetMode(root: string, preset: string, lang: string = 'en')
   print(c('  ' + getMessage('config_nervous.mode_set', lng, { preset }), GREEN));
 }
 
+/** Honest one-line description of the approve auto-proceed behavior (make-usable
+ *  #3 transparency): a positive timeout auto-applies non-safety-floor approvals;
+ *  <= 0 means every approval waits for an explicit decision. Pure → testable. */
+export function describeApproveTimeout(approveTimeoutMs: number, lang: string = 'en'): string {
+  const lng = getLanguage(lang);
+  return approveTimeoutMs > 0
+    ? getMessage('nervous.approve_timeout.auto', lng, { secs: String(Math.round(approveTimeoutMs / 1000)) })
+    : getMessage('nervous.approve_timeout.never', lng);
+}
+
 /**
  * `deckent nervous enable [--mode <preset>]` — flip nervous_system.enabled=true
  * with ONE command instead of a manual JSON edit (make-usable batch), preserving
@@ -168,6 +178,10 @@ export function handleEnableNervous(root: string, lang: string = 'en', mode?: st
   const updated: NervousConfigSection = { ...ns, enabled: true, ...(mode ? { mode: mode as AuthorityMode } : {}) };
   writeNervousSection(root, updated);
   print(c('  ' + getMessage('nervous.enabled_banner', lng, { mode: updated.mode }), GREEN));
+  // make-usable #3 transparency: state the auto-proceed contract up front so the
+  // 10s auto-apply (or its disabled state) is never a silent surprise.
+  const approveTimeoutMs = (ns as { approve_timeout_ms?: number }).approve_timeout_ms ?? 10_000;
+  print(c('  ' + describeApproveTimeout(approveTimeoutMs, lng), DIM));
 }
 
 /** `deckent config nervous override <ACTION_ID> <policy>` */

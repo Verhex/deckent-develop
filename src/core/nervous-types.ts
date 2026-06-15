@@ -165,6 +165,11 @@ export interface NervousSystemConfig {
   readonly quietHours?: Readonly<{ start: string; end: string }>;
   /** Throttle window (ms) — aynı groupKey notification'lar bu sürede tekrar üretilmez */
   readonly throttleWindowMs?: number;
+  /** Safety-floor olmayan 'approve' eylemin onaylanmazsa AUTO-PROCEED edeceği
+   *  hard timeout (ms, default 10000). 0 (veya negatif) → auto-proceed KAPALI:
+   *  eylem siz accept/reject edene dek pending kalır (safety-floor zaten asla
+   *  auto-proceed etmez). */
+  readonly approve_timeout_ms?: number;
   /** Nervous system etkin mi (default: false, Sprint 147 sonunda true) */
   readonly enabled: boolean;
 }

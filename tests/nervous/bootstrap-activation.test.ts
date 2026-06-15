@@ -100,6 +100,8 @@ vi.mock('../../src/nervous/dispatcher.js', () => ({
 }));
 
 vi.mock('../../src/nervous/executor.js', () => ({
+  APPROVE_TIMEOUT_MS: 10_000,
+  shouldArmAutoProceed: (locked: boolean, ms: number) => !locked && ms > 0,
   Executor: vi.fn().mockImplementation((history: unknown, actionHandler: unknown) => {
     executorSpies.ctorArgs.push([history, actionHandler]);
     executorSpies.actionHandlerArg = actionHandler;

@@ -51,8 +51,18 @@ const TIMEOUT_MAP: Readonly<Record<string, number>> = {
   'suggest-30m': 30 * 60 * 1000, // 1800000 ms
 };
 
-/** Hard timeout for approve-policy actions (non-SAFETY_FLOOR). Matches panic-gate default. */
-const APPROVE_TIMEOUT_MS = 10_000;
+/** Default hard timeout for approve-policy actions (non-SAFETY_FLOOR). Matches panic-gate default. */
+export const APPROVE_TIMEOUT_MS = 10_000;
+
+/**
+ * Arm the auto-proceed timer only for a non-safety-floor action with a POSITIVE
+ * timeout. A timeout <= 0 means "never auto-proceed" (the cautious-user trust
+ * setting): the action then stays pending until an explicit human accept/reject.
+ * Safety-floor (locked) actions never auto-proceed regardless. Pure → testable.
+ */
+export function shouldArmAutoProceed(locked: boolean, approveTimeoutMs: number): boolean {
+  return !locked && approveTimeoutMs > 0;
+}
 
 // ─── Executor Class ──────────────────────────────────────────────────────────
 
@@ -72,6 +82,9 @@ export class Executor {
     private readonly actionHandler: ActionHandler,
     private readonly pendingStore?: PendingApprovalStore,
     private readonly projectRoot: string = process.cwd(),
+    /** Hard timeout (ms) before a non-safety-floor approve action auto-proceeds.
+     *  <= 0 disables auto-proceed entirely (action stays pending). */
+    private readonly approveTimeoutMs: number = APPROVE_TIMEOUT_MS,
   ) {}
 
   /**
@@ -345,14 +358,15 @@ export class Executor {
       this.pendingStore?.add(notification);
 
       // Hard-timeout path for non-SAFETY_FLOOR actions via awaitPanicGateApproval.
-      // SAFETY_FLOOR actions are exempt — they require explicit human approval and
-      // keep the in-memory-only path (no auto-proceed on timeout).
-      if (!locked) {
+      // SAFETY_FLOOR actions are exempt (explicit human approval, no auto-proceed),
+      // and a configured approveTimeoutMs <= 0 disables auto-proceed for everyone
+      // (the cautious-user setting — the action stays pending until decided).
+      if (shouldArmAutoProceed(locked, this.approveTimeoutMs)) {
         void awaitPanicGateApproval({
           actionId: action.id,
           taskId: notification.id,
           projectRoot: this.projectRoot,
-          timeoutMs: APPROVE_TIMEOUT_MS,
+          timeoutMs: this.approveTimeoutMs,
         }).then((gateDecision) => {
           if (gateDecision === 'TIMEOUT_AUTO_PROCEED') {
             void finish('timeout-auto-applied', 'timeout');

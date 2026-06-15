@@ -5,7 +5,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { handleEnableNervous } from '../../src/cli/commands/config-nervous.js';
+import { handleEnableNervous, describeApproveTimeout } from '../../src/cli/commands/config-nervous.js';
 
 const dirs: string[] = [];
 function sandbox(): string {
@@ -42,5 +42,16 @@ describe('deckent nervous enable', () => {
     handleEnableNervous(d, 'en', 'bogus-preset');
     expect(process.exitCode).toBe(1);
     process.exitCode = prevExit; // restore for the runner
+  });
+});
+
+describe('describeApproveTimeout (make-usable #3 transparency)', () => {
+  it('states the auto-apply window when a positive timeout is configured', () => {
+    expect(describeApproveTimeout(10_000, 'en')).toMatch(/10s/);
+    expect(describeApproveTimeout(30_000, 'tr')).toMatch(/30s/);
+  });
+  it('states auto-proceed is DISABLED when the timeout is <= 0', () => {
+    expect(describeApproveTimeout(0, 'en')).toMatch(/DISABLED/i);
+    expect(describeApproveTimeout(-1, 'tr')).toMatch(/KAPALI/i);
   });
 });
