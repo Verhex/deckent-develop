@@ -360,3 +360,115 @@ Sprint 277 closes the backend OIDC foundation and wires the dashboard authentica
 -   JWT verification is **fail-closed**: invalid tokens, signature mismatches, or expired claims → dürüst error message (token never echoed).
 -   If IdP is unreachable, the exchange endpoint returns a structured error; user can retry or fall back to manual token.
 -   Verifier state (PKCE, nonce) stored in sessionStorage (per-tab isolation); no server-side state — stateless CSRF protection.
+
+## 12. ERP Connector (`erp.read`)
+
+Deckent connects **inside** an enterprise's ERP through the `erp.read` capability:
+process-mode and the autonomous engine issue structured, read-only queries that
+round-trip to a live ERP (IFS Cloud, Odoo, SAP, Dynamics 365). Every invocation
+lands on the tamper-evident audit chain (Section 8) — the training-data trail.
+
+-   **Module**: `src/core/erp/` (one cohesive, separable module — a step toward the
+    deckent-solo / deckent-enterprise split; ERP is an enterprise-layer concern).
+-   **SSOT compiler**: `src/core/erp/connector.ts` · **capability bridge**:
+    `src/core/erp/handler.ts` · **binding**: `src/core/erp/factory.ts`.
+-   **Vendor drivers** (each its own component): `erp/ifs/driver.ts` (the **first
+    real driver** — CORE-W5), `erp/odoo/driver.ts`, `erp/sap/driver.ts`,
+    `erp/dynamics/driver.ts` (reference implementations behind the same seam), plus
+    an `in-memory` reference driver for tests.
+
+### Read-Only Safety Contract (defence in depth)
+
+The whole ERP path is **read-only by construction**, enforced at four layers:
+
+1.  **Compiled query** carries `operation: 'read'` + `readOnly: true` (machine-checkable).
+2.  **Connector** rejects SQL/DML mutation verbs (`insert`/`update`/`delete`/…) as
+    identifiers, allow-lists entities + fields, parameterizes every value, and clamps
+    the row limit.
+3.  **Each driver** re-checks the read-only contract and refuses any non-read query.
+4.  **Capability** is `erp.read` (a read capability); `erp.write` is **not** wired —
+    write is a deliberately separate, approval-gated future arc (the read-only
+    invariant must not be inverted casually on a system of record).
+
+### Configuration
+
+ERP is **opt-in** (`erp.enabled: false`/absent ⇒ no `erp.read` handler is installed —
+the registry is unchanged). The config holds only **non-secret connection
+identifiers**; the credential (bearer token / API key / basic password) is read
+**only** from an environment variable named by `tokenEnv` (default
+`DECKENT_ERP_TOKEN`) — a credential never lives in `config.json`.
+
+`.deckent/config.json` — full IFS Cloud example:
+
+```json
+{
+  "erp": {
+    "enabled": true,
+    "driver": "ifs",
+    "baseUrl": "https://ifs.example.com",
+    "projection": "CustomerOrdersHandling",
+    "apiVersion": "v1",
+    "tokenEnv": "IFS_ACCESS_TOKEN",
+    "entityModelMap": { "CustomerOrder": "CustomerOrderSet" },
+    "entities": {
+      "CustomerOrder": {
+        "fields": ["OrderNo", "CustomerNo", "OrderState", "WantedDeliveryDate"],
+        "source": "CustomerOrder",
+        "maxLimit": 200
+      }
+    },
+    "maxLimit": 500,
+    "defaultLimit": 50
+  }
+}
+```
+
+Then the credential lives in the environment (never in config / git):
+
+```bash
+export IFS_ACCESS_TOKEN="<oauth-bearer-from-ifs-iam>"
+```
+
+Per-driver required fields:
+
+| `driver` | Required | Credential (from `tokenEnv`) |
+|----------|----------|------------------------------|
+| `ifs` | `baseUrl`, `projection` | OAuth bearer (IFS IAM) |
+| `dynamics` | `baseUrl` | Azure AD OAuth bearer |
+| `odoo` | `url`, `db`, `uid` | API key / password |
+| `sap` | `baseUrl` (+ `username` if `authKind: "basic"`) | bearer **or** basic password |
+| `in-memory` | `memoryTables` (test seed) | — (no credential) |
+
+An **opted-in misconfiguration fails loudly** at startup (missing credential,
+missing required field, or no declared entities) rather than silently disabling
+`erp.read`.
+
+### Invocation
+
+A process/autonomous capability entry targets `erp.read` with a structured query:
+
+```json
+{
+  "kind": "capability",
+  "capabilityTarget": {
+    "capability": "erp.read",
+    "connector": "ifs",
+    "args": {
+      "entity": "CustomerOrder",
+      "fields": ["OrderNo", "OrderState"],
+      "filters": [{ "field": "CustomerNo", "op": "eq", "value": "C-1001" }],
+      "limit": 50
+    }
+  }
+}
+```
+
+`erp.read` is a **pure** effect (EffectClass) → it auto-runs (no approval gate);
+`fields`/`filters`/`entity` are validated against the connector allow-list before
+any network call. The result rows and the compiled query are recorded on the audit
+chain for the training-data trail.
+
+> **Real ERP validation** (live IFS round-trip against a test environment) is a
+> post-beta step (ARC-I); the config above is the fill-in-the-blanks template for
+> that day. The hermetic driver tests (injectable `fetch`) validate wire-format
+> translation without touching the network.
