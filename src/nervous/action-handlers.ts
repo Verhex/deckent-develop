@@ -64,6 +64,11 @@ export interface ActionHandlerDeps {
    *  task's spawn context). Default false → WORKER_RESPAWN proposes instead of
    *  faking a respawn it cannot perform standalone. */
   canRespawn: boolean;
+  /** N3 cooperative respawn: when set (sprint context, opt-in
+   *  config.nervous_system.worker_respawn), WORKER_RESPAWN writes a durable
+   *  respawn-REQUEST the sprint-controller drains + actions through its own
+   *  authoritative lifecycle (single-owner — no race). Absent → propose. */
+  requestRespawn?: (projectRoot: string, taskId: string) => void;
   projectRoot: string;
 }
 
@@ -123,15 +128,22 @@ async function handleWorkerRespawn(
 ): Promise<ActionDispatchResult> {
   const taskId = requireString(payload, 'taskId');
   // Respawn needs the coordinator's full spawn context (command/options/adapter).
-  // Without an injected real kill+spawn pair, the standalone handler CANNOT
-  // re-spawn safely — so it proposes the respawn to the operator/Brain instead
-  // of faking a success it did not perform (honest, no silent no-op).
-  if (!deps.canRespawn) {
-    deps.recommend(deps.projectRoot, 'WORKER_RESPAWN', payload);
+  // Three tiers, safest-first:
+  //  1. canRespawn → a live coordinator injected real kill+spawn (it owns context).
+  //  2. requestRespawn → cooperative signal: write a durable respawn-REQUEST the
+  //     sprint-controller drains + actions through its OWN lifecycle (single-owner,
+  //     no race). This is the opt-in sprint path (config.nervous_system.worker_respawn).
+  //  3. neither → propose to Brain/operator (the standalone-safe default).
+  if (deps.canRespawn) {
+    deps.killWorker(taskId);
+    deps.spawnWorker(taskId);
     return success();
   }
-  deps.killWorker(taskId);
-  deps.spawnWorker(taskId);
+  if (deps.requestRespawn) {
+    deps.requestRespawn(deps.projectRoot, taskId);
+    return success();
+  }
+  deps.recommend(deps.projectRoot, 'WORKER_RESPAWN', payload);
   return success();
 }
 

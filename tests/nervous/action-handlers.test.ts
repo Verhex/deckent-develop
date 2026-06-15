@@ -125,6 +125,22 @@ describe('action-handlers — MVP handlers', () => {
     expect(deps.recommend).toHaveBeenCalledWith('/tmp/test-project', 'WORKER_RESPAWN', { taskId: '180-002' });
   });
 
+  // Test 1c (N3): WORKER_RESPAWN with a cooperative requestRespawn (sprint, opt-in)
+  // → writes a respawn-REQUEST, never a parallel kill/spawn, never a proposal.
+  it('writes a cooperative respawn-request when requestRespawn is injected (N3)', async () => {
+    const requestRespawn = vi.fn();
+    const result = await dispatchAction(
+      'WORKER_RESPAWN',
+      { taskId: '180-003' },
+      { ...deps, requestRespawn },
+    );
+
+    expect(result.outcome).toBe('success');
+    expect(requestRespawn).toHaveBeenCalledWith('/tmp/test-project', '180-003');
+    expect(deps.killWorker).not.toHaveBeenCalled();
+    expect(deps.recommend).not.toHaveBeenCalled();
+  });
+
   // Test 2: ORPHAN_TASK_ARCHIVE → archive helper invoked with sprintId
   it('handles ORPHAN_TASK_ARCHIVE by invoking archiveOrphanTasks', async () => {
     const result = await dispatchAction(

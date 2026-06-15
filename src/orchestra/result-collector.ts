@@ -56,6 +56,7 @@ import { getAgentPrompt } from '../core/agent-pool.js';
 
 // ─── tmux ─────────────────────────────────────────────────────────
 import { spawnWorker, killWorker } from './tmux.js';
+import { drainRespawnRequests } from '../nervous/respawn-request.js';
 
 // ─── Token Counter (Sprint 196 — Task 196-005 / WP-4) ────────────
 // Orchestrator-side token-usage fill. `mergeWithWorkerClaim` /
@@ -835,6 +836,35 @@ export async function waitForResults(
     }
   };
 
+  // ─── N3: cooperative nervous worker-respawn drain ────────────────────
+  // The nervous WORKER_RESPAWN action does NOT kill+spawn workers itself (that
+  // would race this loop, the single owner of worker lifecycle). It writes a
+  // durable respawn-REQUEST; here — inside this loop, opt-in via
+  // config.nervous_system.worker_respawn — we drain it and re-spawn the stale
+  // task through the controller's OWN idempotent single-task spawn. No race.
+  const drainNervousRespawns = async (): Promise<void> => {
+    if (!config?.nervous_system?.worker_respawn) return;
+    for (const reqTaskId of drainRespawnRequests(projectRoot)) {
+      const task = taskMap.get(reqTaskId);
+      if (!task) continue;
+      // Only act on a live (stale) worker — never resurrect a settled task.
+      if (
+        task.status !== TaskStatus.EXECUTING
+        && task.status !== TaskStatus.CLAIMED
+        && task.status !== TaskStatus.TESTING
+      ) continue;
+      try {
+        if (queueBackend) queueBackend.kill(reqTaskId);
+        else killWorker(reqTaskId);
+      } catch (e) {
+        debugLog('drainNervousRespawns:kill', e);
+      }
+      assignedTaskIds.delete(reqTaskId);
+      task.status = TaskStatus.PENDING;
+      await spawnIfNotAssigned(task);
+    }
+  };
+
   // ─── Sprint 165 Bug Y — refactored processQueue ──────────────────────
   // Behavior preserved for backward compat with task-queue.test.ts:
   //   • For each completedTaskId, pick at most ONE eligible task from the
@@ -998,6 +1028,9 @@ export async function waitForResults(
       // Race: fs.watch / fallback-poll vs IPC heartbeat wakeup
       await Promise.race([watcher.waitForChange(), ipcWakeupPromise]);
       const newlyCollected = await collectResults();
+      // N3: action any cooperative nervous respawn-requests before dispatch (no-op
+      // unless config.nervous_system.worker_respawn). Single-owner — no race.
+      await drainNervousRespawns();
       // ADR-064 (TOPP B): unified dispatch tick — main loop spawn entry.
       // Continuous dispatch — re-evaluate eligible Wave N+1 tasks each
       // tick when dependency_pipeline_enabled is true; honor

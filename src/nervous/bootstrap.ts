@@ -27,6 +27,7 @@ import {
   clearNervousHeartbeat,
 } from './ipc-queue.js';
 import { createActionHandler } from './action-handlers.js';
+import { requestWorkerRespawn } from './respawn-request.js';
 import type { ActionHandler, PendingApprovalStore } from './executor.js';
 import type {
   DetectorResult,
@@ -157,7 +158,14 @@ export function createNervousSystemIfEnabled(
   config: DeckentConfig,
   projectRoot: string,
   sprintStateProvider: () => SprintStateSnapshot,
-  actionHandler: ActionHandler = createActionHandler({ projectRoot }),
+  actionHandler: ActionHandler = createActionHandler({
+    projectRoot,
+    // N3: opt-in cooperative respawn — WORKER_RESPAWN writes a durable request the
+    // sprint-controller drains (single-owner, no race). Off → propose (default).
+    ...(((config.nervous_system as NervousSystemConfig | undefined)?.worker_respawn)
+      ? { requestRespawn: requestWorkerRespawn }
+      : {}),
+  }),
   deps: NervousBootstrapDeps = {},
 ): NervousSystemHandle | null {
   const nervousConfig = config.nervous_system as NervousSystemConfig | undefined;

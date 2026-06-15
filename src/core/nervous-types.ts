@@ -170,6 +170,11 @@ export interface NervousSystemConfig {
    *  eylem siz accept/reject edene dek pending kalır (safety-floor zaten asla
    *  auto-proceed etmez). */
   readonly approve_timeout_ms?: number;
+  /** N3 (default false): opt-in cooperative worker respawn. When true (sprint
+   *  context), WORKER_RESPAWN writes a durable respawn-REQUEST the sprint-controller
+   *  drains + actions through its own lifecycle (no race). False → WORKER_RESPAWN
+   *  proposes to Brain (the safe default). */
+  readonly worker_respawn?: boolean;
   /** Nervous system etkin mi (default: false, Sprint 147 sonunda true) */
   readonly enabled: boolean;
 }

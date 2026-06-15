@@ -657,6 +657,10 @@ export interface NervousSystemConfig {
    *  auto-proceed: such actions then stay pending until you explicitly accept or
    *  reject (safety-floor actions never auto-proceed regardless). */
   approve_timeout_ms?: number;
+  /** N3 (default false): opt-in cooperative worker respawn. When true, the nervous
+   *  WORKER_RESPAWN action writes a durable respawn-REQUEST the sprint-controller
+   *  drains + actions through its own lifecycle (no race). False → propose. */
+  worker_respawn?: boolean;
   /** Per-action policy overrides — override preset for specific actions */
   actionOverrides: Record<string, NervousApprovalPolicy>;
   /** Safety floor configuration */
