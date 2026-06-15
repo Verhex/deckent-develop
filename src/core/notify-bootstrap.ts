@@ -68,16 +68,28 @@ export function bootstrapNotifyDispatcher(
     options.throttleMs ?? DEFAULT_NOTIFY_THROTTLE_MS,
   );
 
-  dispatcher.addAdapter(new CliNotificationAdapter());
-  for (const adapter of options.extraAdapters ?? []) {
+  const cliAdapter = new CliNotificationAdapter();
+  dispatcher.addAdapter(cliAdapter);
+  const extras = options.extraAdapters ?? [];
+  for (const adapter of extras) {
     dispatcher.addAdapter(adapter);
   }
-  dispatcher.addAdapter(
-    new FileNotificationAdapter(
-      join(options.projectRoot, DECKENT_DIR, NOTIFY_LOG_FILE),
-    ),
+  const fileAdapter = new FileNotificationAdapter(
+    join(options.projectRoot, DECKENT_DIR, NOTIFY_LOG_FILE),
   );
+  dispatcher.addAdapter(fileAdapter);
 
   setGlobalNotifyDispatcher(dispatcher);
+
+  // W2 — notify-init breadcrumb (DECKENT_DEBUG only, stderr; never .brain/ERRORS.md):
+  // list the wired adapters so an operator can confirm whether the connector
+  // (Telegram/Discord = 'connector-broadcast') is in the chain — the diagnosis for
+  // the "safe-but-deaf" silent-notify gap. Without an extra, the chain is just
+  // cli-parent-tty + file-jsonl → notify never reaches the operator's phone.
+  if (process.env['DECKENT_DEBUG']) {
+    const names = [cliAdapter.name, ...extras.map((a) => a.name), fileAdapter.name];
+    process.stderr.write(`[deckent:debug] notify-bootstrap: ${names.length} adapters wired — ${names.join(', ')}\n`);
+  }
+
   return dispatcher;
 }

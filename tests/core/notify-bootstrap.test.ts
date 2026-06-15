@@ -6,7 +6,7 @@
 // Hermetic: all file I/O under os.tmpdir(); process-globals (the dispatcher and
 // DECKENT_PARENT_PID) are saved and restored so no state leaks to other tests.
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtempSync, rmSync, existsSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -119,5 +119,37 @@ describe('bootstrapNotifyDispatcher (WIRE-001)', () => {
     await expect(
       notify('task-done', 'sprint-test', 'Bitti', 'task DONE'),
     ).resolves.toBeUndefined();
+  });
+
+  // W2 — notify-init breadcrumb: under DECKENT_DEBUG, list the wired adapters so an
+  // operator can confirm whether the connector (Telegram) adapter is in the chain.
+  it('W2: writes a notify-init breadcrumb with adapter names only under DECKENT_DEBUG', () => {
+    const debugBefore = process.env['DECKENT_DEBUG'];
+    const writes: string[] = [];
+    const spy = vi.spyOn(process.stderr, 'write').mockImplementation((chunk: unknown): boolean => {
+      writes.push(String(chunk));
+      return true;
+    });
+    try {
+      // OFF → no breadcrumb
+      delete process.env['DECKENT_DEBUG'];
+      bootstrapNotifyDispatcher({ projectRoot: root, extraAdapters: [new RecordingAdapter()] });
+      expect(writes.some((w) => w.includes('notify-bootstrap'))).toBe(false);
+
+      clearGlobalNotifyDispatcher();
+
+      // ON → breadcrumb lists cli + extra + file adapter names
+      process.env['DECKENT_DEBUG'] = '1';
+      bootstrapNotifyDispatcher({ projectRoot: root, extraAdapters: [new RecordingAdapter()] });
+      const crumb = writes.find((w) => w.includes('notify-bootstrap'));
+      expect(crumb).toBeTruthy();
+      expect(crumb).toContain('cli-parent-tty');
+      expect(crumb).toContain('recording-test'); // the extra (e.g. connector-broadcast in prod)
+      expect(crumb).toContain('file-jsonl');
+    } finally {
+      spy.mockRestore();
+      if (debugBefore === undefined) delete process.env['DECKENT_DEBUG'];
+      else process.env['DECKENT_DEBUG'] = debugBefore;
+    }
   });
 });
