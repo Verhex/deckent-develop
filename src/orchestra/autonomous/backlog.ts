@@ -115,27 +115,31 @@ export function purgeCompletedBacklog(
  *
  * Fail-safe: per-file errors are silently swallowed; a missing directory is a no-op.
  * Resolves AUT-6 (PID-1 finding): autonomous artifacts never cleaned up otherwise.
+ * Returns the number of artifact files removed (so callers can report a count).
  */
 export function cleanupAutonomousArtifacts(
   projectRoot: string,
   tasksDir: string = TASKS_DIR,
-): void {
+): number {
   const dir = join(projectRoot, tasksDir);
-  if (!existsSync(dir)) return;
+  if (!existsSync(dir)) return 0;
   let files: string[];
   try {
     files = readdirSync(dir);
   } catch {
-    return;
+    return 0;
   }
+  let removed = 0;
   for (const file of files) {
     if (!file.startsWith('task-run-') && !/^_.*\.pid$/.test(file)) continue;
     try {
       unlinkSync(join(dir, file));
+      removed += 1;
     } catch {
       // per-file errors ignored — cleanup is best-effort
     }
   }
+  return removed;
 }
 
 /**

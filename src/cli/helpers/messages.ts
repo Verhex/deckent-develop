@@ -868,6 +868,10 @@ const MESSAGES: MessageMap = {
     en: 'Stop signal written — active loop will halt after the in-flight cycle.',
     tr: 'Durdurma sinyali yazıldı — aktif döngü mevcut cycle sonrası duracak.',
   },
+  'autonomous.cleanup_done': {
+    en: 'Swept {count} stray autonomous run-artifact(s) from .tasks/.',
+    tr: '.tasks/ içinden {count} adet artık otonom run-artifact temizlendi.',
+  },
   // ─── autonomous approve/reject/pending + live feedback (APPROVE-002, §4G) ──
   'autonomous.approve_done': {
     en: '✓ Approved: {triggerId} (decision recorded — applied when this trigger is next re-evaluated).',

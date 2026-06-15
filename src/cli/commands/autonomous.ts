@@ -37,7 +37,7 @@ import type {
   AutonomousCycleResult,
   AutonomousRuntimeConfig,
 } from '../../orchestra/autonomous-runtime.js';
-import { loadBacklog, validateBacklogEntry } from '../../orchestra/autonomous/backlog.js';
+import { loadBacklog, validateBacklogEntry, cleanupAutonomousArtifacts } from '../../orchestra/autonomous/backlog.js';
 import { makeDebtWorkGenerator } from '../../orchestra/autonomous/work-generator-source.js';
 import { recoverBacklog } from '../../orchestra/autonomous/execution-pool.js';
 import { atomicWriteFileSync } from '../../agents/worker-lifecycle.js';
@@ -423,6 +423,11 @@ export async function handleStart(opts: AutonomousStartOptions): Promise<void> {
     // N1: tear down the nervous system (observer watchers + executor timers +
     // heartbeat) so the process exits cleanly.
     nervousHandle?.dispose();
+    // AUT-6: the loop has ended (no task is in-flight here), so sweep stray
+    // per-run artifacts (task-run-*.{hb,result,json,prompt,worker,log}, _*.pid)
+    // that the execute-dispatcher leaves behind — keeps .tasks/ from accumulating
+    // run files across autonomous sessions. Best-effort; never throws.
+    cleanupAutonomousArtifacts(root);
   }
 }
 
@@ -515,6 +520,26 @@ export function handleStop(opts: AutonomousStopOptions): void {
   ensureAutonomousDir(root);
   writeFileSync(stopMarkerPath(root), new Date().toISOString(), 'utf-8');
   print(getMessage('autonomous.stop_marker_written', lang));
+}
+
+// ─── cleanup ──────────────────────────────────────────────────────────
+
+export interface AutonomousCleanupOptions {
+  root?: string;
+  lang?: string;
+}
+
+/**
+ * Manually sweep stray autonomous run-artifacts (task-run-*, _*.pid) from .tasks/.
+ * The engine also does this on stop (handleStart finally), but a long-running or
+ * crashed session can leave artifacts behind — this gives the operator an explicit
+ * on-demand sweep. Reports the count removed. (AUT-6 / MASTER-PLAN §4A devam #3.)
+ */
+export function handleCleanup(opts: AutonomousCleanupOptions): void {
+  const lang = getLanguage(opts.lang);
+  const root = opts.root ?? resolveProjectRoot();
+  const removed = cleanupAutonomousArtifacts(root);
+  print(getMessage('autonomous.cleanup_done', lang, { count: String(removed) }));
 }
 
 // ─── live feedback (onTick reporter) (APPROVE-002, §4G) ────────────────
@@ -709,6 +734,20 @@ export function registerAutonomous(program: Command): void {
     .action((opts: AutonomousStopOptions) => {
       try {
         handleStop(opts);
+      } catch (err) {
+        printError(err);
+        process.exitCode = 1;
+      }
+    });
+
+  cmd
+    .command('cleanup')
+    .description('Sweep stray autonomous run-artifacts (task-run-*, _*.pid) from .tasks/')
+    .option('--root <path>', 'Project root override')
+    .option('--lang <code>', 'Language override (en|tr)')
+    .action((opts: AutonomousCleanupOptions) => {
+      try {
+        handleCleanup(opts);
       } catch (err) {
         printError(err);
         process.exitCode = 1;

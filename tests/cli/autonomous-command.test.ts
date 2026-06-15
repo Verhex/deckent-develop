@@ -52,6 +52,7 @@ import {
   handleStart,
   handleStatus,
   handleStop,
+  handleCleanup,
 } from '../../src/cli/commands/autonomous.js';
 import { useSandboxHome } from '../helpers/sandbox-home.js';
 
@@ -117,6 +118,21 @@ describe('deckent autonomous CLI (226-007)', () => {
     const marker = join(root, '.deckent', 'autonomous', 'stop');
     expect(existsSync(marker)).toBe(true);
     expect(out).toContain('Stop signal written');
+  });
+
+  it('cleanup → sweeps stray task-run-* artifacts, keeps real tasks, reports count', async () => {
+    const tasksDir = join(root, '.tasks');
+    mkdirSync(tasksDir, { recursive: true });
+    writeFileSync(join(tasksDir, 'task-run-9-0.json'), '{}', 'utf-8');
+    writeFileSync(join(tasksDir, 'task-run-9-0.hb'), '{}', 'utf-8');
+    writeFileSync(join(tasksDir, '_run-9.pid'), '1', 'utf-8');
+    writeFileSync(join(tasksDir, 'task-001-001.json'), '{}', 'utf-8'); // real sprint task — kept
+    const out = await captureStdout(() => handleCleanup({ root, lang: 'en' }));
+    expect(out).toContain('3'); // 3 artifacts swept
+    expect(existsSync(join(tasksDir, 'task-run-9-0.json'))).toBe(false);
+    expect(existsSync(join(tasksDir, 'task-run-9-0.hb'))).toBe(false);
+    expect(existsSync(join(tasksDir, '_run-9.pid'))).toBe(false);
+    expect(existsSync(join(tasksDir, 'task-001-001.json'))).toBe(true);
   });
 
   it('status → summary with pending count + last audit events', async () => {

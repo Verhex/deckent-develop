@@ -156,12 +156,13 @@ describe('backlog store', () => {
 
   // ── cleanupAutonomousArtifacts ─────────────────────────────────────────────
 
-  it('cleanupAutonomousArtifacts removes task-run-* files', () => {
+  it('cleanupAutonomousArtifacts removes task-run-* files and returns the count', () => {
     const tasksDir = join(dir, '.tasks');
     mkdirSync(tasksDir);
     writeFileSync(join(tasksDir, 'task-run-1234567890-0.json'), '{}');
     writeFileSync(join(tasksDir, 'task-run-1234567890-0.hb'), '{}');
-    cleanupAutonomousArtifacts(dir, '.tasks');
+    const removed = cleanupAutonomousArtifacts(dir, '.tasks');
+    expect(removed).toBe(2);
     expect(existsSync(join(tasksDir, 'task-run-1234567890-0.json'))).toBe(false);
     expect(existsSync(join(tasksDir, 'task-run-1234567890-0.hb'))).toBe(false);
   });
@@ -174,18 +175,21 @@ describe('backlog store', () => {
     expect(existsSync(join(tasksDir, '_run-abc.pid'))).toBe(false);
   });
 
-  it('cleanupAutonomousArtifacts leaves unrelated task files intact', () => {
+  it('cleanupAutonomousArtifacts leaves unrelated task files intact (returns only artifacts removed)', () => {
     const tasksDir = join(dir, '.tasks');
     mkdirSync(tasksDir);
     writeFileSync(join(tasksDir, 'task-001-001.json'), '{}');
     writeFileSync(join(tasksDir, 'task-run-1234567890-0.json'), '{}');
-    cleanupAutonomousArtifacts(dir, '.tasks');
+    const removed = cleanupAutonomousArtifacts(dir, '.tasks');
+    expect(removed).toBe(1); // only the run-artifact, not the real sprint task
     expect(existsSync(join(tasksDir, 'task-001-001.json'))).toBe(true);
     expect(existsSync(join(tasksDir, 'task-run-1234567890-0.json'))).toBe(false);
   });
 
-  it('cleanupAutonomousArtifacts is a no-op when tasks directory is absent', () => {
-    expect(() => cleanupAutonomousArtifacts(dir, '.nonexistent')).not.toThrow();
+  it('cleanupAutonomousArtifacts is a no-op (returns 0) when tasks directory is absent', () => {
+    let removed = -1;
+    expect(() => { removed = cleanupAutonomousArtifacts(dir, '.nonexistent'); }).not.toThrow();
+    expect(removed).toBe(0);
   });
 
   // ── reenqueueRecurring ────────────────────────────────────────────────────
