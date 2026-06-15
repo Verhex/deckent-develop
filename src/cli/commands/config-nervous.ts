@@ -142,6 +142,34 @@ export function handleSetMode(root: string, preset: string, lang: string = 'en')
   print(c('  ' + getMessage('config_nervous.mode_set', lng, { preset }), GREEN));
 }
 
+/**
+ * `deckent nervous enable [--mode <preset>]` — flip nervous_system.enabled=true
+ * with ONE command instead of a manual JSON edit (make-usable batch), preserving
+ * every other key. The default stays OFF (safety invariant) and authority
+ * defaults to 'balanced' (medium/high-risk → human-approval; 5 safety-floor
+ * actions ALWAYS require explicit approval). An explicit invalid preset is
+ * rejected without enabling.
+ */
+export function handleEnableNervous(root: string, lang: string = 'en', mode?: string): void {
+  const lng = getLanguage(lang);
+  if (mode !== undefined && !(VALID_PRESETS as string[]).includes(mode)) {
+    printError(getMessage('config_nervous.invalid_preset', lng, {
+      preset: mode,
+      values: VALID_PRESETS.join(', '),
+    }));
+    process.exitCode = 1;
+    return;
+  }
+  const ns = readNervousSection(root);
+  if (ns.enabled && mode === undefined) {
+    print(c('  ' + getMessage('nervous.already_enabled', lng, { mode: ns.mode }), GREEN));
+    return;
+  }
+  const updated: NervousConfigSection = { ...ns, enabled: true, ...(mode ? { mode: mode as AuthorityMode } : {}) };
+  writeNervousSection(root, updated);
+  print(c('  ' + getMessage('nervous.enabled_banner', lng, { mode: updated.mode }), GREEN));
+}
+
 /** `deckent config nervous override <ACTION_ID> <policy>` */
 export function handleOverride(root: string, actionId: string, policy: string, lang: string = 'en'): void {
   const lng = getLanguage(lang);

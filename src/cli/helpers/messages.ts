@@ -397,6 +397,14 @@ const MESSAGES: MessageMap = {
   },
   // ─── config nervous command (MSG-004, §4G) ───────────────────────────
   'config_nervous.mode_set': { en: '✓ Mode set to: {preset}', tr: '✓ Mod ayarlandı: {preset}' },
+  'nervous.enabled_banner': {
+    en: '✓ Nervous System enabled (authority: {mode}).\n  Safety contract: medium/high-risk actions surface as suggestions you approve; 5 safety-floor actions (kill-sprint, destructive-git, …) ALWAYS require explicit approval — no silent destructive auto-run.\n  Operate: deckent nervous (dashboard) · deckent nervous accept/reject <id>',
+    tr: '✓ Nervous System açıldı (yetki: {mode}).\n  Güvenlik sözleşmesi: orta/yüksek-riskli eylemler onayladığın öneri olarak çıkar; 5 safety-floor eylem (sprint-kill, yıkıcı-git, …) HER ZAMAN açık onay ister — yıkıcı sessiz-çalışma yok.\n  Kullan: deckent nervous (dashboard) · deckent nervous accept/reject <id>',
+  },
+  'nervous.already_enabled': {
+    en: 'Nervous System is already enabled (authority: {mode}). Open it with: deckent nervous',
+    tr: 'Nervous System zaten açık (yetki: {mode}). Açmak için: deckent nervous',
+  },
   'config_nervous.invalid_preset': {
     en: 'Invalid preset: "{preset}". Valid values: {values}',
     tr: 'Geçersiz preset: "{preset}". Geçerli değerler: {values}',

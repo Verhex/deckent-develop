@@ -18,6 +18,7 @@ import type {
   Severity,
 } from '../../core/nervous-types.js';
 import { getActiveDirectivesProtection } from '../../nervous/observer.js';
+import { handleEnableNervous } from './config-nervous.js';
 import { NervousIpcQueue, isNervousPollerAlive } from '../../nervous/ipc-queue.js';
 
 // ─── ANSI Color Helpers ─────────────────────────────────────────────────────
@@ -630,6 +631,17 @@ export function registerNervous(program: Command): void {
     const root = resolveProjectRoot();
     showDashboard(root, langOf(cmd));
   });
+
+  // deckent nervous enable [--mode <preset>]
+  nervousCmd
+    .command('enable')
+    .description('Enable the Nervous System (one command; default stays OFF, human-approval preserved)')
+    .option('--mode <preset>', 'Authority preset (strict|balanced|autopilot|full-auto)')
+    .option('--lang <code>', 'Language override (en|tr)')
+    .action((opts: { mode?: string }, cmd: Command) => {
+      const root = resolveProjectRoot();
+      handleEnableNervous(root, langOf(cmd), opts.mode);
+    });
 
   // deckent nervous accept <id>
   nervousCmd
