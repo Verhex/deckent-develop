@@ -103,4 +103,27 @@ describe('handleBotSlash', () => {
       rmSync(root, { recursive: true, force: true });
     }
   });
+
+  // BOT-PENDING — /pending also surfaces nervous + autonomous parked approvals
+  // (the unified hub), not just the bot's own tool-action parks, so the operator
+  // can query AND approve nervous/autonomous content straight from Telegram.
+  it('/pending surfaces nervous + autonomous parked approvals', async () => {
+    const { mkdtempSync, mkdirSync, writeFileSync, rmSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const root = mkdtempSync(join(tmpdir(), 'botcmd-hub-'));
+    try {
+      mkdirSync(join(root, '.deckent', 'autonomous'), { recursive: true });
+      writeFileSync(join(root, '.deckent', 'nervous-pending.json'),
+        JSON.stringify([{ id: 'n7', title: 'Directives changed' }]));
+      writeFileSync(join(root, '.deckent', 'autonomous', 'pending.json'),
+        JSON.stringify([{ triggerId: 't-42', action: 'autonomous.execute', requestedBy: 'system', enqueuedAt: 'x' }]));
+      const out = await handleBotSlash('/pending', { root, lang: 'en', readOnlyDispatcher: spy });
+      expect(out).toContain('n7');                  // nervous id (reply: approve n7)
+      expect(out).toContain('Directives changed');  // nervous title
+      expect(out).toContain('t-42');                // autonomous trigger id
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
 });

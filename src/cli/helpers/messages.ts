@@ -1104,6 +1104,10 @@ const MESSAGES: MessageMap = {
     en: '  • {tool}({args}) — approve {id} / reject {id}',
     tr: '  • {tool}({args}) — approve {id} / reject {id}',
   },
+  'bot.pending_approval_row': {
+    en: '  • [{kind}] {title} — approve {id} / reject {id}',
+    tr: '  • [{kind}] {title} — approve {id} / reject {id}',
+  },
   'bot.action_expired': {
     en: '⏲️ Expired — {tool} was not executed (the approval was too old). Ask again if you still want it.',
     tr: '⏲️ Süresi doldu — {tool} çalıştırılmadı (onay çok eskidi). Hâlâ istiyorsan tekrar iste.',

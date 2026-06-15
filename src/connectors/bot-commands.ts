@@ -19,6 +19,7 @@ import type { McpToolDispatcher } from '../cli/commands/chat-native.js';
 import { getMessage } from '../cli/helpers/messages.js';
 import { isRiskyBotTool } from './bot-agentic.js';
 import { listBotActions } from './bot-action-store.js';
+import { readPendingApprovals } from '../core/pending-approvals.js';
 
 type BotCommandKind = 'help' | 'pending' | { readonly tool: string };
 
@@ -92,17 +93,26 @@ export function renderBotHelp(lang: string): string {
   return getMessage('bot.help_body', lang);
 }
 
-/** List actions parked for human approval (the /pending surface). */
+/**
+ * List everything parked for human approval (the /pending surface): the bot's own
+ * tool-action parks AND the unified nervous + autonomous approval hub
+ * (readPendingApprovals) — so the operator can query AND approve nervous/autonomous
+ * content straight from Telegram (reply `approve <id>` / `reject <id>`).
+ */
 function renderPending(root: string, lang: string): string {
   const actions = listBotActions(root);
-  if (actions.length === 0) return getMessage('bot.pending_none', lang);
-  const rows = actions.map((a) =>
-    getMessage('bot.pending_row', lang, {
-      tool: a.tool,
-      args: summarize(a.args),
-      id: a.id,
-    }),
-  );
+  const approvals = readPendingApprovals(root);
+  if (actions.length === 0 && approvals.length === 0) {
+    return getMessage('bot.pending_none', lang);
+  }
+  const rows = [
+    ...actions.map((a) =>
+      getMessage('bot.pending_row', lang, { tool: a.tool, args: summarize(a.args), id: a.id }),
+    ),
+    ...approvals.map((p) =>
+      getMessage('bot.pending_approval_row', lang, { kind: p.kind, title: p.title, id: p.id }),
+    ),
+  ];
   return [getMessage('bot.pending_header', lang), ...rows].join('\n');
 }
 
