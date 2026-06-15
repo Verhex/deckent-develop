@@ -106,6 +106,14 @@ export const CHANNELS = {
   // User notification (Sprint 139 seed)
   NOTIFY: 'DECKENT→USER:NOTIFY',
 
+  // Sprint 288 — W3 (cross-surface live-tail). Emitted by nervous/bootstrap when
+  // an approval parks awaiting a human decision. Carries the EXACT
+  // `deckent nervous accept <id>` command (payload matches core/pending-approvals
+  // PendingApproval) so `deckent_watch` (MCP) + `status --follow` surface the ask
+  // live, while `.deckent/nervous-pending.json` stays the snapshot for plain
+  // `deckent status`. Additive — never the source of truth, only the live signal.
+  NERVOUS_NOTIFICATION: 'DECKENT→USER:NERVOUS_NOTIFICATION',
+
   // Orphan HB cleanup (Sprint 139 — Task 016)
   ORPHAN_HB_DETECTED: 'AUDITOR→BRAIN:ORPHAN_HB_DETECTED',
 

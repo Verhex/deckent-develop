@@ -14,6 +14,7 @@
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { getCurrentSprintId, writeEvent, CHANNELS } from '../core/event-stream.js';
 import { NervousObserver } from './observer.js';
 import { DecisionEngine } from './decision-engine.js';
 import { Proposer } from './proposer.js';
@@ -89,6 +90,57 @@ export function makeFilePendingStore(projectRoot: string): PendingApprovalStore 
 }
 
 /**
+ * W3 (cross-surface live-tail): tee a NERVOUS_NOTIFICATION event onto the active
+ * sprint's event stream when an approval parks, so `deckent_watch` (MCP) +
+ * `deckent status --follow` surface the ask live with the EXACT accept command.
+ *
+ * Fail-safe: no active sprint (getCurrentSprintId → null) or a write failure →
+ * no-op. The durable `.deckent/nervous-pending.json` (written by the base store)
+ * remains the snapshot source for plain `deckent status` (W4); this event is the
+ * additive live signal only. Payload shape mirrors core/pending-approvals
+ * PendingApproval so every surface derives the same "run this command".
+ */
+export function emitNervousApprovalPending(
+  projectRoot: string,
+  notification: NervousNotification,
+): void {
+  try {
+    const sprintId = getCurrentSprintId(projectRoot);
+    if (!sprintId) return;
+    writeEvent(projectRoot, sprintId, 'deckent', 'user', CHANNELS.NERVOUS_NOTIFICATION, {
+      kind: 'nervous',
+      id: notification.id,
+      title: notification.title,
+      acceptCommand: `deckent nervous accept ${notification.id}`,
+      rejectCommand: `deckent nervous reject ${notification.id}`,
+    });
+  } catch {
+    // Never break the nervous pipeline on a live-tail emit failure.
+  }
+}
+
+/**
+ * Decorate a PendingApprovalStore so every park (`add`) also tees a live
+ * NERVOUS_NOTIFICATION event (W3). The base store keeps writing the durable
+ * snapshot (`deckent status` / REPL `/nervous`); `remove` is pure forwarding —
+ * only the park emits a live signal. Exported for direct unit testing.
+ */
+export function wrapPendingStoreWithEmit(
+  base: PendingApprovalStore,
+  projectRoot: string,
+): PendingApprovalStore {
+  return {
+    add(notification: NervousNotification): void {
+      base.add(notification);
+      emitNervousApprovalPending(projectRoot, notification);
+    },
+    remove(notificationId: string): void {
+      base.remove(notificationId);
+    },
+  };
+}
+
+/**
  * Nervous System tam pipeline'ını instantiate eder ve `'detection'` event
  * chain'ini wire eder. Tüm modüller Brain scope'unda yaşar (ADR-037).
  *
@@ -124,7 +176,10 @@ export function createNervousSystemIfEnabled(
   const proposer = new Proposer(nervousConfig);
   const dispatcher = new NervousDispatcher(nervousConfig, projectRoot);
   const history = new NervousHistory(projectRoot);
-  const pendingStore = deps.pendingStore ?? makeFilePendingStore(projectRoot);
+  // W3: wrap the durable store so every park tees a live NERVOUS_NOTIFICATION
+  // event (deckent_watch / status --follow) without touching the executor.
+  const baseStore = deps.pendingStore ?? makeFilePendingStore(projectRoot);
+  const pendingStore = wrapPendingStoreWithEmit(baseStore, projectRoot);
   // make-usable #3: thread the configurable approve auto-proceed timeout (0 or
   // negative → never auto-proceed; the cautious-user trust setting).
   const approveTimeoutMs = nervousConfig.approve_timeout_ms ?? APPROVE_TIMEOUT_MS;

@@ -459,6 +459,8 @@ export function registerStatus(program: Command): void {
               }));
               const commsWatch = buildWorkerCommsSection(root, lang);
               if (commsWatch) output(commsWatch);
+              const pendingWatch = buildPendingApprovalsSection(root, lang);
+              if (pendingWatch) output(pendingWatch);
             }
           }
         };

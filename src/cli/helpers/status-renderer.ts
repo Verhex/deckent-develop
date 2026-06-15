@@ -16,6 +16,7 @@
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { DASHBOARD_FILE, TASKS_DIR, DECKENT_DIR } from '../../core/constants.js';
+import { readPendingApprovals } from '../../core/pending-approvals.js';
 import type { DashboardState, Task, AgentInfo } from '../../core/types.js';
 import { AgentStatus } from '../../core/types.js';
 import { clearScreen as ansiClearScreen, cursorTo, clearLine, color } from './ansi.js';
@@ -266,6 +267,21 @@ export class StatusRenderer {
       lines.push(bl('📝 Recent Events: none'));
     }
     lines.push(SEP);
+
+    // ── Section 4.5: Pending Approvals (W3 cross-surface live-tail) ──
+    // Reads the SAME durable hub as plain `deckent status`; a NERVOUS_NOTIFICATION
+    // event redraw makes the parked ask appear here live, with the exact command.
+    const pending = readPendingApprovals(this.config.projectRoot);
+    if (pending.length > 0) {
+      lines.push(bl(`⏳ Pending approvals (${pending.length}):`));
+      for (const p of pending.slice(0, 3)) {
+        lines.push(bl(`   ${p.title.slice(0, 28)} → ${p.acceptCommand}`));
+      }
+      if (pending.length > 3) {
+        lines.push(bl(`   ... and ${pending.length - 3} more`));
+      }
+      lines.push(SEP);
+    }
 
     // ── Section 5: Footer (Alerts / NO_GO) ──
     const alertCount = dashboard?.alerts.length ?? 0;
