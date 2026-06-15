@@ -101,3 +101,59 @@ describe('/api/nervous/* — unified hub integration (W8)', () => {
     expect(readdirSync(ipcPending).length).toBeGreaterThanOrEqual(1);
   });
 });
+
+// Brain inbox — the recommendation feed surfaced for the dashboard NervousPage.
+describe('/api/nervous/recommendations routes', () => {
+  let handle: TestServerHandle;
+  afterEach(async () => {
+    if (handle) { await handle.close(); handle = undefined as unknown as TestServerHandle; }
+  });
+
+  function seedRecommendations(root: string): void {
+    const lines = [
+      { id: 'rec-aaaaaaaaaa11', actionId: 'DEBT_REPRIORITIZE', createdAt: '2026-06-15T10:00:00.000Z', payload: { debtId: 'D-12' }, status: 'open' },
+      { id: 'rec-bbbbbbbbbb22', actionId: 'COMMIT_PUSH', createdAt: '2026-06-15T11:00:00.000Z', payload: {}, status: 'dismissed' },
+    ];
+    writeFileSync(join(root, '.deckent', 'nervous-recommendations.jsonl'), lines.map((l) => JSON.stringify(l)).join('\n') + '\n');
+  }
+
+  it('GET /api/nervous/recommendations returns [] on a fresh project', async () => {
+    handle = await startTestServer({ disableAuth: true });
+    const res = await call(handle, '/api/nervous/recommendations');
+    expect(res.status).toBe(200);
+    expect(res.json()).toEqual([]);
+  });
+
+  it('GET returns only open recommendations by default; ?all=1 includes dismissed', async () => {
+    handle = await startTestServer({ disableAuth: true });
+    seedRecommendations(handle.projectRoot);
+
+    const open = await call(handle, '/api/nervous/recommendations');
+    const openBody = open.json<Array<{ id: string; status: string }>>();
+    expect(openBody).toHaveLength(1);
+    expect(openBody[0].id).toBe('rec-aaaaaaaaaa11');
+
+    const all = await call(handle, '/api/nervous/recommendations?all=1');
+    expect(all.json<unknown[]>()).toHaveLength(2);
+  });
+
+  it('POST /recommendations/dismiss/<id> flips open → dismissed (then excluded)', async () => {
+    handle = await startTestServer({ disableAuth: true });
+    seedRecommendations(handle.projectRoot);
+
+    const res = await call(handle, '/api/nervous/recommendations/dismiss/rec-aaaaaaaaaa11', { method: 'POST' });
+    expect(res.status).toBe(200);
+    expect(res.json<{ dismissed: string }>().dismissed).toBe('rec-aaaaaaaaaa11');
+
+    const after = await call(handle, '/api/nervous/recommendations');
+    expect(after.json<unknown[]>()).toHaveLength(0);
+  });
+
+  it('POST /recommendations/dismiss/<unknown> returns 404', async () => {
+    handle = await startTestServer({ disableAuth: true });
+    seedRecommendations(handle.projectRoot);
+    const res = await call(handle, '/api/nervous/recommendations/dismiss/rec-nope', { method: 'POST' });
+    expect(res.status).toBe(404);
+    expect(res.json<{ dismissed: string | null }>().dismissed).toBeNull();
+  });
+});

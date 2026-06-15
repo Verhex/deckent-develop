@@ -351,6 +351,23 @@ const MESSAGES: MessageMap = {
     en: 'Config: mode={mode} · overrides={overrides} · quiet={quiet}',
     tr: 'Yapılandırma: mod={mode} · override={overrides} · sessiz={quiet}',
   },
+  'nervous.recommendations_header': {
+    en: 'Brain inbox — recommendations ({count}):',
+    tr: 'Brain gelen-kutusu — öneriler ({count}):',
+  },
+  'nervous.no_recommendations': {
+    en: 'No open recommendations.',
+    tr: 'Açık öneri yok.',
+  },
+  'nervous.recommendations_hint': {
+    en: 'Run `deckent nervous recommendations` for the full inbox; dismiss with `--dismiss <id>`.',
+    tr: 'Tam gelen-kutusu için `deckent nervous recommendations`; kapatmak için `--dismiss <id>`.',
+  },
+  'nervous.rec_dismissed': { en: '✓ Recommendation dismissed: {id}', tr: '✓ Öneri kapatıldı: {id}' },
+  'nervous.rec_not_found': {
+    en: 'Open recommendation not found: {id}',
+    tr: 'Açık öneri bulunamadı: {id}',
+  },
   'nervous.accepted': { en: '✓ Accepted: {action}', tr: '✓ Kabul edildi: {action}' },
   'nervous.rejected': { en: '✗ Rejected: {action}{reason}', tr: '✗ Reddedildi: {action}{reason}' },
   'nervous.reject_reason': { en: ' (reason: {reason})', tr: ' (sebep: {reason})' },

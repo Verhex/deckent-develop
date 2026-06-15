@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card"
 import { Badge } from "../components/ui/badge";
 import { SkeletonCard } from "../components/Skeleton";
 import EmptyState from "../components/EmptyState";
-import { Brain, ShieldAlert, Check, X, Activity } from "lucide-react";
+import { Brain, ShieldAlert, Check, X, Activity, Inbox, Lightbulb } from "lucide-react";
 import { useTranslation } from "../i18n/LanguageProvider";
 
 interface PendingApproval {
@@ -15,6 +15,26 @@ interface PendingApproval {
   detector: string;
   createdAt: string;
   risk: "low" | "medium" | "high";
+}
+
+interface NervousRecommendation {
+  id: string;
+  actionId: string;
+  createdAt: string;
+  payload: Record<string, unknown>;
+  status: "open" | "dismissed";
+}
+
+/** One-line, length-bounded payload summary (key=value …) — scannable, no nesting. */
+function formatRecPayload(payload: Record<string, unknown>): string {
+  const parts: string[] = [];
+  for (const [k, v] of Object.entries(payload ?? {})) {
+    if (v === null || typeof v === "object") continue;
+    parts.push(`${k}=${String(v)}`);
+    if (parts.length >= 3) break;
+  }
+  const joined = parts.join(" ");
+  return joined.length > 80 ? joined.slice(0, 77) + "…" : joined;
 }
 
 interface DetectorInfo {
@@ -43,6 +63,8 @@ export default function NervousPage() {
     useApi<NervousStatus>("/api/nervous/status", { pollIntervalMs: NERVOUS_POLL_MS });
   const { data: pending, loading: pendingLoading, error: pendingError, refetch: refetchPending } =
     useApi<PendingApproval[]>("/api/nervous/pending", { pollIntervalMs: NERVOUS_POLL_MS });
+  const { data: recommendations, loading: recsLoading, error: recsError, refetch: refetchRecs } =
+    useApi<NervousRecommendation[]>("/api/nervous/recommendations", { pollIntervalMs: NERVOUS_POLL_MS });
 
   const [actionError, setActionError] = useState<string | null>(null);
   const [actioning, setActioning] = useState<string | null>(null);
@@ -68,6 +90,19 @@ export default function NervousPage() {
       await postJson(`/api/nervous/reject/${id}`);
       refetchPending();
       refetchStatus();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setActioning(null);
+    }
+  }
+
+  async function handleDismiss(id: string) {
+    setActioning(id);
+    setActionError(null);
+    try {
+      await postJson(`/api/nervous/recommendations/dismiss/${id}`);
+      refetchRecs();
     } catch (err) {
       setActionError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -194,6 +229,64 @@ export default function NervousPage() {
               icon={Brain}
               title={t('nervous.approvals_empty_title')}
               description={t('nervous.approvals_empty_desc')}
+            />
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Brain Inbox — recommendations (ADR-037: nervous proposes, Brain disposes) */}
+      <Card className="bg-zinc-900 border-zinc-800">
+        <CardHeader>
+          <CardTitle className="text-zinc-100 flex items-center gap-2">
+            <Inbox className="w-4 h-4 text-brand-300" />
+            {t('nervous.recommendations_title')}
+            {recommendations && recommendations.length > 0 && (
+              <Badge className="ml-2 bg-brand-bg text-brand-300">{recommendations.length}</Badge>
+            )}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {recsLoading && <SkeletonCard />}
+          {recsError && <p className="text-red-400">{t('nervous.error')}: {recsError}</p>}
+          {recommendations && recommendations.length > 0 && (
+            <div className="space-y-3" data-testid="recommendation-list">
+              {recommendations.map((rec) => {
+                const summary = formatRecPayload(rec.payload);
+                return (
+                  <div
+                    key={rec.id}
+                    data-testid={`recommendation-${rec.id}`}
+                    className="rounded-md border border-zinc-800 p-4 flex items-start justify-between gap-4"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Lightbulb className="w-4 h-4 text-brand-300 shrink-0" />
+                        <span className="font-medium text-zinc-100 text-sm">{rec.actionId}</span>
+                      </div>
+                      {summary && <p className="text-sm text-zinc-400 mb-1 truncate">{summary}</p>}
+                      <p className="text-xs text-zinc-600">{rec.id} · {rec.createdAt}</p>
+                    </div>
+                    <div className="flex gap-2 shrink-0">
+                      <button
+                        data-testid={`dismiss-${rec.id}`}
+                        onClick={() => void handleDismiss(rec.id)}
+                        disabled={actioning === rec.id}
+                        className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-md bg-zinc-800 text-zinc-300 hover:bg-zinc-700 disabled:opacity-50 transition-colors"
+                      >
+                        <X className="w-3 h-3" />
+                        {t('nervous.dismiss_button')}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          {!recsLoading && !recsError && (!recommendations || recommendations.length === 0) && (
+            <EmptyState
+              icon={Inbox}
+              title={t('nervous.recommendations_empty_title')}
+              description={t('nervous.recommendations_empty_desc')}
             />
           )}
         </CardContent>

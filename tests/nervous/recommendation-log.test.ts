@@ -11,6 +11,7 @@ import { join } from 'node:path';
 import {
   recordRecommendation,
   readRecommendations,
+  dismissRecommendation,
   RECOMMENDATIONS_FILE,
   type NervousRecommendation,
 } from '../../src/nervous/recommendation-log.js';
@@ -66,6 +67,36 @@ describe('nervous recommendation-log', () => {
   it('readRecommendations returns [] when the feed is absent', () => {
     const r = makeRoot();
     expect(readRecommendations(r)).toEqual([]);
+  });
+
+  it('dismissRecommendation flips an open entry to dismissed (by full id)', () => {
+    const r = makeRoot();
+    const rec = recordRecommendation(r, 'DEBT_REPRIORITIZE', { debtId: 'D-1' });
+    expect(dismissRecommendation(r, rec.id)).toBe(true);
+    const all = readRecommendations(r);
+    expect(all).toHaveLength(1);
+    expect(all[0].status).toBe('dismissed');
+  });
+
+  it('dismissRecommendation matches a unique rec- prefix and leaves others open', () => {
+    const r = makeRoot();
+    const a = recordRecommendation(r, 'SPRINT_START', {});
+    recordRecommendation(r, 'COMMIT_PUSH', {});
+    const prefix = a.id.slice(0, 14); // 'rec-' + 10 uuid chars
+    expect(dismissRecommendation(r, prefix)).toBe(true);
+    const all = readRecommendations(r);
+    expect(all.find((x) => x.id === a.id)!.status).toBe('dismissed');
+    expect(all.filter((x) => x.status === 'open')).toHaveLength(1);
+  });
+
+  it('dismissRecommendation returns false when no open match exists', () => {
+    const r = makeRoot();
+    recordRecommendation(r, 'SPRINT_START', {});
+    expect(dismissRecommendation(r, 'rec-nonexistent')).toBe(false);
+    // dismissing an already-dismissed id is a no-op false
+    const rec = recordRecommendation(r, 'COMMIT_PUSH', {});
+    dismissRecommendation(r, rec.id);
+    expect(dismissRecommendation(r, rec.id)).toBe(false);
   });
 
   it('readRecommendations skips malformed lines without throwing', () => {

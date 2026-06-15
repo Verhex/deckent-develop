@@ -319,3 +319,93 @@ describe('deckent nervous CLI', () => {
     expect(output).toMatch(/\x1b\[\d+m/);
   });
 });
+
+// ─── Brain inbox — recommendations surface ──────────────────────────────────
+
+function writeRecommendations(root: string, lines: object[]): void {
+  const content = lines.map(l => JSON.stringify(l)).join('\n') + '\n';
+  writeFileSync(join(root, '.deckent', 'nervous-recommendations.jsonl'), content, 'utf-8');
+}
+
+describe('deckent nervous recommendations (Brain inbox)', () => {
+  beforeEach(() => {
+    testRoot = createTmpRoot();
+    process.exitCode = undefined;
+  });
+
+  afterEach(() => {
+    try { rmSync(testRoot, { recursive: true, force: true }); } catch {}
+  });
+
+  it('lists open recommendations with action id + payload summary', () => {
+    writeRecommendations(testRoot, [
+      { id: 'rec-aaaaaaaaaa11', actionId: 'DEBT_REPRIORITIZE', createdAt: new Date().toISOString(), payload: { debtId: 'D-12', to: 'HIGH' }, status: 'open' },
+      { id: 'rec-bbbbbbbbbb22', actionId: 'COMMIT_PUSH', createdAt: new Date().toISOString(), payload: { branch: 'main' }, status: 'dismissed' },
+    ]);
+    const program = new Command();
+    registerNervous(program);
+
+    const output = captureOutput(() => {
+      program.parse(['node', 'deckent', 'nervous', 'recommendations'], { from: 'node' });
+    });
+
+    // open shown, dismissed hidden by default
+    expect(output).toContain('DEBT_REPRIORITIZE');
+    expect(output).toContain('debtId=D-12');
+    expect(output).not.toContain('COMMIT_PUSH');
+  });
+
+  it('--all includes dismissed recommendations', () => {
+    writeRecommendations(testRoot, [
+      { id: 'rec-bbbbbbbbbb22', actionId: 'COMMIT_PUSH', createdAt: new Date().toISOString(), payload: {}, status: 'dismissed' },
+    ]);
+    const program = new Command();
+    registerNervous(program);
+
+    const output = captureOutput(() => {
+      program.parse(['node', 'deckent', 'nervous', 'recommendations', '--all'], { from: 'node' });
+    });
+    expect(output).toContain('COMMIT_PUSH');
+  });
+
+  it('--dismiss flips an open recommendation to dismissed (persisted)', () => {
+    writeRecommendations(testRoot, [
+      { id: 'rec-aaaaaaaaaa11', actionId: 'DEBT_REPRIORITIZE', createdAt: new Date().toISOString(), payload: {}, status: 'open' },
+    ]);
+    const program = new Command();
+    registerNervous(program);
+
+    const output = captureOutput(() => {
+      program.parse(['node', 'deckent', 'nervous', 'recommendations', '--dismiss', 'rec-aaaaaaaaaa11'], { from: 'node' });
+    });
+    expect(output).toMatch(/dismissed|kapat/i);
+
+    const onDisk = readFileSync(join(testRoot, '.deckent', 'nervous-recommendations.jsonl'), 'utf-8');
+    expect(JSON.parse(onDisk.trim()).status).toBe('dismissed');
+  });
+
+  it('--dismiss of an unknown id exits 1 with not-found', () => {
+    writeRecommendations(testRoot, []);
+    const program = new Command();
+    registerNervous(program);
+
+    const err = captureStderr(() => {
+      program.parse(['node', 'deckent', 'nervous', 'recommendations', '--dismiss', 'rec-nope'], { from: 'node' });
+    });
+    expect(err).toMatch(/not found|bulunamad/i);
+    expect(process.exitCode).toBe(1);
+  });
+
+  it('default dashboard surfaces the Brain inbox section when open recs exist', () => {
+    writeRecommendations(testRoot, [
+      { id: 'rec-cccccccccc33', actionId: 'SKILL_ROUTING_ADJUST', createdAt: new Date().toISOString(), payload: { skill: 'react-specialist' }, status: 'open' },
+    ]);
+    const program = new Command();
+    registerNervous(program);
+
+    const output = captureOutput(() => {
+      program.parse(['node', 'deckent', 'nervous'], { from: 'node' });
+    });
+    expect(output).toContain('SKILL_ROUTING_ADJUST');
+  });
+});

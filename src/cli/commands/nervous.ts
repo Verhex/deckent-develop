@@ -20,6 +20,10 @@ import type {
 import { getActiveDirectivesProtection } from '../../nervous/observer.js';
 import { handleEnableNervous } from './config-nervous.js';
 import { NervousIpcQueue, isNervousPollerAlive } from '../../nervous/ipc-queue.js';
+import {
+  readRecommendations,
+  dismissRecommendation,
+} from '../../nervous/recommendation-log.js';
 
 // ─── ANSI Color Helpers ─────────────────────────────────────────────────────
 
@@ -181,6 +185,50 @@ function parseSinceDuration(since: string): number {
   }
 }
 
+// ─── Recommendation Formatting ──────────────────────────────────────────────
+
+/** One-line, length-bounded summary of a recommendation payload (key=value …). */
+function formatRecPayload(payload: Record<string, unknown>): string {
+  const parts: string[] = [];
+  for (const [k, v] of Object.entries(payload ?? {})) {
+    if (v === null || typeof v === 'object') continue; // skip nested/null — keep it scannable
+    parts.push(`${k}=${String(v)}`);
+    if (parts.length >= 3) break;
+  }
+  const joined = parts.join(' ');
+  return joined.length > 80 ? joined.slice(0, 77) + '…' : joined;
+}
+
+// ─── Recommendations Action ─────────────────────────────────────────────────
+
+function showRecommendations(root: string, limit: number, all: boolean, lang: string): void {
+  const recs = readRecommendations(root).filter(r => all || r.status === 'open');
+  if (recs.length === 0) {
+    print(colorize('  ' + getMessage('nervous.no_recommendations', lang), DIM));
+    return;
+  }
+  print('');
+  print(colorize('  ' + getMessage('nervous.recommendations_header', lang, { count: String(recs.length) }), BOLD));
+  print('');
+  for (const rec of recs.slice(-limit).reverse()) {
+    const statusMark = rec.status === 'dismissed' ? colorize('✓', DIM) : colorize('▸', MAGENTA);
+    const summary = formatRecPayload(rec.payload);
+    const summaryStr = summary ? `  ${DIM}${summary}${RESET}` : '';
+    print(`  ${statusMark} ${rec.actionId}${summaryStr}`);
+    print(`      ${DIM}${rec.id}  ·  ${timeAgo(rec.createdAt, lang)}${RESET}`);
+  }
+  print('');
+}
+
+function handleDismissRecommendation(root: string, id: string, lang: string): void {
+  if (dismissRecommendation(root, id)) {
+    print(colorize('  ' + getMessage('nervous.rec_dismissed', lang, { id }), GREEN));
+  } else {
+    printError(getMessage('nervous.rec_not_found', lang, { id }));
+    process.exitCode = 1;
+  }
+}
+
 // ─── Dashboard Action ───────────────────────────────────────────────────────
 
 function showDashboard(root: string, lang: string): void {
@@ -206,6 +254,19 @@ function showDashboard(root: string, lang: string): void {
   }
 
   print('');
+
+  // Brain inbox — open recommendations (ADR-037: nervous proposes, Brain disposes)
+  const openRecs = readRecommendations(root).filter(r => r.status === 'open');
+  if (openRecs.length > 0) {
+    print(colorize('  ' + getMessage('nervous.recommendations_header', lang, { count: String(openRecs.length) }), BOLD));
+    for (const rec of openRecs.slice(-5).reverse()) {
+      const summary = formatRecPayload(rec.payload);
+      const summaryStr = summary ? `  ${DIM}${summary}${RESET}` : '';
+      print(`    ${colorize('▸', MAGENTA)} ${rec.actionId}${summaryStr} — ${DIM}${timeAgo(rec.createdAt, lang)} (${rec.id.slice(0, 14)})${RESET}`);
+    }
+    print(colorize('    ' + getMessage('nervous.recommendations_hint', lang), DIM));
+    print('');
+  }
 
   // Recent history (last 5)
   const recent = history.slice(-5).reverse();
@@ -694,6 +755,25 @@ export function registerNervous(program: Command): void {
     .action((opts: { limit: string; since?: string }, cmd: Command) => {
       const root = resolveProjectRoot();
       showHistory(root, parseInt(opts.limit, 10) || 20, langOf(cmd), opts.since);
+    });
+
+  // deckent nervous recommendations [--all] [--limit <n>] [--dismiss <id>]
+  nervousCmd
+    .command('recommendations')
+    .alias('recs')
+    .description('View the Brain inbox — nervous proposals awaiting disposition (ADR-037)')
+    .option('--all', 'Include dismissed recommendations (default: open only)')
+    .option('--limit <n>', 'Number of records to show', '20')
+    .option('--dismiss <id>', 'Dismiss an open recommendation by id (or unique rec- prefix)')
+    .option('--lang <code>', 'Language override (en|tr)')
+    .action((opts: { all?: boolean; limit: string; dismiss?: string }, cmd: Command) => {
+      const root = resolveProjectRoot();
+      const lang = langOf(cmd);
+      if (opts.dismiss) {
+        handleDismissRecommendation(root, opts.dismiss, lang);
+        return;
+      }
+      showRecommendations(root, parseInt(opts.limit, 10) || 20, opts.all === true, lang);
     });
 
   // deckent nervous log

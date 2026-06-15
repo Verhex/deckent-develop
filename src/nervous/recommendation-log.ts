@@ -12,7 +12,7 @@
 // the filtered, open, actionable subset. Append-only JSONL, dependency-free, so
 // it never pulls the LLM / orchestration graph into the nervous hot path.
 
-import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 
@@ -34,8 +34,9 @@ export interface NervousRecommendation {
   createdAt: string;
   /** The detector-provided action payload — the context Brain needs to act. */
   payload: Record<string, unknown>;
-  /** Lifecycle status. New proposals are always 'open'. */
-  status: 'open';
+  /** Lifecycle status. New proposals are 'open'; the operator dismisses addressed
+   *  ones (a proposal is inert — it never auto-executes, dismiss is housekeeping). */
+  status: 'open' | 'dismissed';
 }
 
 /**
@@ -80,4 +81,27 @@ export function readRecommendations(projectRoot: string): NervousRecommendation[
     }
   }
   return out;
+}
+
+/**
+ * Mark an open recommendation as dismissed (operator housekeeping). Rewrites the
+ * feed flipping the matching `open` entry — by exact id or a unique `rec-` prefix
+ * — to `dismissed`. Returns true when an entry changed, false when no open match
+ * was found. A proposal is inert, so dismiss only clears the inbox; it never
+ * executes anything. Malformed lines are dropped on rewrite (already unreadable).
+ */
+export function dismissRecommendation(projectRoot: string, id: string): boolean {
+  const all = readRecommendations(projectRoot);
+  let changed = false;
+  const next = all.map((rec) => {
+    if (!changed && rec.status === 'open' && (rec.id === id || rec.id.startsWith(id))) {
+      changed = true;
+      return { ...rec, status: 'dismissed' as const };
+    }
+    return rec;
+  });
+  if (!changed) return false;
+  const path = join(projectRoot, RECOMMENDATIONS_FILE);
+  writeFileSync(path, next.map((r) => JSON.stringify(r)).join('\n') + '\n', 'utf-8');
+  return true;
 }

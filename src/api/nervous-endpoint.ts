@@ -12,6 +12,7 @@ import { mkdirSync, writeFileSync, existsSync, readFileSync } from 'node:fs';
 import { randomBytes } from 'node:crypto';
 import { join } from 'node:path';
 import { listPendingPanicEvents, acceptPanicGuard } from '../cli/commands/nervous.js';
+import { readRecommendations, dismissRecommendation } from '../nervous/recommendation-log.js';
 
 function sendJson(res: ServerResponse, data: unknown, status = 200): void {
   res.writeHead(status, { 'Content-Type': 'application/json' });
@@ -131,6 +132,24 @@ export function registerNervousRoutes(
       detectors: [] as Array<{ id: string; name: string; enabled: boolean; triggerCount: number }>,
       pendingCount: pending.length,
     });
+    return true;
+  }
+
+  // GET /api/nervous/recommendations — the Brain inbox (ADR-037: nervous proposes,
+  // Brain disposes). Open-only by default; `?all=1` includes dismissed entries.
+  if (method === 'GET' && path === '/api/nervous/recommendations') {
+    const includeAll = parsed.searchParams.get('all') === '1';
+    const recs = readRecommendations(projectRoot).filter(r => includeAll || r.status === 'open');
+    sendJson(res, recs);
+    return true;
+  }
+
+  // POST /api/nervous/recommendations/dismiss/<id> — clear an addressed proposal.
+  // A proposal is inert (never auto-executes); dismiss is operator housekeeping.
+  if (method === 'POST' && path.startsWith('/api/nervous/recommendations/dismiss/')) {
+    const id = decodeURIComponent(path.slice('/api/nervous/recommendations/dismiss/'.length));
+    const dismissed = dismissRecommendation(projectRoot, id);
+    sendJson(res, { dismissed: dismissed ? id : null }, dismissed ? 200 : 404);
     return true;
   }
 

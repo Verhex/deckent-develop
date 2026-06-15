@@ -147,3 +147,60 @@ describe("NervousPage — real data fetch paths (218-006)", () => {
     expect(badge.textContent).toContain("Panic Guard ACTIVE");
   });
 });
+
+const RECOMMENDATIONS = [
+  {
+    id: "rec-aaaaaaaaaa11",
+    actionId: "DEBT_REPRIORITIZE",
+    createdAt: "2026-06-15T10:00:00Z",
+    payload: { debtId: "D-12", to: "HIGH" },
+    status: "open" as const,
+  },
+  {
+    id: "rec-bbbbbbbbbb22",
+    actionId: "COMMIT_PUSH",
+    createdAt: "2026-06-15T11:00:00Z",
+    payload: { branch: "main" },
+    status: "open" as const,
+  },
+];
+
+describe("NervousPage — Brain inbox (recommendations)", () => {
+  it("renders the recommendation list with action id + payload summary", () => {
+    mockDataMap["/api/nervous/pending"] = [];
+    mockDataMap["/api/nervous/status"] = STATUS;
+    mockDataMap["/api/nervous/recommendations"] = RECOMMENDATIONS;
+    renderPage();
+
+    expect(screen.getByTestId("recommendation-list")).toBeTruthy();
+    expect(screen.getByTestId("recommendation-rec-aaaaaaaaaa11")).toBeTruthy();
+    expect(screen.getByText("DEBT_REPRIORITIZE")).toBeTruthy();
+    expect(screen.getByText("debtId=D-12 to=HIGH")).toBeTruthy();
+    expect(screen.getByText("COMMIT_PUSH")).toBeTruthy();
+  });
+
+  it("dismiss button calls the dismiss endpoint and refetches", async () => {
+    mockDataMap["/api/nervous/pending"] = [];
+    mockDataMap["/api/nervous/status"] = STATUS;
+    mockDataMap["/api/nervous/recommendations"] = RECOMMENDATIONS;
+    renderPage();
+
+    const dismissBtn = screen.getByTestId("dismiss-rec-aaaaaaaaaa11");
+    await act(async () => {
+      fireEvent.click(dismissBtn);
+    });
+
+    expect(postJson).toHaveBeenCalledWith("/api/nervous/recommendations/dismiss/rec-aaaaaaaaaa11");
+    expect(mockRefetch).toHaveBeenCalled();
+  });
+
+  it("shows empty state when no open recommendations", () => {
+    mockDataMap["/api/nervous/pending"] = [];
+    mockDataMap["/api/nervous/status"] = STATUS;
+    mockDataMap["/api/nervous/recommendations"] = [];
+    renderPage();
+
+    expect(screen.queryByTestId("recommendation-list")).toBeNull();
+    expect(screen.getByText("No open recommendations")).toBeTruthy();
+  });
+});

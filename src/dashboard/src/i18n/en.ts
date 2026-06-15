@@ -510,6 +510,10 @@ export const en = {
   'nervous.approvals_empty_desc': 'All Nervous System proposals have been reviewed.',
   'nervous.accept_button': 'Accept',
   'nervous.reject_button': 'Reject',
+  'nervous.recommendations_title': 'Brain Inbox',
+  'nervous.recommendations_empty_title': 'No open recommendations',
+  'nervous.recommendations_empty_desc': 'The Nervous System proposes here; the operator acts via the normal flow.',
+  'nervous.dismiss_button': 'Dismiss',
 
   // Autonomous Engine (W6-W7 AutonomousPage)
   'autonomous.title': 'Autonomous Engine',

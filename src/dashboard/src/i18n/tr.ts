@@ -512,6 +512,10 @@ export const tr: Record<TranslationKey, string> = {
   'nervous.approvals_empty_desc': 'Tüm Sinir Sistemi teklifleri incelenmiştir.',
   'nervous.accept_button': 'Kabul Et',
   'nervous.reject_button': 'Reddet',
+  'nervous.recommendations_title': 'Brain Gelen Kutusu',
+  'nervous.recommendations_empty_title': 'Açık öneri yok',
+  'nervous.recommendations_empty_desc': 'Sinir Sistemi burada önerir; operatör normal akıştan uygular.',
+  'nervous.dismiss_button': 'Kapat',
 
   // Autonomous Engine (W6-W7 AutonomousPage)
   'autonomous.title': 'Otonom Motor',
