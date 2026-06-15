@@ -3,13 +3,18 @@
 // Nervous Action Handlers — Step C — Sprint 180 W2-1, Sprint 181 recovery.
 // NERVOUS-TODO §11.2 Step C.
 //
-// Maintenance / observability handlers (autonomous-safe, direct effect):
-//   - WORKER_RESPAWN(taskId)            → spawn-backend kill + spawn (coordinator-injected)
+// Maintenance / observability handlers (autonomous-safe, real direct effect via
+// maintenance-ops.ts — projectRoot-scoped, standalone):
 //   - ORPHAN_TASK_ARCHIVE(sprintId)     → sprint-docs-updater.archiveOrphanTasks
 //   - STALE_LOCK_RELEASE(filePath)      → file-lock.releaseLock
-//   - DEAD_EVENT_STREAM_CLEANUP(sprintId) → event-stream cleanup (Faz 2 wire)
-//   - LOG_ROTATION / CACHE_INVALIDATE / IPC_DIR_CLEANUP / DEBT_TRENDING_REPORT (Faz 2 deps)
+//   - DEAD_EVENT_STREAM_CLEANUP(sprintId) → pruneDeadEventStream (drop corrupt lines)
+//   - LOG_ROTATION                      → rotateSprintLogs (archive old .brain/sprints)
+//   - CACHE_INVALIDATE(cacheType)       → invalidateDocCache (ADR-031 docs cache)
+//   - IPC_DIR_CLEANUP                   → cleanIpcDirs (orphan nervous/panic markers)
+//   - DEBT_TRENDING_REPORT              → generateDebtTrendReport (.deckent/reports)
 //   - METRIC_EMIT(metricName,value)     → append .deckent/metrics.jsonl (observability)
+//   - WORKER_RESPAWN(taskId)            → kill+spawn ONLY with an injected coordinator
+//                                         (canRespawn); otherwise PROPOSES the respawn.
 //
 // Resource-recommendation handlers — EVERY non-maintenance registry action
 // (ADR-037: nervous PROPOSES, Brain/operator DISPOSES — never self-mutates the
@@ -23,6 +28,13 @@ import { appendFileSync, existsSync, mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { ACTION_REGISTRY } from './action-registry.js';
 import { recordRecommendation } from './recommendation-log.js';
+import {
+  rotateSprintLogs,
+  invalidateDocCache,
+  cleanIpcDirs,
+  pruneDeadEventStream,
+  generateDebtTrendReport,
+} from './maintenance-ops.js';
 import type { ActionHandler } from './executor.js';
 
 type ExecutorBridgeResult = Awaited<ReturnType<ActionHandler>>;
@@ -48,6 +60,10 @@ export interface ActionHandlerDeps {
   /** Land a Brain-actionable proposal for a resource the nervous system does not
    *  own (ADR-037). Defaults to recommendation-log.recordRecommendation. */
   recommend: (projectRoot: string, actionId: string, payload: Record<string, unknown>) => void;
+  /** True only when a live coordinator injected a real kill+spawn pair (it has the
+   *  task's spawn context). Default false → WORKER_RESPAWN proposes instead of
+   *  faking a respawn it cannot perform standalone. */
+  canRespawn: boolean;
   projectRoot: string;
 }
 
@@ -106,6 +122,14 @@ async function handleWorkerRespawn(
   deps: ActionHandlerDeps,
 ): Promise<ActionDispatchResult> {
   const taskId = requireString(payload, 'taskId');
+  // Respawn needs the coordinator's full spawn context (command/options/adapter).
+  // Without an injected real kill+spawn pair, the standalone handler CANNOT
+  // re-spawn safely — so it proposes the respawn to the operator/Brain instead
+  // of faking a success it did not perform (honest, no silent no-op).
+  if (!deps.canRespawn) {
+    deps.recommend(deps.projectRoot, 'WORKER_RESPAWN', payload);
+    return success();
+  }
   deps.killWorker(taskId);
   deps.spawnWorker(taskId);
   return success();
@@ -208,10 +232,13 @@ async function loadDefaultDeps(): Promise<ActionHandlerDeps> {
 
   defaultDeps = {
     killWorker: (_taskId: string) => {
-      // No default kill — spawn-backend integration is Faz 2.
+      // Inert placeholder — invoked ONLY when a coordinator sets canRespawn:true
+      // (it injects a real kill+spawn pair with the task's spawn context). The
+      // default WORKER_RESPAWN path never reaches here: canRespawn is false →
+      // the handler proposes the respawn instead.
     },
     spawnWorker: (_taskId: string) => {
-      // No default spawn — sprint-controller orchestrates spawn lifecycle.
+      // Inert placeholder — see killWorker (coordinator-injected path only).
     },
     archiveOrphanTasks: (projectRoot: string, sprintId: string): void => {
       const fn = (docsUpdater as { archiveOrphanTasks?: (r: string, s: string) => void })?.archiveOrphanTasks;
@@ -221,22 +248,17 @@ async function loadDefaultDeps(): Promise<ActionHandlerDeps> {
       const fn = (fileLock as { releaseLock?: (r: string, f: string, w: string) => void })?.releaseLock;
       if (fn) fn(projectRoot, filePath, workerId);
     },
-    cleanDeadEventStream: (_projectRoot: string, _sprintId: string) => {
-      // event-bus has no prune helper yet — Faz 2 will wire this.
-      return 0;
+    cleanDeadEventStream: (projectRoot: string, sprintId: string): number =>
+      pruneDeadEventStream(projectRoot, sprintId),
+    rotateLogs: (projectRoot: string): void => {
+      rotateSprintLogs(projectRoot);
     },
-    rotateLogs: (_projectRoot: string) => {
-      // Sprint log rotation — Faz 2 wire.
+    invalidateCache: (projectRoot: string, cacheType: string): void => {
+      invalidateDocCache(projectRoot, cacheType);
     },
-    invalidateCache: (_projectRoot: string, _cacheType: string) => {
-      // Build/routing cache invalidation — Faz 2 wire.
-    },
-    cleanIpcDir: (_projectRoot: string) => {
-      // IPC dir cleanup — Faz 2 wire.
-      return 0;
-    },
-    generateDebtReport: (_projectRoot: string) => {
-      // Debt trending report generation — Faz 2 wire.
+    cleanIpcDir: (projectRoot: string): number => cleanIpcDirs(projectRoot),
+    generateDebtReport: (projectRoot: string): void => {
+      generateDebtTrendReport(projectRoot);
     },
     emitMetric: (projectRoot: string, metricName: string, value: number): void => {
       // Observability metric point — append-only JSONL, dependency-free.
@@ -247,14 +269,16 @@ async function loadDefaultDeps(): Promise<ActionHandlerDeps> {
       appendFileSync(path, line, 'utf-8');
     },
     recommend: recordRecommendation,
+    canRespawn: false,
     projectRoot: process.cwd(),
   };
   return defaultDeps;
 }
 
 /**
- * Dispatch an action by ID to the appropriate MVP handler, or return
- * `{outcome: 'unimplemented', actionId}` for the 26 stub actions.
+ * Dispatch an action by ID: maintenance actions run their real op, every other
+ * registry action lands a Brain proposal (ADR-037). Only an id absent from the
+ * registry returns `{outcome: 'unimplemented', actionId}`.
  */
 export async function dispatchAction(
   actionId: string,

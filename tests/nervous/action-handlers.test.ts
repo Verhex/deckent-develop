@@ -97,17 +97,32 @@ describe('action-handlers — MVP handlers', () => {
     deps = createMockDeps();
   });
 
-  // Test 1: WORKER_RESPAWN → spawn-backend kill + spawn invoked
-  it('handles WORKER_RESPAWN by killing and re-spawning the worker', async () => {
+  // Test 1: WORKER_RESPAWN with an injected respawn capability → kill + spawn
+  it('handles WORKER_RESPAWN by killing and re-spawning when canRespawn', async () => {
     const result = await dispatchAction(
       'WORKER_RESPAWN',
       { taskId: '180-001' },
-      deps,
+      { ...deps, canRespawn: true },
     );
 
     expect(result.outcome).toBe('success');
     expect(deps.killWorker).toHaveBeenCalledWith('180-001');
     expect(deps.spawnWorker).toHaveBeenCalledWith('180-001');
+  });
+
+  // Test 1b: WORKER_RESPAWN without a real respawn capability → proposes (honest:
+  // no fake kill/spawn it cannot perform standalone).
+  it('proposes WORKER_RESPAWN (no kill/spawn) when canRespawn is false', async () => {
+    const result = await dispatchAction(
+      'WORKER_RESPAWN',
+      { taskId: '180-002' },
+      deps, // canRespawn defaults false via loadDefaultDeps merge
+    );
+
+    expect(result.outcome).toBe('success');
+    expect(deps.killWorker).not.toHaveBeenCalled();
+    expect(deps.spawnWorker).not.toHaveBeenCalled();
+    expect(deps.recommend).toHaveBeenCalledWith('/tmp/test-project', 'WORKER_RESPAWN', { taskId: '180-002' });
   });
 
   // Test 2: ORPHAN_TASK_ARCHIVE → archive helper invoked with sprintId
@@ -463,6 +478,14 @@ describe('action-handlers — real default deps (no mock)', () => {
     expect(recs[0].actionId).toBe('AGENT_PERFORMANCE_FLAG');
     expect(recs[0].payload).toEqual({ agent: 'doc-writer', successRate: 0.4 });
     expect(recs[0].status).toBe('open');
+  });
+
+  it('DEBT_TRENDING_REPORT default dep writes a real trend report (no mock)', async () => {
+    root = mkdtempSync(join(tmpdir(), 'deckent-ah-'));
+    const result = await dispatchAction('DEBT_TRENDING_REPORT', {}, { projectRoot: root });
+    expect(result.outcome).toBe('success');
+    expect(existsSync(join(root, '.deckent', 'reports', 'debt-trend.md'))).toBe(true);
+    expect(existsSync(join(root, '.deckent', 'reports', 'debt-trend.jsonl'))).toBe(true);
   });
 });
 
