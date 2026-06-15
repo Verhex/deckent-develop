@@ -103,7 +103,10 @@ export function makeExecuteDispatcher(deps: ExecuteDispatcherDeps): ActionHandle
           } else {
             const result = await deps.capabilityRegistry.invoke(target, {
               projectRoot: deps.projectRoot,
-              actor: entry.tenant ? { id: 'system', tenantId: entry.tenant } : { id: 'system' },
+              // Audit lineage: prefer the entry's real principal (OIDC sub) so the
+              // audit hash-chain records WHO submitted; fall back to a tenant-scoped
+              // 'system' actor (then bare 'system') for actor-less entries.
+              actor: entry.actor ?? (entry.tenant ? { id: 'system', tenantId: entry.tenant } : { id: 'system' }),
             });
             ok = result.ok;
             reason = result.ok

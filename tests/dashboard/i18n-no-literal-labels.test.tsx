@@ -102,3 +102,66 @@ describe('i18n-no-literal-labels', () => {
     expect(totalTurkish).toBe(0);
   });
 });
+
+// ─── D8: literal-label guard — nav-items.ts + Layout.tsx + Sidebar.tsx ────────
+// The D8 fix moved labels from NavItem.label (literal) to NavItem.labelKey (i18n).
+// This suite guards the fix-locus (nav-items.ts) and the rendering sites
+// (Layout.tsx, Sidebar.tsx) so a reintroduced `label: 'X'` override FAILS the
+// build before it ships.
+describe('i18n-no-literal-labels — D8 nav fix-locus guard', () => {
+  const dashSrc = path.join(__dirname, '../../src/dashboard/src');
+
+  /**
+   * Parse all `label:` string literal assignments from a TypeScript/TSX source.
+   * Matches patterns like:  label: 'Foo'   label: "Bar"   label?: 'Baz'
+   * Returns the matched literal values.
+   */
+  function extractLiteralLabelOverrides(content: string): string[] {
+    // Match `label:` or `label?:` followed by a quoted string (single or double).
+    const re = /\blabel\??:\s*['"]([^'"]+)['"]/g;
+    const hits: string[] = [];
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(content)) !== null) {
+      // Exclude known non-label keys that happen to contain "label" in their name,
+      // e.g. `groupLabel:` (the stable id) — those are intentional stable strings.
+      // The regex already anchors on word-boundary `\b` before "label" and requires
+      // the next char is `:` (with optional `?`), so `groupLabel` does NOT match.
+      hits.push(m[1]!);
+    }
+    return hits;
+  }
+
+  it('nav-items.ts — no NavItem has a literal label: override', () => {
+    const file = path.join(dashSrc, 'nav-items.ts');
+    const content = fs.readFileSync(file, 'utf-8');
+    const overrides = extractLiteralLabelOverrides(content);
+    expect(overrides, `nav-items.ts must not contain literal label: overrides — found: ${JSON.stringify(overrides)}`).toHaveLength(0);
+  });
+
+  it('Layout.tsx — renders nav items via labelKey, not literal label override', () => {
+    const file = path.join(dashSrc, 'components/Layout.tsx');
+    const content = fs.readFileSync(file, 'utf-8');
+    // Layout.tsx renders `{label ?? t(labelKey)}`. The `label` prop is intentional
+    // (comes from NavItem type), but the file itself must not DEFINE any literal
+    // label: 'X' NavItem entries — it only renders what nav-items.ts provides.
+    // Guard: no `{ label: 'something' }` object literal should appear in Layout.tsx.
+    const overrides = extractLiteralLabelOverrides(content);
+    expect(overrides, `Layout.tsx must not define NavItem literal label overrides — found: ${JSON.stringify(overrides)}`).toHaveLength(0);
+  });
+
+  it('Sidebar.tsx — no literal label: NavItem definition', () => {
+    const file = path.join(dashSrc, 'components/Sidebar.tsx');
+    const content = fs.readFileSync(file, 'utf-8');
+    const overrides = extractLiteralLabelOverrides(content);
+    expect(overrides, `Sidebar.tsx must not define NavItem literal label overrides — found: ${JSON.stringify(overrides)}`).toHaveLength(0);
+  });
+
+  it('regression guard — would FAIL if a literal label is re-introduced in nav-items.ts', () => {
+    // Simulate the kind of regression the guard is designed to catch.
+    // Inject a synthetic nav entry with `label: 'Dashboard'` and verify the
+    // extractor finds it — proving the guard would catch a real regression.
+    const syntheticEntry = `{ to: '/', labelKey: 'nav.dashboard', label: 'Dashboard', icon: LayoutDashboard }`;
+    const overrides = extractLiteralLabelOverrides(syntheticEntry);
+    expect(overrides).toContain('Dashboard');
+  });
+});

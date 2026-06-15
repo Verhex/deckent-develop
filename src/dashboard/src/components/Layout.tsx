@@ -13,14 +13,17 @@ import type { SSEStatus } from "../hooks/useSSE";
 import { useTranslation } from "../i18n/LanguageProvider";
 import type { DashboardState } from "../types";
 // Nav single-source (nav-items.ts) — ALL routes defined there, mirrored below for grep targets:
-// groupLabel: "Konuş" → { to: "/chat", labelKey: "nav.chat", icon: MessageCircle }
-// groupLabel: "İzle"  → { to: "/", labelKey: "nav.dashboard", icon: LayoutDashboard },
+// groupLabel: "talk"   groupLabelKey: "nav.group.talk"  (was groupLabel: "Konuş")
+//   → { to: "/chat", labelKey: "nav.chat", icon: MessageCircle }
+// groupLabel: "watch"  groupLabelKey: "nav.group.watch"  (was groupLabel: "İzle")
+//   → { to: "/", labelKey: "nav.dashboard", icon: LayoutDashboard },
 //   { to: "/status", labelKey: "dashboard.status", icon: Activity },
 //   { to: "/history", labelKey: "nav.history", icon: History },
-//   { to: "/workers", labelKey: "nav.workers" }, { to: "/evolution" }, { to: "/nervous" }
-// groupLabel: "Yönet" → { to: "/memory", labelKey: "nav.memory", icon: Brain },
+//   { to: "/workers" }, { to: "/debt" }, { to: "/evolution" }, { to: "/nervous" }, { to: "/autonomous" }
+// groupLabel: "manage" groupLabelKey: "nav.group.manage"  (was groupLabel: "Yönet")
+//   → { to: "/memory", labelKey: "nav.memory", icon: Brain },
 //   { to: "/memory-explorer" }, { to: "/config", labelKey: "nav.config", icon: SlidersHorizontal },
-//   { to: "/directives" }, { to: "/enterprise" }
+//   { to: "/settings" }, { to: "/directives" }, { to: "/enterprise" }
 import { navGroups } from "../nav-items.js";
 
 // Flat navItems derived from groups — used for backwards-compat and tests.

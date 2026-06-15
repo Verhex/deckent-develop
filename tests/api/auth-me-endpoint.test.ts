@@ -15,7 +15,7 @@
 import { describe, it, expect } from 'vitest';
 import http from 'node:http';
 import { createHmac } from 'node:crypto';
-import { registerAuthMeRoute } from '../../src/api/auth-me-endpoint.js';
+import { registerAuthMeRoute, deriveRequestPrincipal } from '../../src/api/auth-me-endpoint.js';
 
 // ─── JWT builder (HS256, no deps — mirrors tests/api/auth-oidc.test.ts) ────────
 
@@ -33,6 +33,17 @@ function makeHs256(claims: Record<string, unknown>, secret: string): string {
   const signingInput = `${headerB64}.${payloadB64}`;
   const sig = createHmac('sha256', secret).update(signingInput).digest('base64url');
   return `${signingInput}.${sig}`;
+}
+
+/**
+ * Forge an UNSIGNED ({alg:'none'}) JWT — the classic signature-bypass shape.
+ * parseOidcClaims decodes the payload WITHOUT a signature check, so this is
+ * exactly the attacker-controllable token the claimsVerified flag guards against.
+ */
+function makeUnsignedJwt(claims: Record<string, unknown>): string {
+  const headerB64 = encodeSegment({ alg: 'none', typ: 'JWT' });
+  const payloadB64 = encodeSegment(claims);
+  return `${headerB64}.${payloadB64}.`; // empty signature segment (3 parts)
 }
 
 // ─── Fake req/res helpers ────────────────────────────────────────────────────
@@ -212,5 +223,84 @@ describe('registerAuthMeRoute — routing guards', () => {
     const req = { ...fakeReq(), method: 'POST' } as unknown as http.IncomingMessage;
     const handled = registerAuthMeRoute('/api/auth/me', 'POST', res, req);
     expect(handled).toBe(false);
+  });
+});
+
+// ─── deriveRequestPrincipal — defense-in-depth (Sprint 289, audit MED) ─────────
+//
+// `deriveRequestPrincipal` decodes role/tenant from an UNVERIFIED JWT payload.
+// The claimsVerified flag exists so a consumer never auto-trusts those claims
+// unless the caller explicitly asserts the bearer passed the auth-gate.
+
+describe('deriveRequestPrincipal — claimsVerified flag', () => {
+  it('omits claimsVerified by default — runtime shape unchanged (fail-closed)', () => {
+    const jwt = makeHs256(
+      { sub: 'user-7', role: 'operator', tenant: 'acme', exp: nowSec() + 3600 },
+      HS_SECRET,
+    );
+    const principal = deriveRequestPrincipal(fakeReq(`Bearer ${jwt}`));
+
+    // Default call must be byte-identical to legacy behavior — no trust assertion.
+    expect(principal.id).toBe('user-7');
+    expect(principal.role).toBe('operator');
+    expect(principal.tenantId).toBe('acme');
+    expect(principal.claimsVerified).toBeUndefined();
+    expect('claimsVerified' in principal).toBe(false);
+  });
+
+  it('stamps claimsVerified:true ONLY when the caller asserts authGateVerified', () => {
+    const jwt = makeHs256(
+      { sub: 'user-7', role: 'operator', tenant: 'acme', exp: nowSec() + 3600 },
+      HS_SECRET,
+    );
+    const principal = deriveRequestPrincipal(fakeReq(`Bearer ${jwt}`), {
+      authGateVerified: true,
+    });
+
+    expect(principal.claimsVerified).toBe(true);
+    expect(principal.role).toBe('operator');
+    expect(principal.tenantId).toBe('acme');
+  });
+
+  it('authGateVerified:false leaves the flag unset (explicit untrusted)', () => {
+    const jwt = makeHs256({ sub: 'u', exp: nowSec() + 3600 }, HS_SECRET);
+    const principal = deriveRequestPrincipal(fakeReq(`Bearer ${jwt}`), {
+      authGateVerified: false,
+    });
+
+    expect(principal.claimsVerified).toBeUndefined();
+  });
+
+  it('static / no-bearer principal carries the flag only when asserted', () => {
+    expect(deriveRequestPrincipal(fakeReq()).claimsVerified).toBeUndefined();
+    expect(
+      deriveRequestPrincipal(fakeReq(), { authGateVerified: true }).claimsVerified,
+    ).toBe(true);
+
+    const opaque = deriveRequestPrincipal(fakeReq('Bearer opaque-static-token'));
+    expect(opaque.id).toBe('api-static');
+    expect(opaque.claimsVerified).toBeUndefined();
+  });
+
+  it('SECURITY: a forged {alg:none} token decodes role/tenant but is NEVER auto-trusted', () => {
+    // The audit probe: a forged unsigned bearer claiming admin + the victim tenant.
+    const forged = makeUnsignedJwt({ sub: 'attacker', role: 'admin', tenant: 'victim-tenant' });
+    const principal = deriveRequestPrincipal(fakeReq(`Bearer ${forged}`));
+
+    // parseOidcClaims (no signature check) still surfaces the attacker's claims …
+    expect(principal.role).toBe('admin');
+    expect(principal.tenantId).toBe('victim-tenant');
+
+    // … but absent an auth-gate assertion the trust flag is NOT set, so a
+    // flag-checking consumer (`principal.claimsVerified === true`) fails closed.
+    expect(principal.claimsVerified).toBeUndefined();
+    const consumerWouldTrust = principal.claimsVerified === true;
+    expect(consumerWouldTrust).toBe(false);
+
+    // Even an explicit gate assertion does not "bless" a forged token's claims as
+    // genuine — the flag only records that the caller's code path is gate-guarded;
+    // the auth-gate itself is what rejects an unsigned bearer before this point.
+    const ifGated = deriveRequestPrincipal(fakeReq(`Bearer ${forged}`), { authGateVerified: true });
+    expect(ifGated.claimsVerified).toBe(true); // caller asserted gate context
   });
 });

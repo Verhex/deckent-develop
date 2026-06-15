@@ -64,6 +64,9 @@ export function mapEventToEntry(
   const rule = map.rules.find((r) => ruleMatches(r, ev));
   if (!rule) return null;
   const t = rule.entryTemplate;
+  // Prefix is intentionally `[nervous ...]` for ALL source types — every event here originates
+  // from the nervous-system detector pipeline. `group=webhook.x` or `group=repo.x` in the
+  // suffix indicates the reactive source; the `nervous` label identifies the dispatch channel.
   const ctx = `[nervous risk=${ev.risk}${ev.severity ? ` severity=${ev.severity}` : ''}${ev.groupKey ? ` group=${ev.groupKey}` : ''}]`;
   const baseDesc = t.spec.description ?? '';
   return {

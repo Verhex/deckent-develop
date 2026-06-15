@@ -95,4 +95,58 @@ describe('makeProcessController.submit', () => {
     const bl = JSON.parse(readFileSync(d.backlogPath, 'utf-8'));
     expect(bl.entries.find((e: { id: string }) => e.id === res.executionId).tenant).toBe('acme');
   });
+
+  it('stamps the full actor (id+role+tenant), not just tenant, onto the backlog entry', async () => {
+    // Audit-lineage fix: the real OIDC sub (actor.id) + role must be durable, not
+    // dropped. Previously only tenant survived → the audit chain forged 'system'.
+    const d = deps();
+    const ctl = makeProcessController(d);
+    const res = await ctl.submit({
+      description: 'tenant read',
+      kind: 'capability',
+      capabilityTarget: { capability: 'erp.read' },
+      actor: { id: 'oidc-sub-abc123', role: 'admin', tenantId: 'acme' },
+    });
+    const bl = JSON.parse(readFileSync(d.backlogPath, 'utf-8'));
+    const entry = bl.entries.find((e: { id: string }) => e.id === res.executionId);
+    expect(entry.actor).toEqual({ id: 'oidc-sub-abc123', role: 'admin', tenantId: 'acme' });
+    expect(entry.tenant).toBe('acme'); // tenant still derived alongside
+  });
+
+  it('passes the entry actor (real OIDC sub) into the capability invocation — not a constant system', async () => {
+    // The dispatcher must derive the invocation actor from entry.actor so the audit
+    // hash-chain records the actual principal, not the hard-coded {id:'system'}.
+    let seenActor: unknown;
+    const d = deps({
+      capabilityRegistry: {
+        invoke: async (target: { capability: string }, ctx: { actor?: unknown }) => {
+          seenActor = ctx.actor;
+          return { ok: true, capability: target.capability, handler: 'mock', value: null };
+        },
+      } as unknown as ProcessControllerDeps['capabilityRegistry'],
+    });
+    const ctl = makeProcessController(d);
+    await ctl.submit({
+      description: 'tenant read',
+      kind: 'capability',
+      capabilityTarget: { capability: 'erp.read' },
+      actor: { id: 'oidc-sub-abc123', role: 'admin', tenantId: 'acme' },
+    });
+    expect(seenActor).toEqual({ id: 'oidc-sub-abc123', role: 'admin', tenantId: 'acme' });
+  });
+
+  it('falls back to a tenant-scoped system actor when the entry carries no actor (backward compat)', async () => {
+    let seenActor: unknown;
+    const d = deps({
+      capabilityRegistry: {
+        invoke: async (target: { capability: string }, ctx: { actor?: unknown }) => {
+          seenActor = ctx.actor;
+          return { ok: true, capability: target.capability, handler: 'mock', value: null };
+        },
+      } as unknown as ProcessControllerDeps['capabilityRegistry'],
+    });
+    const ctl = makeProcessController(d);
+    await ctl.submit({ description: 'tenant read', kind: 'capability', capabilityTarget: { capability: 'erp.read' }, tenant: 'acme' });
+    expect(seenActor).toEqual({ id: 'system', tenantId: 'acme' });
+  });
 });

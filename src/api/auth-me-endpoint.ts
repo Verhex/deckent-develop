@@ -65,25 +65,69 @@ export interface RequestPrincipal {
   id: string;
   role?: Role;
   tenantId?: string;
+  /**
+   * Defense-in-depth trust signal (Sprint 289 — ultracode-audit MED finding).
+   *
+   * `true` ONLY when the claims were derived in a context that KNOWS the bearer
+   * has passed the upstream auth-gate (the caller asserted it via
+   * {@link DeriveRequestPrincipalOptions.authGateVerified}). When the flag is
+   * `false` / absent, the `role` and `tenantId` on this principal come from an
+   * UNVERIFIED JWT payload — `parseOidcClaims` decodes the token WITHOUT a
+   * signature check, so a forged `{alg:'none'}` (or any unsigned) bearer yields
+   * whatever role/tenant the attacker chose.
+   *
+   * A consumer making a cross-tenant or role-based authorization decision MUST
+   * treat a missing/false flag as "claims NOT trusted" and fail closed.
+   */
+  claimsVerified?: boolean;
+}
+
+/** Options for {@link deriveRequestPrincipal}. */
+export interface DeriveRequestPrincipalOptions {
+  /**
+   * Assert that the bearer on this request has ALREADY been verified by the
+   * upstream auth-gate middleware. Set `true` ONLY from a handler the auth-gate
+   * guards (one an unauthenticated request could never reach). When `true`, the
+   * returned principal carries `claimsVerified: true`; otherwise the claims are
+   * treated as unverified (`claimsVerified` is omitted) and downstream
+   * authorization decisions should fail closed.
+   */
+  authGateVerified?: boolean;
 }
 
 /**
  * Derive the caller's identity (actor id + role + tenant) from the request bearer.
- * The auth-gate middleware has already verified the bearer, so this is trusted.
+ *
+ * ⚠️ SECURITY CONTRACT: the returned `role` / `tenantId` are decoded from the JWT
+ * payload via {@link parseOidcClaims} WITHOUT verifying the signature. They are
+ * safe to trust for an authorization decision ONLY when the bearer has already
+ * been verified by the upstream auth-gate — a forged `{alg:'none'}` (or any
+ * unsigned) token decodes to whatever role/tenant the attacker chose. Defense-in-
+ * depth: pass `{ authGateVerified: true }` from a gate-guarded handler so the
+ * principal is stamped `claimsVerified: true`; cross-tenant / role-based consumers
+ * gate on that flag and fail closed when it is missing. Calling this WITHOUT the
+ * option (the default) NEVER marks the claims as verified — by design.
+ *
  * OIDC JWT → { id: sub, role?, tenantId? from claims }. Static / opaque bearer (no
  * JWT claims) → a generic principal with no tenant (single-tenant operator).
  */
-export function deriveRequestPrincipal(req: IncomingMessage): RequestPrincipal {
+export function deriveRequestPrincipal(
+  req: IncomingMessage,
+  opts: DeriveRequestPrincipalOptions = {},
+): RequestPrincipal {
+  // Only an explicit auth-gate assertion marks the claims as trusted; absent it
+  // the flag is omitted entirely so the principal's runtime shape is unchanged.
+  const verified = opts.authGateVerified === true ? { claimsVerified: true } : {};
   const bearer = extractBearer(req);
   const claims = bearer ? parseOidcClaims(bearer) : null;
-  if (!claims) return { id: 'api-static' };
+  if (!claims) return { id: 'api-static', ...verified };
   const c = claims as Record<string, unknown>;
   const sub = c['sub'];
   const id = typeof sub === 'string' && sub ? sub : 'api-oidc';
   const role = roleFromClaims(c);
   const tenantClaim = c['tenant'] ?? c['tenantId'] ?? c['https://deckent.io/tenant'];
   const tenantId = typeof tenantClaim === 'string' && tenantClaim ? tenantClaim : undefined;
-  return { id, ...(role ? { role } : {}), ...(tenantId ? { tenantId } : {}) };
+  return { id, ...(role ? { role } : {}), ...(tenantId ? { tenantId } : {}), ...verified };
 }
 
 // ─── Route handler ────────────────────────────────────────────────────────────

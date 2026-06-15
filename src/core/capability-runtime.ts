@@ -3,7 +3,7 @@
 //   capability-broker.ts        — registry + reference handlers (echo, fs.read)
 //   capability-handlers.ts      — http.get / env.read / shell.exec
 //   capability-handlers-data.ts — db.query / mail.search
-//   capability-handlers-erp.ts  — erp.read (opt-in, injected ErpConnector)
+//   erp/handler.ts               — erp.read (opt-in, injected ErpConnector)
 //   capability-audit-bridge.ts  — per-invocation audit record emission
 // This is the call-site the cluster was missing (capability-maturity E11 —
 // "closed island"); buildEngineRuntime consumes it for kind=capability backlog

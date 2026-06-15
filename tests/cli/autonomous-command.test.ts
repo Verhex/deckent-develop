@@ -312,6 +312,32 @@ describe('deckent autonomous CLI (226-007)', () => {
     expect(nervousDisposeSpy).toHaveBeenCalled();
   });
 
+  // ─── N2 sub-flag: repo_watch + webhook enabled attaches + tears down cleanly ─
+  it('start with reactive.repo_watch + reactive.webhook enabled runs + tears down cleanly (N2)', async () => {
+    // Config: all reactive sub-flags enabled.
+    // No reactive-map, no inbox on disk — branches are taken but empty sources tear
+    // down without hang or leaked handle. Key assertion: resolves without throwing.
+    const configDir = join(root, '.deckent');
+    mkdirSync(configDir, { recursive: true });
+    writeFileSync(
+      join(configDir, 'config.json'),
+      JSON.stringify({
+        autonomous: {
+          enabled: true,
+          reactive: {
+            enabled: true,
+            repo_watch: { enabled: true },
+            webhook: { enabled: true },
+          },
+        },
+      }, null, 2),
+      'utf-8',
+    );
+    await expect(
+      handleStart({ root, lang: 'en', intervalMs: '1', maxIterations: '1' }),
+    ).resolves.toBeUndefined();
+  });
+
   it('start with nervous_system disabled creates no live nervous system (N1 opt-in)', async () => {
     const configDir = join(root, '.deckent');
     mkdirSync(configDir, { recursive: true });

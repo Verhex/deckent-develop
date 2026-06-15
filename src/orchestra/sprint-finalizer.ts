@@ -540,7 +540,8 @@ export async function applyAdaptiveThresholds(projectRoot: string, config: Resol
  * 2. Write sprint log to .brain/sprints/sprint-NNN.md
  * 3. Update MEMORY.md with sprint learnings (trimMemoryWithHeader)
  * 4. Write RETRO.md (writeRetrospective)
- * 5. Update PROJECT-IDENTITY.md "Current State" section
+ * 5. (Legacy removed) Identity file write dropped in Memory V2 — identity is now DB-first,
+ *    surfaced via managed .deckent/workspace/IDENTITY.md (ADR-046, B6).
  * 6. Update last_sprint_id in .deckent/config.json
  * 7. Run decay if over budget
  * 8. Run afterSprint plugin hooks
@@ -766,7 +767,7 @@ export async function finalizeSprint(
     }
   }
 
-  // 5. Legacy .brain/PROJECT-IDENTITY.md update removed — B6 (Memory V2).
+  // 5. Legacy identity-file write dropped — Memory V2, B6.
   // Identity is DB-first: the memory.db `identity` entry is the source of
   // truth, surfaced via the managed .deckent/workspace/IDENTITY.md doc.
 

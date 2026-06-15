@@ -117,6 +117,9 @@ export function makeProcessController(deps: ProcessControllerDeps): ProcessContr
         trigger: { type: 'one-off' },
         status: 'pending',
         ...(tenant ? { tenant } : {}),
+        // Persist the full server-derived principal (not just tenant) so the
+        // dispatcher can carry the real OIDC sub into the audit hash-chain.
+        ...(ctx.actor ? { actor: ctx.actor } : {}),
         lastRun: null,
         lastResult: null,
       };

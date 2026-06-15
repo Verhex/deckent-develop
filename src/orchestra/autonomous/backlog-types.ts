@@ -2,7 +2,7 @@
 // Backlog data model for the autonomous engine. Durable, git-trackable.
 // Spec: docs/superpowers/specs/2026-06-07-autonomous-execution-engine-design.md §5
 
-import type { CapabilityTarget } from '../../core/work-model.js';
+import type { CapabilityTarget, ActorContext } from '../../core/work-model.js';
 
 export type BacklogKind = 'task' | 'sprint' | 'capability';
 export type BacklogPolicy = 'auto' | 'approval-required' | 'risk-tagged';
@@ -32,6 +32,11 @@ export interface BacklogEntry {
   trigger: BacklogTrigger;
   status: BacklogStatus;
   tenant?: string;
+  /** WHO submitted this work — RBAC identity (the real OIDC `sub`), role, and
+   *  tenant. Carried into the capability invocation's actor so the audit
+   *  hash-chain records the actual principal instead of a constant 'system'.
+   *  Optional + additive: actor-less entries keep the prior 'system' fallback. */
+  actor?: ActorContext;
   lastRun: string | null;
   lastResult: { ok: boolean; reason: string } | null;
 }

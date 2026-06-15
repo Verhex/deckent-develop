@@ -8,7 +8,34 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { createHmac } from 'node:crypto';
 import { startTestServer, call, type TestServerHandle } from './test-server-helper.js';
+
+// ─── Real OIDC HS256 bearer setup (mirrors tests/api/auth-me-endpoint.test.ts) ──
+// The HTTP server verifies HS256 JWTs when `.deckent/config.json` carries an
+// `api_oidc` block (server.ts → auth.ts bearerAuthMiddleware). A valid token
+// passes the auth-gate; `deriveRequestPrincipal` then extracts its tenant/role/sub
+// claims — a REAL principal, unlike the degenerate DECKENT_API_AUTH_DISABLED path
+// (no bearer → tenantId undefined → crossTenant trivially false).
+const OIDC_SECRET = 'test-oidc-secret-289-process-endpoint';
+const OIDC_ISSUER = 'https://idp.test/289';
+const OIDC_CONFIG = {
+  api_oidc: { enabled: true, issuer: OIDC_ISSUER, algorithm: 'HS256', key: OIDC_SECRET },
+};
+
+function makeHs256(claims: Record<string, unknown>, secret: string): string {
+  const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
+  const payload = Buffer.from(JSON.stringify(claims)).toString('base64url');
+  const signingInput = `${header}.${payload}`;
+  const sig = createHmac('sha256', secret).update(signingInput).digest('base64url');
+  return `${signingInput}.${sig}`;
+}
+
+/** Build an `Authorization: Bearer <jwt>` header carrying the given identity claims. */
+function bearer(claims: Record<string, unknown>): Record<string, string> {
+  const exp = Math.floor(Date.now() / 1000) + 3600;
+  return { Authorization: `Bearer ${makeHs256({ iss: OIDC_ISSUER, exp, ...claims }, OIDC_SECRET)}` };
+}
 
 describe('/api/process/* routes', () => {
   let handle: TestServerHandle;
@@ -75,5 +102,66 @@ describe('/api/process/* routes', () => {
     const entry = bl.entries.find((e: { id: string }) => e.id === id);
     // the spoofed tenant never reaches the durable entry (no bearer → no tenant)
     expect(entry.tenant).not.toBe('victim-tenant');
+  });
+
+  it('SECURITY (anti-IDOR): a cross-tenant OIDC bearer gets 404 on another tenant\'s entry (no existence leak)', async () => {
+    // Real auth-gate: HS256 JWTs verified via the seeded api_oidc block — NOT
+    // DECKENT_API_AUTH_DISABLED. Each request carries a tenant-bearing principal.
+    handle = await startTestServer({ seed: { config: OIDC_CONFIG } });
+
+    // tenant-B submits a parking (erp.write) entry → durable entry stamped tenant-B.
+    const submit = await call(handle, '/api/process/submit', {
+      method: 'POST',
+      headers: bearer({ sub: 'user-b', tenant: 'tenant-B' }),
+      body: JSON.stringify({ description: 'tenant-B ledger sync', kind: 'capability', capabilityTarget: { capability: 'erp.write' } }),
+    });
+    expect(submit.status).toBe(200);
+    const id = submit.json<{ executionId: string }>().executionId;
+
+    // Owner (tenant-B) sees its own entry → 200 (proves the entry truly exists).
+    const owner = await call(handle, `/api/process/status/${id}`, { headers: bearer({ sub: 'user-b', tenant: 'tenant-B' }) });
+    expect(owner.status).toBe(200);
+
+    // Cross-tenant (tenant-A) → 404. The crossTenant branch fires: a tenant-tagged
+    // entry is invisible to a foreign tenant and leaks no existence signal.
+    const crossStatus = await call(handle, `/api/process/status/${id}`, { headers: bearer({ sub: 'user-a', tenant: 'tenant-A' }) });
+    expect(crossStatus.status).toBe(404);
+    // Same anti-IDOR scope on the /result alias.
+    const crossResult = await call(handle, `/api/process/result/${id}`, { headers: bearer({ sub: 'user-a', tenant: 'tenant-A' }) });
+    expect(crossResult.status).toBe(404);
+
+    // Control: an admin-role principal (even with a different tenant) sees it → 200.
+    // This proves the 404 above is a tenant-scope decision, not a real "not found".
+    const admin = await call(handle, `/api/process/status/${id}`, { headers: bearer({ sub: 'root', tenant: 'tenant-A', role: 'admin' }) });
+    expect(admin.status).toBe(200);
+    expect(admin.json<{ id: string }>().id).toBe(id);
+  });
+
+  it('SECURITY (tenant-stamp): submit stamps the durable entry tenant from the OIDC claim, not the client body', async () => {
+    handle = await startTestServer({ seed: { config: OIDC_CONFIG } });
+
+    // Bearer carries tenant=tenant-real; the request body tries to spoof a DIFFERENT
+    // tenant + actor. The server must derive the tenant from the verified claim only.
+    const submit = await call(handle, '/api/process/submit', {
+      method: 'POST',
+      headers: bearer({ sub: 'user-real', tenant: 'tenant-real' }),
+      body: JSON.stringify({
+        description: 'post invoice to ERP',
+        kind: 'capability',
+        capabilityTarget: { capability: 'erp.write' },
+        // attacker-controlled identity — MUST be ignored, not trusted
+        tenant: 'tenant-spoofed',
+        actor: { id: 'attacker', tenantId: 'tenant-spoofed' },
+      }),
+    });
+    expect(submit.status).toBe(200);
+    const id = submit.json<{ executionId: string }>().executionId;
+
+    const bl = JSON.parse(readFileSync(join(handle.projectRoot, '.deckent', 'autonomous', 'backlog.json'), 'utf-8'));
+    const entry = bl.entries.find((e: { id: string }) => e.id === id);
+    // Server-derived from the OIDC tenant claim — positive path the degenerate test missed.
+    expect(entry.tenant).toBe('tenant-real');
+    // Client-supplied tenant is dropped.
+    expect(entry.tenant).not.toBe('tenant-spoofed');
   });
 });

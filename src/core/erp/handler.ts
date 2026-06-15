@@ -118,8 +118,8 @@ export function createErpReadHandler(opts: ErpReadHandlerOptions): CapabilityHan
   const { connector } = opts;
   return {
     // The WM Capability union has not been widened to the dotted F8 read-only
-    // names yet; the broker gates by string equality (same pattern as
-    // capability-handlers-data.ts).
+    // names yet; the broker gates by string equality (same pattern as other
+    // capability handlers — see capability-broker.ts registration).
     requiredCapability: 'erp.read' as Capability,
     description: 'Runs one structured read-only ERP query through the injected ErpConnector.',
     invoke: (args: Record<string, unknown>, ctx: InvocationContext) =>

@@ -47,4 +47,16 @@ describe('POST /api/reactive/webhook', () => {
     expect(JSON.parse(lines[0]).groupKey).toBe('webhook.a');
     expect(JSON.parse(lines[1]).groupKey).toBe('webhook.b');
   });
+
+  it('returns 401 when no bearer token is provided (auth-gate proof)', async () => {
+    // Start without disableAuth — the auth middleware must block unauthenticated requests.
+    handle = await startTestServer();
+    const res = await call(handle, '/api/reactive/webhook', {
+      method: 'POST',
+      body: JSON.stringify({ event: 'order.created' }),
+    });
+    expect(res.status).toBe(401);
+    // Inbox must NOT have been written — the request was blocked before the handler ran.
+    expect(existsSync(inboxPath(handle.projectRoot))).toBe(false);
+  });
 });
