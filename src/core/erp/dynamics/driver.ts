@@ -35,8 +35,8 @@
 //
 // ADR-008 (core/ imports core/ only) · ADR-010 (no new dependency — built-in fetch).
 
-import type { CompiledQuery, ErpDriver, ErpFilterOp, ErpRow, ErpScalar } from './erp-connector.js';
-import { DeckentError } from './errors.js';
+import type { CompiledQuery, ErpDriver, ErpFilterOp, ErpRow, ErpScalar } from '../connector.js';
+import { DeckentError } from '../../errors.js';
 
 // ─── Injectable fetch seam ────────────────────────────────────────────────────
 

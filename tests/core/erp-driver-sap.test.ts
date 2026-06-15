@@ -2,14 +2,14 @@
 // Sprint 267 T-002 — SAP OData read-only ErpDriver: CompiledQuery → OData GET.
 // Hermetic: fetch is always injected (mock) — no real network I/O.
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { createSapErpDriver, type SapFetchLike } from '../../src/core/erp-driver-sap.js';
+import { createSapErpDriver, type SapFetchLike } from '../../src/core/erp/sap/driver.js';
 import {
   createErpConnector,
   type CompiledQuery,
   type ErpFilterOp,
   type ErpRow,
   type ErpScalar,
-} from '../../src/core/erp-connector.js';
+} from '../../src/core/erp/connector.js';
 
 const BASE_URL = 'https://sap.example.com/sap/opu/odata/sap/API_TEST';
 const PASSWORD = 'super-secret-sap-password';

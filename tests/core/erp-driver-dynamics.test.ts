@@ -2,14 +2,14 @@
 // Sprint 268 T-005 — Dynamics 365 OData v4 read-only ErpDriver: CompiledQuery → Web API GET.
 // Hermetic: fetch is always injected (mock) — no real network I/O.
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { createDynamicsErpDriver, type DynamicsFetchLike } from '../../src/core/erp-driver-dynamics.js';
+import { createDynamicsErpDriver, type DynamicsFetchLike } from '../../src/core/erp/dynamics/driver.js';
 import {
   createErpConnector,
   type CompiledQuery,
   type ErpFilterOp,
   type ErpRow,
   type ErpScalar,
-} from '../../src/core/erp-connector.js';
+} from '../../src/core/erp/connector.js';
 
 const BASE_URL = 'https://org.crm.dynamics.com';
 const TOKEN = 'super-secret-dynamics-oauth-token';

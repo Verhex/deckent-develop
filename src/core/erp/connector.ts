@@ -22,7 +22,7 @@
 // ADR-008 (core/ must not import orchestra/): imports types from work-model only.
 // ADR-010 (single runtime dependency): Node built-ins / hand-rolled only — no deps.
 
-import type { ActorContext } from './work-model.js';
+import type { ActorContext } from '../work-model.js';
 
 // ─── Query spec types (the structured, NOT-raw-SQL input) ────────────────────
 

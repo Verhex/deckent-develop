@@ -4,8 +4,8 @@
 import { describe, it, expect } from 'vitest';
 import { createAuditedCapabilityRegistry } from '../../src/core/capability-runtime.js';
 import type { CapabilityAuditRecord } from '../../src/core/capability-audit-bridge.js';
-import { createInMemoryErpDriver } from '../../src/core/capability-handlers-erp.js';
-import { createErpConnector, type ErpConnector, type ErpResultSet } from '../../src/core/erp-connector.js';
+import { createInMemoryErpDriver } from '../../src/core/erp/handler.js';
+import { createErpConnector, type ErpConnector, type ErpResultSet } from '../../src/core/erp/connector.js';
 
 describe('createAuditedCapabilityRegistry', () => {
   it('preinstalls the full handler set (reference + extended + data)', () => {

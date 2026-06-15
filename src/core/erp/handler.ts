@@ -14,7 +14,7 @@ import {
   CapabilityRegistry,
   type CapabilityHandler,
   type InvocationContext,
-} from './capability-broker.js';
+} from '../capability-broker.js';
 import type {
   CompiledPredicate,
   CompiledQuery,
@@ -25,9 +25,9 @@ import type {
   ErpQuerySpec,
   ErpRow,
   ErpScalar,
-} from './erp-connector.js';
-import type { Capability } from './work-model.js';
-import { DeckentError } from './errors.js';
+} from './connector.js';
+import type { Capability } from '../work-model.js';
+import { DeckentError } from '../errors.js';
 
 // ─── erp.read handler ─────────────────────────────────────────────────────────
 

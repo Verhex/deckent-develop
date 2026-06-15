@@ -2,14 +2,14 @@
 // Sprint 266 T-001 — Odoo read-only ErpDriver: CompiledQuery → JSON-RPC search_read.
 // Hermetic: fetch is always injected (mock) — no real network I/O.
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { createOdooErpDriver, type OdooFetchLike } from '../../src/core/erp-driver-odoo.js';
+import { createOdooErpDriver, type OdooFetchLike } from '../../src/core/erp/odoo/driver.js';
 import {
   createErpConnector,
   type CompiledQuery,
   type ErpFilterOp,
   type ErpRow,
   type ErpScalar,
-} from '../../src/core/erp-connector.js';
+} from '../../src/core/erp/connector.js';
 
 const URL_OK = 'https://erp.example.com/jsonrpc';
 const API_KEY = 'super-secret-odoo-key';

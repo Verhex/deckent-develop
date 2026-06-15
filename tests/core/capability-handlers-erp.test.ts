@@ -7,14 +7,14 @@ import {
   createErpReadHandler,
   createInMemoryErpDriver,
   installErpHandler,
-} from '../../src/core/capability-handlers-erp.js';
+} from '../../src/core/erp/handler.js';
 import { CapabilityRegistry } from '../../src/core/capability-broker.js';
 import {
   createErpConnector,
   type ErpConnector,
   type ErpResultSet,
   type ErpRow,
-} from '../../src/core/erp-connector.js';
+} from '../../src/core/erp/connector.js';
 import type { Capability } from '../../src/core/work-model.js';
 
 const CUSTOMERS: ErpRow[] = [

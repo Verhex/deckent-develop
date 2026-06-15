@@ -6,7 +6,7 @@ import {
   type CompiledQuery,
   type ErpDriver,
   type ErpRow,
-} from '../../src/core/erp-connector.js';
+} from '../../src/core/erp/connector.js';
 import type { ActorContext } from '../../src/core/work-model.js';
 
 /** A capturing driver — records every compiled request it receives + returns canned rows. */

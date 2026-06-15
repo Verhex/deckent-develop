@@ -21,8 +21,8 @@ import {
   installDataHandlers,
   type DataHandlerOptions,
 } from './capability-handlers-data.js';
-import { installErpHandler } from './capability-handlers-erp.js';
-import type { ErpConnector } from './erp-connector.js';
+import { installErpHandler } from './erp/handler.js';
+import type { ErpConnector } from './erp/connector.js';
 import {
   withAuditedInvocation,
   type CapabilityAuditRecord,
