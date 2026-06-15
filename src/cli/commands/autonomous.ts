@@ -53,6 +53,9 @@ import { loadReactiveMap } from '../../orchestra/autonomous/reactive/reactive-ma
 import { makeReactiveIngester } from '../../orchestra/autonomous/reactive/reactive-ingester.js';
 import { makeNervousReactiveSource } from '../../orchestra/autonomous/reactive/nervous-reactive-source.js';
 import { NervousObserver } from '../../nervous/observer.js';
+import { createNervousSystemIfEnabled, type NervousSystemHandle } from '../../nervous/bootstrap.js';
+import { getSprintStateSnapshot } from '../../orchestra/sprint-state-tracker.js';
+import type { DeckentConfig } from '../../core/types.js';
 import { DeckentError } from '../../core/errors.js';
 
 // ─── Filesystem layout helpers ────────────────────────────────────────
@@ -332,6 +335,19 @@ export async function handleStart(opts: AutonomousStartOptions): Promise<void> {
     reactiveSource.start();
   }
 
+  // N1 (F3-009 attach-only fix): drive the built-in nervous detectors LIVE in
+  // autonomous. createNervousSystemIfEnabled builds the self-driving observer
+  // (FS-watch + periodic scan) + the full pipeline + executor (the 30 real action
+  // handlers) so detections actually flow — notify / recommend / autonomous
+  // maintenance — without needing a sprint to host the observer. Internally
+  // gated by config.nervous_system.enabled (returns null when off → no-op). The
+  // sprintStateProvider reads disk state (IDLE_SNAPSHOT when no sprint is live).
+  const nervousHandle: NervousSystemHandle | null = createNervousSystemIfEnabled(
+    resolvedConfig as unknown as DeckentConfig,
+    root,
+    () => getSprintStateSnapshot(root),
+  );
+
   const controller = new AbortController();
   const sigintHandler = (): void => controller.abort();
   process.on('SIGINT', sigintHandler);
@@ -386,6 +402,9 @@ export async function handleStart(opts: AutonomousStartOptions): Promise<void> {
     // Ensure the observer releases any timers/watchers it started so the
     // process (and tests) can exit cleanly.
     reactiveObserver?.stop?.();
+    // N1: tear down the nervous system (observer watchers + executor timers +
+    // heartbeat) so the process exits cleanly.
+    nervousHandle?.dispose();
   }
 }
 

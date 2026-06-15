@@ -13,6 +13,28 @@ vi.mock('../../src/core/provider.js', async (importOriginal) => {
   };
 });
 
+// N1: stub the nervous-system bootstrap so the wire (create-when-enabled +
+// dispose-on-teardown) is asserted WITHOUT running the real FS-watch observer.
+// Mirrors the real gating (enabled → handle, disabled → null).
+const { nervousCreateSpy, nervousDisposeSpy } = vi.hoisted(() => ({
+  nervousCreateSpy: vi.fn(),
+  nervousDisposeSpy: vi.fn(),
+}));
+vi.mock('../../src/nervous/bootstrap.js', async (importOriginal) => {
+  const actual = await importOriginal() as Record<string, unknown>;
+  return {
+    ...actual,
+    createNervousSystemIfEnabled: (
+      config: { nervous_system?: { enabled?: boolean } },
+      ...rest: unknown[]
+    ) => {
+      nervousCreateSpy(config, ...rest);
+      if (!config?.nervous_system?.enabled) return null;
+      return { observer: {}, dispose: nervousDisposeSpy };
+    },
+  };
+});
+
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Command } from 'commander';
 import {
@@ -261,5 +283,44 @@ describe('deckent autonomous CLI (226-007)', () => {
       'utf-8',
     );
     await expect(handleStart({ root, lang: 'en', intervalMs: '1', maxIterations: '1' })).resolves.toBeUndefined();
+  });
+
+  // ─── N1: live nervous detection flow in autonomous ──────────────────────
+  it('start with nervous_system enabled drives + disposes the live nervous system (N1)', async () => {
+    const configDir = join(root, '.deckent');
+    mkdirSync(configDir, { recursive: true });
+    writeFileSync(
+      join(configDir, 'config.json'),
+      JSON.stringify({ autonomous: { enabled: true }, nervous_system: { enabled: true, mode: 'balanced' } }, null, 2),
+      'utf-8',
+    );
+    nervousCreateSpy.mockClear();
+    nervousDisposeSpy.mockClear();
+
+    await expect(handleStart({ root, lang: 'en', intervalMs: '1', maxIterations: '1' })).resolves.toBeUndefined();
+
+    // wire: created with (config, root, sprintStateProvider fn)
+    expect(nervousCreateSpy).toHaveBeenCalled();
+    const lastCall = nervousCreateSpy.mock.calls.at(-1)!;
+    expect(lastCall[1]).toBe(root);
+    expect(typeof lastCall[2]).toBe('function');
+    // lifecycle: enabled → handle created → disposed on teardown (no leak)
+    expect(nervousDisposeSpy).toHaveBeenCalled();
+  });
+
+  it('start with nervous_system disabled creates no live nervous system (N1 opt-in)', async () => {
+    const configDir = join(root, '.deckent');
+    mkdirSync(configDir, { recursive: true });
+    writeFileSync(
+      join(configDir, 'config.json'),
+      JSON.stringify({ autonomous: { enabled: true } }, null, 2),
+      'utf-8',
+    );
+    nervousDisposeSpy.mockClear();
+
+    await expect(handleStart({ root, lang: 'en', intervalMs: '1', maxIterations: '1' })).resolves.toBeUndefined();
+
+    // gating returns null (no handle) → nothing to dispose
+    expect(nervousDisposeSpy).not.toHaveBeenCalled();
   });
 });
