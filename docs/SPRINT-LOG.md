@@ -7925,3 +7925,29 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 287-003: enterprise referansları — derinleştir (286-020 yüzeysel kaldı) (DONE)
 
 ---
+## Sprint 288 — sprint-288
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-06-15
+**Duration:** 446s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 5 |
+| Completed | 5 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 446423ms |
+
+### Tasks
+
+- 288-001: Tema A — Genel Bakış & Vizyon (DONE)
+- 288-002: Tema B — Orkestrasyon Çekirdeği (DONE)
+- 288-003: Tema C — Agent / Skill / Provider Sistemi (DONE)
+- 288-004: Tema D — Hafıza, Yönetişim, Gözlem (DONE)
+- 288-005: Tema E — Arayüzler & Operasyon (DONE)
+
+---

@@ -1,5 +1,15 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-288 Learnings
+- Sprint sprint-288 Learnings: ## Sprint sprint-288 Learnings
+
+## Gains
+- 288-001 — Tema A — Genel Bakış & Vizyon — 4 Türkçe doküman başarıyla oluşturuldu:
+- 288-002 — Tema B — Orkestrasyon Çekirdeği — 4 Türkçe doküman yazıldı.
+- 288-003 — Tema C — Agent / Skill / Provider Sistemi — 4 Türkçe doküman oluşturuldu.
+- 288-004 — Tema D — Hafıza, Yönetişim, Gözlem — 4 Turkish documentation files written for Tema D (Hafıza, Yönetişim, Gözlem).
+- 288-005 — Tema E — Arayüzler & Operasyon — 4 Turkish documentation files written for Tema E (Arayüzler & Operasyon).
+
 ## Sprint sprint-287 Learnings
 - Sprint sprint-287 Learnings: ## Sprint sprint-287 Learnings
 

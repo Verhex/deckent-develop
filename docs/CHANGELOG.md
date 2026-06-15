@@ -2,6 +2,19 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint288] - 2026-06-15
+
+### Added
+
+- Tema A — Genel Bakış & Vizyon
+- Tema B — Orkestrasyon Çekirdeği
+- Tema C — Agent / Skill / Provider Sistemi
+- Tema D — Hafıza, Yönetişim, Gözlem
+- Tema E — Arayüzler & Operasyon
+
+
+_Tasks: 5 total, 5 done, 0 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint287] - 2026-06-14
 
 ### Added

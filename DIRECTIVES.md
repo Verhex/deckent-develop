@@ -1,55 +1,100 @@
-# DIRECTIVES — Sprint 287: Doc-Audit FIX — Vision De-Competitor + Enterprise Depth
+# DIRECTIVES — Sprint 288: deckent'i Anlatan 20 Doküman (analiz/)
 
-## Goal: Sprint 286 doküman-audit'inin disk-verify ile bulunan 3 boşluğunu kapat. (1) `docs/vision/roadmap.md` eskimiş bir iç-strateji/launch dokümanı — rakip-kıyas (OpenClaw/Aider/Devin/Cursor "vs", 🏆-tabloları) + launch-pazarlama (Sprint-150, Show HN/Reddit taktikleri) + eski metrikler (148 sprint, 41 ADR, %99.12) içeriyor → temiz, GÜNCEL, user-facing yol-haritasına dönüştür. (2) `blueprint.md`/`blueprint-TR.md` aynı rakip-ref + eski-metrik sorunu. (3) `enterprise-*` referansları 286'da yüzeysel kaldı → derinleştir. Hedef: rakip-ismi=0, eski-metrik=0, deckent.ai, bugünün deckent'ini (v1.0.0-beta.1, sprint-285+, 89 ADR, 34 MCP tool/8 resource, 15 agent/21 skill, 4 provider) yansıtan dokümanlar.
+## Goal: deckent'i sıfırdan tanıyan biri için, projeyi katman katman anlatan **20 Türkçe doküman** üret; hepsini proje kökünde **`analiz/`** klasörüne yaz. Dokümanlar god-level, doğru ve güncel olmalı — uydurma sayı/özellik YOK. Her doküman kısa-öz girizgah + somut detay (mimari, akış, dosya/komut referansı) içerir. 5 tema × 4 doküman = 20; her tema bağımsız bir task (paralel).
 
 ## Ortak kurallar (BAĞLAYICI)
-- **Rakip-ismi YASAK:** Devin/Cursor/Aider/OpenClaw/Claude-Code/Copilot "vs/kıyas/🏆-tablo/bashing-tagline" → TAMAMEN KALDIR. deckent'in kendi değer-önermesiyle yeniden yaz (evrimsel mimari, dependency-pipeline waves, Memory V2 FTS5, multi-provider, Nervous System, autonomous engine, ADR-governance, MIT-açık). Meşru IDE-entegrasyonu (deckent'i Cursor/VS Code'a MCP ile kurma rehberi) rakip-kıyas DEĞİL — o tür içerik varsa korunur.
-- **Eski-metrik YASAK:** Koda/`.brain/exports/summary.md`'e karşı doğrula — sprint sayısı 285+, ADR 89, MCP 34 tool/8 resource, agent 15, skill 21, model 13/tier 4, sürüm 1.0.0-beta.1. Uydurma/eski sayı (148 sprint, 41 ADR, %99.12 coverage, star-sayısı) → güncelle veya çıkar.
-- **Launch-pazarlama içeriği YASAK (roadmap'te):** "Show HN / Reddit / Twitter thread / Perşembe 10:00 launch / tagline adayları" gibi iç-pazarlama-taktiği user-facing roadmap'e ait değil — çıkar. Roadmap = mevcut-durum → yakın-vade → vizyon (ürün yönü), iç-launch-planı değil.
-- **deckent.ai** her zaman (deckent.agency asla). **EN/TR senkron** (blueprint ↔ blueprint-TR).
-- **Cerrahi:** Sağlam/güncel bölümleri koru; yalnız rakip/eski/launch-içeriğini düzelt. Tam-yeniden-yazım yalnız bölüm kökten yanlışsa.
+- **Dil: Türkçe.** Tüm dokümanlar TR. Kod/komut/dosya-yolu adları orijinal kalır.
+- **Doğruluk koddan/`.brain/exports/summary.md`'ten doğrulanır.** Güncel gerçekler: sürüm `1.0.0-beta.1`, sprint 287+, ADR 89, MCP **34 tool / 8 resource**, **15 built-in agent**, **21 built-in skill**, **4 tier** (economy/standard/premium/premium_plus), **3 cloud provider (Claude/Codex/Gemini) + Ollama (yerel)**, CLI 55+ komut. Model sayısı için `src/core/model-registry.ts`'i oku — sayıyı oradan türet, ezberden yazma (doc/IDENTITY'de "13" geçebilir ama registry'de `fable` ile birlikte daha fazla; canlı kaynak registry).
+- **Rakip-ismi YASAK.** deckent'i kendi değer-önermesiyle anlat (evrimsel mimari, dependency-pipeline waves, Memory V2 FTS5, multi-provider, Nervous System, autonomous engine, ADR-governance, MIT-açık). Başka ürünle "vs/kıyas" yok.
+- **Kaynak-temelli yaz:** İddiayı koddaki modül/komut/ADR ile çapala (ör. "Brain = `src/orchestra/sprint-controller.ts`"). Spekülasyon değil, repo gerçeği.
+- **Her doküman** `# Başlık` + 1 paragraf özet ile başlar, sonra alt-başlıklarla detay. ~80–200 satır hedef (god-level, dolu ama şişirme yok).
+- **Cerrahi scope:** Yalnız `analiz/` altına YAZ. `src/`, `.brain/exports/`, `docs/`, `CLAUDE.md`, `DECKENT.md` salt-OKU (referans için).
 
 ---
 
-## Task 1: roadmap.md — user-facing yol-haritasına dönüştür
+## Task 1: Tema A — Genel Bakış & Vizyon
 - Provider: claude
-- Model: opus
+- Model: sonnet
 - Backend: docker
-- Effort: high
+- Effort: normal
 - Agent: doc-writer
 - Skills: documentation-writer, system-architect
-- Files: docs/vision/roadmap.md
-- Scope: docs/vision/, .brain/exports/summary.md, src/
-### Description
-`docs/vision/roadmap.md` şu an eskimiş iç-strateji dokümanı. Dönüştür: (a) `## 7. Rekabet Konumu — OpenClaw vs Deckent` kıyas-tablosunu KALDIR → deckent'in benzersiz değerleri (kimseyi kıyaslamadan). (b) `## 8. Pazarlama Mesajları` (Show HN/Reddit/tagline/launch-tarihi) KALDIR — user-facing roadmap'e ait değil. (c) "Deckent vs Aider" satırı + kalan rakip-ref → reframe/kaldır. (d) Eski metrikleri (148 sprint, 41 ADR, %99.12, 21+20 skill) güncel-koddan doğrula (285 sprint, 89 ADR, 21 skill). (e) Roadmap'i mevcut-durum → yakın-vade → uzun-vade vizyon (native-agent program, autonomous engine, agentic-OS, enterprise) olarak düzenle. Sağlam teknik-roadmap bölümleri korunur.
-**Kanıt:** `grep -ciE "devin|cursor|aider|openclaw|show hn|99\.12|148 sprint|41 adr" docs/vision/roadmap.md` = 0 + `grep -c "deckent.ai" docs/vision/roadmap.md` ≥ 1.
+- Files: analiz/01-deckent-nedir.md, analiz/02-mimari-genel-bakis.md, analiz/03-vizyon-konumlandirma.md, analiz/04-sprint-yasam-dongusu.md
+- Scope: analiz/, src/, .brain/exports/, docs/
 
-## Task 2: blueprint.md + blueprint-TR.md — de-competitor + de-stale
+### Description
+4 doküman: **01-deckent-nedir** (deckent nedir, hangi problemi çözer, kim için; AI agent orchestration CLI; bir cümlelik konum + temel kavramlar Brain/Worker/Auditor/Sprint). **02-mimari-genel-bakis** (üst-düzey katmanlar: orchestra/ core/ agents/ nervous/ monitor/ connectors/ providers/ api/ mcp/ cli/ dashboard/ — her birinin tek-cümle sorumluluğu, `CLAUDE.md` Architecture bölümünden doğrula). **03-vizyon-konumlandirma** (god-level/enterprise-grade ürün vizyonu, product-not-service ADR-033, agentic-OS yönü, MIT açık-kaynak; pazarlama-taktiği değil ürün-yönü). **04-sprint-yasam-dongusu** (8 faz PLAN→SPAWN→EXECUTE→EVALUATE→FIX→RETRO→DECAY→CLEANUP, her fazın sorumlusu + ne yaptığı, DECKENT.md Sprint Lifecycle tablosundan).
+**Kanıt:** `ls analiz/01-deckent-nedir.md analiz/02-mimari-genel-bakis.md analiz/03-vizyon-konumlandirma.md analiz/04-sprint-yasam-dongusu.md` → 4 dosya mevcut.
+**Test:** İçerik-doğrulama: `grep -l "PLAN" analiz/04-*.md` ve her dosyada `#` başlık + özet paragrafı var; rakip-ismi=0.
+
+---
+
+## Task 2: Tema B — Orkestrasyon Çekirdeği
+- Provider: claude
+- Model: sonnet
+- Backend: docker
+- Effort: normal
+- Agent: doc-writer
+- Skills: documentation-writer, system-architect
+- Files: analiz/05-brain-orchestrator.md, analiz/06-worker-auditor.md, analiz/07-task-routing.md, analiz/08-dependency-pipeline-wave.md
+- Scope: analiz/, src/, .brain/exports/, docs/
+
+### Description
+4 doküman: **05-brain-orchestrator** (Brain tek orkestratör; `sprint-controller.ts` tam sprint döngüsü; planner→task-builder→evaluator akışı; ADR-008 tek-yönlü import kuralı). **06-worker-auditor** (Worker task claim/heartbeat/result yazımı `agents/worker.ts`; Auditor scan loop 30sn, git-diff scope ihlali, asla kod yazmaz; rollerin ayrımı). **07-task-routing** (`task-router.ts` per-task agent+skill+provider seçimi; routing-engine v2 3-layer intent→activation→routing; TaskDNA + confidence). **08-dependency-pipeline-wave** (Kahn topolojik wave'ler, `dependency_pipeline_enabled`, ADR-045 wave-based execution, ADR-064 continuous dispatch). Modül isimlerini `src/orchestra/` ve `src/core/`'dan doğrula.
+**Kanıt:** `ls analiz/05-brain-orchestrator.md analiz/06-worker-auditor.md analiz/07-task-routing.md analiz/08-dependency-pipeline-wave.md` → 4 dosya.
+**Test:** `grep -li "sprint-controller" analiz/05-*.md` + `grep -li "Auditor" analiz/06-*.md`; rakip-ismi=0.
+
+---
+
+## Task 3: Tema C — Agent / Skill / Provider Sistemi
 - Provider: claude
 - Model: sonnet
 - Backend: docker
 - Effort: normal
 - Agent: doc-writer
 - Skills: documentation-writer
-- Files: docs/vision/blueprint.md, docs/vision/blueprint-TR.md
-- Scope: docs/vision/, .brain/exports/summary.md, src/
-### Description
-blueprint (EN) + blueprint-TR (ayna): rakip-ref'leri (Devin/Cursor/Aider/OpenClaw) kaldır → deckent değer-önermesi. Eski metrik/tarih (2026-06-02 pozisyon-snapshot, eski sprint/ADR sayıları) güncel-koddan doğrula. Teknik-blueprint (mimari, katmanlar, yol-haritası) korunur ama güncel. blueprint.md önce → blueprint-TR.md birebir ayna.
-**Kanıt:** `grep -ciE "devin|cursor|aider|openclaw" docs/vision/blueprint.md docs/vision/blueprint-TR.md` = 0 + iki dosya bölüm-sayısı eşit.
+- Files: analiz/09-built-in-agentlar.md, analiz/10-built-in-skiller.md, analiz/11-model-registry-tier.md, analiz/12-multi-provider.md
+- Scope: analiz/, src/, .brain/exports/, docs/
 
-## Task 3: enterprise referansları — derinleştir (286-020 yüzeysel kaldı)
+### Description
+4 doküman: **09-built-in-agentlar** (15 built-in agent — isim + uzmanlık + aktivasyon anahtar kelimeleri, DECKENT.md Built-in Agents tablosundan; ADR-041 horizontal-skill vs vertical-agent). **10-built-in-skiller** (21 built-in skill — isim + açıklama; AST sandbox doğrulama; agent↔skill farkı). **11-model-registry-tier** (`src/core/model-registry.ts` tek doğruluk kaynağı; 4 tier economy/standard/premium/premium_plus + tier-denklik; bundled model listesini KODDAN say, ezberden değil; `models.dev` canlı katalog + 24s cache + bundled fallback). **12-multi-provider** (Claude/Codex/Gemini + Ollama yerel; provider-agnostic tier routing; per-task `- Provider:` override; subscription vs api auth).
+**Kanıt:** `ls analiz/09-built-in-agentlar.md analiz/10-built-in-skiller.md analiz/11-model-registry-tier.md analiz/12-multi-provider.md` → 4 dosya.
+**Test:** `grep -ci "premium_plus" analiz/11-*.md` ≥ 1 + 09'da 15 agent listelenir; rakip-ismi=0 (provider-adı meşru, "vs/kıyas" yok).
+
+---
+
+## Task 4: Tema D — Hafıza, Yönetişim, Gözlem
 - Provider: claude
 - Model: sonnet
 - Backend: docker
 - Effort: normal
 - Agent: doc-writer
 - Skills: documentation-writer, security-specialist
-- Files: docs/reference/enterprise-foundation.md, docs/reference/enterprise-integrations.md
-- Scope: docs/reference/, src/api/, src/core/, src/orchestra/
+- Files: analiz/13-memory-v2.md, analiz/14-adr-governance.md, analiz/15-nervous-system.md, analiz/16-autonomous-engine.md
+- Scope: analiz/, src/, .brain/exports/, docs/
+
 ### Description
-286-020 (false-NO_GO) enterprise dokümanlarına yalnız ADR-governance satırı ekledi — yüzeysel. Derinleştir: enterprise-foundation + enterprise-integrations'ı koda karşı tam-audit — SSO/OIDC (auth-jwks RS256), RBAC (rbac.ts enforce_rbac), multi-tenant (tenant-aware audit/scope dürüstçe partial), audit-query, scheduled-flows, webhook-triggers (ADR-068/069/071). Aspirational olanları dürüstçe işaretle. SECURITY.md'nin hard-vs-advisory dürüstlük-tonunu izle.
-**Kanıt:** ADR-068/069/071 referansları doğru + RBAC rol-isimleri (admin/operator/viewer) koddaki ile + `grep -c "deckent.agency"` = 0.
+4 doküman: **13-memory-v2** (DB-first SQLite `better-sqlite3`, FTS5 dual-layer Türkçe normalize, `.brain/memory.db` tek kaynak + .md export'lar; `deckent recall/remember`; ADR-088). **14-adr-governance** (ADR = mimari karar kaydı, `.brain/exports/decisions.md` MADR v3; 89 ADR; worker prompt'a zorunlu enjeksiyon; ADR-036 governance integration; ihlal→NO_GO + amendment). **15-nervous-system** (proaktif meta-orchestrator ADR-040: observer→detector-registry→decision-engine→proposer→dispatcher→executor→authority-matrix; subscribe/accept/reject akışı). **16-autonomous-engine** (durable backlog `.deckent/autonomous/backlog.json`, recurring/one-off/reactive trigger, 3-gate governance RBAC→policy→risk, `deckent autonomous` komutu).
+**Kanıt:** `ls analiz/13-memory-v2.md analiz/14-adr-governance.md analiz/15-nervous-system.md analiz/16-autonomous-engine.md` → 4 dosya.
+**Test:** `grep -li "FTS5" analiz/13-*.md` + `grep -li "ADR-040" analiz/15-*.md`; rakip-ismi=0.
 
 ---
 
-**Beklenen:** 3 task FIX. opus 1 (roadmap — eskimiş büyük doküman, yargı gerekli) · sonnet 2. doc-writer ağırlık. Bağımsız → paralel. Sprint-sonu CC: 3 dokümanda rakip-ismi=0 + eski-metrik=0 doğrula, commit.
+## Task 5: Tema E — Arayüzler & Operasyon
+- Provider: claude
+- Model: sonnet
+- Backend: docker
+- Effort: normal
+- Agent: doc-writer
+- Skills: documentation-writer
+- Files: analiz/17-cli-komutlari.md, analiz/18-mcp-entegrasyonu.md, analiz/19-dashboard-web-terminal.md, analiz/20-config-kurulum.md
+- Scope: analiz/, src/, .brain/exports/, docs/
+
+### Description
+4 doküman: **17-cli-komutlari** (55+ CLI komutu; ana akış init→set-directives→plan→start→status→review→retro→cleanup; recall/remember/memory; register\<Name\>(program) pattern ADR-012). **18-mcp-entegrasyonu** (34 MCP tool + 8 resource; `claude mcp add deckent -- npx deckent-mcp`; tool/resource tablosu DECKENT.md'den; readonly/destructive ayrımı). **19-dashboard-web-terminal** (React+Vite+Tailwind dashboard `src/dashboard/`; embedded web terminal PTY+WS ADR-062; serve komutu + auth/OIDC). **20-config-kurulum** (3-katman config merge defaults→global→project→env ADR-004; `deckent init` dizin oluşturma + CLAUDE.md adapter; mode preset'leri performance/balanced/economic/api; kurulum adımları). DECKENT.md MCP Tool/Resource tablolarından ve `src/cli/`'dan doğrula.
+**Kanıt:** `ls analiz/17-cli-komutlari.md analiz/18-mcp-entegrasyonu.md analiz/19-dashboard-web-terminal.md analiz/20-config-kurulum.md` → 4 dosya.
+**Test:** `grep -ci "34" analiz/18-*.md` ≥ 1 (34 tool) + 17'de init/plan/start akışı geçer; rakip-ismi=0.
+
+---
+
+**Beklenen:** 5 task, hepsi DONE → `analiz/` altında 01–20 numaralı 20 Türkçe doküman. doc-writer ağırlık, sonnet (doğruluk + god-level). Bağımsız → paralel (5 wave-tek). Sprint-sonu CC: `ls analiz/ | wc -l` = 20 + rakip-ismi=0 + her doküman `#` başlık+özet taşıyor doğrula, sonra commit.
