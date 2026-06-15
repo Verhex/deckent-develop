@@ -1,6 +1,6 @@
 // BOT-1 — live bot-agent wiring: provider fallback chain (ollama → claude → openai)
 // + the config gate + fail-safe fallbacks. The chain logic is unit-tested with mock
-// adapters; the real LLM round-trip is user-verified (like BOT-001/002).
+// runners; the real LLM round-trip is user-verified (like BOT-001/002).
 
 import { describe, it, expect } from 'vitest';
 import {
@@ -9,20 +9,13 @@ import {
   makeFallbackComplete,
   type BotProvider,
 } from '../../src/connectors/bot-completion.js';
-import type { ProviderEvent } from '../../src/agent/provider-tooluse/types.js';
 
-function adapter(name: BotProvider['name'], behavior: { text?: string; throw?: boolean }): BotProvider {
+function prov(name: BotProvider['name'], behavior: { text?: string; throw?: boolean }): BotProvider {
   return {
     name,
-    model: `${name}-model`,
-    adapter: {
-      name,
-      // eslint-disable-next-line require-yield
-      async *send(): AsyncIterable<ProviderEvent> {
-        if (behavior.throw) throw new Error(`${name} down`);
-        if (behavior.text) yield { type: 'text-delta', text: behavior.text };
-        yield { type: 'done' };
-      },
+    run: async () => {
+      if (behavior.throw) throw new Error(`${name} down`);
+      return behavior.text ?? '';
     },
   };
 }
@@ -65,43 +58,46 @@ describe('resolveBotProviders (fallback order + availability)', () => {
     expect(resolveBotProviders({}, {})).toEqual([]);
   });
 
-  it('ollama uses native_model; bot_agent.model overrides it', () => {
-    expect(resolveBotProviders({}, { ollama_host: 'h', native_model: 'qwen3.6:27b' })[0]?.model).toBe('qwen3.6:27b');
-    expect(resolveBotProviders({}, { ollama_host: 'h', bot_agent: { model: 'llama3' } })[0]?.model).toBe('llama3');
+  it('ollama calls native /api/chat with think:false; native_model used, bot_agent.model overrides', async () => {
+    let body: Record<string, unknown> = {};
+    const fetchMock = (async (_url: string, opts: { body: string }) => {
+      body = JSON.parse(opts.body);
+      return { ok: true, json: async () => ({ message: { content: 'ok' } }) };
+    }) as unknown as typeof fetch;
+
+    await resolveBotProviders({}, { ollama_host: 'http://h', native_model: 'qwen3.5:4b' }, fetchMock)[0]!.run('hi');
+    expect(body['model']).toBe('qwen3.5:4b');
+    expect(body['think']).toBe(false);
+
+    await resolveBotProviders({}, { ollama_host: 'http://h', bot_agent: { model: 'llama3.2' } }, fetchMock)[0]!.run('hi');
+    expect(body['model']).toBe('llama3.2');
   });
 });
 
 describe('makeFallbackComplete (runtime fallback)', () => {
   it('returns the first provider that yields text', async () => {
-    const complete = makeFallbackComplete([adapter('ollama', { text: 'from ollama' })]);
-    expect(await complete('p')).toBe('from ollama');
+    expect(await makeFallbackComplete([prov('ollama', { text: 'from ollama' })])('p')).toBe('from ollama');
   });
 
   it('falls through when a provider throws (ollama down → claude)', async () => {
-    const complete = makeFallbackComplete([
-      adapter('ollama', { throw: true }),
-      adapter('claude', { text: 'from claude' }),
-    ]);
+    const complete = makeFallbackComplete([prov('ollama', { throw: true }), prov('claude', { text: 'from claude' })]);
     expect(await complete('p')).toBe('from claude');
   });
 
   it('falls through when a provider returns blank', async () => {
-    const complete = makeFallbackComplete([
-      adapter('ollama', { text: '   ' }),
-      adapter('openai', { text: 'from openai' }),
-    ]);
+    const complete = makeFallbackComplete([prov('ollama', { text: '   ' }), prov('openai', { text: 'from openai' })]);
     expect(await complete('p')).toBe('from openai');
   });
 
   it('throws when every provider fails (humanizer then falls back to raw)', async () => {
-    const complete = makeFallbackComplete([adapter('ollama', { throw: true }), adapter('claude', { throw: true })]);
+    const complete = makeFallbackComplete([prov('ollama', { throw: true }), prov('claude', { throw: true })]);
     await expect(complete('p')).rejects.toThrow(/all bot-agent providers failed/);
   });
 
   it('end-to-end: a fallback completer drives the humanizer, command preserved', async () => {
     const complete = makeFallbackComplete([
-      adapter('ollama', { throw: true }),
-      adapter('claude', { text: 'Hey — reply approve t-42 when ready' }),
+      prov('ollama', { throw: true }),
+      prov('claude', { text: 'Hey — reply approve t-42 when ready' }),
     ]);
     const { makeBotHumanizer } = await import('../../src/connectors/bot-humanizer.js');
     const parts = await makeBotHumanizer({ complete }).toParts('[autonomous] approve t-42 / reject t-42');
