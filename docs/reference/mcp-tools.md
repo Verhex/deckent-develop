@@ -5,7 +5,7 @@
 Deckent ships an MCP server that exposes orchestration to MCP-compatible IDEs (Claude Code, Cursor, etc.). The tools below are registered in `src/mcp/tools/*.ts` and surfaced via `deckent-mcp` stdio transport.
 
 <!-- AUTOGEN:START id="mcp-tools" -->
-> 34 tools registered. Generated from `src/mcp/tools/*.ts`.
+> 35 tools registered. Generated from `src/mcp/tools/*.ts`.
 
 | Tool | Title | Description |
 |------|-------|-------------|
@@ -32,6 +32,7 @@ Deckent ships an MCP server that exposes orchestration to MCP-compatible IDEs (C
 | `deckent_nervous_status` | Nervous Status | Show Nervous System dashboard: pending notifications, recent history, and current config. |
 | `deckent_nervous_subscribe` | Nervous Subscribe | Subscribe to Nervous System notifications for the current sprint. |
 | `deckent_plan` | Plan Sprint | Preview a sprint plan based on current DIRECTIVES.md. Reads DIRECTIVES.md, analyzes task blocks, and returns a proposed task list with model assignments, wave breakdown, and risk assessment — without executing anything. Use this to validate your directives before running deckent_start. Prerequisite: deckent_init + deckent_set_directives must have been run. |
+| `deckent_process` | Process Mode | Process-mode execution surface (continuous request-handling for ERP / business |
 | `deckent_recover` | Sprint Recovery | Recover from a crashed or stuck sprint. Runs audit, cleans orphan IPC directories (dead PIDs only), clears stale locks (>5min), and archives terminal task files. Active tasks are preserved. Use dryRun=true to preview before executing. DESTRUCTIVE: modifies .tasks/, .locks/, and .deckent/ directories. |
 | `deckent_retro` | Sprint Retrospective | Read a sprint retrospective from the Memory V2 DB (.brain/memory.db |
 | `deckent_review` | Sprint Review | Review sprint task results and make GO/NO_GO/GO_WITH_TECH_DEBT decisions. For each task returns: selfAssessment (worker\ |

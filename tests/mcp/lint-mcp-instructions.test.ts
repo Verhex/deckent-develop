@@ -36,11 +36,11 @@ describe('lint-mcp-instructions.mjs', () => {
     expect(stdout).toMatch(/^OK: \d+ tools, \d+ in instructions/);
   });
 
-  it('(b) exit 0 output contains correct tool count (34)', () => {
+  it('(b) exit 0 output contains correct tool count (35)', () => {
     const { exitCode, stdout } = runLintScript();
     expect(exitCode).toBe(0);
-    expect(stdout).toContain('34 tools');
-    expect(stdout).toContain('34 in instructions');
+    expect(stdout).toContain('35 tools');
+    expect(stdout).toContain('35 in instructions');
   });
 
   it('(c) server.ts DECKENT_MCP_INSTRUCTIONS lists all 4 previously-missing tools', () => {
@@ -54,12 +54,12 @@ describe('lint-mcp-instructions.mjs', () => {
     expect(serverTs).toContain('deckent_recover');
   });
 
-  it('(d) server.ts DECKENT_MCP_INSTRUCTIONS header shows Tools (34)', () => {
+  it('(d) server.ts DECKENT_MCP_INSTRUCTIONS header shows Tools (35)', () => {
     const serverTs = readFileSync(
       join(process.cwd(), 'src', 'mcp', 'server.ts'),
       'utf-8',
     );
-    expect(serverTs).toContain('## Tools (34)');
+    expect(serverTs).toContain('## Tools (35)');
   });
 
   it('(e) lint script detects drift when a tool is removed from instructions (temp file test)', () => {
