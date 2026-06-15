@@ -102,6 +102,25 @@ const TASK_INTENT_KEYWORDS: readonly string[] = [
   'plan a sprint',
   'create a sprint',
   'create sprint',
+  // Automation surfaces (make-usable batch): route autonomous/nervous phrases to
+  // the deckent tools instead of letting them fall through to host-AI chitchat.
+  'autonomous status',
+  'enable autonomous',
+  'start autonomous',
+  'stop autonomous',
+  'autonomous backlog',
+  'pending approvals',
+  'pending approval',
+  'show pending',
+  'nervous status',
+  'enable nervous',
+  'nervous system',
+  // Turkish equivalents (mirrors the casual list's TR entries).
+  'otonom durum',
+  'otonom başlat',
+  'bekleyen onay',
+  'onay bekleyen',
+  'nervous durum',
 ];
 
 /** Words that strongly mark casual chit-chat — never trigger MCP. */

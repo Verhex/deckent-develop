@@ -116,6 +116,15 @@ describe('classifyChatIntent', () => {
     expect(classifyChatIntent('query memory for ollama notes')).toBe('task');
   });
 
+  it('returns "task" for autonomous + nervous automation intents (TR + EN)', () => {
+    expect(classifyChatIntent('enable autonomous')).toBe('task');
+    expect(classifyChatIntent('show autonomous status')).toBe('task');
+    expect(classifyChatIntent('show pending approvals')).toBe('task');
+    expect(classifyChatIntent('nervous status')).toBe('task');
+    expect(classifyChatIntent('otonom durumu göster')).toBe('task');
+    expect(classifyChatIntent('bekleyen onayları göster')).toBe('task');
+  });
+
   it('returns "ambiguous" when no rule matches', () => {
     expect(classifyChatIntent('hmm what about that thing')).toBe('ambiguous');
     expect(classifyChatIntent('   ')).toBe('ambiguous');
