@@ -140,6 +140,27 @@ export interface AdaptiveConfig {
   coverage_lookback: number;
 }
 
+/**
+ * BOT-1 bot-agent — rephrases/summarizes outbound connector messages into natural
+ * language. Default OFF (explicit opt-in). The completer is resolved as a fallback
+ * chain (ollama-local → claude → openai); the first available provider is used.
+ */
+export interface BotAgentConfig {
+  /** Turn the bot-agent on (default false). */
+  enabled?: boolean;
+  /** Tone/persona injected into the rephrase prompt (user-customizable). */
+  persona?: string;
+  /** Output language (e.g. 'en', 'tr'). */
+  lang?: string;
+  /** Override the model used for humanizing (else the per-provider cheap default). */
+  model?: string;
+  /** Provider preference order (default ['ollama','claude','openai']). */
+  providers?: Array<'ollama' | 'claude' | 'openai'>;
+  /** Hard timeout (ms) for the LLM call before falling back to raw (default 8000;
+   *  raise for slow local models, e.g. a large ollama model on first call). */
+  timeout_ms?: number;
+}
+
 export interface DeckentConfig {
   mode: PlanMode;
   modes: Record<string, PlanModeConfig>;
@@ -262,6 +283,16 @@ export interface DeckentConfig {
     /** Target chat/channel id the notifications are sent to. */
     chat_id: string;
   }>>;
+
+  // ─── Native transport + bot-agent (REPL native agent + BOT-1) ──────
+  /** Local Ollama endpoint (e.g. "http://127.0.0.1:11434") — native agent + bot-agent. */
+  ollama_host?: string;
+  /** Wire model id for the native transport (e.g. "qwen3.6:27b"). */
+  native_model?: string;
+  /** OpenAI-compatible base URL (OpenAI/OpenRouter/vLLM). */
+  openai_base_url?: string;
+  /** BOT-1 bot-agent — humanizes/summarizes connector (Telegram/Discord) messages. */
+  bot_agent?: BotAgentConfig;
 
   // ─── Telemetry ─────────────────────────────────────────────────────
   /** Telemetry enabled (default: false) */
@@ -726,6 +757,11 @@ export interface ResolvedConfig {
   project_identity_enabled?: boolean;
   /** Outbound messaging connectors (BOT-001, §4G) — passed through from project config, tokens .deck-resolved. */
   notify_connectors?: DeckentConfig['notify_connectors'];
+  /** Native transport + BOT-1 bot-agent (passed through from project config). */
+  ollama_host?: string;
+  native_model?: string;
+  openai_base_url?: string;
+  bot_agent?: BotAgentConfig;
   /** Notify on sprint completion (passed through). */
   notify_on_complete?: boolean;
   // Auditor

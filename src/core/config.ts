@@ -1421,6 +1421,12 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
     fallback_provider: config.fallback_provider,
     // Sprint 220 Task 220-001 — optional native REPL provider override.
     chat_provider: (config as DeckentConfigWithChatProvider).chat_provider,
+    // Native transport + BOT-1 bot-agent — pass through so loadConfig does not
+    // strip them (the REPL native agent + bot-agent read these from config).
+    ollama_host: config.ollama_host,
+    native_model: config.native_model,
+    openai_base_url: config.openai_base_url,
+    bot_agent: config.bot_agent,
     // Memory
     memory_budget: config.memory_budget,
     decay_after_sprints: config.decay_after_sprints,
