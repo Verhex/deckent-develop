@@ -1502,6 +1502,8 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
     worker_comms: config.worker_comms,
     // Cost Guard — passed through (opt-in, absent = disabled)
     cost_guard: config.cost_guard,
+    // ERP connector — passed through (opt-in, absent = disabled; secret-free)
+    erp: config.erp,
     // Plan config (Sprint 276 PLAN-INT-1) — passed through (opt-in, absent = disabled)
     plan: config.plan,
     // Messaging connectors (BOT-001) — passed through; tokens .deck-interpolated below.
@@ -2170,6 +2172,8 @@ export function mergeConfigs(
     worker_comms: config.worker_comms,
     // Cost Guard — passed through (opt-in, absent = disabled)
     cost_guard: config.cost_guard,
+    // ERP connector — passed through (opt-in, absent = disabled; secret-free)
+    erp: config.erp,
     // Plan config (Sprint 276 PLAN-INT-1) — passed through (opt-in, absent = disabled)
     plan: config.plan,
   };

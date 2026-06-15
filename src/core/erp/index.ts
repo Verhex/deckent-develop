@@ -44,6 +44,10 @@ export {
 } from './handler.js';
 export type { ErpReadHandlerOptions } from './handler.js';
 
+// ─── Config → connector binding (the live wire) ───────────────────────────────
+export { buildErpConnectorFromConfig } from './factory.js';
+export type { ErpRuntimeConfig, ErpEntityConfig, ErpDriverKind } from './factory.js';
+
 // ─── Concrete vendor drivers (each a separate component) ──────────────────────
 export { createIfsErpDriver } from './ifs/driver.js';
 export type { IfsErpDriverOptions, IfsFetchLike } from './ifs/driver.js';

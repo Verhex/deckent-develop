@@ -6,6 +6,7 @@ import type { NotificationConfig } from './notifications.js';
 import type { ModelType, ProviderName, EvaluationRubric } from './task-types.js';
 import type { ModelStrategy } from './mode-presets.js';
 import type { ModelTier } from './model-equivalence.js';
+import type { ErpRuntimeConfig } from './erp/factory.js';
 
 // ─── Timeout Configuration ──────────────────────────────────────────
 export interface TimeoutConfig {
@@ -517,6 +518,12 @@ export interface DeckentConfig {
   /** Mid-sprint token-usage abort guard (Sprint 279 WK-cost). Default-disabled (opt-in). */
   cost_guard?: CostGuardConfig;
 
+  // ─── ERP (capability-broker erp.read) ───────────────────────────────
+  /** ERP connector for the `erp.read` capability (process + autonomous). Opt-in
+   *  (`enabled` default-off); secret-free — the credential is read from an env
+   *  var, never stored here. CORE-W5: IFS is the first live driver. */
+  erp?: ErpRuntimeConfig;
+
   // ─── Autonomous Engine ──────────────────────────────────────────────
   /** Autonomous execution engine configuration (Sprint 226 — Task 7). Default-disabled. */
   autonomous?: {
@@ -825,6 +832,8 @@ export interface ResolvedConfig {
   nervous_system?: NervousSystemConfig;
   /** Autonomous engine configuration (passed through from DeckentConfig). Default-disabled. */
   autonomous?: DeckentConfig['autonomous'];
+  /** ERP connector configuration (passed through from DeckentConfig). Opt-in, secret-free. */
+  erp?: ErpRuntimeConfig;
   /** Resource monitor configuration (passed through from DeckentConfig). Default-disabled. */
   resource_monitor?: ResourceMonitorConfig;
   /** Cache warm spawn configuration (passed through from DeckentConfig). Default-disabled. */

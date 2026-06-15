@@ -10,6 +10,7 @@ import { join } from 'node:path';
 import { loadConfig } from '../../core/config.js';
 import { bootstrapProviders } from '../../core/provider.js';
 import { createAuditedCapabilityRegistry } from '../../core/capability-runtime.js';
+import { buildErpConnectorFromConfig } from '../../core/erp/index.js';
 import { writeAuditEvent } from '../../core/audit-writer.js';
 import { runTaskMode } from '../../orchestra/task-mode-runner.js';
 import { runSprint as runSprintLifecycle } from '../../orchestra/sprint-controller.js';
@@ -37,6 +38,11 @@ export async function buildProcessController(projectRoot: string): Promise<Proce
 
   const backlogPath = join(projectRoot, config.autonomous?.backlog_path ?? '.deckent/autonomous/backlog.json');
 
+  // Opt-in ERP connector (config.erp.enabled) → installs the live `erp.read`
+  // handler so process capabilities round-trip to a real ERP (IFS/Odoo/SAP/
+  // Dynamics). Absent/disabled ⇒ undefined ⇒ no erp.read handler (backward-safe).
+  const erpConnector = buildErpConnectorFromConfig(config.erp, process.env);
+
   const capabilityRegistry = createAuditedCapabilityRegistry((record) => {
     writeAuditEvent(projectRoot, 'process', {
       tenantId: record.actor?.tenantId ?? 'local',
@@ -45,7 +51,7 @@ export async function buildProcessController(projectRoot: string): Promise<Proce
       target: record.capability,
       metadata: { timestamp: record.timestamp, error: record.error },
     });
-  });
+  }, erpConnector ? { erp: { connector: erpConnector } } : {});
 
   return makeProcessController({
     projectRoot,

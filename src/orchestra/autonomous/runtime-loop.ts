@@ -37,6 +37,7 @@ import { makeTriggerSource } from './trigger-adapter.js';
 import type { ResolvedConfig } from '../../core/config-types.js';
 import type { CapabilityRegistry } from '../../core/capability-broker.js';
 import { createAuditedCapabilityRegistry } from '../../core/capability-runtime.js';
+import { buildErpConnectorFromConfig } from '../../core/erp/index.js';
 import { writeAuditEvent } from '../../core/audit-writer.js';
 import type { PolicyGate } from '../autonomous-runtime.js';
 import { withNervousObserver } from '../autonomous-runtime.js';
@@ -195,6 +196,10 @@ export function buildEngineRuntime(
   // F8 broker dispatch (capability-maturity gap #3): kind=capability entries
   // resolve through this registry; every invocation lands on the ENT-3 audit
   // hash-chain (writeAuditEvent is itself fail-safe on validation/IO).
+  // Opt-in ERP connector (config.erp.enabled) installs the live `erp.read`
+  // handler so autonomous capability entries round-trip to a real ERP; absent ⇒
+  // no erp.read handler (backward-safe).
+  const erpConnector = buildErpConnectorFromConfig(opts.config.erp, process.env);
   const capabilityRegistry = opts.capabilityRegistry ?? createAuditedCapabilityRegistry(
     (record) => {
       writeAuditEvent(opts.projectRoot, 'autonomous', {
@@ -205,6 +210,7 @@ export function buildEngineRuntime(
         metadata: { timestamp: record.timestamp, error: record.error },
       });
     },
+    erpConnector ? { erp: { connector: erpConnector } } : {},
   );
 
   const handlers = new Map<string, ActionHandler>();
