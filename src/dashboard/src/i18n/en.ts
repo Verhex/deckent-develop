@@ -7,6 +7,14 @@ export const en = {
   'nav.config': 'Config',
   'nav.workers': 'Workers',
   'nav.directives': 'Directives',
+  'nav.evolution': 'Evolution',
+  'nav.nervous': 'Nervous',
+  'nav.autonomous': 'Autonomous',
+  'nav.memory_explorer': 'Memory Explorer',
+  'nav.enterprise': 'Enterprise',
+  'nav.group.talk': 'Talk',
+  'nav.group.watch': 'Monitor',
+  'nav.group.manage': 'Manage',
 
   // Layout
   'layout.subtitle': 'agent orchestration',

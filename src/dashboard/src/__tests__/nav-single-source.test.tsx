@@ -44,11 +44,16 @@ describe("nav-items.ts — single source of truth", () => {
     }
   });
 
-  it("navGroups has 3 groups: Konuş, İzle, Yönet with correct structure", () => {
+  it("navGroups has 3 i18n'd groups (talk/watch/manage) with correct structure", () => {
     const src = navItemsSrc();
-    expect(src).toContain('groupLabel: "Konuş"');
-    expect(src).toContain('groupLabel: "İzle"');
-    expect(src).toContain('groupLabel: "Yönet"');
+    // Stable ids (data-nav-group/key) + i18n keys for the displayed header (D8 fix:
+    // the group headers are no longer literal Turkish — they render via t()).
+    expect(src).toContain('groupLabel: "talk"');
+    expect(src).toContain('groupLabel: "watch"');
+    expect(src).toContain('groupLabel: "manage"');
+    expect(src).toContain('groupLabelKey: "nav.group.talk"');
+    expect(src).toContain('groupLabelKey: "nav.group.watch"');
+    expect(src).toContain('groupLabelKey: "nav.group.manage"');
     // workers and directives must be present with correct i18n keys
     expect(src).toContain('"nav.workers"');
     expect(src).toContain('"nav.directives"');

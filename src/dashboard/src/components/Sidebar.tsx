@@ -36,10 +36,10 @@ export function SidebarNavLinks({ onNavigate }: SidebarNavLinksProps) {
   const { pendingCount } = useNervousStatus();
   return (
     <nav className="flex flex-col gap-3">
-      {navGroups.map(({ groupLabel, items }) => (
+      {navGroups.map(({ groupLabel, groupLabelKey, items }) => (
         <div key={groupLabel} data-nav-group={groupLabel}>
           <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
-            {groupLabel}
+            {t(groupLabelKey)}
           </p>
           <div className="flex flex-col gap-0.5">
             {items.map(({ to, labelKey, label, icon: Icon }) => (

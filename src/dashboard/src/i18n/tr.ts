@@ -9,6 +9,14 @@ export const tr: Record<TranslationKey, string> = {
   'nav.config': 'Yapılandırma',
   'nav.workers': "Worker'lar",
   'nav.directives': 'Direktifler',
+  'nav.evolution': 'Evrim',
+  'nav.nervous': 'Sinir Sistemi',
+  'nav.autonomous': 'Otonom',
+  'nav.memory_explorer': 'Hafıza Gezgini',
+  'nav.enterprise': 'Kurumsal',
+  'nav.group.talk': 'Konuş',
+  'nav.group.watch': 'İzle',
+  'nav.group.manage': 'Yönet',
 
   // Layout
   'layout.subtitle': 'ajan orkestrasyon',

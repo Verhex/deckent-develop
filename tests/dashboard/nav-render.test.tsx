@@ -21,6 +21,7 @@ import { describe, it, expect, afterEach } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
 
 import { navItems } from "../../src/dashboard/src/components/Sidebar";
+import { en } from "../../src/dashboard/src/i18n/en";
 
 afterEach(() => cleanup());
 
@@ -35,7 +36,8 @@ function NavRenderHarness() {
       React.createElement(
         "a",
         { key: item.to, href: item.to, "data-testid": `nav-link-${item.to}` },
-        item.label ?? item.labelKey,
+        // Resolve labelKey → English label via the real i18n dict (mirrors t()).
+        item.label ?? (en as Record<string, string>)[item.labelKey] ?? item.labelKey,
       ),
     ),
   );

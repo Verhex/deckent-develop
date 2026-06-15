@@ -19,6 +19,7 @@ import { render, screen, cleanup } from "@testing-library/react";
 // time for that named export, because Sidebar.tsx's top-level NavLink import
 // is only evaluated when SidebarNavLinks is rendered.
 import { navItems } from "../../src/dashboard/src/components/Sidebar";
+import { en } from "../../src/dashboard/src/i18n/en";
 
 const DASHBOARD_SRC = join(process.cwd(), "src", "dashboard", "src");
 const APP_PATH = join(DASHBOARD_SRC, "App.tsx");
@@ -143,7 +144,9 @@ describe("navItems — jsdom render of 4 new pages", () => {
         React.createElement(
           "a",
           { key: item.to, href: item.to },
-          item.label ?? item.labelKey,
+          // Display via the real i18n dictionary (labelKey → English label), with
+          // the literal `label` + raw key as fallbacks — mirrors `label ?? t(labelKey)`.
+          item.label ?? (en as Record<string, string>)[item.labelKey] ?? item.labelKey,
         ),
       ),
     );
