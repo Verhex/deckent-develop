@@ -6,6 +6,8 @@
  * unit tests.
  */
 import { describe, it, expect, afterEach } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { startTestServer, call, type TestServerHandle } from './test-server-helper.js';
 
 describe('/api/process/* routes', () => {
@@ -51,5 +53,27 @@ describe('/api/process/* routes', () => {
     handle = await startTestServer({ disableAuth: true });
     const res = await call(handle, '/api/process/status/proc-does-not-exist');
     expect(res.status).toBe(404);
+  });
+
+  it('SECURITY: client-supplied actor/tenant in the body is IGNORED (server-derived)', async () => {
+    handle = await startTestServer({ disableAuth: true });
+    const submit = await call(handle, '/api/process/submit', {
+      method: 'POST',
+      body: JSON.stringify({
+        description: 'tenant spoof attempt',
+        kind: 'capability',
+        capabilityTarget: { capability: 'erp.write' },
+        // attacker-controlled identity — MUST be dropped, not trusted
+        actor: { id: 'attacker', tenantId: 'victim-tenant' },
+        tenant: 'victim-tenant',
+        origin: 'webhook',
+      }),
+    });
+    expect(submit.status).toBe(200);
+    const id = submit.json<{ executionId: string }>().executionId;
+    const bl = JSON.parse(readFileSync(join(handle.projectRoot, '.deckent', 'autonomous', 'backlog.json'), 'utf-8'));
+    const entry = bl.entries.find((e: { id: string }) => e.id === id);
+    // the spoofed tenant never reaches the durable entry (no bearer → no tenant)
+    expect(entry.tenant).not.toBe('victim-tenant');
   });
 });

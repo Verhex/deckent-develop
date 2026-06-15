@@ -9,11 +9,12 @@
 // client) injects work here and polls status; every execution lands on the audit
 // hash-chain (training-data trail).
 
-import type { ServerResponse } from 'node:http';
+import type { IncomingMessage, ServerResponse } from 'node:http';
 import { join } from 'node:path';
 import { loadConfig } from '../core/config.js';
 import { loadBacklog } from '../orchestra/autonomous/backlog.js';
 import { buildProcessController } from '../cli/helpers/process-runtime.js';
+import { deriveRequestPrincipal } from './auth-me-endpoint.js';
 import type { ProcessSubmitCtx } from '../orchestra/process-controller.js';
 
 function sendJson(res: ServerResponse, data: unknown, status = 200): void {
@@ -36,15 +37,26 @@ export async function registerProcessRoutes(
   res: ServerResponse,
   body: unknown,
   projectRoot: string,
+  req: IncomingMessage,
 ): Promise<boolean> {
   const path = new URL(url, 'http://localhost').pathname;
   if (!path.startsWith('/api/process/')) return false;
+
+  // The caller's identity is ALWAYS derived server-side from the verified bearer —
+  // never from the request body (anti-spoofing). The auth-gate middleware has
+  // already rejected unauthenticated requests before this handler runs.
+  const principal = deriveRequestPrincipal(req);
 
   // GET /api/process/status/<id>  |  /api/process/result/<id>
   if (method === 'GET' && (path.startsWith('/api/process/status/') || path.startsWith('/api/process/result/'))) {
     const id = decodeURIComponent(path.slice(path.lastIndexOf('/') + 1));
     const entry = loadBacklog(await backlogPathFor(projectRoot)).entries.find((e) => e.id === id);
-    if (!entry) {
+    // Tenant-scope (anti-IDOR): a tenant-tagged entry is only visible to that
+    // tenant; a caller bound to a different tenant gets 404 (no existence leak).
+    // Untagged ('local') entries + tenant-less / admin principals see everything.
+    const crossTenant = !!entry?.tenant && !!principal.tenantId
+      && entry.tenant !== principal.tenantId && principal.role !== 'admin';
+    if (!entry || crossTenant) {
       sendJson(res, { error: 'execution not found', id }, 404);
       return true;
     }
@@ -59,9 +71,19 @@ export async function registerProcessRoutes(
       sendJson(res, { error: 'description (string) is required' }, 400);
       return true;
     }
+    // SECURITY: drop any client-supplied identity (actor / tenant / origin) and
+    // stamp the SERVER-DERIVED principal — a caller cannot impersonate another
+    // tenant/actor or forge audit lineage.
+    const { actor: _clientActor, tenant: _clientTenant, origin: _clientOrigin, ...safe } = ctx;
+    void _clientActor; void _clientTenant; void _clientOrigin;
     try {
       const controller = await buildProcessController(projectRoot);
-      const result = await controller.submit({ ...ctx, origin: ctx.origin ?? 'api' });
+      const result = await controller.submit({
+        ...safe,
+        origin: 'api',
+        actor: principal,
+        ...(principal.tenantId ? { tenant: principal.tenantId } : {}),
+      });
       sendJson(res, result);
     } catch (err) {
       sendJson(res, { error: err instanceof Error ? err.message : String(err) }, 500);

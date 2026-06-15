@@ -58,6 +58,34 @@ function roleFromClaims(claims: Record<string, unknown>): Role | undefined {
   return undefined;
 }
 
+/** The authenticated caller's server-derived identity — the ONLY trusted source
+ *  for actor + tenant. Endpoints must derive this from the verified bearer rather
+ *  than trusting client-supplied identity fields (anti-spoofing / anti-IDOR). */
+export interface RequestPrincipal {
+  id: string;
+  role?: Role;
+  tenantId?: string;
+}
+
+/**
+ * Derive the caller's identity (actor id + role + tenant) from the request bearer.
+ * The auth-gate middleware has already verified the bearer, so this is trusted.
+ * OIDC JWT → { id: sub, role?, tenantId? from claims }. Static / opaque bearer (no
+ * JWT claims) → a generic principal with no tenant (single-tenant operator).
+ */
+export function deriveRequestPrincipal(req: IncomingMessage): RequestPrincipal {
+  const bearer = extractBearer(req);
+  const claims = bearer ? parseOidcClaims(bearer) : null;
+  if (!claims) return { id: 'api-static' };
+  const c = claims as Record<string, unknown>;
+  const sub = c['sub'];
+  const id = typeof sub === 'string' && sub ? sub : 'api-oidc';
+  const role = roleFromClaims(c);
+  const tenantClaim = c['tenant'] ?? c['tenantId'] ?? c['https://deckent.io/tenant'];
+  const tenantId = typeof tenantClaim === 'string' && tenantClaim ? tenantClaim : undefined;
+  return { id, ...(role ? { role } : {}), ...(tenantId ? { tenantId } : {}) };
+}
+
 // ─── Route handler ────────────────────────────────────────────────────────────
 
 function sendJson(res: ServerResponse, data: unknown, status = 200): void {
