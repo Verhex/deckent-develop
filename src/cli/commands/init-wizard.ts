@@ -82,6 +82,10 @@ export function formatNextSteps(language: string): string {
       '',
       'Ya da doğrudan ne yapılacağını söyleyin:',
       '  deckent start "Express API\'ye JWT authentication ekle"',
+      '',
+      'Otomasyon (opsiyonel · varsayılan KAPALI · insan-onaylı · güvenli):',
+      '  • Otonom backlog:   deckent autonomous enable  →  deckent autonomous start',
+      '  • Proaktif gözetim: deckent nervous enable     →  deckent nervous',
     ].join('\n');
   }
   return [
@@ -93,6 +97,10 @@ export function formatNextSteps(language: string): string {
     '',
     'Or just tell me what to build:',
     '  deckent start "Add JWT authentication to the Express API"',
+    '',
+    'Automation (optional · default OFF · human-approved · safe):',
+    '  • Autonomous backlog:  deckent autonomous enable  →  deckent autonomous start',
+    '  • Proactive oversight: deckent nervous enable     →  deckent nervous',
   ].join('\n');
 }
 
