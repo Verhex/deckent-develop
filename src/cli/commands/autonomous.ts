@@ -44,6 +44,7 @@ import { runTaskMode } from '../../orchestra/task-mode-runner.js';
 import { runSprint as runSprintLifecycle } from '../../orchestra/sprint-controller.js';
 import { waitForRunResult } from './run.js';
 import { loadConfig } from '../../core/config.js';
+import { PROJECT_CONFIG_PATH } from '../../core/constants.js';
 import { bootstrapProviders } from '../../core/provider.js';
 import type { ModelType } from '../../core/types.js';
 import { loadReactiveMap } from '../../orchestra/autonomous/reactive/reactive-map.js';
@@ -204,6 +205,48 @@ export interface AutonomousStartOptions {
   maxIterations?: string;
   root?: string;
   lang?: string;
+}
+
+export interface AutonomousEnableOptions {
+  root?: string;
+  lang?: string;
+}
+
+/** Read the project config JSON as a plain object ({} when absent/corrupt) —
+ *  project-scoped only (hermetic; no global-config read). */
+function readProjectConfigDoc(configPath: string): Record<string, unknown> {
+  if (!existsSync(configPath)) return {};
+  try {
+    const d: unknown = JSON.parse(readFileSync(configPath, 'utf-8'));
+    return d && typeof d === 'object' && !Array.isArray(d) ? (d as Record<string, unknown>) : {};
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * `deckent autonomous enable` — flip autonomous.enabled=true in the project
+ * config with ONE command instead of a manual JSON edit (make-usable batch),
+ * preserving every other key. The default stays OFF (safety invariant); this is
+ * an explicit, deliberate opt-in that prints the human-approval safety contract.
+ */
+export function handleEnable(opts: AutonomousEnableOptions): void {
+  const lang = getLanguage(opts.lang);
+  const root = opts.root ?? resolveProjectRoot();
+  const configPath = join(root, PROJECT_CONFIG_PATH);
+  const doc = readProjectConfigDoc(configPath);
+  const autonomous = doc['autonomous'] && typeof doc['autonomous'] === 'object' && !Array.isArray(doc['autonomous'])
+    ? (doc['autonomous'] as Record<string, unknown>)
+    : {};
+  if (autonomous['enabled'] === true) {
+    print(getMessage('autonomous.already_enabled', lang, { path: PROJECT_CONFIG_PATH }));
+    return;
+  }
+  autonomous['enabled'] = true;
+  doc['autonomous'] = autonomous;
+  mkdirSync(dirname(configPath), { recursive: true });
+  writeFileSync(configPath, JSON.stringify(doc, null, 2) + '\n', 'utf-8');
+  print(getMessage('autonomous.enabled_banner', lang, { path: PROJECT_CONFIG_PATH }));
 }
 
 export async function handleStart(opts: AutonomousStartOptions): Promise<void> {
@@ -564,6 +607,20 @@ export function registerAutonomous(program: Command): void {
   const cmd = program
     .command('autonomous')
     .description('Autonomous runtime — authority-bounded continuous loop (F3-009)');
+
+  cmd
+    .command('enable')
+    .description('Enable autonomous mode (one command instead of editing config; default stays OFF)')
+    .option('--root <path>', 'Project root override')
+    .option('--lang <code>', 'Language override (en|tr)')
+    .action((opts: AutonomousEnableOptions) => {
+      try {
+        handleEnable(opts);
+      } catch (err) {
+        printError(err);
+        process.exitCode = 1;
+      }
+    });
 
   cmd
     .command('start')

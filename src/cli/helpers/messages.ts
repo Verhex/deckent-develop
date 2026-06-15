@@ -788,8 +788,16 @@ const MESSAGES: MessageMap = {
 
   // ─── autonomous command (Sprint 228 — 228-001 i18n retrofit) ─────────
   'autonomous.disabled': {
-    en: 'Autonomous mode is disabled. Set config.autonomous.enabled=true (.deckent/config.json) to run the engine.',
-    tr: 'Otonom mod kapalı. Motoru çalıştırmak için config.autonomous.enabled=true yapın (.deckent/config.json).',
+    en: 'Autonomous mode is disabled. Run `deckent autonomous enable` (or set config.autonomous.enabled=true in .deckent/config.json) to run the engine.',
+    tr: 'Otonom mod kapalı. Motoru çalıştırmak için `deckent autonomous enable` çalıştırın (veya .deckent/config.json içinde config.autonomous.enabled=true yapın).',
+  },
+  'autonomous.enabled_banner': {
+    en: '✓ Autonomous mode enabled ({path}).\n  Safety contract: every machine-initiated item passes RBAC → policy → risk gates; approval-required & risk-tagged items PARK for your sign-off — destructive ops never auto-run silently.\n  Start: deckent autonomous start · Add work: deckent autonomous backlog add · Review pending: deckent autonomous pending',
+    tr: '✓ Otonom mod açıldı ({path}).\n  Güvenlik sözleşmesi: her makine-başlatımlı iş RBAC → policy → risk kapılarından geçer; onay-gerektiren & risk-etiketli işler onayın için PARK eder — yıkıcı işlemler sessizce çalışmaz.\n  Başlat: deckent autonomous start · İş ekle: deckent autonomous backlog add · Bekleyenler: deckent autonomous pending',
+  },
+  'autonomous.already_enabled': {
+    en: 'Autonomous mode is already enabled ({path}). Start it with: deckent autonomous start',
+    tr: 'Otonom mod zaten açık ({path}). Başlatmak için: deckent autonomous start',
   },
   'autonomous.start_banner': {
     en: 'Autonomous runtime started — {flows} flow(s), default-deny + approval-gate active',
