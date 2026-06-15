@@ -48,6 +48,34 @@ const FS_WATCH_TARGETS: readonly string[] = [
   '.deckent',
 ];
 
+/**
+ * Files the observer MUST ignore — Brain/nervous bookkeeping side-effects, not
+ * meaningful code/task changes. CRITICAL (the ~200-sprint "nervous hangs the
+ * sprint" bug): watching `.brain/ERRORS.md` created an infinite self-feedback
+ * loop — every FS event ran the phase-guard's `getSprintStateSnapshot` →
+ * `readSprintState` → `readJsonSafe` on an absent/mid-write sprint-state.json →
+ * `debugLog` → append to `.brain/ERRORS.md` → which re-fired this very watcher →
+ * ... spinning the Brain event loop at ~85% CPU so the sprint never reached
+ * SPAWN/EXECUTE and nervous produced zero detections. These high-churn,
+ * self-written files are pure noise to the detectors (which care about task
+ * files, DIRECTIVES, source, memory.db, locks).
+ */
+function isObserverNoiseFile(filename: string | null | undefined): boolean {
+  if (!filename) return false;
+  const name = String(filename).replace(/\\/g, '/');
+  return (
+    name.includes('nervous-') ||        // nervous-history/recommendations/pending/heartbeat/respawn-requests
+    name.includes('nervous-ipc') ||
+    name.includes('panic-ipc') ||
+    name.endsWith('ERRORS.md') ||        // debugLog target — the loop trigger
+    name.endsWith('.dashboard') ||       // auditor snapshot (every scan)
+    name.endsWith('sprint-state.json') ||
+    name.endsWith('metrics.jsonl') ||
+    name.endsWith('-events.jsonl') ||    // event-stream (per-event churn)
+    name.endsWith('.hb')                 // worker heartbeats (sub-second churn during EXECUTE)
+  );
+}
+
 // ─── NervousObserver ───────────────────────────────────────────────
 
 /**
@@ -288,6 +316,11 @@ export class NervousObserver extends EventEmitter {
       const fullPath = join(this.projectRoot, target);
       try {
         const watcher = watch(fullPath, { recursive: true }, (eventType, filename) => {
+          // Drop Brain/nervous bookkeeping churn BEFORE emitting — this is the
+          // fix for the ~200-sprint "nervous hangs the sprint" self-feedback loop
+          // (a .brain/ERRORS.md write from the phase-guard's own failing read
+          // re-firing this watcher forever). See isObserverNoiseFile.
+          if (isObserverNoiseFile(filename)) return;
           const event = this.buildEvent('filesystem', 'FILE_CHANGE', {
             eventType,
             filename: filename ?? undefined,
