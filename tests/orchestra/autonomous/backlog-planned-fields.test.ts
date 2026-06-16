@@ -21,4 +21,17 @@ describe('backlog schema — planner fields', () => {
     const e = { ...base(), fanOut: { over: 'tables', concurrency: 'lots' } };
     expect(validateBacklogEntry(e)).toMatch(/fanOut/);
   });
+  it('rejects NaN / Infinity / float concurrency', () => {
+    expect(validateBacklogEntry({ ...base(), fanOut: { over: 't', concurrency: NaN } })).toMatch(/fanOut/);
+    expect(validateBacklogEntry({ ...base(), fanOut: { over: 't', concurrency: Infinity } })).toMatch(/fanOut/);
+    expect(validateBacklogEntry({ ...base(), fanOut: { over: 't', concurrency: 1.5 } })).toMatch(/fanOut/);
+  });
+  it('rejects a non-object fanOut and an empty over', () => {
+    expect(validateBacklogEntry({ ...base(), fanOut: 42 })).toMatch(/fanOut/);
+    expect(validateBacklogEntry({ ...base(), fanOut: { over: '', concurrency: 2 } })).toMatch(/fanOut/);
+  });
+  it('rejects non-boolean planned and non-string summary', () => {
+    expect(validateBacklogEntry({ ...base(), planned: 42 })).toMatch(/planned/);
+    expect(validateBacklogEntry({ ...base(), summary: 123 })).toMatch(/summary/);
+  });
 });

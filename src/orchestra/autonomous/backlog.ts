@@ -36,7 +36,7 @@ export function validateBacklogEntry(e: unknown): string | null {
   }
   if (r.fanOut !== undefined) {
     const f = r.fanOut as Record<string, unknown>;
-    if (!f || typeof f !== 'object' || typeof f.over !== 'string' || typeof f.concurrency !== 'number' || f.concurrency < 1) {
+    if (!f || typeof f !== 'object' || typeof f.over !== 'string' || !f.over.trim() || !Number.isInteger(f.concurrency) || (f.concurrency as number) < 1) {
       return `entry.${r.id}.fanOut must be { over: string, concurrency: number>=1 }`;
     }
   }

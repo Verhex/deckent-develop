@@ -355,7 +355,7 @@ as an empty backlog (`{ "_version": "1.0", "entries": [] }`).
     {
       "id": "string (non-empty, unique — enqueue dedupes by id against entries of ANY status)",
       "title": "string (non-empty)",
-      "kind": "task | sprint | capability",
+      "kind": "task | sprint | capability | process",
       "spec": {
         "description": "string (optional — kind=task: inline description for runTaskMode)",
         "directivesRef": "string (optional — kind=sprint: directives reference)",
@@ -373,7 +373,10 @@ as an empty backlog (`{ "_version": "1.0", "entries": [] }`).
       "status": "pending | running | parked | done | failed",
       "tenant": "string (optional)",
       "lastRun": "ISO 8601 | null (run COMPLETION time — set only with a non-null lastResult, never on run start)",
-      "lastResult": "{ ok: boolean, reason: string } | null"
+      "lastResult": "{ ok: boolean, reason: string } | null",
+      "planned": "boolean (optional — goal-planner Phase 1: detail generated JIT at dispatch)",
+      "summary": "string (optional — goal-planner one-line WHAT)",
+      "fanOut": { "over": "string", "concurrency": "number>=1 (optional — parallel fan-out hint)" }
     }
   ]
 }
@@ -383,7 +386,7 @@ as an empty backlog (`{ "_version": "1.0", "entries": [] }`).
 
 Hand-written validation (ADR-010, no schema dependency) — returns the first violation:
 - `id` and `title` must be non-empty strings
-- `kind` ∈ `task | sprint | capability`; `policy` ∈ `auto | approval-required | risk-tagged`; `status` ∈ valid set
+- `kind` ∈ `task | sprint | capability | process`; `policy` ∈ `auto | approval-required | risk-tagged`; `status` ∈ valid set
 - `trigger.type` ∈ `recurring | one-off | reactive`
 - `trigger.type = recurring` → `trigger.cron` (string) is REQUIRED
 - `trigger.type = reactive` → `trigger.detector` (string) is REQUIRED
