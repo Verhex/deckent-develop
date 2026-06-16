@@ -22,6 +22,7 @@ import type { MemoryEntryV2 } from '../core/memory-types.js';
 import { searchMemory } from '../core/memory-query.js';
 import { BRAIN_DIR, MEMORY_DB_FILE, PROJECT_CONFIG_PATH } from '../core/constants.js';
 import { selectRelevantAdrs, buildAdrPromptSection } from './adr-selector.js';
+import { readBaseline } from './baseline-tracker.js';
 import { buildTaskPrompt } from './prompt-god-template.js';
 import type { SprintContext, SharedContextEntry, UpstreamHandoffEntry } from './prompt-god-template.js';
 import { SharedMemory } from './shared-memory.js';
@@ -1391,6 +1392,20 @@ export function buildWorkerPrompt(
   // task when worker_comms.enabled && inject_handoffs. Best-effort; undefined when off.
   const upstreamHandoffs = readUpstreamHandoffs(task, projectRoot);
 
+  // WP-14: read the live pre-existing-failure count from this sprint's baseline
+  // snapshot (written by the sprint controller at sprint start) so the prompt's
+  // VERIFY-STEPS note cites the REAL count instead of a stale hardcoded "~67".
+  // Best-effort: undefined when no sprintId or no baseline file → generic warning.
+  let preExistingFailures: number | undefined;
+  try {
+    if (task.sprintId) {
+      const baseline = readBaseline(projectRoot, task.sprintId);
+      if (baseline) preExistingFailures = baseline.fail;
+    }
+  } catch (e) {
+    debugLog('buildWorkerPrompt:readBaseline', e);
+  }
+
   const ctx: SprintContext = {
     agentPrompt,
     agentId: task.assignedAgent ?? 'generic',
@@ -1400,6 +1415,7 @@ export function buildWorkerPrompt(
     dependencies: task.dependencies,
     sharedContext,
     upstreamHandoffs,
+    preExistingFailures,
   };
   const artifact = buildTaskPrompt(task, ctx);
 

@@ -361,3 +361,103 @@ describe('buildTaskPrompt — MF-1 doc-task verify gate', () => {
     expect(result.prompt).toContain('CRITICAL VERIFY STEPS (DO NOT SKIP)');
   });
 });
+
+// WP-14 (🔴): the "pre-existing failures" line in CRITICAL VERIFY STEPS must be
+// derived from the live sprint test-baseline, NEVER a hardcoded "~67" (which goes
+// stale the moment the suite turns green and lets a worker swallow real breakage).
+describe('WP-14: live CI-baseline drives the pre-existing-failures note', () => {
+  it('renders the live failure count and drops the stale ~67 hardcode', () => {
+    const result = buildTaskPrompt(makeTask(), makeCtx({ preExistingFailures: 12 }));
+    expect(result.prompt).toContain('12 pre-existing');
+    expect(result.prompt).not.toContain('67');
+    // The core guidance is preserved.
+    expect(result.prompt).toContain('MUST NOT cause a NO_GO');
+  });
+
+  it('states a green baseline when zero pre-existing failures were measured', () => {
+    const result = buildTaskPrompt(makeTask(), makeCtx({ preExistingFailures: 0 }));
+    expect(result.prompt).not.toContain('67');
+    expect(result.prompt.toLowerCase()).toMatch(/green at this sprint|0 pre-existing/);
+  });
+
+  it('emits no fabricated count when no baseline is available, but still warns', () => {
+    const result = buildTaskPrompt(makeTask(), makeCtx({ preExistingFailures: undefined }));
+    expect(result.prompt).not.toContain('67');
+    expect(result.prompt).toMatch(/pre-existing unrelated failures/i);
+  });
+});
+
+// WP-16 (🟠): a Tier-1 task carrying a Smoke: directive must tell the worker the
+// host-smoke is Brain's gate (run on the host with a real token) so a sandbox
+// smoke failure does NOT become a false NO_GO (284-006: container FAIL, host PASS).
+describe('WP-16: smoke-context note', () => {
+  it('renders the host-smoke note when the task has a Smoke: directive', () => {
+    const task = makeTask({ smoke: { command: 'node dist/cli/entry.js serve --port 3211', expect: '/api/status = 200' } });
+    const result = buildTaskPrompt(task, makeCtx());
+    expect(result.prompt).toContain('node dist/cli/entry.js serve --port 3211');
+    expect(result.prompt).toMatch(/run by Brain|by Brain on the host/i);
+    expect(result.prompt).toMatch(/do NOT mark NO_GO/i);
+  });
+
+  it('omits the smoke note entirely when no Smoke: directive is present', () => {
+    const result = buildTaskPrompt(makeTask(), makeCtx());
+    expect(result.prompt).not.toContain('Proof-of-Function Smoke');
+  });
+});
+
+// WP-17 (🟡): when an agent and a skill share the same name (e.g. api-builder ×2),
+// the same-named skill must NOT be injected a second time on top of the agent persona.
+describe('WP-17: same-name skill↔agent dedup', () => {
+  it('drops the skill whose name matches the assigned agent', () => {
+    const ctx = makeCtx({
+      agentId: 'api-builder',
+      agentPrompt: '# api-builder agent\nVertical API persona.',
+      skillPrompts: [
+        { name: 'api-builder', content: '# api-builder skill\nHorizontal API skill.' },
+        { name: 'testing-expert', content: '# testing-expert\nVitest.' },
+      ],
+    });
+    const result = buildTaskPrompt(makeTask({ assignedAgent: 'api-builder' }), ctx);
+    // The colliding skill block is gone…
+    expect(result.prompt).not.toContain('--- api-builder ---');
+    expect(result.metadata.skills).not.toContain('api-builder');
+    // …but the non-colliding skill and the agent persona both remain.
+    expect(result.prompt).toContain('--- testing-expert ---');
+    expect(result.prompt).toContain('=== Agent: api-builder ===');
+  });
+
+  it('keeps all skills when none collide with the agent name', () => {
+    const result = buildTaskPrompt(makeTask(), makeCtx());
+    expect(result.metadata.skills).toContain('typescript-expert');
+  });
+});
+
+// WP-18 (🟡): the heartbeat instruction must ask the worker to update currentAction
+// at each significant step (DASH-RT-1 complement — fixes the "stuck on Starting…").
+describe('WP-18: heartbeat currentAction instruction', () => {
+  it('tells the worker to update currentAction on each significant step', () => {
+    const result = buildTaskPrompt(makeTask(), makeCtx());
+    expect(result.prompt).toMatch(/currentAction/);
+    expect(result.prompt).toMatch(/## Heartbeat/);
+  });
+});
+
+// WP-19: the self-assessment must be a goCriteria-derived checklist (N/N → DONE),
+// not a subjective percentage.
+describe('WP-19: goCriteria-derived checklist rubric', () => {
+  it('renders one checklist item per goCriteria clause with an N/N→DONE rubric', () => {
+    const task = makeTask({
+      goNogo: {
+        goCriteria: 'tsc --noEmit clean; targeted tests pass; anti-IDOR returns 404',
+        noGoCriteria: 'tests fail',
+        techDebtAcceptable: 'minor',
+      },
+    });
+    const result = buildTaskPrompt(task, makeCtx());
+    expect(result.prompt).toContain('- [ ] tsc --noEmit clean');
+    expect(result.prompt).toContain('- [ ] anti-IDOR returns 404');
+    // Verdict maps to the checklist count, not a subjective %.
+    expect(result.prompt).toMatch(/all .*→ DONE|ticked.*→ DONE/i);
+    expect(result.prompt).not.toContain('<80% → GO_WITH_TECH_DEBT');
+  });
+});

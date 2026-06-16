@@ -2169,29 +2169,32 @@ describe('buildWorkerPrompt — Honest Self-Assessment injection', () => {
     const task = makeTask();
     const prompt = buildWorkerPrompt(task);
     expect(prompt).toContain('## Result & Self-Assessment');
-    expect(prompt).toContain('Assess yourself honestly');
+    // WP-19: subjective "Assess yourself honestly" prose replaced by an objective
+    // goCriteria-derived checklist + verdict rubric.
+    expect(prompt).toContain('Self-assessment rubric');
   });
 
-  it('includes the 80% GO_WITH_TECH_DEBT threshold instruction', () => {
+  it('maps a fully-ticked checklist to DONE (WP-19, replaces the 80% threshold)', () => {
     const task = makeTask();
     const prompt = buildWorkerPrompt(task);
-    expect(prompt).toContain('<80%');
+    expect(prompt).not.toContain('<80%');
+    expect(prompt).toMatch(/ticked → DONE/);
     expect(prompt).toContain('GO_WITH_TECH_DEBT');
   });
 
-  it('includes the 50% NO_GO threshold instruction', () => {
+  it('maps a critical unticked item to NO_GO (WP-19, replaces the 50% threshold)', () => {
     const task = makeTask();
     const prompt = buildWorkerPrompt(task);
-    expect(prompt).toContain('<50%');
-    expect(prompt).toContain('NO_GO');
+    expect(prompt).not.toContain('<50%');
+    expect(prompt).toMatch(/unticked → NO_GO/);
   });
 
-  it('instructs an honest baseline→end delta judgement', () => {
+  it('renders a goCriteria-derived checklist judged WITH EVIDENCE (WP-19)', () => {
     const task = makeTask();
     const prompt = buildWorkerPrompt(task);
-    expect(prompt).toContain('baseline state');
-    expect(prompt).toContain('end state');
-    expect(prompt).toContain('ACTUALLY completed');
+    // One checkbox per goCriteria clause ('tests pass'), ticked only with evidence.
+    expect(prompt).toContain('- [ ] tests pass');
+    expect(prompt).toContain('WITH EVIDENCE');
   });
 
   it('clarifies that "Code written" ≠ "DONE"', () => {

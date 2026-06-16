@@ -90,6 +90,18 @@ export interface SprintContext {
    * Skills→Agent→ADR cache prefix is never split (F1-TOK lesson).
    */
   workerCommsEnabled?: boolean;
+  /**
+   * Live count of pre-existing test failures at THIS sprint's baseline (WP-14).
+   *
+   * Sourced by the caller (task-builder `buildWorkerPrompt`) from the sprint
+   * baseline snapshot (`readBaseline(projectRoot, sprintId).fail`, written by the
+   * sprint controller at sprint start). Feeds the CRITICAL VERIFY STEPS note so
+   * the worker is told the REAL pre-existing-failure count instead of a stale
+   * hardcoded "~67" (ADR-070 zero-hardcode): a green suite that still cites "~67"
+   * lets a worker dismiss failures it actually introduced. `undefined` when no
+   * baseline was captured → the note warns generically without inventing a count.
+   */
+  preExistingFailures?: number;
 }
 
 /**
@@ -200,7 +212,12 @@ export function buildTaskPrompt(task: Task, ctx: SprintContext): PromptArtifact 
 
   // ── 2. Skill Block ──────────────────────────────────────────────────
   // F2 (Sprint 182 PQ-2): full skill content, no truncation, no effort-based clipping.
-  const skillBlock = buildSkillBlock(ctx.skillPrompts, skillNames);
+  // WP-17: drop any skill whose name matches the assigned agent (e.g. api-builder
+  // exists as BOTH a vertical agent and a horizontal skill). The agent persona is
+  // the authoritative one for the task; injecting the same-named skill on top just
+  // double-spends tokens on ~40% overlapping content. Non-colliding skills stay.
+  const dedupedSkillPrompts = dedupeAgentNamedSkills(ctx.skillPrompts, agentId);
+  const skillBlock = buildSkillBlock(dedupedSkillPrompts, skillNames);
 
   // ── 3. ADR Block (topN=3, relevance-scored) ─────────────────────────
   // Sprint 182 PQ-5 (F7): threshold-based filtering. ADRs below
@@ -252,6 +269,7 @@ export function buildTaskPrompt(task: Task, ctx: SprintContext): PromptArtifact 
     task,
     effort,
     idempotencyKey,
+    preExistingFailures: ctx.preExistingFailures,
   });
 
   const charCount = prompt.length;
@@ -281,6 +299,27 @@ function buildAgentBlock(agentId: string, agentPrompt?: string): string {
 }
 
 // ─── Skill Block Builder ───────────────────────────────────────────────
+
+/**
+ * Drop any skill whose name matches the assigned agent (WP-17, case-insensitive).
+ *
+ * Several capabilities exist as BOTH a vertical agent and a horizontal skill of
+ * the same id (api-builder, devops-engineer, …). When such an agent is assigned,
+ * the agent PROMPT.md already carries the persona; re-injecting the same-named
+ * SKILL.md duplicates ~40% of the content for no signal. Returns the input
+ * untouched (same reference semantics for the empty/no-collision case) so the
+ * byte-for-byte prompt is preserved whenever nothing collides.
+ */
+function dedupeAgentNamedSkills(
+  skillPrompts: Array<{ name: string; content: string }> | undefined,
+  agentId: string,
+): Array<{ name: string; content: string }> | undefined {
+  if (!skillPrompts || skillPrompts.length === 0) return skillPrompts;
+  if (!agentId || agentId === 'generic') return skillPrompts;
+  const agentKey = agentId.toLowerCase();
+  const filtered = skillPrompts.filter(sp => sp.name.toLowerCase() !== agentKey);
+  return filtered.length === skillPrompts.length ? skillPrompts : filtered;
+}
 
 /**
  * Build the skill prompt section. Full SKILL.md content for every assigned
@@ -347,6 +386,28 @@ function buildAdrBlock(
   if (!content) return '';
 
   return `=== Mandatory Architecture Rules (ADR) ===\nAll accepted ADRs below are mandatory constraints. Violating an accepted ADR requires a NO_GO result + ADR amendment proposal.\n\n${content}\n`;
+}
+
+// ─── Smoke Note Builder (WP-16) ────────────────────────────────────────
+
+/**
+ * Render the Tier-1 Proof-of-Function smoke-context note (WP-16).
+ *
+ * A `Smoke:` directive names a real-binary command Brain runs ON THE HOST (with
+ * a real auth token) AFTER the task completes — it is Brain's gate, not the
+ * worker's. Without this note workers ran the smoke inside their sandbox, hit a
+ * missing host binary / unbindable port / absent token, and self-reported NO_GO
+ * even though the host smoke passed (284-006: container FAIL, host PASS 153ms).
+ *
+ * Returns '' when the task has no smoke directive so the section is omitted
+ * entirely (byte-for-byte identical prompt for non-Tier-1 tasks).
+ */
+export function buildSmokeNote(smoke?: { command: string; expect: string }): string {
+  if (!smoke || !smoke.command) return '';
+  const expect = smoke.expect ? ` → expect \`${smoke.expect}\`` : '';
+  return `## Proof-of-Function Smoke (Tier-1)
+A \`Smoke:\` proof command is attached to this task: \`${smoke.command}\`${expect}.
+This host-smoke is run by Brain ON THE HOST after your task completes (with a real auth token) — it is Brain's gate, NOT yours. You do NOT need to run it inside your container. If the command fails inside your sandbox (missing host binary, unbindable port, or absent token), that is EXPECTED — do NOT mark NO_GO for a sandbox smoke failure. Make your code changes land and your targeted tests pass; Brain runs the real smoke host-side.`;
 }
 
 // ─── Scope Block Builder ───────────────────────────────────────────────
@@ -721,6 +782,35 @@ You may share structured notes with other workers in this sprint:
 Both fields are optional. Only populate them when you have meaningful cross-worker context to share.`;
 }
 
+// ─── Definition-of-Done Checklist (WP-19) ──────────────────────────────
+
+/**
+ * Build the goCriteria-derived self-assessment checklist (WP-19).
+ *
+ * Splits the task's `goCriteria` into discrete clauses (on `;` / newlines) and
+ * renders one `- [ ]` checklist item per clause plus an N/N→DONE verdict rubric.
+ * This replaces the subjective "<80% → GO_WITH_TECH_DEBT / <50% → NO_GO" guidance:
+ * a worker maps its verdict to ticked boxes (objective) instead of guessing a
+ * completion percentage. Falls back to a clause-free rubric when goCriteria is
+ * empty so the section is never stranded.
+ */
+export function buildDodChecklist(goCriteria?: string): string {
+  const items = (goCriteria ?? '')
+    .split(/[;\n]+/)
+    .map(s => s.trim().replace(/^[-*]\s*/, ''))
+    .filter(s => s.length > 0);
+
+  if (items.length === 0) {
+    return `Assess yourself honestly against the goCriteria above. "Code written" ≠ "DONE": core criteria met with a minor gap → GO_WITH_TECH_DEBT (name the gap); a critical criterion unmet → NO_GO (explain).`;
+  }
+
+  const checklist = items.map(i => `- [ ] ${i}`).join('\n');
+  const n = items.length;
+  return `Self-assessment rubric — "Code written" ≠ "DONE". Tick each Definition-of-Done item only when you verified it WITH EVIDENCE:
+${checklist}
+Verdict: all ${n}/${n} ticked → DONE | core items ticked, a minor item open → GO_WITH_TECH_DEBT (name the open item) | a critical item unticked → NO_GO (explain which and why).`;
+}
+
 // ─── Template Renderer ─────────────────────────────────────────────────
 
 interface RenderInput {
@@ -744,10 +834,33 @@ interface RenderInput {
    * was reaching workers verbatim because no shell expansion happened.
    */
   idempotencyKey: string;
+  /** Live pre-existing test-failure count at the sprint baseline (WP-14); undefined when uncaptured. */
+  preExistingFailures?: number;
+}
+
+/**
+ * Build the "pre-existing failures" guidance for the CRITICAL VERIFY STEPS
+ * block from the live sprint baseline (WP-14). Replaces the stale hardcoded
+ * "~67 pre-existing failures" sentence with the real measured count so the
+ * worker can trust it (ADR-070 zero-hardcode):
+ *   - count > 0  → cite the measured count; pre-existing failures are not the worker's fault.
+ *   - count === 0 → the suite was green at baseline; any failure is likely the worker's own.
+ *   - undefined   → no baseline captured; warn generically without inventing a number.
+ */
+export function buildPreExistingFailuresNote(preExistingFailures?: number): string {
+  const tail =
+    'Base your self-assessment on (a) `tsc --noEmit` clean + (b) the targeted test file(s) for the module(s) you changed passing.';
+  if (preExistingFailures === undefined) {
+    return `The Full test suite may contain pre-existing unrelated failures (stale model-id expectations, env-dependent provider/ollama tests) that were not measured for this sprint. A genuinely pre-existing failure unrelated to your change MUST NOT cause a NO_GO — but do NOT assume the suite is green. ${tail}`;
+  }
+  if (preExistingFailures <= 0) {
+    return `The Full test suite was green at this sprint's baseline (0 pre-existing failures). Any failure you see in your targeted file(s) is therefore most likely yours — fix it, do not dismiss it as pre-existing. ${tail}`;
+  }
+  return `The Full test suite has ${preExistingFailures} pre-existing unrelated failures, measured at this sprint's baseline (stale model-id expectations, env-dependent provider/ollama tests). These pre-existing failures MUST NOT cause a NO_GO — they are not your responsibility. ${tail}`;
 }
 
 function renderTemplate(input: RenderInput): string {
-  const { agentBlock, skillBlock, adrBlock, scopeBlock, depsBlock, sharedBlock, handoffBlock, commsInstructionBlock, task, effort, idempotencyKey } = input;
+  const { agentBlock, skillBlock, adrBlock, scopeBlock, depsBlock, sharedBlock, handoffBlock, commsInstructionBlock, task, effort, idempotencyKey, preExistingFailures } = input;
 
   // Conditionally emit non-empty sections only (skip filler empty headers).
   // Sprint 273 (F1-TOK fix #5): Skills FIRST, then Agent — skill blocks are
@@ -818,7 +931,7 @@ Check the project's TOOLS.md or package.json scripts to find the right commands.
    Examples: \`tsc --noEmit\` (TypeScript), \`mypy\` (Python), \`go vet ./...\` (Go), \`cargo check\` (Rust)
 2. **TARGETED test file(s) only** — run ONLY the test file(s) that cover the module(s) you changed (max 3 attempts)
    Example: \`npx vitest run tests/orchestra/my-module.test.ts\` — do NOT run the Full test suite (\`npx vitest run\` without args).
-   The Full test suite contains ~67 pre-existing unrelated failures (stale model-id expectations, env-dependent provider/ollama tests). These pre-existing failures MUST NOT cause a NO_GO — they are not your responsibility. Base your self-assessment on (a) \`tsc --noEmit\` clean + (b) the targeted test file(s) for the module(s) you changed passing.
+   ${buildPreExistingFailuresNote(preExistingFailures)}
 
 If BOTH pass → selfAssessment = "DONE"
 If minor issues remain → selfAssessment = "GO_WITH_TECH_DEBT" with details in notes
@@ -826,16 +939,23 @@ If Bash tool is unavailable → report in notes, selfAssessment = "GO_WITH_TECH_
 If targeted tests fail after 3 attempts → selfAssessment = "NO_GO" with error details`);
   }
 
+  // Smoke note (WP-16) — Tier-1 Proof-of-Function context. Emitted next to the
+  // VERIFY STEPS (its natural home) only when the task carries a Smoke: directive.
+  const smokeNote = buildSmokeNote(task.smoke);
+  if (smokeNote) sections.push(smokeNote);
+
   // Scope block
   sections.push(scopeBlock);
 
   // Dependencies (only if non-empty)
   if (depsBlock) sections.push(depsBlock);
 
-  // Heartbeat
+  // Heartbeat — WP-18 (DASH-RT-1 complement): the worker must keep currentAction
+  // fresh so the dashboard shows live progress instead of a stuck "Starting…".
   sections.push(`## Heartbeat
 Create .tasks/task-${task.id}.hb BEFORE starting work with workerId "w-${task.id}", status "EXECUTING".
-Update periodically: increment sequence, refresh timestamp via new Date().toISOString() (UTC ISO 8601).`);
+Update periodically: increment sequence, refresh timestamp via new Date().toISOString() (UTC ISO 8601).
+At EVERY significant step, also update the \`currentAction\` field to a short human-readable phrase (e.g. "planning", "editing src/x.ts", "running targeted tests", "writing result") — this drives the live dashboard view, so a stale currentAction reads as a stuck worker.`);
 
   // Result + self-assessment — single authority section. Folds the former
   // separate "## Result File" and "## Honest Self-Assessment" sections so the
@@ -846,7 +966,7 @@ Update periodically: increment sequence, refresh timestamp via new Date().toISOS
   const provider = task.provider ?? getDefaultProviderName();
   sections.push(`## Result & Self-Assessment
 Write .tasks/task-${task.id}.result with: taskId, filesChanged, testsPassed, selfAssessment ("DONE"|"GO_WITH_TECH_DEBT"|"NO_GO"), notes, and tokenUsage with ALL four fields { "inputTokens": <number>, "outputTokens": <number>, "cacheReadTokens": <number>, "provider": "${provider}", "model": "${task.model}" } (provider/model hardcoded as shown; a missing tokenUsage is rejected as NO_GO).
-Assess yourself honestly against the goCriteria above: compare the baseline state to the end state and judge how much you ACTUALLY completed. "Code written" ≠ "DONE". <80% → GO_WITH_TECH_DEBT (name the gap); <50% → NO_GO (explain).
+${buildDodChecklist(task.goNogo?.goCriteria)}
 CRITICAL: never exit without writing the .result file — even on failure, write selfAssessment "NO_GO" with error details. A missing result file stalls the entire sprint.`);
 
   // Karpathy 4-discipline cognitive anchor (concise, provider-agnostic).
