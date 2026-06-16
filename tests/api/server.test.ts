@@ -1174,14 +1174,16 @@ describe('createHttpServer', () => {
       expect(JSON.parse(res.body)).toEqual([]);
     });
 
-    it('returns 404 when static dir set but no index.html fallback', async () => {
+    it('serves the honest dashboard-not-built page (200) when static dir set but the bundle is missing (DASH-OPS-1)', async () => {
       mockExistsSync.mockReturnValue(false);
 
       api = createHttpServer(PROJECT_ROOT, 0, STATIC_DIR);
       await new Promise<void>((r) => api.server.once('listening', r));
 
       const res = await request(api, '/nonexistent');
-      expect(res.status).toBe(404);
+      // DASH-OPS-1: a missing dashboard bundle answers with an honest page, not a bare 404.
+      expect(res.status).toBe(200);
+      expect(res.body).toContain('npm run build:dashboard');
     });
 
     it('returns 403 for path traversal attempts', async () => {

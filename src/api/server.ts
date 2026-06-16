@@ -209,6 +209,42 @@ function sendError(res: ServerResponse, status: number, message: string): void {
   sendJson(res, { error: message }, status);
 }
 
+/**
+ * DASH-OPS-1 (§15 ARC-C): honest "dashboard not built" page.
+ *
+ * Served (200, not a bare 404) for any non-API route when a `staticDir` is
+ * configured but the dashboard bundle's `index.html` is genuinely missing —
+ * a fresh clone, or a TS-only `npm run build` run before `build:dashboard`.
+ * It tells the owner the bundle is absent and how to build it; the JSON API at
+ * `/api/*` stays available regardless. Static, self-contained, English (this is
+ * a developer/ops build-instruction surface — server.ts carries no i18n layer).
+ */
+export function renderDashboardNotBuiltPage(): string {
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Deckent — dashboard not built</title>
+<style>
+  body { font: 15px/1.6 system-ui, sans-serif; max-width: 40rem; margin: 4rem auto; padding: 0 1.5rem; color: #1f2933; }
+  h1 { font-size: 1.4rem; }
+  code, pre { background: #f0f4f8; border-radius: 6px; }
+  code { padding: 0.1rem 0.35rem; }
+  pre { padding: 0.8rem 1rem; overflow-x: auto; }
+  .muted { color: #5b6b7a; }
+</style>
+</head>
+<body>
+<h1>Dashboard not built</h1>
+<p>The Deckent web dashboard bundle was not found at <code>dist/dashboard</code>.</p>
+<p>Build it, then reload this page:</p>
+<pre>npm run build:dashboard   # or: npm run build:all</pre>
+<p class="muted">The JSON API is already running — every endpoint under <code>/api/</code> is available now (e.g. <code>/api/status</code>).</p>
+</body>
+</html>`;
+}
+
 export function parseBody(req: IncomingMessage, maxSize = MAX_BODY_SIZE): Promise<unknown> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
@@ -752,9 +788,17 @@ async function handleRequest(
           res.end(content);
           return;
         } catch {
-          // fall through to 404
+          // fall through to the honest not-built page
         }
       }
+
+      // DASH-OPS-1: the dashboard bundle is genuinely missing (never built, or a
+      // TS-only build before `build:dashboard`). Answer with an honest 200 page
+      // that names the build command instead of a bare 404 — the JSON API at
+      // /api/* is unaffected.
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(renderDashboardNotBuiltPage());
+      return;
     }
 
     // Evolution endpoints: /api/evolution/genealogy, /retirement, /prompt-metrics
