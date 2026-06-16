@@ -1231,10 +1231,29 @@ Items surfaced during the Sprint 211 doc-consolidation audit that were intention
 - **Kalan SP-1 kuyruğu (sıra, FLIP-3 en sonda gated):** F11-016a Ink stabilizasyon (stream-segmenter unclosed-fence + queue/flush race) · F11-016b ADR-090 (ink+react vs ADR-010, ADR-010-W kapanışı) · FLIP-1 graceful subscription-fallback hint (fallback zaten ReplApp'te var; flip sonrası korkutucu-hata yerine soft-hint) · F11-014 codex first-class native (zaten `openai-compatible` ile fonksiyonel; native /provider-switch ince slice) · **F11-014 Gemini API adapter = DÜRÜSTÇE ERTELENDİ** (GOOGLE_API_KEY yok → kanıtlanamaz; key gelince) · FLIP-2 pre-flip verify-batch · FLIP-3 default-ON flip + claude-CLI spawn kes + tag-parse hack arşivle.
 - **Karar (2026-06-15, Alperen):** Tam-5-provider parity hedef ama **provable-first**; native real-binary kanıtı şimdilik **ollama (lokal) + `DECKENT_NATIVE_MOCK`** ile (anthropic-api/openai/gemini key-gated). Mod = **CC el-kodu** (self-modifying terminal, ADR-039). FLIP-3 Gemini + parity-kanıt gelene kadar bekler.
 
+## 17. DECKENT SDK — Gömülebilir Embed-Engine SDK (2026-06-16, Alperen yön)
+
+> **Yeni arc — taslak-spec YAZILDI, implementasyon ERTELENDİ.** deckent'in KENDİ idiom'lu, gömülebilir TypeScript SDK'sı: geliştirici deckent'i kendi uygulamasına **orkestrasyon-motoru** olarak gömer. Spec: `docs/superpowers/specs/2026-06-16-deckent-sdk-design.md`. Bu §16'dan AYRI bir yüzeydir: §16 deckent'in KENDİ terminalini native yapar (içe-dönük); §17 deckent'i BAŞKALARININ uygulamasına açar (dışa-dönük developer yüzeyi). [[project_deckent_sdk_spec]]
+
+**Sıralama notu (Alperen, 06-16):** Modüler community/enterprise bölme işinden ([[project_community_pro_split_strategy]] / MOD-SPLIT) **ÖNCEYE alınabilir** — SDK kararlı bir public-kontrat + provider-adapter seam'i tanımlar; bu seam, enterprise-modül bölmesinin de doğal sınırı olur (önce kontratı çiz, sonra modülerleştir).
+
+**Kilitli kararlar (brainstorm 06-16, D1–D5; spec'te tam):**
+- **D1 Hero = embed-engine** (geliştirici deckent'i app'ine gömer; SaaS-client sonra ağ-üzeri ikiz).
+- **D2 Katmanlı:** in-process core (güç-kullanıcı) + managed runtime (varsayılan, non-blocking, out-of-process); tek client yüzeyi, mod/transport değişir.
+- **D3 En geniş kapsam:** orkestrasyon + gözlem + kontrol + memory(oku/yaz) + config/directives + **extensibility** (define provider/agent/skill/tool). MVP yok.
+- **D4 Yaklaşım ①:** adanmış `src/sdk/` + transport-swappable client (`LocalTransport` ↔ `HttpTransport` = SaaS ikizi neredeyse bedava); mevcut motoru reuse eder (yıkmaz).
+- **D5 Claude Agent SDK = config-gated provider seam** (ertelenmiş; `providers.claude_sdk.enabled`; kapalıyken peer-dep yüklenmez → ADR-010 korunur). Abonelik-politikası riskine karşı hedge. [[project_anthropic_subscription_credit_postponed]]
+
+**§8 açık-sorular NETLEŞTİRİLDİ (06-16):** (1) Runner = `deckent serve` **reuse** (twin-örtüşme max). (2) define* cross-process = serileştirilebilir-metadata + module-specifier (handler IPC'den serileşmez → runner import eder); in-process doğrudan kayıt. (3) LocalTransport'ta da **bearer-token** (ephemeral, twin-parite). (4) Versiyon = v1 subpath `deckent/sdk` + `SDK_API_VERSION` sabiti + stabilite politikası; gerekirse ileride ayrı `@deckent/sdk`.
+
+**Yeni ADR önerisi (impl başlarken):** "Deckent SDK Contract" — kararlı public yüzey + transport soyutlaması + extensibility modeli governed karar.
+
+**Lossless-map:** §16 native-agent-program ile uyumlu ama ondan bağımsız (içe-dönük vs dışa-dönük); §15 arc'larından birine değil, **kendi §17 arc'ı** olarak kaydedilir.
+
 ---
 
 > **Count:** §15'te 123 açık madde (13 arc). §16 native-agent pivotu bunların chat/REPL/tool alt-kümesini SUBSUME eder (eklemez) + 4 sub-proje (kendi spec-döngüleri). None is a throwaway/MVP cut — god-level. Build *sequence*: §15 öncelik-haritası + §16 program-sırası paralel.
 
 ---
 
-*Single source of truth. Update this document — not the superseded roadmaps — when status changes. New work-items MUST also be assigned to a §15 arc OR §16 sub-project (lossless-map invariant).*
+*Single source of truth. Update this document — not the superseded roadmaps — when status changes. New work-items MUST also be assigned to a §15 arc, §16 sub-project, OR §17 SDK arc (lossless-map invariant).*

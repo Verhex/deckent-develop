@@ -344,18 +344,26 @@ Principles:
 
 ---
 
-## 8. Open questions (resolve before implementation plan)
+## 8. Resolved decisions (2026-06-16)
 
-1. **Runner shape:** does `runner.ts` reuse `deckent serve` (HTTP+SSE already exists) or a
-   dedicated thin headless entry? Reusing `serve` maximizes the SaaS-twin overlap; a dedicated
-   runner is lighter. (Lean: reuse `serve` as the managed runner.)
-2. **In-process registration vs managed runner registration:** how do `define*` definitions
-   cross the process boundary to a spawned runner — serialize declarative parts + load a
-   module path? (Handlers/functions can't serialize over IPC; likely require a module path the
-   runner imports.)
-3. **Auth for LocalTransport:** does localhost runner require a bearer token too (uniformity
-   with HttpTransport) or trust the local socket? (Lean: token even locally, for twin parity.)
-4. **Versioning cadence:** SDK semver coupled to `deckent` package version, or independent?
+These were open questions during brainstorming; now **resolved** (revisitable only if
+implementation surfaces a new constraint):
+
+1. **Runner shape → reuse `deckent serve`.** The managed runner reuses the existing
+   `deckent serve` (HTTP + SSE) rather than a dedicated headless entry. This maximizes the
+   SaaS-twin overlap: `LocalTransport` and `HttpTransport` share one protocol (localhost vs
+   remote URL). A thin `runner.ts` only wraps lifecycle (ensure-up / teardown).
+2. **Cross-process registration → declarative metadata + module specifier.** A `define*`
+   definition is split into (a) serializable declarative metadata and (b) a module specifier.
+   The managed runner imports the module to obtain handler functions (functions cannot
+   serialize over IPC). In-process mode registers handlers directly.
+3. **LocalTransport auth → bearer token even on localhost.** An ephemeral auto-generated
+   token is required even locally, for twin-parity with `HttpTransport` (uniform auth path; no
+   "trusted local socket" special case).
+4. **Versioning → subpath now + explicit `SDK_API_VERSION`.** v1 ships as a subpath export
+   (`deckent/sdk`) at the package version; the SDK surface carries an explicit
+   `SDK_API_VERSION` constant + a documented stability/deprecation policy. Promote to a
+   separate `@deckent/sdk` package only if an independent release cadence is later needed.
 
 ---
 
