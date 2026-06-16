@@ -24,11 +24,11 @@ import {
 import { print } from '../helpers/output.js';
 import { getMessage } from '../helpers/messages.js';
 import { getLangFromConfig } from '../helpers/config-reader.js';
-import { PROJECT_CONFIG_PATH } from '../../core/constants.js';
+import { PROJECT_CONFIG_PATH, RESOURCE_LOG_FILE } from '../../core/constants.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────
 
-const DEFAULT_LOG_PATH = '.deckent/resource-log.jsonl';
+const DEFAULT_LOG_PATH = RESOURCE_LOG_FILE;
 const DEFAULT_MAX_WORKERS = 4;
 
 // ─── Config ───────────────────────────────────────────────────────────────
@@ -171,7 +171,7 @@ export function registerResources(program: Command): void {
   program
     .command('resources')
     .description('Show live docker worker resource usage or analyze resource log')
-    .option('--log [path]', 'Show resource log summary (defaults to config log_path or .deckent/resource-log.jsonl)')
+    .option('--log [path]', 'Show resource log summary (defaults to config log_path or .deckent/settings/resource-log.jsonl)')
     .option('--json', 'Output as JSON')
     .action(async (opts: { log?: string | boolean; json?: boolean }) => {
       const root = process.cwd();

@@ -8,7 +8,7 @@
  *   dormant     — file exists but zero external imports
  *   dead        — marked @deprecated or file deleted from manifest
  *
- * Outputs: .deckent/features-manifest.json (auto-generated, runtime-consumable)
+ * Outputs: .deckent/settings/features-manifest.json (auto-generated, runtime-consumable)
  *
  * Usage:
  *   node scripts/sync-manifest.mjs [--root <path>] [--dry-run] [--json]
@@ -304,8 +304,8 @@ if (dryRun || outputJson) {
   }
 } else {
   // Write manifest
-  const manifestPath = join(projectRoot, '.deckent', 'features-manifest.json');
-  mkdirSync(join(projectRoot, '.deckent'), { recursive: true });
+  const manifestPath = join(projectRoot, '.deckent', 'settings', 'features-manifest.json');
+  mkdirSync(join(projectRoot, '.deckent', 'settings'), { recursive: true });
   writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n', 'utf-8');
   console.log(`✓ Features manifest written: ${manifestPath} (${totalFeatures} features)`);
 }

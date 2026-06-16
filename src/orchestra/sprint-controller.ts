@@ -91,7 +91,7 @@ import type { SprintStateSnapshot } from './sprint-pid-manager.js';
 
 // ─── Node Builtins (sync I/O for kill-cascade metadata cleanup) ──
 import { unlinkSync } from 'node:fs';
-import { DECKENT_DIR } from '../core/constants.js';
+import { DECKENT_DIR, RESOURCE_LOG_FILE } from '../core/constants.js';
 
 // ─── Coordination Wire (handoff + heartbeat lifecycle) ────────────
 import { HandoffProtocol } from './handoff-protocol.js';
@@ -760,7 +760,7 @@ export function createAndStartResourceMonitor(
       intervalMs: config.resource_monitor.interval_ms,
       logPath: join(
         projectRoot,
-        config.resource_monitor.log_path ?? join(DECKENT_DIR, 'resource-log.jsonl'),
+        config.resource_monitor.log_path ?? RESOURCE_LOG_FILE,
       ),
     });
     monitor.start();
