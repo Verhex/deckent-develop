@@ -1,0 +1,74 @@
+import { PlannedItemSchema, type PlannedItem, type LlmComplete } from './goal-planner-types.js';
+
+export interface PlanGoalInput {
+  goal: string;
+  /** Optional seed lines from an artifact-ref (extractArtifactSeeds). */
+  seeds?: string[];
+  /** Compact project context (e.g. .brain/exports/summary.md). */
+  context?: string;
+  /** Cap on returned items (default 30). */
+  maxItems?: number;
+  complete: LlmComplete;
+}
+
+const DEFAULT_MAX = 30;
+
+/** System+task prompt instructing the model to emit `{ items: PlannedItem[] }`. */
+export function buildGoalPlanPrompt(input: Omit<PlanGoalInput, 'complete'>): string {
+  const seeds = input.seeds && input.seeds.length > 0
+    ? `\n\nSeed items (open checklist lines from the referenced artifact — group/refine, assign kind):\n${input.seeds.map((s) => `- ${s}`).join('\n')}`
+    : '';
+  const ctx = input.context ? `\n\nProject context:\n${input.context}` : '';
+  return `You are the Deckent autonomous planner. Decompose the GOAL into a LIGHTWEIGHT backlog — titles + kind + scope only, NO implementation detail (detail is generated later, just in time).
+
+Output STRICT JSON: { "items": PlannedItem[] }. Each PlannedItem:
+{ "id": kebab-slug, "title": short, "kind": "task"|"sprint"|"capability"|"process",
+  "scopeDir": repo-relative dir (e.g. "src/api/"), "summary": one line WHAT,
+  "policy": "auto"|"approval-required"|"risk-tagged",
+  "trigger": "one-off" | {"recurring":"<cron>"} | {"reactive":"<detector>"},
+  "fanOut"?: {"over": string, "concurrency": number},
+  "capabilityTarget"?: {"capability": dotted-verb, "connector"?: string, "args"?: object} }
+
+Rules: single-file/tight change → task; multi-file/multi-module feature → sprint;
+non-code connector op (db.query/erp.read/mail.send/http.get) → capability;
+multi-step workflow/DAG → process; "continuously …" → recurring cron;
+"N agents over X" → fanOut.concurrency=N; destructive/irreversible → approval-required.
+At most ${input.maxItems ?? DEFAULT_MAX} items. Output ONLY the JSON, no prose.
+
+GOAL: ${input.goal}${seeds}${ctx}`;
+}
+
+/** Strip code fences and a leading non-JSON preamble, then JSON.parse. */
+function stripToJson(raw: string): string {
+  let s = raw.trim();
+  if (s.startsWith('```')) s = s.replace(/^```[a-z]*\n?/i, '').replace(/```\s*$/, '').trim();
+  const i = s.indexOf('{');
+  const j = s.lastIndexOf('}');
+  return i >= 0 && j > i ? s.slice(i, j + 1) : s;
+}
+
+/** Parse the model output into validated, de-duplicated PlannedItems. Invalid
+ *  items are dropped (never throws). */
+export function parsePlannedItems(raw: string): PlannedItem[] {
+  let parsed: unknown;
+  try { parsed = JSON.parse(stripToJson(raw)); } catch { return []; }
+  const arr = (parsed as { items?: unknown })?.items;
+  if (!Array.isArray(arr)) return [];
+  const seen = new Set<string>();
+  const out: PlannedItem[] = [];
+  for (const candidate of arr) {
+    const r = PlannedItemSchema.safeParse(candidate);
+    if (!r.success) continue;
+    if (seen.has(r.data.id)) continue;
+    seen.add(r.data.id);
+    out.push(r.data);
+  }
+  return out;
+}
+
+/** Phase 1: decompose a goal into validated PlannedItems (capped to maxItems). */
+export async function planGoal(input: PlanGoalInput): Promise<PlannedItem[]> {
+  const max = input.maxItems ?? DEFAULT_MAX;
+  const raw = await input.complete(buildGoalPlanPrompt(input));
+  return parsePlannedItems(raw).slice(0, max);
+}
