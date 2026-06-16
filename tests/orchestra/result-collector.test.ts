@@ -410,6 +410,37 @@ describe('enrichResultTokenUsage', () => {
     expect(result.tokenUsage!.inputTokens).toBe(999);
   });
 
+  // WP-4: the worker now reports a zero-count stub (counts are the orchestrator's
+  // job — an LLM cannot count its own tokens). A zero stub must be FILLED with the
+  // orchestrator estimate, not kept at 0 (which would undercount cost/metrics).
+  it('WP-4: replaces a zero-count worker stub with the orchestrator estimate', () => {
+    const task = makeTask('enr-wp4');
+    task.estimatedTokens = 8000;
+    task.provider = 'claude';
+    task.model = 'sonnet';
+    const stub = { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, provider: 'claude' as const, model: 'sonnet' as const };
+    const result = makeResult({ taskId: 'enr-wp4', linesAdded: 200, linesRemoved: 50, tokenUsage: stub });
+
+    enrichResultTokenUsage(result, task);
+
+    expect(result.tokenUsage!.inputTokens).toBe(8000);
+    expect(result.tokenUsage!.outputTokens).toBe(3000); // 200 * 15
+    expect(result.tokenUsage!.provider).toBe('claude');
+  });
+
+  // WP-4 back-compat: a legacy worker that DID report real non-zero counts is kept.
+  it('WP-4: keeps a legacy non-zero worker claim verbatim', () => {
+    const task = makeTask('enr-wp4b');
+    task.estimatedTokens = 8000;
+    const claim = { inputTokens: 1234, outputTokens: 56, cacheReadTokens: 0, provider: 'claude' as const, model: 'sonnet' as const };
+    const result = makeResult({ taskId: 'enr-wp4b', linesAdded: 200, tokenUsage: claim });
+
+    enrichResultTokenUsage(result, task);
+
+    expect(result.tokenUsage!.inputTokens).toBe(1234);
+    expect(result.tokenUsage!.outputTokens).toBe(56);
+  });
+
   it('does nothing when task is undefined', () => {
     const result = makeResult({ taskId: 'enr-003' });
 

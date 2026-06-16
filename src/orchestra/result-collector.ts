@@ -418,22 +418,28 @@ export function estimateTokenUsage(task: Task, result: TaskResult): TokenUsage {
  *      present, merge it with whatever the worker self-reported — measured
  *      counts override estimates, worker-provided `provider`/`model` are
  *      retained when the measurement omits them.
- *   2. If no measured value is available, keep the worker's claim verbatim
- *      (back-compat with existing workers that emit full TokenUsage).
- *   3. If neither is available, fall back to the legacy heuristic
- *      (`estimateTokenUsage`) so downstream consumers always see a
- *      populated TokenUsage shape.
+ *   2. A worker now reports a ZERO-count stub (WP-4: an LLM cannot count its
+ *      own tokens, so the prompt tells it to leave the counts at 0 and let the
+ *      orchestrator own them). A stub (inputTokens == 0 && outputTokens == 0) is
+ *      treated as "fill me" → fall through to the estimate, preserving the
+ *      worker-provided `provider`/`model`. A LEGACY claim with real non-zero
+ *      counts is kept verbatim (back-compat).
+ *   3. If no real claim is available, fall back to the heuristic
+ *      (`estimateTokenUsage`) so downstream consumers always see a populated
+ *      TokenUsage shape.
  *
  * Mutates the result in place for efficiency. `projectRoot` is optional —
  * when omitted, measured-fill is skipped and the function preserves the
- * original behavior (worker claim wins, then heuristic).
+ * original behavior (real claim wins, then heuristic). With no task context
+ * and no real claim, tokenUsage is left as-is (undefined or the stub) —
+ * downstream cost/metrics already tolerate a missing tokenUsage.
  */
 export function enrichResultTokenUsage(
   result: TaskResult,
   task: Task | undefined,
   projectRoot?: string,
 ): void {
-  // Step 1 (Sprint 196 WP-4): orchestrator-side measured fill.
+  // Step 1 (Sprint 196 WP-4): orchestrator-side measured fill — always wins.
   if (projectRoot) {
     const measured = tryLoadCliLogTokens(projectRoot, result.taskId);
     if (measured) {
@@ -442,12 +448,20 @@ export function enrichResultTokenUsage(
     }
   }
 
-  // Step 2: keep worker's existing claim verbatim.
-  if (result.tokenUsage) return;
+  // Step 2 (WP-4): keep a legacy claim with REAL counts; a zero stub means "fill me".
+  const claim = result.tokenUsage;
+  const hasRealCounts = !!claim && ((claim.inputTokens ?? 0) > 0 || (claim.outputTokens ?? 0) > 0);
+  if (hasRealCounts) return;
 
-  // Step 3: heuristic fallback (legacy behavior).
+  // Step 3: heuristic estimate (preserve the worker stub's provider/model when the
+  // task lacks them). With no task context the stub/undefined is left untouched.
   if (!task) return;
-  result.tokenUsage = estimateTokenUsage(task, result);
+  const estimated = estimateTokenUsage(task, result);
+  result.tokenUsage = {
+    ...estimated,
+    provider: estimated.provider ?? claim?.provider,
+    model: estimated.model ?? claim?.model,
+  };
 }
 
 // ═══ Exported Functions ═══════════════════════════════════════════

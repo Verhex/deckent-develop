@@ -570,13 +570,17 @@ describe('buildWorkerPrompt', () => {
     expect(descLen / totalLen).toBeGreaterThan(0.02);
   });
 
-  it('includes MUST-level token tracking instruction in result file section', () => {
+  it('includes the orchestrator-filled tokenUsage instruction in result file section (WP-4)', () => {
     const task = makeTask();
     const prompt = buildWorkerPrompt(task);
-    expect(prompt).toContain('tokenUsage with ALL four fields');
+    // The tokenUsage shape is still documented…
+    expect(prompt).toContain('tokenUsage');
     expect(prompt).toContain('inputTokens');
     expect(prompt).toContain('outputTokens');
     expect(prompt).toContain('provider');
+    // …but the worker is told NOT to estimate counts; the orchestrator fills them.
+    expect(prompt).toContain('do NOT estimate');
+    expect(prompt).toContain('orchestrator');
   });
 
   it('embeds correct provider and model in token tracking instruction', () => {
@@ -586,11 +590,15 @@ describe('buildWorkerPrompt', () => {
     expect(prompt).toContain('"model": "gpt-4.1"');
   });
 
-  it('states the NO_GO consequence for missing tokenUsage', () => {
+  it('WP-4: tokenUsage is orchestrator-owned (no stale "missing → NO_GO" demand)', () => {
     const task = makeTask();
     const prompt = buildWorkerPrompt(task);
-    expect(prompt).toContain('missing tokenUsage');
-    expect(prompt).toContain('NO_GO');
+    // The impossible self-estimation ask + stale NO_GO threat are gone…
+    expect(prompt).not.toContain('a missing tokenUsage is rejected as NO_GO');
+    expect(prompt).not.toContain('tokenUsage with ALL four fields');
+    // …replaced by: the orchestrator fills the counts; tokenUsage is optional.
+    expect(prompt).toContain('orchestrator');
+    expect(prompt.toLowerCase()).toContain('optional');
   });
 });
 
