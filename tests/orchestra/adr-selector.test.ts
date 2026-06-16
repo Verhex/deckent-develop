@@ -7,6 +7,7 @@ import {
   selectRelevantAdrs,
   buildAdrPromptSection,
   classifyTaskIntent,
+  TASK_TYPE_ADR_PRESETS,
   type AdrRelevance,
 } from '../../src/orchestra/adr-selector.js';
 import type { MemoryEntryV2 } from '../../src/core/memory-types.js';
@@ -261,6 +262,81 @@ describe('adr-selector', () => {
 
     // Null-ish
     expect(selectRelevantAdrs(task, undefined as unknown as MemoryEntryV2[], 3, 146)).toEqual([]);
+  });
+
+  // ─── WP-15: ADR-selector accuracy (the heart-of-task ADR gets in, the
+  // miscategorized one does not) ────────────────────────────────────────
+  it('WP-15: selects the test-hermeticity ADR-087 for a hermetic test task', () => {
+    const pool = [
+      makeAdr({ id: 'adr-003', title: 'vitest over Jest', content: 'vitest test framework, tests/ directory', sprint_num: 3 }),
+      makeAdr({ id: 'adr-019', title: 'Language-Agnostic Worker Verify', content: 'worker verify stack build/test commands', sprint_num: 46 }),
+      makeAdr({ id: 'adr-087', title: 'Async I/O & Test Hermeticity Standard', content: 'Hermetic tests: tmpdir fixtures, no spawnSync, async fs.watch. CI-fresh-checkout standard for tests/.', sprint_num: 215 }),
+      makeAdr({ id: 'adr-015', title: 'TaskRouter Module', content: '6-level routing priority for sprint task assignment', sprint_num: 44 }),
+    ];
+    const task = makeTask(
+      'Add hermetic test for process endpoint',
+      'Write a hermetic vitest test under tests/api; use tmpdir, no spawnSync.',
+      ['tests/api/'],
+    );
+    const ids = selectRelevantAdrs(task, pool, 3, 290).map(r => r.adrId);
+    expect(ids).toContain('adr-087');
+  });
+
+  it('WP-15: test preset includes the hermeticity ADR-087', () => {
+    expect(TASK_TYPE_ADR_PRESETS.test).toContain('adr-087');
+  });
+
+  it('WP-15: drops the miscategorized Dead-Code ADR-038 from the security preset, prefers isolation ADR-034', () => {
+    // ADR-038 is "Dead Code Disposition" — not a security ADR. It must not be
+    // force-ranked into a security task ahead of real security/isolation ADRs.
+    expect(TASK_TYPE_ADR_PRESETS.security).not.toContain('adr-038');
+    expect(TASK_TYPE_ADR_PRESETS.security).toContain('adr-034');
+
+    const pool = [
+      makeAdr({ id: 'adr-006', title: 'spawnSync Security Pattern', content: 'security spawnSync safe argv', sprint_num: 6 }),
+      makeAdr({ id: 'adr-034', title: 'Multi-Project Isolation', content: 'Per-project security boundaries, tenant isolation, auth scope.', sprint_num: 132 }),
+      makeAdr({ id: 'adr-037', title: 'RBAC Authority Matrix', content: 'rbac permission security roles', sprint_num: 139 }),
+      makeAdr({ id: 'adr-038', title: 'Dead Code Disposition', content: 'dead code audit disposition results', sprint_num: 139 }),
+    ];
+    const task = makeTask(
+      'RBAC permission enforcement',
+      'Add security auth permission rbac checks and tenant isolation.',
+      ['src/core/'],
+    );
+    const ids = selectRelevantAdrs(task, pool, 3, 290).map(r => r.adrId);
+    expect(ids).toContain('adr-034');
+  });
+
+  // ─── WP-20: ADR active-constraint distillation + ordering ──────────────
+  // The operative constraint is surfaced as a 1-line head ABOVE the full body
+  // (solves middle-loss) while the FULL content — amendment history included —
+  // stays contiguous below (completeness rule: zero content loss).
+  it('WP-20: prepends a one-line Active constraint above the full, contiguous ADR body', () => {
+    const fullContent =
+      '**Status:** accepted\n\n**Context:** workers escape scope.\n**Decision:** Workers must never write outside scope.filesWrite.\n\n## Amendment — Sprint 300\nClarified for tenants.';
+    const adrs: AdrRelevance[] = [{ adrId: 'adr-099', title: 'Scope Enforcement', score: 1, matchReasons: [] }];
+    const pool = [makeAdr({ id: 'adr-099', title: 'Scope Enforcement', content: fullContent })];
+
+    const section = buildAdrPromptSection(adrs, 'full', pool);
+
+    // Distilled operative constraint surfaces at the head…
+    expect(section).toContain('**Active constraint:** Workers must never write outside scope.filesWrite.');
+    // …the full content (history included) is preserved contiguously (lossless)…
+    expect(section).toContain(fullContent);
+    // …and the head precedes the amendment history (ordering).
+    expect(section.indexOf('**Active constraint:**')).toBeLessThan(section.indexOf('## Amendment'));
+  });
+
+  it('WP-20: prefers an explicit entry.summary for the Active constraint when present', () => {
+    const adrs: AdrRelevance[] = [{ adrId: 'adr-077', title: 'Multi-Provider', score: 1, matchReasons: [] }];
+    const pool = [makeAdr({
+      id: 'adr-077',
+      title: 'Multi-Provider',
+      content: '**Decision:** something long and buried.',
+      summary: 'Every provider must implement the ProviderAdapter contract.',
+    })];
+    const section = buildAdrPromptSection(adrs, 'full', pool);
+    expect(section).toContain('**Active constraint:** Every provider must implement the ProviderAdapter contract.');
   });
 
   // Test 9: buildAdrPromptSection 'full' mode includes full content

@@ -65,10 +65,16 @@ export type TaskType =
 export const TASK_TYPE_ADR_PRESETS: Record<TaskType, string[]> = {
   'core-dev':      ['adr-001', 'adr-002', 'adr-008', 'adr-015'],
   'docs':          ['adr-029', 'adr-030', 'adr-032'],
-  'test':          ['adr-003', 'adr-019'],
+  // WP-15: adr-087 (Async I/O & Test Hermeticity Standard) is THE test-hermeticity
+  // ADR — it is the heart of most test tasks (tmpdir, no spawnSync, CI-fresh) yet
+  // was previously absent, so a hermeticity task never had it force-ranked.
+  'test':          ['adr-003', 'adr-019', 'adr-087'],
   'cli':           ['adr-010', 'adr-011', 'adr-012', 'adr-022-v2'],
   'mcp':           ['adr-022-v2', 'adr-017'],
-  'security':      ['adr-006', 'adr-037', 'adr-038'],
+  // WP-15: adr-038 is "Dead Code Disposition" — NOT a security ADR; it was being
+  // force-ranked into security tasks ahead of real ones. Replaced with adr-034
+  // (Multi-Project Isolation — per-project security boundaries / tenant isolation).
+  'security':      ['adr-006', 'adr-034', 'adr-037'],
   'observability': ['adr-035'],
   'orchestra':     ['adr-008', 'adr-015', 'adr-024', 'adr-026'],
   'provider':      ['adr-017', 'adr-023', 'adr-027'],
@@ -84,8 +90,8 @@ const INTENT_ADR_PREFERENCES: Record<string, string[]> = {
   'cli':           ['adr-010', 'adr-011', 'adr-012', 'adr-022-v2'],
   'mcp':           ['adr-017', 'adr-022-v2'],
   'docs':          ['adr-029', 'adr-030', 'adr-031', 'adr-032'],
-  'test':          ['adr-003', 'adr-019'],
-  'security':      ['adr-006', 'adr-014', 'adr-037', 'adr-038', 'adr-039'],
+  'test':          ['adr-003', 'adr-019', 'adr-087'],
+  'security':      ['adr-006', 'adr-014', 'adr-034', 'adr-037', 'adr-039'],
   'observability': ['adr-035'],
   'provider':      ['adr-017', 'adr-023', 'adr-027'],
   'dashboard':     ['adr-001', 'adr-002'],
@@ -99,7 +105,7 @@ const INTENT_KEYWORDS: Record<string, string[]> = {
   'cli':           ['cli', 'command', 'commander', 'register', 'readline'],
   'mcp':           ['mcp', 'tool', 'resource', 'stdio', 'transport'],
   'docs':          ['documentation', 'doc', 'readme', 'changelog', 'template', 'managed-docs', '.md'],
-  'test':          ['test', 'coverage', 'vitest', 'spec', 'mock', 'assertion'],
+  'test':          ['test', 'coverage', 'vitest', 'spec', 'mock', 'assertion', 'hermetic', 'tmpdir'],
   'security':      ['security', 'auth', 'vulnerability', 'owasp', 'rbac', 'permission'],
   'observability': ['observe', 'monitor', 'event', 'stream', 'heartbeat', 'alert'],
   'provider':      ['provider', 'adapter', 'claude', 'codex', 'gemini', 'fallback'],
@@ -455,8 +461,14 @@ export function buildAdrPromptSection(
           content = `${operative}\n\n[full text: .brain/memory.db ${adr.adrId}]`;
         }
       }
+      // WP-20: surface the operative constraint as a 1-line head ABOVE the full
+      // body. The body (amendment history included) stays contiguous below it, so
+      // there is zero content loss (completeness rule) — the distillation only
+      // fixes "middle-loss" by putting the actionable line where attention is high.
+      const distilled = distillActiveConstraint(rawContent, entry?.summary);
+      const constraintHead = distilled ? `**Active constraint:** ${distilled}\n\n` : '';
       // Dedupe: outer header carries adrId+title only; content body already has status/date.
-      sections.push(`## ${adr.adrId}: ${adr.title}\n\n${content}`);
+      sections.push(`## ${adr.adrId}: ${adr.title}\n\n${constraintHead}${content}`);
     } else {
       // Summary mode: use entry.summary if available, otherwise extract first 3-5 meaningful lines
       let summaryText: string;
@@ -472,6 +484,53 @@ export function buildAdrPromptSection(
   }
 
   return sections.join('\n\n---\n\n');
+}
+
+/** Max chars of the WP-20 distilled "Active constraint" head line. */
+const ACTIVE_CONSTRAINT_CAP = 240;
+
+/**
+ * Distill an ADR's operative constraint into a single line (WP-20).
+ *
+ * Priority: (1) an explicit `entry.summary`, else (2) the `**Decision:**`
+ * statement (the operative core of an MADR ADR), else (3) the first meaningful
+ * non-header / non-metadata content line. Collapses whitespace to one line and
+ * caps the length so the head stays scannable. Returns '' when nothing usable is
+ * found (caller then omits the head — no stranded label).
+ *
+ * Deterministic (no Date/random) so the prompt-determinism guard stays green.
+ */
+export function distillActiveConstraint(content: string, summary?: string | null): string {
+  const cap = (s: string): string => {
+    const one = s.replace(/\s+/g, ' ').trim();
+    return one.length > ACTIVE_CONSTRAINT_CAP ? one.slice(0, ACTIVE_CONSTRAINT_CAP - 1).trimEnd() + '…' : one;
+  };
+
+  if (summary && summary.trim()) return cap(summary);
+
+  const lines = content.split('\n');
+  // 2. The Decision statement — text on the same line, else the next content line.
+  for (let i = 0; i < lines.length; i++) {
+    const m = /^\**\s*Decision\**\s*:?\s*(.*)$/i.exec(lines[i]!.trim());
+    if (!m) continue;
+    let text = m[1]!.replace(/^\**\s*/, '').trim();
+    if (!text) {
+      for (let j = i + 1; j < lines.length; j++) {
+        const nxt = lines[j]!.trim();
+        if (nxt && !nxt.startsWith('#') && !nxt.startsWith('---')) { text = nxt; break; }
+      }
+    }
+    if (text) return cap(text);
+  }
+  // 3. First meaningful content line (skip headers, rules, tables, quotes, metadata).
+  for (const raw of lines) {
+    const l = raw.trim();
+    if (!l || l.startsWith('#') || l.startsWith('---') || l.startsWith('|') || l.startsWith('>')) continue;
+    if (/^\**\s*(status|date|accepted)\b/i.test(l)) continue;
+    const s = l.replace(/^\**\s*/, '').replace(/\s*\**$/, '');
+    if (s) return cap(s);
+  }
+  return '';
 }
 
 /**
