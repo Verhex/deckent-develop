@@ -9,6 +9,7 @@
 //   Gap F: completion tracking — waitForResult() after launch (CLI's waitForRunResult
 //          primitive); result != null && selfAssessment DONE/GO_WITH_TECH_DEBT = success
 //          (mirrors run.ts:320). null = timeout = failure.
+import { writeFileSync } from 'node:fs';
 import type { ResolvedConfig } from '../../core/config-types.js';
 import type { ActionHandler } from '../../nervous/executor.js';
 import type { CapabilityRegistry } from '../../core/capability-broker.js';
@@ -16,9 +17,15 @@ import type { BacklogEntry, BacklogFile } from './backlog-types.js';
 import { loadBacklog, updateStatus } from './backlog.js';
 import type { TaskResult } from '../../core/types.js';
 import type { ExecutionPool } from './execution-pool.js';
+import { needsJitDetail, generateItemDetail } from './jit-detail.js';
+import type { LlmComplete } from './goal-planner-types.js';
 
 /** Action id the backlog-trigger sets on every entry-driven trigger. */
 export const AUTONOMOUS_EXECUTE_ACTION = 'autonomous.execute';
+
+function saveBacklogFile(path: string, bl: BacklogFile): void {
+  writeFileSync(path, JSON.stringify(bl, null, 2), 'utf-8');
+}
 
 export interface ExecuteDispatcherDeps {
   projectRoot: string;
@@ -55,6 +62,10 @@ export interface ExecuteDispatcherDeps {
    * a clear reason (backward-safe; composition root wires the real registry).
    */
   capabilityRegistry?: CapabilityRegistry;
+  /** Goal-planner Phase 2: when present, a planned task/sprint with no detail is
+   *  detailed JIT (and persisted) before it runs. Absent → planned entries run
+   *  with description = title (back-compat). */
+  jitComplete?: LlmComplete;
 }
 
 /** Determine whether a TaskResult represents success (mirrors run.ts:320). */
@@ -80,6 +91,18 @@ export function makeExecuteDispatcher(deps: ExecuteDispatcherDeps): ActionHandle
       // Gap B — mark running before any work begins (re-load so concurrent changes are seen)
       const bl0: BacklogFile = loadBacklog(deps.backlogPath);
       updateStatus(deps.backlogPath, bl0, entry.id, 'running', null);
+
+      // Phase 2: detail a planned task/sprint just-in-time, then persist so the
+      // worker prompt + audit see the full description (and a re-dispatch is stable).
+      let live = entry;
+      if (deps.jitComplete && needsJitDetail(entry)) {
+        try {
+          live = await generateItemDetail(entry, deps.jitComplete);
+          const blJit = loadBacklog(deps.backlogPath);
+          const idx = blJit.entries.findIndex((e) => e.id === entry.id);
+          if (idx >= 0) { blJit.entries[idx] = { ...blJit.entries[idx]!, spec: live.spec }; saveBacklogFile(deps.backlogPath, blJit); }
+        } catch { /* JIT failure → fall back to the title-only description below */ }
+      }
 
       try {
         let ok = false;
@@ -113,6 +136,9 @@ export function makeExecuteDispatcher(deps: ExecuteDispatcherDeps): ActionHandle
               ? `capability ${result.capability} fulfilled by handler '${result.handler}'`
               : `${result.code}: ${result.error}`;
           }
+        } else if (entry.kind === 'process') {
+          ok = false;
+          reason = 'process/workflow execution is not available yet (F3-008 Workflow Composer pending)';
         } else {
           // Task: launch worker, then wait for real completion (Gap F).
           //
@@ -123,7 +149,7 @@ export function makeExecuteDispatcher(deps: ExecuteDispatcherDeps): ActionHandle
           const r = await deps.runTask(
             {
               projectRoot: deps.projectRoot,
-              description: entry.spec.description ?? entry.title,
+              description: live.spec.description ?? live.title,
               model: entry.model,
               provider: entry.provider,
               scope: { directories: [entry.spec.scopeDir ?? '.'] },
